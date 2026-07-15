@@ -1,0 +1,638 @@
+package game
+
+import grid "../grid"
+
+MAX_CARD_DEFINITION_EFFECTS :: 4
+MAX_CARD_UPGRADE_LEVEL :: 10
+
+Card_Id :: enum {
+	Strike,
+	Arc_Bolt,
+	Piercing_Ray,
+	Cross_Slash,
+	Firebomb,
+	Guard,
+	Toxic_Wave,
+	Thorn_Coat,
+	Afterimage,
+	Counter_Rune,
+	Count,
+}
+
+Card_Target_Selector :: enum {
+	Chosen_Entity,
+	Player,
+	Each_Enemy,
+	Each_Affected_Enemy,
+	Count,
+}
+
+Card_Compile_Error :: enum {
+	None,
+	Invalid_Room,
+	Invalid_Phase,
+	Invalid_Instance,
+	Unknown_Definition,
+	Invalid_Definition,
+	Invalid_Target,
+	Target_Out_Of_Range,
+	Target_Blocked,
+	No_Effects,
+	Too_Many_Effects,
+}
+
+Card_Effect_Template :: struct {
+	kind:               Effect_Kind,
+	target:             Card_Target_Selector,
+	base_amount:        i32,
+	amount_per_upgrade: i32,
+	status:             Status_Kind,
+	duration:           i32,
+	reaction:           Reaction_Id,
+	charges:            i32,
+	priority_modifier:  i32,
+}
+
+Card_Definition :: struct {
+	id:           Card_Id,
+	name:         string,
+	cost:         i32,
+	targeting:    Targeting_Spec,
+	effects:      [MAX_CARD_DEFINITION_EFFECTS]Card_Effect_Template,
+	effect_count: int,
+}
+
+Card_Instance :: struct {
+	id:             u32,
+	definition_id:  Card_Id,
+	upgrade_level:  i32,
+}
+
+CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
+	{
+		id = .Strike,
+		name = "Strike",
+		cost = 1,
+		targeting = {
+			rule = .Opponent,
+			cast_range = {.Manhattan, 1, 1},
+			shape = .Single,
+		},
+		effects = {
+			{
+				kind = .Damage,
+				target = .Chosen_Entity,
+				base_amount = 2,
+				amount_per_upgrade = 1,
+			},
+			{},
+			{},
+			{},
+		},
+		effect_count = 1,
+	},
+	{
+		id = .Arc_Bolt,
+		name = "Arc Bolt",
+		cost = 2,
+		targeting = {
+			rule = .Opponent,
+			cast_range = {.Manhattan, 1, 3},
+			shape = .Single,
+			requires_line_of_sight = true,
+			stops_on_wall = true,
+		},
+		effects = {
+			{
+				kind = .Damage,
+				target = .Chosen_Entity,
+				base_amount = 3,
+				amount_per_upgrade = 1,
+			},
+			{},
+			{},
+			{},
+		},
+		effect_count = 1,
+	},
+	{
+		id = .Piercing_Ray,
+		name = "Piercing Ray",
+		cost = 2,
+		targeting = {
+			rule = .Walkable_Cell,
+			cast_range = {.Chebyshev, 1, 5},
+			shape = .Line,
+			requires_line_of_sight = true,
+			stops_on_wall = true,
+		},
+		effects = {
+			{
+				kind = .Damage,
+				target = .Each_Affected_Enemy,
+				base_amount = 2,
+				amount_per_upgrade = 1,
+			},
+			{},
+			{},
+			{},
+		},
+		effect_count = 1,
+	},
+	{
+		id = .Cross_Slash,
+		name = "Cross Slash",
+		cost = 2,
+		targeting = {
+			rule = .Walkable_Cell,
+			cast_range = {.Manhattan, 1, 3},
+			shape = .Cross,
+			radius = 1,
+			requires_line_of_sight = true,
+			stops_on_wall = true,
+		},
+		effects = {
+			{
+				kind = .Damage,
+				target = .Each_Affected_Enemy,
+				base_amount = 2,
+				amount_per_upgrade = 1,
+			},
+			{},
+			{},
+			{},
+		},
+		effect_count = 1,
+	},
+	{
+		id = .Firebomb,
+		name = "Firebomb",
+		cost = 2,
+		targeting = {
+			rule = .Walkable_Cell,
+			cast_range = {.Chebyshev, 1, 3},
+			shape = .Square,
+			radius = 1,
+			requires_line_of_sight = true,
+			stops_on_wall = true,
+		},
+		effects = {
+			{
+				kind = .Damage,
+				target = .Each_Affected_Enemy,
+				base_amount = 2,
+				amount_per_upgrade = 1,
+			},
+			{},
+			{},
+			{},
+		},
+		effect_count = 1,
+	},
+	{
+		id = .Guard,
+		name = "Guard",
+		cost = 1,
+		targeting = {rule = .Self},
+		effects = {
+			{
+				kind = .Apply_Status,
+				target = .Player,
+				base_amount = 3,
+				amount_per_upgrade = 1,
+				status = .Shield,
+				duration = 3,
+			},
+			{},
+			{},
+			{},
+		},
+		effect_count = 1,
+	},
+	{
+		id = .Toxic_Wave,
+		name = "Toxic Wave",
+		cost = 2,
+		targeting = {rule = .None},
+		effects = {
+			{
+				kind = .Apply_Status,
+				target = .Each_Enemy,
+				base_amount = 1,
+				amount_per_upgrade = 1,
+				status = .Poison,
+				duration = 3,
+			},
+			{},
+			{},
+			{},
+		},
+		effect_count = 1,
+	},
+	{
+		id = .Thorn_Coat,
+		name = "Thorn Coat",
+		cost = 1,
+		targeting = {rule = .Self},
+		effects = {
+			{
+				kind = .Apply_Status,
+				target = .Player,
+				base_amount = 1,
+				amount_per_upgrade = 1,
+				status = .Thorns,
+				duration = 3,
+			},
+			{},
+			{},
+			{},
+		},
+		effect_count = 1,
+	},
+	{
+		id = .Afterimage,
+		name = "Afterimage",
+		cost = 1,
+		targeting = {rule = .Self},
+		effects = {
+			{
+				kind = .Apply_Status,
+				target = .Player,
+				base_amount = 1,
+				amount_per_upgrade = 1,
+				status = .Afterimage,
+				duration = 4,
+			},
+			{},
+			{},
+			{},
+		},
+		effect_count = 1,
+	},
+	{
+		id = .Counter_Rune,
+		name = "Counter Rune",
+		cost = 1,
+		targeting = {rule = .Self},
+		effects = {
+			{
+				kind = .Add_Reaction_Binding,
+				target = .Player,
+				base_amount = 2,
+				amount_per_upgrade = 1,
+				duration = 4,
+				reaction = .Thorns_Counter,
+				charges = 2,
+			},
+			{},
+			{},
+			{},
+		},
+		effect_count = 1,
+	},
+}
+
+card_drop_target :: proc(
+	room: ^Room,
+	definition: Card_Definition,
+	position: grid.Position,
+) -> (Target, bool) {
+	validated_definition := definition
+	if room == nil || room.player == nil || room.level_data == nil ||
+	   !validate_card_definition(&validated_definition) {
+		return {}, false
+	}
+	request := Target_Request{}
+	if definition.targeting.shape != .None {
+		request = {anchor = position, has_anchor = true}
+	}
+	query := evaluate_target_query(room, PLAYER_ENTITY, definition.targeting, request)
+	return query.primary_target, query.error == .None && query.has_primary_target
+}
+
+card_target_rule_selects_effect_entity :: proc(rule: Target_Rule) -> bool {
+	switch rule {
+	case .Self, .Player, .Opponent, .Adjacent_Opponent:
+		return true
+	case .Any, .None, .Entity, .Cell, .Walkable_Cell:
+		return false
+	}
+	return false
+}
+
+card_amount_template_is_valid :: proc(template: Card_Effect_Template) -> bool {
+	if template.base_amount <= 0 || template.amount_per_upgrade < 0 {
+		return false
+	}
+	maximum := i64(template.base_amount)+i64(template.amount_per_upgrade)*i64(MAX_CARD_UPGRADE_LEVEL)
+	return maximum <= i64(max(i32))
+}
+
+card_effect_template_is_valid :: proc(
+	definition: ^Card_Definition,
+	template: Card_Effect_Template,
+) -> bool {
+	if definition == nil || int(template.target) < 0 || int(template.target) >= int(Card_Target_Selector.Count) ||
+	   (template.target == .Chosen_Entity && !card_target_rule_selects_effect_entity(definition.targeting.rule)) ||
+	   (template.target == .Each_Affected_Enemy && definition.targeting.shape == .None) {
+		return false
+	}
+
+	switch template.kind {
+	case .Move:
+		return false
+	case .Remove_Status:
+		return status_kind_is_valid(template.status)
+	case .Damage, .Heal:
+		return card_amount_template_is_valid(template)
+	case .Gain_Gold:
+		return template.target == .Player && card_amount_template_is_valid(template)
+	case .Apply_Status:
+		return status_kind_is_valid(template.status) && template.duration > 0 &&
+		       card_amount_template_is_valid(template)
+	case .Add_Reaction_Binding:
+		if template.charges != REACTION_BINDING_UNLIMITED && template.charges <= 0 {
+			return false
+		}
+		if template.duration != REACTION_BINDING_UNLIMITED && template.duration <= 0 {
+			return false
+		}
+		reaction, found := reaction_definition_by_id(template.reaction)
+		return found && validate_reaction_definition(&reaction) && card_amount_template_is_valid(template)
+	}
+	return false
+}
+
+validate_card_definition :: proc(definition: ^Card_Definition) -> bool {
+	if definition == nil || int(definition.id) < 0 || int(definition.id) >= int(Card_Id.Count) ||
+	   len(definition.name) == 0 || definition.cost < 0 ||
+	   !targeting_spec_is_valid(definition.targeting) ||
+	   definition.effect_count <= 0 || definition.effect_count > MAX_CARD_DEFINITION_EFFECTS {
+		return false
+	}
+	for index in 0..<definition.effect_count {
+		if !card_effect_template_is_valid(definition, definition.effects[index]) {
+			return false
+		}
+	}
+	return true
+}
+
+validate_card_definitions :: proc() -> bool {
+	definitions := CARD_DEFINITIONS
+	for &definition, index in definitions {
+		if int(definition.id) != index || !validate_card_definition(&definition) {
+			return false
+		}
+	}
+	return true
+}
+
+card_definition_by_id :: proc(id: Card_Id) -> (Card_Definition, bool) {
+	definitions := CARD_DEFINITIONS
+	index := int(id)
+	if index < 0 || index >= len(definitions) {
+		return {}, false
+	}
+	return definitions[index], true
+}
+
+validate_card_instance :: proc(instance: Card_Instance) -> bool {
+	if instance.id == 0 || instance.upgrade_level < 0 || instance.upgrade_level > MAX_CARD_UPGRADE_LEVEL {
+		return false
+	}
+	definition, found := card_definition_by_id(instance.definition_id)
+	return found && validate_card_definition(&definition)
+}
+
+card_effect_amount :: proc(template: Card_Effect_Template, upgrade_level: i32) -> i32 {
+	assert(upgrade_level >= 0 && upgrade_level <= MAX_CARD_UPGRADE_LEVEL)
+	amount := i64(template.base_amount)+i64(template.amount_per_upgrade)*i64(upgrade_level)
+	assert(amount > 0 && amount <= i64(max(i32)))
+	return i32(amount)
+}
+
+instantiate_card_effect :: proc(
+	template: Card_Effect_Template,
+	target: Entity_Ref,
+	instance: Card_Instance,
+) -> (Effect, bool) {
+	switch template.kind {
+	case .Damage:
+		amount := card_effect_amount(template, instance.upgrade_level)
+		return damage_effect(target, amount), true
+	case .Heal:
+		amount := card_effect_amount(template, instance.upgrade_level)
+		return heal_effect(target, amount), true
+	case .Gain_Gold:
+		amount := card_effect_amount(template, instance.upgrade_level)
+		return gain_gold_effect(amount), true
+	case .Apply_Status:
+		amount := card_effect_amount(template, instance.upgrade_level)
+		return apply_status_effect(target, template.status, amount, template.duration), true
+	case .Remove_Status:
+		return remove_status_effect(target, template.status), true
+	case .Add_Reaction_Binding:
+		amount := card_effect_amount(template, instance.upgrade_level)
+		return add_reaction_binding_effect(
+			target,
+			template.reaction,
+			amount,
+			template.charges,
+			template.duration,
+			template.priority_modifier,
+			{kind = .Card, id = instance.id},
+		), true
+	case .Move:
+		return {}, false
+	}
+	return {}, false
+}
+
+card_effect_target :: proc(selector: Card_Target_Selector, chosen: Target) -> (Entity_Ref, bool) {
+	switch selector {
+	case .Chosen_Entity:
+		return chosen.entity, chosen.kind == .Entity
+	case .Player:
+		return PLAYER_ENTITY, true
+	case .Each_Enemy, .Each_Affected_Enemy, .Count:
+		return {}, false
+	}
+	return {}, false
+}
+
+Card_Target_Evaluation :: struct {
+	query:                 Target_Query_Result,
+	error:                 Card_Compile_Error,
+	required_effect_count: int,
+}
+
+card_target_request_at :: proc(
+	definition: Card_Definition,
+	position: grid.Position,
+) -> Target_Request {
+	if definition.targeting.shape == .None {
+		return {}
+	}
+	return {anchor = position, has_anchor = true}
+}
+
+card_target_request_from_target :: proc(
+	room: ^Room,
+	definition: Card_Definition,
+	target: Target,
+) -> (Target_Request, bool) {
+	if definition.targeting.shape == .None {
+		return {}, true
+	}
+	switch target.kind {
+	case .Entity:
+		position, found := entity_position(room, target.entity)
+		return Target_Request{anchor = position, has_anchor = found}, found
+	case .Cell:
+		return Target_Request{anchor = target.cell, has_anchor = true}, true
+	case .None:
+	}
+	return {}, false
+}
+
+card_compile_error_from_query :: proc(err: Target_Query_Error) -> Card_Compile_Error {
+	switch err {
+	case .None:
+		return .None
+	case .Invalid_Room:
+		return .Invalid_Room
+	case .Invalid_Spec:
+		return .Invalid_Definition
+	case .Anchor_Out_Of_Range:
+		return .Target_Out_Of_Range
+	case .Line_Of_Sight_Blocked:
+		return .Target_Blocked
+	case .Invalid_Source, .Missing_Anchor, .Anchor_Out_Of_Bounds,
+	     .Shape_Not_Aligned, .Invalid_Primary_Target, .Capacity_Exceeded:
+		return .Invalid_Target
+	}
+	return .Invalid_Target
+}
+
+evaluate_card_targeting :: proc(
+	room: ^Room,
+	instance: Card_Instance,
+	request: Target_Request,
+) -> (evaluation: Card_Target_Evaluation) {
+	evaluation.error = .Invalid_Room
+	if room == nil || room.player == nil {
+		return
+	}
+	evaluation.error = .Invalid_Phase
+	if room.phase != .Combat {
+		return
+	}
+	evaluation.error = .Invalid_Instance
+	if instance.id == 0 || instance.upgrade_level < 0 || instance.upgrade_level > MAX_CARD_UPGRADE_LEVEL {
+		return
+	}
+	definition, found := card_definition_by_id(instance.definition_id)
+	if !found {
+		evaluation.error = .Unknown_Definition
+		return
+	}
+	evaluation.error = .Invalid_Definition
+	if !validate_card_definition(&definition) {
+		return
+	}
+	evaluation.query = evaluate_target_query(room, PLAYER_ENTITY, definition.targeting, request)
+	evaluation.error = card_compile_error_from_query(evaluation.query.error)
+	if evaluation.error != .None {
+		return
+	}
+
+	for index in 0..<definition.effect_count {
+		switch definition.effects[index].target {
+		case .Each_Enemy:
+			evaluation.required_effect_count += len(room.enemies)
+		case .Each_Affected_Enemy:
+			evaluation.required_effect_count += evaluation.query.enemy_count
+		case .Chosen_Entity, .Player:
+			evaluation.required_effect_count += 1
+		case .Count:
+		}
+	}
+	if evaluation.required_effect_count == 0 {
+		evaluation.error = .No_Effects
+		return
+	}
+	if evaluation.required_effect_count > MAX_ACTION_EFFECTS {
+		evaluation.error = .Too_Many_Effects
+		return
+	}
+	return
+}
+
+compile_card_action :: proc(
+	room: ^Room,
+	instance: Card_Instance,
+	target: Target,
+) -> (action: Action, err: Card_Compile_Error) {
+	if room == nil || room.player == nil {
+		return {}, .Invalid_Room
+	}
+	if room.phase != .Combat {
+		return {}, .Invalid_Phase
+	}
+	if instance.id == 0 || instance.upgrade_level < 0 || instance.upgrade_level > MAX_CARD_UPGRADE_LEVEL {
+		return {}, .Invalid_Instance
+	}
+	definition, found := card_definition_by_id(instance.definition_id)
+	if !found {
+		return {}, .Unknown_Definition
+	}
+	if !validate_card_definition(&definition) {
+		return {}, .Invalid_Definition
+	}
+	request, has_request := card_target_request_from_target(room, definition, target)
+	if !has_request {
+		return {}, .Invalid_Target
+	}
+	evaluation := evaluate_card_targeting(room, instance, request)
+	if evaluation.error != .None {
+		return {}, evaluation.error
+	}
+	if !evaluation.query.has_primary_target || evaluation.query.primary_target != target {
+		return {}, .Invalid_Target
+	}
+
+	action = make_action(.Card, PLAYER_ENTITY, target, definition.targeting.rule)
+	for index in 0..<definition.effect_count {
+		template := definition.effects[index]
+		if template.target == .Each_Enemy {
+			ids, count := enemy_ids_in_planning_order(room)
+			for enemy_index in 0..<count {
+				effect, instantiated := instantiate_card_effect(
+					template,
+					enemy_entity(ids[enemy_index]),
+					instance,
+				)
+				assert(instantiated && add_effect(&action, effect))
+			}
+			continue
+		}
+		if template.target == .Each_Affected_Enemy {
+			for enemy_index in 0..<evaluation.query.enemy_count {
+				effect, instantiated := instantiate_card_effect(
+					template,
+					enemy_entity(evaluation.query.enemy_ids[enemy_index]),
+					instance,
+				)
+				assert(instantiated && add_effect(&action, effect))
+			}
+			continue
+		}
+
+		effect_target, has_target := card_effect_target(template.target, target)
+		assert(has_target)
+		effect, instantiated := instantiate_card_effect(template, effect_target, instance)
+		assert(instantiated && add_effect(&action, effect))
+	}
+	return action, .None
+}

@@ -1,0 +1,19 @@
+# Configurazioni locali
+  /.agents/
+  /.codex/
+  /.claude/
+  /.vscode/
+  /.idea/
+
+  # Build Odin
+  /build/
+  *.bin
+  *.o
+  *.obj
+  *.ll
+  /odin_pp
+
+  # Segreti
+  .env
+  .env.*
+  !.env.example
