@@ -4,6 +4,12 @@ import "core:math/rand"
 
 MAX_NODE_CONNECTIONS :: 3
 
+ROOM_SEED_SALT     :: u64(0x8CB92BA72F3D8DD7)
+ROOM_SEED_ID_MIX   :: u64(0x9E3779B97F4A7C15)
+ROOM_SEED_KIND_MIX :: u64(0xD1B54A32D192ED03)
+ROOM_SEED_DEPTH_MIX :: u64(0x94D049BB133111EB)
+DEFAULT_ROOM_SEED  :: u64(0xA0761D6478BD642F)
+
 Node_Id :: distinct int
 
 INVALID_NODE_ID :: Node_Id(-1)
@@ -60,6 +66,7 @@ Run_Node :: struct {
 	id:               Node_Id,
 	kind:             Node_Kind,
 	depth:            int,
+	room_seed:        u64,
 	lane:             int,
 	lane_count:       int,
 	outgoing:         [MAX_NODE_CONNECTIONS]Node_Id,
@@ -68,7 +75,28 @@ Run_Node :: struct {
 	cleared:          bool,
 }
 
+mix_room_seed :: proc(value: u64) -> u64 {
+	result := value
+	result = (result~(result >> 30))*0xBF58476D1CE4E5B9
+	result = (result~(result >> 27))*0x94D049BB133111EB
+	return result~(result >> 31)
+}
+
+derive_node_room_seed :: proc(run_seed: u64, id: Node_Id, kind: Node_Kind, depth: int) -> u64 {
+	assert(int(id) >= 0 && depth >= 0)
+	value := run_seed~ROOM_SEED_SALT
+	value ~= u64(int(id)+1)*ROOM_SEED_ID_MIX
+	value ~= u64(int(kind)+1)*ROOM_SEED_KIND_MIX
+	value ~= u64(depth+1)*ROOM_SEED_DEPTH_MIX
+	result := mix_room_seed(value)
+	if result == 0 {
+		return DEFAULT_ROOM_SEED
+	}
+	return result
+}
+
 Run_Map :: struct {
+	seed:         u64,
 	nodes:        [dynamic]Run_Node,
 	layer_starts: [dynamic]int,
 	layer_counts: [dynamic]int,
@@ -233,6 +261,7 @@ generate_run_map :: proc(config: Run_Map_Config, seed: u64) -> (result: Run_Map,
 	result.nodes = make([dynamic]Run_Node, 0, config.layer_count*config.max_nodes_per_middle_layer)
 	result.layer_starts = make([dynamic]int, 0, config.layer_count)
 	result.layer_counts = make([dynamic]int, 0, config.layer_count)
+	result.seed = seed
 
 	random_state: rand.Xoshiro256_Random_State
 	generator := rand.xoshiro256_random_generator(&random_state)
@@ -254,6 +283,9 @@ generate_run_map :: proc(config: Run_Map_Config, seed: u64) -> (result: Run_Map,
 		}
 	}
 	append_layer(&result, config.layer_count-1, 1, .Boss)
+	for &node in result.nodes {
+		node.room_seed = derive_node_room_seed(seed, node.id, node.kind, node.depth)
+	}
 
 	for depth in 0..<config.layer_count-1 {
 		connect_layers(&result, depth, generator)
@@ -303,6 +335,8 @@ validate_run_map :: proc(run_map: ^Run_Map) -> bool {
 			index := start+lane
 			node := &run_map.nodes[index]
 			if int(node.id) != index || node.depth != depth ||
+			   node.room_seed == 0 ||
+			   node.room_seed != derive_node_room_seed(run_map.seed, node.id, node.kind, node.depth) ||
 			   node.lane != lane || node.lane_count != count ||
 			   node.outgoing_count < 0 || node.outgoing_count > MAX_NODE_CONNECTIONS {
 				return false
@@ -315,7 +349,14 @@ validate_run_map :: proc(run_map: ^Run_Map) -> bool {
 
 			for outgoing_index in 0..<node.outgoing_count {
 				target_index := int(node.outgoing[outgoing_index])
+				target_start := 0
+				target_count := 0
+				if depth+1 < len(run_map.layer_starts) {
+					target_start = run_map.layer_starts[depth+1]
+					target_count = run_map.layer_counts[depth+1]
+				}
 				if target_index < 0 || target_index >= len(run_map.nodes) ||
+				   target_index < target_start || target_index >= target_start+target_count ||
 				   run_map.nodes[target_index].depth != depth+1 {
 					return false
 				}
@@ -330,6 +371,10 @@ validate_run_map :: proc(run_map: ^Run_Map) -> bool {
 				}
 			}
 		}
+	}
+	last_layer := len(run_map.layer_starts)-1
+	if run_map.layer_starts[last_layer]+run_map.layer_counts[last_layer] != len(run_map.nodes) {
+		return false
 	}
 
 	if run_map.layer_starts[0] != 0 || run_map.layer_counts[0] != 1 ||

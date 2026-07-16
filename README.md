@@ -9,8 +9,12 @@ Documentazione del gameplay: [Action System](ACTION_SYSTEM.md),
 [Targeting System](TARGETING_SYSTEM.md), [Deck Runtime](DECK_SYSTEM.md) e
 [Card Rewards](REWARD_SYSTEM.md). Il confine fra simulazione, animazioni e input
 bufferizzato e documentato in [Presentation Timeline](PRESENTATION_TIMELINE.md).
+Le milestone sono raccolte nella [Roadmap](ROADMAP.md); il contratto della
+milestone M1 completata e in [Room Generation](ROOM_GENERATION.md).
 
 ![Anteprima della griglia isometrica](odin_pp_isometric.png)
+
+![Prima stanza procedurale deterministica](odin_pp_procedural_room.png)
 
 ![Mappa procedurale della run](odin_pp_route.png)
 
@@ -38,13 +42,15 @@ bufferizzato e documentato in [Presentation Timeline](PRESENTATION_TIMELINE.md).
 odin run src
 ```
 
-La creazione delle stanze aggiorna `Room` tramite puntatore, evitando grandi copie
-per valore che LLVM trasformerebbe in migliaia di operazioni. `-o:none` resta
+Le grandi assegnazioni per valore di `Room` restano confinate negli helper di
+installazione, evitando che LLVM le scalarizzi dentro `main`. `-o:none` resta
 disponibile per esperimenti senza ottimizzazione; `odin build src -out:odin_pp`
 produce invece un eseguibile persistente.
 
-La demo apre una finestra ridimensionabile e avvia una run di sette stanze con
-nemici, trappole, ostacoli, loot, uscite e una rotta procedurale.
+La demo apre una finestra ridimensionabile e avvia una run di sette livelli. Ogni
+nodo possiede un seed di stanza derivato dalla run: layout, nemici, trappole e
+ostacoli vengono generati in modo riproducibile per i profili `Combat`, `Elite` e
+`Boss`.
 
 Per produrre lo screenshot deterministico del targeting avanzato:
 
@@ -60,6 +66,14 @@ Per verificare la timeline con uno snapshot pre-comando e un cue carta attivo:
 ```sh
 odin run src -- --smoke-timeline
 ```
+
+Per produrre uno screenshot deterministico della prima stanza procedurale:
+
+```sh
+odin run src -- --smoke-generation
+```
+
+Il comando salva `odin_pp_procedural_room.png` dopo tre frame e chiude la demo.
 
 ## Loop attuale
 
@@ -78,7 +92,8 @@ odin run src -- --smoke-timeline
    producono piu pulse.
 6. Entrare sull'uscita verde conclude la stanza e apre `Reward` con tre carte distinte.
 7. Scegliere una carta la aggiunge al deck; `Skip` prosegue senza modificarlo.
-8. `Choose_Path` permette di scegliere uno dei due o tre nodi collegati.
+8. `Choose_Path` permette di scegliere uno dei due o tre nodi collegati; entrando
+   nel nodo viene installata la sua stanza deterministica con il profilo relativo.
 9. L'ultimo nodo e il boss. Superarlo porta a `Victory`; morire apre `Defeat`, da
    cui si puo iniziare una nuova run con `Enter` o il pulsante `Restart`.
 
@@ -124,6 +139,13 @@ odin test src/game
 odin test src/render
 ```
 
+La verifica completa, inclusi i test di integrazione del package principale, e:
+
+```sh
+odin test src -all-packages -define:ODIN_TEST_THREADS=1
+odin check src -vet -strict-style
+```
+
 ## Simboli della mappa
 
 | Simbolo | Tile |
@@ -141,18 +163,21 @@ odin test src/render
 src/
   main.odin         # demo e punto di ingresso
   app/              # finestra, canvas virtuale e presentazione
-  game/             # simulazione della stanza e stato persistente della run
+  game/             # simulazione, profili encounter e blueprint della stanza
   grid/             # container generico Grid(T)
-  level/            # semantica delle tile e costruzione dei livelli
+  level/            # tile, layout procedurale e validazione BFS
   render/           # renderer isometrico Raylib
   view/             # scaling, proiezione e camera testabili
 ```
 
 `grid` non conosce il gioco. Gestisce solo coordinate, memoria contigua e
-accesso sicuro. `level` assegna un significato alle celle e dipende da `grid`.
-`Run_State` possiede il player e il grafo della rotta. Una `Room` possiede soltanto
-le entita temporanee e prende in prestito un puntatore al player della run. Il
-renderer legge questi dati, ma non li possiede e non li cambia.
+accesso sicuro. `level` assegna un significato alle celle, genera la topologia e
+ne verifica la raggiungibilita senza conoscere nemici o tipi di nodo. `game`
+traduce il nodo in un profilo, applica l'encounter budget e costruisce un
+`Room_Blueprint`. `Run_State` possiede il player e il grafo della rotta. Una
+`Room` possiede soltanto le entita temporanee e prende in prestito puntatori al
+livello e al player della run. Il renderer legge questi dati, ma non li possiede
+e non li cambia.
 
 Input, IA, trappole e loot costruiscono `Action` composte da effetti ordinati.
 `resolve_action` valida sorgente, target ed effetti prima di modificare la stanza;
@@ -233,3 +258,22 @@ Il generatore Xoshiro usa uno stato locale inizializzato da seed. Non modifica i
 generatore casuale globale: stesso seed e stessa configurazione producono sempre
 la stessa rotta. `validate_run_map` ricontrolla tutte le invarianti prima che una
 run venga accettata.
+
+## Generazione delle stanze
+
+Ogni `Run_Node` conserva un `room_seed` non nullo derivato da seed della run, ID,
+profondita e tipo del nodo. Due stream separati alimentano layout ed encounter,
+senza consumare gli RNG della rotta, del deck o delle ricompense.
+
+`level.generate_room` sceglie spawn, uscita centrale e pareti interne entro un
+numero massimo di tentativi. `level.validate_generated_room` usa BFS per
+controllare bordo, clearance, distanza minima, percentuale calpestabile e
+connessione di tutte le celle aperte. Dopo questa validazione,
+`game.generate_room_blueprint` spende il budget del profilo in archetipi e
+colloca trappole e ostacoli senza sovrapposizioni; un ostacolo viene mantenuto
+soltanto se non disconnette lo spazio libero.
+
+La stanza viene preparata fuori dallo stato corrente. Il commit distrugge la
+vecchia `Room` prima del vecchio `Level`, trasferisce i nuovi owner e riaggancia i
+puntatori presi in prestito. Un fallimento lascia invariati run e player. Il
+contratto completo e in [Room Generation](ROOM_GENERATION.md).

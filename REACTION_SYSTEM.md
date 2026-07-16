@@ -317,17 +317,18 @@ reazioni. `Pulse_Report` aggrega gli stessi contatori per l'intero impulso.
 
 ## Estensione futura
 
-Il matching, il builder e i binding runtime sono generici. Le definizioni sono
-ancora una tabella built-in e non esiste un modello di carta. Il passo successivo
-sara creare `Card_Definition` e `Card_Instance` contenenti:
+Il matching, il builder e i binding runtime sono generici. `Card_Definition` e
+`Card_Instance` compilano gia costo, targeting ed effect template in normali
+`Action`; una carta puo inoltre installare binding tramite
+`Add_Reaction_Binding`, conservando l'ID dell'istanza come sorgente.
+
+Le definizioni di carte e reazioni restano tabelle built-in. In futuro potranno
+essere caricate dai dati di gioco senza cambiare queue, resolver o scheduler. Il
+contratto che continuano a comporre e:
 
 ```text
 costo + targeting + effect template + reaction binding template
 ```
-
-Le carte potranno installare i binding con `Add_Reaction_Binding`. In seguito la
-tabella delle definizioni potra essere caricata dai dati di gioco senza cambiare
-queue, resolver o scheduler.
 
 Gli eventi di scadenza prodotti direttamente dallo scheduler sono per ora
 registrati ma non riaperti come nuove catene reattive. Questo andra risolto prima

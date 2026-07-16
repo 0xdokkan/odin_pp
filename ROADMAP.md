@@ -1,0 +1,137 @@
+# Roadmap
+
+Questa roadmap organizza il lavoro in incrementi giocabili. Una milestone viene
+marcata come completata soltanto quando il suo comportamento e integrato nella
+demo, le invarianti sono coperte da test e la documentazione descrive il codice
+effettivamente presente.
+
+Stati usati:
+
+- `[x]` completata;
+- `[~]` in corso;
+- `[ ]` pianificata.
+
+## [x] Baseline - Vertical slice
+
+La prima vertical slice stabilisce il loop e i confini architetturali su cui
+costruire il gioco:
+
+- griglia 2D e proiezione isometrica su canvas virtuale;
+- rotta della run come DAG deterministico;
+- fasi `Combat`, `Loot`, `Reward`, `Choose_Path`, `Victory` e `Defeat`;
+- azioni atomiche, impulsi, status e reazioni FIFO;
+- intenti committed e archetipi `Chaser`, `Archer` e `Brute`;
+- deck runtime, carte, targeting spaziale, drag e ricompense;
+- loot magnetico durante e dopo il combattimento;
+- timeline di presentazione e buffer di un comando.
+
+La baseline e completata quando la demo attraversa un'intera run e la suite
+completa, lo smoke test della timeline e lo smoke test del targeting terminano
+senza errori.
+
+## [x] M1 - Stanze procedurali
+
+**Obiettivo:** sostituire layout e spawn dimostrativi con stanze riproducibili,
+valide e differenziate per nodo, mantenendo separate topologia e difficolta.
+
+Lo scope comprende:
+
+- configurazione esplicita di dimensioni, densita e distanze di sicurezza;
+- seed della stanza derivato da seed della run e identita del nodo;
+- generazione del layout senza dipendenze di `level` dal gameplay;
+- validazione della raggiungibilita con flood fill o BFS;
+- encounter director con budget distinti per `Combat`, `Elite` e `Boss`;
+- collocamento deterministico di nemici, trappole e ostacoli;
+- integrazione nella creazione e sostituzione della stanza;
+- test generativi su un insieme ampio di seed.
+
+### Definition of Done
+
+M1 e completata quando:
+
+1. gli stessi seed, nodo e configurazione producono lo stesso layout e gli stessi
+   spawn;
+2. esistono esattamente uno spawn del player e un'uscita, entrambi calpestabili;
+3. l'uscita e raggiungibile dallo spawn e le celle riservate non sono isolate;
+4. ogni entita e entro i bounds, su una cella valida e senza sovrapposizioni non
+   consentite;
+5. l'area di sicurezza del player e rispettata e nessun ostacolo blocca l'unico
+   percorso valido;
+6. profondita e tipo del nodo modificano il budget senza entrare nel package
+   `level`;
+7. almeno 4096 combinazioni deterministiche di seed e profilo superano il
+   validatore senza fallback invalido;
+8. `odin test src -all-packages -define:ODIN_TEST_THREADS=1` e
+   `odin check src -vet -strict-style` terminano con successo.
+
+Il contratto tecnico e lo stato dell'incremento sono descritti in
+[Room Generation](ROOM_GENERATION.md).
+
+## [ ] M2 - Economia del deck
+
+**Obiettivo:** rendere le carte una progressione con costi e scelte permanenti.
+
+- pool e rarita pesati per profondita e tipo di nodo;
+- upgrade e rimozione di una `Card_Instance`;
+- shop con prezzi, acquisto e gestione del deck pieno;
+- reward aggiornati senza rompere ID e RNG separati.
+
+**Definition of Done:** scelta, skip, acquisto, upgrade e rimozione sono
+transazioni atomiche e deterministiche; fallimenti e deck pieno non consumano
+oro, ID o RNG; UI e test coprono ogni transizione.
+
+## [ ] M3 - Nodi speciali
+
+**Obiettivo:** dare alla rotta decisioni diverse dal combattimento.
+
+- nodi `Shop`, `Rest`, `Event` e `Treasure`;
+- configurazioni, schermate e transizioni dedicate;
+- vincoli di distribuzione nel DAG.
+
+**Definition of Done:** ogni tipo di nodo possiede un lifecycle completo e
+testato; una run puo attraversarlo e tornare a `Choose_Path` o terminare senza
+stati bloccati; `validate_run_map` ne verifica i vincoli.
+
+## [ ] M4 - Profondita di carte e status
+
+**Obiettivo:** ampliare le decisioni del deck senza duplicare resolver o
+targeting.
+
+- `Exhaust`, `Retain`, carte temporanee e carte ethereal;
+- effetti di pesca e scarto, modificatori di costo e rigenerazione;
+- nuovi trigger di reazione e scadenza;
+- targeting a cono e ulteriori footprint condivise.
+
+**Definition of Done:** preview e compilazione producono gli stessi bersagli;
+zone e ID del deck restano validi dopo ogni combinazione; la timeline mostra le
+mutazioni nello stesso ordine della simulazione; i nuovi effetti hanno test di
+composizione e casi limite.
+
+## [ ] M5 - Encounter e boss
+
+**Obiettivo:** costruire combattimenti con cooperazione fra nemici e pressione
+spaziale crescente.
+
+- pathfinding attorno agli ostacoli;
+- intenti nemici con linee, croci e aree;
+- archetipi di supporto, evocazione e controllo;
+- elite e boss a fasi con regole esplicite.
+
+**Definition of Done:** gli intenti restano committed e deterministici, usano la
+stessa autorita geometrica delle carte e non dipendono dal renderer; simulazioni
+headless coprono morte, blocchi, spawn e cambi di fase senza deadlock o overflow.
+
+## [ ] M6 - Persistenza e game feel
+
+**Obiettivo:** rendere la vertical slice riproducibile, diagnosticabile e
+presentabile senza accoppiare feedback e simulazione.
+
+- salvataggi versionati e caricamento della run;
+- replay deterministici basati sui comandi;
+- selettore del seed e strumenti di debug;
+- gruppi espliciti di cue, audio, particelle, hit stop e screen shake controllato.
+
+**Definition of Done:** un save completa il round trip senza perdere invarianti;
+un replay ricostruisce lo stesso stato finale; migrazioni e dati corrotti falliscono
+in modo diagnosticabile; disabilitare o rallentare i feedback non cambia il
+risultato del gameplay.

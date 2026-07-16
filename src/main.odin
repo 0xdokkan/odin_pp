@@ -1,6 +1,7 @@
 package main
 
 import "core:os"
+import "core:fmt"
 import rl "vendor:raylib"
 import app "app"
 import game "game"
@@ -98,29 +99,138 @@ create_demo_room :: proc(
 	})
 }
 
-create_current_demo_room :: proc(level_data: ^level.Level, run: ^game.Run_State) -> (game.Room, bool) {
-	node, ok := game.current_run_node(run)
-	if !ok {
-		return {}, false
+Prepared_Demo_Room :: struct {
+	level_data: level.Level,
+	player:     game.Player,
+	room:       game.Room,
+}
+
+destroy_prepared_demo_room :: proc(prepared: ^Prepared_Demo_Room) {
+	if prepared == nil {
+		return
 	}
-	return create_demo_room(level_data, &run.player, node)
+	game.destroy_room(&prepared.room)
+	level.destroy(&prepared.level_data)
+	prepared^ = {}
+}
+
+prepare_demo_room :: proc(
+	prepared: ^Prepared_Demo_Room,
+	run: ^game.Run_State,
+	node: ^game.Run_Node,
+	procedural: bool,
+) -> bool {
+	if prepared == nil || run == nil || node == nil {
+		return false
+	}
+	destroy_prepared_demo_room(prepared)
+	prepared.player = run.player
+
+	if procedural {
+		blueprint, blueprint_error := game.generate_room_blueprint(node)
+		if blueprint_error != .None {
+			return false
+		}
+		defer game.destroy_room_blueprint(&blueprint)
+
+		prepared.level_data = blueprint.level_data
+		blueprint.level_data = {}
+		content := game.room_blueprint_content(&blueprint)
+		new_room, room_ok := game.create_room(&prepared.level_data, &prepared.player, content)
+		if !room_ok {
+			destroy_prepared_demo_room(prepared)
+			return false
+		}
+		prepared.room = new_room
+		return true
+	}
+
+	rows := [?]string{
+		"###############",
+		"#@............#",
+		"#.............#",
+		"#...###.......#",
+		"#......>......#",
+		"#.......###...#",
+		"#.............#",
+		"#.............#",
+		"###############",
+	}
+	static_level, parse_error, _ := level.from_ascii(rows[:])
+	if parse_error != .None {
+		return false
+	}
+	prepared.level_data = static_level
+	new_room, room_ok := create_demo_room(&prepared.level_data, &prepared.player, node)
+	if !room_ok {
+		destroy_prepared_demo_room(prepared)
+		return false
+	}
+	prepared.room = new_room
+	return true
+}
+
+install_prepared_demo_room :: proc(
+	level_data: ^level.Level,
+	run: ^game.Run_State,
+	room: ^game.Room,
+	prepared: ^Prepared_Demo_Room,
+) {
+	assert(level_data != nil && run != nil && room != nil && prepared != nil)
+	game.destroy_room(room)
+	level.destroy(level_data)
+	run.player = prepared.player
+	level_data^ = prepared.level_data
+	prepared.level_data = {}
+	prepared.room.player = &run.player
+	prepared.room.level_data = level_data
+	// Keep this large assignment out of main; LLVM otherwise scalarizes Room field by field.
+	room^ = prepared.room
+	prepared.room = {}
 }
 
 replace_current_demo_room :: proc(
 	level_data: ^level.Level,
 	run: ^game.Run_State,
 	room: ^game.Room,
+	procedural: bool,
 ) -> bool {
 	if level_data == nil || run == nil || room == nil {
 		return false
 	}
-	new_room, ok := create_current_demo_room(level_data, run)
-	if !ok {
+	node, node_ok := game.current_run_node(run)
+	if !node_ok {
 		return false
 	}
-	game.destroy_room(room)
-	// Keep this large assignment out of main; LLVM otherwise scalarizes Room field by field.
-	room^ = new_room
+	prepared: Prepared_Demo_Room
+	defer destroy_prepared_demo_room(&prepared)
+	if !prepare_demo_room(&prepared, run, node, procedural) {
+		return false
+	}
+	install_prepared_demo_room(level_data, run, room, &prepared)
+	return true
+}
+
+enter_demo_node :: proc(
+	level_data: ^level.Level,
+	run: ^game.Run_State,
+	room: ^game.Room,
+	node_id: game.Node_Id,
+	procedural: bool,
+) -> bool {
+	if level_data == nil || run == nil || room == nil || !game.can_choose_node(run, node_id) {
+		return false
+	}
+	node, node_ok := game.node_at(run, node_id)
+	if !node_ok {
+		return false
+	}
+	prepared: Prepared_Demo_Room
+	defer destroy_prepared_demo_room(&prepared)
+	if !prepare_demo_room(&prepared, run, node, procedural) || !game.choose_node(run, node_id) {
+		return false
+	}
+	install_prepared_demo_room(level_data, run, room, &prepared)
 	return true
 }
 
@@ -129,23 +239,38 @@ restart_demo_session :: proc(
 	run: ^game.Run_State,
 	room: ^game.Room,
 	seed: u64,
+	procedural: bool,
 ) -> bool {
 	if level_data == nil || run == nil || room == nil {
 		return false
 	}
-	game.destroy_room(room)
-	game.destroy_run(run)
 	new_run, run_ok := game.create_run(DEMO_PLAYER_STATS, DEMO_RUN_CONFIG, seed)
 	if !run_ok {
 		return false
 	}
-	new_room, room_ok := create_current_demo_room(level_data, &new_run)
-	if !room_ok {
-		game.destroy_run(&new_run)
+	defer game.destroy_run(&new_run)
+	node, node_ok := game.current_run_node(&new_run)
+	if !node_ok {
 		return false
 	}
+	prepared: Prepared_Demo_Room
+	defer destroy_prepared_demo_room(&prepared)
+	if !prepare_demo_room(&prepared, &new_run, node, procedural) {
+		return false
+	}
+
+	new_run.player = prepared.player
+	game.destroy_room(room)
+	level.destroy(level_data)
+	game.destroy_run(run)
 	run^ = new_run
-	room^ = new_room
+	new_run = {}
+	level_data^ = prepared.level_data
+	prepared.level_data = {}
+	prepared.room.player = &run.player
+	prepared.room.level_data = level_data
+	room^ = prepared.room
+	prepared.room = {}
 	return true
 }
 
@@ -464,19 +589,8 @@ keyboard_route_choice :: proc(run: ^game.Run_State) -> (game.Node_Id, bool) {
 }
 
 main :: proc() {
-	rows := [?]string{
-		"###############",
-		"#@............#",
-		"#.............#",
-		"#...###.......#",
-		"#......>......#",
-		"#.......###...#",
-		"#.............#",
-		"#.............#",
-		"###############",
-	}
-
 	smoke_test := false
+	smoke_generation := false
 	smoke_map := false
 	smoke_status := false
 	smoke_loot := false
@@ -488,49 +602,68 @@ main :: proc() {
 	smoke_intents := false
 	smoke_archetypes := false
 	smoke_defeat := false
+	smoke_mode_count := 0
 	for argument in os.args {
 		if argument == "--smoke" {
 			smoke_test = true
+			smoke_mode_count += 1
+		} else if argument == "--smoke-generation" {
+			smoke_test = true
+			smoke_generation = true
+			smoke_mode_count += 1
 		} else if argument == "--smoke-map" {
 			smoke_test = true
 			smoke_map = true
+			smoke_mode_count += 1
 		} else if argument == "--smoke-status" {
 			smoke_test = true
 			smoke_status = true
+			smoke_mode_count += 1
 		} else if argument == "--smoke-loot" {
 			smoke_test = true
 			smoke_loot = true
+			smoke_mode_count += 1
 		} else if argument == "--smoke-card" {
 			smoke_test = true
 			smoke_card = true
+			smoke_mode_count += 1
 		} else if argument == "--smoke-targeting" {
 			smoke_test = true
 			smoke_targeting = true
+			smoke_mode_count += 1
 		} else if argument == "--smoke-movement" {
 			smoke_test = true
 			smoke_movement = true
+			smoke_mode_count += 1
 		} else if argument == "--smoke-timeline" {
 			smoke_test = true
 			smoke_timeline = true
+			smoke_mode_count += 1
 		} else if argument == "--smoke-reward" {
 			smoke_test = true
 			smoke_reward = true
+			smoke_mode_count += 1
 		} else if argument == "--smoke-intents" {
 			smoke_test = true
 			smoke_intents = true
+			smoke_mode_count += 1
 		} else if argument == "--smoke-archetypes" {
 			smoke_test = true
 			smoke_archetypes = true
+			smoke_mode_count += 1
 		} else if argument == "--smoke-defeat" {
 			smoke_test = true
 			smoke_defeat = true
+			smoke_mode_count += 1
 		}
 	}
-
-	level_data, parse_error, _ := level.from_ascii(rows[:])
-	if parse_error != .None {
-		return
+	if smoke_mode_count > 1 {
+		fmt.eprintln("choose exactly one --smoke* mode")
+		os.exit(2)
 	}
+	procedural_rooms := !smoke_test || smoke_generation
+
+	level_data: level.Level
 	defer level.destroy(&level_data)
 
 	run_seed: u64 = 0xC0FFEE
@@ -540,7 +673,7 @@ main :: proc() {
 	}
 	defer game.destroy_run(&run_state)
 	room: game.Room
-	if !replace_current_demo_room(&level_data, &run_state, &room) {
+	if !replace_current_demo_room(&level_data, &run_state, &room, procedural_rooms) {
 		return
 	}
 	defer game.destroy_room(&room)
@@ -678,7 +811,13 @@ main :: proc() {
 			(defeat_restart_hovered && rl.IsMouseButtonPressed(.LEFT))
 		if restart_requested {
 			run_seed += 1
-			restarted := restart_demo_session(&level_data, &run_state, &room, run_seed)
+			restarted := restart_demo_session(
+				&level_data,
+				&run_state,
+				&room,
+				run_seed,
+				procedural_rooms,
+			)
 			assert(restarted)
 			show_route_map = false
 			clear_card_interaction(&card_interaction)
@@ -777,15 +916,20 @@ main :: proc() {
 					selected_node = hovered_node
 					selected = true
 				}
-				if selected && game.choose_node(&run_state, selected_node) {
-					replaced := replace_current_demo_room(&level_data, &run_state, &room)
-					assert(replaced)
+				if selected && enter_demo_node(
+					&level_data,
+					&run_state,
+					&room,
+					selected_node,
+					procedural_rooms,
+				) {
 					show_route_map = false
 					route_visible = false
 					clear_card_interaction(&card_interaction)
 					clear_gameplay_command_buffer(&gameplay_buffer)
 					reward_hovered_index = -1
 					reward_skip_hovered = false
+					render.frame_level(&iso_renderer, &level_data)
 					render.clear_event_animations(&iso_renderer)
 				}
 			}
@@ -928,7 +1072,9 @@ main :: proc() {
 		if smoke_test {
 			smoke_frame_count += 1
 			if smoke_frame_count >= 3 {
-				if smoke_map {
+				if smoke_generation {
+					rl.TakeScreenshot("odin_pp_procedural_room.png")
+				} else if smoke_map {
 					rl.TakeScreenshot("odin_pp_route.png")
 				} else if smoke_status {
 					rl.TakeScreenshot("odin_pp_status.png")
