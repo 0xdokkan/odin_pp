@@ -19,6 +19,8 @@ Pulse_Report :: struct {
 	reaction_bindings_added:   int,
 	combat_ended:      bool,
 	player_defeated:   bool,
+	energy_restored:   i32,
+	energy_wasted:     i32,
 	events:            Event_Log,
 }
 
@@ -133,7 +135,9 @@ advance_combat_pulse :: proc(room: ^Room) -> (pulse: Pulse_Report) {
 	pulse.combat_ended = pulse.combat_ended || room.phase == .Loot
 	pulse.player_defeated = pulse.player_defeated || room.phase == .Defeat
 	if room.phase == .Combat {
-		restore_deck_energy_after_pulse(&room.player.deck)
+		regen := room.player.deck.rules.energy_regen_per_pulse
+		pulse.energy_restored = restore_deck_energy_after_pulse(&room.player.deck)
+		pulse.energy_wasted = max(0, regen-pulse.energy_restored)
 	}
 	room.pulse_count += 1
 	if room.phase == .Combat {
@@ -147,6 +151,8 @@ advance_combat_pulse :: proc(room: ^Room) -> (pulse: Pulse_Report) {
 		target = PLAYER_ENTITY,
 		pulse_count = room.pulse_count,
 		energy = room.player.deck.energy,
+		energy_restored = pulse.energy_restored,
+		energy_wasted = pulse.energy_wasted,
 		statuses_advanced = statuses_advanced,
 	})
 	return

@@ -192,8 +192,8 @@ coordinate e, quando pertinente, identita, definizione, upgrade, lifetime e zone
 della carta. Per `Card_Created`, `.Count` indica esplicitamente l'assenza di una
 zona di origine. `Card_Refocused` registra anche `Hand -> Hand` per una carta
 retained, rendendo osservabile la policy senza inventare uno spostamento.
-`Pulse_Advanced` aggiunge contatore, energia finale e informazione
-sui tick. Il renderer usa la sequenza per riprodurre le cause; lo snapshot finale
+`Pulse_Advanced` aggiunge contatore, energia finale, energia realmente recuperata,
+energia sprecata al cap e informazione sui tick. Il renderer usa la sequenza per riprodurre le cause; lo snapshot finale
 sincronizza soltanto i valori assoluti non emessi singolarmente.
 
 Se il log e pieno, gli eventi successivi non vengono allocati: `dropped_count`

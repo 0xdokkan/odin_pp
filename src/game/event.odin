@@ -52,6 +52,8 @@ Game_Event :: struct {
 	binding_source:   Reaction_Binding_Source,
 	pulse_count:      u64,
 	energy:           i32,
+	energy_restored:  i32,
+	energy_wasted:    i32,
 	statuses_advanced: bool,
 }
 

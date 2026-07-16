@@ -12,7 +12,8 @@ Documentazione del gameplay: [Action System](ACTION_SYSTEM.md),
 [Deck Economy](DECK_ECONOMY.md); distribuzione e lifecycle di Shop, Rest, Event e
 Treasure in [Special Nodes](SPECIAL_NODES.md). Il confine fra simulazione,
 animazioni e input bufferizzato e documentato in
-[Presentation Timeline](PRESENTATION_TIMELINE.md). Le milestone sono raccolte
+[Presentation Timeline](PRESENTATION_TIMELINE.md); observer e scenari headless
+sono descritti in [Combat Telemetry](COMBAT_TELEMETRY.md). Le milestone sono raccolte
 nella [Roadmap](ROADMAP.md); i contratti di M1, M2 e M3 sono in
 [Room Generation](ROOM_GENERATION.md), [Deck Economy](DECK_ECONOMY.md) e
 [Special Nodes](SPECIAL_NODES.md).
@@ -216,6 +217,7 @@ odin test src/grid
 odin test src/level
 odin test src/view
 odin test src/game
+odin test src/combatdebug
 odin test src/render
 ```
 
