@@ -532,6 +532,7 @@ generate_room_blueprint :: proc(node: ^Run_Node) -> (result: Room_Blueprint, err
 			health = health,
 			attack = attack,
 			archetype = archetype,
+			drops_healing = enemy_spawn_drops_healing(archetype_index),
 		})
 		spawn_index += 1
 	}

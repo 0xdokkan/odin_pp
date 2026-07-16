@@ -80,6 +80,7 @@ test_buffer_accepts_every_executable_gameplay_command_kind :: proc(t: ^testing.T
 		{kind = .Wait, origin_phase = .Combat},
 		{kind = .Ability, origin_phase = .Combat, ability = .Afterimage},
 		{kind = .Play_Card, origin_phase = .Combat, card_id = 5},
+		{kind = .Refocus, origin_phase = .Combat},
 	}
 
 	for expected in commands {
@@ -99,6 +100,7 @@ test_gameplay_command_rejects_kinds_outside_their_origin_phase :: proc(t: ^testi
 		direction = .North,
 	}))
 	testing.expect(t, !gameplay_command_is_valid({kind = .Wait, origin_phase = .Loot}))
+	testing.expect(t, !gameplay_command_is_valid({kind = .Refocus, origin_phase = .Loot}))
 	testing.expect(t, !gameplay_command_is_valid({
 		kind = .Play_Card,
 		origin_phase = .Complete,

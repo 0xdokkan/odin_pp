@@ -76,6 +76,7 @@ create_demo_room :: proc(
 			health = health,
 			attack = attack,
 			archetype = archetype,
+			drops_healing = game.enemy_spawn_drops_healing(index),
 		}
 	}
 
@@ -422,6 +423,12 @@ poll_gameplay_command :: proc(
 		return
 	}
 
+	if key_pressed(.F) ||
+	   (spatial_interaction_enabled && mouse_inside && rl.IsMouseButtonPressed(.LEFT) &&
+	    render.refocus_button_at_point(renderer, mouse_canvas)) {
+		return Gameplay_Command{kind = .Refocus, origin_phase = .Combat}, true
+	}
+
 	requested_slot := pressed_hand_slot()
 	if spatial_interaction_enabled && mouse_inside && rl.IsMouseButtonPressed(.LEFT) &&
 	   card_interaction.hovered_card_id != 0 {
@@ -484,8 +491,8 @@ poll_gameplay_command :: proc(
 }
 
 Gameplay_Command_Execution :: struct {
-	committed:     bool,
-	card_committed: bool,
+	committed:              bool,
+	clears_card_interaction: bool,
 }
 
 execute_gameplay_command :: proc(room: ^game.Room, command: Gameplay_Command) -> (
@@ -510,7 +517,11 @@ execute_gameplay_command :: proc(room: ^game.Room, command: Gameplay_Command) ->
 	case .Play_Card:
 		play := game.play_card(room, command.card_id, command.target)
 		execution.committed = game.card_play_was_committed(play.result)
-		execution.card_committed = execution.committed
+		execution.clears_card_interaction = execution.committed
+	case .Refocus:
+		refocus := game.refocus_player_hand(room)
+		execution.committed = game.refocus_was_committed(refocus.result)
+		execution.clears_card_interaction = execution.committed
 	}
 	return
 }
@@ -531,7 +542,7 @@ commit_gameplay_command :: proc(
 		return false
 	}
 	after := render.capture_room_presentation(room)
-	if execution.card_committed || room.phase != .Combat {
+	if execution.clears_card_interaction || room.phase != .Combat {
 		clear_card_interaction(card_interaction)
 	}
 	render.begin_renderer_event_timeline(renderer, before, &room.recent_events, &after)
@@ -638,6 +649,8 @@ main :: proc() {
 	smoke_targeting := false
 	smoke_movement := false
 	smoke_timeline := false
+	smoke_deck_flow := false
+	smoke_refocus := false
 	smoke_reward := false
 	smoke_shop := false
 	smoke_rest := false
@@ -683,6 +696,14 @@ main :: proc() {
 		} else if argument == "--smoke-timeline" {
 			smoke_test = true
 			smoke_timeline = true
+			smoke_mode_count += 1
+		} else if argument == "--smoke-deck-flow" {
+			smoke_test = true
+			smoke_deck_flow = true
+			smoke_mode_count += 1
+		} else if argument == "--smoke-refocus" {
+			smoke_test = true
+			smoke_refocus = true
 			smoke_mode_count += 1
 		} else if argument == "--smoke-reward" {
 			smoke_test = true
@@ -902,6 +923,47 @@ main :: proc() {
 		)
 		cue, active := render.active_presentation_cue(&iso_renderer.timeline)
 		assert(active && cue.kind == .Card_Played)
+	} else if smoke_deck_flow {
+		forge, created := game.create_temporary_card(&room.player.deck, .Spark_Forge)
+		assert(created)
+		before := render.capture_room_presentation(&room)
+		play := game.play_card(&room, forge.id, game.entity_target(game.PLAYER_ENTITY))
+		assert(game.card_play_was_committed(play.result))
+		after := render.capture_room_presentation(&room)
+		assert(render.begin_renderer_event_timeline(
+			&iso_renderer,
+			before,
+			&room.recent_events,
+			&after,
+		))
+		render.update_renderer_event_timeline(
+			&iso_renderer,
+			render.PRESENTATION_CARD_PLAY_DURATION+
+				render.PRESENTATION_CARD_CREATE_DURATION+
+				render.PRESENTATION_CARD_MOVE_DURATION*0.45,
+		)
+		cue, active := render.active_presentation_cue(&iso_renderer.timeline)
+		assert(active && cue.kind == .Card_Moved && cue.event.to_card_zone == .Exhaust)
+	} else if smoke_refocus {
+		_, counter_created := game.create_temporary_card(&room.player.deck, .Counter_Rune)
+		_, focus_created := game.create_temporary_card(&room.player.deck, .Battle_Focus)
+		assert(counter_created && focus_created)
+		before := render.capture_room_presentation(&room)
+		refocus := game.refocus_player_hand(&room)
+		assert(game.refocus_was_committed(refocus.result))
+		after := render.capture_room_presentation(&room)
+		assert(render.begin_renderer_event_timeline(
+			&iso_renderer,
+			before,
+			&room.recent_events,
+			&after,
+		))
+		render.update_renderer_event_timeline(
+			&iso_renderer,
+			render.PRESENTATION_REFOCUS_DURATION*0.45,
+		)
+		cue, active := render.active_presentation_cue(&iso_renderer.timeline)
+		assert(active && cue.kind == .Refocus)
 	} else if smoke_movement {
 		before := render.capture_room_presentation(&room)
 		result := game.wait_player_turn(&room)
@@ -1525,6 +1587,10 @@ main :: proc() {
 					rl.TakeScreenshot("odin_pp_enemy_movement.png")
 				} else if smoke_timeline {
 					rl.TakeScreenshot("odin_pp_timeline.png")
+				} else if smoke_deck_flow {
+					rl.TakeScreenshot("odin_pp_deck_flow.png")
+				} else if smoke_refocus {
+					rl.TakeScreenshot("odin_pp_refocus.png")
 				} else if smoke_reward {
 					rl.TakeScreenshot("odin_pp_reward.png")
 				} else if smoke_shop {

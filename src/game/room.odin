@@ -77,14 +77,15 @@ enemy_archetype_name :: proc(archetype: Enemy_Archetype) -> string {
 }
 
 Enemy :: struct {
-	id:         u32,
-	archetype:  Enemy_Archetype,
-	position:   grid.Position,
-	max_health: i32,
-	health:     i32,
-	attack:     i32,
-	statuses:   Status_Set,
-	intent:     Enemy_Intent,
+	id:            u32,
+	archetype:     Enemy_Archetype,
+	position:      grid.Position,
+	max_health:    i32,
+	health:        i32,
+	attack:        i32,
+	drops_healing: bool,
+	statuses:      Status_Set,
+	intent:        Enemy_Intent,
 }
 
 Trap :: struct {
@@ -110,10 +111,21 @@ Loot :: struct {
 }
 
 Enemy_Spawn :: struct {
-	position: grid.Position,
-	health:   i32,
-	attack:   i32,
-	archetype: Enemy_Archetype,
+	position:      grid.Position,
+	health:        i32,
+	attack:        i32,
+	archetype:     Enemy_Archetype,
+	drops_healing: bool,
+}
+
+HEALING_DROP_SPAWN_INTERVAL :: 3
+
+// Il drop di cura e una decisione del contenuto dell'encounter, non di
+// kill_enemy: i produttori di spawn marcano un nemico ogni
+// HEALING_DROP_SPAWN_INTERVAL, cosi un director futuro puo cambiare la regola
+// senza toccare la simulazione.
+enemy_spawn_drops_healing :: proc(spawn_index: int) -> bool {
+	return spawn_index%HEALING_DROP_SPAWN_INTERVAL == HEALING_DROP_SPAWN_INTERVAL-1
 }
 
 Trap_Spawn :: struct {
@@ -321,6 +333,7 @@ create_room :: proc(level_data: ^level.Level, player: ^Player, content: Room_Con
 			max_health = spawn.health,
 			health = spawn.health,
 			attack = spawn.attack,
+			drops_healing = spawn.drops_healing,
 		})
 		result.next_enemy_id += 1
 	}
@@ -344,17 +357,19 @@ create_room :: proc(level_data: ^level.Level, player: ^Player, content: Room_Con
 		result.next_trap_id += 1
 	}
 
-	player.position = spawn_position
-	clear_statuses(&player.statuses)
 	result.phase = .Combat if len(result.enemies) > 0 else .Loot
 	if result.phase == .Combat {
 		if !begin_deck_combat(&player.deck) {
 			destroy_room(&result)
 			return {}, false
 		}
-		plan_enemy_intents(&result)
 	} else {
 		finish_deck_combat(&player.deck)
+	}
+	player.position = spawn_position
+	clear_statuses(&player.statuses)
+	if result.phase == .Combat {
+		plan_enemy_intents(&result)
 	}
 	return result, true
 }
@@ -435,6 +450,50 @@ collect_loot_in_magnet_range :: proc(room: ^Room) -> (collected: int) {
 	return
 }
 
+Player_Command_Outcome :: enum {
+	Combat_Continues,
+	Combat_Ended,
+	Player_Defeated,
+}
+
+player_command_outcome_for_phase :: proc(phase: Room_Phase) -> Player_Command_Outcome {
+	switch phase {
+	case .Combat:
+		return .Combat_Continues
+	case .Loot, .Complete:
+		return .Combat_Ended
+	case .Defeat:
+		return .Player_Defeated
+	}
+	return .Combat_Continues
+}
+
+// Epilogo condiviso di ogni comando player accettato durante Combat: loot
+// magnetico, un solo pulse nemico, di nuovo loot, poi sync del deck quando il
+// fight finisce. Il pulse viene saltato se il comando stesso ha gia chiuso il
+// combattimento; l'ordine delle chiamate e un contratto osservato dai test e
+// dalla presentation timeline.
+finish_player_combat_command :: proc(room: ^Room) -> (
+	pulse: Pulse_Report,
+	outcome: Player_Command_Outcome,
+) {
+	assert(room != nil && room.player != nil)
+	collect_loot_in_magnet_range(room)
+	outcome = player_command_outcome_for_phase(room.phase)
+	if outcome != .Combat_Continues {
+		sync_deck_with_room_phase(room)
+		return
+	}
+	pulse = advance_combat_pulse(room)
+	append_event_log(&room.recent_events, &pulse.events)
+	collect_loot_in_magnet_range(room)
+	outcome = player_command_outcome_for_phase(room.phase)
+	if outcome != .Combat_Continues {
+		sync_deck_with_room_phase(room)
+	}
+	return
+}
+
 kill_enemy :: proc(room: ^Room, enemy_index: int) -> (drops: [2]Loot, drop_count: int) {
 	assert(room != nil)
 	enemy := room.enemies[enemy_index]
@@ -444,7 +503,7 @@ kill_enemy :: proc(room: ^Room, enemy_index: int) -> (drops: [2]Loot, drop_count
 	drops[drop_count] = {position = position, kind = .Gold, amount = 1}
 	append(&room.loot, drops[drop_count])
 	drop_count += 1
-	if enemy.id%3 == 0 {
+	if enemy.drops_healing {
 		drops[drop_count] = {position = position, kind = .Healing, amount = 2}
 		append(&room.loot, drops[drop_count])
 		drop_count += 1
@@ -486,21 +545,13 @@ try_move_player :: proc(room: ^Room, direction: Move_Direction) -> Action_Result
 			report := resolve_action(room, &action)
 			assert(report.accepted)
 			append_event_log(&room.recent_events, &report.events)
-			collect_loot_in_magnet_range(room)
-			if report.combat_ended {
-				sync_deck_with_room_phase(room)
-				return .Combat_Ended
-			}
-			pulse := advance_combat_pulse(room)
-			append_event_log(&room.recent_events, &pulse.events)
-			collect_loot_in_magnet_range(room)
-			if room.phase == .Defeat {
-				sync_deck_with_room_phase(room)
+			_, outcome := finish_player_combat_command(room)
+			switch outcome {
+			case .Player_Defeated:
 				return .Player_Defeated
-			}
-			if room.phase == .Loot {
-				sync_deck_with_room_phase(room)
+			case .Combat_Ended:
 				return .Combat_Ended
+			case .Combat_Continues:
 			}
 			return .Attacked
 		}
@@ -520,10 +571,6 @@ try_move_player :: proc(room: ^Room, direction: Move_Direction) -> Action_Result
 	append_event_log(&room.recent_events, &report.events)
 	collect_loot_in_magnet_range(room)
 	trigger_trap(room)
-	if room.phase == .Defeat {
-		sync_deck_with_room_phase(room)
-		return .Player_Defeated
-	}
 
 	if room.phase == .Loot {
 		collect_loot_in_magnet_range(room)
@@ -535,16 +582,13 @@ try_move_player :: proc(room: ^Room, direction: Move_Direction) -> Action_Result
 		return .Moved
 	}
 
-	pulse := advance_combat_pulse(room)
-	append_event_log(&room.recent_events, &pulse.events)
-	collect_loot_in_magnet_range(room)
-	if room.phase == .Defeat {
-		sync_deck_with_room_phase(room)
+	_, outcome := finish_player_combat_command(room)
+	switch outcome {
+	case .Player_Defeated:
 		return .Player_Defeated
-	}
-	if room.phase == .Loot {
-		sync_deck_with_room_phase(room)
+	case .Combat_Ended:
 		return .Combat_Ended
+	case .Combat_Continues:
 	}
 	return .Moved
 }
@@ -558,17 +602,13 @@ wait_player_turn :: proc(room: ^Room) -> Action_Result {
 	report := resolve_action(room, &action)
 	if !report.accepted do return .Invalid_Phase
 	append_event_log(&room.recent_events, &report.events)
-	collect_loot_in_magnet_range(room)
-	pulse := advance_combat_pulse(room)
-	append_event_log(&room.recent_events, &pulse.events)
-	collect_loot_in_magnet_range(room)
-	if room.phase == .Defeat {
-		sync_deck_with_room_phase(room)
+	_, outcome := finish_player_combat_command(room)
+	switch outcome {
+	case .Player_Defeated:
 		return .Player_Defeated
-	}
-	if room.phase == .Loot {
-		sync_deck_with_room_phase(room)
+	case .Combat_Ended:
 		return .Combat_Ended
+	case .Combat_Continues:
 	}
 	return .None
 }

@@ -5,7 +5,9 @@ di giocata. Le definizioni e la compilazione degli effetti sono in
 [Card System](CARD_SYSTEM.md); cast range e footprint in
 [Targeting System](TARGETING_SYSTEM.md); la risoluzione e in
 [Action System](ACTION_SYSTEM.md); rarita, upgrade, rimozione e shop in
-[Deck Economy](DECK_ECONOMY.md).
+[Deck Economy](DECK_ECONOMY.md). Lifetime, exhaust e resolving sono approfonditi
+in [Card Lifecycle](CARD_LIFECYCLE.md); Refocus, Retain ed Ethereal in
+[Hand Cycle](HAND_CYCLE.md).
 
 ## Indice
 
@@ -33,10 +35,13 @@ owned          tutte le Card_Instance permanenti della run
 draw_pile      carte non ancora pescate nel ciclo corrente
 hand           carte attualmente giocabili
 discard_pile   carte giocate in attesa del reshuffle
+exhaust_pile   carte escluse fino alla fine del fight
+resolving      al massimo una carta, mentre applica i propri effetti
 ```
 
-`owned` e la sorgente persistente. Le altre tre zone sono copie temporanee delle
-stesse istanze e vengono ricostruite all'inizio di ogni combattimento.
+`owned` e la sorgente persistente. Le zone runtime contengono tutte le permanenti
+e fino a 16 istanze con lifetime `Combat`, create durante il fight. Le temporanee
+non entrano mai in `owned`.
 
 ## Storage fisso
 
@@ -44,20 +49,23 @@ stesse istanze e vengono ricostruite all'inizio di ogni combattimento.
 Deck_State :: struct {
 	owned:         [32]Card_Instance,
 	owned_count:   int,
-	draw_pile:     [32]Card_Instance,
+		draw_pile:     [48]Card_Instance,
 	draw_count:    int,
 	hand:          [8]Card_Instance,
 	hand_count:    int,
-	discard_pile:  [32]Card_Instance,
-	discard_count: int,
-	energy:        i32,
-	// regole, prossimo ID, RNG e lifecycle
+		discard_pile:  [48]Card_Instance,
+		discard_count: int,
+		exhaust_pile:  [48]Card_Instance,
+		exhaust_count: int,
+		resolving_card: Card_Instance,
+		has_resolving_card: bool,
+		energy:        i32,
+		// regole, prossimo ID, ID floor, RNG e lifecycle
 }
 ```
 
-Pesca, discard e shuffle non allocano memoria. I limiti rendono esplicito il
-budget del sistema e consentono di rifiutare un reward prima di corrompere le
-zone.
+Pesca, discard, exhaust, create e shuffle non allocano memoria. Il budget massimo
+e 32 permanenti piu 16 temporanee; ogni pila lunga puo contenere tutte e 48.
 
 ## Invarianti
 
@@ -68,12 +76,22 @@ zone.
 - `next_card_id` maggiore di ogni ID esistente;
 - contatori entro la capacita degli array;
 - energia compresa fra zero e massimo;
-- mano non oltre `hand_size`;
-- durante `Combat`, ogni carta posseduta presente in esattamente una zona;
+- mano non oltre `MAX_HAND_CARDS`; `hand_size` e soltanto il target di refill;
+- durante `Combat`, ogni carta posseduta presente in esattamente una delle cinque zone;
+- temporanee assenti da `owned`, univoche e comprese nell'intervallo ID del fight;
+- massimo 16 temporanee e 48 carte runtime totali;
+- slot resolving e relativo flag coerenti;
 - fuori dal combattimento, zone temporanee vuote ed energia zero.
 
 L'ultima proprieta impedisce sia duplicazioni sia carte perse durante un
 reshuffle.
+
+La validazione profonda e quadratica nel numero di carte e gira su ogni
+primitiva tramite `deck_state_is_consistent`. I confini transazionali
+(`begin_deck_combat`, `play_card`, `refocus_player_hand`, shop e mutazioni fuori
+combattimento) chiamano sempre `validate_deck_state` per intero;
+`-define:DECK_DEEP_VALIDATION=false` riduce le sole primitive interne ai
+controlli strutturali economici di `deck_counts_are_valid`.
 
 ## Starter deck
 
@@ -86,7 +104,7 @@ Il deck iniziale contiene dieci istanze con ID da 1 a 10:
 
 `add_owned_card` genera l'ID successivo e funziona soltanto fuori dal
 combattimento. Questa regola permette a reward, Shop e Forgotten Armory di
-aggiungere carte senza dover aggiornare tre zone attive contemporaneamente.
+aggiungere carte senza dover aggiornare le cinque zone runtime contemporaneamente.
 
 `upgrade_owned_card` modifica soltanto l'istanza identificata dal suo ID.
 `remove_owned_card` compatta stabilmente `owned`, non ricicla ID e conserva
@@ -104,8 +122,9 @@ Per una stanza `Combat`, `begin_deck_combat`:
 3. imposta energia al massimo;
 4. pesca fino alla mano iniziale di cinque carte.
 
-Quando il fight termina, `finish_deck_combat` svuota draw, hand e discard e
-azzera l'energia. `owned`, upgrade, prossimo ID e stato RNG restano persistenti.
+Quando il fight termina, `finish_deck_combat` svuota draw, hand, discard, exhaust
+e resolving e azzera energia e ID floor. `owned`, upgrade, prossimo ID e stato
+RNG restano persistenti; gli ID consumati dalle temporanee non vengono riciclati.
 
 ## Shuffle deterministico
 
@@ -129,9 +148,9 @@ draw pile e vuoto:
 3. il nuovo draw pile viene mescolato;
 4. la pesca continua.
 
-Se anche il discard e vuoto, la pesca fallisce senza modificare lo stato. Una
-carta giocata entra nel discard prima della pesca di rimpiazzo, quindi puo
-ricomparire subito quando era l'unica carta disponibile.
+Se anche il discard e vuoto, la pesca fallisce senza modificare lo stato. La carta
+giocata resta in `Resolving` fino al termine dei propri effetti: un effetto `Draw`
+non puo quindi rimescolare e pescare la carta che lo ha prodotto.
 
 ## Energia per pulse
 
@@ -165,14 +184,16 @@ movimento, attesa e abilita debug. E sempre saturata al massimo.
 2. trova l'ID nella mano;
 3. valuta anchor, cast range e footprint, poi compila gli effetti senza mutazioni;
 4. controlla l'energia disponibile;
-5. chiama `resolve_action`;
-6. soltanto se il report e accettato sottrae energia e sposta la carta;
-7. registra gli eventi e raccoglie il loot vicino;
-8. se il fight continua, esegue un solo pulse e pesca un rimpiazzo.
+5. salva il deck, sottrae energia e sposta `Hand -> Resolving`;
+6. chiama `resolve_action` con uno stato del deck ancora valido;
+7. se il report e rifiutato ripristina la copia senza consumare risorse;
+8. se accettato sposta `Resolving -> Discard/Exhaust` e registra gli eventi;
+9. se il fight continua, esegue un solo pulse e pesca un rimpiazzo.
 
 Target invalido, energia insufficiente o azione rifiutata non modificano energia,
-zone o RNG. Se la carta conclude il fight, viene comunque pagata e scartata, ma
-non viene prodotto un pulse aggiuntivo.
+zone o RNG. Se la carta conclude il fight, la transazione viene comunque
+confermata, ma non viene prodotto un pulse aggiuntivo e le zone runtime vengono
+poi svuotate.
 
 ## Eventi e report
 
@@ -184,12 +205,18 @@ transazione gia confermata. `card_play_was_committed` centralizza questo test.
 
 `Room.recent_events` aggiunge:
 
-- `Card_Played`, prima degli eventi degli effetti;
-- `Card_Drawn`, dopo il pulse e la pesca.
+- `Card_Played`, che paga e riproduce `Hand -> Resolving`;
+- gli eventi degli effetti: `Card_Drawn`, `Card_Moved` o `Card_Created`;
+- `Card_Moved`, che conclude `Resolving -> Discard/Exhaust`;
+- un eventuale `Card_Drawn` di rimpiazzo dopo il pulse.
 
-Entrambi conservano ID e `Card_Id`. La timeline parte da una copia del deck:
-`Card_Played` paga e scarta nella copia, mentre `Card_Drawn` riproduce pescata ed
-eventuale reshuffle con lo stato RNG catturato.
+`Refocus` usa una transazione distinta: `Hand_Refocused`, un
+`Card_Refocused` per ogni carta originale, un pulse e infine il refill. Retain,
+Ethereal, energia e casi terminali sono descritti in [Hand Cycle](HAND_CYCLE.md).
+
+Gli eventi conservano identita completa, lifetime e zone. La timeline parte da
+una copia del deck e richiama le stesse primitive autorevoli; ogni mismatch
+rollbacka la singola mutazione presentazionale.
 
 ## Ricompense
 
@@ -212,8 +239,9 @@ massimo e ID esauriti lasciano la run invariata. Il lifecycle e documentato in
 
 La mano inferiore e parte del renderer, non di `Deck_State`. Le carte sono
 sovrapposte e quasi nascoste quando inattive; hover e selezione ne sollevano una.
-Energia, draw e discard restano contatori separati ai lati. Le carte non pagabili
-vengono attenuate.
+Energia, draw, discard ed exhaust restano contatori separati ai lati. Le carte
+temporanee mostrano `TEMP`; le policy della frontiera mostrano `RETAIN` o
+`ETHEREAL`; quelle non pagabili vengono attenuate.
 
 Durante una timeline la mano legge il deck presentazionale, non quello autorevole
 gia risolto. Carta giocata e rimpiazzo cambiano quindi esattamente sui rispettivi
@@ -226,17 +254,25 @@ per convertire la cella nel `primary_target`; `play_card` ricompila e decide se
 commettere la transazione. Rilasciare sulla mano, fuori griglia o su un target
 invalido annulla il drag senza mutazioni.
 
+La carta trascinata resta centrata sotto il cursore sopra la mano. Quando il
+cursore entra realmente su una cella della griglia, la carta viene nascosta fino
+all'uscita dalla griglia: range, percorso e footprint rimangono cosi interamente
+leggibili senza cambiare lo stato del drag.
+
 `1`-`8` conserva il percorso rapido: carte self o senza target partono subito;
 una carta spaziale salva `selected_card_id` nella presentazione e attende un
 click su una cella. Il gameplay riceve sempre e soltanto `card_id` e `Target`;
 lo stato hover/drag non entra in `Deck_State`.
 
+`F` e il pulsante `REFOCUS` producono lo stesso comando bufferizzabile. Dopo un
+commit riuscito hover, selezione e drag vengono azzerati; un rifiuto lascia
+intatta la mano e non produce un pulse.
+
 ## Limiti intenzionali
 
-Non sono ancora implementati exhaust, retain e carte ethereal, effetti che
-pescano o scartano altre carte, modificatori dinamici di costo o rigenerazione,
-salvataggio serializzato, descrizioni complete e animazioni spaziali fra le zone.
-Cue e cambio di zona sincronizzato sono gia presenti.
+Non sono ancora implementati selezione modale dello scarto, modificatori
+dinamici di costo o rigenerazione, salvataggio serializzato, descrizioni complete
+e animazioni spaziali fra le zone.
 
 Shop, Rest, Event e Treasure sono nodi reali della rotta. Le relative schermate
 mantengono hover, pagina e selezione nel renderer, mentre ownership e mutazioni

@@ -2,7 +2,7 @@ package game
 
 import grid "../grid"
 
-// A dense 32-enemy command currently reaches 257 events before reaction headroom.
+// A dense 32-enemy command currently reaches 258 events before reaction headroom.
 MAX_GAME_EVENTS :: 288
 
 Game_Event_Kind :: enum {
@@ -25,6 +25,10 @@ Game_Event_Kind :: enum {
 	Reaction_Binding_Exhausted,
 	Reaction_Binding_Expired,
 	Pulse_Advanced,
+	Card_Moved,
+	Card_Created,
+	Hand_Refocused,
+	Card_Refocused,
 }
 
 Game_Event :: struct {
@@ -39,6 +43,10 @@ Game_Event :: struct {
 	loot_kind:        Loot_Kind,
 	card_id:          u32,
 	card_definition:  Card_Id,
+	card_upgrade_level: i32,
+	card_lifetime:      Card_Lifetime,
+	from_card_zone:     Card_Zone,
+	to_card_zone:       Card_Zone,
 	reaction:         Reaction_Id,
 	binding_id:       u32,
 	binding_source:   Reaction_Binding_Source,
@@ -59,6 +67,10 @@ clear_event_log :: proc(log: ^Event_Log) {
 	}
 }
 
+// Contratto dei chiamanti: un comando che accumula eventi in un log staged
+// prima del commit tratta un ritorno false come fallimento della transazione;
+// dopo il commit gli eventi in eccesso vengono solo scartati e contati in
+// dropped_count, e non possono mai annullare una mutazione autorevole.
 record_event :: proc(log: ^Event_Log, event: Game_Event) -> bool {
 	if log == nil || log.count < 0 || log.count >= MAX_GAME_EVENTS {
 		if log != nil {

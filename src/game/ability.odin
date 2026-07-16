@@ -43,17 +43,13 @@ use_player_ability :: proc(room: ^Room, ability: Player_Ability) -> Action_Resul
 		return .Invalid_Phase
 	}
 	append_event_log(&room.recent_events, &report.events)
-	collect_loot_in_magnet_range(room)
-	pulse := advance_combat_pulse(room)
-	append_event_log(&room.recent_events, &pulse.events)
-	collect_loot_in_magnet_range(room)
-	if room.phase == .Defeat {
-		sync_deck_with_room_phase(room)
+	_, outcome := finish_player_combat_command(room)
+	switch outcome {
+	case .Player_Defeated:
 		return .Player_Defeated
-	}
-	if room.phase == .Loot {
-		sync_deck_with_room_phase(room)
+	case .Combat_Ended:
 		return .Combat_Ended
+	case .Combat_Continues:
 	}
 	return .Used_Ability
 }

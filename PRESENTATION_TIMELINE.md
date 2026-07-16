@@ -68,7 +68,7 @@ Il percorso normale e:
    `Gameplay_Command`.
 2. Se la timeline e idle, `commit_gameplay_command` cattura lo snapshot corrente.
 3. `execute_gameplay_command` chiama l'API autorevole appropriata: movimento,
-   attesa, abilita o carta.
+   attesa, abilita, carta o Refocus.
 4. Soltanto un comando realmente committed puo avviare una presentazione; un
    muro, una fase incompatibile o una carta rifiutata non creano cue.
 5. La simulazione risolve subito azione, reazioni, loot e cambio di fase; quando il
@@ -102,7 +102,12 @@ Le famiglie visualizzate sono:
 | `Damaged`, `Damage_Absorbed`, `Healed` | aggiorna vita o shield e mostra il feedback; una sorgente trap disarma la trap nello snapshot |
 | eventi status | aggiorna i badge dello snapshot e mostra il relativo avviso |
 | eventi binding | mostra l'avviso; il set dei binding non e copiato nello snapshot |
-| `Card_Played`, `Card_Drawn` | paga/scarta e pesca/reshuffla nel deck presentazionale |
+| `Card_Played` | paga e riproduce `Hand -> Resolving` |
+| `Card_Drawn` | pesca e riproduce l'eventuale reshuffle/RNG |
+| `Card_Moved` | riproduce `Hand/Resolving -> Discard/Exhaust` |
+| `Card_Created` | richiede origine `.Count` e ricrea la stessa istanza temporanea e lo stesso ID in mano |
+| `Hand_Refocused` | mostra la frontiera manuale prima del cleanup |
+| `Card_Refocused` | valida policy e identita; mantiene Retain o muove verso discard/exhaust |
 | `Entity_Defeated` | mantiene l'attore nello snapshot durante il fade, poi lo nasconde |
 | `Loot_Dropped` | aggiunge il drop sulla cella e ne mostra il pulse |
 | `Loot_Collected`, `Gold_Gained` | anima la raccolta e aggiorna la copia dell'oro |
@@ -127,7 +132,8 @@ timeline idle                  -> estrazione atomica e nuova validazione
 ```
 
 Il buffer conserva valori logici, non callback ne indici visuali: fase d'origine,
-direzione, abilita, ID stabile della carta e target. Quando viene estratto, il
+direzione, abilita, ID stabile della carta, target oppure il marker Refocus.
+Quando viene estratto, il
 comando passa di nuovo dalle normali API di gameplay. Una carta puo essere uscita
 dalla mano, un target puo essere morto o la fase puo essere cambiata; in questi
 casi il comando viene rifiutato senza forzare uno stato ormai invalido. In
@@ -160,6 +166,10 @@ Gli shortcut numerici vengono risolti contro il deck presentazionale attualmente
 visibile. Non possono quindi accodare una carta appena pescata prima che il suo cue
 l'abbia mostrata. Camera e rendering della mano restano indipendenti dal blocco del
 targeting spaziale.
+
+Il pulsante Refocus e disabilitato durante la timeline. Lo shortcut `F` resta un
+comando discreto e puo occupare il buffer; al consumo viene rivalidato come ogni
+altra intenzione. Il replay completo e descritto in [Hand Cycle](HAND_CYCLE.md).
 
 ## Transizioni e reset
 
@@ -205,8 +215,16 @@ snapshot conserva fino a 32 nemici, 64 trappole e 64 drop. Il log
 espone `dropped_count` e la timeline conserva sia gli eventi gia persi a monte
 sia quelli che non riesce a copiare.
 
-Lo stress test corrente compone 257 eventi: carta, status su 32 nemici, 32 intenti,
-morti, drop doppi, raccolte, pulse e pesca. Restano 31 slot di margine. Non e una
+Prima del commit, un producer staged tratta l'overflow come fallimento e non
+modifica lo stato autorevole. Dopo il commit la simulazione non viene mai
+rollbackata per un problema di presentazione: il log conta gli eventi persi e la
+timeline torna allo snapshot finale. Questo comportamento e fail-soft, ma un
+`dropped_count` non nullo resta un errore diagnostico da coprire nei test di
+capacita, non un esito normale del gameplay.
+
+Lo stress test corrente compone 258 eventi: play e movimento carta, status su 32
+nemici, 32 intenti, morti, drop doppi, raccolte, pulse e pesca. Restano 30 slot di
+margine. Non e una
 prova valida per future definizioni di reazione: quando il massimo cresce, va
 esteso il test oppure sostituito l'array monolitico con storage a blocchi.
 

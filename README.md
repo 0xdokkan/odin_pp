@@ -6,7 +6,8 @@ Documentazione del gameplay: [Action System](ACTION_SYSTEM.md),
 [Status And Event System](STATUS_SYSTEM.md), [Reaction Queue](REACTION_SYSTEM.md),
 [Enemy Intents](ENEMY_INTENT_SYSTEM.md),
 [Magnetic Loot](LOOT_SYSTEM.md), [Card System](CARD_SYSTEM.md),
-[Targeting System](TARGETING_SYSTEM.md), [Deck Runtime](DECK_SYSTEM.md) e
+[Targeting System](TARGETING_SYSTEM.md), [Deck Runtime](DECK_SYSTEM.md),
+[Card Lifecycle](CARD_LIFECYCLE.md), [Hand Cycle](HAND_CYCLE.md) e
 [Card Rewards](REWARD_SYSTEM.md). Rarita, upgrade, rimozione e shop sono in
 [Deck Economy](DECK_ECONOMY.md); distribuzione e lifecycle di Shop, Rest, Event e
 Treasure in [Special Nodes](SPECIAL_NODES.md). Il confine fra simulazione,
@@ -48,6 +49,10 @@ nella [Roadmap](ROADMAP.md); i contratti di M1, M2 e M3 sono in
 
 ![Timeline FIFO durante la giocata di una carta](odin_pp_timeline.png)
 
+![Create, carta temporanea ed exhaust nel deck runtime](odin_pp_deck_flow.png)
+
+![Refocus con Retain ed Ethereal](odin_pp_refocus.png)
+
 ![Schermata di sconfitta con restart](odin_pp_defeat.png)
 
 ## Eseguire la demo
@@ -80,6 +85,24 @@ Per verificare la timeline con uno snapshot pre-comando e un cue carta attivo:
 ```sh
 odin run src -- --smoke-timeline
 ```
+
+Per esercitare nello stesso flusso `Create Card`, lifetime temporaneo, zona
+`Resolving`, `Exhaust` e replay del deck:
+
+```sh
+odin run src -- --smoke-deck-flow
+```
+
+Il comando salva `odin_pp_deck_flow.png` con una `Spark` temporanea visibile,
+`Spark Forge` in exhaust e i contatori aggiornati.
+
+Per verificare Refocus, Retain, Ethereal, pulse e refill nello stesso flusso:
+
+```sh
+odin run src -- --smoke-refocus
+```
+
+Il comando salva `odin_pp_refocus.png` durante il cue iniziale della frontiera.
 
 Per produrre uno screenshot deterministico della prima stanza procedurale:
 
@@ -115,11 +138,14 @@ pannello risolto e Continue disponibile.
 2. Prima dell'input, inseguitori, arcieri e bruti mostrano l'intento committed per
    il prossimo impulso: movimento, attacco, carica e celle minacciate non vengono
    ricalcolati dopo la scelta del player.
-3. Le carte pagano il proprio costo, pescano un rimpiazzo e recuperano una energia
-   per impulso; movimento e attesa possono essere usati per recuperarla.
-4. Ogni passo valido, bump attack, attesa, abilita o carta accettata produce un
-   impulso se il fight continua. Il player puo camminare senza un limite numerico,
-   ma ogni cella attraversata concede la risposta committed ai nemici.
+3. Le carte passano dalla mano a `Resolving`, applicano in ordine danno, status o
+   effetti `Draw`/`Discard`/`Create`, poi entrano in discard o exhaust. Se il
+   fight continua tentano di pescare un rimpiazzo e recuperano una energia per
+   impulso.
+4. Ogni passo valido, bump attack, attesa, abilita, carta o Refocus accettato
+   produce un impulso se il fight continua. Il player puo camminare senza un
+   limite numerico, ma ogni cella attraversata concede la risposta committed ai
+   nemici.
 5. Ogni drop entro tre celle per asse viene assorbito anche durante `Combat`;
    eliminato l'ultimo nemico, la stanza passa a `Loot` e gli spostamenti non
    producono piu pulse.
@@ -152,6 +178,7 @@ posizionamento.
 | `Esc` / click destro | annulla selezione o trascinamento |
 | `WASD` | un comando per pressione: muove il player; contro un nemico esegue un attacco |
 | `Spazio` | aspetta un impulso durante il combattimento |
+| `F` / pulsante Refocus | applica Retain/Ethereal, produce un pulse e pesca fino alla dimensione mano |
 | `C` `V` | abilita debug per Thorn Coat e Afterimage |
 | frecce | sposta la camera |
 | rotella | zoom ancorato al cursore |
@@ -234,8 +261,10 @@ temporanee e prende in prestito puntatori al livello e al player della run. Il
 renderer legge questi dati, ma non li possiede e non li cambia.
 
 Input, IA, trappole e loot costruiscono `Action` composte da effetti ordinati.
-`resolve_action` valida sorgente, target ed effetti prima di modificare la stanza;
-lo scheduler degli impulsi resta separato dal resolver.
+`resolve_action` valida sorgente e target, richiede almeno un effetto inizialmente
+valido, poi ricontrolla e applica gli effetti in sequenza: un effetto successivo
+puo essere saltato se lo stato prodotto dai precedenti lo rende non piu valido.
+Lo scheduler degli impulsi resta separato dal resolver.
 Ogni nemico conserva inline un intento committed per `pulse_count + 1`.
 Pianificazione e risoluzione seguono gli ID in ordine crescente; spostarsi fuori
 da una cella minacciata produce un miss, mentre occupare una destinazione puo
@@ -259,9 +288,15 @@ template in normali `Action`. `Targeting_Spec` separa cast range e footprint:
 Single, linee nelle otto direzioni, croci e quadrati 3x3 condividono clipping,
 line of sight e blocker statici. La query raccoglie ID nemici stabili; il
 renderer visualizza il risultato senza ricalcolare la geometria. `Deck_State`
-conserva ownership, draw pile, mano, discard ed energia in array fissi; shuffle e
-reshuffle sono deterministici.
-`play_card` paga e sposta la carta soltanto dopo che l'azione e stata accettata.
+conserva ownership, draw, mano, discard, exhaust, uno slot resolving ed energia in
+array fissi; shuffle e reshuffle sono deterministici. Istanze `Combat` create
+durante il fight usano ID monotoni, non entrano in ownership e spariscono a fine
+stanza senza riciclare l'ID.
+`play_card` salva il deck, paga e sposta la carta in `Resolving`; un'azione
+rifiutata ripristina lo snapshot, mentre una accettata termina in discard o
+exhaust. Gli effetti deck attraversano lo stesso resolver delle altre mutazioni.
+`Refocus` e la frontiera manuale della mano: conserva le carte Retain, exhausta
+le Ethereal, scarta le altre, concede un pulse nemico e solo dopo pesca il refill.
 Fra stanza e mappa, `Run_Phase.Reward` offre tre definizioni distinte tramite un
 RNG dedicato e pesi di rarita. Soltanto la scelta confermata crea una nuova
 `Card_Instance`; skip, indice invalido e deck pieno non consumano ID. Scelta e

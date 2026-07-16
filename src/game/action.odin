@@ -2,6 +2,9 @@ package game
 
 import grid "../grid"
 
+// Una carta AoE compila un effetto per ogni nemico colpito, quindi la capacita
+// di un'azione segue quella dei nemici della stanza. Una carta che volesse
+// colpire tutti i nemici e aggiungere altri effetti supererebbe questo limite.
 MAX_ACTION_EFFECTS :: MAX_ENEMIES_PER_ROOM
 
 Entity_Kind :: enum {
@@ -78,6 +81,9 @@ Effect_Kind :: enum {
 	Apply_Status,
 	Remove_Status,
 	Add_Reaction_Binding,
+	Draw_Cards,
+	Discard_Cards,
+	Create_Card,
 }
 
 Effect :: struct {
@@ -91,6 +97,7 @@ Effect :: struct {
 	charges:     i32,
 	priority_modifier: i32,
 	binding_source: Reaction_Binding_Source,
+	card_definition: Card_Id,
 }
 
 damage_effect :: proc(target: Entity_Ref, amount: i32) -> Effect {
@@ -103,6 +110,23 @@ heal_effect :: proc(target: Entity_Ref, amount: i32) -> Effect {
 
 gain_gold_effect :: proc(amount: i32) -> Effect {
 	return {kind = .Gain_Gold, target = PLAYER_ENTITY, amount = amount}
+}
+
+draw_cards_effect :: proc(amount: i32) -> Effect {
+	return {kind = .Draw_Cards, target = PLAYER_ENTITY, amount = amount}
+}
+
+discard_cards_effect :: proc(amount: i32) -> Effect {
+	return {kind = .Discard_Cards, target = PLAYER_ENTITY, amount = amount}
+}
+
+create_card_effect :: proc(definition_id: Card_Id, amount: i32) -> Effect {
+	return {
+		kind = .Create_Card,
+		target = PLAYER_ENTITY,
+		amount = amount,
+		card_definition = definition_id,
+	}
 }
 
 move_effect :: proc(target: Entity_Ref, destination: grid.Position) -> Effect {
@@ -185,6 +209,9 @@ Action_Report :: struct {
 	enemies_defeated:  int,
 	statuses_applied:  int,
 	statuses_removed:  int,
+	cards_drawn:       int,
+	cards_discarded:   int,
+	cards_created:     int,
 	reactions_triggered:       int,
 	reactions_dropped:         int,
 	reaction_events_processed: int,
@@ -335,6 +362,15 @@ effect_is_valid :: proc(room: ^Room, effect: Effect) -> bool {
 			priority_modifier = effect.priority_modifier,
 			source = effect.binding_source,
 		})
+	case .Draw_Cards:
+		return effect.target == PLAYER_ENTITY && effect.amount > 0 && room.phase == .Combat &&
+		       can_draw_card(&room.player.deck)
+	case .Discard_Cards:
+		return effect.target == PLAYER_ENTITY && effect.amount > 0 && room.phase == .Combat &&
+		       can_discard_hand_card(&room.player.deck, 0)
+	case .Create_Card:
+		return effect.target == PLAYER_ENTITY && effect.amount > 0 && room.phase == .Combat &&
+		       can_create_temporary_card(&room.player.deck, effect.card_definition)
 	}
 	return false
 }
@@ -563,6 +599,66 @@ apply_effect :: proc(room: ^Room, source: Entity_Ref, effect: Effect, report: ^A
 			binding_id = binding_id,
 			binding_source = effect.binding_source,
 		})
+	case .Draw_Cards:
+		for _ in 0..<effect.amount {
+			if !can_draw_card(&room.player.deck) {
+				break
+			}
+			card, drawn := draw_card(&room.player.deck)
+			assert(drawn)
+			report.cards_drawn += 1
+			record_report_event(report, {
+				kind = .Card_Drawn,
+				source = source,
+				target = PLAYER_ENTITY,
+				card_id = card.id,
+				card_definition = card.definition_id,
+				card_upgrade_level = card.upgrade_level,
+				card_lifetime = card.lifetime,
+				from_card_zone = .Draw,
+				to_card_zone = .Hand,
+			})
+		}
+	case .Discard_Cards:
+		for _ in 0..<effect.amount {
+			if !can_discard_hand_card(&room.player.deck, 0) {
+				break
+			}
+			card, discarded := discard_hand_card(&room.player.deck, 0)
+			assert(discarded)
+			report.cards_discarded += 1
+			record_report_event(report, {
+				kind = .Card_Moved,
+				source = source,
+				target = PLAYER_ENTITY,
+				card_id = card.id,
+				card_definition = card.definition_id,
+				card_upgrade_level = card.upgrade_level,
+				card_lifetime = card.lifetime,
+				from_card_zone = .Hand,
+				to_card_zone = .Discard,
+			})
+		}
+	case .Create_Card:
+		for _ in 0..<effect.amount {
+			if !can_create_temporary_card(&room.player.deck, effect.card_definition) {
+				break
+			}
+			card, created := create_temporary_card(&room.player.deck, effect.card_definition)
+			assert(created)
+			report.cards_created += 1
+			record_report_event(report, {
+				kind = .Card_Created,
+				source = source,
+				target = PLAYER_ENTITY,
+				card_id = card.id,
+				card_definition = card.definition_id,
+					card_upgrade_level = card.upgrade_level,
+					card_lifetime = card.lifetime,
+					from_card_zone = .Count,
+					to_card_zone = .Hand,
+				})
+		}
 	}
 	report.applied_effects += 1
 }

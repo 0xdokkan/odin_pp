@@ -116,6 +116,7 @@ Effect :: struct {
 	charges:     i32,
 	priority_modifier: i32,
 	binding_source: Reaction_Binding_Source,
+	card_definition: Card_Id,
 }
 ```
 
@@ -128,7 +129,10 @@ Gli effetti disponibili sono:
 - `Apply_Status`: applica o rinnova uno status con potenza e durata;
 - `Remove_Status`: rimuove uno status esistente;
 - `Add_Reaction_Binding`: installa una reazione runtime con potenza, cariche,
-  durata, priorita e sorgente.
+	  durata, priorita e sorgente.
+- `Draw_Cards`: pesca fino alla quantita richiesta entro fonti e capacita;
+- `Discard_Cards`: scarta fino alla quantita richiesta in ordine stabile;
+- `Create_Card`: crea in mano istanze con lifetime limitato al fight.
 
 I campi non pertinenti al tipo di effetto restano al valore zero. Stacking,
 durate e tick sono descritti nella guida dedicata agli status.
@@ -147,12 +151,13 @@ L'ordine di validazione e:
 4. almeno un effetto inizialmente applicabile, se l'azione ne contiene.
 
 Un movimento contro un muro o un ostacolo viene rifiutato prima di costruire una
-mutazione valida. Non cambia la stanza e non produce un pulse.
+mutazione valida. Gli effetti deck richiedono fase `Combat`, deck valido e almeno
+una operazione possibile. Un rifiuto non cambia la stanza e non produce un pulse.
 
 Il resolver non gestisce risorse di movimento. Il costo energia delle carte
-appartiene alla transazione `play_card`, perche coinvolge anche mano e discard:
-viene controllato prima del resolver e pagato soltanto dopo un
-`Action_Report.accepted`.
+appartiene alla transazione `play_card`, perche coinvolge anche le zone del deck:
+viene controllato prima del resolver e applicato a una copia ripristinabile. Il
+costo resta committato soltanto con un `Action_Report.accepted`.
 
 ## Ordine e risoluzione parziale
 
@@ -167,6 +172,11 @@ Questa semantica e intenzionale: permette sequenze come danno, cura e movimento
 senza dover costruire un sistema transazionale complesso. `Action_Report` rende
 esplicito cio che e stato realmente applicato.
 
+Vale anche per il deck. `Draw 2 -> Discard 1` osserva lo stato prodotto in ordine;
+una futura carta `Damage -> Create Card` puo applicare il danno e saltare la create
+se la mano diventa piena. `play_card` rollbacka un'azione interamente rifiutata,
+ma non annulla effetti precedenti di un'azione gia accettata.
+
 ## Scheduler degli impulsi
 
 `resolve_action_once` applica una sola azione. `resolve_action` la avvolge con il
@@ -177,6 +187,8 @@ dispatch FIFO delle reazioni, ma non chiama mai `advance_combat_pulse`.
 - `wait_player_turn` risolve una `Wait` vuota e poi produce un impulso;
 - `use_player_ability` risolve tutti gli effetti dell'abilita e poi produce un impulso;
 - `play_card` risolve una carta, ne conferma costo e cambio zona, poi produce un impulso;
+- `refocus_player_hand` applica la policy alla mano, produce un impulso e poi
+  tenta il refill se il combattimento continua;
 - `advance_combat_pulse` risolve gli intenti committed, processa gli status,
   incrementa `pulse_count` e pianifica gli intenti successivi;
 - `resolve_enemy_intents` trasforma ogni piano ancora valido in una normale
@@ -190,7 +202,8 @@ cinque.
 La UI invia questi comandi sul fronte di pressione del tasto, senza keyboard
 repeat. Durante la timeline visuale il primo nuovo comando occupa un buffer di
 capacita uno; viene estratto e validato nuovamente quando la presentazione torna
-idle. Tenere premuto `WASD`, `Spazio`, `C` o `V` non produce comandi aggiuntivi.
+idle. Tenere premuto `WASD`, `Spazio`, `F`, `C` o `V` non produce comandi
+aggiuntivi.
 
 Le reazioni sono a loro volta normali `Action`. Le definizioni dichiarative
 trasformano un evento compatibile in effect template concreti, poi usano
@@ -299,7 +312,7 @@ Il flusso completo implementato e:
 4. gli ID della footprint diventano effetti concreti;
 5. si costruisce una sola `Action`;
 6. il resolver restituisce un `Action_Report`;
-7. `play_card` paga energia, sposta la carta e produce un solo impulso;
+7. `play_card` paga, usa la zona `Resolving`, applica discard/exhaust e produce un solo impulso;
 8. se il fight continua, pesca una carta di rimpiazzo.
 
 Le semantiche di `Single`, linea a otto direzioni, croce, area 3x3, clipping e

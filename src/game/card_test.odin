@@ -29,6 +29,11 @@ test_builtin_card_definitions_are_valid :: proc(t: ^testing.T) {
 	definition.effects[0].status = Status_Kind(99)
 	testing.expect(t, !validate_card_definition(&definition))
 
+	definition, found = card_definition_by_id(.Spark_Forge)
+	testing.expect(t, found)
+	definition.effects[0].has_card_definition = false
+	testing.expect(t, !validate_card_definition(&definition))
+
 	piercing_ray, piercing_ray_found := card_definition_by_id(.Piercing_Ray)
 	testing.expect(t, piercing_ray_found)
 	testing.expect_value(t, piercing_ray.targeting.shape, Target_Shape.Line)
@@ -49,16 +54,143 @@ test_builtin_card_definitions_are_valid :: proc(t: ^testing.T) {
 	testing.expect_value(t, toxic_wave.targeting.rule, Target_Rule.None)
 	testing.expect_value(t, toxic_wave.effects[0].target, Card_Target_Selector.Each_Enemy)
 
+	battle_focus, battle_focus_found := card_definition_by_id(.Battle_Focus)
+	testing.expect(t, battle_focus_found && battle_focus.exhaust_on_play && battle_focus.ethereal)
+	testing.expect_value(t, battle_focus.effects[0].kind, Effect_Kind.Draw_Cards)
+	testing.expect_value(t, battle_focus.effects[0].base_amount, i32(2))
+
+	counter_rune, counter_rune_found := card_definition_by_id(.Counter_Rune)
+	testing.expect(t, counter_rune_found && counter_rune.retain_on_refocus)
+
+	calculated_risk, calculated_risk_found := card_definition_by_id(.Calculated_Risk)
+	testing.expect(t, calculated_risk_found)
+	testing.expect_value(t, calculated_risk.effect_count, 2)
+	testing.expect_value(t, calculated_risk.effects[0].kind, Effect_Kind.Draw_Cards)
+	testing.expect_value(t, calculated_risk.effects[1].kind, Effect_Kind.Discard_Cards)
+
+	spark_forge, spark_forge_found := card_definition_by_id(.Spark_Forge)
+	testing.expect(t, spark_forge_found)
+	testing.expect_value(t, spark_forge.effects[0].kind, Effect_Kind.Create_Card)
+	testing.expect_value(t, spark_forge.effects[0].card_definition, Card_Id.Spark)
+
+	spark, spark_found := card_definition_by_id(.Spark)
+	testing.expect(t, spark_found && spark.temporary_only)
+	testing.expect_value(t, spark.targeting.cast_range, Targeting_Range{.Manhattan, 1, 2})
+	testing.expect(t, !validate_card_instance({id = 80, definition_id = .Spark}))
+	testing.expect(t, validate_card_instance({
+		id = 80,
+		definition_id = .Spark,
+		lifetime = .Combat,
+	}))
+
 	_, found = card_definition_by_id(.Count)
 	testing.expect(t, !found)
+}
+
+@(test)
+test_refocus_keywords_are_exclusive_and_ignore_play_lifecycle :: proc(t: ^testing.T) {
+	counter_rune, counter_found := card_definition_by_id(.Counter_Rune)
+	_, battle_found := card_definition_by_id(.Battle_Focus)
+	strike, strike_found := card_definition_by_id(.Strike)
+	testing.expect(t, counter_found && battle_found && strike_found)
+
+	invalid := counter_rune
+	invalid.ethereal = true
+	testing.expect(t, !validate_card_definition(&invalid))
+	destination, valid := card_definition_destination_after_refocus(invalid)
+	testing.expect(t, !valid)
+	testing.expect_value(t, destination, Card_Zone.Count)
+
+	strike.exhaust_on_play = true
+	testing.expect(t, validate_card_definition(&strike))
+	destination, valid = card_definition_destination_after_refocus(strike)
+	testing.expect(t, valid)
+	testing.expect_value(t, destination, Card_Zone.Discard)
+
+	destination, valid = card_destination_after_refocus({
+		id = 1,
+		definition_id = .Counter_Rune,
+	})
+	testing.expect(t, valid)
+	testing.expect_value(t, destination, Card_Zone.Hand)
+	destination, valid = card_destination_after_refocus({
+		id = 2,
+		definition_id = .Battle_Focus,
+	})
+	testing.expect(t, valid)
+	testing.expect_value(t, destination, Card_Zone.Exhaust)
+	destination, valid = card_destination_after_refocus({
+		id = 3,
+		definition_id = .Spark,
+		lifetime = .Combat,
+	})
+	testing.expect(t, valid)
+	testing.expect_value(t, destination, Card_Zone.Discard)
+
+	destination, valid = card_destination_after_refocus({definition_id = .Strike})
+	testing.expect(t, !valid)
+	testing.expect_value(t, destination, Card_Zone.Count)
+}
+
+@(test)
+test_deck_flow_cards_compile_to_authoritative_effects :: proc(t: ^testing.T) {
+	level_data := create_test_level(t)
+	defer level.destroy(&level_data)
+	player := create_test_player(t)
+	enemy_spawns := [?]Enemy_Spawn{{position = {x = 2, y = 1}, health = 8, attack = 1}}
+	room, ok := create_room(&level_data, &player, {enemies = enemy_spawns[:]})
+	testing.expect(t, ok)
+	defer destroy_room(&room)
+
+	self_target := entity_target(PLAYER_ENTITY)
+	battle_action, battle_error := compile_card_action(
+		&room,
+		{id = 70, definition_id = .Battle_Focus},
+		self_target,
+	)
+	testing.expect_value(t, battle_error, Card_Compile_Error.None)
+	testing.expect_value(t, battle_action.effect_count, 1)
+	testing.expect_value(t, battle_action.effects[0], draw_cards_effect(2))
+
+	risk_action, risk_error := compile_card_action(
+		&room,
+		{id = 71, definition_id = .Calculated_Risk},
+		self_target,
+	)
+	testing.expect_value(t, risk_error, Card_Compile_Error.None)
+	testing.expect_value(t, risk_action.effect_count, 2)
+	testing.expect_value(t, risk_action.effects[0], draw_cards_effect(2))
+	testing.expect_value(t, risk_action.effects[1], discard_cards_effect(1))
+
+	forge_action, forge_error := compile_card_action(
+		&room,
+		{id = 72, definition_id = .Spark_Forge},
+		self_target,
+	)
+	testing.expect_value(t, forge_error, Card_Compile_Error.None)
+	testing.expect_value(t, forge_action.effects[0], create_card_effect(.Spark, 1))
+
+	enemy_target := entity_target(enemy_entity(room.enemies[0].id))
+	spark_action, spark_error := compile_card_action(&room, {
+		id = 73,
+		definition_id = .Spark,
+		lifetime = .Combat,
+	}, enemy_target)
+	testing.expect_value(t, spark_error, Card_Compile_Error.None)
+	testing.expect_value(t, spark_action.effects[0], damage_effect(enemy_target.entity, 2))
 }
 
 @(test)
 test_card_economy_metadata_is_valid_and_covers_every_rarity :: proc(t: ^testing.T) {
 	rarity_counts: [int(Card_Rarity.Count)]int
 	for definition in CARD_DEFINITIONS {
-		testing.expect(t, definition.reward_weight > 0)
-		testing.expect(t, definition.shop_base_price > 0)
+		if definition.temporary_only {
+			testing.expect_value(t, definition.reward_weight, u32(0))
+			testing.expect_value(t, definition.shop_base_price, i32(0))
+		} else {
+			testing.expect(t, definition.reward_weight > 0)
+			testing.expect(t, definition.shop_base_price > 0)
+		}
 		rarity_counts[int(definition.rarity)] += 1
 	}
 	for count in rarity_counts {
@@ -79,6 +211,12 @@ test_card_economy_metadata_is_valid_and_covers_every_rarity :: proc(t: ^testing.
 	testing.expect(t, found)
 	definition.shop_base_price = 0
 	testing.expect(t, !validate_card_definition(&definition))
+
+	spark, spark_found := card_definition_by_id(.Spark)
+	testing.expect(t, spark_found && spark.temporary_only)
+	testing.expect(t, validate_card_definition(&spark))
+	spark.reward_weight = 1
+	testing.expect(t, !validate_card_definition(&spark))
 }
 
 @(test)
@@ -136,6 +274,9 @@ test_weighted_card_choices_are_deterministic_distinct_and_transactional_on_rejec
 	testing.expect_value(t, card_offer_weight(strike, &node), u64(70*100))
 	testing.expect_value(t, card_offer_weight(firebomb, &node), u64(5*75))
 	testing.expect_value(t, card_offer_weight(strike, nil), u64(0))
+	spark, spark_found := card_definition_by_id(.Spark)
+	testing.expect(t, spark_found)
+	testing.expect_value(t, card_offer_weight(spark, &node), u64(0))
 
 	first_state := u64(0xA11CE)
 	second_state := first_state
@@ -148,6 +289,7 @@ test_weighted_card_choices_are_deterministic_distinct_and_transactional_on_rejec
 	for choice, index in first {
 		_, found := card_definition_by_id(choice)
 		testing.expect(t, found)
+		testing.expect(t, choice != .Spark)
 		for previous in 0..<index {
 			testing.expect(t, choice != first[previous])
 		}
@@ -169,6 +311,21 @@ test_weighted_card_choices_are_deterministic_distinct_and_transactional_on_rejec
 	zero_state: u64
 	testing.expect(t, !generate_weighted_card_choices(&zero_state, &node, rejected_choices[:]))
 	testing.expect_value(t, zero_state, u64(0))
+
+	too_many_choices: [int(Card_Id.Count)]Card_Id
+	for &choice in too_many_choices {
+		choice = .Spark
+	}
+	too_many_before := too_many_choices
+	too_many_state := u64(0xC011EC7)
+	too_many_state_before := too_many_state
+	testing.expect(t, !generate_weighted_card_choices(
+		&too_many_state,
+		&node,
+		too_many_choices[:],
+	))
+	testing.expect_value(t, too_many_state, too_many_state_before)
+	testing.expect_value(t, too_many_choices, too_many_before)
 }
 
 @(test)
@@ -237,6 +394,11 @@ test_card_compiler_rejects_invalid_instance_and_target :: proc(t: ^testing.T) {
 
 	_, err := compile_card_action(&room, {definition_id = .Strike}, target)
 	testing.expect_value(t, err, Card_Compile_Error.Invalid_Instance)
+	permanent_spark := Card_Instance{id = 2, definition_id = .Spark, lifetime = .Permanent}
+	_, err = compile_card_action(&room, permanent_spark, target)
+	testing.expect_value(t, err, Card_Compile_Error.Invalid_Instance)
+	preview := evaluate_card_targeting(&room, permanent_spark, {})
+	testing.expect_value(t, preview.error, Card_Compile_Error.Invalid_Instance)
 
 	_, err = compile_card_action(&room, {id = 1, definition_id = .Strike}, target)
 	testing.expect_value(t, err, Card_Compile_Error.Target_Out_Of_Range)

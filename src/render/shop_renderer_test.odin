@@ -53,6 +53,10 @@ create_shop_render_test_run :: proc(t: ^testing.T, fill_deck: bool = false) -> g
 	if fill_deck {
 		for run.player.deck.owned_count < game.MAX_OWNED_CARDS {
 			definition_id := game.Card_Id(run.player.deck.owned_count%int(game.Card_Id.Count))
+			definition, found := game.card_definition_by_id(definition_id)
+			if !found || definition.temporary_only {
+				definition_id = .Strike
+			}
 			_, added := game.add_owned_card(&run.player.deck, definition_id)
 			testing.expect(t, added)
 			if !added {

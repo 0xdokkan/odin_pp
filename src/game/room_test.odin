@@ -315,6 +315,25 @@ test_loot_movement_never_advances_combat_pulse :: proc(t: ^testing.T) {
 }
 
 @(test)
+test_room_creation_failure_from_active_deck_preserves_entire_player :: proc(t: ^testing.T) {
+	level_data := create_test_level(t)
+	defer level.destroy(&level_data)
+	player := create_test_player(t)
+	player.position = {x = 4, y = 3}
+	player.statuses.items[0] = {kind = .Shield, potency = 2, remaining_pulses = 3}
+	player.statuses.count = 1
+	testing.expect(t, begin_deck_combat(&player.deck))
+	before := player
+	enemies := [?]Enemy_Spawn{{position = {x = 5, y = 3}, health = 4, attack = 1}}
+
+	room, ok := create_room(&level_data, &player, {enemies = enemies[:]})
+
+	testing.expect(t, !ok)
+	destroy_room(&room)
+	testing.expect_value(t, player, before)
+}
+
+@(test)
 test_enemy_can_defeat_player :: proc(t: ^testing.T) {
 	level_data := create_test_level(t)
 	defer level.destroy(&level_data)

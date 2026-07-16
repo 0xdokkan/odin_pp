@@ -127,7 +127,7 @@ M3 e completata quando:
 Il contratto tecnico e lo stato dell'incremento sono descritti in
 [Special Nodes](SPECIAL_NODES.md).
 
-## [ ] M4 - Profondita di carte e status
+## [~] M4 - Profondita di carte e status
 
 **Obiettivo:** ampliare le decisioni del deck senza duplicare resolver o
 targeting.
@@ -136,6 +136,33 @@ targeting.
 - effetti di pesca e scarto, modificatori di costo e rigenerazione;
 - nuovi trigger di reazione e scadenza;
 - targeting a cono e ulteriori footprint condivise.
+
+### [x] M4A - Lifecycle e primitive del deck
+
+- zone `Exhaust` e `Resolving`, lifetime permanente o limitato al fight;
+- ID temporanei monotoni, budget fisso e validazione di ownership fra tutte le zone;
+- effetti autorevoli `Draw Cards`, `Discard Cards` e `Create Card`;
+- `Battle Focus`, `Calculated Risk`, `Spark Forge` e token `Spark`;
+- replay FIFO di play, draw, move e create, con HUD `EXH` e tag `TEMP`;
+- smoke `--smoke-deck-flow` e test di reshuffle, rollback, capacita e mismatch.
+
+Il contratto di M4A e descritto in [Card Lifecycle](CARD_LIFECYCLE.md).
+
+### [~] M4B - Ciclo della mano e costi
+
+- [x] `Refocus` manuale come frontiera esplicita per refill, retain ed ethereal;
+- [x] cleanup stabile, un pulse nemico, refill condizionale e replay FIFO;
+- [x] pulsante, shortcut `F`, tag e smoke `--smoke-refocus`;
+- aggiungere modificatori di costo e rigenerazione con durata osservabile;
+- progettare lo scarto selezionato senza inserire stato UI nel deck autorevole.
+
+Il contratto dell'incremento completato e in [Hand Cycle](HAND_CYCLE.md). M4B
+resta in corso finche costi dinamici e selezione dello scarto non sono integrati.
+
+### [ ] M4C - Reazioni e geometria
+
+- nuovi trigger e condizioni di scadenza;
+- targeting a cono e nuove footprint condivise fra preview e resolver.
 
 **Definition of Done:** preview e compilazione producono gli stessi bersagli;
 zone e ID del deck restano validi dopo ogni combinazione; la timeline mostra le

@@ -44,7 +44,7 @@ validate_card_reward_state :: proc(run: ^Run_State) -> bool {
 	}
 	for index in 0..<run.card_reward.choice_count {
 		definition, found := card_definition_by_id(run.card_reward.choices[index])
-		if !found || !validate_card_definition(&definition) {
+		if !found || !validate_card_definition(&definition) || definition.temporary_only {
 			return false
 		}
 		for previous in 0..<index {

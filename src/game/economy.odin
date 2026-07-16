@@ -58,7 +58,7 @@ card_rarity_weight :: proc(weights: Card_Rarity_Weights, rarity: Card_Rarity) ->
 
 card_offer_weight :: proc(definition: Card_Definition, node: ^Run_Node) -> u64 {
 	validated_definition := definition
-	if node == nil || !validate_card_definition(&validated_definition) {
+	if node == nil || !validate_card_definition(&validated_definition) || definition.temporary_only {
 		return 0
 	}
 	weights, ok := card_rarity_weights(node.kind, node.depth)
@@ -88,7 +88,18 @@ generate_weighted_card_choices :: proc(
 	   len(destination) <= 0 || len(destination) > int(Card_Id.Count) {
 		return false
 	}
+	collectible_count := 0
+	for definition in CARD_DEFINITIONS {
+		if card_offer_weight(definition, node) > 0 {
+			collectible_count += 1
+		}
+	}
+	if len(destination) > collectible_count {
+		return false
+	}
 
+	staged_random_state := random_state^
+	staged_choices: [int(Card_Id.Count)]Card_Id
 	selected: [int(Card_Id.Count)]bool
 	for choice_index in 0..<len(destination) {
 		total_weight: u64
@@ -101,7 +112,7 @@ generate_weighted_card_choices :: proc(
 			return false
 		}
 
-		roll := economy_next_random(random_state)%total_weight
+		roll := economy_next_random(&staged_random_state)%total_weight
 		chosen := Card_Id.Count
 		for definition in CARD_DEFINITIONS {
 			if selected[int(definition.id)] {
@@ -117,8 +128,12 @@ generate_weighted_card_choices :: proc(
 		if chosen == .Count {
 			return false
 		}
-		destination[choice_index] = chosen
+		staged_choices[choice_index] = chosen
 		selected[int(chosen)] = true
 	}
+	for choice_index in 0..<len(destination) {
+		destination[choice_index] = staged_choices[choice_index]
+	}
+	random_state^ = staged_random_state
 	return true
 }

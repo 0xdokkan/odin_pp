@@ -4,6 +4,8 @@ Questa guida descrive il primo confine del deck building: definizioni immutabili
 istanze runtime e compilazione in [Action](ACTION_SYSTEM.md). La geometria
 autorevole e in [Targeting System](TARGETING_SYSTEM.md); ownership, mano, pesca,
 energia e giocata sono descritte in [Deck Runtime](DECK_SYSTEM.md).
+Lifetime, zona resolving ed exhaust sono in [Card Lifecycle](CARD_LIFECYCLE.md);
+Refocus, Retain ed Ethereal in [Hand Cycle](HAND_CYCLE.md).
 
 ## Indice
 
@@ -25,7 +27,7 @@ energia e giocata sono descritte in [Deck Runtime](DECK_SYSTEM.md).
 
 ```text
 Card_Definition  dati condivisi da tutte le copie di una carta
-Card_Instance    identita e upgrade di una copia posseduta
+Card_Instance    identita, upgrade e lifetime di una copia runtime o posseduta
 Action           comando concreto costruito per la stanza corrente
 ```
 
@@ -46,6 +48,10 @@ Card_Definition :: struct {
 	reward_weight:   u32,
 	shop_base_price: i32,
 	cost:            i32,
+	temporary_only:  bool,
+	exhaust_on_play: bool,
+	retain_on_refocus: bool,
+	ethereal:          bool,
 	targeting:       Targeting_Spec,
 	effects:         [MAX_CARD_DEFINITION_EFFECTS]Card_Effect_Template,
 	effect_count:    int,
@@ -53,13 +59,15 @@ Card_Definition :: struct {
 ```
 
 `CARD_DEFINITIONS` e indicizzato da `Card_Id`. `validate_card_definitions`
-verifica che indice e ID coincidano, rarita, peso e prezzo siano validi, i costi
-siano non negativi, la specifica di targeting sia valida e ogni template sia
-rappresentabile.
+verifica che indice e ID coincidano, rarita, costo e metadati economici siano
+validi, la specifica di targeting sia valida e ogni template sia rappresentabile.
+Una definizione `temporary_only` deve avere peso e prezzo zero; tutte le altre
+devono essere acquistabili. `retain_on_refocus` ed `ethereal` sono mutuamente
+esclusive. La loro frontiera esplicita e descritta in [Hand Cycle](HAND_CYCLE.md).
 
 Il costo e un dato della definizione. `compile_card_action` non lo paga perche e
-una trasformazione pura; `play_card` controlla l'energia prima del resolver e la
-sottrae soltanto dopo un'azione accettata.
+una trasformazione pura; `play_card` salva il deck, paga prima del resolver e
+ripristina l'intero snapshot se l'azione viene rifiutata.
 
 ## Card Instance
 
@@ -68,6 +76,7 @@ Card_Instance :: struct {
 	id:            u32,
 	definition_id: Card_Id,
 	upgrade_level: i32,
+	lifetime:      Card_Lifetime,
 }
 ```
 
@@ -75,8 +84,9 @@ Card_Instance :: struct {
 effetti persistenti: un `Reaction_Binding` installato da `Counter_Rune` conserva
 la sorgente `{kind = .Card, id = instance.id}`.
 
-L'upgrade valido e compreso fra zero e dieci. Questo limite rende controllabile
-il calcolo delle quantita e viene validato prima di costruire effetti.
+L'upgrade valido e compreso fra zero e dieci. `Permanent` e il valore zero e
+mantiene valide le istanze possedute; `Combat` identifica carte create nel fight.
+Questo lifetime viene validato insieme alla definizione prima di costruire effetti.
 
 ## Effect Template
 
@@ -94,11 +104,21 @@ Card_Effect_Template :: struct {
 	reaction:           Reaction_Id,
 	charges:            i32,
 	priority_modifier:  i32,
+	card_definition:    Card_Id,
+	has_card_definition: bool,
 }
 ```
 
-I campi non pertinenti restano a zero. `Move` e rifiutato intenzionalmente:
+`card_definition` e usato da `Create_Card` e deve essere accompagnato da
+`has_card_definition = true`: in questo modo un campo omesso non crea
+silenziosamente la carta con ID zero. I campi non pertinenti restano a zero.
+`Move` e rifiutato intenzionalmente:
 servirebbe un selettore di coordinate, non un `Entity_Ref` inventato.
+
+`Draw_Cards`, `Discard_Cards` e `Create_Card` richiedono il selettore `Player` e
+una quantita positiva. La create valida anche il `Card_Id` prodotto. In
+compilazione diventano normali `Effect`, quindi report, ordine causale e timeline
+non richiedono un secondo resolver dedicato al deck.
 
 ## Compilazione
 
@@ -124,9 +144,10 @@ applica gli effetti risultanti.
 1. trova l'ID nella mano corrente;
 2. compila target ed effetti;
 3. verifica il costo contro l'energia disponibile;
-4. risolve l'azione;
-5. soltanto se accettata paga e sposta la carta nel discard;
-6. esegue un pulse e pesca un rimpiazzo se il fight continua.
+4. salva il deck, paga e sposta la carta in `Resolving`;
+5. risolve l'azione e rollbacka il deck se viene rifiutata;
+6. sposta la carta in discard o exhaust;
+7. esegue un pulse e pesca un rimpiazzo se il fight continua.
 
 Una carta rifiutata lascia invariati energia, mano, draw, discard e stato RNG.
 
@@ -203,7 +224,11 @@ ancora con l'upgrade.
 | `Toxic_Wave` | Rare | 2 | implicito, None | Poison 1 per 3 pulse a ogni nemico |
 | `Thorn_Coat` | Uncommon | 1 | player, None | Thorns 1 per 3 pulse |
 | `Afterimage` | Uncommon | 1 | player, None | Afterimage 1 per 4 pulse |
-| `Counter_Rune` | Rare | 1 | player, None | due contraccolpi, durata 4 pulse |
+| `Counter_Rune` | Rare | 1 | player, None | Retain; due contraccolpi, durata 4 pulse |
+| `Battle_Focus` | Rare | 1 | player, None | Ethereal; pesca 2, poi exhaust |
+| `Calculated_Risk` | Uncommon | 1 | player, None | pesca 2, poi scarta la carta piu a sinistra |
+| `Spark_Forge` | Uncommon | 1 | player, None | crea una `Spark` temporanea |
+| `Spark` | temporary only | 0 | avversario, Manhattan 1-2, Single | 2 danni, +1 per upgrade; exhaust on play |
 
 La mano in basso sovrappone le carte e ne lascia visibili soltanto le testate.
 L'hover solleva una carta; il drag la porta sul campo e mostra cast range,
@@ -251,7 +276,8 @@ volta soltanto se la carta e stata accettata.
 
 Non sono ancora implementati:
 
-- exhaust e carte temporanee create durante il fight;
+- selezione interattiva della carta da scartare;
+- modificatori runtime di costo e rigenerazione;
 - coni, rotazioni libere delle footprint e proiettili persistenti;
 - upgrade di durata, cariche o costo;
 - caricamento delle definizioni da file;

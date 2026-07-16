@@ -36,6 +36,10 @@ Card_Id :: enum {
 	Thorn_Coat,
 	Afterimage,
 	Counter_Rune,
+	Battle_Focus,
+	Calculated_Risk,
+	Spark_Forge,
+	Spark,
 	Count,
 }
 
@@ -71,6 +75,8 @@ Card_Effect_Template :: struct {
 	reaction:           Reaction_Id,
 	charges:            i32,
 	priority_modifier:  i32,
+	card_definition:    Card_Id,
+	has_card_definition: bool,
 }
 
 Card_Definition :: struct {
@@ -80,6 +86,10 @@ Card_Definition :: struct {
 	reward_weight:   u32,
 	shop_base_price: i32,
 	cost:            i32,
+	temporary_only:  bool,
+	exhaust_on_play: bool,
+	retain_on_refocus: bool,
+	ethereal:          bool,
 	targeting:       Targeting_Spec,
 	effects:         [MAX_CARD_DEFINITION_EFFECTS]Card_Effect_Template,
 	effect_count:    int,
@@ -89,6 +99,7 @@ Card_Instance :: struct {
 	id:             u32,
 	definition_id:  Card_Id,
 	upgrade_level:  i32,
+	lifetime:       Card_Lifetime,
 }
 
 CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
@@ -326,6 +337,7 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 		reward_weight = 65,
 		shop_base_price = 8,
 		cost = 1,
+		retain_on_refocus = true,
 		targeting = {rule = .Self},
 		effects = {
 			{
@@ -336,6 +348,98 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 				duration = 4,
 				reaction = .Thorns_Counter,
 				charges = 2,
+			},
+			{},
+			{},
+			{},
+		},
+		effect_count = 1,
+	},
+	{
+		id = .Battle_Focus,
+		name = "Battle Focus",
+		rarity = .Rare,
+		reward_weight = 65,
+		shop_base_price = 8,
+		cost = 1,
+		exhaust_on_play = true,
+		ethereal = true,
+		targeting = {rule = .Self},
+		effects = {
+			{
+				kind = .Draw_Cards,
+				target = .Player,
+				base_amount = 2,
+			},
+			{},
+			{},
+			{},
+		},
+		effect_count = 1,
+	},
+	{
+		id = .Calculated_Risk,
+		name = "Calculated Risk",
+		rarity = .Uncommon,
+		reward_weight = 80,
+		shop_base_price = 5,
+		cost = 1,
+		targeting = {rule = .Self},
+		effects = {
+			{
+				kind = .Draw_Cards,
+				target = .Player,
+				base_amount = 2,
+			},
+			{
+				kind = .Discard_Cards,
+				target = .Player,
+				base_amount = 1,
+			},
+			{},
+			{},
+		},
+		effect_count = 2,
+	},
+	{
+		id = .Spark_Forge,
+		name = "Spark Forge",
+		rarity = .Uncommon,
+		reward_weight = 75,
+		shop_base_price = 5,
+		cost = 1,
+		targeting = {rule = .Self},
+		effects = {
+			{
+				kind = .Create_Card,
+				target = .Player,
+				base_amount = 1,
+				card_definition = .Spark,
+				has_card_definition = true,
+			},
+			{},
+			{},
+			{},
+		},
+		effect_count = 1,
+	},
+	{
+		id = .Spark,
+		name = "Spark",
+		rarity = .Common,
+		cost = 0,
+		temporary_only = true,
+		targeting = {
+			rule = .Opponent,
+			cast_range = {.Manhattan, 1, 2},
+			shape = .Single,
+		},
+		effects = {
+			{
+				kind = .Damage,
+				target = .Chosen_Entity,
+				base_amount = 2,
+				amount_per_upgrade = 1,
 			},
 			{},
 			{},
@@ -400,6 +504,12 @@ card_effect_template_is_valid :: proc(
 		return card_amount_template_is_valid(template)
 	case .Gain_Gold:
 		return template.target == .Player && card_amount_template_is_valid(template)
+	case .Draw_Cards, .Discard_Cards:
+		return template.target == .Player && card_amount_template_is_valid(template)
+	case .Create_Card:
+		_, found := card_definition_by_id(template.card_definition)
+		return template.target == .Player && template.has_card_definition && found &&
+		       card_amount_template_is_valid(template)
 	case .Apply_Status:
 		return status_kind_is_valid(template.status) && template.duration > 0 &&
 		       card_amount_template_is_valid(template)
@@ -419,10 +529,16 @@ card_effect_template_is_valid :: proc(
 validate_card_definition :: proc(definition: ^Card_Definition) -> bool {
 	if definition == nil || int(definition.id) < 0 || int(definition.id) >= int(Card_Id.Count) ||
 	   len(definition.name) == 0 || int(definition.rarity) < 0 ||
-	   int(definition.rarity) >= int(Card_Rarity.Count) || definition.reward_weight == 0 ||
-	   definition.shop_base_price <= 0 || definition.cost < 0 ||
+	   int(definition.rarity) >= int(Card_Rarity.Count) || definition.cost < 0 ||
+	   (definition.retain_on_refocus && definition.ethereal) ||
 	   !targeting_spec_is_valid(definition.targeting) ||
 	   definition.effect_count <= 0 || definition.effect_count > MAX_CARD_DEFINITION_EFFECTS {
+		return false
+	}
+	if (!definition.temporary_only &&
+	    (definition.reward_weight == 0 || definition.shop_base_price <= 0)) ||
+	   (definition.temporary_only &&
+	    (definition.reward_weight != 0 || definition.shop_base_price != 0 || definition.exhaust_on_play)) {
 		return false
 	}
 	for index in 0..<definition.effect_count {
@@ -453,11 +569,48 @@ card_definition_by_id :: proc(id: Card_Id) -> (Card_Definition, bool) {
 }
 
 validate_card_instance :: proc(instance: Card_Instance) -> bool {
-	if instance.id == 0 || instance.upgrade_level < 0 || instance.upgrade_level > MAX_CARD_UPGRADE_LEVEL {
+	if instance.id == 0 || instance.upgrade_level < 0 || instance.upgrade_level > MAX_CARD_UPGRADE_LEVEL ||
+	   int(instance.lifetime) < 0 || int(instance.lifetime) >= int(Card_Lifetime.Count) {
 		return false
 	}
 	definition, found := card_definition_by_id(instance.definition_id)
-	return found && validate_card_definition(&definition)
+	return found && validate_card_definition(&definition) &&
+	       (!definition.temporary_only || instance.lifetime == .Combat)
+}
+
+card_destination_after_play :: proc(instance: Card_Instance) -> (Card_Zone, bool) {
+	if !validate_card_instance(instance) {
+		return .Count, false
+	}
+	definition, found := card_definition_by_id(instance.definition_id)
+	assert(found)
+	if instance.lifetime == .Combat || definition.exhaust_on_play {
+		return .Exhaust, true
+	}
+	return .Discard, true
+}
+
+card_definition_destination_after_refocus :: proc(definition: Card_Definition) -> (Card_Zone, bool) {
+	validated_definition := definition
+	if !validate_card_definition(&validated_definition) {
+		return .Count, false
+	}
+	if definition.retain_on_refocus {
+		return .Hand, true
+	}
+	if definition.ethereal {
+		return .Exhaust, true
+	}
+	return .Discard, true
+}
+
+card_destination_after_refocus :: proc(instance: Card_Instance) -> (Card_Zone, bool) {
+	if !validate_card_instance(instance) {
+		return .Count, false
+	}
+	definition, found := card_definition_by_id(instance.definition_id)
+	assert(found)
+	return card_definition_destination_after_refocus(definition)
 }
 
 card_effect_amount :: proc(template: Card_Effect_Template, upgrade_level: i32) -> i32 {
@@ -482,6 +635,15 @@ instantiate_card_effect :: proc(
 	case .Gain_Gold:
 		amount := card_effect_amount(template, instance.upgrade_level)
 		return gain_gold_effect(amount), true
+	case .Draw_Cards:
+		amount := card_effect_amount(template, instance.upgrade_level)
+		return draw_cards_effect(amount), true
+	case .Discard_Cards:
+		amount := card_effect_amount(template, instance.upgrade_level)
+		return discard_cards_effect(amount), true
+	case .Create_Card:
+		amount := card_effect_amount(template, instance.upgrade_level)
+		return create_card_effect(template.card_definition, amount), true
 	case .Apply_Status:
 		amount := card_effect_amount(template, instance.upgrade_level)
 		return apply_status_effect(target, template.status, amount, template.duration), true
@@ -584,7 +746,8 @@ evaluate_card_targeting :: proc(
 		return
 	}
 	evaluation.error = .Invalid_Instance
-	if instance.id == 0 || instance.upgrade_level < 0 || instance.upgrade_level > MAX_CARD_UPGRADE_LEVEL {
+	if instance.id == 0 || instance.upgrade_level < 0 || instance.upgrade_level > MAX_CARD_UPGRADE_LEVEL ||
+	   int(instance.lifetime) < 0 || int(instance.lifetime) >= int(Card_Lifetime.Count) {
 		return
 	}
 	definition, found := card_definition_by_id(instance.definition_id)
@@ -594,6 +757,10 @@ evaluate_card_targeting :: proc(
 	}
 	evaluation.error = .Invalid_Definition
 	if !validate_card_definition(&definition) {
+		return
+	}
+	evaluation.error = .Invalid_Instance
+	if !validate_card_instance(instance) {
 		return
 	}
 	evaluation.query = evaluate_target_query(room, PLAYER_ENTITY, definition.targeting, request)
@@ -635,7 +802,8 @@ compile_card_action :: proc(
 	if room.phase != .Combat {
 		return {}, .Invalid_Phase
 	}
-	if instance.id == 0 || instance.upgrade_level < 0 || instance.upgrade_level > MAX_CARD_UPGRADE_LEVEL {
+	if instance.id == 0 || instance.upgrade_level < 0 || instance.upgrade_level > MAX_CARD_UPGRADE_LEVEL ||
+	   int(instance.lifetime) < 0 || int(instance.lifetime) >= int(Card_Lifetime.Count) {
 		return {}, .Invalid_Instance
 	}
 	definition, found := card_definition_by_id(instance.definition_id)
@@ -644,6 +812,9 @@ compile_card_action :: proc(
 	}
 	if !validate_card_definition(&definition) {
 		return {}, .Invalid_Definition
+	}
+	if !validate_card_instance(instance) {
+		return {}, .Invalid_Instance
 	}
 	request, has_request := card_target_request_from_target(room, definition, target)
 	if !has_request {

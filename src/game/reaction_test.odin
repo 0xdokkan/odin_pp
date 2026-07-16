@@ -136,6 +136,38 @@ test_thorns_reacts_after_damage_and_preserves_event_order :: proc(t: ^testing.T)
 }
 
 @(test)
+test_reaction_queue_preserves_damage_after_dense_deck_events :: proc(t: ^testing.T) {
+	level_data := create_test_level(t)
+	defer level.destroy(&level_data)
+	player := create_test_player(t)
+	enemies := [?]Enemy_Spawn{{position = {x = 2, y = 1}, health = 100, attack = 1}}
+	room, ok := create_room(&level_data, &player, {enemies = enemies[:]})
+	testing.expect(t, ok)
+	defer destroy_room(&room)
+	enemy_ref := enemy_entity(room.enemies[0].id)
+	apply_status(&room, enemy_ref, .Thorns, 2, 3)
+
+	action := make_action(.Ability, PLAYER_ENTITY, entity_target(enemy_ref), .Opponent)
+	for index in 0..<9 {
+		if index%2 == 0 {
+			testing.expect(t, add_effect(&action, discard_cards_effect(MAX_HAND_CARDS)))
+		} else {
+			testing.expect(t, add_effect(&action, draw_cards_effect(MAX_HAND_CARDS)))
+		}
+	}
+	testing.expect(t, add_effect(&action, damage_effect(enemy_ref, 1)))
+	report := resolve_action(&room, &action)
+
+	testing.expect(t, report.accepted)
+	testing.expect(t, report.events.count > 64)
+	testing.expect_value(t, report.reaction_events_dropped, 0)
+	testing.expect_value(t, report.reactions_triggered, 1)
+	testing.expect_value(t, report.reaction_events_processed, 71)
+	testing.expect_value(t, room.enemies[0].health, i32(99))
+	testing.expect_value(t, player.health, i32(9))
+}
+
+@(test)
 test_thorns_does_not_react_to_fully_absorbed_damage :: proc(t: ^testing.T) {
 	level_data := create_test_level(t)
 	defer level.destroy(&level_data)

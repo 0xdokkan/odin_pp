@@ -262,10 +262,10 @@ I limiti attuali sono:
 
 | Risorsa | Capacita |
 |---|---:|
-| eventi contemporaneamente in queue | 64 |
+| eventi contemporaneamente in queue | 288 (`MAX_GAME_EVENTS`) |
 | richieste prodotte da un evento | 8 |
 | azioni reattive in una catena | 32 |
-| eventi conservati in un report | 64 |
+| eventi conservati in un report | 288 |
 | binding runtime in una stanza | 32 |
 
 Raggiungere un limite non annulla mutazioni gia applicate. Il sistema termina la

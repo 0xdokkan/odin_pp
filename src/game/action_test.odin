@@ -213,3 +213,140 @@ test_target_rules_distinguish_melee_and_ranged_actions :: proc(t: ^testing.T) {
 	testing.expect(t, ranged_report.accepted)
 	testing.expect_value(t, room.enemies[0].health, i32(3))
 }
+
+@(test)
+test_draw_cards_effect_draws_up_to_capacity_and_reports_each_card :: proc(t: ^testing.T) {
+	level_data := create_test_level(t)
+	defer level.destroy(&level_data)
+	player := create_test_player(t)
+	enemy_spawns := [?]Enemy_Spawn{{position = {x = 5, y = 3}, health = 4, attack = 1}}
+	room, ok := create_room(&level_data, &player, {enemies = enemy_spawns[:]})
+	testing.expect(t, ok)
+	defer destroy_room(&room)
+
+	expected_deck := player.deck
+	expected_cards: [MAX_HAND_CARDS]Card_Instance
+	expected_count := 0
+	for can_draw_card(&expected_deck) {
+		card, drawn := draw_card(&expected_deck)
+		testing.expect(t, drawn)
+		expected_cards[expected_count] = card
+		expected_count += 1
+	}
+	testing.expect(t, expected_count > 0)
+
+	action := make_action(.Ability, PLAYER_ENTITY, entity_target(PLAYER_ENTITY), .Self)
+	testing.expect(t, add_effect(&action, draw_cards_effect(MAX_HAND_CARDS)))
+	report := resolve_action(&room, &action)
+
+	testing.expect(t, report.accepted)
+	testing.expect_value(t, report.applied_effects, 1)
+	testing.expect_value(t, report.cards_drawn, expected_count)
+	testing.expect_value(t, report.events.count, expected_count)
+	testing.expect_value(t, player.deck, expected_deck)
+	for index in 0..<expected_count {
+		event := report.events.events[index]
+		testing.expect_value(t, event.kind, Game_Event_Kind.Card_Drawn)
+		testing.expect_value(t, event.card_id, expected_cards[index].id)
+		testing.expect_value(t, event.card_definition, expected_cards[index].definition_id)
+		testing.expect_value(t, event.card_lifetime, expected_cards[index].lifetime)
+		testing.expect_value(t, event.from_card_zone, Card_Zone.Draw)
+		testing.expect_value(t, event.to_card_zone, Card_Zone.Hand)
+	}
+}
+
+@(test)
+test_discard_cards_effect_uses_stable_hand_order_and_reports_moves :: proc(t: ^testing.T) {
+	level_data := create_test_level(t)
+	defer level.destroy(&level_data)
+	player := create_test_player(t)
+	enemy_spawns := [?]Enemy_Spawn{{position = {x = 5, y = 3}, health = 4, attack = 1}}
+	room, ok := create_room(&level_data, &player, {enemies = enemy_spawns[:]})
+	testing.expect(t, ok)
+	defer destroy_room(&room)
+
+	expected_first := player.deck.hand[0]
+	expected_second := player.deck.hand[1]
+	expected_deck := player.deck
+	_, first_discarded := discard_hand_card(&expected_deck, 0)
+	_, second_discarded := discard_hand_card(&expected_deck, 0)
+	testing.expect(t, first_discarded && second_discarded)
+
+	action := make_action(.Ability, PLAYER_ENTITY, entity_target(PLAYER_ENTITY), .Self)
+	testing.expect(t, add_effect(&action, discard_cards_effect(2)))
+	report := resolve_action(&room, &action)
+
+	testing.expect(t, report.accepted)
+	testing.expect_value(t, report.cards_discarded, 2)
+	testing.expect_value(t, report.events.count, 2)
+	testing.expect_value(t, player.deck, expected_deck)
+	expected_cards := [?]Card_Instance{expected_first, expected_second}
+	for card, index in expected_cards {
+		event := report.events.events[index]
+		testing.expect_value(t, event.kind, Game_Event_Kind.Card_Moved)
+		testing.expect_value(t, event.card_id, card.id)
+		testing.expect_value(t, event.card_definition, card.definition_id)
+		testing.expect_value(t, event.from_card_zone, Card_Zone.Hand)
+		testing.expect_value(t, event.to_card_zone, Card_Zone.Discard)
+	}
+}
+
+@(test)
+test_create_card_effect_creates_combat_cards_up_to_hand_capacity :: proc(t: ^testing.T) {
+	level_data := create_test_level(t)
+	defer level.destroy(&level_data)
+	player := create_test_player(t)
+	enemy_spawns := [?]Enemy_Spawn{{position = {x = 5, y = 3}, health = 4, attack = 1}}
+	room, ok := create_room(&level_data, &player, {enemies = enemy_spawns[:]})
+	testing.expect(t, ok)
+	defer destroy_room(&room)
+
+	expected_deck := player.deck
+	expected_cards: [MAX_HAND_CARDS]Card_Instance
+	expected_count := 0
+	for can_create_temporary_card(&expected_deck, .Spark) {
+		card, created := create_temporary_card(&expected_deck, .Spark)
+		testing.expect(t, created)
+		expected_cards[expected_count] = card
+		expected_count += 1
+	}
+	testing.expect(t, expected_count > 0)
+
+	action := make_action(.Ability, PLAYER_ENTITY, entity_target(PLAYER_ENTITY), .Self)
+	testing.expect(t, add_effect(&action, create_card_effect(.Spark, MAX_HAND_CARDS)))
+	report := resolve_action(&room, &action)
+
+	testing.expect(t, report.accepted)
+	testing.expect_value(t, report.cards_created, expected_count)
+	testing.expect_value(t, report.events.count, expected_count)
+	testing.expect_value(t, player.deck, expected_deck)
+	for index in 0..<expected_count {
+		event := report.events.events[index]
+		testing.expect_value(t, event.kind, Game_Event_Kind.Card_Created)
+		testing.expect_value(t, event.card_id, expected_cards[index].id)
+			testing.expect_value(t, event.card_definition, Card_Id.Spark)
+			testing.expect_value(t, event.card_lifetime, Card_Lifetime.Combat)
+			testing.expect_value(t, event.from_card_zone, Card_Zone.Count)
+			testing.expect_value(t, event.to_card_zone, Card_Zone.Hand)
+	}
+}
+
+@(test)
+test_unavailable_deck_effect_rejects_without_mutation :: proc(t: ^testing.T) {
+	level_data := create_test_level(t)
+	defer level.destroy(&level_data)
+	player := create_test_player(t)
+	enemy_spawns := [?]Enemy_Spawn{{position = {x = 5, y = 3}, health = 4, attack = 1}}
+	room, ok := create_room(&level_data, &player, {enemies = enemy_spawns[:]})
+	testing.expect(t, ok)
+	defer destroy_room(&room)
+
+	deck_before := player.deck
+	action := make_action(.Ability, PLAYER_ENTITY, entity_target(PLAYER_ENTITY), .Self)
+	testing.expect(t, add_effect(&action, create_card_effect(.Count, 1)))
+	report := resolve_action(&room, &action)
+
+	testing.expect(t, !report.accepted)
+	testing.expect_value(t, player.deck, deck_before)
+	testing.expect_value(t, report.events.count, 0)
+}

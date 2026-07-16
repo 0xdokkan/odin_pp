@@ -7,6 +7,9 @@ Pulse_Report :: struct {
 	damage_dealt:      i32,
 	damage_absorbed:   i32,
 	enemies_defeated:  int,
+	cards_drawn:       int,
+	cards_discarded:   int,
+	cards_created:     int,
 	reactions_triggered:       int,
 	reactions_dropped:         int,
 	reaction_events_processed: int,
@@ -26,6 +29,9 @@ merge_action_report :: proc(pulse: ^Pulse_Report, action: ^Action_Report) {
 	pulse.damage_dealt += action.damage_dealt
 	pulse.damage_absorbed += action.damage_absorbed
 	pulse.enemies_defeated += action.enemies_defeated
+	pulse.cards_drawn += action.cards_drawn
+	pulse.cards_discarded += action.cards_discarded
+	pulse.cards_created += action.cards_created
 	pulse.reactions_triggered += action.reactions_triggered
 	pulse.reactions_dropped += action.reactions_dropped
 	pulse.reaction_events_processed += action.reaction_events_processed

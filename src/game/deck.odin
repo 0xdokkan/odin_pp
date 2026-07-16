@@ -1,8 +1,16 @@
 package game
 
-MAX_OWNED_CARDS :: 32
-MAX_HAND_CARDS  :: 8
-MIN_OWNED_CARDS :: 5
+MAX_OWNED_CARDS     :: 32
+MAX_HAND_CARDS      :: 8
+MAX_TEMPORARY_CARDS :: 16
+MAX_COMBAT_CARDS    :: MAX_OWNED_CARDS+MAX_TEMPORARY_CARDS
+MIN_OWNED_CARDS     :: 5
+
+// La validazione profonda di zone e ownership e O(carte al quadrato) e gira su
+// ogni primitiva del deck. I confini transazionali (begin combat, play,
+// refocus, shop) validano sempre per intero; -define:DECK_DEEP_VALIDATION=false
+// riduce le primitive interne ai soli controlli strutturali economici.
+DECK_DEEP_VALIDATION :: #config(DECK_DEEP_VALIDATION, true)
 
 STARTING_HAND_SIZE             :: 5
 DEFAULT_MAX_ENERGY             :: i32(3)
@@ -21,18 +29,38 @@ DEFAULT_DECK_RULES :: Deck_Rules{
 	energy_regen_per_pulse = DEFAULT_ENERGY_REGEN_PER_PULSE,
 }
 
+Card_Lifetime :: enum {
+	Permanent,
+	Combat,
+	Count,
+}
+
+Card_Zone :: enum {
+	Draw,
+	Hand,
+	Discard,
+	Exhaust,
+	Resolving,
+	Count,
+}
+
 Deck_State :: struct {
 	owned:             [MAX_OWNED_CARDS]Card_Instance,
 	owned_count:       int,
-	draw_pile:         [MAX_OWNED_CARDS]Card_Instance,
+	draw_pile:         [MAX_COMBAT_CARDS]Card_Instance,
 	draw_count:        int,
 	hand:              [MAX_HAND_CARDS]Card_Instance,
 	hand_count:        int,
-	discard_pile:      [MAX_OWNED_CARDS]Card_Instance,
+	discard_pile:      [MAX_COMBAT_CARDS]Card_Instance,
 	discard_count:     int,
+	exhaust_pile:      [MAX_COMBAT_CARDS]Card_Instance,
+	exhaust_count:     int,
+	resolving_card:    Card_Instance,
+	has_resolving_card: bool,
 	energy:            i32,
 	rules:             Deck_Rules,
 	next_card_id:      u32,
+	combat_card_id_floor: u32,
 	random_state:      u64,
 	combat_active:     bool,
 }
@@ -44,6 +72,19 @@ Deck_Mutation_Result :: enum {
 	Card_Not_Found,
 	Maximum_Upgrade,
 	Minimum_Deck_Size,
+}
+
+Card_Refocus_Outcome :: struct {
+	card:        Card_Instance,
+	destination: Card_Zone,
+}
+
+Deck_Refocus_Report :: struct {
+	outcomes:        [MAX_HAND_CARDS]Card_Refocus_Outcome,
+	outcome_count:   int,
+	retained_count:  int,
+	discarded_count: int,
+	exhausted_count: int,
 }
 
 deck_rules_are_valid :: proc(rules: Deck_Rules) -> bool {
@@ -108,10 +149,15 @@ add_owned_card :: proc(
 	   deck.next_card_id == max(u32) || !validate_deck_state(deck) {
 		return {}, false
 	}
+	definition, found := card_definition_by_id(definition_id)
+	if !found || definition.temporary_only {
+		return {}, false
+	}
 	instance := Card_Instance{
 		id = deck.next_card_id,
 		definition_id = definition_id,
 		upgrade_level = upgrade_level,
+		lifetime = .Permanent,
 	}
 	if !validate_card_instance(instance) {
 		return {}, false
@@ -207,7 +253,7 @@ deck_next_random :: proc(deck: ^Deck_State) -> u64 {
 }
 
 shuffle_draw_pile :: proc(deck: ^Deck_State) {
-	assert(deck != nil && deck.draw_count >= 0 && deck.draw_count <= MAX_OWNED_CARDS)
+	assert(deck != nil && deck.draw_count >= 0 && deck.draw_count <= MAX_COMBAT_CARDS)
 	for index := deck.draw_count-1; index > 0; index -= 1 {
 		swap_index := int(deck_next_random(deck)%u64(index+1))
 		deck.draw_pile[index], deck.draw_pile[swap_index] =
@@ -215,31 +261,35 @@ shuffle_draw_pile :: proc(deck: ^Deck_State) {
 	}
 }
 
+can_draw_card :: proc(deck: ^Deck_State) -> bool {
+	return deck != nil && deck.combat_active && deck_state_is_consistent(deck) &&
+	       deck.hand_count < MAX_HAND_CARDS &&
+	       (deck.draw_count > 0 || deck.discard_count > 0)
+}
+
 draw_card :: proc(deck: ^Deck_State) -> (card: Card_Instance, ok: bool) {
-	if deck == nil || !deck.combat_active || deck.hand_count < 0 ||
-	   deck.hand_count >= deck.rules.hand_size || deck.hand_count >= MAX_HAND_CARDS ||
-	   deck.draw_count < 0 || deck.draw_count > MAX_OWNED_CARDS ||
-	   deck.discard_count < 0 || deck.discard_count > MAX_OWNED_CARDS {
+	if !can_draw_card(deck) {
 		return {}, false
 	}
-	if deck.draw_count == 0 {
-		if deck.discard_count <= 0 || deck.discard_count > MAX_OWNED_CARDS {
-			return {}, false
+
+	staged := deck^
+	if staged.draw_count == 0 {
+		for index in 0..<staged.discard_count {
+			staged.draw_pile[index] = staged.discard_pile[index]
+			staged.discard_pile[index] = {}
 		}
-		for index in 0..<deck.discard_count {
-			deck.draw_pile[index] = deck.discard_pile[index]
-			deck.discard_pile[index] = {}
-		}
-		deck.draw_count = deck.discard_count
-		deck.discard_count = 0
-		shuffle_draw_pile(deck)
+		staged.draw_count = staged.discard_count
+		staged.discard_count = 0
+		shuffle_draw_pile(&staged)
 	}
 
-	deck.draw_count -= 1
-	card = deck.draw_pile[deck.draw_count]
-	deck.draw_pile[deck.draw_count] = {}
-	deck.hand[deck.hand_count] = card
-	deck.hand_count += 1
+	staged.draw_count -= 1
+	card = staged.draw_pile[staged.draw_count]
+	staged.draw_pile[staged.draw_count] = {}
+	staged.hand[staged.hand_count] = card
+	staged.hand_count += 1
+	assert(deck_state_is_consistent(&staged))
+	deck^ = staged
 	return card, true
 }
 
@@ -258,23 +308,34 @@ draw_to_hand_size :: proc(deck: ^Deck_State) -> (drawn: int) {
 }
 
 begin_deck_combat :: proc(deck: ^Deck_State) -> bool {
-	if deck == nil || !validate_deck_state(deck) || deck.owned_count <= 0 {
+	if deck == nil || deck.combat_active || !validate_deck_state(deck) || deck.owned_count <= 0 {
 		return false
 	}
-	deck.draw_pile = {}
-	deck.hand = {}
-	deck.discard_pile = {}
-	deck.draw_count = deck.owned_count
-	deck.hand_count = 0
-	deck.discard_count = 0
-	deck.energy = deck.rules.max_energy
-	deck.combat_active = true
-	for index in 0..<deck.owned_count {
-		deck.draw_pile[index] = deck.owned[index]
+
+	staged := deck^
+	staged.draw_pile = {}
+	staged.hand = {}
+	staged.discard_pile = {}
+	staged.exhaust_pile = {}
+	staged.resolving_card = {}
+	staged.draw_count = staged.owned_count
+	staged.hand_count = 0
+	staged.discard_count = 0
+	staged.exhaust_count = 0
+	staged.has_resolving_card = false
+	staged.energy = staged.rules.max_energy
+	staged.combat_card_id_floor = staged.next_card_id
+	staged.combat_active = true
+	for index in 0..<staged.owned_count {
+		staged.draw_pile[index] = staged.owned[index]
 	}
-	shuffle_draw_pile(deck)
-	draw_to_hand_size(deck)
-	return validate_deck_state(deck)
+	shuffle_draw_pile(&staged)
+	draw_to_hand_size(&staged)
+	if !validate_deck_state(&staged) {
+		return false
+	}
+	deck^ = staged
+	return true
 }
 
 finish_deck_combat :: proc(deck: ^Deck_State) {
@@ -284,10 +345,15 @@ finish_deck_combat :: proc(deck: ^Deck_State) {
 	deck.draw_pile = {}
 	deck.hand = {}
 	deck.discard_pile = {}
+	deck.exhaust_pile = {}
+	deck.resolving_card = {}
 	deck.draw_count = 0
 	deck.hand_count = 0
 	deck.discard_count = 0
+	deck.exhaust_count = 0
+	deck.has_resolving_card = false
 	deck.energy = 0
+	deck.combat_card_id_floor = 0
 	deck.combat_active = false
 }
 
@@ -297,20 +363,223 @@ sync_deck_with_room_phase :: proc(room: ^Room) {
 	}
 }
 
-discard_hand_card :: proc(deck: ^Deck_State, hand_index: int) -> (Card_Instance, bool) {
-	if deck == nil || !deck.combat_active || hand_index < 0 || hand_index >= deck.hand_count ||
-	   deck.discard_count < 0 || deck.discard_count >= MAX_OWNED_CARDS {
+can_move_hand_card_to_zone :: proc(
+	deck: ^Deck_State,
+	hand_index: int,
+	destination: Card_Zone,
+) -> bool {
+	if deck == nil || !deck.combat_active || !deck_state_is_consistent(deck) ||
+	   hand_index < 0 || hand_index >= deck.hand_count {
+		return false
+	}
+	switch destination {
+	case .Discard:
+		return deck.discard_count < MAX_COMBAT_CARDS
+	case .Exhaust:
+		return deck.exhaust_count < MAX_COMBAT_CARDS
+	case .Draw, .Hand, .Resolving, .Count:
+	}
+	return false
+}
+
+can_discard_hand_card :: proc(deck: ^Deck_State, hand_index: int) -> bool {
+	return can_move_hand_card_to_zone(deck, hand_index, .Discard)
+}
+
+move_hand_card_to_zone :: proc(
+	deck: ^Deck_State,
+	hand_index: int,
+	destination: Card_Zone,
+) -> (Card_Instance, bool) {
+	if !can_move_hand_card_to_zone(deck, hand_index, destination) {
 		return {}, false
 	}
-	card := deck.hand[hand_index]
-	for index in hand_index..<deck.hand_count-1 {
-		deck.hand[index] = deck.hand[index+1]
+
+	staged := deck^
+	card := staged.hand[hand_index]
+	for index in hand_index..<staged.hand_count-1 {
+		staged.hand[index] = staged.hand[index+1]
 	}
-	deck.hand_count -= 1
-	deck.hand[deck.hand_count] = {}
-	deck.discard_pile[deck.discard_count] = card
-	deck.discard_count += 1
+	staged.hand_count -= 1
+	staged.hand[staged.hand_count] = {}
+	switch destination {
+	case .Discard:
+		staged.discard_pile[staged.discard_count] = card
+		staged.discard_count += 1
+	case .Exhaust:
+		staged.exhaust_pile[staged.exhaust_count] = card
+		staged.exhaust_count += 1
+	case .Draw, .Hand, .Resolving, .Count:
+		unreachable()
+	}
+	assert(deck_state_is_consistent(&staged))
+	deck^ = staged
 	return card, true
+}
+
+discard_hand_card :: proc(deck: ^Deck_State, hand_index: int) -> (Card_Instance, bool) {
+	return move_hand_card_to_zone(deck, hand_index, .Discard)
+}
+
+exhaust_hand_card :: proc(deck: ^Deck_State, hand_index: int) -> (Card_Instance, bool) {
+	return move_hand_card_to_zone(deck, hand_index, .Exhaust)
+}
+
+refocus_deck_hand :: proc(deck: ^Deck_State) -> (report: Deck_Refocus_Report, ok: bool) {
+	if deck == nil || !deck.combat_active || deck.has_resolving_card ||
+	   !deck_state_is_consistent(deck) {
+		return
+	}
+
+	original_hand := deck.hand
+	original_count := deck.hand_count
+	staged := deck^
+	for index in 0..<original_count {
+		card := original_hand[index]
+		destination, valid_destination := card_destination_after_refocus(card)
+		if !valid_destination {
+			return {}, false
+		}
+		if destination == .Hand {
+			report.retained_count += 1
+		} else {
+			hand_index, found := hand_card_index_by_id(&staged, card.id)
+			if !found {
+				return {}, false
+			}
+			moved_card, moved := move_hand_card_to_zone(&staged, hand_index, destination)
+			if !moved || moved_card != card {
+				return {}, false
+			}
+			if destination == .Discard {
+				report.discarded_count += 1
+			} else if destination == .Exhaust {
+				report.exhausted_count += 1
+			} else {
+				return {}, false
+			}
+		}
+		report.outcomes[report.outcome_count] = {card = card, destination = destination}
+		report.outcome_count += 1
+	}
+	if report.outcome_count != original_count || !deck_state_is_consistent(&staged) {
+		return {}, false
+	}
+	deck^ = staged
+	return report, true
+}
+
+begin_resolving_hand_card :: proc(
+	deck: ^Deck_State,
+	hand_index: int,
+) -> (Card_Instance, bool) {
+	if deck == nil || !deck.combat_active || !deck_state_is_consistent(deck) ||
+	   deck.has_resolving_card || hand_index < 0 || hand_index >= deck.hand_count {
+		return {}, false
+	}
+
+	staged := deck^
+	card := staged.hand[hand_index]
+	for index in hand_index..<staged.hand_count-1 {
+		staged.hand[index] = staged.hand[index+1]
+	}
+	staged.hand_count -= 1
+	staged.hand[staged.hand_count] = {}
+	staged.resolving_card = card
+	staged.has_resolving_card = true
+	assert(deck_state_is_consistent(&staged))
+	deck^ = staged
+	return card, true
+}
+
+finish_resolving_card :: proc(
+	deck: ^Deck_State,
+	destination: Card_Zone,
+) -> (Card_Instance, bool) {
+	if deck == nil || !deck.combat_active || !deck_state_is_consistent(deck) ||
+	   !deck.has_resolving_card ||
+	   (destination != .Discard && destination != .Exhaust) {
+		return {}, false
+	}
+	if destination == .Discard && deck.discard_count >= MAX_COMBAT_CARDS {
+		return {}, false
+	}
+	if destination == .Exhaust && deck.exhaust_count >= MAX_COMBAT_CARDS {
+		return {}, false
+	}
+
+	staged := deck^
+	card := staged.resolving_card
+	staged.resolving_card = {}
+	staged.has_resolving_card = false
+	if destination == .Discard {
+		staged.discard_pile[staged.discard_count] = card
+		staged.discard_count += 1
+	} else {
+		staged.exhaust_pile[staged.exhaust_count] = card
+		staged.exhaust_count += 1
+	}
+	assert(deck_state_is_consistent(&staged))
+	deck^ = staged
+	return card, true
+}
+
+combat_temporary_card_count :: proc(deck: ^Deck_State) -> int {
+	if deck == nil || !deck.combat_active {
+		return 0
+	}
+	resolving_count := 0
+	if deck.has_resolving_card {
+		resolving_count = 1
+	}
+	return deck.draw_count+deck.hand_count+deck.discard_count+deck.exhaust_count+
+	       resolving_count-
+	       deck.owned_count
+}
+
+can_create_temporary_card :: proc(
+	deck: ^Deck_State,
+	definition_id: Card_Id,
+	upgrade_level: i32 = 0,
+) -> bool {
+	if deck == nil || !deck.combat_active || !deck_state_is_consistent(deck) ||
+	   deck.hand_count >= MAX_HAND_CARDS || deck.next_card_id == max(u32) ||
+	   combat_temporary_card_count(deck) >= MAX_TEMPORARY_CARDS ||
+	   deck.draw_count+deck.hand_count+deck.discard_count+deck.exhaust_count+
+	   (1 if deck.has_resolving_card else 0) >= MAX_COMBAT_CARDS {
+		return false
+	}
+	instance := Card_Instance{
+		id = deck.next_card_id,
+		definition_id = definition_id,
+		upgrade_level = upgrade_level,
+		lifetime = .Combat,
+	}
+	return validate_card_instance(instance)
+}
+
+create_temporary_card :: proc(
+	deck: ^Deck_State,
+	definition_id: Card_Id,
+	upgrade_level: i32 = 0,
+) -> (Card_Instance, bool) {
+	if !can_create_temporary_card(deck, definition_id, upgrade_level) {
+		return {}, false
+	}
+
+	staged := deck^
+	instance := Card_Instance{
+		id = staged.next_card_id,
+		definition_id = definition_id,
+		upgrade_level = upgrade_level,
+		lifetime = .Combat,
+	}
+	staged.hand[staged.hand_count] = instance
+	staged.hand_count += 1
+	staged.next_card_id += 1
+	assert(deck_state_is_consistent(&staged))
+	deck^ = staged
+	return instance, true
 }
 
 restore_deck_energy_after_pulse :: proc(deck: ^Deck_State) -> i32 {
@@ -322,18 +591,33 @@ restore_deck_energy_after_pulse :: proc(deck: ^Deck_State) -> i32 {
 	return deck.energy-before
 }
 
+deck_counts_are_valid :: proc(deck: ^Deck_State) -> bool {
+	return deck != nil && deck_rules_are_valid(deck.rules) && deck.random_state != 0 &&
+	       deck.next_card_id != 0 && deck.owned_count >= 0 && deck.owned_count <= MAX_OWNED_CARDS &&
+	       deck.draw_count >= 0 && deck.draw_count <= MAX_COMBAT_CARDS &&
+	       deck.hand_count >= 0 && deck.hand_count <= MAX_HAND_CARDS &&
+	       deck.discard_count >= 0 && deck.discard_count <= MAX_COMBAT_CARDS &&
+	       deck.exhaust_count >= 0 && deck.exhaust_count <= MAX_COMBAT_CARDS
+}
+
+deck_state_is_consistent :: proc(deck: ^Deck_State) -> bool {
+	when DECK_DEEP_VALIDATION {
+		return validate_deck_state(deck)
+	} else {
+		return deck_counts_are_valid(deck)
+	}
+}
+
 validate_deck_state :: proc(deck: ^Deck_State) -> bool {
-	if deck == nil || !deck_rules_are_valid(deck.rules) || deck.random_state == 0 ||
-	   deck.next_card_id == 0 || deck.owned_count < 0 || deck.owned_count > MAX_OWNED_CARDS ||
-	   deck.draw_count < 0 || deck.draw_count > MAX_OWNED_CARDS ||
-	   deck.hand_count < 0 || deck.hand_count > MAX_HAND_CARDS ||
-	   deck.discard_count < 0 || deck.discard_count > MAX_OWNED_CARDS {
+	if !deck_counts_are_valid(deck) {
 		return false
 	}
 
 	for index in 0..<deck.owned_count {
 		card := deck.owned[index]
-		if !validate_card_instance(card) || card.id >= deck.next_card_id {
+		definition, found := card_definition_by_id(card.definition_id)
+		if !found || definition.temporary_only || !validate_card_instance(card) ||
+		   card.lifetime != .Permanent || card.id >= deck.next_card_id {
 			return false
 		}
 		for previous in 0..<index {
@@ -345,34 +629,90 @@ validate_deck_state :: proc(deck: ^Deck_State) -> bool {
 
 	if !deck.combat_active {
 		return deck.draw_count == 0 && deck.hand_count == 0 &&
-		       deck.discard_count == 0 && deck.energy == 0
+		       deck.discard_count == 0 && deck.exhaust_count == 0 &&
+		       !deck.has_resolving_card && deck.resolving_card == (Card_Instance{}) &&
+		       deck.energy == 0 && deck.combat_card_id_floor == 0
 	}
-	if deck.hand_count > deck.rules.hand_size || deck.energy < 0 || deck.energy > deck.rules.max_energy ||
-	   deck.draw_count+deck.hand_count+deck.discard_count != deck.owned_count {
+	if deck.combat_card_id_floor == 0 || deck.combat_card_id_floor > deck.next_card_id ||
+	   deck.energy < 0 || deck.energy > deck.rules.max_energy {
+		return false
+	}
+	for index in 0..<deck.owned_count {
+		if deck.owned[index].id >= deck.combat_card_id_floor {
+			return false
+		}
+	}
+
+	resolving_count := 0
+	if deck.has_resolving_card {
+		resolving_count = 1
+	} else if deck.resolving_card != (Card_Instance{}) {
+		return false
+	}
+	total_cards := deck.draw_count+deck.hand_count+deck.discard_count+deck.exhaust_count+
+	               resolving_count
+	if total_cards < deck.owned_count || total_cards > MAX_COMBAT_CARDS {
 		return false
 	}
 
-	seen: [MAX_OWNED_CARDS]bool
-	for index in 0..<deck.draw_count {
-		owned_index, found := owned_card_index_by_id(deck, deck.draw_pile[index].id)
-		if !found || seen[owned_index] || deck.draw_pile[index] != deck.owned[owned_index] {
-			return false
-		}
-		seen[owned_index] = true
+	seen_owned: [MAX_OWNED_CARDS]bool
+	seen_ids: [MAX_COMBAT_CARDS]u32
+	seen_count := 0
+	temporary_count := 0
+	resolving_zone: [1]Card_Instance
+	if deck.has_resolving_card {
+		resolving_zone[0] = deck.resolving_card
 	}
-	for index in 0..<deck.hand_count {
-		owned_index, found := owned_card_index_by_id(deck, deck.hand[index].id)
-		if !found || seen[owned_index] || deck.hand[index] != deck.owned[owned_index] {
-			return false
-		}
-		seen[owned_index] = true
+	zones := [?][]Card_Instance{
+		deck.draw_pile[:deck.draw_count],
+		deck.hand[:deck.hand_count],
+		deck.discard_pile[:deck.discard_count],
+		deck.exhaust_pile[:deck.exhaust_count],
+		resolving_zone[:resolving_count],
 	}
-	for index in 0..<deck.discard_count {
-		owned_index, found := owned_card_index_by_id(deck, deck.discard_pile[index].id)
-		if !found || seen[owned_index] || deck.discard_pile[index] != deck.owned[owned_index] {
+	for zone in zones {
+		for card in zone {
+			if !validate_card_instance(card) || card.id >= deck.next_card_id {
+				return false
+			}
+			for previous in 0..<seen_count {
+				if seen_ids[previous] == card.id {
+					return false
+				}
+			}
+			seen_ids[seen_count] = card.id
+			seen_count += 1
+
+			switch card.lifetime {
+			case .Permanent:
+				owned_index, found := owned_card_index_by_id(deck, card.id)
+				if !found || seen_owned[owned_index] || card != deck.owned[owned_index] {
+					return false
+				}
+				seen_owned[owned_index] = true
+			case .Combat:
+				if card.id < deck.combat_card_id_floor {
+					return false
+				}
+				temporary_count += 1
+			case .Count:
+				return false
+			}
+		}
+	}
+	// Gli ID temporanei sono densi: ogni ID coniato dal floor del combat deve
+	// esistere ancora in una zona. Un futuro effetto che distrugge carte
+	// temporanee dovra sostituire questa uguaglianza con un contatore di
+	// creazioni conservato dal deck.
+	if seen_count != total_cards || temporary_count > MAX_TEMPORARY_CARDS ||
+	   deck.next_card_id-deck.combat_card_id_floor != u32(temporary_count) ||
+	   total_cards != deck.owned_count+temporary_count {
+		return false
+	}
+	for index in 0..<deck.owned_count {
+		if !seen_owned[index] {
 			return false
 		}
-		seen[owned_index] = true
 	}
 	return true
 }

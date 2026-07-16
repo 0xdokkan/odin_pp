@@ -8,6 +8,7 @@ Gameplay_Command_Kind :: enum {
 	Wait,
 	Ability,
 	Play_Card,
+	Refocus,
 }
 
 Gameplay_Command :: struct {
@@ -33,7 +34,7 @@ gameplay_command_is_valid :: proc(command: Gameplay_Command) -> bool {
 		return false
 	case .Move:
 		return command.origin_phase == .Combat || command.origin_phase == .Loot
-	case .Wait, .Ability, .Play_Card:
+	case .Wait, .Ability, .Play_Card, .Refocus:
 		return command.origin_phase == .Combat
 	}
 	unreachable()

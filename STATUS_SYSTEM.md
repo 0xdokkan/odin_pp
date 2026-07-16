@@ -174,6 +174,10 @@ Ogni `Action_Report` e `Pulse_Report` contiene un `Event_Log` inline con capacit
 - `Loot_Collected`;
 - `Card_Played`;
 - `Card_Drawn`;
+- `Card_Moved`;
+- `Card_Created`;
+- `Hand_Refocused`;
+- `Card_Refocused`;
 - `Entity_Defeated`;
 - `Status_Applied`;
 - `Status_Removed`;
@@ -183,13 +187,25 @@ Ogni `Action_Report` e `Pulse_Report` contiene un `Event_Log` inline con capacit
 - `Reaction_Binding_Expired`;
 - `Pulse_Advanced`.
 
-Un evento conserva sorgente, target, quantita, status, durata, tipo di loot e
-coordinate quando pertinenti. `Pulse_Advanced` aggiunge contatore, energia finale
-e informazione sui tick. Il renderer usa la sequenza per riprodurre le cause;
-lo snapshot finale sincronizza soltanto i valori assoluti non emessi singolarmente.
+Un evento conserva sorgente, target, quantita, status, durata, tipo di loot,
+coordinate e, quando pertinente, identita, definizione, upgrade, lifetime e zone
+della carta. Per `Card_Created`, `.Count` indica esplicitamente l'assenza di una
+zona di origine. `Card_Refocused` registra anche `Hand -> Hand` per una carta
+retained, rendendo osservabile la policy senza inventare uno spostamento.
+`Pulse_Advanced` aggiunge contatore, energia finale e informazione
+sui tick. Il renderer usa la sequenza per riprodurre le cause; lo snapshot finale
+sincronizza soltanto i valori assoluti non emessi singolarmente.
 
 Se il log e pieno, gli eventi successivi non vengono allocati: `dropped_count`
 registra quanti eventi sono stati persi.
+
+La capacita segue una policy diversa ai due lati del commit. Un log costruito su
+stato staged deve contenere tutti gli eventi necessari: un `record_event` fallito
+annulla la transazione prima che diventi autorevole. Dopo il commit non e invece
+possibile rollbackare simulazione, RNG o ID soltanto per un limite della
+presentazione; gli eventi eccedenti vengono scartati, `dropped_count` resta
+osservabile e lo snapshot finale riconcilia la vista. I command report devono
+propagare questa diagnostica quando il loro envelope puo avvicinarsi al limite.
 
 ## Recent events
 

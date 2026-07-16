@@ -49,9 +49,11 @@ permette di differenziare due carte della stessa rarita senza inserire copie
 fisiche nel pool. Il prezzo base appartiene alla definizione, mentre i
 sovrapprezzi di profondita sono calcolati dallo shop.
 
-`validate_card_definition` rifiuta rarita fuori enum, peso nullo e prezzo non
-positivo. Reward e shop conservano soltanto `Card_Id`: una preview non crea una
-`Card_Instance` e non consuma `next_card_id`.
+`validate_card_definition` rifiuta rarita fuori enum e metadati incoerenti. Le
+carte collezionabili richiedono peso e prezzo positivi; una definizione
+`temporary_only` richiede entrambi a zero ed e esclusa dalle offerte. Reward e
+shop conservano soltanto `Card_Id`: una preview non crea una `Card_Instance` e
+non consuma `next_card_id`.
 
 ## Offerte pesate
 

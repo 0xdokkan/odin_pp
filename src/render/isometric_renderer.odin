@@ -24,6 +24,11 @@ HAND_CARD_ARC_DROP           :: f32(3)
 HAND_RAISED_CARD_WIDTH       :: f32(144)
 HAND_RAISED_CARD_HEIGHT      :: f32(180)
 HAND_RAISED_CARD_MARGIN      :: f32(8)
+REFOCUS_BUTTON_X             :: f32(360)
+REFOCUS_BUTTON_Y             :: f32(20)
+REFOCUS_BUTTON_WIDTH         :: f32(102)
+REFOCUS_BUTTON_HEIGHT        :: f32(30)
+MAX_CARD_KEYWORD_TAGS        :: 3
 
 INTENT_MOVE_FILL       :: rl.Color{238, 174, 73, 38}
 INTENT_MOVE_OUTLINE    :: rl.Color{246, 207, 92, 210}
@@ -145,10 +150,8 @@ dragged_card_bounds :: proc(renderer: ^Renderer, point: view.Vec2) -> rl.Rectang
 	if renderer == nil {
 		return {}
 	}
-	desired_x := point.x+24
-	if desired_x+HAND_RAISED_CARD_WIDTH > renderer.canvas_width-HAND_RAISED_CARD_MARGIN {
-		desired_x = point.x-HAND_RAISED_CARD_WIDTH-24
-	}
+	desired_x := point.x-HAND_RAISED_CARD_WIDTH*0.5
+	desired_y := point.y-HAND_RAISED_CARD_HEIGHT*0.5
 	return {
 		x = clamp(
 			desired_x,
@@ -156,7 +159,7 @@ dragged_card_bounds :: proc(renderer: ^Renderer, point: view.Vec2) -> rl.Rectang
 			renderer.canvas_width-HAND_RAISED_CARD_WIDTH-HAND_RAISED_CARD_MARGIN,
 		),
 		y = clamp(
-			point.y+18,
+			desired_y,
 			f32(108),
 			renderer.canvas_height-HAND_RAISED_CARD_HEIGHT-HAND_RAISED_CARD_MARGIN,
 		),
@@ -170,9 +173,34 @@ point_in_rectangle :: proc(point: view.Vec2, bounds: rl.Rectangle) -> bool {
 	       point.y >= bounds.y && point.y <= bounds.y+bounds.height
 }
 
+refocus_button_bounds :: proc(renderer: ^Renderer) -> rl.Rectangle {
+	if renderer == nil {
+		return {}
+	}
+	return {
+		x = REFOCUS_BUTTON_X,
+		y = REFOCUS_BUTTON_Y,
+		width = REFOCUS_BUTTON_WIDTH,
+		height = REFOCUS_BUTTON_HEIGHT,
+	}
+}
+
+refocus_button_at_point :: proc(renderer: ^Renderer, point: view.Vec2) -> bool {
+	return renderer != nil && point_in_rectangle(point, refocus_button_bounds(renderer))
+}
+
+refocus_button_is_enabled :: proc(renderer: ^Renderer) -> bool {
+	return renderer != nil && !renderer_timeline_is_busy(renderer)
+}
+
 card_drop_area_contains :: proc(renderer: ^Renderer, point: view.Vec2) -> bool {
 	return renderer != nil && point.x >= 0 && point.x <= renderer.canvas_width &&
-	       point.y >= 0 && point.y < renderer.canvas_height-HAND_RESERVED_HEIGHT
+	       point.y >= 0 && point.y < renderer.canvas_height-HAND_RESERVED_HEIGHT &&
+	       !refocus_button_at_point(renderer, point)
+}
+
+dragged_card_is_over_grid :: proc(renderer: ^Renderer, point: view.Vec2) -> bool {
+	return renderer != nil && renderer.has_hovered_cell && card_drop_area_contains(renderer, point)
 }
 
 hand_card_at_point :: proc(
@@ -225,6 +253,14 @@ card_colors :: proc(id: game.Card_Id, affordable: bool) -> (fill, outline: rl.Co
 		fill, outline = rl.Color{53, 46, 70, 245}, rl.Color{194, 184, 226, 255}
 	case .Counter_Rune:
 		fill, outline = rl.Color{68, 59, 30, 245}, rl.Color{246, 207, 92, 255}
+	case .Battle_Focus:
+		fill, outline = rl.Color{31, 61, 56, 245}, rl.Color{91, 214, 176, 255}
+	case .Calculated_Risk:
+		fill, outline = rl.Color{67, 43, 34, 245}, rl.Color{238, 174, 73, 255}
+	case .Spark_Forge:
+		fill, outline = rl.Color{55, 45, 66, 245}, rl.Color{209, 151, 236, 255}
+	case .Spark:
+		fill, outline = rl.Color{57, 54, 31, 245}, rl.Color{246, 207, 92, 255}
 	case .Count:
 		fill, outline = rl.Color{45, 49, 52, 245}, rl.Color{105, 116, 116, 255}
 	}
@@ -258,6 +294,14 @@ card_detail_lines :: proc(card: game.Card_Instance) -> (first, second: cstring) 
 		return fmt.ctprintf("GAIN %d AFTERIMAGE", 1+upgrade), "LASTS 4 PULSES"
 	case .Counter_Rune:
 		return fmt.ctprintf("COUNTER FOR %d", 2+upgrade), "2 CHARGES"
+	case .Battle_Focus:
+		return "DRAW 2", "EXHAUST"
+	case .Calculated_Risk:
+		return "DRAW 2", "DISCARD 1"
+	case .Spark_Forge:
+		return "CREATE 1 SPARK", "TEMPORARY"
+	case .Spark:
+		return fmt.ctprintf("DEAL %d DAMAGE", 2+upgrade), "TEMP - RANGE 1-2"
 	case .Count:
 	}
 	return "", ""
@@ -285,6 +329,14 @@ card_short_name :: proc(id: game.Card_Id) -> cstring {
 		return "AFTER"
 	case .Counter_Rune:
 		return "RUNE"
+	case .Battle_Focus:
+		return "FOCUS"
+	case .Calculated_Risk:
+		return "RISK"
+	case .Spark_Forge:
+		return "FORGE"
+	case .Spark:
+		return "SPARK"
 	case .Count:
 	}
 	return ""
@@ -361,7 +413,132 @@ draw_card_sigil :: proc(bounds: rl.Rectangle, id: game.Card_Id, color: rl.Color)
 		for index in 0..<len(points)-1 {
 			rl.DrawLineEx(points[index], points[index+1], 4, color)
 		}
+	case .Battle_Focus:
+		rl.DrawCircleLinesV(center, radius, color)
+		rl.DrawCircleV(center, 4, color)
+		rl.DrawLineEx({center.x-radius, center.y}, {center.x-6, center.y}, 3, color)
+		rl.DrawLineEx({center.x+6, center.y}, {center.x+radius, center.y}, 3, color)
+	case .Calculated_Risk:
+		rl.DrawLineEx({center.x-radius, center.y-12}, {center.x+radius, center.y+12}, 4, color)
+		rl.DrawLineEx({center.x-radius, center.y+12}, {center.x+radius, center.y-12}, 2, color)
+	case .Spark_Forge:
+		rl.DrawRectangleLines(
+			c.int(center.x-12),
+			c.int(center.y-12),
+			24,
+			24,
+			color,
+		)
+		rl.DrawCircleV(center, 6, color)
+	case .Spark:
+		points := [?]rl.Vector2{
+			{center.x-14, center.y-17},
+			{center.x+2, center.y-4},
+			{center.x-5, center.y+2},
+			{center.x+14, center.y+17},
+		}
+		for index in 0..<len(points)-1 {
+			rl.DrawLineEx(points[index], points[index+1], 4, color)
+		}
 	case .Count:
+	}
+}
+
+Card_Keyword_Tag :: enum {
+	Retain,
+	Ethereal,
+	Temporary,
+}
+
+card_keyword_tags :: proc(
+	card: game.Card_Instance,
+	definition: game.Card_Definition,
+) -> (result: [MAX_CARD_KEYWORD_TAGS]Card_Keyword_Tag, count: int) {
+	if definition.retain_on_refocus {
+		result[count] = .Retain
+		count += 1
+	}
+	if definition.ethereal {
+		result[count] = .Ethereal
+		count += 1
+	}
+	if card.lifetime == .Combat {
+		result[count] = .Temporary
+		count += 1
+	}
+	return
+}
+
+card_keyword_tag_label :: proc(tag: Card_Keyword_Tag, expanded: bool) -> cstring {
+	switch tag {
+	case .Retain:
+		return "RETAIN" if expanded else "RET"
+	case .Ethereal:
+		return "ETHEREAL" if expanded else "ETH"
+	case .Temporary:
+		return "TEMPORARY" if expanded else "TEMP"
+	}
+	unreachable()
+}
+
+card_keyword_tag_color :: proc(tag: Card_Keyword_Tag) -> rl.Color {
+	switch tag {
+	case .Retain:
+		return rl.Color{91, 214, 176, 255}
+	case .Ethereal:
+		return rl.Color{194, 184, 226, 255}
+	case .Temporary:
+		return rl.Color{246, 207, 92, 255}
+	}
+	unreachable()
+}
+
+card_keyword_tag_bounds :: proc(
+	bounds: rl.Rectangle,
+	tag_index: int,
+	expanded: bool,
+) -> rl.Rectangle {
+	if tag_index < 0 || tag_index >= MAX_CARD_KEYWORD_TAGS || bounds.width <= 0 || bounds.height <= 0 {
+		return {}
+	}
+	width: f32 = 31
+	if expanded {
+		width = 52
+	}
+	x := bounds.x+34
+	if expanded {
+		x = bounds.x+bounds.width-width-7
+	}
+	return {
+		x = x,
+		y = bounds.y+29+f32(tag_index)*15,
+		width = width,
+		height = 12,
+	}
+}
+
+draw_card_keyword_tags :: proc(
+	bounds: rl.Rectangle,
+	card: game.Card_Instance,
+	definition: game.Card_Definition,
+	expanded: bool,
+) {
+	tags, count := card_keyword_tags(card, definition)
+	for index in 0..<count {
+		tag := tags[index]
+		tag_bounds := card_keyword_tag_bounds(bounds, index, expanded)
+		color := card_keyword_tag_color(tag)
+		label := card_keyword_tag_label(tag, expanded)
+		label_width := rl.MeasureText(label, 8)
+		rl.DrawRectangleRec(tag_bounds, rl.Color{12, 16, 19, 235})
+		rl.DrawRectangleLinesEx(tag_bounds, 1, color)
+		rl.DrawText(
+			label,
+			c.int(tag_bounds.x+(tag_bounds.width-f32(label_width))*0.5),
+			c.int(tag_bounds.y+2),
+			8,
+			color,
+		)
 	}
 }
 
@@ -420,6 +597,7 @@ draw_card_face :: proc(
 			outline,
 		)
 	}
+	draw_card_keyword_tags(bounds, card, definition, expanded)
 	if card.upgrade_level > 0 {
 		rl.DrawText(
 			fmt.ctprintf("+%d", card.upgrade_level),
@@ -448,10 +626,62 @@ draw_hand_counters :: proc(renderer: ^Renderer, deck: ^game.Deck_State) {
 	right := c.int(renderer.canvas_width)-12
 	rl.DrawRectangle(right-116, c.int(bottom-48), 116, 48, rl.Color{12, 16, 19, 225})
 	rl.DrawRectangleLines(right-116, c.int(bottom-48), 116, 48, rl.Color{75, 86, 87, 255})
-	rl.DrawText("DRAW", right-104, c.int(bottom-41), 10, rl.Color{163, 174, 169, 255})
-	rl.DrawText("DISCARD", right-57, c.int(bottom-41), 10, rl.Color{163, 174, 169, 255})
-	rl.DrawText(fmt.ctprintf("%d", deck.draw_count), right-92, c.int(bottom-24), 17, rl.Color{225, 229, 224, 255})
-	rl.DrawText(fmt.ctprintf("%d", deck.discard_count), right-35, c.int(bottom-24), 17, rl.Color{225, 229, 224, 255})
+	labels := [?]cstring{"DRAW", "DISC", "EXH"}
+	counts := [?]int{deck.draw_count, deck.discard_count, deck.exhaust_count}
+	column_width: f32 = 116.0/3.0
+	for label, index in labels {
+		center_x := f32(right-116)+column_width*(f32(index)+0.5)
+		label_width := rl.MeasureText(label, 9)
+		value_text := fmt.ctprintf("%d", counts[index])
+		value_width := rl.MeasureText(value_text, 17)
+		rl.DrawText(
+			label,
+			c.int(center_x)-label_width/2,
+			c.int(bottom-41),
+			9,
+			rl.Color{163, 174, 169, 255},
+		)
+		rl.DrawText(
+			value_text,
+			c.int(center_x)-value_width/2,
+			c.int(bottom-24),
+			17,
+			rl.Color{225, 229, 224, 255},
+		)
+	}
+}
+
+draw_refocus_button :: proc(renderer: ^Renderer, mouse_position: view.Vec2) {
+	assert(renderer != nil)
+	bounds := refocus_button_bounds(renderer)
+	enabled := refocus_button_is_enabled(renderer)
+	hovered := enabled && refocus_button_at_point(renderer, mouse_position)
+	fill := rl.Color{17, 25, 28, 235}
+	outline := rl.Color{91, 174, 168, 255}
+	label_color := rl.Color{225, 229, 224, 255}
+	if hovered {
+		fill = rl.Color{28, 50, 51, 245}
+		outline = rl.Color{91, 226, 213, 255}
+	} else if !enabled {
+		fill = rl.Color{27, 30, 33, 225}
+		outline = rl.Color{75, 86, 87, 255}
+		label_color = rl.Color{112, 120, 119, 255}
+	}
+
+	rl.DrawRectangleRec(bounds, fill)
+	rl.DrawRectangleLinesEx(bounds, 1, outline)
+	key_bounds := rl.Rectangle{x = bounds.x+6, y = bounds.y+6, width = 18, height = 18}
+	rl.DrawRectangleRec(key_bounds, rl.Color{10, 14, 16, 210})
+	rl.DrawRectangleLinesEx(key_bounds, 1, outline)
+	key_width := rl.MeasureText("F", 11)
+	rl.DrawText(
+		"F",
+		c.int(key_bounds.x+(key_bounds.width-f32(key_width))*0.5),
+		c.int(key_bounds.y+4),
+		11,
+		label_color,
+	)
+	rl.DrawText("REFOCUS", c.int(bounds.x+31), c.int(bounds.y+9), 11, label_color)
 }
 
 renderer_hand_deck :: proc(
@@ -477,6 +707,7 @@ draw_hand :: proc(
 		return
 	}
 	draw_hand_counters(renderer, deck)
+	draw_refocus_button(renderer, mouse_position)
 	raised_card_id := hovered_card_id
 	if raised_card_id == 0 {
 		raised_card_id = selected_card_id
@@ -510,7 +741,7 @@ draw_hand :: proc(
 			)
 		}
 	}
-	if dragged_card_id != 0 {
+	if dragged_card_id != 0 && !dragged_card_is_over_grid(renderer, mouse_position) {
 		if index, found := game.hand_card_index_by_id(deck, dragged_card_id); found {
 			card := deck.hand[index]
 			definition, definition_found := game.card_definition_by_id(card.definition_id)
@@ -1531,34 +1762,87 @@ draw_timeline_popup :: proc(
 	rl.DrawText(label, x, y, font_size, color_with_opacity(color, opacity))
 }
 
-draw_timeline_card_banner :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) {
+timeline_card_cue_verb :: proc(cue: ^Presentation_Cue) -> cstring {
+	if cue == nil {
+		return nil
+	}
+	switch cue.kind {
+	case .Card_Played:
+		return "PLAY"
+	case .Card_Drawn:
+		return "DRAW"
+	case .Card_Created:
+		return "CREATE"
+	case .Card_Refocused:
+		switch cue.event.to_card_zone {
+		case .Hand:
+			return "RETAIN"
+		case .Exhaust:
+			return "ETHEREAL"
+		case .Discard:
+			return "DISCARD"
+		case .Draw, .Resolving, .Count:
+		}
+	case .Card_Moved:
+		if cue.event.to_card_zone == .Exhaust {
+			return "EXHAUST"
+		} else if cue.event.to_card_zone == .Discard {
+			return "DISCARD"
+		}
+	case .Move, .Damage, .Damage_Absorbed, .Heal, .Status_Applied, .Status_Removed,
+	     .Status_Expired, .Defeat, .Loot_Dropped, .Loot, .Attack_Missed, .Move_Blocked,
+	     .Gold_Gained, .Binding_Added, .Binding_Exhausted, .Binding_Expired,
+	     .Pulse_Advanced, .Refocus:
+	}
+	return nil
+}
+
+draw_timeline_banner :: proc(
+	renderer: ^Renderer,
+	cue: ^Presentation_Cue,
+	label: cstring,
+	fill, outline: rl.Color,
+) {
 	assert(renderer != nil && cue != nil)
-	definition, found := game.card_definition_by_id(cue.event.card_definition)
-	if !found {
-		return
-	}
-	verb: cstring = "PLAY"
-	if cue.kind == .Card_Drawn {
-		verb = "DRAW"
-	}
-	label := fmt.ctprintf("%s  %s", verb, definition.name)
 	progress := presentation_cue_progress(cue)
 	opacity := clamp((1-progress)*4, f32(0), f32(1))
-	fill, outline := card_colors(cue.event.card_definition, true)
-	width: f32 = 250
+	font_size: c.int = 16
+	text_width := rl.MeasureText(label, font_size)
+	width := clamp(f32(text_width+44), f32(250), renderer.canvas_width-32)
 	height: f32 = 42
 	x := (renderer.canvas_width-width)*0.5
 	y := f32(108)+(1-presentation_cue_eased_progress(cue))*-12
 	rl.DrawRectangleRec({x, y, width, height}, color_with_opacity(fill, opacity))
 	rl.DrawRectangleLinesEx({x, y, width, height}, 2, color_with_opacity(outline, opacity))
-	font_size: c.int = 16
-	text_width := rl.MeasureText(label, font_size)
 	rl.DrawText(
 		label,
 		c.int(x+(width-f32(text_width))*0.5),
 		c.int(y+12),
 		font_size,
 		color_with_opacity(rl.Color{247, 239, 213, 255}, opacity),
+	)
+}
+
+draw_timeline_card_banner :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) {
+	assert(renderer != nil && cue != nil)
+	definition, found := game.card_definition_by_id(cue.event.card_definition)
+	verb := timeline_card_cue_verb(cue)
+	if !found || verb == nil {
+		return
+	}
+	label := fmt.ctprintf("%s  %s", verb, definition.name)
+	fill, outline := card_colors(cue.event.card_definition, true)
+	draw_timeline_banner(renderer, cue, label, fill, outline)
+}
+
+draw_timeline_refocus_banner :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) {
+	assert(renderer != nil && cue != nil)
+	draw_timeline_banner(
+		renderer,
+		cue,
+		"REFOCUS",
+		rl.Color{28, 50, 51, 245},
+		rl.Color{91, 226, 213, 255},
 	)
 }
 
@@ -1601,7 +1885,12 @@ draw_active_presentation_cue :: proc(renderer: ^Renderer) {
 	if !found || !cue.started {
 		return
 	}
-	if cue.kind == .Card_Played || cue.kind == .Card_Drawn {
+	if cue.kind == .Refocus {
+		draw_timeline_refocus_banner(renderer, cue)
+		return
+	}
+	if cue.kind == .Card_Played || cue.kind == .Card_Drawn || cue.kind == .Card_Moved ||
+	   cue.kind == .Card_Created || cue.kind == .Card_Refocused {
 		draw_timeline_card_banner(renderer, cue)
 		return
 	}
@@ -1659,7 +1948,9 @@ draw_active_presentation_cue :: proc(renderer: ^Renderer) {
 	case .Binding_Expired:
 		label = "BINDING END"
 		color = rl.Color{169, 183, 177, 255}
-	case .Move, .Card_Played, .Card_Drawn, .Defeat, .Loot_Dropped, .Loot, .Pulse_Advanced:
+	case .Move, .Card_Played, .Card_Drawn, .Card_Moved, .Card_Created, .Refocus,
+	     .Card_Refocused, .Defeat,
+	     .Loot_Dropped, .Loot, .Pulse_Advanced:
 		unreachable()
 	}
 	draw_timeline_popup(renderer, label, color, center, presentation_cue_progress(cue))

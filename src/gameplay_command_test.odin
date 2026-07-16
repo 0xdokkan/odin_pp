@@ -58,7 +58,7 @@ test_execute_gameplay_command_commits_only_a_successful_move :: proc(t: ^testing
 		direction = .South,
 	})
 	testing.expect(t, moved.committed)
-	testing.expect(t, !moved.card_committed)
+	testing.expect(t, !moved.clears_card_interaction)
 	testing.expect_value(t, player.position, grid.Position{x = 1, y = 2})
 
 	position_before_blocked_move := player.position
@@ -68,7 +68,7 @@ test_execute_gameplay_command_commits_only_a_successful_move :: proc(t: ^testing
 		direction = .West,
 	})
 	testing.expect(t, !blocked.committed)
-	testing.expect(t, !blocked.card_committed)
+	testing.expect(t, !blocked.clears_card_interaction)
 	testing.expect_value(t, player.position, position_before_blocked_move)
 }
 
@@ -89,7 +89,7 @@ test_execute_gameplay_command_commits_a_successful_wait_with_none_outcome :: pro
 	execution := execute_gameplay_command(&room, {kind = .Wait, origin_phase = .Combat})
 
 	testing.expect(t, execution.committed)
-	testing.expect(t, !execution.card_committed)
+	testing.expect(t, !execution.clears_card_interaction)
 	testing.expect_value(t, room.pulse_count, u64(1))
 	testing.expect_value(t, room.phase, game.Room_Phase.Combat)
 }
@@ -117,7 +117,7 @@ test_execute_gameplay_command_distinguishes_valid_and_invalid_card_plays :: proc
 		target = game.entity_target(game.PLAYER_ENTITY),
 	})
 	testing.expect(t, !invalid.committed)
-	testing.expect(t, !invalid.card_committed)
+	testing.expect(t, !invalid.clears_card_interaction)
 	testing.expect_value(t, room.pulse_count, u64(0))
 
 	valid := execute_gameplay_command(&room, {
@@ -127,8 +127,35 @@ test_execute_gameplay_command_distinguishes_valid_and_invalid_card_plays :: proc
 		target = game.entity_target(game.PLAYER_ENTITY),
 	})
 	testing.expect(t, valid.committed)
-	testing.expect(t, valid.card_committed)
+	testing.expect(t, valid.clears_card_interaction)
 	testing.expect_value(t, room.pulse_count, u64(1))
+}
+
+@(test)
+test_execute_gameplay_command_commits_refocus_and_clears_card_interaction :: proc(t: ^testing.T) {
+	level_data := create_gameplay_command_test_level(t)
+	defer level.destroy(&level_data)
+	player := create_gameplay_command_test_player(t)
+	configure_single_card_test_deck(t, &player, .Guard)
+	enemies := [?]game.Enemy_Spawn{{
+		position = {x = 5, y = 3},
+		health = 8,
+		attack = 1,
+	}}
+	room, ok := game.create_room(&level_data, &player, {enemies = enemies[:]})
+	testing.expect(t, ok)
+	defer game.destroy_room(&room)
+
+	execution := execute_gameplay_command(&room, {
+		kind = .Refocus,
+		origin_phase = .Combat,
+	})
+
+	testing.expect(t, execution.committed)
+	testing.expect(t, execution.clears_card_interaction)
+	testing.expect_value(t, room.pulse_count, u64(1))
+	testing.expect(t, room.recent_events.count > 0)
+	testing.expect_value(t, room.recent_events.events[0].kind, game.Game_Event_Kind.Hand_Refocused)
 }
 
 @(test)

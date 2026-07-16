@@ -16,7 +16,11 @@ PRESENTATION_DAMAGE_DURATION      :: f32(0.18)*PRESENTATION_TIME_SCALE
 PRESENTATION_HEAL_DURATION        :: f32(0.18)*PRESENTATION_TIME_SCALE
 PRESENTATION_STATUS_DURATION      :: f32(0.14)*PRESENTATION_TIME_SCALE
 PRESENTATION_CARD_PLAY_DURATION   :: f32(0.20)*PRESENTATION_TIME_SCALE
-PRESENTATION_CARD_DRAW_DURATION   :: f32(0.12)*PRESENTATION_TIME_SCALE
+PRESENTATION_CARD_DRAW_DURATION     :: f32(0.12)*PRESENTATION_TIME_SCALE
+PRESENTATION_CARD_MOVE_DURATION     :: f32(0.14)*PRESENTATION_TIME_SCALE
+PRESENTATION_CARD_CREATE_DURATION   :: f32(0.16)*PRESENTATION_TIME_SCALE
+PRESENTATION_REFOCUS_DURATION       :: f32(0.18)*PRESENTATION_TIME_SCALE
+PRESENTATION_CARD_REFOCUS_DURATION  :: f32(0.14)*PRESENTATION_TIME_SCALE
 PRESENTATION_DEFEAT_DURATION      :: f32(0.22)*PRESENTATION_TIME_SCALE
 PRESENTATION_LOOT_DURATION        :: f32(0.28)*PRESENTATION_TIME_SCALE
 PRESENTATION_NOTICE_DURATION      :: f32(0.12)*PRESENTATION_TIME_SCALE
@@ -33,6 +37,10 @@ Presentation_Cue_Kind :: enum {
 	Status_Expired,
 	Card_Played,
 	Card_Drawn,
+	Card_Moved,
+	Card_Created,
+	Refocus,
+	Card_Refocused,
 	Defeat,
 	Loot_Dropped,
 	Loot,
@@ -241,6 +249,14 @@ presentation_cue_kind :: proc(event: game.Game_Event) -> Presentation_Cue_Kind {
 		return .Card_Played
 	case .Card_Drawn:
 		return .Card_Drawn
+	case .Card_Moved:
+		return .Card_Moved
+	case .Card_Created:
+		return .Card_Created
+	case .Hand_Refocused:
+		return .Refocus
+	case .Card_Refocused:
+		return .Card_Refocused
 	case .Entity_Defeated:
 		return .Defeat
 	case .Status_Applied:
@@ -279,6 +295,14 @@ presentation_cue_duration :: proc(kind: Presentation_Cue_Kind, event: game.Game_
 		return PRESENTATION_CARD_PLAY_DURATION
 	case .Card_Drawn:
 		return PRESENTATION_CARD_DRAW_DURATION
+	case .Card_Moved:
+		return PRESENTATION_CARD_MOVE_DURATION
+	case .Card_Created:
+		return PRESENTATION_CARD_CREATE_DURATION
+	case .Refocus:
+		return PRESENTATION_REFOCUS_DURATION
+	case .Card_Refocused:
+		return PRESENTATION_CARD_REFOCUS_DURATION
 	case .Defeat:
 		return PRESENTATION_DEFEAT_DURATION
 	case .Loot:
@@ -463,7 +487,10 @@ show_dropped_presentation_loot :: proc(
 }
 
 apply_presentation_card_played :: proc(deck: ^game.Deck_State, event: game.Game_Event) -> bool {
-	if deck == nil || !game.validate_deck_state(deck) || event.amount < 0 || event.amount > deck.energy {
+	if deck == nil || !game.validate_deck_state(deck) || event.amount < 0 ||
+	   event.amount > deck.energy || event.from_card_zone != .Hand ||
+	   event.to_card_zone != .Resolving || event.source != game.PLAYER_ENTITY ||
+	   event.target != game.PLAYER_ENTITY {
 		return false
 	}
 	hand_index, found := game.hand_card_index_by_id(deck, event.card_id)
@@ -471,14 +498,67 @@ apply_presentation_card_played :: proc(deck: ^game.Deck_State, event: game.Game_
 		return false
 	}
 	card := deck.hand[hand_index]
-	if !game.validate_card_instance(card) || card.definition_id != event.card_definition {
+	definition, definition_found := game.card_definition_by_id(card.definition_id)
+	if !game.validate_card_instance(card) || card.definition_id != event.card_definition ||
+	   card.upgrade_level != event.card_upgrade_level || card.lifetime != event.card_lifetime ||
+	   !definition_found || definition.cost != event.amount {
 		return false
 	}
 
 	before := deck^
 	deck.energy -= event.amount
-	discarded_card, discarded := game.discard_hand_card(deck, hand_index)
-	if !discarded || discarded_card != card || !game.validate_deck_state(deck) {
+	resolving_card, resolving := game.begin_resolving_hand_card(deck, hand_index)
+	if !resolving || resolving_card != card || !game.validate_deck_state(deck) {
+		deck^ = before
+		return false
+	}
+	return true
+}
+
+apply_presentation_card_moved :: proc(deck: ^game.Deck_State, event: game.Game_Event) -> bool {
+	if deck == nil || !game.validate_deck_state(deck) || event.target != game.PLAYER_ENTITY ||
+	   (event.from_card_zone != .Hand && event.from_card_zone != .Resolving) ||
+	   (event.to_card_zone != .Discard && event.to_card_zone != .Exhaust) {
+		return false
+	}
+	card: game.Card_Instance
+	hand_index := 0
+	if event.from_card_zone == .Hand {
+		found: bool
+		hand_index, found = game.hand_card_index_by_id(deck, event.card_id)
+		if !found {
+			return false
+		}
+		card = deck.hand[hand_index]
+	} else {
+		if !deck.has_resolving_card {
+			return false
+		}
+		card = deck.resolving_card
+		expected_destination, valid_destination := game.card_destination_after_play(card)
+		if !valid_destination || event.to_card_zone != expected_destination {
+			return false
+		}
+	}
+	if !game.validate_card_instance(card) || card.definition_id != event.card_definition ||
+	   card.id != event.card_id || card.upgrade_level != event.card_upgrade_level ||
+	   card.lifetime != event.card_lifetime {
+		return false
+	}
+
+	before := deck^
+	moved_card: game.Card_Instance
+	moved := false
+	if event.from_card_zone == .Hand {
+		moved_card, moved = game.move_hand_card_to_zone(deck, hand_index, event.to_card_zone)
+	} else {
+		moved_card, moved = game.finish_resolving_card(deck, event.to_card_zone)
+	}
+	if !moved || !game.validate_card_instance(moved_card) || moved_card.id != event.card_id ||
+	   moved_card.definition_id != event.card_definition ||
+	   moved_card.upgrade_level != event.card_upgrade_level ||
+	   moved_card.lifetime != event.card_lifetime ||
+	   (event.from_card_zone == .Hand && moved_card != card) || !game.validate_deck_state(deck) {
 		deck^ = before
 		return false
 	}
@@ -486,13 +566,79 @@ apply_presentation_card_played :: proc(deck: ^game.Deck_State, event: game.Game_
 }
 
 apply_presentation_card_drawn :: proc(deck: ^game.Deck_State, event: game.Game_Event) -> bool {
-	if deck == nil || !game.validate_deck_state(deck) {
+	if deck == nil || !game.validate_deck_state(deck) || event.target != game.PLAYER_ENTITY ||
+	   event.from_card_zone != .Draw || event.to_card_zone != .Hand {
 		return false
 	}
 	before := deck^
 	drawn_card, drawn := game.draw_card(deck)
 	if !drawn || !game.validate_deck_state(deck) || drawn_card.id != event.card_id ||
-	   drawn_card.definition_id != event.card_definition {
+	   drawn_card.definition_id != event.card_definition ||
+	   drawn_card.upgrade_level != event.card_upgrade_level ||
+	   drawn_card.lifetime != event.card_lifetime {
+		deck^ = before
+		return false
+	}
+	return true
+}
+
+apply_presentation_card_created :: proc(deck: ^game.Deck_State, event: game.Game_Event) -> bool {
+	if deck == nil || !game.validate_deck_state(deck) || event.target != game.PLAYER_ENTITY ||
+	   event.from_card_zone != .Count || event.to_card_zone != .Hand ||
+	   event.card_lifetime != .Combat {
+		return false
+	}
+
+	before := deck^
+	created_card, created := game.create_temporary_card(
+		deck,
+		event.card_definition,
+		event.card_upgrade_level,
+	)
+	if !created || !game.validate_deck_state(deck) || created_card.id != event.card_id ||
+	   created_card.definition_id != event.card_definition ||
+	   created_card.upgrade_level != event.card_upgrade_level ||
+	   created_card.lifetime != event.card_lifetime {
+		deck^ = before
+		return false
+	}
+	return true
+}
+
+apply_presentation_hand_refocused :: proc(deck: ^game.Deck_State, event: game.Game_Event) -> bool {
+	return deck != nil && game.validate_deck_state(deck) && event.source == game.PLAYER_ENTITY &&
+	       event.target == game.PLAYER_ENTITY && event.amount == i32(deck.hand_count)
+}
+
+apply_presentation_card_refocused :: proc(deck: ^game.Deck_State, event: game.Game_Event) -> bool {
+	if deck == nil || !game.validate_deck_state(deck) || event.source != game.PLAYER_ENTITY ||
+	   event.target != game.PLAYER_ENTITY || event.from_card_zone != .Hand {
+		return false
+	}
+	hand_index, found := game.hand_card_index_by_id(deck, event.card_id)
+	if !found {
+		return false
+	}
+	card := deck.hand[hand_index]
+	if !game.validate_card_instance(card) || card.id != event.card_id ||
+	   card.definition_id != event.card_definition ||
+	   card.upgrade_level != event.card_upgrade_level || card.lifetime != event.card_lifetime {
+		return false
+	}
+	expected_destination, valid_destination := game.card_destination_after_refocus(card)
+	if !valid_destination || event.to_card_zone != expected_destination {
+		return false
+	}
+	if expected_destination == .Hand {
+		return true
+	}
+	if expected_destination != .Discard && expected_destination != .Exhaust {
+		return false
+	}
+
+	before := deck^
+	moved_card, moved := game.move_hand_card_to_zone(deck, hand_index, expected_destination)
+	if !moved || moved_card != card || !game.validate_deck_state(deck) {
 		deck^ = before
 		return false
 	}
@@ -604,6 +750,22 @@ start_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^Presentat
 		if !apply_presentation_card_drawn(&timeline.view.deck, event) {
 			timeline.update_failures += 1
 		}
+	case .Card_Moved:
+		if !apply_presentation_card_moved(&timeline.view.deck, event) {
+			timeline.update_failures += 1
+		}
+	case .Card_Created:
+		if !apply_presentation_card_created(&timeline.view.deck, event) {
+			timeline.update_failures += 1
+		}
+	case .Refocus:
+		if !apply_presentation_hand_refocused(&timeline.view.deck, event) {
+			timeline.update_failures += 1
+		}
+	case .Card_Refocused:
+		if !apply_presentation_card_refocused(&timeline.view.deck, event) {
+			timeline.update_failures += 1
+		}
 	case .Pulse_Advanced:
 		timeline.view.pulse_count = event.pulse_count
 		timeline.view.deck.energy = event.energy
@@ -633,7 +795,9 @@ update_active_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^P
 	case .Defeat:
 		actor.opacity = 1-presentation_cue_progress(cue)
 	case .Damage, .Damage_Absorbed, .Heal, .Status_Applied, .Status_Removed,
-	     .Status_Expired, .Card_Played, .Card_Drawn, .Loot_Dropped, .Loot, .Attack_Missed,
+	     .Status_Expired, .Card_Played, .Card_Drawn, .Card_Moved, .Card_Created,
+	     .Refocus, .Card_Refocused,
+	     .Loot_Dropped, .Loot, .Attack_Missed,
 	     .Move_Blocked, .Gold_Gained, .Binding_Added, .Binding_Exhausted,
 	     .Binding_Expired, .Pulse_Advanced:
 	}

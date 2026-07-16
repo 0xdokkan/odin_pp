@@ -105,7 +105,7 @@ test_capture_room_presentation_copies_fixed_actor_and_loot_state :: proc(t: ^tes
 }
 
 @(test)
-test_card_played_cue_pays_and_discards_only_the_snapshot_card :: proc(t: ^testing.T) {
+test_card_played_and_moved_cues_pay_then_discard_only_the_snapshot_card :: proc(t: ^testing.T) {
 	player := game.Player{stats = {max_health = 10}, health = 10}
 	testing.expect(t, game.initialize_starter_deck(&player.deck, 123))
 	testing.expect(t, game.begin_deck_combat(&player.deck))
@@ -123,6 +123,20 @@ test_card_played_cue_pays_and_discards_only_the_snapshot_card :: proc(t: ^testin
 		amount = definition.cost,
 		card_id = card.id,
 		card_definition = card.definition_id,
+		card_upgrade_level = card.upgrade_level,
+		card_lifetime = card.lifetime,
+		from_card_zone = .Hand,
+		to_card_zone = .Resolving,
+	})
+	game.record_event(&events, {
+		kind = .Card_Moved,
+		target = game.PLAYER_ENTITY,
+		card_id = card.id,
+		card_definition = card.definition_id,
+		card_upgrade_level = card.upgrade_level,
+		card_lifetime = card.lifetime,
+		from_card_zone = .Resolving,
+		to_card_zone = .Discard,
 	})
 
 	timeline: Presentation_Timeline
@@ -131,8 +145,14 @@ test_card_played_cue_pays_and_discards_only_the_snapshot_card :: proc(t: ^testin
 	update_event_timeline(&timeline, PRESENTATION_CARD_PLAY_DURATION*0.5)
 	testing.expect_value(t, timeline.view.deck.energy, before.deck.energy-definition.cost)
 	testing.expect_value(t, timeline.view.deck.hand_count, before.deck.hand_count-1)
-	testing.expect_value(t, timeline.view.deck.discard_count, before.deck.discard_count+1)
+	testing.expect_value(t, timeline.view.deck.discard_count, before.deck.discard_count)
 	_, still_in_hand := game.hand_card_index_by_id(&timeline.view.deck, card.id)
+	testing.expect(t, !still_in_hand)
+	testing.expect(t, !advance_current_presentation_cue(t, &timeline))
+	update_event_timeline(&timeline, PRESENTATION_CARD_MOVE_DURATION*0.5)
+	testing.expect_value(t, timeline.view.deck.hand_count, before.deck.hand_count-1)
+	testing.expect_value(t, timeline.view.deck.discard_count, before.deck.discard_count+1)
+	_, still_in_hand = game.hand_card_index_by_id(&timeline.view.deck, card.id)
 	testing.expect(t, !still_in_hand)
 	testing.expect_value(
 		t,
@@ -153,6 +173,88 @@ test_card_played_cue_pays_and_discards_only_the_snapshot_card :: proc(t: ^testin
 	update_event_timeline(&bad_timeline, PRESENTATION_CARD_PLAY_DURATION*0.5)
 	testing.expect_value(t, bad_timeline.view.deck, before.deck)
 	testing.expect_value(t, bad_timeline.update_failures, 1)
+
+	bad_cost_events := events
+	bad_cost_events.events[0].amount = definition.cost+1
+	bad_cost_timeline: Presentation_Timeline
+	testing.expect(t, begin_event_timeline(&bad_cost_timeline, before, &bad_cost_events))
+	update_event_timeline(&bad_cost_timeline, PRESENTATION_CARD_PLAY_DURATION*0.5)
+	testing.expect_value(t, bad_cost_timeline.view.deck, before.deck)
+	testing.expect_value(t, bad_cost_timeline.update_failures, 1)
+
+	bad_move_events: game.Event_Log
+	bad_move := events.events[1]
+	bad_move.to_card_zone = .Draw
+	game.record_event(&bad_move_events, bad_move)
+	bad_move_timeline: Presentation_Timeline
+	testing.expect(t, begin_event_timeline(&bad_move_timeline, before, &bad_move_events))
+	update_event_timeline(&bad_move_timeline, PRESENTATION_CARD_MOVE_DURATION*0.5)
+	testing.expect_value(t, bad_move_timeline.view.deck, before.deck)
+	testing.expect_value(t, bad_move_timeline.update_failures, 1)
+
+	exhaust_events := events
+	exhaust_events.events[1].to_card_zone = .Exhaust
+	exhaust_timeline: Presentation_Timeline
+	testing.expect(t, begin_event_timeline(&exhaust_timeline, before, &exhaust_events))
+	testing.expect(t, update_event_timeline(
+		&exhaust_timeline,
+		PRESENTATION_CARD_PLAY_DURATION+PRESENTATION_CARD_MOVE_DURATION,
+	))
+	testing.expect_value(t, exhaust_timeline.view.deck.discard_count, before.deck.discard_count)
+	testing.expect_value(t, exhaust_timeline.view.deck.exhaust_count, before.deck.exhaust_count)
+	testing.expect(t, exhaust_timeline.view.deck.has_resolving_card)
+	testing.expect_value(t, exhaust_timeline.view.deck.resolving_card, card)
+	testing.expect_value(t, exhaust_timeline.update_failures, 1)
+}
+
+@(test)
+test_card_move_cue_accepts_authoritative_exhaust_destination :: proc(t: ^testing.T) {
+	player := game.Player{stats = {max_health = 10}, health = 10}
+	rules := game.Deck_Rules{hand_size = 1, max_energy = 3, energy_regen_per_pulse = 1}
+	testing.expect(t, game.initialize_empty_deck(&player.deck, rules, 124))
+	_, added := game.add_owned_card(&player.deck, .Battle_Focus)
+	testing.expect(t, added)
+	testing.expect(t, game.begin_deck_combat(&player.deck))
+	room := make_presentation_timeline_test_room(&player, nil, nil)
+	defer game.destroy_room(&room)
+	before := capture_room_presentation(&room)
+	card := before.deck.hand[0]
+	definition, found := game.card_definition_by_id(card.definition_id)
+	testing.expect(t, found && definition.exhaust_on_play)
+	events: game.Event_Log
+	game.record_event(&events, {
+		kind = .Card_Played,
+		source = game.PLAYER_ENTITY,
+		target = game.PLAYER_ENTITY,
+		amount = definition.cost,
+		card_id = card.id,
+		card_definition = card.definition_id,
+		card_upgrade_level = card.upgrade_level,
+		card_lifetime = card.lifetime,
+		from_card_zone = .Hand,
+		to_card_zone = .Resolving,
+	})
+	game.record_event(&events, {
+		kind = .Card_Moved,
+		source = game.PLAYER_ENTITY,
+		target = game.PLAYER_ENTITY,
+		card_id = card.id,
+		card_definition = card.definition_id,
+		card_upgrade_level = card.upgrade_level,
+		card_lifetime = card.lifetime,
+		from_card_zone = .Resolving,
+		to_card_zone = .Exhaust,
+	})
+
+	timeline: Presentation_Timeline
+	testing.expect(t, begin_event_timeline(&timeline, before, &events))
+	testing.expect(t, update_event_timeline(
+		&timeline,
+		PRESENTATION_CARD_PLAY_DURATION+PRESENTATION_CARD_MOVE_DURATION,
+	))
+	testing.expect_value(t, timeline.view.deck.exhaust_count, 1)
+	testing.expect_value(t, timeline.view.deck.exhaust_pile[0], card)
+	testing.expect_value(t, timeline.update_failures, 0)
 }
 
 @(test)
@@ -183,12 +285,16 @@ test_card_draw_cue_replays_reshuffle_and_rejects_event_mismatches_atomically :: 
 	expected.energy -= definition.cost
 	hand_index, in_hand := game.hand_card_index_by_id(&expected, card.id)
 	testing.expect(t, in_hand)
-	_, discarded = game.discard_hand_card(&expected, hand_index)
-	testing.expect(t, discarded)
+	resolving_card, resolving := game.begin_resolving_hand_card(&expected, hand_index)
+	testing.expect(t, resolving)
+	testing.expect_value(t, resolving_card, card)
 	expected_drawn, drew_expected := game.draw_card(&expected)
 	testing.expect(t, drew_expected)
-	testing.expect_value(t, expected.discard_count, 0)
-	testing.expect_value(t, expected.draw_count, 1)
+	finished_card, finished := game.finish_resolving_card(&expected, .Discard)
+	testing.expect(t, finished)
+	testing.expect_value(t, finished_card, card)
+	testing.expect_value(t, expected.discard_count, 1)
+	testing.expect_value(t, expected.draw_count, 0)
 
 	events: game.Event_Log
 	game.record_event(&events, {
@@ -197,19 +303,41 @@ test_card_draw_cue_replays_reshuffle_and_rejects_event_mismatches_atomically :: 
 		amount = definition.cost,
 		card_id = card.id,
 		card_definition = card.definition_id,
+		card_upgrade_level = card.upgrade_level,
+		card_lifetime = card.lifetime,
+		from_card_zone = .Hand,
+		to_card_zone = .Resolving,
 	})
 	game.record_event(&events, {
 		kind = .Card_Drawn,
 		target = game.PLAYER_ENTITY,
 		card_id = expected_drawn.id,
 		card_definition = expected_drawn.definition_id,
+		card_upgrade_level = expected_drawn.upgrade_level,
+		card_lifetime = expected_drawn.lifetime,
+		from_card_zone = .Draw,
+		to_card_zone = .Hand,
+	})
+	game.record_event(&events, {
+		kind = .Card_Moved,
+		target = game.PLAYER_ENTITY,
+		card_id = card.id,
+		card_definition = card.definition_id,
+		card_upgrade_level = card.upgrade_level,
+		card_lifetime = card.lifetime,
+		from_card_zone = .Resolving,
+		to_card_zone = .Discard,
 	})
 	timeline: Presentation_Timeline
 	testing.expect(t, begin_event_timeline(&timeline, before, &events))
 	testing.expect(t, !advance_current_presentation_cue(t, &timeline))
 	testing.expect_value(t, timeline.view.deck.draw_count, 0)
-	testing.expect_value(t, timeline.view.deck.discard_count, 2)
+	testing.expect_value(t, timeline.view.deck.discard_count, 1)
+	testing.expect(t, !advance_current_presentation_cue(t, &timeline))
+	testing.expect_value(t, timeline.view.deck.draw_count, 0)
+	testing.expect_value(t, timeline.view.deck.discard_count, 0)
 	testing.expect(t, advance_current_presentation_cue(t, &timeline))
+	testing.expect_value(t, timeline.view.deck.discard_count, 1)
 	testing.expect_value(t, timeline.view.deck, expected)
 	testing.expect_value(t, player.deck, before.deck)
 	testing.expect_value(t, timeline.update_failures, 0)
@@ -227,6 +355,10 @@ test_card_draw_cue_replays_reshuffle_and_rejects_event_mismatches_atomically :: 
 		target = game.PLAYER_ENTITY,
 		card_id = actual_drawn.id+1000,
 		card_definition = actual_drawn.definition_id,
+		card_upgrade_level = actual_drawn.upgrade_level,
+		card_lifetime = actual_drawn.lifetime,
+		from_card_zone = .Draw,
+		to_card_zone = .Hand,
 	})
 	bad_id_timeline: Presentation_Timeline
 	testing.expect(t, begin_event_timeline(&bad_id_timeline, draw_only_before, &bad_draw_events))
@@ -248,6 +380,158 @@ test_card_draw_cue_replays_reshuffle_and_rejects_event_mismatches_atomically :: 
 	advance_current_presentation_cue(t, &bad_definition_timeline)
 	testing.expect_value(t, bad_definition_timeline.view.deck, draw_only_before.deck)
 	testing.expect_value(t, bad_definition_timeline.update_failures, 1)
+}
+
+@(test)
+test_card_created_cue_replays_temporary_identity_and_rejects_mismatches_atomically :: proc(t: ^testing.T) {
+	player := game.Player{stats = {max_health = 10}, health = 10}
+	testing.expect(t, game.initialize_starter_deck(&player.deck, 912))
+	testing.expect(t, game.begin_deck_combat(&player.deck))
+	room := make_presentation_timeline_test_room(&player, nil, nil)
+	defer game.destroy_room(&room)
+	before := capture_room_presentation(&room)
+	expected := before.deck
+	created_card, created := game.create_temporary_card(&expected, .Spark, 1)
+	testing.expect(t, created)
+	events: game.Event_Log
+	game.record_event(&events, {
+		kind = .Card_Created,
+		source = game.PLAYER_ENTITY,
+		target = game.PLAYER_ENTITY,
+		card_id = created_card.id,
+		card_definition = created_card.definition_id,
+		card_upgrade_level = created_card.upgrade_level,
+		card_lifetime = created_card.lifetime,
+		from_card_zone = .Count,
+		to_card_zone = .Hand,
+	})
+
+	timeline: Presentation_Timeline
+	testing.expect(t, begin_event_timeline(&timeline, before, &events))
+	testing.expect(t, update_event_timeline(&timeline, PRESENTATION_CARD_CREATE_DURATION))
+	testing.expect_value(t, timeline.view.deck, expected)
+	testing.expect_value(t, player.deck, before.deck)
+	testing.expect_value(t, timeline.update_failures, 0)
+	created_index, in_hand := game.hand_card_index_by_id(&timeline.view.deck, created_card.id)
+	testing.expect(t, in_hand)
+	if in_hand {
+		testing.expect_value(t, timeline.view.deck.hand[created_index].lifetime, game.Card_Lifetime.Combat)
+	}
+
+	bad_events := events
+	bad_events.events[0].card_id += 1
+	bad_timeline: Presentation_Timeline
+	testing.expect(t, begin_event_timeline(&bad_timeline, before, &bad_events))
+	testing.expect(t, update_event_timeline(&bad_timeline, PRESENTATION_CARD_CREATE_DURATION))
+	testing.expect_value(t, bad_timeline.view.deck, before.deck)
+	testing.expect_value(t, bad_timeline.update_failures, 1)
+
+	bad_origin_events := events
+	bad_origin_events.events[0].from_card_zone = .Draw
+	bad_origin_timeline: Presentation_Timeline
+	testing.expect(t, begin_event_timeline(&bad_origin_timeline, before, &bad_origin_events))
+	testing.expect(t, update_event_timeline(&bad_origin_timeline, PRESENTATION_CARD_CREATE_DURATION))
+	testing.expect_value(t, bad_origin_timeline.view.deck, before.deck)
+	testing.expect_value(t, bad_origin_timeline.update_failures, 1)
+}
+
+@(test)
+test_refocus_cues_replay_each_original_hand_card_and_reject_mismatches_atomically :: proc(t: ^testing.T) {
+	player := game.Player{stats = {max_health = 10}, health = 10}
+	rules := game.Deck_Rules{hand_size = 3, max_energy = 3, energy_regen_per_pulse = 1}
+	testing.expect(t, game.initialize_empty_deck(&player.deck, rules, 0x4EF0C05))
+	definition_ids := [?]game.Card_Id{.Counter_Rune, .Battle_Focus, .Guard}
+	for definition_id in definition_ids {
+		_, added := game.add_owned_card(&player.deck, definition_id)
+		testing.expect(t, added)
+	}
+	testing.expect(t, game.begin_deck_combat(&player.deck))
+	room := make_presentation_timeline_test_room(&player, nil, nil)
+	defer game.destroy_room(&room)
+	before := capture_room_presentation(&room)
+	expected := before.deck
+	refocus, refocused := game.refocus_deck_hand(&expected)
+	testing.expect(t, refocused)
+	testing.expect_value(t, refocus.outcome_count, before.deck.hand_count)
+	testing.expect_value(t, refocus.retained_count, 1)
+	testing.expect_value(t, refocus.discarded_count, 1)
+	testing.expect_value(t, refocus.exhausted_count, 1)
+
+	events: game.Event_Log
+	game.record_event(&events, {
+		kind = .Hand_Refocused,
+		source = game.PLAYER_ENTITY,
+		target = game.PLAYER_ENTITY,
+		amount = i32(before.deck.hand_count),
+	})
+	for index in 0..<refocus.outcome_count {
+		outcome := refocus.outcomes[index]
+		game.record_event(&events, {
+			kind = .Card_Refocused,
+			source = game.PLAYER_ENTITY,
+			target = game.PLAYER_ENTITY,
+			card_id = outcome.card.id,
+			card_definition = outcome.card.definition_id,
+			card_upgrade_level = outcome.card.upgrade_level,
+			card_lifetime = outcome.card.lifetime,
+			from_card_zone = .Hand,
+			to_card_zone = outcome.destination,
+		})
+	}
+
+	timeline: Presentation_Timeline
+	testing.expect(t, begin_event_timeline(&timeline, before, &events))
+	testing.expect_value(t, timeline.count, 1+refocus.outcome_count)
+	testing.expect(t, !advance_current_presentation_cue(t, &timeline))
+	testing.expect_value(t, timeline.view.deck, before.deck)
+	for _ in 0..<refocus.outcome_count {
+		advance_current_presentation_cue(t, &timeline)
+	}
+	testing.expect(t, !event_timeline_is_busy(&timeline))
+	testing.expect_value(t, timeline.view.deck, expected)
+	testing.expect_value(t, player.deck, before.deck)
+	testing.expect_value(t, timeline.update_failures, 0)
+
+	bad_marker := game.Event_Log{}
+	game.record_event(&bad_marker, {
+		kind = .Hand_Refocused,
+		source = game.PLAYER_ENTITY,
+		target = game.PLAYER_ENTITY,
+		amount = i32(before.deck.hand_count+1),
+	})
+	bad_marker_timeline: Presentation_Timeline
+	testing.expect(t, begin_event_timeline(&bad_marker_timeline, before, &bad_marker))
+	advance_current_presentation_cue(t, &bad_marker_timeline)
+	testing.expect_value(t, bad_marker_timeline.view.deck, before.deck)
+	testing.expect_value(t, bad_marker_timeline.update_failures, 1)
+
+	first := refocus.outcomes[0]
+	bad_card_event := game.Game_Event{
+		kind = .Card_Refocused,
+		source = game.PLAYER_ENTITY,
+		target = game.PLAYER_ENTITY,
+		card_id = first.card.id,
+		card_definition = first.card.definition_id,
+		card_upgrade_level = first.card.upgrade_level,
+		card_lifetime = first.card.lifetime,
+		from_card_zone = .Hand,
+		to_card_zone = .Hand if first.destination != .Hand else .Discard,
+	}
+	bad_card_events: game.Event_Log
+	game.record_event(&bad_card_events, bad_card_event)
+	bad_policy_timeline: Presentation_Timeline
+	testing.expect(t, begin_event_timeline(&bad_policy_timeline, before, &bad_card_events))
+	advance_current_presentation_cue(t, &bad_policy_timeline)
+	testing.expect_value(t, bad_policy_timeline.view.deck, before.deck)
+	testing.expect_value(t, bad_policy_timeline.update_failures, 1)
+
+	bad_card_events.events[0].to_card_zone = first.destination
+	bad_card_events.events[0].card_id += 1000
+	bad_identity_timeline: Presentation_Timeline
+	testing.expect(t, begin_event_timeline(&bad_identity_timeline, before, &bad_card_events))
+	advance_current_presentation_cue(t, &bad_identity_timeline)
+	testing.expect_value(t, bad_identity_timeline.view.deck, before.deck)
+	testing.expect_value(t, bad_identity_timeline.update_failures, 1)
 }
 
 @(test)
@@ -318,6 +602,10 @@ test_all_game_events_have_stable_presentation_cue_kinds :: proc(t: ^testing.T) {
 		.Loot_Collected,
 		.Card_Played,
 		.Card_Drawn,
+		.Card_Moved,
+		.Card_Created,
+		.Hand_Refocused,
+		.Card_Refocused,
 		.Entity_Defeated,
 		.Status_Applied,
 		.Status_Removed,
@@ -339,6 +627,10 @@ test_all_game_events_have_stable_presentation_cue_kinds :: proc(t: ^testing.T) {
 		.Loot,
 		.Card_Played,
 		.Card_Drawn,
+		.Card_Moved,
+		.Card_Created,
+		.Refocus,
+		.Card_Refocused,
 		.Defeat,
 		.Status_Applied,
 		.Status_Removed,

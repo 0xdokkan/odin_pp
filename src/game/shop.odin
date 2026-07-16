@@ -43,7 +43,7 @@ normalized_shop_seed :: proc(seed: u64) -> u64 {
 
 shop_card_price :: proc(definition: Card_Definition, depth: int) -> (i32, bool) {
 	validated_definition := definition
-	if !validate_card_definition(&validated_definition) || depth < 0 {
+	if !validate_card_definition(&validated_definition) || definition.temporary_only || depth < 0 {
 		return 0, false
 	}
 	price := i64(definition.shop_base_price)+i64(min(depth, MAX_CARD_OFFER_DEPTH)/3)
@@ -151,7 +151,7 @@ shop_payload_is_valid :: proc(run: ^Run_State) -> bool {
 	for index in 0..<run.shop.offer_count {
 		offer := run.shop.offers[index]
 		definition, found := card_definition_by_id(offer.definition_id)
-		if !found || !validate_card_definition(&definition) {
+		if !found || !validate_card_definition(&definition) || definition.temporary_only {
 			return false
 		}
 		expected_price, price_ok := shop_card_price(definition, node.depth)

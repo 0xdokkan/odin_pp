@@ -21,6 +21,7 @@ Card_Play_Report :: struct {
 	cost:               i32,
 	energy_before:      i32,
 	energy_after:       i32,
+	destination:        Card_Zone,
 	drawn_card:         Card_Instance,
 	drew_card:          bool,
 	action_report:      Action_Report,
@@ -74,16 +75,24 @@ play_card :: proc(room: ^Room, card_id: u32, target: Target) -> (play: Card_Play
 		return
 	}
 
+	deck_before := deck^
+	deck.energy -= definition.cost
+	destination, valid_destination := card_destination_after_play(play.card)
+	assert(valid_destination)
+	play.destination = destination
+	resolving_card, began_resolving := begin_resolving_hand_card(deck, hand_index)
+	assert(began_resolving && resolving_card == play.card)
+
 	play.action_report = resolve_action(room, &action)
 	if !play.action_report.accepted {
+		deck^ = deck_before
 		play.result = .Action_Rejected
 		play.energy_after = deck.energy
 		return
 	}
 
-	deck.energy -= definition.cost
-	discarded_card, discarded := discard_hand_card(deck, hand_index)
-	assert(discarded && discarded_card == play.card)
+	resolved_card, finished_resolving := finish_resolving_card(deck, play.destination)
+	assert(finished_resolving && resolved_card == play.card)
 	record_event(&room.recent_events, {
 		kind = .Card_Played,
 		source = PLAYER_ENTITY,
@@ -91,37 +100,35 @@ play_card :: proc(room: ^Room, card_id: u32, target: Target) -> (play: Card_Play
 		amount = definition.cost,
 		card_id = play.card.id,
 		card_definition = play.card.definition_id,
+		card_upgrade_level = play.card.upgrade_level,
+		card_lifetime = play.card.lifetime,
+		from_card_zone = .Hand,
+		to_card_zone = .Resolving,
 	})
 	append_event_log(&room.recent_events, &play.action_report.events)
-	collect_loot_in_magnet_range(room)
-
-	if room.phase == .Defeat {
+	record_event(&room.recent_events, {
+		kind = .Card_Moved,
+		source = PLAYER_ENTITY,
+		target = PLAYER_ENTITY,
+		card_id = play.card.id,
+		card_definition = play.card.definition_id,
+		card_upgrade_level = play.card.upgrade_level,
+		card_lifetime = play.card.lifetime,
+		from_card_zone = .Resolving,
+		to_card_zone = play.destination,
+	})
+	pulse_report, outcome := finish_player_combat_command(room)
+	play.pulse_report = pulse_report
+	switch outcome {
+	case .Player_Defeated:
 		play.result = .Player_Defeated
-		sync_deck_with_room_phase(room)
 		play.energy_after = deck.energy
 		return
-	}
-	if room.phase == .Loot {
+	case .Combat_Ended:
 		play.result = .Combat_Ended
-		sync_deck_with_room_phase(room)
 		play.energy_after = deck.energy
 		return
-	}
-
-	play.pulse_report = advance_combat_pulse(room)
-	append_event_log(&room.recent_events, &play.pulse_report.events)
-	collect_loot_in_magnet_range(room)
-	if room.phase == .Defeat {
-		play.result = .Player_Defeated
-		sync_deck_with_room_phase(room)
-		play.energy_after = deck.energy
-		return
-	}
-	if room.phase == .Loot {
-		play.result = .Combat_Ended
-		sync_deck_with_room_phase(room)
-		play.energy_after = deck.energy
-		return
+	case .Combat_Continues:
 	}
 
 	play.drawn_card, play.drew_card = draw_card(deck)
@@ -132,6 +139,10 @@ play_card :: proc(room: ^Room, card_id: u32, target: Target) -> (play: Card_Play
 			target = PLAYER_ENTITY,
 			card_id = play.drawn_card.id,
 			card_definition = play.drawn_card.definition_id,
+			card_upgrade_level = play.drawn_card.upgrade_level,
+			card_lifetime = play.drawn_card.lifetime,
+			from_card_zone = .Draw,
+			to_card_zone = .Hand,
 		})
 	}
 	assert(validate_deck_state(deck))

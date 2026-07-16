@@ -66,6 +66,10 @@ nodo. Un sampling pesato senza rimpiazzo produce tre definizioni valide e
 distinte. Lo stato RNG viene avanzato su una copia locale e committato soltanto
 dopo aver costruito l'intera offerta.
 
+Le definizioni `temporary_only` hanno peso zero e non sono eleggibili: vengono
+create soltanto dagli effetti di combattimento descritti in
+[Card Lifecycle](CARD_LIFECYCLE.md).
+
 ## Scelta atomica
 
 `choose_card_reward(run, index)` segue questo ordine:

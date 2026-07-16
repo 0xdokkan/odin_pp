@@ -1,6 +1,6 @@
 package game
 
-MAX_REACTION_QUEUE_EVENTS :: 64
+MAX_REACTION_QUEUE_EVENTS :: MAX_GAME_EVENTS
 MAX_REACTIONS_PER_EVENT :: 8
 MAX_REACTION_ACTIONS_PER_CHAIN :: 32
 
@@ -102,6 +102,9 @@ merge_reaction_action_report :: proc(destination, source: ^Action_Report) {
 	destination.enemies_defeated += source.enemies_defeated
 	destination.statuses_applied += source.statuses_applied
 	destination.statuses_removed += source.statuses_removed
+	destination.cards_drawn += source.cards_drawn
+	destination.cards_discarded += source.cards_discarded
+	destination.cards_created += source.cards_created
 	destination.reaction_bindings_removed += source.reaction_bindings_removed
 	destination.reaction_bindings_added += source.reaction_bindings_added
 	destination.combat_ended = destination.combat_ended || source.combat_ended
