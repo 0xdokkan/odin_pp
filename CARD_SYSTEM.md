@@ -40,18 +40,22 @@ di distinguere due copie con upgrade o binding differenti.
 
 ```odin
 Card_Definition :: struct {
-	id:           Card_Id,
-	name:         string,
-	cost:         i32,
-	targeting:    Targeting_Spec,
-	effects:      [MAX_CARD_DEFINITION_EFFECTS]Card_Effect_Template,
-	effect_count: int,
+	id:              Card_Id,
+	name:            string,
+	rarity:          Card_Rarity,
+	reward_weight:   u32,
+	shop_base_price: i32,
+	cost:            i32,
+	targeting:       Targeting_Spec,
+	effects:         [MAX_CARD_DEFINITION_EFFECTS]Card_Effect_Template,
+	effect_count:    int,
 }
 ```
 
 `CARD_DEFINITIONS` e indicizzato da `Card_Id`. `validate_card_definitions`
-verifica che indice e ID coincidano, i costi siano non negativi, la specifica di
-targeting sia valida e ogni template sia rappresentabile.
+verifica che indice e ID coincidano, rarita, peso e prezzo siano validi, i costi
+siano non negativi, la specifica di targeting sia valida e ogni template sia
+rappresentabile.
 
 Il costo e un dato della definizione. `compile_card_action` non lo paga perche e
 una trasformazione pura; `play_card` controlla l'energia prima del resolver e la
@@ -188,18 +192,18 @@ ancora con l'upgrade.
 
 ## Carte disponibili
 
-| Carta | Costo | Anchor e forma | Effetto base |
-|---|---:|---|---|
-| `Strike` | 1 | avversario, Manhattan 1, Single | 2 danni, +1 per upgrade |
-| `Arc_Bolt` | 2 | avversario, Manhattan 1-3, Single, LoS | 3 danni, +1 per upgrade |
-| `Piercing_Ray` | 2 | cella, Chebyshev 1-5, Line | 2 danni a ogni nemico attraversato, +1 per upgrade |
-| `Cross_Slash` | 2 | cella, Manhattan 1-3, Cross raggio 1 | 2 danni a ogni nemico nella croce, +1 per upgrade |
-| `Firebomb` | 2 | cella, Chebyshev 1-3, Square raggio 1 | 2 danni a ogni nemico nel 3x3, +1 per upgrade |
-| `Guard` | 1 | player, None | Shield 3 per 3 pulse |
-| `Toxic_Wave` | 2 | implicito, None | Poison 1 per 3 pulse a ogni nemico |
-| `Thorn_Coat` | 1 | player, None | Thorns 1 per 3 pulse |
-| `Afterimage` | 1 | player, None | Afterimage 1 per 4 pulse |
-| `Counter_Rune` | 1 | player, None | due contraccolpi, durata 4 pulse |
+| Carta | Rarita | Costo | Anchor e forma | Effetto base |
+|---|---|---:|---|---|
+| `Strike` | Common | 1 | avversario, Manhattan 1, Single | 2 danni, +1 per upgrade |
+| `Arc_Bolt` | Common | 2 | avversario, Manhattan 1-3, Single, LoS | 3 danni, +1 per upgrade |
+| `Piercing_Ray` | Uncommon | 2 | cella, Chebyshev 1-5, Line | 2 danni a ogni nemico attraversato, +1 per upgrade |
+| `Cross_Slash` | Uncommon | 2 | cella, Manhattan 1-3, Cross raggio 1 | 2 danni a ogni nemico nella croce, +1 per upgrade |
+| `Firebomb` | Rare | 2 | cella, Chebyshev 1-3, Square raggio 1 | 2 danni a ogni nemico nel 3x3, +1 per upgrade |
+| `Guard` | Common | 1 | player, None | Shield 3 per 3 pulse |
+| `Toxic_Wave` | Rare | 2 | implicito, None | Poison 1 per 3 pulse a ogni nemico |
+| `Thorn_Coat` | Uncommon | 1 | player, None | Thorns 1 per 3 pulse |
+| `Afterimage` | Uncommon | 1 | player, None | Afterimage 1 per 4 pulse |
+| `Counter_Rune` | Rare | 1 | player, None | due contraccolpi, durata 4 pulse |
 
 La mano in basso sovrappone le carte e ne lascia visibili soltanto le testate.
 L'hover solleva una carta; il drag la porta sul campo e mostra cast range,
@@ -251,8 +255,7 @@ Non sono ancora implementati:
 - coni, rotazioni libere delle footprint e proiettili persistenti;
 - upgrade di durata, cariche o costo;
 - caricamento delle definizioni da file;
-- rimozione e upgrade del deck fra le stanze;
 - descrizione completa degli effetti e tooltip nella UI.
 
-Le ricompense base sono descritte in [Card Rewards](REWARD_SYSTEM.md). I prossimi
-incrementi utili sono upgrade delle istanze e modifica del deck fra le stanze.
+Le ricompense sono descritte in [Card Rewards](REWARD_SYSTEM.md); rarita,
+upgrade e modifica persistente del deck in [Deck Economy](DECK_ECONOMY.md).

@@ -7,6 +7,25 @@ import game "../game"
 import view "../view"
 
 RUN_NODE_RADIUS :: f32(18)
+RUN_SHOP_BUTTON_WIDTH  :: f32(120)
+RUN_SHOP_BUTTON_HEIGHT :: f32(40)
+
+run_shop_button_bounds :: proc(canvas_width, canvas_height: f32) -> rl.Rectangle {
+	if canvas_width < 246 || canvas_height < 24+RUN_SHOP_BUTTON_HEIGHT {
+		return {}
+	}
+	return {
+		x = canvas_width-246,
+		y = 24,
+		width = RUN_SHOP_BUTTON_WIDTH,
+		height = RUN_SHOP_BUTTON_HEIGHT,
+	}
+}
+
+run_shop_button_at_point :: proc(canvas_width, canvas_height: f32, point: view.Vec2) -> bool {
+	bounds := run_shop_button_bounds(canvas_width, canvas_height)
+	return bounds.width > 0 && bounds.height > 0 && point_in_rectangle(point, bounds)
+}
 
 run_node_center :: proc(run: ^game.Run_State, node: ^game.Run_Node, canvas_width, canvas_height: f32) -> view.Vec2 {
 	assert(run != nil && node != nil)
@@ -66,22 +85,41 @@ node_colors :: proc(run: ^game.Run_State, node: ^game.Run_Node) -> (fill, outlin
 	assert(run != nil && node != nil)
 	fill = rl.Color{48, 55, 58, 255}
 	outline = rl.Color{105, 116, 116, 255}
+	switch node.kind {
+	case .Combat:
+	case .Elite:
+		fill = rl.Color{57, 52, 69, 255}
+		outline = rl.Color{155, 137, 187, 255}
+	case .Boss:
+		fill = rl.Color{91, 48, 50, 255}
+		outline = rl.Color{190, 78, 75, 255}
+	case .Shop:
+		fill = rl.Color{31, 77, 78, 255}
+		outline = rl.Color{91, 204, 195, 255}
+	case .Rest:
+		fill = rl.Color{44, 78, 53, 255}
+		outline = rl.Color{113, 190, 110, 255}
+	case .Event:
+		fill = rl.Color{80, 43, 70, 255}
+		outline = rl.Color{216, 111, 178, 255}
+	case .Treasure:
+		fill = rl.Color{91, 69, 31, 255}
+		outline = rl.Color{246, 207, 92, 255}
+	case .Count:
+	}
 
 	if node.cleared {
 		fill = rl.Color{43, 105, 78, 255}
 		outline = rl.Color{74, 196, 133, 255}
 	}
-	if node.id == run.current_node && run.phase == .In_Room {
+	if node.id == run.current_node && run.phase != .Choose_Path &&
+	   run.phase != .Victory && run.phase != .Defeat {
 		fill = rl.Color{38, 112, 111, 255}
 		outline = rl.Color{71, 188, 184, 255}
 	}
 	if node_is_available(run, node.id) {
 		fill = rl.Color{120, 91, 38, 255}
 		outline = rl.Color{246, 207, 92, 255}
-	}
-	if node.kind == .Boss && !node.entered {
-		fill = rl.Color{91, 48, 50, 255}
-		outline = rl.Color{190, 78, 75, 255}
 	}
 	return
 }
@@ -94,6 +132,15 @@ node_symbol :: proc(kind: game.Node_Kind) -> cstring {
 		return "E"
 	case .Boss:
 		return "B"
+	case .Shop:
+		return "S"
+	case .Rest:
+		return "R"
+	case .Event:
+		return "?"
+	case .Treasure:
+		return "T"
+	case .Count:
 	}
 	return "?"
 }
@@ -102,6 +149,7 @@ draw_run_map :: proc(
 	run: ^game.Run_State,
 	canvas_width, canvas_height: f32,
 	hovered_node: game.Node_Id = game.INVALID_NODE_ID,
+	shop_hovered: bool = false,
 ) {
 	assert(run != nil)
 	room_number := min(run.cleared_count+1, len(run.route_map.layer_starts))
@@ -109,7 +157,7 @@ draw_run_map :: proc(
 	rl.DrawRectangle(0, 0, c.int(canvas_width), 92, rl.Color{15, 18, 21, 255})
 	rl.DrawText("ROUTE", 28, 22, 24, rl.Color{225, 229, 224, 255})
 	rl.DrawText(
-		fmt.ctprintf("%s    ROOM %d/%d    HP %d/%d    GOLD %d",
+		fmt.ctprintf("%s    NODE %d/%d    HP %d/%d    GOLD %d",
 			game.run_phase_name(run.phase),
 			room_number,
 			len(run.route_map.layer_starts),
@@ -157,6 +205,28 @@ draw_run_map :: proc(
 		label := fmt.ctprintf("%s", game.node_kind_name(node.kind))
 		label_width := rl.MeasureText(label, 12)
 		rl.DrawText(label, c.int(center.x)-label_width/2, c.int(center.y)+26, 12, rl.Color{137, 148, 145, 255})
+	}
+	if run.phase == .Choose_Path && run.shop.offer_count > 0 && game.validate_shop_state(run) {
+		bounds := run_shop_button_bounds(canvas_width, canvas_height)
+		fill := rl.Color{31, 36, 39, 255}
+		outline := rl.Color{105, 116, 116, 255}
+		label_color := rl.Color{225, 229, 224, 255}
+		if shop_hovered {
+			fill = rl.Color{67, 55, 31, 255}
+			outline = rl.Color{246, 207, 92, 255}
+			label_color = outline
+		}
+		rl.DrawRectangleRec(bounds, fill)
+		rl.DrawRectangleLinesEx(bounds, 2, outline)
+		label: cstring = "SHOP"
+		label_width := rl.MeasureText(label, 14)
+		rl.DrawText(
+			label,
+			c.int(bounds.x+bounds.width*0.5)-label_width/2,
+			c.int(bounds.y+bounds.height*0.5)-7,
+			14,
+			label_color,
+		)
 	}
 	rl.DrawFPS(c.int(canvas_width)-96, 18)
 }

@@ -259,6 +259,10 @@ test_room_blueprint_rejects_invalid_or_zero_seed_nodes :: proc(t: ^testing.T) {
 		{id = INVALID_NODE_ID, kind = .Combat, depth = 0, room_seed = 1},
 		{id = 0, kind = .Combat, depth = -1, room_seed = 1},
 		{id = 0, kind = .Combat, depth = 0, room_seed = 0},
+		{id = 0, kind = .Shop, depth = 1, room_seed = 1},
+		{id = 0, kind = .Rest, depth = 1, room_seed = 1},
+		{id = 0, kind = .Event, depth = 1, room_seed = 1},
+		{id = 0, kind = .Treasure, depth = 1, room_seed = 1},
 	}
 	for &node in invalid_nodes {
 		blueprint, err := generate_room_blueprint(&node)

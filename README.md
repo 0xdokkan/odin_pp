@@ -7,10 +7,14 @@ Documentazione del gameplay: [Action System](ACTION_SYSTEM.md),
 [Enemy Intents](ENEMY_INTENT_SYSTEM.md),
 [Magnetic Loot](LOOT_SYSTEM.md), [Card System](CARD_SYSTEM.md),
 [Targeting System](TARGETING_SYSTEM.md), [Deck Runtime](DECK_SYSTEM.md) e
-[Card Rewards](REWARD_SYSTEM.md). Il confine fra simulazione, animazioni e input
-bufferizzato e documentato in [Presentation Timeline](PRESENTATION_TIMELINE.md).
-Le milestone sono raccolte nella [Roadmap](ROADMAP.md); il contratto della
-milestone M1 completata e in [Room Generation](ROOM_GENERATION.md).
+[Card Rewards](REWARD_SYSTEM.md). Rarita, upgrade, rimozione e shop sono in
+[Deck Economy](DECK_ECONOMY.md); distribuzione e lifecycle di Shop, Rest, Event e
+Treasure in [Special Nodes](SPECIAL_NODES.md). Il confine fra simulazione,
+animazioni e input bufferizzato e documentato in
+[Presentation Timeline](PRESENTATION_TIMELINE.md). Le milestone sono raccolte
+nella [Roadmap](ROADMAP.md); i contratti di M1, M2 e M3 sono in
+[Room Generation](ROOM_GENERATION.md), [Deck Economy](DECK_ECONOMY.md) e
+[Special Nodes](SPECIAL_NODES.md).
 
 ![Anteprima della griglia isometrica](odin_pp_isometric.png)
 
@@ -27,6 +31,16 @@ milestone M1 completata e in [Room Generation](ROOM_GENERATION.md).
 ![Cast range e footprint 3x3 del targeting](odin_pp_advanced_targeting.png)
 
 ![Scelta della ricompensa dopo una stanza](odin_pp_reward.png)
+
+![Nodo Shop con offerte e servizi sul deck](odin_pp_shop.png)
+
+![Scelte del nodo Rest e upgrade per istanza](odin_pp_rest.png)
+
+![Evento deterministico della rotta](odin_pp_event.png)
+
+![Ricompensa del nodo Treasure](odin_pp_treasure.png)
+
+![Risultato one-shot di un nodo speciale](odin_pp_special_result.png)
 
 ![Intenti committed dei nemici](odin_pp_enemy_intents.png)
 
@@ -75,6 +89,25 @@ odin run src -- --smoke-generation
 
 Il comando salva `odin_pp_procedural_room.png` dopo tre frame e chiude la demo.
 
+Per verificare offerte, deck paginato e servizi dello shop:
+
+```sh
+odin run src -- --smoke-shop
+```
+
+Le schermate degli altri nodi speciali hanno smoke dedicati:
+
+```sh
+odin run src -- --smoke-rest
+odin run src -- --smoke-event
+odin run src -- --smoke-treasure
+odin run src -- --smoke-special-result
+```
+
+I comandi salvano `odin_pp_rest.png`, `odin_pp_event.png` e
+`odin_pp_treasure.png`; l'ultimo salva `odin_pp_special_result.png` con il
+pannello risolto e Continue disponibile.
+
 ## Loop attuale
 
 1. La stanza parte in `Combat`: il deck viene mescolato, si pescano cinque carte
@@ -90,11 +123,17 @@ Il comando salva `odin_pp_procedural_room.png` dopo tre frame e chiude la demo.
 5. Ogni drop entro tre celle per asse viene assorbito anche durante `Combat`;
    eliminato l'ultimo nemico, la stanza passa a `Loot` e gli spostamenti non
    producono piu pulse.
-6. Entrare sull'uscita verde conclude la stanza e apre `Reward` con tre carte distinte.
+6. Entrare sull'uscita verde conclude la stanza e apre `Reward` con tre carte
+   distinte, pesate per rarita, profondita e tipo del nodo.
 7. Scegliere una carta la aggiunge al deck; `Skip` prosegue senza modificarlo.
-8. `Choose_Path` permette di scegliere uno dei due o tre nodi collegati; entrando
-   nel nodo viene installata la sua stanza deterministica con il profilo relativo.
-9. L'ultimo nodo e il boss. Superarlo porta a `Victory`; morire apre `Defeat`, da
+   Entrambe le decisioni azzerano la reward e aprono `Choose_Path`.
+8. `Choose_Path` permette di scegliere uno, due o tre nodi collegati. `Combat`,
+   `Elite` e `Boss` installano una stanza deterministica con il profilo relativo.
+9. Un nodo `Shop` offre tre carte, un upgrade e una rimozione. Uscire completa il
+   nodo e apre la mappa; il vendor corrente puo essere riaperto senza reroll.
+10. `Rest`, `Event` e `Treasure` mostrano scelte dedicate. Una scelta oppure Leave
+   produce un risultato one-shot; Continue completa il nodo e torna alla rotta.
+11. L'ultimo nodo e il boss. Superarlo porta a `Victory`; morire apre `Defeat`, da
    cui si puo iniziare una nuova run con `Enter` o il pulsante `Restart`.
 
 Gli attacchi a contatto restano disponibili accanto alle carte. Carte e bump
@@ -121,6 +160,20 @@ posizionamento.
 | `M` | mostra o nasconde la rotta durante una stanza |
 | click / `1` `2` `3` | sceglie una carta durante `Reward` |
 | `S` / pulsante Skip | salta la ricompensa |
+| click / `1` `2` `3` nello shop | acquista una delle offerte disponibili |
+| click su carta posseduta | seleziona l'istanza da migliorare o rimuovere |
+| `U` / pulsante Upgrade | migliora la carta selezionata |
+| `R` / pulsante Remove | rimuove la carta selezionata |
+| frecce / pulsanti freccia | cambia pagina del deck nello shop |
+| `Enter` / `Esc` / Continue | esce dallo shop e apre la mappa |
+| pulsante Shop sulla mappa | riapre il nodo Shop corrente senza reroll |
+| click / `1` in un nodo speciale | Recover al Rest, prima scelta Event o Claim al Treasure |
+| click / `2` in Rest o Event | migliora la carta selezionata oppure usa la seconda scelta Event |
+| click su carta al Rest | seleziona la specifica istanza da migliorare |
+| `U` al Rest | migliora la carta selezionata |
+| frecce / pulsanti freccia al Rest | cambia pagina del deck e azzera la selezione |
+| `L` / pulsante Leave | risolve Rest, Event o Treasure senza prendere la ricompensa |
+| `Enter` / Continue dopo il risultato | completa il nodo speciale e torna alla mappa |
 | click / `1` `2` `3` | sceglie uno dei nodi disponibili |
 | `Enter` / pulsante Restart | avvia una nuova run dalla schermata `Defeat` |
 | `F5` | crea una nuova run con un seed diverso |
@@ -172,12 +225,13 @@ src/
 
 `grid` non conosce il gioco. Gestisce solo coordinate, memoria contigua e
 accesso sicuro. `level` assegna un significato alle celle, genera la topologia e
-ne verifica la raggiungibilita senza conoscere nemici o tipi di nodo. `game`
-traduce il nodo in un profilo, applica l'encounter budget e costruisce un
-`Room_Blueprint`. `Run_State` possiede il player e il grafo della rotta. Una
-`Room` possiede soltanto le entita temporanee e prende in prestito puntatori al
-livello e al player della run. Il renderer legge questi dati, ma non li possiede
-e non li cambia.
+ne verifica la raggiungibilita senza conoscere nemici o tipi di nodo. Per
+`Combat`, `Elite` e `Boss`, `game` traduce il nodo in un profilo, applica
+l'encounter budget e costruisce un `Room_Blueprint`; per i nodi speciali prepara
+invece un payload dedicato senza creare una stanza vuota. `Run_State` possiede il
+player, il grafo e questi payload. Una `Room` possiede soltanto le entita
+temporanee e prende in prestito puntatori al livello e al player della run. Il
+renderer legge questi dati, ma non li possiede e non li cambia.
 
 Input, IA, trappole e loot costruiscono `Action` composte da effetti ordinati.
 `resolve_action` valida sorgente, target ed effetti prima di modificare la stanza;
@@ -209,8 +263,13 @@ conserva ownership, draw pile, mano, discard ed energia in array fissi; shuffle 
 reshuffle sono deterministici.
 `play_card` paga e sposta la carta soltanto dopo che l'azione e stata accettata.
 Fra stanza e mappa, `Run_Phase.Reward` offre tre definizioni distinte tramite un
-RNG dedicato. Soltanto la scelta confermata crea una nuova `Card_Instance`; skip,
-indice invalido e deck pieno non consumano ID e non modificano ownership.
+RNG dedicato e pesi di rarita. Soltanto la scelta confermata crea una nuova
+`Card_Instance`; skip, indice invalido e deck pieno non consumano ID. Scelta e
+Skip passano direttamente a `Choose_Path`. Entrare in un nodo Shop usa un terzo
+RNG, prezzi interi e copie staged del deck per acquisto, upgrade e rimozione;
+fallimenti non modificano oro, ID o random state. Rest, Event e Treasure
+mantengono payload deterministici separati, richiedono una sola scelta e vengono
+completati esplicitamente con Continue.
 La mano compatta a ventaglio, hover e drag sono stato di presentazione: durante
 il trascinamento il renderer interroga `evaluate_card_targeting` per ogni anchor
 e per la cella puntata. La compilazione riesegue la stessa query autorevole prima
@@ -250,6 +309,9 @@ La rotta e un grafo diretto aciclico organizzato in livelli:
 
 - un solo nodo iniziale e un solo boss finale;
 - due o tre nodi per ogni livello intermedio;
+- esattamente un nodo speciale per livello intermedio e almeno un nodo con
+  stanza;
+- ciclo deterministico `Shop`, `Rest`, `Event`, `Treasure` con offset dal seed;
 - archi soltanto verso il livello immediatamente successivo;
 - massimo tre uscite per nodo e nessun arco duplicato;
 - ogni nodo generato e raggiungibile dall'inizio e conduce verso il boss.

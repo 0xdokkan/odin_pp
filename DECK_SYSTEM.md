@@ -4,7 +4,8 @@ Questa guida descrive ownership delle carte, zone, shuffle, energia e transazion
 di giocata. Le definizioni e la compilazione degli effetti sono in
 [Card System](CARD_SYSTEM.md); cast range e footprint in
 [Targeting System](TARGETING_SYSTEM.md); la risoluzione e in
-[Action System](ACTION_SYSTEM.md).
+[Action System](ACTION_SYSTEM.md); rarita, upgrade, rimozione e shop in
+[Deck Economy](DECK_ECONOMY.md).
 
 ## Indice
 
@@ -84,8 +85,12 @@ Il deck iniziale contiene dieci istanze con ID da 1 a 10:
 ```
 
 `add_owned_card` genera l'ID successivo e funziona soltanto fuori dal
-combattimento. Questa regola prepara reward e shop senza dover aggiornare tre
-zone attive contemporaneamente.
+combattimento. Questa regola permette a reward, Shop e Forgotten Armory di
+aggiungere carte senza dover aggiornare tre zone attive contemporaneamente.
+
+`upgrade_owned_card` modifica soltanto l'istanza identificata dal suo ID.
+`remove_owned_card` compatta stabilmente `owned`, non ricicla ID e conserva
+almeno `MIN_OWNED_CARDS`.
 
 ## Inizio e fine combattimento
 
@@ -191,11 +196,17 @@ eventuale reshuffle con lo stato RNG catturato.
 Dopo una stanza non finale, `Run_Phase.Reward` presenta tre `Card_Id` distinti.
 L'offerta non contiene `Card_Instance`: mostrare una carta non consuma un ID.
 
-`choose_card_reward` chiama `add_owned_card` soltanto dopo aver validato fase,
-offerta, indice e capacita. Se l'aggiunta riesce, ownership e `next_card_id`
-avanzano esattamente una volta e la run passa a `Choose_Path`. `Skip`, indice
-invalido o deck pieno non modificano alcuna zona. Dettagli e RNG sono in
-[Card Rewards](REWARD_SYSTEM.md).
+`choose_card_reward` applica `add_owned_card` a una copia staged soltanto dopo
+aver validato fase, offerta, indice e capacita. Ownership e `next_card_id`
+avanzano esattamente una volta, l'offerta viene azzerata e la run passa a
+`Choose_Path`. `Skip`, indice invalido o deck pieno non modificano alcuna zona.
+Dettagli e RNG sono in [Card Rewards](REWARD_SYSTEM.md).
+
+Le modifiche offerte dai nodi speciali attraversano le stesse primitive:
+`Rest` migliora gratuitamente una specifica istanza, mentre `Forgotten_Armory`
+puo aggiungere la carta deterministica proposta dall'evento. Deck pieno, livello
+massimo e ID esauriti lasciano la run invariata. Il lifecycle e documentato in
+[Special Nodes](SPECIAL_NODES.md).
 
 ## Input e presentazione
 
@@ -222,16 +233,12 @@ lo stato hover/drag non entra in `Deck_State`.
 
 ## Limiti intenzionali
 
-Non sono ancora implementati:
+Non sono ancora implementati exhaust, retain e carte ethereal, effetti che
+pescano o scartano altre carte, modificatori dinamici di costo o rigenerazione,
+salvataggio serializzato, descrizioni complete e animazioni spaziali fra le zone.
+Cue e cambio di zona sincronizzato sono gia presenti.
 
-- exhaust, retain e carte ethereal;
-- effetti che pescano o scartano altre carte;
-- shop, rimozione e upgrade fra stanze;
-- modificatori dinamici di costo o rigenerazione;
-- salvataggio serializzato del deck;
-- animazioni spaziali delle singole carte fra mano, draw e discard; cue e cambio
-  di zona sincronizzato sono gia presenti;
-- descrizioni e tooltip completi.
-
-Il prossimo passo naturale e introdurre pool, rarita e upgrade senza cambiare la
-transazione di ownership gia presente.
+Shop, Rest, Event e Treasure sono nodi reali della rotta. Le relative schermate
+mantengono hover, pagina e selezione nel renderer, mentre ownership e mutazioni
+del deck restano in `Run_State`; il contratto e in
+[Special Nodes](SPECIAL_NODES.md).

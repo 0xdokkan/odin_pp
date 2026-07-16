@@ -120,7 +120,7 @@ prepare_demo_room :: proc(
 	node: ^game.Run_Node,
 	procedural: bool,
 ) -> bool {
-	if prepared == nil || run == nil || node == nil {
+	if prepared == nil || run == nil || node == nil || !game.node_kind_has_room(node.kind) {
 		return false
 	}
 	destroy_prepared_demo_room(prepared)
@@ -225,9 +225,13 @@ enter_demo_node :: proc(
 	if !node_ok {
 		return false
 	}
+	if !game.node_kind_has_room(node.kind) {
+		return game.enter_node(run, node_id) != .Invalid
+	}
 	prepared: Prepared_Demo_Room
 	defer destroy_prepared_demo_room(&prepared)
-	if !prepare_demo_room(&prepared, run, node, procedural) || !game.choose_node(run, node_id) {
+	if !prepare_demo_room(&prepared, run, node, procedural) ||
+	   game.enter_node(run, node_id) != .In_Room {
 		return false
 	}
 	install_prepared_demo_room(level_data, run, room, &prepared)
@@ -588,6 +592,42 @@ keyboard_route_choice :: proc(run: ^game.Run_State) -> (game.Node_Id, bool) {
 	return choices[choice_index], true
 }
 
+available_node_of_kind :: proc(run: ^game.Run_State, kind: game.Node_Kind) -> game.Node_Id {
+	for choice in game.available_nodes(run) {
+		node, found := game.node_at(run, choice)
+		if found && node.kind == kind {
+			return choice
+		}
+	}
+	return game.INVALID_NODE_ID
+}
+
+demo_seed_with_first_special :: proc(start_seed: u64, kind: game.Node_Kind) -> (u64, bool) {
+	if !game.node_kind_is_special(kind) {
+		return 0, false
+	}
+	for offset in u64(0)..<u64(512) {
+		seed := start_seed+offset
+		route_map, ok := game.generate_run_map(DEMO_RUN_CONFIG, seed)
+		if !ok {
+			continue
+		}
+		found := false
+		root := &route_map.nodes[0]
+		for index in 0..<root.outgoing_count {
+			if route_map.nodes[int(root.outgoing[index])].kind == kind {
+				found = true
+				break
+			}
+		}
+		game.destroy_run_map(&route_map)
+		if found {
+			return seed, true
+		}
+	}
+	return 0, false
+}
+
 main :: proc() {
 	smoke_test := false
 	smoke_generation := false
@@ -599,6 +639,11 @@ main :: proc() {
 	smoke_movement := false
 	smoke_timeline := false
 	smoke_reward := false
+	smoke_shop := false
+	smoke_rest := false
+	smoke_event := false
+	smoke_treasure := false
+	smoke_special_result := false
 	smoke_intents := false
 	smoke_archetypes := false
 	smoke_defeat := false
@@ -643,6 +688,26 @@ main :: proc() {
 			smoke_test = true
 			smoke_reward = true
 			smoke_mode_count += 1
+		} else if argument == "--smoke-shop" {
+			smoke_test = true
+			smoke_shop = true
+			smoke_mode_count += 1
+		} else if argument == "--smoke-rest" {
+			smoke_test = true
+			smoke_rest = true
+			smoke_mode_count += 1
+		} else if argument == "--smoke-event" {
+			smoke_test = true
+			smoke_event = true
+			smoke_mode_count += 1
+		} else if argument == "--smoke-treasure" {
+			smoke_test = true
+			smoke_treasure = true
+			smoke_mode_count += 1
+		} else if argument == "--smoke-special-result" {
+			smoke_test = true
+			smoke_special_result = true
+			smoke_mode_count += 1
 		} else if argument == "--smoke-intents" {
 			smoke_test = true
 			smoke_intents = true
@@ -667,6 +732,21 @@ main :: proc() {
 	defer level.destroy(&level_data)
 
 	run_seed: u64 = 0xC0FFEE
+	if smoke_shop || smoke_rest || smoke_event || smoke_treasure || smoke_special_result {
+		desired_kind := game.Node_Kind.Shop
+		if smoke_rest {
+			desired_kind = .Rest
+		} else if smoke_event {
+			desired_kind = .Event
+		} else if smoke_treasure || smoke_special_result {
+			desired_kind = .Treasure
+		}
+		found_seed: bool
+		run_seed, found_seed = demo_seed_with_first_special(run_seed, desired_kind)
+		if !found_seed {
+			return
+		}
+	}
 	run_state, run_ok := game.create_run(DEMO_PLAYER_STATS, DEMO_RUN_CONFIG, run_seed)
 	if !run_ok {
 		return
@@ -700,6 +780,8 @@ main :: proc() {
 	gameplay_buffer: Buffered_Gameplay_Command
 	reward_hovered_index := -1
 	reward_skip_hovered := false
+	shop_render_state := render.Shop_Render_State{hovered_offer_index = -1}
+	special_render_state: render.Special_Node_Render_State
 	smoke_frame_count := 0
 	if smoke_map {
 		room.phase = .Complete
@@ -712,6 +794,47 @@ main :: proc() {
 		transition := game.finish_room(&run_state, room.phase)
 		assert(transition == .Reward)
 		reward_hovered_index = 1
+	} else if smoke_shop || smoke_rest || smoke_event || smoke_treasure || smoke_special_result {
+		room.phase = .Complete
+		transition := game.finish_room(&run_state, room.phase)
+		assert(transition == .Reward)
+		assert(game.skip_card_reward(&run_state) == .Skipped)
+		desired_kind := game.Node_Kind.Shop
+		if smoke_rest {
+			desired_kind = .Rest
+			run_state.player.health = run_state.player.stats.max_health/2
+		} else if smoke_event {
+			desired_kind = .Event
+		} else if smoke_treasure || smoke_special_result {
+			desired_kind = .Treasure
+		}
+		if smoke_shop {
+			run_state.player.gold = 20
+		}
+		special_node := available_node_of_kind(&run_state, desired_kind)
+		assert(special_node != game.INVALID_NODE_ID)
+		assert(enter_demo_node(
+			&level_data,
+			&run_state,
+			&room,
+			special_node,
+			procedural_rooms,
+		))
+		if smoke_shop {
+			shop_render_state.has_hovered_offer = true
+			shop_render_state.hovered_offer_index = 1
+			shop_render_state.selected_card_id = run_state.player.deck.owned[0].id
+		} else if smoke_rest {
+			special_render_state.selected_card_id = run_state.player.deck.owned[0].id
+			special_render_state.secondary_hovered = true
+		} else {
+			special_render_state.primary_hovered = true
+		}
+		if smoke_special_result {
+			assert(game.claim_treasure(&run_state) == .Treasure_Claimed)
+			special_render_state.primary_hovered = false
+			special_render_state.continue_hovered = true
+		}
 	} else if smoke_intents {
 		room.enemies[0].position = {x = 2, y = 1}
 		room.enemies[1].position = {x = 7, y = 1}
@@ -725,17 +848,17 @@ main :: proc() {
 		room.enemies[2].archetype = .Brute
 		room.enemies[2].position = {x = 1, y = 4}
 		game.plan_enemy_intents(&room)
-		} else if smoke_defeat {
-			room.player.health = 1
-			room.enemies[0].archetype = .Chaser
-			room.enemies[0].position = {x = 2, y = 1}
-			game.plan_enemy_intents(&room)
-			before := render.capture_room_presentation(&room)
-			result := game.wait_player_turn(&room)
-			assert(result == .Player_Defeated)
-			assert(render.begin_renderer_event_timeline(&iso_renderer, before, &room.recent_events))
-			assert(render.update_renderer_event_timeline(&iso_renderer, 1000))
-			assert(!render.renderer_timeline_is_busy(&iso_renderer))
+	} else if smoke_defeat {
+		room.player.health = 1
+		room.enemies[0].archetype = .Chaser
+		room.enemies[0].position = {x = 2, y = 1}
+		game.plan_enemy_intents(&room)
+		before := render.capture_room_presentation(&room)
+		result := game.wait_player_turn(&room)
+		assert(result == .Player_Defeated)
+		assert(render.begin_renderer_event_timeline(&iso_renderer, before, &room.recent_events))
+		assert(render.update_renderer_event_timeline(&iso_renderer, 1000))
+		assert(!render.renderer_timeline_is_busy(&iso_renderer))
 	} else if smoke_status {
 		game.use_player_ability(&room, .Toxic_Wave)
 		game.use_player_ability(&room, .Guard)
@@ -824,6 +947,8 @@ main :: proc() {
 			clear_gameplay_command_buffer(&gameplay_buffer)
 			reward_hovered_index = -1
 			reward_skip_hovered = false
+			shop_render_state = {hovered_offer_index = -1}
+			special_render_state = {}
 			defeat_restart_hovered = false
 			render.frame_level(&iso_renderer, &level_data)
 			render.clear_event_animations(&iso_renderer)
@@ -839,9 +964,13 @@ main :: proc() {
 		}
 		defeat_visible := run_state.phase == .Defeat
 		reward_visible := run_state.phase == .Reward
-		route_visible := !reward_visible &&
+		shop_visible := run_state.phase == .Shop
+		special_visible := run_state.phase == .Rest || run_state.phase == .Event ||
+		                   run_state.phase == .Treasure
+		route_visible := !reward_visible && !shop_visible && !special_visible &&
 		                 (show_route_map || run_state.phase == .Choose_Path || run_state.phase == .Victory)
 		hovered_node := game.INVALID_NODE_ID
+		shop_button_hovered := false
 
 		if defeat_visible {
 			clear_card_interaction(&card_interaction)
@@ -893,24 +1022,310 @@ main :: proc() {
 			}
 			if resolved {
 				reward_visible = false
+				shop_visible = false
 				route_visible = true
 				show_route_map = true
 				reward_hovered_index = -1
 				reward_skip_hovered = false
 			}
+		} else if shop_visible {
+			clear_card_interaction(&card_interaction)
+			clear_gameplay_command_buffer(&gameplay_buffer)
+			shop_render_state.page = render.shop_clamp_deck_page(
+				&run_state.player.deck,
+				shop_render_state.page,
+			)
+			previous_hovered_offer := -1
+			if shop_render_state.has_hovered_offer {
+				previous_hovered_offer = shop_render_state.hovered_offer_index
+			}
+			previous_hovered_card := shop_render_state.hovered_card_id
+			shop_render_state.has_hovered_offer = false
+			shop_render_state.hovered_offer_index = 0
+			shop_render_state.hovered_card_id = 0
+			shop_render_state.previous_page_hovered = false
+			shop_render_state.next_page_hovered = false
+			shop_render_state.upgrade_hovered = false
+			shop_render_state.remove_hovered = false
+			shop_render_state.continue_hovered = false
+
+			shop_hit: render.Shop_Hit
+			if smoke_shop {
+				shop_render_state.has_hovered_offer = true
+				shop_render_state.hovered_offer_index = 1
+			} else if mouse_inside {
+				shop_hit = render.shop_hit_test(
+					&run_state,
+					f32(window.config.canvas_width),
+					f32(window.config.canvas_height),
+					shop_render_state.page,
+					mouse_canvas,
+					previous_hovered_offer,
+					previous_hovered_card,
+				)
+				switch shop_hit.kind {
+				case .None:
+				case .Offer:
+					shop_render_state.has_hovered_offer = true
+					shop_render_state.hovered_offer_index = shop_hit.offer_index
+				case .Owned_Card:
+					shop_render_state.hovered_card_id = shop_hit.card_id
+				case .Previous_Page:
+					shop_render_state.previous_page_hovered = true
+				case .Next_Page:
+					shop_render_state.next_page_hovered = true
+				case .Upgrade:
+					shop_render_state.upgrade_hovered = true
+				case .Remove:
+					shop_render_state.remove_hovered = true
+				case .Continue:
+					shop_render_state.continue_hovered = true
+				}
+			}
+
+			if !smoke_shop {
+				offer_index := pressed_hand_slot()
+				if offer_index >= 0 && offer_index < game.SHOP_CARD_OFFER_COUNT {
+					game.buy_shop_card(&run_state, offer_index)
+				}
+				if rl.IsKeyPressed(.LEFT) {
+					shop_render_state.page = max(0, shop_render_state.page-1)
+					shop_render_state.selected_card_id = 0
+				} else if rl.IsKeyPressed(.RIGHT) {
+					shop_render_state.page = min(
+						render.shop_deck_page_count(&run_state.player.deck)-1,
+						shop_render_state.page+1,
+					)
+					shop_render_state.selected_card_id = 0
+				}
+				if rl.IsKeyPressed(.U) && shop_render_state.selected_card_id != 0 {
+					game.buy_shop_upgrade(&run_state, shop_render_state.selected_card_id)
+				} else if rl.IsKeyPressed(.R) && shop_render_state.selected_card_id != 0 {
+					result := game.buy_shop_removal(&run_state, shop_render_state.selected_card_id)
+					if result == .Removed {
+						shop_render_state.selected_card_id = 0
+					}
+				}
+
+				leave_requested := rl.IsKeyPressed(.ENTER) || rl.IsKeyPressed(.ESCAPE)
+				if mouse_inside && rl.IsMouseButtonPressed(.LEFT) {
+					switch shop_hit.kind {
+					case .None:
+					case .Offer:
+						game.buy_shop_card(&run_state, shop_hit.offer_index)
+					case .Owned_Card:
+						shop_render_state.selected_card_id = shop_hit.card_id
+					case .Previous_Page:
+						shop_render_state.page = max(0, shop_render_state.page-1)
+						shop_render_state.selected_card_id = 0
+					case .Next_Page:
+						shop_render_state.page = min(
+							render.shop_deck_page_count(&run_state.player.deck)-1,
+							shop_render_state.page+1,
+						)
+						shop_render_state.selected_card_id = 0
+					case .Upgrade:
+						if shop_render_state.selected_card_id != 0 {
+							game.buy_shop_upgrade(&run_state, shop_render_state.selected_card_id)
+						}
+					case .Remove:
+						if shop_render_state.selected_card_id != 0 {
+							result := game.buy_shop_removal(
+								&run_state,
+								shop_render_state.selected_card_id,
+							)
+							if result == .Removed {
+								shop_render_state.selected_card_id = 0
+							}
+						}
+					case .Continue:
+						leave_requested = true
+					}
+				}
+				shop_render_state.page = render.shop_clamp_deck_page(
+					&run_state.player.deck,
+					shop_render_state.page,
+				)
+				if leave_requested && game.leave_shop(&run_state) == .Left {
+					shop_visible = false
+					route_visible = true
+					show_route_map = true
+					shop_render_state = {}
+				}
+			}
+		} else if special_visible {
+			clear_card_interaction(&card_interaction)
+			clear_gameplay_command_buffer(&gameplay_buffer)
+			special_render_state.page = render.special_node_clamp_deck_page(
+				&run_state.player.deck,
+				special_render_state.page,
+			)
+			previous_hovered_card := special_render_state.hovered_card_id
+			special_render_state.hovered_card_id = 0
+			special_render_state.previous_page_hovered = false
+			special_render_state.next_page_hovered = false
+			special_render_state.primary_hovered = false
+			special_render_state.secondary_hovered = false
+			special_render_state.leave_hovered = false
+			special_render_state.continue_hovered = false
+
+			special_hit: render.Special_Node_Hit
+			special_smoke := smoke_rest || smoke_event || smoke_treasure || smoke_special_result
+			if special_smoke {
+				if smoke_special_result {
+					special_render_state.continue_hovered = true
+				} else if smoke_rest {
+					special_render_state.secondary_hovered = true
+				} else {
+					special_render_state.primary_hovered = true
+				}
+			} else if mouse_inside {
+				special_hit = render.special_node_hit_test(
+					&run_state,
+					f32(window.config.canvas_width),
+					f32(window.config.canvas_height),
+					special_render_state.page,
+					mouse_canvas,
+					previous_hovered_card,
+					special_render_state.selected_card_id,
+				)
+				switch special_hit.kind {
+				case .None:
+				case .Primary:
+					special_render_state.primary_hovered = true
+				case .Secondary:
+					special_render_state.secondary_hovered = true
+				case .Leave:
+					special_render_state.leave_hovered = true
+				case .Owned_Card:
+					special_render_state.hovered_card_id = special_hit.card_id
+				case .Previous_Page:
+					special_render_state.previous_page_hovered = true
+				case .Next_Page:
+					special_render_state.next_page_hovered = true
+				case .Continue:
+					special_render_state.continue_hovered = true
+				}
+			}
+
+			if !special_smoke {
+				requested := render.Special_Node_Hit{kind = .None}
+				if game.special_node_can_continue(&run_state) {
+					if rl.IsKeyPressed(.ENTER) {
+						requested.kind = .Continue
+					}
+				} else {
+					choice_index := pressed_hand_slot()
+					if choice_index == 0 {
+						requested.kind = .Primary
+					} else if choice_index == 1 {
+						requested.kind = .Secondary
+					}
+					if rl.IsKeyPressed(.L) {
+						requested.kind = .Leave
+					} else if run_state.phase == .Rest && rl.IsKeyPressed(.U) {
+						requested.kind = .Secondary
+					}
+				}
+				if run_state.phase == .Rest && rl.IsKeyPressed(.LEFT) {
+					special_render_state.page = max(0, special_render_state.page-1)
+					special_render_state.selected_card_id = 0
+				} else if run_state.phase == .Rest && rl.IsKeyPressed(.RIGHT) {
+					special_render_state.page = min(
+						render.special_node_deck_page_count(&run_state.player.deck)-1,
+						special_render_state.page+1,
+					)
+					special_render_state.selected_card_id = 0
+				}
+				if mouse_inside && rl.IsMouseButtonPressed(.LEFT) {
+					requested = special_hit
+				}
+				primary_enabled := render.special_node_primary_is_enabled(&run_state)
+				secondary_enabled := render.special_node_secondary_is_enabled(
+					&run_state,
+					special_render_state.selected_card_id,
+				)
+				if requested.kind == .Primary && !primary_enabled {
+					requested.kind = .None
+				} else if requested.kind == .Secondary && !secondary_enabled {
+					requested.kind = .None
+				}
+
+				switch requested.kind {
+				case .None:
+				case .Owned_Card:
+					special_render_state.selected_card_id = requested.card_id
+				case .Previous_Page:
+					special_render_state.page = max(0, special_render_state.page-1)
+					special_render_state.selected_card_id = 0
+				case .Next_Page:
+					special_render_state.page = min(
+						render.special_node_deck_page_count(&run_state.player.deck)-1,
+						special_render_state.page+1,
+					)
+					special_render_state.selected_card_id = 0
+				case .Primary:
+					switch run_state.phase {
+					case .Rest:
+						game.use_rest_recovery(&run_state)
+					case .Event:
+						game.resolve_route_event(&run_state, .Primary)
+					case .Treasure:
+						game.claim_treasure(&run_state)
+					case .In_Room, .Reward, .Shop, .Choose_Path, .Victory, .Defeat:
+					}
+				case .Secondary:
+					if run_state.phase == .Rest {
+						game.use_rest_upgrade(
+							&run_state,
+							special_render_state.selected_card_id,
+						)
+					} else if run_state.phase == .Event {
+						game.resolve_route_event(&run_state, .Secondary)
+					}
+				case .Leave:
+					game.leave_special_node(&run_state)
+				case .Continue:
+					if game.continue_special_node(&run_state) == .Continued {
+						special_visible = false
+						route_visible = true
+						show_route_map = true
+						special_render_state = {}
+					}
+				}
+				special_render_state.page = render.special_node_clamp_deck_page(
+					&run_state.player.deck,
+					special_render_state.page,
+				)
+			}
 		} else if route_visible {
 			if mouse_inside {
-				if hovered, found := render.run_node_at_point(
+				shop_button_hovered = run_state.phase == .Choose_Path &&
+					run_state.shop.offer_count > 0 && render.run_shop_button_at_point(
+						f32(window.config.canvas_width),
+						f32(window.config.canvas_height),
+						mouse_canvas,
+					)
+				if !shop_button_hovered {
+					if hovered, found := render.run_node_at_point(
 					&run_state,
 					f32(window.config.canvas_width),
 					f32(window.config.canvas_height),
 					mouse_canvas,
 				); found {
 					hovered_node = hovered
+					}
 				}
 			}
 
 			if run_state.phase == .Choose_Path {
+				shop_requested := shop_button_hovered && rl.IsMouseButtonPressed(.LEFT)
+				if shop_requested && game.open_shop(&run_state) == .Opened {
+					shop_visible = true
+					route_visible = false
+					show_route_map = false
+					shop_render_state = {}
+				}
 				selected_node, selected := keyboard_route_choice(&run_state)
 				if mouse_inside && rl.IsMouseButtonPressed(.LEFT) && hovered_node != game.INVALID_NODE_ID {
 					selected_node = hovered_node
@@ -925,11 +1340,18 @@ main :: proc() {
 				) {
 					show_route_map = false
 					route_visible = false
+					shop_visible = run_state.phase == .Shop
+					special_visible = run_state.phase == .Rest || run_state.phase == .Event ||
+					                  run_state.phase == .Treasure
 					clear_card_interaction(&card_interaction)
 					clear_gameplay_command_buffer(&gameplay_buffer)
 					reward_hovered_index = -1
 					reward_skip_hovered = false
-					render.frame_level(&iso_renderer, &level_data)
+					shop_render_state = {}
+					special_render_state = {}
+					if run_state.phase == .In_Room {
+						render.frame_level(&iso_renderer, &level_data)
+					}
 					render.clear_event_animations(&iso_renderer)
 				}
 			}
@@ -1008,12 +1430,27 @@ main :: proc() {
 				reward_hovered_index,
 				reward_skip_hovered,
 			)
+		} else if shop_visible {
+			render.draw_shop_screen(
+				&run_state,
+				f32(window.config.canvas_width),
+				f32(window.config.canvas_height),
+				shop_render_state,
+			)
+		} else if special_visible {
+			render.draw_special_node_screen(
+				&run_state,
+				f32(window.config.canvas_width),
+				f32(window.config.canvas_height),
+				special_render_state,
+			)
 		} else if route_visible {
 			render.draw_run_map(
 				&run_state,
 				f32(window.config.canvas_width),
 				f32(window.config.canvas_height),
 				hovered_node,
+				shop_button_hovered,
 			)
 		} else {
 			if smoke_card || smoke_targeting {
@@ -1090,6 +1527,16 @@ main :: proc() {
 					rl.TakeScreenshot("odin_pp_timeline.png")
 				} else if smoke_reward {
 					rl.TakeScreenshot("odin_pp_reward.png")
+				} else if smoke_shop {
+					rl.TakeScreenshot("odin_pp_shop.png")
+				} else if smoke_rest {
+					rl.TakeScreenshot("odin_pp_rest.png")
+				} else if smoke_event {
+					rl.TakeScreenshot("odin_pp_event.png")
+				} else if smoke_treasure {
+					rl.TakeScreenshot("odin_pp_treasure.png")
+				} else if smoke_special_result {
+					rl.TakeScreenshot("odin_pp_special_result.png")
 				} else if smoke_intents {
 					rl.TakeScreenshot("odin_pp_enemy_intents.png")
 				} else if smoke_archetypes {

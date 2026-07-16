@@ -2,6 +2,7 @@ package game
 
 MAX_OWNED_CARDS :: 32
 MAX_HAND_CARDS  :: 8
+MIN_OWNED_CARDS :: 5
 
 STARTING_HAND_SIZE             :: 5
 DEFAULT_MAX_ENERGY             :: i32(3)
@@ -34,6 +35,15 @@ Deck_State :: struct {
 	next_card_id:      u32,
 	random_state:      u64,
 	combat_active:     bool,
+}
+
+Deck_Mutation_Result :: enum {
+	Invalid,
+	Upgraded,
+	Removed,
+	Card_Not_Found,
+	Maximum_Upgrade,
+	Minimum_Deck_Size,
 }
 
 deck_rules_are_valid :: proc(rules: Deck_Rules) -> bool {
@@ -110,6 +120,49 @@ add_owned_card :: proc(
 	deck.owned_count += 1
 	deck.next_card_id += 1
 	return instance, true
+}
+
+upgrade_owned_card :: proc(deck: ^Deck_State, card_id: u32) -> Deck_Mutation_Result {
+	if deck == nil || deck.combat_active || !validate_deck_state(deck) {
+		return .Invalid
+	}
+	card_index, found := owned_card_index_by_id(deck, card_id)
+	if !found {
+		return .Card_Not_Found
+	}
+	if deck.owned[card_index].upgrade_level >= MAX_CARD_UPGRADE_LEVEL {
+		return .Maximum_Upgrade
+	}
+
+	upgraded := deck.owned[card_index]
+	upgraded.upgrade_level += 1
+	if !validate_card_instance(upgraded) {
+		return .Invalid
+	}
+	deck.owned[card_index] = upgraded
+	assert(validate_deck_state(deck))
+	return .Upgraded
+}
+
+remove_owned_card :: proc(deck: ^Deck_State, card_id: u32) -> Deck_Mutation_Result {
+	if deck == nil || deck.combat_active || !validate_deck_state(deck) {
+		return .Invalid
+	}
+	if deck.owned_count <= MIN_OWNED_CARDS {
+		return .Minimum_Deck_Size
+	}
+	card_index, found := owned_card_index_by_id(deck, card_id)
+	if !found {
+		return .Card_Not_Found
+	}
+
+	for index in card_index..<deck.owned_count-1 {
+		deck.owned[index] = deck.owned[index+1]
+	}
+	deck.owned_count -= 1
+	deck.owned[deck.owned_count] = {}
+	assert(validate_deck_state(deck))
+	return .Removed
 }
 
 initialize_starter_deck :: proc(deck: ^Deck_State, seed: u64 = DEFAULT_DECK_SEED) -> bool {

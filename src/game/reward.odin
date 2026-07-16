@@ -24,29 +24,22 @@ normalized_card_reward_seed :: proc(seed: u64) -> u64 {
 	return seed
 }
 
-card_reward_next_random :: proc(run: ^Run_State) -> u64 {
-	assert(run != nil && run.reward_random_state != 0)
-	x := run.reward_random_state
-	x ~= x >> 12
-	x ~= x << 25
-	x ~= x >> 27
-	run.reward_random_state = x
-	return x*0x2545F4914F6CDD1D
-}
-
 validate_card_reward_state :: proc(run: ^Run_State) -> bool {
-	if run == nil || run.reward_random_state == 0 || !validate_deck_state(&run.player.deck) {
+	if run == nil || run.reward_random_state == 0 || run.shop_random_state == 0 ||
+	   run.player.gold < 0 || !validate_deck_state(&run.player.deck) {
 		return false
 	}
 	if run.phase != .Reward {
 		return run.card_reward == Card_Reward_State{}
 	}
 	if run.card_reward.choice_count != CARD_REWARD_CHOICE_COUNT ||
-	   run.card_reward.source_node != run.current_node || run.player.deck.combat_active {
+	   run.card_reward.source_node != run.current_node || run.player.deck.combat_active ||
+	   (run.shop != Shop_State{}) {
 		return false
 	}
 	node, node_found := current_run_node(run)
-	if !node_found || !node.cleared || node.outgoing_count <= 0 {
+	if !node_found || (node.kind != .Combat && node.kind != .Elite) ||
+	   !node.cleared || node.outgoing_count <= 0 {
 		return false
 	}
 	for index in 0..<run.card_reward.choice_count {
@@ -66,26 +59,27 @@ validate_card_reward_state :: proc(run: ^Run_State) -> bool {
 begin_card_reward :: proc(run: ^Run_State) -> bool {
 	if run == nil || run.phase != .In_Room || run.card_reward.choice_count != 0 ||
 	   run.reward_random_state == 0 || run.player.deck.combat_active ||
-	   int(Card_Id.Count) < CARD_REWARD_CHOICE_COUNT {
+	   (run.shop != Shop_State{}) || int(Card_Id.Count) < CARD_REWARD_CHOICE_COUNT {
 		return false
 	}
 	node, node_found := current_run_node(run)
-	if !node_found || !node.cleared || node.outgoing_count <= 0 {
+	if !node_found || (node.kind != .Combat && node.kind != .Elite) ||
+	   !node.cleared || node.outgoing_count <= 0 {
 		return false
 	}
 
-	pool: [int(Card_Id.Count)]Card_Id
-	for index in 0..<len(pool) {
-		pool[index] = Card_Id(index)
+	staged_random_state := run.reward_random_state
+	staged_reward := Card_Reward_State{source_node = run.current_node}
+	if !generate_weighted_card_choices(
+		&staged_random_state,
+		node,
+		staged_reward.choices[:CARD_REWARD_CHOICE_COUNT],
+	) {
+		return false
 	}
-	for index in 0..<CARD_REWARD_CHOICE_COUNT {
-		remaining := len(pool)-index
-		swap_index := index+int(card_reward_next_random(run)%u64(remaining))
-		pool[index], pool[swap_index] = pool[swap_index], pool[index]
-		run.card_reward.choices[index] = pool[index]
-	}
-	run.card_reward.choice_count = CARD_REWARD_CHOICE_COUNT
-	run.card_reward.source_node = run.current_node
+	staged_reward.choice_count = CARD_REWARD_CHOICE_COUNT
+	run.reward_random_state = staged_random_state
+	run.card_reward = staged_reward
 	run.phase = .Reward
 	assert(validate_card_reward_state(run))
 	return true
@@ -100,13 +94,25 @@ available_card_rewards :: proc(run: ^Run_State) -> []Card_Id {
 
 card_reward_can_be_added :: proc(run: ^Run_State) -> bool {
 	return run != nil && run.phase == .Reward && validate_card_reward_state(run) &&
-	       run.player.deck.owned_count < MAX_OWNED_CARDS
+	       run.player.deck.owned_count < MAX_OWNED_CARDS &&
+	       run.player.deck.next_card_id < max(u32)
 }
 
-finish_card_reward :: proc(run: ^Run_State) {
-	assert(run != nil && run.phase == .Reward)
-	run.card_reward = {}
-	run.phase = .Choose_Path
+finish_card_reward :: proc(run: ^Run_State) -> bool {
+	if run == nil || run.phase != .Reward || !validate_card_reward_state(run) {
+		return false
+	}
+	staged := run^
+	staged.card_reward = {}
+	staged.phase = .Choose_Path
+	if !validate_run_state(&staged) {
+		return false
+	}
+	run.card_reward = staged.card_reward
+	run.phase = staged.phase
+	assert(validate_card_reward_state(run))
+	assert(validate_run_state(run))
+	return true
 }
 
 choose_card_reward :: proc(run: ^Run_State, choice_index: int) -> Card_Reward_Result {
@@ -117,12 +123,21 @@ choose_card_reward :: proc(run: ^Run_State, choice_index: int) -> Card_Reward_Re
 	if run.player.deck.owned_count >= MAX_OWNED_CARDS {
 		return .Deck_Full
 	}
-	_, added := add_owned_card(&run.player.deck, run.card_reward.choices[choice_index])
+	staged_deck := run.player.deck
+	_, added := add_owned_card(&staged_deck, run.card_reward.choices[choice_index])
 	if !added {
 		return .Invalid
 	}
-	finish_card_reward(run)
+	staged_run := run^
+	staged_run.player.deck = staged_deck
+	if !finish_card_reward(&staged_run) {
+		return .Invalid
+	}
+	run.player.deck = staged_run.player.deck
+	run.card_reward = staged_run.card_reward
+	run.phase = staged_run.phase
 	assert(validate_card_reward_state(run))
+	assert(validate_run_state(run))
 	return .Added
 }
 
@@ -130,7 +145,9 @@ skip_card_reward :: proc(run: ^Run_State) -> Card_Reward_Result {
 	if run == nil || run.phase != .Reward || !validate_card_reward_state(run) {
 		return .Invalid
 	}
-	finish_card_reward(run)
+	if !finish_card_reward(run) {
+		return .Invalid
+	}
 	assert(validate_card_reward_state(run))
 	return .Skipped
 }

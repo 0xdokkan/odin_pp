@@ -1,7 +1,9 @@
 # Card Rewards
 
-Questa guida descrive la fase post-stanza che offre tre carte, modifica il deck
-in modo atomico e poi abilita la scelta del percorso.
+Questa guida descrive la fase post-stanza che offre tre carte e modifica il deck
+in modo atomico prima di tornare alla scelta del percorso. L'economia completa e
+documentata in [Deck Economy](DECK_ECONOMY.md); Shop e altri nodi della rotta in
+[Special Nodes](SPECIAL_NODES.md).
 
 ## Indice
 
@@ -19,15 +21,16 @@ in modo atomico e poi abilita la scelta del percorso.
 La ricompensa appartiene alla run, non alla stanza:
 
 ```text
-In_Room -> Room.Complete -> Reward -> Choose_Path -> In_Room
+In_Room -> Room.Complete -> Reward -> Choose_Path
 ```
 
 `finish_room` chiude il runtime del deck, marca il nodo come completato e
 incrementa `cleared_count`. Se il nodo ha uscite genera l'offerta e restituisce
 `Run_Transition.Reward`. Il boss non ha uscite e passa direttamente a `Victory`.
 
-Durante `Reward`, `available_nodes` restituisce una slice vuota. Non e quindi
-possibile saltare la ricompensa scegliendo direttamente un nodo della mappa.
+Durante `Reward`, `available_nodes` restituisce una slice vuota. Soltanto una
+scelta valida o Skip azzera l'offerta e abilita `Choose_Path`. Un eventuale Shop
+si apre in seguito entrando in un vero `Node_Kind.Shop`.
 
 ## Stato
 
@@ -53,14 +56,15 @@ salt dedicato. Non condivide stato con:
 
 - Xoshiro della generazione della mappa;
 - xorshift64* dello shuffle del deck;
+- xorshift64* dell'inventario dei nodi Shop;
 - eventuale casualita grafica futura.
 
 Cambiare quante carte vengono pescate non cambia quindi l'offerta successiva.
 
-La generazione costruisce un pool con tutti i `Card_Id` e applica i primi tre
-passi di Fisher-Yates. Ogni passo sceglie fra la posizione corrente e la parte
-non ancora usata del pool. Il risultato contiene sempre tre definizioni valide
-e distinte senza rejection loop.
+La generazione combina `Card_Rarity`, `reward_weight`, profondita e tipo del
+nodo. Un sampling pesato senza rimpiazzo produce tre definizioni valide e
+distinte. Lo stato RNG viene avanzato su una copia locale e committato soltanto
+dopo aver costruito l'intera offerta.
 
 ## Scelta atomica
 
@@ -69,9 +73,10 @@ e distinte senza rejection loop.
 1. richiede `Run_Phase.Reward`;
 2. valida stato reward e deck;
 3. controlla indice e capacita massima;
-4. chiama `add_owned_card` con il `Card_Id` scelto;
-5. soltanto dopo il successo azzera l'offerta;
-6. passa a `Choose_Path`.
+4. applica `add_owned_card` a una copia staged del deck;
+5. prepara una copia della run con reward azzerata e fase `Choose_Path`;
+6. valida il nuovo stato completo;
+7. committa deck, reward e fase.
 
 La nuova `Card_Instance` riceve `next_card_id` soltanto al punto quattro. Una
 seconda scelta fallisce per phase gate, quindi ownership e ID avanzano una volta
@@ -79,8 +84,8 @@ sola.
 
 ## Skip e deck pieno
 
-`skip_card_reward` azzera l'offerta e passa a `Choose_Path` senza modificare il
-deck o il suo RNG.
+`skip_card_reward` azzera l'offerta e passa a `Choose_Path` senza modificare deck,
+ID o RNG del deck. Non genera offerte Shop e non avanza lo shop RNG.
 
 Se `owned_count` ha raggiunto `MAX_OWNED_CARDS`, una scelta restituisce
 `Deck_Full`. La fase resta `Reward`, l'offerta rimane visibile e il giocatore puo
@@ -101,23 +106,21 @@ deck pieno le carte sono attenuate e Skip resta disponibile.
 
 `validate_card_reward_state` controlla:
 
-- RNG reward non nullo;
+- RNG reward e shop non nulli;
+- oro non negativo;
 - deck valido e inattivo durante `Reward`;
 - esattamente tre scelte durante la fase e stato azzerato fuori fase;
+- assenza simultanea di un payload shop;
 - `source_node` uguale al nodo corrente;
 - nodo completato con almeno una uscita;
 - definizioni valide e mutualmente distinte.
 
-I test coprono 128 seed, indipendenza dal deck RNG, scelta one-shot, indici
-invalidi, skip, deck pieno, sconfitta e boss finale.
+I test coprono 128 seed, pesi e rarita, indipendenza degli RNG, scelta one-shot,
+indici invalidi, skip, deck pieno, rollback, sconfitta e boss finale.
 
 ## Limiti intenzionali
 
-Non sono ancora implementati:
-
-- rarita e pool pesati per tipo di nodo;
-- carte escluse o requisiti di unlock;
-- reward con upgrade gia applicati;
-- reroll e valuta associata;
-- rimozione o sostituzione quando il deck e pieno;
-- animazione della carta che entra nel deck.
+Non sono ancora implementati carte escluse o requisiti di unlock, reward con
+upgrade gia applicati, reroll e relativa valuta, oppure l'animazione della carta
+che entra nel deck. La rimozione e disponibile nello shop, ma non direttamente
+dalla schermata Reward.

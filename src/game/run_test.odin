@@ -119,6 +119,7 @@ test_generated_run_maps_hold_their_invariants :: proc(t: ^testing.T) {
 test_run_rejects_invalid_map_configuration :: proc(t: ^testing.T) {
 	invalid_configs := [?]Run_Map_Config{
 		{layer_count = 2, min_nodes_per_middle_layer = 2, max_nodes_per_middle_layer = 3},
+		{layer_count = MAX_RUN_MAP_LAYERS+1, min_nodes_per_middle_layer = 2, max_nodes_per_middle_layer = 3},
 		{layer_count = 5, min_nodes_per_middle_layer = 1, max_nodes_per_middle_layer = 3},
 		{layer_count = 5, min_nodes_per_middle_layer = 3, max_nodes_per_middle_layer = 2},
 		{layer_count = 5, min_nodes_per_middle_layer = 2, max_nodes_per_middle_layer = 4},
@@ -129,6 +130,53 @@ test_run_rejects_invalid_map_configuration :: proc(t: ^testing.T) {
 		testing.expect(t, !ok)
 		destroy_run_map(&route_map)
 	}
+}
+
+@(test)
+test_run_state_rejects_corrupted_route_metadata_before_exposing_choices :: proc(t: ^testing.T) {
+	run, ok := create_run(RUN_TEST_PLAYER_STATS, TEST_RUN_CONFIG, 0xBAD5EED)
+	testing.expect(t, ok)
+	defer destroy_run(&run)
+	testing.expect_value(t, finish_room(&run, .Complete), Run_Transition.Reward)
+	testing.expect_value(t, skip_card_reward(&run), Card_Reward_Result.Skipped)
+	testing.expect(t, validate_run_state(&run))
+
+	current, current_found := current_run_node(&run)
+	testing.expect(t, current_found)
+	if !current_found {
+		return
+	}
+	original_outgoing_count := current.outgoing_count
+	current.outgoing_count = MAX_NODE_CONNECTIONS+1
+	testing.expect(t, !validate_run_state(&run))
+	testing.expect_value(t, len(available_nodes(&run)), 0)
+	current.outgoing_count = original_outgoing_count
+	testing.expect(t, validate_run_state(&run))
+
+	choices := available_nodes(&run)
+	testing.expect(t, len(choices) > 0)
+	if len(choices) == 0 {
+		return
+	}
+	target, target_found := node_at(&run, choices[0])
+	testing.expect(t, target_found)
+	if !target_found {
+		return
+	}
+	target_id_before := target.id
+	current_before := run.current_node
+	phase_before := run.phase
+	target.id = Node_Id(len(run.route_map.nodes))
+	testing.expect(t, !validate_run_state(&run))
+	testing.expect_value(t, enter_node(&run, choices[0]), Node_Entry_Result.Invalid)
+	testing.expect_value(t, run.current_node, current_before)
+	testing.expect_value(t, run.phase, phase_before)
+	testing.expect(t, !target.entered)
+	target.id = target_id_before
+	testing.expect(t, validate_run_state(&run))
+
+	run.seed ~= 1
+	testing.expect(t, !validate_run_state(&run))
 }
 
 @(test)
@@ -154,7 +202,18 @@ test_run_only_accepts_connected_path_choices :: proc(t: ^testing.T) {
 	testing.expect(t, !choose_node(&run, INVALID_NODE_ID))
 	testing.expect_value(t, run.current_node, current_before)
 
-	chosen := choices[0]
+	chosen := INVALID_NODE_ID
+	for id in choices {
+		node, found := node_at(&run, id)
+		if found && node_kind_has_room(node.kind) {
+			chosen = id
+			break
+		}
+	}
+	testing.expect(t, chosen != INVALID_NODE_ID)
+	if chosen == INVALID_NODE_ID {
+		return
+	}
 	testing.expect(t, choose_node(&run, chosen))
 	testing.expect_value(t, run.current_node, chosen)
 	testing.expect_value(t, run.phase, Run_Phase.In_Room)
@@ -171,21 +230,40 @@ test_run_reaches_victory_by_traversing_one_node_per_layer :: proc(t: ^testing.T)
 	run.player.health = 6
 	run.player.gold = 17
 
-	for run.phase != .Victory {
-		transition := finish_room(&run, .Complete)
-		if transition == .Victory {
+	step_count := 0
+	for run.phase != .Victory && step_count < TEST_RUN_CONFIG.layer_count*4 {
+		step_count += 1
+		switch run.phase {
+		case .In_Room:
+			transition := finish_room(&run, .Complete)
+			testing.expect(
+				t,
+				transition == .Reward || transition == .Victory,
+				"room completion must advance to reward or victory",
+			)
+		case .Reward:
+			testing.expect_value(t, skip_card_reward(&run), Card_Reward_Result.Skipped)
+		case .Shop:
+			testing.expect_value(t, leave_shop(&run), Shop_Result.Left)
+		case .Rest, .Event, .Treasure:
+			testing.expect_value(t, leave_special_node(&run), Special_Node_Result.Left)
+			testing.expect_value(t, continue_special_node(&run), Special_Node_Result.Continued)
+		case .Choose_Path:
+			choices := available_nodes(&run)
+			testing.expect(t, len(choices) > 0)
+			if len(choices) == 0 {
+				return
+			}
+			testing.expect(t, choose_node(&run, choices[0]))
+		case .Victory:
 			break
+		case .Defeat:
+			testing.expect(t, false, "unexpected terminal phase while traversing the run")
+			return
 		}
-		testing.expect_value(t, transition, Run_Transition.Reward)
-		testing.expect_value(t, run.phase, Run_Phase.Reward)
-		testing.expect_value(t, skip_card_reward(&run), Card_Reward_Result.Skipped)
-		testing.expect_value(t, run.phase, Run_Phase.Choose_Path)
-		choices := available_nodes(&run)
-		testing.expect(t, len(choices) > 0)
-		chosen := choices[0]
-		testing.expect(t, choose_node(&run, chosen))
 	}
 
+	testing.expect_value(t, run.phase, Run_Phase.Victory)
 	testing.expect_value(t, run.cleared_count, TEST_RUN_CONFIG.layer_count)
 	testing.expect_value(t, run.player.health, i32(6))
 	testing.expect_value(t, run.player.gold, i32(17))
@@ -205,4 +283,31 @@ test_defeat_terminates_the_run_without_clearing_the_node :: proc(t: ^testing.T) 
 	node, found := current_run_node(&run)
 	testing.expect(t, found)
 	testing.expect(t, !node.cleared)
+}
+
+@(test)
+test_finish_room_rejects_invalid_economy_state_without_partial_completion :: proc(t: ^testing.T) {
+	run, ok := create_run(RUN_TEST_PLAYER_STATS, TEST_RUN_CONFIG, 0xEC0)
+	testing.expect(t, ok)
+	defer destroy_run(&run)
+	node, found := current_run_node(&run)
+	testing.expect(t, found)
+	if !found {
+		return
+	}
+
+	run.shop_random_state = 0
+	player_before := run.player
+	phase_before := run.phase
+	cleared_count_before := run.cleared_count
+	cleared_before := node.cleared
+	reward_before := run.card_reward
+	reward_rng_before := run.reward_random_state
+	testing.expect_value(t, finish_room(&run, .Complete), Run_Transition.Invalid)
+	testing.expect(t, run.player == player_before)
+	testing.expect_value(t, run.phase, phase_before)
+	testing.expect_value(t, run.cleared_count, cleared_count_before)
+	testing.expect_value(t, node.cleared, cleared_before)
+	testing.expect(t, run.card_reward == reward_before)
+	testing.expect_value(t, run.reward_random_state, reward_rng_before)
 }

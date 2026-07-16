@@ -18,7 +18,8 @@ costruire il gioco:
 
 - griglia 2D e proiezione isometrica su canvas virtuale;
 - rotta della run come DAG deterministico;
-- fasi `Combat`, `Loot`, `Reward`, `Choose_Path`, `Victory` e `Defeat`;
+- fasi `Combat`, `Loot`, `Reward`, `Shop`, `Rest`, `Event`, `Treasure`,
+  `Choose_Path`, `Victory` e `Defeat`;
 - azioni atomiche, impulsi, status e reazioni FIFO;
 - intenti committed e archetipi `Chaser`, `Archer` e `Brute`;
 - deck runtime, carte, targeting spaziale, drag e ricompense;
@@ -67,7 +68,7 @@ M1 e completata quando:
 Il contratto tecnico e lo stato dell'incremento sono descritti in
 [Room Generation](ROOM_GENERATION.md).
 
-## [ ] M2 - Economia del deck
+## [x] M2 - Economia del deck
 
 **Obiettivo:** rendere le carte una progressione con costi e scelte permanenti.
 
@@ -76,11 +77,25 @@ Il contratto tecnico e lo stato dell'incremento sono descritti in
 - shop con prezzi, acquisto e gestione del deck pieno;
 - reward aggiornati senza rompere ID e RNG separati.
 
-**Definition of Done:** scelta, skip, acquisto, upgrade e rimozione sono
-transazioni atomiche e deterministiche; fallimenti e deck pieno non consumano
-oro, ID o RNG; UI e test coprono ogni transizione.
+### Definition of Done
 
-## [ ] M3 - Nodi speciali
+M2 e completata quando:
+
+1. reward e shop estraggono offerte uniche con pesi dipendenti da rarita, tipo
+   del nodo e profondita;
+2. RNG di combattimento, reward e shop restano separati e riproducibili;
+3. scelta, skip, acquisto, upgrade e rimozione sono transazioni atomiche;
+4. fallimenti, deck pieno e ID esauriti non consumano oro, ID, offerte o RNG;
+5. upgrade e rimozione agiscono sull'ID della specifica `Card_Instance`;
+6. il nodo Shop corrente puo essere lasciato e riaperto dalla route senza
+   rigenerare offerte;
+7. le modifiche al deck persistono nella stanza procedurale successiva;
+8. UI, smoke test, suite completa e controllo statico terminano con successo.
+
+Il contratto tecnico e lo stato dell'incremento sono descritti in
+[Deck Economy](DECK_ECONOMY.md).
+
+## [x] M3 - Nodi speciali
 
 **Obiettivo:** dare alla rotta decisioni diverse dal combattimento.
 
@@ -88,9 +103,29 @@ oro, ID o RNG; UI e test coprono ogni transizione.
 - configurazioni, schermate e transizioni dedicate;
 - vincoli di distribuzione nel DAG.
 
-**Definition of Done:** ogni tipo di nodo possiede un lifecycle completo e
-testato; una run puo attraversarlo e tornare a `Choose_Path` o terminare senza
-stati bloccati; `validate_run_map` ne verifica i vincoli.
+### Definition of Done
+
+M3 e completata quando:
+
+1. ogni layer intermedio contiene esattamente un nodo speciale e almeno un nodo
+   con stanza;
+2. Shop, Rest, Event e Treasure seguono un ciclo deterministico con offset dal
+   seed, verificato da `validate_run_map`;
+3. l'ingresso costruisce e valida il payload prima di modificare nodo corrente,
+   fase, RNG o flag `entered`;
+4. lo Shop e un nodo della rotta, conserva offerte e servizi durante la
+   riapertura e li azzera entrando nel nodo successivo;
+5. Rest, i tre tipi di Event e Treasure applicano scelte distinte e mostrano un
+   risultato prima di tornare alla rotta;
+6. Leave, risoluzione e Continue sono one-shot e incrementano `cleared_count`
+   esattamente una volta;
+7. vita insufficiente, overflow, deck pieno, livello massimo, ID esauriti e
+   payload corrotti non producono mutazioni parziali;
+8. renderer, controlli, smoke dei quattro tipi, suite completa e controllo
+   statico terminano con successo.
+
+Il contratto tecnico e lo stato dell'incremento sono descritti in
+[Special Nodes](SPECIAL_NODES.md).
 
 ## [ ] M4 - Profondita di carte e status
 

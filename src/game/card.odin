@@ -5,6 +5,26 @@ import grid "../grid"
 MAX_CARD_DEFINITION_EFFECTS :: 4
 MAX_CARD_UPGRADE_LEVEL :: 10
 
+Card_Rarity :: enum {
+	Common,
+	Uncommon,
+	Rare,
+	Count,
+}
+
+card_rarity_name :: proc(rarity: Card_Rarity) -> string {
+	switch rarity {
+	case .Common:
+		return "Common"
+	case .Uncommon:
+		return "Uncommon"
+	case .Rare:
+		return "Rare"
+	case .Count:
+	}
+	return "Unknown"
+}
+
 Card_Id :: enum {
 	Strike,
 	Arc_Bolt,
@@ -54,12 +74,15 @@ Card_Effect_Template :: struct {
 }
 
 Card_Definition :: struct {
-	id:           Card_Id,
-	name:         string,
-	cost:         i32,
-	targeting:    Targeting_Spec,
-	effects:      [MAX_CARD_DEFINITION_EFFECTS]Card_Effect_Template,
-	effect_count: int,
+	id:              Card_Id,
+	name:            string,
+	rarity:          Card_Rarity,
+	reward_weight:   u32,
+	shop_base_price: i32,
+	cost:            i32,
+	targeting:       Targeting_Spec,
+	effects:         [MAX_CARD_DEFINITION_EFFECTS]Card_Effect_Template,
+	effect_count:    int,
 }
 
 Card_Instance :: struct {
@@ -72,6 +95,9 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 	{
 		id = .Strike,
 		name = "Strike",
+		rarity = .Common,
+		reward_weight = 100,
+		shop_base_price = 3,
 		cost = 1,
 		targeting = {
 			rule = .Opponent,
@@ -94,6 +120,9 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 	{
 		id = .Arc_Bolt,
 		name = "Arc Bolt",
+		rarity = .Common,
+		reward_weight = 90,
+		shop_base_price = 3,
 		cost = 2,
 		targeting = {
 			rule = .Opponent,
@@ -118,6 +147,9 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 	{
 		id = .Piercing_Ray,
 		name = "Piercing Ray",
+		rarity = .Uncommon,
+		reward_weight = 80,
+		shop_base_price = 5,
 		cost = 2,
 		targeting = {
 			rule = .Walkable_Cell,
@@ -142,6 +174,9 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 	{
 		id = .Cross_Slash,
 		name = "Cross Slash",
+		rarity = .Uncommon,
+		reward_weight = 90,
+		shop_base_price = 5,
 		cost = 2,
 		targeting = {
 			rule = .Walkable_Cell,
@@ -167,6 +202,9 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 	{
 		id = .Firebomb,
 		name = "Firebomb",
+		rarity = .Rare,
+		reward_weight = 75,
+		shop_base_price = 8,
 		cost = 2,
 		targeting = {
 			rule = .Walkable_Cell,
@@ -192,6 +230,9 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 	{
 		id = .Guard,
 		name = "Guard",
+		rarity = .Common,
+		reward_weight = 100,
+		shop_base_price = 3,
 		cost = 1,
 		targeting = {rule = .Self},
 		effects = {
@@ -212,6 +253,9 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 	{
 		id = .Toxic_Wave,
 		name = "Toxic Wave",
+		rarity = .Rare,
+		reward_weight = 70,
+		shop_base_price = 8,
 		cost = 2,
 		targeting = {rule = .None},
 		effects = {
@@ -232,6 +276,9 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 	{
 		id = .Thorn_Coat,
 		name = "Thorn Coat",
+		rarity = .Uncommon,
+		reward_weight = 85,
+		shop_base_price = 5,
 		cost = 1,
 		targeting = {rule = .Self},
 		effects = {
@@ -252,6 +299,9 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 	{
 		id = .Afterimage,
 		name = "Afterimage",
+		rarity = .Uncommon,
+		reward_weight = 85,
+		shop_base_price = 5,
 		cost = 1,
 		targeting = {rule = .Self},
 		effects = {
@@ -272,6 +322,9 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 	{
 		id = .Counter_Rune,
 		name = "Counter Rune",
+		rarity = .Rare,
+		reward_weight = 65,
+		shop_base_price = 8,
 		cost = 1,
 		targeting = {rule = .Self},
 		effects = {
@@ -365,7 +418,9 @@ card_effect_template_is_valid :: proc(
 
 validate_card_definition :: proc(definition: ^Card_Definition) -> bool {
 	if definition == nil || int(definition.id) < 0 || int(definition.id) >= int(Card_Id.Count) ||
-	   len(definition.name) == 0 || definition.cost < 0 ||
+	   len(definition.name) == 0 || int(definition.rarity) < 0 ||
+	   int(definition.rarity) >= int(Card_Rarity.Count) || definition.reward_weight == 0 ||
+	   definition.shop_base_price <= 0 || definition.cost < 0 ||
 	   !targeting_spec_is_valid(definition.targeting) ||
 	   definition.effect_count <= 0 || definition.effect_count > MAX_CARD_DEFINITION_EFFECTS {
 		return false

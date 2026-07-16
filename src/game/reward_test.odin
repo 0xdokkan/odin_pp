@@ -104,6 +104,8 @@ test_choosing_card_reward_is_atomic_and_one_shot :: proc(t: ^testing.T) {
 	testing.expect_value(t, run.reward_random_state, reward_rng_before)
 	testing.expect(t, validate_deck_state(&run.player.deck))
 	testing.expect(t, validate_card_reward_state(&run))
+	testing.expect(t, run.shop == Shop_State{})
+	testing.expect(t, validate_run_state(&run))
 
 	deck_after := run.player.deck
 	reward_after := run.card_reward
@@ -139,6 +141,78 @@ test_invalid_card_reward_indices_do_not_mutate_state :: proc(t: ^testing.T) {
 }
 
 @(test)
+test_card_reward_rejects_negative_gold_without_mutating_state :: proc(t: ^testing.T) {
+	run, ok := create_run(REWARD_TEST_PLAYER_STATS, REWARD_TEST_RUN_CONFIG, 0xBAD601D)
+	testing.expect(t, ok)
+	defer destroy_run(&run)
+	testing.expect_value(t, finish_room(&run, .Complete), Run_Transition.Reward)
+	run.player.gold = -1
+
+	player_before := run.player
+	reward_before := run.card_reward
+	reward_rng_before := run.reward_random_state
+	shop_before := run.shop
+	shop_rng_before := run.shop_random_state
+	phase_before := run.phase
+	testing.expect(t, !validate_card_reward_state(&run))
+	testing.expect_value(t, choose_card_reward(&run, 0), Card_Reward_Result.Invalid)
+	testing.expect_value(t, skip_card_reward(&run), Card_Reward_Result.Invalid)
+	testing.expect(t, run.player == player_before)
+	testing.expect(t, run.card_reward == reward_before)
+	testing.expect_value(t, run.reward_random_state, reward_rng_before)
+	testing.expect(t, run.shop == shop_before)
+	testing.expect_value(t, run.shop_random_state, shop_rng_before)
+	testing.expect_value(t, run.phase, phase_before)
+}
+
+@(test)
+test_card_reward_rejects_exhausted_instance_ids_atomically :: proc(t: ^testing.T) {
+	run, ok := create_run(REWARD_TEST_PLAYER_STATS, REWARD_TEST_RUN_CONFIG, 0x1D5)
+	testing.expect(t, ok)
+	defer destroy_run(&run)
+	testing.expect_value(t, finish_room(&run, .Complete), Run_Transition.Reward)
+	run.player.deck.next_card_id = max(u32)
+	testing.expect(t, validate_card_reward_state(&run))
+	testing.expect(t, !card_reward_can_be_added(&run))
+
+	player_before := run.player
+	reward_before := run.card_reward
+	reward_rng_before := run.reward_random_state
+	shop_before := run.shop
+	shop_rng_before := run.shop_random_state
+	testing.expect_value(t, choose_card_reward(&run, 0), Card_Reward_Result.Invalid)
+	testing.expect(t, run.player == player_before)
+	testing.expect(t, run.card_reward == reward_before)
+	testing.expect_value(t, run.reward_random_state, reward_rng_before)
+	testing.expect(t, run.shop == shop_before)
+	testing.expect_value(t, run.shop_random_state, shop_rng_before)
+	testing.expect_value(t, run.phase, Run_Phase.Reward)
+}
+
+@(test)
+test_finishing_card_reward_rejects_corrupted_reward_atomically :: proc(t: ^testing.T) {
+	run, ok := create_run(REWARD_TEST_PLAYER_STATS, REWARD_TEST_RUN_CONFIG, 0xC01117)
+	testing.expect(t, ok)
+	defer destroy_run(&run)
+	testing.expect_value(t, finish_room(&run, .Complete), Run_Transition.Reward)
+	run.card_reward.choices[1] = run.card_reward.choices[0]
+	player_before := run.player
+	reward_before := run.card_reward
+	reward_rng_before := run.reward_random_state
+	shop_before := run.shop
+	shop_rng_before := run.shop_random_state
+	phase_before := run.phase
+	testing.expect(t, !validate_card_reward_state(&run))
+	testing.expect(t, !finish_card_reward(&run))
+	testing.expect(t, run.player == player_before)
+	testing.expect(t, run.card_reward == reward_before)
+	testing.expect_value(t, run.reward_random_state, reward_rng_before)
+	testing.expect(t, run.shop == shop_before)
+	testing.expect_value(t, run.shop_random_state, shop_rng_before)
+	testing.expect_value(t, run.phase, phase_before)
+}
+
+@(test)
 test_skipping_card_reward_does_not_change_the_deck :: proc(t: ^testing.T) {
 	run, ok := create_run(REWARD_TEST_PLAYER_STATS, REWARD_TEST_RUN_CONFIG, 0x5A1F)
 	testing.expect(t, ok)
@@ -155,6 +229,7 @@ test_skipping_card_reward_does_not_change_the_deck :: proc(t: ^testing.T) {
 	testing.expect(t, validate_card_reward_state(&run))
 	testing.expect_value(t, skip_card_reward(&run), Card_Reward_Result.Invalid)
 	testing.expect(t, run.player.deck == deck_before)
+	testing.expect_value(t, run.phase, Run_Phase.Choose_Path)
 }
 
 @(test)
@@ -209,14 +284,26 @@ test_defeat_and_final_boss_do_not_open_card_rewards :: proc(t: ^testing.T) {
 		if !found || node.outgoing_count == 0 {
 			break
 		}
-		testing.expect_value(t, finish_room(&victorious, .Complete), Run_Transition.Reward)
-		testing.expect_value(t, skip_card_reward(&victorious), Card_Reward_Result.Skipped)
-		choices := available_nodes(&victorious)
+			testing.expect_value(t, finish_room(&victorious, .Complete), Run_Transition.Reward)
+			testing.expect_value(t, skip_card_reward(&victorious), Card_Reward_Result.Skipped)
+			choices := available_nodes(&victorious)
 		testing.expect(t, len(choices) > 0)
 		if len(choices) == 0 {
 			break
 		}
-		testing.expect(t, choose_node(&victorious, choices[0]))
+		chosen := INVALID_NODE_ID
+		for choice in choices {
+			candidate, candidate_found := node_at(&victorious, choice)
+			if candidate_found && node_kind_has_room(candidate.kind) {
+				chosen = choice
+				break
+			}
+		}
+		testing.expect(t, chosen != INVALID_NODE_ID)
+		if chosen == INVALID_NODE_ID {
+			break
+		}
+		testing.expect(t, choose_node(&victorious, chosen))
 	}
 
 	boss, boss_found := current_run_node(&victorious)

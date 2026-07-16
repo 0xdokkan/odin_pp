@@ -236,7 +236,8 @@ li cancella soltanto dopo che tutta la costruzione e stata validata con successo
 Un fallimento nella creazione della stanza non modifica status, posizione,
 vita, oro o mazzo persistenti del player.
 
-Gli status non avanzano durante `Loot`, `Choose_Path`, `Victory` o `Defeat`.
+Gli status non avanzano durante `Loot`, `Reward`, `Shop`, `Rest`, `Event`,
+`Treasure`, `Choose_Path`, `Victory` o `Defeat`.
 
 ## Limiti intenzionali
 

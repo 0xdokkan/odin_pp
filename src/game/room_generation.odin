@@ -70,7 +70,8 @@ valid_encounter_generation_config :: proc(config: Encounter_Generation_Config) -
 }
 
 room_generation_profile :: proc(node: ^Run_Node) -> (result: Room_Generation_Profile, ok: bool) {
-	if node == nil || int(node.id) < 0 || node.depth < 0 || node.room_seed == 0 {
+	if node == nil || int(node.id) < 0 || node.depth < 0 || node.room_seed == 0 ||
+	   !node_kind_has_room(node.kind) {
 		return {}, false
 	}
 
@@ -134,6 +135,8 @@ room_generation_profile :: proc(node: ^Run_Node) -> (result: Room_Generation_Pro
 			enemy_attack = i32(3+depth/4),
 			trap_damage = i32(5+depth/3),
 		}
+	case .Shop, .Rest, .Event, .Treasure, .Count:
+		return {}, false
 	}
 	return result, valid_encounter_generation_config(result.encounter_config)
 }

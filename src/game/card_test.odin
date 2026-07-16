@@ -54,6 +54,124 @@ test_builtin_card_definitions_are_valid :: proc(t: ^testing.T) {
 }
 
 @(test)
+test_card_economy_metadata_is_valid_and_covers_every_rarity :: proc(t: ^testing.T) {
+	rarity_counts: [int(Card_Rarity.Count)]int
+	for definition in CARD_DEFINITIONS {
+		testing.expect(t, definition.reward_weight > 0)
+		testing.expect(t, definition.shop_base_price > 0)
+		rarity_counts[int(definition.rarity)] += 1
+	}
+	for count in rarity_counts {
+		testing.expect(t, count > 0)
+	}
+
+	definition, found := card_definition_by_id(.Strike)
+	testing.expect(t, found)
+	definition.rarity = .Count
+	testing.expect(t, !validate_card_definition(&definition))
+
+	definition, found = card_definition_by_id(.Strike)
+	testing.expect(t, found)
+	definition.reward_weight = 0
+	testing.expect(t, !validate_card_definition(&definition))
+
+	definition, found = card_definition_by_id(.Strike)
+	testing.expect(t, found)
+	definition.shop_base_price = 0
+	testing.expect(t, !validate_card_definition(&definition))
+}
+
+@(test)
+test_card_rarity_weights_scale_with_depth_and_node_kind :: proc(t: ^testing.T) {
+	early_combat, ok := card_rarity_weights(.Combat, 0)
+	testing.expect(t, ok)
+	testing.expect_value(t, early_combat, Card_Rarity_Weights{common = 70, uncommon = 25, rare = 5})
+
+	deep_combat, deep_ok := card_rarity_weights(.Combat, MAX_CARD_OFFER_DEPTH)
+	testing.expect(t, deep_ok)
+	testing.expect_value(t, deep_combat, Card_Rarity_Weights{common = 22, uncommon = 49, rare = 29})
+	clamped_combat, clamped_ok := card_rarity_weights(.Combat, MAX_CARD_OFFER_DEPTH+100)
+	testing.expect(t, clamped_ok)
+	testing.expect_value(t, clamped_combat, deep_combat)
+
+	early_elite, elite_ok := card_rarity_weights(.Elite, 0)
+	testing.expect(t, elite_ok)
+	testing.expect_value(t, early_elite, Card_Rarity_Weights{common = 60, uncommon = 29, rare = 11})
+	early_boss, boss_ok := card_rarity_weights(.Boss, 0)
+	testing.expect(t, boss_ok)
+	testing.expect_value(t, early_boss, Card_Rarity_Weights{common = 56, uncommon = 30, rare = 14})
+	early_shop, shop_ok := card_rarity_weights(.Shop, 0)
+	testing.expect(t, shop_ok)
+	testing.expect_value(t, early_shop, Card_Rarity_Weights{common = 55, uncommon = 31, rare = 14})
+	early_event, event_ok := card_rarity_weights(.Event, 0)
+	testing.expect(t, event_ok)
+	testing.expect_value(t, early_event, Card_Rarity_Weights{common = 65, uncommon = 28, rare = 7})
+
+	testing.expect(t, deep_combat.common < early_combat.common)
+	testing.expect(t, deep_combat.uncommon > early_combat.uncommon)
+	testing.expect(t, deep_combat.rare > early_combat.rare)
+	testing.expect(t, early_elite.rare > early_combat.rare)
+	testing.expect(t, early_boss.rare > early_elite.rare)
+	testing.expect_value(t, card_rarity_weight(early_combat, .Common), early_combat.common)
+	testing.expect_value(t, card_rarity_weight(early_combat, .Uncommon), early_combat.uncommon)
+	testing.expect_value(t, card_rarity_weight(early_combat, .Rare), early_combat.rare)
+	testing.expect_value(t, card_rarity_weight(early_combat, .Count), u32(0))
+
+	_, ok = card_rarity_weights(.Combat, -1)
+	testing.expect(t, !ok)
+	_, ok = card_rarity_weights(.Rest, 0)
+	testing.expect(t, !ok)
+	_, ok = card_rarity_weights(.Treasure, 0)
+	testing.expect(t, !ok)
+	_, ok = card_rarity_weights(Node_Kind(99), 0)
+	testing.expect(t, !ok)
+}
+
+@(test)
+test_weighted_card_choices_are_deterministic_distinct_and_transactional_on_rejection :: proc(t: ^testing.T) {
+	node := Run_Node{kind = .Combat, depth = 0}
+	strike, strike_found := card_definition_by_id(.Strike)
+	firebomb, firebomb_found := card_definition_by_id(.Firebomb)
+	testing.expect(t, strike_found && firebomb_found)
+	testing.expect_value(t, card_offer_weight(strike, &node), u64(70*100))
+	testing.expect_value(t, card_offer_weight(firebomb, &node), u64(5*75))
+	testing.expect_value(t, card_offer_weight(strike, nil), u64(0))
+
+	first_state := u64(0xA11CE)
+	second_state := first_state
+	first: [3]Card_Id
+	second: [3]Card_Id
+	testing.expect(t, generate_weighted_card_choices(&first_state, &node, first[:]))
+	testing.expect(t, generate_weighted_card_choices(&second_state, &node, second[:]))
+	testing.expect_value(t, first_state, second_state)
+	testing.expect_value(t, first, second)
+	for choice, index in first {
+		_, found := card_definition_by_id(choice)
+		testing.expect(t, found)
+		for previous in 0..<index {
+			testing.expect(t, choice != first[previous])
+		}
+	}
+
+	invalid_node := Run_Node{kind = Node_Kind(99), depth = 0}
+	rejected_state := u64(0xBADC0DE)
+	rejected_choices := [3]Card_Id{.Firebomb, .Guard, .Strike}
+	state_before := rejected_state
+	choices_before := rejected_choices
+	testing.expect(t, !generate_weighted_card_choices(
+		&rejected_state,
+		&invalid_node,
+		rejected_choices[:],
+	))
+	testing.expect_value(t, rejected_state, state_before)
+	testing.expect_value(t, rejected_choices, choices_before)
+
+	zero_state: u64
+	testing.expect(t, !generate_weighted_card_choices(&zero_state, &node, rejected_choices[:]))
+	testing.expect_value(t, zero_state, u64(0))
+}
+
+@(test)
 test_card_drop_target_translates_cells_without_mutating_room :: proc(t: ^testing.T) {
 	level_data := create_test_level(t)
 	defer level.destroy(&level_data)

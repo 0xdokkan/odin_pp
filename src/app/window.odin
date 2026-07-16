@@ -32,6 +32,7 @@ open :: proc(config: Window_Config) -> (result: Window, ok: bool) {
 	if !rl.IsWindowReady() {
 		return {}, false
 	}
+	rl.SetExitKey(.KEY_NULL)
 
 	result.config = config
 	result.scale_mode = config.initial_scale_mode
