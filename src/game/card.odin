@@ -119,7 +119,7 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 			{
 				kind = .Damage,
 				target = .Chosen_Entity,
-				base_amount = 2,
+				base_amount = 3,
 				amount_per_upgrade = 1,
 			},
 			{},

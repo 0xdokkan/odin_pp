@@ -67,3 +67,7 @@ odin test src/combatdebug -all-packages -define:ODIN_TEST_THREADS=1 -vet -strict
 I test separano bump e carta, coprono il bump terminale, Refocus, miss degli
 arcieri, log stale sui rifiuti, scelta deterministica e ripetibilita dello
 scenario headless.
+
+Il primo tuning misurato mantiene il bump a 2 danni e porta `Strike` a 3: le due
+azioni consumano entrambe un pulse, mentre la carta spende una energia per il
+danno aggiuntivo e il ciclo del deck.

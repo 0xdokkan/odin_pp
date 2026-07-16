@@ -215,7 +215,7 @@ ancora con l'upgrade.
 
 | Carta | Rarita | Costo | Anchor e forma | Effetto base |
 |---|---|---:|---|---|
-| `Strike` | Common | 1 | avversario, Manhattan 1, Single | 2 danni, +1 per upgrade |
+| `Strike` | Common | 1 | avversario, Manhattan 1, Single | 3 danni, +1 per upgrade |
 | `Arc_Bolt` | Common | 2 | avversario, Manhattan 1-3, Single, LoS | 3 danni, +1 per upgrade |
 | `Piercing_Ray` | Uncommon | 2 | cella, Chebyshev 1-5, Line | 2 danni a ogni nemico attraversato, +1 per upgrade |
 | `Cross_Slash` | Uncommon | 2 | cella, Manhattan 1-3, Cross raggio 1 | 2 danni a ogni nemico nella croce, +1 per upgrade |
@@ -265,7 +265,7 @@ strike := Card_Instance{
 action, err := compile_card_action(&room, strike, entity_target(enemy))
 if err == .None {
 	report := resolve_action(&room, &action)
-	// Strike +2 produce un singolo effetto Damage(4).
+	// Strike +2 produce un singolo effetto Damage(5).
 }
 ```
 

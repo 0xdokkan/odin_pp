@@ -375,10 +375,10 @@ test_strike_card_compiles_upgrade_and_chosen_target :: proc(t: ^testing.T) {
 	testing.expect_value(t, action.target_rule, Target_Rule.Opponent)
 	testing.expect_value(t, action.effect_count, 1)
 	testing.expect_value(t, action.effects[0].target, enemy_ref)
-	testing.expect_value(t, action.effects[0].amount, i32(4))
+	testing.expect_value(t, action.effects[0].amount, i32(5))
 	report := resolve_action(&room, &action)
 	testing.expect(t, report.accepted)
-	testing.expect_value(t, room.enemies[0].health, i32(2))
+	testing.expect_value(t, room.enemies[0].health, i32(1))
 }
 
 @(test)
