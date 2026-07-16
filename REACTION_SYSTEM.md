@@ -262,16 +262,18 @@ I limiti attuali sono:
 
 | Risorsa | Capacita |
 |---|---:|
-| eventi contemporaneamente in queue | 288 (`MAX_GAME_EVENTS`) |
+| eventi contemporaneamente in queue | 416 (`MAX_GAME_EVENTS`) |
 | richieste prodotte da un evento | 8 |
 | azioni reattive in una catena | 32 |
-| eventi conservati in un report | 288 |
+| eventi conservati in un report | 416 |
 | binding runtime in una stanza | 32 |
 
-Raggiungere un limite non annulla mutazioni gia applicate. Il sistema termina la
-catena in modo deterministico e registra il problema nei contatori del report.
-Questo comportamento fail-soft evita crash e loop infiniti, ma rende comunque
-visibile un errore di bilanciamento o di configurazione.
+Il limite di azioni reattive termina la catena in modo deterministico e registra
+il problema nei contatori del report. La capacita degli eventi e invece parte
+della correttezza: `Action_Report.events` e anche il bus di input delle reazioni,
+quindi il producer termina esplicitamente il processo se non puo conservare un
+evento. Un drop silenzioso salterebbe trigger come `Thorns` o `Afterimage` e
+cambierebbe la simulazione.
 
 ## Scheduler dei nemici
 

@@ -4,6 +4,7 @@ import grid "../grid"
 import level "../level"
 
 MAX_ENEMIES_PER_ROOM :: 32
+MAX_TRAPS_PER_ROOM   :: 64
 LOOT_MAGNET_RANGE_CELLS :: 3
 
 Room_Phase :: enum {
@@ -283,7 +284,8 @@ trap_index_by_id :: proc(room: ^Room, id: u32) -> (int, bool) {
 
 create_room :: proc(level_data: ^level.Level, player: ^Player, content: Room_Content) -> (result: Room, ok: bool) {
 	if level_data == nil || player == nil || !level_data.has_player_spawn ||
-	   len(content.enemies) > MAX_ENEMIES_PER_ROOM {
+	   len(content.enemies) > MAX_ENEMIES_PER_ROOM ||
+	   len(content.traps) > MAX_TRAPS_PER_ROOM {
 		return {}, false
 	}
 	if player.stats.max_health <= 0 || player.health <= 0 || player.health > player.stats.max_health ||
@@ -387,18 +389,10 @@ destroy_room :: proc(room: ^Room) {
 
 trigger_trap :: proc(room: ^Room) {
 	assert(room != nil && room.player != nil)
-	index, found := trap_index_at(room, room.player.position)
-	if !found || !room.traps[index].armed {
-		return
+	resolution := resolve_trap_for_entity(room, PLAYER_ENTITY)
+	if resolution.triggered {
+		append_event_log(&room.recent_events, &resolution.report.events)
 	}
-	trap := room.traps[index]
-	room.traps[index].armed = false
-	action := make_action(.Trigger, trap_entity(trap.id), entity_target(PLAYER_ENTITY), .Player)
-	added := add_effect(&action, damage_effect(PLAYER_ENTITY, trap.damage))
-	assert(added)
-	report := resolve_action(room, &action)
-	assert(report.accepted)
-	append_event_log(&room.recent_events, &report.events)
 }
 
 loot_is_in_magnet_range :: proc(player_position, loot_position: grid.Position) -> bool {
@@ -570,7 +564,6 @@ try_move_player :: proc(room: ^Room, direction: Move_Direction) -> Action_Result
 	}
 	append_event_log(&room.recent_events, &report.events)
 	collect_loot_in_magnet_range(room)
-	trigger_trap(room)
 
 	if room.phase == .Loot {
 		collect_loot_in_magnet_range(room)

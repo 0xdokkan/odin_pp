@@ -3,7 +3,8 @@
 Questa guida descrive il primo confine del deck building: definizioni immutabili,
 istanze runtime e compilazione in [Action](ACTION_SYSTEM.md). La geometria
 autorevole e in [Targeting System](TARGETING_SYSTEM.md); ownership, mano, pesca,
-energia e giocata sono descritte in [Deck Runtime](DECK_SYSTEM.md).
+energia e giocata sono descritte in [Deck Runtime](DECK_SYSTEM.md). Percorsi,
+spostamenti e hazard sono in [Movement System](MOVEMENT_SYSTEM.md).
 Lifetime, zona resolving ed exhaust sono in [Card Lifecycle](CARD_LIFECYCLE.md);
 Refocus, Retain ed Ethereal in [Hand Cycle](HAND_CYCLE.md).
 
@@ -13,6 +14,7 @@ Refocus, Retain ed Ethereal in [Hand Cycle](HAND_CYCLE.md).
 - [Card Definition](#card-definition)
 - [Card Instance](#card-instance)
 - [Effect Template](#effect-template)
+- [Movimento delle carte](#movimento-delle-carte)
 - [Compilazione](#compilazione)
 - [Dalla compilazione alla giocata](#dalla-compilazione-alla-giocata)
 - [Targeting](#targeting)
@@ -106,19 +108,44 @@ Card_Effect_Template :: struct {
 	priority_modifier:  i32,
 	card_definition:    Card_Id,
 	has_card_definition: bool,
+	movement:           Card_Movement_Kind,
+	movement_distance:  int,
 }
 ```
 
 `card_definition` e usato da `Create_Card` e deve essere accompagnato da
 `has_card_definition = true`: in questo modo un campo omesso non crea
 silenziosamente la carta con ID zero. I campi non pertinenti restano a zero.
-`Move` e rifiutato intenzionalmente:
-servirebbe un selettore di coordinate, non un `Entity_Ref` inventato.
+`Move` usa il normale selettore di entita per il mover e deriva la destinazione
+dalla query di targeting tramite `movement` e `movement_distance`.
 
 `Draw_Cards`, `Discard_Cards` e `Create_Card` richiedono il selettore `Player` e
 una quantita positiva. La create valida anche il `Card_Id` prodotto. In
 compilazione diventano normali `Effect`, quindi report, ordine causale e timeline
 non richiedono un secondo resolver dedicato al deck.
+
+## Movimento delle carte
+
+`Card_Movement_Kind` descrive come trasformare anchor e target primario in una
+destinazione concreta:
+
+| Kind | Mover e destinazione |
+|---|---|
+| `None` | il template non e un movimento spaziale |
+| `Player_To_Anchor` | sposta il player sulla cella scelta |
+| `Away_From_Player` | sposta il bersaglio oltre la sua posizione, lungo la linea dal player |
+| `Adjacent_To_Player` | deriva la cella della linea adiacente al player; la query ne verifica la liberta |
+
+Una definizione puo contenere al massimo un template `Move`. La validazione
+richiede una combinazione coerente fra kind, selettore e distanza. Le carte
+correnti compilano movimenti `Traverse`; attraversano quindi ogni cella della
+linea e innescano gli hazard incontrati.
+
+Se il movimento e l'unico template, come in `Dash`, deve risultare valido per
+accettare la carta. In una carta composta, come `Shove` o `Grappling Hook`, la
+query di movimento resta visibile ma un blocker non invalida il danno: durante
+la risoluzione il solo effetto `Move` puo essere saltato. Questo sfrutta la
+semantica ordinata e parziale dell'Action System.
 
 ## Compilazione
 
@@ -129,10 +156,12 @@ non richiedono un secondo resolver dedicato al deck.
 3. trova e ricontrolla la definizione;
 4. ricostruisce una `Target_Request` dal target scelto;
 5. esegue la stessa query geometrica usata dalla preview;
-6. raccoglie gli ID nemici della footprint in ordine stabile;
-7. calcola quanti effetti concreti saranno necessari;
-8. applica lo scaling dell'upgrade;
-9. produce una sola `Action_Kind.Card`.
+6. se esiste un template `Move`, deriva la destinazione ed esegue la stessa
+   `Movement_Query` mostrata dalla preview;
+7. raccoglie gli ID nemici della footprint in ordine stabile;
+8. calcola quanti effetti concreti saranno necessari;
+9. applica lo scaling dell'upgrade;
+10. produce una sola `Action_Kind.Card`.
 
 La funzione non modifica stanza, carta o player. Soltanto `resolve_action`
 applica gli effetti risultanti.
@@ -164,6 +193,11 @@ I selettori implementati sono:
 
 Il target primario resta nell'azione e viene validato di nuovo dal resolver.
 Gli effetti ad area copiano ID stabili, non indici della dynamic array.
+
+Per un template `Move`, il selettore identifica invece l'entita spostata. La
+destinazione non viene inventata come target cella secondario: viene derivata da
+anchor e `Card_Movement_Kind`, conservando distinti la scelta del giocatore e il
+risultato dello spostamento.
 
 Un'azione puo contenere al massimo `MAX_ACTION_EFFECTS`, oggi 32 come
 `MAX_ENEMIES_PER_ROOM`. Una compilazione che richiederebbe piu effetti restituisce
@@ -229,13 +263,17 @@ ancora con l'upgrade.
 | `Calculated_Risk` | Uncommon | 1 | player, None | pesca 2, poi scarta la carta piu a sinistra |
 | `Spark_Forge` | Uncommon | 1 | player, None | crea una `Spark` temporanea |
 | `Spark` | temporary only | 0 | avversario, Manhattan 1-2, Single | 2 danni, +1 per upgrade; exhaust on play |
+| `Shove` | Common | 1 | avversario, Manhattan 1, Single | 1 danno, +1 per upgrade; spinta di 1 cella |
+| `Dash` | Uncommon | 2 | cella, Chebyshev 1-3, Line, LoS | attraversa la linea fino all'anchor |
+| `Grappling_Hook` | Rare | 2 | avversario, Chebyshev 2-4, Line, LoS e actor stop | 1 danno, +1 per upgrade; trascina adiacente al player |
 
 La mano in basso sovrappone le carte e ne lascia visibili soltanto le testate.
 L'hover solleva una carta; il drag la porta sul campo e mostra cast range,
-percorso, footprint e blocker. Il rilascio costruisce il target primario e chiama
-`play_card`; un drop invalido non paga, non scarta e non avanza il pulse. `1`-`8`
-resta la scorciatoia da tastiera: le carte `None` partono subito, quelle spaziali
-restano selezionate in attesa di una cella.
+percorso di targeting, footprint, percorso di movimento, landing e blocker. Il
+rilascio costruisce il target primario e chiama `play_card`; un drop invalido non
+paga, non scarta e non avanza il pulse. `1`-`8` resta la scorciatoia da tastiera:
+le carte `None` partono subito, quelle spaziali restano selezionate in attesa di
+una cella.
 
 ## Errori espliciti
 

@@ -5,7 +5,8 @@ che modifichi lo stato della stanza. Status ed eventi sono descritti in
 [Status And Event System](STATUS_SYSTEM.md); le catene reattive in
 [Reaction Queue](REACTION_SYSTEM.md); pianificazione e telegraph dei nemici in
 [Enemy Intent System](ENEMY_INTENT_SYSTEM.md); cast range e footprint in
-[Targeting System](TARGETING_SYSTEM.md).
+[Targeting System](TARGETING_SYSTEM.md); percorsi, spostamenti forzati e hazard
+in [Movement System](MOVEMENT_SYSTEM.md).
 
 ## Indice
 
@@ -110,6 +111,7 @@ Effect :: struct {
 	target:      Entity_Ref,
 	amount:      i32,
 	destination: grid.Position,
+	movement_mode: Movement_Mode,
 	status:      Status_Kind,
 	duration:    i32,
 	reaction:    Reaction_Id,
@@ -125,7 +127,8 @@ Gli effetti disponibili sono:
 - `Damage`: applica danno; la difesa del player viene calcolata qui;
 - `Heal`: cura senza superare `max_health`;
 - `Gain_Gold`: modifica l'oro persistente del player;
-- `Move`: sposta un'entita su una destinazione valida;
+- `Move`: sposta un'entita con modalita `Traverse` o `Teleport` verso una
+  destinazione validata;
 - `Apply_Status`: applica o rinnova uno status con potenza e durata;
 - `Remove_Status`: rimuove uno status esistente;
 - `Add_Reaction_Binding`: installa una reazione runtime con potenza, cariche,
@@ -150,9 +153,12 @@ L'ordine di validazione e:
 3. target compatibile con `Target_Rule`;
 4. almeno un effetto inizialmente applicabile, se l'azione ne contiene.
 
-Un movimento contro un muro o un ostacolo viene rifiutato prima di costruire una
-mutazione valida. Gli effetti deck richiedono fase `Combat`, deck valido e almeno
-una operazione possibile. Un rifiuto non cambia la stanza e non produce un pulse.
+Ogni `Move` viene validato da `query_entity_movement`. `Traverse` controlla
+l'intera linea, inclusi corner squeeze e attori; `Teleport` ignora la geometria
+intermedia ma controlla la cella di atterraggio. Un movimento bloccato viene
+rifiutato prima di costruire una mutazione valida. Gli effetti deck richiedono
+fase `Combat`, deck valido e almeno una operazione possibile. Un rifiuto non
+cambia la stanza e non produce un pulse.
 
 Il resolver non gestisce risorse di movimento. Il costo energia delle carte
 appartiene alla transazione `play_card`, perche coinvolge anche le zone del deck:
@@ -177,6 +183,12 @@ una futura carta `Damage -> Create Card` puo applicare il danno e saltare la cre
 se la mano diventa piena. `play_card` rollbacka un'azione interamente rifiutata,
 ma non annulla effetti precedenti di un'azione gia accettata.
 
+`Shove` e `Grappling Hook` sfruttano lo stesso contratto: applicano prima il
+danno e poi tentano lo spostamento. Se il target muore oppure la destinazione non
+e piu libera, il `Move` viene saltato senza annullare il danno. `Dash` contiene
+invece soltanto il movimento e deve avere un percorso valido gia in preview e
+compilazione.
+
 ## Scheduler degli impulsi
 
 `resolve_action_once` applica una sola azione. `resolve_action` la avvolge con il
@@ -194,7 +206,8 @@ dispatch FIFO delle reazioni, ma non chiama mai `advance_combat_pulse`.
 - `resolve_enemy_intents` trasforma ogni piano ancora valido in una normale
   `Action`, senza produrre impulsi annidati o ricalcolare il bersaglio; una
   `Charge` valida concatena un movimento e un attacco nello stesso pulse;
-- loot e trappole usano il resolver, ma rispettano la fase e il flusso chiamante.
+- loot e trappole usano il resolver, ma rispettano la fase e il flusso chiamante;
+  una trappola puo ora essere innescata da player o nemici durante un movimento.
 
 Una carta con cinque effetti dovra quindi produrre un solo impulso, non
 cinque.
@@ -239,7 +252,7 @@ action := make_action(
 	cell_target(destination),
 	target_rule = .Walkable_Cell,
 )
-add_effect(&action, move_effect(PLAYER_ENTITY, destination))
+add_effect(&action, move_effect(PLAYER_ENTITY, destination, .Traverse))
 report := resolve_action(room, &action)
 ```
 
@@ -248,6 +261,12 @@ puo essere eseguita. Lo scheduler produce poi esattamente un pulse, percio
 attraversare una cella resta una decisione tattica. Muri e ostacoli rifiutano il
 comando senza pulse; il bump contro un'entita valida segue il flusso melee
 descritto sopra.
+
+Un movimento multi-cella entra nella stanza una cella alla volta. Gli step
+intermedi producono `Movement_Step`, quello terminale `Moved`; dopo ogni ingresso
+viene risolta immediatamente l'eventuale trappola. Il contratto completo, inclusi
+`Teleport` e interruzione letale del percorso, e in
+[Movement System](MOVEMENT_SYSTEM.md).
 
 ### Carica del bruto
 
@@ -272,9 +291,11 @@ attraversare lo stesso resolver usato dagli altri archetipi.
 
 ### Trappola
 
-La trappola diventa la sorgente, il player e il target primario e il danno e un
-effetto. Disarmare la trappola resta una responsabilita del trigger che costruisce
-l'azione.
+La trappola diventa la sorgente e l'attore entrato nella cella, player o nemico,
+e il destinatario del danno. Il trigger disarma la trappola, registra
+`Trap_Triggered` e applica il danno tramite le stesse primitive di shield, morte
+e loot del resolver. Durante un movimento l'ordine e sempre evento di ingresso,
+trigger, danno ed eventuale sconfitta.
 
 ## Compilazione delle carte
 
@@ -299,7 +320,9 @@ action, err := compile_card_action(
 Il compilatore valida fase, istanza e definizione, ricostruisce una
 `Target_Request` ed esegue `evaluate_card_targeting`. La query verifica anchor,
 cast range, allineamento, line of sight e footprint, poi raccoglie gli ID nemici
-in ordine stabile. Il compilatore calcola gli upgrade, espande `Each_Enemy` o
+in ordine stabile. Se la definizione contiene `Move`, la valutazione deriva
+anche mover e destinazione ed esegue la stessa `Movement_Query` mostrata dalla
+preview. Il compilatore calcola gli upgrade, espande `Each_Enemy` o
 `Each_Affected_Enemy` e rifiuta in anticipo azioni oltre la capacita di 32
 effetti. Un binding prodotto da una carta conserva `Card_Instance.id` come
 sorgente.
@@ -307,8 +330,9 @@ sorgente.
 Il flusso completo implementato e:
 
 1. la UI seleziona una carta;
-2. la preview esegue la query per l'anchor puntata senza mutare la stanza;
-3. `compile_card_action` riesegue la stessa query autorevole;
+2. la preview esegue targeting e, se richiesto, movimento per l'anchor puntata
+   senza mutare la stanza;
+3. `compile_card_action` riesegue le stesse query autorevoli;
 4. gli ID della footprint diventano effetti concreti;
 5. si costruisce una sola `Action`;
 6. il resolver restituisce un `Action_Report`;
@@ -318,7 +342,11 @@ Il flusso completo implementato e:
 Le semantiche di `Single`, linea a otto direzioni, croce, area 3x3, clipping e
 blocker sono documentate in [Targeting System](TARGETING_SYSTEM.md). Il resolver
 non ricalcola la geometria: riceve destinatari gia compilati e conserva la
-propria responsabilita limitata alle mutazioni.
+propria responsabilita limitata alle mutazioni. La destinazione di un effetto
+`Move` viene invece rivalidata al momento dell'applicazione, perche effetti
+precedenti possono aver cambiato occupazione o vita del mover.
+Se la sorgente muore durante un effetto, per esempio entrando in una trappola,
+il resolver conta come skipped gli effetti rimanenti e termina l'azione.
 
 ## Limiti intenzionali
 

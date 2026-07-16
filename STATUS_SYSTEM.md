@@ -2,7 +2,8 @@
 
 Questa guida descrive status, impulsi ed eventi costruiti sopra
 [Action System](ACTION_SYSTEM.md). Il dispatch reattivo e descritto in
-[Reaction Queue](REACTION_SYSTEM.md).
+[Reaction Queue](REACTION_SYSTEM.md); granularita degli spostamenti e hazard in
+[Movement System](MOVEMENT_SYSTEM.md).
 
 ## Indice
 
@@ -156,19 +157,28 @@ reazione viene risolta prima dello scheduler nemico, lo scudo puo proteggere
 dalla risposta allo stesso movimento.
 
 Movimenti nemici, spostamenti durante `Loot` e movimenti di altre entita non
-attivano lo status del player.
+attivano lo status del player. Un movimento multi-cella produce
+`Movement_Step` per gli ingressi intermedi e un solo `Moved` terminale;
+Afterimage osserva soltanto `Moved` e si attiva quindi una volta per
+attraversamento, non una volta per cella. Gli hazard dello stesso movimento sono
+gia stati risolti prima del dispatch reattivo, quindi lo shield non li assorbe;
+resta disponibile contro la successiva risposta nemica. Se il mover muore,
+l'evento terminale resta nel log ma non esiste piu un owner valido per la
+reazione.
 
 ## Event log
 
 Ogni `Action_Report` e `Pulse_Report` contiene un `Event_Log` inline con capacita
-288. Gli eventi disponibili sono:
+416. Gli eventi disponibili sono:
 
 - `Damaged`;
 - `Damage_Absorbed`;
 - `Healed`;
+- `Movement_Step`;
 - `Moved`;
 - `Move_Blocked`;
 - `Attack_Missed`;
+- `Trap_Triggered`;
 - `Gold_Gained`;
 - `Loot_Dropped`;
 - `Loot_Collected`;
@@ -196,6 +206,12 @@ retained, rendendo osservabile la policy senza inventare uno spostamento.
 energia sprecata al cap e informazione sui tick. Il renderer usa la sequenza per riprodurre le cause; lo snapshot finale
 sincronizza soltanto i valori assoluti non emessi singolarmente.
 
+La capacita deriva dall'envelope osservabile corrente: lo stress con 32 nemici
+compone 258 eventi, ai quali si aggiungono 158 slot di margine per movimento
+multi-cella e hazard neutrali (`258 + 158 = 416`). Il margine non autorizza
+producer illimitati: ogni nuova famiglia causale deve aggiornare i test di
+capacita.
+
 Se il log e pieno, gli eventi successivi non vengono allocati: `dropped_count`
 registra quanti eventi sono stati persi.
 
@@ -213,7 +229,9 @@ propagare questa diagnostica quando il loro envelope puo avvicinarsi al limite.
 soltanto i segmenti realmente eseguiti:
 
 1. l'eventuale `Card_Played`, seguito dagli eventi dell'azione e delle reazioni;
-2. drop, raccolte magnetiche ed eventuale trappola innescati dall'azione;
+   per ogni cella attraversata l'ordine interno e movimento, `Trap_Triggered`,
+   danno ed eventuale morte/drop;
+2. raccolte magnetiche prodotte dopo l'azione;
 3. se il combattimento continua, azioni nemiche, tick di status e binding, quindi
    il `Pulse_Advanced` terminale;
 4. raccolte magnetiche prodotte dopo il pulse;

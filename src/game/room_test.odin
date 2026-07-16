@@ -28,6 +28,18 @@ create_test_player :: proc(t: ^testing.T) -> Player {
 }
 
 @(test)
+test_create_room_rejects_traps_beyond_presentation_capacity :: proc(t: ^testing.T) {
+	level_data := create_test_level(t)
+	defer level.destroy(&level_data)
+	player := create_test_player(t)
+	trap_spawns: [MAX_TRAPS_PER_ROOM+1]Trap_Spawn
+
+	_, ok := create_room(&level_data, &player, {traps = trap_spawns[:]})
+
+	testing.expect(t, !ok)
+}
+
+@(test)
 test_combat_move_advances_pulse_but_blocked_move_does_not :: proc(t: ^testing.T) {
 	level_data := create_test_level(t)
 	defer level.destroy(&level_data)

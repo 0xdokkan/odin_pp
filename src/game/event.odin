@@ -2,8 +2,8 @@ package game
 
 import grid "../grid"
 
-// A dense 32-enemy command currently reaches 258 events before reaction headroom.
-MAX_GAME_EVENTS :: 288
+// Multi-cell movement and neutral hazards need headroom beyond dense 32-enemy AoE.
+MAX_GAME_EVENTS :: 416
 
 Game_Event_Kind :: enum {
 	Damaged,
@@ -29,6 +29,8 @@ Game_Event_Kind :: enum {
 	Card_Created,
 	Hand_Refocused,
 	Card_Refocused,
+	Movement_Step,
+	Trap_Triggered,
 }
 
 Game_Event :: struct {

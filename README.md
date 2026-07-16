@@ -6,7 +6,8 @@ Documentazione del gameplay: [Action System](ACTION_SYSTEM.md),
 [Status And Event System](STATUS_SYSTEM.md), [Reaction Queue](REACTION_SYSTEM.md),
 [Enemy Intents](ENEMY_INTENT_SYSTEM.md),
 [Magnetic Loot](LOOT_SYSTEM.md), [Card System](CARD_SYSTEM.md),
-[Targeting System](TARGETING_SYSTEM.md), [Deck Runtime](DECK_SYSTEM.md),
+[Targeting System](TARGETING_SYSTEM.md), [Movement System](MOVEMENT_SYSTEM.md),
+[Deck Runtime](DECK_SYSTEM.md),
 [Card Lifecycle](CARD_LIFECYCLE.md), [Hand Cycle](HAND_CYCLE.md) e
 [Card Rewards](REWARD_SYSTEM.md). Rarita, upgrade, rimozione e shop sono in
 [Deck Economy](DECK_ECONOMY.md); distribuzione e lifecycle di Shop, Rest, Event e
@@ -31,6 +32,8 @@ nella [Roadmap](ROADMAP.md); i contratti di M1, M2 e M3 sono in
 ![Trascinamento di una carta e anteprima del range](odin_pp_card_drag.png)
 
 ![Cast range e footprint 3x3 del targeting](odin_pp_advanced_targeting.png)
+
+![Percorso e landing di Dash sopra una trappola](odin_pp_spatial_targeting.png)
 
 ![Scelta della ricompensa dopo una stanza](odin_pp_reward.png)
 
@@ -80,6 +83,16 @@ odin run src -- --smoke-targeting
 
 Il flag prepara `Firebomb`, mostra cast range e footprint sulla griglia, salva
 `odin_pp_advanced_targeting.png` dopo tre frame e chiude la demo.
+
+Per verificare la preview condivisa di targeting e movimento:
+
+```sh
+odin run src -- --smoke-spatial
+```
+
+Il flag trascina una `Dash` temporanea su una linea di tre celle, colloca una
+trappola armata sul percorso e salva `odin_pp_spatial_targeting.png` dopo tre
+frame.
 
 Per verificare la timeline con uno snapshot pre-comando e un cue carta attivo:
 
@@ -138,11 +151,12 @@ pannello risolto e Continue disponibile.
    e il player riceve tre energia.
 2. Prima dell'input, inseguitori, arcieri e bruti mostrano l'intento committed per
    il prossimo impulso: movimento, attacco, carica e celle minacciate non vengono
-   ricalcolati dopo la scelta del player.
+   ricalcolati dopo la scelta del player. Una spinta o un pull puo renderli stale:
+   al pulse producono miss o blocco invece di retargettare.
 3. Le carte passano dalla mano a `Resolving`, applicano in ordine danno, status o
-   effetti `Draw`/`Discard`/`Create`, poi entrano in discard o exhaust. Se il
-   fight continua tentano di pescare un rimpiazzo e recuperano una energia per
-   impulso.
+   effetti `Move`/`Draw`/`Discard`/`Create`, poi entrano in discard o exhaust.
+   Se il fight continua tentano di pescare un rimpiazzo e recuperano una energia
+   per impulso.
 4. Ogni passo valido, bump attack, attesa, abilita, carta o Refocus accettato
    produce un impulso se il fight continua. Il player puo camminare senza un
    limite numerico, ma ogni cella attraversata concede la risposta committed ai
@@ -173,7 +187,7 @@ posizionamento.
 | Input | Azione |
 |---|---|
 | hover su carta | solleva la carta e mostra regole, costo e cast range |
-| trascina carta sulla griglia | mostra anchor, percorso, footprint e blocker; prova la giocata sulla cella di rilascio |
+| trascina carta sulla griglia | mostra anchor, footprint, percorso di cast e movimento, landing e blocker; prova la giocata sulla cella di rilascio |
 | `1`-`8` | gioca una carta non spaziale o seleziona una carta spaziale |
 | click su cella | usa la carta spaziale selezionata da tastiera sull'anchor |
 | `Esc` / click destro | annulla selezione o trascinamento |
@@ -267,10 +281,17 @@ Input, IA, trappole e loot costruiscono `Action` composte da effetti ordinati.
 valido, poi ricontrolla e applica gli effetti in sequenza: un effetto successivo
 puo essere saltato se lo stato prodotto dai precedenti lo rende non piu valido.
 Lo scheduler degli impulsi resta separato dal resolver.
+`Movement_Query` e l'autorita pura degli spostamenti: `Traverse` valida e
+attraversa l'intera linea, `Teleport` ignora le celle intermedie ma controlla la
+landing. L'applicazione entra cella per cella, registra `Movement_Step` e `Moved`
+e risolve subito le trappole per player o nemici. Il relativo contratto e in
+[Movement System](MOVEMENT_SYSTEM.md).
 Ogni nemico conserva inline un intento committed per `pulse_count + 1`.
 Pianificazione e risoluzione seguono gli ID in ordine crescente; spostarsi fuori
 da una cella minacciata produce un miss, mentre occupare una destinazione puo
-bloccare un movimento senza causare replanning.
+bloccare un movimento senza causare replanning. Anche uno spostamento forzato
+lascia intatto il piano congelato: un intento stale fallisce e viene ripianificato
+soltanto per il pulse successivo.
 `Enemy_Archetype` seleziona tre planner sulla stessa pipeline: il `Chaser` avanza
 o attacca in melee, l'`Archer` arretra quando viene ingaggiato e spara lungo una
 linea ortogonale libera, mentre il `Brute` puo attraversare piu celle con una
@@ -282,14 +303,18 @@ conservati dalla stanza.
 `Thorns` converte gli eventi di danno avversario in azioni reattive. Una queue
 FIFO risolve le catene senza ricorsione e conserva l'ordine causale degli eventi.
 Le definizioni dichiarano trigger, filtri, priorita e template degli effetti;
-`Afterimage` usa la stessa pipeline osservando gli eventi di movimento.
+`Afterimage` usa la stessa pipeline osservando il solo `Moved` terminale, quindi
+un attraversamento multi-cella lo attiva una volta.
 I binding runtime aggiungono owner, potenza, cariche, durata e sorgente carta o
 passiva senza duplicare le definizioni.
 `Card_Definition` e `Card_Instance` compilano targeting, upgrade ed effect
 template in normali `Action`. `Targeting_Spec` separa cast range e footprint:
 Single, linee nelle otto direzioni, croci e quadrati 3x3 condividono clipping,
 line of sight e blocker statici. La query raccoglie ID nemici stabili; il
-renderer visualizza il risultato senza ricalcolare la geometria. `Deck_State`
+renderer visualizza il risultato senza ricalcolare la geometria. `Shove`, `Dash`
+e `Grappling Hook` aggiungono una `Movement_Query` alla stessa valutazione: la
+preview mostra percorso, landing e blocker che compilazione e resolver
+ricontrollano. `Deck_State`
 conserva ownership, draw, mano, discard, exhaust, uno slot resolving ed energia in
 array fissi; shuffle e reshuffle sono deterministici. Istanze `Combat` create
 durante il fight usano ID monotoni, non entrano in ownership e spariscono a fine
@@ -309,8 +334,8 @@ mantengono payload deterministici separati, richiedono una sola scelta e vengono
 completati esplicitamente con Continue.
 La mano compatta a ventaglio, hover e drag sono stato di presentazione: durante
 il trascinamento il renderer interroga `evaluate_card_targeting` per ogni anchor
-e per la cella puntata. La compilazione riesegue la stessa query autorevole prima
-della giocata.
+e per la cella puntata. La compilazione riesegue la stessa valutazione autorevole,
+incluso il percorso di movimento, prima della giocata.
 Durante `Combat` e `Loot`, i drop entro distanza Chebyshev tre vengono raccolti
 tramite normali `Action`, anche quando si trovano sopra trappole, ostacoli o
 uscita. Oro e cura vengono assegnati subito dalla simulazione autorevole; gli
@@ -320,7 +345,9 @@ dopo la risoluzione ne viene catturato un secondo per i valori terminali. La
 `Room` risolve sincronicamente l'intera azione, mentre il renderer riproduce gli
 eventi in una timeline FIFO sulla copia presentazionale. Movimento, danno,
 status, mano, energia, sconfitte e loot restano nello stesso ordine causale senza
-rallentare o modificare la simulazione.
+rallentare o modificare la simulazione. Gli ingressi intermedi e i trigger delle
+trappole hanno cue distinti, cosi il replay conserva l'ordine
+`Movement -> Trap -> Damage`.
 Durante la timeline, il primo nuovo comando discreto viene conservato in un
 buffer di capacita uno; gli input successivi vengono scartati. Quando la timeline
 torna idle, il comando viene estratto e validato di nuovo contro la `Room`

@@ -40,6 +40,9 @@ Card_Id :: enum {
 	Calculated_Risk,
 	Spark_Forge,
 	Spark,
+	Shove,
+	Dash,
+	Grappling_Hook,
 	Count,
 }
 
@@ -49,6 +52,13 @@ Card_Target_Selector :: enum {
 	Each_Enemy,
 	Each_Affected_Enemy,
 	Count,
+}
+
+Card_Movement_Kind :: enum {
+	None,
+	Player_To_Anchor,
+	Away_From_Player,
+	Adjacent_To_Player,
 }
 
 Card_Compile_Error :: enum {
@@ -77,6 +87,8 @@ Card_Effect_Template :: struct {
 	priority_modifier:  i32,
 	card_definition:    Card_Id,
 	has_card_definition: bool,
+	movement:           Card_Movement_Kind,
+	movement_distance:  int,
 }
 
 Card_Definition :: struct {
@@ -447,24 +459,112 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 		},
 		effect_count = 1,
 	},
+	{
+		id = .Shove,
+		name = "Shove",
+		rarity = .Common,
+		reward_weight = 90,
+		shop_base_price = 4,
+		cost = 1,
+		targeting = {
+			rule = .Adjacent_Opponent,
+			cast_range = {.Manhattan, 1, 1},
+			shape = .Single,
+		},
+		effects = {
+			{
+				kind = .Damage,
+				target = .Chosen_Entity,
+				base_amount = 1,
+				amount_per_upgrade = 1,
+			},
+			{
+				kind = .Move,
+				target = .Chosen_Entity,
+				movement = .Away_From_Player,
+				movement_distance = 1,
+			},
+			{},
+			{},
+		},
+		effect_count = 2,
+	},
+	{
+		id = .Dash,
+		name = "Dash",
+		rarity = .Uncommon,
+		reward_weight = 75,
+		shop_base_price = 5,
+		cost = 2,
+		targeting = {
+			rule = .Walkable_Cell,
+			cast_range = {.Chebyshev, 1, 3},
+			shape = .Line,
+			requires_line_of_sight = true,
+			stops_on_wall = true,
+		},
+		effects = {
+			{
+				kind = .Move,
+				target = .Player,
+				movement = .Player_To_Anchor,
+			},
+			{},
+			{},
+			{},
+		},
+		effect_count = 1,
+	},
+	{
+		id = .Grappling_Hook,
+		name = "Grappling Hook",
+		rarity = .Rare,
+		reward_weight = 60,
+		shop_base_price = 8,
+		cost = 2,
+		targeting = {
+			rule = .Opponent,
+			cast_range = {.Chebyshev, 2, 4},
+			shape = .Line,
+			requires_line_of_sight = true,
+			stops_on_wall = true,
+			stops_on_actor = true,
+		},
+		effects = {
+			{
+				kind = .Damage,
+				target = .Chosen_Entity,
+				base_amount = 1,
+				amount_per_upgrade = 1,
+			},
+			{
+				kind = .Move,
+				target = .Chosen_Entity,
+				movement = .Adjacent_To_Player,
+			},
+			{},
+			{},
+		},
+		effect_count = 2,
+	},
 }
 
 card_drop_target :: proc(
 	room: ^Room,
-	definition: Card_Definition,
+	instance: Card_Instance,
 	position: grid.Position,
 ) -> (Target, bool) {
-	validated_definition := definition
-	if room == nil || room.player == nil || room.level_data == nil ||
-	   !validate_card_definition(&validated_definition) {
+	if room == nil || room.player == nil || room.level_data == nil {
 		return {}, false
 	}
-	request := Target_Request{}
-	if definition.targeting.shape != .None {
-		request = {anchor = position, has_anchor = true}
+	definition, found := card_definition_by_id(instance.definition_id)
+	if !found {
+		return {}, false
 	}
-	query := evaluate_target_query(room, PLAYER_ENTITY, definition.targeting, request)
-	return query.primary_target, query.error == .None && query.has_primary_target
+	request := card_target_request_at(definition, position)
+	evaluation := evaluate_card_targeting(room, instance, request)
+	return evaluation.query.primary_target,
+	       evaluation.error == .None && evaluation.query.has_primary_target
 }
 
 card_target_rule_selects_effect_entity :: proc(rule: Target_Rule) -> bool {
@@ -485,19 +585,48 @@ card_amount_template_is_valid :: proc(template: Card_Effect_Template) -> bool {
 	return maximum <= i64(max(i32))
 }
 
+card_movement_template_is_valid :: proc(
+	definition: ^Card_Definition,
+	template: Card_Effect_Template,
+) -> bool {
+	if definition == nil || template.kind != .Move ||
+	   template.base_amount != 0 || template.amount_per_upgrade != 0 {
+		return false
+	}
+	switch template.movement {
+	case .None:
+		return false
+	case .Player_To_Anchor:
+		return template.target == .Player && template.movement_distance == 0 &&
+		       definition.targeting.rule == .Walkable_Cell &&
+		       definition.targeting.shape == .Line
+	case .Away_From_Player:
+		return template.target == .Chosen_Entity && template.movement_distance > 0 &&
+		       template.movement_distance <= MAX_MOVEMENT_PATH_CELLS &&
+		       card_target_rule_selects_effect_entity(definition.targeting.rule)
+	case .Adjacent_To_Player:
+		return template.target == .Chosen_Entity && template.movement_distance == 0 &&
+		       card_target_rule_selects_effect_entity(definition.targeting.rule) &&
+		       definition.targeting.shape == .Line
+	}
+	return false
+}
+
 card_effect_template_is_valid :: proc(
 	definition: ^Card_Definition,
 	template: Card_Effect_Template,
 ) -> bool {
 	if definition == nil || int(template.target) < 0 || int(template.target) >= int(Card_Target_Selector.Count) ||
 	   (template.target == .Chosen_Entity && !card_target_rule_selects_effect_entity(definition.targeting.rule)) ||
-	   (template.target == .Each_Affected_Enemy && definition.targeting.shape == .None) {
+	   (template.target == .Each_Affected_Enemy && definition.targeting.shape == .None) ||
+	   (template.kind != .Move &&
+	    (template.movement != .None || template.movement_distance != 0)) {
 		return false
 	}
 
 	switch template.kind {
 	case .Move:
-		return false
+		return card_movement_template_is_valid(definition, template)
 	case .Remove_Status:
 		return status_kind_is_valid(template.status)
 	case .Damage, .Heal:
@@ -545,6 +674,15 @@ validate_card_definition :: proc(definition: ^Card_Definition) -> bool {
 		if !card_effect_template_is_valid(definition, definition.effects[index]) {
 			return false
 		}
+	}
+	movement_count := 0
+	for index in 0..<definition.effect_count {
+		if definition.effects[index].kind == .Move {
+			movement_count += 1
+		}
+	}
+	if movement_count > 1 {
+		return false
 	}
 	return true
 }
@@ -680,8 +818,77 @@ card_effect_target :: proc(selector: Card_Target_Selector, chosen: Target) -> (E
 
 Card_Target_Evaluation :: struct {
 	query:                 Target_Query_Result,
+	movement:              Movement_Query,
+	has_movement:          bool,
+	movement_required:     bool,
 	error:                 Card_Compile_Error,
 	required_effect_count: int,
+}
+
+card_movement_destination :: proc(
+	room: ^Room,
+	template: Card_Effect_Template,
+	target: Entity_Ref,
+	query: ^Target_Query_Result,
+) -> (destination: grid.Position, ok: bool) {
+	if room == nil || room.player == nil || query == nil || template.kind != .Move {
+		return
+	}
+	switch template.movement {
+	case .None:
+		return
+	case .Player_To_Anchor:
+		return query.anchor, target == PLAYER_ENTITY
+	case .Away_From_Player:
+		target_position, found := entity_position(room, target)
+		if !found || !targeting_line_is_aligned(room.player.position, target_position) {
+			return
+		}
+		step := grid.Position{
+			x = sign(target_position.x-room.player.position.x),
+			y = sign(target_position.y-room.player.position.y),
+		}
+		return grid.Position{
+			x = target_position.x+step.x*template.movement_distance,
+			y = target_position.y+step.y*template.movement_distance,
+		}, true
+	case .Adjacent_To_Player:
+		target_position, found := entity_position(room, target)
+		if !found || !targeting_line_is_aligned(target_position, room.player.position) {
+			return
+		}
+		distance := max(
+			abs(target_position.x-room.player.position.x),
+			abs(target_position.y-room.player.position.y),
+		)
+		if distance <= 1 {
+			return
+		}
+		step := grid.Position{
+			x = sign(room.player.position.x-target_position.x),
+			y = sign(room.player.position.y-target_position.y),
+		}
+		return grid.Position{
+			x = room.player.position.x-step.x,
+			y = room.player.position.y-step.y,
+		}, true
+	}
+	return
+}
+
+card_compile_error_from_movement :: proc(err: Movement_Error) -> Card_Compile_Error {
+	switch err {
+	case .None:
+		return .None
+	case .Static_Blocker, .Actor_Blocker:
+		return .Target_Blocked
+	case .Invalid_Room:
+		return .Invalid_Room
+	case .Invalid_Mover, .Same_Position, .Destination_Out_Of_Bounds,
+	     .Path_Not_Aligned, .Path_Too_Long:
+		return .Invalid_Target
+	}
+	return .Invalid_Target
 }
 
 card_target_request_at :: proc(
@@ -770,6 +977,43 @@ evaluate_card_targeting :: proc(
 	}
 
 	for index in 0..<definition.effect_count {
+		template := definition.effects[index]
+		if template.kind != .Move {
+			continue
+		}
+		evaluation.has_movement = true
+		evaluation.movement_required = definition.effect_count == 1
+		if definition.targeting.stops_on_actor &&
+		   !target_cell_set_contains(&evaluation.query.affected, evaluation.query.anchor) {
+			evaluation.error = .Target_Blocked
+			return
+		}
+		effect_target, has_target := card_effect_target(
+			template.target,
+			evaluation.query.primary_target,
+		)
+		if !has_target {
+			evaluation.error = .Invalid_Target
+			return
+		}
+		destination, has_destination := card_movement_destination(
+			room,
+			template,
+			effect_target,
+			&evaluation.query,
+		)
+		if !has_destination {
+			evaluation.error = .Invalid_Target
+			return
+		}
+		evaluation.movement = query_entity_movement(room, effect_target, destination)
+		if evaluation.movement_required && evaluation.movement.error != .None {
+			evaluation.error = card_compile_error_from_movement(evaluation.movement.error)
+			return
+		}
+	}
+
+	for index in 0..<definition.effect_count {
 		switch definition.effects[index].target {
 		case .Each_Enemy:
 			evaluation.required_effect_count += len(room.enemies)
@@ -831,6 +1075,19 @@ compile_card_action :: proc(
 	action = make_action(.Card, PLAYER_ENTITY, target, definition.targeting.rule)
 	for index in 0..<definition.effect_count {
 		template := definition.effects[index]
+		if template.kind == .Move {
+			effect_target, has_target := card_effect_target(template.target, target)
+			assert(has_target && evaluation.has_movement)
+			destination, has_destination := card_movement_destination(
+				room,
+				template,
+				effect_target,
+				&evaluation.query,
+			)
+			assert(has_destination)
+			assert(add_effect(&action, move_effect(effect_target, destination)))
+			continue
+		}
 		if template.target == .Each_Enemy {
 			ids, count := enemy_ids_in_planning_order(room)
 			for enemy_index in 0..<count {

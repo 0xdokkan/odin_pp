@@ -350,12 +350,11 @@ plan_brute_intent :: proc(
 	)
 }
 
-validate_enemy_intent :: proc(room: ^Room, enemy: ^Enemy) -> bool {
-	if room == nil || enemy == nil || room.level_data == nil || room.phase != .Combat {
+validate_enemy_intent_structure :: proc(room: ^Room, intent: ^Enemy_Intent) -> bool {
+	if room == nil || intent == nil || room.level_data == nil || room.phase != .Combat {
 		return false
 	}
-	intent := &enemy.intent
-	if intent.kind == .None || intent.origin != enemy.position ||
+	if intent.kind == .None ||
 	   intent.planned_pulse != room.pulse_count+1 ||
 	   intent.path_count < 0 || intent.path_count > MAX_ENEMY_INTENT_PATH_CELLS ||
 	   intent.threatened_cell_count < 0 ||
@@ -433,6 +432,11 @@ validate_enemy_intent :: proc(room: ^Room, enemy: ^Enemy) -> bool {
 		return true
 	}
 	return false
+}
+
+validate_enemy_intent :: proc(room: ^Room, enemy: ^Enemy) -> bool {
+	return enemy != nil && enemy.intent.origin == enemy.position &&
+	       validate_enemy_intent_structure(room, &enemy.intent)
 }
 
 validate_enemy_intents :: proc(room: ^Room) -> bool {
@@ -564,7 +568,7 @@ resolve_enemy_intents :: proc(room: ^Room, pulse: ^Pulse_Report) {
 			continue
 		}
 		enemy := &room.enemies[enemy_index]
-		assert(validate_enemy_intent(room, enemy))
+		assert(validate_enemy_intent_structure(room, &enemy.intent))
 		intent := enemy.intent
 		enemy.intent = {}
 		source := enemy_entity(enemy.id)

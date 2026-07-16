@@ -6,12 +6,13 @@ import view "../view"
 
 MAX_PRESENTATION_CUES :: game.MAX_GAME_EVENTS
 MAX_PRESENTATION_LOOT :: game.MAX_ENEMIES_PER_ROOM*2
-MAX_PRESENTATION_TRAPS :: 64
+MAX_PRESENTATION_TRAPS :: game.MAX_TRAPS_PER_ROOM
 
 // Values above one slow every cue while preserving their relative rhythm.
 PRESENTATION_TIME_SCALE           :: f32(1.35)
 PRESENTATION_PLAYER_MOVE_DURATION :: f32(0.18)*PRESENTATION_TIME_SCALE
 PRESENTATION_ENEMY_MOVE_DURATION  :: f32(0.32)*PRESENTATION_TIME_SCALE
+PRESENTATION_MOVEMENT_STEP_DURATION :: f32(0.12)*PRESENTATION_TIME_SCALE
 PRESENTATION_DAMAGE_DURATION      :: f32(0.18)*PRESENTATION_TIME_SCALE
 PRESENTATION_HEAL_DURATION        :: f32(0.18)*PRESENTATION_TIME_SCALE
 PRESENTATION_STATUS_DURATION      :: f32(0.14)*PRESENTATION_TIME_SCALE
@@ -25,10 +26,12 @@ PRESENTATION_DEFEAT_DURATION      :: f32(0.22)*PRESENTATION_TIME_SCALE
 PRESENTATION_LOOT_DURATION        :: f32(0.28)*PRESENTATION_TIME_SCALE
 PRESENTATION_NOTICE_DURATION      :: f32(0.12)*PRESENTATION_TIME_SCALE
 PRESENTATION_PULSE_DURATION       :: f32(0.06)*PRESENTATION_TIME_SCALE
+PRESENTATION_MAX_SEQUENCE_DURATION :: f32(12.0)
 PRESENTATION_TIME_EPSILON         :: f32(0.00001)
 
 Presentation_Cue_Kind :: enum {
 	Move,
+	Trap_Triggered,
 	Damage,
 	Damage_Absorbed,
 	Heal,
@@ -233,12 +236,14 @@ presentation_cue_kind :: proc(event: game.Game_Event) -> Presentation_Cue_Kind {
 		return .Damage_Absorbed
 	case .Healed:
 		return .Heal
-	case .Moved:
+	case .Movement_Step, .Moved:
 		return .Move
 	case .Move_Blocked:
 		return .Move_Blocked
 	case .Attack_Missed:
 		return .Attack_Missed
+	case .Trap_Triggered:
+		return .Trap_Triggered
 	case .Gold_Gained:
 		return .Gold_Gained
 	case .Loot_Dropped:
@@ -280,6 +285,9 @@ presentation_cue_kind :: proc(event: game.Game_Event) -> Presentation_Cue_Kind {
 presentation_cue_duration :: proc(kind: Presentation_Cue_Kind, event: game.Game_Event) -> f32 {
 	switch kind {
 	case .Move:
+		if event.kind == .Movement_Step {
+			return PRESENTATION_MOVEMENT_STEP_DURATION
+		}
 		if event.target.kind == .Enemy {
 			return PRESENTATION_ENEMY_MOVE_DURATION
 		}
@@ -307,7 +315,7 @@ presentation_cue_duration :: proc(kind: Presentation_Cue_Kind, event: game.Game_
 		return PRESENTATION_DEFEAT_DURATION
 	case .Loot:
 		return PRESENTATION_LOOT_DURATION
-	case .Attack_Missed, .Move_Blocked, .Gold_Gained, .Loot_Dropped:
+	case .Attack_Missed, .Move_Blocked, .Trap_Triggered, .Gold_Gained, .Loot_Dropped:
 		return PRESENTATION_NOTICE_DURATION
 	case .Pulse_Advanced:
 		return PRESENTATION_PULSE_DURATION
@@ -367,6 +375,16 @@ begin_event_timeline :: proc(
 			duration = presentation_cue_duration(kind, event),
 		}
 		timeline.count += 1
+	}
+	total_duration: f32
+	for index in 0..<timeline.count {
+		total_duration += timeline.cues[index].duration
+	}
+	if total_duration > PRESENTATION_MAX_SEQUENCE_DURATION {
+		duration_scale := PRESENTATION_MAX_SEQUENCE_DURATION/total_duration
+		for index in 0..<timeline.count {
+			timeline.cues[index].duration *= duration_scale
+		}
 	}
 	return timeline.count > 0
 }
@@ -659,15 +677,17 @@ sync_presentation_statuses_from_final :: proc(timeline: ^Presentation_Timeline) 
 	return true
 }
 
-disarm_presentation_trap_for_event :: proc(
+apply_presentation_trap_triggered :: proc(
 	timeline: ^Presentation_Timeline,
 	event: game.Game_Event,
 ) -> bool {
-	if event.source.kind != .Trap {
-		return true
+	if timeline == nil || event.kind != .Trap_Triggered || event.source.kind != .Trap ||
+	   (event.target.kind != .Player && event.target.kind != .Enemy) ||
+	   event.from_position != event.to_position {
+		return false
 	}
 	trap, found := presentation_trap(&timeline.view, event.source.id)
-	if !found {
+	if !found || !trap.armed || trap.position != event.to_position {
 		return false
 	}
 	trap.armed = false
@@ -687,19 +707,17 @@ start_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^Presentat
 		} else {
 			timeline.update_failures += 1
 		}
-	case .Damage:
-		if !disarm_presentation_trap_for_event(timeline, event) {
+	case .Trap_Triggered:
+		if !apply_presentation_trap_triggered(timeline, event) {
 			timeline.update_failures += 1
 		}
+	case .Damage:
 		if has_actor {
 			actor.health = max(i32(0), actor.health-max(i32(0), event.amount))
 		} else {
 			timeline.update_failures += 1
 		}
 	case .Damage_Absorbed:
-		if !disarm_presentation_trap_for_event(timeline, event) {
-			timeline.update_failures += 1
-		}
 		if has_actor {
 			if index, found := game.status_index(&actor.statuses, .Shield); found {
 				actor.statuses.items[index].potency =
@@ -794,7 +812,7 @@ update_active_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^P
 		}
 	case .Defeat:
 		actor.opacity = 1-presentation_cue_progress(cue)
-	case .Damage, .Damage_Absorbed, .Heal, .Status_Applied, .Status_Removed,
+	case .Trap_Triggered, .Damage, .Damage_Absorbed, .Heal, .Status_Applied, .Status_Removed,
 	     .Status_Expired, .Card_Played, .Card_Drawn, .Card_Moved, .Card_Created,
 	     .Refocus, .Card_Refocused,
 	     .Loot_Dropped, .Loot, .Attack_Missed,

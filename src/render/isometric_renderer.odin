@@ -261,6 +261,12 @@ card_colors :: proc(id: game.Card_Id, affordable: bool) -> (fill, outline: rl.Co
 		fill, outline = rl.Color{55, 45, 66, 245}, rl.Color{209, 151, 236, 255}
 	case .Spark:
 		fill, outline = rl.Color{57, 54, 31, 245}, rl.Color{246, 207, 92, 255}
+	case .Shove:
+		fill, outline = rl.Color{66, 42, 35, 245}, rl.Color{236, 137, 91, 255}
+	case .Dash:
+		fill, outline = rl.Color{27, 58, 65, 245}, rl.Color{80, 206, 213, 255}
+	case .Grappling_Hook:
+		fill, outline = rl.Color{48, 48, 54, 245}, rl.Color{187, 190, 197, 255}
 	case .Count:
 		fill, outline = rl.Color{45, 49, 52, 245}, rl.Color{105, 116, 116, 255}
 	}
@@ -275,7 +281,7 @@ card_detail_lines :: proc(card: game.Card_Instance) -> (first, second: cstring) 
 	upgrade := card.upgrade_level
 	switch card.definition_id {
 	case .Strike:
-		return fmt.ctprintf("DEAL %d DAMAGE", 2+upgrade), "RANGE 1"
+		return fmt.ctprintf("DEAL %d DAMAGE", 3+upgrade), "RANGE 1"
 	case .Arc_Bolt:
 		return fmt.ctprintf("DEAL %d DAMAGE", 3+upgrade), "RANGE 1-3"
 	case .Piercing_Ray:
@@ -302,6 +308,12 @@ card_detail_lines :: proc(card: game.Card_Instance) -> (first, second: cstring) 
 		return "CREATE 1 SPARK", "TEMPORARY"
 	case .Spark:
 		return fmt.ctprintf("DEAL %d DAMAGE", 2+upgrade), "TEMP - RANGE 1-2"
+	case .Shove:
+		return fmt.ctprintf("DEAL %d DAMAGE", 1+upgrade), "PUSH 1 CELL"
+	case .Dash:
+		return "MOVE 1-3 CELLS", "TRAVERSE HAZARDS"
+	case .Grappling_Hook:
+		return fmt.ctprintf("DEAL %d DAMAGE", 1+upgrade), "PULL ADJACENT"
 	case .Count:
 	}
 	return "", ""
@@ -337,6 +349,12 @@ card_short_name :: proc(id: game.Card_Id) -> cstring {
 		return "FORGE"
 	case .Spark:
 		return "SPARK"
+	case .Shove:
+		return "SHOVE"
+	case .Dash:
+		return "DASH"
+	case .Grappling_Hook:
+		return "HOOK"
 	case .Count:
 	}
 	return ""
@@ -440,6 +458,18 @@ draw_card_sigil :: proc(bounds: rl.Rectangle, id: game.Card_Id, color: rl.Color)
 		for index in 0..<len(points)-1 {
 			rl.DrawLineEx(points[index], points[index+1], 4, color)
 		}
+	case .Shove:
+		rl.DrawLineEx({center.x-radius, center.y}, {center.x+radius, center.y}, 5, color)
+		rl.DrawLineEx({center.x+radius, center.y}, {center.x+6, center.y-10}, 4, color)
+		rl.DrawLineEx({center.x+radius, center.y}, {center.x+6, center.y+10}, 4, color)
+	case .Dash:
+		for offset in -1..=1 {
+			y := center.y+f32(offset)*10
+			rl.DrawLineEx({center.x-radius, y}, {center.x+radius, y}, 3, color)
+		}
+	case .Grappling_Hook:
+		rl.DrawCircleLinesV({center.x+10, center.y-9}, 8, color)
+		rl.DrawLineEx({center.x+5, center.y-3}, {center.x-13, center.y+15}, 4, color)
 	case .Count:
 	}
 }
@@ -1469,6 +1499,31 @@ draw_card_target_range :: proc(renderer: ^Renderer, room: ^game.Room, card_id: u
 		affected_fill,
 		affected_outline,
 	)
+	if evaluation.has_movement {
+		movement_clear := game.movement_query_is_clear(&evaluation.movement)
+		movement_fill := rl.Color{80, 206, 213, 52}
+		movement_outline := rl.Color{111, 231, 225, 235}
+		if !movement_clear {
+			movement_fill = rl.Color{190, 68, 70, 42}
+			movement_outline = rl.Color{235, 91, 91, 215}
+		}
+		for index in 0..<evaluation.movement.count {
+			draw_card_range_cell(
+				renderer,
+				evaluation.movement.cells[index],
+				movement_fill,
+				movement_outline,
+			)
+		}
+		if evaluation.movement.has_blocker {
+			draw_card_range_cell(
+				renderer,
+				evaluation.movement.blocker,
+				rl.Color{190, 68, 70, 105},
+				rl.Color{255, 112, 102, 255},
+			)
+		}
+	}
 	if evaluation.query.has_blocker {
 		draw_card_range_cell(
 			renderer,
@@ -1485,6 +1540,21 @@ draw_card_target_range :: proc(renderer: ^Renderer, room: ^game.Room, card_id: u
 		anchor_fill,
 		anchor_outline,
 	)
+	if evaluation.has_movement {
+		landing_clear := game.movement_query_is_clear(&evaluation.movement)
+		landing_fill := rl.Color{65, 192, 180, 96}
+		landing_outline := rl.Color{135, 245, 226, 255}
+		if !landing_clear {
+			landing_fill = rl.Color{190, 68, 70, 96}
+			landing_outline = rl.Color{255, 112, 102, 255}
+		}
+		draw_card_range_cell(
+			renderer,
+			evaluation.movement.destination,
+			landing_fill,
+			landing_outline,
+		)
+	}
 }
 
 draw_status_set :: proc(
@@ -1789,7 +1859,7 @@ timeline_card_cue_verb :: proc(cue: ^Presentation_Cue) -> cstring {
 		} else if cue.event.to_card_zone == .Discard {
 			return "DISCARD"
 		}
-	case .Move, .Damage, .Damage_Absorbed, .Heal, .Status_Applied, .Status_Removed,
+	case .Move, .Trap_Triggered, .Damage, .Damage_Absorbed, .Heal, .Status_Applied, .Status_Removed,
 	     .Status_Expired, .Defeat, .Loot_Dropped, .Loot, .Attack_Missed, .Move_Blocked,
 	     .Gold_Gained, .Binding_Added, .Binding_Exhausted, .Binding_Expired,
 	     .Pulse_Advanced, .Refocus:
@@ -1906,6 +1976,10 @@ draw_active_presentation_cue :: proc(renderer: ^Renderer) {
 		return
 	}
 	center, has_center := presentation_event_center(renderer, cue.event)
+	if cue.kind == .Trap_Triggered {
+		center = cell_center(renderer, cue.event.to_position)
+		has_center = true
+	}
 	if !has_center {
 		return
 	}
@@ -1936,6 +2010,9 @@ draw_active_presentation_cue :: proc(renderer: ^Renderer) {
 	case .Move_Blocked:
 		label = "BLOCKED"
 		color = rl.Color{238, 174, 73, 255}
+	case .Trap_Triggered:
+		label = "TRAP"
+		color = rl.Color{246, 146, 72, 255}
 	case .Gold_Gained:
 		label = fmt.ctprintf("+%d GOLD", cue.event.amount)
 		color = rl.Color{246, 207, 92, 255}

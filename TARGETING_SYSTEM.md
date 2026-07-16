@@ -4,7 +4,8 @@ Questa guida descrive l'autorita geometrica condivisa da preview e compilazione
 delle carte. Il targeting calcola celle e ID, ma non applica danni e non modifica
 la stanza. La trasformazione finale in effetti e descritta in
 [Card System](CARD_SYSTEM.md); la loro risoluzione in
-[Action System](ACTION_SYSTEM.md).
+[Action System](ACTION_SYSTEM.md). La validazione di uno spostamento derivato
+dalla carta appartiene invece al [Movement System](MOVEMENT_SYSTEM.md).
 
 ## Indice
 
@@ -17,6 +18,7 @@ la stanza. La trasformazione finale in effetti e descritta in
 - [Actor stop](#actor-stop)
 - [Risultato della query](#risultato-della-query)
 - [Dalla query alla Action](#dalla-query-alla-action)
+- [Targeting e movimento](#targeting-e-movimento)
 - [Preview e compilazione](#preview-e-compilazione)
 - [Carte implementate](#carte-implementate)
 - [Smoke visuale](#smoke-visuale)
@@ -37,6 +39,11 @@ origin -- cast range --> anchor -- shape/radius --> affected cells
 - `shape` e `radius` costruiscono la footprint attorno o lungo quell'anchor;
 - `enemy_ids` contiene i nemici vivi presenti nella footprint valida;
 - il compilatore espande quegli ID in normali `Effect` dentro una `Action`.
+
+Una carta che sposta un attore aggiunge una terza domanda, risolta dopo il
+targeting: quale percorso puo compiere il mover dalla propria posizione alla
+destinazione derivata? La risposta e una `Movement_Query`, non un'estensione
+implicita della footprint.
 
 Per esempio, `Firebomb` puo collocare l'anchor entro tre celle Chebyshev, ma la
 sua footprint e un quadrato 3x3. Un nemico nella footprint puo quindi trovarsi
@@ -268,6 +275,7 @@ evaluate_target_query
 evaluate_card_targeting
             |
             +--> required_effect_count
+            +--> optional Movement_Query
             |
             v
 compile_card_action
@@ -284,6 +292,36 @@ selezionare tutti i nemici vivi, indipendentemente dalla footprint.
 La compilazione viene rifiutata prima di creare azioni parziali se non produce
 effetti o supera `MAX_ACTION_EFFECTS`.
 
+## Targeting e movimento
+
+`Card_Target_Evaluation` conserva entrambe le autorita:
+
+```odin
+Card_Target_Evaluation :: struct {
+	query:                 Target_Query_Result,
+	movement:              Movement_Query,
+	has_movement:          bool,
+	movement_required:     bool,
+	error:                 Card_Compile_Error,
+	required_effect_count: int,
+}
+```
+
+`Target_Query_Result` risponde a cast range, LoS, footprint e target primario.
+Quando la definizione contiene un template `Move`, `evaluate_card_targeting`
+deriva poi mover e destinazione ed esegue `query_entity_movement`.
+
+La distinzione e necessaria per casi come `Shove`: l'anchor e il nemico scelto,
+ma la landing e una cella oltre il nemico. Per `Dash`, invece, anchor e landing
+coincidono, mentre percorso di targeting e percorso realmente attraversato
+restano comunque dati di due query separate.
+
+`movement_required` e vero quando `Move` e l'unico template della definizione.
+Un fallimento rende allora l'intera valutazione `Target_Blocked` o
+`Invalid_Target`. Nelle carte composte il risultato del movimento rimane
+diagnostico e visualizzabile, ma gli altri effetti possono ancora essere
+compilati e applicati.
+
 ## Preview e compilazione
 
 La preview non reimplementa la geometria. Per ogni possibile anchor il renderer
@@ -294,8 +332,10 @@ costruisce una request con `card_target_request_at` e chiama
   valutazione completa; il secondo caso permette a `Target_Rule.Cell` di
   puntare intenzionalmente una cella statica;
 - ambra per percorso e footprint della cella puntata;
+- teal per percorso e landing di movimento validi;
 - verde per un anchor valido e pagabile;
-- rosso per target invalido, carta non pagabile o blocker;
+- rosso per target invalido, carta non pagabile, landing invalida o blocker di
+  targeting e movimento;
 - anchor disegnato per ultimo, cosi la cella di rilascio resta leggibile.
 
 `anchor_reachable` non significa automaticamente "carta giocabile". Per esempio,
@@ -309,6 +349,11 @@ creare gli effetti. Preview e compilazione condividono quindi la stessa funzione
 autorevole; la preview non concede mai una giocata che il compilatore non
 ricontrolli.
 
+Il renderer legge `evaluation.query` ed `evaluation.movement` senza
+reimplementare alcuna geometria. `card_drop_target` consuma la stessa
+valutazione: per un `Dash` bloccato preview, drop e compilazione concordano e la
+giocata non consuma energia, carta o pulse.
+
 L'energia non appartiene alla query. Il renderer la usa per il colore, mentre
 `play_card` la controlla e la paga nella transazione del deck.
 
@@ -321,6 +366,9 @@ L'energia non appartiene alla query. Il renderer la usa per il colore, mentre
 | `Piercing_Ray` | Chebyshev 1-5 | `Line` | otto direzioni, attraversa attori, danno a ogni nemico nella linea |
 | `Cross_Slash` | Manhattan 1-3 | `Cross`, raggio 1 | anchor calpestabile, LoS e bracci fermati dai muri |
 | `Firebomb` | Chebyshev 1-3 | `Square`, raggio 1 | anchor calpestabile, LoS, footprint 3x3 |
+| `Shove` | Manhattan 1 | `Single` | avversario adiacente; landing una cella lontano dal player |
+| `Dash` | Chebyshev 1-3 | `Line` | anchor calpestabile; percorre ogni cella fino alla landing |
+| `Grappling_Hook` | Chebyshev 2-4 | `Line` | avversario, LoS e actor stop; landing adiacente al player |
 
 Le carte `Guard`, `Toxic_Wave`, `Thorn_Coat`, `Afterimage` e `Counter_Rune` usano
 `shape == .None`.
@@ -359,6 +407,11 @@ geometrici in `Card_Compile_Error`:
 `No_Effects` e `Too_Many_Effects` vengono aggiunti da
 `evaluate_card_targeting`, dopo una query geometrica riuscita.
 
+Se e presente un movimento obbligatorio, `Static_Blocker` e `Actor_Blocker`
+diventano `Target_Blocked`; bounds, allineamento, lunghezza o mover invalidi
+diventano `Invalid_Target`. Il dettaglio originale resta disponibile in
+`Card_Target_Evaluation.movement` per la preview.
+
 ## Limiti fissi
 
 Il targeting non alloca durante la query. I budget correnti sono:
@@ -368,6 +421,7 @@ Il targeting non alloca durante la query. I budget correnti sono:
 | `MAX_TARGETING_RANGE` | 12 | massimo cast range |
 | `MAX_TARGETING_RADIUS` | 4 | massimo raggio di forma |
 | `MAX_TARGETING_PATH_CELLS` | 12 | celle della traccia |
+| `MAX_MOVEMENT_PATH_CELLS` | 12 | celle attraversate da un movimento |
 | `MAX_TARGETING_SHAPE_CELLS` | 81 | footprint massima 9x9 |
 | `MAX_ENEMIES_PER_ROOM` | 32 | ID nemici raccolti dalla query |
 | `MAX_ACTION_EFFECTS` | 32 | effetti concreti in una Action |
@@ -386,7 +440,8 @@ Per aggiungere una forma o una nuova carta:
    essa;
 4. mantenere ordine deterministico e storage fisso;
 5. usare gli ID raccolti, mai indici persistenti di `Room.enemies`;
-6. far consumare a preview e compilazione la stessa query;
+6. far consumare a preview e compilazione la stessa valutazione, incluse le
+   eventuali `Movement_Query`;
 7. aggiungere test per bounds, muri, corner squeeze, attori, ordine ID e
    immutabilita della stanza.
 

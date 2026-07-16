@@ -340,15 +340,23 @@ test_card_drop_target_translates_cells_without_mutating_room :: proc(t: ^testing
 
 	strike, found := card_definition_by_id(.Strike)
 	testing.expect(t, found)
-	target, has_target := card_drop_target(&room, strike, room.enemies[0].position)
+	target, has_target := card_drop_target(
+		&room,
+		{id = 1, definition_id = strike.id},
+		room.enemies[0].position,
+	)
 	testing.expect(t, has_target)
 	testing.expect_value(t, target, entity_target(enemy_entity(room.enemies[0].id)))
-	_, has_target = card_drop_target(&room, strike, {x = 3, y = 1})
+	_, has_target = card_drop_target(&room, {id = 1, definition_id = strike.id}, {x = 3, y = 1})
 	testing.expect(t, !has_target)
 
 	guard, guard_found := card_definition_by_id(.Guard)
 	testing.expect(t, guard_found)
-	target, has_target = card_drop_target(&room, guard, {x = 3, y = 1})
+	target, has_target = card_drop_target(
+		&room,
+		{id = 2, definition_id = guard.id},
+		{x = 3, y = 1},
+	)
 	testing.expect(t, has_target)
 	testing.expect_value(t, target, entity_target(PLAYER_ENTITY))
 }

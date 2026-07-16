@@ -258,6 +258,31 @@ test_card_move_cue_accepts_authoritative_exhaust_destination :: proc(t: ^testing
 }
 
 @(test)
+test_invalid_trap_trigger_is_fail_soft_and_keeps_presentation_armed :: proc(t: ^testing.T) {
+	player := game.Player{stats = {max_health = 10}, health = 10}
+	room := make_presentation_timeline_test_room(&player, nil, nil)
+	defer game.destroy_room(&room)
+	append(&room.traps, game.Trap{id = 4, position = {x = 2, y = 1}, damage = 3, armed = true})
+	events: game.Event_Log
+	game.record_event(&events, {
+		kind = .Trap_Triggered,
+		source = game.trap_entity(4),
+		target = game.PLAYER_ENTITY,
+		from_position = {x = 3, y = 1},
+		to_position = {x = 3, y = 1},
+	})
+	timeline: Presentation_Timeline
+	testing.expect(t, begin_event_timeline(&timeline, capture_room_presentation(&room), &events))
+	testing.expect(t, update_event_timeline(&timeline, PRESENTATION_NOTICE_DURATION))
+	trap, found := presentation_trap(&timeline.view, 4)
+	testing.expect(t, found)
+	if found {
+		testing.expect(t, trap.armed)
+	}
+	testing.expect_value(t, timeline.update_failures, 1)
+}
+
+@(test)
 test_card_draw_cue_replays_reshuffle_and_rejects_event_mismatches_atomically :: proc(t: ^testing.T) {
 	player := game.Player{stats = {max_health = 10}, health = 10}
 	rules := game.Deck_Rules{hand_size = 2, max_energy = 3, energy_regen_per_pulse = 1}
@@ -594,9 +619,11 @@ test_all_game_events_have_stable_presentation_cue_kinds :: proc(t: ^testing.T) {
 		.Damaged,
 		.Damage_Absorbed,
 		.Healed,
+		.Movement_Step,
 		.Moved,
 		.Move_Blocked,
 		.Attack_Missed,
+		.Trap_Triggered,
 		.Gold_Gained,
 		.Loot_Dropped,
 		.Loot_Collected,
@@ -620,8 +647,10 @@ test_all_game_events_have_stable_presentation_cue_kinds :: proc(t: ^testing.T) {
 		.Damage_Absorbed,
 		.Heal,
 		.Move,
+		.Move,
 		.Move_Blocked,
 		.Attack_Missed,
+		.Trap_Triggered,
 		.Gold_Gained,
 		.Loot_Dropped,
 		.Loot,
@@ -694,7 +723,7 @@ test_pulse_cue_syncs_status_energy_and_count_from_the_final_snapshot :: proc(t: 
 }
 
 @(test)
-test_trap_stays_armed_during_movement_and_disarms_when_its_damage_starts :: proc(t: ^testing.T) {
+test_trap_disarms_on_explicit_trigger_before_damage_starts :: proc(t: ^testing.T) {
 	player := game.Player{
 		position = {x = 1, y = 1},
 		stats = {max_health = 10},
@@ -710,6 +739,13 @@ test_trap_stays_armed_during_movement_and_disarms_when_its_damage_starts :: proc
 		kind = .Moved,
 		target = game.PLAYER_ENTITY,
 		from_position = {x = 1, y = 1},
+		to_position = {x = 2, y = 1},
+	})
+	game.record_event(&events, {
+		kind = .Trap_Triggered,
+		source = game.trap_entity(4),
+		target = game.PLAYER_ENTITY,
+		from_position = {x = 2, y = 1},
 		to_position = {x = 2, y = 1},
 	})
 	game.record_event(&events, {
@@ -730,11 +766,16 @@ test_trap_stays_armed_during_movement_and_disarms_when_its_damage_starts :: proc
 	if found {
 		testing.expect(t, trap.armed)
 	}
-	update_event_timeline(&timeline, PRESENTATION_DAMAGE_DURATION*0.5)
+	testing.expect_value(t, timeline.view.player.health, i32(10))
+	update_event_timeline(&timeline, PRESENTATION_NOTICE_DURATION*0.5)
 	trap, found = presentation_trap(&timeline.view, 4)
 	if found {
 		testing.expect(t, !trap.armed)
 	}
+	testing.expect_value(t, timeline.view.player.health, i32(10))
+	update_event_timeline(&timeline, PRESENTATION_NOTICE_DURATION*0.5)
+	update_event_timeline(&timeline, PRESENTATION_DAMAGE_DURATION*0.5)
+	testing.expect_value(t, timeline.view.player.health, i32(7))
 	testing.expect_value(t, timeline.update_failures, 0)
 }
 
@@ -799,44 +840,57 @@ test_repeated_moves_remain_distinct_and_interpolate_from_committed_pose :: proc(
 	defer game.destroy_room(&room)
 	events: game.Event_Log
 	game.record_event(&events, {
-		kind = .Moved,
+		kind = .Movement_Step,
 		target = enemy_ref,
 		from_position = {x = 5, y = 2},
 		to_position = {x = 4, y = 2},
 	})
 	game.record_event(&events, {
-		kind = .Moved,
+		kind = .Movement_Step,
 		target = enemy_ref,
 		from_position = {x = 4, y = 2},
 		to_position = {x = 3, y = 2},
 	})
+	game.record_event(&events, {
+		kind = .Moved,
+		target = enemy_ref,
+		from_position = {x = 3, y = 2},
+		to_position = {x = 2, y = 2},
+	})
 	timeline: Presentation_Timeline
 	testing.expect(t, begin_event_timeline(&timeline, capture_room_presentation(&room), &events))
-	testing.expect_value(t, timeline.count, 2)
+	testing.expect_value(t, timeline.count, 3)
 
-	update_event_timeline(&timeline, PRESENTATION_ENEMY_MOVE_DURATION*0.5)
+	update_event_timeline(&timeline, PRESENTATION_MOVEMENT_STEP_DURATION*0.5)
 	actor, found := presentation_actor(&timeline, enemy_ref)
 	testing.expect(t, found)
 	if found {
 		expect_presentation_position(t, actor.position, {x = 4.5, y = 2})
 	}
-	testing.expect(t, !update_event_timeline(&timeline, PRESENTATION_ENEMY_MOVE_DURATION*0.5))
+	testing.expect(t, !update_event_timeline(&timeline, PRESENTATION_MOVEMENT_STEP_DURATION*0.5))
 	actor, found = presentation_actor(&timeline, enemy_ref)
 	if found {
 		expect_presentation_position(t, actor.position, {x = 4, y = 2})
 	}
-	testing.expect_value(t, timeline.count, 1)
+	testing.expect_value(t, timeline.count, 2)
 
-	update_event_timeline(&timeline, PRESENTATION_ENEMY_MOVE_DURATION*0.5)
+	update_event_timeline(&timeline, PRESENTATION_MOVEMENT_STEP_DURATION*0.5)
 	actor, found = presentation_actor(&timeline, enemy_ref)
 	if found {
 		expect_presentation_position(t, actor.position, {x = 3.5, y = 2})
+	}
+	testing.expect(t, !update_event_timeline(&timeline, PRESENTATION_MOVEMENT_STEP_DURATION*0.5))
+	testing.expect_value(t, timeline.count, 1)
+	update_event_timeline(&timeline, PRESENTATION_ENEMY_MOVE_DURATION*0.5)
+	actor, found = presentation_actor(&timeline, enemy_ref)
+	if found {
+		expect_presentation_position(t, actor.position, {x = 2.5, y = 2})
 	}
 	testing.expect(t, update_event_timeline(&timeline, PRESENTATION_ENEMY_MOVE_DURATION*0.5))
 	testing.expect(t, !event_timeline_is_busy(&timeline))
 	actor, found = presentation_actor(&timeline, enemy_ref)
 	if found {
-		expect_presentation_position(t, actor.position, {x = 3, y = 2})
+		expect_presentation_position(t, actor.position, {x = 2, y = 2})
 	}
 }
 
@@ -1018,6 +1072,11 @@ test_timeline_capacity_reports_event_overflow_and_clear_resets_storage :: proc(t
 	testing.expect(t, begin_event_timeline(&timeline, capture_room_presentation(&room), &events))
 	testing.expect_value(t, timeline.count, MAX_PRESENTATION_CUES)
 	testing.expect_value(t, timeline.dropped_count, 1)
+	total_duration: f32
+	for index in 0..<timeline.count {
+		total_duration += timeline.cues[index].duration
+	}
+	testing.expect(t, total_duration <= PRESENTATION_MAX_SEQUENCE_DURATION+PRESENTATION_TIME_EPSILON)
 
 	testing.expect(t, update_event_timeline(&timeline, f32(100)))
 	testing.expect(t, !event_timeline_is_busy(&timeline))

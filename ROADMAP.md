@@ -159,7 +159,22 @@ Il contratto di M4A e descritto in [Card Lifecycle](CARD_LIFECYCLE.md).
 Il contratto dell'incremento completato e in [Hand Cycle](HAND_CYCLE.md). M4B
 resta in corso finche costi dinamici e selezione dello scarto non sono integrati.
 
-### [ ] M4C - Reazioni e geometria
+### [x] M4C - Movimento spaziale e hazard
+
+- query pura `Movement_Query` con semantiche `Traverse` e `Teleport`;
+- percorso cella per cella, blocker statici/attori e corner squeeze condivisi;
+- hazard neutrali per player e nemici, con ordine esplicito
+  `Movement -> Trap -> Damage -> Defeat`;
+- `Shove`, `Dash` e `Grappling Hook` sopra normali effect template;
+- preview, drop e compilazione alimentati dalla stessa valutazione di targeting e
+  movimento;
+- spostamenti forzati che rendono stale gli intenti committed senza retargeting;
+- replay FIFO di `Movement_Step` e `Trap_Triggered`, con envelope eventi
+  `258 + 158 = 416`.
+
+Il contratto di M4C e descritto in [Movement System](MOVEMENT_SYSTEM.md).
+
+### [ ] M4D - Reazioni e nuove geometrie
 
 - nuovi trigger e condizioni di scadenza;
 - targeting a cono e nuove footprint condivise fra preview e resolver.

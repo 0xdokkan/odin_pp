@@ -4,7 +4,8 @@ Questa guida descrive il confine fra la simulazione autorevole della `Room`, la
 riproduzione visuale degli eventi e il buffer dei comandi. La produzione degli
 eventi e descritta in [Action System](ACTION_SYSTEM.md) e
 [Status And Event System](STATUS_SYSTEM.md); targeting e compilazione delle carte
-in [Targeting System](TARGETING_SYSTEM.md) e [Card System](CARD_SYSTEM.md).
+in [Targeting System](TARGETING_SYSTEM.md) e [Card System](CARD_SYSTEM.md);
+percorsi e ordine degli hazard in [Movement System](MOVEMENT_SYSTEM.md).
 
 ## Indice
 
@@ -98,8 +99,9 @@ Le famiglie visualizzate sono:
 
 | Famiglia | Effetto sulla copia di presentazione |
 |---|---|
-| `Moved` | interpola posizione iniziale e finale con easing |
-| `Damaged`, `Damage_Absorbed`, `Healed` | aggiorna vita o shield e mostra il feedback; una sorgente trap disarma la trap nello snapshot |
+| `Movement_Step`, `Moved` | interpolano una tratta con easing; lo step usa una durata piu breve |
+| `Trap_Triggered` | disarma esplicitamente la trappola nello snapshot prima del danno |
+| `Damaged`, `Damage_Absorbed`, `Healed` | aggiorna vita o shield e mostra il feedback |
 | eventi status | aggiorna i badge dello snapshot e mostra il relativo avviso |
 | eventi binding | mostra l'avviso; il set dei binding non e copiato nello snapshot |
 | `Card_Played` | paga e riproduce `Hand -> Resolving` |
@@ -118,7 +120,16 @@ La durata appartiene al tipo di cue. I movimenti del player e dei nemici possono
 quindi avere timing diversi senza introdurre attese nella simulazione. Modificare
 una durata cambia soltanto la presentazione. `PRESENTATION_TIME_SCALE` moltiplica
 tutte le durate: un valore maggiore di uno rallenta l'intera timeline conservando
-il ritmo relativo fra le famiglie di cue.
+il ritmo relativo fra le famiglie di cue. Le sequenze normali mantengono queste
+durate senza modifiche; se la somma supera 12 secondi,
+`begin_event_timeline` scala proporzionalmente tutti i cue. Il limite impedisce
+che un AoE denso blocchi l'input per decine di secondi senza alterare l'ordine.
+
+Un movimento multi-cella arriva gia segmentato dal gameplay. La timeline non
+interpola direttamente origine-destinazione: riproduce ogni `Movement_Step` e il
+`Moved` terminale in FIFO. Se una cella contiene una trappola, il relativo
+`Trap_Triggered` viene quindi mostrato dopo l'ingresso e prima di shield, danno o
+sconfitta, esattamente come nella simulazione.
 
 ## Input buffer
 
@@ -210,23 +221,27 @@ contratto esplicito del sistema e i relativi test.
 ## Capacita e diagnostica
 
 Timeline ed `Event_Log` usano array fissi e non allocano durante la riproduzione.
-`MAX_PRESENTATION_CUES` coincide con `MAX_GAME_EVENTS`, attualmente 288; lo
+`MAX_PRESENTATION_CUES` coincide con `MAX_GAME_EVENTS`, attualmente 416; lo
 snapshot conserva fino a 32 nemici, 64 trappole e 64 drop. Il log
 espone `dropped_count` e la timeline conserva sia gli eventi gia persi a monte
 sia quelli che non riesce a copiare.
 
 Prima del commit, un producer staged tratta l'overflow come fallimento e non
-modifica lo stato autorevole. Dopo il commit la simulazione non viene mai
-rollbackata per un problema di presentazione: il log conta gli eventi persi e la
-timeline torna allo snapshot finale. Questo comportamento e fail-soft, ma un
-`dropped_count` non nullo resta un errore diagnostico da coprire nei test di
-capacita, non un esito normale del gameplay.
+modifica lo stato autorevole. `Action_Report` e un caso piu severo: i suoi eventi
+alimentano anche il dispatcher delle reazioni, quindi `record_report_event`
+termina esplicitamente il processo se esaurisce la capacita. Perdere un evento
+qui cambierebbe il gameplay. Solo le copie post-commit destinate a storico e
+presentazione restano fail-soft: contano gli eventi persi e convergono allo
+snapshot finale. Un `dropped_count` non nullo resta comunque un errore
+diagnostico, non un esito normale.
 
-Lo stress test corrente compone 258 eventi: play e movimento carta, status su 32
-nemici, 32 intenti, morti, drop doppi, raccolte, pulse e pesca. Restano 30 slot di
-margine. Non e una
-prova valida per future definizioni di reazione: quando il massimo cresce, va
-esteso il test oppure sostituito l'array monolitico con storage a blocchi.
+Lo stress test denso compone 258 eventi: play e movimento carta, status su 32
+nemici, 32 intenti, morti, drop doppi, raccolte, pulse e pesca. Un secondo test
+percorre le 12 celle massime sopra 12 trappole e produce 36 eventi senza drop.
+Il limite lascia 158 slot oltre il primo envelope (`258 + 158 = 416`), ma i due
+envelope non vanno sommati alla cieca: una futura carta che combini AoE,
+movimento e nuove reazioni deve estendere il test. Se il massimo reale cresce,
+va sostituito l'array monolitico con storage a blocchi invece di alzare il limite.
 
 `Presentation_Timeline.update_failures` conta eventi che non possono essere
 applicati alla copia, per esempio un target assente dallo snapshot. Il buffer
@@ -301,7 +316,7 @@ Sintomi comuni e controlli:
 | input apparentemente perso | slot gia occupato e `Buffered_Gameplay_Command.dropped_count` |
 | comando vecchio nella stanza nuova | reset del buffer nel cambio di contesto |
 | preview diversa dall'esito | targeting ancora attivo mentre la timeline e busy |
-| coda incompleta | `Event_Log.dropped_count`, `Presentation_Timeline.dropped_count` e limite 288 |
+| coda incompleta | `Event_Log.dropped_count`, `Presentation_Timeline.dropped_count` e limite 416 |
 
 I test della timeline devono controllare lo stato durante il cue, non soltanto il
 risultato finale. Il risultato finale puo sembrare corretto anche se due eventi
@@ -309,10 +324,10 @@ sono stati mostrati nell'ordine sbagliato.
 
 ## Limiti intenzionali
 
-La timeline serializza tutti gli eventi. Una grande area o una lunga catena di
-reazioni puo quindi produrre una presentazione lunga. Raggruppare cue in parallelo
-richiederebbe un identificatore esplicito di azione o gruppo nel log; dedurlo dal
-tipo o dalla vicinanza degli eventi sarebbe ambiguo.
+La timeline serializza tutti gli eventi. Oltre 12 secondi comprime le durate ma
+non raggruppa cue in parallelo. Un vero batching richiederebbe un identificatore
+esplicito di azione o gruppo nel log; dedurlo dal tipo o dalla vicinanza degli
+eventi sarebbe ambiguo.
 
 Il buffer conserva una sola intenzione e non e una macro queue. Questa scelta
 favorisce decisioni leggibili e impedisce di inviare molti pulse senza osservarne

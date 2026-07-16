@@ -2,10 +2,9 @@ package game
 
 import grid "../grid"
 
-// Una carta AoE compila un effetto per ogni nemico colpito, quindi la capacita
-// di un'azione segue quella dei nemici della stanza. Una carta che volesse
-// colpire tutti i nemici e aggiungere altri effetti supererebbe questo limite.
-MAX_ACTION_EFFECTS :: MAX_ENEMIES_PER_ROOM
+// Budget autonomo del resolver. Le carte AoE correnti espandono un solo
+// template su tutti i nemici; future definizioni multi-AoE devono rivalutarlo.
+MAX_ACTION_EFFECTS :: 32
 
 Entity_Kind :: enum {
 	Player,
@@ -91,6 +90,7 @@ Effect :: struct {
 	target:      Entity_Ref,
 	amount:      i32,
 	destination: grid.Position,
+	movement_mode: Movement_Mode,
 	status:      Status_Kind,
 	duration:    i32,
 	reaction:    Reaction_Id,
@@ -129,8 +129,17 @@ create_card_effect :: proc(definition_id: Card_Id, amount: i32) -> Effect {
 	}
 }
 
-move_effect :: proc(target: Entity_Ref, destination: grid.Position) -> Effect {
-	return {kind = .Move, target = target, destination = destination}
+move_effect :: proc(
+	target: Entity_Ref,
+	destination: grid.Position,
+	mode: Movement_Mode = .Traverse,
+) -> Effect {
+	return {
+		kind = .Move,
+		target = target,
+		destination = destination,
+		movement_mode = mode,
+	}
 }
 
 apply_status_effect :: proc(target: Entity_Ref, status: Status_Kind, potency, duration: i32) -> Effect {
@@ -329,19 +338,13 @@ effect_is_valid :: proc(room: ^Room, effect: Effect) -> bool {
 	case .Gain_Gold:
 		return effect.amount > 0 && effect.target == PLAYER_ENTITY
 	case .Move:
-		if !base_cell_is_walkable(room, effect.destination) || obstacle_at(room, effect.destination) {
-			return false
-		}
-		switch effect.target.kind {
-		case .Player:
-			_, occupied := enemy_index_at(room, effect.destination)
-			return !occupied
-		case .Enemy:
-			index, found := enemy_index_by_id(room, effect.target.id)
-			return found && enemy_can_move_to(room, index, effect.destination)
-		case .Trap, .System:
-			return false
-		}
+		query := query_entity_movement(
+			room,
+			effect.target,
+			effect.destination,
+			effect.movement_mode,
+		)
+		return movement_query_is_clear(&query)
 	case .Apply_Status:
 		return effect.amount > 0 && effect.duration > 0 &&
 		       (effect.target.kind == .Player || effect.target.kind == .Enemy) &&
@@ -377,7 +380,11 @@ effect_is_valid :: proc(room: ^Room, effect: Effect) -> bool {
 
 record_report_event :: proc(report: ^Action_Report, event: Game_Event) {
 	assert(report != nil)
-	record_event(&report.events, event)
+	if !record_event(&report.events, event) {
+		// Action events drive reactions as well as presentation; dropping one
+		// would change authoritative gameplay instead of degrading visuals only.
+		panic("Action_Report event capacity exhausted")
+	}
 }
 
 absorb_damage_with_shield :: proc(
@@ -532,25 +539,7 @@ apply_effect :: proc(room: ^Room, source: Entity_Ref, effect: Effect, report: ^A
 			amount = effect.amount,
 		})
 	case .Move:
-		from_position, found := entity_position(room, effect.target)
-		assert(found)
-		switch effect.target.kind {
-		case .Player:
-			room.player.position = effect.destination
-		case .Enemy:
-			index, enemy_found := enemy_index_by_id(room, effect.target.id)
-			assert(enemy_found)
-			room.enemies[index].position = effect.destination
-		case .Trap, .System:
-			unreachable()
-		}
-		record_report_event(report, {
-			kind = .Moved,
-			source = source,
-			target = effect.target,
-			from_position = from_position,
-			to_position = effect.destination,
-		})
+		apply_movement_effect(room, source, effect, report)
 	case .Apply_Status:
 		applied, _ := apply_status(room, effect.target, effect.status, effect.amount, effect.duration)
 		assert(applied)
@@ -685,6 +674,10 @@ resolve_action_once :: proc(room: ^Room, action: ^Action) -> (report: Action_Rep
 	initial_phase := room.phase
 	report.accepted = true
 	for index in 0..<action.effect_count {
+		if !entity_exists(room, action.source) {
+			report.skipped_effects += action.effect_count-index
+			break
+		}
 		effect := action.effects[index]
 		if !effect_is_valid(room, effect) {
 			report.skipped_effects += 1

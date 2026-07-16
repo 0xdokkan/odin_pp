@@ -91,6 +91,7 @@ test_event_log_composes_a_dense_maximum_room_pipeline_without_drops :: proc(t: ^
 	drop_count := MAX_ENEMIES_PER_ROOM+healing_drop_count
 	expected_count := 2+MAX_ENEMIES_PER_ROOM*2+MAX_ENEMIES_PER_ROOM*2+drop_count+drop_count*2+2
 	testing.expect_value(t, expected_count, 258)
+	testing.expect_value(t, MAX_GAME_EVENTS-expected_count, 158)
 	testing.expect_value(t, combined.count, expected_count)
 	testing.expect_value(t, combined.dropped_count, 0)
 	testing.expect_value(t, combined.events[0].kind, Game_Event_Kind.Card_Played)
@@ -104,6 +105,23 @@ test_event_log_composes_a_dense_maximum_room_pipeline_without_drops :: proc(t: ^
 	testing.expect_value(t, combined.events[loot_start].kind, Game_Event_Kind.Loot_Collected)
 	testing.expect_value(t, combined.events[combined.count-2].kind, Game_Event_Kind.Pulse_Advanced)
 	testing.expect_value(t, combined.events[combined.count-1].kind, Game_Event_Kind.Card_Drawn)
+}
+
+@(test)
+test_spatial_events_append_without_changing_existing_ordinals :: proc(t: ^testing.T) {
+	testing.expect_value(t, int(Game_Event_Kind.Moved), 3)
+	testing.expect_value(t, int(Game_Event_Kind.Card_Refocused), 22)
+	testing.expect_value(t, int(Game_Event_Kind.Movement_Step), 23)
+	testing.expect_value(t, int(Game_Event_Kind.Trap_Triggered), 24)
+}
+
+@(test)
+test_inline_event_storage_stays_within_the_stack_budget :: proc(t: ^testing.T) {
+	testing.expect(t, size_of(Event_Log) <= 96*1024)
+	testing.expect(t, size_of(Action_Report) <= 96*1024)
+	testing.expect(t, size_of(Pulse_Report) <= 96*1024)
+	testing.expect(t, size_of(Reaction_Event_Queue) <= 96*1024)
+	testing.expect(t, size_of(Card_Play_Report) <= 192*1024)
 }
 
 @(test)

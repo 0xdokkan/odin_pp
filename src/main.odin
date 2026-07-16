@@ -402,20 +402,17 @@ poll_gameplay_command :: proc(
 			   renderer.has_hovered_cell {
 				if hand_index, found := game.hand_card_index_by_id(input_deck, dragged_card_id); found {
 					card := input_deck.hand[hand_index]
-					definition, definition_found := game.card_definition_by_id(card.definition_id)
-					if definition_found {
-						if target, has_target := game.card_drop_target(
-							room,
-							definition,
-							renderer.hovered_cell,
-						); has_target {
-								return Gameplay_Command{
-									kind = .Play_Card,
-									origin_phase = .Combat,
-									card_id = dragged_card_id,
-									target = target,
-								}, true
-						}
+					if target, has_target := game.card_drop_target(
+						room,
+						card,
+						renderer.hovered_cell,
+					); has_target {
+						return Gameplay_Command{
+							kind = .Play_Card,
+							origin_phase = .Combat,
+							card_id = dragged_card_id,
+							target = target,
+						}, true
 					}
 				}
 			}
@@ -457,16 +454,13 @@ poll_gameplay_command :: proc(
 			card_interaction.selected_card_id,
 		); found {
 			card := input_deck.hand[hand_index]
-			definition, definition_found := game.card_definition_by_id(card.definition_id)
-			if definition_found {
-				if target, has_target := game.card_drop_target(room, definition, renderer.hovered_cell); has_target {
-					return Gameplay_Command{
-						kind = .Play_Card,
-						origin_phase = .Combat,
-						card_id = card.id,
-						target = target,
-					}, true
-				}
+			if target, has_target := game.card_drop_target(room, card, renderer.hovered_cell); has_target {
+				return Gameplay_Command{
+					kind = .Play_Card,
+					origin_phase = .Combat,
+					card_id = card.id,
+					target = target,
+				}, true
 			}
 		}
 		return
@@ -647,6 +641,7 @@ main :: proc() {
 	smoke_loot := false
 	smoke_card := false
 	smoke_targeting := false
+	smoke_spatial := false
 	smoke_movement := false
 	smoke_timeline := false
 	smoke_deck_flow := false
@@ -688,6 +683,10 @@ main :: proc() {
 		} else if argument == "--smoke-targeting" {
 			smoke_test = true
 			smoke_targeting = true
+			smoke_mode_count += 1
+		} else if argument == "--smoke-spatial" {
+			smoke_test = true
+			smoke_spatial = true
 			smoke_mode_count += 1
 		} else if argument == "--smoke-movement" {
 			smoke_test = true
@@ -910,6 +909,13 @@ main :: proc() {
 		room.enemies[0].position = {x = 3, y = 1}
 		room.enemies[1].position = {x = 4, y = 2}
 		room.enemies[2].position = {x = 3, y = 3}
+		game.plan_enemy_intents(&room)
+	} else if smoke_spatial {
+		card, created := game.create_temporary_card(&room.player.deck, .Dash)
+		assert(created && len(room.traps) > 0)
+		card_interaction.dragged_card_id = card.id
+		room.traps[0].position = {x = 3, y = 1}
+		room.traps[0].armed = true
 		game.plan_enemy_intents(&room)
 	} else if smoke_timeline {
 		card_id := prepare_smoke_card_drag(&room, .Guard)
@@ -1426,7 +1432,7 @@ main :: proc() {
 				mouse_delta,
 				frame_time,
 			)
-			if !smoke_card && !smoke_targeting {
+			if !smoke_card && !smoke_targeting && !smoke_spatial {
 				timeline_busy = render.renderer_timeline_is_busy(&iso_renderer)
 				command, has_command := poll_gameplay_command(
 					&room,
@@ -1515,7 +1521,7 @@ main :: proc() {
 				shop_button_hovered,
 			)
 		} else {
-			if smoke_card || smoke_targeting {
+			if smoke_card || smoke_targeting || smoke_spatial {
 				iso_renderer.hovered_cell = {x = 4, y = 1}
 				if smoke_targeting {
 					iso_renderer.hovered_cell = {x = 4, y = 2}
@@ -1546,7 +1552,7 @@ main :: proc() {
 			}
 			render.draw_status(&iso_renderer, &room, window.scale_mode)
 			draw_mouse_canvas := mouse_canvas
-			if smoke_card || smoke_targeting {
+			if smoke_card || smoke_targeting || smoke_spatial {
 				draw_mouse_canvas = {x = 520, y = 165}
 			}
 			render.draw_hand(
@@ -1583,6 +1589,8 @@ main :: proc() {
 					rl.TakeScreenshot("odin_pp_card_drag.png")
 				} else if smoke_targeting {
 					rl.TakeScreenshot("odin_pp_advanced_targeting.png")
+				} else if smoke_spatial {
+					rl.TakeScreenshot("odin_pp_spatial_targeting.png")
 				} else if smoke_movement {
 					rl.TakeScreenshot("odin_pp_enemy_movement.png")
 				} else if smoke_timeline {
