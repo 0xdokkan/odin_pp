@@ -267,6 +267,16 @@ card_colors :: proc(id: game.Card_Id, affordable: bool) -> (fill, outline: rl.Co
 		fill, outline = rl.Color{27, 58, 65, 245}, rl.Color{80, 206, 213, 255}
 	case .Grappling_Hook:
 		fill, outline = rl.Color{48, 48, 54, 245}, rl.Color{187, 190, 197, 255}
+	case .Heavy_Blow:
+		fill, outline = rl.Color{70, 36, 31, 245}, rl.Color{244, 126, 75, 255}
+	case .Venom_Needle:
+		fill, outline = rl.Color{27, 56, 50, 245}, rl.Color{126, 218, 132, 255}
+	case .Caustic_Bloom:
+		fill, outline = rl.Color{56, 59, 27, 245}, rl.Color{205, 220, 83, 255}
+	case .Purifying_Guard:
+		fill, outline = rl.Color{33, 53, 60, 245}, rl.Color{151, 222, 215, 255}
+	case .Volatile_Study:
+		fill, outline = rl.Color{62, 36, 63, 245}, rl.Color{238, 133, 201, 255}
 	case .Count:
 		fill, outline = rl.Color{45, 49, 52, 245}, rl.Color{105, 116, 116, 255}
 	}
@@ -314,6 +324,16 @@ card_detail_lines :: proc(card: game.Card_Instance) -> (first, second: cstring) 
 		return "MOVE 1-3 CELLS", "TRAVERSE HAZARDS"
 	case .Grappling_Hook:
 		return fmt.ctprintf("DEAL %d DAMAGE", 1+upgrade), "PULL ADJACENT"
+	case .Heavy_Blow:
+		return fmt.ctprintf("DEAL %d DAMAGE", 5+upgrade), "RANGE 1"
+	case .Venom_Needle:
+		return fmt.ctprintf("%d DMG + 1 POISON", 1+upgrade), "LASTS 3 PULSES"
+	case .Caustic_Bloom:
+		return fmt.ctprintf("APPLY %d POISON", 2+upgrade), "3X3 - 2 PULSES"
+	case .Purifying_Guard:
+		return fmt.ctprintf("GAIN %d SHIELD", 2+upgrade), "3 PULSES + CLEANSE"
+	case .Volatile_Study:
+		return "CREATE 1 SPARK", fmt.ctprintf("DRAW %d - EXHAUST", 1+upgrade)
 	case .Count:
 	}
 	return "", ""
@@ -355,6 +375,16 @@ card_short_name :: proc(id: game.Card_Id) -> cstring {
 		return "DASH"
 	case .Grappling_Hook:
 		return "HOOK"
+	case .Heavy_Blow:
+		return "HEAVY"
+	case .Venom_Needle:
+		return "VENOM"
+	case .Caustic_Bloom:
+		return "BLOOM"
+	case .Purifying_Guard:
+		return "PURIFY"
+	case .Volatile_Study:
+		return "STUDY"
 	case .Count:
 	}
 	return ""
@@ -470,6 +500,51 @@ draw_card_sigil :: proc(bounds: rl.Rectangle, id: game.Card_Id, color: rl.Color)
 	case .Grappling_Hook:
 		rl.DrawCircleLinesV({center.x+10, center.y-9}, 8, color)
 		rl.DrawLineEx({center.x+5, center.y-3}, {center.x-13, center.y+15}, 4, color)
+	case .Heavy_Blow:
+		rl.DrawRectangle(
+			c.int(center.x-15),
+			c.int(center.y-14),
+			27,
+			10,
+			color,
+		)
+		rl.DrawLineEx({center.x+6, center.y-5}, {center.x-10, center.y+17}, 5, color)
+	case .Venom_Needle:
+		rl.DrawLineEx({center.x-17, center.y+15}, {center.x+12, center.y-14}, 3, color)
+		rl.DrawCircleV({center.x+13, center.y-15}, 3, color)
+		rl.DrawCircleLinesV({center.x+12, center.y+12}, 5, color)
+	case .Caustic_Bloom:
+		rl.DrawCircleV(center, 6, color)
+		petal_offsets := [?]rl.Vector2{{-11, 0}, {11, 0}, {0, -11}, {0, 11}}
+		for offset in petal_offsets {
+			rl.DrawCircleLinesV({center.x+offset.x, center.y+offset.y}, 7, color)
+		}
+	case .Purifying_Guard:
+		points := [?]rl.Vector2{
+			{center.x, center.y-radius},
+			{center.x+radius-3, center.y-8},
+			{center.x+11, center.y+13},
+			{center.x, center.y+radius},
+			{center.x-11, center.y+13},
+			{center.x-radius+3, center.y-8},
+			{center.x, center.y-radius},
+		}
+		for index in 0..<len(points)-1 {
+			rl.DrawLineEx(points[index], points[index+1], 3, color)
+		}
+		rl.DrawLineEx({center.x-7, center.y}, {center.x+7, center.y}, 3, color)
+		rl.DrawLineEx({center.x, center.y-7}, {center.x, center.y+7}, 3, color)
+	case .Volatile_Study:
+		rl.DrawRectangleLines(
+			c.int(center.x-17),
+			c.int(center.y-10),
+			34,
+			24,
+			color,
+		)
+		rl.DrawLineEx({center.x, center.y-10}, {center.x, center.y+14}, 2, color)
+		rl.DrawLineEx({center.x-6, center.y-17}, {center.x-2, center.y-12}, 3, color)
+		rl.DrawLineEx({center.x+6, center.y-17}, {center.x+2, center.y-12}, 3, color)
 	case .Count:
 	}
 }

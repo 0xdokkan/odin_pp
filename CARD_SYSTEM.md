@@ -7,6 +7,8 @@ energia e giocata sono descritte in [Deck Runtime](DECK_SYSTEM.md). Percorsi,
 spostamenti e hazard sono in [Movement System](MOVEMENT_SYSTEM.md).
 Lifetime, zona resolving ed exhaust sono in [Card Lifecycle](CARD_LIFECYCLE.md);
 Refocus, Retain ed Ethereal in [Hand Cycle](HAND_CYCLE.md).
+Il catalogo aggiuntivo e le domande di bilanciamento sono in
+[Content Pass](CONTENT_PASS.md).
 
 ## Indice
 
@@ -266,6 +268,11 @@ ancora con l'upgrade.
 | `Shove` | Common | 1 | avversario, Manhattan 1, Single | 1 danno, +1 per upgrade; spinta di 1 cella |
 | `Dash` | Uncommon | 2 | cella, Chebyshev 1-3, Line, LoS | attraversa la linea fino all'anchor |
 | `Grappling_Hook` | Rare | 2 | avversario, Chebyshev 2-4, Line, LoS e actor stop | 1 danno, +1 per upgrade; trascina adiacente al player |
+| `Heavy_Blow` | Common | 2 | avversario adiacente, Single | 5 danni, +1 per upgrade |
+| `Venom_Needle` | Common | 1 | avversario, Chebyshev 1-3, Single, LoS | 1 danno, +1 per upgrade; Poison 1 per 3 pulse |
+| `Caustic_Bloom` | Uncommon | 2 | cella, Chebyshev 1-3, Square raggio 1 | Poison 2, +1 per upgrade, per 2 pulse ai nemici nel 3x3 |
+| `Purifying_Guard` | Uncommon | 1 | player, None | Shield 2, +1 per upgrade, per 3 pulse; rimuove Poison se presente |
+| `Volatile_Study` | Rare | 2 | player, None | Ethereal; crea 1 `Spark`, pesca 1 + upgrade, poi exhaust |
 
 La mano in basso sovrappone le carte e ne lascia visibili soltanto le testate.
 L'hover solleva una carta; il drag la porta sul campo e mostra cast range,

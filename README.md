@@ -7,6 +7,7 @@ Documentazione del gameplay: [Action System](ACTION_SYSTEM.md),
 [Enemy Intents](ENEMY_INTENT_SYSTEM.md),
 [Magnetic Loot](LOOT_SYSTEM.md), [Card System](CARD_SYSTEM.md),
 [Targeting System](TARGETING_SYSTEM.md), [Movement System](MOVEMENT_SYSTEM.md),
+[Content Pass](CONTENT_PASS.md),
 [Deck Runtime](DECK_SYSTEM.md),
 [Card Lifecycle](CARD_LIFECYCLE.md), [Hand Cycle](HAND_CYCLE.md) e
 [Card Rewards](REWARD_SYSTEM.md). Rarita, upgrade, rimozione e shop sono in
@@ -34,6 +35,8 @@ nella [Roadmap](ROADMAP.md); i contratti di M1, M2 e M3 sono in
 ![Cast range e footprint 3x3 del targeting](odin_pp_advanced_targeting.png)
 
 ![Percorso e landing di Dash sopra una trappola](odin_pp_spatial_targeting.png)
+
+![Cinque nuove carte e targeting 3x3 di Caustic Bloom](odin_pp_content_pass.png)
 
 ![Scelta della ricompensa dopo una stanza](odin_pp_reward.png)
 
@@ -93,6 +96,16 @@ odin run src -- --smoke-spatial
 Il flag trascina una `Dash` temporanea su una linea di tre celle, colloca una
 trappola armata sul percorso e salva `odin_pp_spatial_targeting.png` dopo tre
 frame.
+
+Per verificare il content pass e la leggibilita delle nuove carte:
+
+```sh
+odin run src -- --smoke-content
+```
+
+Il flag prepara una mano con `Heavy Blow`, `Venom Needle`, `Caustic Bloom`,
+`Purifying Guard` e `Volatile Study`, trascina Bloom su tre nemici e salva
+`odin_pp_content_pass.png`.
 
 Per verificare la timeline con uno snapshot pre-comando e un cue carta attivo:
 
@@ -180,7 +193,9 @@ pannello risolto e Continue disponibile.
 Gli attacchi a contatto restano disponibili accanto alle carte. Carte e bump
 attack costruiscono normali `Action`: il bump non sposta il player, ma produce
 comunque un pulse. Il suo costo tattico e quindi la risposta nemica, non il
-posizionamento.
+posizionamento. `Strike` porta il danno melee a 3 per un'energia; `Heavy Blow`
+ne concentra 5 in un solo pulse al costo di due energie. Il confronto e parte
+del playtest descritto in [Content Pass](CONTENT_PASS.md).
 
 ### Controlli
 

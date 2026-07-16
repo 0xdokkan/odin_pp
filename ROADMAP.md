@@ -174,6 +174,18 @@ resta in corso finche costi dinamici e selezione dello scarto non sono integrati
 
 Il contratto di M4C e descritto in [Movement System](MOVEMENT_SYSTEM.md).
 
+### [x] M4C.1 - Content pass
+
+- cinque definizioni senza nuove primitive: `Heavy Blow`, `Venom Needle`,
+  `Caustic Bloom`, `Purifying Guard` e `Volatile Study`;
+- confronto esplicito bump / `Strike` / `Heavy Blow` nell'economia dei pulse;
+- danno + status, status 3x3, cleanup opzionale e Create + Draw + Exhaust;
+- casi renderer distinti, smoke `--smoke-content` e test di composizione;
+- matrice e domande misurabili in [Content Pass](CONTENT_PASS.md).
+
+Il prossimo incremento deve essere scelto dai risultati di playtest, non dalla
+sola disponibilita di una nuova primitiva.
+
 ### [ ] M4D - Reazioni e nuove geometrie
 
 - nuovi trigger e condizioni di scadenza;

@@ -578,7 +578,7 @@ prepare_smoke_card_drag :: proc(room: ^game.Room, definition_id: game.Card_Id) -
 			return deck.hand[0].id
 		}
 	}
-	return deck.hand[0].id
+	panic("smoke card definition is missing from hand and draw pile")
 }
 
 keyboard_route_choice :: proc(run: ^game.Run_State) -> (game.Node_Id, bool) {
@@ -642,6 +642,7 @@ main :: proc() {
 	smoke_card := false
 	smoke_targeting := false
 	smoke_spatial := false
+	smoke_content := false
 	smoke_movement := false
 	smoke_timeline := false
 	smoke_deck_flow := false
@@ -687,6 +688,10 @@ main :: proc() {
 		} else if argument == "--smoke-spatial" {
 			smoke_test = true
 			smoke_spatial = true
+			smoke_mode_count += 1
+		} else if argument == "--smoke-content" {
+			smoke_test = true
+			smoke_content = true
 			smoke_mode_count += 1
 		} else if argument == "--smoke-movement" {
 			smoke_test = true
@@ -917,6 +922,31 @@ main :: proc() {
 		room.traps[0].position = {x = 3, y = 1}
 		room.traps[0].armed = true
 		game.plan_enemy_intents(&room)
+	} else if smoke_content {
+		game.finish_deck_combat(&room.player.deck)
+		assert(game.initialize_empty_deck(
+			&room.player.deck,
+			game.DEFAULT_DECK_RULES,
+			0xC017E17,
+		))
+		content_cards := [?]game.Card_Id{
+			.Heavy_Blow,
+			.Venom_Needle,
+			.Caustic_Bloom,
+			.Purifying_Guard,
+			.Volatile_Study,
+		}
+		for definition_id in content_cards {
+			_, added := game.add_owned_card(&room.player.deck, definition_id)
+			assert(added)
+		}
+		assert(game.begin_deck_combat(&room.player.deck))
+		card_interaction.dragged_card_id = prepare_smoke_card_drag(&room, .Caustic_Bloom)
+		card_interaction.hovered_card_id = prepare_smoke_card_drag(&room, .Volatile_Study)
+		room.enemies[0].position = {x = 3, y = 1}
+		room.enemies[1].position = {x = 4, y = 2}
+		room.enemies[2].position = {x = 3, y = 3}
+		game.clear_enemy_intents(&room)
 	} else if smoke_timeline {
 		card_id := prepare_smoke_card_drag(&room, .Guard)
 		before := render.capture_room_presentation(&room)
@@ -1432,7 +1462,7 @@ main :: proc() {
 				mouse_delta,
 				frame_time,
 			)
-			if !smoke_card && !smoke_targeting && !smoke_spatial {
+			if !smoke_card && !smoke_targeting && !smoke_spatial && !smoke_content {
 				timeline_busy = render.renderer_timeline_is_busy(&iso_renderer)
 				command, has_command := poll_gameplay_command(
 					&room,
@@ -1521,9 +1551,9 @@ main :: proc() {
 				shop_button_hovered,
 			)
 		} else {
-			if smoke_card || smoke_targeting || smoke_spatial {
+			if smoke_card || smoke_targeting || smoke_spatial || smoke_content {
 				iso_renderer.hovered_cell = {x = 4, y = 1}
-				if smoke_targeting {
+				if smoke_targeting || smoke_content {
 					iso_renderer.hovered_cell = {x = 4, y = 2}
 				}
 				iso_renderer.has_hovered_cell = true
@@ -1552,7 +1582,7 @@ main :: proc() {
 			}
 			render.draw_status(&iso_renderer, &room, window.scale_mode)
 			draw_mouse_canvas := mouse_canvas
-			if smoke_card || smoke_targeting || smoke_spatial {
+			if smoke_card || smoke_targeting || smoke_spatial || smoke_content {
 				draw_mouse_canvas = {x = 520, y = 165}
 			}
 			render.draw_hand(
@@ -1591,6 +1621,8 @@ main :: proc() {
 					rl.TakeScreenshot("odin_pp_advanced_targeting.png")
 				} else if smoke_spatial {
 					rl.TakeScreenshot("odin_pp_spatial_targeting.png")
+				} else if smoke_content {
+					rl.TakeScreenshot("odin_pp_content_pass.png")
 				} else if smoke_movement {
 					rl.TakeScreenshot("odin_pp_enemy_movement.png")
 				} else if smoke_timeline {
