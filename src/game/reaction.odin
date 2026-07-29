@@ -100,6 +100,7 @@ merge_reaction_action_report :: proc(destination, source: ^Action_Report) {
 	destination.healing_done += source.healing_done
 	destination.gold_gained += source.gold_gained
 	destination.enemies_defeated += source.enemies_defeated
+	destination.objects_destroyed += source.objects_destroyed
 	destination.statuses_applied += source.statuses_applied
 	destination.statuses_removed += source.statuses_removed
 	destination.cards_drawn += source.cards_drawn

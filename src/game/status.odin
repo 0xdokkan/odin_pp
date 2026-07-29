@@ -69,7 +69,7 @@ status_set_for_entity :: proc(room: ^Room, entity: Entity_Ref) -> (^Status_Set, 
 		if found {
 			return &room.enemies[index].statuses, true
 		}
-	case .Trap, .System:
+	case .Trap, .Object, .System:
 	}
 	return nil, false
 }

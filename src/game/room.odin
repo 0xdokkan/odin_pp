@@ -138,6 +138,7 @@ Room_Content :: struct {
 	enemies:   []Enemy_Spawn,
 	traps:     []Trap_Spawn,
 	obstacles: []grid.Position,
+	objects:   []Grid_Object_Spawn,
 }
 
 Room :: struct {
@@ -148,9 +149,11 @@ Room :: struct {
 	enemies:       [dynamic]Enemy,
 	traps:         [dynamic]Trap,
 	obstacles:     [dynamic]Obstacle,
+	objects:       [dynamic]Grid_Object,
 	loot:          [dynamic]Loot,
-	next_enemy_id: u32,
-	next_trap_id:  u32,
+	next_enemy_id:  u32,
+	next_trap_id:   u32,
+	next_object_id: u32,
 	pulse_count:   u64,
 	recent_events: Event_Log,
 	reaction_bindings: Reaction_Binding_Set,
@@ -234,6 +237,74 @@ obstacle_at :: proc(room: ^Room, position: grid.Position) -> bool {
 	return false
 }
 
+object_index_at :: proc(
+	room: ^Room,
+	position: grid.Position,
+	ignored_index: int = -1,
+) -> (int, bool) {
+	if room == nil {
+		return 0, false
+	}
+	for object, index in room.objects {
+		if index != ignored_index && object.position == position {
+			return index, true
+		}
+	}
+	return 0, false
+}
+
+object_index_by_id :: proc(room: ^Room, id: u32) -> (int, bool) {
+	if room == nil || id == 0 {
+		return 0, false
+	}
+	for object, index in room.objects {
+		if object.id == id {
+			return index, true
+		}
+	}
+	return 0, false
+}
+
+grid_object_at :: proc(room: ^Room, position: grid.Position) -> (^Grid_Object, bool) {
+	index, found := object_index_at(room, position)
+	if !found {
+		return nil, false
+	}
+	return &room.objects[index], true
+}
+
+cell_blocks_movement :: proc(room: ^Room, position: grid.Position) -> bool {
+	if !base_cell_is_walkable(room, position) || obstacle_at(room, position) {
+		return true
+	}
+	object, found := grid_object_at(room, position)
+	if !found {
+		return false
+	}
+	definition, definition_found := grid_object_definition(object.kind)
+	return !definition_found || definition.blocks_movement
+}
+
+cell_blocks_line_of_sight :: proc(room: ^Room, position: grid.Position) -> bool {
+	if !base_cell_is_walkable(room, position) || obstacle_at(room, position) {
+		return true
+	}
+	object, found := grid_object_at(room, position)
+	if !found {
+		return false
+	}
+	definition, definition_found := grid_object_definition(object.kind)
+	return !definition_found || definition.blocks_line_of_sight
+}
+
+remove_grid_object :: proc(room: ^Room, index: int) -> bool {
+	if room == nil || index < 0 || index >= len(room.objects) {
+		return false
+	}
+	unordered_remove(&room.objects, index)
+	return true
+}
+
 trap_index_at :: proc(room: ^Room, position: grid.Position) -> (int, bool) {
 	if room == nil {
 		return 0, false
@@ -285,7 +356,9 @@ trap_index_by_id :: proc(room: ^Room, id: u32) -> (int, bool) {
 create_room :: proc(level_data: ^level.Level, player: ^Player, content: Room_Content) -> (result: Room, ok: bool) {
 	if level_data == nil || player == nil || !level_data.has_player_spawn ||
 	   len(content.enemies) > MAX_ENEMIES_PER_ROOM ||
-	   len(content.traps) > MAX_TRAPS_PER_ROOM {
+	   len(content.traps) > MAX_TRAPS_PER_ROOM ||
+	   len(content.objects) > MAX_GRID_OBJECTS_PER_ROOM ||
+	   !validate_grid_object_definitions() {
 		return {}, false
 	}
 	if player.stats.max_health <= 0 || player.health <= 0 || player.health > player.stats.max_health ||
@@ -304,10 +377,12 @@ create_room :: proc(level_data: ^level.Level, player: ^Player, content: Room_Con
 	result.exit_position = exit_position
 	result.next_enemy_id = 1
 	result.next_trap_id = 1
+	result.next_object_id = 1
 	result.reaction_bindings.next_id = 1
 	result.enemies = make([dynamic]Enemy, 0, len(content.enemies))
 	result.traps = make([dynamic]Trap, 0, len(content.traps))
 	result.obstacles = make([dynamic]Obstacle, 0, len(content.obstacles))
+	result.objects = make([dynamic]Grid_Object, 0, len(content.objects))
 	result.loot = make([dynamic]Loot, 0, len(content.enemies))
 	spawn_position := level_data.player_spawn
 
@@ -319,11 +394,31 @@ create_room :: proc(level_data: ^level.Level, player: ^Player, content: Room_Con
 		append(&result.obstacles, Obstacle{position = position})
 	}
 
+	for spawn in content.objects {
+		definition, found := grid_object_definition(spawn.kind)
+		_, duplicate := object_index_at(&result, spawn.position)
+		if !found || !base_cell_is_walkable(&result, spawn.position) ||
+		   obstacle_at(&result, spawn.position) || duplicate ||
+		   spawn.position == spawn_position || spawn.position == exit_position {
+			destroy_room(&result)
+			return {}, false
+		}
+		append(&result.objects, Grid_Object{
+			id = result.next_object_id,
+			kind = spawn.kind,
+			position = spawn.position,
+			max_health = definition.max_health,
+			health = definition.max_health,
+		})
+		result.next_object_id += 1
+	}
+
 	for spawn in content.enemies {
 		_, occupied := enemy_index_at(&result, spawn.position)
+		_, overlaps_object := object_index_at(&result, spawn.position)
 		if spawn.health <= 0 || spawn.attack <= 0 || spawn.archetype >= .Count ||
 		   !base_cell_is_walkable(&result, spawn.position) ||
-		   obstacle_at(&result, spawn.position) || occupied ||
+		   cell_blocks_movement(&result, spawn.position) || occupied || overlaps_object ||
 		   spawn.position == spawn_position || spawn.position == exit_position {
 			destroy_room(&result)
 			return {}, false
@@ -343,9 +438,10 @@ create_room :: proc(level_data: ^level.Level, player: ^Player, content: Room_Con
 	for spawn in content.traps {
 		_, duplicate := trap_index_at(&result, spawn.position)
 		_, overlaps_enemy := enemy_index_at(&result, spawn.position)
+		_, overlaps_object := object_index_at(&result, spawn.position)
 		if spawn.damage <= 0 ||
 		   !base_cell_is_walkable(&result, spawn.position) ||
-		   obstacle_at(&result, spawn.position) || duplicate || overlaps_enemy ||
+		   obstacle_at(&result, spawn.position) || duplicate || overlaps_enemy || overlaps_object ||
 		   spawn.position == spawn_position || spawn.position == exit_position {
 			destroy_room(&result)
 			return {}, false
@@ -383,6 +479,7 @@ destroy_room :: proc(room: ^Room) {
 	delete(room.enemies)
 	delete(room.traps)
 	delete(room.obstacles)
+	delete(room.objects)
 	delete(room.loot)
 	room^ = {}
 }
@@ -510,7 +607,7 @@ kill_enemy :: proc(room: ^Room, enemy_index: int) -> (drops: [2]Loot, drop_count
 }
 
 enemy_can_move_to :: proc(room: ^Room, enemy_index: int, position: grid.Position) -> bool {
-	if !base_cell_is_walkable(room, position) || obstacle_at(room, position) || position == room.player.position {
+	if cell_blocks_movement(room, position) || position == room.player.position {
 		return false
 	}
 	_, occupied := enemy_index_at(room, position, enemy_index)
@@ -551,7 +648,7 @@ try_move_player :: proc(room: ^Room, direction: Move_Direction) -> Action_Result
 		}
 	}
 
-	if !base_cell_is_walkable(room, target) || obstacle_at(room, target) {
+	if cell_blocks_movement(room, target) {
 		return .Blocked
 	}
 

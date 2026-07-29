@@ -226,8 +226,8 @@ evento `Damaged` da un avversario vivo:
 4. la reazione infligge danno pari alla potenza di `Thorns`.
 
 `Damage_Absorbed` non attiva `Thorns`: se lo scudo assorbe tutto, la vita non e
-stata danneggiata. Veleno e trappole non sono avversari, quindi non ricevono il
-contraccolpo.
+stata danneggiata. Veleno, trappole e grid object pericolosi non sono avversari,
+quindi non ricevono il contraccolpo.
 
 Due combattenti con `Thorns` possono reagire reciprocamente. La catena resta
 iterativa ed e fermata dal limite globale se nessuno muore prima.

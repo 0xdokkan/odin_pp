@@ -123,6 +123,17 @@ test_poison_ticks_and_expires_after_its_duration :: proc(t: ^testing.T) {
 	first_pulse := advance_combat_pulse(&room)
 	testing.expect(t, first_pulse.advanced)
 	testing.expect_value(t, room.enemies[0].health, i32(3))
+	poison_damage_found := false
+	for index in 0..<first_pulse.events.count {
+		event := first_pulse.events.events[index]
+		if event.kind != .Damaged || event.target != enemy_ref {
+			continue
+		}
+		poison_damage_found = true
+		testing.expect(t, event.has_status_cause)
+		testing.expect_value(t, event.status_cause, Status_Kind.Poison)
+	}
+	testing.expect(t, poison_damage_found)
 	status, found := status_for_entity(&room, enemy_ref, .Poison)
 	testing.expect(t, found)
 	testing.expect_value(t, status.remaining_pulses, i32(1))
@@ -138,6 +149,81 @@ test_poison_ticks_and_expires_after_its_duration :: proc(t: ^testing.T) {
 		}
 	}
 	testing.expect(t, expired_found)
+}
+
+@(test)
+test_poison_cause_is_preserved_when_shield_fully_absorbs_damage :: proc(t: ^testing.T) {
+	level_data := create_test_level(t)
+	defer level.destroy(&level_data)
+	player := create_test_player(t)
+	enemy_spawns := [?]Enemy_Spawn{{position = {x = 5, y = 3}, health = 4, attack = 1}}
+	room, ok := create_room(&level_data, &player, {enemies = enemy_spawns[:]})
+	testing.expect(t, ok)
+	defer destroy_room(&room)
+	apply_status(&room, PLAYER_ENTITY, .Poison, 3, 2)
+	apply_status(&room, PLAYER_ENTITY, .Shield, 2, 3)
+
+	pulse: Pulse_Report
+	tick_status_kind(&room, PLAYER_ENTITY, .Poison, &pulse)
+
+	testing.expect_value(t, pulse.damage_absorbed, i32(2))
+	testing.expect_value(t, pulse.damage_dealt, i32(0))
+	testing.expect_value(t, player.health, player.stats.max_health)
+	absorbed_found := false
+	damaged_found := false
+	for index in 0..<pulse.events.count {
+		event := pulse.events.events[index]
+		if event.kind == .Damage_Absorbed {
+			absorbed_found = true
+			testing.expect_value(t, event.amount, i32(2))
+			testing.expect_value(t, event.status, Status_Kind.Shield)
+			testing.expect(t, event.has_status_cause)
+			testing.expect_value(t, event.status_cause, Status_Kind.Poison)
+		} else if event.kind == .Damaged {
+			damaged_found = true
+		}
+	}
+	testing.expect(t, absorbed_found)
+	testing.expect(t, !damaged_found)
+}
+
+@(test)
+test_poison_cause_is_preserved_through_partial_shield_absorption :: proc(t: ^testing.T) {
+	level_data := create_test_level(t)
+	defer level.destroy(&level_data)
+	player := create_test_player(t)
+	enemy_spawns := [?]Enemy_Spawn{{position = {x = 5, y = 3}, health = 4, attack = 1}}
+	room, ok := create_room(&level_data, &player, {enemies = enemy_spawns[:]})
+	testing.expect(t, ok)
+	defer destroy_room(&room)
+	apply_status(&room, PLAYER_ENTITY, .Poison, 5, 2)
+	apply_status(&room, PLAYER_ENTITY, .Shield, 3, 3)
+
+	pulse: Pulse_Report
+	tick_status_kind(&room, PLAYER_ENTITY, .Poison, &pulse)
+
+	testing.expect_value(t, pulse.damage_absorbed, i32(3))
+	testing.expect_value(t, pulse.damage_dealt, i32(1))
+	testing.expect_value(t, player.health, player.stats.max_health-1)
+	absorbed_found := false
+	damaged_found := false
+	for index in 0..<pulse.events.count {
+		event := pulse.events.events[index]
+		if event.kind != .Damage_Absorbed && event.kind != .Damaged {
+			continue
+		}
+		testing.expect(t, event.has_status_cause)
+		testing.expect_value(t, event.status_cause, Status_Kind.Poison)
+		if event.kind == .Damage_Absorbed {
+			absorbed_found = true
+			testing.expect_value(t, event.amount, i32(3))
+		} else {
+			damaged_found = true
+			testing.expect_value(t, event.amount, i32(1))
+		}
+	}
+	testing.expect(t, absorbed_found)
+	testing.expect(t, damaged_found)
 }
 
 @(test)

@@ -87,9 +87,10 @@ autorevole e gia aggiornato e viene mostrato normalmente.
 ## Snapshot e cue FIFO
 
 `Room_Presentation` contiene i dati necessari a disegnare la stanza: fase,
-player, nemici, trappole, loot, oro, pulse, status e una copia inline del deck.
-Gli attori sono referenziati con `Entity_Ref`, quindi la rimozione o il riordino
-di un nemico nella `Room` non invalida il bersaglio di un evento gia copiato.
+player, nemici, trappole, grid object, loot, oro, pulse, status e una copia
+inline del deck. Attori e oggetti sono referenziati con `Entity_Ref`, quindi la
+rimozione o il riordino nella `Room` non invalida il bersaglio di un evento gia
+copiato.
 
 Ogni `Game_Event` diventa un `Presentation_Cue`. La coda e strettamente FIFO:
 non raggruppa eventi simili e non riordina danno, reazioni o loot. Un solo cue e
@@ -101,6 +102,7 @@ Le famiglie visualizzate sono:
 |---|---|
 | `Movement_Step`, `Moved` | interpolano una tratta con easing; lo step usa una durata piu breve |
 | `Trap_Triggered` | disarma esplicitamente la trappola nello snapshot prima del danno |
+| `Hazard_Triggered` | valida sorgente, attore e cella, mostra `BURN` senza consumare l'oggetto |
 | `Damaged`, `Damage_Absorbed`, `Healed` | aggiorna vita o shield e mostra il feedback |
 | eventi status | aggiorna i badge dello snapshot e mostra il relativo avviso |
 | eventi binding | mostra l'avviso; il set dei binding non e copiato nello snapshot |
@@ -127,9 +129,10 @@ che un AoE denso blocchi l'input per decine di secondi senza alterare l'ordine.
 
 Un movimento multi-cella arriva gia segmentato dal gameplay. La timeline non
 interpola direttamente origine-destinazione: riproduce ogni `Movement_Step` e il
-`Moved` terminale in FIFO. Se una cella contiene una trappola, il relativo
-`Trap_Triggered` viene quindi mostrato dopo l'ingresso e prima di shield, danno o
-sconfitta, esattamente come nella simulazione.
+`Moved` terminale in FIFO. Se una cella contiene una trappola o un oggetto
+pericoloso, il relativo `Trap_Triggered` o `Hazard_Triggered` viene quindi
+mostrato dopo l'ingresso e prima dei propri eventi di shield, danno o sconfitta,
+esattamente come nella simulazione.
 
 ## Input buffer
 
@@ -222,7 +225,7 @@ contratto esplicito del sistema e i relativi test.
 
 Timeline ed `Event_Log` usano array fissi e non allocano durante la riproduzione.
 `MAX_PRESENTATION_CUES` coincide con `MAX_GAME_EVENTS`, attualmente 416; lo
-snapshot conserva fino a 32 nemici, 64 trappole e 64 drop. Il log
+snapshot conserva fino a 32 nemici, 64 trappole, 32 grid object e 64 drop. Il log
 espone `dropped_count` e la timeline conserva sia gli eventi gia persi a monte
 sia quelli che non riesce a copiare.
 

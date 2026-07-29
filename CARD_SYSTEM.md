@@ -265,7 +265,7 @@ ancora con l'upgrade.
 | `Calculated_Risk` | Uncommon | 1 | player, None | pesca 2, poi scarta la carta piu a sinistra |
 | `Spark_Forge` | Uncommon | 1 | player, None | crea una `Spark` temporanea |
 | `Spark` | temporary only | 0 | avversario, Manhattan 1-2, Single | 2 danni, +1 per upgrade; exhaust on play |
-| `Shove` | Common | 1 | avversario, Manhattan 1, Single | 1 danno, +1 per upgrade; spinta di 1 cella |
+| `Shove` | Common | 1 | avversario o oggetto, Manhattan 1, Single | 1 danno, +1 per upgrade; spinta di 1 cella |
 | `Dash` | Uncommon | 2 | cella, Chebyshev 1-3, Line, LoS | attraversa la linea fino all'anchor |
 | `Grappling_Hook` | Rare | 2 | avversario, Chebyshev 2-4, Line, LoS e actor stop | 1 danno, +1 per upgrade; trascina adiacente al player |
 | `Heavy_Blow` | Common | 2 | avversario adiacente, Single | 5 danni, +1 per upgrade |

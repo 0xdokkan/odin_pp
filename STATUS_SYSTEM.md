@@ -179,6 +179,7 @@ Ogni `Action_Report` e `Pulse_Report` contiene un `Event_Log` inline con capacit
 - `Move_Blocked`;
 - `Attack_Missed`;
 - `Trap_Triggered`;
+- `Hazard_Triggered`;
 - `Gold_Gained`;
 - `Loot_Dropped`;
 - `Loot_Collected`;
@@ -229,8 +230,9 @@ propagare questa diagnostica quando il loro envelope puo avvicinarsi al limite.
 soltanto i segmenti realmente eseguiti:
 
 1. l'eventuale `Card_Played`, seguito dagli eventi dell'azione e delle reazioni;
-   per ogni cella attraversata l'ordine interno e movimento, `Trap_Triggered`,
-   danno ed eventuale morte/drop;
+   per ogni cella attraversata l'ordine interno e movimento, eventuale
+   `Trap_Triggered` con i suoi effetti, eventuale `Hazard_Triggered` con i suoi
+   effetti, quindi morte/drop;
 2. raccolte magnetiche prodotte dopo l'azione;
 3. se il combattimento continua, azioni nemiche, tick di status e binding, quindi
    il `Pulse_Advanced` terminale;

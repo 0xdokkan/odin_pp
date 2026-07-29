@@ -1126,6 +1126,15 @@ draw_diamond :: proc(vertices: Tile_Vertices, color, outline: rl.Color) {
 	rl.DrawLineV(to_raylib(vertices.left), to_raylib(vertices.top), outline)
 }
 
+draw_quad :: proc(a, b, c, d: view.Vec2, color, outline: rl.Color) {
+	rl.DrawTriangle(to_raylib(a), to_raylib(c), to_raylib(b), color)
+	rl.DrawTriangle(to_raylib(a), to_raylib(d), to_raylib(c), color)
+	rl.DrawLineV(to_raylib(a), to_raylib(b), outline)
+	rl.DrawLineV(to_raylib(b), to_raylib(c), outline)
+	rl.DrawLineV(to_raylib(c), to_raylib(d), outline)
+	rl.DrawLineV(to_raylib(d), to_raylib(a), outline)
+}
+
 cell_center :: proc(renderer: ^Renderer, position: grid.Position) -> view.Vec2 {
 	vertices := tile_vertices(renderer, position)
 	return {
@@ -1790,6 +1799,154 @@ presentation_actor_center :: proc(renderer: ^Renderer, actor: ^Presentation_Acto
 	)
 }
 
+presentation_grid_object_center :: proc(
+	renderer: ^Renderer,
+	object: ^Presentation_Grid_Object,
+) -> view.Vec2 {
+	assert(renderer != nil && object != nil)
+	return view.grid_point_to_canvas(
+		&renderer.camera,
+		&renderer.projection,
+		{x = object.position.x+0.5, y = object.position.y+0.5},
+	)
+}
+
+draw_grid_object_body :: proc(
+	renderer: ^Renderer,
+	kind: game.Grid_Object_Kind,
+	center: view.Vec2,
+	health, max_health: i32,
+	opacity: f32 = 1,
+) {
+	assert(renderer != nil)
+	if kind == .Fire {
+		scale := renderer.camera.zoom
+		half_width := max(f32(7), 11*scale)
+		base_y := center.y+max(f32(2), 3*scale)
+		outer_height := max(f32(16), 27*scale)
+		inner_height := max(f32(9), 15*scale)
+
+		// Small embers keep Fire readable as a persistent cell hazard without
+		// making it look like a solid, movement-blocking tile.
+		ember_color := color_with_opacity(rl.Color{181, 54, 36, 235}, opacity)
+		rl.DrawCircleV(
+			to_raylib({x = center.x-half_width*0.9, y = base_y-half_width*0.25}),
+			max(f32(1.5), 2.2*scale),
+			ember_color,
+		)
+		rl.DrawCircleV(
+			to_raylib({x = center.x+half_width*0.95, y = base_y-half_width*0.45}),
+			max(f32(1), 1.7*scale),
+			ember_color,
+		)
+
+		outer_color := color_with_opacity(rl.Color{221, 62, 34, 255}, opacity)
+		rl.DrawTriangle(
+			to_raylib({x = center.x, y = base_y-outer_height}),
+			to_raylib({x = center.x-half_width, y = base_y}),
+			to_raylib({x = center.x+half_width, y = base_y}),
+			outer_color,
+		)
+		rl.DrawTriangle(
+			to_raylib({x = center.x-half_width*0.38, y = base_y-outer_height*0.64}),
+			to_raylib({x = center.x-half_width*1.22, y = base_y}),
+			to_raylib({x = center.x-half_width*0.05, y = base_y}),
+			color_with_opacity(rl.Color{241, 103, 33, 255}, opacity),
+		)
+		rl.DrawTriangle(
+			to_raylib({x = center.x+half_width*0.45, y = base_y-outer_height*0.72}),
+			to_raylib({x = center.x+half_width*0.02, y = base_y}),
+			to_raylib({x = center.x+half_width*1.15, y = base_y}),
+			color_with_opacity(rl.Color{241, 103, 33, 255}, opacity),
+		)
+		rl.DrawCircleV(
+			to_raylib({x = center.x, y = base_y-half_width*0.38}),
+			half_width,
+			color_with_opacity(rl.Color{247, 126, 35, 255}, opacity),
+		)
+		rl.DrawTriangle(
+			to_raylib({x = center.x+half_width*0.12, y = base_y-inner_height}),
+			to_raylib({x = center.x-half_width*0.55, y = base_y}),
+			to_raylib({x = center.x+half_width*0.58, y = base_y}),
+			color_with_opacity(rl.Color{255, 218, 84, 255}, opacity),
+		)
+		rl.DrawCircleV(
+			to_raylib({x = center.x, y = base_y-half_width*0.25}),
+			half_width*0.52,
+			color_with_opacity(rl.Color{255, 235, 145, 255}, opacity),
+		)
+		return
+	}
+	if kind != .Ice_Block {
+		return
+	}
+
+	half_width := max(f32(9), 17*renderer.camera.zoom)
+	half_depth := max(f32(4.5), 8*renderer.camera.zoom)
+	height := max(f32(13), 23*renderer.camera.zoom)
+	base := Tile_Vertices{
+		top = {x = center.x, y = center.y-half_depth},
+		right = {x = center.x+half_width, y = center.y},
+		bottom = {x = center.x, y = center.y+half_depth},
+		left = {x = center.x-half_width, y = center.y},
+	}
+	top := base
+	top.top.y -= height
+	top.right.y -= height
+	top.bottom.y -= height
+	top.left.y -= height
+	outline := color_with_opacity(rl.Color{210, 248, 252, 255}, opacity)
+	draw_quad(
+		top.left,
+		top.bottom,
+		base.bottom,
+		base.left,
+		color_with_opacity(rl.Color{57, 145, 174, 255}, opacity),
+		outline,
+	)
+	draw_quad(
+		top.bottom,
+		top.right,
+		base.right,
+		base.bottom,
+		color_with_opacity(rl.Color{39, 111, 151, 255}, opacity),
+		outline,
+	)
+	draw_diamond(
+		top,
+		color_with_opacity(rl.Color{137, 224, 236, 255}, opacity),
+		outline,
+	)
+	rl.DrawLineEx(
+		to_raylib({x = top.top.x, y = top.top.y+half_depth*0.6}),
+		to_raylib({x = top.bottom.x-half_width*0.25, y = top.bottom.y-half_depth*0.25}),
+		max(f32(1), 1.2*renderer.camera.zoom),
+		color_with_opacity(rl.Color{238, 255, 255, 225}, opacity),
+	)
+	rl.DrawLineEx(
+		to_raylib({x = top.bottom.x-half_width*0.25, y = top.bottom.y-half_depth*0.25}),
+		to_raylib({x = top.right.x-half_width*0.2, y = top.right.y-half_depth*0.15}),
+		max(f32(1), 1.2*renderer.camera.zoom),
+		color_with_opacity(rl.Color{238, 255, 255, 225}, opacity),
+	)
+
+	if max_health > 0 && health < max_health {
+		bar_width := half_width*1.6
+		bar_height := max(f32(2), 3*renderer.camera.zoom)
+		bar_x := center.x-bar_width*0.5
+		bar_y := top.top.y-max(f32(5), 7*renderer.camera.zoom)
+		ratio := clamp(f32(max(health, i32(0)))/f32(max_health), f32(0), f32(1))
+		rl.DrawRectangleRec(
+			{bar_x, bar_y, bar_width, bar_height},
+			color_with_opacity(rl.Color{17, 31, 38, 220}, opacity),
+		)
+		rl.DrawRectangleRec(
+			{bar_x, bar_y, bar_width*ratio, bar_height},
+			color_with_opacity(rl.Color{101, 218, 230, 255}, opacity),
+		)
+	}
+}
+
 draw_player_body :: proc(renderer: ^Renderer, center: view.Vec2, opacity: f32 = 1) -> f32 {
 	assert(renderer != nil)
 	radius := max(f32(8), 13*renderer.camera.zoom)
@@ -1841,6 +1998,27 @@ draw_presentation_loot :: proc(renderer: ^Renderer, presentation: ^Room_Presenta
 	}
 }
 
+draw_presentation_grid_objects :: proc(renderer: ^Renderer, presentation: ^Room_Presentation) {
+	assert(renderer != nil && presentation != nil)
+	if presentation.object_count < 0 || presentation.object_count > len(presentation.objects) {
+		return
+	}
+	for index in 0..<presentation.object_count {
+		object := &presentation.objects[index]
+		if !object.visible {
+			continue
+		}
+		draw_grid_object_body(
+			renderer,
+			object.kind,
+			presentation_grid_object_center(renderer, object),
+			object.health,
+			object.max_health,
+			object.opacity,
+		)
+	}
+}
+
 draw_presentation_actors :: proc(renderer: ^Renderer) {
 	assert(renderer != nil && renderer_timeline_is_busy(renderer))
 	presentation := &renderer.timeline.view
@@ -1877,8 +2055,14 @@ presentation_event_center :: proc(
 	if actor, found := presentation_actor(&renderer.timeline, event.target); found {
 		return presentation_actor_center(renderer, actor), true
 	}
+	if object, found := presentation_grid_object(&renderer.timeline, event.target); found {
+		return presentation_grid_object_center(renderer, object), true
+	}
 	if actor, found := presentation_actor(&renderer.timeline, event.source); found {
 		return presentation_actor_center(renderer, actor), true
+	}
+	if object, found := presentation_grid_object(&renderer.timeline, event.source); found {
+		return presentation_grid_object_center(renderer, object), true
 	}
 	return cell_center(renderer, event.to_position), true
 }
@@ -1934,8 +2118,9 @@ timeline_card_cue_verb :: proc(cue: ^Presentation_Cue) -> cstring {
 		} else if cue.event.to_card_zone == .Discard {
 			return "DISCARD"
 		}
-	case .Move, .Trap_Triggered, .Damage, .Damage_Absorbed, .Heal, .Status_Applied, .Status_Removed,
-	     .Status_Expired, .Defeat, .Loot_Dropped, .Loot, .Attack_Missed, .Move_Blocked,
+	case .Move, .Trap_Triggered, .Hazard_Triggered, .Damage, .Damage_Absorbed, .Heal,
+	     .Status_Applied, .Status_Removed, .Status_Expired, .Defeat, .Loot_Dropped, .Loot,
+	     .Attack_Missed, .Move_Blocked,
 	     .Gold_Gained, .Binding_Added, .Binding_Exhausted, .Binding_Expired,
 	     .Pulse_Advanced, .Refocus:
 	}
@@ -2088,6 +2273,9 @@ draw_active_presentation_cue :: proc(renderer: ^Renderer) {
 	case .Trap_Triggered:
 		label = "TRAP"
 		color = rl.Color{246, 146, 72, 255}
+	case .Hazard_Triggered:
+		label = "BURN"
+		color = rl.Color{255, 151, 55, 255}
 	case .Gold_Gained:
 		label = fmt.ctprintf("+%d GOLD", cue.event.amount)
 		color = rl.Color{246, 207, 92, 255}
@@ -2157,10 +2345,21 @@ draw_room :: proc(renderer: ^Renderer, room: ^game.Room) {
 	}
 
 	if timeline_busy {
+		draw_presentation_grid_objects(renderer, &renderer.timeline.view)
 		draw_presentation_loot(renderer, &renderer.timeline.view)
 		draw_presentation_actors(renderer)
 		draw_active_presentation_cue(renderer)
 	} else {
+		for object in room.objects {
+			draw_grid_object_body(
+				renderer,
+				object.kind,
+				cell_center(renderer, object.position),
+				object.health,
+				object.max_health,
+			)
+		}
+
 		for item in room.loot {
 			center := cell_center(renderer, item.position)
 			radius := max(f32(4), 7*renderer.camera.zoom)

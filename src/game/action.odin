@@ -10,6 +10,7 @@ Entity_Kind :: enum {
 	Player,
 	Enemy,
 	Trap,
+	Object,
 	System,
 }
 
@@ -27,6 +28,10 @@ enemy_entity :: proc(id: u32) -> Entity_Ref {
 
 trap_entity :: proc(id: u32) -> Entity_Ref {
 	return {kind = .Trap, id = id}
+}
+
+object_entity :: proc(id: u32) -> Entity_Ref {
+	return {kind = .Object, id = id}
 }
 
 Target_Kind :: enum {
@@ -48,6 +53,7 @@ Target_Rule :: enum {
 	Entity,
 	Player,
 	Opponent,
+	Opponent_Or_Object,
 	Adjacent_Opponent,
 	Cell,
 	Walkable_Cell,
@@ -89,6 +95,8 @@ Effect :: struct {
 	kind:        Effect_Kind,
 	target:      Entity_Ref,
 	amount:      i32,
+	has_status_cause: bool,
+	status_cause:     Status_Kind,
 	destination: grid.Position,
 	movement_mode: Movement_Mode,
 	status:      Status_Kind,
@@ -102,6 +110,20 @@ Effect :: struct {
 
 damage_effect :: proc(target: Entity_Ref, amount: i32) -> Effect {
 	return {kind = .Damage, target = target, amount = amount}
+}
+
+status_damage_effect :: proc(
+	target: Entity_Ref,
+	amount: i32,
+	status_cause: Status_Kind,
+) -> Effect {
+	return {
+		kind = .Damage,
+		target = target,
+		amount = amount,
+		has_status_cause = true,
+		status_cause = status_cause,
+	}
 }
 
 heal_effect :: proc(target: Entity_Ref, amount: i32) -> Effect {
@@ -216,6 +238,7 @@ Action_Report :: struct {
 	healing_done:      i32,
 	gold_gained:       i32,
 	enemies_defeated:  int,
+	objects_destroyed: int,
 	statuses_applied:  int,
 	statuses_removed:  int,
 	cards_drawn:       int,
@@ -245,6 +268,9 @@ entity_exists :: proc(room: ^Room, entity: Entity_Ref) -> bool {
 		return found
 	case .Trap:
 		_, found := trap_index_by_id(room, entity.id)
+		return found
+	case .Object:
+		_, found := object_index_by_id(room, entity.id)
 		return found
 	case .System:
 		return entity.id == 0
@@ -282,6 +308,10 @@ entity_position :: proc(room: ^Room, entity: Entity_Ref) -> (grid.Position, bool
 		index, found := trap_index_by_id(room, entity.id)
 		assert(found)
 		return room.traps[index].position, true
+	case .Object:
+		index, found := object_index_by_id(room, entity.id)
+		assert(found)
+		return room.objects[index].position, true
 	case .System:
 		return {}, false
 	}
@@ -291,6 +321,18 @@ entity_position :: proc(room: ^Room, entity: Entity_Ref) -> (grid.Position, bool
 entities_are_opponents :: proc(source, target: Entity_Ref) -> bool {
 	return (source.kind == .Player && target.kind == .Enemy) ||
 	       (source.kind == .Enemy && target.kind == .Player)
+}
+
+entity_is_targetable_object :: proc(room: ^Room, entity: Entity_Ref) -> bool {
+	if room == nil || entity.kind != .Object {
+		return false
+	}
+	index, found := object_index_by_id(room, entity.id)
+	if !found {
+		return false
+	}
+	definition, definition_found := grid_object_definition(room.objects[index].kind)
+	return definition_found && definition.targetable
 }
 
 target_matches_rule :: proc(room: ^Room, source: Entity_Ref, target: Target, rule: Target_Rule) -> bool {
@@ -310,6 +352,10 @@ target_matches_rule :: proc(room: ^Room, source: Entity_Ref, target: Target, rul
 		return target.kind == .Entity && target.entity == PLAYER_ENTITY
 	case .Opponent:
 		return target.kind == .Entity && entities_are_opponents(source, target.entity)
+	case .Opponent_Or_Object:
+		return target.kind == .Entity &&
+		       (entities_are_opponents(source, target.entity) ||
+		        entity_is_targetable_object(room, target.entity))
 	case .Adjacent_Opponent:
 		if target.kind != .Entity || !entities_are_opponents(source, target.entity) {
 			return false
@@ -321,9 +367,7 @@ target_matches_rule :: proc(room: ^Room, source: Entity_Ref, target: Target, rul
 	case .Cell:
 		return target.kind == .Cell
 	case .Walkable_Cell:
-		return target.kind == .Cell &&
-		       base_cell_is_walkable(room, target.cell) &&
-		       !obstacle_at(room, target.cell)
+		return target.kind == .Cell && !cell_blocks_movement(room, target.cell)
 	}
 	return false
 }
@@ -333,7 +377,23 @@ effect_is_valid :: proc(room: ^Room, effect: Effect) -> bool {
 		return false
 	}
 	switch effect.kind {
-	case .Damage, .Heal:
+	case .Damage:
+		if effect.amount <= 0 {
+			return false
+		}
+		if effect.target.kind == .Player || effect.target.kind == .Enemy {
+			return true
+		}
+		if effect.target.kind != .Object {
+			return false
+		}
+		index, found := object_index_by_id(room, effect.target.id)
+		if !found {
+			return false
+		}
+		definition, definition_found := grid_object_definition(room.objects[index].kind)
+		return definition_found && definition.damageable
+	case .Heal:
 		return effect.amount > 0 && (effect.target.kind == .Player || effect.target.kind == .Enemy)
 	case .Gain_Gold:
 		return effect.amount > 0 && effect.target == PLAYER_ENTITY
@@ -391,6 +451,8 @@ absorb_damage_with_shield :: proc(
 	room: ^Room,
 	source, target: Entity_Ref,
 	damage: i32,
+	has_status_cause: bool,
+	status_cause: Status_Kind,
 	report: ^Action_Report,
 ) -> i32 {
 	shield, found := status_for_entity(room, target, .Shield)
@@ -406,6 +468,8 @@ absorb_damage_with_shield :: proc(
 		target = target,
 		amount = absorbed,
 		status = .Shield,
+		has_status_cause = has_status_cause,
+		status_cause = status_cause,
 	})
 	if shield.potency == 0 {
 		removed, ok := remove_status(room, target, .Shield)
@@ -433,7 +497,17 @@ apply_damage_effect :: proc(
 	if effect.target.kind == .Player {
 		damage = max(i32(1), damage-room.player.stats.defense)
 	}
-	damage = absorb_damage_with_shield(room, source, effect.target, damage, report)
+	if effect.target.kind == .Player || effect.target.kind == .Enemy {
+		damage = absorb_damage_with_shield(
+			room,
+			source,
+			effect.target,
+			damage,
+			effect.has_status_cause,
+			effect.status_cause,
+			report,
+		)
+	}
 	if damage <= 0 {
 		return
 	}
@@ -452,6 +526,11 @@ apply_damage_effect :: proc(
 		assert(found)
 		actual_damage = min(damage, room.enemies[index].health)
 		room.enemies[index].health -= actual_damage
+	case .Object:
+		index, found := object_index_by_id(room, effect.target.id)
+		assert(found)
+		actual_damage = min(damage, room.objects[index].health)
+		room.objects[index].health -= actual_damage
 	case .Trap, .System:
 		unreachable()
 	}
@@ -461,6 +540,8 @@ apply_damage_effect :: proc(
 		source = source,
 		target = effect.target,
 		amount = actual_damage,
+		has_status_cause = effect.has_status_cause,
+		status_cause = effect.status_cause,
 	})
 
 	defeated := false
@@ -474,6 +555,14 @@ apply_damage_effect :: proc(
 		if room.enemies[index].health == 0 {
 			drops, drop_count = kill_enemy(room, index)
 			report.enemies_defeated += 1
+			defeated = true
+		}
+	} else if effect.target.kind == .Object {
+		index, found := object_index_by_id(room, effect.target.id)
+		assert(found)
+		if room.objects[index].health == 0 {
+			assert(remove_grid_object(room, index))
+			report.objects_destroyed += 1
 			defeated = true
 		}
 	}
@@ -517,7 +606,7 @@ apply_effect :: proc(room: ^Room, source: Entity_Ref, effect: Effect, report: ^A
 			before := room.enemies[index].health
 			room.enemies[index].health = min(room.enemies[index].max_health, before+effect.amount)
 			healed = room.enemies[index].health-before
-		case .Trap, .System:
+		case .Trap, .Object, .System:
 			unreachable()
 		}
 		report.healing_done += healed

@@ -7,6 +7,7 @@ Documentazione del gameplay: [Action System](ACTION_SYSTEM.md),
 [Enemy Intents](ENEMY_INTENT_SYSTEM.md),
 [Magnetic Loot](LOOT_SYSTEM.md), [Card System](CARD_SYSTEM.md),
 [Targeting System](TARGETING_SYSTEM.md), [Movement System](MOVEMENT_SYSTEM.md),
+[Grid Objects](GRID_OBJECT_SYSTEM.md),
 [Content Pass](CONTENT_PASS.md),
 [Deck Runtime](DECK_SYSTEM.md),
 [Card Lifecycle](CARD_LIFECYCLE.md), [Hand Cycle](HAND_CYCLE.md) e
@@ -35,6 +36,10 @@ nella [Roadmap](ROADMAP.md); i contratti di M1, M2 e M3 sono in
 ![Cast range e footprint 3x3 del targeting](odin_pp_advanced_targeting.png)
 
 ![Percorso e landing di Dash sopra una trappola](odin_pp_spatial_targeting.png)
+
+![Ice Block targetabile con Shove](odin_pp_ice_block.png)
+
+![Fire persistente durante il cue BURN](odin_pp_fire.png)
 
 ![Cinque nuove carte e targeting 3x3 di Caustic Bloom](odin_pp_content_pass.png)
 
@@ -97,6 +102,25 @@ Il flag trascina una `Dash` temporanea su una linea di tre celle, colloca una
 trappola armata sul percorso e salva `odin_pp_spatial_targeting.png` dopo tre
 frame.
 
+Per verificare collisione, linea di vista e targeting degli oggetti fisici:
+
+```sh
+odin run src -- --smoke-object
+```
+
+Il flag prepara `Shove` contro un Ice Block adiacente e salva
+`odin_pp_ice_block.png`. Gli oggetti correnti sono inseriti manualmente
+nelle stanze statiche; non fanno ancora parte della generazione procedurale.
+
+Per verificare l'hazard persistente `Fire` e il relativo replay:
+
+```sh
+odin run src -- --smoke-fire
+```
+
+Il flag fa entrare il player nella cella, mostra il cue `BURN`, mantiene la
+fiamma nella timeline e salva `odin_pp_fire.png`.
+
 Per verificare il content pass e la leggibilita delle nuove carte:
 
 ```sh
@@ -106,6 +130,23 @@ odin run src -- --smoke-content
 Il flag prepara una mano con `Heavy Blow`, `Venom Needle`, `Caustic Bloom`,
 `Purifying Guard` e `Volatile Study`, trascina Bloom su tre nemici e salva
 `odin_pp_content_pass.png`.
+
+Per raccogliere metriche durante una run interattiva:
+
+```sh
+odin run src -- --playtest-report
+```
+
+Alla fine della run, al restart o alla chiusura viene scritto
+`odin_pp_playtest_<seed>.json`. Il report separa comandi e carte e conserva i
+sample ordinati di ogni fight. La variante headless non inizializza Raylib:
+
+```sh
+odin run src -- --smoke-playtest
+```
+
+Esegue venti decisioni deterministiche al massimo e scrive
+`odin_pp_playtest_smoke.json`.
 
 Per verificare la timeline con uno snapshot pre-comando e un cue carta attivo:
 
@@ -291,7 +332,7 @@ player, il grafo e questi payload. Una `Room` possiede soltanto le entita
 temporanee e prende in prestito puntatori al livello e al player della run. Il
 renderer legge questi dati, ma non li possiede e non li cambia.
 
-Input, IA, trappole e loot costruiscono `Action` composte da effetti ordinati.
+Input, IA, hazard e loot costruiscono `Action` composte da effetti ordinati.
 `resolve_action` valida sorgente e target, richiede almeno un effetto inizialmente
 valido, poi ricontrolla e applica gli effetti in sequenza: un effetto successivo
 puo essere saltato se lo stato prodotto dai precedenti lo rende non piu valido.
@@ -299,8 +340,10 @@ Lo scheduler degli impulsi resta separato dal resolver.
 `Movement_Query` e l'autorita pura degli spostamenti: `Traverse` valida e
 attraversa l'intera linea, `Teleport` ignora le celle intermedie ma controlla la
 landing. L'applicazione entra cella per cella, registra `Movement_Step` e `Moved`
-e risolve subito le trappole per player o nemici. Il relativo contratto e in
-[Movement System](MOVEMENT_SYSTEM.md).
+e risolve subito trappole e grid object pericolosi per player o nemici. `Fire`
+e attraversabile, trasparente e persistente: infligge danno a ogni ingresso, ma
+non produce tick quando un attore resta fermo. Il relativo contratto e in
+[Movement System](MOVEMENT_SYSTEM.md) e [Grid Object System](GRID_OBJECT_SYSTEM.md).
 Ogni nemico conserva inline un intento committed per `pulse_count + 1`.
 Pianificazione e risoluzione seguono gli ID in ordine crescente; spostarsi fuori
 da una cella minacciata produce un miss, mentre occupare una destinazione puo
@@ -360,9 +403,9 @@ dopo la risoluzione ne viene catturato un secondo per i valori terminali. La
 `Room` risolve sincronicamente l'intera azione, mentre il renderer riproduce gli
 eventi in una timeline FIFO sulla copia presentazionale. Movimento, danno,
 status, mano, energia, sconfitte e loot restano nello stesso ordine causale senza
-rallentare o modificare la simulazione. Gli ingressi intermedi e i trigger delle
-trappole hanno cue distinti, cosi il replay conserva l'ordine
-`Movement -> Trap -> Damage`.
+rallentare o modificare la simulazione. Gli ingressi intermedi, le trappole e i
+grid object pericolosi hanno cue distinti, cosi il replay conserva l'ordine
+`Movement -> Trigger -> Damage`.
 Durante la timeline, il primo nuovo comando discreto viene conservato in un
 buffer di capacita uno; gli input successivi vengono scartati. Quando la timeline
 torna idle, il comando viene estratto e validato di nuovo contro la `Room`

@@ -113,6 +113,7 @@ test_spatial_events_append_without_changing_existing_ordinals :: proc(t: ^testin
 	testing.expect_value(t, int(Game_Event_Kind.Card_Refocused), 22)
 	testing.expect_value(t, int(Game_Event_Kind.Movement_Step), 23)
 	testing.expect_value(t, int(Game_Event_Kind.Trap_Triggered), 24)
+	testing.expect_value(t, int(Game_Event_Kind.Hazard_Triggered), 25)
 }
 
 @(test)

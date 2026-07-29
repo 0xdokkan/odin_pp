@@ -96,8 +96,8 @@ planned_cell_is_available :: proc(
 	position_count, moving_index: int,
 	target: grid.Position,
 ) -> bool {
-	if room == nil || positions == nil || !base_cell_is_walkable(room, target) ||
-	   obstacle_at(room, target) || target == room.player.position {
+	if room == nil || positions == nil || cell_blocks_movement(room, target) ||
+	   target == room.player.position {
 		return false
 	}
 	for index in 0..<position_count {
@@ -375,6 +375,9 @@ validate_enemy_intent_structure :: proc(room: ^Room, intent: ^Enemy_Intent) -> b
 		   abs(intent.origin.y-intent.destination.y) != 1 {
 			return false
 		}
+		// Movable grid objects are runtime blockers, not part of the committed
+		// intent's immutable structure. Resolution rechecks them and emits
+		// Move_Blocked if the board changed after planning.
 		return base_cell_is_walkable(room, intent.destination) &&
 		       !obstacle_at(room, intent.destination)
 	case .Attack:
@@ -529,8 +532,7 @@ enemy_charge_path_is_clear :: proc(
 	}
 	for index in 0..<intent.path_count {
 		position := intent.path[index]
-		if !base_cell_is_walkable(room, position) || obstacle_at(room, position) ||
-		   position == room.player.position {
+		if cell_blocks_movement(room, position) || position == room.player.position {
 			return false
 		}
 		if _, occupied := enemy_index_at(room, position, enemy_index); occupied {
@@ -581,7 +583,9 @@ resolve_enemy_intents :: proc(room: ^Room, pulse: ^Pulse_Report) {
 		case .Attack:
 			pulse.enemy_actions += 1
 			if enemy.position != intent.origin ||
-			   !enemy_intent_cell_is_threatened(&intent, room.player.position) {
+			   !enemy_intent_cell_is_threatened(&intent, room.player.position) ||
+			   (enemy.archetype == .Archer &&
+			    !has_clear_orthogonal_line(room, enemy.position, room.player.position)) {
 				record_enemy_attack_miss(
 					pulse,
 					source,

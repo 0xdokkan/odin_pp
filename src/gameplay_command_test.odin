@@ -1,6 +1,7 @@
 package main
 
 import "core:testing"
+import combatdebug "combatdebug"
 import game "game"
 import grid "grid"
 import level "level"
@@ -198,4 +199,51 @@ test_execute_gameplay_command_rejects_an_invalid_command_without_mutation :: pro
 	testing.expect_value(t, room.phase, phase_before)
 	testing.expect_value(t, room.pulse_count, u64(0))
 	testing.expect_value(t, room.recent_events.count, 0)
+}
+
+@(test)
+test_observed_terminal_bump_keeps_kind_and_finalizes_combat_room :: proc(t: ^testing.T) {
+	level_data := create_gameplay_command_test_level(t)
+	defer level.destroy(&level_data)
+	player := create_gameplay_command_test_player(t)
+	enemies := [?]game.Enemy_Spawn{{
+		position = {x = 2, y = 1},
+		health = player.stats.attack,
+		attack = 1,
+	}}
+	room, room_ok := game.create_room(&level_data, &player, {enemies = enemies[:]})
+	testing.expect(t, room_ok)
+	defer game.destroy_room(&room)
+	session: combatdebug.Playtest_Session
+	testing.expect(t, combatdebug.begin_playtest_session(&session, 17))
+	defer combatdebug.destroy_playtest_session(&session)
+	testing.expect(t, combatdebug.begin_playtest_room(&session, {
+		node_id = 0,
+		node_kind = .Combat,
+		depth = 0,
+		room_seed = 99,
+	}, &room))
+
+	execution := execute_observed_gameplay_command(&room, {
+		kind = .Move,
+		origin_phase = .Combat,
+		direction = .East,
+	}, &session)
+
+	testing.expect(t, execution.committed)
+	testing.expect_value(t, room.phase, game.Room_Phase.Loot)
+	testing.expect(t, !session.room_active)
+	testing.expect_value(t, len(session.rooms), 1)
+	testing.expect_value(t, len(session.commands), 1)
+	testing.expect_value(
+		t,
+		session.commands[0].sample.kind,
+		combatdebug.Command_Kind.Bump_Attack,
+	)
+	testing.expect_value(t, session.commands[0].sample.player_damage_to_enemies, i64(2))
+	testing.expect_value(
+		t,
+		session.aggregate.commands_committed[int(combatdebug.Command_Kind.Bump_Attack)],
+		u64(1),
+	)
 }

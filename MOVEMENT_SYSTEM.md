@@ -70,8 +70,10 @@ la destinazione. `movement_query_is_clear` richiede `error == .None`, un percors
 non vuoto entro capacita e nessun blocker.
 
 Gli errori distinguono stanza o mover invalidi, destinazione uguale all'origine,
-bounds, allineamento, capacita del percorso, blocker statico e blocker attore.
-Il fallimento e diagnostico: quando esiste una cella responsabile,
+bounds, allineamento, capacita del percorso, blocker statico, blocker attore e
+blocker oggetto. Quest'ultimo impedisce a un grid object mobile di sovrapporsi a
+un altro oggetto anche quando la destinazione, come `Fire`, e attraversabile per
+gli attori. Il fallimento e diagnostico: quando esiste una cella responsabile,
 `has_blocker` e `blocker` permettono alla UI di mostrarla.
 
 ## Traverse e Teleport
@@ -91,14 +93,16 @@ viene rifiutato.
 
 `Teleport` non autorizza un atterraggio illegale: bounds, tile, ostacoli e attori
 sulla destinazione restano validati. Ignora invece muri, ostacoli, attori e
-trappole fra origine e destinazione, perche quelle celle non vengono mai
-attraversate. Una trappola sulla landing viene comunque innescata.
+hazard fra origine e destinazione, perche quelle celle non vengono mai
+attraversate. Una trappola o un `Fire` sulla landing viene comunque innescato.
 
 ## Blocker
 
-I blocker statici sono tile non calpestabili e ostacoli della stanza. Gli attori
-sono player e nemici vivi; il mover non blocca se stesso. Le trappole non sono
-blocker: una cella armata puo essere attraversata e viene risolta come hazard
+I blocker statici sono tile non calpestabili, ostacoli della stanza e oggetti
+con `blocks_movement`. La query dedicata `cell_blocks_movement` e distinta da
+`cell_blocks_line_of_sight`: le due capability possono divergere. Gli attori
+sono player e nemici vivi; il mover non blocca se stesso. Trappole e `Fire` non
+sono blocker: la loro cella puo essere attraversata e viene risolta come hazard
 dopo l'ingresso.
 
 La query controlla prima la geometria statica e poi gli attori. Questa priorita
@@ -120,23 +124,30 @@ tre celle resta un solo comando e, se accettata, un solo pulse del player.
 ## Hazard e ordine eventi
 
 Subito dopo ogni ingresso, `trigger_cell_hazard` controlla la cella corrente.
-Funziona per player e nemici durante `Combat` e `Loot`. Una trappola armata con
-danno positivo viene disarmata e usa la pipeline condivisa del danno, inclusi
-shield, morte, drop e transizione di fase.
+Funziona per player e nemici durante `Combat` e `Loot`. Risolve prima la
+trappola, che viene disarmata, poi un eventuale oggetto `hazardous`, che resta
+persistente. Entrambi usano la pipeline condivisa del danno, inclusi shield,
+difesa, morte, drop e transizione di fase.
 
 L'ordine per una singola cella e:
 
 ```text
 Movement_Step oppure Moved
-Trap_Triggered
-Damage_Absorbed e Status_Removed, quando necessari
-Damaged, se resta danno alla vita
-Entity_Defeated e Loot_Dropped, quando necessari
+Trap_Triggered, se presente
+  -> Damage_Absorbed / Status_Removed / Damaged / Defeat / Loot
+Hazard_Triggered, se il mover vive ed e presente un oggetto hazardous
+  -> Damage_Absorbed / Status_Removed / Damaged / Defeat / Loot
 ```
 
-Il movimento e quindi osservabile prima della conseguenza della cella appena
-raggiunta. La presentazione non deve dedurre il trigger dal danno: usa
-`Trap_Triggered` per disarmare esplicitamente la trappola nello snapshot.
+Ogni trigger e seguito immediatamente dai propri eventi di danno; la seconda
+sorgente viene provata soltanto se il mover e ancora vivo. Il movimento e
+osservabile prima della conseguenza della cella appena raggiunta. La
+presentazione non deduce il trigger dal danno: usa `Trap_Triggered` per disarmare
+la trappola e `Hazard_Triggered` per mostrare il cue dell'oggetto persistente.
+
+`Fire` scatta solo all'ingresso: non produce tick con `Wait`, all'inizio del
+pulse o mentre un attore resta fermo sulla cella. Un Traverse attraverso piu
+fiamme le attiva tutte; un Teleport considera soltanto la landing.
 
 ## Interruzione del percorso
 
@@ -163,7 +174,7 @@ Le carte correnti sono:
 
 | Carta | Movimento | Composizione |
 |---|---|---|
-| `Shove` | spinge di una cella lontano dal player | 1 danno, poi movimento opzionale |
+| `Shove` | spinge di una cella un nemico o Ice Block | 1 danno, poi movimento opzionale |
 | `Dash` | attraversa 1-3 celle fino all'anchor | solo movimento, quindi percorso obbligatorio |
 | `Grappling_Hook` | trascina il nemico fino a una cella adiacente al player | 1 danno, poi movimento opzionale |
 
@@ -214,10 +225,11 @@ tre e colloca una trappola armata sul percorso. Dopo tre frame salva
 `Movement_Step` esiste per percorso, hazard e animazione, ma non attiva
 `Afterimage`. Il matcher osserva soltanto il `Moved` terminale. Un `Dash` di tre
 celle concede quindi lo shield una volta, non tre. Gli hazard sono gia risolti
-quando parte il dispatch reattivo: lo shield non protegge dalle trappole dello
-stesso attraversamento, ma puo proteggere dalla successiva risposta nemica. Se
-il mover muore, la promozione conserva il terminale per replay e matching, ma la
-reazione non puo essere costruita per un owner ormai inesistente.
+quando parte il dispatch reattivo: lo shield ottenuto da `Afterimage` non
+protegge da trappole o fuoco dello stesso attraversamento, ma puo proteggere
+dalla successiva risposta nemica. Se il mover muore, la promozione conserva il
+terminale per replay e matching, ma la reazione non puo essere costruita per un
+owner ormai inesistente.
 
 ## Intenti committed e spostamento forzato
 
@@ -239,10 +251,12 @@ pianificazione del pulse successivo parte normalmente dalla nuova posizione.
 `MAX_MOVEMENT_PATH_CELLS` coincide con `MAX_TARGETING_PATH_CELLS`, oggi 12.
 `Event_Log` ha capacita 416. Lo stress envelope denso occupa 258 eventi; il test
 spaziale massimo attraversa 12 trappole in 12 celle e produce 36 eventi senza
-drop. Restano 158 slot oltre l'envelope denso (`258 + 158 = 416`), ma ogni futura
-composizione AoE + movimento + reazioni deve dimostrare nuovamente il proprio
-massimo. Un overflow di `Action_Report` termina esplicitamente il processo:
-quegli eventi pilotano le reazioni e non possono degradare in modo fail-soft.
+drop. Le celle `Fire` aggiungono un evento trigger e la normale sequenza del
+danno a ogni ingresso. Restano 158 slot oltre l'envelope denso
+(`258 + 158 = 416`), ma ogni futura composizione AoE + movimento + reazioni deve
+dimostrare nuovamente il proprio massimo. Un overflow di `Action_Report` termina
+esplicitamente il processo: quegli eventi pilotano le reazioni e non possono
+degradare in modo fail-soft.
 
 I test fissano inoltre un budget di 96 KiB per log e report singoli e 192 KiB
 per `Card_Play_Report`; l'aumento di una capacita inline deve quindi affrontare

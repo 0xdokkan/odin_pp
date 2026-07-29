@@ -7,6 +7,7 @@ Pulse_Report :: struct {
 	damage_dealt:      i32,
 	damage_absorbed:   i32,
 	enemies_defeated:  int,
+	objects_destroyed: int,
 	cards_drawn:       int,
 	cards_discarded:   int,
 	cards_created:     int,
@@ -31,6 +32,7 @@ merge_action_report :: proc(pulse: ^Pulse_Report, action: ^Action_Report) {
 	pulse.damage_dealt += action.damage_dealt
 	pulse.damage_absorbed += action.damage_absorbed
 	pulse.enemies_defeated += action.enemies_defeated
+	pulse.objects_destroyed += action.objects_destroyed
 	pulse.cards_drawn += action.cards_drawn
 	pulse.cards_discarded += action.cards_discarded
 	pulse.cards_created += action.cards_created
@@ -69,7 +71,7 @@ tick_status_kind :: proc(room: ^Room, entity: Entity_Ref, kind: Status_Kind, pul
 	if kind == .Poison {
 		potency := status.potency
 		action := make_action(.Trigger, SYSTEM_ENTITY, entity_target(entity), .Entity)
-		added := add_effect(&action, damage_effect(entity, potency))
+		added := add_effect(&action, status_damage_effect(entity, potency, .Poison))
 		assert(added)
 		report := resolve_action(room, &action)
 		assert(report.accepted)

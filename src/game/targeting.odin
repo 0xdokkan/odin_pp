@@ -119,7 +119,7 @@ targeting_range_contains :: proc(
 
 targeting_rule_uses_anchor :: proc(rule: Target_Rule) -> bool {
 	switch rule {
-	case .Entity, .Opponent, .Adjacent_Opponent, .Cell, .Walkable_Cell:
+	case .Entity, .Opponent, .Opponent_Or_Object, .Adjacent_Opponent, .Cell, .Walkable_Cell:
 		return true
 	case .Any, .None, .Self, .Player:
 		return false
@@ -182,7 +182,7 @@ add_target_cell :: proc(set: ^Target_Cell_Set, position: grid.Position) -> bool 
 }
 
 targeting_static_blocker_at :: proc(room: ^Room, position: grid.Position) -> bool {
-	return room == nil || !base_cell_is_walkable(room, position) || obstacle_at(room, position)
+	return room == nil || cell_blocks_line_of_sight(room, position)
 }
 
 targeting_actor_at :: proc(room: ^Room, position: grid.Position) -> bool {
@@ -234,6 +234,7 @@ targeting_path_blocker :: proc(
 	origin: grid.Position,
 	path: ^[MAX_TARGETING_PATH_CELLS]grid.Position,
 	path_count: int,
+	allow_blocked_destination: bool = false,
 ) -> (blocker: grid.Position, found: bool) {
 	if room == nil || path == nil || path_count < 0 || path_count > MAX_TARGETING_PATH_CELLS {
 		return {}, true
@@ -241,7 +242,9 @@ targeting_path_blocker :: proc(
 	previous := origin
 	for index in 0..<path_count {
 		position := path[index]
-		if targeting_static_blocker_at(room, position) {
+		is_destination := index == path_count-1
+		if targeting_static_blocker_at(room, position) &&
+		   !(allow_blocked_destination && is_destination) {
 			return position, true
 		}
 		step_x := position.x-previous.x
@@ -286,6 +289,20 @@ targeting_target_at_anchor :: proc(
 		} else if source.kind == .Enemy && room.player != nil && room.player.position == anchor {
 			return entity_target(PLAYER_ENTITY), true
 		}
+	case .Opponent_Or_Object:
+		if source.kind == .Player {
+			if index, found := enemy_index_at(room, anchor); found {
+				return entity_target(enemy_entity(room.enemies[index].id)), true
+			}
+		} else if source.kind == .Enemy && room.player != nil && room.player.position == anchor {
+			return entity_target(PLAYER_ENTITY), true
+		}
+		if index, found := object_index_at(room, anchor); found {
+			entity := object_entity(room.objects[index].id)
+			if entity_is_targetable_object(room, entity) {
+				return entity_target(entity), true
+			}
+		}
 	case .Entity:
 		if room.player != nil && room.player.position == anchor {
 			return entity_target(PLAYER_ENTITY), true
@@ -295,6 +312,9 @@ targeting_target_at_anchor :: proc(
 		}
 		if index, found := trap_index_at(room, anchor); found {
 			return entity_target(trap_entity(room.traps[index].id)), true
+		}
+		if index, found := object_index_at(room, anchor); found {
+			return entity_target(object_entity(room.objects[index].id)), true
 		}
 	case .Cell, .Walkable_Cell, .Any:
 		return cell_target(anchor), true
@@ -333,6 +353,14 @@ build_target_shape :: proc(
 	case .None:
 		return true
 	case .Single:
+		if spec.rule == .Opponent_Or_Object {
+			if object, found := grid_object_at(room, result.anchor); found {
+				entity := object_entity(object.id)
+				if entity_is_targetable_object(room, entity) {
+					return add_target_cell(&result.affected, result.anchor)
+				}
+			}
+		}
 		return append_shape_cell(room, &result.affected, result.anchor)
 	case .Line:
 		for index in 0..<result.path_count {
@@ -449,7 +477,22 @@ evaluate_target_query :: proc(
 		}
 	}
 	if spec.requires_line_of_sight || spec.stops_on_wall {
-		if blocker, blocked := targeting_path_blocker(room, result.origin, &result.path, result.path_count); blocked {
+		allow_blocked_destination := false
+		if spec.rule == .Opponent_Or_Object {
+			if object, found := grid_object_at(room, result.anchor); found {
+				allow_blocked_destination = entity_is_targetable_object(
+					room,
+					object_entity(object.id),
+				)
+			}
+		}
+		if blocker, blocked := targeting_path_blocker(
+			room,
+			result.origin,
+			&result.path,
+			result.path_count,
+			allow_blocked_destination,
+		); blocked {
 			result.error = .Line_Of_Sight_Blocked
 			result.blocker = blocker
 			result.has_blocker = true

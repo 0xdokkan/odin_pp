@@ -311,7 +311,10 @@ Ulteriori garanzie dello scheduler sono:
   esiste ancora un `action_group_id`, quindi movimenti e attacchi di piu nemici
   non possono essere raggruppati in parallelo senza perdere causalita.
 
-Traccia e blocker statici sono gia condivisi con il targeting delle carte. Le
+Traccia e blocker statici sono gia condivisi con il targeting delle carte. Gli
+oggetti fisici vengono ricontrollati alla risoluzione: possono produrre
+`Move_Blocked` su movimento/carica oppure `Attack_Missed` entrando nella linea
+di tiro di un arciere senza cambiare il target committed. Le
 future footprint nemiche dovranno consumare la stessa autorita geometrica e poi
 essere copiate nell'intento committed. Il renderer deve continuare a ricevere
 celle gia calcolate, senza reimplementare le regole.

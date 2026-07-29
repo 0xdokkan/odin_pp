@@ -7,6 +7,7 @@ import view "../view"
 MAX_PRESENTATION_CUES :: game.MAX_GAME_EVENTS
 MAX_PRESENTATION_LOOT :: game.MAX_ENEMIES_PER_ROOM*2
 MAX_PRESENTATION_TRAPS :: game.MAX_TRAPS_PER_ROOM
+MAX_PRESENTATION_GRID_OBJECTS :: game.MAX_GRID_OBJECTS_PER_ROOM
 
 // Values above one slow every cue while preserving their relative rhythm.
 PRESENTATION_TIME_SCALE           :: f32(1.35)
@@ -32,6 +33,7 @@ PRESENTATION_TIME_EPSILON         :: f32(0.00001)
 Presentation_Cue_Kind :: enum {
 	Move,
 	Trap_Triggered,
+	Hazard_Triggered,
 	Damage,
 	Damage_Absorbed,
 	Heal,
@@ -74,6 +76,16 @@ Presentation_Loot :: struct {
 	visible:  bool,
 }
 
+Presentation_Grid_Object :: struct {
+	entity:     game.Entity_Ref,
+	kind:       game.Grid_Object_Kind,
+	position:   view.Vec2,
+	health:     i32,
+	max_health: i32,
+	opacity:    f32,
+	visible:    bool,
+}
+
 Room_Presentation :: struct {
 	phase:       game.Room_Phase,
 	player:      Presentation_Actor,
@@ -82,6 +94,8 @@ Room_Presentation :: struct {
 	enemy_count: int,
 	traps:       [MAX_PRESENTATION_TRAPS]game.Trap,
 	trap_count:  int,
+	objects:      [MAX_PRESENTATION_GRID_OBJECTS]Presentation_Grid_Object,
+	object_count: int,
 	loot:        [MAX_PRESENTATION_LOOT]Presentation_Loot,
 	loot_count:  int,
 	gold:        i32,
@@ -151,6 +165,20 @@ capture_room_presentation :: proc(room: ^game.Room) -> (result: Room_Presentatio
 	for index in 0..<result.trap_count {
 		result.traps[index] = room.traps[index]
 	}
+	result.object_count = min(len(room.objects), MAX_PRESENTATION_GRID_OBJECTS)
+	result.dropped += max(0, len(room.objects)-result.object_count)
+	for index in 0..<result.object_count {
+		object := room.objects[index]
+		result.objects[index] = {
+			entity = game.object_entity(object.id),
+			kind = object.kind,
+			position = presentation_position(object.position),
+			health = object.health,
+			max_health = object.max_health,
+			opacity = 1,
+			visible = true,
+		}
+	}
 
 	result.loot_count = min(len(room.loot), MAX_PRESENTATION_LOOT)
 	result.dropped += max(0, len(room.loot)-result.loot_count)
@@ -196,6 +224,32 @@ presentation_actor :: proc(
 		return nil, false
 	}
 	return presentation_actor_in_view(&timeline.view, entity)
+}
+
+presentation_grid_object_in_view :: proc(
+	presentation: ^Room_Presentation,
+	entity: game.Entity_Ref,
+) -> (^Presentation_Grid_Object, bool) {
+	if presentation == nil || !presentation.valid || entity.kind != .Object || entity.id == 0 ||
+	   presentation.object_count < 0 || presentation.object_count > len(presentation.objects) {
+		return nil, false
+	}
+	for index in 0..<presentation.object_count {
+		if presentation.objects[index].entity == entity {
+			return &presentation.objects[index], true
+		}
+	}
+	return nil, false
+}
+
+presentation_grid_object :: proc(
+	timeline: ^Presentation_Timeline,
+	entity: game.Entity_Ref,
+) -> (^Presentation_Grid_Object, bool) {
+	if timeline == nil {
+		return nil, false
+	}
+	return presentation_grid_object_in_view(&timeline.view, entity)
 }
 
 presentation_trap :: proc(
@@ -244,6 +298,8 @@ presentation_cue_kind :: proc(event: game.Game_Event) -> Presentation_Cue_Kind {
 		return .Attack_Missed
 	case .Trap_Triggered:
 		return .Trap_Triggered
+	case .Hazard_Triggered:
+		return .Hazard_Triggered
 	case .Gold_Gained:
 		return .Gold_Gained
 	case .Loot_Dropped:
@@ -288,7 +344,7 @@ presentation_cue_duration :: proc(kind: Presentation_Cue_Kind, event: game.Game_
 		if event.kind == .Movement_Step {
 			return PRESENTATION_MOVEMENT_STEP_DURATION
 		}
-		if event.target.kind == .Enemy {
+		if event.target.kind == .Enemy || event.target.kind == .Object {
 			return PRESENTATION_ENEMY_MOVE_DURATION
 		}
 		return PRESENTATION_PLAYER_MOVE_DURATION
@@ -315,7 +371,8 @@ presentation_cue_duration :: proc(kind: Presentation_Cue_Kind, event: game.Game_
 		return PRESENTATION_DEFEAT_DURATION
 	case .Loot:
 		return PRESENTATION_LOOT_DURATION
-	case .Attack_Missed, .Move_Blocked, .Trap_Triggered, .Gold_Gained, .Loot_Dropped:
+	case .Attack_Missed, .Move_Blocked, .Trap_Triggered, .Hazard_Triggered, .Gold_Gained,
+	     .Loot_Dropped:
 		return PRESENTATION_NOTICE_DURATION
 	case .Pulse_Advanced:
 		return PRESENTATION_PULSE_DURATION
@@ -694,16 +751,40 @@ apply_presentation_trap_triggered :: proc(
 	return true
 }
 
+presentation_hazard_trigger_is_valid :: proc(
+	timeline: ^Presentation_Timeline,
+	event: game.Game_Event,
+) -> bool {
+	if timeline == nil || event.kind != .Hazard_Triggered || event.source.kind != .Object ||
+	   (event.target.kind != .Player && event.target.kind != .Enemy) || event.amount <= 0 ||
+	   event.from_position != event.to_position {
+		return false
+	}
+	object, object_found := presentation_grid_object(timeline, event.source)
+	actor, actor_found := presentation_actor(timeline, event.target)
+	if !object_found || !actor_found || !object.visible ||
+	   object.position != presentation_position(event.from_position) ||
+	   actor.position != presentation_position(event.to_position) {
+		return false
+	}
+	definition, definition_found := game.grid_object_definition(object.kind)
+	return definition_found && definition.hazardous &&
+	       definition.hazard_damage == event.amount
+}
+
 start_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^Presentation_Cue) {
 	assert(timeline != nil && cue != nil && !cue.started)
 	cue.started = true
 	event := cue.event
 	actor, has_actor := presentation_actor(timeline, event.target)
+	object, has_object := presentation_grid_object(timeline, event.target)
 
 	switch cue.kind {
 	case .Move:
 		if has_actor {
 			actor.position = presentation_position(event.from_position)
+		} else if has_object {
+			object.position = presentation_position(event.from_position)
 		} else {
 			timeline.update_failures += 1
 		}
@@ -711,9 +792,15 @@ start_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^Presentat
 		if !apply_presentation_trap_triggered(timeline, event) {
 			timeline.update_failures += 1
 		}
+	case .Hazard_Triggered:
+		if !presentation_hazard_trigger_is_valid(timeline, event) {
+			timeline.update_failures += 1
+		}
 	case .Damage:
 		if has_actor {
 			actor.health = max(i32(0), actor.health-max(i32(0), event.amount))
+		} else if has_object {
+			object.health = max(i32(0), object.health-max(i32(0), event.amount))
 		} else {
 			timeline.update_failures += 1
 		}
@@ -749,6 +836,9 @@ start_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^Presentat
 		if has_actor {
 			actor.health = 0
 			actor.opacity = 1
+		} else if has_object {
+			object.health = 0
+			object.opacity = 1
 		} else {
 			timeline.update_failures += 1
 		}
@@ -798,7 +888,8 @@ start_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^Presentat
 update_active_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^Presentation_Cue) {
 	assert(timeline != nil && cue != nil && cue.started)
 	actor, has_actor := presentation_actor(timeline, cue.event.target)
-	if !has_actor {
+	object, has_object := presentation_grid_object(timeline, cue.event.target)
+	if !has_actor && !has_object {
 		return
 	}
 	progress := presentation_cue_eased_progress(cue)
@@ -806,14 +897,24 @@ update_active_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^P
 	case .Move:
 		from := presentation_position(cue.event.from_position)
 		to := presentation_position(cue.event.to_position)
-		actor.position = {
+		position := view.Vec2{
 			x = from.x+(to.x-from.x)*progress,
 			y = from.y+(to.y-from.y)*progress,
 		}
+		if has_actor {
+			actor.position = position
+		} else {
+			object.position = position
+		}
 	case .Defeat:
-		actor.opacity = 1-presentation_cue_progress(cue)
-	case .Trap_Triggered, .Damage, .Damage_Absorbed, .Heal, .Status_Applied, .Status_Removed,
-	     .Status_Expired, .Card_Played, .Card_Drawn, .Card_Moved, .Card_Created,
+		opacity := 1-presentation_cue_progress(cue)
+		if has_actor {
+			actor.opacity = opacity
+		} else {
+			object.opacity = opacity
+		}
+	case .Trap_Triggered, .Hazard_Triggered, .Damage, .Damage_Absorbed, .Heal, .Status_Applied,
+	     .Status_Removed, .Status_Expired, .Card_Played, .Card_Drawn, .Card_Moved, .Card_Created,
 	     .Refocus, .Card_Refocused,
 	     .Loot_Dropped, .Loot, .Attack_Missed,
 	     .Move_Blocked, .Gold_Gained, .Binding_Added, .Binding_Exhausted,
@@ -834,6 +935,12 @@ finish_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^Presenta
 		} else if visible_presentation_enemy_count(&timeline.view) == 0 {
 			timeline.view.phase = .Loot
 		}
+	} else if object, object_found := presentation_grid_object(
+		timeline,
+		cue.event.target,
+	); object_found {
+		object.opacity = 0
+		object.visible = false
 	}
 }
 

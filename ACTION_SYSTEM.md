@@ -264,8 +264,9 @@ descritto sopra.
 
 Un movimento multi-cella entra nella stanza una cella alla volta. Gli step
 intermedi producono `Movement_Step`, quello terminale `Moved`; dopo ogni ingresso
-viene risolta immediatamente l'eventuale trappola. Il contratto completo, inclusi
-`Teleport` e interruzione letale del percorso, e in
+vengono risolti immediatamente trappole e grid object pericolosi. Il contratto
+completo, inclusi `Teleport`, `Fire` persistente e interruzione letale del
+percorso, e in
 [Movement System](MOVEMENT_SYSTEM.md).
 
 ### Carica del bruto
@@ -296,6 +297,14 @@ e il destinatario del danno. Il trigger disarma la trappola, registra
 `Trap_Triggered` e applica il danno tramite le stesse primitive di shield, morte
 e loot del resolver. Durante un movimento l'ordine e sempre evento di ingresso,
 trigger, danno ed eventuale sconfitta.
+
+### Grid object pericoloso
+
+Un oggetto con capability `hazardous` diventa sorgente del danno quando player o
+nemico entrano nella sua cella. `Fire` registra `Hazard_Triggered`, resta nella
+stanza e applica `hazard_damage` attraverso la stessa pipeline di difesa, Shield,
+morte e loot. Il trigger e legato all'ingresso: stare fermi sopra la cella non
+crea un'altra azione.
 
 ## Compilazione delle carte
 
@@ -345,8 +354,9 @@ non ricalcola la geometria: riceve destinatari gia compilati e conserva la
 propria responsabilita limitata alle mutazioni. La destinazione di un effetto
 `Move` viene invece rivalidata al momento dell'applicazione, perche effetti
 precedenti possono aver cambiato occupazione o vita del mover.
-Se la sorgente muore durante un effetto, per esempio entrando in una trappola,
-il resolver conta come skipped gli effetti rimanenti e termina l'azione.
+Se la sorgente muore durante un effetto, per esempio entrando in una trappola o
+nel fuoco, il resolver conta come skipped gli effetti rimanenti e termina
+l'azione.
 
 ## Limiti intenzionali
 

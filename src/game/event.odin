@@ -31,6 +31,7 @@ Game_Event_Kind :: enum {
 	Card_Refocused,
 	Movement_Step,
 	Trap_Triggered,
+	Hazard_Triggered,
 }
 
 Game_Event :: struct {
@@ -38,6 +39,8 @@ Game_Event :: struct {
 	source:           Entity_Ref,
 	target:           Entity_Ref,
 	amount:           i32,
+	has_status_cause: bool,
+	status_cause:     Status_Kind,
 	status:           Status_Kind,
 	duration:         i32,
 	from_position:    grid.Position,

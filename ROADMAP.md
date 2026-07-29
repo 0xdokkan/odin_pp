@@ -164,13 +164,13 @@ resta in corso finche costi dinamici e selezione dello scarto non sono integrati
 - query pura `Movement_Query` con semantiche `Traverse` e `Teleport`;
 - percorso cella per cella, blocker statici/attori e corner squeeze condivisi;
 - hazard neutrali per player e nemici, con ordine esplicito
-  `Movement -> Trap -> Damage -> Defeat`;
+  `Movement -> Trigger -> Damage -> Defeat`;
 - `Shove`, `Dash` e `Grappling Hook` sopra normali effect template;
 - preview, drop e compilazione alimentati dalla stessa valutazione di targeting e
   movimento;
 - spostamenti forzati che rendono stale gli intenti committed senza retargeting;
-- replay FIFO di `Movement_Step` e `Trap_Triggered`, con envelope eventi
-  `258 + 158 = 416`.
+- replay FIFO di `Movement_Step`, `Trap_Triggered` e `Hazard_Triggered`, con
+  envelope eventi `258 + 158 = 416`.
 
 Il contratto di M4C e descritto in [Movement System](MOVEMENT_SYSTEM.md).
 
@@ -185,6 +185,61 @@ Il contratto di M4C e descritto in [Movement System](MOVEMENT_SYSTEM.md).
 
 Il prossimo incremento deve essere scelto dai risultati di playtest, non dalla
 sola disponibilita di una nuova primitiva.
+
+### [x] M4C.2 - Telemetria di playtest
+
+- snapshot e descrittore pre-comando collegati all'unico dispatcher di input;
+- sample per tentativi accepted/rejected e aggregati per stanza e intera run;
+- breakdown nominato per comando e carta, inclusi target pianificati/reali,
+  danno, energia, Poison, Refocus, movimento forzato e combo con trappole;
+- confronto osservabile fra bump, `Strike` e `Heavy Blow` quando tutte e tre le
+  opzioni sono disponibili;
+- report JSON deterministico con schema versionato, integrita esplicita e
+  outcome `Victory`, `Defeat` o `Abandoned`;
+- acquisizione interattiva e smoke headless senza inizializzare Raylib;
+- test di attribuzione, aggregazione exactly-once e serializzazione stabile.
+
+Il formato, i confini di attribuzione e i comandi CLI sono descritti in
+[Combat Telemetry](COMBAT_TELEMETRY.md). I risultati di piu run comparabili
+decideranno se il prossimo intervento sara tuning del contenuto o una primitiva
+di controllo come `Slow`/`Root`.
+
+### [x] M4C.3 - Oggetti fisici sulla griglia
+
+- dominio `Grid_Object` data-driven con ID stabile e capability separate per
+  movimento, LoS, targeting, danno e spostamento;
+- query spaziali condivise da player, AI, cariche, targeting e movimento;
+- Ice Block targetabile, spostabile con `Shove`, danneggiabile e distruttibile;
+- policy esplicita: gli oggetti spinti non attivano le trappole e non governano
+  la fine del combat;
+- replay timeline di movimento, danno e distruzione, renderer isometrico e smoke
+  `--smoke-object`;
+- test di storage, overlap, collisione, LoS, action resolver e snapshot.
+
+Il contratto e descritto in [Grid Object System](GRID_OBJECT_SYSTEM.md). Lo
+spawn procedurale resta rinviato finche la connettivita non considera gli
+oggetti solidi.
+
+### [x] M4C.4 - Fire persistente
+
+- capability data-driven `hazardous` e `hazard_damage`, indipendenti da
+  collisione, LoS, targeting, danno e movimento;
+- `Fire` attraversabile e trasparente che infligge 2 danni a player e nemici
+  dopo ogni ingresso in `Combat` o `Loot`;
+- policy entry-only: nessun tick su `Wait` o permanenza, ogni cella attraversata
+  viene risolta, la landing di `Teleport` viene risolta una volta;
+- pipeline condivisa per difesa, Shield, morte, loot e cambio di fase, senza
+  consumare la fiamma;
+- evento `Hazard_Triggered`, replay `BURN`, renderer a strati e smoke
+  `--smoke-fire`;
+- telemetria generica `object_hazard_*`, separata per trigger e danno effettivo
+  su player/nemici, con aggregazione e JSON deterministici;
+- test di catalogo, overlap, geometria, danno, Shield, morte, fase, targeting,
+  timeline e telemetria.
+
+Il contratto e descritto in [Grid Object System](GRID_OBJECT_SYSTEM.md) e
+[Movement System](MOVEMENT_SYSTEM.md). `Chest` resta la prossima slice degli
+oggetti: provera stato chiuso/aperto, interazione e ricompensa one-shot.
 
 ### [ ] M4D - Reazioni e nuove geometrie
 

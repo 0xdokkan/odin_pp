@@ -12,6 +12,7 @@
 *.obj
 *.ll
 /odin_pp
+/odin_pp_playtest_*.json
 
 # Segreti
 .env

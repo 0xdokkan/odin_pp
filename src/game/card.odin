@@ -472,7 +472,7 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 		shop_base_price = 4,
 		cost = 1,
 		targeting = {
-			rule = .Adjacent_Opponent,
+			rule = .Opponent_Or_Object,
 			cast_range = {.Manhattan, 1, 1},
 			shape = .Single,
 		},
@@ -718,7 +718,7 @@ card_drop_target :: proc(
 
 card_target_rule_selects_effect_entity :: proc(rule: Target_Rule) -> bool {
 	switch rule {
-	case .Self, .Player, .Opponent, .Adjacent_Opponent:
+	case .Self, .Player, .Opponent, .Opponent_Or_Object, .Adjacent_Opponent:
 		return true
 	case .Any, .None, .Entity, .Cell, .Walkable_Cell:
 		return false
@@ -1029,7 +1029,7 @@ card_compile_error_from_movement :: proc(err: Movement_Error) -> Card_Compile_Er
 	switch err {
 	case .None:
 		return .None
-	case .Static_Blocker, .Actor_Blocker:
+	case .Static_Blocker, .Actor_Blocker, .Object_Blocker:
 		return .Target_Blocked
 	case .Invalid_Room:
 		return .Invalid_Room

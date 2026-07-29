@@ -191,7 +191,9 @@ has_blocker = true
 blocker     = posizione del blocco
 ```
 
-Pareti, tile non calpestabili e ostacoli della stanza bloccano la vista. Gli
+Pareti, tile non calpestabili, ostacoli della stanza e oggetti con
+`blocks_line_of_sight` bloccano la vista. Un oggetto targetable puo essere
+l'endpoint del ray: occlude le celle successive, non se stesso. Gli
 attori sono trasparenti alla LoS.
 
 Un passo diagonale non puo passare nello spazio fra due blocchi ortogonali. Se
@@ -366,7 +368,7 @@ L'energia non appartiene alla query. Il renderer la usa per il colore, mentre
 | `Piercing_Ray` | Chebyshev 1-5 | `Line` | otto direzioni, attraversa attori, danno a ogni nemico nella linea |
 | `Cross_Slash` | Manhattan 1-3 | `Cross`, raggio 1 | anchor calpestabile, LoS e bracci fermati dai muri |
 | `Firebomb` | Chebyshev 1-3 | `Square`, raggio 1 | anchor calpestabile, LoS, footprint 3x3 |
-| `Shove` | Manhattan 1 | `Single` | avversario adiacente; landing una cella lontano dal player |
+| `Shove` | Manhattan 1 | `Single` | avversario o oggetto targetable adiacente; landing una cella lontano dal player |
 | `Dash` | Chebyshev 1-3 | `Line` | anchor calpestabile; percorre ogni cella fino alla landing |
 | `Grappling_Hook` | Chebyshev 2-4 | `Line` | avversario, LoS e actor stop; landing adiacente al player |
 
@@ -407,10 +409,10 @@ geometrici in `Card_Compile_Error`:
 `No_Effects` e `Too_Many_Effects` vengono aggiunti da
 `evaluate_card_targeting`, dopo una query geometrica riuscita.
 
-Se e presente un movimento obbligatorio, `Static_Blocker` e `Actor_Blocker`
-diventano `Target_Blocked`; bounds, allineamento, lunghezza o mover invalidi
-diventano `Invalid_Target`. Il dettaglio originale resta disponibile in
-`Card_Target_Evaluation.movement` per la preview.
+Se e presente un movimento obbligatorio, `Static_Blocker`, `Actor_Blocker` e
+`Object_Blocker` diventano `Target_Blocked`; bounds, allineamento, lunghezza o
+mover invalidi diventano `Invalid_Target`. Il dettaglio originale resta
+disponibile in `Card_Target_Evaluation.movement` per la preview.
 
 ## Limiti fissi
 

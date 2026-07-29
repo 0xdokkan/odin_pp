@@ -19,6 +19,7 @@ Movement_Error :: enum {
 	Path_Too_Long,
 	Static_Blocker,
 	Actor_Blocker,
+	Object_Blocker,
 }
 
 Movement_Query :: struct {
@@ -54,7 +55,59 @@ movement_actor_blocks :: proc(
 		_, occupied := enemy_index_at(room, position, mover_index)
 		return occupied
 	}
+	if mover.kind == .Object {
+		if room.player.position == position {
+			return true
+		}
+		_, occupied := enemy_index_at(room, position)
+		return occupied
+	}
 	return true
+}
+
+movement_object_blocks :: proc(
+	room: ^Room,
+	mover: Entity_Ref,
+	position: grid.Position,
+) -> bool {
+	assert(room != nil)
+	if mover.kind != .Object {
+		return false
+	}
+	mover_index, found := object_index_by_id(room, mover.id)
+	if !found {
+		return true
+	}
+	_, occupied := object_index_at(room, position, mover_index)
+	return occupied
+}
+
+movement_path_blocker :: proc(
+	room: ^Room,
+	origin: grid.Position,
+	path: ^[MAX_MOVEMENT_PATH_CELLS]grid.Position,
+	path_count: int,
+) -> (blocker: grid.Position, found: bool) {
+	if room == nil || path == nil || path_count < 0 || path_count > MAX_MOVEMENT_PATH_CELLS {
+		return {}, true
+	}
+	previous := origin
+	for position in path[:path_count] {
+		if cell_blocks_movement(room, position) {
+			return position, true
+		}
+		step_x := position.x-previous.x
+		step_y := position.y-previous.y
+		if step_x != 0 && step_y != 0 {
+			side_x := grid.Position{x = previous.x+step_x, y = previous.y}
+			side_y := grid.Position{x = previous.x, y = previous.y+step_y}
+			if cell_blocks_movement(room, side_x) && cell_blocks_movement(room, side_y) {
+				return side_x, true
+			}
+		}
+		previous = position
+	}
+	return
 }
 
 query_entity_movement :: proc(
@@ -71,8 +124,18 @@ query_entity_movement :: proc(
 		return
 	}
 	query.error = .Invalid_Mover
-	if mover.kind != .Player && mover.kind != .Enemy {
+	if mover.kind != .Player && mover.kind != .Enemy && mover.kind != .Object {
 		return
+	}
+	if mover.kind == .Object {
+		object_index, object_found := object_index_by_id(room, mover.id)
+		if !object_found {
+			return
+		}
+		definition, definition_found := grid_object_definition(room.objects[object_index].kind)
+		if !definition_found || !definition.movable {
+			return
+		}
 	}
 	origin, found := entity_position(room, mover)
 	if !found {
@@ -106,7 +169,7 @@ query_entity_movement :: proc(
 	}
 
 	if mode == .Traverse {
-		if blocker, blocked := targeting_path_blocker(
+		if blocker, blocked := movement_path_blocker(
 			room,
 			origin,
 			&query.cells,
@@ -117,7 +180,7 @@ query_entity_movement :: proc(
 			query.has_blocker = true
 			return
 		}
-	} else if targeting_static_blocker_at(room, destination) {
+	} else if cell_blocks_movement(room, destination) {
 		// Teleport checks only its landing cell; intermediate geometry is ignored.
 		query.error = .Static_Blocker
 		query.blocker = destination
@@ -126,6 +189,12 @@ query_entity_movement :: proc(
 	}
 	for index in 0..<query.count {
 		position := query.cells[index]
+		if movement_object_blocks(room, mover, position) {
+			query.error = .Object_Blocker
+			query.blocker = position
+			query.has_blocker = true
+			return
+		}
 		if movement_actor_blocks(room, mover, position) {
 			query.error = .Actor_Blocker
 			query.blocker = position
@@ -151,6 +220,10 @@ set_entity_position :: proc(room: ^Room, entity: Entity_Ref, position: grid.Posi
 		index, found := enemy_index_by_id(room, entity.id)
 		assert(found)
 		room.enemies[index].position = position
+	case .Object:
+		index, found := object_index_by_id(room, entity.id)
+		assert(found)
+		room.objects[index].position = position
 	case .Trap, .System:
 		unreachable()
 	}
