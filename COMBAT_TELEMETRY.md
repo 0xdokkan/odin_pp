@@ -84,11 +84,15 @@ sequenza di comandi, la serializzazione e byte-per-byte deterministica.
 `run_max_distance_scenario` esegue una policy headless con tie-break interamente
 deterministici. Per ogni candidato `North`, `East`, `South`, `West` e `Wait`:
 
-1. preferisce celle non minacciate dagli intenti committed;
-2. massimizza la distanza minima dalle posizioni nemiche previste;
-3. massimizza la somma delle distanze;
-4. conserva la direzione precedente;
-5. usa l'ordine fisso dei candidati.
+Gli spostamenti vengono validati con `query_entity_movement`, inclusi gli
+oggetti solidi. Wait viene valutato separatamente e non attiva hazard di ingresso.
+
+1. minimizza il danno da trappole armate e oggetti pericolosi nella destinazione;
+2. preferisce celle non minacciate dagli intenti committed;
+3. massimizza la distanza minima dalle posizioni nemiche previste;
+4. massimizza la somma delle distanze;
+5. conserva la direzione precedente;
+6. usa l'ordine fisso dei candidati.
 
 Lo scenario termina per budget, fine combattimento, sconfitta o comando
 rifiutato e restituisce stato iniziale/finale insieme alle metriche. Il test ad
@@ -104,14 +108,20 @@ odin run src -- --playtest-report
 ```
 
 Il report viene scritto come `odin_pp_playtest_<seed>.json` alla conclusione,
-al restart o alla chiusura. Per esercitare lo stesso lifecycle senza aprire una
+al restart o alla chiusura. Se esiste gia, si aggiunge `_1`, `_2`, ecc.; il file
+viene creato in modo esclusivo, proteggendo anche processi concorrenti.
+`--playtest-output=/percorso/sessione.json` sceglie il percorso di base e attiva
+la telemetria. Il nome effettivo viene stampato e non entra nel JSON.
+`--seed=123` oppure `--seed=0xC0FFEE` sceglie il seed della run.
+Per esercitare lo stesso lifecycle senza aprire una
 finestra:
 
 ```sh
 odin run src -- --smoke-playtest
 ```
 
-Lo scenario deterministico produce `odin_pp_playtest_smoke.json`.
+Lo scenario deterministico produce `odin_pp_playtest_smoke.json`; qui la
+sovrascrittura resta intenzionale, anche con un percorso esplicito.
 
 ```sh
 odin test src/combatdebug -all-packages -define:ODIN_TEST_THREADS=1 -vet -strict-style

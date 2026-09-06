@@ -18,6 +18,8 @@ expect_blueprints_equal :: proc(t: ^testing.T, first, second: ^Room_Blueprint) {
 	testing.expect_value(t, first.source_node, second.source_node)
 	testing.expect_value(t, first.node_kind, second.node_kind)
 	testing.expect_value(t, first.node_depth, second.node_depth)
+	testing.expect_value(t, first.encounter_kind, second.encounter_kind)
+	testing.expect_value(t, first.modifier, second.modifier)
 	testing.expect_value(t, first.exit_position, second.exit_position)
 	testing.expect_value(t, first.level_data.tiles.width, second.level_data.tiles.width)
 	testing.expect_value(t, first.level_data.tiles.height, second.level_data.tiles.height)
@@ -37,6 +39,10 @@ expect_blueprints_equal :: proc(t: ^testing.T, first, second: ^Room_Blueprint) {
 	testing.expect_value(t, len(first.traps), len(second.traps))
 	for trap, index in first.traps {
 		testing.expect_value(t, trap, second.traps[index])
+	}
+	testing.expect_value(t, len(first.objects), len(second.objects))
+	for object, index in first.objects {
+		testing.expect_value(t, object, second.objects[index])
 	}
 }
 
@@ -109,7 +115,7 @@ test_room_generation_profiles_scale_by_node_kind :: proc(t: ^testing.T) {
 	defer destroy_room_blueprint(&boss_blueprint)
 	testing.expect(t, len(boss_blueprint.enemies) > 0)
 	if len(boss_blueprint.enemies) > 0 {
-		testing.expect_value(t, boss_blueprint.enemies[0].archetype, Enemy_Archetype.Brute)
+		testing.expect_value(t, boss_blueprint.enemies[0].archetype, Enemy_Archetype.Demolitionist)
 	}
 }
 

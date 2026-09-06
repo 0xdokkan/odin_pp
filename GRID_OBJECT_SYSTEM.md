@@ -1,12 +1,16 @@
 # Grid Object System
 
-Questa guida descrive gli oggetti persistenti sulla griglia. Le prime due
-vertical slice separano due famiglie di comportamento:
+Questa guida descrive gli oggetti persistenti sulla griglia:
 
 - `Ice_Block` occupa una cella, blocca movimento e linea di vista, puo essere
   selezionato, danneggiato, spinto e distrutto;
 - `Fire` e attraversabile e trasparente, ma infligge danno a player e nemici
-  ogni volta che entrano nella sua cella.
+  ogni volta che entrano nella sua cella;
+- `Barrel` e solido e spostabile: un colpo accende una miccia;
+- `Bomb` e attraversabile e spostabile, lanciata gia accesa dal Bombarolo.
+
+Micce, combo e fine combattimento sono descritti in
+[Combattimento tattico](TACTICAL_COMBAT.md).
 
 Il sistema e collegato a [Action System](ACTION_SYSTEM.md),
 [Targeting System](TARGETING_SYSTEM.md), [Movement System](MOVEMENT_SYSTEM.md),
@@ -46,6 +50,8 @@ sono capability indipendenti, espresse da query specifiche.
 Grid_Object_Kind :: enum {
 	Ice_Block,
 	Fire,
+	Barrel,
+	Bomb,
 	Count,
 }
 
@@ -60,6 +66,7 @@ Grid_Object_Definition :: struct {
 	movable:              bool,
 	hazardous:            bool,
 	hazard_damage:        i32,
+	explosive:            bool,
 }
 
 Grid_Object :: struct {
@@ -68,6 +75,7 @@ Grid_Object :: struct {
 	position:   grid.Position,
 	max_health: i32,
 	health:     i32,
+	detonation_pulse: u64,
 }
 ```
 
@@ -95,6 +103,7 @@ abbiano le stesse regole e concentra la validazione in un solo catalogo.
 | `movable` | autorizza `Effect.Move` e la relativa query |
 | `hazardous` | abilita il trigger quando un attore entra nella cella |
 | `hazard_damage` | quantita inviata alla pipeline condivisa del danno |
+| `explosive` | il danno accende la miccia durante Combat, senza consumare HP |
 
 `damageable`, `movable` e `hazardous` vengono ricontrollati dal gameplay, non
 soltanto dalla UI. Una preview non puo quindi autorizzare una mutazione che il
@@ -105,7 +114,8 @@ resolver non sa applicare. La validazione del catalogo richiede
 ## Storage e lifecycle
 
 `Room.objects` e un array dinamico limitato da
-`MAX_GRID_OBJECTS_PER_ROOM`. `next_object_id` assegna ID monotoni non nulli;
+`MAX_GRID_OBJECTS_PER_ROOM` (32), riservati gia alla creazione della stanza.
+`next_object_id` assegna ID monotoni non nulli;
 lookup e rimozione usano `object_index_at`, `object_index_by_id`,
 `grid_object_at` e `remove_grid_object`.
 
@@ -119,6 +129,10 @@ La regola di spawn e intenzionalmente piu stretta della collisione runtime:
 anche un `Fire` attraversabile non puo nascere sotto un attore. Entrarci deve
 restare una transizione osservabile, non danno implicito durante
 `create_room`.
+
+Lo spawn runtime del Bombarolo usa `spawn_bomb`: puo atterrare sotto un attore,
+ma non sopra un altro oggetto o un ostacolo. Il limite condiviso e quattro bombe
+accese, oltre al limite totale degli oggetti; un fallimento non consuma ID.
 
 `destroy_room` libera anche lo storage degli oggetti. La distruzione di un
 oggetto durante il fight non modifica `Room_Phase`: soltanto i nemici vivi
@@ -164,6 +178,20 @@ La preview, il drop della carta e `compile_card_action` condividono la stessa
 bloccata, il danno resta valido e il solo movimento viene saltato, come gia
 avveniva contro i nemici.
 
+Per usarla, trascinare Shove sul corpo dell'oggetto oppure selezionare il suo
+slot con `1`-`8` e cliccare. Il picking riconosce anche la parte rialzata del
+disegno: non la proietta sulla casella dietro. Strike e Arc Bolt usano la stessa
+correzione; Dash e le aree mantengono l'anchor sul pavimento. Gli attori disegnati
+sopra una bomba conservano la priorita di selezione.
+
+Shove mostra una freccia verso la destinazione, `BLOCKED` se e occupata e
+`BREAKS` se il danno distruggera prima il ghiaccio. Il pannello contestuale
+spiega adiacenza ortogonale, costo, carta assente dalla mano e miccia del barile.
+Camminare contro un barile non lo spinge durante Combat; colpirlo con Shove
+lo accende anche quando il movimento e bloccato. Spostarlo da acceso non
+posticipa l'esplosione. In Loot, il bump rimuove gli oggetti solidi spostabili
+per mantenere accessibile l'uscita senza richiedere una carta ancora in mano.
+
 Gli intenti nemici restano committed. Se un oggetto viene spinto sul percorso
 di un movimento o di una carica gia pianificati, la struttura dell'intento resta
 valida ma la risoluzione emette `Move_Blocked`. Se entra nella linea di tiro di
@@ -173,7 +201,9 @@ un arciere, l'attacco gia telegrafato emette `Attack_Missed`.
 
 `Effect.Damage` accetta un oggetto soltanto quando la sua definizione e
 `damageable`. Gli oggetti non ricevono difesa, shield, heal o status degli
-attori. Quando gli HP raggiungono zero:
+attori. Durante Combat un esplosivo spento si accende invece di perdere HP;
+uno gia acceso rifiuta ulteriore danno. Per gli altri oggetti, quando gli HP
+raggiungono zero:
 
 1. viene emesso `Damaged`;
 2. l'istanza viene rimossa da `Room.objects`;
@@ -244,9 +274,10 @@ Lo smoke deterministico prepara `Shove` contro un blocco adiacente:
 odin run src -- --smoke-object
 ```
 
-Il comando salva `odin_pp_ice_block.png`. La generazione procedurale non crea
-ancora oggetti: prima dovra includerli nella connettivita e mantenere separato lo
-stream RNG, per non cambiare nemici e trappole dei seed esistenti.
+Il comando salva `odin_pp_ice_block.png`. La generazione procedurale inserisce
+Barrel, Ice Block e Fire dopo gli altri contenuti e verifica la connettivita
+evitando anche le celle Fire. Aumentare il numero di oggetti non consuma RNG
+aggiuntivo e non sposta gli spawn gia scelti.
 
 Lo smoke di `Fire` fa entrare il player nella cella, avanza la timeline fino al
 cue e conserva la fiamma nello snapshot:
@@ -276,7 +307,6 @@ Questo comportamento non viene anticipato dentro gli oggetti esistenti.
 ## Limiti intenzionali
 
 - nessuna occupancy grid o ECS;
-- nessuno spawn procedurale di oggetti;
 - nessun depth sort globale fra attori e volumi alti;
 - nessuno status o reaction binding posseduto dagli oggetti;
 - nessun trigger di trappola da oggetto;

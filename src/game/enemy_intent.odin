@@ -15,6 +15,9 @@ Enemy_Intent_Kind :: enum {
 	Move,
 	Attack,
 	Charge,
+	Bombard,
+	Recover,
+	Protect,
 }
 
 Enemy_Intent :: struct {
@@ -27,6 +30,7 @@ Enemy_Intent :: struct {
 	threatened_cell_count: int,
 	damage:                i32,
 	planned_pulse:         u64,
+	protected_ally:        Entity_Ref,
 }
 
 enemy_intent_kind_name :: proc(kind: Enemy_Intent_Kind) -> string {
@@ -41,6 +45,12 @@ enemy_intent_kind_name :: proc(kind: Enemy_Intent_Kind) -> string {
 		return "Attack"
 	case .Charge:
 		return "Charge"
+	case .Bombard:
+		return "Bombard"
+	case .Recover:
+		return "Recover"
+	case .Protect:
+		return "Protect"
 	}
 	return "Unknown"
 }
@@ -165,6 +175,39 @@ make_attack_intent :: proc(
 	return result
 }
 
+// Campo delle distanze statiche al player. Gli attori vengono considerati dalle
+// prenotazioni del singolo passo, cosi le destinazioni restano ordinate per ID.
+rebuild_enemy_path_distances :: proc(room: ^Room) {
+	for &distance in room.enemy_path_distances {
+		distance = -1
+	}
+	tiles := &room.level_data.tiles
+	start, valid := grid.index_of(tiles, room.player.position)
+	if !valid {
+		return
+	}
+	room.enemy_path_distances[start] = 0
+	room.enemy_path_queue[0] = room.player.position
+	head := 0
+	count := 1
+	steps := [?]grid.Position{{0, -1}, {1, 0}, {0, 1}, {-1, 0}}
+	for head < count {
+		position := room.enemy_path_queue[head]
+		head += 1
+		index, _ := grid.index_of(tiles, position)
+		for step in steps {
+			next := add_position(position, step)
+			next_index, in_bounds := grid.index_of(tiles, next)
+			if !in_bounds || room.enemy_path_distances[next_index] >= 0 || cell_blocks_movement(room, next) {
+				continue
+			}
+			room.enemy_path_distances[next_index] = room.enemy_path_distances[index]+1
+			room.enemy_path_queue[count] = next
+			count += 1
+		}
+	}
+}
+
 plan_chaser_intent :: proc(
 	room: ^Room,
 	enemy: ^Enemy,
@@ -187,7 +230,12 @@ plan_chaser_intent :: proc(
 	if abs(delta_y) > abs(delta_x) {
 		first_step, second_step = second_step, first_step
 	}
-	steps := [?]grid.Position{first_step, second_step}
+	origin_index, valid_origin := grid.index_of(&room.level_data.tiles, origin)
+	if !valid_origin || room.enemy_path_distances[origin_index] < 0 {
+		return intent
+	}
+	best_distance := room.enemy_path_distances[origin_index]
+	steps := [?]grid.Position{first_step, second_step, {0, -1}, {1, 0}, {0, 1}, {-1, 0}}
 	for step in steps {
 		if step.x == 0 && step.y == 0 {
 			continue
@@ -202,11 +250,16 @@ plan_chaser_intent :: proc(
 		) {
 			continue
 		}
+		index, _ := grid.index_of(&room.level_data.tiles, target)
+		distance := room.enemy_path_distances[index]
+		if distance < 0 || distance >= best_distance {
+			continue
+		}
+		best_distance = distance
 		intent.kind = .Move
 		intent.destination = target
 		intent.path[0] = target
 		intent.path_count = 1
-		break
 	}
 	return intent
 }
@@ -306,6 +359,7 @@ plan_brute_intent :: proc(
 	origin: grid.Position,
 	predicted_positions: ^[MAX_ENEMIES_PER_ROOM]grid.Position,
 	enemy_count, ordered_index: int,
+	max_charge_range := BRUTE_MAX_CHARGE_RANGE,
 ) -> Enemy_Intent {
 	assert(room != nil && room.player != nil && enemy != nil && predicted_positions != nil)
 	player_position := room.player.position
@@ -314,7 +368,7 @@ plan_brute_intent :: proc(
 		return make_attack_intent(room, origin, player_position, enemy.attack)
 	}
 	if aligned && distance >= BRUTE_MIN_CHARGE_RANGE &&
-	   distance <= BRUTE_MAX_CHARGE_RANGE &&
+	   distance <= max_charge_range &&
 	   has_clear_orthogonal_line(room, origin, player_position) {
 		intent := make_wait_intent(room, origin)
 		intent.kind = .Charge
@@ -365,9 +419,15 @@ validate_enemy_intent_structure :: proc(room: ^Room, intent: ^Enemy_Intent) -> b
 	switch intent.kind {
 	case .None:
 		return false
-	case .Wait:
+	case .Wait, .Recover:
 		return intent.destination == intent.origin && intent.path_count == 0 &&
 		       intent.threatened_cell_count == 0 && intent.damage == 0
+	case .Protect:
+		return intent.protected_ally.kind == .Enemy && intent.protected_ally.id != 0 &&
+		       intent.path_count == 0 && intent.threatened_cell_count == 0 && intent.damage == 0 &&
+		       abs(intent.origin.x-intent.destination.x)+abs(intent.origin.y-intent.destination.y) > 0 &&
+		       abs(intent.origin.x-intent.destination.x)+abs(intent.origin.y-intent.destination.y) <= CUSTODIAN_PROTECT_RANGE &&
+		       base_cell_is_walkable(room, intent.destination) && !obstacle_at(room, intent.destination)
 	case .Move:
 		if intent.path_count != 1 || intent.threatened_cell_count != 0 ||
 		   intent.damage != 0 || intent.destination != intent.path[0] ||
@@ -396,6 +456,27 @@ validate_enemy_intent_structure :: proc(room: ^Room, intent: ^Enemy_Intent) -> b
 			}
 		}
 		return true
+	case .Bombard:
+		if intent.path_count != 0 || intent.damage != EXPLOSIVE_DAMAGE ||
+		   !base_cell_is_walkable(room, intent.destination) || obstacle_at(room, intent.destination) {
+			return false
+		}
+		for cell, index in intent.threatened_cells[:intent.threatened_cell_count] {
+			if !explosion_contains_cell(room, intent.destination, cell) ||
+			   position_in_list(intent.threatened_cells[:index], cell) {
+				return false
+			}
+		}
+		for y in intent.destination.y-1..=intent.destination.y+1 {
+			for x in intent.destination.x-1..=intent.destination.x+1 {
+				cell := grid.Position{x, y}
+				if explosion_contains_cell(room, intent.destination, cell) !=
+				   enemy_intent_cell_is_threatened(intent, cell) {
+					return false
+				}
+			}
+		}
+		return intent.threatened_cell_count > 0 && intent.threatened_cell_count <= 9
 	case .Charge:
 		if intent.path_count <= 0 || intent.destination != intent.path[intent.path_count-1] ||
 		   intent.threatened_cell_count <= 0 || intent.damage <= 0 {
@@ -469,7 +550,10 @@ plan_enemy_intents :: proc(room: ^Room) {
 	}
 
 	ids, enemy_count := enemy_ids_in_planning_order(room)
+	rebuild_enemy_path_distances(room)
 	predicted_positions: [MAX_ENEMIES_PER_ROOM]grid.Position
+	bomb_anchors: [MAX_ACTIVE_BOMBS]grid.Position
+	bomb_anchor_count := 0
 	for ordered_index in 0..<enemy_count {
 		enemy_index, found := enemy_index_by_id(room, ids[ordered_index])
 		assert(found)
@@ -481,6 +565,12 @@ plan_enemy_intents :: proc(room: ^Room) {
 		assert(found)
 		enemy := &room.enemies[enemy_index]
 		origin := predicted_positions[ordered_index]
+		update_demolitionist_phase(enemy)
+		if enemy.recovery_pulses > 0 {
+			enemy.intent = make_wait_intent(room, origin)
+			enemy.intent.kind = .Recover
+			continue
+		}
 		intent: Enemy_Intent
 		switch enemy.archetype {
 		case .Chaser:
@@ -510,8 +600,21 @@ plan_enemy_intents :: proc(room: ^Room) {
 				enemy_count,
 				ordered_index,
 			)
+		case .Bomber:
+			intent = plan_bomber_intent(room, enemy, origin, &predicted_positions,
+				enemy_count, ordered_index, bomb_anchors[:bomb_anchor_count])
+		case .Custodian:
+			intent = plan_custodian_intent(room, enemy, origin, &predicted_positions,
+				enemy_count, ordered_index)
+		case .Demolitionist:
+			intent = plan_demolitionist_intent(room, enemy, origin, &predicted_positions,
+				enemy_count, ordered_index, bomb_anchors[:bomb_anchor_count])
 		case .Count:
 			unreachable()
+		}
+		if intent.kind == .Bombard {
+			bomb_anchors[bomb_anchor_count] = intent.destination
+			bomb_anchor_count += 1
 		}
 		if intent.kind == .Move || intent.kind == .Charge {
 			predicted_positions[ordered_index] = intent.destination
@@ -564,7 +667,36 @@ resolve_enemy_intents :: proc(room: ^Room, pulse: ^Pulse_Report) {
 	}
 
 	ids, enemy_count := enemy_ids_in_planning_order(room)
+	protected_ids: [MAX_ENEMIES_PER_ROOM]u32
+	protected_count := 0
+	// Support resolves before natural movement, so an ally's ordinary move cannot
+	// cancel protection merely because it has a lower spawn ID. Player-forced
+	// displacement has already happened and still breaks the frozen intent.
 	for ordered_index in 0..<enemy_count {
+		enemy_index, found := enemy_index_by_id(room, ids[ordered_index])
+		if !found || room.enemies[enemy_index].intent.kind != .Protect {
+			continue
+		}
+		enemy := &room.enemies[enemy_index]
+		assert(validate_enemy_intent_structure(room, &enemy.intent))
+		protected_ids[protected_count] = enemy.id
+		protected_count += 1
+		resolve_custodian_protection(room, enemy, pulse)
+		if room.phase != .Combat {
+			return
+		}
+	}
+	for ordered_index in 0..<enemy_count {
+		already_resolved := false
+		for id in protected_ids[:protected_count] {
+			if id == ids[ordered_index] {
+				already_resolved = true
+				break
+			}
+		}
+		if already_resolved {
+			continue
+		}
 		enemy_index, found := enemy_index_by_id(room, ids[ordered_index])
 		if !found {
 			continue
@@ -576,12 +708,26 @@ resolve_enemy_intents :: proc(room: ^Room, pulse: ^Pulse_Report) {
 		source := enemy_entity(enemy.id)
 
 		switch intent.kind {
-		case .None:
+		case .None, .Protect:
 			unreachable()
 		case .Wait:
+			begin_demolitionist_approach(enemy)
+			continue
+		case .Recover:
+			enemy.recovery_pulses = max(i32(0), enemy.recovery_pulses-1)
+			continue
+		case .Bombard:
+			pulse.enemy_actions += 1
+			enemy.recovery_pulses = 1
+			begin_demolitionist_offense(enemy, intent.kind)
+			if enemy.position != intent.origin ||
+			   !spawn_bomb(room, source, intent.destination, &pulse.events) {
+				record_enemy_attack_miss(pulse, source, enemy.position, intent.destination)
+			}
 			continue
 		case .Attack:
 			pulse.enemy_actions += 1
+			begin_demolitionist_offense(enemy, intent.kind)
 			if enemy.position != intent.origin ||
 			   !enemy_intent_cell_is_threatened(&intent, room.player.position) ||
 			   (enemy.archetype == .Archer &&
@@ -605,6 +751,7 @@ resolve_enemy_intents :: proc(room: ^Room, pulse: ^Pulse_Report) {
 			}
 		case .Move:
 			pulse.enemy_actions += 1
+			begin_demolitionist_approach(enemy)
 			destination := intent.destination
 			if enemy.position != intent.origin ||
 			   !enemy_can_move_to(room, enemy_index, destination) {
@@ -628,6 +775,8 @@ resolve_enemy_intents :: proc(room: ^Room, pulse: ^Pulse_Report) {
 			}
 		case .Charge:
 			pulse.enemy_actions += 1
+			enemy.recovery_pulses = 1
+			begin_demolitionist_offense(enemy, intent.kind)
 			if !enemy_charge_path_is_clear(room, enemy_index, &intent) {
 				record_event(&pulse.events, {
 					kind = .Move_Blocked,

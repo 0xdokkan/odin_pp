@@ -648,7 +648,11 @@ draw_shop_screen :: proc(
 	)
 
 	selected_id := state.selected_card_id
-	_, selected_found := game.owned_card_index_by_id(&run.player.deck, selected_id)
+	selected_index, selected_found := game.owned_card_index_by_id(&run.player.deck, selected_id)
+	if selected_found {
+		rl.DrawText(card_upgrade_preview(run.player.deck.owned[selected_index]), 45, 454, 12,
+			rl.Color{169, 183, 177, 255})
+	}
 	upgrade_label: cstring = "UPGRADE"
 	upgrade_enabled := false
 	if run.shop.upgrade_used {
@@ -658,7 +662,7 @@ draw_shop_screen :: proc(
 			upgrade_label = fmt.ctprintf("UPGRADE %dG", price)
 			upgrade_enabled = game.shop_upgrade_can_be_bought(run, selected_id)
 		} else {
-			upgrade_label = "MAX UPGRADE"
+			upgrade_label = "UNAVAILABLE"
 		}
 	}
 	remove_label: cstring = "REMOVE"

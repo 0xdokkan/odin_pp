@@ -217,8 +217,8 @@ di controllo come `Slow`/`Root`.
 - test di storage, overlap, collisione, LoS, action resolver e snapshot.
 
 Il contratto e descritto in [Grid Object System](GRID_OBJECT_SYSTEM.md). Lo
-spawn procedurale resta rinviato finche la connettivita non considera gli
-oggetti solidi.
+spawn procedurale e stato integrato in M4C.5, includendo gli oggetti nella
+verifica della connettivita.
 
 ### [x] M4C.4 - Fire persistente
 
@@ -238,8 +238,21 @@ oggetti solidi.
   timeline e telemetria.
 
 Il contratto e descritto in [Grid Object System](GRID_OBJECT_SYSTEM.md) e
-[Movement System](MOVEMENT_SYSTEM.md). `Chest` resta la prossima slice degli
-oggetti: provera stato chiuso/aperto, interazione e ricompensa one-shot.
+[Movement System](MOVEMENT_SYSTEM.md). `Chest` resta pianificato: provera stato
+chiuso/aperto, interazione e ricompensa one-shot.
+
+### [x] M4C.5 - Esplosivi e prima zona tattica
+
+- Barrel spostabile e Bomb con countdown di due decisioni accettate;
+- area 3x3 condivisa fra preview e danno, inclusi nemici e oggetti;
+- catene ritardate e disinnesco degli esplosivi alla fine del combattimento;
+- Bomber con bersaglio committed e Brute con recupero dopo la carica;
+- Shove e Dash nel mazzo iniziale;
+- Barrel, Ice Block e Fire nelle stanze procedurali, con un percorso disponibile
+  anche considerando il fuoco come cella da evitare;
+- intenti, countdown, timeline e smoke delle interazioni tattiche.
+
+Le regole giocabili sono raccolte in [Tactical Combat](TACTICAL_COMBAT.md).
 
 ### [ ] M4D - Reazioni e nuove geometrie
 
@@ -251,17 +264,42 @@ zone e ID del deck restano validi dopo ogni combinazione; la timeline mostra le
 mutazioni nello stesso ordine della simulazione; i nuovi effetti hanno test di
 composizione e casi limite.
 
-## [ ] M5 - Encounter e boss
+## [~] M5 - Encounter e boss
 
 **Obiettivo:** costruire combattimenti con cooperazione fra nemici e pressione
 spaziale crescente.
 
-- pathfinding attorno agli ostacoli;
-- intenti nemici con linee, croci e aree;
-- archetipi di supporto, evocazione e controllo;
-- elite e boss a fasi con regole esplicite.
+- [x] pathfinding attorno agli ostacoli e agli oggetti solidi;
+- [x] intenti di carica in linea e bombe con area 3x3;
+- [x] primo archetipo di supporto e primo boss a due fasi;
+- [ ] ulteriori geometrie, inclusi attacchi a croce;
+- [ ] archetipi di evocazione e controllo;
+- [ ] ulteriori elite e boss con regole distinte.
 
-**Definition of Done:** gli intenti restano committed e deterministici, usano la
+### [x] M5A - Cooperazione, composizioni e primo boss
+
+- Custodian annuncia la protezione di un alleato; spostamento fuori portata,
+  copertura e bersaglio non piu valido interrompono la protezione;
+- Polveriera, Scorta e Assalto selezionate dal seed, con una coppia vicina che
+  caratterizza lo scontro e budget restante validato;
+- Polveriera iniziale con Bomber, Chaser, due barili, ghiaccio e fuoco;
+- modificatore Furnace con fila o colonna annunciata, due decisioni prima del
+  danno, pausa fra attivazioni e vie statiche per uscire dall'area;
+- stanze iniziali e Boss con modificatore Calm, per introdurre la pressione in
+  modo graduale;
+- Demolitionist unico nei nodi Boss: due fasi che alternano bombe, cariche e
+  recupero, con attacchi annunciati e transizione osservabile;
+- metadati condivisi fra blueprint, stanza e presentazione; validazione della
+  composizione, dell'area Furnace, del budget e dell'unicita del boss;
+- test di cooperazione, scadenze, catene, cambi di fase e fine combattimento,
+  oltre ai 4096 scenari del generatore.
+
+Il contratto della generazione e in [Room Generation](ROOM_GENERATION.md); le
+regole di combattimento sono in [Tactical Combat](TACTICAL_COMBAT.md). M5 resta
+in corso: questo incremento completa il primo insieme giocabile, mentre
+evocazione, controllo e ulteriori famiglie di elite e boss restano pianificati.
+
+**Definition of Done di M5:** gli intenti restano committed e deterministici, usano la
 stessa autorita geometrica delle carte e non dipendono dal renderer; simulazioni
 headless coprono morte, blocchi, spawn e cambi di fase senza deadlock o overflow.
 

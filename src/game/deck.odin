@@ -71,6 +71,7 @@ Deck_Mutation_Result :: enum {
 	Removed,
 	Card_Not_Found,
 	Maximum_Upgrade,
+	Upgrade_Unavailable,
 	Minimum_Deck_Size,
 }
 
@@ -179,6 +180,9 @@ upgrade_owned_card :: proc(deck: ^Deck_State, card_id: u32) -> Deck_Mutation_Res
 	if deck.owned[card_index].upgrade_level >= MAX_CARD_UPGRADE_LEVEL {
 		return .Maximum_Upgrade
 	}
+	if !card_can_upgrade(deck.owned[card_index]) {
+		return .Upgrade_Unavailable
+	}
 
 	upgraded := deck.owned[card_index]
 	upgraded.upgrade_level += 1
@@ -219,13 +223,13 @@ initialize_starter_deck :: proc(deck: ^Deck_State, seed: u64 = DEFAULT_DECK_SEED
 		.Strike,
 		.Arc_Bolt,
 		.Piercing_Ray,
-		.Cross_Slash,
+		.Shove,
 		.Firebomb,
 		.Guard,
 		.Toxic_Wave,
 		.Thorn_Coat,
 		.Afterimage,
-		.Counter_Rune,
+		.Dash,
 	}
 	for definition_id in starter_cards {
 		_, added := add_owned_card(deck, definition_id)

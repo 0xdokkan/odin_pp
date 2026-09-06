@@ -109,6 +109,14 @@ deck valido e inattivo:
 La successiva carta aggiunta usa comunque il vecchio `next_card_id`, anche se
 un'istanza e stata rimossa.
 
+`card_can_upgrade` richiede che almeno un effetto abbia un incremento effettivo.
+`Battle Focus`, `Calculated Risk`, `Spark Forge` e `Dash` non hanno attualmente
+un upgrade disponibile. La primitiva, Shop e Rest restituiscono
+`Upgrade_Unavailable` senza consumare oro, servizio o scelta. Le UI usano la
+stessa query e mostrano una preview prima/dopo ricavata dai template degli
+effetti. Un test dell'intero catalogo confronta gli effetti istanziati a ogni
+livello per verificare che gli upgrade consentiti cambino il gameplay.
+
 ## Shop
 
 `Shop_State` appartiene a `Run_State` e usa storage fisso:
@@ -211,7 +219,7 @@ odin run src -- --smoke-shop
 ## Limiti intenzionali
 
 L'economia corrente non introduce unlock, pool per classe, reroll, sconti,
-vendita di carte o offerte gia migliorate. Lo starter deck conserva tutte le
-definizioni per mantenere compatibili gli smoke test della vertical slice. Rest
+vendita di carte o offerte gia migliorate. Lo starter deck contiene dieci carte,
+incluse Shove e Dash per le interazioni tattiche con la stanza. Rest
 e Forgotten Armory riusano le stesse mutazioni permanenti senza spostarne
 l'ownership; i loro contratti sono in [Special Nodes](SPECIAL_NODES.md).

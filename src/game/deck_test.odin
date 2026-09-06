@@ -27,13 +27,13 @@ test_starter_deck_has_unique_valid_instances :: proc(t: ^testing.T) {
 		.Strike,
 		.Arc_Bolt,
 		.Piercing_Ray,
-		.Cross_Slash,
+		.Shove,
 		.Firebomb,
 		.Guard,
 		.Toxic_Wave,
 		.Thorn_Coat,
 		.Afterimage,
-		.Counter_Rune,
+		.Dash,
 	}
 	for definition, index in CARD_DEFINITIONS {
 		expected := 0

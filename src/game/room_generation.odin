@@ -16,6 +16,7 @@ Encounter_Generation_Config :: struct {
 	max_enemies:        int,
 	trap_count:         int,
 	obstacle_count:     int,
+	object_count:       int,
 	player_safe_radius: int,
 	exit_safe_radius:   int,
 	enemy_health:       i32,
@@ -39,6 +40,8 @@ Room_Blueprint_Error :: enum {
 }
 
 Room_Blueprint :: struct {
+	encounter_kind: Encounter_Kind,
+	modifier: Room_Modifier,
 	seed:          u64,
 	source_node:   Node_Id,
 	node_kind:     Node_Kind,
@@ -49,6 +52,7 @@ Room_Blueprint :: struct {
 	enemies:       [dynamic]Enemy_Spawn,
 	traps:         [dynamic]Trap_Spawn,
 	obstacles:     [dynamic]grid.Position,
+	objects:       [dynamic]Grid_Object_Spawn,
 }
 
 derive_room_stream_seed :: proc(room_seed, salt: u64) -> u64 {
@@ -65,6 +69,7 @@ valid_encounter_generation_config :: proc(config: Encounter_Generation_Config) -
 	       config.enemy_budget <= config.max_enemies*MAX_ENEMY_BUDGET_COST &&
 	       config.trap_count >= 0 && config.trap_count <= MAX_GENERATED_TRAPS &&
 	       config.obstacle_count >= 0 && config.obstacle_count <= MAX_GENERATED_OBSTACLES &&
+	       config.object_count >= 0 && config.object_count <= MAX_GRID_OBJECTS_PER_ROOM &&
 	       config.player_safe_radius >= 0 && config.exit_safe_radius >= 0 &&
 	       config.enemy_health > 0 && config.enemy_attack > 0 && config.trap_damage > 0
 }
@@ -138,6 +143,10 @@ room_generation_profile :: proc(node: ^Run_Node) -> (result: Room_Generation_Pro
 	case .Shop, .Rest, .Event, .Treasure, .Count:
 		return {}, false
 	}
+	result.encounter_config.object_count = 3 if node.kind == .Combat else 6
+	if node.kind == .Combat && encounter_kind_for_node(node) == .Powder_Keg {
+		result.encounter_config.object_count = 4
+	}
 	return result, valid_encounter_generation_config(result.encounter_config)
 }
 
@@ -148,6 +157,7 @@ destroy_room_blueprint :: proc(blueprint: ^Room_Blueprint) {
 	delete(blueprint.enemies)
 	delete(blueprint.traps)
 	delete(blueprint.obstacles)
+	delete(blueprint.objects)
 	level.destroy(&blueprint.level_data)
 	blueprint^ = {}
 }
@@ -157,9 +167,12 @@ room_blueprint_content :: proc(blueprint: ^Room_Blueprint) -> Room_Content {
 		return {}
 	}
 	return {
+		encounter_kind = blueprint.encounter_kind,
+		modifier = blueprint.modifier,
 		enemies = blueprint.enemies[:],
 		traps = blueprint.traps[:],
 		obstacles = blueprint.obstacles[:],
+		objects = blueprint.objects[:],
 	}
 }
 
@@ -268,10 +281,12 @@ enemy_archetype_budget_cost :: proc(archetype: Enemy_Archetype) -> int {
 	switch archetype {
 	case .Chaser:
 		return 1
-	case .Archer:
+	case .Archer, .Bomber, .Custodian:
 		return 2
 	case .Brute:
 		return 3
+	case .Demolitionist:
+		return 6
 	case .Count:
 	}
 	return max(int)
@@ -288,6 +303,7 @@ random_feasible_archetype :: proc(
 	affordable_count := 0
 	for archetype_index in 0..<int(Enemy_Archetype.Count) {
 		archetype := Enemy_Archetype(archetype_index)
+		if archetype == .Demolitionist { continue }
 		cost := enemy_archetype_budget_cost(archetype)
 		if cost > remaining_budget {
 			continue
@@ -314,11 +330,16 @@ enemy_stats_for_archetype :: proc(
 	attack = config.enemy_attack
 	switch archetype {
 	case .Chaser:
-	case .Archer:
+	case .Archer, .Bomber:
 		health = max(i32(1), health-1)
 	case .Brute:
 		health += 3
 		attack += 1
+	case .Custodian:
+		health += 1
+	case .Demolitionist:
+		health = 30
+		attack = 2
 	case .Count:
 		unreachable()
 	}
@@ -424,7 +445,8 @@ validate_room_blueprint :: proc(blueprint: ^Room_Blueprint) -> bool {
 			}
 		}
 	}
-	return true
+	return validate_blueprint_objects(blueprint) && validate_blueprint_encounter(blueprint) &&
+	       blueprint.modifier == generate_blueprint_modifier(blueprint)
 }
 
 generate_room_blueprint :: proc(node: ^Run_Node) -> (result: Room_Blueprint, err: Room_Blueprint_Error) {
@@ -441,6 +463,7 @@ generate_room_blueprint :: proc(node: ^Run_Node) -> (result: Room_Blueprint, err
 	result.node_kind = node.kind
 	result.node_depth = node.depth
 	result.profile = profile
+	result.encounter_kind = encounter_kind_for_node(node)
 	layout_seed := derive_room_stream_seed(node.room_seed, ROOM_LAYOUT_SEED_SALT)
 	level_data, level_error := level.generate_room(profile.level_config, layout_seed)
 	if level_error != .None {
@@ -458,6 +481,7 @@ generate_room_blueprint :: proc(node: ^Run_Node) -> (result: Room_Blueprint, err
 	result.enemies = make([dynamic]Enemy_Spawn, 0, profile.encounter_config.max_enemies)
 	result.traps = make([dynamic]Trap_Spawn, 0, profile.encounter_config.trap_count)
 	result.obstacles = make([dynamic]grid.Position, 0, profile.encounter_config.obstacle_count)
+	result.objects = make([dynamic]Grid_Object_Spawn, 0, profile.encounter_config.object_count)
 	candidates := make([dynamic]grid.Position, 0, cell_capacity)
 	defer delete(candidates)
 	for tile, index in result.level_data.tiles.cells {
@@ -483,10 +507,10 @@ generate_room_blueprint :: proc(node: ^Run_Node) -> (result: Room_Blueprint, err
 	enemy_archetypes: [MAX_ENEMIES_PER_ROOM]Enemy_Archetype
 	enemy_archetype_count := 0
 	remaining_budget := profile.encounter_config.enemy_budget
-	if node.kind == .Boss {
-		enemy_archetypes[enemy_archetype_count] = .Brute
+	for archetype in encounter_required_enemies(result.encounter_kind) {
+		enemy_archetypes[enemy_archetype_count] = archetype
 		enemy_archetype_count += 1
-		remaining_budget -= enemy_archetype_budget_cost(.Brute)
+		remaining_budget -= enemy_archetype_budget_cost(archetype)
 	}
 	for remaining_budget > 0 {
 		remaining_slots := profile.encounter_config.max_enemies-enemy_archetype_count
@@ -518,6 +542,10 @@ generate_room_blueprint :: proc(node: ^Run_Node) -> (result: Room_Blueprint, err
 		}
 	}
 	rand.shuffle(spawn_candidates[:], generator)
+	if !arrange_encounter_spawn_candidates(&result, spawn_candidates[:]) {
+		destroy_room_blueprint(&result)
+		return {}, .Insufficient_Spawn_Cells
+	}
 
 	spawn_index := 0
 	for archetype_index in 0..<enemy_archetype_count {
@@ -548,6 +576,11 @@ generate_room_blueprint :: proc(node: ^Run_Node) -> (result: Room_Blueprint, err
 		})
 		spawn_index += 1
 	}
+	if !generate_blueprint_objects(&result, spawn_candidates[spawn_index:]) {
+		destroy_room_blueprint(&result)
+		return {}, .Invalid_Blueprint
+	}
+	result.modifier = generate_blueprint_modifier(&result)
 	if !validate_room_blueprint(&result) {
 		destroy_room_blueprint(&result)
 		return {}, .Invalid_Blueprint

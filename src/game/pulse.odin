@@ -126,6 +126,8 @@ advance_combat_pulse :: proc(room: ^Room) -> (pulse: Pulse_Report) {
 	}
 	pulse.advanced = true
 	statuses_advanced := false
+	resolve_due_explosives(room, &pulse)
+	resolve_due_room_modifier(room, &pulse)
 	resolve_enemy_intents(room, &pulse)
 	if room.phase == .Combat {
 		tick_all_statuses(room, &pulse)
@@ -142,6 +144,8 @@ advance_combat_pulse :: proc(room: ^Room) -> (pulse: Pulse_Report) {
 		pulse.energy_wasted = max(0, regen-pulse.energy_restored)
 	}
 	room.pulse_count += 1
+	disarm_explosives_after_combat(room, &pulse.events)
+	disarm_room_modifier_after_combat(room)
 	if room.phase == .Combat {
 		plan_enemy_intents(room)
 	} else {

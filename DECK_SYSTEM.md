@@ -98,8 +98,8 @@ controlli strutturali economici di `deck_counts_are_valid`.
 Il deck iniziale contiene dieci istanze con ID da 1 a 10:
 
 ```text
-1 Strike, 1 Arc Bolt, 1 Piercing Ray, 1 Cross Slash, 1 Firebomb,
-1 Guard, 1 Toxic Wave, 1 Thorn Coat, 1 Afterimage, 1 Counter Rune
+1 Strike, 1 Arc Bolt, 1 Piercing Ray, 1 Shove, 1 Firebomb,
+1 Guard, 1 Toxic Wave, 1 Thorn Coat, 1 Afterimage, 1 Dash
 ```
 
 `add_owned_card` genera l'ID successivo e funziona soltanto fuori dal

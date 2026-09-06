@@ -2,6 +2,13 @@
 
 Vertical slice di un roguelike 2D a griglia isometrica scritto in Odin.
 
+Il [combattimento tattico](TACTICAL_COMBAT.md) include Bombaroli, barili
+spostabili, esplosioni a catena e recupero del Brute. Il Custode annuncia uno
+scudo interrompibile; Polveriera, Scorta e Assalto organizzano nemici vicini.
+La Fornace segnala una corsia pericolosa due azioni prima di colpire, mentre il
+Demolitore alterna bombe, carica e recupero in due fasi. La prima stanza e il
+boss non hanno Fornace. Shove e Dash sono nel mazzo iniziale.
+
 Documentazione del gameplay: [Action System](ACTION_SYSTEM.md),
 [Status And Event System](STATUS_SYSTEM.md), [Reaction Queue](REACTION_SYSTEM.md),
 [Enemy Intents](ENEMY_INTENT_SYSTEM.md),
@@ -59,6 +66,10 @@ nella [Roadmap](ROADMAP.md); i contratti di M1, M2 e M3 sono in
 
 ![Inseguitore, arciere e bruto con carica telegrafata](odin_pp_enemy_archetypes.png)
 
+![Custode, Fornace annunciata e anteprima della spinta](odin_pp_encounters.png)
+
+![Demolitore in seconda fase con carica annunciata](odin_pp_miniboss.png)
+
 ![Timeline FIFO durante la giocata di una carta](odin_pp_timeline.png)
 
 ![Create, carta temporanea ed exhaust nel deck runtime](odin_pp_deck_flow.png)
@@ -72,6 +83,17 @@ nella [Roadmap](ROADMAP.md); i contratti di M1, M2 e M3 sono in
 ```sh
 odin run src
 ```
+
+Per ripetere una run e velocizzare le animazioni:
+
+```sh
+odin run src -- --seed=0xC0FFEE --fast
+```
+
+`--seed` accetta un intero `u64` decimale oppure esadecimale con prefisso `0x`.
+`--animation-speed=2` imposta una velocita tra 0.25x e 4x; `--fast` seleziona 4x.
+`F4` cambia la velocita durante la partita. Gli smoke grafici mantengono il timing
+standard per conservare screenshot deterministici.
 
 Le grandi assegnazioni per valore di `Room` restano confinate negli helper di
 installazione, evitando che LLVM le scalarizzi dentro `main`. `-o:none` resta
@@ -109,8 +131,21 @@ odin run src -- --smoke-object
 ```
 
 Il flag prepara `Shove` contro un Ice Block adiacente e salva
-`odin_pp_ice_block.png`. Gli oggetti correnti sono inseriti manualmente
-nelle stanze statiche; non fanno ancora parte della generazione procedurale.
+`odin_pp_ice_block.png`. Barili, Ice Block e Fire compaiono anche nelle
+stanze procedurali, con controlli di connettivita.
+
+Per verificare le nuove interazioni:
+
+```sh
+odin run src -- --smoke-encounters
+odin run src -- --smoke-miniboss
+odin run src -- --smoke-furnace
+```
+
+I comandi salvano rispettivamente `odin_pp_encounters.png`,
+`odin_pp_miniboss.png` e `odin_pp_furnace.png`, poi chiudono la finestra.
+Il primo mostra Shove sul corpo rialzato di un barile; l'ultimo verifica
+anche il completamento del replay della Fornace.
 
 Per verificare l'hazard persistente `Fire` e il relativo replay:
 
@@ -138,7 +173,11 @@ odin run src -- --playtest-report
 ```
 
 Alla fine della run, al restart o alla chiusura viene scritto
-`odin_pp_playtest_<seed>.json`. Il report separa comandi e carte e conserva i
+`odin_pp_playtest_<seed>.json`; se esiste gia, viene aggiunto un suffisso `_1`,
+`_2`, ecc. La creazione esclusiva protegge anche sessioni concorrenti.
+`--playtest-output=/percorso/sessione.json` attiva la raccolta e sceglie il
+percorso di base, con la stessa protezione dalle sovrascritture. La directory
+deve esistere. Il report separa comandi e carte e conserva i
 sample ordinati di ogni fight. La variante headless non inizializza Raylib:
 
 ```sh
@@ -146,7 +185,8 @@ odin run src -- --smoke-playtest
 ```
 
 Esegue venti decisioni deterministiche al massimo e scrive
-`odin_pp_playtest_smoke.json`.
+`odin_pp_playtest_smoke.json`. Per lo smoke `--playtest-output` sceglie il file
+esatto da sovrascrivere intenzionalmente.
 
 Per verificare la timeline con uno snapshot pre-comando e un cue carta attivo:
 
@@ -240,6 +280,13 @@ del playtest descritto in [Content Pass](CONTENT_PASS.md).
 
 ### Controlli
 
+Per spostare un barile, mettiti in una delle quattro celle adiacenti e usa
+**Shove**: trascina la carta sul barile, oppure premi il numero del suo slot
+e clicca il barile. La spinta va di una cella nella direzione opposta al player;
+la destinazione deve essere libera. Camminargli contro non lo sposta.
+Il pannello contestuale indica distanza, blocchi e miccia. Shove accende la
+miccia anche quando la spinta e bloccata: esplosione dopo altre due azioni.
+
 | Input | Azione |
 |---|---|
 | hover su carta | solleva la carta e mostra regole, costo e cast range |
@@ -250,7 +297,7 @@ del playtest descritto in [Content Pass](CONTENT_PASS.md).
 | `WASD` | un comando per pressione: muove il player; contro un nemico esegue un attacco |
 | `Spazio` | aspetta un impulso durante il combattimento |
 | `F` / pulsante Refocus | applica Retain/Ethereal, produce un pulse e pesca fino alla dimensione mano |
-| `C` `V` | abilita debug per Thorn Coat e Afterimage |
+| `C` `V` | abilita Thorn Coat e Afterimage solo avviando con `--debug-abilities` |
 | frecce | sposta la camera |
 | rotella | zoom ancorato al cursore |
 | trascinamento rotella | sposta la camera col mouse |
@@ -278,9 +325,24 @@ del playtest descritto in [Content Pass](CONTENT_PASS.md).
 | `F1` | scaling fit con letterbox |
 | `F2` | integer scaling |
 | `F3` | scaling stretch |
+| `F4` | cambia velocita animazioni: 1x, 2x, 4x |
 | `F11` | fullscreen borderless |
 
 ## Eseguire i test
+
+Un comando unico esegue check, test e link della demo, sia con assert attivi sia
+con `-disable-assert`:
+
+```sh
+sh scripts/check.sh
+```
+
+`sh scripts/check.sh --headless` esegue check e tutti i test senza il link della
+finestra. I binari sono temporanei. La toolchain verificata e
+`odin version dev-2026-08:8412dc37a`. Il link richiede gli archivi Raylib reali
+della distribuzione Odin: un file `libraylib.a` contenente
+`version https://git-lfs.github.com/spec/v1` e un puntatore LFS e deve essere
+sostituito dai relativi artefatti della toolchain.
 
 ```sh
 odin test src/grid

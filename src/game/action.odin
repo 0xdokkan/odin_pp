@@ -392,7 +392,8 @@ effect_is_valid :: proc(room: ^Room, effect: Effect) -> bool {
 			return false
 		}
 		definition, definition_found := grid_object_definition(room.objects[index].kind)
-		return definition_found && definition.damageable
+		return definition_found && definition.damageable &&
+		       (!definition.explosive || room.objects[index].detonation_pulse == 0)
 	case .Heal:
 		return effect.amount > 0 && (effect.target.kind == .Player || effect.target.kind == .Enemy)
 	case .Gain_Gold:
@@ -529,6 +530,11 @@ apply_damage_effect :: proc(
 	case .Object:
 		index, found := object_index_by_id(room, effect.target.id)
 		assert(found)
+		definition, _ := grid_object_definition(room.objects[index].kind)
+		if definition.explosive && room.phase == .Combat {
+			arm_explosive(room, effect.target.id, source, &report.events)
+			return
+		}
 		actual_damage = min(damage, room.objects[index].health)
 		room.objects[index].health -= actual_damage
 	case .Trap, .System:
@@ -561,7 +567,8 @@ apply_damage_effect :: proc(
 		index, found := object_index_by_id(room, effect.target.id)
 		assert(found)
 		if room.objects[index].health == 0 {
-			assert(remove_grid_object(room, index))
+			removed := remove_grid_object(room, index)
+			assert(removed)
 			report.objects_destroyed += 1
 			defeated = true
 		}
@@ -783,6 +790,8 @@ resolve_action :: proc(room: ^Room, action: ^Action) -> (report: Action_Report) 
 	report = resolve_action_once(room, action)
 	if report.accepted {
 		dispatch_reactions(room, &report)
+		disarm_explosives_after_combat(room, &report.events)
+		disarm_room_modifier_after_combat(room)
 	}
 	return
 }

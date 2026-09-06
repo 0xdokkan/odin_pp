@@ -251,11 +251,11 @@ ancora con l'upgrade.
 
 | Carta | Rarita | Costo | Anchor e forma | Effetto base |
 |---|---|---:|---|---|
-| `Strike` | Common | 1 | avversario, Manhattan 1, Single | 3 danni, +1 per upgrade |
-| `Arc_Bolt` | Common | 2 | avversario, Manhattan 1-3, Single, LoS | 3 danni, +1 per upgrade |
+| `Strike` | Common | 1 | avversario o oggetto, Manhattan 1, Single | 3 danni, +1 per upgrade; accende barili |
+| `Arc_Bolt` | Common | 2 | avversario o oggetto, Manhattan 1-3, Single, LoS | 3 danni, +1 per upgrade; accende barili |
 | `Piercing_Ray` | Uncommon | 2 | cella, Chebyshev 1-5, Line | 2 danni a ogni nemico attraversato, +1 per upgrade |
 | `Cross_Slash` | Uncommon | 2 | cella, Manhattan 1-3, Cross raggio 1 | 2 danni a ogni nemico nella croce, +1 per upgrade |
-| `Firebomb` | Rare | 2 | cella, Chebyshev 1-3, Square raggio 1 | 2 danni a ogni nemico nel 3x3, +1 per upgrade |
+| `Firebomb` | Rare | 2 | cella, Chebyshev 1-3, Square raggio 1 | 2 danni a nemici e oggetti nel 3x3, +1 per upgrade; accende barili |
 | `Guard` | Common | 1 | player, None | Shield 3 per 3 pulse |
 | `Toxic_Wave` | Rare | 2 | implicito, None | Poison 1 per 3 pulse a ogni nemico |
 | `Thorn_Coat` | Uncommon | 1 | player, None | Thorns 1 per 3 pulse |

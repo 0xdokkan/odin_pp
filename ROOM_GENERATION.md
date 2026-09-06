@@ -1,7 +1,8 @@
 # Room Generation
 
-Questo documento descrive la milestone M1 completata: seed per nodo, layout
-validato, encounter budget, blueprint e installazione transazionale. La
+Questo documento descrive la milestone M1 completata e i successivi incrementi
+del director: seed per nodo, layout validato, encounter budget, composizioni
+tattiche, modificatori della stanza, blueprint e installazione transazionale. La
 [Definition of Done](ROADMAP.md#definition-of-done) raccoglie i criteri usati per
 accettare l'incremento.
 
@@ -14,7 +15,11 @@ Il codice corrente comprende:
   `level.validate_generated_room`;
 - `game.Encounter_Generation_Config` e profili `Combat`, `Elite` e `Boss`;
 - `game.Room_Blueprint`, che possiede layout e spawn prima del commit;
-- stream RNG separati per layout ed encounter;
+- stream RNG separati per layout ed encounter, con salt dedicati a composizione
+  e modificatore;
+- composizioni Polveriera, Scorta e Assalto, con coppie iniziali vicine;
+- Demolitore a due fasi nei nodi Boss;
+- Furnace deterministico con preavviso e vie di uscita statiche;
 - preparazione e installazione della stanza senza mutare la run su un fallimento;
 - test di determinismo, profili, ownership e 4096 combinazioni seed/profilo.
 
@@ -34,7 +39,8 @@ La generazione deve produrre una stanza che sia:
 - indipendente dal renderer e dal generatore casuale globale.
 
 Non rientrano in M1 editor visuali, stanze su piu piani, biome, decorazioni,
-porte multiple, boss a fasi o salvataggio del layout.
+porte multiple o salvataggio del layout. Il primo boss a fasi e stato aggiunto
+dal successivo incremento degli encounter, sopra lo stesso contratto del blueprint.
 
 ## Layering
 
@@ -76,6 +82,11 @@ La derivazione deve avere queste proprieta:
 `ROOM_ENCOUNTER_SEED_SALT`. Separare gli stream impedisce che aggiungere una
 scelta topologica al layout sposti automaticamente tutti gli archetipi
 dell'encounter.
+
+`ROOM_RECIPE_SEED_SALT` sceglie la composizione e `ROOM_MODIFIER_SEED_SALT`
+sceglie il modificatore e la sua geometria. Queste derivazioni non consumano lo
+stream del placement. Durante i pulse Furnace usa solo scadenze gia determinate:
+non estrae nuovi valori casuali.
 
 Il contratto e deterministico per la versione corrente del generatore. Prima di
 salvare soltanto il seed su disco, la milestone di persistenza dovra aggiungere
@@ -125,10 +136,27 @@ conserva invece la distanza effettiva del cammino minimo trovata dalla BFS.
 
 Soltanto dopo un layout valido, `generate_room_blueprint` costruisce candidati
 per i contenuti. `enemy_budget` determina quantita e costo relativo degli
-archetipi, non posizioni hard coded. `Chaser`, `Archer` e `Brute` costano
-rispettivamente uno, due e tre punti; il profilo boss garantisce un Brute come
-primo acquisto. Il director sceglie la composizione prima del placement e spende
-esattamente tutto il budget entro `max_enemies`. La selezione rispetta:
+archetipi, non posizioni hard coded. `Chaser` costa un punto, `Archer`, `Bomber`
+e `Custodian` due, `Brute` tre e `Demolitionist` sei. Il director sceglie la
+composizione prima del placement, riserva la coppia che la caratterizza e spende
+il budget restante con archetipi ordinari, entro `max_enemies`.
+
+| Composizione | Coppia garantita | Uso |
+| --- | --- | --- |
+| Polveriera / Powder Keg | Bomber + Chaser | Garantita nei Combat di profondita 0–1; selezionabile in seguito |
+| Scorta / Escort | Custodian + Archer | Protezione di un alleato e priorita dei bersagli |
+| Assalto / Assault | Brute + Chaser | Pressione ravvicinata e recupero dopo la carica |
+| Demolitore / Demolitionist | Demolitionist + Bomber | Garantita nei nodi Boss |
+
+Negli altri Combat e negli Elite la scelta fra le prime tre composizioni dipende
+dal seed. Il Demolitore viene escluso dall'estrazione casuale degli archetipi e
+compare esattamente una volta nella composizione Boss. Ha 30 HP e attacco base 2;
+le sue due fasi sono gestite dal sistema degli intenti, senza cambiare il layout.
+
+Le prime due unita sono adiacenti oppure allineate a distanza Manhattan 2, con
+il collegamento libero da muri e ostacoli. Nella Scorta anche il successivo
+placement degli oggetti preserva quel collegamento, cosi il Custode puo iniziare
+con un alleato effettivamente raggiungibile dalla protezione. La selezione rispetta:
 
 - distanza minima dallo spawn;
 - uscita e celle riservate libere;
@@ -143,7 +171,49 @@ delle trappole, budget e conteggi vengono ricalcolati dal validatore. Anche la
 disponibilita di celle per l'intero budget dei contenuti viene verificata qui,
 dove il profilo encounter e noto, non dal package `level`.
 
-### 5. Commit
+### 5. Oggetti e modificatore
+
+Prima del commit, il placement aggiunge Barrel, Ice Block e Fire: tre oggetti
+nei nodi Combat, quattro se la composizione e Polveriera, sei negli Elite e Boss.
+La Polveriera iniziale contiene due barili, un blocco di ghiaccio e una fiamma.
+Il placement preferisce collocare i barili entro due celle dal primo nemico e
+completa gli altri oggetti usando i candidati disponibili. Riusa i candidati gia
+mescolati dopo nemici e trappole, senza consumare altri valori RNG. Il controllo di
+connettivita considera tutti gli oggetti come celle da evitare, incluso Fire,
+cosi rimane un percorso senza danno da fuoco. Il blueprint possiede e valida
+anche gli spawn degli oggetti.
+
+Le stanze di profondita 0–1 e i nodi Boss hanno modificatore `Calm`. Negli altri
+nodi il seed sceglie fra Calm e `Furnace`, mostrato insieme alla composizione
+all'ingresso. Furnace sceglie una fila o colonna, al massimo 16 celle:
+
+- spawn, uscita, muri e ostacoli fissi sono esclusi;
+- ogni cella selezionata ha una via fuori dalla fila o colonna entro due passi
+  nel layout iniziale, senza attraversare oggetti, fuoco o ostacoli;
+- il controllo della via statica ignora gli attori: il loro movimento e gli
+  oggetti spostati durante lo scontro possono cambiare le opzioni disponibili;
+- se non esiste una linea adatta, il modificatore rimane Calm.
+
+La prima fiammata scatta dopo due decisioni accettate del player. Infligge 3 danni
+attraverso la normale pipeline a player, nemici e oggetti sulle celle segnate;
+gli effetti di difesa e Shield restano validi. Puo quindi accendere un barile,
+che riceve il proprio nuovo countdown di due decisioni. I comandi rifiutati non
+avanzano la scadenza.
+
+Dopo ogni fiammata trascorrono due impulsi di pausa e due di preavviso prima
+della successiva. Le celle e la cadenza restano fisse, senza generare oggetti Fire
+persistenti. L'evento `Room_Hazard_Triggered` precede gli eventi di danno; il
+modificatore si disattiva quando il combattimento termina, anche se termina
+durante un'azione del player.
+
+`Room_Blueprint`, `Room_Content` e `Room` trasportano `encounter_kind` e
+`modifier`. Il validatore ricalcola composizione e modificatore dal seed e
+controlla la coppia, l'unicita del boss e gli spawn. `create_room` verifica anche
+capacita, danno, scadenza, allineamento e celle uniche del modificatore prima di
+iniziare il deck di combattimento; un payload invalido non consuma lo stato del
+player.
+
+### 6. Commit
 
 La pipeline costruisce un `Room_Blueprint`, poi un `Prepared_Demo_Room` con copie
 temporanee di `Player`, `Level` e `Room`. `install_prepared_demo_room` committa il
@@ -183,7 +253,10 @@ Una stanza generata e accettabile soltanto se:
 - esiste un solo spawn e una sola uscita;
 - spawn e uscita sono distinti e connessi;
 - tutte le posizioni sono entro i bounds;
-- nemici, trappole e ostacoli occupano celle consentite;
+- nemici, trappole e oggetti occupano celle consentite;
+- composizione, statistiche, budget e modificatore corrispondono al seed;
+- la coppia prevista ha un collegamento valido e il boss resta unico;
+- le celle Furnace rispettano limiti, anchor e vie statiche di uscita;
 - nessuna sovrapposizione vietata raggiunge `create_room`;
 - l'area di sicurezza del player e libera;
 - gli ID delle entita vengono assegnati da `Room`, non dal generatore;
@@ -201,6 +274,10 @@ I test mirati devono coprire:
 - raggiungibilita di spawn e uscita;
 - area di sicurezza e assenza di overlap;
 - budget e profili `Combat`, `Elite` e `Boss`;
+- copertura delle tre composizioni, disposizione della coppia e unicita del boss;
+- determinismo del modificatore e rifiuto di metadati alterati;
+- preavviso, pausa, comandi rifiutati, danno a nemici e oggetti e fine combattimento;
+- morte simultanea di player e ultimo nemico senza sovrascrivere `Defeat`;
 - limite dei tentativi e cleanup sui fallimenti;
 - sostituzione senza puntatori pendenti;
 - stress test deterministico su 4096 combinazioni di seed, profondita e profilo.
@@ -208,7 +285,7 @@ I test mirati devono coprire:
 Verifica completa:
 
 ```sh
-odin test src -all-packages -define:ODIN_TEST_THREADS=1
+odin test src -all-packages -define:ODIN_TEST_THREADS=1 -o:none
 odin check src -vet -strict-style
 ```
 

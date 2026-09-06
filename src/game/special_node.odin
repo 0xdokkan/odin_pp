@@ -36,6 +36,7 @@ Special_Node_Result :: enum {
 	Already_Resolved,
 	Card_Not_Found,
 	Maximum_Upgrade,
+	Upgrade_Unavailable,
 	Deck_Full,
 	Instance_Id_Exhausted,
 	Not_Enough_Health,
@@ -369,6 +370,8 @@ use_rest_upgrade :: proc(run: ^Run_State, card_id: u32) -> Special_Node_Result {
 		return .Card_Not_Found
 	case .Maximum_Upgrade:
 		return .Maximum_Upgrade
+	case .Upgrade_Unavailable:
+		return .Upgrade_Unavailable
 	case .Upgraded:
 	case .Invalid, .Removed, .Minimum_Deck_Size:
 		return .Invalid

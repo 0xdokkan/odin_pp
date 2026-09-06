@@ -32,6 +32,11 @@ Game_Event_Kind :: enum {
 	Movement_Step,
 	Trap_Triggered,
 	Hazard_Triggered,
+	Object_Spawned,
+	Explosive_Armed,
+	Explosion,
+	Explosive_Disarmed,
+	Room_Hazard_Triggered,
 }
 
 Game_Event :: struct {
@@ -46,6 +51,7 @@ Game_Event :: struct {
 	from_position:    grid.Position,
 	to_position:      grid.Position,
 	loot_kind:        Loot_Kind,
+	object_kind:      Grid_Object_Kind,
 	card_id:          u32,
 	card_definition:  Card_Id,
 	card_upgrade_level: i32,

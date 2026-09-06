@@ -30,6 +30,7 @@ Shop_Result :: enum {
 	Deck_Full,
 	Card_Not_Found,
 	Maximum_Upgrade,
+	Upgrade_Unavailable,
 	Minimum_Deck_Size,
 	Service_Used,
 }
@@ -62,7 +63,7 @@ shop_upgrade_price :: proc(run: ^Run_State, card_id: u32) -> (i32, bool) {
 		return 0, false
 	}
 	card := run.player.deck.owned[card_index]
-	if card.upgrade_level >= MAX_CARD_UPGRADE_LEVEL {
+	if !card_can_upgrade(card) {
 		return 0, false
 	}
 	definition, definition_found := card_definition_by_id(card.definition_id)
@@ -284,6 +285,9 @@ buy_shop_upgrade :: proc(run: ^Run_State, card_id: u32) -> Shop_Result {
 	}
 	if run.player.deck.owned[card_index].upgrade_level >= MAX_CARD_UPGRADE_LEVEL {
 		return .Maximum_Upgrade
+	}
+	if !card_can_upgrade(run.player.deck.owned[card_index]) {
+		return .Upgrade_Unavailable
 	}
 	price, price_ok := shop_upgrade_price(run, card_id)
 	if !price_ok {

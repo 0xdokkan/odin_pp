@@ -2,6 +2,10 @@
 
 Questa guida descrive la raccolta magnetica del loot durante e dopo un combattimento.
 
+`create_room` riserva un posto per ogni drop d'oro e uno aggiuntivo per ogni
+nemico con `drops_healing`. Tutto il loot potenziale della stanza puo quindi
+essere prodotto durante `resolve_action` senza riallocare il buffer.
+
 ## Indice
 
 - [Range](#range)

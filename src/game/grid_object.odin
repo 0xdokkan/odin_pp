@@ -7,6 +7,8 @@ MAX_GRID_OBJECTS_PER_ROOM :: 32
 Grid_Object_Kind :: enum {
 	Ice_Block,
 	Fire,
+	Barrel,
+	Bomb,
 	Count,
 }
 
@@ -21,6 +23,7 @@ Grid_Object_Definition :: struct {
 	movable:              bool,
 	hazardous:            bool,
 	hazard_damage:        i32,
+	explosive:            bool,
 }
 
 Grid_Object :: struct {
@@ -29,6 +32,7 @@ Grid_Object :: struct {
 	position:   grid.Position,
 	max_health: i32,
 	health:     i32,
+	detonation_pulse: u64,
 }
 
 Grid_Object_Spawn :: struct {
@@ -58,6 +62,25 @@ GRID_OBJECT_DEFINITIONS :: [int(Grid_Object_Kind.Count)]Grid_Object_Definition{
 		movable = false,
 		hazardous = true,
 		hazard_damage = 2,
+	},
+	{
+		kind = .Barrel,
+		name = "Barrel",
+		max_health = 1,
+		blocks_movement = true,
+		targetable = true,
+		damageable = true,
+		movable = true,
+		explosive = true,
+	},
+	{
+		kind = .Bomb,
+		name = "Bomb",
+		max_health = 1,
+		targetable = true,
+		damageable = true,
+		movable = true,
+		explosive = true,
 	},
 }
 

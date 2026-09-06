@@ -198,23 +198,23 @@ test_generated_room_validator_reports_structural_damage :: proc(t: ^testing.T) {
 	testing.expect_value(t, err, Room_Generation_Error.None)
 	defer destroy(&level)
 
-	assert(set_tile(&level, {x = 0, y = 0}, Tile{kind = .Floor}))
+	testing.expect(t, set_tile(&level, {x = 0, y = 0}, Tile{kind = .Floor}))
 	report := validate_generated_room(&level, config)
 	testing.expect_value(t, report.error, Room_Validation_Error.Border_Not_Solid)
-	assert(set_tile(&level, {x = 0, y = 0}, Tile{kind = .Wall}))
+	testing.expect(t, set_tile(&level, {x = 0, y = 0}, Tile{kind = .Wall}))
 
 	report = validate_generated_room(&level, config)
 	exit_position := report.exit_position
-	assert(set_tile(&level, exit_position, Tile{kind = .Floor}))
+	testing.expect(t, set_tile(&level, exit_position, Tile{kind = .Floor}))
 	report = validate_generated_room(&level, config)
 	testing.expect_value(t, report.error, Room_Validation_Error.Missing_Exit)
-	assert(set_tile(&level, exit_position, Tile{kind = .Exit}))
+	testing.expect(t, set_tile(&level, exit_position, Tile{kind = .Exit}))
 
 	extra_exit := grid.Position{x = 2, y = 2}
 	if extra_exit == level.player_spawn {
 		extra_exit.x += 1
 	}
-	assert(set_tile(&level, extra_exit, Tile{kind = .Exit}))
+	testing.expect(t, set_tile(&level, extra_exit, Tile{kind = .Exit}))
 	report = validate_generated_room(&level, config)
 	testing.expect_value(t, report.error, Room_Validation_Error.Multiple_Exits)
 }
@@ -232,7 +232,7 @@ test_generated_room_validator_detects_unreachable_exit :: proc(t: ^testing.T) {
 	for y in report.exit_position.y-2..=report.exit_position.y+2 {
 		for x in report.exit_position.x-2..=report.exit_position.x+2 {
 			if max(abs(x-report.exit_position.x), abs(y-report.exit_position.y)) == 2 {
-				assert(set_tile(&level, {x = x, y = y}, Tile{kind = .Wall}))
+				testing.expect(t, set_tile(&level, {x = x, y = y}, Tile{kind = .Wall}))
 			}
 		}
 	}
@@ -250,8 +250,8 @@ test_generated_room_validator_enforces_full_exit_clearance :: proc(t: ^testing.T
 	defer destroy(&level)
 	report := validate_generated_room(&level, config)
 	testing.expect_value(t, report.error, Room_Validation_Error.None)
-	assert(set_tile(&level, report.exit_position, Tile{kind = .Floor}))
-	assert(set_tile(&level, {x = 1, y = config.height/2}, Tile{kind = .Exit}))
+	testing.expect(t, set_tile(&level, report.exit_position, Tile{kind = .Floor}))
+	testing.expect(t, set_tile(&level, {x = 1, y = config.height/2}, Tile{kind = .Exit}))
 
 	report = validate_generated_room(&level, config)
 	testing.expect_value(t, report.error, Room_Validation_Error.Exit_Clearance_Blocked)
@@ -267,7 +267,7 @@ test_generated_room_validator_uses_geometric_anchor_distance :: proc(t: ^testing
 	defer destroy(&level)
 	report := validate_generated_room(&level, config)
 	testing.expect_value(t, report.error, Room_Validation_Error.None)
-	assert(set_tile(&level, report.exit_position, Tile{kind = .Floor}))
+	testing.expect(t, set_tile(&level, report.exit_position, Tile{kind = .Floor}))
 
 	close_exit := grid.Position{x = 3, y = 3}
 	if level.player_spawn.x > config.width/2 {
@@ -276,7 +276,7 @@ test_generated_room_validator_uses_geometric_anchor_distance :: proc(t: ^testing
 	if level.player_spawn.y > config.height/2 {
 		close_exit.y = config.height-4
 	}
-	assert(set_tile(&level, close_exit, Tile{kind = .Exit}))
+	testing.expect(t, set_tile(&level, close_exit, Tile{kind = .Exit}))
 	report = validate_generated_room(&level, config)
 	testing.expect_value(t, report.error, Room_Validation_Error.Spawn_Exit_Too_Close)
 }
@@ -311,7 +311,7 @@ test_generated_room_validator_distinguishes_disconnected_and_sparse_layouts :: p
 	testing.expect(t, pocket_found)
 	if pocket_found {
 		for offset in CARDINAL_OFFSETS {
-			assert(set_tile(
+			testing.expect(t, set_tile(
 				&level,
 				{x = pocket.x+offset.x, y = pocket.y+offset.y},
 				Tile{kind = .Wall},
@@ -350,7 +350,7 @@ test_generated_room_validator_distinguishes_disconnected_and_sparse_layouts :: p
 	}
 	testing.expect(t, wall_found)
 	if wall_found {
-		assert(set_tile(&sparse, wall_position, Tile{kind = .Wall}))
+		testing.expect(t, set_tile(&sparse, wall_position, Tile{kind = .Wall}))
 		sparse_report = validate_generated_room(&sparse, sparse_config)
 		testing.expect_value(t, sparse_report.error, Room_Validation_Error.Too_Few_Walkable_Cells)
 	}

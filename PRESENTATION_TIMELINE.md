@@ -1,5 +1,21 @@
 # Presentation Timeline
 
+Gli esplosivi aggiungono `Object_Spawned`, `Explosive_Armed`, `Explosion` e
+`Explosive_Disarmed`. Lo snapshot copia `detonation_pulse`; il countdown segue
+il proprio `pulse_count`, senza leggere lo stato futuro della stanza.
+`Explosion` nasconde la sorgente prima dei cue di danno. Gli spawn riusano
+slot invisibili, mantenendo ID distinti anche quando la capienza e piena.
+Le regole giocabili sono in [Combattimento tattico](TACTICAL_COMBAT.md).
+
+Lo snapshot conserva anche ricetta dell'incontro, corsia e scadenza della
+Fornace e fase del Demolitore. `Room_Hazard_Triggered` mostra il lampo della
+corsia prima dei cue di danno e registra la prossima attivazione. La fase del
+boss viene sincronizzata su `Pulse_Advanced`, alla stessa frontiera della
+pianificazione: HUD e corpo non anticipano la trasformazione mentre si anima
+l'attacco precedente. Alla morte conclusiva la vista disarma la Fornace anche
+se il comando ha chiuso Combat senza produrre un nuovo pulse. Lo scudo del
+Custode usa il normale replay di status.
+
 Questa guida descrive il confine fra la simulazione autorevole della `Room`, la
 riproduzione visuale degli eventi e il buffer dei comandi. La produzione degli
 eventi e descritta in [Action System](ACTION_SYSTEM.md) e
@@ -103,6 +119,7 @@ Le famiglie visualizzate sono:
 | `Movement_Step`, `Moved` | interpolano una tratta con easing; lo step usa una durata piu breve |
 | `Trap_Triggered` | disarma esplicitamente la trappola nello snapshot prima del danno |
 | `Hazard_Triggered` | valida sorgente, attore e cella, mostra `BURN` senza consumare l'oggetto |
+| `Room_Hazard_Triggered` | illumina la corsia Fornace prima del danno e memorizza la prossima scadenza |
 | `Damaged`, `Damage_Absorbed`, `Healed` | aggiorna vita o shield e mostra il feedback |
 | eventi status | aggiorna i badge dello snapshot e mostra il relativo avviso |
 | eventi binding | mostra l'avviso; il set dei binding non e copiato nello snapshot |
@@ -115,7 +132,7 @@ Le famiglie visualizzate sono:
 | `Entity_Defeated` | mantiene l'attore nello snapshot durante il fade, poi lo nasconde |
 | `Loot_Dropped` | aggiunge il drop sulla cella e ne mostra il pulse |
 | `Loot_Collected`, `Gold_Gained` | anima la raccolta e aggiorna la copia dell'oro |
-| `Pulse_Advanced` | sincronizza pulse, energia e durate status dalla vista finale |
+| `Pulse_Advanced` | sincronizza pulse, energia, durate status, modificatore e fase del boss dalla vista finale |
 | `Attack_Missed`, `Move_Blocked` | mostra un avviso senza mutare la `Room` |
 
 La durata appartiene al tipo di cue. I movimenti del player e dei nemici possono
@@ -126,6 +143,12 @@ il ritmo relativo fra le famiglie di cue. Le sequenze normali mantengono queste
 durate senza modifiche; se la somma supera 12 secondi,
 `begin_event_timeline` scala proporzionalmente tutti i cue. Il limite impedisce
 che un AoE denso blocchi l'input per decine di secondi senza alterare l'ordine.
+
+Il renderer applica inoltre una velocita runtime tra 0.25x e 4x al delta della
+timeline. `--animation-speed=2`, `--fast` (4x) e `F4` controllano questa velocita,
+indicata nell'HUD e conservata tra stanze e restart. Il limite di 12 secondi si
+riferisce al tempo della timeline a 1x. Ordine FIFO, snapshot, buffer input e
+simulazione restano identici a ogni velocita; gli smoke grafici usano sempre 1x.
 
 Un movimento multi-cella arriva gia segmentato dal gameplay. La timeline non
 interpola direttamente origine-destinazione: riproduce ogni `Movement_Step` e il

@@ -246,8 +246,7 @@ special_node_secondary_is_enabled :: proc(
 	switch run.phase {
 	case .Rest:
 		card_index, found := game.owned_card_index_by_id(&run.player.deck, selected_card_id)
-		return found &&
-		       run.player.deck.owned[card_index].upgrade_level < game.MAX_CARD_UPGRADE_LEVEL
+		return found && game.card_can_upgrade(run.player.deck.owned[card_index])
 	case .Event:
 		if run.route_event.kind == .Blood_Offering {
 			return true
@@ -521,6 +520,10 @@ draw_rest_actions :: proc(
 ) {
 	action_count := special_node_action_count(run)
 	accent := special_node_accent(run.phase)
+	if index, found := game.owned_card_index_by_id(&run.player.deck, state.selected_card_id); found {
+		rl.DrawText(card_upgrade_preview(run.player.deck.owned[index]), 45, 454, 12,
+			rl.Color{169, 183, 177, 255})
+	}
 	draw_special_node_action(
 		special_node_action_bounds(canvas_width, canvas_height, 0, action_count),
 		"RECOVER",

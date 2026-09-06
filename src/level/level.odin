@@ -216,7 +216,8 @@ from_ascii :: proc(rows: []string) -> (result: Level, err: Parse_Error, error_at
 				level.has_player_spawn = true
 			}
 
-			assert(set_tile(&level, position, tile))
+			written := set_tile(&level, position, tile)
+			assert(written)
 		}
 	}
 
@@ -537,7 +538,8 @@ generate_room_attempt :: proc(
 		for x in 0..<config.width {
 			position := grid.Position{x = x, y = y}
 			if is_border_position(position, config.width, config.height) {
-				assert(set_tile(&result, position, Tile{kind = .Wall}))
+				written := set_tile(&result, position, Tile{kind = .Wall})
+				assert(written)
 			}
 		}
 	}
@@ -567,13 +569,15 @@ generate_room_attempt :: proc(
 	rand.shuffle(wall_candidates[:], generator)
 	wall_count := len(wall_candidates)*config.wall_density_percent/100
 	for index in 0..<wall_count {
-		assert(set_tile(&result, wall_candidates[index], Tile{kind = .Wall}))
+		written := set_tile(&result, wall_candidates[index], Tile{kind = .Wall})
+		assert(written)
 	}
 
 	result.player_spawn = spawn_position
 	result.has_player_spawn = true
-	assert(set_tile(&result, spawn_position, Tile{kind = .Player_Spawn}))
-	assert(set_tile(&result, exit_position, Tile{kind = .Exit}))
+	spawn_written := set_tile(&result, spawn_position, Tile{kind = .Player_Spawn})
+	exit_written := set_tile(&result, exit_position, Tile{kind = .Exit})
+	assert(spawn_written && exit_written)
 	report := validate_generated_room(&result, config)
 	if report.error != .None {
 		destroy(&result)

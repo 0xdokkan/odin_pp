@@ -348,6 +348,7 @@ poll_gameplay_command :: proc(
 	mouse_canvas: view.Vec2,
 	mouse_inside: bool,
 	spatial_interaction_enabled: bool,
+	debug_abilities: bool = false,
 ) -> (command: Gameplay_Command, has_command: bool) {
 	assert(room != nil && room.player != nil && renderer != nil && card_interaction != nil)
 	input_deck, input_phase := render.renderer_hand_deck(renderer, room)
@@ -474,9 +475,9 @@ poll_gameplay_command :: proc(
 		return
 	}
 
-	if key_pressed(.C) {
+	if debug_abilities && key_pressed(.C) {
 		return Gameplay_Command{kind = .Ability, origin_phase = .Combat, ability = .Thorn_Coat}, true
-	} else if key_pressed(.V) {
+	} else if debug_abilities && key_pressed(.V) {
 		return Gameplay_Command{kind = .Ability, origin_phase = .Combat, ability = .Afterimage}, true
 	} else if key_pressed(.W) {
 		return Gameplay_Command{kind = .Move, origin_phase = .Combat, direction = .North}, true
@@ -587,7 +588,8 @@ execute_observed_gameplay_command :: proc(
 	)
 	assert(observed)
 	if room.phase != .Combat {
-		assert(combatdebug.finish_playtest_room(playtest, room))
+		room_finished := combatdebug.finish_playtest_room(playtest, room)
+		assert(room_finished)
 	}
 	return
 }
@@ -706,125 +708,8 @@ demo_seed_with_first_special :: proc(start_seed: u64, kind: game.Node_Kind) -> (
 	return 0, false
 }
 
-begin_current_playtest_room :: proc(
-	session: ^combatdebug.Playtest_Session,
-	run: ^game.Run_State,
-	room: ^game.Room,
-) -> bool {
-	if session == nil || run == nil || room == nil || room.phase != .Combat {
-		return false
-	}
-	node, node_ok := game.current_run_node(run)
-	if !node_ok {
-		return false
-	}
-	metadata, metadata_ok := combatdebug.playtest_room_metadata(node)
-	return metadata_ok && combatdebug.begin_playtest_room(session, metadata, room)
-}
-
-begin_playtest_run :: proc(
-	session: ^combatdebug.Playtest_Session,
-	run_seed: u64,
-	run: ^game.Run_State,
-	room: ^game.Room,
-) -> bool {
-	if !combatdebug.begin_playtest_session(session, run_seed) {
-		return false
-	}
-	if begin_current_playtest_room(session, run, room) {
-		return true
-	}
-	combatdebug.destroy_playtest_session(session)
-	return false
-}
-
-playtest_outcome_for_state :: proc(
-	run: ^game.Run_State,
-	room: ^game.Room,
-) -> combatdebug.Playtest_Run_Outcome {
-	if run != nil && run.phase == .Victory {
-		return .Victory
-	}
-	if (run != nil && run.phase == .Defeat) || (room != nil && room.phase == .Defeat) {
-		return .Defeat
-	}
-	return .Abandoned
-}
-
-write_seed_playtest_report :: proc(
-	session: ^combatdebug.Playtest_Session,
-	run_seed: u64,
-) -> bool {
-	path_buffer: [96]u8
-	path := fmt.bprintf(path_buffer[:], "odin_pp_playtest_%d.json", run_seed)
-	return combatdebug.write_playtest_report(session, path)
-}
-
-finish_seed_playtest_report :: proc(
-	session: ^combatdebug.Playtest_Session,
-	run_seed: u64,
-	outcome: combatdebug.Playtest_Run_Outcome,
-	room: ^game.Room,
-) -> bool {
-	if session == nil {
-		return false
-	}
-	if !session.finalized && !combatdebug.finish_playtest_session(session, outcome, room) {
-		return false
-	}
-	return write_seed_playtest_report(session, run_seed)
-}
-
-run_headless_playtest_smoke :: proc(
-	run: ^game.Run_State,
-	room: ^game.Room,
-	run_seed: u64,
-) -> bool {
-	if run == nil || room == nil || room.player == nil {
-		return false
-	}
-	session: combatdebug.Playtest_Session
-	defer combatdebug.destroy_playtest_session(&session)
-	if !begin_playtest_run(&session, run_seed, run, room) {
-		return false
-	}
-
-	policy: combatdebug.Max_Distance_Policy_State
-	for _ in 0..<20 {
-		if room.phase != .Combat {
-			break
-		}
-		decision := combatdebug.choose_max_distance_command(room, &policy)
-		if !decision.valid {
-			break
-		}
-		command := Gameplay_Command{kind = .Wait, origin_phase = .Combat}
-		if decision.kind == .Move {
-			command.kind = .Move
-			command.direction = decision.direction
-		}
-		position_before := room.player.position
-		execution := execute_observed_gameplay_command(room, command, &session)
-		if !execution.committed {
-			break
-		}
-		if command.kind == .Move && room.player.position != position_before {
-			policy.has_last_direction = true
-			policy.last_direction = command.direction
-		}
-	}
-
-	if session.room_active && !combatdebug.finish_playtest_room(&session, room) {
-		return false
-	}
-	outcome := playtest_outcome_for_state(run, room)
-	if !combatdebug.finish_playtest_session(&session, outcome) {
-		return false
-	}
-	return combatdebug.write_playtest_report(&session, "odin_pp_playtest_smoke.json")
-}
-
 main :: proc() {
+	options := DEFAULT_RUNTIME_OPTIONS
 	playtest_report := false
 	smoke_test := false
 	smoke_playtest := false
@@ -850,9 +735,21 @@ main :: proc() {
 	smoke_special_result := false
 	smoke_intents := false
 	smoke_archetypes := false
+	smoke_tactics := false
+	smoke_encounters := false
+	smoke_miniboss := false
+	smoke_furnace := false
 	smoke_defeat := false
 	smoke_mode_count := 0
-	for argument in os.args {
+	for argument in os.args[1:] {
+		handled, valid := apply_runtime_option(&options, argument)
+		if !valid {
+			fmt.eprintf("invalid option: %s\n", argument)
+			os.exit(2)
+		}
+		if handled {
+			continue
+		}
 		if argument == "--playtest-report" {
 			playtest_report = true
 		} else if argument == "--smoke-playtest" {
@@ -950,15 +847,37 @@ main :: proc() {
 			smoke_test = true
 			smoke_archetypes = true
 			smoke_mode_count += 1
+		} else if argument == "--smoke-tactics" {
+			smoke_test = true
+			smoke_tactics = true
+			smoke_mode_count += 1
 		} else if argument == "--smoke-defeat" {
 			smoke_test = true
 			smoke_defeat = true
 			smoke_mode_count += 1
+		} else if argument == "--smoke-encounters" {
+			smoke_test = true
+			smoke_encounters = true
+			smoke_mode_count += 1
+		} else if argument == "--smoke-miniboss" {
+			smoke_test = true
+			smoke_miniboss = true
+			smoke_mode_count += 1
+		} else if argument == "--smoke-furnace" {
+			smoke_test = true
+			smoke_furnace = true
+			smoke_mode_count += 1
+		} else {
+			fmt.eprintf("unknown option: %s\n", argument)
+			os.exit(2)
 		}
 	}
 	if smoke_mode_count > 1 {
 		fmt.eprintln("choose exactly one --smoke* mode")
 		os.exit(2)
+	}
+	if len(options.playtest_output) > 0 && !smoke_playtest {
+		playtest_report = true
 	}
 	if playtest_report && smoke_test {
 		fmt.eprintln("--playtest-report is interactive; use --smoke-playtest for headless telemetry")
@@ -969,7 +888,7 @@ main :: proc() {
 	level_data: level.Level
 	defer level.destroy(&level_data)
 
-	run_seed: u64 = 0xC0FFEE
+	run_seed := options.seed
 	if smoke_shop || smoke_rest || smoke_event || smoke_treasure || smoke_special_result {
 		desired_kind := game.Node_Kind.Shop
 		if smoke_rest {
@@ -996,11 +915,11 @@ main :: proc() {
 	}
 	defer game.destroy_room(&room)
 	if smoke_playtest {
-		if !run_headless_playtest_smoke(&run_state, &room, run_seed) {
-			fmt.eprintln("failed to write odin_pp_playtest_smoke.json")
+		if !run_headless_playtest_smoke(&run_state, &room, run_seed, options.playtest_output) {
+			fmt.eprintln("failed to write headless playtest report")
 			os.exit(2)
 		}
-		fmt.println("wrote odin_pp_playtest_smoke.json")
+		fmt.println("wrote headless playtest report")
 		return
 	}
 
@@ -1032,6 +951,9 @@ main :: proc() {
 	}
 
 	iso_renderer := render.create(window.config.canvas_width, window.config.canvas_height, &level_data)
+	if !smoke_test {
+		render.set_renderer_playback_speed(&iso_renderer, options.animation_speed)
+	}
 	show_route_map := false
 	card_interaction: Card_Interaction_State
 	gameplay_buffer: Buffered_Gameplay_Command
@@ -1045,7 +967,8 @@ main :: proc() {
 		room.phase = .Complete
 		transition := game.finish_room(&run_state, room.phase)
 		assert(transition == .Reward)
-		assert(game.skip_card_reward(&run_state) == .Skipped)
+		reward_skipped := game.skip_card_reward(&run_state) == .Skipped
+		assert(reward_skipped)
 		show_route_map = true
 	} else if smoke_reward {
 		room.phase = .Complete
@@ -1056,7 +979,8 @@ main :: proc() {
 		room.phase = .Complete
 		transition := game.finish_room(&run_state, room.phase)
 		assert(transition == .Reward)
-		assert(game.skip_card_reward(&run_state) == .Skipped)
+		reward_skipped := game.skip_card_reward(&run_state) == .Skipped
+		assert(reward_skipped)
 		desired_kind := game.Node_Kind.Shop
 		if smoke_rest {
 			desired_kind = .Rest
@@ -1071,13 +995,14 @@ main :: proc() {
 		}
 		special_node := available_node_of_kind(&run_state, desired_kind)
 		assert(special_node != game.INVALID_NODE_ID)
-		assert(enter_demo_node(
+		node_entered := enter_demo_node(
 			&level_data,
 			&run_state,
 			&room,
 			special_node,
 			procedural_rooms,
-		))
+		)
+		assert(node_entered)
 		if smoke_shop {
 			shop_render_state.has_hovered_offer = true
 			shop_render_state.hovered_offer_index = 1
@@ -1089,10 +1014,21 @@ main :: proc() {
 			special_render_state.primary_hovered = true
 		}
 		if smoke_special_result {
-			assert(game.claim_treasure(&run_state) == .Treasure_Claimed)
+			treasure_claimed := game.claim_treasure(&run_state) == .Treasure_Claimed
+			assert(treasure_claimed)
 			special_render_state.primary_hovered = false
 			special_render_state.continue_hovered = true
 		}
+	} else if smoke_tactics {
+		prepared := prepare_tactics_smoke(&room)
+		assert(prepared)
+	} else if smoke_encounters || smoke_miniboss || smoke_furnace {
+		kind: Encounter_Smoke = .Escort
+		if smoke_miniboss { kind = .Miniboss }
+		if smoke_furnace { kind = .Furnace }
+		card_id, prepared := prepare_encounter_smoke(&room, &iso_renderer, kind)
+		assert(prepared)
+		card_interaction.selected_card_id = card_id
 	} else if smoke_intents {
 		room.enemies[0].position = {x = 2, y = 1}
 		room.enemies[1].position = {x = 7, y = 1}
@@ -1114,8 +1050,10 @@ main :: proc() {
 		before := render.capture_room_presentation(&room)
 		result := game.wait_player_turn(&room)
 		assert(result == .Player_Defeated)
-		assert(render.begin_renderer_event_timeline(&iso_renderer, before, &room.recent_events))
-		assert(render.update_renderer_event_timeline(&iso_renderer, 1000))
+		timeline_started := render.begin_renderer_event_timeline(&iso_renderer, before, &room.recent_events)
+		assert(timeline_started)
+		timeline_finished := render.update_renderer_event_timeline(&iso_renderer, 1000)
+		assert(timeline_finished)
 		assert(!render.renderer_timeline_is_busy(&iso_renderer))
 	} else if smoke_status {
 		game.use_player_ability(&room, .Toxic_Wave)
@@ -1128,7 +1066,8 @@ main :: proc() {
 		before := render.capture_room_presentation(&room)
 		result := game.try_move_player(&room, .East)
 		assert(result == .Attacked && room.phase == .Combat)
-		assert(render.begin_renderer_event_timeline(&iso_renderer, before, &room.recent_events))
+		timeline_started := render.begin_renderer_event_timeline(&iso_renderer, before, &room.recent_events)
+		assert(timeline_started)
 		render.update_renderer_event_timeline(
 			&iso_renderer,
 			render.PRESENTATION_DAMAGE_DURATION+
@@ -1180,12 +1119,13 @@ main :: proc() {
 		result := game.try_move_player(&room, .East)
 		assert(result == .Moved)
 		after := render.capture_room_presentation(&room)
-		assert(render.begin_renderer_event_timeline(
+		timeline_started := render.begin_renderer_event_timeline(
 			&iso_renderer,
 			before,
 			&room.recent_events,
 			&after,
-		))
+		)
+		assert(timeline_started)
 		render.update_renderer_event_timeline(
 			&iso_renderer,
 			render.PRESENTATION_PLAYER_MOVE_DURATION+
@@ -1200,11 +1140,12 @@ main :: proc() {
 		assert(fire_visible && presentation_fire.visible && presentation_fire.kind == .Fire)
 	} else if smoke_content {
 		game.finish_deck_combat(&room.player.deck)
-		assert(game.initialize_empty_deck(
+		deck_initialized := game.initialize_empty_deck(
 			&room.player.deck,
 			game.DEFAULT_DECK_RULES,
 			0xC017E17,
-		))
+		)
+		assert(deck_initialized)
 		content_cards := [?]game.Card_Id{
 			.Heavy_Blow,
 			.Venom_Needle,
@@ -1216,7 +1157,8 @@ main :: proc() {
 			_, added := game.add_owned_card(&room.player.deck, definition_id)
 			assert(added)
 		}
-		assert(game.begin_deck_combat(&room.player.deck))
+		combat_started := game.begin_deck_combat(&room.player.deck)
+		assert(combat_started)
 		card_interaction.dragged_card_id = prepare_smoke_card_drag(&room, .Caustic_Bloom)
 		card_interaction.hovered_card_id = prepare_smoke_card_drag(&room, .Volatile_Study)
 		room.enemies[0].position = {x = 3, y = 1}
@@ -1228,7 +1170,8 @@ main :: proc() {
 		before := render.capture_room_presentation(&room)
 		play := game.play_card(&room, card_id, game.entity_target(game.PLAYER_ENTITY))
 		assert(game.card_play_was_committed(play.result))
-		assert(render.begin_renderer_event_timeline(&iso_renderer, before, &room.recent_events))
+		timeline_started := render.begin_renderer_event_timeline(&iso_renderer, before, &room.recent_events)
+		assert(timeline_started)
 		render.update_renderer_event_timeline(
 			&iso_renderer,
 			render.PRESENTATION_CARD_PLAY_DURATION*0.45,
@@ -1242,12 +1185,13 @@ main :: proc() {
 		play := game.play_card(&room, forge.id, game.entity_target(game.PLAYER_ENTITY))
 		assert(game.card_play_was_committed(play.result))
 		after := render.capture_room_presentation(&room)
-		assert(render.begin_renderer_event_timeline(
+		timeline_started := render.begin_renderer_event_timeline(
 			&iso_renderer,
 			before,
 			&room.recent_events,
 			&after,
-		))
+		)
+		assert(timeline_started)
 		render.update_renderer_event_timeline(
 			&iso_renderer,
 			render.PRESENTATION_CARD_PLAY_DURATION+
@@ -1264,12 +1208,13 @@ main :: proc() {
 		refocus := game.refocus_player_hand(&room)
 		assert(game.refocus_was_committed(refocus.result))
 		after := render.capture_room_presentation(&room)
-		assert(render.begin_renderer_event_timeline(
+		timeline_started := render.begin_renderer_event_timeline(
 			&iso_renderer,
 			before,
 			&room.recent_events,
 			&after,
-		))
+		)
+		assert(timeline_started)
 		render.update_renderer_event_timeline(
 			&iso_renderer,
 			render.PRESENTATION_REFOCUS_DURATION*0.45,
@@ -1280,7 +1225,8 @@ main :: proc() {
 		before := render.capture_room_presentation(&room)
 		result := game.wait_player_turn(&room)
 		assert(result != .Invalid_Phase)
-		assert(render.begin_renderer_event_timeline(&iso_renderer, before, &room.recent_events))
+		timeline_started := render.begin_renderer_event_timeline(&iso_renderer, before, &room.recent_events)
+		assert(timeline_started)
 		render.update_renderer_event_timeline(
 			&iso_renderer,
 			render.PRESENTATION_ENEMY_MOVE_DURATION*0.5,
@@ -1293,9 +1239,21 @@ main :: proc() {
 		defer free_all(context.temp_allocator)
 
 		app.update_window_controls(&window)
+		if !smoke_test && rl.IsKeyPressed(.F4) {
+			speed := f32(1) if iso_renderer.playback_speed >= 4 else min(f32(4), iso_renderer.playback_speed*2)
+			render.set_renderer_playback_speed(&iso_renderer, speed)
+		}
 		frame_time := rl.GetFrameTime()
-		render.update_renderer_event_timeline(&iso_renderer, frame_time)
+		if !smoke_furnace {
+			render.update_renderer_event_timeline(&iso_renderer, frame_time)
+		}
 		mouse_canvas, mouse_inside := app.mouse_canvas_position(&window)
+		if smoke_encounters {
+			mouse_canvas = render.cell_center(&iso_renderer, room.objects[0].position)
+			mouse_canvas.y -= max(f32(8), 12*iso_renderer.camera.zoom)*1.4
+			mouse_inside = true
+			render.update_object_target_hover(&iso_renderer, &room, mouse_canvas, card_interaction.selected_card_id)
+		}
 		mouse_delta := app.mouse_canvas_delta(&window)
 		defeat_restart_hovered := run_state.phase == .Defeat && mouse_inside &&
 			render.defeat_restart_at_point(
@@ -1312,11 +1270,13 @@ main :: proc() {
 					playtest_report_written = finish_seed_playtest_report(
 						playtest_session_ptr,
 						run_seed,
+						options.playtest_output,
 						playtest_outcome_for_state(&run_state, &room),
 						&room,
 					)
 					if !playtest_report_written {
 						fmt.eprintln("failed to write playtest report before restart")
+						continue
 					}
 				}
 				combatdebug.destroy_playtest_session(playtest_session_ptr)
@@ -1332,7 +1292,8 @@ main :: proc() {
 			)
 			assert(restarted)
 			if playtest_report {
-				assert(begin_playtest_run(&playtest_session, run_seed, &run_state, &room))
+				playtest_started := begin_playtest_run(&playtest_session, run_seed, &run_state, &room)
+				assert(playtest_started)
 				playtest_session_ptr = &playtest_session
 				playtest_report_written = false
 			}
@@ -1745,11 +1706,12 @@ main :: proc() {
 					special_render_state = {}
 					if run_state.phase == .In_Room {
 						if playtest_session_ptr != nil {
-							assert(begin_current_playtest_room(
+							playtest_room_started := begin_current_playtest_room(
 								playtest_session_ptr,
 								&run_state,
 								&room,
-							))
+							)
+							assert(playtest_room_started)
 						}
 						render.frame_level(&iso_renderer, &level_data)
 					}
@@ -1765,7 +1727,13 @@ main :: proc() {
 				mouse_delta,
 				frame_time,
 			)
-			if !smoke_card && !smoke_targeting && !smoke_spatial && !smoke_object && !smoke_content {
+			if mouse_inside && !smoke_test && !render.renderer_timeline_is_busy(&iso_renderer) {
+				render.update_object_target_hover(
+					&iso_renderer, &room, mouse_canvas, active_targeting_card_id(card_interaction),
+				)
+			}
+			if !smoke_card && !smoke_targeting && !smoke_spatial && !smoke_object && !smoke_content &&
+			   !smoke_encounters && !smoke_miniboss && !smoke_furnace {
 				timeline_busy = render.renderer_timeline_is_busy(&iso_renderer)
 				command, has_command := poll_gameplay_command(
 					&room,
@@ -1774,6 +1742,7 @@ main :: proc() {
 					mouse_canvas,
 					mouse_inside,
 					!timeline_busy && !gameplay_buffer.occupied,
+					options.debug_abilities,
 				)
 				if room.phase == .Complete || room.phase == .Defeat {
 					clear_gameplay_command_buffer(&gameplay_buffer)
@@ -1810,6 +1779,7 @@ main :: proc() {
 					playtest_report_written = finish_seed_playtest_report(
 						playtest_session_ptr,
 						run_seed,
+						options.playtest_output,
 						playtest_outcome_for_state(&run_state, &room),
 						&room,
 					)
@@ -1883,6 +1853,12 @@ main :: proc() {
 			if timeline_busy {
 				active_card_id = 0
 			}
+			if mouse_inside && !smoke_test && !timeline_busy {
+				render.update_object_target_hover(&iso_renderer, &room, mouse_canvas, active_card_id)
+			}
+			if smoke_encounters {
+				render.update_object_target_hover(&iso_renderer, &room, mouse_canvas, active_card_id)
+			}
 			render.draw_level(&iso_renderer, &level_data)
 			if !timeline_busy {
 				render.draw_enemy_intent_ground(
@@ -1895,12 +1871,16 @@ main :: proc() {
 					&room,
 					active_card_id,
 				)
+				render.draw_object_interaction_ground(&iso_renderer, &room, active_card_id)
 			}
 			render.draw_room(&iso_renderer, &room)
 			if !timeline_busy {
 				render.draw_enemy_intent_badges(&iso_renderer, &room)
 			}
 			render.draw_status(&iso_renderer, &room, window.scale_mode)
+			if mouse_inside || active_card_id != 0 {
+				render.draw_object_interaction_help(&iso_renderer, &room, mouse_canvas, active_card_id)
+			}
 			draw_mouse_canvas := mouse_canvas
 			if smoke_card || smoke_targeting || smoke_spatial || smoke_object || smoke_content {
 				draw_mouse_canvas = {x = 520, y = 165}
@@ -1945,7 +1925,8 @@ main :: proc() {
 					rl.TakeScreenshot("odin_pp_ice_block.png")
 				} else if smoke_fire {
 					rl.TakeScreenshot("odin_pp_fire.png")
-					assert(render.update_renderer_event_timeline(&iso_renderer, 1000))
+					timeline_finished := render.update_renderer_event_timeline(&iso_renderer, 1000)
+					assert(timeline_finished)
 					assert(!render.renderer_timeline_is_busy(&iso_renderer))
 					assert(iso_renderer.timeline.update_failures == 0)
 					assert(game.entity_exists(&room, smoke_fire_entity))
@@ -1979,6 +1960,16 @@ main :: proc() {
 					rl.TakeScreenshot("odin_pp_special_result.png")
 				} else if smoke_intents {
 					rl.TakeScreenshot("odin_pp_enemy_intents.png")
+				} else if smoke_tactics {
+					rl.TakeScreenshot("odin_pp_tactics.png")
+				} else if smoke_encounters {
+					rl.TakeScreenshot("odin_pp_encounters.png")
+				} else if smoke_miniboss {
+					rl.TakeScreenshot("odin_pp_miniboss.png")
+				} else if smoke_furnace {
+					rl.TakeScreenshot("odin_pp_furnace.png")
+					finished := render.update_renderer_event_timeline(&iso_renderer, 1000)
+					assert(finished && iso_renderer.timeline.update_failures == 0)
 				} else if smoke_archetypes {
 					rl.TakeScreenshot("odin_pp_enemy_archetypes.png")
 				} else if smoke_defeat {
@@ -1994,6 +1985,7 @@ main :: proc() {
 		playtest_report_written = finish_seed_playtest_report(
 			playtest_session_ptr,
 			run_seed,
+			options.playtest_output,
 			playtest_outcome_for_state(&run_state, &room),
 			&room,
 		)

@@ -1,6 +1,7 @@
 package combatdebug
 
 import "core:encoding/json"
+import "core:fmt"
 import "core:os"
 
 import game "../game"
@@ -462,4 +463,48 @@ write_playtest_report :: proc(
 	}
 	defer delete(data)
 	return os.write_entire_file(path, data) == nil
+}
+
+// Crea un campione senza sovrascrivere report esistenti, anche tra processi.
+// Il chiamante possiede la stringa restituita. Il JSON resta deterministico.
+write_unique_playtest_report :: proc(
+	session: ^Playtest_Session,
+	base_path: string,
+) -> (path: string, ok: bool) {
+	if len(base_path) == 0 {
+		return
+	}
+	data, marshalled := marshal_playtest_report(session)
+	if !marshalled {
+		return
+	}
+	defer delete(data)
+	_, filename := os.split_path(base_path)
+	base_name, extension := os.split_filename(filename)
+	base := base_path[:len(base_path)-len(filename)+len(base_name)]
+	separator := "." if len(extension) > 0 else ""
+	for attempt in 0..<8192 {
+		candidate := fmt.aprintf("%s", base_path)
+		if attempt > 0 {
+			delete(candidate)
+			candidate = fmt.aprintf("%s_%d%s%s", base, attempt, separator, extension)
+		}
+		file, open_error := os.open(candidate, {.Write, .Create, .Excl})
+		if open_error != nil {
+			delete(candidate)
+			if open_error == .Exist {
+				continue
+			}
+			return
+		}
+		written, write_error := os.write(file, data)
+		close_error := os.close(file)
+		if write_error != nil || close_error != nil || written != len(data) {
+			os.remove(candidate)
+			delete(candidate)
+			return
+		}
+		return candidate, true
+	}
+	return
 }

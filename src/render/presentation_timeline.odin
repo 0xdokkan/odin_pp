@@ -34,6 +34,11 @@ Presentation_Cue_Kind :: enum {
 	Move,
 	Trap_Triggered,
 	Hazard_Triggered,
+	Object_Spawned,
+	Explosive_Armed,
+	Explosion,
+	Explosive_Disarmed,
+	Room_Hazard_Triggered,
 	Damage,
 	Damage_Absorbed,
 	Heal,
@@ -61,6 +66,7 @@ Presentation_Cue_Kind :: enum {
 Presentation_Actor :: struct {
 	entity:     game.Entity_Ref,
 	archetype:  game.Enemy_Archetype,
+	boss_phase: i32,
 	position:   view.Vec2,
 	health:     i32,
 	max_health: i32,
@@ -84,10 +90,13 @@ Presentation_Grid_Object :: struct {
 	max_health: i32,
 	opacity:    f32,
 	visible:    bool,
+	detonation_pulse: u64,
 }
 
 Room_Presentation :: struct {
 	phase:       game.Room_Phase,
+	encounter_kind: game.Encounter_Kind,
+	modifier: game.Room_Modifier,
 	player:      Presentation_Actor,
 	deck:        game.Deck_State,
 	enemies:     [game.MAX_ENEMIES_PER_ROOM]Presentation_Actor,
@@ -132,6 +141,8 @@ capture_room_presentation :: proc(room: ^game.Room) -> (result: Room_Presentatio
 	}
 	result.valid = true
 	result.phase = room.phase
+	result.encounter_kind = room.encounter_kind
+	result.modifier = room.modifier
 	result.gold = room.player.gold
 	result.pulse_count = room.pulse_count
 	result.deck = room.player.deck
@@ -152,6 +163,7 @@ capture_room_presentation :: proc(room: ^game.Room) -> (result: Room_Presentatio
 		result.enemies[index] = {
 			entity = game.enemy_entity(enemy.id),
 			archetype = enemy.archetype,
+			boss_phase = enemy.boss_phase,
 			position = presentation_position(enemy.position),
 			health = enemy.health,
 			max_health = enemy.max_health,
@@ -172,6 +184,7 @@ capture_room_presentation :: proc(room: ^game.Room) -> (result: Room_Presentatio
 		result.objects[index] = {
 			entity = game.object_entity(object.id),
 			kind = object.kind,
+			detonation_pulse = object.detonation_pulse,
 			position = presentation_position(object.position),
 			health = object.health,
 			max_health = object.max_health,
@@ -300,6 +313,16 @@ presentation_cue_kind :: proc(event: game.Game_Event) -> Presentation_Cue_Kind {
 		return .Trap_Triggered
 	case .Hazard_Triggered:
 		return .Hazard_Triggered
+	case .Object_Spawned:
+		return .Object_Spawned
+	case .Explosive_Armed:
+		return .Explosive_Armed
+	case .Explosion:
+		return .Explosion
+	case .Explosive_Disarmed:
+		return .Explosive_Disarmed
+	case .Room_Hazard_Triggered:
+		return .Room_Hazard_Triggered
 	case .Gold_Gained:
 		return .Gold_Gained
 	case .Loot_Dropped:
@@ -350,6 +373,8 @@ presentation_cue_duration :: proc(kind: Presentation_Cue_Kind, event: game.Game_
 		return PRESENTATION_PLAYER_MOVE_DURATION
 	case .Damage:
 		return PRESENTATION_DAMAGE_DURATION
+	case .Explosion, .Room_Hazard_Triggered:
+		return f32(0.32)*PRESENTATION_TIME_SCALE
 	case .Heal:
 		return PRESENTATION_HEAL_DURATION
 	case .Status_Applied, .Status_Removed, .Status_Expired, .Damage_Absorbed,
@@ -372,7 +397,7 @@ presentation_cue_duration :: proc(kind: Presentation_Cue_Kind, event: game.Game_
 	case .Loot:
 		return PRESENTATION_LOOT_DURATION
 	case .Attack_Missed, .Move_Blocked, .Trap_Triggered, .Hazard_Triggered, .Gold_Gained,
-	     .Loot_Dropped:
+	     .Loot_Dropped, .Object_Spawned, .Explosive_Armed, .Explosive_Disarmed:
 		return PRESENTATION_NOTICE_DURATION
 	case .Pulse_Advanced:
 		return PRESENTATION_PULSE_DURATION
@@ -780,6 +805,24 @@ start_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^Presentat
 	object, has_object := presentation_grid_object(timeline, event.target)
 
 	switch cue.kind {
+	case .Room_Hazard_Triggered:
+		timeline.view.modifier.activation_pulse = event.pulse_count
+	case .Object_Spawned:
+		if !show_spawned_presentation_object(&timeline.view, event) {
+			timeline.update_failures += 1
+		}
+	case .Explosive_Armed, .Explosive_Disarmed, .Explosion:
+		if !has_object {
+			timeline.update_failures += 1
+		} else if cue.kind == .Explosive_Armed {
+			object.detonation_pulse = event.pulse_count
+		} else {
+			object.detonation_pulse = 0
+			if cue.kind == .Explosion {
+				object.visible = false
+				object.opacity = 0
+			}
+		}
 	case .Move:
 		if has_actor {
 			actor.position = presentation_position(event.from_position)
@@ -877,6 +920,14 @@ start_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^Presentat
 	case .Pulse_Advanced:
 		timeline.view.pulse_count = event.pulse_count
 		timeline.view.deck.energy = event.energy
+		if timeline.final_view.valid {
+			timeline.view.modifier = timeline.final_view.modifier
+			for &enemy in timeline.view.enemies[:timeline.view.enemy_count] {
+				if final_enemy, found := presentation_actor_in_view(&timeline.final_view, enemy.entity); found {
+					enemy.boss_phase = final_enemy.boss_phase
+				}
+			}
+		}
 		if event.statuses_advanced && !sync_presentation_statuses_from_final(timeline) {
 			timeline.update_failures += 1
 		}
@@ -918,7 +969,8 @@ update_active_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^P
 	     .Refocus, .Card_Refocused,
 	     .Loot_Dropped, .Loot, .Attack_Missed,
 	     .Move_Blocked, .Gold_Gained, .Binding_Added, .Binding_Exhausted,
-	     .Binding_Expired, .Pulse_Advanced:
+	     .Binding_Expired, .Pulse_Advanced, .Object_Spawned, .Explosive_Armed,
+	     .Explosive_Disarmed, .Explosion, .Room_Hazard_Triggered:
 	}
 }
 
@@ -932,8 +984,10 @@ finish_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^Presenta
 		actor.visible = false
 		if cue.event.target == game.PLAYER_ENTITY {
 			timeline.view.phase = .Defeat
-		} else if visible_presentation_enemy_count(&timeline.view) == 0 {
+			timeline.view.modifier.activation_pulse = 0
+		} else if visible_presentation_enemy_count(&timeline.view) == 0 && timeline.view.phase != .Defeat {
 			timeline.view.phase = .Loot
+			timeline.view.modifier.activation_pulse = 0
 		}
 	} else if object, object_found := presentation_grid_object(
 		timeline,

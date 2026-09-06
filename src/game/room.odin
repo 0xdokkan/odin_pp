@@ -61,6 +61,9 @@ Enemy_Archetype :: enum {
 	Chaser,
 	Archer,
 	Brute,
+	Bomber,
+	Custodian,
+	Demolitionist,
 	Count,
 }
 
@@ -72,6 +75,12 @@ enemy_archetype_name :: proc(archetype: Enemy_Archetype) -> string {
 		return "Archer"
 	case .Brute:
 		return "Brute"
+	case .Bomber:
+		return "Bomber"
+	case .Custodian:
+		return "Custode"
+	case .Demolitionist:
+		return "Demolitore"
 	case .Count:
 	}
 	return "Unknown"
@@ -87,6 +96,10 @@ Enemy :: struct {
 	drops_healing: bool,
 	statuses:      Status_Set,
 	intent:        Enemy_Intent,
+	recovery_pulses: i32,
+	boss_phase:      i32,
+	boss_cycle:      u32,
+	boss_approach_pulses: i32,
 }
 
 Trap :: struct {
@@ -135,6 +148,8 @@ Trap_Spawn :: struct {
 }
 
 Room_Content :: struct {
+	encounter_kind: Encounter_Kind,
+	modifier: Room_Modifier,
 	enemies:   []Enemy_Spawn,
 	traps:     []Trap_Spawn,
 	obstacles: []grid.Position,
@@ -142,6 +157,8 @@ Room_Content :: struct {
 }
 
 Room :: struct {
+	encounter_kind: Encounter_Kind,
+	modifier: Room_Modifier,
 	level_data:    ^level.Level,
 	player:        ^Player,
 	phase:         Room_Phase,
@@ -151,6 +168,9 @@ Room :: struct {
 	obstacles:     [dynamic]Obstacle,
 	objects:       [dynamic]Grid_Object,
 	loot:          [dynamic]Loot,
+	// Scratch BFS riutilizzato solo durante la pianificazione, senza allocazioni al pulse.
+	enemy_path_distances: []int,
+	enemy_path_queue:     []grid.Position,
 	next_enemy_id:  u32,
 	next_trap_id:   u32,
 	next_object_id: u32,
@@ -375,6 +395,8 @@ create_room :: proc(level_data: ^level.Level, player: ^Player, content: Room_Con
 	result.level_data = level_data
 	result.player = player
 	result.exit_position = exit_position
+	result.encounter_kind = content.encounter_kind
+	result.modifier = content.modifier
 	result.next_enemy_id = 1
 	result.next_trap_id = 1
 	result.next_object_id = 1
@@ -382,8 +404,16 @@ create_room :: proc(level_data: ^level.Level, player: ^Player, content: Room_Con
 	result.enemies = make([dynamic]Enemy, 0, len(content.enemies))
 	result.traps = make([dynamic]Trap, 0, len(content.traps))
 	result.obstacles = make([dynamic]Obstacle, 0, len(content.obstacles))
-	result.objects = make([dynamic]Grid_Object, 0, len(content.objects))
-	result.loot = make([dynamic]Loot, 0, len(content.enemies))
+	result.objects = make([dynamic]Grid_Object, 0, MAX_GRID_OBJECTS_PER_ROOM)
+	loot_capacity := len(content.enemies)
+	for spawn in content.enemies {
+		if spawn.drops_healing {
+			loot_capacity += 1
+		}
+	}
+	result.loot = make([dynamic]Loot, 0, loot_capacity)
+	result.enemy_path_distances = make([]int, len(level_data.tiles.cells))
+	result.enemy_path_queue = make([]grid.Position, len(level_data.tiles.cells))
 	spawn_position := level_data.player_spawn
 
 	for position in content.obstacles {
@@ -431,6 +461,7 @@ create_room :: proc(level_data: ^level.Level, player: ^Player, content: Room_Con
 			health = spawn.health,
 			attack = spawn.attack,
 			drops_healing = spawn.drops_healing,
+			boss_phase = 1 if spawn.archetype == .Demolitionist else 0,
 		})
 		result.next_enemy_id += 1
 	}
@@ -455,7 +486,12 @@ create_room :: proc(level_data: ^level.Level, player: ^Player, content: Room_Con
 		result.next_trap_id += 1
 	}
 
+	if !valid_room_modifier(&result, &result.modifier) {
+		destroy_room(&result)
+		return {}, false
+	}
 	result.phase = .Combat if len(result.enemies) > 0 else .Loot
+	disarm_room_modifier_after_combat(&result)
 	if result.phase == .Combat {
 		if !begin_deck_combat(&player.deck) {
 			destroy_room(&result)
@@ -481,6 +517,8 @@ destroy_room :: proc(room: ^Room) {
 	delete(room.obstacles)
 	delete(room.objects)
 	delete(room.loot)
+	delete(room.enemy_path_distances)
+	delete(room.enemy_path_queue)
 	room^ = {}
 }
 
@@ -600,7 +638,9 @@ kill_enemy :: proc(room: ^Room, enemy_index: int) -> (drops: [2]Loot, drop_count
 		drop_count += 1
 	}
 	if len(room.enemies) == 0 {
-		room.phase = .Loot
+		if room.phase != .Defeat {
+			room.phase = .Loot
+		}
 		clear_enemy_intents(room)
 	}
 	return
@@ -649,6 +689,23 @@ try_move_player :: proc(room: ^Room, direction: Move_Direction) -> Action_Result
 	}
 
 	if cell_blocks_movement(room, target) {
+		// Loot cannot softlock when a movable block was pushed into a corridor.
+		if room.phase == .Loot {
+			if object, found := grid_object_at(room, target); found {
+				definition, _ := grid_object_definition(object.kind)
+				if definition.movable && definition.damageable {
+					ref := object_entity(object.id)
+					action := make_action(.Attack, PLAYER_ENTITY, entity_target(ref), .Opponent_Or_Object)
+					added := add_effect(&action, damage_effect(ref, room.player.stats.attack))
+					assert(added)
+					report := resolve_action(room, &action)
+					if report.accepted {
+						append_event_log(&room.recent_events, &report.events)
+						return .Attacked
+					}
+				}
+			}
+		}
 		return .Blocked
 	}
 

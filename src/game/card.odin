@@ -94,6 +94,7 @@ Card_Effect_Template :: struct {
 	has_card_definition: bool,
 	movement:           Card_Movement_Kind,
 	movement_distance:  int,
+	affects_objects:    bool,
 }
 
 Card_Definition :: struct {
@@ -128,7 +129,7 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 		shop_base_price = 3,
 		cost = 1,
 		targeting = {
-			rule = .Opponent,
+			rule = .Opponent_Or_Object,
 			cast_range = {.Manhattan, 1, 1},
 			shape = .Single,
 		},
@@ -153,7 +154,7 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 		shop_base_price = 3,
 		cost = 2,
 		targeting = {
-			rule = .Opponent,
+			rule = .Opponent_Or_Object,
 			cast_range = {.Manhattan, 1, 3},
 			shape = .Single,
 			requires_line_of_sight = true,
@@ -246,6 +247,7 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 			{
 				kind = .Damage,
 				target = .Each_Affected_Enemy,
+				affects_objects = true,
 				base_amount = 2,
 				amount_per_upgrade = 1,
 			},
@@ -768,6 +770,7 @@ card_effect_template_is_valid :: proc(
 	if definition == nil || int(template.target) < 0 || int(template.target) >= int(Card_Target_Selector.Count) ||
 	   (template.target == .Chosen_Entity && !card_target_rule_selects_effect_entity(definition.targeting.rule)) ||
 	   (template.target == .Each_Affected_Enemy && definition.targeting.shape == .None) ||
+	   (template.affects_objects && (template.kind != .Damage || template.target != .Each_Affected_Enemy)) ||
 	   (template.kind != .Move &&
 	    (template.movement != .None || template.movement_distance != 0)) {
 		return false
@@ -863,6 +866,22 @@ validate_card_instance :: proc(instance: Card_Instance) -> bool {
 	definition, found := card_definition_by_id(instance.definition_id)
 	return found && validate_card_definition(&definition) &&
 	       (!definition.temporary_only || instance.lifetime == .Combat)
+}
+
+// Gli upgrade correnti scalano soltanto gli importi degli effetti. Non vendere
+// livelli privi di benefici, anche quando l'istanza e formalmente valida.
+card_can_upgrade :: proc(instance: Card_Instance) -> bool {
+	if !validate_card_instance(instance) || instance.lifetime != .Permanent ||
+	   instance.upgrade_level >= MAX_CARD_UPGRADE_LEVEL {
+		return false
+	}
+	definition, _ := card_definition_by_id(instance.definition_id)
+	for index in 0..<definition.effect_count {
+		if definition.effects[index].amount_per_upgrade > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 card_destination_after_play :: proc(instance: Card_Instance) -> (Card_Zone, bool) {
@@ -1168,6 +1187,10 @@ evaluate_card_targeting :: proc(
 			evaluation.required_effect_count += len(room.enemies)
 		case .Each_Affected_Enemy:
 			evaluation.required_effect_count += evaluation.query.enemy_count
+			if definition.effects[index].affects_objects {
+				_, object_count := affected_damageable_object_ids(room, &evaluation.query.affected)
+				evaluation.required_effect_count += object_count
+			}
 		case .Chosen_Entity, .Player:
 			evaluation.required_effect_count += 1
 		case .Count:
@@ -1234,7 +1257,9 @@ compile_card_action :: proc(
 				&evaluation.query,
 			)
 			assert(has_destination)
-			assert(add_effect(&action, move_effect(effect_target, destination)))
+			if !add_effect(&action, move_effect(effect_target, destination)) {
+				return {}, .Too_Many_Effects
+			}
 			continue
 		}
 		if template.target == .Each_Enemy {
@@ -1245,18 +1270,37 @@ compile_card_action :: proc(
 					enemy_entity(ids[enemy_index]),
 					instance,
 				)
-				assert(instantiated && add_effect(&action, effect))
+				if !instantiated {
+					return {}, .Invalid_Definition
+				}
+				if !add_effect(&action, effect) {
+					return {}, .Too_Many_Effects
+				}
 			}
 			continue
 		}
 		if template.target == .Each_Affected_Enemy {
+			if template.affects_objects {
+				ids, count := affected_damageable_object_ids(room, &evaluation.query.affected)
+				for id in ids[:count] {
+					effect, valid := instantiate_card_effect(template, object_entity(id), instance)
+					if !valid || !add_effect(&action, effect) {
+						return {}, .Too_Many_Effects
+					}
+				}
+			}
 			for enemy_index in 0..<evaluation.query.enemy_count {
 				effect, instantiated := instantiate_card_effect(
 					template,
 					enemy_entity(evaluation.query.enemy_ids[enemy_index]),
 					instance,
 				)
-				assert(instantiated && add_effect(&action, effect))
+				if !instantiated {
+					return {}, .Invalid_Definition
+				}
+				if !add_effect(&action, effect) {
+					return {}, .Too_Many_Effects
+				}
 			}
 			continue
 		}
@@ -1264,7 +1308,12 @@ compile_card_action :: proc(
 		effect_target, has_target := card_effect_target(template.target, target)
 		assert(has_target)
 		effect, instantiated := instantiate_card_effect(template, effect_target, instance)
-		assert(instantiated && add_effect(&action, effect))
+		if !instantiated {
+			return {}, .Invalid_Definition
+		}
+		if !add_effect(&action, effect) {
+			return {}, .Too_Many_Effects
+		}
 	}
 	return action, .None
 }

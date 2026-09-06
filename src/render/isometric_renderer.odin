@@ -69,6 +69,7 @@ Renderer :: struct {
 	enemy_move_animation_count:    int,
 	enemy_move_animations_dropped: int,
 	timeline: Presentation_Timeline,
+	playback_speed: f32,
 }
 
 Tile_Vertices :: struct {
@@ -299,7 +300,7 @@ card_detail_lines :: proc(card: game.Card_Instance) -> (first, second: cstring) 
 	case .Cross_Slash:
 		return fmt.ctprintf("DEAL %d IN CROSS", 2+upgrade), "RANGE 1-3"
 	case .Firebomb:
-		return fmt.ctprintf("DEAL %d IN 3X3", 2+upgrade), "RANGE 1-3"
+		return fmt.ctprintf("DEAL %d IN 3X3", 2+upgrade), "IGNITES BARRELS"
 	case .Guard:
 		return fmt.ctprintf("GAIN %d SHIELD", 3+upgrade), "LASTS 3 PULSES"
 	case .Toxic_Wave:
@@ -319,7 +320,7 @@ card_detail_lines :: proc(card: game.Card_Instance) -> (first, second: cstring) 
 	case .Spark:
 		return fmt.ctprintf("DEAL %d DAMAGE", 2+upgrade), "TEMP - RANGE 1-2"
 	case .Shove:
-		return fmt.ctprintf("DEAL %d DAMAGE", 1+upgrade), "PUSH 1 CELL"
+		return fmt.ctprintf("DEAL %d DAMAGE", 1+upgrade), "RANGE 1 / PUSH 1"
 	case .Dash:
 		return "MOVE 1-3 CELLS", "TRAVERSE HAZARDS"
 	case .Grappling_Hook:
@@ -909,11 +910,27 @@ begin_renderer_event_timeline :: proc(
 	return begin_event_timeline(&renderer.timeline, before, events, after)
 }
 
+renderer_playback_speed :: proc(renderer: ^Renderer) -> f32 {
+	if renderer == nil || renderer.playback_speed == 0 {
+		return 1
+	}
+	return renderer.playback_speed
+}
+
+set_renderer_playback_speed :: proc(renderer: ^Renderer, speed: f32) -> bool {
+	// Questo confronto rifiuta anche NaN e infinito.
+	if renderer == nil || !(speed >= 0.25 && speed <= 4) {
+		return false
+	}
+	renderer.playback_speed = speed
+	return true
+}
+
 update_renderer_event_timeline :: proc(renderer: ^Renderer, dt: f32) -> bool {
 	if renderer == nil {
 		return false
 	}
-	return update_event_timeline(&renderer.timeline, dt)
+	return update_event_timeline(&renderer.timeline, dt*renderer_playback_speed(renderer))
 }
 
 enemy_move_animation_index :: proc(
@@ -1158,6 +1175,9 @@ enemy_draw_center :: proc(renderer: ^Renderer, enemy: game.Enemy) -> view.Vec2 {
 
 enemy_draw_radius :: proc(renderer: ^Renderer, enemy: game.Enemy) -> f32 {
 	assert(renderer != nil)
+	if enemy.archetype == .Demolitionist {
+		return max(f32(12), 18*renderer.camera.zoom)
+	}
 	if enemy.archetype == .Brute {
 		return max(f32(9), 14*renderer.camera.zoom)
 	}
@@ -1173,6 +1193,8 @@ draw_enemy_body :: proc(
 	assert(renderer != nil)
 	radius := enemy_draw_radius(renderer, enemy)
 	switch enemy.archetype {
+	case .Custodian, .Demolitionist:
+		draw_cooperative_enemy_body(renderer, enemy, center, opacity)
 	case .Chaser:
 		rl.DrawCircleV(to_raylib(center), radius, color_with_opacity(rl.Color{51, 36, 38, 255}, opacity))
 		rl.DrawCircleV(to_raylib(center), radius-2, color_with_opacity(rl.Color{224, 99, 86, 255}, opacity))
@@ -1185,6 +1207,13 @@ draw_enemy_body :: proc(
 			max(f32(1), 1.4*renderer.camera.zoom),
 			color_with_opacity(rl.Color{226, 240, 248, 220}, opacity),
 		)
+	case .Bomber:
+		rl.DrawCircleV(to_raylib(center), radius, color_with_opacity(rl.Color{57, 28, 57, 255}, opacity))
+		rl.DrawCircleV(to_raylib(center), radius-2, color_with_opacity(rl.Color{191, 113, 212, 255}, opacity))
+		rl.DrawCircleV(to_raylib({center.x+radius*0.55, center.y-radius*0.5}), radius*0.45,
+			color_with_opacity(rl.Color{32, 32, 39, 255}, opacity))
+		rl.DrawCircleV(to_raylib({center.x+radius*0.75, center.y-radius}), max(f32(2), radius*0.18),
+			color_with_opacity(rl.Color{255, 204, 85, 255}, opacity))
 	case .Brute:
 		rl.DrawRectangle(
 			c.int(center.x-radius),
@@ -1353,7 +1382,7 @@ enemy_intent_cell_counts :: proc(
 			move_count += 1
 			move_focused = move_focused || enemy.id == focused_enemy_id
 		}
-		if game.enemy_intent_cell_is_threatened(&enemy.intent, position) {
+		if enemy.intent.kind != .Bombard && game.enemy_intent_cell_is_threatened(&enemy.intent, position) {
 			threat_count += 1
 			threat_focused = threat_focused || enemy.id == focused_enemy_id
 		}
@@ -1463,6 +1492,15 @@ draw_enemy_intent_badges :: proc(renderer: ^Renderer, room: ^game.Room) {
 			continue
 		case .Wait:
 			label = "WAIT"
+		case .Recover:
+			label = fmt.ctprintf("RECOVER %d", enemy.recovery_pulses)
+			color = rl.Color{105, 215, 183, 255}
+		case .Protect:
+			label = "SHIELD 3"
+			color = rl.Color{102, 216, 218, 255}
+		case .Bombard:
+			label = "BOMB 2"
+			color = rl.Color{214, 145, 235, 255}
 		case .Move:
 			label = "MOVE"
 			color = INTENT_MOVE_OUTLINE
@@ -1819,6 +1857,10 @@ draw_grid_object_body :: proc(
 	opacity: f32 = 1,
 ) {
 	assert(renderer != nil)
+	if kind == .Barrel || kind == .Bomb {
+		draw_explosive_body(renderer, kind, center, opacity)
+		return
+	}
 	if kind == .Fire {
 		scale := renderer.camera.zoom
 		half_width := max(f32(7), 11*scale)
@@ -2028,7 +2070,7 @@ draw_presentation_actors :: proc(renderer: ^Renderer) {
 			if !actor.visible {
 				continue
 			}
-			enemy := game.Enemy{archetype = actor.archetype}
+			enemy := game.Enemy{archetype = actor.archetype, boss_phase = actor.boss_phase}
 			center := presentation_actor_center(renderer, actor)
 			radius := enemy_draw_radius(renderer, enemy)
 			draw_enemy_body(renderer, enemy, center, actor.opacity)
@@ -2122,7 +2164,7 @@ timeline_card_cue_verb :: proc(cue: ^Presentation_Cue) -> cstring {
 	     .Status_Applied, .Status_Removed, .Status_Expired, .Defeat, .Loot_Dropped, .Loot,
 	     .Attack_Missed, .Move_Blocked,
 	     .Gold_Gained, .Binding_Added, .Binding_Exhausted, .Binding_Expired,
-	     .Pulse_Advanced, .Refocus:
+	     .Pulse_Advanced, .Refocus, .Object_Spawned, .Explosive_Armed, .Explosion, .Explosive_Disarmed, .Room_Hazard_Triggered:
 	}
 	return nil
 }
@@ -2276,6 +2318,21 @@ draw_active_presentation_cue :: proc(renderer: ^Renderer) {
 	case .Hazard_Triggered:
 		label = "BURN"
 		color = rl.Color{255, 151, 55, 255}
+	case .Object_Spawned:
+		label = "BOMB"
+		color = rl.Color{214, 145, 235, 255}
+	case .Explosive_Armed:
+		label = "FUSE 2"
+		color = rl.Color{255, 194, 85, 255}
+	case .Explosive_Disarmed:
+		label = "SAFE"
+		color = rl.Color{105, 215, 183, 255}
+	case .Explosion:
+		label = "BOOM"
+		color = rl.Color{255, 169, 65, 255}
+	case .Room_Hazard_Triggered:
+		label = "FURNACE"
+		color = rl.Color{255, 169, 65, 255}
 	case .Gold_Gained:
 		label = fmt.ctprintf("+%d GOLD", cue.event.amount)
 		color = rl.Color{246, 207, 92, 255}
@@ -2343,11 +2400,14 @@ draw_room :: proc(renderer: ^Renderer, room: ^game.Room) {
 		vertices := inset_vertices(tile_vertices(renderer, obstacle.position), 0.58)
 		draw_diamond(vertices, rl.Color{48, 53, 58, 255}, rl.Color{180, 187, 188, 255})
 	}
+	draw_explosive_ground(renderer, room)
+	draw_encounter_ground(renderer, room)
 
 	if timeline_busy {
 		draw_presentation_grid_objects(renderer, &renderer.timeline.view)
 		draw_presentation_loot(renderer, &renderer.timeline.view)
 		draw_presentation_actors(renderer)
+		draw_explosive_countdowns(renderer, room)
 		draw_active_presentation_cue(renderer)
 	} else {
 		for object in room.objects {
@@ -2383,6 +2443,7 @@ draw_room :: proc(renderer: ^Renderer, room: ^game.Room) {
 			draw_entity_statuses(renderer, room, game.PLAYER_ENTITY, center, radius)
 		}
 		draw_loot_animations(renderer, room)
+		draw_explosive_countdowns(renderer, room)
 	}
 }
 
@@ -2403,10 +2464,20 @@ draw_status :: proc(renderer: ^Renderer, room: ^game.Room, scale_mode: view.Scal
 
 	rl.DrawRectangle(14, 14, 460, 84, rl.Color{12, 15, 18, 220})
 	rl.DrawText(
+		fmt.ctprintf("ANIMATION %.2gx  [F4]", renderer_playback_speed(renderer)),
+		26, 104, 12, rl.Color{169, 183, 177, 255},
+	)
+	if status_view.phase == .Combat {
+		draw_tactical_legend(renderer)
+		draw_encounter_status(renderer, room)
+	} else if status_view.phase == .Loot {
+		rl.DrawText("MOVE INTO BLOCKS TO BREAK THEM AND CLEAR YOUR WAY", 26, 122, 10, rl.Color{169, 183, 177, 255})
+	}
+	rl.DrawText(
 		fmt.ctprintf(
 			"%s  |  %s",
 			game.room_phase_name(status_view.phase),
-			view.scale_mode_name(scale_mode),
+			game.encounter_kind_name(room.encounter_kind),
 		),
 		26,
 		24,

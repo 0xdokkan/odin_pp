@@ -259,6 +259,9 @@ apply_movement_effect :: proc(
 		})
 		movement_recorded := report.events.count > movement_event_index
 		trigger_cell_hazard(room, effect.target, report)
+		if effect.target.kind == .Object {
+			ignite_barrel_near_fire(room, effect.target.id, &report.events)
+		}
 		if !entity_exists(room, effect.target) {
 			if !final_step && movement_recorded {
 				report.events.events[movement_event_index].kind = .Moved

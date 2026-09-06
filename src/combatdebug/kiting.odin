@@ -15,6 +15,7 @@ Kiting_Decision :: struct {
 }
 
 Kiting_Score :: struct {
+	hazard_damage:   i64,
 	threat_count:     int,
 	minimum_distance: int,
 	total_distance:   int,
@@ -50,19 +51,15 @@ predicted_enemy_position :: proc(enemy: ^game.Enemy) -> grid.Position {
 	switch enemy.intent.kind {
 	case .Move, .Charge:
 		return enemy.intent.destination
-	case .None, .Wait, .Attack:
+	case .None, .Wait, .Attack, .Bombard, .Recover, .Protect:
 		return enemy.position
 	}
 	unreachable()
 }
 
 candidate_is_legal :: proc(room: ^game.Room, position: grid.Position) -> bool {
-	if room == nil || room.player == nil || !game.base_cell_is_walkable(room, position) ||
-	   game.obstacle_at(room, position) {
-		return false
-	}
-	_, occupied := game.enemy_index_at(room, position)
-	return !occupied
+	query := game.query_entity_movement(room, game.PLAYER_ENTITY, position)
+	return game.movement_query_is_clear(&query)
 }
 
 score_candidate :: proc(
@@ -73,15 +70,41 @@ score_candidate :: proc(
 	order: int,
 	state: ^Max_Distance_Policy_State,
 ) -> (score: Kiting_Score, ok: bool) {
-	if room == nil || room.player == nil || len(room.enemies) == 0 ||
-	   !candidate_is_legal(room, position) {
+	if room == nil || room.player == nil || len(room.enemies) == 0 {
+		return
+	}
+	if is_move {
+		if !candidate_is_legal(room, position) {
+			return
+		}
+		if index, found := game.trap_index_at(room, position); found && room.traps[index].armed {
+			score.hazard_damage += i64(room.traps[index].damage)
+		}
+		if index, found := game.object_index_at(room, position); found {
+			definition, valid := game.grid_object_definition(room.objects[index].kind)
+			if valid && definition.hazardous {
+				score.hazard_damage += i64(definition.hazard_damage)
+			}
+		}
+	} else if position != room.player.position {
 		return
 	}
 	score.order = order
+	if room.modifier.kind != .None && room.modifier.activation_pulse != 0 &&
+	   room.modifier.activation_pulse <= room.pulse_count+1 &&
+	   game.room_modifier_contains_cell(&room.modifier, position) {
+		score.hazard_damage += i64(room.modifier.damage)
+	}
+	for object in room.objects {
+		if object.detonation_pulse != 0 && object.detonation_pulse <= room.pulse_count+1 &&
+		   game.explosion_contains_cell(room, object.position, position) {
+			score.hazard_damage += i64(game.EXPLOSIVE_DAMAGE)
+		}
+	}
 	score.continues_heading = is_move && state != nil && state.has_last_direction &&
 	                          direction == state.last_direction
 	for &enemy, index in room.enemies {
-		if game.enemy_intent_cell_is_threatened(&enemy.intent, position) {
+		if enemy.intent.kind != .Bombard && game.enemy_intent_cell_is_threatened(&enemy.intent, position) {
 			score.threat_count += 1
 		}
 		distance := manhattan_distance(position, predicted_enemy_position(&enemy))
@@ -94,6 +117,9 @@ score_candidate :: proc(
 }
 
 score_is_better :: proc(candidate, current: Kiting_Score) -> bool {
+	if candidate.hazard_damage != current.hazard_damage {
+		return candidate.hazard_damage < current.hazard_damage
+	}
 	if candidate.threat_count != current.threat_count {
 		return candidate.threat_count < current.threat_count
 	}
