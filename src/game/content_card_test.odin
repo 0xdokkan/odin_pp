@@ -16,7 +16,7 @@ CONTENT_CARD_IDS :: [?]Card_Id{
 test_content_card_definitions_are_valid_collectible_and_append_only :: proc(t: ^testing.T) {
 	testing.expect(t, validate_card_definitions())
 	testing.expect_value(t, int(Card_Id.Heavy_Blow), int(Card_Id.Grappling_Hook)+1)
-	testing.expect_value(t, int(Card_Id.Volatile_Study), int(Card_Id.Count)-1)
+	testing.expect_value(t, int(Card_Id.Volatile_Study), int(Card_Id.Fate_Strike)-1)
 
 	node := Run_Node{kind = .Combat, depth = 0}
 	for id in CONTENT_CARD_IDS {

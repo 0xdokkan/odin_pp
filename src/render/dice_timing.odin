@@ -1,0 +1,18 @@
+package render
+
+// Keep the approved fall and two flights at their original real times. The
+// extra 300 ms belong only to settling after the third floor contact.
+DICE_CUE_DURATION :: f32(2.1)
+DICE_PHYSICS_IMPACT_PROGRESS :: f32(0.648)/DICE_CUE_DURATION
+DICE_SECOND_IMPACT_PROGRESS :: f32(0.972)/DICE_CUE_DURATION
+DICE_THIRD_IMPACT_PROGRESS :: f32(1.224)/DICE_CUE_DURATION
+DICE_PHYSICS_REVEAL_PROGRESS :: f32(1.596)/DICE_CUE_DURATION
+
+// Results retain 108 ms spacing and finish 180 ms before the cue ends.
+DICE_POOL_REVEAL_STEP :: f32(0.108)/DICE_CUE_DURATION
+DICE_POOL_REVEAL_TIMES :: [3]f32{
+	DICE_PHYSICS_REVEAL_PROGRESS,
+	f32(1.704)/DICE_CUE_DURATION,
+	f32(1.812)/DICE_CUE_DURATION,
+}
+DICE_POOL_COMPLETE_PROGRESS :: f32(1.920)/DICE_CUE_DURATION

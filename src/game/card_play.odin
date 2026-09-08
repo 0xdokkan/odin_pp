@@ -83,7 +83,7 @@ play_card :: proc(room: ^Room, card_id: u32, target: Target) -> (play: Card_Play
 	resolving_card, began_resolving := begin_resolving_hand_card(deck, hand_index)
 	assert(began_resolving && resolving_card == play.card)
 
-	play.action_report = resolve_action(room, &action)
+	play.action_report = resolve_played_card_action(room, play.card, target, &action)
 	if !play.action_report.accepted {
 		deck^ = deck_before
 		play.result = .Action_Rejected
@@ -117,6 +117,7 @@ play_card :: proc(room: ^Room, card_id: u32, target: Target) -> (play: Card_Play
 		from_card_zone = .Resolving,
 		to_card_zone = play.destination,
 	})
+	apply_card_relics(room, play.destination, &play.action_report)
 	pulse_report, outcome := finish_player_combat_command(room)
 	play.pulse_report = pulse_report
 	switch outcome {

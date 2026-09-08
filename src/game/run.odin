@@ -1,6 +1,7 @@
 package game
 
 import "core:math/rand"
+import level "../level"
 
 MAX_NODE_CONNECTIONS :: 3
 SPECIAL_NODE_KIND_COUNT :: 4
@@ -176,6 +177,9 @@ Run_State :: struct {
 	rest:                Rest_Node_State,
 	route_event:         Route_Event_State,
 	treasure:            Treasure_Node_State,
+	last_room_family: level.Room_Family,
+	relic_rewards_enabled: bool,
+	relic_reward: Run_Relic_Reward,
 }
 
 Run_Transition :: enum {
@@ -523,13 +527,14 @@ validate_run_map :: proc(run_map: ^Run_Map) -> bool {
 	return incoming[0] == 0
 }
 
-create_run :: proc(stats: Player_Stats, config: Run_Map_Config, seed: u64) -> (result: Run_State, ok: bool) {
+create_run :: proc(stats: Player_Stats, config: Run_Map_Config, seed: u64, with_relic_rewards: bool = false) -> (result: Run_State, ok: bool) {
 	player, player_ok := create_player(stats)
 	if !player_ok {
 		return {}, false
 	}
 	reseeded := reseed_deck(&player.deck, seed~0xD1B54A32D192ED03)
 	assert(reseeded)
+	player.dice = make_dice_state(seed)
 	run_map, map_ok := generate_run_map(config, seed)
 	if !map_ok {
 		return {}, false
@@ -543,6 +548,8 @@ create_run :: proc(stats: Player_Stats, config: Run_Map_Config, seed: u64) -> (r
 	result.seed = seed
 	result.reward_random_state = normalized_card_reward_seed(seed~CARD_REWARD_SEED_SALT)
 	result.shop_random_state = normalized_shop_seed(seed~SHOP_SEED_SALT)
+	result.relic_rewards_enabled = with_relic_rewards
+	result.relic_reward = make_run_relic_reward(&result, .Starter)
 	assert(validate_run_state(&result))
 	return result, true
 }
@@ -588,6 +595,7 @@ available_nodes :: proc(run: ^Run_State) -> []Node_Id {
 }
 
 can_choose_node :: proc(run: ^Run_State, id: Node_Id) -> bool {
+	if run_has_relic_choice(run) { return false }
 	for available in available_nodes(run) {
 		if available == id {
 			return true
@@ -688,7 +696,7 @@ choose_node :: proc(run: ^Run_State, id: Node_Id) -> bool {
 }
 
 finish_room :: proc(run: ^Run_State, room_phase: Room_Phase) -> Run_Transition {
-	if run == nil || run.phase != .In_Room || !validate_run_state(run) {
+	if run == nil || run.phase != .In_Room || run_has_relic_choice(run) || !validate_run_state(run) {
 		return .Invalid
 	}
 	node, ok := current_run_node(run)
@@ -732,6 +740,9 @@ finish_room :: proc(run: ^Run_State, room_phase: Room_Phase) -> Run_Transition {
 		node.cleared = false
 		run.cleared_count -= 1
 		return .Invalid
+	}
+	if node.kind == .Elite {
+		run.relic_reward = make_run_relic_reward(run, .Elite)
 	}
 	return .Reward
 }

@@ -131,6 +131,12 @@ refocus_player_hand :: proc(room: ^Room) -> (refocus: Refocus_Report) {
 		refocus.drawn_count += 1
 		record_refocus_draw(&room.recent_events, card)
 	}
+	for card_outcome in refocus.hand_report.outcomes[:refocus.hand_report.outcome_count] {
+		if card_outcome.destination == .Exhaust {
+			apply_card_relics(room, .Exhaust, nil)
+			break
+		}
+	}
 	assert(validate_deck_state(deck))
 	refocus.result = .Refocused
 	refocus.energy_after = deck.energy

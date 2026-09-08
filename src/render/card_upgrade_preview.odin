@@ -11,6 +11,15 @@ card_upgrade_preview :: proc(card: game.Card_Instance) -> cstring {
 		}
 		return "NO UPGRADE AVAILABLE"
 	}
+	if card.definition_id == .Sundering_Blow {
+		return fmt.ctprintf("2D6 BONUS +%d -> +%d / PUSH ON 8+", card.upgrade_level, card.upgrade_level+1)
+	}
+	if card.definition_id == .Prismatic_Barrage {
+		return fmt.ctprintf("DAMAGE PER 4+: %d -> %d / SHIELD 1 PER OTHER DIE, 2 PULSES", 3+card.upgrade_level, 4+card.upgrade_level)
+	}
+	if card.definition_id == .Twin_Venom {
+		return fmt.ctprintf("HIGHER D6 BONUS +%d -> +%d / PAIR: POISON 2, 2 PULSES IF ALIVE", 1+card.upgrade_level, 2+card.upgrade_level)
+	}
 	definition, _ := game.card_definition_by_id(card.definition_id)
 	line := ""
 	for index in 0..<definition.effect_count {
@@ -23,6 +32,7 @@ card_upgrade_preview :: proc(card: game.Card_Instance) -> cstring {
 		case .Damage: label = "DAMAGE"
 		case .Heal: label = "HEAL"
 		case .Gain_Gold: label = "GOLD"
+		case .Gain_Energy: label = "ENERGY"
 		case .Draw_Cards: label = "DRAW"
 		case .Discard_Cards: label = "DISCARD"
 		case .Create_Card: label = "CREATE"

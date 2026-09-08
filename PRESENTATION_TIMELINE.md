@@ -93,9 +93,20 @@ Il percorso normale e:
    ordine e registrato in `room.recent_events`.
 6. Viene catturato lo snapshot post-comando; `begin_event_timeline` copia eventi,
    vista iniziale e vista finale nella timeline.
-7. `update_event_timeline` avanza il cue in testa. Se `dt` supera il tempo che gli
-   resta, il residuo viene consumato dai cue successivi nello stesso frame.
+7. `update_event_timeline` avanza il cue o gruppo in testa. Se `dt` supera il
+   tempo restante, il residuo passa ai gruppi successivi nello stesso frame.
 8. Dopo l'ultimo cue, il renderer mostra nuovamente la `Room` finale.
+
+Il ciclo della finestra usa `update_renderer_frame_timeline`: conserva il
+passaggio del tempo fra cue, ma limita l'avanzamento di `Dice_Rolled` a 1/18
+del tiro per frame, anche quando il frame inizia sul cue precedente. Un frame
+lento non puo quindi consumare entrambi i rimbalzi senza mostrarli. Il tempo
+si ferma inoltre sui tre contatti definiti dal timing dei dadi, mostrando la
+posa sul piano prima della risalita. A 1x avvengono a 0,648, 0,972 e 1,224
+secondi; seguono 0,372 secondi di assestamento prima della lettura delle facce.
+Il residuo viene scartato quando scatta
+uno di questi limiti; i seek espliciti usano ancora
+`update_renderer_event_timeline` e possono completare subito la sequenza.
 
 Un comando committed che non produce eventi non rende la timeline busy. Lo stato
 autorevole e gia aggiornato e viene mostrato normalmente.
@@ -104,13 +115,17 @@ autorevole e gia aggiornato e viene mostrato normalmente.
 
 `Room_Presentation` contiene i dati necessari a disegnare la stanza: fase,
 player, nemici, trappole, grid object, loot, oro, pulse, status e una copia
-inline del deck. Attori e oggetti sono referenziati con `Entity_Ref`, quindi la
+inline del deck, delle reliquie e della famiglia della stanza. Attori e oggetti
+sono referenziati con `Entity_Ref`, quindi la
 rimozione o il riordino nella `Room` non invalida il bersaglio di un evento gia
 copiato.
 
-Ogni `Game_Event` diventa un `Presentation_Cue`. La coda e strettamente FIFO:
-non raggruppa eventi simili e non riordina danno, reazioni o loot. Un solo cue e
-attivo alla volta.
+Ogni `Game_Event` diventa un `Presentation_Cue`. La coda conserva l'ordine del
+log. Normalmente e attivo un solo cue; gli eventi diretti di Firebomb dichiarano
+invece un `visual_group` non nullo e contiguo. Il gruppo applica le mutazioni
+allo snapshot nell'ordine registrato, poi anima insieme danno, scudi, morti,
+drop e accensione dei barili. La durata comune e il massimo delle durate dei
+membri. Annunci, movimenti, reazioni e frontiere degli impulsi restano separati.
 
 Le famiglie visualizzate sono:
 
@@ -124,6 +139,10 @@ Le famiglie visualizzate sono:
 | eventi status | aggiorna i badge dello snapshot e mostra il relativo avviso |
 | eventi binding | mostra l'avviso; il set dei binding non e copiato nello snapshot |
 | `Card_Played` | paga e riproduce `Hand -> Resolving` |
+| `Energy_Gained` | valida il recupero e aggiorna l'energia al valore assoluto dell'evento, mostrando `+ENERGY` |
+| `Dice_Rolled` | mostra per 2,1 secondi nominali un intero gruppo di dadi verso il centro; `dice_roll` contiene facce e totale gia committed, `amount` coincide con il totale; Barrage conta i 4+, Twin Venom mostra massimo e coppia, senza cambiare la somma registrata |
+| `Spell_Launched` | anima il proiettile fra le posizioni registrate prima degli impatti |
+| `Spell_Impact` | mostra l'impatto e la footprint registrata prima dei relativi danni |
 | `Card_Drawn` | pesca e riproduce l'eventuale reshuffle/RNG |
 | `Card_Moved` | riproduce `Hand/Resolving -> Discard/Exhaust` |
 | `Card_Created` | richiede origine `.Count` e ricrea la stessa istanza temporanea e lo stesso ID in mano |
@@ -132,7 +151,7 @@ Le famiglie visualizzate sono:
 | `Entity_Defeated` | mantiene l'attore nello snapshot durante il fade, poi lo nasconde |
 | `Loot_Dropped` | aggiunge il drop sulla cella e ne mostra il pulse |
 | `Loot_Collected`, `Gold_Gained` | anima la raccolta e aggiorna la copia dell'oro |
-| `Pulse_Advanced` | sincronizza pulse, energia, durate status, modificatore e fase del boss dalla vista finale |
+| `Pulse_Advanced` | sincronizza pulse, energia, durate status, stato delle reliquie, modificatore e fase del boss dalla vista finale |
 | `Attack_Missed`, `Move_Blocked` | mostra un avviso senza mutare la `Room` |
 
 La durata appartiene al tipo di cue. I movimenti del player e dei nemici possono
@@ -140,7 +159,7 @@ quindi avere timing diversi senza introdurre attese nella simulazione. Modificar
 una durata cambia soltanto la presentazione. `PRESENTATION_TIME_SCALE` moltiplica
 tutte le durate: un valore maggiore di uno rallenta l'intera timeline conservando
 il ritmo relativo fra le famiglie di cue. Le sequenze normali mantengono queste
-durate senza modifiche; se la somma supera 12 secondi,
+durate senza modifiche; se la somma delle durate dei gruppi supera 12 secondi,
 `begin_event_timeline` scala proporzionalmente tutti i cue. Il limite impedisce
 che un AoE denso blocchi l'input per decine di secondi senza alterare l'ordine.
 
@@ -149,6 +168,25 @@ timeline. `--animation-speed=2`, `--fast` (4x) e `F4` controllano questa velocit
 indicata nell'HUD e conservata tra stanze e restart. Il limite di 12 secondi si
 riferisce al tempo della timeline a 1x. Ordine FIFO, snapshot, buffer input e
 simulazione restano identici a ogni velocita; gli smoke grafici usano sempre 1x.
+
+Gli [sprite personalizzati](SPRITES.md) seguono un clock cosmetico distinto:
+PNG animati e GIF avanzano secondo gli FPS del manifest, indipendentemente dalla
+velocita della timeline. Posizione, fade, salute e intenzioni continuano a usare
+lo stato presentazionale. Le [reliquie](RELICS.md) producono i normali eventi di
+status, pesca e cura; Swift Soles usa `Energy_Gained`, cosi il bonus appare prima
+del refill del pulse e non anticipa lo stato finale del deck.
+
+Le clip d'azione usano invece il progresso del proprio cue: ogni cast o impatto
+inizia dal primo frame e termina sull'ultimo, anche quando due eventi condividono
+lo stesso asset. I frame idle continuano sul clock cosmetico. Il dado aggiorna
+una render texture dedicata prima di aprire il canvas del gioco; un callback di
+`app.present` lo compone dopo il canvas in coordinate finestra. La caduta parte
+sopra il bordo fisico della finestra e attraversa anche il letterbox. Il dado
+rosso con puntini neri usa una mesh smussata e una simulazione cosmetica a passo
+fisso, con collisioni contro il piano e fra dadi. I lanci multipli condividono
+lo stesso cue e un totale fluttuante, senza pannello. Il risultato si stabilizza
+nella parte finale del cue. Gli HP restano precedenti al tiro finche il replay non
+raggiunge il danno. Dettagli e contratti sono in [Spell e dadi](SPELLS.md).
 
 Un movimento multi-cella arriva gia segmentato dal gameplay. La timeline non
 interpola direttamente origine-destinazione: riproduce ogni `Movement_Step` e il
@@ -232,7 +270,7 @@ Il sistema deve conservare queste proprieta:
    delle carte avanzano soltanto le copie di deck e RNG in `Room_Presentation`.
 2. Gli snapshot iniziale e finale vengono catturati ai due lati dello stesso comando.
 3. I cue rispettano esattamente l'ordine del `Event_Log`.
-4. Esiste al massimo un cue attivo; il `dt` residuo non viene perso.
+4. Esiste al massimo un gruppo attivo; il `dt` residuo non viene perso.
 5. Ogni riferimento a un attore usa un ID stabile, non un indice di dynamic array.
 6. Un nuovo comando non viene eseguito mentre la timeline e busy.
 7. Il buffer contiene al massimo il primo comando offerto ed e riletto una sola volta.
@@ -350,10 +388,11 @@ sono stati mostrati nell'ordine sbagliato.
 
 ## Limiti intenzionali
 
-La timeline serializza tutti gli eventi. Oltre 12 secondi comprime le durate ma
-non raggruppa cue in parallelo. Un vero batching richiederebbe un identificatore
-esplicito di azione o gruppo nel log; dedurlo dal tipo o dalla vicinanza degli
-eventi sarebbe ambiguo.
+La timeline raggruppa soltanto eventi contigui con lo stesso `visual_group`
+esplicito e di tipi ammessi. Firebomb lo usa per i propri impatti diretti;
+le reazioni restano successive e i rimbalzi di Chain Lightning separati. La
+somiglianza o vicinanza di due eventi non basta a renderli simultanei. Oltre
+12 secondi vengono compresse proporzionalmente le durate dei gruppi.
 
 Il buffer conserva una sola intenzione e non e una macro queue. Questa scelta
 favorisce decisioni leggibili e impedisce di inviare molti pulse senza osservarne

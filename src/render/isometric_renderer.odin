@@ -70,6 +70,7 @@ Renderer :: struct {
 	enemy_move_animations_dropped: int,
 	timeline: Presentation_Timeline,
 	playback_speed: f32,
+	sprite_assets: Sprite_Assets,
 }
 
 Tile_Vertices :: struct {
@@ -278,6 +279,16 @@ card_colors :: proc(id: game.Card_Id, affordable: bool) -> (fill, outline: rl.Co
 		fill, outline = rl.Color{33, 53, 60, 245}, rl.Color{151, 222, 215, 255}
 	case .Volatile_Study:
 		fill, outline = rl.Color{62, 36, 63, 245}, rl.Color{238, 133, 201, 255}
+	case .Fate_Strike:
+		fill, outline = rl.Color{61, 42, 77, 245}, rl.Color{230, 180, 255, 255}
+	case .Chain_Lightning:
+		fill, outline = rl.Color{25, 52, 73, 245}, rl.Color{119, 224, 255, 255}
+	case .Sundering_Blow:
+		fill, outline = rl.Color{74, 29, 34, 245}, rl.Color{245, 94, 100, 255}
+	case .Prismatic_Barrage:
+		fill, outline = rl.Color{65, 48, 75, 245}, rl.Color{247, 198, 112, 255}
+	case .Twin_Venom:
+		fill, outline = rl.Color{40, 58, 31, 245}, rl.Color{179, 237, 111, 255}
 	case .Count:
 		fill, outline = rl.Color{45, 49, 52, 245}, rl.Color{105, 116, 116, 255}
 	}
@@ -335,9 +346,27 @@ card_detail_lines :: proc(card: game.Card_Instance) -> (first, second: cstring) 
 		return fmt.ctprintf("GAIN %d SHIELD", 2+upgrade), "3 PULSES + CLEANSE"
 	case .Volatile_Study:
 		return "CREATE 1 SPARK", fmt.ctprintf("DRAW %d - EXHAUST", 1+upgrade)
+	case .Fate_Strike:
+		return fmt.ctprintf("%d + D6 DAMAGE", 2+upgrade), fmt.ctprintf("6: BOUNCE FOR %d", 3+upgrade)
+	case .Chain_Lightning:
+		return fmt.ctprintf("%d DAMAGE EACH", 3+upgrade), "UP TO 3 / HOP 3"
+	case .Sundering_Blow:
+		if upgrade == 0 { return "2D6 DAMAGE", "ROLL 8+: PUSH 1" }
+		return fmt.ctprintf("2D6 + %d DAMAGE", upgrade), "ROLL 8+: PUSH 1"
+	case .Prismatic_Barrage:
+		return fmt.ctprintf("3D6: 4+ = %d DMG", 3+upgrade), "1-3: 1 SHIELD EACH"
+	case .Twin_Venom:
+		return fmt.ctprintf("HIGHER D6 +%d DMG", 1+upgrade), "2D6 / PAIR: POISON 2"
 	case .Count:
 	}
 	return "", ""
+}
+
+dice_card_detail_lines :: proc(card: game.Card_Instance) -> (lines: [4]cstring) {
+	lines[0], lines[1] = card_detail_lines(card)
+	lines[2] = "SHIELD FIRST / 2P" if card.definition_id == .Prismatic_Barrage else "2 PULSES / IF ALIVE"
+	lines[3] = "RANGE 1-3 / LOS"
+	return
 }
 
 card_short_name :: proc(id: game.Card_Id) -> cstring {
@@ -379,13 +408,23 @@ card_short_name :: proc(id: game.Card_Id) -> cstring {
 	case .Heavy_Blow:
 		return "HEAVY"
 	case .Venom_Needle:
-		return "VENOM"
+		return "NEEDLE"
 	case .Caustic_Bloom:
 		return "BLOOM"
 	case .Purifying_Guard:
 		return "PURIFY"
 	case .Volatile_Study:
 		return "STUDY"
+	case .Fate_Strike:
+		return "FATE"
+	case .Chain_Lightning:
+		return "CHAIN"
+	case .Sundering_Blow:
+		return "SUNDER"
+	case .Prismatic_Barrage:
+		return "BARRAGE"
+	case .Twin_Venom:
+		return "VENOM"
 	case .Count:
 	}
 	return ""
@@ -546,6 +585,41 @@ draw_card_sigil :: proc(bounds: rl.Rectangle, id: game.Card_Id, color: rl.Color)
 		rl.DrawLineEx({center.x, center.y-10}, {center.x, center.y+14}, 2, color)
 		rl.DrawLineEx({center.x-6, center.y-17}, {center.x-2, center.y-12}, 3, color)
 		rl.DrawLineEx({center.x+6, center.y-17}, {center.x+2, center.y-12}, 3, color)
+	case .Fate_Strike:
+		rl.DrawRectangleLinesEx({center.x-17, center.y-17, 34, 34}, 2, color)
+		for delta in ([?]rl.Vector2{{-9, -9}, {9, -9}, {0, 0}, {-9, 9}, {9, 9}}) {
+			rl.DrawCircleV(center+delta, 3, color)
+		}
+	case .Chain_Lightning:
+		points := [?]rl.Vector2{{center.x-25, center.y+10}, {center.x, center.y-12}, {center.x+25, center.y+6}}
+		for index in 0..<len(points) {
+			rl.DrawCircleLinesV(points[index], 6, color)
+			if index > 0 { rl.DrawLineEx(points[index-1], points[index], 2, color) }
+		}
+	case .Sundering_Blow:
+		for offset in ([2]rl.Vector2{{-13, -7}, {12, 9}}) {
+			position := center+offset
+			rl.DrawRectangleRoundedLinesEx({position.x-13, position.y-13, 26, 26}, 0.22, 4, 2, color)
+			for pip in ([3]rl.Vector2{{-6, -6}, {0, 0}, {6, 6}}) {
+				rl.DrawCircleV(position+pip, 2, color)
+			}
+		}
+	case .Prismatic_Barrage:
+		for index in 0..<3 {
+			x := center.x+f32(index-1)*20
+			ray_color := color
+			if color == (rl.Color{247, 198, 112, 255}) {ray_color = prismatic_ray_color(index)}
+			rl.DrawLineEx({x, center.y-18}, {center.x, center.y+12}, 3, ray_color)
+			rl.DrawTriangle({x, center.y-24}, {x-5, center.y-15}, {x+5, center.y-15}, ray_color)
+		}
+		rl.DrawCircleLinesV({center.x, center.y+12}, 7, color)
+	case .Twin_Venom:
+		for sign in ([2]f32{-1, 1}) {
+			x := center.x+sign*10
+			rl.DrawLineEx({x, center.y-19}, {x+sign*5, center.y-5}, 4, color)
+			rl.DrawLineEx({x+sign*5, center.y-5}, {x-sign*3, center.y+12}, 3, color)
+			rl.DrawCircleV({x-sign*3, center.y+18}, 3, color)
+		}
 	case .Count:
 	}
 }
@@ -676,7 +750,18 @@ draw_card_face :: proc(
 	name_text := fmt.ctprintf("%s", definition.name) if expanded else card_short_name(card.definition_id)
 	name_width := rl.MeasureText(name_text, 14)
 	name_x := c.int(bounds.x+(bounds.width-f32(name_width))*0.5)
-	rl.DrawText(name_text, name_x, c.int(bounds.y+11), 14, label_color)
+	if expanded && (card.definition_id == .Sundering_Blow || card.definition_id == .Prismatic_Barrage || card.definition_id == .Twin_Venom) {
+		// Keep the two-word title clear of the cost badge and the shortcut.
+		title_center := c.int(bounds.x+35+(bounds.width-57)*0.5)
+		first: cstring = "Sundering"
+		second: cstring = "Blow"
+		if card.definition_id == .Prismatic_Barrage {first, second = "Prismatic", "Barrage"}
+		if card.definition_id == .Twin_Venom {first, second = "Twin", "Venom"}
+		rl.DrawText(first, title_center-rl.MeasureText(first, 12)/2, c.int(bounds.y+7), 12, label_color)
+		rl.DrawText(second, title_center-rl.MeasureText(second, 12)/2, c.int(bounds.y+23), 12, label_color)
+	} else {
+		rl.DrawText(name_text, name_x, c.int(bounds.y+11), 14, label_color)
+	}
 	if expanded {
 		rl.DrawText(fmt.ctprintf("%d", slot+1), c.int(bounds.x+bounds.width-17), c.int(bounds.y+11), 11, outline)
 	} else {
@@ -684,7 +769,14 @@ draw_card_face :: proc(
 	}
 	draw_card_sigil(bounds, card.definition_id, outline)
 
-	if expanded {
+	if expanded && (card.definition_id == .Prismatic_Barrage || card.definition_id == .Twin_Venom) {
+		lines := dice_card_detail_lines(card)
+		for line, index in lines {
+			font: c.int = 10 // DrawText's default font never renders below 10 px.
+			rl.DrawText(line, c.int(bounds.x+(bounds.width-f32(rl.MeasureText(line, font)))*0.5),
+				c.int(bounds.y+110+f32(index)*12), font, label_color if index == 0 else outline)
+		}
+	} else if expanded {
 		first, second := card_detail_lines(card)
 		first_width := rl.MeasureText(fmt.ctprintf("%s", first), 12)
 		second_width := rl.MeasureText(fmt.ctprintf("%s", second), 11)
@@ -705,10 +797,14 @@ draw_card_face :: proc(
 	}
 	draw_card_keyword_tags(bounds, card, definition, expanded)
 	if card.upgrade_level > 0 {
+		upgrade_position := rl.Vector2{bounds.x+8, bounds.y+bounds.height-18}
+		if expanded && (card.definition_id == .Prismatic_Barrage || card.definition_id == .Twin_Venom) {
+			upgrade_position = {bounds.x+bounds.width-28, bounds.y+87}
+		}
 		rl.DrawText(
 			fmt.ctprintf("+%d", card.upgrade_level),
-			c.int(bounds.x+8),
-			c.int(bounds.y+bounds.height-18),
+			c.int(upgrade_position.x),
+			c.int(upgrade_position.y),
 			11,
 			outline,
 		)
@@ -1192,6 +1288,9 @@ draw_enemy_body :: proc(
 ) {
 	assert(renderer != nil)
 	radius := enemy_draw_radius(renderer, enemy)
+	if draw_sprite_asset(&renderer.sprite_assets, sprite_key_for_enemy(enemy.archetype), center, renderer.camera.zoom, opacity) {
+		return
+	}
 	switch enemy.archetype {
 	case .Custodian, .Demolitionist:
 		draw_cooperative_enemy_body(renderer, enemy, center, opacity)
@@ -1676,6 +1775,10 @@ draw_card_target_range :: proc(renderer: ^Renderer, room: ^game.Room, card_id: u
 			landing_fill,
 			landing_outline,
 		)
+		if card.definition_id == .Sundering_Blow {
+			center := cell_center(renderer, evaluation.movement.destination)
+			rl.DrawText("8+", c.int(center.x)-7, c.int(center.y)-5, 11, landing_outline)
+		}
 	}
 }
 
@@ -1857,10 +1960,13 @@ draw_grid_object_body :: proc(
 	opacity: f32 = 1,
 ) {
 	assert(renderer != nil)
+	defer draw_grid_object_health(renderer, kind, center, health, max_health, opacity)
 	if kind == .Barrel || kind == .Bomb {
+		if draw_sprite_asset(&renderer.sprite_assets, sprite_key_for_object(kind), center, renderer.camera.zoom, opacity) { return }
 		draw_explosive_body(renderer, kind, center, opacity)
 		return
 	}
+	if draw_sprite_asset(&renderer.sprite_assets, sprite_key_for_object(kind), center, renderer.camera.zoom, opacity) { return }
 	if kind == .Fire {
 		scale := renderer.camera.zoom
 		half_width := max(f32(7), 11*scale)
@@ -1971,12 +2077,23 @@ draw_grid_object_body :: proc(
 		max(f32(1), 1.2*renderer.camera.zoom),
 		color_with_opacity(rl.Color{238, 255, 255, 225}, opacity),
 	)
+}
 
-	if max_health > 0 && health < max_health {
-		bar_width := half_width*1.6
+draw_grid_object_health :: proc(renderer: ^Renderer, kind: game.Grid_Object_Kind, center: view.Vec2,
+	health, max_health: i32, opacity: f32) {
+	if kind == .Ice_Block && max_health > 0 && health < max_health {
+		bar_width := max(f32(9), 17*renderer.camera.zoom)*1.6
 		bar_height := max(f32(2), 3*renderer.camera.zoom)
-		bar_x := center.x-bar_width*0.5
-		bar_y := top.top.y-max(f32(5), 7*renderer.camera.zoom)
+		bar_center_x := center.x
+		bar_y := center.y-max(f32(13), 23*renderer.camera.zoom)-max(f32(4.5), 8*renderer.camera.zoom)-max(f32(5), 7*renderer.camera.zoom)
+		asset := &renderer.sprite_assets.sprites[int(sprite_key_for_object(kind))]
+		if asset.configured {
+			_, bounds := sprite_asset_rectangles(asset, renderer.sprite_assets.elapsed, center, renderer.camera.zoom)
+			bar_width = bounds.width*0.8
+			bar_center_x = bounds.x+bounds.width*0.5
+			bar_y = bounds.y-max(f32(5), 7*renderer.camera.zoom)
+		}
+		bar_x := bar_center_x-bar_width*0.5
 		ratio := clamp(f32(max(health, i32(0)))/f32(max_health), f32(0), f32(1))
 		rl.DrawRectangleRec(
 			{bar_x, bar_y, bar_width, bar_height},
@@ -1992,6 +2109,8 @@ draw_grid_object_body :: proc(
 draw_player_body :: proc(renderer: ^Renderer, center: view.Vec2, opacity: f32 = 1) -> f32 {
 	assert(renderer != nil)
 	radius := max(f32(8), 13*renderer.camera.zoom)
+	if draw_player_event_clip(renderer, center, opacity) { return radius }
+	if draw_sprite_asset(&renderer.sprite_assets, .Player, center, renderer.camera.zoom, opacity) { return radius }
 	rl.DrawCircleV(
 		to_raylib(center),
 		radius,
@@ -2163,8 +2282,9 @@ timeline_card_cue_verb :: proc(cue: ^Presentation_Cue) -> cstring {
 	case .Move, .Trap_Triggered, .Hazard_Triggered, .Damage, .Damage_Absorbed, .Heal,
 	     .Status_Applied, .Status_Removed, .Status_Expired, .Defeat, .Loot_Dropped, .Loot,
 	     .Attack_Missed, .Move_Blocked,
-	     .Gold_Gained, .Binding_Added, .Binding_Exhausted, .Binding_Expired,
-	     .Pulse_Advanced, .Refocus, .Object_Spawned, .Explosive_Armed, .Explosion, .Explosive_Disarmed, .Room_Hazard_Triggered:
+	     .Gold_Gained, .Energy_Gained, .Binding_Added, .Binding_Exhausted, .Binding_Expired,
+	     .Pulse_Advanced, .Refocus, .Object_Spawned, .Explosive_Armed, .Explosion, .Explosive_Disarmed, .Room_Hazard_Triggered,
+	     .Dice_Rolled, .Spell_Launched, .Spell_Impact:
 	}
 	return nil
 }
@@ -2253,16 +2373,25 @@ draw_timeline_loot_drop_cue :: proc(renderer: ^Renderer, cue: ^Presentation_Cue)
 
 draw_active_presentation_cue :: proc(renderer: ^Renderer) {
 	assert(renderer != nil)
-	cue, found := active_presentation_cue(&renderer.timeline)
-	if !found || !cue.started {
+	for offset in 0..<presentation_group_size(&renderer.timeline) {
+		cue, found := presentation_cue_at(&renderer.timeline, offset)
+		if found && cue.started { draw_presentation_cue(renderer, cue) }
+	}
+}
+
+draw_presentation_cue :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) {
+	if cue.kind == .Spell_Launched || cue.kind == .Spell_Impact {
+		draw_spell_cue(renderer, cue)
 		return
 	}
+	if cue.kind == .Dice_Rolled { return }
 	if cue.kind == .Refocus {
 		draw_timeline_refocus_banner(renderer, cue)
 		return
 	}
 	if cue.kind == .Card_Played || cue.kind == .Card_Drawn || cue.kind == .Card_Moved ||
 	   cue.kind == .Card_Created || cue.kind == .Card_Refocused {
+		if cue.kind == .Card_Played { draw_spell_cast(renderer, cue) }
 		draw_timeline_card_banner(renderer, cue)
 		return
 	}
@@ -2336,6 +2465,9 @@ draw_active_presentation_cue :: proc(renderer: ^Renderer) {
 	case .Gold_Gained:
 		label = fmt.ctprintf("+%d GOLD", cue.event.amount)
 		color = rl.Color{246, 207, 92, 255}
+	case .Energy_Gained:
+		label = fmt.ctprintf("+%d ENERGY", cue.event.amount)
+		color = rl.Color{130, 222, 239, 255}
 	case .Binding_Added:
 		label = "BINDING +"
 		color = rl.Color{194, 184, 226, 255}
@@ -2347,7 +2479,7 @@ draw_active_presentation_cue :: proc(renderer: ^Renderer) {
 		color = rl.Color{169, 183, 177, 255}
 	case .Move, .Card_Played, .Card_Drawn, .Card_Moved, .Card_Created, .Refocus,
 	     .Card_Refocused, .Defeat,
-	     .Loot_Dropped, .Loot, .Pulse_Advanced:
+	     .Loot_Dropped, .Loot, .Pulse_Advanced, .Dice_Rolled, .Spell_Launched, .Spell_Impact:
 		unreachable()
 	}
 	draw_timeline_popup(renderer, label, color, center, presentation_cue_progress(cue))
@@ -2467,6 +2599,11 @@ draw_status :: proc(renderer: ^Renderer, room: ^game.Room, scale_mode: view.Scal
 		fmt.ctprintf("ANIMATION %.2gx  [F4]", renderer_playback_speed(renderer)),
 		26, 104, 12, rl.Color{169, 183, 177, 255},
 	)
+	family := room.family
+	if renderer_timeline_is_busy(renderer) && renderer.timeline.view.valid { family = renderer.timeline.view.family }
+	if family != .Scattered {
+		rl.DrawText(fmt.ctprintf("%s", level.room_family_name(family)), 265, 104, 12, rl.Color{197, 185, 151, 255})
+	}
 	if status_view.phase == .Combat {
 		draw_tactical_legend(renderer)
 		draw_encounter_status(renderer, room)

@@ -1,6 +1,7 @@
 package game
 
 import grid "../grid"
+import level "../level"
 
 GENERATED_OBJECT_KINDS :: [?]Grid_Object_Kind{.Barrel, .Ice_Block, .Fire}
 
@@ -29,7 +30,11 @@ generate_blueprint_objects :: proc(blueprint: ^Room_Blueprint, candidates: []gri
 		if len(blueprint.objects) == blueprint.profile.encounter_config.object_count {
 			break
 		}
-		if position_in_list(blockers[:count], candidate) || !object_preserves_encounter_link(blueprint, candidate) { continue }
+		if position_in_list(blockers[:count], candidate) || !object_preserves_encounter_link(blueprint, candidate) ||
+		   level.room_family_cell_is_reserved(&blueprint.level_data, blueprint.profile.level_config.family, candidate) ||
+		   !object_preserves_enemy_lanes(blueprint, candidate) || !object_preserves_barrel_lanes(blueprint, candidate) { continue }
+		if generated_object_kind(blueprint, len(blueprint.objects)) == .Barrel &&
+		   !generated_barrel_has_push_lane(blueprint, candidate) { continue }
 		if priority == 0 && (generated_object_kind(blueprint, len(blueprint.objects)) != .Barrel ||
 		   grid_distance(candidate, blueprint.enemies[0].position) > 2) { continue }
 		// Treat Fire as blocked here so a route without fire damage remains available.
@@ -56,11 +61,13 @@ validate_blueprint_objects :: proc(blueprint: ^Room_Blueprint) -> bool {
 	copy(blockers[:], blueprint.obstacles[:])
 	for object, index in blueprint.objects {
 		if object.kind != generated_object_kind(blueprint, index) ||
+		   level.room_family_cell_is_reserved(&blueprint.level_data, blueprint.profile.level_config.family, object.position) ||
 		   !cell_is_walkable(&blueprint.level_data, object.position) ||
 		   !position_is_safe_from_room_anchors(object.position, blueprint.level_data.player_spawn,
 			blueprint.exit_position, config) || position_in_list(blockers[:count], object.position) {
 			return false
 		}
+		if object.kind == .Barrel && !generated_barrel_has_push_lane(blueprint, object.position) { return false }
 		for enemy in blueprint.enemies {
 			if object.position == enemy.position {
 				return false
@@ -74,5 +81,32 @@ validate_blueprint_objects :: proc(blueprint: ^Room_Blueprint) -> bool {
 		blockers[count] = object.position
 		count += 1
 	}
-	return all_unblocked_walkable_cells_are_connected(&blueprint.level_data, blockers[:count])
+	return object_preserves_enemy_lanes(blueprint, {-1, -1}) &&
+	       all_unblocked_walkable_cells_are_connected(&blueprint.level_data, blockers[:count])
+}
+
+generated_barrel_lane_cell_open :: proc(blueprint: ^Room_Blueprint, position, extra_blocker: grid.Position) -> bool {
+	if !encounter_position_open(blueprint, position, extra_blocker) { return false }
+	for trap in blueprint.traps { if trap.position == position { return false } }
+	for enemy in blueprint.enemies { if enemy.position == position { return false } }
+	return true
+}
+
+// Require a reachable stance and a free destination on opposite sides of every barrel.
+generated_barrel_has_push_lane :: proc(blueprint: ^Room_Blueprint, position: grid.Position, extra_blocker: grid.Position = {-1, -1}) -> bool {
+	directions := [2]grid.Position{{1, 0}, {0, 1}}
+	for direction in directions {
+		a := grid.Position{position.x+direction.x, position.y+direction.y}
+		b := grid.Position{position.x-direction.x, position.y-direction.y}
+		if generated_barrel_lane_cell_open(blueprint, a, extra_blocker) &&
+		   generated_barrel_lane_cell_open(blueprint, b, extra_blocker) { return true }
+	}
+	return false
+}
+
+object_preserves_barrel_lanes :: proc(blueprint: ^Room_Blueprint, candidate: grid.Position) -> bool {
+	for object in blueprint.objects {
+		if object.kind == .Barrel && !generated_barrel_has_push_lane(blueprint, object.position, candidate) { return false }
+	}
+	return true
 }

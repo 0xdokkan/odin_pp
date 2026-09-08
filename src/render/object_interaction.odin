@@ -45,6 +45,9 @@ body_circle_contains_point :: proc(center, point: view.Vec2, radius: f32) -> boo
 }
 
 enemy_body_contains_point :: proc(renderer: ^Renderer, enemy: game.Enemy, center, point: view.Vec2) -> bool {
+	if hit, configured := sprite_asset_contains_point(&renderer.sprite_assets, sprite_key_for_enemy(enemy.archetype), center, point, renderer.camera.zoom); configured {
+		return hit
+	}
 	radius := enemy_draw_radius(renderer, enemy)
 	dx, dy := point.x-center.x, point.y-center.y
 	switch enemy.archetype {
@@ -96,7 +99,8 @@ actor_body_cell_at_point :: proc(renderer: ^Renderer, room: ^game.Room, point: v
 	if room.player != nil {
 		center := cell_center(renderer, room.player.position)
 		radius := max(f32(8), 13*renderer.camera.zoom)
-		if body_circle_contains_point(center, point, radius) {
+		hit, configured := sprite_asset_contains_point(&renderer.sprite_assets, .Player, center, point, renderer.camera.zoom)
+		if hit || (!configured && body_circle_contains_point(center, point, radius)) {
 			return room.player.position, true
 		}
 	}
@@ -124,7 +128,9 @@ grid_object_at_canvas_point :: proc(renderer: ^Renderer, room: ^game.Room, point
 		return
 	}
 	for object, object_index in room.objects {
-		if object_body_contains_point(object.kind, cell_center(renderer, object.position), point, renderer.camera.zoom) {
+		center := cell_center(renderer, object.position)
+		hit, configured := sprite_asset_contains_point(&renderer.sprite_assets, sprite_key_for_object(object.kind), center, point, renderer.camera.zoom)
+		if hit || (!configured && object_body_contains_point(object.kind, center, point, renderer.camera.zoom)) {
 			// Objects are painted in array order, so the last visible hit wins.
 			index, found = object_index, true
 		}

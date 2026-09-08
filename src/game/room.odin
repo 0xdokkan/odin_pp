@@ -41,6 +41,8 @@ Player :: struct {
 	gold:     i32,
 	statuses: Status_Set,
 	deck:     Deck_State,
+	relics:   Relic_State,
+	dice:     Dice_State,
 }
 
 create_player :: proc(stats: Player_Stats) -> (Player, bool) {
@@ -50,6 +52,7 @@ create_player :: proc(stats: Player_Stats) -> (Player, bool) {
 	result := Player{
 		stats = stats,
 		health = stats.max_health,
+		dice = make_dice_state(DEFAULT_DICE_SEED),
 	}
 	if !initialize_starter_deck(&result.deck) {
 		return {}, false
@@ -148,6 +151,7 @@ Trap_Spawn :: struct {
 }
 
 Room_Content :: struct {
+	family: level.Room_Family,
 	encounter_kind: Encounter_Kind,
 	modifier: Room_Modifier,
 	enemies:   []Enemy_Spawn,
@@ -157,6 +161,7 @@ Room_Content :: struct {
 }
 
 Room :: struct {
+	family: level.Room_Family,
 	encounter_kind: Encounter_Kind,
 	modifier: Room_Modifier,
 	level_data:    ^level.Level,
@@ -383,7 +388,8 @@ create_room :: proc(level_data: ^level.Level, player: ^Player, content: Room_Con
 	}
 	if player.stats.max_health <= 0 || player.health <= 0 || player.health > player.stats.max_health ||
 	   player.stats.attack <= 0 || player.stats.defense < 0 ||
-	   player.gold < 0 || !validate_deck_state(&player.deck) {
+	   player.gold < 0 || !validate_deck_state(&player.deck) || !validate_relic_state(&player.relics) ||
+	   !validate_dice_state(&player.dice) {
 		return {}, false
 	}
 
@@ -396,6 +402,7 @@ create_room :: proc(level_data: ^level.Level, player: ^Player, content: Room_Con
 	result.player = player
 	result.exit_position = exit_position
 	result.encounter_kind = content.encounter_kind
+	result.family = content.family
 	result.modifier = content.modifier
 	result.next_enemy_id = 1
 	result.next_trap_id = 1
@@ -502,6 +509,7 @@ create_room :: proc(level_data: ^level.Level, player: ^Player, content: Room_Con
 	}
 	player.position = spawn_position
 	clear_statuses(&player.statuses)
+	begin_room_relics(&result)
 	if result.phase == .Combat {
 		plan_enemy_intents(&result)
 	}

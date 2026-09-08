@@ -99,7 +99,7 @@ card_reward_can_be_added :: proc(run: ^Run_State) -> bool {
 }
 
 finish_card_reward :: proc(run: ^Run_State) -> bool {
-	if run == nil || run.phase != .Reward || !validate_card_reward_state(run) {
+	if run == nil || run.phase != .Reward || run_has_relic_choice(run) || !validate_card_reward_state(run) {
 		return false
 	}
 	staged := run^

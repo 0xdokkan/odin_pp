@@ -136,7 +136,7 @@ prepare_demo_room :: proc(
 	prepared.player = run.player
 
 	if procedural {
-		blueprint, blueprint_error := game.generate_room_blueprint(node)
+		blueprint, blueprint_error := game.generate_room_blueprint(node, run.last_room_family)
 		if blueprint_error != .None {
 			return false
 		}
@@ -195,6 +195,7 @@ install_prepared_demo_room :: proc(
 	prepared.room.level_data = level_data
 	// Keep this large assignment out of main; LLVM otherwise scalarizes Room field by field.
 	room^ = prepared.room
+	run.last_room_family = room.family
 	prepared.room = {}
 }
 
@@ -257,7 +258,7 @@ restart_demo_session :: proc(
 	if level_data == nil || run == nil || room == nil {
 		return false
 	}
-	new_run, run_ok := game.create_run(DEMO_PLAYER_STATS, DEMO_RUN_CONFIG, seed)
+	new_run, run_ok := game.create_run(DEMO_PLAYER_STATS, DEMO_RUN_CONFIG, seed, run.relic_rewards_enabled)
 	if !run_ok {
 		return false
 	}
@@ -283,6 +284,7 @@ restart_demo_session :: proc(
 	prepared.room.player = &run.player
 	prepared.room.level_data = level_data
 	room^ = prepared.room
+	run.last_room_family = room.family
 	prepared.room = {}
 	return true
 }
@@ -346,11 +348,15 @@ poll_gameplay_command :: proc(
 	renderer: ^render.Renderer,
 	card_interaction: ^Card_Interaction_State,
 	mouse_canvas: view.Vec2,
-	mouse_inside: bool,
+	mouse_in_canvas: bool,
 	spatial_interaction_enabled: bool,
 	debug_abilities: bool = false,
 ) -> (command: Gameplay_Command, has_command: bool) {
 	assert(room != nil && room.player != nil && renderer != nil && card_interaction != nil)
+	raised_card_id := card_interaction.hovered_card_id
+	if raised_card_id == 0 { raised_card_id = card_interaction.selected_card_id }
+	if card_interaction.dragged_card_id != 0 { raised_card_id = 0 }
+	mouse_inside := mouse_in_canvas && !render.relic_bar_contains_point(renderer, room, mouse_canvas, raised_card_id)
 	input_deck, input_phase := render.renderer_hand_deck(renderer, room)
 	if input_phase == .Loot {
 		clear_card_interaction(card_interaction)
@@ -386,13 +392,8 @@ poll_gameplay_command :: proc(
 		card_interaction.dragged_card_id = 0
 	}
 
-	previous_hovered_card_id := card_interaction.hovered_card_id
 	card_interaction.hovered_card_id = 0
 	if card_interaction.dragged_card_id == 0 && mouse_inside {
-		raised_card_id := previous_hovered_card_id
-		if raised_card_id == 0 {
-			raised_card_id = card_interaction.selected_card_id
-		}
 		if hand_index, found := render.hand_card_at_point(
 			renderer,
 			input_deck,
@@ -739,6 +740,11 @@ main :: proc() {
 	smoke_encounters := false
 	smoke_miniboss := false
 	smoke_furnace := false
+	smoke_relics := false
+	smoke_relic_combat := false
+	smoke_sprites := false
+	spell_smoke: Spell_Smoke
+	smoke_family: level.Room_Family = .Scattered
 	smoke_defeat := false
 	smoke_mode_count := 0
 	for argument in os.args[1:] {
@@ -867,6 +873,43 @@ main :: proc() {
 			smoke_test = true
 			smoke_furnace = true
 			smoke_mode_count += 1
+		} else if argument == "--smoke-relics" {
+			smoke_test = true
+			smoke_relics = true
+			smoke_mode_count += 1
+		} else if argument == "--smoke-relic-combat" {
+			smoke_test = true
+			smoke_relic_combat = true
+			smoke_mode_count += 1
+		} else if argument == "--smoke-firebomb-spell" || argument == "--smoke-dice" || argument == "--smoke-dice-pool" ||
+		          argument == "--smoke-chain" || argument == "--smoke-spell-preview" || argument == "--smoke-sunder-preview" ||
+		          argument == "--smoke-barrage" || argument == "--smoke-twin-venom" {
+			smoke_test = true
+			smoke_mode_count += 1
+			switch argument {
+			case "--smoke-firebomb-spell": spell_smoke = .Firebomb
+			case "--smoke-dice": spell_smoke = .Dice
+			case "--smoke-dice-pool": spell_smoke = .Dice_Pool
+			case "--smoke-chain": spell_smoke = .Chain
+			case "--smoke-spell-preview": spell_smoke = .Preview
+			case "--smoke-sunder-preview": spell_smoke = .Sunder_Preview
+			case "--smoke-barrage": spell_smoke = .Barrage
+			case "--smoke-twin-venom": spell_smoke = .Venom
+			}
+		} else if argument == "--smoke-sprites" {
+			smoke_test = true
+			smoke_sprites = true
+			smoke_mode_count += 1
+		} else if argument == "--smoke-family=pillars" || argument == "--smoke-family=ring" ||
+		          argument == "--smoke-family=courts" || argument == "--smoke-family=cover" {
+			smoke_test = true
+			smoke_mode_count += 1
+			switch argument {
+			case "--smoke-family=pillars": smoke_family = .Pillars
+			case "--smoke-family=ring": smoke_family = .Ring
+			case "--smoke-family=courts": smoke_family = .Twin_Courts
+			case "--smoke-family=cover": smoke_family = .Asymmetric
+			}
 		} else {
 			fmt.eprintf("unknown option: %s\n", argument)
 			os.exit(2)
@@ -883,7 +926,11 @@ main :: proc() {
 		fmt.eprintln("--playtest-report is interactive; use --smoke-playtest for headless telemetry")
 		os.exit(2)
 	}
-	procedural_rooms := !smoke_test || smoke_generation
+	if options.spell_lab && (smoke_test || playtest_report) {
+		fmt.eprintln("--spell-lab is a standalone practice arena; run it without smoke or report options")
+		os.exit(2)
+	}
+	procedural_rooms := (!smoke_test && !options.spell_lab) || smoke_generation || smoke_family != .Scattered || smoke_relics
 
 	level_data: level.Level
 	defer level.destroy(&level_data)
@@ -904,7 +951,12 @@ main :: proc() {
 			return
 		}
 	}
-	run_state, run_ok := game.create_run(DEMO_PLAYER_STATS, DEMO_RUN_CONFIG, run_seed)
+	if smoke_family != .Scattered {
+		selected, found := demo_seed_with_room_family(run_seed, smoke_family)
+		if !found { fmt.eprintln("could not find a room-family smoke seed"); return }
+		run_seed = selected
+	}
+	run_state, run_ok := game.create_run(DEMO_PLAYER_STATS, DEMO_RUN_CONFIG, run_seed, (!smoke_test && !options.spell_lab) || smoke_relics)
 	if !run_ok {
 		return
 	}
@@ -914,6 +966,7 @@ main :: proc() {
 		return
 	}
 	defer game.destroy_room(&room)
+	if options.spell_lab && !prepare_spell_lab(&room, options.dice_lab) { fmt.eprintln("could not prepare card practice"); return }
 	if smoke_playtest {
 		if !run_headless_playtest_smoke(&run_state, &room, run_seed, options.playtest_output) {
 			fmt.eprintln("failed to write headless playtest report")
@@ -938,11 +991,14 @@ main :: proc() {
 		return
 	}
 	defer app.close(&window)
+	dice_renderer: render.Dice_Renderer
+	if !render.create_dice_renderer(&dice_renderer) { fmt.eprintln("3D dice unavailable; using 2D die") }
+	defer render.destroy_dice_renderer(&dice_renderer)
 	playtest_session: combatdebug.Playtest_Session
 	defer combatdebug.destroy_playtest_session(&playtest_session)
 	playtest_session_ptr: ^combatdebug.Playtest_Session
 	playtest_report_written := false
-	if playtest_report {
+	if playtest_report && !game.run_has_relic_choice(&run_state) {
 		if !begin_playtest_run(&playtest_session, run_seed, &run_state, &room) {
 			fmt.eprintln("failed to start playtest telemetry")
 			return
@@ -951,6 +1007,15 @@ main :: proc() {
 	}
 
 	iso_renderer := render.create(window.config.canvas_width, window.config.canvas_height, &level_data)
+	sprite_manifest := options.sprite_manifest
+	if len(sprite_manifest) == 0 { sprite_manifest = "assets/sprites.json" }
+	sprite_report := render.load_sprite_assets(&iso_renderer.sprite_assets, sprite_manifest)
+	defer render.unload_sprite_assets(&iso_renderer.sprite_assets)
+	if sprite_report.rejected > 0 || (sprite_report.manifest_found && len(sprite_report.message) > 0) ||
+	   (len(options.sprite_manifest) > 0 && !sprite_report.manifest_found) {
+		fmt.eprintf("Sprites: %s (%d loaded, %d rejected); using built-in graphics where needed.\n",
+			sprite_report.message, sprite_report.loaded, sprite_report.rejected)
+	}
 	if !smoke_test {
 		render.set_renderer_playback_speed(&iso_renderer, options.animation_speed)
 	}
@@ -963,7 +1028,15 @@ main :: proc() {
 	special_render_state: render.Special_Node_Render_State
 	smoke_frame_count := 0
 	smoke_fire_entity: game.Entity_Ref
-	if smoke_map {
+	if spell_smoke != .None {
+		if !prepare_spell_smoke(&room, &iso_renderer, spell_smoke) { fmt.eprintln("spell smoke setup failed"); os.exit(2) }
+		if spell_smoke_is_preview(spell_smoke) {
+			index := 3 if spell_smoke == .Sunder_Preview else 2
+			card_interaction.selected_card_id = room.player.deck.hand[index].id
+			iso_renderer.hovered_cell = room.enemies[0].position
+			iso_renderer.has_hovered_cell = true
+		}
+	} else if smoke_map {
 		room.phase = .Complete
 		transition := game.finish_room(&run_state, room.phase)
 		assert(transition == .Reward)
@@ -1022,6 +1095,20 @@ main :: proc() {
 	} else if smoke_tactics {
 		prepared := prepare_tactics_smoke(&room)
 		assert(prepared)
+	} else if smoke_sprites {
+		prepared := prepare_tactics_smoke(&room) && prepare_sprite_smoke(&iso_renderer)
+		assert(prepared)
+		for &object in room.objects {
+			if object.kind == .Ice_Block { object.health = 2 }
+		}
+	} else if smoke_relic_combat {
+		prepared := prepare_tactics_smoke(&room)
+		assert(prepared)
+		for definition in game.RELIC_DEFINITIONS {
+			added := game.acquire_relic(room.player, definition.id)
+			assert(added)
+		}
+		game.begin_room_relics(&room)
 	} else if smoke_encounters || smoke_miniboss || smoke_furnace {
 		kind: Encounter_Smoke = .Escort
 		if smoke_miniboss { kind = .Miniboss }
@@ -1244,10 +1331,15 @@ main :: proc() {
 			render.set_renderer_playback_speed(&iso_renderer, speed)
 		}
 		frame_time := rl.GetFrameTime()
-		if !smoke_furnace {
-			render.update_renderer_event_timeline(&iso_renderer, frame_time)
+		render.advance_sprite_assets(&iso_renderer.sprite_assets, frame_time if !smoke_test else f32(1.0/60.0))
+		if !smoke_furnace && spell_smoke == .None {
+			render.update_renderer_frame_timeline(&iso_renderer, frame_time)
 		}
 		mouse_canvas, mouse_inside := app.mouse_canvas_position(&window)
+		if spell_smoke_is_preview(spell_smoke) {
+			mouse_canvas = render.cell_center(&iso_renderer, room.enemies[0].position)
+			mouse_inside = true
+		}
 		if smoke_encounters {
 			mouse_canvas = render.cell_center(&iso_renderer, room.objects[0].position)
 			mouse_canvas.y -= max(f32(8), 12*iso_renderer.camera.zoom)*1.4
@@ -1291,7 +1383,10 @@ main :: proc() {
 				procedural_rooms,
 			)
 			assert(restarted)
-			if playtest_report {
+			if options.spell_lab {
+				if !prepare_spell_lab(&room, options.dice_lab) { fmt.eprintln("could not reset card practice"); return }
+			}
+			if playtest_report && !game.run_has_relic_choice(&run_state) {
 				playtest_started := begin_playtest_run(&playtest_session, run_seed, &run_state, &room)
 				assert(playtest_started)
 				playtest_session_ptr = &playtest_session
@@ -1310,7 +1405,7 @@ main :: proc() {
 		}
 
 		timeline_busy := render.renderer_timeline_is_busy(&iso_renderer)
-		if rl.IsKeyPressed(.M) && route_map_toggle_is_allowed(&run_state, &room, &iso_renderer) {
+		if !game.run_has_relic_choice(&run_state) && rl.IsKeyPressed(.M) && route_map_toggle_is_allowed(&run_state, &room, &iso_renderer) {
 			show_route_map = !show_route_map
 			if show_route_map {
 				clear_card_interaction(&card_interaction)
@@ -1326,8 +1421,36 @@ main :: proc() {
 		                 (show_route_map || run_state.phase == .Choose_Path || run_state.phase == .Victory)
 		hovered_node := game.INVALID_NODE_ID
 		shop_button_hovered := false
+		relic_visible := game.run_has_relic_choice(&run_state)
+		relic_hovered := -1
+		relic_skip_hovered := false
 
-		if defeat_visible {
+		if relic_visible {
+			clear_card_interaction(&card_interaction)
+			clear_gameplay_command_buffer(&gameplay_buffer)
+			if mouse_inside {
+				relic_hovered = render.relic_choice_at_point(&run_state,
+					f32(window.config.canvas_width), f32(window.config.canvas_height), mouse_canvas)
+				relic_skip_hovered = render.reward_skip_at_point(f32(window.config.canvas_width),
+					f32(window.config.canvas_height), mouse_canvas)
+			}
+			if smoke_relics { relic_hovered = 1 }
+			choice := pressed_hand_slot()
+			skip := rl.IsKeyPressed(.S)
+			if mouse_inside && rl.IsMouseButtonPressed(.LEFT) {
+				if relic_hovered >= 0 { choice = relic_hovered }
+				if relic_skip_hovered { skip = true }
+			}
+			if !smoke_test && resolve_demo_relic_choice(&run_state, &room, choice, skip) {
+				relic_visible = false
+				if playtest_report && playtest_session_ptr == nil {
+					started := begin_playtest_run(&playtest_session, run_seed, &run_state, &room)
+					assert(started)
+					playtest_session_ptr = &playtest_session
+					playtest_report_written = false
+				}
+			}
+		} else if defeat_visible {
 			clear_card_interaction(&card_interaction)
 			clear_gameplay_command_buffer(&gameplay_buffer)
 		} else if reward_visible {
@@ -1733,7 +1856,7 @@ main :: proc() {
 				)
 			}
 			if !smoke_card && !smoke_targeting && !smoke_spatial && !smoke_object && !smoke_content &&
-			   !smoke_encounters && !smoke_miniboss && !smoke_furnace {
+			   !smoke_encounters && !smoke_miniboss && !smoke_furnace && spell_smoke == .None {
 				timeline_busy = render.renderer_timeline_is_busy(&iso_renderer)
 				command, has_command := poll_gameplay_command(
 					&room,
@@ -1807,8 +1930,22 @@ main :: proc() {
 				}
 			}
 		}
+		dice_cue, has_dice_cue := render.active_presentation_cue(&iso_renderer.timeline)
+		dice_visible := has_dice_cue && dice_cue.started && dice_cue.kind == .Dice_Rolled
+		overlay: app.Window_Overlay
+		overlay_data: Dice_Window_Overlay
+		if dice_visible {
+			overlay = draw_window_dice_overlay
+			overlay_data = {renderer = &dice_renderer, roll = dice_cue.event.dice_roll,
+				progress = render.presentation_cue_progress(dice_cue), seed = dice_event_visual_seed(dice_cue.event),
+				card = dice_cue.event.card_definition}
+			update_window_dice_overlay(&window, &overlay_data)
+		}
 		app.begin_canvas(&window, render.CANVAS_BACKGROUND)
-		if reward_visible {
+		if game.run_has_relic_choice(&run_state) {
+			render.draw_relic_reward_screen(&run_state, f32(window.config.canvas_width),
+				f32(window.config.canvas_height), relic_hovered, relic_skip_hovered)
+		} else if reward_visible {
 			render.draw_reward_screen(
 				&run_state,
 				f32(window.config.canvas_width),
@@ -1874,10 +2011,13 @@ main :: proc() {
 				render.draw_object_interaction_ground(&iso_renderer, &room, active_card_id)
 			}
 			render.draw_room(&iso_renderer, &room)
+			if !timeline_busy { render.draw_spell_path_preview(&iso_renderer, &room, active_card_id) }
 			if !timeline_busy {
 				render.draw_enemy_intent_badges(&iso_renderer, &room)
 			}
 			render.draw_status(&iso_renderer, &room, window.scale_mode)
+			render.draw_relic_bar(&iso_renderer, &room, mouse_canvas, mouse_inside,
+				card_interaction.hovered_card_id if card_interaction.hovered_card_id != 0 else card_interaction.selected_card_id)
 			if mouse_inside || active_card_id != 0 {
 				render.draw_object_interaction_help(&iso_renderer, &room, mouse_canvas, active_card_id)
 			}
@@ -1893,6 +2033,10 @@ main :: proc() {
 				card_interaction.dragged_card_id,
 				draw_mouse_canvas,
 			)
+			if options.spell_lab {
+				label: cstring = "DICE PRACTICE / F5 RESTART" if options.dice_lab else "SPELL PRACTICE / F5 RESTART"
+				rl.DrawText(label, 265, 106, 11, rl.Color{172, 219, 222, 255})
+			}
 			if defeat_visible {
 				render.draw_defeat_overlay(
 					&run_state,
@@ -1902,12 +2046,41 @@ main :: proc() {
 				)
 			}
 		}
-		app.present(&window, render.LETTERBOX_COLOR)
+		app.present(&window, render.LETTERBOX_COLOR, overlay, &overlay_data)
 
 		if smoke_test {
 			smoke_frame_count += 1
 			if smoke_frame_count >= 3 {
-				if smoke_generation {
+				if spell_smoke != .None {
+					switch spell_smoke {
+					case .Firebomb: rl.TakeScreenshot("odin_pp_firebomb_spell.png")
+					case .Dice: rl.TakeScreenshot("odin_pp_dice.png")
+					case .Dice_Pool: rl.TakeScreenshot("odin_pp_dice_pool.png")
+					case .Chain: rl.TakeScreenshot("odin_pp_chain.png")
+					case .Preview: rl.TakeScreenshot("odin_pp_spell_preview.png")
+					case .Sunder_Preview: rl.TakeScreenshot("odin_pp_sunder_preview.png")
+					case .Barrage: rl.TakeScreenshot("odin_pp_barrage.png")
+					case .Venom: rl.TakeScreenshot("odin_pp_twin_venom.png")
+					case .None:
+					}
+					if !spell_smoke_is_preview(spell_smoke) && !finish_spell_smoke(&room, &iso_renderer) {
+						fmt.eprintln("spell replay failed"); os.exit(2)
+					}
+				} else if smoke_family != .Scattered {
+					switch smoke_family {
+					case .Pillars: rl.TakeScreenshot("odin_pp_pillars.png")
+					case .Ring: rl.TakeScreenshot("odin_pp_ring.png")
+					case .Twin_Courts: rl.TakeScreenshot("odin_pp_courts.png")
+					case .Asymmetric: rl.TakeScreenshot("odin_pp_cover.png")
+					case .Scattered:
+					}
+				} else if smoke_relics {
+					rl.TakeScreenshot("odin_pp_relics.png")
+				} else if smoke_relic_combat {
+					rl.TakeScreenshot("odin_pp_relic_combat.png")
+				} else if smoke_sprites {
+					rl.TakeScreenshot("odin_pp_sprites.png")
+				} else if smoke_generation {
 					rl.TakeScreenshot("odin_pp_procedural_room.png")
 				} else if smoke_map {
 					rl.TakeScreenshot("odin_pp_route.png")

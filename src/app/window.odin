@@ -129,7 +129,12 @@ begin_canvas :: proc(window: ^Window, clear_color: rl.Color) {
 	rl.ClearBackground(clear_color)
 }
 
-present :: proc(window: ^Window, letterbox_color: rl.Color) {
+// Window overlays are composed after the canvas, so they may cross letterbox
+// margins without stretching with the game's viewport.
+Window_Overlay :: proc(window: ^Window, data: rawptr)
+
+present :: proc(window: ^Window, letterbox_color: rl.Color,
+	overlay: Window_Overlay = nil, overlay_data: rawptr = nil) {
 	assert(window != nil && window.is_open)
 	rl.EndTextureMode()
 
@@ -149,5 +154,6 @@ present :: proc(window: ^Window, letterbox_color: rl.Color) {
 		height = window.viewport.destination.height,
 	}
 	rl.DrawTexturePro(window.canvas.texture, source, destination, {}, 0, rl.WHITE)
+	if overlay != nil { overlay(window, overlay_data) }
 	rl.EndDrawing()
 }

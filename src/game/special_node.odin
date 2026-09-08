@@ -498,11 +498,13 @@ claim_treasure :: proc(run: ^Run_State) -> Special_Node_Result {
 	staged.treasure.resolved = true
 	staged.treasure.outcome = .Treasure_Claimed
 	staged.treasure.applied_amount = run.treasure.gold_amount
+	staged.relic_reward = make_run_relic_reward(&staged, .Treasure)
 	if !validate_run_state(&staged) {
 		return .Invalid
 	}
 	run.player.gold = staged.player.gold
 	run.treasure = staged.treasure
+	run.relic_reward = staged.relic_reward
 	return .Treasure_Claimed
 }
 
@@ -543,7 +545,7 @@ leave_special_node :: proc(run: ^Run_State) -> Special_Node_Result {
 }
 
 special_node_can_continue :: proc(run: ^Run_State) -> bool {
-	if run == nil || !validate_run_state(run) {
+	if run == nil || run_has_relic_choice(run) || !validate_run_state(run) {
 		return false
 	}
 	switch run.phase {

@@ -2,6 +2,7 @@ package render
 
 import game "../game"
 import grid "../grid"
+import level "../level"
 import view "../view"
 
 MAX_PRESENTATION_CUES :: game.MAX_GAME_EVENTS
@@ -61,6 +62,10 @@ Presentation_Cue_Kind :: enum {
 	Binding_Exhausted,
 	Binding_Expired,
 	Pulse_Advanced,
+	Energy_Gained,
+	Dice_Rolled,
+	Spell_Launched,
+	Spell_Impact,
 }
 
 Presentation_Actor :: struct {
@@ -97,6 +102,8 @@ Room_Presentation :: struct {
 	phase:       game.Room_Phase,
 	encounter_kind: game.Encounter_Kind,
 	modifier: game.Room_Modifier,
+	family: level.Room_Family,
+	relics: game.Relic_State,
 	player:      Presentation_Actor,
 	deck:        game.Deck_State,
 	enemies:     [game.MAX_ENEMIES_PER_ROOM]Presentation_Actor,
@@ -143,6 +150,8 @@ capture_room_presentation :: proc(room: ^game.Room) -> (result: Room_Presentatio
 	result.phase = room.phase
 	result.encounter_kind = room.encounter_kind
 	result.modifier = room.modifier
+	result.family = room.family
+	result.relics = room.player.relics
 	result.gold = room.player.gold
 	result.pulse_count = room.pulse_count
 	result.deck = room.player.deck
@@ -325,6 +334,14 @@ presentation_cue_kind :: proc(event: game.Game_Event) -> Presentation_Cue_Kind {
 		return .Room_Hazard_Triggered
 	case .Gold_Gained:
 		return .Gold_Gained
+	case .Energy_Gained:
+		return .Energy_Gained
+	case .Dice_Rolled:
+		return .Dice_Rolled
+	case .Spell_Launched:
+		return .Spell_Launched
+	case .Spell_Impact:
+		return .Spell_Impact
 	case .Loot_Dropped:
 		return .Loot_Dropped
 	case .Loot_Collected:
@@ -363,6 +380,12 @@ presentation_cue_kind :: proc(event: game.Game_Event) -> Presentation_Cue_Kind {
 
 presentation_cue_duration :: proc(kind: Presentation_Cue_Kind, event: game.Game_Event) -> f32 {
 	switch kind {
+	case .Dice_Rolled:
+		return DICE_CUE_DURATION
+	case .Spell_Launched:
+		return 0.28 if event.card_definition == .Firebomb else 0.12
+	case .Spell_Impact:
+		return 0.28 if event.card_definition == .Firebomb else 0.16
 	case .Move:
 		if event.kind == .Movement_Step {
 			return PRESENTATION_MOVEMENT_STEP_DURATION
@@ -396,7 +419,7 @@ presentation_cue_duration :: proc(kind: Presentation_Cue_Kind, event: game.Game_
 		return PRESENTATION_DEFEAT_DURATION
 	case .Loot:
 		return PRESENTATION_LOOT_DURATION
-	case .Attack_Missed, .Move_Blocked, .Trap_Triggered, .Hazard_Triggered, .Gold_Gained,
+	case .Attack_Missed, .Move_Blocked, .Trap_Triggered, .Hazard_Triggered, .Gold_Gained, .Energy_Gained,
 	     .Loot_Dropped, .Object_Spawned, .Explosive_Armed, .Explosive_Disarmed:
 		return PRESENTATION_NOTICE_DURATION
 	case .Pulse_Advanced:
@@ -459,8 +482,13 @@ begin_event_timeline :: proc(
 		timeline.count += 1
 	}
 	total_duration: f32
-	for index in 0..<timeline.count {
-		total_duration += timeline.cues[index].duration
+	for offset := 0; offset < timeline.count; {
+		span := presentation_group_size(timeline, offset)
+		duration: f32
+		for index in offset..<offset+span { duration = max(duration, timeline.cues[index].duration) }
+		for index in offset..<offset+span { timeline.cues[index].duration = duration }
+		total_duration += duration
+		offset += span
 	}
 	if total_duration > PRESENTATION_MAX_SEQUENCE_DURATION {
 		duration_scale := PRESENTATION_MAX_SEQUENCE_DURATION/total_duration
@@ -484,6 +512,26 @@ presentation_cue_at :: proc(
 
 active_presentation_cue :: proc(timeline: ^Presentation_Timeline) -> (^Presentation_Cue, bool) {
 	return presentation_cue_at(timeline, 0)
+}
+
+// Explicit groups combine direct impacts only; movement, reactions and pulse
+// boundaries retain FIFO timing. Mutations within a group retain log order.
+presentation_cue_can_group :: proc(kind: Presentation_Cue_Kind) -> bool {
+	return kind == .Damage || kind == .Damage_Absorbed || kind == .Status_Removed ||
+	       kind == .Defeat || kind == .Loot_Dropped || kind == .Explosive_Armed
+}
+
+presentation_group_size :: proc(timeline: ^Presentation_Timeline, offset: int = 0) -> int {
+	first, found := presentation_cue_at(timeline, offset)
+	if !found { return 0 }
+	if first.event.visual_group == 0 || !presentation_cue_can_group(first.kind) { return 1 }
+	span := 1
+	for index in offset+1..<timeline.count {
+		cue, _ := presentation_cue_at(timeline, index)
+		if cue.event.visual_group != first.event.visual_group || !presentation_cue_can_group(cue.kind) { break }
+		span += 1
+	}
+	return span
 }
 
 presentation_cue_progress :: proc(cue: ^Presentation_Cue) -> f32 {
@@ -805,6 +853,19 @@ start_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^Presentat
 	object, has_object := presentation_grid_object(timeline, event.target)
 
 	switch cue.kind {
+	case .Dice_Rolled:
+		expected_dice := game.card_dice_count(event.card_definition)
+		if !game.validate_dice_roll(&event.dice_roll) || event.amount != event.dice_roll.total ||
+		   event.dice_roll.count != expected_dice ||
+		   expected_dice == 0 ||
+		   event.source != game.PLAYER_ENTITY {
+			timeline.update_failures += 1
+		}
+	case .Spell_Launched, .Spell_Impact:
+		if event.card_definition != .Firebomb && event.card_definition != .Chain_Lightning &&
+		   game.card_dice_count(event.card_definition) == 0 {
+			timeline.update_failures += 1
+		}
 	case .Room_Hazard_Triggered:
 		timeline.view.modifier.activation_pulse = event.pulse_count
 	case .Object_Spawned:
@@ -893,6 +954,14 @@ start_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^Presentat
 		hide_collected_presentation_loot(&timeline.view, event)
 	case .Gold_Gained:
 		timeline.view.gold += event.amount
+	case .Energy_Gained:
+		if event.target != game.PLAYER_ENTITY || event.amount <= 0 ||
+		   event.energy < 0 || event.energy > timeline.view.deck.rules.max_energy ||
+		   timeline.view.deck.energy+event.amount != event.energy {
+			timeline.update_failures += 1
+		} else {
+			timeline.view.deck.energy = event.energy
+		}
 	case .Card_Played:
 		if !apply_presentation_card_played(&timeline.view.deck, event) {
 			timeline.update_failures += 1
@@ -922,6 +991,7 @@ start_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^Presentat
 		timeline.view.deck.energy = event.energy
 		if timeline.final_view.valid {
 			timeline.view.modifier = timeline.final_view.modifier
+			timeline.view.relics = timeline.final_view.relics
 			for &enemy in timeline.view.enemies[:timeline.view.enemy_count] {
 				if final_enemy, found := presentation_actor_in_view(&timeline.final_view, enemy.entity); found {
 					enemy.boss_phase = final_enemy.boss_phase
@@ -968,9 +1038,9 @@ update_active_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^P
 	     .Status_Removed, .Status_Expired, .Card_Played, .Card_Drawn, .Card_Moved, .Card_Created,
 	     .Refocus, .Card_Refocused,
 	     .Loot_Dropped, .Loot, .Attack_Missed,
-	     .Move_Blocked, .Gold_Gained, .Binding_Added, .Binding_Exhausted,
+	     .Move_Blocked, .Gold_Gained, .Energy_Gained, .Binding_Added, .Binding_Exhausted,
 	     .Binding_Expired, .Pulse_Advanced, .Object_Spawned, .Explosive_Armed,
-	     .Explosive_Disarmed, .Explosion, .Room_Hazard_Triggered:
+	     .Explosive_Disarmed, .Explosion, .Room_Hazard_Triggered, .Dice_Rolled, .Spell_Launched, .Spell_Impact:
 	}
 }
 
@@ -1016,22 +1086,27 @@ update_event_timeline :: proc(timeline: ^Presentation_Timeline, dt: f32) -> (bec
 	remaining := dt
 	for remaining > 0 && event_timeline_is_busy(timeline) {
 		cue := &timeline.cues[timeline.head]
-		if !cue.started {
-			start_presentation_cue(timeline, cue)
+		span := presentation_group_size(timeline)
+		for offset in 0..<span {
+			member, _ := presentation_cue_at(timeline, offset)
+			if !member.started { start_presentation_cue(timeline, member) }
 		}
 		available := max(f32(0), cue.duration-cue.elapsed)
 		step := min(remaining, available)
-		cue.elapsed += step
 		remaining -= step
-		if cue.duration-cue.elapsed <= PRESENTATION_TIME_EPSILON {
-			cue.elapsed = cue.duration
+		for offset in 0..<span {
+			member, _ := presentation_cue_at(timeline, offset)
+			member.elapsed += step
+			if member.duration-member.elapsed <= PRESENTATION_TIME_EPSILON { member.elapsed = member.duration }
+			update_active_presentation_cue(timeline, member)
 		}
-		update_active_presentation_cue(timeline, cue)
 		if cue.elapsed < cue.duration {
 			break
 		}
-		finish_presentation_cue(timeline, cue)
-		pop_presentation_cue(timeline)
+		for _ in 0..<span {
+			finish_presentation_cue(timeline, &timeline.cues[timeline.head])
+			pop_presentation_cue(timeline)
+		}
 	}
 	return was_busy && !event_timeline_is_busy(timeline)
 }

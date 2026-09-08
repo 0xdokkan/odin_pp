@@ -40,6 +40,7 @@ Room_Blueprint_Error :: enum {
 }
 
 Room_Blueprint :: struct {
+	previous_family: level.Room_Family,
 	encounter_kind: Encounter_Kind,
 	modifier: Room_Modifier,
 	seed:          u64,
@@ -74,9 +75,9 @@ valid_encounter_generation_config :: proc(config: Encounter_Generation_Config) -
 	       config.enemy_health > 0 && config.enemy_attack > 0 && config.trap_damage > 0
 }
 
-room_generation_profile :: proc(node: ^Run_Node) -> (result: Room_Generation_Profile, ok: bool) {
+room_generation_profile :: proc(node: ^Run_Node, previous_family: level.Room_Family = .Scattered) -> (result: Room_Generation_Profile, ok: bool) {
 	if node == nil || int(node.id) < 0 || node.depth < 0 || node.room_seed == 0 ||
-	   !node_kind_has_room(node.kind) {
+	   !node_kind_has_room(node.kind) || !level.room_family_is_valid(previous_family) {
 		return {}, false
 	}
 
@@ -144,6 +145,8 @@ room_generation_profile :: proc(node: ^Run_Node) -> (result: Room_Generation_Pro
 		return {}, false
 	}
 	result.encounter_config.object_count = 3 if node.kind == .Combat else 6
+	result.level_config.family = room_family_for_node(node, previous_family)
+	result.level_config.exit_center_radius = result.level_config.width/2
 	if node.kind == .Combat && encounter_kind_for_node(node) == .Powder_Keg {
 		result.encounter_config.object_count = 4
 	}
@@ -167,6 +170,7 @@ room_blueprint_content :: proc(blueprint: ^Room_Blueprint) -> Room_Content {
 		return {}
 	}
 	return {
+		family = blueprint.profile.level_config.family,
 		encounter_kind = blueprint.encounter_kind,
 		modifier = blueprint.modifier,
 		enemies = blueprint.enemies[:],
@@ -356,6 +360,7 @@ generate_obstacles :: proc(
 		if len(blueprint.obstacles) >= desired_count {
 			break
 		}
+		if level.room_family_cell_is_reserved(&blueprint.level_data, blueprint.profile.level_config.family, candidate) { continue }
 		if all_unblocked_walkable_cells_are_connected(
 			&blueprint.level_data,
 			blueprint.obstacles[:],
@@ -379,7 +384,7 @@ validate_room_blueprint :: proc(blueprint: ^Room_Blueprint) -> bool {
 		depth = blueprint.node_depth,
 		room_seed = blueprint.seed,
 	}
-	expected_profile, profile_ok := room_generation_profile(&source_node)
+	expected_profile, profile_ok := room_generation_profile(&source_node, blueprint.previous_family)
 	if !profile_ok || expected_profile != blueprint.profile {
 		return false
 	}
@@ -398,7 +403,8 @@ validate_room_blueprint :: proc(blueprint: ^Room_Blueprint) -> bool {
 	}
 
 	for obstacle, index in blueprint.obstacles {
-		if !cell_is_walkable(&blueprint.level_data, obstacle) ||
+		if level.room_family_cell_is_reserved(&blueprint.level_data, blueprint.profile.level_config.family, obstacle) ||
+		   !cell_is_walkable(&blueprint.level_data, obstacle) ||
 		   !position_is_safe_from_room_anchors(obstacle, player_spawn, blueprint.exit_position, config) ||
 		   position_in_list(blueprint.obstacles[:index], obstacle) {
 			return false
@@ -449,8 +455,8 @@ validate_room_blueprint :: proc(blueprint: ^Room_Blueprint) -> bool {
 	       blueprint.modifier == generate_blueprint_modifier(blueprint)
 }
 
-generate_room_blueprint :: proc(node: ^Run_Node) -> (result: Room_Blueprint, err: Room_Blueprint_Error) {
-	profile, profile_ok := room_generation_profile(node)
+generate_room_blueprint :: proc(node: ^Run_Node, previous_family: level.Room_Family = .Scattered) -> (result: Room_Blueprint, err: Room_Blueprint_Error) {
+	profile, profile_ok := room_generation_profile(node, previous_family)
 	if !profile_ok {
 		return {}, .Invalid_Node
 	}
@@ -459,6 +465,7 @@ generate_room_blueprint :: proc(node: ^Run_Node) -> (result: Room_Blueprint, err
 	}
 
 	result.seed = node.room_seed
+	result.previous_family = previous_family
 	result.source_node = node.id
 	result.node_kind = node.kind
 	result.node_depth = node.depth
@@ -554,6 +561,7 @@ generate_room_blueprint :: proc(node: ^Run_Node) -> (result: Room_Blueprint, err
 			return {}, .Insufficient_Spawn_Cells
 		}
 		archetype := enemy_archetypes[archetype_index]
+		if archetype_index >= 2 { arrange_role_spawn_candidate(&result, spawn_candidates[:], spawn_index, archetype) }
 		health, attack := enemy_stats_for_archetype(profile.encounter_config, archetype)
 		append(&result.enemies, Enemy_Spawn{
 			position = spawn_candidates[spawn_index],

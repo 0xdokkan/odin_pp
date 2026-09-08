@@ -1,0 +1,96 @@
+{
+  "version": 1,
+  "sprites": [
+    {
+      "key": "player",
+      "file": "sprites/player.png",
+      "columns": 4,
+      "rows": 2,
+      "frames": 8,
+      "fps": 8,
+      "width": 32,
+      "height": 48,
+      "anchor": [0.5, 0.9]
+    },
+    {
+      "key": "chaser",
+      "file": "sprites/chaser.gif",
+      "fps": 8,
+      "width": 32,
+      "height": 40,
+      "anchor": [0.5, 1.0]
+    },
+    {
+      "key": "barrel",
+      "file": "sprites/barrel.png",
+      "width": 28,
+      "height": 36,
+      "anchor": [0.5, 0.9]
+    },
+    {
+      "key": "player_cast",
+      "file": "sprites/player_cast.png",
+      "columns": 4,
+      "frames": 4,
+      "width": 32,
+      "height": 48,
+      "anchor": [0.5, 0.9]
+    },
+    {
+      "key": "player_hit",
+      "file": "sprites/player_hit.png",
+      "columns": 4,
+      "frames": 4,
+      "width": 32,
+      "height": 48,
+      "anchor": [0.5, 0.9]
+    },
+    {
+      "key": "firebomb_cast",
+      "file": "effects/firebomb_cast.gif",
+      "width": 48,
+      "height": 48,
+      "anchor": [0.5, 0.5]
+    },
+    {
+      "key": "firebomb_projectile",
+      "file": "effects/firebomb_projectile.png",
+      "width": 24,
+      "height": 24,
+      "anchor": [0.5, 0.5]
+    },
+    {
+      "key": "firebomb_impact",
+      "file": "effects/firebomb_impact.png",
+      "columns": 4,
+      "rows": 2,
+      "frames": 8,
+      "width": 112,
+      "height": 96,
+      "anchor": [0.5, 0.5]
+    },
+    {
+      "key": "chain_bolt",
+      "file": "effects/chain_bolt.png",
+      "columns": 4,
+      "frames": 4,
+      "width": 32,
+      "height": 48,
+      "anchor": [0.5, 0.5]
+    },
+    {
+      "key": "fate_cast",
+      "file": "effects/fate_cast.gif",
+      "width": 64,
+      "height": 64,
+      "anchor": [0.5, 0.5]
+    },
+    {
+      "key": "fate_impact",
+      "file": "effects/fate_impact.gif",
+      "width": 96,
+      "height": 96,
+      "anchor": [0.5, 0.5]
+    }
+  ]
+}

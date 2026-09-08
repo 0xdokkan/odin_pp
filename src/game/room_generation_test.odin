@@ -1,6 +1,7 @@
 package game
 
 import "core:testing"
+import level "../level"
 
 test_generation_node :: proc(id: int, kind: Node_Kind, depth: int, run_seed: u64) -> Run_Node {
 	node_id := Node_Id(id)
@@ -15,6 +16,8 @@ test_generation_node :: proc(id: int, kind: Node_Kind, depth: int, run_seed: u64
 expect_blueprints_equal :: proc(t: ^testing.T, first, second: ^Room_Blueprint) {
 	testing.expect(t, first != nil && second != nil)
 	testing.expect_value(t, first.seed, second.seed)
+	testing.expect_value(t, first.previous_family, second.previous_family)
+	testing.expect_value(t, first.profile, second.profile)
 	testing.expect_value(t, first.source_node, second.source_node)
 	testing.expect_value(t, first.node_kind, second.node_kind)
 	testing.expect_value(t, first.node_depth, second.node_depth)
@@ -130,7 +133,8 @@ test_room_blueprints_hold_invariants_across_run_seeds :: proc(t: ^testing.T) {
 		seed_index := combination/(len(kinds)*9)+1
 		run_seed := u64(seed_index)*0x9E3779B97F4A7C15~u64(profile_index)
 		node := test_generation_node(combination, kind, depth, run_seed)
-		blueprint, err := generate_room_blueprint(&node)
+		previous_family := level.Room_Family(combination%5)
+		blueprint, err := generate_room_blueprint(&node, previous_family)
 		expect_generation_invariant(
 			t, err == .None, "blueprint generated", combination, run_seed, kind, depth,
 		)
@@ -138,6 +142,8 @@ test_room_blueprints_hold_invariants_across_run_seeds :: proc(t: ^testing.T) {
 			continue
 		}
 		generated_count += 1
+		expect_generation_invariant(t, blueprint.profile.level_config.family != previous_family,
+			"room family does not repeat", combination, run_seed, kind, depth)
 		expect_generation_invariant(
 			t,
 			validate_room_blueprint(&blueprint),

@@ -48,7 +48,19 @@ Card_Id :: enum {
 	Caustic_Bloom,
 	Purifying_Guard,
 	Volatile_Study,
+	Fate_Strike,
+	Chain_Lightning,
+	Sundering_Blow,
+	Prismatic_Barrage,
+	Twin_Venom,
 	Count,
+}
+
+card_dice_count :: proc(id: Card_Id) -> int {
+	if id == .Fate_Strike { return 1 }
+	if id == .Sundering_Blow || id == .Twin_Venom { return 2 }
+	if id == .Prismatic_Barrage { return 3 }
+	return 0
 }
 
 Card_Target_Selector :: enum {
@@ -418,7 +430,7 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 			{},
 			{},
 		},
-		effect_count = 2,
+			effect_count = 2,
 	},
 	{
 		id = .Spark_Forge,
@@ -698,6 +710,103 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 		},
 		effect_count = 2,
 	},
+	{
+		id = .Fate_Strike,
+		name = "Fate Strike",
+		rarity = .Uncommon,
+		reward_weight = 75,
+		shop_base_price = 6,
+		cost = 2,
+		targeting = {
+			rule = .Opponent,
+			cast_range = {.Manhattan, 1, 4},
+			shape = .Single,
+			requires_line_of_sight = true,
+			stops_on_wall = true,
+		},
+		effects = {{kind = .Damage, target = .Chosen_Entity, base_amount = 2, amount_per_upgrade = 1}, {}, {}, {}},
+		effect_count = 1,
+	},
+	{
+		id = .Chain_Lightning,
+		name = "Chain Lightning",
+		rarity = .Rare,
+		reward_weight = 65,
+		shop_base_price = 8,
+		cost = 2,
+		targeting = {
+			rule = .Opponent,
+			cast_range = {.Manhattan, 1, 4},
+			shape = .Single,
+			requires_line_of_sight = true,
+			stops_on_wall = true,
+		},
+		effects = {{kind = .Damage, target = .Chosen_Entity, base_amount = 3, amount_per_upgrade = 1}, {}, {}, {}},
+		effect_count = 1,
+	},
+	{
+		id = .Sundering_Blow,
+		name = "Sundering Blow",
+		rarity = .Uncommon,
+		reward_weight = 75,
+		shop_base_price = 6,
+		cost = 2,
+		targeting = {
+			rule = .Opponent,
+			cast_range = {.Manhattan, 1, 2},
+			shape = .Single,
+			requires_line_of_sight = true,
+			stops_on_wall = true,
+		},
+		effects = {
+			{kind = .Damage, target = .Chosen_Entity, base_amount = 2, amount_per_upgrade = 1},
+			{kind = .Move, target = .Chosen_Entity, movement = .Away_From_Player, movement_distance = 1},
+			{}, {},
+		},
+		effect_count = 2,
+	},
+	{
+		id = .Prismatic_Barrage,
+		name = "Prismatic Barrage",
+		rarity = .Uncommon,
+		reward_weight = 75,
+		shop_base_price = 6,
+		cost = 2,
+		targeting = {
+			rule = .Opponent,
+			cast_range = {.Manhattan, 1, 3},
+			shape = .Single,
+			requires_line_of_sight = true,
+			stops_on_wall = true,
+		},
+		effects = {
+			{kind = .Apply_Status, target = .Player, base_amount = 1, status = .Shield, duration = 2},
+			{kind = .Damage, target = .Chosen_Entity, base_amount = 3, amount_per_upgrade = 1},
+			{}, {},
+		},
+		effect_count = 2,
+	},
+	{
+		id = .Twin_Venom,
+		name = "Twin Venom",
+		rarity = .Uncommon,
+		reward_weight = 75,
+		shop_base_price = 6,
+		cost = 2,
+		targeting = {
+			rule = .Opponent,
+			cast_range = {.Manhattan, 1, 3},
+			shape = .Single,
+			requires_line_of_sight = true,
+			stops_on_wall = true,
+		},
+		effects = {
+			{kind = .Damage, target = .Chosen_Entity, base_amount = 2, amount_per_upgrade = 1},
+			{kind = .Apply_Status, target = .Chosen_Entity, base_amount = 2, status = .Poison, duration = 2},
+			{}, {},
+		},
+		effect_count = 2,
+	},
 }
 
 card_drop_target :: proc(
@@ -777,6 +886,8 @@ card_effect_template_is_valid :: proc(
 	}
 
 	switch template.kind {
+	case .Gain_Energy:
+		return false
 	case .Move:
 		return card_movement_template_is_valid(definition, template)
 	case .Remove_Status:
@@ -966,7 +1077,7 @@ instantiate_card_effect :: proc(
 			template.priority_modifier,
 			{kind = .Card, id = instance.id},
 		), true
-	case .Move:
+	case .Move, .Gain_Energy:
 		return {}, false
 	}
 	return {}, false
@@ -1245,6 +1356,17 @@ compile_card_action :: proc(
 	}
 
 	action = make_action(.Card, PLAYER_ENTITY, target, definition.targeting.rule)
+	if instance.definition_id == .Chain_Lightning {
+		path := query_spell_path(room, instance, target)
+		if path.error != .None { return {}, path.error }
+		for entity in path.targets[:path.count] {
+			effect, valid := instantiate_card_effect(definition.effects[0], entity, instance)
+			if !valid || !add_effect(&action, effect) { return {}, .Too_Many_Effects }
+		}
+		return action, .None
+	}
+	// Fate's template is its deterministic base. The die is materialized only by
+	// resolve_played_card_action after all play validation and payment checks.
 	for index in 0..<definition.effect_count {
 		template := definition.effects[index]
 		if template.kind == .Move {

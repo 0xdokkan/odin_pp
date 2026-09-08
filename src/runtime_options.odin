@@ -8,6 +8,9 @@ Runtime_Options :: struct {
 	animation_speed: f32,
 	debug_abilities: bool,
 	playtest_output: string,
+	sprite_manifest: string,
+	spell_lab: bool,
+	dice_lab: bool,
 }
 
 DEFAULT_RUNTIME_OPTIONS :: Runtime_Options{seed = 0xC0FFEE, animation_speed = 1}
@@ -70,12 +73,28 @@ apply_runtime_option :: proc(options: ^Runtime_Options, argument: string) -> (ha
 		options.debug_abilities = true
 		return true, true
 	}
+	if argument == "--spell-lab" {
+		options.spell_lab = true
+		options.dice_lab = false
+		return true, true
+	}
+	if argument == "--dice-lab" {
+		options.spell_lab = true
+		options.dice_lab = true
+		return true, true
+	}
 	if strings.has_prefix(argument, "--playtest-output=") {
 		path := argument[len("--playtest-output="):]
 		if len(path) == 0 {
 			return true, false
 		}
 		options.playtest_output = path
+		return true, true
+	}
+	if strings.has_prefix(argument, "--sprites=") {
+		manifest := argument[len("--sprites="):]
+		if len(manifest) == 0 { return true, false }
+		options.sprite_manifest = manifest
 		return true, true
 	}
 	return false, true

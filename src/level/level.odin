@@ -32,6 +32,7 @@ Parse_Error :: enum {
 }
 
 Room_Generation_Config :: struct {
+	family:                   Room_Family,
 	width, height:            int,
 	wall_density_percent:     int,
 	spawn_clearance_radius:   int,
@@ -333,7 +334,9 @@ anchor_pair_at :: proc(config: Room_Generation_Config, target_index: int) -> (Ro
 }
 
 generation_config_is_valid :: proc(config: Room_Generation_Config) -> bool {
-	if config.width < MIN_GENERATED_ROOM_DIMENSION ||
+	if !room_family_is_valid(config.family) ||
+	   (config.family != .Scattered && (config.width < 13 || config.height < 9)) ||
+	   config.width < MIN_GENERATED_ROOM_DIMENSION ||
 	   config.height < MIN_GENERATED_ROOM_DIMENSION ||
 	   config.width > MAX_GENERATED_ROOM_DIMENSION ||
 	   config.height > MAX_GENERATED_ROOM_DIMENSION ||
@@ -529,6 +532,9 @@ generate_room_attempt :: proc(
 	config: Room_Generation_Config,
 	generator: rand.Generator,
 ) -> (result: Level, ok: bool) {
+	if config.family != .Scattered {
+		return generate_tactical_room_attempt(config, generator)
+	}
 	result, ok = create(config.width, config.height, Tile{kind = .Floor})
 	if !ok {
 		return {}, false

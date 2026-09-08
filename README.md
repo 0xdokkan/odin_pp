@@ -9,6 +9,31 @@ La Fornace segnala una corsia pericolosa due azioni prima di colpire, mentre il
 Demolitore alterna bombe, carica e recupero in due fasi. La prima stanza e il
 boss non hanno Fornace. Shove e Dash sono nel mazzo iniziale.
 
+Le stanze usano quattro famiglie tattiche: pilastri, anello, due cortili e
+coperture asimmetriche. Il seed varia geometria e collocamento, i nemici cercano
+posizioni adatte al proprio ruolo e due stanze consecutive hanno famiglie diverse.
+Sei [reliquie della run](RELICS.md) aggiungono sinergie con spinte, movimento,
+Exhaust e veleno. Il renderer supporta anche [PNG, sprite sheet e GIF
+personalizzati](SPRITES.md).
+
+Il [pacchetto spell](SPELLS.md) aggiunge **Fate Strike** con dado D6 realmente
+tridimensionale rosso che cade dall'alto, **Chain Lightning** con tre bersagli e anteprima dei rimbalzi,
+e una **Firebomb** animata dal lancio all'esplosione. Gli impatti diretti della
+stessa Firebomb vengono mostrati insieme; le reazioni conservano il loro ordine.
+GIF e sheet possono ora sostituire anche le animazioni di lancio, impatto e
+danno del giocatore.
+
+**Sundering Blow** tira due dadi con mesh smussate e collisioni fisiche: il
+contatore raccoglie la somma, il colpo infligge `2D6 + upgrade` danni e un tiro
+di almeno 8 aggiunge una spinta. La scena supporta fino a tre dadi simultanei
+senza aumentare la durata del lancio.
+I dadi rimbalzano e fanno capriole diverse dopo gli urti; gli ultimi rotolamenti
+rallentano gradualmente prima della lettura delle facce.
+
+**Prismatic Barrage** usa `3D6`: ogni `4+` infligge danni, ogni dado basso concede
+Shield. **Twin Venom** usa il maggiore di `2D6` e avvelena quando esce una coppia.
+Il contatore mostra successi o massimo, mantenendo visibile anche la somma.
+
 Documentazione del gameplay: [Action System](ACTION_SYSTEM.md),
 [Status And Event System](STATUS_SYSTEM.md), [Reaction Queue](REACTION_SYSTEM.md),
 [Enemy Intents](ENEMY_INTENT_SYSTEM.md),
@@ -31,6 +56,17 @@ nella [Roadmap](ROADMAP.md); i contratti di M1, M2 e M3 sono in
 ![Anteprima della griglia isometrica](odin_pp_isometric.png)
 
 ![Prima stanza procedurale deterministica](odin_pp_procedural_room.png)
+
+![Scelta della reliquia iniziale](odin_pp_relics.png)
+
+![Dado tridimensionale di Fate Strike](odin_pp_dice.png)
+
+![Anteprima dei rimbalzi di Chain Lightning](odin_pp_spell_preview.png)
+
+![Stanza ad anello con percorsi alternativi](odin_pp_ring.png)
+
+Altre geometrie: [pilastri](odin_pp_pillars.png), [due cortili](odin_pp_courts.png)
+e [coperture asimmetriche](odin_pp_cover.png).
 
 ![Mappa procedurale della run](odin_pp_route.png)
 
@@ -84,6 +120,26 @@ nella [Roadmap](ROADMAP.md); i contratti di M1, M2 e M3 sono in
 odin run src
 ```
 
+Per provare subito spell e dadi in un'arena dedicata:
+
+```sh
+odin run src -- --spell-lab
+```
+
+La mano iniziale contiene Firebomb (`1`), Fate Strike (`2`), Chain Lightning
+(`3`), Sundering Blow (`4`) e Guard (`5`). Seleziona una carta e clicca il bersaglio,
+oppure trascinala. `F` esegue Refocus, `F4` cambia velocita e `F5` ricrea l'arena. Le carte
+sono disponibili anche nelle normali ricompense e negli shop della run.
+
+Per l'arena dedicata alle quattro carte con dadi:
+
+```sh
+odin run src -- --dice-lab
+```
+
+La mano e Fate Strike (`1`), Sundering Blow (`2`), Prismatic Barrage (`3`),
+Twin Venom (`4`) e Guard (`5`); `F5` ricrea anche questa arena.
+
 Per ripetere una run e velocizzare le animazioni:
 
 ```sh
@@ -100,10 +156,43 @@ installazione, evitando che LLVM le scalarizzi dentro `main`. `-o:none` resta
 disponibile per esperimenti senza ottimizzazione; `odin build src -out:odin_pp`
 produce invece un eseguibile persistente.
 
-La demo apre una finestra ridimensionabile e avvia una run di sette livelli. Ogni
-nodo possiede un seed di stanza derivato dalla run: layout, nemici, trappole e
-ostacoli vengono generati in modo riproducibile per i profili `Combat`, `Elite` e
-`Boss`.
+La demo apre una finestra ridimensionabile e avvia una run di sette livelli.
+Prima di agire scegli una reliquia con click o `1`-`3`, oppure saltala con `S`.
+Ogni nodo possiede un seed di stanza derivato dalla run: layout, nemici, trappole
+e ostacoli vengono generati in modo riproducibile per i profili `Combat`, `Elite`
+e `Boss`, considerando anche la famiglia dell'ultima stanza attraversata.
+
+Per usare immagini personali, crea `assets/sprites.json` seguendo
+[l'esempio](assets/sprites.example.json) e la [guida agli sprite](SPRITES.md).
+Puoi configurare anche un solo tipo: gli altri mantengono la grafica attuale.
+Un pacchetto alternativo si carica con:
+
+```sh
+odin run src -- --sprites=/percorso/sprites.json
+```
+
+Per provare le nuove schermate e il caricamento delle animazioni:
+
+```sh
+odin run src -- --smoke-family=pillars
+odin run src -- --smoke-family=ring
+odin run src -- --smoke-family=courts
+odin run src -- --smoke-family=cover
+odin run src -- --smoke-relics
+odin run src -- --smoke-relic-combat
+odin run src -- --smoke-sprites
+```
+
+Ogni comando salva uno screenshot e chiude la finestra. Lo smoke sprite crea
+immagini di prova temporanee per verificare PNG, sheet, GIF, trasparenza e
+fallback; le illustrazioni definitive possono essere aggiunte separatamente.
+
+Gli smoke del pacchetto spell sono `--smoke-firebomb-spell`, `--smoke-dice`, `--smoke-dice-pool`,
+`--smoke-chain`, `--smoke-spell-preview`, `--smoke-sunder-preview`,
+`--smoke-barrage` e `--smoke-twin-venom`.
+La [guida alle spell](SPELLS.md#verifica) elenca i rispettivi screenshot. Gli smoke
+dei tiri e degli impatti verificano anche il replay completo prima di chiudere
+la finestra; le preview mantengono la carta pronta senza consumare RNG.
 
 Per produrre lo screenshot deterministico del targeting avanzato:
 
@@ -242,7 +331,8 @@ pannello risolto e Continue disponibile.
 ## Loop attuale
 
 1. La stanza parte in `Combat`: il deck viene mescolato, si pescano cinque carte
-   e il player riceve tre energia.
+   e il player riceve tre energia. Nella prima stanza si sceglie la reliquia
+   iniziale prima di accettare comandi di combattimento.
 2. Prima dell'input, inseguitori, arcieri e bruti mostrano l'intento committed per
    il prossimo impulso: movimento, attacco, carica e celle minacciate non vengono
    ricalcolati dopo la scelta del player. Una spinta o un pull puo renderli stale:
@@ -259,7 +349,8 @@ pannello risolto e Continue disponibile.
    eliminato l'ultimo nemico, la stanza passa a `Loot` e gli spostamenti non
    producono piu pulse.
 6. Entrare sull'uscita verde conclude la stanza e apre `Reward` con tre carte
-   distinte, pesate per rarita, profondita e tipo del nodo.
+   distinte, pesate per rarita, profondita e tipo del nodo. Dopo un Elite si
+   risolve prima la scelta della reliquia.
 7. Scegliere una carta la aggiunge al deck; `Skip` prosegue senza modificarlo.
    Entrambe le decisioni azzerano la reward e aprono `Choose_Path`.
 8. `Choose_Path` permette di scegliere uno, due o tre nodi collegati. `Combat`,
@@ -267,7 +358,8 @@ pannello risolto e Continue disponibile.
 9. Un nodo `Shop` offre tre carte, un upgrade e una rimozione. Uscire completa il
    nodo e apre la mappa; il vendor corrente puo essere riaperto senza reroll.
 10. `Rest`, `Event` e `Treasure` mostrano scelte dedicate. Una scelta oppure Leave
-   produce un risultato one-shot; Continue completa il nodo e torna alla rotta.
+   produce un risultato one-shot; Claim al Treasure offre anche una reliquia.
+   Dopo le eventuali scelte, Continue completa il nodo e torna alla rotta.
 11. L'ultimo nodo e il boss. Superarlo porta a `Victory`; morire apre `Defeat`, da
    cui si puo iniziare una nuova run con `Enter` o il pulsante `Restart`.
 
@@ -304,6 +396,8 @@ miccia anche quando la spinta e bloccata: esplosione dopo altre due azioni.
 | `R` | inquadra nuovamente il livello |
 | `M` | mostra o nasconde la rotta durante una stanza |
 | click / `1` `2` `3` | sceglie una carta durante `Reward` |
+| click / `1` `2` `3` nella scelta reliquie | acquisisce una delle reliquie offerte |
+| hover su icona reliquia | mostra nome ed effetto |
 | `S` / pulsante Skip | salta la ricompensa |
 | click / `1` `2` `3` nello shop | acquista una delle offerte disponibili |
 | click su carta posseduta | seleziona l'istanza da migliorare o rimuovere |

@@ -68,6 +68,25 @@ M1 e completata quando:
 Il contratto tecnico e lo stato dell'incremento sono descritti in
 [Room Generation](ROOM_GENERATION.md).
 
+### [x] M1A - Famiglie di stanze e placement tattico
+
+- quattro geometrie compatte: arena con pilastri, anello, cortili con due
+  passaggi e coperture asimmetriche;
+- varianti riproducibili dal seed, con spawn e uscita scelti dopo la geometria;
+- nessuna ripetizione della famiglia dell'ultima stanza effettivamente
+  installata, anche attraversando nodi speciali;
+- Archer vicino a coperture aggirabili, Brute con corsie di carica e coppie
+  degli incontri disposte secondo i rispettivi ruoli;
+- perimetro e accessi ai due cortili riservati durante il placement di ostacoli
+  e oggetti, con almeno una direzione iniziale di spinta libera per ogni barile;
+- verifica delle forme su 1536 layout, test dei due passaggi indipendenti e
+  4096 combinazioni di seed, profilo e famiglia precedente;
+- test del commit dello storico, del passaggio nei nodi speciali, del restart
+  e della riproducibilita di una rotta scelta.
+
+Il generatore generico conserva la modalita `Scattered`; la demo usa le quattro
+famiglie tattiche e non torna alla modalita casuale in caso di fallimento.
+
 ## [x] M2 - Economia del deck
 
 **Obiettivo:** rendere le carte una progressione con costi e scelte permanenti.
@@ -264,6 +283,36 @@ zone e ID del deck restano validi dopo ogni combinazione; la timeline mostra le
 mutazioni nello stesso ordine della simulazione; i nuovi effetti hanno test di
 composizione e casi limite.
 
+### [x] M4E - Reliquie della run
+
+- sei reliquie con sinergie per spinte, Exhaust, movimento, Poison, difesa e cure;
+- scelta iniziale e offerte dopo Elite e Claim al Treasure, senza duplicati;
+- inventario persistente fra nodi, limiti per combattimento e reset al restart;
+- offerte deterministiche e transazioni che conservano deck, ricompense e RNG;
+- schermata di scelta, shortcut, barra con descrizioni e due smoke grafici;
+- eventi normali per i bonus e replay esplicito del recupero di energia;
+- test delle giocate reali, della timeline e delle transizioni della run.
+
+Il catalogo e le regole sono in [Reliquie](RELICS.md).
+
+### [x] M4F - Spell, dadi e impatti condivisi
+
+- Fate Strike: RNG D6 dedicato, danno variabile e rimbalzo condizionale su 6;
+- Chain Lightning: tre bersagli distinti con distanza, LoS e ordine deterministici;
+- preview senza consumo di RNG, con tratto condizionale per il bonus del dado;
+- Firebomb con proiettile, impatto unico e footprint catturata nel log;
+- gruppi visivi espliciti per gli effetti diretti dell'area, seguiti dalle reazioni;
+- dado 3D su texture trasparente con risultato coerente con la simulazione;
+- clip PNG/GIF di lancio, impatto e cast/hit del player, con fallback procedurale;
+- arena `--spell-lab`, smoke grafici e test di RNG, replay, gruppi e risorse.
+- pool fino a tre D6 con mesh smussate, collisioni e rimbalzi fisici;
+- Sundering Blow con somma e spinta, Prismatic Barrage con successi e Shield,
+  Twin Venom con massimo e coppie; arena dedicata `--dice-lab`.
+
+Le regole e i comandi sono in [Spell e dadi](SPELLS.md). Ulteriori carte,
+evocazioni, aure, audio e animazioni dedicate agli altri personaggi restano
+incrementi successivi.
+
 ## [~] M5 - Encounter e boss
 
 **Obiettivo:** costruire combattimenti con cooperazione fra nemici e pressione
@@ -303,7 +352,7 @@ evocazione, controllo e ulteriori famiglie di elite e boss restano pianificati.
 stessa autorita geometrica delle carte e non dipendono dal renderer; simulazioni
 headless coprono morte, blocchi, spawn e cambi di fase senza deadlock o overflow.
 
-## [ ] M6 - Persistenza e game feel
+## [~] M6 - Persistenza e game feel
 
 **Obiettivo:** rendere la vertical slice riproducibile, diagnosticabile e
 presentabile senza accoppiare feedback e simulazione.
@@ -312,6 +361,19 @@ presentabile senza accoppiare feedback e simulazione.
 - replay deterministici basati sui comandi;
 - selettore del seed e strumenti di debug;
 - gruppi espliciti di cue, audio, particelle, hit stop e screen shake controllato.
+
+### [x] M6A - Sprite personalizzati
+
+- PNG statici, sprite sheet PNG e GIF per player, nemici e oggetti;
+- manifest opzionale con dimensioni, anchor, frame e FPS configurabili;
+- clock cosmetico separato dalla simulazione e fallback per tipo;
+- texture condivise, alpha picking e scaricamento delle risorse prima della finestra;
+- indicatori di gioco conservati sopra le immagini e smoke GPU con asset temporanei.
+
+La [guida agli sprite](SPRITES.md) descrive il formato e i limiti, incluso il
+timing uniforme delle GIF. Le illustrazioni definitive e le animazioni distinte
+per azione restano da aggiungere. M6 resta in corso per persistenza, replay e
+gli altri feedback pianificati.
 
 **Definition of Done:** un save completa il round trip senza perdere invarianti;
 un replay ricostruisce lo stesso stato finale; migrazioni e dati corrotti falliscono

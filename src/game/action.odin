@@ -89,6 +89,7 @@ Effect_Kind :: enum {
 	Draw_Cards,
 	Discard_Cards,
 	Create_Card,
+	Gain_Energy,
 }
 
 Effect :: struct {
@@ -132,6 +133,10 @@ heal_effect :: proc(target: Entity_Ref, amount: i32) -> Effect {
 
 gain_gold_effect :: proc(amount: i32) -> Effect {
 	return {kind = .Gain_Gold, target = PLAYER_ENTITY, amount = amount}
+}
+
+gain_energy_effect :: proc(amount: i32) -> Effect {
+	return {kind = .Gain_Energy, target = PLAYER_ENTITY, amount = amount}
 }
 
 draw_cards_effect :: proc(amount: i32) -> Effect {
@@ -199,6 +204,7 @@ add_reaction_binding_effect :: proc(
 
 Action :: struct {
 	kind:         Action_Kind,
+	visual_group: u32,
 	source:       Entity_Ref,
 	target:       Target,
 	target_rule:  Target_Rule,
@@ -398,6 +404,9 @@ effect_is_valid :: proc(room: ^Room, effect: Effect) -> bool {
 		return effect.amount > 0 && (effect.target.kind == .Player || effect.target.kind == .Enemy)
 	case .Gain_Gold:
 		return effect.amount > 0 && effect.target == PLAYER_ENTITY
+	case .Gain_Energy:
+		return effect.amount > 0 && effect.target == PLAYER_ENTITY && room.phase == .Combat &&
+		       room.player.deck.combat_active && room.player.deck.energy < room.player.deck.rules.max_energy
 	case .Move:
 		query := query_entity_movement(
 			room,
@@ -634,10 +643,22 @@ apply_effect :: proc(room: ^Room, source: Entity_Ref, effect: Effect, report: ^A
 			target = PLAYER_ENTITY,
 			amount = effect.amount,
 		})
+	case .Gain_Energy:
+		deck := &room.player.deck
+		restored := min(effect.amount, deck.rules.max_energy-deck.energy)
+		deck.energy += restored
+		record_report_event(report, {
+			kind = .Energy_Gained,
+			source = source,
+			target = PLAYER_ENTITY,
+			amount = restored,
+			energy = deck.energy,
+		})
 	case .Move:
 		apply_movement_effect(room, source, effect, report)
 	case .Apply_Status:
-		applied, _ := apply_status(room, effect.target, effect.status, effect.amount, effect.duration)
+		potency := relic_poison_potency(room, source, effect)
+		applied, _ := apply_status(room, effect.target, effect.status, potency, effect.duration)
 		assert(applied)
 		status, found := status_for_entity(room, effect.target, effect.status)
 		assert(found)
@@ -781,6 +802,12 @@ resolve_action_once :: proc(room: ^Room, action: ^Action) -> (report: Action_Rep
 		}
 		apply_effect(room, action.source, effect, &report)
 	}
+	if action.visual_group != 0 {
+		for &event in report.events.events[:report.events.count] {
+			event.visual_group = action.visual_group
+		}
+	}
+	apply_action_relics(room, action, &report)
 	report.combat_ended = initial_phase == .Combat && room.phase == .Loot
 	report.player_defeated = room.phase == .Defeat
 	return
@@ -790,6 +817,7 @@ resolve_action :: proc(room: ^Room, action: ^Action) -> (report: Action_Report) 
 	report = resolve_action_once(room, action)
 	if report.accepted {
 		dispatch_reactions(room, &report)
+		append_room_clear_relic(room, &report)
 		disarm_explosives_after_combat(room, &report.events)
 		disarm_room_modifier_after_combat(room)
 	}
