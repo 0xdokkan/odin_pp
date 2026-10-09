@@ -8,7 +8,7 @@ import level "level"
 import render "render"
 
 // Exercise the real controller and bounded presentation continuations. Idle
-// time keeps advancing while enemy or player animations are still visible;
+// time advances during enemy movement; card casts pause only enemy time;
 // there is no direct enemy/state advancement here.
 run_m7_timed_pulse_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer) -> bool {
 	rows := [?]string{
@@ -56,8 +56,8 @@ run_m7_timed_pulse_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer
 		{kind = .Play_Card, origin_phase = .Combat, card_id = guard,
 		 target = game.entity_target(game.PLAYER_ENTITY)}) { return false }
 	after_actions := f32(config.timer_seconds)-2-game.tactical_card_time_cost(.Guard)
-	if !m7_polish_check(player.position == data.player_spawn && player.tactical.remaining == after_actions &&
-		player.tactical.cycle == 0 && player.tactical.phase == .Decision && room.pulse_count == 3 &&
+	if !m7_polish_check(player.position == data.player_spawn && abs(player.tactical.remaining-after_actions) < 0.0001 &&
+		player.tactical.cycle == 0 && player.tactical.phase == .Decision && room.pulse_count == 2 &&
 		player.tactical.metrics.decisions == 3 && room.enemies[0].position != spawns[0].position &&
 		room.enemies[1].position == spawns[1].position,
 		"three commands did not share their countdown or advance enemy time") { return false }
@@ -70,16 +70,16 @@ run_m7_timed_pulse_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer
 	before_enemy := room.enemies[0].position
 	before_clock := player.tactical.metrics.decision_seconds
 	for _ in 0..<1200 {
-		if !m7_visual_frame(&probe, window, renderer, &room) { return false }
 		elapsed := player.tactical.metrics.decision_seconds-before_clock
 		dt := f32(min(f64(0.125), max(f64(0), 1.25-elapsed)))
+		if !m7_visual_frame(&probe, window, renderer, &room, dt = dt if dt > 0 else 1.0/60.0) { return false }
 		step_tactical_controller(&controller, &room, renderer, &cards, &buffer,
 			dt, true, {focused = true})
 		if elapsed >= 1.25 && !room.tactical_pulse.pending && !render.renderer_timeline_is_busy(renderer) { break }
 	}
-	if !m7_polish_check(player.tactical.remaining == after_actions-1.25 && room.pulse_count == 4 &&
-		player.position == data.player_spawn && room.enemies[0].position != before_enemy &&
-		room.enemies[1].position != spawns[1].position &&
+	if !m7_polish_check(abs(player.tactical.remaining-(after_actions-1.25)) < 0.0001 && room.pulse_count == 3 &&
+		player.position == data.player_spawn && room.enemies[0].position == before_enemy &&
+		room.enemies[1].position == spawns[1].position &&
 		controller.hologram && player.tactical.metrics.hologram_seconds == 1.25 &&
 		player.tactical.phase == .Decision && player.tactical.cycle == 0 && room.qte.kind == .None,
 		"hologram or idle time froze the enemy cadence or restarted the shared pulse") { return false }
@@ -92,7 +92,7 @@ run_m7_timed_pulse_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer
 			app.present(window, render.LETTERBOX_COLOR)
 		}
 		rl.TakeScreenshot("odin_pp_m7_timed_hologram.png")
-		fmt.printf("M7 timed pulse: 2 moves + Guard in one window; %.2fs -> %.2fs after 1.25s hologram; 4 world beats; independent enemy movement; timeline_errors=%d\n",
+		fmt.printf("M7 timed pulse: 2 moves + Guard in one window; %.2fs -> %.2fs after 1.25s hologram; 3 world beats; card cast freezes enemy rhythm; timeline_errors=%d\n",
 			after_actions, player.tactical.remaining, renderer.timeline.update_failures)
 	}
 	return renderer.timeline.update_failures == 0 && !room.tactical_pulse.pending

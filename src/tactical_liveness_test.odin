@@ -129,6 +129,9 @@ test_m7_controller_survives_terminal_recovery_and_defense_then_enters_next_room 
 		room, built := game.create_room(&data, &run.player, {enemies = enemies[:]})
 		testing.expect(t, built)
 		defer game.destroy_room(&room)
+		// This fixture specifically offers the first attack on the recovery
+		// beat; casts no longer advance the enemy's cooldown in M8.
+		if ending == .Recovery_Parry { room.enemies[0].tactical_cooldown = 1 }
 		renderer := new(render.Renderer)
 		defer free(renderer)
 		defer render.destroy_renderer_world_playback(renderer)

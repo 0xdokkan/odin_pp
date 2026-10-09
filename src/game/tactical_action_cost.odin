@@ -12,11 +12,11 @@ tactical_card_time_cost :: proc(id: Card_Id) -> f32 {
 	case .Guard, .Thorn_Coat, .Afterimage, .Counter_Rune, .Battle_Focus,
 	     .Calculated_Risk, .Spark_Forge, .Spark, .Purifying_Guard, .Volatile_Study:
 		return 1
-	case .Strike, .Arc_Bolt, .Shove, .Dash, .Grappling_Hook, .Venom_Needle, .Fate_Strike:
+	case .Strike, .Arc_Bolt, .Shove, .Dash, .Grappling_Hook, .Venom_Needle, .Fate_Strike, .Tesla_Coil:
 		return 2
-	case .Piercing_Ray, .Cross_Slash, .Heavy_Blow, .Sundering_Blow, .Twin_Venom:
+	case .Piercing_Ray, .Cross_Slash, .Heavy_Blow, .Sundering_Blow, .Twin_Venom, .Shock_Floor, .Titan_Grip:
 		return 3
-	case .Firebomb, .Toxic_Wave, .Caustic_Bloom, .Chain_Lightning, .Prismatic_Barrage:
+	case .Firebomb, .Toxic_Wave, .Caustic_Bloom, .Chain_Lightning, .Prismatic_Barrage, .Storm_Crown:
 		return 4
 	case .Count:
 		return 0

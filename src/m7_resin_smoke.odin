@@ -61,8 +61,12 @@ run_m7_resin_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer, dice
 		{kind = .Play_Card, origin_phase = .Combat, card_id = card_id, target = game.entity_target(game.enemy_entity(1))}) { return false }
 	committed_dice := run.player.dice
 	shots := 0
+	controller := Tactical_Controller{was_focused = true}
+	buffer: Buffered_Gameplay_Command
 	for _ in 0..<600 {
+		cast_dt := min(f32(1.0/30.0), run.player.tactical.cast_remaining)
 		render.update_renderer_frame_timeline(renderer, 1.0/30.0)
+		step_tactical_controller(&controller, &room, renderer, &cards, &buffer, cast_dt, true, {focused = true})
 		cue, found := render.active_presentation_cue(&renderer.timeline)
 		drawing := found && cue.started && cue.kind == .Dice_Rolled
 		overlay: app.Window_Overlay
@@ -78,7 +82,7 @@ run_m7_resin_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer, dice
 			rl.TakeScreenshot(fmt.ctprintf("odin_pp_m7_resin_dice_%d.png", shots))
 			shots += 1
 		}
-		if !render.renderer_timeline_is_busy(renderer) { break }
+		if !render.renderer_timeline_is_busy(renderer) && !game.tactical_is_casting(&room) { break }
 	}
-	return shots == 2 && run.player.dice == committed_dice && renderer.timeline.update_failures == 0
+	return shots == 2 && !game.tactical_is_casting(&room) && run.player.dice == committed_dice && renderer.timeline.update_failures == 0
 }

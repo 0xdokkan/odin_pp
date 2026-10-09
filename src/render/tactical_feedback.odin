@@ -37,7 +37,7 @@ tactical_feedback_pose :: proc(renderer: ^Renderer, key: Sprite_Key, position: v
 		if !exists || !actor.visible || actor.position != position { continue }
 		actor_key := Sprite_Key.Player if entity == game.PLAYER_ENTITY else sprite_key_for_enemy(actor.archetype)
 		if key != actor_key { continue }
-		p := presentation_cue_progress(cue)
+		p := comic_clip_progress(presentation_cue_progress(cue))
 		envelope := math.sin(p*math.PI)
 		if cue.kind == .Move {
 			result.lift = 0.095*envelope

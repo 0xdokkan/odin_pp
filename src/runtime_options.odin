@@ -10,6 +10,8 @@ Runtime_Options :: struct {
 	scene_3d: bool,
 	perspective: bool,
 	m7_smoke, m7_view_smoke: bool,
+	m8_view_smoke: bool,
+	arena_view_smoke: bool,
 	animation_speed: f32,
 	debug_abilities: bool,
 	playtest_output: string,
@@ -57,6 +59,9 @@ apply_runtime_option :: proc(options: ^Runtime_Options, argument: string) -> (ha
 	}
 	if argument == "--classic" { options.tactical.enabled = false; options.scene_3d = false; return true, true }
 	if argument == "--m7" { options.tactical.enabled = true; return true, true }
+	if argument == "--m8" { options.tactical.enabled = true; return true, true }
+	if argument == "--smoke-m8-view" { options.m8_view_smoke = true; return true, true }
+	if argument == "--smoke-arenas-view" { options.arena_view_smoke = true; return true, true }
 	if argument == "--flat" { options.scene_3d = false; return true, true }
 	if argument == "--perspective" { options.perspective = true; return true, true }
 	if argument == "--orthographic" { options.perspective = false; return true, true }

@@ -148,6 +148,7 @@ draw_relic_bar :: proc(renderer: ^Renderer, room: ^game.Room, point: view.Vec2, 
 	can_hover := mouse_inside && relic_bar_contains_point(renderer, room, point, raised_card_id)
 	if renderer.tactical.enabled {
 		bar := relic_bar_bounds(renderer, relics.count)
+		gothic_text(renderer,"PASSIVE",bar.x+bar.width+7,bar.y+4,10,GOTHIC_MUTED)
 		hovered: game.Relic_Id
 		for id, index in relics.owned[:relics.count] {
 			bounds := rl.Rectangle{bar.x+f32(index)*25, bar.y, 20, 20}

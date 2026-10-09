@@ -43,9 +43,10 @@ destroy_object_interaction_test_scene :: proc(scene: ^Object_Interaction_Test_Sc
 
 @(test)
 test_barrel_body_click_targets_its_cell_across_camera_zoom_and_pan :: proc(t: ^testing.T) {
-	scene: Object_Interaction_Test_Scene
-	init_object_interaction_test_scene(t, &scene)
-	defer destroy_object_interaction_test_scene(&scene)
+	scene := new(Object_Interaction_Test_Scene)
+	defer free(scene)
+	init_object_interaction_test_scene(t, scene)
+	defer destroy_object_interaction_test_scene(scene)
 	barrel := scene.room.objects[0]
 	zooms := [?]f32{0.35, 1, 2.4}
 	for zoom in zooms {
@@ -68,9 +69,10 @@ test_barrel_body_click_targets_its_cell_across_camera_zoom_and_pan :: proc(t: ^t
 
 @(test)
 test_object_picking_keeps_aoe_dash_and_opponent_only_card_geometry :: proc(t: ^testing.T) {
-	scene: Object_Interaction_Test_Scene
-	init_object_interaction_test_scene(t, &scene)
-	defer destroy_object_interaction_test_scene(&scene)
+	scene := new(Object_Interaction_Test_Scene)
+	defer free(scene)
+	init_object_interaction_test_scene(t, scene)
+	defer destroy_object_interaction_test_scene(scene)
 	center := cell_center(&scene.renderer, scene.room.objects[0].position)
 	point := view.Vec2{center.x, center.y-18}
 	floor := view.canvas_to_cell(&scene.renderer.camera, &scene.renderer.projection, point)
@@ -88,9 +90,10 @@ test_object_picking_keeps_aoe_dash_and_opponent_only_card_geometry :: proc(t: ^t
 
 @(test)
 test_bomb_under_enemy_does_not_steal_actor_targeting :: proc(t: ^testing.T) {
-	scene: Object_Interaction_Test_Scene
-	init_object_interaction_test_scene(t, &scene)
-	defer destroy_object_interaction_test_scene(&scene)
+	scene := new(Object_Interaction_Test_Scene)
+	defer free(scene)
+	init_object_interaction_test_scene(t, scene)
+	defer destroy_object_interaction_test_scene(scene)
 	scene.room.enemies[0].position = {2, 2}
 	scene.room.objects[0].kind = .Bomb
 	center := cell_center(&scene.renderer, scene.room.enemies[0].position)
@@ -111,9 +114,10 @@ test_bomb_under_enemy_does_not_steal_actor_targeting :: proc(t: ^testing.T) {
 
 @(test)
 test_shove_help_reports_diagonal_range_and_blocked_landing_without_mutating :: proc(t: ^testing.T) {
-	scene: Object_Interaction_Test_Scene
-	init_object_interaction_test_scene(t, &scene)
-	defer destroy_object_interaction_test_scene(&scene)
+	scene := new(Object_Interaction_Test_Scene)
+	defer free(scene)
+	init_object_interaction_test_scene(t, scene)
+	defer destroy_object_interaction_test_scene(scene)
 	barrel_id := scene.room.objects[0].id
 	before := scene.player.deck
 	hint, found := object_shove_hint(&scene.room, barrel_id, scene.shove.id)
@@ -145,9 +149,10 @@ test_shove_help_reports_diagonal_range_and_blocked_landing_without_mutating :: p
 test_barrel_click_shove_ignites_even_when_the_landing_is_blocked :: proc(t: ^testing.T) {
 	blocked_cases := [?]bool{false, true}
 	for blocked in blocked_cases {
-		scene: Object_Interaction_Test_Scene
-		init_object_interaction_test_scene(t, &scene)
-		defer destroy_object_interaction_test_scene(&scene)
+		scene := new(Object_Interaction_Test_Scene)
+	defer free(scene)
+		init_object_interaction_test_scene(t, scene)
+		defer destroy_object_interaction_test_scene(scene)
 		barrel_id := scene.room.objects[0].id
 		if blocked {
 			scene.room.enemies[0].position = {3, 2}
@@ -172,9 +177,10 @@ test_barrel_click_shove_ignites_even_when_the_landing_is_blocked :: proc(t: ^tes
 
 @(test)
 test_picking_and_preview_allow_armed_barrel_push_without_resetting_fuse :: proc(t: ^testing.T) {
-	scene: Object_Interaction_Test_Scene
-	init_object_interaction_test_scene(t, &scene)
-	defer destroy_object_interaction_test_scene(&scene)
+	scene := new(Object_Interaction_Test_Scene)
+	defer free(scene)
+	init_object_interaction_test_scene(t, scene)
+	defer destroy_object_interaction_test_scene(scene)
 	barrel_id := scene.room.objects[0].id
 	events: game.Event_Log
 	testing.expect(t, game.arm_explosive(&scene.room, barrel_id, game.PLAYER_ENTITY, &events))
@@ -207,9 +213,10 @@ test_ice_silhouette_and_bomb_circle_exclude_empty_bounding_box_corners :: proc(t
 
 @(test)
 test_low_zoom_square_corners_and_boss_shoulders_target_actor_over_northern_barrel :: proc(t: ^testing.T) {
-	scene: Object_Interaction_Test_Scene
-	init_object_interaction_test_scene(t, &scene)
-	defer destroy_object_interaction_test_scene(&scene)
+	scene := new(Object_Interaction_Test_Scene)
+	defer free(scene)
+	init_object_interaction_test_scene(t, scene)
+	defer destroy_object_interaction_test_scene(scene)
 	scene.renderer.camera.zoom = 0.35
 	scene.room.enemies[0].position = {2, 2}
 	scene.room.objects[0].position = {2, 1}

@@ -50,30 +50,14 @@ run_m7_rework_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer) -> 
 	for _ in 0..<3 { draw_m7_rework_probe(window, renderer, &room, 0, true) }
 	rl.TakeScreenshot("odin_pp_m7_rework_enemy.png")
 	cards: Card_Interaction_State
-	if !commit_gameplay_command(&room, renderer, &cards,
+	probe: M7_Visual_Probe
+	for capture in M7_Visual_Capture { probe.captured += {capture} }
+	if !m7_visual_command(&probe, window, renderer, &room, &cards,
 		{kind = .Play_Card, origin_phase = .Combat, card_id = heavy, target = game.entity_target(game.enemy_entity(1))}) { return false }
-	for _ in 0..<600 {
-		render.update_renderer_frame_timeline(renderer, 1.0/30.0)
-		draw_m7_rework_probe(window, renderer, &room)
-		if render.renderer_timeline_is_busy(renderer) { continue }
-		if !room.tactical_pulse.pending { break }
-		command := Gameplay_Command{kind = .Continue_Pulse, origin_phase = .Combat}
-		if room.qte.kind != .None { command.kind = .QTE_Fail }
-		if !commit_gameplay_command(&room, renderer, &cards, command) { return false }
-	}
-	if room.pulse_count != u64(game.tactical_card_time_cost(.Heavy_Blow)) || room.tactical_pulse.pending ||
+	if room.pulse_count != 0 || room.tactical_pulse.pending || game.tactical_is_casting(&room) ||
 	   room.enemies[0].health != 20 || player.health != player.stats.max_health { return false }
-	if !commit_gameplay_command(&room, renderer, &cards,
+	if !m7_visual_command(&probe, window, renderer, &room, &cards,
 		{kind = .Play_Card, origin_phase = .Combat, card_id = focus, target = game.entity_target(game.PLAYER_ENTITY)}) { return false }
-	for _ in 0..<300 {
-		render.update_renderer_frame_timeline(renderer, 1.0/30.0)
-		draw_m7_rework_probe(window, renderer, &room)
-		if render.renderer_timeline_is_busy(renderer) { continue }
-		if !room.tactical_pulse.pending { break }
-		command := Gameplay_Command{kind = .Continue_Pulse, origin_phase = .Combat}
-		if room.qte.kind != .None { command.kind = .QTE_Fail }
-		if !commit_gameplay_command(&room, renderer, &cards, command) { return false }
-	}
 	rl.TakeScreenshot("odin_pp_m7_rework_survey.png")
 	return !render.renderer_timeline_is_busy(renderer) && !room.tactical_pulse.pending && renderer.timeline.update_failures == 0 &&
 		game.tactical_cell_visible(&room, {1, 4})

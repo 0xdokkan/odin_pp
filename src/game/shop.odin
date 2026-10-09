@@ -106,7 +106,7 @@ build_shop_state_for_node :: proc(
 	}
 
 	choices: [SHOP_CARD_OFFER_COUNT]Card_Id
-	if !generate_weighted_card_choices(random_state, node, choices[:]) {
+	if !generate_weighted_card_choices(random_state, node, choices[:], &run.player.m8_profile) {
 		return {}, false
 	}
 	for choice, index in choices {

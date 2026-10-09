@@ -29,10 +29,14 @@ m7_polish_frame :: proc(window: ^app.Window, renderer: ^render.Renderer, room: ^
 
 m7_polish_settle :: proc(window: ^app.Window, renderer: ^render.Renderer,
 	room: ^game.Room, cards: ^Card_Interaction_State) -> bool {
+	controller := Tactical_Controller{was_focused = true}
+	buffer: Buffered_Gameplay_Command
 	for _ in 0..<1200 {
+		cast_dt := min(f32(1.0/60.0), room.player.tactical.cast_remaining)
 		m7_polish_frame(window, renderer, room)
+		if cast_dt > 0 { step_tactical_controller(&controller, room, renderer, cards, &buffer, cast_dt, true, {focused = true}) }
 		if !m7_polish_check(renderer.timeline.update_failures == 0, "timeline update failed") { return false }
-		if render.renderer_timeline_is_busy(renderer) { continue }
+		if render.renderer_timeline_is_busy(renderer) || game.tactical_is_casting(room) { continue }
 		// This archer is aiming at the cell that the player just left. A defense
 		// prompt here would mean the fixture no longer describes its own rules.
 		if !m7_polish_check(room.qte.kind == .None, "unexpected defense in aimed-shot fixture") { return false }

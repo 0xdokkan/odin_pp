@@ -18,6 +18,7 @@ tactical_hand_card_bounds :: proc(renderer: ^Renderer, index, count: int) -> rl.
 }
 
 gothic_card_accent :: proc(id: game.Card_Id) -> rl.Color {
+	if game.card_is_board_device(id) || id == .Storm_Crown { return {42, 93, 125, 255} }
 	switch gothic_card_icon(id) {
 	case 2, 7: return {72, 92, 42, 255}
 	case 4, 14: return {98, 57, 122, 255}
@@ -73,15 +74,24 @@ draw_tactical_card :: proc(renderer: ^Renderer, bounds: rl.Rectangle, card: game
 	icon_bounds := rl.Rectangle{x+40, y+36, width-56, 44}
 	shadow_bounds := icon_bounds
 	shadow_bounds.y += 2
-	gothic_atlas_icon(art.icons, art.icon_sources[icon], shadow_bounds, {37, 33, 29, 60})
-	gothic_atlas_icon(art.icons, art.icon_sources[icon], icon_bounds, rl.WHITE if available else rl.Color{135, 125, 118, 255})
+	if game.card_is_board_device(card.definition_id) {
+		draw_device_card_icon(card.definition_id, icon_bounds, accent)
+	} else {
+		gothic_atlas_icon(art.icons, art.icon_sources[icon], shadow_bounds, {37, 33, 29, 60})
+		gothic_atlas_icon(art.icons, art.icon_sources[icon], icon_bounds, rl.WHITE if available else rl.Color{135, 125, 118, 255})
+	}
 	// Time has a distinct blue badge, separated from the black energy socket.
 	// The crest stays clear even with the narrowest eight-card hand.
 	rl.DrawRectangleRec({x+8, y+42, 30, 17}, {22, 41, 54, 240})
 	gothic_text_fit(renderer, fmt.ctprintf("-%.0fs", game.tactical_card_time_cost(card.definition_id)), {x+11, y+43, 25, 15}, 12, GOTHIC_BLUE)
+	if game.card_is_board_device(card.definition_id) { gothic_text_fit(renderer,"ATTIVO",{x+8,y+63,32,12},9,accent) }
 	rl.DrawRectangleRec({x+10, y+83, width-20, 2}, accent)
 	rl.DrawRectangleRec({x+10, y+85, width-20, 1}, {251, 244, 223, 170})
 	first, second := gothic_card_lines(card, definition.tactical)
+	if width < 130 {
+		if card.definition_id == .Shock_Floor { first, second = "D4 COLPI + BERS.", fmt.ctprintf("%d DANNO / 3X3", game.card_effect_amount(definition.effects[0], card.upgrade_level)) }
+		if card.definition_id == .Tesla_Coil { first, second = fmt.ctprintf("%d / DIST. DANNI",game.card_effect_amount(definition.effects[0],card.upgrade_level)), "MAX 4 / ATTIVO" }
+	}
 	gothic_text_fit(renderer, first, {x+10, y+90, width-20, 18}, 14, ink)
 	gothic_text_fit(renderer, second, {x+10, y+109, width-20, 17}, 12, ink)
 	rl.DrawRectangleRec({x+9, y+130, width-18, 17}, {41, 42, 45, 24})
@@ -108,6 +118,7 @@ draw_tactical_card_inspector :: proc(renderer: ^Renderer, card: game.Card_Instan
 	if card.definition_id == .Afterimage { reaction = "IGNORA RECUPERO SCHIVA" }
 	if card.definition_id == .Prismatic_Barrage { reaction = "SCUDO PRIMA / 2s" }
 	if card.definition_id == .Twin_Venom { reaction = "VELENO: 2s" }
+	if game.card_is_board_device(card.definition_id) { reaction = "USA IL PULSANTE ATTIVA" }
 	if definition.tactical {
 		if card.definition_id == .Heavy_Blow { reaction = "SALTA AZIONE / RECUPERA 1s" }
 		if card.definition_id == .Strike { reaction = "PREMIA IL CONTRATTACCO" }
@@ -144,8 +155,9 @@ draw_tactical_hand :: proc(renderer: ^Renderer, room: ^game.Room,
 	if right-left < 640 { left = (renderer.canvas_width-640)*0.5; right = left+640 }
 	rl.DrawRectangleGradientV(0, c.int(top-14), c.int(renderer.canvas_width), c.int(TACTICAL_HAND_HEIGHT+14), {8, 13, 21, 0}, {8, 13, 21, 245})
 	gothic_text(renderer, fmt.ctprintf("ENERGIA %d/%d", deck.energy, deck.rules.max_energy), left+2, top+3, 14, GOTHIC_PAPER)
+	spacing := min(f32(15), f32(60)/f32(max(i32(1), deck.rules.max_energy)))
 	for energy in 0..<int(deck.rules.max_energy) {
-		gothic_inlay(left+110+f32(energy)*15, top+11, 4, GOTHIC_BLUE if energy < int(deck.energy) else GOTHIC_STEEL)
+		gothic_inlay(left+110+f32(energy)*spacing, top+11, min(f32(4),spacing*0.35), GOTHIC_BLUE if energy < int(deck.energy) else GOTHIC_STEEL)
 	}
 	gothic_text_fit(renderer, fmt.ctprintf("MAZZO %d / SCARTI %d / ESAURITE %d", deck.draw_count, deck.discard_count, deck.exhaust_count), {right-205, top+5, 205, 17}, 10, GOTHIC_MUTED)
 	hint: cstring = ""

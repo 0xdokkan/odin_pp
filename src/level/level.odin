@@ -20,6 +20,8 @@ Level :: struct {
 	tiles:            grid.Grid(Tile),
 	player_spawn:     grid.Position,
 	has_player_spawn: bool,
+	// Generated arena tier; zero also covers parsed maps and legacy rooms.
+	layout_complexity: int,
 }
 
 Parse_Error :: enum {
@@ -34,6 +36,7 @@ Parse_Error :: enum {
 Room_Generation_Config :: struct {
 	family:                   Room_Family,
 	central_spawn:            bool,
+	complexity:               int,
 	width, height:            int,
 	wall_density_percent:     int,
 	spawn_clearance_radius:   int,
@@ -336,6 +339,7 @@ anchor_pair_at :: proc(config: Room_Generation_Config, target_index: int) -> (Ro
 
 generation_config_is_valid :: proc(config: Room_Generation_Config) -> bool {
 	if !room_family_is_valid(config.family) ||
+	   config.complexity < 0 || config.complexity > 3 ||
 	   (config.family != .Scattered && (config.width < 13 || config.height < 9)) ||
 	   config.width < MIN_GENERATED_ROOM_DIMENSION ||
 	   config.height < MIN_GENERATED_ROOM_DIMENSION ||

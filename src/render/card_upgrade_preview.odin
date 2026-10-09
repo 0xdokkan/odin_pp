@@ -29,7 +29,7 @@ card_upgrade_preview :: proc(card: game.Card_Instance, tactical: bool = false) -
 		}
 		label := ""
 		switch template.kind {
-		case .Damage: label = "DAMAGE"
+		case .Damage, .Deploy_Device: label = "DAMAGE"
 		case .Heal: label = "HEAL"
 		case .Gain_Gold: label = "GOLD"
 		case .Gain_Energy: label = "ENERGY"

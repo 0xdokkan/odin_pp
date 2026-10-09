@@ -113,7 +113,7 @@ reaction_effect_template_is_valid :: proc(
 		return false
 	}
 	switch template.kind {
-	case .Move, .Gain_Energy, .Add_Reaction_Binding, .Draw_Cards, .Discard_Cards, .Create_Card:
+	case .Move, .Gain_Energy, .Deploy_Device, .Add_Reaction_Binding, .Draw_Cards, .Discard_Cards, .Create_Card:
 		return false
 	case .Remove_Status:
 		return true
@@ -344,13 +344,13 @@ build_reaction_effect :: proc(
 			return gain_gold_effect(amount), true
 		case .Apply_Status:
 			return apply_status_effect(target, template.status, amount, template.duration), true
-		case .Move, .Gain_Energy, .Remove_Status, .Add_Reaction_Binding,
+		case .Move, .Gain_Energy, .Deploy_Device, .Remove_Status, .Add_Reaction_Binding,
 		     .Draw_Cards, .Discard_Cards, .Create_Card:
 			unreachable()
 		}
 	case .Remove_Status:
 		return remove_status_effect(target, template.status), true
-	case .Move, .Gain_Energy, .Add_Reaction_Binding, .Draw_Cards, .Discard_Cards, .Create_Card:
+	case .Move, .Gain_Energy, .Deploy_Device, .Add_Reaction_Binding, .Draw_Cards, .Discard_Cards, .Create_Card:
 		return {}, false
 	}
 	return {}, false

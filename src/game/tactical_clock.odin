@@ -3,6 +3,17 @@ package game
 TACTICAL_WORLD_BEAT_SECONDS :: f32(1)
 TACTICAL_RECOVERY_SECONDS :: f32(1)
 
+tactical_is_casting :: proc(room: ^Room) -> bool {
+	return tactical_enabled(room) && room.phase == .Combat && room.player.tactical.cast_remaining > 0
+}
+
+tactical_begin_card_cast :: proc(room: ^Room, seconds: f32) {
+	if !tactical_enabled(room) || room.phase != .Combat || seconds <= 0 { return }
+	s := &room.player.tactical
+	s.cast_remaining, s.cast_duration = seconds, seconds
+	s.metrics.decisions += 1
+}
+
 // Each telegraph has a deadline of its own. Recovery and an already prepared
 // projectile advance faster than a fresh action; classic combat ignores this.
 tactical_enemy_intent_seconds :: proc(enemy: ^Enemy) -> f32 {
@@ -76,7 +87,7 @@ tactical_expire_window :: proc(room: ^Room) -> bool {
 	if !tactical_enabled(room) || room.phase != .Combat || room.tactical_pulse.pending ||
 	   room.qte.kind != .None || room.player.tactical.remaining > 0 { return false }
 	s := &room.player.tactical
-	if s.phase != .Decision || s.queued_beats > 0 { return false }
+	if s.phase != .Decision || s.queued_beats > 0 || s.cast_remaining > 0 { return false }
 	clear_event_log(&room.recent_events)
 	s.cycle = min(s.cycle, max(int)-1)+1
 	s.metrics.pauses += 1

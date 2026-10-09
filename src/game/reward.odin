@@ -74,6 +74,7 @@ begin_card_reward :: proc(run: ^Run_State) -> bool {
 		&staged_random_state,
 		node,
 		staged_reward.choices[:CARD_REWARD_CHOICE_COUNT],
+		&run.player.m8_profile,
 	) {
 		return false
 	}

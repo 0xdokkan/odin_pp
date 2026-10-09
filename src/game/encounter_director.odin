@@ -52,16 +52,32 @@ arrange_encounter_spawn_candidates :: proc(blueprint: ^Room_Blueprint, candidate
 	scores_b := make([]int, len(candidates))
 	defer delete(scores_a)
 	defer delete(scores_b)
+	// Only eight cells can form the required orthogonal distance-one/two pair.
+	// Index them once rather than comparing every pair in a large arena.
+	candidate_indices := make([]int, len(blueprint.level_data.tiles.cells))
+	defer delete(candidate_indices)
 	for candidate, index in candidates {
+		cell, valid := grid.index_of(&blueprint.level_data.tiles, candidate)
+		assert(valid)
+		candidate_indices[cell] = index+1
 		scores_a[index] = encounter_role_position_score(blueprint, required[0], candidate)
 		scores_b[index] = encounter_role_position_score(blueprint, required[1], candidate)
 	}
 	best_a, best_b, best_score := -1, -1, -100000
 	for a in 0..<len(candidates) {
-		for b in 0..<len(candidates) {
-			if !encounter_pair_has_clear_link(blueprint, candidates[a], candidates[b]) { continue }
-			score := scores_a[a]+scores_b[b]
-			if score > best_score { best_a, best_b, best_score = a, b, score }
+		for step in ([?]grid.Position{{0, -1}, {1, 0}, {0, 1}, {-1, 0}}) {
+			for distance in 1..=2 {
+				position := grid.Position{candidates[a].x+step.x*distance, candidates[a].y+step.y*distance}
+				cell, valid := grid.index_of(&blueprint.level_data.tiles, position)
+				if !valid || candidate_indices[cell] == 0 { continue }
+				b := candidate_indices[cell]-1
+				if !encounter_pair_has_clear_link(blueprint, candidates[a], candidates[b]) { continue }
+				score := scores_a[a]+scores_b[b]
+				// Preserve the original ascending a/b tie order and seeded layouts.
+				if score > best_score || (score == best_score && a == best_a && b < best_b) {
+					best_a, best_b, best_score = a, b, score
+				}
+			}
 		}
 	}
 	if best_a < 0 { return false }
@@ -85,6 +101,12 @@ validate_blueprint_encounter :: proc(blueprint: ^Room_Blueprint) -> bool {
 		if enemy.archetype == .Demolitionist && (blueprint.encounter_kind != .Demolitionist || index != 0) {
 			return false
 		}
+	}
+	roles, count := progressive_encounter_required_roles(blueprint)
+	for role in roles[:count] {
+		found := false
+		for enemy in blueprint.enemies { if enemy.archetype == role { found = true; break } }
+		if !found { return false }
 	}
 	if !encounter_pair_has_clear_link(blueprint, blueprint.enemies[0].position, blueprint.enemies[1].position) {
 		return false
@@ -154,6 +176,7 @@ arrange_role_spawn_candidate :: proc(blueprint: ^Room_Blueprint, candidates: []g
 	best, best_score := start, -100000
 	for index in start..<len(candidates) {
 		score := encounter_role_position_score(blueprint, archetype, candidates[index])
+		score += progressive_encounter_sector_score(blueprint, start, candidates[index])
 		for enemy in blueprint.enemies {
 			if grid_distance(enemy.position, candidates[index]) <= 1 { score -= 5 }
 		}

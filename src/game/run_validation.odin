@@ -8,6 +8,8 @@ validate_run_state :: proc(run: ^Run_State) -> bool {
 	   run.player.health > run.player.stats.max_health || run.player.gold < 0 ||
 	   !validate_deck_state(&run.player.deck) || !validate_relic_state(&run.player.relics) ||
 	   !validate_dice_state(&run.player.dice) || !validate_card_reward_state(run) ||
+	   !weapon_slot_valid(run.player.equipment.weapon) || !weapon_slot_valid(run.player.equipment.reserve) ||
+	   !m8_profile_valid(run.player.m8_profile) ||
 	   !validate_shop_state(run) || !validate_special_node_state(run) || !validate_run_relic_reward(run) {
 		return false
 	}

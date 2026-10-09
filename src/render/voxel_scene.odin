@@ -94,6 +94,8 @@ voxel_object_bounds :: proc(kind: game.Grid_Object_Kind, position: view.Vec2) ->
 	case .Barrel: width, height = 0.64, 0.76
 	case .Bomb: width, height = 0.46, 0.46
 	case .Fire: width, height = 0.64, 0.7
+	case .Shock_Floor: width, height = 0.88, 0.12
+	case .Tesla_Coil: width, height = 0.64, 1.18
 	case .Count:
 	}
 	p := rl.Vector3{position.x+0.5, 0.035, position.y+0.5}
@@ -106,6 +108,7 @@ draw_voxel_object :: proc(renderer: ^Renderer, object: Presentation_Grid_Object)
 	size := bounds.max-bounds.min
 	tint := GOTHIC_MUTED
 	switch object.kind {
+	case .Shock_Floor, .Tesla_Coil: draw_m8_device_object(renderer, object)
 	case .Ice_Block:
 		tint = {102, 151, 162, 255}
 		draw_resin_cube_v(renderer, p, size, tint)
@@ -177,6 +180,7 @@ draw_voxel_fog :: proc(renderer: ^Renderer, room: ^game.Room) {
 	if renderer.tactical.no_fog { return }
 	for y in 0..<room.level_data.tiles.height {
 		for x in 0..<room.level_data.tiles.width {
+			if !tactical_cell_on_screen(renderer, {x, y}) { continue }
 			if tactical_render_visible(renderer, {x, y}) { continue }
 			p := rl.Vector3{f32(x)+0.5, 0, f32(y)+0.5}
 			rl.DrawCube(p+rl.Vector3{0, -0.15, 0}, 1, 0.3, 1, {7, 10, 16, 255})

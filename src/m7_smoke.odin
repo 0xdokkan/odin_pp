@@ -97,6 +97,12 @@ m7_route_sample :: proc(seed: u64, tactical: bool) -> (sample: M7_Route_Sample, 
 					command.kind = .Defense
 					command.defense = .Parry if .Parry in room.qte.defenses else (.Deflect if .Deflect in room.qte.defenses else .Dodge)
 				} else { command.kind = .QTE_Key; command.direction = room.qte.keys[room.qte.progress] }
+			} else if game.tactical_is_casting(&room) {
+				// Headless routes have no rendered frames. Advance the real cast
+				// clock to its deadline, as below for recovery; counting 60 ticks
+				// per second exhausted the route budget in larger encounters.
+				game.tactical_tick(&room, run.player.tactical.cast_remaining, true, false)
+				continue
 			} else if room.tactical_pulse.pending {
 				command.kind = .Continue_Pulse
 			} else if room.phase == .Combat && tactical && run.player.tactical.phase == .Recovery {
@@ -137,6 +143,9 @@ m7_route_sample :: proc(seed: u64, tactical: bool) -> (sample: M7_Route_Sample, 
 			sample.commands += 1
 		}
 	}
+	fmt.eprintf("M7 route iteration budget exhausted: seed=%d tactical=%v nodes=%d commands=%d room=%v enemies=%d pulse=%d cast=%.3f remaining=%.3f position=%v\n",
+		seed, tactical, sample.nodes, sample.commands, room.phase, len(room.enemies), room.pulse_count,
+		run.player.tactical.cast_remaining, run.player.tactical.remaining, run.player.position)
 	return
 }
 

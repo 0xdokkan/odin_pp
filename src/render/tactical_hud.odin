@@ -81,6 +81,7 @@ draw_tactical_hud :: proc(renderer: ^Renderer, room: ^game.Room, paused, hologra
 	combat := renderer.tactical.snapshot.phase == .Combat
 	busy := renderer_blocks_player_input(renderer)
 	recovering := game.tactical_is_recovering(room)
+	cinematic := presentation_time_policy(&renderer.timeline) == .Cinematic
 	bounds := tactical_phase_bounds(renderer)
 	x, y, width := bounds.x, bounds.y, bounds.width
 	label: cstring = "AGISCI"
@@ -92,9 +93,10 @@ draw_tactical_hud :: proc(renderer: ^Renderer, room: ^game.Room, paused, hologra
 	if !combat { label = "ESPLORA" }
 	else if room.qte.kind != .None { label = "DIFESA" }
 	else if recovering { label = "RECUPERO" }
+	else if cinematic { label = "DADI" }
+	else if game.tactical_is_casting(room) { label = "LANCIO" }
 	else if busy { label = "AZIONE" }
-	// Player and world presentation do not suspend the pulse clock. QTEs
-	// retain their explicit defensive pause and expose the same time budget.
+	// The pulse continues during casting; cinematic dice and QTE own a full pause.
 	timed := combat
 	accent := GOTHIC_RED if timed && s.remaining <= 5 else GOTHIC_BLUE
 	if recovering { accent = {218, 169, 90, 255} }
@@ -114,6 +116,8 @@ draw_tactical_hud :: proc(renderer: ^Renderer, room: ^game.Room, paused, hologra
 	}
 	status := fmt.ctprintf("PASSO / ATTACCO -%.0fs / RECUPERO %.0fs", game.TACTICAL_MOVE_SECONDS, game.TACTICAL_RECOVERY_SECONDS)
 	if busy { status = "AZIONE / I NEMICI CONTINUANO" }
+	if game.tactical_is_casting(room) { status = fmt.ctprintf("LANCIO %.1fs / NEMICI SOSPESI", s.cast_remaining) }
+	if cinematic { status = "CINEMATICA / TEMPO SOSPESO" }
 	if recovering { status = "MUOVITI / CARTE E ATTACCHI IN RECUPERO" }
 	if room.qte.kind != .None { status = "QTE / TEMPO DEL PULSE SOSPESO" }
 	if !combat { status = "RACCOGLI IL BOTTINO / RAGGIUNGI L'USCITA" }
@@ -130,6 +134,7 @@ draw_tactical_hud :: proc(renderer: ^Renderer, room: ^game.Room, paused, hologra
 		if recovering { text = "SCHIVA: IN RECUPERO" }
 		gothic_text_fit(renderer, text, {renderer.canvas_width-149, 73, 135, 15}, 10, GOTHIC_BLUE if ready else GOTHIC_MUTED)
 	}
+	if !hologram { draw_m8_active_bar(renderer, room) }
 	if room.qte.kind != .None { draw_tactical_defense_hud(renderer, room) }
 	if paused {
 		rl.DrawRectangle(0, 0, c.int(renderer.canvas_width), c.int(renderer.canvas_height), {3, 7, 12, 185})

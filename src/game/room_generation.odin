@@ -14,6 +14,7 @@ MAX_ENEMY_BUDGET_COST   :: 3
 Encounter_Generation_Config :: struct {
 	enemy_budget:       int,
 	max_enemies:        int,
+	target_enemies:     int, // Zero retains the classic budget-driven roster.
 	trap_count:         int,
 	obstacle_count:     int,
 	object_count:       int,
@@ -68,6 +69,8 @@ derive_room_stream_seed :: proc(room_seed, salt: u64) -> u64 {
 valid_encounter_generation_config :: proc(config: Encounter_Generation_Config) -> bool {
 	return config.enemy_budget > 0 &&
 	       config.max_enemies > 0 && config.max_enemies <= MAX_ENEMIES_PER_ROOM &&
+	       config.target_enemies >= 0 && config.target_enemies <= config.max_enemies &&
+	       config.enemy_budget >= config.target_enemies &&
 	       config.enemy_budget <= config.max_enemies*MAX_ENEMY_BUDGET_COST &&
 	       config.trap_count >= 0 && config.trap_count <= MAX_GENERATED_TRAPS &&
 	       config.obstacle_count >= 0 && config.obstacle_count <= MAX_GENERATED_OBSTACLES &&
@@ -94,6 +97,7 @@ room_generation_profile :: proc(node: ^Run_Node, previous_family: level.Room_Fam
 		max_attempts = 64,
 	}
 	depth := node.depth
+	if tactical { depth = min(depth, MAX_RUN_MAP_LAYERS-1) }
 	switch node.kind {
 	case .Combat:
 		result.encounter_config = {
@@ -154,10 +158,12 @@ room_generation_profile :: proc(node: ^Run_Node, previous_family: level.Room_Fam
 		result.encounter_config.enemy_budget += 3
 		result.encounter_config.max_enemies = min(MAX_ENEMIES_PER_ROOM, result.encounter_config.max_enemies+2)
 		result.encounter_config.player_safe_radius = max(3, result.encounter_config.player_safe_radius)
+		configure_progressive_tactical_arena(&result, node)
 	}
 	result.level_config.family = room_family_for_node(node, previous_family)
 	result.level_config.exit_center_radius = result.level_config.width/2
-	if node.kind == .Combat && encounter_kind_for_node(node) == .Powder_Keg {
+	if node.kind == .Combat && encounter_kind_for_node(node) == .Powder_Keg &&
+	   result.encounter_config.target_enemies == 0 {
 		result.encounter_config.object_count = 4
 	}
 	return result, valid_encounter_generation_config(result.encounter_config)
@@ -309,6 +315,7 @@ enemy_archetype_budget_cost :: proc(archetype: Enemy_Archetype) -> int {
 random_feasible_archetype :: proc(
 	remaining_budget, remaining_slots: int,
 	generator: rand.Generator,
+	fill_all_slots: bool = false,
 ) -> (Enemy_Archetype, bool) {
 	if remaining_budget <= 0 || remaining_slots <= 0 {
 		return {}, false
@@ -324,6 +331,7 @@ random_feasible_archetype :: proc(
 		}
 		budget_after := remaining_budget-cost
 		slots_after := remaining_slots-1
+		if fill_all_slots && budget_after < slots_after { continue }
 		if budget_after > 0 && (slots_after <= 0 || budget_after > slots_after*MAX_ENEMY_BUDGET_COST) {
 			continue
 		}
@@ -407,6 +415,7 @@ validate_room_blueprint :: proc(blueprint: ^Room_Blueprint) -> bool {
 	config := blueprint.profile.encounter_config
 	player_spawn := blueprint.level_data.player_spawn
 	if len(blueprint.enemies) == 0 || len(blueprint.enemies) > config.max_enemies ||
+	   (config.target_enemies > 0 && len(blueprint.enemies) != config.target_enemies) ||
 	   len(blueprint.enemies) > MAX_ENEMIES_PER_ROOM || len(blueprint.traps) != config.trap_count ||
 	   len(blueprint.obstacles) != config.obstacle_count {
 		return false
@@ -530,7 +539,19 @@ generate_room_blueprint :: proc(node: ^Run_Node, previous_family: level.Room_Fam
 		enemy_archetype_count += 1
 		remaining_budget -= enemy_archetype_budget_cost(archetype)
 	}
-	if tactical {
+	if profile.encounter_config.target_enemies > 0 {
+		roles, count := progressive_encounter_required_roles(&result)
+		for archetype in roles[:count] {
+			already_present := false
+			for existing in enemy_archetypes[:enemy_archetype_count] {
+				if existing == archetype { already_present = true; break }
+			}
+			if already_present { continue }
+			enemy_archetypes[enemy_archetype_count] = archetype
+			enemy_archetype_count += 1
+			remaining_budget -= enemy_archetype_budget_cost(archetype)
+		}
+	} else if tactical {
 		// Two extra roles use the extra budget exactly. The remaining random
 		// roster keeps the classic seed stream and slot budget unchanged.
 		for archetype in ([?]Enemy_Archetype{.Chaser, .Archer}) {
@@ -545,6 +566,7 @@ generate_room_blueprint :: proc(node: ^Run_Node, previous_family: level.Room_Fam
 			remaining_budget,
 			remaining_slots,
 			generator,
+			profile.encounter_config.target_enemies > 0,
 		)
 		if !found {
 			destroy_room_blueprint(&result)

@@ -100,16 +100,16 @@ test_m7_card_commit_and_idle_clock_remain_live_during_enemy_presentation :: proc
 			"a legal card must commit while the enemy continues animating")
 		_, shielded := game.status_for_entity(&room, game.PLAYER_ENTITY, .Shield)
 		testing.expect(t, shielded && render.renderer_world_is_busy(renderer))
-		testing.expect_value(t, player.tactical.remaining, f32(17.9375)-game.tactical_card_time_cost(.Guard))
-		// Even the player's foreground card animation cannot pause enemy time.
-		// It reserves only the next player command, while its paid beat and the
-		// next quarter-second of real time continue in the world.
+		testing.expect_value(t, player.tactical.remaining, f32(17.9375))
+		// M8 casts reserve the player and freeze the enemy rhythm, while
+		// their cost is paid through the real pulse countdown exactly once.
 		testing.expect(t, render.renderer_blocks_player_input(renderer))
 		testing.expect(t, step_tactical_controller(&controller, &room, renderer, &cards, &buffer,
 			0.25, true, {focused = true}))
-		testing.expect_value(t, player.tactical.remaining, f32(17.6875)-game.tactical_card_time_cost(.Guard))
+		testing.expect_value(t, player.tactical.remaining, f32(17.6875))
 		testing.expect_value(t, player.tactical.metrics.decision_seconds, f64(2.3125))
-		testing.expect_value(t, room.pulse_count, u64(3))
+		testing.expect_value(t, room.pulse_count, u64(2))
+		testing.expect_value(t, player.tactical.cast_remaining, f32(0.75))
 		testing.expect_value(t, renderer.timeline.update_failures, 0)
 	}
 }
@@ -223,8 +223,7 @@ test_m7_new_defense_qte_does_not_reuse_the_same_frame_input_or_skip_paid_deadlin
 	cards: Card_Interaction_State
 	buffer: Buffered_Gameplay_Command
 	testing.expect(t, commit_gameplay_command(&room, renderer, &cards,
-		{kind = .Play_Card, origin_phase = .Combat, card_id = player.deck.hand[0].id,
-		 target = game.entity_target(game.PLAYER_ENTITY)}))
+		{kind = .Ability, origin_phase = .Combat, ability = .Guard}))
 	testing.expect(t, render.renderer_blocks_player_input(renderer))
 	input := Tactical_Controller_Input{focused = true, directions = {true, false, false, false}}
 	input.defenses[int(game.Defense_Mode.Parry)] = true

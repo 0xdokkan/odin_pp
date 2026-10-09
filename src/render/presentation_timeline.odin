@@ -6,7 +6,8 @@ import level "../level"
 import view "../view"
 
 MAX_PRESENTATION_CUES :: game.MAX_GAME_EVENTS
-MAX_PRESENTATION_LOOT :: game.MAX_ENEMIES_PER_ROOM*2
+// A defeated elite can drop gold, healing and a weapon together.
+MAX_PRESENTATION_LOOT :: game.MAX_ENEMIES_PER_ROOM*3
 MAX_PRESENTATION_TRAPS :: game.MAX_TRAPS_PER_ROOM
 MAX_PRESENTATION_GRID_OBJECTS :: game.MAX_GRID_OBJECTS_PER_ROOM
 
@@ -131,6 +132,7 @@ Presentation_Cue :: struct {
 }
 
 Presentation_Timeline :: struct {
+	card_cast: bool,
 	cues:           [MAX_PRESENTATION_CUES]Presentation_Cue,
 	head:           int,
 	count:          int,

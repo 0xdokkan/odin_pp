@@ -61,8 +61,8 @@ validate_dice_state :: proc(dice: ^Dice_State) -> bool {
 }
 
 // Call only on staged state. Preview and targeting never access this stream.
-roll_d6 :: proc(dice: ^Dice_State) -> (face: i32, ok: bool) {
-	if !validate_dice_state(dice) || dice.roll_count == max(u64) {
+roll_die :: proc(dice: ^Dice_State, sides: i32) -> (face: i32, ok: bool) {
+	if sides < 2 || sides > 20 || !validate_dice_state(dice) || dice.roll_count == max(u64) {
 		return 0, false
 	}
 	// Rejection sampling removes modulo bias; the counter counts dice, not samples.
@@ -73,9 +73,9 @@ roll_d6 :: proc(dice: ^Dice_State) -> (face: i32, ok: bool) {
 		value ~= value >> 27
 		dice.random_state = value
 		value *= 0x2545F4914F6CDD1D
-		if value < u64(4) { continue }
+		if value < (max(u64)%u64(sides)+1)%u64(sides) { continue }
 		dice.roll_count += 1
-		return i32(value%6)+1, true
+		return i32(value%u64(sides))+1, true
 	}
 }
 
@@ -96,4 +96,19 @@ roll_d6_pool :: proc(dice: ^Dice_State, count: int) -> (roll: Dice_Roll, ok: boo
 	}
 	dice^ = staged
 	return roll, true
+}
+
+
+card_dice_sides :: proc(card: Card_Id) -> i32 {
+	return 4 if card == .Shock_Floor else 6
+}
+
+roll_d6 :: proc(dice: ^Dice_State) -> (i32, bool) {
+	return roll_die(dice, 6)
+}
+
+roll_d4 :: proc(dice: ^Dice_State) -> (roll: Dice_Roll, ok: bool) {
+	face, rolled := roll_die(dice, 4)
+	if !rolled { return {}, false }
+	return {faces = {face, 0, 0}, total = face, count = 1}, true
 }

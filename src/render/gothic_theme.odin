@@ -218,9 +218,9 @@ gothic_card_icon :: proc(id: game.Card_Id) -> int {
 	case .Battle_Focus, .Calculated_Risk, .Volatile_Study: return 9
 	case .Spark_Forge, .Spark: return 10
 	case .Grappling_Hook: return 11
-	case .Heavy_Blow, .Sundering_Blow: return 12
+	case .Heavy_Blow, .Sundering_Blow, .Titan_Grip: return 12
 	case .Fate_Strike, .Prismatic_Barrage: return 13
-	case .Chain_Lightning: return 14
+	case .Chain_Lightning, .Tesla_Coil, .Shock_Floor, .Storm_Crown: return 14
 	case .Purifying_Guard: return 15
 	case .Count: return 0
 	}

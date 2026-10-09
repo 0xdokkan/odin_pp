@@ -52,6 +52,9 @@ tactical_test_room :: proc(t: ^testing.T, data: ^level.Level, player: ^Player, a
 
 drain_tactical_test_pulse :: proc(t: ^testing.T, room: ^Room, expire_window: bool = true) {
 	for _ in 0..<4000 {
+		if tactical_is_casting(room) {
+			tactical_tick(room, room.player.tactical.cast_remaining, true, false)
+		}
 		if room.qte.kind != .None { testing.expect(t, resolve_qte(room, false)) }
 		if !room.tactical_pulse.pending {
 			if expire_window && room.phase == .Combat && room.player.tactical.phase == .Decision && room.player.tactical.remaining <= 0 {
@@ -118,7 +121,7 @@ test_tactical_hologram_uses_clock_and_rejected_inputs_do_not_reset_it :: proc(t:
 }
 
 @(test)
-test_tactical_cards_refill_on_their_paid_world_beat_before_recovery :: proc(t: ^testing.T) {
+test_tactical_cards_refill_after_cast_without_advancing_world :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
 	room := tactical_test_room(t, &data, &player)
@@ -133,7 +136,7 @@ test_tactical_cards_refill_on_their_paid_world_beat_before_recovery :: proc(t: ^
 	testing.expect_value(t, play.result, Card_Play_Result.Played)
 	testing.expect_value(t, player.deck.hand_count, hand-1)
 	drain_tactical_test_pulse(t, &room)
-	testing.expect_value(t, room.pulse_count, u64(1))
+	testing.expect_value(t, room.pulse_count, u64(0))
 	testing.expect_value(t, player.deck.hand_count, hand)
 	testing.expect_value(t, player.tactical.phase, Tactical_Phase.Decision)
 	testing.expect(t, validate_deck_state(&player.deck))

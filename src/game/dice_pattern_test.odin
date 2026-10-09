@@ -81,7 +81,7 @@ test_dice_patterns_count_all_successes_pairs_and_reject_invalid_inputs :: proc(t
 	for id in 0..<int(Card_Id.Count) {
 		card_id := Card_Id(id)
 		expected := 0
-		if card_id == .Fate_Strike { expected = 1 }
+		if card_id == .Fate_Strike || card_id == .Shock_Floor { expected = 1 }
 		if card_id == .Sundering_Blow || card_id == .Twin_Venom { expected = 2 }
 		if card_id == .Prismatic_Barrage { expected = 3 }
 		testing.expect_value(t, card_dice_count(card_id), expected)
@@ -93,7 +93,7 @@ test_dice_patterns_count_all_successes_pairs_and_reject_invalid_inputs :: proc(t
 test_pattern_cards_are_append_only_collectible_and_pure_to_preview_at_max_upgrade :: proc(t: ^testing.T) {
 	testing.expect_value(t, int(Card_Id.Prismatic_Barrage), int(Card_Id.Sundering_Blow)+1)
 	testing.expect_value(t, int(Card_Id.Twin_Venom), int(Card_Id.Prismatic_Barrage)+1)
-	testing.expect_value(t, int(Card_Id.Twin_Venom), int(Card_Id.Count)-1)
+	testing.expect_value(t, int(Card_Id.Shock_Floor), int(Card_Id.Twin_Venom)+1)
 	for id in ([2]Card_Id{.Prismatic_Barrage, .Twin_Venom}) {
 		definition, found := card_definition_by_id(id)
 		testing.expect(t, found && validate_card_definition(&definition))

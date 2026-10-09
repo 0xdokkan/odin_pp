@@ -119,7 +119,8 @@ play_card :: proc(room: ^Room, card_id: u32, target: Target) -> (play: Card_Play
 		to_card_zone = play.destination,
 	})
 	apply_card_relics(room, play.destination, &play.action_report)
-	pulse_report, outcome := finish_player_combat_command(room, tactical_card_time_cost(play.card.definition_id))
+	// M8 pays the card's time through its cast. Classic still resolves a pulse.
+	pulse_report, outcome := finish_player_combat_command(room, 0)
 	play.pulse_report = pulse_report
 	switch outcome {
 	case .Player_Defeated:
@@ -134,6 +135,7 @@ play_card :: proc(room: ^Room, card_id: u32, target: Target) -> (play: Card_Play
 	}
 
 	if tactical_enabled(room) {
+		tactical_begin_card_cast(room, tactical_card_time_cost(play.card.definition_id))
 		room.tactical_pulse.deferred_draws += 1
 		play.result = .Played
 		play.energy_after = deck.energy

@@ -7,6 +7,10 @@
 
 # Build Odin
 /build/
+/odin_pp_m8_*.png
+/odin_pp_arenas_*.png
+/odin_pp_profile.json
+/odin_pp_profile.json.tmp
 *.bin
 *.o
 *.obj

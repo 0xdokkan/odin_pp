@@ -11,6 +11,7 @@ Gameplay_Command_Kind :: enum {
 	Ability,
 	Play_Card,
 	Refocus,
+	Activate, Equip,
 	Timeout, Continue_Pulse, Begin_Diagonal, QTE_Key, QTE_Fail, Defense,
 }
 
@@ -39,6 +40,10 @@ gameplay_command_is_valid :: proc(command: Gameplay_Command) -> bool {
 		return false
 	case .Move:
 		return command.origin_phase == .Combat || command.origin_phase == .Loot
+	case .Equip:
+		return command.origin_phase == .Combat || command.origin_phase == .Loot
+	case .Activate:
+		return command.origin_phase == .Combat
 	case .Dodge, .Wait, .Ability, .Play_Card, .Refocus, .Timeout, .Continue_Pulse, .Begin_Diagonal, .QTE_Key, .QTE_Fail, .Defense:
 		return command.origin_phase == .Combat
 	}

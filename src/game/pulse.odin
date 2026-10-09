@@ -134,6 +134,7 @@ advance_combat_pulse :: proc(room: ^Room) -> (pulse: Pulse_Report) {
 
 finish_combat_pulse :: proc(room: ^Room, pulse: ^Pulse_Report) {
 	pulse.advanced = true
+	if room.phase == .Combat { tick_board_devices(room, pulse) }
 	statuses_advanced := false
 	if room.phase == .Combat {
 		tick_all_statuses(room, pulse)
@@ -154,6 +155,7 @@ finish_combat_pulse :: proc(room: ^Room, pulse: ^Pulse_Report) {
 	room.pulse_count += 1
 	disarm_explosives_after_combat(room, &pulse.events)
 	disarm_room_modifier_after_combat(room)
+	disarm_board_devices_after_combat(room, &pulse.events)
 	if room.phase == .Combat {
 		plan_enemy_intents(room)
 	} else {

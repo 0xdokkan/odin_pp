@@ -29,7 +29,7 @@ update_window_dice_overlay :: proc(window: ^app.Window, state: ^Dice_Window_Over
 	area := window.viewport.destination
 	render.update_dice_pool_texture(state.renderer, state.roll, state.progress,
 		f32(rl.GetScreenWidth()), f32(rl.GetScreenHeight()),
-		{area.x, area.y, area.width, area.height}, state.seed)
+		{area.x, area.y, area.width, area.height}, state.seed, state.card)
 }
 
 draw_window_dice_overlay :: proc(window: ^app.Window, data: rawptr) {

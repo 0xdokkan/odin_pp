@@ -27,7 +27,7 @@ draw_tactical_ground_shadows :: proc(renderer: ^Renderer, room: ^game.Room) {
 	for y in 0..<room.level_data.tiles.height {
 		for x in 0..<room.level_data.tiles.width {
 			cell := grid.Position{x, y}
-			if !tactical_render_visible(renderer, cell) { continue }
+			if !tactical_cell_on_screen(renderer, cell) || !tactical_render_visible(renderer, cell) { continue }
 			tile, _ := level.tile_at(room.level_data, cell)
 			if tile.kind != .Floor && tile.kind != .Exit { continue }
 			for offset in ([2]grid.Position{{-1, 0}, {0, -1}}) {
@@ -47,6 +47,11 @@ draw_tactical_ground_shadows :: proc(renderer: ^Renderer, room: ^game.Room) {
 
 draw_tactical_loot :: proc(renderer: ^Renderer, item: Presentation_Loot) {
 	p := rl.Vector3{f32(item.position.x)+0.5, 0.13, f32(item.position.y)+0.5}
+	if item.kind == .Weapon {
+		draw_resin_cube(renderer,p+rl.Vector3{0,0.11,0},0.09,0.40,0.09,RESIN_WALL)
+		draw_resin_cube(renderer,p+rl.Vector3{0.12,0.34,0},0.35,0.22,0.08,GOTHIC_BLUE)
+		return
+	}
 	tint := rl.Color{210, 174, 79, 255} if item.kind == .Gold else rl.Color{112, 198, 177, 255}
 	draw_resin_cube(renderer, p, 0.23, 0.16, 0.23, tint)
 	draw_resin_cube(renderer, p+rl.Vector3{0, 0.1, 0}, 0.12, 0.06, 0.12, GOTHIC_PAPER)

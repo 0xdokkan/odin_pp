@@ -72,6 +72,9 @@ Renderer :: struct {
 	timeline: Presentation_Timeline,
 	world_playback: ^World_Playback,
 	playback_speed: f32,
+	frame_simulation_dt: f32,
+	frame_clock_valid: bool,
+	frame_had_cinematic: bool,
 	sprite_assets: Sprite_Assets,
 }
 
@@ -275,7 +278,7 @@ card_colors :: proc(id: game.Card_Id, affordable: bool) -> (fill, outline: rl.Co
 		fill, outline = rl.Color{27, 58, 65, 245}, rl.Color{80, 206, 213, 255}
 	case .Grappling_Hook:
 		fill, outline = rl.Color{48, 48, 54, 245}, rl.Color{187, 190, 197, 255}
-	case .Heavy_Blow:
+	case .Heavy_Blow, .Titan_Grip:
 		fill, outline = rl.Color{70, 36, 31, 245}, rl.Color{244, 126, 75, 255}
 	case .Venom_Needle:
 		fill, outline = rl.Color{27, 56, 50, 245}, rl.Color{126, 218, 132, 255}
@@ -287,7 +290,7 @@ card_colors :: proc(id: game.Card_Id, affordable: bool) -> (fill, outline: rl.Co
 		fill, outline = rl.Color{62, 36, 63, 245}, rl.Color{238, 133, 201, 255}
 	case .Fate_Strike:
 		fill, outline = rl.Color{61, 42, 77, 245}, rl.Color{230, 180, 255, 255}
-	case .Chain_Lightning:
+	case .Chain_Lightning, .Shock_Floor, .Tesla_Coil, .Storm_Crown:
 		fill, outline = rl.Color{25, 52, 73, 245}, rl.Color{119, 224, 255, 255}
 	case .Sundering_Blow:
 		fill, outline = rl.Color{74, 29, 34, 245}, rl.Color{245, 94, 100, 255}
@@ -363,6 +366,10 @@ card_detail_lines :: proc(card: game.Card_Instance) -> (first, second: cstring) 
 		return fmt.ctprintf("3D6: 4+ = %d DMG", 3+upgrade), "1-3: 1 SHIELD EACH"
 	case .Twin_Venom:
 		return fmt.ctprintf("HIGHER D6 +%d DMG", 1+upgrade), "2D6 / PAIR: POISON 2"
+	case .Shock_Floor: return "D4 SHOCKS / D4 TARGETS", "1 DMG / 3X3 / ACTIVE"
+	case .Tesla_Coil: return "8 / DISTANCE DAMAGE", "MAX 4 / ACTIVE DEVICE"
+	case .Titan_Grip: return fmt.ctprintf("%d DAMAGE / THROW 2", 3+upgrade), "INTERRUPT / STAGGER 1"
+	case .Storm_Crown: return fmt.ctprintf("%d DAMAGE EACH", 5+upgrade), "LEGENDARY / CHAIN 3"
 	case .Count:
 	}
 	return "", ""
@@ -431,6 +438,10 @@ card_short_name :: proc(id: game.Card_Id) -> cstring {
 		return "BARRAGE"
 	case .Twin_Venom:
 		return "VENOM"
+	case .Shock_Floor: return "FLOOR"
+	case .Tesla_Coil: return "TESLA"
+	case .Titan_Grip: return "TITAN"
+	case .Storm_Crown: return "CROWN"
 	case .Count:
 	}
 	return ""
@@ -451,6 +462,8 @@ draw_card_sigil :: proc(bounds: rl.Rectangle, id: game.Card_Id, color: rl.Color)
 	case .Strike:
 		rl.DrawLineEx({center.x-radius, center.y+radius}, {center.x+radius, center.y-radius}, 5, color)
 		rl.DrawLineEx({center.x-9, center.y-radius}, {center.x+radius, center.y+9}, 3, color)
+	case .Shock_Floor, .Tesla_Coil:
+		draw_device_card_icon(id, panel, color)
 	case .Arc_Bolt:
 		points := [?]rl.Vector2{
 			{center.x-16, center.y-18},
@@ -546,7 +559,7 @@ draw_card_sigil :: proc(bounds: rl.Rectangle, id: game.Card_Id, color: rl.Color)
 	case .Grappling_Hook:
 		rl.DrawCircleLinesV({center.x+10, center.y-9}, 8, color)
 		rl.DrawLineEx({center.x+5, center.y-3}, {center.x-13, center.y+15}, 4, color)
-	case .Heavy_Blow:
+	case .Heavy_Blow, .Titan_Grip:
 		rl.DrawRectangle(
 			c.int(center.x-15),
 			c.int(center.y-14),
@@ -596,7 +609,7 @@ draw_card_sigil :: proc(bounds: rl.Rectangle, id: game.Card_Id, color: rl.Color)
 		for delta in ([?]rl.Vector2{{-9, -9}, {9, -9}, {0, 0}, {-9, 9}, {9, 9}}) {
 			rl.DrawCircleV(center+delta, 3, color)
 		}
-	case .Chain_Lightning:
+	case .Chain_Lightning, .Storm_Crown:
 		points := [?]rl.Vector2{{center.x-25, center.y+10}, {center.x, center.y-12}, {center.x+25, center.y+6}}
 		for index in 0..<len(points) {
 			rl.DrawCircleLinesV(points[index], 6, color)
@@ -1358,6 +1371,7 @@ draw_enemy_body :: proc(
 }
 
 loot_colors :: proc(kind: game.Loot_Kind) -> (fill, outline: rl.Color) {
+	if kind == .Weapon { return GOTHIC_BLUE, GOTHIC_STEEL }
 	if kind == .Healing {
 		return rl.Color{74, 196, 133, 255}, rl.Color{27, 91, 61, 255}
 	}
@@ -1995,6 +2009,7 @@ draw_grid_object_body :: proc(
 ) {
 	assert(renderer != nil)
 	defer draw_grid_object_health(renderer, kind, center, health, max_health, opacity)
+	if game.board_device_kind(kind) { draw_device_card_icon(.Tesla_Coil if kind == .Tesla_Coil else .Shock_Floor, {center.x-18, center.y-36, 36, 40}, color_with_opacity(GOTHIC_BLUE, opacity)); return }
 	if kind == .Barrel || kind == .Bomb {
 		if draw_sprite_asset(&renderer.sprite_assets, sprite_key_for_object(kind), center, renderer.camera.zoom, opacity) { return }
 		draw_explosive_body(renderer, kind, center, opacity)

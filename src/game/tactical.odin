@@ -27,6 +27,8 @@ Tactical_State :: struct {
 	// Decision pressure belongs to the current room; metrics span the run.
 	budget, cycle: int,
 	remaining: f32,
+	// Casting spends pulse time gradually, without advancing the world clock.
+	cast_remaining, cast_duration: f32,
 	// World time advances in bounded one-second beats; animations never add time.
 	clock_fraction: f32,
 	queued_beats: int,
@@ -81,7 +83,7 @@ tactical_enabled :: proc(room: ^Room) -> bool {
 tactical_allows_action :: proc(room: ^Room) -> bool {
 	if !tactical_enabled(room) || room.phase != .Combat { return true }
 	s := &room.player.tactical
-	return !room.tactical_pulse.pending && room.qte.kind == .None && s.remaining > 0 &&
+	return !room.tactical_pulse.pending && room.qte.kind == .None && s.remaining > 0 && s.cast_remaining <= 0 &&
 	       s.phase == .Decision
 }
 
@@ -106,6 +108,7 @@ begin_tactical_room :: proc(room: ^Room) {
 	s.dodge_recovery = 0
 	s.clock_fraction = 0
 	s.queued_beats = 0
+	s.cast_remaining, s.cast_duration = 0, 0
 	for &enemy in room.enemies { enemy.tactical_cooldown = 0 }
 }
 
@@ -118,6 +121,7 @@ tactical_end_combat :: proc(room: ^Room) {
 	s.dodge_recovery = 0
 	s.clock_fraction = 0
 	s.queued_beats = 0
+	s.cast_remaining, s.cast_duration = 0, 0
 	room.tactical_pulse = {}
 	room.qte = {}
 }
@@ -138,6 +142,19 @@ tactical_tick :: proc(room: ^Room, dt: f32, available: bool, hologram: bool) -> 
 	   room.tactical_pulse.pending || room.qte.kind != .None { return false }
 	s := &room.player.tactical
 	if s.phase != .Decision && s.phase != .Recovery { return false }
+	if s.cast_remaining > 0 {
+		elapsed := min(max(f32(0), dt), s.cast_remaining)
+		s.cast_remaining = max(f32(0), s.cast_remaining-elapsed)
+		if s.cast_remaining < 0.00001 { s.cast_remaining = 0 }
+		charged := min(elapsed, s.remaining)
+		s.remaining = max(f32(0), s.remaining-charged)
+		if s.remaining < 0.00001 { s.remaining = 0 }
+		s.metrics.decision_seconds += f64(charged)
+		if s.cast_remaining == 0 { tactical_refill(room) }
+		// Remainder belongs to the next controller frame: no world catch-up
+		// after a cinematic or a long frame can surprise the player.
+		return s.cast_remaining == 0 && s.remaining == 0
+	}
 	// The final charged beat can finish on a zero-delta controller frame. A
 	// deadline already reached must still publish its explicit timeout command.
 	if s.remaining <= 0 {

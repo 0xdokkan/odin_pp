@@ -102,9 +102,15 @@ m7_visual_command :: proc(probe: ^M7_Visual_Probe, window: ^app.Window,
 	command: Gameplay_Command) -> bool {
 	if !m7_polish_check(commit_gameplay_command(room, renderer, cards, command),
 		"visual probe command rejected") { return false }
+	controller := Tactical_Controller{was_focused = true}
+	buffer: Buffered_Gameplay_Command
 	for _ in 0..<1200 {
+		cast_dt := min(f32(1.0/60.0), room.player.tactical.cast_remaining)
 		if !m7_visual_frame(probe, window, renderer, room) { return false }
-		if render.renderer_timeline_is_busy(renderer) { continue }
+		if cast_dt > 0 {
+			step_tactical_controller(&controller, room, renderer, cards, &buffer, cast_dt, true, {focused = true})
+		}
+		if render.renderer_timeline_is_busy(renderer) || game.tactical_is_casting(room) { continue }
 		if room.qte.kind != .None {
 			// An intentional failed defense exercises the enemy impact and shield
 			// pipeline. No direct health/status or presentation-event fabrication.
@@ -150,8 +156,8 @@ m7_visual_firebomb :: proc(probe: ^M7_Visual_Probe, window: ^app.Window,
 		 target = game.cell_target({8, 4})}) { return false }
 	return m7_polish_check(.Spell_Flight in probe.captured && .Spell_Impact in probe.captured &&
 		room.enemies[0].health < 20 && room.phase == .Combat &&
-		room.pulse_count == u64(game.tactical_card_time_cost(.Firebomb)) &&
-		player.tactical.remaining == f32(config.timer_seconds)-game.tactical_card_time_cost(.Firebomb) &&
+		room.pulse_count == 0 &&
+		abs(player.tactical.remaining-(f32(config.timer_seconds)-game.tactical_card_time_cost(.Firebomb))) < 0.0001 &&
 		room.qte.kind == .None && !room.tactical_pulse.pending,
 		"visual Firebomb did not render its real flight and impact")
 }
@@ -199,6 +205,9 @@ run_m7_visual_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer) -> 
 		 target = game.entity_target(game.enemy_entity(1))}) { return false }
 	if !m7_polish_check(room.enemies[0].health == 16 && .Interrupt in probe.captured &&
 		player.health == player.stats.max_health, "visual Heavy Blow did not interrupt the real attack") { return false }
+	// The cast freezes world beats: the first Wait now resolves the interrupt.
+	if !m7_visual_command(&probe, window, renderer, &room, &cards,
+		{kind = .Wait, origin_phase = .Combat}) { return false }
 	// Guard lasts two world seconds. Wait for the interrupted chaser to commit
 	// its next attack, then cover that deadline rather than its recovery idle.
 	for _ in 0..<8 {

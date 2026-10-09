@@ -124,7 +124,8 @@ draw_hologram_chrome :: proc(renderer: ^Renderer, room: ^game.Room) {
 	y := renderer.canvas_height-62
 	tactical_hud_panel({14, y, renderer.canvas_width-28, 48}, HOLOGRAM_EDGE)
 	p := renderer.tactical.snapshot.player.position
-	gothic_text(renderer, fmt.ctprintf("POSIZIONE %d,%d", int(p.x), int(p.y)), 26, y+9, 12, GOTHIC_PAPER)
+	gothic_text_fit(renderer, fmt.ctprintf("POS %d,%d / %dx%d", int(p.x), int(p.y), room.level_data.tiles.width, room.level_data.tiles.height),
+		{26, y+9, 152, 16}, 12, GOTHIC_PAPER)
 	gothic_text(renderer, "TRASCINA / ZOOM", 26, y+28, 10, GOTHIC_MUTED)
 	rl.DrawRectangleRec({188, y+9, 1, 30}, {51, 69, 88, 180})
 	labels := [?]cstring{"TU", "MELEE", "RANGED", "MINIBOSS", "BOSS", "USCITA"}
@@ -145,15 +146,17 @@ draw_hologram :: proc(renderer: ^Renderer, room: ^game.Room) {
 	if surface { rl.EndMode2D() }
 	orbit := &renderer.tactical.hologram_orbit
 	if !orbit.initialized { reset_tactical_orbit(orbit) }
-	w, h := f32(room.level_data.tiles.width), f32(room.level_data.tiles.height)
-	view_orbit := orbit^
-	view_orbit.distance *= max(w, h)/5.8
-	camera := tactical_orbit_camera(view_orbit, {w*0.5, 0, h*0.5}, true)
+	camera := tactical_hologram_camera(renderer, room.level_data.tiles.width, room.level_data.tiles.height, orbit^)
 	// Reuse the actual actor art and alpha sorting with the map camera. These
 	// view-only overrides must never leak into world picking or combat fog.
 	previous_camera, previous_no_fog := renderer.tactical.camera, renderer.tactical.no_fog
+	previous_outline := renderer.tactical.outline_mode
+	renderer.tactical.outline_mode = .Hologram
 	renderer.tactical.camera, renderer.tactical.no_fog = camera, true
-	defer { renderer.tactical.camera, renderer.tactical.no_fog = previous_camera, previous_no_fog }
+	defer {
+		renderer.tactical.camera, renderer.tactical.no_fog = previous_camera, previous_no_fog
+		renderer.tactical.outline_mode = previous_outline
+	}
 	viewport := tactical_map_drag_bounds(renderer)
 	if surface { viewport.x *= 2; viewport.y *= 2; viewport.width *= 2; viewport.height *= 2 }
 	rl.BeginScissorMode(c.int(viewport.x), c.int(viewport.y), c.int(viewport.width), c.int(viewport.height))

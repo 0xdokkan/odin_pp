@@ -53,11 +53,15 @@ Card_Id :: enum {
 	Sundering_Blow,
 	Prismatic_Barrage,
 	Twin_Venom,
+	Shock_Floor,
+	Tesla_Coil,
+	Titan_Grip,
+	Storm_Crown,
 	Count,
 }
 
 card_dice_count :: proc(id: Card_Id) -> int {
-	if id == .Fate_Strike { return 1 }
+	if id == .Fate_Strike || id == .Shock_Floor { return 1 }
 	if id == .Sundering_Blow || id == .Twin_Venom { return 2 }
 	if id == .Prismatic_Barrage { return 3 }
 	return 0
@@ -107,6 +111,7 @@ Card_Effect_Template :: struct {
 	movement:           Card_Movement_Kind,
 	movement_distance:  int,
 	affects_objects:    bool,
+	object_kind:        Grid_Object_Kind,
 }
 
 Card_Definition :: struct {
@@ -808,6 +813,37 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 		},
 		effect_count = 2,
 	},
+	{
+		id = .Shock_Floor, name = "Shock Floor", rarity = .Uncommon,
+		reward_weight = 85, shop_base_price = 6, cost = 2,
+		targeting = {rule = .Walkable_Cell, cast_range = {.Chebyshev, 1, 3}, shape = .Single, requires_line_of_sight = true, stops_on_wall = true},
+		effects = {{kind = .Deploy_Device, target = .Player, base_amount = 1, amount_per_upgrade = 1, object_kind = .Shock_Floor}, {}, {}, {}},
+		effect_count = 1,
+	},
+	{
+		id = .Tesla_Coil, name = "Tesla Coil", rarity = .Uncommon,
+		reward_weight = 90, shop_base_price = 5, cost = 1,
+		targeting = {rule = .Walkable_Cell, cast_range = {.Chebyshev, 1, 3}, shape = .Single, requires_line_of_sight = true, stops_on_wall = true},
+		effects = {{kind = .Deploy_Device, target = .Player, base_amount = 8, amount_per_upgrade = 1, object_kind = .Tesla_Coil}, {}, {}, {}},
+		effect_count = 1,
+	},
+	{
+		id = .Titan_Grip, name = "Titan Grip", rarity = .Rare,
+		reward_weight = 65, shop_base_price = 9, cost = 2,
+		targeting = {rule = .Opponent, cast_range = {.Manhattan, 1, 1}, shape = .Single},
+		effects = {
+			{kind = .Damage, target = .Chosen_Entity, base_amount = 3, amount_per_upgrade = 1},
+			{kind = .Move, target = .Chosen_Entity, movement = .Away_From_Player, movement_distance = 2},
+			{kind = .Apply_Status, target = .Chosen_Entity, base_amount = 1, status = .Stagger, duration = 1}, {},
+		}, effect_count = 3,
+	},
+	{
+		id = .Storm_Crown, name = "Storm Crown", rarity = .Rare,
+		reward_weight = 35, shop_base_price = 12, cost = 3,
+		targeting = {rule = .Opponent, cast_range = {.Manhattan, 1, 4}, shape = .Single, requires_line_of_sight = true, stops_on_wall = true},
+		effects = {{kind = .Damage, target = .Chosen_Entity, base_amount = 5, amount_per_upgrade = 1}, {}, {}, {}},
+		effect_count = 1,
+	},
 }
 
 card_drop_target :: proc(
@@ -887,6 +923,9 @@ card_effect_template_is_valid :: proc(
 	}
 
 	switch template.kind {
+	case .Deploy_Device:
+		return template.target == .Player && definition.targeting.rule == .Walkable_Cell &&
+		       board_device_kind(template.object_kind) && card_amount_template_is_valid(template)
 	case .Gain_Energy:
 		return false
 	case .Move:
@@ -1080,8 +1119,10 @@ instantiate_card_effect :: proc(
 			template.priority_modifier,
 			{kind = .Card, id = instance.id},
 		), true
+	case .Deploy_Device:
+		return deploy_device_effect(template.object_kind, {}, card_effect_amount(template, instance.upgrade_level)), true
 	case .Move, .Gain_Energy:
-		return {}, false
+			return {}, false
 	}
 	return {}, false
 }
@@ -1262,6 +1303,11 @@ evaluate_card_targeting :: proc(
 		return
 	}
 
+	if card_is_board_device(instance.definition_id) && !board_device_can_deploy(room, definition.effects[0].object_kind, evaluation.query.anchor) {
+		evaluation.error = .Target_Blocked
+		return
+	}
+
 	if tactical_enabled(room) {
 		visible_cells := 0
 		for cell in evaluation.query.affected.cells[:evaluation.query.affected.count] {
@@ -1383,7 +1429,7 @@ compile_card_action :: proc(
 	}
 
 	action = make_action(.Card, PLAYER_ENTITY, target, definition.targeting.rule)
-	if instance.definition_id == .Chain_Lightning {
+	if instance.definition_id == .Chain_Lightning || instance.definition_id == .Storm_Crown {
 		path := query_spell_path(room, instance, target)
 		if path.error != .None { return {}, path.error }
 		for entity in path.targets[:path.count] {
@@ -1459,6 +1505,7 @@ compile_card_action :: proc(
 		effect_target, has_target := card_effect_target(template.target, target)
 		assert(has_target)
 		effect, instantiated := instantiate_card_effect(template, effect_target, instance)
+		if effect.kind == .Deploy_Device { effect.destination = evaluation.query.anchor }
 		if instance.definition_id == .Strike && effect.kind == .Damage { effect.amount += tactical_strike_bonus(room, effect_target) }
 		if !instantiated {
 			return {}, .Invalid_Definition

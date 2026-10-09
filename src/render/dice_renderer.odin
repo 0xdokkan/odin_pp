@@ -170,7 +170,7 @@ draw_dice_shadow :: proc(position: rl.Vector3) {
 
 // One transparent scene for the complete pool. Call before drawing app canvas.
 update_dice_pool_texture :: proc(renderer: ^Dice_Renderer, roll: game.Dice_Roll, progress: f32,
-	window_width, window_height: f32, game_area: rl.Rectangle = {}, seed: u64 = 1) {
+	window_width, window_height: f32, game_area: rl.Rectangle = {}, seed: u64 = 1, card: game.Card_Id = .Count) {
 	if renderer == nil || !dice_pool_roll_valid(roll) {return}
 	layout := dice_pool_layout(window_width, window_height, game_area)
 	if !layout.valid {return}
@@ -200,7 +200,9 @@ update_dice_pool_texture :: proc(renderer: ^Dice_Renderer, roll: game.Dice_Roll,
 		rl.BeginShaderMode(v.light_shader)
 	}
 	for index in 0..<roll.count {
-		draw_dice_mesh(&renderer.mesh, renderer.frame.positions[index], renderer.frame.orientations[index], &renderer.numbering[index], resin)
+		if game.card_dice_sides(card) == 4 {
+			draw_d4_mesh(renderer.frame.positions[index]-rl.Vector3{0,0.18,0},progress,roll.faces[index])
+		} else { draw_dice_mesh(&renderer.mesh, renderer.frame.positions[index], renderer.frame.orientations[index], &renderer.numbering[index], resin) }
 	}
 	if resin { rl.EndShaderMode() }
 	rl.EndMode3D()
@@ -343,14 +345,16 @@ draw_dice_pool_total :: proc(renderer: ^Dice_Renderer, layout: Dice_Pool_Layout,
 	}
 }
 
-draw_dice_pool_fallback :: proc(renderer: ^Dice_Renderer, layout: Dice_Pool_Layout, roll: game.Dice_Roll) {
+draw_dice_pool_fallback :: proc(renderer: ^Dice_Renderer, layout: Dice_Pool_Layout, roll: game.Dice_Roll, card: game.Card_Id = .Count) {
 	for index in 0..<roll.count {
 		position := rl.Vector3{(f32(index)-f32(roll.count-1)*0.5)*1.25, 0.5, 0}
 		if renderer != nil && renderer.has_throw {position = renderer.frame.positions[index]}
 		center := dice_world_to_window(layout, position)
 		side := layout.pixels_per_world
 		bounds := rl.Rectangle{center.x-side*0.5, center.y-side*0.5, side, side}
-		rl.DrawRectangleRounded(bounds, 0.18, 6, DICE_BODY_COLOR)
+		if game.card_dice_sides(card) == 4 {
+			rl.DrawTriangle(center+rl.Vector2{0,-side*0.6}, center+rl.Vector2{-side*0.55,side*0.35}, center+rl.Vector2{side*0.55,side*0.35}, DICE_BODY_COLOR)
+		} else { rl.DrawRectangleRounded(bounds, 0.18, 6, DICE_BODY_COLOR) }
 		pips, count := dice_pip_positions(roll.faces[index])
 		for pip in pips[:count] {rl.DrawCircleV(center+pip*side, side*0.068, DICE_PIP_COLOR)}
 	}
@@ -368,8 +372,9 @@ draw_dice_pool_overlay :: proc(renderer: ^Dice_Renderer, roll: game.Dice_Roll, p
 			{0, 0, f32(renderer.texture.texture.width), -f32(renderer.texture.texture.height)},
 			{0, 0, window_width, window_height}, {}, 0, rl.WHITE)
 		rl.EndBlendMode()
-	} else {draw_dice_pool_fallback(renderer, layout, roll)}
+	} else {draw_dice_pool_fallback(renderer, layout, roll, card)}
 	if roll.count > 1 {draw_dice_pool_total(renderer, layout, roll, progress, card)}
+	if game.card_dice_sides(card) == 4 { draw_d4_result_label(renderer,layout,progress,roll.total) }
 }
 
 update_dice_texture :: proc(renderer: ^Dice_Renderer, face: i32, progress: f32) {

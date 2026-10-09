@@ -16,7 +16,7 @@ Spell_Path :: struct {
 // a later committed six; querying or compiling never rolls the die.
 query_spell_path :: proc(room: ^Room, instance: Card_Instance, target: Target) -> (path: Spell_Path) {
 	path.error = .Invalid_Target
-	if instance.definition_id != .Fate_Strike && instance.definition_id != .Chain_Lightning &&
+	if instance.definition_id != .Fate_Strike && instance.definition_id != .Chain_Lightning && instance.definition_id != .Storm_Crown &&
 	   instance.definition_id != .Sundering_Blow && instance.definition_id != .Prismatic_Barrage &&
 	   instance.definition_id != .Twin_Venom {
 		return
@@ -40,7 +40,7 @@ query_spell_path :: proc(room: ^Room, instance: Card_Instance, target: Target) -
 	path.targets[0] = target.entity
 	path.positions[0] = evaluation.query.anchor
 	path.count = 1
-	if instance.definition_id != .Fate_Strike && instance.definition_id != .Chain_Lightning { return }
+	if instance.definition_id != .Fate_Strike && instance.definition_id != .Chain_Lightning && instance.definition_id != .Storm_Crown { return }
 	maximum := 2 if instance.definition_id == .Fate_Strike else MAX_SPELL_TARGETS
 	for path.count < maximum {
 		origin := path.positions[path.count-1]
@@ -201,6 +201,9 @@ resolve_played_card_action :: proc(
 	if room == nil || room.player == nil || compiled == nil || room.phase != .Combat {
 		return
 	}
+	if card_is_board_device(instance.definition_id) {
+		return resolve_board_device_card(room, instance, target, compiled)
+	}
 	if instance.definition_id == .Sundering_Blow {
 		return resolve_sundering_blow(room, instance, target, compiled)
 	}
@@ -225,7 +228,7 @@ resolve_played_card_action :: proc(
 		merge_spell_hit_report(&report, &hit)
 		return
 	}
-	if instance.definition_id != .Fate_Strike && instance.definition_id != .Chain_Lightning {
+	if instance.definition_id != .Fate_Strike && instance.definition_id != .Chain_Lightning && instance.definition_id != .Storm_Crown {
 		return resolve_action(room, compiled)
 	}
 	path := query_spell_path(room, instance, target)
@@ -246,6 +249,7 @@ resolve_played_card_action :: proc(
 			break
 		}
 		damage := i32(3)+instance.upgrade_level
+		if instance.definition_id == .Storm_Crown { damage = 5+instance.upgrade_level }
 		if instance.definition_id == .Fate_Strike && index == 0 {
 			damage = 2+instance.upgrade_level+roll.total
 		}

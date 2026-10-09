@@ -56,9 +56,9 @@ card_rarity_weight :: proc(weights: Card_Rarity_Weights, rarity: Card_Rarity) ->
 	return 0
 }
 
-card_offer_weight :: proc(definition: Card_Definition, node: ^Run_Node) -> u64 {
+card_offer_weight :: proc(definition: Card_Definition, node: ^Run_Node, profile: ^M8_Profile = nil) -> u64 {
 	validated_definition := definition
-	if node == nil || !validate_card_definition(&validated_definition) || definition.temporary_only {
+	if node == nil || !validate_card_definition(&validated_definition) || definition.temporary_only || !m8_card_unlocked(definition.id, profile) {
 		return 0
 	}
 	weights, ok := card_rarity_weights(node.kind, node.depth)
@@ -83,6 +83,7 @@ generate_weighted_card_choices :: proc(
 	random_state: ^u64,
 	node: ^Run_Node,
 	destination: []Card_Id,
+	profile: ^M8_Profile = nil,
 ) -> bool {
 	if random_state == nil || random_state^ == 0 || node == nil || node.depth < 0 ||
 	   len(destination) <= 0 || len(destination) > int(Card_Id.Count) {
@@ -90,7 +91,7 @@ generate_weighted_card_choices :: proc(
 	}
 	collectible_count := 0
 	for definition in CARD_DEFINITIONS {
-		if card_offer_weight(definition, node) > 0 {
+		if card_offer_weight(definition, node, profile) > 0 {
 			collectible_count += 1
 		}
 	}
@@ -105,7 +106,7 @@ generate_weighted_card_choices :: proc(
 		total_weight: u64
 		for definition in CARD_DEFINITIONS {
 			if !selected[int(definition.id)] {
-				total_weight += card_offer_weight(definition, node)
+				total_weight += card_offer_weight(definition, node, profile)
 			}
 		}
 		if total_weight == 0 {
@@ -118,7 +119,7 @@ generate_weighted_card_choices :: proc(
 			if selected[int(definition.id)] {
 				continue
 			}
-			weight := card_offer_weight(definition, node)
+			weight := card_offer_weight(definition, node, profile)
 			if roll < weight {
 				chosen = definition.id
 				break

@@ -44,6 +44,8 @@ Player :: struct {
 	relics:   Relic_State,
 	dice:     Dice_State,
 	tactical: Tactical_State,
+	equipment: Equipment_State,
+	m8_profile: M8_Profile,
 }
 
 create_player :: proc(stats: Player_Stats) -> (Player, bool) {
@@ -126,12 +128,14 @@ Obstacle :: struct {
 Loot_Kind :: enum {
 	Gold,
 	Healing,
+	Weapon,
 }
 
 Loot :: struct {
 	position: grid.Position,
 	kind:     Loot_Kind,
 	amount:   i32,
+	weapon_id: Weapon_Id,
 }
 
 Enemy_Spawn :: struct {
@@ -191,6 +195,7 @@ Room :: struct {
 	tactical_pulse: Tactical_Pulse,
 	qte: QTE_State,
 	reaction_bindings: Reaction_Binding_Set,
+	ring_challenge_attempted: bool,
 }
 
 Move_Direction :: enum {
@@ -398,7 +403,8 @@ create_room :: proc(level_data: ^level.Level, player: ^Player, content: Room_Con
 	if player.stats.max_health <= 0 || player.health <= 0 || player.health > player.stats.max_health ||
 	   player.stats.attack <= 0 || player.stats.defense < 0 ||
 	   player.gold < 0 || !validate_deck_state(&player.deck) || !validate_relic_state(&player.relics) ||
-	   !validate_dice_state(&player.dice) {
+	   !validate_dice_state(&player.dice) || !weapon_slot_valid(player.equipment.weapon) ||
+	   !weapon_slot_valid(player.equipment.reserve) || !m8_profile_valid(player.m8_profile) {
 		return {}, false
 	}
 
@@ -423,6 +429,7 @@ create_room :: proc(level_data: ^level.Level, player: ^Player, content: Room_Con
 	result.objects = make([dynamic]Grid_Object, 0, MAX_GRID_OBJECTS_PER_ROOM)
 	loot_capacity := len(content.enemies)
 	for spawn in content.enemies {
+		if tactical_enabled(&result) && spawn.archetype == .Brute { loot_capacity += 1 }
 		if spawn.drops_healing {
 			loot_capacity += 1
 		}
@@ -567,6 +574,18 @@ collect_loot_in_magnet_range :: proc(room: ^Room) -> (collected: int) {
 			continue
 		}
 
+		if item.kind == .Weapon {
+			if collect_weapon(room.player, item.weapon_id, item.amount) {
+				record_event(&room.recent_events, {
+					kind = .Loot_Collected, source = PLAYER_ENTITY, target = PLAYER_ENTITY,
+					amount = item.amount, from_position = item.position, to_position = room.player.position, loot_kind = .Weapon,
+				})
+				unordered_remove(&room.loot, index)
+				collected += 1
+			} else { index += 1 }
+			continue
+		}
+
 		action := make_action(.Collect, PLAYER_ENTITY, entity_target(PLAYER_ENTITY), .Self)
 		added := false
 		switch item.kind {
@@ -574,6 +593,8 @@ collect_loot_in_magnet_range :: proc(room: ^Room) -> (collected: int) {
 			added = add_effect(&action, gain_gold_effect(item.amount))
 		case .Healing:
 			added = add_effect(&action, heal_effect(PLAYER_ENTITY, item.amount))
+		case .Weapon:
+			unreachable()
 		}
 		assert(added)
 		report := resolve_action(room, &action)
@@ -643,7 +664,7 @@ finish_player_combat_command :: proc(room: ^Room, time_cost: f32 = TACTICAL_ATTA
 	return
 }
 
-kill_enemy :: proc(room: ^Room, enemy_index: int) -> (drops: [2]Loot, drop_count: int) {
+kill_enemy :: proc(room: ^Room, enemy_index: int) -> (drops: [3]Loot, drop_count: int) {
 	assert(room != nil)
 	enemy := room.enemies[enemy_index]
 	position := enemy.position
@@ -654,6 +675,12 @@ kill_enemy :: proc(room: ^Room, enemy_index: int) -> (drops: [2]Loot, drop_count
 	drop_count += 1
 	if enemy.drops_healing {
 		drops[drop_count] = {position = position, kind = .Healing, amount = 2}
+		append(&room.loot, drops[drop_count])
+		drop_count += 1
+	}
+	if tactical_enabled(room) && enemy.archetype == .Brute {
+		definition, _ := weapon_definition(.Iron_Cleaver)
+		drops[drop_count] = {position = position, kind = .Weapon, amount = definition.max_uses, weapon_id = .Iron_Cleaver}
 		append(&room.loot, drops[drop_count])
 		drop_count += 1
 	}
@@ -696,10 +723,11 @@ try_move_player :: proc(room: ^Room, direction: Move_Direction) -> Action_Result
 		if enemy_index, found := enemy_index_at(room, target); found {
 			enemy := room.enemies[enemy_index]
 			action := make_action(.Attack, PLAYER_ENTITY, entity_target(enemy_entity(enemy.id)), .Adjacent_Opponent)
-			added := add_effect(&action, damage_effect(enemy_entity(enemy.id), room.player.stats.attack))
+			added := add_effect(&action, damage_effect(enemy_entity(enemy.id), player_basic_attack_damage(room.player)))
 			assert(added)
 			report := resolve_action(room, &action)
 			assert(report.accepted)
+			consume_equipped_weapon_use(room.player)
 			append_event_log(&room.recent_events, &report.events)
 			_, outcome := finish_player_combat_command(room)
 			switch outcome {
@@ -721,10 +749,11 @@ try_move_player :: proc(room: ^Room, direction: Move_Direction) -> Action_Result
 				if definition.movable && definition.damageable {
 					ref := object_entity(object.id)
 					action := make_action(.Attack, PLAYER_ENTITY, entity_target(ref), .Opponent_Or_Object)
-					added := add_effect(&action, damage_effect(ref, room.player.stats.attack))
+					added := add_effect(&action, damage_effect(ref, player_basic_attack_damage(room.player)))
 					assert(added)
 					report := resolve_action(room, &action)
 					if report.accepted {
+						consume_equipped_weapon_use(room.player)
 						append_event_log(&room.recent_events, &report.events)
 						return .Attacked
 					}

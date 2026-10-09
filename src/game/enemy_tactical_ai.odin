@@ -40,32 +40,82 @@ enemy_position_is_goal :: proc(room: ^Room, cell: grid.Position, goal: Enemy_Pat
 // Weighted reverse Dijkstra: the cost of entering fire, traps or a blast zone
 // changes the entire route, rather than only rejecting its final step.
 // Stable cell/step order keeps identical seeds and replays deterministic.
+// Indexed heap holds each frontier cell once; decreasing a distance moves it
+// upwards in place. Cost ties use the row-major cell index, as the old scan did.
+enemy_path_precedes :: proc(a, b: int, distances: []int) -> bool {
+	return distances[a] < distances[b] || (distances[a] == distances[b] && a < b)
+}
+
+enemy_path_heap_up :: proc(heap, slots, distances: []int, start: int) {
+	at := start
+	for at > 0 {
+		parent := (at-1)/2
+		if !enemy_path_precedes(heap[at], heap[parent], distances) { break }
+		heap[at], heap[parent] = heap[parent], heap[at]
+		slots[heap[at]], slots[heap[parent]] = at, parent
+		at = parent
+	}
+}
+
+enemy_path_heap_pop :: proc(heap, slots, distances: []int, count: ^int) -> int {
+	cell := heap[0]
+	count^ -= 1
+	slots[cell] = -1
+	if count^ == 0 { return cell }
+	heap[0] = heap[count^]
+	slots[heap[0]] = 0
+	at := 0
+	for {
+		child := at*2+1
+		if child >= count^ { break }
+		if child+1 < count^ && enemy_path_precedes(heap[child+1], heap[child], distances) { child += 1 }
+		if !enemy_path_precedes(heap[child], heap[at], distances) { break }
+		heap[at], heap[child] = heap[child], heap[at]
+		slots[heap[at]], slots[heap[child]] = at, child
+		at = child
+	}
+	return cell
+}
+
 rebuild_tactical_enemy_distances :: proc(room: ^Room, distances: []int, goal: Enemy_Path_Goal) {
 	visited := make([]bool, len(distances))
 	costs := make([]int, len(distances))
+	heap := make([]int, len(distances))
+	slots := make([]int, len(distances))
 	defer delete(visited)
 	defer delete(costs)
+	defer delete(heap)
+	defer delete(slots)
+	count := 0
 	tiles := &room.level_data.tiles
 	for &distance, i in distances {
 		cell := grid.Position{i%tiles.width, i/tiles.width}
-		distance = -1
+		distance, slots[i] = -1, -1
 		if cell_blocks_movement(room, cell) { visited[i] = true; continue }
 		costs[i] = 1+enemy_terrain_danger(room, cell)
-		if enemy_position_is_goal(room, cell, goal) { distance = 0 }
-	}
-	for _ in 0..<len(distances) {
-		best, score := -1, max(int)
-		for distance, i in distances {
-			if !visited[i] && distance >= 0 && distance < score { best, score = i, distance }
+		if enemy_position_is_goal(room, cell, goal) {
+			distance = 0
+			heap[count], slots[i] = i, count
+			enemy_path_heap_up(heap, slots, distances, count)
+			count += 1
 		}
-		if best < 0 { break }
+	}
+	for count > 0 {
+		best := enemy_path_heap_pop(heap, slots, distances, &count)
+		score := distances[best]
 		visited[best] = true
 		cell := grid.Position{best%tiles.width, best/tiles.width}
 		for step in ([?]grid.Position{{0, -1}, {1, 0}, {0, 1}, {-1, 0}}) {
 			i, ok := grid.index_of(tiles, add_position(cell, step))
 			if !ok || visited[i] { continue }
 			candidate := score+costs[best]
-			if distances[i] < 0 || candidate < distances[i] { distances[i] = candidate }
+			if distances[i] >= 0 && candidate >= distances[i] { continue }
+			distances[i] = candidate
+			if slots[i] < 0 {
+				heap[count], slots[i] = i, count
+				count += 1
+			}
+			enemy_path_heap_up(heap, slots, distances, slots[i])
 		}
 	}
 }

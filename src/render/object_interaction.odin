@@ -33,6 +33,8 @@ object_body_contains_point :: proc(kind: game.Grid_Object_Kind, center, point: v
 		base_y := max(f32(2), 3*zoom)
 		height := max(f32(16), 27*zoom)
 		return dy >= base_y-height && dy <= base_y+half_width*0.62 && dx <= half_width*1.22
+	case .Shock_Floor: return dx <= 18*zoom && abs(dy) <= 8*zoom
+	case .Tesla_Coil: return dx <= 13*zoom && dy >= -36*zoom && dy <= 5*zoom
 	case .Count:
 		return false
 	}

@@ -87,14 +87,38 @@ step_tactical_controller :: proc(
 	}
 	// Do not charge the first resumed frame for time spent outside the window.
 	if !controller.was_focused { controller.was_focused = true; return true }
-	if input.pause { controller.paused = !controller.paused; clear_card_interaction(cards); clear_gameplay_command_buffer(buffer) }
+	if input.pause {
+		controller.paused = !controller.paused
+		clear_card_interaction(cards)
+		clear_gameplay_command_buffer(buffer)
+		renderer.frame_clock_valid = false
+		// Neither pause edge owns elapsed gameplay time or a rendered cast frame.
+		return true
+	}
 	if controller.paused { return true }
+	simulation_dt := dt
+	cinematic_input := render.presentation_time_policy(&renderer.timeline) == .Cinematic ||
+		(renderer.frame_clock_valid && renderer.frame_had_cinematic)
+	// Consume the renderer's exact non-cinematic slice. Dice may begin/end
+	// partway through this frame; no pulse or world debt accrues inside them.
+	if renderer.frame_clock_valid {
+		simulation_dt = min(max(f32(0), dt), renderer.frame_simulation_dt)
+		renderer.frame_clock_valid = false
+	} else if render.presentation_time_policy(&renderer.timeline) == .Cinematic {
+		return true
+	}
+	if game.tactical_is_casting(room) {
+		clear_gameplay_command_buffer(buffer)
+		game.tactical_tick(room, simulation_dt, true, false)
+		return true
+	}
+	if cinematic_input { return true }
 	map_toggled := update_tactical_map_controls(controller, room, renderer, cards, buffer, input.map_input)
 	command := Gameplay_Command{origin_phase = .Combat}
 	if room.qte.kind != .None {
 		controller.hologram = false
 		clear_gameplay_command_buffer(buffer)
-		room.qte.remaining = max(f32(0), room.qte.remaining-dt)
+		room.qte.remaining = max(f32(0), room.qte.remaining-simulation_dt)
 		if room.qte.remaining <= 0 { command.kind = .QTE_Fail }
 		else if !room.qte.selected {
 			for pressed, index in input.defenses {
@@ -123,7 +147,7 @@ step_tactical_controller :: proc(
 		}
 		return true
 	}
-	game.tactical_tick(room, dt, true, controller.hologram)
+	game.tactical_tick(room, simulation_dt, true, controller.hologram)
 	if !drain_tactical_world_commands(room, renderer, cards, playtest) {
 		if room.qte.kind != .None {
 			controller.hologram = false

@@ -364,7 +364,10 @@ poll_gameplay_command :: proc(
 	raised_card_id := card_interaction.hovered_card_id
 	if raised_card_id == 0 { raised_card_id = card_interaction.selected_card_id }
 	if card_interaction.dragged_card_id != 0 { raised_card_id = 0 }
-	mouse_inside := mouse_in_canvas && !render.relic_bar_contains_point(renderer, room, mouse_canvas, raised_card_id)
+	if clicked, accepted := m8_pointer_gameplay_command(room, renderer, mouse_canvas, mouse_in_canvas,
+		rl.IsMouseButtonPressed(.LEFT), spatial_interaction_enabled); accepted { return clicked, true }
+	mouse_inside := mouse_in_canvas && !render.relic_bar_contains_point(renderer, room, mouse_canvas, raised_card_id) &&
+		(!renderer.tactical.enabled || !render.point_in_rectangle(mouse_canvas, render.m8_active_bar_bounds(renderer)))
 	input_deck, input_phase := render.renderer_hand_deck(renderer, room)
 	if input_phase == .Loot {
 		clear_card_interaction(card_interaction)
@@ -524,7 +527,7 @@ capture_gameplay_command_telemetry :: proc(
 		return snapshot, {}, {}, false
 	case .Move:
 		resolved_kind, ok = combatdebug.command_kind_for_move(room, command.direction)
-	case .Dodge, .Wait, .Timeout, .Continue_Pulse, .Begin_Diagonal, .QTE_Key, .QTE_Fail, .Defense:
+	case .Dodge, .Wait, .Timeout, .Continue_Pulse, .Begin_Diagonal, .QTE_Key, .QTE_Fail, .Defense, .Activate, .Equip:
 		resolved_kind = .Wait
 	case .Ability:
 		resolved_kind = .Ability
@@ -547,6 +550,15 @@ execute_gameplay_command :: proc(room: ^game.Room, command: Gameplay_Command) ->
 	switch command.kind {
 	case .None:
 		return
+	case .Activate:
+		execution.committed = game.activate_board_devices(room)
+		if execution.committed { _, _ = game.finish_player_combat_command(room, 1) }
+	case .Equip:
+		execution.committed = game.equip_reserved_weapon(room)
+		if execution.committed {
+			game.clear_event_log(&room.recent_events)
+			if room.phase == .Combat { _, _ = game.finish_player_combat_command(room, 1) }
+		}
 	case .Timeout:
 		if !game.tactical_enabled(room) || room.player.tactical.remaining > 0 { return }
 		execution.committed = game.tactical_expire_window(room)
@@ -651,6 +663,9 @@ commit_gameplay_command :: proc(
 		started := render.begin_renderer_world_timeline(renderer, before, &room.recent_events, &after) if world_command else
 			render.begin_renderer_event_timeline(renderer, before, &room.recent_events, &after)
 		assert(started, "committed gameplay must retain its presentation")
+		if command.kind == .Play_Card && game.tactical_is_casting(room) {
+			render.fit_card_cast_timeline(renderer, room.player.tactical.cast_duration)
+		}
 	}
 	return true
 }
@@ -953,8 +968,10 @@ main :: proc() {
 	}
 	if options.m7_smoke { smoke_mode_count += 1 }
 	if options.m7_view_smoke { smoke_mode_count += 1 }
-	if options.m7_view_smoke && !options.tactical.enabled {
-		fmt.eprintln("--smoke-m7-view requires M7; omit --classic")
+	if options.m8_view_smoke { smoke_mode_count += 1 }
+	if options.arena_view_smoke { smoke_mode_count += 1 }
+	if (options.m7_view_smoke || options.m8_view_smoke || options.arena_view_smoke) && !options.tactical.enabled {
+		fmt.eprintln("tactical view smoke requires tactical mode; omit --classic")
 		os.exit(2)
 	}
 	if smoke_mode_count > 1 {
@@ -1003,6 +1020,11 @@ main :: proc() {
 		return
 	}
 	defer game.destroy_run(&run_state)
+	m8_session: M8_Session
+	if !smoke_test && !options.m7_smoke && !options.m7_view_smoke && !options.m8_view_smoke && !options.arena_view_smoke && !options.spell_lab {
+		run_state.player.m8_profile, m8_session.save_enabled = load_m8_profile(M8_PROFILE_PATH)
+		if !m8_session.save_enabled { fmt.eprintln("Profilo M8 non leggibile: file preservato, salvataggio disabilitato.") }
+	}
 	if smoke_test || options.spell_lab { options.tactical.enabled = false; options.scene_3d = false }
 	if options.tactical.enabled && !configure_demo_tactical_player(&run_state.player, options.tactical) { return }
 	room: game.Room
@@ -1031,7 +1053,7 @@ main :: proc() {
 	}
 
 	window, window_ok := app.open(app.Window_Config{
-		title = "Odin Grid Roguelike Prototype",
+		title = "Odin PP 0.4 / M8",
 		initial_width = 1280,
 		initial_height = 720,
 		canvas_width = 960,
@@ -1392,6 +1414,14 @@ main :: proc() {
 		assert(active && cue.kind == .Move)
 	}
 
+	if options.m8_view_smoke {
+		if !run_m8_view_smoke(&window, &iso_renderer, &dice_renderer) { fmt.eprintln("M8 native smoke failed"); os.exit(2) }
+		return
+	}
+	if options.arena_view_smoke {
+		if !run_arena_view_smoke(&window, &iso_renderer, &dice_renderer) { fmt.eprintln("Arena native smoke failed"); os.exit(2) }
+		return
+	}
 	for !app.should_close(&window) {
 		defer free_all(context.temp_allocator)
 
@@ -1401,6 +1431,13 @@ main :: proc() {
 			render.set_renderer_playback_speed(&iso_renderer, speed)
 		}
 		frame_time := (f32(1.0/60.0) if options.m7_view_smoke else rl.GetFrameTime())
+		m8_modal := false
+		m8_mouse, m8_mouse_inside := app.mouse_canvas_position(&window)
+		if !smoke_test && !options.m7_view_smoke && options.tactical.enabled {
+			m8_modal = update_m8_session(&m8_session, &room, &iso_renderer, &tactical_controller,
+				&card_interaction, &gameplay_buffer, run_state.phase == .In_Room &&
+				!show_route_map && !game.run_has_relic_choice(&run_state), frame_time, m8_mouse, m8_mouse_inside)
+		}
 		if rl.IsKeyPressed(.F8) {
 			frame := Input_Diagnostic_Frame{dt = frame_time, focused = rl.IsWindowFocused(),
 				route_map = show_route_map, scripted = smoke_test, mouse_left = rl.IsMouseButtonDown(.LEFT),
@@ -1411,8 +1448,10 @@ main :: proc() {
 			if saved { fmt.printf("Input snapshot saved: %s\n", path); delete(path) }
 			else { fmt.eprintln("Could not save input snapshot (write error or 256 captures already present)") }
 		}
-		render.advance_sprite_assets(&iso_renderer.sprite_assets, frame_time if !smoke_test else f32(1.0/60.0))
-		if !smoke_furnace && spell_smoke == .None &&
+		if render.presentation_time_policy(&iso_renderer.timeline) != .Cinematic {
+			render.advance_sprite_assets(&iso_renderer.sprite_assets, frame_time if !smoke_test else f32(1.0/60.0))
+		}
+		if !m8_modal && !rl.IsKeyPressed(.P) && !smoke_furnace && spell_smoke == .None &&
 		   (!options.tactical.enabled || options.m7_view_smoke || (!tactical_controller.paused && tactical_controller.was_focused && rl.IsWindowFocused())) {
 			render.update_renderer_frame_timeline(&iso_renderer, frame_time)
 		}
@@ -1460,6 +1499,7 @@ main :: proc() {
 				continue
 			}
 			run_seed += 1
+			m8_profile := run_state.player.m8_profile
 			restarted := restart_demo_session(
 				&level_data,
 				&run_state,
@@ -1468,6 +1508,8 @@ main :: proc() {
 				procedural_rooms,
 			)
 			assert(restarted)
+			run_state.player.m8_profile = m8_profile
+			m8_session.character_open, m8_session.ring_open = false, false
 			if options.tactical.enabled {
 				configured := game.configure_tactical_room(&room, options.tactical)
 				assert(configured)
@@ -1495,7 +1537,7 @@ main :: proc() {
 		}
 
 		timeline_busy := render.renderer_timeline_is_busy(&iso_renderer)
-		if (!options.tactical.enabled || room.phase != .Combat) && !game.run_has_relic_choice(&run_state) && rl.IsKeyPressed(.M) && route_map_toggle_is_allowed(&run_state, &room, &iso_renderer) {
+		if !m8_modal && (!options.tactical.enabled || room.phase != .Combat) && !game.run_has_relic_choice(&run_state) && rl.IsKeyPressed(.M) && route_map_toggle_is_allowed(&run_state, &room, &iso_renderer) {
 			show_route_map = !show_route_map
 			if show_route_map {
 				clear_card_interaction(&card_interaction)
@@ -1516,9 +1558,11 @@ main :: proc() {
 		relic_skip_hovered := false
 		tactical_input_blocked := false
 		if options.tactical.enabled {
-			render.update_tactical_view(&iso_renderer, &room, mouse_canvas, mouse_inside && !tactical_controller.hologram && !tactical_controller.paused && rl.IsWindowFocused())
+			render.update_tactical_view(&iso_renderer, &room, mouse_canvas, mouse_inside && !m8_modal &&
+				!render.point_in_rectangle(mouse_canvas, render.m8_active_bar_bounds(&iso_renderer)) &&
+				!tactical_controller.hologram && !tactical_controller.paused && rl.IsWindowFocused())
 			render.update_tactical_atmosphere(&iso_renderer, frame_time if options.m7_view_smoke || (!tactical_controller.paused && rl.IsWindowFocused()) else 0)
-			if !options.m7_view_smoke { tactical_input_blocked = update_tactical_controller(&tactical_controller, &room, &iso_renderer,
+			if !options.m7_view_smoke && !m8_modal { tactical_input_blocked = update_tactical_controller(&tactical_controller, &room, &iso_renderer,
 				&card_interaction, &gameplay_buffer, frame_time,
 				run_state.phase == .In_Room && !relic_visible && !route_visible && !options.m7_view_smoke,
 				mouse_canvas, mouse_inside, playtest_session_ptr) } else { tactical_input_blocked = true }
@@ -2158,6 +2202,11 @@ main :: proc() {
 					theme = &iso_renderer,
 				)
 			}
+		}
+		if m8_session.character_open { render.draw_m8_character_panel(&iso_renderer, &room) }
+		if m8_session.ring_open {
+			render.draw_m8_ring_overlay(&iso_renderer, &room, &m8_session.ring)
+			if len(m8_session.status) > 0 { rl.DrawText(fmt.ctprintf("%s", m8_session.status), 170, 500, 10, rl.LIGHTGRAY) }
 		}
 		app.present(&window, render.LETTERBOX_COLOR, overlay, &overlay_data)
 

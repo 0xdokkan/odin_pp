@@ -113,6 +113,7 @@ sprite_key_for_object :: proc(kind: game.Grid_Object_Kind) -> Sprite_Key {
 	case .Fire: return .Fire
 	case .Barrel: return .Barrel
 	case .Bomb: return .Bomb
+	case .Shock_Floor, .Tesla_Coil: return .Count
 	case .Count: return .Count
 	}
 	return .Count

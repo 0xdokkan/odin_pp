@@ -2,9 +2,9 @@ package game
 
 import grid "../grid"
 
-// Budget autonomo del resolver. Le carte AoE correnti espandono un solo
-// template su tutti i nemici; future definizioni multi-AoE devono rivalutarlo.
-MAX_ACTION_EFFECTS :: 32
+// One simultaneous area discharge can hit every enemy plus the player.
+// Multi-template area cards still validate their expansion against this bound.
+MAX_ACTION_EFFECTS :: MAX_ENEMIES_PER_ROOM+1
 
 Entity_Kind :: enum {
 	Player,
@@ -90,6 +90,7 @@ Effect_Kind :: enum {
 	Discard_Cards,
 	Create_Card,
 	Gain_Energy,
+	Deploy_Device,
 }
 
 Effect :: struct {
@@ -107,6 +108,7 @@ Effect :: struct {
 	priority_modifier: i32,
 	binding_source: Reaction_Binding_Source,
 	card_definition: Card_Id,
+	object_kind: Grid_Object_Kind,
 }
 
 damage_effect :: proc(target: Entity_Ref, amount: i32) -> Effect {
@@ -383,6 +385,10 @@ effect_is_valid :: proc(room: ^Room, effect: Effect) -> bool {
 		return false
 	}
 	switch effect.kind {
+	case .Deploy_Device:
+		return effect.target == PLAYER_ENTITY && effect.amount > 0 &&
+		       (effect.object_kind != .Shock_Floor || (effect.charges >= 1 && effect.charges <= 4)) &&
+		       board_device_can_deploy(room, effect.object_kind, effect.destination)
 	case .Damage:
 		if effect.amount <= 0 {
 			return false
@@ -560,7 +566,7 @@ apply_damage_effect :: proc(
 	})
 
 	defeated := false
-	drops: [2]Loot
+	drops: [3]Loot
 	drop_count := 0
 	if effect.target.kind == .Player {
 		defeated = room.player.health == 0
@@ -607,6 +613,9 @@ apply_effect :: proc(room: ^Room, source: Entity_Ref, effect: Effect, report: ^A
 	assert(room != nil && report != nil && effect_is_valid(room, effect))
 
 	switch effect.kind {
+	case .Deploy_Device:
+		deployed := deploy_board_device(room, effect.object_kind, effect.destination, effect.amount, effect.charges, &report.events)
+		assert(deployed)
 	case .Damage:
 		apply_damage_effect(room, source, effect, report)
 	case .Heal:
@@ -820,6 +829,7 @@ resolve_action :: proc(room: ^Room, action: ^Action) -> (report: Action_Report) 
 		append_room_clear_relic(room, &report)
 		disarm_explosives_after_combat(room, &report.events)
 		disarm_room_modifier_after_combat(room)
+		disarm_board_devices_after_combat(room, &report.events)
 	}
 	return
 }

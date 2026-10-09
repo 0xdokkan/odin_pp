@@ -48,7 +48,7 @@ collect_tactical_translucents :: proc(renderer: ^Renderer, room: ^game.Room = ni
 	// remain in the table pass, and it only needs sorted actor billboards.
 	if room != nil {
 		for y in 0..<room.level_data.tiles.height { for x in 0..<room.level_data.tiles.width {
-			if tactical_render_visible(renderer, {x, y}) && diorama_interior_wall(room, {x, y}) {
+			if tactical_cell_on_screen(renderer, {x, y}) && tactical_render_visible(renderer, {x, y}) && diorama_interior_wall(room, {x, y}) {
 				append(entries, Tactical_Alpha_Entry{kind = .Wall, position = {f32(x), f32(y)}})
 			}
 		} }

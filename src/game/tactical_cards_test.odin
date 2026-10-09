@@ -59,12 +59,16 @@ test_tactical_dash_pays_one_shields_before_hazards_and_rejects_blocked_paths :: 
 			testing.expect_value(t, player.position, grid.Position{6, 4})
 			testing.expect_value(t, player.health, i32(99))
 			testing.expect_value(t, player.tactical.dodge_recovery, 2)
-			testing.expect_value(t, player.tactical.remaining, before_time-tactical_card_time_cost(.Dash))
+			testing.expect_value(t, player.tactical.remaining, before_time)
 			drain_tactical_test_pulse(t, &room)
-			// One energy buys a two-second movement card, without beginning
-			// a new decision window or restarting the active-dodge cooldown.
-			testing.expect_value(t, room.pulse_count, u64(2))
+			// The two-second cast charges only the pulse. Enemy and dodge
+			// recovery clocks resume once the cast finishes.
+			testing.expect_value(t, player.tactical.remaining, before_time-tactical_card_time_cost(.Dash))
+			testing.expect_value(t, room.pulse_count, u64(0))
 			testing.expect_value(t, player.tactical.cycle, 0)
+			testing.expect_value(t, player.tactical.dodge_recovery, 2)
+			tactical_tick(&room, 2, true, false)
+			drain_tactical_test_pulse(t, &room)
 			testing.expect_value(t, player.tactical.dodge_recovery, 0)
 		}
 		destroy_room(&room)
@@ -87,10 +91,15 @@ test_tactical_heavy_blow_cancels_attack_and_opens_a_strike_window :: proc(t: ^te
 	testing.expect(t, !offer_defense_qte(&room, &room.enemies[0]))
 	drain_tactical_test_pulse(t, &room)
 	testing.expect_value(t, player.health, i32(100))
+	testing.expect_value(t, room.pulse_count, u64(0))
+	testing.expect(t, enemy_is_staggered(&room, &room.enemies[0]))
+	testing.expect_value(t, player.tactical.remaining, f32(17))
+	// The first actual world second consumes Stagger and opens Recover.
+	tactical_tick(&room, 1, true, false)
+	drain_tactical_test_pulse(t, &room)
 	testing.expect_value(t, room.enemies[0].intent.kind, Enemy_Intent_Kind.Recover)
 	testing.expect_value(t, room.enemies[0].statuses.count, 0)
-	testing.expect_value(t, room.pulse_count, u64(3))
-	testing.expect_value(t, player.tactical.remaining, f32(17))
+	testing.expect_value(t, room.pulse_count, u64(1))
 	testing.expect_value(t, room.enemies[0].recovery_pulses, i32(1))
 	strike := rework_hand_card(t, &room, .Strike)
 	action, err := compile_card_action(&room, strike, entity_target(enemy_entity(1)))
@@ -101,8 +110,12 @@ test_tactical_heavy_blow_cancels_attack_and_opens_a_strike_window :: proc(t: ^te
 	drain_tactical_test_pulse(t, &room)
 	testing.expect_value(t, room.enemies[0].health, i32(91))
 	testing.expect_value(t, player.health, i32(100))
+	testing.expect_value(t, tactical_strike_bonus(&room, enemy_entity(1)), i32(2))
+	testing.expect_value(t, player.tactical.remaining, f32(14))
+	tactical_tick(&room, 1, true, false)
+	drain_tactical_test_pulse(t, &room)
 	testing.expect_value(t, tactical_strike_bonus(&room, enemy_entity(1)), i32(0))
-	testing.expect_value(t, player.tactical.remaining, f32(15))
+	testing.expect_value(t, player.tactical.remaining, f32(13))
 	testing.expect_value(t, player.tactical.cycle, 0)
 }
 
@@ -194,7 +207,7 @@ test_tactical_survey_extends_current_sight_then_expires_without_memory :: proc(t
 	testing.expect(t, !tactical_cell_visible(&room, {6, 4}))
 	clear(&room.obstacles)
 	drain_tactical_test_pulse(t, &room)
-	for _ in 0..<2 { wait_player_turn(&room); drain_tactical_test_pulse(t, &room) }
+	for _ in 0..<3 { wait_player_turn(&room); drain_tactical_test_pulse(t, &room) }
 	testing.expect(t, !tactical_cell_visible(&room, {6, 4}))
 	testing.expect_value(t, player.deck.exhaust_count, 1)
 	// The directional 2x2 preset expands to a supported centred footprint, not

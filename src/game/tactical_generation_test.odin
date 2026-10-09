@@ -5,9 +5,12 @@ import level "../level"
 
 @(test)
 test_tactical_rooms_expand_connected_layout_and_add_two_enemies_without_stat_inflation :: proc(t: ^testing.T) {
+	// The original +2-cell/+2-role introduction applies to both opening layers.
+	// Later arena tiers have exact rosters covered by arena_progression_test.
+	for depth in 0..=1 {
 	for seed in u64(1)..=12 {
 		for kind in ([?]Node_Kind{.Combat, .Elite, .Boss}) {
-			node := test_generation_node(0, kind, 0 if kind == .Combat else 4, seed)
+			node := test_generation_node(0, kind, depth, seed)
 			classic, classic_error := generate_room_blueprint(&node)
 			testing.expect_value(t, classic_error, Room_Blueprint_Error.None)
 			modern, modern_error := generate_room_blueprint(&node, tactical = true)
@@ -29,6 +32,7 @@ test_tactical_rooms_expand_connected_layout_and_add_two_enemies_without_stat_inf
 			destroy_room_blueprint(&modern)
 			destroy_room_blueprint(&classic)
 		}
+	}
 	}
 }
 

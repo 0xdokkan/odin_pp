@@ -25,6 +25,18 @@ room_family_name :: proc(family: Room_Family) -> string {
 room_family_cell_is_reserved :: proc(data: ^Level, family: Room_Family, position: grid.Position) -> bool {
 	if data == nil || family == .Scattered { return false }
 	width, height := data.tiles.width, data.tiles.height
+	if data.layout_complexity > 0 {
+		if complex_room_crossing_is_reserved(width, height, position) { return true }
+		if family == .Twin_Courts {
+			for partition in 1..=data.layout_complexity+1 {
+				wall_x := complex_court_partition_x(width, data.layout_complexity, partition)
+				if abs(position.x-wall_x) > 1 { continue }
+				gate, found := tile_at(data, {wall_x, position.y})
+				if found && is_walkable(gate.kind) { return true }
+			}
+		}
+		return false
+	}
 	if position.x == 1 || position.y == 1 || position.x == width-2 || position.y == height-2 {
 		return true
 	}
@@ -47,6 +59,7 @@ spawn_center_distance_squared :: proc(config: Room_Generation_Config, position: 
 }
 
 select_central_room_anchors :: proc(data: ^Level, config: Room_Generation_Config, generator: rand.Generator) -> (result: Room_Anchor_Pair, found: bool) {
+	if config.complexity > 0 { return select_complex_room_anchors(data, config, generator) }
 	minimum, maximum := exit_candidate_bounds(config)
 	closest, choices := max(int), 0
 	for y in 1+config.spawn_clearance_radius..<config.height-1-config.spawn_clearance_radius {
@@ -75,12 +88,15 @@ generate_tactical_room_attempt :: proc(config: Room_Generation_Config, generator
 	result, ok = create(config.width, config.height, {kind = .Floor})
 	if !ok { return {}, false }
 	width, height := config.width, config.height
+	result.layout_complexity = config.complexity
 	for y in 0..<height {
 		for x in 0..<width {
 			if is_border_position({x, y}, width, height) { write_family_wall(&result, x, y) }
 		}
 	}
-	switch config.family {
+	if config.complexity > 0 {
+		write_complex_room_family(&result, config, generator)
+	} else { switch config.family {
 	case .Scattered:
 		unreachable()
 	case .Pillars:
@@ -122,7 +138,7 @@ generate_tactical_room_attempt :: proc(config: Room_Generation_Config, generator
 		}
 		x, y := width-5, 3
 		write_family_wall(&result, width-1-x if mirror_x else x, height-1-y if mirror_y else y)
-	}
+	} }
 
 	// Select anchors around the completed shape, never carve away its defining walls.
 	selected: Room_Anchor_Pair
