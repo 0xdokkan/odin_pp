@@ -61,6 +61,12 @@ odin build src -o:none -out:odin_pp
 ./odin_pp
 ```
 
+Su Windows (PowerShell) gli equivalenti sono `.\run.ps1` e
+`.\scripts\check.ps1` (`-Headless` salta le build finali); `odin run src -o:none`
+funziona anche a mano. Windows riserva al thread principale 1 MiB di stack
+contro gli 8 MiB di macOS: [windows_stack.odin](src/windows_stack.odin) porta la
+riserva a 16 MiB dal sorgente, senza flag del linker sulla riga di comando.
+
 Dopo modifiche ai sorgenti, ricompilare prima di riutilizzare `./odin_pp`.
 Le build rapide mantengono assert e controlli di sicurezza; non riducono asset
 o qualità grafica. `-o:none` permette build senza ottimizzazione. `--seed` accetta un `u64`
