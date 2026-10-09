@@ -1,5 +1,7 @@
 package game
 
+import rng "../engine/rng"
+
 MAX_OWNED_CARDS     :: 32
 MAX_HAND_CARDS      :: 8
 MAX_TEMPORARY_CARDS :: 16
@@ -248,12 +250,7 @@ reseed_deck :: proc(deck: ^Deck_State, seed: u64) -> bool {
 
 deck_next_random :: proc(deck: ^Deck_State) -> u64 {
 	assert(deck != nil && deck.random_state != 0)
-	x := deck.random_state
-	x ~= x >> 12
-	x ~= x << 25
-	x ~= x >> 27
-	deck.random_state = x
-	return x*0x2545F4914F6CDD1D
+	return rng.step(&deck.random_state)
 }
 
 shuffle_draw_pile :: proc(deck: ^Deck_State) {

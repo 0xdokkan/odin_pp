@@ -4,6 +4,7 @@ import game "../game"
 import grid "../grid"
 import level "../level"
 import view "../view"
+import tween "../engine/tween"
 
 MAX_PRESENTATION_CUES :: game.MAX_GAME_EVENTS
 // A defeated elite can drop gold, healing and a weapon together.
@@ -549,7 +550,7 @@ presentation_cue_progress :: proc(cue: ^Presentation_Cue) -> f32 {
 
 presentation_cue_eased_progress :: proc(cue: ^Presentation_Cue) -> f32 {
 	linear := presentation_cue_progress(cue)
-	return linear*linear*(3-2*linear)
+	return tween.smoothstep(linear)
 }
 
 active_presentation_cue_progress :: proc(timeline: ^Presentation_Timeline) -> f32 {

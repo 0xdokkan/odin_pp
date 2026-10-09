@@ -6,6 +6,7 @@ import rlgl "vendor:raylib/rlgl"
 import game "../game"
 import grid "../grid"
 import level "../level"
+import tween "../engine/tween"
 
 DIORAMA_EDGE :: rl.Color{55, 73, 96, 255}
 DIORAMA_INK :: rl.Color{9, 16, 27, 255}
@@ -36,7 +37,7 @@ diorama_wall_height :: proc(renderer: ^Renderer, room: ^game.Room, cell: grid.Po
 	if cell.y == 0 { facing = max(facing, -direction.z) }
 	if cell.y == h-1 { facing = max(facing, direction.z) }
 	t := clamp(facing/0.35, f32(0), f32(1))
-	return DIORAMA_WALL_HEIGHT+(DIORAMA_CUTAWAY_HEIGHT-DIORAMA_WALL_HEIGHT)*t*t*(3-2*t)
+	return DIORAMA_WALL_HEIGHT+(DIORAMA_CUTAWAY_HEIGHT-DIORAMA_WALL_HEIGHT)*tween.smoothstep(t)
 }
 
 diorama_wall_face :: proc(room: ^game.Room, cell, offset: grid.Position) -> bool {

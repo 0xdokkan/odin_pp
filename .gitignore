@@ -28,3 +28,8 @@
 /odin_pp_m7_*.png
 /odin_pp_m7_*.json
 /*.m7_*.json
+
+# Build Windows
+/*.exe
+/*.pdb
+

@@ -1,5 +1,7 @@
 package game
 
+import rng "../engine/rng"
+
 import "core:math/rand"
 import level "../level"
 
@@ -137,10 +139,7 @@ Run_Node :: struct {
 }
 
 mix_room_seed :: proc(value: u64) -> u64 {
-	result := value
-	result = (result~(result >> 30))*0xBF58476D1CE4E5B9
-	result = (result~(result >> 27))*0x94D049BB133111EB
-	return result~(result >> 31)
+	return rng.mix(value)
 }
 
 derive_node_room_seed :: proc(run_seed: u64, id: Node_Id, kind: Node_Kind, depth: int) -> u64 {

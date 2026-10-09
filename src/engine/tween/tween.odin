@@ -32,7 +32,7 @@ ease :: proc "contextless" (kind: Ease, t: f32) -> f32 {
 	case .Linear:
 		return x
 	case .Smoothstep:
-		return x * x * (3 - 2*x)
+		return smoothstep(x)
 	case .In_Quad:
 		return x * x
 	case .Out_Quad:
@@ -79,6 +79,12 @@ ease :: proc "contextless" (kind: Ease, t: f32) -> f32 {
 		return out_bounce(x)
 	}
 	return x
+}
+
+// Hermite smoothstep without clamping: callers that already keep t in [0, 1]
+// share one definition (the renderer had seven copies).
+smoothstep :: proc "contextless" (t: f32) -> f32 {
+	return t * t * (3 - 2*t)
 }
 
 @(private)

@@ -41,13 +41,19 @@ from_state :: proc "contextless" (state: u64) -> Rng {
 	return Rng{state = state if state != 0 else GOLDEN_GAMMA}
 }
 
-next_u64 :: proc "contextless" (r: ^Rng) -> u64 {
-	x := r.state
+// Advances a stream kept as a bare u64 (struct fields whose layout and values
+// are pinned by saves and tests) and returns the next output. state != 0.
+step :: proc "contextless" (state: ^u64) -> u64 {
+	x := state^
 	x ~= x >> 12
 	x ~= x << 25
 	x ~= x >> 27
-	r.state = x
+	state^ = x
 	return x * 0x2545F4914F6CDD1D
+}
+
+next_u64 :: proc "contextless" (r: ^Rng) -> u64 {
+	return step(&r.state)
 }
 
 next_u32 :: proc "contextless" (r: ^Rng) -> u32 {
@@ -56,13 +62,17 @@ next_u32 :: proc "contextless" (r: ^Rng) -> u32 {
 
 // Uniform in [0, bound) without modulo bias. bound must be positive.
 below :: proc "contextless" (r: ^Rng, bound: u64) -> u64 {
+	return below_state(&r.state, bound)
+}
+
+below_state :: proc "contextless" (state: ^u64, bound: u64) -> u64 {
 	if bound <= 1 {
 		return 0
 	}
 	// Reject the low `2^64 mod bound` values so every residue is equally likely.
 	threshold := (0 - bound) % bound
 	for {
-		value := next_u64(r)
+		value := step(state)
 		if value >= threshold {
 			return value % bound
 		}
