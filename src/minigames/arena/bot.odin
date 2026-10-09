@@ -1,5 +1,5 @@
 // A simple deterministic autopilot. Tests use it to prove a round is
-// winnable; the preview harness enables it (demo_autoplay) to capture action.
+// winnable; the preview harness enables it (create_autoplay) to capture action.
 package arena
 
 import "core:math"

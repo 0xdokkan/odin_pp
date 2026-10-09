@@ -77,25 +77,28 @@ sprite_destroy :: proc(s: ^Sprite) {
 	s^ = {}
 }
 
-sprite_source :: proc(s: Sprite, frame: int, flip_x := false) -> rl.Rectangle {
+sprite_source :: proc(s: Sprite, frame: int, flip_x := false, flip_y := false) -> rl.Rectangle {
 	f := clamp(frame, 0, max(s.frames-1, 0))
 	r := rl.Rectangle{f32(f * s.width), 0, f32(s.width), f32(s.height)}
 	if flip_x {
 		r.width = -r.width
+	}
+	if flip_y {
+		r.height = -r.height
 	}
 	return r
 }
 
 // Draws a frame centred at `center`, scaled by `scale` pixels per sprite pixel.
 draw_sprite :: proc(s: Sprite, frame: int, center: Vec2, scale: f32 = 1, flip_x := false,
-	tint := rl.WHITE, rotation: f32 = 0) {
+	tint := rl.WHITE, rotation: f32 = 0, flip_y := false) {
 	if s.texture.id == 0 {
 		return
 	}
 	w := f32(s.width) * scale
 	h := f32(s.height) * scale
 	dest := rl.Rectangle{math.round(center.x), math.round(center.y), w, h}
-	rl.DrawTexturePro(s.texture, sprite_source(s, frame, flip_x), dest, {w * 0.5, h * 0.5}, rotation, tint)
+	rl.DrawTexturePro(s.texture, sprite_source(s, frame, flip_x, flip_y), dest, {w * 0.5, h * 0.5}, rotation, tint)
 }
 
 // Same, anchored at the bottom centre (feet), the natural pivot for characters.

@@ -243,9 +243,10 @@ launcher_update :: proc(data: rawptr, frame: ^host.Frame) {
 		case 3:
 			stars = "***"
 		}
-		subtitle := fmt.tprintf("%s\n%s", info.genre, info.tagline)
+		blurb := first_sentence(info.tagline)
+		subtitle := fmt.tprintf("%s\n%s", info.genre, blurb)
 		if rec.plays > 0 {
-			subtitle = fmt.tprintf("%s  -  record %d %s\n%s", info.genre, rec.best_score, stars, info.tagline)
+			subtitle = fmt.tprintf("%s  -  record %d %s\n%s", info.genre, rec.best_score, stars, blurb)
 		}
 		if ui.tile(ctx, cell, info.title, subtitle, info.accent) {
 			audio.play(frame.audio, .Confirm)
@@ -277,6 +278,17 @@ launcher_update :: proc(data: rawptr, frame: ^host.Frame) {
 	if l.status_ttl > 0 {
 		ui.label(ctx, bottom, l.status, .Small, p.warning, .Center)
 	}
+}
+
+// The menu tile shows the opening sentence; the intro card shows the rest.
+@(private = "file")
+first_sentence :: proc(text: string) -> string {
+	for i in 0..<len(text) {
+		if (text[i] == '.' || text[i] == '!' || text[i] == '?') && (i+1 == len(text) || text[i+1] == ' ') {
+			return text[:i+1]
+		}
+	}
+	return text
 }
 
 @(private = "file")

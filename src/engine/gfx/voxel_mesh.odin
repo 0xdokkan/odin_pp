@@ -97,17 +97,18 @@ build_voxel_model :: proc(m: ^physics.Voxel_Map, palette: ^Voxel_Palette) -> (rl
 						u8(min(f32(base.b)*k, 255)), base.a,
 					}
 					order := [6]int{0, 1, 2, 0, 2, 3}
-					uvs := [4][2]f32{{0, 0}, {1, 0}, {1, 1}, {0, 1}}
+					origin := Vec3{f32(x), f32(y), f32(z)} * s
 					for corner in order {
 						p := corners[corner]
+						uv := face_uv(face, (p - origin) / s)
 						mesh.vertices[v*3+0] = p.x
 						mesh.vertices[v*3+1] = p.y
 						mesh.vertices[v*3+2] = p.z
 						mesh.normals[v*3+0] = normal.x
 						mesh.normals[v*3+1] = normal.y
 						mesh.normals[v*3+2] = normal.z
-						mesh.texcoords[v*2+0] = uvs[corner][0]
-						mesh.texcoords[v*2+1] = uvs[corner][1]
+						mesh.texcoords[v*2+0] = uv[0]
+						mesh.texcoords[v*2+1] = uv[1]
 						mesh.colors[v*4+0] = color.r
 						mesh.colors[v*4+1] = color.g
 						mesh.colors[v*4+2] = color.b
@@ -121,6 +122,20 @@ build_voxel_model :: proc(m: ^physics.Voxel_Map, palette: ^Voxel_Palette) -> (rl
 	rl.UploadMesh(&mesh, false)
 	model := rl.LoadModelFromMesh(mesh)
 	return model, model.meshCount > 0
+}
+
+// Texture coordinates from a corner's position inside its voxel (0 or 1 per
+// axis): walls run u along the ground and v downward, so textures stand upright
+// on every side; floors and ceilings map u = x, v = z.
+@(private)
+face_uv :: proc "contextless" (face: int, local: Vec3) -> [2]f32 {
+	switch face / 2 {
+	case 0:
+		return {local.z, 1 - local.y}
+	case 2:
+		return {local.x, 1 - local.y}
+	}
+	return {local.x, local.z}
 }
 
 // Four corners of a unit face, counter-clockwise when seen from outside.

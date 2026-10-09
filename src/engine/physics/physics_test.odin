@@ -263,3 +263,38 @@ test_ray_primitives :: proc(t: ^testing.T) {
 	ts, hs := ray_sphere({0, 0, 0}, {0, 0, 1}, {0, 0, 10}, 2)
 	testing.expect(t, hs && abs(ts-8) < 1e-4)
 }
+
+@(test)
+test_air_dashes_are_limited_per_airtime :: proc(t: ^testing.T) {
+	m := test_map({
+		"..........",
+		"..........",
+		"..........",
+		"..........",
+		"..........",
+		"..........",
+		"..........",
+		"##########",
+	})
+	defer tile_map_destroy(&m)
+	p := platformer_create({60, 20}, {10, 14})
+	params := DEFAULT_PLATFORMER
+	params.dash_cooldown = 0
+	dt := f32(1.0 / 120)
+	dashes := 0
+	for i in 0..<40 {
+		_, ev := platformer_step(&p, params, {dash_pressed = i == 0 || i == 30}, &m, dt)
+		if ev.dashed {
+			dashes += 1
+		}
+	}
+	testing.expect_value(t, dashes, 1)
+	params.air_dashes = 0
+	for i in 0..<40 {
+		_, ev := platformer_step(&p, params, {dash_pressed = i == 0}, &m, dt)
+		if ev.dashed {
+			dashes += 1
+		}
+	}
+	testing.expect_value(t, dashes, 2)
+}

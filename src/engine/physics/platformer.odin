@@ -25,6 +25,8 @@ Platformer_Params :: struct {
 	dash_speed:         f32,
 	dash_time:          f32,
 	dash_cooldown:      f32,
+	// Dashes allowed per airtime (refilled on ground and walls); 0 = no limit.
+	air_dashes:         int,
 }
 
 // Defaults tuned for 16-pixel tiles at a 960x540 canvas.
@@ -47,6 +49,7 @@ DEFAULT_PLATFORMER :: Platformer_Params{
 	dash_speed         = 330,
 	dash_time          = 0.14,
 	dash_cooldown      = 0.5,
+	air_dashes         = 1,
 }
 
 Platformer_Input :: struct {
@@ -73,6 +76,7 @@ Platformer :: struct {
 	wall_side:       f32, // -1 wall on the left, +1 on the right, 0 none
 	dash_remaining:  f32,
 	dash_cooldown:   f32,
+	air_dashes_used: int,
 	jump_cut_used:   bool,
 }
 
@@ -97,12 +101,19 @@ platformer_step :: proc(p: ^Platformer, params: Platformer_Params, input: Platfo
 	} else {
 		p.coyote = max(p.coyote-dt, 0)
 	}
+	if p.grounded || p.wall_side != 0 {
+		p.air_dashes_used = 0
+	}
 	p.jump_buffer = params.jump_buffer_time if input.jump_pressed else max(p.jump_buffer-dt, 0)
 	p.dash_cooldown = max(p.dash_cooldown-dt, 0)
 
-	if input.dash_pressed && params.dash_speed > 0 && p.dash_cooldown <= 0 && p.dash_remaining <= 0 {
+	air_dash_ok := p.grounded || params.air_dashes <= 0 || p.air_dashes_used < params.air_dashes
+	if input.dash_pressed && params.dash_speed > 0 && p.dash_cooldown <= 0 && p.dash_remaining <= 0 && air_dash_ok {
 		p.dash_remaining = params.dash_time
 		p.dash_cooldown = params.dash_cooldown
+		if !p.grounded && params.air_dashes > 0 {
+			p.air_dashes_used += 1
+		}
 		events.dashed = true
 	}
 

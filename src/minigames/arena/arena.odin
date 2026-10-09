@@ -25,13 +25,6 @@ Action :: enum u8 {
 	Dash_Alt,
 }
 
-// Debug hooks for the screenshot preview harness, set before `create`:
-// `demo_autoplay` lets the test bot play instead of the devices, and
-// `demo_skip_seconds` fast-forwards each round headlessly (bot play, or idle
-// without autoplay) to reach later waves. The game itself never sets these.
-demo_autoplay: bool
-demo_skip_seconds: f32
-
 Game :: struct {
 	config:      host.Minigame_Config,
 	world:       World,
@@ -43,6 +36,9 @@ Game :: struct {
 	// that run none.
 	dash_latch:  bool,
 	demo:        bool,
+	// Debug: each round fast-forwards this many seconds headlessly (bot play,
+	// or idle without autoplay) to preview later waves.
+	demo_skip_seconds: f32,
 	playing:     bool,
 	view:        Render,
 }
@@ -60,9 +56,21 @@ info :: proc() -> host.Minigame_Info {
 }
 
 create :: proc(config: host.Minigame_Config) -> host.Scene {
+	return create_game(config, false, 0)
+}
+
+// Debug and attract mode: the test bot plays instead of the devices, and
+// `skip_seconds` fast-forwards each round to reach later waves.
+create_autoplay :: proc(config: host.Minigame_Config, skip_seconds: f32 = 0) -> host.Scene {
+	return create_game(config, true, skip_seconds)
+}
+
+@(private)
+create_game :: proc(config: host.Minigame_Config, demo: bool, skip_seconds: f32) -> host.Scene {
 	g := new(Game)
 	g.config = config
-	g.demo = demo_autoplay
+	g.demo = demo
+	g.demo_skip_seconds = skip_seconds
 	g.clock = timing.fixed_step(SIM_HZ)
 	g.actions = make_actions()
 	render_init(&g.view)
@@ -101,9 +109,9 @@ game_reset :: proc(data: rawptr, config: host.Minigame_Config) {
 	g := cast(^Game)data
 	g.config = config
 	world_reset(&g.world, config)
-	if demo_skip_seconds > 0 {
+	if g.demo_skip_seconds > 0 {
 		// Without autoplay the skipped stretch is idle, which previews defeat.
-		for _ in 0..<int(demo_skip_seconds*SIM_HZ) {
+		for _ in 0..<int(g.demo_skip_seconds*SIM_HZ) {
 			step_input := bot_input(&g.world) if g.demo else Player_Input{}
 			if world_step(&g.world, step_input, SIM_DT) != .Playing {
 				break

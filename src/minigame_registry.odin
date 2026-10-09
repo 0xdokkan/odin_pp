@@ -2,16 +2,25 @@ package main
 
 import host "engine/host"
 import arena "minigames/arena"
+import fps "minigames/fps"
+import platform2d "minigames/platform2d"
+import puzzle "minigames/puzzle"
 
-// Minigames offered by the menu and by run challenges, in display order. The
-// order also feeds challenge selection (seed modulo count), so appending keeps
-// earlier seeds stable while reordering does not.
-MINIGAME_COUNT :: 1
+// Minigames offered by the menu and by run challenges, in display order.
+// Challenges pick `seed % MINIGAME_COUNT`, so editing the list changes which
+// minigame a given run seed offers.
+MINIGAME_COUNT :: 4
 
 minigame_info :: proc(index: int) -> (host.Minigame_Info, bool) {
 	switch index {
 	case 0:
+		return platform2d.info(), true
+	case 1:
 		return arena.info(), true
+	case 2:
+		return fps.info(), true
+	case 3:
+		return puzzle.info(), true
 	}
 	return {}, false
 }

@@ -22,6 +22,7 @@ Platformer3 :: struct {
 	yaw:            f32,
 	dash_remaining: f32,
 	dash_cooldown:  f32,
+	air_dashes_used: int,
 	jump_cut_used:  bool,
 }
 
@@ -47,6 +48,7 @@ DEFAULT_PLATFORMER3 :: Platformer_Params{
 	dash_speed         = 14,
 	dash_time          = 0.16,
 	dash_cooldown      = 0.6,
+	air_dashes         = 1,
 }
 
 platformer3_step :: proc(p: ^Platformer3, params: Platformer_Params, input: Platformer3_Input,
@@ -60,15 +62,20 @@ platformer3_step :: proc(p: ^Platformer3, params: Platformer_Params, input: Plat
 	if p.grounded {
 		p.coyote = params.coyote_time
 		p.air_jumps_left = params.air_jumps
+		p.air_dashes_used = 0
 	} else {
 		p.coyote = max(p.coyote-dt, 0)
 	}
 	p.jump_buffer = params.jump_buffer_time if input.jump_pressed else max(p.jump_buffer-dt, 0)
 	p.dash_cooldown = max(p.dash_cooldown-dt, 0)
 
-	if input.dash_pressed && params.dash_speed > 0 && p.dash_cooldown <= 0 && p.dash_remaining <= 0 {
+	air_dash_ok := p.grounded || params.air_dashes <= 0 || p.air_dashes_used < params.air_dashes
+	if input.dash_pressed && params.dash_speed > 0 && p.dash_cooldown <= 0 && p.dash_remaining <= 0 && air_dash_ok {
 		p.dash_remaining = params.dash_time
 		p.dash_cooldown = params.dash_cooldown
+		if !p.grounded && params.air_dashes > 0 {
+			p.air_dashes_used += 1
+		}
 		events.dashed = true
 	}
 

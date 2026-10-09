@@ -41,3 +41,12 @@ test_anim_frame_loops_and_clamps :: proc(t: ^testing.T) {
 	testing.expect_value(t, anim_frame(10, 4, 0, 3, loop = false), 2)
 	testing.expect_value(t, anim_frame(10, 4, 7, 1), 7)
 }
+
+@(test)
+test_wall_uvs_stand_upright :: proc(t: ^testing.T) {
+	for face in ([4]int{0, 1, 4, 5}) {
+		testing.expect_value(t, face_uv(face, {0, 1, 0})[1], f32(0))
+		testing.expect_value(t, face_uv(face, {0, 0, 0})[1], f32(1))
+	}
+	testing.expect_value(t, face_uv(2, {1, 1, 0}), [2]f32{1, 0})
+}

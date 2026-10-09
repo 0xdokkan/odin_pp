@@ -79,7 +79,8 @@ create :: proc(theme: ^Theme) -> ^Context {
 	input.bind_all(m, Nav.Left, input.key(.LEFT), input.key(.A), input.pad(.LEFT_FACE_LEFT), input.pad_axis(.LEFT_X, false))
 	input.bind_all(m, Nav.Right, input.key(.RIGHT), input.key(.D), input.pad(.LEFT_FACE_RIGHT), input.pad_axis(.LEFT_X, true))
 	input.bind_all(m, Nav.Confirm, input.key(.ENTER), input.key(.SPACE), input.pad(.RIGHT_FACE_DOWN), input.key(.KP_ENTER))
-	input.bind_all(m, Nav.Back, input.key(.ESCAPE), input.key(.BACKSPACE), input.pad(.RIGHT_FACE_RIGHT))
+	// Backspace stays free for games (undo, delete); Esc and pad B go back.
+	input.bind_all(m, Nav.Back, input.key(.ESCAPE), input.pad(.RIGHT_FACE_RIGHT))
 	input.bind_all(m, Nav.Next, input.key(.TAB))
 	return ctx
 }
@@ -430,7 +431,10 @@ tile :: proc(ctx: ^Context, r: Rect, title, subtitle: string, accent: rl.Color, 
 	inner.height -= 8
 	head := cut_top(&inner, text_pixels(.Large) + 4)
 	label(ctx, head, title, .Large, p.text if enabled else p.text_dim)
+	// Long descriptions are cut at the tile's edge rather than spilling out.
+	clip_begin(ctx, inner)
 	paragraph(ctx, inner, subtitle, .Small, p.text_dim)
+	clip_end(ctx)
 	return s.clicked
 }
 

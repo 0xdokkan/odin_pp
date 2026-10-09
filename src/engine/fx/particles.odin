@@ -87,7 +87,15 @@ emit :: proc(p: ^Particles($N), e: Emitter, origin: Vec3, count: int, r: ^rng.Rn
 			dir = Vec3{math.cos(angle), math.sin(angle), 0}
 		}
 		jitter: Vec3
-		if e.radius > 0 {
+		if e.radius > 0 && e.three_d {
+			for {
+				v := Vec3{rng.float_signed(r), rng.float_signed(r), rng.float_signed(r)}
+				if v.x*v.x+v.y*v.y+v.z*v.z <= 1 {
+					jitter = v * e.radius
+					break
+				}
+			}
+		} else if e.radius > 0 {
 			d := rng.unit_disc(r) * e.radius
 			jitter = Vec3{d.x, d.y, 0}
 		}

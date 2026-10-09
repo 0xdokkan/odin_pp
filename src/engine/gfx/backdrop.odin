@@ -76,12 +76,13 @@ draw_shockwave :: proc(center: Vec2, progress, max_radius: f32, color: rl.Color)
 	rl.DrawRing(center, max(radius-3, 0), radius, 0, 360, 32, c)
 }
 
-// Layered translucent discs approximating a glow.
+// Soft radial glow: full colour at the centre fading to transparent, without
+// the visible rings of stacked discs.
 draw_glow :: proc(center: Vec2, radius: f32, color: rl.Color) {
-	for i in 0..<4 {
-		k := 1 - f32(i)*0.22
-		c := color
-		c.a = u8(f32(color.a) * 0.18)
-		rl.DrawCircleV(center, radius*k, c)
-	}
+	// Peak opacity matches the old four stacked discs (about 55%).
+	inner := color
+	inner.a = u8(f32(color.a) * 0.55)
+	outer := color
+	outer.a = 0
+	rl.DrawCircleGradient(rl.Vector2{math.round(center.x), math.round(center.y)}, radius, inner, outer)
 }
