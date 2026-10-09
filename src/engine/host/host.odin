@@ -1,6 +1,7 @@
 package host
 
 import "core:fmt"
+import "core:strings"
 import rl "vendor:raylib"
 import app "../../app"
 import view "../../view"
@@ -52,7 +53,8 @@ create :: proc(config: Config) -> (^Host, bool) {
 	h.theme = gui.default_theme()
 	gui.load_fonts(&h.theme)
 	h.ui = gui.create(&h.theme)
-	h.profile_path = config.profile_path
+	// Owned copy: callers often build the path in the per-frame temp allocator.
+	h.profile_path = strings.clone(config.profile_path)
 	h.letterbox = config.letterbox_color if config.letterbox_color.a != 0 else rl.BLACK
 	h.force_focus = config.force_focus
 	if config.profile_path != "" {
@@ -74,6 +76,7 @@ destroy :: proc(h: ^Host) {
 	destroy_all(&h.stack)
 	save_profile(h)
 	profile_destroy(&h.profile)
+	delete(h.profile_path)
 	audio.bank_destroy(h.audio)
 	gui.destroy(h.ui)
 	gui.unload_fonts(&h.theme)
