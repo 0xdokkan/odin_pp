@@ -29,19 +29,21 @@ gothic_card_lines :: proc(card: game.Card_Instance, tactical: bool = false) -> (
 		case .Piercing_Ray: return fmt.ctprintf("%d DANNI IN LINEA", a), "SOLO CELLE VISIBILI"
 		case .Cross_Slash: return fmt.ctprintf("%d DANNI A CROCE", a), "SOLO CELLE VISIBILI"
 		case .Guard, .Purifying_Guard:
-			return fmt.ctprintf("%d SCUDO / %d PULSE", a, d.effects[0].duration), "RIMUOVE VELENO" if card.definition_id == .Purifying_Guard else "ABILITA BLOCK / PARRY"
-		case .Thorn_Coat: return fmt.ctprintf("%d SPINE / %d PULSE", a, d.effects[0].duration), "ABILITA DEFLECT"
+			return fmt.ctprintf("%d SCUDO / %ds", a, d.effects[0].duration), "RIMUOVE VELENO" if card.definition_id == .Purifying_Guard else "ABILITA BLOCK / PARRY"
+		case .Thorn_Coat: return fmt.ctprintf("%d SPINE / %ds", a, d.effects[0].duration), "ABILITA DEFLECT"
 		case .Counter_Rune: return fmt.ctprintf("CONTRATTACCO %d", a), fmt.ctprintf("%d CARICHE / RETAIN", d.effects[0].charges)
-		case .Battle_Focus: return fmt.ctprintf("PESCA %d / ESPLORA", a), fmt.ctprintf("VISTA: %d PULSE / MAX %d", d.effects[1].duration, game.MAX_TACTICAL_VISION)
-		case .Spark_Forge: return fmt.ctprintf("CREA %d SPARK", a), "TEMPORANEE / COSTO 0"
+		case .Battle_Focus: return fmt.ctprintf("PESCA %d / ESPLORA", a), fmt.ctprintf("VISTA: %ds / MAX %d", d.effects[1].duration, game.MAX_TACTICAL_VISION)
+		case .Spark_Forge: return fmt.ctprintf("CREA %d SPARK", a), "TEMPORANEE / ENERGIA 0"
 		case .Shove: return fmt.ctprintf("SPINGE %d / POI COLPISCE", d.effects[0].movement_distance), fmt.ctprintf("%d DANNO / ANCHE BOMBE", b)
-		case .Dash: return fmt.ctprintf("MUOVI 1-%d / SCUDO %d", d.targeting.cast_range.maximum, a), fmt.ctprintf("SCUDO PRIMA / %d PULSE", d.effects[0].duration)
+		case .Dash: return fmt.ctprintf("MUOVI 1-%d / SCUDO %d", d.targeting.cast_range.maximum, a), fmt.ctprintf("SCUDO PRIMA / %ds", d.effects[0].duration)
 		case .Heavy_Blow: return fmt.ctprintf("%d DANNI + STORDISCE", a), "INTERROMPE L'INTENTO"
-		case .Venom_Needle: return fmt.ctprintf("%d DANNO + %d VELENO", a, b), fmt.ctprintf("VELENO: %d PULSE", d.effects[1].duration)
+		case .Venom_Needle: return fmt.ctprintf("%d DANNO + %d VELENO", a, b), fmt.ctprintf("VELENO: %ds", d.effects[1].duration)
+		case .Toxic_Wave: return fmt.ctprintf("APPLICA %d VELENO", a), fmt.ctprintf("DURATA %ds", d.effects[0].duration)
+		case .Caustic_Bloom: return fmt.ctprintf("%d VELENO NEL %dX%d", a, d.targeting.radius*2+1, d.targeting.radius*2+1), fmt.ctprintf("DURATA %ds", d.effects[0].duration)
 		case .Volatile_Study: return fmt.ctprintf("CREA %d SPARK", a), fmt.ctprintf("PESCA %d / EXHAUST", b)
-		case .Afterimage: return "SCHIVA SENZA RECUPERO", fmt.ctprintf("%d SCUDO SE MUOVI / %dP", a, d.effects[0].duration)
+		case .Afterimage: return "SCHIVA SENZA RECUPERO", fmt.ctprintf("%d SCUDO SE MUOVI / %ds", a, d.effects[0].duration)
 		case .Chain_Lightning: return fmt.ctprintf("%d DANNI / NEMICO", a), fmt.ctprintf("%d VISIBILI / SALTO %d", game.MAX_SPELL_TARGETS, game.SPELL_BOUNCE_RANGE)
-		case .Firebomb, .Toxic_Wave, .Calculated_Risk, .Spark, .Grappling_Hook, .Caustic_Bloom,
+		case .Firebomb, .Calculated_Risk, .Spark, .Grappling_Hook,
 		     .Fate_Strike, .Sundering_Blow, .Prismatic_Barrage, .Twin_Venom, .Count:
 		}
 	}

@@ -7,8 +7,10 @@ DICE_MAX_FRAME_PROGRESS :: f32(1.0/18.0)
 
 update_renderer_frame_timeline :: proc(renderer: ^Renderer, dt: f32) -> bool {
 	if renderer == nil || !(dt > 0 && dt < max(f32)) { return false }
+	was_busy := renderer_timeline_is_busy(renderer)
+	update_renderer_world_playback(renderer, dt*renderer_playback_speed(renderer))
 	timeline := &renderer.timeline
-	if !event_timeline_is_busy(timeline) { return false }
+	if !event_timeline_is_busy(timeline) { return was_busy && !renderer_timeline_is_busy(renderer) }
 	remaining := dt*renderer_playback_speed(renderer)
 	for remaining > 0 && event_timeline_is_busy(timeline) {
 		cue, _ := active_presentation_cue(timeline)
@@ -46,5 +48,5 @@ update_renderer_frame_timeline :: proc(renderer: ^Renderer, dt: f32) -> bool {
 		}
 		if limited { break }
 	}
-	return !event_timeline_is_busy(timeline)
+	return was_busy && !renderer_timeline_is_busy(renderer)
 }

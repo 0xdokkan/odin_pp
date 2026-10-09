@@ -37,7 +37,7 @@ play_card :: proc(room: ^Room, card_id: u32, target: Target) -> (play: Card_Play
 	if room == nil || room.player == nil {
 		return
 	}
-	if room.phase != .Combat || !tactical_allows_action(room, true) {
+	if room.phase != .Combat || !tactical_allows_action(room) {
 		play.result = .Invalid_Phase
 		return
 	}
@@ -119,7 +119,7 @@ play_card :: proc(room: ^Room, card_id: u32, target: Target) -> (play: Card_Play
 		to_card_zone = play.destination,
 	})
 	apply_card_relics(room, play.destination, &play.action_report)
-	pulse_report, outcome := finish_player_combat_command(room)
+	pulse_report, outcome := finish_player_combat_command(room, tactical_card_time_cost(play.card.definition_id))
 	play.pulse_report = pulse_report
 	switch outcome {
 	case .Player_Defeated:
@@ -135,7 +135,6 @@ play_card :: proc(room: ^Room, card_id: u32, target: Target) -> (play: Card_Play
 
 	if tactical_enabled(room) {
 		room.tactical_pulse.deferred_draws += 1
-		if room.player.tactical.phase == .Preparation { room.player.tactical.metrics.prepared_cards += 1 }
 		play.result = .Played
 		play.energy_after = deck.energy
 		return

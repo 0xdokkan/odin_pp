@@ -15,10 +15,10 @@ card_upgrade_preview :: proc(card: game.Card_Instance, tactical: bool = false) -
 		return fmt.ctprintf("2D6 BONUS +%d -> +%d / PUSH ON 8+", card.upgrade_level, card.upgrade_level+1)
 	}
 	if card.definition_id == .Prismatic_Barrage {
-		return fmt.ctprintf("DAMAGE PER 4+: %d -> %d / SHIELD 1 PER OTHER DIE, 2 PULSES", 3+card.upgrade_level, 4+card.upgrade_level)
+		return fmt.ctprintf("DAMAGE PER 4+: %d -> %d / SHIELD 1 PER OTHER DIE, %s", 3+card.upgrade_level, 4+card.upgrade_level, "2s" if tactical else "2 PULSES")
 	}
 	if card.definition_id == .Twin_Venom {
-		return fmt.ctprintf("HIGHER D6 BONUS +%d -> +%d / PAIR: POISON 2, 2 PULSES IF ALIVE", 1+card.upgrade_level, 2+card.upgrade_level)
+		return fmt.ctprintf("HIGHER D6 BONUS +%d -> +%d / PAIR: POISON 2, %s IF ALIVE", 1+card.upgrade_level, 2+card.upgrade_level, "2s" if tactical else "2 PULSES")
 	}
 	definition, _ := game.card_definition_by_id(card.definition_id, tactical)
 	line := ""

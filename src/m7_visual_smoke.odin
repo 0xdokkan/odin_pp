@@ -57,15 +57,15 @@ m7_visual_capture_for_cue :: proc(cue: ^render.Presentation_Cue) -> (M7_Visual_C
 // Timing covers update + CPU draw submission only: present/vsync and PNG writes
 // are outside the sample. It is deliberately not described as GPU frame time.
 m7_visual_frame :: proc(probe: ^M7_Visual_Probe, window: ^app.Window,
-	renderer: ^render.Renderer, room: ^game.Room, selected: u32 = 0) -> bool {
+	renderer: ^render.Renderer, room: ^game.Room, selected: u32 = 0, dt: f32 = 1.0/60.0) -> bool {
 	deck_random, dice_random := room.player.deck.random_state, room.player.dice.random_state
 	started := f64(0)
 	if window != nil { started = rl.GetTime() }
-	render.advance_sprite_assets(&renderer.sprite_assets, 1.0/60.0)
-	render.update_renderer_frame_timeline(renderer, 1.0/60.0)
+	render.advance_sprite_assets(&renderer.sprite_assets, dt)
+	render.update_renderer_frame_timeline(renderer, dt)
 	if window != nil {
 		render.update_tactical_view(renderer, room, {}, false, true)
-		render.update_tactical_atmosphere(renderer, 1.0/60.0)
+		render.update_tactical_atmosphere(renderer, dt)
 		updated := rl.GetTime()
 		app.begin_canvas(window, render.RESIN_BACKGROUND)
 		render.draw_tactical_world(renderer, room, selected)
@@ -86,8 +86,8 @@ m7_visual_frame :: proc(probe: ^M7_Visual_Probe, window: ^app.Window,
 		"visual probe dropped or failed presentation cues") { return false }
 	if !m7_polish_check(deck_random == room.player.deck.random_state && dice_random == room.player.dice.random_state,
 		"visual frame consumed authoritative gameplay RNG") { return false }
-	for offset in 0..<render.presentation_group_size(&renderer.timeline) {
-		cue, found := render.presentation_cue_at(&renderer.timeline, offset)
+	for offset in 0..<render.renderer_active_cue_count(renderer) {
+		cue, found := render.renderer_active_cue_at(renderer, offset)
 		if !found { continue }
 		capture, relevant := m7_visual_capture_for_cue(cue)
 		if !relevant || capture in probe.captured { continue }
@@ -113,6 +113,12 @@ m7_visual_command :: proc(probe: ^M7_Visual_Probe, window: ^app.Window,
 		} else if room.tactical_pulse.pending {
 			if !commit_gameplay_command(room, renderer, cards,
 				{kind = .Continue_Pulse, origin_phase = .Combat}) { return false }
+		} else if room.phase == .Combat && room.player.tactical.phase == .Decision &&
+		          room.player.tactical.remaining <= 0 {
+			// The controller delivers the deadline after all time charged by the
+			// last action has resolved, never in the middle of its enemy beat.
+			if !commit_gameplay_command(room, renderer, cards,
+				{kind = .Timeout, origin_phase = .Combat}) { return false }
 		} else { return true }
 	}
 	return m7_polish_check(false, "visual probe timeline did not settle within 1200 frames")
@@ -143,7 +149,9 @@ m7_visual_firebomb :: proc(probe: ^M7_Visual_Probe, window: ^app.Window,
 		{kind = .Play_Card, origin_phase = .Combat, card_id = firebomb,
 		 target = game.cell_target({8, 4})}) { return false }
 	return m7_polish_check(.Spell_Flight in probe.captured && .Spell_Impact in probe.captured &&
-		room.enemies[0].health < 20 && player.health == player.stats.max_health &&
+		room.enemies[0].health < 20 && room.phase == .Combat &&
+		room.pulse_count == u64(game.tactical_card_time_cost(.Firebomb)) &&
+		player.tactical.remaining == f32(config.timer_seconds)-game.tactical_card_time_cost(.Firebomb) &&
 		room.qte.kind == .None && !room.tactical_pulse.pending,
 		"visual Firebomb did not render its real flight and impact")
 }
@@ -189,8 +197,15 @@ run_m7_visual_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer) -> 
 	if !m7_visual_command(&probe, window, renderer, &room, &cards,
 		{kind = .Play_Card, origin_phase = .Combat, card_id = heavy,
 		 target = game.entity_target(game.enemy_entity(1))}) { return false }
-	if !m7_polish_check(room.enemies[0].health == 16 && room.enemies[0].intent.kind == .Recover &&
+	if !m7_polish_check(room.enemies[0].health == 16 && .Interrupt in probe.captured &&
 		player.health == player.stats.max_health, "visual Heavy Blow did not interrupt the real attack") { return false }
+	// Guard lasts two world seconds. Wait for the interrupted chaser to commit
+	// its next attack, then cover that deadline rather than its recovery idle.
+	for _ in 0..<8 {
+		if room.enemies[0].intent.kind != .Recover { break }
+		if !m7_visual_command(&probe, window, renderer, &room, &cards,
+			{kind = .Wait, origin_phase = .Combat}) { return false }
+	}
 	if !m7_visual_command(&probe, window, renderer, &room, &cards,
 		{kind = .Play_Card, origin_phase = .Combat, card_id = guard,
 		 target = game.entity_target(game.PLAYER_ENTITY)}) { return false }

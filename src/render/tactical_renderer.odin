@@ -21,6 +21,7 @@ Tactical_View :: struct {
 	light_position_location, light_hologram_location, light_eye_location: c.int,
 	light_clear_location, light_accents_location: c.int,
 	clear_light: f32,
+	translucents: ^Tactical_Alpha_Buffer,
 	labels: ^Tactical_Label_Layout,
 	surface: ^Tactical_Surface,
 	block_mesh: Dice_Bevel_Mesh,
@@ -69,6 +70,8 @@ create_tactical_assets :: proc(renderer: ^Renderer, parent: rl.RenderTexture2D =
 }
 
 destroy_tactical_assets :: proc(renderer: ^Renderer) {
+	destroy_renderer_world_playback(renderer)
+	destroy_tactical_translucents(renderer)
 	destroy_tactical_surface(renderer)
 	destroy_gothic_art(&renderer.tactical.art)
 	if renderer.tactical.labels != nil { free(renderer.tactical.labels); renderer.tactical.labels = nil }
@@ -103,8 +106,7 @@ tactical_presentation_opaque :: proc(renderer: ^Renderer, room: ^game.Room, posi
 update_tactical_view :: proc(renderer: ^Renderer, room: ^game.Room, mouse: view.Vec2, inside: bool, refresh_only: bool = false) {
 	v := &renderer.tactical
 	if !v.enabled { return }
-	if renderer_timeline_is_busy(renderer) && renderer.timeline.view.valid { v.snapshot^ = renderer.timeline.view }
-	else { v.snapshot^ = capture_room_presentation(room) }
+	v.snapshot^ = renderer_presentation_snapshot(renderer, room)
 	v.no_fog = room.player.tactical.config.vision_size == 0 || tactical_room_is_clear(v.snapshot.phase)
 	if !tactical_room_is_clear(v.snapshot.phase) { v.clear_light = 0 }
 	v.refocus_enabled = room.phase == .Combat && game.tactical_allows_action(room)
@@ -142,7 +144,7 @@ update_tactical_view :: proc(renderer: ^Renderer, room: ^game.Room, mouse: view.
 	renderer.camera.origin.y -= center.y*renderer.camera.zoom
 	if refresh_only { return }
 	renderer.has_hovered_cell = false
-	if !inside || !point_in_rectangle(mouse, tactical_world_bounds(renderer)) || renderer_timeline_is_busy(renderer) { return }
+	if !inside || !point_in_rectangle(mouse, tactical_world_bounds(renderer)) || renderer_blocks_player_input(renderer) { return }
 	cell: grid.Position
 	if v.scene_3d {
 		ray := rl.GetScreenToWorldRayEx(to_raylib(mouse), v.camera, c.int(renderer.canvas_width), c.int(renderer.canvas_height))
@@ -178,8 +180,8 @@ tactical_billboard_geometry :: proc(renderer: ^Renderer, key: Sprite_Key, positi
 	effective_key := key
 	clip_progress := f32(-1)
 	if key == .Player {
-		for offset in 0..<presentation_group_size(&renderer.timeline) {
-			cue, found := presentation_cue_at(&renderer.timeline, offset)
+		for offset in 0..<renderer_active_cue_count(renderer) {
+			cue, found := renderer_active_cue_at(renderer, offset)
 			if !found || !cue.started { continue }
 			candidate := Sprite_Key.Player
 			if cue.kind == .Card_Played { candidate = .Player_Cast }
@@ -308,50 +310,16 @@ update_tactical_body_hover :: proc(renderer: ^Renderer, mouse: view.Vec2) {
 	}
 }
 
-draw_tactical_billboards :: proc(renderer: ^Renderer) {
-	Entry :: struct {key: Sprite_Key, position: view.Vec2, opacity, distance: f32}
-	entries: [game.MAX_ENEMIES_PER_ROOM+game.MAX_GRID_OBJECTS_PER_ROOM+1]Entry
-	count := 0
-	snapshot := renderer.tactical.snapshot
-	for actor in snapshot.enemies[:snapshot.enemy_count] {
-		cell := grid.Position{int(math.round(actor.position.x)), int(math.round(actor.position.y))}
-		if actor.visible && tactical_render_visible(renderer, cell) {
-			entries[count] = {key = sprite_key_for_enemy(actor.archetype), position = actor.position, opacity = actor.opacity}
-			count += 1
-		}
-	}
-	if snapshot.player.visible {
-		entries[count] = {key = .Player, position = snapshot.player.position, opacity = snapshot.player.opacity}
-		count += 1
-	}
-	for &entry in entries[:count] {
-		delta := renderer.tactical.camera.position-rl.Vector3{entry.position.x+0.5, 0, entry.position.y+0.5}
-		entry.distance = rl.Vector3DotProduct(delta, delta)
-	}
-	for i in 1..<count {
-		entry := entries[i]
-		j := i
-		for j > 0 && entries[j-1].distance < entry.distance { entries[j] = entries[j-1]; j -= 1 }
-		entries[j] = entry
-	}
-	// Alpha sprites retain terrain depth testing, but transparent texels must
-	// not write depth and hide later sprites. Flush before restoring GL state.
-	rlgl.DrawRenderBatchActive()
-	rlgl.DisableDepthMask()
-	for entry in entries[:count] { tactical_billboard(renderer, entry.key, entry.position, entry.opacity) }
-	rlgl.DrawRenderBatchActive()
-	rlgl.EnableDepthMask()
-}
-
 draw_tactical_world :: proc(renderer: ^Renderer, room: ^game.Room, active_card: u32) {
 	v := &renderer.tactical
 	snapshot := v.snapshot
+	lights: [4]rl.Vector4
 	surface := begin_tactical_surface(renderer)
 	if surface { rl.BeginMode2D({zoom = 2}) }
 	draw_tactical_backdrop(renderer)
 	if surface { rl.EndMode2D() }
 	if v.scene_3d {
-		lights := prepare_diorama_lights(renderer, room)
+		lights = prepare_diorama_lights(renderer, room)
 		rl.BeginMode3D(v.camera)
 		draw_voxel_fog(renderer, room)
 		begin_tactical_lighting(renderer, accents = lights)
@@ -403,9 +371,9 @@ draw_tactical_world :: proc(renderer: ^Renderer, room: ^game.Room, active_card: 
 		draw_voxel_threats(renderer, room)
 		rl.EndMode3D()
 	}
-	if !renderer_timeline_is_busy(renderer) {
+	if tactical_telegraphs_are_visible(renderer, room) {
 		if surface { rl.BeginMode2D({zoom = 2}) }
-		draw_card_target_range(renderer, room, active_card)
+		if !renderer_blocks_player_input(renderer) { draw_card_target_range(renderer, room, active_card) }
 		if !v.scene_3d { for &enemy in room.enemies {
 			for cell in enemy.intent.threatened_cells[:enemy.intent.threatened_cell_count] {
 				if tactical_render_visible(renderer, cell) { draw_card_range_cell(renderer, cell, {232, 95, 83, 45}, {232, 95, 83, 190}) }
@@ -413,21 +381,21 @@ draw_tactical_world :: proc(renderer: ^Renderer, room: ^game.Room, active_card: 
 		} }
 		if surface { rl.EndMode2D() }
 	}
-	// Ground feedback precedes the actors, while the terrain depth buffer
-	// continues to occlude billboards behind real walls and obstacles.
+	// Ground feedback precedes the sorted walls/sprites. Opaque terrain keeps
+	// its depth while the translucent wall bodies reveal visible actors.
 	if v.scene_3d {
 		rl.BeginMode3D(v.camera)
 		draw_tactical_actor_bases(renderer)
 		draw_tactical_feedback(renderer, .Ground)
-		draw_tactical_billboards(renderer)
+		draw_tactical_billboards(renderer, room, lights)
 		draw_tactical_feedback(renderer, .Accent)
 		rl.EndMode3D()
 	}
 	end_tactical_surface(renderer, surface)
 	draw_tactical_annotations(renderer, room)
 	// Filter each member of simultaneous impacts, not only the first event.
-	for offset in 0..<presentation_group_size(&renderer.timeline) {
-		cue, found := presentation_cue_at(&renderer.timeline, offset)
+	for offset in 0..<renderer_active_cue_count(renderer) {
+		cue, found := renderer_active_cue_at(renderer, offset)
 		if found && cue.started && tactical_cue_visible(renderer, cue) {
 			if !draw_tactical_feedback_overlay(renderer, cue) { draw_presentation_cue(renderer, cue) }
 		}

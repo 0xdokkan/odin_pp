@@ -108,7 +108,7 @@ refocus_player_hand :: proc(room: ^Room) -> (refocus: Refocus_Report) {
 
 	deck^ = staged_deck
 	room.recent_events = staged_events
-	pulse_report, outcome := finish_player_combat_command(room)
+	pulse_report, outcome := finish_player_combat_command(room, TACTICAL_REFOCUS_SECONDS)
 	refocus.pulse_report = pulse_report
 	switch outcome {
 	case .Player_Defeated:

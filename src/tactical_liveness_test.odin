@@ -13,18 +13,17 @@ Tactical_Liveness_Probe :: struct {
 	accepted, released: int,
 }
 
-// Match the native frame order, including its clock exclusion for frames that
-// started in presentation. Seeking the timeline to the end would miss stalls
-// in the rendered playback loop and its interaction with controller ownership.
+// Match the native frame order: presentation advances visually while the world
+// clock receives the full focused frame delta. Seeking either timeline to the
+// end would miss stalls and accidental ownership of ordinary player input.
 tactical_liveness_frame :: proc(probe: ^Tactical_Liveness_Probe, room: ^game.Room,
 	renderer: ^render.Renderer, input: Tactical_Controller_Input, dt: f32,
 	requested: Gameplay_Command = {}) -> bool {
-	was_busy := render.renderer_timeline_is_busy(renderer)
 	if !probe.controller.paused && probe.controller.was_focused && input.focused {
 		render.update_renderer_frame_timeline(renderer, dt)
 	}
 	blocked := step_tactical_controller(&probe.controller, room, renderer, &probe.cards, &probe.buffer,
-		0 if was_busy else dt, true, input)
+		dt, true, input)
 	if blocked { return false }
 	probe.released += 1
 	command, buffered := take_gameplay_command(&probe.buffer)
@@ -62,9 +61,10 @@ test_m7_controller_rendered_frames_finish_late_recoveries_and_release_new_walks 
 			defer game.destroy_room(&room)
 			renderer := new(render.Renderer)
 			defer free(renderer)
+			defer render.destroy_renderer_world_playback(renderer)
 			render.set_renderer_playback_speed(renderer, speed)
 			probe := Tactical_Liveness_Probe{controller = {was_focused = true}}
-			map_opened, saw_preparation, saw_forced, saw_qte, finished: bool
+			map_opened, saw_recovery, saw_qte, finished: bool
 			map_frames := 0
 			frames := 0
 			frame_steps := [4]f32{1.0/240.0, 0.017, 0.083, 0.2}
@@ -74,8 +74,7 @@ test_m7_controller_rendered_frames_finish_late_recoveries_and_release_new_walks 
 				if irregular { dt = frame_steps[frames%4] }
 				input := Tactical_Controller_Input{focused = true}
 				if room.qte.kind != .None { saw_qte = true }
-				if player.tactical.phase == .Preparation { saw_preparation = true }
-				if player.tactical.phase == .Forced { saw_forced = true }
+				if player.tactical.phase == .Recovery { saw_recovery = true }
 				// A map left open has to consume its clock and reach an ordinary
 				// timeout/recovery, rather than freezing the simulation permanently.
 				if !map_opened && player.tactical.phase == .Decision && !render.renderer_timeline_is_busy(renderer) {
@@ -89,8 +88,8 @@ test_m7_controller_rendered_frames_finish_late_recoveries_and_release_new_walks 
 					direction, found := m7_route_move(&room)
 					if found { input.directions[int(direction)] = true }
 				}
-				// Preparation is deliberately allowed to expire; QTE receives no
-				// answer, exercising the actual controller timeout continuations.
+				// QTE receives no answer, exercising actual defense timeouts.
+				// Recovery continues using frame time while fresh walks remain valid.
 				accepted := tactical_liveness_frame(&probe, &room, renderer, input, dt)
 				if room.phase != .Combat || renderer.timeline.update_failures != 0 { break }
 				if accepted && player.tactical.cycle >= 4 {
@@ -98,9 +97,9 @@ test_m7_controller_rendered_frames_finish_late_recoveries_and_release_new_walks 
 					break
 				}
 			}
-			testing.expect(t, finished && saw_preparation && saw_forced && saw_qte && map_frames > 0 &&
+			testing.expect(t, finished && saw_recovery && saw_qte && map_frames > 0 &&
 				player.tactical.metrics.hologram_seconds > 0 && player.tactical.metrics.qte_failures > 0 &&
-				player.tactical.metrics.forced_pulses >= 16 && renderer.timeline.update_failures == 0,
+				player.tactical.metrics.forced_pulses >= 3 && renderer.timeline.update_failures == 0,
 				fmt.tprintf("controller liveness: speed=%.0f irregular=%v frames=%d phase=%v tactical=%v pulse=%d pending=%v qte=%v timeline=%v cursor=%d/%d budget=%d remaining=%.3f",
 					speed, irregular, frames, room.phase, player.tactical.phase, room.pulse_count,
 					room.tactical_pulse.pending, room.qte.kind, render.renderer_timeline_is_busy(renderer),
@@ -110,14 +109,14 @@ test_m7_controller_rendered_frames_finish_late_recoveries_and_release_new_walks 
 }
 
 @(test)
-test_m7_controller_survives_terminal_preparation_and_defense_then_enters_next_room :: proc(t: ^testing.T) {
-	Ending :: enum {Direct_Parry, Preparation_Card, Forced_Parry}
+test_m7_controller_survives_terminal_recovery_and_defense_then_enters_next_room :: proc(t: ^testing.T) {
+	Ending :: enum {Direct_Parry, Recovery_Poison, Recovery_Parry}
 	for ending in Ending {
 		run, created := game.create_run({max_health = 1000, attack = 2, defense = 1}, DEMO_RUN_CONFIG, 0xC0FFEE)
 		testing.expect(t, created)
 		defer game.destroy_run(&run)
 		config := game.DEFAULT_TACTICAL_CONFIG
-		config.timer_seconds = 1
+		config.timer_seconds = 3 if ending == .Direct_Parry else 1
 		testing.expect(t, game.configure_tactical(&run.player, config))
 		testing.expect(t, game.initialize_empty_deck(&run.player.deck, game.DEFAULT_DECK_RULES, 71))
 		for id in ([5]game.Card_Id{.Strike, .Guard, .Dash, .Battle_Focus, .Arc_Bolt}) {
@@ -132,36 +131,31 @@ test_m7_controller_survives_terminal_preparation_and_defense_then_enters_next_ro
 		defer game.destroy_room(&room)
 		renderer := new(render.Renderer)
 		defer free(renderer)
+		defer render.destroy_renderer_world_playback(renderer)
 		probe := Tactical_Liveness_Probe{controller = {was_focused = true}}
-		guard, strike: u32
+		guard: u32
 		for card in run.player.deck.hand[:run.player.deck.hand_count] {
 			if card.definition_id == .Guard { guard = card.id }
-			if card.definition_id == .Strike { strike = card.id }
 		}
-		testing.expect(t, guard != 0 && strike != 0)
-		guard_played, saw_preparation, saw_forced_parry: bool
+		testing.expect(t, guard != 0)
+		if ending == .Recovery_Poison {
+			applied, _ := game.apply_status(&room, game.enemy_entity(1), .Poison, 1, 3)
+			testing.expect(t, applied)
+		}
+		guard_played, saw_recovery, saw_recovery_parry: bool
 		frames := 0
 		for room.phase == .Combat && frames < 10000 {
 			frames += 1
 			input := Tactical_Controller_Input{focused = true}
 			requested: Gameplay_Command
-			if room.qte.kind == .Defense && (ending == .Direct_Parry ||
-			   (ending == .Forced_Parry && run.player.tactical.phase == .Forced)) && guard_played {
+			if run.player.tactical.phase == .Recovery { saw_recovery = true }
+			if room.qte.kind == .Defense && ending != .Recovery_Poison && guard_played {
 				if !room.qte.selected { input.defenses[int(game.Defense_Mode.Parry)] = true }
 				else { input.directions[int(room.qte.keys[room.qte.progress])] = true }
-				if ending == .Forced_Parry { saw_forced_parry = true }
-			} else if run.player.tactical.phase == .Preparation {
-				saw_preparation = true
-				if ending == .Preparation_Card {
-					requested = {kind = .Play_Card, origin_phase = .Combat, card_id = strike,
-						target = game.entity_target(game.enemy_entity(1))}
-				} else if !guard_played {
-					requested = {kind = .Play_Card, origin_phase = .Combat, card_id = guard,
-						target = game.entity_target(game.PLAYER_ENTITY)}
-				} else { input.end_preparation = true }
+				if run.player.tactical.phase == .Recovery { saw_recovery_parry = true }
 			} else if run.player.tactical.phase == .Decision {
 				requested = {kind = .Wait, origin_phase = .Combat}
-				if ending == .Direct_Parry && !guard_played {
+				if ending != .Recovery_Poison && !guard_played {
 					requested = {kind = .Play_Card, origin_phase = .Combat, card_id = guard,
 						target = game.entity_target(game.PLAYER_ENTITY)}
 				}
@@ -175,8 +169,8 @@ test_m7_controller_survives_terminal_preparation_and_defense_then_enters_next_ro
 			fmt.tprintf("terminal %v failed after %d frames: room=%v tactical=%v qte=%v pending=%v",
 				ending, frames, room.phase, run.player.tactical.phase, room.qte.kind, room.tactical_pulse.pending))
 		if room.phase != .Loot { continue }
-		testing.expect(t, ending == .Direct_Parry || saw_preparation)
-		testing.expect(t, ending != .Forced_Parry || saw_forced_parry)
+		testing.expect(t, ending == .Direct_Parry || saw_recovery)
+		testing.expect(t, ending != .Recovery_Parry || saw_recovery_parry)
 		for room.phase == .Loot && frames < 12000 {
 			frames += 1
 			input := Tactical_Controller_Input{focused = true}

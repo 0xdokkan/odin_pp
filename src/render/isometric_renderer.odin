@@ -70,6 +70,7 @@ Renderer :: struct {
 	enemy_move_animation_count:    int,
 	enemy_move_animations_dropped: int,
 	timeline: Presentation_Timeline,
+	world_playback: ^World_Playback,
 	playback_speed: f32,
 	sprite_assets: Sprite_Assets,
 }
@@ -196,7 +197,7 @@ refocus_button_at_point :: proc(renderer: ^Renderer, point: view.Vec2) -> bool {
 }
 
 refocus_button_is_enabled :: proc(renderer: ^Renderer) -> bool {
-	return renderer != nil && !renderer_timeline_is_busy(renderer) && (!renderer.tactical.enabled || renderer.tactical.refocus_enabled)
+	return renderer != nil && !renderer_blocks_player_input(renderer) && (!renderer.tactical.enabled || renderer.tactical.refocus_enabled)
 }
 
 card_drop_area_contains :: proc(renderer: ^Renderer, point: view.Vec2) -> bool {
@@ -897,7 +898,10 @@ renderer_hand_deck :: proc(
 	room: ^game.Room,
 ) -> (^game.Deck_State, game.Room_Phase) {
 	assert(renderer != nil && room != nil && room.player != nil)
-	if renderer_timeline_is_busy(renderer) && renderer.timeline.view.valid {
+	if renderer.tactical.enabled && renderer.tactical.snapshot != nil {
+		return &renderer.tactical.snapshot.deck, renderer.tactical.snapshot.phase
+	}
+	if renderer_blocks_player_input(renderer) && renderer.timeline.view.valid {
 		return &renderer.timeline.view.deck, renderer.timeline.view.phase
 	}
 	return &room.player.deck, room.phase
@@ -995,11 +999,12 @@ clear_event_animations :: proc(renderer: ^Renderer) {
 	clear_enemy_move_animations(renderer)
 	if renderer != nil {
 		clear_event_timeline(&renderer.timeline)
+		clear_renderer_world_playback(renderer)
 	}
 }
 
 renderer_timeline_is_busy :: proc(renderer: ^Renderer) -> bool {
-	return renderer != nil && event_timeline_is_busy(&renderer.timeline)
+	return renderer != nil && (event_timeline_is_busy(&renderer.timeline) || renderer_world_is_busy(renderer))
 }
 
 begin_renderer_event_timeline :: proc(
@@ -1008,7 +1013,7 @@ begin_renderer_event_timeline :: proc(
 	events: ^game.Event_Log,
 	after: ^Room_Presentation = nil,
 ) -> bool {
-	if renderer == nil || renderer_timeline_is_busy(renderer) {
+	if renderer == nil || renderer_blocks_player_input(renderer) {
 		return false
 	}
 	clear_loot_animations(renderer)
@@ -1036,7 +1041,11 @@ update_renderer_event_timeline :: proc(renderer: ^Renderer, dt: f32) -> bool {
 	if renderer == nil {
 		return false
 	}
-	return update_event_timeline(&renderer.timeline, dt*renderer_playback_speed(renderer))
+	was_busy := renderer_timeline_is_busy(renderer)
+	step := dt*renderer_playback_speed(renderer)
+	update_event_timeline(&renderer.timeline, step)
+	update_renderer_world_playback(renderer, step)
+	return was_busy && !renderer_timeline_is_busy(renderer)
 }
 
 enemy_move_animation_index :: proc(
@@ -1933,8 +1942,8 @@ renderer_status_view :: proc(renderer: ^Renderer, room: ^game.Room) -> (result: 
 	if room == nil || room.player == nil {
 		return
 	}
-	if renderer_timeline_is_busy(renderer) && renderer.timeline.view.valid {
-		presentation := &renderer.timeline.view
+	if (renderer.tactical.enabled && renderer.tactical.snapshot != nil) || (renderer_blocks_player_input(renderer) && renderer.timeline.view.valid) {
+		presentation := renderer.tactical.snapshot if renderer.tactical.enabled && renderer.tactical.snapshot != nil else &renderer.timeline.view
 		result.phase = presentation.phase
 		result.health = presentation.player.health
 		result.max_health = presentation.player.max_health
@@ -2238,16 +2247,17 @@ presentation_event_center :: proc(
 	if renderer == nil {
 		return {}, false
 	}
-	if actor, found := presentation_actor(&renderer.timeline, event.target); found {
+	presentation := renderer.tactical.snapshot if renderer.tactical.enabled && renderer.tactical.snapshot != nil else &renderer.timeline.view
+	if actor, found := presentation_actor_in_view(presentation, event.target); found {
 		return presentation_actor_center(renderer, actor), true
 	}
-	if object, found := presentation_grid_object(&renderer.timeline, event.target); found {
+	if object, found := presentation_grid_object_in_view(presentation, event.target); found {
 		return presentation_grid_object_center(renderer, object), true
 	}
-	if actor, found := presentation_actor(&renderer.timeline, event.source); found {
+	if actor, found := presentation_actor_in_view(presentation, event.source); found {
 		return presentation_actor_center(renderer, actor), true
 	}
-	if object, found := presentation_grid_object(&renderer.timeline, event.source); found {
+	if object, found := presentation_grid_object_in_view(presentation, event.source); found {
 		return presentation_grid_object_center(renderer, object), true
 	}
 	return cell_center(renderer, event.to_position), true

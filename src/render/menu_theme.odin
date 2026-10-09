@@ -108,6 +108,6 @@ menu_triangle :: proc(theme: ^Renderer, a, b, c: rl.Vector2, color: rl.Color) {
 menu_card_face :: proc(theme: ^Renderer, bounds: rl.Rectangle, card: game.Card_Instance,
 	definition: game.Card_Definition, slot: int, affordable, expanded, highlighted, selected: bool) {
 	if menu_themed(theme) {
-		draw_tactical_card(theme, bounds, card, definition, slot, affordable, selected, highlighted, true, false)
+		draw_tactical_card(theme, bounds, card, definition, slot, affordable, selected, highlighted, true)
 	} else { draw_card_face(bounds, card, definition, slot, affordable, expanded, highlighted, selected) }
 }

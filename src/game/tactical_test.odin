@@ -44,13 +44,21 @@ tactical_test_room :: proc(t: ^testing.T, data: ^level.Level, player: ^Player, a
 	spawns := [?]Enemy_Spawn{{position = ({2, 1} if adjacent else {5, 3}), health = 1000, attack = 3}}
 	room, ok := create_room(data, player, {enemies = spawns[:]})
 	testing.expect(t, ok)
+	// Defense fixtures begin one second before an already committed attack.
+	// Role cadence itself is exercised separately by tactical_clock_test.
+	if adjacent { room.enemies[0].tactical_cooldown = 1 }
 	return room
 }
 
-drain_tactical_test_pulse :: proc(t: ^testing.T, room: ^Room) {
-	for _ in 0..<200 {
+drain_tactical_test_pulse :: proc(t: ^testing.T, room: ^Room, expire_window: bool = true) {
+	for _ in 0..<4000 {
 		if room.qte.kind != .None { testing.expect(t, resolve_qte(room, false)) }
-		if !room.tactical_pulse.pending { return }
+		if !room.tactical_pulse.pending {
+			if expire_window && room.phase == .Combat && room.player.tactical.phase == .Decision && room.player.tactical.remaining <= 0 {
+				testing.expect(t, tactical_expire_window(room))
+			}
+			return
+		}
 		testing.expect(t, continue_tactical_pulse(room))
 		testing.expect_value(t, room.recent_events.dropped_count, 0)
 	}
@@ -58,29 +66,30 @@ drain_tactical_test_pulse :: proc(t: ^testing.T, room: ^Room) {
 }
 
 @(test)
-test_tactical_cycles_skip_one_then_three_without_recursive_timer_decay :: proc(t: ^testing.T) {
+test_tactical_windows_have_fixed_recovery_without_per_action_timer_reset :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
 	room := tactical_test_room(t, &data, &player)
 	defer level.destroy(&data)
 	defer destroy_room(&room)
 	for cycle in 1..=4 {
-		for budget in 1..=2 {
-			testing.expect_value(t, player.tactical.budget, 3-budget)
+		for spent in 0..<2 {
+			testing.expect_value(t, player.tactical.budget, 2)
+			testing.expect_value(t, player.tactical.remaining, f32(2-spent))
 			testing.expect(t, wait_player_turn(&room) != .Invalid_Phase)
 			drain_tactical_test_pulse(t, &room)
 		}
-		testing.expect_value(t, player.tactical.skipped_remaining, 2*cycle-1)
-		if cycle >= 2 { testing.expect(t, finish_preparation(&room)) }
-		for _ in 0..<2*cycle-1 {
-			testing.expect(t, continue_tactical_pulse(&room))
-			drain_tactical_test_pulse(t, &room)
-		}
+		testing.expect_value(t, player.tactical.cycle, cycle)
+		testing.expect(t, tactical_is_recovering(&room))
+		testing.expect_value(t, player.tactical.remaining, TACTICAL_RECOVERY_SECONDS)
+		testing.expect(t, !continue_tactical_pulse(&room), "animation updates cannot manufacture recovery beats")
+		testing.expect(t, !tactical_tick(&room, TACTICAL_RECOVERY_SECONDS, true, false))
+		drain_tactical_test_pulse(t, &room)
 		testing.expect_value(t, player.tactical.phase, Tactical_Phase.Decision)
 		testing.expect_value(t, player.tactical.budget, 2)
 	}
-	testing.expect_value(t, player.tactical.metrics.forced_pulses, u64(16))
-	testing.expect_value(t, room.pulse_count, u64(24))
+	testing.expect_value(t, player.tactical.metrics.forced_pulses, u64(4))
+	testing.expect_value(t, room.pulse_count, u64(12))
 }
 
 @(test)
@@ -90,49 +99,43 @@ test_tactical_hologram_uses_clock_and_rejected_inputs_do_not_reset_it :: proc(t:
 	room := tactical_test_room(t, &data, &player)
 	defer level.destroy(&data)
 	defer destroy_room(&room)
-	testing.expect(t, !tactical_tick(&room, 1.25, true, true))
+	testing.expect(t, !tactical_tick(&room, 0.25, true, true))
+	testing.expect_value(t, try_move_player(&room, .North), Action_Result.Blocked)
+	testing.expect_value(t, player.tactical.remaining, f32(1.75))
+	testing.expect(t, !tactical_tick(&room, 1, true, true))
+	testing.expect(t, room.tactical_pulse.pending)
+	drain_tactical_test_pulse(t, &room)
 	testing.expect_value(t, player.tactical.remaining, f32(0.75))
 	testing.expect_value(t, player.tactical.metrics.hologram_seconds, f64(1.25))
-	testing.expect_value(t, try_move_player(&room, .North), Action_Result.Blocked)
 	testing.expect(t, !tactical_tick(&room, 10, false, true))
 	testing.expect_value(t, player.tactical.remaining, f32(0.75))
-	testing.expect(t, tactical_tick(&room, 1, true, true))
-	testing.expect_value(t, player.tactical.remaining, f32(0))
-	testing.expect_value(t, room.pulse_count, u64(0))
+	testing.expect(t, !tactical_tick(&room, 1, true, true))
+	drain_tactical_test_pulse(t, &room)
+	testing.expect_value(t, player.tactical.remaining, TACTICAL_RECOVERY_SECONDS)
+	testing.expect(t, tactical_is_recovering(&room))
+	testing.expect_value(t, room.pulse_count, u64(2))
+	testing.expect_value(t, player.tactical.metrics.hologram_seconds, f64(2))
 }
 
 @(test)
-test_tactical_preparation_defers_pulses_and_replacement_until_recovery :: proc(t: ^testing.T) {
+test_tactical_cards_refill_on_their_paid_world_beat_before_recovery :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
 	room := tactical_test_room(t, &data, &player)
 	defer level.destroy(&data)
 	defer destroy_room(&room)
-	player.tactical.phase = .Preparation
-	player.tactical.skipped_remaining = 3
-	for index in 0..<2 {
-		player.deck.hand[index].definition_id = .Guard
-		for &owned in player.deck.owned[:player.deck.owned_count] {
-			if owned.id == player.deck.hand[index].id { owned.definition_id = .Guard }
-		}
+	player.deck.hand[0].definition_id = .Guard
+	for &owned in player.deck.owned[:player.deck.owned_count] {
+		if owned.id == player.deck.hand[0].id { owned.definition_id = .Guard }
 	}
 	hand := player.deck.hand_count
-	for _ in 0..<2 {
-		play := play_card(&room, player.deck.hand[0].id, entity_target(PLAYER_ENTITY))
-		testing.expect_value(t, play.result, Card_Play_Result.Played)
-	}
-	testing.expect_value(t, player.deck.hand_count, hand-2)
-	testing.expect_value(t, player.deck.energy, i32(1))
-	testing.expect_value(t, player.tactical.metrics.prepared_cards, u64(2))
-	testing.expect_value(t, room.pulse_count, u64(0))
-	testing.expect_value(t, wait_player_turn(&room), Action_Result.Invalid_Phase)
-	testing.expect(t, finish_preparation(&room))
-	for _ in 0..<3 {
-		testing.expect(t, continue_tactical_pulse(&room))
-		drain_tactical_test_pulse(t, &room)
-	}
-	testing.expect_value(t, room.pulse_count, u64(3))
+	play := play_card(&room, player.deck.hand[0].id, entity_target(PLAYER_ENTITY))
+	testing.expect_value(t, play.result, Card_Play_Result.Played)
+	testing.expect_value(t, player.deck.hand_count, hand-1)
+	drain_tactical_test_pulse(t, &room)
+	testing.expect_value(t, room.pulse_count, u64(1))
 	testing.expect_value(t, player.deck.hand_count, hand)
+	testing.expect_value(t, player.tactical.phase, Tactical_Phase.Decision)
 	testing.expect(t, validate_deck_state(&player.deck))
 }
 
@@ -202,15 +205,16 @@ test_tactical_visibility_does_not_remember_cells_and_rejects_hidden_targets :: p
 }
 
 @(test)
-test_tactical_failed_defense_and_terminal_forced_pulse :: proc(t: ^testing.T) {
+test_tactical_failed_defense_and_terminal_recovery_beat :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
 	room := tactical_test_room(t, &data, &player, true)
 	defer level.destroy(&data)
 	defer destroy_room(&room)
 	player.health = 1
-	player.tactical.phase = .Forced
-	player.tactical.skipped_remaining = 9
+	player.tactical.remaining = 0
+	testing.expect(t, tactical_expire_window(&room))
+	testing.expect(t, !tactical_tick(&room, 1, true, false))
 	_, _ = apply_status(&room, PLAYER_ENTITY, .Afterimage, 1, 4)
 	testing.expect(t, continue_tactical_pulse(&room))
 	testing.expect(t, continue_tactical_pulse(&room))
@@ -219,7 +223,6 @@ test_tactical_failed_defense_and_terminal_forced_pulse :: proc(t: ^testing.T) {
 	testing.expect(t, continue_tactical_pulse(&room))
 	testing.expect_value(t, room.phase, Room_Phase.Defeat)
 	testing.expect_value(t, room.pulse_count, u64(1))
-	testing.expect_value(t, player.tactical.skipped_remaining, 0)
 	testing.expect(t, !continue_tactical_pulse(&room))
 	testing.expect(t, !room.tactical_pulse.pending)
 }
@@ -338,7 +341,6 @@ test_tactical_room_change_resets_pressure_but_preserves_run_metrics :: proc(t: ^
 	testing.expect_value(t, player.tactical.cycle, 0)
 	testing.expect_value(t, player.tactical.budget, config.timer_seconds)
 	testing.expect_value(t, player.tactical.remaining, f32(config.timer_seconds))
-	testing.expect_value(t, player.tactical.skipped_remaining, 0)
 	testing.expect_value(t, player.tactical.phase, Tactical_Phase.Decision)
 	testing.expect_value(t, player.tactical.config, config)
 	testing.expect_value(t, player.tactical.metrics, metrics)
@@ -350,7 +352,7 @@ test_tactical_room_change_resets_pressure_but_preserves_run_metrics :: proc(t: ^
 }
 
 @(test)
-test_tactical_segmented_pulse_matches_direct_resolution_with_reworked_recovery :: proc(t: ^testing.T) {
+test_tactical_action_time_and_idle_time_produce_identical_world_results :: proc(t: ^testing.T) {
 	data_a, data_b: level.Level
 	player_a, player_b: Player
 	room_a := tactical_test_room(t, &data_a, &player_a, true)
@@ -359,15 +361,18 @@ test_tactical_segmented_pulse_matches_direct_resolution_with_reworked_recovery :
 	defer level.destroy(&data_b)
 	defer destroy_room(&room_a)
 	defer destroy_room(&room_b)
-	player_b.tactical.budget = 20
+	for player in ([2]^Player{&player_a, &player_b}) {
+		player.tactical.config.timer_seconds = 20
+		player.tactical.budget, player.tactical.remaining = 20, 20
+	}
 	_, _ = apply_status(&room_a, PLAYER_ENTITY, .Shield, 3, 3)
 	_, _ = apply_status(&room_b, PLAYER_ENTITY, .Shield, 3, 3)
-	// Both paths now use the tactical enemy rules. A classic chaser intentionally
-	// has a different cadence, so comparing its entire state is no longer valid.
+	// A real-time second and a paid action second feed exactly the same world
+	// schedule, including enemy recovery, status expiry and energy regeneration.
 	for _ in 0..<4 {
-		pulse := advance_combat_pulse(&room_a)
-		testing.expect(t, pulse.advanced)
+		testing.expect(t, !tactical_tick(&room_a, 1, true, false))
 		testing.expect(t, wait_player_turn(&room_b) != .Invalid_Phase)
+		drain_tactical_test_pulse(t, &room_a)
 		drain_tactical_test_pulse(t, &room_b)
 		testing.expect_value(t, room_b.pulse_count, room_a.pulse_count)
 		testing.expect_value(t, player_b.health, player_a.health)

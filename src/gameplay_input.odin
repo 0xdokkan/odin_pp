@@ -11,7 +11,7 @@ Gameplay_Command_Kind :: enum {
 	Ability,
 	Play_Card,
 	Refocus,
-	Timeout, Continue_Pulse, End_Preparation, Begin_Diagonal, QTE_Key, QTE_Fail, Defense,
+	Timeout, Continue_Pulse, Begin_Diagonal, QTE_Key, QTE_Fail, Defense,
 }
 
 Gameplay_Command :: struct {
@@ -39,7 +39,7 @@ gameplay_command_is_valid :: proc(command: Gameplay_Command) -> bool {
 		return false
 	case .Move:
 		return command.origin_phase == .Combat || command.origin_phase == .Loot
-	case .Dodge, .Wait, .Ability, .Play_Card, .Refocus, .Timeout, .Continue_Pulse, .End_Preparation, .Begin_Diagonal, .QTE_Key, .QTE_Fail, .Defense:
+	case .Dodge, .Wait, .Ability, .Play_Card, .Refocus, .Timeout, .Continue_Pulse, .Begin_Diagonal, .QTE_Key, .QTE_Fail, .Defense:
 		return command.origin_phase == .Combat
 	}
 	unreachable()

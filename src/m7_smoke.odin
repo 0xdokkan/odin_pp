@@ -97,10 +97,13 @@ m7_route_sample :: proc(seed: u64, tactical: bool) -> (sample: M7_Route_Sample, 
 					command.kind = .Defense
 					command.defense = .Parry if .Parry in room.qte.defenses else (.Deflect if .Deflect in room.qte.defenses else .Dodge)
 				} else { command.kind = .QTE_Key; command.direction = room.qte.keys[room.qte.progress] }
-			} else if room.tactical_pulse.pending || (room.phase == .Combat && run.player.tactical.phase == .Forced) {
+			} else if room.tactical_pulse.pending {
 				command.kind = .Continue_Pulse
-			} else if room.phase == .Combat && tactical && run.player.tactical.phase == .Preparation {
-				command.kind = .End_Preparation
+			} else if room.phase == .Combat && tactical && run.player.tactical.phase == .Recovery {
+				game.tactical_tick(&room, game.TACTICAL_RECOVERY_SECONDS, true, false)
+				if room.tactical_pulse.pending { command.kind = .Continue_Pulse } else { continue }
+			} else if room.phase == .Combat && tactical && run.player.tactical.remaining <= 0 {
+				command.kind = .Timeout
 			} else {
 				if room.phase == .Combat {
 					for card in run.player.deck.hand[:run.player.deck.hand_count] {
@@ -126,7 +129,11 @@ m7_route_sample :: proc(seed: u64, tactical: bool) -> (sample: M7_Route_Sample, 
 				}
 			}
 			execution := execute_gameplay_command(&room, command)
-			if !execution.committed || room.recent_events.dropped_count != 0 { return }
+			if !execution.committed || room.recent_events.dropped_count != 0 {
+				fmt.eprintf("M7 route command rejected: seed=%d tactical=%v room=%v phase=%v remaining=%.3f command=%v pulse=%d\n",
+					seed, tactical, room.phase, run.player.tactical.phase, run.player.tactical.remaining, command.kind, room.pulse_count)
+				return
+			}
 			sample.commands += 1
 		}
 	}
@@ -156,25 +163,20 @@ m7_stress_sample :: proc(timer, vision: int) -> (sample: M7_Smoke_Sample, ok: bo
 		if room.phase != .Combat { return }
 		if room.qte.kind != .None {
 			command.kind = .QTE_Fail
-		} else if room.tactical_pulse.pending || player.tactical.phase == .Forced {
+		} else if room.tactical_pulse.pending {
 			command.kind = .Continue_Pulse
-		} else if player.tactical.phase == .Preparation {
-			command.kind = .End_Preparation
-			for card in player.deck.hand[:player.deck.hand_count] {
-				if card.definition_id == .Guard && player.deck.energy >= 1 {
-					command.kind = .Play_Card
-					command.card_id = card.id
-					command.target = game.entity_target(game.PLAYER_ENTITY)
-					break
-				}
-			}
+		} else if player.tactical.phase == .Recovery {
+			game.tactical_tick(&room, game.TACTICAL_RECOVERY_SECONDS, true, false)
+			if room.tactical_pulse.pending { command.kind = .Continue_Pulse } else { continue }
 		} else {
 			if player.tactical.cycle == 8 {
 				sample = {timer, vision, room.pulse_count, player.health, player.tactical.metrics}
-				return sample, room.pulse_count == u64(timer*8+64) && player.tactical.metrics.forced_pulses == 64
+				return sample, room.pulse_count == u64(timer*8+8) && player.tactical.metrics.forced_pulses == 8
 			}
-			if !game.tactical_tick(&room, f32(timer), true, true) { return }
-			command.kind = .Timeout
+			expired := game.tactical_tick(&room, f32(timer), true, true)
+			if room.tactical_pulse.pending { command.kind = .Continue_Pulse }
+			else if expired { command.kind = .Timeout }
+			else { return }
 		}
 		result := execute_gameplay_command(&room, command)
 		if !result.committed || room.recent_events.dropped_count != 0 || !game.validate_deck_state(&player.deck) { return }
@@ -207,19 +209,19 @@ run_m7_headless_smoke :: proc() -> bool {
 		}
 	}
 	report := struct {schema_version: int, scenario: string, samples: [10]M7_Smoke_Sample, routes: [4]M7_Route_Sample}{
-		1, "M7 late-cycle stress and terminal runs; not a balance benchmark", samples, routes}
+		2, "M7 fixed-recovery stress and terminal runs; not a balance benchmark", samples, routes}
 	data, err := json.marshal(report)
 	if err != nil { return false }
 	defer delete(data)
 	if os.write_entire_file("odin_pp_m7_stress.json", data) != nil { return false }
-	fmt.println("M7: 10 presets + 4 terminal runs replayed twice; 8 stress cycles; 64 forced pulses per preset; no overflow")
+	fmt.println("M7: 10 presets + 4 terminal runs replayed twice; 8 stress cycles; 8 fixed recovery beats per preset; no overflow")
 	return true
 }
 
 write_m7_metrics :: proc(player: ^game.Player, seed: u64, output: string) -> bool {
 	if !player.tactical.config.enabled { return true }
 	report := struct {schema_version: int, seed: u64, config: game.Tactical_Config, metrics: game.Tactical_Metrics}{
-		1, seed, player.tactical.config, player.tactical.metrics}
+		2, seed, player.tactical.config, player.tactical.metrics}
 	data, err := json.marshal(report)
 	if err != nil { return false }
 	defer delete(data)

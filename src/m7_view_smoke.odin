@@ -88,11 +88,12 @@ step_m7_view_smoke :: proc(state: ^M7_View_Smoke, controller: ^Tactical_Controll
 		else if !state.guard_started {
 			state.guard_started = true
 			command.kind, command.ability = .Ability, .Guard
-		} else if !state.defended && room.pulse_count < 4 {
-			// The chaser now rests after missing the diagonal. Guard covers the next attack.
-			command.kind = .Wait
+		} else if !state.defended && room.pulse_count < 12 {
+			// Defense stays available while each enemy follows its own deadline.
+			// Repeated accepted Guard actions spend time without ending the window.
+			command.kind, command.ability = .Ability, .Guard
 		} else {
-			valid := state.defended && room.pulse_count == state.defense_pulse+1 && room.pulse_count <= 5 &&
+			valid := state.defended && room.pulse_count == state.defense_pulse+1 && room.pulse_count <= 12 &&
 				room.player.tactical.metrics.qte_successes >= 2 && renderer.timeline.update_failures == 0
 			fmt.printf("M7 defense: pulse=%d response_at=%d successes=%d timeline_errors=%d\n", room.pulse_count, state.defense_pulse, room.player.tactical.metrics.qte_successes, renderer.timeline.update_failures)
 			return true, valid

@@ -4,6 +4,15 @@ import "core:testing"
 import grid "../grid"
 import level "../level"
 
+// Drive real elapsed time through the same clock as the controller. A role's
+// telegraph must survive unrelated one-second beats until its own deadline.
+advance_enemy_rework_seconds :: proc(t: ^testing.T, room: ^Room, seconds: int) {
+	for _ in 0..<seconds {
+		testing.expect(t, !tactical_tick(room, 1, true, false))
+		drain_tactical_test_pulse(t, room)
+	}
+}
+
 @(test)
 test_tactical_archer_aims_without_qte_then_fires_at_frozen_cell_and_recovers :: proc(t: ^testing.T) {
 	for evade in ([?]bool{false, true}) {
@@ -13,8 +22,14 @@ test_tactical_archer_aims_without_qte_then_fires_at_frozen_cell_and_recovers :: 
 		room := create_enemy_rework_room(t, &data, &player, spawns[:])
 		testing.expect(t, room.enemies[0].intent.windup)
 		testing.expect(t, !offer_defense_qte(&room, &room.enemies[0]))
-		wait_player_turn(&room)
-		drain_tactical_test_pulse(t, &room)
+		initial := room.enemies[0].intent
+		for _ in 0..<2 {
+			advance_enemy_rework_seconds(t, &room, 1)
+			testing.expect_value(t, room.enemies[0].intent, initial)
+			testing.expect(t, !room.enemies[0].aim_ready)
+			testing.expect_value(t, player.health, i32(100))
+		}
+		advance_enemy_rework_seconds(t, &room, 1)
 		testing.expect_value(t, player.health, i32(100))
 		testing.expect(t, room.enemies[0].aim_ready)
 		testing.expect(t, !room.enemies[0].intent.windup)
@@ -25,6 +40,9 @@ test_tactical_archer_aims_without_qte_then_fires_at_frozen_cell_and_recovers :: 
 		testing.expect(t, !room.enemies[0].aim_ready)
 		testing.expect_value(t, room.enemies[0].intent.kind, Enemy_Intent_Kind.Recover)
 		testing.expect_value(t, room.enemies[0].recovery_pulses, i32(1))
+		testing.expect_value(t, room.pulse_count, u64(4))
+		testing.expect_value(t, player.tactical.remaining, f32(16))
+		testing.expect_value(t, player.tactical.cycle, 0)
 		destroy_room(&room)
 		level.destroy(&data)
 	}
@@ -50,8 +68,7 @@ test_tactical_stagger_interrupts_prepared_shots_bombs_charges_and_support :: pro
 		applied, _ := apply_status(&room, enemy_entity(1), .Stagger, 1, 1)
 		testing.expect(t, applied)
 		testing.expect(t, !offer_defense_qte(&room, &room.enemies[0]))
-		wait_player_turn(&room)
-		drain_tactical_test_pulse(t, &room)
+		advance_enemy_rework_seconds(t, &room, 1)
 		testing.expect_value(t, player.health, i32(100))
 		testing.expect_value(t, room.enemies[0].position, position)
 		testing.expect_value(t, active_bomb_count(&room), 0)
@@ -78,8 +95,10 @@ test_tactical_brute_cleave_has_three_fixed_cells_and_charge_recovers_two :: proc
 			for cell in ([?]grid.Position{{4, 3}, {4, 4}, {4, 5}}) { testing.expect(t, enemy_intent_cell_is_threatened(&intent, cell)) }
 			testing.expect(t, !enemy_intent_cell_is_threatened(&intent, {3, 4}))
 		}
-		wait_player_turn(&room)
-		drain_tactical_test_pulse(t, &room)
+		advance_enemy_rework_seconds(t, &room, 3)
+		testing.expect_value(t, room.enemies[0].intent, intent)
+		testing.expect_value(t, room.enemies[0].recovery_pulses, i32(0))
+		advance_enemy_rework_seconds(t, &room, 1)
 		testing.expect_value(t, room.enemies[0].recovery_pulses, i32(2) if charge else i32(1))
 		testing.expect_value(t, room.enemies[0].intent.kind, Enemy_Intent_Kind.Recover)
 		destroy_room(&room)
@@ -99,8 +118,10 @@ test_tactical_custodian_cannot_shield_loop_and_exposes_two_pulse_window :: proc(
 			for enemy in room.enemies { testing.expect(t, enemy.intent.kind != .Protect) }
 		} else {
 			testing.expect_value(t, room.enemies[0].intent.kind, Enemy_Intent_Kind.Protect)
-			wait_player_turn(&room)
-			drain_tactical_test_pulse(t, &room)
+			advance_enemy_rework_seconds(t, &room, 2)
+			_, early_shield := status_for_entity(&room, enemy_entity(2), .Shield)
+			testing.expect(t, !early_shield)
+			advance_enemy_rework_seconds(t, &room, 1)
 			shield, found := status_for_entity(&room, enemy_entity(2), .Shield)
 			testing.expect(t, found)
 			if found { testing.expect_value(t, shield.potency, i32(2)) }

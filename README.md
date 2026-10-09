@@ -35,17 +35,33 @@ Per i dettagli delle API, ogni sezione rimanda ai sorgenti pertinenti.
 ## Avvio
 
 Serve Odin con i binding e le librerie native Raylib della distribuzione.
-La toolchain registrata nelle verifiche precedenti del progetto è
-`odin version dev-2026-08:8412dc37a`; non è un vincolo imposto automaticamente.
+La toolchain usata nelle verifiche correnti è
+`odin version dev-2026-10:84bc3fc21`; non è un vincolo imposto automaticamente.
 Eseguire i comandi dalla radice della repo:
 
 ```sh
-odin run src
-odin build src -out:odin_pp
-odin run src -- --seed=0xC0FFEE --fast
+./run.sh
+./run.sh --seed=0xC0FFEE --fast
 ```
 
-`-o:none` permette build senza ottimizzazione. `--seed` accetta un `u64`
+Il launcher usa `odin run src -o:none`, passa gli argomenti al gioco e funziona
+anche se invocato da un'altra directory. `ODIN` può indicare un compilatore
+alternativo. Ricompila i sorgenti a ogni avvio, per eseguire sempre le modifiche
+correnti. Il comando senza `-o:none` abilita invece l'ottimizzazione predefinita
+(`minimal`), che su questo progetto può rendere molto lunga l'attesa **prima**
+dell'apertura della finestra.
+
+Comando equivalente, oppure build da riutilizzare senza ricompilare:
+
+```sh
+odin run src -o:none
+odin build src -o:none -out:odin_pp
+./odin_pp
+```
+
+Dopo modifiche ai sorgenti, ricompilare prima di riutilizzare `./odin_pp`.
+Le build rapide mantengono assert e controlli di sicurezza; non riducono asset
+o qualità grafica. `-o:none` permette build senza ottimizzazione. `--seed` accetta un `u64`
 decimale o esadecimale con prefisso `0x`; seed e percorso scelto rendono la run
 riproducibile per la versione corrente del generatore.
 
@@ -72,13 +88,13 @@ si usa Skip. Ogni stanza parte con cinque carte e tre energia. I nemici
 annunciano già il piano per la prossima risposta: schivare o spostare un
 bersaglio può invalidarlo, senza permettere all'IA di cambiarlo all'ultimo momento.
 
-Un comando accettato durante Combat concede un **pulse**, cioè una risposta
+Nel loop classico, un comando accettato durante Combat concede un **pulse**, cioè una risposta
 nemica, se lo scontro continua. Vale per movimento, bump attack, attesa,
 abilità, carta e Refocus; una carta con più effetti costa al massimo un pulse.
-In M7 la preparazione permette più carte prima della pausa e i QTE possono
-sospendere la risposta nemica prima del danno. I comandi rifiutati non avanzano
-il tempo di combattimento. Ogni pulse
-rigenera un'energia, fino al massimo di tre.
+In M7 le azioni consumano tempo dentro una finestra, seguita da un secondo di
+recupero con movimento libero. I QTE possono sospendere un attacco prima del
+danno. I comandi rifiutati non aggiungono costi. Il classico rigenera un'energia
+per pulse; M7 ne rigenera una ogni tre secondi del mondo, fino al massimo di tre.
 
 Alla morte dell'ultimo nemico la stanza passa a Loot. Ci si può muovere senza
 pulse, raccogliere i drop rimasti ed entrare sull'uscita verde. Una stanza non
@@ -128,17 +144,17 @@ bloccata; l'esplosione arriva dopo altre due azioni accettate.
 ## Modalità tattica M7
 
 La demo avvia ora il prototipo **M7**: scena 3D con sprite 2D, fog locale,
-timer, recupero forzato, preparazione e QTE. `--classic` mantiene il loop
+timer, recupero mobile di un secondo e QTE. `--classic` mantiene il loop
 precedente per i confronti. Le sezioni dei sistemi descrivono i contratti
 condivisi; le differenze del nuovo ciclo sono raccolte qui e nella roadmap.
 
 ```sh
-odin run src
-odin run src -- --decision-time=15 --vision=2
-odin run src -- --vision=9
-odin run src -- --orthographic
-odin run src -- --flat --no-fog
-odin run src -- --classic
+odin run src -o:none
+odin run src -o:none -- --decision-time=15 --vision=2
+odin run src -o:none -- --vision=9
+odin run src -o:none -- --orthographic
+odin run src -o:none -- --flat --no-fog
+odin run src -o:none -- --classic
 ```
 
 | Opzione | Valore / funzione |
@@ -210,7 +226,7 @@ celle. Il primo incontro ha quattro nemici invece di due. La generazione resta
 deterministica e verifica connessione, accessibilità dell'uscita e spazi di spawn.
 
 La mano M7 è una fila senza sovrapposizioni: fino a otto carte completamente
-visibili, con energia richiesta, bersaglio/raggio, effetto, costo in pulse e
+visibili, con energia richiesta, bersaglio/raggio, effetto, costo aggiuntivo in secondi e
 stato di disponibilità. Hover e selezione aprono un pannello di dettaglio;
 con sette–otto carte il titolo e l'illustrazione adottano un layout compatto;
 eventuali testi troppo lunghi terminano con puntini e restano nel dettaglio.
@@ -222,29 +238,29 @@ Il bilanciamento numerico è una prima proposta giocabile, ancora da provare in 
 Il rework dei nemici si applica al gameplay M7; il classico resta disponibile
 come confronto:
 
-- **Bombaroli:** un pulse di preparazione, poi lancio sulla cella annunciata,
+- **Bombaroli:** preparazione di 4 secondi, poi rilascio dopo 1 secondo sulla cella annunciata,
   senza inseguire il nuovo bersaglio. Una sola bomba nemica attiva o in preparazione
-  nella stanza, miccia di **3 pulse**, **3 danni** e almeno **2 pulse di recupero**.
+  nella stanza, miccia di **3 secondi**, **3 danni** e almeno **2 secondi di recupero**.
   I nemici rinviano il lancio anche se è già presente una bomba del player.
   Spostare il lanciatore dopo l'annuncio fa fallire il lancio. Le bombe del
-  player conservano miccia di 2 pulse e 4 danni; non subiscono questa riduzione.
+  player conservano miccia di 2 secondi e 4 danni; non subiscono questa riduzione.
 - **Inseguitori:** il percorso tiene conto di fuoco, trappole e zone di esplosione;
   i pericoli hanno un costo, non diventano muri invalicabili. Dopo ogni attacco,
-  anche mancato, recuperano per un pulse.
+  anche mancato, recuperano per un secondo. La cadenza normale è di 2 secondi.
 - **Arcieri:** cercano una linea di tiro libera a distanza 2–5, arretrando
-  quando necessario. **Un pulse di mira**, tiro sulla cella fissata, poi recupero 1.
+  quando necessario. **3 secondi per mirare/muovere**, rilascio sulla cella fissata dopo 1 secondo, poi recupero 1 secondo.
   La mira non infligge danno e non apre QTE; durante il tiro si possono usare le
   normali difese. Spostarli o stordirli interrompe il tiro. Da adiacenti e senza
   vie di fuga possono colpire per un solo danno.
-- **Bruti:** il fendente adiacente copre tre celle frontali; recupero 1 dopo
+- **Bruti:** cadenza di 4 secondi; il fendente adiacente copre tre celle frontali; recupero 1 dopo
   il fendente e 2 dopo la carica, anche mancata. Colpi e cariche possono
   spingere di una cella, attivando i pericoli
   della destinazione. Uno scudo che assorbe tutto il danno impedisce la spinta;
   le cariche ammettono le difese QTE abilitate da carte e condizioni.
-- **Custodi:** proteggono gli altri archetipi con 2 Shield per due decisioni,
-  poi recuperano per 2 pulse. Non possono creare catene di protezione fra custodi.
+- **Custodi:** agiscono ogni 3 secondi, proteggono gli altri archetipi con 2 Shield per 2 secondi,
+  poi recuperano per 2 secondi. Non possono creare catene di protezione fra custodi.
   Spostarli, spezzare la linea di vista o stordirli annulla la protezione annunciata.
-- **Boss:** conserva fasi, cariche e bombe, ma recupera almeno 1 pulse dopo
+- **Boss:** cadenza normale di 4 secondi; conserva fasi, cariche e bombe, ma recupera almeno 1 secondo dopo
   un attacco e almeno 2 dopo carica/lancio. Può essere interrotto con Heavy Blow.
   Il Demolitionist può accendere un barile che minaccia il player, oltre a
   caricare e bombardare; il bersaglio annunciato non viene sostituito se spostato.
@@ -255,31 +271,42 @@ Mira, preparazione, lancio, recupero, fendente, carica e protezione hanno etiche
 distinte. L’hover su un nemico visibile mostra il suo ruolo e come rispondere.
 Lo stordimento nasconde le minacce dell’intento interrotto, ma non disinnesca
 esplosivi già presenti. Questi valori sono un primo bilanciamento da provare durante le run,
-in particolare nelle pause forzate lunghe.
+anche mentre il player si muove durante il recupero.
 
 Il rework carte M7 usa lo stesso catalogo effettivo per costo, targeting, effetti,
-mano, mercante, ricompense, upgrade e timeline. Tutte le carte mantengono il costo
-di **un pulse**, oppure la preparazione multipla quando disponibile. La schivata
-base rimane sempre accessibile fuori recupero, senza richiedere carte.
+mano, mercante, ricompense, upgrade e timeline. Il costo energetico resta distinto
+dal **costo temporale**, centralizzato in `game/tactical_action_cost.odin`:
+
+| Azione | Tempo aggiuntivo |
+|---|---:|
+| Passo, attacco base, attesa, schivata attiva, tentativo diagonale | 1 s |
+| Refocus | 2 s |
+| Supporto, Guard, Afterimage, Battle Focus, Spark | 1 s |
+| Strike, Arc Bolt, Shove, Dash, Grappling Hook, Venom Needle, Fate Strike | 2 s |
+| Piercing Ray, Cross Slash, Heavy Blow, Sundering Blow, Twin Venom | 3 s |
+| Firebomb, Toxic Wave, Caustic Bloom, Chain Lightning, Prismatic Barrage | 4 s |
+
+Le carte mostrano il badge `−Ns`; anche una Spark a energia zero costa tempo.
+La schivata base rimane accessibile fuori recupero, senza richiedere carte.
 
 | Carta M7 | Energia | Effetto base / ruolo |
 |---|---:|---|
 | Strike | 1 | 3 danni; **+2** contro un nemico in recupero o stordito |
 | Arc Bolt | 1 | 2 danni, tiro economico |
 | Piercing Ray / Cross Slash | 2 | 3 danni in linea / a croce, nelle celle visibili |
-| Guard | 1 | 4 Shield per 2 pulse; abilita Block e Parry |
-| Thorn Coat | 1 | 2 Thorns per 3 pulse; abilita Deflect contro gli arcieri |
-| Counter Rune | 1 | contrattacco 3, 2 cariche, 4 pulse; Retain |
-| Battle Focus | 1 | pesca fino a 2 carte; Survey per 3 pulse: lato della vista +2 (da 2×2 passa a 5×5), massimo 9; Exhaust / Ethereal |
+| Guard | 1 | 4 Shield per 2 secondi; abilita Block e Parry |
+| Thorn Coat | 1 | 2 Thorns per 3 secondi; abilita Deflect contro gli arcieri |
+| Counter Rune | 1 | contrattacco 3, 2 cariche, 4 secondi; Retain |
+| Battle Focus | 1 | pesca fino a 2 carte; Survey per 3 secondi: lato della vista +2 (da 2×2 passa a 5×5), massimo 9; Exhaust / Ethereal |
 | Spark Forge | 1 | crea fino a 2 Spark temporanee a costo 0 |
-| Dash | 1 | 2 Shield **prima** di muovere, durata 2 pulse; movimento fino a 4 celle, senza usare il recupero della schivata |
+| Dash | 1 | 2 Shield **prima** di muovere, durata 2 secondi; movimento fino a 4 celle, senza usare il recupero della schivata |
 | Shove | 1 | prima spinge di 1 cella, poi infligge 1 danno; allontana bombe e interrompe intenti tramite spostamento |
 | Grappling Hook | 1 | 1 danno e trascina adiacente, raggio 2–4; interrompe gli intenti spostando il nemico |
-| Heavy Blow | 2 | 4 danni e Stagger: salta l’azione annunciata e apre almeno 1 pulse di recupero |
-| Venom Needle | 1 | 1 danno + Poison 2 per 2 pulse |
-| Purifying Guard | 1 | 3 Shield per 2 pulse e rimuove Poison |
+| Heavy Blow | 2 | 4 danni e Stagger: salta l’azione annunciata e apre almeno 1 secondo di recupero dopo il pagamento del costo temporale |
+| Venom Needle | 1 | 1 danno + Poison 2 per 2 secondi |
+| Purifying Guard | 1 | 3 Shield per 2 secondi e rimuove Poison |
 | Volatile Study | 2 | crea 1 Spark, pesca fino a 2 carte; Exhaust |
-| Toxic Wave | 2 | Poison 1 per 3 pulse ai nemici visibili entro raggio Chebyshev 2 (5×5) |
+| Toxic Wave | 2 | Poison 1 per 3 secondi ai nemici visibili entro raggio Chebyshev 2 (5×5) |
 
 Afterimage mantiene il bypass del recupero della schivata e lo Shield dopo il
 movimento. Calculated Risk, Spark, Firebomb, Caustic Bloom e le formule delle
@@ -287,7 +314,7 @@ cinque carte con dadi/catene conservano i valori del catalogo base. **Aree e
 rimbalzi colpiscono solo celle/nemici visibili**: nessun bersaglio occultato viene
 rivelato dalla preview. Survey rispetta muri e ostacoli; quando scade, la vista
 si restringe senza memoria dell’esplorazione. Con `--no-fog` non modifica la vista.
-Durate e status avanzano già alla fine del pulse della giocata. Le carte con
+Durate e status avanzano ogni secondo del mondo, anche durante il tempo pagato dalla giocata. Le carte con
 pescata/creazione rispettano capienza e disponibilità; non garantiscono sempre
 il numero massimo di carte scritto. Upgrade e keyword mantengono le policy esistenti.
 
@@ -301,40 +328,62 @@ il numero massimo di carte scritto. Upgrade e keyword mantengono le policy esist
 | `P` | pausa esplicita, con scena coperta; `P` riprende |
 | `Q`, `E`, `Z`, `C` | tenta rispettivamente diagonale nord-ovest, nord-est, sud-ovest, sud-est sulla griglia |
 | `WASD` durante QTE diagonale | due pressioni nell'ordine indicato: prima asse orizzontale, poi verticale |
-| `Shift + WASD` | schivata attiva di 1–2 celle in linea; costo 1 pulse, recupero 2 pulse, senza carta richiesta |
+| `Shift + WASD` | schivata attiva di 1–2 celle in linea; costo 1 secondo, recupero 2 secondi, senza carta richiesta |
 | `J` / `K` durante scelta difesa | parata / parry, disponibili con Shield |
 | `L` durante scelta difesa | deviazione di una freccia, disponibile con Thorns |
 | `I` durante scelta difesa | schivata reattiva di una cella; poi `WASD` sceglie la landing; disponibile senza carte quando pronta |
 | `WASD` dopo scelta parata/parry/deviazione | premi il tasto richiesto entro la finestra residua |
-| `Enter` durante preparazione | termina le giocate anticipate e avvia i pulse forzati |
 | rotella | zoom della camera locale |
 | `M` | mappa della rotta fuori Combat; in Combat si usa l'ologramma |
 
 In M7 `C` è riservato alla diagonale; gli shortcut di debug delle abilità
 restano disponibili integralmente in modalità classica. I comandi ordinari
-sono sospesi durante QTE, risoluzione nemica, ologramma e pausa. Durante la
-preparazione sono accettate soltanto carte e chiusura della finestra.
+sono sospesi durante QTE, ologramma e pausa. I movimenti e le animazioni dei
+nemici non bloccano movimento, carte o targeting del player. Durante il recupero
+rimane disponibile la camminata ordinaria; carte, attacchi, refocus, schivata
+attiva e diagonali sono sospesi. Le difese QTE restano disponibili secondo le
+loro condizioni.
 
-Il budget delle decisioni segue `20, 19, ..., 1`: a zero la pausa dura
-`1, 3, 5, 7, ...` pulse nelle successive iterazioni, poi il budget torna a 20.
-All'ingresso di **ogni nuova stanza** il ciclo e i pulse residui si azzerano,
-il budget e il timer tornano al valore configurato: la prima pausa della
-stanza è sempre di **1 pulse**. Le statistiche cumulative della run rimangono
-conservate. Scadere senza agire consuma una normale
-Wait; timeout e input simultanei non producono due azioni. Animazioni
-obbligatorie, QTE, pausa e perdita del focus sospendono il countdown; hover,
-drag e ologramma consumano il tempo della decisione. Aprire/chiudere la mappa
-non concede reset. Durante i pulse forzati avanzano nemici, status, hazard
-ed energia; la fine del fight cancella subito la pausa residua.
+Il **pulse del player è una finestra di 20 secondi** (15/20 configurabili),
+che può contenere più azioni. Il countdown scorre mentre si decide e ogni
+azione accettata sottrae il proprio costo aggiuntivo, senza riempire il timer.
+Gli input rifiutati non pagano costi. Un'azione iniziata con tempo residuo
+positivo si completa; il pagamento è limitato al tempo rimasto nella finestra.
 
-Da tre pulse da saltare si apre una preparazione di 15 secondi: carte senza
-limite numerico aggiuntivo, pagate normalmente e risolte in ordine, senza
-risposte nemiche intermedie né rigenerazione gratuita. Gli effetti espliciti
-di pesca funzionano subito; i rimpiazzi automatici vengono rinviati al termine
-della pausa. La preparazione non azzera il proprio timer a ogni carta.
+Tempo reale e tempo speso dalle azioni alimentano lo stesso clock di gioco.
+Ogni secondo viene risolto un **beat del mondo**: agiscono solo i nemici la cui
+scadenza è maturata, poi avanzano status, micce e recuperi. Gli intenti restano
+fissati fino alla loro scadenza: non inseguono il player a ogni beat. Energia:
++1 ogni 3 secondi del mondo, entro il massimo; la pesca sostitutiva delle carte
+si risolve dopo il beat. La velocità delle animazioni non altera questi costi.
 
-Una diagonale riuscita sposta di una cella e concede un solo pulse. Errore o
-scadenza perdono la mossa e concedono un solo pulse; una landing inizialmente
+Solo allo zero dell'intera finestra parte un **recupero fisso di 1 secondo di
+tempo attivo**, uguale in ogni ciclo. Si può camminare senza costo temporale
+aggiuntivo: i passi non accorciano né prolungano il recupero. Camminare verso un
+nemico non permette un attacco; collisioni e hazard mantengono le regole normali.
+Nemici, bombe, status ed energia continuano sul clock condiviso. Allo scadere,
+dopo aver risolto gli eventuali beat/QTE pendenti, riparte il timer configurato.
+Non esistono più la crescita `1, 3, 5…` né la preparazione automatica di 15 secondi.
+
+All'ingresso di **ogni nuova stanza** ciclo, debito di tempo e recupero schivata
+si azzerano. Le statistiche cumulative della run rimangono. Un timeout chiude
+la finestra una sola volta, dopo la risoluzione del tempo già pagato; il secondo
+di recupero trascorre realmente, senza aggiungere una Wait o beat immediati.
+
+QTE, pausa e perdita del focus sospendono il countdown; animazioni del player e
+dei nemici, hover, targeting e ologramma consumano tempo. Consultare la mappa
+lascia avanzare anche i nemici, senza reset. Un input sullo stesso frame di un
+beat viene eseguito subito dopo la risoluzione logica, mentre l’animazione nemica
+prosegue. Solo la breve animazione della propria azione riserva il prossimo
+comando del player: una pressione di movimento in questa finestra viene
+conservata una sola volta. Il targeting delle carte sopravvive ai beat autonomi,
+ma viene chiuso da timeout o QTE. Anche il recupero avanza durante le animazioni
+e la consultazione dell'ologramma; QTE, pausa e perdita del focus lo sospendono.
+L'HUD mostra `RECUPERO`, countdown decimale e carte disabilitate. La fine del
+fight cancella subito il debito e consente il movimento nel Loot.
+
+Una diagonale riuscita sposta di una cella e costa un secondo. Errore o
+scadenza perdono la mossa e costano comunque un secondo; una landing inizialmente
 bloccata non apre il QTE. I QTE difensivi intercettano attacchi ordinari melee,
 cariche e frecce prima del danno: la parata aggiunge Shield 2 per quel pulse, il parry
 annulla il colpo e infligge 2 danni, la deviazione restituisce il danno previsto,
@@ -345,14 +394,14 @@ non tutti gli attacchi offrono un QTE. Shield e gli altri status mantengono
 anche gli effetti automatici già esistenti.
 
 La schivata non richiede carte: quella attiva attraversa al massimo due celle
-ortogonali e consuma un pulse; quella reattiva muove di una cella durante il
-QTE dell'attacco in corso, senza aggiungere un altro pulse. Dopo una schivata
-riuscita devono passare due pulse completi, compresi quelli forzati.
+ortogonali e costa un secondo; quella reattiva muove di una cella durante il
+QTE dell'attacco in corso, senza aggiungere altro tempo. Dopo una schivata
+riuscita devono passare due secondi del mondo completi, compresi i beat maturati nel recupero del player.
 **Afterimage permette di schivare anche durante il recupero**, oltre al suo
 effetto automatico. Fine combattimento e nuova run azzerano questo recupero.
 La schivata non attraversa muri, oggetti solidi o nemici e non conferisce
 invulnerabilità ai pericoli sul pavimento. Un tentativo attivo senza spazio
-non consuma pulse; una landing reattiva bloccata fa fallire il QTE.
+non consuma tempo; una landing reattiva bloccata fa fallire il QTE.
 
 La fog non memorizza celle visitate. Le viste 3×3, 5×5, 7×7 e 9×9 sono centrate sul player; nel 2×2 il
 quadrante include il player e segue il segno dell'ultima direzione. Gli angoli
@@ -389,7 +438,7 @@ GPU. Un `libraylib.a` contenente `version https://git-lfs.github.com/spec/v1` è
 un puntatore LFS, non un archivio collegabile: occorrono gli artefatti nativi
 della toolchain. Era il limite dell'ambiente Linux dell'audit storico.
 
-Gli smoke si eseguono con `odin run src -- <flag>`, uno alla volta. Quelli
+Gli smoke si eseguono con `odin run src -o:none -- <flag>`, uno alla volta. Quelli
 grafici salvano lo screenshot nella directory di avvio e chiudono la finestra;
 le immagini sono output rigenerabili, non prerequisiti del checkout.
 
@@ -534,7 +583,7 @@ una sola istanza per tipo. Potenza e durata devono essere positive.
 | Poison | potenza e durata maggiori | danno di sorgente System a fine pulse, poi decremento della durata |
 | Thorns | potenza e durata maggiori | contraccolpo per danno effettivo ricevuto da un avversario vivo |
 | Afterimage | potenza e durata maggiori | dopo il proprio `Moved` in Combat concede Shield pari alla potenza, per due pulse; in M7 permette schivate durante il recupero |
-| Stagger | potenza e durata maggiori | M7: interrompe l’intento nemico, cancella mira/lancio preparati e concede almeno 1 pulse di recupero |
+| Stagger | potenza e durata maggiori | M7: interrompe l’intento nemico, cancella mira/lancio preparati e lascia almeno 1 secondo sfruttabile dopo il costo della carta |
 | Survey | potenza e durata maggiori | M7: lato della vista +2 (2×2 → 5×5), massimo 9, rispettando LoS e senza memoria |
 
 Il danno al player segue `danno base -> difesa -> Shield -> salute`; i nemici
@@ -955,7 +1004,7 @@ Sorgenti: [enemy_intent.odin](src/game/enemy_intent.odin),
 
 ### Intenti committed
 
-Ogni nemico conserva un `Enemy_Intent` per `pulse_count + 1`, con origine,
+Nel classico ogni nemico conserva un `Enemy_Intent` per `pulse_count + 1`, con origine,
 percorso, destinazione, celle minacciate e danno. Protect conserva anche ID e
 cella dell'alleato. Il piano è un impegno sulle celle, non una Action con target
 che segue il player. Viene creato all'ingresso e dopo ogni pulse, mai per un
@@ -1343,12 +1392,12 @@ Non sono incluse nuove illustrazioni: il sistema permette di inserire le proprie
 
 1. Crea `assets/sprites.json`, prendendo come riferimento [assets/sprites.example.json](assets/sprites.example.json).
 2. Inserisci le immagini nelle posizioni indicate dal manifest. I percorsi dei file sono relativi alla cartella che contiene il manifest.
-3. Avvia `odin run src`. Il manifest predefinito è `assets/sprites.json`, relativo alla directory di avvio.
+3. Avvia `odin run src -o:none`. Il manifest predefinito è `assets/sprites.json`, relativo alla directory di avvio.
 
 Per usare un altro pacchetto:
 
 ```sh
-odin run src -- --sprites=/percorso/del/pacchetto/sprites.json
+odin run src -o:none -- --sprites=/percorso/del/pacchetto/sprites.json
 ```
 
 Per cominciare con una sola immagine statica:
@@ -1446,7 +1495,7 @@ Dimensioni PNG e struttura GIF vengono controllate prima della decodifica. Manif
 ### Verifica grafica
 
 ```sh
-odin run src -- --smoke-sprites
+odin run src -o:none -- --smoke-sprites
 ```
 
 Il comando crea PNG e GIF di prova temporanei, verifica condivisione delle
@@ -1488,9 +1537,9 @@ Usa interi e booleani, senza timestamp, hash map o dati del renderer: stessa
 sequenza e seed producono gli stessi byte.
 
 ```sh
-odin run src -- --seed=0xC0FFEE --playtest-report
-odin run src -- --playtest-output=/percorso/sessione.json
-odin run src -- --smoke-playtest
+odin run src -o:none -- --seed=0xC0FFEE --playtest-report
+odin run src -o:none -- --playtest-output=/percorso/sessione.json
+odin run src -o:none -- --smoke-playtest
 ```
 
 Il report interattivo viene scritto a fine run, restart o chiusura come
@@ -1713,7 +1762,7 @@ invarianti e descritta dalla documentazione. Stati: `[x]` completata,
 | M7 | [~] | prototipo M7A–M7F integrato; M7G attende playtest umano e bilanciamento |
 | M7A | [x] | timer decrescente e cicli di recupero locali alla stanza; statistiche cumulative della run |
 | M7B | [x] | visibilità locale 7×7 predefinita, confronto 2/3/5/7/9 senza memoria, ologramma 3D ruotabile e con countdown attivo |
-| M7C | [x] | giocate anticipate multiple prima di saltare almeno tre pulse |
+| M7C | [x] | più azioni per finestra con costi in tempo; recupero mobile fisso al posto della preparazione anticipata |
 | M7D | [x] | QTE da tastiera difficile per un passo diagonale, con esito e costo espliciti |
 | M7E | [x] | difese abilitate da carte/condizioni, in alcuni casi con QTE da tastiera |
 | M7F | [x] | ambiente 3D illuminato con sprite 2D, camera prospettica orbitabile e parallasse |
@@ -1734,11 +1783,11 @@ salvataggi persistenti o file di replay completi.
 
 | Incremento | Sorgenti / contratto implementato |
 |---|---|
-| M7A | [tactical.odin](src/game/tactical.odin), [tactical_controller.odin](src/tactical_controller.odin): pressione azzerata alla creazione riuscita di una nuova stanza; clock fornito dall'app; timeout esplicito; pause `S(0)=0`, `S(n)=2n-1` |
+| M7A | [tactical.odin](src/game/tactical.odin), [tactical_controller.odin](src/tactical_controller.odin): pressione azzerata alla creazione riuscita di una nuova stanza; clock fornito dall'app; timeout esplicito; recupero fisso di 1 secondo attivo |
 | M7B | visibilità logica senza memoria, condivisa col targeting; il renderer ricostruisce la maschera sullo snapshot mostrato; ologramma completo consultabile con countdown attivo |
-| M7C | [card_play.odin](src/game/card_play.odin): giocate immediate in preparazione, costo normale, rimpiazzi rinviati; nessuna coda di carte programmata durante la pausa |
-| M7D | QTE diagonale con input ordinati, validazione del movimento e un pulse per successo o fallimento; nessun attraversamento degli angoli bloccati |
-| M7E | pulse segmentato con ordine Protect/priorità per ID conservato; attacco fermato prima del danno, QTE da tastiera, ripresa una sola volta; difese disponibili anche nei pulse forzati |
+| M7C | [card_play.odin](src/game/card_play.odin): giocate immediate con costo in tempo; rimpiazzi dopo il beat; carte sospese durante il recupero mobile |
+| M7D | QTE diagonale con input ordinati, validazione del movimento e un secondo per successo o fallimento; nessun attraversamento degli angoli bloccati |
+| M7E | pulse segmentato con ordine Protect/priorità per ID conservato; attacco fermato prima del danno, QTE da tastiera, ripresa una sola volta; difese disponibili anche durante il recupero |
 | M7F | [tactical_renderer.odin](src/render/tactical_renderer.odin): terreno 3D, sprite su quad, alpha e profondità, [tactical_scene.odin](src/render/tactical_scene.odin): camera orbitabile, shader di luce/nebbia e geometrie; picking coerente con la camera; [hologram.odin](src/render/hologram.odin): schermo dedicato con miniature distinte, rotazione e zoom |
 | M7H | [tactical_hand.odin](src/render/tactical_hand.odin): dock leggibile, dettagli effetti/QTE, targeting e costi visibili |
 | M7I | [gothic_theme.odin](src/render/gothic_theme.odin), [assets/gothic](assets/gothic): atlanti trasparenti incorporati, font Jersey 10 con licenza OFL, pergamena, palette e cornici; sprite esterni e picking alpha conservati |
@@ -1749,30 +1798,30 @@ salvataggi persistenti o file di replay completi.
 
 `Player.tactical` conserva configurazione, budget, cicli e metriche. La Room
 possiede il cursore del pulse, il QTE attivo e la pesca rinviata. Ogni
-continuazione produce un log limitato: una pausa lunga non accumula tutti i
-pulse nei 416 slot di un singolo comando. Fine del combattimento e restart
-cancellano continuazioni/QTE; una nuova stanza azzera il livello di penalità,
+continuazione produce un log limitato: il debito di tempo non accumula tutti i
+beat nei 416 slot di un singolo comando. Fine del combattimento e restart
+cancellano continuazioni/QTE; una nuova stanza azzera il contatore di finestre,
 il recupero schivata e ripristina budget/timer. Configurazione e metriche
 restano nel player della run. Il clock decisionale e quello QTE non dipendono da
 FPS, `--fast` o velocità delle animazioni.
 
 I comandi M7 passano dal dispatcher condiviso: `Timeout`, `Continue_Pulse`,
-`End_Preparation`, `Begin_Diagonal`, `Defense`, `QTE_Key`, `QTE_Fail`.
+`Begin_Diagonal`, `Defense`, `QTE_Key`, `QTE_Fail`.
 Il pulse conserva gli intenti committed; parry e deviazione annullano la
 risoluzione dell'attacco senza riscriverne il piano. I comandi ordinari non
 possono intervenire mentre una risposta è sospesa.
 
 ```sh
 sh scripts/check.sh
-odin run src -- --smoke-m7
-odin run src -- --smoke-m7-view
-odin run src -- --decision-time=15 --vision=2 --playtest-report
+odin run src -o:none -- --smoke-m7
+odin run src -o:none -- --smoke-m7-view
+odin run src -o:none -- --decision-time=15 --vision=2 --playtest-report
 ```
 
 Lo smoke headless scrive `odin_pp_m7_stress.json`: dieci combinazioni di
 15/20 secondi e visibilità completa/2×2/3×3/5×5/7×7, ripetute due volte. Ogni arena
-raggiunge otto cicli e 64 pulse forzati. La salute elevata dell'arena serve a
-verificare le pause avanzate, non a stimare il bilanciamento. Quattro run con
+raggiunge otto cicli e otto beat di recupero. La salute elevata dell'arena serve
+a verificare cicli ripetuti, non a stimare il bilanciamento. Quattro run con
 statistiche normali confrontano classico/M7 su due seed fino a Victory o
 Defeat, anch'esse ripetute; il driver semplice non rappresenta un giocatore
 esperto e può perdere. Ogni percorso controlla commit, log e terminazione.
@@ -1796,16 +1845,18 @@ che lo stato RNG non cambi e che la timeline termini senza errori.
 dopo vere giocate di Heavy Blow e Battle Focus.
 
 Con `--playtest-report`, oltre al report esistente, viene scritto un file
-separato `*.m7_N.json` con `schema_version = 1`, seed, configurazione e
-metriche M7: decisioni, timeout, pause, pulse forzati, carte anticipate,
-esiti QTE e tempo trascorso nelle decisioni e nell'ologramma. La creazione
+separato `*.m7_N.json` con `schema_version = 2`, seed, configurazione e
+metriche M7: decisioni, timeout, recuperi, beat del recupero (`forced_pulses`,
+nome storico), esiti QTE e tempo attivo (`decision_seconds`, incluso recupero)
+e nell'ologramma. La versione 2 rimuove durata della preparazione e carte
+anticipate; anche `odin_pp_m7_stress.json` usa lo schema 2. La creazione
 esclusiva evita sovrascritture; i tempi riflettono la sessione interattiva.
 Lo schema del report di combattimento classico resta invariato. I segmenti
 M7 vengono osservati separatamente: per il costo complessivo di una carta
 va considerata anche la successiva risposta nemica.
 
 Le regressioni di [tactical_test.odin](src/game/tactical_test.odin) verificano
-cicli, preparazione, timeout, QTE, angoli, difese e morte. I test
+cicli, recupero fisso, timeout, QTE, angoli, difese e morte. I test
 `tactical_room_pressure_test.odin` nei package game/main coprono reset della
 pressione alla nuova stanza, transizione con reward e mancata mutazione
 quando la costruzione fallisce. Quelle di [tactical_renderer_test.odin](src/render/tactical_renderer_test.odin)
@@ -1829,8 +1880,10 @@ La revisione del 9 ottobre distingue due problemi. È riprodotta e corretta
 la **pressione WASD persa durante la timeline M7**: il controller ritornava
 prima che il poll ordinario potesse leggerla. Ora conserva al massimo un
 passo nella stessa fase Combat/Loot, attraversando le continuazioni del
-pulse normale. QTE, recupero, preparazione, cambio fase, ologramma, pausa e
-perdita del focus annullano il passo; non esiste uno sblocco forzato.
+pulse normale. L'ingresso nel recupero scarta il vecchio buffer ma permette
+un nuovo passo nello stesso frame; durante il recupero i nuovi passi restano
+validi. QTE, cambio fase, ologramma, pausa e perdita del focus annullano il
+buffer; non esiste uno sblocco forzato.
 La regressione è stata verificata fallire prima della correzione.
 
 Il **blocco persistente anche con nuove pressioni** segnalato nel playtest
@@ -1846,14 +1899,14 @@ WASD consente di confrontare gli stati. La cattura non modifica il gioco.
 Per una traccia di ogni input durante lo sviluppo:
 
 ```sh
-odin run src -define:M7_INPUT_TRACE=true
+odin run src -o:none -define:M7_INPUT_TRACE=true
 ```
 
 Le regressioni di `tactical_controller_test.odin` verificano il buffer e i
 suoi confini; `tactical_liveness_test.odin` attraversa controller e timeline
 frame per frame, con timestep regolari/irregolari, velocità 1×/4×, QTE,
-preparazione e recuperi fino al quarto ciclo. Verifica inoltre tre finali di
-fight (parry, carta in preparazione, parry durante recupero), Loot, reward e
+recuperi ripetuti. Verifica inoltre tre finali di fight (parry, veleno durante
+recupero, parry durante recupero), Loot, reward e
 movimento nella nuova stanza. Un harness esplorativo temporaneo ha provato
 192 partite generate: 7.610 comandi, 8.028 pulse, 474 tiri di dadi e 388
 Refocus, senza stalli; questo non dimostra l'assenza del bug segnalato.
@@ -1928,8 +1981,9 @@ Il ciclo di penalità era conservato in `Player.tactical` anche entrando nella
 stanza successiva. `begin_tactical_room` ripristina ora ciclo zero, fase Decision,
 timer/budget configurati, zero pulse residui e zero recupero schivata. Il reset
 avviene soltanto dopo la costruzione riuscita della stanza; configurazione,
-orientamento e metriche cumulative restano conservati. La sequenza `1, 3, 5…`
-riparte in ogni stanza M7. I percorsi classici non applicano questo reset.
+orientamento e metriche cumulative restano conservati. Ogni stanza riparte da
+Pulse 1; il recupero resta sempre di un secondo. I percorsi classici non
+applicano questo reset.
 
 Le stanze procedurali M7 selezionano lo spawn centrale **prima** di collocare
 incontri e oggetti. Viene scelta la cella valida più vicina al centro, con
@@ -1972,6 +2026,123 @@ ruotato, loot e nuova stanza. Nel campione finale di 328 frame il costo CPU
 medio di invio draw è 7,729 ms (picco 15,465 ms, Apple M1, `-o:none`), sempre
 esclusi present/vsync, cattura PNG e completamento GPU.
 
+### Mura interne trasparenti e perimetro orientato alla camera
+
+Nel diorama 3D le mura interne conservano l'altezza completa (1,58 unità),
+con corpo e rilievi blu semitrasparenti e zoccolo opaco per rendere leggibile
+la cella occupata. Si abbassano a 0,5 unità soltanto i due lati del perimetro
+rivolti verso la camera. I lati opposti rimangono alti; un raccordo angolare
+continuo evita scatti quando la camera passa da un quadrante al successivo.
+Lo spostamento del player o lo zoom non cambiano i lati abbassati.
+
+`render/diorama_scene.odin` separa basamenti opachi e corpi delle mura.
+`render/tactical_translucency.odin` ordina pareti interne e sprite insieme,
+dal fondo verso la camera, conservando il test di profondità del terreno
+senza scrivere profondità per le superfici trasparenti. Anche rilievi e
+lampade interne seguono la trasparenza. Il buffer di ordinamento riusa la
+capacità fra i frame ed è rilasciato con il renderer.
+
+È una modifica di presentazione: le mura restano solide e bloccano la linea
+di vista. La fog di combattimento continua a nascondere le celle non visibili;
+il materiale trasparente non rivela nemici oltre la fog. L'ologramma conserva
+la propria geometria e il timer attivo; la modalità classica non cambia.
+
+Le regressioni coprono classificazione interno/perimetro, quattro quadranti,
+rotazione continua, traslazione/zoom, ordine dei layer e visibilità. Lo smoke
+`m7_wall_smoke.odin`, incluso in `--smoke-m7-view`, cattura un combattimento
+con nemico occluso e quattro angoli della stessa stanza in Loot:
+`odin_pp_m7_walls_combat.png` e `odin_pp_m7_walls_corner_0.png` … `_3.png`.
+
+Verifica della revisione: `scripts/check.sh` supera 645 test con e senza
+assert, strict/vet e le due build. Gli smoke headless e 3D passano; la prova
+in finestra include quattro angoli, nemico nascosto dalla fog, combattimento,
+movimento nel Loot e nuova stanza, con zero errori della timeline.
+
+### M7: pulse temporale e cadenze autonome
+
+`game/tactical_clock.odin` riceve sia il tempo decisionale reale sia il costo
+delle azioni accettate. Accumula le frazioni e accoda beat da un secondo;
+`Continue_Pulse` li risolve con log limitati, senza ricorsione né perdita dei
+beat durante un QTE. La scadenza della finestra usa `tactical_expire_window`,
+dopo aver risolto il tempo già pagato. `remaining` non viene più ripristinato
+al termine di ogni comando. Le regole e i valori iniziali sono descritti in
+[Modalità tattica M7](#modalità-tattica-m7).
+
+I nemici conservano una scadenza individuale e l'intento già annunciato.
+Gli status, le bombe e i recuperi avanzano sul clock del mondo; l'energia ha
+una cadenza distinta di tre secondi. Stagger cancella un intento anche prima
+della sua scadenza e lascia almeno un secondo di recupero sfruttabile dopo
+il costo della carta. Fine fight e nuova stanza cancellano frazioni/debito,
+continuazioni e QTE. Il classico conserva la risposta a ogni comando.
+
+La presentazione M7 ha due canali: l’azione del player e i cue del mondo.
+`drain_tactical_world_commands` completa i segmenti logici dovuti nello stesso
+frame, con budget derivato dal debito e dal numero massimo di nemici; si ferma
+su QTE o fine fight. Il polling del player avviene subito dopo, senza attendere
+le immagini. `renderer_blocks_player_input` considera soltanto la propria azione;
+`renderer_timeline_is_busy` include entrambi i canali per completare correttamente
+transizioni e smoke. Il clock reale continua in entrambi i casi.
+
+`render/world_playback.odin` conserva cue e trasformazioni, senza sostituire lo
+stato aggiornato con snapshot di vecchi beat. Corpi diversi si animano insieme;
+i waypoint dello stesso corpo mantengono ordine e durata. Un banco limitato,
+allocato una volta e riutilizzato, riserva spazio prima del commit logico: nessun
+beat già applicato perde la sua presentazione. Clear e distruzione includono
+entrambi i canali. Lo snapshot diagnostico F8 distingue il blocco della propria
+animazione, i cue del mondo e il debito del clock. Il flag interno `forced`
+identifica soltanto i beat maturati durante il recupero e non blocca l'input.
+
+Lo smoke `m7_timed_pulse_smoke.odin` esegue due passi e Guard nello stesso
+Pulse 1 (`20 → 17 s`), poi consulta l'ologramma per 1,25 secondi (`15,75 s`).
+Controlla che inseguitore e bruto agiscano rispettivamente al secondo e al
+quarto beat, senza ulteriori comandi del player. Salva
+`odin_pp_m7_timed_actions.png` e `odin_pp_m7_timed_hologram.png`.
+Lo smoke `m7_independent_world_smoke.odin` esegue un passo, una nuova pressione
+e Guard durante animazioni nemiche ancora attive, facendo avanzare il clock a
+ogni frame. Salva `odin_pp_m7_independent_movement.png` e
+`odin_pp_m7_independent_card.png`; `odin_pp_m7_independent_ready.png` mostra
+il ritorno immediato ai comandi mentre i nemici stanno ancora animando.
+Le regressioni verificano anche interpolazione
+simultanea, stato aggiornato dopo danni/scudi, velocità di playback 1×/4× e
+clock attivo durante l’animazione del player.
+Le regressioni coprono anche input esattamente sul beat, targeting conservato,
+scadenza senza doppio addebito, animazioni/QTE, tempo frazionario, interruzioni
+e cancellazione del debito nel Loot. La fixture grafica usa salute elevata
+per verificare il flusso; i costi sono una prima taratura da valutare in run.
+
+Verifica finale: `scripts/check.sh` passa 683 test con e senza assert, strict/vet
+e le due build. Lo smoke headless completa dieci preset e quattro run terminali
+ripetuti due volte. Lo smoke 3D verifica azioni multiple, ologramma, nove feedback,
+combattimento/Loot/stanza successiva e quattro angoli delle mura, senza errori
+della timeline. La QA visiva conferma costi energetici e temporali distinti e
+countdown dei nemici leggibili; il bilanciamento resta da valutare giocando.
+
+
+### M7: recupero mobile di un secondo
+
+Il precedente salto di turno contava beat `1, 3, 5…` ma aspettava la timeline
+per ogni segmento: la durata percepita dipendeva da nemici, effetti e velocità
+visiva. Ora `TACTICAL_RECOVERY_SECONDS = 1` usa il clock attivo condiviso.
+`tactical_allows_movement` separa la camminata dall'offensiva;
+`tactical_allows_action` viene usato da gameplay, carte, preview e HUD.
+Il controllo dell'attacco contro un nemico avviene prima di modificare il log.
+
+`Recovery` sostituisce `Forced`; sono rimossi `Preparation`, `End_Preparation`,
+la configurazione della preparazione, il contatore di pulse da saltare e la
+formula crescente. `Continue_Pulse` accetta soltanto beat già maturati:
+richiamarlo non accelera il recupero. `tactical_finish_recovery` riattiva le
+azioni soltanto dopo timer zero, debito risolto e nessun QTE pendente. Camminare
+non genera tempo, energia o beat aggiuntivi; bombe, status e collisioni
+conservano gli effetti normali. Il classico conserva le sue regole.
+
+Le regressioni verificano partizioni del secondo a 1/4/60/120 aggiornamenti,
+playback 1×/4×, passi ripetuti gratuiti, attacchi/carte/refocus respinti senza
+mutazioni, beat anticipato, QTE sospeso e ripreso, morte da hazard e fine fight
+da veleno. `m7_recovery_smoke.odin` usa i comandi reali anche nella finestra 3D:
+cattura `odin_pp_m7_recovery_walk.png` a metà recupero, dopo due passi, e
+verifica il ritorno delle carte al pulse successivo. Un secondo è la prima
+taratura da valutare con partite reali, non un bilanciamento definitivo.
+
 ### M7G: lavoro restante dopo il prototipo
 
 Restano da svolgere le revisioni del codice e i playtest umani concordati:
@@ -1979,14 +2150,14 @@ Restano da svolgere le revisioni del codice e i playtest umani concordati:
 - confrontare 15/20 secondi e 3×3/5×5/7×7 separatamente, poi insieme;
 - valutare la leggibilità di minacce, carte e QTE, compreso l'uso dell'ologramma
   mentre il timer scorre e la durata del parry;
-- misurare danni durante pause avanzate, valore della preparazione e perdita
-  di controllo causata dalla crescita senza limite;
+- misurare danni ed efficacia del movimento nel recupero fisso di un secondo,
+  per tararne la durata senza reintrodurre blocchi crescenti;
 - provare il nuovo ritmo dei bombaroli (preparazione, miccia 3, danno 3,
   recupero 2, limite condiviso 1), le spinte dei bruti e i barili accesi dai boss;
 - valutare due nemici aggiuntivi, vista 7×7/9×9 e recupero di due pulse della
   schivata; confrontare la frequenza dei QTE e il valore di Afterimage;
 - verificare il valore delle carte a lungo raggio con fog e delle combinazioni
-  di pesca/creazione durante la preparazione;
+  di pesca/creazione dentro la finestra temporale;
 - decidere eventuali correzioni a progressione, costi, durata delle finestre
   e gestione dei rimpiazzi sulle evidenze delle run.
 

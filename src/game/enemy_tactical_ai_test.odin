@@ -50,6 +50,11 @@ test_m7_bombers_prepare_one_frozen_throw_with_three_pulses_to_escape :: proc(t: 
 	for enemy in room.enemies { if enemy.intent.windup { count += 1 } }
 	testing.expect_value(t, count, 1)
 	anchor := player.position
+	initial := room.enemies[0].intent
+	testing.expect(t, !tactical_tick(&room, 3, true, false))
+	drain_tactical_test_pulse(t, &room)
+	testing.expect_value(t, room.enemies[0].intent, initial)
+	testing.expect(t, !room.enemies[0].bomb_ready)
 	wait_player_turn(&room)
 	drain_tactical_test_pulse(t, &room)
 	testing.expect_value(t, active_bomb_count(&room), 0)
@@ -74,8 +79,9 @@ test_m7_shoving_a_prepared_bomber_cancels_throw_and_still_grants_recovery :: pro
 	room := create_enemy_rework_room(t, &data, &player, spawns[:])
 	defer level.destroy(&data)
 	defer destroy_room(&room)
-	wait_player_turn(&room)
+	testing.expect(t, !tactical_tick(&room, 4, true, false))
 	drain_tactical_test_pulse(t, &room)
+	testing.expect(t, room.enemies[0].bomb_ready)
 	action := make_action(.Trigger, PLAYER_ENTITY, entity_target(enemy_entity(1)), .Opponent)
 	testing.expect(t, add_effect(&action, move_effect(enemy_entity(1), {6, 1})))
 	report := resolve_action(&room, &action)
@@ -156,6 +162,9 @@ test_m7_charge_can_be_parried_once_and_retains_recovery :: proc(t: ^testing.T) {
 	room := create_enemy_rework_room(t, &data, &player, spawns[:])
 	defer level.destroy(&data)
 	defer destroy_room(&room)
+	// Wait through the brute's first three seconds, then defend its deadline.
+	testing.expect(t, !tactical_tick(&room, 3, true, false))
+	drain_tactical_test_pulse(t, &room)
 	_, _ = apply_status(&room, PLAYER_ENTITY, .Shield, 3, 3)
 	testing.expect_value(t, room.enemies[0].intent.kind, Enemy_Intent_Kind.Charge)
 	wait_player_turn(&room)
@@ -168,7 +177,7 @@ test_m7_charge_can_be_parried_once_and_retains_recovery :: proc(t: ^testing.T) {
 	testing.expect_value(t, room.enemies[0].position, grid.Position{7, 4})
 	testing.expect_value(t, room.enemies[0].health, i32(18))
 	testing.expect_value(t, room.enemies[0].intent.kind, Enemy_Intent_Kind.Recover)
-	testing.expect_value(t, room.pulse_count, u64(1))
+	testing.expect_value(t, room.pulse_count, u64(4))
 }
 
 @(test)

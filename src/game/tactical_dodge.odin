@@ -17,8 +17,8 @@ tactical_dodge_has_landing :: proc(room: ^Room) -> bool {
 }
 
 start_tactical_dodge_recovery :: proc(room: ^Room) {
-	// The pulse containing the dodge finishes next; then two whole pulses
-	// must pass. Forced pulses count, opening/closing UI does not.
+	// Pay the dodge's second, then leave two whole world seconds of recovery.
+	// Window recovery beats count; opening/closing UI does not.
 	room.player.tactical.dodge_recovery = TACTICAL_DODGE_RECOVERY+1
 }
 
@@ -50,6 +50,6 @@ try_dodge_player :: proc(room: ^Room, direction: Move_Direction) -> bool {
 	start_tactical_dodge_recovery(room)
 	room.player.tactical.facing = direction
 	collect_loot_in_magnet_range(room)
-	_, _ = finish_player_combat_command(room)
+	_, _ = finish_player_combat_command(room, TACTICAL_DODGE_SECONDS)
 	return true
 }

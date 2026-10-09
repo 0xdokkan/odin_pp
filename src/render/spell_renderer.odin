@@ -219,7 +219,7 @@ draw_spell_cue :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) {
 
 draw_spell_path_preview :: proc(renderer: ^Renderer, room: ^game.Room, card_id: u32) {
 	if renderer == nil || room == nil || room.player == nil || !renderer.has_hovered_cell ||
-	   renderer_timeline_is_busy(renderer) { return }
+	   renderer_blocks_player_input(renderer) { return }
 	index, found := game.hand_card_index_by_id(&room.player.deck, card_id)
 	if !found { return }
 	card := room.player.deck.hand[index]

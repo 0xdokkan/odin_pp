@@ -94,7 +94,7 @@ draw_hologram_projection :: proc(renderer: ^Renderer, room: ^game.Room) {
 	rlgl.DrawRenderBatchActive()
 	rlgl.DisableDepthMask()
 	rl.DrawCube({w*0.5, 0.033, scan}, w-2, 0.002, 0.055, {100, 202, 230, 90})
-	if !renderer_timeline_is_busy(renderer) {
+	if tactical_telegraphs_are_visible(renderer, room) {
 		for &enemy in room.enemies {
 			if game.enemy_is_staggered(room, &enemy) { continue }
 			for cell in enemy.intent.threatened_cells[:enemy.intent.threatened_cell_count] { draw_hologram_threat(room, cell) }

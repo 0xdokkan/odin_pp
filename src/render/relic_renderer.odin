@@ -119,7 +119,11 @@ relic_bar_contains_point :: proc(renderer: ^Renderer, room: ^game.Room, point: v
 	raised_card_id: u32 = 0) -> bool {
 	if renderer == nil || room == nil || room.player == nil { return false }
 	relics := &room.player.relics
-	if renderer_timeline_is_busy(renderer) && renderer.timeline.view.valid { relics = &renderer.timeline.view.relics }
+	if renderer.tactical.enabled && renderer.tactical.snapshot != nil && renderer.tactical.snapshot.valid {
+		relics = &renderer.tactical.snapshot.relics
+	} else if renderer_blocks_player_input(renderer) && renderer.timeline.view.valid {
+		relics = &renderer.timeline.view.relics
+	}
 	if relics.count <= 0 { return false }
 	// The hand is drawn above this bar, including the enlarged hovered card.
 	deck, _ := renderer_hand_deck(renderer, room)
@@ -135,7 +139,11 @@ relic_bar_bounds :: proc(renderer: ^Renderer, count: int) -> rl.Rectangle {
 draw_relic_bar :: proc(renderer: ^Renderer, room: ^game.Room, point: view.Vec2, mouse_inside: bool,
 	raised_card_id: u32 = 0) {
 	relics := &room.player.relics
-	if renderer_timeline_is_busy(renderer) && renderer.timeline.view.valid { relics = &renderer.timeline.view.relics }
+	if renderer.tactical.enabled && renderer.tactical.snapshot != nil && renderer.tactical.snapshot.valid {
+		relics = &renderer.tactical.snapshot.relics
+	} else if renderer_blocks_player_input(renderer) && renderer.timeline.view.valid {
+		relics = &renderer.timeline.view.relics
+	}
 	if relics.count == 0 { return }
 	can_hover := mouse_inside && relic_bar_contains_point(renderer, room, point, raised_card_id)
 	if renderer.tactical.enabled {

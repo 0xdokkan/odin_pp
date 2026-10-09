@@ -17,6 +17,7 @@ test_m7_movement_pressed_during_loot_animation_is_delivered_once :: proc(t: ^tes
 	defer game.destroy_room(&room)
 	renderer := new(render.Renderer)
 	defer free(renderer)
+	defer render.destroy_renderer_world_playback(renderer)
 	controller := Tactical_Controller{was_focused = true}
 	cards: Card_Interaction_State
 	buffer: Buffered_Gameplay_Command
@@ -42,7 +43,7 @@ test_m7_movement_pressed_during_loot_animation_is_delivered_once :: proc(t: ^tes
 }
 
 @(test)
-test_m7_buffered_walk_survives_the_normal_segmented_enemy_response :: proc(t: ^testing.T) {
+test_m7_world_continuations_release_walk_without_waiting_for_enemy_animation :: proc(t: ^testing.T) {
 	for during_timeline in ([2]bool{true, false}) { expect_m7_buffered_walk_through_pulse(t, during_timeline) }
 }
 
@@ -55,47 +56,53 @@ expect_m7_buffered_walk_through_pulse :: proc(t: ^testing.T, during_timeline: bo
 	room, ok := game.create_room(&data, &player, {enemies = enemies[:]})
 	testing.expect(t, ok)
 	defer game.destroy_room(&room)
+	// The charged second actually moves this enemy, so a completed beat must
+	// release input while its visual response is still being presented.
+	room.enemies[0].tactical_cooldown = 1
 	renderer := new(render.Renderer)
 	defer free(renderer)
+	defer render.destroy_renderer_world_playback(renderer)
 	controller := Tactical_Controller{was_focused = true}
 	cards: Card_Interaction_State
 	buffer: Buffered_Gameplay_Command
 	testing.expect(t, commit_gameplay_command(&room, renderer, &cards,
 		{kind = .Move, origin_phase = .Combat, direction = .East}))
 	if !during_timeline { render.update_renderer_event_timeline(renderer, 100) }
-	testing.expect(t, step_tactical_controller(&controller, &room, renderer, &cards, &buffer,
-		0, true, {focused = true, directions = {false, false, true, false}}))
-	testing.expect(t, buffer.occupied)
-	input_released := false
-	for _ in 0..<12 {
-		render.update_renderer_event_timeline(renderer, 100)
-		if !step_tactical_controller(&controller, &room, renderer, &cards, &buffer, 0, true, {focused = true}) {
-			input_released = true
-			break
-		}
-		testing.expect(t, buffer.occupied, "normal pulse continuations must not drop the queued walk")
-	}
-	testing.expect(t, input_released)
+	blocked := step_tactical_controller(&controller, &room, renderer, &cards, &buffer,
+		0, true, {focused = true, directions = {false, false, true, false}})
+	// Only the player's own unfinished step keeps its usual single walk
+	// buffer. Ordinary world work completes in this same controller frame.
+	testing.expect_value(t, blocked, during_timeline)
+	testing.expect_value(t, buffer.occupied, during_timeline)
 	testing.expect_value(t, room.qte.kind, game.QTE_Kind.None)
 	testing.expect_value(t, player.tactical.phase, game.Tactical_Phase.Decision)
 	testing.expect_value(t, room.pulse_count, u64(1))
-	command, buffered := take_gameplay_command(&buffer)
-	testing.expect(t, buffered)
-	if buffered {
-		testing.expect(t, commit_gameplay_command(&room, renderer, &cards, command))
-		testing.expect_value(t, player.position, grid.Position{2, 2})
+	testing.expect(t, !room.tactical_pulse.pending)
+	command := Gameplay_Command{kind = .Move, origin_phase = .Combat, direction = .South}
+	if during_timeline {
+		render.update_renderer_event_timeline(renderer, 100)
+		testing.expect(t, !step_tactical_controller(&controller, &room, renderer, &cards, &buffer,
+			0, true, {focused = true}))
+		buffered_command, buffered := take_gameplay_command(&buffer)
+		testing.expect(t, buffered, "normal world continuations must preserve the player's buffered walk")
+		if buffered { command = buffered_command }
 	}
+	testing.expect(t, commit_gameplay_command(&room, renderer, &cards, command))
+	testing.expect_value(t, player.position, grid.Position{2, 2})
+	_, duplicated := take_gameplay_command(&buffer)
+	testing.expect(t, !duplicated)
 }
 
 @(test)
 test_m7_input_buffer_is_discarded_at_rules_and_interaction_boundaries :: proc(t: ^testing.T) {
-	Boundary :: enum {QTE, Preparation, Forced, Map_Open, Map_Close, Pause, Focus, Unavailable, Phase_Change}
+	Boundary :: enum {QTE, Map_Open, Map_Close, Pause, Focus, Unavailable, Phase_Change}
 	for boundary in Boundary {
 		player: game.Player
 		testing.expect(t, game.configure_tactical(&player, game.DEFAULT_TACTICAL_CONFIG))
 		room := game.Room{player = &player, phase = .Combat}
 		renderer := new(render.Renderer)
 		defer free(renderer)
+		defer render.destroy_renderer_world_playback(renderer)
 		renderer.canvas_width, renderer.canvas_height = 960, 540
 		// The boundary must win even when presentation still owns the frame.
 		renderer.timeline.count = 1
@@ -108,8 +115,6 @@ test_m7_input_buffer_is_discarded_at_rules_and_interaction_boundaries :: proc(t:
 		available := true
 		switch boundary {
 		case .QTE: room.qte.kind = .Defense
-		case .Preparation: player.tactical.phase = .Preparation
-		case .Forced: player.tactical.phase = .Forced
 		case .Map_Open: input.map_input.toggle = true
 		case .Map_Close: controller.hologram = true; input.map_input.close = true
 		case .Pause: input.pause = true
@@ -129,6 +134,7 @@ test_m7_focus_resume_does_not_charge_absence_or_replay_queued_input :: proc(t: ^
 	room := game.Room{player = &player, phase = .Combat}
 	renderer := new(render.Renderer)
 	defer free(renderer)
+	defer render.destroy_renderer_world_playback(renderer)
 	controller := Tactical_Controller{was_focused = true}
 	cards: Card_Interaction_State
 	buffer: Buffered_Gameplay_Command

@@ -120,7 +120,7 @@ actor_body_at_point :: proc(renderer: ^Renderer, room: ^game.Room, point: view.V
 
 grid_object_at_canvas_point :: proc(renderer: ^Renderer, room: ^game.Room, point: view.Vec2) -> (index: int, found: bool) {
 	if renderer == nil || room == nil || renderer.camera.zoom <= 0 ||
-	   !view.projection_is_valid(&renderer.projection) || renderer_timeline_is_busy(renderer) {
+	   !view.projection_is_valid(&renderer.projection) || renderer_blocks_player_input(renderer) {
 		return
 	}
 	// Actors are drawn after objects. A bomb beneath an enemy must not steal its click.
@@ -147,7 +147,7 @@ object_aware_card_target_cell :: proc(
 ) -> grid.Position {
 	definition, valid := game.card_definition_by_id(card.definition_id)
 	if !valid || renderer == nil || room == nil || definition.targeting.shape != .Single ||
-	   renderer_timeline_is_busy(renderer) {
+	   renderer_blocks_player_input(renderer) {
 		return floor_cell
 	}
 	if definition.targeting.rule != .Opponent && definition.targeting.rule != .Opponent_Or_Object &&
@@ -177,7 +177,7 @@ object_aware_card_target_cell :: proc(
 update_object_target_hover :: proc(renderer: ^Renderer, room: ^game.Room, point: view.Vec2, card_id: u32) {
 	if renderer == nil || room == nil || room.player == nil || room.level_data == nil ||
 	   renderer.camera.zoom <= 0 || !view.projection_is_valid(&renderer.projection) ||
-	   renderer_timeline_is_busy(renderer) || !card_drop_area_contains(renderer, point) {
+	   renderer_blocks_player_input(renderer) || !card_drop_area_contains(renderer, point) {
 		return
 	}
 	position := view.canvas_to_cell(&renderer.camera, &renderer.projection, point)
@@ -236,7 +236,7 @@ object_shove_hint :: proc(room: ^game.Room, object_id, active_card_id: u32) -> (
 }
 
 draw_object_interaction_ground :: proc(renderer: ^Renderer, room: ^game.Room, active_card_id: u32) {
-	if renderer == nil || room == nil || !renderer.has_hovered_cell || renderer_timeline_is_busy(renderer) {
+	if renderer == nil || room == nil || !renderer.has_hovered_cell || renderer_blocks_player_input(renderer) {
 		return
 	}
 	index, found := game.object_index_at(room, renderer.hovered_cell)
@@ -269,7 +269,7 @@ draw_object_interaction_ground :: proc(renderer: ^Renderer, room: ^game.Room, ac
 
 draw_object_interaction_help :: proc(renderer: ^Renderer, room: ^game.Room, point: view.Vec2, active_card_id: u32) {
 	if renderer == nil || room == nil || room.player == nil || room.phase != .Combat ||
-	   renderer_timeline_is_busy(renderer) {
+	   renderer_blocks_player_input(renderer) {
 		return
 	}
 	selected_shove := false

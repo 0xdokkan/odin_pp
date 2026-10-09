@@ -72,56 +72,62 @@ draw_tactical_status :: proc(renderer: ^Renderer, room: ^game.Room) {
 		bounds := rl.Rectangle{14+f32(index)*status_width, 65, status_width-3, 17}
 		rl.DrawRectangleRec(bounds, {14, 21, 31, 225})
 		rl.DrawRectangleRec({bounds.x, bounds.y, 1, bounds.height}, accent)
-		gothic_text_fit(renderer, fmt.ctprintf("%s %d/%d", label, status.potency, status.remaining_pulses), {bounds.x+4, bounds.y, bounds.width-6, 17}, 12, accent)
+		gothic_text_fit(renderer, fmt.ctprintf("%s %d / %ds", label, status.potency, status.remaining_pulses), {bounds.x+4, bounds.y, bounds.width-6, 17}, 12, accent)
 	}
 }
 
 draw_tactical_hud :: proc(renderer: ^Renderer, room: ^game.Room, paused, hologram: bool) {
 	s := &room.player.tactical
 	combat := renderer.tactical.snapshot.phase == .Combat
-	busy := renderer_timeline_is_busy(renderer)
+	busy := renderer_blocks_player_input(renderer)
+	recovering := game.tactical_is_recovering(room)
 	bounds := tactical_phase_bounds(renderer)
 	x, y, width := bounds.x, bounds.y, bounds.width
-	label: cstring = "DECIDI"
+	label: cstring = "AGISCI"
 	switch s.phase {
 	case .Decision:
-	case .Preparation: label = "PREPARA"
-	case .Forced: label = "RECUPERO"
+	case .Recovery: label = "RECUPERO"
 	case .Resolving: label = "AZIONE"
 	}
 	if !combat { label = "ESPLORA" }
+	else if room.qte.kind != .None { label = "DIFESA" }
+	else if recovering { label = "RECUPERO" }
 	else if busy { label = "AZIONE" }
-	timed := combat && !busy && (s.phase == .Decision || s.phase == .Preparation)
+	// Player and world presentation do not suspend the pulse clock. QTEs
+	// retain their explicit defensive pause and expose the same time budget.
+	timed := combat
 	accent := GOTHIC_RED if timed && s.remaining <= 5 else GOTHIC_BLUE
+	if recovering { accent = {218, 169, 90, 255} }
 	tactical_hud_panel(bounds, accent)
-	gothic_text_fit(renderer, fmt.ctprintf("PULSE %d", renderer_status_view(renderer, room).pulse_count), {x+12, y+7, 91, 22}, 16, GOTHIC_MUTED)
+	gothic_text_fit(renderer, fmt.ctprintf("PULSE %d", min(s.cycle, max(int)-1)+1), {x+12, y+7, 91, 22}, 16, GOTHIC_MUTED)
 	gothic_text_fit(renderer, label, {x+107, y+7, 106, 22}, 18, GOTHIC_PAPER)
 	if timed {
 		gothic_text_fit(renderer, fmt.ctprintf("%.1fs", s.remaining), {x+width-83, y+4, 72, 27}, 24, accent)
-	} else if combat && s.phase == .Forced {
-		gothic_text_fit(renderer, fmt.ctprintf("%dP", s.skipped_remaining), {x+width-63, y+4, 52, 27}, 24, GOTHIC_RED)
 	}
 	budget := max(f32(1), f32(s.budget))
-	if s.phase == .Preparation { budget = max(f32(1), s.config.preparation_seconds) }
+	if recovering { budget = game.TACTICAL_RECOVERY_SECONDS }
 	rl.DrawRectangleRec({x+12, y+35, width-24, 4}, GOTHIC_STEEL)
 	if timed {
 		rl.DrawRectangleRec({x+12, y+35, (width-24)*clamp(s.remaining/budget, f32(0), f32(1)), 4}, accent)
 	} else if !combat {
 		rl.DrawRectangleRec({x+12, y+35, width-24, 2}, GOTHIC_BLUE)
 	}
-	status := fmt.ctprintf("DOPO: %ds / %d PULSE DI RECUPERO", max(0, s.budget-1), game.tactical_skip_count(min(s.cycle, max(int)-1)+1))
-	if s.phase == .Forced { status = "RECUPERO AUTOMATICO" }
-	if s.phase == .Preparation { status = "GIOCA CARTE / INVIO: TERMINA" }
-	if busy { status = "RISOLUZIONE DELL'AZIONE" }
+	status := fmt.ctprintf("PASSO / ATTACCO -%.0fs / RECUPERO %.0fs", game.TACTICAL_MOVE_SECONDS, game.TACTICAL_RECOVERY_SECONDS)
+	if busy { status = "AZIONE / I NEMICI CONTINUANO" }
+	if recovering { status = "MUOVITI / CARTE E ATTACCHI IN RECUPERO" }
+	if room.qte.kind != .None { status = "QTE / TEMPO DEL PULSE SOSPESO" }
 	if !combat { status = "RACCOGLI IL BOTTINO / RAGGIUNGI L'USCITA" }
-	if hologram && combat { status = "MAPPA APERTA / IL TEMPO SCORRE" }
+	if hologram && combat && room.qte.kind == .None {
+		status = "MAPPA APERTA / RECUPERO IN CORSO" if recovering else "MAPPA APERTA / IL TEMPO SCORRE"
+	}
 	gothic_text_fit(renderer, status, {x+12, y+46, width-24, 18}, 12, accent if hologram else GOTHIC_MUTED)
 	gothic_button(renderer, tactical_map_controls_bounds(renderer), "TAB", "CHIUDI" if hologram else "MAPPA", room.qte.kind == .None)
 	if !hologram && combat {
-		gothic_button(renderer, tactical_refocus_bounds(renderer), "F", "REFOCUS", refocus_button_is_enabled(renderer))
-		ready := game.tactical_dodge_ready(room)
+		gothic_button(renderer, tactical_refocus_bounds(renderer), "F", fmt.ctprintf("REFOCUS -%.0fs", game.TACTICAL_REFOCUS_SECONDS), refocus_button_is_enabled(renderer))
+		ready := game.tactical_dodge_ready(room) && !recovering
 		recovery := max(0, s.dodge_recovery-(1 if room.tactical_pulse.pending else 0))
-		text := "SHIFT: SCHIVA" if ready else fmt.ctprintf("SCHIVA: %dP", recovery)
+		text := fmt.ctprintf("SHIFT: SCHIVA -%.0fs", game.TACTICAL_DODGE_SECONDS) if ready else fmt.ctprintf("SCHIVA: %ds", recovery)
+		if recovering { text = "SCHIVA: IN RECUPERO" }
 		gothic_text_fit(renderer, text, {renderer.canvas_width-149, 73, 135, 15}, 10, GOTHIC_BLUE if ready else GOTHIC_MUTED)
 	}
 	if room.qte.kind != .None { draw_tactical_defense_hud(renderer, room) }

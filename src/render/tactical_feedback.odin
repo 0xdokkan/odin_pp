@@ -26,12 +26,14 @@ Tactical_Feedback_Pose :: struct {
 tactical_feedback_pose :: proc(renderer: ^Renderer, key: Sprite_Key, position: view.Vec2) -> Tactical_Feedback_Pose {
 	result := Tactical_Feedback_Pose{scale_y = 1, tint = rl.WHITE}
 	if renderer == nil || !renderer.tactical.enabled || !renderer.tactical.scene_3d { return result }
-	for offset in 0..<min(presentation_group_size(&renderer.timeline), MAX_TACTICAL_FEEDBACK_CUES) {
-		cue, found := presentation_cue_at(&renderer.timeline, offset)
+	for offset in 0..<renderer_active_cue_count(renderer) {
+		cue, found := renderer_active_cue_at(renderer, offset)
 		if !found || !cue.started { continue }
 		entity := cue.event.target
 		if cue.kind == .Card_Played { entity = game.PLAYER_ENTITY }
-		actor, exists := presentation_actor(&renderer.timeline, entity)
+		snapshot := renderer.tactical.snapshot
+		if snapshot == nil { snapshot = &renderer.timeline.view }
+		actor, exists := presentation_actor_in_view(snapshot, entity)
 		if !exists || !actor.visible || actor.position != position { continue }
 		actor_key := Sprite_Key.Player if entity == game.PLAYER_ENTITY else sprite_key_for_enemy(actor.archetype)
 		if key != actor_key { continue }
@@ -183,8 +185,8 @@ draw_tactical_feedback :: proc(renderer: ^Renderer, layer: Tactical_Feedback_Lay
 		}
 		draw_tactical_status_rune(renderer, &renderer.tactical.snapshot.player)
 	}
-	for offset in 0..<min(presentation_group_size(&renderer.timeline), MAX_TACTICAL_FEEDBACK_CUES) {
-		cue, found := presentation_cue_at(&renderer.timeline, offset)
+	for offset in 0..<renderer_active_cue_count(renderer) {
+		cue, found := renderer_active_cue_at(renderer, offset)
 		if !found || !cue.started || !tactical_cue_visible(renderer, cue) { continue }
 		p := presentation_cue_progress(cue)
 		alpha := tactical_feedback_alpha(p)

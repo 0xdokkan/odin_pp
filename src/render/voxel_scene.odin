@@ -13,8 +13,14 @@ draw_voxel_marker :: proc(cell: grid.Position, color: rl.Color) {
 	rl.DrawCubeWires(p, 0.87, 0.005, 0.87, color)
 }
 
+// Recovery remains a movement window: choosing a safe cell requires the
+// same current telegraphs while a player's recovery step is animating.
+tactical_telegraphs_are_visible :: proc(renderer: ^Renderer, room: ^game.Room) -> bool {
+	return !renderer_blocks_player_input(renderer) || game.tactical_is_recovering(room)
+}
+
 draw_voxel_threats :: proc(renderer: ^Renderer, room: ^game.Room) {
-	if !renderer_timeline_is_busy(renderer) {
+	if tactical_telegraphs_are_visible(renderer, room) {
 		for &enemy in room.enemies {
 			if game.enemy_is_staggered(room, &enemy) { continue }
 			color := GOTHIC_RED
@@ -43,7 +49,7 @@ draw_voxel_threats :: proc(renderer: ^Renderer, room: ^game.Room) {
 
 draw_voxel_fuse_labels :: proc(renderer: ^Renderer, room: ^game.Room) {
 	snapshot := renderer.tactical.snapshot
-	if !renderer_timeline_is_busy(renderer) {
+	if tactical_telegraphs_are_visible(renderer, room) {
 		for &enemy in room.enemies {
 			if game.enemy_is_staggered(room, &enemy) { continue }
 			if enemy.intent.kind != .Bombard || !tactical_render_visible(renderer, enemy.intent.destination) { continue }
@@ -58,7 +64,7 @@ draw_voxel_fuse_labels :: proc(renderer: ^Renderer, room: ^game.Room) {
 		if !object.visible || object.detonation_pulse == 0 || !tactical_render_visible(renderer, cell) { continue }
 		remaining := game.explosive_pulses_remaining(object.detonation_pulse, snapshot.pulse_count, object.fuse_pulses)
 		p := tactical_project(renderer, {object.position.x+0.5, object.position.y+0.5}, 0.85)
-		label := fmt.ctprintf("%d PULSE", remaining)
+		label := fmt.ctprintf("MICCIA %ds", remaining)
 		draw_tactical_label(renderer, p, label, "", GOTHIC_RED if remaining <= 1 else GOTHIC_PAPER)
 	}
 }

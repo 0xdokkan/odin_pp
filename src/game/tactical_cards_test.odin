@@ -43,6 +43,7 @@ test_tactical_dash_pays_one_shields_before_hazards_and_rejects_blocked_paths :: 
 		append(&room.traps, Trap{id = 99, position = {5, 4}, damage = 3, armed = true})
 		if blocked { append(&room.obstacles, Obstacle{position = {5, 4}}) }
 		before := player.deck
+		before_time := player.tactical.remaining
 		player.tactical.dodge_recovery = 2
 		result := play_card(&room, card.id, cell_target({6, 4}))
 		if blocked {
@@ -51,14 +52,20 @@ test_tactical_dash_pays_one_shields_before_hazards_and_rejects_blocked_paths :: 
 			testing.expect_value(t, player.position, grid.Position{4, 4})
 			testing.expect_value(t, player.statuses.count, 0)
 			testing.expect(t, !room.tactical_pulse.pending)
+			testing.expect_value(t, player.tactical.remaining, before_time)
 		} else {
 			testing.expect_value(t, result.result, Card_Play_Result.Played)
 			testing.expect_value(t, player.deck.energy, before.energy-1)
 			testing.expect_value(t, player.position, grid.Position{6, 4})
 			testing.expect_value(t, player.health, i32(99))
 			testing.expect_value(t, player.tactical.dodge_recovery, 2)
+			testing.expect_value(t, player.tactical.remaining, before_time-tactical_card_time_cost(.Dash))
 			drain_tactical_test_pulse(t, &room)
-			testing.expect_value(t, room.pulse_count, u64(1))
+			// One energy buys a two-second movement card, without beginning
+			// a new decision window or restarting the active-dodge cooldown.
+			testing.expect_value(t, room.pulse_count, u64(2))
+			testing.expect_value(t, player.tactical.cycle, 0)
+			testing.expect_value(t, player.tactical.dodge_recovery, 0)
 		}
 		destroy_room(&room)
 		level.destroy(&data)
@@ -82,6 +89,9 @@ test_tactical_heavy_blow_cancels_attack_and_opens_a_strike_window :: proc(t: ^te
 	testing.expect_value(t, player.health, i32(100))
 	testing.expect_value(t, room.enemies[0].intent.kind, Enemy_Intent_Kind.Recover)
 	testing.expect_value(t, room.enemies[0].statuses.count, 0)
+	testing.expect_value(t, room.pulse_count, u64(3))
+	testing.expect_value(t, player.tactical.remaining, f32(17))
+	testing.expect_value(t, room.enemies[0].recovery_pulses, i32(1))
 	strike := rework_hand_card(t, &room, .Strike)
 	action, err := compile_card_action(&room, strike, entity_target(enemy_entity(1)))
 	testing.expect_value(t, err, Card_Compile_Error.None)
@@ -92,6 +102,8 @@ test_tactical_heavy_blow_cancels_attack_and_opens_a_strike_window :: proc(t: ^te
 	testing.expect_value(t, room.enemies[0].health, i32(91))
 	testing.expect_value(t, player.health, i32(100))
 	testing.expect_value(t, tactical_strike_bonus(&room, enemy_entity(1)), i32(0))
+	testing.expect_value(t, player.tactical.remaining, f32(15))
+	testing.expect_value(t, player.tactical.cycle, 0)
 }
 
 @(test)

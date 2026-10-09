@@ -414,8 +414,11 @@ validate_enemy_intent_structure :: proc(room: ^Room, intent: ^Enemy_Intent) -> b
 	if room == nil || intent == nil || room.level_data == nil || room.phase != .Combat {
 		return false
 	}
-	if intent.kind == .None ||
-	   intent.planned_pulse != room.pulse_count+1 ||
+	// Classic telegraphs target the next pulse. Timed M7 telegraphs can remain
+	// committed across several world beats while their own deadline counts down.
+	valid_plan_time := intent.planned_pulse == room.pulse_count+1
+	if tactical_enabled(room) { valid_plan_time = intent.planned_pulse > 0 && intent.planned_pulse <= room.pulse_count+1 }
+	if intent.kind == .None || !valid_plan_time ||
 	   intent.path_count < 0 || intent.path_count > MAX_ENEMY_INTENT_PATH_CELLS ||
 	   intent.threatened_cell_count < 0 ||
 	   intent.threatened_cell_count > MAX_ENEMY_INTENT_THREAT_CELLS {
@@ -525,7 +528,9 @@ validate_enemy_intent_structure :: proc(room: ^Room, intent: ^Enemy_Intent) -> b
 }
 
 validate_enemy_intent :: proc(room: ^Room, enemy: ^Enemy) -> bool {
-	return enemy != nil && enemy.intent.origin == enemy.position &&
+	// M7 keeps a committed telegraph when a player pushes its owner. Its original
+	// origin deliberately survives until the deadline so that the action misses.
+	return enemy != nil && (enemy.intent.origin == enemy.position || tactical_enabled(room)) &&
 	       validate_enemy_intent_structure(room, &enemy.intent)
 }
 
@@ -571,15 +576,29 @@ plan_enemy_intents :: proc(room: ^Room) {
 		assert(found)
 		enemy := &room.enemies[enemy_index]
 		origin := predicted_positions[ordered_index]
+		if tactical_enabled(room) && enemy.intent.kind != .None && enemy.tactical_cooldown > 0 {
+			// Reserve the same committed destination while other enemies plan; a
+			// one-second world beat must not retarget a slower enemy's telegraph.
+			if enemy.intent.kind == .Move || enemy.intent.kind == .Charge {
+				predicted_positions[ordered_index] = enemy.intent.destination
+			}
+			if enemy.intent.kind == .Bombard {
+				bomb_anchors[bomb_anchor_count] = enemy.intent.destination
+				bomb_anchor_count += 1
+			}
+			continue
+		}
 		update_demolitionist_phase(enemy)
 		if enemy.recovery_pulses > 0 {
 			enemy.intent = make_wait_intent(room, origin)
 			enemy.intent.kind = .Recover
+			tactical_schedule_enemy(room, enemy)
 			continue
 		}
 		if tactical_enabled(room) && !enemy.bomb_ready && !enemy.aim_ready {
 			if escape, fleeing := tactical_enemy_escape(room, origin, &predicted_positions, enemy_count, ordered_index); fleeing {
 				enemy.intent = escape
+				tactical_schedule_enemy(room, enemy)
 				predicted_positions[ordered_index] = escape.destination
 				continue
 			}
@@ -648,6 +667,7 @@ plan_enemy_intents :: proc(room: ^Room) {
 			predicted_positions[ordered_index] = intent.destination
 		}
 		enemy.intent = intent
+		tactical_schedule_enemy(room, enemy)
 	}
 	assert(validate_enemy_intents(room))
 }

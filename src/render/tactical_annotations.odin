@@ -143,13 +143,14 @@ draw_tactical_annotations :: proc(renderer: ^Renderer, room: ^game.Room) {
 		if i, shielded := game.status_index(&actor.statuses, .Shield); shielded { first = fmt.ctprintf("HP %d / SC %d", actor.health, actor.statuses.items[i].potency) }
 		intent: cstring = ""
 		color := rl.Color{187, 106, 109, 255}
-		if !renderer_timeline_is_busy(renderer) {
+		if tactical_telegraphs_are_visible(renderer, room) {
 			if i, found := game.enemy_index_by_id(room, actor.entity.id); found {
 				enemy := &room.enemies[i]
 				intent = tactical_intent_label(enemy.intent)
 				if enemy.intent.windup { color = {218, 169, 90, 255} }
-				if enemy.intent.kind == .Recover { intent = fmt.ctprintf("RECUPERO %d", enemy.recovery_pulses); color = {124, 164, 190, 255} }
+				if enemy.intent.kind == .Recover { intent = fmt.ctprintf("RECUPERO %ds", enemy.recovery_pulses); color = {124, 164, 190, 255} }
 				if enemy.intent.kind == .Attack && !enemy.intent.windup { intent = fmt.ctprintf("%s %d", intent, enemy.intent.damage) }
+				if enemy.intent.kind != .Recover { intent = fmt.ctprintf("%s / %.1fs", intent, game.tactical_enemy_seconds(room, enemy)) }
 				if game.enemy_is_staggered(room, enemy) { intent = "INTERROTTO"; color = GOTHIC_PAPER }
 			}
 		}

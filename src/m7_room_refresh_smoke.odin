@@ -53,16 +53,17 @@ run_m7_room_refresh_smoke :: proc(window: ^app.Window, renderer: ^render.Rendere
 				{kind = .Wait, origin_phase = .Combat}) { return false }
 		}
 		if !m7_polish_check(run.player.tactical.cycle == cycle &&
-			run.player.tactical.skipped_remaining == 2*cycle-1,
-			"procedural room did not accumulate its recovery pressure") { return false }
-		if cycle == 1 && !m7_visual_command(&probe, window, renderer, &room, &cards,
-			{kind = .Continue_Pulse, origin_phase = .Combat}) { return false }
+			run.player.tactical.phase == .Recovery && run.player.tactical.remaining == game.TACTICAL_RECOVERY_SECONDS,
+			"procedural room did not keep recovery fixed at one second") { return false }
+		if !m7_visual_finish_recovery(&probe, window, renderer, &room, &cards) { return false }
 	}
 	for _ in 0..<256 {
 		if room.phase != .Combat { break }
 		command := Gameplay_Command{origin_phase = .Combat}
-		if run.player.tactical.phase == .Forced { command.kind = .Continue_Pulse }
-		else {
+		if run.player.tactical.phase == .Recovery {
+			if !m7_visual_finish_recovery(&probe, window, renderer, &room, &cards) { return false }
+			continue
+		} else {
 			for card in run.player.deck.hand[:run.player.deck.hand_count] {
 				if command.kind != .None || card.definition_id == .Dash { continue }
 				for enemy in room.enemies {
@@ -76,7 +77,6 @@ run_m7_room_refresh_smoke :: proc(window: ^app.Window, renderer: ^render.Rendere
 				}
 			}
 		}
-		if command.kind == .None && run.player.tactical.phase == .Preparation { command.kind = .End_Preparation }
 		if command.kind == .None {
 			direction, found := m7_route_move(&room)
 			if !m7_polish_check(found, "procedural enemies are unreachable") { return false }
@@ -107,7 +107,7 @@ run_m7_room_refresh_smoke :: proc(window: ^app.Window, renderer: ^render.Rendere
 	}
 	if next == game.INVALID_NODE_ID || !enter_demo_node(&data, &run, &room, next, true) { return false }
 	if !m7_polish_check(m7_room_refresh_spawn_valid(&room) && room.pulse_count == 0 &&
-		run.player.tactical.cycle == 0 && run.player.tactical.skipped_remaining == 0 &&
+		run.player.tactical.cycle == 0 &&
 		run.player.tactical.budget == config.timer_seconds && run.player.tactical.remaining == f32(config.timer_seconds) &&
 		run.player.tactical.phase == .Decision && run.player.tactical.metrics == metrics &&
 		game.tactical_allows_action(&room), "new procedural room retained pressure or an invalid spawn") { return false }

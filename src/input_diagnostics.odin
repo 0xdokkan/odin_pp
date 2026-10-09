@@ -40,8 +40,8 @@ format_input_diagnostic :: proc(storage: []u8, run: ^game.Run_State, room: ^game
 	fmt.sbprintf(&b, "player=%v health=%d deck_active=%v energy=%d hand_count=%d deck_resolving=%v tactical_allows_action=%v\n",
 		p.position, p.health, p.deck.combat_active, p.deck.energy, p.deck.hand_count,
 		p.deck.has_resolving_card, game.tactical_allows_action(room))
-	fmt.sbprintf(&b, "tactical_enabled=%v phase=%v remaining=%.9f budget=%d cycle=%d skipped=%d dodge_recovery=%d\n",
-		s.config.enabled, s.phase, s.remaining, s.budget, s.cycle, s.skipped_remaining, s.dodge_recovery)
+	fmt.sbprintf(&b, "tactical_enabled=%v phase=%v remaining=%.9f budget=%d cycle=%d recovering=%v dodge_recovery=%d\n",
+		s.config.enabled, s.phase, s.remaining, s.budget, s.cycle, game.tactical_is_recovering(room), s.dodge_recovery)
 	fmt.sbprintf(&b, "pulse_pending=%v started=%v forced=%v cursor=%d count=%d defense_answered=%d\n",
 		room.tactical_pulse.pending, room.tactical_pulse.started, room.tactical_pulse.forced,
 		room.tactical_pulse.cursor, room.tactical_pulse.count, room.tactical_pulse.defense_answered)
@@ -52,6 +52,12 @@ format_input_diagnostic :: proc(storage: []u8, run: ^game.Run_State, room: ^game
 		render.renderer_timeline_is_busy(renderer), renderer.timeline.head, renderer.timeline.count,
 		renderer.timeline.update_failures, renderer.timeline.dropped_count, render.renderer_playback_speed(renderer),
 		renderer.timeline.view.phase, renderer.timeline.view.player.position)
+	fmt.sbprintf(&b, "player_animation_blocks_input=%v world_busy=%v world_cues=%d world_high_water=%d world_rejected_batches=%d clock_fraction=%.6f queued_beats=%d\n",
+		render.renderer_blocks_player_input(renderer), render.renderer_world_is_busy(renderer),
+		(renderer.world_playback.count if renderer.world_playback != nil else 0),
+		(renderer.world_playback.high_water if renderer.world_playback != nil else 0),
+		(renderer.world_playback.rejected_batches if renderer.world_playback != nil else 0),
+		s.clock_fraction, s.queued_beats)
 	if cue, found := render.active_presentation_cue(&renderer.timeline); found {
 		fmt.sbprintf(&b, "active_cue=%v started=%v elapsed=%.9f duration=%.9f event=%v source=%v target=%v\n",
 			cue.kind, cue.started, cue.elapsed, cue.duration, cue.event.kind, cue.event.source, cue.event.target)

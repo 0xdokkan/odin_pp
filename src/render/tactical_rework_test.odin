@@ -37,7 +37,7 @@ test_reworked_card_costs_replay_in_the_same_catalog_as_the_hand :: proc(t: ^test
 	d, _ := game.card_definition_by_id(.Dash, true)
 	first, second := gothic_card_lines({definition_id = .Dash}, d.tactical)
 	testing.expect_value(t, string(first), "MUOVI 1-4 / SCUDO 2")
-	testing.expect_value(t, string(second), "SCUDO PRIMA / 2 PULSE")
+	testing.expect_value(t, string(second), "SCUDO PRIMA / 2s")
 }
 
 @(test)

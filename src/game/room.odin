@@ -108,6 +108,8 @@ Enemy :: struct {
 	aim_anchor: grid.Position,
 	bomb_ready: bool,
 	bomb_anchor: grid.Position,
+	// M7 only: seconds until this enemy resolves its committed intent.
+	tactical_cooldown: f32,
 }
 
 Trap :: struct {
@@ -613,12 +615,9 @@ player_command_outcome_for_phase :: proc(phase: Room_Phase) -> Player_Command_Ou
 	return .Combat_Continues
 }
 
-// Epilogo condiviso di ogni comando player accettato durante Combat: loot
-// magnetico, un solo pulse nemico, di nuovo loot, poi sync del deck quando il
-// fight finisce. Il pulse viene saltato se il comando stesso ha gia chiuso il
-// combattimento; l'ordine delle chiamate e un contratto osservato dai test e
-// dalla presentation timeline.
-finish_player_combat_command :: proc(room: ^Room) -> (
+// Accepted commands share loot and terminal cleanup. Classic advances one
+// response pulse; M7 pays combat time and queues the world beats it crosses.
+finish_player_combat_command :: proc(room: ^Room, time_cost: f32 = TACTICAL_ATTACK_SECONDS) -> (
 	pulse: Pulse_Report,
 	outcome: Player_Command_Outcome,
 ) {
@@ -631,12 +630,7 @@ finish_player_combat_command :: proc(room: ^Room) -> (
 		return
 	}
 	if tactical_enabled(room) {
-		if room.player.tactical.phase != .Preparation {
-			room.tactical_pulse.pending = true
-			room.tactical_pulse.forced = false
-			room.player.tactical.phase = .Resolving
-			room.player.tactical.metrics.decisions += 1
-		}
+		tactical_spend_action_time(room, time_cost)
 		return
 	}
 	pulse = advance_combat_pulse(room)
@@ -687,13 +681,17 @@ sign :: proc(value: int) -> int {
 }
 
 try_move_player :: proc(room: ^Room, direction: Move_Direction) -> Action_Result {
-	if !tactical_allows_action(room) { return .Invalid_Phase }
+	if !tactical_allows_movement(room) { return .Invalid_Phase }
 	if room == nil || room.player == nil || (room.phase != .Combat && room.phase != .Loot) {
 		return .Invalid_Phase
 	}
-	clear_event_log(&room.recent_events)
-
 	target := add_position(room.player.position, direction_offset(direction))
+	// Walking remains available during recovery, but walking into an enemy is
+	// an attack and must pass the offensive gate before mutating the event log.
+	if room.phase == .Combat && !tactical_allows_action(room) {
+		if _, found := enemy_index_at(room, target); found { return .Invalid_Phase }
+	}
+	clear_event_log(&room.recent_events)
 	if room.phase == .Combat {
 		if enemy_index, found := enemy_index_at(room, target); found {
 			enemy := room.enemies[enemy_index]

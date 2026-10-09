@@ -11,13 +11,13 @@ test_card_descriptions_preserve_classic_and_tactical_rules :: proc(t: ^testing.T
 		tactical_first, tactical_second: string,
 	}{
 		{.Arc_Bolt, "6 DANNI", "", "5 DANNI", "TIRO RAPIDO"},
-		{.Guard, "6 SCUDO", "DURATA 3 PULSE", "7 SCUDO / 2 PULSE", "ABILITA BLOCK / PARRY"},
+		{.Guard, "6 SCUDO", "DURATA 3 PULSE", "7 SCUDO / 2s", "ABILITA BLOCK / PARRY"},
 		{.Shove, "4 DANNO / SPINTA 1", "", "SPINGE 1 / POI COLPISCE", "4 DANNO / ANCHE BOMBE"},
-		{.Dash, "MUOVI 1-3 CELLE", "ATTRAVERSA I PERICOLI", "MUOVI 1-4 / SCUDO 2", "SCUDO PRIMA / 2 PULSE"},
-		{.Venom_Needle, "4 DANNO + 1 VELENO", "VELENO: 3 PULSE", "4 DANNO + 2 VELENO", "VELENO: 2 PULSE"},
+		{.Dash, "MUOVI 1-3 CELLE", "ATTRAVERSA I PERICOLI", "MUOVI 1-4 / SCUDO 2", "SCUDO PRIMA / 2s"},
+		{.Venom_Needle, "4 DANNO + 1 VELENO", "VELENO: 3 PULSE", "4 DANNO + 2 VELENO", "VELENO: 2s"},
 		{.Volatile_Study, "CREA 1 SPARK", "PESCA 4 / EXHAUST", "CREA 1 SPARK", "PESCA 5 / EXHAUST"},
-		{.Afterimage, "4 AFTERIMAGE", "DURATA 4 PULSE", "SCHIVA SENZA RECUPERO", "4 SCUDO SE MUOVI / 4P"},
-		{.Battle_Focus, "PESCA 2", "EXHAUST / ETHEREAL", "PESCA 2 / ESPLORA", "VISTA: 3 PULSE / MAX 9"},
+		{.Afterimage, "4 AFTERIMAGE", "DURATA 4 PULSE", "SCHIVA SENZA RECUPERO", "4 SCUDO SE MUOVI / 4s"},
+		{.Battle_Focus, "PESCA 2", "EXHAUST / ETHEREAL", "PESCA 2 / ESPLORA", "VISTA: 3s / MAX 9"},
 	}
 	for row in cases {
 		card := game.Card_Instance{definition_id = row.id, upgrade_level = 3}

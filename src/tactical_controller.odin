@@ -15,22 +15,31 @@ Tactical_Controller :: struct {
 M7_INPUT_TRACE :: #config(M7_INPUT_TRACE, false)
 
 Tactical_Controller_Input :: struct {
-	focused, pause, end_preparation, shift: bool,
+	focused, pause, shift: bool,
 	directions: [4]bool,
 	diagonals: [4]bool,
 	defenses: [4]bool,
 	map_input: Tactical_Map_Input,
 }
 
+buffer_tactical_walk_input :: proc(buffer: ^Buffered_Gameplay_Command, phase: game.Room_Phase, directions: [4]bool) {
+	for pressed, index in directions {
+		if pressed {
+			offer_gameplay_command(buffer, {kind = .Move, origin_phase = phase, direction = game.Move_Direction(index)})
+			break
+		}
+	}
+}
+
 // The decision clock and QTE deadline are independent of presentation speed.
-// Timeout wins at the boundary; no second command can be issued in that frame.
+// A window boundary cancels old input, then permits a fresh recovery walk.
 update_tactical_controller :: proc(
 	controller: ^Tactical_Controller, room: ^game.Room, renderer: ^render.Renderer,
 	cards: ^Card_Interaction_State, buffer: ^Buffered_Gameplay_Command,
 	dt: f32, available: bool, mouse: view.Vec2, inside: bool, playtest: ^combatdebug.Playtest_Session,
 ) -> (blocks_input: bool) {
 	input := Tactical_Controller_Input{
-		focused = rl.IsWindowFocused(), pause = rl.IsKeyPressed(.P), end_preparation = rl.IsKeyPressed(.ENTER),
+		focused = rl.IsWindowFocused(), pause = rl.IsKeyPressed(.P),
 		shift = rl.IsKeyDown(.LEFT_SHIFT) || rl.IsKeyDown(.RIGHT_SHIFT),
 		map_input = {mouse = mouse, inside = inside, toggle = rl.IsKeyPressed(.TAB), close = rl.IsKeyPressed(.ESCAPE),
 			reset = rl.IsKeyPressed(.R), pressed = rl.IsMouseButtonPressed(.LEFT), down = rl.IsMouseButtonDown(.LEFT),
@@ -80,29 +89,11 @@ step_tactical_controller :: proc(
 	if !controller.was_focused { controller.was_focused = true; return true }
 	if input.pause { controller.paused = !controller.paused; clear_card_interaction(cards); clear_gameplay_command_buffer(buffer) }
 	if controller.paused { return true }
-	busy := render.renderer_timeline_is_busy(renderer)
 	map_toggled := update_tactical_map_controls(controller, room, renderer, cards, buffer, input.map_input)
-	// M7 owns input while the timeline plays, so the ordinary poll below main's
-	// controller call cannot see a one-frame press. Preserve one walk through a
-	// normal response pulse; never carry it across an interaction/rules boundary.
-	movement_buffer_allowed := !controller.hologram && !map_toggled && room.qte.kind == .None &&
-		(room.phase == .Loot || (room.phase == .Combat &&
-		 (room.player.tactical.phase == .Decision || room.player.tactical.phase == .Resolving)))
-	if !movement_buffer_allowed || (buffer.occupied && buffer.command.origin_phase != room.phase) {
-		clear_gameplay_command_buffer(buffer)
-	}
-	if movement_buffer_allowed && (busy || room.tactical_pulse.pending) && !input.shift && cards.dragged_card_id == 0 {
-		for pressed, index in input.directions {
-			if pressed {
-				offer_gameplay_command(buffer, {kind = .Move, origin_phase = room.phase, direction = game.Move_Direction(index)})
-				break
-			}
-		}
-	}
-	if busy { return true }
 	command := Gameplay_Command{origin_phase = .Combat}
 	if room.qte.kind != .None {
 		controller.hologram = false
+		clear_gameplay_command_buffer(buffer)
 		room.qte.remaining = max(f32(0), room.qte.remaining-dt)
 		if room.qte.remaining <= 0 { command.kind = .QTE_Fail }
 		else if !room.qte.selected {
@@ -114,14 +105,58 @@ step_tactical_controller :: proc(
 				if pressed { command.kind = .QTE_Key; command.direction = game.Move_Direction(index); break }
 			}
 		}
-	} else if room.tactical_pulse.pending || (room.phase == .Combat && room.player.tactical.phase == .Forced) {
-		command.kind = .Continue_Pulse
-	} else if game.tactical_tick(room, dt, true, controller.hologram) {
-		command.kind = .Timeout
+		if command.kind != .None {
+			clear_card_interaction(cards)
+			commit_gameplay_command(room, renderer, cards, command, playtest)
+		}
+		return true
+	}
+	// Resolve due gameplay atomically, then let the pictures run independently.
+	// The real clock also advances during the player's own animation; only its
+	// input lane waits for that animation. Never reuse this frame's key for a
+	// defense QTE which has just appeared while resolving the world.
+	if !drain_tactical_world_commands(room, renderer, cards, playtest) {
+		if room.qte.kind != .None {
+			controller.hologram = false
+			clear_card_interaction(cards)
+			clear_gameplay_command_buffer(buffer)
+		}
+		return true
+	}
+	game.tactical_tick(room, dt, true, controller.hologram)
+	if !drain_tactical_world_commands(room, renderer, cards, playtest) {
+		if room.qte.kind != .None {
+			controller.hologram = false
+			clear_card_interaction(cards)
+			clear_gameplay_command_buffer(buffer)
+		}
+		return true
+	}
+	// Expiration is checked after all paid beats, including the last second.
+	if game.tactical_tick(room, 0, true, controller.hologram) {
 		controller.hologram = false
-	} else if room.phase == .Combat && room.player.tactical.phase == .Preparation && input.end_preparation {
-		command.kind = .End_Preparation
-	} else if !controller.hologram && room.phase == .Combat && room.player.tactical.phase == .Decision {
+		clear_card_interaction(cards)
+		clear_gameplay_command_buffer(buffer)
+		if !commit_gameplay_command(room, renderer, cards, {kind = .Timeout, origin_phase = .Combat}, playtest) { return true }
+		// A fresh walk on this exact boundary is already a recovery walk.
+		// Discarded targeting or old buffered commands cannot cross with it.
+	}
+	if game.tactical_is_recovering(room) {
+		cards.selected_card_id = 0
+		cards.dragged_card_id = 0
+	}
+	movement_buffer_allowed := !controller.hologram && !map_toggled &&
+		(room.phase == .Loot || (room.phase == .Combat && game.tactical_allows_movement(room)))
+	if !movement_buffer_allowed || (buffer.occupied && buffer.command.origin_phase != room.phase) {
+		clear_gameplay_command_buffer(buffer)
+	}
+	if render.renderer_blocks_player_input(renderer) {
+		if movement_buffer_allowed && !input.shift && cards.dragged_card_id == 0 {
+			buffer_tactical_walk_input(buffer, room.phase, input.directions)
+		}
+		return true
+	}
+	if !controller.hologram && room.phase == .Combat && room.player.tactical.phase == .Decision {
 		if input.shift {
 			for pressed, index in input.directions {
 				if pressed { command.kind = .Dodge; command.direction = game.Move_Direction(index); break }
@@ -134,11 +169,26 @@ step_tactical_controller :: proc(
 	}
 	if command.kind != .None {
 		clear_card_interaction(cards)
-		if command.kind != .Continue_Pulse { clear_gameplay_command_buffer(buffer) }
+		clear_gameplay_command_buffer(buffer)
 		commit_gameplay_command(room, renderer, cards, command, playtest)
 		return true
 	}
 	return map_toggled || controller.hologram || room.qte.kind != .None
+}
+
+// One beat contains a start, at most one command per enemy, and a finish.
+// The extra beat accounts for debt already started before a defense QTE.
+// Backpressure leaves authoritative gameplay untouched until cues have space.
+drain_tactical_world_commands :: proc(room: ^game.Room, renderer: ^render.Renderer,
+	cards: ^Card_Interaction_State, playtest: ^combatdebug.Playtest_Session) -> bool {
+	budget := (max(0, room.player.tactical.queued_beats)+1)*(game.MAX_ENEMIES_PER_ROOM+2)
+	for _ in 0..<budget {
+		if room.qte.kind != .None { return false }
+		if room.phase != .Combat || !room.tactical_pulse.pending { return true }
+		if !commit_gameplay_command(room, renderer, cards,
+			{kind = .Continue_Pulse, origin_phase = .Combat}, playtest) { return false }
+	}
+	return room.qte.kind == .None && !room.tactical_pulse.pending
 }
 
 Tactical_Map_Input :: struct {

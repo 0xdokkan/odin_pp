@@ -344,6 +344,13 @@ immediate_card_command :: proc(card: game.Card_Instance) -> (Gameplay_Command, b
 	}, true
 }
 
+poll_walk_command :: proc(phase: game.Room_Phase) -> (Gameplay_Command, bool) {
+	for key, index in ([4]rl.KeyboardKey{.W, .D, .S, .A}) {
+		if key_pressed(key) { return {kind = .Move, origin_phase = phase, direction = game.Move_Direction(index)}, true }
+	}
+	return {}, false
+}
+
 poll_gameplay_command :: proc(
 	room: ^game.Room,
 	renderer: ^render.Renderer,
@@ -361,16 +368,7 @@ poll_gameplay_command :: proc(
 	input_deck, input_phase := render.renderer_hand_deck(renderer, room)
 	if input_phase == .Loot {
 		clear_card_interaction(card_interaction)
-		if key_pressed(.W) {
-			return Gameplay_Command{kind = .Move, origin_phase = .Loot, direction = .North}, true
-		} else if key_pressed(.D) {
-			return Gameplay_Command{kind = .Move, origin_phase = .Loot, direction = .East}, true
-		} else if key_pressed(.S) {
-			return Gameplay_Command{kind = .Move, origin_phase = .Loot, direction = .South}, true
-		} else if key_pressed(.A) {
-			return Gameplay_Command{kind = .Move, origin_phase = .Loot, direction = .West}, true
-		}
-		return
+		return poll_walk_command(.Loot)
 	}
 	if input_phase != .Combat || !input_deck.combat_active {
 		clear_card_interaction(card_interaction)
@@ -403,6 +401,14 @@ poll_gameplay_command :: proc(
 		); found {
 			card_interaction.hovered_card_id = input_deck.hand[hand_index].id
 		}
+	}
+
+	if game.tactical_is_recovering(room) {
+		card_interaction.selected_card_id = 0
+		card_interaction.dragged_card_id = 0
+		// Shift+WASD requests an active dodge; do not silently turn it into a walk.
+		if rl.IsKeyDown(.LEFT_SHIFT) || rl.IsKeyDown(.RIGHT_SHIFT) { return }
+		return poll_walk_command(.Combat)
 	}
 
 	if spatial_interaction_enabled && card_interaction.dragged_card_id != 0 {
@@ -487,15 +493,9 @@ poll_gameplay_command :: proc(
 		return Gameplay_Command{kind = .Ability, origin_phase = .Combat, ability = .Thorn_Coat}, true
 	} else if debug_abilities && key_pressed(.V) {
 		return Gameplay_Command{kind = .Ability, origin_phase = .Combat, ability = .Afterimage}, true
-	} else if key_pressed(.W) {
-		return Gameplay_Command{kind = .Move, origin_phase = .Combat, direction = .North}, true
-	} else if key_pressed(.D) {
-		return Gameplay_Command{kind = .Move, origin_phase = .Combat, direction = .East}, true
-	} else if key_pressed(.S) {
-		return Gameplay_Command{kind = .Move, origin_phase = .Combat, direction = .South}, true
-	} else if key_pressed(.A) {
-		return Gameplay_Command{kind = .Move, origin_phase = .Combat, direction = .West}, true
-	} else if key_pressed(.SPACE) {
+	}
+	if walk, pressed := poll_walk_command(.Combat); pressed { return walk, true }
+	if key_pressed(.SPACE) {
 		return Gameplay_Command{kind = .Wait, origin_phase = .Combat}, true
 	}
 	return
@@ -524,7 +524,7 @@ capture_gameplay_command_telemetry :: proc(
 		return snapshot, {}, {}, false
 	case .Move:
 		resolved_kind, ok = combatdebug.command_kind_for_move(room, command.direction)
-	case .Dodge, .Wait, .Timeout, .Continue_Pulse, .End_Preparation, .Begin_Diagonal, .QTE_Key, .QTE_Fail, .Defense:
+	case .Dodge, .Wait, .Timeout, .Continue_Pulse, .Begin_Diagonal, .QTE_Key, .QTE_Fail, .Defense:
 		resolved_kind = .Wait
 	case .Ability:
 		resolved_kind = .Ability
@@ -549,13 +549,10 @@ execute_gameplay_command :: proc(room: ^game.Room, command: Gameplay_Command) ->
 		return
 	case .Timeout:
 		if !game.tactical_enabled(room) || room.player.tactical.remaining > 0 { return }
-		if room.player.tactical.phase == .Preparation { execution.committed = game.finish_preparation(room) }
-		else { execution.committed = game.wait_player_turn(room) != .Invalid_Phase }
+		execution.committed = game.tactical_expire_window(room)
 		if execution.committed { room.player.tactical.metrics.timeouts += 1 }
 	case .Continue_Pulse:
 		execution.committed = game.continue_tactical_pulse(room)
-	case .End_Preparation:
-		execution.committed = game.finish_preparation(room)
 	case .Begin_Diagonal:
 		execution.committed = game.begin_diagonal_qte(room, command.offset)
 	case .Defense:
@@ -632,10 +629,15 @@ commit_gameplay_command :: proc(
 	command: Gameplay_Command,
 	playtest: ^combatdebug.Playtest_Session = nil,
 ) -> bool {
-	if room == nil || renderer == nil || card_interaction == nil ||
-	   render.renderer_timeline_is_busy(renderer) {
-		return false
-	}
+	if room == nil || renderer == nil || card_interaction == nil { return false }
+	world_command := game.tactical_enabled(room) &&
+		(command.kind == .Continue_Pulse || command.kind == .Timeout ||
+		 command.kind == .Defense || ((command.kind == .QTE_Key || command.kind == .QTE_Fail) && room.qte.kind == .Defense))
+	if world_command {
+		// Reserve a whole event log before mutating gameplay: no committed beat
+		// can lose its presentation when the bounded world bank is full.
+		if render.renderer_world_available_cues(renderer) < game.MAX_GAME_EVENTS { return false }
+	} else if render.renderer_blocks_player_input(renderer) { return false }
 	before := render.capture_room_presentation(room)
 	execution := execute_observed_gameplay_command(room, command, playtest)
 	if !execution.committed {
@@ -645,7 +647,11 @@ commit_gameplay_command :: proc(
 	if execution.clears_card_interaction || room.phase != .Combat {
 		clear_card_interaction(card_interaction)
 	}
-	render.begin_renderer_event_timeline(renderer, before, &room.recent_events, &after)
+	if room.recent_events.count > 0 {
+		started := render.begin_renderer_world_timeline(renderer, before, &room.recent_events, &after) if world_command else
+			render.begin_renderer_event_timeline(renderer, before, &room.recent_events, &after)
+		assert(started, "committed gameplay must retain its presentation")
+	}
 	return true
 }
 
@@ -1394,7 +1400,6 @@ main :: proc() {
 			speed := f32(1) if iso_renderer.playback_speed >= 4 else min(f32(4), iso_renderer.playback_speed*2)
 			render.set_renderer_playback_speed(&iso_renderer, speed)
 		}
-		presentation_was_busy := render.renderer_timeline_is_busy(&iso_renderer)
 		frame_time := (f32(1.0/60.0) if options.m7_view_smoke else rl.GetFrameTime())
 		if rl.IsKeyPressed(.F8) {
 			frame := Input_Diagnostic_Frame{dt = frame_time, focused = rl.IsWindowFocused(),
@@ -1514,7 +1519,7 @@ main :: proc() {
 			render.update_tactical_view(&iso_renderer, &room, mouse_canvas, mouse_inside && !tactical_controller.hologram && !tactical_controller.paused && rl.IsWindowFocused())
 			render.update_tactical_atmosphere(&iso_renderer, frame_time if options.m7_view_smoke || (!tactical_controller.paused && rl.IsWindowFocused()) else 0)
 			if !options.m7_view_smoke { tactical_input_blocked = update_tactical_controller(&tactical_controller, &room, &iso_renderer,
-				&card_interaction, &gameplay_buffer, (f32(0) if presentation_was_busy else frame_time),
+				&card_interaction, &gameplay_buffer, frame_time,
 				run_state.phase == .In_Room && !relic_visible && !route_visible && !options.m7_view_smoke,
 				mouse_canvas, mouse_inside, playtest_session_ptr) } else { tactical_input_blocked = true }
 		}
@@ -1951,7 +1956,7 @@ main :: proc() {
 			}
 			if !tactical_input_blocked && !smoke_card && !smoke_targeting && !smoke_spatial && !smoke_object && !smoke_content &&
 			   !smoke_encounters && !smoke_miniboss && !smoke_furnace && spell_smoke == .None {
-				timeline_busy = render.renderer_timeline_is_busy(&iso_renderer)
+				timeline_busy = render.renderer_blocks_player_input(&iso_renderer)
 				command, has_command := poll_gameplay_command(
 					&room,
 					&iso_renderer,
@@ -2083,7 +2088,7 @@ main :: proc() {
 				}
 				iso_renderer.has_hovered_cell = true
 			}
-			timeline_busy = render.renderer_timeline_is_busy(&iso_renderer)
+			timeline_busy = render.renderer_blocks_player_input(&iso_renderer)
 			active_card_id := active_targeting_card_id(card_interaction)
 			if timeline_busy {
 				active_card_id = 0
@@ -2164,9 +2169,13 @@ main :: proc() {
 				if !run_m7_voxel_smoke(&window, &iso_renderer) { fmt.eprintln("M7 voxel smoke failed"); os.exit(2) }
 				if !run_m7_resin_smoke(&window, &iso_renderer, &dice_renderer) { fmt.eprintln("M7 resin/dice smoke failed"); os.exit(2) }
 				if !run_m7_rework_smoke(&window, &iso_renderer) { fmt.eprintln("M7 cards/enemies rework smoke failed"); os.exit(2) }
+				if !run_m7_timed_pulse_smoke(&window, &iso_renderer) { fmt.eprintln("M7 timed pulse smoke failed"); os.exit(2) }
+				if !run_m7_independent_world_smoke(&window, &iso_renderer) { fmt.eprintln("M7 independent world smoke failed"); os.exit(2) }
+				if !run_m7_recovery_smoke(&window, &iso_renderer) { fmt.eprintln("M7 recovery smoke failed"); os.exit(2) }
 				if !run_m7_polish_smoke(&window, &iso_renderer) { fmt.eprintln("M7 polish flow smoke failed"); os.exit(2) }
 				if !run_m7_visual_smoke(&window, &iso_renderer) { fmt.eprintln("M7 visual feedback smoke failed"); os.exit(2) }
 				if !run_m7_room_refresh_smoke(&window, &iso_renderer) { fmt.eprintln("M7 room refresh smoke failed"); os.exit(2) }
+				if !run_m7_wall_smoke(&window, &iso_renderer) { fmt.eprintln("M7 wall visibility smoke failed"); os.exit(2) }
 				if !run_m7_menu_smoke(&window, &iso_renderer) { fmt.eprintln("M7 menu smoke failed"); os.exit(2) }
 				fmt.println("M7 UI: relic, reward, route, shop, rest, event, treasure and terminal screens captured")
 				break
