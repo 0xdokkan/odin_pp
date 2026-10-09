@@ -196,6 +196,7 @@ Room :: struct {
 	qte: QTE_State,
 	reaction_bindings: Reaction_Binding_Set,
 	ring_challenge_attempted: bool,
+	minigame_challenge_attempted: bool,
 }
 
 Move_Direction :: enum {

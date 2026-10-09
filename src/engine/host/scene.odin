@@ -40,6 +40,8 @@ Frame :: struct {
 	audio:          ^audio.Bank,
 	window:         ^app.Window,
 	profile:        ^Profile,
+	// Where the profile is saved; empty when persistence is disabled.
+	profile_path:   string,
 	commands:       ^Commands,
 }
 

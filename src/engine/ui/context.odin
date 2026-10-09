@@ -219,7 +219,8 @@ label :: proc(ctx: ^Context, r: Rect, text: string, size := Text_Size.Body, colo
 // Word-wrapped text; returns the height used. Words are measured once each.
 paragraph :: proc(ctx: ^Context, r: Rect, text: string, size := Text_Size.Body, color: Maybe(rl.Color) = nil,
 	line_gap: f32 = 4) -> f32 {
-	space := measure(ctx.theme, " ", size).x
+	// Words are measured alone, so add the glyph spacing lost at both joins.
+	space := measure(ctx.theme, " ", size).x + 2*ctx.theme.spacing
 	line_height := text_pixels(size) + line_gap
 	y := r.y
 	remaining := text
@@ -292,19 +293,23 @@ Widget_State :: struct {
 	clicked:  bool,
 }
 
-// Registers a focusable widget and resolves mouse and keyboard activation.
-interact :: proc(ctx: ^Context, r: Rect, enabled := true) -> Widget_State {
-	s := Widget_State{ordinal = ctx.focus_count}
-	ctx.focus_count += 1
+// Registers a widget and resolves mouse and keyboard activation. Widgets that
+// are not focusable (e.g. over a game that owns the keyboard) answer the mouse only.
+interact :: proc(ctx: ^Context, r: Rect, enabled := true, focusable := true) -> Widget_State {
+	s := Widget_State{ordinal = -1}
+	if focusable {
+		s.ordinal = ctx.focus_count
+		ctx.focus_count += 1
+	}
 	if !enabled {
 		return s
 	}
 	p := ctx.pointer
 	s.hovered = p.inside && contains(r, p.position)
-	if s.hovered && !ctx.keyboard_mode {
+	if focusable && s.hovered && !ctx.keyboard_mode {
 		ctx.focus = s.ordinal
 	}
-	s.focused = ctx.focus == s.ordinal
+	s.focused = focusable && ctx.focus == s.ordinal
 	s.held = s.hovered && p.down && contains(r, ctx.press_origin)
 	mouse_click := s.hovered && p.released && contains(r, ctx.press_origin)
 	key_click := s.focused && ctx.keyboard_mode && .Confirm in ctx.nav.pressed
@@ -313,8 +318,8 @@ interact :: proc(ctx: ^Context, r: Rect, enabled := true) -> Widget_State {
 }
 
 button :: proc(ctx: ^Context, r: Rect, text: string, enabled := true, primary := false,
-	size := Text_Size.Body) -> bool {
-	s := interact(ctx, r, enabled)
+	size := Text_Size.Body, focusable := true) -> bool {
+	s := interact(ctx, r, enabled, focusable)
 	p := ctx.theme.palette
 	base := p.accent if primary else p.button
 	color := base

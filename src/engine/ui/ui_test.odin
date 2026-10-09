@@ -116,8 +116,8 @@ test_paragraph_wraps_on_word_boundaries :: proc(t: ^testing.T) {
 	ctx := create(&theme)
 	defer destroy(ctx)
 	begin(ctx, Pointer{}, {}, 0)
-	// Without fonts each Small glyph is 7 px wide; 84 px fits twelve glyphs.
-	h := paragraph(ctx, Rect{0, 0, 84, 200}, "uno due tre quattro", .Small)
+	// Without fonts each Small glyph is 8 px wide; 96 px fits twelve glyphs.
+	h := paragraph(ctx, Rect{0, 0, 96, 200}, "uno due tre quattro", .Small)
 	testing.expect_value(t, ctx.command_count, 2)
 	testing.expect_value(t, ctx.commands[0].text, "uno due tre")
 	testing.expect_value(t, ctx.commands[1].text, "quattro")

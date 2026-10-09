@@ -12,7 +12,7 @@ Text_Size :: enum u8 {
 }
 
 TEXT_PIXELS :: [Text_Size]f32{
-	.Small = 14,
+	.Small = 16,
 	.Body  = 20,
 	.Large = 28,
 	.Title = 40,
@@ -22,7 +22,7 @@ TEXT_PIXELS :: [Text_Size]f32{
 text_pixels :: proc "contextless" (size: Text_Size) -> f32 {
 	switch size {
 	case .Small:
-		return 14
+		return 16
 	case .Body:
 		return 20
 	case .Large:

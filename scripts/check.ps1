@@ -19,6 +19,11 @@ try {
     Invoke-Odin check src -vet -strict-style -disable-assert
     Invoke-Odin test src -all-packages '-define:ODIN_TEST_THREADS=1' '-o:none' "-out:$checkDir\tests.exe"
     Invoke-Odin test src -all-packages '-define:ODIN_TEST_THREADS=1' '-o:none' -disable-assert "-out:$checkDir\tests-no-assert.exe"
+    # Engine and minigame packages are tested on their own as well: not every
+    # one is reachable from the main package.
+    foreach ($dir in @(Get-ChildItem src\engine, src\minigames -Directory -ErrorAction SilentlyContinue)) {
+        Invoke-Odin test $dir.FullName -vet -strict-style '-o:none' "-out:$checkDir\$($dir.Name)-tests.exe"
+    }
     if (-not $Headless) {
         Invoke-Odin build src '-o:none' "-out:$checkDir\odin_pp.exe"
         Invoke-Odin build src '-o:none' -disable-assert "-out:$checkDir\odin_pp-no-assert.exe"

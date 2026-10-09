@@ -12,6 +12,8 @@ Config :: struct {
 	window:       app.Window_Config,
 	profile_path: string, // empty disables persistence
 	enable_audio: bool,
+	// Bars around the canvas when the window aspect differs; zero means black.
+	letterbox_color: rl.Color,
 }
 
 Host :: struct {
@@ -30,6 +32,7 @@ Host :: struct {
 	frame_ms:      [120]f32,
 	frame_cursor:  int,
 	last_settings: Settings,
+	letterbox:     rl.Color,
 }
 
 // Opens the window and the shared services. The host is heap-allocated
@@ -46,6 +49,7 @@ create :: proc(config: Config) -> (^Host, bool) {
 	gui.load_fonts(&h.theme)
 	h.ui = gui.create(&h.theme)
 	h.profile_path = config.profile_path
+	h.letterbox = config.letterbox_color if config.letterbox_color.a != 0 else rl.BLACK
 	if config.profile_path != "" {
 		h.profile, _ = profile_load(config.profile_path)
 	} else {
@@ -89,6 +93,14 @@ apply_settings :: proc(h: ^Host) {
 		audio.set_muted(h.audio, s.muted)
 	}
 	h.last_settings = s
+}
+
+// Saves the profile from inside a scene, e.g. after a round updates records.
+persist_profile :: proc(frame: ^Frame) -> bool {
+	if frame.profile == nil || frame.profile_path == "" {
+		return false
+	}
+	return profile_save(frame.profile_path, frame.profile)
 }
 
 push_scene :: proc(h: ^Host, scene: Scene) -> bool {
@@ -138,6 +150,7 @@ step :: proc(h: ^Host) -> bool {
 		audio          = h.audio,
 		window         = &h.window,
 		profile        = &h.profile,
+		profile_path   = h.profile_path,
 		commands       = &h.commands,
 	}
 
@@ -177,7 +190,7 @@ step :: proc(h: ^Host) -> bool {
 		draw_debug(h, canvas, h.debug)
 	}
 	present_data := Present_Data{host = h, frame = &frame, first = first_draw, count = count}
-	app.present(&h.window, rl.BLACK, present_window_overlays, &present_data)
+	app.present(&h.window, h.letterbox, present_window_overlays, &present_data)
 	for i in first_draw..<count {
 		s := &h.stack.items[i]
 		if s.after_present != nil {
