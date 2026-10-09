@@ -204,10 +204,11 @@ orbit_eye :: proc "contextless" (c: Orbit_Camera) -> Vec3 {
 	return look + Vec3{-math.sin(c.yaw) * cp, math.sin(c.pitch), -math.cos(c.yaw) * cp} * c.distance
 }
 
-// Camera-relative movement basis on the ground plane.
+// Camera-relative movement basis on the ground plane. `right` is screen-right:
+// looking toward +z (yaw 0) with +y up, that is -x in raylib's right-handed space.
 orbit_ground_basis :: proc "contextless" (c: Orbit_Camera) -> (forward, right: Vec2) {
 	forward = Vec2{math.sin(c.yaw), math.cos(c.yaw)}
-	right = Vec2{forward.y, -forward.x}
+	right = Vec2{-forward.y, forward.x}
 	return
 }
 

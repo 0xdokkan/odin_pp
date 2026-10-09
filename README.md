@@ -1,7 +1,9 @@
-# Odin PP — versione 0.4 / M8
+# Odin PP — versione 0.5 / M9
 
 Vertical slice di un roguelike con deck building, griglia logica 2D, ambiente
 realmente 3D a blocchi e personaggi sprite pixel art, scritto in Odin con Raylib.
+Dalla 0.5 gira su un engine condiviso che ospita anche cinque minigiochi con
+gameplay diversi: platform 2D e 3D, arena in tempo reale, FPS e puzzle a turni.
 La run attraversa sette livelli di una rotta
 procedurale, fra combattimenti, ricompense e nodi speciali, fino al Demolitore.
 Carte, spinte, esplosivi, status e reliquie condividono una simulazione
@@ -154,6 +156,21 @@ pausa con `Esc` o quando la finestra perde il focus, risultati con stelle,
 punteggio e record, riprova. La simulazione di ogni minigioco è pura, a passo
 fisso e deterministica per seed e input; i test la guidano senza finestra.
 Il catalogo per menu e sfide è in [minigame_registry.odin](src/minigame_registry.odin).
+
+### I minigiochi
+
+| Id | Titolo | Gioco | Comandi principali | Stelle |
+|---|---|---|---|---|
+| [platform2d](src/minigames/platform2d) | Torre di Cenere | platform a scorrimento: livelli composti per seed da 22 blocchi verificati da un solver che usa il controller vero; nemici da schiacciare, totem che sparano, blocchi che crollano, bracieri di checkpoint | `A`/`D`, `Spazio` (doppio salto, wall jump), `Shift` scatto, `S` scende | arrivo; 60% delle braci; 90% senza ferite |
+| [platform3d](src/minigames/platform3d) | Guglie Sospese | platform 3D su isole di voxel con distanze tarate sul salto misurato; frammenti d'anima, portale, piattaforme mobili e friabili, spuntoni a tempo, sentinelle | `WASD`, `Spazio`, `Shift`, `Q`/`E` o tasto destro per la camera | portale; tutti i frammenti; senza vite perse |
+| [arena](src/minigames/arena) | Arena delle Braci | twin-stick a ondate in arene simmetriche: cinque nemici con attacchi telegrafati e il Signore delle Braci, potenziamenti, combo fino a x8 | `WASD`, mouse per mirare, clic sinistro, `Spazio` scatto | vittoria; metà vita; combo obiettivo |
+| [fps](src/minigames/fps) | Cripta delle Rune | prima persona in una cripta generata: tre nemici con IA su flow field, bastone runico a mana, rune che aprono il portale, minimappa | mouse, `WASD`, `Shift`, clic sinistro, `Tab` mappa | fuga; tempo sotto il par; vita e mira oltre il 50% |
+| [puzzle](src/minigames/puzzle) | Sigilli della Cripta | Sokoban con ghiaccio e grate a piastre; 17 livelli risolti da un BFS che ne fissa il par; undo/redo e suggerimenti | frecce/`WASD`, `Z` annulla, `Y` ripete, `R` ricomincia, `H` aiuto | entro par; entro 1,5 par; risolto |
+
+Ogni pacchetto ha un bot deterministico (`create_autoplay` o `autoplay`) usato
+dai test e per le catture, e test headless su determinismo, vincibilità,
+sconfitta, validità della generazione su molti seed e soak con input casuali.
+`--smoke-minigame=<id>` cattura `odin_pp_<id>.png` dopo tre secondi di gioco.
 
 ### Sfide nella run
 
@@ -2095,7 +2112,8 @@ invarianti e descritta dalla documentazione. Stati: `[x]` completata,
 | M7K | [x] | blocchi grigio-blu lucidi senza fondali, vista ampliata, stanze più grandi e due nemici aggiuntivi, schivata senza carte con recupero e dadi 3D coordinati |
 | M7L | [x] | catalogo tattico, interruzione/ricognizione/contrattacco, ruoli nemici e recuperi leggibili, pannello nemico e starter aggiornato; bilanciamento umano in M7G |
 | M8 / 0.4 | [x] | cast e cinematiche separati, Shock Floor/Tesla, arma a utilizzi, scheda 3D, ring giocabile con sblocchi persistenti e contorni da illustrazione |
-| Dopo M8 | [ ] | bilanciamento umano, altri oggetti/armi, minigiochi FPS/platform e nuove sfide; salvataggio completo della run |
+| M9 / 0.5 | [x] | engine condiviso in tredici package, run come scena, menu e impostazioni, cinque minigiochi (platform 2D e 3D, arena, FPS, puzzle) e sfide nella run; build, avvio e verifica su Windows |
+| Dopo M9 | [ ] | bilanciamento umano di run e minigiochi, input del roguelike su action map (rimappatura, pad), Ring delle Ombre sul guscio dei minigiochi, timeline di presentazione generica nell'engine, altri oggetti/armi; salvataggio completo della run |
 
 ### M7: implementazione e verifiche storiche
 

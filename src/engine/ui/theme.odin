@@ -1,6 +1,8 @@
 package ui
 
 import "core:c"
+import "core:fmt"
+import "core:strings"
 import rl "vendor:raylib"
 
 Text_Size :: enum u8 {
@@ -155,6 +157,26 @@ measure :: proc(theme: ^Theme, text: string, size: Text_Size) -> [2]f32 {
 	ctext := cstring_temp(text)
 	m := rl.MeasureTextEx(theme.fonts[size], ctext, pixels, theme.spacing)
 	return {m.x, m.y}
+}
+
+// Shortens text to fit max_width, ending in "...", cutting only at UTF-8
+// character boundaries. Returns the text unchanged when it already fits.
+ellipsize :: proc(theme: ^Theme, text: string, max_width: f32, size: Text_Size) -> string {
+	if measure(theme, text, size).x <= max_width {
+		return text
+	}
+	end := len(text)
+	for end > 0 {
+		end -= 1
+		for end > 0 && text[end] & 0xC0 == 0x80 {
+			end -= 1
+		}
+		candidate := fmt.tprintf("%s...", strings.trim_right_space(text[:end]))
+		if measure(theme, candidate, size).x <= max_width {
+			return candidate
+		}
+	}
+	return "..."
 }
 
 @(private)

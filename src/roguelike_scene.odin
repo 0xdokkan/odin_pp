@@ -394,7 +394,7 @@ roguelike_prepare :: proc(rs: ^Roguelike_Session) -> Session_Start {
 
 roguelike_window_config :: proc(rs: ^Roguelike_Session) -> app.Window_Config {
 	return app.Window_Config{
-		title = "Odin PP 0.4 / M8",
+		title = "Odin PP 0.5 / M9",
 		initial_width = 1280,
 		initial_height = 720,
 		canvas_width = 960,

@@ -20,7 +20,7 @@ trap 'rm -rf -- "$check_dir"' EXIT HUP INT TERM
 # one is reachable from the main package.
 for dir in src/engine/*/ src/minigames/*/; do
     [ -d "$dir" ] || continue
-    "$odin_compiler" test "$dir" -vet -strict-style -o:none -out:"$check_dir/$(basename "$dir")-tests"
+    "$odin_compiler" test "$dir" -vet -strict-style -define:ODIN_TEST_THREADS=1 -o:none -out:"$check_dir/$(basename "$dir")-tests"
 done
 
 if [ "${1:-}" != --headless ]; then

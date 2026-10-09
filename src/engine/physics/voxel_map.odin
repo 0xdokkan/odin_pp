@@ -28,6 +28,12 @@ voxel_map_destroy :: proc(m: ^Voxel_Map, allocator := context.allocator) {
 	m^ = {}
 }
 
+// Edge length used by every query; a zero-value map behaves as size 1 instead
+// of dividing by zero.
+voxel_size_of :: proc "contextless" (m: ^Voxel_Map) -> f32 {
+	return m.voxel_size if m.voxel_size > 0 else 1
+}
+
 voxel_in_bounds :: proc "contextless" (m: ^Voxel_Map, x, y, z: int) -> bool {
 	return x >= 0 && y >= 0 && z >= 0 && x < m.width && y < m.height && z < m.depth
 }
@@ -58,16 +64,16 @@ voxel_fill_box :: proc "contextless" (m: ^Voxel_Map, from, to: [3]int, value: u8
 }
 
 voxel_of :: proc "contextless" (m: ^Voxel_Map, p: Vec3) -> [3]int {
-	s := m.voxel_size
+	s := voxel_size_of(m)
 	return [3]int{int(math.floor(p.x / s)), int(math.floor(p.y / s)), int(math.floor(p.z / s))}
 }
 
 voxel_world_size :: proc "contextless" (m: ^Voxel_Map) -> Vec3 {
-	return Vec3{f32(m.width), f32(m.height), f32(m.depth)} * m.voxel_size
+	return Vec3{f32(m.width), f32(m.height), f32(m.depth)} * voxel_size_of(m)
 }
 
 box_hits_voxels :: proc "contextless" (m: ^Voxel_Map, box_min, box_max: Vec3) -> bool {
-	s := m.voxel_size
+	s := voxel_size_of(m)
 	lo := voxel_of(m, box_min)
 	hi := [3]int{
 		int(math.floor((box_max.x - EPSILON) / s)),
@@ -110,7 +116,7 @@ Move_Result3 :: struct {
 // Resolves x, then z, then y; blocked velocity components are zeroed.
 move_body3 :: proc(m: ^Voxel_Map, body: ^Body3, delta: Vec3) -> Move_Result3 {
 	result: Move_Result3
-	limit := m.voxel_size * 0.45
+	limit := voxel_size_of(m) * 0.45
 	steps := max(1, int(math.ceil(max(abs(delta.x), abs(delta.y), abs(delta.z)) / limit)))
 	part := delta / f32(steps)
 	for _ in 0..<steps {
@@ -135,7 +141,7 @@ move_axis3 :: proc(m: ^Voxel_Map, body: ^Body3, axis: int, d: f32, result: ^Move
 	if !box_hits_voxels(m, body.position, body.position+body.size) {
 		return
 	}
-	s := m.voxel_size
+	s := voxel_size_of(m)
 	if d > 0 {
 		edge := math.floor((body.position[axis] + body.size[axis] - EPSILON) / s) * s
 		body.position[axis] = edge - body.size[axis]
@@ -176,7 +182,7 @@ raycast_voxels :: proc(m: ^Voxel_Map, origin, direction: Vec3, max_distance: f32
 	if v := voxel_get(m, cell.x, cell.y, cell.z); v != 0 {
 		return Ray_Hit3{hit = true, point = origin, cell = cell, value = v}
 	}
-	s := m.voxel_size
+	s := voxel_size_of(m)
 	step: [3]int
 	t_max, t_delta: Vec3
 	for axis in 0..<3 {

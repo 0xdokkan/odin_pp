@@ -72,7 +72,7 @@ build_voxel_model :: proc(m: ^physics.Voxel_Map, palette: ^Voxel_Palette) -> (rl
 	mesh.normals = cast([^]f32)rl.MemAlloc(c.uint(vertex_count * 3 * size_of(f32)))
 	mesh.texcoords = cast([^]f32)rl.MemAlloc(c.uint(vertex_count * 2 * size_of(f32)))
 	mesh.colors = cast([^]u8)rl.MemAlloc(c.uint(vertex_count * 4))
-	s := m.voxel_size
+	s := physics.voxel_size_of(m)
 	shades := FACE_SHADE
 	v := 0
 	for y in 0..<m.height {

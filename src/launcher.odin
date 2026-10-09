@@ -243,7 +243,8 @@ launcher_update :: proc(data: rawptr, frame: ^host.Frame) {
 		case 3:
 			stars = "***"
 		}
-		blurb := first_sentence(info.tagline)
+		// One line of description: the tile also carries title, genre and record.
+		blurb := ui.ellipsize(ctx.theme, first_sentence(info.tagline), cell.width - 24, .Small)
 		subtitle := fmt.tprintf("%s\n%s", info.genre, blurb)
 		if rec.plays > 0 {
 			subtitle = fmt.tprintf("%s  -  record %d %s\n%s", info.genre, rec.best_score, stars, blurb)

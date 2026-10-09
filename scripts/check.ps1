@@ -22,7 +22,7 @@ try {
     # Engine and minigame packages are tested on their own as well: not every
     # one is reachable from the main package.
     foreach ($dir in @(Get-ChildItem src\engine, src\minigames -Directory -ErrorAction SilentlyContinue)) {
-        Invoke-Odin test $dir.FullName -vet -strict-style '-o:none' "-out:$checkDir\$($dir.Name)-tests.exe"
+        Invoke-Odin test $dir.FullName -vet -strict-style '-define:ODIN_TEST_THREADS=1' '-o:none' "-out:$checkDir\$($dir.Name)-tests.exe"
     }
     if (-not $Headless) {
         Invoke-Odin build src '-o:none' "-out:$checkDir\odin_pp.exe"

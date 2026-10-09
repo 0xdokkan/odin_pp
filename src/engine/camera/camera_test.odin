@@ -59,3 +59,12 @@ test_orbit_eye_sits_behind_target :: proc(t: ^testing.T) {
 	testing.expect(t, eye.z < 0)
 	testing.expect(t, abs(math.sqrt(eye.x*eye.x+eye.z*eye.z)-c.distance) < 1e-4)
 }
+
+@(test)
+test_ground_bases_point_right_on_screen :: proc(t: ^testing.T) {
+	// Looking toward +z with +y up, screen-right is -x.
+	_, orbit_right := orbit_ground_basis(orbit_create({}))
+	testing.expect(t, abs(orbit_right.x+1) < 1e-5 && abs(orbit_right.y) < 1e-5)
+	_, fps_right := fps_ground_basis(0)
+	testing.expect_value(t, fps_right, orbit_right)
+}

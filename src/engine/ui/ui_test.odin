@@ -136,3 +136,15 @@ test_command_buffer_overflow_is_counted :: proc(t: ^testing.T) {
 	testing.expect_value(t, ctx.command_count, MAX_COMMANDS)
 	testing.expect_value(t, ctx.dropped, 5)
 }
+
+@(test)
+test_ellipsize_respects_width_and_utf8 :: proc(t: ^testing.T) {
+	theme := default_theme()
+	// Without fonts Small glyphs are 8 px: 80 px fits ten bytes.
+	testing.expect_value(t, ellipsize(&theme, "breve", 80, .Small), "breve")
+	cut := ellipsize(&theme, "una frase troppo lunga", 80, .Small)
+	testing.expect_value(t, cut, "una fra...")
+	accented := ellipsize(&theme, "perché però", 72, .Small)
+	testing.expect(t, len(accented) <= 9)
+	testing.expect(t, accented[len(accented)-3:] == "...")
+}
