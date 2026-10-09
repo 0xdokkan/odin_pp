@@ -12,24 +12,47 @@ m8_active_bar_bounds :: proc(renderer: ^Renderer) -> rl.Rectangle {
     return {(renderer.canvas_width-width)*0.5, renderer.canvas_height-217, width, 26}
 }
 
+m8_tesla_control_labels :: proc(room: ^game.Room) -> (title, detail: cstring) {
+    title="ATTIVA"
+    if room == nil {return title,"NESSUN OGGETTO ATTIVO"}
+    network := game.query_board_device_network(room)
+    if network.count == 0 {return title,"NESSUN OGGETTO ATTIVO"}
+    cooldown: i32
+    for object in room.objects {
+        if object.kind == .Tesla_Coil {cooldown=max(cooldown,object.device_cooldown)}
+    }
+    if network.field {
+        return "ATTIVA MEGA","CONSUMA 4 / FUOCO AMICO" if cooldown == 0 else fmt.ctprintf("RICARICA %ds / CONSUMA 4",cooldown)
+    }
+    if cooldown > 0 {return title,fmt.ctprintf("TESLA %d/4 / RICARICA %ds",network.count,cooldown)}
+    if network.count >= 2 {return title,fmt.ctprintf("TESLA %d/4 / PARETI RIUSABILI",network.count)}
+    return title,"TESLA 1/4 / SERVONO 2"
+}
+
 draw_m8_active_bar :: proc(renderer: ^Renderer, room: ^game.Room) {
     if room == nil || room.player == nil { return }
     b := m8_active_bar_bounds(renderer)
     w := b.width*0.28
     ready := m8_control_enabled(renderer,room,.Activate)
-    count := game.board_tesla_count(room)
     floors := game.board_device_count(room, .Shock_Floor)
-    label := fmt.ctprintf("TESLA %d/4 / TRAPPOLE %d", count, floors)
-    if count == 0 && floors == 0 { label = "OGGETTI ATTIVI" }
-    cooldown,charges := i32(0),i32(0)
+    charges: i32
+    triggered := 0
     for object in room.objects {
-        if object.kind == .Tesla_Coil { cooldown=max(cooldown,object.device_cooldown) }
-        if object.kind == .Shock_Floor { charges+=object.device_charges }
+        if object.kind == .Shock_Floor {
+            charges+=object.device_charges
+            if object.device_armed { triggered+=1 }
+        }
     }
-    if count == 0 && floors > 0 { label=fmt.ctprintf("TRAPPOLE %d / COLPI %d",floors,charges) }
-    if cooldown > 0 { label=fmt.ctprintf("TESLA %d/4 / RICARICA %ds",count,cooldown) }
-    if game.query_board_device_network(room).field && cooldown == 0 { label = "CAMPO / FUOCO AMICO" }
-    m8_mouse_button(renderer,m8_control_bounds(renderer,.Activate),"ATTIVA",ready,label)
+    title,label := m8_tesla_control_labels(room)
+    m8_mouse_button(renderer,m8_control_bounds(renderer,.Activate),title,ready,label)
+    // Passive traps have a read-only status strip, separate from the Tesla button.
+    if floors > 0 {
+        status := rl.Rectangle{b.x,b.y-20,min(b.width,440),17}
+        rl.DrawRectangleRec(status,GOTHIC_RECESS)
+        rl.DrawRectangleRec({status.x,status.y,2,status.height},GOTHIC_BLUE if triggered > 0 else GOTHIC_STEEL)
+        gothic_text_fit(renderer,fmt.ctprintf("TRAPPOLE / IN ATTESA %d / INNESCATE %d / COLPI %d",floors-triggered,triggered,charges),
+            {status.x+7,status.y+1,status.width-14,15},11,GOTHIC_BLUE if triggered > 0 else GOTHIC_MUTED)
+    }
     equipment := &room.player.equipment
     name: cstring = "ARMA: MANI NUDE"
     if def, found := game.weapon_definition(equipment.weapon.id); found {

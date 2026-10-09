@@ -7,6 +7,7 @@ MAX_SHOCK_FLOORS :: 4
 TESLA_RECHARGE_BEATS :: i32(3)
 
 Board_Device_Network :: struct {
+	ids: [MAX_TESLA_COILS]u32,
 	positions: [MAX_TESLA_COILS]grid.Position,
 	count: int,
 	hull: [MAX_TESLA_COILS]grid.Position,
@@ -108,17 +109,16 @@ board_device_cross :: proc(a, b, c: grid.Position) -> int {
 // IDs retain deployment order even when destruction reorders room.objects.
 query_board_device_network :: proc(room: ^Room) -> (network: Board_Device_Network) {
 	if room == nil { return }
-	ids: [MAX_TESLA_COILS]u32
 	network.ready = true
 	for object in room.objects {
 		if object.kind != .Tesla_Coil || network.count == MAX_TESLA_COILS { continue }
 		at := network.count
-		for at > 0 && ids[at-1] > object.id {
-			ids[at] = ids[at-1]
+		for at > 0 && network.ids[at-1] > object.id {
+			network.ids[at] = network.ids[at-1]
 			network.positions[at] = network.positions[at-1]
 			at -= 1
 		}
-		ids[at], network.positions[at] = object.id, object.position
+		network.ids[at], network.positions[at] = object.id, object.position
 		network.count += 1
 		network.ready = network.ready && object.device_cooldown <= 0
 		network.base_damage = max(network.base_damage, object.device_damage)
@@ -252,27 +252,40 @@ shock_floor_contains_cell :: proc(room: ^Room, center, cell: grid.Position) -> b
 	       base_cell_is_walkable(room, cell) && !obstacle_at(room, cell)
 }
 
+arm_shock_floor :: proc(object: ^Grid_Object, enemy: Entity_Ref, events: ^Event_Log) {
+	assert(object != nil && object.kind == .Shock_Floor && enemy.kind == .Enemy)
+	object.device_armed = true
+	record_event(events, {kind = .Hazard_Triggered, source = enemy,
+		target = object_entity(object.id), object_kind = .Shock_Floor,
+		from_position = object.position, to_position = object.position})
+}
+
+// All movement, including pushes, charges and teleport landings, enters here
+// through the shared movement resolver. Crossing an entire area still trips
+// its trap; discharges retain the world's one-second cadence.
+trigger_shock_floors_on_entry :: proc(room: ^Room, entity: Entity_Ref, events: ^Event_Log) {
+	if room == nil || room.phase != .Combat || entity.kind != .Enemy { return }
+	position, present := entity_position(room, entity)
+	if !present { return }
+	for &object in room.objects {
+		if object.kind == .Shock_Floor && !object.device_armed && object.device_charges > 0 &&
+		   shock_floor_contains_cell(room, object.position, position) {
+			arm_shock_floor(&object, entity, events)
+		}
+	}
+}
+
 board_devices_can_activate :: proc(room: ^Room) -> bool {
 	if room == nil || room.player == nil || room.phase != .Combat || !tactical_allows_action(room) { return false }
-	for object in room.objects {
-		if object.kind == .Shock_Floor && !object.device_armed && object.device_charges > 0 { return true }
-	}
 	return query_board_device_network(room).ready
 }
 
-// The command owner spends action time exactly once after this accepts. Arming
-// several devices is one action; recharge and repeated discharges use world beats.
+// Only Tesla networks use the active command. Shock floors are passive traps;
+// neither their presence nor their state can enable or consume this action.
 activate_board_devices :: proc(room: ^Room) -> bool {
 	if !board_devices_can_activate(room) { return false }
 	clear_event_log(&room.recent_events)
-	for &object in room.objects {
-		if object.kind != .Shock_Floor || object.device_armed || object.device_charges <= 0 { continue }
-		object.device_armed = true
-		record_event(&room.recent_events, {kind = .Hazard_Triggered, source = PLAYER_ENTITY,
-			target = object_entity(object.id), object_kind = .Shock_Floor, from_position = object.position, to_position = object.position})
-	}
 	network := query_board_device_network(room)
-	if !network.ready { return true }
 	for &object in room.objects {
 		if object.kind == .Tesla_Coil { object.device_cooldown = TESLA_RECHARGE_BEATS }
 	}
@@ -308,16 +321,34 @@ activate_board_devices :: proc(room: ^Room) -> bool {
 		assert(report.accepted)
 		append_event_log(&room.recent_events, &report.events)
 	}
+	// Lightning walls leave their coils anchored for later combinations. Only
+	// a complete electromagnetic field spends its four participating coils,
+	// after the entire discharge resolves. Terminal cleanup may already have
+	// removed them; stable IDs prevent duplicate removals or unrelated objects.
+	if network.field {
+		for id in network.ids[:network.count] {
+			index, found := object_index_by_id(room, id)
+			if !found { continue }
+			position := room.objects[index].position
+			remove_grid_object(room, index)
+			record_event(&room.recent_events, {kind = .Entity_Defeated, source = SYSTEM_ENTITY,
+				target = object_entity(id), object_kind = .Tesla_Coil,
+				from_position = position, to_position = position})
+		}
+	}
 	return true
 }
 
+// Dormant floors never spend charges. The first occupied beat also handles a
+// floor placed underneath an enemy. Once tripped, the committed d4 sequence
+// runs to completion even if the area becomes empty again.
 tick_board_devices :: proc(room: ^Room, pulse: ^Pulse_Report) {
 	if room == nil || pulse == nil || room.phase != .Combat { return }
 	ids: [MAX_SHOCK_FLOORS]u32
 	count := 0
 	for &object in room.objects {
 		if object.kind == .Tesla_Coil { object.device_cooldown = max(0, object.device_cooldown-1) }
-		if object.kind == .Shock_Floor && object.device_armed && object.device_charges > 0 && count < len(ids) {
+		if object.kind == .Shock_Floor && object.device_charges > 0 && count < len(ids) {
 			ids[count] = object.id
 			count += 1
 		}
@@ -327,11 +358,15 @@ tick_board_devices :: proc(room: ^Room, pulse: ^Pulse_Report) {
 		index, found := object_index_by_id(room, id)
 		if !found { continue }
 		object := room.objects[index]
+		enemy_ids, enemy_count := shock_floor_targets(room, object)
+		if !object.device_armed {
+			if enemy_count == 0 { continue }
+			arm_shock_floor(&room.objects[index], enemy_entity(enemy_ids[0]), &pulse.events)
+		}
 		room.objects[index].device_charges -= 1
 		record_event(&pulse.events, {kind = .Spell_Impact, source = object_entity(id), target = SYSTEM_ENTITY,
 			card_definition = .Shock_Floor, object_kind = .Shock_Floor, from_position = object.position,
 			to_position = object.position, amount = object.device_damage, area_mask = 0x1ff})
-		enemy_ids, enemy_count := shock_floor_targets(room, object)
 		for enemy_id in enemy_ids[:enemy_count] {
 			if room.phase != .Combat { break }
 			ei, present := enemy_index_by_id(room, enemy_id)

@@ -366,8 +366,8 @@ card_detail_lines :: proc(card: game.Card_Instance) -> (first, second: cstring) 
 		return fmt.ctprintf("3D6: 4+ = %d DMG", 3+upgrade), "1-3: 1 SHIELD EACH"
 	case .Twin_Venom:
 		return fmt.ctprintf("HIGHER D6 +%d DMG", 1+upgrade), "2D6 / PAIR: POISON 2"
-	case .Shock_Floor: return "D4 SHOCKS / D4 TARGETS", "1 DMG / 3X3 / ACTIVE"
-	case .Tesla_Coil: return "8 / DISTANCE DAMAGE", "MAX 4 / ACTIVE DEVICE"
+	case .Shock_Floor: return "D4 SHOCKS / D4 TARGETS", fmt.ctprintf("%d DMG / 3X3 / TRAP", 1+upgrade)
+	case .Tesla_Coil: return fmt.ctprintf("%d / DISTANCE DAMAGE", 8+upgrade), "FIELD CONSUMES 4 COILS"
 	case .Titan_Grip: return fmt.ctprintf("%d DAMAGE / THROW 2", 3+upgrade), "INTERRUPT / STAGGER 1"
 	case .Storm_Crown: return fmt.ctprintf("%d DAMAGE EACH", 5+upgrade), "LEGENDARY / CHAIN 3"
 	case .Count:

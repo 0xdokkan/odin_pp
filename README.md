@@ -73,13 +73,17 @@ riproducibile per la versione corrente del generatore.
 | `--fast` | velocità 4x |
 | `--spell-lab` | arena con Firebomb, Fate Strike, Chain Lightning, Sundering Blow e Guard |
 | `--dice-lab` | arena con Fate Strike, Sundering Blow, Prismatic Barrage, Twin Venom e Guard |
+| `--dice-set-lab` | tavolo 3D del set D4/D6/D8/D10/D%/D12/D20: selezione, lancio e rotazione con il mouse |
 | `--sprites=/percorso/sprites.json` | manifest grafico alternativo |
 | `--debug-abilities` | abilita gli shortcut di debug `C` e `V` |
 | `--playtest-report` | registra una sessione interattiva |
 | `--playtest-output=/percorso/sessione.json` | attiva la telemetria e sceglie il percorso di base |
 
-Nei laboratori le carte sono già in mano, nell'ordine indicato; `F5` ricrea
+Nei laboratori spell e dice le carte sono già in mano, nell'ordine indicato; `F5` ricrea
 l'arena con un nuovo seed. Restano attivi costi, pulse e risposta dei nemici.
+Il tavolo `--dice-set-lab` è invece una galleria autonoma: non modifica la run,
+il profilo o i risultati dei dadi del gameplay. I sette modelli sono disponibili
+nel renderer; le carte attuali continuano a usare soltanto D4 e D6.
 Usare i laboratori senza opzioni smoke o report di playtest. Gli smoke grafici
 mantengono velocità 1x per rendere riproducibile la cattura.
 
@@ -182,16 +186,22 @@ renderer non tira nuovamente i dadi e non riapplica effetti.
 | Shock Floor | 2 / 3 s | pavimento calpestabile, area 3×3, massimo 4 nella stanza; il d4 decide sia il numero di scariche sia il massimo di nemici per scarica |
 | Tesla Coil | 1 / 2 s | torretta solida da 4 HP, massimo 4 nella stanza; 2–3 nodi creano collegamenti, 4 nodi non allineati possono chiudere un campo |
 
-Il pulsante **ATTIVA**, da cliccare nella barra degli oggetti, arma insieme
-tutti i pavimenti ancora inattivi e attiva la rete Tesla
-pronta; costa un secondo in Combat soltanto se il comando riesce. Dopo
-l'attivazione, ogni pavimento emette una scarica per beat del mondo fino a
+La **Shock Floor è una trappola passiva**: aspetta senza consumare cariche finché
+un nemico entra nella sua area 3×3, anche attraverso una spinta o una carica.
+Un teletrasporto controlla solo l'arrivo. Il player non la innesca; una pedana
+posata sotto un nemico si innesca al primo beat del mondo. Cast e cinematiche
+non fanno avanzare le scariche. Dopo l'innesco, ogni pavimento emette una
+scarica per beat del mondo fino a
 esaurire il risultato del d4. Con un **3** produce quindi **3 scariche**, ognuna
 su **massimo 3 nemici** nell'area. Il danno base è **1 per bersaglio**: il dado
 non decide il danno. Gli upgrade aggiungono un danno. Si preferiscono i nemici
 più vicini, poi l'ID stabile; pavimento e scariche non feriscono il player.
+La sequenza, una volta innescata, procede anche se l'area torna vuota. L'HUD
+distingue le pedane in attesa da quelle innescate; non hanno un pulsante attivo.
 
-Le Tesla emettono un impulso sui collegamenti al clic su **ATTIVA**; non sono muri
+Il pulsante **ATTIVA**, da cliccare nella barra degli oggetti, riguarda soltanto
+una rete Tesla pronta; costa un secondo in Combat se il comando riesce.
+Le Tesla emettono un impulso sui collegamenti al clic; non sono muri
 invalicabili e non infliggono danno continuo al semplice attraversamento.
 I collegamenti rispettano muri, coperture e angoli chiusi. Il danno base di un
 collegamento è **`max(1, ceil(8 / distanza))`**, con distanza Chebyshev: 1 cella
@@ -204,9 +214,14 @@ dall'ordine di posa, se i bordi hanno linea di vista libera. Il danno dell'area
 è quello del **bordo più debole**. Il campo colpisce anche il player presente
 nell'area; scudo e difesa applicano le regole normali. Una configurazione
 allineata o con bordo ostruito resta una rete di soli collegamenti validi.
-Ogni bersaglio riceve al massimo un colpo per attivazione. Le Tesla richiedono
+Ogni bersaglio riceve al massimo un colpo per attivazione. Le torri mantengono
+la posizione di posa: le scariche con 2–3 torri non le consumano e richiedono
 **3 beat del mondo** prima della successiva attivazione, compreso il tempo
-aggiunto da azioni accettate; cast e dadi non accelerano la ricarica.
+aggiunto da azioni accettate; cast e dadi non accelerano la ricarica. La mega
+combo con un campo valido consuma tutte e quattro le Tesla dopo la scarica,
+liberando gli slot per una nuova rete. Quattro torri allineate o con campo
+ostruito producono soltanto collegamenti e rimangono. Restano danneggiabili
+(4 HP): la persistenza non conferisce invulnerabilità.
 
 Preview, overlay e danno interrogano la stessa geometria in
 [board_device.odin](src/game/board_device.odin). I dispositivi sono locali al
@@ -318,7 +333,7 @@ odin run src -o:none -- --classic
 | `--smoke-m7-view` | prova grafica di scena, oggetti 3D, fog, ologramma, QTE e menu |
 | `--smoke-m8-view` | prova 3D di d4, dispositivi, equipaggiamento, scheda personaggio, ring e cambio stanza |
 
-Gli smoke classici e i laboratori spell/dadi conservano il comportamento classico;
+Gli smoke classici e i laboratori `--spell-lab` / `--dice-lab` conservano il comportamento classico;
 gli smoke `m7` esercitano il loop tattico aggiornato a M8.
 Gli sprite esterni continuano a usare `--sprites`: nella scena 3D M7 sono
 riservati ai personaggi; ghiaccio, barili, bombe e fuoco sono mesh a blocchi.
@@ -1154,25 +1169,30 @@ assegna un `visual_group` ai feedback diretti compatibili: si animano insieme,
 ma le mutazioni dello snapshot restano ordinate. Reazioni e rimbalzi restano
 separati. Il renderer non interroga la stanza futura per ricostruire l'area.
 
-I D6 hanno mesh smussate, collisioni col piano e fra corpi, fino a tre
-simultanei. Shock Floor usa un D4 tetraedrico con risultato committed; durante
-la sua animazione vale la stessa pausa completa del D6. In M7 sono blu-neri con punti chiari, grana e rivestimento lucido
-condivisi con i blocchi del livello; il totale appare in un pannello laterale
-separato dalla mano. Il classico conserva i dadi rossi.
+Il set 3D numerato comprende **D4, D6, D8, D10, D%, D12 e D20**: tetraedro,
+cubo, ottaedro, trapezoedri pentagonali, dodecaedro e icosaedro. Le mesh sono
+chiuse e smussate, con numeri fissi avorio, 6/9 sottolineati e resina blu scura
+lucida. Il D4 ripete tre cifre per faccia: si legge il valore alla punta.
+Il D10 mostra 0–9 (0 vale 10), il percentuale 00–90. Il laboratorio si apre
+con `./run.sh --dice-set-lab`; basta cliccare un dado per osservarlo da vicino.
 
-Riferimenti fotografici raccolti per i prossimi modelli: [tavola locale dei dadi](references/dice/index.html),
+Le carte attuali usano D4/D6, fino a tre D6 simultanei. Shock Floor usa il
+tetraedro numerato durante la stessa pausa completa del D6. Il totale appare
+in un pannello laterale separato dalla mano. Il classico conserva i D6 rossi
+con punti.
+
+Riferimenti fotografici dei modelli: [tavola locale dei dadi](references/dice/index.html),
 [Chessex Translucent Blue/White](https://magicmerchant.it/catalogue/7-dice-chessex-translucent-blue-white-23076-dadi-832)
 e [Lunar Veil di Misty Mountain Gaming](https://mistymountaingaming.com/products/lunar-veil-sharp-edged-resin-dice-set).
 Le foto guidano proporzioni, facce e numerazione del set D4/D6/D8/D10/D%/D12/D20;
 sono materiale di consultazione, separato dagli asset caricati dal gioco.
-Direzione proposta: corpo blu scuro lucido, smussi piccoli, numeri avorio
-leggibili e 6/9 distinguibili. Il D4 reale usa tre cifre orientate verso i
-vertici, non una faccia superiore. Il renderer corrente resta quello D4/D6
-con punti: la raccolta è un riferimento per il successivo rework dei modelli.
-
 La fisica è cosmetica, precalcolata a passo fisso una volta per
 lancio. Le facce vengono orientate prima del playback per mostrare il risultato
-committed, senza cambiare numeri durante la caduta; le facce opposte sommano sette.
+committed, senza cambiare numeri durante la caduta; nel D6 le facce opposte sommano sette.
+Il percorso dei rimbalzi riusa la simulazione cubica esistente: ogni poliedro
+corregge l'appoggio sul piano usando i propri vertici e conserva una rotazione
+locale costante durante il lancio. Non è una simulazione di collisioni dedicata
+a ogni solido. Modelli e lanci sono precalcolati, senza costruire mesh a ogni frame.
 I primi due urti danno spinte verticali di 12 e 9 unità/s e impulsi angolari;
 seguono attrito e assestamento, senza leggere RNG del gameplay.
 
@@ -2408,9 +2428,10 @@ sh scripts/check.sh
 ./run.sh --smoke-m7
 ./run.sh --smoke-m8-view
 ./run.sh --smoke-arenas-view
+./run.sh --smoke-dice-set
 ```
 
-Verifica del 9 ottobre 2026: `scripts/check.sh` completo, **748 test superati**
+Verifica precedente della base M8 del 9 ottobre 2026: `scripts/check.sh` completo, **748 test superati**
 sia con assert sia senza, vet/strict-style e build puliti, nessun leak segnalato.
 Passati lo stress headless (10 preset e 4 run terminali ripetute due volte),
 il percorso 3D M7 e quello M8: piazzamenti, d4, campo Tesla con fuoco amico,
@@ -2432,6 +2453,32 @@ ring e stanza successiva. Queste sono prove riproducibili di integrazione e resa
 visiva; non sostituiscono una sessione manuale di bilanciamento. Gli esiti finali
 della verifica vanno riferiti alla revisione eseguita, senza riutilizzare i
 conteggi storici delle milestone precedenti.
+
+Aggiornamento trappole, Tesla e dadi del 9 ottobre 2026: **770 test superati**
+con e senza assert, `scripts/check.sh` completo (vet/strict-style e due build).
+Le regressioni aggiunte coprono attesa senza consumo, ingresso/spinta/carica,
+teletrasporto, player escluso dall'innesco, pulsante solo Tesla e sincronizzazione
+del nuovo evento `Hazard_Triggered` con la presentazione. Per la rete verificano
+persistenza delle pareti, cooldown, danni prima del consumo delle quattro torri
+e possibilità di riposarle. I test dei dadi verificano geometria chiusa,
+numerazione fissa, appoggio di ogni risultato sul piano, ripetibilità e assenza
+di mutazioni durante il playback.
+Un controllo nativo più stretto ha inoltre riprodotto due errori di timeline
+per ogni piazzamento Tesla: il validator dei lanci/impatti ammetteva solo le
+vecchie spell e le carte con dadi. Ora riconosce anche le carte dispositivo;
+una regressione verifica gli eventi reali di posa, scarica e consumo, con
+zero errori di presentazione e nessun evento perso.
+
+Passati lo stress M7 (10 preset e 4 run ripetute due volte) e gli smoke nativi
+M8 e set dadi. Il primo prova pedana automatica, consumo della mega con fuoco
+amico, equipaggiamento, Loot, ring e stanza successiva. Il secondo disegna i
+sette modelli lungo 100 frame di lancio, tutti i risultati del D4 e lo 00 del
+percentuale. Screenshot: `odin_pp_dice_set.png`, `odin_pp_dice_d4_detail.png`,
+`odin_pp_m8_d4.png`, `odin_pp_m8_devices.png` (rete prima della mega) e
+`odin_pp_m8_mega_combo.png` (dopo il consumo). La verifica visiva ha corretto
+anche il materiale che ignorava l'alpha dell'atlante e copriva le cifre con
+rettangoli: ora la resina campiona la texture dei numeri e mantiene l'avorio
+leggibile sulle facce in ombra.
 
 La verifica delle arene progressive usa quattro blueprint reali (17×11,
 25×17, 33×23 e 45×31), fino a 22 nemici. Lo smoke 3D ha verificato 28 beat

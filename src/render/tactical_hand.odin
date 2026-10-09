@@ -84,13 +84,15 @@ draw_tactical_card :: proc(renderer: ^Renderer, bounds: rl.Rectangle, card: game
 	// The crest stays clear even with the narrowest eight-card hand.
 	rl.DrawRectangleRec({x+8, y+42, 30, 17}, {22, 41, 54, 240})
 	gothic_text_fit(renderer, fmt.ctprintf("-%.0fs", game.tactical_card_time_cost(card.definition_id)), {x+11, y+43, 25, 15}, 12, GOTHIC_BLUE)
-	if game.card_is_board_device(card.definition_id) { gothic_text_fit(renderer,"ATTIVO",{x+8,y+63,32,12},9,accent) }
+	if game.card_is_board_device(card.definition_id) {
+		gothic_text_fit(renderer,"PASSIVA" if card.definition_id == .Shock_Floor else "ATTIVO",{x+8,y+63,32,12},9,accent)
+	}
 	rl.DrawRectangleRec({x+10, y+83, width-20, 2}, accent)
 	rl.DrawRectangleRec({x+10, y+85, width-20, 1}, {251, 244, 223, 170})
 	first, second := gothic_card_lines(card, definition.tactical)
 	if width < 130 {
 		if card.definition_id == .Shock_Floor { first, second = "D4 COLPI + BERS.", fmt.ctprintf("%d DANNO / 3X3", game.card_effect_amount(definition.effects[0], card.upgrade_level)) }
-		if card.definition_id == .Tesla_Coil { first, second = fmt.ctprintf("%d / DIST. DANNI",game.card_effect_amount(definition.effects[0],card.upgrade_level)), "MAX 4 / ATTIVO" }
+		if card.definition_id == .Tesla_Coil { first, second = fmt.ctprintf("%d / DIST. DANNI",game.card_effect_amount(definition.effects[0],card.upgrade_level)), "CAMPO USA 4 TESLA" }
 	}
 	gothic_text_fit(renderer, first, {x+10, y+90, width-20, 18}, 14, ink)
 	gothic_text_fit(renderer, second, {x+10, y+109, width-20, 17}, 12, ink)
@@ -119,6 +121,8 @@ draw_tactical_card_inspector :: proc(renderer: ^Renderer, card: game.Card_Instan
 	if card.definition_id == .Prismatic_Barrage { reaction = "SCUDO PRIMA / 2s" }
 	if card.definition_id == .Twin_Venom { reaction = "VELENO: 2s" }
 	if game.card_is_board_device(card.definition_id) { reaction = "USA IL PULSANTE ATTIVA" }
+	if card.definition_id == .Shock_Floor { reaction = "TRAPPOLA: INGRESSO NEMICO" }
+	if card.definition_id == .Tesla_Coil { reaction = "ATTIVA / 2-3 TESLA RESTANO" }
 	if definition.tactical {
 		if card.definition_id == .Heavy_Blow { reaction = "SALTA AZIONE / RECUPERA 1s" }
 		if card.definition_id == .Strike { reaction = "PREMIA IL CONTRATTACCO" }

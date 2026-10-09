@@ -74,8 +74,8 @@ gothic_card_lines :: proc(card: game.Card_Instance, tactical: bool = false) -> (
 	case .Sundering_Blow: return fmt.ctprintf("2D6 + %d DANNI", u), "TIRO 8+: SPINTA 1"
 	case .Prismatic_Barrage: return fmt.ctprintf("3D6: 4+ = %d DANNI", 3+u), "1-3: 1 SCUDO / DADO"
 	case .Twin_Venom: return fmt.ctprintf("MAX(2D6) + %d DANNI", 1+u), "COPPIA: 2 VELENO"
-	case .Shock_Floor: return "D4 SCARICHE / D4 BERSAGLI", fmt.ctprintf("%d DANNO / AREA 3X3", a)
-	case .Tesla_Coil: return fmt.ctprintf("%d / DISTANZA DANNI", a), "MAX 4 / OGGETTO ATTIVO"
+	case .Shock_Floor: return "D4 SCARICHE / D4 BERSAGLI", fmt.ctprintf("%d DANNO / TRAPPOLA 3X3", a)
+	case .Tesla_Coil: return fmt.ctprintf("%d / DISTANZA DANNI", a), "CAMPO: CONSUMA 4 TESLA"
 	case .Titan_Grip: return fmt.ctprintf("%d DANNI / LANCIA 2", a), "INTERROMPE / STORDISCE 1s"
 	case .Storm_Crown: return fmt.ctprintf("%d DANNI / 3 BERSAGLI", a), "LEGGENDARIA / RIMBALZO 3"
 	case .Count: return "", ""

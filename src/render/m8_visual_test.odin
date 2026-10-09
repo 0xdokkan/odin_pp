@@ -4,29 +4,7 @@ import "core:math"
 import "core:testing"
 import rl "vendor:raylib"
 import game "../game"
-
-@(test)
-test_d4_faces_have_exactly_four_distinct_results_and_closed_tetrahedron :: proc(t: ^testing.T) {
-    for result in i32(1)..=4 {
-        seen: [5]bool
-        for face in 0..<4 {
-            value := d4_face_value(face,result)
-            testing.expect(t,value >= 1 && value <= 4 && !seen[value])
-            seen[value]=true
-        }
-        testing.expect_value(t,d4_face_value(0,result),result)
-    }
-    vertices := D4_VERTICES
-    faces := D4_FACES
-    edges: [4][4]int
-    for face in faces {
-        a,b,c := vertices[face[0]],vertices[face[1]],vertices[face[2]]
-        normal := rl.Vector3CrossProduct(b-a,c-a)
-        testing.expect(t,rl.Vector3Length(normal)>0.1)
-        for i in 0..<3 { lo,hi := min(face[i],face[(i+1)%3]),max(face[i],face[(i+1)%3]); edges[lo][hi]+=1 }
-    }
-    for a in 0..<4 { for b in a+1..<4 { testing.expect_value(t,edges[a][b],2) } }
-}
+import level "../level"
 
 @(test)
 test_ring_grab_has_four_distinct_held_poses_and_safe_endpoints :: proc(t: ^testing.T) {
@@ -51,10 +29,10 @@ test_m8_device_descriptions_keep_d4_targets_separate_from_damage :: proc(t: ^tes
     for tactical in ([2]bool{false,true}) {
         first,second := gothic_card_lines({definition_id=.Shock_Floor,upgrade_level=0},tactical)
         testing.expect_value(t,string(first),"D4 SCARICHE / D4 BERSAGLI")
-        testing.expect_value(t,string(second),"1 DANNO / AREA 3X3")
+        testing.expect_value(t,string(second),"1 DANNO / TRAPPOLA 3X3")
         first,second=gothic_card_lines({definition_id=.Tesla_Coil},tactical)
         testing.expect_value(t,string(first),"8 / DISTANZA DANNI")
-        testing.expect_value(t,string(second),"MAX 4 / OGGETTO ATTIVO")
+        testing.expect_value(t,string(second),"CAMPO: CONSUMA 4 TESLA")
         first,second=gothic_card_lines({definition_id=.Storm_Crown},tactical)
         testing.expect_value(t,string(second),"LEGGENDARIA / RIMBALZO 3")
     }
@@ -137,6 +115,15 @@ test_m8_pointer_controls_match_drawn_buttons_and_respect_action_gates :: proc(t:
     append(&room.objects,game.Grid_Object{kind=.Shock_Floor,device_charges=3})
     defer delete(room.objects)
     active := m8_control_bounds(renderer,.Activate)
+    testing.expect_value(t,m8_control_at_point(renderer,&room,{active.x+3,active.y+3}),M8_Control.None)
+    room.objects[0].device_armed=true
+    testing.expect_value(t,m8_control_at_point(renderer,&room,{active.x+3,active.y+3}),M8_Control.None)
+    data, created := level.create(4,4,{kind=.Floor})
+    testing.expect(t,created)
+    defer level.destroy(&data)
+    room.level_data=&data
+    append(&room.objects,game.Grid_Object{kind=.Tesla_Coil,id=2,position={1,1},device_damage=8})
+    append(&room.objects,game.Grid_Object{kind=.Tesla_Coil,id=3,position={2,1},device_damage=8})
     testing.expect_value(t,m8_control_at_point(renderer,&room,{active.x+3,active.y+3}),M8_Control.Activate)
     player.tactical.config.enabled=true
     player.tactical.phase=.Recovery
@@ -146,6 +133,67 @@ test_m8_pointer_controls_match_drawn_buttons_and_respect_action_gates :: proc(t:
         card := tactical_hand_card_bounds(renderer,i,5)
         testing.expect_value(t,m8_control_at_point(renderer,&room,{card.x+5,card.y+5}),M8_Control.None)
     }
+}
+
+@(test)
+test_shock_floor_presentation_preserves_trigger_state_without_live_aliasing :: proc(t: ^testing.T) {
+    player := game.Player{}
+    room := game.Room{player=&player,phase=.Combat}
+    defer delete(room.objects)
+    append(&room.objects,game.Grid_Object{kind=.Shock_Floor,id=1,device_charges=3})
+    waiting := capture_room_presentation(&room)
+    room.objects[0].device_armed=true
+    triggered := capture_room_presentation(&room)
+    testing.expect(t,!waiting.objects[0].device_armed)
+    testing.expect(t,triggered.objects[0].device_armed)
+    room.objects[0].device_armed=false
+    testing.expect(t,triggered.objects[0].device_armed)
+}
+
+@(test)
+test_shock_floor_entry_cue_arms_the_visual_snapshot_without_a_damage_notice :: proc(t: ^testing.T) {
+    player := game.Player{}
+    room := game.Room{player=&player,phase=.Combat}
+    defer delete(room.objects)
+    defer delete(room.enemies)
+    append(&room.objects,game.Grid_Object{kind=.Shock_Floor,id=1,position={2,2},device_charges=3})
+    append(&room.enemies,game.Enemy{id=4,position={2,3},health=5,max_health=5})
+    before := capture_room_presentation(&room)
+    events: game.Event_Log
+    game.arm_shock_floor(&room.objects[0],game.enemy_entity(4),&events)
+    timeline := new(Presentation_Timeline)
+    defer free(timeline)
+    testing.expect(t,begin_event_timeline(timeline,before,&events))
+    testing.expect(t,update_event_timeline(timeline,PRESENTATION_NOTICE_DURATION))
+    testing.expect_value(t,timeline.update_failures,0)
+    testing.expect(t,timeline.view.objects[0].device_armed)
+    testing.expect_value(t,timeline.view.enemies[0].health,i32(5))
+}
+
+@(test)
+test_tesla_button_discloses_consumption_only_for_a_real_field :: proc(t: ^testing.T) {
+    data,created := level.create(7,7,{kind=.Floor})
+    testing.expect(t,created)
+    defer level.destroy(&data)
+    player := game.Player{}
+    room := game.Room{level_data=&data,player=&player,phase=.Combat}
+    defer delete(room.objects)
+    for position,index in ([4][2]int{{1,1},{5,1},{5,5},{1,5}}) {
+        append(&room.objects,game.Grid_Object{kind=.Tesla_Coil,id=u32(index+1),position={position[0],position[1]},device_damage=8})
+        title,detail := m8_tesla_control_labels(&room)
+        if index == 1 {
+            testing.expect_value(t,string(title),"ATTIVA")
+            testing.expect_value(t,string(detail),"TESLA 2/4 / PARETI RIUSABILI")
+        } else if index == 3 {
+            testing.expect_value(t,string(title),"ATTIVA MEGA")
+            testing.expect_value(t,string(detail),"CONSUMA 4 / FUOCO AMICO")
+        }
+    }
+    // Four in a line still form reusable lightning walls, not the mega field.
+    for &object,index in room.objects {object.position={index+1,1}}
+    title,detail := m8_tesla_control_labels(&room)
+    testing.expect_value(t,string(title),"ATTIVA")
+    testing.expect_value(t,string(detail),"TESLA 4/4 / PARETI RIUSABILI")
 }
 
 @(test)

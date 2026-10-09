@@ -98,6 +98,7 @@ Presentation_Grid_Object :: struct {
 	visible:    bool,
 	detonation_pulse: u64,
 	fuse_pulses: int,
+	device_armed: bool,
 }
 
 Room_Presentation :: struct {
@@ -200,6 +201,7 @@ capture_room_presentation :: proc(room: ^game.Room) -> (result: Room_Presentatio
 			kind = object.kind,
 			detonation_pulse = object.detonation_pulse,
 			fuse_pulses = object.fuse_pulses,
+			device_armed = object.device_armed,
 			position = presentation_position(object.position),
 			health = object.health,
 			max_health = object.max_health,
@@ -834,6 +836,14 @@ presentation_hazard_trigger_is_valid :: proc(
 	timeline: ^Presentation_Timeline,
 	event: game.Game_Event,
 ) -> bool {
+	if timeline != nil && event.kind == .Hazard_Triggered && event.object_kind == .Shock_Floor &&
+	   event.source.kind == .Enemy && event.target.kind == .Object && event.amount == 0 &&
+	   event.from_position == event.to_position {
+		object, object_found := presentation_grid_object(timeline,event.target)
+		actor, actor_found := presentation_actor(timeline,event.source)
+		return object_found && actor_found && object.visible && actor.visible &&
+		       object.kind == .Shock_Floor && object.position == presentation_position(event.to_position)
+	}
 	if timeline == nil || event.kind != .Hazard_Triggered || event.source.kind != .Object ||
 	   (event.target.kind != .Player && event.target.kind != .Enemy) || event.amount <= 0 ||
 	   event.from_position != event.to_position {
@@ -869,7 +879,7 @@ start_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^Presentat
 		}
 	case .Spell_Launched, .Spell_Impact:
 		if event.card_definition != .Firebomb && event.card_definition != .Chain_Lightning &&
-		   game.card_dice_count(event.card_definition) == 0 {
+		   game.card_dice_count(event.card_definition) == 0 && !game.card_is_board_device(event.card_definition) {
 			timeline.update_failures += 1
 		}
 	case .Room_Hazard_Triggered:
@@ -906,6 +916,8 @@ start_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^Presentat
 	case .Hazard_Triggered:
 		if !presentation_hazard_trigger_is_valid(timeline, event) {
 			timeline.update_failures += 1
+		} else if has_object && object.kind == .Shock_Floor {
+			object.device_armed = true
 		}
 	case .Damage:
 		if has_actor {

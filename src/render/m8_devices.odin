@@ -26,6 +26,7 @@ draw_m8_device_object :: proc(renderer: ^Renderer, object: Presentation_Grid_Obj
     p := rl.Vector3{object.position.x+0.5, 0.075, object.position.y+0.5}
     blue := rl.Color{82, 181, 238, 255}
     if object.kind == .Shock_Floor {
+        blue = rl.Color{92,198,250,255} if object.device_armed else rl.Color{56,92,118,255}
         draw_resin_cube(renderer, p, 0.88, 0.09, 0.88, RESIN_DARK)
         for axis in 0..<2 { for i in 0..<3 {
             offset := f32(i-1)*0.27
@@ -33,7 +34,13 @@ draw_m8_device_object :: proc(renderer: ^Renderer, object: Presentation_Grid_Obj
             size := rl.Vector3{0.045, 0.022, 0.78} if axis == 0 else rl.Vector3{0.78, 0.022, 0.045}
             rl.DrawCubeV(center, size, blue)
         } }
-        draw_resin_cube(renderer, p+rl.Vector3{0, 0.085, 0}, 0.17, 0.06, 0.17, GOTHIC_PAPER)
+        draw_resin_cube(renderer, p+rl.Vector3{0, 0.085, 0}, 0.17, 0.06, 0.17, GOTHIC_PAPER if object.device_armed else RESIN_CAP)
+        if object.device_armed {
+            // The sensor is quiet until an enemy enters; only a live trap arcs.
+            step := f32(comic_pose_frame(renderer.sprite_assets.elapsed)%2)*0.025
+            rl.DrawLine3D(p+rl.Vector3{-0.24,0.16,0.06},p+rl.Vector3{-0.03,0.25+step,-0.06},blue)
+            rl.DrawLine3D(p+rl.Vector3{-0.03,0.25+step,-0.06},p+rl.Vector3{0.24,0.16,0.06},blue)
+        }
     } else {
         draw_resin_cube(renderer, p, 0.65, 0.14, 0.65, RESIN_DARK)
         draw_resin_cube(renderer, p+rl.Vector3{0, 0.40, 0}, 0.20, 0.75, 0.20, RESIN_WALL)
@@ -73,14 +80,13 @@ draw_m8_device_network :: proc(renderer: ^Renderer, room: ^game.Room) {
     }
     for object in room.objects {
         if object.kind != .Shock_Floor || !tactical_render_visible(renderer, object.position) { continue }
-        if object.device_armed {
-            for dy in -1..=1 { for dx in -1..=1 {
-                cell := grid.Position{object.position.x+dx, object.position.y+dy}
-                if tactical_render_visible(renderer, cell) && game.shock_floor_contains_cell(room, object.position, cell) {
-                    rl.DrawCubeWires({f32(cell.x)+0.5, 0.059, f32(cell.y)+0.5}, 0.83, 0.01, 0.83, {88,184,240,95})
-                }
-            } }
-        }
+        color := rl.Color{88,184,240,95} if object.device_armed else rl.Color{68,113,145,32}
+        for dy in -1..=1 { for dx in -1..=1 {
+            cell := grid.Position{object.position.x+dx, object.position.y+dy}
+            if tactical_render_visible(renderer, cell) && game.shock_floor_contains_cell(room, object.position, cell) {
+                rl.DrawCubeWires({f32(cell.x)+0.5, 0.059, f32(cell.y)+0.5}, 0.83, 0.01, 0.83, color)
+            }
+        } }
     }
 }
 

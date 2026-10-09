@@ -185,6 +185,7 @@ renderer_presentation_snapshot :: proc(renderer: ^Renderer, room: ^game.Room) ->
 					if live.position == last.position { live.position = object.position }
 					if live.health == last.health { live.health = object.health }
 					if live.detonation_pulse == last.detonation_pulse { live.detonation_pulse = object.detonation_pulse }
+					if live.device_armed == last.device_armed { live.device_armed = object.device_armed }
 					if live.visible == last.visible { live.visible = object.visible; live.opacity = object.opacity }
 				} else if !live_found && !last_found && object.visible && result.object_count < len(result.objects) {
 					result.objects[result.object_count] = object

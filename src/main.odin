@@ -970,6 +970,12 @@ main :: proc() {
 	if options.m7_view_smoke { smoke_mode_count += 1 }
 	if options.m8_view_smoke { smoke_mode_count += 1 }
 	if options.arena_view_smoke { smoke_mode_count += 1 }
+	if options.dice_set_smoke { smoke_mode_count += 1 }
+	if (options.dice_set_lab || options.dice_set_smoke) &&
+	   (!options.tactical.enabled || options.spell_lab || (options.dice_set_lab && smoke_mode_count > 0)) {
+		fmt.eprintln("dice set lab requires tactical mode and cannot be combined with another lab or smoke")
+		os.exit(2)
+	}
 	if (options.m7_view_smoke || options.m8_view_smoke || options.arena_view_smoke) && !options.tactical.enabled {
 		fmt.eprintln("tactical view smoke requires tactical mode; omit --classic")
 		os.exit(2)
@@ -1021,7 +1027,7 @@ main :: proc() {
 	}
 	defer game.destroy_run(&run_state)
 	m8_session: M8_Session
-	if !smoke_test && !options.m7_smoke && !options.m7_view_smoke && !options.m8_view_smoke && !options.arena_view_smoke && !options.spell_lab {
+	if !smoke_test && !options.m7_smoke && !options.m7_view_smoke && !options.m8_view_smoke && !options.arena_view_smoke && !options.spell_lab && !options.dice_set_lab && !options.dice_set_smoke {
 		run_state.player.m8_profile, m8_session.save_enabled = load_m8_profile(M8_PROFILE_PATH)
 		if !m8_session.save_enabled { fmt.eprintln("Profilo M8 non leggibile: file preservato, salvataggio disabilitato.") }
 	}
@@ -1416,6 +1422,10 @@ main :: proc() {
 
 	if options.m8_view_smoke {
 		if !run_m8_view_smoke(&window, &iso_renderer, &dice_renderer) { fmt.eprintln("M8 native smoke failed"); os.exit(2) }
+		return
+	}
+	if options.dice_set_lab || options.dice_set_smoke {
+		if !run_dice_set_lab(&window, &iso_renderer, &dice_renderer, options.dice_set_smoke) { fmt.eprintln("Dice set lab failed"); os.exit(2) }
 		return
 	}
 	if options.arena_view_smoke {

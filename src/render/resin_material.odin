@@ -38,11 +38,19 @@ uniform vec3 eye;
 uniform int hologram;
 uniform float roomClear;
 uniform vec4 accentLights[4];
+uniform sampler2D texture0;
 out vec4 finalColor;
 float grain(vec2 p) { return fract(sin(dot(p, vec2(127.1,311.7)))*43758.5453); }
 void main() {
     vec3 n = normalize(normal);
-    vec3 base = color.rgb;
+    vec4 material = color;
+    // Model numerals share the resin shader with the body. Their font atlas
+    // needs real alpha sampling: ignoring it paints the entire glyph quad.
+    if (hologram == 2) {
+        material *= texture(texture0, surfaceUV);
+        if (material.a < 0.01) discard;
+    }
+    vec3 base = material.rgb;
     vec3 l = normalize(vec3(-0.35, 1.0, -0.65));
     float sun = max(dot(n, l), 0.0);
     if (hologram == 1) {
@@ -85,8 +93,14 @@ void main() {
             lit += vec3(0.22,0.65,1.0)*(base*diffuse*1.25+shine*0.11)*reach;
         }
     }
+    if (hologram == 2) {
+        // Ivory inlays keep their readable value on a shaded face while the
+        // blue resin still receives the complete directional glossy lighting.
+        float ink = smoothstep(0.60,0.85,min(color.r,min(color.g,color.b)));
+        lit = mix(lit,base*(0.83+sun*0.20),ink);
+    }
     float mist = hologram == 2 ? 0.0 : smoothstep(5.0,10.0,length(worldPosition.xz-lantern.xz))*mix(0.55,0.08,clear);
-    finalColor = vec4(mix(lit,vec3(0.02,0.03,0.055),mist),color.a);
+    finalColor = vec4(mix(lit,vec3(0.02,0.03,0.055),mist),material.a);
 }`
 
 draw_resin_cube_v :: proc(renderer: ^Renderer, position, size: rl.Vector3, color: rl.Color) {

@@ -16,6 +16,9 @@ Dice_Renderer :: struct {
 	ready, has_throw, has_frame: bool,
 	requested_width, requested_height: int,
 	mesh: Dice_Bevel_Mesh,
+	polyhedra: [Polyhedral_Die_Kind.Count]Polyhedral_Die,
+	polyhedra_ready: bool,
+	frame_kind: Polyhedral_Die_Kind,
 	throw_state: Dice_Throw,
 	numbering: [3]Dice_Numbering,
 	roll: game.Dice_Roll,
@@ -116,8 +119,17 @@ ensure_dice_texture :: proc(renderer: ^Dice_Renderer, width, height: f32) -> boo
 	return true
 }
 
+prepare_polyhedral_models :: proc(renderer: ^Dice_Renderer) {
+	if renderer == nil || renderer.polyhedra_ready { return }
+	for kind in Polyhedral_Die_Kind {
+		if kind != .Count { renderer.polyhedra[kind] = build_polyhedral_die(kind) }
+	}
+	renderer.polyhedra_ready = true
+}
+
 create_dice_renderer :: proc(renderer: ^Dice_Renderer) -> bool {
 	if renderer == nil {return false}
+	prepare_polyhedral_models(renderer)
 	if renderer.mesh.count == 0 {renderer.mesh = build_dice_bevel_mesh()}
 	if !rl.IsWindowReady() {return false}
 	return ensure_dice_texture(renderer, f32(rl.GetScreenWidth()), f32(rl.GetScreenHeight()))
@@ -130,6 +142,7 @@ destroy_dice_renderer :: proc(renderer: ^Dice_Renderer) {
 }
 
 prepare_dice_pool :: proc(renderer: ^Dice_Renderer, roll: game.Dice_Roll, seed: u64, layout: Dice_Pool_Layout) {
+	prepare_polyhedral_models(renderer)
 	if renderer.has_throw && renderer.seed == seed && renderer.roll == roll {return}
 	build_dice_throw(&renderer.throw_state, roll.count, seed, layout.release_height)
 	renderer.roll, renderer.seed, renderer.has_throw = roll, seed, true
@@ -199,11 +212,17 @@ update_dice_pool_texture :: proc(renderer: ^Dice_Renderer, roll: game.Dice_Roll,
 		rl.SetShaderValue(v.light_shader, v.light_hologram_location, &mode, .INT)
 		rl.BeginShaderMode(v.light_shader)
 	}
+	kind := polyhedral_die_for_sides(int(game.card_dice_sides(card)))
+	font := rl.GetFontDefault()
+	if menu_themed(renderer.theme) { font, _ = gothic_font(renderer.theme, 32) }
 	for index in 0..<roll.count {
-		if game.card_dice_sides(card) == 4 {
-			draw_d4_mesh(renderer.frame.positions[index]-rl.Vector3{0,0.18,0},progress,roll.faces[index])
+		if kind == .D4 || menu_themed(renderer.theme) {
+			model := &renderer.polyhedra[kind]
+			position, orientation := polyhedral_dice_pose(model, &renderer.throw_state, index, progress, roll.faces[index])
+			draw_polyhedral_die(model, position, orientation, font, resin)
 		} else { draw_dice_mesh(&renderer.mesh, renderer.frame.positions[index], renderer.frame.orientations[index], &renderer.numbering[index], resin) }
 	}
+	renderer.frame_kind = kind
 	if resin { rl.EndShaderMode() }
 	rl.EndMode3D()
 	rl.EndBlendMode()
@@ -355,8 +374,15 @@ draw_dice_pool_fallback :: proc(renderer: ^Dice_Renderer, layout: Dice_Pool_Layo
 		if game.card_dice_sides(card) == 4 {
 			rl.DrawTriangle(center+rl.Vector2{0,-side*0.6}, center+rl.Vector2{-side*0.55,side*0.35}, center+rl.Vector2{side*0.55,side*0.35}, DICE_BODY_COLOR)
 		} else { rl.DrawRectangleRounded(bounds, 0.18, 6, DICE_BODY_COLOR) }
-		pips, count := dice_pip_positions(roll.faces[index])
-		for pip in pips[:count] {rl.DrawCircleV(center+pip*side, side*0.068, DICE_PIP_COLOR)}
+		if game.card_dice_sides(card) == 4 || (renderer != nil && menu_themed(renderer.theme)) {
+			label := fmt.ctprintf("%d", roll.faces[index])
+			theme := renderer.theme if renderer != nil else nil
+			size := c.int(side*0.45)
+			menu_text(theme, label, c.int(center.x)-menu_measure_text(theme,label,size)/2, c.int(center.y-side*0.22), size, GOTHIC_PAPER)
+		} else {
+			pips, count := dice_pip_positions(roll.faces[index])
+			for pip in pips[:count] {rl.DrawCircleV(center+pip*side, side*0.068, DICE_PIP_COLOR)}
+		}
 	}
 }
 
@@ -366,7 +392,8 @@ draw_dice_pool_overlay :: proc(renderer: ^Dice_Renderer, roll: game.Dice_Roll, p
 	if !dice_pool_roll_valid(roll) {return}
 	layout := dice_pool_layout(window_width, window_height, game_area)
 	if !layout.valid {return}
-	if renderer != nil && renderer.ready && renderer.has_frame && renderer.seed == seed && renderer.roll == roll {
+	if renderer != nil && renderer.ready && renderer.has_frame && renderer.seed == seed && renderer.roll == roll &&
+	   renderer.frame_kind == polyhedral_die_for_sides(int(game.card_dice_sides(card))) {
 		rl.BeginBlendMode(.ALPHA_PREMULTIPLY)
 		rl.DrawTexturePro(renderer.texture.texture,
 			{0, 0, f32(renderer.texture.texture.width), -f32(renderer.texture.texture.height)},

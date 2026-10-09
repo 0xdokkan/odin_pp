@@ -18,6 +18,7 @@ Runtime_Options :: struct {
 	sprite_manifest: string,
 	spell_lab: bool,
 	dice_lab: bool,
+	dice_set_lab, dice_set_smoke: bool,
 }
 
 DEFAULT_RUNTIME_OPTIONS :: Runtime_Options{seed = 0xC0FFEE, animation_speed = 1, tactical = game.DEFAULT_TACTICAL_CONFIG, scene_3d = true, perspective = true}
@@ -62,6 +63,8 @@ apply_runtime_option :: proc(options: ^Runtime_Options, argument: string) -> (ha
 	if argument == "--m8" { options.tactical.enabled = true; return true, true }
 	if argument == "--smoke-m8-view" { options.m8_view_smoke = true; return true, true }
 	if argument == "--smoke-arenas-view" { options.arena_view_smoke = true; return true, true }
+	if argument == "--dice-set-lab" { options.dice_set_lab = true; return true, true }
+	if argument == "--smoke-dice-set" { options.dice_set_smoke = true; return true, true }
 	if argument == "--flat" { options.scene_3d = false; return true, true }
 	if argument == "--perspective" { options.perspective = true; return true, true }
 	if argument == "--orthographic" { options.perspective = false; return true, true }
