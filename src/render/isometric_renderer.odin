@@ -56,6 +56,7 @@ Enemy_Move_Animation :: struct {
 }
 
 Renderer :: struct {
+	tactical: Tactical_View,
 	projection:       view.Isometric_Projection,
 	camera:           view.Isometric_Camera,
 	canvas_width:     f32,
@@ -117,6 +118,7 @@ hand_card_bounds :: proc(renderer: ^Renderer, card_index, card_count: int) -> rl
 	   card_index < 0 || card_index >= card_count {
 		return {}
 	}
+	if renderer.tactical.enabled { return tactical_hand_card_bounds(renderer, card_index, card_count) }
 	step := hand_card_step(renderer, card_count)
 	total_width := HAND_CARD_WIDTH+step*f32(card_count-1)
 	start_x := (renderer.canvas_width-total_width)*0.5
@@ -131,6 +133,7 @@ hand_card_bounds :: proc(renderer: ^Renderer, card_index, card_count: int) -> rl
 }
 
 hand_raised_card_bounds :: proc(renderer: ^Renderer, card_index, card_count: int) -> rl.Rectangle {
+	if renderer != nil && renderer.tactical.enabled { return tactical_hand_card_bounds(renderer, card_index, card_count) }
 	resting := hand_card_bounds(renderer, card_index, card_count)
 	if resting.width <= 0 {
 		return {}
@@ -176,6 +179,7 @@ point_in_rectangle :: proc(point: view.Vec2, bounds: rl.Rectangle) -> bool {
 }
 
 refocus_button_bounds :: proc(renderer: ^Renderer) -> rl.Rectangle {
+	if renderer != nil && renderer.tactical.enabled { return tactical_refocus_bounds(renderer) }
 	if renderer == nil {
 		return {}
 	}
@@ -192,10 +196,11 @@ refocus_button_at_point :: proc(renderer: ^Renderer, point: view.Vec2) -> bool {
 }
 
 refocus_button_is_enabled :: proc(renderer: ^Renderer) -> bool {
-	return renderer != nil && !renderer_timeline_is_busy(renderer)
+	return renderer != nil && !renderer_timeline_is_busy(renderer) && (!renderer.tactical.enabled || renderer.tactical.refocus_enabled)
 }
 
 card_drop_area_contains :: proc(renderer: ^Renderer, point: view.Vec2) -> bool {
+	if renderer != nil && renderer.tactical.enabled { return point_in_rectangle(point, tactical_world_bounds(renderer)) }
 	return renderer != nil && point.x >= 0 && point.x <= renderer.canvas_width &&
 	       point.y >= 0 && point.y < renderer.canvas_height-HAND_RESERVED_HEIGHT &&
 	       !refocus_button_at_point(renderer, point)
@@ -855,6 +860,7 @@ draw_hand_counters :: proc(renderer: ^Renderer, deck: ^game.Deck_State) {
 
 draw_refocus_button :: proc(renderer: ^Renderer, mouse_position: view.Vec2) {
 	assert(renderer != nil)
+	if renderer.tactical.enabled { gothic_button(renderer, refocus_button_bounds(renderer), "F", "REFOCUS", refocus_button_is_enabled(renderer)); return }
 	bounds := refocus_button_bounds(renderer)
 	enabled := refocus_button_is_enabled(renderer)
 	hovered := enabled && refocus_button_at_point(renderer, mouse_position)
@@ -904,6 +910,10 @@ draw_hand :: proc(
 	mouse_position: view.Vec2,
 ) {
 	assert(renderer != nil && room != nil && room.player != nil)
+	if renderer.tactical.enabled {
+		draw_tactical_hand(renderer, room, hovered_card_id, selected_card_id, dragged_card_id, mouse_position)
+		return
+	}
 	deck, phase := renderer_hand_deck(renderer, room)
 	if phase != .Combat || !deck.combat_active {
 		return
@@ -919,7 +929,7 @@ draw_hand :: proc(
 		if card.id == dragged_card_id || card.id == raised_card_id {
 			continue
 		}
-		definition, found := game.card_definition_by_id(card.definition_id)
+		definition, found := game.card_definition_by_id(card.definition_id, game.tactical_enabled(room))
 		assert(found)
 		bounds := hand_card_bounds(renderer, index, deck.hand_count)
 		affordable := deck.energy >= definition.cost
@@ -928,7 +938,7 @@ draw_hand :: proc(
 	if raised_card_id != 0 {
 		if index, found := game.hand_card_index_by_id(deck, raised_card_id); found {
 			card := deck.hand[index]
-			definition, definition_found := game.card_definition_by_id(card.definition_id)
+			definition, definition_found := game.card_definition_by_id(card.definition_id, game.tactical_enabled(room))
 			assert(definition_found)
 			bounds := hand_raised_card_bounds(renderer, index, deck.hand_count)
 			draw_card_face(
@@ -946,7 +956,7 @@ draw_hand :: proc(
 	if dragged_card_id != 0 && !dragged_card_is_over_grid(renderer, mouse_position) {
 		if index, found := game.hand_card_index_by_id(deck, dragged_card_id); found {
 			card := deck.hand[index]
-			definition, definition_found := game.card_definition_by_id(card.definition_id)
+			definition, definition_found := game.card_definition_by_id(card.definition_id, game.tactical_enabled(room))
 			assert(definition_found)
 			draw_card_face(
 				dragged_card_bounds(renderer, mouse_position),
@@ -1220,6 +1230,11 @@ color_with_opacity :: proc(color: rl.Color, opacity: f32) -> rl.Color {
 }
 
 tile_vertices :: proc(renderer: ^Renderer, position: grid.Position) -> Tile_Vertices {
+	if renderer.tactical.enabled && renderer.tactical.scene_3d {
+		x, y := f32(position.x), f32(position.y)
+		return {tactical_project(renderer, {x, y}), tactical_project(renderer, {x+1, y}),
+			tactical_project(renderer, {x+1, y+1}), tactical_project(renderer, {x, y+1})}
+	}
 	x := cast(f32)position.x
 	y := cast(f32)position.y
 	return Tile_Vertices{
@@ -1435,6 +1450,7 @@ draw_card_range_cell :: proc(
 	position: grid.Position,
 	fill, outline: rl.Color,
 ) {
+	if !tactical_render_visible(renderer, position) { return }
 	vertices := inset_vertices(tile_vertices(renderer, position), 0.88)
 	draw_diamond(vertices, fill, outline)
 }
@@ -1652,7 +1668,7 @@ draw_card_target_range :: proc(renderer: ^Renderer, room: ^game.Room, card_id: u
 		return
 	}
 	card := deck.hand[card_index]
-	definition, definition_found := game.card_definition_by_id(card.definition_id)
+	definition, definition_found := game.card_definition_by_id(card.definition_id, game.tactical_enabled(room))
 	if !definition_found {
 		return
 	}
@@ -1664,6 +1680,13 @@ draw_card_target_range :: proc(renderer: ^Renderer, room: ^game.Room, card_id: u
 		range_outline.a = 110
 	}
 
+	if definition.tactical && definition.id == .Toxic_Wave {
+		for enemy in room.enemies {
+			if game.tactical_card_enemy_in_area(room, definition.id, enemy.position) {
+				draw_card_range_cell(renderer, enemy.position, range_fill, range_outline)
+			}
+		}
+	}
 	if definition.targeting.shape != .None {
 		for y in 0..<room.level_data.tiles.height {
 			for x in 0..<room.level_data.tiles.width {
@@ -1775,7 +1798,7 @@ draw_card_target_range :: proc(renderer: ^Renderer, room: ^game.Room, card_id: u
 			landing_fill,
 			landing_outline,
 		)
-		if card.definition_id == .Sundering_Blow {
+		if card.definition_id == .Sundering_Blow && tactical_render_visible(renderer, evaluation.movement.destination) {
 			center := cell_center(renderer, evaluation.movement.destination)
 			rl.DrawText("8+", c.int(center.x)-7, c.int(center.y)-5, 11, landing_outline)
 		}
@@ -1933,6 +1956,7 @@ renderer_status_view :: proc(renderer: ^Renderer, room: ^game.Room) -> (result: 
 
 presentation_actor_center :: proc(renderer: ^Renderer, actor: ^Presentation_Actor) -> view.Vec2 {
 	assert(renderer != nil && actor != nil)
+	if renderer.tactical.enabled { return tactical_project(renderer, {actor.position.x+0.5, actor.position.y+0.5}) }
 	return view.grid_point_to_canvas(
 		&renderer.camera,
 		&renderer.projection,
@@ -1945,6 +1969,7 @@ presentation_grid_object_center :: proc(
 	object: ^Presentation_Grid_Object,
 ) -> view.Vec2 {
 	assert(renderer != nil && object != nil)
+	if renderer.tactical.enabled { return tactical_project(renderer, {object.position.x+0.5, object.position.y+0.5}) }
 	return view.grid_point_to_canvas(
 		&renderer.camera,
 		&renderer.projection,
@@ -2580,6 +2605,7 @@ draw_room :: proc(renderer: ^Renderer, room: ^game.Room) {
 }
 
 draw_status :: proc(renderer: ^Renderer, room: ^game.Room, scale_mode: view.Scale_Mode) {
+	if renderer.tactical.enabled { draw_gothic_status(renderer, room); return }
 	assert(renderer != nil && room != nil && room.player != nil)
 
 	status_view := renderer_status_view(renderer, room)
@@ -2605,8 +2631,10 @@ draw_status :: proc(renderer: ^Renderer, room: ^game.Room, scale_mode: view.Scal
 		rl.DrawText(fmt.ctprintf("%s", level.room_family_name(family)), 265, 104, 12, rl.Color{197, 185, 151, 255})
 	}
 	if status_view.phase == .Combat {
-		draw_tactical_legend(renderer)
-		draw_encounter_status(renderer, room)
+		if !renderer.tactical.enabled {
+			draw_tactical_legend(renderer)
+			draw_encounter_status(renderer, room)
+		}
 	} else if status_view.phase == .Loot {
 		rl.DrawText("MOVE INTO BLOCKS TO BREAK THEM AND CLEAR YOUR WAY", 26, 122, 10, rl.Color{169, 183, 177, 255})
 	}

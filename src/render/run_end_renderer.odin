@@ -28,15 +28,15 @@ defeat_restart_at_point :: proc(
 draw_defeat_overlay :: proc(
 	run: ^game.Run_State,
 	canvas_width, canvas_height: f32,
-	restart_hovered: bool,
+	restart_hovered: bool, theme: ^Renderer = nil,
 ) {
 	assert(run != nil && run.phase == .Defeat)
-	rl.DrawRectangle(0, 0, c.int(canvas_width), c.int(canvas_height), rl.Color{8, 10, 12, 210})
+	menu_rectangle(theme, 0, 0, c.int(canvas_width), c.int(canvas_height), rl.Color{8, 10, 12, 210})
 
 	title: cstring = "DEFEAT"
 	title_size: c.int = 42
-	title_width := rl.MeasureText(title, title_size)
-	rl.DrawText(
+	title_width := menu_measure_text(theme, title, title_size)
+	menu_text(theme,
 		title,
 		c.int(canvas_width*0.5)-title_width/2,
 		c.int(canvas_height*0.31),
@@ -46,8 +46,8 @@ draw_defeat_overlay :: proc(
 
 	summary := fmt.ctprintf("ROOMS CLEARED  %d", run.cleared_count)
 	summary_size: c.int = 16
-	summary_width := rl.MeasureText(summary, summary_size)
-	rl.DrawText(
+	summary_width := menu_measure_text(theme, summary, summary_size)
+	menu_text(theme,
 		summary,
 		c.int(canvas_width*0.5)-summary_width/2,
 		c.int(canvas_height*0.46),
@@ -62,12 +62,12 @@ draw_defeat_overlay :: proc(
 		fill = rl.Color{62, 70, 72, 255}
 		outline = rl.Color{255, 247, 237, 255}
 	}
-	rl.DrawRectangleRec(bounds, fill)
-	rl.DrawRectangleLinesEx(bounds, 2, outline)
+	menu_rectangle_rec(theme, bounds, fill)
+	menu_outline(theme, bounds, 2, outline)
 	label: cstring = "RESTART"
 	font_size: c.int = 18
-	label_width := rl.MeasureText(label, font_size)
-	rl.DrawText(
+	label_width := menu_measure_text(theme, label, font_size)
+	menu_text(theme,
 		label,
 		c.int(bounds.x+bounds.width*0.5)-label_width/2,
 		c.int(bounds.y+bounds.height*0.5)-font_size/2,

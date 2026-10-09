@@ -11,6 +11,7 @@ DICE_MAX_TEXTURE_EDGE :: 2048
 DICE_MAX_TEXTURE_PIXELS :: 4*1024*1024
 
 Dice_Renderer :: struct {
+	theme: ^Renderer,
 	texture: rl.RenderTexture2D,
 	ready, has_throw, has_frame: bool,
 	requested_width, requested_height: int,
@@ -110,7 +111,7 @@ ensure_dice_texture :: proc(renderer: ^Dice_Renderer, width, height: f32) -> boo
 		renderer.texture = {}
 		return false
 	}
-	rl.SetTextureFilter(renderer.texture.texture, .BILINEAR)
+	rl.SetTextureFilter(renderer.texture.texture, .POINT if menu_themed(renderer.theme) else .BILINEAR)
 	renderer.ready = true
 	return true
 }
@@ -188,9 +189,20 @@ update_dice_pool_texture :: proc(renderer: ^Dice_Renderer, roll: game.Dice_Roll,
 	for index in 0..<roll.count {draw_dice_shadow(renderer.frame.positions[index])}
 	rlgl.DrawRenderBatchActive()
 	rlgl.EnableDepthMask()
-	for index in 0..<roll.count {
-		draw_dice_mesh(&renderer.mesh, renderer.frame.positions[index], renderer.frame.orientations[index], &renderer.numbering[index])
+	resin := menu_themed(renderer.theme) && renderer.theme.tactical.light_shader.id != 0
+	if resin {
+		v := &renderer.theme.tactical
+		eye, light := layout.camera.position, rl.Vector3{-3, 5, 4}
+		mode: c.int = 2
+		rl.SetShaderValue(v.light_shader, v.light_eye_location, &eye, .VEC3)
+		rl.SetShaderValue(v.light_shader, v.light_position_location, &light, .VEC3)
+		rl.SetShaderValue(v.light_shader, v.light_hologram_location, &mode, .INT)
+		rl.BeginShaderMode(v.light_shader)
 	}
+	for index in 0..<roll.count {
+		draw_dice_mesh(&renderer.mesh, renderer.frame.positions[index], renderer.frame.orientations[index], &renderer.numbering[index], resin)
+	}
+	if resin { rl.EndShaderMode() }
 	rl.EndMode3D()
 	rl.EndBlendMode()
 	rl.EndTextureMode()
@@ -241,6 +253,10 @@ dice_final_projected_bounds :: proc(renderer: ^Dice_Renderer, layout: Dice_Pool_
 dice_total_target :: proc(renderer: ^Dice_Renderer, layout: Dice_Pool_Layout, extended: bool = false) -> rl.Vector2 {
 	area := layout.game_area
 	preferred := rl.Vector2{layout.ground.x, area.y+area.height*0.76}
+	if renderer != nil && menu_themed(renderer.theme) {
+		// Keep the result beside the board, clear of both the dice and the hand.
+		return {area.x+area.width*0.85, area.y+area.height*0.30}
+	}
 	margin := f32(68) if extended else f32(54)
 	preferred.y = min(preferred.y, area.y+area.height*0.865-margin*layout.scale)
 	if renderer == nil || !renderer.has_throw {return preferred}
@@ -266,37 +282,48 @@ dice_total_target :: proc(renderer: ^Dice_Renderer, layout: Dice_Pool_Layout, ex
 
 draw_dice_pool_total :: proc(renderer: ^Dice_Renderer, layout: Dice_Pool_Layout, roll: game.Dice_Roll, progress: f32,
 	card: game.Card_Id = .Count) {
+	theme: ^Renderer
+	if renderer != nil { theme = renderer.theme }
 	state := dice_total_state(roll, progress)
 	if state.revealed == 0 {return}
 	successes, highest := card == .Prismatic_Barrage, card == .Twin_Venom
 	extended := successes || highest
 	target := dice_total_target(renderer, layout, extended)
+	if menu_themed(theme) {
+		bounds := dice_total_bounds(target, layout.scale, extended)
+		gothic_frame(bounds, RESIN_BACKGROUND, RESIN_CAP)
+	}
 	font := c.int(max(f32(20), (44+8*state.pulse)*layout.scale))
 	label := fmt.ctprintf("%d", state.visible_total)
 	if successes {label = fmt.ctprintf("%d/3", state.visible_successes)}
 	if highest {label = fmt.ctprintf("%d", state.visible_highest)}
-	x := c.int(target.x)-rl.MeasureText(label, font)/2
+	x := c.int(target.x)-menu_measure_text(theme, label, font)/2
 	y := c.int(target.y)-font/2
-	rl.DrawText(label, x+3, y+4, font, {0, 0, 0, 190})
-	rl.DrawText(label, x+1, y+2, font, {171, 24, 32, 230})
-	rl.DrawText(label, x, y, font, {255, 243, 225, 255})
+	menu_text(theme, label, x+3, y+4, font, {0, 0, 0, 190})
+	menu_text(theme, label, x+1, y+2, font, {171, 24, 32, 230})
+	menu_text(theme, label, x, y, font, {255, 243, 225, 255})
 	caption_font := c.int(max(f32(8), 10*layout.scale))
 	caption: cstring = "TOTAL"
 	if successes {caption = "4+ SUCCESSES"}
 	if highest {caption = "HIGHEST / PAIR!" if state.visible_pair else "HIGHEST DIE"}
-	caption_x := c.int(target.x)-rl.MeasureText(caption, caption_font)/2
+	if menu_themed(theme) {
+		caption = "TOTALE"
+		if successes { caption = "4+ SUCCESSI" }
+		if highest { caption = "MASSIMO / COPPIA!" if state.visible_pair else "DADO MAGGIORE" }
+	}
+	caption_x := c.int(target.x)-menu_measure_text(theme, caption, caption_font)/2
 	caption_y := c.int(target.y+29*layout.scale)
-	rl.DrawText(caption, caption_x+1, caption_y+1, caption_font, {0, 0, 0, 180})
+	menu_text(theme, caption, caption_x+1, caption_y+1, caption_font, {0, 0, 0, 180})
 	caption_color := rl.Color{235, 119, 117, 255}
 	if successes {caption_color = {255, 205, 116, 255}}
 	if highest {caption_color = {163, 232, 128, 255}}
-	rl.DrawText(caption, caption_x, caption_y, caption_font, caption_color)
+	menu_text(theme, caption, caption_x, caption_y, caption_font, caption_color)
 	if extended {
 		total := fmt.ctprintf("TOTAL %d", state.visible_total)
-		total_x := c.int(target.x)-rl.MeasureText(total, caption_font)/2
+		total_x := c.int(target.x)-menu_measure_text(theme, total, caption_font)/2
 		total_y := c.int(target.y+43*layout.scale)
-		rl.DrawText(total, total_x+1, total_y+1, caption_font, {0, 0, 0, 180})
-		rl.DrawText(total, total_x, total_y, caption_font, {221, 214, 209, 255})
+		menu_text(theme, total, total_x+1, total_y+1, caption_font, {0, 0, 0, 180})
+		menu_text(theme, total, total_x, total_y, caption_font, {221, 214, 209, 255})
 	}
 	if renderer == nil || !renderer.has_throw {return}
 	for index in 0..<state.revealed {
@@ -312,7 +339,7 @@ draw_dice_pool_total :: proc(renderer: ^Dice_Renderer, layout: Dice_Pool_Layout,
 		if successes {text = "+1" if roll.faces[index] >= 4 else "+1 SHIELD"}
 		if highest {text = fmt.ctprintf("%d", roll.faces[index])}
 		color := rl.Color{255, 235, 204, u8(255*(1-p))}
-		rl.DrawText(text, c.int(center.x)-rl.MeasureText(text, small_font)/2, c.int(center.y), small_font, color)
+		menu_text(theme, text, c.int(center.x)-menu_measure_text(theme, text, small_font)/2, c.int(center.y), small_font, color)
 	}
 }
 

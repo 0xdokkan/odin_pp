@@ -348,7 +348,7 @@ draw_special_node_action :: proc(
 	bounds: rl.Rectangle,
 	title, detail: cstring,
 	hovered, enabled: bool,
-	accent: rl.Color,
+	accent: rl.Color, theme: ^Renderer = nil,
 ) {
 	fill := rl.Color{27, 32, 35, 255}
 	outline := rl.Color{96, 107, 107, 255}
@@ -364,11 +364,11 @@ draw_special_node_action :: proc(
 		outline = accent
 		title_color = accent
 	}
-	rl.DrawRectangleRec(bounds, fill)
-	rl.DrawRectangleLinesEx(bounds, 2, outline)
+	menu_rectangle_rec(theme, bounds, fill)
+	menu_outline(theme, bounds, 2, outline)
 	title_size: c.int = 17
-	title_width := rl.MeasureText(title, title_size)
-	rl.DrawText(
+	title_width := menu_measure_text(theme, title, title_size)
+	menu_text(theme,
 		title,
 		c.int(bounds.x+bounds.width*0.5)-title_width/2,
 		c.int(bounds.y+20),
@@ -376,8 +376,8 @@ draw_special_node_action :: proc(
 		title_color,
 	)
 	detail_size: c.int = 12
-	detail_width := rl.MeasureText(detail, detail_size)
-	rl.DrawText(
+	detail_width := menu_measure_text(theme, detail, detail_size)
+	menu_text(theme,
 		detail,
 		c.int(bounds.x+bounds.width*0.5)-detail_width/2,
 		c.int(bounds.y+52),
@@ -388,7 +388,7 @@ draw_special_node_action :: proc(
 
 draw_special_node_header :: proc(
 	run: ^game.Run_State,
-	canvas_width: f32,
+	canvas_width: f32, theme: ^Renderer = nil,
 ) {
 	title: cstring
 	subtitle: cstring
@@ -405,9 +405,9 @@ draw_special_node_header :: proc(
 	case .In_Room, .Reward, .Shop, .Choose_Path, .Victory, .Defeat:
 		return
 	}
-	rl.DrawRectangle(0, 0, c.int(canvas_width), c.int(SPECIAL_NODE_HEADER_HEIGHT), rl.Color{15, 18, 21, 255})
-	rl.DrawText(title, 28, 13, 23, rl.Color{225, 229, 224, 255})
-	rl.DrawText(subtitle, 28, 43, 13, special_node_accent(run.phase))
+	menu_rectangle(theme, 0, 0, c.int(canvas_width), c.int(SPECIAL_NODE_HEADER_HEIGHT), rl.Color{15, 18, 21, 255})
+	menu_text(theme, title, 28, 13, 23, rl.Color{225, 229, 224, 255})
+	menu_text(theme, subtitle, 28, 43, 13, special_node_accent(run.phase))
 	stats_label := fmt.ctprintf(
 			"HP %d/%d    GOLD %d    DECK %d/%d",
 			run.player.health,
@@ -417,8 +417,8 @@ draw_special_node_header :: proc(
 			game.MAX_OWNED_CARDS,
 		)
 	stats_size: c.int = 13
-	stats_width := rl.MeasureText(stats_label, stats_size)
-	rl.DrawText(
+	stats_width := menu_measure_text(theme, stats_label, stats_size)
+	menu_text(theme,
 		stats_label,
 		c.int(canvas_width)-116-stats_width,
 		29,
@@ -429,13 +429,13 @@ draw_special_node_header :: proc(
 
 draw_special_node_result :: proc(
 	run: ^game.Run_State,
-	canvas_width, canvas_height: f32,
+	canvas_width, canvas_height: f32, theme: ^Renderer = nil,
 ) {
 	bounds := special_node_result_bounds(canvas_width, canvas_height)
 	accent := special_node_accent(run.phase)
-	rl.DrawRectangleRec(bounds, rl.Color{24, 29, 31, 255})
-	rl.DrawRectangleLinesEx(bounds, 2, accent)
-	rl.DrawText("RESULT", c.int(bounds.x+24), c.int(bounds.y+20), 13, rl.Color{151, 163, 158, 255})
+	menu_rectangle_rec(theme, bounds, rl.Color{24, 29, 31, 255})
+	menu_outline(theme, bounds, 2, accent)
+	menu_text(theme, "RESULT", c.int(bounds.x+24), c.int(bounds.y+20), 13, rl.Color{151, 163, 158, 255})
 
 	result: cstring = "RESOLVED"
 	detail: cstring = "THE PATH AHEAD IS OPEN"
@@ -451,9 +451,7 @@ draw_special_node_result :: proc(
 				&run.player.deck,
 				run.rest.target_card_id,
 			); found {
-				definition, definition_found := game.card_definition_by_id(
-					run.player.deck.owned[card_index].definition_id,
-				)
+				definition, definition_found := game.card_definition_by_id(run.player.deck.owned[card_index].definition_id, menu_themed(theme))
 				if definition_found {
 					detail = fmt.ctprintf("%s +%d", definition.name, run.player.deck.owned[card_index].upgrade_level)
 				}
@@ -474,7 +472,7 @@ draw_special_node_result :: proc(
 		case .None, .Recovered, .Upgraded, .Treasure_Claimed:
 		}
 		if run.route_event.added_card_id != 0 {
-			definition, found := game.card_definition_by_id(run.route_event.offered_card)
+			definition, found := game.card_definition_by_id(run.route_event.offered_card, menu_themed(theme))
 			if found {
 				detail = fmt.ctprintf("ADDED %s", definition.name)
 			}
@@ -494,8 +492,8 @@ draw_special_node_result :: proc(
 	case .In_Room, .Reward, .Shop, .Choose_Path, .Victory, .Defeat:
 	}
 	result_size: c.int = 25
-	result_width := rl.MeasureText(result, result_size)
-	rl.DrawText(
+	result_width := menu_measure_text(theme, result, result_size)
+	menu_text(theme,
 		result,
 		c.int(bounds.x+bounds.width*0.5)-result_width/2,
 		c.int(bounds.y+55),
@@ -503,8 +501,8 @@ draw_special_node_result :: proc(
 		accent,
 	)
 	detail_size: c.int = 14
-	detail_width := rl.MeasureText(detail, detail_size)
-	rl.DrawText(
+	detail_width := menu_measure_text(theme, detail, detail_size)
+	menu_text(theme,
 		detail,
 		c.int(bounds.x+bounds.width*0.5)-detail_width/2,
 		c.int(bounds.y+98),
@@ -516,12 +514,12 @@ draw_special_node_result :: proc(
 draw_rest_actions :: proc(
 	run: ^game.Run_State,
 	canvas_width, canvas_height: f32,
-	state: Special_Node_Render_State,
+	state: Special_Node_Render_State, theme: ^Renderer = nil,
 ) {
 	action_count := special_node_action_count(run)
 	accent := special_node_accent(run.phase)
 	if index, found := game.owned_card_index_by_id(&run.player.deck, state.selected_card_id); found {
-		rl.DrawText(card_upgrade_preview(run.player.deck.owned[index]), 45, 454, 12,
+		menu_text(theme, card_upgrade_preview(run.player.deck.owned[index], menu_themed(theme)), 45, 454, 12,
 			rl.Color{169, 183, 177, 255})
 	}
 	draw_special_node_action(
@@ -531,6 +529,7 @@ draw_rest_actions :: proc(
 		state.primary_hovered,
 		special_node_primary_is_enabled(run),
 		accent,
+		theme = theme,
 	)
 	draw_special_node_action(
 		special_node_action_bounds(canvas_width, canvas_height, 1, action_count),
@@ -539,6 +538,7 @@ draw_rest_actions :: proc(
 		state.secondary_hovered,
 		special_node_secondary_is_enabled(run, state.selected_card_id),
 		accent,
+		theme = theme,
 	)
 	draw_special_node_action(
 		special_node_action_bounds(canvas_width, canvas_height, 2, action_count),
@@ -547,12 +547,13 @@ draw_rest_actions :: proc(
 		state.leave_hovered,
 		true,
 		accent,
+		theme = theme,
 	)
 
 	deck := &run.player.deck
 	page_count := special_node_deck_page_count(deck)
 	page := special_node_clamp_deck_page(deck, state.page)
-	rl.DrawText(
+	menu_text(theme,
 		fmt.ctprintf("OWNED DECK    PAGE %d/%d", page+1, page_count),
 		45,
 		292,
@@ -574,7 +575,7 @@ draw_rest_actions :: proc(
 				canvas_height,
 				false,
 				card.id == state.selected_card_id,
-			)
+			 theme = theme)
 		}
 	}
 	if hovered_index, found := game.owned_card_index_by_id(deck, state.hovered_card_id);
@@ -587,26 +588,28 @@ draw_rest_actions :: proc(
 			canvas_height,
 			true,
 			state.hovered_card_id == state.selected_card_id,
-		)
+		 theme = theme)
 	}
 	draw_shop_page_button(
 		special_node_previous_page_bounds(canvas_width, canvas_height),
 		true,
 		state.previous_page_hovered,
 		page > 0,
+		theme = theme,
 	)
 	draw_shop_page_button(
 		special_node_next_page_bounds(canvas_width, canvas_height),
 		false,
 		state.next_page_hovered,
 		page+1 < page_count,
+		theme = theme,
 	)
 }
 
 draw_event_actions :: proc(
 	run: ^game.Run_State,
 	canvas_width, canvas_height: f32,
-	state: Special_Node_Render_State,
+	state: Special_Node_Render_State, theme: ^Renderer = nil,
 ) {
 	primary_title: cstring
 	primary_detail: cstring
@@ -624,7 +627,7 @@ draw_event_actions :: proc(
 		secondary_title = "BOTTLE"
 		secondary_detail = fmt.ctprintf("+%d GOLD", run.route_event.secondary_gold)
 	case .Forgotten_Armory:
-		definition, found := game.card_definition_by_id(run.route_event.offered_card)
+		definition, found := game.card_definition_by_id(run.route_event.offered_card, menu_themed(theme))
 		assert(found)
 		primary_title = "TAKE CARD"
 		primary_detail = fmt.ctprintf("%s", definition.name)
@@ -642,6 +645,7 @@ draw_event_actions :: proc(
 		state.primary_hovered,
 		special_node_primary_is_enabled(run),
 		accent,
+		theme = theme,
 	)
 	draw_special_node_action(
 		special_node_action_bounds(canvas_width, canvas_height, 1, action_count),
@@ -650,6 +654,7 @@ draw_event_actions :: proc(
 		state.secondary_hovered,
 		special_node_secondary_is_enabled(run, state.selected_card_id),
 		accent,
+		theme = theme,
 	)
 	draw_special_node_action(
 		special_node_action_bounds(canvas_width, canvas_height, 2, action_count),
@@ -658,13 +663,14 @@ draw_event_actions :: proc(
 		state.leave_hovered,
 		true,
 		accent,
+		theme = theme,
 	)
 }
 
 draw_treasure_actions :: proc(
 	run: ^game.Run_State,
 	canvas_width, canvas_height: f32,
-	state: Special_Node_Render_State,
+	state: Special_Node_Render_State, theme: ^Renderer = nil,
 ) {
 	action_count := special_node_action_count(run)
 	accent := special_node_accent(run.phase)
@@ -675,6 +681,7 @@ draw_treasure_actions :: proc(
 		state.primary_hovered,
 		special_node_primary_is_enabled(run),
 		accent,
+		theme = theme,
 	)
 	draw_special_node_action(
 		special_node_action_bounds(canvas_width, canvas_height, 1, action_count),
@@ -683,39 +690,40 @@ draw_treasure_actions :: proc(
 		state.leave_hovered,
 		true,
 		accent,
+		theme = theme,
 	)
 }
 
 draw_special_node_screen :: proc(
 	run: ^game.Run_State,
 	canvas_width, canvas_height: f32,
-	state: Special_Node_Render_State = {},
+	state: Special_Node_Render_State = {}, theme: ^Renderer = nil,
 ) {
 	assert(run != nil && special_node_phase_is_supported(run.phase))
 	assert(game.validate_special_node_state(run))
 	assert(special_node_canvas_is_supported(canvas_width, canvas_height))
-	rl.DrawRectangle(0, 0, c.int(canvas_width), c.int(canvas_height), CANVAS_BACKGROUND)
-	draw_special_node_header(run, canvas_width)
+	menu_rectangle(theme, 0, 0, c.int(canvas_width), c.int(canvas_height), CANVAS_BACKGROUND)
+	draw_special_node_header(run, canvas_width, theme = theme)
 
 	if special_node_is_resolved(run) {
-		draw_special_node_result(run, canvas_width, canvas_height)
+		draw_special_node_result(run, canvas_width, canvas_height, theme = theme)
 		draw_shop_button(
 			special_node_continue_bounds(canvas_width, canvas_height),
 			"CONTINUE",
 			state.continue_hovered,
 			true,
 			special_node_accent(run.phase),
-		)
+		 theme = theme)
 	} else {
 		switch run.phase {
 		case .Rest:
-			draw_rest_actions(run, canvas_width, canvas_height, state)
+			draw_rest_actions(run, canvas_width, canvas_height, state, theme = theme)
 		case .Event:
-			draw_event_actions(run, canvas_width, canvas_height, state)
+			draw_event_actions(run, canvas_width, canvas_height, state, theme = theme)
 		case .Treasure:
-			draw_treasure_actions(run, canvas_width, canvas_height, state)
+			draw_treasure_actions(run, canvas_width, canvas_height, state, theme = theme)
 		case .In_Room, .Reward, .Shop, .Choose_Path, .Victory, .Defeat:
 		}
 	}
-	rl.DrawFPS(c.int(canvas_width)-96, 18)
+
 }

@@ -7,11 +7,13 @@ Status_Kind :: enum {
 	Shield,
 	Thorns,
 	Afterimage,
+	Stagger,
+	Survey,
 }
 
 status_kind_is_valid :: proc(kind: Status_Kind) -> bool {
 	switch kind {
-	case .Poison, .Shield, .Thorns, .Afterimage:
+	case .Poison, .Shield, .Thorns, .Afterimage, .Stagger, .Survey:
 		return true
 	}
 	return false
@@ -27,6 +29,10 @@ status_kind_name :: proc(kind: Status_Kind) -> string {
 		return "Thorns"
 	case .Afterimage:
 		return "Afterimage"
+	case .Stagger:
+		return "Stagger"
+	case .Survey:
+		return "Survey"
 	}
 	return "Unknown"
 }
@@ -110,7 +116,7 @@ apply_status :: proc(
 	if index, already_present := status_index(statuses, kind); already_present {
 		status := &statuses.items[index]
 		switch kind {
-		case .Poison, .Thorns, .Afterimage:
+		case .Poison, .Thorns, .Afterimage, .Stagger, .Survey:
 			status.potency = max(status.potency, potency)
 		case .Shield:
 			available := max(i32)-status.potency

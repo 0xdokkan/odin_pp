@@ -396,15 +396,15 @@ draw_shop_offer :: proc(
 	run: ^game.Run_State,
 	offer_index: int,
 	canvas_width, canvas_height: f32,
-	raised: bool,
+	raised: bool, theme: ^Renderer = nil,
 ) {
 	assert(run != nil && offer_index >= 0 && offer_index < run.shop.offer_count)
 	offer := run.shop.offers[offer_index]
-	definition, found := game.card_definition_by_id(offer.definition_id)
+	definition, found := game.card_definition_by_id(offer.definition_id, menu_themed(theme))
 	assert(found)
 	enabled := game.shop_offer_can_be_bought(run, offer_index)
 	preview := game.Card_Instance{definition_id = offer.definition_id}
-	draw_card_face(
+	menu_card_face(theme,
 		shop_offer_bounds(canvas_width, canvas_height, offer_index, raised),
 		preview,
 		definition,
@@ -422,15 +422,15 @@ draw_shop_offer :: proc(
 		price_fill = rl.Color{31, 33, 35, 255}
 		price_outline = rl.Color{88, 94, 95, 255}
 	}
-	rl.DrawRectangleRec(price_bounds, price_fill)
-	rl.DrawRectangleLinesEx(price_bounds, 1, price_outline)
+	menu_rectangle_rec(theme, price_bounds, price_fill)
+	menu_outline(theme, price_bounds, 1, price_outline)
 	price_label := fmt.ctprintf("%s   %d GOLD", game.card_rarity_name(definition.rarity), offer.price)
 	if offer.sold {
 		price_label = "SOLD"
 	}
 	font_size: c.int = 12
-	label_width := rl.MeasureText(price_label, font_size)
-	rl.DrawText(
+	label_width := menu_measure_text(theme, price_label, font_size)
+	menu_text(theme,
 		price_label,
 		c.int(price_bounds.x+price_bounds.width*0.5)-label_width/2,
 		c.int(price_bounds.y+7),
@@ -445,9 +445,9 @@ draw_shop_offer :: proc(
 			width = card_bounds.width,
 			height = 36,
 		}
-		rl.DrawRectangleRec(overlay, rl.Color{12, 15, 18, 225})
-		sold_width := rl.MeasureText("SOLD", 18)
-		rl.DrawText(
+		menu_rectangle_rec(theme, overlay, rl.Color{12, 15, 18, 225})
+		sold_width := menu_measure_text(theme, "SOLD", 18)
+		menu_text(theme,
 			"SOLD",
 			c.int(overlay.x+overlay.width*0.5)-sold_width/2,
 			c.int(overlay.y+9),
@@ -461,38 +461,42 @@ draw_shop_owned_card :: proc(
 	run: ^game.Run_State,
 	card_index, page_slot: int,
 	canvas_width, canvas_height: f32,
-	raised, selected: bool,
+	raised, selected: bool, theme: ^Renderer = nil,
 ) {
 	assert(run != nil && card_index >= 0 && card_index < run.player.deck.owned_count)
 	card := run.player.deck.owned[card_index]
-	definition, found := game.card_definition_by_id(card.definition_id)
+	definition, found := game.card_definition_by_id(card.definition_id, menu_themed(theme))
 	assert(found)
 	bounds := shop_owned_card_bounds(canvas_width, canvas_height, page_slot, raised)
 	fill, outline := card_colors(card.definition_id, true)
-	rl.DrawRectangleRec({bounds.x+3, bounds.y+4, bounds.width, bounds.height}, rl.Color{5, 7, 9, 150})
-	rl.DrawRectangleRec(bounds, fill)
-	rl.DrawRectangleLinesEx(bounds, 2, outline)
+	menu_rectangle_rec(theme, {bounds.x+3, bounds.y+4, bounds.width, bounds.height}, rl.Color{5, 7, 9, 150})
+	menu_rectangle_rec(theme, bounds, fill)
+	menu_outline(theme, bounds, 2, outline)
 	if raised || selected {
 		highlight_bounds := rl.Rectangle{bounds.x-2, bounds.y-2, bounds.width+4, bounds.height+4}
 		highlight_color := rl.Color{247, 239, 213, 255} if raised else rl.Color{169, 210, 216, 255}
-		rl.DrawRectangleLinesEx(highlight_bounds, 2, highlight_color)
+		menu_outline(theme, highlight_bounds, 2, highlight_color)
 	}
 
 	badge_center := rl.Vector2{bounds.x+14, bounds.y+15}
-	rl.DrawCircleV(badge_center, 9, rl.Color{12, 16, 19, 245})
-	rl.DrawCircleLinesV(badge_center, 9, outline)
+	menu_circle(theme, badge_center, 9, rl.Color{12, 16, 19, 245})
+	menu_circle_lines(theme, badge_center, 9, outline)
 	cost_text := fmt.ctprintf("%d", definition.cost)
-	cost_width := rl.MeasureText(cost_text, 11)
-	rl.DrawText(cost_text, c.int(badge_center.x)-cost_width/2, c.int(badge_center.y)-6, 11, outline)
+	cost_width := menu_measure_text(theme, cost_text, 11)
+	menu_text(theme, cost_text, c.int(badge_center.x)-cost_width/2, c.int(badge_center.y)-6, 11, outline)
 
 	name := card_short_name(card.definition_id)
-	name_width := rl.MeasureText(name, 11)
+	name_width := menu_measure_text(theme, name, 11)
 	name_x := c.int(bounds.x+31)
 	maximum_name_x := c.int(bounds.x+bounds.width-7)-name_width
-	rl.DrawText(name, min(name_x, maximum_name_x), c.int(bounds.y+9), 11, rl.Color{237, 239, 232, 255})
-	draw_card_sigil(bounds, card.definition_id, outline)
+	menu_text(theme, name, min(name_x, maximum_name_x), c.int(bounds.y+9), 11, rl.Color{237, 239, 232, 255})
+	if menu_themed(theme) {
+		icon := gothic_card_icon(card.definition_id)
+		gothic_atlas_icon(theme.tactical.art.icons, theme.tactical.art.icon_sources[icon],
+			{bounds.x+18, bounds.y+37, bounds.width-36, 66})
+	} else { draw_card_sigil(bounds, card.definition_id, outline) }
 	if card.upgrade_level > 0 {
-		rl.DrawText(
+		menu_text(theme,
 			fmt.ctprintf("+%d", card.upgrade_level),
 			c.int(bounds.x+7),
 			c.int(bounds.y+bounds.height-17),
@@ -506,7 +510,7 @@ draw_shop_button :: proc(
 	bounds: rl.Rectangle,
 	label: cstring,
 	hovered, enabled: bool,
-	accent: rl.Color,
+	accent: rl.Color, theme: ^Renderer = nil,
 ) {
 	fill := rl.Color{31, 36, 39, 255}
 	outline := rl.Color{105, 116, 116, 255}
@@ -520,11 +524,11 @@ draw_shop_button :: proc(
 		outline = accent
 		label_color = accent
 	}
-	rl.DrawRectangleRec(bounds, fill)
-	rl.DrawRectangleLinesEx(bounds, 2, outline)
+	menu_rectangle_rec(theme, bounds, fill)
+	menu_outline(theme, bounds, 2, outline)
 	font_size: c.int = 13
-	label_width := rl.MeasureText(label, font_size)
-	rl.DrawText(
+	label_width := menu_measure_text(theme, label, font_size)
+	menu_text(theme,
 		label,
 		c.int(bounds.x+bounds.width*0.5)-label_width/2,
 		c.int(bounds.y+bounds.height*0.5)-font_size/2,
@@ -533,7 +537,7 @@ draw_shop_button :: proc(
 	)
 }
 
-draw_shop_page_button :: proc(bounds: rl.Rectangle, previous, hovered, enabled: bool) {
+draw_shop_page_button :: proc(bounds: rl.Rectangle, previous, hovered, enabled: bool, theme: ^Renderer = nil) {
 	fill := rl.Color{31, 36, 39, 255}
 	outline := rl.Color{105, 116, 116, 255}
 	icon := rl.Color{225, 229, 224, 255}
@@ -545,14 +549,14 @@ draw_shop_page_button :: proc(bounds: rl.Rectangle, previous, hovered, enabled: 
 		outline = rl.Color{246, 207, 92, 255}
 		icon = outline
 	}
-	rl.DrawRectangleRec(bounds, fill)
-	rl.DrawRectangleLinesEx(bounds, 2, outline)
+	menu_rectangle_rec(theme, bounds, fill)
+	menu_outline(theme, bounds, 2, outline)
 	center := rl.Vector2{bounds.x+bounds.width*0.5, bounds.y+bounds.height*0.5}
 	direction: f32 = 1
 	if previous {
 		direction = -1
 	}
-	rl.DrawTriangle(
+	menu_triangle(theme,
 		{center.x+direction*6, center.y},
 		{center.x-direction*4, center.y-7},
 		{center.x-direction*4, center.y+7},
@@ -563,17 +567,17 @@ draw_shop_page_button :: proc(bounds: rl.Rectangle, previous, hovered, enabled: 
 draw_shop_screen :: proc(
 	run: ^game.Run_State,
 	canvas_width, canvas_height: f32,
-	state: Shop_Render_State = {},
+	state: Shop_Render_State = {}, theme: ^Renderer = nil,
 ) {
 	assert(run != nil && run.phase == .Shop && game.validate_shop_state(run))
 	assert(shop_canvas_is_supported(canvas_width, canvas_height))
 	page_count := shop_deck_page_count(&run.player.deck)
 	page := shop_clamp_deck_page(&run.player.deck, state.page)
 
-	rl.DrawRectangle(0, 0, c.int(canvas_width), c.int(canvas_height), CANVAS_BACKGROUND)
-	rl.DrawRectangle(0, 0, c.int(canvas_width), c.int(SHOP_HEADER_HEIGHT), rl.Color{15, 18, 21, 255})
-	rl.DrawText("SHOP", 28, 13, 23, rl.Color{225, 229, 224, 255})
-	rl.DrawText(
+	menu_rectangle(theme, 0, 0, c.int(canvas_width), c.int(canvas_height), CANVAS_BACKGROUND)
+	menu_rectangle(theme, 0, 0, c.int(canvas_width), c.int(SHOP_HEADER_HEIGHT), rl.Color{15, 18, 21, 255})
+	menu_text(theme, "SHOP", 28, 13, 23, rl.Color{225, 229, 224, 255})
+	menu_text(theme,
 		fmt.ctprintf(
 			"GOLD %d    DECK %d/%d",
 			run.player.gold,
@@ -585,20 +589,20 @@ draw_shop_screen :: proc(
 		14,
 		rl.Color{151, 163, 158, 255},
 	)
-	rl.DrawText("CARD OFFERS", 206, 58, 12, rl.Color{137, 148, 145, 255})
+	menu_text(theme, "CARD OFFERS", 206, 48, 12, rl.Color{137, 148, 145, 255})
 
 	for index in 0..<run.shop.offer_count {
 		if !state.has_hovered_offer || index != state.hovered_offer_index {
-			draw_shop_offer(run, index, canvas_width, canvas_height, false)
+			draw_shop_offer(run, index, canvas_width, canvas_height, false, theme = theme)
 		}
 	}
 	if state.has_hovered_offer && state.hovered_offer_index >= 0 &&
 	   state.hovered_offer_index < run.shop.offer_count {
-		draw_shop_offer(run, state.hovered_offer_index, canvas_width, canvas_height, true)
+		draw_shop_offer(run, state.hovered_offer_index, canvas_width, canvas_height, true, theme = theme)
 	}
 
 	deck_label := fmt.ctprintf("OWNED DECK    PAGE %d/%d", page+1, page_count)
-	rl.DrawText(deck_label, 45, 292, 13, rl.Color{151, 163, 158, 255})
+	menu_text(theme, deck_label, 45, 292, 13, rl.Color{151, 163, 158, 255})
 	start, valid_page := shop_deck_page_start(&run.player.deck, page)
 	assert(valid_page)
 	visible_count := shop_deck_cards_on_page(&run.player.deck, page)
@@ -614,7 +618,7 @@ draw_shop_screen :: proc(
 				canvas_height,
 				false,
 				card.id == state.selected_card_id,
-			)
+			 theme = theme)
 		}
 	}
 	if hovered_index, found := game.owned_card_index_by_id(
@@ -629,7 +633,7 @@ draw_shop_screen :: proc(
 			canvas_height,
 			true,
 			state.hovered_card_id == state.selected_card_id,
-		)
+		 theme = theme)
 	}
 
 	previous_enabled := page > 0
@@ -639,18 +643,20 @@ draw_shop_screen :: proc(
 		true,
 		state.previous_page_hovered,
 		previous_enabled,
+		theme = theme,
 	)
 	draw_shop_page_button(
 		shop_next_page_bounds(canvas_width, canvas_height),
 		false,
 		state.next_page_hovered,
 		next_enabled,
+		theme = theme,
 	)
 
 	selected_id := state.selected_card_id
 	selected_index, selected_found := game.owned_card_index_by_id(&run.player.deck, selected_id)
 	if selected_found {
-		rl.DrawText(card_upgrade_preview(run.player.deck.owned[selected_index]), 45, 454, 12,
+		menu_text(theme, card_upgrade_preview(run.player.deck.owned[selected_index], menu_themed(theme)), 45, 454, 12,
 			rl.Color{169, 183, 177, 255})
 	}
 	upgrade_label: cstring = "UPGRADE"
@@ -681,6 +687,7 @@ draw_shop_screen :: proc(
 		state.upgrade_hovered,
 		upgrade_enabled,
 		rl.Color{91, 204, 195, 255},
+		theme = theme,
 	)
 	draw_shop_button(
 		shop_remove_bounds(canvas_width, canvas_height),
@@ -688,6 +695,7 @@ draw_shop_screen :: proc(
 		state.remove_hovered,
 		remove_enabled,
 		rl.Color{224, 99, 86, 255},
+		theme = theme,
 	)
 	draw_shop_button(
 		shop_continue_bounds(canvas_width, canvas_height),
@@ -695,6 +703,7 @@ draw_shop_screen :: proc(
 		state.continue_hovered,
 		true,
 		rl.Color{246, 207, 92, 255},
+		theme = theme,
 	)
-	rl.DrawFPS(c.int(canvas_width)-96, 18)
+
 }

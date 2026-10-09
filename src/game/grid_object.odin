@@ -33,6 +33,8 @@ Grid_Object :: struct {
 	max_health: i32,
 	health:     i32,
 	detonation_pulse: u64,
+	fuse_pulses: int,
+	explosion_damage: i32,
 }
 
 Grid_Object_Spawn :: struct {

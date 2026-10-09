@@ -93,7 +93,7 @@ tick_status_kind :: proc(room: ^Room, entity: Entity_Ref, kind: Status_Kind, pul
 
 tick_entity_statuses :: proc(room: ^Room, entity: Entity_Ref, pulse: ^Pulse_Report) {
 	assert(room != nil && pulse != nil)
-	status_order := [?]Status_Kind{.Poison, .Shield, .Thorns, .Afterimage}
+	status_order := [?]Status_Kind{.Poison, .Shield, .Thorns, .Afterimage, .Stagger, .Survey}
 	for kind in status_order {
 		if room.phase != .Combat || !entity_exists(room, entity) {
 			return
@@ -125,16 +125,22 @@ advance_combat_pulse :: proc(room: ^Room) -> (pulse: Pulse_Report) {
 		return
 	}
 	pulse.advanced = true
-	statuses_advanced := false
 	resolve_due_explosives(room, &pulse)
 	resolve_due_room_modifier(room, &pulse)
 	resolve_enemy_intents(room, &pulse)
+	finish_combat_pulse(room, &pulse)
+	return
+}
+
+finish_combat_pulse :: proc(room: ^Room, pulse: ^Pulse_Report) {
+	pulse.advanced = true
+	statuses_advanced := false
 	if room.phase == .Combat {
-		tick_all_statuses(room, &pulse)
+		tick_all_statuses(room, pulse)
 		statuses_advanced = true
 	}
 	if room.phase == .Combat {
-		tick_reaction_bindings(room, &pulse)
+		tick_reaction_bindings(room, pulse)
 	}
 	pulse.combat_ended = pulse.combat_ended || room.phase == .Loot
 	pulse.player_defeated = pulse.player_defeated || room.phase == .Defeat

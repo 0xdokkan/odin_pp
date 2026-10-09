@@ -87,12 +87,12 @@ draw_reward_card :: proc(
 	choice: game.Card_Id,
 	choice_index, choice_count: int,
 	canvas_width, canvas_height: f32,
-	raised, enabled: bool,
+	raised, enabled: bool, theme: ^Renderer = nil,
 ) {
-	definition, found := game.card_definition_by_id(choice)
+	definition, found := game.card_definition_by_id(choice, menu_themed(theme))
 	assert(found)
 	preview := game.Card_Instance{definition_id = choice}
-	draw_card_face(
+	menu_card_face(theme,
 		reward_card_bounds(canvas_width, canvas_height, choice_index, choice_count, raised),
 		preview,
 		definition,
@@ -108,7 +108,7 @@ draw_reward_screen :: proc(
 	run: ^game.Run_State,
 	canvas_width, canvas_height: f32,
 	hovered_card_index: int = -1,
-	skip_hovered: bool = false,
+	skip_hovered: bool = false, theme: ^Renderer = nil,
 ) {
 	assert(run != nil && run.phase == .Reward)
 	choices := game.available_card_rewards(run)
@@ -117,10 +117,10 @@ draw_reward_screen :: proc(
 	node, node_found := game.current_run_node(run)
 	assert(node_found)
 
-	rl.DrawRectangle(0, 0, c.int(canvas_width), c.int(canvas_height), CANVAS_BACKGROUND)
-	rl.DrawRectangle(0, 0, c.int(canvas_width), 92, rl.Color{15, 18, 21, 255})
-	rl.DrawText("CARD REWARD", 28, 20, 24, rl.Color{225, 229, 224, 255})
-	rl.DrawText(
+	menu_rectangle(theme, 0, 0, c.int(canvas_width), c.int(canvas_height), CANVAS_BACKGROUND)
+	menu_rectangle(theme, 0, 0, c.int(canvas_width), 92, rl.Color{15, 18, 21, 255})
+	menu_text(theme, "CARD REWARD", 28, 20, 24, rl.Color{225, 229, 224, 255})
+	menu_text(theme,
 		fmt.ctprintf("%s CLEARED    DECK %d/%d", game.node_kind_name(node.kind), run.player.deck.owned_count, game.MAX_OWNED_CARDS),
 		28,
 		55,
@@ -133,14 +133,14 @@ draw_reward_screen :: proc(
 		command = "DECK FULL"
 		command_color = rl.Color{224, 99, 86, 255}
 	}
-	command_width := rl.MeasureText(command, 16)
-	rl.DrawText(command, c.int(canvas_width)*1/2-command_width/2, 108, 16, command_color)
+	command_width := menu_measure_text(theme, command, 16)
+	menu_text(theme, command, c.int(canvas_width)*1/2-command_width/2, 108, 16, command_color)
 
 	for index in 0..<len(choices) {
 		if index == hovered_card_index {
 			continue
 		}
-		draw_reward_card(choices[index], index, len(choices), canvas_width, canvas_height, false, can_add)
+		draw_reward_card(choices[index], index, len(choices), canvas_width, canvas_height, false, can_add, theme = theme)
 	}
 	if hovered_card_index >= 0 && hovered_card_index < len(choices) {
 		draw_reward_card(
@@ -151,7 +151,7 @@ draw_reward_screen :: proc(
 			canvas_height,
 			true,
 			can_add,
-		)
+		 theme = theme)
 	}
 
 	skip_bounds := reward_skip_bounds(canvas_width, canvas_height)
@@ -161,15 +161,15 @@ draw_reward_screen :: proc(
 		skip_fill = rl.Color{67, 55, 31, 255}
 		skip_outline = rl.Color{246, 207, 92, 255}
 	}
-	rl.DrawRectangleRec(skip_bounds, skip_fill)
-	rl.DrawRectangleLinesEx(skip_bounds, 2, skip_outline)
-	skip_width := rl.MeasureText("SKIP", 16)
-	rl.DrawText(
+	menu_rectangle_rec(theme, skip_bounds, skip_fill)
+	menu_outline(theme, skip_bounds, 2, skip_outline)
+	skip_width := menu_measure_text(theme, "SKIP", 16)
+	menu_text(theme,
 		"SKIP",
 		c.int(skip_bounds.x+skip_bounds.width*0.5)-skip_width/2,
 		c.int(skip_bounds.y+10),
 		16,
 		rl.Color{225, 229, 224, 255},
 	)
-	rl.DrawFPS(c.int(canvas_width)-96, 18)
+
 }

@@ -40,6 +40,37 @@ write_family_wall :: proc(data: ^Level, x, y: int) {
 	assert(written)
 }
 
+spawn_center_distance_squared :: proc(config: Room_Generation_Config, position: grid.Position) -> int {
+	// Doubled coordinates preserve symmetry for rooms with an even dimension.
+	dx, dy := position.x*2-(config.width-1), position.y*2-(config.height-1)
+	return dx*dx+dy*dy
+}
+
+select_central_room_anchors :: proc(data: ^Level, config: Room_Generation_Config, generator: rand.Generator) -> (result: Room_Anchor_Pair, found: bool) {
+	minimum, maximum := exit_candidate_bounds(config)
+	closest, choices := max(int), 0
+	for y in 1+config.spawn_clearance_radius..<config.height-1-config.spawn_clearance_radius {
+		for x in 1+config.spawn_clearance_radius..<config.width-1-config.spawn_clearance_radius {
+			spawn := grid.Position{x, y}
+			distance := spawn_center_distance_squared(config, spawn)
+			if distance > closest || !clearance_is_walkable(data, spawn, config.spawn_clearance_radius) { continue }
+			for exit_y in minimum.y..=maximum.y {
+				for exit_x in minimum.x..=maximum.x {
+					exit_position := grid.Position{exit_x, exit_y}
+					if !anchor_pair_is_valid(config, spawn, exit_position) ||
+					   !clearance_is_walkable(data, exit_position, config.exit_clearance_radius) { continue }
+					if distance < closest { closest = distance; choices = 0 }
+					choices += 1
+					// Reservoir sampling avoids storing all pairs. Equal candidates
+					// vary with the layout seed without favoring one side of the room.
+					if rand.int_range(0, choices, generator) == 0 { result = {spawn, exit_position} }
+				}
+			}
+		}
+	}
+	return result, choices > 0
+}
+
 generate_tactical_room_attempt :: proc(config: Room_Generation_Config, generator: rand.Generator) -> (result: Level, ok: bool) {
 	result, ok = create(config.width, config.height, {kind = .Floor})
 	if !ok { return {}, false }
@@ -94,23 +125,29 @@ generate_tactical_room_attempt :: proc(config: Room_Generation_Config, generator
 	}
 
 	// Select anchors around the completed shape, never carve away its defining walls.
-	anchors := make([dynamic]Room_Anchor_Pair, 0, valid_anchor_pair_count(config))
-	defer delete(anchors)
-	minimum, maximum := exit_candidate_bounds(config)
-	for spawn in interior_corners(width, height) {
-		if !clearance_is_walkable(&result, spawn, config.spawn_clearance_radius) { continue }
-		for y in minimum.y..=maximum.y {
-			for x in minimum.x..=maximum.x {
-				exit_position := grid.Position{x, y}
-				if anchor_pair_is_valid(config, spawn, exit_position) &&
-				   clearance_is_walkable(&result, exit_position, config.exit_clearance_radius) {
-					append(&anchors, Room_Anchor_Pair{spawn, exit_position})
+	selected: Room_Anchor_Pair
+	if config.central_spawn {
+		selected, ok = select_central_room_anchors(&result, config, generator)
+		if !ok { destroy(&result); return {}, false }
+	} else {
+		anchors := make([dynamic]Room_Anchor_Pair, 0, valid_anchor_pair_count(config))
+		defer delete(anchors)
+		minimum, maximum := exit_candidate_bounds(config)
+		for spawn in interior_corners(width, height) {
+			if !clearance_is_walkable(&result, spawn, config.spawn_clearance_radius) { continue }
+			for y in minimum.y..=maximum.y {
+				for x in minimum.x..=maximum.x {
+					exit_position := grid.Position{x, y}
+					if anchor_pair_is_valid(config, spawn, exit_position) &&
+					   clearance_is_walkable(&result, exit_position, config.exit_clearance_radius) {
+						append(&anchors, Room_Anchor_Pair{spawn, exit_position})
+					}
 				}
 			}
 		}
+		if len(anchors) == 0 { destroy(&result); return {}, false }
+		selected = anchors[rand.int_range(0, len(anchors), generator)]
 	}
-	if len(anchors) == 0 { destroy(&result); return {}, false }
-	selected := anchors[rand.int_range(0, len(anchors), generator)]
 	result.player_spawn = selected.spawn
 	result.has_player_spawn = true
 	spawn_written := set_tile(&result, selected.spawn, {kind = .Player_Spawn})

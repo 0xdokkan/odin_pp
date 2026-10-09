@@ -110,6 +110,7 @@ Card_Effect_Template :: struct {
 }
 
 Card_Definition :: struct {
+	tactical: bool,
 	id:              Card_Id,
 	name:            string,
 	rarity:          Card_Rarity,
@@ -817,7 +818,7 @@ card_drop_target :: proc(
 	if room == nil || room.player == nil || room.level_data == nil {
 		return {}, false
 	}
-	definition, found := card_definition_by_id(instance.definition_id)
+	definition, found := card_definition_by_id(instance.definition_id, tactical_enabled(room))
 	if !found {
 		return {}, false
 	}
@@ -960,13 +961,15 @@ validate_card_definitions :: proc() -> bool {
 	return true
 }
 
-card_definition_by_id :: proc(id: Card_Id) -> (Card_Definition, bool) {
+card_definition_by_id :: proc(id: Card_Id, tactical: bool = false) -> (Card_Definition, bool) {
 	definitions := CARD_DEFINITIONS
 	index := int(id)
 	if index < 0 || index >= len(definitions) {
 		return {}, false
 	}
-	return definitions[index], true
+	definition := definitions[index]
+	if tactical { rework_tactical_card(&definition) }
+	return definition, true
 }
 
 validate_card_instance :: proc(instance: Card_Instance) -> bool {
@@ -1236,7 +1239,7 @@ evaluate_card_targeting :: proc(
 	   int(instance.lifetime) < 0 || int(instance.lifetime) >= int(Card_Lifetime.Count) {
 		return
 	}
-	definition, found := card_definition_by_id(instance.definition_id)
+	definition, found := card_definition_by_id(instance.definition_id, tactical_enabled(room))
 	if !found {
 		evaluation.error = .Unknown_Definition
 		return
@@ -1249,10 +1252,32 @@ evaluate_card_targeting :: proc(
 	if !validate_card_instance(instance) {
 		return
 	}
+	if tactical_enabled(room) && request.has_anchor && !tactical_cell_visible(room, request.anchor) {
+		evaluation.error = .Invalid_Target
+		return
+	}
 	evaluation.query = evaluate_target_query(room, PLAYER_ENTITY, definition.targeting, request)
 	evaluation.error = card_compile_error_from_query(evaluation.query.error)
 	if evaluation.error != .None {
 		return
+	}
+
+	if tactical_enabled(room) {
+		visible_cells := 0
+		for cell in evaluation.query.affected.cells[:evaluation.query.affected.count] {
+			if !tactical_cell_visible(room, cell) { continue }
+			evaluation.query.affected.cells[visible_cells] = cell
+			visible_cells += 1
+		}
+		evaluation.query.affected.count = visible_cells
+		visible_enemies := 0
+		for id in evaluation.query.enemy_ids[:evaluation.query.enemy_count] {
+			i, present := enemy_index_by_id(room, id)
+			if !present || !tactical_card_enemy_in_area(room, instance.definition_id, room.enemies[i].position) { continue }
+			evaluation.query.enemy_ids[visible_enemies] = id
+			visible_enemies += 1
+		}
+		evaluation.query.enemy_count = visible_enemies
 	}
 
 	for index in 0..<definition.effect_count {
@@ -1261,7 +1286,7 @@ evaluate_card_targeting :: proc(
 			continue
 		}
 		evaluation.has_movement = true
-		evaluation.movement_required = definition.effect_count == 1
+		evaluation.movement_required = definition.effect_count == 1 || template.movement == .Player_To_Anchor
 		if definition.targeting.stops_on_actor &&
 		   !target_cell_set_contains(&evaluation.query.affected, evaluation.query.anchor) {
 			evaluation.error = .Target_Blocked
@@ -1295,7 +1320,9 @@ evaluate_card_targeting :: proc(
 	for index in 0..<definition.effect_count {
 		switch definition.effects[index].target {
 		case .Each_Enemy:
-			evaluation.required_effect_count += len(room.enemies)
+			for enemy in room.enemies {
+				if tactical_card_enemy_in_area(room, instance.definition_id, enemy.position) { evaluation.required_effect_count += 1 }
+			}
 		case .Each_Affected_Enemy:
 			evaluation.required_effect_count += evaluation.query.enemy_count
 			if definition.effects[index].affects_objects {
@@ -1333,7 +1360,7 @@ compile_card_action :: proc(
 	   int(instance.lifetime) < 0 || int(instance.lifetime) >= int(Card_Lifetime.Count) {
 		return {}, .Invalid_Instance
 	}
-	definition, found := card_definition_by_id(instance.definition_id)
+	definition, found := card_definition_by_id(instance.definition_id, tactical_enabled(room))
 	if !found {
 		return {}, .Unknown_Definition
 	}
@@ -1387,6 +1414,8 @@ compile_card_action :: proc(
 		if template.target == .Each_Enemy {
 			ids, count := enemy_ids_in_planning_order(room)
 			for enemy_index in 0..<count {
+				entity_index, _ := enemy_index_by_id(room, ids[enemy_index])
+				if !tactical_card_enemy_in_area(room, instance.definition_id, room.enemies[entity_index].position) { continue }
 				effect, instantiated := instantiate_card_effect(
 					template,
 					enemy_entity(ids[enemy_index]),
@@ -1430,6 +1459,7 @@ compile_card_action :: proc(
 		effect_target, has_target := card_effect_target(template.target, target)
 		assert(has_target)
 		effect, instantiated := instantiate_card_effect(template, effect_target, instance)
+		if instance.definition_id == .Strike && effect.kind == .Damage { effect.amount += tactical_strike_bonus(room, effect_target) }
 		if !instantiated {
 			return {}, .Invalid_Definition
 		}
@@ -1438,4 +1468,8 @@ compile_card_action :: proc(
 		}
 	}
 	return action, .None
+}
+
+card_requires_spatial_target :: proc(definition: Card_Definition) -> bool {
+	return definition.targeting.shape != .None
 }

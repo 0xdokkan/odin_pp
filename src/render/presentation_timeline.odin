@@ -96,9 +96,11 @@ Presentation_Grid_Object :: struct {
 	opacity:    f32,
 	visible:    bool,
 	detonation_pulse: u64,
+	fuse_pulses: int,
 }
 
 Room_Presentation :: struct {
+	tactical: bool,
 	phase:       game.Room_Phase,
 	encounter_kind: game.Encounter_Kind,
 	modifier: game.Room_Modifier,
@@ -147,6 +149,7 @@ capture_room_presentation :: proc(room: ^game.Room) -> (result: Room_Presentatio
 		return
 	}
 	result.valid = true
+	result.tactical = game.tactical_enabled(room)
 	result.phase = room.phase
 	result.encounter_kind = room.encounter_kind
 	result.modifier = room.modifier
@@ -194,6 +197,7 @@ capture_room_presentation :: proc(room: ^game.Room) -> (result: Room_Presentatio
 			entity = game.object_entity(object.id),
 			kind = object.kind,
 			detonation_pulse = object.detonation_pulse,
+			fuse_pulses = object.fuse_pulses,
 			position = presentation_position(object.position),
 			health = object.health,
 			max_health = object.max_health,
@@ -634,7 +638,7 @@ show_dropped_presentation_loot :: proc(
 	return true
 }
 
-apply_presentation_card_played :: proc(deck: ^game.Deck_State, event: game.Game_Event) -> bool {
+apply_presentation_card_played :: proc(deck: ^game.Deck_State, event: game.Game_Event, tactical: bool = false) -> bool {
 	if deck == nil || !game.validate_deck_state(deck) || event.amount < 0 ||
 	   event.amount > deck.energy || event.from_card_zone != .Hand ||
 	   event.to_card_zone != .Resolving || event.source != game.PLAYER_ENTITY ||
@@ -646,7 +650,7 @@ apply_presentation_card_played :: proc(deck: ^game.Deck_State, event: game.Game_
 		return false
 	}
 	card := deck.hand[hand_index]
-	definition, definition_found := game.card_definition_by_id(card.definition_id)
+	definition, definition_found := game.card_definition_by_id(card.definition_id, tactical)
 	if !game.validate_card_instance(card) || card.definition_id != event.card_definition ||
 	   card.upgrade_level != event.card_upgrade_level || card.lifetime != event.card_lifetime ||
 	   !definition_found || definition.cost != event.amount {
@@ -877,6 +881,7 @@ start_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^Presentat
 			timeline.update_failures += 1
 		} else if cue.kind == .Explosive_Armed {
 			object.detonation_pulse = event.pulse_count
+			object.fuse_pulses = int(event.duration)
 		} else {
 			object.detonation_pulse = 0
 			if cue.kind == .Explosion {
@@ -963,7 +968,7 @@ start_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^Presentat
 			timeline.view.deck.energy = event.energy
 		}
 	case .Card_Played:
-		if !apply_presentation_card_played(&timeline.view.deck, event) {
+		if !apply_presentation_card_played(&timeline.view.deck, event, timeline.view.tactical) {
 			timeline.update_failures += 1
 		}
 	case .Card_Drawn:

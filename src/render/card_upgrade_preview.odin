@@ -4,7 +4,7 @@ import "core:fmt"
 import game "../game"
 
 // Le cifre della preview provengono dagli stessi template del resolver.
-card_upgrade_preview :: proc(card: game.Card_Instance) -> cstring {
+card_upgrade_preview :: proc(card: game.Card_Instance, tactical: bool = false) -> cstring {
 	if !game.card_can_upgrade(card) {
 		if card.upgrade_level >= game.MAX_CARD_UPGRADE_LEVEL {
 			return "MAX UPGRADE"
@@ -20,7 +20,7 @@ card_upgrade_preview :: proc(card: game.Card_Instance) -> cstring {
 	if card.definition_id == .Twin_Venom {
 		return fmt.ctprintf("HIGHER D6 BONUS +%d -> +%d / PAIR: POISON 2, 2 PULSES IF ALIVE", 1+card.upgrade_level, 2+card.upgrade_level)
 	}
-	definition, _ := game.card_definition_by_id(card.definition_id)
+	definition, _ := game.card_definition_by_id(card.definition_id, tactical)
 	line := ""
 	for index in 0..<definition.effect_count {
 		template := definition.effects[index]

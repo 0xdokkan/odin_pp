@@ -136,7 +136,7 @@ prepare_demo_room :: proc(
 	prepared.player = run.player
 
 	if procedural {
-		blueprint, blueprint_error := game.generate_room_blueprint(node, run.last_room_family)
+		blueprint, blueprint_error := game.generate_room_blueprint(node, run.last_room_family, run.player.tactical.config.enabled)
 		if blueprint_error != .None {
 			return false
 		}
@@ -263,6 +263,7 @@ restart_demo_session :: proc(
 		return false
 	}
 	defer game.destroy_run(&new_run)
+	if run.player.tactical.config.enabled && !configure_demo_tactical_player(&new_run.player, run.player.tactical.config) { return false }
 	node, node_ok := game.current_run_node(&new_run)
 	if !node_ok {
 		return false
@@ -304,7 +305,7 @@ pressed_hand_slot :: proc() -> int {
 }
 
 card_requires_chosen_target :: proc(definition: game.Card_Definition) -> bool {
-	return definition.targeting.shape != .None
+	return game.card_requires_spatial_target(definition)
 }
 
 Card_Interaction_State :: struct {
@@ -408,6 +409,7 @@ poll_gameplay_command :: proc(
 		if rl.IsMouseButtonReleased(.LEFT) || !rl.IsMouseButtonDown(.LEFT) {
 			dragged_card_id := card_interaction.dragged_card_id
 			card_interaction.dragged_card_id = 0
+			if renderer.tactical.enabled { card_interaction.selected_card_id = dragged_card_id }
 			if mouse_inside && render.card_drop_area_contains(renderer, mouse_canvas) &&
 			   renderer.has_hovered_cell {
 				if hand_index, found := game.hand_card_index_by_id(input_deck, dragged_card_id); found {
@@ -439,6 +441,11 @@ poll_gameplay_command :: proc(
 	requested_slot := pressed_hand_slot()
 	if spatial_interaction_enabled && mouse_inside && rl.IsMouseButtonPressed(.LEFT) &&
 	   card_interaction.hovered_card_id != 0 {
+		if renderer.tactical.enabled && card_interaction.selected_card_id == card_interaction.hovered_card_id {
+			if index, found := game.hand_card_index_by_id(input_deck, card_interaction.selected_card_id); found {
+				if card_command, immediate := immediate_card_command(input_deck.hand[index]); immediate { return card_command, true }
+			}
+		}
 		card_interaction.dragged_card_id = card_interaction.hovered_card_id
 		card_interaction.hovered_card_id = 0
 		card_interaction.selected_card_id = 0
@@ -517,7 +524,7 @@ capture_gameplay_command_telemetry :: proc(
 		return snapshot, {}, {}, false
 	case .Move:
 		resolved_kind, ok = combatdebug.command_kind_for_move(room, command.direction)
-	case .Wait:
+	case .Dodge, .Wait, .Timeout, .Continue_Pulse, .End_Preparation, .Begin_Diagonal, .QTE_Key, .QTE_Fail, .Defense:
 		resolved_kind = .Wait
 	case .Ability:
 		resolved_kind = .Ability
@@ -540,9 +547,31 @@ execute_gameplay_command :: proc(room: ^game.Room, command: Gameplay_Command) ->
 	switch command.kind {
 	case .None:
 		return
+	case .Timeout:
+		if !game.tactical_enabled(room) || room.player.tactical.remaining > 0 { return }
+		if room.player.tactical.phase == .Preparation { execution.committed = game.finish_preparation(room) }
+		else { execution.committed = game.wait_player_turn(room) != .Invalid_Phase }
+		if execution.committed { room.player.tactical.metrics.timeouts += 1 }
+	case .Continue_Pulse:
+		execution.committed = game.continue_tactical_pulse(room)
+	case .End_Preparation:
+		execution.committed = game.finish_preparation(room)
+	case .Begin_Diagonal:
+		execution.committed = game.begin_diagonal_qte(room, command.offset)
+	case .Defense:
+		if game.select_defense(room, command.defense) { game.clear_event_log(&room.recent_events); execution.committed = true }
+	case .QTE_Key:
+		game.clear_event_log(&room.recent_events)
+		execution.committed = game.qte_key(room, command.direction)
+	case .QTE_Fail:
+		execution.committed = game.resolve_qte(room, false)
 	case .Move:
 		result := game.try_move_player(room, command.direction)
 		execution.committed = result != .Invalid_Phase && result != .Blocked
+		if execution.committed { room.player.tactical.facing = command.direction }
+	case .Dodge:
+		execution.committed = game.try_dodge_player(room, command.direction)
+		execution.clears_card_interaction = execution.committed
 	case .Wait:
 		result := game.wait_player_turn(room)
 		execution.committed = result != .Invalid_Phase
@@ -558,6 +587,7 @@ execute_gameplay_command :: proc(room: ^game.Room, command: Gameplay_Command) ->
 		execution.committed = game.refocus_was_committed(refocus.result)
 		execution.clears_card_interaction = execution.committed
 	}
+	game.tactical_end_combat(room)
 	return
 }
 
@@ -915,6 +945,12 @@ main :: proc() {
 			os.exit(2)
 		}
 	}
+	if options.m7_smoke { smoke_mode_count += 1 }
+	if options.m7_view_smoke { smoke_mode_count += 1 }
+	if options.m7_view_smoke && !options.tactical.enabled {
+		fmt.eprintln("--smoke-m7-view requires M7; omit --classic")
+		os.exit(2)
+	}
 	if smoke_mode_count > 1 {
 		fmt.eprintln("choose exactly one --smoke* mode")
 		os.exit(2)
@@ -961,6 +997,8 @@ main :: proc() {
 		return
 	}
 	defer game.destroy_run(&run_state)
+	if smoke_test || options.spell_lab { options.tactical.enabled = false; options.scene_3d = false }
+	if options.tactical.enabled && !configure_demo_tactical_player(&run_state.player, options.tactical) { return }
 	room: game.Room
 	if !replace_current_demo_room(&level_data, &run_state, &room, procedural_rooms) {
 		return
@@ -976,6 +1014,16 @@ main :: proc() {
 		return
 	}
 
+	if options.m7_smoke {
+		if !run_m7_headless_smoke() { os.exit(2) }
+		return
+	}
+	if smoke_test || options.spell_lab { options.tactical.enabled = false; options.scene_3d = false }
+	if options.tactical.enabled {
+		configured := game.configure_tactical_room(&room, options.tactical)
+		assert(configured)
+	}
+
 	window, window_ok := app.open(app.Window_Config{
 		title = "Odin Grid Roguelike Prototype",
 		initial_width = 1280,
@@ -986,6 +1034,7 @@ main :: proc() {
 		minimum_window_height = 360,
 		target_fps = 60,
 		initial_scale_mode = .Fit,
+		pixel_art = options.tactical.enabled,
 	})
 	if !window_ok {
 		return
@@ -1007,6 +1056,21 @@ main :: proc() {
 	}
 
 	iso_renderer := render.create(window.config.canvas_width, window.config.canvas_height, &level_data)
+	iso_renderer.tactical.enabled = options.tactical.enabled
+	iso_renderer.tactical.scene_3d = options.scene_3d
+	iso_renderer.tactical.perspective = options.perspective
+	if options.tactical.enabled { render.create_tactical_assets(&iso_renderer, window.canvas) }
+	if options.tactical.enabled { dice_renderer.theme = &iso_renderer }
+	defer render.destroy_tactical_assets(&iso_renderer)
+	defer {
+		if playtest_report && !write_m7_metrics(&run_state.player, run_seed, options.playtest_output) { fmt.eprintln("failed to write M7 metrics") }
+	}
+	tactical_controller: Tactical_Controller
+	m7_view_state: M7_View_Smoke
+	if options.m7_view_smoke {
+		game.skip_run_relic(&run_state)
+		if !prepare_m7_view_room(&level_data, &run_state, &room) { fmt.eprintln("M7 view setup failed"); os.exit(2) }
+	}
 	sprite_manifest := options.sprite_manifest
 	if len(sprite_manifest) == 0 { sprite_manifest = "assets/sprites.json" }
 	sprite_report := render.load_sprite_assets(&iso_renderer.sprite_assets, sprite_manifest)
@@ -1330,9 +1394,21 @@ main :: proc() {
 			speed := f32(1) if iso_renderer.playback_speed >= 4 else min(f32(4), iso_renderer.playback_speed*2)
 			render.set_renderer_playback_speed(&iso_renderer, speed)
 		}
-		frame_time := rl.GetFrameTime()
+		presentation_was_busy := render.renderer_timeline_is_busy(&iso_renderer)
+		frame_time := (f32(1.0/60.0) if options.m7_view_smoke else rl.GetFrameTime())
+		if rl.IsKeyPressed(.F8) {
+			frame := Input_Diagnostic_Frame{dt = frame_time, focused = rl.IsWindowFocused(),
+				route_map = show_route_map, scripted = smoke_test, mouse_left = rl.IsMouseButtonDown(.LEFT),
+				shift = rl.IsKeyDown(.LEFT_SHIFT) || rl.IsKeyDown(.RIGHT_SHIFT)}
+			for key, index in ([?]rl.KeyboardKey{.W, .D, .S, .A}) { frame.wasd_down[index] = rl.IsKeyDown(key) }
+			path, saved := write_input_diagnostic(&run_state, &room, &iso_renderer, &tactical_controller,
+				&card_interaction, &gameplay_buffer, frame)
+			if saved { fmt.printf("Input snapshot saved: %s\n", path); delete(path) }
+			else { fmt.eprintln("Could not save input snapshot (write error or 256 captures already present)") }
+		}
 		render.advance_sprite_assets(&iso_renderer.sprite_assets, frame_time if !smoke_test else f32(1.0/60.0))
-		if !smoke_furnace && spell_smoke == .None {
+		if !smoke_furnace && spell_smoke == .None &&
+		   (!options.tactical.enabled || options.m7_view_smoke || (!tactical_controller.paused && tactical_controller.was_focused && rl.IsWindowFocused())) {
 			render.update_renderer_frame_timeline(&iso_renderer, frame_time)
 		}
 		mouse_canvas, mouse_inside := app.mouse_canvas_position(&window)
@@ -1374,6 +1450,10 @@ main :: proc() {
 				combatdebug.destroy_playtest_session(playtest_session_ptr)
 				playtest_session_ptr = nil
 			}
+			if playtest_report && !write_m7_metrics(&run_state.player, run_seed, options.playtest_output) {
+				fmt.eprintln("failed to write M7 metrics before restart")
+				continue
+			}
 			run_seed += 1
 			restarted := restart_demo_session(
 				&level_data,
@@ -1383,6 +1463,11 @@ main :: proc() {
 				procedural_rooms,
 			)
 			assert(restarted)
+			if options.tactical.enabled {
+				configured := game.configure_tactical_room(&room, options.tactical)
+				assert(configured)
+				tactical_controller = {}
+			}
 			if options.spell_lab {
 				if !prepare_spell_lab(&room, options.dice_lab) { fmt.eprintln("could not reset card practice"); return }
 			}
@@ -1405,7 +1490,7 @@ main :: proc() {
 		}
 
 		timeline_busy := render.renderer_timeline_is_busy(&iso_renderer)
-		if !game.run_has_relic_choice(&run_state) && rl.IsKeyPressed(.M) && route_map_toggle_is_allowed(&run_state, &room, &iso_renderer) {
+		if (!options.tactical.enabled || room.phase != .Combat) && !game.run_has_relic_choice(&run_state) && rl.IsKeyPressed(.M) && route_map_toggle_is_allowed(&run_state, &room, &iso_renderer) {
 			show_route_map = !show_route_map
 			if show_route_map {
 				clear_card_interaction(&card_interaction)
@@ -1424,6 +1509,15 @@ main :: proc() {
 		relic_visible := game.run_has_relic_choice(&run_state)
 		relic_hovered := -1
 		relic_skip_hovered := false
+		tactical_input_blocked := false
+		if options.tactical.enabled {
+			render.update_tactical_view(&iso_renderer, &room, mouse_canvas, mouse_inside && !tactical_controller.hologram && !tactical_controller.paused && rl.IsWindowFocused())
+			render.update_tactical_atmosphere(&iso_renderer, frame_time if options.m7_view_smoke || (!tactical_controller.paused && rl.IsWindowFocused()) else 0)
+			if !options.m7_view_smoke { tactical_input_blocked = update_tactical_controller(&tactical_controller, &room, &iso_renderer,
+				&card_interaction, &gameplay_buffer, (f32(0) if presentation_was_busy else frame_time),
+				run_state.phase == .In_Room && !relic_visible && !route_visible && !options.m7_view_smoke,
+				mouse_canvas, mouse_inside, playtest_session_ptr) } else { tactical_input_blocked = true }
+		}
 
 		if relic_visible {
 			clear_card_interaction(&card_interaction)
@@ -1842,20 +1936,20 @@ main :: proc() {
 				}
 			}
 		} else {
-			render.update_camera(
+			if !options.tactical.enabled { render.update_camera(
 				&iso_renderer,
 				&level_data,
 				mouse_canvas,
 				mouse_inside,
 				mouse_delta,
 				frame_time,
-			)
-			if mouse_inside && !smoke_test && !render.renderer_timeline_is_busy(&iso_renderer) {
+			) }
+			if !options.tactical.enabled && mouse_inside && !smoke_test && !render.renderer_timeline_is_busy(&iso_renderer) {
 				render.update_object_target_hover(
 					&iso_renderer, &room, mouse_canvas, active_targeting_card_id(card_interaction),
 				)
 			}
-			if !smoke_card && !smoke_targeting && !smoke_spatial && !smoke_object && !smoke_content &&
+			if !tactical_input_blocked && !smoke_card && !smoke_targeting && !smoke_spatial && !smoke_object && !smoke_content &&
 			   !smoke_encounters && !smoke_miniboss && !smoke_furnace && spell_smoke == .None {
 				timeline_busy = render.renderer_timeline_is_busy(&iso_renderer)
 				command, has_command := poll_gameplay_command(
@@ -1944,7 +2038,7 @@ main :: proc() {
 		app.begin_canvas(&window, render.CANVAS_BACKGROUND)
 		if game.run_has_relic_choice(&run_state) {
 			render.draw_relic_reward_screen(&run_state, f32(window.config.canvas_width),
-				f32(window.config.canvas_height), relic_hovered, relic_skip_hovered)
+				f32(window.config.canvas_height), relic_hovered, relic_skip_hovered, theme = &iso_renderer)
 		} else if reward_visible {
 			render.draw_reward_screen(
 				&run_state,
@@ -1952,6 +2046,7 @@ main :: proc() {
 				f32(window.config.canvas_height),
 				reward_hovered_index,
 				reward_skip_hovered,
+				theme = &iso_renderer,
 			)
 		} else if shop_visible {
 			render.draw_shop_screen(
@@ -1959,6 +2054,7 @@ main :: proc() {
 				f32(window.config.canvas_width),
 				f32(window.config.canvas_height),
 				shop_render_state,
+				theme = &iso_renderer,
 			)
 		} else if special_visible {
 			render.draw_special_node_screen(
@@ -1966,6 +2062,7 @@ main :: proc() {
 				f32(window.config.canvas_width),
 				f32(window.config.canvas_height),
 				special_render_state,
+				theme = &iso_renderer,
 			)
 		} else if route_visible {
 			render.draw_run_map(
@@ -1974,6 +2071,7 @@ main :: proc() {
 				f32(window.config.canvas_height),
 				hovered_node,
 				shop_button_hovered,
+				theme = &iso_renderer,
 			)
 		} else {
 			if smoke_card || smoke_targeting || smoke_spatial || smoke_object || smoke_content {
@@ -1990,12 +2088,16 @@ main :: proc() {
 			if timeline_busy {
 				active_card_id = 0
 			}
-			if mouse_inside && !smoke_test && !timeline_busy {
+			if !options.tactical.enabled && mouse_inside && !smoke_test && !timeline_busy {
 				render.update_object_target_hover(&iso_renderer, &room, mouse_canvas, active_card_id)
 			}
 			if smoke_encounters {
 				render.update_object_target_hover(&iso_renderer, &room, mouse_canvas, active_card_id)
 			}
+			if options.tactical.enabled {
+				render.update_tactical_view(&iso_renderer, &room, mouse_canvas, false, true)
+				render.draw_tactical_world(&iso_renderer, &room, active_card_id)
+			} else {
 			render.draw_level(&iso_renderer, &level_data)
 			if !timeline_busy {
 				render.draw_enemy_intent_ground(
@@ -2015,10 +2117,11 @@ main :: proc() {
 			if !timeline_busy {
 				render.draw_enemy_intent_badges(&iso_renderer, &room)
 			}
+			}
 			render.draw_status(&iso_renderer, &room, window.scale_mode)
 			render.draw_relic_bar(&iso_renderer, &room, mouse_canvas, mouse_inside,
 				card_interaction.hovered_card_id if card_interaction.hovered_card_id != 0 else card_interaction.selected_card_id)
-			if mouse_inside || active_card_id != 0 {
+			if !options.tactical.enabled && (mouse_inside || active_card_id != 0) {
 				render.draw_object_interaction_help(&iso_renderer, &room, mouse_canvas, active_card_id)
 			}
 			draw_mouse_canvas := mouse_canvas
@@ -2033,6 +2136,10 @@ main :: proc() {
 				card_interaction.dragged_card_id,
 				draw_mouse_canvas,
 			)
+			if options.tactical.enabled {
+				if tactical_controller.hologram { render.draw_hologram(&iso_renderer, &room) }
+				render.draw_tactical_hud(&iso_renderer, &room, !options.m7_view_smoke && (tactical_controller.paused || !rl.IsWindowFocused()), tactical_controller.hologram)
+			}
 			if options.spell_lab {
 				label: cstring = "DICE PRACTICE / F5 RESTART" if options.dice_lab else "SPELL PRACTICE / F5 RESTART"
 				rl.DrawText(label, 265, 106, 11, rl.Color{172, 219, 222, 255})
@@ -2043,11 +2150,28 @@ main :: proc() {
 					f32(window.config.canvas_width),
 					f32(window.config.canvas_height),
 					defeat_restart_hovered,
+					theme = &iso_renderer,
 				)
 			}
 		}
 		app.present(&window, render.LETTERBOX_COLOR, overlay, &overlay_data)
 
+		if options.m7_view_smoke {
+			done, valid := step_m7_view_smoke(&m7_view_state, &tactical_controller, &room, &iso_renderer, &card_interaction)
+			if done {
+				if !valid { fmt.eprintln("M7 view playback regression failed"); os.exit(2) }
+				fmt.println("M7 view: diagonal + defensive QTE completed; one pulse per response; timeline synchronized")
+				if !run_m7_voxel_smoke(&window, &iso_renderer) { fmt.eprintln("M7 voxel smoke failed"); os.exit(2) }
+				if !run_m7_resin_smoke(&window, &iso_renderer, &dice_renderer) { fmt.eprintln("M7 resin/dice smoke failed"); os.exit(2) }
+				if !run_m7_rework_smoke(&window, &iso_renderer) { fmt.eprintln("M7 cards/enemies rework smoke failed"); os.exit(2) }
+				if !run_m7_polish_smoke(&window, &iso_renderer) { fmt.eprintln("M7 polish flow smoke failed"); os.exit(2) }
+				if !run_m7_visual_smoke(&window, &iso_renderer) { fmt.eprintln("M7 visual feedback smoke failed"); os.exit(2) }
+				if !run_m7_room_refresh_smoke(&window, &iso_renderer) { fmt.eprintln("M7 room refresh smoke failed"); os.exit(2) }
+				if !run_m7_menu_smoke(&window, &iso_renderer) { fmt.eprintln("M7 menu smoke failed"); os.exit(2) }
+				fmt.println("M7 UI: relic, reward, route, shop, rest, event, treasure and terminal screens captured")
+				break
+			}
+		}
 		if smoke_test {
 			smoke_frame_count += 1
 			if smoke_frame_count >= 3 {

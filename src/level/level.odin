@@ -33,6 +33,7 @@ Parse_Error :: enum {
 
 Room_Generation_Config :: struct {
 	family:                   Room_Family,
+	central_spawn:            bool,
 	width, height:            int,
 	wall_density_percent:     int,
 	spawn_clearance_radius:   int,
@@ -352,6 +353,21 @@ generation_config_is_valid :: proc(config: Room_Generation_Config) -> bool {
 	   config.max_attempts <= 0 || config.max_attempts > MAX_ROOM_GENERATION_ATTEMPTS {
 		return false
 	}
+	if config.central_spawn {
+		// With central placement both anchors need their full clearance. The
+		// farthest corners of these regions bound every possible anchor pair.
+		spawn_min := 1+config.spawn_clearance_radius
+		spawn_max := grid.Position{config.width-2-config.spawn_clearance_radius, config.height-2-config.spawn_clearance_radius}
+		exit_min, exit_max := exit_candidate_bounds(config)
+		exit_min.x = max(exit_min.x, 1+config.exit_clearance_radius)
+		exit_min.y = max(exit_min.y, 1+config.exit_clearance_radius)
+		exit_max.x = min(exit_max.x, config.width-2-config.exit_clearance_radius)
+		exit_max.y = min(exit_max.y, config.height-2-config.exit_clearance_radius)
+		if spawn_min > spawn_max.x || spawn_min > spawn_max.y || exit_min.x > exit_max.x || exit_min.y > exit_max.y { return false }
+		farthest := max(abs(spawn_min-exit_max.x), abs(spawn_max.x-exit_min.x)) +
+		            max(abs(spawn_min-exit_max.y), abs(spawn_max.y-exit_min.y))
+		return farthest >= config.min_spawn_exit_distance
+	}
 	return valid_anchor_pair_count(config) > 0
 }
 
@@ -428,9 +444,10 @@ validate_generated_room :: proc(
 		}
 	}
 
+	valid_spawn_position := has_full_interior_clearance(spawn_position, config.spawn_clearance_radius, config.width, config.height) if config.central_spawn else
+	                        is_interior_corner(spawn_position, config.width, config.height)
 	if spawn_count != 1 || !level_data.has_player_spawn ||
-	   level_data.player_spawn != spawn_position ||
-	   !is_interior_corner(spawn_position, config.width, config.height) {
+	   level_data.player_spawn != spawn_position || !valid_spawn_position {
 		result.error = .Invalid_Spawn
 		return
 	}
@@ -550,9 +567,15 @@ generate_room_attempt :: proc(
 		}
 	}
 
-	pair_count := valid_anchor_pair_count(config)
-	selected_pair := rand.int_range(0, pair_count, generator)
-	anchors, anchors_found := anchor_pair_at(config, selected_pair)
+	anchors: Room_Anchor_Pair
+	anchors_found: bool
+	if config.central_spawn {
+		anchors, anchors_found = select_central_room_anchors(&result, config, generator)
+	} else {
+		pair_count := valid_anchor_pair_count(config)
+		selected_pair := rand.int_range(0, pair_count, generator)
+		anchors, anchors_found = anchor_pair_at(config, selected_pair)
+	}
 	if !anchors_found {
 		destroy(&result)
 		return {}, false

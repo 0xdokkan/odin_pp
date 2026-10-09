@@ -6,6 +6,30 @@ import game "../game"
 import view "../view"
 
 @(test)
+test_tactical_full_hand_is_readable_clickable_and_separate_from_grid :: proc(t: ^testing.T) {
+	renderer := Renderer{canvas_width = 960, canvas_height = 540, tactical = {enabled = true}}
+	for count in 1..=game.MAX_HAND_CARDS {
+		deck := game.Deck_State{combat_active = true, hand_count = count}
+		for index in 0..<count { deck.hand[index].id = u32(index+1) }
+		previous_right: f32
+		for index in 0..<count {
+			bounds := hand_card_bounds(&renderer, index, count)
+			testing.expect(t, bounds.x >= previous_right && bounds.x+bounds.width <= renderer.canvas_width)
+			testing.expect(t, bounds.y > renderer.canvas_height-TACTICAL_HAND_HEIGHT && bounds.y+bounds.height <= renderer.canvas_height)
+			previous_right = bounds.x+bounds.width
+			for point in ([?]view.Vec2{{bounds.x+2, bounds.y+2}, {bounds.x+bounds.width-2, bounds.y+bounds.height-2}}) {
+				actual, found := hand_card_at_point(&renderer, &deck, point, deck.hand[index].id)
+				testing.expect(t, found && actual == index)
+				testing.expect(t, !card_drop_area_contains(&renderer, point))
+			}
+		}
+	}
+	map_button := tactical_map_button_bounds(&renderer)
+	testing.expect(t, !card_drop_area_contains(&renderer, {map_button.x+10, map_button.y+10}))
+	testing.expect(t, card_drop_area_contains(&renderer, {480, 240}))
+}
+
+@(test)
 test_overlapping_hand_headers_hit_the_visually_topmost_card :: proc(t: ^testing.T) {
 	renderer := Renderer{canvas_width = 960, canvas_height = 540}
 	deck := game.Deck_State{combat_active = true, hand_count = 5}

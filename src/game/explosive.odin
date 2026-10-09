@@ -20,17 +20,24 @@ arm_explosive :: proc(room: ^Room, id: u32, source: Entity_Ref, events: ^Event_L
 	if !definition.explosive || object.detonation_pulse != 0 {
 		return false
 	}
-	object.detonation_pulse = room.pulse_count+EXPLOSIVE_FUSE_PULSES+1
+	fuse := EXPLOSIVE_FUSE_PULSES
+	object.explosion_damage = EXPLOSIVE_DAMAGE
+	if tactical_enabled(room) && object.kind == .Bomb && source.kind == .Enemy {
+		fuse = TACTICAL_BOMB_FUSE
+		object.explosion_damage = TACTICAL_BOMB_DAMAGE
+	}
+	object.fuse_pulses = fuse
+	object.detonation_pulse = room.pulse_count+u64(fuse)+1
 	record_event(events, {
 		kind = .Explosive_Armed, source = source, target = object_entity(id),
 		from_position = object.position, to_position = object.position,
-		pulse_count = object.detonation_pulse, duration = EXPLOSIVE_FUSE_PULSES,
+		pulse_count = object.detonation_pulse, duration = i32(fuse),
 	})
 	return true
 }
 
-explosive_pulses_remaining :: proc(deadline, pulse: u64) -> int {
-	return int(min(deadline-pulse, u64(EXPLOSIVE_FUSE_PULSES))) if deadline > pulse else 0
+explosive_pulses_remaining :: proc(deadline, pulse: u64, fuse: int = EXPLOSIVE_FUSE_PULSES) -> int {
+	return int(min(deadline-pulse, u64(max(1, fuse)))) if deadline > pulse else 0
 }
 
 // Walls and fixed obstacles are excluded; cover objects can be destroyed by the blast.
@@ -125,6 +132,8 @@ resolve_due_explosives :: proc(room: ^Room, pulse: ^Pulse_Report) {
 			continue
 		}
 		center := room.objects[index].position
+		damage := room.objects[index].explosion_damage
+		if damage <= 0 { damage = EXPLOSIVE_DAMAGE }
 		room.objects[index].detonation_pulse = 0
 		source := object_entity(id)
 		action := make_action(.Trigger, source, entity_target(source), .Entity)
@@ -136,15 +145,15 @@ resolve_due_explosives :: proc(room: ^Room, pulse: ^Pulse_Report) {
 					continue
 				}
 				if room.player.position == cell {
-					added := add_effect(&action, damage_effect(PLAYER_ENTITY, EXPLOSIVE_DAMAGE))
+					added := add_effect(&action, damage_effect(PLAYER_ENTITY, damage))
 					assert(added)
 				}
 				if enemy_index, present := enemy_index_at(room, cell); present {
-					added := add_effect(&action, damage_effect(enemy_entity(room.enemies[enemy_index].id), EXPLOSIVE_DAMAGE))
+					added := add_effect(&action, damage_effect(enemy_entity(room.enemies[enemy_index].id), damage))
 					assert(added)
 				}
 				if object, present := grid_object_at(room, cell); present && object.id != id {
-					effect := damage_effect(object_entity(object.id), EXPLOSIVE_DAMAGE)
+					effect := damage_effect(object_entity(object.id), damage)
 					if effect_is_valid(room, effect) {
 						added := add_effect(&action, effect)
 						assert(added)
@@ -153,7 +162,7 @@ resolve_due_explosives :: proc(room: ^Room, pulse: ^Pulse_Report) {
 			}
 		}
 		record_event(&pulse.events, {
-			kind = .Explosion, source = source, target = source, amount = EXPLOSIVE_DAMAGE,
+			kind = .Explosion, source = source, target = source, amount = damage,
 			from_position = center, to_position = center,
 		})
 		report := resolve_action(room, &action)

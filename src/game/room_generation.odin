@@ -40,6 +40,7 @@ Room_Blueprint_Error :: enum {
 }
 
 Room_Blueprint :: struct {
+	tactical: bool,
 	previous_family: level.Room_Family,
 	encounter_kind: Encounter_Kind,
 	modifier: Room_Modifier,
@@ -75,7 +76,7 @@ valid_encounter_generation_config :: proc(config: Encounter_Generation_Config) -
 	       config.enemy_health > 0 && config.enemy_attack > 0 && config.trap_damage > 0
 }
 
-room_generation_profile :: proc(node: ^Run_Node, previous_family: level.Room_Family = .Scattered) -> (result: Room_Generation_Profile, ok: bool) {
+room_generation_profile :: proc(node: ^Run_Node, previous_family: level.Room_Family = .Scattered, tactical: bool = false) -> (result: Room_Generation_Profile, ok: bool) {
 	if node == nil || int(node.id) < 0 || node.depth < 0 || node.room_seed == 0 ||
 	   !node_kind_has_room(node.kind) || !level.room_family_is_valid(previous_family) {
 		return {}, false
@@ -145,6 +146,15 @@ room_generation_profile :: proc(node: ^Run_Node, previous_family: level.Room_Fam
 		return {}, false
 	}
 	result.encounter_config.object_count = 3 if node.kind == .Combat else 6
+	if tactical {
+		result.level_config.central_spawn = true
+		result.level_config.width += 2
+		result.level_config.height += 2
+		result.level_config.min_spawn_exit_distance += 1
+		result.encounter_config.enemy_budget += 3
+		result.encounter_config.max_enemies = min(MAX_ENEMIES_PER_ROOM, result.encounter_config.max_enemies+2)
+		result.encounter_config.player_safe_radius = max(3, result.encounter_config.player_safe_radius)
+	}
 	result.level_config.family = room_family_for_node(node, previous_family)
 	result.level_config.exit_center_radius = result.level_config.width/2
 	if node.kind == .Combat && encounter_kind_for_node(node) == .Powder_Keg {
@@ -384,7 +394,7 @@ validate_room_blueprint :: proc(blueprint: ^Room_Blueprint) -> bool {
 		depth = blueprint.node_depth,
 		room_seed = blueprint.seed,
 	}
-	expected_profile, profile_ok := room_generation_profile(&source_node, blueprint.previous_family)
+	expected_profile, profile_ok := room_generation_profile(&source_node, blueprint.previous_family, blueprint.tactical)
 	if !profile_ok || expected_profile != blueprint.profile {
 		return false
 	}
@@ -455,8 +465,8 @@ validate_room_blueprint :: proc(blueprint: ^Room_Blueprint) -> bool {
 	       blueprint.modifier == generate_blueprint_modifier(blueprint)
 }
 
-generate_room_blueprint :: proc(node: ^Run_Node, previous_family: level.Room_Family = .Scattered) -> (result: Room_Blueprint, err: Room_Blueprint_Error) {
-	profile, profile_ok := room_generation_profile(node, previous_family)
+generate_room_blueprint :: proc(node: ^Run_Node, previous_family: level.Room_Family = .Scattered, tactical: bool = false) -> (result: Room_Blueprint, err: Room_Blueprint_Error) {
+	profile, profile_ok := room_generation_profile(node, previous_family, tactical)
 	if !profile_ok {
 		return {}, .Invalid_Node
 	}
@@ -465,6 +475,7 @@ generate_room_blueprint :: proc(node: ^Run_Node, previous_family: level.Room_Fam
 	}
 
 	result.seed = node.room_seed
+	result.tactical = tactical
 	result.previous_family = previous_family
 	result.source_node = node.id
 	result.node_kind = node.kind
@@ -518,6 +529,15 @@ generate_room_blueprint :: proc(node: ^Run_Node, previous_family: level.Room_Fam
 		enemy_archetypes[enemy_archetype_count] = archetype
 		enemy_archetype_count += 1
 		remaining_budget -= enemy_archetype_budget_cost(archetype)
+	}
+	if tactical {
+		// Two extra roles use the extra budget exactly. The remaining random
+		// roster keeps the classic seed stream and slot budget unchanged.
+		for archetype in ([?]Enemy_Archetype{.Chaser, .Archer}) {
+			enemy_archetypes[enemy_archetype_count] = archetype
+			enemy_archetype_count += 1
+			remaining_budget -= enemy_archetype_budget_cost(archetype)
+		}
 	}
 	for remaining_budget > 0 {
 		remaining_slots := profile.encounter_config.max_enemies-enemy_archetype_count

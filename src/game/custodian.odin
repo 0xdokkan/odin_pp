@@ -6,6 +6,8 @@ CUSTODIAN_PROTECT_RANGE :: 2
 CUSTODIAN_SHIELD_AMOUNT :: 3
 CUSTODIAN_SHIELD_PULSES :: 2
 
+custodian_shield_amount :: proc(room: ^Room) -> i32 { return 2 if tactical_enabled(room) else CUSTODIAN_SHIELD_AMOUNT }
+
 custodian_has_support_line :: proc(room: ^Room, origin, target: grid.Position) -> bool {
 	distance := abs(origin.x-target.x)+abs(origin.y-target.y)
 	if distance <= 0 || distance > CUSTODIAN_PROTECT_RANGE {
@@ -30,11 +32,11 @@ plan_custodian_intent :: proc(
 	best_id: u32
 	best_score := max(int)
 	for &ally in room.enemies {
-		if ally.id == enemy.id || !custodian_has_support_line(room, origin, ally.position) {
+		if ally.id == enemy.id || (tactical_enabled(room) && ally.archetype == .Custodian) || !custodian_has_support_line(room, origin, ally.position) {
 			continue
 		}
 		shield, shielded := status_for_entity(room, enemy_entity(ally.id), .Shield)
-		if shielded && shield.potency >= CUSTODIAN_SHIELD_AMOUNT {
+		if shielded && shield.potency >= custodian_shield_amount(room) {
 			continue
 		}
 		score := abs(ally.position.x-room.player.position.x)+abs(ally.position.y-room.player.position.y)
@@ -60,7 +62,7 @@ plan_custodian_intent :: proc(
 	best_distance := max(int)
 	best_id = 0
 	for ally in room.enemies {
-		if ally.id == enemy.id {
+		if ally.id == enemy.id || (tactical_enabled(room) && ally.archetype == .Custodian) {
 			continue
 		}
 		distance := abs(origin.x-ally.position.x)+abs(origin.y-ally.position.y)
@@ -95,7 +97,7 @@ resolve_custodian_protection :: proc(room: ^Room, enemy: ^Enemy, pulse: ^Pulse_R
 	intent := enemy.intent
 	source := enemy_entity(enemy.id)
 	enemy.intent = {}
-	enemy.recovery_pulses = 1
+	enemy.recovery_pulses = 2 if tactical_enabled(room) else 1
 	pulse.enemy_actions += 1
 	ally_index, found := enemy_index_by_id(room, intent.protected_ally.id)
 	if enemy.position != intent.origin || !found ||
@@ -113,7 +115,7 @@ resolve_custodian_protection :: proc(room: ^Room, enemy: ^Enemy, pulse: ^Pulse_R
 	action := make_action(.Trigger, source, entity_target(intent.protected_ally), .Entity)
 	// Enemy effects are followed by the same pulse's status tick.
 	added := add_effect(&action, apply_status_effect(intent.protected_ally, .Shield,
-		CUSTODIAN_SHIELD_AMOUNT, CUSTODIAN_SHIELD_PULSES+1))
+		custodian_shield_amount(room), CUSTODIAN_SHIELD_PULSES+1))
 	assert(added)
 	report := resolve_action(room, &action)
 	assert(report.accepted)

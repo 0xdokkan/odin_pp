@@ -3,6 +3,22 @@ package main
 import "core:testing"
 
 @(test)
+test_tactical_larger_visibility_and_camera_options :: proc(t: ^testing.T) {
+	options := DEFAULT_RUNTIME_OPTIONS
+	testing.expect_value(t, options.tactical.vision_size, 7)
+	testing.expect(t, options.perspective && options.scene_3d)
+	for argument in ([?]string{"--vision=5", "--vision=7", "--orthographic"}) {
+		handled, ok := apply_runtime_option(&options, argument)
+		testing.expect(t, handled && ok)
+	}
+	testing.expect_value(t, options.tactical.vision_size, 7)
+	testing.expect(t, !options.perspective)
+	handled, valid := apply_runtime_option(&options, "--vision=9")
+	testing.expect(t, handled && valid)
+	testing.expect_value(t, options.tactical.vision_size, 9)
+}
+
+@(test)
 test_runtime_options_accept_reproducible_seed_speed_and_report_path :: proc(t: ^testing.T) {
 	options := DEFAULT_RUNTIME_OPTIONS
 	testing.expect(t, !options.debug_abilities)
@@ -42,6 +58,8 @@ test_runtime_options_reject_invalid_values_without_mutation :: proc(t: ^testing.
 		"--seed=", "--seed=-1", "--seed=0x", "--seed=18446744073709551616", "--seed=12xyz",
 		"--animation-speed=0", "--animation-speed=5", "--animation-speed=NaN",
 		"--animation-speed=Inf", "--animation-speed=2junk", "--playtest-output=", "--sprites=",
+		"--decision-time=0", "--decision-time=61", "--decision-time=NaN",
+		"--vision=1", "--vision=4", "--qte-time=NaN", "--qte-time=0", "--qte-time=6",
 	}
 	for argument in invalid {
 		handled, ok := apply_runtime_option(&options, argument)

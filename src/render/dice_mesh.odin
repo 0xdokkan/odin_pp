@@ -2,6 +2,7 @@ package render
 
 import "core:math"
 import rl "vendor:raylib"
+import rlgl "vendor:raylib/rlgl"
 
 DICE_BEVEL :: f32(0.08)
 DICE_BODY_TRIANGLES :: 44
@@ -138,7 +139,8 @@ dice_lit_face_color :: proc(normal: rl.Vector3) -> rl.Color {
 		u8(min(f32(255), 43*brightness+190*specular)), 255}
 }
 
-draw_dice_mesh :: proc(mesh: ^Dice_Bevel_Mesh, position: rl.Vector3, orientation: rl.Quaternion, numbering: ^Dice_Numbering) {
+draw_dice_mesh :: proc(mesh: ^Dice_Bevel_Mesh, position: rl.Vector3, orientation: rl.Quaternion, numbering: ^Dice_Numbering, resin: bool = false) {
+	if resin { draw_resin_die(mesh, position, orientation, numbering); return }
 	for triangle in mesh.triangles[:mesh.count] {
 		normal := rl.Vector3RotateByQuaternion(triangle.normal, orientation)
 		a := rl.Vector3RotateByQuaternion(triangle.points[0], orientation)+position
@@ -161,4 +163,41 @@ draw_dice_mesh :: proc(mesh: ^Dice_Bevel_Mesh, position: rl.Vector3, orientation
 			}
 		}
 	}
+}
+
+resin_die_vertex :: proc(local, position: rl.Vector3, orientation: rl.Quaternion) {
+	world := rl.Vector3RotateByQuaternion(local, orientation)+position
+	rlgl.TexCoord2f(local.x+local.z+0.5, local.y+local.z*0.5+0.5)
+	rlgl.Vertex3f(world.x, world.y, world.z)
+}
+
+draw_resin_die :: proc(mesh: ^Dice_Bevel_Mesh, position: rl.Vector3, orientation: rl.Quaternion, numbering: ^Dice_Numbering) {
+	rlgl.SetTexture(rlgl.GetTextureIdDefault())
+	rlgl.Begin(rlgl.TRIANGLES)
+	rlgl.Color4ub(RESIN_WALL.r, RESIN_WALL.g, RESIN_WALL.b, 255)
+	for triangle in mesh.triangles[:mesh.count] {
+		n := rl.Vector3RotateByQuaternion(triangle.normal, orientation)
+		rlgl.Normal3f(n.x, n.y, n.z)
+		for point in triangle.points { resin_die_vertex(point, position, orientation) }
+	}
+	// Pale inlaid pips stay readable against the blue-black moulded body.
+	rlgl.Color4ub(190, 220, 244, 255)
+	for face in 0..<6 {
+		normal, _, _ := dice_face_basis(i32(face+1))
+		n := rl.Vector3RotateByQuaternion(normal, orientation)
+		rlgl.Normal3f(n.x, n.y, n.z)
+		u, v := numbering.u[face], numbering.v[face]
+		pips, count := dice_pip_positions(numbering.values[face])
+		for pip in pips[:count] {
+			center := normal*0.502+u*pip.x+v*pip.y
+			for segment in 0..<DICE_PIP_SEGMENTS {
+				a, b := f32(segment)*2*math.PI/DICE_PIP_SEGMENTS, f32(segment+1)*2*math.PI/DICE_PIP_SEGMENTS
+				resin_die_vertex(center, position, orientation)
+				resin_die_vertex(center+(u*math.cos(a)+v*math.sin(a))*0.068, position, orientation)
+				resin_die_vertex(center+(u*math.cos(b)+v*math.sin(b))*0.068, position, orientation)
+			}
+		}
+	}
+	rlgl.End()
+	rlgl.SetTexture(0)
 }

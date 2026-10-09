@@ -149,14 +149,15 @@ draw_run_map :: proc(
 	run: ^game.Run_State,
 	canvas_width, canvas_height: f32,
 	hovered_node: game.Node_Id = game.INVALID_NODE_ID,
-	shop_hovered: bool = false,
+	shop_hovered: bool = false, theme: ^Renderer = nil,
 ) {
 	assert(run != nil)
 	room_number := min(run.cleared_count+1, len(run.route_map.layer_starts))
 
-	rl.DrawRectangle(0, 0, c.int(canvas_width), 92, rl.Color{15, 18, 21, 255})
-	rl.DrawText("ROUTE", 28, 22, 24, rl.Color{225, 229, 224, 255})
-	rl.DrawText(
+	menu_rectangle(theme, 0, 0, c.int(canvas_width), 92, rl.Color{15, 18, 21, 255})
+	title: cstring = "TORRE CONQUISTATA" if menu_themed(theme) && run.phase == .Victory else "ROUTE"
+	menu_text(theme, title, 28, 22, 24, rl.Color{225, 229, 224, 255})
+	menu_text(theme,
 		fmt.ctprintf("%s    NODE %d/%d    HP %d/%d    GOLD %d",
 			game.run_phase_name(run.phase),
 			room_number,
@@ -178,24 +179,24 @@ draw_run_map :: proc(
 			assert(ok)
 			target_center := run_node_center(run, target, canvas_width, canvas_height)
 			color := edge_color(run, &source, target)
-			rl.DrawLineEx(to_raylib(source_center), to_raylib(target_center), 3, color)
+			menu_line(theme, to_raylib(source_center), to_raylib(target_center), 3, color)
 		}
 	}
 
 	for &node in run.route_map.nodes {
 		center := run_node_center(run, &node, canvas_width, canvas_height)
 		fill, outline := node_colors(run, &node)
-		rl.DrawCircleV(to_raylib(center), RUN_NODE_RADIUS+3, rl.Color{19, 23, 26, 255})
-		rl.DrawCircleV(to_raylib(center), RUN_NODE_RADIUS, fill)
-		rl.DrawCircleLinesV(to_raylib(center), RUN_NODE_RADIUS, outline)
+		menu_circle(theme, to_raylib(center), RUN_NODE_RADIUS+3, rl.Color{19, 23, 26, 255})
+		menu_circle(theme, to_raylib(center), RUN_NODE_RADIUS, fill)
+		menu_circle_lines(theme, to_raylib(center), RUN_NODE_RADIUS, outline)
 		if node.id == hovered_node {
-			rl.DrawCircleLinesV(to_raylib(center), RUN_NODE_RADIUS+5, rl.Color{245, 238, 216, 255})
+			menu_circle_lines(theme, to_raylib(center), RUN_NODE_RADIUS+5, rl.Color{245, 238, 216, 255})
 		}
 
 		symbol := node_symbol(node.kind)
 		font_size: c.int = 16
-		text_width := rl.MeasureText(symbol, font_size)
-		rl.DrawText(
+		text_width := menu_measure_text(theme, symbol, font_size)
+		menu_text(theme,
 			symbol,
 			c.int(center.x)-text_width/2,
 			c.int(center.y)-font_size/2,
@@ -203,8 +204,8 @@ draw_run_map :: proc(
 			rl.Color{245, 238, 216, 255},
 		)
 		label := fmt.ctprintf("%s", game.node_kind_name(node.kind))
-		label_width := rl.MeasureText(label, 12)
-		rl.DrawText(label, c.int(center.x)-label_width/2, c.int(center.y)+26, 12, rl.Color{137, 148, 145, 255})
+		label_width := menu_measure_text(theme, label, 12)
+		menu_text(theme, label, c.int(center.x)-label_width/2, c.int(center.y)+26, 12, rl.Color{137, 148, 145, 255})
 	}
 	if run.phase == .Choose_Path && run.shop.offer_count > 0 && game.validate_shop_state(run) {
 		bounds := run_shop_button_bounds(canvas_width, canvas_height)
@@ -216,11 +217,11 @@ draw_run_map :: proc(
 			outline = rl.Color{246, 207, 92, 255}
 			label_color = outline
 		}
-		rl.DrawRectangleRec(bounds, fill)
-		rl.DrawRectangleLinesEx(bounds, 2, outline)
+		menu_rectangle_rec(theme, bounds, fill)
+		menu_outline(theme, bounds, 2, outline)
 		label: cstring = "SHOP"
-		label_width := rl.MeasureText(label, 14)
-		rl.DrawText(
+		label_width := menu_measure_text(theme, label, 14)
+		menu_text(theme,
 			label,
 			c.int(bounds.x+bounds.width*0.5)-label_width/2,
 			c.int(bounds.y+bounds.height*0.5)-7,
@@ -228,5 +229,5 @@ draw_run_map :: proc(
 			label_color,
 		)
 	}
-	rl.DrawFPS(c.int(canvas_width)-96, 18)
+
 }

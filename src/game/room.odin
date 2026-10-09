@@ -43,6 +43,7 @@ Player :: struct {
 	deck:     Deck_State,
 	relics:   Relic_State,
 	dice:     Dice_State,
+	tactical: Tactical_State,
 }
 
 create_player :: proc(stats: Player_Stats) -> (Player, bool) {
@@ -103,6 +104,10 @@ Enemy :: struct {
 	boss_phase:      i32,
 	boss_cycle:      u32,
 	boss_approach_pulses: i32,
+	aim_ready: bool,
+	aim_anchor: grid.Position,
+	bomb_ready: bool,
+	bomb_anchor: grid.Position,
 }
 
 Trap :: struct {
@@ -173,7 +178,7 @@ Room :: struct {
 	obstacles:     [dynamic]Obstacle,
 	objects:       [dynamic]Grid_Object,
 	loot:          [dynamic]Loot,
-	// Scratch BFS riutilizzato solo durante la pianificazione, senza allocazioni al pulse.
+	// Campo delle distanze condiviso; M7 usa costi pesati per i pericoli.
 	enemy_path_distances: []int,
 	enemy_path_queue:     []grid.Position,
 	next_enemy_id:  u32,
@@ -181,6 +186,8 @@ Room :: struct {
 	next_object_id: u32,
 	pulse_count:   u64,
 	recent_events: Event_Log,
+	tactical_pulse: Tactical_Pulse,
+	qte: QTE_State,
 	reaction_bindings: Reaction_Binding_Set,
 }
 
@@ -509,6 +516,7 @@ create_room :: proc(level_data: ^level.Level, player: ^Player, content: Room_Con
 	}
 	player.position = spawn_position
 	clear_statuses(&player.statuses)
+	begin_tactical_room(&result)
 	begin_room_relics(&result)
 	if result.phase == .Combat {
 		plan_enemy_intents(&result)
@@ -619,6 +627,16 @@ finish_player_combat_command :: proc(room: ^Room) -> (
 	outcome = player_command_outcome_for_phase(room.phase)
 	if outcome != .Combat_Continues {
 		sync_deck_with_room_phase(room)
+		tactical_end_combat(room)
+		return
+	}
+	if tactical_enabled(room) {
+		if room.player.tactical.phase != .Preparation {
+			room.tactical_pulse.pending = true
+			room.tactical_pulse.forced = false
+			room.player.tactical.phase = .Resolving
+			room.player.tactical.metrics.decisions += 1
+		}
 		return
 	}
 	pulse = advance_combat_pulse(room)
@@ -669,6 +687,7 @@ sign :: proc(value: int) -> int {
 }
 
 try_move_player :: proc(room: ^Room, direction: Move_Direction) -> Action_Result {
+	if !tactical_allows_action(room) { return .Invalid_Phase }
 	if room == nil || room.player == nil || (room.phase != .Combat && room.phase != .Loot) {
 		return .Invalid_Phase
 	}
@@ -749,6 +768,7 @@ try_move_player :: proc(room: ^Room, direction: Move_Direction) -> Action_Result
 }
 
 wait_player_turn :: proc(room: ^Room) -> Action_Result {
+	if !tactical_allows_action(room) { return .Invalid_Phase }
 	if room == nil || room.phase != .Combat {
 		return .Invalid_Phase
 	}

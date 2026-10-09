@@ -7,6 +7,7 @@ plan_bomber_intent :: proc(
 	predicted_positions: ^[MAX_ENEMIES_PER_ROOM]grid.Position,
 	enemy_count, ordered_index: int, reserved_bombs: []grid.Position,
 ) -> Enemy_Intent {
+	if tactical_enabled(room) { return plan_tactical_bomber(room, enemy, origin, predicted_positions, enemy_count, ordered_index, reserved_bombs) }
 	distance := abs(origin.x-room.player.position.x)+abs(origin.y-room.player.position.y)
 	if distance >= 2 && distance <= 5 &&
 	   active_bomb_count(room)+len(reserved_bombs) < MAX_ACTIVE_BOMBS &&

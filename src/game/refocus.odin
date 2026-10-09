@@ -58,7 +58,7 @@ refocus_player_hand :: proc(room: ^Room) -> (refocus: Refocus_Report) {
 	if room == nil || room.player == nil {
 		return
 	}
-	if room.phase != .Combat {
+	if room.phase != .Combat || !tactical_allows_action(room) {
 		refocus.result = .Invalid_Phase
 		return
 	}
@@ -120,6 +120,16 @@ refocus_player_hand :: proc(room: ^Room) -> (refocus: Refocus_Report) {
 		refocus.energy_after = deck.energy
 		return
 	case .Combat_Continues:
+	}
+
+	if tactical_enabled(room) {
+		room.tactical_pulse.refill = true
+		for card_outcome in refocus.hand_report.outcomes[:refocus.hand_report.outcome_count] {
+			if card_outcome.destination == .Exhaust { room.tactical_pulse.exhaust_relic = true }
+		}
+		refocus.result = .Refocused
+		refocus.energy_after = deck.energy
+		return
 	}
 
 	for deck.hand_count < deck.rules.hand_size {

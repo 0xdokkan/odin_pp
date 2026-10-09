@@ -13,8 +13,14 @@
 *.ll
 /odin_pp
 /odin_pp_playtest_*.json
+/odin_pp_input_*.txt
 
 # Segreti
 .env
 .env.*
 !.env.example
+
+# Prove rigenerabili M7
+/odin_pp_m7_*.png
+/odin_pp_m7_*.json
+/*.m7_*.json

@@ -37,10 +37,11 @@ play_card :: proc(room: ^Room, card_id: u32, target: Target) -> (play: Card_Play
 	if room == nil || room.player == nil {
 		return
 	}
-	if room.phase != .Combat {
+	if room.phase != .Combat || !tactical_allows_action(room, true) {
 		play.result = .Invalid_Phase
 		return
 	}
+	if !tactical_target_visible(room, target) { play.result = .Action_Rejected; return }
 	clear_event_log(&room.recent_events)
 	deck := &room.player.deck
 	if !deck.combat_active || !validate_deck_state(deck) {
@@ -54,7 +55,7 @@ play_card :: proc(room: ^Room, card_id: u32, target: Target) -> (play: Card_Play
 		return
 	}
 	play.card = deck.hand[hand_index]
-	definition, definition_found := card_definition_by_id(play.card.definition_id)
+	definition, definition_found := card_definition_by_id(play.card.definition_id, tactical_enabled(room))
 	if !definition_found || !validate_card_instance(play.card) || !validate_card_definition(&definition) {
 		play.result = .Invalid_Card
 		return
@@ -130,6 +131,14 @@ play_card :: proc(room: ^Room, card_id: u32, target: Target) -> (play: Card_Play
 		play.energy_after = deck.energy
 		return
 	case .Combat_Continues:
+	}
+
+	if tactical_enabled(room) {
+		room.tactical_pulse.deferred_draws += 1
+		if room.player.tactical.phase == .Preparation { room.player.tactical.metrics.prepared_cards += 1 }
+		play.result = .Played
+		play.energy_after = deck.energy
+		return
 	}
 
 	play.drawn_card, play.drew_card = draw_card(deck)

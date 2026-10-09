@@ -11,6 +11,7 @@ Window_Config :: struct {
 	minimum_window_width, minimum_window_height: int,
 	target_fps:                                 int,
 	initial_scale_mode:                          view.Scale_Mode,
+	pixel_art: bool,
 }
 
 Window :: struct {
@@ -70,7 +71,7 @@ set_scale_mode :: proc(window: ^Window, mode: view.Scale_Mode) {
 	window.scale_mode = mode
 
 	filter := rl.TextureFilter.BILINEAR
-	if mode == .Integer {
+	if mode == .Integer || window.config.pixel_art {
 		filter = .POINT
 	}
 	rl.SetTextureFilter(window.canvas.texture, filter)

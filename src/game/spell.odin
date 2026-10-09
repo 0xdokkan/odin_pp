@@ -25,7 +25,7 @@ query_spell_path :: proc(room: ^Room, instance: Card_Instance, target: Target) -
 		path.error = .Invalid_Room
 		return
 	}
-	definition, found := card_definition_by_id(instance.definition_id)
+	definition, found := card_definition_by_id(instance.definition_id, tactical_enabled(room))
 	if !found { return }
 	request, has_request := card_target_request_from_target(room, definition, target)
 	if !has_request { return }
@@ -52,7 +52,7 @@ query_spell_path :: proc(room: ^Room, instance: Card_Instance, target: Target) -
 			for entity in path.targets[:path.count] {
 				visited = visited || entity.id == enemy.id
 			}
-			if visited || enemy.health <= 0 { continue }
+			if visited || enemy.health <= 0 || !tactical_card_enemy_in_area(room, instance.definition_id, enemy.position) { continue }
 			distance := int(abs(origin.x-enemy.position.x)+abs(origin.y-enemy.position.y))
 			if distance <= 0 || distance > SPELL_BOUNCE_RANGE ||
 			   !shape_cell_has_clear_path(room, origin, enemy.position) { continue }
@@ -211,7 +211,7 @@ resolve_played_card_action :: proc(
 		action := compiled^
 		action.visual_group = 1
 		origin := room.player.position
-		definition, _ := card_definition_by_id(instance.definition_id)
+		definition, _ := card_definition_by_id(instance.definition_id, tactical_enabled(room))
 		query := evaluate_card_targeting(room, instance, card_target_request_at(definition, target.cell))
 		impact := spell_card_event(.Spell_Impact, instance, origin, target.cell)
 		for cell in query.query.affected.cells[:query.query.affected.count] {

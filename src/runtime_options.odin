@@ -2,9 +2,14 @@ package main
 
 import "core:strconv"
 import "core:strings"
+import game "game"
 
 Runtime_Options :: struct {
 	seed: u64,
+	tactical: game.Tactical_Config,
+	scene_3d: bool,
+	perspective: bool,
+	m7_smoke, m7_view_smoke: bool,
 	animation_speed: f32,
 	debug_abilities: bool,
 	playtest_output: string,
@@ -13,7 +18,7 @@ Runtime_Options :: struct {
 	dice_lab: bool,
 }
 
-DEFAULT_RUNTIME_OPTIONS :: Runtime_Options{seed = 0xC0FFEE, animation_speed = 1}
+DEFAULT_RUNTIME_OPTIONS :: Runtime_Options{seed = 0xC0FFEE, animation_speed = 1, tactical = game.DEFAULT_TACTICAL_CONFIG, scene_3d = true, perspective = true}
 
 // Il parser standard della toolchain non segnala overflow degli interi.
 parse_run_seed :: proc(value: string) -> (seed: u64, ok: bool) {
@@ -49,6 +54,32 @@ parse_run_seed :: proc(value: string) -> (seed: u64, ok: bool) {
 apply_runtime_option :: proc(options: ^Runtime_Options, argument: string) -> (handled, ok: bool) {
 	if options == nil {
 		return false, false
+	}
+	if argument == "--classic" { options.tactical.enabled = false; options.scene_3d = false; return true, true }
+	if argument == "--m7" { options.tactical.enabled = true; return true, true }
+	if argument == "--flat" { options.scene_3d = false; return true, true }
+	if argument == "--perspective" { options.perspective = true; return true, true }
+	if argument == "--orthographic" { options.perspective = false; return true, true }
+	if argument == "--no-fog" { options.tactical.vision_size = 0; return true, true }
+	if argument == "--smoke-m7" { options.m7_smoke = true; return true, true }
+	if argument == "--smoke-m7-view" { options.m7_view_smoke = true; return true, true }
+	if strings.has_prefix(argument, "--decision-time=") {
+		value, valid := strconv.parse_int(argument[len("--decision-time="):])
+		valid = valid && value >= 1 && value <= 60
+		if valid { options.tactical.timer_seconds = value }
+		return true, valid
+	}
+	if strings.has_prefix(argument, "--vision=") {
+		value, valid := strconv.parse_int(argument[len("--vision="):])
+		valid = valid && value != 0 && game.valid_tactical_vision(value)
+		if valid { options.tactical.vision_size = value }
+		return true, valid
+	}
+	if strings.has_prefix(argument, "--qte-time=") {
+		value, valid := strconv.parse_f32(argument[len("--qte-time="):])
+		valid = valid && value >= 0.2 && value <= 5
+		if valid { options.tactical.qte_seconds = value }
+		return true, valid
 	}
 	if strings.has_prefix(argument, "--seed=") {
 		seed, valid := parse_run_seed(argument[len("--seed="):])

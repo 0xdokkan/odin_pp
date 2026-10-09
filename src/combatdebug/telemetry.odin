@@ -241,7 +241,7 @@ capture_card_descriptor :: proc(
 		return
 	}
 	card := room.player.deck.hand[hand_index]
-	definition, definition_found := game.card_definition_by_id(card.definition_id)
+	definition, definition_found := game.card_definition_by_id(card.definition_id, game.tactical_enabled(room))
 	if !definition_found {
 		return
 	}
@@ -271,7 +271,7 @@ capture_card_descriptor :: proc(
 				planned_targets = 1
 			}
 		case .Each_Enemy:
-			planned_targets = len(room.enemies)
+			for enemy in room.enemies { if game.tactical_card_enemy_in_area(room, card.definition_id, enemy.position) { planned_targets += 1 } }
 		case .Each_Affected_Enemy:
 			planned_targets = evaluation.query.enemy_count
 		case .Player, .Count:

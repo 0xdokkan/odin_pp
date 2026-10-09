@@ -31,6 +31,9 @@ Enemy_Intent :: struct {
 	damage:                i32,
 	planned_pulse:         u64,
 	protected_ally:        Entity_Ref,
+	windup:                bool,
+	target_object:         u32,
+	push:                  bool,
 }
 
 enemy_intent_kind_name :: proc(kind: Enemy_Intent_Kind) -> string {
@@ -178,6 +181,7 @@ make_attack_intent :: proc(
 // Campo delle distanze statiche al player. Gli attori vengono considerati dalle
 // prenotazioni del singolo passo, cosi le destinazioni restano ordinate per ID.
 rebuild_enemy_path_distances :: proc(room: ^Room) {
+	if tactical_enabled(room) { rebuild_tactical_enemy_distances(room, room.enemy_path_distances, .Melee); return }
 	for &distance in room.enemy_path_distances {
 		distance = -1
 	}
@@ -252,6 +256,7 @@ plan_chaser_intent :: proc(
 		}
 		index, _ := grid.index_of(&room.level_data.tiles, target)
 		distance := room.enemy_path_distances[index]
+		if tactical_enabled(room) && distance >= 0 { distance += enemy_terrain_danger(room, target) }
 		if distance < 0 || distance >= best_distance {
 			continue
 		}
@@ -272,6 +277,7 @@ plan_archer_intent :: proc(
 	enemy_count, ordered_index: int,
 ) -> Enemy_Intent {
 	assert(room != nil && room.player != nil && enemy != nil && predicted_positions != nil)
+	if tactical_enabled(room) { return plan_tactical_archer(room, enemy, origin, predicted_positions, enemy_count, ordered_index) }
 	player_position := room.player.position
 	distance := abs(player_position.x-origin.x)+abs(player_position.y-origin.y)
 	if distance == 1 {
@@ -457,7 +463,7 @@ validate_enemy_intent_structure :: proc(room: ^Room, intent: ^Enemy_Intent) -> b
 		}
 		return true
 	case .Bombard:
-		if intent.path_count != 0 || intent.damage != EXPLOSIVE_DAMAGE ||
+		if intent.path_count != 0 || intent.damage != (TACTICAL_BOMB_DAMAGE if tactical_enabled(room) else EXPLOSIVE_DAMAGE) ||
 		   !base_cell_is_walkable(room, intent.destination) || obstacle_at(room, intent.destination) {
 			return false
 		}
@@ -571,6 +577,13 @@ plan_enemy_intents :: proc(room: ^Room) {
 			enemy.intent.kind = .Recover
 			continue
 		}
+		if tactical_enabled(room) && !enemy.bomb_ready && !enemy.aim_ready {
+			if escape, fleeing := tactical_enemy_escape(room, origin, &predicted_positions, enemy_count, ordered_index); fleeing {
+				enemy.intent = escape
+				predicted_positions[ordered_index] = escape.destination
+				continue
+			}
+		}
 		intent: Enemy_Intent
 		switch enemy.archetype {
 		case .Chaser:
@@ -612,10 +625,25 @@ plan_enemy_intents :: proc(room: ^Room) {
 		case .Count:
 			unreachable()
 		}
+		if tactical_enabled(room) && enemy.archetype == .Brute && intent.kind == .Attack {
+			step, _, aligned := orthogonal_step_and_distance(origin, intent.threatened_cells[0])
+			if aligned {
+				center := intent.threatened_cells[0]
+				for sign in ([?]int{-1, 1}) {
+					cell := grid.Position{center.x+step.y*sign, center.y+step.x*sign}
+					if grid.contains(&room.level_data.tiles, cell) && shape_cell_has_clear_path(room, origin, cell) {
+						intent.threatened_cells[intent.threatened_cell_count] = cell
+						intent.threatened_cell_count += 1
+					}
+				}
+			}
+		}
 		if intent.kind == .Bombard {
 			bomb_anchors[bomb_anchor_count] = intent.destination
 			bomb_anchor_count += 1
 		}
+		if tactical_enabled(room) && (enemy.archetype == .Brute || enemy.archetype == .Demolitionist) &&
+		   (intent.kind == .Attack || intent.kind == .Charge) { intent.push = true }
 		if intent.kind == .Move || intent.kind == .Charge {
 			predicted_positions[ordered_index] = intent.destination
 		}
@@ -660,7 +688,7 @@ record_enemy_attack_miss :: proc(
 	})
 }
 
-resolve_enemy_intents :: proc(room: ^Room, pulse: ^Pulse_Report) {
+resolve_enemy_intents :: proc(room: ^Room, pulse: ^Pulse_Report, only_id: u32 = 0) {
 	assert(room != nil && room.player != nil && pulse != nil)
 	if room.phase != .Combat {
 		return
@@ -673,6 +701,7 @@ resolve_enemy_intents :: proc(room: ^Room, pulse: ^Pulse_Report) {
 	// cancel protection merely because it has a lower spawn ID. Player-forced
 	// displacement has already happened and still breaks the frozen intent.
 	for ordered_index in 0..<enemy_count {
+		if only_id != 0 && ids[ordered_index] != only_id { continue }
 		enemy_index, found := enemy_index_by_id(room, ids[ordered_index])
 		if !found || room.enemies[enemy_index].intent.kind != .Protect {
 			continue
@@ -681,12 +710,14 @@ resolve_enemy_intents :: proc(room: ^Room, pulse: ^Pulse_Report) {
 		assert(validate_enemy_intent_structure(room, &enemy.intent))
 		protected_ids[protected_count] = enemy.id
 		protected_count += 1
+		if interrupt_staggered_enemy(room, enemy, pulse) { continue }
 		resolve_custodian_protection(room, enemy, pulse)
 		if room.phase != .Combat {
 			return
 		}
 	}
 	for ordered_index in 0..<enemy_count {
+		if only_id != 0 && ids[ordered_index] != only_id { continue }
 		already_resolved := false
 		for id in protected_ids[:protected_count] {
 			if id == ids[ordered_index] {
@@ -703,6 +734,7 @@ resolve_enemy_intents :: proc(room: ^Room, pulse: ^Pulse_Report) {
 		}
 		enemy := &room.enemies[enemy_index]
 		assert(validate_enemy_intent_structure(room, &enemy.intent))
+		if interrupt_staggered_enemy(room, enemy, pulse) { continue }
 		intent := enemy.intent
 		enemy.intent = {}
 		source := enemy_entity(enemy.id)
@@ -718,16 +750,53 @@ resolve_enemy_intents :: proc(room: ^Room, pulse: ^Pulse_Report) {
 			continue
 		case .Bombard:
 			pulse.enemy_actions += 1
+			if intent.windup {
+				enemy.bomb_ready = enemy.position == intent.origin
+				enemy.bomb_anchor = intent.destination
+				if !enemy.bomb_ready { enemy.recovery_pulses = 1; record_enemy_attack_miss(pulse, source, enemy.position, intent.destination) }
+				continue
+			}
+			enemy.bomb_ready = false
 			enemy.recovery_pulses = 1
 			begin_demolitionist_offense(enemy, intent.kind)
+			if tactical_enabled(room) { enemy.recovery_pulses = max(enemy.recovery_pulses, TACTICAL_BOMBER_RECOVERY) }
 			if enemy.position != intent.origin ||
+			   (tactical_enabled(room) && (active_bomb_count(room) >= TACTICAL_BOMB_LIMIT || !enemy_has_lob_line(room, enemy.position, intent.destination))) ||
 			   !spawn_bomb(room, source, intent.destination, &pulse.events) {
 				record_enemy_attack_miss(pulse, source, enemy.position, intent.destination)
 			}
 			continue
 		case .Attack:
 			pulse.enemy_actions += 1
+			if intent.windup {
+				enemy.aim_ready = enemy.position == intent.origin
+				enemy.aim_anchor = intent.threatened_cells[0]
+				if !enemy.aim_ready { enemy.recovery_pulses = 1; record_enemy_attack_miss(pulse, source, enemy.position, enemy.aim_anchor) }
+				continue
+			}
+			enemy.aim_ready = false
 			begin_demolitionist_offense(enemy, intent.kind)
+			if tactical_enabled(room) { enemy.recovery_pulses = max(i32(1), enemy.recovery_pulses) }
+			if intent.target_object != 0 {
+				object_index, present := object_index_by_id(room, intent.target_object)
+				if enemy.position != intent.origin || !present ||
+				   room.objects[object_index].position != intent.threatened_cells[0] ||
+				   !enemy_has_lob_line(room, enemy.position, intent.threatened_cells[0]) {
+					record_enemy_attack_miss(pulse, source, enemy.position, intent.threatened_cells[0])
+					continue
+				}
+				action := make_action(.Attack, source, entity_target(object_entity(intent.target_object)), .Entity)
+				added := add_effect(&action, damage_effect(object_entity(intent.target_object), intent.damage))
+				assert(added)
+				report := resolve_action(room, &action)
+				merge_action_report(pulse, &report)
+				if room.phase != .Combat { return }
+				continue
+			}
+			if room.tactical_pulse.cancel_attack == enemy.id {
+				record_enemy_attack_miss(pulse, source, enemy.position, intent.threatened_cells[0])
+				continue
+			}
 			if enemy.position != intent.origin ||
 			   !enemy_intent_cell_is_threatened(&intent, room.player.position) ||
 			   (enemy.archetype == .Archer &&
@@ -746,6 +815,7 @@ resolve_enemy_intents :: proc(room: ^Room, pulse: ^Pulse_Report) {
 			report := resolve_action(room, &action)
 			assert(report.accepted)
 			merge_action_report(pulse, &report)
+			resolve_tactical_enemy_push(room, source, &intent, &report, pulse)
 			if report.player_defeated || room.phase != .Combat {
 				return
 			}
@@ -777,6 +847,11 @@ resolve_enemy_intents :: proc(room: ^Room, pulse: ^Pulse_Report) {
 			pulse.enemy_actions += 1
 			enemy.recovery_pulses = 1
 			begin_demolitionist_offense(enemy, intent.kind)
+			if tactical_enabled(room) { enemy.recovery_pulses = max(i32(2), enemy.recovery_pulses) }
+			if room.tactical_pulse.cancel_attack == enemy.id {
+				record_enemy_attack_miss(pulse, source, enemy.position, intent.threatened_cells[0])
+				continue
+			}
 			if !enemy_charge_path_is_clear(room, enemy_index, &intent) {
 				record_event(&pulse.events, {
 					kind = .Move_Blocked,
@@ -816,6 +891,7 @@ resolve_enemy_intents :: proc(room: ^Room, pulse: ^Pulse_Report) {
 			attack_report := resolve_action(room, &attack_action)
 			assert(attack_report.accepted)
 			merge_action_report(pulse, &attack_report)
+			resolve_tactical_enemy_push(room, source, &intent, &attack_report, pulse)
 			if attack_report.player_defeated || room.phase != .Combat {
 				return
 			}
