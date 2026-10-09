@@ -14,6 +14,9 @@ Config :: struct {
 	enable_audio: bool,
 	// Bars around the canvas when the window aspect differs; zero means black.
 	letterbox_color: rl.Color,
+	// Automation: report the window as focused even in the background, so
+	// focus-loss pauses do not interfere with scripted captures.
+	force_focus:     bool,
 }
 
 Host :: struct {
@@ -33,6 +36,7 @@ Host :: struct {
 	frame_cursor:  int,
 	last_settings: Settings,
 	letterbox:     rl.Color,
+	force_focus:   bool,
 }
 
 // Opens the window and the shared services. The host is heap-allocated
@@ -50,6 +54,7 @@ create :: proc(config: Config) -> (^Host, bool) {
 	h.ui = gui.create(&h.theme)
 	h.profile_path = config.profile_path
 	h.letterbox = config.letterbox_color if config.letterbox_color.a != 0 else rl.BLACK
+	h.force_focus = config.force_focus
 	if config.profile_path != "" {
 		h.profile, _ = profile_load(config.profile_path)
 	} else {
@@ -136,7 +141,7 @@ step :: proc(h: ^Host) -> bool {
 
 	mouse, inside := app.mouse_canvas_position(&h.window)
 	canvas := rl.Rectangle{0, 0, f32(h.window.config.canvas_width), f32(h.window.config.canvas_height)}
-	window_focused := rl.IsWindowFocused()
+	window_focused := h.force_focus || rl.IsWindowFocused()
 	frame := Frame{
 		dt             = dt,
 		time           = h.time,

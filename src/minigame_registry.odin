@@ -1,11 +1,18 @@
 package main
 
 import host "engine/host"
+import arena "minigames/arena"
 
-// Minigames offered by the menu and by run challenges, in display order.
-MINIGAME_COUNT :: 0
+// Minigames offered by the menu and by run challenges, in display order. The
+// order also feeds challenge selection (seed modulo count), so appending keeps
+// earlier seeds stable while reordering does not.
+MINIGAME_COUNT :: 1
 
 minigame_info :: proc(index: int) -> (host.Minigame_Info, bool) {
+	switch index {
+	case 0:
+		return arena.info(), true
+	}
 	return {}, false
 }
 

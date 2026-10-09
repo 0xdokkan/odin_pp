@@ -12,7 +12,7 @@ package input
 
 import rl "vendor:raylib"
 
-MAX_BINDINGS :: 4
+MAX_BINDINGS :: 6
 
 Binding_Kind :: enum u8 {
 	None,

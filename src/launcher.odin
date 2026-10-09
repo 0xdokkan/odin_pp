@@ -19,6 +19,9 @@ Launch_Options :: struct {
 	difficulty: int,
 	// --smoke-menu: capture odin_pp_menu.png after a few frames and quit.
 	smoke_menu: bool,
+	// --smoke-minigame=<id>: play <id> without the intro, capture
+	// odin_pp_<id>.png after a few seconds and quit.
+	smoke_minigame: string,
 }
 
 split_launch_arguments :: proc(args: []string) -> (Launch_Options, [dynamic]string) {
@@ -36,6 +39,9 @@ split_launch_arguments :: proc(args: []string) -> (Launch_Options, [dynamic]stri
 			launch.difficulty = 2
 		case arg == "--smoke-menu":
 			launch.smoke_menu = true
+		case strings.has_prefix(arg, "--smoke-minigame="):
+			launch.smoke_minigame = arg[len("--smoke-minigame="):]
+			launch.minigame = launch.smoke_minigame
 		case:
 			append(&rest, arg)
 		}
@@ -56,8 +62,9 @@ run_launcher :: proc(options: Runtime_Options, launch: Launch_Options) {
 	h, ok := host.create(host.Config{
 		window          = window,
 		profile_path    = profile_path(),
-		enable_audio    = true,
+		enable_audio    = launch.smoke_minigame == "" && !launch.smoke_menu,
 		letterbox_color = render.LETTERBOX_COLOR,
+		force_focus     = launch.smoke_minigame != "",
 	})
 	if !ok {
 		fmt.eprintln("could not open the window")
@@ -70,7 +77,14 @@ run_launcher :: proc(options: Runtime_Options, launch: Launch_Options) {
 	if launch.minigame != "" {
 		index := minigame_index_by_id(launch.minigame)
 		if info, found := minigame_info(index); found {
-			host.push_scene(h, info.create(launcher_minigame_config(menu)))
+			scene := info.create(launcher_minigame_config(menu))
+			if launch.smoke_minigame != "" {
+				if shell := host.shell_of(&scene); shell != nil {
+					host.shell_skip_intro(shell)
+				}
+				scene.after_present = minigame_smoke_after_present
+			}
+			host.push_scene(h, scene)
 		} else {
 			fmt.eprintf("unknown minigame: %s\n", launch.minigame)
 		}
@@ -143,6 +157,16 @@ launcher_after_present :: proc(data: rawptr, frame: ^host.Frame) {
 	l.frames += 1
 	if l.frames == 30 {
 		rl.TakeScreenshot("odin_pp_menu.png")
+		host.quit(frame)
+	}
+}
+
+// Three seconds of play, then a capture named after the minigame.
+@(private = "file")
+minigame_smoke_after_present :: proc(data: rawptr, frame: ^host.Frame) {
+	if frame.index == 180 {
+		shell := cast(^host.Minigame_Shell)data
+		rl.TakeScreenshot(fmt.ctprintf("odin_pp_%s.png", shell.info.id))
 		host.quit(frame)
 	}
 }
@@ -231,7 +255,7 @@ launcher_update :: proc(data: rawptr, frame: ^host.Frame) {
 
 	// Bottom bar: difficulty, settings, quit.
 	diff_area := ui.cut_left(&bottom, 420)
-	ui.label(ctx, ui.cut_left(&diff_area, 110), "Difficolta", .Body, p.text_dim)
+	ui.label(ctx, ui.cut_left(&diff_area, 110), "Difficoltà", .Body, p.text_dim)
 	names := DIFFICULTY_NAMES
 	for i in 0..<3 {
 		r := ui.column(diff_area, 3, i, 8)
@@ -306,7 +330,7 @@ settings_update :: proc(data: rawptr, frame: ^host.Frame) {
 	}
 	ui.toggle(ctx, ui.row(rows, 7, 3, 6), "Audio disattivato", &s.muted)
 	ui.slider(ctx, ui.row(rows, 7, 4, 6), "Scuotimento", &s.screen_shake, 0, 1)
-	ui.slider(ctx, ui.row(rows, 7, 5, 6), "Sensibilita mouse", &s.mouse_sensitivity, 0.25, 3)
+	ui.slider(ctx, ui.row(rows, 7, 5, 6), "Sensibilità mouse", &s.mouse_sensitivity, 0.25, 3)
 	ui.toggle(ctx, ui.row(rows, 7, 6, 6), "Mostra FPS", &s.show_fps)
 	close := ui.cut_bottom(&inner, 40)
 	if ui.button(ctx, close, "Chiudi", primary = true) || (panel.opened > 0.1 && ui.back_pressed(ctx)) {

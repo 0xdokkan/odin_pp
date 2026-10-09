@@ -50,7 +50,8 @@ draw_text :: proc(theme: ^Theme, text: string, position: [2]f32, size := Text_Si
 	ctext := cstring_temp(text)
 	p := rl.Vector2{math.round(position.x), math.round(position.y)}
 	if shadow {
-		rl.DrawTextEx(font, ctext, p + {2, 2}, pixels, 1, rl.Color{0, 0, 0, 160})
+		// The shadow fades with the text, so animated labels stay clean.
+		rl.DrawTextEx(font, ctext, p + {2, 2}, pixels, 1, rl.Color{0, 0, 0, u8(160 * f32(color.a) / 255)})
 	}
 	rl.DrawTextEx(font, ctext, p, pixels, 1, color)
 }

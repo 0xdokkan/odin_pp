@@ -90,14 +90,26 @@ default_theme :: proc() -> Theme {
 	return Theme{palette = GOTHIC_PALETTE, roundness = 0.18, border = 2, padding = 10, spacing = 1}
 }
 
+// Printable ASCII plus Latin-1 letters, so Italian accents (àèéìòù) render.
+// raylib's default set stops at 126.
+FONT_CODEPOINTS :: 95 + 96
+
 // Rasterises the embedded pixel font once per size. Coverage is quantised so
 // glyphs stay crisp when the canvas is scaled.
 load_fonts :: proc(theme: ^Theme) {
 	bytes := #load("../../../assets/fonts/Jersey10-Regular.ttf")
 	sizes := TEXT_PIXELS
+	codepoints: [FONT_CODEPOINTS]rune
+	for i in 0..<95 {
+		codepoints[i] = rune(32 + i)
+	}
+	for i in 0..<96 {
+		codepoints[95+i] = rune(160 + i)
+	}
 	loaded := 0
 	for size in Text_Size {
-		font := rl.LoadFontFromMemory(".ttf", raw_data(bytes), c.int(len(bytes)), c.int(sizes[size]), nil, 0)
+		font := rl.LoadFontFromMemory(".ttf", raw_data(bytes), c.int(len(bytes)), c.int(sizes[size]),
+			raw_data(codepoints[:]), FONT_CODEPOINTS)
 		if font.texture.id == 0 {
 			theme.fonts[size] = rl.GetFontDefault()
 			continue

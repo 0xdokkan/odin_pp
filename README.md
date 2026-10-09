@@ -14,6 +14,7 @@ Per i dettagli delle API, ogni sezione rimanda ai sorgenti pertinenti.
 ## Indice
 
 - [Avvio](#avvio)
+- [Engine e minigiochi](#engine-e-minigiochi)
 - [Controlli e loop di gioco](#controlli-e-loop-di-gioco)
 - [M8: versione 0.4](#m8-versione-04)
 - [Modalità tattica M7](#modalità-tattica-m7)
@@ -73,8 +74,18 @@ o qualità grafica. `-o:none` permette build senza ottimizzazione. `--seed` acce
 decimale o esadecimale con prefisso `0x`; seed e percorso scelto rendono la run
 riproducibile per la versione corrente del generatore.
 
+Senza argomenti si apre il **menu**: la run del roguelike, i minigiochi con i
+record, la difficoltà e le impostazioni (volumi, scuotimento, sensibilità del
+mouse, FPS), salvate con i record in `odin_pp/profilo.json` nella cartella dati
+dell'utente. Smoke, laboratori e report di playtest avviano la run direttamente,
+come prima.
+
 | Opzione | Uso |
 |---|---|
+| `--run` | salta il menu ed entra subito nella run |
+| `--minigame=<id>` | apre un minigioco sopra il menu (`platform2d`, `platform3d`, `arena`, `fps`, `puzzle`) |
+| `--easy`, `--hard` | difficoltà iniziale dei minigiochi dal menu |
+| `--smoke-menu` | cattura `odin_pp_menu.png` dopo 30 frame ed esce |
 | `--animation-speed=2` | velocità delle animazioni ordinarie, fra 0.25x e 4x; non accelera cast o dadi M8 |
 | `--fast` | velocità 4x |
 | `--spell-lab` | arena con Firebomb, Fate Strike, Chain Lightning, Sundering Blow e Guard |
@@ -88,6 +99,70 @@ Nei laboratori le carte sono già in mano, nell'ordine indicato; `F5` ricrea
 l'arena con un nuovo seed. Restano attivi costi, pulse e risposta dei nemici.
 Usare i laboratori senza opzioni smoke o report di playtest. Gli smoke grafici
 mantengono velocità 1x per rendere riproducibile la cattura.
+
+## Engine e minigiochi
+
+Il roguelike e i minigiochi girano sullo stesso engine, in
+[src/engine](src/engine): tredici package piccoli, senza dipendenze dal gioco,
+ognuno con i propri test headless. Le parti di sola logica (casualità, tempo,
+fisica, layout dell'interfaccia, sintesi audio, salvataggi) non chiamano Raylib.
+
+| Package | Contenuto |
+|---|---|
+| [rng](src/engine/rng) | stream xorshift64* con derivazione splitmix per dominio, range senza bias, pesi, shuffle; lo usano anche mazzo, dadi ed economia del roguelike |
+| [timing](src/engine/timing) | accumulatore a passo fisso con limite di recupero, timer e cooldown |
+| [tween](src/engine/tween) | curve di easing, smoothing indipendente dal frame rate, tween tipizzati |
+| [pool](src/engine/pool) | pool a capacità fissa con handle generazionali |
+| [physics](src/engine/physics) | rettangoli, cerchi e raggi; tile map 2D con piattaforme attraversabili, raycast DDA e move-and-slide; controller platform (coyote time, jump buffer, salto variabile, doppio salto, wall jump, dash); mappe voxel con collisioni e raycast 3D e controller platform 3D |
+| [input](src/engine/input) | azioni logiche su tastiera, mouse e gamepad con rimappatura; fronti pressed/released calcolati da campioni puri |
+| [audio](src/engine/audio) | effetti procedurali in stile sfxr, musica chiptune generata in loop, codifica WAV; senza dispositivo audio ogni chiamata è nulla |
+| [ui](src/engine/ui) | interfaccia immediata: pulsanti, interruttori, slider, tessere, pannelli, testo a capo; comandi di disegno registrati e resi in un punto, focus da tastiera e pad, layout a tagli di rettangolo, font pixel incorporato |
+| [camera](src/engine/camera) | camera 2D con zona morta, limiti e scuotimento a "trauma"; camera in prima persona e orbitale in terza persona |
+| [fx](src/engine/fx) | particelle a pool fisso 2D/3D, popup, flash e hit stop |
+| [gfx](src/engine/gfx) | sprite pixel art scritti come righe di caratteri, billboard, shader con sole, luce puntiforme e nebbia, mesh di voxel con facce nascoste rimosse, fondali procedurali |
+| [save](src/engine/save) | JSON versionato scritto in modo atomico, percorsi per utente |
+| [host](src/engine/host) | finestra, ciclo dei frame, stack di scene, profilo con impostazioni e record, guscio dei minigiochi |
+
+### Scene
+
+Ogni modalità è una `host.Scene`: dati propri sull'heap e procedure `update`,
+`draw` (canvas), `draw_window` (overlay in coordinate di finestra, come i dadi
+3D), `after_present` (screenshot), `resume` (la scena sopra è stata chiusa,
+con un eventuale `host.Result`) e `destroy`. Lo stack ha due regole: sotto una
+scena **modal** non si aggiorna nulla, sotto una scena **opaque** non si
+disegna nulla. `push`, `pop`, `replace` e `quit` sono comandi accodati e
+applicati a fine frame, quindi nessuna scena viene distrutta mentre è in uso.
+I widget di `ui` vanno chiamati in `update`, così stanno sopra al mondo di ogni
+scena; il mondo si disegna in `draw`.
+
+Il roguelike è la scena [roguelike_scene.odin](src/roguelike_scene.odin): lo
+stato che prima viveva nelle variabili locali di `main` è in
+`Roguelike_Session`, sull'heap. Il setup è diviso fra `roguelike_prepare`
+(run, stanza e smoke headless, senza finestra) e `roguelike_attach` (risorse
+GPU sulla finestra dell'host).
+
+### Contratto dei minigiochi
+
+Un minigioco è un package in [src/minigames](src/minigames) con due procedure:
+`info() -> host.Minigame_Info` (id, titolo, genere, descrizione, comandi,
+colore) e `create(host.Minigame_Config) -> host.Scene`. La configurazione porta
+seed, difficoltà (0-2) e il flag `challenge` per le sfide della run, che sono
+più brevi e hanno un solo tentativo. Il gioco implementa `Minigame_Hooks`
+(`reset`, `step`, `draw`, `score`, `destroy`, musica, cattura del mouse) e
+`host.minigame_scene` aggiunge il guscio comune: scheda iniziale con i comandi,
+pausa con `Esc` o quando la finestra perde il focus, risultati con stelle,
+punteggio e record, riprova. La simulazione di ogni minigioco è pura, a passo
+fisso e deterministica per seed e input; i test la guidano senza finestra.
+Il catalogo per menu e sfide è in [minigame_registry.odin](src/minigame_registry.odin).
+
+### Sfide nella run
+
+In una stanza di combattimento o Elite ripulita, una volta per stanza, il
+pulsante **Sfida minigioco** (o `G`) apre un minigioco scelto dal seed del nodo,
+con difficoltà crescente con la profondità. La run vede solo l'esito: una
+vittoria vale 4/8/12/18 oro per 0-3 stelle, sconfitta e abbandono non danno
+nulla e non tolgono nulla. Le regole sono in
+[minigame_challenge.odin](src/game/minigame_challenge.odin).
 
 ## Controlli e loop di gioco
 
@@ -143,6 +218,9 @@ a Victory, la morte del player a Defeat.
 | `F1`, `F2`, `F3` | scaling fit con letterbox, integer, stretch |
 | `F4` | cambia velocità delle animazioni ordinarie: 1x, 2x, 4x; cast e dadi M8 restano a 1x |
 | `F11` | fullscreen borderless |
+| `G` / Sfida minigioco | in una stanza ripulita (Loot), una volta per stanza: apre un minigioco di sfida |
+| `F9` | diagnostica dell'host: FPS, grafico dei frame, stack delle scene |
+| `F10` | torna al menu (run avviata dal menu) |
 
 Per spostare un barile serve **Shove in mano, un'energia e adiacenza
 ortogonale**. Trascinare la carta sul corpo del barile oppure selezionarla e
@@ -660,7 +738,10 @@ temporanei. Per i report interattivi vedere [Telemetria](#telemetria-e-playtest)
 
 | Percorso | Responsabilità |
 |---|---|
-| [src/main.odin](src/main.odin) | composizione della demo, schermate e transizioni |
+| [src/main.odin](src/main.odin) | punto di ingresso, preparazione e installazione delle stanze demo, comandi di gioco |
+| [src/roguelike_scene.odin](src/roguelike_scene.odin) | la run come scena dell'host: stato della sessione, schermate e transizioni |
+| [src/launcher.odin](src/launcher.odin), [minigame_registry.odin](src/minigame_registry.odin) | menu, impostazioni e catalogo dei minigiochi |
+| [src/engine](src/engine), [src/minigames](src/minigames) | engine condiviso e minigiochi (vedi [Engine e minigiochi](#engine-e-minigiochi)) |
 | [src/app](src/app) | finestra, canvas virtuale e presentazione |
 | [src/grid](src/grid) | `Grid(T)`, coordinate, memoria contigua, accesso sicuro |
 | [src/level](src/level) | tile, layout e validazione topologica BFS |
