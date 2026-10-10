@@ -1,4 +1,4 @@
-# Odin PP — versione 0.4 / M8
+# Odin PP — versione 0.4 / M8 e fondazioni M9
 
 Vertical slice di un roguelike con deck building, griglia logica 2D, ambiente
 realmente 3D a blocchi e personaggi sprite pixel art, scritto in Odin con Raylib.
@@ -6,6 +6,9 @@ La run attraversa sette livelli di una rotta
 procedurale, fra combattimenti, ricompense e nodi speciali, fino al Demolitore.
 Carte, spinte, esplosivi, status e reliquie condividono una simulazione
 deterministica, separata dalle animazioni.
+Le fondazioni M9 aggiungono modalità autonome con movimento continuo:
+arena libera, ring 1v1 e una prova FPS, con collisioni e strumenti condivisi.
+Il combattimento tattico della 0.4 conserva le proprie regole a griglia.
 
 Questo README raccoglie la documentazione del progetto: uso della demo,
 contratti dei sistemi, riferimenti per sviluppare e lavoro ancora pianificato.
@@ -16,6 +19,7 @@ Per i dettagli delle API, ogni sezione rimanda ai sorgenti pertinenti.
 - [Avvio](#avvio)
 - [Controlli e loop di gioco](#controlli-e-loop-di-gioco)
 - [M8: versione 0.4](#m8-versione-04)
+- [M9: fondazioni per le modalità libere](#m9-fondazioni-per-le-modalità-libere)
 - [Modalità tattica M7](#modalità-tattica-m7)
 - [Verifica e smoke test](#verifica-e-smoke-test)
 - [Architettura e ownership](#architettura-e-ownership)
@@ -74,6 +78,9 @@ riproducibile per la versione corrente del generatore.
 | `--spell-lab` | arena con Firebomb, Fate Strike, Chain Lightning, Sundering Blow e Guard |
 | `--dice-lab` | arena con Fate Strike, Sundering Blow, Prismatic Barrage, Twin Venom e Guard |
 | `--dice-set-lab` | tavolo 3D del set D4/D6/D8/D10/D%/D12/D20: selezione, lancio e rotazione con il mouse |
+| `--engine-lab` / `--arena-lab` | arena libera con collisioni, dummy e strumenti M9 |
+| `--ring-lab` | ring 1v1 di pratica con strumenti M9; non assegna sblocchi |
+| `--fps-lab` | prova FPS con strumenti M9 e due livelli selezionabili |
 | `--sprites=/percorso/sprites.json` | manifest grafico alternativo |
 | `--debug-abilities` | abilita gli shortcut di debug `C` e `V` |
 | `--playtest-report` | registra una sessione interattiva |
@@ -86,6 +93,9 @@ il profilo o i risultati dei dadi del gameplay. I sette modelli sono disponibili
 nel renderer; le carte attuali continuano a usare soltanto D4 e D6.
 Usare i laboratori senza opzioni smoke o report di playtest. Gli smoke grafici
 mantengono velocità 1x per rendere riproducibile la cattura.
+I laboratori M9 richiedono gli asset tattici e non si combinano con `--classic`,
+altri laboratori, smoke o report. `--m9` è un alias del tattico corrente;
+non sostituisce il combattimento principale con il movimento libero.
 
 ## Controlli e loop di gioco
 
@@ -163,7 +173,7 @@ fra ricompense e offerte.
 |---|---|---|
 | Decisione, movimento, targeting, ologramma | scorre; le azioni non-carta aggiungono il proprio costo | avanzano sui beat del mondo |
 | Cast di una carta da `Ns` | scorre per la durata effettiva del cast, senza doppio addebito | fermi, compresa la presentazione nemica già in corso |
-| Dadi / cinematica, pausa, scheda personaggio o ring | fermo | fermi |
+| Dadi / cinematica, pausa, scheda personaggio o attività M9 | fermo | fermi |
 
 Il cast occupa i comandi del player per la durata indicata sulla carta. Un
 lancio di dadi all'interno della carta è una pausa completa aggiuntiva: non
@@ -245,7 +255,8 @@ profilo permanente. La prima versione offre questo drop; altri tipi di arma e
 oggetti attivi riutilizzeranno gli slot e il comando di attivazione.
 
 La barra sopra la mano mostra attivazione, numero di dispositivi, arma e usi.
-**ATTIVA**, **EQUIPAGGIA**, **PERSONAGGIO** e **SFIDA DEL RING** sono
+**ATTIVA**, **EQUIPAGGIA**, **PERSONAGGIO**, **SFIDA DEL RING**,
+**PROVA FPS** e **LABORATORIO M9** sono
 pulsanti usati **solo con il mouse**. Disegno e hitbox condividono le stesse
 coordinate; i comandi disabilitati non cliccano la board. **PERSONAGGIO**
 apre una scheda in pausa: modellino **realmente 3D** del player a sinistra,
@@ -256,15 +267,17 @@ Il danno mostrato include l'arma.
 ### Il Ring delle Ombre e gli sblocchi
 
 Nel Loot, prima di lasciare la stanza, il pulsante **SFIDA DEL RING** apre
-**una sfida per stanza** in un
-ring 3D con combattenti pixel ritagliati. Il gioco dell'arena rimane sospeso;
-il duello usa salute e stato propri. `A/D` muovono, `1` colpisce, `2` schiva e
-`3` afferra da vicino durante il recupero annunciato del campione. La presa ha
-quattro pose tenute per 0,3 s ciascuna: presa a due mani, sollevamento, lancio e
-impatto. La sconfitta non sottrae salute alla run. Il pulsante **ABBANDONA**
-conclude il tentativo come sconfitta; dopo l'esito diventa **TORNA ALLA STANZA**
-e riporta al Loot. Apertura, abbandono e ritorno si comandano con il mouse;
-`A/D` e `1/2/3` restano i controlli del combattimento del minigioco.
+**una sfida per stanza** in un ring 3D con combattenti pixel ritagliati.
+Il ring giocato usa ora la simulazione continua M9: `WASD` muovono sul piano,
+`1` esegue un pugno, `2` un colpo pesante, `3` una presa ravvicinata,
+`Spazio` schiva e `Shift` tiene la guardia. Tempi e collisioni sono descritti
+in [M9](#m9-fondazioni-per-le-modalità-libere).
+
+La stanza principale rimane sospesa e il duello usa salute e stato propri.
+La sconfitta non sottrae salute alla run. Cliccare **TORNA** durante il duello
+consuma il tentativo come sconfitta; dopo l'esito riporta al Loot senza
+riassegnare il premio. `Esc` oppure **PAUSA / RIPRENDI** sospendono e riprendono
+il duello. Apertura e ritorno si comandano con il mouse.
 
 | Traguardo persistente | Sblocco |
 |---|---|
@@ -296,11 +309,140 @@ in quattro pose. Si conservano corpi 2D, profondità 3D, blocchi plastici blu sc
 e HUD pixel. Dispositivi e campo hanno geometrie e rune dedicate, senza nascondere
 la griglia o mostrare nemici coperti dalla fog.
 
-**Il ring è il primo minigioco implementato.** FPS, platform, altri eventi e un
-picchiaduro 3D più articolato restano direzioni future. Non sono presenti una
-raccolta di minigiochi completa, ruote, un inventario esteso di consumabili o un
+Il ring introdotto in M8 è stato ampliato dalle fondazioni M9; una prima
+prova FPS è ora giocabile. Platform, altri eventi e un picchiaduro 3D più
+articolato restano direzioni future. Non sono presenti una raccolta di
+minigiochi completa, ruote, un inventario esteso di consumabili o un
 salvataggio/ripristino della run. Bilanciamento delle reti, durata dei cast e
-difficoltà del ring richiedono ancora partite umane.
+difficoltà delle sfide richiedono ancora partite umane.
+
+## M9: fondazioni per le modalità libere
+
+M9 aggiunge quattro incrementi giocabili alla base **0.4**: arena senza
+griglia, ring con mosse e collisioni, una prova FPS e strumenti per sviluppare
+questi contenuti. Non modifica pulse, cast, dadi, fog o regole del classico/M7.
+
+```sh
+./run.sh --engine-lab
+./run.sh --ring-lab
+./run.sh --fps-lab
+./run.sh --smoke-m9-view
+```
+
+Nella run, i pulsanti **SFIDA DEL RING**, **PROVA FPS** e **LABORATORIO M9**
+sono disponibili con il mouse durante Loot, a presentazione conclusa.
+L'attività possiede input e tempo finché non si preme **TORNA**. Stanza,
+salute, carte, RNG e pulse della run rimangono sospesi. Il frame di chiusura
+consuma anche il clic, impedendo che arrivi alla board.
+
+Soltanto **SFIDA DEL RING** dalla stanza può assegnare i traguardi M8, una
+volta per tentativo. FPS, arena libera, ring del laboratorio e tutte le
+modalità avviate da CLI sono pratica: non scrivono vittorie nel profilo e non
+sbloccano carte. Cambiare modalità nel laboratorio conserva questa distinzione.
+
+### Arena libera, corpi e tempo
+
+`engine` gestisce posizioni continue **X/Z con i piedi a Y=0**. I corpi sono
+capsule verticali; il movimento usa il loro cerchio orizzontale contro solidi
+AABB e altri personaggi. I test lungo l'intero spostamento impediscono di
+attraversare ostacoli sottili, mentre lo scivolamento permette di seguire una
+parete. Sprite, contorno illustrato e collider hanno dimensioni indipendenti.
+Raycast, layer World/Actor/Trigger e volumi evento sono condivisi fra le modalità.
+
+La simulazione procede a **60 tick al secondo**, indipendentemente dal
+rendering interpolato. Un frame recupera al massimo **8 tick**; un blocco più
+lungo scarta il tempo eccedente e lo registra in `dropped_seconds`. Pausa e
+perdita del focus svuotano tempo frazionario e input pendenti: la ripresa non
+scarica azioni arretrate. Dopo una perdita del focus è richiesta una ripresa
+esplicita. Il clock dei minigiochi non alimenta quello del tattico.
+
+L'arena libera parte nel cortile con pilastri e un avversario fermo. Con
+**LIVELLO** si passa alla galleria con coperture; **CAMBIA AVVERSARIO** attiva
+o disattiva l'IA. I corpi vengono registrati nuovamente a ogni cambio livello.
+
+### Ring 1v1
+
+| Input | Azione |
+|---|---|
+| `WASD` mantenuti | movimento continuo X/Z; diagonali normalizzate |
+| `1` | pugno rapido: 1 danno |
+| `2` | colpo pesante: 2 danni, maggiore portata e spinta |
+| `3` | presa ravvicinata e lancio: 3 danni |
+| `Spazio` + direzione | schivata; senza direzione arretra |
+| `Shift` mantenuto | guardia frontale e movimento rallentato |
+| `Esc` / **PAUSA**, **RIPRENDI** | sospende/riprende la modalità |
+| clic su **TORNA** | ritorna alla stanza oppure chiude il laboratorio CLI |
+
+Ogni mossa definisce startup, fotogrammi attivi, recupero, volume del colpo,
+danno, spinta, stordimento, hit-stop e finestre di concatenazione. La mossa
+iniziata conserva una copia dei dati: modificarla nel laboratorio ha effetto
+dal prossimo attacco. Un colpo può danneggiare ciascun avversario una sola
+volta; le concatenazioni del pugno richiedono un contatto e la finestra prevista.
+
+Body, hitbox e hurtbox sono separati. La guardia blocca i colpi frontali;
+la presa la supera. La schivata rende invulnerabili soltanto nei fotogrammi
+attivi e non attraversa i corpi. Colpi e prese rispettano la linea di vista
+fra i personaggi, anche quando la portata è aumentata dal laboratorio.
+L'IA alterna colpi pesanti annunciati e pugni, con aperture sfruttabili.
+
+Il lancio coordina due personaggi in **quattro pose da 18 tick**: aggancio,
+sollevamento, lancio e impatto. La sequenza occupa 72 tick di simulazione
+(1,2 s), oltre alla breve pausa d'impatto. Il danno arriva una sola volta e
+l'eventuale vittoria attende l'ultima posa. La destinazione si ferma al primo
+contatto con un ostacolo; l'arco verticale è una posa visiva, non un salto
+fisico. L'hit-stop ferma la simulazione del ring; un input breve può essere
+conservato nella finestra di concatenazione, senza accodare mosse durante
+l'intera presa.
+
+### Prova FPS
+
+La prova offre due stanze selezionabili, **Navata** e **Cortile**, con tre
+nemici, coperture e pilastri. Si vince eliminando i tre avversari; la salute
+parte da 100 ed è indipendente dalla run. Il movimento è relativo alla visuale,
+con collisioni degli stessi servizi dell'arena libera.
+
+`WASD` muovono, il mouse mira, il tasto sinistro mantenuto spara, `R` ricarica.
+L'arma ha **6 colpi nel caricatore e 30 di riserva**, danno 12, intervallo
+fra colpi di 0,24 s e ricarica di 1,2 s. I raycast colpiscono il primo corpo o
+solido: i nemici non possono essere colpiti attraverso le pareti. Gli avversari
+annunciano il tiro, conservano il punto mirato e attraversano un recupero.
+
+L'FPS entra in pausa. Il pulsante centrale **CLICCA QUI PER GIOCARE**, oppure
+**RIPRENDI** in alto, avvia la simulazione e cattura il mouse; `Esc`, perdita del focus,
+esito o uscita lo liberano. Il clic usato per riprendere non spara
+automaticamente: occorre rilasciare il pulsante prima del primo colpo.
+
+### Laboratorio e contenuti modificabili
+
+I laboratori CLI e **LABORATORIO M9** mostrano gli strumenti azionabili con
+il mouse: selezione Arena/Ring/FPS, reset, livello, collisioni, pausa e
+avanzamento di **1 TICK**. Il ring mostra anche hitbox e hurtbox. Il pannello
+delle mosse seleziona pugno, pesante o presa e modifica startup e danno;
+variando lo startup sposta anche la finestra di concatenazione, conservandone
+la posizione relativa al recupero. Le altre proprietà sono già dati
+strutturati nel package `fight`.
+
+**SALVA MOSSE** scrive `odin_pp_moves.json` nella directory di avvio, usando
+un file temporaneo e rinomina;
+**CARICA** valida versione, dimensione e tutte le definizioni prima di
+sostituire il set. Dati corrotti o finestre di concatenazione incompatibili
+vengono rifiutati senza modifiche parziali. Questi preset sono strumenti di
+pratica: una sfida della run parte con le mosse normali.
+
+**REGISTRA / FERMA REC** conserva lo stato iniziale e gli input di ogni tick.
+**REPLAY** ripristina quello stato, ignora i comandi di combattimento dal vivo
+e va in pausa al termine. La registrazione rimane **in memoria**, fino a
+18.000 tick (5 minuti), e non sopravvive a una nuova sessione o al cambio
+di modalità. Non è un replay salvato su disco né una registrazione della run.
+Durante registrazione/replay i controlli che cambierebbero contenuti o modalità
+sono disabilitati. Pausa, esecuzione al singolo tick e replay condividono il
+medesimo percorso di simulazione.
+
+Questa base non comprende gravità, salti fisici, scale o pendenze, piattaforme
+mobili, navmesh, corpi rigidi dinamici o un picchiaduro completo con catalogo
+di combo e personaggi. Le geometrie sono ancora definite in Odin: il selettore
+del laboratorio non è un editor di livelli. Rimangono da sviluppare questi
+controller e strumenti quando i prossimi minigiochi ne richiederanno l'uso.
 
 ## Modalità tattica M7
 
@@ -331,7 +473,8 @@ odin run src -o:none -- --classic
 | `--classic` / `--m7` | loop classico / tattico corrente M8; `--m7` resta un alias compatibile |
 | `--smoke-m7` | confronto headless riproducibile, senza aprire finestre |
 | `--smoke-m7-view` | prova grafica di scena, oggetti 3D, fog, ologramma, QTE e menu |
-| `--smoke-m8-view` | prova 3D di d4, dispositivi, equipaggiamento, scheda personaggio, ring e cambio stanza |
+| `--smoke-m8-view` | prova 3D di d4, dispositivi, equipaggiamento, scheda personaggio, compatibilità del ring M8 e cambio stanza |
+| `--smoke-m9-view` | arena continua, duello con IA, presa in quattro pose, replay e FPS con ricarica e vittoria |
 
 Gli smoke classici e i laboratori `--spell-lab` / `--dice-lab` conservano il comportamento classico;
 gli smoke `m7` esercitano il loop tattico aggiornato a M8.
@@ -550,7 +693,7 @@ si azzerano. Le statistiche cumulative della run rimangono. Un timeout chiude
 la finestra una sola volta, dopo la risoluzione del tempo già pagato; il secondo
 di recupero trascorre realmente, senza aggiungere una Wait o beat immediati.
 
-Dadi, QTE, pausa, scheda personaggio, ring e perdita del focus sospendono il
+Dadi, QTE, pausa, scheda personaggio, attività M9 e perdita del focus sospendono il
 countdown dell’arena. Cast, movimento, animazioni nemiche, hover, targeting e
 ologramma consumano tempo; durante il cast sono sospesi mondo e input ordinari.
 Consultare la mappa
@@ -609,12 +752,18 @@ verifica mirata sono:
 
 ```sh
 odin check src -vet -strict-style
-odin test src -all-packages -define:ODIN_TEST_THREADS=1 -o:none
-odin test src/game -o:none
-odin test src/render -o:none
-odin test src/combatdebug -o:none
+odin test src -all-packages -define:ODIN_TEST_THREADS=1 -o:none -out:/tmp/odin-pp-tests
+odin test src/game -o:none -out:/tmp/odin-pp-game-tests
+odin test src/render -o:none -out:/tmp/odin-pp-render-tests
+odin test src/combatdebug -o:none -out:/tmp/odin-pp-combatdebug-tests
+odin test src/engine -o:none -out:/tmp/odin-pp-engine-tests
+odin test src/fight -o:none -out:/tmp/odin-pp-fight-tests
+odin test src/shooter -o:none -out:/tmp/odin-pp-shooter-tests
 ```
 
+Specificare sempre `-out` nei test: il runner crea e rimuove il proprio binario;
+un output predefinito nella repo può interferire con una build del gioco omonima.
+`-o:none` evita il lungo passaggio di ottimizzazione durante lo sviluppo.
 Anche `src/grid`, `src/level` e `src/view` hanno test dedicati. I test del renderer
 verificano la logica testabile; gli smoke con finestra verificano anche la resa
 GPU. Un `libraylib.a` contenente `version https://git-lfs.github.com/spec/v1` è
@@ -627,8 +776,9 @@ le immagini sono output rigenerabili, non prerequisiti del checkout.
 
 | Flag | Screenshot / verifica |
 |---|---|
+| `--smoke-m9-view` | collisioni continue, vittoria contro l'IA del ring, quattro pose della presa, replay esatto, FPS con telegraph/ricarica/vittoria e ritorno; screenshot `odin_pp_m9_arena.png`, `ring.png`, `ring_grab_0.png`–`ring_grab_3.png`, `tools.png`, `fps.png` (prefisso comune `odin_pp_m9_`) |
 | `--smoke-arenas-view` | quattro fasce di arene reali, combattimento, ologramma, Loot e cambio stanza; screenshot `odin_pp_arenas_*.png` |
-| `--smoke-m8-view` | `odin_pp_m8_d4.png`, `devices`, `character`, `loot`, `ring_0`–`ring_3`, `next_room` (tutti con prefisso `odin_pp_m8_` e suffisso `.png`) |
+| `--smoke-m8-view` | dispositivi e compatibilità del ring M8: `odin_pp_m8_d4.png`, `devices`, `character`, `loot`, `ring_0`–`ring_3`, `next_room` (tutti con prefisso `odin_pp_m8_` e suffisso `.png`) |
 | `--smoke` | `odin_pp_isometric.png` |
 | `--smoke-generation` | `odin_pp_procedural_room.png` |
 | `--smoke-map` | `odin_pp_route.png` |
@@ -664,6 +814,11 @@ le immagini sono output rigenerabili, non prerequisiti del checkout.
 Gli smoke di spell e impatti controllano anche il completamento del replay;
 le preview non consumano RNG. Lo smoke sprite crea e rimuove asset diagnostici
 temporanei. Per i report interattivi vedere [Telemetria](#telemetria-e-playtest).
+Le regressioni M9 verificano simulazione invariata a 30/60/144 FPS, collisioni
+e raggi senza attraversamenti, finestre delle mosse, parata/schivata/prese,
+replay esatto, input al cambio focus e transizioni fra run e attività.
+[m9_transition_test.odin](src/m9_transition_test.odin) copre anche ricompense
+una sola volta, isolamento della pratica e chiusura senza click-through.
 
 ## Architettura e ownership
 
@@ -674,15 +829,21 @@ temporanei. Per i report interattivi vedere [Telemetria](#telemetria-e-playtest)
 | [src/grid](src/grid) | `Grid(T)`, coordinate, memoria contigua, accesso sicuro |
 | [src/level](src/level) | tile, layout e validazione topologica BFS |
 | [src/game](src/game) | simulazione, azioni, carte, run, generazione degli incontri |
+| [src/engine](src/engine) | clock fisso, corpi e solidi continui, collisioni, raycast, trigger e livelli riutilizzabili |
+| [src/fight](src/fight) | simulazione pura del ring X/Z, mosse, hit/hurtbox, IA, presa e hit-stop |
+| [src/shooter](src/shooter) | simulazione pura FPS, arma, munizioni, nemici e due livelli |
 | [src/view](src/view) | scaling, camera e proiezione testabili |
 | [src/render](src/render) | renderer Raylib, snapshot e timeline |
 | [src/combatdebug](src/combatdebug) | observer, scenari headless e report |
 | [src/gameplay_input.odin](src/gameplay_input.odin) | comandi logici, buffer e dispatcher |
 | [src/runtime_options.odin](src/runtime_options.odin) | opzioni della sessione |
-| [src/m8_session.odin](src/m8_session.odin) | modali personaggio/ring e persistenza del profilo di sblocco |
+| [src/m8_session.odin](src/m8_session.odin) | scheda personaggio, ingresso/ritorno dalle attività, ricevuta del ring e persistenza degli sblocchi |
+| [src/m9_session.odin](src/m9_session.odin) | proprietario di input/clock della modalità libera, pause, cursore, preset delle mosse e registrazione/replay |
+| [src/m9_lab.odin](src/m9_lab.odin), [m9_smoke.odin](src/m9_smoke.odin) | ciclo dei laboratori e verifica nativa riproducibile |
 | [src/game/board_device.odin](src/game/board_device.odin) | geometria condivisa, attivazione, scariche e cleanup dei dispositivi |
-| [src/game/m8_equipment.odin](src/game/m8_equipment.odin), [m8_ring.odin](src/game/m8_ring.odin) | armi a utilizzi, simulazione del ring e progressione |
+| [src/game/m8_equipment.odin](src/game/m8_equipment.odin), [m8_ring.odin](src/game/m8_ring.odin) | armi a utilizzi, progressione del ring e compatibilità della simulazione M8 precedente |
 | [src/render/cast_playback.odin](src/render/cast_playback.odin) | policy Live/Cast/Cinematic e durata visiva del cast |
+| [src/render/m9_world.odin](src/render/m9_world.odin), [m9_controls.odin](src/render/m9_controls.odin) | scena/camera delle modalità libere, interpolazione, HUD e controlli mouse condivisi |
 
 `grid` non conosce il gioco. `level` conosce la topologia, ma non difficoltà,
 nemici o tipi di nodo. `game` non dipende dal renderer o dalla telemetria;
@@ -695,6 +856,15 @@ isometrica. La profondità visiva non aggiunge movimento verticale. Il canvas vi
 possiede la propria `Grid(Tile)`. `Room` possiede nemici, trappole, ostacoli,
 oggetti, loot e scratch buffer, ma prende in prestito `^Level` e `^Player`.
 Il renderer possiede soltanto risorse e copie di presentazione.
+
+`engine`, `fight` e `shooter` non importano Raylib, `game` o la griglia tattica.
+Le due simulazioni libere possiedono ciascuna il proprio `engine.World` e
+dipendono soltanto dai servizi geometrici/temporali condivisi. `M9_Session`
+possiede la modalità corrente e la registrazione dinamica, liberata da
+`destroy_m9_session`. Il loop principale sospende l'aggiornamento tattico mentre
+questa sessione è aperta; il renderer non decide esiti o ricompense.
+Il risultato del ring passa attraverso `settle_ring_challenge`, mantenendo la
+progressione M8 senza usare il vecchio duello monodimensionale nel gioco live.
 
 La nuova stanza viene costruita in un `Room_Blueprint` e preparata con copie di
 player, livello e stanza. Si valida tutto prima del commit; un fallimento libera
@@ -1969,8 +2139,10 @@ convention. Raylib si importa con `import rl "vendor:raylib"`.
 
 Chiarire dati, proprietario, durata e procedure che possono mutarli prima di
 introdurre astrazioni. Mantenere simulazione senza finestra, renderer passivo,
-input trasformato in comandi e RNG isolati. La simulazione corrente avanza per
-pulse; il timestep fisso della fisica cosmetica non deve influenzarla.
+input trasformato in comandi e RNG isolati. Il tattico avanza con pulse e beat;
+la fisica cosmetica dei dadi non deve influenzarlo. Le modalità libere M9
+avanzano invece con il proprio tick fisso a 60 Hz, senza alimentare il clock
+della run sospesa.
 
 Preferire servizi richiesti dal gioco a ECS o generics anticipati. Misurare
 frame time, allocazioni e copie prima di ottimizzare; `mem.Tracking_Allocator`
@@ -2013,7 +2185,7 @@ invarianti e descritta dalla documentazione. Stati: `[x]` completata,
 | M4E | [x] | sei reliquie, acquisizione e sinergie |
 | M4F | [x] | spell, pool di dadi, catene, gruppi di impatto e laboratori |
 | M5 + M5A | [~] | M5A completata: cooperazione, composizioni e primo boss; restano altri elite/boss, evocazione, controllo e nuove geometrie nemiche |
-| M6 + M6A | [~] | M6A completata: sprite, GIF, sheet e clip; M8 salva gli sblocchi, restano salvataggio run, replay e ulteriori feedback |
+| M6 + M6A | [~] | M6A completata: sprite, GIF, sheet e clip; M8 salva gli sblocchi, M9 registra input in memoria; restano salvataggio run, replay su disco e ulteriori feedback |
 | M7 | [~] | prototipo M7A–M7F integrato; M7G attende playtest umano e bilanciamento |
 | M7A | [x] | timer decrescente e cicli di recupero locali alla stanza; statistiche cumulative della run |
 | M7B | [x] | visibilità locale 7×7 predefinita, confronto 2/3/5/7/9 senza memoria, ologramma 3D ruotabile e con countdown attivo |
@@ -2028,7 +2200,11 @@ invarianti e descritta dalla documentazione. Stati: `[x]` completata,
 | M7K | [x] | blocchi grigio-blu lucidi senza fondali, vista ampliata, stanze più grandi e due nemici aggiuntivi, schivata senza carte con recupero e dadi 3D coordinati |
 | M7L | [x] | catalogo tattico, interruzione/ricognizione/contrattacco, ruoli nemici e recuperi leggibili, pannello nemico e starter aggiornato; bilanciamento umano in M7G |
 | M8 / 0.4 | [x] | cast e cinematiche separati, Shock Floor/Tesla, arma a utilizzi, scheda 3D, ring giocabile con sblocchi persistenti e contorni da illustrazione |
-| Dopo M8 | [ ] | bilanciamento umano, altri oggetti/armi, minigiochi FPS/platform e nuove sfide; salvataggio completo della run |
+| M9A — arena libera | [x] | clock 60 Hz, movimento continuo X/Z, collisioni corpi/solidi, raycast, layer e livelli con coperture |
+| M9B — ring | [x] | duello live libero, mosse configurabili, guardia, schivata, presa a quattro pose, hit-stop e ritorno alla run con sblocco singolo |
+| M9C — FPS | [x] | due stanze, arma con caricatore/riserva/ricarica, tre nemici con telegraph, vittoria/sconfitta e gestione del cursore |
+| M9D — strumenti | [x] | laboratorio mouse, collider/hitbox, passo singolo, preset mosse JSON validati e replay degli input in memoria |
+| Dopo le fondazioni M9 | [ ] | playtest e bilanciamento, più mosse/armi/sfide, controller verticale e platform, editor dei livelli, replay su disco e salvataggio completo della run |
 
 ### M7: implementazione e verifiche storiche
 
@@ -2411,8 +2587,9 @@ Le policy temporali sono separate in `cast_playback.odin`, `frame_timeline.odin`
 e `tactical_controller.odin`; i costi restano centralizzati nel catalogo tattico.
 Geometria, preview e danno dei dispositivi condividono `board_device.odin`.
 `m8_equipment.odin` gestisce gli utilizzi senza cambiare l'attacco classico;
-`m8_ring.odin` separa il duello dall'arena e applica traguardi una sola volta.
-`m8_session.odin` possiede i modali e il file del profilo.
+`m8_ring.odin` conserva la progressione, i traguardi una sola volta e la
+simulazione originaria per compatibilità. Il duello live corrente è in `fight`;
+`m8_session.odin` possiede il passaggio alla sessione M9 e il file del profilo.
 
 I test coprono separazione dei clock, mancato doppio addebito, dadi e F4,
 scadenza a fine cast, rifiuti senza mutazioni, d4 con più bersagli, massimo
@@ -2488,6 +2665,37 @@ con 1.000 HP e un finisher scriptato attraverso il normale risolutore di effetti
 non dimostra il bilanciamento di una vittoria giocata manualmente.
 Il log distingue tempo CPU di generazione/simulazione e invio del disegno di
 mondo/ologramma, escludendo presentazione, vsync, PNG e completamento GPU.
+
+### M9: implementazione e verifica
+
+Le [fondazioni M9](#m9-fondazioni-per-le-modalità-libere) sono integrate nella
+base 0.4. Il controllo completo del 10 ottobre 2026 supera **829 test** in
+tutti i package, sia con assert sia senza, oltre a vet/strict-style e alle
+due build. Lo smoke nativo M9 verifica collisioni nell'arena, vittoria contro
+l'IA del ring con valori ordinari, presa in quattro pose, replay identico,
+FPS con attacco annunciato, ricarica, vittoria e ritorno fra modalità.
+Sulla stessa build passano anche il confronto headless M7 (dieci preset,
+quattro run terminali e otto cicli stress) e lo smoke 3D M8: dispositivi,
+equipaggiamento, loot e ingresso nella stanza successiva.
+
+Le regressioni coprono anche pareti sottili, collisioni veloci, colpi e prese
+ostruiti dai pilastri, lancio fermato al primo contatto, registrazione dei
+corpi dopo cambio livello, mancato click sui controlli nascosti, input al
+cambio focus e assegnazione singola degli sblocchi. Le prove scriptate
+dimostrano questi contratti; difficoltà, varietà delle mosse e qualità del
+ritmo restano da valutare con partite umane.
+
+Screenshot rigenerabili: `odin_pp_m9_arena.png`, `odin_pp_m9_ring.png`,
+`odin_pp_m9_fps.png`, `odin_pp_m9_tools.png` e le quattro pose
+`odin_pp_m9_ring_grab_0.png`–`odin_pp_m9_ring_grab_3.png`.
+
+Correzione dell'avvio FPS con il mouse: il precedente messaggio centrale era
+solo disegnato, mentre il clic era riconosciuto esclusivamente su **RIPRENDI**
+in alto. Ora il pannello centrale è un pulsante con disegno e hitbox condivisi,
+attivo solo durante una partita FPS in pausa. La ripresa è idempotente e
+consuma il clic senza sparare. Le regressioni seguono il percorso
+posizione del mouse → controllo → simulazione e verificano anche gli stati
+non riprendibili; l'avvio è stato confermato nella finestra macOS.
 
 
 ### M7G: lavoro restante dopo il prototipo

@@ -87,12 +87,13 @@ test_m8_mouse_navigation_closes_modals_without_click_through :: proc(t: ^testing
 	testing.expect(t, !session.character_open, "closing still consumes this frame's click")
 	input.mouse = m8_test_button_center(renderer, .Ring)
 	testing.expect(t, step_m8_session(&session, &room, renderer, &controller, &cards, &buffer, true, 0, input))
-	testing.expect(t, session.ring_open)
+	testing.expect(t, session.activity.mode == .Ring)
 	health := player.health
-	leave := render.m8_modal_control_bounds(renderer, .Leave_Ring)
+	leave := render.m9_control_bounds(renderer, .Leave)
 	input.mouse = {leave.x+leave.width/2, leave.y+leave.height/2}
+	input.activity.control=.Leave
 	testing.expect(t, step_m8_session(&session, &room, renderer, &controller, &cards, &buffer, true, 0, input))
-	testing.expect(t, !session.ring_open && session.ring.phase == .Lost && session.ring.settled)
+	testing.expect(t, session.activity.mode == .None && session.ring.phase == .Lost && session.ring.settled)
 	testing.expect_value(t, player.health, health)
 	testing.expect(t, room.ring_challenge_attempted)
 	input.mouse = m8_test_button_center(renderer, .Ring)

@@ -183,10 +183,10 @@ Tactical_Billboard :: struct {
 }
 
 // Rendering and picking share this world-space quad, including custom anchors.
-tactical_billboard_geometry :: proc(renderer: ^Renderer, key: Sprite_Key, position: view.Vec2) -> Tactical_Billboard {
+tactical_billboard_geometry :: proc(renderer: ^Renderer, key: Sprite_Key, position: view.Vec2, feedback: bool = true) -> Tactical_Billboard {
 	effective_key := key
 	clip_progress := f32(-1)
-	if key == .Player {
+	if feedback && key == .Player {
 		for offset in 0..<renderer_active_cue_count(renderer) {
 			cue, found := renderer_active_cue_at(renderer, offset)
 			if !found || !cue.started { continue }
@@ -225,7 +225,8 @@ tactical_billboard_geometry :: proc(renderer: ^Renderer, key: Sprite_Key, positi
 		size = {asset.width/64, asset.height/64}
 		anchor = {asset.anchor.x, asset.anchor.y}
 	}
-	pose := tactical_feedback_pose(renderer, key, position)
+	pose := Tactical_Feedback_Pose{scale_y=1,tint=rl.WHITE}
+	if feedback {pose=tactical_feedback_pose(renderer,key,position)}
 	size.y *= pose.scale_y
 	up := rl.Vector3{0, 1, 0}
 	right := rl.Vector3Normalize(rl.Vector3CrossProduct(up, renderer.tactical.camera.position-renderer.tactical.camera.target))

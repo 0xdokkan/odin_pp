@@ -4,7 +4,7 @@ import rl "vendor:raylib"
 import game "../game"
 import view "../view"
 
-M8_Control :: enum {None, Activate, Equip, Character, Ring}
+M8_Control :: enum {None, Activate, Equip, Character, Ring, FPS, Workshop}
 
 m8_control_bounds :: proc(renderer: ^Renderer, control: M8_Control) -> rl.Rectangle {
     if renderer == nil { return {} }
@@ -15,6 +15,8 @@ m8_control_bounds :: proc(renderer: ^Renderer, control: M8_Control) -> rl.Rectan
     case .Equip: return {b.x+width*2+54,b.y,100,b.height}
     case .Character: return {b.x+width*2+159,b.y,b.width-width*2-159,b.height}
     case .Ring: return {renderer.canvas_width-184,97,170,26}
+    case .FPS: return {renderer.canvas_width-184,131,170,26}
+    case .Workshop: return {renderer.canvas_width-184,165,170,26}
     case .None: return {}
     }
     return {}
@@ -32,13 +34,14 @@ m8_control_enabled :: proc(renderer: ^Renderer, room: ^game.Room, control: M8_Co
             game.weapon_slot_valid(equipment.reserve) && game.weapon_slot_valid(equipment.weapon)
     case .Character: return !renderer_timeline_is_busy(renderer)
     case .Ring: return room.phase == .Loot && !room.ring_challenge_attempted && !renderer_timeline_is_busy(renderer)
+    case .FPS,.Workshop: return room.phase == .Loot && !renderer_timeline_is_busy(renderer)
     case .None: return false
     }
     return false
 }
 
 m8_control_at_point :: proc(renderer: ^Renderer, room: ^game.Room, point: view.Vec2) -> M8_Control {
-    for control in ([4]M8_Control{.Activate,.Equip,.Character,.Ring}) {
+    for control in ([6]M8_Control{.Activate,.Equip,.Character,.Ring,.FPS,.Workshop}) {
         if m8_control_enabled(renderer,room,control) && point_in_rectangle(point,m8_control_bounds(renderer,control)) { return control }
     }
     return .None

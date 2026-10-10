@@ -65,6 +65,10 @@ draw_m8_active_bar :: proc(renderer: ^Renderer, room: ^game.Room) {
     if room.phase == .Loot && !room.ring_challenge_attempted {
         m8_mouse_button(renderer,m8_control_bounds(renderer,.Ring),"SFIDA DEL RING",m8_control_enabled(renderer,room,.Ring))
     }
+    if room.phase == .Loot {
+        m8_mouse_button(renderer,m8_control_bounds(renderer,.FPS),"PROVA FPS",m8_control_enabled(renderer,room,.FPS))
+        m8_mouse_button(renderer,m8_control_bounds(renderer,.Workshop),"LABORATORIO M9",m8_control_enabled(renderer,room,.Workshop))
+    }
 }
 
 // A faceted, genuinely volumetric inspectable miniature. Its lantern, mask,

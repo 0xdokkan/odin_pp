@@ -971,6 +971,13 @@ main :: proc() {
 	if options.m8_view_smoke { smoke_mode_count += 1 }
 	if options.arena_view_smoke { smoke_mode_count += 1 }
 	if options.dice_set_smoke { smoke_mode_count += 1 }
+	if options.m9_smoke {smoke_mode_count+=1}
+	if options.m9_lab != .None || options.m9_smoke {
+		if !options.tactical.enabled || options.spell_lab || options.dice_set_lab || options.dice_set_smoke ||
+		   (options.m9_lab != .None && smoke_mode_count>0) || playtest_report || len(options.playtest_output)>0 {
+			fmt.eprintln("M9 labs require tactical assets and cannot be combined with other labs, reports or smoke modes");os.exit(2)
+		}
+	}
 	if (options.dice_set_lab || options.dice_set_smoke) &&
 	   (!options.tactical.enabled || options.spell_lab || (options.dice_set_lab && smoke_mode_count > 0)) {
 		fmt.eprintln("dice set lab requires tactical mode and cannot be combined with another lab or smoke")
@@ -1027,7 +1034,8 @@ main :: proc() {
 	}
 	defer game.destroy_run(&run_state)
 	m8_session: M8_Session
-	if !smoke_test && !options.m7_smoke && !options.m7_view_smoke && !options.m8_view_smoke && !options.arena_view_smoke && !options.spell_lab && !options.dice_set_lab && !options.dice_set_smoke {
+	defer destroy_m9_session(&m8_session.activity)
+	if !smoke_test && !options.m7_smoke && !options.m7_view_smoke && !options.m8_view_smoke && !options.arena_view_smoke && !options.spell_lab && !options.dice_set_lab && !options.dice_set_smoke && options.m9_lab == .None && !options.m9_smoke {
 		run_state.player.m8_profile, m8_session.save_enabled = load_m8_profile(M8_PROFILE_PATH)
 		if !m8_session.save_enabled { fmt.eprintln("Profilo M8 non leggibile: file preservato, salvataggio disabilitato.") }
 	}
@@ -1074,6 +1082,7 @@ main :: proc() {
 		return
 	}
 	defer app.close(&window)
+	defer rl.EnableCursor()
 	dice_renderer: render.Dice_Renderer
 	if !render.create_dice_renderer(&dice_renderer) { fmt.eprintln("3D dice unavailable; using 2D die") }
 	defer render.destroy_dice_renderer(&dice_renderer)
@@ -1424,6 +1433,11 @@ main :: proc() {
 		if !run_m8_view_smoke(&window, &iso_renderer, &dice_renderer) { fmt.eprintln("M8 native smoke failed"); os.exit(2) }
 		return
 	}
+	if options.m9_lab != .None {run_m9_lab(&window,&iso_renderer,options.m9_lab);return}
+	if options.m9_smoke {
+		if !run_m9_view_smoke(&window,&iso_renderer) {fmt.eprintln("M9 native smoke failed");os.exit(2)}
+		return
+	}
 	if options.dice_set_lab || options.dice_set_smoke {
 		if !run_dice_set_lab(&window, &iso_renderer, &dice_renderer, options.dice_set_smoke) { fmt.eprintln("Dice set lab failed"); os.exit(2) }
 		return
@@ -1447,6 +1461,13 @@ main :: proc() {
 			m8_modal = update_m8_session(&m8_session, &room, &iso_renderer, &tactical_controller,
 				&card_interaction, &gameplay_buffer, run_state.phase == .In_Room &&
 				!show_route_map && !game.run_has_relic_choice(&run_state), frame_time, m8_mouse, m8_mouse_inside)
+		}
+		if m8_session.activity.mode != .None {
+			render.advance_sprite_assets(&iso_renderer.sprite_assets,frame_time)
+			app.begin_canvas(&window,render.RESIN_BACKGROUND)
+			draw_m9_session(&iso_renderer,&m8_session.activity)
+			app.present(&window,render.LETTERBOX_COLOR)
+			continue
 		}
 		if rl.IsKeyPressed(.F8) {
 			frame := Input_Diagnostic_Frame{dt = frame_time, focused = rl.IsWindowFocused(),
@@ -1483,9 +1504,9 @@ main :: proc() {
 				f32(window.config.canvas_height),
 				mouse_canvas,
 			)
-		restart_requested := rl.IsKeyPressed(.F5) ||
+		restart_requested := !m8_modal && (rl.IsKeyPressed(.F5) ||
 			(run_state.phase == .Defeat && rl.IsKeyPressed(.ENTER)) ||
-			(defeat_restart_hovered && rl.IsMouseButtonPressed(.LEFT))
+			(defeat_restart_hovered && rl.IsMouseButtonPressed(.LEFT)))
 		if restart_requested {
 			if playtest_session_ptr != nil {
 				if !playtest_report_written {
@@ -1519,7 +1540,8 @@ main :: proc() {
 			)
 			assert(restarted)
 			run_state.player.m8_profile = m8_profile
-			m8_session.character_open, m8_session.ring_open = false, false
+			m8_session.character_open = false
+			destroy_m9_session(&m8_session.activity)
 			if options.tactical.enabled {
 				configured := game.configure_tactical_room(&room, options.tactical)
 				assert(configured)
@@ -2214,10 +2236,6 @@ main :: proc() {
 			}
 		}
 		if m8_session.character_open { render.draw_m8_character_panel(&iso_renderer, &room) }
-		if m8_session.ring_open {
-			render.draw_m8_ring_overlay(&iso_renderer, &room, &m8_session.ring)
-			if len(m8_session.status) > 0 { rl.DrawText(fmt.ctprintf("%s", m8_session.status), 170, 500, 10, rl.LIGHTGRAY) }
-		}
 		app.present(&window, render.LETTERBOX_COLOR, overlay, &overlay_data)
 
 		if options.m7_view_smoke {
