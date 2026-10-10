@@ -310,6 +310,7 @@ TILE_FRAMES :: [6][16]string{
 
 Sprites :: struct {
 	player:  gfx.Sprite,
+	player_paper, ghoul_paper, bat_paper, totem_paper: gfx.Sprite,
 	ghoul:   gfx.Sprite,
 	bat:     gfx.Sprite,
 	totem:   gfx.Sprite,
@@ -359,13 +360,13 @@ sprites_create :: proc() -> Sprites {
 
 	pal = {}
 	gfx.palette_set(&pal, 'k', {20, 16, 26, 255})
-	gfx.palette_set(&pal, 'h', {58, 62, 84, 255})
-	gfx.palette_set(&pal, 'H', {92, 98, 126, 255})
+	gfx.palette_set(&pal, 'h', {177, 166, 144, 255})
+	gfx.palette_set(&pal, 'H', {234, 225, 204, 255})
 	gfx.palette_set(&pal, 'f', {26, 20, 32, 255})
-	gfx.palette_set(&pal, 'e', {255, 214, 120, 255})
-	gfx.palette_set(&pal, 'c', {156, 32, 46, 255})
-	gfx.palette_set(&pal, 'C', {204, 62, 66, 255})
-	gfx.palette_set(&pal, 'd', {98, 20, 34, 255})
+	gfx.palette_set(&pal, 'e', {146, 220, 255, 255})
+	gfx.palette_set(&pal, 'c', {39, 49, 65, 255})
+	gfx.palette_set(&pal, 'C', {81, 100, 120, 255})
+	gfx.palette_set(&pal, 'd', {22, 31, 44, 255})
 	gfx.palette_set(&pal, 's', {236, 226, 204, 255})
 	gfx.palette_set(&pal, 'b', {46, 42, 56, 255})
 	player_rows: [len(Player_Frame)][16]string
@@ -379,9 +380,9 @@ sprites_create :: proc() -> Sprites {
 	pal = {}
 	// Pale and sickly, so it reads against the red-lit slate.
 	gfx.palette_set(&pal, 'k', {14, 16, 12, 255})
-	gfx.palette_set(&pal, 'g', {138, 150, 112, 255})
-	gfx.palette_set(&pal, 'G', {186, 196, 150, 255})
-	gfx.palette_set(&pal, 'd', {84, 96, 70, 255})
+	gfx.palette_set(&pal, 'g', {152, 69, 72, 255})
+	gfx.palette_set(&pal, 'G', {211, 102, 96, 255})
+	gfx.palette_set(&pal, 'd', {91, 38, 47, 255})
 	gfx.palette_set(&pal, 'e', {255, 128, 64, 255})
 	gfx.palette_set(&pal, 't', {222, 212, 192, 255})
 	ghoul := GHOUL_FRAMES
@@ -389,8 +390,8 @@ sprites_create :: proc() -> Sprites {
 
 	pal = {}
 	gfx.palette_set(&pal, 'k', {16, 12, 20, 255})
-	gfx.palette_set(&pal, 'p', {70, 44, 84, 255})
-	gfx.palette_set(&pal, 'P', {108, 70, 124, 255})
+	gfx.palette_set(&pal, 'p', {40, 62, 82, 255})
+	gfx.palette_set(&pal, 'P', {83, 115, 145, 255})
 	gfx.palette_set(&pal, 'e', {255, 84, 64, 255})
 	bat := BAT_FRAMES
 	s.bat, _ = gfx.sprite_create({bat[0][:], bat[1][:]}, &pal)
@@ -436,9 +437,9 @@ sprites_create :: proc() -> Sprites {
 	gfx.palette_set(&pal, 'b', {48, 50, 66, 255})
 	gfx.palette_set(&pal, 'c', {64, 66, 86, 255})
 	gfx.palette_set(&pal, 'd', {86, 88, 110, 255})
-	gfx.palette_set(&pal, 't', {150, 136, 116, 255})
-	gfx.palette_set(&pal, 'T', {196, 180, 150, 255})
-	gfx.palette_set(&pal, 'm', {118, 62, 44, 255})
+	gfx.palette_set(&pal, 't', {113, 145, 170, 255})
+	gfx.palette_set(&pal, 'T', {166, 196, 216, 255})
+	gfx.palette_set(&pal, 'm', {65, 97, 122, 255})
 	// Ledge planks
 	gfx.palette_set(&pal, 'w', {120, 88, 64, 255})
 	gfx.palette_set(&pal, 'W', {164, 126, 90, 255})
@@ -460,11 +461,19 @@ sprites_create :: proc() -> Sprites {
 		tile_frames[i] = tiles[i][:]
 	}
 	s.tiles, _ = gfx.sprite_create(tile_frames[:], &pal)
+	s.player_paper = gfx.sprite_silhouette_create(s.player)
+	s.ghoul_paper = gfx.sprite_silhouette_create(s.ghoul)
+	s.bat_paper = gfx.sprite_silhouette_create(s.bat)
+	s.totem_paper = gfx.sprite_silhouette_create(s.totem)
 	s.glow = glow_texture_create()
 	return s
 }
 
 sprites_destroy :: proc(s: ^Sprites) {
+	gfx.sprite_destroy(&s.player_paper)
+	gfx.sprite_destroy(&s.ghoul_paper)
+	gfx.sprite_destroy(&s.bat_paper)
+	gfx.sprite_destroy(&s.totem_paper)
 	gfx.sprite_destroy(&s.player)
 	gfx.sprite_destroy(&s.ghoul)
 	gfx.sprite_destroy(&s.bat)

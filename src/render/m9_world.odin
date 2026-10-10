@@ -6,6 +6,7 @@ import engine "../engine"
 import fight "../fight"
 import shooter "../shooter"
 import view "../view"
+import ui "../engine/ui"
 import rl "vendor:raylib"
 import rlgl "vendor:raylib/rlgl"
 
@@ -45,63 +46,45 @@ m9_world_extent :: proc(world: ^engine.World) -> rl.Vector2 {
 	return {x,z}
 }
 
-draw_m9_geometry :: proc(renderer: ^Renderer, world: ^engine.World, ring: bool, debug: bool) {
+draw_m9_geometry :: proc(renderer: ^Renderer, world: ^engine.World, debug: bool) {
 	extent := m9_world_extent(world)
 	draw_resin_cube(renderer,{0,-0.22,0},extent.x*2+0.5,0.42,extent.y*2+0.5,RESIN_DARK)
 	draw_resin_cube(renderer,{0,-0.02,0},extent.x*2,0.035,extent.y*2,{35,48,66,255})
 	for solid in world.solids[:world.solid_count] {
 		a,b := m9_vector(solid.bounds.min),m9_vector(solid.bounds.max)
 		center,size := (a+b)*0.5,b-a
-		if ring {
-			center.y,size.y=0.16,0.32
-			draw_resin_cube_v(renderer,center,size,RESIN_WALL)
-			for y in ([3]f32{0.55,0.95,1.35}) {
-				along_x := size.x>size.z
-				p,q := center,center
-				p.y,q.y=y,y
-				if along_x {p.x=a.x;q.x=b.x} else {p.z=a.z;q.z=b.z}
-				rl.DrawCylinderEx(p,q,0.025,0.025,5,{106,116,140,255})
+		draw_resin_cube_v(renderer,center,size,RESIN_WALL)
+		// Trim follows the same solid bounds; it adds no apparent playable
+		// ledges or pillars that the continuous controller could pass through.
+		draw_resin_cube(renderer,{center.x,a.y+0.09,center.z},size.x+0.018,0.18,size.z+0.018,RESIN_DARK)
+		draw_resin_cube(renderer,{center.x,b.y+0.018,center.z},size.x+0.025,0.05,size.z+0.025,RESIN_CAP)
+		draw_resin_cube(renderer,{center.x,b.y-0.08,center.z},size.x+0.012,0.028,size.z+0.012,{34,60,87,255})
+		long_wall:=size.x>5 || size.z>5
+		if long_wall {
+			along_x:=size.x>size.z
+			length:=size.x if along_x else size.z
+			panels:=int(length/2.7)
+			for panel in 0..<panels {
+				p:=center
+				offset:=(f32(panel)+0.5)*length/f32(panels)-length/2
+				if along_x {p.x+=offset} else {p.z+=offset}
+				p.y=a.y+size.y*0.48
+				stripe:=rl.Vector3{0.026,size.y*0.60,size.z+0.024} if along_x else rl.Vector3{size.x+0.024,size.y*0.60,0.026}
+				draw_resin_cube_v(renderer,p,stripe,{27,43,63,255})
+				p.y=a.y+size.y*0.66
+				stripe.y=0.24
+				draw_resin_cube_v(renderer,p,stripe,{52,105,150,255})
 			}
+		} else if size.y>2 {
+			rl.DrawCube({center.x,a.y+size.y*0.46,center.z},size.x+0.02,0.045,size.z+0.02,{46,122,181,255})
+			rl.DrawCube({center.x,a.y+size.y*0.65,center.z},0.14,0.44,size.z+0.025,RESIN_DARK)
+			rl.DrawCube({center.x,a.y+size.y*0.65,center.z},0.03,0.23,size.z+0.03,{51,133,191,255})
 		} else {
-			draw_resin_cube_v(renderer,center,size,RESIN_WALL)
-			// Trim follows the same solid bounds; it adds no apparent playable
-			// ledges or pillars that the continuous controller could pass through.
-			draw_resin_cube(renderer,{center.x,a.y+0.09,center.z},size.x+0.018,0.18,size.z+0.018,RESIN_DARK)
-			draw_resin_cube(renderer,{center.x,b.y+0.018,center.z},size.x+0.025,0.05,size.z+0.025,RESIN_CAP)
-			draw_resin_cube(renderer,{center.x,b.y-0.08,center.z},size.x+0.012,0.028,size.z+0.012,{34,60,87,255})
-			long_wall:=size.x>5 || size.z>5
-			if long_wall {
-				along_x:=size.x>size.z
-				length:=size.x if along_x else size.z
-				panels:=int(length/2.7)
-				for panel in 0..<panels {
-					p:=center
-					offset:=(f32(panel)+0.5)*length/f32(panels)-length/2
-					if along_x {p.x+=offset} else {p.z+=offset}
-					p.y=a.y+size.y*0.48
-					stripe:=rl.Vector3{0.026,size.y*0.60,size.z+0.024} if along_x else rl.Vector3{size.x+0.024,size.y*0.60,0.026}
-					draw_resin_cube_v(renderer,p,stripe,{27,43,63,255})
-					p.y=a.y+size.y*0.66
-					stripe.y=0.24
-					draw_resin_cube_v(renderer,p,stripe,{52,105,150,255})
-				}
-			} else if size.y>2 {
-				rl.DrawCube({center.x,a.y+size.y*0.46,center.z},size.x+0.02,0.045,size.z+0.02,{46,122,181,255})
-				rl.DrawCube({center.x,a.y+size.y*0.65,center.z},0.14,0.44,size.z+0.025,RESIN_DARK)
-				rl.DrawCube({center.x,a.y+size.y*0.65,center.z},0.03,0.23,size.z+0.03,{51,133,191,255})
-			} else {
-				for side in ([2]f32{-1,1}) {
-					rl.DrawCube({center.x+side*size.x*0.35,b.y+0.045,center.z},0.045,0.018,max(f32(0.1),size.z-0.2),{91,111,135,255})
-				}
+			for side in ([2]f32{-1,1}) {
+				rl.DrawCube({center.x+side*size.x*0.35,b.y+0.045,center.z},0.045,0.018,max(f32(0.1),size.z-0.2),{91,111,135,255})
 			}
 		}
 		if debug {rl.DrawBoundingBox({a,b},{70,190,230,180})}
-	}
-	if ring {
-		for x in ([2]f32{-4.45,4.45}) {for z in ([2]f32{-4.45,4.45}) {
-			draw_resin_cube(renderer,{x,0.76,z},0.24,1.52,0.24,RESIN_CAP)
-			rl.DrawCube({x,1.58,z},0.28,0.08,0.28,GOTHIC_BLUE)
-		}}
 	}
 }
 
@@ -199,18 +182,29 @@ draw_m9_fight :: proc(renderer: ^Renderer, state: ^fight.State, v: M9_View) {
 		a:=m9_mix_position(state.fighters[0].previous,state.fighters[0].position,1 if v.paused else v.alpha)
 		b:=m9_mix_position(state.fighters[1].previous,state.fighters[1].position,1 if v.paused else v.alpha)
 		midpoint:=(a+b)*0.5
-		camera.target=midpoint+rl.Vector3{0,0.62,0}
-		camera.position=camera.target+rl.Vector3{4.8,5.8,8.8}
-		camera.fovy=clamp(5.4+rl.Vector3Distance(a,b)*0.72,f32(6.6),f32(11.5))
+		// Keep the entire pedestal and nearest boundary in view. A restrained
+		// midpoint drift follows the duel without turning every dodge into a pan.
+		camera.target=midpoint*0.20+rl.Vector3{0,0.20,0}
+		camera.position=camera.target+rl.Vector3{6.8,7.8,10.8}
+		camera.fovy=clamp(9.7+rl.Vector3Distance(a,b)*0.34,f32(10.6),f32(12.7))
 	}
 	previous,outline := renderer.tactical.camera,renderer.tactical.outline_mode
 	renderer.tactical.camera,renderer.tactical.outline_mode=camera,.Ring
 	defer {renderer.tactical.camera=previous;renderer.tactical.outline_mode=outline}
 	rl.BeginMode3D(camera)
-	lit := begin_m8_model_lighting(renderer,camera)
-	draw_m9_geometry(renderer,&state.world,extent.x<6,v.debug)
+	lit := begin_m9_ring_lighting(renderer,camera)
+	if extent.x<6 {
+		draw_m9_ring_stage(renderer,&state.world)
+	} else {draw_m9_geometry(renderer,&state.world,v.debug)}
 	if lit {rl.EndShaderMode()}
+	if extent.x<6 {
+		draw_m9_ring_ropes(&state.world)
+		if v.debug {for solid in state.world.solids[:state.world.solid_count] {
+			rl.DrawBoundingBox({m9_vector(solid.bounds.min),m9_vector(solid.bounds.max)},{70,190,230,180})
+		}}
+	}
 	draw_m9_floor_marks(&state.world)
+	draw_m9_fight_cues(state)
 	for actor in state.fighters {draw_m9_contact_shadow(m9_vector(actor.position),fight.BODY_RADIUS)}
 	// Sort cutouts by camera distance; depth still clips them against solid cover.
 	order := [2]int{0,1}
@@ -247,22 +241,8 @@ draw_m9_fight :: proc(renderer: ^Renderer, state: ^fight.State, v: M9_View) {
 	}
 	if state.hit_flash_ticks>0 {draw_tactical_rune(m9_vector(state.last_hit_position),0.45,0,GOTHIC_PAPER)}
 	rl.EndMode3D()
-	gothic_text(renderer,"M9 / ARENA LIBERA" if v.kind == .Arena else "IL RING DELLE OMBRE",20,17,23,GOTHIC_PAPER)
-	for actor,i in state.fighters {
-		x := f32(20) if i == 0 else w-242
-		tactical_hud_panel({x,105,222,60},GOTHIC_BLUE if i == 0 else GOTHIC_RED)
-		gothic_text(renderer,fmt.ctprintf("%s %d/%d","TU" if i == 0 else "CAMPIONE",actor.health,actor.max_health),x+10,111,20,GOTHIC_PAPER)
-		gothic_text(renderer,fmt.ctprintf("%s / %df",m9_move_name(actor.action),actor.action_tick),x+10,138,12,GOTHIC_BLUE if i == 0 else GOTHIC_RED)
-	}
-	line: cstring = "WASD MUOVI / 1 PUGNO / 2 PESANTE / 3 PRESA / SPAZIO SCHIVA / SHIFT PARATA"
-	gothic_text_fit(renderer,line,{20,h-121 if v.tools else h-42,w-40,20},13,GOTHIC_PAPER)
-	if v.paused {gothic_text(renderer,"PAUSA / IL MONDO ESTERNO E' SOSPESO",20,h-145 if v.tools else h-70,13,GOTHIC_BLUE)}
-	if state.result != .Active {
-		tactical_hud_panel({w*0.5-190,h*0.5-32,380,65},GOTHIC_BLUE)
-		gothic_text_fit(renderer,"VITTORIA" if state.result == .Won else "SCONFITTA",{w*0.5-175,h*0.5-20,350,24},24,GOTHIC_PAPER)
-		gothic_text_fit(renderer,"TORNA ALLA STANZA O RIPROVA IN LABORATORIO",{w*0.5-175,h*0.5+9,350,20},12,GOTHIC_MUTED)
-	}
-	draw_m9_controls(renderer,v,&state.moves)
+	draw_m9_fight_hud(renderer,state,v)
+	if !v.hosted {draw_m9_controls(renderer,v,&state.moves)}
 }
 
 draw_m9_fps :: proc(renderer: ^Renderer, state, prior: ^shooter.State, v: M9_View) {
@@ -277,7 +257,7 @@ draw_m9_fps :: proc(renderer: ^Renderer, state, prior: ^shooter.State, v: M9_Vie
 	defer {renderer.tactical.camera=previous;renderer.tactical.outline_mode=outline}
 	rl.BeginMode3D(camera)
 	lit := begin_m8_model_lighting(renderer,camera)
-	draw_m9_geometry(renderer,&state.world,false,v.debug)
+	draw_m9_geometry(renderer,&state.world,v.debug)
 	if lit {rl.EndShaderMode()}
 	draw_m9_floor_marks(&state.world)
 	for enemy in state.enemies[:state.enemy_count] {
@@ -307,11 +287,14 @@ draw_m9_fps :: proc(renderer: ^Renderer, state, prior: ^shooter.State, v: M9_Vie
 	rl.DrawLineV({w/2-8,h/2},{w/2-3,h/2},color);rl.DrawLineV({w/2+3,h/2},{w/2+8,h/2},color)
 	rl.DrawLineV({w/2,h/2-8},{w/2,h/2-3},color);rl.DrawLineV({w/2,h/2+3},{w/2,h/2+8},color)
 	if state.player.damage_flash>0 {rl.DrawRectangleLinesEx({3,3,w-6,h-6},5,{209,45,70,210})}
-	tactical_hud_panel({16,12,410,34},GOTHIC_BLUE)
-	gothic_text(renderer,fmt.ctprintf("FPS / HP %d / MUNIZIONI %d + %d",state.player.health,state.player.ammo,state.player.reserve),25,17,18,GOTHIC_PAPER)
+	tactical_hud_panel({16,12,210,34},GOTHIC_RED)
+	gothic_text(renderer,fmt.ctprintf("VITA %d",state.player.health),25,17,18,GOTHIC_PAPER)
+	ui.hud_meter(nil,{117,24,97,6},f32(state.player.health)/100,GOTHIC_RED)
+	tactical_hud_panel({236,12,190,34},GOTHIC_BLUE)
+	gothic_text_fit(renderer,fmt.ctprintf("MUNIZIONI %d / %d",state.player.ammo,state.player.reserve),{245,19,172,18},16,GOTHIC_PAPER)
 	gothic_text(renderer,fmt.ctprintf("%s / NEMICI %d",shooter.level_name(state.level_index),shooter.living_enemies(state)),20,104,16,GOTHIC_PAPER)
 	if state.player.reload_remaining>0 {gothic_text(renderer,"RICARICA...",w/2-55,h/2+27,15,GOTHIC_BLUE)}
-	gothic_text_fit(renderer,"WASD MUOVI / MOUSE MIRA / CLICK SPARA / R RICARICA / ESC MENU",{20,h-120 if v.tools else h-36,w-40,20},13,GOTHIC_PAPER)
+	gothic_text_fit(renderer,"WASD MUOVI / MOUSE MIRA / CLICK SPARA / R RICARICA / ESC MENU",{20,h-120 if v.tools else h-30,w-40,18},12,GOTHIC_MUTED)
 	if v.paused || state.phase != .Active {
 		bounds := m9_control_bounds(renderer,.Resume_FPS)
 		if m9_control_enabled(v,.Resume_FPS) {

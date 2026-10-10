@@ -8,11 +8,11 @@ import input "../input"
 import ui "../ui"
 
 // How a minigame is started: from the launcher (free play, retries allowed)
-// or as a one-shot challenge inside a roguelike run.
+// or as a one-shot challenge inside a roguelike run. Each mode owns its fixed
+// balance instead of accepting an external difficulty setting.
 Minigame_Config :: struct {
-	seed:       u64,
-	difficulty: int, // 0 easy, 1 normal, 2 hard
-	challenge:  bool,
+	seed:      u64,
+	challenge: bool,
 }
 
 Minigame_Info :: struct {
@@ -82,7 +82,16 @@ minigame_scene :: proc(info: Minigame_Info, hooks: Minigame_Hooks, config: Minig
 		clear_color = rl.Color{10, 10, 16, 255},
 		update      = shell_update,
 		draw        = shell_draw,
+		suspend     = shell_suspend,
 		destroy     = shell_destroy,
+	}
+}
+
+@(private)
+shell_suspend :: proc(data: rawptr) {
+	s := cast(^Minigame_Shell)data
+	if s.phase == .Playing {
+		set_phase(s, .Paused)
 	}
 }
 
@@ -153,8 +162,9 @@ shell_update :: proc(data: rawptr, frame: ^Frame) {
 	ctx := frame.ui
 	playing := s.phase == .Playing
 
-	// Losing focus pauses the round, so alt-tab never costs a life.
-	if playing && !frame.window_focused {
+	// Losing either window focus or scene input ownership pauses the round.
+	// A non-modal overlay must not leave enemies running under its controls.
+	if playing && (!frame.window_focused || !frame.focused) {
 		set_phase(s, .Paused)
 		playing = false
 	}

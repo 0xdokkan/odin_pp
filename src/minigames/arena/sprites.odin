@@ -322,9 +322,9 @@ sprite_palette :: proc() -> gfx.Pixel_Palette {
 	gfx.palette_set(&p, 'o', {240, 126, 46, 255})
 	gfx.palette_set(&p, 'g', {232, 196, 112, 255})
 	gfx.palette_set(&p, 'b', {214, 204, 180, 255})
-	gfx.palette_set(&p, 'p', {104, 66, 138, 255})
-	gfx.palette_set(&p, 'P', {62, 38, 86, 255})
-	gfx.palette_set(&p, 'v', {214, 160, 255, 255})
+	gfx.palette_set(&p, 'p', {76, 111, 146, 255})
+	gfx.palette_set(&p, 'P', {36, 61, 87, 255})
+	gfx.palette_set(&p, 'v', {158, 211, 246, 255})
 	gfx.palette_set(&p, 'm', {246, 112, 42, 255})
 	gfx.palette_set(&p, 'M', {168, 48, 30, 255})
 	return p
@@ -352,7 +352,16 @@ sprites_create :: proc(sprites, white: ^[Sprite_Id]gfx.Sprite) {
 		for f in 0..<count {
 			frames[f] = sprite_rows(id, f)
 		}
-		sprites[id], _ = gfx.sprite_create(frames[:count], &palette)
+		actor_palette := palette
+		if id == .Player {
+			gfx.palette_set(&actor_palette, 'S', {180, 169, 147, 255})
+			gfx.palette_set(&actor_palette, 's', {238, 228, 206, 255})
+			gfx.palette_set(&actor_palette, 'y', {147, 219, 250, 255})
+			gfx.palette_set(&actor_palette, 'i', {44, 56, 74, 255})
+			gfx.palette_set(&actor_palette, 'I', {24, 34, 49, 255})
+			gfx.palette_set(&actor_palette, 'c', {12, 21, 30, 255})
+		}
+		sprites[id], _ = gfx.sprite_create(frames[:count], &actor_palette)
 		white[id], _ = gfx.sprite_create(frames[:count], &blank)
 	}
 }

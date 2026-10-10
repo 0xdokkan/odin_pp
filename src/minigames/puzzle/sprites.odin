@@ -22,6 +22,7 @@ Sprites :: struct {
 	wall_top:   gfx.Sprite, // 2 variants
 	wall_front: gfx.Sprite, // 2 variants
 	crate:      gfx.Sprite, // dormant, lit
+	hero_paper: gfx.Sprite,
 	hero:       gfx.Sprite, // down, down step, up, up step, side, side step
 	flame:      gfx.Sprite, // 3 frames
 	ok:         bool,
@@ -32,13 +33,13 @@ crypt_palette :: proc() -> gfx.Pixel_Palette {
 	p: gfx.Pixel_Palette
 	set :: gfx.palette_set
 	// Flagstones.
-	set(&p, 'm', {22, 20, 30, 255})
-	set(&p, 'h', {86, 81, 103, 255})
-	set(&p, 'b', {64, 60, 79, 255})
-	set(&p, 'n', {57, 53, 71, 255})
-	set(&p, 's', {47, 44, 60, 255})
-	set(&p, 'k', {30, 28, 40, 255})
-	set(&p, 'q', {54, 74, 58, 255})
+	set(&p, 'm', {14, 22, 33, 255})
+	set(&p, 'h', {117, 147, 173, 255})
+	set(&p, 'b', {63, 82, 105, 255})
+	set(&p, 'n', {59, 76, 96, 255})
+	set(&p, 's', {41, 57, 78, 255})
+	set(&p, 'k', {21, 31, 45, 255})
+	set(&p, 'q', {63, 90, 107, 255})
 	// Ice.
 	set(&p, 'I', {92, 148, 198, 255})
 	set(&p, 'J', {142, 198, 234, 255})
@@ -46,27 +47,27 @@ crypt_palette :: proc() -> gfx.Pixel_Palette {
 	set(&p, 'L', {66, 112, 164, 255})
 	set(&p, 'M', {44, 74, 116, 255})
 	// Sigil grooves.
-	set(&p, 'v', {88, 70, 160, 255})
-	set(&p, 'w', {132, 110, 226, 255})
+	set(&p, 'v', {52, 106, 144, 255})
+	set(&p, 'w', {125, 192, 225, 255})
 	// Bronze plate.
 	set(&p, 'P', {150, 118, 70, 255})
 	set(&p, 'Q', {200, 164, 100, 255})
 	set(&p, 'R', {98, 74, 44, 255})
 	set(&p, 'S', {34, 28, 26, 255})
 	set(&p, 'T', {62, 84, 96, 255})
-	set(&p, 'U', {130, 255, 210, 255})
+	set(&p, 'U', {151, 217, 249, 255})
 	// Iron gate.
 	set(&p, 'G', {72, 76, 92, 255})
 	set(&p, 'H', {140, 146, 166, 255})
 	set(&p, 'E', {36, 38, 50, 255})
 	set(&p, 'F', {120, 74, 52, 255})
 	// Walls.
-	set(&p, 'A', {66, 61, 80, 255})
-	set(&p, 'B', {84, 79, 100, 255})
-	set(&p, 'C', {54, 50, 66, 255})
-	set(&p, 'D', {62, 55, 72, 255})
-	set(&p, 'X', {38, 34, 48, 255})
-	set(&p, 'Y', {98, 90, 112, 255})
+	set(&p, 'A', {53, 74, 99, 255})
+	set(&p, 'B', {78, 101, 127, 255})
+	set(&p, 'C', {35, 49, 70, 255})
+	set(&p, 'D', {47, 66, 89, 255})
+	set(&p, 'X', {20, 32, 48, 255})
+	set(&p, 'Y', {128, 158, 184, 255})
 	// Sandstone relic.
 	set(&p, '1', {214, 186, 134, 255})
 	set(&p, '2', {176, 146, 98, 255})
@@ -76,12 +77,12 @@ crypt_palette :: proc() -> gfx.Pixel_Palette {
 	set(&p, '6', {255, 208, 110, 255})
 	set(&p, '7', {255, 248, 214, 255})
 	// Hooded acolyte.
-	set(&p, 'r', {156, 34, 50, 255})
-	set(&p, 't', {204, 62, 70, 255})
-	set(&p, 'u', {96, 20, 36, 255})
-	set(&p, 'f', {236, 210, 178, 255})
+	set(&p, 'r', {193, 182, 158, 255})
+	set(&p, 't', {239, 229, 207, 255})
+	set(&p, 'u', {120, 114, 103, 255})
+	set(&p, 'f', {22, 30, 40, 255})
 	set(&p, 'e', {34, 22, 28, 255})
-	set(&p, 'g', {228, 184, 92, 255})
+	set(&p, 'g', {143, 216, 251, 255})
 	set(&p, 'z', {18, 12, 20, 255})
 	// Torch.
 	set(&p, 'y', {255, 236, 150, 255})
@@ -570,6 +571,7 @@ sprites_create :: proc() -> Sprites {
 	s.wall_front = make_one(WALL_FRONT_ROWS[:], &palette, &ok)
 	s.crate = make_one(CRATE_ROWS[:], &palette, &ok)
 	s.hero = make_one(HERO_ROWS[:], &palette, &ok)
+	s.hero_paper = gfx.sprite_silhouette_create(s.hero)
 	s.flame = make_one(FLAME_ROWS[:], &palette, &ok)
 	s.ok = ok
 	return s
@@ -586,6 +588,7 @@ sprites_destroy :: proc(s: ^Sprites) {
 	gfx.sprite_destroy(&s.wall_front)
 	gfx.sprite_destroy(&s.crate)
 	gfx.sprite_destroy(&s.hero)
+	gfx.sprite_destroy(&s.hero_paper)
 	gfx.sprite_destroy(&s.flame)
 	s^ = {}
 }

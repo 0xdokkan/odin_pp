@@ -7,7 +7,7 @@ import physics "../../engine/physics"
 import rng "../../engine/rng"
 
 @(private = "file")
-build_single :: proc(w: ^World, def: Chunk_Def, config := host.Minigame_Config{seed = 1, difficulty = 2}) {
+build_single :: proc(w: ^World, def: Chunk_Def, config := host.Minigame_Config{seed = 1}) {
 	sequence := [3]Chunk_Def{CHUNKS[chunk_index("soglia")], def, CHUNKS[chunk_index("altare")]}
 	world_build(w, config, sequence[:])
 }
@@ -238,14 +238,17 @@ test_solver_rejects_impossible_chunks :: proc(t: ^testing.T) {
 
 @(test)
 test_generation_is_valid_for_many_seeds :: proc(t: ^testing.T) {
+	testing.expect_value(t, middle_chunk_count({}), 9)
+	testing.expect_value(t, middle_chunk_count({challenge = true}), 5)
+	testing.expect_value(t, lives_for(), 4)
 	w := new(World)
 	defer free(w)
 	defer world_destroy(w)
 	start, end := chunk_index("soglia"), chunk_index("altare")
 	for seed in u64(1)..=40 {
-		for difficulty in 0..=2 {
+		for seed_offset in 0..=2 {
 			for challenge in ([2]bool{false, true}) {
-				config := host.Minigame_Config{seed = seed * 7919, difficulty = difficulty, challenge = challenge}
+				config := host.Minigame_Config{seed = seed * 7919 + u64(seed_offset), challenge = challenge}
 				sequence, count := generate_sequence(config)
 				again, again_count := generate_sequence(config)
 				testing.expect(t, sequence == again && count == again_count)
@@ -273,7 +276,7 @@ test_generation_is_valid_for_many_seeds :: proc(t: ^testing.T) {
 				exit := cell_of_point(physics.rect_center(w.exit_rect))
 				testing.expect(t, exit.x > w.cols-12 && exit.x < w.cols)
 				testing.expect_value(t, w.time_limit > 0, challenge)
-				testing.expect(t, w.lives == lives_for(config) && w.lives >= 3)
+				testing.expect(t, w.lives == lives_for() && w.lives >= 3)
 				for c in w.checkpoints[:w.checkpoint_count] {
 					cell := cell_of_point(c.feet - {0, 1})
 					testing.expect(t, standable(w, cell.x, cell.y))
@@ -288,10 +291,10 @@ test_generation_is_valid_for_many_seeds :: proc(t: ^testing.T) {
 		}
 	}
 	// Different seeds give different levels.
-	a, _ := generate_sequence({seed = 1, difficulty = 1})
+	a, _ := generate_sequence({seed = 1})
 	differs := false
 	for seed in u64(2)..=6 {
-		b, _ := generate_sequence({seed = seed, difficulty = 1})
+		b, _ := generate_sequence({seed = seed})
 		differs |= a != b
 	}
 	testing.expect(t, differs)
@@ -309,8 +312,8 @@ test_generated_levels_are_completable :: proc(t: ^testing.T) {
 	w := new(World)
 	defer free(w)
 	defer world_destroy(w)
-	configs := [3]host.Minigame_Config{{seed = 11, difficulty = 0}, {seed = 12, difficulty = 1, challenge = true},
-		{seed = 13, difficulty = 2}}
+	configs := [3]host.Minigame_Config{{seed = 11}, {seed = 12, challenge = true},
+		{seed = 13}}
 	for config in configs {
 		world_reset(w, config)
 		g := bot_create(w).graph
@@ -338,7 +341,7 @@ test_bot_wins_a_generated_level :: proc(t: ^testing.T) {
 	w := new(World)
 	defer free(w)
 	defer world_destroy(w)
-	for config in ([2]host.Minigame_Config{{seed = 21, difficulty = 1}, {seed = 22, difficulty = 2}}) {
+	for config in ([2]host.Minigame_Config{{seed = 21}, {seed = 22}}) {
 		world_reset(w, config)
 		// Enemies would make the scripted route a gamble; the route itself is
 		// what this test proves.
@@ -374,7 +377,7 @@ test_lava_costs_lives_until_the_round_is_lost :: proc(t: ^testing.T) {
 		"########################################",
 		"########################################",
 	}}
-	build_single(w, lava, {seed = 3, difficulty = 1})
+	build_single(w, lava, {seed = 3})
 	start := w.spawn
 	deaths := 0
 	status := host.Round_Status.Playing
@@ -404,7 +407,7 @@ test_challenge_time_limit_loses :: proc(t: ^testing.T) {
 	w := new(World)
 	defer free(w)
 	defer world_destroy(w)
-	world_reset(w, {seed = 9, difficulty = 1, challenge = true})
+	world_reset(w, {seed = 9, challenge = true})
 	testing.expect(t, w.time_limit > 30)
 	w.enemy_count = 0
 	status := host.Round_Status.Playing
@@ -440,13 +443,18 @@ test_stomp_bounces_and_side_contact_hurts :: proc(t: ^testing.T) {
 	arena := Chunk_Def{name = "arena", role = .Middle, rows = {
 		"........................................",
 		"........................................",
-		"..........g.............g...............",
+		"........................................",
 		"########################################",
 		"########################################",
 		"########################################",
 		"########################################",
 	}}
-	build_single(w, arena, {seed = 4, difficulty = 2})
+	build_single(w, arena, {seed = 4})
+	// Explicit contacts: this test must not depend on procedural enemy density.
+	gen := rng.create(4)
+	for x in ([2]int{10, 24}) {
+		add_enemy(w, .Ghoul, cell_box(w.chunk_start[1]+x, LEVEL_ROWS-len(arena.rows)+2), 1, &gen)
+	}
 	testing.expect_value(t, w.enemy_count, 2)
 	w.player.invulnerable = 0
 	// Drop the player onto the first ghoul.
@@ -502,9 +510,9 @@ test_checkpoint_becomes_the_respawn_point :: proc(t: ^testing.T) {
 		"########################################",
 		"########################################",
 	}}
-	// With easy every second middle chunk gets a checkpoint.
+	// Challenges place a checkpoint every second middle chunk.
 	sequence := [5]Chunk_Def{CHUNKS[chunk_index("soglia")], flat, flat, spikes, CHUNKS[chunk_index("altare")]}
-	world_build(w, {seed = 5, difficulty = 0}, sequence[:])
+	world_build(w, {seed = 5, challenge = true}, sequence[:])
 	testing.expect_value(t, w.checkpoint_count, 1)
 	testing.expect(t, step_until(w, {move = 1}, STEP_HZ*20, .Checkpoint))
 	lit := w.checkpoints[0].feet
@@ -552,7 +560,7 @@ test_star_rules :: proc(t: ^testing.T) {
 	w := new(World)
 	defer free(w)
 	defer world_destroy(w)
-	world_reset(w, {seed = 2, difficulty = 1})
+	world_reset(w, {seed = 2})
 	w.status = .Won
 	set_embers :: proc(w: ^World, ratio: f32) {
 		w.embers_collected = int(math.ceil(f32(w.ember_count) * ratio))
@@ -585,7 +593,7 @@ test_same_seed_and_inputs_replay_exactly :: proc(t: ^testing.T) {
 	defer free(b)
 	defer world_destroy(a)
 	defer world_destroy(b)
-	config := host.Minigame_Config{seed = 77, difficulty = 2}
+	config := host.Minigame_Config{seed = 77}
 	world_reset(a, config)
 	world_reset(b, config)
 	ra := rng.create(5)
@@ -601,7 +609,7 @@ test_same_seed_and_inputs_replay_exactly :: proc(t: ^testing.T) {
 	testing.expect(t, a.steps > 0 && a.player.ctrl.body.position.x != a.spawn.x - PLAYER_SIZE.x*0.5)
 
 	// A different seed is a different round.
-	world_reset(b, {seed = 78, difficulty = 2})
+	world_reset(b, {seed = 78})
 	rb = rng.create(5)
 	cb = {}
 	for _ in 0..<STEP_HZ*60 {
@@ -617,7 +625,7 @@ test_random_input_soak :: proc(t: ^testing.T) {
 	defer free(w)
 	defer world_destroy(w)
 	for seed in u64(1)..=4 {
-		config := host.Minigame_Config{seed = seed, difficulty = int(seed % 3), challenge = seed == 4}
+		config := host.Minigame_Config{seed = seed, challenge = seed == 4}
 		world_reset(w, config)
 		r := rng.create(seed * 31)
 		cmd: Player_Input
@@ -642,14 +650,14 @@ test_random_input_soak :: proc(t: ^testing.T) {
 	}
 }
 
-// The bot playing with enemies on hard: knockbacks, deaths and crumbled
+// The bot playing with enemies: knockbacks, deaths and crumbled
 // bridges force constant re-planning; nothing may break.
 @(test)
 test_bot_soak_with_enemies :: proc(t: ^testing.T) {
 	w := new(World)
 	defer free(w)
 	defer world_destroy(w)
-	world_reset(w, {seed = 31, difficulty = 2})
+	world_reset(w, {seed = 31})
 	bot := bot_create(w)
 	defer bot_destroy(&bot)
 	status := host.Round_Status.Playing
@@ -668,7 +676,7 @@ test_bot_soak_with_enemies :: proc(t: ^testing.T) {
 @(test)
 test_hooks_step_headless :: proc(t: ^testing.T) {
 	g := new(Game)
-	game_reset(g, {seed = 6, difficulty = 1})
+	game_reset(g, {seed = 6})
 	frame := host.Frame{dt = 1.0 / 60}
 	testing.expect_value(t, game_step(g, &frame, false), host.Round_Status.Playing)
 	testing.expect_value(t, g.world.steps, u64(0))
@@ -678,7 +686,7 @@ test_hooks_step_headless :: proc(t: ^testing.T) {
 	testing.expect(t, g.world.steps >= 230 && g.world.steps <= 240)
 	score, stars := game_score(g)
 	testing.expect(t, score >= 0 && stars == 0)
-	game_reset(g, {seed = 6, difficulty = 1})
+	game_reset(g, {seed = 6})
 	testing.expect_value(t, g.world.steps, u64(0))
 	game_destroy(g)
 }

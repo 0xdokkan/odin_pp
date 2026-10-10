@@ -6,9 +6,28 @@
 // can be driven in tests.
 package ui
 
+import "core:math"
 import rl "vendor:raylib"
 
 Rect :: rl.Rectangle
+
+HUD_MARGIN :: 14
+HUD_GAP :: 10
+HUD_TOP_HEIGHT :: 66
+
+// Shared dock: vitals, current objective, then score/progress. Keeping the
+// positions stable makes switching between the game's activities predictable.
+hud_columns :: proc(canvas: Rect) -> [3]Rect {
+	width := max(canvas.width - 2*HUD_MARGIN - 2*HUD_GAP, 0)
+	left := math.floor(width*0.32)
+	middle := math.floor(width*0.36)
+	x, y := canvas.x + HUD_MARGIN, canvas.y + HUD_MARGIN
+	return {
+		{x, y, left, HUD_TOP_HEIGHT},
+		{x + left + HUD_GAP, y, middle, HUD_TOP_HEIGHT},
+		{x + left + middle + 2*HUD_GAP, y, width-left-middle, HUD_TOP_HEIGHT},
+	}
+}
 
 // Rect-cut layout: each cut removes a strip from `r` and returns it.
 cut_top :: proc(r: ^Rect, amount: f32) -> Rect {

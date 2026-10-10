@@ -37,9 +37,9 @@ test_pause_clears_queued_actions_and_consumes_menu_click :: proc(t: ^testing.T) 
 	testing.expect(t, !consume_player_input(g, {}).fire && !g.dash_latch)
 	for _ in 0..<3 {
 		advance_player_controls(g, {down = {.Fire, .Dash}}, SIM_DT)
-		testing.expect(t, g.fire_blocked && !g.dash_latch)
+		testing.expect(t, .Fire not_in g.controls.down && !g.dash_latch)
 	}
 	advance_player_controls(g, {}, SIM_DT)
 	advance_player_controls(g, {down = {.Fire, .Dash}}, SIM_DT)
-	testing.expect(t, !g.fire_blocked && g.dash_latch)
+	testing.expect(t, .Fire in g.controls.down && g.dash_latch)
 }

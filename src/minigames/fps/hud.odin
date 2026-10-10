@@ -10,14 +10,13 @@ import host "../../engine/host"
 import physics "../../engine/physics"
 import ui "../../engine/ui"
 
-IVORY :: rl.Color{236, 226, 204, 255}
-IVORY_DIM :: rl.Color{160, 152, 136, 255}
-CRIMSON :: rl.Color{178, 38, 52, 255}
-EMBER :: rl.Color{232, 196, 112, 255}
-ARCANE :: rl.Color{96, 140, 240, 255}
-VIOLET :: rl.Color{196, 130, 255, 255}
-WARNING :: rl.Color{226, 168, 72, 255}
-PANEL :: rl.Color{14, 14, 20, 175}
+IVORY :: ui.GOTHIC_PALETTE.text
+IVORY_DIM :: ui.GOTHIC_PALETTE.text_dim
+CRIMSON :: ui.GOTHIC_PALETTE.danger
+EMBER :: ui.GOTHIC_PALETTE.warning
+ARCANE :: ui.GOTHIC_PALETTE.accent
+PORTAL_BLUE :: ui.GOTHIC_PALETTE.focus
+WARNING :: ui.GOTHIC_PALETTE.warning
 
 draw_hud :: proc(g: ^Game, frame: ^host.Frame, cam: rl.Camera3D) {
 	w := &g.world
@@ -31,12 +30,16 @@ draw_hud :: proc(g: ^Game, frame: ^host.Frame, cam: rl.Camera3D) {
 	}
 	draw_damage(g, width, height)
 	fx.flash_draw(v.flash, width, height)
-	draw_bars(g, frame.theme, height)
-	draw_runes(g, frame.theme)
-	draw_compass(g, frame.theme, width)
-	draw_score(g, frame.theme, width)
+	zones := ui.hud_columns(frame.canvas)
+	for zone in zones {
+		ui.hud_panel(frame.theme, zone)
+	}
+	draw_bars(g, frame.theme, zones[0])
+	draw_runes(g, frame.theme, zones[1])
+	draw_compass(g, frame.theme, zones[1])
+	draw_score(g, frame.theme, zones[2])
 	if v.show_map {
-		draw_minimap(g, width)
+		draw_minimap(g, frame.theme, width)
 	}
 	draw_banner(g, frame.theme, width)
 	switch w.status {
@@ -46,7 +49,7 @@ draw_hud :: proc(g: ^Game, frame: ^host.Frame, cam: rl.Camera3D) {
 		rl.DrawRectangleRec({0, 0, width, height}, {90, 0, 8, u8(255 * a)})
 	case .Won:
 		a := min(v.end_time*0.6, 0.35)
-		rl.DrawRectangleRec({0, 0, width, height}, {70, 30, 110, u8(255 * a)})
+		rl.DrawRectangleRec({0, 0, width, height}, {28, 57, 95, u8(255 * a)})
 	}
 }
 
@@ -99,10 +102,10 @@ draw_viewmodel :: proc(g: ^Game, width, height: f32) {
 	charge := w.player.mana / MAX_MANA
 	pulse := 0.85 + 0.15*math.sin(v.time*3)
 	rl.BeginBlendMode(.ADDITIVE)
-	glow2d(v, crystal, (22+26*charge)*pulse, {255, 160, 70, u8(130 + 110*charge)})
+	glow2d(v, crystal, (22+26*charge)*pulse, {99, 168, 218, u8(100 + 90*charge)})
 	if v.muzzle > 0 {
 		k := v.muzzle / MUZZLE_TIME
-		glow2d(v, crystal, 110*k+30, {255, 220, 150, 255})
+		glow2d(v, crystal, 110*k+30, {170, 220, 255, 255})
 		rl.DrawCircleV(crystal, 14*k+4, {255, 250, 230, u8(255 * k)})
 	}
 	rl.EndBlendMode()
@@ -184,48 +187,51 @@ draw_bar :: proc(r: rl.Rectangle, value, ghost: f32, fill, back: rl.Color) {
 }
 
 @(private)
-draw_bars :: proc(g: ^Game, theme: ^ui.Theme, height: f32) {
+draw_bars :: proc(g: ^Game, theme: ^ui.Theme, bounds: ui.Rect) {
 	w := &g.world
 	v := &g.view
 	p := w.player
-	x, y := f32(18), height-64
-	rl.DrawRectangleRounded({x - 10, y - 12, 262, 60}, 0.25, 6, PANEL)
+	palette := theme.palette
+	inner := ui.shrink(bounds, 10)
 	if v.pickup_pulse > 0 {
-		// A pickup makes the vitals panel glint.
-		rl.DrawRectangleRoundedLinesEx({x - 10, y - 12, 262, 60}, 0.25, 6, 2, ui.with_alpha(EMBER, v.pickup_pulse))
+		rl.DrawRectangleLinesEx(bounds, 1, ui.with_alpha(palette.warning, v.pickup_pulse))
 	}
-	ui.draw_text(theme, "Vita", {x, y - 4}, .Small, IVORY_DIM)
-	draw_bar({x + 46, y, 160, 14}, p.hp/MAX_HP, v.ghost_hp/MAX_HP, CRIMSON, {44, 18, 24, 255})
-	hp_color := IVORY if p.hp >= 35 else rl.Color{255, 110, 110, 255}
-	ui.draw_text(theme, fmt.tprintf("%d", int(math.ceil(p.hp))), {x + 214, y - 4}, .Body, hp_color)
-	mana_back := rl.Color{20, 24, 48, 255}
+	ui.draw_text_fit(theme, "VITA", {inner.x, inner.y, 42, 20}, .Small, palette.text_dim)
+	bar := rl.Rectangle{inner.x + 46, inner.y + 5, inner.width - 90, 9}
+	draw_bar(bar, p.hp/MAX_HP, v.ghost_hp/MAX_HP, palette.danger, palette.background)
+	hp_color := palette.text if p.hp >= 35 else palette.danger
+	ui.draw_text_fit(theme, fmt.tprintf("%d", int(math.ceil(p.hp))),
+		{inner.x + inner.width - 38, inner.y - 1, 38, 22}, .Body, hp_color, .Right)
+	mana_back := palette.background
 	if v.dry_time > 0 && int(v.time*16)%2 == 0 {
-		mana_back = {120, 20, 30, 255}
+		mana_back = palette.danger
 	}
-	ui.draw_text(theme, "Mana", {x, y + 18}, .Small, IVORY_DIM)
-	draw_bar({x + 46, y + 22, 160, 10}, p.mana/MAX_MANA, p.mana/MAX_MANA, ARCANE, mana_back)
-	ui.draw_text(theme, fmt.tprintf("%d", int(p.mana)), {x + 214, y + 16}, .Small, IVORY)
+	ui.draw_text_fit(theme, "MANA", {inner.x, inner.y + 26, 42, 20}, .Small, palette.text_dim)
+	draw_bar({bar.x, inner.y + 33, bar.width, 6}, p.mana/MAX_MANA, p.mana/MAX_MANA, palette.accent, mana_back)
+	ui.draw_text_fit(theme, fmt.tprintf("%d", int(p.mana)),
+		{inner.x + inner.width - 38, inner.y + 25, 38, 22}, .Small, palette.text, .Right)
 }
 
 @(private)
-draw_runes :: proc(g: ^Game, theme: ^ui.Theme) {
+draw_runes :: proc(g: ^Game, theme: ^ui.Theme, bounds: ui.Rect) {
 	w := &g.world
 	v := &g.view
-	x, y := f32(18), f32(14)
+	inner := ui.shrink(bounds, 10)
+	ui.draw_text_fit(theme, fmt.tprintf("RUNE %d/%d", w.runes_taken, w.rune_count),
+		{inner.x, inner.y, 90, 20}, .Small, theme.palette.text_dim)
 	slots := f32(w.rune_count)
-	rl.DrawRectangleRounded({x - 10, y - 8, 70 + slots*24, 44}, 0.25, 6, PANEL)
-	ui.draw_text(theme, "Rune", {x, y + 4}, .Body, IVORY_DIM)
+	step := min(f32(19), (inner.width-102)/max(slots, 1))
 	for i in 0..<w.rune_count {
-		c := rl.Vector2{x + 62 + f32(i)*24, y + 14}
+		c := rl.Vector2{inner.x + inner.width - (slots-f32(i)-0.5)*step, inner.y + 10}
 		if i < w.runes_taken {
 			rl.BeginBlendMode(.ADDITIVE)
-			glow2d(v, c, 22 + 4*math.sin(v.time*3+f32(i)), {255, 170, 70, 200})
+			glow2d(v, c, 13 + 2*math.sin(v.time*3+f32(i)), {255, 170, 70, 150})
 			rl.EndBlendMode()
-			rl.DrawPoly(c, 4, 9, 0, EMBER)
-			rl.DrawPoly(c, 4, 4, 0, {255, 244, 210, 255})
+			rl.DrawPoly(c, 4, 5, 0, theme.palette.warning)
+			rl.DrawPoly(c, 4, 2, 0, theme.palette.text)
 		} else {
-			rl.DrawPoly(c, 4, 9, 0, {30, 30, 40, 230})
-			rl.DrawPolyLinesEx(c, 4, 9, 0, 1.5, IVORY_DIM)
+			rl.DrawPoly(c, 4, 5, 0, theme.palette.background)
+			rl.DrawPolyLinesEx(c, 4, 5, 0, 1, theme.palette.border)
 		}
 	}
 }
@@ -233,7 +239,7 @@ draw_runes :: proc(g: ^Game, theme: ^ui.Theme) {
 // Direction (and path length) to the nearest rune, or to the portal once
 // it is open: the crypt is a maze, so this only says where, not how.
 @(private)
-draw_compass :: proc(g: ^Game, theme: ^ui.Theme, width: f32) {
+draw_compass :: proc(g: ^Game, theme: ^ui.Theme, bounds: ui.Rect) {
 	w := &g.world
 	p := w.player
 	target: Vec3
@@ -258,8 +264,7 @@ draw_compass :: proc(g: ^Game, theme: ^ui.Theme, width: f32) {
 	if best >= FLOW_UNREACHED {
 		return
 	}
-	strip := rl.Rectangle{width*0.5 - 130, 12, 260, 18}
-	rl.DrawRectangleRounded({strip.x - 6, strip.y - 4, strip.width + 12, strip.height + 26}, 0.3, 6, PANEL)
+	strip := rl.Rectangle{bounds.x + 16, bounds.y + 38, bounds.width - 122, 14}
 	half := strip.width * 0.5
 	mid := strip.x + half
 	RANGE :: f32(1.6) // radians shown either side of the centre
@@ -278,7 +283,7 @@ draw_compass :: proc(g: ^Game, theme: ^ui.Theme, width: f32) {
 	to := target - player_eye(p)
 	rel := math.angle_diff(p.yaw, math.atan2(to.x, to.z))
 	mx := clamp(mid-rel/RANGE*half, strip.x+6, strip.x+strip.width-6)
-	color := VIOLET if is_portal else EMBER
+	color := PORTAL_BLUE if is_portal else EMBER
 	rl.DrawPoly({mx, strip.y + strip.height*0.5}, 4, 8, 0, color)
 	rl.DrawPolyLinesEx({mx, strip.y + strip.height*0.5}, 4, 8, 0, 1.5, {20, 16, 12, 255})
 	if abs(rel) > RANGE {
@@ -288,38 +293,34 @@ draw_compass :: proc(g: ^Game, theme: ^ui.Theme, width: f32) {
 		rl.DrawTriangle(tip, {mx + dir*6, strip.y + strip.height - 2}, {mx + dir*6, strip.y + 2}, color)
 	}
 	label := fmt.tprintf("%s  %d m", "Portale" if is_portal else "Runa", best)
-	ui.draw_text_centered(theme, label, {mid, strip.y + strip.height + 11}, .Small, ui.with_alpha(color, 0.9))
+	ui.draw_text_fit(theme, label, {strip.x + strip.width + 10, strip.y - 1, 82, 18},
+		.Small, color, .Right)
 }
 
 @(private)
-draw_right :: proc(theme: ^ui.Theme, text: string, right, y: f32, size: ui.Text_Size, color: rl.Color) {
-	m := ui.measure(theme, text, size)
-	ui.draw_text(theme, text, {right - m.x, y}, size, color)
-}
-
-@(private)
-draw_score :: proc(g: ^Game, theme: ^ui.Theme, width: f32) {
+draw_score :: proc(g: ^Game, theme: ^ui.Theme, bounds: ui.Rect) {
 	w := &g.world
-	right := width - 18
-	rl.DrawRectangleRounded({right - 176, 6, 186, 82}, 0.2, 6, PANEL)
-	draw_right(theme, fmt.tprintf("%d", live_score(w)), right, 8, .Large, EMBER)
-	draw_right(theme, "Punti", right-96, 14, .Small, IVORY_DIM)
-	par_color := IVORY if w.time <= w.par_time else WARNING
-	draw_right(theme, fmt.tprintf("%s / %s", host.format_time(w.time), host.format_time(w.par_time)), right, 40, .Small, par_color)
-	draw_right(theme, fmt.tprintf("Uccisioni %d   Mira %d%%", w.stats.kills, int(accuracy(w)*100)), right, 60, .Small, IVORY_DIM)
+	inner := ui.shrink(bounds, 10)
+	p := theme.palette
+	ui.draw_text_fit(theme, "PUNTI", {inner.x, inner.y, 64, 20}, .Small, p.text_dim)
+	ui.draw_text_fit(theme, fmt.tprintf("%d", live_score(w)),
+		{inner.x + 68, inner.y - 2, inner.width - 68, 26}, .Large, p.text, .Right)
+	par_color := p.text_dim if w.time <= w.par_time else p.warning
+	ui.draw_text_fit(theme, fmt.tprintf("%s / %s", host.format_time(w.time), host.format_time(w.par_time)),
+		{inner.x, inner.y + 27, inner.width, 18}, .Small, par_color, .Right)
 }
 
 // Explored floor only, walls appear as they are seen. North-up: world x to
 // the right, world z downward.
 @(private)
-draw_minimap :: proc(g: ^Game, width: f32) {
+draw_minimap :: proc(g: ^Game, theme: ^ui.Theme, width: f32) {
 	w := &g.world
 	v := &g.view
 	cell := min(f32(3), 120/f32(w.side))
 	size := cell * f32(w.side)
 	ox := math.round(width - 18 - size)
-	oy := f32(98)
-	rl.DrawRectangleRounded({ox - 6, oy - 6, size + 12, size + 12}, 0.06, 6, PANEL)
+	oy := f32(ui.HUD_MARGIN + ui.HUD_TOP_HEIGHT + 14)
+	ui.hud_panel(theme, {ox - 6, oy - 6, size + 12, size + 12})
 	for z in 0..<w.side {
 		for x in 0..<w.side {
 			col := z*w.side + x
@@ -363,7 +364,7 @@ draw_minimap :: proc(g: ^Game, width: f32) {
 	pc := column_of(w, w.portal.center + Vec3{0.5, 0, 0})
 	if pc >= 0 && (w.explored[pc] || w.portal.open) {
 		c := rl.Vector2{ox + w.portal.center.x*cell, oy + w.portal.center.z*cell}
-		color := VIOLET if w.portal.open else rl.Color{120, 100, 140, 255}
+		color := PORTAL_BLUE if w.portal.open else rl.Color{120, 100, 140, 255}
 		rl.DrawCircleV(c, cell*1.3, color)
 	}
 	feet := player_feet(w.player)
@@ -400,7 +401,7 @@ draw_banner :: proc(g: ^Game, theme: ^ui.Theme, width: f32) {
 		duration = 3.5
 		title = "Il portale si è aperto!"
 		sub = "La cripta si risveglia: raggiungi l'arco"
-		color = VIOLET
+		color = PORTAL_BLUE
 	case .Sealed:
 		duration = 2.2
 		title = "Il portale è sigillato"
@@ -414,7 +415,8 @@ draw_banner :: proc(g: ^Game, theme: ^ui.Theme, width: f32) {
 		return
 	}
 	a := min(t*5, 1) * min((duration-t)*2.5, 1)
-	y := f32(132) - (1-min(t*5, 1))*10
-	ui.draw_text_centered(theme, title, {width * 0.5, y}, .Title, ui.with_alpha(color, a))
-	ui.draw_text_centered(theme, sub, {width * 0.5, y + 34}, .Body, ui.with_alpha(IVORY, a*0.9))
+	y := f32(ui.HUD_MARGIN + ui.HUD_TOP_HEIGHT + 8) - (1-min(t*5, 1))*6
+	ui.draw_text_fit(theme, title, {width*0.5 - 230, y, 460, 24}, .Body, ui.with_alpha(color, a), .Center)
+	ui.draw_text_fit(theme, sub, {width*0.5 - 230, y + 24, 460, 20}, .Small,
+		ui.with_alpha(theme.palette.text_dim, a), .Center)
 }

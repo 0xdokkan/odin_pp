@@ -42,6 +42,7 @@ uniform vec2 fogRange;
 uniform vec3 pointPos;
 uniform vec3 pointColor;
 uniform float pointRadius;
+uniform float specular;
 uniform float unlit;
 out vec4 finalColor;
 void main() {
@@ -58,6 +59,15 @@ void main() {
         light += pointColor * att * att * max(dot(n, d / max(dist, 0.0001)), 0.0);
     }
     vec3 color = base.rgb * light;
+    if (unlit < 0.5 && specular > 0.0) {
+        vec3 eye = normalize(viewPos - fragPos);
+        vec3 source = normalize(pointPos - fragPos);
+        vec3 halfDir = normalize(source + eye);
+        float falloff = clamp(1.0 - length(pointPos - fragPos) / max(pointRadius, 0.001), 0.0, 1.0);
+        float shine = pow(max(dot(n, halfDir), 0.0), 28.0) * falloff;
+        float rim = pow(1.0 - max(dot(n, eye), 0.0), 4.0);
+        color += specular * (pointColor * shine + sunColor * rim * 0.16);
+    }
     float viewDist = length(viewPos - fragPos);
     float fog = clamp((viewDist - fogRange.x) / max(fogRange.y - fogRange.x, 0.001), 0.0, 1.0);
     finalColor = vec4(mix(color, fogColor.rgb, fog * fogColor.a), base.a);
@@ -76,8 +86,11 @@ Lighting :: struct {
 	point_pos:    Vec3,
 	point_color:  Vec3,
 	point_radius: f32,
+	// Optional resin sheen. Zero preserves matte rendering for existing scenes.
+	specular:     f32,
 	loc_sun_dir, loc_sun_color, loc_ambient, loc_view, loc_fog_color, loc_fog_range: i32,
 	loc_point_pos, loc_point_color, loc_point_radius, loc_model, loc_unlit: i32,
+	loc_specular: i32,
 }
 
 lighting_create :: proc() -> Lighting {
@@ -103,6 +116,7 @@ lighting_create :: proc() -> Lighting {
 	l.loc_point_pos = rl.GetShaderLocation(l.shader, "pointPos")
 	l.loc_point_color = rl.GetShaderLocation(l.shader, "pointColor")
 	l.loc_point_radius = rl.GetShaderLocation(l.shader, "pointRadius")
+	l.loc_specular = rl.GetShaderLocation(l.shader, "specular")
 	l.loc_model = rl.GetShaderLocation(l.shader, "matModel")
 	l.loc_unlit = rl.GetShaderLocation(l.shader, "unlit")
 	return l
@@ -136,6 +150,8 @@ lighting_update :: proc(l: ^Lighting, camera_position: Vec3) {
 	rl.SetShaderValue(l.shader, l.loc_fog_range, &fog_range, .VEC2)
 	radius := l.point_radius
 	rl.SetShaderValue(l.shader, l.loc_point_radius, &radius, .FLOAT)
+	specular := l.specular
+	rl.SetShaderValue(l.shader, l.loc_specular, &specular, .FLOAT)
 	// Immediate-mode vertices are already in world space.
 	rl.SetShaderValueMatrix(l.shader, l.loc_model, rl.Matrix(1))
 }

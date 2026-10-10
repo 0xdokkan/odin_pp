@@ -16,7 +16,6 @@ import render "render"
 Launch_Options :: struct {
 	run:        bool,   // --run: straight into the roguelike
 	minigame:   string, // --minigame=<id>: open one minigame on top of the menu
-	difficulty: int,
 	// --smoke-menu: capture odin_pp_menu.png after a few frames and quit.
 	smoke_menu: bool,
 	// --smoke-minigame=<id>: play <id> without the intro, capture
@@ -25,7 +24,7 @@ Launch_Options :: struct {
 }
 
 split_launch_arguments :: proc(args: []string) -> (Launch_Options, [dynamic]string) {
-	launch := Launch_Options{difficulty = 1}
+	launch := Launch_Options{}
 	rest := make([dynamic]string, 0, len(args))
 	for arg in args {
 		switch {
@@ -33,10 +32,6 @@ split_launch_arguments :: proc(args: []string) -> (Launch_Options, [dynamic]stri
 			launch.run = true
 		case strings.has_prefix(arg, "--minigame="):
 			launch.minigame = arg[len("--minigame="):]
-		case arg == "--easy":
-			launch.difficulty = 0
-		case arg == "--hard":
-			launch.difficulty = 2
 		case arg == "--smoke-menu":
 			launch.smoke_menu = true
 		case strings.has_prefix(arg, "--smoke-minigame="):
@@ -71,13 +66,14 @@ run_launcher :: proc(options: Runtime_Options, launch: Launch_Options) {
 		return
 	}
 	defer host.destroy(h)
-	menu := launcher_create(options, launch.difficulty)
+	menu := launcher_create(options)
 	menu.smoke = launch.smoke_menu
 	host.push_scene(h, launcher_scene(menu))
 	if launch.minigame != "" {
 		index := minigame_index_by_id(launch.minigame)
 		if info, found := minigame_info(index); found {
-			scene := info.create(launcher_cli_minigame_config(options, launch))
+			config := launcher_cli_minigame_config(options)
+			scene := minigame_capture_scene(index,config) if launch.smoke_minigame != "" else info.create(config)
 			if launch.smoke_minigame != "" {
 				if shell := host.shell_of(&scene); shell != nil {
 					host.shell_skip_intro(shell)
@@ -94,7 +90,6 @@ run_launcher :: proc(options: Runtime_Options, launch: Launch_Options) {
 
 Launcher :: struct {
 	options:    Runtime_Options,
-	difficulty: int,
 	seeds:      rng.Rng,
 	time:       f32,
 	status:     string,
@@ -104,10 +99,9 @@ Launcher :: struct {
 	frames:     int,
 }
 
-launcher_create :: proc(options: Runtime_Options, difficulty: int) -> ^Launcher {
+launcher_create :: proc(options: Runtime_Options) -> ^Launcher {
 	l := new(Launcher)
 	l.options = options
-	l.difficulty = clamp(difficulty, 0, 2)
 	l.seeds = rng.create(u64(time.now()._nsec) ~ options.seed)
 	return l
 }
@@ -132,17 +126,14 @@ launcher_scene :: proc(l: ^Launcher) -> host.Scene {
 }
 
 launcher_minigame_config :: proc(l: ^Launcher) -> host.Minigame_Config {
-	return host.Minigame_Config{seed = rng.next_u64(&l.seeds), difficulty = l.difficulty}
+	return host.Minigame_Config{seed = rng.next_u64(&l.seeds)}
 }
 
 // Command-line launches and captures must reproduce the requested seed. The
 // interactive menu keeps its independent stream for subsequent new rounds.
-launcher_cli_minigame_config :: proc(options: Runtime_Options, launch: Launch_Options) -> host.Minigame_Config {
-	return {seed = options.seed, difficulty = clamp(launch.difficulty, 0, 2)}
+launcher_cli_minigame_config :: proc(options: Runtime_Options) -> host.Minigame_Config {
+	return {seed = options.seed}
 }
-
-@(private = "file")
-DIFFICULTY_NAMES :: [3]string{"Facile", "Normale", "Difficile"}
 
 @(private = "file")
 launcher_resume :: proc(data: rawptr, frame: ^host.Frame, from: string, result: Maybe(host.Result)) {
@@ -209,76 +200,62 @@ launcher_update :: proc(data: rawptr, frame: ^host.Frame) {
 	ctx := frame.ui
 	p := ctx.theme.palette
 	canvas := frame.canvas
-	if !l.focus_set {
+	if !l.focus_set && frame.focused {
 		ui.set_focus(ctx, 0)
 		ctx.keyboard_mode = false
 		l.focus_set = true
 	}
 
-	area := ui.shrink_xy(canvas, 36, 24)
-	ui.cut_top(&area, 96) // title, drawn in launcher_draw
-	bottom := ui.cut_bottom(&area, 44)
-	ui.cut_bottom(&area, 14)
+	area := ui.shrink_xy(canvas, 32, 24)
+	ui.cut_top(&area, 80) // title, drawn in launcher_draw
+	ui.cut_bottom(&area, 26) // navigation legend
+	status := ui.cut_bottom(&area, 20)
+	bottom := ui.cut_bottom(&area, 38)
+	ui.cut_bottom(&area, 12)
 
-	// The run: a large tile on the left.
-	left := ui.cut_left(&area, 330)
-	ui.cut_left(&area, 20)
-	run_text := "Sette livelli di stanze procedurali fino al Demolitore.\n\n- Mazzo di carte, dadi e reliquie\n- Nemici con intenti dichiarati\n- Negozi, riposi, eventi e tesori\n- Sfide dei minigiochi nelle stanze ripulite: vinci oro extra\n\nF10 durante la run torna a questo menu."
-	if ui.tile(ctx, left, "La Rotta", run_text, p.accent) {
+	// Give the main game one clear action. The catalogue remains a compact
+	// list, with complete short descriptions instead of clipped card copy.
+	left := ui.cut_left(&area, 304)
+	ui.cut_left(&area, 24)
+	run := ui.panel(ctx, left)
+	ui.label(ctx, ui.cut_top(&run, 22), "L'ASCESA", .Small, p.focus)
+	ui.label(ctx, ui.cut_top(&run, 48), "La Rotta", .Title, p.text)
+	ui.cut_top(&run, 8)
+	ui.paragraph(ctx, ui.cut_top(&run, 76), "Carte, dadi e reliquie.\nSette livelli per raggiungere\nil cuore della torre.", .Body, p.text_dim)
+	start := ui.cut_bottom(&run, 42)
+	ui.cut_bottom(&run, 10)
+	ui.paragraph(ctx, run, "Leggi gli intenti. Scegli il momento.\nLe sfide nelle stanze ripulite\nricompensano la tua audacia.", .Small, p.text_dim)
+	if ui.button(ctx, start, "Inizia l'ascesa", primary = true) {
 		audio.play(frame.audio, .Confirm)
 		launcher_start_run(l, frame)
 	}
 
-	// Minigames: a grid on the right.
 	count := MINIGAME_COUNT
+	heading := ui.cut_top(&area, 28)
+	ui.label(ctx, heading, "LE PROVE DELLA TORRE", .Body, p.text)
+	ui.label(ctx, heading, "Pratica libera", .Small, p.text_dim, .Right)
+	ui.cut_top(&area, 4)
 	if count == 0 {
-		ui.panel(ctx, area, "Minigiochi")
+		ui.panel(ctx, area)
 		ui.label(ctx, ui.shrink(area, 40), "Nessun minigioco registrato.", .Body, p.text_dim, .Center)
 	}
-	columns := 2
-	rows := max((count+columns-1)/columns, 1)
 	for i in 0..<count {
 		info, ok := minigame_info(i)
 		if !ok {
 			continue
 		}
-		cell := ui.cell(area, columns, rows, i, 14)
+		cell := ui.row(area, count, i, 4)
 		rec := host.record_get(frame.profile, info.id)
-		stars := ""
-		switch rec.best_stars {
-		case 1:
-			stars = "*"
-		case 2:
-			stars = "**"
-		case 3:
-			stars = "***"
-		}
-		// One line of description: the tile also carries title, genre and record.
-		blurb := ui.ellipsize(ctx.theme, first_sentence(info.tagline), cell.width - 24, .Small)
-		subtitle := fmt.tprintf("%s\n%s", info.genre, blurb)
-		if rec.plays > 0 {
-			subtitle = fmt.tprintf("%s  -  record %d %s\n%s", info.genre, rec.best_score, stars, blurb)
-		}
-		if ui.tile(ctx, cell, info.title, subtitle, info.accent) {
+		if launcher_trial_row(ctx, cell, info, rec) {
 			audio.play(frame.audio, .Confirm)
 			host.push(frame, info.create(launcher_minigame_config(l)))
 		}
 	}
 
-	// Bottom bar: difficulty, settings, quit.
-	diff_area := ui.cut_left(&bottom, 420)
-	ui.label(ctx, ui.cut_left(&diff_area, 110), "Difficoltà", .Body, p.text_dim)
-	names := DIFFICULTY_NAMES
-	for i in 0..<3 {
-		r := ui.column(diff_area, 3, i, 8)
-		if ui.button(ctx, r, names[i], primary = l.difficulty == i) {
-			l.difficulty = i
-			audio.play(frame.audio, .Blip)
-		}
-	}
-	quit_rect := ui.cut_right(&bottom, 120)
+	// Bottom bar: settings and quit.
+	quit_rect := ui.cut_right(&bottom, 92)
 	ui.cut_right(&bottom, 12)
-	settings_rect := ui.cut_right(&bottom, 160)
+	settings_rect := ui.cut_right(&bottom, 144)
 	if ui.button(ctx, settings_rect, "Impostazioni") {
 		audio.play(frame.audio, .Confirm)
 		host.push(frame, settings_scene())
@@ -287,19 +264,46 @@ launcher_update :: proc(data: rawptr, frame: ^host.Frame) {
 		host.quit(frame)
 	}
 	if l.status_ttl > 0 {
-		ui.label(ctx, bottom, l.status, .Small, p.warning, .Center)
+		ui.label(ctx, status, l.status, .Small, p.warning, .Left)
 	}
 }
 
-// The menu tile shows the opening sentence; the intro card shows the rest.
 @(private = "file")
-first_sentence :: proc(text: string) -> string {
-	for i in 0..<len(text) {
-		if (text[i] == '.' || text[i] == '!' || text[i] == '?') && (i+1 == len(text) || text[i+1] == ' ') {
-			return text[:i+1]
-		}
+launcher_trial_blurb :: proc(id: string) -> string {
+	switch id {
+	case "platform2d": return "Platform 2D  /  Salti e braci"
+	case "platform3d": return "Platform 3D  /  Isole sospese"
+	case "arena": return "Arena  /  Resisti alle ondate"
+	case "fps": return "Prima persona  /  Rune e ombre"
+	case "puzzle": return "Enigmi  /  Pietre e sigilli"
+	case "ring": return "Duello 3D  /  Parate e prese"
 	}
-	return text
+	return "Una prova nella torre"
+}
+
+@(private = "file")
+launcher_trial_row :: proc(ctx: ^ui.Context, bounds: ui.Rect, info: host.Minigame_Info,
+	record: host.Record) -> bool {
+	s := ui.interact(ctx, bounds)
+	p := ctx.theme.palette
+	active := s.hovered || s.focused
+	ui.fill(ctx, bounds, p.panel_alt if active else p.panel)
+	ui.fill(ctx, {bounds.x, bounds.y+bounds.height-1, bounds.width, 1}, p.border)
+	ui.fill(ctx, {bounds.x, bounds.y+8, 2, bounds.height-16}, p.focus if active else p.border)
+	if s.focused && ctx.keyboard_mode {
+		ui.outline(ctx, bounds, p.focus, 1)
+	}
+	inner := ui.shrink_xy(bounds, 12, 3)
+	result := ui.cut_right(&inner, 96)
+	ui.label(ctx, ui.cut_top(&inner, 20), info.title, .Body, p.text)
+	ui.label(ctx, inner, launcher_trial_blurb(info.id), .Small, p.text_dim)
+	if record.plays > 0 {
+		ui.label(ctx, ui.cut_top(&result, 20), fmt.tprintf("%d", record.best_score), .Body, p.text, .Right)
+		ui.label(ctx, result, fmt.tprintf("%d / 3 sigilli", record.best_stars), .Small, p.warning, .Right)
+	} else {
+		ui.label(ctx, result, "Entra  >", .Small, p.focus if active else p.text_dim, .Right)
+	}
+	return s.clicked
 }
 
 @(private = "file")
@@ -307,15 +311,25 @@ launcher_draw :: proc(data: rawptr, frame: ^host.Frame) {
 	l := cast(^Launcher)data
 	w := frame.canvas.width
 	h := frame.canvas.height
-	gfx.draw_vertical_gradient(frame.canvas, rl.Color{18, 16, 30, 255}, rl.Color{44, 20, 28, 255})
-	gfx.draw_stars(w, h*0.6, 70, l.time)
-	gfx.draw_hills(w, h, h*0.78, 90, l.time*14, rl.Color{30, 24, 40, 255}, 1.3)
-	gfx.draw_hills(w, h, h*0.88, 60, l.time*30, rl.Color{20, 16, 26, 255}, 4.1)
-	ui.draw_text(frame.theme, "ODIN PP", {36, 22}, .Huge, rl.Color{236, 226, 204, 255})
-	ui.draw_text(frame.theme, "Roguelike e minigiochi su un unico engine", {40, 88}, .Body, rl.Color{232, 196, 112, 255})
-	ui.draw_text(frame.theme, "Frecce/WASD o pad per scegliere, Invio per confermare  -  F9 diagnostica  -  F11 schermo intero",
-		{40, h - 20}, .Small, rl.Color{150, 140, 128, 255}, false)
-	gfx.draw_vignette(w, h, 0.45)
+	p := frame.theme.palette
+	gfx.draw_vertical_gradient(frame.canvas, rl.Color{12, 18, 29, 255}, p.background)
+	// Recessed pillars echo the arena's block geometry without covering the
+	// controls with moving particles or another layer of decorative cards.
+	for i in 0..<7 {
+		x := f32(i)*w/6 - 34
+		rl.DrawRectangleRec({x, 0, 68, h}, rl.Color{16, 23, 34, 255})
+		rl.DrawRectangleRec({x+6, 0, 2, h}, rl.Color{30, 43, 58, 255})
+		for j in 0..<8 {
+			rl.DrawRectangleRec({x, f32(j)*76 + f32(i%2)*38, 68, 2}, p.background)
+		}
+	}
+	gfx.draw_stars(w, h*0.6, 24, l.time*0.4)
+	gfx.draw_vignette(w, h, 0.35)
+	ui.draw_text(frame.theme, "ODIN PP", {32, 24}, .Title, p.text)
+	ui.draw_text(frame.theme, "Ogni stanza, una scelta. Ogni prova, una nuova strada.", {34, 72}, .Body, p.text_dim)
+	rl.DrawRectangleRec({32, 99, w-64, 1}, p.border)
+	ui.draw_text(frame.theme, "Mouse / frecce / pad: scegli    Invio: conferma", {32, h-24}, .Small, p.text_dim, false)
+	ui.draw_text_fit(frame.theme, "F11  Schermo intero", {w-230, h-27, 198, 20}, .Small, p.text_dim, .Right)
 }
 
 // Settings: a modal panel over the menu, saved when closed.

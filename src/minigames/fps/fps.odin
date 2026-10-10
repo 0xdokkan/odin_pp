@@ -38,10 +38,9 @@ Game :: struct {
 	clock:        timing.Fixed_Step,
 	actions:      input.Action_Map(Action),
 	controls:     input.State(Action),
-	was_playing:  bool,
+	input_gate: input.Resume_Gate(Action),
 	jump_queued:  bool,
 	fire_queued:  bool,
-	fire_blocked: bool,
 	demo:         bool,
 }
 
@@ -52,7 +51,7 @@ info :: proc() -> host.Minigame_Info {
 		genre    = "FPS 3D",
 		tagline  = "Scendi nella cripta, strappa le rune ai suoi guardiani e fuggi dal portale prima che i morti ti reclamino.",
 		controls = "Mouse: guarda   WASD / stick: muoviti   Shift: corri   Spazio: salta\nClick SX / RT: bastone runico   Tab: mappa",
-		accent   = {226, 128, 58, 255},
+		accent   = {125, 170, 203, 255},
 		create   = create,
 	}
 }
@@ -118,25 +117,18 @@ hook_reset :: proc(data: rawptr, config: host.Minigame_Config) {
 
 @(private)
 suspend_player_input :: proc(g: ^Game) {
-	input.reset(&g.controls)
-	g.was_playing = false
+	input.suspend(&g.controls, &g.input_gate)
 	g.jump_queued = false
 	g.fire_queued = false
-	g.fire_blocked = false
 }
 
 // A click that starts/resumes the round belongs to the shell until released.
 // Movement remains held input; jump is delivered once, fire also supports hold.
 @(private)
 advance_player_controls :: proc(g: ^Game, sample: input.Sample(Action), dt: f32) -> Player_Input {
-	input.advance(&g.controls, sample, dt)
-	if !g.was_playing {
-		g.was_playing = true
-		g.controls.pressed = {}
-		g.fire_blocked = .Fire in g.controls.down
+	if input.advance_resumable(&g.controls, &g.input_gate, sample, dt, {.Fire}) {
 		return {}
 	}
-	g.fire_blocked = g.fire_blocked && .Fire in g.controls.down
 	move := input.vector(&g.controls, Action.Left, Action.Right, Action.Forward, Action.Back)
 	if .Jump in g.controls.pressed {
 		g.jump_queued = true
@@ -147,7 +139,7 @@ advance_player_controls :: proc(g: ^Game, sample: input.Sample(Action), dt: f32)
 	return Player_Input{
 		move = {move.x, -move.y},
 		sprint = .Sprint in g.controls.down,
-		fire = .Fire in g.controls.down && !g.fire_blocked,
+		fire = .Fire in g.controls.down,
 	}
 }
 
@@ -172,7 +164,7 @@ hook_step :: proc(data: rawptr, frame: ^host.Frame, playing: bool) -> host.Round
 		suspend_player_input(g)
 	}
 	if frame.focused && !g.demo {
-		resuming := !g.was_playing
+		resuming := !g.input_gate.active
 		base = advance_player_controls(g, input.sample(&g.actions), frame.dt)
 		if resuming {
 			// Keys still held from the menu (Space, Enter) must not fire edges.

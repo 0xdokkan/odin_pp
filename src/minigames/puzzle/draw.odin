@@ -101,7 +101,8 @@ cell_hash :: proc "contextless" (x, y: int) -> u32 {
 }
 
 compute_layout :: proc(b: ^Board, canvas: rl.Rectangle) -> Layout {
-	area := rl.Rectangle{16, 50, canvas.width - 32, canvas.height - 50 - 26}
+	top := f32(ui.HUD_MARGIN + ui.HUD_TOP_HEIGHT + 30)
+	area := rl.Rectangle{16, top, canvas.width - 32, canvas.height - top - 32}
 	scale := 1
 	for s := 4; s >= 1; s -= 1 {
 		w := f32(b.width * TILE_PX * s)
@@ -318,7 +319,7 @@ view_on_move :: proc(v: ^View, p: ^Puzzle, r: Move_Result) {
 		for cell in 0..<b.width*b.height {
 			if b.tiles[cell] == .Gate {
 				add_ring(v, cell_center(v, cell_vec(b, cell)), v.layout.tile*0.8, 0.45,
-					{140, 255, 210, 200} if r.gates_opened else {200, 120, 90, 160})
+					{160, 219, 246, 200} if r.gates_opened else {200, 120, 90, 160})
 			}
 		}
 	}
@@ -510,6 +511,18 @@ draw_world :: proc(v: ^View, p: ^Puzzle, params: Draw_Params) {
 	v.layout.origin += offset
 	defer v.layout.origin = saved
 
+	// The room is a carved diorama resting on an obsidian plinth.
+	// Decorative depth sits behind the board, never on a playable cell.
+	base := rl.Rectangle{L.origin.x-7*s, L.origin.y-6*s, f32(b.width)*T+14*s, f32(b.height)*T+12*s}
+	rl.DrawRectangleRec({base.x+3*s, base.y+6*s, base.width, base.height}, {3, 7, 13, 205})
+	rl.DrawRectangleRec(base, {16, 27, 41, 255})
+	rl.DrawRectangleLinesEx(base, s, {69, 101, 133, 255})
+	for side in 0..<2 {
+		x := base.x+3*s if side == 0 else base.x+base.width-3*s
+		rl.DrawRectangleRec({x-s, base.y+3*s, 2*s, 9*s}, {133, 173, 203, 210})
+		rl.DrawRectangleRec({x-s, base.y+base.height-12*s, 2*s, 9*s}, {133, 173, 203, 210})
+	}
+
 	// Floor layer.
 	for y in 0..<b.height {
 		for x in 0..<b.width {
@@ -627,20 +640,22 @@ draw_wall :: proc(v: ^View, b: ^Board, x, y: int, k, lift: f32, time: f32) {
 			}
 		}
 	}
-	shade := rl.Color{255, 255, 255, 255} if inner else rl.Color{150, 146, 166, 255}
+	shade := rl.Color{255, 255, 255, 255} if inner else rl.Color{139, 151, 165, 255}
 	tint := ui.with_alpha(shade, k)
 	// The top face rises into the cell above only when nothing playable is
 	// there, so a wall never hides a sigil or a relic standing behind it.
 	raise := H if !walkable(tile_at(b, x, y-1)) else 0
 	top := pos.y - raise
 	blit(v.sprites.wall_top, int(h%2), {pos.x, top, T, T}, tint)
-	rim := ui.with_alpha({112, 106, 132, 255}, k)
-	dark := ui.with_alpha({30, 27, 40, 255}, k)
+	// Glossy top plate, with dark grout retained between neighbours.
+	rl.DrawRectangleLinesEx({pos.x+s, top+s, T-2*s, T-2*s}, s*0.5, ui.with_alpha({119, 154, 182, 100}, k))
+	rim := ui.with_alpha({149, 181, 208, 255}, k)
+	dark := ui.with_alpha({17, 28, 43, 255}, k)
 	if tile_at(b, x, y-1) != .Wall {
 		rl.DrawRectangleRec({pos.x, top, T, s}, rim)
 	}
 	if tile_at(b, x-1, y) != .Wall {
-		rl.DrawRectangleRec({pos.x, top, s, T}, ui.with_alpha({96, 90, 114, 255}, k))
+		rl.DrawRectangleRec({pos.x, top, s, T}, ui.with_alpha({103, 136, 163, 255}, k))
 	}
 	if tile_at(b, x+1, y) != .Wall {
 		rl.DrawRectangleRec({pos.x + T - s, top, s, T}, dark)
@@ -768,7 +783,8 @@ draw_hero :: proc(v: ^View, appear: f32, time: f32) {
 	if behind {
 		draw_lantern(lx, ly, s, appear)
 	}
-	blit(v.sprites.hero, frame, dest, ui.with_alpha(rl.WHITE, appear), flip)
+	gfx.draw_sprite_cutout_rect(v.sprites.hero, v.sprites.hero_paper, frame, dest,
+		flip_x = flip, tint = ui.with_alpha(rl.WHITE, appear), thickness = 1.15*s)
 	if !behind {
 		draw_lantern(lx, ly, s, appear)
 	}
@@ -824,7 +840,7 @@ draw_sigil_glows :: proc(v: ^View, p: ^Puzzle, params: Draw_Params) {
 		c := cell_center(v, cell_vec(b, cell))
 		fill := v.sigil_fill[cell]
 		pulse := tween.pulse01(time + f32(cell)*0.37, 2.4)
-		idle := rl.Color{90, 110, 255, u8((70 + 60*pulse) * (1-fill) * k)}
+		idle := rl.Color{96, 171, 228, u8((70 + 60*pulse) * (1-fill) * k)}
 		gold := rl.Color{255, 196, 90, u8(190 * fill * k)}
 		soft_glow(c, T*(0.62 + 0.08*pulse), idle)
 		soft_glow(c, T*0.95, gold)
@@ -883,13 +899,13 @@ draw_lights :: proc(v: ^View, p: ^Puzzle, params: Draw_Params) {
 		// The acolyte's lantern.
 		c := lantern_pos(v)
 		flicker := 0.9 + 0.1*math.sin(time*11) + 0.05*math.sin(time*23)
-		soft_glow(c, T*2.6*flicker, {255, 170, 90, 58})
-		soft_glow(c, T*0.5, {255, 220, 150, 90})
+		soft_glow(c, T*2.6*flicker, {104, 175, 230, 48})
+		soft_glow(c, T*0.5, {166, 222, 255, 80})
 	}
 	for i in 0..<b.plate_count {
 		cell := int(b.plates[i])
 		if occupied(&p.state, cell) {
-			soft_glow(cell_center(v, cell_vec(b, cell)), T*0.8, {90, 255, 200, 34})
+			soft_glow(cell_center(v, cell_vec(b, cell)), T*0.8, {105, 185, 230, 34})
 		}
 	}
 	for i in 0..<v.torch_count {
@@ -920,64 +936,67 @@ Hud_Info :: struct {
 
 draw_hud :: proc(v: ^View, theme: ^ui.Theme, canvas: rl.Rectangle, info: Hud_Info, time: f32) {
 	p := theme.palette
-	// Top band.
-	rl.DrawRectangleGradientV(0, 0, i32(canvas.width), 46, {8, 8, 14, 230}, {8, 8, 14, 0})
-	ui.draw_text(theme, fmt.tprintf("Cripta %d di %d", info.level_index+1, info.level_count), {18, 6}, .Small, p.text_dim)
-	ui.draw_text(theme, info.level_name, {18, 20}, .Large, p.text)
-
-	// Moves, par and the stars still within reach.
-	right := canvas.width - 18
-	moves_text := fmt.tprintf("Mosse %d", info.moves)
-	par_text := fmt.tprintf("Par %d", info.par)
-	mw := ui.measure(theme, moves_text, .Large).x
-	ui.draw_text(theme, moves_text, {right - mw, 16}, .Large, p.text)
-	pw := ui.measure(theme, par_text, .Small).x
-	ui.draw_text(theme, par_text, {right - mw - pw - 18, 25}, .Small, p.text_dim)
-	reach := level_stars(info.moves, info.par, info.hints)
-	for i in 0..<3 {
-		filled := u8(i) < reach
-		c := [2]f32{right - mw - pw - 92 + f32(i)*22, 32}
-		ui.draw_star(c + {1, 2}, 9, {0, 0, 0, 150})
-		ui.draw_star(c, 9, p.focus if filled else rl.Color{70, 66, 80, 255})
+	zones := ui.hud_columns(canvas)
+	for zone in zones {
+		ui.hud_panel(theme, zone)
 	}
-	if info.plates > 0 {
-		label := fmt.tprintf("Piastre %d/%d", info.plates_down, info.plates)
-		color := p.success if info.plates_down == info.plates else p.text_dim
-		lw := ui.measure(theme, label, .Small).x
-		ui.draw_text(theme, label, {right - lw, 44}, .Small, color)
-	}
+	left, middle, right := ui.shrink(zones[0], 10), ui.shrink(zones[1], 10), ui.shrink(zones[2], 10)
+	ui.draw_text_fit(theme, fmt.tprintf("CRIPTA %d / %d", info.level_index+1, info.level_count),
+		{left.x, left.y, left.width, 18}, .Small, p.text_dim)
+	ui.draw_text_fit(theme, info.level_name, {left.x, left.y + 22, left.width, 24}, .Body, p.text)
 
 	if info.torch_max > 0 {
-		draw_torch_bar(theme, canvas, info, time)
+		draw_torch_bar(theme, middle, info, time)
+	} else {
+		ui.draw_text_fit(theme, "ATTIVA TUTTI I SIGILLI", {middle.x, middle.y, middle.width, 21}, .Body, p.text, .Center)
+	}
+	label := "Spingi le reliquie sui sigilli"
+	color := p.text_dim
+	if info.plates > 0 {
+		label = fmt.tprintf("PIASTRE  %d/%d", info.plates_down, info.plates)
+		color = p.warning if info.plates_down == info.plates else p.text_dim
+	} else if info.challenge {
+		label = "Ogni mossa consuma la torcia"
+	}
+	ui.draw_text_fit(theme, label, {middle.x, middle.y + 28, middle.width, 18}, .Small, color, .Center)
+
+	ui.draw_text_fit(theme, "MOSSE", {right.x, right.y, 64, 22}, .Small, p.text_dim)
+	ui.draw_text_fit(theme, fmt.tprintf("%d", info.moves),
+		{right.x + 68, right.y - 2, right.width - 68, 26}, .Large, p.text, .Right)
+	ui.draw_text_fit(theme, fmt.tprintf("PAR %d", info.par), {right.x, right.y + 28, right.width - 80, 18}, .Small, p.text_dim)
+	reach := level_stars(info.moves, info.par, info.hints)
+	for i in 0..<3 {
+		c := [2]f32{right.x + right.width - 52 + f32(i)*22, right.y + 37}
+		ui.draw_star(c, 7, p.warning if u8(i) < reach else p.border)
 	}
 
 	if v.message_time > 0 {
 		a := clamp(v.message_time*2, 0, 1)
-		ui.draw_text_centered(theme, v.message, {canvas.width*0.5, 64}, .Body, ui.with_alpha(p.warning, a))
+		ui.draw_text_fit(theme, v.message,
+			{canvas.width*0.5 - 240, ui.HUD_MARGIN + ui.HUD_TOP_HEIGHT + 7, 480, 22},
+			.Body, ui.with_alpha(p.warning, a), .Center)
 	}
 
-	help := "Frecce/WASD muovi   Z annulla   Y ripeti   R ricomincia   H aiuto   Esc pausa"
+	// The pause screen owns the complete command reference.
+	help := "Z annulla    Y ripeti    H suggerimento    ESC comandi"
 	if info.challenge {
-		help = "Frecce/WASD muovi   Z annulla (la torcia non torna)   R ricomincia   Esc pausa"
+		help = "Z annulla (la torcia non torna)    R ricomincia    ESC comandi"
 	}
-	ui.draw_text_centered(theme, help, {canvas.width*0.5, canvas.height - 13}, .Small, ui.with_alpha(p.text_dim, 0.85))
+	ui.draw_text_fit(theme, help, {16, canvas.height - 27, canvas.width - 32, 20}, .Small, p.text_dim, .Center)
 }
 
 @(private)
-draw_torch_bar :: proc(theme: ^ui.Theme, canvas: rl.Rectangle, info: Hud_Info, time: f32) {
+draw_torch_bar :: proc(theme: ^ui.Theme, bounds: rl.Rectangle, info: Hud_Info, time: f32) {
 	p := theme.palette
-	w := f32(220)
-	bar := rl.Rectangle{canvas.width*0.5 - w*0.5, 18, w, 12}
 	frac := f32(info.torch) / f32(max(info.torch_max, 1))
 	low := frac < 0.2
-	rl.DrawRectangleRounded({bar.x - 2, bar.y - 2, bar.width + 4, bar.height + 4}, 0.5, 6, {0, 0, 0, 170})
-	fill := rl.Color{255, 170, 70, 255}
+	fill := p.warning
 	if low {
-		fill = ui.mix_color({255, 90, 60, 255}, {255, 200, 120, 255}, tween.pulse01(time, 0.6))
+		fill = ui.mix_color(p.danger, p.warning, tween.pulse01(time, 0.6))
 	}
-	rl.DrawRectangleRounded({bar.x, bar.y, bar.width * frac, bar.height}, 0.5, 6, fill)
-	label := fmt.tprintf("Torcia %d", info.torch)
-	ui.draw_text_centered(theme, label, {canvas.width*0.5, 8}, .Small, p.warning if low else p.text_dim)
+	ui.draw_text_fit(theme, fmt.tprintf("TORCIA  %d", info.torch),
+		{bounds.x, bounds.y - 2, bounds.width, 20}, .Small, p.warning if low else p.text, .Center)
+	ui.hud_meter(theme, {bounds.x + 12, bounds.y + 21, bounds.width - 24, 4}, frac, fill)
 }
 
 // Arrow over the hero pointing the suggested way.
@@ -994,7 +1013,7 @@ draw_hint :: proc(v: ^View, time: f32) {
 	base := c + dv*T*bounce
 	side := [2]f32{-dv.y, dv.x} * T * 0.22
 	a := u8(255 * clamp(v.hint_time*2, 0, 1))
-	color := rl.Color{140, 255, 210, a}
+	color := rl.Color{160, 219, 246, a}
 	rl.DrawTriangle(tip, base + side, base - side, color)
 	rl.DrawTriangle(tip, base - side, base + side, color)
 }
@@ -1010,7 +1029,7 @@ draw_title_card :: proc(theme: ^ui.Theme, canvas: rl.Rectangle, index, count: in
 	rl.DrawRectangleGradientH(0, i32(cy - 46), i32(canvas.width*0.5), 92, {4, 3, 8, 0}, {4, 3, 8, u8(225*a)})
 	rl.DrawRectangleGradientH(i32(canvas.width*0.5), i32(cy - 46), i32(canvas.width*0.5), 92, {4, 3, 8, u8(225*a)}, {4, 3, 8, 0})
 	rise := (1 - a) * 8
-	ui.draw_text_centered(theme, fmt.tprintf("Cripta %d di %d", index+1, count), {canvas.width*0.5, cy - 20 + rise}, .Body, ui.with_alpha(p.focus, a))
+	ui.draw_text_centered(theme, fmt.tprintf("Cripta %d di %d", index+1, count), {canvas.width*0.5, cy - 20 + rise}, .Body, ui.with_alpha(p.warning, a))
 	ui.draw_text_centered(theme, name, {canvas.width*0.5, cy + 12 + rise}, .Title, ui.with_alpha(p.text, a))
 }
 
@@ -1023,7 +1042,7 @@ draw_clear_card :: proc(theme: ^ui.Theme, canvas: rl.Rectangle, res: Level_Resul
 	rl.DrawRectangleGradientH(0, i32(cy - 62), i32(canvas.width*0.5), 124, {0, 0, 0, 0}, {6, 4, 10, u8(190*a)})
 	rl.DrawRectangleGradientH(i32(canvas.width*0.5), i32(cy - 62), i32(canvas.width*0.5), 124, {6, 4, 10, u8(190*a)}, {0, 0, 0, 0})
 	title := "La cripta si apre!" if last else "Sigilli risvegliati!"
-	ui.draw_text_centered(theme, title, {canvas.width*0.5, cy - 32 + slide}, .Title, ui.with_alpha(p.focus, a))
+	ui.draw_text_centered(theme, title, {canvas.width*0.5, cy - 32 + slide}, .Title, ui.with_alpha(p.warning, a))
 	for i in 0..<3 {
 		appear := clamp((t - 0.25 - f32(i)*0.15) * 4, 0, 1)
 		if appear <= 0 {
@@ -1033,7 +1052,7 @@ draw_clear_card :: proc(theme: ^ui.Theme, canvas: rl.Rectangle, res: Level_Resul
 		c := [2]f32{canvas.width*0.5 + f32(i-1)*44, cy + 14}
 		r := 15 * tween.ease(.Out_Back, appear)
 		ui.draw_star(c + {2, 3}, r, {0, 0, 0, 150})
-		ui.draw_star(c, r, p.focus if filled else rl.Color{70, 66, 80, 255})
+		ui.draw_star(c, r, p.warning if filled else rl.Color{70, 66, 80, 255})
 	}
 	stats := fmt.tprintf("Mosse %d   Par %d", res.moves, res.par)
 	ui.draw_text_centered(theme, stats, {canvas.width*0.5, cy + 44}, .Body, ui.with_alpha(p.text_dim, a))
@@ -1049,25 +1068,25 @@ vignette_strength :: proc(torch, torch_max: int) -> f32 {
 }
 
 draw_backdrop :: proc(canvas: rl.Rectangle, time: f32) {
-	gfx.draw_vertical_gradient(canvas, {16, 14, 24, 255}, {8, 7, 12, 255})
+	gfx.draw_vertical_gradient(canvas, {13, 22, 34, 255}, {5, 9, 16, 255})
 	// A vast sigil carved into the dark, turning very slowly behind the crypt.
 	c := [2]f32{canvas.width*0.5, canvas.height*0.5 + 10}
 	for ring in 0..<2 {
 		radius := f32(330 - ring*70)
 		spin := time * (0.03 if ring == 0 else -0.045)
-		rl.DrawRing(c, radius - 2, radius, 0, 360, 96, {70, 60, 120, 34})
+		rl.DrawRing(c, radius - 2, radius, 0, 360, 96, {64, 112, 158, 34})
 		marks := 36 - ring*12
 		for i in 0..<marks {
 			a := spin + f32(i)*2*math.PI/f32(marks)
 			q := c + {math.cos(a), math.sin(a)} * (radius + 9)
 			size := f32(4 if i%3 == 0 else 2)
-			rl.DrawRectangleRec({q.x - size*0.5, q.y - size*0.5, size, size}, {96, 84, 160, 40})
+			rl.DrawRectangleRec({q.x - size*0.5, q.y - size*0.5, size, size}, {96, 150, 196, 40})
 		}
 	}
 	// Slow drifting fog bands.
 	for i in 0..<3 {
 		y := canvas.height * (0.25 + 0.25*f32(i)) + math.sin(time*0.2+f32(i)*2)*20
-		rl.DrawRectangleGradientV(0, i32(y - 60), i32(canvas.width), 60, {40, 34, 60, 0}, {40, 34, 60, 26})
-		rl.DrawRectangleGradientV(0, i32(y), i32(canvas.width), 60, {40, 34, 60, 26}, {40, 34, 60, 0})
+		rl.DrawRectangleGradientV(0, i32(y - 60), i32(canvas.width), 60, {32, 53, 78, 0}, {32, 53, 78, 26})
+		rl.DrawRectangleGradientV(0, i32(y), i32(canvas.width), 60, {32, 53, 78, 26}, {32, 53, 78, 0})
 	}
 }

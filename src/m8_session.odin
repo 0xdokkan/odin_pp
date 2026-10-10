@@ -4,6 +4,7 @@ import "core:encoding/json"
 import "core:fmt"
 import "core:os"
 import game "game"
+import host "engine/host"
 import render "render"
 import view "view"
 import rl "vendor:raylib"
@@ -12,7 +13,8 @@ M8_PROFILE_PATH :: "odin_pp_profile.json"
 M8_Profile_File :: struct { version: int, progress: game.M8_Profile }
 M8_Session :: struct {
 	character_open, save_enabled: bool,
-	activity: M9_Session,
+	requested: render.M8_Control,
+	ring_pending: bool,
 	// M8 progression receipt only; the live ring simulation belongs to fight.
 	ring: game.Ring_Challenge,
 	reward: game.Ring_Reward,
@@ -22,7 +24,6 @@ M8_Session :: struct {
 M8_Session_Input :: struct {
 	focused, inside, pressed: bool,
 	mouse: view.Vec2,
-	activity: M9_Input,
 }
 
 // Object controls have one input path: an enabled button's left-click edge.
@@ -32,7 +33,7 @@ m8_pointer_gameplay_command :: proc(room: ^game.Room, renderer: ^render.Renderer
 	switch render.m8_control_at_point(renderer, room, mouse) {
 	case .Activate: return {kind = .Activate, origin_phase = room.phase}, true
 	case .Equip: return {kind = .Equip, origin_phase = room.phase}, true
-	case .None, .Character, .Ring, .FPS, .Workshop:
+	case .None, .Character, .Ring, .FPS:
 	}
 	return {}, false
 }
@@ -65,31 +66,14 @@ update_m8_session :: proc(session: ^M8_Session, room: ^game.Room, renderer: ^ren
 	buffer: ^Buffered_Gameplay_Command, available: bool, dt: f32, mouse: view.Vec2, inside: bool) -> bool {
 	input := M8_Session_Input{focused = rl.IsWindowFocused(), inside = inside, mouse = mouse,
 		pressed = rl.IsMouseButtonPressed(.LEFT)}
-	if session.activity.mode != .None {input.activity=sample_m9_input(&session.activity,renderer,mouse,inside)}
 	consumed := step_m8_session(session, room, renderer, controller, cards, buffer, available, dt, input)
-	update_m9_cursor(&session.activity)
 	return consumed
 }
 
 step_m8_session :: proc(session: ^M8_Session, room: ^game.Room, renderer: ^render.Renderer,
 	controller: ^Tactical_Controller, cards: ^Card_Interaction_State,
 	buffer: ^Buffered_Gameplay_Command, available: bool, dt: f32, input: M8_Session_Input) -> bool {
-	if session.activity.mode != .None {
-		activity_input := input.activity
-		activity_input.focused=input.focused && available
-		step_m9_session(&session.activity,dt,activity_input)
-		if !session.activity.practice && !session.ring.settled {
-			result := session.activity.ring.result
-			if result != .Active || session.activity.mode == .None {
-				session.ring.phase=.Won if result == .Won else .Lost
-				session.reward=game.settle_ring_challenge(room,&session.ring)
-				if session.reward.won && session.save_enabled && !save_m8_profile(M8_PROFILE_PATH,room.player.m8_profile) {
-					session.activity.status="Salvataggio non riuscito: progressi validi per questa sessione."
-				}
-			}
-		}
-		return true // Closing consumes the input too; it cannot reach the board.
-	}
+	if session.requested != .None || session.ring_pending {return true}
 	if !available || !input.focused { return session.character_open }
 	left_click := input.inside && input.pressed
 	if session.character_open {
@@ -105,16 +89,32 @@ step_m8_session :: proc(session: ^M8_Session, room: ^game.Room, renderer: ^rende
 	if clicked == .Ring && room.phase == .Loot {
 		started: bool
 		session.ring, started = game.begin_ring_challenge(room)
-		if started {begin_m9_session(&session.activity,.Ring,false,false)}
+		if started {session.requested=.Ring; session.ring_pending=true}
 		session.reward = {}
 		session.status = ""
 	}
-	if clicked == .FPS {begin_m9_session(&session.activity,.FPS,true,false)}
-	if clicked == .Workshop {begin_m9_session(&session.activity,.Arena,true,true)}
-	if session.character_open || session.activity.mode != .None {
+	if clicked == .FPS {session.requested=.FPS}
+	if session.character_open || session.requested != .None {
 		clear_card_interaction(cards)
 		clear_gameplay_command_buffer(buffer)
 		return true
 	}
 	return false
+}
+
+// Accept only the outstanding ring receipt. Standalone victories and foreign
+// results cannot unlock cards, and closing a won result cannot pay twice.
+settle_m8_host_activity :: proc(session: ^M8_Session, room: ^game.Room, from: string, result: Maybe(host.Result)) -> bool {
+    if !session.ring_pending || from != "ring" {return false}
+    r, has := result.?
+    if has && r.minigame != "ring" {return false}
+    session.ring_pending=false
+    session.requested=.None
+    session.ring.phase=.Won if has && r.outcome==.Won else .Lost
+    session.reward=game.settle_ring_challenge(room,&session.ring)
+    session.status=""
+    if session.reward.won && session.save_enabled && !save_m8_profile(M8_PROFILE_PATH,room.player.m8_profile) {
+        session.status="Salvataggio non riuscito: progressi validi per questa sessione."
+    }
+    return true
 }

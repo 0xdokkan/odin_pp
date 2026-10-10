@@ -12,9 +12,9 @@ DT :: f32(1.0 / SIM_HZ)
 
 // Worlds are large: always on the heap (test threads have small stacks).
 @(private = "file")
-new_world :: proc(seed: u64, difficulty := 1, challenge := false) -> ^World {
+new_world :: proc(seed: u64, challenge := false) -> ^World {
 	w := new(World)
-	world_reset(w, host.Minigame_Config{seed = seed, difficulty = difficulty, challenge = challenge})
+	world_reset(w, host.Minigame_Config{seed = seed, challenge = challenge})
 	return w
 }
 
@@ -121,12 +121,22 @@ test_same_seed_and_inputs_replay_identically :: proc(t: ^testing.T) {
 
 @(test)
 test_generation_is_valid_for_many_seeds :: proc(t: ^testing.T) {
+	free_play := tuning_for({})
+	challenge := tuning_for({challenge = true})
+	testing.expect_value(t, free_play.cells, 9)
+	testing.expect_value(t, free_play.runes, 4)
+	testing.expect_value(t, free_play.enemies, 11)
+	testing.expect_value(t, free_play.damage_scale, f32(1))
+	testing.expect_value(t, challenge.cells, 7)
+	testing.expect_value(t, challenge.runes, 3)
+	testing.expect_value(t, challenge.enemies, 6)
+	testing.expect_value(t, challenge.damage_scale, f32(0.75))
 	field := new([MAX_COLUMNS]i32)
 	defer free(field)
 	for seed in u64(1)..=30 {
-		for difficulty in 0..=2 {
+		for seed_offset in 0..=2 {
 			for challenge in ([2]bool{false, true}) {
-				w := new_world(seed*7919+u64(difficulty), difficulty, challenge)
+				w := new_world(seed*7919+u64(seed_offset), challenge)
 				defer free_world(w)
 				tuning := tuning_for(w.config)
 				m := &w.maze
@@ -177,9 +187,9 @@ test_generation_is_valid_for_many_seeds :: proc(t: ^testing.T) {
 @(test)
 test_bot_collects_every_rune_and_escapes :: proc(t: ^testing.T) {
 	for seed in ([4]u64{1, 7, 1234, 0xC0FFEE}) {
-		for difficulty in 0..=2 {
+		for seed_offset in 0..=2 {
 			for challenge in ([2]bool{false, true}) {
-				w := new_world(seed, difficulty, challenge)
+				w := new_world(seed+u64(seed_offset)*101, challenge)
 				defer free_world(w)
 				// Reachability only: no enemies to fight.
 				w.enemy_count = 0
@@ -187,8 +197,8 @@ test_bot_collects_every_rune_and_escapes :: proc(t: ^testing.T) {
 				for i := 0; i < SIM_HZ*300 && w.status == .Playing; i += 1 {
 					world_step(w, bot_input(w, DT), DT)
 				}
-				testing.expectf(t, w.status == .Won, "seed %d diff %d challenge %v: status %v runes %d/%d",
-					seed, difficulty, challenge, w.status, w.runes_taken, w.rune_count)
+				testing.expectf(t, w.status == .Won, "seed %d offset %d challenge %v: status %v runes %d/%d",
+					seed, seed_offset, challenge, w.status, w.runes_taken, w.rune_count)
 				testing.expect_value(t, w.runes_taken, w.rune_count)
 				_, stars := world_score(w)
 				testing.expect(t, stars >= 1)
@@ -197,14 +207,14 @@ test_bot_collects_every_rune_and_escapes :: proc(t: ^testing.T) {
 	}
 }
 
-// With enemies the bot is no expert, but on easy it should usually make it:
+// With enemies the bot is no expert, but at the fixed balance it should usually make it:
 // a sanity check that the round is winnable under fire.
 @(test)
-test_bot_survives_easy_crypts_with_enemies :: proc(t: ^testing.T) {
+test_bot_survives_crypts_with_enemies :: proc(t: ^testing.T) {
 	wins := 0
 	total := 0
 	for seed in u64(1)..=8 {
-		w := new_world(seed*31, 0, false)
+		w := new_world(seed*31)
 		defer free_world(w)
 		for i := 0; i < SIM_HZ*400 && w.status == .Playing; i += 1 {
 			world_step(w, bot_input(w, DT), DT)
@@ -214,7 +224,7 @@ test_bot_survives_easy_crypts_with_enemies :: proc(t: ^testing.T) {
 			wins += 1
 		}
 	}
-	testing.expectf(t, wins*2 >= total, "bot won only %d of %d easy rounds", wins, total)
+	testing.expectf(t, wins*2 >= total, "bot won only %d of %d rounds", wins, total)
 }
 
 @(test)
@@ -396,7 +406,7 @@ check_invariants :: proc(t: ^testing.T, w: ^World) -> bool {
 test_long_random_soak_keeps_invariants :: proc(t: ^testing.T) {
 	script := rng.create(777)
 	for round in 0..<4 {
-		w := new_world(u64(round)*101+5, round%3, round == 3)
+		w := new_world(u64(round)*101+5, round == 3)
 		defer free_world(w)
 		in_: Player_Input
 		use_bot := false
@@ -413,7 +423,7 @@ test_long_random_soak_keeps_invariants :: proc(t: ^testing.T) {
 			}
 			if w.status != .Playing {
 				// Keep soaking from a fresh round.
-				world_reset(w, host.Minigame_Config{seed = u64(i), difficulty = round % 3})
+				world_reset(w, host.Minigame_Config{seed = u64(i)})
 			}
 		}
 		testing.expect_value(t, w.dropped_events, 0)

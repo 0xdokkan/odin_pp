@@ -75,7 +75,7 @@ Game :: struct {
 	repeat:      Repeat,
 	queued:      Action,
 	has_queued:  bool,
-	was_playing: bool,
+	input_gate: input.Resume_Gate(Action),
 	phase:       Phase,
 	phase_time:  f32,
 	result:      Level_Result, // of the level just cleared
@@ -136,16 +136,15 @@ game_reset :: proc(data: rawptr, config: host.Minigame_Config) {
 	g := cast(^Game)data
 	g.config = config
 	suspend_player_input(g)
-	session_start(&g.session, config.seed, config.difficulty, config.challenge)
+	session_start(&g.session, config.seed, config.challenge)
 	begin_level(g)
 }
 
 @(private)
 suspend_player_input :: proc(g: ^Game) {
-	input.reset(&g.controls)
+	input.suspend(&g.controls, &g.input_gate)
 	g.repeat = {}
 	g.has_queued = false
-	g.was_playing = false
 }
 
 @(private)
@@ -236,20 +235,15 @@ game_step :: proc(data: rawptr, frame: ^host.Frame, playing: bool) -> host.Round
 	command: Action
 	has_command := false
 	if frame.focused {
-		input.poll(&g.actions, &g.controls, dt)
-		if !g.was_playing {
-			// Keys still held from a menu must not act as fresh presses.
-			g.controls.pressed = {}
+		if input.advance_resumable(&g.controls, &g.input_gate, input.sample(&g.actions), dt, {}) {
 			g.repeat = {}
 		}
 		command, has_command = repeat_update(&g.repeat, &g.controls, dt)
-		g.was_playing = true
 	} else {
 		// The shell owns focus pauses. Without device focus, scripted/demo
 		// commands may still finish; only device state and repeats are reset.
-		input.reset(&g.controls)
+		input.suspend(&g.controls, &g.input_gate)
 		g.repeat = {}
-		g.was_playing = false
 	}
 
 	switch g.phase {

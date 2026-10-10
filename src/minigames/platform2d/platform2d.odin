@@ -45,7 +45,7 @@ Game :: struct {
 	// Presses latched until a simulation step consumes them, so none is lost
 	// on frames that run zero steps (hit-stop, high refresh rates).
 	pending:     Player_Input,
-	was_playing: bool,
+	input_gate: input.Resume_Gate(Action),
 	autoplay:    bool,
 	bot:         Bot,
 	view:        View,
@@ -95,19 +95,13 @@ game_reset :: proc(data: rawptr, config: host.Minigame_Config) {
 
 @(private)
 suspend_player_input :: proc(g: ^Game) {
-	input.reset(&g.controls)
+	input.suspend(&g.controls, &g.input_gate)
 	g.pending = {}
-	g.was_playing = false
 }
 
 @(private)
 advance_player_controls :: proc(g: ^Game, sample: input.Sample(Action), dt: f32) {
-	input.advance(&g.controls, sample, dt)
-	// Menu presses never become fresh jump/dash edges on resume.
-	if !g.was_playing {
-		g.controls.pressed = {}
-	}
-	g.was_playing = true
+	input.advance_resumable(&g.controls, &g.input_gate, sample, dt, {})
 	c := &g.controls
 	if .Jump in c.pressed || .Jump_Alt in c.pressed {
 		g.pending.jump_pressed = true

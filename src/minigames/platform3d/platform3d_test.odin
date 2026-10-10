@@ -8,9 +8,9 @@ import rng "../../engine/rng"
 
 // Worlds are big: tests keep them on the heap (test threads have small stacks).
 @(private = "file")
-make_world :: proc(seed: u64, difficulty: int, challenge := false) -> ^World {
+make_world :: proc(seed: u64, challenge := false) -> ^World {
 	w := new(World)
-	world_reset(w, host.Minigame_Config{seed = seed, difficulty = difficulty, challenge = challenge})
+	world_reset(w, host.Minigame_Config{seed = seed, challenge = challenge})
 	return w
 }
 
@@ -144,7 +144,7 @@ check_level :: proc(t: ^testing.T, w: ^World, label: string) {
 
 @(test)
 test_jump_reach_follows_the_controller :: proc(t: ^testing.T) {
-	w := make_world(1, 1)
+	w := make_world(1)
 	defer drop_world(w)
 	single := reach_at(w, 0, false)
 	double := reach_at(w, 0, true)
@@ -161,10 +161,19 @@ test_jump_reach_follows_the_controller :: proc(t: ^testing.T) {
 
 @(test)
 test_generation_is_valid_for_many_seeds :: proc(t: ^testing.T) {
-	for difficulty in 0..<3 {
+	free_play := gen_settings({})
+	challenge := gen_settings({challenge = true})
+	testing.expect_value(t, free_play.path_pads, 18)
+	testing.expect_value(t, free_play.shards_required, 7)
+	testing.expect_value(t, free_play.lives, 3)
+	testing.expect(t, free_play.double_jump && !free_play.timed)
+	testing.expect_value(t, challenge.path_pads, 11)
+	testing.expect_value(t, challenge.shards_required, 4)
+	testing.expect(t, challenge.timed)
+	for seed_offset in 0..<3 {
 		for challenge in ([2]bool{false, true}) {
 			for seed in u64(1)..=24 {
-				w := make_world(seed*7919+u64(difficulty), difficulty, challenge)
+				w := make_world(seed*7919+u64(seed_offset), challenge)
 				check_level(t, w, "level")
 				drop_world(w)
 			}
@@ -174,9 +183,9 @@ test_generation_is_valid_for_many_seeds :: proc(t: ^testing.T) {
 
 @(test)
 test_generation_is_deterministic :: proc(t: ^testing.T) {
-	a := make_world(42, 2)
+	a := make_world(42)
 	defer drop_world(a)
-	b := make_world(42, 2)
+	b := make_world(42)
 	defer drop_world(b)
 	testing.expect_value(t, a.pad_count, b.pad_count)
 	testing.expect(t, a.pads == b.pads)
@@ -188,7 +197,7 @@ test_generation_is_deterministic :: proc(t: ^testing.T) {
 		same = same && c == b.terrain.cells[i]
 	}
 	testing.expect(t, same)
-	c := make_world(43, 2)
+	c := make_world(43)
 	defer drop_world(c)
 	testing.expect(t, c.pads != a.pads)
 }
@@ -214,9 +223,9 @@ random_input :: proc(r: ^rng.Rng, current: Player_Input) -> Player_Input {
 
 @(test)
 test_same_seed_and_inputs_give_the_same_round :: proc(t: ^testing.T) {
-	a := make_world(9, 1)
+	a := make_world(9)
 	defer drop_world(a)
-	b := make_world(9, 1)
+	b := make_world(9)
 	defer drop_world(b)
 	ra := rng.create(77)
 	rb := rng.create(77)
@@ -237,9 +246,9 @@ test_same_seed_and_inputs_give_the_same_round :: proc(t: ^testing.T) {
 	testing.expect_value(t, sa, sb)
 	testing.expect_value(t, ka, kb)
 	// The bot is deterministic too.
-	c := make_world(5, 2)
+	c := make_world(5)
 	defer drop_world(c)
-	d := make_world(5, 2)
+	d := make_world(5)
 	defer drop_world(d)
 	bc := new(Bot)
 	defer free(bc)
@@ -272,13 +281,13 @@ run_bot :: proc(w: ^World, max_seconds: f32) {
 // chain, bridge, spike strip and sentinel the generator makes is crossable.
 @(test)
 test_bot_finishes_courses :: proc(t: ^testing.T) {
-	for difficulty in 0..<3 {
+	for seed_offset in 0..<3 {
 		for challenge in ([2]bool{false, true}) {
 			for seed in u64(1)..=5 {
-				w := make_world(seed*31+u64(difficulty), difficulty, challenge)
+				w := make_world(seed*31+u64(seed_offset), challenge)
 				run_bot(w, 400)
-				testing.expectf(t, w.status == .Won, "difficulty %d challenge %v seed %d: %v after %.1fs, %d/%d shards, %d deaths",
-					difficulty, challenge, seed, w.status, w.time, w.shards_taken, w.shard_count, w.deaths)
+				testing.expectf(t, w.status == .Won, "seed offset %d challenge %v seed %d: %v after %.1fs, %d/%d shards, %d deaths",
+					seed_offset, challenge, seed, w.status, w.time, w.shards_taken, w.shard_count, w.deaths)
 				drop_world(w)
 			}
 		}
@@ -287,7 +296,7 @@ test_bot_finishes_courses :: proc(t: ^testing.T) {
 
 @(test)
 test_collecting_everything_wins_with_three_stars :: proc(t: ^testing.T) {
-	w := make_world(3, 1)
+	w := make_world(3)
 	defer drop_world(w)
 	opened := false
 	for i in 0..<w.shard_count {
@@ -320,7 +329,7 @@ test_collecting_everything_wins_with_three_stars :: proc(t: ^testing.T) {
 
 @(test)
 test_sealed_portal_does_not_win :: proc(t: ^testing.T) {
-	w := make_world(4, 0)
+	w := make_world(4)
 	defer drop_world(w)
 	center := (w.portal_lo + w.portal_hi) * 0.5
 	w.player.body.position = Vec3{center.x - 0.3, w.portal_lo.y, center.z - 0.3}
@@ -334,7 +343,7 @@ test_sealed_portal_does_not_win :: proc(t: ^testing.T) {
 
 @(test)
 test_falling_costs_lives_until_the_round_is_lost :: proc(t: ^testing.T) {
-	w := make_world(6, 1)
+	w := make_world(6)
 	defer drop_world(w)
 	lives := w.lives
 	respawns := 0
@@ -363,7 +372,7 @@ test_falling_costs_lives_until_the_round_is_lost :: proc(t: ^testing.T) {
 
 @(test)
 test_challenge_runs_out_of_time :: proc(t: ^testing.T) {
-	w := make_world(8, 1, true)
+	w := make_world(8, true)
 	defer drop_world(w)
 	testing.expect(t, w.time_limit > 0)
 	warned := false
@@ -375,7 +384,7 @@ test_challenge_runs_out_of_time :: proc(t: ^testing.T) {
 	}
 	testing.expect(t, warned)
 	testing.expect_value(t, w.status, host.Round_Status.Lost)
-	free_play := make_world(8, 1)
+	free_play := make_world(8)
 	defer drop_world(free_play)
 	testing.expect_value(t, free_play.time_limit, f32(0))
 	testing.expect(t, free_play.path_count > w.path_count)
@@ -384,7 +393,7 @@ test_challenge_runs_out_of_time :: proc(t: ^testing.T) {
 @(private = "file")
 find_world_with :: proc(kind: Mover_Kind) -> ^World {
 	for seed in u64(1)..=60 {
-		w := make_world(seed, 2)
+		w := make_world(seed)
 		for i in 0..<w.mover_count {
 			if w.movers[i].kind == kind {
 				return w
@@ -466,7 +475,7 @@ test_spikes_and_sentinels_hurt :: proc(t: ^testing.T) {
 		if spiked && knocked {
 			break
 		}
-		w := make_world(seed, 2)
+		w := make_world(seed)
 		if !spiked && w.spike_count > 0 {
 			s := w.spikes[0]
 			// Wait for the stab, then stand in the middle of the strip.
@@ -501,7 +510,7 @@ test_spikes_and_sentinels_hurt :: proc(t: ^testing.T) {
 test_random_input_soak :: proc(t: ^testing.T) {
 	r := rng.create(2024)
 	for round in 0..<6 {
-		w := make_world(u64(round)*101+3, round%3, round >= 4)
+		w := make_world(u64(round)*101+3, round >= 4)
 		cmd: Player_Input
 		for _ in 0..<9000 {
 			cmd = random_input(&r, cmd)
@@ -522,7 +531,7 @@ test_random_input_soak :: proc(t: ^testing.T) {
 				break
 			}
 			if status != .Playing {
-				world_reset(w, host.Minigame_Config{seed = u64(round) + 900, difficulty = round % 3})
+				world_reset(w, host.Minigame_Config{seed = u64(round) + 900})
 			}
 		}
 		drop_world(w)

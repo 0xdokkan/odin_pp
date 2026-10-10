@@ -2,14 +2,14 @@
 
 Vertical slice di un roguelike con deck building, griglia logica 2D, ambiente
 realmente 3D a blocchi e personaggi sprite pixel art, scritto in Odin con Raylib.
-L’integrazione dell’engine aggiunge un menu comune e cinque minigiochi con
-gameplay diversi: platform 2D e 3D, arena in tempo reale, FPS e puzzle a turni.
+L’integrazione dell’engine aggiunge un menu comune e sei prove con
+gameplay diversi: platform 2D e 3D, arena a ondate, FPS, puzzle e ring 1v1.
 La run attraversa sette livelli di una rotta
 procedurale, fra combattimenti, ricompense e nodi speciali, fino al Demolitore.
 Carte, spinte, esplosivi, status e reliquie condividono una simulazione
 deterministica, separata dalle animazioni.
-Le fondazioni M9 aggiungono modalità autonome con movimento continuo:
-arena libera, ring 1v1 e una prova FPS, con collisioni e strumenti condivisi.
+Il ring usa la simulazione continua `fight`; l’FPS unico è Cripta delle Rune.
+I prototipi M9 restano laboratori tecnici espliciti da CLI, con collisioni e strumenti condivisi.
 Il combattimento tattico della 0.4 conserva le proprie regole a griglia.
 
 Questo README raccoglie la documentazione del progetto: uso della demo,
@@ -81,7 +81,7 @@ decimale o esadecimale con prefisso `0x`; seed e percorso scelto rendono la run
 riproducibile per la versione corrente del generatore.
 
 Senza argomenti si apre il **menu**: la run del roguelike, i minigiochi con i
-record, la difficoltà e le impostazioni (volumi, scuotimento, sensibilità del
+record e le impostazioni (volumi, scuotimento, sensibilità del
 mouse, FPS), salvate con i record in `odin_pp/profilo.json` nella cartella dati
 dell'utente. Se il file è corrotto o appartiene a una versione futura, la sessione
 usa valori predefiniti e disabilita le scritture per conservare il file originale.
@@ -91,8 +91,7 @@ Gli smoke e i laboratori non scrivono i profili.
 | Opzione | Uso |
 |---|---|
 | `--run` | salta il menu ed entra subito nella run |
-| `--minigame=<id>` | apre un minigioco sopra il menu (`platform2d`, `platform3d`, `arena`, `fps`, `puzzle`) |
-| `--easy`, `--hard` | difficoltà iniziale dei minigiochi dal menu |
+| `--minigame=<id>` | apre un minigioco sopra il menu (`platform2d`, `platform3d`, `arena`, `fps`, `puzzle`, `ring`) |
 | `--smoke-menu` | cattura `odin_pp_menu.png` dopo 30 frame ed esce |
 | `--animation-speed=2` | velocità delle animazioni ordinarie, fra 0.25x e 4x; non accelera cast o dadi M8 |
 | `--fast` | velocità 4x |
@@ -141,15 +140,47 @@ fisica, layout dell'interfaccia, sintesi audio, salvataggi) non chiamano Raylib.
 | [save](src/engine/save) | JSON versionato scritto in modo atomico, percorsi per utente |
 | [host](src/engine/host) | finestra, ciclo dei frame, stack di scene, profilo con impostazioni e record, guscio dei minigiochi |
 
+### Interfaccia e input condivisi
+
+La palette semantica vive in `engine/ui.GOTHIC_PALETTE`: nero e ardesia per
+le superfici, blu per interazione e focus, rosso per danni, oro per premi.
+Il renderer del roguelike usa le stesse costanti; texture delle carte,
+materiali 3D e ambienti mantengono le proprie variazioni artistiche.
+`hud_panel`, `hud_meter`, `draw_text_fit` e `hud_columns` sono i componenti
+comuni. Le prove del catalogo ordinano vita/risorse a sinistra, obiettivo al centro,
+punti/progresso a destra. La run conserva pulse, carte e QTE nella propria
+HUD, con gli stessi pannelli e colori.
+
+Il menu dà priorità all’ascesa e presenta le prove in righe leggibili. Durante
+Combat la barra degli oggetti mostra solo dispositivi o equipaggiamento
+presenti; i controlli disabilitati visibili intercettano il mouse, quelli
+nascosti non lasciano zone invisibili sulla board. Nel Loot attività e pratica
+occupano un piccolo pannello in basso a destra; l’uscita resta libera al centro.
+Disegno, hit test e occlusione del mouse usano lo stesso layout.
+
+L’host concede input soltanto alla scena superiore e annulla clic e focus UI
+al cambio scena. `input.Resume_Gate` è condiviso dagli adattatori delle prove, incluso il ring:
+il primo campione dopo la pausa stabilisce lo stato dei tasti senza generare
+nuove pressioni; il fuoco già tenuto resta bloccato fino al rilascio.
+I singoli giochi possiedono ancora le code delle azioni da consegnare ai tick.
+La run riceve tempo e puntatore da `host.Frame`; quando perde l’input pulisce
+selezioni, buffer e trascinamenti, preservando pulse, QTE e stato del mondo.
+
 ### Scene
 
 Run e minigiochi del menu sono `host.Scene`: dati propri sull'heap e procedure `update`,
 `draw` (canvas), `draw_window` (overlay in coordinate di finestra, come i dadi
-3D), `after_present` (screenshot), `resume` (la scena sopra è stata chiusa,
+3D), `after_present` (screenshot), `suspend` (cede l’input a una scena nuova),
+`resume` (la scena sopra è stata chiusa,
 con un eventuale `host.Result`) e `destroy`. Lo stack ha due regole: sotto una
 scena **modal** non si aggiorna nulla, sotto una scena **opaque** non si
 disegna nulla. `push`, `pop`, `replace` e `quit` sono comandi accodati e
 applicati a fine frame, quindi nessuna scena viene distrutta mentre è in uso.
+`suspend` viene chiamato solo per un push accettato, anche se l’overlay è
+modale: i minigiochi entrano in pausa e rilasciano il cursore. Dopo la chiusura
+dell’overlay richiedono una ripresa esplicita. I nomi in `resume` e
+`Result.minigame` sono validi per il callback anche dopo `destroy` della scena
+figlia; vanno copiati se si desidera conservarli oltre quel frame.
 I widget di `ui` vanno chiamati in `update`, così stanno sopra al mondo di ogni
 scena; il mondo si disegna in `draw`.
 
@@ -164,7 +195,7 @@ GPU sulla finestra dell'host).
 Un minigioco è un package in [src/minigames](src/minigames) con due procedure:
 `info() -> host.Minigame_Info` (id, titolo, genere, descrizione, comandi,
 colore) e `create(host.Minigame_Config) -> host.Scene`. La configurazione porta
-seed, difficoltà (0-2) e il flag `challenge` per le sfide della run, che sono
+seed e il flag `challenge` per le sfide della run, che sono
 più brevi e hanno un solo tentativo. Il gioco implementa `Minigame_Hooks`
 (`reset`, `step`, `draw`, `score`, `destroy`, musica, cattura del mouse) e
 `host.minigame_scene` aggiunge il guscio comune: scheda iniziale con i comandi,
@@ -172,6 +203,13 @@ pausa con `Esc` o quando la finestra perde il focus, risultati con stelle,
 punteggio e record, riprova. La simulazione di ogni minigioco è pura, a passo
 fisso e deterministica per seed e input; i test la guidano senza finestra.
 Il catalogo per menu e sfide è in [minigame_registry.odin](src/minigame_registry.odin).
+
+Tutte le prove usano un unico bilanciamento fisso, equivalente al precedente
+livello Normale. Non esistono selettori di difficoltà nel menu o nella
+configurazione; i vecchi flag `--easy` e `--hard` non sono più accettati.
+Restano la progressione interna di livelli/ondate e la varietà data dal seed.
+Le sfide della run mantengono la durata ridotta, senza modificatori legati
+alla profondità o alle stanze Elite.
 
 ### I minigiochi
 
@@ -182,22 +220,25 @@ Il catalogo per menu e sfide è in [minigame_registry.odin](src/minigame_registr
 | [arena](src/minigames/arena) | Arena delle Braci | twin-stick a ondate in arene simmetriche: cinque nemici con attacchi telegrafati e il Signore delle Braci, potenziamenti, combo fino a x8 | `WASD`, mouse per mirare, clic sinistro, `Spazio` scatto | vittoria; metà vita; combo obiettivo |
 | [fps](src/minigames/fps) | Cripta delle Rune | prima persona in una cripta generata: tre nemici con IA su flow field, bastone runico a mana, rune che aprono il portale, minimappa | mouse, `WASD`, `Shift`, clic sinistro, `Tab` mappa | fuga; tempo sotto il par; vita e mira oltre il 50% |
 | [puzzle](src/minigames/puzzle) | Sigilli della Cripta | Sokoban con ghiaccio e grate a piastre; 17 livelli risolti da un BFS che ne fissa il par; undo/redo e suggerimenti | frecce/`WASD`, `Z` annulla, `Y` ripete, `R` ricomincia, `H` aiuto | entro par; entro 1,5 par; risolto |
+| [ring](src/ring_minigame.odin) | Il Ring delle Ombre | duello 3D continuo contro il campione, guardia, schivata, combo e presa in quattro pose; stessa scena dal menu e dalla run | `WASD`, `1` pugno, `2` pesante, `3` presa, `Spazio` schiva, `Shift` para; pad stick/X/Y/RB/A/LB | vittoria; salute residua almeno 3; almeno 6 |
 
 Ogni pacchetto ha un bot deterministico (`create_autoplay` o `autoplay`) usato
 dai test e per le catture, e test headless su determinismo, vincibilità,
 sconfitta, validità della generazione su molti seed e soak con input casuali.
-`--smoke-minigame=<id>` cattura `odin_pp_<id>.png` dopo 180 frame di gioco.
+`--smoke-minigame=<id>` usa il bot, ignora input live e cattura
+`odin_pp_<id>.png` dopo 180 frame di gioco.
 Gli avvii diretti `--minigame` e `--smoke-minigame` rispettano esattamente
-`--seed` e la difficoltà CLI; dal menu ogni nuova partita può usare un nuovo seed.
+`--seed`; dal menu ogni nuova partita può usare un nuovo seed.
 La cattura verifica avvio e rendering, mentre i bot dei test verificano partite
-complete. `--fps-lab` resta il laboratorio M9 con Navata/Cortile e caricatore;
-`--minigame=fps` avvia la distinta Cripta delle Rune con bastone e mana.
+complete. `--minigame=fps` e il pulsante Cripta nella run avviano la stessa
+Cripta delle Rune con bastone e mana. `--fps-lab` conserva soltanto il banco
+di prova M9 per raycast/caricatore: non compare nel menu o nel Loot.
 
 ### Sfide nella run
 
 In una stanza di combattimento o Elite ripulita, una volta per stanza, il
-pulsante **Sfida minigioco**, azionato con il mouse, apre un minigioco scelto dal seed del nodo,
-con difficoltà crescente con la profondità. La run vede solo l'esito: una
+pulsante **SFIDA EXTRA**, azionato con il mouse, apre un minigioco scelto dal seed del nodo,
+con lo stesso bilanciamento a ogni profondità. La run vede solo l'esito: una
 vittoria vale 4/8/12/18 oro per 0-3 stelle, sconfitta e abbandono non danno
 nulla e non tolgono nulla. Le regole sono in
 [minigame_challenge.odin](src/game/minigame_challenge.odin).
@@ -365,9 +406,10 @@ L'equipaggiamento resta tra stanze della stessa run, ma non viene salvato nel
 profilo permanente. La prima versione offre questo drop; altri tipi di arma e
 oggetti attivi riutilizzeranno gli slot e il comando di attivazione.
 
-La barra sopra la mano mostra attivazione, numero di dispositivi, arma e usi.
-**ATTIVA**, **EQUIPAGGIA**, **PERSONAGGIO**, **SFIDA DEL RING**,
-**PROVA FPS** e **LABORATORIO M9** sono
+La barra sopra la mano mostra attivazione e dispositivi solo quando presenti,
+e arma/usi solo se equipaggiati o in riserva. Nel Loot si sposta in basso.
+**ATTIVA**, **EQUIPAGGIA**, **PERSONAGGIO**, **SFIDA RING**,
+**CRIPTA DELLE RUNE** e **SFIDA EXTRA** sono
 pulsanti usati **solo con il mouse**. Disegno e hitbox condividono le stesse
 coordinate; i comandi disabilitati non cliccano la board. **PERSONAGGIO**
 apre una scheda in pausa: modellino **realmente 3D** del player a sinistra,
@@ -377,7 +419,7 @@ Il danno mostrato include l'arma.
 
 ### Il Ring delle Ombre e gli sblocchi
 
-Nel Loot, prima di lasciare la stanza, il pulsante **SFIDA DEL RING** apre
+Nel Loot, prima di lasciare la stanza, il pulsante **SFIDA RING** apre
 **una sfida per stanza** in un ring 3D con combattenti pixel ritagliati.
 Il ring giocato usa ora la simulazione continua M9: `WASD` muovono sul piano,
 `1` esegue un pugno, `2` un colpo pesante, `3` una presa ravvicinata,
@@ -385,10 +427,13 @@ Il ring giocato usa ora la simulazione continua M9: `WASD` muovono sul piano,
 in [M9](#m9-fondazioni-per-le-modalità-libere).
 
 La stanza principale rimane sospesa e il duello usa salute e stato propri.
-La sconfitta non sottrae salute alla run. Cliccare **TORNA** durante il duello
-consuma il tentativo come sconfitta; dopo l'esito riporta al Loot senza
-riassegnare il premio. `Esc` oppure **PAUSA / RIPRENDI** sospendono e riprendono
-il duello. Apertura e ritorno si comandano con il mouse.
+La sconfitta non sottrae salute alla run. `Esc` apre la pausa; **Abbandona**
+consuma il tentativo senza premi. Dopo l’esito, **Continua** torna al Loot
+e assegna lo sblocco una volta sola. Intro, pausa e risultati sono gli stessi
+del catalogo. Dal menu sono possibili riprove e record, ma nessuno sblocco M8.
+Sul pad: stick muove, X pugno, Y pesante, RB presa, A schiva, LB parata;
+B/Start restano alla pausa della shell. Il campione ha sempre 12 HP,
+dal menu e nella sfida della run, con le stesse mosse e gli stessi tempi.
 
 | Traguardo persistente | Sblocco |
 |---|---|
@@ -420,8 +465,9 @@ in quattro pose. Si conservano corpi 2D, profondità 3D, blocchi plastici blu sc
 e HUD pixel. Dispositivi e campo hanno geometrie e rune dedicate, senza nascondere
 la griglia o mostrare nemici coperti dalla fog.
 
-Il ring introdotto in M8 è stato ampliato dalle fondazioni M9; una prima
-prova FPS è ora giocabile. Il catalogo del menu aggiunge platform 2D/3D, arena, FPS e puzzle; un
+Il ring introdotto in M8 converge nella scena condivisa basata su `fight`: la
+vecchia simulazione laterale e il suo overlay sono rimossi. Il catalogo include
+platform 2D/3D, arena a ondate, Cripta FPS, puzzle e ring; un
 picchiaduro 3D più articolato resta una direzione futura. Non sono presenti una raccolta di
 minigiochi completa, ruote, un inventario esteso di consumabili o un
 salvataggio/ripristino della run. Bilanciamento delle reti, durata dei cast e
@@ -440,14 +486,16 @@ questi contenuti. Non modifica pulse, cast, dadi, fog o regole del classico/M7.
 ./run.sh --smoke-m9-view
 ```
 
-Nella run, i pulsanti **SFIDA DEL RING**, **PROVA FPS** e **LABORATORIO M9**
-sono disponibili con il mouse durante Loot, a presentazione conclusa.
-L'attività possiede input e tempo finché non si preme **TORNA**. Stanza,
+Nella run, **SFIDA RING** e **CRIPTA DELLE RUNE** aprono le scene canoniche
+del catalogo durante Loot, a presentazione conclusa. **SFIDA EXTRA** offre
+una delle cinque prove storiche per oro, preservando la scelta degli stessi seed.
+Il laboratorio è disponibile solo da CLI. L’attività possiede input e tempo
+fino al ritorno tramite la shell. Stanza,
 salute, carte, RNG e pulse della run rimangono sospesi. Il frame di chiusura
 consuma anche il clic, impedendo che arrivi alla board.
 
-Soltanto **SFIDA DEL RING** dalla stanza può assegnare i traguardi M8, una
-volta per tentativo. FPS, arena libera, ring del laboratorio e tutte le
+Soltanto **SFIDA RING** dalla stanza può assegnare i traguardi M8, una
+volta per tentativo. Cripta libera, arena libera, ring del catalogo e tutti i
 laboratori M9 avviati da CLI sono pratica: non scrivono vittorie del ring nel
 profilo M8 e non sbloccano carte. I minigiochi del nuovo menu hanno record
 separati nel profilo dell'engine. Cambiare modalità nel laboratorio conserva questa distinzione.
@@ -526,7 +574,7 @@ automaticamente: occorre rilasciare il pulsante prima del primo colpo.
 
 ### Laboratorio e contenuti modificabili
 
-I laboratori CLI e **LABORATORIO M9** mostrano gli strumenti azionabili con
+I laboratori CLI mostrano gli strumenti azionabili con
 il mouse: selezione Arena/Ring/FPS, reset, livello, collisioni, pausa e
 avanzamento di **1 TICK**. Il ring mostra anche hitbox e hurtbox. Il pannello
 delle mosse seleziona pugno, pesante o presa e modifica startup e danno;
@@ -891,7 +939,7 @@ le immagini sono output rigenerabili, non prerequisiti del checkout.
 |---|---|
 | `--smoke-m9-view` | collisioni continue, vittoria contro l'IA del ring, quattro pose della presa, replay esatto, FPS con telegraph/ricarica/vittoria e ritorno; screenshot `odin_pp_m9_arena.png`, `ring.png`, `ring_grab_0.png`–`ring_grab_3.png`, `tools.png`, `fps.png` (prefisso comune `odin_pp_m9_`) |
 | `--smoke-arenas-view` | quattro fasce di arene reali, combattimento, ologramma, Loot e cambio stanza; screenshot `odin_pp_arenas_*.png` |
-| `--smoke-m8-view` | dispositivi e compatibilità del ring M8: `odin_pp_m8_d4.png`, `devices`, `character`, `loot`, `ring_0`–`ring_3`, `next_room` (tutti con prefisso `odin_pp_m8_` e suffisso `.png`) |
+| `--smoke-m8-view` | dispositivi, ring canonico e sblocco, ritorno Loot: `odin_pp_m8_d4.png`, `devices`, `character`, `loot`, `next_room` (tutti con prefisso `odin_pp_m8_` e suffisso `.png`) |
 | `--smoke` | `odin_pp_isometric.png` |
 | `--smoke-generation` | `odin_pp_procedural_room.png` |
 | `--smoke-map` | `odin_pp_route.png` |
@@ -2320,8 +2368,8 @@ invarianti e descritta dalla documentazione. Stati: `[x]` completata,
 | M9B — ring | [x] | duello live libero, mosse configurabili, guardia, schivata, presa a quattro pose, hit-stop e ritorno alla run con sblocco singolo |
 | M9C — FPS | [x] | due stanze, arma con caricatore/riserva/ricarica, tre nemici con telegraph, vittoria/sconfitta e gestione del cursore |
 | M9D — strumenti | [x] | laboratorio mouse, collider/hitbox, passo singolo, preset mosse JSON validati e replay degli input in memoria |
-| M9 / 0.5 | [x] | engine condiviso in tredici package, run come scena, menu e impostazioni, cinque minigiochi (platform 2D e 3D, arena, FPS, puzzle) e sfide nella run; launcher e script Windows disponibili |
-| Dopo M9 | [ ] | bilanciamento umano di run e minigiochi, input del roguelike su action map (rimappatura, pad), Ring delle Ombre sul guscio dei minigiochi, timeline di presentazione generica nell'engine, altri oggetti/armi; salvataggio completo della run |
+| M9 / 0.5 | [x] | engine condiviso in tredici package, run come scena, menu e impostazioni, sei prove (platform 2D e 3D, arena, FPS, puzzle, ring unificato) e sfide nella run; launcher e script Windows disponibili |
+| Dopo M9 | [ ] | bilanciamento umano di run e minigiochi, input del roguelike su action map (rimappatura, pad), timeline di presentazione generica nell'engine, altri oggetti/armi; salvataggio completo della run |
 
 ### M7: implementazione e verifiche storiche
 
@@ -2866,6 +2914,86 @@ coperte dai bot headless, non da playtest umani. Restano da valutare difficoltà
 ritmo e coerenza visiva fra le modalità. Raylib segnala dodici codepoint non
 presenti nel font incorporato; nelle catture esaminate i testi di gioco sono
 leggibili, ma non è una verifica completa di tutti i caratteri del font.
+
+
+### Allineamento engine e HUD dopo il merge
+
+L’host gestisce ora interattività e sospensione delle scene in modo uniforme;
+la run e le attività M9 rispettano la stessa ownership dell’input. Sono stati
+riprodotti e corretti due difetti del contratto scene: una prova continuava a
+simulare sotto un overlay non modale e il nome/esito di una scena poteva
+essere invalidato da `destroy` prima della callback di ritorno. Le regressioni
+coprono anche overlay modali, push rifiutati e clic ereditati fra schermate.
+`Resume_Gate` sostituisce cinque implementazioni locali della ripresa input.
+
+HUD e menu condividono palette e primitivi grafici dell’engine. Nella run
+sono stati rimossi pannelli vuoti, ridotte le informazioni ripetute e separate
+le attività del Loot dal percorso centrale. Nelle cinque prove sono allineati
+pannelli, barre, obiettivi e notifiche; il puzzle riserva esplicitamente spazio
+alla board su tutti i livelli. Il test della barra oggetti distingue controlli
+nascosti, controlli visibili disabilitati e click sulla board.
+
+Verifica del 10 ottobre 2026: **1.025 test** con e senza assert, strict/vet e
+due build tramite `scripts/check.sh`. Dopo l’ultimo aggiustamento geometrico
+del pannello Loot sono state ripetute le regressioni HUD e lo smoke M8.
+Il report M7 è ancora identico byte per byte al merge precedente. Gli smoke
+nativi coprono menu, avvio e rendering delle cinque prove, ring/FPS/replay M9,
+combattimento e dispositivi M8, Loot e stanza successiva. Screenshot:
+`odin_pp_menu.png`, `odin_pp_m8_devices.png`, `odin_pp_m8_loot.png`,
+`odin_pp_platform3d.png`, `odin_pp_fps.png`, `odin_pp_puzzle.png`.
+
+Questo allineamento non modifica bilanciamento o regole di combattimento.
+Griglia tattica, fisica continua X/Z e controller platform tile/voxel restano
+specializzati; i laboratori CLI conservano i propri driver diagnostici.
+L’input del roguelike non è ancora completamente rimappabile tramite action
+map e le due progressioni salvate restano distinte. La revisione artistica successiva è descritta sotto. Verifiche native su
+macOS, script Windows non eseguiti.
+
+
+### Coesione delle prove e FPS/ring unificati
+
+Tutte le prove adottano nero, ardesia/blu e avorio. Rosso comunica pericolo,
+oro indica rune e ricompense. FPS e platform 3D usano le figure dell’atlante
+principale con silhouette di carta separate, precompilate al caricamento;
+platform 2D, arena e puzzle conservano le pose dei propri sprite e ricevono
+la stessa cornice avorio/nera. Nessuna rigenerazione di texture per frame.
+La lieve lucentezza è un parametro opzionale del lighting condiviso, zero
+per i renderer che non la richiedono.
+
+Il ring ha una pedana scolpita, intarsi, angoli illuminati e camera più ampia.
+La Cripta ha superfici blu levigate, architettura incisa, magie leggibili e
+segnali d’attacco. Guglie Sospese sostituisce l’avatar cubico con il Viandante;
+le piattaforme hanno bordi e nicchie. Torre di Cenere, Arena delle Braci e
+Sigilli della Cripta condividono pietra, cornici e accenti freddi mantenendo
+intatti geometria di gioco, collisioni e obiettivi.
+
+`ring_minigame.odin` adatta l’unica simulazione `fight` alla shell. Il receipt
+M8 conserva soltanto esito e pagamento, senza simulazione parallela. Le
+regressioni verificano routing unico, assenza di ricompense dalla pratica,
+un solo sblocco al ritorno, abbandono, sospensione e input ripresi senza
+azioni ereditate. Gli strumenti M9 restano diagnostica esplicita: non sono
+una seconda scelta di FPS/ring nel gioco. Non sono stati unificati i due
+formati di profilo o modificati pulse, carte e combattimento della run.
+
+Verifica: **1.028 test con e senza assert**, strict/vet e due build.
+Smoke nelle finestre native per menu, tutte le sei prove, dispositivi M8,
+ring/sblocco/ritorno Loot/stanza successiva e laboratori M9 con replay.
+Il report M7 prima/dopo è identico byte per byte (4.023 byte). Le catture
+usano bot e seed 7, senza registrare record o sblocchi di test.
+Regressioni aggiuntive proteggono il mirror delle celle dell’atlante,
+la presa su RB (B/Start appartengono alla shell) e il clic su Sfida extra,
+che non deve attraversare la HUD fino alla board. Le due figure trasparenti
+di ogni attore si compongono senza scrivere profondità: pareti e piattaforme
+continuano a occultarle, mentre il bordo non può coprire la propria illustrazione.
+Dopo questa correzione grafica sono stati ripetuti strict/vet, build, test FPS
+e verifiche native di FPS e platform 3D.
+
+Screenshot: `odin_pp_menu.png`, `odin_pp_ring.png`, `odin_pp_fps.png`,
+`odin_pp_platform2d.png`, `odin_pp_platform3d.png`, `odin_pp_arena.png`,
+`odin_pp_puzzle.png`. Le animazioni dei cutout usano pose e trasformazioni
+a scatti dei disegni esistenti, non nuovi fotogrammi anatomici disegnati.
+Restano da valutare in playtest umano difficoltà, pad e leggibilità alle
+varie distanze; verifica nativa effettuata su macOS, non su Windows.
 
 
 ### M7G: lavoro restante dopo il prototipo

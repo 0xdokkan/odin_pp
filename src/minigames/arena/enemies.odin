@@ -446,7 +446,7 @@ pick_boss_move :: proc(w: ^World, e: ^Enemy) -> Boss_Move {
 
 @(private)
 boss_summon :: proc(w: ^World, e: ^Enemy) {
-	count := 3 + clamp(w.config.difficulty, 0, 2) / 2
+	count := 3
 	for i in 0..<count {
 		angle := f32(i)*2*math.PI/f32(count) + rng.float01(&w.ai_rng)
 		pos := e.pos + Vec2{math.cos(angle), math.sin(angle)} * (e.radius + 34)
@@ -628,7 +628,7 @@ build_wave :: proc(w: ^World) {
 	r := &w.wave_rng
 	if is_boss_wave(w, w.wave) {
 		push_queue(w, .Boss)
-		escorts := 2 + clamp(w.config.difficulty, 0, 2)*2
+		escorts := 4
 		for _ in 0..<escorts {
 			push_queue(w, .Chaser)
 		}

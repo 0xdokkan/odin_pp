@@ -31,12 +31,11 @@ Game :: struct {
 	clock:       timing.Fixed_Step,
 	actions:     input.Action_Map(Action),
 	controls:    input.State(Action),
-	was_playing: bool,
+	input_gate: input.Resume_Gate(Action),
 	// A dash press is delivered to exactly one fixed step, even on frames
 	// that run none.
 	dash_latch:  bool,
 	fire_latch:  bool,
-	fire_blocked: bool,
 	demo:        bool,
 	// Debug: each round fast-forwards this many seconds headlessly (bot play,
 	// or idle without autoplay) to preview later waves.
@@ -130,22 +129,14 @@ game_reset :: proc(data: rawptr, config: host.Minigame_Config) {
 
 @(private)
 suspend_player_input :: proc(g: ^Game) {
-	input.reset(&g.controls)
-	g.was_playing = false
+	input.suspend(&g.controls, &g.input_gate)
 	g.dash_latch = false
 	g.fire_latch = false
-	g.fire_blocked = false
 }
 
 @(private)
 advance_player_controls :: proc(g: ^Game, sample: input.Sample(Action), dt: f32) {
-	input.advance(&g.controls, sample, dt)
-	if !g.was_playing {
-		g.controls.pressed = {}
-		g.fire_blocked = .Fire in g.controls.down
-	}
-	g.was_playing = true
-	g.fire_blocked = g.fire_blocked && .Fire in g.controls.down
+	input.advance_resumable(&g.controls, &g.input_gate, sample, dt, {.Fire})
 	if .Dash in g.controls.pressed || .Dash_Alt in g.controls.pressed {
 		g.dash_latch = true
 	}
@@ -172,7 +163,7 @@ read_input :: proc(g: ^Game, frame: ^host.Frame) -> Player_Input {
 	advance_player_controls(g, input.sample(&g.actions), frame.dt)
 	result := Player_Input{
 		move = input.vector(s, Action.Left, Action.Right, Action.Up, Action.Down),
-		fire = .Fire in s.down && !g.fire_blocked,
+		fire = .Fire in s.down,
 	}
 	v := &g.view
 	stick := input.vector(s, Action.Aim_Left, Action.Aim_Right, Action.Aim_Up, Action.Aim_Down)

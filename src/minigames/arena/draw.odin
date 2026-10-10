@@ -28,7 +28,7 @@ IVORY_DIM :: rl.Color{160, 152, 136, 255}
 CRIMSON :: rl.Color{178, 38, 52, 255}
 GOLD :: rl.Color{232, 196, 112, 255}
 EMBER :: rl.Color{240, 128, 48, 255}
-VIOLET :: rl.Color{186, 120, 255, 255}
+SOUL_BLUE :: rl.Color{129, 192, 234, 255}
 CLEAR :: rl.Color{0, 0, 0, 0}
 
 // Iron braziers on the border walls, in cells.
@@ -250,7 +250,7 @@ enemy_color :: proc "contextless" (kind: Enemy_Kind) -> rl.Color {
 	case .Chaser:
 		return {255, 150, 60, 255}
 	case .Caster:
-		return VIOLET
+		return SOUL_BLUE
 	case .Charger:
 		return {255, 90, 70, 255}
 	case .Splitter, .Shard:
@@ -538,7 +538,7 @@ kill_feedback :: proc(v: ^Render, w: ^World, frame: ^host.Frame, e: Event, kill_
 	case .Caster:
 		burst(v, tinted(DEATH_EMBERS, {240, 210, 255, 255}, {90, 30, 160, 0}), e.pos, e.dir, 20)
 		burst(v, ASH, e.pos, e.dir, 8, false)
-		add_ring(v, e.pos, 32, 0.3, VIOLET)
+		add_ring(v, e.pos, 32, 0.3, SOUL_BLUE)
 		fx.hit_stop(&v.hit_stop, 0.04)
 		trauma(v, frame, 0.18)
 	case .Splitter:
@@ -719,12 +719,12 @@ bake_level :: proc(v: ^Render, w: ^World) {
 	bake_circle(player_start())
 	for i in 0..<w.portal_count {
 		p := w.portals[i]
-		rl.DrawRing(p, 15, 17, 0, 360, 28, {74, 40, 70, 255})
-		rl.DrawRing(p, 8, 9, 0, 360, 20, {60, 34, 58, 255})
+		rl.DrawRing(p, 15, 17, 0, 360, 28, {71, 108, 145, 255})
+		rl.DrawRing(p, 8, 9, 0, 360, 20, {44, 78, 113, 255})
 		for k in 0..<6 {
 			a := f32(k) * math.PI / 3
 			d := Vec2{math.cos(a), math.sin(a)}
-			rl.DrawLineEx(p+d*10, p+d*14, 2, {70, 38, 66, 255})
+			rl.DrawLineEx(p+d*10, p+d*14, 2, {66, 110, 151, 255})
 		}
 	}
 	for y in 0..<MAP_H {
@@ -748,10 +748,14 @@ bake_level :: proc(v: ^Render, w: ^World) {
 bake_floor :: proc(v: ^Render, x, y, salt: int) {
 	r := rl.Rectangle{f32(x) * TILE, f32(y) * TILE, TILE, TILE}
 	shade := hash01(x, y, salt)
-	base := ui.mix_color({48, 44, 52, 255}, {40, 37, 45, 255}, shade)
-	rl.DrawRectangleRec(r, base)
-	light := ui.mix_color(base, {80, 74, 82, 255}, 0.35)
-	mortar := rl.Color{24, 22, 28, 255}
+	base := ui.mix_color({50, 68, 89, 255}, {39, 53, 72, 255}, shade)
+	rl.DrawRectangleRec(r, {12, 20, 31, 255})
+	rl.DrawRectangleRec({r.x+1, r.y+1, TILE-2, TILE-2}, base)
+	// Bevelled modular slab: a broad top highlight and a recessed bottom edge.
+	rl.DrawRectangleRec({r.x+2, r.y+2, TILE-4, 1}, {96, 124, 151, 190})
+	rl.DrawRectangleRec({r.x+2, r.y+TILE-3, TILE-4, 1}, {23, 35, 51, 255})
+	light := ui.mix_color(base, {112, 143, 169, 255}, 0.35)
+	mortar := rl.Color{13, 21, 34, 255}
 	rl.DrawRectangleRec({r.x, r.y, TILE, 1}, light)
 	rl.DrawRectangleRec({r.x, r.y, 1, TILE}, light)
 	rl.DrawRectangleRec({r.x, r.y + TILE - 1, TILE, 1}, mortar)
@@ -790,8 +794,8 @@ bake_floor :: proc(v: ^Render, x, y, salt: int) {
 
 @(private)
 bake_circle :: proc(c: Vec2) {
-	dark := rl.Color{70, 26, 32, 255}
-	dim := rl.Color{56, 24, 30, 255}
+	dark := rl.Color{53, 89, 121, 255}
+	dim := rl.Color{36, 66, 93, 255}
 	rl.DrawRing(c, 108, 112, 0, 360, 72, dark)
 	rl.DrawRing(c, 92, 94, 0, 360, 64, dim)
 	rl.DrawRing(c, 30, 32, 0, 360, 32, dim)
@@ -815,9 +819,14 @@ bake_circle :: proc(c: Vec2) {
 bake_wall :: proc(w: ^World, x, y, salt: int) {
 	r := rl.Rectangle{f32(x) * TILE, f32(y) * TILE, TILE, TILE}
 	tone := hash01(x, y, salt+30)
-	top := ui.mix_color({76, 80, 100, 255}, {66, 70, 90, 255}, tone)
+	top := ui.mix_color({63, 84, 109, 255}, {50, 67, 91, 255}, tone)
 	seam := rl.Color{42, 44, 58, 255}
 	rl.DrawRectangleRec(r, top)
+	// Inset steel plate above the masonry, with carved mounting studs.
+	rl.DrawRectangleLinesEx({r.x+3, r.y+3, TILE-6, TILE-6}, 1, {103, 136, 167, 150})
+	for stud in ([4]Vec2{{4, 4}, {TILE-6, 4}, {4, TILE-6}, {TILE-6, TILE-6}}) {
+		rl.DrawRectangleRec({r.x+stud.x, r.y+stud.y, 2, 2}, {139, 166, 189, 180})
+	}
 	// Staggered bricks.
 	for row in 0..<4 {
 		ry := r.y + f32(row)*8
@@ -831,10 +840,10 @@ bake_wall :: proc(w: ^World, x, y, salt: int) {
 		}
 	}
 	if open_cell(w, x, y-1) {
-		rl.DrawRectangleRec({r.x, r.y, TILE, 2}, {112, 116, 140, 255})
+		rl.DrawRectangleRec({r.x, r.y, TILE, 2}, {143, 179, 208, 255})
 	}
 	if open_cell(w, x-1, y) {
-		rl.DrawRectangleRec({r.x, r.y, 1, TILE}, {96, 100, 122, 255})
+		rl.DrawRectangleRec({r.x, r.y, 1, TILE}, {114, 147, 177, 255})
 	}
 	if open_cell(w, x+1, y) {
 		rl.DrawRectangleRec({r.x + TILE - 1, r.y, 1, TILE}, {36, 38, 50, 255})
@@ -842,7 +851,7 @@ bake_wall :: proc(w: ^World, x, y, salt: int) {
 	if open_cell(w, x, y+1) {
 		// Front face spills onto the floor below, which gives the walls height.
 		face := rl.Rectangle{r.x, r.y + TILE, TILE, FACE_H}
-		rl.DrawRectangleRec(face, {46, 46, 62, 255})
+		rl.DrawRectangleRec(face, {25, 38, 56, 255})
 		rl.DrawRectangleRec({face.x, face.y, TILE, 1}, {30, 30, 42, 255})
 		rl.DrawRectangleRec({face.x, face.y + 6, TILE, 1}, {36, 36, 50, 255})
 		for k in 0..<2 {
@@ -986,7 +995,7 @@ draw_telegraphs :: proc(v: ^Render, w: ^World, alpha: f32) {
 			dir := physics.normalize2(w.player.pos - pos)
 			prog := 1 - e.timer/0.6
 			for k := f32(18); k < 140; k += 14 {
-				rl.DrawCircleV(pos+dir*k, 1.5, alpha_of(VIOLET, 0.5*prog))
+				rl.DrawCircleV(pos+dir*k, 1.5, alpha_of(SOUL_BLUE, 0.5*prog))
 			}
 		}
 	}
@@ -1074,7 +1083,7 @@ draw_player :: proc(v: ^Render, w: ^World, alpha: f32) {
 		t := clamp(w.phase_time/0.45, 0, 1)
 		angle := (f32(-90) if flip else 90) * tween.ease(.Out_Bounce, t)
 		tint := ui.mix_color(rl.WHITE, {210, 150, 140, 255}, t)
-		gfx.draw_sprite(sprite, 0, pos+{0, PLAYER_RADIUS - 5}, 2, flip, tint, angle)
+		gfx.draw_sprite_cutout(sprite, v.white[.Player], 0, pos+{0, PLAYER_RADIUS - 5}, 2, flip, tint, angle)
 		return
 	}
 	speed := physics.length2(p.vel)
@@ -1095,7 +1104,7 @@ draw_player :: proc(v: ^Render, w: ^World, alpha: f32) {
 	if behind {
 		draw_staff(v, p, pos)
 	}
-	gfx.draw_sprite_feet(sprite, frame, feet, 2, flip, tint, squash)
+	gfx.draw_sprite_cutout_feet(sprite, v.white[.Player], frame, feet, 2, flip, tint, squash)
 	if p.hurt_time < 0.1 {
 		gfx.draw_sprite_feet(v.white[.Player], frame, feet, 2, flip, {255, 120, 120, 230}, squash)
 	} else if p.dash_time > 0 {
@@ -1166,7 +1175,7 @@ draw_enemy :: proc(v: ^Render, w: ^World, e: ^Enemy, alpha: f32) {
 		squash *= Vec2{1 + 0.12*k, 1 - 0.1*k}
 	}
 	feet := pos + {0, e.radius} + offset
-	gfx.draw_sprite_feet(v.sprites[id], frame, feet, scale, flip, rl.WHITE, squash)
+	gfx.draw_sprite_cutout_feet(v.sprites[id], v.white[id], frame, feet, scale, flip, rl.WHITE, squash)
 	overlay := rl.Color{}
 	if e.flash > 0 {
 		// Fades out, so sustained fire still shows the sprite underneath.
@@ -1252,7 +1261,7 @@ draw_lights :: proc(v: ^Render, w: ^World, alpha: f32) {
 			if e.kind == .Caster {
 				hand := pos + physics.normalize2(w.player.pos-pos)*12 + {0, -6}
 				prog := 1 - e.timer/0.6
-				rl.DrawCircleV(hand, 2+4*prog, alpha_of(VIOLET, 0.9))
+				rl.DrawCircleV(hand, 2+4*prog, alpha_of(SOUL_BLUE, 0.9))
 			}
 		}
 		if e.kind == .Boss {
@@ -1285,7 +1294,7 @@ draw_orbs :: proc(v: ^Render, w: ^World, alpha: f32) {
 	it := pool.iterator(&w.orbs)
 	for o in pool.next(&it) {
 		pos := lerp2(o.prev, o.pos, alpha)
-		col := rl.Color{255, 110, 50, 255} if o.big else VIOLET
+		col := rl.Color{255, 110, 50, 255} if o.big else SOUL_BLUE
 		rl.DrawCircleGradient(pos, o.radius*3, alpha_of(col, 0.4), CLEAR)
 	}
 	rl.EndBlendMode()
@@ -1293,8 +1302,8 @@ draw_orbs :: proc(v: ^Render, w: ^World, alpha: f32) {
 	for o, h in pool.next(&it) {
 		pos := lerp2(o.prev, o.pos, alpha)
 		pulse := 1 + 0.15*math.sin(v.time*22+f32(h.index))
-		outer := rl.Color{200, 50, 40, 255} if o.big else rl.Color{120, 50, 200, 255}
-		inner := rl.Color{255, 200, 120, 255} if o.big else rl.Color{230, 190, 255, 255}
+		outer := rl.Color{200, 50, 40, 255} if o.big else rl.Color{44, 108, 168, 255}
+		inner := rl.Color{255, 200, 120, 255} if o.big else rl.Color{172, 222, 255, 255}
 		rl.DrawCircleV(pos, o.radius*pulse+1, {20, 8, 20, 200})
 		rl.DrawCircleV(pos, o.radius*pulse, outer)
 		rl.DrawCircleV(pos, o.radius*0.55*pulse, inner)
@@ -1314,12 +1323,6 @@ text :: proc(theme: ^ui.Theme, s: string, pos: Vec2, size: ui.Text_Size, color: 
 text_centered :: proc(theme: ^ui.Theme, s: string, center: Vec2, size: ui.Text_Size, color: rl.Color, a: f32 = 1) {
 	m := ui.measure(theme, s, size)
 	text(theme, s, center - m*0.5, size, color, a)
-}
-
-@(private)
-text_right :: proc(theme: ^ui.Theme, s: string, right_top: Vec2, size: ui.Text_Size, color: rl.Color, a: f32 = 1) {
-	m := ui.measure(theme, s, size)
-	text(theme, s, {right_top.x - m.x, right_top.y}, size, color, a)
 }
 
 // Pure-red vignette while low on hearts, plus a pulse after every hit.
@@ -1409,108 +1412,97 @@ draw_popups :: proc(v: ^Render, theme: ^ui.Theme, cam: rl.Camera2D) {
 }
 
 @(private)
-bar :: proc(r: rl.Rectangle, frac: f32, fill: rl.Color, back := rl.Color{24, 22, 30, 220}) {
-	rl.DrawRectangleRec({r.x - 1, r.y - 1, r.width + 2, r.height + 2}, {6, 6, 10, 200})
-	rl.DrawRectangleRec(r, back)
-	rl.DrawRectangleRec({r.x, r.y, r.width * clamp(frac, 0, 1), r.height}, fill)
-}
-
-@(private)
 draw_hud :: proc(v: ^Render, w: ^World, frame: ^host.Frame) {
 	theme := frame.theme
+	palette := theme.palette
 	view := Vec2{frame.canvas.width, frame.canvas.height}
 	p := &w.player
-	rl.DrawRectangleGradientV(0, 0, i32(view.x), 70, {6, 6, 10, 190}, CLEAR)
-
-	// Hearts.
+	zones := ui.hud_columns(frame.canvas)
+	for zone in zones {
+		ui.hud_panel(theme, zone)
+	}
+	left, middle, right := ui.shrink(zones[0], 10), ui.shrink(zones[1], 10), ui.shrink(zones[2], 10)
 	shake := f32(0)
 	if v.heart_shake > 0 {
 		shake = math.sin(v.time*70) * 3 * v.heart_shake / 0.45
 	}
 	low := p.hp*3 <= p.max_hp
 	for i in 0..<p.max_hp {
-		pos := Vec2{26 + f32(i)*21 + shake, 20}
+		pos := Vec2{left.x + 8 + f32(i)*21 + shake, left.y + 10}
 		if i < p.hp {
 			beat := f32(1)
 			if low {
-				beat = 1 + 0.15*math.pow(max(math.sin(v.time*5.5), 0), 6)
+				beat += 0.15*math.pow(max(math.sin(v.time*5.5), 0), 6)
 			}
 			gfx.draw_sprite(v.sprites[.Heart], 0, pos, 2*beat)
 		} else {
-			gfx.draw_sprite(v.white[.Heart], 0, pos, 2, tint = {46, 40, 52, 255})
+			gfx.draw_sprite(v.white[.Heart], 0, pos, 2, tint = palette.border)
 		}
 	}
-	// Dash meter.
 	ready := p.dash_cooldown <= 0
-	dash := rl.Rectangle{16, 38, 92, 5}
-	fill := GOLD if ready else rl.Color{120, 108, 88, 255}
-	if v.dash_ready > 0 {
-		fill = ui.mix_color(GOLD, rl.WHITE, v.dash_ready)
+	ui.draw_text_fit(theme, "SCATTO", {left.x, left.y + 27, 56, 18}, .Small, palette.text_dim)
+	fill := ui.mix_color(palette.accent, palette.text, v.dash_ready) if ready else palette.text_dim
+	ui.hud_meter(theme, {left.x + 66, left.y + 34, left.width - 66, 5}, 1-p.dash_cooldown/DASH_COOLDOWN, fill)
+
+	label := fmt.tprintf("ONDATA %d / %d", w.wave, w.tuning.waves)
+	status := fmt.tprintf("NEMICI  %d", max(w.wave_total-w.wave_killed, 0))
+	remaining := f32(1)
+	fill = palette.danger
+	if w.phase == .Calm {
+		label = "PREPARATI" if w.wave == 0 else "TREGUA"
+		calm := FIRST_CALM if w.wave == 0 else CALM_TIME
+		remaining = w.phase_time/calm
+		status = fmt.tprintf("PROSSIMA ONDATA  %ds", int(math.ceil(max(calm-w.phase_time, 0))))
+		fill = palette.accent
+	} else if w.wave_total > 0 {
+		remaining = 1 - f32(w.wave_killed)/f32(w.wave_total)
 	}
-	bar(dash, 1-p.dash_cooldown/DASH_COOLDOWN, fill)
-	text(theme, "Scatto", {dash.x + dash.width + 8, dash.y - 7}, .Small, GOLD if ready else IVORY_DIM)
-	// Active powers.
-	y := f32(56)
+	ui.draw_text_fit(theme, label, {middle.x, middle.y - 1, middle.width, 22}, .Body, palette.text, .Center)
+	ui.draw_text_fit(theme, status, {middle.x, middle.y + 21, middle.width, 18}, .Small, palette.text_dim, .Center)
+	ui.hud_meter(theme, {middle.x, middle.y + 42, middle.width, 4}, remaining, fill)
+
+	score_color := ui.mix_color(palette.text, palette.warning, clamp(f32(f64(w.score)-v.score_shown)/200, 0, 1))
+	ui.draw_text_fit(theme, "PUNTI", {right.x, right.y, 64, 20}, .Small, palette.text_dim)
+	ui.draw_text_fit(theme, fmt.tprintf("%d", i64(v.score_shown)),
+		{right.x + 68, right.y - 2, right.width - 68, 26}, .Large, score_color, .Right)
+	combo := fmt.tprintf("SERIE MIGLIORE  %d/%d", w.best_combo, w.tuning.combo_goal)
+	if w.combo > 0 {
+		combo = fmt.tprintf("COMBO %d   x%d", w.combo, combo_multiplier(w.combo))
+	}
+	ui.draw_text_fit(theme, combo, {right.x, right.y + 26, right.width, 18}, .Small,
+		palette.warning if w.combo > 0 else palette.text_dim, .Right)
+	if w.combo > 0 {
+		ui.hud_meter(theme, {right.x, right.y + 44, right.width, 2}, w.combo_timer/COMBO_WINDOW, palette.warning)
+	}
+
+	// Temporary powers live below the vitals, never over the wave counter.
+	y := zones[0].y + zones[0].height + 8
 	for power in Power {
-		remaining := p.power[power]
-		if remaining <= 0 {
+		power_left := p.power[power]
+		if power_left <= 0 {
 			continue
 		}
 		color := power_color(power)
-		blink := remaining < 2 && int(v.time*8)%2 == 0
-		gfx.draw_sprite(v.sprites[.Gem], 0, {24, y + 9}, 1.6, tint = color)
-		text(theme, power_name(power), {38, y}, .Small, color, 0.5 if blink else 1)
-		bar({38, y + 17, 70, 3}, remaining/POWER_DURATION, color)
-		y += 26
+		blink := power_left < 2 && int(v.time*8)%2 == 0
+		ui.hud_panel(theme, {left.x - 10, y, 158, 26}, color)
+		gfx.draw_sprite(v.sprites[.Gem], 0, {left.x, y + 13}, 1.3, tint = color)
+		ui.draw_text_fit(theme, power_name(power), {left.x + 14, y + 3, 124, 20}, .Small,
+			ui.with_alpha(color, 0.5 if blink else 1))
+		ui.hud_meter(theme, {left.x - 8, y + 24, 154, 2}, power_left/POWER_DURATION, color)
+		y += 31
 	}
 
-	// Wave status.
-	cx := view.x * 0.5
-	switch w.phase {
-	case .Calm:
-		label := "Preparati" if w.wave == 0 else "Tregua"
-		text_centered(theme, label, {cx, 16}, .Body, IVORY_DIM)
-		calm := FIRST_CALM if w.wave == 0 else CALM_TIME
-		bar({cx - 100, 32, 200, 4}, w.phase_time/calm, GOLD)
-	case .Fight, .Victory, .Defeat:
-		label := fmt.tprintf("Ondata %d / %d", w.wave, w.tuning.waves)
-		text_centered(theme, label, {cx, 16}, .Body, IVORY)
-		remaining := f32(1)
-		if w.wave_total > 0 {
-			remaining = 1 - f32(w.wave_killed)/f32(w.wave_total)
-		}
-		bar({cx - 100, 32, 200, 4}, remaining, CRIMSON)
-	}
-
-	// Score and combo, top right.
-	right := view.x - 16
-	score_color := ui.mix_color(IVORY, GOLD, clamp(f32(f64(w.score)-v.score_shown)/200, 0, 1))
-	text_right(theme, fmt.tprintf("%d", i64(v.score_shown)), {right, 4}, .Large, score_color)
-	goal := w.tuning.combo_goal
-	if w.combo > 0 {
-		mult := combo_multiplier(w.combo)
-		flash := ui.mix_color(GOLD, rl.WHITE, v.combo_flash)
-		text_right(theme, fmt.tprintf("x%d", mult), {right, 30}, .Large, flash)
-		mw := ui.measure(theme, fmt.tprintf("x%d", mult), .Large).x
-		text_right(theme, fmt.tprintf("Combo %d", w.combo), {right - mw - 10, 38}, .Small, IVORY)
-		bar({right - 110, 60, 110, 3}, w.combo_timer/COMBO_WINDOW, GOLD)
-	}
-	best_color := GOLD if w.best_combo >= goal else IVORY_DIM
-	text_right(theme, fmt.tprintf("Combo migliore %d / %d", w.best_combo, goal), {right, 66}, .Small, best_color)
-
-	// Boss health.
 	if boss := pool.get(&w.enemies, w.boss); boss != nil {
-		r := rl.Rectangle{cx - 210, view.y - 30, 420, 9}
-		text_centered(theme, enemy_name(.Boss), {cx, r.y - 12}, .Small, GOLD)
-		rl.DrawRectangleRec({r.x - 2, r.y - 2, r.width + 4, r.height + 4}, {6, 6, 10, 220})
-		rl.DrawRectangleRec(r, {30, 18, 22, 255})
-		rl.DrawRectangleRec({r.x, r.y, r.width * v.boss_ghost, r.height}, {236, 226, 204, 200})
-		fill_color := CRIMSON
+		bounds := rl.Rectangle{view.x*0.5 - 220, view.y - 53, 440, 39}
+		ui.hud_panel(theme, bounds, palette.danger)
+		ui.draw_text_fit(theme, enemy_name(.Boss), {bounds.x + 10, bounds.y + 3, 420, 18}, .Small, palette.warning, .Center)
+		r := rl.Rectangle{bounds.x + 10, bounds.y + 26, 420, 5}
+		ui.hud_meter(theme, r, v.boss_ghost, palette.text_dim)
+		fill_color := palette.danger
 		if boss.enraged {
-			fill_color = ui.mix_color(CRIMSON, EMBER, 0.5+0.5*math.sin(v.time*8))
+			fill_color = ui.mix_color(palette.danger, palette.warning, 0.5+0.5*math.sin(v.time*8))
 		}
 		rl.DrawRectangleRec({r.x, r.y, r.width * clamp(boss.hp/boss.max_hp, 0, 1), r.height}, fill_color)
-		rl.DrawRectangleRec({r.x, r.y, r.width, 2}, {255, 255, 255, 40})
 	}
 }
 
@@ -1561,6 +1553,15 @@ draw_banner :: proc(v: ^Render, w: ^World, frame: ^host.Frame) {
 	case .Defeat:
 		title = "Sei caduto tra le braci"
 		color = {255, 90, 90, 255}
+	}
+	if b.kind != .Victory && b.kind != .Defeat {
+		toast := rl.Rectangle{view.x*0.5 - 230, f32(ui.HUD_MARGIN + ui.HUD_TOP_HEIGHT + 8) + slide*0.3, 460, 24}
+		ui.draw_text_fit(theme, title, toast, .Body, ui.with_alpha(color, a), .Center)
+		if subtitle != "" {
+			toast.y += 23
+			ui.draw_text_fit(theme, subtitle, toast, .Small, ui.with_alpha(sub_color, a), .Center)
+		}
+		return
 	}
 	band := rl.Rectangle{0, y - 34, view.x, 84 if subtitle != "" else 62}
 	shade := rl.Color{6, 4, 8, u8(150 * a)}

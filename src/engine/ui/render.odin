@@ -49,17 +49,68 @@ draw_text :: proc(theme: ^Theme, text: string, position: [2]f32, size := Text_Si
 	pixels := text_pixels(size)
 	ctext := cstring_temp(text)
 	p := rl.Vector2{math.round(position.x), math.round(position.y)}
+	spacing := theme.spacing if theme != nil else 1
 	if shadow {
 		// The shadow fades with the text, so animated labels stay clean.
-		rl.DrawTextEx(font, ctext, p + {2, 2}, pixels, 1, rl.Color{0, 0, 0, u8(160 * f32(color.a) / 255)})
+		rl.DrawTextEx(font, ctext, p + {2, 2}, pixels, spacing, rl.Color{0, 0, 0, u8(160 * f32(color.a) / 255)})
 	}
-	rl.DrawTextEx(font, ctext, p, pixels, 1, color)
+	rl.DrawTextEx(font, ctext, p, pixels, spacing, color)
 }
 
 draw_text_centered :: proc(theme: ^Theme, text: string, center: [2]f32, size := Text_Size.Body, color := rl.WHITE,
 	shadow := true) {
 	m := measure(theme, text, size)
 	draw_text(theme, text, center - m*0.5, size, color, shadow)
+}
+
+// Shrink through the existing font atlas before shortening text. Both the
+// measured and drawn line use identical glyph spacing and pixel snapping.
+draw_text_fit :: proc(theme: ^Theme, text: string, bounds: Rect, size := Text_Size.Body,
+	color := rl.WHITE, align := Align.Left) {
+	if bounds.width <= 0 || bounds.height <= 0 {
+		return
+	}
+	chosen := size
+	for chosen > .Small && (measure(theme, text, chosen).x > bounds.width || text_pixels(chosen) > bounds.height) {
+		chosen = Text_Size(int(chosen)-1)
+	}
+	line := ellipsize(theme, text, bounds.width, chosen)
+	m := measure(theme, line, chosen)
+	x := bounds.x
+	switch align {
+	case .Left:
+	case .Center:
+		x += (bounds.width-m.x)*0.5
+	case .Right:
+		x += bounds.width-m.x
+	}
+	draw_text(theme, line, {x, bounds.y + (bounds.height-m.y)*0.5}, chosen, color)
+}
+
+// Immediate equivalents of the menu panel/meter for HUDs rendered in a world
+// pass. Nil themes use the shared palette, without loading another font atlas.
+hud_panel :: proc(theme: ^Theme, bounds: Rect, accent: Maybe(rl.Color) = nil) {
+	p := theme.palette if theme != nil else GOTHIC_PALETTE
+	rl.DrawRectangleRec({bounds.x+2, bounds.y+3, bounds.width, bounds.height}, p.shadow)
+	rl.DrawRectangleRec(bounds, p.panel)
+	rl.DrawRectangleLinesEx(bounds, 1, p.border)
+	line := accent.? or_else p.focus
+	rl.DrawRectangleRec({bounds.x+1, bounds.y+1, max(bounds.width-2, 0), 1}, with_alpha(line, 0.4))
+}
+
+hud_meter :: proc(theme: ^Theme, bounds: Rect, value01: f32, color: Maybe(rl.Color) = nil) {
+	p := theme.palette if theme != nil else GOTHIC_PALETTE
+	rl.DrawRectangleRec(bounds, p.background)
+	inner := shrink(bounds, 1) if bounds.height >= 5 else bounds
+	inner.width *= clamp(value01, 0, 1)
+	if inner.width > 0 && inner.height > 0 {
+		fill_color := color.? or_else p.accent
+		rl.DrawRectangleRec(inner, fill_color)
+		rl.DrawRectangleRec({inner.x, inner.y, inner.width, 1}, mix_color(fill_color, p.text, 0.3))
+	}
+	if bounds.height >= 5 {
+		rl.DrawRectangleLinesEx(bounds, 1, p.border)
+	}
 }
 
 // Filled five-pointed star, point up.

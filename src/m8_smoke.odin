@@ -119,7 +119,7 @@ run_m8_view_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer, dice:
 	for _ in 0..<3 { m8_smoke_frame(window, renderer, dice, &room, &controller, &cards, &buffer, 0) }
 	rl.TakeScreenshot("odin_pp_m8_devices.png")
 	game.collect_weapon(&player, .Iron_Cleaver, 4)
-	equip_button := render.m8_control_bounds(renderer, .Equip)
+	equip_button := render.m8_control_bounds(renderer, .Equip, &room)
 	equip_command, equip_clicked := m8_pointer_gameplay_command(&room, renderer,
 		{equip_button.x+equip_button.width/2,equip_button.y+equip_button.height/2}, true, true, true)
 	if !equip_clicked || !commit_gameplay_command(&room, renderer, &cards, equip_command) { return false }
@@ -134,7 +134,7 @@ run_m8_view_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer, dice:
 		fmt.eprintln("M8 passive trap did not trigger on the world beat"); return false
 	}
 	before_health := player.health
-	active_button := render.m8_control_bounds(renderer, .Activate)
+	active_button := render.m8_control_bounds(renderer, .Activate, &room)
 	active_command, active_clicked := m8_pointer_gameplay_command(&room, renderer,
 		{active_button.x+active_button.width/2,active_button.y+active_button.height/2}, true, true, true)
 	if !active_clicked || !commit_gameplay_command(&room, renderer, &cards, active_command) { return false }
@@ -169,26 +169,23 @@ run_m8_view_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer, dice:
 	// Exercise actual controls against the deterministic opponent, including all
 	// four grab poses. The arena remains untouched while this modal runs.
 	room_clock, room_pulse := player.tactical.remaining, room.pulse_count
-	captured: [4]bool
-	for _ in 0..<3600 {
-		if ring.phase != .Active { break }
-		if ring.action == .Idle {
-			if game.ring_enemy_vulnerable(&ring) {
-				if !game.ring_command(&ring, .Grab) { game.ring_command(&ring, .Right if ring.player_x < ring.enemy_x else .Left) }
-			} else if ring.enemy_windup < 0.25 { game.ring_command(&ring, .Dodge) }
-		}
-		game.tick_ring(&ring, 1.0/60.0)
-		app.begin_canvas(window, render.RESIN_BACKGROUND)
-		render.draw_m8_ring_overlay(renderer, &room, &ring)
-		app.present(window, render.LETTERBOX_COLOR)
-		if ring.action == .Grab_Throw {
-			pose := game.ring_grab_pose(&ring)
-			if !captured[pose] && ring.action_time-f32(pose)*game.RING_GRAB_DURATION/4 > 0.06 {
-				rl.TakeScreenshot(fmt.ctprintf("odin_pp_m8_ring_%d.png", pose)); captured[pose] = true
-			}
-		}
-	}
-	if ring.phase != .Won || !game.settle_ring_challenge(&room, &ring).has_unlock || player.tactical.remaining != room_clock || room.pulse_count != room_pulse { fmt.eprintln("M8 ring return failed"); return false }
+    duel := Ring_Minigame{}
+    ring_minigame_reset(&duel,{})
+    defer destroy_m9_session(&duel.session)
+    for tick in 0..<1800 {
+        if duel.session.ring.result != .Active {break}
+        ring_minigame_advance(&duel,1.0/60.0,true,ring_minigame_bot(&duel.session.ring))
+        if tick%6==0 {
+            app.begin_canvas(window,render.RESIN_BACKGROUND)
+            v:=m9_view(&duel.session); v.hosted=true; v.alpha=1
+            render.draw_m9_fight(renderer,&duel.session.ring,v)
+            app.present(window,render.LETTERBOX_COLOR)
+        }
+    }
+    ring.phase=.Won if duel.session.ring.result==.Won else .Lost
+    if ring.phase != .Won || !game.settle_ring_challenge(&room,&ring).has_unlock || player.tactical.remaining != room_clock || room.pulse_count != room_pulse {
+        fmt.eprintln("M8 canonical ring return failed"); return false
+    }
 	for _ in 0..<30 {
 		if room.phase == .Complete { break }
 		direction, found := m7_route_move(&room)
@@ -202,6 +199,6 @@ run_m8_view_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer, dice:
 	render.clear_event_animations(renderer)
 	for _ in 0..<2 { m8_smoke_frame(window, renderer, dice, &room, &controller, &cards, &buffer) }
 	rl.TakeScreenshot("odin_pp_m8_next_room.png")
-	fmt.println("M8 native: 5 casts, canonical d4 cinematic, passive trap, 4-Tesla field/consumption/friendlyfire, equip, loot, ring4poses/unlock, nextroom passed")
+	fmt.println("M8 native: 5 casts, canonical d4 cinematic, passive trap, 4-Tesla field/consumption/friendlyfire, equip, loot, canonical ring/unlock, nextroom passed")
 	return true
 }

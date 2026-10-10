@@ -21,19 +21,17 @@ PITCH_MAX :: f32(1.05)
 ZOOM_MIN :: f32(7)
 ZOOM_MAX :: f32(15)
 
-// Night over the abyss: slate stone, ivory, crimson, ember gold, soul cyan.
-SKY_TOP :: rl.Color{8, 8, 20, 255}
-SKY_HORIZON :: rl.Color{62, 42, 64, 255}
-ABYSS_MID :: rl.Color{44, 24, 36, 255}
-ABYSS_DEEP :: rl.Color{30, 10, 14, 255}
-FOG :: rl.Color{54, 38, 58, 235}
+// The tower's diorama palette: obsidian, blue slate, ivory cutouts and gold rewards.
+SKY_TOP :: rl.Color{5, 9, 16, 255}
+SKY_HORIZON :: rl.Color{28, 44, 65, 255}
+ABYSS_MID :: rl.Color{16, 28, 43, 255}
+ABYSS_DEEP :: rl.Color{7, 12, 21, 255}
+FOG :: rl.Color{24, 39, 58, 235}
 IVORY :: rl.Color{236, 226, 204, 255}
 IVORY_DIM :: rl.Color{160, 152, 136, 255}
 GOLD :: rl.Color{232, 196, 112, 255}
 CRIMSON :: rl.Color{196, 44, 58, 255}
 SOUL :: rl.Color{140, 220, 255, 255}
-PANEL :: rl.Color{20, 22, 30, 205}
-BORDER :: rl.Color{92, 84, 72, 255}
 
 Message_Kind :: enum u8 {
 	None,
@@ -46,6 +44,7 @@ Message_Kind :: enum u8 {
 
 View :: struct {
 	lit:             gfx.Lighting,
+	figures:         gfx.Paper_Figures,
 	glow:            gfx.Lighting, // unlit but fogged, for emissive things
 	terrain:         rl.Model,
 	glow_model:      rl.Model,
@@ -85,14 +84,14 @@ View :: struct {
 
 voxel_palette :: proc() -> gfx.Voxel_Palette {
 	p: gfx.Voxel_Palette
-	p[u8(Material.Stone)] = {94, 94, 112, 255}
-	p[u8(Material.Stone_Dark)] = {66, 63, 82, 255}
-	p[u8(Material.Stone_Top)] = {132, 126, 134, 255}
-	p[u8(Material.Moss)] = {70, 96, 64, 255}
-	p[u8(Material.Plank)] = {124, 90, 64, 255}
+	p[u8(Material.Stone)] = {64, 87, 113, 255}
+	p[u8(Material.Stone_Dark)] = {31, 47, 68, 255}
+	p[u8(Material.Stone_Top)] = {107, 139, 167, 255}
+	p[u8(Material.Moss)] = {60, 85, 106, 255}
+	p[u8(Material.Plank)] = {105, 98, 87, 255}
 	p[u8(Material.Crystal)] = {104, 150, 214, 255}
-	p[u8(Material.Ember)] = {236, 116, 48, 255}
-	p[u8(Material.Rune)] = {176, 48, 64, 255}
+	p[u8(Material.Ember)] = {132, 193, 230, 255}
+	p[u8(Material.Rune)] = {90, 156, 215, 255}
 	return p
 }
 
@@ -122,10 +121,12 @@ LIFE_ROWS := [?]string{
 }
 
 view_init :: proc(v: ^View) {
+	v.figures = gfx.paper_figures_create()
 	v.lit = gfx.lighting_create()
+	v.lit.specular = 0.18
 	v.lit.sun_dir = {-0.5, -1, -0.32}
-	v.lit.sun_color = {0.92, 0.84, 0.76}
-	v.lit.ambient = {0.34, 0.31, 0.43}
+	v.lit.sun_color = {0.76, 0.86, 1.0}
+	v.lit.ambient = {0.29, 0.35, 0.44}
 	v.lit.fog_color = FOG
 	v.lit.fog_near = 18
 	v.lit.fog_far = 78
@@ -177,6 +178,7 @@ view_init :: proc(v: ^View) {
 
 view_destroy :: proc(v: ^View) {
 	unload_models(v)
+	gfx.paper_figures_destroy(&v.figures)
 	gfx.lighting_destroy(&v.lit)
 	gfx.lighting_destroy(&v.glow)
 	gfx.sprite_destroy(&v.halo)
@@ -594,14 +596,11 @@ view_draw :: proc(v: ^View, w: ^World, frame: ^host.Frame) {
 	}
 	gfx.lighting_begin(&v.lit)
 	draw_far_spires(w)
+	draw_diorama_caps(v, w)
 	draw_movers(v, w)
 	draw_spike_plates(w)
 	draw_bridge_posts(w)
 	draw_braziers(w, false)
-	for i in 0..<w.sentinel_count {
-		draw_sentinel(v, w, w.sentinels[i], false)
-	}
-	draw_player(v, w)
 	fx.draw3d(&v.dust)
 	gfx.lighting_end(&v.lit)
 
@@ -611,16 +610,13 @@ view_draw :: proc(v: ^View, w: ^World, frame: ^host.Frame) {
 	gfx.lighting_begin(&v.glow)
 	draw_mover_glow(v, w)
 	draw_spikes(v, w)
-	for i in 0..<w.sentinel_count {
-		draw_sentinel(v, w, w.sentinels[i], true)
-	}
 	draw_shards(v, w)
-	draw_player_glow(v, w)
 	draw_bridge_ropes(w)
 	draw_braziers(w, true)
 	gfx.lighting_end(&v.glow)
 	draw_portal_surface(v, w)
 	draw_shadows(v, w)
+	draw_paper_actors(v, w, cam)
 
 	// Additive pass without depth writes, so glows never clip each other.
 	rlgl.DrawRenderBatchActive()
@@ -636,6 +632,42 @@ view_draw :: proc(v: ^View, w: ^World, frame: ^host.Frame) {
 	gfx.draw_vignette(width, height, 0.55)
 	fx.flash_draw(v.flash, width, height)
 	draw_hud(v, w, frame, cam)
+}
+
+// Paper and illustration share a plane. They test the solid world's depth,
+// but cannot write it: the independent border pose must not hide its own art.
+// Without depth writes the actors must be composited from farthest to nearest.
+@(private)
+draw_paper_actors :: proc(v: ^View, w: ^World, cam: rl.Camera3D) {
+	Actor :: struct { index: int, distance: f32 }
+	actors: [MAX_SENTINELS+1]Actor
+	eye := Vec3(cam.position)
+	actors[0] = {index = -1, distance = physics.length3(physics.body3_center(w.player.body)-eye)}
+	for i in 0..<w.sentinel_count {
+		actors[i+1] = {index = i, distance = physics.length3(w.sentinels[i].position-eye)}
+	}
+	count := w.sentinel_count+1
+	for i in 1..<count {
+		actor := actors[i]
+		j := i-1
+		for j>=0 && actors[j].distance<actor.distance {
+			actors[j+1] = actors[j]
+			j -= 1
+		}
+		actors[j+1] = actor
+	}
+	rlgl.DrawRenderBatchActive()
+	rlgl.DisableDepthMask()
+	gfx.lighting_begin_unlit(&v.lit)
+	defer {
+		gfx.lighting_end(&v.lit)
+		rlgl.DrawRenderBatchActive()
+		rlgl.EnableDepthMask()
+	}
+	for actor in actors[:count] {
+		if actor.index<0 { draw_player(v, w) }
+		else { draw_sentinel(v, w, w.sentinels[actor.index]) }
+	}
 }
 
 // Where the horizon sits on screen for the current pitch.
@@ -678,7 +710,7 @@ draw_sky :: proc(v: ^View, width, height: f32) {
 	}
 	// Two layers of distant spire silhouettes around the horizon.
 	for layer in 0..<2 {
-		color := rl.Color{40, 30, 52, 255} if layer == 0 else rl.Color{28, 20, 36, 255}
+		color := rl.Color{29, 47, 68, 255} if layer == 0 else rl.Color{14, 27, 43, 255}
 		count := 30
 		for i in 0..<count {
 			seed := f32(i*7 + layer*131)
@@ -708,10 +740,40 @@ draw_far_spires :: proc(w: ^World) {
 		s := w.far[i]
 		h := s.height
 		base := s.position
-		rl.DrawCubeV(v3(base+{0, h * 0.3, 0}), {s.width, h * 0.6, s.width}, {78, 74, 92, 255})
-		rl.DrawCubeV(v3(base+{0, h * 0.72, 0}), {s.width * 0.7, h * 0.26, s.width * 0.7}, {88, 84, 100, 255})
-		rl.DrawCubeV(v3(base+{0, h * 0.92, 0}), {s.width * 0.4, h * 0.16, s.width * 0.4}, {98, 92, 108, 255})
-		rl.DrawCubeV(v3(base+{s.width * 0.9, h * 0.62, 0}), {s.width * 0.6, s.width * 0.5, s.width * 0.6}, {70, 66, 84, 255})
+		rl.DrawCubeV(v3(base+{0, h * 0.3, 0}), {s.width, h * 0.6, s.width}, {43, 64, 88, 255})
+		rl.DrawCubeV(v3(base+{0, h * 0.72, 0}), {s.width * 0.7, h * 0.26, s.width * 0.7}, {56, 80, 107, 255})
+		rl.DrawCubeV(v3(base+{0, h * 0.92, 0}), {s.width * 0.4, h * 0.16, s.width * 0.4}, {84, 111, 139, 255})
+		rl.DrawCubeV(v3(base+{s.width * 0.9, h * 0.62, 0}), {s.width * 0.6, s.width * 0.5, s.width * 0.6}, {32, 51, 73, 255})
+	}
+}
+
+// Static collision voxels remain the source of truth. Only exposed tops get
+// a thin layered cap; draw distance bounds the added geometry on large levels.
+@(private)
+draw_diorama_caps :: proc(v: ^View, w: ^World) {
+	for p in w.pads[:w.pad_count] {
+		if p.kind == .Shuttle || p.kind == .Crumble { continue }
+		center := Vec3{f32(p.lo.x+p.hi.x)*0.5, f32(p.top), f32(p.lo.y+p.hi.y)*0.5}
+		if physics.length3(center-v.follow)>38 { continue }
+		sx, sz := f32(p.hi.x-p.lo.x), f32(p.hi.y-p.lo.y)
+		// Thin silver-blue lip: side faces catch light, recessed grout stays dark.
+		rl.DrawCubeV(v3(center-{0, 0.07, 0}), {sx+0.05, 0.085, sz+0.05}, {72, 103, 137, 255})
+		for z in p.lo.y..<p.hi.y { for x in p.lo.x..<p.hi.x {
+			// Decorative pillar bases or solid towers must not be capped above.
+			if physics.voxel_get(&w.terrain,x,p.top,z) != 0 { continue }
+			if material_glows(Material(physics.voxel_get(&w.terrain,x,p.top-1,z))) { continue }
+			pos := Vec3{f32(x)+0.5, f32(p.top)+0.008, f32(z)+0.5}
+			shade := u8((x*17+z*13)%9)
+			rl.DrawCubeV(v3(pos), {0.955, 0.025, 0.955}, {u8(97+shade), u8(125+shade), u8(153+shade), 255})
+			rl.DrawCubeV(v3(pos+{0, 0.017, -0.452}), {0.88, 0.012, 0.025}, {162, 186, 206, 255})
+		} }
+		// Carved recess and stone pilaster on the front of every island.
+		if sz>=2 && p.depth>=2 {
+			rl.DrawCubeV(v3(center+{0, -0.68, sz*0.5+0.008}), {0.46, 0.86, 0.035}, {9, 19, 32, 255})
+			rl.DrawCubeV(v3(center+{-0.31, -0.72, sz*0.5+0.035}), {0.1, 1.04, 0.1}, {69, 93, 119, 255})
+			rl.DrawCubeV(v3(center+{0.31, -0.72, sz*0.5+0.035}), {0.1, 1.04, 0.1}, {69, 93, 119, 255})
+			rl.DrawCubeV(v3(center+{0, -0.25, sz*0.5+0.04}), {0.72, 0.11, 0.12}, {111, 142, 171, 255})
+		}
 	}
 }
 
@@ -725,8 +787,8 @@ draw_movers :: proc(v: ^View, w: ^World) {
 		c := m.position + m.size*0.5
 		switch m.kind {
 		case .Shuttle:
-			rl.DrawCubeV(v3(c), v3(m.size), {100, 98, 118, 255})
-			rl.DrawCubeV(v3(c+{0, 0.455, 0}), v3(Vec3{m.size.x + 0.04, 0.1, m.size.z + 0.04}), {142, 136, 142, 255})
+			rl.DrawCubeV(v3(c), v3(m.size), {62, 88, 117, 255})
+			rl.DrawCubeV(v3(c+{0, 0.455, 0}), v3(Vec3{m.size.x + 0.04, 0.1, m.size.z + 0.04}), {151, 182, 208, 255})
 		case .Crumble:
 			offset: Vec3
 			if m.state == .Shaking {
@@ -818,33 +880,12 @@ sentinel_yaw :: proc(s: Sentinel, time: f32) -> f32 {
 }
 
 @(private)
-draw_sentinel :: proc(v: ^View, w: ^World, s: Sentinel, glow: bool) {
-	bob := math.sin(v.time*3+s.phase*5) * 0.1
-	pos := s.position + {0, bob, 0}
-	rlgl.PushMatrix()
-	rlgl.Translatef(pos.x, pos.y, pos.z)
-	rlgl.Rotatef(sentinel_yaw(s, w.time)*math.DEG_PER_RAD, 0, 1, 0)
-	if !glow {
-		sway := math.sin(v.time*5+s.phase) * 0.05
-		rl.DrawCubeV({0, -0.3, 0}, {0.84, 0.38, 0.84}, {40, 36, 52, 255})
-		rl.DrawCubeV({0, 0.02, 0}, {0.68, 0.36, 0.68}, {52, 46, 64, 255})
-		rl.DrawCubeV({0, 0.38, -0.02}, {0.56, 0.42, 0.56}, {70, 62, 96, 255})
-		rl.DrawCubeV({0, 0.66, -0.08}, {0.2, 0.16, 0.2}, {84, 76, 112, 255})
-		rl.DrawCubeV({0, 0.36, 0.2}, {0.4, 0.28, 0.2}, {14, 10, 18, 255})
-		for k in 0..<4 {
-			x := f32(-0.32) if k%2 == 0 else 0.32
-			z := f32(-0.32) if k < 2 else 0.32
-			rl.DrawCubeV({x + sway, -0.58, z}, {0.14, 0.2, 0.14}, {34, 30, 44, 255})
-		}
-	} else {
-		flicker := u8(200 + 55*math.sin(v.time*17+s.phase))
-		rl.DrawCubeV({-0.1, 0.4, 0.305}, {0.08, 0.06, 0.03}, {255, 120, 60, flicker})
-		rl.DrawCubeV({0.1, 0.4, 0.305}, {0.08, 0.06, 0.03}, {255, 120, 60, flicker})
-	}
-	rlgl.PopMatrix()
-	if glow {
-		rl.DrawCircle3D(v3(s.position-{0, 0.72, 0}), 0.55+0.06*math.sin(v.time*4), {1, 0, 0}, 90, {220, 60, 60, 200})
-	}
+draw_sentinel :: proc(v: ^View, w: ^World, s: Sentinel) {
+	pose := math.floor(v.time*5)/5
+	feet := s.position + Vec3{0, -0.66+math.sin(pose*3+s.phase*5)*0.075, 0}
+	gfx.paper_figure_billboard(&v.figures, camera.orbit_to_raylib(v.cam), 1, feet, 1.5,
+		math.sin(sentinel_yaw(s,w.time)-v.cam.yaw)<0, time = v.time+s.phase)
+	rl.DrawCircle3D(v3(s.position-{0, 0.72, 0}), 0.55, {1, 0, 0}, 90, {220, 60, 60, 200})
 }
 
 @(private)
@@ -876,55 +917,16 @@ shard_draw_position :: proc(v: ^View, s: Shard, i: int) -> Vec3 {
 // Hooded wanderer: ivory mask, crimson hood and cape, slate cloak.
 @(private)
 draw_player :: proc(v: ^View, w: ^World) {
-	if !player_visible(v, w) {
-		return
-	}
-	p := w.player
-	feet := physics.body3_feet(p.body)
-	speed := physics.length2(Vec2{p.body.velocity.x, p.body.velocity.z})
-	run := min(speed/w.params.max_speed, 1)
-	stretch := clamp(p.body.velocity.y*0.012, -0.12, 0.14) if !p.grounded else 0
-	s := 1 + v.squash + stretch
-	side := 1 / math.sqrt(max(s, 0.3))
-	swing := math.sin(w.stride*2.3) * 38 * run
-	if !p.grounded {
-		swing = 24
-	}
-	rlgl.PushMatrix()
-	rlgl.Translatef(feet.x, feet.y, feet.z)
-	rlgl.Rotatef(v.yaw*math.DEG_PER_RAD, 0, 1, 0)
-	if p.dash_remaining > 0 {
-		rlgl.Rotatef(18, 1, 0, 0)
-	} else {
-		rlgl.Rotatef(run*6, 1, 0, 0)
-	}
-	rlgl.Scalef(side, s, side)
-	for k in 0..<2 {
-		dir := f32(1) if k == 0 else -1
-		rlgl.PushMatrix()
-		rlgl.Translatef(dir*0.13, 0.44, 0)
-		rlgl.Rotatef(swing*dir, 1, 0, 0)
-		rl.DrawCubeV({0, -0.21, 0}, {0.17, 0.42, 0.2}, {44, 44, 58, 255})
-		rl.DrawCubeV({0, -0.39, 0.03}, {0.19, 0.08, 0.26}, {30, 28, 36, 255})
-		rlgl.PopMatrix()
-	}
-	rl.DrawCubeV({0, 0.64, 0}, {0.5, 0.46, 0.36}, {58, 62, 80, 255})
-	rl.DrawCubeV({0, 0.92, 0}, {0.44, 0.16, 0.32}, {70, 74, 94, 255})
-	rl.DrawCubeV({0, 1.02, 0.01}, {0.48, 0.1, 0.4}, {168, 36, 50, 255})
-	rl.DrawCubeV({0, 1.19, 0.03}, {0.33, 0.3, 0.3}, {230, 218, 194, 255})
-	rl.DrawCubeV({0, 1.26, -0.04}, {0.4, 0.3, 0.36}, {150, 32, 46, 255})
-	rl.DrawCubeV({-0.075, 1.2, 0.185}, {0.06, 0.05, 0.02}, {24, 18, 26, 255})
-	rl.DrawCubeV({0.075, 1.2, 0.185}, {0.06, 0.05, 0.02}, {24, 18, 26, 255})
-	cape := 10 + run*48 + math.sin(v.time*9)*4*run
-	if !p.grounded {
-		cape = 30 + clamp(p.body.velocity.y*2, -20, 25)
-	}
-	rlgl.PushMatrix()
-	rlgl.Translatef(0, 1.0, -0.18)
-	rlgl.Rotatef(cape, 1, 0, 0)
-	rl.DrawCubeV({0, -0.3, -0.02}, {0.44, 0.6, 0.05}, {150, 30, 44, 255})
-	rlgl.PopMatrix()
-	rlgl.PopMatrix()
+	if !player_visible(v, w) { return }
+	feet := physics.body3_feet(w.player.body)
+	cam := camera.orbit_to_raylib(v.cam)
+	// Same acolyte as the run; four held poses suggest a paper miniature.
+	speed := physics.length2(Vec2{w.player.body.velocity.x, w.player.body.velocity.z})
+	pose := math.floor(w.stride*3)/3
+	feet.y += abs(math.sin(pose))*0.04*min(speed/w.params.max_speed, 1)
+	height := 1.58 * clamp(1+v.squash*0.25, 0.9, 1.12)
+	flip := math.sin(v.yaw-v.cam.yaw)<0
+	gfx.paper_figure_billboard(&v.figures, cam, 0, feet, height, flip, time = v.time)
 }
 
 @(private)
@@ -944,19 +946,6 @@ chest_position :: proc(v: ^View, w: ^World) -> Vec3 {
 	feet := physics.body3_feet(w.player.body)
 	s := 1 + v.squash
 	return feet + Vec3{math.sin(v.yaw) * 0.19, 0.72 * s, math.cos(v.yaw) * 0.19}
-}
-
-@(private)
-draw_player_glow :: proc(v: ^View, w: ^World) {
-	if !player_visible(v, w) {
-		return
-	}
-	c := chest_position(v, w)
-	rlgl.PushMatrix()
-	rlgl.Translatef(c.x, c.y, c.z)
-	rlgl.Rotatef(v.yaw*math.DEG_PER_RAD, 0, 1, 0)
-	rl.DrawCubeV({}, {0.12, 0.12, 0.04}, {170, 236, 255, 255})
-	rlgl.PopMatrix()
 }
 
 @(private)
@@ -1167,7 +1156,8 @@ draw_marker :: proc(cam: rl.Camera3D, p: Vec3, width, height: f32, color: rl.Col
 	dir, depth := view_direction(cam, p)
 	screen := rl.GetWorldToScreenEx(v3(p), cam, i32(width), i32(height))
 	margin := f32(28)
-	inside := depth > 0 && screen.x > margin && screen.x < width-margin && screen.y > margin && screen.y < height-margin
+	top := f32(ui.HUD_MARGIN + ui.HUD_TOP_HEIGHT + 22)
+	inside := depth > 0 && screen.x > margin && screen.x < width-margin && screen.y > top && screen.y < height-margin
 	if inside {
 		r := 6 + math.sin(time*5)
 		rl.DrawPoly(screen, 4, r+2, 0, {0, 0, 0, color.a / 2})
@@ -1179,18 +1169,15 @@ draw_marker :: proc(cam: rl.Camera3D, p: Vec3, width, height: f32, color: rl.Col
 	}
 	center := Vec2{width * 0.5, height * 0.5}
 	half := Vec2{width*0.5 - margin, height*0.5 - margin}
+	if dir.y < 0 {
+		half.y = center.y - top
+	}
 	k := min(half.x/max(abs(dir.x), 0.001), half.y/max(abs(dir.y), 0.001))
 	tip := center + dir*k
 	back := tip - dir*16
 	side := Vec2{-dir.y, dir.x} * 9
 	rl.DrawTriangle({tip.x, tip.y}, {back.x + side.x, back.y + side.y}, {back.x - side.x, back.y - side.y}, color)
 	rl.DrawTriangle({tip.x, tip.y}, {back.x - side.x, back.y - side.y}, {back.x + side.x, back.y + side.y}, color)
-}
-
-@(private)
-draw_panel :: proc(r: rl.Rectangle) {
-	rl.DrawRectangleRounded(r, 0.3, 6, PANEL)
-	rl.DrawRectangleRoundedLinesEx(r, 0.3, 6, 2, BORDER)
 }
 
 @(private)
@@ -1223,43 +1210,47 @@ draw_hud :: proc(v: ^View, w: ^World, frame: ^host.Frame, cam: rl.Camera3D) {
 		draw_marker(cam, w.shards[nearest].position+{0, 0.9, 0}, width, height, ui.with_alpha(SOUL, 0.85), v.time, true)
 	}
 
-	// Shards and lives.
-	panel := rl.Rectangle{14, 14, 236, 64}
-	draw_panel(panel)
-	gfx.draw_sprite(v.gem_icon, 0, {40, 46}, 3.4)
-	enough := w.shards_taken >= w.shards_required
-	count_color := GOLD if enough else IVORY
-	ui.draw_text(theme, fmt.tprintf("%d/%d", w.shards_taken, w.shards_required), {64, 18}, .Large, count_color)
-	extra := w.shard_count - w.shards_required
-	label := "portale aperto" if w.portal_open else "frammenti d'anima"
-	if extra > 0 && enough {
-		label = fmt.tprintf("bonus %d/%d", max(w.shards_taken-w.shards_required, 0), extra)
+	// Shared HUD: vitals, objective, score. Every value owns a bounded lane.
+	palette := theme.palette
+	zones := ui.hud_columns(frame.canvas)
+	for zone in zones {
+		ui.hud_panel(theme, zone)
 	}
-	ui.draw_text(theme, label, {64, 50}, .Small, IVORY_DIM)
+	left, middle, right := ui.shrink(zones[0], 10), ui.shrink(zones[1], 10), ui.shrink(zones[2], 10)
 	for i in 0..<w.settings.lives {
-		x := f32(160 + i*22)
-		if i >= 4 {
-			break
-		}
-		tint := rl.WHITE if i < w.lives else rl.Color{60, 56, 64, 255}
-		gfx.draw_sprite(v.life_icon, 0, {x, 32}, 2.4, tint = tint)
+		tint := rl.WHITE if i < w.lives else palette.border
+		gfx.draw_sprite(v.life_icon, 0, {left.x + 10 + f32(i)*24, left.y + 10}, 2.4, tint = tint)
 	}
+	ui.draw_text_fit(theme, "SCATTO", {left.x, left.y + 27, 56, 18}, .Small, palette.text_dim)
+	ui.hud_meter(theme, {left.x + 66, left.y + 34, left.width - 66, 5},
+		1-w.player.dash_cooldown/PLAYER_PARAMS.dash_cooldown)
 
-	// Score and clock.
-	score, _ := world_score(w)
-	ui.draw_text_centered(theme, fmt.tprintf("Punteggio  %d", score), {width * 0.5, 30}, .Body, IVORY)
-	clock := rl.Rectangle{width - 150, 14, 136, 44}
-	draw_panel(clock)
-	if w.time_limit > 0 {
-		left := max(w.time_limit-w.time, 0)
-		color := IVORY
-		if left < 10 {
-			color = ui.mix_color(CRIMSON, IVORY, 0.5+0.5*math.sin(v.time*10))
-		}
-		ui.draw_text_centered(theme, host.format_time(left), {clock.x + clock.width*0.5, clock.y + 22}, .Large, color)
-	} else {
-		ui.draw_text_centered(theme, host.format_time(w.time), {clock.x + clock.width*0.5, clock.y + 22}, .Large, IVORY)
+	enough := w.shards_taken >= w.shards_required
+	count_color := palette.warning if enough else palette.text
+	gfx.draw_sprite(v.gem_icon, 0, {middle.x + 10, middle.y + 12}, 2.6)
+	ui.draw_text_fit(theme, fmt.tprintf("FRAMMENTI  %d/%d", w.shards_taken, w.shards_required),
+		{middle.x + 30, middle.y, middle.width - 30, 23}, .Body, count_color)
+	label := "Raggiungi il santuario" if w.portal_open else "Raccogli i frammenti d'anima"
+	extra := w.shard_count - w.shards_required
+	if extra > 0 && enough {
+		label = fmt.tprintf("PORTALE APERTO   Bonus %d/%d", max(w.shards_taken-w.shards_required, 0), extra)
 	}
+	ui.draw_text_fit(theme, label, {middle.x, middle.y + 27, middle.width, 18}, .Small, palette.text_dim, .Center)
+
+	score, _ := world_score(w)
+	ui.draw_text_fit(theme, "PUNTI", {right.x, right.y, 64, 20}, .Small, palette.text_dim)
+	ui.draw_text_fit(theme, fmt.tprintf("%d", score),
+		{right.x + 68, right.y - 2, right.width - 68, 26}, .Large, palette.text, .Right)
+	clock := host.format_time(w.time)
+	clock_color := palette.text_dim
+	if w.time_limit > 0 {
+		left_time := max(w.time_limit-w.time, 0)
+		clock = fmt.tprintf("TEMPO  %s", host.format_time(left_time))
+		if left_time < 10 {
+			clock_color = ui.mix_color(palette.danger, palette.text, 0.5+0.5*math.sin(v.time*10))
+		}
+	}
+	ui.draw_text_fit(theme, clock, {right.x, right.y + 26, right.width, 20}, .Body, clock_color, .Right)
 
 	// Centre messages.
 	if v.message_time > 0 && v.message != .None {
@@ -1294,9 +1285,11 @@ draw_hud :: proc(v: ^View, w: ^World, frame: ^host.Frame, cam: rl.Camera3D) {
 				sub = "Nessuna vita rimasta"
 			}
 		}
-		ui.draw_text_centered(theme, title, {width * 0.5, height*0.3}, .Title, ui.with_alpha(color, alpha))
+		toast := rl.Rectangle{width*0.5 - 230, ui.HUD_MARGIN + ui.HUD_TOP_HEIGHT + 8, 460, 24}
+		ui.draw_text_fit(theme, title, toast, .Body, ui.with_alpha(color, alpha), .Center)
 		if sub != "" {
-			ui.draw_text_centered(theme, sub, {width * 0.5, height*0.3 + 40}, .Body, ui.with_alpha(IVORY, alpha))
+			toast.y += 23
+			ui.draw_text_fit(theme, sub, toast, .Small, ui.with_alpha(palette.text_dim, alpha), .Center)
 		}
 	}
 
@@ -1308,8 +1301,8 @@ draw_hud :: proc(v: ^View, w: ^World, frame: ^host.Frame, cam: rl.Camera3D) {
 
 	if w.status == .Playing && v.play_time < 9 {
 		a := clamp((9-v.play_time)/2, 0, 1)
-		ui.draw_text_centered(theme, "Q/E o tasto destro: ruota la visuale    Shift: scatto    Spazio in aria: doppio salto",
-			{width * 0.5, height - 26}, .Small, ui.with_alpha(IVORY_DIM, a))
+		ui.draw_text_fit(theme, "SPAZIO doppio salto    SHIFT scatto    Q/E visuale",
+			{width*0.5 - 250, height - 34, 500, 20}, .Small, ui.with_alpha(palette.text_dim, a), .Center)
 	}
 }
 

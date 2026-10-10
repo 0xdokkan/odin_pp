@@ -3,27 +3,83 @@ package render
 import rl "vendor:raylib"
 import game "../game"
 import view "../view"
+import ui "../engine/ui"
 
-M8_Control :: enum {None, Activate, Equip, Character, Ring, FPS, Workshop}
+M8_Control :: enum {None, Activate, Equip, Character, Ring, FPS}
 
-m8_control_bounds :: proc(renderer: ^Renderer, control: M8_Control) -> rl.Rectangle {
+// One layout drives drawing, hit testing and board occlusion. Loot controls
+// move to the footer; hidden equipment never leaves an invisible hit region.
+m8_active_bar_bounds :: proc(renderer: ^Renderer, room: ^game.Room = nil) -> rl.Rectangle {
+    width := min(f32(932), renderer.canvas_width-28)
+    loot := room != nil && room.phase == .Loot
+    return {(renderer.canvas_width-width)*0.5, renderer.canvas_height-(46 if loot else 218), width, 28}
+}
+
+m8_activity_bounds :: proc(width, height: f32, index: int) -> rl.Rectangle {
+    total := min(f32(320), width-28)
+    cell := (total-6)/2
+    // The center stays open for the exit arch and the path to it.
+    return {width-total-14+f32(index%2)*(cell+6), height-114+f32(index/2)*32, cell, 26}
+}
+
+// The host draws this offer, but it participates in the same board occlusion
+// as the item buttons. An offer click must never also target the tile beneath.
+m8_extra_challenge_bounds :: proc(width,height:f32) -> rl.Rectangle {
+    return m8_activity_bounds(width,height,2)
+}
+
+m8_control_bounds :: proc(renderer: ^Renderer, control: M8_Control, room: ^game.Room = nil) -> rl.Rectangle {
     if renderer == nil { return {} }
-    b := m8_active_bar_bounds(renderer)
-    width := b.width*0.28
+    b := m8_active_bar_bounds(renderer, room)
+    // Ratios also retain usable, disjoint hit targets on the 640px canvas.
     switch control {
-    case .Activate: return {b.x,b.y,width,b.height}
-    case .Equip: return {b.x+width*2+54,b.y,100,b.height}
-    case .Character: return {b.x+width*2+159,b.y,b.width-width*2-159,b.height}
-    case .Ring: return {renderer.canvas_width-184,97,170,26}
-    case .FPS: return {renderer.canvas_width-184,131,170,26}
-    case .Workshop: return {renderer.canvas_width-184,165,170,26}
+    case .Activate: return {b.x,b.y,b.width*0.26,b.height}
+    case .Equip: return {b.x+b.width*0.64,b.y,b.width*0.14-6,b.height}
+    case .Character: return {b.x+b.width*0.82,b.y,b.width*0.18,b.height}
+    case .Ring: return m8_activity_bounds(renderer.canvas_width,renderer.canvas_height,0)
+    case .FPS: return m8_activity_bounds(renderer.canvas_width,renderer.canvas_height,1)
     case .None: return {}
     }
     return {}
 }
 
+m8_weapon_bounds :: proc(renderer: ^Renderer, room: ^game.Room) -> rl.Rectangle {
+    b := m8_active_bar_bounds(renderer,room)
+    return {b.x+b.width*0.28,b.y,b.width*0.35-6,b.height}
+}
+
+m8_trap_status_bounds :: proc(renderer: ^Renderer, room: ^game.Room) -> rl.Rectangle {
+    b := m8_active_bar_bounds(renderer,room)
+    return {b.x,b.y-20,min(b.width,370),16}
+}
+
+m8_control_visible :: proc(room: ^game.Room, control: M8_Control) -> bool {
+    if room == nil || room.player == nil || (room.phase != .Combat && room.phase != .Loot) {return false}
+    switch control {
+    case .Activate: return game.board_device_count(room,.Tesla_Coil)>0
+    case .Equip: return room.player.equipment.reserve.id != .None
+    case .Character: return true
+    case .Ring: return room.phase == .Loot && !room.ring_challenge_attempted
+    case .FPS: return room.phase == .Loot
+    case .None: return false
+    }
+    return false
+}
+
+m8_hud_contains_point :: proc(renderer: ^Renderer, room: ^game.Room, point: view.Vec2) -> bool {
+    for control in M8_Control {
+        if m8_control_visible(room,control) && point_in_rectangle(point,m8_control_bounds(renderer,control,room)) {return true}
+    }
+    if room == nil || room.player == nil {return false}
+    if room.phase == .Loot && !room.minigame_challenge_attempted &&
+       point_in_rectangle(point,m8_extra_challenge_bounds(renderer.canvas_width,renderer.canvas_height)) {return true}
+    equipment := room.player.equipment
+    if (equipment.weapon.id != .None || equipment.reserve.id != .None) && point_in_rectangle(point,m8_weapon_bounds(renderer,room)) {return true}
+    return game.board_device_count(room,.Shock_Floor)>0 && point_in_rectangle(point,m8_trap_status_bounds(renderer,room))
+}
+
 m8_control_enabled :: proc(renderer: ^Renderer, room: ^game.Room, control: M8_Control) -> bool {
-    if renderer == nil || room == nil || room.player == nil || !renderer.tactical.enabled ||
+    if renderer == nil || room == nil || room.player == nil || !renderer.tactical.enabled || !m8_control_visible(room,control) ||
        (room.phase != .Combat && room.phase != .Loot) || room.qte.kind != .None ||
        game.tactical_is_casting(room) || renderer_blocks_player_input(renderer) { return false }
     switch control {
@@ -34,26 +90,25 @@ m8_control_enabled :: proc(renderer: ^Renderer, room: ^game.Room, control: M8_Co
             game.weapon_slot_valid(equipment.reserve) && game.weapon_slot_valid(equipment.weapon)
     case .Character: return !renderer_timeline_is_busy(renderer)
     case .Ring: return room.phase == .Loot && !room.ring_challenge_attempted && !renderer_timeline_is_busy(renderer)
-    case .FPS,.Workshop: return room.phase == .Loot && !renderer_timeline_is_busy(renderer)
+    case .FPS: return room.phase == .Loot && !renderer_timeline_is_busy(renderer)
     case .None: return false
     }
     return false
 }
 
 m8_control_at_point :: proc(renderer: ^Renderer, room: ^game.Room, point: view.Vec2) -> M8_Control {
-    for control in ([6]M8_Control{.Activate,.Equip,.Character,.Ring,.FPS,.Workshop}) {
-        if m8_control_enabled(renderer,room,control) && point_in_rectangle(point,m8_control_bounds(renderer,control)) { return control }
+    for control in ([5]M8_Control{.Activate,.Equip,.Character,.Ring,.FPS}) {
+        if m8_control_enabled(renderer,room,control) && point_in_rectangle(point,m8_control_bounds(renderer,control,room)) { return control }
     }
     return .None
 }
 
-M8_Modal_Control :: enum {Close_Character, Leave_Ring}
+M8_Modal_Control :: enum {Close_Character}
 
 m8_modal_control_bounds :: proc(renderer: ^Renderer, control: M8_Modal_Control) -> rl.Rectangle {
     if renderer == nil { return {} }
     switch control {
     case .Close_Character: return {renderer.canvas_width-208,52,148,28}
-    case .Leave_Ring: return {renderer.canvas_width-268,renderer.canvas_height-47,238,32}
     }
     return {}
 }
@@ -63,10 +118,7 @@ m8_modal_control_bounds :: proc(renderer: ^Renderer, control: M8_Modal_Control) 
 m8_mouse_button :: proc(renderer: ^Renderer, bounds: rl.Rectangle, label: cstring, enabled: bool = true, detail: cstring = nil) {
     accent := GOTHIC_BLUE if enabled else GOTHIC_STEEL
     ink := GOTHIC_PAPER if enabled else GOTHIC_MUTED
-    rl.DrawRectangleRec({bounds.x+1,bounds.y+2,bounds.width,bounds.height},GOTHIC_INK)
-    rl.DrawRectangleRec(bounds,GOTHIC_RECESS)
-    rl.DrawRectangleLinesEx(bounds,1,accent)
-    rl.DrawRectangleRec({bounds.x+3,bounds.y+2,bounds.width-6,1},ink)
+    ui.hud_panel(nil,bounds,accent)
     if detail != nil {
         gothic_text_fit(renderer,label,{bounds.x+8,bounds.y+1,bounds.width-16,14},12,ink)
         gothic_text_fit(renderer,detail,{bounds.x+8,bounds.y+14,bounds.width-16,12},10,accent if enabled else GOTHIC_MUTED)

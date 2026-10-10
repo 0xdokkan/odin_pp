@@ -4,7 +4,9 @@ import "core:math"
 import "core:testing"
 import rl "vendor:raylib"
 import game "../game"
+import fight "../fight"
 import level "../level"
+import view "../view"
 
 @(test)
 test_ring_grab_has_four_distinct_held_poses_and_safe_endpoints :: proc(t: ^testing.T) {
@@ -19,8 +21,8 @@ test_ring_grab_has_four_distinct_held_poses_and_safe_endpoints :: proc(t: ^testi
     testing.expect(t,m8_ring_pose(1).enemy_offset.y>1)
     testing.expect(t,abs(m8_ring_pose(3).enemy_angle+math.PI/2)<0.001)
     for i in 0..<4 {
-        ring := game.Ring_Challenge{action=.Grab_Throw,action_time=f32(i)*0.3+0.01}
-        testing.expect_value(t,game.ring_grab_pose(&ring),i)
+        ring := fight.State{throw_active=true,throw_tick=i*fight.THROW_POSE_TICKS+1}
+        testing.expect_value(t,fight.throw_pose(&ring),i)
     }
 }
 
@@ -100,21 +102,21 @@ test_m8_pointer_controls_match_drawn_buttons_and_respect_action_gates :: proc(t:
     player := game.Player{}
     room := game.Room{player=&player,phase=.Loot}
     for control in ([2]M8_Control{.Character,.Ring}) {
-        b := m8_control_bounds(renderer,control)
+        b := m8_control_bounds(renderer,control,&room)
         testing.expect_value(t,m8_control_at_point(renderer,&room,{b.x+b.width/2,b.y+b.height/2}),control)
     }
-    equip := m8_control_bounds(renderer,.Equip)
+    equip := m8_control_bounds(renderer,.Equip,&room)
     point := [2]f32{equip.x+5,equip.y+5}
     testing.expect_value(t,m8_control_at_point(renderer,&room,{point[0],point[1]}),M8_Control.None)
     player.equipment.reserve={.Iron_Cleaver,4}
     testing.expect_value(t,m8_control_at_point(renderer,&room,{point[0],point[1]}),M8_Control.Equip)
-    ring := m8_control_bounds(renderer,.Ring)
+    ring := m8_control_bounds(renderer,.Ring,&room)
     room.ring_challenge_attempted=true
     testing.expect_value(t,m8_control_at_point(renderer,&room,{ring.x+3,ring.y+3}),M8_Control.None)
     room.phase=.Combat
     append(&room.objects,game.Grid_Object{kind=.Shock_Floor,device_charges=3})
     defer delete(room.objects)
-    active := m8_control_bounds(renderer,.Activate)
+    active := m8_control_bounds(renderer,.Activate,&room)
     testing.expect_value(t,m8_control_at_point(renderer,&room,{active.x+3,active.y+3}),M8_Control.None)
     room.objects[0].device_armed=true
     testing.expect_value(t,m8_control_at_point(renderer,&room,{active.x+3,active.y+3}),M8_Control.None)
@@ -204,8 +206,7 @@ test_m8_modal_mouse_buttons_stay_visible_and_clear_of_action_text :: proc(t: ^te
     for width in ([3]f32{640,960,1280}) {
         renderer.canvas_width=width
         close := m8_modal_control_bounds(renderer,.Close_Character)
-        leave := m8_modal_control_bounds(renderer,.Leave_Ring)
-        for button in ([2]rl.Rectangle{close,leave}) {
+        for button in ([1]rl.Rectangle{close}) {
             testing.expect(t,button.width>0 && button.height>=26)
             testing.expect(t,button.x>=0 && button.x+button.width<=width)
             testing.expect(t,button.y>=0 && button.y+button.height<=renderer.canvas_height)
@@ -213,9 +214,74 @@ test_m8_modal_mouse_buttons_stay_visible_and_clear_of_action_text :: proc(t: ^te
         }
         // Character statistics start below the top-right close button.
         testing.expect(t,close.y+close.height<130)
-        // Ring keyboard combat instructions end before the mouse-only leave button.
-        testing.expect(t,leave.x>width-290)
-        testing.expect(t,leave.y>renderer.canvas_height-56)
-        testing.expect(t,!point_in_rectangle({close.x+4,close.y+4},leave))
+
     }
+}
+
+@(test)
+test_m8_hidden_controls_do_not_occlude_board_and_visible_disabled_controls_do :: proc(t: ^testing.T) {
+    renderer := new(Renderer)
+    defer free(renderer)
+    renderer.canvas_width,renderer.canvas_height=960,540
+    renderer.tactical.enabled=true
+    player: game.Player
+    room := game.Room{player=&player,phase=.Combat}
+    defer delete(room.objects)
+    activate := m8_control_bounds(renderer,.Activate,&room)
+    point := [2]f32{activate.x+4,activate.y+4}
+    testing.expect(t,!m8_hud_contains_point(renderer,&room,{point.x,point.y}))
+    append(&room.objects,game.Grid_Object{kind=.Tesla_Coil})
+    testing.expect(t,m8_hud_contains_point(renderer,&room,{point.x,point.y}))
+    testing.expect(t,m8_control_at_point(renderer,&room,{point.x,point.y})==M8_Control.None,
+        "one visible Tesla needs another tower; its disabled button must still intercept the pointer")
+    equip := m8_control_bounds(renderer,.Equip,&room)
+    testing.expect(t,!m8_hud_contains_point(renderer,&room,{equip.x+4,equip.y+4}))
+    player.equipment.reserve={.Iron_Cleaver,4}
+    testing.expect(t,m8_hud_contains_point(renderer,&room,{equip.x+4,equip.y+4}))
+}
+
+@(test)
+test_m8_footer_controls_fit_and_do_not_overlap_between_phases :: proc(t: ^testing.T) {
+    renderer := new(Renderer)
+    defer free(renderer)
+    player: game.Player
+    room := game.Room{player=&player}
+    for width in ([3]f32{640,960,1280}) {
+        renderer.canvas_width,renderer.canvas_height=width,540
+        for phase in ([2]game.Room_Phase{.Combat,.Loot}) {
+            room.phase=phase
+            controls := [5]M8_Control{.Activate,.Equip,.Character,.Ring,.FPS}
+            for control,i in controls {
+                if phase == .Combat && i>=3 {continue}
+                a := m8_control_bounds(renderer,control,&room)
+                testing.expect(t,a.x>=0 && a.y>=0 && a.x+a.width<=width && a.y+a.height<=540)
+                for other,j in controls {
+                    if j<=i || (phase == .Combat && j>=3) {continue}
+                    b := m8_control_bounds(renderer,other,&room)
+                    testing.expect(t,!rl.CheckCollisionRecs(a,b))
+                }
+                if phase == .Combat {
+                    for card in 0..<8 {testing.expect(t,!rl.CheckCollisionRecs(a,tactical_hand_card_bounds(renderer,card,8)))}
+                } else {testing.expect(t,!rl.CheckCollisionRecs(a,m8_extra_challenge_bounds(width,540)))}
+            }
+        }
+    }
+}
+
+@(test)
+test_extra_challenge_offer_blocks_board_only_while_visible :: proc(t: ^testing.T) {
+    renderer:=new(Renderer)
+    defer free(renderer)
+    renderer.canvas_width,renderer.canvas_height=960,540
+    player: game.Player
+    room:=game.Room{player=&player,phase=.Loot}
+    bounds:=m8_extra_challenge_bounds(960,540)
+    point:=view.Vec2{bounds.x+bounds.width/2,bounds.y+bounds.height/2}
+    testing.expect(t,m8_hud_contains_point(renderer,&room,point))
+    testing.expect_value(t,m8_control_at_point(renderer,&room,point),M8_Control.None)
+    room.minigame_challenge_attempted=true
+    testing.expect(t,!m8_hud_contains_point(renderer,&room,point))
+    room.minigame_challenge_attempted=false
+    room.phase=.Combat
+    testing.expect(t,!m8_hud_contains_point(renderer,&room,point))
 }

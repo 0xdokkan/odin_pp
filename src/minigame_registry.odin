@@ -8,9 +8,11 @@ import platform3d "minigames/platform3d"
 import puzzle "minigames/puzzle"
 
 // Minigames offered by the menu and by run challenges, in display order.
-// Challenges pick `seed % MINIGAME_COUNT`, so editing the list changes which
-// minigame a given run seed offers.
-MINIGAME_COUNT :: 5
+// Keep the first EXTRA_CHALLENGE_COUNT entries stable for seeded run offers.
+MINIGAME_COUNT :: 6
+// Preserve the existing seeded extra-challenge sequence. The ring has its
+// own single-attempt offer and card unlocks instead of the gold reward.
+EXTRA_CHALLENGE_COUNT :: 5
 
 minigame_info :: proc(index: int) -> (host.Minigame_Info, bool) {
 	switch index {
@@ -24,6 +26,8 @@ minigame_info :: proc(index: int) -> (host.Minigame_Info, bool) {
 		return fps.info(), true
 	case 4:
 		return puzzle.info(), true
+	case 5:
+		return ring_minigame_info(), true
 	}
 	return {}, false
 }
@@ -35,4 +39,25 @@ minigame_index_by_id :: proc(id: string) -> int {
 		}
 	}
 	return -1
+}
+
+// Captures exercise the real simulation without accepting stray live mouse
+// input (especially important when the FPS has captured the desktop cursor).
+minigame_capture_scene :: proc(index: int, config: host.Minigame_Config) -> host.Scene {
+	switch index {
+	case 0: return platform2d.create_autoplay(config)
+	case 1: return platform3d.create_autoplay(config)
+	case 2: return arena.create_autoplay(config)
+	case 3: return fps.create_autoplay(config)
+	case 4:
+		scene := puzzle.create(config)
+		puzzle.autoplay(&scene,2)
+		return scene
+	case 5:
+		scene := ring_minigame_create(config)
+		g := cast(^Ring_Minigame)host.shell_of(&scene).hooks.data
+		g.demo=true
+		return scene
+	}
+	return {}
 }

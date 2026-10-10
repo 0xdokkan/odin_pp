@@ -3,6 +3,7 @@
 // minigame, is a Scene; menus and pauses are scenes pushed on top.
 package host
 
+import "core:strings"
 import rl "vendor:raylib"
 import app "../../app"
 import audio "../audio"
@@ -64,7 +65,12 @@ Scene :: struct {
 	draw_window:   proc(data: rawptr, frame: ^Frame),
 	// Optional: runs after the frame is on screen (screenshots).
 	after_present: proc(data: rawptr, frame: ^Frame),
-	// Optional: the scene above was popped, possibly with a result.
+	// Optional: an accepted push transfers input to a scene above this one.
+	// Called even when the incoming scene is modal and stops our updates.
+	// Release mouse capture and hold gameplay here; resume remains explicit.
+	suspend:       proc(data: rawptr),
+	// Optional: the scene above was popped, possibly with a result. Strings in
+	// `from`/`result` are borrowed for this frame; clone them to retain them.
 	resume:        proc(data: rawptr, frame: ^Frame, from: string, result: Maybe(Result)),
 	destroy:       proc(data: rawptr),
 }
@@ -155,12 +161,15 @@ draw_start :: proc(s: ^Stack) -> int {
 	return 0
 }
 
-stack_push :: proc(s: ^Stack, scene: Scene) -> bool {
+stack_push :: proc(s: ^Stack, scene: Scene, suspend_top := true) -> bool {
 	if s.count >= MAX_SCENES {
 		if scene.destroy != nil {
 			scene.destroy(scene.data)
 		}
 		return false
+	}
+	if top := stack_top(s); suspend_top && top != nil && top.suspend != nil {
+		top.suspend(top.data)
 	}
 	s.items[s.count] = scene
 	s.count += 1
@@ -190,17 +199,26 @@ apply :: proc(s: ^Stack, c: ^Commands, frame: ^Frame) -> bool {
 			if !ok {
 				continue
 			}
+			// Destroy may release the storage backing either name. Preserve the
+			// callback values while retaining destroy-before-resume ordering
+			// (the outgoing scene may release its captured mouse).
+			from := strings.clone(popped.name, context.temp_allocator)
+			if result, has_result := cmd.result.?; has_result {
+				result.minigame = strings.clone(result.minigame, context.temp_allocator)
+				cmd.result = result
+			}
 			if popped.destroy != nil {
 				popped.destroy(popped.data)
 			}
 			if top := stack_top(s); top != nil && top.resume != nil {
-				top.resume(top.data, frame, popped.name, cmd.result)
+				top.resume(top.data, frame, from, cmd.result)
 			}
 		case .Replace:
 			if popped, ok := stack_pop(s); ok && popped.destroy != nil {
 				popped.destroy(popped.data)
 			}
-			stack_push(s, cmd.scene)
+			// The scene below the replaced top never regained input ownership.
+			stack_push(s, cmd.scene, suspend_top = false)
 		case .Quit:
 			keep_running = false
 		}

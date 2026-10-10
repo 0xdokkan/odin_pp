@@ -11,6 +11,7 @@ M9_Control :: enum {None, Leave, Pause, Resume_FPS, Step, Debug, Reset, Arena, R
 M9_View :: struct {
 	kind: M9_Kind,
 	practice, tools, paused, debug, recording, replaying, captured: bool,
+	hosted: bool,
 	fps_active: bool,
 	alpha: f32,
 	steps, recorded, replay_at: int,

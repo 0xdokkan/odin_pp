@@ -16,11 +16,10 @@ Minigame_Challenge_Outcome :: enum u8 {
 }
 
 Minigame_Challenge :: struct {
-	node_id:    Node_Id,
-	seed:       u64,
-	difficulty: int, // 0..2, grows with depth
+	node_id: Node_Id,
+	seed:    u64,
 	// Index into the host's minigame catalog, chosen from the seed.
-	minigame:   int,
+	minigame: int,
 }
 
 minigame_challenge_available :: proc(run: ^Run_State, room: ^Room) -> bool {
@@ -44,22 +43,13 @@ begin_minigame_challenge :: proc(run: ^Run_State, room: ^Room, catalog_size: int
 	room.minigame_challenge_attempted = true
 	seed := mix_room_seed(node.room_seed ~ MINIGAME_CHALLENGE_SALT)
 	challenge := Minigame_Challenge{
-		node_id    = node.id,
-		seed       = seed,
-		difficulty = minigame_challenge_difficulty(node.depth, node.kind),
-		minigame   = int(seed % u64(catalog_size)),
+		node_id  = node.id,
+		seed     = seed,
+		minigame = int(seed % u64(catalog_size)),
 	}
 	room.minigame_challenge = challenge
 	room.minigame_challenge_pending = true
 	return challenge, true
-}
-
-minigame_challenge_difficulty :: proc(depth: int, kind: Node_Kind) -> int {
-	d := 0 if depth <= 2 else (1 if depth <= 4 else 2)
-	if kind == .Elite {
-		d = min(d+1, 2)
-	}
-	return d
 }
 
 minigame_challenge_gold :: proc(outcome: Minigame_Challenge_Outcome, stars: u8) -> i32 {

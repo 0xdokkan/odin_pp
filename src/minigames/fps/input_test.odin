@@ -36,13 +36,13 @@ test_pause_discards_unconsumed_fire_and_jump :: proc(t: ^testing.T) {
 	g.clock = timing.fixed_step(SIM_HZ)
 	view_reset(&g.view, &g.world)
 	g.jump_queued = true
-	g.was_playing = true
+	g.input_gate.active = true
 	frame := host.Frame{dt = g.clock.step * 0.25, focused = true}
 	advance_simulation(g, &frame, {fire = true}, {})
 	testing.expect(t, g.fire_queued && g.jump_queued)
 	ticks := g.clock.total_steps
 	hook_step(g, &frame, false)
-	testing.expect(t, !g.fire_queued && !g.jump_queued && !g.was_playing)
+	testing.expect(t, !g.fire_queued && !g.jump_queued && !g.input_gate.active)
 	testing.expect_value(t, g.clock.accumulator, f32(0))
 	testing.expect_value(t, g.clock.total_steps, ticks)
 	frame.dt = g.clock.step

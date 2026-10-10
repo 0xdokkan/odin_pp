@@ -57,25 +57,26 @@ Palette :: struct {
 	shadow:        rl.Color,
 }
 
-// Ivory and crimson on slate, matching the roguelike HUD.
+// Ink, blue steel and paper: the same materials as the tactical board.
+// Crimson is reserved for harm, blue for interaction and gold for rewards.
 GOTHIC_PALETTE :: Palette{
-	background   = {14, 16, 22, 255},
-	panel        = {26, 29, 38, 238},
-	panel_alt    = {36, 40, 52, 240},
-	border       = {92, 84, 72, 255},
-	text         = {236, 226, 204, 255},
-	text_dim     = {160, 152, 136, 255},
-	accent       = {178, 38, 52, 255},
-	accent_text  = {255, 240, 228, 255},
-	button       = {48, 52, 66, 255},
-	button_hover = {66, 70, 88, 255},
-	button_down  = {34, 36, 46, 255},
-	disabled     = {40, 42, 50, 200},
-	focus        = {232, 196, 112, 255},
-	danger       = {214, 64, 64, 255},
-	success      = {96, 184, 112, 255},
-	warning      = {226, 168, 72, 255},
-	shadow       = {0, 0, 0, 120},
+	background   = {13, 13, 16, 255},
+	panel        = {19, 25, 34, 242},
+	panel_alt    = {28, 37, 49, 246},
+	border       = {43, 53, 69, 255},
+	text         = {226, 220, 203, 255},
+	text_dim     = {154, 167, 181, 255},
+	accent       = {83, 130, 166, 255},
+	accent_text  = {239, 240, 224, 255},
+	button       = {32, 43, 58, 255},
+	button_hover = {50, 71, 91, 255},
+	button_down  = {20, 29, 41, 255},
+	disabled     = {28, 32, 40, 230},
+	focus        = {125, 170, 203, 255},
+	danger       = {214, 65, 78, 255},
+	success      = {113, 181, 145, 255},
+	warning      = {222, 184, 107, 255},
+	shadow       = {0, 0, 0, 110},
 }
 
 Theme :: struct {
@@ -89,7 +90,7 @@ Theme :: struct {
 }
 
 default_theme :: proc() -> Theme {
-	return Theme{palette = GOTHIC_PALETTE, roundness = 0.18, border = 2, padding = 10, spacing = 1}
+	return Theme{palette = GOTHIC_PALETTE, roundness = 0, border = 1, padding = 12, spacing = 1}
 }
 
 // Printable ASCII plus Latin-1 letters, so Italian accents (àèéìòù) render.
@@ -164,6 +165,9 @@ measure :: proc(theme: ^Theme, text: string, size: Text_Size) -> [2]f32 {
 ellipsize :: proc(theme: ^Theme, text: string, max_width: f32, size: Text_Size) -> string {
 	if measure(theme, text, size).x <= max_width {
 		return text
+	}
+	if measure(theme, "...", size).x > max_width {
+		return ""
 	}
 	end := len(text)
 	for end > 0 {

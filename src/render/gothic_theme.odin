@@ -5,15 +5,17 @@ import "core:fmt"
 import "core:math"
 import rl "vendor:raylib"
 import game "../game"
+import ui "../engine/ui"
 
-GOTHIC_INK :: rl.Color{13, 13, 16, 255}
-GOTHIC_PAPER :: rl.Color{218, 207, 184, 255}
-GOTHIC_MUTED :: rl.Color{147, 133, 121, 255}
-GOTHIC_RED :: rl.Color{174, 39, 51, 255}
+// Semantic colors belong to the engine UI; the world/card art keeps its own materials.
+GOTHIC_INK :: ui.GOTHIC_PALETTE.background
+GOTHIC_PAPER :: ui.GOTHIC_PALETTE.text
+GOTHIC_MUTED :: ui.GOTHIC_PALETTE.text_dim
+GOTHIC_RED :: ui.GOTHIC_PALETTE.danger
 GOTHIC_DARK_RED :: rl.Color{72, 17, 25, 255}
-GOTHIC_STEEL :: rl.Color{43, 53, 69, 255}
-GOTHIC_BLUE :: rl.Color{125, 170, 203, 255}
-GOTHIC_RECESS :: rl.Color{19, 25, 34, 255}
+GOTHIC_STEEL :: ui.GOTHIC_PALETTE.border
+GOTHIC_BLUE :: ui.GOTHIC_PALETTE.focus
+GOTHIC_RECESS :: ui.GOTHIC_PALETTE.panel
 GOTHIC_FONT_SIZES :: [?]int{10, 12, 14, 16, 18, 24, 32}
 
 Gothic_Art :: struct {

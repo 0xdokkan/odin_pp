@@ -48,12 +48,12 @@ void main() {
 }
 `
 
-FOG_COLOR :: rl.Color{9, 8, 13, 255}
-FOG_NEAR :: f32(3)
+FOG_COLOR :: rl.Color{7, 12, 21, 255}
+FOG_NEAR :: f32(4)
 FOG_FAR :: f32(22)
-LANTERN_COLOR :: Vec3{1.35, 0.98, 0.64}
-MUZZLE_COLOR :: Vec3{2.2, 1.45, 0.7}
-SPRITE_AMBIENT :: Vec3{0.42, 0.4, 0.48}
+LANTERN_COLOR :: Vec3{0.83, 1.06, 1.38}
+MUZZLE_COLOR :: Vec3{1.3, 1.85, 2.3}
+SPRITE_AMBIENT :: Vec3{0.64, 0.68, 0.76}
 MUZZLE_TIME :: f32(0.09)
 
 MAX_TRAILS :: 16
@@ -108,6 +108,7 @@ View :: struct {
 	model:         rl.Model,
 	has_model:     bool,
 	sprites:       [Sprite_Id]gfx.Sprite,
+	figures:       gfx.Paper_Figures,
 	glow:          rl.Texture2D,
 	stone:         rl.Texture2D,
 	cam:           camera.Fps_Camera,
@@ -146,8 +147,9 @@ view_init :: proc(v: ^View) {
 	v.lighting.fog_near = FOG_NEAR
 	v.lighting.fog_far = FOG_FAR
 	v.lighting.sun_dir = {-0.35, -1, -0.45}
-	v.lighting.sun_color = {0.2, 0.22, 0.32}
-	v.lighting.ambient = {0.27, 0.25, 0.31}
+	v.lighting.sun_color = {0.19, 0.24, 0.34}
+	v.lighting.ambient = {0.29, 0.33, 0.42}
+	v.lighting.specular = 0.22
 	v.sprite_shader = rl.LoadShaderFromMemory(SPRITE_VERTEX, SPRITE_FRAGMENT)
 	v.sprite_ok = rl.IsShaderValid(v.sprite_shader)
 	if v.sprite_ok {
@@ -155,6 +157,7 @@ view_init :: proc(v: ^View) {
 		v.loc_fog_color = rl.GetShaderLocation(v.sprite_shader, "fogColor")
 		v.loc_fog_range = rl.GetShaderLocation(v.sprite_shader, "fogRange")
 	}
+	v.figures = gfx.paper_figures_create()
 	art := sprite_art()
 	for id in Sprite_Id {
 		frames: [8]gfx.Frame_Rows
@@ -174,6 +177,7 @@ view_init :: proc(v: ^View) {
 
 view_destroy :: proc(v: ^View) {
 	release_model(v)
+	gfx.paper_figures_destroy(&v.figures)
 	for id in Sprite_Id {
 		gfx.sprite_destroy(&v.sprites[id])
 	}
@@ -225,19 +229,19 @@ make_stone_texture :: proc() -> rl.Texture2D {
 		for x in 0..<SIZE {
 			bx, by := x/BLOCK, y/BLOCK
 			ix, iy := x%BLOCK, y%BLOCK
-			v := 214 + hash(bx+by*7, bx*by+3)%30 - 15 + hash(x, y)%22 - 11
+			v := 221 + hash(bx+by*7, bx*by+3)%10 - 5 + hash(x, y)%5 - 2
 			edge_lo := min(ix, iy)
 			edge_hi := max(ix, iy)
 			if edge_lo == 0 {
-				v = 78 + hash(x, y)%12
+				v = 98 + hash(x, y)%8
 			} else if edge_lo == 1 {
-				v += 16
+				v += 24
 			} else if edge_hi == BLOCK-1 {
-				v -= 30
+				v -= 38
 			}
 			// Sparse chips and cracks.
-			if hash(x*3+1, y*5+2)%37 == 0 {
-				v -= 48
+			if hash(x*3+1, y*5+2)%193 == 0 {
+				v -= 25
 			}
 			c := u8(clamp(v, 0, 255))
 			rl.ImageDrawPixel(&img, i32(x), i32(y), {c, c, c, 255})
@@ -255,22 +259,22 @@ voxel_palette :: proc() -> gfx.Voxel_Palette {
 	set :: proc(p: ^gfx.Voxel_Palette, m: Material, c: rl.Color) {
 		p[u8(m)] = c
 	}
-	set(&p, .Floor, {86, 78, 82, 255})
-	set(&p, .Floor_Cracked, {66, 60, 64, 255})
-	set(&p, .Floor_Room_A, {124, 112, 106, 255})
-	set(&p, .Floor_Room_B, {86, 76, 80, 255})
-	set(&p, .Ceiling, {46, 42, 48, 255})
-	set(&p, .Slate, {134, 136, 152, 255})
-	set(&p, .Slate_Trim, {94, 96, 112, 255})
-	set(&p, .Moss, {106, 132, 96, 255})
-	set(&p, .Moss_Trim, {74, 94, 68, 255})
-	set(&p, .Brick, {166, 84, 70, 255})
-	set(&p, .Brick_Trim, {114, 58, 52, 255})
-	set(&p, .Obsidian, {90, 76, 116, 255})
-	set(&p, .Obsidian_Trim, {58, 48, 78, 255})
-	set(&p, .Glyph, {150, 112, 78, 255})
-	set(&p, .Pillar, {212, 200, 170, 255})
-	set(&p, .Arch, {236, 204, 134, 255})
+	set(&p, .Floor, {80, 94, 117, 255})
+	set(&p, .Floor_Cracked, {65, 78, 98, 255})
+	set(&p, .Floor_Room_A, {112, 129, 151, 255})
+	set(&p, .Floor_Room_B, {87, 103, 126, 255})
+	set(&p, .Ceiling, {35, 45, 62, 255})
+	set(&p, .Slate, {107, 123, 147, 255})
+	set(&p, .Slate_Trim, {55, 72, 96, 255})
+	set(&p, .Moss, {91, 111, 123, 255})
+	set(&p, .Moss_Trim, {45, 63, 76, 255})
+	set(&p, .Brick, {110, 109, 126, 255})
+	set(&p, .Brick_Trim, {55, 56, 75, 255})
+	set(&p, .Obsidian, {65, 78, 104, 255})
+	set(&p, .Obsidian_Trim, {36, 48, 69, 255})
+	set(&p, .Glyph, {105, 158, 192, 255})
+	set(&p, .Pillar, {144, 156, 168, 255})
+	set(&p, .Arch, {190, 185, 165, 255})
 	return p
 }
 
@@ -421,12 +425,12 @@ view_consume_events :: proc(g: ^Game, frame: ^host.Frame) {
 			from := muzzle_position(v)
 			// The beam starts a little ahead of the crystal so it stays thin on screen.
 			ahead := physics.normalize3(e.position - from)
-			add_trail(v, from+ahead*min(0.5, physics.length3(e.position-from)*0.5), e.position, {255, 206, 120, 230})
+			add_trail(v, from+ahead*min(0.5, physics.length3(e.position-from)*0.5), e.position, {154, 212, 250, 230})
 			audio.play(a, .Laser, 0.45, rng.float_range(r, 0.62, 0.72))
 			trauma(v, 0.07)
 			emitter := fx.Emitter{speed_min = 0.5, speed_max = 2, direction = e.normal, spread = 0.6,
 				life_min = 0.08, life_max = 0.18, size_start = 0.05, size_end = 0,
-				color_start = {255, 230, 160, 255}, color_end = {255, 120, 40, 0}, three_d = true}
+				color_start = {189, 231, 255, 255}, color_end = {56, 119, 187, 0}, three_d = true}
 			fx.emit(&v.particles, emitter, from, 4, r)
 		case .Dry_Fire:
 			v.dry_time = 0.4
@@ -482,10 +486,10 @@ view_consume_events :: proc(g: ^Game, frame: ^host.Frame) {
 			v.hitmarker = 0.16
 			burst := fx.Emitter{speed_min = 1.5, speed_max = 4, direction = {0, 1, 0}, spread = math.PI,
 				life_min = 0.2, life_max = 0.5, size_start = 0.08, size_end = 0,
-				color_start = {240, 170, 255, 255}, color_end = {120, 40, 200, 0}, gravity = 2, three_d = true}
+				color_start = {248, 138, 149, 255}, color_end = {151, 32, 49, 0}, gravity = 2, three_d = true}
 			fx.emit(&v.particles, burst, e.position, 18, r)
 			audio.play(a, .Hit, 0.45, 1.6)
-			add_mark(v, e.position, "Parata +25", {214, 160, 255, 255})
+			add_mark(v, e.position, "Parata +25", {172, 220, 250, 255})
 		case .Enemy_Alert:
 			vol := spatial_volume(v, e.position)
 			add_mark(v, e.position+Vec3{0, 0.45, 0}, "!", {255, 90, 70, 255})
@@ -505,12 +509,12 @@ view_consume_events :: proc(g: ^Game, frame: ^host.Frame) {
 			audio.play(a, .Laser, 0.4*spatial_volume(v, e.position), 0.4)
 			flare := fx.Emitter{speed_min = 0.5, speed_max = 1.8, direction = {0, 1, 0}, spread = math.PI,
 				life_min = 0.2, life_max = 0.4, size_start = 0.07, size_end = 0,
-				color_start = {240, 170, 255, 255}, color_end = {120, 40, 200, 0}, three_d = true}
+				color_start = {248, 138, 149, 255}, color_end = {151, 32, 49, 0}, three_d = true}
 			fx.emit(&v.particles, flare, e.position, 10, r)
 		case .Projectile_Burst:
 			burst := fx.Emitter{speed_min = 1, speed_max = 3.5, direction = e.normal, spread = 1.4,
 				life_min = 0.2, life_max = 0.45, size_start = 0.08, size_end = 0,
-				color_start = {240, 170, 255, 255}, color_end = {110, 30, 180, 0}, gravity = 3, three_d = true}
+				color_start = {248, 138, 149, 255}, color_end = {127, 28, 42, 0}, gravity = 3, three_d = true}
 			fx.emit(&v.particles, burst, e.position, 16, r)
 			audio.play(a, .Hit, 0.35*spatial_volume(v, e.position), 0.6)
 		case .Player_Hurt:
@@ -561,7 +565,7 @@ view_consume_events :: proc(g: ^Game, frame: ^host.Frame) {
 		case .Footstep:
 			audio.play(a, .Step, 0.55, rng.float_range(r, 0.8, 1.05))
 		case .Escaped:
-			fx.flash_start(&v.flash, {230, 200, 255, 230}, 0.9)
+			fx.flash_start(&v.flash, {188, 221, 255, 180}, 0.9)
 			audio.play(a, .Power_Up, 0.7, 0.5)
 		case .Died:
 			fx.flash_start(&v.flash, {150, 0, 10, 200}, 1.2)
@@ -619,7 +623,7 @@ view_update :: proc(g: ^Game, frame: ^host.Frame, live: bool) {
 		}
 		trail := fx.Emitter{speed_min = 0, speed_max = 0.4, direction = {0, 1, 0}, spread = math.PI,
 			life_min = 0.2, life_max = 0.4, size_start = 0.09, size_end = 0,
-			color_start = {220, 120, 255, 220}, color_end = {90, 20, 160, 0}, three_d = true}
+			color_start = {237, 76, 103, 220}, color_end = {103, 21, 36, 0}, three_d = true}
 		fx.emit(&v.particles, trail, pr.position, 1, r)
 	}
 	// Runes shed sparks so they read from a distance, and the open portal swirls.
@@ -642,7 +646,7 @@ view_update :: proc(g: ^Game, frame: ^host.Frame, live: bool) {
 		pos := w.portal.center + Vec3{math.cos(a) * rr, math.sin(a) * rr * 1.3, 0}
 		mote := fx.Emitter{speed_min = 0.3, speed_max = 1, direction = {0, 1, 0}, spread = 0.6,
 			life_min = 0.5, life_max = 1, size_start = 0.06, size_end = 0,
-			color_start = {230, 190, 255, 255}, color_end = {120, 60, 220, 0}, gravity = -1, three_d = true}
+			color_start = {179, 221, 255, 255}, color_end = {60, 125, 192, 0}, gravity = -1, three_d = true}
 		fx.emit(&v.particles, mote, pos, 1, r)
 	}
 }
@@ -697,7 +701,7 @@ choose_light :: proc(g: ^Game, eye: Vec3) {
 		}
 	}
 	if found {
-		l.point_color = Vec3{1.5, 0.6, 1.9}
+		l.point_color = Vec3{1.7, 0.33, 0.4}
 		l.point_radius = 7
 		return
 	}
@@ -722,7 +726,7 @@ choose_light :: proc(g: ^Game, eye: Vec3) {
 	}
 	if w.portal.open && physics.length3(w.portal.center-eye) < 9 {
 		l.point_pos = w.portal.center
-		l.point_color = Vec3{1.3, 0.8, 2.0} * flicker
+		l.point_color = Vec3{0.6, 1.25, 1.9} * flicker
 		l.point_radius = 10
 	}
 }
@@ -745,6 +749,9 @@ Sprite_Draw :: struct {
 	size:   Vec2,
 	tint:   rl.Color,
 	flip:   bool,
+	figure: bool,
+	figure_index: int,
+	pose: f32,
 	dist:   f32,
 }
 
@@ -842,7 +849,29 @@ collect_sprites :: proc(g: ^Game, list: ^Draw_List, cam: rl.Camera3D) {
 			lit = rl.WHITE
 		}
 		flip := e.facing.x*right.x + e.facing.y*right.z < 0
-		push_sprite(list, eye, Sprite_Draw{sprite = id, frame = frame, center = center, size = size, tint = lit, flip = flip})
+		if v.figures.texture.id != 0 {
+			figure_index := 1 if e.kind == .Ghoul else (6 if e.kind == .Wraith else 5)
+			size = gfx.paper_figure_size(&v.figures, figure_index, height)
+			pose := f32(frame%2)*2-1
+			if e.state == .Dead {
+				size.y *= 0.19
+				size.x *= 1.15
+				center = feet+Vec3{0,size.y*0.5,0}
+				lit = {90,98,117,tint.a}
+			} else if e.state == .Windup || e.state == .Strike {
+				size.x *= 1.09
+				size.y *= 0.94
+				center.y -= height*0.03
+			} else {
+				center.y += pose*0.018
+			}
+			if e.kind == .Wraith { lit = rl.Color{min(lit.r,155),min(lit.g,213),lit.b,lit.a} }
+			if e.hurt_time > 0 { lit = {180,224,255,255} }
+			push_sprite(list, eye, Sprite_Draw{sprite=id,frame=frame,center=center,size=size,tint=lit,flip=flip,
+				figure=true,figure_index=figure_index,pose=pose})
+		} else {
+			push_sprite(list, eye, Sprite_Draw{sprite=id,frame=frame,center=center,size=size,tint=lit,flip=flip})
+		}
 	}
 	for i in 0..<w.pickup_count {
 		pk := w.pickups[i]
@@ -909,6 +938,12 @@ draw_sprite_list :: proc(v: ^View, list: ^Draw_List, cam: rl.Camera3D) {
 		}
 		items[j+1] = item
 	}
+	// Sorted cutouts still test against world depth, but must not write it.
+	// A detached paper border can otherwise occlude its own illustration when
+	// the camera pitches and the two billboard layers cease to be coplanar.
+	rlgl.DrawRenderBatchActive()
+	rlgl.DisableDepthMask()
+	defer { rlgl.DrawRenderBatchActive(); rlgl.EnableDepthMask() }
 	if v.sprite_ok {
 		view_pos := Vec3(cam.position)
 		rl.SetShaderValue(v.sprite_shader, v.loc_view, &view_pos, .VEC3)
@@ -919,6 +954,15 @@ draw_sprite_list :: proc(v: ^View, list: ^Draw_List, cam: rl.Camera3D) {
 		rl.BeginShaderMode(v.sprite_shader)
 	}
 	for item in items {
+		if item.figure {
+			source := gfx.paper_figure_source(&v.figures,item.figure_index,item.flip)
+			// Two independent layers: the border holds its pose, the drawing steps.
+			border_tint:=rl.Color{218,225,237,item.tint.a}
+			border_center:=item.center+Vec3{0,-item.pose*0.012,0}
+			rl.DrawBillboardPro(cam,v.figures.border,source,border_center,{0,1,0},item.size,item.size*0.5,0,border_tint)
+			rl.DrawBillboardPro(cam,v.figures.texture,source,item.center,{0,1,0},item.size,item.size*0.5,0,item.tint)
+			continue
+		}
 		s := v.sprites[item.sprite]
 		if s.texture.id == 0 {
 			continue
@@ -963,14 +1007,14 @@ draw_glows :: proc(g: ^Game, cam: rl.Camera3D) {
 		c := t.color
 		c.a = u8(255 * t.life)
 		rl.DrawCylinderEx(t.from, t.to, 0.006+0.01*t.life, 0.015+0.03*t.life, 5, c)
-		glow(v, cam, t.to, 0.6*t.life+0.2, {255, 190, 100, u8(220 * t.life)})
+		glow(v, cam, t.to, 0.6*t.life+0.2, {139, 207, 252, u8(190 * t.life)})
 	}
 	for pr in w.projectiles {
 		if !pr.alive {
 			continue
 		}
-		glow(v, cam, pr.position, 1.1, {200, 90, 255, 230})
-		glow(v, cam, pr.position, 0.45, {255, 230, 255, 255})
+		glow(v, cam, pr.position, 1.1, {230, 55, 80, 230})
+		glow(v, cam, pr.position, 0.45, {255, 215, 216, 255})
 	}
 	for i in 0..<w.pickup_count {
 		pk := w.pickups[i]
@@ -997,10 +1041,10 @@ draw_glows :: proc(g: ^Game, cam: rl.Camera3D) {
 		e := w.enemies[i]
 		if e.state == .Windup && e.kind == .Cultist {
 			k := clamp(e.state_time/enemy_params(e.kind).windup, 0, 1)
-			glow(v, cam, enemy_feet(e)+Vec3{0, 1.95, 0}, 0.4+0.7*k, {220, 110, 255, 230})
+			glow(v, cam, enemy_feet(e)+Vec3{0, 1.95, 0}, 0.4+0.7*k, {231, 58, 83, 230})
 		}
 		if e.state == .Windup && e.kind == .Wraith {
-			glow(v, cam, enemy_eye(e), 0.9, {140, 255, 230, 160})
+			glow(v, cam, enemy_eye(e), 0.9, {146, 206, 246, 160})
 		}
 	}
 	for i in 0..<v.decor_count {
@@ -1020,7 +1064,7 @@ draw_glows :: proc(g: ^Game, cam: rl.Camera3D) {
 }
 
 // The portal: a ring of motes spinning in the plane of the arch. Sealed, it
-// is a faint dull membrane; open, a bright violet vortex.
+// is a faint dull membrane; open, a bright blue vortex.
 @(private)
 draw_portal :: proc(g: ^Game, cam: rl.Camera3D) {
 	w := &g.world
@@ -1029,7 +1073,7 @@ draw_portal :: proc(g: ^Game, cam: rl.Camera3D) {
 	if !w.portal.open {
 		// The seal: one point per rune on a slowly turning ring, lit as the
 		// runes are found, so the arch itself shows what is missing.
-		glow(v, cam, c, 1.8, {90, 60, 130, 70})
+		glow(v, cam, c, 1.8, {49, 89, 138, 70})
 		count := max(w.rune_count, 1)
 		for i in 0..<count {
 			a := v.time*0.35 + f32(i)*math.TAU/f32(count) + math.PI/2
@@ -1039,14 +1083,14 @@ draw_portal :: proc(g: ^Game, cam: rl.Camera3D) {
 				glow(v, cam, p, 0.6*pulse, {255, 180, 80, 230})
 				glow(v, cam, p, 0.25, {255, 240, 200, 255})
 			} else {
-				glow(v, cam, p, 0.38, {120, 90, 160, 120})
+				glow(v, cam, p, 0.38, {74, 111, 155, 120})
 			}
 		}
 		return
 	}
 	k := clamp(w.portal.open_time*1.5, 0, 1)
-	glow(v, cam, c, 2.6*k, {170, 90, 255, 130})
-	glow(v, cam, c, 0.9*k, {255, 230, 255, 150})
+	glow(v, cam, c, 2.6*k, {77, 150, 219, 130})
+	glow(v, cam, c, 0.9*k, {201, 232, 255, 150})
 	for ring in 0..<3 {
 		radius := (0.35 + f32(ring)*0.28) * k
 		count := 10 + ring*4
@@ -1054,8 +1098,59 @@ draw_portal :: proc(g: ^Game, cam: rl.Camera3D) {
 		for i in 0..<count {
 			a := v.time*speed + f32(i)*math.TAU/f32(count) + f32(ring)
 			p := c + Vec3{math.cos(a) * radius, math.sin(a) * radius * 1.4, 0}
-			glow(v, cam, p, 0.26, {210, 150, 255, 170})
+			glow(v, cam, p, 0.26, {134, 205, 255, 170})
 		}
+	}
+}
+
+// Flush inlays follow solid faces: decoration never suggests a new platform
+// or a collision volume. Only nearby faces are submitted to the renderer.
+@(private)
+draw_crypt_inlays :: proc(g: ^Game, eye: Vec3) {
+	w,v := &g.world,&g.view
+	gfx.lighting_begin(&v.lighting)
+	for z in max(0,int(eye.z)-13)..<min(w.side,int(eye.z)+14) {
+		for x in max(0,int(eye.x)-13)..<min(w.side,int(eye.x)+14) {
+			if !walkable_xz(w,x,z) { continue }
+			for direction in ([4][2]int{{1,0},{-1,0},{0,1},{0,-1}}) {
+				if walkable_xz(w,x+direction.x,z+direction.y) { continue }
+				p:=Vec3{f32(x)+0.5+f32(direction.x)*0.492, FLOOR_Y, f32(z)+0.5+f32(direction.y)*0.492}
+				width,depth:=f32(1),f32(0.026)
+				if direction.x!=0 { width,depth=depth,width }
+				rl.DrawCube(p+Vec3{0,0.18,0},width,0.085,depth,{40,56,78,255})
+				rl.DrawCube(p+Vec3{0,2.68,0},width,0.045,depth,{91,123,153,255})
+				if (x*3+z*5)%9!=0 { continue }
+				if direction.x!=0 { depth=0.30 } else { width=0.30 }
+				rl.DrawCube(p+Vec3{0,1.63,0},width,0.90,depth,{17,27,43,255})
+				if direction.x!=0 { depth=0.055;width=0.033 } else { width=0.055;depth=0.033 }
+				rl.DrawCube(p+Vec3{0,1.68,0},width,0.54,depth,{117,182,223,255})
+				if direction.x!=0 { depth=0.19 } else { width=0.19 }
+				rl.DrawCube(p+Vec3{0,1.83,0},width,0.045,depth,{134,187,222,255})
+			}
+		}
+	}
+	gfx.lighting_end(&v.lighting)
+}
+
+@(private)
+draw_enemy_ground_feedback :: proc(g: ^Game, eye: Vec3) {
+	w:=&g.world
+	for enemy in w.enemies[:w.enemy_count] {
+		if enemy.state==.Dead { continue }
+		feet:=enemy_feet(enemy)
+		if physics.length3(feet-eye)>FOG_FAR { continue }
+		gfx.draw_blob_shadow(feet,0.38,0.60*fog_fade(eye,feet))
+		if enemy.state!=.Windup { continue }
+		params:=enemy_params(enemy.kind)
+		progress:=clamp(enemy.state_time/params.windup,0,1)
+		p:=feet+Vec3{0,0.037,0}
+		color:=rl.Color{222,55,79,u8(210*fog_fade(eye,p))}
+		// The closing ring is a timing tell, not a promise about hit volume.
+		radius:=0.58-progress*0.16
+		rl.DrawCircle3D(p,radius,{1,0,0},90,color)
+		rl.DrawCircle3D(p,0.40,{1,0,0},90,{111,32,48,color.a})
+		facing:=Vec3{enemy.facing.x,0,enemy.facing.y}
+		rl.DrawLine3D(p+facing*0.45,p+facing*(0.75+progress*0.22),color)
 	}
 }
 
@@ -1069,6 +1164,8 @@ view_draw :: proc(g: ^Game, frame: ^host.Frame) {
 	if v.has_model {
 		rl.DrawModel(v.model, {}, 1, rl.WHITE)
 	}
+	draw_crypt_inlays(g,eye)
+	draw_enemy_ground_feedback(g,eye)
 	list := new(Draw_List, context.temp_allocator)
 	collect_sprites(g, list, cam)
 	draw_sprite_list(v, list, cam)

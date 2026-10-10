@@ -83,7 +83,7 @@ Enemy :: struct {
 	body:   physics.Body2,
 	home:   Vec2,
 	dir:    f32,
-	// Difficulty multiplier on movement and fire rate.
+	// Challenge adjustment to movement and fire rate.
 	speed:  f32,
 	timer:  f32,
 	phase:  f32,
@@ -214,72 +214,33 @@ player_params :: proc() -> physics.Platformer_Params {
 }
 
 middle_chunk_count :: proc(config: host.Minigame_Config) -> int {
-	d := clamp(config.difficulty, 0, 2)
-	if config.challenge {
-		return 4 + d
-	}
-	return 7 + 2*d
+	return 5 if config.challenge else 9
 }
 
-lives_for :: proc(config: host.Minigame_Config) -> int {
-	switch clamp(config.difficulty, 0, 2) {
-	case 0:
-		return 5
-	case 1:
-		return 4
-	}
-	return 3
+lives_for :: proc() -> int {
+	return 4
 }
 
-// Challenges run one notch easier than their difficulty, as they are a single
-// attempt inside a longer run.
-@(private)
-effective_level :: proc(config: host.Minigame_Config) -> int {
-	level := clamp(config.difficulty, 0, 2)
-	if config.challenge {
-		level -= 1
-	}
-	return level
-}
-
+// Challenges stay shorter and gentler because they are part of a longer run.
 slot_tier :: proc(config: host.Minigame_Config, slot, count: int) -> int {
 	t := f32(slot) / f32(max(count-1, 1))
-	switch effective_level(config) {
-	case -1:
-		return 0 if t < 0.6 else 1
-	case 0:
+	if config.challenge {
 		return 0 if t < 0.5 else 1
-	case 1:
-		if t < 0.25 {
-			return 0
-		}
-		return 1 if t < 0.75 else 2
 	}
-	return 1 if t < 0.4 else 2
+	if t < 0.25 {
+		return 0
+	}
+	return 1 if t < 0.75 else 2
 }
 
 @(private)
 enemy_keep_chance :: proc(config: host.Minigame_Config) -> f32 {
-	switch effective_level(config) {
-	case -1:
-		return 0.45
-	case 0:
-		return 0.55
-	case 1:
-		return 0.8
-	}
-	return 1
+	return 0.55 if config.challenge else 0.8
 }
 
 @(private)
 enemy_speed_scale :: proc(config: host.Minigame_Config) -> f32 {
-	switch effective_level(config) {
-	case -1, 0:
-		return 0.8
-	case 1:
-		return 1
-	}
-	return 1.25
+	return 0.8 if config.challenge else 1
 }
 
 // ---------------------------------------------------------------------------
@@ -338,13 +299,10 @@ world_build :: proc(w: ^World, config: host.Minigame_Config, sequence: []Chunk_D
 	w^ = {}
 	w.config = config
 	w.params = player_params()
-	if config.difficulty <= 0 {
-		w.params.coyote_time = 0.13
-	}
 	gen := rng.create(rng.derive(config.seed, 7))
 	keep := enemy_keep_chance(config)
 	speed := enemy_speed_scale(config)
-	every := 2 if config.difficulty <= 0 || config.challenge else 3
+	every := 2 if config.challenge else 3
 
 	x0 := 0
 	middle_index := 0
@@ -423,10 +381,10 @@ world_build :: proc(w: ^World, config: host.Minigame_Config, sequence: []Chunk_D
 			physics.set_tile(&w.collision, x, y, shape_of(w.tiles[y*MAX_COLS+x]))
 		}
 	}
-	w.max_lives = lives_for(config)
+	w.max_lives = lives_for()
 	w.lives = w.max_lives
 	if config.challenge {
-		slack := f32(1.7) if config.difficulty <= 0 else f32(1.45)
+		slack := f32(1.45)
 		w.time_limit = math.ceil(w.par_time*slack + 10)
 	}
 	place_player(w, w.spawn)

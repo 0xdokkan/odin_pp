@@ -546,7 +546,7 @@ hash01 :: proc "contextless" (a, b: int) -> f32 {
 @(private)
 draw_backdrop :: proc(v: ^View, w: ^World, canvas: rl.Rectangle) {
 	s := &v.sprites
-	gfx.draw_vertical_gradient(canvas, {12, 10, 22, 255}, {84, 30, 38, 255})
+	gfx.draw_vertical_gradient(canvas, {7, 11, 18, 255}, {31, 48, 67, 255})
 	scroll := v.cam.position.x * ZOOM
 	// Zero when the camera sits on the ground, positive as it climbs.
 	lift := (v.cam.bounds_max.y - 135 - v.cam.position.y) * ZOOM
@@ -554,8 +554,8 @@ draw_backdrop :: proc(v: ^View, w: ^World, canvas: rl.Rectangle) {
 
 	moon := Vec2{canvas.width*0.76 - scroll*0.01, 118 + lift*0.04}
 	rl.BeginBlendMode(.ADDITIVE)
-	soft_glow(s, moon, 190, {170, 70, 60, 150})
-	soft_glow(s, moon, 80, {120, 90, 70, 120})
+	soft_glow(s, moon, 190, {68, 130, 187, 110})
+	soft_glow(s, moon, 80, {120, 171, 218, 90})
 	rl.EndBlendMode()
 	rl.DrawCircleV(moon, 46, {236, 214, 190, 255})
 	rl.DrawCircleV(moon + {-14, -10}, 8, {216, 192, 170, 255})
@@ -566,14 +566,14 @@ draw_backdrop :: proc(v: ^View, w: ^World, canvas: rl.Rectangle) {
 	for i in 0..<3 {
 		y := moon.y + 18 + f32(i)*14
 		x := math.mod(v.time*(6+f32(i)*3)+f32(i)*140, canvas.width+300) - 150
-		rl.DrawEllipse(i32(x), i32(y), 120, 7, {40, 22, 34, 90})
+		rl.DrawEllipse(i32(x), i32(y), 120, 7, {17, 28, 43, 120})
 	}
 
-	draw_spires(canvas, scroll*0.1, 330+lift*0.12, 130, {40, 28, 48, 255}, 1)
-	gfx.draw_hills(canvas.width, canvas.height, 430+lift*0.2, 120, scroll*0.2, {30, 21, 38, 255}, 1.7)
-	draw_spires(canvas, scroll*0.32, 420+lift*0.3, 210, {24, 17, 30, 255}, 2)
-	gfx.draw_hills(canvas.width, canvas.height, 500+lift*0.4, 70, scroll*0.4, {18, 13, 24, 255}, 4.2)
-	rl.DrawRectangleGradientV(0, i32(canvas.height-220), i32(canvas.width), 220, {0, 0, 0, 0}, {110, 36, 36, 70})
+	draw_spires(canvas, scroll*0.1, 330+lift*0.12, 130, {28, 44, 62, 255}, 1)
+	gfx.draw_hills(canvas.width, canvas.height, 430+lift*0.2, 120, scroll*0.2, {19, 31, 46, 255}, 1.7)
+	draw_spires(canvas, scroll*0.32, 420+lift*0.3, 210, {14, 24, 37, 255}, 2)
+	gfx.draw_hills(canvas.width, canvas.height, 500+lift*0.4, 70, scroll*0.4, {9, 16, 26, 255}, 4.2)
+	rl.DrawRectangleGradientV(0, i32(canvas.height-220), i32(canvas.width), 220, {0, 0, 0, 0}, {44, 85, 116, 65})
 }
 
 // Ruined towers with a few lit windows, repeating with the scroll.
@@ -591,11 +591,14 @@ draw_spires :: proc(canvas: rl.Rectangle, scroll, base, spacing: f32, color: rl.
 		apex := Vec2{x + width*0.5, top - 26 - h*34}
 		rl.DrawTriangle({x - 4, top}, {x + width + 4, top}, apex, color)
 		rl.DrawTriangle({x - 4, top}, apex, {x + width + 4, top}, color)
+		rl.DrawRectangleRec({x-5, top+height*0.35, 5, canvas.height-top}, color)
+		rl.DrawRectangleRec({x+width, top+height*0.35, 5, canvas.height-top}, color)
+		rl.DrawRectangleRec({x-3, top+4, width+6, 2}, {68, 92, 116, 75})
 		if hash01(i, seed+11) > 0.45 {
-			rl.DrawRectangleRec({x + width*0.5 - 2, top + 18, 4, 7}, {200, 96, 50, 170})
+			rl.DrawRectangleRec({x + width*0.5 - 2, top + 18, 4, 7}, {112, 179, 221, 150})
 		}
 		if hash01(i, seed+13) > 0.7 {
-			rl.DrawRectangleRec({x + width*0.5 - 2, top + 44, 4, 7}, {180, 80, 44, 130})
+			rl.DrawRectangleRec({x + width*0.5 - 2, top + 44, 4, 7}, {78, 136, 177, 130})
 		}
 	}
 }
@@ -607,7 +610,7 @@ draw_player_light :: proc(v: ^View, w: ^World) {
 	}
 	rl.BeginBlendMode(.ADDITIVE)
 	flicker := 1 + 0.06*math.sin(v.time*11) + 0.04*math.sin(v.time*23)
-	soft_glow(&v.sprites, player_center(w.player), 64*flicker, {92, 48, 28, 255})
+	soft_glow(&v.sprites, player_center(w.player), 64*flicker, {39, 78, 119, 190})
 	rl.EndBlendMode()
 }
 
@@ -656,6 +659,11 @@ draw_tiles :: proc(v: ^View, w: ^World, x0, x1, y0, y1: int) {
 				if !solid_at(w, x, y+1) && y < LEVEL_ROWS-1 {
 					rl.DrawRectangleRec({pos.x, pos.y + TILE - 1, TILE, 1}, edge)
 					rl.DrawRectangleGradientV(i32(pos.x), i32(pos.y+TILE), i32(TILE), 6, {0, 0, 0, 90}, {0, 0, 0, 0})
+				}
+				// Polished blue bevel and inset seam; solid geometry stays unchanged.
+				if frame == .Stone_Top {
+					rl.DrawRectangleRec({pos.x+1, pos.y+1, TILE-2, 1}, {162, 188, 208, 210})
+					rl.DrawRectangleRec({pos.x+1, pos.y+3, TILE-2, 1}, {37, 57, 77, 190})
 				}
 				// Candles on a few ledges of the ruins.
 				if frame == .Stone_Top && hash01(x, y+101) > 0.93 && tile_kind(w, x, y-1) == .Empty {
@@ -748,8 +756,8 @@ draw_portal :: proc(v: ^View, w: ^World) {
 	if !on_screen(v, c, 60) {
 		return
 	}
-	stone := rl.Color{58, 54, 72, 255}
-	dark := rl.Color{30, 28, 40, 255}
+	stone := rl.Color{51, 69, 89, 255}
+	dark := rl.Color{18, 29, 42, 255}
 	arch_center := Vec2{c.x, r.y + 16}
 	rl.DrawRectangleRec({r.x - 7, r.y + 16, 7, r.height - 16}, stone)
 	rl.DrawRectangleRec({r.x + r.width, r.y + 16, 7, r.height - 16}, stone)
@@ -807,13 +815,13 @@ draw_enemies :: proc(v: ^View, w: ^World) {
 		case .Ghoul:
 			frame := int(e.phase*6) % 2
 			bob := Vec2{1, 1 + 0.06*math.sin(e.phase*12)}
-			gfx.draw_sprite_feet(v.sprites.ghoul, frame, feet, 1, e.dir < 0, rl.WHITE, bob)
+			gfx.draw_sprite_cutout_feet(v.sprites.ghoul, v.sprites.ghoul_paper, frame, feet, 1, e.dir < 0, rl.WHITE, bob)
 			rl.BeginBlendMode(.ADDITIVE)
 			soft_glow(&v.sprites, feet - {0, 8.5 - f32(frame)}, 5, {120, 44, 14, 255})
 			rl.EndBlendMode()
 		case .Bat:
 			frame := int(e.phase*(14 if e.aggro else 9)) % 2
-			gfx.draw_sprite(v.sprites.bat, frame, c, 1, e.dir < 0)
+			gfx.draw_sprite_cutout(v.sprites.bat, v.sprites.bat_paper, frame, c, 1, e.dir < 0)
 			if e.aggro {
 				rl.BeginBlendMode(.ADDITIVE)
 				soft_glow(&v.sprites, c + {0, 1}, 8, {110, 22, 20, 255})
@@ -826,7 +834,7 @@ draw_enemies :: proc(v: ^View, w: ^World) {
 				heat = 1 - e.charge/0.55
 				wobble.x = math.round(math.sin(v.time*60)) * 0.5
 			}
-			gfx.draw_sprite_feet(v.sprites.totem, 0, feet + wobble, 1)
+			gfx.draw_sprite_cutout_feet(v.sprites.totem, v.sprites.totem_paper, 0, feet + wobble, 1)
 			top_left := feet + wobble - {8, 16}
 			rl.BeginBlendMode(.ADDITIVE)
 			for eye in ([2]Vec2{{5, 6}, {11, 6}}) {
@@ -877,7 +885,7 @@ draw_player :: proc(v: ^View, w: ^World) {
 	if !p.ctrl.grounded && p.ctrl.wall_side != 0 && p.ctrl.body.velocity.y > 0 {
 		flip = p.ctrl.wall_side > 0
 	}
-	gfx.draw_sprite_feet(v.sprites.player, int(frame), player_feet(p), 1, flip, rl.WHITE, squash)
+	gfx.draw_sprite_cutout_feet(v.sprites.player, v.sprites.player_paper, int(frame), player_feet(p), 1, flip, rl.WHITE, squash)
 }
 
 @(private)
@@ -900,92 +908,79 @@ draw_popups :: proc(v: ^View, frame: ^host.Frame) {
 @(private)
 draw_hud :: proc(v: ^View, w: ^World, frame: ^host.Frame) {
 	theme := frame.theme
+	p := theme.palette
 	canvas := frame.canvas
-	// Hearts and embers, top left.
-	rl.DrawRectangleRounded({10, 8, f32(max(w.max_lives, 4))*30 + 26, 92}, 0.25, 6, {10, 8, 14, 150})
+	zones := ui.hud_columns(canvas)
+	for zone in zones {
+		ui.hud_panel(theme, zone)
+	}
+	left, middle, right := ui.shrink(zones[0], 10), ui.shrink(zones[1], 10), ui.shrink(zones[2], 10)
+
+	// Vitals and collectibles stay together; star previews have their own lane.
 	for i in 0..<w.max_lives {
-		full := i < w.lives
-		scale := f32(3)
+		scale := f32(2.4)
 		if i == w.lives && v.heart_pulse > 0 {
-			scale += v.heart_pulse * 1.5
+			scale += v.heart_pulse
 		}
-		gfx.draw_sprite(v.sprites.heart, 0 if full else 1, {32 + f32(i)*30, 30}, scale)
+		gfx.draw_sprite(v.sprites.heart, 0 if i < w.lives else 1,
+			{left.x + 10 + f32(i)*25, left.y + 10}, scale)
 	}
-	ember_scale := 3 + v.ember_pulse*1.2
-	gfx.draw_sprite(v.sprites.ember, 0, {32, 70}, ember_scale)
+	gfx.draw_sprite(v.sprites.ember, 0, {left.x + 8, left.y + 36}, 2.2 + v.ember_pulse*0.8)
 	ratio := ember_ratio(w)
-	count_color := COLOR_IVORY
-	if ratio >= 0.9 {
-		count_color = COLOR_EMBER
-	} else if ratio >= 0.6 {
-		count_color = COLOR_GOLD
-	}
-	text := fmt.tprintf("%d/%d", w.embers_collected, w.ember_count)
-	ui.draw_text(theme, text, {52, 56}, .Large, count_color)
-	// Live star forecast: what finishing now would earn.
-	sx := 60 + ui.measure(theme, text, .Large).x + 8
+	ui.draw_text_fit(theme, fmt.tprintf("%d/%d BRACI", w.embers_collected, w.ember_count),
+		{left.x + 24, left.y + 26, left.width - 88, 20}, .Small, p.warning)
 	lit := [3]bool{true, ratio >= 0.6, ratio >= 0.9 && w.hits == 0}
 	for i in 0..<3 {
-		color := COLOR_GOLD if lit[i] else rl.Color{70, 64, 70, 255}
-		ui.draw_star({sx + f32(i)*18, 71}, 7, color)
+		ui.draw_star({left.x + left.width - 46 + f32(i)*18, left.y + 36}, 6,
+			p.warning if lit[i] else p.border)
 	}
 
-	// Time, top centre.
-	if w.time_limit > 0 {
-		left := max(w.time_limit-w.time, 0)
-		color := COLOR_IVORY
-		size := ui.Text_Size.Large
-		if left < 10 {
-			k := 0.5 + 0.5*math.sin(v.time*10)
-			color = ui.mix_color(COLOR_IVORY, {255, 70, 60, 255}, f32(k))
-			size = .Title
-		}
-		ui.draw_text_centered(theme, "TEMPO", {canvas.width*0.5, 18}, .Small, COLOR_DIM)
-		ui.draw_text_centered(theme, host.format_time(left), {canvas.width*0.5, 44}, size, color)
-	} else {
-		ui.draw_text_centered(theme, host.format_time(w.time), {canvas.width*0.5, 26}, .Body, COLOR_DIM)
-	}
-	// Area name, lit up for a moment on entering a new chunk.
+	area := "TORRE DI CENERE"
 	if v.area < w.chunk_count {
-		title := w.chunks[v.area].title
-		k := clamp(v.area_time, 0, 1)
-		y := f32(76) if w.time_limit > 0 else 50
-		ui.draw_text_centered(theme, title, {canvas.width*0.5, y}, .Small, ui.mix_color(COLOR_DIM, COLOR_GOLD, k))
+		area = w.chunks[v.area].title
 	}
+	ui.draw_text_fit(theme, area, {middle.x, middle.y, middle.width, 20}, .Body, p.text, .Center)
+	clock := host.format_time(w.time)
+	clock_color := p.text_dim
+	if w.time_limit > 0 {
+		left_time := max(w.time_limit-w.time, 0)
+		clock = fmt.tprintf("TEMPO  %s", host.format_time(left_time))
+		if left_time < 10 {
+			clock_color = ui.mix_color(p.danger, p.text, 0.5+0.5*math.sin(v.time*10))
+		}
+	}
+	ui.draw_text_fit(theme, clock, {middle.x, middle.y + 26, middle.width, 20}, .Body, clock_color, .Center)
 
-	// Score, top right.
-	score_text := fmt.tprintf("%d", i64(v.score_shown))
-	m := ui.measure(theme, score_text, .Large)
-	ui.draw_text(theme, "PUNTI", {canvas.width - 20 - ui.measure(theme, "PUNTI", .Small).x, 12}, .Small, COLOR_DIM)
-	ui.draw_text(theme, score_text, {canvas.width - 20 - m.x, 30}, .Large, COLOR_IVORY)
+	ui.draw_text_fit(theme, "PUNTI", {right.x, right.y, 64, 20}, .Small, p.text_dim)
+	ui.draw_text_fit(theme, fmt.tprintf("%d", i64(v.score_shown)),
+		{right.x + 68, right.y - 2, right.width - 68, 26}, .Large, p.text, .Right)
+	label := "RAGGIUNGI IL PORTALE"
 	if w.combo > 1 {
-		combo := fmt.tprintf("Combo x%d", w.combo)
-		cm := ui.measure(theme, combo, .Body)
-		ui.draw_text(theme, combo, {canvas.width - 20 - cm.x, 62}, .Body, COLOR_GOLD)
+		label = fmt.tprintf("COMBO x%d", w.combo)
 	}
+	ui.draw_text_fit(theme, label, {right.x, right.y + 27, right.width, 18}, .Small,
+		p.warning if w.combo > 1 else p.text_dim, .Right)
 
-	// Route bar along the bottom: checkpoints, player, portal.
-	bar := rl.Rectangle{canvas.width*0.5 - 160, canvas.height - 22, 320, 6}
-	rl.DrawRectangleRounded({bar.x - 6, bar.y - 6, bar.width + 12, bar.height + 12}, 0.5, 6, {10, 8, 14, 150})
-	rl.DrawRectangleRec(bar, {44, 36, 44, 255})
+	// A slim route ribbon leaves the landing area unobstructed.
+	bar := rl.Rectangle{canvas.width*0.5 - 160, canvas.height - 18, 320, 5}
+	ui.hud_panel(theme, {bar.x - 8, bar.y - 8, bar.width + 16, 21})
 	progress := world_progress(w)
-	rl.DrawRectangleRec({bar.x, bar.y, bar.width * progress, bar.height}, {190, 70, 50, 255})
+	ui.hud_meter(theme, bar, progress)
 	goal := max(physics.rect_center(w.exit_rect).x, 1)
 	for c in w.checkpoints[:w.checkpoint_count] {
 		x := bar.x + bar.width*clamp(c.feet.x/goal, 0, 1)
-		rl.DrawRectangleRec({x - 1, bar.y - 3, 3, bar.height + 6}, COLOR_GOLD if c.lit else rl.Color{110, 100, 100, 255})
+		rl.DrawRectangleRec({x - 1, bar.y - 2, 2, bar.height + 4}, p.warning if c.lit else p.border)
 	}
-	rl.DrawCircleV({bar.x + bar.width, bar.y + 3}, 6, {200, 50, 64, 255})
-	rl.DrawCircleV({bar.x + bar.width, bar.y + 3}, 3, {255, 220, 170, 255})
-	px := bar.x + bar.width*progress
-	rl.DrawCircleV({px, bar.y + 3}, 5, COLOR_IVORY)
+	rl.DrawPoly({bar.x + bar.width, bar.y + 2}, 4, 5, 0, p.warning)
+	rl.DrawCircleV({bar.x + bar.width*progress, bar.y + 2}, 3, p.text)
 
-	// Banner.
 	if v.banner_time > 0 && v.banner != "" {
 		a := clamp(v.banner_time*2, 0, 1)
-		ui.draw_text_centered(theme, v.banner, {canvas.width*0.5, 128}, .Title, ui.with_alpha(COLOR_IVORY, a))
+		toast := rl.Rectangle{canvas.width*0.5 - 240, ui.HUD_MARGIN + ui.HUD_TOP_HEIGHT + 8, 480, 24}
+		ui.draw_text_fit(theme, v.banner, toast, .Body, ui.with_alpha(p.text, a), .Center)
 		if v.banner_sub != "" {
-			ui.draw_text_centered(theme, v.banner_sub, {canvas.width*0.5, 162}, .Body, ui.with_alpha(COLOR_GOLD, a))
+			toast.y += 23
+			ui.draw_text_fit(theme, v.banner_sub, toast, .Small, ui.with_alpha(p.warning, a), .Center)
 		}
 	}
 }
@@ -996,7 +991,7 @@ draw_hud :: proc(v: ^View, w: ^World, frame: ^host.Frame) {
 draw_ash_tower :: proc(v: ^View, canvas: rl.Rectangle, progress, lift: f32) {
 	x := canvas.width*0.8 - progress*canvas.width*0.3
 	top := 96 + lift*0.06
-	color := rl.Color{30, 21, 38, 255}
+	color := rl.Color{19, 31, 46, 255}
 	rl.DrawRectangleRec({x - 30, top, 60, canvas.height - top}, color)
 	rl.DrawRectangleRec({x - 40, top - 8, 80, 12}, color)
 	for i in 0..<5 {

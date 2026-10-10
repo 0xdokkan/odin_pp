@@ -63,7 +63,7 @@ test_generation_is_valid_for_many_seeds :: proc(t: ^testing.T) {
 	defer drop_world(w)
 	layouts_with_obstacles := 0
 	for seed in u64(1)..=80 {
-		world_reset(w, {seed = seed, difficulty = int(seed % 3)})
+		world_reset(w, {seed = seed})
 		for x in 0..<MAP_W {
 			testing.expect(t, !open_cell(w, x, 0) && !open_cell(w, x, MAP_H-1))
 		}
@@ -130,7 +130,7 @@ test_layouts_differ_between_seeds :: proc(t: ^testing.T) {
 
 @(test)
 test_same_seed_and_inputs_are_deterministic :: proc(t: ^testing.T) {
-	config := host.Minigame_Config{seed = 4242, difficulty = 1}
+	config := host.Minigame_Config{seed = 4242}
 	a := new_world(config)
 	defer drop_world(a)
 	b := new_world(config)
@@ -169,7 +169,7 @@ test_bot_wins_challenge_rounds :: proc(t: ^testing.T) {
 	defer drop_world(w)
 	wins := 0
 	for seed in u64(1)..=4 {
-		world_reset(w, {seed = seed, difficulty = 0, challenge = true})
+		world_reset(w, {seed = seed, challenge = true})
 		status := run_bot(w, 240)
 		if status == .Won {
 			wins += 1
@@ -178,12 +178,12 @@ test_bot_wins_challenge_rounds :: proc(t: ^testing.T) {
 			testing.expect(t, stars >= 1)
 		}
 	}
-	testing.expectf(t, wins >= 3, "bot won %d of 4 easy challenges", wins)
+	testing.expectf(t, wins >= 3, "bot won %d of 4 challenges", wins)
 }
 
 @(test)
 test_driven_full_round_reaches_victory :: proc(t: ^testing.T) {
-	w := new_world({seed = 77, difficulty = 2})
+	w := new_world({seed = 77})
 	defer drop_world(w)
 	boss_seen := false
 	for _ in 0..<SIM_HZ*600 {
@@ -212,7 +212,7 @@ test_driven_full_round_reaches_victory :: proc(t: ^testing.T) {
 
 @(test)
 test_idle_player_loses :: proc(t: ^testing.T) {
-	w := new_world({seed = 5, difficulty = 1})
+	w := new_world({seed = 5})
 	defer drop_world(w)
 	died := false
 	for _ in 0..<SIM_HZ*180 {
@@ -237,12 +237,12 @@ test_idle_player_loses :: proc(t: ^testing.T) {
 @(test)
 test_wave_plans_cover_every_archetype :: proc(t: ^testing.T) {
 	configs := [?]host.Minigame_Config{
-		{seed = 1, difficulty = 0},
-		{seed = 2, difficulty = 1},
-		{seed = 3, difficulty = 2},
-		{seed = 4, difficulty = 0, challenge = true},
-		{seed = 5, difficulty = 1, challenge = true},
-		{seed = 6, difficulty = 2, challenge = true},
+		{seed = 1},
+		{seed = 2},
+		{seed = 3},
+		{seed = 4, challenge = true},
+		{seed = 5, challenge = true},
+		{seed = 6, challenge = true},
 	}
 	w := new(World)
 	defer drop_world(w)
@@ -275,15 +275,16 @@ test_wave_plans_cover_every_archetype :: proc(t: ^testing.T) {
 		}
 		testing.expect(t, seen >= {.Chaser, .Caster, .Charger, .Splitter, .Boss}, "every archetype appears")
 	}
-	free_play := tuning_for({difficulty = 1})
-	challenge := tuning_for({difficulty = 1, challenge = true})
+	free_play := tuning_for({})
+	challenge := tuning_for({challenge = true})
 	testing.expect(t, challenge.waves < free_play.waves, "challenges are shorter")
-	testing.expect(t, tuning_for({difficulty = 2}).waves > tuning_for({difficulty = 0}).waves)
+	testing.expect_value(t, free_play.waves, 8)
+	testing.expect_value(t, challenge.waves, 4)
 }
 
 @(test)
 test_combo_grows_scores_and_expires :: proc(t: ^testing.T) {
-	w := new_world({seed = 3, difficulty = 1})
+	w := new_world({seed = 3})
 	defer drop_world(w)
 	w.phase = .Fight
 	w.queue_len = 0
@@ -307,7 +308,7 @@ test_combo_grows_scores_and_expires :: proc(t: ^testing.T) {
 
 @(test)
 test_dash_passes_through_orbs :: proc(t: ^testing.T) {
-	w := new_world({seed = 8, difficulty = 1})
+	w := new_world({seed = 8})
 	defer drop_world(w)
 	p := &w.player
 	fire_orb(w, p.pos+{30, 0}, {-1, 0}, 200)
@@ -327,7 +328,7 @@ test_dash_passes_through_orbs :: proc(t: ^testing.T) {
 
 @(test)
 test_splitter_bursts_into_shards :: proc(t: ^testing.T) {
-	w := new_world({seed = 21, difficulty = 1})
+	w := new_world({seed = 21})
 	defer drop_world(w)
 	h, _ := create_enemy(w, .Splitter, cell_center(6, 6))
 	damage_enemy(w, h, pool.get(&w.enemies, h), 100, {1, 0})
@@ -343,7 +344,7 @@ test_splitter_bursts_into_shards :: proc(t: ^testing.T) {
 
 @(test)
 test_stars_follow_the_rules :: proc(t: ^testing.T) {
-	w := new_world({seed = 1, difficulty = 1})
+	w := new_world({seed = 1})
 	defer drop_world(w)
 	_, stars := world_score(w)
 	testing.expect_value(t, stars, u8(0))
@@ -362,7 +363,7 @@ test_stars_follow_the_rules :: proc(t: ^testing.T) {
 
 @(test)
 test_important_events_survive_a_full_buffer :: proc(t: ^testing.T) {
-	w := new_world({seed = 2, difficulty = 1})
+	w := new_world({seed = 2})
 	defer drop_world(w)
 	for _ in 0..<MAX_EVENTS {
 		emit(w, Event{kind = .Orb_Pop})
@@ -394,7 +395,7 @@ test_random_input_soak :: proc(t: ^testing.T) {
 	r := rng.create(1234)
 	current: Player_Input
 	seed := u64(100)
-	world_reset(w, {seed = seed, difficulty = 2})
+	world_reset(w, {seed = seed})
 	last_score := i64(0)
 	rounds := 1
 	for step in 0..<60000 {
@@ -430,7 +431,7 @@ test_random_input_soak :: proc(t: ^testing.T) {
 		if status != .Playing {
 			testing.expectf(t, w.spawn_failures == 0, "seed %d: enemy or spawn pool overflowed", seed)
 			seed += 1
-			world_reset(w, {seed = seed, difficulty = int(seed % 3), challenge = seed%2 == 0})
+			world_reset(w, {seed = seed, challenge = seed%2 == 0})
 			last_score = 0
 			rounds += 1
 		}

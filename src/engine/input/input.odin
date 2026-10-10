@@ -177,10 +177,46 @@ poll :: proc(m: ^Action_Map($A), s: ^State(A), dt: f32) {
 	advance(s, sample(m), dt)
 }
 
-// Forgets edges and held time, e.g. when a modal closes, so a key still down
-// from the menu does not fire again in the game underneath.
+// Forgets all device history. Use suspend/advance_resumable at menu or focus
+// boundaries: resetting alone turns a still-held key into a fresh press.
 reset :: proc(s: ^State($A)) {
 	s^ = {}
+}
+
+// Shared menu/focus boundary for gameplay controls. The first active sample
+// establishes a baseline without edges. Selected held actions (typically fire)
+// remain suppressed until released; movement can resume immediately.
+Resume_Gate :: struct($A: typeid) {
+	active:  bool,
+	blocked: bit_set[A],
+}
+
+suspend :: proc(s: ^State($A), gate: ^Resume_Gate(A)) {
+	reset(s)
+	gate^ = {}
+}
+
+// Returns true on the first sample after suspension, so mouse-look can also
+// discard its capture delta. Fixed-step action queues remain the caller's job.
+advance_resumable :: proc(s: ^State($A), gate: ^Resume_Gate(A), sample: Sample(A), dt: f32,
+	block_held: bit_set[A]) -> bool {
+	resumed := !gate.active
+	if resumed {
+		gate.active = true
+		gate.blocked = sample.down & block_held
+		s^ = State(A){down = sample.down, value = sample.value}
+	} else {
+		gate.blocked &= sample.down
+		advance(s, sample, dt)
+	}
+	for action in gate.blocked {
+		s.down -= {action}
+		s.pressed -= {action}
+		s.released -= {action}
+		s.value[action] = 0
+		s.held_time[action] = 0
+	}
+	return resumed
 }
 
 down :: proc(s: ^State($A), action: A) -> bool {

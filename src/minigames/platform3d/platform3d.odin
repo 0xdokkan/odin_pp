@@ -34,7 +34,7 @@ Game :: struct {
 	// Edges caught on frames that run no simulation step are kept for the next.
 	pending_jump: bool,
 	pending_dash: bool,
-	was_playing: bool,
+	input_gate: input.Resume_Gate(Action),
 	demo:         bool,
 	bot:          Bot,
 }
@@ -114,19 +114,14 @@ game_reset :: proc(data: rawptr, config: host.Minigame_Config) {
 
 @(private)
 suspend_player_input :: proc(g: ^Game) {
-	input.reset(&g.controls)
+	input.suspend(&g.controls, &g.input_gate)
 	g.pending_jump = false
 	g.pending_dash = false
-	g.was_playing = false
 }
 
 @(private)
 advance_player_controls :: proc(g: ^Game, sample: input.Sample(Action), dt: f32) {
-	input.advance(&g.controls, sample, dt)
-	if !g.was_playing {
-		g.controls.pressed = {}
-	}
-	g.was_playing = true
+	input.advance_resumable(&g.controls, &g.input_gate, sample, dt, {})
 	if .Jump in g.controls.pressed {
 		g.pending_jump = true
 	}

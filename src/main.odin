@@ -367,7 +367,7 @@ poll_gameplay_command :: proc(
 	if clicked, accepted := m8_pointer_gameplay_command(room, renderer, mouse_canvas, mouse_in_canvas,
 		rl.IsMouseButtonPressed(.LEFT), spatial_interaction_enabled); accepted { return clicked, true }
 	mouse_inside := mouse_in_canvas && !render.relic_bar_contains_point(renderer, room, mouse_canvas, raised_card_id) &&
-		(!renderer.tactical.enabled || !render.point_in_rectangle(mouse_canvas, render.m8_active_bar_bounds(renderer)))
+		(!renderer.tactical.enabled || !render.m8_hud_contains_point(renderer, room, mouse_canvas))
 	input_deck, input_phase := render.renderer_hand_deck(renderer, room)
 	if input_phase == .Loot {
 		clear_card_interaction(card_interaction)

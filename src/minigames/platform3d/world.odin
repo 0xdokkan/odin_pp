@@ -310,38 +310,17 @@ World :: struct {
 }
 
 gen_settings :: proc(config: host.Minigame_Config) -> Gen_Settings {
-	d := clamp(config.difficulty, 0, 2)
-	s: Gen_Settings
-	switch d {
-	case 0:
-		s = Gen_Settings{
-			path_pads = 16, shards_required = 5, shards_bonus = 2, lives = 4, safety = 0.7,
-			double_jump = false, rise_min = -2, rise_max = 1, size_min = 4, size_max = 6,
-			shuttle_chance = 0.1, crumble_chance = 0.1, bridge_chance = 0.22, spire_chance = 0.15,
-			max_shuttles = 1, max_crumbles = 1, spikes = 1, sentinels = 1, branch_max = 1,
-			bridge_holes = 0, crumble_delay = 0.8, knockback = 6,
-		}
-	case 1:
-		s = Gen_Settings{
-			path_pads = 18, shards_required = 7, shards_bonus = 2, lives = 3, safety = 0.64,
-			double_jump = true, rise_min = -2, rise_max = 2, size_min = 3, size_max = 6,
-			shuttle_chance = 0.14, crumble_chance = 0.14, bridge_chance = 0.16, spire_chance = 0.22,
-			max_shuttles = 2, max_crumbles = 2, spikes = 3, sentinels = 2, branch_max = 2,
-			bridge_holes = 1, crumble_delay = 0.62, knockback = 8,
-		}
-	case:
-		s = Gen_Settings{
-			path_pads = 22, shards_required = 9, shards_bonus = 2, lives = 3, safety = 0.72,
-			double_jump = true, rise_min = -3, rise_max = 3, size_min = 3, size_max = 5,
-			shuttle_chance = 0.18, crumble_chance = 0.18, bridge_chance = 0.12, spire_chance = 0.3,
-			max_shuttles = 3, max_crumbles = 3, spikes = 5, sentinels = 3, branch_max = 3,
-			bridge_holes = 2, crumble_delay = 0.5, knockback = 9.5,
-		}
+	s := Gen_Settings{
+		path_pads = 18, shards_required = 7, shards_bonus = 2, lives = 3, safety = 0.64,
+		double_jump = true, rise_min = -2, rise_max = 2, size_min = 3, size_max = 6,
+		shuttle_chance = 0.14, crumble_chance = 0.14, bridge_chance = 0.16, spire_chance = 0.22,
+		max_shuttles = 2, max_crumbles = 2, spikes = 3, sentinels = 2, branch_max = 2,
+		bridge_holes = 1, crumble_delay = 0.62, knockback = 8,
 	}
 	if config.challenge {
 		// One attempt inside a run: a shorter course, a little gentler, on a clock.
 		s.path_pads = s.path_pads/2 + 2
-		s.shards_required = 3 + d
+		s.shards_required = 4
 		s.shards_bonus = 1
 		s.safety -= 0.04
 		s.spikes = (s.spikes + 1) / 2

@@ -4,12 +4,13 @@ import "core:fmt"
 import "core:os"
 import "core:testing"
 import game "game"
+import host "engine/host"
 import level "level"
 import render "render"
 import view "view"
 
-m8_test_button_center :: proc(renderer: ^render.Renderer, control: render.M8_Control) -> view.Vec2 {
-	b := render.m8_control_bounds(renderer, control)
+m8_test_button_center :: proc(renderer: ^render.Renderer, control: render.M8_Control, room: ^game.Room = nil) -> view.Vec2 {
+	b := render.m8_control_bounds(renderer, control, room)
 	return {b.x+b.width/2, b.y+b.height/2}
 }
 
@@ -32,7 +33,7 @@ test_m8_mouse_buttons_commit_equipment_and_activation_once :: proc(t: ^testing.T
 	buffer: Buffered_Gameplay_Command
 	controller := Tactical_Controller{was_focused = true}
 	testing.expect(t, game.collect_weapon(&player, .Iron_Cleaver, 4))
-	equip := m8_test_button_center(renderer, .Equip)
+	equip := m8_test_button_center(renderer, .Equip, &room)
 	for flags in ([3][3]bool{{false,true,true},{true,false,true},{true,true,false}}) {
 		_, accepted := m8_pointer_gameplay_command(&room, renderer, equip, flags[0], flags[1], flags[2])
 		testing.expect(t, !accepted, "outside, held, or blocked input cannot dispatch")
@@ -44,7 +45,7 @@ test_m8_mouse_buttons_commit_equipment_and_activation_once :: proc(t: ^testing.T
 	testing.expect_value(t, player.tactical.remaining, f32(19))
 	step_tactical_controller(&controller, &room, renderer, &cards, &buffer, 0, true, {focused = true})
 	testing.expect(t, game.deploy_board_device(&room, .Shock_Floor, {2,2}, 1, 3, &room.recent_events))
-	activate := m8_test_button_center(renderer, .Activate)
+	activate := m8_test_button_center(renderer, .Activate, &room)
 	_, floor_click := m8_pointer_gameplay_command(&room, renderer, activate, true, true, true)
 	testing.expect(t, !floor_click, "a passive trap cannot be armed with the active-item button")
 	testing.expect(t, game.deploy_board_device(&room, .Tesla_Coil, {3,1}, 8, 0, &room.recent_events))
@@ -75,7 +76,7 @@ test_m8_mouse_navigation_closes_modals_without_click_through :: proc(t: ^testing
 	controller: Tactical_Controller
 	cards := Card_Interaction_State{selected_card_id = 42}
 	buffer: Buffered_Gameplay_Command
-	input := M8_Session_Input{focused = true, inside = true, pressed = true, mouse = m8_test_button_center(renderer, .Character)}
+	input := M8_Session_Input{focused = true, inside = true, pressed = true, mouse = m8_test_button_center(renderer, .Character, &room)}
 	testing.expect(t, step_m8_session(&session, &room, renderer, &controller, &cards, &buffer, true, 0, input))
 	testing.expect(t, session.character_open && cards.selected_card_id == 0)
 	close := render.m8_modal_control_bounds(renderer, .Close_Character)
@@ -86,19 +87,16 @@ test_m8_mouse_navigation_closes_modals_without_click_through :: proc(t: ^testing
 	input.pressed = true
 	testing.expect(t, step_m8_session(&session, &room, renderer, &controller, &cards, &buffer, true, 0, input))
 	testing.expect(t, !session.character_open, "closing still consumes this frame's click")
-	input.mouse = m8_test_button_center(renderer, .Ring)
+	input.mouse = m8_test_button_center(renderer, .Ring, &room)
 	testing.expect(t, step_m8_session(&session, &room, renderer, &controller, &cards, &buffer, true, 0, input))
-	testing.expect(t, session.activity.mode == .Ring)
-	health := player.health
-	leave := render.m9_control_bounds(renderer, .Leave)
-	input.mouse = {leave.x+leave.width/2, leave.y+leave.height/2}
-	input.activity.control=.Leave
-	testing.expect(t, step_m8_session(&session, &room, renderer, &controller, &cards, &buffer, true, 0, input))
-	testing.expect(t, session.activity.mode == .None && session.ring.phase == .Lost && session.ring.settled)
-	testing.expect_value(t, player.health, health)
-	testing.expect(t, room.ring_challenge_attempted)
-	input.mouse = m8_test_button_center(renderer, .Ring)
-	testing.expect(t, !step_m8_session(&session, &room, renderer, &controller, &cards, &buffer, true, 0, input))
+    testing.expect(t,session.requested==.Ring && session.ring_pending)
+    health := player.health
+    testing.expect(t,settle_m8_host_activity(&session,&room,"ring",host.Result{minigame="ring",outcome=.Abandoned}))
+    testing.expect(t,session.requested==.None && session.ring.phase==.Lost && session.ring.settled)
+    testing.expect_value(t,player.health,health)
+    testing.expect(t,room.ring_challenge_attempted)
+    testing.expect(t,!step_m8_session(&session,&room,renderer,&controller,&cards,&buffer,true,0,input))
+
 }
 
 @(test)

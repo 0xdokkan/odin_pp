@@ -24,7 +24,6 @@ Level_Result :: struct {
 
 Session :: struct {
 	seed:       u64,
-	difficulty: int,
 	challenge:  bool,
 	picks:      [MAX_SEQUENCE]Level_Pick,
 	count:      int,
@@ -41,42 +40,23 @@ Session :: struct {
 
 // Free play climbs through ranks; a challenge is one mid-sized level.
 @(private)
-sequence_ranks :: proc(difficulty: int, challenge: bool) -> (ranks: [MAX_SEQUENCE]int, count: int) {
+sequence_ranks :: proc(challenge: bool) -> (ranks: [MAX_SEQUENCE]int, count: int) {
 	if challenge {
-		// Mid-sized levels only; hard is set apart by a shorter torch.
-		ranks[0] = 2 if difficulty <= 0 else 3
+		ranks[0] = 3
 		return ranks, 1
 	}
-	switch clamp(difficulty, 0, 2) {
-	case 0:
-		ranks = {1, 1, 2, 0, 0}
-		count = 3
-	case 1:
-		ranks = {1, 2, 3, 4, 0}
-		count = 4
-	case:
-		ranks = {2, 3, 4, 4, 5}
-		count = 5
-	}
-	return
+	ranks = {1, 2, 3, 4, 0}
+	return ranks, 4
 }
 
 // A challenge interrupts a run, so its level stays short.
-challenge_max_par :: proc(difficulty: int) -> int {
-	switch clamp(difficulty, 0, 2) {
-	case 0:
-		return 50
-	case 1:
-		return 62
-	}
-	return 75
-}
+CHALLENGE_MAX_PAR :: 62
 
-// Deterministic for a (seed, difficulty, challenge) triple. A level never
+// Deterministic for a (seed, challenge) pair. A level never
 // repeats within a sequence; mirrored or rotated variants keep par intact.
-plan_sequence :: proc(seed: u64, difficulty: int, challenge: bool) -> (picks: [MAX_SEQUENCE]Level_Pick, count: int) {
-	ranks, n := sequence_ranks(difficulty, challenge)
-	max_par := challenge_max_par(difficulty) if challenge else 0
+plan_sequence :: proc(seed: u64, challenge: bool) -> (picks: [MAX_SEQUENCE]Level_Pick, count: int) {
+	ranks, n := sequence_ranks(challenge)
+	max_par := CHALLENGE_MAX_PAR if challenge else 0
 	r := rng.create(rng.derive(seed, 0x51C1))
 	used: [len(LEVELS)]bool
 	for slot in 0..<n {
@@ -140,11 +120,10 @@ pick_transform :: proc(r: ^rng.Rng, level: int) -> Transform {
 	return options[rng.below(r, u64(n))]
 }
 
-session_start :: proc(s: ^Session, seed: u64, difficulty: int, challenge: bool) {
+session_start :: proc(s: ^Session, seed: u64, challenge: bool) {
 	s.seed = seed
-	s.difficulty = difficulty
 	s.challenge = challenge
-	s.picks, s.count = plan_sequence(seed, difficulty, challenge)
+	s.picks, s.count = plan_sequence(seed, challenge)
 	s.results = {}
 	session_load(s, 0)
 }
@@ -168,19 +147,13 @@ session_load :: proc(s: ^Session, index: int) {
 	puzzle_init(&s.puzzle, b, st)
 	s.par = def.par
 	s.hints = 0
-	s.torch_max = torch_budget(def.par, s.difficulty) if s.challenge else -1
+	s.torch_max = torch_budget(def.par) if s.challenge else -1
 	s.torch = s.torch_max
 }
 
-// Generous on easy (3x par), tighter on hard (2x par); undone moves count.
-torch_budget :: proc(par, difficulty: int) -> int {
-	switch clamp(difficulty, 0, 2) {
-	case 0:
-		return par*3 + 12
-	case 1:
-		return par*5/2 + 10
-	}
-	return par*2 + 8
+// Undone moves still count against the fixed challenge allowance.
+torch_budget :: proc(par: int) -> int {
+	return par*5/2 + 10
 }
 
 session_level :: proc(s: ^Session) -> ^Level_Def {

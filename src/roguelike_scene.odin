@@ -801,13 +801,35 @@ roguelike_scene :: proc(rs: ^Roguelike_Session) -> host.Scene {
 		draw          = roguelike_draw,
 		draw_window   = roguelike_draw_window,
 		after_present = roguelike_after_present,
+		suspend       = roguelike_suspend,
 		resume        = roguelike_resume,
 		destroy       = roguelike_destroy,
 	}
 }
 
+// Host focus is the ownership boundary, including non-modal overlays. Never
+// sample raw gameplay controls after a different scene has taken ownership.
+roguelike_suspend_input :: proc(rs: ^Roguelike_Session) {
+	clear_card_interaction(&rs.card_interaction)
+	clear_gameplay_command_buffer(&rs.gameplay_buffer)
+	rs.mouse_inside = false
+	rs.tactical_controller.was_focused = false
+	rs.iso_renderer.frame_clock_valid = false
+	rs.iso_renderer.tactical.world_orbit.dragging = false
+	rs.iso_renderer.tactical.hologram_orbit.dragging = false
+}
+
+roguelike_suspend :: proc(data: rawptr) {
+	rs := cast(^Roguelike_Session)data
+	roguelike_suspend_input(rs)
+}
+
 roguelike_update :: proc(data: rawptr, hf: ^host.Frame) {
 	rs := cast(^Roguelike_Session)data
+	if rs.smoke_mode_count == 0 && !rs.smoke_test && (!hf.focused || !hf.window_focused) {
+		roguelike_suspend_input(rs)
+		return
+	}
 	if rs.from_launcher && hf.focused && rl.IsKeyPressed(.F10) {
 		host.pop(hf)
 		return
@@ -816,20 +838,19 @@ roguelike_update :: proc(data: rawptr, hf: ^host.Frame) {
 		speed := f32(1) if rs.iso_renderer.playback_speed >= 4 else min(f32(4), rs.iso_renderer.playback_speed*2)
 		render.set_renderer_playback_speed(&rs.iso_renderer, speed)
 	}
-	rs.frame_time = (f32(1.0/60.0) if rs.options.m7_view_smoke else rl.GetFrameTime())
+	rs.frame_time = (f32(1.0/60.0) if rs.options.m7_view_smoke else hf.dt)
 	rs.m8_modal = false
-	m8_mouse, m8_mouse_inside := app.mouse_canvas_position(rs.window)
+	m8_mouse, m8_mouse_inside := view.Vec2{hf.mouse.x,hf.mouse.y}, hf.mouse_inside
 	if !rs.smoke_test && !rs.options.m7_view_smoke && rs.options.tactical.enabled {
 		rs.m8_modal = update_m8_session(&rs.m8_session, &rs.room, &rs.iso_renderer, &rs.tactical_controller,
 			&rs.card_interaction, &rs.gameplay_buffer, rs.run_state.phase == .In_Room &&
 			!rs.show_route_map && !game.run_has_relic_choice(&rs.run_state), rs.frame_time, m8_mouse, m8_mouse_inside)
 	}
-	if rs.m8_session.activity.mode != .None {
-		rs.overlay = nil
-		rs.overlay_data = {}
-		render.advance_sprite_assets(&rs.iso_renderer.sprite_assets, rs.frame_time)
-		return
-	}
+	if roguelike_open_activity(rs,hf) {
+        rs.overlay=nil
+        rs.overlay_data={}
+        return
+    }
 	if rl.IsKeyPressed(.F8) {
 		frame := Input_Diagnostic_Frame{dt = rs.frame_time, focused = rl.IsWindowFocused(),
 			route_map = rs.show_route_map, scripted = rs.smoke_test, mouse_left = rl.IsMouseButtonDown(.LEFT),
@@ -847,7 +868,7 @@ roguelike_update :: proc(data: rawptr, hf: ^host.Frame) {
 	   (!rs.options.tactical.enabled || rs.options.m7_view_smoke || (!rs.tactical_controller.paused && rs.tactical_controller.was_focused && rl.IsWindowFocused())) {
 		render.update_renderer_frame_timeline(&rs.iso_renderer, rs.frame_time)
 	}
-	rs.mouse_canvas, rs.mouse_inside = app.mouse_canvas_position(rs.window)
+	rs.mouse_canvas, rs.mouse_inside = m8_mouse, m8_mouse_inside
 	if spell_smoke_is_preview(rs.spell_smoke) {
 		rs.mouse_canvas = render.cell_center(&rs.iso_renderer, rs.room.enemies[0].position)
 		rs.mouse_inside = true
@@ -902,7 +923,6 @@ roguelike_update :: proc(data: rawptr, hf: ^host.Frame) {
 		assert(restarted)
 		rs.run_state.player.m8_profile = m8_profile
 		rs.m8_session.character_open = false
-		destroy_m9_session(&rs.m8_session.activity)
 		if rs.options.tactical.enabled {
 			configured := game.configure_tactical_room(&rs.room, rs.options.tactical)
 			assert(configured)
@@ -952,7 +972,7 @@ roguelike_update :: proc(data: rawptr, hf: ^host.Frame) {
 	tactical_input_blocked := false
 	if rs.options.tactical.enabled {
 		render.update_tactical_view(&rs.iso_renderer, &rs.room, rs.mouse_canvas, rs.mouse_inside && !rs.m8_modal &&
-			!render.point_in_rectangle(rs.mouse_canvas, render.m8_active_bar_bounds(&rs.iso_renderer)) &&
+			!render.m8_hud_contains_point(&rs.iso_renderer, &rs.room, rs.mouse_canvas) &&
 			!rs.tactical_controller.hologram && !rs.tactical_controller.paused && rl.IsWindowFocused())
 		render.update_tactical_atmosphere(&rs.iso_renderer, rs.frame_time if rs.options.m7_view_smoke || (!rs.tactical_controller.paused && rl.IsWindowFocused()) else 0)
 		if !rs.options.m7_view_smoke && !rs.m8_modal { tactical_input_blocked = update_tactical_controller(&rs.tactical_controller, &rs.room, &rs.iso_renderer,
@@ -1481,12 +1501,32 @@ roguelike_update :: proc(data: rawptr, hf: ^host.Frame) {
 	roguelike_offer_challenge(rs, hf)
 }
 
+// FPS and ring use the same catalog scenes from the menu and the run.
+// The M9 editor and its diagnostic shooter remain explicit CLI laboratories.
+roguelike_open_activity :: proc(rs: ^Roguelike_Session, hf: ^host.Frame) -> bool {
+    requested := rs.m8_session.requested
+    if requested == .None {return false}
+    rs.m8_session.requested=.None
+    info, found := m8_requested_activity_info(requested)
+    if !found {return false}
+    config := host.Minigame_Config{seed=rs.run_seed, challenge=requested==.Ring}
+    audio.play(hf.audio,.Confirm)
+    host.push(hf,info.create(config))
+    return true
+}
+
+m8_requested_activity_info :: proc(requested: render.M8_Control) -> (host.Minigame_Info, bool) {
+    if requested != .Ring && requested != .FPS {return {},false}
+    id := "ring" if requested == .Ring else "fps"
+    return minigame_info(minigame_index_by_id(id))
+}
+
 // One gate is shared by the offer and its regression tests. Suspended input,
 // cinematics and progression choices cannot start a second activity.
 roguelike_challenge_available :: proc(rs: ^Roguelike_Session, hf: ^host.Frame) -> bool {
 	return MINIGAME_COUNT > 0 && rs.smoke_mode_count == 0 && !rs.smoke_test &&
 	       !rs.options.spell_lab && !rs.options.dice_set_lab && rs.options.m9_lab == .None &&
-	       !rs.m8_modal && !rs.m8_session.character_open && rs.m8_session.activity.mode == .None &&
+	       !rs.m8_modal && !rs.m8_session.character_open && rs.m8_session.requested == .None && !rs.m8_session.ring_pending &&
 	       !rs.show_route_map && hf.visible && hf.focused && hf.window_focused &&
 	       !rs.tactical_controller.paused && !rs.tactical_controller.hologram &&
 	       rs.room.qte.kind == .None && !game.tactical_is_casting(&rs.room) &&
@@ -1494,18 +1534,18 @@ roguelike_challenge_available :: proc(rs: ^Roguelike_Session, hf: ^host.Frame) -
 	       game.minigame_challenge_available(&rs.run_state, &rs.room)
 }
 
-roguelike_challenge_bounds :: proc(canvas_width: f32) -> ui.Rect {
-	// Character, Ring, FPS practice and M9 workshop occupy the rows above.
-	return {canvas_width - 184, 199, 170, 26}
+roguelike_challenge_bounds :: proc(canvas_width: f32, canvas_height: f32 = 540) -> ui.Rect {
+	// Optional activities share a compact dock beside the exit, not over it.
+	return render.m8_extra_challenge_bounds(canvas_width, canvas_height)
 }
 
 // Mouse-only: the run owns the keyboard, so the button never takes focus.
 roguelike_offer_challenge :: proc(rs: ^Roguelike_Session, hf: ^host.Frame) {
 	rs.challenge_message_ttl = max(rs.challenge_message_ttl-hf.dt, 0)
 	if !roguelike_challenge_available(rs, hf) { return }
-	if !ui.button(hf.ui, roguelike_challenge_bounds(f32(rs.window.config.canvas_width)),
-		"Sfida minigioco", size = .Small, focusable = false) { return }
-	challenge, ok := game.begin_minigame_challenge(&rs.run_state, &rs.room, MINIGAME_COUNT)
+	if !ui.button(hf.ui, roguelike_challenge_bounds(hf.canvas.width, hf.canvas.height),
+		"SFIDA EXTRA", size = .Small, focusable = false) { return }
+	challenge, ok := game.begin_minigame_challenge(&rs.run_state, &rs.room, EXTRA_CHALLENGE_COUNT)
 	if !ok { return }
 	info, found := minigame_info(challenge.minigame)
 	if !found {
@@ -1515,13 +1555,30 @@ roguelike_offer_challenge :: proc(rs: ^Roguelike_Session, hf: ^host.Frame) {
 	clear_card_interaction(&rs.card_interaction)
 	clear_gameplay_command_buffer(&rs.gameplay_buffer)
 	audio.play(hf.audio, .Confirm)
-	host.push(hf, info.create(host.Minigame_Config{seed = challenge.seed, difficulty = challenge.difficulty, challenge = true}))
+	host.push(hf, info.create(host.Minigame_Config{seed = challenge.seed, challenge = true}))
 }
 
 roguelike_resume :: proc(data: rawptr, hf: ^host.Frame, from: string, result: Maybe(host.Result)) {
 	rs := cast(^Roguelike_Session)data
+	roguelike_suspend_input(rs)
 	audio.stop_music(hf.audio)
 	host.persist_profile(hf)
+    if settle_m8_host_activity(&rs.m8_session,&rs.room,from,result) {
+        delete(rs.challenge_message)
+        reward := rs.m8_session.reward
+        if reward.has_unlock {
+            title := "Titan Grip" if reward.unlocked == .Titan_Grip else "Storm Crown"
+            rs.challenge_message=fmt.aprintf("Ring vinto / carta sbloccata: %s%s",title,"" if reward.card_added else " (disponibile nelle ricompense)")
+        } else {
+            rs.challenge_message=fmt.aprintf("%s", "Ring vinto / vittoria registrata" if reward.won else "Ring concluso / nessuna penalita alla run")
+        }
+        if len(rs.m8_session.status)>0 {
+            delete(rs.challenge_message)
+            rs.challenge_message=fmt.aprintf("%s",rs.m8_session.status)
+        }
+        rs.challenge_message_ttl=5
+        return
+    }
 	if !rs.room.minigame_challenge_pending { return }
 	challenge := rs.room.minigame_challenge
 	info, found := minigame_info(challenge.minigame)
@@ -1550,13 +1607,9 @@ roguelike_resume :: proc(data: rawptr, hf: ^host.Frame, from: string, result: Ma
 
 roguelike_draw :: proc(data: rawptr, hf: ^host.Frame) {
 	rs := cast(^Roguelike_Session)data
-	if rs.m8_session.activity.mode != .None {
-		draw_m9_session(&rs.iso_renderer, &rs.m8_session.activity)
-		return
-	}
 	defer if rs.challenge_message_ttl > 0 {
 		alpha := min(rs.challenge_message_ttl, 1)
-		ui.draw_text_centered(hf.theme, rs.challenge_message, {hf.canvas.width * 0.5, 150}, .Large,
+		ui.draw_text_centered(hf.theme, rs.challenge_message, {hf.canvas.width * 0.5, 88}, .Body,
 			ui.with_alpha(rl.Color{232, 196, 112, 255}, alpha))
 	}
 	if game.run_has_relic_choice(&rs.run_state) {
@@ -1683,7 +1736,7 @@ roguelike_draw :: proc(data: rawptr, hf: ^host.Frame) {
 
 roguelike_draw_window :: proc(data: rawptr, hf: ^host.Frame) {
 	rs := cast(^Roguelike_Session)data
-	if rs.m8_session.activity.mode == .None && rs.overlay != nil {
+	if rs.m8_session.requested == .None && !rs.m8_session.ring_pending && rs.overlay != nil {
 		rs.overlay(rs.window, &rs.overlay_data)
 	}
 }
@@ -1822,7 +1875,6 @@ roguelike_after_present :: proc(data: rawptr, hf: ^host.Frame) {
 
 roguelike_destroy :: proc(data: rawptr) {
 	rs := cast(^Roguelike_Session)data
-	destroy_m9_session(&rs.m8_session.activity)
 	if rs.attached {
 		rl.EnableCursor()
 		if rs.playtest_session_ptr != nil && !rs.playtest_report_written {

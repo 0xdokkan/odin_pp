@@ -160,7 +160,7 @@ Event :: struct {
 	flag:   bool,
 }
 
-// Everything the difficulty and the launch mode change.
+// Fixed round balance, with a shorter format for challenges inside a run.
 Tuning :: struct {
 	waves:         int,
 	max_hp:        int,
@@ -178,30 +178,14 @@ Tuning :: struct {
 }
 
 tuning_for :: proc(config: host.Minigame_Config) -> Tuning {
-	t: Tuning
-	switch clamp(config.difficulty, 0, 2) {
-	case 0:
-		t = Tuning{
-			waves = 7, max_hp = 8, enemy_speed = 0.85, orb_speed = 0.8, cast_interval = 1.3,
-			budget_low = 7, budget_high = 33, alive_cap = 14, boss_hp = 55, caster_shots = 1,
-			boss_ring = 10, combo_goal = 20, drop_bonus = 0.03,
-		}
-	case 1:
-		t = Tuning{
-			waves = 8, max_hp = 6, enemy_speed = 1, orb_speed = 1, cast_interval = 1,
-			budget_low = 10, budget_high = 46, alive_cap = 20, boss_hp = 85, caster_shots = 1,
-			boss_ring = 14, combo_goal = 32, drop_bonus = 0,
-		}
-	case:
-		t = Tuning{
-			waves = 10, max_hp = 5, enemy_speed = 1.12, orb_speed = 1.15, cast_interval = 0.85,
-			budget_low = 12, budget_high = 60, alive_cap = 26, boss_hp = 115, caster_shots = 3,
-			boss_ring = 18, combo_goal = 42, drop_bonus = 0,
-		}
+	t := Tuning{
+		waves = 8, max_hp = 6, enemy_speed = 1, orb_speed = 1, cast_interval = 1,
+		budget_low = 10, budget_high = 46, alive_cap = 20, boss_hp = 85, caster_shots = 1,
+		boss_ring = 14, combo_goal = 32, drop_bonus = 0,
 	}
 	if config.challenge {
 		// A run challenge is a short sprint: fewer waves, a lighter final boss.
-		t.waves = 3 + clamp(config.difficulty, 0, 2)
+		t.waves = 4
 		t.max_hp += 1
 		t.budget_low *= 0.9
 		t.budget_high *= 0.62

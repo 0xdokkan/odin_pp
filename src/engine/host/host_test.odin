@@ -243,3 +243,127 @@ test_format_time :: proc(t: ^testing.T) {
 	testing.expect_value(t, format_time(83.47), "1:23.4")
 	testing.expect_value(t, format_time(-1), "0:00.0")
 }
+
+@(test)
+test_shell_pauses_when_an_overlay_owns_scene_input :: proc(t: ^testing.T) {
+	theme := ui.default_theme()
+	ctx := ui.create(&theme)
+	defer ui.destroy(ctx)
+	game := Fake_Game{}
+	scene := minigame_scene(Minigame_Info{id = "fake"}, fake_hooks(&game), {})
+	defer scene.destroy(scene.data)
+	shell := shell_of(&scene)
+	shell_skip_intro(shell)
+	cmds: Commands
+	frame := Frame{dt = 0.1, ui = ctx, commands = &cmds, visible = true,
+		focused = false, window_focused = true, canvas = {0, 0, 960, 540}}
+	ui.begin(ctx, {}, {}, frame.dt)
+	scene.update(scene.data, &frame)
+	ui.end(ctx)
+	testing.expect_value(t, shell.phase, Shell_Phase.Paused)
+	testing.expect_value(t, game.steps, 0)
+	testing.expect_value(t, shell.elapsed, f32(0))
+	// Removing the overlay grants input, but cannot silently resume the round.
+	frame.focused = true
+	ui.begin(ctx, {}, {}, frame.dt)
+	scene.update(scene.data, &frame)
+	ui.end(ctx)
+	testing.expect_value(t, shell.phase, Shell_Phase.Paused)
+	testing.expect_value(t, game.steps, 0)
+}
+
+@(test)
+test_pop_keeps_owned_names_valid_during_resume :: proc(t: ^testing.T) {
+	s: Stack
+	parent: Probe
+	name := [5]u8{'c', 'h', 'i', 'l', 'd'}
+	stack_push(&s, probe_scene("parent", &parent))
+	stack_push(&s, Scene{
+		name = string(name[:]), data = &name,
+		destroy = proc(data: rawptr) {
+			// A child's name may be owned by its data and disappear on destroy.
+			(cast(^[5]u8)data)^ = {'x', 'x', 'x', 'x', 'x'}
+		},
+	})
+	cmds: Commands
+	frame := Frame{commands = &cmds}
+	pop(&frame, Result{minigame = string(name[:]), outcome = .Won})
+	testing.expect(t, apply(&s, &cmds, &frame))
+	testing.expect_value(t, parent.from, "child")
+	testing.expect_value(t, parent.last.?.minigame, "child")
+	destroy_all(&s)
+}
+
+@(test)
+test_visible_lower_scene_cannot_consume_overlay_click :: proc(t: ^testing.T) {
+	theme := ui.default_theme()
+	ctx := ui.create(&theme)
+	defer ui.destroy(ctx)
+	s: Stack
+	parent, overlay: Probe
+	probes := [?]^Probe{&parent, &overlay}
+	for probe in probes {
+		scene := probe_scene("button", probe)
+		scene.update = proc(data: rawptr, frame: ^Frame) {
+			p := cast(^Probe)data
+			p.updates += 1
+			if ui.button(frame.ui, {0, 0, 80, 40}, "Open") {
+				p.resumed += 1
+			}
+		}
+		stack_push(&s, scene)
+	}
+	frame := Frame{ui = ctx, window_focused = true, canvas = {0, 0, 960, 540}}
+	ui.begin(ctx, {position = {20, 20}, inside = true, pressed = true, down = true}, {}, 0.016)
+	update_scenes(&s, &frame, 0, 0)
+	ui.end(ctx)
+	ui.begin(ctx, {position = {20, 20}, inside = true, released = true}, {}, 0.016)
+	update_scenes(&s, &frame, 0, 0)
+	ui.end(ctx)
+	testing.expect_value(t, parent.updates, 2)
+	testing.expect_value(t, overlay.updates, 2)
+	testing.expect_value(t, parent.resumed, 0)
+	testing.expect_value(t, overlay.resumed, 1)
+	testing.expect_value(t, ctx.focus_count, 1)
+	testing.expect(t, !ctx.noninteractive, "the host must restore the surrounding UI state")
+	destroy_all(&s)
+}
+
+@(test)
+test_modal_push_suspends_round_until_explicit_resume :: proc(t: ^testing.T) {
+	s: Stack
+	game: Fake_Game
+	scene := minigame_scene(Minigame_Info{id = "fake"}, fake_hooks(&game), {})
+	shell := shell_of(&scene)
+	shell_skip_intro(shell)
+	stack_push(&s, scene)
+	child: Probe
+	stack_push(&s, probe_scene("overlay", &child, modal = true))
+	testing.expect_value(t, shell.phase, Shell_Phase.Paused)
+	testing.expect_value(t, update_start(&s), 1)
+	cmds: Commands
+	frame := Frame{commands = &cmds}
+	pop(&frame)
+	testing.expect(t, apply(&s, &cmds, &frame))
+	testing.expect_value(t, shell.phase, Shell_Phase.Paused)
+	testing.expect_value(t, shell.elapsed, f32(0))
+	shell_skip_intro(shell)
+	testing.expect_value(t, shell.phase, Shell_Phase.Playing)
+	destroy_all(&s)
+}
+
+@(test)
+test_failed_push_does_not_suspend_current_scene :: proc(t: ^testing.T) {
+	s: Stack
+	for _ in 0..<MAX_SCENES-1 {
+		stack_push(&s, Scene{})
+	}
+	game: Fake_Game
+	scene := minigame_scene(Minigame_Info{id = "fake"}, fake_hooks(&game), {})
+	shell := shell_of(&scene)
+	shell_skip_intro(shell)
+	stack_push(&s, scene)
+	testing.expect(t, !stack_push(&s, Scene{}))
+	testing.expect_value(t, shell.phase, Shell_Phase.Playing)
+	destroy_all(&s)
+}

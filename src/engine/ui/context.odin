@@ -53,6 +53,7 @@ Context :: struct {
 	theme:          ^Theme,
 	pointer:        Pointer,
 	press_origin:   [2]f32,
+	press_valid:    bool,
 	nav_map:        input.Action_Map(Nav),
 	nav:            input.State(Nav),
 	// Focus is the ordinal of a focusable widget in call order this frame.
@@ -65,6 +66,8 @@ Context :: struct {
 	command_count:  int,
 	dropped:        int,
 	time:           f32,
+	// A covered scene may still draw, but must not register or consume input.
+	noninteractive: bool,
 }
 
 // Heap-allocated: the command buffer is large.
@@ -106,6 +109,7 @@ begin :: proc(ctx: ^Context, pointer: Pointer, nav: input.Sample(Nav), dt: f32) 
 	ctx.pointer = pointer
 	if pointer.pressed {
 		ctx.press_origin = pointer.position
+		ctx.press_valid = pointer.inside
 	}
 	input.advance(&ctx.nav, nav, dt)
 	ctx.time += dt
@@ -124,6 +128,12 @@ begin :: proc(ctx: ^Context, pointer: Pointer, nav: input.Sample(Nav), dt: f32) 
 
 // Applies keyboard navigation collected during the frame.
 end :: proc(ctx: ^Context) {
+	if ctx.pointer.released || !ctx.pointer.down {
+		ctx.press_valid = false
+	}
+	if ctx.noninteractive {
+		return
+	}
 	if ctx.focus_count == 0 {
 		ctx.focus = -1
 		return
@@ -156,15 +166,40 @@ end :: proc(ctx: ^Context) {
 }
 
 back_pressed :: proc(ctx: ^Context) -> bool {
-	return .Back in ctx.nav.pressed
+	return !ctx.noninteractive && .Back in ctx.nav.pressed
 }
 
 confirm_pressed :: proc(ctx: ^Context) -> bool {
-	return .Confirm in ctx.nav.pressed
+	return !ctx.noninteractive && .Confirm in ctx.nav.pressed
+}
+
+// Does not mutate sampled input or navigation focus. The host can draw a
+// covered scene, then restore interactivity for the scene that owns input.
+set_interactive :: proc(ctx: ^Context, enabled: bool) -> bool {
+	previous := !ctx.noninteractive
+	ctx.noninteractive = !enabled
+	return previous
+}
+
+// A release belongs to the scene where its press began. Retain nav.down so a
+// held confirmation key does not become a fresh press in the replacement scene.
+cancel_interaction :: proc(ctx: ^Context) {
+	ctx.press_valid = false
+	ctx.focus = -1
+	ctx.keyboard_mode = false
+	ctx.nav.pressed = {}
+	ctx.nav.released = {}
+	ctx.nav.held_time = {}
+	ctx.pointer.pressed = false
+	ctx.pointer.down = false
+	ctx.pointer.released = false
 }
 
 // Moves keyboard focus to a widget ordinal, e.g. the first menu entry.
 set_focus :: proc(ctx: ^Context, ordinal: int) {
+	if ctx.noninteractive {
+		return
+	}
 	ctx.focus = ordinal
 	ctx.keyboard_mode = true
 }
@@ -272,14 +307,15 @@ paragraph :: proc(ctx: ^Context, r: Rect, text: string, size := Text_Size.Body, 
 
 panel :: proc(ctx: ^Context, r: Rect, title := "", alt := false) -> Rect {
 	p := ctx.theme.palette
-	fill(ctx, Rect{r.x + 4, r.y + 5, r.width, r.height}, p.shadow, ctx.theme.roundness*0.5)
+	fill(ctx, Rect{r.x + 2, r.y + 3, r.width, r.height}, p.shadow, ctx.theme.roundness*0.5)
 	fill(ctx, r, p.panel_alt if alt else p.panel, ctx.theme.roundness*0.5)
 	outline(ctx, r, p.border, ctx.theme.border, ctx.theme.roundness*0.5)
+	fill(ctx, Rect{r.x + 1, r.y + 1, max(r.width - 2, 0), 1}, with_alpha(p.focus, 0.24))
 	inner := shrink(r, ctx.theme.padding)
 	if title != "" {
 		header := cut_top(&inner, text_pixels(.Large) + 6)
 		label(ctx, header, title, .Large, p.text)
-		fill(ctx, Rect{inner.x, inner.y, inner.width, 2}, p.accent)
+		fill(ctx, Rect{inner.x, inner.y, inner.width, 1}, p.border)
 		inner.y += 8
 		inner.height -= 8
 	}
@@ -298,6 +334,9 @@ Widget_State :: struct {
 // are not focusable (e.g. over a game that owns the keyboard) answer the mouse only.
 interact :: proc(ctx: ^Context, r: Rect, enabled := true, focusable := true) -> Widget_State {
 	s := Widget_State{ordinal = -1}
+	if ctx.noninteractive {
+		return s
+	}
 	if focusable {
 		s.ordinal = ctx.focus_count
 		ctx.focus_count += 1
@@ -311,8 +350,8 @@ interact :: proc(ctx: ^Context, r: Rect, enabled := true, focusable := true) -> 
 		ctx.focus = s.ordinal
 	}
 	s.focused = focusable && ctx.focus == s.ordinal
-	s.held = s.hovered && p.down && contains(r, ctx.press_origin)
-	mouse_click := s.hovered && p.released && contains(r, ctx.press_origin)
+	s.held = s.hovered && p.down && ctx.press_valid && contains(r, ctx.press_origin)
+	mouse_click := s.hovered && p.released && ctx.press_valid && contains(r, ctx.press_origin)
 	key_click := s.focused && ctx.keyboard_mode && .Confirm in ctx.nav.pressed
 	s.clicked = mouse_click || key_click
 	return s
@@ -329,7 +368,7 @@ button :: proc(ctx: ^Context, r: Rect, text: string, enabled := true, primary :=
 	} else if s.held {
 		color = p.button_down
 	} else if s.hovered || s.focused {
-		color = mix_color(base, p.button_hover if !primary else rl.Color{220, 70, 80, 255}, 0.6)
+		color = mix_color(base, p.button_hover if !primary else p.focus, 0.6)
 	}
 	round := ctx.theme.roundness
 	offset := f32(1) if s.held else 0
@@ -338,6 +377,7 @@ button :: proc(ctx: ^Context, r: Rect, text: string, enabled := true, primary :=
 	fill(ctx, body, color, round)
 	edge := p.focus if s.focused && enabled else p.border
 	outline(ctx, body, edge, ctx.theme.border, round)
+	fill(ctx, Rect{body.x + 1, body.y + 1, max(body.width - 2, 0), 1}, with_alpha(p.text, 0.12))
 	text_color := p.accent_text if primary else p.text
 	if !enabled {
 		text_color = p.text_dim
@@ -361,8 +401,11 @@ toggle :: proc(ctx: ^Context, r: Rect, text: string, value: ^bool) -> bool {
 		fill(ctx, r, with_alpha(p.button_hover, 0.5), ctx.theme.roundness)
 	}
 	box := Rect{r.x + r.width - r.height + 4, r.y + 4, r.height - 8, r.height - 8}
-	fill(ctx, box, p.success if value^ else p.button, 0.3)
-	outline(ctx, box, p.focus if s.focused else p.border, 2, 0.3)
+	fill(ctx, box, p.accent if value^ else p.button)
+	outline(ctx, box, p.focus if s.focused else p.border, 1)
+	if value^ {
+		label(ctx, box, "+", .Body, p.accent_text, .Center)
+	}
 	label(ctx, Rect{r.x + 8, r.y, r.width - r.height - 8, r.height}, text, .Body, p.text)
 	return changed
 }
@@ -392,23 +435,23 @@ slider :: proc(ctx: ^Context, r: Rect, text: string, value: ^f32, low, high: f32
 		fill(ctx, r, with_alpha(p.button_hover, 0.5), ctx.theme.roundness)
 	}
 	label(ctx, Rect{r.x + 8, r.y, r.width*0.4, r.height}, text, .Body, p.text)
-	fill(ctx, track, p.button, 1)
+	fill(ctx, track, p.button)
 	t := (value^ - low) / (high - low) if high > low else 0
-	fill(ctx, Rect{track.x, track.y, track.width * t, track.height}, p.accent, 1)
+	fill(ctx, Rect{track.x, track.y, track.width * t, track.height}, p.accent)
 	knob := Rect{track.x + track.width*t - 6, track.y - 6, 12, 18}
-	fill(ctx, knob, p.focus if s.focused else p.text, 0.4)
+	fill(ctx, knob, p.focus if s.focused else p.text)
 	return value^ != old
 }
 
 progress :: proc(ctx: ^Context, r: Rect, value01: f32, color: Maybe(rl.Color) = nil, back: Maybe(rl.Color) = nil) {
 	p := ctx.theme.palette
-	fill(ctx, r, back.? or_else p.button, 0.5)
+	fill(ctx, r, back.? or_else p.background)
 	inner := shrink(r, 2)
 	inner.width *= clamp(value01, 0, 1)
 	if inner.width > 0 {
-		fill(ctx, inner, color.? or_else p.accent, 0.5)
+		fill(ctx, inner, color.? or_else p.accent)
 	}
-	outline(ctx, r, p.border, 1, 0.5)
+	outline(ctx, r, p.border, 1)
 }
 
 // Selectable tile with a title, a subtitle and an accent stripe: the building
@@ -417,15 +460,15 @@ tile :: proc(ctx: ^Context, r: Rect, title, subtitle: string, accent: rl.Color, 
 	enabled := true) -> bool {
 	s := interact(ctx, r, enabled)
 	p := ctx.theme.palette
-	lift := f32(-4) if (s.hovered || s.focused) && enabled else 0
+	lift := f32(-1) if (s.hovered || s.focused) && enabled else 0
 	body := Rect{r.x, r.y + lift, r.width, r.height}
-	fill(ctx, Rect{r.x + 3, r.y + 6, r.width, r.height}, p.shadow, 0.12)
-	fill(ctx, body, p.panel_alt if enabled else p.disabled, 0.12)
+	fill(ctx, Rect{r.x + 2, r.y + 3, r.width, r.height}, p.shadow, ctx.theme.roundness)
+	fill(ctx, body, p.panel_alt if enabled else p.disabled, ctx.theme.roundness)
 	stripe := body
-	stripe.height = 8
-	fill(ctx, stripe, accent if enabled else p.text_dim, 0.5)
+	stripe.height = 2
+	fill(ctx, stripe, accent if enabled else p.text_dim)
 	edge := p.focus if (s.focused || selected) && enabled else p.border
-	outline(ctx, body, edge, 3 if s.focused || selected else 2, 0.12)
+	outline(ctx, body, edge, 1, ctx.theme.roundness)
 	inner := shrink(body, 12)
 	inner.y += 8
 	inner.height -= 8

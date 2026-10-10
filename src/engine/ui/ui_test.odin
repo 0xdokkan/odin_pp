@@ -147,4 +147,63 @@ test_ellipsize_respects_width_and_utf8 :: proc(t: ^testing.T) {
 	accented := ellipsize(&theme, "perché però", 72, .Small)
 	testing.expect(t, len(accented) <= 9)
 	testing.expect(t, accented[len(accented)-3:] == "...")
+	testing.expect_value(t, ellipsize(&theme, "long", 8, .Small), "")
+}
+
+@(test)
+test_covered_scene_cannot_take_pointer_keyboard_or_focus :: proc(t: ^testing.T) {
+	theme := default_theme()
+	ctx := create(&theme)
+	defer destroy(ctx)
+	r := Rect{10, 10, 200, 30}
+	set_focus(ctx, 0)
+	begin(ctx, Pointer{position = {20, 20}, inside = true, pressed = true, down = true}, nav({.Confirm, .Back, .Down}), 0.016)
+	testing.expect(t, set_interactive(ctx, false))
+	testing.expect(t, !button(ctx, r, "Covered"))
+	testing.expect(t, !back_pressed(ctx) && !confirm_pressed(ctx))
+	testing.expect_value(t, ctx.focus_count, 0)
+	set_focus(ctx, 3)
+	end(ctx)
+	testing.expect_value(t, ctx.focus, 0)
+	testing.expect(t, !set_interactive(ctx, true))
+	testing.expect(t, confirm_pressed(ctx))
+}
+
+@(test)
+test_scene_change_cancels_press_and_preserves_held_key :: proc(t: ^testing.T) {
+	theme := default_theme()
+	ctx := create(&theme)
+	defer destroy(ctx)
+	r := Rect{10, 10, 100, 30}
+	begin(ctx, Pointer{position = {20, 20}, inside = true, pressed = true, down = true}, nav({.Confirm}), 0.016)
+	button(ctx, r, "Old scene")
+	end(ctx)
+	cancel_interaction(ctx)
+	begin(ctx, Pointer{position = {20, 20}, inside = true, released = true}, nav({.Confirm}), 0.016)
+	testing.expect(t, !button(ctx, r, "New scene"))
+	testing.expect(t, !confirm_pressed(ctx))
+	end(ctx)
+	begin(ctx, Pointer{position = {20, 20}, inside = true, pressed = true, down = true}, {}, 0.016)
+	button(ctx, r, "New scene")
+	end(ctx)
+	begin(ctx, Pointer{position = {20, 20}, inside = true, released = true}, {}, 0.016)
+	testing.expect(t, button(ctx, r, "New scene"))
+	end(ctx)
+}
+
+@(test)
+test_hud_dock_keeps_safe_edges_on_both_canvas_sizes :: proc(t: ^testing.T) {
+	for width in ([?]f32{960, 1280}) {
+		canvas := Rect{30, 20, width, 540}
+		cols := hud_columns(canvas)
+		testing.expect_value(t, cols[0].x, canvas.x + HUD_MARGIN)
+		testing.expect_value(t, cols[2].x + cols[2].width, canvas.x + canvas.width - HUD_MARGIN)
+		for rect, i in cols {
+			testing.expect_value(t, rect.y, canvas.y + HUD_MARGIN)
+			testing.expect_value(t, rect.height, f32(HUD_TOP_HEIGHT))
+			if i > 0 {
+				testing.expect_value(t, rect.x - (cols[i-1].x + cols[i-1].width), f32(HUD_GAP))
+			}
+		}
+	}
 }

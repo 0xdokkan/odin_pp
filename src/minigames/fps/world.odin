@@ -65,36 +65,13 @@ Tuning :: struct {
 }
 
 tuning_for :: proc(config: host.Minigame_Config) -> Tuning {
-	d := clamp(config.difficulty, 0, 2)
-	t: Tuning
-	speed := [3]f32{0.88, 1, 1.12}
-	lead := [3]f32{0, 0.5, 0.85}
-	loops := [3]f32{0.14, 0.11, 0.08}
-	t.speed_scale = speed[d]
-	t.lead = lead[d]
-	t.loop_chance = loops[d]
+	t := Tuning{speed_scale = 1, lead = 0.5, loop_chance = 0.11}
 	if config.challenge {
-		cells := [3]int{6, 7, 7}
-		rooms := [3]int{4, 4, 5}
-		runes := [3]int{2, 3, 3}
-		enemies := [3]int{4, 6, 8}
-		health := [3]int{3, 3, 3}
-		mana := [3]int{2, 2, 2}
-		wave := [3]int{1, 2, 2}
-		damage := [3]f32{0.55, 0.75, 0.95}
-		t.cells, t.rooms, t.runes, t.enemies = cells[d], rooms[d], runes[d], enemies[d]
-		t.health_packs, t.mana_packs, t.wave, t.damage_scale = health[d], mana[d], wave[d], damage[d]
+		t.cells, t.rooms, t.runes, t.enemies = 7, 4, 3, 6
+		t.health_packs, t.mana_packs, t.wave, t.damage_scale = 3, 2, 2, 0.75
 	} else {
-		cells := [3]int{8, 9, 10}
-		rooms := [3]int{5, 6, 7}
-		runes := [3]int{3, 4, 5}
-		enemies := [3]int{8, 11, 15}
-		health := [3]int{5, 5, 4}
-		mana := [3]int{4, 3, 3}
-		wave := [3]int{2, 3, 4}
-		damage := [3]f32{0.7, 1, 1.3}
-		t.cells, t.rooms, t.runes, t.enemies = cells[d], rooms[d], runes[d], enemies[d]
-		t.health_packs, t.mana_packs, t.wave, t.damage_scale = health[d], mana[d], wave[d], damage[d]
+		t.cells, t.rooms, t.runes, t.enemies = 9, 6, 4, 11
+		t.health_packs, t.mana_packs, t.wave, t.damage_scale = 5, 3, 3, 1
 	}
 	return t
 }

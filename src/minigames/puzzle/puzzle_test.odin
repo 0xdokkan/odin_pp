@@ -407,26 +407,24 @@ test_symmetries_preserve_par :: proc(t: ^testing.T) {
 
 @(test)
 test_sequence_selection_is_deterministic :: proc(t: ^testing.T) {
-	for difficulty in 0..=2 {
-		for challenge in ([?]bool{false, true}) {
-			for seed in u64(1)..=u64(40) {
-				a, na := plan_sequence(seed, difficulty, challenge)
-				b, nb := plan_sequence(seed, difficulty, challenge)
-				testing.expect_value(t, na, nb)
-				testing.expect_value(t, a, b)
-				if challenge {
-					testing.expect_value(t, na, 1)
-					testing.expect(t, LEVELS[a[0].index].par <= challenge_max_par(difficulty))
-				} else {
-					testing.expect(t, na >= 3 && na <= MAX_SEQUENCE)
+	for challenge in ([?]bool{false, true}) {
+		for seed in u64(1)..=u64(40) {
+			a, na := plan_sequence(seed, challenge)
+			b, nb := plan_sequence(seed, challenge)
+			testing.expect_value(t, na, nb)
+			testing.expect_value(t, a, b)
+			if challenge {
+				testing.expect_value(t, na, 1)
+				testing.expect(t, LEVELS[a[0].index].par <= CHALLENGE_MAX_PAR)
+			} else {
+				testing.expect(t, na == 4)
+			}
+			for i in 0..<na {
+				for j in i+1..<na {
+					testing.expect(t, a[i].index != a[j].index, "a level repeats in a sequence")
 				}
-				for i in 0..<na {
-					for j in i+1..<na {
-						testing.expect(t, a[i].index != a[j].index, "a level repeats in a sequence")
-					}
-					if i > 0 {
-						testing.expect(t, LEVELS[a[i].index].rank >= LEVELS[a[i-1].index].rank, "ranks must not fall")
-					}
+				if i > 0 {
+					testing.expect(t, LEVELS[a[i].index].rank >= LEVELS[a[i-1].index].rank, "ranks must not fall")
 				}
 			}
 		}
@@ -434,7 +432,7 @@ test_sequence_selection_is_deterministic :: proc(t: ^testing.T) {
 	// Different seeds explore the library.
 	seen: [len(LEVELS)]bool
 	for seed in u64(0)..<200 {
-		picks, n := plan_sequence(seed, 2, false)
+		picks, n := plan_sequence(seed, false)
 		for i in 0..<n {
 			seen[picks[i].index] = true
 		}
@@ -528,7 +526,7 @@ test_stars_and_scores :: proc(t: ^testing.T) {
 test_session_plays_through_and_torch_limits_challenge :: proc(t: ^testing.T) {
 	s := new(Session)
 	defer free(s)
-	session_start(s, 7, 0, false)
+	session_start(s, 7, false)
 	testing.expect_value(t, s.torch_max, -1)
 	for {
 		p := &s.puzzle
@@ -550,10 +548,10 @@ test_session_plays_through_and_torch_limits_challenge :: proc(t: ^testing.T) {
 	testing.expect(t, score > 0)
 	testing.expect_value(t, stars, u8(3))
 
-	session_start(s, 7, 1, true)
+	session_start(s, 7, true)
 	testing.expect_value(t, s.count, 1)
-	testing.expect_value(t, s.torch_max, torch_budget(s.par, 1))
-	testing.expect(t, torch_budget(20, 0) > torch_budget(20, 1) && torch_budget(20, 1) > torch_budget(20, 2))
+	testing.expect_value(t, s.torch_max, torch_budget(s.par))
+	testing.expect_value(t, torch_budget(20), 60)
 	died := false
 	for _ in 0..<s.torch_max {
 		// Shuffle back and forth: moves that never solve anything.
@@ -701,8 +699,8 @@ run_until_done :: proc(g: ^Game, frame: ^host.Frame, max_seconds: f32) -> host.R
 
 @(test)
 test_game_autoplay_clears_a_free_play_run :: proc(t: ^testing.T) {
-	for difficulty in 0..=1 {
-		g := headless_game({seed = 11, difficulty = difficulty})
+	for seed in ([2]u64{11, 12}) {
+		g := headless_game({seed = seed})
 		defer headless_free(g)
 		testing.expect_value(t, g.phase, Phase.Enter)
 		frame := host.Frame{dt = 1.0 / 60, canvas = g.canvas}
@@ -728,14 +726,14 @@ test_game_autoplay_clears_a_free_play_run :: proc(t: ^testing.T) {
 
 @(test)
 test_game_challenge_is_lost_when_the_torch_dies :: proc(t: ^testing.T) {
-	g := headless_game({seed = 4, difficulty = 2, challenge = true})
+	g := headless_game({seed = 4, challenge = true})
 	defer headless_free(g)
 	frame := host.Frame{dt = 1.0 / 60, canvas = g.canvas}
 	for g.phase == .Enter {
 		game_step(g, &frame, true)
 	}
 	s := &g.session
-	testing.expect_value(t, s.torch, torch_budget(s.par, 2))
+	testing.expect_value(t, s.torch, torch_budget(s.par))
 	// Hints are refused in a challenge.
 	execute(g, &frame, .Hint)
 	testing.expect_value(t, s.hints, 0)
@@ -764,7 +762,7 @@ test_game_challenge_is_lost_when_the_torch_dies :: proc(t: ^testing.T) {
 
 @(test)
 test_game_hint_points_along_a_solution :: proc(t: ^testing.T) {
-	g := headless_game({seed = 2, difficulty = 1})
+	g := headless_game({seed = 2})
 	defer headless_free(g)
 	frame := host.Frame{dt = 1.0 / 60, canvas = g.canvas}
 	for g.phase == .Enter {
@@ -789,7 +787,7 @@ test_game_hint_points_along_a_solution :: proc(t: ^testing.T) {
 
 @(test)
 test_queued_command_waits_for_the_animation :: proc(t: ^testing.T) {
-	g := headless_game({seed = 1, difficulty = 0})
+	g := headless_game({seed = 1})
 	defer headless_free(g)
 	frame := host.Frame{dt = 1.0 / 60, canvas = g.canvas}
 	for g.phase == .Enter {

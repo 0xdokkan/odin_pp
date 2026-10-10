@@ -175,17 +175,14 @@ step :: proc(h: ^Host) -> bool {
 	}
 
 	gui.begin_frame(h.ui, frame.mouse, inside, dt)
+	gui.set_interactive(h.ui, window_focused)
+	if !window_focused {
+		gui.cancel_interaction(h.ui)
+	}
 	first_update := update_start(&h.stack)
 	first_draw := draw_start(&h.stack)
 	count := h.stack.count
-	for i in first_update..<count {
-		s := &h.stack.items[i]
-		frame.focused = i == count-1 && window_focused
-		frame.visible = i >= first_draw
-		if s.update != nil {
-			s.update(s.data, &frame)
-		}
-	}
+	update_scenes(&h.stack, &frame, first_update, first_draw)
 	gui.end(h.ui)
 
 	clear := rl.BLACK
@@ -213,6 +210,8 @@ step :: proc(h: ^Host) -> bool {
 	app.present(&h.window, h.letterbox, present_window_overlays, &present_data)
 	for i in first_draw..<count {
 		s := &h.stack.items[i]
+		frame.focused = i == count-1 && window_focused
+		frame.visible = true
 		if s.after_present != nil {
 			s.after_present(s.data, &frame)
 		}
@@ -222,8 +221,30 @@ step :: proc(h: ^Host) -> bool {
 	running := apply(&h.stack, &h.commands, &frame)
 	if changed {
 		h.fade = 0.6
+		gui.cancel_interaction(h.ui)
 	}
 	return running
+}
+
+// A visible lower scene may still animate, but only the top scene can consume
+// shared UI input. Keeping this around callbacks also covers non-modal overlays.
+@(private)
+update_scenes :: proc(stack: ^Stack, frame: ^Frame, first_update, first_draw: int) {
+	for i in first_update..<stack.count {
+		scene := &stack.items[i]
+		frame.focused = i == stack.count-1 && frame.window_focused
+		frame.visible = i >= first_draw
+		was_interactive := false
+		if frame.ui != nil {
+			was_interactive = gui.set_interactive(frame.ui, frame.focused)
+		}
+		if scene.update != nil {
+			scene.update(scene.data, frame)
+		}
+		if frame.ui != nil {
+			gui.set_interactive(frame.ui, was_interactive)
+		}
+	}
 }
 
 @(private)
@@ -239,6 +260,8 @@ present_window_overlays :: proc(window: ^app.Window, data: rawptr) {
 	p := cast(^Present_Data)data
 	for i in p.first..<p.count {
 		s := &p.host.stack.items[i]
+		p.frame.focused = i == p.count-1 && p.frame.window_focused
+		p.frame.visible = true
 		if s.draw_window != nil {
 			s.draw_window(s.data, p.frame)
 		}

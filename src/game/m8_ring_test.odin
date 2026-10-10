@@ -4,41 +4,6 @@ import "core:testing"
 import level "../level"
 
 @(test)
-test_m8_ring_grab_has_four_held_poses_and_one_damage_impact :: proc(t: ^testing.T) {
-	ring := Ring_Challenge{phase = .Active, player_health = 6, enemy_health = 9, player_x = 0.4, enemy_x = 0.6, enemy_recovery = 1}
-	testing.expect(t, ring_command(&ring, .Grab))
-	testing.expect_value(t, ring_grab_pose(&ring), 0)
-	for pose in 1..<4 {
-		tick_ring(&ring, 0.305)
-		testing.expect_value(t, ring_grab_pose(&ring), pose)
-		testing.expect_value(t, ring.player_health, i32(6))
-		testing.expect_value(t, ring.enemy_recovery, f32(1))
-	}
-	testing.expect_value(t, ring.enemy_health, i32(6))
-	testing.expect_value(t, ring.successful_throws, i32(1))
-	tick_ring(&ring, 0.4)
-	testing.expect_value(t, ring.action, Ring_Action.Idle)
-	testing.expect_value(t, ring.enemy_health, i32(6))
-	testing.expect_value(t, ring.successful_throws, i32(1))
-}
-
-@(test)
-test_m8_ring_telegraph_dodge_and_vulnerable_grab_rules :: proc(t: ^testing.T) {
-	ring := Ring_Challenge{phase = .Active, player_health = 6, enemy_health = 9, player_x = 0.4, enemy_x = 0.6, enemy_windup = 0.2}
-	before := ring
-	testing.expect(t, !ring_command(&ring, .Grab))
-	testing.expect_value(t, ring, before)
-	testing.expect(t, ring_command(&ring, .Dodge))
-	testing.expect(t, !ring_command(&ring, .Jab))
-	tick_ring(&ring, 0.21)
-	testing.expect_value(t, ring.player_health, i32(6))
-	testing.expect(t, ring_enemy_vulnerable(&ring))
-	tick_ring(&ring, 0.31)
-	testing.expect(t, ring_command(&ring, .Right))
-	testing.expect(t, ring_command(&ring, .Grab))
-}
-
-@(test)
 test_m8_ring_loss_never_changes_main_player_health_or_advances_room :: proc(t: ^testing.T) {
 	data := create_test_level(t)
 	defer level.destroy(&data)
@@ -51,7 +16,7 @@ test_m8_ring_loss_never_changes_main_player_health_or_advances_room :: proc(t: ^
 	_, started = begin_ring_challenge(&room)
 	testing.expect(t, !started)
 	before := player
-	tick_ring(&ring, 20)
+	ring.phase = .Lost // Combat outcome arrives from the canonical fight scene.
 	testing.expect_value(t, ring.phase, Ring_Phase.Lost)
 	reward := settle_ring_challenge(&room, &ring)
 	testing.expect(t, reward.settled && !reward.won && !reward.has_unlock)
@@ -115,37 +80,6 @@ test_m8_locked_cards_never_leak_into_reward_pool :: proc(t: ^testing.T) {
 }
 
 @(test)
-test_m8_ring_can_be_won_with_telegraphed_dodges_and_three_throws :: proc(t: ^testing.T) {
-	data := create_test_level(t)
-	defer level.destroy(&data)
-	player := create_test_player(t)
-	room, ok := create_room(&data, &player, {})
-	testing.expect(t, ok)
-	defer destroy_room(&room)
-	ring, started := begin_ring_challenge(&room)
-	testing.expect(t, started)
-	for _ in 0..<1000 {
-		if ring.phase != .Active { break }
-		if ring.action == .Idle {
-			if ring_enemy_vulnerable(&ring) {
-				if abs(ring.player_x-ring.enemy_x) > 0.25 {
-					testing.expect(t, ring_command(&ring, .Right if ring.player_x < ring.enemy_x else .Left))
-				} else { testing.expect(t, ring_command(&ring, .Grab)) }
-			} else if ring.enemy_windup < 0.25 {
-				testing.expect(t, ring_command(&ring, .Dodge))
-			}
-		}
-		tick_ring(&ring, 0.05)
-	}
-	testing.expect_value(t, ring.phase, Ring_Phase.Won)
-	testing.expect_value(t, ring.successful_throws, i32(3))
-	testing.expect_value(t, ring.player_health, RING_PLAYER_MAX_HEALTH)
-	reward := settle_ring_challenge(&room, &ring)
-	testing.expect(t, reward.won && reward.has_unlock && reward.card_added)
-	testing.expect_value(t, reward.unlocked, Card_Id.Titan_Grip)
-}
-
-@(test)
 test_m8_unlock_survives_full_deck_and_remains_available_in_offers :: proc(t: ^testing.T) {
 	data := create_test_level(t)
 	defer level.destroy(&data)
@@ -193,14 +127,4 @@ test_m8_storm_crown_preview_and_play_share_three_targets_and_damage :: proc(t: ^
 	testing.expect_value(t, player, before)
 	testing.expect_value(t, play_card(&room, instance.id, target).result, Card_Play_Result.Played)
 	for enemy, index in room.enemies { testing.expect_value(t, enemy.health, i32(33) if index < 3 else i32(40)) }
-}
-
-@(test)
-test_m8_ring_rejects_nonfinite_or_paused_clock_samples :: proc(t: ^testing.T) {
-	ring := Ring_Challenge{phase = .Active, player_health = 6, enemy_health = 9, player_x = 0.4, enemy_x = 0.6, enemy_windup = 0.2}
-	before := ring
-	for dt in ([?]f32{0, -1, transmute(f32)u32(0x7FC00000), transmute(f32)u32(0x7F800000)}) {
-		tick_ring(&ring, dt)
-		testing.expect_value(t, ring, before)
-	}
 }

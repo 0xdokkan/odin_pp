@@ -14,7 +14,7 @@ REACH_MIN_RISE :: -8
 REACH_MAX_RISE :: 4
 REACH_COUNT :: REACH_MAX_RISE - REACH_MIN_RISE + 1
 // Largest fraction of the simulated reach a generated gap may ask for. The
-// difficulty safety margins sit below it; the tests check every link.
+// generation safety margins sit below it; the tests check every link.
 REACH_LIMIT :: f32(0.8)
 SPIRE_DEPTH :: 80
 MAX_RESERVES :: 256
@@ -588,7 +588,7 @@ try_shuttle_link :: proc(g: ^Gen, from, d: int) -> int {
 	}
 	msize := [2]int{3, 3}
 	start := place_rect(ar, d, 1, msize, random_lateral(g, ar, d, msize, 2, false))
-	travel := rng.int_range(&g.r, 3, 4+clamp(w.config.difficulty, 0, 2))
+	travel := rng.int_range(&g.r, 3, 5)
 	dv := dir_vec(d)
 	end := IRect{start.lo + dv*travel, start.hi + dv*travel}
 	rise := rng.int_range(&g.r, -1, 1)
@@ -699,7 +699,7 @@ try_bridge_link :: proc(g: ^Gen, from, d: int) -> int {
 	ar := pad_rect(a)
 	lat := lateral_axis(d)
 	along := 1 - lat
-	width := 2 if w.config.difficulty == 0 else rng.int_range(&g.r, 1, 2)
+	width := rng.int_range(&g.r, 1, 2)
 	if ar.hi[lat]-ar.lo[lat] < width {
 		return -1
 	}
@@ -728,9 +728,6 @@ try_bridge_link :: proc(g: ^Gen, from, d: int) -> int {
 	if holes == 2 && length >= 5 {
 		br.holes = {1, length - 2}
 	} else if holes >= 1 {
-		if w.config.difficulty >= 2 && length >= 5 {
-			br.hole_len = 2
-		}
 		br.holes[0] = rng.int_range(&g.r, 1, length-1-br.hole_len)
 	}
 	b := new_pad(b_rect, a.top, .Island)
@@ -773,7 +770,7 @@ gen_branches :: proc(g: ^Gen, wanted: int, tips: []int) -> int {
 		}
 	}
 	rng.shuffle(&g.r, candidates[:n])
-	rise_hi := 1 if w.config.difficulty == 0 else 2
+	rise_hi := 2
 	count := 0
 	for ci in 0..<n {
 		if count >= wanted || count >= len(tips) {
@@ -1013,7 +1010,6 @@ place_spikes :: proc(g: ^Gen) {
 	w := g.w
 	candidates: [MAX_PATH]int
 	n := hazard_candidates(g, candidates[:], .Spikes, 5, 2)
-	difficulty := clamp(w.config.difficulty, 0, 2)
 	for k in 0..<n {
 		if w.spike_count >= min(g.s.spikes, MAX_SPIKES) {
 			break
@@ -1026,14 +1022,14 @@ place_spikes :: proc(g: ^Gen) {
 		axis := travel_axis(w, index)
 		lat := 1 - axis
 		length := p.hi[axis] - p.lo[axis]
-		width := 2 if difficulty == 2 && length >= 6 else 1
+		width := 1
 		mid := p.lo[axis] + (length-width)/2
 		lo, hi: Vec2
 		lo[axis] = f32(mid)
 		hi[axis] = f32(mid + width)
 		lo[lat] = f32(p.lo[lat])
 		hi[lat] = f32(p.hi[lat])
-		period := 2.4 - 0.2*f32(difficulty)
+		period := f32(2.2)
 		w.spikes[w.spike_count] = Spikes{lo = lo, hi = hi, top = f32(p.top), period = period,
 			phase = rng.float_range(&g.r, 0, period), pad = index}
 		w.spike_count += 1
@@ -1047,7 +1043,6 @@ place_sentinels :: proc(g: ^Gen) {
 	w := g.w
 	candidates: [MAX_PATH]int
 	n := hazard_candidates(g, candidates[:], .Sentinel, 4, 5)
-	difficulty := clamp(w.config.difficulty, 0, 2)
 	for k in 0..<n {
 		if w.sentinel_count >= min(g.s.sentinels, MAX_SENTINELS) {
 			break
@@ -1069,7 +1064,7 @@ place_sentinels :: proc(g: ^Gen) {
 		b[along] = mid
 		a[across] = f32(p.lo[lat]) + 0.6
 		b[across] = f32(p.hi[lat]) - 0.6
-		w.sentinels[w.sentinel_count] = Sentinel{a = a, b = b, speed = 1.7 + 0.35*f32(difficulty),
+		w.sentinels[w.sentinel_count] = Sentinel{a = a, b = b, speed = 2.05,
 			phase = rng.float_range(&g.r, 0, 2), pad = index, position = a}
 		w.sentinel_count += 1
 		p.hazard = true

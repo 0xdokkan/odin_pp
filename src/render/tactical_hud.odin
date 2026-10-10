@@ -4,8 +4,9 @@ import "core:c"
 import "core:fmt"
 import rl "vendor:raylib"
 import game "../game"
+import ui "../engine/ui"
 
-TACTICAL_HUD_HEIGHT :: f32(88)
+TACTICAL_HUD_HEIGHT :: f32(84)
 
 tactical_refocus_bounds :: proc(renderer: ^Renderer) -> rl.Rectangle {
 	return {renderer.canvas_width-151, 43, 137, 25}
@@ -14,17 +15,13 @@ tactical_map_controls_bounds :: proc(renderer: ^Renderer) -> rl.Rectangle {
 	return {renderer.canvas_width-151, 12, 137, 25}
 }
 tactical_phase_bounds :: proc(renderer: ^Renderer) -> rl.Rectangle {
-	return {renderer.canvas_width*0.5-155, 10, 310, 71}
+	return {renderer.canvas_width*0.5-151, 12, 302, 54}
 }
 
 // Small separate surfaces preserve the space between health, clock and controls.
 // This same geometry is shared with pointer hitboxes and scene framing.
 tactical_hud_panel :: proc(bounds: rl.Rectangle, accent: rl.Color = GOTHIC_STEEL) {
-	rl.DrawRectangleRec({bounds.x+2, bounds.y+3, bounds.width, bounds.height}, {3, 7, 12, 120})
-	rl.DrawRectangleRec(bounds, {14, 21, 31, 225})
-	rl.DrawRectangleRec({bounds.x, bounds.y, 2, bounds.height}, accent)
-	rl.DrawRectangleRec({bounds.x+2, bounds.y, bounds.width-2, 1}, {67, 85, 110, 150})
-	rl.DrawRectangleRec({bounds.x+2, bounds.y+bounds.height-1, bounds.width-2, 1}, {4, 9, 15, 190})
+	ui.hud_panel(nil, bounds, accent)
 }
 
 draw_tactical_status :: proc(renderer: ^Renderer, room: ^game.Room) {
@@ -32,12 +29,7 @@ draw_tactical_status :: proc(renderer: ^Renderer, room: ^game.Room) {
 	tactical_hud_panel({14, 12, 270, 47}, GOTHIC_BLUE)
 	gothic_text_fit(renderer, fmt.ctprintf("HP %d/%d", v.health, v.max_health), {24, 16, 113, 28}, 24, GOTHIC_PAPER)
 	bar := rl.Rectangle{146, 23, 125, 10}
-	rl.DrawRectangleRec(bar, GOTHIC_INK)
-	rl.DrawRectangleRec({bar.x+1, bar.y+1, bar.width-2, bar.height-2}, GOTHIC_DARK_RED)
-	health_width := (bar.width-2)*clamp(f32(v.health)/f32(max(i32(1), v.max_health)), f32(0), f32(1))
-	rl.DrawRectangleRec({bar.x+1, bar.y+1, health_width, bar.height-2}, GOTHIC_RED)
-	rl.DrawRectangleRec({bar.x+1, bar.y+1, health_width, 2}, {228, 95, 103, 255})
-	for mark in 1..<10 { rl.DrawRectangleRec({bar.x+f32(mark)*(bar.width/10), bar.y+1, 1, bar.height-2}, {13, 17, 24, 140}) }
+	ui.hud_meter(nil,bar,f32(v.health)/f32(max(i32(1),v.max_health)),GOTHIC_RED)
 	gothic_text_fit(renderer, fmt.ctprintf("ORO %d", v.gold), {25, 40, 104, 17}, 12, GOTHIC_MUTED)
 	phase := "STANZA LIBERATA" if v.phase == .Loot || v.phase == .Complete else fmt.ctprintf("NEMICI %d", v.enemy_count)
 	gothic_text_fit(renderer, phase, {147, 40, 127, 17}, 12, GOTHIC_BLUE if v.phase == .Loot else GOTHIC_MUTED)
@@ -101,20 +93,20 @@ draw_tactical_hud :: proc(renderer: ^Renderer, room: ^game.Room, paused, hologra
 	accent := GOTHIC_RED if timed && s.remaining <= 5 else GOTHIC_BLUE
 	if recovering { accent = {218, 169, 90, 255} }
 	tactical_hud_panel(bounds, accent)
-	gothic_text_fit(renderer, fmt.ctprintf("PULSE %d", min(s.cycle, max(int)-1)+1), {x+12, y+7, 91, 22}, 16, GOTHIC_MUTED)
-	gothic_text_fit(renderer, label, {x+107, y+7, 106, 22}, 18, GOTHIC_PAPER)
+	gothic_text_fit(renderer, fmt.ctprintf("PULSE %d", min(s.cycle, max(int)-1)+1), {x+12, y+6, 85, 20}, 14, GOTHIC_MUTED)
+	gothic_text_fit(renderer, label, {x+103, y+6, 98, 20}, 16, GOTHIC_PAPER)
 	if timed {
-		gothic_text_fit(renderer, fmt.ctprintf("%.1fs", s.remaining), {x+width-83, y+4, 72, 27}, 24, accent)
+		gothic_text_fit(renderer, fmt.ctprintf("%.1fs", s.remaining), {x+width-80, y+2, 69, 26}, 24, accent)
 	}
 	budget := max(f32(1), f32(s.budget))
 	if recovering { budget = game.TACTICAL_RECOVERY_SECONDS }
-	rl.DrawRectangleRec({x+12, y+35, width-24, 4}, GOTHIC_STEEL)
+	rl.DrawRectangleRec({x+12, y+29, width-24, 4}, GOTHIC_STEEL)
 	if timed {
-		rl.DrawRectangleRec({x+12, y+35, (width-24)*clamp(s.remaining/budget, f32(0), f32(1)), 4}, accent)
+		rl.DrawRectangleRec({x+12, y+29, (width-24)*clamp(s.remaining/budget, f32(0), f32(1)), 4}, accent)
 	} else if !combat {
-		rl.DrawRectangleRec({x+12, y+35, width-24, 2}, GOTHIC_BLUE)
+		rl.DrawRectangleRec({x+12, y+29, width-24, 2}, GOTHIC_BLUE)
 	}
-	status := fmt.ctprintf("PASSO / ATTACCO -%.0fs / RECUPERO %.0fs", game.TACTICAL_MOVE_SECONDS, game.TACTICAL_RECOVERY_SECONDS)
+	status := fmt.ctprintf("PASSO / ATTACCO -%.0fs", game.TACTICAL_MOVE_SECONDS)
 	if busy { status = "AZIONE / I NEMICI CONTINUANO" }
 	if game.tactical_is_casting(room) { status = fmt.ctprintf("LANCIO %.1fs / NEMICI SOSPESI", s.cast_remaining) }
 	if cinematic { status = "CINEMATICA / TEMPO SOSPESO" }
@@ -124,7 +116,7 @@ draw_tactical_hud :: proc(renderer: ^Renderer, room: ^game.Room, paused, hologra
 	if hologram && combat && room.qte.kind == .None {
 		status = "MAPPA APERTA / RECUPERO IN CORSO" if recovering else "MAPPA APERTA / IL TEMPO SCORRE"
 	}
-	gothic_text_fit(renderer, status, {x+12, y+46, width-24, 18}, 12, accent if hologram else GOTHIC_MUTED)
+	gothic_text_fit(renderer, status, {x+12, y+37, width-24, 14}, 10, accent if hologram else GOTHIC_MUTED)
 	gothic_button(renderer, tactical_map_controls_bounds(renderer), "TAB", "CHIUDI" if hologram else "MAPPA", room.qte.kind == .None)
 	if !hologram && combat {
 		gothic_button(renderer, tactical_refocus_bounds(renderer), "F", fmt.ctprintf("REFOCUS -%.0fs", game.TACTICAL_REFOCUS_SECONDS), refocus_button_is_enabled(renderer))

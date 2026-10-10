@@ -42,7 +42,6 @@ test_minigame_challenge_is_offered_once_per_cleared_room :: proc(t: ^testing.T) 
 	challenge, ok := begin_minigame_challenge(run, room, 5)
 	testing.expect(t, ok)
 	testing.expect(t, challenge.minigame >= 0 && challenge.minigame < 5)
-	testing.expect(t, challenge.difficulty >= 0 && challenge.difficulty <= 2)
 	testing.expect(t, !minigame_challenge_available(run, room))
 	_, again := begin_minigame_challenge(run, room, 5)
 	testing.expect(t, !again)
@@ -71,6 +70,30 @@ test_minigame_challenge_choice_is_deterministic :: proc(t: ^testing.T) {
 }
 
 @(test)
+test_minigame_challenge_does_not_scale_with_depth_or_elite_rooms :: proc(t: ^testing.T) {
+	a_run, a_room, a_data := challenge_fixture(t, 99)
+	defer challenge_cleanup(a_run, a_room, a_data)
+	a, ok := begin_minigame_challenge(a_run, a_room, 5)
+	testing.expect(t, ok)
+	for kind in ([2]Node_Kind{.Combat, .Elite}) {
+		for depth in ([3]int{0, 3, 6}) {
+			b_run, b_room, b_data := challenge_fixture(t, 99)
+			defer challenge_cleanup(b_run, b_room, b_data)
+			node, _ := current_run_node(b_run)
+			// Hold the room seed fixed: depth and room kind may not add a
+			// difficulty modifier to the generated challenge or its receipt.
+			node.depth = depth
+			node.kind = kind
+			b, started := begin_minigame_challenge(b_run, b_room, 5)
+			testing.expect(t, started)
+			testing.expect_value(t, b, a)
+			testing.expect_value(t, b.seed, mix_room_seed(node.room_seed ~ MINIGAME_CHALLENGE_SALT))
+			testing.expect_value(t, settle_minigame_challenge(b_run, b_room, b, .Won, 2), i32(12))
+		}
+	}
+}
+
+@(test)
 test_minigame_challenge_pays_only_wins_by_stars :: proc(t: ^testing.T) {
 	run, room, data := challenge_fixture(t, 3)
 	defer challenge_cleanup(run, room, data)
@@ -84,9 +107,6 @@ test_minigame_challenge_pays_only_wins_by_stars :: proc(t: ^testing.T) {
 	testing.expect_value(t, settle_minigame_challenge(run, room, challenge, .Won, 3), i32(0))
 	testing.expect_value(t, run.player.gold, start+18)
 	testing.expect(t, !room.minigame_challenge_pending)
-	testing.expect_value(t, minigame_challenge_difficulty(0, .Combat), 0)
-	testing.expect_value(t, minigame_challenge_difficulty(6, .Combat), 2)
-	testing.expect_value(t, minigame_challenge_difficulty(3, .Elite), 2)
 }
 
 @(test)
