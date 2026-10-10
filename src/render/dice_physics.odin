@@ -2,6 +2,7 @@ package render
 
 import "core:math"
 import rl "vendor:raylib"
+import tween "../engine/tween"
 
 DICE_PHYSICS_MAX_BODIES :: 3
 DICE_PHYSICS_DT :: f32(1.0/120.0)
@@ -499,7 +500,7 @@ dice_physics_finish_quiet_tail :: proc(throw: ^Dice_Throw, bodies: []Dice_Physic
 	start := max(throw.first_impact_frame, final_index-18)
 	for frame_index in start..=final_index {
 		t := f32(frame_index-start)/f32(max(1, final_index-start))
-		ease := t*t*(3-2*t)
+		ease := tween.smoothstep(t)
 		for index in 0..<len(bodies) {
 			frame := &throw.frames[frame_index]
 			frame.positions[index] += (rest[index].position-frame.positions[index])*ease

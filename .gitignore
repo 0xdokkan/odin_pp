@@ -33,3 +33,16 @@
 /odin_pp_m7_*.png
 /odin_pp_m7_*.json
 /*.m7_*.json
+
+# Build Windows
+/*.exe
+/*.pdb
+
+
+# Screenshot rigenerabili del menu e dei minigiochi
+/odin_pp_menu.png
+/odin_pp_platform2d.png
+/odin_pp_platform3d.png
+/odin_pp_arena.png
+/odin_pp_fps.png
+/odin_pp_puzzle.png

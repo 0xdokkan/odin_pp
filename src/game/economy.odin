@@ -1,5 +1,7 @@
 package game
 
+import rng "../engine/rng"
+
 MAX_CARD_OFFER_DEPTH :: 12
 
 Card_Rarity_Weights :: struct {
@@ -71,12 +73,7 @@ card_offer_weight :: proc(definition: Card_Definition, node: ^Run_Node, profile:
 
 economy_next_random :: proc(random_state: ^u64) -> u64 {
 	assert(random_state != nil && random_state^ != 0)
-	x := random_state^
-	x ~= x >> 12
-	x ~= x << 25
-	x ~= x >> 27
-	random_state^ = x
-	return x*0x2545F4914F6CDD1D
+	return rng.step(random_state)
 }
 
 generate_weighted_card_choices :: proc(

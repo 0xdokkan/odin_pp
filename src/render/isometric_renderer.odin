@@ -7,6 +7,7 @@ import game "../game"
 import grid "../grid"
 import level "../level"
 import view "../view"
+import tween "../engine/tween"
 
 CANVAS_BACKGROUND :: rl.Color{24, 27, 31, 255}
 LETTERBOX_COLOR   :: rl.Color{10, 12, 15, 255}
@@ -1084,7 +1085,7 @@ enemy_move_animation_grid_position :: proc(animation: ^Enemy_Move_Animation) -> 
 		return animation.to_grid
 	}
 	linear := clamp(animation.elapsed/animation.duration, f32(0), f32(1))
-	progress := linear*linear*(3-2*linear)
+	progress := tween.smoothstep(linear)
 	return {
 		x = animation.from_grid.x+(animation.to_grid.x-animation.from_grid.x)*progress,
 		y = animation.from_grid.y+(animation.to_grid.y-animation.from_grid.y)*progress,
@@ -1383,7 +1384,7 @@ draw_loot_animations :: proc(renderer: ^Renderer, room: ^game.Room) {
 	for index in 0..<renderer.loot_animation_count {
 		animation := &renderer.loot_animations[index]
 		linear := clamp(animation.elapsed/animation.duration, f32(0), f32(1))
-		progress := linear*linear*(3-2*linear)
+		progress := tween.smoothstep(linear)
 		from := cell_center(renderer, animation.from_position)
 		to_position := animation.to_position
 		if animation.target == game.PLAYER_ENTITY {
@@ -2288,7 +2289,7 @@ draw_timeline_popup :: proc(
 	assert(renderer != nil)
 	font_size: c.int = 16
 	text_width := rl.MeasureText(label, font_size)
-	eased := progress*progress*(3-2*progress)
+	eased := tween.smoothstep(progress)
 	opacity := clamp((1-progress)*3, f32(0), f32(1))
 	x := c.int(center.x)-text_width/2
 	y := c.int(center.y-26-eased*18)

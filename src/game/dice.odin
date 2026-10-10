@@ -1,5 +1,7 @@
 package game
 
+import rng "../engine/rng"
+
 DICE_SEED_SALT :: u64(0x8CB92BA72F3D8DD7)
 DEFAULT_DICE_SEED :: u64(0xDB4F0B9175AE2165)
 
@@ -66,17 +68,9 @@ roll_die :: proc(dice: ^Dice_State, sides: i32) -> (face: i32, ok: bool) {
 		return 0, false
 	}
 	// Rejection sampling removes modulo bias; the counter counts dice, not samples.
-	for {
-		value := dice.random_state
-		value ~= value >> 12
-		value ~= value << 25
-		value ~= value >> 27
-		dice.random_state = value
-		value *= 0x2545F4914F6CDD1D
-		if value < (max(u64)%u64(sides)+1)%u64(sides) { continue }
-		dice.roll_count += 1
-		return i32(value%u64(sides))+1, true
-	}
+	value := rng.below_state(&dice.random_state, u64(sides))
+	dice.roll_count += 1
+	return i32(value)+1, true
 }
 
 // A pool is one transaction. Even exhaustion on its final die leaves the source

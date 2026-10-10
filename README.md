@@ -1,7 +1,9 @@
-# Odin PP — versione 0.4 / M8 e fondazioni M9
+# Odin PP — M9 / engine e minigiochi integrati
 
 Vertical slice di un roguelike con deck building, griglia logica 2D, ambiente
 realmente 3D a blocchi e personaggi sprite pixel art, scritto in Odin con Raylib.
+L’integrazione dell’engine aggiunge un menu comune e cinque minigiochi con
+gameplay diversi: platform 2D e 3D, arena in tempo reale, FPS e puzzle a turni.
 La run attraversa sette livelli di una rotta
 procedurale, fra combattimenti, ricompense e nodi speciali, fino al Demolitore.
 Carte, spinte, esplosivi, status e reliquie condividono una simulazione
@@ -17,6 +19,7 @@ Per i dettagli delle API, ogni sezione rimanda ai sorgenti pertinenti.
 ## Indice
 
 - [Avvio](#avvio)
+- [Engine e minigiochi](#engine-e-minigiochi)
 - [Controlli e loop di gioco](#controlli-e-loop-di-gioco)
 - [M8: versione 0.4](#m8-versione-04)
 - [M9: fondazioni per le modalità libere](#m9-fondazioni-per-le-modalità-libere)
@@ -65,14 +68,32 @@ odin build src -o:none -out:odin_pp
 ./odin_pp
 ```
 
+Su Windows (PowerShell) gli equivalenti sono `.\run.ps1` e
+`.\scripts\check.ps1` (`-Headless` salta le build finali); `odin run src -o:none`
+funziona anche a mano. Windows riserva al thread principale 1 MiB di stack
+contro gli 8 MiB di macOS: [windows_stack.odin](src/windows_stack.odin) porta la
+riserva a 16 MiB dal sorgente, senza flag del linker sulla riga di comando.
+
 Dopo modifiche ai sorgenti, ricompilare prima di riutilizzare `./odin_pp`.
 Le build rapide mantengono assert e controlli di sicurezza; non riducono asset
 o qualità grafica. `-o:none` permette build senza ottimizzazione. `--seed` accetta un `u64`
 decimale o esadecimale con prefisso `0x`; seed e percorso scelto rendono la run
 riproducibile per la versione corrente del generatore.
 
+Senza argomenti si apre il **menu**: la run del roguelike, i minigiochi con i
+record, la difficoltà e le impostazioni (volumi, scuotimento, sensibilità del
+mouse, FPS), salvate con i record in `odin_pp/profilo.json` nella cartella dati
+dell'utente. Se il file è corrotto o appartiene a una versione futura, la sessione
+usa valori predefiniti e disabilita le scritture per conservare il file originale.
+Smoke, laboratori e report di playtest avviano la run direttamente, come prima.
+Gli smoke e i laboratori non scrivono i profili.
+
 | Opzione | Uso |
 |---|---|
+| `--run` | salta il menu ed entra subito nella run |
+| `--minigame=<id>` | apre un minigioco sopra il menu (`platform2d`, `platform3d`, `arena`, `fps`, `puzzle`) |
+| `--easy`, `--hard` | difficoltà iniziale dei minigiochi dal menu |
+| `--smoke-menu` | cattura `odin_pp_menu.png` dopo 30 frame ed esce |
 | `--animation-speed=2` | velocità delle animazioni ordinarie, fra 0.25x e 4x; non accelera cast o dadi M8 |
 | `--fast` | velocità 4x |
 | `--spell-lab` | arena con Firebomb, Fate Strike, Chain Lightning, Sundering Blow e Guard |
@@ -96,6 +117,93 @@ mantengono velocità 1x per rendere riproducibile la cattura.
 I laboratori M9 richiedono gli asset tattici e non si combinano con `--classic`,
 altri laboratori, smoke o report. `--m9` è un alias del tattico corrente;
 non sostituisce il combattimento principale con il movimento libero.
+
+## Engine e minigiochi
+
+Il roguelike e i minigiochi girano sullo stesso engine, in
+[src/engine](src/engine): il nucleo continuo M9 e tredici package di servizi, senza dipendenze dal gameplay,
+ognuno con i propri test headless. Le parti di sola logica (casualità, tempo,
+fisica, layout dell'interfaccia, sintesi audio, salvataggi) non chiamano Raylib.
+
+| Package | Contenuto |
+|---|---|
+| [rng](src/engine/rng) | stream xorshift64* con derivazione splitmix per dominio, range senza bias, pesi, shuffle; lo usano anche mazzo, dadi ed economia del roguelike |
+| [timing](src/engine/timing) | accumulatore a passo fisso con limite di recupero, timer e cooldown |
+| [tween](src/engine/tween) | curve di easing, smoothing indipendente dal frame rate, tween tipizzati |
+| [pool](src/engine/pool) | pool a capacità fissa con handle generazionali |
+| [physics](src/engine/physics) | rettangoli, cerchi e raggi; tile map 2D con piattaforme attraversabili, raycast DDA e move-and-slide; controller platform (coyote time, jump buffer, salto variabile, doppio salto, wall jump, dash); mappe voxel con collisioni e raycast 3D e controller platform 3D |
+| [input](src/engine/input) | azioni logiche su tastiera, mouse e gamepad con rimappatura; fronti pressed/released calcolati da campioni puri |
+| [audio](src/engine/audio) | effetti procedurali in stile sfxr, musica chiptune generata in loop, codifica WAV; senza dispositivo audio ogni chiamata è nulla |
+| [ui](src/engine/ui) | interfaccia immediata: pulsanti, interruttori, slider, tessere, pannelli, testo a capo; comandi di disegno registrati e resi in un punto, focus da tastiera e pad, layout a tagli di rettangolo, font pixel incorporato |
+| [camera](src/engine/camera) | camera 2D con zona morta, limiti e scuotimento a "trauma"; camera in prima persona e orbitale in terza persona |
+| [fx](src/engine/fx) | particelle a pool fisso 2D/3D, popup, flash e hit stop |
+| [gfx](src/engine/gfx) | sprite pixel art scritti come righe di caratteri, billboard, shader con sole, luce puntiforme e nebbia, mesh di voxel con facce nascoste rimosse, fondali procedurali |
+| [save](src/engine/save) | JSON versionato scritto in modo atomico, percorsi per utente |
+| [host](src/engine/host) | finestra, ciclo dei frame, stack di scene, profilo con impostazioni e record, guscio dei minigiochi |
+
+### Scene
+
+Run e minigiochi del menu sono `host.Scene`: dati propri sull'heap e procedure `update`,
+`draw` (canvas), `draw_window` (overlay in coordinate di finestra, come i dadi
+3D), `after_present` (screenshot), `resume` (la scena sopra è stata chiusa,
+con un eventuale `host.Result`) e `destroy`. Lo stack ha due regole: sotto una
+scena **modal** non si aggiorna nulla, sotto una scena **opaque** non si
+disegna nulla. `push`, `pop`, `replace` e `quit` sono comandi accodati e
+applicati a fine frame, quindi nessuna scena viene distrutta mentre è in uso.
+I widget di `ui` vanno chiamati in `update`, così stanno sopra al mondo di ogni
+scena; il mondo si disegna in `draw`.
+
+Il roguelike è la scena [roguelike_scene.odin](src/roguelike_scene.odin): lo
+stato che prima viveva nelle variabili locali di `main` è in
+`Roguelike_Session`, sull'heap. Il setup è diviso fra `roguelike_prepare`
+(run, stanza e smoke headless, senza finestra) e `roguelike_attach` (risorse
+GPU sulla finestra dell'host).
+
+### Contratto dei minigiochi
+
+Un minigioco è un package in [src/minigames](src/minigames) con due procedure:
+`info() -> host.Minigame_Info` (id, titolo, genere, descrizione, comandi,
+colore) e `create(host.Minigame_Config) -> host.Scene`. La configurazione porta
+seed, difficoltà (0-2) e il flag `challenge` per le sfide della run, che sono
+più brevi e hanno un solo tentativo. Il gioco implementa `Minigame_Hooks`
+(`reset`, `step`, `draw`, `score`, `destroy`, musica, cattura del mouse) e
+`host.minigame_scene` aggiunge il guscio comune: scheda iniziale con i comandi,
+pausa con `Esc` o quando la finestra perde il focus, risultati con stelle,
+punteggio e record, riprova. La simulazione di ogni minigioco è pura, a passo
+fisso e deterministica per seed e input; i test la guidano senza finestra.
+Il catalogo per menu e sfide è in [minigame_registry.odin](src/minigame_registry.odin).
+
+### I minigiochi
+
+| Id | Titolo | Gioco | Comandi principali | Stelle |
+|---|---|---|---|---|
+| [platform2d](src/minigames/platform2d) | Torre di Cenere | platform a scorrimento: livelli composti per seed da 22 blocchi verificati da un solver che usa il controller vero; nemici da schiacciare, totem che sparano, blocchi che crollano, bracieri di checkpoint | `A`/`D`, `Spazio` (doppio salto, wall jump), `Shift` scatto, `S` scende | arrivo; 60% delle braci; 90% senza ferite |
+| [platform3d](src/minigames/platform3d) | Guglie Sospese | platform 3D su isole di voxel con distanze tarate sul salto misurato; frammenti d'anima, portale, piattaforme mobili e friabili, spuntoni a tempo, sentinelle | `WASD`, `Spazio`, `Shift`, `Q`/`E` o tasto destro per la camera | portale; tutti i frammenti; senza vite perse |
+| [arena](src/minigames/arena) | Arena delle Braci | twin-stick a ondate in arene simmetriche: cinque nemici con attacchi telegrafati e il Signore delle Braci, potenziamenti, combo fino a x8 | `WASD`, mouse per mirare, clic sinistro, `Spazio` scatto | vittoria; metà vita; combo obiettivo |
+| [fps](src/minigames/fps) | Cripta delle Rune | prima persona in una cripta generata: tre nemici con IA su flow field, bastone runico a mana, rune che aprono il portale, minimappa | mouse, `WASD`, `Shift`, clic sinistro, `Tab` mappa | fuga; tempo sotto il par; vita e mira oltre il 50% |
+| [puzzle](src/minigames/puzzle) | Sigilli della Cripta | Sokoban con ghiaccio e grate a piastre; 17 livelli risolti da un BFS che ne fissa il par; undo/redo e suggerimenti | frecce/`WASD`, `Z` annulla, `Y` ripete, `R` ricomincia, `H` aiuto | entro par; entro 1,5 par; risolto |
+
+Ogni pacchetto ha un bot deterministico (`create_autoplay` o `autoplay`) usato
+dai test e per le catture, e test headless su determinismo, vincibilità,
+sconfitta, validità della generazione su molti seed e soak con input casuali.
+`--smoke-minigame=<id>` cattura `odin_pp_<id>.png` dopo 180 frame di gioco.
+Gli avvii diretti `--minigame` e `--smoke-minigame` rispettano esattamente
+`--seed` e la difficoltà CLI; dal menu ogni nuova partita può usare un nuovo seed.
+La cattura verifica avvio e rendering, mentre i bot dei test verificano partite
+complete. `--fps-lab` resta il laboratorio M9 con Navata/Cortile e caricatore;
+`--minigame=fps` avvia la distinta Cripta delle Rune con bastone e mana.
+
+### Sfide nella run
+
+In una stanza di combattimento o Elite ripulita, una volta per stanza, il
+pulsante **Sfida minigioco**, azionato con il mouse, apre un minigioco scelto dal seed del nodo,
+con difficoltà crescente con la profondità. La run vede solo l'esito: una
+vittoria vale 4/8/12/18 oro per 0-3 stelle, sconfitta e abbandono non danno
+nulla e non tolgono nulla. Le regole sono in
+[minigame_challenge.odin](src/game/minigame_challenge.odin).
+Il risultato deve corrispondere alla sfida pendente della stanza e può essere
+consumato una sola volta, anche in caso di abbandono. Pausa, ologramma, cast,
+QTE e attività M9 impediscono di aprire una seconda attività sovrapposta.
 
 ## Controlli e loop di gioco
 
@@ -151,6 +259,9 @@ a Victory, la morte del player a Defeat.
 | `F1`, `F2`, `F3` | scaling fit con letterbox, integer, stretch |
 | `F4` | cambia velocità delle animazioni ordinarie: 1x, 2x, 4x; cast e dadi M8 restano a 1x |
 | `F11` | fullscreen borderless |
+| `G` / Sfida minigioco | in una stanza ripulita (Loot), una volta per stanza: apre un minigioco di sfida |
+| `F9` | diagnostica dell'host: FPS, grafico dei frame, stack delle scene |
+| `F10` | torna al menu (run avviata dal menu) |
 
 Per spostare un barile serve **Shove in mano, un'energia e adiacenza
 ortogonale**. Trascinare la carta sul corpo del barile oppure selezionarla e
@@ -310,8 +421,8 @@ e HUD pixel. Dispositivi e campo hanno geometrie e rune dedicate, senza nasconde
 la griglia o mostrare nemici coperti dalla fog.
 
 Il ring introdotto in M8 è stato ampliato dalle fondazioni M9; una prima
-prova FPS è ora giocabile. Platform, altri eventi e un picchiaduro 3D più
-articolato restano direzioni future. Non sono presenti una raccolta di
+prova FPS è ora giocabile. Il catalogo del menu aggiunge platform 2D/3D, arena, FPS e puzzle; un
+picchiaduro 3D più articolato resta una direzione futura. Non sono presenti una raccolta di
 minigiochi completa, ruote, un inventario esteso di consumabili o un
 salvataggio/ripristino della run. Bilanciamento delle reti, durata dei cast e
 difficoltà delle sfide richiedono ancora partite umane.
@@ -337,8 +448,9 @@ consuma anche il clic, impedendo che arrivi alla board.
 
 Soltanto **SFIDA DEL RING** dalla stanza può assegnare i traguardi M8, una
 volta per tentativo. FPS, arena libera, ring del laboratorio e tutte le
-modalità avviate da CLI sono pratica: non scrivono vittorie nel profilo e non
-sbloccano carte. Cambiare modalità nel laboratorio conserva questa distinzione.
+laboratori M9 avviati da CLI sono pratica: non scrivono vittorie del ring nel
+profilo M8 e non sbloccano carte. I minigiochi del nuovo menu hanno record
+separati nel profilo dell'engine. Cambiare modalità nel laboratorio conserva questa distinzione.
 
 ### Arena libera, corpi e tempo
 
@@ -438,11 +550,12 @@ Durante registrazione/replay i controlli che cambierebbero contenuti o modalità
 sono disabilitati. Pausa, esecuzione al singolo tick e replay condividono il
 medesimo percorso di simulazione.
 
-Questa base non comprende gravità, salti fisici, scale o pendenze, piattaforme
-mobili, navmesh, corpi rigidi dinamici o un picchiaduro completo con catalogo
-di combo e personaggi. Le geometrie sono ancora definite in Odin: il selettore
-del laboratorio non è un editor di livelli. Rimangono da sviluppare questi
-controller e strumenti quando i prossimi minigiochi ne richiederanno l'uso.
+Il controller continuo di questi laboratori resta sul piano X/Z; i nuovi
+platform usano invece `engine/physics`, con movimento verticale, gravità e
+mappe tile/voxel. Sono due domini distinti: le capsule e le collisioni fra
+attori del ring non vengono sostituite dai collider AABB dei platform. Non
+sono presenti un editor generale di livelli, corpi rigidi dinamici o un
+picchiaduro completo con catalogo di combo e personaggi.
 
 ## Modalità tattica M7
 
@@ -824,7 +937,10 @@ una sola volta, isolamento della pratica e chiusura senza click-through.
 
 | Percorso | Responsabilità |
 |---|---|
-| [src/main.odin](src/main.odin) | composizione della demo, schermate e transizioni |
+| [src/main.odin](src/main.odin) | punto di ingresso, preparazione e installazione delle stanze demo, comandi di gioco |
+| [src/roguelike_scene.odin](src/roguelike_scene.odin) | la run come scena dell'host: stato della sessione, schermate e transizioni |
+| [src/launcher.odin](src/launcher.odin), [minigame_registry.odin](src/minigame_registry.odin) | menu, impostazioni e catalogo dei minigiochi |
+| [src/engine](src/engine), [src/minigames](src/minigames) | engine condiviso e minigiochi (vedi [Engine e minigiochi](#engine-e-minigiochi)) |
 | [src/app](src/app) | finestra, canvas virtuale e presentazione |
 | [src/grid](src/grid) | `Grid(T)`, coordinate, memoria contigua, accesso sicuro |
 | [src/level](src/level) | tile, layout e validazione topologica BFS |
@@ -2204,7 +2320,8 @@ invarianti e descritta dalla documentazione. Stati: `[x]` completata,
 | M9B — ring | [x] | duello live libero, mosse configurabili, guardia, schivata, presa a quattro pose, hit-stop e ritorno alla run con sblocco singolo |
 | M9C — FPS | [x] | due stanze, arma con caricatore/riserva/ricarica, tre nemici con telegraph, vittoria/sconfitta e gestione del cursore |
 | M9D — strumenti | [x] | laboratorio mouse, collider/hitbox, passo singolo, preset mosse JSON validati e replay degli input in memoria |
-| Dopo le fondazioni M9 | [ ] | playtest e bilanciamento, più mosse/armi/sfide, controller verticale e platform, editor dei livelli, replay su disco e salvataggio completo della run |
+| M9 / 0.5 | [x] | engine condiviso in tredici package, run come scena, menu e impostazioni, cinque minigiochi (platform 2D e 3D, arena, FPS, puzzle) e sfide nella run; launcher e script Windows disponibili |
+| Dopo M9 | [ ] | bilanciamento umano di run e minigiochi, input del roguelike su action map (rimappatura, pad), Ring delle Ombre sul guscio dei minigiochi, timeline di presentazione generica nell'engine, altri oggetti/armi; salvataggio completo della run |
 
 ### M7: implementazione e verifiche storiche
 
@@ -2669,7 +2786,8 @@ mondo/ologramma, escludendo presentazione, vsync, PNG e completamento GPU.
 ### M9: implementazione e verifica
 
 Le [fondazioni M9](#m9-fondazioni-per-le-modalità-libere) sono integrate nella
-base 0.4. Il controllo completo del 10 ottobre 2026 supera **829 test** in
+base 0.4. Prima dell’integrazione del branch engine, il controllo del
+10 ottobre 2026 superava **829 test** in
 tutti i package, sia con assert sia senza, oltre a vet/strict-style e alle
 due build. Lo smoke nativo M9 verifica collisioni nell'arena, vittoria contro
 l'IA del ring con valori ordinari, presa in quattro pose, replay identico,
@@ -2696,6 +2814,58 @@ attivo solo durante una partita FPS in pausa. La ripresa è idempotente e
 consuma il clic senza sparare. Le regressioni seguono il percorso
 posizione del mouse → controllo → simulazione e verificano anche gli stati
 non riprendibili; l'avvio è stato confermato nella finestra macOS.
+
+
+### Integrazione del branch engine/minigiochi
+
+Il 10 ottobre 2026 è stato integrato `claude/engine-minigiochi` (`67b6297`)
+partendo dal checkpoint locale M9 `5f7650a`. Il merge a tre vie mantiene
+entrambi gli sviluppi: i servizi dell’engine, il menu e i cinque minigiochi del
+branch; collisioni continue, ring, FPS, replay, strumenti e fix del clic M9
+locali. Dadi canonici, Tesla persistenti e trappola passiva restano presenti.
+Il controller continuo X/Z di `src/engine` e i controller tile/voxel di
+`src/engine/physics` coprono domini diversi; non sono stati sostituiti l’uno
+con l’altro. RNG ed easing comuni eliminano duplicazioni senza cambiare le
+sequenze di gameplay.
+
+L’audit ha aggiunto regressioni e correzioni funzionali:
+
+- FPS e arena conservano un clic breve ricevuto fra due tick e lo consumano
+  una volta. Il clic del menu non spara all’avvio o alla ripresa.
+- Pausa e perdita del focus cancellano input pendenti e frazioni temporali
+  residue; i clock ignorano delta negativi o non finiti. I tick completati
+  non vengono azzerati.
+- I profili corrotti o di versione futura non vengono sovrascritti con i
+  valori predefiniti. Il decode JSON usa memoria temporanea fino alla
+  validazione, evitando perdite con dati annidati rifiutati.
+- Un raycast può entrare dall’esterno in una tile map aperta.
+- Le sfide della run verificano identità, stanza ed esito pendente prima
+  della ricompensa. Risultati duplicati, estranei o già consumati non pagano.
+- Seed CLI riproducibile, nessuna scrittura dei profili negli smoke/lab e
+  pulsante delle nuove sfide azionabile con il mouse, separato dai controlli M9.
+
+Verifica dell’integrazione: `scripts/check.sh` copre tutti i **1.011 test**
+con assert attivi e disattivati, controllo strict/vet e due build. Tutti i
+servizi e minigiochi registrati sono raggiungibili da `src`: le due esecuzioni
+`-all-packages` bastano, senza ripetere singolarmente le stesse suite negli
+script Unix e PowerShell.
+
+Il report headless M7 prima/dopo il merge è identico byte per byte (4.023
+byte, SHA-256 `343cae6483dc8f40cc4cf4973a721b8107861abbeb64b7db00e0f767acd8687c`):
+dieci preset, quattro run terminali ripetute e otto cicli stress. Gli smoke
+nativi verificano menu, avvio/rendering dei cinque minigiochi, flusso M9,
+dispositivi/loot/cambio stanza M8 e i sette dadi 3D. Catture rigenerabili:
+`odin_pp_menu.png`, `odin_pp_platform2d.png`, `odin_pp_platform3d.png`,
+`odin_pp_arena.png`, `odin_pp_fps.png`, `odin_pp_puzzle.png`, oltre alle
+catture M8/M9 e del tavolo dadi.
+
+Le verifiche native sono state eseguite su macOS; gli script Windows sono
+inclusi ma non sono stati eseguiti su Windows in questa integrazione.
+Gli smoke dei nuovi minigiochi durano 180 frame: le partite complete sono
+coperte dai bot headless, non da playtest umani. Restano da valutare difficoltà,
+ritmo e coerenza visiva fra le modalità. Raylib segnala dodici codepoint non
+presenti nel font incorporato; nelle catture esaminate i testi di gioco sono
+leggibili, ma non è una verifica completa di tutti i caratteri del font.
 
 
 ### M7G: lavoro restante dopo il prototipo

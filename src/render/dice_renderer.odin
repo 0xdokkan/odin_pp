@@ -6,6 +6,7 @@ import "core:math"
 import rl "vendor:raylib"
 import rlgl "vendor:raylib/rlgl"
 import game "../game"
+import tween "../engine/tween"
 
 DICE_MAX_TEXTURE_EDGE :: 2048
 DICE_MAX_TEXTURE_PIXELS :: 4*1024*1024
@@ -352,7 +353,7 @@ draw_dice_pool_total :: proc(renderer: ^Dice_Renderer, layout: Dice_Pool_Layout,
 		if p >= 1 {continue}
 		from := dice_world_to_window(layout, renderer.frame.positions[index])
 		from.y -= layout.pixels_per_world*0.70
-		eased := p*p*(3-2*p)
+		eased := tween.smoothstep(p)
 		center := from+(target-from)*eased
 		center.y -= math.sin(p*math.PI)*25*layout.scale
 		small_font := c.int(max(f32(11), 20*layout.scale))

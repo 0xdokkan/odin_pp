@@ -1,5 +1,6 @@
 package main
 
+import "core:fmt"
 import "core:os"
 import "core:testing"
 import game "game"
@@ -102,9 +103,12 @@ test_m8_mouse_navigation_closes_modals_without_click_through :: proc(t: ^testing
 
 @(test)
 test_m8_profile_round_trip_rejects_corruption_and_preserves_file :: proc(t: ^testing.T) {
-	path := "/private/tmp/odin-pp-m8-profile-regression.json"
+	temp_dir, temp_error := os.temp_directory(context.temp_allocator)
+	testing.expect(t, temp_error == nil)
+	path, join_error := os.join_path({temp_dir, "odin-pp-m8-profile-regression.json"}, context.temp_allocator)
+	testing.expect(t, join_error == nil)
 	defer os.remove(path)
-	defer os.remove("/private/tmp/odin-pp-m8-profile-regression.json.tmp")
+	defer os.remove(fmt.tprintf("%s.tmp", path))
 	testing.expect(t, save_m8_profile(path, {ring_wins = 3}))
 	profile, loaded := load_m8_profile(path)
 	testing.expect(t, loaded)
