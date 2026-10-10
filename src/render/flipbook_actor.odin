@@ -1,18 +1,22 @@
 package render
 
 import "core:c"
+import "core:fmt"
 import "core:math"
+import "core:strings"
 import rl "vendor:raylib"
 import rlgl "vendor:raylib/rlgl"
 import game "../game"
 import view "../view"
 
-// Board characters are paper standees. A rigid card, cut once around every
-// pose the character can strike, carries a pixel-art print that plays
-// flipbook drawings. The card is what moves on the board (hop, shake, turn,
-// topple); the print is what animates. Clips are chosen from the
-// presentation cues but never gate gameplay: a clip that outlives its cue
-// finishes on its own clock while input is already live again.
+// Board characters are paper standees: a pixel-art print that plays
+// flipbook drawings, on a paper card cut a little wider than the drawing.
+// Each drawing carries a distance field to its silhouette, and when the print
+// turns a page the card's cut morphs from the old drawing to the new one: it
+// reaches out where an arm extends and draws back as it returns. The card is
+// also what moves on the board (hop, shake, turn, topple). Clips are chosen
+// from the presentation cues but never gate gameplay: a clip that outlives
+// its cue finishes on its own clock while input is already live again.
 
 FLIPBOOK_MAX_ACTORS :: game.MAX_ENEMIES_PER_ROOM+9
 // A cue still active within this gap is the same trigger, not a new one.
@@ -22,10 +26,50 @@ FLIPBOOK_WALK_GRACE :: f64(0.1)
 FLIPBOOK_TURN_SECONDS :: f64(0.18)
 FLIPBOOK_FALL_SECONDS :: f64(0.38)
 FLIPBOOK_FORGET_SECONDS :: f64(1.0)
+// How long the paper takes to follow the print to a new drawing.
+FLIPBOOK_MORPH_SECONDS :: f64(0.09)
+
+// Samples two drawings' fields and blends them, then cuts paper, the
+// visible card edge (offset down-right) and the ink line from the result.
+FLIPBOOK_PAPER_FRAGMENT :: `#version 330
+in vec2 fragTexCoord;
+in vec4 fragColor;
+uniform sampler2D texture0;
+uniform vec4 frameA;
+uniform vec4 frameB;
+uniform float morph;
+uniform vec2 cell;
+uniform vec2 edgeDir;
+out vec4 finalColor;
+float field(vec4 r, vec2 uv) {
+    vec2 p = r.xy + clamp(uv, vec2(0.002), vec2(0.998))*r.zw;
+    return texture(texture0, p).r*255.0/PAPER_SCALE;
+}
+float dist(vec2 uv) { return mix(field(frameA, uv), field(frameB, uv), morph); }
+float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7)))*43758.5453); }
+void main() {
+    vec2 uv = fragTexCoord;
+    float d = dist(uv);
+    float de = dist(uv - edgeDir*EDGE_PX/cell);
+    float aa = max(fwidth(d), 0.03)*0.8;
+    float paper = 1.0 - smoothstep(PAPER_PX - aa, PAPER_PX + aa, d);
+    float body = max(paper, 1.0 - smoothstep(PAPER_PX - aa, PAPER_PX + aa, de));
+    float ink = 1.0 - smoothstep(INK_PX - aa, INK_PX + aa, min(d, de));
+    if (ink < 0.01) discard;
+    vec2 px = floor(uv*cell*4.0);
+    float grain = (hash(px) - 0.5)*0.026 + (hash(floor(uv*cell*0.6)) - 0.5)*0.022;
+    vec3 sheet = vec3(0.894, 0.867, 0.788) + grain;
+    vec3 col = mix(vec3(0.051, 0.078, 0.118), vec3(0.643, 0.596, 0.514), body);
+    col = mix(col, sheet, paper);
+    finalColor = vec4(col*fragColor.rgb, ink*fragColor.a);
+}`
 
 Flipbook_Assets :: struct {
-	frames, cards: [Flipbook_Character]rl.Texture2D,
-	card_alpha: [Flipbook_Character][]u8,
+	frames, papers: [Flipbook_Character]rl.Texture2D,
+	// CPU copies of the fields, for picking on the paper itself.
+	fields: [Flipbook_Character][]u8,
+	paper_shader: rl.Shader,
+	frame_a_location, frame_b_location, morph_location, cell_location, edge_location: c.int,
 	loaded: bool,
 }
 
@@ -38,6 +82,9 @@ Flipbook_Actor :: struct {
 	first_frame: i32,
 	started, base_started, trigger_seen, walk_until, turn_started, seen: f64,
 	position: view.Vec2,
+	// The drawing on the card now and the one it is morphing away from.
+	shown, previous: [2]i32,
+	shown_since: f64,
 }
 
 Flipbook_State :: struct {
@@ -46,7 +93,7 @@ Flipbook_State :: struct {
 
 create_flipbook_assets :: proc(assets: ^Flipbook_Assets) {
 	for character in Flipbook_Character {
-		for bytes, kind in ([2][]u8{FLIPBOOK_FRAMES_PNG[character], FLIPBOOK_CARD_PNG[character]}) {
+		for bytes, kind in ([2][]u8{FLIPBOOK_FRAMES_PNG[character], FLIPBOOK_PAPER_PNG[character]}) {
 			img := rl.LoadImageFromMemory(".png", raw_data(bytes), c.int(len(bytes)))
 			if img.data == nil { continue }
 			texture := rl.LoadTextureFromImage(img)
@@ -55,31 +102,41 @@ create_flipbook_assets :: proc(assets: ^Flipbook_Assets) {
 				rl.SetTextureFilter(texture, .POINT)
 				assets.frames[character] = texture
 			} else {
-				// The card is a smooth scissor cut seen at many sizes.
-				rl.GenTextureMipmaps(&texture)
-				rl.SetTextureFilter(texture, .TRILINEAR)
-				assets.cards[character] = texture
+				// Distance fields interpolate: bilinear, no mipmaps (cells abut).
+				rl.SetTextureFilter(texture, .BILINEAR)
+				rl.SetTextureWrap(texture, .CLAMP)
+				assets.papers[character] = texture
 				colors := rl.LoadImageColors(img)
-				alpha := make([]u8, int(img.width)*int(img.height))
-				for &value, index in alpha { value = colors[index].a }
+				field := make([]u8, int(img.width)*int(img.height))
+				for &value, index in field { value = colors[index].r }
 				rl.UnloadImageColors(colors)
-				assets.card_alpha[character] = alpha
+				assets.fields[character] = field
 			}
 			rl.UnloadImage(img)
 		}
 	}
-	assets.loaded = true
+	source := flipbook_paper_source()
+	assets.paper_shader = rl.LoadShaderFromMemory(nil, source)
+	if assets.paper_shader.id != 0 {
+		assets.frame_a_location = rl.GetShaderLocation(assets.paper_shader, "frameA")
+		assets.frame_b_location = rl.GetShaderLocation(assets.paper_shader, "frameB")
+		assets.morph_location = rl.GetShaderLocation(assets.paper_shader, "morph")
+		assets.cell_location = rl.GetShaderLocation(assets.paper_shader, "cell")
+		assets.edge_location = rl.GetShaderLocation(assets.paper_shader, "edgeDir")
+	}
+	assets.loaded = assets.paper_shader.id != 0
 	for character in Flipbook_Character {
-		if assets.frames[character].id == 0 || assets.cards[character].id == 0 { assets.loaded = false }
+		if assets.frames[character].id == 0 || assets.papers[character].id == 0 { assets.loaded = false }
 	}
 }
 
 destroy_flipbook_assets :: proc(assets: ^Flipbook_Assets) {
 	for character in Flipbook_Character {
 		if assets.frames[character].id != 0 { rl.UnloadTexture(assets.frames[character]) }
-		if assets.cards[character].id != 0 { rl.UnloadTexture(assets.cards[character]) }
-		delete(assets.card_alpha[character])
+		if assets.papers[character].id != 0 { rl.UnloadTexture(assets.papers[character]) }
+		delete(assets.fields[character])
 	}
+	if assets.paper_shader.id != 0 { rl.UnloadShader(assets.paper_shader) }
 	assets^ = {}
 }
 
@@ -223,7 +280,8 @@ flipbook_slot :: proc(state: ^Flipbook_State, entity: game.Entity_Ref, character
 	// Stagger idle breathing so a pack never inhales in unison.
 	offset := f64(entity.id%7)*0.37
 	free_slot^ = {entity = entity, character = character, used = true, started = now,
-		base_started = now-offset, trigger_seen = -1, walk_until = -1, turn_started = -1, seen = now}
+		base_started = now-offset, trigger_seen = -1, walk_until = -1, turn_started = -1, seen = now,
+		shown = {-1, -1}, previous = {-1, -1}}
 	return free_slot
 }
 
@@ -399,13 +457,27 @@ flipbook_billboard_geometry :: proc(renderer: ^Renderer, character: Flipbook_Cha
 	}
 	clip := &sheet.clips[action]
 	cell := rl.Vector2{f32(sheet.cell.x), f32(sheet.cell.y)}
+	// The paper follows the print to each new drawing over a short morph.
+	shown := [2]i32{clip.row, frame}
+	previous, morph := shown, f32(1)
+	if actor != nil {
+		if actor.shown.x < 0 { actor.previous, actor.shown, actor.shown_since = shown, shown, now-FLIPBOOK_MORPH_SECONDS }
+		else if actor.shown != shown { actor.previous, actor.shown, actor.shown_since = actor.shown, shown, now }
+		previous = actor.previous
+		morph = f32(clamp((now-actor.shown_since)/FLIPBOOK_MORPH_SECONDS, 0, 1))
+	}
+	papers := v.flipbook.papers[character]
+	paper := rl.Vector2{f32(sheet.paper_cell.x)/f32(max(papers.width, 1)), f32(sheet.paper_cell.y)/f32(max(papers.height, 1))}
 	result := Tactical_Billboard{
 		texture = v.flipbook.frames[character],
 		source = {f32(frame)*cell.x, f32(clip.row)*cell.y, cell.x, cell.y},
 		key = key,
 		flipbook = true,
-		card = v.flipbook.cards[character],
+		card = papers,
 		card_margin = f32(sheet.card_margin),
+		card_a = {f32(previous.y)*paper.x, f32(previous.x)*paper.y, paper.x, paper.y},
+		card_b = {f32(shown.y)*paper.x, f32(shown.x)*paper.y, paper.x, paper.y},
+		card_morph = morph,
 	}
 	pose := Tactical_Feedback_Pose{scale_y = 1, tint = rl.WHITE}
 	if feedback { pose = tactical_feedback_pose(renderer, key, position) }
@@ -424,10 +496,10 @@ flipbook_billboard_geometry :: proc(renderer: ^Renderer, character: Flipbook_Cha
 	right := flipbook_camera_right(renderer)
 	feet_x := cell.x-sheet.feet.x if result.mirror else sheet.feet.x
 	below := cell.y-sheet.feet.y
-	// The card's bottom edge stands in its base on the floor; the print sits
-	// a paper margin above it. Map markers drop the card and stand on the feet.
-	lift := (below+result.card_margin)*scale
-	if v.outline_mode == .Hologram { lift = below*scale; result.card = {} }
+	// The paper under the feet stands in the base's slot; map markers drop
+	// the card and stand on their feet.
+	lift := (FLIPBOOK_PAPER+FLIPBOOK_INK)*scale+0.03
+	if v.outline_mode == .Hologram { lift = 0; result.card = {} }
 	base := rl.Vector3{position.x+0.5, 0.02+lift+pose.lift, position.y+0.5}
 	sy := scale*pose.scale_y
 	bl := base-right*(feet_x*scale*width)-up*(below*sy)
@@ -464,17 +536,47 @@ flipbook_card_hit :: proc(renderer: ^Renderer, quad: Tactical_Billboard, ray: rl
 	if !collision.hit { return }
 	character, ok := flipbook_character(quad.key)
 	if !ok { return }
-	alpha := renderer.tactical.flipbook.card_alpha[character]
+	field := renderer.tactical.flipbook.fields[character]
 	width, height := int(quad.card.width), int(quad.card.height)
-	if len(alpha) < width*height || width <= 0 { return collision.distance, true }
+	if len(field) < width*height || width <= 0 { return collision.distance, true }
 	u := points[3]-points[0]
 	w := points[1]-points[0]
 	delta := collision.point-points[0]
 	fx := clamp(rl.Vector3DotProduct(delta, u)/rl.Vector3DotProduct(u, u), 0, 0.9999)
 	fy := clamp(rl.Vector3DotProduct(delta, w)/rl.Vector3DotProduct(w, w), 0, 0.9999)
 	if quad.mirror { fx = 0.9999-fx }
-	if alpha[int(fy*f32(height))*width+int(fx*f32(width))] <= 16 { return }
+	// Picking follows the paper of the drawing on the card now.
+	x := clamp(int((quad.card_b.x+fx*quad.card_b.width)*f32(width)), 0, width-1)
+	y := clamp(int((quad.card_b.y+fy*quad.card_b.height)*f32(height)), 0, height-1)
+	if f32(field[y*width+x]) > (FLIPBOOK_PAPER+FLIPBOOK_INK)*FLIPBOOK_PAPER_SCALE { return }
 	return collision.distance, true
+}
+
+draw_flipbook_card :: proc(renderer: ^Renderer, quad: Tactical_Billboard, uv: [4]rl.Vector2, opacity: f32) {
+	assets := &renderer.tactical.flipbook
+	if assets.paper_shader.id == 0 { return }
+	points := flipbook_card_points(quad)
+	a := rl.Vector4{quad.card_a.x, quad.card_a.y, quad.card_a.width, quad.card_a.height}
+	b := rl.Vector4{quad.card_b.x, quad.card_b.y, quad.card_b.width, quad.card_b.height}
+	morph := quad.card_morph
+	cell := rl.Vector2{quad.source.width+quad.card_margin*2, quad.source.height+quad.card_margin*2}
+	edge := rl.Vector2{-1 if quad.mirror else 1, 1}
+	rl.SetShaderValue(assets.paper_shader, assets.frame_a_location, &a, .VEC4)
+	rl.SetShaderValue(assets.paper_shader, assets.frame_b_location, &b, .VEC4)
+	rl.SetShaderValue(assets.paper_shader, assets.morph_location, &morph, .FLOAT)
+	rl.SetShaderValue(assets.paper_shader, assets.cell_location, &cell, .VEC2)
+	rl.SetShaderValue(assets.paper_shader, assets.edge_location, &edge, .VEC2)
+	rl.BeginShaderMode(assets.paper_shader)
+	rlgl.SetTexture(quad.card.id)
+	rlgl.Begin(rlgl.QUADS)
+	rlgl.Color4ub(255, 255, 255, u8(clamp(opacity, f32(0), f32(1))*255))
+	for point, index in points {
+		rlgl.TexCoord2f(uv[index].x, uv[index].y)
+		rlgl.Vertex3f(point.x, point.y, point.z)
+	}
+	rlgl.End()
+	rlgl.SetTexture(0)
+	rl.EndShaderMode()
 }
 
 // The standee's base: a low iron plinth with a slot that grips the card,
@@ -498,4 +600,16 @@ draw_flipbook_stand :: proc(renderer: ^Renderer, key: Sprite_Key, position: view
 	rl.DrawCube({0, 0.062, 0}, 0.5, 0.016, 0.18, {44, 50, 66, 255})
 	rl.DrawCube({0, 0.082, 0}, 0.24, 0.03, 0.075, {30, 35, 48, 255})
 	rl.DrawCube({0, 0.03, 0.121}, 0.5, 0.014, 0.004, accent)
+}
+
+// The card shader with the generator's paper constants baked in. GLSL braces
+// rule out fmt templates, so named tokens are replaced instead.
+flipbook_paper_source :: proc() -> cstring {
+	source := string(FLIPBOOK_PAPER_FRAGMENT)
+	tokens := [4]string{"PAPER_SCALE", "EDGE_PX", "PAPER_PX", "INK_PX"}
+	values := [4]f32{FLIPBOOK_PAPER_SCALE, FLIPBOOK_EDGE, FLIPBOOK_PAPER, FLIPBOOK_PAPER+FLIPBOOK_INK}
+	for token, index in tokens {
+		source, _ = strings.replace_all(source, token, fmt.tprintf("%.4f", values[index]), context.temp_allocator)
+	}
+	return strings.clone_to_cstring(source, context.temp_allocator)
 }

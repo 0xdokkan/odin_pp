@@ -81,41 +81,72 @@ def feet_anchor(idx):
     return float(xs[near].mean()), float(bottom + 1)
 
 
-def build_card(union):
-    """union: bool mask of every frame (logical cell). Returns RGBA at CARD_SCALE
-    covering the cell grown by `margin` logical pixels on each side."""
-    margin = int(math.ceil(CARD_PAPER + CARD_INK + CARD_EDGE + 1))
-    F = CARD_SCALE
-    m = np.pad(union, margin)
-    hi = np.repeat(np.repeat(m, F, 0), F, 1)
-    dist = pr.chamfer(hi)
-    paper = (dist <= CARD_PAPER * F).astype(np.float32)
-    # Scissor-cut contour: smooth the stepped silhouette into curves.
-    paper = pr.gaussian(paper, 2.6 * F)
-    paper_mask = paper > 0.5
-    shift = int(round(CARD_EDGE * F))
-    edge_mask = np.zeros_like(paper_mask)
-    edge_mask[shift:, shift:] = paper_mask[:-shift, :-shift]
-    body = paper_mask | edge_mask
-    dist_out = pr.chamfer(body)
-    ink_cov = np.clip(CARD_INK * F + 0.5 - dist_out, 0, 1)
-    h, w = hi.shape
-    out = np.zeros((h, w, 4), np.float32)
-    out[..., :3] = INK
-    out[..., 3] = np.where(body, 1.0, ink_cov)
-    out[edge_mask & ~paper_mask, :3] = PAPER_EDGE
-    rng = np.random.default_rng(7)
-    grain = pr.gaussian(rng.normal(0, 1, (h, w)), 0.9) * 0.012
-    fibre = pr.gaussian(rng.normal(0, 1, (h, w)), 6.0) * 0.012
-    paper_rgb = PAPER[None, None, :] + (grain + fibre)[..., None]
-    # A thin highlight along the top-left cut edge sells the thickness.
-    lit = np.zeros_like(paper_mask)
-    lit[:-1, :-1] = paper_mask[:-1, :-1] & ~paper_mask[1:, 1:]
-    rgb = np.clip(paper_rgb, 0, 1)
-    rgb[lit] = np.clip(rgb[lit] + 0.06, 0, 1)
-    out[paper_mask, :3] = rgb[paper_mask]
-    return out, margin
+PAPER_SCALE = 20       # field units per logical pixel (8-bit: up to 12.75 px)
 
+
+def paper_field(alpha, margin):
+    """Exact distance (logical px) from every texel of the paper cell to the
+    figure's silhouette; 0 inside. One field per drawing: the card follows the
+    pose, and the renderer morphs between consecutive drawings."""
+    mask = np.pad(alpha > 0, margin)
+    h, w = mask.shape
+    solid = mask
+    edge = solid & ~(np.roll(solid, 1, 0) & np.roll(solid, -1, 0) & np.roll(solid, 1, 1) & np.roll(solid, -1, 1))
+    ey, ex = np.nonzero(edge)
+    yy, xx = np.mgrid[0:h, 0:w]
+    best = np.full((h, w), 1e9, np.float32)
+    for start in range(0, len(ex), 256):
+        bx = ex[start:start + 256][None, None, :]
+        by = ey[start:start + 256][None, None, :]
+        dx = np.maximum(np.abs(xx[..., None] - bx) - 0.5, 0)
+        dy = np.maximum(np.abs(yy[..., None] - by) - 0.5, 0)
+        best = np.minimum(best, np.sqrt(dx * dx + dy * dy).min(-1))
+    best[solid] = 0
+    best = pr.gaussian(best, 0.6)
+    best[solid] = 0
+    return best
+
+
+def field_texels(field):
+    v = np.clip(np.round(field * PAPER_SCALE), 0, 255) / 255.0
+    out = np.ones(field.shape + (4,), np.float32)
+    out[..., 0] = v
+    out[..., 1] = v
+    out[..., 2] = v
+    return out
+
+
+def _upsample(field, factor):
+    # Bilinear, as the GPU samples the field.
+    h, w = field.shape
+    ys = (np.arange(h * factor) + 0.5) / factor - 0.5
+    xs = (np.arange(w * factor) + 0.5) / factor - 0.5
+    y0 = np.clip(np.floor(ys).astype(int), 0, h - 1)
+    x0 = np.clip(np.floor(xs).astype(int), 0, w - 1)
+    y1 = np.clip(y0 + 1, 0, h - 1)
+    x1 = np.clip(x0 + 1, 0, w - 1)
+    fy = np.clip(ys - np.floor(ys), 0, 1)[:, None]
+    fx = np.clip(xs - np.floor(xs), 0, 1)[None, :]
+    a = field[y0][:, x0] * (1 - fx) + field[y0][:, x1] * fx
+    b = field[y1][:, x0] * (1 - fx) + field[y1][:, x1] * fx
+    return a * (1 - fy) + b * fy
+
+
+def paper_preview(field, factor):
+    """What the card shader draws for one field (for the contact sheets)."""
+    f = _upsample(np.round(field * PAPER_SCALE) / PAPER_SCALE, factor)
+    shift = int(round(CARD_EDGE * factor))
+    shifted = np.full_like(f, 1e3)
+    shifted[shift:, shift:] = f[:-shift, :-shift]
+    paper = f <= CARD_PAPER
+    body = paper | (shifted <= CARD_PAPER)
+    ink = np.minimum(f, shifted) <= CARD_PAPER + CARD_INK
+    out = np.zeros(f.shape + (4,), np.float32)
+    out[ink, :3] = INK
+    out[ink, 3] = 1
+    out[body & ~paper, :3] = PAPER_EDGE
+    out[paper, :3] = PAPER
+    return out
 
 def build_character(name, spec, px, opts):
     rigs = {}
@@ -165,14 +196,22 @@ def build_character(name, spec, px, opts):
     x0, x1 = xs.min() - 1, xs.max() + 2
     union = union[y0:y1, x0:x1]
     cell_h, cell_w = union.shape
-    card, card_margin = build_card(union)
+    card_margin = int(math.ceil(CARD_PAPER + CARD_INK + CARD_EDGE + 1))
+    paper_h, paper_w = cell_h + 2 * card_margin, cell_w + 2 * card_margin
     cols = max(len(row) for _, _, _, row in rendered)
     atlas = np.zeros((cell_h * len(rendered), cell_w * cols, 4), np.float32)
+    paper = np.zeros((paper_h * len(rendered), paper_w * cols, 4), np.float32)
+    paper[..., 3] = 1
+    fields = {}
     table = []
     for ri, (action, mode, hit, row) in enumerate(rendered):
         durations = []
         for ci, (rgba, dur) in enumerate(row):
-            atlas[ri * cell_h:(ri + 1) * cell_h, ci * cell_w:(ci + 1) * cell_w] = rgba[y0:y1, x0:x1]
+            frame = rgba[y0:y1, x0:x1]
+            atlas[ri * cell_h:(ri + 1) * cell_h, ci * cell_w:(ci + 1) * cell_w] = frame
+            field = paper_field(frame[..., 3], card_margin)
+            fields[(ri, ci)] = field
+            paper[ri * paper_h:(ri + 1) * paper_h, ci * paper_w:(ci + 1) * paper_w] = field_texels(field)
             durations.append(dur)
         table.append({"action": action, "row": ri, "count": len(row), "loop": mode == "loop",
                       "hit": hit, "durations": durations})
@@ -187,7 +226,9 @@ def build_character(name, spec, px, opts):
         "card_margin": card_margin,
         "actions": table,
         "atlas": atlas,
-        "card": card,
+        "paper": paper,
+        "paper_cell": (paper_w, paper_h),
+        "fields": fields,
     }
     if opts["preview"]:
         write_preview(info, opts["preview"])
@@ -196,7 +237,6 @@ def build_character(name, spec, px, opts):
 
 def write_preview(info, folder):
     F = CARD_SCALE
-    card = info["card"]
     m = info["card_margin"] * F
     rows = []
     cw, ch = info["cell"]
@@ -205,7 +245,7 @@ def write_preview(info, folder):
         for ci in range(entry["count"]):
             frame = info["atlas"][entry["row"] * ch:(entry["row"] + 1) * ch, ci * cw:(ci + 1) * cw]
             big = np.repeat(np.repeat(frame, F, 0), F, 1)
-            comp = card.copy()
+            comp = paper_preview(info["fields"][(entry["row"], ci)], F)
             region = comp[m:m + big.shape[0], m:m + big.shape[1]]
             a = big[..., 3:4]
             region[..., :3] = big[..., :3] * a + region[..., :3] * (1 - a)
@@ -234,7 +274,13 @@ def write_odin(built):
     out.append("Flipbook_Character :: enum u8 {%s}" % ", ".join(_odin_name(n) for n in names))
     out.append("Flipbook_Action :: enum u8 {%s}" % ", ".join(_odin_name(a) for a in ACTION_ORDER))
     out.append("FLIPBOOK_MAX_FRAMES :: %d" % MAX_FRAMES)
-    out.append("FLIPBOOK_CARD_SCALE :: %d" % CARD_SCALE)
+    out.append("// The paper card: each drawing has a distance field to its silhouette")
+    out.append("// (PAPER_SCALE units per pixel); the card is drawn PAPER pixels out, with")
+    out.append("// an INK line and a cut EDGE offset down and right.")
+    out.append("FLIPBOOK_PAPER_SCALE :: f32(%d)" % PAPER_SCALE)
+    out.append("FLIPBOOK_PAPER :: f32(%.2f)" % CARD_PAPER)
+    out.append("FLIPBOOK_INK :: f32(%.2f)" % CARD_INK)
+    out.append("FLIPBOOK_EDGE :: f32(%.2f)" % CARD_EDGE)
     out.append("")
     out.append("// Durations are milliseconds per drawing. `hit` is the drawing that lands")
     out.append("// on the triggering cue's impact (-1: none).")
@@ -247,6 +293,7 @@ def write_odin(built):
     out.append("\tfeet: [2]f32,")
     out.append("\trest_height, world_height: f32,")
     out.append("\tcard_margin: i32,")
+    out.append("\tpaper_cell: [2]i32,")
     out.append("\tclips: [Flipbook_Action]Flipbook_Clip,")
     out.append("}")
     out.append("")
@@ -254,9 +301,9 @@ def write_odin(built):
     out.append("FLIPBOOK_SHEETS := [Flipbook_Character]Flipbook_Sheet{")
     for b in built:
         clips = {a["action"]: a for a in b["actions"]}
-        out.append("\t.%s = {cell = {%d, %d}, feet = {%.1f, %.1f}, rest_height = %.1f, world_height = %.3f, card_margin = %d, clips = {"
+        out.append("\t.%s = {cell = {%d, %d}, feet = {%.1f, %.1f}, rest_height = %.1f, world_height = %.3f, card_margin = %d, paper_cell = {%d, %d}, clips = {"
                    % (_odin_name(b["name"]), b["cell"][0], b["cell"][1], b["feet"][0], b["feet"][1],
-                      b["rest_height"], b["world_height"], b["card_margin"]))
+                      b["rest_height"], b["world_height"], b["card_margin"], b["paper_cell"][0], b["paper_cell"][1]))
         for action in ACTION_ORDER:
             entry = clips.get(action)
             if entry is None:
@@ -270,7 +317,7 @@ def write_odin(built):
         out.append("\t}},")
     out.append("}")
     out.append("")
-    for kind, suffix in (("FRAMES", ""), ("CARD", "-card")):
+    for kind, suffix in (("FRAMES", ""), ("PAPER", "-paper")):
         out.append("FLIPBOOK_%s_PNG := [Flipbook_Character][]u8{" % kind)
         for n in names:
             out.append('\t.%s = #load("../../assets/gothic/flipbook/%s%s.png"),' % (_odin_name(n), n, suffix))
@@ -295,7 +342,7 @@ def main():
         built.append(info)
         if opts["write"]:
             pr.save_rgba(info["atlas"], os.path.join(OUT_DIR, f"{name}.png"))
-            pr.save_rgba(info["card"], os.path.join(OUT_DIR, f"{name}-card.png"))
+            pr.save_rgba(info["paper"], os.path.join(OUT_DIR, f"{name}-paper.png"))
     if opts["write"] and not opts["only"]:
         write_odin(built)
         print("WROTE", ODIN_OUT)

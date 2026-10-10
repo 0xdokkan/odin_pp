@@ -44,18 +44,17 @@ Diorama_Kit :: struct {
 
 DIORAMA_ODM_VERTEX_SIZE :: 20
 
-load_diorama_kit :: proc(kit: ^Diorama_Kit, bytes: []u8) -> bool {
-	destroy_diorama_kit(kit)
-	if len(bytes) < 8 || string(bytes[:4]) != "ODM1" { return false }
+// Every vertex of an ODM file (see tools/art/build_walls.py), unsplit.
+load_odm_vertices :: proc(bytes: []u8) -> (vertices: []Diorama_Vertex, ok: bool) {
+	if len(bytes) < 8 || string(bytes[:4]) != "ODM1" { return }
 	piece_count, _ := endian.get_u32(bytes[4:], .Little)
-	table := 8
-	vertex_header := table+int(piece_count)*32
-	if vertex_header+4 > len(bytes) { return false }
+	vertex_header := 8+int(piece_count)*32
+	if vertex_header+4 > len(bytes) { return }
 	total, _ := endian.get_u32(bytes[vertex_header:], .Little)
 	data := vertex_header+4
-	if data+int(total)*DIORAMA_ODM_VERTEX_SIZE > len(bytes) { return false }
-	kit.vertices = make([]Diorama_Vertex, int(total))
-	for &vertex, index in kit.vertices {
+	if data+int(total)*DIORAMA_ODM_VERTEX_SIZE > len(bytes) { return }
+	vertices = make([]Diorama_Vertex, int(total))
+	for &vertex, index in vertices {
 		at := data+index*DIORAMA_ODM_VERTEX_SIZE
 		x, _ := endian.get_f32(bytes[at:], .Little)
 		y, _ := endian.get_f32(bytes[at+4:], .Little)
@@ -64,6 +63,17 @@ load_diorama_kit :: proc(kit: ^Diorama_Kit, bytes: []u8) -> bool {
 		vertex.normal = rl.Vector3Normalize({f32(i8(bytes[at+12])), f32(i8(bytes[at+13])), f32(i8(bytes[at+14]))})
 		vertex.color = {bytes[at+16], bytes[at+17], bytes[at+18], bytes[at+19]}
 	}
+	return vertices, true
+}
+
+load_diorama_kit :: proc(kit: ^Diorama_Kit, bytes: []u8) -> bool {
+	destroy_diorama_kit(kit)
+	vertices, ok := load_odm_vertices(bytes)
+	if !ok { return false }
+	kit.vertices = vertices
+	piece_count, _ := endian.get_u32(bytes[4:], .Little)
+	table := 8
+	total := len(vertices)
 	found := 0
 	for entry in 0..<int(piece_count) {
 		at := table+entry*32
@@ -72,7 +82,7 @@ load_diorama_kit :: proc(kit: ^Diorama_Kit, bytes: []u8) -> bool {
 		name := string(bytes[at:name_end])
 		first, _ := endian.get_u32(bytes[at+24:], .Little)
 		count, _ := endian.get_u32(bytes[at+28:], .Little)
-		if int(first)+int(count) > int(total) || count%3 != 0 { continue }
+		if int(first)+int(count) > total || count%3 != 0 { continue }
 		for piece in Diorama_Piece {
 			if DIORAMA_PIECE_NAMES[piece] == name {
 				kit.pieces[piece] = kit.vertices[int(first):int(first+count)]

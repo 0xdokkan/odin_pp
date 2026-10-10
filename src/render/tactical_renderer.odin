@@ -35,6 +35,10 @@ Tactical_View :: struct {
 	flipbook: Flipbook_Assets,
 	flipbook_state: ^Flipbook_State,
 	kit: Diorama_Kit,
+	pilgrim: []Diorama_Vertex,
+	// The last pointer seen by the view, for HUD hover states only.
+	pointer: view.Vec2,
+	pointer_inside: bool,
 }
 
 create_tactical_assets :: proc(renderer: ^Renderer, parent: rl.RenderTexture2D = {}) {
@@ -46,6 +50,7 @@ create_tactical_assets :: proc(renderer: ^Renderer, parent: rl.RenderTexture2D =
 	create_gothic_art(&renderer.tactical.art)
 	create_flipbook_assets(&renderer.tactical.flipbook)
 	load_diorama_kit(&renderer.tactical.kit, DIORAMA_KIT_BYTES)
+	load_pilgrim_model(&renderer.tactical.pilgrim)
 	renderer.tactical.flipbook_state = new(Flipbook_State)
 	create_tactical_surface(renderer, parent)
 	for &texture, index in renderer.tactical.fallback {
@@ -87,6 +92,8 @@ destroy_tactical_assets :: proc(renderer: ^Renderer) {
 	destroy_gothic_art(&renderer.tactical.art)
 	destroy_flipbook_assets(&renderer.tactical.flipbook)
 	destroy_diorama_kit(&renderer.tactical.kit)
+	delete(renderer.tactical.pilgrim)
+	renderer.tactical.pilgrim = nil
 	if renderer.tactical.flipbook_state != nil { free(renderer.tactical.flipbook_state); renderer.tactical.flipbook_state = nil }
 	if renderer.tactical.outline_shader.id != 0 { rl.UnloadShader(renderer.tactical.outline_shader); renderer.tactical.outline_shader = {} }
 	if renderer.tactical.labels != nil { free(renderer.tactical.labels); renderer.tactical.labels = nil }
@@ -121,6 +128,7 @@ tactical_presentation_opaque :: proc(renderer: ^Renderer, room: ^game.Room, posi
 update_tactical_view :: proc(renderer: ^Renderer, room: ^game.Room, mouse: view.Vec2, inside: bool, refresh_only: bool = false) {
 	v := &renderer.tactical
 	if !v.enabled { return }
+	tactical_hud_pointer(renderer, mouse, inside)
 	v.snapshot^ = renderer_presentation_snapshot(renderer, room)
 	v.no_fog = room.player.tactical.config.vision_size == 0 || tactical_room_is_clear(v.snapshot.phase)
 	if !tactical_room_is_clear(v.snapshot.phase) { v.clear_light = 0 }
@@ -189,11 +197,14 @@ Tactical_Billboard :: struct {
 	texture: rl.Texture2D,
 	source: rl.Rectangle,
 	key: Sprite_Key,
-	// Flipbook standees: the rigid paper card behind the print, the paper
-	// margin around the print in its own pixels, and a left-facing mirror.
+	// Flipbook standees: the paper fields behind the print, the paper margin
+	// around the print in its own pixels, a left-facing mirror, and the two
+	// drawings (uv rects in the field atlas) the cut is morphing between.
 	flipbook, mirror: bool,
 	card: rl.Texture2D,
 	card_margin: f32,
+	card_a, card_b: rl.Rectangle,
+	card_morph: f32,
 }
 
 // Rendering and picking share this world-space quad, including custom anchors.
@@ -268,19 +279,8 @@ draw_tactical_billboard_quad :: proc(renderer: ^Renderer, quad: Tactical_Billboa
 	uv := [4]rl.Vector2{{0, 0}, {0, 1}, {1, 1}, {1, 0}}
 	if quad.mirror { uv = {{1, 0}, {1, 1}, {0, 1}, {0, 0}} }
 	if quad.flipbook {
-		if quad.card.id != 0 {
-			// The card takes the scene's light tint but never the hit flash:
-			// paper stays paper while the print reacts.
-			points := flipbook_card_points(quad)
-			rlgl.SetTexture(quad.card.id)
-			rlgl.Begin(rlgl.QUADS)
-			rlgl.Color4ub(255, 255, 255, u8(clamp(opacity, f32(0), f32(1))*255))
-			for point, index in points {
-				rlgl.TexCoord2f(uv[index].x, uv[index].y)
-				rlgl.Vertex3f(point.x, point.y, point.z)
-			}
-			rlgl.End()
-		}
+		// Paper stays paper while the print reacts: no hit flash on the card.
+		if quad.card.id != 0 { draw_flipbook_card(renderer, quad, uv, opacity) }
 	} else { draw_comic_cutout(renderer, quad, position, opacity) }
 	rlgl.SetTexture(quad.texture.id)
 	rlgl.Begin(rlgl.QUADS)

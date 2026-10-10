@@ -85,10 +85,12 @@ reserve_tactical_actor_label_bounds :: proc(renderer: ^Renderer, actor: ^Present
 }
 
 draw_tactical_label :: proc(renderer: ^Renderer, anchor: view.Vec2, first, second: cstring,
-	color: rl.Color, health: f32 = -1) {
+	color: rl.Color, health: f32 = -1, icon: Intent_Icon = .None, alarm: bool = false, seed: int = 0) {
 	viewport := tactical_world_bounds(renderer)
 	if !point_in_rectangle(anchor, {viewport.x-30, viewport.y-35, viewport.width+60, viewport.height+80}) { return }
-	width := max(gothic_text_width(renderer, first, 11), gothic_text_width(renderer, second, 10))+12
+	// The intent sticker sits at the label's left, top-left of the enemy.
+	inset := f32(26) if icon != .None else 0
+	width := max(gothic_text_width(renderer, first, 11), gothic_text_width(renderer, second, 10))+12+inset
 	height := f32(17) if second == "" else f32(30)
 	if health >= 0 { height += 4 }
 	bounds, placed := place_tactical_label(renderer.tactical.labels, anchor, {width, height}, viewport)
@@ -99,11 +101,14 @@ draw_tactical_label :: proc(renderer: ^Renderer, anchor: view.Vec2, first, secon
 	}
 	rl.DrawRectangleRec(bounds, GOTHIC_INK)
 	rl.DrawRectangleRec({bounds.x, bounds.y, 2, bounds.height}, color)
-	gothic_text(renderer, first, bounds.x+6, bounds.y+1, 11, GOTHIC_PAPER)
-	if second != "" { gothic_text(renderer, second, bounds.x+6, bounds.y+14, 10, color) }
+	gothic_text(renderer, first, bounds.x+6+inset, bounds.y+1, 11, GOTHIC_PAPER)
+	if second != "" { gothic_text(renderer, second, bounds.x+6+inset, bounds.y+14, 10, color) }
 	if health >= 0 {
-		rl.DrawRectangleRec({bounds.x+5, bounds.y+bounds.height-4, bounds.width-9, 2}, GOTHIC_DARK_RED)
-		rl.DrawRectangleRec({bounds.x+5, bounds.y+bounds.height-4, (bounds.width-9)*clamp(health, f32(0), f32(1)), 2}, color)
+		rl.DrawRectangleRec({bounds.x+5+inset, bounds.y+bounds.height-4, bounds.width-9-inset, 2}, GOTHIC_DARK_RED)
+		rl.DrawRectangleRec({bounds.x+5+inset, bounds.y+bounds.height-4, (bounds.width-9-inset)*clamp(health, f32(0), f32(1)), 2}, color)
+	}
+	if icon != .None {
+		draw_intent_sticker({bounds.x+5, bounds.y+bounds.height*0.5}, icon, alarm, renderer.sprite_assets.elapsed, seed)
 	}
 }
 
@@ -143,10 +148,13 @@ draw_tactical_annotations :: proc(renderer: ^Renderer, room: ^game.Room) {
 		if i, shielded := game.status_index(&actor.statuses, .Shield); shielded { first = fmt.ctprintf("HP %d / SC %d", actor.health, actor.statuses.items[i].potency) }
 		intent: cstring = ""
 		color := rl.Color{187, 106, 109, 255}
+		icon := Intent_Icon.None
+		alarm := false
 		if tactical_telegraphs_are_visible(renderer, room) {
 			if i, found := game.enemy_index_by_id(room, actor.entity.id); found {
 				enemy := &room.enemies[i]
 				intent = tactical_intent_label(enemy.intent)
+				icon, alarm = tactical_intent_icon(room, enemy), enemy.intent.windup
 				if enemy.intent.windup { color = {218, 169, 90, 255} }
 				if enemy.intent.kind == .Recover { intent = fmt.ctprintf("RECUPERO %ds", enemy.recovery_pulses); color = {124, 164, 190, 255} }
 				if enemy.intent.kind == .Attack && !enemy.intent.windup { intent = fmt.ctprintf("%s %d", intent, enemy.intent.damage) }
@@ -154,7 +162,8 @@ draw_tactical_annotations :: proc(renderer: ^Renderer, room: ^game.Room) {
 				if game.enemy_is_staggered(room, enemy) { intent = "INTERROTTO"; color = GOTHIC_PAPER }
 			}
 		}
-		draw_tactical_label(renderer, anchor, first, intent, color, f32(actor.health)/f32(max(i32(1), actor.max_health)))
+		draw_tactical_label(renderer, anchor, first, intent, color, f32(actor.health)/f32(max(i32(1), actor.max_health)),
+			icon, alarm, int(actor.entity.id))
 	}
 	if tactical_room_is_clear(v.snapshot.phase) {
 		p := room.exit_position

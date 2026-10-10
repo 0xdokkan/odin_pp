@@ -3,7 +3,6 @@ package render
 import rl "vendor:raylib"
 import game "../game"
 import view "../view"
-import ui "../engine/ui"
 
 M8_Control :: enum {None, Activate, Equip, Character, Ring, FPS}
 
@@ -35,7 +34,8 @@ m8_control_bounds :: proc(renderer: ^Renderer, control: M8_Control, room: ^game.
     switch control {
     case .Activate: return {b.x,b.y,b.width*0.26,b.height}
     case .Equip: return {b.x+b.width*0.64,b.y,b.width*0.14-6,b.height}
-    case .Character: return {b.x+b.width*0.82,b.y,b.width*0.18,b.height}
+    // The character sheet lives with the other commands in the top dock.
+    case .Character: return tactical_hud_layout(renderer).character
     case .Ring: return m8_activity_bounds(renderer.canvas_width,renderer.canvas_height,0)
     case .FPS: return m8_activity_bounds(renderer.canvas_width,renderer.canvas_height,1)
     case .None: return {}
@@ -116,14 +116,5 @@ m8_modal_control_bounds :: proc(renderer: ^Renderer, control: M8_Modal_Control) 
 // Mouse controls carry an action verb, never a keyboard-key badge. Optional
 // detail keeps device counts/recharge separate from the activation affordance.
 m8_mouse_button :: proc(renderer: ^Renderer, bounds: rl.Rectangle, label: cstring, enabled: bool = true, detail: cstring = nil) {
-    accent := GOTHIC_BLUE if enabled else GOTHIC_STEEL
-    ink := GOTHIC_PAPER if enabled else GOTHIC_MUTED
-    ui.hud_panel(nil,bounds,accent)
-    if detail != nil {
-        gothic_text_fit(renderer,label,{bounds.x+8,bounds.y+1,bounds.width-16,14},12,ink)
-        gothic_text_fit(renderer,detail,{bounds.x+8,bounds.y+14,bounds.width-16,12},10,accent if enabled else GOTHIC_MUTED)
-    } else {
-        text_width := min(bounds.width-16,gothic_text_width(renderer,label,14))
-        gothic_text_fit(renderer,label,{bounds.x+(bounds.width-text_width)*0.5,bounds.y+(bounds.height-17)*0.5,text_width,18},14,ink)
-    }
+    hud_button(renderer,bounds,nil,label,enabled,GOTHIC_BLUE,detail)
 }

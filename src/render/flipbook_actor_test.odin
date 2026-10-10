@@ -1,5 +1,6 @@
 package render
 
+import "core:strings"
 import "core:testing"
 import game "../game"
 
@@ -135,12 +136,17 @@ test_flipbook_card_stands_on_the_floor_and_turns_with_the_walk :: proc(t: ^testi
 	defer flipbook_test_free(renderer)
 	update_flipbook_actors(renderer, nil)
 	for character in Flipbook_Character {
+		sheet := &FLIPBOOK_SHEETS[character]
 		quad := flipbook_billboard_geometry(renderer, character, flipbook_key(character), {2, 3}, false, game.SYSTEM_ENTITY)
-		lowest := f32(1e9)
-		for point in flipbook_card_points(quad) { lowest = min(lowest, point.y) }
-		testing.expect(t, abs(lowest-0.02) < 0.002)
+		// The paper under the feet stands in the base's slot, just above the floor.
+		scale := sheet.world_height/sheet.rest_height
+		feet := quad.points[1].y+(f32(sheet.cell.y)-sheet.feet.y)*scale
+		testing.expect(t, abs(feet-(0.02+(FLIPBOOK_PAPER+FLIPBOOK_INK)*scale+0.03)) < 0.002)
 		top := (quad.points[0].y+quad.points[3].y)*0.5
-		testing.expect(t, top > FLIPBOOK_SHEETS[character].world_height*0.9)
+		testing.expect(t, top > sheet.world_height*0.9)
+		// Without an actor there is nothing to morph from.
+		testing.expect_value(t, quad.card_a, quad.card_b)
+		testing.expect_value(t, quad.card_morph, f32(1))
 	}
 	// Walking toward the screen's left turns the card over.
 	right := flipbook_camera_right(renderer)
@@ -151,4 +157,10 @@ test_flipbook_card_stands_on_the_floor_and_turns_with_the_walk :: proc(t: ^testi
 	update_flipbook_actors(renderer, nil)
 	player := flipbook_find(renderer, game.PLAYER_ENTITY, .Pilgrim, {2, 3})
 	testing.expect(t, player != nil && player.facing_left && player.base == .Walk)
+}
+
+@(test)
+test_flipbook_paper_shader_source_is_fully_formatted :: proc(t: ^testing.T) {
+	source := string(flipbook_paper_source())
+	testing.expectf(t, !strings.contains(source, "%"), "unformatted shader:\n%s", source)
 }

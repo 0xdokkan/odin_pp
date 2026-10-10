@@ -90,3 +90,17 @@ verso la telecamera (taglio all'altezza del muro) e trasparenza dei muri interni
 restano quelli di prima. Se il kit non si carica, torna il disegno procedurale.
 Ogni decorazione resta dentro il volume della cella e sotto il raggio di culling
 di 1,8 (lo verifica `test_diorama_kit_pieces_fit_their_cell`).
+
+## Viandante 3D (scheda personaggio)
+
+```bash
+blender -b --factory-startup --python tools/art/build_pilgrim.py -- --preview C:/tmp/viandante
+```
+
+Scolpisce il Viandante a partire dallo sprite del tabellone: mantello avorio
+aperto con pieghe, cappuccio con il volto in ombra e occhi azzurri, tunica con la
+croce cremisi, cintura, stivali e la lanterna a gabbia alzata. Il mantello e il
+cappuccio usano la suddivisione; l'esportazione è nello stesso formato ODM del
+kit (`assets/models/pilgrim.odm`). La scheda lo mette su un piedistallo in una
+piccola cappella costruita con i pezzi del kit, illuminato dalla sua lanterna.
+`--blend FILE` salva anche la scena .blend per ritoccarla a mano.

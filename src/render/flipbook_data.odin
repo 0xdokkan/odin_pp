@@ -5,7 +5,13 @@ package render
 Flipbook_Character :: enum u8 {Pilgrim, Ghoul, Archer, Brute, Bomber, Bishop, Archmage}
 Flipbook_Action :: enum u8 {Idle, Walk, Attack, Windup, Cast, Hurt, Block, Dodge, Stunned, Interact, Death}
 FLIPBOOK_MAX_FRAMES :: 8
-FLIPBOOK_CARD_SCALE :: 4
+// The paper card: each drawing has a distance field to its silhouette
+// (PAPER_SCALE units per pixel); the card is drawn PAPER pixels out, with
+// an INK line and a cut EDGE offset down and right.
+FLIPBOOK_PAPER_SCALE :: f32(20)
+FLIPBOOK_PAPER :: f32(5.50)
+FLIPBOOK_INK :: f32(1.50)
+FLIPBOOK_EDGE :: f32(1.10)
 
 // Durations are milliseconds per drawing. `hit` is the drawing that lands
 // on the triggering cue's impact (-1: none).
@@ -18,12 +24,13 @@ Flipbook_Sheet :: struct {
 	feet: [2]f32,
 	rest_height, world_height: f32,
 	card_margin: i32,
+	paper_cell: [2]i32,
 	clips: [Flipbook_Action]Flipbook_Clip,
 }
 
 @(rodata)
 FLIPBOOK_SHEETS := [Flipbook_Character]Flipbook_Sheet{
-	.Pilgrim = {cell = {92, 94}, feet = {46.5, 86.0}, rest_height = 78.0, world_height = 1.350, card_margin = 10, clips = {
+	.Pilgrim = {cell = {92, 94}, feet = {46.5, 86.0}, rest_height = 78.0, world_height = 1.350, card_margin = 10, paper_cell = {112, 114}, clips = {
 		.Idle = {row = 0, count = 4, hit = -1, loop = true, durations = {260, 220, 300, 220, 0, 0, 0, 0}},
 		.Walk = {row = 1, count = 6, hit = -1, loop = true, durations = {90, 80, 90, 90, 80, 90, 0, 0}},
 		.Attack = {row = 2, count = 5, hit = 2, loop = false, durations = {124, 186, 124, 186, 124, 0, 0, 0}},
@@ -36,7 +43,7 @@ FLIPBOOK_SHEETS := [Flipbook_Character]Flipbook_Sheet{
 		.Interact = {row = 8, count = 3, hit = 1, loop = false, durations = {124, 186, 124, 0, 0, 0, 0, 0}},
 		.Death = {row = 9, count = 4, hit = 0, loop = false, durations = {124, 124, 186, 248, 0, 0, 0, 0}},
 	}},
-	.Ghoul = {cell = {122, 91}, feet = {67.0, 75.0}, rest_height = 73.0, world_height = 1.190, card_margin = 10, clips = {
+	.Ghoul = {cell = {122, 91}, feet = {67.0, 75.0}, rest_height = 73.0, world_height = 1.190, card_margin = 10, paper_cell = {142, 111}, clips = {
 		.Idle = {row = 0, count = 4, hit = -1, loop = true, durations = {280, 230, 320, 230, 0, 0, 0, 0}},
 		.Walk = {row = 1, count = 6, hit = -1, loop = true, durations = {95, 85, 95, 95, 85, 95, 0, 0}},
 		.Attack = {row = 2, count = 5, hit = 2, loop = false, durations = {124, 124, 124, 186, 124, 0, 0, 0}},
@@ -49,7 +56,7 @@ FLIPBOOK_SHEETS := [Flipbook_Character]Flipbook_Sheet{
 		.Interact = {hit = -1},
 		.Death = {row = 7, count = 3, hit = 0, loop = false, durations = {124, 186, 248, 0, 0, 0, 0, 0}},
 	}},
-	.Archer = {cell = {83, 97}, feet = {45.0, 76.0}, rest_height = 75.0, world_height = 1.350, card_margin = 10, clips = {
+	.Archer = {cell = {83, 97}, feet = {45.0, 76.0}, rest_height = 75.0, world_height = 1.350, card_margin = 10, paper_cell = {103, 117}, clips = {
 		.Idle = {row = 0, count = 4, hit = -1, loop = true, durations = {280, 230, 320, 230, 0, 0, 0, 0}},
 		.Walk = {row = 1, count = 6, hit = -1, loop = true, durations = {95, 85, 95, 95, 85, 95, 0, 0}},
 		.Attack = {row = 2, count = 6, hit = 2, loop = false, durations = {124, 186, 124, 124, 124, 62, 0, 0}},
@@ -62,7 +69,7 @@ FLIPBOOK_SHEETS := [Flipbook_Character]Flipbook_Sheet{
 		.Interact = {hit = -1},
 		.Death = {row = 7, count = 3, hit = 0, loop = false, durations = {124, 186, 248, 0, 0, 0, 0, 0}},
 	}},
-	.Brute = {cell = {110, 107}, feet = {65.0, 95.0}, rest_height = 93.0, world_height = 1.560, card_margin = 10, clips = {
+	.Brute = {cell = {110, 107}, feet = {65.0, 95.0}, rest_height = 93.0, world_height = 1.560, card_margin = 10, paper_cell = {130, 127}, clips = {
 		.Idle = {row = 0, count = 4, hit = -1, loop = true, durations = {280, 230, 320, 230, 0, 0, 0, 0}},
 		.Walk = {row = 1, count = 6, hit = -1, loop = true, durations = {95, 85, 95, 95, 85, 95, 0, 0}},
 		.Attack = {row = 2, count = 5, hit = 2, loop = false, durations = {124, 186, 124, 186, 124, 0, 0, 0}},
@@ -75,7 +82,7 @@ FLIPBOOK_SHEETS := [Flipbook_Character]Flipbook_Sheet{
 		.Interact = {hit = -1},
 		.Death = {row = 7, count = 3, hit = 0, loop = false, durations = {124, 186, 248, 0, 0, 0, 0, 0}},
 	}},
-	.Bomber = {cell = {90, 80}, feet = {39.5, 76.0}, rest_height = 75.0, world_height = 1.350, card_margin = 10, clips = {
+	.Bomber = {cell = {90, 80}, feet = {39.5, 76.0}, rest_height = 75.0, world_height = 1.350, card_margin = 10, paper_cell = {110, 100}, clips = {
 		.Idle = {row = 0, count = 4, hit = -1, loop = true, durations = {280, 230, 320, 230, 0, 0, 0, 0}},
 		.Walk = {row = 1, count = 6, hit = -1, loop = true, durations = {95, 85, 95, 95, 85, 95, 0, 0}},
 		.Attack = {row = 2, count = 5, hit = 2, loop = false, durations = {124, 186, 124, 186, 124, 0, 0, 0}},
@@ -88,7 +95,7 @@ FLIPBOOK_SHEETS := [Flipbook_Character]Flipbook_Sheet{
 		.Interact = {hit = -1},
 		.Death = {row = 7, count = 3, hit = 0, loop = false, durations = {124, 186, 248, 0, 0, 0, 0, 0}},
 	}},
-	.Bishop = {cell = {89, 116}, feet = {38.5, 104.0}, rest_height = 91.0, world_height = 1.350, card_margin = 10, clips = {
+	.Bishop = {cell = {89, 116}, feet = {38.5, 104.0}, rest_height = 91.0, world_height = 1.350, card_margin = 10, paper_cell = {109, 136}, clips = {
 		.Idle = {row = 0, count = 4, hit = -1, loop = true, durations = {280, 230, 320, 230, 0, 0, 0, 0}},
 		.Walk = {row = 1, count = 4, hit = -1, loop = true, durations = {110, 100, 110, 100, 0, 0, 0, 0}},
 		.Attack = {row = 2, count = 5, hit = 2, loop = false, durations = {124, 186, 124, 186, 124, 0, 0, 0}},
@@ -101,7 +108,7 @@ FLIPBOOK_SHEETS := [Flipbook_Character]Flipbook_Sheet{
 		.Interact = {hit = -1},
 		.Death = {row = 8, count = 3, hit = 0, loop = false, durations = {124, 186, 248, 0, 0, 0, 0, 0}},
 	}},
-	.Archmage = {cell = {104, 102}, feet = {50.5, 92.0}, rest_height = 91.0, world_height = 1.650, card_margin = 10, clips = {
+	.Archmage = {cell = {104, 102}, feet = {50.5, 92.0}, rest_height = 91.0, world_height = 1.650, card_margin = 10, paper_cell = {124, 122}, clips = {
 		.Idle = {row = 0, count = 4, hit = -1, loop = true, durations = {260, 240, 300, 240, 0, 0, 0, 0}},
 		.Walk = {row = 1, count = 4, hit = -1, loop = true, durations = {110, 100, 110, 100, 0, 0, 0, 0}},
 		.Attack = {row = 2, count = 5, hit = 2, loop = false, durations = {124, 186, 124, 186, 124, 0, 0, 0}},
@@ -126,12 +133,12 @@ FLIPBOOK_FRAMES_PNG := [Flipbook_Character][]u8{
 	.Archmage = #load("../../assets/gothic/flipbook/archmage.png"),
 }
 
-FLIPBOOK_CARD_PNG := [Flipbook_Character][]u8{
-	.Pilgrim = #load("../../assets/gothic/flipbook/pilgrim-card.png"),
-	.Ghoul = #load("../../assets/gothic/flipbook/ghoul-card.png"),
-	.Archer = #load("../../assets/gothic/flipbook/archer-card.png"),
-	.Brute = #load("../../assets/gothic/flipbook/brute-card.png"),
-	.Bomber = #load("../../assets/gothic/flipbook/bomber-card.png"),
-	.Bishop = #load("../../assets/gothic/flipbook/bishop-card.png"),
-	.Archmage = #load("../../assets/gothic/flipbook/archmage-card.png"),
+FLIPBOOK_PAPER_PNG := [Flipbook_Character][]u8{
+	.Pilgrim = #load("../../assets/gothic/flipbook/pilgrim-paper.png"),
+	.Ghoul = #load("../../assets/gothic/flipbook/ghoul-paper.png"),
+	.Archer = #load("../../assets/gothic/flipbook/archer-paper.png"),
+	.Brute = #load("../../assets/gothic/flipbook/brute-paper.png"),
+	.Bomber = #load("../../assets/gothic/flipbook/bomber-paper.png"),
+	.Bishop = #load("../../assets/gothic/flipbook/bishop-paper.png"),
+	.Archmage = #load("../../assets/gothic/flipbook/archmage-paper.png"),
 }
