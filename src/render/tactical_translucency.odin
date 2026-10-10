@@ -11,6 +11,7 @@ import view "../view"
 Tactical_Alpha_Entry :: struct {
 	kind: enum {Sprite, Wall},
 	key: Sprite_Key,
+	entity: game.Entity_Ref,
 	position: view.Vec2,
 	opacity, depth: f32,
 }
@@ -34,15 +35,31 @@ collect_tactical_translucents :: proc(renderer: ^Renderer, room: ^game.Room = ni
 	}
 	entries := &v.translucents.entries
 	clear(entries)
+	// The board pass (it has a room) advances the standees' clips; the map
+	// reuses them as they are.
+	if room != nil { update_flipbook_actors(renderer, room) }
 	snapshot := v.snapshot
 	for actor in snapshot.enemies[:snapshot.enemy_count] {
 		cell := grid.Position{int(math.round(actor.position.x)), int(math.round(actor.position.y))}
 		if actor.visible && tactical_render_visible(renderer, cell) {
-			append(entries, Tactical_Alpha_Entry{key = sprite_key_for_enemy(actor.archetype), position = actor.position, opacity = actor.opacity})
+			key := sprite_key_for_enemy(actor.archetype)
+			append(entries, Tactical_Alpha_Entry{key = key, entity = actor.entity, position = actor.position,
+				opacity = flipbook_opacity(renderer, actor.entity, key, actor.position, actor.opacity)})
 		}
 	}
 	if snapshot.player.visible {
-		append(entries, Tactical_Alpha_Entry{key = .Player, position = snapshot.player.position, opacity = snapshot.player.opacity})
+		append(entries, Tactical_Alpha_Entry{key = .Player, entity = game.PLAYER_ENTITY, position = snapshot.player.position,
+			opacity = flipbook_opacity(renderer, game.PLAYER_ENTITY, .Player, snapshot.player.position, snapshot.player.opacity)})
+	}
+	// Standees removed from the board mid-death finish toppling first.
+	if v.flipbook_state != nil && v.flipbook.loaded {
+		for &actor in v.flipbook_state.actors {
+			cell := grid.Position{int(math.round(actor.position.x)), int(math.round(actor.position.y))}
+			if !actor.used || !actor.ghost || !tactical_render_visible(renderer, cell) { continue }
+			key := flipbook_key(actor.character)
+			append(entries, Tactical_Alpha_Entry{key = key, entity = actor.entity, position = actor.position,
+				opacity = flipbook_opacity(renderer, actor.entity, key, actor.position, 1)})
+		}
 	}
 	// The hologram intentionally supplies no room: its own miniature walls
 	// remain in the table pass, and it only needs sorted actor billboards.
@@ -78,7 +95,7 @@ draw_tactical_billboards :: proc(renderer: ^Renderer, room: ^game.Room = nil, li
 			draw_diorama_wall(renderer, room, {int(entry.position.x), int(entry.position.y)})
 		} else {
 			if walls_active { rl.EndShaderMode(); walls_active = false }
-			tactical_billboard(renderer, entry.key, entry.position, entry.opacity)
+			tactical_billboard(renderer, entry.key, entry.position, entry.opacity, entry.entity)
 		}
 	}
 	if walls_active { rl.EndShaderMode() }
