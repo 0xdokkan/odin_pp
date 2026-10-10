@@ -198,6 +198,8 @@ suspend :: proc(s: ^State($A), gate: ^Resume_Gate(A)) {
 
 // Returns true on the first sample after suspension, so mouse-look can also
 // discard its capture delta. Fixed-step action queues remain the caller's job.
+// Spell out block_held's type at call sites, e.g. bit_set[Action]{.Fire}:
+// implicit compound literals cannot infer the polymorphic enum type here.
 advance_resumable :: proc(s: ^State($A), gate: ^Resume_Gate(A), sample: Sample(A), dt: f32,
 	block_held: bit_set[A]) -> bool {
 	resumed := !gate.active

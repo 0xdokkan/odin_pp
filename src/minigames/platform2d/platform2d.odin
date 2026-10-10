@@ -101,7 +101,7 @@ suspend_player_input :: proc(g: ^Game) {
 
 @(private)
 advance_player_controls :: proc(g: ^Game, sample: input.Sample(Action), dt: f32) {
-	input.advance_resumable(&g.controls, &g.input_gate, sample, dt, {})
+	input.advance_resumable(&g.controls, &g.input_gate, sample, dt, bit_set[Action]{})
 	c := &g.controls
 	if .Jump in c.pressed || .Jump_Alt in c.pressed {
 		g.pending.jump_pressed = true

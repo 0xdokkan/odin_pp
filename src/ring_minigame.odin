@@ -27,15 +27,15 @@ ring_minigame_info :: proc() -> host.Minigame_Info {
 
 ring_minigame_actions :: proc() -> input.Action_Map(Ring_Input_Action) {
 	m := input.make_map(Ring_Input_Action)
-	input.bind_all(&m,.Left,input.key(.A),input.key(.LEFT),input.pad_axis(.LEFT_X,false))
-	input.bind_all(&m,.Right,input.key(.D),input.key(.RIGHT),input.pad_axis(.LEFT_X,true))
-	input.bind_all(&m,.Forward,input.key(.W),input.key(.UP),input.pad_axis(.LEFT_Y,false))
-	input.bind_all(&m,.Back,input.key(.S),input.key(.DOWN),input.pad_axis(.LEFT_Y,true))
-	input.bind_all(&m,.Jab,input.key(.ONE),input.pad(.RIGHT_FACE_LEFT))
-	input.bind_all(&m,.Heavy,input.key(.TWO),input.pad(.RIGHT_FACE_UP))
-	input.bind_all(&m,.Grab,input.key(.THREE),input.pad(.RIGHT_TRIGGER_1))
-	input.bind_all(&m,.Dodge,input.key(.SPACE),input.pad(.RIGHT_FACE_DOWN))
-	input.bind_all(&m,.Guard,input.key(.LEFT_SHIFT),input.key(.RIGHT_SHIFT),input.pad(.LEFT_TRIGGER_1))
+	input.bind_all(&m,Ring_Input_Action.Left,input.key(.A),input.key(.LEFT),input.pad_axis(.LEFT_X,false))
+	input.bind_all(&m,Ring_Input_Action.Right,input.key(.D),input.key(.RIGHT),input.pad_axis(.LEFT_X,true))
+	input.bind_all(&m,Ring_Input_Action.Forward,input.key(.W),input.key(.UP),input.pad_axis(.LEFT_Y,false))
+	input.bind_all(&m,Ring_Input_Action.Back,input.key(.S),input.key(.DOWN),input.pad_axis(.LEFT_Y,true))
+	input.bind_all(&m,Ring_Input_Action.Jab,input.key(.ONE),input.pad(.RIGHT_FACE_LEFT))
+	input.bind_all(&m,Ring_Input_Action.Heavy,input.key(.TWO),input.pad(.RIGHT_FACE_UP))
+	input.bind_all(&m,Ring_Input_Action.Grab,input.key(.THREE),input.pad(.RIGHT_TRIGGER_1))
+	input.bind_all(&m,Ring_Input_Action.Dodge,input.key(.SPACE),input.pad(.RIGHT_FACE_DOWN))
+	input.bind_all(&m,Ring_Input_Action.Guard,input.key(.LEFT_SHIFT),input.key(.RIGHT_SHIFT),input.pad(.LEFT_TRIGGER_1))
 	return m
 }
 
@@ -56,7 +56,7 @@ ring_minigame_reset :: proc(data: rawptr, config: host.Minigame_Config) {
 }
 
 ring_minigame_command :: proc(g: ^Ring_Minigame, sample: input.Sample(Ring_Input_Action), dt: f32) -> fight.Input {
-	if input.advance_resumable(&g.controls,&g.gate,sample,dt,{}) {return {}}
+	if input.advance_resumable(&g.controls,&g.gate,sample,dt,bit_set[Ring_Input_Action]{}) {return {}}
 	v := input.vector(&g.controls,Ring_Input_Action.Left,Ring_Input_Action.Right,Ring_Input_Action.Forward,Ring_Input_Action.Back)
 	return {move={v.x,0,v.y}, jab=.Jab in g.controls.pressed, heavy=.Heavy in g.controls.pressed,
 		grab=.Grab in g.controls.pressed, dodge=.Dodge in g.controls.pressed, guard=.Guard in g.controls.down}

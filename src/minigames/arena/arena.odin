@@ -136,7 +136,7 @@ suspend_player_input :: proc(g: ^Game) {
 
 @(private)
 advance_player_controls :: proc(g: ^Game, sample: input.Sample(Action), dt: f32) {
-	input.advance_resumable(&g.controls, &g.input_gate, sample, dt, {.Fire})
+	input.advance_resumable(&g.controls, &g.input_gate, sample, dt, bit_set[Action]{.Fire})
 	if .Dash in g.controls.pressed || .Dash_Alt in g.controls.pressed {
 		g.dash_latch = true
 	}

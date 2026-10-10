@@ -41,7 +41,7 @@ test_fps_pitch_matters_and_dead_bodies_do_not_block_later_shots :: proc(t: ^test
 	state.player.pitch = 0
 	state.enemies[0].health = WEAPON_DAMAGE
 	for _ in 0..<15 { step(&state, {fire_held = true}) }
-	testing.expect_value(t, state.enemies[0].phase, .Dead)
+	testing.expect_value(t, state.enemies[0].phase, Enemy_Phase.Dead)
 	testing.expect_value(t, state.kills, 1)
 	testing.expect_value(t, state.world.actor_count, 2)
 	for _ in 0..<15 { step(&state, {fire_held = true}) }
@@ -100,12 +100,12 @@ test_fps_enemy_windup_locks_aim_and_cover_blocks_enemy_fire :: proc(t: ^testing.
 	state := quiet_fixture()
 	state.enemies[0].phase = .Hunt
 	step(&state, {})
-	testing.expect_value(t, state.enemies[0].phase, .Windup)
+	testing.expect_value(t, state.enemies[0].phase, Enemy_Phase.Windup)
 	locked := state.enemies[0].aim_target
 	for _ in 0..<55 { step(&state, {move_right = 1}) }
 	testing.expect_value(t, state.enemies[0].aim_target, locked)
 	testing.expect_value(t, state.player.health, 100)
-	testing.expect_value(t, state.enemies[0].phase, .Recovery)
+	testing.expect_value(t, state.enemies[0].phase, Enemy_Phase.Recovery)
 	state = quiet_fixture()
 	state.enemies[0].phase = .Hunt
 	step(&state, {})
@@ -123,13 +123,13 @@ test_fps_enemy_windup_locks_aim_and_cover_blocks_enemy_fire :: proc(t: ^testing.
 test_fps_win_loss_reset_and_level_selection_are_deterministic :: proc(t: ^testing.T) {
 	state := quiet_fixture()
 	for _ in 0..<32 { step(&state, {fire_held = true}) }
-	testing.expect_value(t, state.phase, .Won)
+	testing.expect_value(t, state.phase, Phase.Won)
 	testing.expect_value(t, state.kills, 1)
 	won_ticks := state.ticks
 	step(&state, {fire_held = true, move_forward = 1})
 	testing.expect_value(t, state.ticks, won_ticks)
 	reset(&state, 1)
-	testing.expect_value(t, state.phase, .Active)
+	testing.expect_value(t, state.phase, Phase.Active)
 	testing.expect_value(t, state.level_index, 1)
 	testing.expect_value(t, state.player.health, 100)
 	testing.expect_value(t, state.player.ammo, MAGAZINE_SIZE)
@@ -146,7 +146,7 @@ test_fps_win_loss_reset_and_level_selection_are_deterministic :: proc(t: ^testin
 	state.player.health = ENEMY_DAMAGE
 	state.enemies[0].phase = .Hunt
 	for _ in 0..<60 { step(&state, {}) }
-	testing.expect_value(t, state.phase, .Lost)
+	testing.expect_value(t, state.phase, Phase.Lost)
 	testing.expect_value(t, state.player.health, 0)
 	reset(&state, -1)
 	testing.expect_value(t, state.level_index, 1)

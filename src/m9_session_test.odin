@@ -97,7 +97,10 @@ test_m9_session_ring_and_fps_replay_restore_exact_simulations :: proc(t: ^testin
 
 @(test)
 test_m9_session_move_file_round_trip_and_invalid_set_is_atomic :: proc(t: ^testing.T) {
-	path:="/private/tmp/odin-pp-m9-moves-regression.json"
+	temp_dir, temp_error := os.temp_directory(context.temp_allocator)
+	testing.expect(t, temp_error == nil)
+	path, join_error := os.join_path({temp_dir, "odin-pp-m9-moves-regression.json"}, context.temp_allocator)
+	testing.expect(t, join_error == nil)
 	defer os.remove(path)
 	state:=fight.begin(true,true)
 	move:=state.moves[.Jab]

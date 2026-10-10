@@ -126,7 +126,7 @@ suspend_player_input :: proc(g: ^Game) {
 // Movement remains held input; jump is delivered once, fire also supports hold.
 @(private)
 advance_player_controls :: proc(g: ^Game, sample: input.Sample(Action), dt: f32) -> Player_Input {
-	if input.advance_resumable(&g.controls, &g.input_gate, sample, dt, {.Fire}) {
+	if input.advance_resumable(&g.controls, &g.input_gate, sample, dt, bit_set[Action]{.Fire}) {
 		return {}
 	}
 	move := input.vector(&g.controls, Action.Left, Action.Right, Action.Forward, Action.Back)
