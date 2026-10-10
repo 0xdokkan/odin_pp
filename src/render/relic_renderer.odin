@@ -148,17 +148,18 @@ draw_relic_bar :: proc(renderer: ^Renderer, room: ^game.Room, point: view.Vec2, 
 	can_hover := mouse_inside && relic_bar_contains_point(renderer, room, point, raised_card_id)
 	if renderer.tactical.enabled {
 		bar := relic_bar_bounds(renderer, relics.count)
-		gothic_text(renderer,"PASSIVE",bar.x+bar.width+7,bar.y+4,10,GOTHIC_MUTED)
 		hovered: game.Relic_Id
 		for id, index in relics.owned[:relics.count] {
 			bounds := rl.Rectangle{bar.x+f32(index)*25, bar.y, 20, 20}
-			rl.DrawRectangleRec(bounds, GOTHIC_INK)
-			rl.DrawRectangleLinesEx(bounds, 1, GOTHIC_MUTED)
+			over := can_hover && point_in_rectangle(point, bounds)
+			rl.DrawRectangleRec(bounds, HUD_FILL_HOVER if over else HUD_FILL)
+			rl.DrawRectangleLinesEx(bounds, 1, relic_color(id) if over else HUD_EDGE)
+			rl.DrawRectangleRec({bounds.x+1, bounds.y+bounds.height-3, bounds.width-2, 2}, relic_color(id))
 			gothic_text(renderer, relic_mark(id), bounds.x+5, bounds.y+1, 14, GOTHIC_PAPER)
-			if can_hover && point_in_rectangle(point, bounds) { hovered = id }
+			if over { hovered = id }
 		}
 		if definition, found := game.relic_definition(hovered); found {
-			gothic_frame({14, 137, 310, 105}, GOTHIC_INK, GOTHIC_PAPER)
+			hud_frame({14, 137, 310, 105}, relic_color(hovered))
 			gothic_text(renderer, fmt.ctprintf("%s", definition.name), 25, 145, 18, GOTHIC_PAPER)
 			gothic_wrapped_text(renderer, definition.description, 25, 171, 286, GOTHIC_MUTED)
 		}

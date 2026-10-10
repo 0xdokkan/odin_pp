@@ -109,6 +109,12 @@ View :: struct {
 	has_model:     bool,
 	sprites:       [Sprite_Id]gfx.Sprite,
 	figures:       gfx.Paper_Figures,
+	// Animated paper standees for the enemies, one player per slot.
+	book:          gfx.Flipbook_Assets,
+	books:         [MAX_ENEMIES]gfx.Flipbook_Player,
+	book_states:   [MAX_ENEMIES]Enemy_State,
+	book_hurt:     [MAX_ENEMIES]bool,
+	book_kinds:    [MAX_ENEMIES]Enemy_Kind,
 	glow:          rl.Texture2D,
 	stone:         rl.Texture2D,
 	cam:           camera.Fps_Camera,
@@ -158,6 +164,7 @@ view_init :: proc(v: ^View) {
 		v.loc_fog_range = rl.GetShaderLocation(v.sprite_shader, "fogRange")
 	}
 	v.figures = gfx.paper_figures_create()
+	gfx.create_flipbook_assets(&v.book)
 	art := sprite_art()
 	for id in Sprite_Id {
 		frames: [8]gfx.Frame_Rows
@@ -178,6 +185,7 @@ view_init :: proc(v: ^View) {
 view_destroy :: proc(v: ^View) {
 	release_model(v)
 	gfx.paper_figures_destroy(&v.figures)
+	gfx.destroy_flipbook_assets(&v.book)
 	for id in Sprite_Id {
 		gfx.sprite_destroy(&v.sprites[id])
 	}
@@ -752,6 +760,11 @@ Sprite_Draw :: struct {
 	figure: bool,
 	figure_index: int,
 	pose: f32,
+	// A flipbook standee: player slot, feet and resting height.
+	book: bool,
+	book_index: int,
+	feet: Vec3,
+	height: f32,
 	dist:   f32,
 }
 
@@ -849,7 +862,13 @@ collect_sprites :: proc(g: ^Game, list: ^Draw_List, cam: rl.Camera3D) {
 			lit = rl.WHITE
 		}
 		flip := e.facing.x*right.x + e.facing.y*right.z < 0
-		if v.figures.texture.id != 0 {
+		if v.book.loaded && i < len(v.books) {
+			fps_update_book(v, i, e)
+			if e.kind == .Wraith { lit = rl.Color{min(lit.r,155),min(lit.g,213),lit.b,lit.a} }
+			standee_feet := feet+Vec3{0, lift, 0}
+			push_sprite(list, eye, Sprite_Draw{center=standee_feet+Vec3{0, height*0.5, 0}, tint=lit, flip=!flip,
+				book=true, book_index=i, feet=standee_feet, height=height*0.9})
+		} else if v.figures.texture.id != 0 {
 			figure_index := 1 if e.kind == .Ghoul else (6 if e.kind == .Wraith else 5)
 			size = gfx.paper_figure_size(&v.figures, figure_index, height)
 			pose := f32(frame%2)*2-1
@@ -954,6 +973,18 @@ draw_sprite_list :: proc(v: ^View, list: ^Draw_List, cam: rl.Camera3D) {
 		rl.BeginShaderMode(v.sprite_shader)
 	}
 	for item in items {
+		if item.book {
+			// Paper first in its own shader (fog arrives through the tint),
+			// then the print back under the fogged sprite shader.
+			book := &v.books[item.book_index]
+			print, row, frame := gfx.flipbook_billboard_quad(cam, book, item.feet, item.height, item.flip, f64(v.time))
+			paper := gfx.flipbook_turn_page(&book.page, &v.book, book.character, row, frame, f64(v.time))
+			gfx.draw_flipbook_paper(&v.book, book.character, print, paper, item.flip, f32(item.tint.a)/255,
+				{item.tint.r, item.tint.g, item.tint.b, 255})
+			if v.sprite_ok { rl.BeginShaderMode(v.sprite_shader) }
+			gfx.draw_flipbook_print(&v.book, book.character, print, row, frame, item.flip, item.tint)
+			continue
+		}
 		if item.figure {
 			source := gfx.paper_figure_source(&v.figures,item.figure_index,item.flip)
 			// Two independent layers: the border holds its pose, the drawing steps.
@@ -1173,4 +1204,35 @@ view_draw :: proc(g: ^Game, frame: ^host.Frame) {
 	draw_glows(g, cam)
 	rl.EndMode3D()
 	draw_hud(g, frame, cam)
+}
+
+// Drives an enemy standee from its brain state: the chase strides, the
+// wind-up telegraphs, the strike lands on its impact drawing, a hit flinches
+// and death crumples the print before the card fades.
+@(private)
+fps_update_book :: proc(v: ^View, index: int, e: Enemy) {
+	now := f64(v.time)
+	book := &v.books[index]
+	character := gfx.Flipbook_Character.Ghoul
+	if e.kind == .Wraith { character = .Archmage }
+	if e.kind == .Cultist { character = .Bishop }
+	if book.character != character || v.book_kinds[index] != e.kind || (e.state != .Dead && book.action == .Death) {
+		book^ = gfx.flipbook_player(character, f64(e.phase))
+		v.book_kinds[index] = e.kind
+		v.book_states[index] = .Idle
+	}
+	switch e.state {
+	case .Idle: gfx.flipbook_loop(book, .Idle, now)
+	case .Chase: gfx.flipbook_loop(book, .Walk, now)
+	case .Windup: gfx.flipbook_loop(book, .Windup, now)
+	case .Recover: gfx.flipbook_loop(book, .Stunned, now)
+	case .Strike:
+		if v.book_states[index] != .Strike { gfx.flipbook_play(book, .Attack, now, true) }
+	case .Dead:
+		if v.book_states[index] != .Dead { gfx.flipbook_play(book, .Death, now) }
+	}
+	hurt := e.hurt_time > 0 && e.state != .Dead
+	if hurt && !v.book_hurt[index] { gfx.flipbook_play(book, .Hurt, now) }
+	v.book_hurt[index] = hurt
+	v.book_states[index] = e.state
 }

@@ -171,8 +171,6 @@ draw_tactical_hand :: proc(renderer: ^Renderer, room: ^game.Room,
 			hint = "SCEGLI BERSAGLIO / DESTRO: ANNULLA" if game.card_requires_spatial_target(definition) else "CLIC DI NUOVO: GIOCA"
 		}
 	}
-	if selected == 0 { hint = "CARTE: COSTO 1-4s" }
-	if !available { hint = "RISOLUZIONE..." }
 	if recovering { hint = "RECUPERO / PUOI MUOVERTI" }
 	if right-left > 580 { gothic_text_fit(renderer, hint, {left+180, top+5, right-left-398, 17}, 10, GOTHIC_BLUE) }
 	for card, index in deck.hand[:deck.hand_count] {

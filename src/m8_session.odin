@@ -22,7 +22,7 @@ M8_Session :: struct {
 }
 
 M8_Session_Input :: struct {
-	focused, inside, pressed: bool,
+	focused, inside, pressed, escape: bool,
 	mouse: view.Vec2,
 }
 
@@ -65,7 +65,7 @@ update_m8_session :: proc(session: ^M8_Session, room: ^game.Room, renderer: ^ren
 	controller: ^Tactical_Controller, cards: ^Card_Interaction_State,
 	buffer: ^Buffered_Gameplay_Command, available: bool, dt: f32, mouse: view.Vec2, inside: bool) -> bool {
 	input := M8_Session_Input{focused = rl.IsWindowFocused(), inside = inside, mouse = mouse,
-		pressed = rl.IsMouseButtonPressed(.LEFT)}
+		pressed = rl.IsMouseButtonPressed(.LEFT), escape = rl.IsKeyPressed(.ESCAPE)}
 	consumed := step_m8_session(session, room, renderer, controller, cards, buffer, available, dt, input)
 	return consumed
 }
@@ -77,7 +77,7 @@ step_m8_session :: proc(session: ^M8_Session, room: ^game.Room, renderer: ^rende
 	if !available || !input.focused { return session.character_open }
 	left_click := input.inside && input.pressed
 	if session.character_open {
-		if left_click && render.point_in_rectangle(input.mouse, render.m8_modal_control_bounds(renderer, .Close_Character)) { session.character_open = false }
+		if input.escape || left_click && render.point_in_rectangle(input.mouse, render.m8_modal_control_bounds(renderer, .Close_Character)) { session.character_open = false }
 		return true
 	}
 	if controller.paused || controller.hologram || room.qte.kind != .None ||

@@ -3,6 +3,7 @@ package render
 import "core:c"
 import "core:math"
 import rl "vendor:raylib"
+import gfx "../engine/gfx"
 import rlgl "vendor:raylib/rlgl"
 import game "../game"
 import grid "../grid"
@@ -32,6 +33,13 @@ Tactical_View :: struct {
 	visible_count: int,
 	snapshot: ^Room_Presentation,
 	fallback: [11]rl.Texture2D,
+	flipbook: gfx.Flipbook_Assets,
+	flipbook_state: ^Flipbook_State,
+	kit: Diorama_Kit,
+	pilgrim: []Diorama_Vertex,
+	// The last pointer seen by the view, for HUD hover states only.
+	pointer: view.Vec2,
+	pointer_inside: bool,
 }
 
 create_tactical_assets :: proc(renderer: ^Renderer, parent: rl.RenderTexture2D = {}) {
@@ -41,6 +49,10 @@ create_tactical_assets :: proc(renderer: ^Renderer, parent: rl.RenderTexture2D =
 	create_tactical_lighting(renderer)
 	create_comic_outline(renderer)
 	create_gothic_art(&renderer.tactical.art)
+	gfx.create_flipbook_assets(&renderer.tactical.flipbook)
+	load_diorama_kit(&renderer.tactical.kit, DIORAMA_KIT_BYTES)
+	load_pilgrim_model(&renderer.tactical.pilgrim)
+	renderer.tactical.flipbook_state = new(Flipbook_State)
 	create_tactical_surface(renderer, parent)
 	for &texture, index in renderer.tactical.fallback {
 		img := rl.GenImageColor(48, 64, rl.BLANK)
@@ -79,6 +91,11 @@ destroy_tactical_assets :: proc(renderer: ^Renderer) {
 	destroy_tactical_translucents(renderer)
 	destroy_tactical_surface(renderer)
 	destroy_gothic_art(&renderer.tactical.art)
+	gfx.destroy_flipbook_assets(&renderer.tactical.flipbook)
+	destroy_diorama_kit(&renderer.tactical.kit)
+	delete(renderer.tactical.pilgrim)
+	renderer.tactical.pilgrim = nil
+	if renderer.tactical.flipbook_state != nil { free(renderer.tactical.flipbook_state); renderer.tactical.flipbook_state = nil }
 	if renderer.tactical.outline_shader.id != 0 { rl.UnloadShader(renderer.tactical.outline_shader); renderer.tactical.outline_shader = {} }
 	if renderer.tactical.labels != nil { free(renderer.tactical.labels); renderer.tactical.labels = nil }
 	if renderer.tactical.light_shader.id != 0 { rl.UnloadShader(renderer.tactical.light_shader); renderer.tactical.light_shader = {} }
@@ -112,6 +129,7 @@ tactical_presentation_opaque :: proc(renderer: ^Renderer, room: ^game.Room, posi
 update_tactical_view :: proc(renderer: ^Renderer, room: ^game.Room, mouse: view.Vec2, inside: bool, refresh_only: bool = false) {
 	v := &renderer.tactical
 	if !v.enabled { return }
+	tactical_hud_pointer(renderer, mouse, inside)
 	v.snapshot^ = renderer_presentation_snapshot(renderer, room)
 	v.no_fog = room.player.tactical.config.vision_size == 0 || tactical_room_is_clear(v.snapshot.phase)
 	if !tactical_room_is_clear(v.snapshot.phase) { v.clear_light = 0 }
@@ -180,10 +198,23 @@ Tactical_Billboard :: struct {
 	texture: rl.Texture2D,
 	source: rl.Rectangle,
 	key: Sprite_Key,
+	// Flipbook standees: the paper fields behind the print, the paper margin
+	// around the print in its own pixels, a left-facing mirror, and the two
+	// drawings (uv rects in the field atlas) the cut is morphing between.
+	flipbook, mirror: bool,
+	card: rl.Texture2D,
+	card_margin: f32,
+	card_a, card_b: rl.Rectangle,
+	card_morph: f32,
 }
 
 // Rendering and picking share this world-space quad, including custom anchors.
-tactical_billboard_geometry :: proc(renderer: ^Renderer, key: Sprite_Key, position: view.Vec2, feedback: bool = true) -> Tactical_Billboard {
+tactical_billboard_geometry :: proc(renderer: ^Renderer, key: Sprite_Key, position: view.Vec2, feedback: bool = true,
+	entity: game.Entity_Ref = game.SYSTEM_ENTITY) -> Tactical_Billboard {
+	if character, ok := flipbook_character(key); ok && renderer.tactical.flipbook.loaded &&
+	   !renderer.sprite_assets.sprites[int(key)].configured {
+		return flipbook_billboard_geometry(renderer, character, key, position, feedback, entity)
+	}
 	effective_key := key
 	clip_progress := f32(-1)
 	if feedback && key == .Player {
@@ -232,20 +263,26 @@ tactical_billboard_geometry :: proc(renderer: ^Renderer, key: Sprite_Key, positi
 	right := rl.Vector3Normalize(rl.Vector3CrossProduct(up, renderer.tactical.camera.position-renderer.tactical.camera.target))
 	base := rl.Vector3{position.x+0.5, 0.02+pose.lift, position.y+0.5}
 	bl := base-right*(size.x*anchor.x)-up*(size.y*(1-anchor.y))
-	quad := Tactical_Billboard{{bl+up*size.y+right*pose.lean, bl, bl+right*size.x, bl+right*size.x+up*size.y+right*pose.lean}, texture, source, effective_key}
+	quad := Tactical_Billboard{points = {bl+up*size.y+right*pose.lean, bl, bl+right*size.x, bl+right*size.x+up*size.y+right*pose.lean},
+		texture = texture, source = source, key = effective_key}
 	return comic_world_ground_clearance(renderer, quad)
 }
 
-tactical_billboard :: proc(renderer: ^Renderer, key: Sprite_Key, position: view.Vec2, opacity: f32) {
-	quad := tactical_billboard_geometry(renderer, key, position)
+tactical_billboard :: proc(renderer: ^Renderer, key: Sprite_Key, position: view.Vec2, opacity: f32,
+	entity: game.Entity_Ref = game.SYSTEM_ENTITY) {
+	quad := tactical_billboard_geometry(renderer, key, position, true, entity)
 	pose := tactical_feedback_pose(renderer, key, position)
 	draw_tactical_billboard_quad(renderer, quad, position, opacity, pose.tint)
 }
 
 draw_tactical_billboard_quad :: proc(renderer: ^Renderer, quad: Tactical_Billboard, position: view.Vec2, opacity: f32, tint: rl.Color = rl.WHITE) {
 	if quad.texture.id == 0 { return }
-	draw_comic_cutout(renderer, quad, position, opacity)
 	uv := [4]rl.Vector2{{0, 0}, {0, 1}, {1, 1}, {1, 0}}
+	if quad.mirror { uv = {{1, 0}, {1, 1}, {0, 1}, {0, 0}} }
+	if quad.flipbook {
+		// Paper stays paper while the print reacts: no hit flash on the card.
+		if quad.card.id != 0 { draw_flipbook_card(renderer, quad, uv, opacity) }
+	} else { draw_comic_cutout(renderer, quad, position, opacity) }
 	rlgl.SetTexture(quad.texture.id)
 	rlgl.Begin(rlgl.QUADS)
 	rlgl.Color4ub(tint.r, tint.g, tint.b, u8(clamp(opacity, f32(0), f32(1))*255))
@@ -258,8 +295,10 @@ draw_tactical_billboard_quad :: proc(renderer: ^Renderer, quad: Tactical_Billboa
 	rlgl.SetTexture(0)
 }
 
-tactical_billboard_hit :: proc(renderer: ^Renderer, key: Sprite_Key, position: view.Vec2, ray: rl.Ray) -> (distance: f32, hit: bool) {
-	quad := tactical_billboard_geometry(renderer, key, position)
+tactical_billboard_hit :: proc(renderer: ^Renderer, key: Sprite_Key, position: view.Vec2, ray: rl.Ray,
+	entity: game.Entity_Ref = game.SYSTEM_ENTITY) -> (distance: f32, hit: bool) {
+	quad := tactical_billboard_geometry(renderer, key, position, true, entity)
+	if quad.flipbook && quad.card.id != 0 { return flipbook_card_hit(renderer, quad, ray) }
 	collision := rl.GetRayCollisionQuad(ray, quad.points[0], quad.points[1], quad.points[2], quad.points[3])
 	if !collision.hit { return }
 	asset := &renderer.sprite_assets.sprites[int(quad.key)]
@@ -306,7 +345,7 @@ update_tactical_body_hover :: proc(renderer: ^Renderer, mouse: view.Vec2) {
 	for actor in v.snapshot.enemies[:v.snapshot.enemy_count] {
 		cell := grid.Position{int(math.round(actor.position.x)), int(math.round(actor.position.y))}
 		if !actor.visible || !tactical_render_visible(renderer, cell) { continue }
-		if distance, hit := tactical_billboard_hit(renderer, sprite_key_for_enemy(actor.archetype), actor.position, ray); hit && distance < closest {
+		if distance, hit := tactical_billboard_hit(renderer, sprite_key_for_enemy(actor.archetype), actor.position, ray, actor.entity); hit && distance < closest {
 			closest = distance
 			renderer.hovered_cell = cell
 			renderer.has_hovered_cell = true

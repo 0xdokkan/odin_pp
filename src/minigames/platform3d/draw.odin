@@ -45,6 +45,11 @@ Message_Kind :: enum u8 {
 View :: struct {
 	lit:             gfx.Lighting,
 	figures:         gfx.Paper_Figures,
+	// The board's animated paper standees: the hero and the ghoul sentinels.
+	book:            gfx.Flipbook_Assets,
+	hero:            gfx.Flipbook_Player,
+	ghouls:          [MAX_SENTINELS]gfx.Flipbook_Player,
+	was_grounded:    bool,
 	glow:            gfx.Lighting, // unlit but fogged, for emissive things
 	terrain:         rl.Model,
 	glow_model:      rl.Model,
@@ -122,6 +127,9 @@ LIFE_ROWS := [?]string{
 
 view_init :: proc(v: ^View) {
 	v.figures = gfx.paper_figures_create()
+	gfx.create_flipbook_assets(&v.book)
+	v.hero = gfx.flipbook_player(.Pilgrim)
+	for &ghoul, index in v.ghouls { ghoul = gfx.flipbook_player(.Ghoul, f64(index)*0.37) }
 	v.lit = gfx.lighting_create()
 	v.lit.specular = 0.18
 	v.lit.sun_dir = {-0.5, -1, -0.32}
@@ -179,6 +187,7 @@ view_init :: proc(v: ^View) {
 view_destroy :: proc(v: ^View) {
 	unload_models(v)
 	gfx.paper_figures_destroy(&v.figures)
+	gfx.destroy_flipbook_assets(&v.book)
 	gfx.lighting_destroy(&v.lit)
 	gfx.lighting_destroy(&v.glow)
 	gfx.sprite_destroy(&v.halo)
@@ -666,7 +675,7 @@ draw_paper_actors :: proc(v: ^View, w: ^World, cam: rl.Camera3D) {
 	}
 	for actor in actors[:count] {
 		if actor.index<0 { draw_player(v, w) }
-		else { draw_sentinel(v, w, w.sentinels[actor.index]) }
+		else { draw_sentinel(v, w, w.sentinels[actor.index], actor.index) }
 	}
 }
 
@@ -880,11 +889,19 @@ sentinel_yaw :: proc(s: Sentinel, time: f32) -> f32 {
 }
 
 @(private)
-draw_sentinel :: proc(v: ^View, w: ^World, s: Sentinel) {
+draw_sentinel :: proc(v: ^View, w: ^World, s: Sentinel, index: int = 0) {
 	pose := math.floor(v.time*5)/5
 	feet := s.position + Vec3{0, -0.66+math.sin(pose*3+s.phase*5)*0.075, 0}
-	gfx.paper_figure_billboard(&v.figures, camera.orbit_to_raylib(v.cam), 1, feet, 1.5,
-		math.sin(sentinel_yaw(s,w.time)-v.cam.yaw)<0, time = v.time+s.phase)
+	flip := math.sin(sentinel_yaw(s,w.time)-v.cam.yaw)<0
+	if v.book.loaded && index >= 0 && index < len(v.ghouls) {
+		// A patrolling ghoul standee, striding on its own clock.
+		ghoul := &v.ghouls[index]
+		gfx.flipbook_loop(ghoul, .Walk, f64(v.time))
+		gfx.draw_flipbook_billboard(&v.book, camera.orbit_to_raylib(v.cam), ghoul, s.position+Vec3{0, -0.62, 0}, 1.3,
+			!flip, rl.WHITE, f64(v.time))
+	} else {
+		gfx.paper_figure_billboard(&v.figures, camera.orbit_to_raylib(v.cam), 1, feet, 1.5, flip, time = v.time+s.phase)
+	}
 	rl.DrawCircle3D(v3(s.position-{0, 0.72, 0}), 0.55, {1, 0, 0}, 90, {220, 60, 60, 200})
 }
 
@@ -926,6 +943,19 @@ draw_player :: proc(v: ^View, w: ^World) {
 	feet.y += abs(math.sin(pose))*0.04*min(speed/w.params.max_speed, 1)
 	height := 1.58 * clamp(1+v.squash*0.25, 0.9, 1.12)
 	flip := math.sin(v.yaw-v.cam.yaw)<0
+	if v.book.loaded {
+		// The same Viandante standee as the run: it strides while running,
+		// leaps on take-off and falls when the climb ends.
+		now := f64(v.time)
+		hero := &v.hero
+		gfx.flipbook_loop(hero, .Walk if w.player.grounded && speed > 0.4 else .Idle, now)
+		if !w.player.grounded && v.was_grounded { gfx.flipbook_play(hero, .Dodge, now) }
+		if w.phase == .Dying { gfx.flipbook_play(hero, .Death, now) }
+		else if hero.action == .Death { hero^ = gfx.flipbook_player(.Pilgrim) }
+		v.was_grounded = w.player.grounded
+		gfx.draw_flipbook_billboard(&v.book, cam, hero, feet, height*0.92, !flip, rl.WHITE, now)
+		return
+	}
 	gfx.paper_figure_billboard(&v.figures, cam, 0, feet, height, flip, time = v.time)
 }
 
