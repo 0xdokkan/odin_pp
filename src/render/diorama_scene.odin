@@ -105,6 +105,7 @@ draw_diorama_wall_face :: proc(center, normal: rl.Vector3, height: f32, variant:
 // Internal walls keep their complete silhouette. Only their low plinth is
 // opaque; the upper body is submitted with actors in the sorted alpha pass.
 draw_diorama_wall :: proc(renderer: ^Renderer, room: ^game.Room, cell: grid.Position) {
+	if renderer.tactical.kit.loaded { draw_diorama_kit_wall(renderer, room, cell); return }
 	p := rl.Vector3{f32(cell.x)+0.5, 0, f32(cell.y)+0.5}
 	n := gothic_hash(cell.x, cell.y)
 	h := diorama_wall_height(renderer, room, cell)

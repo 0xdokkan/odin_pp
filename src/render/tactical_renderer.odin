@@ -34,6 +34,7 @@ Tactical_View :: struct {
 	fallback: [11]rl.Texture2D,
 	flipbook: Flipbook_Assets,
 	flipbook_state: ^Flipbook_State,
+	kit: Diorama_Kit,
 }
 
 create_tactical_assets :: proc(renderer: ^Renderer, parent: rl.RenderTexture2D = {}) {
@@ -44,6 +45,7 @@ create_tactical_assets :: proc(renderer: ^Renderer, parent: rl.RenderTexture2D =
 	create_comic_outline(renderer)
 	create_gothic_art(&renderer.tactical.art)
 	create_flipbook_assets(&renderer.tactical.flipbook)
+	load_diorama_kit(&renderer.tactical.kit, DIORAMA_KIT_BYTES)
 	renderer.tactical.flipbook_state = new(Flipbook_State)
 	create_tactical_surface(renderer, parent)
 	for &texture, index in renderer.tactical.fallback {
@@ -84,6 +86,7 @@ destroy_tactical_assets :: proc(renderer: ^Renderer) {
 	destroy_tactical_surface(renderer)
 	destroy_gothic_art(&renderer.tactical.art)
 	destroy_flipbook_assets(&renderer.tactical.flipbook)
+	destroy_diorama_kit(&renderer.tactical.kit)
 	if renderer.tactical.flipbook_state != nil { free(renderer.tactical.flipbook_state); renderer.tactical.flipbook_state = nil }
 	if renderer.tactical.outline_shader.id != 0 { rl.UnloadShader(renderer.tactical.outline_shader); renderer.tactical.outline_shader = {} }
 	if renderer.tactical.labels != nil { free(renderer.tactical.labels); renderer.tactical.labels = nil }

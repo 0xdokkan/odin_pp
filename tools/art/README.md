@@ -63,3 +63,30 @@ finisce, la clip completa i suoi disegni con il proprio orologio.
 Per aggiungere un'azione: aggiungila ad `ACTION_ORDER` in `build_sprites.py`,
 scrivi le pose in `characters.py`, rigenera e collega la cue in
 `flipbook_cue_action` (`src/render/flipbook_actor.odin`).
+
+## Mura gotiche
+
+```bash
+blender -b --factory-startup --python tools/art/build_walls.py -- --preview C:/tmp/mura
+```
+
+Modella con bmesh il kit delle mura e scrive `assets/models/gothic-walls.odm`
+(lista di triangoli con colori per vertice; il formato è descritto in testa allo
+script). Ogni pezzo è in unità di cella, con l'origine alla base del centro della
+cella, ed è rivolto verso +Z (griglia +y); il renderer lo ruota verso ogni lato.
+
+| Pezzo | Uso |
+|---|---|
+| `core` | il nucleo 0,8 x 0,8 di ogni muro |
+| `link` | verso un muro vicino o oltre il bordo: massa continua |
+| `face_ashlar`, `face_lancet`, `face_buttress`, `face_rose` | verso una cella calpestabile visibile, scelta deterministica per lato |
+| `post`, `pilaster` | angoli: pieno, o colonna a fascio sugli spigoli convessi |
+| `merlons`, `cap`, `cut_cap` | merlatura e cappello; `cut_cap` è la sezione dei muri vicini ritratti |
+| `sconce` | lanterna a muro, centrata sulla luce della lampada |
+
+`src/render/diorama_kit.odin` legge il file (senza GL, quindi anche nei test) e
+invia i triangoli con lo stesso shader resin dei blocchi: luce, nebbia, ritiro
+verso la telecamera (taglio all'altezza del muro) e trasparenza dei muri interni
+restano quelli di prima. Se il kit non si carica, torna il disegno procedurale.
+Ogni decorazione resta dentro il volume della cella e sotto il raggio di culling
+di 1,8 (lo verifica `test_diorama_kit_pieces_fit_their_cell`).
