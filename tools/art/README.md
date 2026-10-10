@@ -12,8 +12,8 @@ blender -b --factory-startup --python tools/art/build_sprites.py
 Legge `assets/gothic/figures-v2.png` e scrive:
 
 - `assets/gothic/flipbook/<nome>.png`: i disegni del personaggio, una riga per azione;
-- `assets/gothic/flipbook/<nome>-card.png`: il cartoncino rigido (risoluzione 4x);
-- `src/render/flipbook_data.odin`: le tabelle dei fotogrammi (file generato, non modificarlo).
+- `assets/gothic/flipbook/<nome>-paper.png`: per ogni disegno, il campo di distanza dalla sua sagoma;
+- `src/engine/gfx/flipbook_data.odin`: le tabelle dei fotogrammi (file generato, non modificarlo).
 
 Come funziona:
 
@@ -27,9 +27,17 @@ Come funziona:
    sottocampioni per pixel su una tela 4x e ridotta a voto di maggioranza: compaiono
    solo i colori originali, quindi resta pixel art pulita. Il contorno viene rifatto
    a ogni posa.
-4. Il cartoncino si ritaglia una volta sola attorno all'unione di tutte le pose,
-   così resta rigido mentre la stampa si anima dentro. Spessore, inchiostro e taglio
-   visibile sono impostati in testa a `build_sprites.py`.
+4. La carta non è un ritaglio fisso: ogni disegno ha il suo campo di distanza esatto
+   dalla sagoma e lo shader della carta (`src/engine/gfx/flipbook.odin`) taglia il
+   cartoncino poco oltre la figura. Quando la stampa cambia disegno, la carta passa
+   dal campo vecchio al nuovo in 90 ms: si allunga dove un braccio si estende e
+   rientra quando torna. Spessore, inchiostro e taglio visibile sono impostati in
+   testa a `build_sprites.py` e arrivano allo shader come costanti.
+
+Il nucleo (dati, tempi, shader, `Flipbook_Player`, disegno a billboard 3D e 2D) vive
+in `src/engine/gfx/flipbook.odin`, così lo usano sia il tabellone sia i minigiochi:
+oggi Platform 3D (il Viandante e i ghoul sentinella) e l'FPS (ghoul, spettri e
+cultisti, guidati dagli stati dei nemici).
 
 Opzioni utili:
 

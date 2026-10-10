@@ -3,22 +3,23 @@ package render
 import "core:strings"
 import "core:testing"
 import game "../game"
+import gfx "../engine/gfx"
 
 @(test)
 test_flipbook_frames_follow_their_durations :: proc(t: ^testing.T) {
-	for character in Flipbook_Character {
-		for action in Flipbook_Action {
-			clip := &FLIPBOOK_SHEETS[character].clips[action]
+	for character in gfx.Flipbook_Character {
+		for action in gfx.Flipbook_Action {
+			clip := &gfx.FLIPBOOK_SHEETS[character].clips[action]
 			if clip.count == 0 { continue }
-			testing.expect(t, clip.count <= FLIPBOOK_MAX_FRAMES)
-			first, finished := flipbook_frame(clip, 0)
+			testing.expect(t, clip.count <= gfx.FLIPBOOK_MAX_FRAMES)
+			first, finished := gfx.flipbook_frame(clip, 0)
 			testing.expect_value(t, first, i32(0))
 			testing.expect(t, !finished)
-			length := flipbook_clip_seconds(clip)
+			length := gfx.flipbook_clip_seconds(clip)
 			testing.expect(t, length > 0)
-			last, _ := flipbook_frame(clip, length-0.001)
+			last, _ := gfx.flipbook_frame(clip, length-0.001)
 			testing.expect_value(t, last, clip.count-1)
-			after, done := flipbook_frame(clip, length+0.5)
+			after, done := gfx.flipbook_frame(clip, length+0.5)
 			if clip.loop {
 				testing.expect(t, !done)
 				testing.expect(t, after >= 0 && after < clip.count)
@@ -33,13 +34,13 @@ test_flipbook_frames_follow_their_durations :: proc(t: ^testing.T) {
 
 @(test)
 test_flipbook_every_action_resolves_to_a_drawn_clip :: proc(t: ^testing.T) {
-	for character in Flipbook_Character {
-		sheet := &FLIPBOOK_SHEETS[character]
+	for character in gfx.Flipbook_Character {
+		sheet := &gfx.FLIPBOOK_SHEETS[character]
 		testing.expect(t, sheet.clips[.Idle].count > 0 && sheet.clips[.Idle].loop)
 		testing.expect(t, sheet.clips[.Walk].count > 0 && sheet.clips[.Walk].loop)
 		testing.expect(t, sheet.clips[.Death].count > 0 && !sheet.clips[.Death].loop)
-		for action in Flipbook_Action {
-			testing.expect(t, sheet.clips[flipbook_resolve(character, action)].count > 0)
+		for action in gfx.Flipbook_Action {
+			testing.expect(t, sheet.clips[gfx.flipbook_resolve(character, action)].count > 0)
 		}
 		testing.expect(t, sheet.feet.x > 0 && sheet.feet.x < f32(sheet.cell.x))
 		testing.expect(t, sheet.feet.y > 0 && sheet.feet.y <= f32(sheet.cell.y))
@@ -81,10 +82,10 @@ test_flipbook_hit_plays_hurt_then_returns_to_breathing :: proc(t: ^testing.T) {
 	player := flipbook_find(renderer, game.PLAYER_ENTITY, .Pilgrim, {2, 3})
 	testing.expect(t, brute != nil && player != nil)
 	if brute == nil || player == nil { return }
-	testing.expect_value(t, brute.action, Flipbook_Action.Hurt)
+	testing.expect_value(t, brute.action, gfx.Flipbook_Action.Hurt)
 	// The attacker strikes from its impact drawing: the cue is the impact.
-	testing.expect_value(t, player.action, Flipbook_Action.Attack)
-	testing.expect_value(t, player.first_frame, FLIPBOOK_SHEETS[.Pilgrim].clips[.Attack].hit)
+	testing.expect_value(t, player.action, gfx.Flipbook_Action.Attack)
+	testing.expect_value(t, player.first_frame, gfx.FLIPBOOK_SHEETS[.Pilgrim].clips[.Attack].hit)
 	// The same cue on the next frame is not a new trigger.
 	started := brute.started
 	renderer.sprite_assets.elapsed = 0.05
@@ -95,11 +96,11 @@ test_flipbook_hit_plays_hurt_then_returns_to_breathing :: proc(t: ^testing.T) {
 	renderer.sprite_assets.elapsed = 0.1
 	update_flipbook_actors(renderer, nil)
 	action, _ := flipbook_drawing(brute, renderer.sprite_assets.elapsed)
-	testing.expect_value(t, action, Flipbook_Action.Hurt)
+	testing.expect_value(t, action, gfx.Flipbook_Action.Hurt)
 	renderer.sprite_assets.elapsed = 5
 	update_flipbook_actors(renderer, nil)
 	action, _ = flipbook_drawing(brute, renderer.sprite_assets.elapsed)
-	testing.expect_value(t, action, Flipbook_Action.Idle)
+	testing.expect_value(t, action, gfx.Flipbook_Action.Idle)
 }
 
 @(test)
@@ -135,13 +136,13 @@ test_flipbook_card_stands_on_the_floor_and_turns_with_the_walk :: proc(t: ^testi
 	renderer := flipbook_test_renderer()
 	defer flipbook_test_free(renderer)
 	update_flipbook_actors(renderer, nil)
-	for character in Flipbook_Character {
-		sheet := &FLIPBOOK_SHEETS[character]
+	for character in gfx.Flipbook_Character {
+		sheet := &gfx.FLIPBOOK_SHEETS[character]
 		quad := flipbook_billboard_geometry(renderer, character, flipbook_key(character), {2, 3}, false, game.SYSTEM_ENTITY)
 		// The paper under the feet stands in the base's slot, just above the floor.
 		scale := sheet.world_height/sheet.rest_height
 		feet := quad.points[1].y+(f32(sheet.cell.y)-sheet.feet.y)*scale
-		testing.expect(t, abs(feet-(0.02+(FLIPBOOK_PAPER+FLIPBOOK_INK)*scale+0.03)) < 0.002)
+		testing.expect(t, abs(feet-(0.02+(gfx.FLIPBOOK_PAPER+gfx.FLIPBOOK_INK)*scale+0.03)) < 0.002)
 		top := (quad.points[0].y+quad.points[3].y)*0.5
 		testing.expect(t, top > sheet.world_height*0.9)
 		// Without an actor there is nothing to morph from.
@@ -161,6 +162,6 @@ test_flipbook_card_stands_on_the_floor_and_turns_with_the_walk :: proc(t: ^testi
 
 @(test)
 test_flipbook_paper_shader_source_is_fully_formatted :: proc(t: ^testing.T) {
-	source := string(flipbook_paper_source())
+	source := string(gfx.flipbook_paper_source())
 	testing.expectf(t, !strings.contains(source, "%"), "unformatted shader:\n%s", source)
 }

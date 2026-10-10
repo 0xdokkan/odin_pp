@@ -1,10 +1,8 @@
 package render
 
-import "core:c"
-import "core:fmt"
 import "core:math"
-import "core:strings"
 import rl "vendor:raylib"
+import gfx "../engine/gfx"
 import rlgl "vendor:raylib/rlgl"
 import game "../game"
 import view "../view"
@@ -26,59 +24,12 @@ FLIPBOOK_WALK_GRACE :: f64(0.1)
 FLIPBOOK_TURN_SECONDS :: f64(0.18)
 FLIPBOOK_FALL_SECONDS :: f64(0.38)
 FLIPBOOK_FORGET_SECONDS :: f64(1.0)
-// How long the paper takes to follow the print to a new drawing.
-FLIPBOOK_MORPH_SECONDS :: f64(0.09)
-
-// Samples two drawings' fields and blends them, then cuts paper, the
-// visible card edge (offset down-right) and the ink line from the result.
-FLIPBOOK_PAPER_FRAGMENT :: `#version 330
-in vec2 fragTexCoord;
-in vec4 fragColor;
-uniform sampler2D texture0;
-uniform vec4 frameA;
-uniform vec4 frameB;
-uniform float morph;
-uniform vec2 cell;
-uniform vec2 edgeDir;
-out vec4 finalColor;
-float field(vec4 r, vec2 uv) {
-    vec2 p = r.xy + clamp(uv, vec2(0.002), vec2(0.998))*r.zw;
-    return texture(texture0, p).r*255.0/PAPER_SCALE;
-}
-float dist(vec2 uv) { return mix(field(frameA, uv), field(frameB, uv), morph); }
-float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7)))*43758.5453); }
-void main() {
-    vec2 uv = fragTexCoord;
-    float d = dist(uv);
-    float de = dist(uv - edgeDir*EDGE_PX/cell);
-    float aa = max(fwidth(d), 0.03)*0.8;
-    float paper = 1.0 - smoothstep(PAPER_PX - aa, PAPER_PX + aa, d);
-    float body = max(paper, 1.0 - smoothstep(PAPER_PX - aa, PAPER_PX + aa, de));
-    float ink = 1.0 - smoothstep(INK_PX - aa, INK_PX + aa, min(d, de));
-    if (ink < 0.01) discard;
-    vec2 px = floor(uv*cell*4.0);
-    float grain = (hash(px) - 0.5)*0.026 + (hash(floor(uv*cell*0.6)) - 0.5)*0.022;
-    vec3 sheet = vec3(0.894, 0.867, 0.788) + grain;
-    vec3 col = mix(vec3(0.051, 0.078, 0.118), vec3(0.643, 0.596, 0.514), body);
-    col = mix(col, sheet, paper);
-    finalColor = vec4(col*fragColor.rgb, ink*fragColor.a);
-}`
-
-Flipbook_Assets :: struct {
-	frames, papers: [Flipbook_Character]rl.Texture2D,
-	// CPU copies of the fields, for picking on the paper itself.
-	fields: [Flipbook_Character][]u8,
-	paper_shader: rl.Shader,
-	frame_a_location, frame_b_location, morph_location, cell_location, edge_location: c.int,
-	loaded: bool,
-}
-
 Flipbook_Actor :: struct {
 	entity: game.Entity_Ref,
-	character: Flipbook_Character,
+	character: gfx.Flipbook_Character,
 	used, ghost, facing_left: bool,
 	// `action` is the running one-shot (Idle: none); `base` the loop beneath.
-	action, base, trigger: Flipbook_Action,
+	action, base, trigger: gfx.Flipbook_Action,
 	first_frame: i32,
 	started, base_started, trigger_seen, walk_until, turn_started, seen: f64,
 	position: view.Vec2,
@@ -91,56 +42,7 @@ Flipbook_State :: struct {
 	actors: [FLIPBOOK_MAX_ACTORS]Flipbook_Actor,
 }
 
-create_flipbook_assets :: proc(assets: ^Flipbook_Assets) {
-	for character in Flipbook_Character {
-		for bytes, kind in ([2][]u8{FLIPBOOK_FRAMES_PNG[character], FLIPBOOK_PAPER_PNG[character]}) {
-			img := rl.LoadImageFromMemory(".png", raw_data(bytes), c.int(len(bytes)))
-			if img.data == nil { continue }
-			texture := rl.LoadTextureFromImage(img)
-			if kind == 0 {
-				// The print is pixel art: never filtered.
-				rl.SetTextureFilter(texture, .POINT)
-				assets.frames[character] = texture
-			} else {
-				// Distance fields interpolate: bilinear, no mipmaps (cells abut).
-				rl.SetTextureFilter(texture, .BILINEAR)
-				rl.SetTextureWrap(texture, .CLAMP)
-				assets.papers[character] = texture
-				colors := rl.LoadImageColors(img)
-				field := make([]u8, int(img.width)*int(img.height))
-				for &value, index in field { value = colors[index].r }
-				rl.UnloadImageColors(colors)
-				assets.fields[character] = field
-			}
-			rl.UnloadImage(img)
-		}
-	}
-	source := flipbook_paper_source()
-	assets.paper_shader = rl.LoadShaderFromMemory(nil, source)
-	if assets.paper_shader.id != 0 {
-		assets.frame_a_location = rl.GetShaderLocation(assets.paper_shader, "frameA")
-		assets.frame_b_location = rl.GetShaderLocation(assets.paper_shader, "frameB")
-		assets.morph_location = rl.GetShaderLocation(assets.paper_shader, "morph")
-		assets.cell_location = rl.GetShaderLocation(assets.paper_shader, "cell")
-		assets.edge_location = rl.GetShaderLocation(assets.paper_shader, "edgeDir")
-	}
-	assets.loaded = assets.paper_shader.id != 0
-	for character in Flipbook_Character {
-		if assets.frames[character].id == 0 || assets.papers[character].id == 0 { assets.loaded = false }
-	}
-}
-
-destroy_flipbook_assets :: proc(assets: ^Flipbook_Assets) {
-	for character in Flipbook_Character {
-		if assets.frames[character].id != 0 { rl.UnloadTexture(assets.frames[character]) }
-		if assets.papers[character].id != 0 { rl.UnloadTexture(assets.papers[character]) }
-		delete(assets.fields[character])
-	}
-	if assets.paper_shader.id != 0 { rl.UnloadShader(assets.paper_shader) }
-	assets^ = {}
-}
-
-flipbook_character :: proc(key: Sprite_Key) -> (Flipbook_Character, bool) {
+flipbook_character :: proc(key: Sprite_Key) -> (gfx.Flipbook_Character, bool) {
 	#partial switch key {
 	case .Player, .Player_Cast, .Player_Hit: return .Pilgrim, true
 	case .Chaser: return .Ghoul, true
@@ -153,7 +55,7 @@ flipbook_character :: proc(key: Sprite_Key) -> (Flipbook_Character, bool) {
 	return .Pilgrim, false
 }
 
-flipbook_key :: proc(character: Flipbook_Character) -> Sprite_Key {
+flipbook_key :: proc(character: gfx.Flipbook_Character) -> Sprite_Key {
 	switch character {
 	case .Pilgrim: return .Player
 	case .Ghoul: return .Chaser
@@ -166,67 +68,8 @@ flipbook_key :: proc(character: Flipbook_Character) -> Sprite_Key {
 	return .Player
 }
 
-// A character without a dedicated clip borrows the closest one it has.
-flipbook_resolve :: proc(character: Flipbook_Character, action: Flipbook_Action) -> Flipbook_Action {
-	clips := &FLIPBOOK_SHEETS[character].clips
-	current := action
-	for _ in 0..<4 {
-		if clips[current].count > 0 { return current }
-		switch current {
-		case .Cast: current = .Attack
-		case .Dodge: current = .Walk
-		case .Block: current = .Hurt
-		case .Idle, .Walk, .Attack, .Windup, .Hurt, .Stunned, .Interact, .Death: current = .Idle
-		}
-	}
-	return .Idle
-}
-
-flipbook_priority :: proc(action: Flipbook_Action) -> int {
-	switch action {
-	case .Death: return 6
-	case .Hurt: return 5
-	case .Cast, .Attack: return 4
-	case .Block, .Dodge: return 3
-	case .Interact: return 2
-	case .Walk, .Windup, .Stunned: return 1
-	case .Idle: return 0
-	}
-	return 0
-}
-
-flipbook_clip_seconds :: proc(clip: ^Flipbook_Clip, first: i32 = 0) -> f64 {
-	total: f64
-	for index in max(first, 0)..<clip.count { total += f64(clip.durations[index]) }
-	return total/1000
-}
-
-// The drawing shown `elapsed` seconds into a clip that began at drawing
-// `first`. A finished one-shot holds its last drawing.
-flipbook_frame :: proc(clip: ^Flipbook_Clip, elapsed: f64, first: i32 = 0) -> (frame: i32, finished: bool) {
-	if clip.count <= 0 { return 0, true }
-	t := max(elapsed, 0)*1000
-	if clip.loop {
-		cycle := flipbook_clip_seconds(clip)*1000
-		if cycle <= 0 { return 0, false }
-		t = math.mod(t, cycle)
-		for index in 0..<clip.count {
-			duration := f64(clip.durations[index])
-			if t < duration { return index, false }
-			t -= duration
-		}
-		return clip.count-1, false
-	}
-	for index in clamp(first, 0, clip.count-1)..<clip.count {
-		duration := f64(clip.durations[index])
-		if t < duration { return index, false }
-		t -= duration
-	}
-	return clip.count-1, true
-}
-
 flipbook_one_shot_seconds :: proc(actor: ^Flipbook_Actor) -> f64 {
-	return flipbook_clip_seconds(&FLIPBOOK_SHEETS[actor.character].clips[actor.action], actor.first_frame)
+	return gfx.flipbook_clip_seconds(&gfx.FLIPBOOK_SHEETS[actor.character].clips[actor.action], actor.first_frame)
 }
 
 flipbook_one_shot_running :: proc(actor: ^Flipbook_Actor, now: f64) -> bool {
@@ -237,9 +80,9 @@ flipbook_one_shot_running :: proc(actor: ^Flipbook_Actor, now: f64) -> bool {
 
 // Past the impact drawing, a one-shot is only follow-through and may yield.
 flipbook_past_hit :: proc(actor: ^Flipbook_Actor, now: f64) -> bool {
-	clip := &FLIPBOOK_SHEETS[actor.character].clips[actor.action]
+	clip := &gfx.FLIPBOOK_SHEETS[actor.character].clips[actor.action]
 	if clip.hit < 0 { return true }
-	frame, _ := flipbook_frame(clip, now-actor.started, actor.first_frame)
+	frame, _ := gfx.flipbook_frame(clip, now-actor.started, actor.first_frame)
 	return frame > clip.hit
 }
 
@@ -255,19 +98,19 @@ flipbook_death_done :: proc(actor: ^Flipbook_Actor, now: f64) -> bool {
 }
 
 // The drawing to print right now.
-flipbook_drawing :: proc(actor: ^Flipbook_Actor, now: f64) -> (action: Flipbook_Action, frame: i32) {
-	sheet := &FLIPBOOK_SHEETS[actor.character]
+flipbook_drawing :: proc(actor: ^Flipbook_Actor, now: f64) -> (action: gfx.Flipbook_Action, frame: i32) {
+	sheet := &gfx.FLIPBOOK_SHEETS[actor.character]
 	if actor.action != .Idle {
 		clip := &sheet.clips[actor.action]
-		drawing, finished := flipbook_frame(clip, now-actor.started, actor.first_frame)
+		drawing, finished := gfx.flipbook_frame(clip, now-actor.started, actor.first_frame)
 		if !finished || actor.action == .Death { return actor.action, drawing }
 	}
-	base := flipbook_resolve(actor.character, actor.base)
-	drawing, _ := flipbook_frame(&sheet.clips[base], now-actor.base_started)
+	base := gfx.flipbook_resolve(actor.character, actor.base)
+	drawing, _ := gfx.flipbook_frame(&sheet.clips[base], now-actor.base_started)
 	return base, drawing
 }
 
-flipbook_slot :: proc(state: ^Flipbook_State, entity: game.Entity_Ref, character: Flipbook_Character, now: f64) -> ^Flipbook_Actor {
+flipbook_slot :: proc(state: ^Flipbook_State, entity: game.Entity_Ref, character: gfx.Flipbook_Character, now: f64) -> ^Flipbook_Actor {
 	free_slot: ^Flipbook_Actor
 	for &actor in state.actors {
 		if actor.used && actor.entity == entity && actor.character == character { return &actor }
@@ -285,7 +128,7 @@ flipbook_slot :: proc(state: ^Flipbook_State, entity: game.Entity_Ref, character
 	return free_slot
 }
 
-flipbook_find :: proc(renderer: ^Renderer, entity: game.Entity_Ref, character: Flipbook_Character, position: view.Vec2) -> ^Flipbook_Actor {
+flipbook_find :: proc(renderer: ^Renderer, entity: game.Entity_Ref, character: gfx.Flipbook_Character, position: view.Vec2) -> ^Flipbook_Actor {
 	state := renderer.tactical.flipbook_state
 	if state == nil { return nil }
 	for &actor in state.actors {
@@ -314,7 +157,7 @@ flipbook_face :: proc(actor: ^Flipbook_Actor, sideways: f32, now: f64) {
 
 // Which clip a cue asks of this actor. `from_hit` starts at the impact
 // drawing: the cue *is* the impact, its anticipation is already past.
-flipbook_cue_action :: proc(cue: ^Presentation_Cue, entity: game.Entity_Ref) -> (action: Flipbook_Action, matched, from_hit: bool) {
+flipbook_cue_action :: proc(cue: ^Presentation_Cue, entity: game.Entity_Ref) -> (action: gfx.Flipbook_Action, matched, from_hit: bool) {
 	event := &cue.event
 	#partial switch cue.kind {
 	case .Move:
@@ -344,10 +187,10 @@ flipbook_cue_action :: proc(cue: ^Presentation_Cue, entity: game.Entity_Ref) -> 
 }
 
 flipbook_observe :: proc(renderer: ^Renderer, state: ^Flipbook_State, room: ^game.Room, actor: Presentation_Actor,
-	character: Flipbook_Character, now: f64, right: rl.Vector3) {
+	character: gfx.Flipbook_Character, now: f64, right: rl.Vector3) {
 	slot := flipbook_slot(state, actor.entity, character, now)
 	slot.seen, slot.ghost, slot.position = now, false, actor.position
-	wanted, from_hit := Flipbook_Action.Idle, false
+	wanted, from_hit := gfx.Flipbook_Action.Idle, false
 	walking := false
 	snapshot := renderer.tactical.snapshot
 	for offset in 0..<renderer_active_cue_count(renderer) {
@@ -368,7 +211,7 @@ flipbook_observe :: proc(renderer: ^Renderer, state: ^Flipbook_State, room: ^gam
 				flipbook_face(slot, rl.Vector3DotProduct({delta.x, 0, delta.y}, right), now)
 			}
 		}
-		if flipbook_priority(action) > flipbook_priority(wanted) { wanted, from_hit = action, at_hit }
+		if gfx.flipbook_priority(action) > gfx.flipbook_priority(wanted) { wanted, from_hit = action, at_hit }
 	}
 	if walking {
 		if now > slot.walk_until && slot.base != .Walk { slot.base_started = now }
@@ -377,10 +220,10 @@ flipbook_observe :: proc(renderer: ^Renderer, state: ^Flipbook_State, room: ^gam
 	if wanted != .Idle {
 		fresh := wanted != slot.trigger || now-slot.trigger_seen > FLIPBOOK_TRIGGER_GAP
 		slot.trigger, slot.trigger_seen = wanted, now
-		resolved := flipbook_resolve(character, wanted)
-		clip := &FLIPBOOK_SHEETS[character].clips[resolved]
+		resolved := gfx.flipbook_resolve(character, wanted)
+		clip := &gfx.FLIPBOOK_SHEETS[character].clips[resolved]
 		if fresh && !clip.loop && slot.action != .Death {
-			if !flipbook_one_shot_running(slot, now) || flipbook_priority(resolved) >= flipbook_priority(slot.action) ||
+			if !flipbook_one_shot_running(slot, now) || gfx.flipbook_priority(resolved) >= gfx.flipbook_priority(slot.action) ||
 			   flipbook_past_hit(slot, now) {
 				slot.action, slot.started = resolved, now
 				slot.first_frame = max(clip.hit, 0) if from_hit else 0
@@ -388,7 +231,7 @@ flipbook_observe :: proc(renderer: ^Renderer, state: ^Flipbook_State, room: ^gam
 		}
 	}
 	// The loop beneath the one-shots: stride, telegraph, daze or breath.
-	base := Flipbook_Action.Idle
+	base := gfx.Flipbook_Action.Idle
 	if now < slot.walk_until { base = .Walk }
 	else {
 		statuses := actor.statuses
@@ -443,17 +286,17 @@ flipbook_opacity :: proc(renderer: ^Renderer, entity: game.Entity_Ref, key: Spri
 	return clamp(1-(fall-0.55)/0.45, 0, 1)
 }
 
-flipbook_billboard_geometry :: proc(renderer: ^Renderer, character: Flipbook_Character, key: Sprite_Key, position: view.Vec2,
+flipbook_billboard_geometry :: proc(renderer: ^Renderer, character: gfx.Flipbook_Character, key: Sprite_Key, position: view.Vec2,
 	feedback: bool, entity: game.Entity_Ref) -> Tactical_Billboard {
 	v := &renderer.tactical
-	sheet := &FLIPBOOK_SHEETS[character]
+	sheet := &gfx.FLIPBOOK_SHEETS[character]
 	now := renderer.sprite_assets.elapsed
 	actor := flipbook_find(renderer, entity, character, position) if feedback else nil
-	action, frame := Flipbook_Action.Idle, i32(0)
+	action, frame := gfx.Flipbook_Action.Idle, i32(0)
 	if actor != nil { action, frame = flipbook_drawing(actor, now) }
 	else {
 		phase := f64(position.x*0.31+position.y*0.17)
-		frame, _ = flipbook_frame(&sheet.clips[.Idle], now+phase)
+		frame, _ = gfx.flipbook_frame(&sheet.clips[.Idle], now+phase)
 	}
 	clip := &sheet.clips[action]
 	cell := rl.Vector2{f32(sheet.cell.x), f32(sheet.cell.y)}
@@ -461,10 +304,10 @@ flipbook_billboard_geometry :: proc(renderer: ^Renderer, character: Flipbook_Cha
 	shown := [2]i32{clip.row, frame}
 	previous, morph := shown, f32(1)
 	if actor != nil {
-		if actor.shown.x < 0 { actor.previous, actor.shown, actor.shown_since = shown, shown, now-FLIPBOOK_MORPH_SECONDS }
+		if actor.shown.x < 0 { actor.previous, actor.shown, actor.shown_since = shown, shown, now-gfx.FLIPBOOK_MORPH_SECONDS }
 		else if actor.shown != shown { actor.previous, actor.shown, actor.shown_since = actor.shown, shown, now }
 		previous = actor.previous
-		morph = f32(clamp((now-actor.shown_since)/FLIPBOOK_MORPH_SECONDS, 0, 1))
+		morph = f32(clamp((now-actor.shown_since)/gfx.FLIPBOOK_MORPH_SECONDS, 0, 1))
 	}
 	papers := v.flipbook.papers[character]
 	paper := rl.Vector2{f32(sheet.paper_cell.x)/f32(max(papers.width, 1)), f32(sheet.paper_cell.y)/f32(max(papers.height, 1))}
@@ -498,7 +341,7 @@ flipbook_billboard_geometry :: proc(renderer: ^Renderer, character: Flipbook_Cha
 	below := cell.y-sheet.feet.y
 	// The paper under the feet stands in the base's slot; map markers drop
 	// the card and stand on their feet.
-	lift := (FLIPBOOK_PAPER+FLIPBOOK_INK)*scale+0.03
+	lift := (gfx.FLIPBOOK_PAPER+gfx.FLIPBOOK_INK)*scale+0.03
 	if v.outline_mode == .Hologram { lift = 0; result.card = {} }
 	base := rl.Vector3{position.x+0.5, 0.02+lift+pose.lift, position.y+0.5}
 	sy := scale*pose.scale_y
@@ -548,7 +391,7 @@ flipbook_card_hit :: proc(renderer: ^Renderer, quad: Tactical_Billboard, ray: rl
 	// Picking follows the paper of the drawing on the card now.
 	x := clamp(int((quad.card_b.x+fx*quad.card_b.width)*f32(width)), 0, width-1)
 	y := clamp(int((quad.card_b.y+fy*quad.card_b.height)*f32(height)), 0, height-1)
-	if f32(field[y*width+x]) > (FLIPBOOK_PAPER+FLIPBOOK_INK)*FLIPBOOK_PAPER_SCALE { return }
+	if f32(field[y*width+x]) > (gfx.FLIPBOOK_PAPER+gfx.FLIPBOOK_INK)*gfx.FLIPBOOK_PAPER_SCALE { return }
 	return collision.distance, true
 }
 
@@ -585,7 +428,7 @@ draw_flipbook_card :: proc(renderer: ^Renderer, quad: Tactical_Billboard, uv: [4
 draw_flipbook_stand :: proc(renderer: ^Renderer, key: Sprite_Key, position: view.Vec2, accent: rl.Color) {
 	character, ok := flipbook_character(key)
 	if !ok { return }
-	sheet := &FLIPBOOK_SHEETS[character]
+	sheet := &gfx.FLIPBOOK_SHEETS[character]
 	pose := tactical_feedback_pose(renderer, key, position)
 	right := flipbook_camera_right(renderer)
 	angle := math.atan2(-right.z, right.x)*math.DEG_PER_RAD
@@ -602,14 +445,3 @@ draw_flipbook_stand :: proc(renderer: ^Renderer, key: Sprite_Key, position: view
 	rl.DrawCube({0, 0.03, 0.121}, 0.5, 0.014, 0.004, accent)
 }
 
-// The card shader with the generator's paper constants baked in. GLSL braces
-// rule out fmt templates, so named tokens are replaced instead.
-flipbook_paper_source :: proc() -> cstring {
-	source := string(FLIPBOOK_PAPER_FRAGMENT)
-	tokens := [4]string{"PAPER_SCALE", "EDGE_PX", "PAPER_PX", "INK_PX"}
-	values := [4]f32{FLIPBOOK_PAPER_SCALE, FLIPBOOK_EDGE, FLIPBOOK_PAPER, FLIPBOOK_PAPER+FLIPBOOK_INK}
-	for token, index in tokens {
-		source, _ = strings.replace_all(source, token, fmt.tprintf("%.4f", values[index]), context.temp_allocator)
-	}
-	return strings.clone_to_cstring(source, context.temp_allocator)
-}

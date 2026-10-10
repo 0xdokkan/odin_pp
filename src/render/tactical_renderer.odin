@@ -3,6 +3,7 @@ package render
 import "core:c"
 import "core:math"
 import rl "vendor:raylib"
+import gfx "../engine/gfx"
 import rlgl "vendor:raylib/rlgl"
 import game "../game"
 import grid "../grid"
@@ -32,7 +33,7 @@ Tactical_View :: struct {
 	visible_count: int,
 	snapshot: ^Room_Presentation,
 	fallback: [11]rl.Texture2D,
-	flipbook: Flipbook_Assets,
+	flipbook: gfx.Flipbook_Assets,
 	flipbook_state: ^Flipbook_State,
 	kit: Diorama_Kit,
 	pilgrim: []Diorama_Vertex,
@@ -48,7 +49,7 @@ create_tactical_assets :: proc(renderer: ^Renderer, parent: rl.RenderTexture2D =
 	create_tactical_lighting(renderer)
 	create_comic_outline(renderer)
 	create_gothic_art(&renderer.tactical.art)
-	create_flipbook_assets(&renderer.tactical.flipbook)
+	gfx.create_flipbook_assets(&renderer.tactical.flipbook)
 	load_diorama_kit(&renderer.tactical.kit, DIORAMA_KIT_BYTES)
 	load_pilgrim_model(&renderer.tactical.pilgrim)
 	renderer.tactical.flipbook_state = new(Flipbook_State)
@@ -90,7 +91,7 @@ destroy_tactical_assets :: proc(renderer: ^Renderer) {
 	destroy_tactical_translucents(renderer)
 	destroy_tactical_surface(renderer)
 	destroy_gothic_art(&renderer.tactical.art)
-	destroy_flipbook_assets(&renderer.tactical.flipbook)
+	gfx.destroy_flipbook_assets(&renderer.tactical.flipbook)
 	destroy_diorama_kit(&renderer.tactical.kit)
 	delete(renderer.tactical.pilgrim)
 	renderer.tactical.pilgrim = nil
