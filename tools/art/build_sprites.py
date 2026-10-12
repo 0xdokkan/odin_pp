@@ -349,4 +349,6 @@ def main():
     print("DONE")
 
 
-main()
+# build_living.py imports the helpers above without rebuilding the classic set.
+if __name__ == "__main__":
+    main()

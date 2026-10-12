@@ -1007,6 +1007,8 @@ roguelike_update :: proc(data: rawptr, hf: ^host.Frame) {
 			rs.run_state.phase == .In_Room && !relic_visible && !rs.route_visible && !rs.options.m7_view_smoke,
 			rs.mouse_canvas, rs.mouse_inside, rs.playtest_session_ptr) } else { tactical_input_blocked = true }
 	}
+	// The mechanics lab draws its characters as living cards.
+	render.set_living_cards(&rs.iso_renderer, rs.options.mechanics_lab)
 	// Arrivals follow the running board: never paused, in a modal or mid-animation.
 	if rs.options.mechanics_lab && !rs.m8_modal && !rs.tactical_controller.paused && rl.IsWindowFocused() &&
 	   rs.run_state.phase == .In_Room && !render.renderer_timeline_is_busy(&rs.iso_renderer) {

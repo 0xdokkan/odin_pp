@@ -94,18 +94,21 @@ draw_tactical_actor_bases :: proc(renderer: ^Renderer) {
 	for actor in snapshot.enemies[:snapshot.enemy_count] {
 		cell := grid.Position{int(math.round(actor.position.x)), int(math.round(actor.position.y))}
 		if !actor.visible || !tactical_render_visible(renderer, cell) { continue }
-		p := rl.Vector3{actor.position.x+0.5, 0.048, actor.position.y+0.5}
+		key := sprite_key_for_enemy(actor.archetype)
+		at, _ := living_card_position(renderer, actor.entity, key, actor.position)
+		p := rl.Vector3{at.x+0.5, 0.048, at.y+0.5}
 		draw_tactical_actor_shadow(p)
 		rl.DrawCylinder(p, 0.3, 0.3, 0.01, 24, GOTHIC_INK)
 		rl.DrawCircle3D(p+rl.Vector3{0, 0.01, 0}, 0.32, {1, 0, 0}, 90, GOTHIC_RED)
-		if renderer.tactical.flipbook.loaded { draw_flipbook_stand(renderer, sprite_key_for_enemy(actor.archetype), actor.position, GOTHIC_RED) }
+		if renderer.tactical.flipbook.loaded { draw_flipbook_stand(renderer, key, actor.position, GOTHIC_RED, actor.entity) }
 	}
 	if !snapshot.player.visible { return }
-	p := rl.Vector3{snapshot.player.position.x+0.5, 0.05, snapshot.player.position.y+0.5}
+	at, _ := living_card_position(renderer, game.PLAYER_ENTITY, .Player, snapshot.player.position)
+	p := rl.Vector3{at.x+0.5, 0.05, at.y+0.5}
 	draw_tactical_actor_shadow(p)
 	rl.DrawCylinder(p, 0.32, 0.32, 0.01, 24, GOTHIC_INK)
 	rl.DrawCircle3D(p+rl.Vector3{0, 0.01, 0}, 0.34, {1, 0, 0}, 90, GOTHIC_PAPER)
-	if renderer.tactical.flipbook.loaded { draw_flipbook_stand(renderer, .Player, snapshot.player.position, GOTHIC_PAPER) }
+	if renderer.tactical.flipbook.loaded { draw_flipbook_stand(renderer, .Player, snapshot.player.position, GOTHIC_PAPER, game.PLAYER_ENTITY) }
 }
 
 draw_tactical_actor_shadow :: proc(position: rl.Vector3) {

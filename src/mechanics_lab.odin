@@ -85,9 +85,10 @@ prepare_mechanics_lab :: proc(rs: ^Roguelike_Session) -> bool {
 }
 
 mechanics_lab_smoke_frame :: proc(window: ^app.Window, renderer: ^render.Renderer, room: ^game.Room, controller: ^Tactical_Controller,
-	cards: ^Card_Interaction_State, buffer: ^Buffered_Gameplay_Command, dt: f32) {
+	cards: ^Card_Interaction_State, buffer: ^Buffered_Gameplay_Command, dt: f32, clock := false) {
 	render.update_renderer_frame_timeline(renderer, dt)
-	step_tactical_controller(controller, room, renderer, cards, buffer, 0, true, {focused = true})
+	// The board clock runs only where a capture needs real time to pass.
+	step_tactical_controller(controller, room, renderer, cards, buffer, dt if clock else 0, true, {focused = true})
 	render.advance_sprite_assets(&renderer.sprite_assets, dt)
 	render.update_tactical_view(renderer, room, {}, false, true)
 	render.update_tactical_atmosphere(renderer, dt)
@@ -116,6 +117,8 @@ run_mechanics_lab_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer,
 	render.clear_event_animations(renderer)
 	render.reset_tactical_orbit(&renderer.tactical.world_orbit)
 	render.frame_level(renderer, &data)
+	render.set_living_cards(renderer, true)
+	defer render.set_living_cards(renderer, false)
 	controller := Tactical_Controller{was_focused = true}
 	cards: Card_Interaction_State
 	buffer: Buffered_Gameplay_Command
@@ -180,7 +183,34 @@ run_mechanics_lab_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer,
 	render.clear_event_animations(renderer)
 	for _ in 0..<30 { mechanics_lab_smoke_frame(window, renderer, &room, &controller, &cards, &buffer, 1.0/60.0) }
 	rl.TakeScreenshot("odin_pp_mechanics_lab_restart.png")
-	standee := render.flipbook_find(renderer, game.PLAYER_ENTITY, gfx.Flipbook_Character.Pilgrim, {})
-	if standee == nil || standee.action == .Death { fmt.eprintln("mechanics lab: the player's standee did not come back"); return false }
+	standee := render.living_find(renderer, game.PLAYER_ENTITY, gfx.Flipbook_Character.Pilgrim)
+	if standee == nil || standee.action == .Death { fmt.eprintln("mechanics lab: the player's card did not come back"); return false }
+	// A step and a bump, frame by frame: the drawing acts, the card slides
+	// as a block at the push. Captures for the animated previews.
+	if !mechanics_lab_capture(window, renderer, &room, &controller, &cards, &buffer, {kind = .Move, origin_phase = .Combat, direction = .East}, "move") { return false }
+	// The foe stands to the north, beside the card on screen rather than in
+	// front of it, so the blow can be seen.
+	if _, placed := game.spawn_enemy(&room, {position = {player.position.x, player.position.y-1}, health = 40, attack = 1, archetype = .Chaser}); !placed {
+		fmt.eprintln("mechanics lab: no foe beside the player"); return false
+	}
+	render.clear_event_animations(renderer)
+	for _ in 0..<20 { mechanics_lab_smoke_frame(window, renderer, &room, &controller, &cards, &buffer, 1.0/60.0) }
+	if !mechanics_lab_capture(window, renderer, &room, &controller, &cards, &buffer, {kind = .Move, origin_phase = .Combat, direction = .North}, "attack") { return false }
+	return true
+}
+
+// Commits one command, then plays a second and a quarter of real time and
+// saves every second frame as odin_pp_living_<name>_NN.png.
+mechanics_lab_capture :: proc(window: ^app.Window, renderer: ^render.Renderer, room: ^game.Room, controller: ^Tactical_Controller,
+	cards: ^Card_Interaction_State, buffer: ^Buffered_Gameplay_Command, command: Gameplay_Command, name: string) -> bool {
+	for _ in 0..<240 {
+		if game.tactical_allows_action(room) && !render.renderer_blocks_player_input(renderer) { break }
+		mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0, true)
+	}
+	if !commit_gameplay_command(room, renderer, cards, command) { fmt.eprintln("mechanics lab: capture not committed:", name); return false }
+	for frame in 0..<76 {
+		mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0, true)
+		if frame%2 == 0 { rl.TakeScreenshot(fmt.ctprintf("odin_pp_living_%s_%02d.png", name, frame/2)) }
+	}
 	return true
 }

@@ -260,6 +260,7 @@ flipbook_observe :: proc(renderer: ^Renderer, state: ^Flipbook_State, room: ^gam
 // A fresh board starts with fresh standees.
 forget_flipbook_actors :: proc(renderer: ^Renderer) {
 	if renderer != nil && renderer.tactical.flipbook_state != nil { renderer.tactical.flipbook_state^ = {} }
+	forget_living_actors(renderer)
 }
 
 // Once per frame, before the board is drawn: read the cues and states. Map
@@ -415,6 +416,18 @@ draw_flipbook_card :: proc(renderer: ^Renderer, quad: Tactical_Billboard, uv: [4
 	morph := quad.card_morph
 	cell := rl.Vector2{quad.source.width+quad.card_margin*2, quad.source.height+quad.card_margin*2}
 	edge := rl.Vector2{-1 if quad.mirror else 1, 1}
+	sheet := gfx.FLIPBOOK_SHEET_COLOR
+	uv := uv
+	if quad.living {
+		// The still card: never mirrored, on its whiter drawing paper, its cut
+		// edge as thick on the board as the classic card's.
+		points = quad.card_points
+		uv = {{0, 0}, {0, 1}, {1, 1}, {1, 0}}
+		edge = {1, 1}
+		sheet = gfx.LIVING_SHEET_COLOR
+		cell *= gfx.LIVING_PRINT_SCALE
+	}
+	rl.SetShaderValue(assets.paper_shader, assets.sheet_location, &sheet, .VEC3)
 	rl.SetShaderValue(assets.paper_shader, assets.frame_a_location, &a, .VEC4)
 	rl.SetShaderValue(assets.paper_shader, assets.frame_b_location, &b, .VEC4)
 	rl.SetShaderValue(assets.paper_shader, assets.morph_location, &morph, .FLOAT)
@@ -436,17 +449,23 @@ draw_flipbook_card :: proc(renderer: ^Renderer, quad: Tactical_Billboard, uv: [4
 // The standee's base: a low iron plinth with a slot that grips the card,
 // turned with the card toward the camera and hopping with it. A thin strip
 // of the side's colour (ivory pilgrim, crimson foe) runs along its front.
-draw_flipbook_stand :: proc(renderer: ^Renderer, key: Sprite_Key, position: view.Vec2, accent: rl.Color) {
+draw_flipbook_stand :: proc(renderer: ^Renderer, key: Sprite_Key, position: view.Vec2, accent: rl.Color,
+	entity: game.Entity_Ref = game.SYSTEM_ENTITY) {
 	character, ok := flipbook_character(key)
 	if !ok { return }
 	sheet := &gfx.FLIPBOOK_SHEETS[character]
-	pose := tactical_feedback_pose(renderer, key, position)
+	lift := tactical_feedback_pose(renderer, key, position).lift
+	at := position
+	if renderer.tactical.living && renderer.tactical.living_assets.loaded {
+		// A living card is a rigid block: the base slides and hops with it.
+		at, lift = living_card_position(renderer, entity, key, position)
+	}
 	right := flipbook_camera_right(renderer)
 	angle := math.atan2(-right.z, right.x)*math.DEG_PER_RAD
 	size := clamp(sheet.world_height/1.35, 0.85, 1.2)
 	rlgl.PushMatrix()
 	defer rlgl.PopMatrix()
-	rlgl.Translatef(position.x+0.5, pose.lift, position.y+0.5)
+	rlgl.Translatef(at.x+0.5, lift, at.y+0.5)
 	rlgl.Rotatef(angle, 0, 1, 0)
 	rlgl.Scalef(size, 1, size)
 	rl.DrawCube({0, 0.03, 0}, 0.58, 0.05, 0.24, {20, 24, 34, 255})

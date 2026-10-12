@@ -38,18 +38,32 @@ collect_tactical_translucents :: proc(renderer: ^Renderer, room: ^game.Room = ni
 	// The board pass (it has a room) advances the standees' clips; the map
 	// reuses them as they are.
 	if room != nil { update_flipbook_actors(renderer, room) }
+	if room != nil && v.living { update_living_actors(renderer, room) }
+	living := v.living && v.living_assets.loaded && v.living_state != nil
 	snapshot := v.snapshot
 	for actor in snapshot.enemies[:snapshot.enemy_count] {
 		cell := grid.Position{int(math.round(actor.position.x)), int(math.round(actor.position.y))}
 		if actor.visible && tactical_render_visible(renderer, cell) {
 			key := sprite_key_for_enemy(actor.archetype)
-			append(entries, Tactical_Alpha_Entry{key = key, entity = actor.entity, position = actor.position,
-				opacity = flipbook_opacity(renderer, actor.entity, key, actor.position, actor.opacity)})
+			opacity := living_opacity(renderer, actor.entity, key, actor.opacity) if living else
+				flipbook_opacity(renderer, actor.entity, key, actor.position, actor.opacity)
+			append(entries, Tactical_Alpha_Entry{key = key, entity = actor.entity, position = actor.position, opacity = opacity})
 		}
 	}
 	if snapshot.player.visible {
-		append(entries, Tactical_Alpha_Entry{key = .Player, entity = game.PLAYER_ENTITY, position = snapshot.player.position,
-			opacity = flipbook_opacity(renderer, game.PLAYER_ENTITY, .Player, snapshot.player.position, snapshot.player.opacity)})
+		opacity := living_opacity(renderer, game.PLAYER_ENTITY, .Player, snapshot.player.opacity) if living else
+			flipbook_opacity(renderer, game.PLAYER_ENTITY, .Player, snapshot.player.position, snapshot.player.opacity)
+		append(entries, Tactical_Alpha_Entry{key = .Player, entity = game.PLAYER_ENTITY, position = snapshot.player.position, opacity = opacity})
+	}
+	// Living cards removed from the board mid-death finish toppling first.
+	if living {
+		for &actor in v.living_state.actors {
+			cell := grid.Position{int(math.round(actor.position.x)), int(math.round(actor.position.y))}
+			if !actor.used || !actor.ghost || !tactical_render_visible(renderer, cell) { continue }
+			key := flipbook_key(actor.character)
+			append(entries, Tactical_Alpha_Entry{key = key, entity = actor.entity, position = actor.position,
+				opacity = living_opacity(renderer, actor.entity, key, 1)})
+		}
 	}
 	// Standees removed from the board mid-death finish toppling first.
 	if v.flipbook_state != nil && v.flipbook.loaded {

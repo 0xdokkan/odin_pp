@@ -35,6 +35,10 @@ Tactical_View :: struct {
 	fallback: [11]rl.Texture2D,
 	flipbook: gfx.Flipbook_Assets,
 	flipbook_state: ^Flipbook_State,
+	// Living cards (living_card.odin): on for the mechanics lab only.
+	living: bool,
+	living_assets: gfx.Living_Assets,
+	living_state: ^Living_State,
 	kit: Diorama_Kit,
 	pilgrim: []Diorama_Vertex,
 	intent_memory: [game.MAX_ENEMIES_PER_ROOM]Intent_Memory,
@@ -97,6 +101,7 @@ destroy_tactical_assets :: proc(renderer: ^Renderer) {
 	delete(renderer.tactical.pilgrim)
 	renderer.tactical.pilgrim = nil
 	if renderer.tactical.flipbook_state != nil { free(renderer.tactical.flipbook_state); renderer.tactical.flipbook_state = nil }
+	destroy_living_cards(renderer)
 	if renderer.tactical.outline_shader.id != 0 { rl.UnloadShader(renderer.tactical.outline_shader); renderer.tactical.outline_shader = {} }
 	if renderer.tactical.labels != nil { free(renderer.tactical.labels); renderer.tactical.labels = nil }
 	if renderer.tactical.light_shader.id != 0 { rl.UnloadShader(renderer.tactical.light_shader); renderer.tactical.light_shader = {} }
@@ -207,6 +212,10 @@ Tactical_Billboard :: struct {
 	card_margin: f32,
 	card_a, card_b: rl.Rectangle,
 	card_morph: f32,
+	// A living card's paper keeps its own quad: the print may narrow or
+	// mirror inside it while the card stays as it is.
+	living: bool,
+	card_points: [4]rl.Vector3,
 }
 
 // Rendering and picking share this world-space quad, including custom anchors.
@@ -214,6 +223,9 @@ tactical_billboard_geometry :: proc(renderer: ^Renderer, key: Sprite_Key, positi
 	entity: game.Entity_Ref = game.SYSTEM_ENTITY) -> Tactical_Billboard {
 	if character, ok := flipbook_character(key); ok && renderer.tactical.flipbook.loaded &&
 	   !renderer.sprite_assets.sprites[int(key)].configured {
+		if renderer.tactical.living && renderer.tactical.living_assets.loaded {
+			return living_billboard_geometry(renderer, character, key, position, feedback, entity)
+		}
 		return flipbook_billboard_geometry(renderer, character, key, position, feedback, entity)
 	}
 	effective_key := key
@@ -299,6 +311,7 @@ draw_tactical_billboard_quad :: proc(renderer: ^Renderer, quad: Tactical_Billboa
 tactical_billboard_hit :: proc(renderer: ^Renderer, key: Sprite_Key, position: view.Vec2, ray: rl.Ray,
 	entity: game.Entity_Ref = game.SYSTEM_ENTITY) -> (distance: f32, hit: bool) {
 	quad := tactical_billboard_geometry(renderer, key, position, true, entity)
+	if quad.living && quad.card.id != 0 { return living_card_hit(renderer, quad, ray) }
 	if quad.flipbook && quad.card.id != 0 { return flipbook_card_hit(renderer, quad, ray) }
 	collision := rl.GetRayCollisionQuad(ray, quad.points[0], quad.points[1], quad.points[2], quad.points[3])
 	if !collision.hit { return }
