@@ -75,6 +75,15 @@ tactical_advance_clock :: proc(room: ^Room, seconds: f32) {
 tactical_spend_action_time :: proc(room: ^Room, seconds: f32) {
 	if !tactical_enabled(room) || room.phase != .Combat || !(seconds > 0) { return }
 	s := &room.player.tactical
+	if s.config.timed_actions {
+		// The action lasts its cost: the window and the world run through it
+		// in real time, and the player waits for it to finish. Recovery walks
+		// take their time too.
+		if s.phase != .Decision && s.phase != .Recovery { return }
+		s.metrics.decisions += 1
+		s.action_remaining, s.action_duration = seconds, seconds
+		return
+	}
 	if s.phase != .Decision { return }
 	s.metrics.decisions += 1
 	tactical_advance_clock(room, seconds)
@@ -93,5 +102,7 @@ tactical_expire_window :: proc(room: ^Room) -> bool {
 	s.metrics.pauses += 1
 	s.phase = .Recovery
 	s.remaining = TACTICAL_RECOVERY_SECONDS
+	// The window's end also ends a timed action still running.
+	s.action_remaining, s.action_duration = 0, 0
 	return true
 }

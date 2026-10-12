@@ -1445,7 +1445,9 @@ roguelike_update :: proc(data: rawptr, hf: ^host.Frame) {
 		}
 		if !tactical_input_blocked && !rs.smoke_card && !rs.smoke_targeting && !rs.smoke_spatial && !rs.smoke_object && !rs.smoke_content &&
 		   !rs.smoke_encounters && !rs.smoke_miniboss && !rs.smoke_furnace && rs.spell_smoke == .None {
-			rs.timeline_busy = render.renderer_blocks_player_input(&rs.iso_renderer)
+			// A timed action holds new commands like an animation does: they wait
+			// in the buffer and run when it ends.
+			rs.timeline_busy = render.renderer_blocks_player_input(&rs.iso_renderer) || game.tactical_player_busy(&rs.room)
 			command, has_command := poll_gameplay_command(
 				&rs.room,
 				&rs.iso_renderer,

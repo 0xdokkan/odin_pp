@@ -8,8 +8,11 @@ Tactical_Config :: struct {
 	timer_seconds: int,
 	vision_size: int,
 	qte_seconds: f32,
+	// Timed actions (the mechanics lab): an action lasts its cost in real time
+	// instead of spending it at once (tactical_clock.odin).
+	timed_actions: bool,
 }
-DEFAULT_TACTICAL_CONFIG :: Tactical_Config{true, 20, 7, 1.2}
+DEFAULT_TACTICAL_CONFIG :: Tactical_Config{true, 20, 7, 1.2, false}
 MAX_TACTICAL_VISION :: 9
 TACTICAL_DODGE_RECOVERY :: 2
 
@@ -29,6 +32,9 @@ Tactical_State :: struct {
 	remaining: f32,
 	// Casting spends pulse time gradually, without advancing the world clock.
 	cast_remaining, cast_duration: f32,
+	// With timed actions, the player's own action still running (seconds);
+	// the world clock runs through it as usual.
+	action_remaining, action_duration: f32,
 	// World time advances in bounded one-second beats; animations never add time.
 	clock_fraction: f32,
 	queued_beats: int,
@@ -86,20 +92,28 @@ tactical_enabled :: proc(room: ^Room) -> bool {
 	return room != nil && room.player != nil && room.player.tactical.config.enabled
 }
 
-tactical_allows_action :: proc(room: ^Room) -> bool {
+// `ignore_busy` asks whether an action would be allowed once the player's
+// own timed action has finished (input buffering, and the dodge that cuts it).
+tactical_allows_action :: proc(room: ^Room, ignore_busy := false) -> bool {
 	if !tactical_enabled(room) || room.phase != .Combat { return true }
 	s := &room.player.tactical
 	return !room.tactical_pulse.pending && room.qte.kind == .None && s.remaining > 0 && s.cast_remaining <= 0 &&
-	       s.phase == .Decision
+	       s.phase == .Decision && (ignore_busy || s.action_remaining <= 0)
+}
+
+// The player is still performing a timed action.
+tactical_player_busy :: proc(room: ^Room) -> bool {
+	return tactical_enabled(room) && room.phase == .Combat && room.player.tactical.action_remaining > 0
 }
 
 tactical_is_recovering :: proc(room: ^Room) -> bool {
 	return tactical_enabled(room) && room.phase == .Combat && room.player.tactical.phase == .Recovery
 }
 
-tactical_allows_movement :: proc(room: ^Room) -> bool {
-	if !tactical_is_recovering(room) { return tactical_allows_action(room) }
-	return !room.tactical_pulse.pending && room.qte.kind == .None
+tactical_allows_movement :: proc(room: ^Room, ignore_busy := false) -> bool {
+	if !tactical_is_recovering(room) { return tactical_allows_action(room, ignore_busy) }
+	return !room.tactical_pulse.pending && room.qte.kind == .None &&
+	       (ignore_busy || room.player.tactical.action_remaining <= 0)
 }
 
 // Called only after a new room has been successfully built. Keep configuration
@@ -115,6 +129,7 @@ begin_tactical_room :: proc(room: ^Room) {
 	s.clock_fraction = 0
 	s.queued_beats = 0
 	s.cast_remaining, s.cast_duration = 0, 0
+	s.action_remaining, s.action_duration = 0, 0
 	tactical_reset_beats(s)
 	for &enemy in room.enemies { enemy.tactical_cooldown = 0 }
 }
@@ -129,6 +144,7 @@ tactical_end_combat :: proc(room: ^Room) {
 	s.clock_fraction = 0
 	s.queued_beats = 0
 	s.cast_remaining, s.cast_duration = 0, 0
+	s.action_remaining, s.action_duration = 0, 0
 	tactical_reset_beats(s)
 	room.tactical_pulse = {}
 	room.qte = {}
@@ -170,6 +186,11 @@ tactical_tick :: proc(room: ^Room, dt: f32, available: bool, hologram: bool) -> 
 		return true
 	}
 	if !(dt > 0) { return false }
+	// A timed action runs on the same real seconds as the window.
+	if s.action_remaining > 0 {
+		s.action_remaining = max(f32(0), s.action_remaining-dt)
+		if s.action_remaining < 0.00001 { s.action_remaining = 0 }
+	}
 	elapsed := min(dt, max(f32(0), s.remaining))
 	before := s.clock_fraction
 	tactical_advance_clock(room, elapsed)

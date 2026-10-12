@@ -61,10 +61,12 @@ create_mechanics_lab_room :: proc(data: ^level.Level, player: ^game.Player, conf
 	room, ok = game.create_room(data, player, {enemies = spawns[:]})
 	if !ok { return }
 	room.endless = true
-	// No fog: every arrival is in plain sight.
+	// No fog: every arrival is in plain sight. Each action lasts its cost in
+	// real time, so its animation has room to play.
 	lab := config
 	lab.enabled = true
 	lab.vision_size = 0
+	lab.timed_actions = true
 	if !game.configure_tactical_room(&room, lab) { game.destroy_room(&room); return {}, false }
 	return room, true
 }

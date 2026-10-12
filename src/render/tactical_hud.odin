@@ -84,7 +84,7 @@ draw_tactical_hud :: proc(renderer: ^Renderer, room: ^game.Room, paused, hologra
 	else if recovering { label = "RECUPERO" }
 	else if cinematic { label = "DADI" }
 	else if game.tactical_is_casting(room) { label = "LANCIO" }
-	else if busy { label = "AZIONE" }
+	else if busy || game.tactical_player_busy(room) { label = "AZIONE" }
 	// The pulse continues during casting; cinematic dice and QTE own a full pause.
 	timed := combat
 	accent := GOTHIC_RED if timed && s.remaining <= 5 else GOTHIC_BLUE
@@ -113,9 +113,15 @@ draw_tactical_hud :: proc(renderer: ^Renderer, room: ^game.Room, paused, hologra
 	meter := rl.Rectangle{x+104, y+29, width-116, 7}
 	if timed { hud_bar(meter, s.remaining/budget, accent, int(min(budget, 30))) }
 	else { hud_bar(meter, 1, GOTHIC_BLUE if !combat else GOTHIC_STEEL) }
+	// A timed action (mechanics lab): a thin gold line drains as it plays out.
+	if game.tactical_player_busy(room) && s.action_duration > 0 {
+		left := clamp(s.action_remaining/s.action_duration, 0, 1)
+		rl.DrawRectangleRec({meter.x, meter.y+meter.height+2, meter.width*left, 2}, TACTICAL_FEEDBACK_CRITICAL)
+	}
 	// One context line, only when it says something the plate does not.
 	status: cstring
 	if busy { status = "I NEMICI CONTINUANO" }
+	if game.tactical_player_busy(room) { status = fmt.ctprintf("AZIONE %.1fs / I NEMICI CONTINUANO", s.action_remaining) }
 	if game.tactical_is_casting(room) { status = fmt.ctprintf("LANCIO %.1fs / NEMICI SOSPESI", s.cast_remaining) }
 	if cinematic { status = "TEMPO SOSPESO" }
 	if recovering { status = "MUOVITI / CARTE IN RECUPERO" }

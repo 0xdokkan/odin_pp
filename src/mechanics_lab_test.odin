@@ -16,6 +16,8 @@ test_mechanics_lab_is_an_open_endless_arena_with_only_teslas :: proc(t: ^testing
 	testing.expect(t, room.endless && game.tactical_enabled(&room))
 	testing.expect_value(t, room.phase, game.Room_Phase.Combat)
 	testing.expect_value(t, player.tactical.config.vision_size, 0)
+	// Each action lasts its cost in real time here.
+	testing.expect(t, player.tactical.config.timed_actions)
 	testing.expect_value(t, data.tiles.width, MECHANICS_LAB_WIDTH)
 	testing.expect_value(t, data.tiles.height, MECHANICS_LAB_HEIGHT)
 	// No cover: every cell inside the border is walkable floor.

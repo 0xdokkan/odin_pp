@@ -172,7 +172,7 @@ step_tactical_controller :: proc(
 		cards.dragged_card_id = 0
 	}
 	movement_buffer_allowed := !controller.hologram && !map_toggled &&
-		(room.phase == .Loot || (room.phase == .Combat && game.tactical_allows_movement(room)))
+		(room.phase == .Loot || (room.phase == .Combat && game.tactical_allows_movement(room, true)))
 	if !movement_buffer_allowed || (buffer.occupied && buffer.command.origin_phase != room.phase) {
 		clear_gameplay_command_buffer(buffer)
 	}
