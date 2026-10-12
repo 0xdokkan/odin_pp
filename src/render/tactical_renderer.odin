@@ -39,6 +39,9 @@ Tactical_View :: struct {
 	living: bool,
 	living_assets: gfx.Living_Assets,
 	living_state: ^Living_State,
+	// The lab's inspector keeps the enemy last hovered, and the mouse then.
+	inspected: u32,
+	inspected_mouse: rl.Vector2,
 	kit: Diorama_Kit,
 	pilgrim: []Diorama_Vertex,
 	intent_memory: [game.MAX_ENEMIES_PER_ROOM]Intent_Memory,
@@ -469,5 +472,7 @@ draw_tactical_world :: proc(renderer: ^Renderer, room: ^game.Room, active_card: 
 			if !draw_tactical_feedback_overlay(renderer, cue) { draw_presentation_cue(renderer, cue) }
 		}
 	}
+	// The mechanics lab's paper tokens outlive their cues.
+	draw_living_tokens(renderer)
 }
 

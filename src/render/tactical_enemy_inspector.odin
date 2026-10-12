@@ -1,14 +1,32 @@
 package render
 
 import "core:fmt"
+import rl "vendor:raylib"
 import game "../game"
 
+// The enemy under the mouse. The mechanics lab keeps showing it while an
+// animation plays, and while the camera glides under a mouse that stays still.
+tactical_inspected_enemy :: proc(renderer: ^Renderer, room: ^game.Room) -> (^game.Enemy, bool) {
+	v := &renderer.tactical
+	if renderer.has_hovered_cell && !renderer_blocks_player_input(renderer) && tactical_render_visible(renderer, renderer.hovered_cell) {
+		if index, found := game.enemy_index_at(room, renderer.hovered_cell); found {
+			if v.living { v.inspected, v.inspected_mouse = room.enemies[index].id, rl.GetMousePosition() }
+			return &room.enemies[index], true
+		}
+	}
+	if !v.living || v.inspected == 0 { return nil, false }
+	if renderer_blocks_player_input(renderer) || rl.GetMousePosition() == v.inspected_mouse {
+		if index, found := game.enemy_index_by_id(room, v.inspected); found { return &room.enemies[index], true }
+	}
+	v.inspected = 0
+	return nil, false
+}
+
 draw_tactical_enemy_inspector :: proc(renderer: ^Renderer, room: ^game.Room) {
-	if !renderer.has_hovered_cell || renderer_blocks_player_input(renderer) ||
-	   !tactical_render_visible(renderer, renderer.hovered_cell) { return }
-	index, found := game.enemy_index_at(room, renderer.hovered_cell)
+	// A defence prompt takes the same corner; it comes first.
+	if renderer.tactical.living && room.qte.kind != .None { return }
+	enemy, found := tactical_inspected_enemy(renderer, room)
 	if !found { return }
-	enemy := &room.enemies[index]
 	title, first, second: cstring
 	switch enemy.archetype {
 	case .Chaser:
@@ -34,7 +52,11 @@ draw_tactical_enemy_inspector :: proc(renderer: ^Renderer, room: ^game.Room) {
 	intent := tactical_intent_label(enemy.intent)
 	if game.enemy_is_staggered(room, enemy) { intent = "STORDITO" }
 	gothic_text_fit(renderer, fmt.ctprintf("%s / %.1fs", intent, game.tactical_enemy_seconds(room, enemy)), {x, y+86, 192, 22}, 18, GOTHIC_BLUE)
-	gothic_text_fit(renderer, fmt.ctprintf("HP %d / COLPO %d", enemy.health, enemy.attack), {x, y+111, 192, 18}, 12, GOTHIC_PAPER)
+	if renderer.tactical.living {
+		gothic_text_fit(renderer, fmt.ctprintf("HP %d/%d / COLPO %d", enemy.health, enemy.max_health, enemy.attack), {x, y+109, 192, 22}, 16, GOTHIC_PAPER)
+	} else {
+		gothic_text_fit(renderer, fmt.ctprintf("HP %d / COLPO %d", enemy.health, enemy.attack), {x, y+111, 192, 18}, 12, GOTHIC_PAPER)
+	}
 	if enemy.recovery_pulses > 0 {
 		gothic_text_fit(renderer, fmt.ctprintf("ESPOSTO %ds / STRIKE +2", enemy.recovery_pulses), {x, y+137, 192, 18}, 12, GOTHIC_PAPER)
 	} else {

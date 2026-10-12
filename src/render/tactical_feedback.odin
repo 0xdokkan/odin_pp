@@ -306,10 +306,15 @@ draw_tactical_feedback_overlay :: proc(renderer: ^Renderer, cue: ^Presentation_C
 	case .Damage:
 		label = fmt.ctprintf("-%d", cue.event.amount); color = TACTICAL_FEEDBACK_HIT
 		if game.event_is_critical(cue.event) { label = fmt.ctprintf("CRITICO -%d", cue.event.amount); color = TACTICAL_FEEDBACK_CRITICAL }
+		// The mechanics lab shows the amount on a paper token; a critical blow
+		// still says so.
+		if renderer.tactical.living { label = "CRITICO" if game.event_is_critical(cue.event) else nil }
 	case .Move:
 		if game.event_is_critical(cue.event) && cue.event.target == game.PLAYER_ENTITY { label = "CRITICO!"; color = TACTICAL_FEEDBACK_CRITICAL }
 	case .Damage_Absorbed: label = fmt.ctprintf("PARATA %d", cue.event.amount)
-	case .Heal: label = fmt.ctprintf("+%d", cue.event.amount); color = {128, 220, 190, 255}
+	case .Heal:
+		if renderer.tactical.living { return true }
+		label = fmt.ctprintf("+%d", cue.event.amount); color = {128, 220, 190, 255}
 	case .Status_Applied:
 		if cue.event.status == .Stagger { label = "INTERROTTO"; color = {218, 187, 123, 255} }
 		else if cue.event.status == .Shield { label = fmt.ctprintf("SCUDO +%d", cue.event.amount) }

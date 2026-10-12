@@ -37,6 +37,7 @@ Living_Actor :: struct {
 
 Living_State :: struct {
 	actors: [FLIPBOOK_MAX_ACTORS]Living_Actor,
+	tokens: [LIVING_MAX_TOKENS]Living_Token,
 }
 
 // Turns living cards on or off for this renderer; the drawings load the
@@ -59,13 +60,16 @@ living_cards_ready :: proc(renderer: ^Renderer) -> bool {
 
 destroy_living_cards :: proc(renderer: ^Renderer) {
 	v := &renderer.tactical
+	living_tokens_free(v.living_state)
 	gfx.destroy_living_assets(&v.living_assets)
 	if v.living_state != nil { free(v.living_state); v.living_state = nil }
 }
 
 // A fresh board starts with fresh drawings.
 forget_living_actors :: proc(renderer: ^Renderer) {
-	if renderer != nil && renderer.tactical.living_state != nil { renderer.tactical.living_state^ = {} }
+	if renderer == nil || renderer.tactical.living_state == nil { return }
+	living_tokens_free(renderer.tactical.living_state)
+	renderer.tactical.living_state^ = {}
 }
 
 living_slot :: proc(state: ^Living_State, entity: game.Entity_Ref, character: gfx.Flipbook_Character, now: f64) -> ^Living_Actor {
@@ -333,6 +337,7 @@ update_living_actors :: proc(renderer: ^Renderer, room: ^game.Room) {
 		if actor.action == .Death && !living_death_done(&actor, now) { actor.ghost = true; continue }
 		if actor.ghost || now-actor.seen > LIVING_FORGET_SECONDS { actor = {} }
 	}
+	update_living_tokens(renderer, now)
 }
 
 // The drawing to print right now.

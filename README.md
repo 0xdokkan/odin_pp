@@ -142,6 +142,21 @@ consuma secondi. I colori caldi staccano dal pavimento blu e segnano le minacce;
 verde e viola, vicini al blu, sono chiari; rosso e verde differiscono anche per
 luminosità, per chi è daltonico ([living_ring.odin](src/render/living_ring.odin)).
 
+Danni e cure compaiono su **segnalini di carta**: piccoli cartoncini tagliati e
+inchiostrati come quelli dei personaggi, che escono di lato dalla carta di chi è
+colpito o curato con il numero in pixel, rosso per i danni e verde per le cure,
+restano un attimo e cadono ([living_token.odin](src/render/living_token.odin)).
+Prendono il posto dei riquadri scuri con i numeri; un colpo critico mostra
+ancora CRITICO.
+
+La vita dei nemici è più grande e sempre visibile: `HP 12/18` con il massimo, una
+barra con una tacca per punto (una ogni 5 oltre i 30) e un'etichetta che non
+sparisce finché il nemico è sullo schermo. Se il suo posto finisce sotto il
+pannello in alto scende appena sotto, evita il cartello della prova e in mezzo
+alla folla si mostra comunque. Il riquadro del nemico sotto il mouse resta
+visibile anche durante le animazioni e mentre la telecamera scorre con il mouse
+fermo; lascia il posto solo alla difesa.
+
 | Opzione | Uso |
 |---|---|
 | `--run` | salta il menu ed entra subito nella run |
@@ -740,7 +755,7 @@ odin run src -o:none -- --classic
 | `--smoke-m7-view` | prova grafica di scena, oggetti 3D, fog, ologramma, QTE e menu |
 | `--smoke-m8-view` | prova 3D di d4, dispositivi, offerta del ring, equipaggiamento, scheda personaggio, tag match e cambio stanza |
 | `--smoke-western` | nuvoletta 6 RANCH 7: apertura automatica, volo delle carte, insegna, porte, corsa a tempo e premio |
-| `--smoke-mechanics-lab` | Prova meccaniche: arena aperta, mano di sole Tesla, ring riaperto, arrivi fino al massimo, ultima uccisione senza fine del combattimento, cartoncino del giocatore di nuovo in piedi dopo morte e riavvio, cartoncini vivi (un passo e un attacco fotogramma per fotogramma) e cerchi d'azione |
+| `--smoke-mechanics-lab` | Prova meccaniche: arena aperta, mano di sole Tesla, ring riaperto, arrivi fino al massimo, ultima uccisione senza fine del combattimento, cartoncino del giocatore di nuovo in piedi dopo morte e riavvio, cartoncini vivi (un passo e un attacco fotogramma per fotogramma), cerchi d'azione e segnalini di danno e cura |
 | `--smoke-m9-view` | arena continua, duello con IA, presa in quattro pose, replay e FPS con ricarica e vittoria |
 
 Gli smoke classici e i laboratori `--spell-lab` / `--dice-lab` conservano il comportamento classico;
@@ -1047,7 +1062,7 @@ le immagini sono output rigenerabili, non prerequisiti del checkout.
 | `--smoke-arenas-view` | quattro fasce di arene reali, combattimento, ologramma, Loot e cambio stanza; screenshot `odin_pp_arenas_*.png` |
 | `--smoke-m8-view` | dispositivi con APRI IL RING, campo, tag match, ritorno Loot: `odin_pp_m8_d4.png`, `devices`, `mega_combo`, `character`, `loot`, `tag_ring`, `next_room` (tutti con prefisso `odin_pp_m8_` e suffisso `.png`) |
 | `--smoke-western` | 6 RANCH 7 dalla mano al premio: `odin_pp_western_hand.png`, `cards`, `sign`, `gate`, `riders`, `ride`, `grab`, `win`, `reward` (prefisso `odin_pp_western_`) |
-| `--smoke-mechanics-lab` | sandbox: `odin_pp_mechanics_lab.png`, `_square`, `_full`, `_refill`, `_restart` (prefisso `odin_pp_mechanics_lab`); cartoncini vivi: `odin_pp_living_move_00.png`–`_37` e `odin_pp_living_attack_00.png`–`_37`, un'immagine ogni due fotogrammi; cerchi d'azione: `odin_pp_living_rings_00.png`–`_49`, ogni tre |
+| `--smoke-mechanics-lab` | sandbox: `odin_pp_mechanics_lab.png`, `_square`, `_full`, `_refill`, `_restart` (prefisso `odin_pp_mechanics_lab`); cartoncini vivi: `odin_pp_living_move_00.png`–`_37` e `odin_pp_living_attack_00.png`–`_37`, un'immagine ogni due fotogrammi; cerchi d'azione: `odin_pp_living_rings_00.png`–`_49`, ogni tre; segnalino di cura: `odin_pp_living_heal_00.png`–`_39`, ogni due |
 | `--smoke` | `odin_pp_isometric.png` |
 | `--smoke-generation` | `odin_pp_procedural_room.png` |
 | `--smoke-map` | `odin_pp_route.png` |

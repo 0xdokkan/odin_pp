@@ -200,6 +200,18 @@ run_mechanics_lab_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer,
 	// countdowns, the player's on every tick.
 	if renderer.tactical.living_assets.ring_shader.id == 0 { fmt.eprintln("mechanics lab: no action rings"); return false }
 	mechanics_lab_film(window, renderer, &room, &controller, &cards, &buffer, 150, 3, "rings")
+	// A cure: the green paper token. (Blows got red ones above.)
+	player.health = max(1, player.health-3)
+	cure_before := render.capture_room_presentation(&room)
+	game.clear_event_log(&room.recent_events)
+	cure := game.make_action(.Ability, game.PLAYER_ENTITY)
+	if !game.add_effect(&cure, game.heal_effect(game.PLAYER_ENTITY, 3)) { return false }
+	cured := game.resolve_action(&room, &cure)
+	if !cured.accepted { fmt.eprintln("mechanics lab: the cure was refused"); return false }
+	game.append_event_log(&room.recent_events, &cured.events)
+	cure_after := render.capture_room_presentation(&room)
+	if !render.begin_renderer_event_timeline(renderer, cure_before, &room.recent_events, &cure_after) { return false }
+	mechanics_lab_film(window, renderer, &room, &controller, &cards, &buffer, 80, 2, "heal")
 	return true
 }
 
