@@ -37,6 +37,7 @@ Tactical_View :: struct {
 	flipbook_state: ^Flipbook_State,
 	kit: Diorama_Kit,
 	pilgrim: []Diorama_Vertex,
+	intent_memory: [game.MAX_ENEMIES_PER_ROOM]Intent_Memory,
 	// The last pointer seen by the view, for HUD hover states only.
 	pointer: view.Vec2,
 	pointer_inside: bool,

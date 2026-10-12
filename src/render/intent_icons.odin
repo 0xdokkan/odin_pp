@@ -24,6 +24,29 @@ INTENT_AMBER :: rl.Color{232, 168, 64, 255}
 INTENT_AIR :: rl.Color{168, 178, 186, 255}
 INTENT_STICKER_RADIUS :: f32(14)
 
+// Between an enemy acting and planning again its intent is briefly empty;
+// the sticker keeps the last plan instead of blinking out for that instant.
+Intent_Memory :: struct {
+	id: u32,
+	icon: Intent_Icon,
+	alarm, used: bool,
+}
+
+remembered_intent_icon :: proc(renderer: ^Renderer, id: u32, icon: Intent_Icon, alarm: bool) -> (Intent_Icon, bool) {
+	memory := &renderer.tactical.intent_memory
+	slot := -1
+	for &entry, index in memory {
+		if entry.used && entry.id == id { slot = index; break }
+		if !entry.used && slot < 0 { slot = index }
+	}
+	if slot < 0 { slot = int(id)%len(memory) }
+	entry := &memory[slot]
+	if !entry.used || entry.id != id { entry^ = {id = id, used = true} }
+	if icon == .None && entry.icon != .None { return entry.icon, entry.alarm }
+	entry.icon, entry.alarm = icon, alarm
+	return icon, alarm
+}
+
 tactical_intent_icon :: proc(room: ^game.Room, enemy: ^game.Enemy) -> Intent_Icon {
 	if game.enemy_is_staggered(room, enemy) { return .Interrupted }
 	switch enemy.intent.kind {

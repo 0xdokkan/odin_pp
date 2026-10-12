@@ -150,11 +150,13 @@ draw_tactical_annotations :: proc(renderer: ^Renderer, room: ^game.Room) {
 		color := rl.Color{187, 106, 109, 255}
 		icon := Intent_Icon.None
 		alarm := false
-		if tactical_telegraphs_are_visible(renderer, room) {
+		// Enemies keep their own clock: their intent stays on screen while the
+		// player's move or cast plays, and only leaves with the enemy itself.
+		if v.enabled || tactical_telegraphs_are_visible(renderer, room) {
 			if i, found := game.enemy_index_by_id(room, actor.entity.id); found {
 				enemy := &room.enemies[i]
 				intent = tactical_intent_label(enemy.intent)
-				icon, alarm = tactical_intent_icon(room, enemy), enemy.intent.windup
+				icon, alarm = remembered_intent_icon(renderer, enemy.id, tactical_intent_icon(room, enemy), enemy.intent.windup)
 				if enemy.intent.windup { color = {218, 169, 90, 255} }
 				if enemy.intent.kind == .Recover { intent = fmt.ctprintf("RECUPERO %ds", enemy.recovery_pulses); color = {124, 164, 190, 255} }
 				if enemy.intent.kind == .Attack && !enemy.intent.windup { intent = fmt.ctprintf("%s %d", intent, enemy.intent.damage) }
