@@ -189,6 +189,12 @@ flipbook_cue_action :: proc(cue: ^Presentation_Cue, entity: game.Entity_Ref) -> 
 flipbook_observe :: proc(renderer: ^Renderer, state: ^Flipbook_State, room: ^game.Room, actor: Presentation_Actor,
 	character: gfx.Flipbook_Character, now: f64, right: rl.Vector3) {
 	slot := flipbook_slot(state, actor.entity, character, now)
+	// Back on the board alive after its fall: a restart reuses the player's
+	// id, and that is a fresh card, not the fallen one.
+	if slot.action == .Death && actor.health > 0 && flipbook_death_done(slot, now) {
+		slot^ = {}
+		slot = flipbook_slot(state, actor.entity, character, now)
+	}
 	slot.seen, slot.ghost, slot.position = now, false, actor.position
 	wanted, from_hit := gfx.Flipbook_Action.Idle, false
 	walking := false
@@ -249,6 +255,11 @@ flipbook_observe :: proc(renderer: ^Renderer, state: ^Flipbook_State, room: ^gam
 		if base != .Walk { slot.base_started = now }
 		slot.base = base
 	}
+}
+
+// A fresh board starts with fresh standees.
+forget_flipbook_actors :: proc(renderer: ^Renderer) {
+	if renderer != nil && renderer.tactical.flipbook_state != nil { renderer.tactical.flipbook_state^ = {} }
 }
 
 // Once per frame, before the board is drawn: read the cues and states. Map

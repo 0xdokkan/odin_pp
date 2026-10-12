@@ -4,6 +4,7 @@ import "core:fmt"
 import "core:strings"
 import rl "vendor:raylib"
 import app "app"
+import gfx "engine/gfx"
 import game "game"
 import grid "grid"
 import level "level"
@@ -157,5 +158,27 @@ run_mechanics_lab_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer,
 	if !refilled || len(room.enemies) != 1 { fmt.eprintln("mechanics lab: empty arena not refilled"); return false }
 	for _ in 0..<60 { mechanics_lab_smoke_frame(window, renderer, &room, &controller, &cards, &buffer, 1.0/60.0) }
 	rl.TakeScreenshot("odin_pp_mechanics_lab_refill.png")
+	// Death, then a restart: the player's standee must come back.
+	player.health = 1
+	before := render.capture_room_presentation(&room)
+	game.clear_event_log(&room.recent_events)
+	blow := game.make_action(.Attack, game.enemy_entity(room.enemies[0].id))
+	if !game.add_effect(&blow, game.damage_effect(game.PLAYER_ENTITY, 50)) { return false }
+	report := game.resolve_action(&room, &blow)
+	if !report.accepted || room.phase != .Defeat { fmt.eprintln("mechanics lab: the player did not fall"); return false }
+	game.append_event_log(&room.recent_events, &report.events)
+	after := render.capture_room_presentation(&room)
+	if !render.begin_renderer_event_timeline(renderer, before, &room.recent_events, &after) { return false }
+	for _ in 0..<240 { mechanics_lab_smoke_frame(window, renderer, &room, &controller, &cards, &buffer, 1.0/60.0) }
+	game.destroy_room(&room)
+	player.health = player.stats.max_health
+	room, built = create_mechanics_lab_room(&data, &player, game.DEFAULT_TACTICAL_CONFIG)
+	if !built { return false }
+	render.frame_level(renderer, &data)
+	render.clear_event_animations(renderer)
+	for _ in 0..<30 { mechanics_lab_smoke_frame(window, renderer, &room, &controller, &cards, &buffer, 1.0/60.0) }
+	rl.TakeScreenshot("odin_pp_mechanics_lab_restart.png")
+	standee := render.flipbook_find(renderer, game.PLAYER_ENTITY, gfx.Flipbook_Character.Pilgrim, {})
+	if standee == nil || standee.action == .Death { fmt.eprintln("mechanics lab: the player's standee did not come back"); return false }
 	return true
 }

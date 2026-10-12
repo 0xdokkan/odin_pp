@@ -1027,6 +1027,7 @@ clear_event_animations :: proc(renderer: ^Renderer) {
 	if renderer != nil {
 		clear_event_timeline(&renderer.timeline)
 		clear_renderer_world_playback(renderer)
+		forget_flipbook_actors(renderer)
 	}
 }
 
