@@ -71,7 +71,7 @@ test_m8_locked_cards_never_leak_into_reward_pool :: proc(t: ^testing.T) {
 		for id in choices { testing.expect(t, id != .Titan_Grip && id != .Storm_Crown) }
 	}
 	profile.ring_wins = 3
-	all: [int(Card_Id.Count)-1]Card_Id // Spark alone is temporary-only.
+	all: [int(Card_Id.Count)-3]Card_Id // Spark is temporary-only; the Scopa pair is never offered.
 	random := u64(1)
 	testing.expect(t, generate_weighted_card_choices(&random, &node, all[:], &profile))
 	found_titan, found_crown := false, false

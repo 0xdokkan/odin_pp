@@ -37,8 +37,59 @@ gothic_rarity_accent :: proc(rarity: game.Card_Rarity) -> rl.Color {
 	return GOTHIC_MUTED
 }
 
+SCOPA_CARD_SIZE :: rl.Vector2{60, 96}
+
+// The source rectangle of a Scopa card in its sheet.
+scopa_card_source :: proc(id: game.Card_Id) -> rl.Rectangle {
+	return {0 if id == .Sei_Denari else SCOPA_CARD_SIZE.x+2, 0, SCOPA_CARD_SIZE.x, SCOPA_CARD_SIZE.y}
+}
+
+// Draws a Scopa card face into `dest` (pixel-exact when the scale is whole).
+draw_scopa_face :: proc(renderer: ^Renderer, id: game.Card_Id, dest: rl.Rectangle, rotation: f32 = 0, tint: rl.Color = rl.WHITE) {
+	texture := renderer.tactical.art.scopa
+	if texture.id == 0 { return }
+	rl.DrawTexturePro(texture, scopa_card_source(id), dest, {dest.width*0.5, dest.height*0.5}, rotation, tint)
+}
+
+// The Scopa pair is a real playing card on green felt rather than a gothic
+// crest: the Neapolitan face fills the height, cost and time sit at the corners.
+draw_scopa_tactical_card :: proc(renderer: ^Renderer, bounds: rl.Rectangle, card: game.Card_Instance, definition: game.Card_Definition,
+	slot: int, affordable, selected, hovered, available: bool) {
+	x, y, width, height := bounds.x, bounds.y, bounds.width, bounds.height
+	edge := GOTHIC_BLUE if selected || hovered else GOTHIC_STEEL
+	gothic_frame({x+2, y+3, width, height}, GOTHIC_INK, GOTHIC_INK)
+	gothic_frame(bounds, {26, 62, 44, 255}, edge)
+	for stripe in 0..<int(height/6) {
+		rl.DrawRectangleRec({x+5, y+5+f32(stripe)*6, width-10, 1}, {34, 76, 54, 255})
+	}
+	scale := max(f32(0.5), f32(int((height-12)/SCOPA_CARD_SIZE.y*2))*0.5)
+	face := rl.Rectangle{x+width*0.5, y+height*0.5, SCOPA_CARD_SIZE.x*scale, SCOPA_CARD_SIZE.y*scale}
+	draw_scopa_face(renderer, card.definition_id, {face.x+2, face.y+3, face.width, face.height}, 0, {0, 0, 0, 90})
+	draw_scopa_face(renderer, card.definition_id, face, 0, rl.WHITE if available else rl.Color{150, 140, 130, 255})
+	if selected || hovered {
+		light := f32(0.72)+f32(math.sin(renderer.sprite_assets.elapsed*3))*0.12
+		rl.DrawRectangleLinesEx({face.x-face.width*0.5-2, face.y-face.height*0.5-2, face.width+4, face.height+4}, 2, rl.Fade(edge, light))
+	}
+	rl.DrawRectangleRec({x+7, y+8, 22, 24}, GOTHIC_STEEL)
+	rl.DrawRectangleRec({x+8, y+9, 20, 22}, GOTHIC_INK)
+	gothic_text(renderer, fmt.ctprintf("%d", definition.cost), x+13, y+8, 18, GOTHIC_BLUE if affordable else GOTHIC_RED)
+	rl.DrawRectangleRec({x+7, y+36, 30, 17}, {22, 41, 54, 240})
+	gothic_text_fit(renderer, fmt.ctprintf("-%.0fs", game.tactical_card_time_cost(card.definition_id)), {x+10, y+37, 25, 15}, 12, GOTHIC_BLUE)
+	gold := game.card_effect_amount(definition.effects[0], card.upgrade_level)
+	ribbon := rl.Rectangle{x+width*0.5-36, y+height-27, 72, 19}
+	rl.DrawRectangleRec(ribbon, {72, 54, 24, 240})
+	rl.DrawRectangleLinesEx(ribbon, 1, {236, 196, 96, 255})
+	label := fmt.ctprintf("+%d ORO", gold)
+	gothic_text(renderer, label, ribbon.x+(ribbon.width-gothic_text_width(renderer, label, 14))*0.5, ribbon.y+1, 14, {252, 226, 132, 255})
+	gothic_text(renderer, fmt.ctprintf("%d", slot+1), x+width-16, y+8, 12, GOTHIC_PAPER)
+}
+
 draw_tactical_card :: proc(renderer: ^Renderer, bounds: rl.Rectangle, card: game.Card_Instance, definition: game.Card_Definition,
 	slot: int, affordable, selected, hovered, available: bool) {
+	if game.card_is_scopa(card.definition_id) && renderer.tactical.art.scopa.id != 0 {
+		draw_scopa_tactical_card(renderer, bounds, card, definition, slot, affordable, selected, hovered, available)
+		return
+	}
 	art := &renderer.tactical.art
 	accent := gothic_card_accent(card.definition_id)
 	rarity := gothic_rarity_accent(definition.rarity)

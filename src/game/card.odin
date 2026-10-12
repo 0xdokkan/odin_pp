@@ -57,7 +57,15 @@ Card_Id :: enum {
 	Tesla_Coil,
 	Titan_Grip,
 	Storm_Crown,
+	Sei_Denari,
+	Sette_Denari,
 	Count,
+}
+
+// The 6 and 7 of coins from a Scopa deck: gold now, and together in hand
+// they open the western easter egg. They never appear as rewards or wares.
+card_is_scopa :: proc(id: Card_Id) -> bool {
+	return id == .Sei_Denari || id == .Sette_Denari
 }
 
 card_dice_count :: proc(id: Card_Id) -> int {
@@ -842,6 +850,20 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 		reward_weight = 35, shop_base_price = 12, cost = 3,
 		targeting = {rule = .Opponent, cast_range = {.Manhattan, 1, 4}, shape = .Single, requires_line_of_sight = true, stops_on_wall = true},
 		effects = {{kind = .Damage, target = .Chosen_Entity, base_amount = 5, amount_per_upgrade = 1}, {}, {}, {}},
+		effect_count = 1,
+	},
+	{
+		id = .Sei_Denari, name = "6 di denari", rarity = .Common,
+		reward_weight = 1, shop_base_price = 6, cost = 1, exhaust_on_play = true,
+		targeting = {rule = .Self},
+		effects = {{kind = .Gain_Gold, target = .Player, base_amount = 6}, {}, {}, {}},
+		effect_count = 1,
+	},
+	{
+		id = .Sette_Denari, name = "7 di denari", rarity = .Common,
+		reward_weight = 1, shop_base_price = 7, cost = 1, exhaust_on_play = true,
+		targeting = {rule = .Self},
+		effects = {{kind = .Gain_Gold, target = .Player, base_amount = 7}, {}, {}, {}},
 		effect_count = 1,
 	},
 }

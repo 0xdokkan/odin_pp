@@ -293,6 +293,8 @@ card_colors :: proc(id: game.Card_Id, affordable: bool) -> (fill, outline: rl.Co
 		fill, outline = rl.Color{61, 42, 77, 245}, rl.Color{230, 180, 255, 255}
 	case .Chain_Lightning, .Shock_Floor, .Tesla_Coil, .Storm_Crown:
 		fill, outline = rl.Color{25, 52, 73, 245}, rl.Color{119, 224, 255, 255}
+	case .Sei_Denari, .Sette_Denari:
+		fill, outline = rl.Color{72, 54, 24, 245}, rl.Color{236, 196, 96, 255}
 	case .Sundering_Blow:
 		fill, outline = rl.Color{74, 29, 34, 245}, rl.Color{245, 94, 100, 255}
 	case .Prismatic_Barrage:
@@ -371,6 +373,8 @@ card_detail_lines :: proc(card: game.Card_Instance) -> (first, second: cstring) 
 	case .Tesla_Coil: return fmt.ctprintf("%d / DISTANCE DAMAGE", 8+upgrade), "FIELD CONSUMES 4 COILS"
 	case .Titan_Grip: return fmt.ctprintf("%d DAMAGE / THROW 2", 3+upgrade), "INTERRUPT / STAGGER 1"
 	case .Storm_Crown: return fmt.ctprintf("%d DAMAGE EACH", 5+upgrade), "LEGENDARY / CHAIN 3"
+	case .Sei_Denari: return "+6 GOLD", "SCOPA / EXHAUST"
+	case .Sette_Denari: return "+7 GOLD", "SCOPA / EXHAUST"
 	case .Count:
 	}
 	return "", ""
@@ -443,6 +447,8 @@ card_short_name :: proc(id: game.Card_Id) -> cstring {
 	case .Tesla_Coil: return "TESLA"
 	case .Titan_Grip: return "TITAN"
 	case .Storm_Crown: return "CROWN"
+	case .Sei_Denari: return "6 ORO"
+	case .Sette_Denari: return "7 ORO"
 	case .Count:
 	}
 	return ""
@@ -639,6 +645,13 @@ draw_card_sigil :: proc(bounds: rl.Rectangle, id: game.Card_Id, color: rl.Color)
 			rl.DrawLineEx({x, center.y-19}, {x+sign*5, center.y-5}, 4, color)
 			rl.DrawLineEx({x+sign*5, center.y-5}, {x-sign*3, center.y+12}, 3, color)
 			rl.DrawCircleV({x-sign*3, center.y+18}, 3, color)
+		}
+	case .Sei_Denari, .Sette_Denari:
+		coins := 6 if id == .Sei_Denari else 7
+		for index in 0..<coins {
+			p := center+rl.Vector2{f32(index%2)*16-8, f32(index/2)*12-14}
+			if index == 6 { p = center }
+			rl.DrawCircleLinesV(p, 5, color)
 		}
 	case .Count:
 	}

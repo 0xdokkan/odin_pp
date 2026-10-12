@@ -60,7 +60,8 @@ card_rarity_weight :: proc(weights: Card_Rarity_Weights, rarity: Card_Rarity) ->
 
 card_offer_weight :: proc(definition: Card_Definition, node: ^Run_Node, profile: ^M8_Profile = nil) -> u64 {
 	validated_definition := definition
-	if node == nil || !validate_card_definition(&validated_definition) || definition.temporary_only || !m8_card_unlocked(definition.id, profile) {
+	if node == nil || !validate_card_definition(&validated_definition) || definition.temporary_only || !m8_card_unlocked(definition.id, profile) ||
+	   card_is_scopa(definition.id) {
 		return 0
 	}
 	weights, ok := card_rarity_weights(node.kind, node.depth)

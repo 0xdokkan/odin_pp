@@ -20,6 +20,8 @@ GOTHIC_FONT_SIZES :: [?]int{10, 12, 14, 16, 18, 24, 32}
 
 Gothic_Art :: struct {
 	icons, figures, paper: rl.Texture2D,
+	// The Scopa 6 and 7 of coins (tools/art/build_scopa.py), side by side.
+	scopa: rl.Texture2D,
 	figure_sources, icon_sources: [16]rl.Rectangle,
 	figure_alpha: []u8,
 	fonts: [len(GOTHIC_FONT_SIZES)]rl.Font,
@@ -80,6 +82,12 @@ create_gothic_art :: proc(art: ^Gothic_Art) {
 		rl.ImageDrawPixel(&paper, c.int(x), c.int(y), {u8(218+shade), u8(207+shade), u8(184+shade), 255})
 	} }
 	art.paper = rl.LoadTextureFromImage(paper)
+	scopa_bytes := #load("../../assets/gothic/scopa-denari.png")
+	if scopa := rl.LoadImageFromMemory(".png", raw_data(scopa_bytes), c.int(len(scopa_bytes))); scopa.data != nil {
+		art.scopa = rl.LoadTextureFromImage(scopa)
+		rl.SetTextureFilter(art.scopa, .POINT)
+		rl.UnloadImage(scopa)
+	}
 	rl.SetTextureFilter(art.paper, .POINT)
 	rl.UnloadImage(paper)
 	body_bytes := #load("../../assets/fonts/Jersey10-Regular.ttf")
@@ -101,7 +109,7 @@ create_gothic_art :: proc(art: ^Gothic_Art) {
 	}
 }
 destroy_gothic_art :: proc(art: ^Gothic_Art) {
-	for texture in ([?]rl.Texture2D{art.icons, art.figures, art.paper}) { if texture.id != 0 { rl.UnloadTexture(texture) } }
+	for texture in ([?]rl.Texture2D{art.icons, art.figures, art.paper, art.scopa}) { if texture.id != 0 { rl.UnloadTexture(texture) } }
 	for font in art.fonts { if font.texture.id != 0 { rl.UnloadFont(font) } }
 	delete(art.figure_alpha)
 	art^ = {}
@@ -224,6 +232,8 @@ gothic_card_icon :: proc(id: game.Card_Id) -> int {
 	case .Fate_Strike, .Prismatic_Barrage: return 13
 	case .Chain_Lightning, .Tesla_Coil, .Shock_Floor, .Storm_Crown: return 14
 	case .Purifying_Guard: return 15
+	// Scopa cards draw their own art (draw_scopa_card); this is the fallback.
+	case .Sei_Denari, .Sette_Denari: return 9
 	case .Count: return 0
 	}
 	return 0

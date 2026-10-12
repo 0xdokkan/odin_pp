@@ -46,7 +46,8 @@ rework_tactical_card :: proc(definition: ^Card_Definition) {
 		d.effects[1].base_amount = 2
 	case .Strike, .Toxic_Wave, .Afterimage, .Calculated_Risk, .Spark,
 	     .Firebomb, .Caustic_Bloom, .Fate_Strike, .Chain_Lightning,
-	     .Sundering_Blow, .Prismatic_Barrage, .Twin_Venom, .Shock_Floor, .Tesla_Coil, .Titan_Grip, .Storm_Crown, .Count:
+	     .Sundering_Blow, .Prismatic_Barrage, .Twin_Venom, .Shock_Floor, .Tesla_Coil, .Titan_Grip, .Storm_Crown,
+	     .Sei_Denari, .Sette_Denari, .Count:
 	}
 }
 

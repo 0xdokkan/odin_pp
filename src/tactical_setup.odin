@@ -12,7 +12,8 @@ configure_demo_tactical_player :: proc(player: ^game.Player, config: game.Tactic
 			else if card.definition_id == .Piercing_Ray { card.definition_id = .Heavy_Blow }
 			else if card.definition_id == .Toxic_Wave { card.definition_id = .Battle_Focus }
 		}
-		for id in ([2]game.Card_Id{.Shock_Floor, .Tesla_Coil}) {
+		// The Scopa pair rides along from the first room: gold, and an easter egg.
+		for id in ([4]game.Card_Id{.Shock_Floor, .Tesla_Coil, .Sei_Denari, .Sette_Denari}) {
 			present := false
 			for card in player.deck.owned[:player.deck.owned_count] { if card.definition_id == id { present = true } }
 			if !present { if _, added := game.add_owned_card(&player.deck, id); !added { return false } }
