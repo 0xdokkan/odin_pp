@@ -88,6 +88,21 @@ usa valori predefiniti e disabilita le scritture per conservare il file original
 Smoke, laboratori e report di playtest avviano la run direttamente, come prima.
 Gli smoke e i laboratori non scrivono i profili.
 
+### Prova meccaniche
+
+Il pulsante **Prova meccaniche** del menu (o `--mechanics-lab`) apre una sandbox
+per provare le meccaniche nuove, una alla volta. È un'arena grande 23x17 senza
+ostacoli né nebbia, con il giocatore al centro. Il combattimento non finisce mai:
+l'ultimo nemico ucciso non ripulisce la stanza, e ogni 4 secondi di gioco arriva
+un nemico casuale (Chaser, Archer, Brute, Bomber o Custode) su una casella libera
+ad almeno 4 celle dal giocatore, fino a 6 insieme; un'arena vuota si riempie
+subito. Gli easter egg si riaprono ogni volta. Per ora il mazzo contiene **solo
+Tesla Coil** (8 copie, mano da 5, energia 12). Niente ricompense, uscita o
+profilo; `F5` ricomincia, `F10` torna al menu. Arena, mazzo e ritmo degli arrivi
+sono in [mechanics_lab.odin](src/mechanics_lab.odin) e
+[sandbox.odin](src/game/sandbox.odin): per provare una nuova meccanica basta
+cambiare `MECHANICS_LAB_DECK`.
+
 | Opzione | Uso |
 |---|---|
 | `--run` | salta il menu ed entra subito nella run |
@@ -95,6 +110,7 @@ Gli smoke e i laboratori non scrivono i profili.
 | `--smoke-menu` | cattura `odin_pp_menu.png` dopo 30 frame ed esce |
 | `--animation-speed=2` | velocità delle animazioni ordinarie, fra 0.25x e 4x; non accelera cast o dadi M8 |
 | `--fast` | velocità 4x |
+| `--mechanics-lab` | Prova meccaniche: arena aperta senza fine, mazzo di sole Tesla, nemici che continuano ad arrivare |
 | `--spell-lab` | arena con Firebomb, Fate Strike, Chain Lightning, Sundering Blow e Guard |
 | `--dice-lab` | arena con Fate Strike, Sundering Blow, Prismatic Barrage, Twin Venom e Guard |
 | `--dice-set-lab` | tavolo 3D del set D4/D6/D8/D10/D%/D12/D20: selezione, lancio e rotazione con il mouse |
@@ -685,6 +701,7 @@ odin run src -o:none -- --classic
 | `--smoke-m7-view` | prova grafica di scena, oggetti 3D, fog, ologramma, QTE e menu |
 | `--smoke-m8-view` | prova 3D di d4, dispositivi, offerta del ring, equipaggiamento, scheda personaggio, tag match e cambio stanza |
 | `--smoke-western` | nuvoletta 6 RANCH 7: apertura automatica, volo delle carte, insegna, porte, corsa a tempo e premio |
+| `--smoke-mechanics-lab` | Prova meccaniche: arena aperta, mano di sole Tesla, ring riaperto, arrivi fino al massimo, ultima uccisione senza fine del combattimento |
 | `--smoke-m9-view` | arena continua, duello con IA, presa in quattro pose, replay e FPS con ricarica e vittoria |
 
 Gli smoke classici e i laboratori `--spell-lab` / `--dice-lab` conservano il comportamento classico;
@@ -991,6 +1008,7 @@ le immagini sono output rigenerabili, non prerequisiti del checkout.
 | `--smoke-arenas-view` | quattro fasce di arene reali, combattimento, ologramma, Loot e cambio stanza; screenshot `odin_pp_arenas_*.png` |
 | `--smoke-m8-view` | dispositivi con APRI IL RING, campo, tag match, ritorno Loot: `odin_pp_m8_d4.png`, `devices`, `mega_combo`, `character`, `loot`, `tag_ring`, `next_room` (tutti con prefisso `odin_pp_m8_` e suffisso `.png`) |
 | `--smoke-western` | 6 RANCH 7 dalla mano al premio: `odin_pp_western_hand.png`, `cards`, `sign`, `gate`, `riders`, `ride`, `grab`, `win`, `reward` (prefisso `odin_pp_western_`) |
+| `--smoke-mechanics-lab` | sandbox: `odin_pp_mechanics_lab.png`, `_square`, `_full`, `_refill` (prefisso `odin_pp_mechanics_lab`) |
 | `--smoke` | `odin_pp_isometric.png` |
 | `--smoke-generation` | `odin_pp_procedural_room.png` |
 | `--smoke-map` | `odin_pp_route.png` |

@@ -1075,7 +1075,9 @@ finish_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^Presenta
 		if cue.event.target == game.PLAYER_ENTITY {
 			timeline.view.phase = .Defeat
 			timeline.view.modifier.activation_pulse = 0
-		} else if visible_presentation_enemy_count(&timeline.view) == 0 && timeline.view.phase != .Defeat {
+		} else if visible_presentation_enemy_count(&timeline.view) == 0 && timeline.view.phase != .Defeat &&
+		          !(timeline.final_view.valid && timeline.final_view.phase == .Combat) {
+			// A room that stays in combat (the endless sandbox) is not cleared.
 			timeline.view.phase = .Loot
 			timeline.view.modifier.activation_pulse = 0
 		}

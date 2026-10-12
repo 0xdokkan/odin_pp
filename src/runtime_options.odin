@@ -13,6 +13,8 @@ Runtime_Options :: struct {
 	m7_smoke, m7_view_smoke: bool,
 	m8_view_smoke: bool,
 	western_smoke: bool,
+	// PROVA MECCANICHE: the endless sandbox (mechanics_lab.odin) and its capture.
+	mechanics_lab, mechanics_lab_smoke: bool,
 	arena_view_smoke: bool,
 	animation_speed: f32,
 	debug_abilities: bool,
@@ -72,6 +74,8 @@ apply_runtime_option :: proc(options: ^Runtime_Options, argument: string) -> (ha
 	if argument == "--smoke-m9-view" {options.m9_smoke=true;return true,true}
 	if argument == "--smoke-m8-view" { options.m8_view_smoke = true; return true, true }
 	if argument == "--smoke-western" { options.western_smoke = true; return true, true }
+	if argument == "--mechanics-lab" { options.mechanics_lab = true; return true, true }
+	if argument == "--smoke-mechanics-lab" { options.mechanics_lab_smoke = true; return true, true }
 	if argument == "--smoke-arenas-view" { options.arena_view_smoke = true; return true, true }
 	if argument == "--dice-set-lab" { options.dice_set_lab = true; return true, true }
 	if argument == "--smoke-dice-set" { options.dice_set_smoke = true; return true, true }

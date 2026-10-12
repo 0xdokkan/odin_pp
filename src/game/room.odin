@@ -199,6 +199,8 @@ Room :: struct {
 	reaction_bindings: Reaction_Binding_Set,
 	// A ring opened by a square of coils, awaiting the duel's result.
 	tesla_ring: Tesla_Ring,
+	// The mechanics sandbox never clears: the last kill keeps the combat going.
+	endless: bool,
 }
 
 Move_Direction :: enum {
@@ -687,13 +689,45 @@ kill_enemy :: proc(room: ^Room, enemy_index: int) -> (drops: [3]Loot, drop_count
 		append(&room.loot, drops[drop_count])
 		drop_count += 1
 	}
-	if len(room.enemies) == 0 {
+	if len(room.enemies) == 0 && !room.endless {
 		if room.phase != .Defeat {
 			room.phase = .Loot
 		}
 		clear_enemy_intents(room)
 	}
 	return
+}
+
+// A free cell for a newcomer: walkable, and nobody or nothing already on it.
+enemy_spawn_cell_is_free :: proc(room: ^Room, cell: grid.Position) -> bool {
+	if room == nil || room.player == nil || !base_cell_is_walkable(room, cell) || cell_blocks_movement(room, cell) ||
+	   cell == room.player.position || cell == room.exit_position { return false }
+	if _, found := enemy_index_at(room, cell); found { return false }
+	if _, found := object_index_at(room, cell); found { return false }
+	if _, found := trap_index_at(room, cell); found { return false }
+	return true
+}
+
+// Adds an enemy to a room already in combat, with the same rules as the
+// room's own spawns, and plans its first intent.
+spawn_enemy :: proc(room: ^Room, spawn: Enemy_Spawn) -> (id: u32, ok: bool) {
+	if room == nil || room.player == nil || room.phase != .Combat || len(room.enemies) >= MAX_ENEMIES_PER_ROOM ||
+	   spawn.health <= 0 || spawn.attack <= 0 || spawn.archetype >= .Count ||
+	   !enemy_spawn_cell_is_free(room, spawn.position) { return }
+	id = room.next_enemy_id
+	room.next_enemy_id += 1
+	append(&room.enemies, Enemy{
+		id = id,
+		archetype = spawn.archetype,
+		position = spawn.position,
+		max_health = spawn.health,
+		health = spawn.health,
+		attack = spawn.attack,
+		drops_healing = spawn.drops_healing,
+		boss_phase = 1 if spawn.archetype == .Demolitionist else 0,
+	})
+	plan_enemy_intents(room)
+	return id, true
 }
 
 enemy_can_move_to :: proc(room: ^Room, enemy_index: int, position: grid.Position) -> bool {

@@ -108,6 +108,8 @@ Roguelike_Session :: struct {
 
 	// Launched from the menu: F10 returns there instead of quitting.
 	from_launcher:           bool,
+	// PROVA MECCANICHE: the endless arena's arrivals.
+	sandbox:                 game.Sandbox_State,
 
 	// Minigame challenge feedback shown after returning to the run.
 	challenge_message:       string,
@@ -305,6 +307,7 @@ roguelike_parse_arguments :: proc(rs: ^Roguelike_Session, args: []string) {
 	if rs.options.m7_view_smoke { rs.smoke_mode_count += 1 }
 	if rs.options.m8_view_smoke { rs.smoke_mode_count += 1 }
 	if rs.options.western_smoke { rs.smoke_mode_count += 1 }
+	if rs.options.mechanics_lab_smoke { rs.smoke_mode_count += 1 }
 	if rs.options.arena_view_smoke { rs.smoke_mode_count += 1 }
 	if rs.options.dice_set_smoke { rs.smoke_mode_count += 1 }
 	if rs.options.m9_smoke { rs.smoke_mode_count += 1 }
@@ -320,7 +323,13 @@ roguelike_parse_arguments :: proc(rs: ^Roguelike_Session, args: []string) {
 		fmt.eprintln("dice set lab requires tactical mode and cannot be combined with another lab or smoke")
 		os.exit(2)
 	}
-	if (rs.options.m7_view_smoke || rs.options.m8_view_smoke || rs.options.arena_view_smoke || rs.options.western_smoke) && !rs.options.tactical.enabled {
+	if rs.options.mechanics_lab && (!rs.options.tactical.enabled || rs.options.spell_lab || rs.options.dice_set_lab ||
+	   rs.options.m9_lab != .None || rs.smoke_mode_count > 0 || rs.playtest_report) {
+		fmt.eprintln("the mechanics lab requires tactical mode and cannot be combined with another lab, report or smoke")
+		os.exit(2)
+	}
+	if (rs.options.m7_view_smoke || rs.options.m8_view_smoke || rs.options.arena_view_smoke || rs.options.western_smoke ||
+	    rs.options.mechanics_lab_smoke) && !rs.options.tactical.enabled {
 		fmt.eprintln("tactical view smoke requires tactical mode; omit --classic")
 		os.exit(2)
 	}
@@ -345,18 +354,18 @@ roguelike_parse_arguments :: proc(rs: ^Roguelike_Session, args: []string) {
 // Smoke, lab and report modes run the roguelike directly, without the menu.
 roguelike_requires_direct_start :: proc(rs: ^Roguelike_Session) -> bool {
 	return rs.smoke_mode_count > 0 || rs.options.spell_lab || rs.options.dice_set_lab ||
-	       rs.options.m9_lab != .None || rs.playtest_report
+	       rs.options.m9_lab != .None || rs.playtest_report || rs.options.mechanics_lab
 }
 
 // Labs and captures never read or write persistent progression.
 roguelike_profile_enabled :: proc(rs: ^Roguelike_Session) -> bool {
-	return rs.smoke_mode_count == 0 && !rs.smoke_test && !rs.options.spell_lab &&
+	return rs.smoke_mode_count == 0 && !rs.smoke_test && !rs.options.spell_lab && !rs.options.mechanics_lab &&
 	       !rs.options.dice_set_lab && !rs.options.dice_set_smoke &&
 	       rs.options.m9_lab == .None && !rs.options.m9_smoke
 }
 
 roguelike_prepare :: proc(rs: ^Roguelike_Session) -> Session_Start {
-	rs.procedural_rooms = (!rs.smoke_test && !rs.options.spell_lab) || rs.smoke_generation || rs.smoke_family != .Scattered || rs.smoke_relics
+	rs.procedural_rooms = (!rs.smoke_test && !rs.options.spell_lab && !rs.options.mechanics_lab) || rs.smoke_generation || rs.smoke_family != .Scattered || rs.smoke_relics
 
 
 	rs.run_seed = rs.options.seed
@@ -380,7 +389,8 @@ roguelike_prepare :: proc(rs: ^Roguelike_Session) -> Session_Start {
 		rs.run_seed = selected
 	}
 	run_ok: bool
-	rs.run_state, run_ok = game.create_run(DEMO_PLAYER_STATS, DEMO_RUN_CONFIG, rs.run_seed, (!rs.smoke_test && !rs.options.spell_lab) || rs.smoke_relics)
+	rs.run_state, run_ok = game.create_run(DEMO_PLAYER_STATS, DEMO_RUN_CONFIG, rs.run_seed,
+		(!rs.smoke_test && !rs.options.spell_lab && !rs.options.mechanics_lab) || rs.smoke_relics)
 	if !run_ok {
 		return .Failed}
 	rs.run_created = true
@@ -394,6 +404,7 @@ roguelike_prepare :: proc(rs: ^Roguelike_Session) -> Session_Start {
 		return .Failed}
 	rs.room_created = true
 	if rs.options.spell_lab && !prepare_spell_lab(&rs.room, rs.options.dice_lab) { fmt.eprintln("could not prepare card practice"); return .Failed}
+	if rs.options.mechanics_lab && !prepare_mechanics_lab(rs) { fmt.eprintln("could not prepare the mechanics lab"); return .Failed}
 	if rs.smoke_playtest {
 		if !run_headless_playtest_smoke(&rs.run_state, &rs.room, rs.run_seed, rs.options.playtest_output) {
 			fmt.eprintln("failed to write headless playtest report")
@@ -408,7 +419,8 @@ roguelike_prepare :: proc(rs: ^Roguelike_Session) -> Session_Start {
 		return .Finished
 	}
 	if rs.smoke_test || rs.options.spell_lab { rs.options.tactical.enabled = false; rs.options.scene_3d = false }
-	if rs.options.tactical.enabled {
+	// The mechanics lab configured its own fogless arena.
+	if rs.options.tactical.enabled && !rs.options.mechanics_lab {
 		configured := game.configure_tactical_room(&rs.room, rs.options.tactical)
 		assert(configured)
 	}
@@ -773,6 +785,10 @@ roguelike_attach :: proc(rs: ^Roguelike_Session, window: ^app.Window) -> Session
 		if !run_western_smoke(rs.window, &rs.iso_renderer, &rs.dice_renderer) { fmt.eprintln("6 RANCH 7 smoke failed"); os.exit(2) }
 		return .Finished
 	}
+	if rs.options.mechanics_lab_smoke {
+		if !run_mechanics_lab_smoke(rs.window, &rs.iso_renderer, &rs.dice_renderer) { fmt.eprintln("mechanics lab smoke failed"); os.exit(2) }
+		return .Finished
+	}
 	if rs.options.m9_lab != .None {
 		run_m9_lab(rs.window, &rs.iso_renderer, rs.options.m9_lab)
 		return .Finished
@@ -938,6 +954,10 @@ roguelike_update :: proc(data: rawptr, hf: ^host.Frame) {
 		if rs.options.spell_lab {
 			if !prepare_spell_lab(&rs.room, rs.options.dice_lab) { fmt.eprintln("could not reset card practice"); host.quit(hf); return }
 		}
+		if rs.options.mechanics_lab {
+			if !prepare_mechanics_lab(rs) { fmt.eprintln("could not reset the mechanics lab"); host.quit(hf); return }
+			rs.tactical_controller = {}
+		}
 		if rs.playtest_report && !game.run_has_relic_choice(&rs.run_state) {
 			playtest_started := begin_playtest_run(&rs.playtest_session, rs.run_seed, &rs.run_state, &rs.room)
 			assert(playtest_started)
@@ -986,6 +1006,11 @@ roguelike_update :: proc(data: rawptr, hf: ^host.Frame) {
 			&rs.card_interaction, &rs.gameplay_buffer, rs.frame_time,
 			rs.run_state.phase == .In_Room && !relic_visible && !rs.route_visible && !rs.options.m7_view_smoke,
 			rs.mouse_canvas, rs.mouse_inside, rs.playtest_session_ptr) } else { tactical_input_blocked = true }
+	}
+	// Arrivals follow the running board: never paused, in a modal or mid-animation.
+	if rs.options.mechanics_lab && !rs.m8_modal && !rs.tactical_controller.paused && rl.IsWindowFocused() &&
+	   rs.run_state.phase == .In_Room && !render.renderer_timeline_is_busy(&rs.iso_renderer) {
+		_, _ = game.sandbox_tick(&rs.room, &rs.sandbox, rs.frame_time)
 	}
 
 	if relic_visible {
@@ -1697,6 +1722,7 @@ roguelike_draw :: proc(data: rawptr, hf: ^host.Frame) {
 			if rs.tactical_controller.hologram { render.draw_hologram(&rs.iso_renderer, &rs.room) }
 			render.draw_tactical_hud(&rs.iso_renderer, &rs.room, !rs.options.m7_view_smoke && (rs.tactical_controller.paused || !rl.IsWindowFocused()), rs.tactical_controller.hologram)
 		}
+		if rs.options.mechanics_lab { render.draw_mechanics_lab_banner(&rs.iso_renderer, &rs.room, rs.from_launcher) }
 		if rs.options.spell_lab {
 			label: cstring = "DICE PRACTICE / F5 RESTART" if rs.options.dice_lab else "SPELL PRACTICE / F5 RESTART"
 			rl.DrawText(label, 265, 106, 11, rl.Color{172, 219, 222, 255})
