@@ -6,8 +6,10 @@ import game "../game"
 import grid "../grid"
 import view "../view"
 
-// Enemy intent displays on trial in the mechanics lab (F6 cycles them). The
-// rules they follow come from how vision works away from where one looks:
+// How a living board shows what each enemy is about to do. The game uses
+// SIGILLI + TERRENO; the mechanics lab cycles the four displays with F6 to
+// compare them. The rules they follow come from how vision works away from
+// where one looks:
 // the edge of the eye misses colour and detail but catches luminance changes
 // (flicker around 5-10 Hz) and motion. So an intent says what it is with a
 // large pictogram and a consistent colour (red blow, orange shot or area,
@@ -22,8 +24,12 @@ import view "../view"
 //             cells about to be struck fill from their edges inward, the
 //             player's own cell outlined when it is one of them; a move is an
 //             arrow to its cell, a protection a thread to the ally.
-//   SIGILLI + TERRENO  both (the default).
+//   SIGILLI + TERRENO  both (the game's).
 //   ETICHETTE the board as it was: the small sticker in the health label.
+//
+// Under fog nothing gives a hidden enemy away: its seal, arrow and thread
+// show only while it is in sight, and a threatened cell only while that cell
+// is.
 
 Intent_Display :: enum u8 {Both, Seals, Ground, Labels}
 
@@ -68,12 +74,12 @@ cycle_intent_display :: proc(renderer: ^Renderer) {
 
 intent_seals_on :: proc(renderer: ^Renderer) -> bool {
 	v := &renderer.tactical
-	return v.mechanics_lab && (v.intent_display == .Both || v.intent_display == .Seals)
+	return v.living && (v.intent_display == .Both || v.intent_display == .Seals)
 }
 
 intent_ground_on :: proc(renderer: ^Renderer) -> bool {
 	v := &renderer.tactical
-	return v.mechanics_lab && (v.intent_display == .Both || v.intent_display == .Ground)
+	return v.living && (v.intent_display == .Both || v.intent_display == .Ground)
 }
 
 // Seconds to the action and its whole countdown; `progress` runs 0..1 to it.
@@ -110,7 +116,7 @@ intent_trace :: proc(renderer: ^Renderer, id: u32) -> ^Intent_Trace {
 // the one that has just been carried out (its countdown ran out and a new
 // plan took its place).
 update_intent_traces :: proc(renderer: ^Renderer, room: ^game.Room, now: f64) {
-	if room == nil || !renderer.tactical.mechanics_lab { return }
+	if room == nil || !renderer.tactical.living { return }
 	for &trace in renderer.tactical.intent_traces {
 		if !trace.used { continue }
 		found := false
@@ -177,12 +183,12 @@ draw_intent_seals :: proc(renderer: ^Renderer, room: ^game.Room) {
 		loud := intent_loudness(left)
 		lit := intent_flicker(left, now)
 		color := living_ring_color(kind)
-		radius := 13+7*loud
-		if left < INTENT_FLICKER_SECONDS && lit == 1 { radius += 2 }
+		radius := 13+4*loud
+		if left < INTENT_FLICKER_SECONDS && lit == 1 { radius += 1.5 }
 		// A glow of the action's colour behind it as the action nears: a patch
 		// of colour survives the blur of the eye's edge, a thin line does not.
-		inner, outer := radius+3, radius+3+4+7*loud
-		if loud > 0 { rl.DrawCircleV(center, outer+10*loud, color_with_opacity(color, 0.32*loud*lit)) }
+		inner, outer := radius+3, radius+3+4+4*loud
+		if loud > 0 { rl.DrawCircleV(center, outer+5*loud, color_with_opacity(color, 0.3*loud*lit)) }
 		// The gauge: a thin dark track, the colour filling it clockwise to the
 		// action, a notch per second of the countdown.
 		rl.DrawRing(center, outer-1, outer+1, 0, 360, 40, {13, 20, 30, 220})
@@ -203,7 +209,7 @@ draw_intent_seals :: proc(renderer: ^Renderer, room: ^game.Room) {
 	for &trace in v.intent_traces {
 		if !trace.used || trace.flash_kind == .None { continue }
 		t := f32((now-trace.flash)/INTENT_FLASH_SECONDS)
-		if t < 0 || t >= 1 { continue }
+		if t < 0 || t >= 1 || !tactical_render_visible(renderer, {int(trace.flash_at.x), int(trace.flash_at.y)}) { continue }
 		p := tactical_project(renderer, {trace.flash_at.x+0.5, trace.flash_at.y+0.5}, 1.1)
 		r := 18+46*t
 		rl.DrawRing({p.x, p.y}, r, r+5*(1-t)+1, 0, 360, 48, color_with_opacity(living_ring_color(trace.flash_kind), 1-t))
@@ -240,7 +246,7 @@ draw_intent_ground :: proc(renderer: ^Renderer, room: ^game.Room) {
 			if enemy.intent.path_count == 0 { continue }
 			from := enemy.position
 			to := enemy.intent.destination
-			if !tactical_render_visible(renderer, to) { continue }
+			if !tactical_render_visible(renderer, from) || !tactical_render_visible(renderer, to) { continue }
 			// The cell it steps onto fills like a struck one; the arrow says from where.
 			draw_intent_cell(to, progress, color, (0.45+0.45*loud)*lit)
 			draw_intent_arrow(from, to, progress, color_with_opacity(color, (0.45+0.5*loud)*lit))
@@ -248,6 +254,7 @@ draw_intent_ground :: proc(renderer: ^Renderer, room: ^game.Room) {
 			ally_index, found := game.enemy_index_by_id(room, enemy.intent.protected_ally.id)
 			if !found { continue }
 			ally := room.enemies[ally_index].position
+			if !tactical_render_visible(renderer, enemy.position) || !tactical_render_visible(renderer, ally) { continue }
 			a := rl.Vector3{f32(enemy.position.x)+0.5, 0.7, f32(enemy.position.y)+0.5}
 			b := rl.Vector3{f32(ally.x)+0.5, 0.7, f32(ally.y)+0.5}
 			tether := color_with_opacity(color, (0.5+0.5*loud)*lit)
@@ -263,7 +270,7 @@ draw_intent_ground :: proc(renderer: ^Renderer, room: ^game.Room) {
 		t := f32((now-trace.flash)/INTENT_FLASH_SECONDS)
 		if t < 0 || t >= 1 { continue }
 		for cell in trace.flash_cells[:trace.flash_count] {
-			draw_intent_cell(cell, 1, {255, 250, 235, 255}, 0.75*(1-t))
+			if tactical_render_visible(renderer, cell) { draw_intent_cell(cell, 1, {255, 250, 235, 255}, 0.75*(1-t)) }
 		}
 	}
 }

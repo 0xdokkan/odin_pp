@@ -4,12 +4,12 @@ import "core:testing"
 import game "../game"
 
 @(test)
-test_intent_display_cycles_and_stays_in_the_lab :: proc(t: ^testing.T) {
+test_intent_display_shows_on_living_boards_and_cycles :: proc(t: ^testing.T) {
 	renderer := new(Renderer)
 	defer free(renderer)
-	// The rest of the game keeps its board as it is.
+	// Only living boards (the 3D board) show it, with seals and ground.
 	testing.expect(t, !intent_seals_on(renderer) && !intent_ground_on(renderer))
-	renderer.tactical.mechanics_lab = true
+	renderer.tactical.living = true
 	testing.expect(t, intent_seals_on(renderer) && intent_ground_on(renderer))
 	cycle_intent_display(renderer)
 	testing.expect(t, intent_seals_on(renderer) && !intent_ground_on(renderer))
@@ -49,7 +49,7 @@ test_intent_traces_flash_the_action_that_landed :: proc(t: ^testing.T) {
 	room.player = &player
 	renderer := new(Renderer)
 	defer free(renderer)
-	renderer.tactical.mechanics_lab = true
+	renderer.tactical.living = true
 	update_intent_traces(renderer, &room, 1.0)
 	trace := intent_trace(renderer, 3)
 	testing.expect(t, trace.kind == .Strike && trace.flash_kind == .None)

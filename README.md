@@ -105,29 +105,15 @@ cambiare `MECHANICS_LAB_DECK`.
 
 Le novità nate qui ora valgono in tutto il gioco: le azioni che durano il loro
 costo e la finestra che si accorcia ([Modalità tattica M7](#modalità-tattica-m7)),
-i cartoncini vivi, il cerchio d'azione del Viandante, i segnalini di carta e la
-vita sempre visibile ([Il tavolo](#il-tavolo-cartoncini-vivi-cerchi-e-segnalini)).
+i cartoncini vivi, il cerchio d'azione del Viandante, le intenzioni dei nemici
+con sigilli e terreno, i segnalini di carta e la vita sempre visibile
+([Il tavolo](#il-tavolo-cartoncini-vivi-cerchi-e-segnalini)).
 La prova resta la sandbox in cui provare le prossime.
 
-**Intenzioni dei nemici (in prova, `F6`).** Il cerchio che si stringe attorno ai
-nemici è spento: la prova confronta altri modi di dire cosa sta per fare un
-nemico, e quando, anche a chi non lo sta guardando. La visione periferica perde
-colore e dettaglio ma coglie i cambi di luminosità (un tremolio fra 5 e 10 Hz) e
-il movimento; per questo ogni modo dice **cosa** con un pittogramma grande e un
-colore coerente, **quando** con un indicatore che si riempie verso l'azione, e
-**adesso** con un tremolio di luce e della figura nell'ultimo mezzo secondo e un
-lampo verso l'esterno quando l'azione arriva. Solo le azioni a meno di un
-secondo e mezzo sono vivide: le altre restano tenui, così sei nemici non gridano
-tutti insieme.
-
-| Modo (`F6`) | Cosa mostra |
-|---|---|
-| SIGILLI + TERRENO | entrambi (predefinito) |
-| SIGILLI | un sigillo appuntato sulla carta del nemico: il pittogramma su carta, un indicatore spesso attorno con una tacca per secondo, un alone del colore dell'azione quando si avvicina; la figura trema prima di agire |
-| TERRENO | la conseguenza dove arriva, come in Into the Breach: le celle colpite si riempiono dai bordi al centro, la cella del Viandante si contorna se è fra queste; un movimento riempie la cella d'arrivo con una freccia, una protezione tira un filo verso l'alleato |
-| ETICHETTE | il tavolo di prima: il piccolo adesivo nell'etichetta della vita |
-
-I modi sono in [intent_display.odin](src/render/intent_display.odin).
+**Intenzioni dei nemici (`F6`).** Nel gioco i nemici mostrano cosa stanno per
+fare con sigilli e terreno ([Il tavolo](#il-tavolo-cartoncini-vivi-cerchi-e-segnalini));
+qui `F6` passa fra i quattro modi (sigilli + terreno, sigilli, terreno, le
+etichette di prima) per confrontarli, e il cartello mostra quello attivo.
 
 | Opzione | Uso |
 |---|---|
@@ -442,8 +428,28 @@ dopo uno scocco e si stringe fino a toccare la carta allo scocco successivo, il
 momento giusto per un'azione critica; segue il tempo reale anche quando
 un'azione consuma secondi.
 
-Le azioni dei nemici hanno un colore per tipo, usato dai modi delle intenzioni
-della Prova meccaniche (il loro cerchio d'azione è spento per ora):
+**Le intenzioni dei nemici** si leggono anche con la coda dell'occhio. La
+visione periferica perde colore e dettaglio ma coglie i cambi di luminosità (un
+tremolio fra 5 e 10 Hz) e il movimento; per questo ogni nemico dice **cosa** sta
+per fare con un pittogramma grande e un colore, **quando** con un indicatore che
+si riempie verso l'azione, e **adesso** con un tremolio di luce e della figura
+nell'ultimo mezzo secondo e un lampo verso l'esterno quando l'azione arriva. Solo
+le azioni a meno di un secondo e mezzo sono vivide: le altre restano tenui, così
+più nemici non gridano tutti insieme
+([intent_display.odin](src/render/intent_display.odin)).
+
+- **Sigilli**: un sigillo appuntato sulla carta del nemico, con il pittogramma
+  su carta (spada, arco, bomba, stivale, scudo), un indicatore spesso con una
+  tacca per secondo e un alone del colore dell'azione quando si avvicina; la
+  figura trema prima di agire.
+- **Terreno**: la conseguenza dove arriva, come in Into the Breach. Le celle
+  colpite si riempiono dai bordi al centro e la cella del Viandante si contorna
+  se è fra queste; un movimento riempie la cella d'arrivo con una freccia, una
+  protezione tira un filo verso l'alleato.
+
+Nella nebbia niente tradisce un nemico nascosto: sigillo, freccia, filo e lampo
+compaiono solo se è in vista, una cella minacciata solo se è visibile. Il colore
+dice il tipo di azione:
 
 | Colore | Azione in arrivo |
 |---|---|
