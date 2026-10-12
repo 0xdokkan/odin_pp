@@ -8,6 +8,7 @@ import game "game"
 import host "engine/host"
 import render "render"
 import view "view"
+import western "western"
 import rl "vendor:raylib"
 
 M8_PROFILE_PATH :: "odin_pp_profile.json"
@@ -19,10 +20,24 @@ M8_Session :: struct {
 	ring_link: Ring_Run_Link,
 	report: game.Tesla_Ring_Report,
 	status: string,
+	ranch: Ranch_Session,
+}
+
+// 6 RANCH 7 plays in a bubble over the frozen board, inside the run scene.
+Ranch_Session :: struct {
+	active: bool,
+	state: western.State,
+	// Where the 6 and the 7 sat in the hand when they left for the sign.
+	card_from: [2]rl.Rectangle,
+	// Settled during this step; the scene reports it once.
+	finished: bool,
+	reward: game.Western_Ranch_Reward,
 }
 
 M8_Session_Input :: struct {
 	focused, inside, pressed, escape: bool,
+	// The ranch's press edge: Space, Enter or a click inside the canvas.
+	ranch_press: bool,
 	mouse: view.Vec2,
 }
 
@@ -36,6 +51,38 @@ m8_pointer_gameplay_command :: proc(room: ^game.Room, renderer: ^render.Renderer
 	case .None, .Character:
 	}
 	return {}, false
+}
+
+begin_ranch_session :: proc(ranch: ^Ranch_Session, room: ^game.Room, renderer: ^render.Renderer) -> bool {
+	if ranch.active || room.phase != .Combat || !game.tactical_allows_action(room) || !game.western_ranch_can_start(room) { return false }
+	six, seven, _ := game.western_ranch_hand(room)
+	count := room.player.deck.hand_count
+	from := [2]rl.Rectangle{render.tactical_hand_card_bounds(renderer, six, count), render.tactical_hand_card_bounds(renderer, seven, count)}
+	if !game.begin_western_ranch(room) { return false }
+	seed := (u64(room.pulse_count)+1)*0x9E37_79B9_7F4A_7C15 ~ u64(room.player.gold)<<20 ~ u64(room.next_object_id)
+	ranch^ = {active = true, state = western.begin(seed), card_from = from}
+	return true
+}
+
+// A won duel refills health and pays the purse, shown as ordinary feedback.
+step_ranch_session :: proc(ranch: ^Ranch_Session, room: ^game.Room, renderer: ^render.Renderer, dt: f32, press: bool) {
+	western.step(&ranch.state, dt, press)
+	if ranch.state.phase != .Done { return }
+	before := render.capture_room_presentation(room)
+	ranch.reward = game.settle_western_ranch(room, ranch.state.won)
+	ranch.active = false
+	ranch.finished = true
+	if !ranch.reward.won { return }
+	game.clear_event_log(&room.recent_events)
+	at := room.player.position
+	if ranch.reward.healed > 0 {
+		game.record_event(&room.recent_events, {kind = .Healed, source = game.PLAYER_ENTITY, target = game.PLAYER_ENTITY,
+			amount = ranch.reward.healed, from_position = at, to_position = at})
+	}
+	game.record_event(&room.recent_events, {kind = .Gold_Gained, source = game.PLAYER_ENTITY, target = game.PLAYER_ENTITY,
+		amount = ranch.reward.gold, from_position = at, to_position = at})
+	after := render.capture_room_presentation(room)
+	_ = render.begin_renderer_event_timeline(renderer, before, &room.recent_events, &after)
 }
 
 // Board health becomes ring health, so the duel keeps how hurt everyone is.
@@ -107,6 +154,7 @@ update_m8_session :: proc(session: ^M8_Session, room: ^game.Room, renderer: ^ren
 	buffer: ^Buffered_Gameplay_Command, available: bool, dt: f32, mouse: view.Vec2, inside: bool) -> bool {
 	input := M8_Session_Input{focused = rl.IsWindowFocused(), inside = inside, mouse = mouse,
 		pressed = rl.IsMouseButtonPressed(.LEFT), escape = rl.IsKeyPressed(.ESCAPE)}
+	input.ranch_press = rl.IsKeyPressed(.SPACE) || rl.IsKeyPressed(.ENTER) || (input.pressed && inside)
 	consumed := step_m8_session(session, room, renderer, controller, cards, buffer, available, dt, input)
 	return consumed
 }
@@ -115,6 +163,14 @@ step_m8_session :: proc(session: ^M8_Session, room: ^game.Room, renderer: ^rende
 	controller: ^Tactical_Controller, cards: ^Card_Interaction_State,
 	buffer: ^Buffered_Gameplay_Command, available: bool, dt: f32, input: M8_Session_Input) -> bool {
 	if session.ring_pending {return true}
+	session.ranch.finished = false
+	if session.ranch.active {
+		// Losing focus pauses the duel; it never counts as a press.
+		step_ranch_session(&session.ranch, room, renderer, dt if input.focused else 0, input.focused && input.ranch_press)
+		clear_card_interaction(cards)
+		clear_gameplay_command_buffer(buffer)
+		return true
+	}
 	if !available || !input.focused { return session.character_open }
 	left_click := input.inside && input.pressed
 	if session.character_open {
@@ -127,6 +183,12 @@ step_m8_session :: proc(session: ^M8_Session, room: ^game.Room, renderer: ^rende
 	clicked: render.M8_Control
 	if left_click { clicked = render.m8_control_at_point(renderer, room, input.mouse) }
 	if clicked == .Character { session.character_open = true }
+	// Holding the 6 and the 7 together opens the ranch at once.
+	if !session.character_open && begin_ranch_session(&session.ranch, room, renderer) {
+		clear_card_interaction(cards)
+		clear_gameplay_command_buffer(buffer)
+		return true
+	}
 	if session.character_open {
 		clear_card_interaction(cards)
 		clear_gameplay_command_buffer(buffer)

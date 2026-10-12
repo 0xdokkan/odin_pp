@@ -246,6 +246,17 @@ Dal menu restano tutti giocabili liberamente.
   l'interno di almeno 2x2 caselle (Tesla escluse). Se si attiva il quadrato
   mentre uno o più nemici sono nel campo, al posto della scarica parte il ring
   (vedi [sotto](#il-ring-delle-ombre-e-gli-sblocchi)).
+- **6 RANCH 7**: appena il 6 e il 7 di denari sono insieme in mano, accanto al
+  giocatore si apre una nuvoletta di pensiero a fumetto (circa un sesto dello
+  schermo) mentre la board resta ferma. Le due carte volano dalla mano
+  nell'insegna del ranch, a sinistra e a destra della scritta (6 RANCH 7), le
+  porte si aprono ed escono il giocatore e un cowboy a cavallo. Vista dall'alto,
+  due corsie divise da una linea nera, il terreno scorre: un countdown da 5
+  scocca ogni secondo e a ogni scocco la moneta va a chi preme (`Spazio`,
+  `Invio` o clic) più vicino all'istante giusto. Chi arriva a 3 monete vince.
+  **Vittoria**: vita piena e +10 oro. **Sconfitta**: nessuna perdita. Le carte
+  finiscono negli scarti. Logica in [western.odin](src/western/western.odin),
+  disegno in [western_bubble.odin](src/render/western_bubble.odin).
 
 Pausa, ologramma, cast, QTE e attività M9 impediscono di aprire una seconda
 attività sovrapposta.
@@ -320,7 +331,9 @@ equipaggiamento e il primo minigioco completo. `./run.sh` avvia questa versione;
 `--m7` rimane un alias del tattico corrente e `--classic` conserva il loop
 classico. Lo starter tattico include ora una Shock Floor e una Tesla Coil,
 oltre alle carte già presenti: i nuovi dispositivi possono comparire anche
-fra ricompense e offerte.
+fra ricompense e offerte. Include anche il **6** e il **7 di denari**, carte con
+la grafica della Scopa: costano 1, danno 6 e 7 oro e si esauriscono per il resto
+del combattimento; non compaiono fra ricompense e offerte.
 
 ### Tre regole del tempo
 
@@ -343,6 +356,29 @@ potranno dichiararsi cinematici nello stesso punto. Attualmente sono integrati
 i dadi D4/D6; non è ancora presente una carta con ruota. La risoluzione logica
 resta una sola transazione deterministica, seguita dalla presentazione; il
 renderer non tira nuovamente i dadi e non riapplica effetti.
+
+### Colpo a tempo
+
+Ogni volta che il countdown del pulse scocca un secondo intero (per esempio da
+4,35 a 4), un'azione fatta **entro 0,15 s** da quell'istante, prima o dopo, è
+**critica**. Ogni scocco premia una sola azione; i secondi saltati dal costo di
+un'azione non scoccano, e la finestra appena aperta non conta come scocco.
+Un passo premuto in tempo ma accodato dietro l'animazione precedente resta
+critico fino a 0,45 s dopo lo scocco. L'HUD mostra una spia che si accende
+nella finestra; l'azione critica mostra **CRITICO!**.
+
+| Azione sul secondo | Effetto critico |
+|---|---|
+| Passo in linea retta | una casella in più |
+| Due tasti insieme (`W`+`D`, `S`+`A`...) | passo in diagonale (solo sul secondo) |
+| Attacco a urto | danno doppio |
+| Carta: danni | x1,5, almeno +2 |
+| Carta: scudo, cura, oro | x1,5, almeno +1 |
+| Carta: altri status | +1 potenza e +1 durata |
+| Carta: pesca, energia, carte create, reazioni | +1 |
+| Carta-dispositivo | danno x1,5 (almeno +2); la Tesla nasce con vita doppia, la Shock Floor con un colpo in più (massimo 5) |
+
+Le regole e i numeri sono in [tactical_beat.odin](src/game/tactical_beat.odin).
 
 ### Dispositivi elettrici e attivazione
 
@@ -647,7 +683,8 @@ odin run src -o:none -- --classic
 | `--classic` / `--m7` | loop classico / tattico corrente M8; `--m7` resta un alias compatibile |
 | `--smoke-m7` | confronto headless riproducibile, senza aprire finestre |
 | `--smoke-m7-view` | prova grafica di scena, oggetti 3D, fog, ologramma, QTE e menu |
-| `--smoke-m8-view` | prova 3D di d4, dispositivi, equipaggiamento, scheda personaggio, compatibilità del ring M8 e cambio stanza |
+| `--smoke-m8-view` | prova 3D di d4, dispositivi, offerta del ring, equipaggiamento, scheda personaggio, tag match e cambio stanza |
+| `--smoke-western` | nuvoletta 6 RANCH 7: apertura automatica, volo delle carte, insegna, porte, corsa a tempo e premio |
 | `--smoke-m9-view` | arena continua, duello con IA, presa in quattro pose, replay e FPS con ricarica e vittoria |
 
 Gli smoke classici e i laboratori `--spell-lab` / `--dice-lab` conservano il comportamento classico;
@@ -952,7 +989,8 @@ le immagini sono output rigenerabili, non prerequisiti del checkout.
 |---|---|
 | `--smoke-m9-view` | collisioni continue, vittoria contro l'IA del ring, quattro pose della presa, replay esatto, FPS con telegraph/ricarica/vittoria e ritorno; screenshot `odin_pp_m9_arena.png`, `ring.png`, `ring_grab_0.png`–`ring_grab_3.png`, `tools.png`, `fps.png` (prefisso comune `odin_pp_m9_`) |
 | `--smoke-arenas-view` | quattro fasce di arene reali, combattimento, ologramma, Loot e cambio stanza; screenshot `odin_pp_arenas_*.png` |
-| `--smoke-m8-view` | dispositivi, ring canonico e sblocco, ritorno Loot: `odin_pp_m8_d4.png`, `devices`, `character`, `loot`, `next_room` (tutti con prefisso `odin_pp_m8_` e suffisso `.png`) |
+| `--smoke-m8-view` | dispositivi con APRI IL RING, campo, tag match, ritorno Loot: `odin_pp_m8_d4.png`, `devices`, `mega_combo`, `character`, `loot`, `tag_ring`, `next_room` (tutti con prefisso `odin_pp_m8_` e suffisso `.png`) |
+| `--smoke-western` | 6 RANCH 7 dalla mano al premio: `odin_pp_western_hand.png`, `cards`, `sign`, `gate`, `riders`, `ride`, `grab`, `win`, `reward` (prefisso `odin_pp_western_`) |
 | `--smoke` | `odin_pp_isometric.png` |
 | `--smoke-generation` | `odin_pp_procedural_room.png` |
 | `--smoke-map` | `odin_pp_route.png` |
@@ -1462,6 +1500,8 @@ completi restano in `CARD_DEFINITIONS`; l'upgrade è disponibile solo se
 | `Caustic_Bloom` | Uncommon | 2 | cella, Chebyshev 1-3, Square raggio 1 | Poison 2, +1 per upgrade, per 2 pulse ai nemici nel 3x3 |
 | `Purifying_Guard` | Uncommon | 1 | player, None | Shield 2, +1 per upgrade, per 3 pulse; rimuove Poison se presente |
 | `Volatile_Study` | Rare | 2 | player, None | Ethereal; crea 1 `Spark`, pesca 1 + upgrade, poi exhaust |
+| `Sei_Denari` | starter, mai offerta | 1 | player, None | +6 oro; exhaust on play. Con il 7 in mano apre 6 RANCH 7 |
+| `Sette_Denari` | starter, mai offerta | 1 | player, None | +7 oro; exhaust on play. Con il 6 in mano apre 6 RANCH 7 |
 
 ## Spell e dadi
 

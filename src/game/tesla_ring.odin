@@ -12,17 +12,6 @@ MAX_TESLA_RING_ROSTER :: 4
 // A lost duel costs a quarter of the maximum health, never the last point.
 TESLA_RING_LOSS_DIVISOR :: i32(4)
 
-// Easter eggs open once per floor. A floor is the whole run until floors
-// exist; begin_floor clears them for the next one.
-Floor_Secret :: enum u8 {
-	Tesla_Ring,
-	Western_Ranch,
-}
-
-begin_floor :: proc(player: ^Player) {
-	if player != nil { player.floor_secrets = {} }
-}
-
 // Set when the coils are spent; the host opens the duel and settles it.
 Tesla_Ring :: struct {
 	enemy_ids: [MAX_TESLA_RING_ROSTER]u32,

@@ -304,6 +304,7 @@ roguelike_parse_arguments :: proc(rs: ^Roguelike_Session, args: []string) {
 	if rs.options.m7_smoke { rs.smoke_mode_count += 1 }
 	if rs.options.m7_view_smoke { rs.smoke_mode_count += 1 }
 	if rs.options.m8_view_smoke { rs.smoke_mode_count += 1 }
+	if rs.options.western_smoke { rs.smoke_mode_count += 1 }
 	if rs.options.arena_view_smoke { rs.smoke_mode_count += 1 }
 	if rs.options.dice_set_smoke { rs.smoke_mode_count += 1 }
 	if rs.options.m9_smoke { rs.smoke_mode_count += 1 }
@@ -319,7 +320,7 @@ roguelike_parse_arguments :: proc(rs: ^Roguelike_Session, args: []string) {
 		fmt.eprintln("dice set lab requires tactical mode and cannot be combined with another lab or smoke")
 		os.exit(2)
 	}
-	if (rs.options.m7_view_smoke || rs.options.m8_view_smoke || rs.options.arena_view_smoke) && !rs.options.tactical.enabled {
+	if (rs.options.m7_view_smoke || rs.options.m8_view_smoke || rs.options.arena_view_smoke || rs.options.western_smoke) && !rs.options.tactical.enabled {
 		fmt.eprintln("tactical view smoke requires tactical mode; omit --classic")
 		os.exit(2)
 	}
@@ -768,6 +769,10 @@ roguelike_attach :: proc(rs: ^Roguelike_Session, window: ^app.Window) -> Session
 		if !run_m8_view_smoke(rs.window, &rs.iso_renderer, &rs.dice_renderer) { fmt.eprintln("M8 native smoke failed"); os.exit(2) }
 		return .Finished
 	}
+	if rs.options.western_smoke {
+		if !run_western_smoke(rs.window, &rs.iso_renderer, &rs.dice_renderer) { fmt.eprintln("6 RANCH 7 smoke failed"); os.exit(2) }
+		return .Finished
+	}
 	if rs.options.m9_lab != .None {
 		run_m9_lab(rs.window, &rs.iso_renderer, rs.options.m9_lab)
 		return .Finished
@@ -847,6 +852,7 @@ roguelike_update :: proc(data: rawptr, hf: ^host.Frame) {
 			&rs.card_interaction, &rs.gameplay_buffer, rs.run_state.phase == .In_Room &&
 			!rs.show_route_map && !game.run_has_relic_choice(&rs.run_state), rs.frame_time, m8_mouse, m8_mouse_inside)
 	}
+	roguelike_ranch_feedback(rs, hf)
 	if roguelike_open_activity(rs,hf) {
         rs.overlay=nil
         rs.overlay_data={}
@@ -1524,6 +1530,29 @@ roguelike_open_activity :: proc(rs: ^Roguelike_Session, hf: ^host.Frame) -> bool
     return true
 }
 
+// Sounds of the ranch duel and its verdict, once per step.
+roguelike_ranch_feedback :: proc(rs: ^Roguelike_Session, hf: ^host.Frame) {
+	ranch := &rs.m8_session.ranch
+	if !ranch.active && !ranch.finished {return}
+	cues := ranch.state.cues
+	if .Card_Slot in cues {audio.play(hf.audio,.Confirm)}
+	if .Gate in cues {audio.play(hf.audio,.Push)}
+	if .Tick in cues {audio.play(hf.audio,.Blip)}
+	if .Press in cues {audio.play(hf.audio,.Step)}
+	if .Coin_Player in cues {audio.play(hf.audio,.Coin)}
+	if .Coin_Rival in cues {audio.play(hf.audio,.Hurt,0.6)}
+	if .Win in cues {audio.play(hf.audio,.Win)}
+	if .Lose in cues {audio.play(hf.audio,.Lose)}
+	if !ranch.finished {return}
+	delete(rs.challenge_message)
+	if ranch.reward.won {
+		rs.challenge_message=fmt.aprintf("6 RANCH 7: vita piena e +%d oro!",ranch.reward.gold)
+	} else {
+		rs.challenge_message=fmt.aprintf("%s","6 RANCH 7: il cowboy vince, nessuna perdita")
+	}
+	rs.challenge_message_ttl=5
+}
+
 roguelike_resume :: proc(data: rawptr, hf: ^host.Frame, from: string, result: Maybe(host.Result)) {
 	rs := cast(^Roguelike_Session)data
 	roguelike_suspend_input(rs)
@@ -1681,6 +1710,9 @@ roguelike_draw :: proc(data: rawptr, hf: ^host.Frame) {
 				theme = &rs.iso_renderer,
 			)
 		}
+	}
+	if rs.m8_session.ranch.active {
+		render.draw_western_bubble(&rs.iso_renderer, &rs.room, &rs.m8_session.ranch.state, rs.m8_session.ranch.card_from)
 	}
 	if rs.m8_session.character_open { render.draw_m8_character_panel(&rs.iso_renderer, &rs.room) }
 
