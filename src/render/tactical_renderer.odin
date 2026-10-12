@@ -50,6 +50,9 @@ Tactical_View :: struct {
 	// menu to go back to.
 	pause_hovered: Pause_Choice,
 	pause_menu: bool,
+	// The mechanics lab's enemy intent displays on trial (intent_display.odin).
+	intent_display: Intent_Display,
+	intent_traces: [game.MAX_ENEMIES_PER_ROOM*2]Intent_Trace,
 	kit: Diorama_Kit,
 	pilgrim: []Diorama_Vertex,
 	intent_memory: [game.MAX_ENEMIES_PER_ROOM]Intent_Memory,
@@ -448,6 +451,7 @@ draw_tactical_world :: proc(renderer: ^Renderer, room: ^game.Room, active_card: 
 		draw_diorama_accents(renderer, room)
 		draw_tactical_clear_markers(renderer, room)
 		draw_voxel_threats(renderer, room)
+		draw_intent_ground(renderer, room)
 		draw_m8_device_network(renderer, room)
 		rl.EndMode3D()
 	}
@@ -473,6 +477,7 @@ draw_tactical_world :: proc(renderer: ^Renderer, room: ^game.Room, active_card: 
 	}
 	end_tactical_surface(renderer, surface)
 	draw_tactical_annotations(renderer, room)
+	draw_intent_seals(renderer, room)
 	// Filter each member of simultaneous impacts, not only the first event.
 	for offset in 0..<renderer_active_cue_count(renderer) {
 		cue, found := renderer_active_cue_at(renderer, offset)

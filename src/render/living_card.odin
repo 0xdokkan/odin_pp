@@ -33,6 +33,8 @@ Living_Actor :: struct {
 	slide_ms: f32,
 	slide_kind: gfx.Living_Travel,
 	sliding, moved: bool,
+	// 0..1: how close the figure is to acting (the lab's seals make it tremble).
+	tremble: f32,
 }
 
 Living_State :: struct {
@@ -67,7 +69,9 @@ destroy_living_cards :: proc(renderer: ^Renderer) {
 
 // A fresh board starts with fresh drawings.
 forget_living_actors :: proc(renderer: ^Renderer) {
-	if renderer == nil || renderer.tactical.living_state == nil { return }
+	if renderer == nil { return }
+	renderer.tactical.intent_traces = {}
+	if renderer.tactical.living_state == nil { return }
 	living_tokens_free(renderer.tactical.living_state)
 	renderer.tactical.living_state^ = {}
 }
@@ -234,6 +238,7 @@ living_observe :: proc(renderer: ^Renderer, state: ^Living_State, room: ^game.Ro
 		slot = living_slot(state, actor.entity, character, now)
 	}
 	slot.seen, slot.ghost, slot.position = now, false, actor.position
+	slot.tremble = intent_tremble(renderer, room, actor.entity)
 	right := flipbook_camera_right(renderer)
 	forward := living_camera_forward(renderer)
 	snapshot := renderer.tactical.snapshot
@@ -338,6 +343,7 @@ update_living_actors :: proc(renderer: ^Renderer, room: ^game.Room) {
 		if actor.ghost || now-actor.seen > LIVING_FORGET_SECONDS { actor = {} }
 	}
 	update_living_tokens(renderer, now)
+	update_intent_traces(renderer, room, now)
 }
 
 // The drawing to print right now.
@@ -417,6 +423,10 @@ living_billboard_geometry :: proc(renderer: ^Renderer, character: gfx.Flipbook_C
 	center := base-right*((sheet.feet.x-cell.x*0.5)*scale)
 	half := right*(cell.x*0.5*scale*width)
 	pbl := center-half-up*(below*scale)
+	if actor != nil && actor.tremble > 0 {
+		// About to act: the figure trembles inside its still card.
+		pbl += right*(math.sin(f32(now)*math.TAU*11)*0.014*actor.tremble)
+	}
 	result.points = {pbl+top, pbl, pbl+half*2, pbl+half*2+top}
 	if fall := living_fall(actor, now); fall > 0 {
 		// The whole card topples backwards around its bottom edge.

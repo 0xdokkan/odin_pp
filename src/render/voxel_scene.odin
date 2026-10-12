@@ -20,7 +20,8 @@ tactical_telegraphs_are_visible :: proc(renderer: ^Renderer, room: ^game.Room) -
 }
 
 draw_voxel_threats :: proc(renderer: ^Renderer, room: ^game.Room) {
-	if tactical_telegraphs_are_visible(renderer, room) {
+	// The lab's ground display draws the enemies' threats its own way.
+	if tactical_telegraphs_are_visible(renderer, room) && !intent_ground_on(renderer) {
 		for &enemy in room.enemies {
 			if game.enemy_is_staggered(room, &enemy) { continue }
 			color := GOTHIC_RED

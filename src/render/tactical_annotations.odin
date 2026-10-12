@@ -173,7 +173,7 @@ draw_tactical_annotations :: proc(renderer: ^Renderer, room: ^game.Room) {
 	if v.mechanics_lab {
 		// The mechanics lab's banner is drawn over the board: labels keep clear.
 		v.labels.bounds[v.labels.count] = mechanics_lab_banner_bounds(renderer, "PROVA MECCANICHE",
-			"NEMICI 0/0  /  F5 RICOMINCIA  /  F10 MENU")
+			"NEMICI 0/0  /  F5 RICOMINCIA  /  F6 INTENTI: SIGILLI + TERRENO  /  F10 MENU")
 		v.labels.count += 1
 	}
 	// Existing status glyphs retain their ground lane; text badges avoid it.
@@ -226,6 +226,8 @@ draw_tactical_annotations :: proc(renderer: ^Renderer, room: ^game.Room) {
 			if feet.x < 0 || feet.y < 0 || feet.x > renderer.canvas_width || feet.y > renderer.canvas_height { continue }
 			shield := i32(0)
 			if i, shielded := game.status_index(&actor.statuses, .Shield); shielded { shield = actor.statuses.items[i].potency }
+			// With the lab's seals the pictogram is on the card, not in the label.
+			if intent_seals_on(renderer) { icon = .None }
 			draw_living_health_label(renderer, anchor, living_health_text(actor.health, actor.max_health, shield), intent, color,
 				actor.health, actor.max_health, icon, alarm, int(actor.entity.id))
 			continue

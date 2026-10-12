@@ -24,6 +24,10 @@ INTENT_AMBER :: rl.Color{232, 168, 64, 255}
 INTENT_AIR :: rl.Color{168, 178, 186, 255}
 INTENT_STICKER_RADIUS :: f32(14)
 
+// Ink widths grow with the sticker (draw_intent_sticker's radius).
+@(private="file")
+ink: f32 = 1
+
 // Between an enemy acting and planning again its intent is briefly empty;
 // the sticker keeps the last plan instead of blinking out for that instant.
 Intent_Memory :: struct {
@@ -85,15 +89,15 @@ icon_point :: proc(center: rl.Vector2, r: f32, x, y: f32, angle: f32 = 0, pivot 
 // An inked stroke: the ink first, a little wider, then the colour.
 @(private="file")
 stroke :: proc(a, b: rl.Vector2, width: f32, color: rl.Color) {
-	rl.DrawLineEx(a, b, width+2, INTENT_INK)
-	rl.DrawCircleV(a, (width+2)*0.5, INTENT_INK)
-	rl.DrawCircleV(b, (width+2)*0.5, INTENT_INK)
-	rl.DrawLineEx(a, b, width, color)
+	rl.DrawLineEx(a, b, (width+2)*ink, INTENT_INK)
+	rl.DrawCircleV(a, (width+2)*ink*0.5, INTENT_INK)
+	rl.DrawCircleV(b, (width+2)*ink*0.5, INTENT_INK)
+	rl.DrawLineEx(a, b, width*ink, color)
 }
 
 @(private="file")
 blob :: proc(center: rl.Vector2, radius: f32, color: rl.Color) {
-	rl.DrawCircleV(center, radius+1, INTENT_INK)
+	rl.DrawCircleV(center, radius+ink, INTENT_INK)
 	rl.DrawCircleV(center, radius, color)
 }
 
@@ -106,18 +110,20 @@ fill :: proc(points: []rl.Vector2, color: rl.Color) {
 @(private="file")
 outlined :: proc(points: []rl.Vector2, color: rl.Color) {
 	fill(points, color)
-	for index in 0..<len(points) { rl.DrawLineEx(points[index], points[(index+1)%len(points)], 1.6, INTENT_INK) }
+	for index in 0..<len(points) { rl.DrawLineEx(points[index], points[(index+1)%len(points)], 1.6*ink, INTENT_INK) }
 }
 
-draw_intent_sticker :: proc(center: rl.Vector2, icon: Intent_Icon, alarm: bool, time: f64, seed: int) {
+draw_intent_sticker :: proc(center: rl.Vector2, icon: Intent_Icon, alarm: bool, time: f64, seed: int,
+	radius := INTENT_STICKER_RADIUS) {
 	if icon == .None { return }
 	rlgl.DrawRenderBatchActive()
 	rlgl.DisableBackfaceCulling()
-	defer { rlgl.DrawRenderBatchActive(); rlgl.EnableBackfaceCulling() }
+	ink = radius/INTENT_STICKER_RADIUS
+	defer { rlgl.DrawRenderBatchActive(); rlgl.EnableBackfaceCulling(); ink = 1 }
 	t := f32(math.mod(time, 1000))
 	c := center
-	if alarm { c.x += math.sin(t*46)*1.1 }
-	r := INTENT_STICKER_RADIUS
+	if alarm { c.x += math.sin(t*46)*1.1*ink }
+	r := radius
 	// Scissor-cut outline: a fixed wobble per enemy, never per frame.
 	cut: [14]rl.Vector2
 	shadow: [14]rl.Vector2
@@ -125,12 +131,12 @@ draw_intent_sticker :: proc(center: rl.Vector2, icon: Intent_Icon, alarm: bool, 
 		a := f32(index)/f32(len(cut))*math.TAU
 		wobble := 1+0.07*math.sin(f32(seed%13)*1.7+f32(index)*2.3)
 		cut[index] = c+rl.Vector2{math.cos(a), math.sin(a)}*r*wobble
-		shadow[index] = cut[index]+{2, 2.5}
+		shadow[index] = cut[index]+rl.Vector2{2, 2.5}*ink
 	}
 	fill(shadow[:], {0, 0, 0, 110})
 	if alarm {
 		pulse := 0.5+0.5*math.sin(t*9)
-		rl.DrawRing(c, r+2, r+3.5+pulse*2, 0, 360, 24, color_with_opacity(INTENT_CRIMSON, 0.35+0.4*pulse))
+		rl.DrawRing(c, r+2*ink, r+(3.5+pulse*2)*ink, 0, 360, 24, color_with_opacity(INTENT_CRIMSON, 0.35+0.4*pulse))
 	}
 	outlined(cut[:], INTENT_PAPER_ALARM if alarm else INTENT_PAPER)
 	u := r*0.78
@@ -146,7 +152,7 @@ draw_intent_sticker :: proc(center: rl.Vector2, icon: Intent_Icon, alarm: bool, 
 		base := icon_point(c, u, -0.35, 0.42, swing-0.15, hilt)
 		pommel := icon_point(c, u, -0.6, 0.68, swing-0.15, hilt)
 		trail := icon_point(c, u, 0.62, -0.1, swing*0.5-0.9, hilt)
-		rl.DrawLineEx(icon_point(c, u, 0.68, -0.2, swing-0.45, hilt), trail, 1.4, color_with_opacity(INTENT_AIR, 0.8))
+		rl.DrawLineEx(icon_point(c, u, 0.68, -0.2, swing-0.45, hilt), trail, 1.4*ink, color_with_opacity(INTENT_AIR, 0.8))
 		stroke(base, tip, 3, INTENT_STEEL)
 		stroke(guard_a, guard_b, 2.4, INTENT_CRIMSON)
 		stroke(base, pommel, 2.2, INTENT_LEATHER)
@@ -159,8 +165,8 @@ draw_intent_sticker :: proc(center: rl.Vector2, icon: Intent_Icon, alarm: bool, 
 			icon_point(c, u, -0.45, 0.4), icon_point(c, u, -0.2, 0.75)}
 		for index in 0..<4 { stroke(bow[index], bow[index+1], 2.2, INTENT_LEATHER) }
 		string_x := min(-0.2+pull, -0.2)
-		rl.DrawLineEx(bow[0], icon_point(c, u, string_x, 0), 1.2, INTENT_INK)
-		rl.DrawLineEx(bow[4], icon_point(c, u, string_x, 0), 1.2, INTENT_INK)
+		rl.DrawLineEx(bow[0], icon_point(c, u, string_x, 0), 1.2*ink, INTENT_INK)
+		rl.DrawLineEx(bow[4], icon_point(c, u, string_x, 0), 1.2*ink, INTENT_INK)
 		stroke(icon_point(c, u, -0.3+pull, 0), icon_point(c, u, 0.55+pull, 0), 2, INTENT_STEEL)
 		head := [3]rl.Vector2{icon_point(c, u, 0.75+pull, 0), icon_point(c, u, 0.5+pull, -0.18), icon_point(c, u, 0.5+pull, 0.18)}
 		outlined(head[:], INTENT_CRIMSON)
@@ -174,7 +180,7 @@ draw_intent_sticker :: proc(center: rl.Vector2, icon: Intent_Icon, alarm: bool, 
 		}
 		for index in 0..<3 {
 			y := -0.5+f32(index)*0.5
-			rl.DrawLineEx(icon_point(c, u, -0.95+dash*0.3, y), icon_point(c, u, -0.6+dash*0.3, y), 1.2, color_with_opacity(INTENT_AIR, 1-dash))
+			rl.DrawLineEx(icon_point(c, u, -0.95+dash*0.3, y), icon_point(c, u, -0.6+dash*0.3, y), 1.2*ink, color_with_opacity(INTENT_AIR, 1-dash))
 		}
 	case .Bombard:
 		// A bomb rocking on its lit fuse.
@@ -186,9 +192,9 @@ draw_intent_sticker :: proc(center: rl.Vector2, icon: Intent_Icon, alarm: bool, 
 		spark := 0.5+0.5*math.sin(t*31)
 		for index in 0..<4 {
 			a := f32(index)*math.PI*0.5+t*6
-			rl.DrawLineEx(fuse_top, fuse_top+rl.Vector2{math.cos(a), math.sin(a)}*(2+spark*3), 1.4, INTENT_AMBER)
+			rl.DrawLineEx(fuse_top, fuse_top+rl.Vector2{math.cos(a), math.sin(a)}*(2+spark*3)*ink, 1.4*ink, INTENT_AMBER)
 		}
-		rl.DrawCircleV(fuse_top, 1.6+spark, {255, 236, 170, 255})
+		rl.DrawCircleV(fuse_top, (1.6+spark)*ink, {255, 236, 170, 255})
 	case .Protect:
 		// A shield with a cross, its ward pulsing.
 		ward := 0.5+0.5*math.sin(t*4)
@@ -213,7 +219,7 @@ draw_intent_sticker :: proc(center: rl.Vector2, icon: Intent_Icon, alarm: bool, 
 			phase := t*2.4+f32(index)/3
 			k := phase-math.floor(phase)
 			p := icon_point(c, u, dir*(-0.45-k*0.45), 0.38-f32(index)*0.22-k*0.1)
-			rl.DrawCircleV(p, (1.5+k*2.5), color_with_opacity(INTENT_AIR, 1-k))
+			rl.DrawCircleV(p, (1.5+k*2.5)*ink, color_with_opacity(INTENT_AIR, 1-k))
 		}
 		if icon == .Retreat {
 			arc := [4]rl.Vector2{icon_point(c, u, 0.55, -0.35), icon_point(c, u, 0.42, -0.7), icon_point(c, u, 0.05, -0.78), icon_point(c, u, -0.2, -0.62)}
@@ -243,7 +249,7 @@ draw_intent_sticker :: proc(center: rl.Vector2, icon: Intent_Icon, alarm: bool, 
 				star[k] = p+rl.Vector2{math.cos(ka), math.sin(ka)}*rr
 			}
 			for k in 0..<10 { rl.DrawTriangle(p, star[k], star[(k+1)%10], INTENT_AMBER if icon == .Recover else INTENT_PAPER_ALARM) }
-			for k in 0..<10 { rl.DrawLineEx(star[k], star[(k+1)%10], 1.4, INTENT_INK) }
+			for k in 0..<10 { rl.DrawLineEx(star[k], star[(k+1)%10], 1.4*ink, INTENT_INK) }
 		}
 	}
 }

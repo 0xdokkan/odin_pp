@@ -198,10 +198,32 @@ run_mechanics_lab_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer,
 	render.clear_event_animations(renderer)
 	for _ in 0..<20 { mechanics_lab_smoke_frame(window, renderer, &room, &controller, &cards, &buffer, 1.0/60.0) }
 	if !mechanics_lab_capture(window, renderer, &room, &controller, &cards, &buffer, {kind = .Move, origin_phase = .Combat, direction = .North}, "attack") { return false }
-	// The action rings closing in with the clock: the enemies' on their
-	// countdowns, the player's on every tick.
+	// The player's action ring on every tick, and the enemy intent displays on
+	// trial, one after the other (F6 in the lab).
 	if renderer.tactical.living_assets.ring_shader.id == 0 { fmt.eprintln("mechanics lab: no action rings"); return false }
-	mechanics_lab_film(window, renderer, &room, &controller, &cards, &buffer, 150, 3, "rings")
+	for mode in render.Intent_Display {
+		renderer.tactical.intent_display = mode
+		mechanics_lab_film(window, renderer, &room, &controller, &cards, &buffer, 120, 3, fmt.tprintf("intents_%d", int(mode)))
+	}
+	// One instant with a blow about to land, under the new display and the old
+	// one: the same frame twice, for a look at what the edge of the eye keeps.
+	renderer.tactical.intent_display = .Both
+	for _ in 0..<900 {
+		imminent := false
+		for &enemy in room.enemies {
+			if enemy.intent.kind != .Attack && enemy.intent.kind != .Charge { continue }
+			left := game.tactical_enemy_seconds(&room, &enemy)
+			if left > 0.1 && left < 0.45 { imminent = true }
+		}
+		if imminent && room.qte.kind == .None { break }
+		mechanics_lab_smoke_frame(window, renderer, &room, &controller, &cards, &buffer, 1.0/60.0, true)
+	}
+	for mode in ([2]render.Intent_Display{.Both, .Labels}) {
+		renderer.tactical.intent_display = mode
+		for _ in 0..<2 { mechanics_lab_smoke_frame(window, renderer, &room, &controller, &cards, &buffer, 0) }
+		rl.TakeScreenshot("odin_pp_living_intent_both.png" if mode == .Both else "odin_pp_living_intent_labels.png")
+	}
+	renderer.tactical.intent_display = .Both
 	// A cure: the green paper token. (Blows got red ones above.)
 	player.health = max(1, player.health-3)
 	cure_before := render.capture_room_presentation(&room)

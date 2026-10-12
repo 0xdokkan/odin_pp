@@ -21,6 +21,9 @@ import view "../view"
 LIVING_RING_SPAN :: f32(1.6)
 // Its line, in screen pixels.
 LIVING_RING_WIDTH :: f32(1.6)
+// The enemies' rings are off for now: the lab tries other ways to show an
+// enemy's intent (intent_display.odin). The player's ring stays.
+LIVING_ENEMY_RINGS :: false
 // The share of a countdown over which a fresh ring fades in.
 LIVING_RING_FADE :: f32(0.08)
 
@@ -92,7 +95,7 @@ draw_living_rings :: proc(renderer: ^Renderer, room: ^game.Room) {
 	rlgl.DisableDepthTest()
 	defer { rlgl.DrawRenderBatchActive(); rlgl.EnableDepthTest() }
 	// The enemies' rings are still a trial of the mechanics lab.
-	for actor in snapshot.enemies[:snapshot.enemy_count if v.mechanics_lab else 0] {
+	for actor in snapshot.enemies[:snapshot.enemy_count if v.mechanics_lab && LIVING_ENEMY_RINGS else 0] {
 		cell := grid.Position{int(math.round(actor.position.x)), int(math.round(actor.position.y))}
 		if !actor.visible || actor.health <= 0 || !tactical_render_visible(renderer, cell) { continue }
 		index, found := game.enemy_index_by_id(room, actor.entity.id)

@@ -1027,6 +1027,8 @@ roguelike_update :: proc(data: rawptr, hf: ^host.Frame) {
 	// The board's characters are living cards, wherever the board is 3D.
 	render.set_living_cards(&rs.iso_renderer, rs.options.scene_3d)
 	render.set_mechanics_lab(&rs.iso_renderer, rs.options.mechanics_lab)
+	// The lab's intent displays on trial.
+	if rs.options.mechanics_lab && hf.focused && rl.IsKeyPressed(.F6) { render.cycle_intent_display(&rs.iso_renderer) }
 	// Arrivals follow the running board: never paused, in a modal or mid-animation.
 	if rs.options.mechanics_lab && !rs.m8_modal && !rs.tactical_controller.paused && rl.IsWindowFocused() &&
 	   rs.run_state.phase == .In_Room && !render.renderer_timeline_is_busy(&rs.iso_renderer) {

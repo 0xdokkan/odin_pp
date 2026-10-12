@@ -107,8 +107,27 @@ Le novità nate qui ora valgono in tutto il gioco: le azioni che durano il loro
 costo e la finestra che si accorcia ([Modalità tattica M7](#modalità-tattica-m7)),
 i cartoncini vivi, il cerchio d'azione del Viandante, i segnalini di carta e la
 vita sempre visibile ([Il tavolo](#il-tavolo-cartoncini-vivi-cerchi-e-segnalini)).
-Solo qui i nemici hanno anche il loro cerchio d'azione. La prova resta la
-sandbox in cui provare le prossime.
+La prova resta la sandbox in cui provare le prossime.
+
+**Intenzioni dei nemici (in prova, `F6`).** Il cerchio che si stringe attorno ai
+nemici è spento: la prova confronta altri modi di dire cosa sta per fare un
+nemico, e quando, anche a chi non lo sta guardando. La visione periferica perde
+colore e dettaglio ma coglie i cambi di luminosità (un tremolio fra 5 e 10 Hz) e
+il movimento; per questo ogni modo dice **cosa** con un pittogramma grande e un
+colore coerente, **quando** con un indicatore che si riempie verso l'azione, e
+**adesso** con un tremolio di luce e della figura nell'ultimo mezzo secondo e un
+lampo verso l'esterno quando l'azione arriva. Solo le azioni a meno di un
+secondo e mezzo sono vivide: le altre restano tenui, così sei nemici non gridano
+tutti insieme.
+
+| Modo (`F6`) | Cosa mostra |
+|---|---|
+| SIGILLI + TERRENO | entrambi (predefinito) |
+| SIGILLI | un sigillo appuntato sulla carta del nemico: il pittogramma su carta, un indicatore spesso attorno con una tacca per secondo, un alone del colore dell'azione quando si avvicina; la figura trema prima di agire |
+| TERRENO | la conseguenza dove arriva, come in Into the Breach: le celle colpite si riempiono dai bordi al centro, la cella del Viandante si contorna se è fra queste; un movimento riempie la cella d'arrivo con una freccia, una protezione tira un filo verso l'alleato |
+| ETICHETTE | il tavolo di prima: il piccolo adesivo nell'etichetta della vita |
+
+I modi sono in [intent_display.odin](src/render/intent_display.odin).
 
 | Opzione | Uso |
 |---|---|
@@ -423,10 +442,8 @@ dopo uno scocco e si stringe fino a toccare la carta allo scocco successivo, il
 momento giusto per un'azione critica; segue il tempo reale anche quando
 un'azione consuma secondi.
 
-Nella **Prova meccaniche** anche i nemici hanno il loro cerchio: si apre al
-massimo quando il nemico arriva o sceglie l'azione successiva e si chiude lungo
-il conto alla rovescia di quell'azione (quello scritto sopra di lui), toccando la
-carta quando agisce. Il colore dice cosa sta per fare:
+Le azioni dei nemici hanno un colore per tipo, usato dai modi delle intenzioni
+della Prova meccaniche (il loro cerchio d'azione è spento per ora):
 
 | Colore | Azione in arrivo |
 |---|---|
@@ -435,8 +452,8 @@ carta quando agisce. Il colore dice cosa sta per fare:
 | verde | movimento |
 | viola | protezione di un alleato |
 
-Durante recupero e attesa non c'è cerchio. I colori caldi staccano dal pavimento
-blu e segnano le minacce;
+Recupero e attesa non hanno colore. I colori caldi staccano dal pavimento blu e
+segnano le minacce;
 verde e viola, vicini al blu, sono chiari; rosso e verde differiscono anche per
 luminosità, per chi è daltonico ([living_ring.odin](src/render/living_ring.odin)).
 
@@ -1084,7 +1101,7 @@ le immagini sono output rigenerabili, non prerequisiti del checkout.
 | `--smoke-arenas-view` | quattro fasce di arene reali, combattimento, ologramma, Loot e cambio stanza; screenshot `odin_pp_arenas_*.png` |
 | `--smoke-m8-view` | dispositivi con APRI IL RING, campo, tag match, ritorno Loot: `odin_pp_m8_d4.png`, `devices`, `mega_combo`, `character`, `loot`, `tag_ring`, `next_room` (tutti con prefisso `odin_pp_m8_` e suffisso `.png`) |
 | `--smoke-western` | 6 RANCH 7 dalla mano al premio: `odin_pp_western_hand.png`, `cards`, `sign`, `gate`, `riders`, `ride`, `grab`, `win`, `reward` (prefisso `odin_pp_western_`) |
-| `--smoke-mechanics-lab` | sandbox: `odin_pp_mechanics_lab.png`, `_square`, `_full`, `_refill`, `_restart`, `_stun`, `_pause`, `_defeat` (prefisso `odin_pp_mechanics_lab`); cartoncini vivi: `odin_pp_living_move_00.png`–`_37` e `odin_pp_living_attack_00.png`–`_37`, un'immagine ogni due fotogrammi; cerchi d'azione: `odin_pp_living_rings_00.png`–`_49`, ogni tre; segnalino di cura: `odin_pp_living_heal_00.png`–`_39`, ogni due |
+| `--smoke-mechanics-lab` | sandbox: `odin_pp_mechanics_lab.png`, `_square`, `_full`, `_refill`, `_restart`, `_stun`, `_pause`, `_defeat` (prefisso `odin_pp_mechanics_lab`); cartoncini vivi: `odin_pp_living_move_00.png`–`_37` e `odin_pp_living_attack_00.png`–`_37`, un'immagine ogni due fotogrammi; modi degli intenti nemici (F6): `odin_pp_living_intents_0_00.png`–`_3_39` (0 sigilli + terreno, 1 sigilli, 2 terreno, 3 etichette), ogni tre; segnalino di cura: `odin_pp_living_heal_00.png`–`_39`, ogni due |
 | `--smoke` | `odin_pp_isometric.png` |
 | `--smoke-generation` | `odin_pp_procedural_room.png` |
 | `--smoke-map` | `odin_pp_route.png` |

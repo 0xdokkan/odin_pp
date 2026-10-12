@@ -19,8 +19,8 @@ set_mechanics_lab :: proc(renderer: ^Renderer, on: bool) {
 draw_mechanics_lab_banner :: proc(renderer: ^Renderer, room: ^game.Room, from_menu: bool) {
 	if renderer == nil || room == nil { return }
 	title: cstring = "PROVA MECCANICHE"
-	detail := fmt.ctprintf("NEMICI %d/%d  /  F5 RICOMINCIA%s", len(room.enemies), game.SANDBOX_MAX_ENEMIES,
-		"  /  F10 MENU" if from_menu else "")
+	detail := fmt.ctprintf("NEMICI %d/%d  /  F5 RICOMINCIA  /  F6 INTENTI: %s%s", len(room.enemies), game.SANDBOX_MAX_ENEMIES,
+		intent_display_name(renderer.tactical.intent_display), "  /  F10 MENU" if from_menu else "")
 	bounds := mechanics_lab_banner_bounds(renderer, title, detail)
 	hud_frame(bounds, HUD_AMBER)
 	rl.DrawRectangleRec({bounds.x, bounds.y, 3, bounds.height}, HUD_AMBER)
