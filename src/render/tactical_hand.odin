@@ -200,7 +200,7 @@ draw_tactical_hand :: proc(renderer: ^Renderer, room: ^game.Room,
 	hovered, selected, dragged: u32, mouse: view.Vec2) {
 	deck, phase := renderer_hand_deck(renderer, room)
 	if phase != .Combat || !deck.combat_active { return }
-	available := !renderer_blocks_player_input(renderer) && game.tactical_allows_action(room)
+	available := !renderer_blocks_player_input(renderer) && game.tactical_allows_cards(room)
 	recovering := game.tactical_is_recovering(room)
 	top := renderer.canvas_height-TACTICAL_HAND_HEIGHT
 	first_bounds := tactical_hand_card_bounds(renderer, 0, deck.hand_count)
@@ -223,6 +223,7 @@ draw_tactical_hand :: proc(renderer: ^Renderer, room: ^game.Room,
 		}
 	}
 	if recovering { hint = "RECUPERO / PUOI MUOVERTI" }
+	if game.tactical_is_stunned(room) { hint = "STORDITO / SOLO CARTE" }
 	if right-left > 580 { gothic_text_fit(renderer, hint, {left+180, top+5, right-left-398, 17}, 10, GOTHIC_BLUE) }
 	for card, index in deck.hand[:deck.hand_count] {
 		definition, found := game.card_definition_by_id(card.definition_id, true)

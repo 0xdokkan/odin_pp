@@ -103,59 +103,12 @@ sono in [mechanics_lab.odin](src/mechanics_lab.odin) e
 [sandbox.odin](src/game/sandbox.odin): per provare una nuova meccanica basta
 cambiare `MECHANICS_LAB_DECK`.
 
-Nella prova ogni azione che non è una carta **dura in tempo reale il suo
-costo** (`Tactical_Config.timed_actions`): un passo da 1 s occupa il Viandante
-per un secondo, mentre il countdown e i nemici scorrono come sempre (un battito
-al secondo). I comandi premuti nel frattempo aspettano in coda e partono alla
-fine; la schivata invece interrompe subito l'azione. L'HUD mostra **AZIONE** con
-una linea dorata che si consuma. Le carte restano un lancio.
-
-I personaggi della prova sono **cartoncini vivi**: la figura, più piccola, è un
-disegno animato su un cartoncino che resta fermo e non cambia mai forma né
-dimensione. Il personaggio si muove dentro la carta e il bordo lo taglia quando
-ne esce; per cambiare casella spinge il cartoncino, che scivola rigido (la
-spallata del Viandante, la corsa del ghoul, i passi pesanti del bruto...). I
-disegni vanno a 12 al secondo, a 24 nei momenti più rapidi, con
-schiacciamento e allungamento, linea viva e piccoli segni a matita. Il resto del
-gioco usa i cartoncini classici. Generatore e regole sono in
-[tools/art/README.md](tools/art/README.md#cartoncini-vivi-prova-meccaniche); il
-runtime è [living_card.odin](src/render/living_card.odin).
-
-Ogni personaggio della prova ha anche un **cerchio d'azione**: una linea sottile
-con la forma del suo cartoncino, che si stringe verso la carta e la tocca nel
-momento in cui il personaggio agisce. Il cerchio di un nemico si apre al massimo
-quando arriva o sceglie l'azione successiva e si chiude lungo il conto alla
-rovescia di quell'azione (quello scritto sopra di lui). Il colore dice cosa sta
-per fare:
-
-| Colore | Azione in arrivo |
-|---|---|
-| rosso | colpo ravvicinato: attacco, spinta, fendente, carica |
-| arancio | colpo a distanza o ad area: mira, tiro, bombe, barili accesi |
-| verde | movimento |
-| viola | protezione di un alleato |
-
-Durante recupero e attesa non c'è cerchio. Il cerchio del Viandante è oro, come
-il colpo critico, e batte i secondi: è al massimo subito dopo uno scocco e tocca
-la carta allo scocco successivo; segue il tempo reale anche quando un'azione
-consuma secondi. I colori caldi staccano dal pavimento blu e segnano le minacce;
-verde e viola, vicini al blu, sono chiari; rosso e verde differiscono anche per
-luminosità, per chi è daltonico ([living_ring.odin](src/render/living_ring.odin)).
-
-Danni e cure compaiono su **segnalini di carta**: piccoli cartoncini tagliati e
-inchiostrati come quelli dei personaggi, che escono di lato dalla carta di chi è
-colpito o curato con il numero in pixel, rosso per i danni e verde per le cure,
-restano un attimo e cadono ([living_token.odin](src/render/living_token.odin)).
-Prendono il posto dei riquadri scuri con i numeri; un colpo critico mostra
-ancora CRITICO.
-
-La vita dei nemici è più grande e sempre visibile: `HP 12/18` con il massimo, una
-barra con una tacca per punto (una ogni 5 oltre i 30) e un'etichetta che non
-sparisce finché il nemico è sullo schermo. Se il suo posto finisce sotto il
-pannello in alto scende appena sotto, evita il cartello della prova e in mezzo
-alla folla si mostra comunque. Il riquadro del nemico sotto il mouse resta
-visibile anche durante le animazioni e mentre la telecamera scorre con il mouse
-fermo; lascia il posto solo alla difesa.
+Le novità nate qui ora valgono in tutto il gioco: le azioni che durano il loro
+costo e la finestra che si accorcia ([Modalità tattica M7](#modalità-tattica-m7)),
+i cartoncini vivi, il cerchio d'azione del Viandante, i segnalini di carta e la
+vita sempre visibile ([Il tavolo](#il-tavolo-cartoncini-vivi-cerchi-e-segnalini)).
+Solo qui i nemici hanno anche il loro cerchio d'azione. La prova resta la
+sandbox in cui provare le prossime.
 
 | Opzione | Uso |
 |---|---|
@@ -435,11 +388,12 @@ Ogni volta che il countdown del pulse scocca un secondo intero (per esempio da
 un'azione non scoccano, e la finestra appena aperta non conta come scocco.
 Un passo premuto in tempo ma accodato dietro l'animazione precedente resta
 critico fino a 0,45 s dopo lo scocco. L'HUD mostra una spia che si accende
-nella finestra; l'azione critica mostra **CRITICO!**.
+nella finestra; l'azione critica mostra **CRITICO!**. Un passo in linea retta
+resta sempre di una casella e non consuma lo scocco: sul secondo, il critico
+del movimento è solo il passo in diagonale.
 
 | Azione sul secondo | Effetto critico |
 |---|---|
-| Passo in linea retta | una casella in più |
 | Due tasti insieme (`W`+`D`, `S`+`A`...) | passo in diagonale (solo sul secondo) |
 | Attacco a urto | danno doppio |
 | Carta: danni | x1,5, almeno +2 |
@@ -449,6 +403,57 @@ nella finestra; l'azione critica mostra **CRITICO!**.
 | Carta-dispositivo | danno x1,5 (almeno +2); la Tesla nasce con vita doppia, la Shock Floor con un colpo in più (massimo 5) |
 
 Le regole e i numeri sono in [tactical_beat.odin](src/game/tactical_beat.odin).
+
+### Il tavolo: cartoncini vivi, cerchi e segnalini
+
+I personaggi del tavolo 3D sono **cartoncini vivi**: la figura è un disegno
+animato su un cartoncino che resta fermo e non cambia mai forma né dimensione.
+Il personaggio si muove dentro la carta e il bordo lo taglia quando ne esce; per
+cambiare casella spinge il cartoncino, che scivola rigido (la spallata del
+Viandante, la corsa del ghoul, i passi pesanti del bruto...). I disegni vanno a
+12 al secondo, a 24 nei momenti più rapidi, con schiacciamento e allungamento,
+linea viva e piccoli segni a matita. Generatore e regole sono in
+[tools/art/README.md](tools/art/README.md#cartoncini-vivi); il runtime è
+[living_card.odin](src/render/living_card.odin). I minigiochi (Platform 3D, FPS)
+usano ancora i cartoncini classici.
+
+Il Viandante ha un **cerchio d'azione**: una linea sottile oro, come il colpo
+critico, con la forma del suo cartoncino. Batte i secondi: è al massimo subito
+dopo uno scocco e si stringe fino a toccare la carta allo scocco successivo, il
+momento giusto per un'azione critica; segue il tempo reale anche quando
+un'azione consuma secondi.
+
+Nella **Prova meccaniche** anche i nemici hanno il loro cerchio: si apre al
+massimo quando il nemico arriva o sceglie l'azione successiva e si chiude lungo
+il conto alla rovescia di quell'azione (quello scritto sopra di lui), toccando la
+carta quando agisce. Il colore dice cosa sta per fare:
+
+| Colore | Azione in arrivo |
+|---|---|
+| rosso | colpo ravvicinato: attacco, spinta, fendente, carica |
+| arancio | colpo a distanza o ad area: mira, tiro, bombe, barili accesi |
+| verde | movimento |
+| viola | protezione di un alleato |
+
+Durante recupero e attesa non c'è cerchio. I colori caldi staccano dal pavimento
+blu e segnano le minacce;
+verde e viola, vicini al blu, sono chiari; rosso e verde differiscono anche per
+luminosità, per chi è daltonico ([living_ring.odin](src/render/living_ring.odin)).
+
+Danni e cure compaiono su **segnalini di carta**: piccoli cartoncini tagliati e
+inchiostrati come quelli dei personaggi, che escono di lato dalla carta di chi è
+colpito o curato con il numero in pixel, rosso per i danni e verde per le cure,
+restano un attimo e cadono ([living_token.odin](src/render/living_token.odin)).
+Prendono il posto dei riquadri scuri con i numeri; un colpo critico mostra
+ancora CRITICO.
+
+La vita dei nemici è grande e sempre visibile: `HP 12/18` con il massimo, una
+barra con una tacca per punto (una ogni 5 oltre i 30) e un'etichetta che non
+sparisce finché il nemico è sullo schermo. Se il suo posto finisce sotto il
+pannello in alto scende appena sotto, nella Prova meccaniche evita il cartello e
+in mezzo alla folla si mostra comunque. Il riquadro del nemico sotto il mouse
+resta visibile anche durante le animazioni e mentre la telecamera scorre con il
+mouse fermo; lascia il posto solo alla difesa.
 
 ### Dispositivi elettrici e attivazione
 
@@ -932,7 +937,7 @@ il numero massimo di carte scritto. Upgrade e keyword mantengono le policy esist
 | `Shift + WASD` | schivata attiva di 1–2 celle in linea; costo 1 secondo, recupero 2 secondi, senza carta richiesta |
 | `J` / `K` durante scelta difesa | parata / parry, disponibili con Shield |
 | `L` durante scelta difesa | deviazione di una freccia, disponibile con Thorns |
-| `I` durante scelta difesa | schivata reattiva di una cella; poi `WASD` sceglie la landing; disponibile senza carte quando pronta |
+| `E` durante scelta difesa | schivata reattiva di una cella; poi `WASD` sceglie la landing; disponibile senza carte quando pronta |
 | `WASD` dopo scelta parata/parry/deviazione | premi il tasto richiesto entro la finestra residua |
 | rotella | zoom della camera locale |
 | `M` | mappa della rotta fuori Combat; in Combat si usa l'ologramma |
@@ -947,8 +952,15 @@ loro condizioni.
 
 Il **pulse del player è una finestra di 20 secondi**, configurabile da 1 a 60,
 che può contenere più azioni. Il countdown scorre mentre si decide. Movimento,
-attacco, attesa, refocus, attivazione ed equipaggiamento sottraggono anche il
-proprio costo immediato. Una carta invece avvia un cast di `Ns`: durante questi
+attacco, attesa, refocus, attivazione ed equipaggiamento **durano in tempo reale
+il loro costo** (`Tactical_Config.timed_actions`): un passo da 1 s occupa il
+Viandante per un secondo, mentre il countdown e i nemici scorrono come sempre (un
+battito al secondo). I comandi premuti nel frattempo aspettano in coda e partono
+alla fine; la schivata invece interrompe subito l'azione, e la fine della
+finestra chiude anche l'azione in corso. L'HUD mostra **AZIONE** con una linea
+dorata che si consuma. Con le regole di base (`DEFAULT_TACTICAL_CONFIG`, usate
+dalle sonde di regressione) il costo si sottrae invece subito. Una carta avvia
+un cast di `Ns`: durante questi
 secondi il countdown scende, il mondo resta fermo e il costo non viene sottratto
 una seconda volta. Gli input rifiutati non pagano costi. Una carta iniziata con
 tempo residuo positivo completa il proprio cast anche se il countdown arriva
@@ -962,16 +974,26 @@ scadenza. Energia: +1 ogni 3 secondi del mondo, entro il massimo. Il rimpiazzo
 della carta si pesca al termine del cast se Combat continua; non serve un beat
 nemico aggiuntivo. La velocità delle animazioni non altera questi contratti.
 
-Solo allo zero dell'intera finestra parte un **recupero fisso di 1 secondo di
-tempo attivo**, uguale in ogni ciclo. Si può camminare senza costo temporale
-aggiuntivo: i passi non accorciano né prolungano il recupero. Camminare verso un
-nemico non permette un attacco; collisioni e hazard mantengono le regole normali.
-Nemici, bombe, status ed energia continuano sul clock condiviso. Allo scadere,
-dopo aver risolto gli eventuali beat/QTE pendenti, riparte il timer configurato.
-Non esistono più la crescita `1, 3, 5…` né la preparazione automatica di 15 secondi.
+Solo allo zero dell'intera finestra parte un **recupero di 1 secondo di tempo
+attivo**. Si può camminare senza costo temporale aggiuntivo: i passi non
+accorciano né prolungano il recupero. Camminare verso un nemico non permette un
+attacco; collisioni e hazard mantengono le regole normali. Nemici, bombe, status
+ed energia continuano sul clock condiviso. Allo scadere, dopo aver risolto gli
+eventuali beat/QTE pendenti, riparte la finestra successiva.
 
-All'ingresso di **ogni nuova stanza** ciclo, debito di tempo e recupero schivata
-si azzerano. Le statistiche cumulative della run rimangono. Un timeout chiude
+**La finestra si accorcia** (`Tactical_Config.shrinking_window`): ogni finestra
+che arriva a zero lascia alla successiva un secondo in meno (20, 19, 18...).
+Quando non resta più neanche un secondo il Viandante è **stordito**: niente
+passi, attacchi, schivate o difese, solo carte, per 1 secondo la prima volta
+nella stanza, 2 la seconda, 3 la terza e così via; poi la finestra torna intera.
+Ogni **6 carte giocate** annullano il calo della scadenza successiva e danno un
+secondo in più: a 18, invece di scendere a 17, si riparte da 19. La finestra non
+supera mai i 20 secondi iniziali. L'HUD mostra `STORDITO` e, accanto ai nemici,
+la lunghezza della finestra e le carte contate (`MAX 19s / CARTE 4/6`). Con le
+regole di base ogni finestra resta intera.
+
+All'ingresso di **ogni nuova stanza** ciclo, debito di tempo, recupero schivata,
+lunghezza della finestra, carte contate e stordimenti si azzerano. Le statistiche cumulative della run rimangono. Un timeout chiude
 la finestra una sola volta, dopo la risoluzione del tempo già pagato; il secondo
 di recupero trascorre realmente, senza aggiungere una Wait o beat immediati.
 
@@ -1062,7 +1084,7 @@ le immagini sono output rigenerabili, non prerequisiti del checkout.
 | `--smoke-arenas-view` | quattro fasce di arene reali, combattimento, ologramma, Loot e cambio stanza; screenshot `odin_pp_arenas_*.png` |
 | `--smoke-m8-view` | dispositivi con APRI IL RING, campo, tag match, ritorno Loot: `odin_pp_m8_d4.png`, `devices`, `mega_combo`, `character`, `loot`, `tag_ring`, `next_room` (tutti con prefisso `odin_pp_m8_` e suffisso `.png`) |
 | `--smoke-western` | 6 RANCH 7 dalla mano al premio: `odin_pp_western_hand.png`, `cards`, `sign`, `gate`, `riders`, `ride`, `grab`, `win`, `reward` (prefisso `odin_pp_western_`) |
-| `--smoke-mechanics-lab` | sandbox: `odin_pp_mechanics_lab.png`, `_square`, `_full`, `_refill`, `_restart` (prefisso `odin_pp_mechanics_lab`); cartoncini vivi: `odin_pp_living_move_00.png`–`_37` e `odin_pp_living_attack_00.png`–`_37`, un'immagine ogni due fotogrammi; cerchi d'azione: `odin_pp_living_rings_00.png`–`_49`, ogni tre; segnalino di cura: `odin_pp_living_heal_00.png`–`_39`, ogni due |
+| `--smoke-mechanics-lab` | sandbox: `odin_pp_mechanics_lab.png`, `_square`, `_full`, `_refill`, `_restart`, `_stun`, `_pause`, `_defeat` (prefisso `odin_pp_mechanics_lab`); cartoncini vivi: `odin_pp_living_move_00.png`–`_37` e `odin_pp_living_attack_00.png`–`_37`, un'immagine ogni due fotogrammi; cerchi d'azione: `odin_pp_living_rings_00.png`–`_49`, ogni tre; segnalino di cura: `odin_pp_living_heal_00.png`–`_39`, ogni due |
 | `--smoke` | `odin_pp_isometric.png` |
 | `--smoke-generation` | `odin_pp_procedural_room.png` |
 | `--smoke-map` | `odin_pp_route.png` |

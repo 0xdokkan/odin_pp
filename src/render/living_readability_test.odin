@@ -5,26 +5,26 @@ import rl "vendor:raylib"
 import game "../game"
 
 @(test)
-test_lab_health_label_counts_the_health_and_stays_on_the_board :: proc(t: ^testing.T) {
-	testing.expect_value(t, string(lab_health_text(12, 18, 0)), "HP 12/18")
-	testing.expect_value(t, string(lab_health_text(12, 18, 3)), "HP 12/18 / SC 3")
-	testing.expect_value(t, lab_health_step(18), i32(1))
-	testing.expect_value(t, lab_health_step(40), i32(5))
+test_living_health_label_counts_the_health_and_stays_on_the_board :: proc(t: ^testing.T) {
+	testing.expect_value(t, string(living_health_text(12, 18, 0)), "HP 12/18")
+	testing.expect_value(t, string(living_health_text(12, 18, 3)), "HP 12/18 / SC 3")
+	testing.expect_value(t, living_health_step(18), i32(1))
+	testing.expect_value(t, living_health_step(40), i32(5))
 	viewport := rl.Rectangle{12, 110, 1256, 400}
 	// Behind the top panel: just below it, straight under the enemy.
-	at := lab_label_anchor(viewport, {400, 12}, {120, 44})
+	at := living_label_anchor(viewport, {400, 12}, {120, 44})
 	testing.expect(t, at.x == 400 && at.y == 110+44+2)
 	// Off the side: pulled in whole.
-	at = lab_label_anchor(viewport, {5, 300}, {120, 44})
+	at = living_label_anchor(viewport, {5, 300}, {120, 44})
 	testing.expect(t, at.x == 12+60 && at.y == 300)
-	at = lab_label_anchor(viewport, {640, 300}, {120, 44})
+	at = living_label_anchor(viewport, {640, 300}, {120, 44})
 	testing.expect(t, at.x == 640 && at.y == 300)
 }
 
-// The lab's inspector keeps the enemy it showed while the camera glides under
-// a still mouse; the classic one follows the cell under the mouse only.
+// A living board's inspector keeps the enemy it showed while the camera glides
+// under a still mouse; the classic one follows the cell under the mouse only.
 @(test)
-test_lab_inspector_keeps_its_enemy_while_the_board_moves :: proc(t: ^testing.T) {
+test_living_inspector_keeps_its_enemy_while_the_board_moves :: proc(t: ^testing.T) {
 	enemies := [?]game.Enemy{{id = 5, position = {x = 3, y = 2}, health = 7, max_health = 10}}
 	room := make_enemy_intent_renderer_test_room(enemies[:])
 	defer game.destroy_room(&room)

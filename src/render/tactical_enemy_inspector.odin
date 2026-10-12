@@ -4,7 +4,7 @@ import "core:fmt"
 import rl "vendor:raylib"
 import game "../game"
 
-// The enemy under the mouse. The mechanics lab keeps showing it while an
+// The enemy under the mouse. A living board keeps showing it while an
 // animation plays, and while the camera glides under a mouse that stays still.
 tactical_inspected_enemy :: proc(renderer: ^Renderer, room: ^game.Room) -> (^game.Enemy, bool) {
 	v := &renderer.tactical

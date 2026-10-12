@@ -49,7 +49,9 @@ update_tactical_controller :: proc(
 	}
 	for key, index in ([?]rl.KeyboardKey{.W, .D, .S, .A}) { input.directions[index] = rl.IsKeyPressed(key) }
 	for key, index in ([?]rl.KeyboardKey{.Q, .E, .Z, .C}) { input.diagonals[index] = rl.IsKeyPressed(key) }
-	for key, index in ([?]rl.KeyboardKey{.J, .K, .L, .I}) { input.defenses[index] = rl.IsKeyPressed(key) }
+	// Block, parry, deflect, dodge. The dodge sits by WASD, which then picks
+	// its landing; the diagonal keys are not read during a defence.
+	for key, index in ([?]rl.KeyboardKey{.J, .K, .L, .E}) { input.defenses[index] = rl.IsKeyPressed(key) }
 	blocked := step_tactical_controller(controller, room, renderer, cards, buffer, dt, available, input, playtest)
 	if M7_INPUT_TRACE {
 		if input.directions != ([4]bool{}) || input.pause || input.map_input.toggle {

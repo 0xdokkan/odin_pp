@@ -35,13 +35,21 @@ Tactical_View :: struct {
 	fallback: [11]rl.Texture2D,
 	flipbook: gfx.Flipbook_Assets,
 	flipbook_state: ^Flipbook_State,
-	// Living cards (living_card.odin): on for the mechanics lab only.
+	// Living cards (living_card.odin): on wherever the board is 3D.
 	living: bool,
 	living_assets: gfx.Living_Assets,
 	living_state: ^Living_State,
-	// The lab's inspector keeps the enemy last hovered, and the mouse then.
+	// The inspector of a living board keeps the enemy last hovered, and the
+	// mouse then.
 	inspected: u32,
 	inspected_mouse: rl.Vector2,
+	// The mechanics lab is running: its banner sits over the board and its
+	// trial extras show (the enemies' action rings).
+	mechanics_lab: bool,
+	// The pause menu: the button under the mouse, and whether there is a main
+	// menu to go back to.
+	pause_hovered: Pause_Choice,
+	pause_menu: bool,
 	kit: Diorama_Kit,
 	pilgrim: []Diorama_Vertex,
 	intent_memory: [game.MAX_ENEMIES_PER_ROOM]Intent_Memory,

@@ -4,9 +4,9 @@ import grid "../grid"
 
 // Acting on the tick. When the decision clock crosses a whole second, a move,
 // a bump or a card played within TACTICAL_BEAT_WINDOW of that instant is
-// critical: a straight step goes one cell further, two direction keys pressed
-// together step diagonally, a bump hits twice as hard and a card resolves a
-// stronger version of itself.
+// critical: two direction keys pressed together step diagonally, a bump hits
+// twice as hard and a card resolves a stronger version of itself. A straight
+// step stays one cell and leaves the tick to the next action.
 //
 // Beats are counted only as real time crosses a second (tactical_tick). An
 // action's cost advances the clock by whole seconds and never makes a beat of
@@ -37,7 +37,7 @@ tactical_reset_beats :: proc(s: ^Tactical_State) {
 tactical_beat_target :: proc(room: ^Room) -> u32 {
 	if room == nil || room.player == nil || !tactical_enabled(room) || room.phase != .Combat { return 0 }
 	s := &room.player.tactical
-	if s.phase != .Decision && s.phase != .Recovery { return 0 }
+	if s.phase != .Decision && !tactical_between_windows(s) { return 0 }
 	if s.beat_index > 0 && s.beat_age <= TACTICAL_BEAT_WINDOW && s.beat_spent != s.beat_index { return s.beat_index }
 	if 1-s.clock_fraction <= TACTICAL_BEAT_WINDOW && s.beat_spent != s.beat_index+1 { return s.beat_index+1 }
 	return 0

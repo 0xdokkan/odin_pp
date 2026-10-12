@@ -306,7 +306,7 @@ draw_tactical_feedback_overlay :: proc(renderer: ^Renderer, cue: ^Presentation_C
 	case .Damage:
 		label = fmt.ctprintf("-%d", cue.event.amount); color = TACTICAL_FEEDBACK_HIT
 		if game.event_is_critical(cue.event) { label = fmt.ctprintf("CRITICO -%d", cue.event.amount); color = TACTICAL_FEEDBACK_CRITICAL }
-		// The mechanics lab shows the amount on a paper token; a critical blow
+		// A living board shows the amount on a paper token; a critical blow
 		// still says so.
 		if renderer.tactical.living { label = "CRITICO" if game.event_is_critical(cue.event) else nil }
 	case .Move:

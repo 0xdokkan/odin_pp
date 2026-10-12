@@ -6,7 +6,7 @@ import gfx "../engine/gfx"
 import game "../game"
 import view "../view"
 
-// Living cards (the mechanics lab): each character is a drawing animated on a
+// Living cards (the 3D board): each character is a drawing animated on a
 // still paper card (gfx.LIVING_SHEETS). The card never bends or turns: the
 // drawing acts inside it, turns round inside it and is cut by its edge. On a
 // move the drawing shoves, runs, stomps or hops, and the card slides to the

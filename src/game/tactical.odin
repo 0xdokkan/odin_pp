@@ -2,17 +2,25 @@ package game
 
 import grid "../grid"
 
-Tactical_Phase :: enum { Decision, Recovery, Resolving }
+// Recovery leaves only walking; Stunned (an exhausted window) only cards.
+Tactical_Phase :: enum { Decision, Recovery, Resolving, Stunned }
 Tactical_Config :: struct {
 	enabled: bool,
 	timer_seconds: int,
 	vision_size: int,
 	qte_seconds: f32,
-	// Timed actions (the mechanics lab): an action lasts its cost in real time
-	// instead of spending it at once (tactical_clock.odin).
+	// Timed actions: an action lasts its cost in real time instead of spending
+	// it at once (tactical_clock.odin).
 	timed_actions: bool,
+	// The shrinking window: each window that runs out leaves the next a second
+	// shorter, down to a stun (tactical_clock.odin).
+	shrinking_window: bool,
 }
-DEFAULT_TACTICAL_CONFIG :: Tactical_Config{true, 20, 7, 1.2, false}
+// The bare rules, which the regression probes are written against.
+DEFAULT_TACTICAL_CONFIG :: Tactical_Config{enabled = true, timer_seconds = 20, vision_size = 7, qte_seconds = 1.2}
+// The game as it is played: actions last their cost, the window shrinks.
+GAME_TACTICAL_CONFIG :: Tactical_Config{enabled = true, timer_seconds = 20, vision_size = 7, qte_seconds = 1.2,
+	timed_actions = true, shrinking_window = true}
 MAX_TACTICAL_VISION :: 9
 TACTICAL_DODGE_RECOVERY :: 2
 
@@ -47,6 +55,13 @@ Tactical_State :: struct {
 	beat_index, beat_spent: u32,
 	beat_age: f32,
 	critical_next, critical_card: bool,
+	// The shrinking window (tactical_clock.odin): the window the current
+	// recovery or stun leads to, cards played toward the next won second and
+	// the seconds won in this window, and how many stuns this room has dealt.
+	next_budget: int,
+	cards_toward_second, won_seconds: int,
+	stuns: int,
+	stun_duration: f32,
 }
 Tactical_Pulse :: struct {
 	pending, started, forced: bool,
@@ -110,6 +125,23 @@ tactical_is_recovering :: proc(room: ^Room) -> bool {
 	return tactical_enabled(room) && room.phase == .Combat && room.player.tactical.phase == .Recovery
 }
 
+tactical_is_stunned :: proc(room: ^Room) -> bool {
+	return tactical_enabled(room) && room.phase == .Combat && room.player.tactical.phase == .Stunned
+}
+
+// Recovery and stun both stand between two windows.
+tactical_between_windows :: proc(s: ^Tactical_State) -> bool {
+	return s.phase == .Recovery || s.phase == .Stunned
+}
+
+// Cards are also the one thing a stunned player can still play.
+tactical_allows_cards :: proc(room: ^Room) -> bool {
+	if tactical_allows_action(room) { return true }
+	if !tactical_is_stunned(room) { return false }
+	s := &room.player.tactical
+	return !room.tactical_pulse.pending && room.qte.kind == .None && s.remaining > 0 && s.cast_remaining <= 0
+}
+
 tactical_allows_movement :: proc(room: ^Room, ignore_busy := false) -> bool {
 	if !tactical_is_recovering(room) { return tactical_allows_action(room, ignore_busy) }
 	return !room.tactical_pulse.pending && room.qte.kind == .None &&
@@ -125,6 +157,7 @@ begin_tactical_room :: proc(room: ^Room) {
 	s.budget = s.config.timer_seconds
 	s.remaining = f32(s.budget)
 	s.cycle = 0
+	tactical_reset_window_pressure(s)
 	s.dodge_recovery = 0
 	s.clock_fraction = 0
 	s.queued_beats = 0
@@ -140,6 +173,7 @@ tactical_end_combat :: proc(room: ^Room) {
 	s.budget = s.config.timer_seconds
 	s.phase = .Decision
 	s.remaining = f32(s.budget)
+	tactical_reset_window_pressure(s)
 	s.dodge_recovery = 0
 	s.clock_fraction = 0
 	s.queued_beats = 0
@@ -154,7 +188,7 @@ tactical_finish_cycle_pulse :: proc(room: ^Room, forced: bool) {
 	s := &room.player.tactical
 	s.dodge_recovery = max(0, s.dodge_recovery-1)
 	if forced { s.metrics.forced_pulses += 1 }
-	if s.phase != .Recovery { s.phase = .Decision }
+	if !tactical_between_windows(s) { s.phase = .Decision }
 	tactical_queue_next_beat(room)
 	tactical_finish_recovery(room)
 }
@@ -165,7 +199,7 @@ tactical_tick :: proc(room: ^Room, dt: f32, available: bool, hologram: bool) -> 
 	if !tactical_enabled(room) || room.phase != .Combat || !available ||
 	   room.tactical_pulse.pending || room.qte.kind != .None { return false }
 	s := &room.player.tactical
-	if s.phase != .Decision && s.phase != .Recovery { return false }
+	if s.phase != .Decision && !tactical_between_windows(s) { return false }
 	if s.cast_remaining > 0 {
 		elapsed := min(max(f32(0), dt), s.cast_remaining)
 		s.cast_remaining = max(f32(0), s.cast_remaining-elapsed)
@@ -182,7 +216,7 @@ tactical_tick :: proc(room: ^Room, dt: f32, available: bool, hologram: bool) -> 
 	// The final charged beat can finish on a zero-delta controller frame. A
 	// deadline already reached must still publish its explicit timeout command.
 	if s.remaining <= 0 {
-		if s.phase == .Recovery { tactical_finish_recovery(room); return false }
+		if tactical_between_windows(s) { tactical_finish_recovery(room); return false }
 		return true
 	}
 	if !(dt > 0) { return false }
@@ -197,7 +231,7 @@ tactical_tick :: proc(room: ^Room, dt: f32, available: bool, hologram: bool) -> 
 	tactical_note_beat_time(s, before, elapsed)
 	s.metrics.decision_seconds += f64(elapsed)
 	if hologram { s.metrics.hologram_seconds += f64(elapsed) }
-	if s.phase == .Recovery { tactical_finish_recovery(room); return false }
+	if tactical_between_windows(s) { tactical_finish_recovery(room); return false }
 	return s.remaining <= 0 && !room.tactical_pulse.pending
 }
 
@@ -369,6 +403,8 @@ begin_diagonal_qte :: proc(room: ^Room, offset: grid.Position) -> bool {
 }
 
 offer_defense_qte :: proc(room: ^Room, enemy: ^Enemy) -> bool {
+	// A stunned player cannot defend: only cards are left.
+	if tactical_is_stunned(room) { return false }
 	intent := &enemy.intent
 	if enemy_is_staggered(room, enemy) || intent.windup || (intent.kind != .Attack && intent.kind != .Charge) || intent.target_object != 0 || enemy.position != intent.origin ||
 	   !enemy_intent_cell_is_threatened(intent, room.player.position) ||

@@ -6,7 +6,7 @@ import rl "vendor:raylib"
 import game "../game"
 import grid "../grid"
 
-// Damage and healing tokens of the mechanics lab: little paper cards, cut and
+// Damage and healing tokens of a living board: little paper cards, cut and
 // inked like the standees, that flick out of a card when it is struck or
 // healed and carry the amount in pixel figures, red for a blow and green for a
 // cure. They pop out with the hurt drawing's impact and slide out of the

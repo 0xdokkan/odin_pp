@@ -37,7 +37,7 @@ play_card :: proc(room: ^Room, card_id: u32, target: Target) -> (play: Card_Play
 	if room == nil || room.player == nil {
 		return
 	}
-	if room.phase != .Combat || !tactical_allows_action(room) {
+	if room.phase != .Combat || !tactical_allows_cards(room) {
 		play.result = .Invalid_Phase
 		return
 	}
@@ -142,6 +142,7 @@ play_card :: proc(room: ^Room, card_id: u32, target: Target) -> (play: Card_Play
 
 	if tactical_enabled(room) {
 		tactical_begin_card_cast(room, tactical_card_time_cost(play.card.definition_id))
+		tactical_count_card(room)
 		room.tactical_pulse.deferred_draws += 1
 		play.result = .Played
 		play.energy_after = deck.energy

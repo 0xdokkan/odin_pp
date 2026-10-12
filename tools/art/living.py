@@ -33,7 +33,7 @@ TWOS = 12          # drawings per second for most of the motion
 ONES = 24          # ...and where it is fastest
 # Figure size against the classic card: the paper keeps its size and the
 # print shrinks, so the figure has room to move inside it.
-LIVING_SCALE = 0.80
+LIVING_SCALE = 0.89
 COLUMNS = 16
 MAX_FRAMES = 48
 RENDER_MARGIN = 60

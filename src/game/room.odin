@@ -804,12 +804,8 @@ try_move_player :: proc(room: ^Room, direction: Move_Direction) -> Action_Result
 		return .Blocked
 	}
 
-	// On the tick a straight step carries one cell further when it is clear.
-	if critical && room.phase == .Combat {
-		further := add_position(target, direction_offset(direction))
-		query := query_entity_movement(room, PLAYER_ENTITY, further)
-		if movement_query_is_clear(&query) { target = further }
-	}
+	// A straight step is one cell, on the tick or not: the tick's step is the
+	// diagonal (try_move_player_diagonal).
 	action := make_action(.Move, PLAYER_ENTITY, cell_target(target), .Walkable_Cell)
 	added := add_effect(&action, move_effect(PLAYER_ENTITY, target))
 	assert(added)
@@ -817,7 +813,6 @@ try_move_player :: proc(room: ^Room, direction: Move_Direction) -> Action_Result
 	if !report.accepted {
 		return .Blocked
 	}
-	if critical { mark_critical_events(&report.events) }
 	append_event_log(&room.recent_events, &report.events)
 	collect_loot_in_magnet_range(room)
 

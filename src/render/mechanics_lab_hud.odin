@@ -5,10 +5,15 @@ import rl "vendor:raylib"
 import game "../game"
 
 // The sandbox's sign under the top HUD: its name, the crowd and the keys.
-// The banner's frame; the board's labels keep clear of it.
+// The banner's frame; the board's labels keep clear of it while the lab runs
+// (set_mechanics_lab).
 mechanics_lab_banner_bounds :: proc(renderer: ^Renderer, title, detail: cstring) -> rl.Rectangle {
 	width := max(gothic_text_width(renderer, title, 16), gothic_text_width(renderer, detail, 10))+28
 	return {(renderer.canvas_width-width)*0.5, TACTICAL_HUD_HEIGHT+4, width, 38}
+}
+
+set_mechanics_lab :: proc(renderer: ^Renderer, on: bool) {
+	if renderer != nil { renderer.tactical.mechanics_lab = on }
 }
 
 draw_mechanics_lab_banner :: proc(renderer: ^Renderer, room: ^game.Room, from_menu: bool) {

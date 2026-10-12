@@ -119,6 +119,8 @@ run_mechanics_lab_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer,
 	render.frame_level(renderer, &data)
 	render.set_living_cards(renderer, true)
 	defer render.set_living_cards(renderer, false)
+	render.set_mechanics_lab(renderer, true)
+	defer render.set_mechanics_lab(renderer, false)
 	controller := Tactical_Controller{was_focused = true}
 	cards: Card_Interaction_State
 	buffer: Buffered_Gameplay_Command
@@ -212,6 +214,33 @@ run_mechanics_lab_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer,
 	cure_after := render.capture_room_presentation(&room)
 	if !render.begin_renderer_event_timeline(renderer, cure_before, &room.recent_events, &cure_after) { return false }
 	mechanics_lab_film(window, renderer, &room, &controller, &cards, &buffer, 80, 2, "heal")
+	// The shrinking window: the last second runs out into a stun, cards only.
+	player.tactical.config.shrinking_window = true
+	player.tactical.budget, player.tactical.remaining, player.tactical.won_seconds = 1, 0.1, 0
+	for _ in 0..<300 {
+		mechanics_lab_smoke_frame(window, renderer, &room, &controller, &cards, &buffer, 1.0/60.0, true)
+		if game.tactical_is_stunned(&room) { break }
+	}
+	if !game.tactical_is_stunned(&room) || !game.tactical_allows_cards(&room) || game.tactical_allows_movement(&room) {
+		fmt.eprintln("mechanics lab: the last second did not run out into a stun"); return false
+	}
+	for _ in 0..<10 { mechanics_lab_smoke_frame(window, renderer, &room, &controller, &cards, &buffer, 1.0/60.0, true) }
+	rl.TakeScreenshot("odin_pp_mechanics_lab_stun.png")
+	// The pause menu and the defeat screen, with the way back to the menu.
+	renderer.tactical.pause_hovered, renderer.tactical.pause_menu = .Menu, true
+	defeat := game.Run_State{phase = .Defeat}
+	for screen in 0..<2 {
+		for _ in 0..<3 {
+			app.begin_canvas(window, render.RESIN_BACKGROUND)
+			render.draw_tactical_world(renderer, &room, 0)
+			render.draw_tactical_hand(renderer, &room, 0, 0, 0, {})
+			render.draw_tactical_hud(renderer, &room, screen == 0, false)
+			if screen == 1 { render.draw_defeat_overlay(&defeat, renderer.canvas_width, renderer.canvas_height, .Menu, true, theme = renderer) }
+			app.present(window, render.LETTERBOX_COLOR)
+		}
+		rl.TakeScreenshot("odin_pp_mechanics_lab_pause.png" if screen == 0 else "odin_pp_mechanics_lab_defeat.png")
+	}
+	renderer.tactical.pause_hovered, renderer.tactical.pause_menu = .None, false
 	return true
 }
 

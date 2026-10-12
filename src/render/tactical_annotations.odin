@@ -112,34 +112,34 @@ draw_tactical_label :: proc(renderer: ^Renderer, anchor: view.Vec2, first, secon
 	}
 }
 
-// The mechanics lab's health labels: larger type with the maximum, a bar with
-// one notch per point so the health can be counted at a glance, and a label
-// that never leaves an enemy on screen (behind the top panel it waits just
-// below it; in a crowd it still shows, over the others).
-LAB_HEALTH_COLOR :: rl.Color{224, 78, 88, 255}
+// The health labels of a living board: larger type with the maximum, a bar
+// with one notch per point so the health can be counted at a glance, and a
+// label that never leaves an enemy on screen (behind the top panel it waits
+// just below it; in a crowd it still shows, over the others).
+LIVING_HEALTH_COLOR :: rl.Color{224, 78, 88, 255}
 
-lab_health_text :: proc(health, max_health, shield: i32) -> cstring {
+living_health_text :: proc(health, max_health, shield: i32) -> cstring {
 	if shield > 0 { return fmt.ctprintf("HP %d/%d / SC %d", health, max_health, shield) }
 	return fmt.ctprintf("HP %d/%d", health, max_health)
 }
 
 // One notch per point of health; one every five for large pools.
-lab_health_step :: proc(max_health: i32) -> i32 { return 1 if max_health <= 30 else 5 }
+living_health_step :: proc(max_health: i32) -> i32 { return 1 if max_health <= 30 else 5 }
 
 // Where a kept label sits: inside the board's area, never behind the panels.
-lab_label_anchor :: proc(viewport: rl.Rectangle, anchor: view.Vec2, size: view.Vec2) -> view.Vec2 {
+living_label_anchor :: proc(viewport: rl.Rectangle, anchor: view.Vec2, size: view.Vec2) -> view.Vec2 {
 	return {clamp(anchor.x, viewport.x+size.x*0.5, viewport.x+viewport.width-size.x*0.5),
 		clamp(anchor.y, viewport.y+size.y+2, viewport.y+viewport.height)}
 }
 
-draw_lab_health_label :: proc(renderer: ^Renderer, anchor: view.Vec2, first, second: cstring, color: rl.Color,
+draw_living_health_label :: proc(renderer: ^Renderer, anchor: view.Vec2, first, second: cstring, color: rl.Color,
 	health, max_health: i32, icon: Intent_Icon, alarm: bool, seed: int) {
 	viewport := tactical_world_bounds(renderer)
 	inset := f32(26) if icon != .None else 0
 	bar := clamp(f32(max(max_health, 1))*3, 48, 120)
 	width := max(gothic_text_width(renderer, first, 14), gothic_text_width(renderer, second, 12), bar)+12+inset
 	height := f32(29) if second == "" else f32(44)
-	at := lab_label_anchor(viewport, anchor, {width, height})
+	at := living_label_anchor(viewport, anchor, {width, height})
 	bounds, placed := place_tactical_label(renderer.tactical.labels, at, {width, height}, viewport)
 	if !placed { bounds = {at.x-width*0.5, at.y-height, width, height} }
 	bottom := rl.Vector2{bounds.x+bounds.width/2, bounds.y+bounds.height}
@@ -152,8 +152,8 @@ draw_lab_health_label :: proc(renderer: ^Renderer, anchor: view.Vec2, first, sec
 	if second != "" { gothic_text(renderer, second, bounds.x+7+inset, bounds.y+19, 12, color) }
 	x, y, w := bounds.x+7+inset, bounds.y+bounds.height-9, bounds.width-12-inset
 	rl.DrawRectangleRec({x, y, w, 5}, GOTHIC_DARK_RED)
-	rl.DrawRectangleRec({x, y, w*clamp(f32(health)/f32(max(max_health, 1)), 0, 1), 5}, LAB_HEALTH_COLOR)
-	step := lab_health_step(max_health)
+	rl.DrawRectangleRec({x, y, w*clamp(f32(health)/f32(max(max_health, 1)), 0, 1), 5}, LIVING_HEALTH_COLOR)
+	step := living_health_step(max_health)
 	for point := step; point < max_health; point += step {
 		rl.DrawRectangleRec({math.floor(x+w*f32(point)/f32(max_health)), y, 1, 5}, GOTHIC_INK)
 	}
@@ -170,7 +170,7 @@ draw_tactical_annotations :: proc(renderer: ^Renderer, room: ^game.Room) {
 		reserve_tactical_actor_label_bounds(renderer, &actor)
 	}
 	if room.qte.kind != .None { v.labels.bounds[0] = {14, TACTICAL_HUD_HEIGHT+13, 237, 143}; v.labels.count = 1 }
-	if v.living {
+	if v.mechanics_lab {
 		// The mechanics lab's banner is drawn over the board: labels keep clear.
 		v.labels.bounds[v.labels.count] = mechanics_lab_banner_bounds(renderer, "PROVA MECCANICHE",
 			"NEMICI 0/0  /  F5 RICOMINCIA  /  F10 MENU")
@@ -221,12 +221,12 @@ draw_tactical_annotations :: proc(renderer: ^Renderer, room: ^game.Room) {
 			}
 		}
 		if v.living {
-			// The mechanics lab: the health of every enemy on screen stays shown.
+			// A living board: the health of every enemy on screen stays shown.
 			feet := tactical_project(renderer, {actor.position.x+0.5, actor.position.y+0.5})
 			if feet.x < 0 || feet.y < 0 || feet.x > renderer.canvas_width || feet.y > renderer.canvas_height { continue }
 			shield := i32(0)
 			if i, shielded := game.status_index(&actor.statuses, .Shield); shielded { shield = actor.statuses.items[i].potency }
-			draw_lab_health_label(renderer, anchor, lab_health_text(actor.health, actor.max_health, shield), intent, color,
+			draw_living_health_label(renderer, anchor, living_health_text(actor.health, actor.max_health, shield), intent, color,
 				actor.health, actor.max_health, icon, alarm, int(actor.entity.id))
 			continue
 		}

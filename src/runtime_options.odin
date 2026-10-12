@@ -27,7 +27,7 @@ Runtime_Options :: struct {
 	m9_smoke: bool,
 }
 
-DEFAULT_RUNTIME_OPTIONS :: Runtime_Options{seed = 0xC0FFEE, animation_speed = 1, tactical = game.DEFAULT_TACTICAL_CONFIG, scene_3d = true, perspective = true}
+DEFAULT_RUNTIME_OPTIONS :: Runtime_Options{seed = 0xC0FFEE, animation_speed = 1, tactical = game.GAME_TACTICAL_CONFIG, scene_3d = true, perspective = true}
 
 // Il parser standard della toolchain non segnala overflow degli interi.
 parse_run_seed :: proc(value: string) -> (seed: u64, ok: bool) {

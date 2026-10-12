@@ -92,7 +92,8 @@ Roguelike_Session :: struct {
 	m8_modal:                bool,
 	mouse_canvas:            view.Vec2,
 	mouse_inside:            bool,
-	defeat_restart_hovered:  bool,
+	defeat_hovered:          render.Defeat_Choice,
+	pause_hovered:           render.Pause_Choice,
 	timeline_busy:           bool,
 	defeat_visible:          bool,
 	reward_visible:          bool,
@@ -856,6 +857,18 @@ roguelike_update :: proc(data: rawptr, hf: ^host.Frame) {
 		host.pop(hf)
 		return
 	}
+	// The pause menu: resume, or back to the main menu.
+	rs.pause_hovered = .None
+	if rs.tactical_controller.paused && hf.mouse_inside {
+		rs.pause_hovered = render.pause_choice_at_point(&rs.iso_renderer, {hf.mouse.x, hf.mouse.y}, rs.from_launcher)
+	}
+	if rs.pause_hovered != .None && hf.focused && rl.IsMouseButtonPressed(.LEFT) {
+		if rs.pause_hovered == .Menu { host.pop(hf); return }
+		rs.tactical_controller.paused = false
+		rs.iso_renderer.frame_clock_valid = false
+		rs.pause_hovered = .None
+	}
+	rs.iso_renderer.tactical.pause_hovered, rs.iso_renderer.tactical.pause_menu = rs.pause_hovered, rs.from_launcher
 	if !rs.smoke_test && rl.IsKeyPressed(.F4) {
 		speed := f32(1) if rs.iso_renderer.playback_speed >= 4 else min(f32(4), rs.iso_renderer.playback_speed*2)
 		render.set_renderer_playback_speed(&rs.iso_renderer, speed)
@@ -903,15 +916,19 @@ roguelike_update :: proc(data: rawptr, hf: ^host.Frame) {
 		render.update_object_target_hover(&rs.iso_renderer, &rs.room, rs.mouse_canvas, rs.card_interaction.selected_card_id)
 	}
 	mouse_delta := app.mouse_canvas_delta(rs.window)
-	rs.defeat_restart_hovered = rs.run_state.phase == .Defeat && rs.mouse_inside &&
-		render.defeat_restart_at_point(
-			f32(rs.window.config.canvas_width),
-			f32(rs.window.config.canvas_height),
-			rs.mouse_canvas,
-		)
+	rs.defeat_hovered = .None
+	if rs.run_state.phase == .Defeat && rs.mouse_inside {
+		rs.defeat_hovered = render.defeat_choice_at_point(f32(rs.window.config.canvas_width),
+			f32(rs.window.config.canvas_height), rs.mouse_canvas, rs.from_launcher)
+	}
+	// After a defeat: back to the main menu, or out of the game.
+	if !rs.m8_modal && rl.IsMouseButtonPressed(.LEFT) {
+		if rs.defeat_hovered == .Menu { host.pop(hf); return }
+		if rs.defeat_hovered == .Quit { host.quit(hf); return }
+	}
 	restart_requested := !rs.m8_modal && (rl.IsKeyPressed(.F5) ||
 		(rs.run_state.phase == .Defeat && rl.IsKeyPressed(.ENTER)) ||
-		(rs.defeat_restart_hovered && rl.IsMouseButtonPressed(.LEFT)))
+		(rs.defeat_hovered == .Restart && rl.IsMouseButtonPressed(.LEFT)))
 	if restart_requested {
 		if rs.playtest_session_ptr != nil {
 			if !rs.playtest_report_written {
@@ -971,7 +988,7 @@ roguelike_update :: proc(data: rawptr, hf: ^host.Frame) {
 		rs.reward_skip_hovered = false
 		rs.shop_render_state = {hovered_offer_index = -1}
 		rs.special_render_state = {}
-		rs.defeat_restart_hovered = false
+		rs.defeat_hovered = .None
 		render.frame_level(&rs.iso_renderer, &rs.level_data)
 		render.clear_event_animations(&rs.iso_renderer)
 	}
@@ -1007,8 +1024,9 @@ roguelike_update :: proc(data: rawptr, hf: ^host.Frame) {
 			rs.run_state.phase == .In_Room && !relic_visible && !rs.route_visible && !rs.options.m7_view_smoke,
 			rs.mouse_canvas, rs.mouse_inside, rs.playtest_session_ptr) } else { tactical_input_blocked = true }
 	}
-	// The mechanics lab draws its characters as living cards.
-	render.set_living_cards(&rs.iso_renderer, rs.options.mechanics_lab)
+	// The board's characters are living cards, wherever the board is 3D.
+	render.set_living_cards(&rs.iso_renderer, rs.options.scene_3d)
+	render.set_mechanics_lab(&rs.iso_renderer, rs.options.mechanics_lab)
 	// Arrivals follow the running board: never paused, in a modal or mid-animation.
 	if rs.options.mechanics_lab && !rs.m8_modal && !rs.tactical_controller.paused && rl.IsWindowFocused() &&
 	   rs.run_state.phase == .In_Room && !render.renderer_timeline_is_busy(&rs.iso_renderer) {
@@ -1736,7 +1754,8 @@ roguelike_draw :: proc(data: rawptr, hf: ^host.Frame) {
 				&rs.run_state,
 				f32(rs.window.config.canvas_width),
 				f32(rs.window.config.canvas_height),
-				rs.defeat_restart_hovered,
+				rs.defeat_hovered,
+				rs.from_launcher,
 				theme = &rs.iso_renderer,
 			)
 		}

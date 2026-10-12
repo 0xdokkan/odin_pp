@@ -1,6 +1,5 @@
 package render
 
-import "core:c"
 import "core:fmt"
 import rl "vendor:raylib"
 import game "../game"
@@ -69,6 +68,7 @@ draw_tactical_hud :: proc(renderer: ^Renderer, room: ^game.Room, paused, hologra
 	combat := renderer.tactical.snapshot.phase == .Combat
 	busy := renderer_blocks_player_input(renderer)
 	recovering := game.tactical_is_recovering(room)
+	stunned := game.tactical_is_stunned(room)
 	cinematic := presentation_time_policy(&renderer.timeline) == .Cinematic
 	layout := tactical_hud_layout(renderer)
 	bounds := layout.pulse
@@ -78,10 +78,12 @@ draw_tactical_hud :: proc(renderer: ^Renderer, room: ^game.Room, paused, hologra
 	case .Decision:
 	case .Recovery: label = "RECUPERO"
 	case .Resolving: label = "AZIONE"
+	case .Stunned: label = "STORDITO"
 	}
 	if !combat { label = "ESPLORA" }
 	else if room.qte.kind != .None { label = "DIFESA" }
 	else if recovering { label = "RECUPERO" }
+	else if stunned { label = "STORDITO" }
 	else if cinematic { label = "DADI" }
 	else if game.tactical_is_casting(room) { label = "LANCIO" }
 	else if busy || game.tactical_player_busy(room) { label = "AZIONE" }
@@ -89,6 +91,7 @@ draw_tactical_hud :: proc(renderer: ^Renderer, room: ^game.Room, paused, hologra
 	timed := combat
 	accent := GOTHIC_RED if timed && s.remaining <= 5 else GOTHIC_BLUE
 	if recovering { accent = HUD_AMBER }
+	if stunned { accent = GOTHIC_RED }
 	hud_frame(bounds, accent)
 	gothic_text_fit(renderer, label, {x+12, y+5, 150, 24}, 18, GOTHIC_PAPER)
 	gothic_text_fit(renderer, fmt.ctprintf("PULSE %d", min(s.cycle, max(int)-1)+1), {x+12, y+26, 90, 14}, 10, GOTHIC_MUTED)
@@ -110,10 +113,11 @@ draw_tactical_hud :: proc(renderer: ^Renderer, room: ^game.Room, paused, hologra
 	}
 	budget := max(f32(1), f32(s.budget))
 	if recovering { budget = game.TACTICAL_RECOVERY_SECONDS }
+	if stunned { budget = max(f32(1), s.stun_duration) }
 	meter := rl.Rectangle{x+104, y+29, width-116, 7}
 	if timed { hud_bar(meter, s.remaining/budget, accent, int(min(budget, 30))) }
 	else { hud_bar(meter, 1, GOTHIC_BLUE if !combat else GOTHIC_STEEL) }
-	// A timed action (mechanics lab): a thin gold line drains as it plays out.
+	// A timed action: a thin gold line drains as it plays out.
 	if game.tactical_player_busy(room) && s.action_duration > 0 {
 		left := clamp(s.action_remaining/s.action_duration, 0, 1)
 		rl.DrawRectangleRec({meter.x, meter.y+meter.height+2, meter.width*left, 2}, TACTICAL_FEEDBACK_CRITICAL)
@@ -125,11 +129,21 @@ draw_tactical_hud :: proc(renderer: ^Renderer, room: ^game.Room, paused, hologra
 	if game.tactical_is_casting(room) { status = fmt.ctprintf("LANCIO %.1fs / NEMICI SOSPESI", s.cast_remaining) }
 	if cinematic { status = "TEMPO SOSPESO" }
 	if recovering { status = "MUOVITI / CARTE IN RECUPERO" }
+	if stunned { status = "SOLO CARTE" }
 	if room.qte.kind != .None { status = "PULSE SOSPESO" }
 	if !combat { status = "RACCOGLI IL BOTTINO / RAGGIUNGI L'USCITA" }
 	if hologram && combat && room.qte.kind == .None { status = "MAPPA APERTA / IL TEMPO SCORRE" }
 	v := renderer_status_view(renderer, room)
 	objective: cstring = fmt.ctprintf("NEMICI %d", v.enemy_count) if combat else "STANZA LIBERATA"
+	if timed && game.tactical_enabled(room) && s.config.shrinking_window {
+		// The shrinking window: this window's length, and the cards counted
+		// toward the next won second (with any already won).
+		// Between two windows, the length of the one coming.
+		window := s.next_budget if (recovering || stunned) && s.next_budget > 0 else s.budget
+		won := fmt.ctprintf(" +%ds", s.won_seconds) if s.won_seconds > 0 else ""
+		objective = fmt.ctprintf("MAX %ds / CARTE %d/%d%s / NEMICI %d", window, s.cards_toward_second,
+			game.TACTICAL_CARDS_PER_SECOND, won, v.enemy_count)
+	}
 	objective_width := gothic_text_width(renderer, objective, 10)
 	gothic_text(renderer, objective, x+width-12-objective_width, y+bounds.height-17, 10, GOTHIC_BLUE if !combat else GOTHIC_MUTED)
 	if status != nil {
@@ -147,23 +161,19 @@ draw_tactical_hud :: proc(renderer: ^Renderer, room: ^game.Room, paused, hologra
 	}
 	if !hologram { draw_m8_active_bar(renderer, room) }
 	if room.qte.kind != .None { draw_tactical_defense_hud(renderer, room) }
-	if paused {
-		rl.DrawRectangle(0, 0, c.int(renderer.canvas_width), c.int(renderer.canvas_height), {3, 7, 12, 185})
-		px, py := renderer.canvas_width*0.5-120, renderer.canvas_height*0.5-43
-		hud_frame({px, py, 240, 86}, GOTHIC_BLUE)
-		gothic_text(renderer, "PAUSA", px+78, py+12, 32, GOTHIC_PAPER)
-		gothic_text(renderer, "P PER RIPRENDERE", px+48, py+56, 16, GOTHIC_MUTED)
-	}
+	if paused { draw_pause_menu(renderer, renderer.tactical.pause_hovered, renderer.tactical.pause_menu) }
 }
 
 // The dash is a key, not a button: a keycap, its cost and a recharge meter.
 draw_tactical_dodge_chip :: proc(renderer: ^Renderer, room: ^game.Room, bounds: rl.Rectangle) {
 	s := &room.player.tactical
 	recovering := game.tactical_is_recovering(room)
-	ready := game.tactical_dodge_ready(room) && !recovering
+	stunned := game.tactical_is_stunned(room)
+	ready := game.tactical_dodge_ready(room) && !recovering && !stunned
 	recovery := max(0, s.dodge_recovery-(1 if room.tactical_pulse.pending else 0))
 	detail := fmt.ctprintf("-%.0fs", game.TACTICAL_DODGE_SECONDS) if ready else fmt.ctprintf("PRONTA FRA %d", recovery)
 	if recovering { detail = "IN RECUPERO" }
+	if stunned { detail = "STORDITO" }
 	rl.DrawRectangleRec(bounds, {12, 18, 27, 200})
 	rl.DrawRectangleLinesEx(bounds, 1, {28, 38, 52, 255})
 	cap_bounds := rl.Rectangle{bounds.x+4, bounds.y+4, 40, bounds.height-8}
@@ -184,7 +194,7 @@ draw_tactical_defense_hud :: proc(renderer: ^Renderer, room: ^game.Room) {
 		line := y+50
 		if .Block in q.defenses { hud_button(renderer, {x+12, line, 213, 24}, "J", "BLOCK   K: PARRY", true, GOTHIC_RED); line += 29 }
 		if .Deflect in q.defenses { hud_button(renderer, {x+12, line, 213, 24}, "L", "DEVIAZIONE", true, GOTHIC_RED); line += 29 }
-		if .Dodge in q.defenses { hud_button(renderer, {x+12, line, 213, 24}, "I", "SCHIVA, POI WASD", true, GOTHIC_RED) }
+		if .Dodge in q.defenses { hud_button(renderer, {x+12, line, 213, 24}, "E", "SCHIVA, POI WASD", true, GOTHIC_RED) }
 	} else if q.kind == .Defense && q.mode == .Dodge {
 		gothic_text(renderer, "WASD: SCEGLI LA CELLA", x+12, y+66, 16, GOTHIC_PAPER)
 	} else {

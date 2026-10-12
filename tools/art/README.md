@@ -75,14 +75,14 @@ Per aggiungere un'azione: aggiungila ad `ACTION_ORDER` in `build_sprites.py`,
 scrivi le pose in `characters.py`, rigenera e collega la cue in
 `flipbook_cue_action` (`src/render/flipbook_actor.odin`).
 
-## Cartoncini vivi (Prova meccaniche)
+## Cartoncini vivi
 
 ```bash
 blender -b --factory-startup --python tools/art/build_living.py
 ```
 
-Una prova di stile, usata solo nella Prova meccaniche: stesse figure e stessi rig
-dei cartoncini classici, ma la figura è un disegno animato su un cartoncino
+I personaggi del tavolo 3D: stesse figure e stessi rig dei cartoncini classici
+(che restano ai minigiochi), ma la figura è un disegno animato su un cartoncino
 fermo. Scrive:
 
 - `assets/gothic/flipbook/living/<nome>.png`: i disegni, 16 per riga, una clip dopo l'altra;
@@ -92,8 +92,8 @@ fermo. Scrive:
 Cosa cambia rispetto al flipbook classico:
 
 1. **Il cartoncino non si muove e non cambia forma.** È l'unione (anche
-   specchiata) delle sagome a riposo, allargata di 1/0,8 attorno ai piedi: la
-   figura è stampata all'80% e ha spazio per muoversi. Ciò che esce dalla carta
+   specchiata) delle sagome a riposo, allargata di 1/0,89 attorno ai piedi: la
+   figura è stampata all'89% e ha un po' di spazio per muoversi. Ciò che esce dalla carta
    viene tagliato dal bordo, come un disegno che esce dal foglio. Linea
    d'inchiostro e taglio hanno lo spessore dei cartoncini classici.
 2. **Le clip sono chiavi nel tempo**, scritte in `living_actions.py` (ms, con

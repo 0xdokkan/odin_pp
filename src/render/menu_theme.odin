@@ -34,6 +34,8 @@ menu_label :: proc(text: cstring) -> cstring {
 	case "TREASURE": return "TESORO"
 	case "DEFEAT": return "LA TORRE TI HA VINTO"
 	case "RESTART": return "RIPROVA"
+	case "MAIN MENU": return "MENU PRINCIPALE"
+	case "QUIT GAME": return "ESCI DAL GIOCO"
 	case "CONTINUE": return "CONTINUA"
 	case "SKIP": return "PASSA"
 	case "CHOOSE ONE": return "SCEGLINE UNA"

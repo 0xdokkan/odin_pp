@@ -590,6 +590,9 @@ execute_gameplay_command :: proc(room: ^game.Room, command: Gameplay_Command) ->
 			room.player.tactical.critical_next = critical
 			result = game.try_move_player(room, command.direction)
 			room.player.tactical.critical_next = false
+			// Only a bump is critical on a straight key: a plain step leaves
+			// the tick to the next action.
+			if result != .Attacked { room.player.tactical.beat_spent = spent }
 		}
 		execution.committed = result != .Invalid_Phase && result != .Blocked
 		if execution.committed && command.diagonal == {} { room.player.tactical.facing = command.direction }

@@ -8,13 +8,14 @@ import game "../game"
 import grid "../grid"
 import view "../view"
 
-// The action ring of the mechanics lab: a thin line with the shape of a living
+// The action ring of a living board: a thin line with the shape of a living
 // card's cut that closes in on the card and touches it the moment its owner
-// acts. An enemy's ring opens wide when the enemy arrives or commits to its
-// next action and closes over that action's countdown; its colour says what is
-// coming. The player's ring beats the whole seconds of the critical tick in the
-// gold of a critical action: wide just after a tick, on the card at the next.
-// It runs with the clock, never with the animations.
+// acts. The player's ring beats the whole seconds of the critical tick in the
+// gold of a critical action: wide just after a tick, on the card at the next;
+// it runs with the clock, never with the animations. In the mechanics lab the
+// enemies have rings too: one opens wide when its enemy arrives or commits to
+// its next action and closes over that action's countdown, and its colour says
+// what is coming.
 
 // How wide the ring opens, against the card.
 LIVING_RING_SPAN :: f32(1.6)
@@ -90,7 +91,8 @@ draw_living_rings :: proc(renderer: ^Renderer, room: ^game.Room) {
 	rlgl.DrawRenderBatchActive()
 	rlgl.DisableDepthTest()
 	defer { rlgl.DrawRenderBatchActive(); rlgl.EnableDepthTest() }
-	for actor in snapshot.enemies[:snapshot.enemy_count] {
+	// The enemies' rings are still a trial of the mechanics lab.
+	for actor in snapshot.enemies[:snapshot.enemy_count if v.mechanics_lab else 0] {
 		cell := grid.Position{int(math.round(actor.position.x)), int(math.round(actor.position.y))}
 		if !actor.visible || actor.health <= 0 || !tactical_render_visible(renderer, cell) { continue }
 		index, found := game.enemy_index_by_id(room, actor.entity.id)

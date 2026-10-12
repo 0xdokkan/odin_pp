@@ -3,6 +3,41 @@ package game
 TACTICAL_WORLD_BEAT_SECONDS :: f32(1)
 TACTICAL_RECOVERY_SECONDS :: f32(1)
 
+// The shrinking window. Each window that runs out leaves the next one a second
+// shorter (20, 19, 18...). When even the last second is gone the player is
+// stunned (cards only, no walking or defending) for one second, two the next
+// time in the same room, and so on; then the window is whole again. Every six
+// cards played win the drop back and a second more, never past the starting
+// window. A new room starts afresh.
+TACTICAL_CARDS_PER_SECOND :: 6
+
+tactical_reset_window_pressure :: proc(s: ^Tactical_State) {
+	s.next_budget = 0
+	s.cards_toward_second, s.won_seconds = 0, 0
+	s.stuns = 0
+	s.stun_duration = 0
+}
+
+// Every card played counts toward the next won second.
+tactical_count_card :: proc(room: ^Room) {
+	if !tactical_enabled(room) || room.phase != .Combat { return }
+	s := &room.player.tactical
+	s.cards_toward_second += 1
+	if s.cards_toward_second >= TACTICAL_CARDS_PER_SECOND {
+		s.cards_toward_second = 0
+		s.won_seconds += 1
+	}
+}
+
+// The window after this one: a second shorter, or longer by the seconds the
+// cards won (the drop forgiven), never past the starting window. Without the
+// shrinking window every window is whole.
+tactical_next_window :: proc(s: ^Tactical_State) -> int {
+	if !s.config.shrinking_window { return s.config.timer_seconds }
+	next := s.budget+s.won_seconds if s.won_seconds > 0 else s.budget-1
+	return min(next, s.config.timer_seconds)
+}
+
 tactical_is_casting :: proc(room: ^Room) -> bool {
 	return tactical_enabled(room) && room.phase == .Combat && room.player.tactical.cast_remaining > 0
 }
@@ -38,21 +73,23 @@ tactical_schedule_enemy :: proc(room: ^Room, enemy: ^Enemy) {
 
 tactical_queue_next_beat :: proc(room: ^Room) {
 	s := &room.player.tactical
-	if room.phase != .Combat || (s.phase != .Decision && s.phase != .Recovery) ||
+	if room.phase != .Combat || (s.phase != .Decision && !tactical_between_windows(s)) ||
 	   s.queued_beats <= 0 || room.tactical_pulse.pending { return }
 	room.tactical_pulse.pending = true
-	room.tactical_pulse.forced = s.phase == .Recovery
+	room.tactical_pulse.forced = tactical_between_windows(s)
 	if s.phase == .Decision { s.phase = .Resolving }
 }
 
 // Recovery is timed by the same active clock as the world. A beat may finish
 // before the recovery deadline; a QTE may defer its final beat beyond it.
 tactical_finish_recovery :: proc(room: ^Room) {
-	if !tactical_is_recovering(room) || room.tactical_pulse.pending || room.qte.kind != .None { return }
+	if !(tactical_is_recovering(room) || tactical_is_stunned(room)) || room.tactical_pulse.pending || room.qte.kind != .None { return }
 	s := &room.player.tactical
-	if s.remaining > 0 || s.queued_beats > 0 { return }
+	if s.remaining > 0 || s.queued_beats > 0 || s.cast_remaining > 0 { return }
 	s.phase = .Decision
-	s.budget = s.config.timer_seconds
+	s.budget = s.next_budget if s.next_budget > 0 else s.config.timer_seconds
+	s.next_budget = 0
+	s.stun_duration = 0
 	s.remaining = f32(s.budget)
 }
 
@@ -104,5 +141,16 @@ tactical_expire_window :: proc(room: ^Room) -> bool {
 	s.remaining = TACTICAL_RECOVERY_SECONDS
 	// The window's end also ends a timed action still running.
 	s.action_remaining, s.action_duration = 0, 0
+	s.next_budget = tactical_next_window(s)
+	s.won_seconds = 0
+	if s.next_budget <= 0 {
+		// Not a second left: stunned, a second longer at each stun of the room,
+		// and then the whole window again.
+		s.stuns = min(s.stuns, max(int)-1)+1
+		s.phase = .Stunned
+		s.stun_duration = f32(s.stuns)
+		s.remaining = s.stun_duration
+		s.next_budget = s.config.timer_seconds
+	}
 	return true
 }

@@ -54,10 +54,12 @@ test_tactical_critical_steps_bumps_and_diagonals :: proc(t: ^testing.T) {
 	testing.expect_value(t, room.enemies[0].health, 100-critical_bump_damage(base))
 	testing.expect(t, !player.tactical.critical_next)
 	drain_tactical_test_pulse(t, &room, false)
-	// A straight step on the tick carries one cell further.
+	// A straight step on the tick is still one cell: the tick's step is the diagonal.
 	player.tactical.critical_next = true
+	start := player.position
 	testing.expect_value(t, try_move_player(&room, .West), Action_Result.Moved)
-	testing.expect_value(t, player.position.x, 2)
+	testing.expect_value(t, player.position.x, start.x-1)
+	testing.expect(t, !player.tactical.critical_next)
 	drain_tactical_test_pulse(t, &room, false)
 	// Two keys on the tick step diagonally; a single axis is not a diagonal.
 	testing.expect_value(t, try_move_player_diagonal(&room, {1, 0}), Action_Result.Blocked)
