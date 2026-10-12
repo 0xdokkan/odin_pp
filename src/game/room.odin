@@ -715,6 +715,7 @@ try_move_player :: proc(room: ^Room, direction: Move_Direction) -> Action_Result
 	if room == nil || room.player == nil || (room.phase != .Combat && room.phase != .Loot) {
 		return .Invalid_Phase
 	}
+	critical := tactical_take_critical(room)
 	target := add_position(room.player.position, direction_offset(direction))
 	// Walking remains available during recovery, but walking into an enemy is
 	// an attack and must pass the offensive gate before mutating the event log.
@@ -726,11 +727,14 @@ try_move_player :: proc(room: ^Room, direction: Move_Direction) -> Action_Result
 		if enemy_index, found := enemy_index_at(room, target); found {
 			enemy := room.enemies[enemy_index]
 			action := make_action(.Attack, PLAYER_ENTITY, entity_target(enemy_entity(enemy.id)), .Adjacent_Opponent)
-			added := add_effect(&action, damage_effect(enemy_entity(enemy.id), player_basic_attack_damage(room.player)))
+			damage := player_basic_attack_damage(room.player)
+			if critical { damage = critical_bump_damage(damage) }
+			added := add_effect(&action, damage_effect(enemy_entity(enemy.id), damage))
 			assert(added)
 			report := resolve_action(room, &action)
 			assert(report.accepted)
 			consume_equipped_weapon_use(room.player)
+			if critical { mark_critical_events(&report.events) }
 			append_event_log(&room.recent_events, &report.events)
 			_, outcome := finish_player_combat_command(room)
 			switch outcome {
@@ -766,6 +770,12 @@ try_move_player :: proc(room: ^Room, direction: Move_Direction) -> Action_Result
 		return .Blocked
 	}
 
+	// On the tick a straight step carries one cell further when it is clear.
+	if critical && room.phase == .Combat {
+		further := add_position(target, direction_offset(direction))
+		query := query_entity_movement(room, PLAYER_ENTITY, further)
+		if movement_query_is_clear(&query) { target = further }
+	}
 	action := make_action(.Move, PLAYER_ENTITY, cell_target(target), .Walkable_Cell)
 	added := add_effect(&action, move_effect(PLAYER_ENTITY, target))
 	assert(added)
@@ -773,6 +783,7 @@ try_move_player :: proc(room: ^Room, direction: Move_Direction) -> Action_Result
 	if !report.accepted {
 		return .Blocked
 	}
+	if critical { mark_critical_events(&report.events) }
 	append_event_log(&room.recent_events, &report.events)
 	collect_loot_in_magnet_range(room)
 

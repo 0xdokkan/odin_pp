@@ -575,9 +575,20 @@ execute_gameplay_command :: proc(room: ^game.Room, command: Gameplay_Command) ->
 	case .QTE_Fail:
 		execution.committed = game.resolve_qte(room, false)
 	case .Move:
-		result := game.try_move_player(room, command.direction)
+		spent := room.player.tactical.beat_spent
+		critical := game.tactical_claim_beat(room, command.beat)
+		result: game.Action_Result
+		if critical && command.diagonal != {} {
+			result = game.try_move_player_diagonal(room, command.diagonal)
+		} else {
+			room.player.tactical.critical_next = critical
+			result = game.try_move_player(room, command.direction)
+			room.player.tactical.critical_next = false
+		}
 		execution.committed = result != .Invalid_Phase && result != .Blocked
-		if execution.committed { room.player.tactical.facing = command.direction }
+		if execution.committed && command.diagonal == {} { room.player.tactical.facing = command.direction }
+		// A step that did not happen gives its tick back.
+		if !execution.committed { room.player.tactical.beat_spent = spent }
 	case .Dodge:
 		execution.committed = game.try_dodge_player(room, command.direction)
 		execution.clears_card_interaction = execution.committed
@@ -588,9 +599,13 @@ execute_gameplay_command :: proc(room: ^game.Room, command: Gameplay_Command) ->
 		result := game.use_player_ability(room, command.ability)
 		execution.committed = result != .Invalid_Phase
 	case .Play_Card:
+		spent := room.player.tactical.beat_spent
+		room.player.tactical.critical_next = game.tactical_claim_beat(room, command.beat)
 		play := game.play_card(room, command.card_id, command.target)
+		room.player.tactical.critical_next = false
 		execution.committed = game.card_play_was_committed(play.result)
 		execution.clears_card_interaction = execution.committed
+		if !execution.committed { room.player.tactical.beat_spent = spent }
 	case .Refocus:
 		refocus := game.refocus_player_hand(room)
 		execution.committed = game.refocus_was_committed(refocus.result)

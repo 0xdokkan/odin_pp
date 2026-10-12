@@ -24,6 +24,10 @@ Gameplay_Command :: struct {
 	target:       game.Target,
 	offset: grid.Position,
 	defense: game.Defense_Mode,
+	// The tick this action was pressed on (0: off the tick), and for a move
+	// made with two direction keys, its diagonal step.
+	beat: u32,
+	diagonal: grid.Position,
 }
 
 Buffered_Gameplay_Command :: struct {

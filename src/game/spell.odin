@@ -110,6 +110,7 @@ resolve_sundering_blow :: proc(
 		action.effects[1] = {}
 		action.effect_count = 1
 	}
+	tactical_critical_scale(room, &action)
 	origin := room.player.position
 	hit := resolve_action(room, &action)
 	if !hit.accepted { return }
@@ -167,6 +168,7 @@ resolve_pattern_dice_spell :: proc(
 			assert(added)
 		}
 	}
+	tactical_critical_scale(room, &action)
 	origin := room.player.position
 	hit := resolve_action(room, &action)
 	if !hit.accepted { return }
@@ -213,6 +215,7 @@ resolve_played_card_action :: proc(
 	if instance.definition_id == .Firebomb {
 		action := compiled^
 		action.visual_group = 1
+		tactical_critical_scale(room, &action)
 		origin := room.player.position
 		definition, _ := card_definition_by_id(instance.definition_id, tactical_enabled(room))
 		query := evaluate_card_targeting(room, instance, card_target_request_at(definition, target.cell))
@@ -229,7 +232,9 @@ resolve_played_card_action :: proc(
 		return
 	}
 	if instance.definition_id != .Fate_Strike && instance.definition_id != .Chain_Lightning && instance.definition_id != .Storm_Crown {
-		return resolve_action(room, compiled)
+		action := compiled^
+		tactical_critical_scale(room, &action)
+		return resolve_action(room, &action)
 	}
 	path := query_spell_path(room, instance, target)
 	if path.error != .None || path.count == 0 { return }
@@ -256,6 +261,7 @@ resolve_played_card_action :: proc(
 		action := make_action(.Card, PLAYER_ENTITY, entity_target(path.targets[index]), .Opponent)
 		added := add_effect(&action, damage_effect(path.targets[index], damage))
 		assert(added)
+		tactical_critical_scale(room, &action)
 		hit := resolve_action(room, &action)
 		if !hit.accepted {
 			report.skipped_effects += path.count-index

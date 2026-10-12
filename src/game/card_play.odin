@@ -84,7 +84,12 @@ play_card :: proc(room: ^Room, card_id: u32, target: Target) -> (play: Card_Play
 	resolving_card, began_resolving := begin_resolving_hand_card(deck, hand_index)
 	assert(began_resolving && resolving_card == play.card)
 
+	// A card played on the tick resolves its critical version.
+	critical := tactical_take_critical(room)
+	room.player.tactical.critical_card = critical
 	play.action_report = resolve_played_card_action(room, play.card, target, &action)
+	room.player.tactical.critical_card = false
+	if critical { mark_critical_events(&play.action_report.events) }
 	if !play.action_report.accepted {
 		deck^ = deck_before
 		play.result = .Action_Rejected
@@ -105,6 +110,7 @@ play_card :: proc(room: ^Room, card_id: u32, target: Target) -> (play: Card_Play
 		card_lifetime = play.card.lifetime,
 		from_card_zone = .Hand,
 		to_card_zone = .Resolving,
+		area_mask = EVENT_CRITICAL_BIT if critical else 0,
 	})
 	append_event_log(&room.recent_events, &play.action_report.events)
 	record_event(&room.recent_events, {

@@ -13,6 +13,7 @@ import view "../view"
 TACTICAL_FEEDBACK_BLUE :: rl.Color{108, 192, 250, 255}
 TACTICAL_FEEDBACK_HIT :: rl.Color{237, 93, 105, 255}
 TACTICAL_FEEDBACK_WHITE :: rl.Color{221, 241, 255, 255}
+TACTICAL_FEEDBACK_CRITICAL :: rl.Color{240, 198, 92, 255}
 MAX_TACTICAL_FEEDBACK_CUES :: 32
 
 Tactical_Feedback_Layer :: enum {Ground, Accent}
@@ -283,6 +284,7 @@ draw_tactical_feedback_overlay :: proc(renderer: ^Renderer, cue: ^Presentation_C
 			definition, found := game.card_definition_by_id(cue.event.card_definition, true)
 			if !found { return true }
 			label = fmt.ctprintf("%s", definition.name)
+			if game.event_is_critical(cue.event) { label = fmt.ctprintf("CRITICO / %s", definition.name) }
 		}
 		viewport := tactical_world_bounds(renderer)
 		width := min(f32(280), gothic_text_width(renderer, label, 13)+35)
@@ -291,8 +293,9 @@ draw_tactical_feedback_overlay :: proc(renderer: ^Renderer, cue: ^Presentation_C
 		if placed {
 			alpha := tactical_feedback_alpha(presentation_cue_progress(cue))
 			rl.DrawRectangleRec(bounds, color_with_opacity({10, 19, 33, 244}, alpha))
-			rl.DrawRectangleRec({bounds.x, bounds.y+bounds.height-1, bounds.width, 1}, color_with_opacity(TACTICAL_FEEDBACK_BLUE, alpha*0.7))
-			gothic_text(renderer, "+", bounds.x+7, bounds.y+4, 13, color_with_opacity(TACTICAL_FEEDBACK_BLUE, alpha))
+			accent := TACTICAL_FEEDBACK_CRITICAL if game.event_is_critical(cue.event) else TACTICAL_FEEDBACK_BLUE
+			rl.DrawRectangleRec({bounds.x, bounds.y+bounds.height-1, bounds.width, 1}, color_with_opacity(accent, alpha*0.7))
+			gothic_text(renderer, "+", bounds.x+7, bounds.y+4, 13, color_with_opacity(accent, alpha))
 			gothic_text_fit(renderer, label, {bounds.x+23, bounds.y+4, bounds.width-28, 15}, 13, color_with_opacity(TACTICAL_FEEDBACK_WHITE, alpha))
 		}
 		return true
@@ -300,7 +303,11 @@ draw_tactical_feedback_overlay :: proc(renderer: ^Renderer, cue: ^Presentation_C
 	label: cstring
 	color := TACTICAL_FEEDBACK_BLUE
 	#partial switch cue.kind {
-	case .Damage: label = fmt.ctprintf("-%d", cue.event.amount); color = TACTICAL_FEEDBACK_HIT
+	case .Damage:
+		label = fmt.ctprintf("-%d", cue.event.amount); color = TACTICAL_FEEDBACK_HIT
+		if game.event_is_critical(cue.event) { label = fmt.ctprintf("CRITICO -%d", cue.event.amount); color = TACTICAL_FEEDBACK_CRITICAL }
+	case .Move:
+		if game.event_is_critical(cue.event) && cue.event.target == game.PLAYER_ENTITY { label = "CRITICO!"; color = TACTICAL_FEEDBACK_CRITICAL }
 	case .Damage_Absorbed: label = fmt.ctprintf("PARATA %d", cue.event.amount)
 	case .Heal: label = fmt.ctprintf("+%d", cue.event.amount); color = {128, 220, 190, 255}
 	case .Status_Applied:

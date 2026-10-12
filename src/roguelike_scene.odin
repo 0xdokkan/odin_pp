@@ -73,6 +73,7 @@ Roguelike_Session :: struct {
 	show_route_map:          bool,
 	card_interaction:        Card_Interaction_State,
 	gameplay_buffer:         Buffered_Gameplay_Command,
+	beat_chord:              Beat_Chord,
 	reward_hovered_index:    int,
 	reward_skip_hovered:     bool,
 	shop_render_state:       render.Shop_Render_State,
@@ -1425,8 +1426,10 @@ roguelike_update :: proc(data: rawptr, hf: ^host.Frame) {
 			)
 			if rs.room.phase == .Complete || rs.room.phase == .Defeat {
 				clear_gameplay_command_buffer(&rs.gameplay_buffer)
+				rs.beat_chord = {}
 			} else if rs.timeline_busy {
 				if has_command {
+					beat_stamp(&rs.room, &command)
 					offer_gameplay_command(&rs.gameplay_buffer, command)
 				}
 			} else if buffered, has_buffered := take_gameplay_command(&rs.gameplay_buffer); has_buffered {
@@ -1440,12 +1443,12 @@ roguelike_update :: proc(data: rawptr, hf: ^host.Frame) {
 					buffered,
 					rs.playtest_session_ptr,
 				)
-			} else if has_command {
+			} else if ready, has_ready := beat_input_command(&rs.beat_chord, &rs.room, command, has_command, rs.frame_time); has_ready {
 				commit_gameplay_command(
 					&rs.room,
 					&rs.iso_renderer,
 					&rs.card_interaction,
-					command,
+					ready,
 					rs.playtest_session_ptr,
 				)
 			}

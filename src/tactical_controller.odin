@@ -22,10 +22,12 @@ Tactical_Controller_Input :: struct {
 	map_input: Tactical_Map_Input,
 }
 
-buffer_tactical_walk_input :: proc(buffer: ^Buffered_Gameplay_Command, phase: game.Room_Phase, directions: [4]bool) {
+buffer_tactical_walk_input :: proc(buffer: ^Buffered_Gameplay_Command, phase: game.Room_Phase, directions: [4]bool, beat: u32 = 0) {
 	for pressed, index in directions {
 		if pressed {
-			offer_gameplay_command(buffer, {kind = .Move, origin_phase = phase, direction = game.Move_Direction(index)})
+			// The tick is judged when the key is pressed, not when the walk
+			// leaves the buffer after the previous animation.
+			offer_gameplay_command(buffer, {kind = .Move, origin_phase = phase, direction = game.Move_Direction(index), beat = beat})
 			break
 		}
 	}
@@ -176,7 +178,7 @@ step_tactical_controller :: proc(
 	}
 	if render.renderer_blocks_player_input(renderer) {
 		if movement_buffer_allowed && !input.shift && cards.dragged_card_id == 0 {
-			buffer_tactical_walk_input(buffer, room.phase, input.directions)
+			buffer_tactical_walk_input(buffer, room.phase, input.directions, game.tactical_beat_target(room))
 		}
 		return true
 	}

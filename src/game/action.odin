@@ -387,7 +387,7 @@ effect_is_valid :: proc(room: ^Room, effect: Effect) -> bool {
 	switch effect.kind {
 	case .Deploy_Device:
 		return effect.target == PLAYER_ENTITY && effect.amount > 0 &&
-		       (effect.object_kind != .Shock_Floor || (effect.charges >= 1 && effect.charges <= 4)) &&
+		       (effect.object_kind != .Shock_Floor || (effect.charges >= 1 && effect.charges <= TACTICAL_SHOCK_FLOOR_MAX_CHARGES)) &&
 		       board_device_can_deploy(room, effect.object_kind, effect.destination)
 	case .Damage:
 		if effect.amount <= 0 {

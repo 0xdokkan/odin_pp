@@ -78,6 +78,14 @@ Game_Event :: struct {
 	statuses_advanced: bool,
 }
 
+// The 3x3 footprint uses nine bits of area_mask; its top bit marks an action
+// played on the tick (tactical_beat.odin) without growing every event log.
+EVENT_CRITICAL_BIT :: u16(1)<<15
+
+event_is_critical :: proc(event: Game_Event) -> bool {
+	return event.area_mask&EVENT_CRITICAL_BIT != 0
+}
+
 Event_Log :: struct {
 	events:        [MAX_GAME_EVENTS]Game_Event,
 	count:         int,

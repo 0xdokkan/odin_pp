@@ -62,11 +62,14 @@ deploy_device_effect :: proc(kind: Grid_Object_Kind, position: grid.Position, da
 deploy_board_device :: proc(room: ^Room, kind: Grid_Object_Kind, position: grid.Position, damage, charges: i32, events: ^Event_Log) -> bool {
 	if events == nil || events.count < 0 || events.count >= MAX_GAME_EVENTS ||
 	   !board_device_can_deploy(room, kind, position) || damage <= 0 ||
-	   (kind == .Shock_Floor && (charges < 1 || charges > 4)) { return false }
+	   (kind == .Shock_Floor && (charges < 1 || charges > TACTICAL_SHOCK_FLOOR_MAX_CHARGES)) { return false }
 	definition, _ := grid_object_definition(kind)
+	// A coil deployed on the tick is built twice as sturdy.
+	health := definition.max_health
+	if room.player != nil && room.player.tactical.critical_card && definition.max_health > 0 { health *= 2 }
 	object := Grid_Object{
 		id = room.next_object_id, kind = kind, position = position,
-		health = definition.max_health, max_health = definition.max_health,
+		health = health, max_health = health,
 		device_damage = damage, device_charges = charges, device_target_limit = charges,
 	}
 	room.next_object_id += 1
@@ -89,6 +92,7 @@ resolve_board_device_card :: proc(room: ^Room, instance: Card_Instance, target: 
 		if !rolled { return }
 		action.effects[0].charges = roll.total
 	}
+	tactical_critical_scale(room, &action)
 	origin := room.player.position
 	hit := resolve_action(room, &action)
 	if !hit.accepted { return }

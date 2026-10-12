@@ -35,6 +35,12 @@ Tactical_State :: struct {
 	facing: Move_Direction,
 	dodge_recovery: int,
 	metrics: Tactical_Metrics,
+	// On-beat criticals (tactical_beat.odin): beats crossed by real time in
+	// this room, seconds since the last one, the last beat rewarded, and the
+	// one-shot flags read by the critical action.
+	beat_index, beat_spent: u32,
+	beat_age: f32,
+	critical_next, critical_card: bool,
 }
 Tactical_Pulse :: struct {
 	pending, started, forced: bool,
@@ -109,6 +115,7 @@ begin_tactical_room :: proc(room: ^Room) {
 	s.clock_fraction = 0
 	s.queued_beats = 0
 	s.cast_remaining, s.cast_duration = 0, 0
+	tactical_reset_beats(s)
 	for &enemy in room.enemies { enemy.tactical_cooldown = 0 }
 }
 
@@ -122,6 +129,7 @@ tactical_end_combat :: proc(room: ^Room) {
 	s.clock_fraction = 0
 	s.queued_beats = 0
 	s.cast_remaining, s.cast_duration = 0, 0
+	tactical_reset_beats(s)
 	room.tactical_pulse = {}
 	room.qte = {}
 }
@@ -163,7 +171,9 @@ tactical_tick :: proc(room: ^Room, dt: f32, available: bool, hologram: bool) -> 
 	}
 	if !(dt > 0) { return false }
 	elapsed := min(dt, max(f32(0), s.remaining))
+	before := s.clock_fraction
 	tactical_advance_clock(room, elapsed)
+	tactical_note_beat_time(s, before, elapsed)
 	s.metrics.decision_seconds += f64(elapsed)
 	if hologram { s.metrics.hologram_seconds += f64(elapsed) }
 	if s.phase == .Recovery { tactical_finish_recovery(room); return false }

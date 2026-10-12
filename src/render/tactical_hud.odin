@@ -95,7 +95,18 @@ draw_tactical_hud :: proc(renderer: ^Renderer, room: ^game.Room, paused, hologra
 	if timed {
 		timer := fmt.ctprintf("%.1fs", s.remaining)
 		timer_width := gothic_text_width(renderer, timer, 24)
-		gothic_text(renderer, timer, x+width-12-timer_width, y+3, 24, accent)
+		// The tick: a lamp fills toward each whole second and flares gold in
+		// the window where moves, bumps and cards turn critical.
+		approach, on_beat := game.tactical_beat_glow(room)
+		lamp := rl.Vector2{x+width-24-timer_width, y+15}
+		gothic_text(renderer, timer, x+width-12-timer_width, y+3, 24, TACTICAL_FEEDBACK_CRITICAL if on_beat else accent)
+		rl.DrawCircleV(lamp, 6, HUD_TROUGH)
+		rl.DrawCircleSector(lamp, 5, -90, -90+360*approach, 16, color_with_opacity(TACTICAL_FEEDBACK_CRITICAL, 0.55))
+		if on_beat {
+			rl.DrawCircleV(lamp, 5, TACTICAL_FEEDBACK_CRITICAL)
+			rl.DrawRing(lamp, 7, 9, 0, 360, 20, color_with_opacity(TACTICAL_FEEDBACK_CRITICAL, 0.7))
+		}
+		rl.DrawCircleLinesV(lamp, 6, HUD_EDGE)
 	}
 	budget := max(f32(1), f32(s.budget))
 	if recovering { budget = game.TACTICAL_RECOVERY_SECONDS }
