@@ -12,7 +12,7 @@ LIVING_MAX_FRAMES :: 48
 LIVING_COLUMNS :: 16
 // The drawings' size against the classic print: the card shader's edge
 // offset is scaled by it so lines keep their classic thickness.
-LIVING_PRINT_SCALE :: f32(0.750)
+LIVING_PRINT_SCALE :: f32(0.800)
 
 // Durations are milliseconds per drawing; `hit` is the drawing on the
 // action's impact (-1: none); a move clip starts sliding the card at
@@ -33,7 +33,7 @@ Living_Sheet :: struct {
 
 @(rodata)
 LIVING_SHEETS := [Flipbook_Character]Living_Sheet{
-	.Pilgrim = {cell = {116, 120}, feet = {58.5, 111.0}, rest_height = 78.0, world_height = 1.013, ground = 1.83, card_margin = 6, paper_cell = {128, 132}, clips = {
+	.Pilgrim = {cell = {109, 113}, feet = {54.5, 104.0}, rest_height = 78.0, world_height = 1.080, ground = 1.38, card_margin = 6, paper_cell = {121, 125}, clips = {
 		.Idle = {first = 0, count = 32, hit = -1, loop = true, travel = .None, travel_start = 0, travel_ms = 0, durations = {83, 84, 83, 83, 84, 83, 83, 84, 83, 83, 84, 83, 83, 84, 83, 83, 84, 83, 83, 84, 83, 83, 84, 83, 83, 84, 83, 83, 84, 83, 83, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}},
 		.Move_Side = {first = 32, count = 15, hit = 3, loop = false, travel = .Shove, travel_start = 275, travel_ms = 220, durations = {83, 84, 83, 42, 41, 42, 83, 84, 83, 83, 84, 83, 83, 42, 167, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}},
 		.Move_Up = {first = 47, count = 15, hit = 3, loop = false, travel = .Shove, travel_start = 285, travel_ms = 220, durations = {83, 84, 83, 42, 41, 42, 83, 84, 83, 83, 84, 83, 83, 42, 167, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}},
@@ -50,7 +50,7 @@ LIVING_SHEETS := [Flipbook_Character]Living_Sheet{
 		.Interact = {first = 187, count = 9, hit = 3, loop = false, travel = .None, travel_start = 0, travel_ms = 0, durations = {83, 84, 83, 83, 84, 83, 83, 57, 167, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}},
 		.Death = {first = 196, count = 15, hit = 1, loop = false, travel = .None, travel_start = 0, travel_ms = 0, durations = {83, 84, 41, 42, 83, 84, 83, 83, 84, 83, 83, 84, 83, 80, 167, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}},
 	}},
-	.Ghoul = {cell = {144, 113}, feet = {72.0, 104.0}, rest_height = 73.0, world_height = 0.892, ground = 1.83, card_margin = 6, paper_cell = {156, 125}, clips = {
+	.Ghoul = {cell = {136, 107}, feet = {68.0, 98.0}, rest_height = 73.0, world_height = 0.952, ground = 1.38, card_margin = 6, paper_cell = {148, 119}, clips = {
 		.Idle = {first = 0, count = 27, hit = -1, loop = true, travel = .None, travel_start = 0, travel_ms = 0, durations = {83, 84, 83, 83, 84, 83, 83, 84, 83, 83, 84, 83, 83, 84, 83, 83, 84, 83, 83, 84, 83, 83, 84, 83, 83, 84, 33, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}},
 		.Move_Side = {first = 27, count = 14, hit = 2, loop = false, travel = .Run, travel_start = 90, travel_ms = 520, durations = {83, 84, 41, 42, 42, 83, 83, 84, 83, 83, 84, 83, 25, 167, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}},
 		.Move_Up = {first = 41, count = 14, hit = 2, loop = false, travel = .Run, travel_start = 90, travel_ms = 520, durations = {83, 84, 41, 42, 42, 83, 83, 84, 83, 83, 84, 83, 25, 167, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}},
@@ -67,7 +67,7 @@ LIVING_SHEETS := [Flipbook_Character]Living_Sheet{
 		.Interact = {hit = -1},
 		.Death = {first = 144, count = 14, hit = 1, loop = false, travel = .None, travel_start = 0, travel_ms = 0, durations = {83, 84, 41, 84, 83, 83, 84, 83, 83, 84, 83, 83, 42, 167, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}},
 	}},
-	.Archer = {cell = {114, 116}, feet = {57.0, 107.0}, rest_height = 75.0, world_height = 1.013, ground = 1.83, card_margin = 6, paper_cell = {126, 128}, clips = {
+	.Archer = {cell = {108, 110}, feet = {54.0, 101.0}, rest_height = 75.0, world_height = 1.080, ground = 1.38, card_margin = 6, paper_cell = {120, 122}, clips = {
 		.Idle = {first = 0, count = 32, hit = -1, loop = true, travel = .None, travel_start = 0, travel_ms = 0, durations = {83, 84, 83, 83, 84, 83, 83, 84, 83, 83, 84, 83, 83, 84, 83, 83, 84, 83, 83, 84, 83, 83, 84, 83, 83, 84, 83, 83, 84, 83, 83, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}},
 		.Move_Side = {first = 32, count = 14, hit = 1, loop = false, travel = .Dash, travel_start = 165, travel_ms = 240, durations = {83, 84, 41, 42, 42, 41, 84, 83, 83, 84, 83, 83, 27, 167, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}},
 		.Move_Up = {first = 46, count = 14, hit = 1, loop = false, travel = .Dash, travel_start = 165, travel_ms = 240, durations = {83, 84, 41, 42, 42, 41, 84, 83, 83, 84, 83, 83, 27, 167, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}},
@@ -84,7 +84,7 @@ LIVING_SHEETS := [Flipbook_Character]Living_Sheet{
 		.Interact = {hit = -1},
 		.Death = {first = 147, count = 15, hit = 1, loop = false, travel = .None, travel_start = 0, travel_ms = 0, durations = {83, 84, 41, 84, 83, 83, 84, 83, 83, 84, 83, 83, 84, 38, 167, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}},
 	}},
-	.Brute = {cell = {130, 140}, feet = {65.0, 131.0}, rest_height = 93.0, world_height = 1.170, ground = 1.83, card_margin = 6, paper_cell = {142, 152}, clips = {
+	.Brute = {cell = {124, 132}, feet = {62.0, 123.0}, rest_height = 93.0, world_height = 1.248, ground = 1.38, card_margin = 6, paper_cell = {136, 144}, clips = {
 		.Idle = {first = 0, count = 34, hit = -1, loop = true, travel = .None, travel_start = 0, travel_ms = 0, durations = {83, 84, 83, 83, 84, 83, 83, 84, 83, 83, 84, 83, 83, 84, 83, 83, 84, 83, 83, 84, 83, 83, 84, 83, 83, 84, 83, 83, 84, 83, 83, 84, 83, 50, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}},
 		.Move_Side = {first = 34, count = 14, hit = 2, loop = false, travel = .Stomp, travel_start = 200, travel_ms = 440, durations = {83, 84, 83, 83, 84, 41, 42, 83, 84, 83, 83, 84, 83, 167, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}},
 		.Move_Up = {first = 48, count = 14, hit = 2, loop = false, travel = .Stomp, travel_start = 200, travel_ms = 440, durations = {83, 84, 83, 83, 84, 41, 42, 83, 84, 83, 83, 84, 83, 167, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}},
@@ -101,7 +101,7 @@ LIVING_SHEETS := [Flipbook_Character]Living_Sheet{
 		.Interact = {hit = -1},
 		.Death = {first = 150, count = 14, hit = 1, loop = false, travel = .None, travel_start = 0, travel_ms = 0, durations = {83, 84, 41, 84, 83, 83, 84, 83, 83, 84, 83, 83, 42, 167, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}},
 	}},
-	.Bomber = {cell = {121, 116}, feet = {60.5, 107.0}, rest_height = 75.0, world_height = 1.013, ground = 1.83, card_margin = 6, paper_cell = {133, 128}, clips = {
+	.Bomber = {cell = {115, 110}, feet = {57.5, 101.0}, rest_height = 75.0, world_height = 1.080, ground = 1.38, card_margin = 6, paper_cell = {127, 122}, clips = {
 		.Idle = {first = 0, count = 24, hit = -1, loop = true, travel = .None, travel_start = 0, travel_ms = 0, durations = {83, 84, 83, 83, 84, 83, 83, 84, 83, 83, 84, 83, 83, 84, 83, 83, 84, 83, 83, 84, 83, 83, 84, 83, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}},
 		.Move_Side = {first = 24, count = 12, hit = 2, loop = false, travel = .Hop, travel_start = 120, travel_ms = 360, durations = {83, 84, 83, 83, 84, 83, 83, 84, 83, 83, 27, 167, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}},
 		.Move_Up = {first = 36, count = 12, hit = 2, loop = false, travel = .Hop, travel_start = 120, travel_ms = 360, durations = {83, 84, 83, 83, 84, 83, 83, 84, 83, 83, 27, 167, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}},
@@ -118,7 +118,7 @@ LIVING_SHEETS := [Flipbook_Character]Living_Sheet{
 		.Interact = {hit = -1},
 		.Death = {first = 132, count = 15, hit = 1, loop = false, travel = .None, travel_start = 0, travel_ms = 0, durations = {83, 84, 41, 84, 83, 83, 84, 83, 83, 84, 83, 83, 84, 38, 167, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}},
 	}},
-	.Bishop = {cell = {111, 137}, feet = {55.5, 128.0}, rest_height = 91.0, world_height = 1.013, ground = 1.83, card_margin = 6, paper_cell = {123, 149}, clips = {
+	.Bishop = {cell = {105, 130}, feet = {52.5, 121.0}, rest_height = 91.0, world_height = 1.080, ground = 1.38, card_margin = 6, paper_cell = {117, 142}, clips = {
 		.Idle = {first = 0, count = 36, hit = -1, loop = true, travel = .None, travel_start = 0, travel_ms = 0, durations = {83, 84, 83, 83, 84, 83, 83, 84, 83, 83, 84, 83, 83, 84, 83, 83, 84, 83, 83, 84, 83, 83, 84, 83, 83, 84, 83, 83, 84, 83, 83, 84, 83, 83, 84, 83, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}},
 		.Move_Side = {first = 36, count = 13, hit = 3, loop = false, travel = .Glide, travel_start = 260, travel_ms = 420, durations = {83, 84, 83, 83, 84, 83, 83, 84, 83, 83, 84, 83, 167, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}},
 		.Move_Up = {first = 49, count = 13, hit = 3, loop = false, travel = .Glide, travel_start = 260, travel_ms = 420, durations = {83, 84, 83, 83, 84, 83, 83, 84, 83, 83, 84, 83, 167, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}},
@@ -135,7 +135,7 @@ LIVING_SHEETS := [Flipbook_Character]Living_Sheet{
 		.Interact = {hit = -1},
 		.Death = {first = 161, count = 14, hit = 1, loop = false, travel = .None, travel_start = 0, travel_ms = 0, durations = {83, 84, 41, 84, 83, 83, 84, 83, 83, 84, 83, 83, 42, 167, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}},
 	}},
-	.Archmage = {cell = {124, 137}, feet = {62.5, 128.0}, rest_height = 91.0, world_height = 1.237, ground = 1.83, card_margin = 6, paper_cell = {136, 149}, clips = {
+	.Archmage = {cell = {117, 130}, feet = {58.5, 121.0}, rest_height = 91.0, world_height = 1.320, ground = 1.38, card_margin = 6, paper_cell = {129, 142}, clips = {
 		.Idle = {first = 0, count = 34, hit = -1, loop = true, travel = .None, travel_start = 0, travel_ms = 0, durations = {83, 84, 83, 83, 84, 83, 83, 84, 83, 83, 84, 83, 83, 84, 83, 83, 84, 83, 83, 84, 83, 83, 84, 83, 83, 84, 83, 83, 84, 83, 83, 84, 83, 50, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}},
 		.Move_Side = {first = 34, count = 13, hit = 1, loop = false, travel = .Float, travel_start = 140, travel_ms = 500, durations = {83, 84, 83, 83, 84, 83, 83, 84, 83, 83, 84, 83, 167, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}},
 		.Move_Up = {first = 47, count = 13, hit = 1, loop = false, travel = .Float, travel_start = 140, travel_ms = 500, durations = {83, 84, 83, 83, 84, 83, 83, 84, 83, 83, 84, 83, 167, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}},

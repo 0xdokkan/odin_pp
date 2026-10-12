@@ -113,4 +113,6 @@ draw_tactical_billboards :: proc(renderer: ^Renderer, room: ^game.Room = nil, li
 		}
 	}
 	if walls_active { rl.EndShaderMode() }
+	// The board pass only: the hologram has no room.
+	draw_living_rings(renderer, room)
 }

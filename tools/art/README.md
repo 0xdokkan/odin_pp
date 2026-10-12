@@ -89,8 +89,8 @@ fermo. Scrive:
 Cosa cambia rispetto al flipbook classico:
 
 1. **Il cartoncino non si muove e non cambia forma.** È l'unione (anche
-   specchiata) delle sagome a riposo, allargata di 1/0,75 attorno ai piedi: la
-   figura è stampata al 75% e ha spazio per muoversi. Ciò che esce dalla carta
+   specchiata) delle sagome a riposo, allargata di 1/0,8 attorno ai piedi: la
+   figura è stampata all'80% e ha spazio per muoversi. Ciò che esce dalla carta
    viene tagliato dal bordo, come un disegno che esce dal foglio. Linea
    d'inchiostro e taglio hanno lo spessore dei cartoncini classici.
 2. **Le clip sono chiavi nel tempo**, scritte in `living_actions.py` (ms, con

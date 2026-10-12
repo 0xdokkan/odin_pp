@@ -121,6 +121,27 @@ gioco usa i cartoncini classici. Generatore e regole sono in
 [tools/art/README.md](tools/art/README.md#cartoncini-vivi-prova-meccaniche); il
 runtime è [living_card.odin](src/render/living_card.odin).
 
+Ogni personaggio della prova ha anche un **cerchio d'azione**: una linea sottile
+con la forma del suo cartoncino, che si stringe verso la carta e la tocca nel
+momento in cui il personaggio agisce. Il cerchio di un nemico si apre al massimo
+quando arriva o sceglie l'azione successiva e si chiude lungo il conto alla
+rovescia di quell'azione (quello scritto sopra di lui). Il colore dice cosa sta
+per fare:
+
+| Colore | Azione in arrivo |
+|---|---|
+| rosso | colpo ravvicinato: attacco, spinta, fendente, carica |
+| arancio | colpo a distanza o ad area: mira, tiro, bombe, barili accesi |
+| verde | movimento |
+| viola | protezione di un alleato |
+
+Durante recupero e attesa non c'è cerchio. Il cerchio del Viandante è oro, come
+il colpo critico, e batte i secondi: è al massimo subito dopo uno scocco e tocca
+la carta allo scocco successivo; segue il tempo reale anche quando un'azione
+consuma secondi. I colori caldi staccano dal pavimento blu e segnano le minacce;
+verde e viola, vicini al blu, sono chiari; rosso e verde differiscono anche per
+luminosità, per chi è daltonico ([living_ring.odin](src/render/living_ring.odin)).
+
 | Opzione | Uso |
 |---|---|
 | `--run` | salta il menu ed entra subito nella run |
@@ -719,7 +740,7 @@ odin run src -o:none -- --classic
 | `--smoke-m7-view` | prova grafica di scena, oggetti 3D, fog, ologramma, QTE e menu |
 | `--smoke-m8-view` | prova 3D di d4, dispositivi, offerta del ring, equipaggiamento, scheda personaggio, tag match e cambio stanza |
 | `--smoke-western` | nuvoletta 6 RANCH 7: apertura automatica, volo delle carte, insegna, porte, corsa a tempo e premio |
-| `--smoke-mechanics-lab` | Prova meccaniche: arena aperta, mano di sole Tesla, ring riaperto, arrivi fino al massimo, ultima uccisione senza fine del combattimento, cartoncino del giocatore di nuovo in piedi dopo morte e riavvio, cartoncini vivi (un passo e un attacco fotogramma per fotogramma) |
+| `--smoke-mechanics-lab` | Prova meccaniche: arena aperta, mano di sole Tesla, ring riaperto, arrivi fino al massimo, ultima uccisione senza fine del combattimento, cartoncino del giocatore di nuovo in piedi dopo morte e riavvio, cartoncini vivi (un passo e un attacco fotogramma per fotogramma) e cerchi d'azione |
 | `--smoke-m9-view` | arena continua, duello con IA, presa in quattro pose, replay e FPS con ricarica e vittoria |
 
 Gli smoke classici e i laboratori `--spell-lab` / `--dice-lab` conservano il comportamento classico;
@@ -1026,7 +1047,7 @@ le immagini sono output rigenerabili, non prerequisiti del checkout.
 | `--smoke-arenas-view` | quattro fasce di arene reali, combattimento, ologramma, Loot e cambio stanza; screenshot `odin_pp_arenas_*.png` |
 | `--smoke-m8-view` | dispositivi con APRI IL RING, campo, tag match, ritorno Loot: `odin_pp_m8_d4.png`, `devices`, `mega_combo`, `character`, `loot`, `tag_ring`, `next_room` (tutti con prefisso `odin_pp_m8_` e suffisso `.png`) |
 | `--smoke-western` | 6 RANCH 7 dalla mano al premio: `odin_pp_western_hand.png`, `cards`, `sign`, `gate`, `riders`, `ride`, `grab`, `win`, `reward` (prefisso `odin_pp_western_`) |
-| `--smoke-mechanics-lab` | sandbox: `odin_pp_mechanics_lab.png`, `_square`, `_full`, `_refill`, `_restart` (prefisso `odin_pp_mechanics_lab`); cartoncini vivi: `odin_pp_living_move_00.png`–`_37` e `odin_pp_living_attack_00.png`–`_37`, un'immagine ogni due fotogrammi |
+| `--smoke-mechanics-lab` | sandbox: `odin_pp_mechanics_lab.png`, `_square`, `_full`, `_refill`, `_restart` (prefisso `odin_pp_mechanics_lab`); cartoncini vivi: `odin_pp_living_move_00.png`–`_37` e `odin_pp_living_attack_00.png`–`_37`, un'immagine ogni due fotogrammi; cerchi d'azione: `odin_pp_living_rings_00.png`–`_49`, ogni tre |
 | `--smoke` | `odin_pp_isometric.png` |
 | `--smoke-generation` | `odin_pp_procedural_room.png` |
 | `--smoke-map` | `odin_pp_route.png` |

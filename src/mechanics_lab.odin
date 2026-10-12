@@ -196,7 +196,21 @@ run_mechanics_lab_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer,
 	render.clear_event_animations(renderer)
 	for _ in 0..<20 { mechanics_lab_smoke_frame(window, renderer, &room, &controller, &cards, &buffer, 1.0/60.0) }
 	if !mechanics_lab_capture(window, renderer, &room, &controller, &cards, &buffer, {kind = .Move, origin_phase = .Combat, direction = .North}, "attack") { return false }
+	// The action rings closing in with the clock: the enemies' on their
+	// countdowns, the player's on every tick.
+	if renderer.tactical.living_assets.ring_shader.id == 0 { fmt.eprintln("mechanics lab: no action rings"); return false }
+	mechanics_lab_film(window, renderer, &room, &controller, &cards, &buffer, 150, 3, "rings")
 	return true
+}
+
+// Plays `frames` frames with the clock running and saves every `every`th one
+// as odin_pp_living_<name>_NN.png.
+mechanics_lab_film :: proc(window: ^app.Window, renderer: ^render.Renderer, room: ^game.Room, controller: ^Tactical_Controller,
+	cards: ^Card_Interaction_State, buffer: ^Buffered_Gameplay_Command, frames, every: int, name: string) {
+	for frame in 0..<frames {
+		mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0, true)
+		if frame%every == 0 { rl.TakeScreenshot(fmt.ctprintf("odin_pp_living_%s_%02d.png", name, frame/every)) }
+	}
 }
 
 // Commits one command, then plays a second and a quarter of real time and
