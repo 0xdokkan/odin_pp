@@ -7,97 +7,137 @@ import input "engine/input"
 import ui "engine/ui"
 import fight "fight"
 import game "game"
-import fps "minigames/fps"
+import grid "grid"
+import level "level"
 import render "render"
 
 @(test)
-test_unified_catalog_routes_room_and_menu_to_the_same_ring_and_fps :: proc(t: ^testing.T) {
-    for control in ([2]render.M8_Control{.Ring,.FPS}) {
-        info, found := m8_requested_activity_info(control)
-        testing.expect(t,found)
-        menu, registered := minigame_info(minigame_index_by_id(info.id))
-        testing.expect(t,registered && info.create==menu.create)
-        if control==.FPS {testing.expect(t,info.create==fps.info().create)}
-        else {testing.expect(t,info.create==ring_minigame_create)}
-    }
-    _, found := m8_requested_activity_info(.Character)
-    testing.expect(t,!found,"Only the two canonical activity buttons route to a scene")
-    testing.expect(t,EXTRA_CHALLENGE_COUNT==5,"Existing seeds retain their extra-challenge sequence")
+test_run_ring_is_the_catalog_ring_scene :: proc(t: ^testing.T) {
+    info, found := minigame_info(minigame_index_by_id("ring"))
+    testing.expect(t,found && info.create==ring_minigame_create)
     testing.expect_value(t,minigame_index_by_id("ring"),5)
 }
 
-@(test)
-test_unified_ring_request_consumes_click_and_preserves_the_run :: proc(t: ^testing.T) {
+// Two enemies inside a square of coils; the player stands with them.
+tesla_ring_run_fixture :: proc(t: ^testing.T) -> ^Roguelike_Session {
     rs := host_run_fixture(t)
-    defer roguelike_destroy(rs)
-    rs.card_interaction.selected_card_id=42
-    rs.gameplay_buffer.occupied=true
-    before:=rs.run_state.player
-    pulse:=rs.room.pulse_count
-    point:=m8_test_button_center(&rs.iso_renderer,.Ring,&rs.room)
-    consumed:=step_m8_session(&rs.m8_session,&rs.room,&rs.iso_renderer,&rs.tactical_controller,
-        &rs.card_interaction,&rs.gameplay_buffer,true,0,{focused=true,inside=true,pressed=true,mouse=point})
-    testing.expect(t,consumed && rs.m8_session.requested==.Ring && rs.m8_session.ring_pending)
-    testing.expect(t,rs.room.ring_challenge_attempted && !rs.gameplay_buffer.occupied && rs.card_interaction.selected_card_id==0)
-    testing.expect_value(t,rs.run_state.player,before)
-    testing.expect_value(t,rs.room.pulse_count,pulse)
-    // No second click or delta can advance the board while the host handoff waits.
-    testing.expect(t,step_m8_session(&rs.m8_session,&rs.room,&rs.iso_renderer,&rs.tactical_controller,
-        &rs.card_interaction,&rs.gameplay_buffer,true,8,{focused=true,inside=true,pressed=true,mouse=point}))
-    testing.expect_value(t,rs.run_state.player,before)
+    game.destroy_room(&rs.room)
+    level.destroy(&rs.level_data)
+    rows := [?]string{"#########", "#.......#", "#.......#", "#.......#", "#...@...#", "#.......#", "#.......#", "#...>...#", "#########"}
+    err: level.Parse_Error
+    rs.level_data, err, _ = level.from_ascii(rows[:])
+    testing.expect_value(t,err,level.Parse_Error.None)
+    spawns := [?]game.Enemy_Spawn{{position={3,3},health=20,attack=1,archetype=.Brute},{position={5,5},health=10,attack=1}}
+    ok: bool
+    rs.room, ok = game.create_room(&rs.level_data,&rs.run_state.player,{enemies=spawns[:]})
+    testing.expect(t,ok)
+    log: game.Event_Log
+    for cell in ([4]grid.Position{{2,2},{6,2},{6,6},{2,6}}) {
+        testing.expect(t,game.deploy_board_device(&rs.room,.Tesla_Coil,cell,8,0,&log))
+    }
+    return rs
 }
 
 @(test)
-test_unified_ring_return_validates_receipt_and_unlocks_once :: proc(t: ^testing.T) {
-    rs:=host_run_fixture(t)
+test_tesla_square_activation_opens_the_tag_ring_and_freezes_the_run :: proc(t: ^testing.T) {
+    rs := tesla_ring_run_fixture(t)
     defer roguelike_destroy(rs)
-    rs.m8_session.ring,_=game.begin_ring_challenge(&rs.room)
+    _, ready := game.query_tesla_ring(&rs.room)
+    testing.expect(t,ready)
+    title, _ := render.m8_tesla_control_labels(&rs.room)
+    testing.expect_value(t,string(title),"APRI IL RING")
+    clock, pulse := rs.run_state.player.tactical.remaining, rs.room.pulse_count
+    execution := execute_gameplay_command(&rs.room,{kind=.Activate,origin_phase=.Combat})
+    testing.expect(t,execution.committed && rs.room.tesla_ring.pending)
+    testing.expect_value(t,game.board_tesla_count(&rs.room),0)
+    testing.expect_value(t,rs.run_state.player.tactical.remaining,clock)
+    testing.expect_value(t,rs.room.pulse_count,pulse)
+    rs.card_interaction.selected_card_id=42
+    rs.gameplay_buffer.occupied=true
+    commands: host.Commands
+    frame := host.Frame{commands=&commands}
+    testing.expect(t,roguelike_open_activity(rs,&frame))
+    testing.expect(t,rs.m8_session.ring_pending && !rs.gameplay_buffer.occupied && rs.card_interaction.selected_card_id==0)
+    testing.expect_value(t,commands.count,1)
+    // A second frame cannot open a second duel or advance the board.
+    testing.expect(t,!roguelike_open_activity(rs,&frame))
+    testing.expect(t,step_m8_session(&rs.m8_session,&rs.room,&rs.iso_renderer,&rs.tactical_controller,
+        &rs.card_interaction,&rs.gameplay_buffer,true,8,{focused=true,inside=true,pressed=true}))
+    // The scene seats both enemies: the first fights, the other waits on the apron.
+    scene := commands.items[0].scene
+    defer scene.destroy(scene.data)
+    g := cast(^Ring_Minigame)host.shell_of(&scene).hooks.data
+    ring := &g.session.ring
+    testing.expect_value(t,ring.roster_count,2)
+    testing.expect_value(t,ring.active,0)
+    testing.expect_value(t,ring.fighters[1].health,fight.ring_opponent_health(2))
+    testing.expect(t,fight.roster_waiting(ring,1))
+    testing.expect_value(t,ring.roster[1].health,fight.ring_opponent_health(2))
+    testing.expect_value(t,ring.fighters[0].health,fight.RING_PLAYER_HEALTH)
+    testing.expect(t,rs.m8_session.ring_link.reported)
+}
+
+@(test)
+test_tesla_ring_return_settles_once_and_defeats_the_roster :: proc(t: ^testing.T) {
+    rs := tesla_ring_run_fixture(t)
+    defer roguelike_destroy(rs)
+    testing.expect(t,game.begin_tesla_ring(&rs.room))
     rs.m8_session.ring_pending=true
-    before:=rs.run_state.player
+    rs.m8_session.ring_link=tesla_ring_link(&rs.room)
+    before := rs.run_state.player.health
     frame: host.Frame
-    result:=host.Result{minigame="ring",outcome=.Won,stars=3}
+    result := host.Result{minigame="ring",outcome=.Won,stars=3}
     roguelike_resume(rs,&frame,"fps",result)
     testing.expect(t,rs.m8_session.ring_pending)
     result.minigame="fps"
     roguelike_resume(rs,&frame,"ring",result)
-    testing.expect_value(t,rs.run_state.player,before)
     testing.expect(t,rs.m8_session.ring_pending)
+    testing.expect_value(t,len(rs.room.enemies),2)
     result.minigame="ring"
     roguelike_resume(rs,&frame,"ring",result)
-    testing.expect(t,!rs.m8_session.ring_pending && rs.m8_session.reward.won && rs.m8_session.reward.has_unlock)
-    testing.expect_value(t,rs.m8_session.reward.unlocked,game.Card_Id.Titan_Grip)
+    testing.expect(t,!rs.m8_session.ring_pending && rs.m8_session.report.won)
+    testing.expect_value(t,rs.m8_session.report.defeated,2)
+    testing.expect_value(t,len(rs.room.enemies),0)
+    testing.expect_value(t,rs.room.phase,game.Room_Phase.Loot)
+    testing.expect_value(t,rs.run_state.player.health,before)
     testing.expect_value(t,rs.run_state.player.m8_profile.ring_wins,u32(1))
-    testing.expect_value(t,rs.run_state.player.deck.owned_count,before.deck.owned_count+1)
-    testing.expect_value(t,rs.run_state.player.health,before.health)
-    testing.expect_value(t,rs.run_state.player.dice,before.dice)
-    testing.expect_value(t,rs.run_state.player.gold,before.gold)
-    after:=rs.run_state.player
+    after := rs.run_state.player
     roguelike_resume(rs,&frame,"ring",result)
     testing.expect_value(t,rs.run_state.player,after)
 }
 
 @(test)
-test_unified_ring_abandon_or_loss_consumes_attempt_without_penalty :: proc(t: ^testing.T) {
+test_tesla_ring_loss_or_abandon_costs_health_and_keeps_wounds :: proc(t: ^testing.T) {
     for has_result in ([2]bool{false,true}) {
-        rs:=host_run_fixture(t)
-        rs.m8_session.ring,_=game.begin_ring_challenge(&rs.room)
+        rs := tesla_ring_run_fixture(t)
+        testing.expect(t,game.begin_tesla_ring(&rs.room))
         rs.m8_session.ring_pending=true
-        before:=rs.run_state.player
+        rs.m8_session.ring_link=tesla_ring_link(&rs.room)
+        // The Brute ended on a third of its ring health; the other was knocked out.
+        link := &rs.m8_session.ring_link
+        link.final=link.entered
+        link.final.entries[0].health=link.entered.entries[0].health/3
+        link.final.entries[1].health,link.final.entries[1].ko=0,true
+        link.reported=true
+        player := &rs.run_state.player
+        before := player.health
         result: Maybe(host.Result)
         if has_result {result=host.Result{minigame="ring",outcome=.Lost}}
         frame: host.Frame
         roguelike_resume(rs,&frame,"ring",result)
-        testing.expect(t,!rs.m8_session.ring_pending && rs.m8_session.ring.settled && !rs.m8_session.reward.won)
-        testing.expect(t,rs.room.ring_challenge_attempted)
-        testing.expect_value(t,rs.run_state.player,before)
-        testing.expect_value(t,rs.room.phase,game.Room_Phase.Loot)
-        testing.expect_value(t,rs.room.pulse_count,u64(0))
+        testing.expect(t,!rs.m8_session.ring_pending && rs.m8_session.report.settled && !rs.m8_session.report.won)
+        testing.expect_value(t,player.health,max(i32(1),before-max(i32(1),player.stats.max_health/4)))
+        testing.expect_value(t,len(rs.room.enemies),1)
+        testing.expect_value(t,rs.room.enemies[0].archetype,game.Enemy_Archetype.Brute)
+        testing.expect_value(t,rs.room.enemies[0].health,i32(7))
+        testing.expect_value(t,rs.room.phase,game.Room_Phase.Combat)
+        testing.expect_value(t,player.m8_profile.ring_wins,u32(0))
         roguelike_destroy(rs)
     }
 }
 
 @(test)
-test_unified_practice_result_never_unlocks_cards_or_consumes_ring :: proc(t: ^testing.T) {
+test_unified_practice_result_never_touches_the_run :: proc(t: ^testing.T) {
     rs:=host_run_fixture(t)
     defer roguelike_destroy(rs)
     before:=rs.run_state.player
@@ -105,26 +145,6 @@ test_unified_practice_result_never_unlocks_cards_or_consumes_ring :: proc(t: ^te
     for id in ([2]string{"fps","ring"}) {
         roguelike_resume(rs,&frame,id,host.Result{minigame=id,outcome=.Won,stars=3})
         testing.expect_value(t,rs.run_state.player,before)
-        testing.expect(t,!rs.room.ring_challenge_attempted)
-    }
-}
-
-@(test)
-test_unified_activity_entry_respects_tactical_input_owners :: proc(t: ^testing.T) {
-    rs:=host_run_fixture(t)
-    defer roguelike_destroy(rs)
-    for control in ([2]render.M8_Control{.Ring,.FPS}) {
-        for gate in 0..<4 {
-            rs.tactical_controller.hologram=gate==0
-            rs.tactical_controller.paused=gate==1
-            rs.room.phase=.Combat if gate==2 else .Loot
-            point:=m8_test_button_center(&rs.iso_renderer,control,&rs.room)
-            consumed:=step_m8_session(&rs.m8_session,&rs.room,&rs.iso_renderer,&rs.tactical_controller,
-                &rs.card_interaction,&rs.gameplay_buffer,true,0,{focused=gate!=3,inside=true,pressed=true,mouse=point})
-            testing.expect(t,!consumed)
-            testing.expect_value(t,rs.m8_session.requested,render.M8_Control.None)
-            testing.expect(t,!rs.room.ring_challenge_attempted)
-        }
     }
 }
 

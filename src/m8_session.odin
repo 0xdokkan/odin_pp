@@ -3,6 +3,7 @@ package main
 import "core:encoding/json"
 import "core:fmt"
 import "core:os"
+import fight "fight"
 import game "game"
 import host "engine/host"
 import render "render"
@@ -13,11 +14,10 @@ M8_PROFILE_PATH :: "odin_pp_profile.json"
 M8_Profile_File :: struct { version: int, progress: game.M8_Profile }
 M8_Session :: struct {
 	character_open, save_enabled: bool,
-	requested: render.M8_Control,
+	// A Tesla ring handed to the ring scene; the live duel belongs to fight.
 	ring_pending: bool,
-	// M8 progression receipt only; the live ring simulation belongs to fight.
-	ring: game.Ring_Challenge,
-	reward: game.Ring_Reward,
+	ring_link: Ring_Run_Link,
+	report: game.Tesla_Ring_Report,
 	status: string,
 }
 
@@ -33,9 +33,50 @@ m8_pointer_gameplay_command :: proc(room: ^game.Room, renderer: ^render.Renderer
 	switch render.m8_control_at_point(renderer, room, mouse) {
 	case .Activate: return {kind = .Activate, origin_phase = room.phase}, true
 	case .Equip: return {kind = .Equip, origin_phase = room.phase}, true
-	case .None, .Character, .Ring, .FPS:
+	case .None, .Character:
 	}
 	return {}, false
+}
+
+// Board health becomes ring health, so the duel keeps how hurt everyone is.
+tesla_ring_link :: proc(room: ^game.Room) -> (link: Ring_Run_Link) {
+	ring := room.tesla_ring
+	player := room.player
+	roster := &link.entered
+	roster.player_max = fight.RING_PLAYER_HEALTH
+	roster.player_health = ring_health_share(fight.RING_PLAYER_HEALTH, player.health, player.stats.max_health)
+	opponent := fight.ring_opponent_health(ring.count)
+	for slot in 0..<min(ring.count, fight.MAX_RING_ROSTER) {
+		entry := fight.Roster_Entry{kind = -1, enemy_id = ring.enemy_ids[slot], health = opponent, max_health = opponent}
+		if index, found := game.enemy_index_by_id(room, entry.enemy_id); found {
+			enemy := room.enemies[index]
+			entry.kind = int(enemy.archetype)
+			entry.health = ring_health_share(opponent, enemy.health, enemy.max_health)
+		}
+		roster.entries[slot] = entry
+		roster.count += 1
+	}
+	return
+}
+
+ring_health_share :: proc(scale, health, max_health: i32) -> i32 {
+	if max_health <= 0 { return scale }
+	return clamp((scale*health+max_health-1)/max_health, 1, scale)
+}
+
+// What the duel left of each opponent, in thousandths of its entry health.
+tesla_ring_outcome :: proc(link: ^Ring_Run_Link, won: bool) -> (outcome: game.Tesla_Ring_Outcome) {
+	outcome.won = won
+	for slot in 0..<min(link.entered.count, game.MAX_TESLA_RING_ROSTER) {
+		entered := max(i32(1), link.entered.entries[slot].health)
+		left := entered
+		if link.reported {
+			final := link.final.entries[slot]
+			left = 0 if final.ko else final.health
+		}
+		outcome.remaining[slot] = clamp(left*1000/entered, 0, 1000)
+	}
+	return
 }
 
 load_m8_profile :: proc(path: string) -> (game.M8_Profile, bool) {
@@ -73,7 +114,7 @@ update_m8_session :: proc(session: ^M8_Session, room: ^game.Room, renderer: ^ren
 step_m8_session :: proc(session: ^M8_Session, room: ^game.Room, renderer: ^render.Renderer,
 	controller: ^Tactical_Controller, cards: ^Card_Interaction_State,
 	buffer: ^Buffered_Gameplay_Command, available: bool, dt: f32, input: M8_Session_Input) -> bool {
-	if session.requested != .None || session.ring_pending {return true}
+	if session.ring_pending {return true}
 	if !available || !input.focused { return session.character_open }
 	left_click := input.inside && input.pressed
 	if session.character_open {
@@ -86,15 +127,7 @@ step_m8_session :: proc(session: ^M8_Session, room: ^game.Room, renderer: ^rende
 	clicked: render.M8_Control
 	if left_click { clicked = render.m8_control_at_point(renderer, room, input.mouse) }
 	if clicked == .Character { session.character_open = true }
-	if clicked == .Ring && room.phase == .Loot {
-		started: bool
-		session.ring, started = game.begin_ring_challenge(room)
-		if started {session.requested=.Ring; session.ring_pending=true}
-		session.reward = {}
-		session.status = ""
-	}
-	if clicked == .FPS {session.requested=.FPS}
-	if session.character_open || session.requested != .None {
+	if session.character_open {
 		clear_card_interaction(cards)
 		clear_gameplay_command_buffer(buffer)
 		return true
@@ -102,18 +135,18 @@ step_m8_session :: proc(session: ^M8_Session, room: ^game.Room, renderer: ^rende
 	return false
 }
 
-// Accept only the outstanding ring receipt. Standalone victories and foreign
-// results cannot unlock cards, and closing a won result cannot pay twice.
+// Accept only the outstanding Tesla ring. Standalone victories and foreign
+// results cannot touch the run, and a second return cannot settle twice.
+// Leaving the duel early counts as a loss.
 settle_m8_host_activity :: proc(session: ^M8_Session, room: ^game.Room, from: string, result: Maybe(host.Result)) -> bool {
     if !session.ring_pending || from != "ring" {return false}
     r, has := result.?
     if has && r.minigame != "ring" {return false}
     session.ring_pending=false
-    session.requested=.None
-    session.ring.phase=.Won if has && r.outcome==.Won else .Lost
-    session.reward=game.settle_ring_challenge(room,&session.ring)
+    session.report=game.settle_tesla_ring(room,tesla_ring_outcome(&session.ring_link,has && r.outcome==.Won))
+    session.ring_link={}
     session.status=""
-    if session.reward.won && session.save_enabled && !save_m8_profile(M8_PROFILE_PATH,room.player.m8_profile) {
+    if session.report.reward.won && session.save_enabled && !save_m8_profile(M8_PROFILE_PATH,room.player.m8_profile) {
         session.status="Salvataggio non riuscito: progressi validi per questa sessione."
     }
     return true

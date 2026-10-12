@@ -230,21 +230,25 @@ sconfitta, validità della generazione su molti seed e soak con input casuali.
 Gli avvii diretti `--minigame` e `--smoke-minigame` rispettano esattamente
 `--seed`; dal menu ogni nuova partita può usare un nuovo seed.
 La cattura verifica avvio e rendering, mentre i bot dei test verificano partite
-complete. `--minigame=fps` e il pulsante Cripta nella run avviano la stessa
-Cripta delle Rune con bastone e mana. `--fps-lab` conserva soltanto il banco
-di prova M9 per raycast/caricatore: non compare nel menu o nel Loot.
+complete. `--minigame=fps` e il menu avviano la Cripta delle Rune con bastone
+e mana. `--fps-lab` conserva soltanto il banco di prova M9 per
+raycast/caricatore: non compare nel menu.
 
-### Sfide nella run
+### Minigiochi nella run
 
-In una stanza di combattimento o Elite ripulita, una volta per stanza, il
-pulsante **SFIDA EXTRA**, azionato con il mouse, apre un minigioco scelto dal seed del nodo,
-con lo stesso bilanciamento a ogni profondità. La run vede solo l'esito: una
-vittoria vale 4/8/12/18 oro per 0-3 stelle, sconfitta e abbandono non danno
-nulla e non tolgono nulla. Le regole sono in
-[minigame_challenge.odin](src/game/minigame_challenge.odin).
-Il risultato deve corrispondere alla sfida pendente della stanza e può essere
-consumato una sola volta, anche in caso di abbandono. Pausa, ologramma, cast,
-QTE e attività M9 impediscono di aprire una seconda attività sovrapposta.
+I minigiochi non si aprono più alla fine della stanza: niente pulsanti nel Loot.
+Nella run si sbloccano rispettando condizioni precise durante il combattimento,
+e ognuno **una sola volta per piano** (`Floor_Secret` in
+[tesla_ring.odin](src/game/tesla_ring.odin); per ora la run è un solo piano).
+Dal menu restano tutti giocabili liberamente.
+
+- **Il Ring delle Ombre**: quattro Tesla sugli angoli di un quadrato con
+  l'interno di almeno 2x2 caselle (Tesla escluse). Se si attiva il quadrato
+  mentre uno o più nemici sono nel campo, al posto della scarica parte il ring
+  (vedi [sotto](#il-ring-delle-ombre-e-gli-sblocchi)).
+
+Pausa, ologramma, cast, QTE e attività M9 impediscono di aprire una seconda
+attività sovrapposta.
 
 ## Controlli e loop di gioco
 
@@ -300,7 +304,6 @@ a Victory, la morte del player a Defeat.
 | `F1`, `F2`, `F3` | scaling fit con letterbox, integer, stretch |
 | `F4` | cambia velocità delle animazioni ordinarie: 1x, 2x, 4x; cast e dadi M8 restano a 1x |
 | `F11` | fullscreen borderless |
-| `G` / Sfida minigioco | in una stanza ripulita (Loot), una volta per stanza: apre un minigioco di sfida |
 | `F9` | diagnostica dell'host: FPS, grafico dei frame, stack delle scene |
 | `F10` | torna al menu (run avviata dal menu) |
 
@@ -408,8 +411,7 @@ oggetti attivi riutilizzeranno gli slot e il comando di attivazione.
 
 La barra sopra la mano mostra attivazione e dispositivi solo quando presenti,
 e arma/usi solo se equipaggiati o in riserva. Nel Loot si sposta in basso.
-**ATTIVA**, **EQUIPAGGIA**, **PERSONAGGIO**, **SFIDA RING**,
-**CRIPTA DELLE RUNE** e **SFIDA EXTRA** sono
+**ATTIVA**, **EQUIPAGGIA** e **PERSONAGGIO** sono
 pulsanti usati **solo con il mouse**. Disegno e hitbox condividono le stesse
 coordinate; i comandi disabilitati non cliccano la board. **PERSONAGGIO**
 apre una scheda in pausa: modellino **realmente 3D** del player a sinistra,
@@ -419,21 +421,32 @@ Il danno mostrato include l'arma.
 
 ### Il Ring delle Ombre e gli sblocchi
 
-Nel Loot, prima di lasciare la stanza, il pulsante **SFIDA RING** apre
-**una sfida per stanza** in un ring 3D con combattenti pixel ritagliati.
+Quattro Tesla che formano un quadrato perfetto, con almeno 2x2 caselle
+all'interno, trasformano **ATTIVA** in **APRI IL RING** quando nel campo ci sono
+nemici: le bobine si consumano senza scarica e i nemici dentro (fino a quattro)
+salgono sul ring 3D con combattenti pixel ritagliati. Con un solo nemico è il
+duello classico; con più nemici è un **tag match**: ne combatte uno alla volta,
+gli altri aspettano sul bordo al proprio angolo. Un avversario in difficoltà può
+correre all'angolo di un alleato in salute e dargli il cambio con la mano;
+un avversario al tappeto lascia il posto al successivo. Il giocatore vince
+quando li ha battuti tutti.
 Il ring giocato usa ora la simulazione continua M9: `WASD` muovono sul piano,
 `1` esegue un pugno, `2` un colpo pesante, `3` una presa ravvicinata,
 `Spazio` schiva e `Shift` tiene la guardia. Tempi e collisioni sono descritti
 in [M9](#m9-fondazioni-per-le-modalità-libere).
 
-La stanza principale rimane sospesa e il duello usa salute e stato propri.
-La sconfitta non sottrae salute alla run. `Esc` apre la pausa; **Abbandona**
-consuma il tentativo senza premi. Dopo l’esito, **Continua** torna al Loot
-e assegna lo sblocco una volta sola. Intro, pausa e risultati sono gli stessi
-del catalogo. Dal menu sono possibili riprove e record, ma nessuno sblocco M8.
-Sul pad: stick muove, X pugno, Y pesante, RB presa, A schiva, LB parata;
-B/Start restano alla pausa della shell. Il campione ha sempre 12 HP,
-dal menu e nella sfida della run, con le stesse mosse e gli stessi tempi.
+La stanza rimane sospesa e il duello non consuma tempo della board. Le vite
+entrano in proporzione: il giocatore porta nel ring la sua percentuale di vita
+(su 8 HP), ogni nemico la propria su 12 HP da solo, 9/7/6 HP a testa in un tag
+match da 2/3/4 (`ring_opponent_health` in [tag.odin](src/fight/tag.odin)).
+**Vittoria**: tutti gli sfidanti sono sconfitti e lasciano il loro bottino.
+**Sconfitta** o **Abbandona**: il giocatore perde un quarto della vita massima
+(mai l'ultimo punto), i nemici tornano sulla board con le ferite subite nel
+ring e quelli messi al tappeto restano a terra. Intro, pausa e risultati sono
+gli stessi del catalogo. Dal menu sono possibili riprove e record, ma nessuno
+sblocco M8. Sul pad: stick muove, X pugno, Y pesante, RB presa, A schiva,
+LB parata; B/Start restano alla pausa della shell. Dal menu il campione ha
+12 HP, con le stesse mosse e gli stessi tempi.
 
 | Traguardo persistente | Sblocco |
 |---|---|

@@ -14,6 +14,10 @@ m8_tesla_control_labels :: proc(room: ^game.Room) -> (title, detail: cstring) {
     for object in room.objects {
         if object.kind == .Tesla_Coil {cooldown=max(cooldown,object.device_cooldown)}
     }
+    // A square around enemies opens the floor's ring instead of discharging.
+    if ring, found := game.query_tesla_ring(room); found {
+        return "APRI IL RING","1 SFIDANTE / DUELLO" if ring.count == 1 else fmt.ctprintf("TAG MATCH / %d SFIDANTI",ring.count)
+    }
     if network.field {
         return "ATTIVA MEGA","CONSUMA 4 / FUOCO AMICO" if cooldown == 0 else fmt.ctprintf("RICARICA %ds / CONSUMA 4",cooldown)
     }
@@ -47,11 +51,7 @@ draw_m8_active_bar :: proc(renderer: ^Renderer, room: ^game.Room) {
         if def,found := game.weapon_definition(equipment.weapon.id); found {name=fmt.ctprintf("%s / %d USI",def.name,equipment.weapon.uses_remaining)}
         gothic_text_fit(renderer,name,{bounds.x+9,bounds.y+6,bounds.width-18,18},12,GOTHIC_PAPER)
     }
-    controls := [3]M8_Control{.Equip,.Ring,.FPS}
-    labels := [3]cstring{"EQUIPAGGIA","SFIDA RING","CRIPTA DELLE RUNE"}
-    for control,index in controls {
-        if m8_control_visible(room,control) {m8_mouse_button(renderer,m8_control_bounds(renderer,control,room),labels[index],m8_control_enabled(renderer,room,control))}
-    }
+    if m8_control_visible(room,.Equip) {m8_mouse_button(renderer,m8_control_bounds(renderer,.Equip,room),"EQUIPAGGIA",m8_control_enabled(renderer,room,.Equip))}
 }
 
 draw_m8_character_panel :: proc(renderer: ^Renderer, room: ^game.Room) {

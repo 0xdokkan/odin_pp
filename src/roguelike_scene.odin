@@ -1501,64 +1501,27 @@ roguelike_update :: proc(data: rawptr, hf: ^host.Frame) {
 		update_window_dice_overlay(rs.window, &rs.overlay_data)
 	}
 
-	roguelike_offer_challenge(rs, hf)
-}
-
-// FPS and ring use the same catalog scenes from the menu and the run.
-// The M9 editor and its diagnostic shooter remain explicit CLI laboratories.
-roguelike_open_activity :: proc(rs: ^Roguelike_Session, hf: ^host.Frame) -> bool {
-    requested := rs.m8_session.requested
-    if requested == .None {return false}
-    rs.m8_session.requested=.None
-    info, found := m8_requested_activity_info(requested)
-    if !found {return false}
-    config := host.Minigame_Config{seed=rs.run_seed, challenge=requested==.Ring}
-    audio.play(hf.audio,.Confirm)
-    host.push(hf,info.create(config))
-    return true
-}
-
-m8_requested_activity_info :: proc(requested: render.M8_Control) -> (host.Minigame_Info, bool) {
-    if requested != .Ring && requested != .FPS {return {},false}
-    id := "ring" if requested == .Ring else "fps"
-    return minigame_info(minigame_index_by_id(id))
-}
-
-// One gate is shared by the offer and its regression tests. Suspended input,
-// cinematics and progression choices cannot start a second activity.
-roguelike_challenge_available :: proc(rs: ^Roguelike_Session, hf: ^host.Frame) -> bool {
-	return MINIGAME_COUNT > 0 && rs.smoke_mode_count == 0 && !rs.smoke_test &&
-	       !rs.options.spell_lab && !rs.options.dice_set_lab && rs.options.m9_lab == .None &&
-	       !rs.m8_modal && !rs.m8_session.character_open && rs.m8_session.requested == .None && !rs.m8_session.ring_pending &&
-	       !rs.show_route_map && hf.visible && hf.focused && hf.window_focused &&
-	       !rs.tactical_controller.paused && !rs.tactical_controller.hologram &&
-	       rs.room.qte.kind == .None && !game.tactical_is_casting(&rs.room) &&
-	       !game.run_has_relic_choice(&rs.run_state) && !render.renderer_timeline_is_busy(&rs.iso_renderer) &&
-	       game.minigame_challenge_available(&rs.run_state, &rs.room)
-}
-
-roguelike_challenge_bounds :: proc(canvas_width: f32, canvas_height: f32 = 540) -> ui.Rect {
-	// Optional activities share a compact dock beside the exit, not over it.
-	return render.m8_extra_challenge_bounds(canvas_width, canvas_height)
-}
-
-// Mouse-only: the run owns the keyboard, so the button never takes focus.
-roguelike_offer_challenge :: proc(rs: ^Roguelike_Session, hf: ^host.Frame) {
 	rs.challenge_message_ttl = max(rs.challenge_message_ttl-hf.dt, 0)
-	if !roguelike_challenge_available(rs, hf) { return }
-	if !ui.button(hf.ui, roguelike_challenge_bounds(hf.canvas.width, hf.canvas.height),
-		"SFIDA EXTRA", size = .Small, focusable = false) { return }
-	challenge, ok := game.begin_minigame_challenge(&rs.run_state, &rs.room, EXTRA_CHALLENGE_COUNT)
-	if !ok { return }
-	info, found := minigame_info(challenge.minigame)
-	if !found {
-		game.settle_minigame_challenge(&rs.run_state, &rs.room, challenge, .Abandoned, 0)
-		return
-	}
-	clear_card_interaction(&rs.card_interaction)
-	clear_gameplay_command_buffer(&rs.gameplay_buffer)
-	audio.play(hf.audio, .Confirm)
-	host.push(hf, info.create(host.Minigame_Config{seed = challenge.seed, challenge = true}))
+}
+
+// A square of Tesla coils around enemies hands the duel to the catalog ring
+// scene. The run waits, frozen, until roguelike_resume settles the result.
+roguelike_open_activity :: proc(rs: ^Roguelike_Session, hf: ^host.Frame) -> bool {
+    if !rs.room.tesla_ring.pending || rs.m8_session.ring_pending {return false}
+    info, found := minigame_info(minigame_index_by_id("ring"))
+    if !found {
+        // Without a ring the spent coils simply fizzle.
+        rs.room.tesla_ring={}
+        return false
+    }
+    rs.m8_session.ring_pending=true
+    rs.m8_session.ring_link=tesla_ring_link(&rs.room)
+    rs.m8_session.report={}
+    clear_card_interaction(&rs.card_interaction)
+    clear_gameplay_command_buffer(&rs.gameplay_buffer)
+    audio.play(hf.audio,.Confirm)
+    host.push(hf,info.create({seed=rs.run_seed, challenge=true, payload=&rs.m8_session.ring_link}))
+    return true
 }
 
 roguelike_resume :: proc(data: rawptr, hf: ^host.Frame, from: string, result: Maybe(host.Result)) {
@@ -1566,46 +1529,32 @@ roguelike_resume :: proc(data: rawptr, hf: ^host.Frame, from: string, result: Ma
 	roguelike_suspend_input(rs)
 	audio.stop_music(hf.audio)
 	host.persist_profile(hf)
-    if settle_m8_host_activity(&rs.m8_session,&rs.room,from,result) {
-        delete(rs.challenge_message)
-        reward := rs.m8_session.reward
-        if reward.has_unlock {
-            title := "Titan Grip" if reward.unlocked == .Titan_Grip else "Storm Crown"
-            rs.challenge_message=fmt.aprintf("Ring vinto / carta sbloccata: %s%s",title,"" if reward.card_added else " (disponibile nelle ricompense)")
-        } else {
-            rs.challenge_message=fmt.aprintf("%s", "Ring vinto / vittoria registrata" if reward.won else "Ring concluso / nessuna penalita alla run")
-        }
-        if len(rs.m8_session.status)>0 {
-            delete(rs.challenge_message)
-            rs.challenge_message=fmt.aprintf("%s",rs.m8_session.status)
-        }
-        rs.challenge_message_ttl=5
-        return
-    }
-	if !rs.room.minigame_challenge_pending { return }
-	challenge := rs.room.minigame_challenge
-	info, found := minigame_info(challenge.minigame)
-	if !found || info.id != from { return }
-	r, has := result.?
-	if has && r.minigame != info.id { return }
-	outcome := game.Minigame_Challenge_Outcome.Abandoned
-	stars: u8
-	if has {
-		stars = r.stars
-		switch r.outcome {
-		case .Won: outcome = .Won
-		case .Lost: outcome = .Lost
-		case .Abandoned:
-		}
+	before := render.capture_room_presentation(&rs.room)
+	if !settle_m8_host_activity(&rs.m8_session,&rs.room,from,result) {return}
+	// The board shows the duel's toll: knockouts fall and drop their loot.
+	after := render.capture_room_presentation(&rs.room)
+	if rs.room.recent_events.count > 0 {
+		if render.renderer_blocks_player_input(&rs.iso_renderer) {render.clear_event_animations(&rs.iso_renderer)}
+		_ = render.begin_renderer_event_timeline(&rs.iso_renderer,before,&rs.room.recent_events,&after)
 	}
-	gold := game.settle_minigame_challenge(&rs.run_state, &rs.room, challenge, outcome, stars)
+	if rs.room.phase != .Combat {clear_card_interaction(&rs.card_interaction)}
 	delete(rs.challenge_message)
-	if gold > 0 {
-		rs.challenge_message = fmt.aprintf("Sfida vinta: +%d oro", gold)
-	} else {
-		rs.challenge_message = fmt.aprintf("Sfida %s: nessuna ricompensa", "persa" if outcome == .Lost else "abbandonata")
+	report := rs.m8_session.report
+	reward := report.reward
+	switch {
+	case len(rs.m8_session.status)>0:
+		rs.challenge_message=fmt.aprintf("%s",rs.m8_session.status)
+	case reward.has_unlock:
+		title := "Titan Grip" if reward.unlocked == .Titan_Grip else "Storm Crown"
+		rs.challenge_message=fmt.aprintf("Ring vinto / carta sbloccata: %s%s",title,"" if reward.card_added else " (disponibile nelle ricompense)")
+	case report.won:
+		rs.challenge_message=fmt.aprintf("%s","Ring vinto: sfidante sconfitto" if report.defeated == 1 else "Ring vinto: sfidanti sconfitti")
+	case report.defeated > 0:
+		rs.challenge_message=fmt.aprintf("Ring perso: -%d vita / %d al tappeto",report.player_damage,report.defeated)
+	case:
+		rs.challenge_message=fmt.aprintf("Ring perso: -%d vita",report.player_damage)
 	}
-	rs.challenge_message_ttl = 4
+	rs.challenge_message_ttl=5
 }
 
 roguelike_draw :: proc(data: rawptr, hf: ^host.Frame) {
@@ -1739,7 +1688,7 @@ roguelike_draw :: proc(data: rawptr, hf: ^host.Frame) {
 
 roguelike_draw_window :: proc(data: rawptr, hf: ^host.Frame) {
 	rs := cast(^Roguelike_Session)data
-	if rs.m8_session.requested == .None && !rs.m8_session.ring_pending && rs.overlay != nil {
+	if !rs.m8_session.ring_pending && rs.overlay != nil {
 		rs.overlay(rs.window, &rs.overlay_data)
 	}
 }

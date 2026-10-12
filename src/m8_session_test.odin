@@ -87,16 +87,14 @@ test_m8_mouse_navigation_closes_modals_without_click_through :: proc(t: ^testing
 	input.pressed = true
 	testing.expect(t, step_m8_session(&session, &room, renderer, &controller, &cards, &buffer, true, 0, input))
 	testing.expect(t, !session.character_open, "closing still consumes this frame's click")
-	input.mouse = m8_test_button_center(renderer, .Ring, &room)
+	// A ring awaiting its duel holds the board; a foreign return cannot release it.
+	session.ring_pending = true
 	testing.expect(t, step_m8_session(&session, &room, renderer, &controller, &cards, &buffer, true, 0, input))
-    testing.expect(t,session.requested==.Ring && session.ring_pending)
-    health := player.health
-    testing.expect(t,settle_m8_host_activity(&session,&room,"ring",host.Result{minigame="ring",outcome=.Abandoned}))
-    testing.expect(t,session.requested==.None && session.ring.phase==.Lost && session.ring.settled)
-    testing.expect_value(t,player.health,health)
-    testing.expect(t,room.ring_challenge_attempted)
-    testing.expect(t,!step_m8_session(&session,&room,renderer,&controller,&cards,&buffer,true,0,input))
-
+	testing.expect(t, !settle_m8_host_activity(&session, &room, "fps", host.Result{minigame = "fps", outcome = .Won}))
+	testing.expect(t, session.ring_pending)
+	session.ring_pending = false
+	input.pressed = false
+	testing.expect(t, !step_m8_session(&session, &room, renderer, &controller, &cards, &buffer, true, 0, input))
 }
 
 @(test)

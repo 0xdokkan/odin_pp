@@ -46,6 +46,8 @@ Player :: struct {
 	tactical: Tactical_State,
 	equipment: Equipment_State,
 	m8_profile: M8_Profile,
+	// Easter eggs already opened on this floor (tesla_ring.odin).
+	floor_secrets: bit_set[Floor_Secret; u8],
 }
 
 create_player :: proc(stats: Player_Stats) -> (Player, bool) {
@@ -195,10 +197,8 @@ Room :: struct {
 	tactical_pulse: Tactical_Pulse,
 	qte: QTE_State,
 	reaction_bindings: Reaction_Binding_Set,
-	ring_challenge_attempted: bool,
-	minigame_challenge_attempted: bool,
-	minigame_challenge_pending: bool,
-	minigame_challenge: Minigame_Challenge,
+	// A ring opened by a square of coils, awaiting the duel's result.
+	tesla_ring: Tesla_Ring,
 }
 
 Move_Direction :: enum {

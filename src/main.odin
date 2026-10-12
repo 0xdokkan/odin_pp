@@ -551,8 +551,14 @@ execute_gameplay_command :: proc(room: ^game.Room, command: Gameplay_Command) ->
 	case .None:
 		return
 	case .Activate:
-		execution.committed = game.activate_board_devices(room)
-		if execution.committed { _, _ = game.finish_player_combat_command(room, 1) }
+		// A square of coils around enemies opens the floor's ring instead of
+		// discharging; the duel itself costs no board time.
+		if game.begin_tesla_ring(room) {
+			execution.committed = true
+		} else {
+			execution.committed = game.activate_board_devices(room)
+			if execution.committed { _, _ = game.finish_player_combat_command(room, 1) }
+		}
 	case .Equip:
 		execution.committed = game.equip_reserved_weapon(room)
 		if execution.committed {
