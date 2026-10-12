@@ -26,7 +26,10 @@ Come funziona:
 3. Ogni fotogramma è una posa chiave scritta a mano, renderizzata con 8x8
    sottocampioni per pixel su una tela 4x e ridotta a voto di maggioranza: compaiono
    solo i colori originali, quindi resta pixel art pulita. Il contorno viene rifatto
-   a ogni posa.
+   a ogni posa, dopo aver cancellato i frammenti che la posa stacca dal corpo (un
+   angolo di veste o una scheggia di pastorale rimasti su un osso fermo): è `mend`
+   di `pixel_rig.py`, lo stesso dei cartoncini vivi, e il log della build elenca
+   ciò che cancella (`MENDED`).
 4. La carta non è un ritaglio fisso: ogni disegno ha il suo campo di distanza esatto
    dalla sagoma e lo shader della carta (`src/engine/gfx/flipbook.odin`) taglia il
    cartoncino poco oltre la figura. Quando la stampa cambia disegno, la carta passa

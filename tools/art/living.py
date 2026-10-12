@@ -50,9 +50,6 @@ STRETCH_PER_SPEED = 1.0 / 2600.0
 STRETCH_MAX = 0.16
 # Boiling line: share of the silhouette's border that gains an ink pixel.
 BOIL = 0.035
-# A piece of a drawing smaller than this share of its body is a scrap torn
-# off by the pose and is rubbed out (mend).
-MEND_KEEP = 0.03
 # Pencil marks.
 PENCIL = np.array([96, 92, 88], np.float32) / 255
 PENCIL_LIGHT = np.array([168, 160, 146], np.float32) / 255
@@ -317,43 +314,6 @@ def silhouette_edge(idx):
     return solid & ~inner
 
 
-def mend(idx, keep=MEND_KEEP, log=None):
-    """Rub out the scraps a pose tears off the body: a corner of cloth or a
-    bit of staff whose pixels belong to a bone that stayed behind, or the tip
-    of a limb cut off by the card's edge. Pieces are 8-connected; every figure
-    is a single piece at rest. The sizes rubbed out go to `log`."""
-    solid = idx >= 0
-    h, w = solid.shape
-    labels = np.full((h, w), -1, np.int32)
-    sizes = []
-    for sy, sx in zip(*np.nonzero(solid)):
-        if labels[sy, sx] >= 0:
-            continue
-        label = len(sizes)
-        labels[sy, sx] = label
-        stack, count = [(sy, sx)], 0
-        while stack:
-            y, x = stack.pop()
-            count += 1
-            for yy in (y - 1, y, y + 1):
-                for xx in (x - 1, x, x + 1):
-                    if 0 <= yy < h and 0 <= xx < w and solid[yy, xx] and labels[yy, xx] < 0:
-                        labels[yy, xx] = label
-                        stack.append((yy, xx))
-        sizes.append(count)
-    if len(sizes) < 2:
-        return idx
-    sizes = np.array(sizes)
-    scraps = np.nonzero(sizes < keep * sizes.max())[0]
-    if not len(scraps):
-        return idx
-    if log is not None:
-        log.extend(int(sizes[i]) for i in scraps)
-    out = idx.copy()
-    out[np.isin(labels, scraps)] = -1
-    return out
-
-
 # --------------------------------------------------------------------------
 # Pencil marks, drawn in canvas pixels around the feet.
 
@@ -509,7 +469,7 @@ def build(name, spec, living, px, figure_cell, feet_anchor, block, colours, pad)
         origin = (feet[0] - ax, feet[1] - ay)
         idx = rig.render(rig_pose(rig, (ax, ay), rh, pose), size, origin)
         # Before the ink line, which would join a scrap lying a pixel away.
-        return pr.outline(mend(pr.clean_frame(idx), log=scraps))
+        return pr.outline(pr.mend(pr.clean_frame(idx), log=scraps))
 
     rest = render("base", {}) >= 0
     grow = 1.0 / LIVING_SCALE
@@ -558,7 +518,7 @@ def build(name, spec, living, px, figure_cell, feet_anchor, block, colours, pad)
             # reaches out of the card, and that goes too.
             shown = idx.copy()
             shown[~inside] = -1
-            figure = pr.to_rgba(rigs[rig_key][0].palette, mend(shown, log=scraps))
+            figure = pr.to_rgba(rigs[rig_key][0].palette, pr.mend(shown, log=scraps))
             layer = np.zeros(figure.shape, np.float32)
             ys, xs = np.nonzero(idx >= 0)
             box = (xs.min(), ys.min(), xs.max(), ys.max()) if len(xs) else (feet[0], feet[1], feet[0], feet[1])
