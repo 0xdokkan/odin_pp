@@ -24,6 +24,9 @@
 /odin_pp_playtest_*.json
 /odin_pp_input_*.txt
 
+# Strumenti Python (tools/art, tools/audio)
+__pycache__/
+
 # Segreti
 .env
 .env.*

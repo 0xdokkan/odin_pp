@@ -115,6 +115,34 @@ fare con sigilli e terreno ([Il tavolo](#il-tavolo-cartoncini-vivi-cerchi-e-segn
 qui `F6` passa fra i quattro modi (sigilli + terreno, sigilli, terreno, le
 etichette di prima) per confrontarli, e il cartello mostra quello attivo.
 
+**Suoni (solo qui).** La prova ha i suoi effetti sonori: ogni azione di ogni
+personaggio (passi, colpi, ferite, parate, caduta e i telegrafi come la MIRA
+dell'arciere o la CARICA del bruto), ogni carta, i dispositivi, le bombe, gli
+status, il battito del secondo, il colpo a tempo, la fine della finestra, lo
+stordimento e l'avviso di difesa, sopra il fondo di una cripta in loop. Sono
+**tutti fatti da codice**, senza registrazioni né librerie (quindi senza
+licenze): [tools/audio](tools/audio/SOUND_SPEC.md) li sintetizza dalla materia
+dell'azione (cuoio, ferro, legno, osso, pietra e la carta del cartoncino che
+striscia sulla pietra), li mette tutti nella stessa sala di pietra e tiene
+magie e segnali in Re frigio. Partono con il disegno che li mostra
+([lab_sounds.odin](src/render/lab_sounds.odin)), così i passi cadono sui passi
+e i colpi sull'impatto, con piccole variazioni di altezza e volume a ogni
+colpo, e un limitatore sull'uscita tiene puliti i momenti più fitti (un colpo,
+una caduta e un'esplosione insieme); seguono il volume degli effetti e il muto
+delle impostazioni. Nel gioco normale per ora non suonano. Per rifarli dopo
+aver cambiato una ricetta (`tools/audio/sfx_<famiglia>.py`):
+
+```bash
+"C:/Program Files/Blender Foundation/Blender 3.5/3.5/python/bin/python.exe" tools/audio/build_sfx.py
+```
+
+Il comando riscrive `assets/audio/lab/*.ogg` (Ogg Vorbis a 192 kbit/s: un terzo
+dei WAV, e raylib lo decodifica campione per campione; lo codifica il modulo
+audio di Blender) e la tabella generata
+[lab_sfx_data.odin](src/engine/audio/lab_sfx_data.odin); con
+`--only <famiglia> --preview <cartella> --no-write` produce invece spettrogrammi,
+misure e un ascolto di tutta la famiglia, senza toccare il gioco.
+
 | Opzione | Uso |
 |---|---|
 | `--run` | salta il menu ed entra subito nella run |
@@ -783,7 +811,7 @@ odin run src -o:none -- --classic
 | `--smoke-m7-view` | prova grafica di scena, oggetti 3D, fog, ologramma, QTE e menu |
 | `--smoke-m8-view` | prova 3D di d4, dispositivi, offerta del ring, equipaggiamento, scheda personaggio, tag match e cambio stanza |
 | `--smoke-western` | nuvoletta 6 RANCH 7: apertura automatica, volo delle carte, insegna, porte, corsa a tempo e premio |
-| `--smoke-mechanics-lab` | Prova meccaniche: arena aperta, mano di sole Tesla, ring riaperto, arrivi fino al massimo, ultima uccisione senza fine del combattimento, cartoncino del giocatore di nuovo in piedi dopo morte e riavvio, cartoncini vivi (un passo e un attacco fotogramma per fotogramma), cerchi d'azione e segnalini di danno e cura |
+| `--smoke-mechanics-lab` | Prova meccaniche: arena aperta, mano di sole Tesla, ring riaperto, arrivi fino al massimo, ultima uccisione senza fine del combattimento, cartoncino del giocatore di nuovo in piedi dopo morte e riavvio, cartoncini vivi (un passo e un attacco fotogramma per fotogramma), cerchi d'azione e segnalini di danno e cura, e i suoni che ogni azione mette in coda (passo, colpo, ferita, caduta, cura, battito, stordimento: senza dispositivo audio, li conta) |
 | `--smoke-m9-view` | arena continua, duello con IA, presa in quattro pose, replay e FPS con ricarica e vittoria |
 
 Gli smoke classici e i laboratori `--spell-lab` / `--dice-lab` conservano il comportamento classico;

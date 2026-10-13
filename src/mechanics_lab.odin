@@ -4,6 +4,7 @@ import "core:fmt"
 import "core:strings"
 import rl "vendor:raylib"
 import app "app"
+import audio "engine/audio"
 import gfx "engine/gfx"
 import game "game"
 import grid "grid"
@@ -99,6 +100,8 @@ mechanics_lab_smoke_frame :: proc(window: ^app.Window, renderer: ^render.Rendere
 	render.draw_tactical_hud(renderer, room, false, false)
 	render.draw_mechanics_lab_banner(renderer, room, true)
 	app.present(window, render.LETTERBOX_COLOR)
+	// The sounds are counted, not played: the smoke runs without a device.
+	render.play_lab_sounds(renderer, nil, 0)
 }
 
 // The sandbox in the real window: a hand of Teslas, a square of coils around
@@ -263,6 +266,26 @@ run_mechanics_lab_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer,
 		rl.TakeScreenshot("odin_pp_mechanics_lab_pause.png" if screen == 0 else "odin_pp_mechanics_lab_defeat.png")
 	}
 	renderer.tactical.pause_hovered, renderer.tactical.pause_menu = .None, false
+	return mechanics_lab_sounds_heard(renderer)
+}
+
+// The smoke's actions each sounded: steps, blows, hurts, the clock, the
+// cure, the stun and the fall.
+mechanics_lab_sounds_heard :: proc(renderer: ^render.Renderer) -> bool {
+	sounds := renderer.tactical.lab_sounds
+	if sounds == nil { fmt.eprintln("mechanics lab: no sounds"); return false }
+	heard := 0
+	for count, sfx in sounds.played {
+		if count > 0 { fmt.eprintln("mechanics lab sound:", sfx, count); heard += 1 }
+	}
+	// The step's clip follows the camera: any of the three.
+	if sounds.played[.Pilgrim_Move_Side]+sounds.played[.Pilgrim_Move_Up]+sounds.played[.Pilgrim_Move_Down] == 0 {
+		fmt.eprintln("mechanics lab: no sound for the step"); return false
+	}
+	for sfx in ([?]audio.Lab_Sfx{.Pilgrim_Attack, .Pilgrim_Hurt, .Ghoul_Hurt, .Pilgrim_Death, .Ui_Defeat, .Pilgrim_Heal, .Ui_Beat_Tick, .Ui_Stun}) {
+		if sounds.played[sfx] == 0 { fmt.eprintln("mechanics lab: no sound for", sfx); return false }
+	}
+	fmt.eprintln("mechanics lab sounds:", heard)
 	return true
 }
 

@@ -81,6 +81,9 @@ Roguelike_Session :: struct {
 	smoke_frame_count:       int,
 	smoke_fire_entity:       game.Entity_Ref,
 
+	// The mechanics lab's sounds (render/lab_sounds.odin).
+	lab_bank:                audio.Lab_Bank,
+
 	// Which resources exist, so destroy mirrors the old deferred cleanup.
 	run_created:             bool,
 	room_created:            bool,
@@ -840,6 +843,21 @@ roguelike_suspend_input :: proc(rs: ^Roguelike_Session) {
 	rs.iso_renderer.frame_clock_valid = false
 	rs.iso_renderer.tactical.world_orbit.dragging = false
 	rs.iso_renderer.tactical.hologram_orbit.dragging = false
+	// The room's ambience waits for the scene to come back.
+	audio.lab_ambience(&rs.lab_bank, false)
+}
+
+// The mechanics lab's sounds: what the board pass queued, and the room's
+// ambience, at the player's effects volume (and silent when muted).
+roguelike_lab_sounds :: proc(rs: ^Roguelike_Session, hf: ^host.Frame) {
+	bank := hf.audio
+	if bank == nil || !bank.ready || bank.muted || !audio.lab_bank_load(&rs.lab_bank) {
+		render.play_lab_sounds(&rs.iso_renderer, nil, 0)
+		audio.lab_ambience(&rs.lab_bank, false)
+		return
+	}
+	render.play_lab_sounds(&rs.iso_renderer, &rs.lab_bank, bank.sfx_volume)
+	audio.lab_ambience(&rs.lab_bank, rs.run_state.phase == .In_Room, .Amb_Crypt_Loop, bank.sfx_volume)
 }
 
 roguelike_suspend :: proc(data: rawptr) {
@@ -1035,6 +1053,7 @@ roguelike_update :: proc(data: rawptr, hf: ^host.Frame) {
 	   rs.run_state.phase == .In_Room && !render.renderer_timeline_is_busy(&rs.iso_renderer) {
 		_, _ = game.sandbox_tick(&rs.room, &rs.sandbox, rs.frame_time)
 	}
+	if rs.options.mechanics_lab { roguelike_lab_sounds(rs, hf) }
 
 	if relic_visible {
 		clear_card_interaction(&rs.card_interaction)
@@ -1932,6 +1951,7 @@ roguelike_destroy :: proc(data: rawptr) {
 		if rs.playtest_report && !write_m7_metrics(&rs.run_state.player, rs.run_seed, rs.options.playtest_output) {
 			fmt.eprintln("failed to write M7 metrics")
 		}
+		audio.lab_bank_unload(&rs.lab_bank)
 		render.destroy_tactical_assets(&rs.iso_renderer)
 		combatdebug.destroy_playtest_session(&rs.playtest_session)
 		render.destroy_dice_renderer(&rs.dice_renderer)

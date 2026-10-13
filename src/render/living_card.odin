@@ -35,6 +35,11 @@ Living_Actor :: struct {
 	sliding, moved: bool,
 	// 0..1: how close the figure is to acting (the lab's seals make it tremble).
 	tremble: f32,
+	// The cue that started the running one-shot (.Move for a step), and the
+	// clip and loop the lab's sounds last played for (lab_sounds.odin).
+	cause: Presentation_Cue_Kind,
+	voiced: f64,
+	voiced_base: gfx.Living_Action,
 }
 
 Living_State :: struct {
@@ -71,6 +76,7 @@ destroy_living_cards :: proc(renderer: ^Renderer) {
 forget_living_actors :: proc(renderer: ^Renderer) {
 	if renderer == nil { return }
 	renderer.tactical.intent_traces = {}
+	lab_sounds_reset(renderer)
 	if renderer.tactical.living_state == nil { return }
 	living_tokens_free(renderer.tactical.living_state)
 	renderer.tactical.living_state^ = {}
@@ -244,6 +250,7 @@ living_observe :: proc(renderer: ^Renderer, state: ^Living_State, room: ^game.Ro
 	snapshot := renderer.tactical.snapshot
 	sheet := &gfx.LIVING_SHEETS[character]
 	wanted := gfx.Living_Action.Idle
+	cause := Presentation_Cue_Kind.Move
 	for offset in 0..<renderer_active_cue_count(renderer) {
 		cue, found := renderer_active_cue_at(renderer, offset)
 		if !found || !cue.started { continue }
@@ -264,6 +271,7 @@ living_observe :: proc(renderer: ^Renderer, state: ^Living_State, room: ^game.Ro
 			if !pushed { living_face(slot, h, now) }
 			if slot.action != .Death {
 				living_start(slot, move, now)
+				slot.cause = .Move
 				clip := &sheet.clips[slot.action]
 				// The card goes from wherever it stands now, at the push.
 				here, _ := living_card_position(renderer, actor.entity, flipbook_key(character), from)
@@ -291,7 +299,7 @@ living_observe :: proc(renderer: ^Renderer, state: ^Living_State, room: ^game.Ro
 				if abs(side) > 0.2 && (side < 0) != slot.facing_left { action = .Hurt_Back }
 			}
 		}
-		if gfx.living_priority(action) > gfx.living_priority(wanted) { wanted = action }
+		if gfx.living_priority(action) > gfx.living_priority(wanted) { wanted, cause = action, cue.kind }
 	}
 	if wanted != .Idle {
 		fresh := wanted != slot.trigger || now-slot.trigger_seen > LIVING_TRIGGER_GAP
@@ -299,6 +307,7 @@ living_observe :: proc(renderer: ^Renderer, state: ^Living_State, room: ^game.Ro
 		if fresh && slot.action != .Death {
 			if !living_busy(slot, now) || gfx.living_priority(wanted) >= gfx.living_priority(slot.action) || living_past_hit(slot, now) {
 				living_start(slot, wanted, now)
+				slot.cause = cause
 			}
 		}
 	}
@@ -344,6 +353,7 @@ update_living_actors :: proc(renderer: ^Renderer, room: ^game.Room) {
 	}
 	update_living_tokens(renderer, now)
 	update_intent_traces(renderer, room, now)
+	update_lab_sounds(renderer, room, now)
 }
 
 // The drawing to print right now.

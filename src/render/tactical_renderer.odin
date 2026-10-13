@@ -53,6 +53,8 @@ Tactical_View :: struct {
 	// The mechanics lab's enemy intent displays on trial (intent_display.odin).
 	intent_display: Intent_Display,
 	intent_traces: [game.MAX_ENEMIES_PER_ROOM*2]Intent_Trace,
+	// The mechanics lab's sounds waiting to play (lab_sounds.odin).
+	lab_sounds: ^Lab_Sounds,
 	kit: Diorama_Kit,
 	pilgrim: []Diorama_Vertex,
 	intent_memory: [game.MAX_ENEMIES_PER_ROOM]Intent_Memory,
@@ -116,6 +118,7 @@ destroy_tactical_assets :: proc(renderer: ^Renderer) {
 	renderer.tactical.pilgrim = nil
 	if renderer.tactical.flipbook_state != nil { free(renderer.tactical.flipbook_state); renderer.tactical.flipbook_state = nil }
 	destroy_living_cards(renderer)
+	destroy_lab_sounds(renderer)
 	if renderer.tactical.outline_shader.id != 0 { rl.UnloadShader(renderer.tactical.outline_shader); renderer.tactical.outline_shader = {} }
 	if renderer.tactical.labels != nil { free(renderer.tactical.labels); renderer.tactical.labels = nil }
 	if renderer.tactical.light_shader.id != 0 { rl.UnloadShader(renderer.tactical.light_shader); renderer.tactical.light_shader = {} }
