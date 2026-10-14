@@ -65,12 +65,12 @@ test_host_suspension_clears_run_input_without_advancing_gameplay :: proc(t: ^tes
     before := rs.run_state.player
     pulse := rs.room.pulse_count
     rs.card_interaction.selected_card_id=42
-    rs.gameplay_buffer.occupied=true
+    rs.gameplay_buffer.chord.active=true
     rs.iso_renderer.frame_clock_valid=true
     rs.iso_renderer.tactical.world_orbit.dragging=true
     rs.iso_renderer.tactical.hologram_orbit.dragging=true
     roguelike_suspend_input(rs)
-    testing.expect(t,rs.card_interaction.selected_card_id==0 && !rs.gameplay_buffer.occupied)
+    testing.expect(t,rs.card_interaction.selected_card_id==0 && !rs.gameplay_buffer.chord.active)
     testing.expect(t,!rs.iso_renderer.frame_clock_valid && !rs.tactical_controller.was_focused)
     testing.expect(t,!rs.iso_renderer.tactical.world_orbit.dragging && !rs.iso_renderer.tactical.hologram_orbit.dragging)
     testing.expect_value(t,rs.run_state.player,before)

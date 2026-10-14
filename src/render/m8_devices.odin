@@ -37,7 +37,7 @@ draw_m8_device_object :: proc(renderer: ^Renderer, object: Presentation_Grid_Obj
         draw_resin_cube(renderer, p+rl.Vector3{0, 0.085, 0}, 0.17, 0.06, 0.17, GOTHIC_PAPER if object.device_armed else RESIN_CAP)
         if object.device_armed {
             // The sensor is quiet until an enemy enters; only a live trap arcs.
-            step := f32(comic_pose_frame(renderer.sprite_assets.elapsed)%2)*0.025
+            step := f32(comic_pose_frame(tactical_world_time(renderer))%2)*0.025
             rl.DrawLine3D(p+rl.Vector3{-0.24,0.16,0.06},p+rl.Vector3{-0.03,0.25+step,-0.06},blue)
             rl.DrawLine3D(p+rl.Vector3{-0.03,0.25+step,-0.06},p+rl.Vector3{0.24,0.16,0.06},blue)
         }
@@ -72,7 +72,7 @@ draw_m8_device_network :: proc(renderer: ^Renderer, room: ^game.Room) {
             rl.DrawCubeWires(p, 0.76, 0.014, 0.76, blue)
             if network.ready {
                 // A thin segmented fence leaves the center of the cell readable.
-                phase := f32(comic_pose_frame(renderer.sprite_assets.elapsed))*0.02
+                phase := f32(comic_pose_frame(tactical_world_time(renderer)))*0.02
                 rl.DrawLine3D(p+rl.Vector3{-0.32,0.19+phase,0}, p+rl.Vector3{0.02,0.12-phase,0.10}, blue)
                 rl.DrawLine3D(p+rl.Vector3{0.02,0.12-phase,0.10}, p+rl.Vector3{0.32,0.19+phase,0}, blue)
             }
@@ -100,7 +100,7 @@ draw_m8_tesla_link :: proc(renderer: ^Renderer, a,b: grid.Position, ready: bool)
     for i in 0..<steps {
         p,q := start+delta*(f32(i)/f32(steps)),start+delta*(f32(i+1)/f32(steps))
         if !tactical_render_visible(renderer,{int(p.x),int(p.z)}) || !tactical_render_visible(renderer,{int(q.x),int(q.z)}) { continue }
-        wobble := f32((i+comic_pose_frame(renderer.sprite_assets.elapsed))%3-1)*0.045 if ready else 0
+        wobble := f32((i+comic_pose_frame(tactical_world_time(renderer)))%3-1)*0.045 if ready else 0
         for height in ([3]f32{0.34,0.73,1.10}) {
             rl.DrawLine3D(p+rl.Vector3{0,height+wobble,0},q+rl.Vector3{0,height-wobble,0},color)
         }

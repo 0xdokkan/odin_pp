@@ -180,7 +180,7 @@ build_route_event_state :: proc(player: ^Player, node: ^Run_Node) -> (result: Ro
 	case .Forgotten_Armory:
 		random_state := normalized_card_reward_seed(node.room_seed~ROUTE_EVENT_CARD_SEED_SALT)
 		choice: [1]Card_Id
-		if !generate_weighted_card_choices(&random_state, node, choice[:], &player.m8_profile) {
+		if !generate_weighted_card_choices(&random_state, node, choice[:], &player.m8_profile, player.tactical.config.enabled) {
 			return {}, false
 		}
 		result.has_offered_card = true

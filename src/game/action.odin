@@ -91,6 +91,8 @@ Effect_Kind :: enum {
 	Create_Card,
 	Gain_Energy,
 	Deploy_Device,
+	// Movimento Ombra: `amount` seconds inside the player's shadow.
+	Enter_Shadow,
 }
 
 Effect :: struct {
@@ -139,6 +141,10 @@ gain_gold_effect :: proc(amount: i32) -> Effect {
 
 gain_energy_effect :: proc(amount: i32) -> Effect {
 	return {kind = .Gain_Energy, target = PLAYER_ENTITY, amount = amount}
+}
+
+enter_shadow_effect :: proc(seconds: i32) -> Effect {
+	return {kind = .Enter_Shadow, target = PLAYER_ENTITY, amount = seconds}
 }
 
 draw_cards_effect :: proc(amount: i32) -> Effect {
@@ -385,6 +391,8 @@ effect_is_valid :: proc(room: ^Room, effect: Effect) -> bool {
 		return false
 	}
 	switch effect.kind {
+	case .Enter_Shadow:
+		return effect.target == PLAYER_ENTITY && effect.amount > 0 && tactical_can_begin_shadow(room)
 	case .Deploy_Device:
 		return effect.target == PLAYER_ENTITY && effect.amount > 0 &&
 		       (effect.object_kind != .Shock_Floor || (effect.charges >= 1 && effect.charges <= TACTICAL_SHOCK_FLOOR_MAX_CHARGES)) &&
@@ -509,6 +517,9 @@ apply_damage_effect :: proc(
 	effect: Effect,
 	report: ^Action_Report,
 ) {
+	// Every hit on the player passes here, hazards included: nothing reaches
+	// a player sunk in his shadow (no shield spent, no Damaged, no reactions).
+	if effect.target.kind == .Player && tactical_player_intangible(room) { return }
 	damage := effect.amount
 	if effect.target.kind == .Player {
 		damage = max(i32(1), damage-room.player.stats.defense)
@@ -613,6 +624,14 @@ apply_effect :: proc(room: ^Room, source: Entity_Ref, effect: Effect, report: ^A
 	assert(room != nil && report != nil && effect_is_valid(room, effect))
 
 	switch effect.kind {
+	case .Enter_Shadow:
+		origin := room.player.position
+		began := tactical_begin_shadow(room, f32(effect.amount))
+		assert(began)
+		record_report_event(report, {
+			kind = .Shadow_Entered, source = source, target = PLAYER_ENTITY,
+			from_position = origin, to_position = origin, duration = effect.amount,
+		})
 	case .Deploy_Device:
 		deployed := deploy_board_device(room, effect.object_kind, effect.destination, effect.amount, effect.charges, &report.events)
 		assert(deployed)

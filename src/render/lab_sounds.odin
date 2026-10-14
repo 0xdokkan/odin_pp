@@ -53,6 +53,11 @@ Lab_Sounds :: struct {
 	enemies: [game.MAX_ENEMIES_PER_ROOM]u32,
 	enemy_count: int,
 	deal: f64,
+	// MOVIMENTO OMBRA as last heard (shadow_step.odin): the card's sinking
+	// has sounded and its rise not yet, and the shadow's steps, diagonals on
+	// a beat and beats so far.
+	shadow: bool,
+	shadow_steps, shadow_criticals, shadow_beats: u32,
 	// What the lab has played so far (smoke and tests).
 	played: [audio.Lab_Sfx]int,
 }
@@ -215,6 +220,7 @@ lab_card_sfx :: proc(card: game.Card_Id) -> (sfx: audio.Lab_Sfx, ok: bool) {
 	case .Storm_Crown: return .Card_Storm_Crown, true
 	case .Sei_Denari: return .Card_Sei_Denari, true
 	case .Sette_Denari: return .Card_Sette_Denari, true
+	case .Shadow_Step: return .Card_Shadow_Step, true
 	case .Count:
 	}
 	return
@@ -326,13 +332,42 @@ update_lab_sounds :: proc(renderer: ^Renderer, room: ^game.Room, now: f64) {
 			if sfx, ok := lab_base_sfx(actor.character, actor.base); ok { lab_sound_queue(s, sfx, now, 1, pan) }
 		}
 	}
+	// MOVIMENTO OMBRA: the card's own cues show it going down into its shadow
+	// (after the card's sound) and climbing back out (after the landing);
+	// each sounds as it starts to show. The shadow's steps start no clip on
+	// the card, so the boots and the paper's scrape stay silent: the pool has
+	// a step of its own, a diagonal on a beat also stings, and its beats tick
+	// like the world's.
+	shadow := &v.shadow
+	player_pan := lab_sound_pan(renderer, game.PLAYER_ENTITY)
+	if !s.shadow && shadow.active && shadow.sink > 0 {
+		s.shadow = true
+		lab_sound_queue(s, .Pilgrim_Shadow_Sink, now, 1, player_pan)
+	} else if s.shadow && !shadow.active && shadow.rise > 0 {
+		s.shadow = false
+		lab_sound_queue(s, .Pilgrim_Shadow_Rise, now, 1, player_pan)
+	}
+	if shadow.steps != s.shadow_steps {
+		s.shadow_steps = shadow.steps
+		lab_sound_queue(s, .Pilgrim_Shadow_Step, now, 1, player_pan)
+	}
+	if shadow.criticals != s.shadow_criticals {
+		s.shadow_criticals = shadow.criticals
+		lab_sound_queue(s, .Ui_Critical, now)
+	}
+	if shadow.beats != s.shadow_beats {
+		s.shadow_beats = shadow.beats
+		lab_sound_queue(s, .Ui_Beat_Tick, now)
+	}
 	// The cues now showing, each once; the cards first, so what they put on
-	// the board knows they already sounded.
+	// the board knows they already sounded. What was heard is kept on the
+	// world's clock: a cue the shadow holds still is never heard again.
 	impacts := 0
+	world := tactical_world_time_at(renderer, now)
 	for cards in ([2]bool{true, false}) {
 		for offset in 0..<renderer_active_cue_count(renderer) {
 			cue, found := renderer_active_cue_at(renderer, offset)
-			if !found || !cue.started || (cue.kind == .Card_Played) != cards || lab_sound_heard(s, cue.kind, cue.event, now) { continue }
+			if !found || !cue.started || (cue.kind == .Card_Played) != cards || lab_sound_heard(s, cue.kind, cue.event, world) { continue }
 			lab_cue_sounds(renderer, s, cue, now, &impacts)
 		}
 	}
@@ -360,7 +395,8 @@ lab_watch_room :: proc(s: ^Lab_Sounds, room: ^game.Room, now: f64) {
 		if t.beat_index > s.beat && t.phase == .Decision { lab_sound_queue(s, .Ui_Beat_Tick, now) }
 		if t.beat_spent != s.beat_spent && t.beat_spent != 0 { lab_sound_queue(s, .Ui_Critical, now) }
 		if t.phase != s.phase {
-			if t.phase == .Stunned { lab_sound_queue(s, .Ui_Stun, now) }
+			// A stun that Movimento Ombra interrupted resumes; it does not strike again.
+			if t.phase == .Stunned && s.phase != .Shadow { lab_sound_queue(s, .Ui_Stun, now) }
 			else if t.phase == .Recovery && s.phase == .Decision && t.remaining > 0 { lab_sound_queue(s, .Ui_Window_End, now) }
 		}
 		if room.qte.kind == .Defense && s.qte != .Defense { lab_sound_queue(s, .Ui_Defense_Prompt, now) }

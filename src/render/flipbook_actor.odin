@@ -161,7 +161,8 @@ flipbook_cue_action :: proc(cue: ^Presentation_Cue, entity: game.Entity_Ref) -> 
 	event := &cue.event
 	#partial switch cue.kind {
 	case .Move:
-		if event.target == entity { return .Walk, true, false }
+		// A teleport is no walk: the card is simply on its landing.
+		if event.target == entity && !game.event_is_teleport(event^) { return .Walk, true, false }
 	case .Damage:
 		if event.target == entity { return .Hurt, true, false }
 		if event.source == entity { return .Attack, true, true }
@@ -356,6 +357,8 @@ flipbook_billboard_geometry :: proc(renderer: ^Renderer, character: gfx.Flipbook
 	lift := (gfx.FLIPBOOK_PAPER+gfx.FLIPBOOK_INK)*scale+0.03
 	if v.outline_mode == .Hologram { lift = 0; result.card = {} }
 	base := rl.Vector3{position.x+0.5, 0.02+lift+pose.lift, position.y+0.5}
+	// The player's card in its shadow, as on the living board (shadow_step.odin).
+	base.y -= tactical_shadow_depth(renderer, entity)*sheet.world_height
 	sy := scale*pose.scale_y
 	bl := base-right*(feet_x*scale*width)-up*(below*sy)
 	span := right*(cell.x*scale*width)
@@ -407,7 +410,7 @@ flipbook_card_hit :: proc(renderer: ^Renderer, quad: Tactical_Billboard, ray: rl
 	return collision.distance, true
 }
 
-draw_flipbook_card :: proc(renderer: ^Renderer, quad: Tactical_Billboard, uv: [4]rl.Vector2, opacity: f32) {
+draw_flipbook_card :: proc(renderer: ^Renderer, quad: Tactical_Billboard, uv: [4]rl.Vector2, opacity: f32, tint: rl.Color = rl.WHITE) {
 	assets := &renderer.tactical.flipbook
 	if assets.paper_shader.id == 0 { return }
 	points := flipbook_card_points(quad)
@@ -436,7 +439,7 @@ draw_flipbook_card :: proc(renderer: ^Renderer, quad: Tactical_Billboard, uv: [4
 	rl.BeginShaderMode(assets.paper_shader)
 	rlgl.SetTexture(quad.card.id)
 	rlgl.Begin(rlgl.QUADS)
-	rlgl.Color4ub(255, 255, 255, u8(clamp(opacity, f32(0), f32(1))*255))
+	rlgl.Color4ub(tint.r, tint.g, tint.b, u8(clamp(opacity, f32(0), f32(1))*255))
 	for point, index in points {
 		rlgl.TexCoord2f(uv[index].x, uv[index].y)
 		rlgl.Vertex3f(point.x, point.y, point.z)

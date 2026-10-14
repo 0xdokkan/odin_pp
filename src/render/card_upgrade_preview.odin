@@ -38,7 +38,7 @@ card_upgrade_preview :: proc(card: game.Card_Instance, tactical: bool = false) -
 		case .Create_Card: label = "CREATE"
 		case .Apply_Status: label = game.status_kind_name(template.status)
 		case .Add_Reaction_Binding: label = "COUNTER"
-		case .Move, .Remove_Status:
+		case .Move, .Remove_Status, .Enter_Shadow:
 		}
 		before := game.card_effect_amount(template, card.upgrade_level)
 		after := game.card_effect_amount(template, card.upgrade_level+1)

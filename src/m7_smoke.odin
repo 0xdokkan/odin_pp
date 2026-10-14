@@ -103,6 +103,13 @@ m7_route_sample :: proc(seed: u64, tactical: bool) -> (sample: M7_Route_Sample, 
 				// per second exhausted the route budget in larger encounters.
 				game.tactical_tick(&room, run.player.tactical.cast_remaining, true, false)
 				continue
+			} else if game.tactical_shadow_active(&room) {
+				// The shadow stays put: its four seconds pass, then it rises.
+				if !game.tactical_shadow_due(&room) {
+					game.tactical_tick(&room, run.player.tactical.shadow_remaining, true, false)
+					continue
+				}
+				command.kind = .Shadow_Emerge
 			} else if room.tactical_pulse.pending {
 				command.kind = .Continue_Pulse
 			} else if room.phase == .Combat && tactical && run.player.tactical.phase == .Recovery {

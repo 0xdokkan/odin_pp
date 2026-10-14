@@ -30,6 +30,9 @@ PRESENTATION_DEFEAT_DURATION      :: f32(0.22)*PRESENTATION_TIME_SCALE
 PRESENTATION_LOOT_DURATION        :: f32(0.28)*PRESENTATION_TIME_SCALE
 PRESENTATION_NOTICE_DURATION      :: f32(0.12)*PRESENTATION_TIME_SCALE
 PRESENTATION_PULSE_DURATION       :: f32(0.06)*PRESENTATION_TIME_SCALE
+// Movimento Ombra: the player sinking into his shadow, and rising from it.
+PRESENTATION_SHADOW_SINK_DURATION :: f32(0.2)*PRESENTATION_TIME_SCALE
+PRESENTATION_SHADOW_RISE_DURATION :: f32(0.25)*PRESENTATION_TIME_SCALE
 PRESENTATION_MAX_SEQUENCE_DURATION :: f32(12.0)
 PRESENTATION_TIME_EPSILON         :: f32(0.00001)
 
@@ -68,6 +71,8 @@ Presentation_Cue_Kind :: enum {
 	Dice_Rolled,
 	Spell_Launched,
 	Spell_Impact,
+	Shadow_Entered,
+	Shadow_Emerged,
 }
 
 Presentation_Actor :: struct {
@@ -383,6 +388,10 @@ presentation_cue_kind :: proc(event: game.Game_Event) -> Presentation_Cue_Kind {
 		return .Binding_Expired
 	case .Pulse_Advanced:
 		return .Pulse_Advanced
+	case .Shadow_Entered:
+		return .Shadow_Entered
+	case .Shadow_Emerged:
+		return .Shadow_Emerged
 	}
 	unreachable()
 }
@@ -398,6 +407,10 @@ presentation_cue_duration :: proc(kind: Presentation_Cue_Kind, event: game.Game_
 	case .Move:
 		if event.kind == .Movement_Step {
 			return PRESENTATION_MOVEMENT_STEP_DURATION
+		}
+		// A teleport has no road to walk: it only marks the landing.
+		if game.event_is_teleport(event) {
+			return PRESENTATION_NOTICE_DURATION
 		}
 		if event.target.kind == .Enemy || event.target.kind == .Object {
 			return PRESENTATION_ENEMY_MOVE_DURATION
@@ -433,6 +446,10 @@ presentation_cue_duration :: proc(kind: Presentation_Cue_Kind, event: game.Game_
 		return PRESENTATION_NOTICE_DURATION
 	case .Pulse_Advanced:
 		return PRESENTATION_PULSE_DURATION
+	case .Shadow_Entered:
+		return PRESENTATION_SHADOW_SINK_DURATION
+	case .Shadow_Emerged:
+		return PRESENTATION_SHADOW_RISE_DURATION
 	}
 	unreachable()
 }
@@ -903,10 +920,13 @@ start_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^Presentat
 			}
 		}
 	case .Move:
+		// A teleport shows the body on its landing at once, never on the line
+		// between.
+		start := event.to_position if game.event_is_teleport(event) else event.from_position
 		if has_actor {
-			actor.position = presentation_position(event.from_position)
+			actor.position = presentation_position(start)
 		} else if has_object {
-			object.position = presentation_position(event.from_position)
+			object.position = presentation_position(start)
 		} else {
 			timeline.update_failures += 1
 		}
@@ -1022,7 +1042,7 @@ start_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^Presentat
 			timeline.update_failures += 1
 		}
 	case .Attack_Missed, .Move_Blocked,
-	     .Binding_Added, .Binding_Exhausted, .Binding_Expired:
+	     .Binding_Added, .Binding_Exhausted, .Binding_Expired, .Shadow_Entered, .Shadow_Emerged:
 	}
 }
 
@@ -1038,6 +1058,7 @@ update_active_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^P
 	case .Move:
 		from := presentation_position(cue.event.from_position)
 		to := presentation_position(cue.event.to_position)
+		if game.event_is_teleport(cue.event) { from = to }
 		position := view.Vec2{
 			x = from.x+(to.x-from.x)*progress,
 			y = from.y+(to.y-from.y)*progress,
@@ -1060,7 +1081,8 @@ update_active_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^P
 	     .Loot_Dropped, .Loot, .Attack_Missed,
 	     .Move_Blocked, .Gold_Gained, .Energy_Gained, .Binding_Added, .Binding_Exhausted,
 	     .Binding_Expired, .Pulse_Advanced, .Object_Spawned, .Explosive_Armed,
-	     .Explosive_Disarmed, .Explosion, .Room_Hazard_Triggered, .Dice_Rolled, .Spell_Launched, .Spell_Impact:
+	     .Explosive_Disarmed, .Explosion, .Room_Hazard_Triggered, .Dice_Rolled, .Spell_Launched, .Spell_Impact,
+	     .Shadow_Entered, .Shadow_Emerged:
 	}
 }
 

@@ -18,13 +18,30 @@ GOTHIC_BLUE :: ui.GOTHIC_PALETTE.focus
 GOTHIC_RECESS :: ui.GOTHIC_PALETTE.panel
 GOTHIC_FONT_SIZES :: [?]int{10, 12, 14, 16, 18, 24, 32}
 
+// The card icon atlas: the 16 painted icons in four rows of four, then the
+// rows added by tools/art/build_card_icons.py (cell 16: Movimento Ombra).
+CARD_ICON_COLUMNS :: 4
+CARD_ICON_ROWS :: 5
+CARD_ICON_CELLS :: CARD_ICON_COLUMNS*CARD_ICON_ROWS
+// The figure atlas: four rows of four.
+GOTHIC_FIGURE_CELLS :: 16
+
 Gothic_Art :: struct {
 	icons, figures, paper: rl.Texture2D,
 	// The Scopa 6 and 7 of coins (tools/art/build_scopa.py), side by side.
 	scopa: rl.Texture2D,
-	figure_sources, icon_sources: [16]rl.Rectangle,
+	figure_sources: [GOTHIC_FIGURE_CELLS]rl.Rectangle,
+	icon_sources: [CARD_ICON_CELLS]rl.Rectangle,
 	figure_alpha: []u8,
 	fonts: [len(GOTHIC_FONT_SIZES)]rl.Font,
+}
+
+// A cell of a four-column atlas `rows` cells high, in pixels (right and
+// bottom excluded). The icons' fifth row leaves the painted four where they
+// were: 1568/5 and 1254/4 rows start on the same pixels.
+gothic_atlas_cell :: proc(cell, rows, width, height: int) -> (left, top, right, bottom: int) {
+	return cell%CARD_ICON_COLUMNS*width/CARD_ICON_COLUMNS, cell/CARD_ICON_COLUMNS*height/rows,
+		(cell%CARD_ICON_COLUMNS+1)*width/CARD_ICON_COLUMNS, (cell/CARD_ICON_COLUMNS+1)*height/rows
 }
 
 gothic_hash :: proc(x, y: int) -> u32 {
@@ -44,16 +61,16 @@ create_gothic_art :: proc(art: ^Gothic_Art) {
 		colors := rl.LoadImageColors(img)
 		texture := rl.LoadTextureFromImage(img)
 		rl.SetTextureFilter(texture, .POINT)
-		sources := &art.icon_sources if index == 0 else &art.figure_sources
+		sources := art.icon_sources[:] if index == 0 else art.figure_sources[:]
+		atlas_rows := len(sources)/CARD_ICON_COLUMNS
 		if index == 0 { art.icons = texture }
 		else {
 			art.figures = texture
 			art.figure_alpha = make([]u8, int(img.width)*int(img.height))
 			for &alpha, at in art.figure_alpha { alpha = colors[at].a }
 		}
-		for cell in 0..<16 {
-			left, right := cell%4*int(img.width)/4, (cell%4+1)*int(img.width)/4
-			top, bottom := cell/4*int(img.height)/4, (cell/4+1)*int(img.height)/4
+		for cell in 0..<len(sources) {
+			left, top, right, bottom := gothic_atlas_cell(cell, atlas_rows, int(img.width), int(img.height))
 			if index == 1 {
 				// The generated 1254px sheet has uneven transparent gutters.
 				// Explicit regions keep every figure whole and isolated; crop
@@ -122,15 +139,23 @@ gothic_font :: proc(renderer: ^Renderer, size: int) -> (rl.Font, f32) {
 	if font.texture.id == 0 { return rl.GetFontDefault(), f32(size) }
 	return font, f32(sizes[index]+4 if sizes[index] < 24 else sizes[index]+8)
 }
-gothic_text_width :: proc(renderer: ^Renderer, text: cstring, size: int) -> f32 {
+gothic_text_width :: proc(renderer: ^Renderer, text: cstring, size: int, spacing: f32 = 1) -> f32 {
 	font, actual := gothic_font(renderer, size)
-	return rl.MeasureTextEx(font, text, actual, 1).x
+	return rl.MeasureTextEx(font, text, actual, spacing).x
 }
-gothic_text :: proc(renderer: ^Renderer, text: cstring, x, y: f32, size: int, color: rl.Color) {
+gothic_text :: proc(renderer: ^Renderer, text: cstring, x, y: f32, size: int, color: rl.Color, spacing: f32 = 1) {
 	font, actual := gothic_font(renderer, size)
-	rl.DrawTextEx(font, text, {math.round(x), math.round(y)}, actual, 1, color)
+	rl.DrawTextEx(font, text, {math.round(x), math.round(y)}, actual, spacing, color)
 }
 gothic_text_fit :: proc(renderer: ^Renderer, text: cstring, bounds: rl.Rectangle, size: int, color: rl.Color) {
+	// The pixel font is crisp only at some sizes; a smaller one bends its
+	// figures (an "o" reads as an "a"). Close the letters up first.
+	if gothic_text_width(renderer, text, size) > bounds.width && gothic_text_width(renderer, text, size, 0) <= bounds.width {
+		rl.BeginScissorMode(c.int(bounds.x), c.int(bounds.y), c.int(bounds.width), c.int(bounds.height))
+		gothic_text(renderer, text, bounds.x, bounds.y, size, color, 0)
+		rl.EndScissorMode()
+		return
+	}
 	chosen := size
 	for chosen > 10 && gothic_text_width(renderer, text, chosen) > bounds.width { chosen -= 2 }
 	label := text
@@ -232,6 +257,7 @@ gothic_card_icon :: proc(id: game.Card_Id) -> int {
 	case .Fate_Strike, .Prismatic_Barrage: return 13
 	case .Chain_Lightning, .Tesla_Coil, .Shock_Floor, .Storm_Crown: return 14
 	case .Purifying_Guard: return 15
+	case .Shadow_Step: return 16
 	// Scopa cards draw their own art (draw_scopa_card); this is the fallback.
 	case .Sei_Denari, .Sette_Denari: return 9
 	case .Count: return 0

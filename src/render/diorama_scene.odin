@@ -176,7 +176,7 @@ draw_tactical_tile :: proc(renderer: ^Renderer, room: ^game.Room, tile: level.Ti
 }
 
 draw_diorama_lamp_glow :: proc(renderer: ^Renderer, lamp: rl.Vector3, cell: grid.Position, opacity: f32 = 1) {
-	time := f32(renderer.sprite_assets.elapsed)
+	time := f32(tactical_world_time(renderer))
 	flicker := f32(0.86+0.14*math.sin(time*2.6+f32(cell.x+cell.y)))
 	core := DIORAMA_GLOW
 	core.a = u8(255*opacity)
@@ -193,7 +193,8 @@ draw_diorama_accents :: proc(renderer: ^Renderer, room: ^game.Room) {
 	rlgl.DrawRenderBatchActive()
 	rlgl.DisableDepthMask()
 	defer { rlgl.DrawRenderBatchActive(); rlgl.EnableDepthMask() }
-	time := f32(renderer.sprite_assets.elapsed)
+	// The world's clock: the lamps and the dust hold still with it.
+	time := f32(tactical_world_time(renderer))
 	for y in 0..<room.level_data.tiles.height { for x in 0..<room.level_data.tiles.width {
 		cell := grid.Position{x, y}
 		if !tactical_cell_on_screen(renderer, cell) || !tactical_render_visible(renderer, cell) { continue }

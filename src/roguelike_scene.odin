@@ -73,7 +73,6 @@ Roguelike_Session :: struct {
 	show_route_map:          bool,
 	card_interaction:        Card_Interaction_State,
 	gameplay_buffer:         Buffered_Gameplay_Command,
-	beat_chord:              Beat_Chord,
 	reward_hovered_index:    int,
 	reward_skip_hovered:     bool,
 	shop_render_state:       render.Shop_Render_State,
@@ -1041,6 +1040,9 @@ roguelike_update :: proc(data: rawptr, hf: ^host.Frame) {
 			&rs.card_interaction, &rs.gameplay_buffer, rs.frame_time,
 			rs.run_state.phase == .In_Room && !relic_visible && !rs.route_visible && !rs.options.m7_view_smoke,
 			rs.mouse_canvas, rs.mouse_inside, rs.playtest_session_ptr) } else { tactical_input_blocked = true }
+		// A tick move waiting for its diagonal partner never outlives a frame in
+		// which the player's lane is not free.
+		if tactical_input_blocked { clear_gameplay_command_buffer(&rs.gameplay_buffer) }
 	}
 	// The board's characters are living cards, wherever the board is 3D.
 	render.set_living_cards(&rs.iso_renderer, rs.options.scene_3d)
@@ -1487,8 +1489,9 @@ roguelike_update :: proc(data: rawptr, hf: ^host.Frame) {
 		}
 		if !tactical_input_blocked && !rs.smoke_card && !rs.smoke_targeting && !rs.smoke_spatial && !rs.smoke_object && !rs.smoke_content &&
 		   !rs.smoke_encounters && !rs.smoke_miniboss && !rs.smoke_furnace && rs.spell_smoke == .None {
-			// A timed action holds new commands like an animation does: they wait
-			// in the buffer and run when it ends.
+			// The player's own action, its animation or its timed seconds, owns
+			// the input lane: a command pressed now is dropped, never kept for when
+			// the action ends. Only a press made after it acts.
 			rs.timeline_busy = render.renderer_blocks_player_input(&rs.iso_renderer) || game.tactical_player_busy(&rs.room)
 			command, has_command := poll_gameplay_command(
 				&rs.room,
@@ -1496,29 +1499,11 @@ roguelike_update :: proc(data: rawptr, hf: ^host.Frame) {
 				&rs.card_interaction,
 				rs.mouse_canvas,
 				rs.mouse_inside,
-				!rs.timeline_busy && !rs.gameplay_buffer.occupied,
+				!rs.timeline_busy,
 				rs.options.debug_abilities,
 			)
-			if rs.room.phase == .Complete || rs.room.phase == .Defeat {
-				clear_gameplay_command_buffer(&rs.gameplay_buffer)
-				rs.beat_chord = {}
-			} else if rs.timeline_busy {
-				if has_command {
-					beat_stamp(&rs.room, &command)
-					offer_gameplay_command(&rs.gameplay_buffer, command)
-				}
-			} else if buffered, has_buffered := take_gameplay_command(&rs.gameplay_buffer); has_buffered {
-				if has_command {
-					offer_gameplay_command(&rs.gameplay_buffer, command)
-				}
-				commit_gameplay_command(
-					&rs.room,
-					&rs.iso_renderer,
-					&rs.card_interaction,
-					buffered,
-					rs.playtest_session_ptr,
-				)
-			} else if ready, has_ready := beat_input_command(&rs.beat_chord, &rs.room, command, has_command, rs.frame_time); has_ready {
+			if ready, has_ready := route_gameplay_command(&rs.gameplay_buffer, &rs.room, rs.timeline_busy,
+				command, has_command, rs.frame_time); has_ready {
 				commit_gameplay_command(
 					&rs.room,
 					&rs.iso_renderer,

@@ -5,7 +5,7 @@ import game "game"
 import level "level"
 
 @(test)
-test_mechanics_lab_is_an_open_endless_arena_with_only_teslas :: proc(t: ^testing.T) {
+test_mechanics_lab_is_an_open_endless_arena_with_only_shadow_steps :: proc(t: ^testing.T) {
 	data: level.Level
 	defer level.destroy(&data)
 	player, created := game.create_player(DEMO_PLAYER_STATS)
@@ -28,9 +28,9 @@ test_mechanics_lab_is_an_open_endless_arena_with_only_teslas :: proc(t: ^testing
 		}
 	}
 	testing.expect(t, len(room.objects) == 0 && len(room.traps) == 0)
-	// The deck holds Tesla coils and nothing else.
+	// The deck holds Movimento Ombra and nothing else.
 	testing.expect_value(t, player.deck.owned_count, len(MECHANICS_LAB_DECK))
-	for card in player.deck.owned[:player.deck.owned_count] { testing.expect_value(t, card.definition_id, game.Card_Id.Tesla_Coil) }
+	for card in player.deck.owned[:player.deck.owned_count] { testing.expect_value(t, card.definition_id, game.Card_Id.Shadow_Step) }
 	testing.expect(t, player.deck.hand_count > 0)
 }
 

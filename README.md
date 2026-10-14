@@ -97,7 +97,8 @@ l'ultimo nemico ucciso non ripulisce la stanza, e ogni 4 secondi di gioco arriva
 un nemico casuale (Chaser, Archer, Brute, Bomber o Custode) su una casella libera
 ad almeno 4 celle dal giocatore, fino a 6 insieme; un'arena vuota si riempie
 subito. Gli easter egg si riaprono ogni volta. Per ora il mazzo contiene **solo
-Tesla Coil** (8 copie, mano da 5, energia 12). Niente ricompense, uscita o
+Movimento Ombra** (8 copie, mano da 5, energia 12; vedi
+[Movimento Ombra](#movimento-ombra)). Niente ricompense, uscita o
 profilo; `F5` ricomincia, `F10` torna al menu. Arena, mazzo e ritmo degli arrivi
 sono in [mechanics_lab.odin](src/mechanics_lab.odin) e
 [sandbox.odin](src/game/sandbox.odin): per provare una nuova meccanica basta
@@ -106,14 +107,19 @@ cambiare `MECHANICS_LAB_DECK`.
 Le novità nate qui ora valgono in tutto il gioco: le azioni che durano il loro
 costo e la finestra che si accorcia ([Modalità tattica M7](#modalità-tattica-m7)),
 i cartoncini vivi, il cerchio d'azione del Viandante, le intenzioni dei nemici
-con sigilli e terreno, i segnalini di carta e la vita sempre visibile
-([Il tavolo](#il-tavolo-cartoncini-vivi-cerchi-e-segnalini)).
-La prova resta la sandbox in cui provare le prossime.
+con sigilli e terreno, i segnalini di carta e la vita di ogni nemico sempre
+visibile in un cuore di carta sopra la testa
+([Il tavolo](#il-tavolo-cartoncini-vivi-cerchi-e-segnalini)). Anche
+[Movimento Ombra](#movimento-ombra), la carta che si prova qui adesso, è nel
+mazzo iniziale di ogni run tattica. La prova resta la sandbox in cui provare le
+prossime.
 
 **Intenzioni dei nemici (`F6`).** Nel gioco i nemici mostrano cosa stanno per
 fare con sigilli e terreno ([Il tavolo](#il-tavolo-cartoncini-vivi-cerchi-e-segnalini));
-qui `F6` passa fra i quattro modi (sigilli + terreno, sigilli, terreno, le
-etichette di prima) per confrontarli, e il cartello mostra quello attivo.
+qui `F6` passa fra i quattro modi per confrontarli: `SIGILLI + TERRENO`,
+`SIGILLI`, `TERRENO` e `ADESIVI`, cioè il tavolo di prima, con il piccolo
+adesivo dell'intento accanto al cuore del nemico (dove prima c'era l'etichetta
+scura). Il cartello mostra il modo attivo.
 
 **Suoni (solo qui).** La prova ha i suoi effetti sonori: ogni azione di ogni
 personaggio (passi, colpi, ferite, parate, caduta e i telegrafi come la MIRA
@@ -150,7 +156,7 @@ misure e un ascolto di tutta la famiglia, senza toccare il gioco.
 | `--smoke-menu` | cattura `odin_pp_menu.png` dopo 30 frame ed esce |
 | `--animation-speed=2` | velocità delle animazioni ordinarie, fra 0.25x e 4x; non accelera cast o dadi M8 |
 | `--fast` | velocità 4x |
-| `--mechanics-lab` | Prova meccaniche: arena aperta senza fine, mazzo di sole Tesla, nemici che continuano ad arrivare |
+| `--mechanics-lab` | Prova meccaniche: arena aperta senza fine, mazzo di soli Movimento Ombra, nemici che continuano ad arrivare |
 | `--spell-lab` | arena con Firebomb, Fate Strike, Chain Lightning, Sundering Blow e Guard |
 | `--dice-lab` | arena con Fate Strike, Sundering Blow, Prismatic Barrage, Twin Venom e Guard |
 | `--dice-set-lab` | tavolo 3D del set D4/D6/D8/D10/D%/D12/D20: selezione, lancio e rotazione con il mouse |
@@ -219,8 +225,9 @@ al cambio scena. `input.Resume_Gate` è condiviso dagli adattatori delle prove, 
 il primo campione dopo la pausa stabilisce lo stato dei tasti senza generare
 nuove pressioni; il fuoco già tenuto resta bloccato fino al rilascio.
 I singoli giochi possiedono ancora le code delle azioni da consegnare ai tick.
-La run riceve tempo e puntatore da `host.Frame`; quando perde l’input pulisce
-selezioni, buffer e trascinamenti, preservando pulse, QTE e stato del mondo.
+La run riceve tempo e puntatore da `host.Frame`; non tiene comandi in coda e,
+quando perde l’input, pulisce selezioni, trascinamenti e il passo sul secondo
+che aspetta il tasto della diagonale, preservando pulse, QTE e stato del mondo.
 
 ### Scene
 
@@ -330,7 +337,10 @@ abilità, carta e Refocus; una carta con più effetti costa al massimo un pulse.
 La modalità tattica M8, evoluzione di M7, consuma tempo dentro una finestra,
 seguita da un secondo di recupero con movimento libero. Le carte spendono il
 proprio tempo durante il cast, con mondo fermo; i dadi sospendono anche il timer. I QTE possono sospendere un attacco prima del
-danno. I comandi rifiutati non aggiungono costi. Il classico rigenera un'energia
+danno. I comandi rifiutati non aggiungono costi. Nessun comando resta in coda:
+una pressione fatta mentre la propria azione è ancora in corso (la sua
+animazione o, nel tattico, i suoi secondi) viene scartata, e agisce solo una
+pressione fatta dopo. Il classico rigenera un'energia
 per pulse; M7 ne rigenera una ogni tre secondi del mondo, fino al massimo di tre.
 
 Alla morte dell'ultimo nemico la stanza passa a Loot. Ci si può muovere senza
@@ -389,7 +399,9 @@ classico. Lo starter tattico include ora una Shock Floor e una Tesla Coil,
 oltre alle carte già presenti: i nuovi dispositivi possono comparire anche
 fra ricompense e offerte. Include anche il **6** e il **7 di denari**, carte con
 la grafica della Scopa: costano 1, danno 6 e 7 oro e si esauriscono per il resto
-del combattimento; non compaiono fra ricompense e offerte.
+del combattimento; non compaiono fra ricompense e offerte. Infine una copia di
+**[Movimento Ombra](#movimento-ombra)**, che invece si trova anche fra
+ricompense e offerte delle run tattiche.
 
 ### Tre regole del tempo
 
@@ -398,6 +410,7 @@ del combattimento; non compaiono fra ricompense e offerte.
 | Decisione, movimento, targeting, ologramma | scorre; le azioni non-carta aggiungono il proprio costo | avanzano sui beat del mondo |
 | Cast di una carta da `Ns` | scorre per la durata effettiva del cast, senza doppio addebito | fermi, compresa la presentazione nemica già in corso |
 | Dadi / cinematica, pausa, scheda personaggio o attività M9 | fermo | fermi |
+| [Movimento Ombra](#movimento-ombra) | fermo; scorrono solo i 4 s dell'ombra | fermi, comprese le loro animazioni |
 
 Il cast occupa i comandi del player per la durata indicata sulla carta. Un
 lancio di dadi all'interno della carta è una pausa completa aggiuntiva: non
@@ -419,8 +432,10 @@ Ogni volta che il countdown del pulse scocca un secondo intero (per esempio da
 4,35 a 4), un'azione fatta **entro 0,15 s** da quell'istante, prima o dopo, è
 **critica**. Ogni scocco premia una sola azione; i secondi saltati dal costo di
 un'azione non scoccano, e la finestra appena aperta non conta come scocco.
-Un passo premuto in tempo ma accodato dietro l'animazione precedente resta
-critico fino a 0,45 s dopo lo scocco. L'HUD mostra una spia che si accende
+Lo scocco si giudica alla pressione: un passo premuto in tempo resta critico
+anche se parte qualche fotogramma dopo, mentre aspetta (al massimo 0,06 s) il
+secondo tasto della diagonale. Non c'è coda: premuto mentre l'azione precedente
+è ancora in corso, il passo si perde. L'HUD mostra una spia che si accende
 nella finestra; l'azione critica mostra **CRITICO!**. Un passo in linea retta
 resta sempre di una casella e non consuma lo scocco: sul secondo, il critico
 del movimento è solo il passo in diagonale.
@@ -436,6 +451,60 @@ del movimento è solo il passo in diagonale.
 | Carta-dispositivo | danno x1,5 (almeno +2); la Tesla nasce con vita doppia, la Shock Floor con un colpo in più (massimo 5) |
 
 Le regole e i numeri sono in [tactical_beat.odin](src/game/tactical_beat.odin).
+
+### Movimento Ombra
+
+`Movimento Ombra` (rara, energia 3, **0 s** di finestra, senza potenziamenti né
+exhaust) fa sprofondare il Viandante nella propria ombra per **4 secondi
+reali**. Il mondo si ferma del tutto: nemici, intenti e loro tempi, micce,
+dispositivi, impulsi, clock e battiti del mondo, finestra, stordimento e
+recuperi, arrivi della Prova restano esattamente dov'erano (18 s prima, 18 s
+dopo). I 4 secondi partono quando la giocata ha finito di mostrarsi: il
+cartoncino sprofonda, poi la carta va negli scarti e se ne pesca un'altra
+(circa 0,9 s in tutto); fino ad allora, come durante ogni propria azione, una
+pressione si perde, e l'arco sulla pozza e la barra dell'HUD cominciano a
+calare solo quando l'ombra si può muovere. Il
+Viandante è intangibile, nessun danno lo raggiunge, e può solo **muovere
+l'ombra**: niente carte, attacchi, schivate, attese, Refocus o dispositivi. Ogni
+passo dell'ombra dura 0,4 s e parte dalla sua casella con le regole normali del
+movimento (muri, oggetti e nemici bloccano, nessuno viene urtato); una pressione
+durante il passo si perde. L'ombra ha i suoi battiti, a 1, 2 e 3 secondi del suo
+orologio (entro 0,15 s): due tasti premuti su uno di questi fanno il passo in
+diagonale (CRITICO!), come sul secondo del mondo. Allo scadere, appena l'ultimo
+passo è arrivato, il Viandante risale dove si trova l'ombra con un
+teletrasporto: di nuovo tangibile, trappole e fuoco della casella d'arrivo
+mordono come a ogni atterraggio e il magnete raccoglie il bottino vicino; poi il
+mondo riprende, e un colpo annunciato sulla casella lasciata va a vuoto. Giocata
+sul secondo non consuma lo scocco (niente CRITICO né bonus); si può giocare
+anche da storditi, e lo stordimento riprende con gli stessi secondi. Una copia è
+nel mazzo iniziale di ogni run tattica ([tactical_setup.odin](src/tactical_setup.odin))
+e la carta compare fra ricompense e negozio; le run classiche non la offrono e,
+se l'hanno in mano, la rifiutano.
+
+Sul tavolo il cartoncino del Viandante scende sotto il pavimento fino al
+cappuccio, scuro, dentro una pozza d'inchiostro viola che scivola di casella in
+casella; i colori del mondo si spengono, e i suoi cartoncini, sigilli, lampade e
+dispositivi restano nella posa in cui si sono fermati; anche ciò che il mondo
+stava mostrando sul Viandante (un `MANCATO`, una parata, le loro scintille)
+resta dove lui è sprofondato e non segue la pozza. Il bordo della pozza
+segna i secondi rimasti, un anello d'oro si stringe verso ogni battito e si
+accende sopra di esso. L'HUD diventa viola: `OMBRA` con i secondi dell'ombra, la
+loro barra e la spia dei suoi battiti; sotto, la finestra ferma (`FERMO 18.0s`);
+una linea viola si consuma a ogni passo e la riga di stato dice
+`MONDO FERMO / SOLO PASSI / DIAGONALE SUL BATTITO`. La mano scrive
+`OMBRA / SOLO PASSI` e la schivata `OMBRA`. La carta mostra `0s` di tempo,
+`OMBRA 4s / MONDO FERMO` e `INTANGIBILE / SOLO PASSI`. Per non confondersi con
+l'ombra, lo status di Afterimage nell'HUD si chiama ora `SCIA`. Regole in
+[tactical_shadow.odin](src/game/tactical_shadow.odin), quadro in
+[shadow_step.odin](src/render/shadow_step.odin).
+
+Nella Prova meccaniche anche l'ombra si sente
+([lab_sounds.odin](src/render/lab_sounds.odin)): la carta sfila dalla mano e
+una campana si ferma insieme al tempo, il Viandante sprofonda in un'onda
+d'inchiostro, ogni passo dell'ombra è un fruscio morbido (mai gli stivali), la
+diagonale sul battito suona il CRITICO e la risalita finisce con il cartoncino
+posato sulla pietra. Lo smoke `--smoke-mechanics-lab` la gioca dalla mano e la
+filma ([Verifica e smoke test](#verifica-e-smoke-test)).
 
 ### Il tavolo: cartoncini vivi, cerchi e segnalini
 
@@ -498,11 +567,24 @@ restano un attimo e cadono ([living_token.odin](src/render/living_token.odin)).
 Prendono il posto dei riquadri scuri con i numeri; un colpo critico mostra
 ancora CRITICO.
 
-La vita dei nemici è grande e sempre visibile: `HP 12/18` con il massimo, una
-barra con una tacca per punto (una ogni 5 oltre i 30) e un'etichetta che non
-sparisce finché il nemico è sullo schermo. Se il suo posto finisce sotto il
-pannello in alto scende appena sotto, nella Prova meccaniche evita il cartello e
-in mezzo alla folla si mostra comunque. Il riquadro del nemico sotto il mouse
+La vita dei nemici è un **cartellino di carta** sopra la testa, tagliato e
+inchiostrato come i segnalini: un cuore rosso e `12/18` (la vita sul massimo)
+nelle stesse cifre a pixel ([living_heart.odin](src/render/living_heart.odin)).
+Resta sempre visibile finché il nemico è sullo schermo: lascia libero l'angolo
+del sigillo, sale di una riga sopra un altro cartellino, si sposta di lato
+invece di coprire il Viandante e, se la testa finisce sotto il pannello in alto
+o sotto il cartello della Prova, scende appena sotto, ma mai oltre i piedi del
+nemico: se anche i piedi sono lì sotto, il cartellino resta al suo posto,
+coperto con lui. In mezzo alla folla prende il posto libero più vicino al suo;
+se non ce n'è, si sovrappone agli altri cartellini dove ne copre meno, ma mai a
+un sigillo, a un pannello o a un'etichetta. Il pixel raddoppia quando la
+telecamera è vicina.
+Prende il posto delle etichette scure sopra i nemici (la piastra nera con `HP 18/18`, la
+riga colorata dell'intento come `MUOVE / 2.8s` e la barra rossa): l'intento si
+legge da sigilli e terreno, lo scudo dall'anello e dal numero ai piedi, e le
+etichette scure restano solo per bombe, micce e uscita. Sui tavoli
+senza sigilli (`--flat`, i modi terreno e adesivi di `F6`) l'adesivo
+dell'intento sta accanto al cuore. Il riquadro del nemico sotto il mouse
 resta visibile anche durante le animazioni e mentre la telecamera scorre con il
 mouse fermo; lascia il posto solo alla difesa.
 
@@ -811,7 +893,7 @@ odin run src -o:none -- --classic
 | `--smoke-m7-view` | prova grafica di scena, oggetti 3D, fog, ologramma, QTE e menu |
 | `--smoke-m8-view` | prova 3D di d4, dispositivi, offerta del ring, equipaggiamento, scheda personaggio, tag match e cambio stanza |
 | `--smoke-western` | nuvoletta 6 RANCH 7: apertura automatica, volo delle carte, insegna, porte, corsa a tempo e premio |
-| `--smoke-mechanics-lab` | Prova meccaniche: arena aperta, mano di sole Tesla, ring riaperto, arrivi fino al massimo, ultima uccisione senza fine del combattimento, cartoncino del giocatore di nuovo in piedi dopo morte e riavvio, cartoncini vivi (un passo e un attacco fotogramma per fotogramma), cerchi d'azione e segnalini di danno e cura, e i suoni che ogni azione mette in coda (passo, colpo, ferita, caduta, cura, battito, stordimento: senza dispositivo audio, li conta) |
+| `--smoke-mechanics-lab` | Prova meccaniche: arena aperta, mano di soli Movimento Ombra, ring riaperto, arrivi fino al massimo, ultima uccisione senza fine del combattimento, cartoncino del giocatore di nuovo in piedi dopo morte e riavvio, cartoncini vivi (un passo e un attacco fotogramma per fotogramma), cerchi d'azione e segnalini di danno e cura, i suoni che ogni azione mette in coda (passo, colpo, ferita, caduta, cura, battito, stordimento: senza dispositivo audio, li conta) e infine un Movimento Ombra giocato dalla mano: finestra e clock del mondo fermi per tutta l'ombra, quattro passi dell'ombra con una diagonale sul suo primo battito, risalita sull'ultima casella dell'ombra, nessun passo del Viandante fra i suoni e tutti quelli dell'ombra (carta, sprofondare, passi, CRITICO, battiti, risalita) |
 | `--smoke-m9-view` | arena continua, duello con IA, presa in quattro pose, replay e FPS con ricarica e vittoria |
 
 Gli smoke classici e i laboratori `--spell-lab` / `--dice-lab` conservano il comportamento classico;
@@ -859,8 +941,10 @@ transizione usa il tempo della presentazione e non modifica pulse, timer,
 RNG o regole dell'ologramma. I blocchi hanno ombre di contatto corte sul
 pavimento, senza una shadow map aggiuntiva.
 
-Salute e intento condividono una targhetta; le micce e gli annunci delle
-bombe usano lo stesso posizionamento per evitare sovrapposizioni fra testi.
+La vita di ogni nemico è un cuore di carta sopra la testa, l'intento un sigillo
+e il terreno ([Il tavolo](#il-tavolo-cartoncini-vivi-cerchi-e-segnalini)); cuori,
+sigilli, micce, annunci delle bombe e segnalini usano lo stesso posizionamento
+per evitare sovrapposizioni fra testi.
 Gli indicatori degli status mantengono la propria zona sul terreno. Le
 etichette restano dentro la zona della scena e usano un collegamento sottile
 quando devono spostarsi. L'HUD tiene gli status separati dai contatori.
@@ -920,8 +1004,10 @@ come confronto:
 
 Gli avvisi sul pavimento sono leggibili anche quando il lanciatore è fuori
 vista: segnalano l'impatto nella zona visibile senza scoprire il nemico.
-Mira, preparazione, lancio, recupero, fendente, carica e protezione hanno etichette
-distinte. L’hover su un nemico visibile mostra il suo ruolo e come rispondere.
+Mira, preparazione, lancio, recupero, fendente, carica e protezione hanno
+pittogrammi e colori distinti nei sigilli e sul terreno. L’hover su un nemico
+visibile ne scrive l'intento con i secondi rimasti (`MUOVE / 2.8s`), il ruolo e
+come rispondere.
 Lo stordimento nasconde le minacce dell’intento interrotto, ma non disinnesca
 esplosivi già presenti. Questi valori sono un primo bilanciamento da provare durante le run,
 anche mentre il player si muove durante il recupero.
@@ -939,10 +1025,13 @@ dal **costo temporale**, centralizzato in `game/tactical_action_cost.odin`:
 | Strike, Arc Bolt, Shove, Dash, Grappling Hook, Venom Needle, Fate Strike, Tesla Coil | 2 s |
 | Piercing Ray, Cross Slash, Heavy Blow, Sundering Blow, Twin Venom, Shock Floor, Titan Grip | 3 s |
 | Firebomb, Toxic Wave, Caustic Bloom, Chain Lightning, Prismatic Barrage, Storm Crown | 4 s |
+| [Movimento Ombra](#movimento-ombra) | 0 s: i suoi 4 s reali stanno fuori dalla finestra |
 
 Le carte mostrano la durata `Ns`: il cast spende quei secondi una sola volta,
-progressivamente, e ferma il mondo. Le altre azioni sottraggono subito il costo
-aggiuntivo e possono far maturare beat. Anche Spark a energia zero costa tempo.
+progressivamente, e ferma il mondo. Movimento Ombra mostra `0s`: non ha cast, la
+carta di rimpiazzo arriva subito e la finestra resta ferma per tutta l'ombra.
+Le altre azioni sottraggono subito il costo aggiuntivo e possono far maturare
+beat. Anche Spark a energia zero costa tempo.
 La schivata base rimane accessibile fuori recupero, senza richiedere carte.
 
 | Carta M7 | Energia | Effetto base / ruolo |
@@ -963,6 +1052,7 @@ La schivata base rimane accessibile fuori recupero, senza richiedere carte.
 | Purifying Guard | 1 | 3 Shield per 2 secondi e rimuove Poison |
 | Volatile Study | 2 | crea 1 Spark, pesca fino a 2 carte; Exhaust |
 | Toxic Wave | 2 | Poison 1 per 3 secondi ai nemici visibili entro raggio Chebyshev 2 (5×5) |
+| Movimento Ombra | 3 | 4 secondi reali nell'ombra: mondo e finestra fermi, intangibile, solo passi dell'ombra da 0,4 s (diagonale sui suoi battiti); risale sull'ultima casella dell'ombra. 0 s di finestra, giocabile anche da storditi |
 
 Afterimage mantiene il bypass del recupero della schivata e lo Shield dopo il
 movimento. Calculated Risk, Spark, Firebomb, Caustic Bloom e le formule delle
@@ -995,7 +1085,9 @@ il numero massimo di carte scritto. Upgrade e keyword mantengono le policy esist
 
 Nel tattico `C` è riservato alla diagonale; l’equipaggiamento si usa con il mouse. Gli shortcut di debug delle abilità
 restano disponibili integralmente in modalità classica. I comandi ordinari
-sono sospesi durante cast, dadi, QTE, ologramma e pausa. I movimenti e le animazioni dei
+sono sospesi durante cast, dadi, QTE, ologramma e pausa; dentro
+[Movimento Ombra](#movimento-ombra) `WASD` muove soltanto l'ombra e tutto il
+resto tace. I movimenti e le animazioni dei
 nemici non bloccano movimento, carte o targeting del player. Durante il recupero
 rimane disponibile la camminata ordinaria; carte, attacchi, refocus, schivata
 attiva e diagonali sono sospesi. Le difese QTE restano disponibili secondo le
@@ -1006,10 +1098,11 @@ che può contenere più azioni. Il countdown scorre mentre si decide. Movimento,
 attacco, attesa, refocus, attivazione ed equipaggiamento **durano in tempo reale
 il loro costo** (`Tactical_Config.timed_actions`): un passo da 1 s occupa il
 Viandante per un secondo, mentre il countdown e i nemici scorrono come sempre (un
-battito al secondo). I comandi premuti nel frattempo aspettano in coda e partono
-alla fine; la schivata invece interrompe subito l'azione, e la fine della
-finestra chiude anche l'azione in corso. L'HUD mostra **AZIONE** con una linea
-dorata che si consuma. Con le regole di base (`DEFAULT_TACTICAL_CONFIG`, usate
+battito al secondo). Un comando premuto nel frattempo viene **scartato**, mai
+tenuto da parte per dopo: agisce solo una pressione fatta a fine azione. La
+schivata (`Shift + WASD`) invece non aspetta e interrompe subito l'azione, e la
+fine della finestra chiude anche l'azione in corso. L'HUD mostra **AZIONE** con
+una linea dorata che si consuma. Con le regole di base (`DEFAULT_TACTICAL_CONFIG`, usate
 dalle sonde di regressione) il costo si sottrae invece subito. Una carta avvia
 un cast di `Ns`: durante questi
 secondi il countdown scende, il mondo resta fermo e il costo non viene sottratto
@@ -1022,8 +1115,9 @@ Ogni secondo matura un beat: agiscono solo i nemici giunti alla propria scadenza
 poi avanzano status, micce, recuperi e dispositivi. I cast non accumulano beat
 arretrati da recuperare tutti insieme. Gli intenti restano fissati fino alla
 scadenza. Energia: +1 ogni 3 secondi del mondo, entro il massimo. Il rimpiazzo
-della carta si pesca al termine del cast se Combat continua; non serve un beat
-nemico aggiuntivo. La velocità delle animazioni non altera questi contratti.
+della carta si pesca al termine del cast se Combat continua (subito, per una
+carta da 0 s); non serve un beat nemico aggiuntivo. La velocità delle animazioni
+non altera questi contratti.
 
 Solo allo zero dell'intera finestra parte un **recupero di 1 secondo di tempo
 attivo**. Si può camminare senza costo temporale aggiuntivo: i passi non
@@ -1049,14 +1143,20 @@ la finestra una sola volta, dopo la risoluzione del tempo già pagato; il second
 di recupero trascorre realmente, senza aggiungere una Wait o beat immediati.
 
 Dadi, QTE, pausa, scheda personaggio, attività M9 e perdita del focus sospendono il
-countdown dell’arena. Cast, movimento, animazioni nemiche, hover, targeting e
+countdown dell’arena; Movimento Ombra lo ferma per i suoi 4 secondi. Cast,
+movimento, animazioni nemiche, hover, targeting e
 ologramma consumano tempo; durante il cast sono sospesi mondo e input ordinari.
 Consultare la mappa
 lascia avanzare anche i nemici, senza reset. Un input sullo stesso frame di un
 beat viene eseguito subito dopo la risoluzione logica, mentre l’animazione nemica
-prosegue. La propria animazione riserva il prossimo comando del player: durante il movimento una nuova pressione viene conservata
-una sola volta. Durante cast e cinematiche il vecchio buffer viene invece
-svuotato, evitando azioni involontarie al termine della carta. Il targeting
+prosegue. L'azione del player (la sua animazione, i suoi secondi o il passo
+dell'ombra) occupa invece il suo input: una pressione fatta nel frattempo viene
+scartata, non conservata, e solo una nuova pressione a fine azione agisce.
+Lo stesso per cast e cinematiche: al termine della carta non parte nessuna
+azione involontaria. L'unico input che aspetta qualche fotogramma è il passo
+premuto sul secondo, in attesa del tasto della diagonale; ogni confine (fine
+della finestra, QTE, pausa, mappa, schivata, perdita del focus, nuova stanza) lo
+lascia cadere. Il targeting
 delle carte sopravvive ai beat autonomi,
 ma viene chiuso da timeout o QTE. Anche il recupero avanza durante le animazioni
 e la consultazione dell'ologramma; QTE, pausa e perdita del focus lo sospendono.
@@ -1135,7 +1235,7 @@ le immagini sono output rigenerabili, non prerequisiti del checkout.
 | `--smoke-arenas-view` | quattro fasce di arene reali, combattimento, ologramma, Loot e cambio stanza; screenshot `odin_pp_arenas_*.png` |
 | `--smoke-m8-view` | dispositivi con APRI IL RING, campo, tag match, ritorno Loot: `odin_pp_m8_d4.png`, `devices`, `mega_combo`, `character`, `loot`, `tag_ring`, `next_room` (tutti con prefisso `odin_pp_m8_` e suffisso `.png`) |
 | `--smoke-western` | 6 RANCH 7 dalla mano al premio: `odin_pp_western_hand.png`, `cards`, `sign`, `gate`, `riders`, `ride`, `grab`, `win`, `reward` (prefisso `odin_pp_western_`) |
-| `--smoke-mechanics-lab` | sandbox: `odin_pp_mechanics_lab.png`, `_square`, `_full`, `_refill`, `_restart`, `_stun`, `_pause`, `_defeat` (prefisso `odin_pp_mechanics_lab`); cartoncini vivi: `odin_pp_living_move_00.png`–`_37` e `odin_pp_living_attack_00.png`–`_37`, un'immagine ogni due fotogrammi; modi degli intenti nemici (F6): `odin_pp_living_intents_0_00.png`–`_3_39` (0 sigilli + terreno, 1 sigilli, 2 terreno, 3 etichette), ogni tre; segnalino di cura: `odin_pp_living_heal_00.png`–`_39`, ogni due |
+| `--smoke-mechanics-lab` | sandbox: `odin_pp_mechanics_lab.png`, `_square`, `_full`, `_refill`, `_restart`, `_stun`, `_pause`, `_defeat` (prefisso `odin_pp_mechanics_lab`); cartoncini vivi: `odin_pp_living_move_00.png`–`_37` e `odin_pp_living_attack_00.png`–`_37`, un'immagine ogni due fotogrammi; modi degli intenti nemici (F6): `odin_pp_living_intents_0_00.png`–`_3_39` (0 sigilli + terreno, 1 sigilli, 2 terreno, 3 adesivi), ogni tre, e lo stesso istante con un colpo in arrivo nei modi 0 e 3 (`odin_pp_living_intent_both.png`, `_labels`); segnalino di cura: `odin_pp_living_heal_00.png`–`_39`, ogni due; Movimento Ombra dalla mano: `odin_pp_living_shadow_00.png`–`_82` (sprofonda, quattro passi dell'ombra con la diagonale sul primo battito, risale), ogni quattro |
 | `--smoke` | `odin_pp_isometric.png` |
 | `--smoke-generation` | `odin_pp_procedural_room.png` |
 | `--smoke-map` | `odin_pp_route.png` |
@@ -1195,7 +1295,7 @@ una sola volta, isolamento della pratica e chiusura senza click-through.
 | [src/view](src/view) | scaling, camera e proiezione testabili |
 | [src/render](src/render) | renderer Raylib, snapshot e timeline |
 | [src/combatdebug](src/combatdebug) | observer, scenari headless e report |
-| [src/gameplay_input.odin](src/gameplay_input.odin) | comandi logici, buffer e dispatcher |
+| [src/gameplay_input.odin](src/gameplay_input.odin) | comandi logici, fase d'origine e l'unico input in attesa (il passo sul secondo che aspetta la diagonale, [beat_input.odin](src/beat_input.odin)) |
 | [src/runtime_options.odin](src/runtime_options.odin) | opzioni della sessione |
 | [src/m8_session.odin](src/m8_session.odin) | scheda personaggio, ingresso/ritorno dalle attività, ricevuta del ring e persistenza degli sblocchi |
 | [src/m9_session.odin](src/m9_session.odin) | proprietario di input/clock della modalità libera, pause, cursore, preset delle mosse e registrazione/replay |
@@ -1545,9 +1645,12 @@ scalano automaticamente.
 
 Lo starter deck ha dieci carte: Strike, Arc Bolt, Piercing Ray, Shove,
 Firebomb, Guard, Toxic Wave, Thorn Coat, Afterimage e Dash.
-La demo M7 sostituisce Arc Bolt con **Fate Strike**, Piercing Ray con
-**Heavy Blow** e Toxic Wave con **Battle Focus**, per provare subito dadi,
-interruzione e ricognizione. Dieci carte e mano mescolata, senza pesca garantita.
+La run tattica ([tactical_setup.odin](src/tactical_setup.odin)) sostituisce Arc
+Bolt con **Fate Strike**, Piercing Ray con **Heavy Blow** e Toxic Wave con
+**Battle Focus**, per provare subito dadi, interruzione e ricognizione, e
+aggiunge una Shock Floor, una Tesla Coil, il 6 e il 7 di denari e un
+**Movimento Ombra**: quindici carte. Il classico resta a dieci. In entrambi la
+mano è mescolata, senza pesca garantita.
 `begin_deck_combat` copia owned nel draw, imposta `combat_card_id_floor`,
 mescola e pesca cinque carte. Fisher–Yates usa uno xorshift64* locale separato
 dagli RNG della run. Si pesca dalla fine del draw in fondo alla mano; quando
@@ -1611,7 +1714,8 @@ il cleanup resta committed.
 `Hand_Refocused` precede un `Card_Refocused` per ogni carta originale,
 compreso `Hand -> Hand` per Retain; seguono pulse, raccolta e refill.
 Questi eventi non sono intercambiabili con Card_Moved senza normalizzare la
-causa. F può essere bufferizzato durante la timeline, il pulsante è disabilitato.
+causa. Durante la timeline del player il pulsante è disabilitato e `F` premuto
+si perde: non resta in coda.
 
 ### Catalogo delle carte
 
@@ -1647,6 +1751,7 @@ completi restano in `CARD_DEFINITIONS`; l'upgrade è disponibile solo se
 | `Volatile_Study` | Rare | 2 | player, None | Ethereal; crea 1 `Spark`, pesca 1 + upgrade, poi exhaust |
 | `Sei_Denari` | starter, mai offerta | 1 | player, None | +6 oro; exhaust on play. Con il 7 in mano apre 6 RANCH 7 |
 | `Sette_Denari` | starter, mai offerta | 1 | player, None | +7 oro; exhaust on play. Con il 6 in mano apre 6 RANCH 7 |
+| `Shadow_Step` (Movimento Ombra) | Rare, starter tattico | 3 | player, None | solo tattica: 4 s reali nell'ombra; mondo, nemici, finestra e stordimento fermi; intangibile; solo passi dell'ombra (diagonale sui suoi battiti); risale sull'ultima casella. 0 s di finestra, senza upgrade. Il classico non la offre e la rifiuta (`Invalid_Phase`) |
 
 ## Spell e dadi
 
@@ -2125,32 +2230,45 @@ durata della carta: dadi esclusi dal costo, cast e dadi non accelerabili con F4.
 0.25x–4x scala invece il delta, viene conservata fra stanze/restart e non cambia
 il gameplay. Corpi animati usano un clock cosmetico; clip evento seguono il cue.
 
-### Buffer e transizioni
+### Input senza coda e transizioni
 
-Nel classico e nelle brevi azioni di movimento il buffer ha capacità **uno**,
-politica first-wins: durante una timeline si
-conserva il primo comando discreto e si scartano i successivi. Alla fine viene
-estratto una volta e rivalidato contro Room e fase d'origine. Memorizza valori
-logici e ID, mai puntatori o indici visuali. Un Move nato in Combat non diventa
-implicitamente un Move in Loot. Tenere un tasto premuto non genera repeat.
+**Nessun comando resta in coda**, in nessuna modalità (classico, tattico, Prova
+meccaniche e laboratori: `route_gameplay_command` in
+[beat_input.odin](src/beat_input.odin)). Mentre è in corso l'azione del player
+stesso, cioè la sua animazione nella timeline, i secondi di un'azione a tempo o
+il passo da 0,4 s dell'ombra di [Movimento Ombra](#movimento-ombra), una
+pressione viene scartata; agisce solo una pressione fatta dopo la fine
+dell'azione. Il poll continua a girare, così hover, `Esc` e l'annullamento del
+drag rispondono, ma il suo comando non viene tenuto. La schivata `Shift + WASD`
+che interrompe un'azione a tempo è una regola del gioco, non una coda. L'unico
+input che attraversa qualche fotogramma è il passo premuto sul secondo, che
+aspetta al massimo `BEAT_CHORD_SECONDS` (0,06 s) il tasto perpendicolare della
+diagonale: vive in `Buffered_Gameplay_Command`, e ogni confine che svuota
+quella struttura (controller bloccato, fine della finestra, QTE, pausa, mappa,
+schivata o diagonale, perdita del focus, restart, nuova stanza, schermate) lo
+lascia cadere. I comandi portano valori logici e ID, mai puntatori o indici
+visuali, e la fase d'origine: un Move nato in Combat non diventa implicitamente
+un Move in Loot. Tenere un tasto premuto non genera repeat.
 
 Nel classico, mentre lo snapshot è arretrato, drag, drop, click spaziali, range
-e intenti a terra sono sospesi; il drag attivo si annulla. La tastiera può bufferizzare
-comandi discreti, con slot risolti contro la mano visibile: una carta pescata
-non è disponibile prima del relativo cue. Nuove selezioni spaziali aspettano
-che timeline e buffer siano idle. Nel tattico la timeline dei nemici non blocca
-le azioni del player: cast, cinematiche e QTE mantengono gate espliciti e
-cancellano il buffer precedente. La camera resta indipendente.
+e intenti a terra sono sospesi; il drag attivo si annulla. Gli slot della
+tastiera si risolvono contro la mano visibile: una carta pescata non è
+disponibile prima del relativo cue. Nuove selezioni spaziali aspettano che la
+timeline sia idle. Nel tattico la timeline dei nemici non blocca le azioni del
+player: cast, cinematiche e QTE mantengono gate espliciti. La camera resta
+indipendente.
 
 `finish_room` e le schermate Reward, Victory e Defeat aspettano l'ultimo cue.
-Restart, nuova stanza e cambio schermata svuotano timeline e buffer; anche
-l'apertura manuale della mappa richiede idle e cancella il vecchio contesto.
+Restart, nuova stanza e cambio schermata svuotano la timeline e lasciano cadere
+il passo in attesa; anche l'apertura manuale della mappa richiede idle e
+cancella il vecchio contesto.
 
 ### Diagnostica ed estensioni
 
 Timeline e log hanno 416 slot; lo snapshot conserva 32 nemici, 64 trappole,
 32 oggetti e 96 drop (oro, cura e arma per ciascuno dei 32 nemici). `dropped_count` segnala perdite; `update_failures`
-segnala eventi non applicabili. Il buffer espone offered, dropped e consumed.
+segnala eventi non applicabili. Lo snapshot `F8` mostra anche il passo in
+attesa della diagonale (`chord_active`, `chord_direction`, `chord_timer`).
 Controllare lo stato intermedio dei cue nei test: la convergenza finale può
 nascondere errori nell'ordine visuale.
 
@@ -2158,14 +2276,15 @@ Per un evento nuovo: payload sufficiente, mapping esaustivo a cue, durata,
 mutazioni start/finish, interpolazione, disegno e verifica di ordine e delta
 in eccesso. Il renderer non deve recuperare payload mancanti dalla Room futura.
 Per un comando nuovo: kind e payload stabili, polling senza mutazioni,
-API autorevole, criterio committed, snapshot e rivalidazione del buffer.
+API autorevole, criterio committed, snapshot e fase d'origine
+(`gameplay_command_is_valid`).
 
 | Sintomo | Controllo |
 |---|---|
 | salto visivo / danno su entità scomparsa | ordine eventi, ID, payload from/to, start/finish, update_failures |
 | ultimo feedback tagliato | guardia timeline idle prima della transizione |
-| input perso | slot già occupato e contatori first-wins |
-| comando vecchio nella stanza nuova | reset del buffer |
+| input perso | premuto durante la propria azione (scartato per regola) o a controller bloccato: `player_animation_blocks_input`, fase e timeline nello snapshot `F8` |
+| comando vecchio nella stanza nuova | passo in attesa della diagonale non lasciato cadere a quel confine (`clear_gameplay_command_buffer`) |
 | preview diversa dall'esito | targeting attivo su snapshot arretrato |
 | coda incompleta | dropped_count e budget eventi |
 
@@ -2298,7 +2417,7 @@ Sorgenti: [telemetry.odin](src/combatdebug/telemetry.odin),
 [session.odin](src/combatdebug/session.odin), [report.odin](src/combatdebug/report.odin),
 [kiting.odin](src/combatdebug/kiting.odin) e [playtest_session.odin](src/playtest_session.odin).
 
-Il dispatcher condiviso da input diretto e bufferizzato cattura uno snapshot
+Il dispatcher condiviso da input, controller e driver di prova cattura uno snapshot
 pre-comando e un descrittore della carta, esegue l'API autorevole e passa
 esito e Room finale a `observe_command_detailed`. Il tipo è esplicito:
 un Move contro un nemico viene classificato Bump_Attack prima della risoluzione,
@@ -2533,7 +2652,7 @@ invarianti e descritta dalla documentazione. Stati: `[x]` completata,
 
 | Milestone | Stato | Risultato / lavoro restante |
 |---|---|---|
-| Baseline | [x] | loop della run, griglia, azioni, deck, intenti, timeline e buffer |
+| Baseline | [x] | loop della run, griglia, azioni, deck, intenti, timeline e input |
 | M1 + M1A | [x] | stanze procedurali, quattro famiglie, placement tattico, seed e commit transazionale |
 | M2 | [x] | rarità, reward pesate, upgrade, rimozione e Shop |
 | M3 | [x] | nodi Shop, Rest, Event e Treasure con distribuzione e scelte one-shot |
@@ -2671,24 +2790,32 @@ quelle nuove, con e senza assert.
 
 ### Stabilità input e verifica del blocco persistente
 
-La revisione del 9 ottobre distingue due problemi. È riprodotta e corretta
-la **pressione WASD persa durante la timeline M7**: il controller ritornava
-prima che il poll ordinario potesse leggerla. Ora conserva al massimo un
-passo nella stessa fase Combat/Loot, attraversando le continuazioni del
-pulse normale. L'ingresso nel recupero scarta il vecchio buffer ma permette
-un nuovo passo nello stesso frame; durante il recupero i nuovi passi restano
-validi. QTE, cambio fase, ologramma, pausa e perdita del focus annullano il
-buffer; non esiste uno sblocco forzato.
-La regressione è stata verificata fallire prima della correzione.
+La revisione del 9 ottobre distingueva due problemi. Il primo era la
+**pressione WASD persa durante la timeline M7**: il controller ritornava
+prima che il poll ordinario potesse leggerla. La correzione di allora la
+conservava (al massimo un passo nella stessa fase Combat/Loot); dal 14 ottobre
+la regola è l'opposto e vale in tutto il gioco: **nessun comando resta in
+coda**. Il passo conservato partiva da solo alla fine dell'azione, e chi
+premeva più volte si trovava azioni in più; ora una pressione fatta durante la
+propria azione (animazione, secondi dell'azione o passo dell'ombra) viene
+scartata e agisce solo una pressione successiva
+([Input senza coda e transizioni](#input-senza-coda-e-transizioni)). Resta solo
+il passo premuto sul secondo, che aspetta per 0,06 s il tasto della diagonale:
+QTE, fine della finestra, cambio fase, ologramma, pausa e perdita del focus lo
+lasciano cadere, e non esiste uno sblocco forzato. L'ingresso nel recupero
+permette un nuovo passo nello stesso frame; durante il recupero i nuovi passi
+restano validi.
 
 Il **blocco persistente anche con nuove pressioni** segnalato nel playtest
-non è ancora riprodotto: non è corretto considerarlo risolto dal buffer.
+non è ancora riprodotto: non va considerato risolto né dalla coda di allora né
+dalla sua rimozione.
 Il successivo pass grafico è stato richiesto separatamente: i nuovi feedback
 leggono la timeline esistente e non introducono timer di blocco o fasi logiche.
 Quando si verifica, premere **F8** prima di riavviare: viene creato un file
 esclusivo `odin_pp_input_N.txt` nella directory di avvio (massimo 8 KiB per
 cattura, 256 file). Contiene seed, nodo, fasi logiche e mostrate, focus,
-pausa, QTE, clock, pulse, cursore/tempo della timeline, drag, buffer e
+pausa, QTE, clock, pulse, cursore/tempo della timeline, drag, il passo in
+attesa della diagonale (`chord_active`, `chord_direction`, `chord_timer`) e
 collisioni delle quattro celle vicine. Ripetere F8 dopo una nuova pressione
 WASD consente di confrontare gli stati. La cattura non modifica il gioco.
 Per una traccia di ogni input durante lo sviluppo:
@@ -2697,9 +2824,19 @@ Per una traccia di ogni input durante lo sviluppo:
 odin run src -o:none -define:M7_INPUT_TRACE=true
 ```
 
-Le regressioni di `tactical_controller_test.odin` verificano il buffer e i
-suoi confini; `tactical_liveness_test.odin` attraversa controller e timeline
-frame per frame, con timestep regolari/irregolari, velocità 1×/4×, QTE,
+Le regressioni di `gameplay_input_test.odin` e `tactical_controller_test.odin`
+fanno passare ogni pressione per una copia della corsia della scena
+(presentazione, controller, scarto dell'input nei fotogrammi che il controller
+tiene per sé, poi il comando con lo stesso stato "occupato" della scena) e
+verificano che una pressione durante la propria azione si perda invece di
+accodarsi, senza che il controller ne tenga nulla da parte, premendo a ogni
+fotogramma: per tutto il secondo di un passo in combattimento, per tutto il
+turno di un passo con `--classic` (la stessa corsia di `--spell-lab` e
+`--dice-lab`) e per tutto un passo del loot. Verificano anche che la schivata
+interrompa ancora l'azione e che il passo in attesa della diagonale cada a ogni
+confine; `shadow_controller_test.odin` fa lo stesso dentro l'ombra di Movimento
+Ombra. `tactical_liveness_test.odin` attraversa controller e timeline frame per
+frame, con timestep regolari/irregolari, velocità 1×/4×, QTE,
 recuperi ripetuti. Verifica inoltre tre finali di fight (parry, veleno durante
 recupero, parry durante recupero), Loot, reward e
 movimento nella nuova stanza. Un harness esplorativo temporaneo ha provato
@@ -2708,8 +2845,11 @@ Refocus, senza stalli; questo non dimostra l'assenza del bug segnalato.
 
 Lo smoke grafico include `m7_polish_smoke.odin`: movimento che dimentica la
 vecchia zona visibile, uccisione reale con Piercing Ray, transizione luminosa,
-sette passi nel loot con raccolta del drop, reward, stanza successiva e nuovo
-movimento, verificando reset di luce/fog e assenza di errori di timeline.
+sette passi nel loot con raccolta del drop (durante il primo, `D` premuto a
+ogni fotogramma passa per la corsia della scena e si perde: il giocatore resta
+fermo finché un nuovo tasto non lo muove di una casella), reward, stanza
+successiva e nuovo movimento, verificando reset di luce/fog e assenza di
+errori di timeline.
 Salva `odin_pp_m7_polish_combat.png`, `odin_pp_m7_polish_loot.png` e
 `odin_pp_m7_polish_next_room.png`. L'automazione nativa macOS non ha consegnato
 tasti/clic a Raylib neppure nel menu iniziale: il playtest automatizzato in
@@ -2745,7 +2885,7 @@ anche sotto l'ancoraggio. Due regressioni coprono bordo superiore e folla.
 salti, flash di danno, scudi esagonali, rune, interruzioni, proiettili e
 frammenti d'impatto. Gli effetti sono locali, limitati a 32 cue simultanee,
 senza particelle persistenti o aggiornamenti di gameplay. I badge condividono
-l'allocatore di salute/intenti/bombe e, se spostati, hanno un collegamento
+l'allocatore di cuori, sigilli e bombe e, se spostati, hanno un collegamento
 al bersaglio. Le carte mostrano cornici metalliche, gemme energia, sigilli
 rarità e feedback di selezione; a otto carte i dettagli lunghi restano
 consultabili nell'ispettore. Layout e hitbox della mano non cambiano.

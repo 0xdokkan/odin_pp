@@ -103,6 +103,13 @@ draw_tactical_actor_bases :: proc(renderer: ^Renderer) {
 		if renderer.tactical.flipbook.loaded { draw_flipbook_stand(renderer, key, actor.position, GOTHIC_RED, actor.entity) }
 	}
 	if !snapshot.player.visible { return }
+	// In the shadow the pool takes the stand's place while the card is under
+	// the floor; out of it (casting before it sinks, or sprung out at the end
+	// of the rise) the card keeps its stand.
+	if tactical_shadow_showing(renderer) {
+		draw_tactical_shadow_pool(renderer)
+		if tactical_shadow_depth(renderer, game.PLAYER_ENTITY) > 0 { return }
+	}
 	at, _ := living_card_position(renderer, game.PLAYER_ENTITY, .Player, snapshot.player.position)
 	p := rl.Vector3{at.x+0.5, 0.05, at.y+0.5}
 	draw_tactical_actor_shadow(p)

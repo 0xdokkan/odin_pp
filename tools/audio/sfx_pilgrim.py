@@ -14,7 +14,10 @@ His identity, shared by every recipe below:
     follow the card's real travel curve (the runtime's back-out
     "shove"/"dash" easing), fading as the card comes to rest;
   - his BODY taking or giving a blow: an unpitched, band-limited noise mass
-    (60-250 Hz) over a short sub, never a ringing tone.
+    (60-250 Hz) over a short sub, never a ringing tone;
+  - his SHADOW (Movimento Ombra) is ink: dark, soft noise (brown and pink, no
+    grit, no hiss) through a band that sinks, slips and swells up, thickened
+    by a slow uneven swirl, as a viscous liquid moves.
 Every action combines these differently, so they read as one person while each
 move stays distinct. Recipes are dry; the build adds the stone hall.
 """
@@ -363,6 +366,25 @@ def _coin(seed, base, tau=0.09, dur=0.35):
     ring = _modes(dur, modes, seed=seed)
     tick = _band(white(dur, seed + 1), 3000, 12000) * _env_ad(dur, 0.0002, 0.0005)
     return _norm(ring) + 0.4 * _norm(tick)
+
+
+def _path(dur, points):
+    """A frequency path (Hz per sample) through (time_s, Hz) points, gliding
+    evenly in pitch between them."""
+    ts, fs = zip(*points)
+    return np.exp(np.interp(time_axis(dur), ts, np.log(fs)))
+
+
+def _ink(dur, seed, env, centers, q=0.8, swirl=0.4):
+    """His shadow's ink: dark soft noise through a band whose centre follows
+    `centers` (Hz per sample), its level following `env`, thickened by a slow,
+    uneven swirl (a viscous liquid moving); never bright, never gritty."""
+    n = n_samples(dur)
+    e = pad_to(np.asarray(env, float), dur)
+    src = brown(dur, seed) + 0.7 * pink(dur, seed + 1)
+    turn = 1 - swirl * (0.5 + 0.5 * _norm(lowpass(white(dur, seed + 2), 9, 2)))
+    body = _track(src, centers, q) * turn
+    return _norm(body)[:n] * e / (np.max(e) + 1e-9)
 
 
 def _ward(dur, notes, attack=0.012, tau=0.3, trem=6.0, depth=0.3, detune=1.4, seed=0):
@@ -801,5 +823,83 @@ def pilgrim_death(seed):
         (0.78, roll, 0.16), (0.78, rumble, 0.10),
         (0.80, gutter, 0.8), (0.80, puffs, 0.18),
         (0.90, resettle, 0.15), (0.90, rpaper, 0.06),
+    ])
+    return _finish(x, D, tail=0.08)
+
+
+# --------------------------------------------------------------------------
+# His shadow (Movimento Ombra): he sinks into it, it steps, he rises
+
+@sound("pilgrim_shadow_sink", loudness=-21, wet=0.3, marks=(0.0, 0.27))
+def pilgrim_shadow_sink(seed):
+    """He sinks into his shadow (the card's own cue takes 0.27 s): the wool
+    gathers as he crouches into it, a soft inky down-swell (its band falling
+    700 -> 110 Hz, peak 0.15) swallows him, the paper card folds as it goes
+    under (a slow cardboard creak and a few crease crackles, heard through
+    the ink), it closes flat at 0.27 and the ink closes over him with a soft
+    low gulp; on the way down the lantern's globe chimes once, muffled."""
+    D = 0.65
+    env = env_points(D, [(0, 0), (0.05, 0.35), (0.15, 1.0), (0.3, 0.55), (0.5, 0.12), (D, 0)])
+    down = _ink(D, seed, env, _path(D, [(0, 700), (0.15, 420), (0.5, 110)]), q=0.9)
+    deep = env_points(D, [(0, 0), (0.12, 0.5), (0.27, 1.0), (0.45, 0.3), (D, 0)])
+    low = _band(brown(D, seed + 1), 50, 200, order=3) * deep
+    crouch = _cloak(0.2, seed + 2, env_points(0.2, [(0, 0), (0.08, 1.0), (0.2, 0)]), lo=350, hi=900)
+    # Under the surface nothing above 1.8 kHz carries.
+    fold = lowpass(_creak(0.16, seed + 3, 28, 55, 520, q=1.6), 1400, 2)
+    crease = lowpass(_crumple(0.2, seed + 4, length=0.12, rate=120, lo=1500), 1800, 2)
+    flap = lowpass(_slap(0.08, seed + 5, 300, 2500, tau=0.008), 1200, 2)
+    gulp = _thump(0.2, seed + 6, 95, 0.035, drop=0.25, attack=0.008, lp=240)
+    chime = lowpass(_glass(0.4, tau=0.1, attack=0.004), 2600, 2)
+    x = place(D, [
+        (0.0, crouch, 0.18), (0.0, down, 0.8), (0.0, low, 0.6),
+        (0.12, fold, 0.9), (0.13, crease, 0.6), (0.255, flap, 0.5),
+        (0.27, gulp, 0.25), (0.17, chime, 0.04),
+    ])
+    return _finish(x, D, tail=0.08)
+
+
+@sound("pilgrim_shadow_step", loudness=-24, wet=0.2, marks=(0.0, 0.07))
+def pilgrim_shadow_step(seed):
+    """One step of his shadow (one every 0.4 s at most, so it must not tire):
+    no boots and no card, only the ink slipping a cell along the floor, fast
+    at first as the pool is (peak 0.07): a short, soft, airy swish over a dark
+    smear of ink, with no attack, gone by 0.3."""
+    D = 0.35
+    swish = _whoosh(0.3, seed, 320, 950, 400, peak_at=0.24, q=0.9, power=1.5, tone=0.06)
+    env = env_points(D, [(0, 0), (0.025, 0.6), (0.07, 1.0), (0.16, 0.4), (0.3, 0.0)])
+    smear = _ink(D, seed + 1, env, _path(D, [(0, 380), (0.07, 520), (0.3, 170)]), q=0.8, swirl=0.3)
+    air = _band(pink(D, seed + 2), 1500, 4500) * env_points(D, [(0, 0), (0.04, 1.0), (0.12, 0.2), (0.2, 0)])
+    x = place(D, [(0.0, swish, 0.7), (0.0, smear, 0.5), (0.0, air, 0.3)])
+    return _finish(x, D, tail=0.05)
+
+
+@sound("pilgrim_shadow_rise", loudness=-20, wet=0.3, marks=(0.0, 0.13, 0.34))
+def pilgrim_shadow_rise(seed):
+    """He climbs back out of his shadow (the card's own cue: out of the floor
+    at 0.13, a small spring, down on its base at 0.34): an inky up-swell (its
+    band rising 120 -> 900 Hz, peak 0.12) lets him go, the paper card unfolds
+    as it comes up (a cardboard flex creak rising, a few crisp grains, the
+    card springing straight at 0.17), then the light thud of the card set
+    down on stone at 0.34 (its iron base knocks, the lantern jingles once),
+    the cloak settles and the ink stills."""
+    D = 0.8
+    r = rng(seed)
+    env = env_points(D, [(0, 0), (0.06, 0.45), (0.12, 1.0), (0.2, 0.3), (0.32, 0.05), (D, 0)])
+    up = _ink(D, seed, env, _path(D, [(0, 120), (0.12, 520), (0.25, 900)]), q=0.9)
+    air = _whoosh(0.22, seed + 1, 260, 900, 700, peak_at=0.55, q=0.9, tone=0.05)
+    unfold = _creak(0.1, seed + 2, 55, 110, 780, q=2.0)
+    flex = grains(0.12, sorted(r.uniform(0, 0.09, 7)), 0.01, seed + 3, band=(1800, 6500))
+    spring = _slap(0.06, seed + 4, 900, 6000, tau=0.004)
+    thud = _thump(0.2, seed + 5, 115, 0.02, drop=0.5, attack=0.001, lp=380)
+    knock = _modes(0.12, [(820, 0.022, 1.0), (1290, 0.015, 0.6), (2010, 0.009, 0.4)])
+    tick = _band(white(0.02, seed + 6), 1500, 8000) * _env_ad(0.02, 0.0002, 0.0008)
+    jingle = _lantern(seed + 7, [(0.0, 0.6), (0.03, 0.25)], glass=0.3, links=0.6, dur=0.4)
+    settle = _cloak(0.2, seed + 8, env_points(0.2, [(0, 0), (0.03, 1), (0.2, 0)]), lo=350, hi=900)
+    still = _ink(0.3, seed + 9, env_points(0.3, [(0, 0), (0.05, 1.0), (0.3, 0)]), _path(0.3, [(0, 300), (0.3, 140)]))
+    x = place(D, [
+        (0.0, up, 0.75), (0.02, air, 0.2),
+        (0.1, unfold, 0.6), (0.11, flex, 0.5), (0.17, spring, 0.3),
+        (0.34, thud, 0.3), (0.34, knock, 0.13), (0.34, tick, 0.1), (0.345, jingle, 0.16),
+        (0.36, settle, 0.1), (0.36, still, 0.12),
     ])
     return _finish(x, D, tail=0.08)

@@ -43,6 +43,7 @@ gothic_card_lines :: proc(card: game.Card_Instance, tactical: bool = false) -> (
 		case .Volatile_Study: return fmt.ctprintf("CREA %d SPARK", a), fmt.ctprintf("PESCA %d / EXHAUST", b)
 		case .Afterimage: return "SCHIVA SENZA RECUPERO", fmt.ctprintf("%d SCUDO SE MUOVI / %ds", a, d.effects[0].duration)
 		case .Chain_Lightning: return fmt.ctprintf("%d DANNI / NEMICO", a), fmt.ctprintf("%d VISIBILI / SALTO %d", game.MAX_SPELL_TARGETS, game.SPELL_BOUNCE_RANGE)
+		case .Shadow_Step: return fmt.ctprintf("OMBRA %ds / MONDO FERMO", a), "INTANGIBILE / SOLO PASSI"
 		case .Sei_Denari, .Sette_Denari: return fmt.ctprintf("+%d ORO", a), "SCOPA / UNA VOLTA PER STANZA"
 		case .Titan_Grip, .Storm_Crown, .Shock_Floor, .Tesla_Coil, .Firebomb, .Calculated_Risk, .Spark, .Grappling_Hook,
 		     .Fate_Strike, .Sundering_Blow, .Prismatic_Barrage, .Twin_Venom, .Count:
@@ -80,6 +81,7 @@ gothic_card_lines :: proc(card: game.Card_Instance, tactical: bool = false) -> (
 	case .Titan_Grip: return fmt.ctprintf("%d DANNI / LANCIA 2", a), "INTERROMPE / STORDISCE 1s"
 	case .Storm_Crown: return fmt.ctprintf("%d DANNI / 3 BERSAGLI", a), "LEGGENDARIA / RIMBALZO 3"
 	case .Sei_Denari, .Sette_Denari: return fmt.ctprintf("+%d ORO", a), "SCOPA / EXHAUST"
+	case .Shadow_Step: return fmt.ctprintf("OMBRA %ds", a), "SOLO TATTICA"
 	case .Count: return "", ""
 	}
 	return "", ""

@@ -75,6 +75,7 @@ begin_card_reward :: proc(run: ^Run_State) -> bool {
 		node,
 		staged_reward.choices[:CARD_REWARD_CHOICE_COUNT],
 		&run.player.m8_profile,
+		run.player.tactical.config.enabled,
 	) {
 		return false
 	}

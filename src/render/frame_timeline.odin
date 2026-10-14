@@ -13,9 +13,12 @@ update_renderer_frame_timeline :: proc(renderer: ^Renderer, dt: f32) -> bool {
 	renderer.frame_had_cinematic = false
 	cast_frame := renderer.timeline.card_cast && event_timeline_is_busy(&renderer.timeline)
 	timeline := &renderer.timeline
+	// While the player is in his shadow the world's cues hold, like the world
+	// itself; the frame's real time still reaches the shadow's clock.
+	world_runs := !renderer.tactical.shadow.active
 	if !event_timeline_is_busy(timeline) {
 		renderer.frame_simulation_dt = dt
-		update_renderer_world_playback(renderer, dt*renderer_playback_speed(renderer))
+		if world_runs { update_renderer_world_playback(renderer, dt*renderer_playback_speed(renderer)) }
 		return was_busy && !renderer_timeline_is_busy(renderer)
 	}
 	// Casting has a gameplay duration: F4 cannot accelerate its paid seconds.
@@ -61,6 +64,6 @@ update_renderer_frame_timeline :: proc(renderer: ^Renderer, dt: f32) -> bool {
 		if limited { break }
 	}
 	if !event_timeline_is_busy(timeline) { renderer.frame_simulation_dt += remaining/speed }
-	if !cast_frame { update_renderer_world_playback(renderer, renderer.frame_simulation_dt*renderer_playback_speed(renderer)) }
+	if !cast_frame && world_runs { update_renderer_world_playback(renderer, renderer.frame_simulation_dt*renderer_playback_speed(renderer)) }
 	return was_busy && !renderer_timeline_is_busy(renderer)
 }

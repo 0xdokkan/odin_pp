@@ -64,3 +64,15 @@ beat_input_command :: proc(chord: ^Beat_Chord, room: ^game.Room, command: Gamepl
 	}
 	return result, true
 }
+
+// The scene's input lane for one frame. While the player's own action runs
+// (`busy`: its animation or its timed seconds) the command is dropped, never
+// kept for when the action ends, and a pending chord is dropped with it.
+route_gameplay_command :: proc(held: ^Buffered_Gameplay_Command, room: ^game.Room, busy: bool,
+	command: Gameplay_Command, has_command: bool, dt: f32) -> (result: Gameplay_Command, ok: bool) {
+	if busy || room.phase == .Complete || room.phase == .Defeat {
+		clear_gameplay_command_buffer(held)
+		return
+	}
+	return beat_input_command(&held.chord, room, command, has_command, dt)
+}

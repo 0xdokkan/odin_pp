@@ -25,7 +25,8 @@ import view "../view"
 //             player's own cell outlined when it is one of them; a move is an
 //             arrow to its cell, a protection a thread to the ally.
 //   SIGILLI + TERRENO  both (the game's).
-//   ETICHETTE the board as it was: the small sticker in the health label.
+//   ADESIVI   the board as it was: the small sticker, now beside the heart
+//             over the enemy's head (living_heart.odin).
 //
 // Under fog nothing gives a hidden enemy away: its seal, arrow and thread
 // show only while it is in sight, and a threatened cell only while that cell
@@ -62,7 +63,7 @@ intent_display_name :: proc(mode: Intent_Display) -> cstring {
 	case .Both: return "SIGILLI + TERRENO"
 	case .Seals: return "SIGILLI"
 	case .Ground: return "TERRENO"
-	case .Labels: return "ETICHETTE"
+	case .Labels: return "ADESIVI"
 	}
 	return ""
 }
@@ -155,23 +156,31 @@ intent_tremble :: proc(renderer: ^Renderer, room: ^game.Room, entity: game.Entit
 	return clamp(1-left/INTENT_TREMBLE_SECONDS, 0, 1)
 }
 
-// SIGILLI: over the board, after the labels.
+// Where an enemy's seal is pinned: by the top right corner of its card. The
+// hearts over the heads (living_heart.odin) keep clear of it.
+intent_seal_center :: proc(renderer: ^Renderer, actor: Presentation_Actor) -> (center: rl.Vector2, ok: bool) {
+	key := sprite_key_for_enemy(actor.archetype)
+	character, found := flipbook_character(key)
+	if !found { return }
+	corner := living_billboard_geometry(renderer, character, key, actor.position, true, actor.entity).card_points[3]
+	at := tactical_project(renderer, {corner.x, corner.z}, corner.y)
+	return {at.x-4, at.y+8}, true
+}
+
+// SIGILLI: over the board, after the hearts.
 draw_intent_seals :: proc(renderer: ^Renderer, room: ^game.Room) {
 	v := &renderer.tactical
 	if !intent_seals_on(renderer) || v.snapshot == nil || !living_cards_ready(renderer) { return }
-	now := renderer.sprite_assets.elapsed
+	// The world's clock: still while the player is in his shadow.
+	now := tactical_world_time(renderer)
 	for actor in v.snapshot.enemies[:v.snapshot.enemy_count] {
 		cell := grid.Position{int(math.round(actor.position.x)), int(math.round(actor.position.y))}
 		if !actor.visible || actor.health <= 0 || !tactical_render_visible(renderer, cell) { continue }
 		index, found := game.enemy_index_by_id(room, actor.entity.id)
 		if !found { continue }
 		enemy := &room.enemies[index]
-		key := sprite_key_for_enemy(actor.archetype)
-		character, ok := flipbook_character(key)
+		center, ok := intent_seal_center(renderer, actor)
 		if !ok { continue }
-		corner := living_billboard_geometry(renderer, character, key, actor.position, true, actor.entity).card_points[3]
-		at := tactical_project(renderer, {corner.x, corner.z}, corner.y)
-		center := rl.Vector2{at.x-4, at.y+8}
 		icon := tactical_intent_icon(room, enemy)
 		kind := living_ring_kind(enemy)
 		if kind == .None || game.enemy_is_staggered(room, enemy) {
@@ -220,8 +229,10 @@ draw_intent_seals :: proc(renderer: ^Renderer, room: ^game.Room) {
 draw_intent_ground :: proc(renderer: ^Renderer, room: ^game.Room) {
 	v := &renderer.tactical
 	if !intent_ground_on(renderer) || room == nil { return }
-	now := renderer.sprite_assets.elapsed
+	now := tactical_world_time(renderer)
 	player := room.player.position
+	// Sunk in his shadow the player is out of reach: no threat outlines him.
+	intangible := game.tactical_player_intangible(room)
 	for &enemy in room.enemies {
 		kind := living_ring_kind(&enemy)
 		if kind == .None || game.enemy_is_staggered(room, &enemy) { continue }
@@ -235,7 +246,9 @@ draw_intent_ground :: proc(renderer: ^Renderer, room: ^game.Room) {
 			for cell in cells {
 				if !tactical_render_visible(renderer, cell) { continue }
 				draw_intent_cell(cell, progress, color, (0.5+0.45*loud)*lit)
-				if cell == player { draw_intent_cell_outline(cell, 0.06+0.05*loud, color_with_opacity({255, 240, 225, 255}, (0.6+0.4*loud)*lit)) }
+				if cell == player && !intangible {
+					draw_intent_cell_outline(cell, 0.06+0.05*loud, color_with_opacity({255, 240, 225, 255}, (0.6+0.4*loud)*lit))
+				}
 			}
 			if enemy.intent.kind == .Charge {
 				for cell in enemy.intent.path[:enemy.intent.path_count] {

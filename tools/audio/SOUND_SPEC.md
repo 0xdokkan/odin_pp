@@ -100,6 +100,13 @@ each sound starts with the drawing it belongs to:
   cast is its protection, the archmage's its fire. When an enemy's card falls
   into its telegraph loop: `ghoul_windup`, `archer_aim`, `brute_windup`,
   `bomber_prepare`; the pilgrim's daze plays `pilgrim_stunned`.
+- **The shadow** (Movimento Ombra): `card_shadow_step` when the card is
+  played; `pilgrim_shadow_sink` as his card starts going down into its
+  shadow and `pilgrim_shadow_rise` as it starts climbing back out (the
+  card's own cues pace both); `pilgrim_shadow_step` on every step of the
+  shadow, which starts no clip on the card, so never the boots or the
+  card's scrape; `ui_critical` when a diagonal lands on a beat and
+  `ui_beat_tick` on the shadow's own beats.
 - **Cues**: `card_<id>` when a card is played (before anything it puts on the
   board, so a Tesla card's coil is not heard twice), cards drawn dealt one
   after the other, refocus, gold (not after a Scopa card, which has its own
@@ -143,6 +150,9 @@ chime and iron rattle when he moves hard). Warm, light, human scale.
 | pilgrim_interact | picks up loot | 0.7 | 0.28 | -22 | 0.2 | crouches (cloth) and pockets it at 0.28: coins clink into a leather pouch |
 | pilgrim_heal | is healed | 0.9 | — | -21 | 0.35 | warm rising swell, soft bell partials (D, F, A), a breath of air; comforting |
 | pilgrim_death | dies | 1.2 | 0.118, 0.68 | -18 | 0.3 | struck at 0.118, the card folds and topples (paper crease + slap on stone at 0.68), the lantern rolls and its glass cracks, the blue flame gutters out |
+| pilgrim_shadow_sink | sinks into his shadow (Movimento Ombra) | 0.65 | 0.0, 0.27 | -21 | 0.3 | a soft inky down-swell (a dark band falling 700 -> 110 Hz, peak 0.15) as the card goes down, the card folding under it (a cardboard creak and crease crackles, muffled as through ink), flat at 0.27 with a soft low gulp; a faint muffled chime of the lantern globe |
+| pilgrim_shadow_step | one step of the shadow (one every 0.4 s at most) | 0.35 | 0.0, 0.07 | -24 | 0.2 | very short, soft, airy, ink-like: a dark swish slipping one cell, no attack, peak 0.07 where the pool glides fastest; no boots, no card scrape; must not tire |
+| pilgrim_shadow_rise | rises out of his shadow (the world resumes) | 0.8 | 0.0, 0.13, 0.34 | -20 | 0.3 | an inky up-swell (120 -> 900 Hz, peak 0.12), the card unfolding as it comes out of the floor at 0.13 (a flex creak, crisp paper grains, a spring), a light thud of the card set down on stone at 0.34 (its iron base knocks, the lantern jingles), the cloak settles |
 
 ### Family `ghoul` — the Chaser
 
@@ -239,6 +249,7 @@ Length ~0.5–0.9 s; loudness -19 unless noted; wet 0.25.
 | card_purifying_guard | Purifying Guard: shield, cures poison | the guard's ward plus a cleansing shimmer, bright and clean |
 | card_thorn_coat | Thorn Coat: thorns | bramble vines creak and tighten, thorny clicks |
 | card_afterimage | Afterimage: dodge without recovery | a ghostly echoing whoosh, the sound repeats fainter (delay) |
+| card_shadow_step | Movimento Ombra: 4 s in his shadow, the world stops | a dark sinking whoosh over a low glide (D3 down to D2), then a D bell struck as time stops (0.25): its shimmer slows to a standstill and the ring hangs, still |
 | card_counter_rune | Counter Rune: counter-attack charges | a rune carved in stone (scratch) and lit (a low glowing hum) |
 | card_battle_focus | Battle Focus: draw, see further | a deep slow breath of air and a single clear bell; time slows |
 | card_calculated_risk | Calculated Risk: draw, discard | cards riffled and one flicked away |

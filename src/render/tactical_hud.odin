@@ -27,7 +27,7 @@ tactical_status_label :: proc(kind: game.Status_Kind, short: bool) -> (label: st
 	case .Poison: label, accent = "VELENO", HUD_VENOM
 	case .Shield: label = "SCUDO"
 	case .Thorns: label, accent = "SPINE", HUD_VENOM
-	case .Afterimage: label, accent = "OMBRA", HUD_SHADE
+	case .Afterimage: label, accent = "SCIA", HUD_SHADE
 	case .Stagger: label, accent = "STORDITO", GOTHIC_RED
 	case .Survey: label = "VISTA"
 	}
@@ -69,18 +69,21 @@ draw_tactical_hud :: proc(renderer: ^Renderer, room: ^game.Room, paused, hologra
 	busy := renderer_blocks_player_input(renderer)
 	recovering := game.tactical_is_recovering(room)
 	stunned := game.tactical_is_stunned(room)
+	shadow := game.tactical_shadow_active(room)
 	cinematic := presentation_time_policy(&renderer.timeline) == .Cinematic
 	layout := tactical_hud_layout(renderer)
 	bounds := layout.pulse
 	x, y, width := bounds.x, bounds.y, bounds.width
 	label: cstring = "AGISCI"
 	switch s.phase {
-	case .Decision:
+	case .Decision, .Shadow:
 	case .Recovery: label = "RECUPERO"
 	case .Resolving: label = "AZIONE"
 	case .Stunned: label = "STORDITO"
 	}
+	// MOVIMENTO OMBRA: the window waits, frozen, while the shadow walks.
 	if !combat { label = "ESPLORA" }
+	else if shadow { label = "OMBRA" }
 	else if room.qte.kind != .None { label = "DIFESA" }
 	else if recovering { label = "RECUPERO" }
 	else if stunned { label = "STORDITO" }
@@ -92,15 +95,22 @@ draw_tactical_hud :: proc(renderer: ^Renderer, room: ^game.Room, paused, hologra
 	accent := GOTHIC_RED if timed && s.remaining <= 5 else GOTHIC_BLUE
 	if recovering { accent = HUD_AMBER }
 	if stunned { accent = GOTHIC_RED }
+	if shadow { accent = HUD_SHADE }
 	hud_frame(bounds, accent)
 	gothic_text_fit(renderer, label, {x+12, y+5, 150, 24}, 18, GOTHIC_PAPER)
-	gothic_text_fit(renderer, fmt.ctprintf("PULSE %d", min(s.cycle, max(int)-1)+1), {x+12, y+26, 90, 14}, 10, GOTHIC_MUTED)
+	sub := fmt.ctprintf("PULSE %d", min(s.cycle, max(int)-1)+1)
+	// The window's own seconds wait, shown still, while the shadow's run.
+	if shadow { sub = fmt.ctprintf("FERMO %.1fs", s.remaining) }
+	gothic_text_fit(renderer, sub, {x+12, y+26, 90, 14}, 10, GOTHIC_MUTED)
 	if timed {
-		timer := fmt.ctprintf("%.1fs", s.remaining)
+		timer := fmt.ctprintf("%.1fs", s.shadow_remaining if shadow else s.remaining)
 		timer_width := gothic_text_width(renderer, timer, 24)
 		// The tick: a lamp fills toward each whole second and flares gold in
-		// the window where moves, bumps and cards turn critical.
+		// the window where moves, bumps and cards turn critical. In the shadow,
+		// the shadow's own beats (a two-key step on one goes diagonally); after
+		// its last one the lamp rests.
 		approach, on_beat := game.tactical_beat_glow(room)
+		if shadow && !on_beat && game.tactical_shadow_elapsed(s) >= f32(game.TACTICAL_SHADOW_BEATS) { approach = 0 }
 		lamp := rl.Vector2{x+width-24-timer_width, y+15}
 		gothic_text(renderer, timer, x+width-12-timer_width, y+3, 24, TACTICAL_FEEDBACK_CRITICAL if on_beat else accent)
 		rl.DrawCircleV(lamp, 6, HUD_TROUGH)
@@ -115,10 +125,15 @@ draw_tactical_hud :: proc(renderer: ^Renderer, room: ^game.Room, paused, hologra
 	if recovering { budget = game.TACTICAL_RECOVERY_SECONDS }
 	if stunned { budget = max(f32(1), s.stun_duration) }
 	meter := rl.Rectangle{x+104, y+29, width-116, 7}
-	if timed { hud_bar(meter, s.remaining/budget, accent, int(min(budget, 30))) }
+	if shadow { hud_bar(meter, s.shadow_remaining/max(s.shadow_duration, 0.001), HUD_SHADE, int(s.shadow_duration+0.5)) }
+	else if timed { hud_bar(meter, s.remaining/budget, accent, int(min(budget, 30))) }
 	else { hud_bar(meter, 1, GOTHIC_BLUE if !combat else GOTHIC_STEEL) }
-	// A timed action: a thin gold line drains as it plays out.
-	if game.tactical_player_busy(room) && s.action_duration > 0 {
+	// A timed action: a thin gold line drains as it plays out; a shadow's
+	// step, a violet one.
+	if game.tactical_shadow_step_busy(room) {
+		left := clamp(s.shadow_step_remaining/game.TACTICAL_SHADOW_STEP_SECONDS, 0, 1)
+		rl.DrawRectangleRec({meter.x, meter.y+meter.height+2, meter.width*left, 2}, SHADOW_RIM)
+	} else if game.tactical_player_busy(room) && s.action_duration > 0 {
 		left := clamp(s.action_remaining/s.action_duration, 0, 1)
 		rl.DrawRectangleRec({meter.x, meter.y+meter.height+2, meter.width*left, 2}, TACTICAL_FEEDBACK_CRITICAL)
 	}
@@ -130,12 +145,14 @@ draw_tactical_hud :: proc(renderer: ^Renderer, room: ^game.Room, paused, hologra
 	if cinematic { status = "TEMPO SOSPESO" }
 	if recovering { status = "MUOVITI / CARTE IN RECUPERO" }
 	if stunned { status = "SOLO CARTE" }
+	if shadow { status = "MONDO FERMO / SOLO PASSI / DIAGONALE SUL BATTITO" }
 	if room.qte.kind != .None { status = "PULSE SOSPESO" }
 	if !combat { status = "RACCOGLI IL BOTTINO / RAGGIUNGI L'USCITA" }
 	if hologram && combat && room.qte.kind == .None { status = "MAPPA APERTA / IL TEMPO SCORRE" }
 	v := renderer_status_view(renderer, room)
 	objective: cstring = fmt.ctprintf("NEMICI %d", v.enemy_count) if combat else "STANZA LIBERATA"
-	if timed && game.tactical_enabled(room) && s.config.shrinking_window {
+	// In the shadow no card can be played: the line keeps its room for the rule.
+	if timed && game.tactical_enabled(room) && s.config.shrinking_window && !shadow {
 		// The shrinking window: this window's length, and the cards counted
 		// toward the next won second (with any already won).
 		// Between two windows, the length of the one coming.
@@ -169,11 +186,13 @@ draw_tactical_dodge_chip :: proc(renderer: ^Renderer, room: ^game.Room, bounds: 
 	s := &room.player.tactical
 	recovering := game.tactical_is_recovering(room)
 	stunned := game.tactical_is_stunned(room)
-	ready := game.tactical_dodge_ready(room) && !recovering && !stunned
+	shadow := game.tactical_shadow_active(room)
+	ready := game.tactical_dodge_ready(room) && !recovering && !stunned && !shadow
 	recovery := max(0, s.dodge_recovery-(1 if room.tactical_pulse.pending else 0))
 	detail := fmt.ctprintf("-%.0fs", game.TACTICAL_DODGE_SECONDS) if ready else fmt.ctprintf("PRONTA FRA %d", recovery)
 	if recovering { detail = "IN RECUPERO" }
 	if stunned { detail = "STORDITO" }
+	if shadow { detail = "OMBRA" }
 	rl.DrawRectangleRec(bounds, {12, 18, 27, 200})
 	rl.DrawRectangleLinesEx(bounds, 1, {28, 38, 52, 255})
 	cap_bounds := rl.Rectangle{bounds.x+4, bounds.y+4, 40, bounds.height-8}

@@ -57,9 +57,20 @@ tactical_feedback_pose :: proc(renderer: ^Renderer, key: Sprite_Key, position: v
 	return result
 }
 
+// Where the cues aimed at an actor show: on the actor as the board shows it,
+// except the player sunk in his shadow. The pool takes his place in the
+// snapshot, but his body stays where it sank, and so does what the held world
+// shows of him (a miss, a block, a shield, their sparks).
+tactical_cue_actor_position :: proc(renderer: ^Renderer, entity: game.Entity_Ref) -> (position: view.Vec2, found: bool) {
+	if entity == game.PLAYER_ENTITY && renderer.tactical.shadow.active { return renderer.tactical.shadow.body, true }
+	actor, ok := presentation_actor_in_view(renderer.tactical.snapshot, entity)
+	if !ok { return }
+	return actor.position, true
+}
+
 tactical_feedback_position :: proc(renderer: ^Renderer, entity: game.Entity_Ref, fallback: grid.Position) -> rl.Vector3 {
-	if actor, found := presentation_actor_in_view(renderer.tactical.snapshot, entity); found {
-		return {actor.position.x+0.5, 0.055, actor.position.y+0.5}
+	if position, found := tactical_cue_actor_position(renderer, entity); found {
+		return {position.x+0.5, 0.055, position.y+0.5}
 	}
 	for object in renderer.tactical.snapshot.objects[:renderer.tactical.snapshot.object_count] {
 		if object.entity == entity { return {object.position.x+0.5, 0.055, object.position.y+0.5} }
@@ -69,6 +80,11 @@ tactical_feedback_position :: proc(renderer: ^Renderer, entity: game.Entity_Ref,
 
 tactical_feedback_alpha :: proc(p: f32) -> f32 {
 	return clamp(p*12, f32(0), f32(1))*clamp((1-p)*3, f32(0), f32(1))
+}
+
+// A played card's rune and sparks: blue, or the shadow's violet.
+tactical_card_played_color :: proc(cue: ^Presentation_Cue) -> rl.Color {
+	return SHADOW_RIM if cue.kind == .Card_Played && cue.event.card_definition == .Shadow_Step else TACTICAL_FEEDBACK_BLUE
 }
 
 // Eight angular strokes leave the cell center and grid edges readable.
@@ -193,7 +209,8 @@ draw_tactical_feedback :: proc(renderer: ^Renderer, layer: Tactical_Feedback_Lay
 		alpha := tactical_feedback_alpha(p)
 		center := tactical_feedback_position(renderer, cue.event.target, cue.event.to_position)
 		if layer == .Ground {
-			if cue.kind == .Move {
+			// A teleport leaves no trail of steps behind it.
+			if cue.kind == .Move && !game.event_is_teleport(cue.event) {
 				from := rl.Vector3{f32(cue.event.from_position.x)+0.5, 0.056, f32(cue.event.from_position.y)+0.5}
 				color := TACTICAL_FEEDBACK_BLUE if cue.event.target == game.PLAYER_ENTITY else TACTICAL_FEEDBACK_HIT
 				for index in 0..<3 {
@@ -204,7 +221,7 @@ draw_tactical_feedback :: proc(renderer: ^Renderer, layer: Tactical_Feedback_Lay
 				}
 			} else if cue.kind == .Card_Played || cue.kind == .Refocus {
 				center = tactical_feedback_position(renderer, game.PLAYER_ENTITY, cue.event.from_position)
-				draw_tactical_rune(center, 0.24+0.19*p, p*0.3, color_with_opacity(TACTICAL_FEEDBACK_BLUE, alpha))
+				draw_tactical_rune(center, 0.24+0.19*p, p*0.3, color_with_opacity(tactical_card_played_color(cue), alpha))
 				draw_tactical_rune(center+rl.Vector3{0, 0.002, 0}, 0.17+0.14*p, -p*0.3, color_with_opacity(TACTICAL_FEEDBACK_WHITE, alpha*0.6))
 			} else if cue.kind == .Explosion || cue.kind == .Spell_Impact || cue.kind == .Room_Hazard_Triggered {
 				color := tactical_feedback_spell_color(cue.event.card_definition)
@@ -243,7 +260,7 @@ draw_tactical_feedback :: proc(renderer: ^Renderer, layer: Tactical_Feedback_Lay
 			} else { draw_tactical_sparks(center, p, TACTICAL_FEEDBACK_BLUE, 4, 0.28) }
 		case .Card_Played:
 			center = tactical_feedback_position(renderer, game.PLAYER_ENTITY, cue.event.from_position)
-			draw_tactical_sparks(center+rl.Vector3{0, 0.12, 0}, p, TACTICAL_FEEDBACK_BLUE, 5, 0.25)
+			draw_tactical_sparks(center+rl.Vector3{0, 0.12, 0}, p, tactical_card_played_color(cue), 5, 0.25)
 		case .Spell_Launched:
 			draw_tactical_spell_flight(renderer, cue)
 		case .Spell_Impact:
@@ -274,7 +291,7 @@ draw_tactical_status_rune :: proc(renderer: ^Renderer, actor: ^Presentation_Acto
 }
 
 // Called after actor annotations: compact feedback shares their collision
-// allocator and viewport instead of painting floating text across health bars.
+// allocator and viewport instead of painting floating text across the hearts.
 draw_tactical_feedback_overlay :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) -> bool {
 	if !renderer.tactical.enabled || !renderer.tactical.scene_3d { return false }
 	if cue.kind == .Loot || cue.kind == .Loot_Dropped { return false }

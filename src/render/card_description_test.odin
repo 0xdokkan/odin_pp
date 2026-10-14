@@ -18,6 +18,7 @@ test_card_descriptions_preserve_classic_and_tactical_rules :: proc(t: ^testing.T
 		{.Volatile_Study, "CREA 1 SPARK", "PESCA 4 / EXHAUST", "CREA 1 SPARK", "PESCA 5 / EXHAUST"},
 		{.Afterimage, "4 AFTERIMAGE", "DURATA 4 PULSE", "SCHIVA SENZA RECUPERO", "4 SCUDO SE MUOVI / 4s"},
 		{.Battle_Focus, "PESCA 2", "EXHAUST / ETHEREAL", "PESCA 2 / ESPLORA", "VISTA: 3s / MAX 9"},
+		{.Shadow_Step, "OMBRA 4s", "SOLO TATTICA", "OMBRA 4s / MONDO FERMO", "INTANGIBILE / SOLO PASSI"},
 	}
 	for row in cases {
 		card := game.Card_Instance{definition_id = row.id, upgrade_level = 3}

@@ -301,6 +301,8 @@ card_colors :: proc(id: game.Card_Id, affordable: bool) -> (fill, outline: rl.Co
 		fill, outline = rl.Color{65, 48, 75, 245}, rl.Color{247, 198, 112, 255}
 	case .Twin_Venom:
 		fill, outline = rl.Color{40, 58, 31, 245}, rl.Color{179, 237, 111, 255}
+	case .Shadow_Step:
+		fill, outline = rl.Color{33, 26, 48, 245}, rl.Color{164, 144, 183, 255}
 	case .Count:
 		fill, outline = rl.Color{45, 49, 52, 245}, rl.Color{105, 116, 116, 255}
 	}
@@ -375,6 +377,7 @@ card_detail_lines :: proc(card: game.Card_Instance) -> (first, second: cstring) 
 	case .Storm_Crown: return fmt.ctprintf("%d DAMAGE EACH", 5+upgrade), "LEGENDARY / CHAIN 3"
 	case .Sei_Denari: return "+6 GOLD", "SCOPA / EXHAUST"
 	case .Sette_Denari: return "+7 GOLD", "SCOPA / EXHAUST"
+	case .Shadow_Step: return "OMBRA 4s", "SOLO TATTICA"
 	case .Count:
 	}
 	return "", ""
@@ -449,6 +452,7 @@ card_short_name :: proc(id: game.Card_Id) -> cstring {
 	case .Storm_Crown: return "CROWN"
 	case .Sei_Denari: return "6 ORO"
 	case .Sette_Denari: return "7 ORO"
+	case .Shadow_Step: return "OMBRA"
 	case .Count:
 	}
 	return ""
@@ -653,6 +657,12 @@ draw_card_sigil :: proc(bounds: rl.Rectangle, id: game.Card_Id, color: rl.Color)
 			if index == 6 { p = center }
 			rl.DrawCircleLinesV(p, 5, color)
 		}
+	case .Shadow_Step:
+		// A hood sinking into its pool.
+		rl.DrawEllipse(c.int(center.x), c.int(center.y+12), radius, 6, color)
+		rl.DrawCircleLinesV({center.x, center.y-4}, 9, color)
+		rl.DrawLineEx({center.x-9, center.y-4}, {center.x-13, center.y+10}, 3, color)
+		rl.DrawLineEx({center.x+9, center.y-4}, {center.x+13, center.y+10}, 3, color)
 	case .Count:
 	}
 }
@@ -1072,7 +1082,8 @@ update_renderer_event_timeline :: proc(renderer: ^Renderer, dt: f32) -> bool {
 	was_busy := renderer_timeline_is_busy(renderer)
 	step := dt*renderer_playback_speed(renderer)
 	update_event_timeline(&renderer.timeline, step)
-	update_renderer_world_playback(renderer, step)
+	// The world's cues hold while the player is in his shadow.
+	if !renderer.tactical.shadow.active { update_renderer_world_playback(renderer, step) }
 	return was_busy && !renderer_timeline_is_busy(renderer)
 }
 
@@ -2278,14 +2289,21 @@ presentation_event_center :: proc(
 		return {}, false
 	}
 	presentation := renderer.tactical.snapshot if renderer.tactical.enabled && renderer.tactical.snapshot != nil else &renderer.timeline.view
+	// The player sunk in his shadow keeps the held world's cues on his body,
+	// not on the gliding pool (tactical_cue_actor_position).
+	shown_center :: proc(renderer: ^Renderer, actor: ^Presentation_Actor) -> view.Vec2 {
+		shown := actor^
+		if actor.entity == game.PLAYER_ENTITY && renderer.tactical.shadow.active { shown.position = renderer.tactical.shadow.body }
+		return presentation_actor_center(renderer, &shown)
+	}
 	if actor, found := presentation_actor_in_view(presentation, event.target); found {
-		return presentation_actor_center(renderer, actor), true
+		return shown_center(renderer, actor), true
 	}
 	if object, found := presentation_grid_object_in_view(presentation, event.target); found {
 		return presentation_grid_object_center(renderer, object), true
 	}
 	if actor, found := presentation_actor_in_view(presentation, event.source); found {
-		return presentation_actor_center(renderer, actor), true
+		return shown_center(renderer, actor), true
 	}
 	if object, found := presentation_grid_object_in_view(presentation, event.source); found {
 		return presentation_grid_object_center(renderer, object), true
@@ -2349,7 +2367,7 @@ timeline_card_cue_verb :: proc(cue: ^Presentation_Cue) -> cstring {
 	     .Attack_Missed, .Move_Blocked,
 	     .Gold_Gained, .Energy_Gained, .Binding_Added, .Binding_Exhausted, .Binding_Expired,
 	     .Pulse_Advanced, .Refocus, .Object_Spawned, .Explosive_Armed, .Explosion, .Explosive_Disarmed, .Room_Hazard_Triggered,
-	     .Dice_Rolled, .Spell_Launched, .Spell_Impact:
+	     .Dice_Rolled, .Spell_Launched, .Spell_Impact, .Shadow_Entered, .Shadow_Emerged:
 	}
 	return nil
 }
@@ -2468,7 +2486,8 @@ draw_presentation_cue :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) {
 		draw_timeline_loot_drop_cue(renderer, cue)
 		return
 	}
-	if cue.kind == .Move || cue.kind == .Defeat || cue.kind == .Pulse_Advanced {
+	if cue.kind == .Move || cue.kind == .Defeat || cue.kind == .Pulse_Advanced ||
+	   cue.kind == .Shadow_Entered || cue.kind == .Shadow_Emerged {
 		return
 	}
 	center, has_center := presentation_event_center(renderer, cue.event)
@@ -2544,7 +2563,8 @@ draw_presentation_cue :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) {
 		color = rl.Color{169, 183, 177, 255}
 	case .Move, .Card_Played, .Card_Drawn, .Card_Moved, .Card_Created, .Refocus,
 	     .Card_Refocused, .Defeat,
-	     .Loot_Dropped, .Loot, .Pulse_Advanced, .Dice_Rolled, .Spell_Launched, .Spell_Impact:
+	     .Loot_Dropped, .Loot, .Pulse_Advanced, .Dice_Rolled, .Spell_Launched, .Spell_Impact,
+	     .Shadow_Entered, .Shadow_Emerged:
 		unreachable()
 	}
 	draw_timeline_popup(renderer, label, color, center, presentation_cue_progress(cue))

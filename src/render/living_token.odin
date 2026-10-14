@@ -10,12 +10,13 @@ import grid "../grid"
 // inked like the standees, that flick out of a card when it is struck or
 // healed and carry the amount in pixel figures, red for a blow and green for a
 // cure. They pop out with the hurt drawing's impact and slide out of the
-// card's side (clear of the health label above it), hang a moment and drop
+// card's side (clear of the heart above it), hang a moment and drop
 // away. A token outlives the cue that spawned it,
 // so it lives in the living state; its picture is made the first time it is
 // drawn.
 
 LIVING_MAX_TOKENS :: 16
+LIVING_MAX_BLOWS :: LIVING_MAX_TOKENS*2
 LIVING_TOKEN_SECONDS :: f64(1.15)
 // The hurt drawings land their blow ~0.1 s into the cue.
 LIVING_TOKEN_DELAY :: f64(0.1)
@@ -42,9 +43,21 @@ Living_Token :: struct {
 	texture: rl.Texture2D,
 }
 
+// A blow already given its token, on the world's clock (tactical_world_time):
+// a cue held while the player is in his shadow never gives a second one, even
+// once the first token has dropped away.
+Living_Blow :: struct {
+	used, heal: bool,
+	amount: i32,
+	entity, source: game.Entity_Ref,
+	pulse: u64,
+	group: u32,
+	at: f64,
+}
+
 // 5x7 pixel figures, rows top to bottom, bit 4 the leftmost column.
 @(rodata)
-LIVING_TOKEN_GLYPHS := [12][7]u8{
+LIVING_TOKEN_GLYPHS := [13][7]u8{
 	{0b01110, 0b10001, 0b10011, 0b10101, 0b11001, 0b10001, 0b01110}, // 0
 	{0b00100, 0b01100, 0b00100, 0b00100, 0b00100, 0b00100, 0b01110}, // 1
 	{0b01110, 0b10001, 0b00001, 0b00010, 0b00100, 0b01000, 0b11111}, // 2
@@ -57,6 +70,7 @@ LIVING_TOKEN_GLYPHS := [12][7]u8{
 	{0b01110, 0b10001, 0b10001, 0b01111, 0b00001, 0b00010, 0b01100}, // 9
 	{0b00000, 0b00100, 0b00100, 0b11111, 0b00100, 0b00100, 0b00000}, // +
 	{0b00000, 0b00000, 0b00000, 0b11111, 0b00000, 0b00000, 0b00000}, // -
+	{0b00001, 0b00010, 0b00010, 0b00100, 0b01000, 0b01000, 0b10000}, // /
 }
 
 living_token_glyph :: proc(r: u8) -> (index: int, ok: bool) {
@@ -64,6 +78,7 @@ living_token_glyph :: proc(r: u8) -> (index: int, ok: bool) {
 	case '0'..='9': return int(r-'0'), true
 	case '+': return 10, true
 	case '-': return 11, true
+	case '/': return 12, true
 	}
 	return
 }
@@ -79,8 +94,13 @@ living_token_size :: proc(text: string) -> (width, height: int) {
 }
 
 // Whether a blow is already showing: one token per blow, however many frames
-// its cue lasts.
-living_token_spawn :: proc(state: ^Living_State, event: game.Game_Event, heal: bool, now: f64) -> bool {
+// its cue lasts. `world` is the world's clock (the sprite clock when left out).
+living_token_spawn :: proc(state: ^Living_State, event: game.Game_Event, heal: bool, now: f64, world := f64(-1)) -> bool {
+	world := world if world >= 0 else now
+	for blow in state.blows {
+		if blow.used && world-blow.at <= LIVING_TOKEN_SECONDS && blow.entity == event.target && blow.source == event.source &&
+		   blow.amount == event.amount && blow.pulse == event.pulse_count && blow.group == event.visual_group && blow.heal == heal { return false }
+	}
 	stack := 0
 	for &token in state.tokens {
 		if !token.used { continue }
@@ -88,6 +108,9 @@ living_token_spawn :: proc(state: ^Living_State, event: game.Game_Event, heal: b
 		   token.pulse == event.pulse_count && token.group == event.visual_group && token.heal == heal { return false }
 		if token.entity == event.target { stack += 1 }
 	}
+	state.blows[state.blow_next] = {used = true, heal = heal, amount = event.amount, entity = event.target, source = event.source,
+		pulse = event.pulse_count, group = event.visual_group, at = world}
+	state.blow_next = (state.blow_next+1)%len(state.blows)
 	slot: ^Living_Token
 	for &token in state.tokens { if !token.used { slot = &token; break } }
 	if slot == nil {
@@ -111,7 +134,8 @@ living_tokens_free :: proc(state: ^Living_State) {
 }
 
 // Once per frame with the actors: a token for every blow and cure now playing.
-update_living_tokens :: proc(renderer: ^Renderer, now: f64) {
+// The tokens keep the sprite clock; `world` is the world's (tactical_world_time).
+update_living_tokens :: proc(renderer: ^Renderer, now, world: f64) {
 	state := renderer.tactical.living_state
 	for &token in state.tokens {
 		if token.used && now-token.born > LIVING_TOKEN_SECONDS { living_token_free(&token) }
@@ -122,7 +146,7 @@ update_living_tokens :: proc(renderer: ^Renderer, now: f64) {
 		heal := cue.kind == .Heal
 		if (cue.kind != .Damage && !heal) || cue.event.amount <= 0 { continue }
 		if _, actor := presentation_actor_in_view(renderer.tactical.snapshot, cue.event.target); !actor { continue }
-		living_token_spawn(state, cue.event, heal, now)
+		living_token_spawn(state, cue.event, heal, now, world)
 	}
 }
 
@@ -159,8 +183,10 @@ draw_living_tokens :: proc(renderer: ^Renderer) {
 	now := renderer.sprite_assets.elapsed
 	for &token in v.living_state.tokens {
 		if !token.used || now < token.born { continue }
-		// Follow the card while it is on the board; a fallen foe keeps its spot.
-		if actor, found := presentation_actor_in_view(v.snapshot, token.entity); found && actor.visible {
+		// Follow the card while it is on the board; a fallen foe keeps its
+		// spot, and so does the player's card gone into its shadow.
+		sunk := token.entity == game.PLAYER_ENTITY && tactical_shadow_showing(renderer) && token.at != {}
+		if actor, found := presentation_actor_in_view(v.snapshot, token.entity); found && actor.visible && !sunk {
 			cell := grid.Position{int(math.round(actor.position.x)), int(math.round(actor.position.y))}
 			if !tactical_render_visible(renderer, cell) { continue }
 			key := Sprite_Key.Player if token.entity == game.PLAYER_ENTITY else sprite_key_for_enemy(actor.archetype)

@@ -15,6 +15,8 @@ hand and one kit:
   impact   pitch-dropping thumps (a body and a thud), wood, iron and stone
            modes, debris grains
   fortune  bone dice on wood, bright gold coins (disk modes) on stone
+  time     a clear bell whose shimmer slows (Battle Focus) or comes to a
+           standstill and hangs (Movimento Ombra)
 
 Recipes are dry (the build adds the hall, wet 0.25) and end peaking at 0.85,
 before the build's loudness normalisation (-19). The marks are the recipes'
@@ -599,6 +601,63 @@ def card_afterimage(seed):
         ghost = lowpass(resample(base, 1 + 0.015 * k), 4800 / 1.7 ** k, 3)
         events.append((0.04 + 0.13 * k, _norm(ghost), 0.85 * 0.52 ** k))
     return _out(place(dur, events), 0.04)
+
+
+def _frozen_bell(dur, f, seed, partials, tau=0.3, hold=0.08, still=0.05, stop=0.06, attack=0.003, trem_rate=6.0,
+                 trem_depth=0.18, beat=1.2):
+    """A bell whose time stops: struck, it rings on its own clock for `hold`
+    s, then that clock slows (time constant `stop`) to `still` of its speed,
+    and with it the decay, the tremolo and the beating of its doublets: the
+    shimmer comes to a standstill and the ring hangs, unnaturally even, until
+    the recipe lets it go."""
+    r = rng(seed)
+    t = time_axis(dur)
+    rate = still + (1 - still) * np.exp(-np.maximum(t - hold, 0) / stop)
+    clock = np.cumsum(rate) / SR
+    x = np.zeros_like(t)
+    for q, dm, a in partials:
+        fq = f * q
+        if fq >= SR * 0.45:
+            continue
+        env = a * np.exp(-clock / (tau * dm))
+        b = beat * r.uniform(0.5, 1.5)
+        x += env * np.sin(2 * np.pi * fq * t + r.uniform(0, 2 * np.pi))
+        # The doublet's detune runs on the bell's clock: the beating stops too.
+        x += 0.6 * env * np.sin(2 * np.pi * (fq * t + b * clock) + r.uniform(0, 2 * np.pi))
+    x = x * (1 - np.exp(-t / max(attack, 1e-4)))
+    trem = 1 + trem_depth * np.cos(2 * np.pi * trem_rate * clock)   # starts at its crest
+    return _norm(x * trem)
+
+
+@sound("card_shadow_step", loudness=LOUD, wet=WET, marks=(0.0, 0.03, 0.25))
+def card_shadow_step(seed):
+    """Movimento Ombra: the card leaves the hand, a dark whoosh sinks from
+    0.03 (its band falling 2 kHz -> 170 Hz, a body band two octaves under it)
+    over a low glide from D3 down to D2, and at 0.25, as the world's colours
+    finish draining, a D bell is struck with a faint crystal frost on top
+    (D7): their shimmer and beating slow to a standstill and the ring hangs,
+    still (time stops), then lets go."""
+    dur = 0.9
+    sink = _whoosh(0.38, seed + 10, 2000, 800, 170, t_peak=0.09, q=1.1, a=1.3, b=1.3, whistle=0.15)
+    body = _whoosh(0.4, seed + 11, 500, 230, 70, t_peak=0.1, q=0.9, a=1.3, b=1.3)
+    lo = 0.6
+    g = glide(D3, D2, lo)
+    fall = lowpass(sine(g, n=n_samples(lo)) + 0.35 * sine(2 * g, n=n_samples(lo)), 500, 2)
+    fall = _norm(fall) * _swell(lo, 0.12, a=1.0, b=1.6)
+    ring = 0.25
+    bell = _frozen_bell(dur - ring, D5, seed + 20, _BELL_D, tau=0.3, hold=0.08, still=0.05, stop=0.06, attack=0.003,
+                        trem_rate=6.5, trem_depth=0.2, beat=1.4)
+    frost = _frozen_bell(dur - ring, D7, seed + 21, _BELL_CLEAR[1:], tau=0.2, hold=0.08, still=0.05, stop=0.06,
+                         attack=0.002, trem_rate=9.0, trem_depth=0.3, beat=2.5)
+    x = place(dur, [
+        (0.0, _flick(seed), FLICK),
+        (0.03, sink, 0.75),
+        (0.03, body, 0.3),
+        (0.05, fall, 0.22),
+        (ring, bell, 0.7),
+        (ring, frost, 0.18),
+    ])
+    return _out(x, 0.2)
 
 
 @sound("card_counter_rune", loudness=LOUD, wet=WET, marks=(0.0, 0.05, 0.15, 0.25, 0.37))

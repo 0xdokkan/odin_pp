@@ -406,7 +406,8 @@ poll_gameplay_command :: proc(
 		}
 	}
 
-	if game.tactical_is_recovering(room) {
+	// Recovery and Movimento Ombra leave only walking (in the shadow, its steps).
+	if game.tactical_is_recovering(room) || game.tactical_shadow_active(room) {
 		card_interaction.selected_card_id = 0
 		card_interaction.dragged_card_id = 0
 		// Shift+WASD requests an active dodge; do not silently turn it into a walk.
@@ -527,7 +528,10 @@ capture_gameplay_command_telemetry :: proc(
 		return snapshot, {}, {}, false
 	case .Move:
 		resolved_kind, ok = combatdebug.command_kind_for_move(room, command.direction)
-	case .Dodge, .Wait, .Timeout, .Continue_Pulse, .Begin_Diagonal, .QTE_Key, .QTE_Fail, .Defense, .Activate, .Equip:
+		// A shadow step walks from the shadow's cell and never bumps.
+		if game.tactical_shadow_active(room) { resolved_kind = .Move }
+	case .Dodge, .Wait, .Timeout, .Continue_Pulse, .Begin_Diagonal, .QTE_Key, .QTE_Fail, .Defense, .Activate, .Equip,
+	     .Shadow_Emerge:
 		resolved_kind = .Wait
 	case .Ability:
 		resolved_kind = .Ability
@@ -580,7 +584,14 @@ execute_gameplay_command :: proc(room: ^game.Room, command: Gameplay_Command) ->
 		execution.committed = game.qte_key(room, command.direction)
 	case .QTE_Fail:
 		execution.committed = game.resolve_qte(room, false)
+	case .Shadow_Emerge:
+		execution.committed = game.tactical_end_shadow(room)
 	case .Move:
+		// Inside Movimento Ombra the keys walk the shadow, on its own beats.
+		if game.tactical_shadow_active(room) {
+			execution.committed = game.try_shadow_step(room, command.direction, command.diagonal, command.beat) == .Moved
+			break
+		}
 		spent := room.player.tactical.beat_spent
 		critical := game.tactical_claim_beat(room, command.beat)
 		result: game.Action_Result
@@ -609,7 +620,9 @@ execute_gameplay_command :: proc(room: ^game.Room, command: Gameplay_Command) ->
 		execution.committed = result != .Invalid_Phase
 	case .Play_Card:
 		spent := room.player.tactical.beat_spent
-		room.player.tactical.critical_next = game.tactical_claim_beat(room, command.beat)
+		if game.tactical_card_claims_beat(room, command.card_id) {
+			room.player.tactical.critical_next = game.tactical_claim_beat(room, command.beat)
+		}
 		play := game.play_card(room, command.card_id, command.target)
 		room.player.tactical.critical_next = false
 		execution.committed = game.card_play_was_committed(play.result)

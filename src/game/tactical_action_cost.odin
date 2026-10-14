@@ -18,7 +18,8 @@ tactical_card_time_cost :: proc(id: Card_Id) -> f32 {
 		return 3
 	case .Firebomb, .Toxic_Wave, .Caustic_Bloom, .Chain_Lightning, .Prismatic_Barrage, .Storm_Crown:
 		return 4
-	case .Count:
+	// Movimento Ombra takes no window time: its four seconds stand outside it.
+	case .Shadow_Step, .Count:
 		return 0
 	}
 	return 0

@@ -41,6 +41,8 @@ sandbox_random :: proc(sandbox: ^Sandbox_State, below: int) -> int {
 // arena is refilled at once. Returns the newcomer's id.
 sandbox_tick :: proc(room: ^Room, sandbox: ^Sandbox_State, dt: f32) -> (id: u32, spawned: bool) {
 	if room == nil || room.player == nil || sandbox == nil || !room.endless || room.phase != .Combat { return }
+	// The arrivals' clock stops with the world inside Movimento Ombra.
+	if tactical_shadow_active(room) { return }
 	// Easter eggs stay open here: the sandbox is for trying them again.
 	if !room.tesla_ring.pending { room.player.floor_secrets = {} }
 	sandbox.timer = max(sandbox.timer-max(dt, 0), 0)

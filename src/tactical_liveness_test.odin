@@ -26,13 +26,11 @@ tactical_liveness_frame :: proc(probe: ^Tactical_Liveness_Probe, room: ^game.Roo
 		dt, true, input)
 	if blocked { return false }
 	probe.released += 1
-	command, buffered := take_gameplay_command(&probe.buffer)
-	if !buffered {
-		command = requested
-		if command.kind == .None {
-			for pressed, index in input.directions {
-				if pressed { command = {kind = .Move, origin_phase = room.phase, direction = game.Move_Direction(index)}; break }
-			}
+	// Nothing is held across frames: only this frame's request or press acts.
+	command := requested
+	if command.kind == .None {
+		for pressed, index in input.directions {
+			if pressed { command = {kind = .Move, origin_phase = room.phase, direction = game.Move_Direction(index)}; break }
 		}
 	}
 	if command.kind == .None { return false }

@@ -22,17 +22,6 @@ Tactical_Controller_Input :: struct {
 	map_input: Tactical_Map_Input,
 }
 
-buffer_tactical_walk_input :: proc(buffer: ^Buffered_Gameplay_Command, phase: game.Room_Phase, directions: [4]bool, beat: u32 = 0) {
-	for pressed, index in directions {
-		if pressed {
-			// The tick is judged when the key is pressed, not when the walk
-			// leaves the buffer after the previous animation.
-			offer_gameplay_command(buffer, {kind = .Move, origin_phase = phase, direction = game.Move_Direction(index), beat = beat})
-			break
-		}
-	}
-}
-
 // The decision clock and QTE deadline are independent of presentation speed.
 // A window boundary cancels old input, then permits a fresh recovery walk.
 update_tactical_controller :: proc(
@@ -58,11 +47,11 @@ update_tactical_controller :: proc(
 			cue, has_cue := render.active_presentation_cue(&renderer.timeline)
 			elapsed, duration := f32(0), f32(0)
 			if has_cue { elapsed, duration = cue.elapsed, cue.duration }
-			fmt.printf("M7 input: keys=%v shift=%v focused=%v available=%v paused=%v map=%v blocked=%v room=%v tactical=%v pending=%v qte=%v qte_clock=%.3f clock=%.3f dt=%.6f timeline=%d/%d cue=%.6f/%.6f drag=%d deck_active=%v buffered=%v position=%v\n",
+			fmt.printf("M7 input: keys=%v shift=%v focused=%v available=%v paused=%v map=%v blocked=%v room=%v tactical=%v pending=%v qte=%v qte_clock=%.3f clock=%.3f dt=%.6f timeline=%d/%d cue=%.6f/%.6f drag=%d deck_active=%v chord=%v position=%v\n",
 				input.directions, input.shift, input.focused, available, controller.paused, controller.hologram, blocked,
 				room.phase, room.player.tactical.phase, room.tactical_pulse.pending, room.qte.kind,
 				room.qte.remaining, room.player.tactical.remaining, dt, renderer.timeline.head, renderer.timeline.count,
-				elapsed, duration, cards.dragged_card_id, room.player.deck.combat_active, buffer.occupied, room.player.position)
+				elapsed, duration, cards.dragged_card_id, room.player.deck.combat_active, buffer.chord.active, room.player.position)
 			for pressed, index in input.directions {
 				if !pressed { continue }
 				destination := game.add_position(room.player.position, game.direction_offset(game.Move_Direction(index)))
@@ -118,6 +107,25 @@ step_tactical_controller :: proc(
 	}
 	if cinematic_input { return true }
 	map_toggled := update_tactical_map_controls(controller, room, renderer, cards, buffer, input.map_input)
+	// Movimento Ombra: the world is frozen and only the shadow's clock runs,
+	// and not while the card's own sinking cue still owns the player's input.
+	// Its end is an explicit command, like a timeout; meanwhile the scene's
+	// lane walks the shadow with ordinary moves, tick chord included.
+	if game.tactical_shadow_active(room) {
+		if render.renderer_blocks_player_input(renderer) {
+			clear_gameplay_command_buffer(buffer)
+			return true
+		}
+		game.tactical_tick(room, simulation_dt, true, controller.hologram)
+		if game.tactical_shadow_due(room) {
+			controller.hologram = false
+			clear_card_interaction(cards)
+			clear_gameplay_command_buffer(buffer)
+			commit_gameplay_command(room, renderer, cards, {kind = .Shadow_Emerge, origin_phase = .Combat}, playtest)
+			return true
+		}
+		return map_toggled || controller.hologram
+	}
 	command := Gameplay_Command{origin_phase = .Combat}
 	if room.qte.kind != .None {
 		controller.hologram = false
@@ -167,21 +175,16 @@ step_tactical_controller :: proc(
 		clear_gameplay_command_buffer(buffer)
 		if !commit_gameplay_command(room, renderer, cards, {kind = .Timeout, origin_phase = .Combat}, playtest) { return true }
 		// A fresh walk on this exact boundary is already a recovery walk.
-		// Discarded targeting or old buffered commands cannot cross with it.
+		// Discarded targeting or a pending tick chord cannot cross with it.
 	}
 	if game.tactical_is_recovering(room) {
 		cards.selected_card_id = 0
 		cards.dragged_card_id = 0
 	}
-	movement_buffer_allowed := !controller.hologram && !map_toggled &&
-		(room.phase == .Loot || (room.phase == .Combat && game.tactical_allows_movement(room, true)))
-	if !movement_buffer_allowed || (buffer.occupied && buffer.command.origin_phase != room.phase) {
-		clear_gameplay_command_buffer(buffer)
-	}
+	// The player's own animation owns the input lane: a press made now is
+	// dropped, never kept for when the animation ends.
 	if render.renderer_blocks_player_input(renderer) {
-		if movement_buffer_allowed && !input.shift && cards.dragged_card_id == 0 {
-			buffer_tactical_walk_input(buffer, room.phase, input.directions, game.tactical_beat_target(room))
-		}
+		clear_gameplay_command_buffer(buffer)
 		return true
 	}
 	if !controller.hologram && room.phase == .Combat && room.player.tactical.phase == .Decision {

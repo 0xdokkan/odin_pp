@@ -14,7 +14,8 @@ import grid "../grid"
 // the first action of a window is not free. Each beat rewards one action.
 TACTICAL_BEAT_WINDOW :: f32(0.15)
 // A beat stays claimable this long after it struck, for an action that was
-// pressed on time but buffered behind the previous animation.
+// pressed on time but committed a little later: a move pressed on the tick
+// waits a few frames for its diagonal partner key.
 TACTICAL_BEAT_GRACE :: f32(0.45)
 TACTICAL_SHOCK_FLOOR_MAX_CHARGES :: i32(5)
 
@@ -37,6 +38,8 @@ tactical_reset_beats :: proc(s: ^Tactical_State) {
 tactical_beat_target :: proc(room: ^Room) -> u32 {
 	if room == nil || room.player == nil || !tactical_enabled(room) || room.phase != .Combat { return 0 }
 	s := &room.player.tactical
+	// Inside the shadow the press is judged against the shadow's own beats.
+	if s.phase == .Shadow { return tactical_shadow_beat_target(room) }
 	if s.phase != .Decision && !tactical_between_windows(s) { return 0 }
 	if s.beat_index > 0 && s.beat_age <= TACTICAL_BEAT_WINDOW && s.beat_spent != s.beat_index { return s.beat_index }
 	if 1-s.clock_fraction <= TACTICAL_BEAT_WINDOW && s.beat_spent != s.beat_index+1 { return s.beat_index+1 }
@@ -44,10 +47,15 @@ tactical_beat_target :: proc(room: ^Room) -> u32 {
 }
 
 // 0..1 nearness to the next tick, for the HUD metronome; `on` within the window.
+// Inside the shadow, the nearness to the shadow's own next beat.
 tactical_beat_glow :: proc(room: ^Room) -> (approach: f32, on: bool) {
 	if room == nil || room.player == nil || !tactical_enabled(room) { return }
 	s := &room.player.tactical
 	approach = s.clock_fraction
+	if tactical_shadow_active(room) {
+		elapsed := tactical_shadow_elapsed(s)
+		approach = elapsed-f32(int(elapsed))
+	}
 	on = tactical_beat_target(room) != 0
 	return
 }
@@ -56,10 +64,20 @@ tactical_beat_glow :: proc(room: ^Room) -> (approach: f32, on: bool) {
 tactical_claim_beat :: proc(room: ^Room, beat: u32) -> bool {
 	if beat == 0 || room == nil || room.player == nil || !tactical_enabled(room) || room.phase != .Combat { return false }
 	s := &room.player.tactical
+	// The world's beats are frozen with it; the shadow claims its own.
+	if s.phase == .Shadow { return false }
 	if s.beat_spent == beat || beat < s.beat_index || beat > s.beat_index+1 { return false }
 	if beat == s.beat_index && s.beat_age > TACTICAL_BEAT_GRACE { return false }
 	s.beat_spent = beat
 	return true
+}
+
+// Movimento Ombra stands outside the window's time: played on the tick it
+// leaves the beat to the next action, with no critical and no badge.
+tactical_card_claims_beat :: proc(room: ^Room, card_id: u32) -> bool {
+	if room == nil || room.player == nil { return false }
+	index, found := hand_card_index_by_id(&room.player.deck, card_id)
+	return !found || room.player.deck.hand[index].definition_id != .Shadow_Step
 }
 
 // Read once by the action that the claim was made for.
@@ -104,7 +122,8 @@ tactical_critical_scale :: proc(room: ^Room, action: ^Action) {
 		case .Deploy_Device:
 			effect.amount = critical_damage(effect.amount)
 			if effect.object_kind == .Shock_Floor { effect.charges = min(effect.charges+1, TACTICAL_SHOCK_FLOOR_MAX_CHARGES) }
-		case .Move, .Remove_Status, .Discard_Cards:
+		// Unchanged; Movimento Ombra's four seconds never grow either.
+		case .Move, .Remove_Status, .Discard_Cards, .Enter_Shadow:
 		}
 	}
 }

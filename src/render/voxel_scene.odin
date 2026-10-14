@@ -132,7 +132,7 @@ draw_voxel_object :: proc(renderer: ^Renderer, object: Presentation_Grid_Object)
 		draw_resin_cube(renderer, {p.x, 0.05, p.z}, 0.68, 0.08, 0.68, {40, 24, 27, 255})
 		for i in 0..<5 {
 			x, z := f32(i%3-1)*0.18, f32(i/3)*0.23-0.12
-			h := (f32(0.25)+f32(i%3)*0.15)*(0.91+0.09*math.sin(f32(renderer.sprite_assets.elapsed)*7+f32(i)*1.7))
+			h := (f32(0.25)+f32(i%3)*0.15)*(0.91+0.09*math.sin(f32(tactical_world_time(renderer))*7+f32(i)*1.7))
 			draw_resin_cube(renderer, {p.x+x, h/2+0.08, p.z+z}, 0.17, h, 0.17, GOTHIC_RED)
 			draw_resin_cube(renderer, {p.x+x, h*0.3+0.1, p.z+z+0.04}, 0.09, h*0.6, 0.12, {222, 132, 54, 255})
 		}

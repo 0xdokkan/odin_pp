@@ -58,6 +58,8 @@ Tactical_View :: struct {
 	kit: Diorama_Kit,
 	pilgrim: []Diorama_Vertex,
 	intent_memory: [game.MAX_ENEMIES_PER_ROOM]Intent_Memory,
+	// MOVIMENTO OMBRA: the player's pool and the world held still (shadow_step.odin).
+	shadow: Shadow_View,
 	// The last pointer seen by the view, for HUD hover states only.
 	pointer: view.Vec2,
 	pointer_inside: bool,
@@ -154,6 +156,8 @@ update_tactical_view :: proc(renderer: ^Renderer, room: ^game.Room, mouse: view.
 	if !v.enabled { return }
 	tactical_hud_pointer(renderer, mouse, inside)
 	v.snapshot^ = renderer_presentation_snapshot(renderer, room)
+	// Before the vision and the camera: in the shadow they follow the pool.
+	update_tactical_shadow(renderer, room)
 	v.no_fog = room.player.tactical.config.vision_size == 0 || tactical_room_is_clear(v.snapshot.phase)
 	if !tactical_room_is_clear(v.snapshot.phase) { v.clear_light = 0 }
 	v.refocus_enabled = room.phase == .Combat && game.tactical_allows_action(room)
@@ -302,16 +306,20 @@ tactical_billboard :: proc(renderer: ^Renderer, key: Sprite_Key, position: view.
 	entity: game.Entity_Ref = game.SYSTEM_ENTITY) {
 	quad := tactical_billboard_geometry(renderer, key, position, true, entity)
 	pose := tactical_feedback_pose(renderer, key, position)
-	draw_tactical_billboard_quad(renderer, quad, position, opacity, pose.tint)
+	// Sunk in its shadow the player's card is dark, paper and print alike.
+	shade, seen := tactical_shadow_tint(renderer, entity)
+	if shade != rl.WHITE { pose.tint = shade }
+	draw_tactical_billboard_quad(renderer, quad, position, opacity*seen, pose.tint, shade)
 }
 
-draw_tactical_billboard_quad :: proc(renderer: ^Renderer, quad: Tactical_Billboard, position: view.Vec2, opacity: f32, tint: rl.Color = rl.WHITE) {
+draw_tactical_billboard_quad :: proc(renderer: ^Renderer, quad: Tactical_Billboard, position: view.Vec2, opacity: f32,
+	tint: rl.Color = rl.WHITE, paper: rl.Color = rl.WHITE) {
 	if quad.texture.id == 0 { return }
 	uv := [4]rl.Vector2{{0, 0}, {0, 1}, {1, 1}, {1, 0}}
 	if quad.mirror { uv = {{1, 0}, {1, 1}, {0, 1}, {0, 0}} }
 	if quad.flipbook {
 		// Paper stays paper while the print reacts: no hit flash on the card.
-		if quad.card.id != 0 { draw_flipbook_card(renderer, quad, uv, opacity) }
+		if quad.card.id != 0 { draw_flipbook_card(renderer, quad, uv, opacity, paper) }
 	} else { draw_comic_cutout(renderer, quad, position, opacity) }
 	rlgl.SetTexture(quad.texture.id)
 	rlgl.Begin(rlgl.QUADS)
@@ -354,8 +362,8 @@ tactical_billboard_hit :: proc(renderer: ^Renderer, key: Sprite_Key, position: v
 tactical_cue_visible :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) -> bool {
 	snapshot := renderer.tactical.snapshot
 	position := cue.event.to_position
-	if target, ok := presentation_actor_in_view(snapshot, cue.event.target); ok {
-		position = {int(math.round(target.position.x)), int(math.round(target.position.y))}
+	if target, ok := tactical_cue_actor_position(renderer, cue.event.target); ok {
+		position = {int(math.round(target.x)), int(math.round(target.y))}
 	} else if cue.event.target.kind == .Object {
 		for object in snapshot.objects[:snapshot.object_count] {
 			if object.entity == cue.event.target { position = {int(math.round(object.position.x)), int(math.round(object.position.y))}; break }
@@ -445,8 +453,10 @@ draw_tactical_world :: proc(renderer: ^Renderer, room: ^game.Room, active_card: 
 		if !actor.visible || !tactical_render_visible(renderer, cell) { continue }
 		if !v.scene_3d { draw_enemy_body(renderer, {archetype = actor.archetype, health = actor.health}, tactical_project(renderer, {actor.position.x+0.5, actor.position.y+0.5}), actor.opacity) }
 	}
-	if snapshot.player.visible {
-		if !v.scene_3d { draw_player_body(renderer, tactical_project(renderer, {snapshot.player.position.x+0.5, snapshot.player.position.y+0.5}), snapshot.player.opacity) }
+	if snapshot.player.visible && !v.scene_3d {
+		center := tactical_project(renderer, {snapshot.player.position.x+0.5, snapshot.player.position.y+0.5})
+		if tactical_shadow_showing(renderer) { draw_tactical_shadow_flat(renderer, center, snapshot.player.opacity) }
+		else { draw_player_body(renderer, center, snapshot.player.opacity) }
 	}
 	if v.scene_3d {
 		rl.EndShaderMode()
@@ -479,8 +489,15 @@ draw_tactical_world :: proc(renderer: ^Renderer, room: ^game.Room, active_card: 
 		rl.EndMode3D()
 	}
 	end_tactical_surface(renderer, surface)
+	// The world stands still: without the resolve shader's grade, a cold veil
+	// over the whole canvas, as the board is drawn (the HUD and the hand come
+	// after it, clear).
+	if !surface && v.shadow.frozen > 0 {
+		rl.DrawRectangleRec({0, 0, renderer.canvas_width, renderer.canvas_height}, color_with_opacity({8, 12, 28, 255}, 0.4*v.shadow.frozen))
+	}
 	draw_tactical_annotations(renderer, room)
 	draw_intent_seals(renderer, room)
+	draw_tactical_shadow_overlay(renderer)
 	// Filter each member of simultaneous impacts, not only the first event.
 	for offset in 0..<renderer_active_cue_count(renderer) {
 		cue, found := renderer_active_cue_at(renderer, offset)

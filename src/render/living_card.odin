@@ -45,6 +45,8 @@ Living_Actor :: struct {
 Living_State :: struct {
 	actors: [FLIPBOOK_MAX_ACTORS]Living_Actor,
 	tokens: [LIVING_MAX_TOKENS]Living_Token,
+	blows: [LIVING_MAX_BLOWS]Living_Blow,
+	blow_next: int,
 }
 
 // Turns living cards on or off for this renderer; the drawings load the
@@ -72,10 +74,11 @@ destroy_living_cards :: proc(renderer: ^Renderer) {
 	if v.living_state != nil { free(v.living_state); v.living_state = nil }
 }
 
-// A fresh board starts with fresh drawings.
+// A fresh board starts with fresh drawings (and a world that never stopped).
 forget_living_actors :: proc(renderer: ^Renderer) {
 	if renderer == nil { return }
 	renderer.tactical.intent_traces = {}
+	renderer.tactical.shadow = {}
 	lab_sounds_reset(renderer)
 	if renderer.tactical.living_state == nil { return }
 	living_tokens_free(renderer.tactical.living_state)
@@ -166,7 +169,7 @@ living_card_position :: proc(renderer: ^Renderer, entity: game.Entity_Ref, key: 
 	if !ok { return }
 	actor := living_find(renderer, entity, character)
 	if actor == nil || !actor.sliding { return }
-	now := renderer.sprite_assets.elapsed
+	now := living_clock(renderer, entity)
 	u := f32((now-actor.slide_start)*1000/f64(max(actor.slide_ms, 1)))
 	if u >= 1 { return }
 	p := living_travel_progress(actor.slide_kind, u) if u > 0 else 0
@@ -236,12 +239,16 @@ living_past_hit :: proc(actor: ^Living_Actor, now: f64) -> bool {
 
 living_observe :: proc(renderer: ^Renderer, state: ^Living_State, room: ^game.Room, actor: Presentation_Actor,
 	character: gfx.Flipbook_Character, now: f64) {
-	slot := living_slot(state, actor.entity, character, now)
+	// The drawings keep the actor's own clock (living_clock: the world's
+	// stands still while the player is in his shadow); `seen` keeps the
+	// sprite clock, so a card held still is never forgotten.
+	clock := living_clock_at(renderer, actor.entity, now)
+	slot := living_slot(state, actor.entity, character, clock)
 	// Back on the board alive after its fall: a restart reuses the player's
 	// id, and that is a fresh card.
-	if slot.action == .Death && actor.health > 0 && living_death_done(slot, now) {
+	if slot.action == .Death && actor.health > 0 && living_death_done(slot, clock) {
 		slot^ = {}
-		slot = living_slot(state, actor.entity, character, now)
+		slot = living_slot(state, actor.entity, character, clock)
 	}
 	slot.seen, slot.ghost, slot.position = now, false, actor.position
 	slot.tremble = intent_tremble(renderer, room, actor.entity)
@@ -257,6 +264,13 @@ living_observe :: proc(renderer: ^Renderer, state: ^Living_State, room: ^game.Ro
 		event := &cue.event
 		if cue.kind == .Move && event.target == actor.entity {
 			from, to := presentation_position(event.from_position), presentation_position(event.to_position)
+			// A teleport is no walk: the card is simply on its landing, with no
+			// clip and no slide across the board. It is still the card's last
+			// move, so a walk back over the cells of the one before is a walk.
+			if game.event_is_teleport(event^) {
+				slot.moved, slot.move_from, slot.move_to, slot.sliding = true, from, to, false
+				continue
+			}
 			if slot.moved && slot.move_from == from && slot.move_to == to { continue }
 			slot.moved, slot.move_from, slot.move_to = true, from, to
 			d := rl.Vector3{to.x-from.x, 0, to.y-from.y}
@@ -268,16 +282,16 @@ living_observe :: proc(renderer: ^Renderer, state: ^Living_State, room: ^game.Ro
 			if pushed { move = .Hurt_Back }
 			else if actor.entity == game.PLAYER_ENTITY && abs(event.to_position.x-event.from_position.x)+abs(event.to_position.y-event.from_position.y) >= 2 { move = .Dodge }
 			else if length > 0.001 && abs(f) >= 0.38*length { move = .Move_Up if f > 0 else .Move_Down }
-			if !pushed { living_face(slot, h, now) }
+			if !pushed { living_face(slot, h, clock) }
 			if slot.action != .Death {
-				living_start(slot, move, now)
+				living_start(slot, move, clock)
 				slot.cause = .Move
 				clip := &sheet.clips[slot.action]
 				// The card goes from wherever it stands now, at the push.
 				here, _ := living_card_position(renderer, actor.entity, flipbook_key(character), from)
 				slot.slide_from, slot.slide_to = here, to
 				slot.slide_kind = clip.travel if clip.travel != .None && !pushed else .Dash
-				slot.slide_start = now+(f64(clip.travel_start)/1000 if clip.travel != .None && !pushed else 0)
+				slot.slide_start = clock+(f64(clip.travel_start)/1000 if clip.travel != .None && !pushed else 0)
 				slot.slide_ms = f32(clip.travel_ms) if clip.travel != .None && !pushed else 220
 				slot.sliding = true
 			}
@@ -288,7 +302,7 @@ living_observe :: proc(renderer: ^Renderer, state: ^Living_State, room: ^game.Ro
 		if action == .Attack || action == .Cast {
 			if target, ok := presentation_actor_in_view(snapshot, event.target); ok && event.target != actor.entity {
 				delta := rl.Vector3{target.position.x-actor.position.x, 0, target.position.y-actor.position.y}
-				living_face(slot, rl.Vector3DotProduct(delta, right), now)
+				living_face(slot, rl.Vector3DotProduct(delta, right), clock)
 			}
 		}
 		if action == .Hurt {
@@ -302,11 +316,11 @@ living_observe :: proc(renderer: ^Renderer, state: ^Living_State, room: ^game.Ro
 		if gfx.living_priority(action) > gfx.living_priority(wanted) { wanted, cause = action, cue.kind }
 	}
 	if wanted != .Idle {
-		fresh := wanted != slot.trigger || now-slot.trigger_seen > LIVING_TRIGGER_GAP
-		slot.trigger, slot.trigger_seen = wanted, now
+		fresh := wanted != slot.trigger || clock-slot.trigger_seen > LIVING_TRIGGER_GAP
+		slot.trigger, slot.trigger_seen = wanted, clock
 		if fresh && slot.action != .Death {
-			if !living_busy(slot, now) || gfx.living_priority(wanted) >= gfx.living_priority(slot.action) || living_past_hit(slot, now) {
-				living_start(slot, wanted, now)
+			if !living_busy(slot, clock) || gfx.living_priority(wanted) >= gfx.living_priority(slot.action) || living_past_hit(slot, clock) {
+				living_start(slot, wanted, clock)
 				slot.cause = cause
 			}
 		}
@@ -327,7 +341,7 @@ living_observe :: proc(renderer: ^Renderer, state: ^Living_State, room: ^game.Ro
 	base = gfx.living_resolve(character, base)
 	if base != slot.base {
 		slot.base = base
-		slot.base_started = now
+		slot.base_started = clock
 	}
 }
 
@@ -348,11 +362,13 @@ update_living_actors :: proc(renderer: ^Renderer, room: ^game.Room) {
 	for &actor in state.actors {
 		if !actor.used || actor.seen == now { continue }
 		// Gone from the board mid-death: finish the fall as a ghost.
-		if actor.action == .Death && !living_death_done(&actor, now) { actor.ghost = true; continue }
+		if actor.action == .Death && !living_death_done(&actor, living_clock_at(renderer, actor.entity, now)) { actor.ghost = true; continue }
 		if actor.ghost || now-actor.seen > LIVING_FORGET_SECONDS { actor = {} }
 	}
-	update_living_tokens(renderer, now)
-	update_intent_traces(renderer, room, now)
+	// The traces belong to the world and hold with it; the tokens fly on, but
+	// a blow held with the world never gives a second one.
+	update_living_tokens(renderer, now, tactical_world_time_at(renderer, now))
+	update_intent_traces(renderer, room, tactical_world_time_at(renderer, now))
 	update_lab_sounds(renderer, room, now)
 }
 
@@ -375,7 +391,7 @@ living_opacity :: proc(renderer: ^Renderer, entity: game.Entity_Ref, key: Sprite
 	if !ok { return opacity }
 	actor := living_find(renderer, entity, character)
 	if actor == nil || actor.action != .Death { return opacity }
-	fall := living_fall(actor, renderer.sprite_assets.elapsed)
+	fall := living_fall(actor, living_clock(renderer, entity))
 	return clamp(1-(fall-0.55)/0.45, 0, 1)
 }
 
@@ -383,7 +399,7 @@ living_billboard_geometry :: proc(renderer: ^Renderer, character: gfx.Flipbook_C
 	feedback: bool, entity: game.Entity_Ref) -> Tactical_Billboard {
 	v := &renderer.tactical
 	sheet := &gfx.LIVING_SHEETS[character]
-	now := renderer.sprite_assets.elapsed
+	now := living_clock(renderer, entity)
 	actor := living_find(renderer, entity, character) if feedback else nil
 	action, frame := gfx.Living_Action.Idle, i32(0)
 	if actor != nil { action, frame = living_drawing(actor, now) }
@@ -424,6 +440,9 @@ living_billboard_geometry :: proc(renderer: ^Renderer, character: gfx.Flipbook_C
 	lift := (sheet.ground+gfx.FLIPBOOK_PAPER+gfx.FLIPBOOK_INK)*scale+0.03
 	if v.outline_mode == .Hologram { lift = 0; result.card = {} }
 	base := rl.Vector3{at.x+0.5, 0.02+lift+travel_lift, at.y+0.5}
+	// MOVIMENTO OMBRA: the player's card goes down into its shadow; the
+	// floor's depth hides what is under it (shadow_step.odin).
+	base.y -= tactical_shadow_depth(renderer, entity)*sheet.world_height
 	bl := base-right*(sheet.feet.x*scale)-up*(below*scale)
 	span := right*(cell.x*scale)
 	top := up*(cell.y*scale)

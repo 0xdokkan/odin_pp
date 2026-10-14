@@ -12,12 +12,12 @@ import level "level"
 import render "render"
 
 // PROVA MECCANICHE: a sandbox for trying mechanics one at a time. A large
-// arena with no cover, a deck made only of the cards under test (for now the
-// Tesla coil) and enemies that never stop coming (game/sandbox.odin). It never
-// touches the profile, gives no rewards and has no exit to walk to.
+// arena with no cover, a deck made only of the cards under test (for now
+// Movimento Ombra) and enemies that never stop coming (game/sandbox.odin). It
+// never touches the profile, gives no rewards and has no exit to walk to.
 MECHANICS_LAB_WIDTH :: 23
 MECHANICS_LAB_HEIGHT :: 17
-MECHANICS_LAB_DECK :: [8]game.Card_Id{.Tesla_Coil, .Tesla_Coil, .Tesla_Coil, .Tesla_Coil, .Tesla_Coil, .Tesla_Coil, .Tesla_Coil, .Tesla_Coil}
+MECHANICS_LAB_DECK :: [8]game.Card_Id{.Shadow_Step, .Shadow_Step, .Shadow_Step, .Shadow_Step, .Shadow_Step, .Shadow_Step, .Shadow_Step, .Shadow_Step}
 MECHANICS_LAB_RULES :: game.Deck_Rules{hand_size = 5, max_energy = 12, energy_regen_per_pulse = 3}
 MECHANICS_LAB_DECK_SEED :: u64(0x7E57_1AB)
 
@@ -104,8 +104,9 @@ mechanics_lab_smoke_frame :: proc(window: ^app.Window, renderer: ^render.Rendere
 	render.play_lab_sounds(renderer, nil, 0)
 }
 
-// The sandbox in the real window: a hand of Teslas, a square of coils around
-// the arrivals, the last kill that keeps the combat going and the refill.
+// The sandbox in the real window: a hand of Movimento Ombra, a square of coils
+// around the arrivals, the last kill that keeps the combat going and the refill;
+// last, one of those cards played, the shadow walked and the rise.
 run_mechanics_lab_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer, dice: ^render.Dice_Renderer) -> bool {
 	data: level.Level
 	defer level.destroy(&data)
@@ -115,7 +116,7 @@ run_mechanics_lab_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer,
 	if !built { fmt.eprintln("mechanics lab: arena not built"); return false }
 	defer game.destroy_room(&room)
 	for card in player.deck.hand[:player.deck.hand_count] {
-		if card.definition_id != .Tesla_Coil { fmt.eprintln("mechanics lab: a card other than Tesla"); return false }
+		if card.definition_id != .Shadow_Step { fmt.eprintln("mechanics lab: a card other than Movimento Ombra"); return false }
 	}
 	render.clear_event_animations(renderer)
 	render.reset_tactical_orbit(&renderer.tactical.world_orbit)
@@ -266,7 +267,140 @@ run_mechanics_lab_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer,
 		rl.TakeScreenshot("odin_pp_mechanics_lab_pause.png" if screen == 0 else "odin_pp_mechanics_lab_defeat.png")
 	}
 	renderer.tactical.pause_hovered, renderer.tactical.pause_menu = .None, false
+	if !mechanics_lab_shadow(window, renderer, &room, &controller, &cards, &buffer) { return false }
 	return mechanics_lab_sounds_heard(renderer)
+}
+
+// MOVIMENTO OMBRA from the hand, as the lane plays it, filmed every fourth
+// frame as odin_pp_living_shadow_NN.png: the card sinks the player into his
+// shadow, the shadow steps, takes a diagonal on its first beat and steps
+// again while the world stands still, and when the four seconds are over he
+// rises where it stopped. The window, the world's beats and every footstep
+// wait for him; only the shadow's own sounds play.
+mechanics_lab_shadow :: proc(window: ^app.Window, renderer: ^render.Renderer, room: ^game.Room, controller: ^Tactical_Controller,
+	cards: ^Card_Interaction_State, buffer: ^Buffered_Gameplay_Command) -> bool {
+	player := room.player
+	// From an open window, the stun above over and a second and a half into
+	// it (the world's clock between two beats), nothing resolving or running.
+	for _ in 0..<600 {
+		if player.tactical.phase == .Decision && player.tactical.remaining <= f32(player.tactical.budget)-1.5 &&
+		   game.tactical_can_begin_shadow(room) && !render.renderer_blocks_player_input(renderer) { break }
+		mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0, true)
+	}
+	if room.phase != .Combat || player.tactical.phase != .Decision || !game.tactical_can_begin_shadow(room) {
+		fmt.eprintln("mechanics lab: no open window for the shadow"); return false
+	}
+	sounds := renderer.tactical.lab_sounds
+	if sounds == nil { fmt.eprintln("mechanics lab: no sounds before the shadow"); return false }
+	heard := sounds.played
+	left, clock, pulses, body := player.tactical.remaining, player.tactical.clock_fraction, room.pulse_count, player.position
+	if player.deck.hand_count == 0 || player.deck.hand[0].definition_id != .Shadow_Step ||
+	   !commit_gameplay_command(room, renderer, cards, {kind = .Play_Card, origin_phase = .Combat,
+		card_id = player.deck.hand[0].id, target = game.entity_target(game.PLAYER_ENTITY)}) || !game.tactical_shadow_active(room) {
+		fmt.eprintln("mechanics lab: Movimento Ombra was not played"); return false
+	}
+	frame := 0
+	// The card and the sinking hold the shadow's four seconds.
+	for _ in 0..<120 {
+		if !render.renderer_blocks_player_input(renderer) { break }
+		mechanics_lab_reel_frame(window, renderer, room, controller, cards, buffer, "shadow", 4, &frame)
+	}
+	if render.renderer_blocks_player_input(renderer) || player.tactical.shadow_remaining < game.TACTICAL_SHADOW_SECONDS-2.0/60.0 {
+		fmt.eprintln("mechanics lab: the sinking ate the shadow's seconds"); return false
+	}
+	// Four steps, each as soon as the shadow's own lockout and its moment
+	// allow: one straight away, the diagonal on the first beat, two more. The
+	// first free way of each list is taken.
+	Planned_Step :: struct {
+		after: f32,
+		beat: bool,
+		ways: [4]grid.Position,
+	}
+	steps := [4]Planned_Step{
+		{after = 0, ways = {{1, 0}, {0, 1}, {-1, 0}, {0, -1}}},
+		{beat = true, ways = {{1, 1}, {1, -1}, {-1, 1}, {-1, -1}}},
+		{after = 1.6, ways = {{0, 1}, {1, 0}, {-1, 0}, {0, -1}}},
+		{after = 2.3, ways = {{1, 0}, {0, 1}, {0, -1}, {-1, 0}}},
+	}
+	shadow_cell := player.tactical.shadow_position
+	for step, index in steps {
+		for _ in 0..<240 {
+			if !game.tactical_shadow_active(room) { break }
+			if !render.renderer_blocks_player_input(renderer) && !game.tactical_player_busy(room) &&
+			   game.tactical_shadow_elapsed(&player.tactical) >= step.after && (!step.beat || game.tactical_beat_target(room) != 0) { break }
+			mechanics_lab_reel_frame(window, renderer, room, controller, cards, buffer, "shadow", 4, &frame)
+		}
+		if !game.tactical_shadow_active(room) { fmt.eprintln("mechanics lab: the shadow ended before step", index); return false }
+		stepped := false
+		for way in step.ways {
+			// A diagonal is the lane's two keys on a beat: the first key's
+			// direction, both keys' offset and the beat stamped at the press.
+			command := Gameplay_Command{kind = .Move, origin_phase = .Combat}
+			if step.beat {
+				command.direction = .East if way.x > 0 else .West
+				command.diagonal, command.beat = way, game.tactical_beat_target(room)
+			} else {
+				for direction in game.Move_Direction {
+					if game.direction_offset(direction) == way { command.direction = direction }
+				}
+			}
+			if commit_gameplay_command(room, renderer, cards, command) {
+				stepped = player.tactical.shadow_position == game.add_position(shadow_cell, way)
+				break
+			}
+		}
+		if !stepped || player.position != body {
+			fmt.eprintln("mechanics lab: shadow step", index, "not taken from", shadow_cell); return false
+		}
+		shadow_cell = player.tactical.shadow_position
+		mechanics_lab_reel_frame(window, renderer, room, controller, cards, buffer, "shadow", 4, &frame)
+	}
+	// The rest of the four seconds, then the rise (the controller's own
+	// command). Up to the rise the window and the world's clock stay where
+	// they stopped; the body lands on the shadow's cell.
+	risen := false
+	rising: [audio.Lab_Sfx]int
+	for _ in 0..<360 {
+		if player.tactical.remaining != left || player.tactical.clock_fraction != clock || room.pulse_count != pulses {
+			fmt.eprintf("mechanics lab: the world moved in the shadow (window %.3f -> %.3f s)\n", left, player.tactical.remaining); return false
+		}
+		if !game.tactical_shadow_active(room) { risen, rising = true, sounds.played; break }
+		mechanics_lab_reel_frame(window, renderer, room, controller, cards, buffer, "shadow", 4, &frame)
+	}
+	if !risen || player.position != shadow_cell || shadow_cell == body {
+		fmt.eprintln("mechanics lab: the player did not rise on the shadow's cell", shadow_cell, "but at", player.position); return false
+	}
+	// The card climbs out and the world's colours come back.
+	for _ in 0..<120 {
+		if !render.tactical_shadow_showing(renderer) && !render.renderer_blocks_player_input(renderer) && renderer.tactical.shadow.frozen <= 0 { break }
+		mechanics_lab_reel_frame(window, renderer, room, controller, cards, buffer, "shadow", 4, &frame)
+	}
+	for _ in 0..<8 { mechanics_lab_reel_frame(window, renderer, room, controller, cards, buffer, "shadow", 4, &frame) }
+	// The shadow's steps start no clip on the card: never the boots and the
+	// card's scrape, nor a dodge for the diagonal; the rise is no walk either.
+	// (Once risen the world's blows are back, and one that now misses him
+	// rightly makes his card dodge.) Its own sounds all played.
+	for sfx in ([?]audio.Lab_Sfx{.Pilgrim_Move_Side, .Pilgrim_Move_Up, .Pilgrim_Move_Down}) {
+		if sounds.played[sfx] != heard[sfx] { fmt.eprintln("mechanics lab: a footstep in the shadow:", sfx); return false }
+	}
+	if rising[.Pilgrim_Dodge] != heard[.Pilgrim_Dodge] { fmt.eprintln("mechanics lab: a shadow step played the dodge"); return false }
+	if sounds.played[.Card_Shadow_Step] != heard[.Card_Shadow_Step]+1 || sounds.played[.Pilgrim_Shadow_Sink] != heard[.Pilgrim_Shadow_Sink]+1 ||
+	   sounds.played[.Pilgrim_Shadow_Step] != heard[.Pilgrim_Shadow_Step]+len(steps) ||
+	   sounds.played[.Pilgrim_Shadow_Rise] != heard[.Pilgrim_Shadow_Rise]+1 || sounds.played[.Ui_Critical] <= heard[.Ui_Critical] ||
+	   sounds.played[.Ui_Beat_Tick] < heard[.Ui_Beat_Tick]+game.TACTICAL_SHADOW_BEATS {
+		fmt.eprintln("mechanics lab: the shadow's sounds did not all play"); return false
+	}
+	fmt.eprintf("mechanics lab shadow: %d steps, risen at %v from %v, window %.2f s kept, %d frames\n", len(steps), player.position, body, left, frame)
+	return true
+}
+
+// One frame of a film with the clock running; every `every`th one is saved
+// as odin_pp_living_<name>_NN.png.
+mechanics_lab_reel_frame :: proc(window: ^app.Window, renderer: ^render.Renderer, room: ^game.Room, controller: ^Tactical_Controller,
+	cards: ^Card_Interaction_State, buffer: ^Buffered_Gameplay_Command, name: string, every: int, frame: ^int) {
+	mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0, true)
+	if frame^%every == 0 { rl.TakeScreenshot(fmt.ctprintf("odin_pp_living_%s_%02d.png", name, frame^/every)) }
+	frame^ += 1
 }
 
 // The smoke's actions each sounded: steps, blows, hurts, the clock, the

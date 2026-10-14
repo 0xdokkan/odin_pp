@@ -55,6 +55,31 @@ m7_polish_command :: proc(window: ^app.Window, renderer: ^render.Renderer,
 	return m7_polish_settle(window, renderer, room, cards)
 }
 
+// One frame of the scene's input lane (roguelike_update): the window's frame,
+// the controller with the frame's keys, then, unless the controller keeps the
+// frame for itself (the scene then drops all held input), the lane with the
+// scene's busy flag. `pressed` presses `walk` for the controller and the
+// lane's poll alike; with `only_while_busy` the lane takes it only on a frame
+// the player's own step still holds after this frame's update. `kept`: the
+// controller took up the press for later.
+m7_polish_lane_frame :: proc(window: ^app.Window, renderer: ^render.Renderer, room: ^game.Room,
+	cards: ^Card_Interaction_State, controller: ^Tactical_Controller, buffer: ^Buffered_Gameplay_Command,
+	walk: Gameplay_Command, pressed: bool, only_while_busy := false) -> (moved, busy, kept: bool) {
+	m7_polish_frame(window, renderer, room)
+	input := Tactical_Controller_Input{focused = true}
+	input.directions[int(walk.direction)] = pressed
+	before := buffer^
+	blocked := step_tactical_controller(controller, room, renderer, cards, buffer, 1.0/60.0, true, input)
+	kept = buffer^ != before && buffer^ != Buffered_Gameplay_Command{}
+	if blocked {
+		clear_gameplay_command_buffer(buffer)
+		return false, true, kept
+	}
+	busy = render.renderer_blocks_player_input(renderer) || game.tactical_player_busy(room)
+	ready, ok := route_gameplay_command(buffer, room, busy, walk, pressed && (busy || !only_while_busy), 1.0/60.0)
+	return ok && commit_gameplay_command(room, renderer, cards, ready), busy, kept
+}
+
 // A complete room lifecycle, rather than a forced phase switch: moving reveals
 // the archer, a ranged card kills it beyond loot magnet range, walking collects
 // that drop, and the actual run/reward/route APIs install the following room.
@@ -108,25 +133,34 @@ run_m7_polish_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer) -> 
 		render.tactical_render_visible(renderer, room.exit_position), "cleared room did not illuminate its exit") { return false }
 	rl.TakeScreenshot("odin_pp_m7_polish_loot.png")
 	pulses_after_combat, clock_after_combat := room.pulse_count, run.player.tactical.remaining
-	if !commit_gameplay_command(&room, renderer, &cards, {kind = .Move, origin_phase = .Loot, direction = .East}) { return false }
+	walk := Gameplay_Command{kind = .Move, origin_phase = .Loot, direction = .East}
+	if !commit_gameplay_command(&room, renderer, &cards, walk) { return false }
 	controller := Tactical_Controller{was_focused = true}
 	buffer: Buffered_Gameplay_Command
-	input := Tactical_Controller_Input{focused = true}
-	input.directions[int(game.Move_Direction.East)] = true
-	if !m7_polish_check(render.renderer_timeline_is_busy(renderer) &&
-		step_tactical_controller(&controller, &room, renderer, &cards, &buffer, 0, true, input) && buffer.occupied,
-		"WASD during loot animation was lost instead of buffered") { return false }
+	after_first_step := run.player.position
+	// WASD pressed on every frame of the step, through the scene's own lane:
+	// each press is dropped, and nothing is kept for when the step ends.
+	pressed_frames := 0
+	for pressed_frames < 600 {
+		moved, busy, kept := m7_polish_lane_frame(window, renderer, &room, &cards, &controller, &buffer, walk, true, true)
+		if !m7_polish_check(!moved && !kept && buffer == Buffered_Gameplay_Command{},
+			"WASD during the loot step was kept instead of dropped") { return false }
+		if !busy { break }
+		pressed_frames += 1
+	}
+	if !m7_polish_check(pressed_frames > 5, "the loot step did not hold the player's input") { return false }
 	if !m7_polish_settle(window, renderer, &room, &cards) { return false }
 	if !m7_polish_check(len(room.loot) == 0 && run.player.gold == gold_before+1,
 		"loot movement did not collect the real enemy drop") { return false }
-	if !m7_polish_check(!step_tactical_controller(&controller, &room, renderer, &cards, &buffer,
-		0, true, {focused = true}), "idle loot controller still blocks the buffered move") { return false }
-	buffered, has_buffered := take_gameplay_command(&buffer)
-	before_buffered_move := run.player.position
-	if !m7_polish_check(has_buffered && buffered.kind == .Move && buffered.direction == .East &&
-		m7_polish_command(window, renderer, &room, &cards, buffered) &&
-		run.player.position == game.add_position(before_buffered_move, {1, 0}),
-		"the buffered loot move did not resume when presentation finished") { return false }
+	for _ in 0..<30 {
+		moved, _, _ := m7_polish_lane_frame(window, renderer, &room, &cards, &controller, &buffer, walk, false)
+		if !m7_polish_check(!moved && run.player.position == after_first_step,
+			"a press made during the loot step moved the player after it") { return false }
+	}
+	fresh, _, _ := m7_polish_lane_frame(window, renderer, &room, &cards, &controller, &buffer, walk, true)
+	if !m7_polish_check(fresh && m7_polish_settle(window, renderer, &room, &cards) &&
+		run.player.position == game.add_position(after_first_step, {1, 0}),
+		"a fresh loot move after the step did not act") { return false }
 	loot_moves := 2
 	for room.phase == .Loot && loot_moves < 32 {
 		direction, found := m7_route_move(&room)
@@ -166,7 +200,7 @@ run_m7_polish_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer) -> 
 		renderer.tactical.clear_light == 0, "movement in the following combat room failed") { return false }
 	for _ in 0..<3 { m7_polish_frame(window, renderer, &room) }
 	rl.TakeScreenshot("odin_pp_m7_polish_next_room.png")
-	fmt.printf("M7 polish: combat move + ranged kill; %d loot moves with buffered WASD; drop collected; reward + next room move; fog/light reset; timeline_errors=%d\n",
-		loot_moves, renderer.timeline.update_failures)
+	fmt.printf("M7 polish: combat move + ranged kill; %d loot moves, WASD pressed through the scene's lane on all %d frames of a step dropped; drop collected; reward + next room move; fog/light reset; timeline_errors=%d\n",
+		loot_moves, pressed_frames, renderer.timeline.update_failures)
 	return true
 }

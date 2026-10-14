@@ -141,9 +141,16 @@ play_card :: proc(room: ^Room, card_id: u32, target: Target) -> (play: Card_Play
 	}
 
 	if tactical_enabled(room) {
-		tactical_begin_card_cast(room, tactical_card_time_cost(play.card.definition_id))
+		seconds := tactical_card_time_cost(play.card.definition_id)
+		tactical_begin_card_cast(room, seconds)
 		tactical_count_card(room)
 		room.tactical_pulse.deferred_draws += 1
+		// A card that takes no time has no cast to wait for: it is a decision
+		// of its own, and its replacement is drawn now.
+		if seconds <= 0 {
+			room.player.tactical.metrics.decisions += 1
+			tactical_refill(room)
+		}
 		play.result = .Played
 		play.energy_after = deck.energy
 		return

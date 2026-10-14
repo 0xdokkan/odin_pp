@@ -21,7 +21,7 @@ gothic_card_accent :: proc(id: game.Card_Id) -> rl.Color {
 	if game.card_is_board_device(id) || id == .Storm_Crown { return {42, 93, 125, 255} }
 	switch gothic_card_icon(id) {
 	case 2, 7: return {72, 92, 42, 255}
-	case 4, 14: return {98, 57, 122, 255}
+	case 4, 14, 16: return {98, 57, 122, 255}
 	case 1, 5, 15: return {60, 84, 93, 255}
 	case 3, 10, 11: return {122, 88, 34, 255}
 	case: return {130, 43, 45, 255}
@@ -35,6 +35,14 @@ gothic_rarity_accent :: proc(rarity: game.Card_Rarity) -> rl.Color {
 	case .Common, .Count: return {115, 106, 92, 255}
 	}
 	return GOTHIC_MUTED
+}
+
+// The time a card takes from the window: "-2s", or "0s" for one that takes
+// none (Movimento Ombra stands outside it).
+tactical_card_time_badge :: proc(id: game.Card_Id) -> cstring {
+	cost := game.tactical_card_time_cost(id)
+	if cost <= 0 { return "0s" }
+	return fmt.ctprintf("-%.0fs", cost)
 }
 
 SCOPA_CARD_SIZE :: rl.Vector2{60, 96}
@@ -74,7 +82,7 @@ draw_scopa_tactical_card :: proc(renderer: ^Renderer, bounds: rl.Rectangle, card
 	rl.DrawRectangleRec({x+8, y+9, 20, 22}, GOTHIC_INK)
 	gothic_text(renderer, fmt.ctprintf("%d", definition.cost), x+13, y+8, 18, GOTHIC_BLUE if affordable else GOTHIC_RED)
 	rl.DrawRectangleRec({x+7, y+36, 30, 17}, {22, 41, 54, 240})
-	gothic_text_fit(renderer, fmt.ctprintf("-%.0fs", game.tactical_card_time_cost(card.definition_id)), {x+10, y+37, 25, 15}, 12, GOTHIC_BLUE)
+	gothic_text_fit(renderer, tactical_card_time_badge(card.definition_id), {x+10, y+37, 25, 15}, 12, GOTHIC_BLUE)
 	gold := game.card_effect_amount(definition.effects[0], card.upgrade_level)
 	ribbon := rl.Rectangle{x+width*0.5-36, y+height-27, 72, 19}
 	rl.DrawRectangleRec(ribbon, {72, 54, 24, 240})
@@ -134,7 +142,7 @@ draw_tactical_card :: proc(renderer: ^Renderer, bounds: rl.Rectangle, card: game
 	// Time has a distinct blue badge, separated from the black energy socket.
 	// The crest stays clear even with the narrowest eight-card hand.
 	rl.DrawRectangleRec({x+8, y+42, 30, 17}, {22, 41, 54, 240})
-	gothic_text_fit(renderer, fmt.ctprintf("-%.0fs", game.tactical_card_time_cost(card.definition_id)), {x+11, y+43, 25, 15}, 12, GOTHIC_BLUE)
+	gothic_text_fit(renderer, tactical_card_time_badge(card.definition_id), {x+11, y+43, 25, 15}, 12, GOTHIC_BLUE)
 	if game.card_is_board_device(card.definition_id) {
 		gothic_text_fit(renderer,"PASSIVA" if card.definition_id == .Shock_Floor else "ATTIVO",{x+8,y+63,32,12},9,accent)
 	}
@@ -160,12 +168,15 @@ draw_tactical_card_inspector :: proc(renderer: ^Renderer, card: game.Card_Instan
 	if card.upgrade_level > 0 { name = fmt.ctprintf("%s +%d", definition.name, card.upgrade_level) }
 	gothic_text_fit(renderer, name, {x, y, 195, 25}, 18, GOTHIC_PAPER)
 	gothic_rule(x, y+29, 190, gothic_rarity_accent(definition.rarity))
-	gothic_text_fit(renderer, fmt.ctprintf("ENERGIA %d / TEMPO -%.0fs", definition.cost, game.tactical_card_time_cost(card.definition_id)), {x, y+35, 193, 18}, 14, GOTHIC_BLUE)
+	gothic_text_fit(renderer, fmt.ctprintf("ENERGIA %d / TEMPO %s", definition.cost, tactical_card_time_badge(card.definition_id)), {x, y+35, 193, 18}, 14, GOTHIC_BLUE)
 	gothic_text_fit(renderer, tactical_card_target_label(definition), {x, y+54, 193, 17}, 12, GOTHIC_MUTED)
 	first, second := gothic_card_lines(card, definition.tactical)
 	gothic_text_fit(renderer, first, {x, y+76, 192, 20}, 16, GOTHIC_PAPER)
 	gothic_text_fit(renderer, second, {x, y+97, 192, 18}, 14, GOTHIC_PAPER)
 	reaction: cstring = ""
+	// A second rule line, where the keyword tags go when the card has none.
+	rule: cstring = ""
+	if card.definition_id == .Shadow_Step { reaction, rule = "NEMICI E TIMER FERMI", "DIAGONALE SUL BATTITO" }
 	if card.definition_id == .Guard || card.definition_id == .Purifying_Guard { reaction = "QTE: BLOCK / PARRY" }
 	if card.definition_id == .Thorn_Coat { reaction = "QTE: DEFLECT (FRECCE)" }
 	if card.definition_id == .Afterimage { reaction = "IGNORA RECUPERO SCHIVA" }
@@ -185,6 +196,7 @@ draw_tactical_card_inspector :: proc(renderer: ^Renderer, card: game.Card_Instan
 	gothic_text_fit(renderer, reaction, {x, y+117, 192, 17}, 12, GOTHIC_RED)
 	tags, count := card_keyword_tags(card, definition)
 	tag_count := count+(1 if definition.exhaust_on_play else 0)
+	if tag_count == 0 && rule != "" { gothic_text_fit(renderer, rule, {x, y+139, 192, 17}, 12, GOTHIC_RED) }
 	tag_width := f32(192)/f32(max(1, tag_count))
 	for index in 0..<tag_count {
 		label := "EXHAUST" if index == count else card_keyword_tag_label(tags[index], true)
@@ -224,6 +236,7 @@ draw_tactical_hand :: proc(renderer: ^Renderer, room: ^game.Room,
 	}
 	if recovering { hint = "RECUPERO / PUOI MUOVERTI" }
 	if game.tactical_is_stunned(room) { hint = "STORDITO / SOLO CARTE" }
+	if game.tactical_shadow_active(room) { hint = "OMBRA / SOLO PASSI" }
 	if right-left > 580 { gothic_text_fit(renderer, hint, {left+180, top+5, right-left-398, 17}, 10, GOTHIC_BLUE) }
 	for card, index in deck.hand[:deck.hand_count] {
 		definition, found := game.card_definition_by_id(card.definition_id, true)

@@ -177,3 +177,17 @@ cappuccio usano la suddivisione; l'esportazione è nello stesso formato ODM del
 kit (`assets/models/pilgrim.odm`). La scheda lo mette su un piedistallo in una
 piccola cappella costruita con i pezzi del kit, illuminato dalla sua lanterna.
 `--blend FILE` salva anche la scena .blend per ritoccarla a mano.
+
+## Icone delle carte fatte a mano
+
+```bash
+python tools/art/build_card_icons.py
+```
+
+Aggiunge ad `assets/gothic/card-icons-pixel.png` una quinta riga di celle in pixel
+art disegnate nello script (una griglia di 28x28 lettere di palette per icona; oggi
+la cella 16, Movimento Ombra) e lascia identiche, byte per byte, le 16 icone dipinte.
+Usa solo la libreria standard di Python (va bene anche quello di Blender) e non passa
+mai l'atlante da Blender né da altre librerie d'immagine. `--check` dice se l'atlante
+è aggiornato; `--preview C:/tmp/icone --no-write` scrive le celle aggiunte senza
+toccarlo. I dettagli sono in `assets/gothic/generation-prompts.md`.

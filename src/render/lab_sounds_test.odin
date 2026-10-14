@@ -4,6 +4,7 @@ import "core:testing"
 import audio "../engine/audio"
 import gfx "../engine/gfx"
 import game "../game"
+import level "../level"
 
 // Every card has its own sound, and every character sounds its steps, hurts
 // and fall.
@@ -148,4 +149,172 @@ test_lab_sounds_of_cards_and_devices :: proc(t: ^testing.T) {
 	for sound in s.queue[:s.count] { if sound.sfx == .Ui_Card_Draw { deals += 1 } }
 	testing.expect_value(t, deals, 3)
 	testing.expect(t, s.queue[s.count-1].at > s.queue[s.count-2].at)
+}
+
+// A world cue with a sound of its own (a miss, energy...) still showing when
+// the player sinks into his shadow is held with the world for the card and
+// the four seconds, longer than a cue is remembered: it is heard once, not
+// again in the shadow nor when the world goes on.
+@(test)
+test_lab_sounds_hear_a_cue_the_shadow_holds_once :: proc(t: ^testing.T) {
+	data: level.Level
+	player: game.Player
+	room := shadow_view_test_room(t, &data, &player)
+	defer level.destroy(&data)
+	defer game.destroy_room(&room)
+	snapshot: Room_Presentation
+	renderer := shadow_view_test_renderer(&data, &snapshot)
+	defer free(renderer)
+	defer destroy_renderer_world_playback(renderer)
+	renderer.tactical.mechanics_lab = true
+	renderer.tactical.living_state = new(Living_State)
+	defer free(renderer.tactical.living_state)
+	defer destroy_lab_sounds(renderer)
+	// Both lanes, as the scene runs them: the world's cues hold in the shadow.
+	frame :: proc(renderer: ^Renderer, room: ^game.Room, dt: f32) {
+		renderer.sprite_assets.elapsed += f64(dt)
+		update_renderer_frame_timeline(renderer, dt)
+		update_tactical_view(renderer, room, {}, false)
+		now := renderer.sprite_assets.elapsed
+		living_observe(renderer, renderer.tactical.living_state, room, renderer.tactical.snapshot.player, .Pilgrim, now)
+		update_lab_sounds(renderer, room, now)
+		play_lab_sounds(renderer, nil, 0)
+	}
+	frame(renderer, &room, 0.01)
+	sounds := renderer.tactical.lab_sounds
+	world: game.Event_Log
+	game.record_event(&world, {kind = .Attack_Missed, source = game.enemy_entity(room.enemies[0].id), target = game.PLAYER_ENTITY,
+		from_position = {7, 1}, to_position = player.position})
+	game.record_event(&world, {kind = .Energy_Gained, source = game.PLAYER_ENTITY, target = game.PLAYER_ENTITY, amount = 1})
+	testing.expect(t, begin_renderer_world_timeline(renderer, capture_room_presentation(&room), &world))
+	for _ in 0..<2 { frame(renderer, &room, 0.02) }
+	testing.expect(t, sounds.played[.Ui_Miss] == 1 && sounds.played[.Ui_Energy] == 1)
+	before := capture_room_presentation(&room)
+	play := game.play_card(&room, player.deck.hand[0].id, game.entity_target(game.PLAYER_ENTITY))
+	testing.expect_value(t, play.result, game.Card_Play_Result.Played)
+	after := capture_room_presentation(&room)
+	testing.expect(t, begin_renderer_event_timeline(renderer, before, &room.recent_events, &after))
+	played := renderer.sprite_assets.elapsed
+	for _ in 0..<400 {
+		if game.tactical_shadow_due(&room) { break }
+		if !renderer_blocks_player_input(renderer) { testing.expect(t, !game.tactical_tick(&room, 0.02, true, false)) }
+		frame(renderer, &room, 0.02)
+	}
+	testing.expect(t, game.tactical_shadow_due(&room))
+	testing.expect(t, renderer.sprite_assets.elapsed-played > LAB_SOUND_HEARD_SECONDS)
+	testing.expect(t, sounds.played[.Ui_Miss] == 1 && sounds.played[.Ui_Energy] == 1)
+	before = capture_room_presentation(&room)
+	testing.expect(t, game.tactical_end_shadow(&room))
+	after = capture_room_presentation(&room)
+	testing.expect(t, begin_renderer_event_timeline(renderer, before, &room.recent_events, &after))
+	for _ in 0..<150 { frame(renderer, &room, 0.02) }
+	testing.expect(t, renderer.world_playback == nil || renderer.world_playback.count == 0)
+	testing.expect_value(t, sounds.played[.Ui_Miss], 1)
+	testing.expect_value(t, sounds.played[.Ui_Energy], 1)
+}
+
+// One frame of the board as the lab plays it: the view, the player's card
+// reading its cues, then the lab's ears (the sounds are counted, not played).
+lab_shadow_test_frame :: proc(renderer: ^Renderer, room: ^game.Room, dt: f32) {
+	shadow_view_test_frame(renderer, room, dt)
+	now := renderer.sprite_assets.elapsed
+	living_observe(renderer, renderer.tactical.living_state, room, renderer.tactical.snapshot.player, .Pilgrim, now)
+	update_lab_sounds(renderer, room, now)
+	play_lab_sounds(renderer, nil, 0)
+}
+
+// Movimento Ombra played for real: the card sounds as itself; the sinking
+// waits for the card to start going down and the rise for it to start
+// climbing out, after the landing; each step of the shadow is its own soft
+// sound, a diagonal on a beat also stings and its beats tick. The boots and
+// the card's scrape never play: no step starts a clip on the card.
+@(test)
+test_lab_sounds_follow_the_shadow_never_its_footsteps :: proc(t: ^testing.T) {
+	data: level.Level
+	player: game.Player
+	room := shadow_view_test_room(t, &data, &player)
+	defer level.destroy(&data)
+	defer game.destroy_room(&room)
+	snapshot: Room_Presentation
+	renderer := shadow_view_test_renderer(&data, &snapshot)
+	defer free(renderer)
+	defer destroy_renderer_world_playback(renderer)
+	renderer.tactical.mechanics_lab = true
+	renderer.tactical.living_state = new(Living_State)
+	defer free(renderer.tactical.living_state)
+	defer destroy_lab_sounds(renderer)
+	lab_shadow_test_frame(renderer, &room, 0)
+	sounds := renderer.tactical.lab_sounds
+	s := &renderer.tactical.shadow
+
+	before := capture_room_presentation(&room)
+	play := game.play_card(&room, player.deck.hand[0].id, game.entity_target(game.PLAYER_ENTITY))
+	testing.expect_value(t, play.result, game.Card_Play_Result.Played)
+	after := capture_room_presentation(&room)
+	testing.expect(t, begin_renderer_event_timeline(renderer, before, &room.recent_events, &after))
+	lab_shadow_test_frame(renderer, &room, 0.02)
+	testing.expect(t, sounds.played[.Card_Shadow_Step] == 1 && sounds.played[.Pilgrim_Cast] == 1)
+	// The room is in the shadow, the card not yet going down: no sinking yet.
+	testing.expect(t, s.active && s.sink == 0 && sounds.played[.Pilgrim_Shadow_Sink] == 0)
+	early := false
+	for _ in 0..<100 {
+		if s.sink > 0 { break }
+		lab_shadow_test_frame(renderer, &room, 0.02)
+		if s.sink <= 0 && sounds.played[.Pilgrim_Shadow_Sink] > 0 { early = true }
+	}
+	testing.expect(t, !early, "the sinking sounded before the card went down")
+	testing.expect_value(t, sounds.played[.Pilgrim_Shadow_Sink], 1)
+	waited := sounds.last_played[.Pilgrim_Shadow_Sink]-sounds.last_played[.Card_Shadow_Step]
+	testing.expectf(t, waited > f64(PRESENTATION_CARD_PLAY_DURATION)-0.021 && waited < f64(PRESENTATION_CARD_PLAY_DURATION)+0.05,
+		"the sinking sounded %.3f s after the card", waited)
+	for _ in 0..<200 {
+		if !renderer_blocks_player_input(renderer) { break }
+		lab_shadow_test_frame(renderer, &room, 0.02)
+	}
+
+	// A step straight, then two keys on the shadow's first beat: a diagonal.
+	testing.expect_value(t, game.try_shadow_step(&room, .East), game.Action_Result.Moved)
+	lab_shadow_test_frame(renderer, &room, 0)
+	testing.expect(t, sounds.played[.Pilgrim_Shadow_Step] == 1 && sounds.played[.Ui_Critical] == 0)
+	for _ in 0..<40 {
+		if game.tactical_shadow_beat_target(&room) != 0 { break }
+		testing.expect(t, !game.tactical_tick(&room, 0.05, true, false))
+		lab_shadow_test_frame(renderer, &room, 0.05)
+	}
+	beat := game.tactical_shadow_beat_target(&room)
+	testing.expect_value(t, game.try_shadow_step(&room, .South, {1, 1}, beat), game.Action_Result.Moved)
+	lab_shadow_test_frame(renderer, &room, 0)
+	testing.expect(t, sounds.played[.Pilgrim_Shadow_Step] == 2 && sounds.played[.Ui_Critical] == 1)
+	for _ in 0..<200 {
+		if game.tactical_shadow_due(&room) { break }
+		testing.expect(t, !game.tactical_tick(&room, 0.05, true, false))
+		lab_shadow_test_frame(renderer, &room, 0.05)
+	}
+	testing.expect_value(t, sounds.played[.Ui_Beat_Tick], game.TACTICAL_SHADOW_BEATS)
+
+	// The rise: the landing's cue first, then the card climbs out.
+	before = capture_room_presentation(&room)
+	testing.expect(t, game.tactical_end_shadow(&room))
+	after = capture_room_presentation(&room)
+	testing.expect(t, begin_renderer_event_timeline(renderer, before, &room.recent_events, &after))
+	ended := renderer.sprite_assets.elapsed
+	lab_shadow_test_frame(renderer, &room, 0)
+	testing.expect(t, !s.active && s.rising && sounds.played[.Pilgrim_Shadow_Rise] == 0)
+	early = false
+	for _ in 0..<200 {
+		if !renderer_blocks_player_input(renderer) { break }
+		lab_shadow_test_frame(renderer, &room, 0.02)
+		if s.rise <= 0 && sounds.played[.Pilgrim_Shadow_Rise] > 0 { early = true }
+	}
+	testing.expect(t, !early, "the rise sounded before the card climbed out")
+	lab_shadow_test_frame(renderer, &room, 0.02)
+	testing.expect(t, !tactical_shadow_showing(renderer))
+	testing.expect_value(t, sounds.played[.Pilgrim_Shadow_Rise], 1)
+	landed := sounds.last_played[.Pilgrim_Shadow_Rise]-ended
+	testing.expectf(t, landed > f64(PRESENTATION_NOTICE_DURATION)-0.021, "the rise sounded %.3f s after the shadow ended", landed)
+	testing.expect_value(t, sounds.played[.Pilgrim_Shadow_Sink], 1)
+	testing.expect_value(t, sounds.played[.Pilgrim_Shadow_Step], 2)
+	testing.expect_value(t, sounds.played[.Ui_Critical], 1)
+	steps := sounds.played[.Pilgrim_Move_Side]+sounds.played[.Pilgrim_Move_Up]+sounds.played[.Pilgrim_Move_Down]+sounds.played[.Pilgrim_Dodge]
+	testing.expect_value(t, steps, 0)
 }

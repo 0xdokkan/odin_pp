@@ -6,7 +6,7 @@ import rlgl "vendor:raylib/rlgl"
 import game "../game"
 import grid "../grid"
 
-// Every enemy intent gets a paper sticker beside its health label: a
+// Every enemy intent gets a paper sticker, on its seal or beside its heart: a
 // hand-cut ivory disc with an inked pictogram that moves in a short loop, so
 // what an enemy is about to do reads at a glance. A committed wind-up warms
 // the paper red, shakes it and rings it.

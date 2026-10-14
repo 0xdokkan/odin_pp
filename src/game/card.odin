@@ -59,6 +59,7 @@ Card_Id :: enum {
 	Storm_Crown,
 	Sei_Denari,
 	Sette_Denari,
+	Shadow_Step,
 	Count,
 }
 
@@ -66,6 +67,12 @@ Card_Id :: enum {
 // they open the western easter egg. They never appear as rewards or wares.
 card_is_scopa :: proc(id: Card_Id) -> bool {
 	return id == .Sei_Denari || id == .Sette_Denari
+}
+
+// Movimento Ombra stops the tactical clock, which classic combat does not
+// have: classic runs never offer it, and refuse to play it.
+card_requires_tactical :: proc(id: Card_Id) -> bool {
+	return id == .Shadow_Step
 }
 
 card_dice_count :: proc(id: Card_Id) -> int {
@@ -866,6 +873,15 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 		effects = {{kind = .Gain_Gold, target = .Player, base_amount = 7}, {}, {}, {}},
 		effect_count = 1,
 	},
+	{
+		// Four real seconds inside the player's shadow (tactical_shadow.odin).
+		// Its length never scales: there is no upgrade.
+		id = .Shadow_Step, name = "Movimento Ombra", rarity = .Rare,
+		reward_weight = 60, shop_base_price = 8, cost = 3,
+		targeting = {rule = .Self},
+		effects = {{kind = .Enter_Shadow, target = .Player, base_amount = 4}, {}, {}, {}},
+		effect_count = 1,
+	},
 }
 
 card_drop_target :: proc(
@@ -945,6 +961,9 @@ card_effect_template_is_valid :: proc(
 	}
 
 	switch template.kind {
+	case .Enter_Shadow:
+		return template.target == .Player && definition.targeting.rule == .Self &&
+		       template.amount_per_upgrade == 0 && card_amount_template_is_valid(template)
 	case .Deploy_Device:
 		return template.target == .Player && definition.targeting.rule == .Walkable_Cell &&
 		       board_device_kind(template.object_kind) && card_amount_template_is_valid(template)
@@ -1143,6 +1162,8 @@ instantiate_card_effect :: proc(
 		), true
 	case .Deploy_Device:
 		return deploy_device_effect(template.object_kind, {}, card_effect_amount(template, instance.upgrade_level)), true
+	case .Enter_Shadow:
+		return enter_shadow_effect(card_effect_amount(template, instance.upgrade_level)), true
 	case .Move, .Gain_Energy:
 			return {}, false
 	}
@@ -1313,6 +1334,10 @@ evaluate_card_targeting :: proc(
 	}
 	evaluation.error = .Invalid_Instance
 	if !validate_card_instance(instance) {
+		return
+	}
+	if card_requires_tactical(instance.definition_id) && !tactical_enabled(room) {
+		evaluation.error = .Invalid_Phase
 		return
 	}
 	if tactical_enabled(room) && request.has_anchor && !tactical_cell_visible(room, request.anchor) {

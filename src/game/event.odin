@@ -41,6 +41,10 @@ Game_Event_Kind :: enum {
 	Dice_Rolled,
 	Spell_Launched,
 	Spell_Impact,
+	// Movimento Ombra (tactical_shadow.odin): the player sinks at from_position
+	// for `duration` seconds; he rises again at to_position.
+	Shadow_Entered,
+	Shadow_Emerged,
 }
 
 Game_Event :: struct {
@@ -84,6 +88,14 @@ EVENT_CRITICAL_BIT :: u16(1)<<15
 
 event_is_critical :: proc(event: Game_Event) -> bool {
 	return event.area_mask&EVENT_CRITICAL_BIT != 0
+}
+
+// The bit below it marks a Moved made by a teleport (Movement_Mode.Teleport):
+// the body vanishes and reappears instead of walking the line between.
+EVENT_TELEPORT_BIT :: u16(1)<<14
+
+event_is_teleport :: proc(event: Game_Event) -> bool {
+	return event.area_mask&EVENT_TELEPORT_BIT != 0
 }
 
 Event_Log :: struct {

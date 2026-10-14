@@ -2,8 +2,10 @@ package game
 
 import grid "../grid"
 
-// Recovery leaves only walking; Stunned (an exhausted window) only cards.
-Tactical_Phase :: enum { Decision, Recovery, Resolving, Stunned }
+// Recovery leaves only walking; Stunned (an exhausted window) only cards;
+// Shadow (Movimento Ombra, tactical_shadow.odin) only the shadow's own steps,
+// with the whole world frozen.
+Tactical_Phase :: enum { Decision, Recovery, Resolving, Stunned, Shadow }
 Tactical_Config :: struct {
 	enabled: bool,
 	timer_seconds: int,
@@ -62,6 +64,16 @@ Tactical_State :: struct {
 	cards_toward_second, won_seconds: int,
 	stuns: int,
 	stun_duration: f32,
+	// Movimento Ombra (tactical_shadow.odin): the phase the shadow interrupted,
+	// its own real-time clock, the current step's lockout, the cell the body
+	// sank on (player.position stays there), the shadow's cell and the one it
+	// left, the shadow beats already rewarded and the steps taken.
+	shadow_resume: Tactical_Phase,
+	shadow_remaining, shadow_duration: f32,
+	shadow_step_remaining: f32,
+	shadow_origin, shadow_position, shadow_from: grid.Position,
+	shadow_beats_spent: bit_set[0..<8; u8],
+	shadow_steps: int,
 }
 Tactical_Pulse :: struct {
 	pending, started, forced: bool,
@@ -108,7 +120,7 @@ tactical_enabled :: proc(room: ^Room) -> bool {
 }
 
 // `ignore_busy` asks whether an action would be allowed once the player's
-// own timed action has finished (input buffering, and the dodge that cuts it).
+// own timed action has finished (the dodge, which cuts that action short).
 tactical_allows_action :: proc(room: ^Room, ignore_busy := false) -> bool {
 	if !tactical_enabled(room) || room.phase != .Combat { return true }
 	s := &room.player.tactical
@@ -116,9 +128,10 @@ tactical_allows_action :: proc(room: ^Room, ignore_busy := false) -> bool {
 	       s.phase == .Decision && (ignore_busy || s.action_remaining <= 0)
 }
 
-// The player is still performing a timed action.
+// The player is still performing a timed action, or a shadow step.
 tactical_player_busy :: proc(room: ^Room) -> bool {
-	return tactical_enabled(room) && room.phase == .Combat && room.player.tactical.action_remaining > 0
+	return tactical_enabled(room) && room.phase == .Combat &&
+	       (room.player.tactical.action_remaining > 0 || tactical_shadow_step_busy(room))
 }
 
 tactical_is_recovering :: proc(room: ^Room) -> bool {
@@ -164,6 +177,7 @@ begin_tactical_room :: proc(room: ^Room) {
 	s.cast_remaining, s.cast_duration = 0, 0
 	s.action_remaining, s.action_duration = 0, 0
 	tactical_reset_beats(s)
+	tactical_reset_shadow(s)
 	for &enemy in room.enemies { enemy.tactical_cooldown = 0 }
 }
 
@@ -180,6 +194,7 @@ tactical_end_combat :: proc(room: ^Room) {
 	s.cast_remaining, s.cast_duration = 0, 0
 	s.action_remaining, s.action_duration = 0, 0
 	tactical_reset_beats(s)
+	tactical_reset_shadow(s)
 	room.tactical_pulse = {}
 	room.qte = {}
 }
@@ -188,7 +203,9 @@ tactical_finish_cycle_pulse :: proc(room: ^Room, forced: bool) {
 	s := &room.player.tactical
 	s.dodge_recovery = max(0, s.dodge_recovery-1)
 	if forced { s.metrics.forced_pulses += 1 }
-	if !tactical_between_windows(s) { s.phase = .Decision }
+	// Only the beat's own Resolving hands the window back: no pulse ever
+	// finishes inside a shadow, and none may end one.
+	if s.phase == .Resolving { s.phase = .Decision }
 	tactical_queue_next_beat(room)
 	tactical_finish_recovery(room)
 }
@@ -199,6 +216,9 @@ tactical_tick :: proc(room: ^Room, dt: f32, available: bool, hologram: bool) -> 
 	if !tactical_enabled(room) || room.phase != .Combat || !available ||
 	   room.tactical_pulse.pending || room.qte.kind != .None { return false }
 	s := &room.player.tactical
+	// Inside the shadow only its own clock runs: the window, the world beats,
+	// the enemies and any stun stay exactly where they were.
+	if s.phase == .Shadow { tactical_shadow_tick(room, dt); return false }
 	if s.phase != .Decision && !tactical_between_windows(s) { return false }
 	if s.cast_remaining > 0 {
 		elapsed := min(max(f32(0), dt), s.cast_remaining)
@@ -370,7 +390,7 @@ tactical_cell_visible :: proc(room: ^Room, position: grid.Position) -> bool {
 	if !grid.contains(&room.level_data.tiles, position) { return false }
 	s := &room.player.tactical
 	if !s.config.enabled || s.config.vision_size == 0 { return true }
-	origin := room.player.position
+	origin := tactical_view_origin(room)
 	return tactical_in_footprint(tactical_vision_size(s.config, &room.player.statuses), s.facing, origin, position) &&
 		tactical_line_visible(origin, position, tactical_room_opaque, room)
 }

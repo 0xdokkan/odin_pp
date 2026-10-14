@@ -3,22 +3,133 @@ package render
 import "core:testing"
 import rl "vendor:raylib"
 import game "../game"
+import view "../view"
 
 @(test)
-test_living_health_label_counts_the_health_and_stays_on_the_board :: proc(t: ^testing.T) {
-	testing.expect_value(t, string(living_health_text(12, 18, 0)), "HP 12/18")
-	testing.expect_value(t, string(living_health_text(12, 18, 3)), "HP 12/18 / SC 3")
-	testing.expect_value(t, living_health_step(18), i32(1))
-	testing.expect_value(t, living_health_step(40), i32(5))
-	viewport := rl.Rectangle{12, 110, 1256, 400}
-	// Behind the top panel: just below it, straight under the enemy.
-	at := living_label_anchor(viewport, {400, 12}, {120, 44})
-	testing.expect(t, at.x == 400 && at.y == 110+44+2)
-	// Off the side: pulled in whole.
-	at = living_label_anchor(viewport, {5, 300}, {120, 44})
-	testing.expect(t, at.x == 12+60 && at.y == 300)
-	at = living_label_anchor(viewport, {640, 300}, {120, 44})
-	testing.expect(t, at.x == 640 && at.y == 300)
+test_living_heart_reads_the_health_over_the_maximum :: proc(t: ^testing.T) {
+	testing.expect_value(t, living_heart_text(12, 18), "12/18")
+	testing.expect_value(t, living_heart_text(-3, 18), "0/18")
+	width, height := living_heart_size("12/18")
+	// The heart, a pixel, five figures, and a token's paper and edge.
+	testing.expect(t, width == 7+1+5*6-1+7 && height == 14)
+	slash, ok := living_token_glyph('/')
+	testing.expect(t, ok && slash == 12)
+	// Every figure of a tag is drawable.
+	for r in living_heart_text(123, 456) {
+		_, found := living_token_glyph(u8(r))
+		testing.expect(t, found)
+	}
+}
+
+// Centred over the head, left of the enemy's own seal, lifted past another
+// tag, never out of the board, and always shown.
+@(test)
+test_living_heart_keeps_clear_of_seals_and_other_tags :: proc(t: ^testing.T) {
+	viewport := rl.Rectangle{12, 84, 936, 260}
+	size := view.Vec2{44, 14}
+	layout: Tactical_Label_Layout
+	alone := place_living_heart(&layout, {300, 200}, size, {}, false, viewport)
+	testing.expect(t, alone == rl.Rectangle{278, 186, 44, 14})
+	testing.expect(t, layout.count == 1 && layout.bounds[0] == alone)
+	// A seal close to the head pushes the tag left of the square it keeps.
+	layout = {}
+	seal := rl.Vector2{330, 190}
+	layout.bounds[0] = living_heart_seal_bounds(seal)
+	layout.count = 1
+	beside := place_living_heart(&layout, {300, 200}, size, seal, true, viewport)
+	testing.expect(t, beside.x+beside.width < seal.x-LIVING_HEART_SEAL_KEEP-2 && beside.y == 186)
+	testing.expect(t, !rl.CheckCollisionRecs(beside, layout.bounds[0]))
+	// A seal far to the right leaves it centred.
+	layout = {}
+	far := place_living_heart(&layout, {300, 200}, size, {400, 190}, true, viewport)
+	testing.expect(t, far.x == 278)
+	// Two heads together: the second tag goes up a row.
+	layout = {}
+	first := place_living_heart(&layout, {300, 200}, size, {}, false, viewport)
+	second := place_living_heart(&layout, {310, 204}, size, {}, false, viewport)
+	testing.expect(t, !rl.CheckCollisionRecs(first, second) && second.y < first.y)
+	// Behind the top panel: just under it; off the side: pulled in whole.
+	layout = {}
+	top := place_living_heart(&layout, {300, 60}, size, {}, false, viewport)
+	testing.expect(t, top.y == viewport.y)
+	side := place_living_heart(&layout, {0, 300}, size, {}, false, viewport)
+	testing.expect(t, side.x == viewport.x)
+	// A crowd that fills every row still shows it, in its first place.
+	layout = {}
+	layout.bounds[0], layout.count = {0, 0, 2000, 2000}, 1
+	crowd := place_living_heart(&layout, {300, 200}, size, {}, false, viewport)
+	testing.expect(t, crowd == rl.Rectangle{278, 186, 44, 14} && layout.count == 2)
+	// The player's figure behind the enemy: the tag steps aside, never over it.
+	layout = {}
+	figure := rl.Rectangle{270, 120, 60, 110}
+	aside := place_living_heart(&layout, {300, 200}, size, {}, false, viewport, figure)
+	testing.expect(t, !rl.CheckCollisionRecs(aside, figure) && aside.y == 186 && aside.x+aside.width <= figure.x)
+	// Blocked by another label instead, with the figure far off: one step
+	// aside, never across the board past the figure.
+	layout = {}
+	layout.bounds[0], layout.count = {276, 130, 48, 75}, 1
+	near := place_living_heart(&layout, {300, 200}, size, {}, false, viewport, {600, 100, 60, 110})
+	testing.expect(t, near.x == 230 && near.y == 186)
+	// A head behind the top panel, with the lab's banner there too: the tag
+	// waits under the banner, over its enemy.
+	layout = {}
+	layout.bounds[0], layout.count = {200, 84, 400, 60}, 1
+	under := place_living_heart(&layout, {300, 40}, size, {}, false, viewport)
+	testing.expect(t, under.y > 84+60 && under.x == 278)
+	// Never past its enemy's feet: a tag that cannot sit over its own enemy
+	// stays in its first place rather than wander off below another figure.
+	layout.count = 1
+	kept := place_living_heart(&layout, {300, 40}, size, {}, false, viewport, {}, 120)
+	testing.expect(t, kept.y == viewport.y)
+}
+
+// A crowd that takes every row over the head, both sides and the cells down
+// to the feet: the tag takes the nearest free place around its first. With
+// none free, it lies over other tags where it hides the least of them, never
+// under a seal (drawn over it).
+@(test)
+test_living_heart_finds_its_place_in_a_crowd :: proc(t: ^testing.T) {
+	viewport := rl.Rectangle{12, 84, 936, 400}
+	size := view.Vec2{44, 14}
+	layout: Tactical_Label_Layout
+	layout.bounds[0], layout.count = {226, 230, 150, 120}, 1
+	near := place_living_heart(&layout, {300, 300}, size, {}, false, viewport, {}, 330)
+	testing.expect_value(t, near, rl.Rectangle{278, 206, 44, 14})
+	// Everything taken: a seal (another enemy's), and the other tags.
+	layout = {}
+	seal := living_heart_seal_bounds({300, 293})
+	layout.bounds[0], layout.bounds[1], layout.count = seal, {0, 0, 2000, 2000}, 2
+	over := place_living_heart(&layout, {300, 300}, size, {}, false, viewport, {}, 1e9, 1)
+	testing.expect_value(t, over, rl.Rectangle{278, 238, 44, 14})
+	testing.expect(t, !rl.CheckCollisionRecs(over, seal))
+	// Not told which places are tags: its first place.
+	layout.count = 2
+	first := place_living_heart(&layout, {300, 300}, size, {}, false, viewport)
+	testing.expect_value(t, first, rl.Rectangle{278, 286, 44, 14})
+	// Over other tags, where it hides the least of them: in a strip one tag
+	// high, its first place under a seal, the place over a sliver of a tag
+	// rather than the nearer one wholly over another.
+	layout = {}
+	strip := rl.Rectangle{152, 216, 240, 14}
+	layout.bounds[0] = {250, 216, 40, 14}
+	layout.bounds[1], layout.bounds[2] = {196, 216, 52, 14}, {300, 216, 8, 14}
+	layout.bounds[3], layout.bounds[4] = {150, 216, 50, 14}, {340, 216, 60, 14}
+	layout.count = 5
+	least := place_living_heart(&layout, {270, 230}, size, {}, false, strip, {}, 1e9, 1)
+	testing.expect_value(t, least, rl.Rectangle{296, 216, 44, 14})
+}
+
+// The heart's pixel rows are runs of lit pixels: the glyph is the classic
+// heart, seven wide, widest in its middle rows and a single pixel at its tip.
+@(test)
+test_living_heart_glyph_is_a_heart :: proc(t: ^testing.T) {
+	widths: [7]int
+	for row, index in LIVING_HEART_GLYPH {
+		for column in 0..<LIVING_HEART_WIDTH { if row&(u8(1)<<u8(column)) != 0 { widths[index] += 1 } }
+	}
+	testing.expect(t, widths == {4, 7, 7, 7, 5, 3, 1})
+	// Two lobes: the top row is split in the middle.
+	testing.expect(t, LIVING_HEART_GLYPH[0]&0b0001000 == 0)
 }
 
 // A living board's inspector keeps the enemy it showed while the camera glides

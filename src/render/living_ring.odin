@@ -108,7 +108,9 @@ draw_living_rings :: proc(renderer: ^Renderer, room: ^game.Room) {
 		if !ok { continue }
 		draw_living_ring(renderer, character, key, actor.position, actor.entity, living_ring_open(room, enemy), living_ring_color(kind))
 	}
-	if snapshot.player.visible && snapshot.player.health > 0 {
+	// In the shadow the card is under the floor: the pool's own beat ring
+	// takes this one's place (draw_tactical_shadow_pool).
+	if snapshot.player.visible && snapshot.player.health > 0 && !tactical_shadow_showing(renderer) {
 		if open, on := living_beat_open(room); on {
 			draw_living_ring(renderer, .Pilgrim, .Player, snapshot.player.position, game.PLAYER_ENTITY, open, living_ring_color(.Beat))
 		}
@@ -118,7 +120,7 @@ draw_living_rings :: proc(renderer: ^Renderer, room: ^game.Room) {
 draw_living_ring :: proc(renderer: ^Renderer, character: gfx.Flipbook_Character, key: Sprite_Key, position: view.Vec2,
 	entity: game.Entity_Ref, open: f32, color: rl.Color) {
 	assets := &renderer.tactical.living_assets
-	if living_fall(living_find(renderer, entity, character), renderer.sprite_assets.elapsed) > 0 { return }
+	if living_fall(living_find(renderer, entity, character), living_clock(renderer, entity)) > 0 { return }
 	alpha := clamp((1-open)/LIVING_RING_FADE, 0, 1)
 	if alpha <= 0 { return }
 	quad := living_billboard_geometry(renderer, character, key, position, true, entity)
