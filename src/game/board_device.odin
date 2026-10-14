@@ -88,7 +88,7 @@ resolve_board_device_card :: proc(room: ^Room, instance: Card_Instance, target: 
 	roll: Dice_Roll
 	if instance.definition_id == .Shock_Floor {
 		rolled: bool
-		roll, rolled = roll_d4(&staged_dice)
+		roll, rolled = roll_card_dice(&staged_dice, instance)
 		if !rolled { return }
 		action.effects[0].charges = roll.total
 	}
@@ -344,7 +344,7 @@ activate_board_devices :: proc(room: ^Room) -> bool {
 }
 
 // Dormant floors never spend charges. The first occupied beat also handles a
-// floor placed underneath an enemy. Once tripped, the committed d4 sequence
+// floor placed underneath an enemy. Once tripped, the committed die's sequence
 // runs to completion even if the area becomes empty again.
 tick_board_devices :: proc(room: ^Room, pulse: ^Pulse_Report) {
 	if room == nil || pulse == nil || room.phase != .Combat { return }
@@ -389,7 +389,7 @@ tick_board_devices :: proc(room: ^Room, pulse: ^Pulse_Report) {
 }
 
 
-// The committed d4 controls both repetition and target count. Equal distances
+// The committed die controls both repetition and target count. Equal distances
 // always use entity ID, independent of removals or physical array ordering.
 shock_floor_targets :: proc(room: ^Room, object: Grid_Object) -> (ids: [MAX_ENEMIES_PER_ROOM]u32, count: int) {
 	distances: [MAX_ENEMIES_PER_ROOM]int

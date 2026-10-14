@@ -163,6 +163,6 @@ tactical_end_shadow :: proc(room: ^Room) -> bool {
 		kind = .Shadow_Emerged, source = PLAYER_ENTITY, target = PLAYER_ENTITY,
 		from_position = origin, to_position = room.player.position,
 	})
-	_, _ = finish_player_combat_command(room, 0)
+	_, _ = finish_player_combat_command(room, 0, acted = false)
 	return true
 }

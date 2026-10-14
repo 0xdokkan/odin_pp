@@ -40,6 +40,9 @@ Living_Actor :: struct {
 	cause: Presentation_Cue_Kind,
 	voiced: f64,
 	voiced_base: gfx.Living_Action,
+	// The last blow this card struck (Attack_Fx.id): its guard and its wound
+	// are two cues, one drawing.
+	blow: u32,
 }
 
 Living_State :: struct {
@@ -79,6 +82,7 @@ forget_living_actors :: proc(renderer: ^Renderer) {
 	if renderer == nil { return }
 	renderer.tactical.intent_traces = {}
 	renderer.tactical.shadow = {}
+	forget_attack_fx(renderer)
 	lab_sounds_reset(renderer)
 	if renderer.tactical.living_state == nil { return }
 	living_tokens_free(renderer.tactical.living_state)
@@ -107,6 +111,17 @@ living_find :: proc(renderer: ^Renderer, entity: game.Entity_Ref, character: gfx
 	if state == nil { return nil }
 	for &actor in state.actors {
 		if actor.used && actor.character == character && actor.entity == entity { return &actor }
+	}
+	return nil
+}
+
+// The card of `entity` still falling, whichever its drawing: once its body
+// has left the board it finishes its death as a ghost.
+living_find_dying :: proc(renderer: ^Renderer, entity: game.Entity_Ref) -> ^Living_Actor {
+	state := renderer.tactical.living_state
+	if state == nil { return nil }
+	for &actor in state.actors {
+		if actor.used && actor.entity == entity && actor.action == .Death { return &actor }
 	}
 	return nil
 }
@@ -186,7 +201,16 @@ living_cue_action :: proc(cue: ^Presentation_Cue, entity: game.Entity_Ref) -> (a
 		if event.source == entity { return .Attack, true }
 	case .Damage_Absorbed, .Move_Blocked:
 		if event.target == entity { return .Block, true }
+		// A blow stopped by a guard was still struck.
+		if event.source == entity && game.event_is_attack(event^) { return .Attack, true }
+	case .Explosive_Armed:
+		// A barrel set alight from afar.
+		if event.source == entity && game.event_is_attack(event^) { return .Attack, true }
 	case .Attack_Missed:
+		// A blow never struck (an intent staggered, an aim broken, a throw
+		// that never left the hand, a charge parried before it ran) is
+		// neither attacked nor dodged.
+		if !game.event_is_attack(event^) { break }
 		if event.target == entity { return .Dodge, true }
 		if event.source == entity { return .Attack, true }
 	case .Defeat:
@@ -221,6 +245,14 @@ living_camera_forward :: proc(renderer: ^Renderer) -> rl.Vector3 {
 living_start :: proc(actor: ^Living_Actor, action: gfx.Living_Action, now: f64) {
 	resolved := gfx.living_resolve(actor.character, action)
 	actor.action, actor.started = resolved, now
+}
+
+// The clips that answer a blow: they land it LIVING_REACT_STRIKE in.
+living_reacts :: proc(action: gfx.Living_Action) -> bool {
+	#partial switch action {
+	case .Hurt, .Hurt_Back, .Block, .Dodge, .Death: return true
+	}
+	return false
 }
 
 living_busy :: proc(actor: ^Living_Actor, now: f64) -> bool {
@@ -258,6 +290,10 @@ living_observe :: proc(renderer: ^Renderer, state: ^Living_State, room: ^game.Ro
 	sheet := &gfx.LIVING_SHEETS[character]
 	wanted := gfx.Living_Action.Idle
 	cause := Presentation_Cue_Kind.Move
+	// The wanted clip's blow, when it strikes one, and who struck the blow it
+	// answers, when it reacts to one.
+	blow := u32(0)
+	striker: game.Entity_Ref
 	for offset in 0..<renderer_active_cue_count(renderer) {
 		cue, found := renderer_active_cue_at(renderer, offset)
 		if !found || !cue.started { continue }
@@ -299,6 +335,15 @@ living_observe :: proc(renderer: ^Renderer, state: ^Living_State, room: ^game.Ro
 		}
 		action, matched := living_cue_action(cue, actor.entity)
 		if !matched { continue }
+		// One drawing per blow, however many of its cues show (a guard and
+		// a wound).
+		blow_id := u32(0)
+		if action == .Attack {
+			if fx := attack_fx_of_cue(renderer, cue); fx != nil {
+				if slot.blow == fx.id { continue }
+				blow_id = fx.id
+			}
+		}
 		if action == .Attack || action == .Cast {
 			if target, ok := presentation_actor_in_view(snapshot, event.target); ok && event.target != actor.entity {
 				delta := rl.Vector3{target.position.x-actor.position.x, 0, target.position.y-actor.position.y}
@@ -313,15 +358,20 @@ living_observe :: proc(renderer: ^Renderer, state: ^Living_State, room: ^game.Ro
 				if abs(side) > 0.2 && (side < 0) != slot.facing_left { action = .Hurt_Back }
 			}
 		}
-		if gfx.living_priority(action) > gfx.living_priority(wanted) { wanted, cause = action, cue.kind }
+		if gfx.living_priority(action) > gfx.living_priority(wanted) { wanted, cause, blow, striker = action, cue.kind, blow_id, event.source }
 	}
 	if wanted != .Idle {
 		fresh := wanted != slot.trigger || clock-slot.trigger_seen > LIVING_TRIGGER_GAP
 		slot.trigger, slot.trigger_seen = wanted, clock
 		if fresh && slot.action != .Death {
 			if !living_busy(slot, clock) || gfx.living_priority(wanted) >= gfx.living_priority(slot.action) || living_past_hit(slot, clock) {
-				living_start(slot, wanted, clock)
+				// A struck card reacts as its blow lands: after a bolt's flight,
+				// with a swing's contact.
+				at := clock
+				if living_reacts(wanted) { at += attack_fx_reaction_delay(renderer, actor.entity, now, striker) }
+				living_start(slot, wanted, at)
 				slot.cause = cause
+				if blow != 0 { slot.blow = blow }
 			}
 		}
 	}
@@ -375,7 +425,8 @@ update_living_actors :: proc(renderer: ^Renderer, room: ^game.Room) {
 // The drawing to print right now.
 living_drawing :: proc(actor: ^Living_Actor, now: f64) -> (action: gfx.Living_Action, frame: i32) {
 	sheet := &gfx.LIVING_SHEETS[actor.character]
-	if actor.action != .Idle {
+	// A reaction waiting for its blow to land: the loop beneath goes on until then.
+	if actor.action != .Idle && now >= actor.started {
 		clip := &sheet.clips[actor.action]
 		drawing, finished := gfx.living_frame(clip, now-actor.started)
 		if !finished || actor.action == .Death { return actor.action, drawing }

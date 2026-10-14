@@ -23,8 +23,8 @@ test_m8_d4_is_reproducible_bounded_and_rejects_without_mutation :: proc(t: ^test
 	a, b := make_dice_state(9981), make_dice_state(9981)
 	seen: [4]bool
 	for _ in 0..<128 {
-		first, ok := roll_d4(&a)
-		second, other_ok := roll_d4(&b)
+		first, ok := roll_dice_pool(&a, 1, 4)
+		second, other_ok := roll_dice_pool(&b, 1, 4)
 		testing.expect(t, ok && other_ok && validate_dice_roll(&first))
 		testing.expect(t, first.total >= 1 && first.total <= 4)
 		testing.expect_value(t, first, second)
@@ -34,7 +34,7 @@ test_m8_d4_is_reproducible_bounded_and_rejects_without_mutation :: proc(t: ^test
 	for found in seen { testing.expect(t, found) }
 	a.roll_count = max(u64)
 	before := a
-	_, ok := roll_d4(&a)
+	_, ok := roll_dice_pool(&a, 1, 4)
 	testing.expect(t, !ok)
 	testing.expect_value(t, a, before)
 }
@@ -68,6 +68,45 @@ test_m8_floor_targeting_never_rolls_and_committed_deploy_uses_one_d4 :: proc(t: 
 	for event in report.events.events[:report.events.count] {
 		if event.kind == .Dice_Rolled { testing.expect_value(t, event.dice_roll.total, floor.device_charges) }
 	}
+}
+
+// The top of the ladder: a D20 floor that rolls 20 on the tick keeps all 21
+// discharges, and no floor holds more.
+@(test)
+test_m8_d20_floor_on_the_tick_keeps_every_charge :: proc(t: ^testing.T) {
+	data := spell_test_level(t)
+	defer level.destroy(&data)
+	player := spell_test_player(t, .Shock_Floor, int(MAX_DICE_UPGRADE_LEVEL))
+	found := false
+	for seed in u64(1)..<u64(4000) {
+		candidate := make_dice_state(seed)
+		staged := candidate
+		roll, ok := roll_card_dice(&staged, player.deck.owned[0])
+		if ok && roll.total == 20 { player.dice, found = candidate, true; break }
+	}
+	testing.expect(t, found)
+	spawns := [?]Enemy_Spawn{{position = {9, 3}, health = 30, attack = 1}}
+	room, ok := create_room(&data, &player, {enemies = spawns[:]})
+	testing.expect(t, ok)
+	defer destroy_room(&room)
+	player.tactical.critical_card = true
+	card := player.deck.hand[0]
+	action, err := compile_card_action(&room, card, cell_target({3, 2}))
+	testing.expect_value(t, err, Card_Compile_Error.None)
+	report := resolve_played_card_action(&room, card, cell_target({3, 2}), &action)
+	testing.expect(t, report.accepted)
+	testing.expect_value(t, len(room.objects), 1)
+	if len(room.objects) == 1 {
+		testing.expect_value(t, TACTICAL_SHOCK_FLOOR_MAX_CHARGES, i32(21))
+		testing.expect_value(t, room.objects[0].device_charges, TACTICAL_SHOCK_FLOOR_MAX_CHARGES)
+		testing.expect_value(t, room.objects[0].device_target_limit, TACTICAL_SHOCK_FLOOR_MAX_CHARGES)
+	}
+	for event in report.events.events[:report.events.count] {
+		if event.kind == .Dice_Rolled { testing.expect_value(t, event.dice_roll, Dice_Roll{faces = {20, 0, 0}, total = 20, sides = 20, count = 1}) }
+	}
+	log: Event_Log
+	testing.expect(t, !deploy_board_device(&room, .Shock_Floor, {5, 2}, 1, TACTICAL_SHOCK_FLOOR_MAX_CHARGES+1, &log))
+	player.tactical.critical_card = false
 }
 
 @(test)

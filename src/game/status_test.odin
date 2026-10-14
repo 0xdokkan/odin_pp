@@ -1,6 +1,7 @@
 package game
 
 import "core:testing"
+import grid "../grid"
 import level "../level"
 
 @(test)
@@ -20,23 +21,46 @@ test_invalid_status_kind_is_rejected_without_consuming_a_slot :: proc(t: ^testin
 	testing.expect_value(t, player.statuses.count, 0)
 }
 
+// Poison, Bruciatura and Rallentamento are stacks: each application adds its
+// stacks, and they keep no duration. Every other status still needs one, and
+// the player cannot be slowed.
 @(test)
-test_poison_refreshes_with_the_stronger_potency :: proc(t: ^testing.T) {
+test_poison_burn_and_slow_stacks_add_up_without_a_duration :: proc(t: ^testing.T) {
 	level_data := create_test_level(t)
 	defer level.destroy(&level_data)
 	player := create_test_player(t)
-	room, ok := create_room(&level_data, &player, {})
+	enemy_spawns := [?]Enemy_Spawn{{position = {x = 5, y = 3}, health = 4, attack = 1}}
+	room, ok := create_room(&level_data, &player, {enemies = enemy_spawns[:]})
 	testing.expect(t, ok)
 	defer destroy_room(&room)
 
-	applied, created := apply_status(&room, PLAYER_ENTITY, .Poison, 2, 3)
-	testing.expect(t, applied && created)
-	applied, created = apply_status(&room, PLAYER_ENTITY, .Poison, 1, 5)
-	testing.expect(t, applied && !created)
-	status, found := status_for_entity(&room, PLAYER_ENTITY, .Poison)
-	testing.expect(t, found)
-	testing.expect_value(t, status.potency, i32(2))
-	testing.expect_value(t, status.remaining_pulses, i32(5))
+	enemy := enemy_entity(room.enemies[0].id)
+	for kind in ([?]Status_Kind{.Poison, .Burn, .Slow}) {
+		testing.expect(t, status_kind_stacks(kind))
+		applied, created := apply_status(&room, enemy, kind, 2, 0)
+		testing.expect(t, applied && created)
+		applied, created = apply_status(&room, enemy, kind, 1, 5)
+		testing.expect(t, applied && !created)
+		status, found := status_for_entity(&room, enemy, kind)
+		testing.expect(t, found)
+		if !found { continue }
+		testing.expect_value(t, status.potency, i32(3))
+		testing.expect_value(t, status.remaining_pulses, i32(0))
+	}
+	for kind in ([?]Status_Kind{.Shield, .Thorns, .Afterimage, .Stagger, .Survey}) {
+		testing.expect(t, !status_kind_stacks(kind))
+	}
+	applied, _ := apply_status(&room, enemy, .Thorns, 1, 0)
+	testing.expect(t, !applied)
+	testing.expect(t, !effect_is_valid(&room, apply_status_effect(enemy, .Shield, 2, 0)))
+	testing.expect(t, effect_is_valid(&room, apply_status_effect(enemy, .Burn, 2, 0)))
+	burned, _ := apply_status(&room, PLAYER_ENTITY, .Burn, 1, 0)
+	testing.expect(t, burned)
+	slowed, _ := apply_status(&room, PLAYER_ENTITY, .Slow, 1, 0)
+	testing.expect(t, !slowed)
+	testing.expect(t, !effect_is_valid(&room, apply_status_effect(PLAYER_ENTITY, .Slow, 1, 0)))
+	_, player_slowed := status_for_entity(&room, PLAYER_ENTITY, .Slow)
+	testing.expect(t, !player_slowed)
 }
 
 @(test)
@@ -109,20 +133,22 @@ test_status_effects_emit_apply_and_remove_events :: proc(t: ^testing.T) {
 }
 
 @(test)
-test_poison_ticks_and_expires_after_its_duration :: proc(t: ^testing.T) {
+test_poison_bites_each_enemy_action_and_wears_a_stack :: proc(t: ^testing.T) {
 	level_data := create_test_level(t)
 	defer level.destroy(&level_data)
 	player := create_test_player(t)
-	enemy_spawns := [?]Enemy_Spawn{{position = {x = 5, y = 3}, health = 4, attack = 1}}
+	enemy_spawns := [?]Enemy_Spawn{{position = {x = 5, y = 3}, health = 10, attack = 1}}
 	room, ok := create_room(&level_data, &player, {enemies = enemy_spawns[:]})
 	testing.expect(t, ok)
 	defer destroy_room(&room)
 	enemy_ref := enemy_entity(room.enemies[0].id)
-	apply_status(&room, enemy_ref, .Poison, 1, 2)
+	apply_status(&room, enemy_ref, .Poison, 2, 0)
 
+	// Its action (a wait counts) is followed by a bite of its stacks.
+	room.enemies[0].intent = make_wait_intent(&room, room.enemies[0].position)
 	first_pulse := advance_combat_pulse(&room)
 	testing.expect(t, first_pulse.advanced)
-	testing.expect_value(t, room.enemies[0].health, i32(3))
+	testing.expect_value(t, room.enemies[0].health, i32(8))
 	poison_damage_found := false
 	for index in 0..<first_pulse.events.count {
 		event := first_pulse.events.events[index]
@@ -132,14 +158,15 @@ test_poison_ticks_and_expires_after_its_duration :: proc(t: ^testing.T) {
 		poison_damage_found = true
 		testing.expect(t, event.has_status_cause)
 		testing.expect_value(t, event.status_cause, Status_Kind.Poison)
+		testing.expect_value(t, event.source, SYSTEM_ENTITY)
 	}
 	testing.expect(t, poison_damage_found)
 	status, found := status_for_entity(&room, enemy_ref, .Poison)
 	testing.expect(t, found)
-	testing.expect_value(t, status.remaining_pulses, i32(1))
+	if found { testing.expect_value(t, status.potency, i32(1)) }
 
 	second_pulse := advance_combat_pulse(&room)
-	testing.expect_value(t, room.enemies[0].health, i32(2))
+	testing.expect_value(t, room.enemies[0].health, i32(7))
 	_, found = status_for_entity(&room, enemy_ref, .Poison)
 	testing.expect(t, !found)
 	expired_found := false
@@ -149,6 +176,110 @@ test_poison_ticks_and_expires_after_its_duration :: proc(t: ^testing.T) {
 		}
 	}
 	testing.expect(t, expired_found)
+	_ = advance_combat_pulse(&room)
+	testing.expect_value(t, room.enemies[0].health, i32(7))
+}
+
+// Every kind of intent carried out is an action: each bites once, a hit, a
+// miss or a blocked step alike.
+@(test)
+test_poison_bites_after_every_intent_kind :: proc(t: ^testing.T) {
+	for kind in ([?]Enemy_Intent_Kind{.Wait, .Recover, .Move, .Attack}) {
+		level_data := create_test_level(t)
+		player := create_test_player(t)
+		enemy_spawns := [?]Enemy_Spawn{{position = {x = 2, y = 1}, health = 10, attack = 1}}
+		room, ok := create_room(&level_data, &player, {enemies = enemy_spawns[:]})
+		testing.expect(t, ok)
+		enemy := &room.enemies[0]
+		ref := enemy_entity(enemy.id)
+		switch kind {
+		case .Wait: enemy.intent = make_wait_intent(&room, enemy.position)
+		case .Recover:
+			enemy.intent = make_wait_intent(&room, enemy.position)
+			enemy.intent.kind = .Recover
+		case .Move:
+			// Blocked by the player: a miss is still its action.
+			enemy.intent = make_wait_intent(&room, enemy.position)
+			enemy.intent.kind = .Move
+			enemy.intent.destination = player.position
+			enemy.intent.path[0] = enemy.intent.destination
+			enemy.intent.path_count = 1
+		case .Attack: enemy.intent = make_attack_intent(&room, enemy.position, player.position, 1)
+		case .None, .Charge, .Bombard, .Protect:
+		}
+		apply_status(&room, ref, .Poison, 3, 0)
+		pulse: Pulse_Report
+		resolve_enemy_intents(&room, &pulse)
+		testing.expect_value(t, room.enemies[0].health, i32(7))
+		status, found := status_for_entity(&room, ref, .Poison)
+		testing.expect(t, found && status.potency == 2)
+		destroy_room(&room)
+		level.destroy(&level_data)
+	}
+}
+
+// The tactical roles' own intents (a charge, a bomb's windup, a protection)
+// are actions too; a stagger that interrupts an intent is not.
+@(test)
+test_poison_bites_charges_windups_and_protections_but_not_an_interruption :: proc(t: ^testing.T) {
+	Case :: struct {
+		archetype:      Enemy_Archetype,
+		position, ally: grid.Position,
+		kind:           Enemy_Intent_Kind,
+		staggered:      bool,
+	}
+	cases := [?]Case{
+		{archetype = .Brute, position = {4, 1}, ally = {6, 6}, kind = .Charge},
+		{archetype = .Bomber, position = {6, 2}, ally = {6, 6}, kind = .Bombard},
+		{archetype = .Custodian, position = {2, 2}, ally = {2, 3}, kind = .Protect},
+		{archetype = .Chaser, position = {4, 1}, ally = {6, 6}, kind = .Move, staggered = true},
+	}
+	for c in cases {
+		data: level.Level
+		player: Player
+		spawns := [?]Enemy_Spawn{{position = c.position, health = 50, attack = 1, archetype = c.archetype},
+			{position = c.ally, health = 50, attack = 1, archetype = .Chaser}}
+		room := create_enemy_rework_room(t, &data, &player, spawns[:])
+		enemy := &room.enemies[0]
+		ref := enemy_entity(enemy.id)
+		if c.kind == .Charge {
+			// Lined up with the player, two cells between them.
+			enemy.intent = make_wait_intent(&room, enemy.position)
+			enemy.intent.kind = .Charge
+			enemy.intent.destination = {4, 3}
+			enemy.intent.path[0], enemy.intent.path[1] = {4, 2}, {4, 3}
+			enemy.intent.path_count = 2
+			enemy.intent.threatened_cells[0] = player.position
+			enemy.intent.threatened_cell_count = 1
+			enemy.intent.damage = 1
+		} else if c.kind == .Move {
+			enemy.intent = make_wait_intent(&room, enemy.position)
+			enemy.intent.kind = .Move
+			enemy.intent.destination = {4, 2}
+			enemy.intent.path[0] = enemy.intent.destination
+			enemy.intent.path_count = 1
+		}
+		testing.expect_value(t, enemy.intent.kind, c.kind)
+		if c.kind == .Bombard { testing.expect(t, enemy.intent.windup) }
+		if c.staggered { _, _ = apply_status(&room, ref, .Stagger, 1, 1) }
+		_, _ = apply_status(&room, ref, .Poison, 3, 0)
+		pulse: Pulse_Report
+		resolve_enemy_intents(&room, &pulse, enemy.id)
+		index, alive := enemy_index_by_id(&room, ref.id)
+		testing.expect(t, alive)
+		if alive {
+			status, found := status_for_entity(&room, ref, .Poison)
+			if c.staggered {
+				testing.expect_value(t, room.enemies[index].health, i32(50))
+				testing.expect(t, found && status.potency == 3)
+			} else {
+				testing.expect_value(t, room.enemies[index].health, i32(47))
+				testing.expect(t, found && status.potency == 2)
+			}
+		}
+		destroy_room(&room)
+		level.destroy(&data)
+	}
 }
 
 @(test)
@@ -160,11 +291,12 @@ test_poison_cause_is_preserved_when_shield_fully_absorbs_damage :: proc(t: ^test
 	room, ok := create_room(&level_data, &player, {enemies = enemy_spawns[:]})
 	testing.expect(t, ok)
 	defer destroy_room(&room)
-	apply_status(&room, PLAYER_ENTITY, .Poison, 3, 2)
+	// The bite is its stacks, no defense taken first: 2 Shield take it all.
+	apply_status(&room, PLAYER_ENTITY, .Poison, 2, 0)
 	apply_status(&room, PLAYER_ENTITY, .Shield, 2, 3)
 
 	pulse: Pulse_Report
-	tick_status_kind(&room, PLAYER_ENTITY, .Poison, &pulse)
+	tick_poison_on_action(&room, PLAYER_ENTITY, &pulse)
 
 	testing.expect_value(t, pulse.damage_absorbed, i32(2))
 	testing.expect_value(t, pulse.damage_dealt, i32(0))
@@ -196,15 +328,16 @@ test_poison_cause_is_preserved_through_partial_shield_absorption :: proc(t: ^tes
 	room, ok := create_room(&level_data, &player, {enemies = enemy_spawns[:]})
 	testing.expect(t, ok)
 	defer destroy_room(&room)
-	apply_status(&room, PLAYER_ENTITY, .Poison, 5, 2)
+	// Five stacks, three of them on the Shield; the player's defense takes none.
+	apply_status(&room, PLAYER_ENTITY, .Poison, 5, 0)
 	apply_status(&room, PLAYER_ENTITY, .Shield, 3, 3)
 
 	pulse: Pulse_Report
-	tick_status_kind(&room, PLAYER_ENTITY, .Poison, &pulse)
+	tick_poison_on_action(&room, PLAYER_ENTITY, &pulse)
 
 	testing.expect_value(t, pulse.damage_absorbed, i32(3))
-	testing.expect_value(t, pulse.damage_dealt, i32(1))
-	testing.expect_value(t, player.health, player.stats.max_health-1)
+	testing.expect_value(t, pulse.damage_dealt, i32(2))
+	testing.expect_value(t, player.health, player.stats.max_health-2)
 	absorbed_found := false
 	damaged_found := false
 	for index in 0..<pulse.events.count {
@@ -219,7 +352,7 @@ test_poison_cause_is_preserved_through_partial_shield_absorption :: proc(t: ^tes
 			testing.expect_value(t, event.amount, i32(3))
 		} else {
 			damaged_found = true
-			testing.expect_value(t, event.amount, i32(1))
+			testing.expect_value(t, event.amount, i32(2))
 		}
 	}
 	testing.expect(t, absorbed_found)
@@ -246,22 +379,28 @@ test_poison_can_end_combat_during_a_pulse :: proc(t: ^testing.T) {
 }
 
 @(test)
-test_player_poison_can_cause_defeat_after_enemy_actions :: proc(t: ^testing.T) {
+test_player_poison_bites_his_own_actions_only_and_can_defeat_him :: proc(t: ^testing.T) {
 	level_data := create_test_level(t)
 	defer level.destroy(&level_data)
 	player := create_test_player(t)
-	player.health = 2
+	player.health = 3
+	testing.expect_value(t, player.stats.defense, i32(1))
 	enemy_spawns := [?]Enemy_Spawn{{position = {x = 5, y = 3}, health = 4, attack = 1}}
 	room, ok := create_room(&level_data, &player, {enemies = enemy_spawns[:]})
 	testing.expect(t, ok)
 	defer destroy_room(&room)
-	apply_status(&room, PLAYER_ENTITY, .Poison, 3, 2)
+	apply_status(&room, PLAYER_ENTITY, .Poison, 3, 0)
 
+	// The enemies' pulse alone does not touch it.
 	pulse := advance_combat_pulse(&room)
-
-	testing.expect(t, pulse.player_defeated)
+	testing.expect(t, !pulse.player_defeated)
+	testing.expect_value(t, player.health, i32(3))
+	// His wait does, by all its 3 stacks: his point of defense takes nothing
+	// from a bite.
+	testing.expect_value(t, wait_player_turn(&room), Action_Result.Player_Defeated)
 	testing.expect_value(t, room.phase, Room_Phase.Defeat)
 	testing.expect_value(t, player.health, i32(0))
+	testing.expect(t, !player.deck.combat_active)
 }
 
 @(test)
@@ -352,9 +491,8 @@ test_toxic_wave_targets_every_enemy_but_advances_one_pulse :: proc(t: ^testing.T
 	testing.expect(t, first_found && second_found)
 	testing.expect_value(t, room.enemies[first_index].health, i32(2))
 	testing.expect_value(t, room.enemies[second_index].health, i32(2))
-	first_poison, first_poison_found := status_for_entity(&room, first_ref, .Poison)
-	second_poison, second_poison_found := status_for_entity(&room, second_ref, .Poison)
-	testing.expect(t, first_poison_found && second_poison_found)
-	testing.expect_value(t, first_poison.remaining_pulses, i32(2))
-	testing.expect_value(t, second_poison.remaining_pulses, i32(2))
+	// One stack each, spent by each enemy's response.
+	_, first_poison_found := status_for_entity(&room, first_ref, .Poison)
+	_, second_poison_found := status_for_entity(&room, second_ref, .Poison)
+	testing.expect(t, !first_poison_found && !second_poison_found)
 }

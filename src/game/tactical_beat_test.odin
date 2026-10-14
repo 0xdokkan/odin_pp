@@ -80,7 +80,7 @@ test_tactical_critical_cards_strengthen_every_effect_kind :: proc(t: ^testing.T)
 	action := make_action(.Card, PLAYER_ENTITY, entity_target(PLAYER_ENTITY), .Self)
 	testing.expect(t, add_effect(&action, damage_effect(enemy_entity(room.enemies[0].id), 3)))
 	testing.expect(t, add_effect(&action, apply_status_effect(PLAYER_ENTITY, .Shield, 4, 2)))
-	testing.expect(t, add_effect(&action, apply_status_effect(enemy_entity(room.enemies[0].id), .Poison, 2, 2)))
+	testing.expect(t, add_effect(&action, apply_status_effect(enemy_entity(room.enemies[0].id), .Poison, 2, 0)))
 	testing.expect(t, add_effect(&action, Effect{kind = .Gain_Gold, target = PLAYER_ENTITY, amount = 6}))
 	plain := action
 	tactical_critical_scale(&room, &plain)
@@ -90,8 +90,9 @@ test_tactical_critical_cards_strengthen_every_effect_kind :: proc(t: ^testing.T)
 	testing.expect_value(t, action.effects[0].amount, i32(5))
 	testing.expect_value(t, action.effects[1].amount, i32(6))
 	testing.expect_value(t, action.effects[1].duration, i32(3))
+	// One more stack; a stack has no duration to lengthen.
 	testing.expect_value(t, action.effects[2].amount, i32(3))
-	testing.expect_value(t, action.effects[2].duration, i32(3))
+	testing.expect_value(t, action.effects[2].duration, i32(0))
 	testing.expect_value(t, action.effects[3].amount, i32(9))
 	// A coil deployed on the tick is built with twice the health.
 	events: Event_Log

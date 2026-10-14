@@ -140,7 +140,8 @@ test_m7_controller_survives_terminal_recovery_and_defense_then_enters_next_room 
 		}
 		testing.expect(t, guard != 0)
 		if ending == .Recovery_Poison {
-			applied, _ := game.apply_status(&room, game.enemy_entity(1), .Poison, 1, 3)
+			// Its two stacks bite its first action, on the recovery beat: lethal.
+			applied, _ := game.apply_status(&room, game.enemy_entity(1), .Poison, 2, 0)
 			testing.expect(t, applied)
 		}
 		guard_played, saw_recovery, saw_recovery_parry: bool

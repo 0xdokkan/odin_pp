@@ -191,3 +191,36 @@ Usa solo la libreria standard di Python (va bene anche quello di Blender) e non 
 mai l'atlante da Blender né da altre librerie d'immagine. `--check` dice se l'atlante
 è aggiornato; `--preview C:/tmp/icone --no-write` scrive le celle aggiunte senza
 toccarlo. I dettagli sono in `assets/gothic/generation-prompts.md`.
+
+## Armi e colpi di carta
+
+```bash
+python tools/art/build_attack_props.py
+```
+
+Le armi che i cartoncini vivi menano sul tavolo e quello che lanciano
+(`src/render/attack_fx.odin`): la lanterna di ferro del Viandante, le due armi
+M8 (Mannaia di ferro e Picca della tempesta), gli artigli del ghoul, la mannaia
+del bruto, il pastorale del custode, il bastone dell'arcimago, il dardo della
+balestra, la bomba, la brace in due disegni che si alternano, e i pezzi di un
+impatto: la scia di carta di un fendente, la stella del colpo (stampata in
+bianco e colorata dal colpo: rossa, blu se lo scudo para, oro se critico), i
+graffi del ghoul e i pezzetti di carta che volano dalle caselle vuote.
+
+Ogni pezzo è pixel art scritta nello script come righe di lettere di palette,
+nei colori delle figure; lo script aggiunge il contorno d'inchiostro (ogni pixel
+vuoto che tocca la figura, anche in diagonale) e chiude i buchi di un pixel o
+due. La carta è il campo di distanza esatto dalla stampa, tagliato dallo stesso
+shader dei cartoncini (`FLIPBOOK_PAPER_FRAGMENT`) sul loro foglio più bianco: il
+campo è salvato stirato, così i 5,5 px di carta dello shader diventano una carta
+più sottile, larga quanto dice ogni pezzo. Scrive, con lo stesso impaccamento:
+
+- `assets/gothic/attack-props.png`: le stampe (mai filtrate);
+- `assets/gothic/attack-props-paper.png`: i loro campi, un canale;
+- `src/engine/gfx/attack_props_data.odin`: la tabella (file generato, non modificarlo).
+
+Usa solo la libreria standard di Python (va bene anche quello di Blender); lo
+stesso script dà gli stessi byte. `--check` dice se i tre file sono aggiornati;
+`--preview C:/tmp/armi --no-write` scrive, senza toccarli, ogni pezzo sulla sua
+carta ingrandito e una prova di volo e di fendente che imita lo shader, con il
+taglio sempre in basso a destra come lo tiene il gioco.

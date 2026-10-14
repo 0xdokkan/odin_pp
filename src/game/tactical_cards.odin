@@ -39,7 +39,7 @@ rework_tactical_card :: proc(definition: ^Card_Definition) {
 		d.effects[1] = {kind = .Apply_Status, target = .Chosen_Entity, status = .Stagger, base_amount = 1, duration = 1}
 		d.effect_count = 2
 	case .Venom_Needle:
-		d.effects[1].base_amount, d.effects[1].duration = 2, 2
+		d.effects[1].base_amount = 2
 	case .Purifying_Guard:
 		d.effects[0].base_amount, d.effects[0].duration = 3, 2
 	case .Volatile_Study:

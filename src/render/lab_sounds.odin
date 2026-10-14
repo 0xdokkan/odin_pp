@@ -233,6 +233,8 @@ lab_status_sfx :: proc(status: game.Status_Kind) -> (sfx: audio.Lab_Sfx, ok: boo
 	case .Thorns: return .Ui_Status_Thorns, true
 	case .Afterimage: return .Ui_Status_Afterimage, true
 	case .Stagger: return .Ui_Status_Stagger, true
+	case .Burn: return .Ui_Status_Burn, true
+	case .Slow: return .Ui_Status_Slow, true
 	case .Survey:
 	}
 	return
@@ -252,6 +254,9 @@ lab_object_kind :: proc(renderer: ^Renderer, entity: game.Entity_Ref) -> (kind: 
 lab_cue_sounds :: proc(renderer: ^Renderer, s: ^Lab_Sounds, cue: ^Presentation_Cue, now: f64, impacts: ^int) {
 	event := cue.event
 	pan := lab_sound_pan(renderer, event.target)
+	// What a blow does sounds as it lands: a bolt still flying to its mark
+	// has not missed it yet (attack_fx.odin).
+	landing, _ := attack_fx_landing_in(renderer, event.target, now, event.source)
 	#partial switch cue.kind {
 	case .Card_Played:
 		if sfx, ok := lab_card_sfx(event.card_definition); ok { lab_sound_queue(s, sfx, now) }
@@ -274,15 +279,15 @@ lab_cue_sounds :: proc(renderer: ^Renderer, s: ^Lab_Sounds, cue: ^Presentation_C
 		lab_sound_queue(s, .Ui_Status_Expired, now, 1, pan)
 	case .Damage_Absorbed:
 		// The pilgrim's card blocks with its own sound.
-		if event.target != game.PLAYER_ENTITY { lab_sound_queue(s, .Ui_Block_Absorb, now, 1, pan) }
+		if event.target != game.PLAYER_ENTITY { lab_sound_queue(s, .Ui_Block_Absorb, now+landing, 1, pan) }
 	case .Attack_Missed:
-		lab_sound_queue(s, .Ui_Miss, now, 1, pan)
+		lab_sound_queue(s, .Ui_Miss, now+landing, 1, pan)
 	case .Move_Blocked:
 		lab_sound_queue(s, .Ui_Move_Blocked, now, 1, pan)
 	case .Heal:
 		lab_sound_queue(s, .Pilgrim_Heal, now, 1 if event.target == game.PLAYER_ENTITY else 0.7, pan)
 	case .Explosive_Armed:
-		lab_sound_queue(s, .World_Bomb_Fuse, now)
+		lab_sound_queue(s, .World_Bomb_Fuse, now+landing)
 	case .Explosive_Disarmed:
 		lab_sound_queue(s, .World_Bomb_Fizzle, now)
 	case .Explosion:
@@ -302,7 +307,7 @@ lab_cue_sounds :: proc(renderer: ^Renderer, s: ^Lab_Sounds, cue: ^Presentation_C
 		}
 	case .Damage:
 		if kind, object := lab_object_kind(renderer, event.target); object {
-			lab_sound_queue(s, .World_Ice_Crack if kind == .Ice_Block else .World_Object_Hit, now)
+			lab_sound_queue(s, .World_Ice_Crack if kind == .Ice_Block else .World_Object_Hit, now+landing)
 		}
 	case .Defeat:
 		if event.target == game.PLAYER_ENTITY { lab_sound_queue(s, .Ui_Defeat, now+0.6) }
@@ -324,7 +329,9 @@ update_lab_sounds :: proc(renderer: ^Renderer, room: ^game.Room, now: f64) {
 			actor.voiced = actor.started
 			travelled := int(abs(actor.move_to.x-actor.move_from.x)+abs(actor.move_to.y-actor.move_from.y)+0.5)
 			if sfx, ok := lab_actor_sfx(actor.character, actor.action, actor.cause, travelled); ok {
-				lab_sound_queue(s, sfx, now, 1, pan)
+				// A reaction waiting for its blow sounds when it starts.
+				ahead := max(0, actor.started-living_clock_at(renderer, actor.entity, now))
+				lab_sound_queue(s, sfx, now+ahead, 1, pan)
 			}
 		}
 		if actor.base != actor.voiced_base {

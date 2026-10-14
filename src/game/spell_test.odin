@@ -21,14 +21,14 @@ spell_test_player :: proc(t: ^testing.T, definition: Card_Id, upgrade: int = 0) 
 	return player
 }
 
-spell_test_dice_for_face :: proc(t: ^testing.T, desired: i32) -> Dice_State {
-	for seed in u64(1)..<u64(1000) {
+spell_test_dice_for_face :: proc(t: ^testing.T, desired: i32, sides: i32) -> Dice_State {
+	for seed in u64(1)..<u64(4000) {
 		original := make_dice_state(seed)
 		staged := original
-		face, ok := roll_d6(&staged)
+		face, ok := roll_die(&staged, sides)
 		if ok && face == desired { return original }
 	}
-	testing.expect(t, false, "could not find deterministic d6 fixture")
+	testing.expect(t, false, "could not find deterministic die fixture")
 	return make_dice_state(1)
 }
 
@@ -59,9 +59,9 @@ test_dice_stream_is_reproducible_bounded_and_separate_from_deck :: proc(t: ^test
 	first, second := player.dice, player.dice
 	seen: [6]bool
 	for index in 0..<128 {
-		a, a_ok := roll_d6(&first)
+		a, a_ok := roll_die(&first, 6)
 		deck_next_random(&player.deck)
-		b, b_ok := roll_d6(&second)
+		b, b_ok := roll_die(&second, 6)
 		testing.expect(t, a_ok && b_ok && a >= 1 && a <= 6)
 		testing.expect_value(t, a, b)
 		testing.expect_value(t, first, second)
@@ -172,39 +172,44 @@ test_fate_rejections_preserve_dice_deck_and_health_including_action_rollback :: 
 }
 
 @(test)
-test_fate_all_faces_use_one_roll_and_only_six_adds_a_bounce :: proc(t: ^testing.T) {
-	for desired in i32(1)..=i32(6) {
-		data := spell_test_level(t)
-		player := spell_test_player(t, .Fate_Strike, 1)
-		player.dice = spell_test_dice_for_face(t, desired)
-		expected_dice := player.dice
-		_, expected_ok := roll_d6(&expected_dice)
-		testing.expect(t, expected_ok)
-		enemies := [?]Enemy_Spawn{{position = {3, 1}, health = 40, attack = 1}, {position = {4, 1}, health = 40, attack = 1}}
-		room, ok := create_room(&data, &player, {enemies = enemies[:]})
-		testing.expect(t, ok)
-		card := player.deck.hand[0]
-		play := play_card(&room, card.id, entity_target(enemy_entity(1)))
-		testing.expect_value(t, play.result, Card_Play_Result.Played)
-		testing.expect_value(t, player.dice, expected_dice)
-		testing.expect_value(t, room.enemies[0].health, i32(40)-(3+desired))
-		testing.expect_value(t, room.enemies[1].health, i32(36) if desired == 6 else i32(40))
-		testing.expect_value(t, spell_test_event_count(&room.recent_events, .Dice_Rolled), 1)
-		testing.expect_value(t, spell_test_event_count(&room.recent_events, .Spell_Launched), 1)
-		testing.expect_value(t, spell_test_event_count(&room.recent_events, .Spell_Impact), 2 if desired == 6 else 1)
-		testing.expect_value(t, room.recent_events.events[0].kind, Game_Event_Kind.Card_Played)
-		die_event := room.recent_events.events[1]
-		testing.expect_value(t, die_event.kind, Game_Event_Kind.Dice_Rolled)
-		testing.expect_value(t, die_event.amount, desired)
-		testing.expect_value(t, die_event.dice_roll, Dice_Roll{faces = {desired, 0, 0}, count = 1, total = desired})
-		testing.expect_value(t, die_event.card_id, card.id)
-		testing.expect_value(t, die_event.card_upgrade_level, i32(1))
-		testing.expect_value(t, room.pulse_count, u64(1))
-		testing.expect_value(t, player.deck.energy, i32(2))
-		testing.expect_value(t, spell_test_event_count(&room.recent_events, .Card_Drawn), 1)
-		testing.expect_value(t, room.recent_events.dropped_count, 0)
-		destroy_room(&room)
-		level.destroy(&data)
+test_fate_every_face_of_every_die_uses_one_roll_and_only_the_top_face_bounces :: proc(t: ^testing.T) {
+	for upgrade in i32(0)..=MAX_DICE_UPGRADE_LEVEL {
+		sides := card_die_sides(.Fate_Strike, upgrade)
+		for desired in i32(1)..=sides {
+			data := spell_test_level(t)
+			player := spell_test_player(t, .Fate_Strike, int(upgrade))
+			player.dice = spell_test_dice_for_face(t, desired, sides)
+			expected_dice := player.dice
+			_, expected_ok := roll_die(&expected_dice, sides)
+			testing.expect(t, expected_ok)
+			enemies := [?]Enemy_Spawn{{position = {3, 1}, health = 100, attack = 1}, {position = {4, 1}, health = 100, attack = 1}}
+			room, ok := create_room(&data, &player, {enemies = enemies[:]})
+			testing.expect(t, ok)
+			card := player.deck.hand[0]
+			play := play_card(&room, card.id, entity_target(enemy_entity(1)))
+			bounce := desired == sides
+			testing.expect_value(t, play.result, Card_Play_Result.Played)
+			testing.expect_value(t, player.dice, expected_dice)
+			// Upgrades raise only the die: two plus the face, three on the bounce.
+			testing.expect_value(t, room.enemies[0].health, i32(100)-(2+desired))
+			testing.expect_value(t, room.enemies[1].health, i32(100)-FATE_BOUNCE_DAMAGE if bounce else i32(100))
+			testing.expect_value(t, spell_test_event_count(&room.recent_events, .Dice_Rolled), 1)
+			testing.expect_value(t, spell_test_event_count(&room.recent_events, .Spell_Launched), 1)
+			testing.expect_value(t, spell_test_event_count(&room.recent_events, .Spell_Impact), 2 if bounce else 1)
+			testing.expect_value(t, room.recent_events.events[0].kind, Game_Event_Kind.Card_Played)
+			die_event := room.recent_events.events[1]
+			testing.expect_value(t, die_event.kind, Game_Event_Kind.Dice_Rolled)
+			testing.expect_value(t, die_event.amount, desired)
+			testing.expect_value(t, die_event.dice_roll, Dice_Roll{faces = {desired, 0, 0}, sides = sides, count = 1, total = desired})
+			testing.expect_value(t, die_event.card_id, card.id)
+			testing.expect_value(t, die_event.card_upgrade_level, upgrade)
+			testing.expect_value(t, room.pulse_count, u64(1))
+			testing.expect_value(t, player.deck.energy, i32(2))
+			testing.expect_value(t, spell_test_event_count(&room.recent_events, .Card_Drawn), 1)
+			testing.expect_value(t, room.recent_events.dropped_count, 0)
+			destroy_room(&room)
+			level.destroy(&data)
+		}
 	}
 }
 
@@ -255,7 +260,8 @@ test_spell_bounces_stop_immediately_after_player_dies_to_first_hit_reaction :: p
 		data := spell_test_level(t)
 		player := spell_test_player(t, id)
 		player.health = 1
-		player.dice = spell_test_dice_for_face(t, 6)
+		// The D4's top face: Fate would bounce if the player survived.
+		player.dice = spell_test_dice_for_face(t, 4, 4)
 		enemies := [?]Enemy_Spawn{{position = {3, 1}, health = 40, attack = 1}, {position = {4, 1}, health = 40, attack = 1}}
 		room, ok := create_room(&data, &player, {enemies = enemies[:]})
 		testing.expect(t, ok)

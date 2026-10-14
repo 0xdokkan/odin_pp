@@ -98,6 +98,57 @@ event_is_teleport :: proc(event: Game_Event) -> bool {
 	return event.area_mask&EVENT_TELEPORT_BIT != 0
 }
 
+// The two bits below it mark a physical blow (a bump, an enemy's Attack or
+// Charge) for the board (render/attack_fx.odin), and whether it flies there
+// (a bolt, a bomb, an ember) instead of being swung. The attacker's own
+// Damage_Absorbed, Damaged, Explosive_Armed or Attack_Missed then carries
+// the attacker's cell in from_position, the aimed cell in to_position and, in
+// the footprint bits around to_position, every cell the blow sweeps.
+EVENT_ATTACK_BIT :: u16(1)<<13
+EVENT_RANGED_BIT :: u16(1)<<12
+EVENT_FOOTPRINT_BITS :: u16(0x1ff)
+
+event_is_attack :: proc(event: Game_Event) -> bool {
+	return event.area_mask&EVENT_ATTACK_BIT != 0
+}
+
+event_is_ranged_attack :: proc(event: Game_Event) -> bool {
+	return event.area_mask&(EVENT_ATTACK_BIT|EVENT_RANGED_BIT) == EVENT_ATTACK_BIT|EVENT_RANGED_BIT
+}
+
+// The footprint bit of `cell` around `center` (row-major 3x3, as a spell's);
+// not ok beyond it.
+event_footprint_bit :: proc(center, cell: grid.Position) -> (bit: u16, ok: bool) {
+	dx, dy := cell.x-center.x, cell.y-center.y
+	if abs(dx) > 1 || abs(dy) > 1 { return }
+	return u16(1)<<u32((dy+1)*3+dx+1), true
+}
+
+// Marks one blow's own events in `log`, from `first` on: the attacker's
+// Damage_Absorbed on `target`, then its Damaged, Explosive_Armed or
+// Attack_Missed, where the marking stops. The reactions and pushes that follow
+// keep their own events, unmarked, and so does damage with a status cause.
+mark_attack_events :: proc(log: ^Event_Log, first: int, source, target: Entity_Ref,
+	origin, aim: grid.Position, cells: []grid.Position, ranged: bool) {
+	if log == nil { return }
+	// The aim is always swept, whatever else is.
+	centre, _ := event_footprint_bit(aim, aim)
+	mask := EVENT_ATTACK_BIT|(EVENT_RANGED_BIT if ranged else 0)|centre
+	for cell in cells {
+		if bit, ok := event_footprint_bit(aim, cell); ok { mask |= bit }
+	}
+	for &event in log.events[clamp(first, 0, log.count):log.count] {
+		if event.source != source || event.target != target || event.has_status_cause { continue }
+		#partial switch event.kind {
+		case .Damage_Absorbed, .Damaged, .Explosive_Armed, .Attack_Missed:
+		case: continue
+		}
+		event.from_position, event.to_position = origin, aim
+		event.area_mask = event.area_mask&~EVENT_FOOTPRINT_BITS|mask
+		if event.kind != .Damage_Absorbed { break }
+	}
+}
+
 Event_Log :: struct {
 	events:        [MAX_GAME_EVENTS]Game_Event,
 	count:         int,

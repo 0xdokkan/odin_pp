@@ -61,30 +61,90 @@ expire_status :: proc(room: ^Room, entity: Entity_Ref, kind: Status_Kind, pulse:
 	})
 }
 
-tick_status_kind :: proc(room: ^Room, entity: Entity_Ref, kind: Status_Kind, pulse: ^Pulse_Report) {
+// A status that deals its stacks as damage: a System hit with the status as
+// its cause. A Shield absorbs it and the presentation shows it as any blow;
+// the player's defense never takes from it (apply_damage_effect).
+status_damage_tick :: proc(room: ^Room, entity: Entity_Ref, kind: Status_Kind, pulse: ^Pulse_Report) {
 	status, found := status_for_entity(room, entity, kind)
 	if !found {
 		return
 	}
 	pulse.status_ticks += 1
+	action := make_action(.Trigger, SYSTEM_ENTITY, entity_target(entity), .Entity)
+	added := add_effect(&action, status_damage_effect(entity, status.potency, kind))
+	assert(added)
+	report := resolve_action(room, &action)
+	assert(report.accepted)
+	merge_action_report(pulse, &report)
+}
 
-	if kind == .Poison {
-		potency := status.potency
-		action := make_action(.Trigger, SYSTEM_ENTITY, entity_target(entity), .Entity)
-		added := add_effect(&action, status_damage_effect(entity, potency, .Poison))
-		assert(added)
-		report := resolve_action(room, &action)
-		assert(report.accepted)
-		merge_action_report(pulse, &report)
-		if !entity_exists(room, entity) {
-			return
-		}
-	}
-
-	status, found = status_for_entity(room, entity, kind)
+// One stack less; the last one ends the status.
+wear_status_stack :: proc(room: ^Room, entity: Entity_Ref, kind: Status_Kind, pulse: ^Pulse_Report) {
+	status, found := status_for_entity(room, entity, kind)
 	if !found {
 		return
 	}
+	status.potency -= 1
+	if status.potency <= 0 {
+		expire_status(room, entity, kind, pulse)
+	}
+}
+
+// Poison bites its bearer's own actions: damage equal to its stacks, then a
+// stack less. Nothing reaches the player sunk in his shadow, and the shadow's
+// own steps are no action: there it neither bites nor wears.
+tick_poison_on_action :: proc(room: ^Room, entity: Entity_Ref, pulse: ^Pulse_Report) {
+	assert(room != nil && pulse != nil)
+	if room.phase != .Combat || !entity_exists(room, entity) ||
+	   (entity == PLAYER_ENTITY && tactical_player_intangible(room)) {
+		return
+	}
+	if _, poisoned := status_for_entity(room, entity, .Poison); !poisoned {
+		return
+	}
+	status_damage_tick(room, entity, .Poison, pulse)
+	if room.phase == .Combat && entity_exists(room, entity) {
+		wear_status_stack(room, entity, .Poison, pulse)
+	}
+}
+
+// After an enemy carries out an intent (any kind, hit, miss or blocked): its
+// poison bites, and the slow that held this intent wears a stack. Classic
+// combat has no seconds to hold, so there each action wears one.
+finish_enemy_action :: proc(room: ^Room, enemy: Entity_Ref, slowed: bool, pulse: ^Pulse_Report) {
+	tick_poison_on_action(room, enemy, pulse)
+	if (slowed || !tactical_enabled(room)) && room.phase == .Combat && entity_exists(room, enemy) {
+		wear_status_stack(room, enemy, .Slow, pulse)
+	}
+}
+
+// Bruciatura: its stacks as damage; they never wear.
+burn_status :: proc(room: ^Room, entity: Entity_Ref, pulse: ^Pulse_Report) {
+	assert(room != nil && pulse != nil)
+	if room.phase != .Combat || !entity_exists(room, entity) {
+		return
+	}
+	status_damage_tick(room, entity, .Burn, pulse)
+}
+
+tick_status_kind :: proc(room: ^Room, entity: Entity_Ref, kind: Status_Kind, pulse: ^Pulse_Report) {
+	status, found := status_for_entity(room, entity, kind)
+	if !found {
+		return
+	}
+	switch kind {
+	case .Poison, .Slow:
+		// Worn by their bearer's actions, never by the clock.
+		return
+	case .Burn:
+		// A tactical room burns at each new window (tactical_expire_window).
+		if !tactical_enabled(room) {
+			burn_status(room, entity, pulse)
+		}
+		return
+	case .Shield, .Thorns, .Afterimage, .Stagger, .Survey:
+	}
+	pulse.status_ticks += 1
 	status.remaining_pulses -= 1
 	if status.remaining_pulses <= 0 {
 		expire_status(room, entity, kind, pulse)
@@ -93,7 +153,8 @@ tick_status_kind :: proc(room: ^Room, entity: Entity_Ref, kind: Status_Kind, pul
 
 tick_entity_statuses :: proc(room: ^Room, entity: Entity_Ref, pulse: ^Pulse_Report) {
 	assert(room != nil && pulse != nil)
-	status_order := [?]Status_Kind{.Poison, .Shield, .Thorns, .Afterimage, .Stagger, .Survey}
+	// Burn's blow first, while a Shield about to run out still guards.
+	status_order := [?]Status_Kind{.Burn, .Shield, .Thorns, .Afterimage, .Stagger, .Survey}
 	for kind in status_order {
 		if room.phase != .Combat || !entity_exists(room, entity) {
 			return
@@ -102,22 +163,28 @@ tick_entity_statuses :: proc(room: ^Room, entity: Entity_Ref, pulse: ^Pulse_Repo
 	}
 }
 
-tick_all_statuses :: proc(room: ^Room, pulse: ^Pulse_Report) {
+// The player, then every enemy in turn; an enemy that dies on its own tick
+// leaves the next one in its place.
+tick_combatants :: proc(room: ^Room, pulse: ^Pulse_Report, tick: proc(room: ^Room, entity: Entity_Ref, pulse: ^Pulse_Report)) {
 	assert(room != nil && pulse != nil)
 	if room.phase != .Combat {
 		return
 	}
 
-	tick_entity_statuses(room, PLAYER_ENTITY, pulse)
+	tick(room, PLAYER_ENTITY, pulse)
 	enemy_index := 0
 	for enemy_index < len(room.enemies) && room.phase == .Combat {
 		enemy_id := room.enemies[enemy_index].id
-		tick_entity_statuses(room, enemy_entity(enemy_id), pulse)
+		tick(room, enemy_entity(enemy_id), pulse)
 		_, still_present := enemy_index_by_id(room, enemy_id)
 		if still_present {
 			enemy_index += 1
 		}
 	}
+}
+
+tick_all_statuses :: proc(room: ^Room, pulse: ^Pulse_Report) {
+	tick_combatants(room, pulse, tick_entity_statuses)
 }
 
 advance_combat_pulse :: proc(room: ^Room) -> (pulse: Pulse_Report) {

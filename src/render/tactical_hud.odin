@@ -30,9 +30,18 @@ tactical_status_label :: proc(kind: game.Status_Kind, short: bool) -> (label: st
 	case .Afterimage: label, accent = "SCIA", HUD_SHADE
 	case .Stagger: label, accent = "STORDITO", GOTHIC_RED
 	case .Survey: label = "VISTA"
+	case .Burn: label, accent = "BRUCIATURA", HUD_EMBER
+	case .Slow: label, accent = "RALLENTAMENTO", HUD_FROST
 	}
 	if short && len(label) > 3 { label = label[:3] }
 	return
+}
+
+// A stack status shows its stacks; the others their potency and seconds.
+tactical_status_chip_text :: proc(status: game.Status, short: bool) -> cstring {
+	label, _ := tactical_status_label(status.kind, short)
+	if game.status_kind_stacks(status.kind) { return fmt.ctprintf("%s %d", label, status.potency) }
+	return fmt.ctprintf("%s %d / %ds", label, status.potency, status.remaining_pulses)
 }
 
 // VITA: health first and large, then gold and the active statuses.
@@ -55,8 +64,8 @@ draw_tactical_status :: proc(renderer: ^Renderer, room: ^game.Room) {
 	shown := min(count, 3)
 	chip := min(f32(96), (room_width-f32(shown-1)*4-(26 if count > shown else 0))/f32(shown))
 	for status, index in v.statuses.items[:shown] {
-		label, accent := tactical_status_label(status.kind, chip < 80)
-		hud_chip(renderer, {left+f32(index)*(chip+4), row-1, chip, 18}, fmt.ctprintf("%s %d / %ds", label, status.potency, status.remaining_pulses), accent)
+		_, accent := tactical_status_label(status.kind, chip < 80)
+		hud_chip(renderer, {left+f32(index)*(chip+4), row-1, chip, 18}, tactical_status_chip_text(status, chip < 80), accent)
 	}
 	if count > shown {
 		gothic_text_fit(renderer, fmt.ctprintf("+%d", count-shown), {left+f32(shown)*(chip+4), row, 24, 17}, 12, GOTHIC_MUTED)

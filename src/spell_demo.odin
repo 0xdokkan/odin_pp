@@ -56,36 +56,36 @@ prepare_spell_smoke :: proc(room: ^game.Room, renderer: ^render.Renderer, kind: 
 	if kind == .Dice_Pool { index = 3 }
 	if kind == .Barrage { index = 2 }
 	if kind == .Venom { index = 3 }
+	card := room.player.deck.hand[index]
 	if kind == .Dice {
-		// Choose a real RNG state whose next fair die is six to exercise the bonus.
+		// Choose a real RNG state whose next fair die shows its top face to exercise the bounce.
 		for seed in u64(1)..=256 {
 			candidate := game.make_dice_state(seed)
 			staged := candidate
-			face, valid := game.roll_d6(&staged)
-			if valid && face == 6 { room.player.dice = candidate; break }
+			roll, valid := game.roll_card_dice(&staged, card)
+			if valid && roll.total == roll.sides { room.player.dice = candidate; break }
 		}
 	}
 	if kind == .Dice_Pool {
-		// A committed nine shows both the sum and conditional push without killing
-		// the target before the movement portion of the same action resolves.
+		// A committed push total shows both the sum and conditional push without
+		// killing the target before the movement portion of the same action resolves.
 		for seed in u64(1)..=256 {
 			candidate := game.make_dice_state(seed)
 			staged := candidate
-			roll, valid := game.roll_d6_pool(&staged, 2)
-			if valid && roll.total == 9 { room.player.dice = candidate; break }
+			roll, valid := game.roll_card_dice(&staged, card)
+			if valid && roll.total == game.SUNDERING_PUSH_TOTAL { room.player.dice = candidate; break }
 		}
 	}
 	if dice_lab {
-		for seed in u64(1)..=256 {
+		for seed in u64(1)..=4096 {
 			candidate := game.make_dice_state(seed)
 			staged := candidate
-			roll, valid := game.roll_d6_pool(&staged, 3 if kind == .Barrage else 2)
+			roll, valid := game.roll_card_dice(&staged, card)
 			matches := game.dice_success_count(&roll) == 2 if kind == .Barrage else
 				game.dice_has_pair(&roll) && roll.faces[0] == 4
 			if valid && matches { room.player.dice = candidate; break }
 		}
 	}
-	card := room.player.deck.hand[index]
 	target := game.entity_target(game.enemy_entity(room.enemies[0].id))
 	if kind == .Firebomb { target = game.cell_target({6, 3}) }
 	before := render.capture_room_presentation(room)

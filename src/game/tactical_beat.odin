@@ -17,7 +17,8 @@ TACTICAL_BEAT_WINDOW :: f32(0.15)
 // pressed on time but committed a little later: a move pressed on the tick
 // waits a few frames for its diagonal partner key.
 TACTICAL_BEAT_GRACE :: f32(0.45)
-TACTICAL_SHOCK_FLOOR_MAX_CHARGES :: i32(5)
+// A floor holds its die's roll (up to a D20) and the critical one more.
+TACTICAL_SHOCK_FLOOR_MAX_CHARGES :: MAX_DIE_SIDES+1
 
 // Called by tactical_tick with the fraction before real time advanced.
 tactical_note_beat_time :: proc(s: ^Tactical_State, before, elapsed: f32) {
@@ -113,7 +114,8 @@ tactical_critical_scale :: proc(room: ^Room, action: ^Action) {
 			effect.amount = critical_boost(effect.amount)
 		case .Apply_Status:
 			if effect.status == .Shield { effect.amount = critical_boost(effect.amount) } else { effect.amount += 1 }
-			effect.duration += 1
+			// Stacks have no duration to lengthen.
+			if !status_kind_stacks(effect.status) { effect.duration += 1 }
 		case .Add_Reaction_Binding:
 			effect.amount += 1
 			if effect.charges > 0 { effect.charges += 1 }
@@ -152,6 +154,7 @@ try_move_player_diagonal :: proc(room: ^Room, offset: grid.Position) -> Action_R
 		report := resolve_action(room, &action)
 		if !report.accepted { return .Blocked }
 		consume_equipped_weapon_use(room.player)
+		mark_attack_events(&report.events, 0, PLAYER_ENTITY, enemy_entity(enemy.id), room.player.position, target, {}, false)
 		mark_critical_events(&report.events)
 		append_event_log(&room.recent_events, &report.events)
 		_, outcome := finish_player_combat_command(room)

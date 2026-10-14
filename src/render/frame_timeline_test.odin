@@ -19,7 +19,7 @@ test_frame_hitch_cannot_skip_dice_rebounds_even_when_entering_from_another_cue :
 		}
 		renderer.timeline.cues[dice_index] = {kind = .Dice_Rolled, duration = duration,
 			event = {kind = .Dice_Rolled, card_definition = .Fate_Strike, source = game.PLAYER_ENTITY,
-				amount = 4, dice_roll = {faces = {4, 0, 0}, total = 4, count = 1}}}
+				amount = 4, dice_roll = {faces = {4, 0, 0}, total = 4, sides = 4, count = 1}}}
 		testing.expect(t, !update_renderer_frame_timeline(renderer, 0.9))
 		cue, found := active_presentation_cue(&renderer.timeline)
 		testing.expect(t, found && cue.kind == .Dice_Rolled && cue.started)
@@ -50,7 +50,7 @@ test_frame_playback_keeps_normal_speed_without_a_hitch :: proc(t: ^testing.T) {
 		renderer.timeline.count = 1
 		renderer.timeline.cues[0] = {kind = .Dice_Rolled, duration = DICE_CUE_DURATION,
 			event = {kind = .Dice_Rolled, card_definition = .Fate_Strike, source = game.PLAYER_ENTITY,
-				amount = 4, dice_roll = {faces = {4, 0, 0}, total = 4, count = 1}}}
+				amount = 4, dice_roll = {faces = {4, 0, 0}, total = 4, sides = 4, count = 1}}}
 		update_renderer_frame_timeline(renderer, 1.0/60.0)
 		testing.expect_value(t, renderer.timeline.cues[0].elapsed, f32(1.0/60.0)*speed)
 		free(renderer)
@@ -66,7 +66,7 @@ test_live_dice_expose_each_floor_contact_once_at_all_normal_speeds :: proc(t: ^t
 		renderer.timeline.count = 1
 		renderer.timeline.cues[0] = {kind = .Dice_Rolled, duration = DICE_CUE_DURATION,
 			event = {kind = .Dice_Rolled, card_definition = .Fate_Strike, source = game.PLAYER_ENTITY,
-				amount = 4, dice_roll = {faces = {4, 0, 0}, total = 4, count = 1}}}
+				amount = 4, dice_roll = {faces = {4, 0, 0}, total = 4, sides = 4, count = 1}}}
 		landmarks := [3]f32{DICE_PHYSICS_IMPACT_PROGRESS, DICE_SECOND_IMPACT_PROGRESS, DICE_THIRD_IMPACT_PROGRESS}
 		exposed: [3]int
 		frames := 0
@@ -106,7 +106,7 @@ test_live_dice_contact_landmarks_survive_repeated_hitches_and_compression :: pro
 			event = {card_definition = .Fate_Strike}}
 		renderer.timeline.cues[1] = {kind = .Dice_Rolled, duration = duration,
 			event = {kind = .Dice_Rolled, card_definition = .Fate_Strike, source = game.PLAYER_ENTITY,
-				amount = 4, dice_roll = {faces = {4, 0, 0}, total = 4, count = 1}}}
+				amount = 4, dice_roll = {faces = {4, 0, 0}, total = 4, sides = 4, count = 1}}}
 		landmarks := [3]f32{DICE_PHYSICS_IMPACT_PROGRESS, DICE_SECOND_IMPACT_PROGRESS, DICE_THIRD_IMPACT_PROGRESS}
 		exposed: [3]int
 		previous: f32

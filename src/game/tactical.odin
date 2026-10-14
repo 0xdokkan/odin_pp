@@ -461,6 +461,8 @@ resolve_qte :: proc(room: ^Room, requested_success: bool, dodge_direction: Move_
 	q := room.qte
 	room.qte = {}
 	clear_event_log(&room.recent_events)
+	// One report for the dodge's bite and the pulse a terminal answer ends.
+	pulse: Pulse_Report
 	if q.kind == .Diagonal {
 		if success {
 			action := make_action(.Move, PLAYER_ENTITY, cell_target(q.destination), .Walkable_Cell)
@@ -501,14 +503,21 @@ resolve_qte :: proc(room: ^Room, requested_success: bool, dodge_direction: Move_
 				report := resolve_action(room, &action)
 				success = report.accepted
 				append_event_log(&room.recent_events, &report.events)
-				if success { start_tactical_dodge_recovery(room); room.player.tactical.facing = dodge_direction }
+				if success {
+					start_tactical_dodge_recovery(room)
+					room.player.tactical.facing = dodge_direction
+					// A dodge is the player's action, whichever key starts it: his
+					// poison bites. Block, parry and deflect answer a blow only.
+					tick_poison_on_action(room, PLAYER_ENTITY, &pulse)
+					append_event_log(&room.recent_events, &pulse.events)
+					pulse = {}
+				}
 			}
 		}
 	}
 	if success { room.player.tactical.metrics.qte_successes += 1 }
 	else { room.player.tactical.metrics.qte_failures += 1 }
 	if q.kind == .Defense && room.phase != .Combat && room.tactical_pulse.started {
-		pulse: Pulse_Report
 		finish_combat_pulse(room, &pulse)
 		append_event_log(&room.recent_events, &pulse.events)
 		collect_loot_in_magnet_range(room)

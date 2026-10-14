@@ -283,7 +283,7 @@ buy_shop_upgrade :: proc(run: ^Run_State, card_id: u32) -> Shop_Result {
 	if !found {
 		return .Card_Not_Found
 	}
-	if run.player.deck.owned[card_index].upgrade_level >= MAX_CARD_UPGRADE_LEVEL {
+	if run.player.deck.owned[card_index].upgrade_level >= card_max_upgrade_level(run.player.deck.owned[card_index].definition_id) {
 		return .Maximum_Upgrade
 	}
 	if !card_can_upgrade(run.player.deck.owned[card_index]) {

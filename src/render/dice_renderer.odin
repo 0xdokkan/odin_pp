@@ -22,6 +22,8 @@ Dice_Renderer :: struct {
 	frame_kind: Polyhedral_Die_Kind,
 	throw_state: Dice_Throw,
 	numbering: [3]Dice_Numbering,
+	// Where each resting solid moves so that big dice never rest inside each other.
+	rest_offsets: [3]rl.Vector3,
 	roll: game.Dice_Roll,
 	seed: u64,
 	frame: Dice_Physics_Frame,
@@ -145,10 +147,12 @@ destroy_dice_renderer :: proc(renderer: ^Dice_Renderer) {
 prepare_dice_pool :: proc(renderer: ^Dice_Renderer, roll: game.Dice_Roll, seed: u64, layout: Dice_Pool_Layout) {
 	prepare_polyhedral_models(renderer)
 	if renderer.has_throw && renderer.seed == seed && renderer.roll == roll {return}
-	build_dice_throw(&renderer.throw_state, roll.count, seed, layout.release_height)
+	build_dice_throw(&renderer.throw_state, int(roll.count), seed, layout.release_height)
 	renderer.roll, renderer.seed, renderer.has_throw = roll, seed, true
 	final := sample_dice_throw(&renderer.throw_state, 1)
 	for index in 0..<roll.count {renderer.numbering[index] = dice_numbering_for_result(final.orientations[index], roll.faces[index])}
+	renderer.rest_offsets = polyhedral_rest_offsets(&renderer.polyhedra[polyhedral_die_for_sides(int(roll.sides))],
+		&renderer.throw_state, roll.faces, int(roll.count))
 	if renderer.mesh.count == 0 {renderer.mesh = build_dice_bevel_mesh()}
 }
 
@@ -183,8 +187,9 @@ draw_dice_shadow :: proc(position: rl.Vector3) {
 }
 
 // One transparent scene for the complete pool. Call before drawing app canvas.
+// The roll names its own die, so the scene needs no card.
 update_dice_pool_texture :: proc(renderer: ^Dice_Renderer, roll: game.Dice_Roll, progress: f32,
-	window_width, window_height: f32, game_area: rl.Rectangle = {}, seed: u64 = 1, card: game.Card_Id = .Count) {
+	window_width, window_height: f32, game_area: rl.Rectangle = {}, seed: u64 = 1) {
 	if renderer == nil || !dice_pool_roll_valid(roll) {return}
 	layout := dice_pool_layout(window_width, window_height, game_area)
 	if !layout.valid {return}
@@ -200,7 +205,8 @@ update_dice_pool_texture :: proc(renderer: ^Dice_Renderer, roll: game.Dice_Roll,
 	rl.BeginBlendMode(.CUSTOM_SEPARATE)
 	rl.BeginMode3D(layout.camera)
 	rlgl.DisableDepthMask()
-	for index in 0..<roll.count {draw_dice_shadow(renderer.frame.positions[index])}
+	settle := polyhedral_rest_settle(progress)
+	for index in 0..<roll.count {draw_dice_shadow(renderer.frame.positions[index]+renderer.rest_offsets[index]*settle)}
 	rlgl.DrawRenderBatchActive()
 	rlgl.EnableDepthMask()
 	resin := menu_themed(renderer.theme) && renderer.theme.tactical.light_shader.id != 0
@@ -213,15 +219,20 @@ update_dice_pool_texture :: proc(renderer: ^Dice_Renderer, roll: game.Dice_Roll,
 		rl.SetShaderValue(v.light_shader, v.light_hologram_location, &mode, .INT)
 		rl.BeginShaderMode(v.light_shader)
 	}
-	kind := polyhedral_die_for_sides(int(game.card_dice_sides(card)))
+	kind := polyhedral_die_for_sides(int(roll.sides))
 	font := rl.GetFontDefault()
 	if menu_themed(renderer.theme) { font, _ = gothic_font(renderer.theme, 32) }
 	for index in 0..<roll.count {
-		if kind == .D4 || menu_themed(renderer.theme) {
+		// Classic play keeps its red cube with pips for a D6 only. A D10 lands
+		// on 10, not 0, as the card names its face.
+		if kind != .D6 || menu_themed(renderer.theme) {
 			model := &renderer.polyhedra[kind]
-			position, orientation := polyhedral_dice_pose(model, &renderer.throw_state, index, progress, roll.faces[index])
-			draw_polyhedral_die(model, position, orientation, font, resin)
-		} else { draw_dice_mesh(&renderer.mesh, renderer.frame.positions[index], renderer.frame.orientations[index], &renderer.numbering[index], resin) }
+			position, orientation := polyhedral_dice_pose(model, &renderer.throw_state, int(index), progress, roll.faces[index])
+			draw_polyhedral_die(model, position+renderer.rest_offsets[index]*settle, orientation, font, resin, true)
+		} else {
+			draw_dice_mesh(&renderer.mesh, renderer.frame.positions[index]+renderer.rest_offsets[index]*settle,
+				renderer.frame.orientations[index], &renderer.numbering[index], resin)
+		}
 	}
 	renderer.frame_kind = kind
 	if resin { rl.EndShaderMode() }
@@ -240,7 +251,7 @@ dice_total_state :: proc(roll: game.Dice_Roll, progress: f32) -> (state: Dice_To
 		if p < reveal {continue}
 		state.revealed += 1
 		state.visible_total += roll.faces[index]
-		if roll.faces[index] >= 4 {state.visible_successes += 1}
+		if roll.faces[index] >= game.DICE_SUCCESS_THRESHOLD {state.visible_successes += 1}
 		state.visible_highest = max(state.visible_highest, roll.faces[index])
 		age := (p-reveal)/DICE_POOL_REVEAL_STEP
 		state.transfer_progress[index] = clamp(age, f32(0), f32(1))
@@ -262,7 +273,7 @@ dice_final_projected_bounds :: proc(renderer: ^Dice_Renderer, layout: Dice_Pool_
 	for corner in 0..<8 {
 		point := rl.Vector3{0.5 if corner&1 != 0 else -0.5,
 			0.5 if corner&2 != 0 else -0.5, 0.5 if corner&4 != 0 else -0.5}
-		world := final.positions[index]+rl.Vector3RotateByQuaternion(point, final.orientations[index])
+		world := final.positions[index]+renderer.rest_offsets[index]+rl.Vector3RotateByQuaternion(point, final.orientations[index])
 		pixel := dice_world_to_window(layout, world)
 		left, right = min(left, pixel.x), max(right, pixel.x)
 		top, bottom = min(top, pixel.y), max(bottom, pixel.y)
@@ -283,7 +294,7 @@ dice_total_target :: proc(renderer: ^Dice_Renderer, layout: Dice_Pool_Layout, ex
 	preferred.y = min(preferred.y, area.y+area.height*0.865-margin*layout.scale)
 	if renderer == nil || !renderer.has_throw {return preferred}
 	bounds: [3]rl.Rectangle
-	for index in 0..<renderer.roll.count {bounds[index] = dice_final_projected_bounds(renderer, layout, index)}
+	for index in 0..<renderer.roll.count {bounds[index] = dice_final_projected_bounds(renderer, layout, int(index))}
 	best, least_overlap := preferred, f32(1e20)
 	for row in 0..<2 {
 		for offset in ([7]f32{0, -0.1, 0.1, -0.2, 0.2, -0.3, 0.3}) {
@@ -317,7 +328,7 @@ draw_dice_pool_total :: proc(renderer: ^Dice_Renderer, layout: Dice_Pool_Layout,
 	}
 	font := c.int(max(f32(20), (44+8*state.pulse)*layout.scale))
 	label := fmt.ctprintf("%d", state.visible_total)
-	if successes {label = fmt.ctprintf("%d/3", state.visible_successes)}
+	if successes {label = fmt.ctprintf("%d/%d", state.visible_successes, roll.count)}
 	if highest {label = fmt.ctprintf("%d", state.visible_highest)}
 	x := c.int(target.x)-menu_measure_text(theme, label, font)/2
 	y := c.int(target.y)-font/2
@@ -326,11 +337,11 @@ draw_dice_pool_total :: proc(renderer: ^Dice_Renderer, layout: Dice_Pool_Layout,
 	menu_text(theme, label, x, y, font, {255, 243, 225, 255})
 	caption_font := c.int(max(f32(8), 10*layout.scale))
 	caption: cstring = "TOTAL"
-	if successes {caption = "4+ SUCCESSES"}
+	if successes {caption = fmt.ctprintf("%d+ SUCCESSES", game.DICE_SUCCESS_THRESHOLD)}
 	if highest {caption = "HIGHEST / PAIR!" if state.visible_pair else "HIGHEST DIE"}
 	if menu_themed(theme) {
 		caption = "TOTALE"
-		if successes { caption = "4+ SUCCESSI" }
+		if successes { caption = fmt.ctprintf("%d+ SUCCESSI", game.DICE_SUCCESS_THRESHOLD) }
 		if highest { caption = "MASSIMO / COPPIA!" if state.visible_pair else "DADO MAGGIORE" }
 	}
 	caption_x := c.int(target.x)-menu_measure_text(theme, caption, caption_font)/2
@@ -341,7 +352,7 @@ draw_dice_pool_total :: proc(renderer: ^Dice_Renderer, layout: Dice_Pool_Layout,
 	if highest {caption_color = {163, 232, 128, 255}}
 	menu_text(theme, caption, caption_x, caption_y, caption_font, caption_color)
 	if extended {
-		total := fmt.ctprintf("TOTAL %d", state.visible_total)
+		total := fmt.ctprintf("TOTALE %d" if menu_themed(theme) else "TOTAL %d", state.visible_total)
 		total_x := c.int(target.x)-menu_measure_text(theme, total, caption_font)/2
 		total_y := c.int(target.y+43*layout.scale)
 		menu_text(theme, total, total_x+1, total_y+1, caption_font, {0, 0, 0, 180})
@@ -351,31 +362,35 @@ draw_dice_pool_total :: proc(renderer: ^Dice_Renderer, layout: Dice_Pool_Layout,
 	for index in 0..<state.revealed {
 		p := state.transfer_progress[index]
 		if p >= 1 {continue}
-		from := dice_world_to_window(layout, renderer.frame.positions[index])
+		from := dice_world_to_window(layout, renderer.frame.positions[index]+renderer.rest_offsets[index]*polyhedral_rest_settle(progress))
 		from.y -= layout.pixels_per_world*0.70
 		eased := tween.smoothstep(p)
 		center := from+(target-from)*eased
 		center.y -= math.sin(p*math.PI)*25*layout.scale
 		small_font := c.int(max(f32(11), 20*layout.scale))
 		text := fmt.ctprintf("+%d", roll.faces[index])
-		if successes {text = "+1" if roll.faces[index] >= 4 else "+1 SHIELD"}
+		if successes {
+			miss: cstring = "+1 SCUDO" if menu_themed(theme) else "+1 SHIELD"
+			text = "+1" if roll.faces[index] >= game.DICE_SUCCESS_THRESHOLD else miss
+		}
 		if highest {text = fmt.ctprintf("%d", roll.faces[index])}
 		color := rl.Color{255, 235, 204, u8(255*(1-p))}
 		menu_text(theme, text, c.int(center.x)-menu_measure_text(theme, text, small_font)/2, c.int(center.y), small_font, color)
 	}
 }
 
-draw_dice_pool_fallback :: proc(renderer: ^Dice_Renderer, layout: Dice_Pool_Layout, roll: game.Dice_Roll, card: game.Card_Id = .Count) {
+draw_dice_pool_fallback :: proc(renderer: ^Dice_Renderer, layout: Dice_Pool_Layout, roll: game.Dice_Roll) {
 	for index in 0..<roll.count {
 		position := rl.Vector3{(f32(index)-f32(roll.count-1)*0.5)*1.25, 0.5, 0}
 		if renderer != nil && renderer.has_throw {position = renderer.frame.positions[index]}
 		center := dice_world_to_window(layout, position)
 		side := layout.pixels_per_world
 		bounds := rl.Rectangle{center.x-side*0.5, center.y-side*0.5, side, side}
-		if game.card_dice_sides(card) == 4 {
+		if roll.sides == 4 {
 			rl.DrawTriangle(center+rl.Vector2{0,-side*0.6}, center+rl.Vector2{-side*0.55,side*0.35}, center+rl.Vector2{side*0.55,side*0.35}, DICE_BODY_COLOR)
 		} else { rl.DrawRectangleRounded(bounds, 0.18, 6, DICE_BODY_COLOR) }
-		if game.card_dice_sides(card) == 4 || (renderer != nil && menu_themed(renderer.theme)) {
+		// Pips only fit a D6; every other die prints its number.
+		if roll.sides != 6 || (renderer != nil && menu_themed(renderer.theme)) {
 			label := fmt.ctprintf("%d", roll.faces[index])
 			theme := renderer.theme if renderer != nil else nil
 			size := c.int(side*0.45)
@@ -394,25 +409,13 @@ draw_dice_pool_overlay :: proc(renderer: ^Dice_Renderer, roll: game.Dice_Roll, p
 	layout := dice_pool_layout(window_width, window_height, game_area)
 	if !layout.valid {return}
 	if renderer != nil && renderer.ready && renderer.has_frame && renderer.seed == seed && renderer.roll == roll &&
-	   renderer.frame_kind == polyhedral_die_for_sides(int(game.card_dice_sides(card))) {
+	   renderer.frame_kind == polyhedral_die_for_sides(int(roll.sides)) {
 		rl.BeginBlendMode(.ALPHA_PREMULTIPLY)
 		rl.DrawTexturePro(renderer.texture.texture,
 			{0, 0, f32(renderer.texture.texture.width), -f32(renderer.texture.texture.height)},
 			{0, 0, window_width, window_height}, {}, 0, rl.WHITE)
 		rl.EndBlendMode()
-	} else {draw_dice_pool_fallback(renderer, layout, roll, card)}
+	} else {draw_dice_pool_fallback(renderer, layout, roll)}
 	if roll.count > 1 {draw_dice_pool_total(renderer, layout, roll, progress, card)}
-	if game.card_dice_sides(card) == 4 { draw_d4_result_label(renderer,layout,progress,roll.total) }
-}
-
-update_dice_texture :: proc(renderer: ^Dice_Renderer, face: i32, progress: f32) {
-	value := clamp(face, i32(1), i32(6))
-	update_dice_pool_texture(renderer, {faces = {value, 0, 0}, count = 1, total = value}, progress,
-		f32(rl.GetScreenWidth()), f32(rl.GetScreenHeight()))
-}
-
-draw_dice_overlay :: proc(renderer: ^Dice_Renderer, window_width, window_height: f32, face: i32,
-	progress: f32, game_area: rl.Rectangle = {}) {
-	value := clamp(face, i32(1), i32(6))
-	draw_dice_pool_overlay(renderer, {faces = {value, 0, 0}, count = 1, total = value}, progress, window_width, window_height, game_area)
+	if card == .Shock_Floor { draw_shock_floor_result_label(renderer, layout, progress, roll) }
 }

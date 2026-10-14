@@ -179,7 +179,7 @@ upgrade_owned_card :: proc(deck: ^Deck_State, card_id: u32) -> Deck_Mutation_Res
 	if !found {
 		return .Card_Not_Found
 	}
-	if deck.owned[card_index].upgrade_level >= MAX_CARD_UPGRADE_LEVEL {
+	if deck.owned[card_index].upgrade_level >= card_max_upgrade_level(deck.owned[card_index].definition_id) {
 		return .Maximum_Upgrade
 	}
 	if !card_can_upgrade(deck.owned[card_index]) {

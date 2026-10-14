@@ -643,12 +643,20 @@ player_command_outcome_for_phase :: proc(phase: Room_Phase) -> Player_Command_Ou
 
 // Accepted commands share loot and terminal cleanup. Classic advances one
 // response pulse; M7 pays combat time and queues the world beats it crosses.
-finish_player_combat_command :: proc(room: ^Room, time_cost: f32 = TACTICAL_ATTACK_SECONDS) -> (
+// Each one is an action of the player's (`acted`): his poison bites. Rising
+// from Movimento Ombra is the shadow's end, not an action.
+finish_player_combat_command :: proc(room: ^Room, time_cost: f32 = TACTICAL_ATTACK_SECONDS, acted := true) -> (
 	pulse: Pulse_Report,
 	outcome: Player_Command_Outcome,
 ) {
 	assert(room != nil && room.player != nil)
 	collect_loot_in_magnet_range(room)
+	if acted && room.phase == .Combat {
+		// `pulse` doubles as the bite's report: no second report on this deep stack.
+		tick_poison_on_action(room, PLAYER_ENTITY, &pulse)
+		append_event_log(&room.recent_events, &pulse.events)
+		pulse = {}
+	}
 	outcome = player_command_outcome_for_phase(room.phase)
 	if outcome != .Combat_Continues {
 		sync_deck_with_room_phase(room)
@@ -768,6 +776,7 @@ try_move_player :: proc(room: ^Room, direction: Move_Direction) -> Action_Result
 			report := resolve_action(room, &action)
 			assert(report.accepted)
 			consume_equipped_weapon_use(room.player)
+			mark_attack_events(&report.events, 0, PLAYER_ENTITY, enemy_entity(enemy.id), room.player.position, target, {}, false)
 			if critical { mark_critical_events(&report.events) }
 			append_event_log(&room.recent_events, &report.events)
 			_, outcome := finish_player_combat_command(room)
@@ -795,6 +804,7 @@ try_move_player :: proc(room: ^Room, direction: Move_Direction) -> Action_Result
 					report := resolve_action(room, &action)
 					if report.accepted {
 						consume_equipped_weapon_use(room.player)
+						mark_attack_events(&report.events, 0, PLAYER_ENTITY, ref, room.player.position, target, {}, false)
 						append_event_log(&room.recent_events, &report.events)
 						return .Attacked
 					}

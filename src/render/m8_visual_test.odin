@@ -29,7 +29,7 @@ test_ring_grab_has_four_distinct_held_poses_and_safe_endpoints :: proc(t: ^testi
 test_m8_device_descriptions_keep_d4_targets_separate_from_damage :: proc(t: ^testing.T) {
     for tactical in ([2]bool{false,true}) {
         first,second := gothic_card_lines({definition_id=.Shock_Floor,upgrade_level=0},tactical)
-        testing.expect_value(t,string(first),"D4 SCARICHE / D4 BERSAGLI")
+        testing.expect_value(t,string(first),"1d4 SCARICHE / 1d4 BERSAGLI")
         testing.expect_value(t,string(second),"1 DANNO / TRAPPOLA 3X3")
         first,second=gothic_card_lines({definition_id=.Tesla_Coil},tactical)
         testing.expect_value(t,string(first),"8 / DISTANZA DANNI")

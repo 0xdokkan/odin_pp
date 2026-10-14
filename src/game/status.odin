@@ -9,12 +9,30 @@ Status_Kind :: enum {
 	Afterimage,
 	Stagger,
 	Survey,
+	// Bruciatura: damage equal to its stacks at each new tactical window
+	// (each pulse in classic combat); its stacks never wear.
+	Burn,
+	// Rallentamento: each stack holds an enemy's next planned intent a second
+	// longer; the action it held wears a stack. No effect on the player.
+	Slow,
 }
 
 status_kind_is_valid :: proc(kind: Status_Kind) -> bool {
 	switch kind {
-	case .Poison, .Shield, .Thorns, .Afterimage, .Stagger, .Survey:
+	case .Poison, .Shield, .Thorns, .Afterimage, .Stagger, .Survey, .Burn, .Slow:
 		return true
+	}
+	return false
+}
+
+// Poison, Burn and Slow are stacks: applications add up and nothing counts
+// them down by the pulse. Their bearer's actions (Poison, Slow) or the new
+// windows (Burn) wear them instead (pulse.odin).
+status_kind_stacks :: proc(kind: Status_Kind) -> bool {
+	switch kind {
+	case .Poison, .Burn, .Slow:
+		return true
+	case .Shield, .Thorns, .Afterimage, .Stagger, .Survey:
 	}
 	return false
 }
@@ -33,6 +51,10 @@ status_kind_name :: proc(kind: Status_Kind) -> string {
 		return "Stagger"
 	case .Survey:
 		return "Survey"
+	case .Burn:
+		return "Burn"
+	case .Slow:
+		return "Slow"
 	}
 	return "Unknown"
 }
@@ -98,6 +120,10 @@ can_apply_status :: proc(room: ^Room, entity: Entity_Ref, kind: Status_Kind) -> 
 	   statuses.count < 0 || statuses.count > MAX_STATUSES_PER_ENTITY {
 		return false
 	}
+	// Rallentamento holds an enemy's intents; the player has none to hold.
+	if kind == .Slow && entity.kind == .Player {
+		return false
+	}
 	_, already_present := status_index(statuses, kind)
 	return already_present || statuses.count < MAX_STATUSES_PER_ENTITY
 }
@@ -108,7 +134,8 @@ apply_status :: proc(
 	kind: Status_Kind,
 	potency, duration: i32,
 ) -> (applied, created: bool) {
-	if potency <= 0 || duration <= 0 || !can_apply_status(room, entity, kind) {
+	stacks := status_kind_stacks(kind)
+	if potency <= 0 || (duration <= 0 && !stacks) || !can_apply_status(room, entity, kind) {
 		return false, false
 	}
 	statuses, found := status_set_for_entity(room, entity)
@@ -116,20 +143,20 @@ apply_status :: proc(
 	if index, already_present := status_index(statuses, kind); already_present {
 		status := &statuses.items[index]
 		switch kind {
-		case .Poison, .Thorns, .Afterimage, .Stagger, .Survey:
+		case .Thorns, .Afterimage, .Stagger, .Survey:
 			status.potency = max(status.potency, potency)
-		case .Shield:
+		case .Shield, .Poison, .Burn, .Slow:
 			available := max(i32)-status.potency
 			status.potency += min(potency, available)
 		}
-		status.remaining_pulses = max(status.remaining_pulses, duration)
+		if !stacks { status.remaining_pulses = max(status.remaining_pulses, duration) }
 		return true, false
 	}
 
 	statuses.items[statuses.count] = {
 		kind = kind,
 		potency = potency,
-		remaining_pulses = duration,
+		remaining_pulses = 0 if stacks else duration,
 	}
 	statuses.count += 1
 	return true, true

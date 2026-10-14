@@ -75,11 +75,17 @@ card_requires_tactical :: proc(id: Card_Id) -> bool {
 	return id == .Shadow_Step
 }
 
+// The dice cards and how many dice each rolls (dice.odin: roll_card_dice).
 card_dice_count :: proc(id: Card_Id) -> int {
 	if id == .Fate_Strike || id == .Shock_Floor { return 1 }
 	if id == .Sundering_Blow || id == .Twin_Venom { return 2 }
 	if id == .Prismatic_Barrage { return 3 }
 	return 0
+}
+
+// A dice card's upgrades climb the dice ladder and stop at its top.
+card_max_upgrade_level :: proc(id: Card_Id) -> i32 {
+	return MAX_DICE_UPGRADE_LEVEL if card_dice_count(id) > 0 else MAX_CARD_UPGRADE_LEVEL
 }
 
 Card_Target_Selector :: enum {
@@ -328,7 +334,6 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 				base_amount = 1,
 				amount_per_upgrade = 1,
 				status = .Poison,
-				duration = 3,
 			},
 			{},
 			{},
@@ -638,7 +643,6 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 				target = .Chosen_Entity,
 				base_amount = 1,
 				status = .Poison,
-				duration = 3,
 			},
 			{},
 			{},
@@ -667,7 +671,6 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 				base_amount = 2,
 				amount_per_upgrade = 1,
 				status = .Poison,
-				duration = 2,
 			},
 			{},
 			{},
@@ -745,7 +748,7 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 			requires_line_of_sight = true,
 			stops_on_wall = true,
 		},
-		effects = {{kind = .Damage, target = .Chosen_Entity, base_amount = 2, amount_per_upgrade = 1}, {}, {}, {}},
+		effects = {{kind = .Damage, target = .Chosen_Entity, base_amount = 2}, {}, {}, {}},
 		effect_count = 1,
 	},
 	{
@@ -780,7 +783,7 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 			stops_on_wall = true,
 		},
 		effects = {
-			{kind = .Damage, target = .Chosen_Entity, base_amount = 2, amount_per_upgrade = 1},
+			{kind = .Damage, target = .Chosen_Entity, base_amount = 2},
 			{kind = .Move, target = .Chosen_Entity, movement = .Away_From_Player, movement_distance = 1},
 			{}, {},
 		},
@@ -802,7 +805,7 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 		},
 		effects = {
 			{kind = .Apply_Status, target = .Player, base_amount = 1, status = .Shield, duration = 2},
-			{kind = .Damage, target = .Chosen_Entity, base_amount = 3, amount_per_upgrade = 1},
+			{kind = .Damage, target = .Chosen_Entity, base_amount = 3},
 			{}, {},
 		},
 		effect_count = 2,
@@ -822,8 +825,8 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 			stops_on_wall = true,
 		},
 		effects = {
-			{kind = .Damage, target = .Chosen_Entity, base_amount = 2, amount_per_upgrade = 1},
-			{kind = .Apply_Status, target = .Chosen_Entity, base_amount = 2, status = .Poison, duration = 2},
+			{kind = .Damage, target = .Chosen_Entity, base_amount = 2},
+			{kind = .Apply_Status, target = .Chosen_Entity, base_amount = 2, status = .Poison},
 			{}, {},
 		},
 		effect_count = 2,
@@ -832,7 +835,7 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 		id = .Shock_Floor, name = "Shock Floor", rarity = .Uncommon,
 		reward_weight = 85, shop_base_price = 6, cost = 2,
 		targeting = {rule = .Walkable_Cell, cast_range = {.Chebyshev, 1, 3}, shape = .Single, requires_line_of_sight = true, stops_on_wall = true},
-		effects = {{kind = .Deploy_Device, target = .Player, base_amount = 1, amount_per_upgrade = 1, object_kind = .Shock_Floor}, {}, {}, {}},
+		effects = {{kind = .Deploy_Device, target = .Player, base_amount = 1, object_kind = .Shock_Floor}, {}, {}, {}},
 		effect_count = 1,
 	},
 	{
@@ -984,7 +987,9 @@ card_effect_template_is_valid :: proc(
 		return template.target == .Player && template.has_card_definition && found &&
 		       card_amount_template_is_valid(template)
 	case .Apply_Status:
-		return status_kind_is_valid(template.status) && template.duration > 0 &&
+		// Stacks carry no duration; every other status needs one.
+		return status_kind_is_valid(template.status) &&
+		       (template.duration == 0 if status_kind_stacks(template.status) else template.duration > 0) &&
 		       card_amount_template_is_valid(template)
 	case .Add_Reaction_Binding:
 		if template.charges != REACTION_BINDING_UNLIMITED && template.charges <= 0 {
@@ -1053,7 +1058,7 @@ card_definition_by_id :: proc(id: Card_Id, tactical: bool = false) -> (Card_Defi
 }
 
 validate_card_instance :: proc(instance: Card_Instance) -> bool {
-	if instance.id == 0 || instance.upgrade_level < 0 || instance.upgrade_level > MAX_CARD_UPGRADE_LEVEL ||
+	if instance.id == 0 || instance.upgrade_level < 0 || instance.upgrade_level > card_max_upgrade_level(instance.definition_id) ||
 	   int(instance.lifetime) < 0 || int(instance.lifetime) >= int(Card_Lifetime.Count) {
 		return false
 	}
@@ -1066,9 +1071,11 @@ validate_card_instance :: proc(instance: Card_Instance) -> bool {
 // livelli privi di benefici, anche quando l'istanza e formalmente valida.
 card_can_upgrade :: proc(instance: Card_Instance) -> bool {
 	if !validate_card_instance(instance) || instance.lifetime != .Permanent ||
-	   instance.upgrade_level >= MAX_CARD_UPGRADE_LEVEL {
+	   instance.upgrade_level >= card_max_upgrade_level(instance.definition_id) {
 		return false
 	}
+	// A dice card's benefit is the next die of its ladder.
+	if card_dice_count(instance.definition_id) > 0 { return true }
 	definition, _ := card_definition_by_id(instance.definition_id)
 	for index in 0..<definition.effect_count {
 		if definition.effects[index].amount_per_upgrade > 0 {

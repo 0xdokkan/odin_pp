@@ -54,12 +54,14 @@ spell_demo_expect_committed_smoke :: proc(t: ^testing.T, kind: Spell_Smoke) {
 	testing.expect_value(t, cue.kind, expected_kind)
 	testing.expect(t, abs(render.presentation_cue_progress(cue)-expected_progress) < 0.0001)
 	if kind == .Dice {
-		testing.expect_value(t, cue.event.amount, i32(6))
+		// An unupgraded Fate Strike rolls a D4: its top face bounces.
+		testing.expect_value(t, cue.event.amount, i32(4))
+		testing.expect_value(t, cue.event.dice_roll.sides, i32(4))
 		testing.expect_value(t, run.player.dice.roll_count, u64(1))
 	}
 	if kind == .Dice_Pool {
 		testing.expect_value(t, cue.event.dice_roll.count, 2)
-		testing.expect_value(t, cue.event.amount, i32(9))
+		testing.expect_value(t, cue.event.amount, game.SUNDERING_PUSH_TOTAL)
 		testing.expect_value(t, run.player.dice.roll_count, u64(2))
 	}
 	if new_dice {

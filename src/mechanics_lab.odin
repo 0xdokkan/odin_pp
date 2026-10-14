@@ -106,7 +106,8 @@ mechanics_lab_smoke_frame :: proc(window: ^app.Window, renderer: ^render.Rendere
 
 // The sandbox in the real window: a hand of Movimento Ombra, a square of coils
 // around the arrivals, the last kill that keeps the combat going and the refill;
-// last, one of those cards played, the shadow walked and the rise.
+// then one of those cards played, the shadow walked and the rise, every kind of
+// blow and, last, a slowed brute's seal.
 run_mechanics_lab_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer, dice: ^render.Dice_Renderer) -> bool {
 	data: level.Level
 	defer level.destroy(&data)
@@ -240,6 +241,7 @@ run_mechanics_lab_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer,
 	cure_after := render.capture_room_presentation(&room)
 	if !render.begin_renderer_event_timeline(renderer, cure_before, &room.recent_events, &cure_after) { return false }
 	mechanics_lab_film(window, renderer, &room, &controller, &cards, &buffer, 80, 2, "heal")
+	if !mechanics_lab_statuses(window, renderer, &room, &controller, &cards, &buffer) { return false }
 	// The shrinking window: the last second runs out into a stun, cards only.
 	player.tactical.config.shrinking_window = true
 	player.tactical.budget, player.tactical.remaining, player.tactical.won_seconds = 1, 0.1, 0
@@ -268,7 +270,260 @@ run_mechanics_lab_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer,
 	}
 	renderer.tactical.pause_hovered, renderer.tactical.pause_menu = .None, false
 	if !mechanics_lab_shadow(window, renderer, &room, &controller, &cards, &buffer) { return false }
+	if !mechanics_lab_blows(window, renderer, &room, &controller, &cards, &buffer) { return false }
+	if !mechanics_lab_slow(window, renderer, &room, &controller, &cards, &buffer) { return false }
 	return mechanics_lab_sounds_heard(renderer)
+}
+
+// Every kind of blow on the board, one at a time, filmed every second frame
+// as odin_pp_living_blow_<name>_NN.png: each enemy's own weapon over its
+// cells (the brute's cleave over three, and his charge struck once he has
+// arrived), the archer's bolt into the player and into the floor, the
+// bomber's bomb, the archmage's ember on a barrel, and the player's bumps with
+// his lantern and with each M8 weapon. Every look must have shown.
+mechanics_lab_blows :: proc(window: ^app.Window, renderer: ^render.Renderer, room: ^game.Room, controller: ^Tactical_Controller,
+	cards: ^Card_Interaction_State, buffer: ^Buffered_Gameplay_Command) -> bool {
+	player := room.player
+	Blow :: struct {
+		name: string,
+		archetype: game.Enemy_Archetype,
+		at: grid.Position,
+		look: render.Attack_Look,
+		cleave, miss, charge, barrel: bool,
+	}
+	center := player.position
+	blows := [?]Blow{
+		{name = "bolt", archetype = .Archer, at = {center.x+4, center.y}, look = .Bolt},
+		{name = "bolt_miss", archetype = .Archer, at = {center.x-4, center.y}, look = .Bolt, miss = true},
+		{name = "cleave", archetype = .Brute, at = {center.x+1, center.y}, look = .Cleaver, cleave = true},
+		{name = "charge", archetype = .Brute, at = {center.x+3, center.y}, look = .Cleaver, charge = true},
+		{name = "claws", archetype = .Chaser, at = {center.x, center.y-1}, look = .Claws},
+		{name = "crozier", archetype = .Custodian, at = {center.x-1, center.y}, look = .Crozier},
+		{name = "staff", archetype = .Demolitionist, at = {center.x, center.y+1}, look = .Staff},
+		{name = "bomb", archetype = .Bomber, at = {center.x+3, center.y-1}, look = .Bomb},
+		{name = "ember", archetype = .Demolitionist, at = {center.x+3, center.y-3}, look = .Ember, barrel = true},
+	}
+	for blow in blows {
+		if !mechanics_lab_clear_arena(room) { return false }
+		player.health = player.stats.max_health
+		// The smoke stands him back where the blows aim (no walk to show).
+		player.position = center
+		id, placed := game.spawn_enemy(room, {position = blow.at, health = 60, attack = 1, archetype = blow.archetype})
+		if !placed { fmt.eprintln("mechanics lab: no room for the", blow.name); return false }
+		index, _ := game.enemy_index_by_id(room, id)
+		enemy := &room.enemies[index]
+		aim := center
+		intent := game.make_attack_intent(room, enemy.position, aim, 1)
+		if blow.cleave {
+			for side in ([2]grid.Position{{aim.x, aim.y-1}, {aim.x, aim.y+1}}) {
+				intent.threatened_cells[intent.threatened_cell_count] = side
+				intent.threatened_cell_count += 1
+			}
+		}
+		if blow.charge {
+			// Two cells at a run, then the blow from the third.
+			intent.kind = .Charge
+			for step in 1..=2 {
+				intent.path[intent.path_count] = {enemy.position.x-step, aim.y}
+				intent.path_count += 1
+			}
+			intent.destination = intent.path[intent.path_count-1]
+		}
+		barrel: u32
+		if blow.barrel {
+			// A barrel by the player, set alight from afar.
+			barrel = room.next_object_id
+			room.next_object_id += 1
+			append(&room.objects, game.Grid_Object{id = barrel, kind = .Barrel, position = {center.x+1, center.y-1}, health = 1, max_health = 1})
+			intent = game.make_attack_intent(room, enemy.position, {center.x+1, center.y-1}, 1)
+			intent.target_object = barrel
+		}
+		intent.push = blow.cleave || blow.charge
+		enemy.intent = intent
+		// A miss: he has stepped off the line the archer shot along.
+		if blow.miss { player.position = {center.x, center.y+1} }
+		render.clear_event_animations(renderer)
+		for _ in 0..<12 { mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0) }
+		shown := renderer.tactical.attack_fx.spawned[blow.look]
+		before := render.capture_room_presentation(room)
+		pulse: game.Pulse_Report
+		game.resolve_enemy_intents(room, &pulse, id)
+		after := render.capture_room_presentation(room)
+		if pulse.events.count == 0 || !render.begin_renderer_world_timeline(renderer, before, &pulse.events, &after) {
+			fmt.eprintln("mechanics lab: the", blow.name, "was not shown"); return false
+		}
+		frames := 80 if blow.charge else 48
+		for frame in 0..<frames {
+			mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0)
+			if frame%2 == 0 { rl.TakeScreenshot(fmt.ctprintf("odin_pp_living_blow_%s_%02d.png", blow.name, frame/2)) }
+		}
+		if renderer.tactical.attack_fx.spawned[blow.look] != shown+1 {
+			fmt.eprintln("mechanics lab: the", blow.name, "showed no", blow.look); return false
+		}
+		if barrel != 0 {
+			if at, found := game.object_index_by_id(room, barrel); found { _ = game.remove_grid_object(room, at) }
+		}
+	}
+	// The player's bumps: the lantern, then each M8 weapon in his hand.
+	weapons := [?]game.Weapon_Slot{{}, {id = .Iron_Cleaver, uses_remaining = 4}, {id = .Storm_Pike, uses_remaining = 3}}
+	looks := [?]render.Attack_Look{.Lantern, .Iron_Cleaver, .Storm_Pike}
+	names := [?]string{"lantern", "iron_cleaver", "storm_pike"}
+	for weapon, index in weapons {
+		if !mechanics_lab_clear_arena(room) { return false }
+		player.health = player.stats.max_health
+		player.equipment.weapon = weapon
+		if _, placed := game.spawn_enemy(room, {position = {player.position.x+1, player.position.y}, health = 60, attack = 1, archetype = .Chaser}); !placed {
+			fmt.eprintln("mechanics lab: no foe for the bump"); return false
+		}
+		render.clear_event_animations(renderer)
+		for _ in 0..<12 { mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0) }
+		shown := renderer.tactical.attack_fx.spawned[looks[index]]
+		if !mechanics_lab_capture(window, renderer, room, controller, cards, buffer, {kind = .Move, origin_phase = .Combat, direction = .East},
+			fmt.tprintf("blow_%s", names[index])) { return false }
+		if renderer.tactical.attack_fx.spawned[looks[index]] <= shown {
+			fmt.eprintln("mechanics lab: the bump showed no", looks[index]); return false
+		}
+	}
+	player.equipment.weapon = {}
+	for look in render.Attack_Look {
+		if look != .None && renderer.tactical.attack_fx.spawned[look] == 0 { fmt.eprintln("mechanics lab: no prop for", look); return false }
+	}
+	fmt.eprintln("mechanics lab blows:", renderer.tactical.attack_fx.spawned)
+	return true
+}
+
+// The stack statuses, filmed as odin_pp_living_statuses_NN.png and held still
+// as odin_pp_mechanics_lab_statuses.png: Veleno, Bruciatura and Rallentamento
+// on a foe (the brute, when one is in the arena), Bruciatura and Veleno on the
+// player. Their tags at the feet, their names and stacks in the HUD and in the
+// foe's inspector; the window that runs out next (the stun below) burns.
+mechanics_lab_statuses :: proc(window: ^app.Window, renderer: ^render.Renderer, room: ^game.Room, controller: ^Tactical_Controller,
+	cards: ^Card_Interaction_State, buffer: ^Buffered_Gameplay_Command) -> bool {
+	if len(room.enemies) == 0 { fmt.eprintln("mechanics lab: no foe for the statuses"); return false }
+	foe := game.enemy_entity(room.enemies[0].id)
+	for enemy in room.enemies { if enemy.archetype == .Brute { foe = game.enemy_entity(enemy.id) } }
+	before := render.capture_room_presentation(room)
+	game.clear_event_log(&room.recent_events)
+	marks := game.make_action(.Trigger, game.SYSTEM_ENTITY)
+	effects := [5]game.Effect{
+		game.apply_status_effect(foe, .Poison, 3, 0), game.apply_status_effect(foe, .Burn, 2, 0), game.apply_status_effect(foe, .Slow, 2, 0),
+		game.apply_status_effect(game.PLAYER_ENTITY, .Burn, 1, 0), game.apply_status_effect(game.PLAYER_ENTITY, .Poison, 2, 0),
+	}
+	for effect in effects {
+		if !game.add_effect(&marks, effect) { fmt.eprintln("mechanics lab: a status effect refused"); return false }
+	}
+	marked := game.resolve_action(room, &marks)
+	if !marked.accepted || marked.statuses_applied != len(effects) { fmt.eprintln("mechanics lab: the statuses were refused"); return false }
+	game.append_event_log(&room.recent_events, &marked.events)
+	after := render.capture_room_presentation(room)
+	if !render.begin_renderer_event_timeline(renderer, before, &room.recent_events, &after) { return false }
+	mechanics_lab_film(window, renderer, room, controller, cards, buffer, 60, 3, "statuses")
+	// Held still, the mouse on the foe: its inspector lists them too.
+	mechanics_lab_inspect_still(window, renderer, room, foe, "odin_pp_mechanics_lab_statuses.png")
+	return true
+}
+
+// Rallentamento on the seal, last: a brute slowed by 2 keeps the step it had
+// planned (off the player's lines, so not a charge), then plans the next
+// intent 2 s longer, so its seal counts two more notches and fills that much
+// slower (odin_pp_mechanics_lab_slow.png, its inspector open); once that
+// action is carried out the slow wears a stack and the intent after it is held
+// 1 s (odin_pp_mechanics_lab_slow_worn.png).
+mechanics_lab_slow :: proc(window: ^app.Window, renderer: ^render.Renderer, room: ^game.Room, controller: ^Tactical_Controller,
+	cards: ^Card_Interaction_State, buffer: ^Buffered_Gameplay_Command) -> bool {
+	SLOW :: i32(2)
+	brute :: proc(room: ^game.Room, id: u32) -> ^game.Enemy {
+		index, found := game.enemy_index_by_id(room, id)
+		return &room.enemies[index] if found else nil
+	}
+	stacks :: proc(enemy: ^game.Enemy) -> i32 {
+		index, found := game.status_index(&enemy.statuses, .Slow)
+		return enemy.statuses.items[index].potency if found else 0
+	}
+	player := room.player
+	if !mechanics_lab_clear_arena(room) { return false }
+	player.health = player.stats.max_health
+	// No weapon panel over the board where the brute's tags stand: the bumps'
+	// weapons go, and so do the spares on the floor the magnet would pick up.
+	player.equipment = {}
+	for index := len(room.loot)-1; index >= 0; index -= 1 {
+		if room.loot[index].kind == .Weapon { unordered_remove(&room.loot, index) }
+	}
+	id, placed := game.spawn_enemy(room, {position = {player.position.x+3, player.position.y+2}, health = 60, attack = 1, archetype = .Brute})
+	if !placed { fmt.eprintln("mechanics lab: no room for the slowed brute"); return false }
+	foe := game.enemy_entity(id)
+	before := render.capture_room_presentation(room)
+	game.clear_event_log(&room.recent_events)
+	marks := game.make_action(.Trigger, game.SYSTEM_ENTITY)
+	if !game.add_effect(&marks, game.apply_status_effect(foe, .Slow, SLOW, 0)) { return false }
+	marked := game.resolve_action(room, &marks)
+	if !marked.accepted || marked.statuses_applied != 1 { fmt.eprintln("mechanics lab: the slow was refused"); return false }
+	game.append_event_log(&room.recent_events, &marked.events)
+	after := render.capture_room_presentation(room)
+	if !render.begin_renderer_event_timeline(renderer, before, &room.recent_events, &after) { return false }
+	// The held intent, a second and a half into its countdown.
+	enemy: ^game.Enemy
+	for _ in 0..<900 {
+		enemy = brute(room, id)
+		if enemy == nil { break }
+		if enemy.intent.slowed == SLOW && room.qte.kind == .None && !render.renderer_blocks_player_input(renderer) &&
+		   game.tactical_enemy_intent_seconds(enemy)-game.tactical_enemy_seconds(room, enemy) >= 1.5 { break }
+		mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0, true)
+	}
+	if enemy == nil || enemy.intent.slowed != SLOW || stacks(enemy) != SLOW {
+		fmt.eprintln("mechanics lab: the brute planned no intent held by its slow"); return false
+	}
+	held, base := game.tactical_enemy_intent_seconds(enemy), game.tactical_enemy_base_seconds(enemy)
+	if held != base+f32(SLOW) { fmt.eprintf("mechanics lab: a slowed intent of %.1f s, not %.1f\n", held, base+f32(SLOW)); return false }
+	kind := enemy.intent.kind
+	mechanics_lab_inspect_still(window, renderer, room, foe, "odin_pp_mechanics_lab_slow.png")
+	// Carried out, it wears one stack; the next intent is held one second.
+	for _ in 0..<900 {
+		enemy = brute(room, id)
+		if enemy == nil || (stacks(enemy) < SLOW && enemy.intent.slowed == SLOW-1 && room.qte.kind == .None &&
+		   !render.renderer_blocks_player_input(renderer)) { break }
+		mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0, true)
+	}
+	if enemy == nil || stacks(enemy) != SLOW-1 || enemy.intent.slowed != SLOW-1 ||
+	   game.tactical_enemy_intent_seconds(enemy) != game.tactical_enemy_base_seconds(enemy)+f32(SLOW-1) {
+		fmt.eprintln("mechanics lab: the slowed action did not wear one stack"); return false
+	}
+	for _ in 0..<30 { mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0, true) }
+	mechanics_lab_inspect_still(window, renderer, room, foe, "odin_pp_mechanics_lab_slow_worn.png")
+	fmt.eprintf("mechanics lab slow: %v held %.0f s (%.0f s base), then %v %.0f s with %d stack left\n",
+		kind, held, base, enemy.intent.kind, game.tactical_enemy_intent_seconds(enemy), stacks(enemy))
+	return true
+}
+
+// Empties the arena for the next act: every foe falls with its own clip.
+mechanics_lab_clear_arena :: proc(room: ^game.Room) -> bool {
+	action := game.Action{kind = .Ability, source = game.PLAYER_ENTITY}
+	for enemy in room.enemies {
+		action.effects[action.effect_count] = {kind = .Damage, target = game.enemy_entity(enemy.id), amount = 1000}
+		action.effect_count += 1
+	}
+	return action.effect_count == 0 || game.resolve_action(room, &action).accepted
+}
+
+// A still frame with the mouse on `foe`, so its inspector stands beside the
+// board, saved as `name`.
+mechanics_lab_inspect_still :: proc(window: ^app.Window, renderer: ^render.Renderer, room: ^game.Room, foe: game.Entity_Ref, name: cstring) {
+	for _ in 0..<3 {
+		render.update_renderer_frame_timeline(renderer, 0)
+		render.update_tactical_view(renderer, room, {}, false, true)
+		if index, found := game.enemy_index_by_id(room, foe.id); found {
+			renderer.has_hovered_cell, renderer.hovered_cell = true, room.enemies[index].position
+		}
+		app.begin_canvas(window, render.RESIN_BACKGROUND)
+		render.draw_tactical_world(renderer, room, 0)
+		render.draw_tactical_status(renderer, room)
+		render.draw_tactical_hand(renderer, room, 0, 0, 0, {})
+		render.draw_tactical_hud(renderer, room, false, false)
+		render.draw_mechanics_lab_banner(renderer, room, true)
+		app.present(window, render.LETTERBOX_COLOR)
+	}
+	rl.TakeScreenshot(name)
+	renderer.has_hovered_cell = false
 }
 
 // MOVIMENTO OMBRA from the hand, as the lane plays it, filmed every fourth
@@ -404,7 +659,7 @@ mechanics_lab_reel_frame :: proc(window: ^app.Window, renderer: ^render.Renderer
 }
 
 // The smoke's actions each sounded: steps, blows, hurts, the clock, the
-// cure, the stun and the fall.
+// cure, the statuses, the stun and the fall.
 mechanics_lab_sounds_heard :: proc(renderer: ^render.Renderer) -> bool {
 	sounds := renderer.tactical.lab_sounds
 	if sounds == nil { fmt.eprintln("mechanics lab: no sounds"); return false }
@@ -418,6 +673,10 @@ mechanics_lab_sounds_heard :: proc(renderer: ^render.Renderer) -> bool {
 	}
 	for sfx in ([?]audio.Lab_Sfx{.Pilgrim_Attack, .Pilgrim_Hurt, .Ghoul_Hurt, .Pilgrim_Death, .Ui_Defeat, .Pilgrim_Heal, .Ui_Beat_Tick, .Ui_Stun}) {
 		if sounds.played[sfx] == 0 { fmt.eprintln("mechanics lab: no sound for", sfx); return false }
+	}
+	for kind in ([?]game.Status_Kind{.Poison, .Burn, .Slow}) {
+		sfx, _ := render.lab_status_sfx(kind)
+		if sounds.played[sfx] == 0 { fmt.eprintln("mechanics lab: no sound for the status", kind, sfx); return false }
 	}
 	fmt.eprintln("mechanics lab sounds:", heard)
 	return true

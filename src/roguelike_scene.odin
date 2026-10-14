@@ -605,6 +605,12 @@ roguelike_attach :: proc(rs: ^Roguelike_Session, window: ^app.Window) -> Session
 		game.use_player_ability(&rs.room, .Guard)
 		game.use_player_ability(&rs.room, .Thorn_Coat)
 		game.use_player_ability(&rs.room, .Afterimage)
+		// The stacks on show too: Bruciatura on the player, every one on a foe.
+		if len(rs.room.enemies) > 0 {
+			foe := game.enemy_entity(rs.room.enemies[0].id)
+			for kind in ([3]game.Status_Kind{.Poison, .Burn, .Slow}) { _, _ = game.apply_status(&rs.room, foe, kind, 2, 0) }
+		}
+		_, _ = game.apply_status(&rs.room, game.PLAYER_ENTITY, .Burn, 1, 0)
 	} else if rs.smoke_loot {
 		rs.room.player.position = {x = 10, y = 2}
 		rs.room.enemies[0].health = rs.room.player.stats.attack

@@ -150,7 +150,7 @@ draw_tactical_card :: proc(renderer: ^Renderer, bounds: rl.Rectangle, card: game
 	rl.DrawRectangleRec({x+10, y+85, width-20, 1}, {251, 244, 223, 170})
 	first, second := gothic_card_lines(card, definition.tactical)
 	if width < 130 {
-		if card.definition_id == .Shock_Floor { first, second = "D4 COLPI + BERS.", fmt.ctprintf("%d DANNO / 3X3", game.card_effect_amount(definition.effects[0], card.upgrade_level)) }
+		if card.definition_id == .Shock_Floor { first, second = fmt.ctprintf("%s COLPI + BERS.", card_dice_label(card)), fmt.ctprintf("%d DANNO / 3X3", game.card_effect_amount(definition.effects[0], card.upgrade_level)) }
 		if card.definition_id == .Tesla_Coil { first, second = fmt.ctprintf("%d / DIST. DANNI",game.card_effect_amount(definition.effects[0],card.upgrade_level)), "CAMPO USA 4 TESLA" }
 	}
 	gothic_text_fit(renderer, first, {x+10, y+90, width-20, 18}, 14, ink)
@@ -181,7 +181,7 @@ draw_tactical_card_inspector :: proc(renderer: ^Renderer, card: game.Card_Instan
 	if card.definition_id == .Thorn_Coat { reaction = "QTE: DEFLECT (FRECCE)" }
 	if card.definition_id == .Afterimage { reaction = "IGNORA RECUPERO SCHIVA" }
 	if card.definition_id == .Prismatic_Barrage { reaction = "SCUDO PRIMA / 2s" }
-	if card.definition_id == .Twin_Venom { reaction = "VELENO: 2s" }
+	if card.definition_id == .Twin_Venom { reaction = "VELENO: A OGNI SUA AZIONE" }
 	if game.card_is_board_device(card.definition_id) { reaction = "USA IL PULSANTE ATTIVA" }
 	if card.definition_id == .Shock_Floor { reaction = "TRAPPOLA: INGRESSO NEMICO" }
 	if card.definition_id == .Tesla_Coil { reaction = "ATTIVA / 2-3 TESLA RESTANO" }

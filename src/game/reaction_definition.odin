@@ -118,7 +118,7 @@ reaction_effect_template_is_valid :: proc(
 	case .Remove_Status:
 		return true
 	case .Damage, .Heal, .Gain_Gold, .Apply_Status:
-		if template.kind == .Apply_Status && template.duration <= 0 {
+		if template.kind == .Apply_Status && template.duration <= 0 && !status_kind_stacks(template.status) {
 			return false
 		}
 		switch template.amount_source {

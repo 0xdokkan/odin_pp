@@ -130,18 +130,20 @@ draw_tactical_annotations :: proc(renderer: ^Renderer, room: ^game.Room) {
 			"NEMICI 0/0  /  F5 RICOMINCIA  /  F6 INTENTI: SIGILLI + TERRENO  /  F10 MENU")
 		v.labels.count += 1
 	}
-	// Existing status glyphs retain their ground lane; text badges avoid it.
+	// Existing status glyphs retain their ground lane, the paper tags under
+	// them included; text badges avoid it.
 	for &actor in v.snapshot.enemies[:v.snapshot.enemy_count] {
 		cell := grid.Position{int(math.round(actor.position.x)), int(math.round(actor.position.y))}
 		if !actor.visible || actor.statuses.count == 0 || !tactical_render_visible(renderer, cell) { continue }
 		p := tactical_project(renderer, {actor.position.x+0.5, actor.position.y+0.5})
-		draw_status_set(renderer, &actor.statuses, p, 14, actor.opacity)
-		if v.labels.count < len(v.labels.bounds) { v.labels.bounds[v.labels.count] = {p.x-30, p.y-18, 60, 36}; v.labels.count += 1 }
+		tags := draw_status_set(renderer, &actor.statuses, p, 14, actor.opacity, tactical_status_tag_pixel(renderer, actor.position))
+		if v.labels.count < len(v.labels.bounds) { v.labels.bounds[v.labels.count] = tactical_status_lane(p, tags); v.labels.count += 1 }
 	}
 	if v.snapshot.player.visible && v.snapshot.player.statuses.count > 0 {
-		p := tactical_project(renderer, {v.snapshot.player.position.x+0.5, v.snapshot.player.position.y+0.5})
-		draw_status_set(renderer, &v.snapshot.player.statuses, p, 14, v.snapshot.player.opacity)
-		if v.labels.count < len(v.labels.bounds) { v.labels.bounds[v.labels.count] = {p.x-30, p.y-18, 60, 36}; v.labels.count += 1 }
+		player := &v.snapshot.player
+		p := tactical_project(renderer, {player.position.x+0.5, player.position.y+0.5})
+		tags := draw_status_set(renderer, &player.statuses, p, 14, player.opacity, tactical_status_tag_pixel(renderer, player.position))
+		if v.labels.count < len(v.labels.bounds) { v.labels.bounds[v.labels.count] = tactical_status_lane(p, tags); v.labels.count += 1 }
 	}
 	// Critical fuse labels reserve space before actors and their ordinary intents.
 	draw_voxel_fuse_labels(renderer, room)

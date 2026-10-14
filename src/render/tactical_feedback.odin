@@ -44,11 +44,12 @@ tactical_feedback_pose :: proc(renderer: ^Renderer, key: Sprite_Key, position: v
 			result.lift = 0.095*envelope
 			result.lean = 0.028*math.sin(p*2*math.PI)
 			result.scale_y = 1+0.045*envelope
-		} else if cue.kind == .Damage {
+		} else if cue.kind == .Damage && !attack_fx_shows(renderer, cue) {
+			// A blow shown with its props has its own impact (attack_fx.odin).
 			result.lean = math.sin(p*3*math.PI)*(1-p)*0.07
 			result.scale_y = 1-0.07*envelope
 			result.tint = {255, u8(255-145*envelope), u8(255-115*envelope), 255}
-		} else if cue.kind == .Damage_Absorbed {
+		} else if cue.kind == .Damage_Absorbed && !attack_fx_shows(renderer, cue) {
 			result.tint = {u8(255-80*envelope), u8(255-25*envelope), 255, 255}
 		} else if cue.kind == .Card_Played {
 			result.lift = envelope*0.04
@@ -245,9 +246,10 @@ draw_tactical_feedback :: proc(renderer: ^Renderer, layer: Tactical_Feedback_Lay
 		case .Damage:
 			color := TACTICAL_FEEDBACK_HIT
 			if cue.event.has_status_cause && cue.event.status_cause == .Poison { color = {126, 211, 174, 255} }
-			draw_tactical_hit(renderer, center, p, color)
+			if cue.event.has_status_cause && cue.event.status_cause == .Burn { color = {244, 157, 104, 255} }
+			if !attack_fx_shows(renderer, cue) { draw_tactical_hit(renderer, center, p, color) }
 		case .Damage_Absorbed:
-			draw_tactical_shield(renderer, center, p)
+			if !attack_fx_shows(renderer, cue) { draw_tactical_shield(renderer, center, p) }
 		case .Status_Applied:
 			if cue.event.status == .Shield { draw_tactical_shield(renderer, center, p) }
 			else if cue.event.status == .Stagger {

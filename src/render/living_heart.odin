@@ -53,16 +53,16 @@ draw_pixel_row :: proc(bits: u8, width: int, x, y, pixel: f32, color: rl.Color) 
 	}
 }
 
-// The tag with its top left at `at` (whole screen pixels), `pixel` screen
-// pixels to a tag pixel: living_token_texture's picture, drawn in place with
-// pieces that never overlap, so a fading tag stays even.
-draw_living_heart :: proc(at: rl.Vector2, text: string, pixel: f32, alpha: f32 = 1) {
-	w, h := living_heart_size(text)
+// A tag's paper, `w` by `h` tag pixels with its top left at `at` (whole
+// screen pixels), `pixel` screen pixels to a tag pixel: living_token_texture's
+// picture, drawn in place with pieces that never overlap, so a fading tag
+// stays even. Its ink, for the figures drawn on it.
+draw_paper_tag :: proc(at: rl.Vector2, w, h: int, pixel: f32, alpha: f32 = 1) -> (ink: rl.Color) {
 	pw, ph := f32(w-1), f32(h-1)
 	box :: proc(at: rl.Vector2, pixel, x, y, w, h: f32, color: rl.Color) {
 		rl.DrawRectangleRec({at.x+x*pixel, at.y+y*pixel, w*pixel, h*pixel}, color)
 	}
-	ink := color_with_opacity(LIVING_TOKEN_INK, alpha)
+	ink = color_with_opacity(LIVING_TOKEN_INK, alpha)
 	// The paper's ink line, three corners cut by hand...
 	box(at, pixel, 1, 0, pw-2, 1, ink)
 	box(at, pixel, 0, 1, 1, ph-2, ink)
@@ -73,11 +73,11 @@ draw_living_heart :: proc(at: rl.Vector2, text: string, pixel: f32, alpha: f32 =
 	box(at, pixel, 1, ph, pw-1, 1, ink)
 	// ...and the paper.
 	box(at, pixel, 1, 1, pw-2, ph-2, color_with_opacity(LIVING_TOKEN_PAPER, alpha))
-	red := color_with_opacity(LIVING_TOKEN_DAMAGE, alpha)
-	for row in 0..<7 {
-		draw_pixel_row(LIVING_HEART_GLYPH[row], LIVING_HEART_WIDTH, at.x+3*pixel, at.y+f32(3+row)*pixel, pixel, red)
-	}
-	left := f32(3+LIVING_HEART_WIDTH+1)
+	return
+}
+
+// A tag's pixel figures, from tag pixel column `left` on its text row.
+draw_paper_tag_text :: proc(at: rl.Vector2, left: f32, text: string, pixel: f32, ink: rl.Color) {
 	for index in 0..<len(text) {
 		glyph, ok := living_token_glyph(text[index])
 		if !ok { continue }
@@ -85,6 +85,17 @@ draw_living_heart :: proc(at: rl.Vector2, text: string, pixel: f32, alpha: f32 =
 			draw_pixel_row(LIVING_TOKEN_GLYPHS[glyph][row], 5, at.x+(left+f32(index*6))*pixel, at.y+f32(3+row)*pixel, pixel, ink)
 		}
 	}
+}
+
+// The heart's tag with its top left at `at`.
+draw_living_heart :: proc(at: rl.Vector2, text: string, pixel: f32, alpha: f32 = 1) {
+	w, h := living_heart_size(text)
+	ink := draw_paper_tag(at, w, h, pixel, alpha)
+	red := color_with_opacity(LIVING_TOKEN_DAMAGE, alpha)
+	for row in 0..<7 {
+		draw_pixel_row(LIVING_HEART_GLYPH[row], LIVING_HEART_WIDTH, at.x+3*pixel, at.y+f32(3+row)*pixel, pixel, red)
+	}
+	draw_paper_tag_text(at, f32(3+LIVING_HEART_WIDTH+1), text, pixel, ink)
 }
 
 // The top of a living figure's head (world): `rest_height` above its feet,

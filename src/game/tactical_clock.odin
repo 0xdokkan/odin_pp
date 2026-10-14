@@ -51,7 +51,12 @@ tactical_begin_card_cast :: proc(room: ^Room, seconds: f32) {
 
 // Each telegraph has a deadline of its own. Recovery and an already prepared
 // projectile advance faster than a fresh action; classic combat ignores this.
+// Rallentamento's seconds, added when the intent was planned, are part of it.
 tactical_enemy_intent_seconds :: proc(enemy: ^Enemy) -> f32 {
+	return tactical_enemy_base_seconds(enemy)+f32(max(i32(0), enemy.intent.slowed))
+}
+
+tactical_enemy_base_seconds :: proc(enemy: ^Enemy) -> f32 {
 	if enemy.intent.kind == .Recover || enemy.aim_ready || enemy.bomb_ready { return 1 }
 	switch enemy.archetype {
 	case .Chaser: return 2
@@ -67,8 +72,13 @@ tactical_enemy_seconds :: proc(room: ^Room, enemy: ^Enemy) -> f32 {
 	return max(f32(0), enemy.tactical_cooldown-room.player.tactical.clock_fraction)
 }
 
+// A freshly planned intent: each stack of Rallentamento holds it a second
+// longer (the stack wears once that action is carried out, pulse.odin).
 tactical_schedule_enemy :: proc(room: ^Room, enemy: ^Enemy) {
-	if tactical_enabled(room) { enemy.tactical_cooldown = tactical_enemy_intent_seconds(enemy) }
+	if !tactical_enabled(room) { return }
+	enemy.intent.slowed = 0
+	if index, slowed := status_index(&enemy.statuses, .Slow); slowed { enemy.intent.slowed = enemy.statuses.items[index].potency }
+	enemy.tactical_cooldown = tactical_enemy_intent_seconds(enemy)
 }
 
 tactical_queue_next_beat :: proc(room: ^Room) {
@@ -151,6 +161,16 @@ tactical_expire_window :: proc(room: ^Room) -> bool {
 		s.stun_duration = f32(s.stuns)
 		s.remaining = s.stun_duration
 		s.next_budget = s.config.timer_seconds
+	}
+	// Bruciatura bites as the window number changes, on this very command, so
+	// its blows have their cues. A lethal one ends the fight as any blow does.
+	burn: Pulse_Report
+	tick_combatants(room, &burn, burn_status)
+	append_event_log(&room.recent_events, &burn.events)
+	if room.phase != .Combat {
+		collect_loot_in_magnet_range(room)
+		sync_deck_with_room_phase(room)
+		tactical_end_combat(room)
 	}
 	return true
 }

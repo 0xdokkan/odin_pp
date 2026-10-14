@@ -44,7 +44,10 @@ draw_tactical_enemy_inspector :: proc(renderer: ^Renderer, room: ^game.Room) {
 	case .Count: return
 	}
 	x, y := f32(25), TACTICAL_HUD_HEIGHT+f32(26)
-	gothic_frame({x-11, y-8, 218, 172}, GOTHIC_RECESS, GOTHIC_STEEL)
+	// Its statuses, when it has any, on one more line: each one's name and
+	// stacks (or potency and seconds) in its colour.
+	statused := enemy.statuses.count > 0
+	gothic_frame({x-11, y-8, 218, 172+(24 if statused else 0)}, GOTHIC_RECESS, GOTHIC_STEEL)
 	gothic_text_fit(renderer, title, {x, y, 192, 24}, 18, GOTHIC_PAPER)
 	gothic_rule(x, y+29, 190)
 	gothic_text_fit(renderer, first, {x, y+38, 192, 20}, 14, GOTHIC_PAPER)
@@ -61,5 +64,17 @@ draw_tactical_enemy_inspector :: proc(renderer: ^Renderer, room: ^game.Room) {
 		gothic_text_fit(renderer, fmt.ctprintf("ESPOSTO %ds / STRIKE +2", enemy.recovery_pulses), {x, y+137, 192, 18}, 12, GOTHIC_PAPER)
 	} else {
 		gothic_text_fit(renderer, "CELLE ACCESE = INTENTO FISSO", {x, y+137, 192, 18}, 12, GOTHIC_MUTED)
+	}
+	if statused {
+		count := enemy.statuses.count
+		shown := min(count, 3)
+		chip := (f32(192)-f32(shown-1)*4-(26 if count > shown else 0))/f32(shown)
+		for status, index in enemy.statuses.items[:shown] {
+			_, accent := tactical_status_label(status.kind, false)
+			hud_chip(renderer, {x+f32(index)*(chip+4), y+158, chip, 18}, tactical_status_chip_text(status, shown > 1), accent)
+		}
+		if count > shown {
+			gothic_text_fit(renderer, fmt.ctprintf("+%d", count-shown), {x+f32(shown)*(chip+4), y+159, 24, 17}, 12, GOTHIC_MUTED)
+		}
 	}
 }

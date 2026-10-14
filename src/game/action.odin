@@ -430,7 +430,8 @@ effect_is_valid :: proc(room: ^Room, effect: Effect) -> bool {
 		)
 		return movement_query_is_clear(&query)
 	case .Apply_Status:
-		return effect.amount > 0 && effect.duration > 0 &&
+		// Stacks carry no duration; every other status needs one.
+		return effect.amount > 0 && (effect.duration > 0 || status_kind_stacks(effect.status)) &&
 		       (effect.target.kind == .Player || effect.target.kind == .Enemy) &&
 		       can_apply_status(room, effect.target, effect.status)
 	case .Remove_Status:
@@ -521,7 +522,9 @@ apply_damage_effect :: proc(
 	// a player sunk in his shadow (no shield spent, no Damaged, no reactions).
 	if effect.target.kind == .Player && tactical_player_intangible(room) { return }
 	damage := effect.amount
-	if effect.target.kind == .Player {
+	// A status's bite (Veleno, Bruciatura) is its stacks: no defense takes
+	// from it, only a Shield.
+	if effect.target.kind == .Player && !effect.has_status_cause {
 		damage = max(i32(1), damage-room.player.stats.defense)
 	}
 	if effect.target.kind == .Player || effect.target.kind == .Enemy {

@@ -3,13 +3,15 @@
 Quiet, clear cues that must never mask the action. The family shares a small
 set of voices so it reads as one instrument of the paper theatre:
 
-- a small hardwood block (the beat tick, the thorn clicks);
+- a small hardwood block (the beat tick, the thorn clicks, the slow's
+  dragging escapement);
 - a crystal goblet voice (critical, energy, the stun's tinkles): glass-bowl
   partials 1 : 2.32 : 4.25 : 6.63 with slow beating doublets;
 - a bronze bell with a minor-third tierce (window end, defeat);
 - a ward hum: detuned D-Phrygian partials with a shimmer (block, shield,
-  stagger, the afterimage's ghost);
-- paper grains 1.5-8 kHz (blocked move, card draw, refocus, defeat);
+  stagger, the afterimage's ghost, the burn's ember, the slow's sinking);
+- paper grains 1.5-8 kHz (blocked move, card draw, refocus, defeat, the
+  burn's embers, the slow's sand);
 - small bronze coins tuned to the mode (gold).
 
 Every tonal element sits in D Phrygian (D Eb F G A Bb C). Recipes are dry;
@@ -635,6 +637,76 @@ def ui_status_afterimage(seed):
     ghost = _ward(dur, [_hz("D5"), _hz("A5")], [1.0, 0.6], seed + 1, detune=0.004, trem_rate=6.0, trem_depth=0.3)
     ghost *= _env(dur, [(0, 0), (0.1, 1), (0.4, 0.6), (0.58, 0)])
     x = place(dur, events + [(0.0, ghost, 0.035)])
+    return _finish(x, 0.03)
+
+
+@sound("ui_status_burn", loudness=-22, wet=0.2)
+def ui_status_burn(seed):
+    """The paper catches fire: a dry match-strike scratch (gritty noise whose
+    band drops 5.2 -> 2.6 kHz in 30 ms), a small ignition whoomph (pink noise
+    through a band rising 200 -> 1100 Hz, peak at 0.08 s), then the edge
+    smoulders: ember pops (1.8-6 kHz, thinning out) and singeing paper grains
+    over a low roar (130-380 Hz, a flame on a card, not a furnace), and a
+    faint ember tone (the ward's D4/A4/D5 under a 10 Hz flame flicker,
+    warming up a touch)."""
+    dur = 0.6
+    t = time_axis(dur)
+    r = rng(seed)
+    strike = white(0.03, seed) * (0.35 + 0.65 * _grit(0.03, seed + 1, 900))
+    strike = _norm(_moving_band(strike, [(0, 5200), (0.03, 2600)], 1.0))
+    strike = _tail(strike * _env(0.03, [(0, 0), (0.002, 1), (0.03, 0.2)]))
+    whoomph = _moving_band(pink(0.3, seed + 2), [(0, 200), (0.07, 600), (0.25, 1100)], 0.9)
+    whoomph = _norm(whoomph) * _env(0.3, [(0, 0), (0.08, 1), (0.18, 0.35), (0.3, 0)]) ** 1.4
+    # brown() is mostly sub-10 Hz drift: keep only the flame's low roar.
+    roar = _norm(highpass(lowpass(brown(dur, seed + 3), 380, 2), 130, 3))
+    roar *= _env(dur, [(0, 0), (0.05, 0.4), (0.12, 1), (0.4, 0.55), (0.58, 0)])
+    times = sorted(0.04 + 0.5 * r.random(16) ** 1.5)
+    gains = [1.0 - 0.6 * (tk - 0.04) / 0.5 for tk in times]
+    pops = _paper(dur, times, seed + 4, band=(1800, 6000), glen=(0.0015, 0.004), gains=gains, q=1.6)
+    singe = _paper(dur, sorted(0.03 + 0.45 * r.random(26)), seed + 5, band=(2500, 8000), glen=(0.006, 0.018))
+    singe *= _env(dur, [(0, 0), (0.05, 1), (0.3, 0.6), (0.5, 0)])
+    warm = 1 + 0.012 * np.clip((t - 0.05) / 0.4, 0, 1)
+    ember = _ward(dur, [_hz("D4"), _hz("A4"), _hz("D5")], [1.0, 0.6, 0.3], seed + 6,
+                  trem_rate=10.0, trem_depth=0.45, bend=warm)
+    ember *= _env(dur, [(0, 0), (0.06, 0), (0.2, 1), (0.42, 0.6), (0.58, 0)])
+    x = place(dur, [(0.0, strike, 0.35), (0.012, whoomph, 0.7), (0.0, roar, 0.16),
+                    (0.0, pops, 0.42), (0.0, singe, 0.1), (0.0, ember, 0.12)])
+    return _finish(x, 0.03)
+
+
+@sound("ui_status_slow", loudness=-23, wet=0.3)
+def ui_status_slow(seed):
+    """The clock drags: the beat tick's hardwood escapement ticks five times,
+    each later than the one before (gaps 90 -> 165 ms), its tooth dropping
+    later after the pallet (6 -> 14 ms) and each block a step lower down the
+    mode (A5 G5 F5 Eb5 D5, the tock an octave under), over the ward's octave
+    sinking a fourth (D4/D5 -> A3/A4) as its shimmer slows from 7 to 2 Hz,
+    and a faint trickle of sand (the hourglass) that thins out."""
+    dur = 0.7
+    t = time_axis(dur)
+    r = rng(seed)
+    events = []
+    for k, (tk, note) in enumerate(zip([0.0, 0.09, 0.2, 0.335, 0.5], ["A5", "G5", "F5", "Eb5", "D5"])):
+        f = _hz(note)
+        drop = tk + 0.006 + 0.002 * k
+        pallet = _click(0.0012, seed + 10 + 4 * k, lo=2600)
+        tooth = _click(0.0016, seed + 11 + 4 * k, lo=1800)
+        block = _modes(0.08, [(f, 0.014 + 0.002 * k, 1.0), (f * 2.258, 0.008, 0.45),
+                              (f * 3.739, 0.005, 0.25), (f * 5.352, 0.003, 0.12)], attack=0.0004)
+        tock = _modes(0.07, [(f / 2, 0.013 + 0.003 * k, 1.0), (f * 1.114, 0.006, 0.3)], attack=0.0008)
+        g = 0.92 ** k
+        events += [(tk, pallet, 0.12 * g), (drop, tooth, 0.3 * g), (drop, block, 0.55 * g), (drop, tock, 0.2 * g)]
+    u = np.clip((t - 0.08) / 0.52, 0, 1)
+    sink = 2 ** (-5 / 12 * u * u * (3 - 2 * u))
+    ward = _ward(dur, [_hz("D4"), _hz("D5")], [1.0, 0.45], seed + 1, trem_depth=0.0, bend=sink)
+    rate = 7 - 5 * np.clip(t / 0.6, 0, 1)
+    ward *= 1 + 0.3 * np.sin(2 * np.pi * np.cumsum(rate) / SR + r.uniform(0, 6.28))
+    ward *= _env(dur, [(0, 0), (0.08, 1), (0.45, 0.8), (0.68, 0)])
+    times = sorted(0.03 + 0.6 * r.random(90) ** 1.4)
+    gains = [1.0 - 0.8 * (tk - 0.03) / 0.6 for tk in times]
+    sand = _paper(dur, times, seed + 2, band=(3500, 9000), glen=(0.0008, 0.002), gains=gains, q=1.0)
+    x = place(dur, events + [(0.0, ward, 0.22), (0.0, sand, 0.05)])
+    x = lowpass(x, 9000, 2)
     return _finish(x, 0.03)
 
 

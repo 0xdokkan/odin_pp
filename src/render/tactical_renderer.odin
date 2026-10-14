@@ -39,6 +39,9 @@ Tactical_View :: struct {
 	living: bool,
 	living_assets: gfx.Living_Assets,
 	living_state: ^Living_State,
+	// The paper props of the board's blows and the blows showing (attack_fx.odin).
+	attack_props: gfx.Attack_Props,
+	attack_fx: Attack_Fx_State,
 	// The inspector of a living board keeps the enemy last hovered, and the
 	// mouse then.
 	inspected: u32,
@@ -73,6 +76,7 @@ create_tactical_assets :: proc(renderer: ^Renderer, parent: rl.RenderTexture2D =
 	create_comic_outline(renderer)
 	create_gothic_art(&renderer.tactical.art)
 	gfx.create_flipbook_assets(&renderer.tactical.flipbook)
+	gfx.create_attack_props(&renderer.tactical.attack_props)
 	load_diorama_kit(&renderer.tactical.kit, DIORAMA_KIT_BYTES)
 	load_pilgrim_model(&renderer.tactical.pilgrim)
 	renderer.tactical.flipbook_state = new(Flipbook_State)
@@ -115,6 +119,8 @@ destroy_tactical_assets :: proc(renderer: ^Renderer) {
 	destroy_tactical_surface(renderer)
 	destroy_gothic_art(&renderer.tactical.art)
 	gfx.destroy_flipbook_assets(&renderer.tactical.flipbook)
+	gfx.destroy_attack_props(&renderer.tactical.attack_props)
+	forget_attack_fx(renderer)
 	destroy_diorama_kit(&renderer.tactical.kit)
 	delete(renderer.tactical.pilgrim)
 	renderer.tactical.pilgrim = nil

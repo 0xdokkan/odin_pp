@@ -58,8 +58,9 @@ polyhedral_draw_label :: proc(font: rl.Font, digits: [2]int, count: int,
 	}
 }
 
+// `values`: the faces read the values they roll (polyhedral_face_label).
 draw_polyhedral_die :: proc(die: ^Polyhedral_Die, position: rl.Vector3, rotation: rl.Quaternion,
-	font: rl.Font = {}, resin: bool = false) {
+	font: rl.Font = {}, resin: bool = false, values: bool = false) {
 	if die == nil || die.triangle_count == 0 {return}
 	rlgl.SetTexture(rlgl.GetTextureIdDefault())
 	rlgl.Begin(rlgl.TRIANGLES)
@@ -87,7 +88,7 @@ draw_polyhedral_die :: proc(die: ^Polyhedral_Die, position: rl.Vector3, rotation
 			}
 			continue
 		}
-		digits, count := polyhedral_face_label(die, face)
+		digits, count := polyhedral_face_label(die, face, values)
 		height: f32 = 0.37
 		switch die.kind {
 		case .D8: height = 0.29

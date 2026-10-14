@@ -127,7 +127,8 @@ test_shadow_makes_every_damage_path_miss_the_player :: proc(t: ^testing.T) {
 	defer level.destroy(&data)
 	defer destroy_room(&room)
 	_, _ = apply_status(&room, PLAYER_ENTITY, .Shield, 2, 3)
-	_, _ = apply_status(&room, PLAYER_ENTITY, .Poison, 2, 3)
+	_, _ = apply_status(&room, PLAYER_ENTITY, .Poison, 2, 0)
+	_, _ = apply_status(&room, PLAYER_ENTITY, .Burn, 2, 0)
 	append(&room.traps, Trap{id = 77, position = player.position, damage = 4, armed = true})
 	testing.expect_value(t, shadow_test_play(t, &room).result, Card_Play_Result.Played)
 	health := player.health
@@ -141,9 +142,14 @@ test_shadow_makes_every_damage_path_miss_the_player :: proc(t: ^testing.T) {
 	_, _ = trigger_cell_hazard(&room, PLAYER_ENTITY, &trap)
 	pulse: Pulse_Report
 	tick_entity_statuses(&room, PLAYER_ENTITY, &pulse)
+	// Neither his poison (no action of his: it does not even wear) nor his burn.
+	tick_poison_on_action(&room, PLAYER_ENTITY, &pulse)
+	burn_status(&room, PLAYER_ENTITY, &pulse)
 	testing.expect_value(t, player.health, health)
 	shield, shielded := status_for_entity(&room, PLAYER_ENTITY, .Shield)
 	testing.expect(t, shielded && shield.potency == 2)
+	poison, poisoned := status_for_entity(&room, PLAYER_ENTITY, .Poison)
+	testing.expect(t, poisoned && poison.potency == 2)
 	shadow_test_rise(t, &room)
 	again := resolve_action(&room, &blow)
 	testing.expect(t, again.accepted && again.damage_dealt > 0)

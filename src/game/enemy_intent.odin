@@ -34,6 +34,9 @@ Enemy_Intent :: struct {
 	windup:                bool,
 	target_object:         u32,
 	push:                  bool,
+	// M7: the seconds Rallentamento added when this intent was planned
+	// (tactical_schedule_enemy); its countdown and seal include them.
+	slowed:                i32,
 }
 
 enemy_intent_kind_name :: proc(kind: Enemy_Intent_Kind) -> string {
@@ -693,19 +696,36 @@ enemy_charge_path_is_clear :: proc(
 	return true
 }
 
+// A miss on the player, or on the object a shot was aimed at (`target`).
 record_enemy_attack_miss :: proc(
 	pulse: ^Pulse_Report,
 	source: Entity_Ref,
 	from_position, target_position: grid.Position,
+	blow: ^Enemy_Intent = nil,
+	ranged := false,
+	target := PLAYER_ENTITY,
 ) {
 	assert(pulse != nil)
+	first := pulse.events.count
 	record_event(&pulse.events, {
 		kind = .Attack_Missed,
 		source = source,
-		target = PLAYER_ENTITY,
+		target = target,
 		from_position = from_position,
 		to_position = target_position,
 	})
+	// A blow struck and missed still swings over its cells (or flies to them).
+	// A blow never struck (an aim broken, a throw that never leaves the hand,
+	// a charge parried before it ran) stays unmarked: the board shows none.
+	if blow != nil {
+		mark_attack_events(&pulse.events, first, source, target, from_position, target_position,
+			blow.threatened_cells[:blow.threatened_cell_count], ranged)
+	}
+}
+
+// Archers shoot and bombers throw; an object is struck from afar.
+enemy_attack_is_ranged :: proc(enemy: ^Enemy, intent: ^Enemy_Intent) -> bool {
+	return enemy.archetype == .Archer || enemy.archetype == .Bomber || intent.target_object != 0
 }
 
 resolve_enemy_intents :: proc(room: ^Room, pulse: ^Pulse_Report, only_id: u32 = 0) {
@@ -731,7 +751,9 @@ resolve_enemy_intents :: proc(room: ^Room, pulse: ^Pulse_Report, only_id: u32 = 
 		protected_ids[protected_count] = enemy.id
 		protected_count += 1
 		if interrupt_staggered_enemy(room, enemy, pulse) { continue }
+		source, slowed := enemy_entity(enemy.id), enemy.intent.slowed > 0
 		resolve_custodian_protection(room, enemy, pulse)
+		finish_enemy_action(room, source, slowed, pulse)
 		if room.phase != .Combat {
 			return
 		}
@@ -758,6 +780,11 @@ resolve_enemy_intents :: proc(room: ^Room, pulse: ^Pulse_Report, only_id: u32 = 
 		intent := enemy.intent
 		enemy.intent = {}
 		source := enemy_entity(enemy.id)
+		// Whatever its intent turns into (a hit, a miss, a blocked step, a
+		// wait), it was its owner's action: its poison and slow follow it, on
+		// every way out of this iteration. A staggered enemy, interrupted
+		// above, did not act.
+		defer finish_enemy_action(room, source, intent.slowed > 0, pulse)
 
 		switch intent.kind {
 		case .None, .Protect:
@@ -802,19 +829,24 @@ resolve_enemy_intents :: proc(room: ^Room, pulse: ^Pulse_Report, only_id: u32 = 
 				if enemy.position != intent.origin || !present ||
 				   room.objects[object_index].position != intent.threatened_cells[0] ||
 				   !enemy_has_lob_line(room, enemy.position, intent.threatened_cells[0]) {
-					record_enemy_attack_miss(pulse, source, enemy.position, intent.threatened_cells[0])
+					// The ember is thrown all the same, at the cell its barrel stood on.
+					record_enemy_attack_miss(pulse, source, enemy.position, intent.threatened_cells[0], &intent, true,
+						object_entity(intent.target_object))
 					continue
 				}
 				action := make_action(.Attack, source, entity_target(object_entity(intent.target_object)), .Entity)
 				added := add_effect(&action, damage_effect(object_entity(intent.target_object), intent.damage))
 				assert(added)
 				report := resolve_action(room, &action)
+				mark_attack_events(&report.events, 0, source, object_entity(intent.target_object), enemy.position,
+					intent.threatened_cells[0], intent.threatened_cells[:1], true)
 				merge_action_report(pulse, &report)
 				if room.phase != .Combat { return }
 				continue
 			}
+			ranged := enemy_attack_is_ranged(enemy, &intent)
 			if room.tactical_pulse.cancel_attack == enemy.id {
-				record_enemy_attack_miss(pulse, source, enemy.position, intent.threatened_cells[0])
+				record_enemy_attack_miss(pulse, source, enemy.position, intent.threatened_cells[0], &intent, ranged)
 				continue
 			}
 			if enemy.position != intent.origin ||
@@ -826,6 +858,8 @@ resolve_enemy_intents :: proc(room: ^Room, pulse: ^Pulse_Report, only_id: u32 = 
 					source,
 					enemy.position,
 					intent.threatened_cells[0],
+					&intent,
+					ranged,
 				)
 				continue
 			}
@@ -834,6 +868,8 @@ resolve_enemy_intents :: proc(room: ^Room, pulse: ^Pulse_Report, only_id: u32 = 
 			assert(added)
 			report := resolve_action(room, &action)
 			assert(report.accepted)
+			mark_attack_events(&report.events, 0, source, PLAYER_ENTITY, enemy.position, intent.threatened_cells[0],
+				intent.threatened_cells[:intent.threatened_cell_count], ranged)
 			merge_action_report(pulse, &report)
 			resolve_tactical_enemy_push(room, source, &intent, &report, pulse)
 			if report.player_defeated || room.phase != .Combat {
@@ -868,6 +904,7 @@ resolve_enemy_intents :: proc(room: ^Room, pulse: ^Pulse_Report, only_id: u32 = 
 			enemy.recovery_pulses = 1
 			begin_demolitionist_offense(enemy, intent.kind)
 			if tactical_enabled(room) { enemy.recovery_pulses = max(i32(2), enemy.recovery_pulses) }
+			// Parried before it ran: the brute never left his cell, so no blow.
 			if room.tactical_pulse.cancel_attack == enemy.id {
 				record_enemy_attack_miss(pulse, source, enemy.position, intent.threatened_cells[0])
 				continue
@@ -902,6 +939,7 @@ resolve_enemy_intents :: proc(room: ^Room, pulse: ^Pulse_Report, only_id: u32 = 
 					source,
 					moved_enemy.position,
 					intent.threatened_cells[0],
+					&intent,
 				)
 				continue
 			}
@@ -910,6 +948,8 @@ resolve_enemy_intents :: proc(room: ^Room, pulse: ^Pulse_Report, only_id: u32 = 
 			assert(added_attack)
 			attack_report := resolve_action(room, &attack_action)
 			assert(attack_report.accepted)
+			mark_attack_events(&attack_report.events, 0, source, PLAYER_ENTITY, moved_enemy.position, intent.threatened_cells[0],
+				intent.threatened_cells[:intent.threatened_cell_count], false)
 			merge_action_report(pulse, &attack_report)
 			resolve_tactical_enemy_push(room, source, &intent, &attack_report, pulse)
 			if attack_report.player_defeated || room.phase != .Combat {

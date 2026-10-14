@@ -26,7 +26,7 @@ use_player_ability :: proc(room: ^Room, ability: Player_Ability) -> Action_Resul
 	case .Toxic_Wave:
 		action = make_action(.Ability, PLAYER_ENTITY, {}, .None)
 		for enemy in room.enemies {
-			added := add_effect(&action, apply_status_effect(enemy_entity(enemy.id), .Poison, 1, 3))
+			added := add_effect(&action, apply_status_effect(enemy_entity(enemy.id), .Poison, 1, 0))
 			assert(added)
 		}
 	case .Thorn_Coat:

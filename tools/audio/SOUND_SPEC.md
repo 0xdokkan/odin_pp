@@ -243,8 +243,8 @@ Length ~0.5–0.9 s; loudness -19 unless noted; wet 0.25.
 | card_strike | Strike: a blow, exposes | a short blade slash: whoosh + crisp cut |
 | card_cross_slash | Cross Slash: damage in a cross | two crossing slashes, the second answering the first |
 | card_heavy_blow | Heavy Blow: big damage, stuns | a hammer wind-up and a massive blunt impact, a stunned ring |
-| card_sundering_blow | Sundering Blow: 2d6, may push | dice rattle, then a stone-cracking sundering hit |
-| card_fate_strike | Fate Strike: 1d6 + damage | a single die rolled across wood, then a fated strike (blade + bell) |
+| card_sundering_blow | Sundering Blow: 2 dice of its level (2d4 up to 2d20), may push | dice rattle, then a stone-cracking sundering hit |
+| card_fate_strike | Fate Strike: 1 die of its level + damage | a single die rolled across wood, then a fated strike (blade + bell) |
 | card_guard | Guard: shield | a ward rises: a solid, hopeful bell partial + a wooden shield thump |
 | card_purifying_guard | Purifying Guard: shield, cures poison | the guard's ward plus a cleansing shimmer, bright and clean |
 | card_thorn_coat | Thorn Coat: thorns | bramble vines creak and tighten, thorny clicks |
@@ -278,9 +278,9 @@ Same rules as `cards_arms`.
 | card_toxic_wave | Toxic Wave: applies poison | a wave of noxious gas: a low wet hiss spreading, bubbles |
 | card_venom_needle | Venom Needle: damage + poison | a needle flicked (thin whistle), a tiny wet prick |
 | card_caustic_bloom | Caustic Bloom: poison in 3x3 | an acid flower bursts open: bubbling bloom, sizzle |
-| card_twin_venom | Twin Venom: 2d6, poison on a pair | two vials uncorked and splashed, the dice rattle |
+| card_twin_venom | Twin Venom: 2 dice of its level, poison on a pair | two vials uncorked and splashed, the dice rattle |
 | card_volatile_study | Volatile Study: creates Sparks, draws | glassware clinks, a volatile mixture fizzes and pops |
-| card_prismatic_barrage | Prismatic Barrage: 3d6 crystal shots | three crystalline shots (glassy pings in D Phrygian, rising) |
+| card_prismatic_barrage | Prismatic Barrage: 3 dice of its level, crystal shots | three crystalline shots (glassy pings in D Phrygian, rising) |
 
 ### Family `world` — devices, bombs, the room's events
 
@@ -323,6 +323,8 @@ Quiet and clear; they must never mask the action sounds.
 | ui_status_thorns | thorns applied | 0.5 | -22 | 0.2 | thorny bramble clicks |
 | ui_status_stagger | staggered (interrupted) | 0.6 | -21 | 0.25 | a jolt and a short wobble |
 | ui_status_afterimage | afterimage applied | 0.6 | -23 | 0.35 | a ghostly breath echo |
+| ui_status_burn | a burn applied (Bruciatura) | 0.6 | -22 | 0.2 | the paper catches: a dry strike, a small ignition whoomph, ember pops and singeing paper over a low roar, a faint flickering D/A ember tone |
+| ui_status_slow | slow applied (Rallentamento) | 0.7 | -23 | 0.3 | the clock drags: escapement ticks coming later and later and a step lower each (A5 down to D5), over a ward octave sinking D4 -> A3 as its shimmer slows; a faint trickle of sand (the hourglass) |
 | ui_status_expired | a status wears off | 0.4 | -28 | 0.2 | a soft fading puff |
 | ui_defeat | the Viandante falls (defeat) | 2.0 | -18 | 0.5 | a low drone sinks, paper crumples, a distant bell |
 

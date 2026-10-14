@@ -58,6 +58,8 @@ menu_label :: proc(text: cstring) -> cstring {
 	case "CARD OFFERS": return "CARTE IN VENDITA"
 	case "RECOVER": return "RECUPERA"
 	case "UPGRADE": return "POTENZIA"
+	case "MAX UPGRADE": return "POTENZIAMENTO MASSIMO"
+	case "NO UPGRADE AVAILABLE": return "NESSUN POTENZIAMENTO"
 	case "REMOVE": return "RIMUOVI"
 	case "LEAVE": return "PROSEGUI"
 	case "RESULT": return "ESITO"

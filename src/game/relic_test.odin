@@ -278,10 +278,11 @@ test_relic_venom_vial_boosts_one_enemy_application_and_preserves_rejection :: pr
 	player.deck.energy = 3
 	play := play_card(&room, id, {})
 	testing.expect_value(t, play.result, Card_Play_Result.Played)
+	// Two stacks (the vial's one more) bit once and wore one; the other's single stack is spent.
 	first, found := status_for_entity(&room, enemy_entity(1), .Poison)
-	testing.expect(t, found && first.potency == 2 && first.remaining_pulses == 2)
-	second, second_found := status_for_entity(&room, enemy_entity(2), .Poison)
-	testing.expect(t, second_found && second.potency == 1)
+	testing.expect(t, found && first.potency == 1)
+	_, second_found := status_for_entity(&room, enemy_entity(2), .Poison)
+	testing.expect(t, !second_found)
 	testing.expect(t, player.relics.combat.poison_used)
 	testing.expect_value(t, room.enemies[0].health, i32(38))
 	testing.expect_value(t, room.enemies[1].health, i32(39))

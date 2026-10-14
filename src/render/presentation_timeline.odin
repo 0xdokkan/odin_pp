@@ -114,6 +114,9 @@ Room_Presentation :: struct {
 	modifier: game.Room_Modifier,
 	family: level.Room_Family,
 	relics: game.Relic_State,
+	// The M8 weapon in the player's hand as the board shows him (the look of
+	// his blows, attack_fx.odin): a blow's last use is still in it while it plays.
+	weapon: game.Weapon_Id,
 	player:      Presentation_Actor,
 	deck:        game.Deck_State,
 	enemies:     [game.MAX_ENEMIES_PER_ROOM]Presentation_Actor,
@@ -136,6 +139,9 @@ Presentation_Cue :: struct {
 	elapsed:  f32,
 	duration: f32,
 	started:  bool,
+	// The command whose events these are (Renderer.cue_batches): the cues of
+	// one blow share it, and no later blow ever does.
+	batch:    u32,
 }
 
 Presentation_Timeline :: struct {
@@ -164,6 +170,7 @@ capture_room_presentation :: proc(room: ^game.Room) -> (result: Room_Presentatio
 	result.modifier = room.modifier
 	result.family = room.family
 	result.relics = room.player.relics
+	result.weapon = room.player.equipment.weapon.id
 	result.gold = room.player.gold
 	result.pulse_count = room.pulse_count
 	result.deck = room.player.deck
@@ -550,12 +557,30 @@ presentation_cue_can_group :: proc(kind: Presentation_Cue_Kind) -> bool {
 presentation_group_size :: proc(timeline: ^Presentation_Timeline, offset: int = 0) -> int {
 	first, found := presentation_cue_at(timeline, offset)
 	if !found { return 0 }
+	if first.kind == .Damage_Absorbed && game.event_is_attack(first.event) { return presentation_blow_span(timeline, offset) }
 	if first.event.visual_group == 0 || !presentation_cue_can_group(first.kind) { return 1 }
 	span := 1
 	for index in offset+1..<timeline.count {
 		cue, _ := presentation_cue_at(timeline, index)
 		if cue.event.visual_group != first.event.visual_group || !presentation_cue_can_group(cue.kind) { break }
 		span += 1
+	}
+	return span
+}
+
+// A blow met by a guard (game.mark_attack_events) is one blow, as the world
+// shows it: its guard, the Shield it breaks and the wound that gets through
+// start together.
+presentation_blow_span :: proc(timeline: ^Presentation_Timeline, offset: int) -> int {
+	first, _ := presentation_cue_at(timeline, offset)
+	span := 1
+	for index in offset+1..<timeline.count {
+		cue, _ := presentation_cue_at(timeline, index)
+		event := cue.event
+		if event.source != first.event.source || event.target != first.event.target { break }
+		if cue.kind == .Status_Removed && event.status == .Shield { span += 1; continue }
+		if cue.kind == .Damage && game.event_is_attack(event) && event.to_position == first.event.to_position { span += 1 }
+		break
 	}
 	return span
 }
@@ -600,7 +625,8 @@ apply_presentation_status :: proc(
 	kind: game.Status_Kind,
 	potency, duration: i32,
 ) -> bool {
-	if statuses == nil || !game.status_kind_is_valid(kind) || potency <= 0 || duration <= 0 ||
+	if statuses == nil || !game.status_kind_is_valid(kind) || potency <= 0 ||
+	   (duration <= 0 && !game.status_kind_stacks(kind)) ||
 	   statuses.count < 0 || statuses.count > len(statuses.items) {
 		return false
 	}
@@ -833,6 +859,21 @@ sync_presentation_statuses_from_final :: proc(timeline: ^Presentation_Timeline) 
 	return true
 }
 
+// A poison bite wears a stack without an event of its own: at the bite, the
+// bitten actor's poison takes the final view's stacks. A bite that ends it
+// leaves it for its Status_Expired to remove. (A command bites each actor at
+// most once: the player's own action, each enemy's in its pulse.)
+sync_presentation_poison_from_final :: proc(timeline: ^Presentation_Timeline, actor: ^Presentation_Actor) {
+	if timeline == nil || actor == nil || !timeline.final_view.valid { return }
+	index, poisoned := game.status_index(&actor.statuses, .Poison)
+	if !poisoned { return }
+	final_actor, found := presentation_actor_in_view(&timeline.final_view, actor.entity)
+	if !found { return }
+	if final_index, kept := game.status_index(&final_actor.statuses, .Poison); kept {
+		actor.statuses.items[index].potency = final_actor.statuses.items[final_index].potency
+	}
+}
+
 apply_presentation_trap_triggered :: proc(
 	timeline: ^Presentation_Timeline,
 	event: game.Game_Event,
@@ -889,8 +930,10 @@ start_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^Presentat
 	switch cue.kind {
 	case .Dice_Rolled:
 		expected_dice := game.card_dice_count(event.card_definition)
+		// The die must be the one of the card's logged level.
 		if !game.validate_dice_roll(&event.dice_roll) || event.amount != event.dice_roll.total ||
-		   event.dice_roll.count != expected_dice ||
+		   int(event.dice_roll.count) != expected_dice ||
+		   event.dice_roll.sides != game.card_die_sides(event.card_definition, event.card_upgrade_level) ||
 		   expected_dice == 0 ||
 		   event.source != game.PLAYER_ENTITY {
 			timeline.update_failures += 1
@@ -943,6 +986,7 @@ start_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^Presentat
 	case .Damage:
 		if has_actor {
 			actor.health = max(i32(0), actor.health-max(i32(0), event.amount))
+			if event.has_status_cause && event.status_cause == .Poison { sync_presentation_poison_from_final(timeline, actor) }
 		} else if has_object {
 			object.health = max(i32(0), object.health-max(i32(0), event.amount))
 		} else {
@@ -954,6 +998,7 @@ start_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^Presentat
 				actor.statuses.items[index].potency =
 					max(i32(0), actor.statuses.items[index].potency-max(i32(0), event.amount))
 			}
+			if event.has_status_cause && event.status_cause == .Poison { sync_presentation_poison_from_final(timeline, actor) }
 		} else {
 			timeline.update_failures += 1
 		}

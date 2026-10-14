@@ -94,8 +94,9 @@ living_token_size :: proc(text: string) -> (width, height: int) {
 }
 
 // Whether a blow is already showing: one token per blow, however many frames
-// its cue lasts. `world` is the world's clock (the sprite clock when left out).
-living_token_spawn :: proc(state: ^Living_State, event: game.Game_Event, heal: bool, now: f64, world := f64(-1)) -> bool {
+// its cue lasts. `world` is the world's clock (the sprite clock when left out);
+// `landing` the seconds until the blow lands (a bolt still flying to the card).
+living_token_spawn :: proc(state: ^Living_State, event: game.Game_Event, heal: bool, now: f64, world := f64(-1), landing := f64(0)) -> bool {
 	world := world if world >= 0 else now
 	for blow in state.blows {
 		if blow.used && world-blow.at <= LIVING_TOKEN_SECONDS && blow.entity == event.target && blow.source == event.source &&
@@ -119,7 +120,7 @@ living_token_spawn :: proc(state: ^Living_State, event: game.Game_Event, heal: b
 		living_token_free(slot)
 	}
 	slot^ = {used = true, heal = heal, amount = event.amount, entity = event.target, source = event.source,
-		pulse = event.pulse_count, group = event.visual_group, born = now+LIVING_TOKEN_DELAY, stack = stack}
+		pulse = event.pulse_count, group = event.visual_group, born = now+max(LIVING_TOKEN_DELAY, landing), stack = stack}
 	return true
 }
 
@@ -146,7 +147,8 @@ update_living_tokens :: proc(renderer: ^Renderer, now, world: f64) {
 		heal := cue.kind == .Heal
 		if (cue.kind != .Damage && !heal) || cue.event.amount <= 0 { continue }
 		if _, actor := presentation_actor_in_view(renderer.tactical.snapshot, cue.event.target); !actor { continue }
-		living_token_spawn(state, cue.event, heal, now, world)
+		landing, _ := attack_fx_landing_in(renderer, cue.event.target, now, cue.event.source)
+		living_token_spawn(state, cue.event, heal, now, world, landing)
 	}
 }
 

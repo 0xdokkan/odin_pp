@@ -111,8 +111,12 @@ con sigilli e terreno, i segnalini di carta e la vita di ogni nemico sempre
 visibile in un cuore di carta sopra la testa
 ([Il tavolo](#il-tavolo-cartoncini-vivi-cerchi-e-segnalini)). Anche
 [Movimento Ombra](#movimento-ombra), la carta che si prova qui adesso, è nel
-mazzo iniziale di ogni run tattica. La prova resta la sandbox in cui provare le
-prossime.
+mazzo iniziale di ogni run tattica. Lo stesso vale per gli status a stack
+Veleno, Bruciatura e Rallentamento ([Status](#status)), per i dadi delle carte
+che salgono dal D4 al D20 con gli upgrade ([Spell e dadi](#spell-e-dadi)) e per
+i colpi che si vedono sul tavolo, ognuno con la sua arma di carta
+([Il tavolo](#il-tavolo-cartoncini-vivi-cerchi-e-segnalini)). La prova resta la
+sandbox in cui provare le prossime.
 
 **Intenzioni dei nemici (`F6`).** Nel gioco i nemici mostrano cosa stanno per
 fare con sigilli e terreno ([Il tavolo](#il-tavolo-cartoncini-vivi-cerchi-e-segnalini));
@@ -125,14 +129,19 @@ scura). Il cartello mostra il modo attivo.
 personaggio (passi, colpi, ferite, parate, caduta e i telegrafi come la MIRA
 dell'arciere o la CARICA del bruto), ogni carta, i dispositivi, le bombe, gli
 status, il battito del secondo, il colpo a tempo, la fine della finestra, lo
-stordimento e l'avviso di difesa, sopra il fondo di una cripta in loop. Sono
-**tutti fatti da codice**, senza registrazioni né librerie (quindi senza
-licenze): [tools/audio](tools/audio/SOUND_SPEC.md) li sintetizza dalla materia
+stordimento e l'avviso di difesa, sopra il fondo di una cripta in loop. Ogni
+status ha la sua voce: il Veleno gorgoglia, la Bruciatura è la carta che prende
+fuoco (uno sfregamento, la vampata, le braci che crepitano) e il Rallentamento
+è lo scappamento del battito che ticchetta sempre più lento e più grave, con un
+filo di sabbia di clessidra. Sono **tutti fatti da codice**, senza registrazioni
+né librerie (quindi senza licenze):
+[tools/audio](tools/audio/SOUND_SPEC.md) li sintetizza dalla materia
 dell'azione (cuoio, ferro, legno, osso, pietra e la carta del cartoncino che
 striscia sulla pietra), li mette tutti nella stessa sala di pietra e tiene
 magie e segnali in Re frigio. Partono con il disegno che li mostra
 ([lab_sounds.odin](src/render/lab_sounds.odin)), così i passi cadono sui passi
-e i colpi sull'impatto, con piccole variazioni di altezza e volume a ogni
+e i colpi sull'impatto (un dardo che manca suona quando arriva a terra, e chi
+lo schiva quando lo schiva), con piccole variazioni di altezza e volume a ogni
 colpo, e un limitatore sull'uscita tiene puliti i momenti più fitti (un colpo,
 una caduta e un'esplosione insieme); seguono il volume degli effetti e il muto
 delle impostazioni. Nel gioco normale per ora non suonano. Per rifarli dopo
@@ -172,7 +181,8 @@ Nei laboratori spell e dice le carte sono già in mano, nell'ordine indicato; `F
 l'arena con un nuovo seed. Restano attivi costi, pulse e risposta dei nemici.
 Il tavolo `--dice-set-lab` è invece una galleria autonoma: non modifica la run,
 il profilo o i risultati dei dadi del gameplay. I sette modelli sono disponibili
-nel renderer; le carte attuali continuano a usare soltanto D4 e D6.
+nel renderer; in gioco le carte con dadi lanciano dal D4 al D20 secondo il
+livello di upgrade (il D% resta soltanto nel tavolo).
 Usare i laboratori senza opzioni smoke o report di playtest. Gli smoke grafici
 mantengono velocità 1x per rendere riproducibile la cattura.
 I laboratori M9 richiedono gli asset tattici e non si combinano con `--classic`,
@@ -422,7 +432,7 @@ La fog senza memoria e l'ologramma che consuma tempo restano attivi.
 La policy riutilizzabile `Live / Cast / Cinematic` è in
 [cast_playback.odin](src/render/cast_playback.odin): nuovi tipi di ruota o reveal
 potranno dichiararsi cinematici nello stesso punto. Attualmente sono integrati
-i dadi D4/D6; non è ancora presente una carta con ruota. La risoluzione logica
+i dadi dal D4 al D20; non è ancora presente una carta con ruota. La risoluzione logica
 resta una sola transazione deterministica, seguita dalla presentazione; il
 renderer non tira nuovamente i dadi e non riapplica effetti.
 
@@ -446,9 +456,9 @@ del movimento è solo il passo in diagonale.
 | Attacco a urto | danno doppio |
 | Carta: danni | x1,5, almeno +2 |
 | Carta: scudo, cura, oro | x1,5, almeno +1 |
-| Carta: altri status | +1 potenza e +1 durata |
+| Carta: altri status | +1 potenza e +1 durata (Veleno, Bruciatura e Rallentamento: +1 stack, non hanno durata) |
 | Carta: pesca, energia, carte create, reazioni | +1 |
-| Carta-dispositivo | danno x1,5 (almeno +2); la Tesla nasce con vita doppia, la Shock Floor con un colpo in più (massimo 5) |
+| Carta-dispositivo | danno x1,5 (almeno +2); la Tesla nasce con vita doppia, la Shock Floor con un colpo in più (massimo 21: un 20 del D20 più uno) |
 
 Le regole e i numeri sono in [tactical_beat.odin](src/game/tactical_beat.odin).
 
@@ -537,8 +547,8 @@ più nemici non gridano tutti insieme
 
 - **Sigilli**: un sigillo appuntato sulla carta del nemico, con il pittogramma
   su carta (spada, arco, bomba, stivale, scudo), un indicatore spesso con una
-  tacca per secondo e un alone del colore dell'azione quando si avvicina; la
-  figura trema prima di agire.
+  tacca per secondo (anche per quelli aggiunti dal Rallentamento) e un alone del
+  colore dell'azione quando si avvicina; la figura trema prima di agire.
 - **Terreno**: la conseguenza dove arriva, come in Into the Breach. Le celle
   colpite si riempiono dai bordi al centro e la cella del Viandante si contorna
   se è fra queste; un movimento riempie la cella d'arrivo con una freccia, una
@@ -567,6 +577,48 @@ restano un attimo e cadono ([living_token.odin](src/render/living_token.odin)).
 Prendono il posto dei riquadri scuri con i numeri; un colpo critico mostra
 ancora CRITICO.
 
+**I colpi si vedono sul tavolo.** Ogni colpo fisico, del Viandante o di un
+nemico, ha la sua arma di carta: pixel art ritagliata con lo stesso bordo
+bianco dei cartoncini vivi, disegnata da codice
+([build_attack_props.py](tools/art/README.md#armi-e-colpi-di-carta)).
+
+- **Corpo a corpo**: l'arma di chi colpisce spazza **ogni casella** del colpo,
+  dalla più lontana dalla telecamera alla più vicina, con una scia di carta; la
+  stella dell'impatto cade sul cartoncino colpito e le caselle vuote perdono
+  pezzetti di carta. Il fendente del bruto passa sulle sue tre caselle, il
+  ghoul graffia due volte con gli artigli, la Picca della tempesta affonda.
+- **A distanza**: il dardo della balestra (e la bomba del bombarolo, la brace
+  che l'arcimago lancia su un barile) vola dal tiratore alla casella con un arco
+  leggero, orientato sul suo volo: resta conficcato nel cartoncino colpito,
+  rimbalza sullo scudo, si pianta nel pavimento se manca.
+- **Ognuno ha la sua arma**: il Viandante la sua lanterna di ferro o l'arma M8
+  che ha in mano (Mannaia di ferro, Picca della tempesta), anche nel colpo che
+  ne consuma l'ultimo uso; ghoul gli artigli, balestriere il dardo, bruto la
+  mannaia, bombarolo la bomba, custode il pastorale, arcimago il bastone.
+- **Il tempo**: il colpo arriva sul disegno d'impatto della clip d'attacco di
+  chi colpisce; il dardo parte lì, e la reazione del colpito, il suo segnalino
+  e i suoni della Prova aspettano che arrivi. Una carica colpisce quando il
+  cartoncino è arrivato, una spinta cede terreno quando il colpo cade. Quello
+  che nello stesso battito tocca a chi ha colpito (la risposta delle Thorns, il
+  morso del suo Veleno, la sua morte e il suo bottino) aspetta che abbia finito
+  il colpo: prima si vede colpire, poi incassare o cadere. Un colpo che
+  incontra uno Shield è un colpo solo anche nella corsia del giocatore:
+  parata, scudo rotto e ferita partono insieme, con la stella rossa (oro se
+  critico). La stella sta al centro del punto colpito, sopra il dardo
+  conficcato; su un oggetto, sul lato della sua scatola verso la telecamera.
+  Un colpo mai sferrato (un intento interrotto, una mira spezzata, un lancio
+  che non parte, una carica parata prima di partire) non ha arma, né attacco
+  né schivata: resta solo il MANCATO.
+
+Per questi colpi le armi prendono il posto del taglio rosso generico e del
+lampo sulla figura; magie e dispositivi restano come prima. I tavoli 2D
+(`--flat`, `--classic`) tengono il taglio e il lampo; anche lì però una carica
+colpisce quando è arrivata, e un colpo che incontra uno Shield parte insieme
+alla sua ferita. Il runtime è [attack_fx.odin](src/render/attack_fx.odin):
+le fasi successive (il Deflect) hanno `play_attack_swing`,
+`play_attack_projectile` e `reflect_attack_projectile`, che rimanda un dardo
+al suo tiratore.
+
 La vita dei nemici è un **cartellino di carta** sopra la testa, tagliato e
 inchiostrato come i segnalini: un cuore rosso e `12/18` (la vita sul massimo)
 nelle stesse cifre a pixel ([living_heart.odin](src/render/living_heart.odin)).
@@ -592,7 +644,7 @@ mouse fermo; lascia il posto solo alla difesa.
 
 | Carta | Energia / cast | Comportamento base |
 |---|---|---|
-| Shock Floor | 2 / 3 s | pavimento calpestabile, area 3×3, massimo 4 nella stanza; il d4 decide sia il numero di scariche sia il massimo di nemici per scarica |
+| Shock Floor | 2 / 3 s | pavimento calpestabile, area 3×3, massimo 4 nella stanza; il dado (D4, fino al D20 con gli upgrade) decide sia il numero di scariche sia il massimo di nemici per scarica |
 | Tesla Coil | 1 / 2 s | torretta solida da 4 HP, massimo 4 nella stanza; 2–3 nodi creano collegamenti, 4 nodi non allineati possono chiudere un campo |
 
 La **Shock Floor è una trappola passiva**: aspetta senza consumare cariche finché
@@ -601,9 +653,11 @@ Un teletrasporto controlla solo l'arrivo. Il player non la innesca; una pedana
 posata sotto un nemico si innesca al primo beat del mondo. Cast e cinematiche
 non fanno avanzare le scariche. Dopo l'innesco, ogni pavimento emette una
 scarica per beat del mondo fino a
-esaurire il risultato del d4. Con un **3** produce quindi **3 scariche**, ognuna
-su **massimo 3 nemici** nell'area. Il danno base è **1 per bersaglio**: il dado
-non decide il danno. Gli upgrade aggiungono un danno. Si preferiscono i nemici
+esaurire il risultato del dado. Con un **3** produce quindi **3 scariche**, ognuna
+su **massimo 3 nemici** nell'area. Il danno è **1 per bersaglio** a ogni livello:
+il dado non decide il danno e gli upgrade alzano soltanto il dado. Una pedana
+tiene al massimo 21 scariche (un 20 del D20 più quella del
+[colpo a tempo](#colpo-a-tempo)). Si preferiscono i nemici
 più vicini, poi l'ID stabile; pavimento e scariche non feriscono il player.
 La sequenza, una volta innescata, procede anche se l'area torna vuota. L'HUD
 distingue le pedane in attesa da quelle innescate; non hanno un pulsante attivo.
@@ -893,7 +947,7 @@ odin run src -o:none -- --classic
 | `--smoke-m7-view` | prova grafica di scena, oggetti 3D, fog, ologramma, QTE e menu |
 | `--smoke-m8-view` | prova 3D di d4, dispositivi, offerta del ring, equipaggiamento, scheda personaggio, tag match e cambio stanza |
 | `--smoke-western` | nuvoletta 6 RANCH 7: apertura automatica, volo delle carte, insegna, porte, corsa a tempo e premio |
-| `--smoke-mechanics-lab` | Prova meccaniche: arena aperta, mano di soli Movimento Ombra, ring riaperto, arrivi fino al massimo, ultima uccisione senza fine del combattimento, cartoncino del giocatore di nuovo in piedi dopo morte e riavvio, cartoncini vivi (un passo e un attacco fotogramma per fotogramma), cerchi d'azione e segnalini di danno e cura, i suoni che ogni azione mette in coda (passo, colpo, ferita, caduta, cura, battito, stordimento: senza dispositivo audio, li conta) e infine un Movimento Ombra giocato dalla mano: finestra e clock del mondo fermi per tutta l'ombra, quattro passi dell'ombra con una diagonale sul suo primo battito, risalita sull'ultima casella dell'ombra, nessun passo del Viandante fra i suoni e tutti quelli dell'ombra (carta, sprofondare, passi, CRITICO, battiti, risalita) |
+| `--smoke-mechanics-lab` | Prova meccaniche: arena aperta, mano di soli Movimento Ombra, ring riaperto, arrivi fino al massimo, ultima uccisione senza fine del combattimento, cartoncino del giocatore di nuovo in piedi dopo morte e riavvio, cartoncini vivi (un passo e un attacco fotogramma per fotogramma), cerchi d'azione e segnalini di danno e cura, gli status a stack (Veleno, Bruciatura e Rallentamento su un nemico, Bruciatura e Veleno sul giocatore: etichette di carta ai piedi, nomi e stack nell'HUD e nell'ispettore del nemico, `odin_pp_living_statuses_NN.png` e `odin_pp_mechanics_lab_statuses.png`; la finestra che scade subito dopo li fa bruciare), i suoni che ogni azione mette in coda (passo, colpo, ferita, caduta, cura, status, battito, stordimento: senza dispositivo audio, li conta) e infine un Movimento Ombra giocato dalla mano: finestra e clock del mondo fermi per tutta l'ombra, quattro passi dell'ombra con una diagonale sul suo primo battito, risalita sull'ultima casella dell'ombra, nessun passo del Viandante fra i suoni e tutti quelli dell'ombra (carta, sprofondare, passi, CRITICO, battiti, risalita); per finire ogni colpo uno alla volta, con la sua arma di carta: il dardo nel Viandante e nel pavimento, il fendente del bruto sulle tre caselle e la sua carica colpita all'arrivo, gli artigli del ghoul, il pastorale, il bastone, la bomba del bombarolo, la brace dell'arcimago su un barile e i colpi del Viandante con la lanterna e con le due armi M8 (ogni arma deve comparire); ultimo, il Rallentamento sul sigillo: un bruto rallentato di 2 compie il passo già annunciato, poi annuncia il prossimo intento 2 secondi più lungo (due tacche in più) e, compiuta quell'azione, perde uno stack e trattiene il successivo di un secondo solo |
 | `--smoke-m9-view` | arena continua, duello con IA, presa in quattro pose, replay e FPS con ricarica e vittoria |
 
 Gli smoke classici e i laboratori `--spell-lab` / `--dice-lab` conservano il comportamento classico;
@@ -945,9 +999,13 @@ La vita di ogni nemico è un cuore di carta sopra la testa, l'intento un sigillo
 e il terreno ([Il tavolo](#il-tavolo-cartoncini-vivi-cerchi-e-segnalini)); cuori,
 sigilli, micce, annunci delle bombe e segnalini usano lo stesso posizionamento
 per evitare sovrapposizioni fra testi.
-Gli indicatori degli status mantengono la propria zona sul terreno. Le
-etichette restano dentro la zona della scena e usano un collegamento sottile
-quando devono spostarsi. L'HUD tiene gli status separati dai contatori.
+Gli indicatori degli status mantengono la propria zona sul terreno. Bruciatura
+e Rallentamento sono etichette di carta in pixel art sotto i piedi, ritagliate e
+inchiostrate come i cuori (una fiamma, una clessidra e i loro stack), in fila
+sotto i dischi degli status più vecchi; con i cuori raddoppiano il pixel quando
+la camera è vicina. Le etichette restano dentro la zona della scena e usano un
+collegamento sottile quando devono spostarsi. L'HUD tiene gli status separati
+dai contatori; l'ispettore del nemico ne elenca nomi e stack (o potenza e secondi).
 
 Le prime due profondità della rotta restano compatte: Combat **17×11**, quattro
 nemici e spazio sicuro centrale. Dal terzo livello superficie, coperture e
@@ -1048,10 +1106,10 @@ La schivata base rimane accessibile fuori recupero, senza richiedere carte.
 | Shove | 1 | prima spinge di 1 cella, poi infligge 1 danno; allontana bombe e interrompe intenti tramite spostamento |
 | Grappling Hook | 1 | 1 danno e trascina adiacente, raggio 2–4; interrompe gli intenti spostando il nemico |
 | Heavy Blow | 2 | 4 danni e Stagger: salta l’azione annunciata e apre almeno 1 secondo di recupero dopo il pagamento del costo temporale |
-| Venom Needle | 1 | 1 danno + Poison 2 per 2 secondi |
-| Purifying Guard | 1 | 3 Shield per 2 secondi e rimuove Poison |
+| Venom Needle | 1 | 1 danno + 2 Veleno (danno a ogni azione del bersaglio, poi uno stack in meno) |
+| Purifying Guard | 1 | 3 Shield per 2 secondi e rimuove il Veleno |
 | Volatile Study | 2 | crea 1 Spark, pesca fino a 2 carte; Exhaust |
-| Toxic Wave | 2 | Poison 1 per 3 secondi ai nemici visibili entro raggio Chebyshev 2 (5×5) |
+| Toxic Wave | 2 | 1 Veleno ai nemici visibili entro raggio Chebyshev 2 (5×5) |
 | Movimento Ombra | 3 | 4 secondi reali nell'ombra: mondo e finestra fermi, intangibile, solo passi dell'ombra da 0,4 s (diagonale sui suoi battiti); risale sull'ultima casella dell'ombra. 0 s di finestra, giocabile anche da storditi |
 
 Afterimage mantiene il bypass del recupero della schivata e lo Shield dopo il
@@ -1060,7 +1118,10 @@ cinque carte con dadi/catene conservano i valori del catalogo base. **Aree e
 rimbalzi colpiscono solo celle/nemici visibili**: nessun bersaglio occultato viene
 rivelato dalla preview. Survey rispetta muri e ostacoli; quando scade, la vista
 si restringe senza memoria dell’esplorazione. Con `--no-fog` non modifica la vista.
-Durate e status avanzano ogni secondo del mondo. Durante cast e dadi il mondo
+Le durate degli status avanzano ogni secondo del mondo; Veleno, Bruciatura e
+Rallentamento non hanno durata: il Veleno morde le azioni di chi lo porta, la
+Bruciatura brucia a ogni nuova finestra, il Rallentamento allunga gli intenti
+del nemico ([Status](#status)). Durante cast e dadi il mondo
 è fermo: non scadono status, micce, recuperi o cooldown dei dispositivi. Le carte con
 pescata/creazione rispettano capienza e disponibilità; non garantiscono sempre
 il numero massimo di carte scritto. Upgrade e keyword mantengono le policy esistenti.
@@ -1112,7 +1173,9 @@ prima a zero; il recupero parte dopo il cast.
 
 Fuori dai cast, tempo reale e costi immediati alimentano il **clock del mondo**.
 Ogni secondo matura un beat: agiscono solo i nemici giunti alla propria scadenza,
-poi avanzano status, micce, recuperi e dispositivi. I cast non accumulano beat
+poi avanzano status, micce, recuperi e dispositivi (ogni nemico che ha agito
+riceve subito il morso del proprio Veleno). La Bruciatura morde invece sul
+comando di scadenza della finestra, quando cambia il numero di pulse. I cast non accumulano beat
 arretrati da recuperare tutti insieme. Gli intenti restano fissati fino alla
 scadenza. Energia: +1 ogni 3 secondi del mondo, entro il massimo. Il rimpiazzo
 della carta si pesca al termine del cast se Combat continua (subito, per una
@@ -1235,7 +1298,7 @@ le immagini sono output rigenerabili, non prerequisiti del checkout.
 | `--smoke-arenas-view` | quattro fasce di arene reali, combattimento, ologramma, Loot e cambio stanza; screenshot `odin_pp_arenas_*.png` |
 | `--smoke-m8-view` | dispositivi con APRI IL RING, campo, tag match, ritorno Loot: `odin_pp_m8_d4.png`, `devices`, `mega_combo`, `character`, `loot`, `tag_ring`, `next_room` (tutti con prefisso `odin_pp_m8_` e suffisso `.png`) |
 | `--smoke-western` | 6 RANCH 7 dalla mano al premio: `odin_pp_western_hand.png`, `cards`, `sign`, `gate`, `riders`, `ride`, `grab`, `win`, `reward` (prefisso `odin_pp_western_`) |
-| `--smoke-mechanics-lab` | sandbox: `odin_pp_mechanics_lab.png`, `_square`, `_full`, `_refill`, `_restart`, `_stun`, `_pause`, `_defeat` (prefisso `odin_pp_mechanics_lab`); cartoncini vivi: `odin_pp_living_move_00.png`–`_37` e `odin_pp_living_attack_00.png`–`_37`, un'immagine ogni due fotogrammi; modi degli intenti nemici (F6): `odin_pp_living_intents_0_00.png`–`_3_39` (0 sigilli + terreno, 1 sigilli, 2 terreno, 3 adesivi), ogni tre, e lo stesso istante con un colpo in arrivo nei modi 0 e 3 (`odin_pp_living_intent_both.png`, `_labels`); segnalino di cura: `odin_pp_living_heal_00.png`–`_39`, ogni due; Movimento Ombra dalla mano: `odin_pp_living_shadow_00.png`–`_82` (sprofonda, quattro passi dell'ombra con la diagonale sul primo battito, risale), ogni quattro |
+| `--smoke-mechanics-lab` | sandbox: `odin_pp_mechanics_lab.png`, `_square`, `_full`, `_refill`, `_restart`, `_stun`, `_pause`, `_defeat` (prefisso `odin_pp_mechanics_lab`); cartoncini vivi: `odin_pp_living_move_00.png`–`_37` e `odin_pp_living_attack_00.png`–`_37`, un'immagine ogni due fotogrammi; modi degli intenti nemici (F6): `odin_pp_living_intents_0_00.png`–`_3_39` (0 sigilli + terreno, 1 sigilli, 2 terreno, 3 adesivi), ogni tre, e lo stesso istante con un colpo in arrivo nei modi 0 e 3 (`odin_pp_living_intent_both.png`, `_labels`); segnalino di cura: `odin_pp_living_heal_00.png`–`_39`, ogni due; status a stack: `odin_pp_living_statuses_00.png`–`_19`, ogni tre, e `odin_pp_mechanics_lab_statuses.png` (fermo, con l'ispettore del nemico); Movimento Ombra dalla mano: `odin_pp_living_shadow_00.png`–`_82` (sprofonda, quattro passi dell'ombra con la diagonale sul primo battito, risale), ogni quattro; colpi: `odin_pp_living_blow_<nome>_00.png`–`_23` per `bolt`, `bolt_miss`, `cleave`, `claws`, `crozier`, `staff`, `bomb` ed `ember`, `_00`–`_39` per `charge`, `_00`–`_37` per `lantern`, `iron_cleaver` e `storm_pike`, ogni due; Rallentamento sul sigillo: `odin_pp_mechanics_lab_slow.png` (l'intento trattenuto, con l'ispettore del bruto) e `odin_pp_mechanics_lab_slow_worn.png` (dopo l'azione, uno stack in meno) |
 | `--smoke` | `odin_pp_isometric.png` |
 | `--smoke-generation` | `odin_pp_procedural_room.png` |
 | `--smoke-map` | `odin_pp_route.png` |
@@ -1375,12 +1438,16 @@ rifiutata: non offre rollback globale degli effetti di un'azione già accettata.
 
 ### Ordine del pulse e degli eventi
 
-Dopo azione del player, reazioni e prima raccolta magnetica, se Combat continua:
+Dopo azione del player, reazioni, prima raccolta magnetica e morso del suo
+Veleno, se Combat continua:
 
 1. scoppiano gli esplosivi in scadenza;
 2. si risolve l'eventuale corsia Furnace;
-3. si risolvono i Protect, poi gli altri intenti nemici, ordinati per ID;
-4. se il fight continua, avanzano gli status del player e poi dei nemici;
+3. si risolvono i Protect, poi gli altri intenti nemici, ordinati per ID; dopo
+   ogni intento portato a termine (colpo, mancato, passo bloccato, attesa o
+   recupero) morde il Veleno di quel nemico e il suo Rallentamento perde uno stack;
+4. se il fight continua, avanzano gli status del player e poi dei nemici (la
+   Bruciatura morde a ogni pulse classico);
 5. avanzano le durate dei binding; si rigenera energia se ancora in Combat;
 6. aumenta `pulse_count`, si pianifica il prossimo intento o si svuotano i piani;
 7. `Pulse_Advanced` registra pulse, energia recuperata/sprecata e tick;
@@ -1394,24 +1461,43 @@ l'ultimo comando e viene azzerato all'inizio del successivo.
 ### Status
 
 Ogni combattente possiede uno `Status_Set` inline, con massimo otto status e
-una sola istanza per tipo. Potenza e durata devono essere positive.
+una sola istanza per tipo. La potenza deve essere positiva, e così la durata,
+tranne per gli status a **stack** (`status_kind_stacks`: Veleno, Bruciatura,
+Rallentamento): non ne hanno (`remaining_pulses` resta 0) e nessun pulse li
+consuma; ogni applicazione aggiunge i propri stack.
 
 | Status | Stacking | Comportamento |
 |---|---|---|
 | Shield | somma saturata della potenza, durata maggiore | assorbe danno dopo la difesa; a zero viene rimosso |
-| Poison | potenza e durata maggiori | danno di sorgente System a fine pulse, poi decremento della durata |
+| Poison (Veleno) | somma saturata degli stack, senza durata | a ogni azione di chi lo porta infligge danno pari agli stack (sorgente System), poi perde uno stack; a zero finisce |
+| Burn (Bruciatura) | somma saturata degli stack, senza durata | M7: all'inizio di ogni nuova finestra (quando quella in corso scade e cambia il numero di pulse) infligge danno pari agli stack; in combattimento classico a ogni pulse. Gli stack non calano mai: dura fino alla morte o alla fine della stanza |
+| Slow (Rallentamento) | somma saturata degli stack, senza durata | M7: ogni stack fa aspettare 1 secondo in più il prossimo intento pianificato dal nemico (il conto alla rovescia, il sigillo e l'anello lo includono; `Enemy_Intent.slowed`); dopo l'azione così trattenuta perde uno stack. L'intento già in corso quando arriva non si allunga e non lo consuma. In classico ogni azione ne consuma uno senza altro effetto. Il player non può esserne colpito |
 | Thorns | potenza e durata maggiori | contraccolpo per danno effettivo ricevuto da un avversario vivo |
 | Afterimage | potenza e durata maggiori | dopo il proprio `Moved` in Combat concede Shield pari alla potenza, per due pulse; in M7 permette schivate durante il recupero |
 | Stagger | potenza e durata maggiori | M7: interrompe l’intento nemico, cancella mira/lancio preparati e lascia almeno 1 secondo sfruttabile dopo il costo della carta |
 | Survey | potenza e durata maggiori | M7: lato della vista +2 (2×2 → 5×5), massimo 9, rispettando LoS e senza memoria |
 
 Il danno al player segue `danno base -> difesa -> Shield -> salute`; i nemici
-non hanno ancora una statistica difesa. Anche Poison usa questo percorso,
-può essere assorbito e può concludere il fight. La durata applicata prima della
-risposta nemica avanza già alla fine di quel pulse. L'ordine dei tick per entità
-è Poison, Shield, Thorns, Afterimage, Stagger, Survey.
+non hanno ancora una statistica difesa. Il morso di Veleno e Bruciatura salta
+la difesa (resta pari agli stack): solo lo Shield lo assorbe, e può concludere
+il fight. La durata applicata prima della risposta nemica avanza già alla fine
+di quel pulse.
+L'ordine dei tick per entità è Bruciatura (solo in classico), Shield, Thorns,
+Afterimage, Stagger, Survey: la Bruciatura morde prima che uno Shield in
+scadenza sparisca.
 
-Thorns non scatta su danno interamente assorbito, veleno o hazard neutrali.
+Sono **azioni** del player tutti i comandi accettati in combattimento: passo
+(anche durante il recupero), attacco a urto, carta, attesa, schivata (anche
+quella reattiva del QTE di difesa, appena atterra), diagonale (anche fallita),
+refocus, Activate ed Equip; il Veleno morde alla fine del comando, prima del
+tempo del mondo che il comando fa scorrere. Non lo sono Movimento Ombra (la
+carta, i passi dell'ombra e la risalita: nell'ombra il player è intangibile),
+le altre risposte ai QTE di difesa (blocco, parata, deviazione) e l'anello
+Tesla. Del nemico ogni intento risolto, di qualsiasi tipo; un intento
+interrotto da Stagger non è un'azione. La Bruciatura in M7 morde sul comando
+`Timeout`, con i suoi cue e i suoi suoni.
+
+Thorns non scatta su danno interamente assorbito, veleno, bruciatura o hazard neutrali.
 Afterimage osserva solo il movimento terminale: un Dash di tre celle lo attiva
 una volta. Il suo Shield arriva **dopo** gli hazard attraversati, ma prima della
 risposta nemica. Nessuna reazione può essere costruita per un owner già morto.
@@ -1628,7 +1714,8 @@ I selettori sono `Chosen_Entity`, `Player`, `Each_Enemy` ed
 `Player_To_Anchor`, `Away_From_Player` o `Adjacent_To_Player`. Create_Card
 richiede una definizione esplicita con `has_card_definition = true`.
 Lo scaling ordinario è `base_amount + amount_per_upgrade * upgrade_level`,
-con livello 0–10 e controllo overflow in `i64`. Durata, cariche e costo non
+con livello 0–10 e controllo overflow in `i64`. Le carte con dadi non scalano
+importi: il livello 0–5 sceglie il dado (`DICE_LADDER`). Durata, cariche e costo non
 scalano automaticamente.
 
 ### Ownership, zone e risorse
@@ -1723,7 +1810,8 @@ La tabella seguente descrive il **catalogo classico** al livello base. Le
 variazioni del catalogo tattico sono nella sezione [M7](#modalità-tattica-m7).
 Le spell con dadi e rimbalzi sono descritte subito dopo. Rarità e metadati
 completi restano in `CARD_DEFINITIONS`; l'upgrade è disponibile solo se
-`card_can_upgrade` rileva un beneficio effettivo.
+`card_can_upgrade` rileva un beneficio effettivo; per le carte con dadi il
+beneficio è il dado successivo, fino al D20.
 
 | Carta | Rarita | Costo | Anchor e forma | Effetto base |
 |---|---|---:|---|---|
@@ -1733,7 +1821,7 @@ completi restano in `CARD_DEFINITIONS`; l'upgrade è disponibile solo se
 | `Cross_Slash` | Uncommon | 2 | cella, Manhattan 1-3, Cross raggio 1 | 2 danni a ogni nemico nella croce, +1 per upgrade |
 | `Firebomb` | Rare | 2 | cella, Chebyshev 1-3, Square raggio 1 | 2 danni a nemici e oggetti nel 3x3, +1 per upgrade; accende barili |
 | `Guard` | Common | 1 | player, None | Shield 3 per 3 pulse |
-| `Toxic_Wave` | Rare | 2 | implicito, None | Poison 1 per 3 pulse a ogni nemico |
+| `Toxic_Wave` | Rare | 2 | implicito, None | 1 Veleno, +1 per upgrade, a ogni nemico |
 | `Thorn_Coat` | Uncommon | 1 | player, None | Thorns 1 per 3 pulse |
 | `Afterimage` | Uncommon | 1 | player, None | Afterimage 1 per 4 pulse |
 | `Counter_Rune` | Rare | 1 | player, None | Retain; due contraccolpi, durata 4 pulse |
@@ -1745,9 +1833,9 @@ completi restano in `CARD_DEFINITIONS`; l'upgrade è disponibile solo se
 | `Dash` | Uncommon | 2 | cella, Chebyshev 1-3, Line, LoS | attraversa la linea fino all'anchor |
 | `Grappling_Hook` | Rare | 2 | avversario, Chebyshev 2-4, Line, LoS e actor stop | 1 danno, +1 per upgrade; trascina adiacente al player |
 | `Heavy_Blow` | Common | 2 | avversario adiacente, Single | 5 danni, +1 per upgrade |
-| `Venom_Needle` | Common | 1 | avversario, Chebyshev 1-3, Single, LoS | 1 danno, +1 per upgrade; Poison 1 per 3 pulse |
-| `Caustic_Bloom` | Uncommon | 2 | cella, Chebyshev 1-3, Square raggio 1 | Poison 2, +1 per upgrade, per 2 pulse ai nemici nel 3x3 |
-| `Purifying_Guard` | Uncommon | 1 | player, None | Shield 2, +1 per upgrade, per 3 pulse; rimuove Poison se presente |
+| `Venom_Needle` | Common | 1 | avversario, Chebyshev 1-3, Single, LoS | 1 danno, +1 per upgrade; 1 Veleno |
+| `Caustic_Bloom` | Uncommon | 2 | cella, Chebyshev 1-3, Square raggio 1 | 2 Veleno, +1 per upgrade, ai nemici nel 3x3 |
+| `Purifying_Guard` | Uncommon | 1 | player, None | Shield 2, +1 per upgrade, per 3 pulse; rimuove il Veleno se presente |
 | `Volatile_Study` | Rare | 2 | player, None | Ethereal; crea 1 `Spark`, pesca 1 + upgrade, poi exhaust |
 | `Sei_Denari` | starter, mai offerta | 1 | player, None | +6 oro; exhaust on play. Con il 7 in mano apre 6 RANCH 7 |
 | `Sette_Denari` | starter, mai offerta | 1 | player, None | +7 oro; exhaust on play. Con il 6 in mano apre 6 RANCH 7 |
@@ -1760,38 +1848,53 @@ Sorgenti: [spell.odin](src/game/spell.odin), [dice.odin](src/game/dice.odin),
 [dice_physics.odin](src/render/dice_physics.odin) e
 [dice_playback.odin](src/render/dice_playback.odin).
 
-`U` è il livello dell'istanza. Tutte queste carte costano due energia;
-valori prima di difesa, Shield e reazioni:
+`U` è il livello dell'istanza e `D` il dado del suo livello: D4 al livello 0,
+poi D6, D8, D10, D12 e D20 al quinto e ultimo upgrade (`DICE_LADDER` in
+[dice.odin](src/game/dice.odin)). Un upgrade di una carta con dadi cambia solo
+il dado; il numero di dadi resta quello della carta. La stessa scala vale per
+Shock Floor. Sulle carte il dado si scrive con la d minuscola (`1d4`, `2d8`;
+la preview di upgrade mostra `d4 -> d6`): nel font pixel la D maiuscola si
+confonde con lo zero. Tutte queste carte costano due energia; valori prima di
+difesa, Shield e reazioni:
 
 | Carta | Rarità | Primo bersaglio con LoS | Effetto |
 |---|---|---|---|
 | Firebomb | Rare | cella calpestabile, Chebyshev 1–3 | `2 + U` danni ai nemici e oggetti validi nel 3x3 |
-| Fate Strike | Uncommon | nemico, Manhattan 1–4 | `2 + U + D6`; con 6, possibile rimbalzo da `3 + U` |
+| Fate Strike | Uncommon | nemico, Manhattan 1–4 | `2 + 1D`; con la faccia più alta del dado, possibile rimbalzo da 3 |
 | Chain Lightning | Rare | nemico, Manhattan 1–4 | `3 + U` a fino a tre nemici distinti |
-| Sundering Blow | Uncommon | nemico allineato, Manhattan 1–2 | `2D6 + U`; somma dei dadi almeno 8: spinta di una cella |
-| Prismatic Barrage | Uncommon | nemico, Manhattan 1–3 | `3D6`: ogni 4+ vale `3 + U` danni; ogni dado basso dà 1 Shield per due pulse |
-| Twin Venom | Uncommon | nemico, Manhattan 1–3 | `1 + max(2D6) + U`; una coppia applica Poison 2 per due pulse al sopravvissuto |
+| Sundering Blow | Uncommon | nemico allineato, Manhattan 1–2 | `2D`; somma dei dadi almeno 8: spinta di una cella |
+| Prismatic Barrage | Uncommon | nemico, Manhattan 1–3 | `3D`: ogni 4+ vale 3 danni; ogni dado sotto il 4 dà 1 Shield per due pulse |
+| Twin Venom | Uncommon | nemico, Manhattan 1–3 | `1 + max(2D)`; una coppia applica 2 Veleno al sopravvissuto |
 
-Fate ha probabilità `1/6` di bonus; Sundering `15/36` di spinta, calcolata
-sui soli dadi. Barrage aggrega i danni dei successi in un colpo, preceduto dallo
-Shield: con zero successi è comunque una giocata valida da tre Shield.
-La probabilità di almeno un successo è `7/8`. Twin Venom ha probabilità `1/6`
-di coppia; l'upgrade non cambia potenza, durata o probabilità del veleno.
+Con un dado da N facce Fate rimbalza con probabilità `1/N`. Le soglie restano
+numeri fissi, quindi un dado più grande le supera più spesso: Sundering spinge
+con `1/16` (2D4), `15/36` (2D6), `43/64`, `79/100`, `123/144` e `379/400` (2D20);
+ogni dado di Barrage è un successo con `(N-3)/N`, dal 25% del D4 all'85% del D20.
+Barrage aggrega i danni dei successi in un colpo, preceduto dallo Shield: con
+zero successi è comunque una giocata valida da tre Shield. La probabilità di
+almeno un successo è `37/64` con 3D4 e `7/8` con 3D6. Twin Venom ha probabilità
+`1/N` di coppia; l'upgrade non cambia gli stack del veleno.
 
 ### RNG e percorso committed
 
 `Player.dice` contiene uno stream e un contatore dedicati, indipendenti da
-mazzo, mappa, incontri, reward e rendering. I D4 e D6 usano rejection sampling per
-non introdurre bias di modulo. `roll_d6_pool` prepara su copia fino a tre
-facce e totale; `Dice_Rolled` rappresenta l'intero lancio. Il commit avviene
-con l'effetto accettato; una giocata rifiutata non consuma dadi. Hover,
-preview e compilazione non estraggono risultati.
+mazzo, mappa, incontri, reward e rendering. Ogni dado usa rejection sampling per
+non introdurre bias di modulo. `roll_card_dice` è l'unico tiro delle carte: il
+numero di dadi viene da `card_dice_count`, il dado da `card_die_sides`, e
+`roll_dice_pool` prepara su copia fino a tre facce dello stesso dado, il totale
+e le facce del dado. Una nuova carta con dadi eredita così scala, limite di
+upgrade, testi e presentazione. `Dice_Rolled` rappresenta l'intero lancio e
+porta il dado: la presentazione rifiuta un dado diverso da quello del livello
+registrato. Il commit avviene con l'effetto accettato; una giocata rifiutata
+non consuma dadi. Hover, preview e compilazione non estraggono risultati.
 
 `query_spell_path` sceglie tutti i destinatari prima della risoluzione. Ogni
 salto parte dalla posizione precedente e cerca un nemico vivo non visitato,
 entro tre passi Manhattan e con LoS. Vince il più vicino, poi l'ID minore.
 Chain e Storm Crown conservano massimo tre bersagli, Fate due. La preview numera i salti;
-il secondo di Fate è tratteggiato e marcato `6 ONLY`, la spinta di Sundering `8+`.
+il secondo di Fate è tratteggiato e marcato `SOLO N` (la faccia più alta del suo
+dado), la spinta di Sundering `8+`. Le righe della preview riportano le
+probabilità del dado del livello.
 
 Ogni colpo conclude le proprie reazioni prima del successivo. Morte del player,
 fine combattimento o scomparsa del prossimo bersaglio interrompono il resto:
@@ -1810,13 +1913,18 @@ Il set 3D numerato comprende **D4, D6, D8, D10, D%, D12 e D20**: tetraedro,
 cubo, ottaedro, trapezoedri pentagonali, dodecaedro e icosaedro. Le mesh sono
 chiuse e smussate, con numeri fissi avorio, 6/9 sottolineati e resina blu scura
 lucida. Il D4 ripete tre cifre per faccia: si legge il valore alla punta.
-Il D10 mostra 0–9 (0 vale 10), il percentuale 00–90. Il laboratorio si apre
-con `./run.sh --dice-set-lab`; basta cliccare un dado per osservarlo da vicino.
+Nel set il D10 mostra 0–9 (0 vale 10), il percentuale 00–90; in gioco la
+faccia del 10 porta 10, come la chiamano le carte (`10: RIMBALZO 3`,
+`SOLO 10`). Il laboratorio si apre con `./run.sh --dice-set-lab`; basta
+cliccare un dado per osservarlo da vicino.
 
-Le carte attuali usano D4/D6, fino a tre D6 simultanei. Shock Floor usa il
-tetraedro numerato durante la stessa pausa completa del D6. Il totale appare
-in un pannello laterale separato dalla mano. Il classico conserva i D6 rossi
-con punti.
+In gioco ogni carta lancia il poliedro del proprio livello, fino a tre dadi
+uguali, durante la stessa pausa completa, e i dadi si fermano sulle facce
+registrate; Shock Floor nomina il proprio dado nell'etichetta del risultato. Il
+totale appare in un pannello laterale separato dalla mano. Il classico conserva
+i D6 rossi con punti; gli altri dadi usano il set numerato anche lì. D10, D12 e
+D20 sporgono dal cubo della simulazione: a riposo vengono separati sul piano
+durante l'ultimo assestamento, senza toccare il volo.
 
 Riferimenti fotografici dei modelli: [tavola locale dei dadi](references/dice/index.html),
 [Chessex Translucent Blue/White](https://magicmerchant.it/catalogue/7-dice-chessex-translucent-blue-white-23076-dadi-832)
@@ -2089,7 +2197,10 @@ può scegliere un nodo della mappa.
 
 Upgrade e rimozione richiedono deck inattivo e **ID della specifica istanza**.
 Upgrade conserva identità, ordine, RNG e prossimo ID; remove compatta owned
-senza riciclare ID e conserva almeno cinque carte. Il livello massimo è dieci.
+senza riciclare ID e conserva almeno cinque carte. Il livello massimo è dieci,
+cinque per le carte con dadi (dal D4 al D20); deck, Shop e Rest rispondono
+`Maximum_Upgrade` oltre quel limite. La preview di una carta con dadi mostra
+soltanto il dado, per esempio `d4 -> d6`.
 `card_can_upgrade` richiede un beneficio effettivo: Battle Focus, Calculated
 Risk, Spark Forge e Dash non sono migliorabili. Shop e Rest condividono la
 query e la preview prima/dopo, restituendo `Upgrade_Unavailable` senza costi.
@@ -2160,7 +2271,7 @@ con tutte e sei non compare. Scegliere o saltare è necessario per proseguire.
 | Iron Knuckle | Il primo spostamento forzato riuscito di un nemico o oggetto in ogni impulso dà 1 Shield per 2 impulsi | Shove, Grappling Hook e barili |
 | Ash Bookmark | Il primo Exhaust di ogni combattimento pesca una carta aggiuntiva | Battle Focus, Volatile Study, Ethereal |
 | Swift Soles | La prima carta che sposta effettivamente il giocatore in ogni combattimento recupera 1 energia | Dash e riposizionamento |
-| Venom Vial | La prima applicazione riuscita di Poison a un nemico in ogni combattimento ha potenza +1 | Venom Needle e Caustic Bloom |
+| Venom Vial | La prima applicazione riuscita di Veleno a un nemico in ogni combattimento ha uno stack in più | Venom Needle e Caustic Bloom |
 | Guard Sigil | All'ingresso in combattimento dà 2 Shield per 3 impulsi | Avvicinamento e prime decisioni |
 | Mending Thread | Alla fine di un combattimento vinto cura 2 HP | Recupero fra gli scontri |
 
@@ -2481,7 +2592,7 @@ più run riproducibili e misurare:
 - spinte/pull che attivano hazard o invalidano intenti;
 - Refocus come ricerca di una risposta o semplice recupero di una mano debole.
 
-Root/Slow, coni e costi dinamici devono rispondere a un bisogno ripetuto dei
+Root, coni e costi dinamici devono rispondere a un bisogno ripetuto dei
 playtest, non alla sola possibilità tecnica di aggiungerli.
 
 ## Odin: appunti per lo sviluppo
@@ -3008,7 +3119,9 @@ al termine di ogni comando. Le regole e i valori iniziali sono descritti in
 [Modalità tattica M7](#modalità-tattica-m7).
 
 I nemici conservano una scadenza individuale e l'intento già annunciato.
-Gli status, le bombe e i recuperi avanzano sul clock del mondo; l'energia ha
+Gli status a durata, le bombe e i recuperi avanzano sul clock del mondo; il
+Veleno morde le azioni di chi lo porta, la Bruciatura ogni finestra che scade e
+il Rallentamento allunga i prossimi intenti del nemico; l'energia ha
 una cadenza distinta di tre secondi. Stagger cancella un intento anche prima
 della sua scadenza e lascia almeno un secondo di recupero sfruttabile dopo
 il costo della carta. Fine fight e nuova stanza cancellano frazioni/debito,

@@ -77,6 +77,8 @@ Renderer :: struct {
 	frame_clock_valid: bool,
 	frame_had_cinematic: bool,
 	sprite_assets: Sprite_Assets,
+	// Every command's presentation gets the next number (Presentation_Cue.batch).
+	cue_batches: u32,
 }
 
 Tile_Vertices :: struct {
@@ -315,6 +317,14 @@ card_colors :: proc(id: game.Card_Id, affordable: bool) -> (fill, outline: rl.Co
 
 card_detail_lines :: proc(card: game.Card_Instance) -> (first, second: cstring) {
 	upgrade := card.upgrade_level
+	// Dice cards share the tactical hand's die-aware text; the floor takes the
+	// narrow hand's shorter form to fit the classic card.
+	if card.definition_id == .Shock_Floor {
+		definition, _ := game.card_definition_by_id(.Shock_Floor)
+		return fmt.ctprintf("%s COLPI + BERS.", card_dice_label(card)),
+		       fmt.ctprintf("%d DANNO / 3X3", game.card_effect_amount(definition.effects[0], upgrade))
+	}
+	if game.card_dice_count(card.definition_id) > 0 { return gothic_card_lines(card) }
 	switch card.definition_id {
 	case .Strike:
 		return fmt.ctprintf("DEAL %d DAMAGE", 3+upgrade), "RANGE 1"
@@ -353,25 +363,16 @@ card_detail_lines :: proc(card: game.Card_Instance) -> (first, second: cstring) 
 	case .Heavy_Blow:
 		return fmt.ctprintf("DEAL %d DAMAGE", 5+upgrade), "RANGE 1"
 	case .Venom_Needle:
-		return fmt.ctprintf("%d DMG + 1 POISON", 1+upgrade), "LASTS 3 PULSES"
+		return fmt.ctprintf("%d DANNO + 1 VELENO", 1+upgrade), POISON_RULE_SHORT
 	case .Caustic_Bloom:
-		return fmt.ctprintf("APPLY %d POISON", 2+upgrade), "3X3 - 2 PULSES"
+		return fmt.ctprintf("%d VELENO NEL 3X3", 2+upgrade), POISON_RULE_SHORT
 	case .Purifying_Guard:
 		return fmt.ctprintf("GAIN %d SHIELD", 2+upgrade), "3 PULSES + CLEANSE"
 	case .Volatile_Study:
 		return "CREATE 1 SPARK", fmt.ctprintf("DRAW %d - EXHAUST", 1+upgrade)
-	case .Fate_Strike:
-		return fmt.ctprintf("%d + D6 DAMAGE", 2+upgrade), fmt.ctprintf("6: BOUNCE FOR %d", 3+upgrade)
 	case .Chain_Lightning:
 		return fmt.ctprintf("%d DAMAGE EACH", 3+upgrade), "UP TO 3 / HOP 3"
-	case .Sundering_Blow:
-		if upgrade == 0 { return "2D6 DAMAGE", "ROLL 8+: PUSH 1" }
-		return fmt.ctprintf("2D6 + %d DAMAGE", upgrade), "ROLL 8+: PUSH 1"
-	case .Prismatic_Barrage:
-		return fmt.ctprintf("3D6: 4+ = %d DMG", 3+upgrade), "1-3: 1 SHIELD EACH"
-	case .Twin_Venom:
-		return fmt.ctprintf("HIGHER D6 +%d DMG", 1+upgrade), "2D6 / PAIR: POISON 2"
-	case .Shock_Floor: return "D4 SHOCKS / D4 TARGETS", fmt.ctprintf("%d DMG / 3X3 / TRAP", 1+upgrade)
+	case .Fate_Strike, .Sundering_Blow, .Prismatic_Barrage, .Twin_Venom, .Shock_Floor:
 	case .Tesla_Coil: return fmt.ctprintf("%d / DISTANCE DAMAGE", 8+upgrade), "FIELD CONSUMES 4 COILS"
 	case .Titan_Grip: return fmt.ctprintf("%d DAMAGE / THROW 2", 3+upgrade), "INTERRUPT / STAGGER 1"
 	case .Storm_Crown: return fmt.ctprintf("%d DAMAGE EACH", 5+upgrade), "LEGENDARY / CHAIN 3"
@@ -385,8 +386,8 @@ card_detail_lines :: proc(card: game.Card_Instance) -> (first, second: cstring) 
 
 dice_card_detail_lines :: proc(card: game.Card_Instance) -> (lines: [4]cstring) {
 	lines[0], lines[1] = card_detail_lines(card)
-	lines[2] = "SHIELD FIRST / 2P" if card.definition_id == .Prismatic_Barrage else "2 PULSES / IF ALIVE"
-	lines[3] = "RANGE 1-3 / LOS"
+	lines[2] = "SCUDO PRIMA / 2P" if card.definition_id == .Prismatic_Barrage else POISON_RULE_SHORT
+	lines[3] = "RAGGIO 1-3 / VISTA"
 	return
 }
 
@@ -1056,7 +1057,12 @@ begin_renderer_event_timeline :: proc(
 	}
 	clear_loot_animations(renderer)
 	clear_enemy_move_animations(renderer)
-	return begin_event_timeline(&renderer.timeline, before, events, after)
+	started := begin_event_timeline(&renderer.timeline, before, events, after)
+	renderer.cue_batches += 1
+	for offset in 0..<renderer.timeline.count {
+		renderer.timeline.cues[(renderer.timeline.head+offset)%MAX_PRESENTATION_CUES].batch = renderer.cue_batches
+	}
+	return started
 }
 
 renderer_playback_speed :: proc(renderer: ^Renderer) -> f32 {
@@ -1854,13 +1860,16 @@ draw_card_target_range :: proc(renderer: ^Renderer, room: ^game.Room, card_id: u
 	}
 }
 
+// The statuses at a fighter's feet; the bounds of their paper tags (empty when
+// it has none). `tag_pixel` 0 sizes the tags by the board's zoom.
 draw_status_set :: proc(
 	renderer: ^Renderer,
 	statuses: ^game.Status_Set,
 	center: view.Vec2,
 	entity_radius: f32,
 	opacity: f32 = 1,
-) {
+	tag_pixel: f32 = 0,
+) -> (tags: rl.Rectangle) {
 	assert(renderer != nil && statuses != nil)
 	if index, found := game.status_index(statuses, .Shield); found {
 		shield := &statuses.items[index]
@@ -1953,6 +1962,11 @@ draw_status_set :: proc(
 			color,
 		)
 	}
+	// Bruciatura and Rallentamento: paper tags in a row under the feet, below
+	// the lower round markers.
+	pixel := tag_pixel if tag_pixel > 0 else (f32(2) if renderer.camera.zoom >= 2 else f32(1))
+	below := center.y+entity_radius*0.62+max(f32(4), 5*renderer.camera.zoom)+2
+	return draw_status_tags(statuses, to_raylib(center), below, opacity, pixel)
 }
 
 draw_entity_statuses :: proc(
@@ -2511,13 +2525,16 @@ draw_presentation_cue :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) {
 		label = fmt.ctprintf("+%d", cue.event.amount)
 		color = rl.Color{92, 220, 151, 255}
 	case .Status_Applied:
-		label = fmt.ctprintf("+%s %d", game.status_kind_name(cue.event.status), cue.event.amount)
+		name, _ := tactical_status_label(cue.event.status, false)
+		label = fmt.ctprintf("+%s %d", name, cue.event.amount)
 		color = rl.Color{169, 210, 216, 255}
 	case .Status_Removed:
-		label = fmt.ctprintf("-%s", game.status_kind_name(cue.event.status))
+		name, _ := tactical_status_label(cue.event.status, false)
+		label = fmt.ctprintf("-%s", name)
 		color = rl.Color{169, 183, 177, 255}
 	case .Status_Expired:
-		label = fmt.ctprintf("%s END", game.status_kind_name(cue.event.status))
+		name, _ := tactical_status_label(cue.event.status, false)
+		label = fmt.ctprintf("FINE %s", name)
 		color = rl.Color{169, 183, 177, 255}
 	case .Attack_Missed:
 		label = "MISS"
@@ -2729,32 +2746,25 @@ draw_status :: proc(renderer: ^Renderer, room: ^game.Room, scale_mode: view.Scal
 	rl.DrawText(pulse_text, status_x, 74, status_font_size, rl.Color{169, 183, 177, 255})
 	status_x += rl.MeasureText(pulse_text, status_font_size)+status_gap
 
-	shield_index, has_shield := game.status_index(&status_view.statuses, .Shield)
-	poison_index, has_poison := game.status_index(&status_view.statuses, .Poison)
-	thorns_index, has_thorns := game.status_index(&status_view.statuses, .Thorns)
-	afterimage_index, has_afterimage := game.status_index(&status_view.statuses, .Afterimage)
-	if has_shield {
-		shield := &status_view.statuses.items[shield_index]
-		label := fmt.ctprintf("SHIELD %d:%d", shield.potency, shield.remaining_pulses)
-		rl.DrawText(label, status_x, 74, status_font_size, rl.Color{101, 174, 218, 255})
-		status_x += rl.MeasureText(label, status_font_size)+status_gap
+	// The player's statuses, each in its colour: a stack status its stacks,
+	// the others their potency and pulses left.
+	Classic_Status :: struct {
+		kind:  game.Status_Kind,
+		color: rl.Color,
 	}
-	if has_poison {
-		poison := &status_view.statuses.items[poison_index]
-		label := fmt.ctprintf("POISON %d:%d", poison.potency, poison.remaining_pulses)
-		rl.DrawText(label, status_x, 74, status_font_size, rl.Color{113, 190, 91, 255})
-		status_x += rl.MeasureText(label, status_font_size)+status_gap
+	classic_statuses := [?]Classic_Status{
+		{.Shield, {101, 174, 218, 255}}, {.Poison, {113, 190, 91, 255}}, {.Thorns, {238, 174, 73, 255}},
+		{.Afterimage, {194, 184, 226, 255}}, {.Burn, HUD_EMBER},
 	}
-	if has_thorns {
-		thorns := &status_view.statuses.items[thorns_index]
-		label := fmt.ctprintf("THORNS %d:%d", thorns.potency, thorns.remaining_pulses)
-		rl.DrawText(label, status_x, 74, status_font_size, rl.Color{238, 174, 73, 255})
+	for entry in classic_statuses {
+		index, found := game.status_index(&status_view.statuses, entry.kind)
+		if !found { continue }
+		status := status_view.statuses.items[index]
+		name, _ := tactical_status_label(entry.kind, false)
+		label := fmt.ctprintf("%s %d", name, status.potency) if game.status_kind_stacks(entry.kind) else
+			fmt.ctprintf("%s %d:%d", name, status.potency, status.remaining_pulses)
+		rl.DrawText(label, status_x, 74, status_font_size, entry.color)
 		status_x += rl.MeasureText(label, status_font_size)+status_gap
-	}
-	if has_afterimage {
-		afterimage := &status_view.statuses.items[afterimage_index]
-		label := fmt.ctprintf("AFTERIMAGE %d:%d", afterimage.potency, afterimage.remaining_pulses)
-		rl.DrawText(label, status_x, 74, status_font_size, rl.Color{194, 184, 226, 255})
 	}
 	rl.DrawFPS(c.int(renderer.canvas_width)-96, 18)
 }

@@ -4,6 +4,11 @@ import grid "../grid"
 
 MAX_SPELL_TARGETS :: 3
 SPELL_BOUNCE_RANGE :: 3
+// Dice card rules. Thresholds stay fixed numbers, so a bigger die clears them
+// more often; Fate Strike bounces on its die's highest face.
+FATE_BOUNCE_DAMAGE :: i32(3)
+SUNDERING_PUSH_TOTAL :: i32(8)
+PRISMATIC_HIT_DAMAGE :: i32(3)
 
 Spell_Path :: struct {
 	targets: [MAX_SPELL_TARGETS]Entity_Ref,
@@ -13,7 +18,7 @@ Spell_Path :: struct {
 }
 
 // Both paths are certain spatial queries. Fate's second target is conditional on
-// a later committed six; querying or compiling never rolls the die.
+// a later committed top face; querying or compiling never rolls the die.
 query_spell_path :: proc(room: ^Room, instance: Card_Instance, target: Target) -> (path: Spell_Path) {
 	path.error = .Invalid_Target
 	if instance.definition_id != .Fate_Strike && instance.definition_id != .Chain_Lightning && instance.definition_id != .Storm_Crown &&
@@ -102,11 +107,11 @@ resolve_sundering_blow :: proc(
 	path := query_spell_path(room, instance, target)
 	if path.error != .None || path.count != 1 { return }
 	staged_dice := room.player.dice
-	roll, rolled := roll_d6_pool(&staged_dice, 2)
+	roll, rolled := roll_card_dice(&staged_dice, instance)
 	if !rolled { return }
 	action := compiled^
-	action.effects[0].amount = roll.total+instance.upgrade_level
-	if roll.total < 8 {
+	action.effects[0].amount = roll.total
+	if roll.total < SUNDERING_PUSH_TOTAL {
 		action.effects[1] = {}
 		action.effect_count = 1
 	}
@@ -141,7 +146,7 @@ resolve_pattern_dice_spell :: proc(
 	path := query_spell_path(room, instance, target)
 	if path.error != .None || path.count != 1 { return }
 	staged_dice := room.player.dice
-	roll, rolled := roll_d6_pool(&staged_dice, card_dice_count(instance.definition_id))
+	roll, rolled := roll_card_dice(&staged_dice, instance)
 	if !rolled { return }
 	action := compiled^
 	action.effects = {}
@@ -149,22 +154,22 @@ resolve_pattern_dice_spell :: proc(
 	damage: i32
 	if barrage {
 		successes := dice_success_count(&roll)
-		failures := i32(roll.count-successes)
+		failures := roll.count-i32(successes)
 		if failures > 0 {
 			added := add_effect(&action, apply_status_effect(PLAYER_ENTITY, .Shield, failures, 2))
 			assert(added)
 		}
-		damage = i32(successes)*(3+instance.upgrade_level)
+		damage = i32(successes)*PRISMATIC_HIT_DAMAGE
 		if damage > 0 {
 			added := add_effect(&action, damage_effect(target.entity, damage))
 			assert(added)
 		}
 	} else {
-		damage = 1+max(roll.faces[0], roll.faces[1])+instance.upgrade_level
+		damage = 1+max(roll.faces[0], roll.faces[1])
 		added := add_effect(&action, damage_effect(target.entity, damage))
 		assert(added)
 		if dice_has_pair(&roll) {
-			added = add_effect(&action, apply_status_effect(target.entity, .Poison, 2, 2))
+			added = add_effect(&action, apply_status_effect(target.entity, .Poison, 2, 0))
 			assert(added)
 		}
 	}
@@ -242,9 +247,10 @@ resolve_played_card_action :: proc(
 	roll: Dice_Roll
 	if instance.definition_id == .Fate_Strike {
 		rolled: bool
-		roll, rolled = roll_d6_pool(&staged_dice, 1)
+		roll, rolled = roll_card_dice(&staged_dice, instance)
 		if !rolled { return }
-		if roll.total != 6 { path.count = 1 }
+		// Only the die's highest face carries fate to a second enemy.
+		if roll.total != roll.sides { path.count = 1 }
 	}
 	origin := room.player.position
 	for index in 0..<path.count {
@@ -255,9 +261,8 @@ resolve_played_card_action :: proc(
 		}
 		damage := i32(3)+instance.upgrade_level
 		if instance.definition_id == .Storm_Crown { damage = 5+instance.upgrade_level }
-		if instance.definition_id == .Fate_Strike && index == 0 {
-			damage = 2+instance.upgrade_level+roll.total
-		}
+		// Fate's upgrades raise only its die.
+		if instance.definition_id == .Fate_Strike { damage = 2+roll.total if index == 0 else FATE_BOUNCE_DAMAGE }
 		action := make_action(.Card, PLAYER_ENTITY, entity_target(path.targets[index]), .Opponent)
 		added := add_effect(&action, damage_effect(path.targets[index], damage))
 		assert(added)

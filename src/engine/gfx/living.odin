@@ -131,6 +131,14 @@ living_clip_seconds :: proc(clip: ^Living_Clip, first: i32 = 0) -> f64 {
 	return total/1000
 }
 
+// Seconds from a clip's start to its hit drawing (0 without one): when an
+// attack clip's blow lands (render/attack_fx.odin).
+living_hit_seconds :: proc(clip: ^Living_Clip) -> f64 {
+	total: f64
+	for index in 0..<clamp(clip.hit, 0, clip.count) { total += f64(clip.durations[index]) }
+	return total/1000
+}
+
 // The drawing shown `elapsed` seconds into a clip that began at drawing
 // `first`. A finished one-shot holds its last drawing.
 living_frame :: proc(clip: ^Living_Clip, elapsed: f64, first: i32 = 0) -> (frame: i32, finished: bool) {
