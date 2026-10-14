@@ -279,6 +279,7 @@ apply_movement_effect :: proc(
 		movement_recorded := report.events.count > movement_event_index
 		trigger_shock_floors_on_entry(room, effect.target, &report.events)
 		trigger_cell_hazard(room, effect.target, report)
+		trigger_ground_on_entry(room, effect.target, report)
 		if effect.target.kind == .Object {
 			ignite_barrel_near_fire(room, effect.target.id, &report.events)
 		}

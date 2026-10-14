@@ -26,6 +26,14 @@ update_renderer_frame_timeline :: proc(renderer: ^Renderer, dt: f32) -> bool {
 	remaining := dt*speed
 	for remaining > 0 && event_timeline_is_busy(timeline) {
 		cue, _ := active_presentation_cue(timeline)
+		// What follows a blow of the player's (the status an arrow leaves, the
+		// foe it fells, the charge it spends) waits until the blow lands, as its
+		// token and the struck card do; the world runs on meanwhile.
+		if !cue.started && attack_fx_foreground_pending(renderer) {
+			renderer.frame_simulation_dt += remaining/speed
+			remaining = 0
+			break
+		}
 		cinematic := presentation_cue_is_cinematic(cue.kind)
 		renderer.frame_had_cinematic = renderer.frame_had_cinematic || cinematic
 		available := max(f32(0), cue.duration-cue.elapsed)

@@ -114,6 +114,19 @@ each sound starts with the drawing it belongs to:
   moves, heals, bombs armed, disarmed and exploding (barrels have their own),
   coils set down by any other way, one zap per discharge, shock floors, fire
   catching, hits on objects (ice cracks).
+- **The ground** (Pozza di Veleno, Incendio): the pool's landing plays
+  `world_pool_splash`, the fire's `world_fire`; an enemy whose card steps
+  into a pool splashes (`world_pool_splash`, panned to it) and into a fire
+  makes it flare (`world_fire`); when a fire's arms reach further at a new
+  window `world_fire_spread` plays once (a fire just lit is its card's
+  landing), and when one goes out at its fifth `world_fire_out`.
+- **The player's charges** (Deflect, Feretro, Dado del Destino, Lama
+  Velenosa): each card plays `card_<id>` and its charge, as it is loaded,
+  `ui_status_<charge>` (`deflect`, `arrows`, `fate`, `venom_blade`). A blow
+  RIFLESSO turns back plays `pilgrim_deflect` as it reaches him (a bolt's
+  flight first); FERETRO's arrow is his attack clip, so it plays
+  `pilgrim_shoot` instead of `pilgrim_attack`; a loaded bump's die plays
+  `ui_fate_die` at the struck foe as it shows.
 - **The room**: `ui_beat_tick` on every whole second of an open window,
   `ui_critical` when an action claims the beat, `ui_window_end`, `ui_stun`,
   `ui_defense_prompt`, `pilgrim_parry` on a parry or deflection that lands,
@@ -146,6 +159,8 @@ chime and iron rattle when he moves hard). Warm, light, human scale.
 | pilgrim_hurt_back | is hit from behind | 0.8 | 0.118 | -18 | 0.18 | same family as hurt, pitched forward: slightly higher, sharper slap |
 | pilgrim_block | blocks (shield absorbs) | 0.65 | 0.118 | -19 | 0.22 | a ward takes the blow at 0.118: dull thud through a shimmering ward (soft D-Phrygian partials), lantern chimes |
 | pilgrim_parry | parries (QTE success) | 0.8 | 0.05 | -17 | 0.3 | bright steel-on-iron clang at 0.05 with a ringing tail; satisfying |
+| pilgrim_deflect | RIFLESSO turns a blow back (as it reaches him) | 0.7 | 0.0 | -18 | 0.28 | the ward flashes at 0.0: a hard click, a bright steel ring over D5 A5 D6 that dies fast, the globe's chime, and the blow sent back: a bright whoosh leaving him and falling away (3.5 -> 0.8 kHz) |
+| pilgrim_shoot | looses one of FERETRO's arrows (his attack clip) | 0.7 | 0.03, 0.125, 0.3 | -19 | 0.2 | the string drawn (a leather-and-wood creak from 0.03), released at 0.125 with the attack clip's hit (a thrummed twang on D3, the bow's dry knock, a snap), the arrow's whistling whoosh leaving him, the cloak settling at 0.30 |
 | pilgrim_stunned | stunned / staggered | 1.6 | — | -24 | 0.3 | dazed: a high thin ringing with slow wobble, faint circling tinkles of the lantern; quiet, unsettling |
 | pilgrim_interact | picks up loot | 0.7 | 0.28 | -22 | 0.2 | crouches (cloth) and pockets it at 0.28: coins clink into a leather pouch |
 | pilgrim_heal | is healed | 0.9 | — | -21 | 0.35 | warm rising swell, soft bell partials (D, F, A), a breath of air; comforting |
@@ -259,6 +274,10 @@ Length ~0.5–0.9 s; loudness -19 unless noted; wet 0.25.
 | card_titan_grip | Titan Grip: damage, throw, stun | a gauntlet clenches (leather + iron), a heavy throw whoosh |
 | card_sei_denari | 6 of coins (Scopa): +6 gold | a handful of coins spilled, bright |
 | card_sette_denari | 7 of coins (Scopa): +7 gold | a bigger handful, with a little flourish |
+| card_deflect | Deflect: RIFLESSO, the next blow goes back | the buckler snapped up (an airy rise), its iron set at 0.12 (a clank, a steel shimmer on A5), then the glance at 0.27: a crisp D6 ping and a bright whoosh turning away and falling |
+| card_coffin | Feretro: three arrows | a coffin lid creaks open (0.06), drops on its hinge with a hollow knock (0.30), three arrows drawn out of it (0.42, 0.50, 0.58: a shaft's knock, an iron head's tick, a fletching's hiss) |
+| card_fate_dice | Dado del Destino: three bumps that roll its die | one bone die rolled across wood (0.05 to 0.27), then fate sealed at 0.34: a low D bell struck softly, a crystal shimmer (A6) over it |
+| card_venom_blade | Lama Velenosa: its die is the bumps it poisons | a dagger drawn from its sheath (a bright scrape from 0.07, the blade ringing on D6), a drop of venom at 0.26 (a tight plip and a sizzle), two small bubbles |
 
 ### Family `cards_arcana` — cards of storm, fire, poison and devices
 
@@ -281,6 +300,8 @@ Same rules as `cards_arms`.
 | card_twin_venom | Twin Venom: 2 dice of its level, poison on a pair | two vials uncorked and splashed, the dice rattle |
 | card_volatile_study | Volatile Study: creates Sparks, draws | glassware clinks, a volatile mixture fizzes and pops |
 | card_prismatic_barrage | Prismatic Barrage: 3 dice of its level, crystal shots | three crystalline shots (glassy pings in D Phrygian, rising) |
+| card_poison_pool | Pozza di Veleno: a pool of poison on a cell | a vial uncorked (the cork's pop), the poison glugging out in its flight, its splash on the stone at 0.38, the pool bubbling slower and slower |
+| card_wildfire | Incendio: a fire that grows as a plus | flint struck on steel twice (0.07, 0.15: a steel ping, a spray of sparks), the floor catches with a soft whoomp (0.22), a crackle that spreads |
 
 ### Family `world` — devices, bombs, the room's events
 
@@ -294,6 +315,9 @@ Same rules as `cards_arms`.
 | world_explosion | a bomb explodes | 2.0 | -12 | 0.45 | a deep blast, stone shatters, debris rains, long hall tail |
 | world_barrel_explosion | a barrel explodes | 2.0 | -12 | 0.45 | wood splinters + blast + oily fire whoosh |
 | world_fire | fire on a cell | 1.2 | -20 | 0.3 | flames catch and crackle |
+| world_fire_spread | the floor's fires grow at a new window | 0.9 | -20 | 0.3 | a rush of flame swelling to 0.15, crackle running along it, dying by 0.8 |
+| world_fire_out | a floor fire goes out at its fifth window | 0.85 | -22 | 0.3 | the flames gutter and sink (the bed darkening, its crackle thinning, to 0.45), a last ember pops at 0.38, smoke hisses away with a soft puff from 0.32 |
+| world_pool_splash | an enemy steps into a pool of poison (and a pool lands) | 0.55 | -20 | 0.25 | a wet slap at 0.0, the pool sucking at the card's base (0.02-0.16), a few thick bubbles breaking to 0.45 |
 | world_ice_crack | an ice block cracks | 0.8 | -19 | 0.3 | ice fractures: sharp glassy cracks, creak |
 | world_bomb_fizzle | a bomb is disarmed | 0.7 | -21 | 0.2 | the fuse is pinched out: a hiss that dies, a little puff |
 | world_object_hit | a device or object is struck | 0.5 | -19 | 0.22 | wood-and-iron knock |
@@ -325,6 +349,11 @@ Quiet and clear; they must never mask the action sounds.
 | ui_status_afterimage | afterimage applied | 0.6 | -23 | 0.35 | a ghostly breath echo |
 | ui_status_burn | a burn applied (Bruciatura) | 0.6 | -22 | 0.2 | the paper catches: a dry strike, a small ignition whoomph, ember pops and singeing paper over a low roar, a faint flickering D/A ember tone |
 | ui_status_slow | slow applied (Rallentamento) | 0.7 | -23 | 0.3 | the clock drags: escapement ticks coming later and later and a step lower each (A5 down to D5), over a ward octave sinking D4 -> A3 as its shimmer slows; a faint trickle of sand (the hourglass) |
+| ui_status_deflect | RIFLESSO loaded | 0.5 | -23 | 0.3 | a polished buckler catches the light: two crystal glints (D6, A6) over the ward's thin open fifth |
+| ui_status_arrows | FRECCE loaded | 0.45 | -22 | 0.2 | three arrows slid into a quiver: fletching swishes, the shafts' hardwood knocks, iron ticks |
+| ui_status_fate | DESTINO loaded | 0.6 | -23 | 0.3 | a bone die ticks twice in the hand, a low D bell of fate touched under a slow violet shimmer (A5/D6) |
+| ui_status_venom_blade | LAMA loaded | 0.5 | -22 | 0.2 | a blade's thin ting (Eb6), a drop of venom and two small bubbles over a sickly fall A5 -> Eb5 |
+| ui_fate_die | the Dado del Destino's die at a bump | 0.4 | -22 | 0.25 | a bone die bouncing on stone, each bounce lower, landing with a soft D6 ping |
 | ui_status_expired | a status wears off | 0.4 | -28 | 0.2 | a soft fading puff |
 | ui_defeat | the Viandante falls (defeat) | 2.0 | -18 | 0.5 | a low drone sinks, paper crumples, a distant bell |
 

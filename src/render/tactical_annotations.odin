@@ -11,6 +11,20 @@ Tactical_Label_Layout :: struct {
 	count: int,
 	actor_bounds: [game.MAX_ENEMIES_PER_ROOM+1]rl.Rectangle,
 	actor_count: int,
+	// Each enemy's heart as placed this frame (draw_living_hearts), for the
+	// tags drawn after them that keep clear of it (the Dado del Destino's die).
+	hearts: [game.MAX_ENEMIES_PER_ROOM]rl.Rectangle,
+	heart_ids: [game.MAX_ENEMIES_PER_ROOM]u32,
+	heart_count: int,
+}
+
+// Where the heart of enemy `id` stands this frame, when it is shown.
+tactical_label_heart :: proc(layout: ^Tactical_Label_Layout, id: u32) -> (bounds: rl.Rectangle, found: bool) {
+	if layout == nil { return }
+	for heart_id, index in layout.heart_ids[:layout.heart_count] {
+		if heart_id == id { return layout.hearts[index], true }
+	}
+	return
 }
 
 tactical_label_candidate_is_clear :: proc(layout: ^Tactical_Label_Layout, candidate: rl.Rectangle) -> bool {

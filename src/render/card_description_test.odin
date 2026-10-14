@@ -21,6 +21,13 @@ test_card_descriptions_preserve_classic_and_tactical_rules :: proc(t: ^testing.T
 		{.Afterimage, "4 AFTERIMAGE", "DURATA 4 PULSE", "SCHIVA SENZA RECUPERO", "4 SCUDO SE MUOVI / 4s"},
 		{.Battle_Focus, "PESCA 2", "EXHAUST / ETHEREAL", "PESCA 2 / ESPLORA", "VISTA: 3s / MAX 9"},
 		{.Shadow_Step, "OMBRA 4s", "SOLO TATTICA", "OMBRA 4s / MONDO FERMO", "INTANGIBILE / SOLO PASSI"},
+		// Phase 2: amounts from the catalog, dice from the ladder (d10 at +3).
+		{.Poison_Pool, "5 VELENO A CELLA", "SOLO TATTICA", "5 VELENO A CELLA", "SOLO NEMICI / STANZA"},
+		{.Wildfire, "4 BRUCIATURA", "SOLO TATTICA", "4 BRUCIATURA A CELLA", "CROCE: +1 A FINESTRA"},
+		{.Deflect, "1 RIFLESSO", "SOLO TATTICA", "+1 RIFLESSO", "RIMANDA UN COLPO"},
+		{.Coffin, "6 FRECCE", "SOLO TATTICA", "6 FRECCE / CTRL+CLIC", "1 DANNO + 1 STATUS"},
+		{.Fate_Dice, "1d10 SU 3 COLPI", "SOLO TATTICA", "1d10 SU 3 COLPI", "UN TIRO A OGNI COLPO"},
+		{.Venom_Blade, "1d10 COLPI AVVELENATI", "SOLO TATTICA", "1d10 COLPI AVVELENATI", "2 VELENO A COLPO"},
 	}
 	for row in cases {
 		card := game.Card_Instance{definition_id = row.id, upgrade_level = 3}
@@ -73,6 +80,44 @@ test_card_descriptions_keep_special_dice_rules_and_visibility :: proc(t: ^testin
 	testing.expect_value(t, string(lines[0]), "3d8: 4+ = 3 DANNI")
 	testing.expect_value(t, string(lines[2]), "SCUDO PRIMA / 2P")
 	testing.expect_value(t, string(lines[3]), "RAGGIO 1-3 / VISTA")
+}
+
+// Seven or eight cards in hand: the cards whose lines would shrink or be cut
+// there say them shorter, the rest keep theirs; the classic face of a
+// tactical-only card reads the catalog like the hand.
+@(test)
+test_card_descriptions_shorten_for_a_narrow_hand :: proc(t: ^testing.T) {
+	cases := [?]struct {
+		id: game.Card_Id,
+		level: i32,
+		first, second: string,
+	}{
+		{.Shadow_Step, 0, "OMBRA 4s", "MONDO FERMO"},
+		{.Wildfire, 2, "3 BRUCIATURA", "CROCE: +1 A FINESTRA"},
+		{.Coffin, 1, "4 FRECCE", "CTRL+CLIC: 1 DANNO"},
+		{.Venom_Blade, game.MAX_DICE_UPGRADE_LEVEL, "1d20 COLPI", "2 VELENO A COLPO"},
+		{.Shock_Floor, 0, "1d4 COLPI + BERS.", "1 DANNO / 3X3"},
+		{.Tesla_Coil, 0, "8 / DIST. DANNI", "CAMPO USA 4 TESLA"},
+	}
+	for row in cases {
+		first, second, found := gothic_card_narrow_lines({definition_id = row.id, upgrade_level = row.level}, true)
+		testing.expectf(t, found, "%v has no narrow lines", row.id)
+		testing.expect_value(t, string(first), row.first)
+		testing.expect_value(t, string(second), row.second)
+	}
+	for id in ([?]game.Card_Id{.Strike, .Poison_Pool, .Deflect, .Fate_Dice}) {
+		_, _, found := gothic_card_narrow_lines({definition_id = id}, true)
+		testing.expectf(t, !found, "%v shortens its lines", id)
+	}
+	for id in game.Card_Id {
+		if id == .Count || !game.card_requires_tactical(id) { continue }
+		card := game.Card_Instance{definition_id = id, upgrade_level = 2}
+		face_first, face_second := card_detail_lines(card)
+		first, second := gothic_card_lines(card)
+		testing.expect_value(t, string(face_first), string(first))
+		testing.expect_value(t, string(face_second), "SOLO TATTICA")
+		testing.expect_value(t, string(second), "SOLO TATTICA")
+	}
 }
 
 // The path preview's odds follow the die of the card's level.

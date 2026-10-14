@@ -394,11 +394,13 @@ test_shadow_card_is_offered_to_tactical_runs_only :: proc(t: ^testing.T) {
 	offered := false
 	for id in all { offered = offered || id == .Shadow_Step }
 	testing.expect(t, offered)
-	classic: [int(Card_Id.Count)-4]Card_Id
+	// Classic also leaves out Movimento Ombra, the cards of the ground and the
+	// ones that load the player's charges.
+	classic: [int(Card_Id.Count)-10]Card_Id
 	random = 1
 	testing.expect(t, !generate_weighted_card_choices(&random, &node, all[:], &profile, false))
 	testing.expect(t, generate_weighted_card_choices(&random, &node, classic[:], &profile, false))
-	for id in classic { testing.expect(t, id != .Shadow_Step) }
+	for id in classic { testing.expect(t, !card_requires_tactical(id)) }
 	price, priced := shop_card_price(definition, 9)
 	testing.expect(t, priced)
 	testing.expect_value(t, price, i32(8+9/3))

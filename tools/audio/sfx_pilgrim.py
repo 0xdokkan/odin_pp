@@ -648,6 +648,58 @@ def pilgrim_parry(seed):
     return _finish(x, D, tail=0.02)
 
 
+@sound("pilgrim_deflect", loudness=-18, wet=0.28, marks=(0.0,))
+def pilgrim_deflect(seed):
+    """RIFLESSO: the blow meets his ward at 0.0 and is turned: a hard click,
+    a bright steel ring over the ward's partials (D5 A5 D6: a flash that dies
+    fast), the lantern globe's chime, and the blow sent back: a bright whoosh
+    leaving him and falling away (3.5 -> 0.8 kHz) with a faint whistle."""
+    D = 0.7
+    click = _band(white(0.02, seed), 2000, 16000) * _env_ad(0.02, 0.0001, 0.0006)
+    ring = []
+    for j, rt in enumerate((1.0, 1.47, 2.09, 2.56, 3.2, 3.9)):
+        f = _hz("D", 6) * rt
+        tau = 0.22 / (1 + 0.4 * j)
+        ring += [(f, tau, 1.0 / (1 + 0.3 * j)), (f + 2.0 + j, tau * 0.9, 0.35 / (1 + 0.3 * j))]
+    ring = _modes(0.6, ring, seed=seed + 1)
+    exc = white(0.001, seed + 2) * np.hanning(n_samples(0.001))
+    ring = _norm(convolve(exc, ring)[:len(ring)])
+    ward = _ward(0.45, [(_hz("D", 5), 1.0), (_hz("A", 5), 0.6), (_hz("D", 6), 0.35)], attack=0.003, tau=0.1, trem=9.0,
+                 depth=0.3, seed=seed + 3)
+    chime = _glass(0.45, tau=0.12)
+    away = _whoosh(0.28, seed + 4, 3500, 2600, 800, peak_at=0.15, q=1.4, power=1.6, tone=0.5)
+    weight = _thump(0.15, seed + 5, 150, 0.016, drop=0.5, attack=0.0008)
+    x = place(D, [
+        (0.0, click, 0.24), (0.0, ring, 0.7), (0.0, ward, 0.3), (0.0, weight, 0.16),
+        (0.008, chime, 0.1), (0.03, away, 0.42),
+    ])
+    t = time_axis(D)
+    x *= np.where(t > 0.5, np.cos(0.5 * np.pi * np.clip((t - 0.5) / 0.2, 0, 1)) ** 2, 1.0)
+    return _finish(x, D, tail=0.02)
+
+
+@sound("pilgrim_shoot", loudness=-19, wet=0.2, marks=(0.03, 0.125, 0.3))
+def pilgrim_shoot(seed):
+    """FERETRO: an arrow loosed from his hand bow: the string drawn (a
+    leather-and-wood creak from 0.03, tightening), released at 0.125 (the
+    string's twang, a thrummed low pluck on D3, a dry wooden knock of the
+    bow and a snap), the arrow's whistling whoosh leaving him, and the cloak
+    settling at 0.30."""
+    D = 0.7
+    draw = _creak(0.09, seed, f0=30, f1=70, center=900, q=2.4)
+    twang = karplus(_hz("D", 3), 0.4, damping=0.993, brightness=0.6, seed=seed + 1)
+    twang = _band(twang, 90, 5000) * _env_ad(0.4, 0.001, 0.12)
+    knock = _modes(0.1, [(420, 0.018, 1.0), (980, 0.01, 0.6), (1700, 0.006, 0.35)], seed=seed + 2)
+    snap = _band(white(0.02, seed + 3), 1800, 9000) * _env_ad(0.02, 0.0002, 0.001)
+    fly = _whoosh(0.22, seed + 4, 900, 3200, 1800, peak_at=0.25, q=1.3, power=1.6, tone=0.6)
+    settle = _cloak(0.18, seed + 5, env_points(0.18, [(0, 0), (0.04, 1), (0.18, 0)]), lo=350, hi=900)
+    x = place(D, [
+        (0.03, draw, 0.22), (0.125, twang, 0.5), (0.125, knock, 0.4), (0.125, snap, 0.3),
+        (0.13, fly, 0.45), (0.3, settle, 0.14),
+    ])
+    return _finish(x, D, tail=0.03)
+
+
 @sound("pilgrim_stunned", loudness=-24, wet=0.3)
 def pilgrim_stunned(seed):
     """Dazed: a thin high ringing near A7 led by a slow 0.62 Hz pitch wobble

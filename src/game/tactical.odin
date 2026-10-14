@@ -74,6 +74,9 @@ Tactical_State :: struct {
 	shadow_origin, shadow_position, shadow_from: grid.Position,
 	shadow_beats_spent: bit_set[0..<8; u8],
 	shadow_steps: int,
+	// DADO DEL DESTINO: the die its loaded bumps roll, the one of the last
+	// card played (player_charges.odin); a new room forgets it with the charges.
+	fate_sides: i32,
 }
 Tactical_Pulse :: struct {
 	pending, started, forced: bool,
@@ -178,6 +181,7 @@ begin_tactical_room :: proc(room: ^Room) {
 	s.action_remaining, s.action_duration = 0, 0
 	tactical_reset_beats(s)
 	tactical_reset_shadow(s)
+	s.fate_sides = 0
 	for &enemy in room.enemies { enemy.tactical_cooldown = 0 }
 }
 
@@ -433,6 +437,8 @@ offer_defense_qte :: proc(room: ^Room, enemy: ^Enemy) -> bool {
 		index, found := enemy_index_by_id(room, enemy.id)
 		if !found || !enemy_charge_path_is_clear(room, index, intent) { return false }
 	}
+	// RIFLESSO answers this blow by itself (deflect_enemy_blow): no defence to choose.
+	if player_charges(room, .Deflect) > 0 { return false }
 	defenses: bit_set[Defense_Mode]
 	if _, found := status_for_entity(room, PLAYER_ENTITY, .Shield); found { defenses += {.Block, .Parry} }
 	if _, found := status_for_entity(room, PLAYER_ENTITY, .Thorns); found && enemy.archetype == .Archer { defenses += {.Deflect} }

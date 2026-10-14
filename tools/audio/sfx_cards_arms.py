@@ -948,3 +948,117 @@ def card_sette_denari(seed):
     x = place(dur, [(0.0, _flick(seed), FLICK), (0.0, _norm(coins), 0.85), (0.0, chinks, 0.25),
                     (0.0, _norm(spinner), 0.32), (0.7, last, 0.42)])
     return _out(x, 0.04)
+
+
+# --------------------------------------------------------------------------
+# The player's charges (Phase 2)
+
+@sound("card_deflect", loudness=LOUD, wet=WET, marks=(0.0, 0.12, 0.27))
+def card_deflect(seed):
+    """Deflect: the buckler snapped up (an airy rise peaking at 0.11), its
+    iron rings as it is set at 0.12 (a low clank and thump, a steel shimmer
+    on A5), then at 0.27 the glance it will give: a crisp ping (D6) and a
+    bright whoosh that turns away and falls (3.4 -> 0.9 kHz), the blow sent
+    back."""
+    dur = 0.75
+    rise = _whoosh(0.1, seed + 10, 420, 2000, 1500, t_peak=0.088, q=1.2, a=1.6, b=1.0, whistle=0.2)
+    away = _whoosh(0.24, seed + 40, 3400, 2800, 900, t_peak=0.035, q=1.6, a=1.0, b=1.3, whistle=0.45)
+    x = place(dur, [
+        (0.0, _flick(seed), FLICK),
+        (0.02, rise, 0.42),
+        (0.12, _iron(0.5, 610, seed + 20, tau=0.12), 0.5),
+        (0.12, _thump(0.25, seed + 21, f0=170, f1=90, drop=0.02, tau=0.025, lp=700, noise=0.4), 0.3),
+        (0.12, _steel(0.5, A5, seed + 22, tau=0.1, count=6), 0.22),
+        (0.27, _cut(seed + 30, dur=0.05), 0.3),
+        (0.27, _steel(0.45, D6, seed + 31, tau=0.07), 0.42),
+        (0.28, away, 0.5),
+    ])
+    return _out(x, 0.12)
+
+
+@sound("card_coffin", loudness=LOUD, wet=WET, marks=(0.0, 0.06, 0.3, 0.42, 0.5, 0.58))
+def card_coffin(seed):
+    """Feretro: a coffin lid of old wood creaks open from 0.06 (stick-slip
+    friction slowing down through the plank's resonances) and drops back on
+    its hinge at 0.30 (a hollow knock, a low thump), then three arrows are
+    drawn out of it, at 0.42, 0.50 and 0.58: each the dry knock of its shaft
+    on the rim, its iron head's tick and the hiss of its fletching."""
+    dur = 0.85
+    creak = _creak(0.26, seed + 10, 38, 22, [(310, 1.0), (720, 0.6), (1650, 0.35)], t0=0.0, t1=0.24, jitter=0.2, tau=0.008)
+    creak = _norm(creak) * _swell(0.26, 0.08, a=1.0, b=1.2)
+    events = [(0.0, _flick(seed), FLICK), (0.06, creak, 0.55),
+              (0.30, _wood(0.35, 128, seed + 20, tau=0.06, click=0.4), 0.7),
+              (0.30, _thump(0.3, seed + 21, f0=140, f1=70, drop=0.02, tau=0.04, lp=500, noise=0.5), 0.45)]
+    r = rng(seed + 2)
+    for k, t0 in enumerate((0.42, 0.50, 0.58)):
+        shaft = _wood(0.12, r.uniform(520, 640), seed + 30 + k, tau=0.012, click=0.5)
+        tick = _iron(0.12, r.uniform(2400, 2900), seed + 40 + k, tau=0.02, count=4)
+        hiss = _norm(bandpass(white(0.07, seed + 50 + k), 5200, 0.9)) * _swell(0.07, 0.015, a=1.0, b=1.5)
+        events += [(t0, shaft, 0.4), (t0 + 0.004, tick, 0.18), (t0 - 0.02, hiss, 0.16)]
+    return _out(place(dur, events), 0.06)
+
+
+@sound("card_fate_dice", loudness=LOUD, wet=WET, marks=(0.0, 0.05, 0.27, 0.34))
+def card_fate_dice(seed):
+    """Dado del Destino: one bone die rolled across wood (first bounce 0.05,
+    bounces shrinking, tumbling, settling at 0.27), then fate is sealed at
+    0.34: a low D bell (D4, a bell's minor third) struck softly and a crystal
+    shimmer (A6) rising over it, beating slowly as it hangs."""
+    dur = 1.0
+    r = rng(seed + 1)
+    ev = [(0.05, 1.0), (0.1, 0.6), (0.14, 0.44), (0.172, 0.32), (0.198, 0.24)]
+    tt = 0.215
+    while tt < 0.255:
+        ev.append((tt, r.uniform(0.08, 0.18) * (1 - (tt - 0.21) / 0.1)))
+        tt += r.uniform(0.02, 0.032)
+    ev += [(0.27, 0.28), (0.281, 0.09)]
+    die = _clatter(dur, ev, [_die(seed + 40 + j, table=False) for j in range(4)], seed + 2)
+    table = _clatter(dur, ev, [_wood(0.1, b, seed + 50 + j, tau=0.009, click=0.25) for j, b in enumerate((180, 220, 265))],
+                     seed + 3)
+    seal = 0.34
+    bell = _bell(dur - seal, D4, seed + 30, _BELL_D, tau=0.32, attack=0.012, trem_rate=3.5, trem_depth=0.12, beat=0.8)
+    shimmer = _bell(dur - seal - 0.04, A6, seed + 31, _BELL_CLEAR[1:3], tau=0.22, attack=0.03, trem_rate=6.0,
+                    trem_depth=0.3, beat=2.0)
+    x = place(dur, [
+        (0.0, _flick(seed), FLICK),
+        (0.0, _norm(die), 0.5),
+        (0.0, _norm(table), 0.3),
+        (seal, bell, 0.62),
+        (seal + 0.04, shimmer, 0.14),
+    ])
+    return _out(x, 0.15)
+
+
+def _drop(dur, f0, rise, tau):
+    """A drop's tight plip, or a small bubble closing: a damped sine whose
+    pitch rises as it decays (sharp onset)."""
+    t = time_axis(dur)
+    f = f0 * (1 + rise * t / tau)
+    return np.sin(2 * np.pi * np.cumsum(f) / SR) * np.exp(-t / tau) * np.clip(t / 0.0008, 0, 1)
+
+
+@sound("card_venom_blade", loudness=LOUD, wet=WET, marks=(0.0, 0.07, 0.26, 0.36))
+def card_venom_blade(seed):
+    """Lama Velenosa: a dagger drawn from its leather sheath (a short bright
+    scrape from 0.07, the blade ringing free on D6), then poison runs down its
+    edge: a drip at 0.26 (a tight liquid plip) and a faint sizzle as the venom
+    bites the steel, two small bubbles closing from 0.36."""
+    dur = 0.75
+    draw_l = 0.14
+    draw = _norm(sweep_bandpass(white(draw_l, seed + 10), 2600, 5200, q=1.4)) * _swell(draw_l, 0.1, a=1.2, b=1.0)
+    leather = _norm(bandpass(pink(draw_l, seed + 11), 900, 0.9)) * _swell(draw_l, 0.04, a=1.0, b=2.0)
+    sizzle_l = 0.32
+    ts = time_axis(sizzle_l)
+    sizzle = crackle(sizzle_l, 900 * np.exp(-ts / 0.1) + 20, seed + 30, decay=0.0004)
+    sizzle = _norm(bandpass(sizzle, 4800, 0.8)) * _swell(sizzle_l, 0.03, a=1.0, b=1.6)
+    x = place(dur, [
+        (0.0, _flick(seed), FLICK),
+        (0.07, draw, 0.32),
+        (0.07, leather, 0.2),
+        (0.2, _steel(0.5, D6, seed + 20, tau=0.08), 0.36),
+        (0.26, _drop(0.08, 900, 0.9, 0.012), 0.42),
+        (0.27, sizzle, 0.14),
+        (0.36, _drop(0.06, 620, 0.12, 0.014), 0.2),
+        (0.41, _drop(0.06, 760, 0.12, 0.011), 0.16),
+    ])
+    return _out(x, 0.08)

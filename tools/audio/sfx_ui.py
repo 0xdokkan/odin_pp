@@ -710,6 +710,101 @@ def ui_status_slow(seed):
     return _finish(x, 0.03)
 
 
+# The player's charges (Phase 2)
+
+@sound("ui_status_deflect", loudness=-23, wet=0.3)
+def ui_status_deflect(seed):
+    """RIFLESSO ready: a polished buckler catches the light, two crystal
+    glints (D6, then A6 70 ms later, bright and short) over the ward's thin
+    open fifth (D5/A5) swelling and turning away, a breath of air."""
+    dur = 0.5
+    g1 = _crystal(_hz("D6"), 0.4, 0.09)
+    g2 = _crystal(_hz("A6"), 0.33, 0.07)
+    ward = _ward(dur, [_hz("D5"), _hz("A5")], [1.0, 0.6], seed, trem_rate=8.0, trem_depth=0.25)
+    ward = ward * _env(dur, [(0, 0), (0.08, 1), (0.25, 0.5), (0.48, 0)])
+    air = _norm(bandpass(pink(0.12, seed + 1), 5200, 1.0)) * _env(0.12, [(0, 0), (0.02, 1), (0.12, 0)])
+    x = place(dur, [(0.0, air, 0.1), (0.01, g1, 0.55), (0.08, g2, 0.45), (0.0, ward, 0.16)])
+    return _finish(x, 0.03)
+
+
+@sound("ui_status_arrows", loudness=-22, wet=0.2)
+def ui_status_arrows(seed):
+    """FRECCE in the quiver: three arrows slid home one after the other
+    (0.0, 0.08, 0.15): the swish of each fletching (soft paper grains,
+    4-8 kHz), the knock of its wooden shaft on the quiver's bottom (hardwood
+    modes, a little lower each time) and a tick of its iron head."""
+    dur = 0.45
+    r = rng(seed)
+    events = []
+    for k, t0 in enumerate((0.0, 0.08, 0.15)):
+        swish = _paper(0.06, sorted(0.04 * r.random(8)), seed + 10 + k, band=(4000, 8000), glen=(0.004, 0.012))
+        f = 610 * 0.93 ** k
+        knock = _modes(0.08, [(f, 0.012, 1.0), (f * 2.4, 0.007, 0.5), (f * 3.9, 0.004, 0.3)], attack=0.0003)
+        tick = _modes(0.03, [(r.uniform(3000, 3600), 0.005, 1.0), (r.uniform(4600, 5300), 0.003, 0.5)], attack=0.0002)
+        events += [(t0, swish, 0.25), (t0 + 0.035, knock, 0.6), (t0 + 0.036, tick, 0.18),
+                   (t0 + 0.035, _click(0.001, seed + 30 + k, lo=1800), 0.12)]
+    return _finish(place(dur, events), 0.03)
+
+
+@sound("ui_status_fate", loudness=-23, wet=0.3)
+def ui_status_fate(seed):
+    """DESTINO loaded: a bone die ticks twice in the hand (tiny stiff modes),
+    then a low bell of fate is touched (D4, minor tierce, soft attack) under a
+    violet shimmer of the ward (A5/D6, slowly beating), fading."""
+    dur = 0.6
+    r = rng(seed)
+    events = []
+    for k, t0 in enumerate((0.0, 0.055)):
+        die = _modes(0.04, [(r.uniform(2600, 3300), 0.006, 1.0), (r.uniform(4300, 5100), 0.004, 0.7),
+                            (r.uniform(6300, 7400), 0.003, 0.45)], attack=0.0001)
+        events += [(t0, die, 0.45 * (1 - 0.3 * k)), (t0, _click(0.0008, seed + 10 + k, lo=2500), 0.15)]
+    bell = _bell(_hz("D4"), 0.52, 0.22, attack=0.01, beat=0.3, hum=0.6, bright=0.5)
+    shimmer = _ward(0.5, [_hz("A5"), _hz("D6")], [1.0, 0.5], seed + 1, trem_rate=4.0, trem_depth=0.35)
+    shimmer = shimmer * _env(0.5, [(0, 0), (0.12, 1), (0.3, 0.6), (0.5, 0)])
+    events += [(0.09, bell, 0.5), (0.1, shimmer, 0.14)]
+    return _finish(place(dur, events), 0.04)
+
+
+def _bubble(f0, rise, tau):
+    """A small bubble closing (Minnaert-like): a damped sine whose pitch
+    rises as it decays."""
+    tb = time_axis(tau * 5)
+    f = f0 * (1 + rise * tb / tau)
+    return np.sin(2 * np.pi * np.cumsum(f) / SR) * _expdecay(tau * 5, tau, 0.0008)
+
+
+@sound("ui_status_venom_blade", loudness=-22, wet=0.2)
+def ui_status_venom_blade(seed):
+    """LAMA poisoned: a blade's thin ting (a short steel ring on Eb6) and the
+    venom slicking it: a drop's plip and two small bubbles closing over a
+    sickly tone falling A5 -> Eb5."""
+    dur = 0.5
+    t = time_axis(dur)
+    f = _hz("Eb6")
+    ting = _modes(0.35, [(f, 0.08, 1.0), (f * 1.506, 0.05, 0.5), (f * 2.17, 0.03, 0.3), (f * 2.63, 0.02, 0.2)], attack=0.0002)
+    u = np.clip((t - 0.12) / 0.3, 0, 1)
+    sick = sine(_hz("A5") * (_hz("Eb5") / _hz("A5")) ** u, n=len(t)) * _env(dur, [(0, 0), (0.12, 0), (0.18, 1), (0.45, 0)])
+    events = [(0.0, ting, 0.4), (0.0, _click(0.0008, seed, lo=3000), 0.12), (0.12, _bubble(950, 0.9, 0.011), 0.45),
+              (0.22, _bubble(640, 0.1, 0.014), 0.3), (0.28, _bubble(780, 0.1, 0.012), 0.24), (0.0, sick, 0.05)]
+    return _finish(place(dur, events), 0.03)
+
+
+@sound("ui_fate_die", loudness=-22, wet=0.25)
+def ui_fate_die(seed):
+    """The Dado del Destino rolled at a bump: a bone die bounces on stone
+    (bright stiff modes, each bounce lower and quieter, the stone answering)
+    and lands with a soft crystal ping of the mode (D6)."""
+    dur = 0.4
+    r = rng(seed)
+    events = []
+    for k, (t0, g) in enumerate(((0.0, 1.0), (0.055, 0.6), (0.095, 0.38), (0.12, 0.22))):
+        die = _modes(0.04, [(r.uniform(2700, 3300) * 0.97 ** k, 0.005, 1.0), (r.uniform(4400, 5200), 0.0035, 0.6)],
+                     attack=0.0001)
+        events += [(t0, die, 0.5 * g), (t0, _stone(0.03, seed + 10 + k, lo=500, hi=2600, count=6, decay=0.004), 0.25 * g)]
+    events.append((0.15, _crystal(_hz("D6"), 0.25, 0.06), 0.2))
+    return _finish(place(dur, events), 0.03)
+
+
 @sound("ui_status_expired", loudness=-28, wet=0.2)
 def ui_status_expired(seed):
     """A soft fading puff: pink noise whose lowpass closes 3 kHz -> 500 Hz as

@@ -83,7 +83,7 @@ test_dice_patterns_count_all_successes_pairs_and_reject_invalid_inputs :: proc(t
 	for id in 0..<int(Card_Id.Count) {
 		card_id := Card_Id(id)
 		expected := 0
-		if card_id == .Fate_Strike || card_id == .Shock_Floor { expected = 1 }
+		if card_id == .Fate_Strike || card_id == .Shock_Floor || card_id == .Fate_Dice || card_id == .Venom_Blade { expected = 1 }
 		if card_id == .Sundering_Blow || card_id == .Twin_Venom { expected = 2 }
 		if card_id == .Prismatic_Barrage { expected = 3 }
 		testing.expect_value(t, card_dice_count(card_id), expected)

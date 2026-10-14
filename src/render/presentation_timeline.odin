@@ -11,6 +11,8 @@ MAX_PRESENTATION_CUES :: game.MAX_GAME_EVENTS
 MAX_PRESENTATION_LOOT :: game.MAX_ENEMIES_PER_ROOM*3
 MAX_PRESENTATION_TRAPS :: game.MAX_TRAPS_PER_ROOM
 MAX_PRESENTATION_GRID_OBJECTS :: game.MAX_GRID_OBJECTS_PER_ROOM
+// One bit a cell of the largest level: the pools on its floor.
+MAX_PRESENTATION_GROUND_CELLS :: level.MAX_GENERATED_ROOM_DIMENSION*level.MAX_GENERATED_ROOM_DIMENSION
 
 // Values above one slow every cue while preserving their relative rhythm.
 PRESENTATION_TIME_SCALE           :: f32(1.35)
@@ -33,6 +35,9 @@ PRESENTATION_PULSE_DURATION       :: f32(0.06)*PRESENTATION_TIME_SCALE
 // Movimento Ombra: the player sinking into his shadow, and rising from it.
 PRESENTATION_SHADOW_SINK_DURATION :: f32(0.2)*PRESENTATION_TIME_SCALE
 PRESENTATION_SHADOW_RISE_DURATION :: f32(0.25)*PRESENTATION_TIME_SCALE
+// DADO DEL DESTINO: its die at the struck foe, as the blow lands (its paper
+// token stays a while longer: player_charges.odin).
+PRESENTATION_FATE_DURATION :: f32(0.24)*PRESENTATION_TIME_SCALE
 PRESENTATION_MAX_SEQUENCE_DURATION :: f32(12.0)
 PRESENTATION_TIME_EPSILON         :: f32(0.00001)
 
@@ -73,6 +78,9 @@ Presentation_Cue_Kind :: enum {
 	Spell_Impact,
 	Shadow_Entered,
 	Shadow_Emerged,
+	// RIFLESSO and the Dado del Destino's die (game.Game_Event_Kind).
+	Attack_Deflected,
+	Fate_Rolled,
 }
 
 Presentation_Actor :: struct {
@@ -107,6 +115,15 @@ Presentation_Grid_Object :: struct {
 	device_armed: bool,
 }
 
+// The pools and fires on the floor as the board shows them (game/ground.odin):
+// a bit a pool's cell, row-major, `width` cells a row; the fires as they stand.
+Presentation_Ground :: struct {
+	width: int,
+	pool: [MAX_PRESENTATION_GROUND_CELLS/64]u64,
+	fires: [game.MAX_GROUND_FIRES]game.Ground_Fire,
+	fire_count: int,
+}
+
 Room_Presentation :: struct {
 	tactical: bool,
 	phase:       game.Room_Phase,
@@ -127,6 +144,8 @@ Room_Presentation :: struct {
 	object_count: int,
 	loot:        [MAX_PRESENTATION_LOOT]Presentation_Loot,
 	loot_count:  int,
+	// Shown from a pool's or a fire's landing (start_presentation_cue).
+	ground:      Presentation_Ground,
 	gold:        i32,
 	pulse_count: u64,
 	valid:       bool,
@@ -153,6 +172,10 @@ Presentation_Timeline :: struct {
 	update_failures: int,
 	view:           Room_Presentation,
 	final_view:     Room_Presentation,
+	// The stacks of the player's charges his blow spent, as it found them
+	// (sync_presentation_player_charges_from_final; 0: none spent): the board
+	// keeps them on show until the blow lands (hold_unlanded_blows).
+	charges_before: [game.Status_Kind]i32,
 }
 
 presentation_position :: proc(position: grid.Position) -> view.Vec2 {
@@ -223,6 +246,7 @@ capture_room_presentation :: proc(room: ^game.Room) -> (result: Room_Presentatio
 		}
 	}
 
+	result.dropped += capture_presentation_ground(room, &result.ground)
 	result.loot_count = min(len(room.loot), MAX_PRESENTATION_LOOT)
 	result.dropped += max(0, len(room.loot)-result.loot_count)
 	for index in 0..<result.loot_count {
@@ -233,6 +257,40 @@ capture_room_presentation :: proc(room: ^game.Room) -> (result: Room_Presentatio
 			amount = item.amount,
 			visible = true,
 		}
+	}
+	return
+}
+
+// The room's ground into `ground`; the pool cells it had no bit for.
+capture_presentation_ground :: proc(room: ^game.Room, ground: ^Presentation_Ground) -> (dropped: int) {
+	ground^ = {}
+	if room == nil || room.level_data == nil { return }
+	ground.width = room.level_data.tiles.width
+	for value, index in room.ground.pool {
+		if value <= 0 { continue }
+		if index >= MAX_PRESENTATION_GROUND_CELLS { dropped += 1; continue }
+		ground.pool[index/64] |= u64(1)<<u64(index%64)
+	}
+	ground.fire_count = min(room.ground.fire_count, len(ground.fires))
+	copy(ground.fires[:], room.ground.fires[:ground.fire_count])
+	return
+}
+
+// Whether `cell` is a pool's in the shown ground.
+presentation_ground_pool :: proc(ground: ^Presentation_Ground, cell: grid.Position) -> bool {
+	if ground == nil || cell.x < 0 || cell.y < 0 || cell.x >= ground.width || ground.width <= 0 { return false }
+	index := cell.y*ground.width+cell.x
+	return index < MAX_PRESENTATION_GROUND_CELLS && ground.pool[index/64]&(u64(1)<<u64(index%64)) != 0
+}
+
+// The strongest shown fire on `cell` (0: none), and whether it is a fire's centre.
+presentation_ground_burn :: proc(ground: ^Presentation_Ground, cell: grid.Position) -> (burn: i32, centre: bool, last: bool) {
+	if ground == nil { return }
+	for fire in ground.fires[:ground.fire_count] {
+		if !game.ground_fire_covers(fire, cell) { continue }
+		burn = max(burn, fire.burn)
+		centre = centre || fire.center == cell
+		last = last || fire.stage >= game.GROUND_FIRE_STAGES
 	}
 	return
 }
@@ -399,6 +457,10 @@ presentation_cue_kind :: proc(event: game.Game_Event) -> Presentation_Cue_Kind {
 		return .Shadow_Entered
 	case .Shadow_Emerged:
 		return .Shadow_Emerged
+	case .Attack_Deflected:
+		return .Attack_Deflected
+	case .Fate_Rolled:
+		return .Fate_Rolled
 	}
 	unreachable()
 }
@@ -457,6 +519,11 @@ presentation_cue_duration :: proc(kind: Presentation_Cue_Kind, event: game.Game_
 		return PRESENTATION_SHADOW_SINK_DURATION
 	case .Shadow_Emerged:
 		return PRESENTATION_SHADOW_RISE_DURATION
+	// The blow RIFLESSO turns back is still a blow.
+	case .Attack_Deflected:
+		return PRESENTATION_DAMAGE_DURATION
+	case .Fate_Rolled:
+		return PRESENTATION_FATE_DURATION
 	}
 	unreachable()
 }
@@ -874,6 +941,24 @@ sync_presentation_poison_from_final :: proc(timeline: ^Presentation_Timeline, ac
 	}
 }
 
+// The player's charges his own blow spends (a bump's Lama and Destino, an
+// arrow) wear without an event of their own: at the blow, they take the final
+// view's stacks, and what they were is kept in charges_before. A last one spent
+// is left for its Status_Expired to remove.
+sync_presentation_player_charges_from_final :: proc(timeline: ^Presentation_Timeline) {
+	if timeline == nil || !timeline.final_view.valid { return }
+	shown, final := &timeline.view.player.statuses, &timeline.final_view.player.statuses
+	for kind in game.Status_Kind {
+		if !game.status_kind_is_player_charge(kind) { continue }
+		index, carried := game.status_index(shown, kind)
+		if !carried { continue }
+		final_index, kept := game.status_index(final, kind)
+		if !kept { continue }
+		if shown.items[index].potency != final.items[final_index].potency { timeline.charges_before[kind] = shown.items[index].potency }
+		shown.items[index].potency = final.items[final_index].potency
+	}
+}
+
 apply_presentation_trap_triggered :: proc(
 	timeline: ^Presentation_Timeline,
 	event: game.Game_Event,
@@ -940,8 +1025,13 @@ start_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^Presentat
 		}
 	case .Spell_Launched, .Spell_Impact:
 		if event.card_definition != .Firebomb && event.card_definition != .Chain_Lightning &&
-		   game.card_dice_count(event.card_definition) == 0 && !game.card_is_board_device(event.card_definition) {
+		   game.card_dice_count(event.card_definition) == 0 && !game.card_is_board_device(event.card_definition) &&
+		   !game.card_places_ground(event.card_definition) {
 			timeline.update_failures += 1
+		}
+		// A pool or a fire is on the floor from its landing on.
+		if cue.kind == .Spell_Impact && game.card_places_ground(event.card_definition) && timeline.final_view.valid {
+			timeline.view.ground = timeline.final_view.ground
 		}
 	case .Room_Hazard_Triggered:
 		timeline.view.modifier.activation_pulse = event.pulse_count
@@ -984,6 +1074,7 @@ start_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^Presentat
 			object.device_armed = true
 		}
 	case .Damage:
+		if event.source == game.PLAYER_ENTITY && game.event_is_attack(event) { sync_presentation_player_charges_from_final(timeline) }
 		if has_actor {
 			actor.health = max(i32(0), actor.health-max(i32(0), event.amount))
 			if event.has_status_cause && event.status_cause == .Poison { sync_presentation_poison_from_final(timeline, actor) }
@@ -993,6 +1084,7 @@ start_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^Presentat
 			timeline.update_failures += 1
 		}
 	case .Damage_Absorbed:
+		if event.source == game.PLAYER_ENTITY && game.event_is_attack(event) { sync_presentation_player_charges_from_final(timeline) }
 		if has_actor {
 			if index, found := game.status_index(&actor.statuses, .Shield); found {
 				actor.statuses.items[index].potency =
@@ -1086,7 +1178,15 @@ start_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^Presentat
 		if event.statuses_advanced && !sync_presentation_statuses_from_final(timeline) {
 			timeline.update_failures += 1
 		}
-	case .Attack_Missed, .Move_Blocked,
+	case .Fate_Rolled:
+		// One die of the ladder, rolled by the player's own bump.
+		roll := event.dice_roll
+		if !game.validate_dice_roll(&roll) || roll.count != 1 || event.source != game.PLAYER_ENTITY ||
+		   event.duration < 0 || event.duration > i32(max(game.Fate_Outcome)) {
+			timeline.update_failures += 1
+		}
+		sync_presentation_player_charges_from_final(timeline)
+	case .Attack_Missed, .Move_Blocked, .Attack_Deflected,
 	     .Binding_Added, .Binding_Exhausted, .Binding_Expired, .Shadow_Entered, .Shadow_Emerged:
 	}
 }
@@ -1127,7 +1227,7 @@ update_active_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^P
 	     .Move_Blocked, .Gold_Gained, .Energy_Gained, .Binding_Added, .Binding_Exhausted,
 	     .Binding_Expired, .Pulse_Advanced, .Object_Spawned, .Explosive_Armed,
 	     .Explosive_Disarmed, .Explosion, .Room_Hazard_Triggered, .Dice_Rolled, .Spell_Launched, .Spell_Impact,
-	     .Shadow_Entered, .Shadow_Emerged:
+	     .Shadow_Entered, .Shadow_Emerged, .Attack_Deflected, .Fate_Rolled:
 	}
 }
 

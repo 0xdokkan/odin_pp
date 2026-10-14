@@ -1712,6 +1712,9 @@ roguelike_draw :: proc(data: rawptr, hf: ^host.Frame) {
 			render.update_object_target_hover(&rs.iso_renderer, &rs.room, rs.mouse_canvas, active_card_id)
 		}
 		if rs.options.tactical.enabled {
+			// FERETRO's aim shows while a click would loose an arrow.
+			rs.iso_renderer.tactical.arrow_aim = arrows_aiming(&rs.room) && !rs.m8_modal && !rs.timeline_busy &&
+				game.tactical_allows_action(&rs.room) && !game.tactical_player_busy(&rs.room)
 			render.update_tactical_view(&rs.iso_renderer, &rs.room, rs.mouse_canvas, false, true)
 			render.draw_tactical_world(&rs.iso_renderer, &rs.room, active_card_id)
 		} else {

@@ -45,6 +45,14 @@ Game_Event_Kind :: enum {
 	// for `duration` seconds; he rises again at to_position.
 	Shadow_Entered,
 	Shadow_Emerged,
+	// RIFLESSO (player_charges.odin): an enemy blow that would have hit the
+	// player is turned back at its attacker. The attacker's own event, marked
+	// as its blow (mark_attack_events); `amount` is what goes back to it.
+	Attack_Deflected,
+	// DADO DEL DESTINO: a loaded bump's die (dice_roll), rolled as the blow
+	// lands on `target`; `duration` is its Fate_Outcome, `amount` the stacks it
+	// left or the life it stole.
+	Fate_Rolled,
 }
 
 Game_Event :: struct {
@@ -107,6 +115,14 @@ event_is_teleport :: proc(event: Game_Event) -> bool {
 EVENT_ATTACK_BIT :: u16(1)<<13
 EVENT_RANGED_BIT :: u16(1)<<12
 EVENT_FOOTPRINT_BITS :: u16(0x1ff)
+// The bit below them marks the blow RIFLESSO gives back: the attacker's own
+// bolt flying home (the board turns that bolt round instead of loosing one of
+// the player's), or the player's riposte to a swing.
+EVENT_REFLECTED_BIT :: u16(1)<<11
+
+event_is_reflected :: proc(event: Game_Event) -> bool {
+	return event.area_mask&EVENT_REFLECTED_BIT != 0
+}
 
 event_is_attack :: proc(event: Game_Event) -> bool {
 	return event.area_mask&EVENT_ATTACK_BIT != 0
@@ -125,22 +141,23 @@ event_footprint_bit :: proc(center, cell: grid.Position) -> (bit: u16, ok: bool)
 }
 
 // Marks one blow's own events in `log`, from `first` on: the attacker's
-// Damage_Absorbed on `target`, then its Damaged, Explosive_Armed or
-// Attack_Missed, where the marking stops. The reactions and pushes that follow
-// keep their own events, unmarked, and so does damage with a status cause.
+// Damage_Absorbed on `target`, then its Damaged, Explosive_Armed,
+// Attack_Missed or Attack_Deflected, where the marking stops. The reactions and
+// pushes that follow keep their own events, unmarked, and so does damage with
+// a status cause. `reflected` marks the blow RIFLESSO gives back.
 mark_attack_events :: proc(log: ^Event_Log, first: int, source, target: Entity_Ref,
-	origin, aim: grid.Position, cells: []grid.Position, ranged: bool) {
+	origin, aim: grid.Position, cells: []grid.Position, ranged: bool, reflected := false) {
 	if log == nil { return }
 	// The aim is always swept, whatever else is.
 	centre, _ := event_footprint_bit(aim, aim)
-	mask := EVENT_ATTACK_BIT|(EVENT_RANGED_BIT if ranged else 0)|centre
+	mask := EVENT_ATTACK_BIT|(EVENT_RANGED_BIT if ranged else 0)|(EVENT_REFLECTED_BIT if reflected else 0)|centre
 	for cell in cells {
 		if bit, ok := event_footprint_bit(aim, cell); ok { mask |= bit }
 	}
 	for &event in log.events[clamp(first, 0, log.count):log.count] {
 		if event.source != source || event.target != target || event.has_status_cause { continue }
 		#partial switch event.kind {
-		case .Damage_Absorbed, .Damaged, .Explosive_Armed, .Attack_Missed:
+		case .Damage_Absorbed, .Damaged, .Explosive_Armed, .Attack_Missed, .Attack_Deflected:
 		case: continue
 		}
 		event.from_position, event.to_position = origin, aim

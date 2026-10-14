@@ -151,6 +151,33 @@ test_lab_sounds_of_cards_and_devices :: proc(t: ^testing.T) {
 	testing.expect(t, s.queue[s.count-1].at > s.queue[s.count-2].at)
 }
 
+// The charges' sounds wait for their blow: the Dado del Destino's die is
+// heard as it shows, when the bump lands; RIFLESSO rings as the bolt it turns
+// back reaches the player.
+@(test)
+test_lab_sounds_of_the_charges_wait_for_their_blow :: proc(t: ^testing.T) {
+	snapshot: Room_Presentation
+	renderer := attack_test_renderer(&snapshot)
+	defer attack_test_free(renderer)
+	foe := game.enemy_entity(1)
+	now := f64(5)
+	renderer.sprite_assets.elapsed = now
+	_, swung := play_attack_swing(renderer, game.PLAYER_ENTITY, foe, .Lantern, {2, 1})
+	landing, pending := attack_fx_landing_in(renderer, foe, now, game.PLAYER_ENTITY)
+	testing.expect(t, swung && pending && landing > 0)
+	s: Lab_Sounds
+	impacts := 0
+	fate := Presentation_Cue{kind = .Fate_Rolled, started = true, event = {kind = .Fate_Rolled, source = game.PLAYER_ENTITY, target = foe}}
+	lab_cue_sounds(renderer, &s, &fate, now, &impacts)
+	testing.expect(t, s.count == 1 && s.queue[0].sfx == .Ui_Fate_Die && abs(s.queue[0].at-(now+landing)) < 1e-9)
+	archer := game.enemy_entity(2)
+	_, flight, shot := play_attack_projectile(renderer, archer, game.PLAYER_ENTITY, .Bolt, {2, 2})
+	testing.expect(t, shot && flight > 0)
+	turned := Presentation_Cue{kind = .Attack_Deflected, started = true, event = {kind = .Attack_Deflected, source = archer, target = game.PLAYER_ENTITY}}
+	lab_cue_sounds(renderer, &s, &turned, now, &impacts)
+	testing.expect(t, s.count == 2 && s.queue[1].sfx == .Pilgrim_Deflect && abs(s.queue[1].at-(now+flight)) < 1e-6)
+}
+
 // A world cue with a sound of its own (a miss, energy...) still showing when
 // the player sinks into his shadow is held with the world for the card and
 // the four seconds, longer than a cue is remembered: it is heard once, not

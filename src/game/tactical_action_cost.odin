@@ -6,13 +6,16 @@ TACTICAL_MOVE_SECONDS :: f32(1)
 TACTICAL_ATTACK_SECONDS :: f32(1)
 TACTICAL_DODGE_SECONDS :: f32(1)
 TACTICAL_REFOCUS_SECONDS :: f32(2)
+// One arrow of Feretro (shoot_player_arrow), like a bump.
+TACTICAL_ARROW_SECONDS :: f32(1)
 
 tactical_card_time_cost :: proc(id: Card_Id) -> f32 {
 	switch id {
 	case .Guard, .Thorn_Coat, .Afterimage, .Counter_Rune, .Battle_Focus,
-	     .Calculated_Risk, .Spark_Forge, .Spark, .Purifying_Guard, .Volatile_Study, .Sei_Denari, .Sette_Denari:
+	     .Calculated_Risk, .Spark_Forge, .Spark, .Purifying_Guard, .Volatile_Study, .Sei_Denari, .Sette_Denari,
+	     .Poison_Pool, .Deflect, .Coffin, .Fate_Dice, .Venom_Blade:
 		return 1
-	case .Strike, .Arc_Bolt, .Shove, .Dash, .Grappling_Hook, .Venom_Needle, .Fate_Strike, .Tesla_Coil:
+	case .Strike, .Arc_Bolt, .Shove, .Dash, .Grappling_Hook, .Venom_Needle, .Fate_Strike, .Tesla_Coil, .Wildfire:
 		return 2
 	case .Piercing_Ray, .Cross_Slash, .Heavy_Blow, .Sundering_Blow, .Twin_Venom, .Shock_Floor, .Titan_Grip:
 		return 3

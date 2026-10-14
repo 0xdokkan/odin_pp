@@ -15,6 +15,8 @@ Gameplay_Command_Kind :: enum {
 	Timeout, Continue_Pulse, Begin_Diagonal, QTE_Key, QTE_Fail, Defense,
 	// Movimento Ombra's time is up: the player rises at the shadow's cell.
 	Shadow_Emerge,
+	// FERETRO: an arrow loosed at `target` (Ctrl and a left click on a foe).
+	Shoot,
 }
 
 Gameplay_Command :: struct {
@@ -52,7 +54,7 @@ gameplay_command_is_valid :: proc(command: Gameplay_Command) -> bool {
 	case .Activate:
 		return command.origin_phase == .Combat
 	case .Dodge, .Wait, .Ability, .Play_Card, .Refocus, .Timeout, .Continue_Pulse, .Begin_Diagonal, .QTE_Key, .QTE_Fail, .Defense,
-	     .Shadow_Emerge:
+	     .Shadow_Emerge, .Shoot:
 		return command.origin_phase == .Combat
 	}
 	unreachable()

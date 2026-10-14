@@ -60,6 +60,12 @@ Card_Id :: enum {
 	Sei_Denari,
 	Sette_Denari,
 	Shadow_Step,
+	Poison_Pool,
+	Wildfire,
+	Deflect,
+	Coffin,
+	Fate_Dice,
+	Venom_Blade,
 	Count,
 }
 
@@ -70,14 +76,23 @@ card_is_scopa :: proc(id: Card_Id) -> bool {
 }
 
 // Movimento Ombra stops the tactical clock, which classic combat does not
-// have: classic runs never offer it, and refuse to play it.
+// have; a pool and a fire live on the tactical board's ground and windows
+// (ground.odin); the player's charges load the tactical blows, arrows and
+// windows (player_charges.odin): classic runs never offer them, and refuse to
+// play them.
 card_requires_tactical :: proc(id: Card_Id) -> bool {
-	return id == .Shadow_Step
+	return id == .Shadow_Step || card_places_ground(id) || card_loads_player_charge(id)
+}
+
+// Deflect, Feretro, Dado del Destino and Lama Velenosa: each loads one of the
+// player's charges (status.odin) and nothing else.
+card_loads_player_charge :: proc(id: Card_Id) -> bool {
+	return id == .Deflect || id == .Coffin || id == .Fate_Dice || id == .Venom_Blade
 }
 
 // The dice cards and how many dice each rolls (dice.odin: roll_card_dice).
 card_dice_count :: proc(id: Card_Id) -> int {
-	if id == .Fate_Strike || id == .Shock_Floor { return 1 }
+	if id == .Fate_Strike || id == .Shock_Floor || id == .Fate_Dice || id == .Venom_Blade { return 1 }
 	if id == .Sundering_Blow || id == .Twin_Venom { return 2 }
 	if id == .Prismatic_Barrage { return 3 }
 	return 0
@@ -885,6 +900,63 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 		effects = {{kind = .Enter_Shadow, target = .Player, base_amount = 4}, {}, {}, {}},
 		effect_count = 1,
 	},
+	{
+		// A pool of poison on a free cell for the rest of the room: Veleno 2 (+1
+		// per upgrade) to an enemy for each of its cells it enters; the areas
+		// pools close fill by themselves (ground.odin).
+		id = .Poison_Pool, name = "Pozza di Veleno", rarity = .Common,
+		reward_weight = 85, shop_base_price = 4, cost = 1,
+		targeting = {rule = .Walkable_Cell, cast_range = {.Chebyshev, 1, 3}, shape = .Single, requires_line_of_sight = true, stops_on_wall = true},
+		effects = {{kind = .Place_Ground, target = .Player, base_amount = 2, amount_per_upgrade = 1, status = .Poison}, {}, {}, {}},
+		effect_count = 1,
+	},
+	{
+		// A fire on a free cell that grows as a plus at each new window and goes
+		// out at the fifth: Bruciatura 1 (+1 per upgrade) to an enemy entering a
+		// burning cell, or standing where it catches (ground.odin).
+		id = .Wildfire, name = "Incendio", rarity = .Uncommon,
+		reward_weight = 75, shop_base_price = 6, cost = 2,
+		targeting = {rule = .Walkable_Cell, cast_range = {.Chebyshev, 1, 3}, shape = .Single, requires_line_of_sight = true, stops_on_wall = true},
+		effects = {{kind = .Place_Ground, target = .Player, base_amount = 1, amount_per_upgrade = 1, status = .Burn}, {}, {}, {}},
+		effect_count = 1,
+	},
+	{
+		// RIFLESSO: the next enemy blow that would hit the player goes back to
+		// its attacker (player_charges.odin). Each play adds a charge; no upgrade.
+		id = .Deflect, name = "Deflect", rarity = .Uncommon,
+		reward_weight = 80, shop_base_price = 5, cost = 1,
+		targeting = {rule = .Self},
+		effects = {{kind = .Apply_Status, target = .Player, base_amount = 1, status = .Deflect}, {}, {}, {}},
+		effect_count = 1,
+	},
+	{
+		// FRECCE: three arrows (+1 per upgrade), loosed with Ctrl and a click on
+		// a foe in the line of fire (shoot_player_arrow). Plays add up.
+		id = .Coffin, name = "Feretro", rarity = .Uncommon,
+		reward_weight = 75, shop_base_price = 6, cost = 2,
+		targeting = {rule = .Self},
+		effects = {{kind = .Apply_Status, target = .Player, base_amount = 3, amount_per_upgrade = 1, status = .Arrows}, {}, {}, {}},
+		effect_count = 1,
+	},
+	{
+		// DESTINO: the next three bumps each roll the card's die at the hit
+		// (player_bump); a new play loads them back to three. A dice card: its
+		// upgrades climb the die.
+		id = .Fate_Dice, name = "Dado del Destino", rarity = .Rare,
+		reward_weight = 60, shop_base_price = 8, cost = 2,
+		targeting = {rule = .Self},
+		effects = {{kind = .Apply_Status, target = .Player, base_amount = FATE_DICE_CHARGES, status = .Fate}, {}, {}, {}},
+		effect_count = 1,
+	},
+	{
+		// LAMA: its die, rolled as it is played, is how many bumps it poisons
+		// (resolve_loading_card); the template's one stands for that roll.
+		id = .Venom_Blade, name = "Lama Velenosa", rarity = .Common,
+		reward_weight = 85, shop_base_price = 4, cost = 1,
+		targeting = {rule = .Self},
+		effects = {{kind = .Apply_Status, target = .Player, base_amount = 1, status = .Venom_Blade}, {}, {}, {}},
+		effect_count = 1,
+	},
 }
 
 card_drop_target :: proc(
@@ -967,6 +1039,11 @@ card_effect_template_is_valid :: proc(
 	case .Enter_Shadow:
 		return template.target == .Player && definition.targeting.rule == .Self &&
 		       template.amount_per_upgrade == 0 && card_amount_template_is_valid(template)
+	case .Place_Ground:
+		// Its stacks are given on entry: no duration.
+		return template.target == .Player && definition.targeting.rule == .Walkable_Cell &&
+		       definition.targeting.shape == .Single && ground_kind_is_valid(template.status) &&
+		       template.duration == 0 && card_amount_template_is_valid(template)
 	case .Deploy_Device:
 		return template.target == .Player && definition.targeting.rule == .Walkable_Cell &&
 		       board_device_kind(template.object_kind) && card_amount_template_is_valid(template)
@@ -987,9 +1064,11 @@ card_effect_template_is_valid :: proc(
 		return template.target == .Player && template.has_card_definition && found &&
 		       card_amount_template_is_valid(template)
 	case .Apply_Status:
-		// Stacks carry no duration; every other status needs one.
+		// Stacks carry no duration; every other status needs one. The player's
+		// charges go to the player alone.
 		return status_kind_is_valid(template.status) &&
 		       (template.duration == 0 if status_kind_stacks(template.status) else template.duration > 0) &&
+		       (!status_kind_is_player_charge(template.status) || template.target == .Player) &&
 		       card_amount_template_is_valid(template)
 	case .Add_Reaction_Binding:
 		if template.charges != REACTION_BINDING_UNLIMITED && template.charges <= 0 {
@@ -1171,6 +1250,8 @@ instantiate_card_effect :: proc(
 		return deploy_device_effect(template.object_kind, {}, card_effect_amount(template, instance.upgrade_level)), true
 	case .Enter_Shadow:
 		return enter_shadow_effect(card_effect_amount(template, instance.upgrade_level)), true
+	case .Place_Ground:
+		return place_ground_effect({}, template.status, card_effect_amount(template, instance.upgrade_level)), true
 	case .Move, .Gain_Energy:
 			return {}, false
 	}
@@ -1358,6 +1439,11 @@ evaluate_card_targeting :: proc(
 	}
 
 	if card_is_board_device(instance.definition_id) && !board_device_can_deploy(room, definition.effects[0].object_kind, evaluation.query.anchor) {
+		evaluation.error = .Target_Blocked
+		return
+	}
+	// A pool or a fire needs a free cell: no enemy, object or player on it.
+	if card_places_ground(instance.definition_id) && !ground_can_place(room, definition.effects[0].status, evaluation.query.anchor) {
 		evaluation.error = .Target_Blocked
 		return
 	}
@@ -1559,7 +1645,7 @@ compile_card_action :: proc(
 		effect_target, has_target := card_effect_target(template.target, target)
 		assert(has_target)
 		effect, instantiated := instantiate_card_effect(template, effect_target, instance)
-		if effect.kind == .Deploy_Device { effect.destination = evaluation.query.anchor }
+		if effect.kind == .Deploy_Device || effect.kind == .Place_Ground { effect.destination = evaluation.query.anchor }
 		if instance.definition_id == .Strike && effect.kind == .Damage { effect.amount += tactical_strike_bonus(room, effect_target) }
 		if !instantiated {
 			return {}, .Invalid_Definition

@@ -3,18 +3,22 @@ package render
 import "core:testing"
 import game "../game"
 
-// The icon atlas grew a fifth row (tools/art/build_card_icons.py): Movimento
-// Ombra has its own icon there, every other card keeps its painted one, and
-// the painted cells are cut where they always were.
+// The icon atlas grew a fifth and a sixth row (tools/art/build_card_icons.py):
+// Movimento Ombra and the cards of Phase 2 have their own icons there, every
+// other card keeps its painted one, and the painted cells are cut where they
+// always were.
 @(test)
-test_card_icons_add_a_row_without_moving_the_painted_cells :: proc(t: ^testing.T) {
-	testing.expect_value(t, gothic_card_icon(.Shadow_Step), 16)
+test_card_icons_add_rows_without_moving_the_painted_cells :: proc(t: ^testing.T) {
+	added := [?]game.Card_Id{.Shadow_Step, .Poison_Pool, .Wildfire, .Deflect, .Coffin, .Fate_Dice, .Venom_Blade}
+	for id, index in added { testing.expect_value(t, gothic_card_icon(id), 16+index) }
 	for id in game.Card_Id {
-		if id == .Count || id == .Shadow_Step { continue }
+		own := id == .Count
+		for card in added { own = own || card == id }
+		if own { continue }
 		testing.expect(t, gothic_card_icon(id) >= 0 && gothic_card_icon(id) < 16)
 	}
 	art: Gothic_Art
-	testing.expect(t, 16 < CARD_ICON_CELLS && CARD_ICON_CELLS == len(art.icon_sources))
+	testing.expect(t, 16+len(added) <= CARD_ICON_CELLS && CARD_ICON_CELLS == len(art.icon_sources))
 	// The atlas as embedded: its PNG header gives its size.
 	png := #load("../../assets/gothic/card-icons-pixel.png")
 	be32 :: proc(b: []u8) -> int { return int(b[0])<<24 | int(b[1])<<16 | int(b[2])<<8 | int(b[3]) }
@@ -27,7 +31,13 @@ test_card_icons_add_a_row_without_moving_the_painted_cells :: proc(t: ^testing.T
 		old_left, old_top, old_right, old_bottom := gothic_atlas_cell(cell, 4, width, painted)
 		testing.expect(t, left == old_left && top == old_top && right == old_right && bottom == old_bottom)
 	}
-	// The added cell sits wholly under the painted sheet.
-	_, top, _, bottom := gothic_atlas_cell(16, CARD_ICON_ROWS, width, height)
-	testing.expect(t, top == painted && bottom == height)
+	// The added cells sit wholly under the painted sheet, the first right
+	// under it and the last row down to the atlas's bottom.
+	for cell in 16..<CARD_ICON_CELLS {
+		_, top, _, bottom := gothic_atlas_cell(cell, CARD_ICON_ROWS, width, height)
+		testing.expect(t, top >= painted && bottom <= height && bottom-top >= 313)
+	}
+	_, first, _, _ := gothic_atlas_cell(16, CARD_ICON_ROWS, width, height)
+	_, _, _, last := gothic_atlas_cell(CARD_ICON_CELLS-1, CARD_ICON_ROWS, width, height)
+	testing.expect(t, first == painted && last == height)
 }

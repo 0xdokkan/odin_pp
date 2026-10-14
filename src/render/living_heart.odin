@@ -301,6 +301,10 @@ draw_living_hearts :: proc(renderer: ^Renderer, room: ^game.Room) {
 		feet := tactical_project(renderer, {actor.position.x+0.5, actor.position.y+0.5})
 		bounds := place_living_heart(v.labels, {head.x-sticker*0.5, head.y}, {size.x+sticker, size.y},
 			seal_at[index], sealed[index], tactical_world_bounds(renderer), avoid, feet.y, tags)
+		if v.labels.heart_count < len(v.labels.hearts) {
+			v.labels.hearts[v.labels.heart_count], v.labels.heart_ids[v.labels.heart_count] = bounds, actor.entity.id
+			v.labels.heart_count += 1
+		}
 		draw_living_heart({bounds.x+sticker, bounds.y}, text, pixel, actor.opacity)
 		if icon != .None {
 			draw_intent_sticker({bounds.x+radius, bounds.y+bounds.height*0.5}, icon, alarm, tactical_world_time(renderer),

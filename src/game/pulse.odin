@@ -133,8 +133,8 @@ tick_status_kind :: proc(room: ^Room, entity: Entity_Ref, kind: Status_Kind, pul
 		return
 	}
 	switch kind {
-	case .Poison, .Slow:
-		// Worn by their bearer's actions, never by the clock.
+	case .Poison, .Slow, .Deflect, .Arrows, .Fate, .Venom_Blade:
+		// Worn by their bearer's actions (a charge: by its use), never by the clock.
 		return
 	case .Burn:
 		// A tactical room burns at each new window (tactical_expire_window).

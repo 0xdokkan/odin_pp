@@ -40,6 +40,8 @@ Living_Actor :: struct {
 	cause: Presentation_Cue_Kind,
 	voiced: f64,
 	voiced_base: gfx.Living_Action,
+	// The running attack looses a shot (the player's arrow sounds as one).
+	shot: bool,
 	// The last blow this card struck (Attack_Fx.id): its guard and its wound
 	// are two cues, one drawing.
 	blow: u32,
@@ -50,6 +52,8 @@ Living_State :: struct {
 	tokens: [LIVING_MAX_TOKENS]Living_Token,
 	blows: [LIVING_MAX_BLOWS]Living_Blow,
 	blow_next: int,
+	// The Dado del Destino's dice at the struck cards (player_charges.odin).
+	fates: Living_Fates,
 }
 
 // Turns living cards on or off for this renderer; the drawings load the
@@ -83,6 +87,7 @@ forget_living_actors :: proc(renderer: ^Renderer) {
 	renderer.tactical.intent_traces = {}
 	renderer.tactical.shadow = {}
 	forget_attack_fx(renderer)
+	forget_ground_fx(renderer)
 	lab_sounds_reset(renderer)
 	if renderer.tactical.living_state == nil { return }
 	living_tokens_free(renderer.tactical.living_state)
@@ -195,13 +200,21 @@ living_card_position :: proc(renderer: ^Renderer, entity: game.Entity_Ref, key: 
 
 living_cue_action :: proc(cue: ^Presentation_Cue, entity: game.Entity_Ref) -> (action: gfx.Living_Action, matched: bool) {
 	event := &cue.event
+	// A shot RIFLESSO gives back is the shooter's own bolt coming home: the
+	// player swings at nothing.
+	returned := game.event_is_reflected(event^) && game.event_is_ranged_attack(event^)
 	#partial switch cue.kind {
 	case .Damage:
 		if event.target == entity { return .Hurt, true }
-		if event.source == entity { return .Attack, true }
+		if event.source == entity && !returned { return .Attack, true }
 	case .Damage_Absorbed, .Move_Blocked:
 		if event.target == entity { return .Block, true }
 		// A blow stopped by a guard was still struck.
+		if event.source == entity && game.event_is_attack(event^) && !returned { return .Attack, true }
+	case .Attack_Deflected:
+		// RIFLESSO: the player guards and the blow turns back; it was struck
+		// all the same.
+		if event.target == entity { return .Block, true }
 		if event.source == entity && game.event_is_attack(event^) { return .Attack, true }
 	case .Explosive_Armed:
 		// A barrel set alight from afar.
@@ -294,6 +307,7 @@ living_observe :: proc(renderer: ^Renderer, state: ^Living_State, room: ^game.Ro
 	// answers, when it reacts to one.
 	blow := u32(0)
 	striker: game.Entity_Ref
+	shot := false
 	for offset in 0..<renderer_active_cue_count(renderer) {
 		cue, found := renderer_active_cue_at(renderer, offset)
 		if !found || !cue.started { continue }
@@ -321,7 +335,7 @@ living_observe :: proc(renderer: ^Renderer, state: ^Living_State, room: ^game.Ro
 			if !pushed { living_face(slot, h, clock) }
 			if slot.action != .Death {
 				living_start(slot, move, clock)
-				slot.cause = .Move
+				slot.cause, slot.shot = .Move, false
 				clip := &sheet.clips[slot.action]
 				// The card goes from wherever it stands now, at the push.
 				here, _ := living_card_position(renderer, actor.entity, flipbook_key(character), from)
@@ -358,7 +372,10 @@ living_observe :: proc(renderer: ^Renderer, state: ^Living_State, room: ^game.Ro
 				if abs(side) > 0.2 && (side < 0) != slot.facing_left { action = .Hurt_Back }
 			}
 		}
-		if gfx.living_priority(action) > gfx.living_priority(wanted) { wanted, cause, blow, striker = action, cue.kind, blow_id, event.source }
+		if gfx.living_priority(action) > gfx.living_priority(wanted) {
+			wanted, cause, blow, striker = action, cue.kind, blow_id, event.source
+			shot = action == .Attack && game.event_is_ranged_attack(event^)
+		}
 	}
 	if wanted != .Idle {
 		fresh := wanted != slot.trigger || clock-slot.trigger_seen > LIVING_TRIGGER_GAP
@@ -370,7 +387,7 @@ living_observe :: proc(renderer: ^Renderer, state: ^Living_State, room: ^game.Ro
 				at := clock
 				if living_reacts(wanted) { at += attack_fx_reaction_delay(renderer, actor.entity, now, striker) }
 				living_start(slot, wanted, at)
-				slot.cause = cause
+				slot.cause, slot.shot = cause, shot
 				if blow != 0 { slot.blow = blow }
 			}
 		}
@@ -418,6 +435,7 @@ update_living_actors :: proc(renderer: ^Renderer, room: ^game.Room) {
 	// The traces belong to the world and hold with it; the tokens fly on, but
 	// a blow held with the world never gives a second one.
 	update_living_tokens(renderer, now, tactical_world_time_at(renderer, now))
+	update_fate_tokens(renderer, now)
 	update_intent_traces(renderer, room, tactical_world_time_at(renderer, now))
 	update_lab_sounds(renderer, room, now)
 }

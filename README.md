@@ -96,9 +96,12 @@ ostacoli né nebbia, con il giocatore al centro. Il combattimento non finisce ma
 l'ultimo nemico ucciso non ripulisce la stanza, e ogni 4 secondi di gioco arriva
 un nemico casuale (Chaser, Archer, Brute, Bomber o Custode) su una casella libera
 ad almeno 4 celle dal giocatore, fino a 6 insieme; un'arena vuota si riempie
-subito. Gli easter egg si riaprono ogni volta. Per ora il mazzo contiene **solo
-Movimento Ombra** (8 copie, mano da 5, energia 12; vedi
-[Movimento Ombra](#movimento-ombra)). Niente ricompense, uscita o
+subito. Gli easter egg si riaprono ogni volta. Il mazzo contiene **una copia di
+Movimento Ombra e una di ogni carta nuova della Fase 2** (Pozza di Veleno,
+Incendio, Deflect, Feretro, Dado del Destino e Lama Velenosa), tutte e sette in
+mano (energia 12; vedi [Movimento Ombra](#movimento-ombra),
+[Pozza di Veleno e Incendio](#pozza-di-veleno-e-incendio) e
+[Deflect, Feretro, Dado del Destino e Lama Velenosa](#deflect-feretro-dado-del-destino-e-lama-velenosa)). Niente ricompense, uscita o
 profilo; `F5` ricomincia, `F10` torna al menu. Arena, mazzo e ritmo degli arrivi
 sono in [mechanics_lab.odin](src/mechanics_lab.odin) e
 [sandbox.odin](src/game/sandbox.odin): per provare una nuova meccanica basta
@@ -115,8 +118,11 @@ mazzo iniziale di ogni run tattica. Lo stesso vale per gli status a stack
 Veleno, Bruciatura e Rallentamento ([Status](#status)), per i dadi delle carte
 che salgono dal D4 al D20 con gli upgrade ([Spell e dadi](#spell-e-dadi)) e per
 i colpi che si vedono sul tavolo, ognuno con la sua arma di carta
-([Il tavolo](#il-tavolo-cartoncini-vivi-cerchi-e-segnalini)). La prova resta la
-sandbox in cui provare le prossime.
+([Il tavolo](#il-tavolo-cartoncini-vivi-cerchi-e-segnalini)). Le carte nuove della
+Fase 2 ([Pozza di Veleno e Incendio](#pozza-di-veleno-e-incendio) e
+[Deflect, Feretro, Dado del Destino e Lama Velenosa](#deflect-feretro-dado-del-destino-e-lama-velenosa))
+compaiono fra ricompense e negozio di ogni run tattica. La prova resta la sandbox in cui
+provare le prossime.
 
 **Intenzioni dei nemici (`F6`).** Nel gioco i nemici mostrano cosa stanno per
 fare con sigilli e terreno ([Il tavolo](#il-tavolo-cartoncini-vivi-cerchi-e-segnalini));
@@ -165,7 +171,7 @@ misure e un ascolto di tutta la famiglia, senza toccare il gioco.
 | `--smoke-menu` | cattura `odin_pp_menu.png` dopo 30 frame ed esce |
 | `--animation-speed=2` | velocità delle animazioni ordinarie, fra 0.25x e 4x; non accelera cast o dadi M8 |
 | `--fast` | velocità 4x |
-| `--mechanics-lab` | Prova meccaniche: arena aperta senza fine, mazzo di soli Movimento Ombra, nemici che continuano ad arrivare |
+| `--mechanics-lab` | Prova meccaniche: arena aperta senza fine, mazzo delle carte in prova (Movimento Ombra, Pozza di Veleno, Incendio, Deflect, Feretro, Dado del Destino, Lama Velenosa), nemici che continuano ad arrivare |
 | `--spell-lab` | arena con Firebomb, Fate Strike, Chain Lightning, Sundering Blow e Guard |
 | `--dice-lab` | arena con Fate Strike, Sundering Blow, Prismatic Barrage, Twin Venom e Guard |
 | `--dice-set-lab` | tavolo 3D del set D4/D6/D8/D10/D%/D12/D20: selezione, lancio e rotazione con il mouse |
@@ -456,9 +462,11 @@ del movimento è solo il passo in diagonale.
 | Attacco a urto | danno doppio |
 | Carta: danni | x1,5, almeno +2 |
 | Carta: scudo, cura, oro | x1,5, almeno +1 |
-| Carta: altri status | +1 potenza e +1 durata (Veleno, Bruciatura e Rallentamento: +1 stack, non hanno durata) |
+| Carta: altri status | +1 potenza e +1 durata (Veleno, Bruciatura, Rallentamento e le cariche del Viandante: +1 stack, non hanno durata; Lama Velenosa: il dado più uno) |
 | Carta: pesca, energia, carte create, reazioni | +1 |
 | Carta-dispositivo | danno x1,5 (almeno +2); la Tesla nasce con vita doppia, la Shock Floor con un colpo in più (massimo 21: un 20 del D20 più uno) |
+| Movimento Ombra, Dado del Destino | nessun critico: giocate sul secondo lasciano lo scocco all'azione dopo |
+| Freccia di Feretro | mai critica: non prende lo scocco |
 
 Le regole e i numeri sono in [tactical_beat.odin](src/game/tactical_beat.odin).
 
@@ -515,6 +523,224 @@ d'inchiostro, ogni passo dell'ombra è un fruscio morbido (mai gli stivali), la
 diagonale sul battito suona il CRITICO e la risalita finisce con il cartoncino
 posato sulla pietra. Lo smoke `--smoke-mechanics-lab` la gioca dalla mano e la
 filma ([Verifica e smoke test](#verifica-e-smoke-test)).
+
+### Pozza di Veleno e Incendio
+
+Le prime carte della Fase 2 vivono sul pavimento della stanza tattica. Pozze e
+fuochi non sono oggetti della griglia: non occupano uno dei 32 posti, non
+bloccano niente, le bombe ci cadono sopra e i dispositivi ci si posano, e non
+toccano mai il Viandante. Entrambe le carte puntano una **cella libera** a
+distanza Chebyshev 1–3 con linea di vista: calpestabile, senza copertura, senza
+nemici, oggetti di alcun tipo o il giocatore stesso (trappole e uscita vanno
+bene). Restano fino alla fine della stanza, anche durante il bottino (una stanza
+nuova parte pulita); nelle run classiche non compaiono e, se sono in mano, vengono
+rifiutate (`Invalid_Phase`). Regole in [ground.odin](src/game/ground.odin).
+
+`Pozza di Veleno` (comune, energia 1, **1 s** di finestra) versa una pozza. Un
+**nemico** che entra in una sua cella, con qualunque movimento (un passo, ogni
+cella di una carica, una spinta o un trascinamento, l'atterraggio di un
+teletrasporto), prende **2 Veleno** (+1 per upgrade, +1 se giocata sul secondo),
+e altrettanto per ogni cella di pozza in cui passa, anche da una cella di pozza
+all'altra; uscirne non dà niente. Il Veleno arriva dal System, come quello dei
+dispositivi: la reliquia Venom Vial non lo aumenta e le reazioni del Viandante
+non lo vedono. Pozze vicine sono un'unica area e si disegnano come una sola chiazza.
+Dopo ogni pozza il pavimento libero (calpestabile, senza coperture né oggetti che
+bloccano, non ancora pozza) si divide in aree a 4 vicini: la più grande è
+l'esterno, e ogni altra area che tocca una pozza è chiusa e **si riempie subito**
+con il veleno della carta che l'ha chiusa; chi ci sta dentro prende quel Veleno.
+Gli attori non chiudono mai un'area, muri, coperture e oggetti solidi sì. Una
+tasca chiusa solo da muri o oggetti, senza pozze intorno, resta asciutta; due
+aree a pari merito come più grandi restano entrambe esterne. Un nemico che entra
+nella pozza con un proprio passo prende il Veleno subito e lo sente alla fine di
+quella stessa azione (2 danni, poi ne resta 1).
+
+`Incendio` (non comune, energia 2, **2 s** di finestra) accende un fuoco sulla
+cella: un effetto del pavimento, non l'oggetto Fire (non accende barili e non
+brucia il Viandante). Un **nemico** che entra in una cella in fiamme prende **1
+Bruciatura** (+1 per upgrade, +1 se giocata sul secondo) a ogni ingresso. A ogni
+nuova finestra, nello stesso momento in cui morde la Bruciatura, ogni fuoco cresce
+a croce: bracci lunghi 1, poi 2, 3 e 4 caselle; un braccio si ferma per sempre al
+primo muro, copertura o oggetto solido (anche se poi l'ostacolo si sposta); alla
+quinta finestra, quando arriverebbe a 5, il fuoco si spegne. Un nemico sulla
+casella che prende fuoco riceve la Bruciatura del fuoco più forte, una volta
+sola anche se lo raggiungono due fuochi, e la sente dalla finestra dopo: prima
+morde, poi il fuoco cresce, come per chi ci entra camminando. Al massimo 32 fuochi
+per stanza; un fuoco può ardere sopra una pozza o un altro fuoco, una pozza non
+si versa su un'altra pozza. I nemici non evitano pozze e fiamme: le attraversano
+come il resto del pavimento.
+
+Sul tavolo ([ground_fx.odin](src/render/ground_fx.odin)) pozze e bruciature sono
+un decalco di carta disteso sul pavimento, in pixel art: il liquido verde (bruno
+e braci sotto il fuoco) con il margine di carta bianca, la linea d'inchiostro e
+il taglio della carta verso la camera, come cartoncini e oggetti di carta, e la
+luce sul lato lontano del liquido. Quando la camera gira verso un altro lato del
+tavolo, taglio e luce la seguono (alla diagonale più vicina) e il decalco si
+ricuoce a poco a poco; una camera ferma vicino a un asse non lo ricuoce avanti e
+indietro. Le
+celle vicine si fondono in una chiazza dai bordi arrotondati, quelle che si
+toccano solo in diagonale restano separate. La pozza compare quando la fiala di
+carta lanciata dal Viandante atterra, con uno schizzo di gocce, e un'area chiusa
+si allaga dalla cella versata verso l'esterno. Il fuoco arriva come una brace;
+a ogni finestra le fiamme di carta spuntano sulle caselle nuove (più alte al
+centro, più basse nell'ultima finestra) e alla fine si abbassano e spariscono con
+la loro bruciatura. Un nemico che mette piede in una pozza schizza gocce verdi,
+in una fiamma tira faville. Mirando, l'anteprima della carta colora di verde anche
+le celle che la pozza riempirebbe, e di brace la croce intera che il fuoco
+raggiungerebbe. Sul tavolo piatto (`--flat`) la pozza è un rombo verde con carta e
+inchiostro sui lati asciutti, il fuoco un rombo di brace con la sua fiammella.
+Le carte scrivono `2 VELENO A CELLA` / `SOLO NEMICI / STANZA` e
+`1 BRUCIATURA A CELLA` / `CROCE: +1 A FINESTRA` (con sette o otto carte in mano
+`1 BRUCIATURA`); l'ispettore aggiunge
+`AREE CHIUSE: SI RIEMPIONO` / `OGNI CELLA ENTRATA AVVELENA` e
+`CRESCE A OGNI NUOVA FINESTRA` / `SI SPEGNE ALLA QUINTA`. Le icone, nella quinta
+riga dell'atlante ([build_card_icons.py](tools/art/build_card_icons.py)), sono una
+fiala rovesciata nella sua pozza e un fuoco su una croce bruciata, con una
+fiamma in fondo a ogni braccio.
+
+Nella Prova meccaniche ognuna ha il suo suono: la Pozza è una fiala stappata, il
+veleno che gorgoglia fuori e lo schizzo sulla pietra; l'Incendio un acciarino
+battuto due volte, la vampata e il crepitio che si allarga. Una pozza in cui
+entra un nemico schizza (`world_pool_splash`); un fuoco i cui bracci si allungano
+a una nuova finestra rugge (`world_fire_spread`, una volta: un fuoco appena acceso
+suona con la sua carta) e quello che alla quinta si spegne sfrigola via in un filo
+di fumo con un'ultima brace (`world_fire_out`); un nemico che entra nel fuoco lo
+fa divampare (`world_fire`). Lo smoke `--smoke-mechanics-lab` le gioca dalla
+mano, le filma ([Verifica e smoke test](#verifica-e-smoke-test)) e ne controlla
+le regole. L'anello chiuso dall'ultima pozza fa otto celle da 2 Veleno, e il
+chaser rimasto dentro prende i suoi 2 una volta sola. Il chaser che attraversa
+due pozze prende 2 Veleno a ogni cella e ogni suo passo morde i suoi stack: arriva
+accanto al Viandante con 33 vita su 40 e 1 Veleno. Il Viandante entra in una
+pozza sua senza prendere niente e senza schizzi. Il fuoco allunga i quattro
+bracci di una casella a ogni finestra; prende il bruto alla seconda con 1
+Bruciatura, che non cala mai e morde dalla terza (dopo la seconda, la terza, la
+quarta e la quinta finestra il bruto ha 60, 59, 58 e 57 di vita); brucia la
+casella del Viandante senza segnarlo; senza muri sulla sua strada deve ruggire
+quattro volte e spegnersi una.
+
+### Deflect, Feretro, Dado del Destino e Lama Velenosa
+
+Le altre quattro carte della Fase 2 caricano il Viandante di **cariche**: status
+a stack che porta solo lui (un nemico non ne riceve mai) e che si spendono una
+alla volta con l'uso, fino all'ultima o alla fine della stanza (una stanza nuova
+parte senza). Si giocano su di sé, con il loro tasto (`1`–`8`) o con un secondo
+clic sulla carta. Tutte e quattro prendono **1 s** di finestra e sono solo tattiche:
+compaiono fra ricompense e negozio delle run tattiche, le run classiche non le
+offrono e, se le hanno in mano, le rifiutano (`Invalid_Phase`). Nell'HUD vengono
+prima Veleno e Bruciatura del Viandante, che lo mordono (con tre o quattro cariche
+non finiscono mai nel `+n`), poi le cariche: `RIFLESSO n`, `FRECCE n`,
+`DESTINO n`, `LAMA n` (con poco spazio `RIF`, `FRE`, `DES`, `LAM`), poi gli altri
+status. Una carica si vede spesa quando il suo colpo arriva (la lanterna cala, la
+freccia colpisce, il colpo rimandato raggiunge il Viandante), non quando parte;
+l'ultima carica spesa fa sparire il suo chip. Un colpo, un urto o una freccia spendono le
+loro cariche solo se vengono accettati. Ogni status ha ora un posto per tipo
+(`MAX_STATUSES_PER_ENTITY = len(Status_Kind)`): il Viandante può portarli tutti
+insieme, tranne il Rallentamento. Regole in
+[player_charges.odin](src/game/player_charges.odin).
+
+`Deflect` (non comune, energia 1, senza potenziamenti) dà una carica di
+**RIFLESSO**; ogni giocata ne aggiunge una (giocata sul secondo, due). Il
+prossimo colpo nemico che colpirebbe il Viandante (un attacco in mischia, un
+dardo, il colpo di una carica) torna indietro: lui non subisce niente, né danno
+né spinta, il suo Shield resta intatto, e l'attaccante prende il danno che
+avrebbe preso lui (dopo la sua difesa, almeno 1); si spende una carica e per
+quel colpo non si apre la scelta di difesa. Bombe, esplosioni, trappole,
+pericoli, Veleno e Bruciatura non sono colpi e non la toccano; nell'ombra di
+Movimento Ombra nessun colpo lo raggiunge e la carica resta. Sul tavolo il
+dardo arriva al cartoncino del Viandante, che para, gira e torna nel
+balestriere che l'ha tirato (è lo stesso dardo, mai un secondo); un fendente o
+una carica vengono parati e il Viandante risponde con un colpo della sua
+lanterna (o dell'arma M8 che ha in mano). `RIFLESSO` compare sopra di lui quando
+il colpo torna indietro, una volta per colpo; se l'attaccante ha uno Scudo, sopra
+l'attaccante si legge anche `PARATA n`, e un dardo rimandato che lo Scudo ferma
+tutto rimbalza via invece di conficcarsi. Il chip `RIFLESSO` resta nell'HUD, al
+suo posto, finché il colpo non raggiunge il Viandante.
+
+`Feretro` (non comune, energia 2) dà **3 frecce** (+1 per upgrade, +1 sul
+secondo); le giocate si sommano. Tenendo premuto `Ctrl` il tavolo segna con un
+anello d'oro ai piedi i nemici che le frecce raggiungono: visibili e sulla
+linea di tiro, con la LoS dei tiri del gioco (muri, ostacoli e oggetti opachi
+la fermano, come la diagonale fra due blocchi; gli altri combattenti no; una
+traccia di 12 celle al massimo);
+quello sotto il mouse si accende, con la linea che la freccia farebbe. Un clic
+sinistro su uno di loro scocca una freccia: è un'azione del Viandante come un
+attacco a urto (1 s di finestra, il suo Veleno morde, si gira verso il
+bersaglio), senza coda (premuta durante la propria azione si perde) e mai
+critica. Vola come un dardo di carta e fa 1 danno più uno status scelto dai dadi
+del giocatore: Veleno 2, Bruciatura 1 o Rallentamento 1. Lo status compare sul
+nemico quando la freccia arriva: finché vola, quello che segue il tiro (lo
+status, la caduta del nemico, la freccia spesa) aspetta, mentre il mondo e il
+tempo della finestra vanno avanti. Con `Ctrl` premuto, un
+clic che non cade su un nemico raggiungibile non fa niente (non prende né gioca
+carte); sulla mano il clic resta della mano. La riga della mano scrive
+`CTRL+CLIC SU UN NEMICO: FRECCIA (n)` e, con `Ctrl` premuto,
+`CLIC SU UN NEMICO EVIDENZIATO: FRECCIA`.
+
+`Dado del Destino` (rara, energia 2, carta con dadi: d4 al livello 0, poi la
+scala fino al d20) carica i prossimi **3 attacchi a urto** (`DESTINO 3`): una
+nuova giocata li riporta a 3, mai oltre, e il dado è quello dell'ultima carta
+giocata. Giocata sul secondo non consuma lo scocco, come Movimento Ombra: non ha
+una versione critica. A ogni urto caricato, dritto o in diagonale, il dado si
+tira al colpo e decide: **1** Veleno, **2** Bruciatura, **3** Rallentamento, con
+tanti stack quanto il risultato; **4** ruba vita (il Viandante guarisce del
+danno inflitto, niente a vita piena); **5** critico (danno doppio; un urto già
+critico sul secondo resta doppio, non quadruplo); **6 o più** letale: il nemico
+cade, scudo compreso. Il boss (il Demolitore) e il miniboss (il Custode) non
+cadono mai così: per loro è un critico. Con il d4 del livello 0 escono solo le
+prime quattro facce. Sul tavolo, appena il colpo arriva, dal lato sinistro del
+cartoncino colpito esce un cartellino di carta con il contorno in pixel del dado
+(il triangolo del d4, il quadrato del d6, il rombo del d8, l'aquilone del d10, il
+pentagono del d12, l'esagono del d20) e la faccia uscita nel colore di ciò che
+fa. Si ferma accanto al cuore del nemico, mai sopra, nemmeno mentre spunta: da
+un cartoncino stretto, come quello del Custode, esce più in là. Sopra il nemico
+si legge `VELENO n`, `BRUCIATURA n`, `RALLENTAMENTO n`, `RUBA VITA +n`, `CRITICO`
+o `LETALE`; sul tavolo piatto l'etichetta dice anche il dado
+(`d8 4 / RUBA VITA +2`). Il critico fatto dal dado lo dice solo il dado, quando
+compare: l'urto non lo annuncia prima. Un urto critico sul secondo dice `CRITICO`
+da sé, se il dado non lo dice già. Due urti di fila sullo stesso nemico con la
+stessa faccia mostrano ciascuno il suo dado e il suo suono.
+
+`Lama Velenosa` (comune, energia 1, carta con dadi) tira il suo dado quando la
+si gioca, come ogni carta con dadi (il lancio si vede a tutto schermo): il
+risultato è il numero di **attacchi a urto avvelenati** (`LAMA n`; le giocate si
+sommano, sul secondo uno in più). Ogni urto caricato lascia 2 Veleno; Lama e
+Destino possono caricare lo stesso urto.
+
+Le carte scrivono `+1 RIFLESSO` / `RIMANDA UN COLPO`, `3 FRECCE / CTRL+CLIC` /
+`1 DANNO + 1 STATUS`, `1d4 SU 3 COLPI` / `UN TIRO A OGNI COLPO` e
+`1d4 COLPI AVVELENATI` / `2 VELENO A COLPO` (con sette o otto carte in mano
+`3 FRECCE` / `CTRL+CLIC: 1 DANNO` e `1d4 COLPI`); l'ispettore aggiunge
+`IL NEMICO PRENDE IL COLPO` / `NO BOMBE, TRAPPOLE, STATUS`,
+`+ VEL 2 O BRU 1 O RAL 1` / `LINEA DI TIRO / 1s L'UNA`,
+`1 VEL 2 BRU 3 RAL 4 VITA` / `5 CRITICO / 6+ LETALE` e
+`IL DADO DECIDE I COLPI` / `LE CARICHE SI SOMMANO`. Per non confonderla con
+Deflect, la difesa di Thorn Coat contro i dardi si legge ora
+`ABILITA DEVIAZIONE` e `QTE: DEVIAZIONE (FRECCE)`, come il tasto `L`. Le icone,
+nella quinta e nella sesta riga dell'atlante
+([build_card_icons.py](tools/art/build_card_icons.py)), sono uno scudo tondo
+d'acciaio da cui un dardo rimbalza via, una bara con la croce d'oro e tre frecce
+che spuntano dalla testa, un d20 d'osso con il 20 in un anello viola e un pugnale
+dall'elsa d'oro che gocciola veleno.
+
+Nella Prova meccaniche ognuna ha il suo suono: lo scudo alzato e il colpo che
+rimbalza via, il coperchio di una bara che cigola e tre frecce estratte, un dado
+d'osso sul legno e una campana bassa del destino, un pugnale sfilato e una goccia
+di veleno che sfrigola; ogni carica ha il suo suono quando arriva, il colpo
+rimandato squilla quando raggiunge il Viandante (`pilgrim_deflect`), la freccia
+ha la sua corda (`pilgrim_shoot`) e il dado del Destino rimbalza sul nemico
+colpito (`ui_fate_die`). Lo smoke `--smoke-mechanics-lab` le gioca dalla mano, le
+filma ([Verifica e smoke test](#verifica-e-smoke-test)) e ne controlla le regole.
+Deflect rimanda un dardo, un fendente e una carica: per nessuno dei tre si apre
+la scelta di difesa, anche se la schivata è pronta; il Viandante non perde vita
+né casella, l'attaccante prende i 3 del colpo e la carica si spende. Il dardo è
+uno solo, che va e torna; fendente e carica hanno la risposta della lanterna.
+Feretro dà 3 frecce. Con `Ctrl` le frecce raggiungono il nemico sulla linea di
+tiro, che il tavolo segna, e non quello dietro un blocco di copertura: un clic su
+quest'ultimo non scocca niente. La freccia è un'azione da 1 s e lascia 1 danno e
+uno solo fra Veleno 2, Bruciatura 1 e Rallentamento 1. Il Dado del Destino carica
+3 urti con il d4 del livello 0; quando il d4 fa 2, l'urto lascia 2 danni e
+Bruciatura 2. Giocato di nuovo, riporta gli urti a 3 e non oltre. Un 16 del d20
+fa cadere il nemico, ma sul Custode è solo un critico (4 danni). Lama Velenosa
+tira 3 e il suo urto lascia 2 danni e Veleno 2, con 2 cariche rimaste.
 
 ### Il tavolo: cartoncini vivi, cerchi e segnalini
 
@@ -575,7 +801,8 @@ inchiostrati come quelli dei personaggi, che escono di lato dalla carta di chi �
 colpito o curato con il numero in pixel, rosso per i danni e verde per le cure,
 restano un attimo e cadono ([living_token.odin](src/render/living_token.odin)).
 Prendono il posto dei riquadri scuri con i numeri; un colpo critico mostra
-ancora CRITICO.
+ancora CRITICO. Ogni colpo ha il suo segnalino anche quando è uguale al
+precedente: due urti da 2 sullo stesso nemico, uno dopo l'altro, ne mostrano due.
 
 **I colpi si vedono sul tavolo.** Ogni colpo fisico, del Viandante o di un
 nemico, ha la sua arma di carta: pixel art ritagliata con lo stesso bordo
@@ -615,9 +842,11 @@ lampo sulla figura; magie e dispositivi restano come prima. I tavoli 2D
 (`--flat`, `--classic`) tengono il taglio e il lampo; anche lì però una carica
 colpisce quando è arrivata, e un colpo che incontra uno Shield parte insieme
 alla sua ferita. Il runtime è [attack_fx.odin](src/render/attack_fx.odin):
-le fasi successive (il Deflect) hanno `play_attack_swing`,
-`play_attack_projectile` e `reflect_attack_projectile`, che rimanda un dardo
-al suo tiratore.
+`play_attack_swing`, `play_attack_projectile` e `reflect_attack_projectile`
+(che rimanda un dardo al suo tiratore) servono anche a
+[Deflect](#deflect-feretro-dado-del-destino-e-lama-velenosa): il dardo deviato
+gira quando arriva, la risposta a un fendente è un colpo del Viandante, e la
+freccia di Feretro vola come il dardo.
 
 La vita dei nemici è un **cartellino di carta** sopra la testa, tagliato e
 inchiostrato come i segnalini: un cuore rosso e `12/18` (la vita sul massimo)
@@ -630,7 +859,13 @@ nemico: se anche i piedi sono lì sotto, il cartellino resta al suo posto,
 coperto con lui. In mezzo alla folla prende il posto libero più vicino al suo;
 se non ce n'è, si sovrappone agli altri cartellini dove ne copre meno, ma mai a
 un sigillo, a un pannello o a un'etichetta. Il pixel raddoppia quando la
-telecamera è vicina.
+telecamera è vicina. Come il segnalino, il cuore aspetta che il colpo arrivi: finché
+un dardo vola o un fendente non è calato, cuore e VITA dell'HUD mostrano ancora
+la vita di prima, anche quando il colpo abbatte il nemico (un colpo `LETALE`, una
+freccia sull'ultimo punto di vita): il cuore se ne va quando il colpo arriva
+([world_playback.odin](src/render/world_playback.odin)). L'ispettore del nemico
+sotto il mouse dice lo stesso: vita e status come il tavolo li mostra, quindi
+dopo un `Ctrl`+clic lo status della freccia compare anche lì quando arriva.
 Prende il posto delle etichette scure sopra i nemici (la piastra nera con `HP 18/18`, la
 riga colorata dell'intento come `MUOVE / 2.8s` e la barra rossa): l'intento si
 legge da sigilli e terreno, lo scudo dall'anello e dal numero ai piedi, e le
@@ -947,7 +1182,7 @@ odin run src -o:none -- --classic
 | `--smoke-m7-view` | prova grafica di scena, oggetti 3D, fog, ologramma, QTE e menu |
 | `--smoke-m8-view` | prova 3D di d4, dispositivi, offerta del ring, equipaggiamento, scheda personaggio, tag match e cambio stanza |
 | `--smoke-western` | nuvoletta 6 RANCH 7: apertura automatica, volo delle carte, insegna, porte, corsa a tempo e premio |
-| `--smoke-mechanics-lab` | Prova meccaniche: arena aperta, mano di soli Movimento Ombra, ring riaperto, arrivi fino al massimo, ultima uccisione senza fine del combattimento, cartoncino del giocatore di nuovo in piedi dopo morte e riavvio, cartoncini vivi (un passo e un attacco fotogramma per fotogramma), cerchi d'azione e segnalini di danno e cura, gli status a stack (Veleno, Bruciatura e Rallentamento su un nemico, Bruciatura e Veleno sul giocatore: etichette di carta ai piedi, nomi e stack nell'HUD e nell'ispettore del nemico, `odin_pp_living_statuses_NN.png` e `odin_pp_mechanics_lab_statuses.png`; la finestra che scade subito dopo li fa bruciare), i suoni che ogni azione mette in coda (passo, colpo, ferita, caduta, cura, status, battito, stordimento: senza dispositivo audio, li conta) e infine un Movimento Ombra giocato dalla mano: finestra e clock del mondo fermi per tutta l'ombra, quattro passi dell'ombra con una diagonale sul suo primo battito, risalita sull'ultima casella dell'ombra, nessun passo del Viandante fra i suoni e tutti quelli dell'ombra (carta, sprofondare, passi, CRITICO, battiti, risalita); per finire ogni colpo uno alla volta, con la sua arma di carta: il dardo nel Viandante e nel pavimento, il fendente del bruto sulle tre caselle e la sua carica colpita all'arrivo, gli artigli del ghoul, il pastorale, il bastone, la bomba del bombarolo, la brace dell'arcimago su un barile e i colpi del Viandante con la lanterna e con le due armi M8 (ogni arma deve comparire); ultimo, il Rallentamento sul sigillo: un bruto rallentato di 2 compie il passo già annunciato, poi annuncia il prossimo intento 2 secondi più lungo (due tacche in più) e, compiuta quell'azione, perde uno stack e trattiene il successivo di un secondo solo |
+| `--smoke-mechanics-lab` | Prova meccaniche: arena aperta, mano con tutto il mazzo in prova, ring riaperto, arrivi fino al massimo, ultima uccisione senza fine del combattimento, cartoncino del giocatore di nuovo in piedi dopo morte e riavvio, cartoncini vivi (un passo e un attacco fotogramma per fotogramma), cerchi d'azione e segnalini di danno e cura, gli status a stack (Veleno, Bruciatura e Rallentamento su un nemico, Bruciatura e Veleno sul giocatore: etichette di carta ai piedi, nomi e stack nell'HUD e nell'ispettore del nemico, `odin_pp_living_statuses_NN.png` e `odin_pp_mechanics_lab_statuses.png`; la finestra che scade subito dopo li fa bruciare), i suoni che ogni azione mette in coda (passo, colpo, ferita, caduta, cura, status, battito, stordimento: senza dispositivo audio, li conta) e infine un Movimento Ombra giocato dalla mano: finestra e clock del mondo fermi per tutta l'ombra, quattro passi dell'ombra con una diagonale sul suo primo battito, risalita sull'ultima casella dell'ombra, nessun passo del Viandante fra i suoni e tutti quelli dell'ombra (carta, sprofondare, passi, CRITICO, battiti, risalita); per finire ogni colpo uno alla volta, con la sua arma di carta: il dardo nel Viandante e nel pavimento, il fendente del bruto sulle tre caselle e la sua carica colpita all'arrivo, gli artigli del ghoul, il pastorale, il bastone, la bomba del bombarolo, la brace dell'arcimago su un barile e i colpi del Viandante con la lanterna e con le due armi M8 (ogni arma deve comparire); ultimo, il Rallentamento sul sigillo: un bruto rallentato di 2 compie il passo già annunciato, poi annuncia il prossimo intento 2 secondi più lungo (due tacche in più) e, compiuta quell'azione, perde uno stack e trattiene il successivo di un secondo solo; infine Pozza di Veleno e Incendio dalla mano: un anello di pozze chiuso dall'ultima, che allaga l'area (otto celle da 2 Veleno) e avvelena una volta sola il chaser rimasto dentro, un chaser che attraversa due pozze schizzando e prendendo 2 Veleno a ogni cella, il Viandante che entra in una pozza sua senza prendere niente, un fuoco accanto a un bruto che allunga i bracci per quattro finestre, lo prende alla seconda (Bruciatura 1, che morde dalla terza), brucia la casella del Viandante senza segnarlo e si spegne alla quinta, con i suoni delle carte, dello schizzo e del fuoco che si allarga e si spegne; ultime le cariche del Viandante: Deflect su un dardo (lo stesso dardo torna nel balestriere), su un fendente e su una carica (risposta con la lanterna), mai con la scelta di difesa, il Viandante illeso e fermo e l'attaccante con i 3 del colpo, Feretro con `Ctrl` (segnato il nemico sulla linea di tiro, non quello dietro una copertura, su cui il clic non scocca niente) e una freccia da 1 s scoccata dal clic, con 1 danno e uno status, il Dado del Destino su tre urti (un d4 che fa BRUCIATURA 2, una nuova giocata che riporta gli urti a 3, un d20 che fa LETALE e lo stesso 16 che sul Custode è solo un CRITICO) e Lama Velenosa con il suo dado e l'urto avvelenato, con i suoni delle carte, delle cariche, del colpo rimandato, della freccia e del dado |
 | `--smoke-m9-view` | arena continua, duello con IA, presa in quattro pose, replay e FPS con ricarica e vittoria |
 
 Gli smoke classici e i laboratori `--spell-lab` / `--dice-lab` conservano il comportamento classico;
@@ -1025,6 +1260,10 @@ visibili, con energia richiesta, bersaglio/raggio, effetto, durata del cast in s
 stato di disponibilità. Hover e selezione aprono un pannello di dettaglio;
 con sette–otto carte il titolo e l'illustrazione adottano un layout compatto;
 eventuali testi troppo lunghi terminano con puntini e restano nel dettaglio.
+Le carte le cui righe lì si rimpicciolirebbero o si taglierebbero ne hanno una
+forma corta (Shock Floor, Tesla Coil, Movimento Ombra con `OMBRA 4s` /
+`MONDO FERMO`, Incendio, Feretro e Lama Velenosa): la Prova meccaniche tiene in
+mano tutte e sette le sue carte.
 Le carte difensive indicano anche i QTE che abilitano. Le carte restano nella
 loro posizione durante la selezione. Il catalogo tattico ora distingue mobilità protetta, interruzione, ricognizione
 e contrattacco; rarità, lifetime e regole di costruzione del mazzo restano condivisi.
@@ -1076,11 +1315,11 @@ dal **costo temporale**, centralizzato in `game/tactical_action_cost.odin`:
 
 | Azione | Costo temporale / durata del cast |
 |---|---:|
-| Passo, attacco base, attesa, schivata attiva, tentativo diagonale | 1 s |
+| Passo, attacco base, attesa, schivata attiva, tentativo diagonale, freccia di Feretro | 1 s |
 | Refocus | 2 s |
 | Clic su **ATTIVA** o **EQUIPAGGIA** in Combat | 1 s |
-| Supporto, Guard, Afterimage, Battle Focus, Spark | 1 s |
-| Strike, Arc Bolt, Shove, Dash, Grappling Hook, Venom Needle, Fate Strike, Tesla Coil | 2 s |
+| Supporto, Guard, Afterimage, Battle Focus, Spark, Pozza di Veleno, Deflect, Feretro, Dado del Destino, Lama Velenosa | 1 s |
+| Strike, Arc Bolt, Shove, Dash, Grappling Hook, Venom Needle, Fate Strike, Tesla Coil, Incendio | 2 s |
 | Piercing Ray, Cross Slash, Heavy Blow, Sundering Blow, Twin Venom, Shock Floor, Titan Grip | 3 s |
 | Firebomb, Toxic Wave, Caustic Bloom, Chain Lightning, Prismatic Barrage, Storm Crown | 4 s |
 | [Movimento Ombra](#movimento-ombra) | 0 s: i suoi 4 s reali stanno fuori dalla finestra |
@@ -1098,7 +1337,7 @@ La schivata base rimane accessibile fuori recupero, senza richiedere carte.
 | Arc Bolt | 1 | 2 danni, tiro economico |
 | Piercing Ray / Cross Slash | 2 | 3 danni in linea / a croce, nelle celle visibili |
 | Guard | 1 | 4 Shield per 2 secondi; abilita Block e Parry |
-| Thorn Coat | 1 | 2 Thorns per 3 secondi; abilita Deflect contro gli arcieri |
+| Thorn Coat | 1 | 2 Thorns per 3 secondi; abilita la deviazione (QTE `L`) contro gli arcieri |
 | Counter Rune | 1 | contrattacco 3, 2 cariche, 4 secondi; Retain |
 | Battle Focus | 1 | pesca fino a 2 carte; Survey per 3 secondi: lato della vista +2 (da 2×2 passa a 5×5), massimo 9; Exhaust / Ethereal |
 | Spark Forge | 1 | crea fino a 2 Spark temporanee a costo 0 |
@@ -1111,6 +1350,12 @@ La schivata base rimane accessibile fuori recupero, senza richiedere carte.
 | Volatile Study | 2 | crea 1 Spark, pesca fino a 2 carte; Exhaust |
 | Toxic Wave | 2 | 1 Veleno ai nemici visibili entro raggio Chebyshev 2 (5×5) |
 | Movimento Ombra | 3 | 4 secondi reali nell'ombra: mondo e finestra fermi, intangibile, solo passi dell'ombra da 0,4 s (diagonale sui suoi battiti); risale sull'ultima casella dell'ombra. 0 s di finestra, giocabile anche da storditi |
+| Pozza di Veleno | 1 | una pozza su una cella libera fino alla fine della stanza: 2 Veleno (+1 per upgrade) a un nemico per ogni sua cella in cui entra; le aree che chiude si riempiono ([Pozza di Veleno e Incendio](#pozza-di-veleno-e-incendio)) |
+| Incendio | 2 | un fuoco su una cella libera: 1 Bruciatura (+1 per upgrade) a ogni ingresso e a chi prende fuoco; cresce a croce di una casella a ogni nuova finestra e si spegne alla quinta |
+| Deflect | 1 | una carica di RIFLESSO: il prossimo colpo nemico sul Viandante torna all'attaccante, senza scelta di difesa ([Deflect, Feretro, Dado del Destino e Lama Velenosa](#deflect-feretro-dado-del-destino-e-lama-velenosa)) |
+| Feretro | 2 | 3 frecce (+1 per upgrade): `Ctrl` + clic su un nemico in linea di tiro, 1 danno + Veleno 2, Bruciatura 1 o Rallentamento 1; 1 s a freccia |
+| Dado del Destino | 2 | i prossimi 3 urti tirano il dado del suo livello: 1-3 status, 4 ruba vita, 5 critico, 6+ letale (boss e miniboss: critico) |
+| Lama Velenosa | 1 | tira il suo dado: tanti urti con 2 Veleno |
 
 Afterimage mantiene il bypass del recupero della schivata e lo Shield dopo il
 movimento. Calculated Risk, Spark, Firebomb, Caustic Bloom e le formule delle
@@ -1133,6 +1378,7 @@ il numero massimo di carte scritto. Upgrade e keyword mantengono le policy esist
 | Trascinamento col tasto centrale sulla scena / rotella | orbita la camera 3D / zoom; gli assi WASD restano quelli della griglia |
 | Clic su una carta / trascinamento | seleziona e mostra i dettagli / gioca sul bersaglio; un secondo clic gioca le carte senza bersaglio |
 | `1`–`8` / clic destro o `Esc` | seleziona una carta con bersaglio o gioca subito una carta senza bersaglio / annulla la selezione |
+| `Ctrl` + clic sinistro su un nemico | con le frecce di Feretro: scocca una freccia al nemico segnato (visibile e in linea di tiro); con `Ctrl` premuto il tavolo segna quelli raggiungibili |
 | `P` | pausa esplicita, con scena coperta; `P` riprende |
 | `Q`, `E`, `Z`, `C` | tenta rispettivamente diagonale nord-ovest, nord-est, sud-ovest, sud-est sulla griglia |
 | `WASD` durante QTE diagonale | due pressioni nell'ordine indicato: prima asse orizzontale, poi verticale |
@@ -1298,7 +1544,7 @@ le immagini sono output rigenerabili, non prerequisiti del checkout.
 | `--smoke-arenas-view` | quattro fasce di arene reali, combattimento, ologramma, Loot e cambio stanza; screenshot `odin_pp_arenas_*.png` |
 | `--smoke-m8-view` | dispositivi con APRI IL RING, campo, tag match, ritorno Loot: `odin_pp_m8_d4.png`, `devices`, `mega_combo`, `character`, `loot`, `tag_ring`, `next_room` (tutti con prefisso `odin_pp_m8_` e suffisso `.png`) |
 | `--smoke-western` | 6 RANCH 7 dalla mano al premio: `odin_pp_western_hand.png`, `cards`, `sign`, `gate`, `riders`, `ride`, `grab`, `win`, `reward` (prefisso `odin_pp_western_`) |
-| `--smoke-mechanics-lab` | sandbox: `odin_pp_mechanics_lab.png`, `_square`, `_full`, `_refill`, `_restart`, `_stun`, `_pause`, `_defeat` (prefisso `odin_pp_mechanics_lab`); cartoncini vivi: `odin_pp_living_move_00.png`–`_37` e `odin_pp_living_attack_00.png`–`_37`, un'immagine ogni due fotogrammi; modi degli intenti nemici (F6): `odin_pp_living_intents_0_00.png`–`_3_39` (0 sigilli + terreno, 1 sigilli, 2 terreno, 3 adesivi), ogni tre, e lo stesso istante con un colpo in arrivo nei modi 0 e 3 (`odin_pp_living_intent_both.png`, `_labels`); segnalino di cura: `odin_pp_living_heal_00.png`–`_39`, ogni due; status a stack: `odin_pp_living_statuses_00.png`–`_19`, ogni tre, e `odin_pp_mechanics_lab_statuses.png` (fermo, con l'ispettore del nemico); Movimento Ombra dalla mano: `odin_pp_living_shadow_00.png`–`_82` (sprofonda, quattro passi dell'ombra con la diagonale sul primo battito, risale), ogni quattro; colpi: `odin_pp_living_blow_<nome>_00.png`–`_23` per `bolt`, `bolt_miss`, `cleave`, `claws`, `crozier`, `staff`, `bomb` ed `ember`, `_00`–`_39` per `charge`, `_00`–`_37` per `lantern`, `iron_cleaver` e `storm_pike`, ogni due; Rallentamento sul sigillo: `odin_pp_mechanics_lab_slow.png` (l'intento trattenuto, con l'ispettore del bruto) e `odin_pp_mechanics_lab_slow_worn.png` (dopo l'azione, uno stack in meno) |
+| `--smoke-mechanics-lab` | sandbox: `odin_pp_mechanics_lab.png`, `_square`, `_full`, `_refill`, `_restart`, `_stun`, `_pause`, `_defeat` (prefisso `odin_pp_mechanics_lab`); cartoncini vivi: `odin_pp_living_move_00.png`–`_37` e `odin_pp_living_attack_00.png`–`_37`, un'immagine ogni due fotogrammi; modi degli intenti nemici (F6): `odin_pp_living_intents_0_00.png`–`_3_39` (0 sigilli + terreno, 1 sigilli, 2 terreno, 3 adesivi), ogni tre, e lo stesso istante con un colpo in arrivo nei modi 0 e 3 (`odin_pp_living_intent_both.png`, `_labels`); segnalino di cura: `odin_pp_living_heal_00.png`–`_39`, ogni due; status a stack: `odin_pp_living_statuses_00.png`–`_19`, ogni tre, e `odin_pp_mechanics_lab_statuses.png` (fermo, con l'ispettore del nemico); Movimento Ombra dalla mano: `odin_pp_living_shadow_00.png`–`_82` (sprofonda, quattro passi dell'ombra con la diagonale sul primo battito, risale), ogni quattro; colpi: `odin_pp_living_blow_<nome>_00.png`–`_23` per `bolt`, `bolt_miss`, `cleave`, `claws`, `crozier`, `staff`, `bomb` ed `ember`, `_00`–`_39` per `charge`, `_00`–`_37` per `lantern`, `iron_cleaver` e `storm_pike`, ogni due; Rallentamento sul sigillo: `odin_pp_mechanics_lab_slow.png` (l'intento trattenuto, con l'ispettore del bruto) e `odin_pp_mechanics_lab_slow_worn.png` (dopo l'azione, uno stack in meno); Pozza di Veleno e Incendio: `odin_pp_mechanics_lab_pool_preview.png` (l'anteprima con l'area che l'ultima pozza chiuderebbe), `odin_pp_living_pool_00.png`–`_29` (la fiala lanciata chiude l'anello e l'area si allaga), ogni tre, `odin_pp_living_pool_walk_NN.png` (un chaser attraversa due pozze, poi il Viandante entra in una sua), ogni sei, `odin_pp_living_fire_NN.png` (il fuoco accanto al bruto per cinque finestre), ogni quattro, `odin_pp_mechanics_lab_fire.png` (alla quarta finestra) e il tavolo piatto in `odin_pp_mechanics_lab_pool_flat.png` e `odin_pp_mechanics_lab_fire_flat.png`; le cariche: `odin_pp_mechanics_lab_card_Deflect.png`, `_Coffin`, `_Fate_Dice`, `_Venom_Blade` (ogni carta sotto il mouse, con l'ispettore), `odin_pp_living_deflect_bolt_00.png`–`_31`, `odin_pp_living_deflect_cleave_00.png`–`_31` e `odin_pp_living_deflect_charge_00.png`–`_39`, ogni due, `odin_pp_mechanics_lab_arrow_aim.png` (`Ctrl` premuto, il mouse sul nemico segnato; quello dietro la copertura resta senza segno), `odin_pp_living_arrow_00.png`–`_37`, `odin_pp_living_fate_00.png`–`_37`, `odin_pp_living_fate_lethal_00.png`–`_37` e `odin_pp_living_fate_boss_00.png`–`_37` (il Custode), ogni due, `odin_pp_mechanics_lab_venom_roll.png` (il dado di Lama Velenosa) e `odin_pp_living_venom_00.png`–`_37` |
 | `--smoke` | `odin_pp_isometric.png` |
 | `--smoke-generation` | `odin_pp_procedural_room.png` |
 | `--smoke-map` | `odin_pp_route.png` |
@@ -1460,10 +1706,11 @@ l'ultimo comando e viene azzerato all'inizio del successivo.
 
 ### Status
 
-Ogni combattente possiede uno `Status_Set` inline, con massimo otto status e
-una sola istanza per tipo. La potenza deve essere positiva, e così la durata,
-tranne per gli status a **stack** (`status_kind_stacks`: Veleno, Bruciatura,
-Rallentamento): non ne hanno (`remaining_pulses` resta 0) e nessun pulse li
+Ogni combattente possiede uno `Status_Set` inline, con un posto per tipo
+(`MAX_STATUSES_PER_ENTITY = len(Status_Kind)`) e una sola istanza per tipo. La
+potenza deve essere positiva, e così la durata, tranne per gli status a
+**stack** (`status_kind_stacks`: Veleno, Bruciatura, Rallentamento e le cariche
+del Viandante): non ne hanno (`remaining_pulses` resta 0) e nessun pulse li
 consuma; ogni applicazione aggiunge i propri stack.
 
 | Status | Stacking | Comportamento |
@@ -1476,6 +1723,10 @@ consuma; ogni applicazione aggiunge i propri stack.
 | Afterimage | potenza e durata maggiori | dopo il proprio `Moved` in Combat concede Shield pari alla potenza, per due pulse; in M7 permette schivate durante il recupero |
 | Stagger | potenza e durata maggiori | M7: interrompe l’intento nemico, cancella mira/lancio preparati e lascia almeno 1 secondo sfruttabile dopo il costo della carta |
 | Survey | potenza e durata maggiori | M7: lato della vista +2 (2×2 → 5×5), massimo 9, rispettando LoS e senza memoria |
+| Deflect (RIFLESSO) | somma saturata degli stack, senza durata | solo il Viandante: il prossimo colpo nemico che lo colpirebbe torna all'attaccante; uno stack per colpo, fino alla fine della stanza |
+| Arrows (FRECCE) | somma saturata degli stack, senza durata | solo il Viandante: frecce da scoccare con `Ctrl` + clic; uno stack a freccia, fino alla fine della stanza |
+| Fate (DESTINO) | il massimo degli stack (3), senza durata | solo il Viandante: gli urti caricati tirano il dado dell'ultimo Dado del Destino; uno stack a urto, fino alla fine della stanza |
+| Venom_Blade (LAMA) | somma saturata degli stack, senza durata | solo il Viandante: urti con 2 Veleno; uno stack a urto, fino alla fine della stanza |
 
 Il danno al player segue `danno base -> difesa -> Shield -> salute`; i nemici
 non hanno ancora una statistica difesa. Il morso di Veleno e Bruciatura salta
@@ -1489,7 +1740,7 @@ scadenza sparisca.
 Sono **azioni** del player tutti i comandi accettati in combattimento: passo
 (anche durante il recupero), attacco a urto, carta, attesa, schivata (anche
 quella reattiva del QTE di difesa, appena atterra), diagonale (anche fallita),
-refocus, Activate ed Equip; il Veleno morde alla fine del comando, prima del
+refocus, Activate, Equip e la freccia di Feretro; il Veleno morde alla fine del comando, prima del
 tempo del mondo che il comando fa scorrere. Non lo sono Movimento Ombra (la
 carta, i passi dell'ombra e la risalita: nell'ombra il player è intangibile),
 le altre risposte ai QTE di difesa (blocco, parata, deviazione) e l'anello
@@ -1497,6 +1748,9 @@ Tesla. Del nemico ogni intento risolto, di qualsiasi tipo; un intento
 interrotto da Stagger non è un'azione. La Bruciatura in M7 morde sul comando
 `Timeout`, con i suoi cue e i suoi suoni.
 
+Veleno e Bruciatura del pavimento (pozze e fuochi,
+[Pozza di Veleno e Incendio](#pozza-di-veleno-e-incendio)) hanno sorgente System,
+come i morsi: nessuna reliquia o reazione del Viandante li modifica.
 Thorns non scatta su danno interamente assorbito, veleno, bruciatura o hazard neutrali.
 Afterimage osserva solo il movimento terminale: un Dash di tre celle lo attiva
 una volta. Il suo Shield arriva **dopo** gli hazard attraversati, ma prima della
@@ -1641,6 +1895,8 @@ un generico `is_occupied`: loot, trappole e Fire hanno regole diverse dai solidi
 | Barrel | solido / trasparente | spostabile; in Combat il danno accende la miccia |
 | Bomb | attraversabile / trasparente | spostabile, nasce accesa dal lancio del Bombarolo |
 
+Pozze e fuochi delle carte della Fase 2 non sono oggetti: stanno sul pavimento
+(`Room.ground`, [ground.odin](src/game/ground.odin)) e non occupano né posti né celle.
 Gli oggetti hanno storage preallocato per 32 istanze e ID monotoni non nulli.
 Lo spawn iniziale rifiuta sovrapposizioni con attori, uscita, spawn, trappole,
 ostacoli e altri oggetti, anche per Fire. Lo spawn runtime di una bomba può
@@ -1840,6 +2096,12 @@ beneficio è il dado successivo, fino al D20.
 | `Sei_Denari` | starter, mai offerta | 1 | player, None | +6 oro; exhaust on play. Con il 7 in mano apre 6 RANCH 7 |
 | `Sette_Denari` | starter, mai offerta | 1 | player, None | +7 oro; exhaust on play. Con il 6 in mano apre 6 RANCH 7 |
 | `Shadow_Step` (Movimento Ombra) | Rare, starter tattico | 3 | player, None | solo tattica: 4 s reali nell'ombra; mondo, nemici, finestra e stordimento fermi; intangibile; solo passi dell'ombra (diagonale sui suoi battiti); risale sull'ultima casella. 0 s di finestra, senza upgrade. Il classico non la offre e la rifiuta (`Invalid_Phase`) |
+| `Poison_Pool` (Pozza di Veleno) | Common | 1 | cella libera, Chebyshev 1-3, Single, LoS | solo tattica: una pozza fino alla fine della stanza; 2 Veleno, +1 per upgrade, a un nemico per ogni sua cella in cui entra; le aree che chiude si riempiono. 1 s di finestra. Il classico non la offre e la rifiuta |
+| `Wildfire` (Incendio) | Uncommon | 2 | cella libera, Chebyshev 1-3, Single, LoS | solo tattica: un fuoco che cresce a croce (bracci da 1 a 4 caselle) a ogni nuova finestra e si spegne alla quinta; 1 Bruciatura, +1 per upgrade, a ogni ingresso e a chi prende fuoco. 2 s di finestra. Il classico non la offre e la rifiuta |
+| `Deflect` | Uncommon | 1 | player, None | solo tattica: una carica di RIFLESSO, il prossimo colpo nemico torna all'attaccante; senza upgrade. 1 s di finestra |
+| `Coffin` (Feretro) | Uncommon | 2 | player, None | solo tattica: 3 frecce, +1 per upgrade, da scoccare con `Ctrl` + clic. 1 s di finestra, e 1 s a freccia |
+| `Fate_Dice` (Dado del Destino) | Rare | 2 | player, None | solo tattica, carta con dadi: 3 urti che tirano il dado del suo livello. 1 s di finestra |
+| `Venom_Blade` (Lama Velenosa) | Common | 1 | player, None | solo tattica, carta con dadi: il dado decide quanti urti lasciano 2 Veleno. 1 s di finestra |
 
 ## Spell e dadi
 
@@ -1865,6 +2127,15 @@ difesa, Shield e reazioni:
 | Sundering Blow | Uncommon | nemico allineato, Manhattan 1–2 | `2D`; somma dei dadi almeno 8: spinta di una cella |
 | Prismatic Barrage | Uncommon | nemico, Manhattan 1–3 | `3D`: ogni 4+ vale 3 danni; ogni dado sotto il 4 dà 1 Shield per due pulse |
 | Twin Venom | Uncommon | nemico, Manhattan 1–3 | `1 + max(2D)`; una coppia applica 2 Veleno al sopravvissuto |
+
+Due carte della Fase 2 tirano un dado della stessa scala, in tattica:
+`Dado del Destino` (energia 2) non tira niente quando la si gioca, ma ogni suo
+urto caricato tira il dado al colpo (il cartellino del dado sul nemico, non il
+tavolo dei dadi), e `Lama Velenosa` (energia 1) lo tira giocandola, con il lancio
+a tutto schermo come le altre
+([Deflect, Feretro, Dado del Destino e Lama Velenosa](#deflect-feretro-dado-del-destino-e-lama-velenosa)).
+Anche le frecce di Feretro scelgono il loro status con i dadi del player
+(`Player.dice`, sotto).
 
 Con un dado da N facce Fate rimbalza con probabilità `1/N`. Le soglie restano
 numeri fissi, quindi un dado più grande le supera più spesso: Sundering spinge
@@ -2350,7 +2621,9 @@ stesso, cioè la sua animazione nella timeline, i secondi di un'azione a tempo o
 il passo da 0,4 s dell'ombra di [Movimento Ombra](#movimento-ombra), una
 pressione viene scartata; agisce solo una pressione fatta dopo la fine
 dell'azione. Il poll continua a girare, così hover, `Esc` e l'annullamento del
-drag rispondono, ma il suo comando non viene tenuto. La schivata `Shift + WASD`
+drag rispondono, ma il suo comando non viene tenuto. Lo stesso vale per la
+freccia di Feretro (`Ctrl` + clic, il comando `Shoot`): un'azione da 1 s come le
+altre, mai tenuta per dopo e mai segnata con lo scocco. La schivata `Shift + WASD`
 che interrompe un'azione a tempo è una regola del gioco, non una coda. L'unico
 input che attraversa qualche fotogramma è il passo premuto sul secondo, che
 aspetta al massimo `BEAT_CHORD_SECONDS` (0,06 s) il tasto perpendicolare della

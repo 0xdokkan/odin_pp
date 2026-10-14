@@ -32,6 +32,11 @@ tactical_status_label :: proc(kind: game.Status_Kind, short: bool) -> (label: st
 	case .Survey: label = "VISTA"
 	case .Burn: label, accent = "BRUCIATURA", HUD_EMBER
 	case .Slow: label, accent = "RALLENTAMENTO", HUD_FROST
+	// The player's charges (game/player_charges.odin).
+	case .Deflect: label, accent = "RIFLESSO", HUD_FROST
+	case .Arrows: label, accent = "FRECCE", HUD_AMBER
+	case .Fate: label, accent = "DESTINO", HUD_SHADE
+	case .Venom_Blade: label, accent = "LAMA", HUD_VENOM
 	}
 	if short && len(label) > 3 { label = label[:3] }
 	return
@@ -42,6 +47,25 @@ tactical_status_chip_text :: proc(status: game.Status, short: bool) -> cstring {
 	label, _ := tactical_status_label(status.kind, short)
 	if game.status_kind_stacks(status.kind) { return fmt.ctprintf("%s %d", label, status.potency) }
 	return fmt.ctprintf("%s %d / %ds", label, status.potency, status.remaining_pulses)
+}
+
+// The order of the HUD's status chips (the first three show, the rest are a
+// count): what bites the player first (VELENO, BRUCIATURA), so that it never
+// hides behind the count, then his charges (what his cards loaded him with:
+// RIFLESSO, FRECCE, DESTINO, LAMA), then the rest, each group as it was gained.
+tactical_status_chip_order :: proc(statuses: ^game.Status_Set) -> (ordered: game.Status_Set) {
+	group :: proc(kind: game.Status_Kind) -> int {
+		if kind == .Poison || kind == .Burn { return 0 }
+		return 1 if game.status_kind_is_player_charge(kind) else 2
+	}
+	for rank in 0..<3 {
+		for status in statuses.items[:clamp(statuses.count, 0, len(statuses.items))] {
+			if group(status.kind) != rank { continue }
+			ordered.items[ordered.count] = status
+			ordered.count += 1
+		}
+	}
+	return
 }
 
 // VITA: health first and large, then gold and the active statuses.
@@ -57,13 +81,14 @@ draw_tactical_status :: proc(renderer: ^Renderer, room: ^game.Room) {
 	row := b.y+b.height-22
 	gothic_inlay(b.x+16, row+8, 4, HUD_AMBER)
 	gothic_text_fit(renderer, fmt.ctprintf("%d", v.gold), {b.x+24, row, 42, 17}, 12, HUD_AMBER)
-	count := v.statuses.count
+	ordered := tactical_status_chip_order(&v.statuses)
+	count := ordered.count
 	if count == 0 { return }
 	left := b.x+72
 	room_width := b.x+b.width-8-left
 	shown := min(count, 3)
 	chip := min(f32(96), (room_width-f32(shown-1)*4-(26 if count > shown else 0))/f32(shown))
-	for status, index in v.statuses.items[:shown] {
+	for status, index in ordered.items[:shown] {
 		_, accent := tactical_status_label(status.kind, chip < 80)
 		hud_chip(renderer, {left+f32(index)*(chip+4), row-1, chip, 18}, tactical_status_chip_text(status, chip < 80), accent)
 	}

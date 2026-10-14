@@ -199,6 +199,8 @@ Room :: struct {
 	reaction_bindings: Reaction_Binding_Set,
 	// A ring opened by a square of coils, awaiting the duel's result.
 	tesla_ring: Tesla_Ring,
+	// Pools and fires on the floor (ground.odin); they last as long as the room.
+	ground: Ground_State,
 	// The mechanics sandbox never clears: the last kill keeps the combat going.
 	endless: bool,
 }
@@ -442,6 +444,7 @@ create_room :: proc(level_data: ^level.Level, player: ^Player, content: Room_Con
 	result.loot = make([dynamic]Loot, 0, loot_capacity)
 	result.enemy_path_distances = make([]int, len(level_data.tiles.cells))
 	result.enemy_path_queue = make([]grid.Position, len(level_data.tiles.cells))
+	result.ground.pool = make([]i32, len(level_data.tiles.cells))
 	spawn_position := level_data.player_spawn
 
 	for position in content.obstacles {
@@ -549,6 +552,7 @@ destroy_room :: proc(room: ^Room) {
 	delete(room.loot)
 	delete(room.enemy_path_distances)
 	delete(room.enemy_path_queue)
+	delete(room.ground.pool)
 	room^ = {}
 }
 
@@ -767,18 +771,9 @@ try_move_player :: proc(room: ^Room, direction: Move_Direction) -> Action_Result
 	clear_event_log(&room.recent_events)
 	if room.phase == .Combat {
 		if enemy_index, found := enemy_index_at(room, target); found {
-			enemy := room.enemies[enemy_index]
-			action := make_action(.Attack, PLAYER_ENTITY, entity_target(enemy_entity(enemy.id)), .Adjacent_Opponent)
-			damage := player_basic_attack_damage(room.player)
-			if critical { damage = critical_bump_damage(damage) }
-			added := add_effect(&action, damage_effect(enemy_entity(enemy.id), damage))
-			assert(added)
-			report := resolve_action(room, &action)
-			assert(report.accepted)
-			consume_equipped_weapon_use(room.player)
-			mark_attack_events(&report.events, 0, PLAYER_ENTITY, enemy_entity(enemy.id), room.player.position, target, {}, false)
-			if critical { mark_critical_events(&report.events) }
-			append_event_log(&room.recent_events, &report.events)
+			// The bump, loaded with whatever the player's charges add (player_charges.odin).
+			struck := player_bump(room, enemy_index, target, .Adjacent_Opponent, critical)
+			assert(struck)
 			_, outcome := finish_player_combat_command(room)
 			switch outcome {
 			case .Player_Defeated:

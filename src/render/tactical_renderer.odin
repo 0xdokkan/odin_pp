@@ -63,6 +63,11 @@ Tactical_View :: struct {
 	intent_memory: [game.MAX_ENEMIES_PER_ROOM]Intent_Memory,
 	// MOVIMENTO OMBRA: the player's pool and the world held still (shadow_step.odin).
 	shadow: Shadow_View,
+	// The pools and fires on the floor (ground_fx.odin).
+	ground: ^Ground_Fx,
+	// FERETRO: the player holds Ctrl with arrows to loose; the board marks the
+	// foes they reach (player_charges.odin). The scene sets it every frame.
+	arrow_aim: bool,
 	// The last pointer seen by the view, for HUD hover states only.
 	pointer: view.Vec2,
 	pointer_inside: bool,
@@ -127,6 +132,7 @@ destroy_tactical_assets :: proc(renderer: ^Renderer) {
 	if renderer.tactical.flipbook_state != nil { free(renderer.tactical.flipbook_state); renderer.tactical.flipbook_state = nil }
 	destroy_living_cards(renderer)
 	destroy_lab_sounds(renderer)
+	destroy_ground_fx(renderer)
 	if renderer.tactical.outline_shader.id != 0 { rl.UnloadShader(renderer.tactical.outline_shader); renderer.tactical.outline_shader = {} }
 	if renderer.tactical.labels != nil { free(renderer.tactical.labels); renderer.tactical.labels = nil }
 	if renderer.tactical.light_shader.id != 0 { rl.UnloadShader(renderer.tactical.light_shader); renderer.tactical.light_shader = {} }
@@ -412,6 +418,7 @@ draw_tactical_world :: proc(renderer: ^Renderer, room: ^game.Room, active_card: 
 	v := &renderer.tactical
 	v.draw_frustum = tactical_draw_frustum(v.camera, renderer.canvas_width, renderer.canvas_height)
 	snapshot := v.snapshot
+	update_ground_fx(renderer, room)
 	lights: [4]rl.Vector4
 	surface := begin_tactical_surface(renderer)
 	if surface { rl.BeginMode2D({zoom = 2}) }
@@ -438,6 +445,7 @@ draw_tactical_world :: proc(renderer: ^Renderer, room: ^game.Room, active_card: 
 		if v.scene_3d { draw_voxel_cover(renderer, obstacle.position) }
 		else { draw_diamond(inset_vertices(tile_vertices(renderer, obstacle.position), 0.7), rl.GRAY, rl.LIGHTGRAY) }
 	}
+	if !v.scene_3d { draw_ground_flat(renderer, room) }
 	for trap in snapshot.traps[:snapshot.trap_count] {
 		if !trap.armed || !tactical_cell_on_screen(renderer, trap.position) || !tactical_render_visible(renderer, trap.position) { continue }
 		if v.scene_3d { draw_voxel_trap(renderer, trap) }
@@ -466,6 +474,7 @@ draw_tactical_world :: proc(renderer: ^Renderer, room: ^game.Room, active_card: 
 	}
 	if v.scene_3d {
 		rl.EndShaderMode()
+		draw_ground_decal(renderer, room)
 		draw_tactical_ground_shadows(renderer, room)
 		draw_diorama_accents(renderer, room)
 		draw_tactical_clear_markers(renderer, room)
@@ -476,7 +485,10 @@ draw_tactical_world :: proc(renderer: ^Renderer, room: ^game.Room, active_card: 
 	}
 	if tactical_telegraphs_are_visible(renderer, room) {
 		if surface { rl.BeginMode2D({zoom = 2}) }
-		if !renderer_blocks_player_input(renderer) { draw_card_target_range(renderer, room, active_card) }
+		if !renderer_blocks_player_input(renderer) {
+			draw_card_target_range(renderer, room, active_card)
+			draw_arrow_aim(renderer, room)
+		}
 		if !v.scene_3d { for &enemy in room.enemies {
 			for cell in enemy.intent.threatened_cells[:enemy.intent.threatened_cell_count] {
 				if tactical_render_visible(renderer, cell) { draw_card_range_cell(renderer, cell, {232, 95, 83, 45}, {232, 95, 83, 190}) }
@@ -513,5 +525,6 @@ draw_tactical_world :: proc(renderer: ^Renderer, room: ^game.Room, active_card: 
 	}
 	// The mechanics lab's paper tokens outlive their cues.
 	draw_living_tokens(renderer)
+	draw_fate_tokens(renderer)
 }
 

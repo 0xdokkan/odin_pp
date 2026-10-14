@@ -93,6 +93,9 @@ Effect_Kind :: enum {
 	Deploy_Device,
 	// Movimento Ombra: `amount` seconds inside the player's shadow.
 	Enter_Shadow,
+	// Pozza di Veleno (`status` Poison) or Incendio (Burn) on `destination`:
+	// `amount` stacks to an enemy for each cell of it entered (ground.odin).
+	Place_Ground,
 }
 
 Effect :: struct {
@@ -393,6 +396,8 @@ effect_is_valid :: proc(room: ^Room, effect: Effect) -> bool {
 	switch effect.kind {
 	case .Enter_Shadow:
 		return effect.target == PLAYER_ENTITY && effect.amount > 0 && tactical_can_begin_shadow(room)
+	case .Place_Ground:
+		return effect.target == PLAYER_ENTITY && effect.amount > 0 && ground_can_place(room, effect.status, effect.destination)
 	case .Deploy_Device:
 		return effect.target == PLAYER_ENTITY && effect.amount > 0 &&
 		       (effect.object_kind != .Shock_Floor || (effect.charges >= 1 && effect.charges <= TACTICAL_SHOCK_FLOOR_MAX_CHARGES)) &&
@@ -512,6 +517,12 @@ absorb_damage_with_shield :: proc(
 	return damage-absorbed
 }
 
+// What a blow of `amount` takes from the player before any Shield: his
+// defense counted, never below 1. RIFLESSO sends back the same.
+player_blow_damage :: proc(room: ^Room, amount: i32) -> i32 {
+	return max(i32(1), amount-room.player.stats.defense)
+}
+
 apply_damage_effect :: proc(
 	room: ^Room,
 	source: Entity_Ref,
@@ -525,7 +536,7 @@ apply_damage_effect :: proc(
 	// A status's bite (Veleno, Bruciatura) is its stacks: no defense takes
 	// from it, only a Shield.
 	if effect.target.kind == .Player && !effect.has_status_cause {
-		damage = max(i32(1), damage-room.player.stats.defense)
+		damage = player_blow_damage(room, damage)
 	}
 	if effect.target.kind == .Player || effect.target.kind == .Enemy {
 		damage = absorb_damage_with_shield(
@@ -638,6 +649,9 @@ apply_effect :: proc(room: ^Room, source: Entity_Ref, effect: Effect, report: ^A
 	case .Deploy_Device:
 		deployed := deploy_board_device(room, effect.object_kind, effect.destination, effect.amount, effect.charges, &report.events)
 		assert(deployed)
+	case .Place_Ground:
+		placed := place_ground(room, effect.status, effect.destination, effect.amount, report)
+		assert(placed)
 	case .Damage:
 		apply_damage_effect(room, source, effect, report)
 	case .Heal:

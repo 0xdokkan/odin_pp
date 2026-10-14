@@ -863,6 +863,11 @@ resolve_enemy_intents :: proc(room: ^Room, pulse: ^Pulse_Report, only_id: u32 = 
 				)
 				continue
 			}
+			// RIFLESSO: the blow goes back to its attacker instead.
+			if deflect_enemy_blow(room, source, enemy.position, &intent, ranged, pulse) {
+				if room.phase != .Combat { return }
+				continue
+			}
 			action := make_action(.Attack, source, entity_target(PLAYER_ENTITY), .Opponent)
 			added := add_effect(&action, damage_effect(PLAYER_ENTITY, intent.damage))
 			assert(added)
@@ -941,6 +946,11 @@ resolve_enemy_intents :: proc(room: ^Room, pulse: ^Pulse_Report, only_id: u32 = 
 					intent.threatened_cells[0],
 					&intent,
 				)
+				continue
+			}
+			// RIFLESSO: the charge's blow goes back to the brute that struck it.
+			if deflect_enemy_blow(room, source, moved_enemy.position, &intent, false, pulse) {
+				if room.phase != .Combat { return }
 				continue
 			}
 			attack_action := make_action(.Attack, source, entity_target(PLAYER_ENTITY), .Opponent)

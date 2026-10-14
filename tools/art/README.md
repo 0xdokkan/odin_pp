@@ -184,9 +184,18 @@ piccola cappella costruita con i pezzi del kit, illuminato dalla sua lanterna.
 python tools/art/build_card_icons.py
 ```
 
-Aggiunge ad `assets/gothic/card-icons-pixel.png` una quinta riga di celle in pixel
-art disegnate nello script (una griglia di 28x28 lettere di palette per icona; oggi
-la cella 16, Movimento Ombra) e lascia identiche, byte per byte, le 16 icone dipinte.
+Aggiunge ad `assets/gothic/card-icons-pixel.png` una quinta e una sesta riga di
+celle in pixel art disegnate nello script (una griglia di 28x28 lettere di palette
+per icona; oggi la cella 16, Movimento Ombra, la 17, Pozza di Veleno: una fiala
+rovesciata nella sua pozza, la 18, Incendio: un fuoco su una croce bruciata, una
+fiamma in fondo a ogni braccio, la 19, Deflect: uno scudo tondo d'acciaio da cui un
+dardo rimbalza via in una scintilla, la 20, Feretro: una bara di legno scuro con la
+croce d'oro e tre frecce che spuntano dalla testa, la 21, Dado del Destino: un d20
+d'osso con il 20 sulla faccia illuminata in un anello viola, e la 22, Lama Velenosa:
+un pugnale dall'elsa d'oro con il filo verde che gocciola veleno) e lascia
+identiche, byte per byte, le 16 icone dipinte. Ogni riga aggiunta tiene il passo
+della quinta (314 pixel), così le icone di una riga non si spostano quando se ne
+aggiunge un'altra.
 Usa solo la libreria standard di Python (va bene anche quello di Blender) e non passa
 mai l'atlante da Blender né da altre librerie d'immagine. `--check` dice se l'atlante
 è aggiornato; `--preview C:/tmp/icone --no-write` scrive le celle aggiunte senza
@@ -205,7 +214,11 @@ del bruto, il pastorale del custode, il bastone dell'arcimago, il dardo della
 balestra, la bomba, la brace in due disegni che si alternano, e i pezzi di un
 impatto: la scia di carta di un fendente, la stella del colpo (stampata in
 bianco e colorata dal colpo: rossa, blu se lo scudo para, oro se critico), i
-graffi del ghoul e i pezzetti di carta che volano dalle caselle vuote.
+graffi del ghoul e i pezzetti di carta che volano dalle caselle vuote. Per il
+pavimento (`src/render/ground_fx.odin`): le fiamme dei fuochi di Incendio (due
+disegni grandi per il centro, due più piccoli per i bracci, che si alternano),
+la fiala di Pozza di Veleno in volo, le gocce del suo schizzo e le faville di
+una fiamma calpestata.
 
 Ogni pezzo è pixel art scritta nello script come righe di lettere di palette,
 nei colori delle figure; lo script aggiunge il contorno d'inchiostro (ogni pixel

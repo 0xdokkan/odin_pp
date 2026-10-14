@@ -12,9 +12,10 @@ slow shimmer) as the card wakes. Then the effect, made of what it summons:
   harmonics and a hum-locked sizzle, sparse 2-10 kHz crackle, sharp N-wave
   snaps with a short torn-air crackle and a low air thump; the ray's beam is
   burning air (a rough 1.8-10 kHz sear) over an FM chord whose index flares;
-- fire (firebomb, spark forge): brown-noise roar under 400 Hz, crackle
-  grains, a sputtering fuse;
-- poison (toxic wave, venom needle, caustic bloom, twin venom): modelled
+- fire (firebomb, spark forge, wildfire): brown-noise roar under 400 Hz,
+  crackle grains, a sputtering fuse, a flint's sparks;
+- poison (toxic wave, venom needle, caustic bloom, twin venom, poison
+  pool): modelled
   bubbles (damped sines whose pitch rises as they close, after van den Doel;
   the big, low ones barely rise, or they turn into cartoon bloops) over wet,
   gurgling band-passed hiss; the needle's whistle is aeolian noise;
@@ -966,6 +967,63 @@ def card_twin_venom(seed):
 
 
 _EVENTS["card_twin_venom"] = (0.0, 0.095, 0.195, 0.3, 0.4, 0.52)
+
+
+@sound("card_poison_pool", loudness=_LOUD, wet=_WET)
+def card_poison_pool(seed):
+    """A vial uncorked and flung: the cork pops, the poison glugs out in its
+    flight and splashes on the stone, where its pool keeps bubbling."""
+    dur = 0.95
+    b = _Bus(dur)
+    _intro(b, seed)
+    b.add(0.06, _cork(seed + 3, 0.92), 0.7)
+    b.add(0.0, _norm(_glops(dur, [0.2, 0.27], 140, 210, seed + 4)), 0.45)
+    # it lands: the splash, one low blorp of the pool forming
+    S = 0.38
+    b.add(S, _splash(seed + 5, 1.1), 0.75)
+    b.add(S, _bubble(160, 1.0, _BLORP_XI, 2.4), 0.35)
+    # the pool keeps bubbling, slower and slower
+    d = dur - S - 0.02
+    m = n_samples(d)
+    u = np.arange(m) / m
+    bt = random_times(d, 60, seed + 6, 0.05, d, lambda v: 1 - 0.8 * v)
+    b.add(S + 0.02, _norm(_bubbles(d, bt, 300, 1100, seed + 7, 0.15, 1.6)) * (1 - u) ** 0.9, 0.45)
+    gt = np.sort(rng(seed + 8).uniform(0.12, d - 0.1, 3))
+    b.add(S + 0.02, _norm(_glops(d, gt, 120, 190, seed + 9)), 0.3)
+    return _finish(b)
+
+
+_EVENTS["card_poison_pool"] = (0.0, 0.06, 0.2, 0.38)
+
+
+@sound("card_wildfire", loudness=_LOUD, wet=_WET)
+def card_wildfire(seed):
+    """Flint struck on steel twice, and the floor catches: a soft whoomp of
+    flame, then a crackle that spreads."""
+    dur = 0.95
+    b = _Bus(dur)
+    _intro(b, seed)
+    for i, (t0, g) in enumerate(((0.07, 0.6), (0.15, 0.85))):
+        # each strike: a short steel ping and a spray of sparks
+        b.add(t0, _modal(0.08, [(3900 + 300 * i, 0.012, 1.0), (6100, 0.008, 0.6), (8300, 0.005, 0.4)], seed + 3 + i), 0.35 * g)
+        sp = 0.12
+        b.add(t0 + 0.002, _ecrackle(sp, 3000 * np.exp(-time_axis(sp) / 0.025), seed + 5 + i, 3000, 11000, 0.0002), 0.5 * g)
+    # it catches: a soft whoomp...
+    C, d = 0.22, 0.3
+    b.add(C, _whoosh(d, seed + 7, 250, 1100, 1.3, 0.35), 0.55)
+    n = n_samples(d)
+    b.add(C, _norm(highpass(lowpass(pink(d, seed + 8), 600, 2), 60, 2)) * _ar(n, 0.02, 0.08), 0.4)
+    # ...and the fire spreads, roaring and crackling, ever more of it
+    d2 = dur - C - 0.02
+    m = n_samples(d2)
+    u = np.arange(m) / m
+    env = np.clip(u / 0.25, 0, 1) * np.clip((1 - u) / 0.35, 0, 1)
+    b.add(C + 0.02, _roar(d2, seed + 9, 380) * env, 0.35)
+    b.add(C + 0.02, _fire_crackle(d2, 120 + 380 * u, seed + 10) * env, 0.35)
+    return _finish(b)
+
+
+_EVENTS["card_wildfire"] = (0.0, 0.07, 0.15, 0.22)
 
 
 # ==========================================================================

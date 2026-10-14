@@ -164,8 +164,11 @@ tactical_expire_window :: proc(room: ^Room) -> bool {
 	}
 	// Bruciatura bites as the window number changes, on this very command, so
 	// its blows have their cues. A lethal one ends the fight as any blow does.
+	// Then the fires on the floor grow (ground.odin): whoever they catch now
+	// burns from the next window, as one who walks in.
 	burn: Pulse_Report
 	tick_combatants(room, &burn, burn_status)
+	grow_ground_fires(room, &burn)
 	append_event_log(&room.recent_events, &burn.events)
 	if room.phase != .Combat {
 		collect_loot_in_magnet_range(room)

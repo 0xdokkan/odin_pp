@@ -19,9 +19,11 @@ GOTHIC_RECESS :: ui.GOTHIC_PALETTE.panel
 GOTHIC_FONT_SIZES :: [?]int{10, 12, 14, 16, 18, 24, 32}
 
 // The card icon atlas: the 16 painted icons in four rows of four, then the
-// rows added by tools/art/build_card_icons.py (cell 16: Movimento Ombra).
+// rows added by tools/art/build_card_icons.py (cell 16: Movimento Ombra, 17:
+// Pozza di Veleno, 18: Incendio, 19: Deflect, 20: Feretro, 21: Dado del
+// Destino, 22: Lama Velenosa).
 CARD_ICON_COLUMNS :: 4
-CARD_ICON_ROWS :: 5
+CARD_ICON_ROWS :: 6
 CARD_ICON_CELLS :: CARD_ICON_COLUMNS*CARD_ICON_ROWS
 // The figure atlas: four rows of four.
 GOTHIC_FIGURE_CELLS :: 16
@@ -37,8 +39,8 @@ Gothic_Art :: struct {
 }
 
 // A cell of a four-column atlas `rows` cells high, in pixels (right and
-// bottom excluded). The icons' fifth row leaves the painted four where they
-// were: 1568/5 and 1254/4 rows start on the same pixels.
+// bottom excluded). The icons' added rows leave the painted four where they
+// were: 1881/6 and 1254/4 rows start on the same pixels.
 gothic_atlas_cell :: proc(cell, rows, width, height: int) -> (left, top, right, bottom: int) {
 	return cell%CARD_ICON_COLUMNS*width/CARD_ICON_COLUMNS, cell/CARD_ICON_COLUMNS*height/rows,
 		(cell%CARD_ICON_COLUMNS+1)*width/CARD_ICON_COLUMNS, (cell/CARD_ICON_COLUMNS+1)*height/rows
@@ -258,6 +260,12 @@ gothic_card_icon :: proc(id: game.Card_Id) -> int {
 	case .Chain_Lightning, .Tesla_Coil, .Shock_Floor, .Storm_Crown: return 14
 	case .Purifying_Guard: return 15
 	case .Shadow_Step: return 16
+	case .Poison_Pool: return 17
+	case .Wildfire: return 18
+	case .Deflect: return 19
+	case .Coffin: return 20
+	case .Fate_Dice: return 21
+	case .Venom_Blade: return 22
 	// Scopa cards draw their own art (draw_scopa_card); this is the fallback.
 	case .Sei_Denari, .Sette_Denari: return 9
 	case .Count: return 0

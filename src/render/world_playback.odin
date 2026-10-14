@@ -8,6 +8,9 @@ import view "../view"
 // never an old room snapshot or an input lock. The bound covers the maximum
 // sixty-second clock debt plus the tail of the preceding rendered beat.
 MAX_WORLD_PRESENTATION_CUES :: MAX_PRESENTATION_CUES*64
+// The bodies whose deaths are still to come that one snapshot keeps apart
+// (hold_unlanded_blows): every enemy and object of a room at once.
+HOLD_STANDING_BODIES :: game.MAX_ENEMIES_PER_ROOM+game.MAX_GRID_OBJECTS_PER_ROOM
 
 World_Presentation_Cue :: struct {
 	cue: Presentation_Cue,
@@ -139,7 +142,11 @@ begin_renderer_world_timeline :: proc(renderer: ^Renderer, before: Room_Presenta
 // shows it, is done striking (attack_fx_done_seconds).
 world_blow_done :: proc(origin: ^Room_Presentation, blow: game.Game_Event) -> f32 {
 	ranged := game.event_is_ranged_attack(blow)
-	if blow.source == game.PLAYER_ENTITY { return f32(attack_fx_done_seconds(.Pilgrim, attack_player_look(origin.weapon), blow)) }
+	// The player's shot is an arrow (attack_look), whatever is in his hand.
+	if blow.source == game.PLAYER_ENTITY {
+		look := Attack_Look.Bolt if ranged else attack_player_look(origin.weapon)
+		return f32(attack_fx_done_seconds(.Pilgrim, look, blow))
+	}
 	actor, found := presentation_actor_in_view(origin, blow.source)
 	if !found { return 0 }
 	character, known := flipbook_character(sprite_key_for_enemy(actor.archetype))
@@ -281,10 +288,100 @@ renderer_presentation_snapshot :: proc(renderer: ^Renderer, room: ^game.Room) ->
 			if result.loot_count == final.loot_count && result.loot == final.loot {
 				result.loot, result.loot_count = shown.loot, shown.loot_count
 			}
+			if result.ground == final.ground { result.ground = shown.ground }
 		}
 	}
 	apply_world_presentation(renderer, &result)
+	hold_unlanded_blows(renderer, &result)
 	return result
+}
+
+// What a blow does shows as it lands, as its token and the struck card's
+// reaction do: until then (a world cue still waiting, a bolt still flying, a
+// swing not yet down) the heart over the struck fighter's head and the HUD keep
+// the health it had, a body the blow fells as well (it falls as the blow
+// lands), and the player keeps on show the charges the blow spends: those his
+// own blow spent (a bump's Lama and Destino, an arrow), and the RIFLESSO that
+// turns an enemy's back as it reaches him.
+hold_unlanded_blows :: proc(renderer: ^Renderer, result: ^Room_Presentation) {
+	// A body whose death is still to come in the world's cues already stands
+	// as its command found it (apply_world_presentation): nothing to give back.
+	standing: [HOLD_STANDING_BODIES]game.Entity_Ref
+	standing_count := 0
+	if renderer.world_playback != nil {
+		for &entry in renderer.world_playback.cues[:renderer.world_playback.count] {
+			if entry.cue.kind != .Defeat || entry.cue.started || entry.cue.event.target == game.PLAYER_ENTITY || standing_count == len(standing) { continue }
+			standing[standing_count] = entry.cue.event.target
+			standing_count += 1
+		}
+	}
+	hold :: proc(result: ^Room_Presentation, standing: []game.Entity_Ref, target: game.Entity_Ref, amount: i32) {
+		actor, found := presentation_actor_in_view(result, target)
+		if !found || amount <= 0 { return }
+		for body in standing { if body == target { return } }
+		actor.health = min(actor.max_health, max(actor.health, 0)+amount)
+	}
+	// A blow the board shows with its props waits for it: on the frame its
+	// cue starts, before the prop is on the board (observe_attack_cues), then
+	// for as long as the prop carries it.
+	props := renderer.tactical.enabled && renderer.tactical.scene_3d && renderer.tactical.living
+	waiting :: proc(renderer: ^Renderer, cue: ^Presentation_Cue, props: bool) -> bool {
+		return game.event_is_attack(cue.event) && (!cue.started || (props && !attack_fx_shown(renderer, cue)))
+	}
+	// RIFLESSO's charges still to be spent, and where the first stood.
+	deflects: i32
+	slot := -1
+	if renderer.world_playback != nil {
+		for &entry in renderer.world_playback.cues[:renderer.world_playback.count] {
+			if !waiting(renderer, &entry.cue, props) { continue }
+			#partial switch entry.cue.kind {
+			case .Damage:
+				hold(result, standing[:standing_count], entry.cue.event.target, entry.cue.event.amount)
+			case .Attack_Deflected:
+				deflects += 1
+				if index, found := game.status_index(&entry.actor.statuses, .Deflect); found && slot < 0 { slot = index }
+			}
+		}
+	}
+	// The player's own blows: the view takes them as their cues start.
+	for offset in 0..<presentation_group_size(&renderer.timeline) {
+		cue, found := presentation_cue_at(&renderer.timeline, offset)
+		if found && cue.started && cue.kind == .Damage && waiting(renderer, cue, props) { hold(result, standing[:standing_count], cue.event.target, cue.event.amount) }
+	}
+	if attack_fx_foreground_pending(renderer) {
+		statuses := &result.player.statuses
+		for &status in statuses.items[:statuses.count] {
+			if game.status_kind_is_player_charge(status.kind) { status.potency = max(status.potency, renderer.timeline.charges_before[status.kind]) }
+		}
+	}
+	if props {
+		now := renderer.sprite_assets.elapsed
+		for &fx in renderer.tactical.attack_fx.items {
+			if !fx.used { continue }
+			if fx.damage > 0 && fx.landing-living_clock_at(renderer, fx.attacker, now) > 0 { hold(result, standing[:standing_count], fx.victim, fx.damage) }
+			if fx.deflect && !fx.answered {
+				deflects += 1
+				if slot < 0 { slot = int(fx.slot) }
+			}
+		}
+	}
+	hold_player_charge(&result.player.statuses, .Deflect, deflects, slot)
+}
+
+// `count` more of the player's charge `kind` than `statuses` carry; when its
+// last one is already gone, back at `slot` among them (its chip's place in
+// the HUD's order: as it was gained), or last.
+hold_player_charge :: proc(statuses: ^game.Status_Set, kind: game.Status_Kind, count: i32, slot: int) {
+	if count <= 0 || statuses.count < 0 || statuses.count > len(statuses.items) { return }
+	if index, found := game.status_index(statuses, kind); found {
+		statuses.items[index].potency += count
+		return
+	}
+	if statuses.count == len(statuses.items) { return }
+	at := clamp(slot, 0, statuses.count) if slot >= 0 else statuses.count
+	for index := statuses.count; index > at; index -= 1 { statuses.items[index] = statuses.items[index-1] }
+	statuses.items[at] = {kind = kind, potency = count}
+	statuses.count += 1
 }
 
 // One bounded scan per visible body, rather than a scan per queued waypoint.

@@ -30,9 +30,13 @@ Lab_Sound :: struct {
 	volume, pan: f32,
 }
 
+// A cue heard: its kind, its event and its command (Presentation_Cue.batch).
+// The same event in a later command (two bumps from the same cell rolling the
+// same face on the same foe) is a sound of its own.
 Lab_Heard :: struct {
 	kind: Presentation_Cue_Kind,
 	event: game.Game_Event,
+	batch: u32,
 	at: f64,
 }
 
@@ -91,20 +95,21 @@ lab_sound_pan :: proc(renderer: ^Renderer, entity: game.Entity_Ref) -> f32 {
 	return clamp((at.x/f32(renderer.canvas_width))*2-1, -1, 1)*0.55
 }
 
-lab_sound_heard :: proc(s: ^Lab_Sounds, kind: Presentation_Cue_Kind, event: game.Game_Event, now: f64) -> bool {
+lab_sound_heard :: proc(s: ^Lab_Sounds, kind: Presentation_Cue_Kind, event: game.Game_Event, now: f64, batch := u32(0)) -> bool {
 	for heard in s.heard {
-		if heard.at > 0 && now-heard.at < LAB_SOUND_HEARD_SECONDS && heard.kind == kind && heard.event == event { return true }
+		if heard.at > 0 && now-heard.at < LAB_SOUND_HEARD_SECONDS && heard.kind == kind && heard.batch == batch && heard.event == event { return true }
 	}
-	s.heard[s.heard_next] = {kind = kind, event = event, at = now}
+	s.heard[s.heard_next] = {kind = kind, event = event, batch = batch, at = now}
 	s.heard_next = (s.heard_next+1)%LAB_SOUND_HEARD
 	return false
 }
 
 // A character's sound for the clip its card just started. `cause` is the cue
-// that started it (.Move for a step).
+// that started it (.Move for a step); `shot`, an attack that looses a shot.
 lab_actor_sfx :: proc(character: gfx.Flipbook_Character, action: gfx.Living_Action, cause: Presentation_Cue_Kind,
-	travelled: int) -> (sfx: audio.Lab_Sfx, ok: bool) {
+	travelled: int, shot := false) -> (sfx: audio.Lab_Sfx, ok: bool) {
 	// A blocked step bumps (the cue's own sound); a stopped blow is a block.
+	// A blow RIFLESSO turns back has its own (lab_cue_sounds).
 	if action == .Block && cause != .Damage_Absorbed { return }
 	switch character {
 	case .Pilgrim:
@@ -113,7 +118,8 @@ lab_actor_sfx :: proc(character: gfx.Flipbook_Character, action: gfx.Living_Acti
 		case .Move_Up: return .Pilgrim_Move_Up, true
 		case .Move_Down: return .Pilgrim_Move_Down, true
 		case .Dodge: return .Pilgrim_Dodge, true
-		case .Attack: return .Pilgrim_Attack, true
+		// FERETRO's arrow is loosed, not swung.
+		case .Attack: return (.Pilgrim_Shoot if shot else .Pilgrim_Attack), true
 		case .Cast: return .Pilgrim_Cast, true
 		case .Hurt: return .Pilgrim_Hurt, true
 		case .Hurt_Back: return .Pilgrim_Hurt_Back, true
@@ -221,6 +227,12 @@ lab_card_sfx :: proc(card: game.Card_Id) -> (sfx: audio.Lab_Sfx, ok: bool) {
 	case .Sei_Denari: return .Card_Sei_Denari, true
 	case .Sette_Denari: return .Card_Sette_Denari, true
 	case .Shadow_Step: return .Card_Shadow_Step, true
+	case .Poison_Pool: return .Card_Poison_Pool, true
+	case .Wildfire: return .Card_Wildfire, true
+	case .Deflect: return .Card_Deflect, true
+	case .Coffin: return .Card_Coffin, true
+	case .Fate_Dice: return .Card_Fate_Dice, true
+	case .Venom_Blade: return .Card_Venom_Blade, true
 	case .Count:
 	}
 	return
@@ -235,6 +247,10 @@ lab_status_sfx :: proc(status: game.Status_Kind) -> (sfx: audio.Lab_Sfx, ok: boo
 	case .Stagger: return .Ui_Status_Stagger, true
 	case .Burn: return .Ui_Status_Burn, true
 	case .Slow: return .Ui_Status_Slow, true
+	case .Deflect: return .Ui_Status_Deflect, true
+	case .Arrows: return .Ui_Status_Arrows, true
+	case .Fate: return .Ui_Status_Fate, true
+	case .Venom_Blade: return .Ui_Status_Venom_Blade, true
 	case .Survey:
 	}
 	return
@@ -282,6 +298,13 @@ lab_cue_sounds :: proc(renderer: ^Renderer, s: ^Lab_Sounds, cue: ^Presentation_C
 		if event.target != game.PLAYER_ENTITY { lab_sound_queue(s, .Ui_Block_Absorb, now+landing, 1, pan) }
 	case .Attack_Missed:
 		lab_sound_queue(s, .Ui_Miss, now+landing, 1, pan)
+	case .Attack_Deflected:
+		// RIFLESSO rings as the blow reaches the player and turns back.
+		lab_sound_queue(s, .Pilgrim_Deflect, now+landing, 1, pan)
+	case .Fate_Rolled:
+		// The Dado del Destino's die bounces at the struck foe as it shows,
+		// when the bump lands (update_fate_tokens).
+		lab_sound_queue(s, .Ui_Fate_Die, now+landing, 1, pan)
 	case .Move_Blocked:
 		lab_sound_queue(s, .Ui_Move_Blocked, now, 1, pan)
 	case .Heal:
@@ -304,6 +327,9 @@ lab_cue_sounds :: proc(renderer: ^Renderer, s: ^Lab_Sounds, cue: ^Presentation_C
 		#partial switch event.card_definition {
 		case .Tesla_Coil: impacts^ += 1
 		case .Shock_Floor: lab_sound_queue(s, .World_Shock_Floor, now)
+		// A pool splashes on its cell, a fire catches there.
+		case .Poison_Pool: lab_sound_queue(s, .World_Pool_Splash, now)
+		case .Wildfire: lab_sound_queue(s, .World_Fire, now)
 		}
 	case .Damage:
 		if kind, object := lab_object_kind(renderer, event.target); object {
@@ -328,7 +354,7 @@ update_lab_sounds :: proc(renderer: ^Renderer, room: ^game.Room, now: f64) {
 		if actor.action != .Idle && actor.started != actor.voiced {
 			actor.voiced = actor.started
 			travelled := int(abs(actor.move_to.x-actor.move_from.x)+abs(actor.move_to.y-actor.move_from.y)+0.5)
-			if sfx, ok := lab_actor_sfx(actor.character, actor.action, actor.cause, travelled); ok {
+			if sfx, ok := lab_actor_sfx(actor.character, actor.action, actor.cause, travelled, actor.shot); ok {
 				// A reaction waiting for its blow sounds when it starts.
 				ahead := max(0, actor.started-living_clock_at(renderer, actor.entity, now))
 				lab_sound_queue(s, sfx, now+ahead, 1, pan)
@@ -374,7 +400,7 @@ update_lab_sounds :: proc(renderer: ^Renderer, room: ^game.Room, now: f64) {
 	for cards in ([2]bool{true, false}) {
 		for offset in 0..<renderer_active_cue_count(renderer) {
 			cue, found := renderer_active_cue_at(renderer, offset)
-			if !found || !cue.started || (cue.kind == .Card_Played) != cards || lab_sound_heard(s, cue.kind, cue.event, world) { continue }
+			if !found || !cue.started || (cue.kind == .Card_Played) != cards || lab_sound_heard(s, cue.kind, cue.event, world, cue.batch) { continue }
 			lab_cue_sounds(renderer, s, cue, now, &impacts)
 		}
 	}

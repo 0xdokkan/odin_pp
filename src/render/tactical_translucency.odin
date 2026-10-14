@@ -9,9 +9,11 @@ import grid "../grid"
 import view "../view"
 
 Tactical_Alpha_Entry :: struct {
-	kind: enum {Sprite, Wall, Attack},
+	kind: enum {Sprite, Wall, Attack, Ground},
 	// An Attack entry: its blow's slot in Attack_Fx_State.
 	attack: i32,
+	// A Ground entry: its flame's cell, or past the cells its splash (ground_fx.odin).
+	ground: i32,
 	key: Sprite_Key,
 	entity: game.Entity_Ref,
 	position: view.Vec2,
@@ -39,7 +41,8 @@ collect_tactical_translucents :: proc(renderer: ^Renderer, room: ^game.Room = ni
 	clear(entries)
 	// The board pass (it has a room) advances the standees' clips; the map
 	// reuses them as they are. The blows first: a struck card's reaction
-	// waits for its own.
+	// waits for its own. The ground was followed once this frame already, as
+	// the board began (draw_tactical_world).
 	if room != nil { observe_attack_cues(renderer) }
 	if room != nil { update_flipbook_actors(renderer, room) }
 	if room != nil && v.living { update_living_actors(renderer, room) }
@@ -80,6 +83,7 @@ collect_tactical_translucents :: proc(renderer: ^Renderer, room: ^game.Room = ni
 		}
 	}
 	if room != nil { collect_attack_fx_entries(renderer, entries) }
+	if room != nil { collect_ground_entries(renderer, room, entries) }
 	// The hologram intentionally supplies no room: its own miniature walls
 	// remain in the table pass, and it only needs sorted actor billboards.
 	if room != nil {
@@ -115,6 +119,9 @@ draw_tactical_billboards :: proc(renderer: ^Renderer, room: ^game.Room = nil, li
 		} else if entry.kind == .Attack {
 			if walls_active { rl.EndShaderMode(); walls_active = false }
 			draw_attack_fx_entry(renderer, entry)
+		} else if entry.kind == .Ground {
+			if walls_active { rl.EndShaderMode(); walls_active = false }
+			draw_ground_entry(renderer, entry)
 		} else {
 			if walls_active { rl.EndShaderMode(); walls_active = false }
 			tactical_billboard(renderer, entry.key, entry.position, entry.opacity, entry.entity)

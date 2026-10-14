@@ -188,6 +188,24 @@ resolve_pattern_dice_spell :: proc(
 	return
 }
 
+// A pool or a fire is thrown to its cell (Spell_Launched) and lands there
+// (Spell_Impact): the board shows the ground from the landing on, and then
+// whoever a closed area poisons.
+resolve_ground_card :: proc(room: ^Room, instance: Card_Instance, target: Target, compiled: ^Action) -> (report: Action_Report) {
+	if compiled == nil || !card_places_ground(instance.definition_id) || compiled.kind != .Card ||
+	   compiled.source != PLAYER_ENTITY || compiled.target != target || target.kind != .Cell || compiled.effect_count != 1 ||
+	   compiled.effects[0].kind != .Place_Ground || compiled.effects[0].destination != target.cell { return }
+	action := compiled^
+	tactical_critical_scale(room, &action)
+	origin := room.player.position
+	hit := resolve_action(room, &action)
+	if !hit.accepted { return }
+	record_report_event(&report, spell_card_event(.Spell_Launched, instance, origin, target.cell))
+	record_report_event(&report, spell_card_event(.Spell_Impact, instance, origin, target.cell, amount = action.effects[0].amount))
+	merge_spell_hit_report(&report, &hit)
+	return
+}
+
 merge_spell_hit_report :: proc(destination, hit: ^Action_Report) {
 	if !hit.accepted { return }
 	destination.accepted = true
@@ -211,8 +229,15 @@ resolve_played_card_action :: proc(
 	if card_is_board_device(instance.definition_id) {
 		return resolve_board_device_card(room, instance, target, compiled)
 	}
+	if card_places_ground(instance.definition_id) {
+		return resolve_ground_card(room, instance, target, compiled)
+	}
 	if instance.definition_id == .Sundering_Blow {
 		return resolve_sundering_blow(room, instance, target, compiled)
+	}
+	// Lama Velenosa rolls the bumps it loads; the Dado del Destino keeps its die.
+	if instance.definition_id == .Venom_Blade || instance.definition_id == .Fate_Dice {
+		return resolve_loading_card(room, instance, target, compiled)
 	}
 	if instance.definition_id == .Prismatic_Barrage || instance.definition_id == .Twin_Venom {
 		return resolve_pattern_dice_spell(room, instance, target, compiled)

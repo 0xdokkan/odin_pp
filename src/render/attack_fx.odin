@@ -46,6 +46,17 @@ Attack_Outcome :: enum u8 {Missed, Absorbed, Hit}
 
 Attack_Fx :: struct {
 	used, critical, reflected: bool,
+	// RIFLESSO: the blow an Attack_Deflected cue shows, and whether it has
+	// been turned back yet (attack_fx_answer_deflection): a bolt flies home as
+	// it reaches the player; a swing is answered by his riposte, a cue of its own.
+	deflect, answered: bool,
+	// RIFLESSO's place among the player's statuses as the blow began (-1:
+	// none): the charge it spends keeps its chip there until the blow reaches
+	// him (hold_unlanded_blows).
+	slot: i32,
+	// What the blow takes from its victim's health, shown as it lands
+	// (hold_unlanded_blows).
+	damage: i32,
 	id: u32,
 	kind: Attack_Fx_Kind,
 	look: Attack_Look,
@@ -97,9 +108,10 @@ attack_character :: proc(renderer: ^Renderer, entity: game.Entity_Ref) -> (chara
 }
 
 // The player's iron lantern, or the M8 weapon in his hand as the board shows
-// him; every enemy its own.
+// him, and the arrow he looses (FERETRO); every enemy its own.
 attack_look :: proc(renderer: ^Renderer, attacker: game.Entity_Ref, ranged: bool) -> Attack_Look {
 	if attacker == game.PLAYER_ENTITY {
+		if ranged { return .Bolt }
 		return attack_player_look(renderer.tactical.snapshot.weapon if renderer.tactical.snapshot != nil else .None)
 	}
 	_, archetype, ok := attack_character(renderer, attacker)
@@ -509,6 +521,34 @@ reflect_attack_projectile :: proc(renderer: ^Renderer, id: u32, outcome := Attac
 	return fx.landing-now, true
 }
 
+// RIFLESSO: a deflected blow turned back once it reaches the player. A bolt
+// flies home from where it is, now the player's, aimed at its shooter's cell
+// (where the reflected cues aim: attack_fx_of_cue finds it for them), and
+// lands as its answer does: a wound, or a guard when the shooter's Shield takes
+// all of it; a swing waits for the riposte its own cue brings.
+attack_fx_answer_deflection :: proc(renderer: ^Renderer, fx: ^Attack_Fx) {
+	if fx == nil || fx.answered { return }
+	fx.answered = true
+	if fx.kind != .Projectile { return }
+	home := fx.from
+	if _, ok := reflect_attack_projectile(renderer, fx.id, attack_fx_returned_outcome(renderer, fx)); ok { fx.aim, fx.swept = home, 1<<4 }
+}
+
+// How a deflected bolt (`fx`, not yet turned) lands back on its shooter: as
+// the answer RIFLESSO's command gives it (game.deflect_enemy_blow), its wound
+// or, with none, its guard. A hit when the board holds no answer.
+attack_fx_returned_outcome :: proc(renderer: ^Renderer, fx: ^Attack_Fx) -> Attack_Outcome {
+	outcome := Attack_Outcome.Missed
+	if renderer.world_playback != nil {
+		for &entry in renderer.world_playback.cues[:renderer.world_playback.count] {
+			cue := &entry.cue
+			if cue.batch != fx.batch || !game.event_is_reflected(cue.event) || cue.event.source != fx.victim || cue.event.target != fx.attacker { continue }
+			if cue.kind == .Damage || cue.kind == .Damage_Absorbed { outcome = max(outcome, attack_cue_outcome(cue.kind)) }
+		}
+	}
+	return outcome if outcome != .Missed else .Hit
+}
+
 // The newest prop of `attacker` of a kind still on the board.
 attack_fx_find :: proc(renderer: ^Renderer, attacker: game.Entity_Ref, kind: Attack_Fx_Kind) -> (id: u32, ok: bool) {
 	newest := f64(-1)
@@ -523,10 +563,12 @@ attack_fx_key :: proc(cue: ^Presentation_Cue) -> Attack_Fx_Key {
 		swept = cue.event.area_mask&game.EVENT_FOOTPRINT_BITS}
 }
 
+// A deflected blow reaches the player's guard: it is stopped there, as one a
+// Shield takes.
 attack_cue_outcome :: proc(kind: Presentation_Cue_Kind) -> Attack_Outcome {
 	#partial switch kind {
 	case .Damage, .Explosive_Armed: return .Hit
-	case .Damage_Absorbed: return .Absorbed
+	case .Damage_Absorbed, .Attack_Deflected: return .Absorbed
 	}
 	return .Missed
 }
@@ -534,14 +576,36 @@ attack_cue_outcome :: proc(kind: Presentation_Cue_Kind) -> Attack_Outcome {
 attack_cue_is_blow :: proc(cue: ^Presentation_Cue) -> bool {
 	if cue == nil || !cue.started || !game.event_is_attack(cue.event) { return false }
 	#partial switch cue.kind {
-	case .Damage, .Damage_Absorbed, .Attack_Missed, .Explosive_Armed: return true
+	case .Damage, .Damage_Absorbed, .Attack_Missed, .Explosive_Armed, .Attack_Deflected: return true
 	}
 	return false
 }
 
-// The prop showing the blow of `cue`, if any.
+// RIFLESSO's answer to a shot: the shooter's own bolt coming home, not an
+// arrow of the player's.
+attack_cue_returns_bolt :: proc(cue: ^Presentation_Cue) -> bool {
+	return cue != nil && game.event_is_reflected(cue.event) && game.event_is_ranged_attack(cue.event)
+}
+
+// The deflected bolt a returned shot's cue answers: the shooter's, aimed at the
+// player, in the same batch.
+attack_fx_deflected_bolt :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) -> ^Attack_Fx {
+	for &fx in renderer.tactical.attack_fx.items {
+		if fx.used && fx.deflect && fx.kind == .Projectile && fx.batch == cue.batch &&
+		   ((!fx.answered && fx.attacker == cue.event.target && fx.victim == cue.event.source) ||
+		    (fx.answered && fx.attacker == cue.event.source && fx.victim == cue.event.target)) { return &fx }
+	}
+	return nil
+}
+
+// The prop showing the blow of `cue`, if any. A returned shot is shown by the
+// bolt it turned round.
 attack_fx_of_cue :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) -> ^Attack_Fx {
 	if !attack_cue_is_blow(cue) { return nil }
+	if attack_cue_returns_bolt(cue) {
+		fx := attack_fx_deflected_bolt(renderer, cue)
+		return fx if fx != nil && fx.answered else nil
+	}
 	key := attack_fx_key(cue)
 	for &fx in renderer.tactical.attack_fx.items {
 		if fx.used && fx.batch == key.batch && fx.attacker == key.attacker && fx.victim == key.victim && fx.aim == key.aim && fx.swept == key.swept { return &fx }
@@ -559,15 +623,32 @@ observe_attack_cues :: proc(renderer: ^Renderer) {
 	for &fx in state.items {
 		if fx.used && living_clock_at(renderer, fx.attacker, now) > attack_fx_end(&fx) { fx = {} }
 	}
+	// RIFLESSO: a deflected bolt turns round as it reaches the player.
+	for &fx in state.items {
+		if fx.used && fx.deflect && !fx.answered && living_clock_at(renderer, fx.attacker, now) >= fx.landing {
+			attack_fx_answer_deflection(renderer, &fx)
+		}
+	}
 	for offset in 0..<renderer_active_cue_count(renderer) {
 		cue, found := renderer_active_cue_at(renderer, offset)
 		if !found || !attack_cue_is_blow(cue) { continue }
 		outcome := attack_cue_outcome(cue.kind)
+		// The shot given back is the shooter's own bolt, turned now if it has
+		// not been yet: the player looses none of his.
+		if attack_cue_returns_bolt(cue) {
+			attack_fx_answer_deflection(renderer, attack_fx_deflected_bolt(renderer, cue))
+			if fx := attack_fx_of_cue(renderer, cue); fx != nil {
+				fx.critical = fx.critical || game.event_is_critical(cue.event)
+				if cue.kind == .Damage { fx.damage = cue.event.amount }
+			}
+			continue
+		}
 		if fx := attack_fx_of_cue(renderer, cue); fx != nil {
 			// A guard, then a wound: the same blow, and it got through (only
 			// the wound says it was critical).
 			fx.outcome = max(fx.outcome, outcome)
 			fx.critical = fx.critical || game.event_is_critical(cue.event)
+			if cue.kind == .Damage { fx.damage = cue.event.amount }
 			continue
 		}
 		key := attack_fx_key(cue)
@@ -586,8 +667,27 @@ observe_attack_cues :: proc(renderer: ^Renderer) {
 		}
 		if fx := attack_fx_by_id(renderer, id); fx != nil {
 			fx.batch, fx.swept, fx.critical = key.batch, key.swept, game.event_is_critical(cue.event)
+			fx.deflect = cue.kind == .Attack_Deflected
+			if cue.kind == .Damage { fx.damage = cue.event.amount }
+			// The board shows the charge this blow spends still in its place.
+			fx.slot = -1
+			if index, carried := game.status_index(&v.snapshot.player.statuses, .Deflect); carried && fx.deflect { fx.slot = i32(index) }
 		}
 	}
+}
+
+// Whether the board has put this blow's prop on it already (it keeps the blows
+// it has shown): a returned shot once its bolt has turned carrying the wound,
+// or when that bolt is gone.
+attack_fx_shown :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) -> bool {
+	if attack_cue_returns_bolt(cue) {
+		fx := attack_fx_deflected_bolt(renderer, cue)
+		return fx == nil || (fx.answered && (cue.kind != .Damage || fx.damage > 0))
+	}
+	key := attack_fx_key(cue)
+	if key.batch == 0 { return true }
+	for previous in renderer.tactical.attack_fx.seen { if previous == key { return true } }
+	return false
 }
 
 // Seconds until the earliest blow still to land on `victim` (a bolt in
@@ -611,6 +711,27 @@ attack_fx_reaction_delay :: proc(renderer: ^Renderer, victim: game.Entity_Ref, n
 	attacker: Maybe(game.Entity_Ref) = nil) -> f64 {
 	left, pending := attack_fx_landing_in(renderer, victim, now, attacker)
 	return max(0, left-LIVING_REACT_STRIKE) if pending else 0
+}
+
+// Whether a blow of the player's own command (the foreground timeline's: a
+// bump, an arrow) is still on its way, on a board that shows it with its
+// props: its cue started before its prop is on the board, or its prop has not
+// landed yet (on the player's clock, which always runs). What follows the blow
+// waits for it (update_renderer_frame_timeline), and the charges it spent stay
+// on show until it lands (hold_unlanded_blows).
+attack_fx_foreground_pending :: proc(renderer: ^Renderer) -> bool {
+	v := &renderer.tactical
+	head, busy := active_presentation_cue(&renderer.timeline)
+	if !busy || head.batch == 0 || !(v.enabled && v.scene_3d && v.living) { return false }
+	for offset in 0..<presentation_group_size(&renderer.timeline) {
+		cue, _ := presentation_cue_at(&renderer.timeline, offset)
+		if attack_cue_is_blow(cue) && cue.event.source == game.PLAYER_ENTITY && !attack_fx_shown(renderer, cue) { return true }
+	}
+	now := renderer.sprite_assets.elapsed
+	for &fx in v.attack_fx.items {
+		if fx.used && fx.batch == head.batch && fx.attacker == game.PLAYER_ENTITY && fx.landing-living_clock_at(renderer, fx.attacker, now) > 0 { return true }
+	}
+	return false
 }
 
 // The board shows this blow with its props: the cue's generic hit stays away.

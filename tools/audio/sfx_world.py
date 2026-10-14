@@ -806,6 +806,74 @@ def world_fire(seed):
     return _finish(x, D, fade_out=0.08)
 
 
+@sound("world_fire_spread", loudness=-20, wet=0.3,
+       note="the floor's fires grow a cell at a new window: a rush of flame swelling to 0.15, crackle running along to 0.8")
+def world_fire_spread(seed):
+    D = 0.9
+    rush = _moving_band(pink(D, seed), _path([(0, 220), (0.15, 1200), (0.5, 700), (D, 500)]), 0.8)
+    rush = _norm(rush) * env_points(D, [(0, 0), (0.02, 0.2), (0.15, 1.0), (0.45, 0.35), (D, 0.0)])
+    bed = _fire_bed(D, seed + 1, crack_rate=44, crack_env=lambda u: max(0.0, 1.0 - u), lap=0.8, crackle_gain=1.5, power=1.5)
+    bed = highpass(bed, 120, 2) * env_points(D, [(0, 0), (0.06, 0.4), (0.2, 1.0), (0.75, 0.5), (D, 0)])
+    x = 0.85 * rush + 0.7 * bed
+    _events("world_fire_spread", 0.0, 0.15, 0.45)
+    return _finish(x, D, fade_out=0.08)
+
+
+@sound("world_fire_out", loudness=-22, wet=0.3,
+       note="a floor fire goes out at its fifth window: the flames gutter and sink 0.0-0.45 (the bed darkening, its "
+            "crackle thinning), a last ember pops at 0.38, smoke hisses with a soft puff from 0.32, gone by 0.8")
+def world_fire_out(seed):
+    D = 0.85
+    # The burning cell's own bed (world_fire), sinking: darker, thinner.
+    bed = _fire_bed(D, seed, crack_rate=30, crack_env=lambda u: max(0.0, 1.0 - 2.2 * u), lap=0.6, crackle_gain=1.3, power=1.7)
+    bed = _moving_lowpass(highpass(bed, 120, 2), _path([(0, 6000), (0.45, 900), (D, 600)]))
+    bed = _norm(bed) * env_points(D, [(0, 0), (0.03, 1.0), (0.18, 0.8), (0.45, 0.15), (0.6, 0.0), (D, 0.0)])
+    # The flame's last breath, falling.
+    sink = _moving_band(pink(D, seed + 1), _path([(0, 900), (0.4, 260), (D, 200)]), 0.9)
+    sink = _norm(sink) * env_points(D, [(0, 0), (0.02, 0.5), (0.12, 1.0), (0.45, 0.2), (0.6, 0.0), (D, 0.0)])
+    # Smoke where it stood: a soft hiss falling away (the fuse's fizzle,
+    # gentler), a puff, and one last ember.
+    t = time_axis(D)
+    after = np.clip(t - 0.32, 0, None)
+    hiss = _moving_band(white(D, seed + 2), _path([(0, 4500), (0.32, 4500), (0.7, 1800), (D, 1800)]), 0.8)
+    hiss = _norm(hiss) * (t >= 0.32) * np.minimum(1, after / 0.03) * _t60(after, 0.4)
+    ember = _norm(_pops(D, [0.38], seed + 3, lo=1200, hi=3500, big=1.0, power=1.0))
+    puff = place(D, [(0.32, _puff(seed + 4, length=0.3, center=600.0), 1.0)])
+    x = 0.7 * bed + 0.55 * sink + 0.25 * hiss + 0.45 * puff + 0.5 * ember
+    _events("world_fire_out", 0.0, 0.12, 0.32, 0.38, 0.45)
+    return _finish(_limit(x, 0.7), D, fade_out=0.08)
+
+
+def _blub(f0, length, rise=0.15):
+    """A bubble breaking the skin of a thick pool: a short damped sine whose
+    pitch rises a little as it closes."""
+    t = time_axis(length)
+    f = f0 * (1 + rise * t / length)
+    return sine(f, n=len(t)) * np.minimum(1, t / 0.001) * np.exp(-t / (length * 0.3))
+
+
+@sound("world_pool_splash", loudness=-20, wet=0.25,
+       note="a card steps into a pool of poison: a wet slap at 0.0, the pool sucks at its base 0.02-0.16, bubbles to 0.45")
+def world_pool_splash(seed):
+    D = 0.55
+    r = rng(seed)
+    t = time_axis(D)
+    n = len(t)
+    slap = _norm(highpass(lowpass(pink(D, seed), 2400, 2), 180, 2)) * np.minimum(1, t / 0.002) * _t60(t, 0.12)
+    crisp = _norm(highpass(white(D, seed + 1), 2500, 2)) * np.minimum(1, t / 0.0005) * _t60(t, 0.03)
+    suck = _moving_band(pink(D, seed + 2), _path([(0, 900), (0.12, 350), (D, 300)]), 1.2)
+    suck = _norm(suck) * env_points(D, [(0, 0), (0.02, 0), (0.06, 1), (0.16, 0), (D, 0)])
+    blubs = silence(D)
+    for t0 in sorted(r.uniform(0.05, 0.42, 6)):
+        b = _blub(math.exp(r.uniform(math.log(220), math.log(800))), 0.06, 0.35)
+        k = int(t0 * SR)
+        e = min(n, k + len(b))
+        blubs[k:e] += r.uniform(0.4, 1.0) * b[:e - k]
+    x = 0.8 * slap + 0.25 * crisp + 0.5 * suck + 0.35 * _norm(blubs)
+    _events("world_pool_splash", 0.0, 0.06, 0.2)
+    return _finish(_limit(x, 0.7), D, fade_out=0.05)
+
+
 @sound("world_ice_crack", loudness=-19, wet=0.3,
        note="a creak 0.0-0.1, the main crack 0.1, the fracture runs 0.142-0.338, a last creak 0.4-0.53, shards tinkle 0.47-0.72")
 def world_ice_crack(seed):

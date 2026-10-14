@@ -30,10 +30,13 @@ LIVING_TOKEN_HEAL :: rl.Color{40, 150, 76, 255}
 Living_Token :: struct {
 	used, heal: bool,
 	amount: i32,
-	// What makes a blow this one: one token per blow, however long its cue.
+	// What makes a blow this one: one token per blow, however long its cue,
+	// and the command it came with (Presentation_Cue.batch): two bumps of the
+	// same damage on the same foe a second apart are two blows.
 	entity, source: game.Entity_Ref,
 	pulse: u64,
 	group: u32,
+	batch: u32,
 	born: f64,
 	// Earlier tokens still showing on the same card: this one goes beside them.
 	stack: int,
@@ -51,7 +54,7 @@ Living_Blow :: struct {
 	amount: i32,
 	entity, source: game.Entity_Ref,
 	pulse: u64,
-	group: u32,
+	group, batch: u32,
 	at: f64,
 }
 
@@ -95,22 +98,25 @@ living_token_size :: proc(text: string) -> (width, height: int) {
 
 // Whether a blow is already showing: one token per blow, however many frames
 // its cue lasts. `world` is the world's clock (the sprite clock when left out);
-// `landing` the seconds until the blow lands (a bolt still flying to the card).
-living_token_spawn :: proc(state: ^Living_State, event: game.Game_Event, heal: bool, now: f64, world := f64(-1), landing := f64(0)) -> bool {
+// `landing` the seconds until the blow lands (a bolt still flying to the card);
+// `batch` the command whose cue it is.
+living_token_spawn :: proc(state: ^Living_State, event: game.Game_Event, heal: bool, now: f64, world := f64(-1), landing := f64(0),
+	batch := u32(0)) -> bool {
 	world := world if world >= 0 else now
 	for blow in state.blows {
 		if blow.used && world-blow.at <= LIVING_TOKEN_SECONDS && blow.entity == event.target && blow.source == event.source &&
-		   blow.amount == event.amount && blow.pulse == event.pulse_count && blow.group == event.visual_group && blow.heal == heal { return false }
+		   blow.amount == event.amount && blow.pulse == event.pulse_count && blow.group == event.visual_group && blow.heal == heal &&
+		   blow.batch == batch { return false }
 	}
 	stack := 0
 	for &token in state.tokens {
 		if !token.used { continue }
 		if token.entity == event.target && token.source == event.source && token.amount == event.amount &&
-		   token.pulse == event.pulse_count && token.group == event.visual_group && token.heal == heal { return false }
+		   token.pulse == event.pulse_count && token.group == event.visual_group && token.heal == heal && token.batch == batch { return false }
 		if token.entity == event.target { stack += 1 }
 	}
 	state.blows[state.blow_next] = {used = true, heal = heal, amount = event.amount, entity = event.target, source = event.source,
-		pulse = event.pulse_count, group = event.visual_group, at = world}
+		pulse = event.pulse_count, group = event.visual_group, batch = batch, at = world}
 	state.blow_next = (state.blow_next+1)%len(state.blows)
 	slot: ^Living_Token
 	for &token in state.tokens { if !token.used { slot = &token; break } }
@@ -120,7 +126,7 @@ living_token_spawn :: proc(state: ^Living_State, event: game.Game_Event, heal: b
 		living_token_free(slot)
 	}
 	slot^ = {used = true, heal = heal, amount = event.amount, entity = event.target, source = event.source,
-		pulse = event.pulse_count, group = event.visual_group, born = now+max(LIVING_TOKEN_DELAY, landing), stack = stack}
+		pulse = event.pulse_count, group = event.visual_group, batch = batch, born = now+max(LIVING_TOKEN_DELAY, landing), stack = stack}
 	return true
 }
 
@@ -148,7 +154,7 @@ update_living_tokens :: proc(renderer: ^Renderer, now, world: f64) {
 		if (cue.kind != .Damage && !heal) || cue.event.amount <= 0 { continue }
 		if _, actor := presentation_actor_in_view(renderer.tactical.snapshot, cue.event.target); !actor { continue }
 		landing, _ := attack_fx_landing_in(renderer, cue.event.target, now, cue.event.source)
-		living_token_spawn(state, cue.event, heal, now, world, landing)
+		living_token_spawn(state, cue.event, heal, now, world, landing, cue.batch)
 	}
 }
 

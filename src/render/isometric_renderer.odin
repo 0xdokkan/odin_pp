@@ -305,6 +305,18 @@ card_colors :: proc(id: game.Card_Id, affordable: bool) -> (fill, outline: rl.Co
 		fill, outline = rl.Color{40, 58, 31, 245}, rl.Color{179, 237, 111, 255}
 	case .Shadow_Step:
 		fill, outline = rl.Color{33, 26, 48, 245}, rl.Color{164, 144, 183, 255}
+	case .Poison_Pool:
+		fill, outline = rl.Color{28, 58, 40, 245}, rl.Color{126, 206, 104, 255}
+	case .Wildfire:
+		fill, outline = rl.Color{78, 36, 22, 245}, rl.Color{250, 136, 60, 255}
+	case .Deflect:
+		fill, outline = rl.Color{30, 50, 66, 245}, rl.Color{150, 196, 228, 255}
+	case .Coffin:
+		fill, outline = rl.Color{60, 46, 30, 245}, rl.Color{226, 186, 120, 255}
+	case .Fate_Dice:
+		fill, outline = rl.Color{52, 34, 70, 245}, rl.Color{214, 170, 250, 255}
+	case .Venom_Blade:
+		fill, outline = rl.Color{30, 56, 40, 245}, rl.Color{150, 226, 110, 255}
 	case .Count:
 		fill, outline = rl.Color{45, 49, 52, 245}, rl.Color{105, 116, 116, 255}
 	}
@@ -320,11 +332,12 @@ card_detail_lines :: proc(card: game.Card_Instance) -> (first, second: cstring) 
 	// Dice cards share the tactical hand's die-aware text; the floor takes the
 	// narrow hand's shorter form to fit the classic card.
 	if card.definition_id == .Shock_Floor {
-		definition, _ := game.card_definition_by_id(.Shock_Floor)
-		return fmt.ctprintf("%s COLPI + BERS.", card_dice_label(card)),
-		       fmt.ctprintf("%d DANNO / 3X3", game.card_effect_amount(definition.effects[0], upgrade))
+		first, second, _ = gothic_card_narrow_lines(card)
+		return
 	}
-	if game.card_dice_count(card.definition_id) > 0 { return gothic_card_lines(card) }
+	// So do the tactical-only cards ("SOLO TATTICA"): the catalog gives their
+	// amounts, never a second table here.
+	if game.card_dice_count(card.definition_id) > 0 || game.card_requires_tactical(card.definition_id) { return gothic_card_lines(card) }
 	switch card.definition_id {
 	case .Strike:
 		return fmt.ctprintf("DEAL %d DAMAGE", 3+upgrade), "RANGE 1"
@@ -372,13 +385,13 @@ card_detail_lines :: proc(card: game.Card_Instance) -> (first, second: cstring) 
 		return "CREATE 1 SPARK", fmt.ctprintf("DRAW %d - EXHAUST", 1+upgrade)
 	case .Chain_Lightning:
 		return fmt.ctprintf("%d DAMAGE EACH", 3+upgrade), "UP TO 3 / HOP 3"
-	case .Fate_Strike, .Sundering_Blow, .Prismatic_Barrage, .Twin_Venom, .Shock_Floor:
+	case .Fate_Strike, .Sundering_Blow, .Prismatic_Barrage, .Twin_Venom, .Shock_Floor, .Fate_Dice, .Venom_Blade,
+	     .Shadow_Step, .Poison_Pool, .Wildfire, .Deflect, .Coffin:
 	case .Tesla_Coil: return fmt.ctprintf("%d / DISTANCE DAMAGE", 8+upgrade), "FIELD CONSUMES 4 COILS"
 	case .Titan_Grip: return fmt.ctprintf("%d DAMAGE / THROW 2", 3+upgrade), "INTERRUPT / STAGGER 1"
 	case .Storm_Crown: return fmt.ctprintf("%d DAMAGE EACH", 5+upgrade), "LEGENDARY / CHAIN 3"
 	case .Sei_Denari: return "+6 GOLD", "SCOPA / EXHAUST"
 	case .Sette_Denari: return "+7 GOLD", "SCOPA / EXHAUST"
-	case .Shadow_Step: return "OMBRA 4s", "SOLO TATTICA"
 	case .Count:
 	}
 	return "", ""
@@ -454,6 +467,12 @@ card_short_name :: proc(id: game.Card_Id) -> cstring {
 	case .Sei_Denari: return "6 ORO"
 	case .Sette_Denari: return "7 ORO"
 	case .Shadow_Step: return "OMBRA"
+	case .Poison_Pool: return "POZZA"
+	case .Wildfire: return "FUOCO"
+	case .Deflect: return "RIFLESSO"
+	case .Coffin: return "FERETRO"
+	case .Fate_Dice: return "DESTINO"
+	case .Venom_Blade: return "LAMA"
 	case .Count:
 	}
 	return ""
@@ -664,6 +683,39 @@ draw_card_sigil :: proc(bounds: rl.Rectangle, id: game.Card_Id, color: rl.Color)
 		rl.DrawCircleLinesV({center.x, center.y-4}, 9, color)
 		rl.DrawLineEx({center.x-9, center.y-4}, {center.x-13, center.y+10}, 3, color)
 		rl.DrawLineEx({center.x+9, center.y-4}, {center.x+13, center.y+10}, 3, color)
+	case .Poison_Pool:
+		// A drop falling into its puddle.
+		rl.DrawEllipse(c.int(center.x), c.int(center.y+10), radius, 6, color)
+		rl.DrawCircleV({center.x, center.y-6}, 5, color)
+		rl.DrawTriangle({center.x, center.y-17}, {center.x-5, center.y-6}, {center.x+5, center.y-6}, color)
+	case .Wildfire:
+		// A flame and the plus it grows into.
+		rl.DrawTriangle({center.x, center.y-radius}, {center.x-8, center.y+8}, {center.x+8, center.y+8}, color)
+		for direction in ([4]rl.Vector2{{-1, 0}, {1, 0}, {0, -1}, {0, 1}}) {
+			rl.DrawCircleV(center+direction*(radius+4), 3, color)
+		}
+	case .Deflect:
+		// A buckler and the bolt it sends back.
+		rl.DrawCircleLinesV({center.x-6, center.y}, 12, color)
+		rl.DrawLineEx({center.x+4, center.y-6}, {center.x+radius+6, center.y-14}, 3, color)
+		rl.DrawTriangle({center.x+radius+8, center.y-15}, {center.x+radius-1, center.y-17}, {center.x+radius+3, center.y-8}, color)
+	case .Coffin:
+		// Three arrows, upright.
+		for index in 0..<3 {
+			x := center.x+f32(index-1)*10
+			rl.DrawLineEx({x, center.y+radius}, {x, center.y-radius+5}, 2, color)
+			rl.DrawTriangle({x, center.y-radius-1}, {x-4, center.y-radius+6}, {x+4, center.y-radius+6}, color)
+		}
+	case .Fate_Dice:
+		// One die showing its five, the critical face.
+		rl.DrawRectangleRoundedLinesEx({center.x-13, center.y-13, 26, 26}, 0.22, 4, 2, color)
+		rl.DrawCircleV(center, 3, color)
+		for pip in ([4]rl.Vector2{{-7, -7}, {7, -7}, {-7, 7}, {7, 7}}) { rl.DrawCircleV(center+pip, 2, color) }
+	case .Venom_Blade:
+		// A dagger, a drop at its point.
+		rl.DrawLineEx({center.x-radius, center.y+radius}, {center.x+radius-4, center.y-radius+4}, 4, color)
+		rl.DrawLineEx({center.x-radius+2, center.y+5}, {center.x-5, center.y+radius-2}, 3, color)
+		rl.DrawCircleV({center.x+radius-1, center.y-radius+12}, 3, color)
 	case .Count:
 	}
 }
@@ -1832,6 +1884,10 @@ draw_card_target_range :: proc(renderer: ^Renderer, room: ^game.Room, card_id: u
 		)
 	}
 
+	// A pool's cells and the areas it closes, a fire's whole reach.
+	if game.card_places_ground(card.definition_id) {
+		draw_ground_preview(renderer, room, card.definition_id, evaluation.query.anchor, evaluation.error == .None)
+	}
 	// The anchor is drawn last so the intended drop cell remains unambiguous.
 	draw_card_range_cell(
 		renderer,
@@ -2381,7 +2437,7 @@ timeline_card_cue_verb :: proc(cue: ^Presentation_Cue) -> cstring {
 	     .Attack_Missed, .Move_Blocked,
 	     .Gold_Gained, .Energy_Gained, .Binding_Added, .Binding_Exhausted, .Binding_Expired,
 	     .Pulse_Advanced, .Refocus, .Object_Spawned, .Explosive_Armed, .Explosion, .Explosive_Disarmed, .Room_Hazard_Triggered,
-	     .Dice_Rolled, .Spell_Launched, .Spell_Impact, .Shadow_Entered, .Shadow_Emerged:
+	     .Dice_Rolled, .Spell_Launched, .Spell_Impact, .Shadow_Entered, .Shadow_Emerged, .Attack_Deflected, .Fate_Rolled:
 	}
 	return nil
 }
@@ -2578,6 +2634,11 @@ draw_presentation_cue :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) {
 	case .Binding_Expired:
 		label = "BINDING END"
 		color = rl.Color{169, 183, 177, 255}
+	case .Attack_Deflected:
+		label = "RIFLESSO"
+		color = rl.Color{101, 174, 218, 255}
+	case .Fate_Rolled:
+		label, color = fate_outcome_label(cue.event, true)
 	case .Move, .Card_Played, .Card_Drawn, .Card_Moved, .Card_Created, .Refocus,
 	     .Card_Refocused, .Defeat,
 	     .Loot_Dropped, .Loot, .Pulse_Advanced, .Dice_Rolled, .Spell_Launched, .Spell_Impact,

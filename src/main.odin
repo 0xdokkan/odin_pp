@@ -344,6 +344,32 @@ immediate_card_command :: proc(card: game.Card_Instance) -> (Gameplay_Command, b
 	}, true
 }
 
+// FERETRO: the player holds Ctrl with arrows to loose; the board then marks
+// the foes they reach (render.draw_arrow_aim).
+arrows_aiming :: proc(room: ^game.Room) -> bool {
+	return arrows_aiming_at(room, rl.IsKeyDown(.LEFT_CONTROL) || rl.IsKeyDown(.RIGHT_CONTROL))
+}
+
+// The same with Ctrl `held` or not.
+arrows_aiming_at :: proc(room: ^game.Room, held: bool) -> bool {
+	return held && game.tactical_enabled(room) && room.phase == .Combat && game.player_charges(room, .Arrows) > 0
+}
+
+// FERETRO's click while `aiming`: an arrow at the foe under the mouse when
+// the arrows reach it. Such a click is the arrow's either way (`taken`): it
+// never also picks up a card or drops one on the board.
+arrow_shot_command :: proc(room: ^game.Room, renderer: ^render.Renderer, aiming, clicked: bool) -> (command: Gameplay_Command,
+	has_command, taken: bool) {
+	if !aiming || !clicked { return }
+	taken = true
+	if !renderer.has_hovered_cell { return }
+	index, found := game.enemy_index_at(room, renderer.hovered_cell)
+	if !found { return }
+	foe := game.enemy_entity(room.enemies[index].id)
+	if !game.player_arrow_target_is_valid(room, foe) { return }
+	return {kind = .Shoot, origin_phase = .Combat, target = game.entity_target(foe)}, true, true
+}
+
 poll_walk_command :: proc(phase: game.Room_Phase) -> (Gameplay_Command, bool) {
 	for key, index in ([4]rl.KeyboardKey{.W, .D, .S, .A}) {
 		if key_pressed(key) { return {kind = .Move, origin_phase = phase, direction = game.Move_Direction(index)}, true }
@@ -442,6 +468,14 @@ poll_gameplay_command :: proc(
 		return
 	}
 
+	// FERETRO: Ctrl held, a left click on a foe the arrows reach looses one;
+	// over the hand the click stays the hand's.
+	if spatial_interaction_enabled && mouse_inside && card_interaction.hovered_card_id == 0 {
+		if shot, has_shot, taken := arrow_shot_command(room, renderer, arrows_aiming(room), rl.IsMouseButtonPressed(.LEFT)); taken {
+			return shot, has_shot
+		}
+	}
+
 	if key_pressed(.F) ||
 	   (spatial_interaction_enabled && mouse_inside && rl.IsMouseButtonPressed(.LEFT) &&
 	    render.refocus_button_at_point(renderer, mouse_canvas)) {
@@ -533,7 +567,8 @@ capture_gameplay_command_telemetry :: proc(
 	case .Dodge, .Wait, .Timeout, .Continue_Pulse, .Begin_Diagonal, .QTE_Key, .QTE_Fail, .Defense, .Activate, .Equip,
 	     .Shadow_Emerge:
 		resolved_kind = .Wait
-	case .Ability:
+	// An arrow is neither a step nor a bump nor a card.
+	case .Ability, .Shoot:
 		resolved_kind = .Ability
 	case .Play_Card:
 		resolved_kind = .Play_Card
@@ -628,6 +663,11 @@ execute_gameplay_command :: proc(room: ^game.Room, command: Gameplay_Command) ->
 		execution.committed = game.card_play_was_committed(play.result)
 		execution.clears_card_interaction = execution.committed
 		if !execution.committed { room.player.tactical.beat_spent = spent }
+	case .Shoot:
+		// Never stamped with a beat: an arrow is never critical.
+		result := game.shoot_player_arrow(room, command.target.entity)
+		execution.committed = result != .Invalid_Phase && result != .Blocked
+		execution.clears_card_interaction = execution.committed
 	case .Refocus:
 		refocus := game.refocus_player_hand(room)
 		execution.committed = game.refocus_was_committed(refocus.result)

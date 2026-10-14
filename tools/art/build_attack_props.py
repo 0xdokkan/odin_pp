@@ -6,7 +6,9 @@
 library.)
 
 The weapons the living cards swing, the bolts, bomb and embers they throw and
-the paper bits of an impact (src/render/attack_fx.odin). Each prop is pixel
+the paper bits of an impact (src/render/attack_fx.odin); the flames of the
+ground's fires, the flask a pool is thrown in, its drops and the cinders a
+fire throws (src/render/ground_fx.odin). Each prop is pixel
 art written here as rows of palette letters, in the figures' own colours;
 the script adds its ink outline (every empty texel touching the body, 8-way)
 and closes hollows of a texel or two. Its paper is an exact distance field
@@ -72,6 +74,8 @@ PALETTE = {
     "F": (190, 82, 35), "f": (255, 214, 120), "g": (244, 157, 104), # fire
     "T": (40, 71, 108),                                             # storm blue
     "H": (250, 250, 246),                                           # white print, tinted at run time
+    "a": (28, 74, 52), "c": (52, 128, 72), "h": (150, 222, 132),    # venom
+    "k": (196, 226, 214), "m": (150, 104, 64),                      # glass, cork
 }
 
 # name, rows (None: an analytic shape), grip, tip (texels of the rows, x to the
@@ -257,6 +261,104 @@ PROPS = [
     ("Shard_A", ["XX.", "XXX", "X.."], (1.5, 1.5), (2.5, 0.5), False, False, 1.6),
     ("Shard_B", [".X.", "XXX", ".XX"], (1.5, 1.5), (2.5, 0.5), False, False, 1.6),
     ("Shard_C", ["XXX", ".XX", "..X"], (1.5, 1.5), (2.5, 0.5), False, False, 1.6),
+    # INCENDIO: a fire's centre flames (two drawings that flicker), standing on
+    # their base, a tongue licking up beside the tip...
+    ("Flame_A", [
+        "......F......",
+        ".....FF......",
+        ".....FgF.....",
+        "....FggF..F..",
+        "....FggF..FF.",
+        "...FggggF.FgF",
+        "...FgffgFFggF",
+        "..FggffggFggF",
+        "..FgfffggggF.",
+        ".FggffUfgggF.",
+        ".FgfffUUfggF.",
+        "FggffUUUffggF",
+        "FgfffUUUUfggF",
+        "FgffUUUUUffgF",
+        "FgffUUUUUUfgF",
+        "FgfUUUUUUUfgF",
+        ".FgfUUUUUfgF.",
+        ".FggfUUUffgF.",
+        "..FggfffggF..",
+        "...FFFFFFF...",
+    ], (6.5, 19.5), (6.5, 0.5), True, True, 2.6),
+    ("Flame_B", [
+        "......F......",
+        "......FF.....",
+        ".....FgF.....",
+        "..F..FggF....",
+        ".FF..FggF....",
+        "FgF.FggggF...",
+        "FggFFgffgF...",
+        "FggFggffggF..",
+        ".FggggfffgF..",
+        ".FgggfUffggF.",
+        ".FggfUUfffgF.",
+        "FggffUUUffggF",
+        "FggfUUUUfffgF",
+        "FgffUUUUUffgF",
+        "FgfUUUUUUffgF",
+        "FgfUUUUUUUfgF",
+        ".FgfUUUUUfgF.",
+        ".FgffUUUfggF.",
+        "..FggfffggF..",
+        "...FFFFFFF...",
+    ], (6.5, 19.5), (6.5, 0.5), True, True, 2.6),
+    # ...and the smaller flames along its arms.
+    ("Flame_C", [
+        "....F....",
+        "...FF....",
+        "...FgF...",
+        "..FggF.F.",
+        "..FgfgFFF",
+        ".FgffgFgF",
+        ".FgfUfggF",
+        "FgfUUfgF.",
+        "FgfUUUfgF",
+        "FgUUUUfgF",
+        ".FgUUUfF.",
+        "..FgffF..",
+        "...FFF...",
+    ], (4.5, 12.5), (4.5, 0.5), True, True, 2.2),
+    ("Flame_D", [
+        "....F....",
+        "....FF...",
+        "...FgF...",
+        ".F.FggF..",
+        "FFFgfgF..",
+        "FgFgffgF.",
+        "FggfUfgF.",
+        ".FgfUUfgF",
+        "FgfUUUfgF",
+        "FgfUUUUgF",
+        ".FfUUUgF.",
+        "..FffgF..",
+        "...FFF...",
+    ], (4.5, 12.5), (4.5, 0.5), True, True, 2.2),
+    # POZZA DI VELENO: the flask it is thrown in, corked, and the drops of its
+    # splash.
+    ("Flask", [
+        "...mmm...",
+        "...mmm...",
+        "....k....",
+        "...kak...",
+        "...kak...",
+        "..kaaak..",
+        ".kacccak.",
+        "kacchccak",
+        "kachhccak",
+        "kacccccak",
+        "kaccccaak",
+        ".kaaaaak.",
+        "..kkkkk..",
+    ], (4.5, 12.5), (4.5, 0.5), True, True, 2.6),
+    ("Drop_A", [".h.", "hhc", "hcc", "cca", ".a."], (1.5, 4.5), (1.5, 0.5), True, True, 1.2),
+    ("Drop_B", ["..h.", ".hcc", "hcca", ".aa."], (1.5, 3.5), (2.5, 0.5), True, True, 1.2),
+    # A cinder a fire throws: a spark in its glow.
+    ("Cinder", [".g.", "gUg", ".F."], (1.5, 2.5), (1.5, 0.5), True, True, 1.6),
 ]
 
 

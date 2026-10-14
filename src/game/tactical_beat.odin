@@ -73,12 +73,16 @@ tactical_claim_beat :: proc(room: ^Room, beat: u32) -> bool {
 	return true
 }
 
-// Movimento Ombra stands outside the window's time: played on the tick it
-// leaves the beat to the next action, with no critical and no badge.
+// Movimento Ombra stands outside the window's time, and the Dado del Destino
+// loads its three bumps whatever the tick (it has no stronger version): played
+// on the tick, each leaves the beat to the next action, with no critical and no
+// badge.
 tactical_card_claims_beat :: proc(room: ^Room, card_id: u32) -> bool {
 	if room == nil || room.player == nil { return false }
 	index, found := hand_card_index_by_id(&room.player.deck, card_id)
-	return !found || room.player.deck.hand[index].definition_id != .Shadow_Step
+	if !found { return true }
+	id := room.player.deck.hand[index].definition_id
+	return id != .Shadow_Step && id != .Fate_Dice
 }
 
 // Read once by the action that the claim was made for.
@@ -113,13 +117,17 @@ tactical_critical_scale :: proc(room: ^Room, action: ^Action) {
 		case .Heal, .Gain_Gold:
 			effect.amount = critical_boost(effect.amount)
 		case .Apply_Status:
+			// The Dado del Destino loads its bumps, never more (and never claims
+			// the tick: tactical_card_claims_beat). The other charges get one more.
+			if effect.status == .Fate { continue }
 			if effect.status == .Shield { effect.amount = critical_boost(effect.amount) } else { effect.amount += 1 }
 			// Stacks have no duration to lengthen.
 			if !status_kind_stacks(effect.status) { effect.duration += 1 }
 		case .Add_Reaction_Binding:
 			effect.amount += 1
 			if effect.charges > 0 { effect.charges += 1 }
-		case .Draw_Cards, .Create_Card, .Gain_Energy:
+		// A pool or a fire gives a stack more.
+		case .Draw_Cards, .Create_Card, .Gain_Energy, .Place_Ground:
 			effect.amount += 1
 		case .Deploy_Device:
 			effect.amount = critical_damage(effect.amount)
@@ -147,16 +155,8 @@ try_move_player_diagonal :: proc(room: ^Room, offset: grid.Position) -> Action_R
 	if enemy_index, found := enemy_index_at(room, target); found {
 		if !tactical_allows_action(room) { return .Invalid_Phase }
 		clear_event_log(&room.recent_events)
-		enemy := room.enemies[enemy_index]
-		action := make_action(.Attack, PLAYER_ENTITY, entity_target(enemy_entity(enemy.id)), .Opponent)
-		added := add_effect(&action, damage_effect(enemy_entity(enemy.id), critical_bump_damage(player_basic_attack_damage(room.player))))
-		assert(added)
-		report := resolve_action(room, &action)
-		if !report.accepted { return .Blocked }
-		consume_equipped_weapon_use(room.player)
-		mark_attack_events(&report.events, 0, PLAYER_ENTITY, enemy_entity(enemy.id), room.player.position, target, {}, false)
-		mark_critical_events(&report.events)
-		append_event_log(&room.recent_events, &report.events)
+		// Always critical, loaded like a straight bump (player_charges.odin).
+		if !player_bump(room, enemy_index, target, .Opponent, true) { return .Blocked }
 		_, outcome := finish_player_combat_command(room)
 		switch outcome {
 		case .Player_Defeated: return .Player_Defeated

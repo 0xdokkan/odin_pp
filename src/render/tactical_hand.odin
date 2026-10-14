@@ -20,10 +20,10 @@ tactical_hand_card_bounds :: proc(renderer: ^Renderer, index, count: int) -> rl.
 gothic_card_accent :: proc(id: game.Card_Id) -> rl.Color {
 	if game.card_is_board_device(id) || id == .Storm_Crown { return {42, 93, 125, 255} }
 	switch gothic_card_icon(id) {
-	case 2, 7: return {72, 92, 42, 255}
-	case 4, 14, 16: return {98, 57, 122, 255}
-	case 1, 5, 15: return {60, 84, 93, 255}
-	case 3, 10, 11: return {122, 88, 34, 255}
+	case 2, 7, 17, 22: return {72, 92, 42, 255}
+	case 4, 14, 16, 21: return {98, 57, 122, 255}
+	case 1, 5, 15, 19: return {60, 84, 93, 255}
+	case 3, 10, 11, 20: return {122, 88, 34, 255}
 	case: return {130, 43, 45, 255}
 	}
 }
@@ -149,9 +149,8 @@ draw_tactical_card :: proc(renderer: ^Renderer, bounds: rl.Rectangle, card: game
 	rl.DrawRectangleRec({x+10, y+83, width-20, 2}, accent)
 	rl.DrawRectangleRec({x+10, y+85, width-20, 1}, {251, 244, 223, 170})
 	first, second := gothic_card_lines(card, definition.tactical)
-	if width < 130 {
-		if card.definition_id == .Shock_Floor { first, second = fmt.ctprintf("%s COLPI + BERS.", card_dice_label(card)), fmt.ctprintf("%d DANNO / 3X3", game.card_effect_amount(definition.effects[0], card.upgrade_level)) }
-		if card.definition_id == .Tesla_Coil { first, second = fmt.ctprintf("%d / DIST. DANNI",game.card_effect_amount(definition.effects[0],card.upgrade_level)), "CAMPO USA 4 TESLA" }
+	if width < CARD_NARROW_WIDTH {
+		if short_first, short_second, short := gothic_card_narrow_lines(card, definition.tactical); short { first, second = short_first, short_second }
 	}
 	gothic_text_fit(renderer, first, {x+10, y+90, width-20, 18}, 14, ink)
 	gothic_text_fit(renderer, second, {x+10, y+109, width-20, 17}, 12, ink)
@@ -177,8 +176,14 @@ draw_tactical_card_inspector :: proc(renderer: ^Renderer, card: game.Card_Instan
 	// A second rule line, where the keyword tags go when the card has none.
 	rule: cstring = ""
 	if card.definition_id == .Shadow_Step { reaction, rule = "NEMICI E TIMER FERMI", "DIAGONALE SUL BATTITO" }
+	if card.definition_id == .Poison_Pool { reaction, rule = "AREE CHIUSE: SI RIEMPIONO", "OGNI CELLA ENTRATA AVVELENA" }
+	if card.definition_id == .Wildfire { reaction, rule = "CRESCE A OGNI NUOVA FINESTRA", "SI SPEGNE ALLA QUINTA" }
+	if card.definition_id == .Deflect { reaction, rule = "IL NEMICO PRENDE IL COLPO", "NO BOMBE, TRAPPOLE, STATUS" }
+	if card.definition_id == .Coffin { reaction, rule = "+ VEL 2 O BRU 1 O RAL 1", "LINEA DI TIRO / 1s L'UNA" }
+	if card.definition_id == .Fate_Dice { reaction, rule = "1 VEL 2 BRU 3 RAL 4 VITA", "5 CRITICO / 6+ LETALE" }
+	if card.definition_id == .Venom_Blade { reaction, rule = "IL DADO DECIDE I COLPI", "LE CARICHE SI SOMMANO" }
 	if card.definition_id == .Guard || card.definition_id == .Purifying_Guard { reaction = "QTE: BLOCK / PARRY" }
-	if card.definition_id == .Thorn_Coat { reaction = "QTE: DEFLECT (FRECCE)" }
+	if card.definition_id == .Thorn_Coat { reaction = "QTE: DEVIAZIONE (FRECCE)" }
 	if card.definition_id == .Afterimage { reaction = "IGNORA RECUPERO SCHIVA" }
 	if card.definition_id == .Prismatic_Barrage { reaction = "SCUDO PRIMA / 2s" }
 	if card.definition_id == .Twin_Venom { reaction = "VELENO: A OGNI SUA AZIONE" }
@@ -234,6 +239,11 @@ draw_tactical_hand :: proc(renderer: ^Renderer, room: ^game.Room,
 			hint = "SCEGLI BERSAGLIO / DESTRO: ANNULLA" if game.card_requires_spatial_target(definition) else "CLIC DI NUOVO: GIOCA"
 		}
 	}
+	// FERETRO: how its arrows are loosed, and while Ctrl is held, where.
+	if arrows := game.player_charges(room, .Arrows); arrows > 0 && selected == 0 {
+		hint = fmt.ctprintf("CTRL+CLIC SU UN NEMICO: FRECCIA (%d)", arrows)
+	}
+	if renderer.tactical.arrow_aim { hint = "CLIC SU UN NEMICO EVIDENZIATO: FRECCIA" }
 	if recovering { hint = "RECUPERO / PUOI MUOVERTI" }
 	if game.tactical_is_stunned(room) { hint = "STORDITO / SOLO CARTE" }
 	if game.tactical_shadow_active(room) { hint = "OMBRA / SOLO PASSI" }

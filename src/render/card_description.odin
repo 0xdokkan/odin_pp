@@ -49,7 +49,9 @@ gothic_card_lines :: proc(card: game.Card_Instance, tactical: bool = false) -> (
 		case .Cross_Slash: return fmt.ctprintf("%d DANNI A CROCE", a), "SOLO CELLE VISIBILI"
 		case .Guard, .Purifying_Guard:
 			return fmt.ctprintf("%d SCUDO / %ds", a, d.effects[0].duration), "RIMUOVE VELENO" if card.definition_id == .Purifying_Guard else "ABILITA BLOCK / PARRY"
-		case .Thorn_Coat: return fmt.ctprintf("%d SPINE / %ds", a, d.effects[0].duration), "ABILITA DEFLECT"
+		// The defence prompt's own name (DEVIAZIONE): Deflect is the card that
+		// sends a blow back.
+		case .Thorn_Coat: return fmt.ctprintf("%d SPINE / %ds", a, d.effects[0].duration), "ABILITA DEVIAZIONE"
 		case .Counter_Rune: return fmt.ctprintf("CONTRATTACCO %d", a), fmt.ctprintf("%d CARICHE / RETAIN", d.effects[0].charges)
 		case .Battle_Focus: return fmt.ctprintf("PESCA %d / ESPLORA", a), fmt.ctprintf("VISTA: %ds / MAX %d", d.effects[1].duration, game.MAX_TACTICAL_VISION)
 		case .Spark_Forge: return fmt.ctprintf("CREA %d SPARK", a), "TEMPORANEE / ENERGIA 0"
@@ -63,6 +65,13 @@ gothic_card_lines :: proc(card: game.Card_Instance, tactical: bool = false) -> (
 		case .Afterimage: return "SCHIVA SENZA RECUPERO", fmt.ctprintf("%d SCUDO SE MUOVI / %ds", a, d.effects[0].duration)
 		case .Chain_Lightning: return fmt.ctprintf("%d DANNI / NEMICO", a), fmt.ctprintf("%d VISIBILI / SALTO %d", game.MAX_SPELL_TARGETS, game.SPELL_BOUNCE_RANGE)
 		case .Shadow_Step: return fmt.ctprintf("OMBRA %ds / MONDO FERMO", a), "INTANGIBILE / SOLO PASSI"
+		case .Poison_Pool: return fmt.ctprintf("%d VELENO A CELLA", a), "SOLO NEMICI / STANZA"
+		case .Wildfire: return fmt.ctprintf("%d BRUCIATURA A CELLA", a), "CROCE: +1 A FINESTRA"
+		// The player's charges (game/player_charges.odin).
+		case .Deflect: return fmt.ctprintf("+%d RIFLESSO", a), "RIMANDA UN COLPO"
+		case .Coffin: return fmt.ctprintf("%d FRECCE / CTRL+CLIC", a), fmt.ctprintf("%d DANNO + 1 STATUS", game.COFFIN_ARROW_DAMAGE)
+		case .Fate_Dice: return fmt.ctprintf("%s SU %d COLPI", card_dice_label(card), game.FATE_DICE_CHARGES), "UN TIRO A OGNI COLPO"
+		case .Venom_Blade: return fmt.ctprintf("%s COLPI AVVELENATI", card_dice_label(card)), fmt.ctprintf("%d VELENO A COLPO", game.VENOM_BLADE_POISON)
 		case .Sei_Denari, .Sette_Denari: return fmt.ctprintf("+%d ORO", a), "SCOPA / UNA VOLTA PER STANZA"
 		case .Titan_Grip, .Storm_Crown, .Shock_Floor, .Tesla_Coil, .Firebomb, .Calculated_Risk, .Spark, .Grappling_Hook,
 		     .Fate_Strike, .Sundering_Blow, .Prismatic_Barrage, .Twin_Venom, .Count:
@@ -108,8 +117,36 @@ gothic_card_lines :: proc(card: game.Card_Instance, tactical: bool = false) -> (
 	case .Storm_Crown: return fmt.ctprintf("%d DANNI / 3 BERSAGLI", a), "LEGGENDARIA / RIMBALZO 3"
 	case .Sei_Denari, .Sette_Denari: return fmt.ctprintf("+%d ORO", a), "SCOPA / EXHAUST"
 	case .Shadow_Step: return fmt.ctprintf("OMBRA %ds", a), "SOLO TATTICA"
+	case .Poison_Pool: return fmt.ctprintf("%d VELENO A CELLA", a), "SOLO TATTICA"
+	case .Wildfire: return fmt.ctprintf("%d BRUCIATURA", a), "SOLO TATTICA"
+	case .Deflect: return fmt.ctprintf("%d RIFLESSO", a), "SOLO TATTICA"
+	case .Coffin: return fmt.ctprintf("%d FRECCE", a), "SOLO TATTICA"
+	case .Fate_Dice: return fmt.ctprintf("%s SU %d COLPI", card_dice_label(card), game.FATE_DICE_CHARGES), "SOLO TATTICA"
+	case .Venom_Blade: return fmt.ctprintf("%s COLPI AVVELENATI", card_dice_label(card)), "SOLO TATTICA"
 	case .Count: return "", ""
 	}
 	return "", ""
+}
+
+// A hand of seven or eight cards: narrower than this, a card's lines shrink
+// or are cut. PROVA MECCANICHE holds its whole deck, seven cards, at once.
+CARD_NARROW_WIDTH :: f32(130)
+
+// The short lines of the cards whose hand lines would not hold their size on
+// a narrow card; the inspector keeps the whole text. found is false for the
+// cards whose lines fit as they are.
+gothic_card_narrow_lines :: proc(card: game.Card_Instance, tactical: bool = false) -> (first, second: cstring, found: bool) {
+	d, defined := game.card_definition_by_id(card.definition_id, tactical)
+	if !defined { return }
+	a := game.card_effect_amount(d.effects[0], card.upgrade_level) if d.effects[0].base_amount > 0 else 0
+	#partial switch card.definition_id {
+	case .Shock_Floor: return fmt.ctprintf("%s COLPI + BERS.", card_dice_label(card)), fmt.ctprintf("%d DANNO / 3X3", a), true
+	case .Tesla_Coil: return fmt.ctprintf("%d / DIST. DANNI", a), "CAMPO USA 4 TESLA", true
+	case .Shadow_Step: return fmt.ctprintf("OMBRA %ds", a), "MONDO FERMO", true
+	case .Wildfire: return fmt.ctprintf("%d BRUCIATURA", a), "CROCE: +1 A FINESTRA", true
+	case .Coffin: return fmt.ctprintf("%d FRECCE", a), fmt.ctprintf("CTRL+CLIC: %d DANNO", game.COFFIN_ARROW_DAMAGE), true
+	case .Venom_Blade: return fmt.ctprintf("%s COLPI", card_dice_label(card)), fmt.ctprintf("%d VELENO A COLPO", game.VENOM_BLADE_POISON), true
+	}
+	return
 }
 

@@ -7,12 +7,24 @@ library.)
 
 assets/gothic/card-icons-pixel.png holds the 16 painted icons
 (assets/gothic/generation-prompts.md) in four rows of four. This script keeps
-those rows byte for byte and appends a fifth row of the same cells, painted
-here as coarse pixel art in the atlas's style (24-28 square pixel units, a
-few flat colours, a thick near-black outline):
+those rows byte for byte and appends a fifth and a sixth row of the same
+cells, painted here as coarse pixel art in the atlas's style (24-28 square
+pixel units, a few flat colours, a thick near-black outline):
 
     cell 16  Movimento Ombra: the ivory hooded Viandante, his face a dark void
              with two pale blue eyes, sinking into a violet pool of shadow.
+    cell 17  Pozza di Veleno: a glass vial tipped over, pouring its green
+             poison into a bubbling puddle.
+    cell 18  Incendio: a fire on a charred cross of floor, a flame at the
+             end of each arm (it grows as a plus).
+    cell 19  Deflect: a steel buckler with a gold boss, a bolt flying back
+             off its rim in a spark, blue strokes of where it came and went.
+    cell 20  Feretro: an upright coffin of dark wood with a gold cross,
+             three arrows standing up out of its head.
+    cell 21  Dado del Destino: a bone d20 with a 20 on its lit face, in a
+             violet ring of fate and sparks of gold.
+    cell 22  Lama Velenosa: a dagger with a gold guard, its lower edge
+             coated green and dripping poison.
 
 The PNG is read and written here with zlib and struct, never through Blender
 or an image library, so the painted pixels are never resampled or recoloured:
@@ -20,7 +32,8 @@ their scanlines are copied as they are, filter bytes included. The other
 chunks of the original (its content credentials too) are kept unchanged; they
 describe the painted sheet, so their image hash no longer matches. The same
 atlas in gives the same bytes out, and running the script again rebuilds the
-added row from scratch.
+added rows from scratch. Every added row keeps the fifth row's pitch (314
+pixels), so the icons painted before the sixth row keep their pixels too.
 
 Options:
     --check        exit 1 if the atlas is not what this script would write
@@ -40,7 +53,7 @@ ATLAS = os.path.join(ROOT, "assets", "gothic", "card-icons-pixel.png")
 
 COLUMNS = 4
 PAINTED_ROWS = 4
-ROWS = 5
+ROWS = 6
 # One pixel unit of the icon, in atlas pixels (the painted icons' own size).
 SCALE = 10
 SIGNATURE = b"\x89PNG\r\n\x1a\n"
@@ -56,6 +69,24 @@ PALETTE = {
     "S": (30, 8, 56, 255),      # the pool's depth
     "V": (70, 24, 118, 255),    # the pool
     "v": (128, 72, 186, 255),   # the pool's lit rim and ripple, rising wisps
+    "G": (30, 88, 52, 255),     # poison in shade
+    "g": (70, 156, 72, 255),    # poison
+    "L": (166, 226, 112, 255),  # poison's light, its bubbles
+    "W": (206, 230, 226, 255),  # the vial's glass
+    "w": (140, 176, 182, 255),  # glass in shade
+    "U": (255, 244, 196, 255),  # a highlight; the flame's white heart
+    "A": (58, 26, 26, 255),     # the charred floor
+    "F": (186, 34, 30, 255),    # flame's red edge
+    "O": (240, 120, 32, 255),   # flame
+    "Y": (255, 206, 76, 255),   # flame's yellow
+    "M": (138, 146, 160, 255),  # steel
+    "m": (78, 84, 100, 255),    # steel in shade
+    "H": (214, 222, 232, 255),  # steel's light
+    "N": (82, 52, 34, 255),     # dark wood
+    "n": (128, 84, 50, 255),    # wood
+    "B": (172, 120, 64, 255),   # light wood: a shaft, a lit plank
+    "e": (88, 150, 200, 255),   # the deflection's blue in shade
+    "Q": (176, 120, 30, 255),   # gold in shade
 }
 
 # Movimento Ombra, 28x28 units, as the Viandante of the figure atlas: his hood
@@ -92,8 +123,195 @@ SHADOW_STEP = (
     "............................",
 )
 
+POISON_POOL = (
+    ".................KKKKKK.....",
+    "................KKWWWWKK....",
+    "...............KKWWWWWWKK...",
+    "..............KKggWUUWWWKK..",
+    "..............KgggUWWWWWWK..",
+    "..............KGggggWWWWWK..",
+    "..............KGGggggWWWWK..",
+    ".............KKGGGggggWWWK..",
+    "............KKWGGGGggggWWK..",
+    "...........KKWKWGGGGggggKK..",
+    "..........KKWKgKwGGGGggKK...",
+    "........KKKWKgKwKKGGGGKK....",
+    "........KwWKgKwKKKKKKKK.....",
+    "........KKwgKwKK............",
+    ".........KKwwKK.............",
+    ".......KKKgLwK..............",
+    "......KKgKggKKKKKKKKK.......",
+    "...KKKKGGggLggggggGGKKKK....",
+    ".KKKGggLLLggLLLLLLggggGKKK..",
+    "KKGggLLLLLgLLLLLLLLLggggGKK.",
+    "KGgggggggggggggggLgggggggGK.",
+    "KGGgggLgggggggggggggggggGGK.",
+    "KGGGgggggGggggggggggLggGGGK.",
+    "KKGGGGgggggggggggggggGGGGKK.",
+    ".KKKGGGGGGGGGGGGGGGGGGGKKK..",
+    "...KKKKKGGGGGGGGGGGKKKKK....",
+    ".......KKKKKKKKKKKKK........",
+    "............................",
+)
+
+WILDFIRE = (
+    ".........KKKKKKKKKK.........",
+    ".........KAAAAAAAAK.........",
+    ".........KAAAFFAAAK.........",
+    ".........KAAOOFAAAK.........",
+    ".........KAAFYOFAAK.........",
+    ".........KAAOYYOAAK.........",
+    ".........KAAOYYOOAK.........",
+    ".........KAAFYYAAAK.........",
+    ".........KAAAAFAAAK.........",
+    "KKKKKKKKKKAAAAFAAAKKKKKKKKKK",
+    "KAAAAAAAAAAAAFFAAAAAAAAAAAAK",
+    "KAAAFAAAAAAAAFOFAAAAOAAFAAAK",
+    "KAAAOFAAAAAAFOOFAAAAAAFOAAAK",
+    "KAAFOOFAAAAFFOYOFAAAAFOOFAAK",
+    "KAAOYYFAAAAFOYYOFFAAAFYYOAAK",
+    "KAAOYYOAAAFOOYUOOFAAAOYYOAAK",
+    "KAAFYYFOAFFOYUUYOFFAAFYYFAAK",
+    "KAAAAAAAAFOOYUUYOOFAAAAAAAAK",
+    "KKKKKKKKKKFOYUUYOFKKKKKKKKKK",
+    ".........KFOYUUYOFK.........",
+    ".........KAFOUUOFAK.........",
+    ".........KAOAFFAAAK.........",
+    ".........KAAAFFAAAK.........",
+    ".........KAAFOOAAAK.........",
+    ".........KAAOYYFAAK.........",
+    ".........KAAOYYOAAK.........",
+    ".........KAAFYYAAAK.........",
+    ".........KKKKKKKKKK.........",
+)
+
+
+# The player's charges (Phase 2): Deflect, Feretro, Dado del Destino and Lama
+# Velenosa.
+DEFLECT = (
+    "...................K...KKKK.",
+    "..................KeK.KmmmmK",
+    ".............K....KeeK.KmmHK",
+    "............KEK....KeKKBBmmK",
+    ".............KEK...KeKBBBKmK",
+    "..............KEK...KBBBK.K.",
+    ".........KKK...KEK.KBBBK....",
+    "......KKKmmmKKK.K.KBBBK.....",
+    ".....KmmHHHHHmmK.KRBBK......",
+    "....KmHMMMMMMMHmKRRBK.......",
+    "...KmMMMMMMMMMMRRRRK...KKK..",
+    "..KmMMMMHHHHHMMMRYK..KKEEEK.",
+    ".KmHMMMHMMMMMHMMYUYKKEEEKK..",
+    ".KmMMMHMMMMMMMHMMYmK.KKKKKK.",
+    ".KHMMHMMMYYYMMMHMMHK..KKeeeK",
+    "KmHMMHMMYUYYYMMHMMHmKKeeeKK.",
+    "KmHMMHMMYYYYYMMHMMHmK.KKK...",
+    "KmHMMHMMYYYYYMMHMmHmK.......",
+    ".KHMMHMMMYYYMMMHmmHK........",
+    ".KmMMMHMMMMMMMHmmmmK........",
+    ".KmHMMMHMMMMMHmmmHmK........",
+    "..KmMMMMHHHHHmmmmmK.........",
+    "...KmMMMMMMMmmmmmK..........",
+    "....KmHMMMMmmmHmK...........",
+    ".....KmmHHHHHmmK............",
+    "......KKKmmmKKK.............",
+    ".........KKK................",
+    "............................",
+)
+COFFIN = (
+    ".............KmK............",
+    "..........K..KmK..K.........",
+    ".........KmKKmHmKKmK........",
+    ".........KmKmmmmmKmK........",
+    "........KmHmKKIKKmHmK.......",
+    ".......KmmmmmKIKmmmmmK......",
+    "........KKIKKKIKKKIKK.......",
+    ".........KIKKRIRKKIK........",
+    ".........KIKKRIRKKIK........",
+    "........KRIRKKIKKRIRK.......",
+    ".......KNNNNNNNNNNNNK.......",
+    "......KNNBDDDDDDDDDNNK......",
+    ".....KNNBBnnnnnnnnnnNNK.....",
+    ".....KNNBBnnnnnnnnnnNNK.....",
+    ".....KNBBBnnnnUQnnnnnNK.....",
+    ".....KNBBBnnnnYQnnnnnNK.....",
+    ".....KNNBBnnnnYQnnnnNNK.....",
+    ".....KNNBBnYYYYYYYYnNNK.....",
+    "......KNBBnnnnYQnnnnNK......",
+    "......KNNBnnnnYQnnnNNK......",
+    "......KNNBnnnnYQnnnNNK......",
+    ".......KNBnnnnYQnnnNK.......",
+    ".......KNBnnnnYQnnnNK.......",
+    ".......KNNnnnnYQnnNNK.......",
+    ".......KNNnnnnnnnnNNK.......",
+    "........KNnnnnnnnnNK........",
+    "........KNNNNNNNNNNK........",
+    "........KNNNNNNNNNNK........",
+)
+FATE_DICE = (
+    ".........KKKKKKKKKK.........",
+    ".......KKVVVVVVVVVVKK.......",
+    "......KVVVvvvvvvvvVVVK..K...",
+    "...K.KVVvvKKKKKKKKvvVVKKYK..",
+    "..KYKVvvKKKKiiDiKKKKvvVKK...",
+    "...KVvKK.KiiiiDiiiK.KKvVK...",
+    "..KVvK.KKiiiiiDiiiiKK.KvVK..",
+    ".KVVvKKiiiiiiDDDiiiiiKKvVVK.",
+    ".KVvKiiiiiiiIDIDiiiiiiiKvVK.",
+    "KVVvKiiiiiiiDIIIDiiiiiiKvVVK",
+    "KVvKKiiiiiiDDIIIDDiiiiiKKvVK",
+    "KVvKKiiiiiiDIIIIIDiiiiiKKvVK",
+    "KVvKKiiiiiRRRIIRRRDiiiiKKvVK",
+    "KVvKKiiiiDDIRIIRIRDDiiiKKvVK",
+    "KVvKKiiiiDRRRIIRIRIDiiiKKvVK",
+    "KVvKKiiiDIRIIIIRIRIIDiiKKvVK",
+    "KVvKKiiDDIRRRIIRRRIIDDiKKvVK",
+    "KVvKKiiDIIIIIIIIIIIIIDiKKvVK",
+    "KVVvKiDDIIIIIIIIIIIIIDDKvVVK",
+    ".KVvKiDDDDDDDDDDDDDDDDDKvVK.",
+    ".KVVvDKiiiiiiiiiiiiiiKKDVVK.",
+    "..KVvK.KKiiiiiiiiiiKK.KvVK..",
+    ".KYKVvKK.KiiiiiiiiK.KKvVK...",
+    "..K.KVvvKKKKiiiiKKKKvvVK.K..",
+    ".....KVVvvKKKKKKKKvvVVK.KYK.",
+    "......KVVVvvvvvvvvVVVK...K..",
+    ".......KKVVVVVVVVVVKK.......",
+    ".........KKKKKKKKKK.........",
+)
+VENOM_BLADE = (
+    "..........................K.",
+    "........................KKMK",
+    "......................KKMHK.",
+    "....................KKMMHHK.",
+    "...................KMMHHHK..",
+    "....................KHHMMK..",
+    "...................KMHMMK...",
+    "..................KMHMMMK...",
+    ".................KMHMMmK....",
+    "................KMHMMgK.....",
+    "...............KMHMMmgGK....",
+    "..............KMHMMggKK.....",
+    ".............KMHMMmgGgK.....",
+    "....KK......KMHMMggKKgK.....",
+    "...KQYKK...KMHMMmgGKKLK.....",
+    "...KYYYYK.KMHMMggKgK.K......",
+    "....KYYYYKMHMMmgGKgKKgK.....",
+    ".....KYYYYHMMggKKKgK.K......",
+    "......KYYYYMmgGK.KgK........",
+    ".......KnnYYgKgK.KLK........",
+    "......KnnnYYgKgK..K.........",
+    "...KKKnnnKYYQKgK.KgK........",
+    "..KYYnnnK.KYYKLK..K.........",
+    ".KYYYYnK...KK.K.............",
+    ".KYQYYnK.....KgK............",
+    "..KYYKK.......K.............",
+    "...KK.......................",
+    "............................",
+)
+
+
 # The hand-made cells of the added rows, by atlas cell.
-ICONS = {16: SHADOW_STEP}
+ICONS = {16: SHADOW_STEP, 17: POISON_POOL, 18: WILDFIRE, 19: DEFLECT, 20: COFFIN, 21: FATE_DICE, 22: VENOM_BLADE}
 
 
 def chunk(kind, body):
@@ -135,9 +353,17 @@ def cell_bounds(cell, width, height, rows):
     return left, top, right, bottom
 
 
+def added_pitch(painted):
+    """The height of the first added row (314 pixels on the painted sheet):
+    every added icon is centred on it, so a row added later never moves the
+    ones painted before it."""
+    return (painted * (PAINTED_ROWS + 1) + PAINTED_ROWS - 1) // PAINTED_ROWS - painted
+
+
 def paint(width, painted, height):
     """The added rows' pixels (RGBA, top to bottom), from atlas row `painted`."""
     pixels = bytearray(width * (height - painted) * 4)
+    pitch = added_pitch(painted)
     for cell, art in sorted(ICONS.items()):
         units = len(art)
         if any(len(line) != units for line in art):
@@ -145,10 +371,11 @@ def paint(width, painted, height):
         if any(unit != "." and unit not in PALETTE for line in art for unit in line):
             sys.exit(f"cell {cell}: a letter outside the palette")
         left, top, right, bottom = cell_bounds(cell, width, height, ROWS)
-        if top < painted or units * SCALE > min(right - left, bottom - top):
+        oy = top + (pitch - units * SCALE) // 2
+        if top < painted or units * SCALE > right - left or oy < top or oy + units * SCALE > bottom:
             sys.exit(f"cell {cell} does not fit an added row")
         ox = left + (right - left - units * SCALE) // 2
-        oy = top + (bottom - top - units * SCALE) // 2 - painted
+        oy -= painted
         for y, line in enumerate(art):
             for x, unit in enumerate(line):
                 if unit == ".":
@@ -168,7 +395,9 @@ def build(path):
     # The painted sheet is square: four rows of the same cells as its columns.
     painted = width
     extended = (painted * ROWS + PAINTED_ROWS - 1) // PAINTED_ROWS
-    if height not in (painted, extended):
+    # The painted sheet, or this script's work from it with any number of added rows.
+    known = {(painted * rows + PAINTED_ROWS - 1) // PAINTED_ROWS for rows in range(PAINTED_ROWS, ROWS + 1)}
+    if height not in known:
         sys.exit(f"{path}: {width}x{height} is neither the painted sheet nor its extension")
     for row in range(PAINTED_ROWS + 1):
         # The added row must leave every painted cell where the loader finds it.
