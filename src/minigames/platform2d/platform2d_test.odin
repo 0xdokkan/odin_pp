@@ -6,6 +6,10 @@ import host "../../engine/host"
 import physics "../../engine/physics"
 import rng "../../engine/rng"
 
+// Direct `odin test` retains the complete content sweep; check --quick opts out.
+@(private = "file")
+ODIN_TEST_FULL :: #config(ODIN_TEST_FULL, true)
+
 @(private = "file")
 build_single :: proc(w: ^World, def: Chunk_Def, config := host.Minigame_Config{seed = 1}) {
 	sequence := [3]Chunk_Def{CHUNKS[chunk_index("soglia")], def, CHUNKS[chunk_index("altare")]}
@@ -161,22 +165,24 @@ test_chunks_are_well_formed :: proc(t: ^testing.T) {
 	}
 }
 
-// Every chunk, between the start and end pieces, is crossable with the real
-// controller, has no dead ends, and every ember on it can be collected.
-@(test)
-test_every_chunk_is_completable :: proc(t: ^testing.T) {
-	w := new(World)
-	defer free(w)
-	defer world_destroy(w)
-	for def in CHUNKS {
-		if def.role != .Middle {
-			continue
+when ODIN_TEST_FULL {
+	// Every chunk, between the start and end pieces, is crossable with the real
+	// controller, has no dead ends, and every ember on it can be collected.
+	@(test)
+	test_every_chunk_is_completable :: proc(t: ^testing.T) {
+		w := new(World)
+		defer free(w)
+		defer world_destroy(w)
+		for def in CHUNKS {
+			if def.role != .Middle {
+				continue
+			}
+			build_single(w, def)
+			r := analyse(w)
+			testing.expectf(t, r.reachable, "%s: exit unreachable", def.name)
+			testing.expectf(t, r.dead == 0, "%s: %d dead-end cells", def.name, r.dead)
+			testing.expectf(t, r.missed == 0, "%s: %d unreachable embers", def.name, r.missed)
 		}
-		build_single(w, def)
-		r := analyse(w)
-		testing.expectf(t, r.reachable, "%s: exit unreachable", def.name)
-		testing.expectf(t, r.dead == 0, "%s: %d dead-end cells", def.name, r.dead)
-		testing.expectf(t, r.missed == 0, "%s: %d unreachable embers", def.name, r.missed)
 	}
 }
 
@@ -305,21 +311,25 @@ cell_of_point :: proc(p: Vec2) -> [2]int {
 	return {int(math.floor(p.x / TILE)), int(math.floor(p.y / TILE))}
 }
 
-// Whole generated levels, not just chunks: the exit is reachable from the
-// spawn and from every checkpoint, with no dead ends and no missed embers.
+// Reuse the same solver graph to check structural reachability and replay it
+// through the real world/controller. The quick profile keeps one free-play and
+// one challenge; full retains all five original generated/bot test seeds.
 @(test)
-test_generated_levels_are_completable :: proc(t: ^testing.T) {
+test_generated_levels_are_completable_and_bot_reaches_exit :: proc(t: ^testing.T) {
 	w := new(World)
 	defer free(w)
 	defer world_destroy(w)
-	configs := [3]host.Minigame_Config{{seed = 11}, {seed = 12, challenge = true},
-		{seed = 13}}
-	for config in configs {
+	configs := [5]host.Minigame_Config{{seed = 11}, {seed = 12, challenge = true},
+		{seed = 13}, {seed = 21}, {seed = 22}}
+	config_count := len(configs) if ODIN_TEST_FULL else 2
+	for config in configs[:config_count] {
 		world_reset(w, config)
-		g := bot_create(w).graph
-		defer nav_destroy(g)
+		bot := bot_create(w)
+		defer bot_destroy(&bot)
+		g := bot.graph
 		cell, _ := resting_cell(w, w.player.ctrl.body)
-		testing.expect(t, g.nodes[nav_find(g, cell)].dist < INF)
+		root := nav_find(g, cell)
+		testing.expect(t, root >= 0 && g.nodes[root].dist < INF)
 		for node in g.nodes {
 			testing.expect(t, node.dist < INF)
 		}
@@ -330,25 +340,11 @@ test_generated_levels_are_completable :: proc(t: ^testing.T) {
 			n := nav_find(g, cell_of_point(c.feet - {0, 1}))
 			testing.expect(t, n >= 0 && g.nodes[n].dist < INF)
 		}
-	}
-}
 
-// ---------------------------------------------------------------------------
-// Rules
-
-@(test)
-test_bot_wins_a_generated_level :: proc(t: ^testing.T) {
-	w := new(World)
-	defer free(w)
-	defer world_destroy(w)
-	for config in ([2]host.Minigame_Config{{seed = 21}, {seed = 22}}) {
-		world_reset(w, config)
 		// Enemies would make the scripted route a gamble; the route itself is
-		// what this test proves.
+		// what this test proves. The graph depends only on terrain/controller.
 		w.enemy_count = 0
-		bot := bot_create(w)
 		bot.snap = true
-		defer bot_destroy(&bot)
 		status := host.Round_Status.Playing
 		for _ in 0..<STEP_HZ*300 {
 			status = world_step(w, bot_input(&bot, w), SIM_DT)
@@ -356,7 +352,7 @@ test_bot_wins_a_generated_level :: proc(t: ^testing.T) {
 				break
 			}
 		}
-		testing.expect_value(t, status, host.Round_Status.Won)
+		testing.expectf(t, status == .Won, "seed %d (challenge %t): bot status %v", config.seed, config.challenge, status)
 		testing.expect_value(t, w.hits, 0)
 		score, stars := world_score(w)
 		testing.expect(t, score >= FINISH_POINTS)
@@ -364,6 +360,9 @@ test_bot_wins_a_generated_level :: proc(t: ^testing.T) {
 		testing.expect(t, w.finish_bonus > 0)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Rules
 
 @(test)
 test_lava_costs_lives_until_the_round_is_lost :: proc(t: ^testing.T) {
@@ -619,32 +618,34 @@ test_same_seed_and_inputs_replay_exactly :: proc(t: ^testing.T) {
 	testing.expect(t, world_hash(a) != world_hash(b))
 }
 
-@(test)
-test_random_input_soak :: proc(t: ^testing.T) {
-	w := new(World)
-	defer free(w)
-	defer world_destroy(w)
-	for seed in u64(1)..=4 {
-		config := host.Minigame_Config{seed = seed, challenge = seed == 4}
-		world_reset(w, config)
-		r := rng.create(seed * 31)
-		cmd: Player_Input
-		for _ in 0..<40000 {
-			cmd = random_input(&r, cmd)
-			// Lean rightward so the walk covers the whole level.
-			if cmd.move == 0 && rng.chance(&r, 0.5) {
-				cmd.move = 1
-			}
-			status := world_step(w, cmd, SIM_DT)
-			if !check_invariants(t, w) {
-				return
-			}
-			if status != .Playing {
-				testing.expect(t, w.status == status)
-				// Finished rounds stay finished.
-				world_step(w, cmd, SIM_DT)
-				testing.expect_value(t, w.status, status)
-				world_reset(w, config)
+when ODIN_TEST_FULL {
+	@(test)
+	test_random_input_soak :: proc(t: ^testing.T) {
+		w := new(World)
+		defer free(w)
+		defer world_destroy(w)
+		for seed in u64(1)..=4 {
+			config := host.Minigame_Config{seed = seed, challenge = seed == 4}
+			world_reset(w, config)
+			r := rng.create(seed * 31)
+			cmd: Player_Input
+			for _ in 0..<40000 {
+				cmd = random_input(&r, cmd)
+				// Lean rightward so the walk covers the whole level.
+				if cmd.move == 0 && rng.chance(&r, 0.5) {
+					cmd.move = 1
+				}
+				status := world_step(w, cmd, SIM_DT)
+				if !check_invariants(t, w) {
+					return
+				}
+				if status != .Playing {
+					testing.expect(t, w.status == status)
+					// Finished rounds stay finished.
+					world_step(w, cmd, SIM_DT)
+					testing.expect_value(t, w.status, status)
+					world_reset(w, config)
+				}
 			}
 		}
 	}
@@ -652,23 +653,25 @@ test_random_input_soak :: proc(t: ^testing.T) {
 
 // The bot playing with enemies: knockbacks, deaths and crumbled
 // bridges force constant re-planning; nothing may break.
-@(test)
-test_bot_soak_with_enemies :: proc(t: ^testing.T) {
-	w := new(World)
-	defer free(w)
-	defer world_destroy(w)
-	world_reset(w, {seed = 31})
-	bot := bot_create(w)
-	defer bot_destroy(&bot)
-	status := host.Round_Status.Playing
-	for _ in 0..<STEP_HZ*240 {
-		status = world_step(w, bot_input(&bot, w), SIM_DT)
-		if !check_invariants(t, w) || status != .Playing {
-			break
+when ODIN_TEST_FULL {
+	@(test)
+	test_bot_soak_with_enemies :: proc(t: ^testing.T) {
+		w := new(World)
+		defer free(w)
+		defer world_destroy(w)
+		world_reset(w, {seed = 31})
+		bot := bot_create(w)
+		defer bot_destroy(&bot)
+		status := host.Round_Status.Playing
+		for _ in 0..<STEP_HZ*240 {
+			status = world_step(w, bot_input(&bot, w), SIM_DT)
+			if !check_invariants(t, w) || status != .Playing {
+				break
+			}
 		}
+		testing.expect(t, status != .Playing || w.time > 200)
+		testing.expect(t, w.embers_collected > 0)
 	}
-	testing.expect(t, status != .Playing || w.time > 200)
-	testing.expect(t, w.embers_collected > 0)
 }
 
 // The hook layer runs headless: reset, unfocused steps with hit-stop and

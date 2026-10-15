@@ -30,6 +30,33 @@ test_flipbook_frames_follow_their_durations :: proc(t: ^testing.T) {
 			}
 		}
 	}
+	// Unequal durations and a zero-length tail: boundaries advance, while a
+	// one-shot holds its last drawing even if that drawing has no duration.
+	Case :: struct {count: i32, loop: bool, elapsed: f64, first, frame: i32, finished: bool}
+	for c in ([12]Case{
+		{0, false, 0, 0, 0, true}, {-1, true, 1, 2, 0, true},
+		{3, false, -1, -2, 0, false}, {3, false, 0.125, 0, 1, false},
+		{3, false, 0.375, 0, 2, true}, {3, false, 0, 1, 1, false},
+		{3, false, 0.25, 1, 2, true}, {2, false, 0, 99, 1, false},
+		{2, false, 0.25, 99, 1, true}, {3, true, 0, 2, 0, false},
+		{3, true, 0.375, 2, 0, false}, {3, true, 0.5, -1, 1, false},
+	}) {
+		clip := gfx.Flipbook_Clip{count = c.count, loop = c.loop}
+		clip.durations[0], clip.durations[1] = 125, 250
+		frame, finished := gfx.flipbook_frame(&clip, c.elapsed, c.first)
+		testing.expectf(t, frame == c.frame && finished == c.finished, "clip edge %v: got %v/%v", c, frame, finished)
+	}
+	zero := gfx.Flipbook_Clip{count = 3, loop = true}
+	frame, finished := gfx.flipbook_frame(&zero, 5, 2)
+	testing.expect(t, frame == 0 && !finished)
+	zero.loop = false
+	frame, finished = gfx.flipbook_frame(&zero, 0)
+	testing.expect(t, frame == 2 && finished)
+	clip := gfx.Flipbook_Clip{count = 3}
+	clip.durations[0], clip.durations[1] = 125, 250
+	testing.expect_value(t, gfx.flipbook_clip_seconds(&clip, -1), f64(0.375))
+	testing.expect_value(t, gfx.flipbook_clip_seconds(&clip, 1), f64(0.25))
+	testing.expect_value(t, gfx.flipbook_clip_seconds(&clip, 99), f64(0))
 }
 
 @(test)

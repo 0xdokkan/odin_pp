@@ -48,6 +48,25 @@ Gameplay_Command :: struct {
 	aim: game.First_Person_Aim,
 }
 
+// Both the native hand and MOSTRA EFFETTO construct the same commands. Their
+// callers own pointer bounds, hand lookup and selection/drag state; only the
+// game decides whether an anchor provides a target.
+targeted_card_command :: proc(room: ^game.Room, card: game.Card_Instance, anchor: grid.Position) -> (Gameplay_Command, bool) {
+	target, valid := game.card_drop_target(room, card, anchor)
+	if !valid { return {}, false }
+	return {kind = .Play_Card, origin_phase = .Combat, card_id = card.id, target = target}, true
+}
+
+immediate_card_command :: proc(card: game.Card_Instance) -> (Gameplay_Command, bool) {
+	definition, found := game.card_definition_by_id(card.definition_id)
+	if !found || game.card_requires_spatial_target(definition) { return {}, false }
+	target: game.Target
+	if definition.targeting.rule == .Self || definition.targeting.rule == .Player {
+		target = game.entity_target(game.PLAYER_ENTITY)
+	}
+	return {kind = .Play_Card, origin_phase = .Combat, card_id = card.id, target = target}, true
+}
+
 // No command is ever kept for later. While the player's own action runs (its
 // animation or its timed seconds) a press is dropped; only a press made after
 // the action ends acts. The one input held across frames is a move pressed on

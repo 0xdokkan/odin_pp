@@ -16,6 +16,15 @@ test_dice_results_reveal_only_counted_faces_and_delay_pair_bonus :: proc(t: ^tes
 		testing.expect_value(t, state.visible_total, totals[index])
 		testing.expect_value(t, state.visible_highest, highest[index])
 	}
+	last := dice_total_state(roll, reveals[2])
+	testing.expect(t, last.pulse > 0.9 && last.transfer_progress[2] < 0.1)
+	complete := dice_total_state(roll, DICE_POOL_COMPLETE_PROGRESS)
+	testing.expect(t, complete.complete)
+	testing.expect_value(t, complete.visible_total, roll.total)
+	for progress in complete.transfer_progress {testing.expect(t, progress > 0.999)}
+	// Invalid pools must never expose a fabricated result.
+	testing.expect_value(t, dice_total_state({faces = {6, 0, 0}, sides = 6, count = 1, total = 6}, 1), Dice_Total_State{})
+	testing.expect_value(t, dice_total_state({faces = {6, 6, 0}, sides = 6, count = 2, total = 9}, 1), Dice_Total_State{})
 	roll = {faces = {4, 4, 0}, total = 8, sides = 6, count = 2}
 	testing.expect(t, !dice_total_state(roll, reveals[1]-0.001).visible_pair)
 	testing.expect(t, dice_total_state(roll, reveals[1]).visible_pair)

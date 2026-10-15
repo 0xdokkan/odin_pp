@@ -5,21 +5,30 @@ import grid "../grid"
 import level "../level"
 
 @(test)
-test_ice_block_definition_exposes_physical_capabilities :: proc(t: ^testing.T) {
+test_grid_object_catalog_preserves_solid_and_hazard_capabilities :: proc(t: ^testing.T) {
 	testing.expect(t, validate_grid_object_definitions())
-
-	definition, found := grid_object_definition(.Ice_Block)
-	testing.expect(t, found)
-	testing.expect_value(t, definition.kind, Grid_Object_Kind.Ice_Block)
-	testing.expect_value(t, definition.name, "Ice Block")
-	testing.expect_value(t, definition.max_health, i32(4))
-	testing.expect(t, definition.blocks_movement)
-	testing.expect(t, definition.blocks_line_of_sight)
-	testing.expect(t, definition.targetable)
-	testing.expect(t, definition.damageable)
-	testing.expect(t, definition.movable)
-
-	_, found = grid_object_definition(.Count)
+	// Capability expectations are independent of the definitions. Health and
+	// damage tuning are exercised by materialization and hazard behavior tests.
+	cases := [?]struct {
+		kind: Grid_Object_Kind,
+		blocks_movement, blocks_line_of_sight: bool,
+		targetable, damageable, movable, hazardous: bool,
+	}{
+		{.Ice_Block, true, true, true, true, true, false},
+		{.Fire, false, false, false, false, false, true},
+	}
+	for fixture in cases {
+		definition, found := grid_object_definition(fixture.kind)
+		testing.expect(t, found)
+		testing.expect_value(t, definition.kind, fixture.kind)
+		testing.expect_value(t, definition.blocks_movement, fixture.blocks_movement)
+		testing.expect_value(t, definition.blocks_line_of_sight, fixture.blocks_line_of_sight)
+		testing.expect_value(t, definition.targetable, fixture.targetable)
+		testing.expect_value(t, definition.damageable, fixture.damageable)
+		testing.expect_value(t, definition.movable, fixture.movable)
+		testing.expect_value(t, definition.hazardous, fixture.hazardous)
+	}
+	_, found := grid_object_definition(.Count)
 	testing.expect(t, !found)
 }
 

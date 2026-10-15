@@ -553,8 +553,7 @@ first_person_paint :: proc(rows: []string, margin, paper: int) -> (print: First_
 	print.width, print.height = len(rows[0])+margin*2, len(rows)+margin*2
 	if print.width*print.height > FIRST_PERSON_PRINT_TEXELS { return {} }
 	w, h := print.width, print.height
-	Layer :: enum u8 {Clear, Print, Ink, Paper, Cut}
-	layers: [FIRST_PERSON_PRINT_TEXELS]Layer
+	layers, staged: [FIRST_PERSON_PRINT_TEXELS]Paper_Outline_Layer
 	for row, y in rows {
 		for x in 0..<len(row) {
 			if color, ok := first_person_print_color(row[x]); ok {
@@ -563,29 +562,9 @@ first_person_paint :: proc(rows: []string, margin, paper: int) -> (print: First_
 			}
 		}
 	}
-	// Each ring grows round all before it: the ink line and the cut touch
-	// diagonally too, the paper's own rings alternate so its corners round.
-	grow :: proc(layers: ^[FIRST_PERSON_PRINT_TEXELS]Layer, w, h: int, into: Layer, diagonal: bool) {
-		staged := layers^
-		for y in 0..<h {
-			for x in 0..<w {
-				if layers[y*w+x] != .Clear { continue }
-				near: for dy in -1..=1 {
-					for dx in -1..=1 {
-						if (dx == 0 && dy == 0) || (!diagonal && dx != 0 && dy != 0) { continue }
-						xx, yy := x+dx, y+dy
-						if xx < 0 || yy < 0 || xx >= w || yy >= h || layers[yy*w+xx] == .Clear { continue }
-						staged[y*w+x] = into
-						break near
-					}
-				}
-			}
-		}
-		layers^ = staged
-	}
-	grow(&layers, w, h, .Ink, true)
-	for ring in 0..<paper { grow(&layers, w, h, .Paper, ring%2 == 1) }
-	grow(&layers, w, h, .Cut, true)
+	paper_outline_grow(layers[:w*h], staged[:w*h], w, h, .Ink, true)
+	for ring in 0..<paper { paper_outline_grow(layers[:w*h], staged[:w*h], w, h, .Paper, ring%2 == 1) }
+	paper_outline_grow(layers[:w*h], staged[:w*h], w, h, .Cut, true)
 	for index in 0..<w*h {
 		#partial switch layers[index] {
 		case .Ink, .Cut: print.pixels[index] = LIVING_TOKEN_INK

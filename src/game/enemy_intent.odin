@@ -1,5 +1,6 @@
 package game
 
+import "core:slice"
 import grid "../grid"
 
 MAX_ENEMY_INTENT_PATH_CELLS   :: 8
@@ -94,15 +95,7 @@ enemy_ids_in_planning_order :: proc(room: ^Room) -> (
 	for enemy, index in room.enemies {
 		ids[index] = enemy.id
 	}
-	for index in 1..<count {
-		id := ids[index]
-		insert_at := index
-		for insert_at > 0 && ids[insert_at-1] > id {
-			ids[insert_at] = ids[insert_at-1]
-			insert_at -= 1
-		}
-		ids[insert_at] = id
-	}
+	slice.sort(ids[:count])
 	return
 }
 

@@ -8,6 +8,7 @@ import host "../../engine/host"
 import physics "../../engine/physics"
 import pool "../../engine/pool"
 import rng "../../engine/rng"
+import tween "../../engine/tween"
 
 Vec2 :: [2]f32
 
@@ -384,7 +385,7 @@ update_player :: proc(w: ^World, input: Player_Input, dt: f32) {
 		}
 	} else {
 		target := move * PLAYER_SPEED
-		p.vel += (target - p.vel) * (1 - math.exp(-PLAYER_ACCEL*dt))
+		p.vel = tween.damp(p.vel, target, PLAYER_ACCEL, dt)
 	}
 	p.pos += p.vel * dt
 	physics.resolve_circle_tiles(&w.tiles, &p.pos, PLAYER_RADIUS)

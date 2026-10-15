@@ -42,15 +42,8 @@ mechanics_lab_first_person :: proc(window: ^app.Window, renderer: ^render.Render
 	player := room.player
 	center := grid.Position{MECHANICS_LAB_WIDTH/2, MECHANICS_LAB_HEIGHT/2}
 	fp := &renderer.tactical.first_person
-	foe :: proc(room: ^game.Room, id: u32) -> ^game.Enemy {
-		index, found := game.enemy_index_by_id(room, id)
-		return &room.enemies[index] if found else nil
-	}
-	spawn :: proc(room: ^game.Room, at: grid.Position, health: i32, archetype: game.Enemy_Archetype = .Chaser, free := false) -> u32 {
-		id, placed := game.spawn_enemy(room, {position = at, health = health, attack = 1, archetype = archetype})
-		if placed && !free { mechanics_lab_hold(room, id) }
-		return id
-	}
+	foe :: mechanics_lab_enemy
+	spawn :: mechanics_lab_spawn_enemy
 	// A frame with the clock running, the mouse the view's and the trigger
 	// `fire` (with Shift and keys when given), saved as
 	// odin_pp_living_<name>_NN.png when `save`.

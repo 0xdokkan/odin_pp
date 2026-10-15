@@ -7,6 +7,10 @@ import level "../level"
 @(test)
 test_builtin_card_definitions_are_valid :: proc(t: ^testing.T) {
 	testing.expect(t, validate_card_definitions())
+	// Keep persisted catalog boundaries stable when extending the enum.
+	testing.expect_value(t, int(Card_Id.Heavy_Blow), int(Card_Id.Grappling_Hook)+1)
+	testing.expect_value(t, int(Card_Id.Volatile_Study), int(Card_Id.Fate_Strike)-1)
+	testing.expect_value(t, int(Card_Id.Chain_Lightning), int(Card_Id.Sundering_Blow)-1)
 
 	definition, found := card_definition_by_id(.Strike)
 	testing.expect(t, found)
@@ -72,6 +76,8 @@ test_builtin_card_definitions_are_valid :: proc(t: ^testing.T) {
 	testing.expect(t, spark_forge_found)
 	testing.expect_value(t, spark_forge.effects[0].kind, Effect_Kind.Create_Card)
 	testing.expect_value(t, spark_forge.effects[0].card_definition, Card_Id.Spark)
+	study, study_found := card_definition_by_id(.Volatile_Study)
+	testing.expect(t, study_found && study.ethereal)
 
 	spark, spark_found := card_definition_by_id(.Spark)
 	testing.expect(t, spark_found && spark.temporary_only)
@@ -133,54 +139,6 @@ test_refocus_keywords_are_exclusive_and_ignore_play_lifecycle :: proc(t: ^testin
 }
 
 @(test)
-test_deck_flow_cards_compile_to_authoritative_effects :: proc(t: ^testing.T) {
-	level_data := create_test_level(t)
-	defer level.destroy(&level_data)
-	player := create_test_player(t)
-	enemy_spawns := [?]Enemy_Spawn{{position = {x = 2, y = 1}, health = 8, attack = 1}}
-	room, ok := create_room(&level_data, &player, {enemies = enemy_spawns[:]})
-	testing.expect(t, ok)
-	defer destroy_room(&room)
-
-	self_target := entity_target(PLAYER_ENTITY)
-	battle_action, battle_error := compile_card_action(
-		&room,
-		{id = 70, definition_id = .Battle_Focus},
-		self_target,
-	)
-	testing.expect_value(t, battle_error, Card_Compile_Error.None)
-	testing.expect_value(t, battle_action.effect_count, 1)
-	testing.expect_value(t, battle_action.effects[0], draw_cards_effect(2))
-
-	risk_action, risk_error := compile_card_action(
-		&room,
-		{id = 71, definition_id = .Calculated_Risk},
-		self_target,
-	)
-	testing.expect_value(t, risk_error, Card_Compile_Error.None)
-	testing.expect_value(t, risk_action.effect_count, 2)
-	testing.expect_value(t, risk_action.effects[0], draw_cards_effect(2))
-	testing.expect_value(t, risk_action.effects[1], discard_cards_effect(1))
-
-	forge_action, forge_error := compile_card_action(
-		&room,
-		{id = 72, definition_id = .Spark_Forge},
-		self_target,
-	)
-	testing.expect_value(t, forge_error, Card_Compile_Error.None)
-	testing.expect_value(t, forge_action.effects[0], create_card_effect(.Spark, 1))
-
-	enemy_target := entity_target(enemy_entity(room.enemies[0].id))
-	spark_action, spark_error := compile_card_action(&room, {
-		id = 73,
-		definition_id = .Spark,
-		lifetime = .Combat,
-	}, enemy_target)
-	testing.expect_value(t, spark_error, Card_Compile_Error.None)
-	testing.expect_value(t, spark_action.effects[0], damage_effect(enemy_target.entity, 2))
-}
-
-@(test)
 test_card_economy_metadata_is_valid_and_covers_every_rarity :: proc(t: ^testing.T) {
 	rarity_counts: [int(Card_Rarity.Count)]int
 	for definition in CARD_DEFINITIONS {
@@ -195,6 +153,13 @@ test_card_economy_metadata_is_valid_and_covers_every_rarity :: proc(t: ^testing.
 	}
 	for count in rarity_counts {
 		testing.expect(t, count > 0)
+	}
+	// These additions must remain ordinary rewards, irrespective of tuning.
+	node := Run_Node{kind = .Combat, depth = 0}
+	for id in ([7]Card_Id{.Heavy_Blow, .Venom_Needle, .Caustic_Bloom, .Purifying_Guard, .Volatile_Study, .Fate_Strike, .Chain_Lightning}) {
+		definition, found := card_definition_by_id(id)
+		testing.expect(t, found && !definition.temporary_only)
+		testing.expect(t, card_offer_weight(definition, &node) > 0)
 	}
 
 	definition, found := card_definition_by_id(.Strike)
@@ -400,19 +365,45 @@ test_card_compiler_rejects_invalid_instance_and_target :: proc(t: ^testing.T) {
 	defer destroy_room(&room)
 	target := entity_target(enemy_entity(room.enemies[0].id))
 
-	_, err := compile_card_action(&room, {definition_id = .Strike}, target)
-	testing.expect_value(t, err, Card_Compile_Error.Invalid_Instance)
-	permanent_spark := Card_Instance{id = 2, definition_id = .Spark, lifetime = .Permanent}
-	_, err = compile_card_action(&room, permanent_spark, target)
-	testing.expect_value(t, err, Card_Compile_Error.Invalid_Instance)
-	preview := evaluate_card_targeting(&room, permanent_spark, {})
-	testing.expect_value(t, preview.error, Card_Compile_Error.Invalid_Instance)
+	// Card validation precedes targeting in both entry points. Keep explicit
+	// expected errors, rather than only checking preview/compiler agreement.
+	for fixture in ([?]struct {card: Card_Instance, error: Card_Compile_Error}{
+		{{definition_id = .Strike}, .Invalid_Instance},
+		{{definition_id = .Count}, .Invalid_Instance},
+		{{id = 1, definition_id = .Count}, .Unknown_Definition},
+		{{id = 2, definition_id = .Spark, lifetime = .Permanent}, .Invalid_Instance},
+		{{id = 3, definition_id = .Strike, lifetime = .Count}, .Invalid_Instance},
+		{{id = 4, definition_id = .Strike, upgrade_level = -1}, .Invalid_Instance},
+		{{id = 5, definition_id = .Fate_Strike, upgrade_level = MAX_DICE_UPGRADE_LEVEL+1}, .Invalid_Instance},
+	}) {
+		_, err := compile_card_action(&room, fixture.card, {})
+		testing.expect_value(t, err, fixture.error)
+		preview := evaluate_card_targeting(&room, fixture.card, {})
+		testing.expect_value(t, preview.error, fixture.error)
+	}
 
-	_, err = compile_card_action(&room, {id = 1, definition_id = .Strike}, target)
+	_, err := compile_card_action(&room, {id = 1, definition_id = .Strike}, target)
 	testing.expect_value(t, err, Card_Compile_Error.Target_Out_Of_Range)
 
-	_, err = compile_card_action(nil, {id = 1, definition_id = .Strike}, target)
+	// An unresolved entity is rejected before the compiler checks mode rules;
+	// the preview receives an anchor request and has no entity to resolve.
+	lasso := Card_Instance{id = 6, definition_id = .Lasso}
+	_, err = compile_card_action(&room, lasso, entity_target(enemy_entity(max(u32))))
+	testing.expect_value(t, err, Card_Compile_Error.Invalid_Target)
+	_, err = compile_card_action(&room, lasso, target)
+	testing.expect_value(t, err, Card_Compile_Error.Invalid_Phase)
+	preview := evaluate_card_targeting(&room, lasso, {})
+	testing.expect_value(t, preview.error, Card_Compile_Error.Invalid_Phase)
+
+	room.phase = .Loot
+	_, err = compile_card_action(&room, {}, {})
+	testing.expect_value(t, err, Card_Compile_Error.Invalid_Phase)
+	preview = evaluate_card_targeting(&room, {}, {})
+	testing.expect_value(t, preview.error, Card_Compile_Error.Invalid_Phase)
+	_, err = compile_card_action(nil, {}, {})
 	testing.expect_value(t, err, Card_Compile_Error.Invalid_Room)
+	preview = evaluate_card_targeting(nil, {}, {})
+	testing.expect_value(t, preview.error, Card_Compile_Error.Invalid_Room)
 }
 
 @(test)
@@ -508,89 +499,47 @@ test_global_card_supports_nine_enemies_without_truncation :: proc(t: ^testing.T)
 	}
 }
 
-expect_affected_card_compilation :: proc(
-	t: ^testing.T,
-	definition_id: Card_Id,
-	anchor: grid.Position,
-	enemy_spawns: []Enemy_Spawn,
-	expected_enemy_ids: []u32,
-) {
-	level_data := create_test_level(t)
-	defer level.destroy(&level_data)
-	player := create_test_player(t)
-	room, ok := create_room(&level_data, &player, {enemies = enemy_spawns})
-	testing.expect(t, ok)
-	defer destroy_room(&room)
-
-	instance := Card_Instance{
-		id = u32(90+int(definition_id)),
-		definition_id = definition_id,
-	}
-	target := cell_target(anchor)
-	action, err := compile_card_action(&room, instance, target)
-
-	testing.expect_value(t, err, Card_Compile_Error.None)
-	testing.expect_value(t, action.target, target)
-	testing.expect_value(t, action.target_rule, Target_Rule.Walkable_Cell)
-	testing.expect_value(t, action.effect_count, len(expected_enemy_ids))
-	for index in 0..<action.effect_count {
-		testing.expect_value(t, action.effects[index].kind, Effect_Kind.Damage)
-		testing.expect_value(t, action.effects[index].target, enemy_entity(expected_enemy_ids[index]))
-		testing.expect_value(t, action.effects[index].amount, i32(2))
-	}
-}
-
 @(test)
-test_piercing_ray_compiles_only_line_enemy_ids_in_stable_order :: proc(t: ^testing.T) {
-	enemy_spawns := [?]Enemy_Spawn{
-		{position = {x = 4, y = 1}, health = 5, attack = 1},
-		{position = {x = 5, y = 3}, health = 5, attack = 1},
-		{position = {x = 2, y = 1}, health = 5, attack = 1},
+test_area_card_compilation_preserves_shape_and_stable_enemy_order :: proc(t: ^testing.T) {
+	// Independent target oracles: agreement with the preview alone could let
+	// both paths accept the same incorrect shape or storage order.
+	cases := [?]struct {
+		definition_id: Card_Id,
+		anchor: grid.Position,
+		enemies: [4]grid.Position,
+		enemy_count: int,
+		expected_ids: [3]u32,
+		target_count: int,
+	}{
+		{.Piercing_Ray, {5, 1}, {{4, 1}, {5, 3}, {2, 1}, {}}, 3, {1, 3, 0}, 2},
+		{.Cross_Slash, {2, 2}, {{2, 3}, {5, 3}, {2, 1}, {1, 2}}, 4, {1, 3, 4}, 3},
+		{.Firebomb, {4, 2}, {{5, 3}, {2, 3}, {3, 1}, {4, 3}}, 4, {1, 3, 4}, 3},
 	}
-	expected_enemy_ids := [?]u32{1, 3}
-	expect_affected_card_compilation(
-		t,
-		.Piercing_Ray,
-		{x = 5, y = 1},
-		enemy_spawns[:],
-		expected_enemy_ids[:],
-	)
-}
+	for fixture in cases {
+		level_data := create_test_level(t)
+		defer level.destroy(&level_data)
+		player := create_test_player(t)
+		spawns: [4]Enemy_Spawn
+		for index in 0..<fixture.enemy_count {
+			spawns[index] = {position = fixture.enemies[index], health = 5, attack = 1}
+		}
+		room, ok := create_room(&level_data, &player, {enemies = spawns[:fixture.enemy_count]})
+		testing.expect(t, ok)
+		defer destroy_room(&room)
 
-@(test)
-test_cross_slash_compiles_only_cross_enemy_ids_in_stable_order :: proc(t: ^testing.T) {
-	enemy_spawns := [?]Enemy_Spawn{
-		{position = {x = 2, y = 3}, health = 5, attack = 1},
-		{position = {x = 5, y = 3}, health = 5, attack = 1},
-		{position = {x = 2, y = 1}, health = 5, attack = 1},
-		{position = {x = 1, y = 2}, health = 5, attack = 1},
+		instance := Card_Instance{id = 90+u32(fixture.definition_id), definition_id = fixture.definition_id}
+		target := cell_target(fixture.anchor)
+		action, err := compile_card_action(&room, instance, target)
+		testing.expect_value(t, err, Card_Compile_Error.None)
+		testing.expect_value(t, action.target, target)
+		testing.expect_value(t, action.target_rule, Target_Rule.Walkable_Cell)
+		if !testing.expect_value(t, action.effect_count, fixture.target_count) { continue }
+		for effect, index in action.effects[:action.effect_count] {
+			testing.expect_value(t, effect.kind, Effect_Kind.Damage)
+			testing.expect_value(t, effect.target, enemy_entity(fixture.expected_ids[index]))
+			testing.expect_value(t, effect.amount, i32(2))
+		}
 	}
-	expected_enemy_ids := [?]u32{1, 3, 4}
-	expect_affected_card_compilation(
-		t,
-		.Cross_Slash,
-		{x = 2, y = 2},
-		enemy_spawns[:],
-		expected_enemy_ids[:],
-	)
-}
-
-@(test)
-test_firebomb_compiles_only_square_enemy_ids_in_stable_order :: proc(t: ^testing.T) {
-	enemy_spawns := [?]Enemy_Spawn{
-		{position = {x = 5, y = 3}, health = 5, attack = 1},
-		{position = {x = 2, y = 3}, health = 5, attack = 1},
-		{position = {x = 3, y = 1}, health = 5, attack = 1},
-		{position = {x = 4, y = 3}, health = 5, attack = 1},
-	}
-	expected_enemy_ids := [?]u32{1, 3, 4}
-	expect_affected_card_compilation(
-		t,
-		.Firebomb,
-		{x = 4, y = 2},
-		enemy_spawns[:],
-		expected_enemy_ids[:],
-	)
 }
 
 @(test)

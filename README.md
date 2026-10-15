@@ -2365,14 +2365,42 @@ I binari sono temporanei; `ODIN` può indicare un compilatore alternativo.
 ```sh
 sh scripts/check.sh
 sh scripts/check.sh --headless
+sh scripts/check.sh --quick --headless
 ```
 
-`--headless` omette le build della demo con finestra. I comandi utili per una
-verifica mirata sono:
+La modalità **completa**, predefinita e da eseguire prima del merge, mantiene
+tutti i seed delle matrici di generazione, il catalogo dei chunk platform,
+le simulazioni lunghe e le due configurazioni degli assert. **`--quick`** serve
+durante lo sviluppo: controlla tutti i package con assert attivi, selezionando
+scenari rappresentativi nelle matrici costose. `--headless` omette le build
+della demo con finestra e si può combinare con entrambi i profili, in qualunque
+ordine. In PowerShell gli equivalenti sono `-Quick` e `-Headless`.
+
+La selezione rapida conserva:
+
+- 135 combinazioni classiche (tipo di nodo, profondità e famiglia precedente),
+  72 arene progressive (ogni famiglia per tipo/profondità) e 12 spawn tattici
+  (ogni famiglia per tipo); la completa mantiene le originali 4.504 generazioni;
+- due platform generati, uno libero e uno sfida: lo stesso grafo verifica
+  raggiungibilità e completamento con il controller reale; la completa verifica
+  anche tutti i chunk e conserva i cinque seed originari;
+- il catalogo completo degli effetti delle carte e tutti gli upgrade; nella
+  finestra che li ospita, prove 2D/3D di Strike, Fate Strike, Tesla, Movimento
+  Ombra, Canna da Pesca e First Person, al livello base e massimo;
+- tutte le regressioni locali su input, softlock, pause, QTE, timeline, deck,
+  salvataggi e transizioni. Solo sei simulazioni lunghe dei minigiochi e la
+  risoluzione esaustiva dei chunk platform sono escluse dalla rapida.
+
+Il flag Odin `-define:ODIN_TEST_FULL=false` seleziona gli stessi casi nei comandi
+manuali. Senza flag, anche `odin test` mantiene la suite completa. Non vengono
+cambiate regole del gioco, seed o generatori di produzione per velocizzare i test.
+
+I comandi utili per una verifica mirata sono:
 
 ```sh
 odin check src -vet -strict-style
 odin test src -all-packages -define:ODIN_TEST_THREADS=1 -o:none -out:/tmp/odin-pp-tests
+odin test src -all-packages -define:ODIN_TEST_THREADS=1 -define:ODIN_TEST_FULL=false -o:none -out:/tmp/odin-pp-tests-quick
 odin test src/game -o:none -out:/tmp/odin-pp-game-tests
 odin test src/render -o:none -out:/tmp/odin-pp-render-tests
 odin test src/combatdebug -o:none -out:/tmp/odin-pp-combatdebug-tests
@@ -4638,6 +4666,131 @@ rientrano nella soglia dello smoke; non è stata ripetuta la cattura di tutte
 le altre carte né la variante piatta di questo smoke.
 L'audit verifica inoltre gli asset incorporati e la completezza degli
 atlanti e del manifest audio. Le verifiche Windows non sono state eseguite.
+
+
+### Refactor mirati e selezione dei test — 15 ottobre 2026
+
+Accorpate nove procedure di test: determinismo d4, compilazione delle carte
+di flusso, FIFO Refocus costruito a mano, sessione puzzle, rivelazione dei dadi,
+due microtest della sconfitta, snapshot dei raggi dei nemici e prova del bot
+platform ora integrata con la raggiungibilità. Le aspettative ancora utili
+sono nei test del comportamento reale. Non vengono eliminate le regressioni
+su blocchi dell'input, orologi, pause, ownership, salvataggi o transizioni.
+
+I refactor di produzione condividono la validazione delle carte fra preview
+e compiler, la costruzione dei metadati degli eventi del mazzo, il picking
+delle carte possedute in Shop/Rest, la geometria di caduta e picking delle
+figure di carta, la dilatazione dei contorni, il caricamento/liberazione delle
+texture e la base della camera del platform 3D. Restano distinti registrazione degli eventi e reazioni,
+ordine degli errori, regole Classica/M7, animazioni living/flipbook e formati
+delle texture. Il timing delle clip conserva le proprie differenze intenzionali.
+Per i contorni, il confronto prima/dopo dei sei disegni (due guanti, AK, due
+lampi e tracciante) produce **40.908 byte identici**; maschere e buffer temporanei
+restano sullo stack, senza allocazioni per frame.
+
+Con la toolchain e `-o:none` indicati sopra, la suite completa passa **1.326
+test**, circa **72 secondi per esecuzione**, con assert attivi e disattivati;
+passano anche strict/vet e le due build. La rapida passa **1.319 test in circa
+27 secondi**, contro i 74–75 secondi della suite prima della selezione. Sono
+tempi del runner su questo Mac, esclusa compilazione: la rapida riduce le
+matrici, mentre la completa conserva tutti i seed e le simulazioni lunghe.
+Verificati anche combinazione/ordine delle opzioni dello script shell e rifiuto
+degli argomenti sconosciuti; il corrispondente PowerShell è aggiornato ma non
+è stato eseguito su Windows.
+
+Passano anche lo smoke M7 (dieci preset, replay e stress), la finestra del
+platform 3D, lo smoke M8 (cast, trappola, Tesla, ring, loot e cambio stanza)
+e Mostra effetto con gli ingressi Shop/Rest e quattro film completi
+(Strike/Tesla al livello base e massimo). Catture e log della verifica sono
+artefatti temporanei, non asset del gioco.
+
+
+### Secondo lotto di refactor e selezione — 15 ottobre 2026
+
+Accorpate altre **sei procedure**, portando la suite completa da 1.326 a
+**1.320 test** e quella rapida da 1.319 a **1.313**. Catalogo, disponibilità
+delle carte e ID stabili hanno un solo punto di verifica; i test degli effetti
+reali e degli upgrade rimangono. Le tre forme degli attacchi ad area sono
+verificate da una tabella con bersagli attesi indipendenti dalla preview.
+Fuoco e blocco di ghiaccio condividono la tabella delle capacità, mantenendo
+separate le prove di collisione, danno e persistenza. Shop verifica nello
+stesso test mazzo parziale e pieno, paginazione, hover e copertura di tutte le
+carte, senza duplicare l'intera procedura.
+
+Per i dadi, la raggiungibilità di ogni faccia da d4 a d20 è verificata nella
+primitiva; il wrapper delle carte mantiene tutte le combinazioni carta/livello
+con quattro seed rappresentativi, **120 coppie di lanci invece di 7.680**.
+Restano verificati ordine dei risultati, consumo del generatore e rifiuti
+senza mutazioni. La selezione non elimina scenari di input, softlock, pause,
+timeline, QTE, transizioni o salvataggi.
+
+Quattro ordinamenti manuali degli ID usano ora `core:slice.sort` su snapshot
+fissi, prima delle mutazioni: bersagli degli oggetti, esplosivi, cleanup dei
+dispositivi e pianificazione dei nemici. Restano distinti gli ordinamenti
+per distanza e quelli che associano ID e posizione. Il test esistente di fine
+fight copre anche dispositivi in ordine di memoria invertito, verificando
+l'ordine degli eventi e la conservazione del barile.
+
+Living e flipbook condividono somma delle durate e ricerca del fotogramma;
+conservano le rispettive normalizzazioni dei loop, che possono differire ai
+confini in virgola mobile. Il confronto temporaneo con le implementazioni
+precedenti ha verificato **219.857 risultati esatti su 262 clip**, con assert
+attivi e disattivati. I due test permanenti degli adattatori includono ora
+anche i confini temporali e le clip vuote o di durata zero. Il laboratorio
+condivide ricerca/spawn dei nemici e cattura del targeting; i test dei menu
+condividono solo gli helper geometrici indipendenti dal picking di produzione.
+
+Validazione su macOS: suite completa **1.320/1.320** con assert attivi e
+disattivati, circa **73/72 secondi**; rapida **1.313/1.313 in 27 secondi**.
+Passano strict/vet e le due build. Il report deterministico M7, con dieci
+preset, replay e stress, è identico byte per byte a quello precedente.
+Passano nella finestra nativa platform 3D, M8 (cast, trappola, campo Tesla,
+ring, loot e stanza successiva) e il laboratorio completo, inclusi Lazzo,
+Pinball, FPS temporaneo, pesca e feedback audio. Controllate anche le catture
+di combattimento, loot, nuova stanza, platform e targeting del Lazzo.
+I tempi sono del runner, esclusa compilazione: questo lotto riduce soprattutto
+la manutenzione delle duplicazioni, senza un ulteriore taglio sostanziale
+dei tempi rispetto al primo. Le verifiche Windows restano da eseguire.
+
+
+### Terzo lotto di refactor e selezione — 16 ottobre 2026
+
+Shop e Rest condividono ora anche il disegno del mazzo posseduto: titolo,
+paginazione, selezione e carta in hover disegnata per ultima. Validatori e
+azioni dei due menu rimangono distinti. Trascinamento, click su una cella e
+film di Mostra effetto usano la stessa costruzione del comando di targeting;
+il polling conserva il mazzo di presentazione e la gestione della selezione,
+mentre le regole di targeting restano nel gameplay. Rimossa anche la delega
+superflua alla verifica del target spaziale.
+
+Camera 2D, accelerazione del platformer, Arena e presentazione dei platform
+riusano `tween.damp`, `tween.approach` e `tween.ease`, già presenti nell'engine.
+Restano separati i loop dei minigiochi, hit-stop, ripresa dopo pausa e calcoli
+con wrap angolare o precisione differente. Il confronto temporaneo con le
+formule precedenti ha prodotto **101.751 risultati bit per bit identici**;
+per Shop/Rest, **57.120 combinazioni** di mazzo, pagina, hover, selezione e
+pulsanti producono le stesse chiamate di disegno nello stesso ordine.
+
+Accorpate **quattro procedure di test**, conservando i casi: movimento valido
+e rifiutato, Poison assorbito completamente o parzialmente dallo scudo, range
+di targeting zero/minimo/massimo e pulsanti abilitati/disabilitati. Gli oracoli
+rimangono espliciti; gli eventi di danno verificano anche l'assenza di duplicati
+e il movimento rifiutato non produce effetti o eventi. La suite passa da
+1.320 a **1.316 procedure complete**, da 1.313 a **1.309 rapide**. Il lotto
+rimuove complessivamente **147 righe Odin**, senza nuovi test permanenti né
+riduzioni delle matrici di seed o dei test di regressione temporali.
+
+Validazione su macOS: **1.316 test con assert attivi e disattivati**, circa
+73 secondi per passaggio; rapida **1.309 test in 27 secondi**, strict/vet e
+due build superati. Il report M7 resta identico byte per byte al secondo lotto.
+Passano gli smoke nativi di Arena, platform 2D/3D, M8 e Mostra effetto con
+ingressi Shop/Rest, chiusura/ripartenza/ridimensionamento e **sei film completi**
+(Strike, Guard e Tesla al livello base e massimo), 48 catture e zero errori.
+Controllate visivamente anche le schermate dei tre minigiochi e dei due menu.
+Per i film campione: 2.248 frame senza limite FPS, media 9,62 ms e percentile
+99 di 14,12 ms; sono misure locali dello smoke, non un benchmark generale.
+Windows non verificato. Screenshot, log e confronti temporanei restano fuori
+dal repository.
 
 
 ### M7G: lavoro restante dopo il prototipo

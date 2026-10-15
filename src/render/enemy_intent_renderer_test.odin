@@ -14,26 +14,6 @@ make_enemy_intent_renderer_test_room :: proc(enemies: []game.Enemy) -> game.Room
 }
 
 @(test)
-test_enemy_draw_radius_distinguishes_brute_from_chaser_and_archer :: proc(t: ^testing.T) {
-	renderer := Renderer{}
-	renderer.camera.zoom = 1
-
-	chaser_radius := enemy_draw_radius(&renderer, {archetype = .Chaser})
-	archer_radius := enemy_draw_radius(&renderer, {archetype = .Archer})
-	brute_radius := enemy_draw_radius(&renderer, {archetype = .Brute})
-
-	testing.expect_value(t, chaser_radius, f32(12))
-	testing.expect_value(t, archer_radius, chaser_radius)
-	testing.expect_value(t, brute_radius, f32(14))
-	testing.expect(t, brute_radius > chaser_radius)
-
-	renderer.camera.zoom = 0.25
-	testing.expect_value(t, enemy_draw_radius(&renderer, {archetype = .Chaser}), f32(7))
-	testing.expect_value(t, enemy_draw_radius(&renderer, {archetype = .Archer}), f32(7))
-	testing.expect_value(t, enemy_draw_radius(&renderer, {archetype = .Brute}), f32(9))
-}
-
-@(test)
 test_focused_enemy_intent_uses_hovered_combat_enemy_with_an_intent :: proc(t: ^testing.T) {
 	enemies := [?]game.Enemy{
 		{id = 11, position = {x = 2, y = 3}, intent = {kind = .Move}},

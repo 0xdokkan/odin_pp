@@ -7,6 +7,10 @@ import host "../../engine/host"
 import physics "../../engine/physics"
 import rng "../../engine/rng"
 
+// Long simulations remain part of the default/full pre-merge suite.
+@(private = "file")
+ODIN_TEST_FULL :: #config(ODIN_TEST_FULL, true)
+
 @(private = "file")
 DT :: f32(1.0 / SIM_HZ)
 
@@ -402,31 +406,33 @@ check_invariants :: proc(t: ^testing.T, w: ^World) -> bool {
 	return ok
 }
 
-@(test)
-test_long_random_soak_keeps_invariants :: proc(t: ^testing.T) {
-	script := rng.create(777)
-	for round in 0..<4 {
-		w := new_world(u64(round)*101+5, round == 3)
-		defer free_world(w)
-		in_: Player_Input
-		use_bot := false
-		for i in 0..<15000 {
-			if i%40 == 0 {
-				in_ = random_input(&script)
-				use_bot = rng.chance(&script, 0.5)
+when ODIN_TEST_FULL {
+	@(test)
+	test_long_random_soak_keeps_invariants :: proc(t: ^testing.T) {
+		script := rng.create(777)
+		for round in 0..<4 {
+			w := new_world(u64(round)*101+5, round == 3)
+			defer free_world(w)
+			in_: Player_Input
+			use_bot := false
+			for i in 0..<15000 {
+				if i%40 == 0 {
+					in_ = random_input(&script)
+					use_bot = rng.chance(&script, 0.5)
+				}
+				step := bot_input(w, DT) if use_bot else in_
+				world_step(w, step, DT)
+				in_.jump = false
+				if !check_invariants(t, w) {
+					return
+				}
+				if w.status != .Playing {
+					// Keep soaking from a fresh round.
+					world_reset(w, host.Minigame_Config{seed = u64(i)})
+				}
 			}
-			step := bot_input(w, DT) if use_bot else in_
-			world_step(w, step, DT)
-			in_.jump = false
-			if !check_invariants(t, w) {
-				return
-			}
-			if w.status != .Playing {
-				// Keep soaking from a fresh round.
-				world_reset(w, host.Minigame_Config{seed = u64(i)})
-			}
+			testing.expect_value(t, w.dropped_events, 0)
 		}
-		testing.expect_value(t, w.dropped_events, 0)
 	}
 }
 

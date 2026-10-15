@@ -793,17 +793,9 @@ apply_effect :: proc(room: ^Room, source: Entity_Ref, effect: Effect, report: ^A
 			card, drawn := draw_card(&room.player.deck)
 			assert(drawn)
 			report.cards_drawn += 1
-			record_report_event(report, {
-				kind = .Card_Drawn,
-				source = source,
-				target = PLAYER_ENTITY,
-				card_id = card.id,
-				card_definition = card.definition_id,
-				card_upgrade_level = card.upgrade_level,
-				card_lifetime = card.lifetime,
-				from_card_zone = .Draw,
-				to_card_zone = .Hand,
-			})
+			record_report_event(report, make_card_zone_event(
+				.Card_Drawn, source, PLAYER_ENTITY, card, .Draw, .Hand,
+			))
 		}
 	case .Discard_Cards:
 		for _ in 0..<effect.amount {
@@ -813,17 +805,9 @@ apply_effect :: proc(room: ^Room, source: Entity_Ref, effect: Effect, report: ^A
 			card, discarded := discard_hand_card(&room.player.deck, 0)
 			assert(discarded)
 			report.cards_discarded += 1
-			record_report_event(report, {
-				kind = .Card_Moved,
-				source = source,
-				target = PLAYER_ENTITY,
-				card_id = card.id,
-				card_definition = card.definition_id,
-				card_upgrade_level = card.upgrade_level,
-				card_lifetime = card.lifetime,
-				from_card_zone = .Hand,
-				to_card_zone = .Discard,
-			})
+			record_report_event(report, make_card_zone_event(
+				.Card_Moved, source, PLAYER_ENTITY, card, .Hand, .Discard,
+			))
 		}
 	case .Create_Card:
 		for _ in 0..<effect.amount {
@@ -833,17 +817,9 @@ apply_effect :: proc(room: ^Room, source: Entity_Ref, effect: Effect, report: ^A
 			card, created := create_temporary_card(&room.player.deck, effect.card_definition)
 			assert(created)
 			report.cards_created += 1
-			record_report_event(report, {
-				kind = .Card_Created,
-				source = source,
-				target = PLAYER_ENTITY,
-				card_id = card.id,
-				card_definition = card.definition_id,
-					card_upgrade_level = card.upgrade_level,
-					card_lifetime = card.lifetime,
-					from_card_zone = .Count,
-					to_card_zone = .Hand,
-				})
+			record_report_event(report, make_card_zone_event(
+				.Card_Created, source, PLAYER_ENTITY, card, .Count, .Hand,
+			))
 		}
 	case .First_Person:
 		began := tactical_begin_first_person(room, f32(effect.amount))

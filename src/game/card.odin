@@ -1485,37 +1485,59 @@ card_compile_error_from_query :: proc(err: Target_Query_Error) -> Card_Compile_E
 	return .Invalid_Target
 }
 
+// Both preview and compilation validate the card before resolving a target.
+// Keep request conversion outside this helper: the compiler rejects a missing
+// entity before applying the card's mode restrictions, as it always has.
+@(private="file")
+validated_card_definition_for_action :: proc(
+	room: ^Room,
+	instance: Card_Instance,
+) -> (definition: Card_Definition, err: Card_Compile_Error) {
+	if room == nil || room.player == nil {
+		return {}, .Invalid_Room
+	}
+	if room.phase != .Combat {
+		return {}, .Invalid_Phase
+	}
+	if instance.id == 0 || instance.upgrade_level < 0 || instance.upgrade_level > MAX_CARD_UPGRADE_LEVEL ||
+	   int(instance.lifetime) < 0 || int(instance.lifetime) >= int(Card_Lifetime.Count) {
+		return {}, .Invalid_Instance
+	}
+	found: bool
+	definition, found = card_definition_by_id(instance.definition_id, tactical_enabled(room))
+	if !found {
+		return {}, .Unknown_Definition
+	}
+	if !validate_card_definition(&definition) {
+		return {}, .Invalid_Definition
+	}
+	// Instance validity still checks the canonical catalog, including temporary
+	// lifetimes and per-card upgrade limits, independently of tactical rewrites.
+	if !validate_card_instance(instance) {
+		return {}, .Invalid_Instance
+	}
+	return definition, .None
+}
+
 evaluate_card_targeting :: proc(
 	room: ^Room,
 	instance: Card_Instance,
 	request: Target_Request,
+) -> Card_Target_Evaluation {
+	definition, err := validated_card_definition_for_action(room, instance)
+	if err != .None {
+		return {error = err}
+	}
+	return evaluate_validated_card_targeting(room, instance, definition, request)
+}
+
+@(private="file")
+evaluate_validated_card_targeting :: proc(
+	room: ^Room,
+	instance: Card_Instance,
+	definition: Card_Definition,
+	request: Target_Request,
 ) -> (evaluation: Card_Target_Evaluation) {
-	evaluation.error = .Invalid_Room
-	if room == nil || room.player == nil {
-		return
-	}
-	evaluation.error = .Invalid_Phase
-	if room.phase != .Combat {
-		return
-	}
-	evaluation.error = .Invalid_Instance
-	if instance.id == 0 || instance.upgrade_level < 0 || instance.upgrade_level > MAX_CARD_UPGRADE_LEVEL ||
-	   int(instance.lifetime) < 0 || int(instance.lifetime) >= int(Card_Lifetime.Count) {
-		return
-	}
-	definition, found := card_definition_by_id(instance.definition_id, tactical_enabled(room))
-	if !found {
-		evaluation.error = .Unknown_Definition
-		return
-	}
-	evaluation.error = .Invalid_Definition
-	if !validate_card_definition(&definition) {
-		return
-	}
-	evaluation.error = .Invalid_Instance
-	if !validate_card_instance(instance) {
-		return
-	}
 	// The Canna da Pesca is no card to play: its slot fishes (fishing.odin).
 	if (card_requires_tactical(instance.definition_id) && !tactical_enabled(room)) || card_is_room_tool(instance.definition_id) {
 		evaluation.error = .Invalid_Phase
@@ -1646,31 +1668,16 @@ compile_card_action :: proc(
 	instance: Card_Instance,
 	target: Target,
 ) -> (action: Action, err: Card_Compile_Error) {
-	if room == nil || room.player == nil {
-		return {}, .Invalid_Room
-	}
-	if room.phase != .Combat {
-		return {}, .Invalid_Phase
-	}
-	if instance.id == 0 || instance.upgrade_level < 0 || instance.upgrade_level > MAX_CARD_UPGRADE_LEVEL ||
-	   int(instance.lifetime) < 0 || int(instance.lifetime) >= int(Card_Lifetime.Count) {
-		return {}, .Invalid_Instance
-	}
-	definition, found := card_definition_by_id(instance.definition_id, tactical_enabled(room))
-	if !found {
-		return {}, .Unknown_Definition
-	}
-	if !validate_card_definition(&definition) {
-		return {}, .Invalid_Definition
-	}
-	if !validate_card_instance(instance) {
-		return {}, .Invalid_Instance
+	definition: Card_Definition
+	definition, err = validated_card_definition_for_action(room, instance)
+	if err != .None {
+		return {}, err
 	}
 	request, has_request := card_target_request_from_target(room, definition, target)
 	if !has_request {
 		return {}, .Invalid_Target
 	}
-	evaluation := evaluate_card_targeting(room, instance, request)
+	evaluation := evaluate_validated_card_targeting(room, instance, definition, request)
 	if evaluation.error != .None {
 		return {}, evaluation.error
 	}

@@ -1,10 +1,18 @@
 package puzzle
 
+import rng "../../engine/rng"
 import "core:testing"
 import gfx "../../engine/gfx"
 import host "../../engine/host"
 import input "../../engine/input"
-import rng "../../engine/rng"
+
+// Long simulations remain part of the default/full pre-merge suite.
+@(private = "file")
+ODIN_TEST_FULL :: #config(ODIN_TEST_FULL, true)
+
+when !ODIN_TEST_FULL {
+	_ :: rng // Only the full-profile soak uses this import.
+}
 
 // Puzzles are ~100 KB, so tests keep them on the heap (test threads have
 // small stacks).
@@ -446,48 +454,50 @@ test_sequence_selection_is_deterministic :: proc(t: ^testing.T) {
 	testing.expect(t, variety >= len(LEVELS) - 4)
 }
 
-@(test)
-test_random_soak_keeps_invariants :: proc(t: ^testing.T) {
-	r := rng.create(99)
-	for &level in LEVELS {
-		p := new(Puzzle)
-		b, s, _ := parse_level(level.rows)
-		puzzle_init(p, b, s)
-		crates := p.state.crate_count
-		for step in 0..<2500 {
-			roll := rng.below(&r, 10)
-			switch {
-			case roll < 7:
-				apply_move(p, Dir(rng.below(&r, 4)))
-			case roll < 9:
-				undo(p)
-			case:
-				if rng.chance(&r, 0.1) {
-					restart(p)
-				} else {
-					redo(p)
+when ODIN_TEST_FULL {
+	@(test)
+	test_random_soak_keeps_invariants :: proc(t: ^testing.T) {
+		r := rng.create(99)
+		for &level in LEVELS {
+			p := new(Puzzle)
+			b, s, _ := parse_level(level.rows)
+			puzzle_init(p, b, s)
+			crates := p.state.crate_count
+			for step in 0..<2500 {
+				roll := rng.below(&r, 10)
+				switch {
+				case roll < 7:
+					apply_move(p, Dir(rng.below(&r, 4)))
+				case roll < 9:
+					undo(p)
+				case:
+					if rng.chance(&r, 0.1) {
+						restart(p)
+					} else {
+						redo(p)
+					}
 				}
-			}
-			st := &p.state
-			testing.expect_value(t, st.crate_count, crates)
-			inside := !walkable(p.board.tiles[st.player]) || crate_slot(st, int(st.player)) >= 0
-			testing.expectf(t, !inside, "%q step %d: player inside a wall or crate", level.name, step)
-			if inside {
-				break
-			}
-			for i in 0..<int(st.crate_count) {
-				testing.expect(t, walkable(p.board.tiles[st.crates[i]]))
-				for j in i+1..<int(st.crate_count) {
-					testing.expect(t, st.crates[i] != st.crates[j], "two crates share a cell")
+				st := &p.state
+				testing.expect_value(t, st.crate_count, crates)
+				inside := !walkable(p.board.tiles[st.player]) || crate_slot(st, int(st.player)) >= 0
+				testing.expectf(t, !inside, "%q step %d: player inside a wall or crate", level.name, step)
+				if inside {
+					break
 				}
+				for i in 0..<int(st.crate_count) {
+					testing.expect(t, walkable(p.board.tiles[st.crates[i]]))
+					for j in i+1..<int(st.crate_count) {
+						testing.expect(t, st.crates[i] != st.crates[j], "two crates share a cell")
+					}
+				}
+				testing.expect(t, p.moves >= 0)
 			}
-			testing.expect(t, p.moves >= 0)
+			// Undo all the way back always reaches some earlier recorded state;
+			// a restart then lands exactly on the start.
+			restart(p)
+			testing.expect_value(t, p.state, p.start)
+			free(p)
 		}
-		// Undo all the way back always reaches some earlier recorded state;
-		// a restart then lands exactly on the start.
-		restart(p)
-		testing.expect_value(t, p.state, p.start)
-		free(p)
 	}
 }
 
@@ -520,59 +530,6 @@ test_stars_and_scores :: proc(t: ^testing.T) {
 	s.results[1].stars = 3
 	_, stars = session_score(s)
 	testing.expect_value(t, stars, u8(3)) // 8/3 = 2.67
-}
-
-@(test)
-test_session_plays_through_and_torch_limits_challenge :: proc(t: ^testing.T) {
-	s := new(Session)
-	defer free(s)
-	session_start(s, 7, false)
-	testing.expect_value(t, s.torch_max, -1)
-	for {
-		p := &s.puzzle
-		sol := solve(&p.board, p.state, 2_000_000)
-		testing.expect(t, sol.solved)
-		for d in sol.path {
-			apply_move(p, d)
-			testing.expect(t, !session_spend_torch(s))
-		}
-		solution_destroy(&sol)
-		res := session_complete_level(s)
-		testing.expect_value(t, res.stars, u8(3))
-		if session_is_last(s) {
-			break
-		}
-		session_load(s, s.current+1)
-	}
-	score, stars := session_score(s)
-	testing.expect(t, score > 0)
-	testing.expect_value(t, stars, u8(3))
-
-	session_start(s, 7, true)
-	testing.expect_value(t, s.count, 1)
-	testing.expect_value(t, s.torch_max, torch_budget(s.par))
-	testing.expect_value(t, torch_budget(20), 60)
-	died := false
-	for _ in 0..<s.torch_max {
-		// Shuffle back and forth: moves that never solve anything.
-		r := apply_move(&s.puzzle, .Left)
-		if !r.moved {
-			r = apply_move(&s.puzzle, .Right)
-		}
-		if !r.moved {
-			r = apply_move(&s.puzzle, .Up)
-		}
-		if !r.moved {
-			r = apply_move(&s.puzzle, .Down)
-		}
-		if session_spend_torch(s) {
-			died = true
-			break
-		}
-		undo(&s.puzzle) // undo never gives the light back
-	}
-	testing.expect(t, died)
-	testing.expect_value(t, s.torch, 0)
 }
 
 @(test)
@@ -702,6 +659,7 @@ test_game_autoplay_clears_a_free_play_run :: proc(t: ^testing.T) {
 	for seed in ([2]u64{11, 12}) {
 		g := headless_game({seed = seed})
 		defer headless_free(g)
+		testing.expect_value(t, g.session.torch_max, -1)
 		testing.expect_value(t, g.phase, Phase.Enter)
 		frame := host.Frame{dt = 1.0 / 60, canvas = g.canvas}
 		// Paused frames hold everything still.
@@ -714,6 +672,7 @@ test_game_autoplay_clears_a_free_play_run :: proc(t: ^testing.T) {
 		g.demo.limit = -1
 		status := run_until_done(g, &frame, 600)
 		testing.expect_value(t, status, host.Round_Status.Won)
+		testing.expect_value(t, g.session.torch, -1)
 		score, stars := game_score(g)
 		testing.expect_value(t, stars, u8(3))
 		testing.expect(t, score > 0)
@@ -733,7 +692,10 @@ test_game_challenge_is_lost_when_the_torch_dies :: proc(t: ^testing.T) {
 		game_step(g, &frame, true)
 	}
 	s := &g.session
-	testing.expect_value(t, s.torch, torch_budget(s.par))
+	testing.expect_value(t, s.count, 1)
+	testing.expect_value(t, s.torch_max, torch_budget(s.par))
+	testing.expect_value(t, torch_budget(20), 60)
+	testing.expect_value(t, s.torch, s.torch_max)
 	// Hints are refused in a challenge.
 	execute(g, &frame, .Hint)
 	testing.expect_value(t, s.hints, 0)

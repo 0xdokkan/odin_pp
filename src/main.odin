@@ -317,10 +317,6 @@ pressed_hand_card_slot :: proc() -> int {
 	return -1
 }
 
-card_requires_chosen_target :: proc(definition: game.Card_Definition) -> bool {
-	return game.card_requires_spatial_target(definition)
-}
-
 Card_Interaction_State :: struct {
 	hovered_card_id:  u32,
 	selected_card_id: u32,
@@ -338,23 +334,6 @@ active_targeting_card_id :: proc(state: Card_Interaction_State) -> u32 {
 		return state.dragged_card_id
 	}
 	return state.selected_card_id
-}
-
-immediate_card_command :: proc(card: game.Card_Instance) -> (Gameplay_Command, bool) {
-	definition, found := game.card_definition_by_id(card.definition_id)
-	if !found || card_requires_chosen_target(definition) {
-		return {}, false
-	}
-	target: game.Target
-	if definition.targeting.rule == .Self || definition.targeting.rule == .Player {
-		target = game.entity_target(game.PLAYER_ENTITY)
-	}
-	return {
-		kind = .Play_Card,
-		origin_phase = .Combat,
-		card_id = card.id,
-		target = target,
-	}, true
 }
 
 // FERETRO: the player holds Ctrl with arrows to loose; the board then marks
@@ -540,19 +519,7 @@ poll_gameplay_command :: proc(
 			if mouse_inside && render.card_drop_area_contains(renderer, mouse_canvas) &&
 			   renderer.has_hovered_cell {
 				if hand_index, found := game.hand_card_index_by_id(input_deck, dragged_card_id); found {
-					card := input_deck.hand[hand_index]
-					if target, has_target := game.card_drop_target(
-						room,
-						card,
-						renderer.hovered_cell,
-					); has_target {
-						return Gameplay_Command{
-							kind = .Play_Card,
-							origin_phase = .Combat,
-							card_id = dragged_card_id,
-							target = target,
-						}, true
-					}
+					return targeted_card_command(room, input_deck.hand[hand_index], renderer.hovered_cell)
 				}
 			}
 		}
@@ -605,15 +572,7 @@ poll_gameplay_command :: proc(
 			input_deck,
 			card_interaction.selected_card_id,
 		); found {
-			card := input_deck.hand[hand_index]
-			if target, has_target := game.card_drop_target(room, card, renderer.hovered_cell); has_target {
-				return Gameplay_Command{
-					kind = .Play_Card,
-					origin_phase = .Combat,
-					card_id = card.id,
-					target = target,
-				}, true
-			}
+			return targeted_card_command(room, input_deck.hand[hand_index], renderer.hovered_cell)
 		}
 		return
 	}

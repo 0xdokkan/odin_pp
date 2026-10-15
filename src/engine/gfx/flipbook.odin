@@ -78,27 +78,8 @@ flipbook_paper_source :: proc() -> cstring {
 
 create_flipbook_assets :: proc(assets: ^Flipbook_Assets) {
 	for character in Flipbook_Character {
-		for bytes, kind in ([2][]u8{FLIPBOOK_FRAMES_PNG[character], FLIPBOOK_PAPER_PNG[character]}) {
-			img := rl.LoadImageFromMemory(".png", raw_data(bytes), c.int(len(bytes)))
-			if img.data == nil { continue }
-			texture := rl.LoadTextureFromImage(img)
-			if kind == 0 {
-				// The print is pixel art: never filtered.
-				rl.SetTextureFilter(texture, .POINT)
-				assets.frames[character] = texture
-			} else {
-				// Distance fields interpolate: bilinear, no mipmaps (cells abut).
-				rl.SetTextureFilter(texture, .BILINEAR)
-				rl.SetTextureWrap(texture, .CLAMP)
-				assets.papers[character] = texture
-				colors := rl.LoadImageColors(img)
-				field := make([]u8, int(img.width)*int(img.height))
-				for &value, index in field { value = colors[index].r }
-				rl.UnloadImageColors(colors)
-				assets.fields[character] = field
-			}
-			rl.UnloadImage(img)
-		}
+		assets.frames[character], assets.papers[character], assets.fields[character] =
+			load_paper_textures(FLIPBOOK_FRAMES_PNG[character], FLIPBOOK_PAPER_PNG[character], false)
 	}
 	assets.paper_shader = rl.LoadShaderFromMemory(nil, flipbook_paper_source())
 	if assets.paper_shader.id != 0 {
@@ -117,9 +98,7 @@ create_flipbook_assets :: proc(assets: ^Flipbook_Assets) {
 
 destroy_flipbook_assets :: proc(assets: ^Flipbook_Assets) {
 	for character in Flipbook_Character {
-		if assets.frames[character].id != 0 { rl.UnloadTexture(assets.frames[character]) }
-		if assets.papers[character].id != 0 { rl.UnloadTexture(assets.papers[character]) }
-		delete(assets.fields[character])
+		unload_paper_textures(assets.frames[character], assets.papers[character], assets.fields[character])
 	}
 	if assets.paper_shader.id != 0 { rl.UnloadShader(assets.paper_shader) }
 	assets^ = {}
@@ -155,9 +134,7 @@ flipbook_priority :: proc(action: Flipbook_Action) -> int {
 }
 
 flipbook_clip_seconds :: proc(clip: ^Flipbook_Clip, first: i32 = 0) -> f64 {
-	total: f64
-	for index in max(first, 0)..<clip.count { total += f64(clip.durations[index]) }
-	return total/1000
+	return clip_duration_seconds(clip.durations[:max(clip.count, 0)], first)
 }
 
 // The drawing shown `elapsed` seconds into a clip that began at drawing
@@ -169,19 +146,10 @@ flipbook_frame :: proc(clip: ^Flipbook_Clip, elapsed: f64, first: i32 = 0) -> (f
 		cycle := flipbook_clip_seconds(clip)*1000
 		if cycle <= 0 { return 0, false }
 		t = math.mod(t, cycle)
-		for index in 0..<clip.count {
-			duration := f64(clip.durations[index])
-			if t < duration { return index, false }
-			t -= duration
-		}
-		return clip.count-1, false
+		frame, _ = clip_frame_at_ms(clip.durations[:clip.count], t)
+		return frame, false
 	}
-	for index in clamp(first, 0, clip.count-1)..<clip.count {
-		duration := f64(clip.durations[index])
-		if t < duration { return index, false }
-		t -= duration
-	}
-	return clip.count-1, true
+	return clip_frame_at_ms(clip.durations[:clip.count], t, first)
 }
 
 // The paper's morph between two drawings: uv rects in the field atlas.

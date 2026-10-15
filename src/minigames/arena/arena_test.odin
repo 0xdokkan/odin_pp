@@ -7,6 +7,10 @@ import physics "../../engine/physics"
 import pool "../../engine/pool"
 import rng "../../engine/rng"
 
+// Long simulations remain part of the default/full pre-merge suite.
+@(private = "file")
+ODIN_TEST_FULL :: #config(ODIN_TEST_FULL, true)
+
 @(private = "file")
 new_world :: proc(config: host.Minigame_Config) -> ^World {
 	w := new(World)
@@ -388,54 +392,56 @@ test_sprite_rows_are_rectangular :: proc(t: ^testing.T) {
 	}
 }
 
-@(test)
-test_random_input_soak :: proc(t: ^testing.T) {
-	w := new(World)
-	defer drop_world(w)
-	r := rng.create(1234)
-	current: Player_Input
-	seed := u64(100)
-	world_reset(w, {seed = seed})
-	last_score := i64(0)
-	rounds := 1
-	for step in 0..<60000 {
-		input := scripted_input(&r, step, &current)
-		// Every few seconds let the bot drive, so later waves get exercised too.
-		if (step/1200)%2 == 1 {
-			input = bot_input(w)
-		}
-		status := world_step(w, input, SIM_DT)
-		testing.expect(t, w.event_count <= MAX_EVENTS)
-		events_clear(w)
-		p := &w.player
-		if !open_at(w, p.pos) || p.pos.x < 0 || p.pos.y < 0 || p.pos.x > WORLD_W || p.pos.y > WORLD_H {
-			testing.expectf(t, false, "step %d: player escaped to %v", step, p.pos)
-			return
-		}
-		testing.expect(t, p.hp >= 0 && p.hp <= p.max_hp)
-		testing.expect(t, w.score >= last_score, "score never decreases")
-		last_score = w.score
-		testing.expect(t, w.combo >= 0 && w.best_combo >= w.combo)
-		testing.expect(t, w.wave <= w.tuning.waves)
-		testing.expect(t, w.queue_next <= w.queue_len && w.queue_len <= MAX_QUEUE)
-		testing.expect(t, w.enemies.count <= MAX_ENEMIES && w.bullets.count <= MAX_BULLETS)
-		testing.expect(t, w.orbs.count <= MAX_ORBS && w.pickups.count <= MAX_PICKUPS && w.spawns.count <= MAX_SPAWNS)
-		it := pool.iterator(&w.enemies)
-		for e in pool.next(&it) {
-			if !open_at(w, e.pos) {
-				testing.expectf(t, false, "step %d: %v inside a wall at %v", step, e.kind, e.pos)
+when ODIN_TEST_FULL {
+	@(test)
+	test_random_input_soak :: proc(t: ^testing.T) {
+		w := new(World)
+		defer drop_world(w)
+		r := rng.create(1234)
+		current: Player_Input
+		seed := u64(100)
+		world_reset(w, {seed = seed})
+		last_score := i64(0)
+		rounds := 1
+		for step in 0..<60000 {
+			input := scripted_input(&r, step, &current)
+			// Every few seconds let the bot drive, so later waves get exercised too.
+			if (step/1200)%2 == 1 {
+				input = bot_input(w)
+			}
+			status := world_step(w, input, SIM_DT)
+			testing.expect(t, w.event_count <= MAX_EVENTS)
+			events_clear(w)
+			p := &w.player
+			if !open_at(w, p.pos) || p.pos.x < 0 || p.pos.y < 0 || p.pos.x > WORLD_W || p.pos.y > WORLD_H {
+				testing.expectf(t, false, "step %d: player escaped to %v", step, p.pos)
 				return
 			}
-			testing.expect(t, e.hp > 0)
+			testing.expect(t, p.hp >= 0 && p.hp <= p.max_hp)
+			testing.expect(t, w.score >= last_score, "score never decreases")
+			last_score = w.score
+			testing.expect(t, w.combo >= 0 && w.best_combo >= w.combo)
+			testing.expect(t, w.wave <= w.tuning.waves)
+			testing.expect(t, w.queue_next <= w.queue_len && w.queue_len <= MAX_QUEUE)
+			testing.expect(t, w.enemies.count <= MAX_ENEMIES && w.bullets.count <= MAX_BULLETS)
+			testing.expect(t, w.orbs.count <= MAX_ORBS && w.pickups.count <= MAX_PICKUPS && w.spawns.count <= MAX_SPAWNS)
+			it := pool.iterator(&w.enemies)
+			for e in pool.next(&it) {
+				if !open_at(w, e.pos) {
+					testing.expectf(t, false, "step %d: %v inside a wall at %v", step, e.kind, e.pos)
+					return
+				}
+				testing.expect(t, e.hp > 0)
+			}
+			if status != .Playing {
+				testing.expectf(t, w.spawn_failures == 0, "seed %d: enemy or spawn pool overflowed", seed)
+				seed += 1
+				world_reset(w, {seed = seed, challenge = seed%2 == 0})
+				last_score = 0
+				rounds += 1
+			}
 		}
-		if status != .Playing {
-			testing.expectf(t, w.spawn_failures == 0, "seed %d: enemy or spawn pool overflowed", seed)
-			seed += 1
-			world_reset(w, {seed = seed, challenge = seed%2 == 0})
-			last_score = 0
-			rounds += 1
-		}
+		testing.expect_value(t, w.spawn_failures, 0)
+		testing.expect(t, rounds >= 1)
 	}
-	testing.expect_value(t, w.spawn_failures, 0)
-	testing.expect(t, rounds >= 1)
 }

@@ -1,6 +1,7 @@
 package physics
 
 import "core:math"
+import tween "../tween"
 
 // Tuning for a side-view character. Zero disables the optional moves
 // (air jumps, wall slide/jump, dash).
@@ -129,13 +130,7 @@ platformer_step :: proc(p: ^Platformer, params: Platformer_Params, input: Platfo
 		} else {
 			accel = params.air_accel if abs(target) > EPSILON else params.air_decel
 		}
-		v := p.body.velocity.x
-		if v < target {
-			v = min(v+accel*dt, target)
-		} else {
-			v = max(v-accel*dt, target)
-		}
-		p.body.velocity.x = v
+		p.body.velocity.x = tween.approach(p.body.velocity.x, target, accel*dt)
 
 		// Jumps, by priority: ground (or coyote), wall, air.
 		if p.jump_buffer > 0 {

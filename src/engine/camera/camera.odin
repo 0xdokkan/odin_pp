@@ -4,6 +4,7 @@ package camera
 
 import "core:math"
 import rl "vendor:raylib"
+import tween "../tween"
 
 Vec2 :: [2]f32
 Vec3 :: [3]f32
@@ -77,7 +78,7 @@ camera2_update :: proc(c: ^Camera2, target: Vec2, view_size: Vec2, dt: f32) {
 	if c.smoothing <= 0 {
 		c.position = goal
 	} else {
-		c.position += (goal - c.position) * (1 - math.exp(-c.smoothing*dt))
+		c.position = tween.damp(c.position, goal, c.smoothing, dt)
 	}
 	camera2_clamp(c, view_size)
 	shake_update(&c.shake, dt)

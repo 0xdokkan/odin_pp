@@ -355,7 +355,7 @@ tactical_refill :: proc(room: ^Room) {
 	for p.deferred_draws > 0 || (p.refill && deck.hand_count < deck.rules.hand_size) {
 		card, drawn := draw_card(deck)
 		if !drawn { break }
-		record_refocus_draw(&room.recent_events, card)
+		record_card_draw(&room.recent_events, card)
 		p.deferred_draws = max(0, p.deferred_draws-1)
 	}
 	if p.exhaust_relic { apply_card_relics(room, .Exhaust, nil) }

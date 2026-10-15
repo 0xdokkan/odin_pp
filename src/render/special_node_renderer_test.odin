@@ -17,15 +17,6 @@ SPECIAL_NODE_RENDER_TEST_RUN_CONFIG :: game.Run_Map_Config{
 	max_nodes_per_middle_layer = 3,
 }
 
-special_node_rectangle_center :: proc(bounds: rl.Rectangle) -> view.Vec2 {
-	return {x = bounds.x+bounds.width*0.5, y = bounds.y+bounds.height*0.5}
-}
-
-special_node_rectangles_overlap :: proc(first, second: rl.Rectangle) -> bool {
-	return first.x < second.x+second.width && first.x+first.width > second.x &&
-	       first.y < second.y+second.height && first.y+first.height > second.y
-}
-
 create_special_node_render_test_run :: proc(
 	t: ^testing.T,
 	kind: game.Node_Kind,
@@ -102,7 +93,7 @@ test_blood_offering_primary_is_disabled_when_gold_would_overflow :: proc(t: ^tes
 	primary := special_node_action_bounds(960, 540, 0, 3)
 	testing.expect_value(
 		t,
-		special_node_hit_test(&run, 960, 540, 0, special_node_rectangle_center(primary)).kind,
+		special_node_hit_test(&run, 960, 540, 0, rectangle_center(primary)).kind,
 		Special_Node_Hit_Kind.None,
 	)
 	testing.expect_value(
@@ -123,7 +114,7 @@ test_special_node_action_and_result_geometry_is_disjoint :: proc(t: ^testing.T) 
 			testing.expect(t, bounds.x+bounds.width <= 960)
 			testing.expect(t, bounds.y+bounds.height <= 540)
 			for previous in 0..<index {
-				testing.expect(t, !special_node_rectangles_overlap(bounds, actions[previous]))
+				testing.expect(t, !rectangles_overlap(bounds, actions[previous]))
 			}
 		}
 	}
@@ -135,7 +126,7 @@ test_special_node_action_and_result_geometry_is_disjoint :: proc(t: ^testing.T) 
 	testing.expect(t, continue_bounds.x >= 0 && continue_bounds.y >= 0)
 	testing.expect(t, continue_bounds.x+continue_bounds.width <= 960)
 	testing.expect(t, continue_bounds.y+continue_bounds.height <= 540)
-	testing.expect(t, !special_node_rectangles_overlap(result, continue_bounds))
+	testing.expect(t, !rectangles_overlap(result, continue_bounds))
 
 	for slot in 0..<SHOP_DECK_CARDS_PER_PAGE {
 		card := special_node_owned_card_bounds(960, 540, slot)
@@ -177,7 +168,7 @@ test_special_node_geometry_and_hit_tests_reject_invalid_inputs :: proc(t: ^testi
 }
 
 @(test)
-test_rest_deck_pages_return_stable_instance_ids :: proc(t: ^testing.T) {
+test_rest_deck_adapter_preserves_page_and_hover_selection :: proc(t: ^testing.T) {
 	run := create_special_node_render_test_run(t, .Rest)
 	defer game.destroy_run(&run)
 	deck := &run.player.deck
@@ -190,23 +181,24 @@ test_rest_deck_pages_return_stable_instance_ids :: proc(t: ^testing.T) {
 	testing.expect_value(t, special_node_clamp_deck_page(deck, -3), 0)
 	testing.expect_value(t, special_node_clamp_deck_page(deck, page_count+2), page_count-1)
 
-	for page in 0..<page_count {
+	// Exhaustive deck geometry/picking lives with the shared Shop row. Here
+	// verify Rest routes both ends of its deck through that row unchanged.
+	for page in ([2]int{0, page_count-1}) {
 		start, valid := special_node_deck_page_start(deck, page)
 		testing.expect(t, valid)
 		visible_count := special_node_deck_cards_on_page(deck, page)
 		testing.expect(t, visible_count > 0 && visible_count <= SHOP_DECK_CARDS_PER_PAGE)
-		for slot in 0..<visible_count {
-			bounds := special_node_owned_card_bounds(960, 540, slot)
-			hit := special_node_hit_test(
-				&run,
-				960,
-				540,
-				page,
-				special_node_rectangle_center(bounds),
-			)
-			testing.expect_value(t, hit.kind, Special_Node_Hit_Kind.Owned_Card)
-			testing.expect_value(t, hit.card_id, deck.owned[start+slot].id)
-		}
+		slot := visible_count-1
+		bounds := special_node_owned_card_bounds(960, 540, slot)
+		hit := special_node_hit_test(
+			&run,
+			960,
+			540,
+			page,
+			rectangle_center(bounds),
+		)
+		testing.expect_value(t, hit.kind, Special_Node_Hit_Kind.Owned_Card)
+		testing.expect_value(t, hit.card_id, deck.owned[start+slot].id)
 	}
 
 	raised_card_id := deck.owned[1].id
@@ -241,12 +233,12 @@ test_rest_hit_test_exposes_selection_actions_and_page_controls :: proc(t: ^testi
 	leave := special_node_action_bounds(960, 540, 2, 3)
 	testing.expect_value(
 		t,
-		special_node_hit_test(&run, 960, 540, 0, special_node_rectangle_center(primary)).kind,
+		special_node_hit_test(&run, 960, 540, 0, rectangle_center(primary)).kind,
 		Special_Node_Hit_Kind.Primary,
 	)
 	testing.expect_value(
 		t,
-		special_node_hit_test(&run, 960, 540, 0, special_node_rectangle_center(secondary)).kind,
+		special_node_hit_test(&run, 960, 540, 0, rectangle_center(secondary)).kind,
 		Special_Node_Hit_Kind.None,
 	)
 	testing.expect_value(
@@ -256,7 +248,7 @@ test_rest_hit_test_exposes_selection_actions_and_page_controls :: proc(t: ^testi
 			960,
 			540,
 			0,
-			special_node_rectangle_center(secondary),
+			rectangle_center(secondary),
 			0,
 			selected_card_id,
 		).kind,
@@ -264,12 +256,12 @@ test_rest_hit_test_exposes_selection_actions_and_page_controls :: proc(t: ^testi
 	)
 	testing.expect_value(
 		t,
-		special_node_hit_test(&run, 960, 540, 0, special_node_rectangle_center(leave)).kind,
+		special_node_hit_test(&run, 960, 540, 0, rectangle_center(leave)).kind,
 		Special_Node_Hit_Kind.Leave,
 	)
 
-	previous := special_node_rectangle_center(special_node_previous_page_bounds(960, 540))
-	next := special_node_rectangle_center(special_node_next_page_bounds(960, 540))
+	previous := rectangle_center(special_node_previous_page_bounds(960, 540))
+	next := rectangle_center(special_node_next_page_bounds(960, 540))
 	testing.expect_value(
 		t,
 		special_node_hit_test(&run, 960, 540, 0, previous).kind,
@@ -299,7 +291,7 @@ test_resolved_rest_exposes_only_continue :: proc(t: ^testing.T) {
 	old_action := special_node_action_bounds(960, 540, 0, 3)
 	testing.expect_value(
 		t,
-		special_node_hit_test(&run, 960, 540, 0, special_node_rectangle_center(old_action)).kind,
+		special_node_hit_test(&run, 960, 540, 0, rectangle_center(old_action)).kind,
 		Special_Node_Hit_Kind.None,
 	)
 	testing.expect_value(
@@ -309,7 +301,7 @@ test_resolved_rest_exposes_only_continue :: proc(t: ^testing.T) {
 			960,
 			540,
 			0,
-			special_node_rectangle_center(special_node_owned_card_bounds(960, 540, 0)),
+			rectangle_center(special_node_owned_card_bounds(960, 540, 0)),
 		).kind,
 		Special_Node_Hit_Kind.None,
 	)
@@ -320,7 +312,7 @@ test_resolved_rest_exposes_only_continue :: proc(t: ^testing.T) {
 			960,
 			540,
 			0,
-			special_node_rectangle_center(special_node_continue_bounds(960, 540)),
+			rectangle_center(special_node_continue_bounds(960, 540)),
 		).kind,
 		Special_Node_Hit_Kind.Continue,
 	)
@@ -342,7 +334,7 @@ test_event_and_treasure_actions_switch_to_continue_after_resolution :: proc(t: ^
 			960,
 			540,
 			0,
-			special_node_rectangle_center(special_node_action_bounds(960, 540, index, 3)),
+			rectangle_center(special_node_action_bounds(960, 540, index, 3)),
 		)
 		testing.expect_value(t, hit.kind, expected)
 	}
@@ -355,7 +347,7 @@ test_event_and_treasure_actions_switch_to_continue_after_resolution :: proc(t: ^
 			960,
 			540,
 			0,
-			special_node_rectangle_center(special_node_continue_bounds(960, 540)),
+			rectangle_center(special_node_continue_bounds(960, 540)),
 		).kind,
 		Special_Node_Hit_Kind.Continue,
 	)
@@ -370,7 +362,7 @@ test_event_and_treasure_actions_switch_to_continue_after_resolution :: proc(t: ^
 			960,
 			540,
 			0,
-			special_node_rectangle_center(special_node_action_bounds(960, 540, 0, 2)),
+			rectangle_center(special_node_action_bounds(960, 540, 0, 2)),
 		).kind,
 		Special_Node_Hit_Kind.Primary,
 	)
@@ -381,7 +373,7 @@ test_event_and_treasure_actions_switch_to_continue_after_resolution :: proc(t: ^
 			960,
 			540,
 			0,
-			special_node_rectangle_center(special_node_action_bounds(960, 540, 1, 2)),
+			rectangle_center(special_node_action_bounds(960, 540, 1, 2)),
 		).kind,
 		Special_Node_Hit_Kind.Leave,
 	)
@@ -394,7 +386,7 @@ test_event_and_treasure_actions_switch_to_continue_after_resolution :: proc(t: ^
 			960,
 			540,
 			0,
-			special_node_rectangle_center(special_node_continue_bounds(960, 540)),
+			rectangle_center(special_node_continue_bounds(960, 540)),
 		).kind,
 		Special_Node_Hit_Kind.Continue,
 	)

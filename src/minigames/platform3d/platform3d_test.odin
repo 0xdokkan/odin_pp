@@ -6,6 +6,14 @@ import host "../../engine/host"
 import physics "../../engine/physics"
 import rng "../../engine/rng"
 
+// Long simulations remain part of the default/full pre-merge suite.
+@(private = "file")
+ODIN_TEST_FULL :: #config(ODIN_TEST_FULL, true)
+
+when !ODIN_TEST_FULL {
+	_ :: math // Only the full-profile soak uses this import.
+}
+
 // Worlds are big: tests keep them on the heap (test threads have small stacks).
 @(private = "file")
 make_world :: proc(seed: u64, challenge := false) -> ^World {
@@ -506,34 +514,36 @@ test_spikes_and_sentinels_hurt :: proc(t: ^testing.T) {
 }
 
 // Thousands of random steps on several courses: nothing breaks.
-@(test)
-test_random_input_soak :: proc(t: ^testing.T) {
-	r := rng.create(2024)
-	for round in 0..<6 {
-		w := make_world(u64(round)*101+3, round >= 4)
-		cmd: Player_Input
-		for _ in 0..<9000 {
-			cmd = random_input(&r, cmd)
-			status := world_step(w, cmd, SIM_DT)
-			p := w.player.body
-			ok := !math.is_nan(p.position.x) && !math.is_nan(p.position.y) && !math.is_nan(p.position.z) &&
-				!math.is_inf(p.position.y)
-			testing.expect(t, ok)
-			testing.expect(t, w.lives >= 0 && w.lives <= w.settings.lives)
-			testing.expect(t, w.shards_taken <= w.shard_count)
-			testing.expect(t, w.event_count <= MAX_EVENTS)
-			testing.expect(t, w.safe_pad >= 0 && w.safe_pad < w.pad_count && w.pads[w.safe_pad].mover < 0)
-			if w.phase == .Alive {
-				eps := Vec3{0.01, 0.01, 0.01}
-				testing.expect(t, !physics.box_hits_voxels(&w.terrain, p.position+eps, p.position+p.size-eps))
+when ODIN_TEST_FULL {
+	@(test)
+	test_random_input_soak :: proc(t: ^testing.T) {
+		r := rng.create(2024)
+		for round in 0..<6 {
+			w := make_world(u64(round)*101+3, round >= 4)
+			cmd: Player_Input
+			for _ in 0..<9000 {
+				cmd = random_input(&r, cmd)
+				status := world_step(w, cmd, SIM_DT)
+				p := w.player.body
+				ok := !math.is_nan(p.position.x) && !math.is_nan(p.position.y) && !math.is_nan(p.position.z) &&
+					!math.is_inf(p.position.y)
+				testing.expect(t, ok)
+				testing.expect(t, w.lives >= 0 && w.lives <= w.settings.lives)
+				testing.expect(t, w.shards_taken <= w.shard_count)
+				testing.expect(t, w.event_count <= MAX_EVENTS)
+				testing.expect(t, w.safe_pad >= 0 && w.safe_pad < w.pad_count && w.pads[w.safe_pad].mover < 0)
+				if w.phase == .Alive {
+					eps := Vec3{0.01, 0.01, 0.01}
+					testing.expect(t, !physics.box_hits_voxels(&w.terrain, p.position+eps, p.position+p.size-eps))
+				}
+				if !ok {
+					break
+				}
+				if status != .Playing {
+					world_reset(w, host.Minigame_Config{seed = u64(round) + 900})
+				}
 			}
-			if !ok {
-				break
-			}
-			if status != .Playing {
-				world_reset(w, host.Minigame_Config{seed = u64(round) + 900})
-			}
+			drop_world(w)
 		}
-		drop_world(w)
 	}
 }

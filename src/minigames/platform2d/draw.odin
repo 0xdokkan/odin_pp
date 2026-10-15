@@ -14,6 +14,7 @@ import host "../../engine/host"
 import physics "../../engine/physics"
 import rng "../../engine/rng"
 import ui "../../engine/ui"
+import tween "../../engine/tween"
 
 ZOOM :: f32(2)
 
@@ -351,7 +352,7 @@ view_update :: proc(v: ^View, w: ^World, frame: ^host.Frame, playing: bool) {
 		desired = {}
 	}
 	if w.phase != .Dying {
-		v.look += (desired - v.look) * (1 - math.exp(-2.5*dt))
+		v.look = tween.damp(v.look, desired, 2.5, dt)
 	}
 	v.cam.lookahead = v.look
 	camera.camera2_update(&v.cam, target, view, dt)
@@ -376,7 +377,7 @@ view_update :: proc(v: ^View, w: ^World, frame: ^host.Frame, playing: bool) {
 	}
 	v.area_time = max(v.area_time-dt, 0)
 	score, _ := world_score(w)
-	v.score_shown += (f32(score) - v.score_shown) * (1 - math.exp(-8*dt))
+	v.score_shown = tween.damp(v.score_shown, f32(score), 8, dt)
 	if abs(f32(score)-v.score_shown) < 1 {
 		v.score_shown = f32(score)
 	}
@@ -461,7 +462,7 @@ view_update :: proc(v: ^View, w: ^World, frame: ^host.Frame, playing: bool) {
 			}
 		}
 	}
-	v.squash += (Vec2{1, 1} - v.squash) * (1 - math.exp(-14*dt))
+	v.squash = tween.damp(v.squash, Vec2{1, 1}, 14, dt)
 
 	// Countdown ticks in the last ten seconds of a timed run.
 	if w.time_limit > 0 && w.phase == .Alive {

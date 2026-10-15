@@ -5,12 +5,16 @@ import "core:testing"
 @(test)
 test_dice_pool_matches_individual_rolls_and_keeps_face_order :: proc(t: ^testing.T) {
 	for sides in DICE_LADDER {
+		seen: [MAX_DIE_SIDES+1]bool
 		for count in 1..=MAX_ROLL_DICE {
-			for seed in u64(1)..=u64(32) {
+			// Face reachability belongs to the primitive, once per die. Other
+			// pool sizes still cover ordering and identical stream consumption.
+			seed_count := u64(256) if count == 1 else u64(32)
+			for seed in u64(1)..=seed_count {
 				pool_state := make_dice_state(seed)
 				individual_state := pool_state
 				pool, ok := roll_dice_pool(&pool_state, count, sides)
-				testing.expect(t, ok && validate_dice_roll(&pool))
+				if !testing.expect(t, ok && validate_dice_roll(&pool)) { continue }
 				testing.expect_value(t, pool.count, i32(count))
 				testing.expect_value(t, pool.sides, sides)
 				total: i32
@@ -18,6 +22,7 @@ test_dice_pool_matches_individual_rolls_and_keeps_face_order :: proc(t: ^testing
 					face, rolled := roll_die(&individual_state, sides)
 					testing.expect(t, rolled)
 					testing.expect_value(t, pool.faces[index], face)
+					seen[pool.faces[index]] = true
 					total += face
 				}
 				testing.expect_value(t, pool.total, total)
@@ -25,6 +30,8 @@ test_dice_pool_matches_individual_rolls_and_keeps_face_order :: proc(t: ^testing
 				testing.expect_value(t, pool_state.roll_count, u64(count))
 			}
 		}
+		for face in 1..=sides { testing.expect(t, seen[face]) }
+		for face in sides+1..=MAX_DIE_SIDES { testing.expect(t, !seen[face]) }
 	}
 }
 
@@ -122,8 +129,9 @@ test_card_dice_roll_its_count_of_its_level_die_reproducibly :: proc(t: ^testing.
 		for level in i32(0)..=MAX_DICE_UPGRADE_LEVEL {
 			card := Card_Instance{id = 1, definition_id = id, upgrade_level = level}
 			sides := card_die_sides(id, level)
-			seen: [MAX_DIE_SIDES+1]bool
-			for seed in u64(1)..=u64(256) {
+			// The primitive above owns exhaustive face reachability. Here the
+			// contract is each card's count, upgrade die and unchanged RNG use.
+			for seed in ([4]u64{1, 7, 123, 256}) {
 				state := make_dice_state(seed)
 				expected_state := state
 				roll, ok := roll_card_dice(&state, card)
@@ -133,11 +141,7 @@ test_card_dice_roll_its_count_of_its_level_die_reproducibly :: proc(t: ^testing.
 				testing.expect_value(t, state, expected_state)
 				testing.expect_value(t, int(roll.count), card_dice_count(id))
 				testing.expect_value(t, roll.sides, sides)
-				for face in roll.faces[:roll.count] { seen[face] = true }
 			}
-			// Every face of the level's die turns up, and none beyond it.
-			for face in 1..=sides { testing.expect(t, seen[face]) }
-			for face in sides+1..=MAX_DIE_SIDES { testing.expect(t, !seen[face]) }
 		}
 		over := Card_Instance{id = 1, definition_id = id, upgrade_level = MAX_DICE_UPGRADE_LEVEL+1}
 		state := make_dice_state(7)

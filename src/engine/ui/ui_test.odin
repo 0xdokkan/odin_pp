@@ -26,24 +26,26 @@ test_rect_cut_layout :: proc(t: ^testing.T) {
 }
 
 @(test)
-test_button_click_requires_press_and_release_inside :: proc(t: ^testing.T) {
+test_button_click_requires_enabled_press_and_release_inside :: proc(t: ^testing.T) {
 	theme := default_theme()
-	ctx := create(&theme)
-	defer destroy(ctx)
 	r := Rect{10, 10, 100, 30}
-	begin(ctx, Pointer{position = {20, 20}, inside = true, pressed = true, down = true}, {}, 0.016)
-	testing.expect(t, !button(ctx, r, "Ok"))
-	end(ctx)
-	begin(ctx, Pointer{position = {25, 20}, inside = true, released = true}, {}, 0.016)
-	testing.expect(t, button(ctx, r, "Ok"))
-	end(ctx)
-	// Press outside then release inside is not a click.
-	begin(ctx, Pointer{position = {300, 300}, inside = true, pressed = true, down = true}, {}, 0.016)
-	button(ctx, r, "Ok")
-	end(ctx)
-	begin(ctx, Pointer{position = {25, 20}, inside = true, released = true}, {}, 0.016)
-	testing.expect(t, !button(ctx, r, "Ok"))
-	end(ctx)
+	for enabled in ([2]bool{true, false}) {
+		ctx := create(&theme)
+		defer destroy(ctx)
+		begin(ctx, Pointer{position = {20, 20}, inside = true, pressed = true, down = true}, {}, 0.016)
+		testing.expect(t, !button(ctx, r, "Ok", enabled = enabled))
+		end(ctx)
+		begin(ctx, Pointer{position = {25, 20}, inside = true, released = true}, {}, 0.016)
+		testing.expect_value(t, button(ctx, r, "Ok", enabled = enabled), enabled)
+		end(ctx)
+		// A press outside followed by release inside never belongs to this button.
+		begin(ctx, Pointer{position = {300, 300}, inside = true, pressed = true, down = true}, {}, 0.016)
+		button(ctx, r, "Ok", enabled = enabled)
+		end(ctx)
+		begin(ctx, Pointer{position = {25, 20}, inside = true, released = true}, {}, 0.016)
+		testing.expect(t, !button(ctx, r, "Ok", enabled = enabled))
+		end(ctx)
+	}
 }
 
 @(test)
@@ -70,20 +72,6 @@ test_keyboard_focus_cycles_and_confirms :: proc(t: ^testing.T) {
 	testing.expect_value(t, ctx.focus, 2) // wraps around
 	frame(ctx, rects, {})
 	testing.expect_value(t, frame(ctx, rects, {.Confirm}), 2)
-}
-
-@(test)
-test_disabled_buttons_never_click :: proc(t: ^testing.T) {
-	theme := default_theme()
-	ctx := create(&theme)
-	defer destroy(ctx)
-	r := Rect{0, 0, 50, 20}
-	begin(ctx, Pointer{position = {5, 5}, inside = true, pressed = true, down = true}, {}, 0)
-	button(ctx, r, "x", enabled = false)
-	end(ctx)
-	begin(ctx, Pointer{position = {5, 5}, inside = true, released = true}, {}, 0)
-	testing.expect(t, !button(ctx, r, "x", enabled = false))
-	end(ctx)
 }
 
 @(test)

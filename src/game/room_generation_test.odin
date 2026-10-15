@@ -126,7 +126,10 @@ test_room_generation_profiles_scale_by_node_kind :: proc(t: ^testing.T) {
 test_room_blueprints_hold_invariants_across_run_seeds :: proc(t: ^testing.T) {
 	kinds := [?]Node_Kind{.Combat, .Elite, .Boss}
 	generated_count := 0
-	for combination in 0..<4096 {
+	// The first 135 combinations cover all 27 kind/depth profiles with each
+	// of the five previous families. Full runs preserve the original seeds.
+	combinations := 4096 if ODIN_TEST_FULL else len(kinds)*9*5
+	for combination in 0..<combinations {
 		profile_index := combination%(len(kinds)*9)
 		kind := kinds[profile_index/9]
 		depth := profile_index%9
@@ -144,15 +147,8 @@ test_room_blueprints_hold_invariants_across_run_seeds :: proc(t: ^testing.T) {
 		generated_count += 1
 		expect_generation_invariant(t, blueprint.profile.level_config.family != previous_family,
 			"room family does not repeat", combination, run_seed, kind, depth)
-		expect_generation_invariant(
-			t,
-			validate_room_blueprint(&blueprint),
-			"blueprint validates",
-			combination,
-			run_seed,
-			kind,
-			depth,
-		)
+		// Generation already validates the blueprint, including connectivity.
+		// Keep independent content checks and real room materialization here.
 		config := blueprint.profile.encounter_config
 		expect_generation_invariant(
 			t,
@@ -206,19 +202,6 @@ test_room_blueprints_hold_invariants_across_run_seeds :: proc(t: ^testing.T) {
 				trap_index,
 			)
 		}
-		expect_generation_invariant(
-			t,
-			all_unblocked_walkable_cells_are_connected(
-				&blueprint.level_data,
-				blueprint.obstacles[:],
-			),
-			"walkable cells connected",
-			combination,
-			run_seed,
-			kind,
-			depth,
-		)
-
 		player, player_ok := create_player(RUN_TEST_PLAYER_STATS)
 		expect_generation_invariant(
 			t, player_ok, "player created", combination, run_seed, kind, depth,
@@ -240,7 +223,7 @@ test_room_blueprints_hold_invariants_across_run_seeds :: proc(t: ^testing.T) {
 		}
 		destroy_room_blueprint(&blueprint)
 	}
-	testing.expectf(t, generated_count == 4096, "generated=%v expected=4096", generated_count)
+	testing.expectf(t, generated_count == combinations, "generated=%v expected=%v", generated_count, combinations)
 }
 
 @(test)

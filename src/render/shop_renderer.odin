@@ -220,7 +220,22 @@ shop_owned_card_at_point :: proc(
 	   !shop_canvas_is_supported(canvas_width, canvas_height) {
 		return 0, false
 	}
-	deck := &run.player.deck
+	return owned_deck_card_at_point(&run.player.deck, canvas_width, canvas_height, page, point, raised_card_id)
+}
+
+// Shop and Rest share the deck row. Keep its picking order in one place:
+// the raised card is drawn last, then ordinary cards are picked back to front.
+// Each screen validates its own phase and interaction rules before calling.
+owned_deck_card_at_point :: proc(
+	deck: ^game.Deck_State,
+	canvas_width, canvas_height: f32,
+	page: int,
+	point: view.Vec2,
+	raised_card_id: u32 = 0,
+) -> (card_id: u32, found: bool) {
+	if !shop_canvas_is_supported(canvas_width, canvas_height) {
+		return 0, false
+	}
 	start, valid_page := shop_deck_page_start(deck, page)
 	if !valid_page {
 		return 0, false
@@ -564,6 +579,71 @@ draw_shop_page_button :: proc(bounds: rl.Rectangle, previous, hovered, enabled: 
 	)
 }
 
+// Shop and Rest share the same deck page. Draw the hovered card last so
+// the raised card stays above its neighbours in both menus.
+draw_owned_deck_page :: proc(
+	run: ^game.Run_State,
+	canvas_width, canvas_height: f32,
+	requested_page: int,
+	hovered_card_id, selected_card_id: u32,
+	previous_page_hovered, next_page_hovered: bool,
+	theme: ^Renderer = nil,
+) {
+	page_count := shop_deck_page_count(&run.player.deck)
+	page := shop_clamp_deck_page(&run.player.deck, requested_page)
+	deck_label := fmt.ctprintf("OWNED DECK    PAGE %d/%d", page+1, page_count)
+	menu_text(theme, deck_label, 45, 292, 13, rl.Color{151, 163, 158, 255})
+	start, valid_page := shop_deck_page_start(&run.player.deck, page)
+	assert(valid_page)
+	visible_count := shop_deck_cards_on_page(&run.player.deck, page)
+	for slot in 0..<visible_count {
+		card_index := start+slot
+		card := run.player.deck.owned[card_index]
+		if card.id != hovered_card_id {
+			draw_shop_owned_card(
+				run,
+				card_index,
+				slot,
+				canvas_width,
+				canvas_height,
+				false,
+				card.id == selected_card_id,
+			 theme = theme)
+		}
+	}
+	if hovered_index, found := game.owned_card_index_by_id(
+		&run.player.deck,
+		hovered_card_id,
+	); found && hovered_index >= start && hovered_index < start+visible_count {
+		draw_shop_owned_card(
+			run,
+			hovered_index,
+			hovered_index-start,
+			canvas_width,
+			canvas_height,
+			true,
+			hovered_card_id == selected_card_id,
+		 theme = theme)
+	}
+
+	previous_enabled := page > 0
+	next_enabled := page+1 < page_count
+	draw_shop_page_button(
+		shop_previous_page_bounds(canvas_width, canvas_height),
+		true,
+		previous_page_hovered,
+		previous_enabled,
+		theme = theme,
+	)
+	draw_shop_page_button(
+		shop_next_page_bounds(canvas_width, canvas_height),
+		false,
+		next_page_hovered,
+		next_enabled,
+		theme = theme,
+	)
+}
+
 draw_shop_screen :: proc(
 	run: ^game.Run_State,
 	canvas_width, canvas_height: f32,
@@ -571,8 +651,6 @@ draw_shop_screen :: proc(
 ) {
 	assert(run != nil && run.phase == .Shop && game.validate_shop_state(run))
 	assert(shop_canvas_is_supported(canvas_width, canvas_height))
-	page_count := shop_deck_page_count(&run.player.deck)
-	page := shop_clamp_deck_page(&run.player.deck, state.page)
 
 	menu_rectangle(theme, 0, 0, c.int(canvas_width), c.int(canvas_height), CANVAS_BACKGROUND)
 	menu_rectangle(theme, 0, 0, c.int(canvas_width), c.int(SHOP_HEADER_HEIGHT), rl.Color{15, 18, 21, 255})
@@ -605,57 +683,9 @@ draw_shop_screen :: proc(
 		draw_effect_entry_button(theme, shop_offer_effect_bounds(canvas_width, canvas_height, index))
 	}
 
-	deck_label := fmt.ctprintf("OWNED DECK    PAGE %d/%d", page+1, page_count)
-	menu_text(theme, deck_label, 45, 292, 13, rl.Color{151, 163, 158, 255})
-	start, valid_page := shop_deck_page_start(&run.player.deck, page)
-	assert(valid_page)
-	visible_count := shop_deck_cards_on_page(&run.player.deck, page)
-	for slot in 0..<visible_count {
-		card_index := start+slot
-		card := run.player.deck.owned[card_index]
-		if card.id != state.hovered_card_id {
-			draw_shop_owned_card(
-				run,
-				card_index,
-				slot,
-				canvas_width,
-				canvas_height,
-				false,
-				card.id == state.selected_card_id,
-			 theme = theme)
-		}
-	}
-	if hovered_index, found := game.owned_card_index_by_id(
-		&run.player.deck,
-		state.hovered_card_id,
-	); found && hovered_index >= start && hovered_index < start+visible_count {
-		draw_shop_owned_card(
-			run,
-			hovered_index,
-			hovered_index-start,
-			canvas_width,
-			canvas_height,
-			true,
-			state.hovered_card_id == state.selected_card_id,
-		 theme = theme)
-	}
-
-	previous_enabled := page > 0
-	next_enabled := page+1 < page_count
-	draw_shop_page_button(
-		shop_previous_page_bounds(canvas_width, canvas_height),
-		true,
-		state.previous_page_hovered,
-		previous_enabled,
-		theme = theme,
-	)
-	draw_shop_page_button(
-		shop_next_page_bounds(canvas_width, canvas_height),
-		false,
-		state.next_page_hovered,
-		next_enabled,
-		theme = theme,
-	)
+	draw_owned_deck_page(run, canvas_width, canvas_height, state.page,
+		state.hovered_card_id, state.selected_card_id,
+		state.previous_page_hovered, state.next_page_hovered, theme)
 
 	selected_id := state.selected_card_id
 	selected_index, selected_found := game.owned_card_index_by_id(&run.player.deck, selected_id)

@@ -183,31 +183,7 @@ special_node_owned_card_at_point :: proc(
 	   !special_node_canvas_is_supported(canvas_width, canvas_height) {
 		return 0, false
 	}
-	deck := &run.player.deck
-	start, valid_page := special_node_deck_page_start(deck, page)
-	if !valid_page {
-		return 0, false
-	}
-	visible_count := special_node_deck_cards_on_page(deck, page)
-	if raised_card_id != 0 {
-		if raised_index, raised_found := game.owned_card_index_by_id(deck, raised_card_id);
-		   raised_found && raised_index >= start && raised_index < start+visible_count {
-			slot := raised_index-start
-			if special_node_point_in_bounds(
-				point,
-				special_node_owned_card_bounds(canvas_width, canvas_height, slot, true),
-			) {
-				return raised_card_id, true
-			}
-		}
-	}
-	for slot := visible_count-1; slot >= 0; slot -= 1 {
-		bounds := special_node_owned_card_bounds(canvas_width, canvas_height, slot)
-		if special_node_point_in_bounds(point, bounds) {
-			return deck.owned[start+slot].id, true
-		}
-	}
-	return 0, false
+	return owned_deck_card_at_point(&run.player.deck, canvas_width, canvas_height, page, point, raised_card_id)
 }
 
 special_node_primary_is_enabled :: proc(run: ^game.Run_State) -> bool {
@@ -550,62 +526,11 @@ draw_rest_actions :: proc(
 		theme = theme,
 	)
 
-	deck := &run.player.deck
-	page_count := special_node_deck_page_count(deck)
-	page := special_node_clamp_deck_page(deck, state.page)
-	menu_text(theme,
-		fmt.ctprintf("OWNED DECK    PAGE %d/%d", page+1, page_count),
-		45,
-		292,
-		13,
-		rl.Color{151, 163, 158, 255},
-	)
-	start, valid_page := special_node_deck_page_start(deck, page)
-	assert(valid_page)
-	visible_count := special_node_deck_cards_on_page(deck, page)
-	for slot in 0..<visible_count {
-		card_index := start+slot
-		card := deck.owned[card_index]
-		if card.id != state.hovered_card_id {
-			draw_shop_owned_card(
-				run,
-				card_index,
-				slot,
-				canvas_width,
-				canvas_height,
-				false,
-				card.id == state.selected_card_id,
-			 theme = theme)
-		}
-	}
-	if hovered_index, found := game.owned_card_index_by_id(deck, state.hovered_card_id);
-	   found && hovered_index >= start && hovered_index < start+visible_count {
-		draw_shop_owned_card(
-			run,
-			hovered_index,
-			hovered_index-start,
-			canvas_width,
-			canvas_height,
-			true,
-			state.hovered_card_id == state.selected_card_id,
-		 theme = theme)
-	}
-	draw_shop_page_button(
-		special_node_previous_page_bounds(canvas_width, canvas_height),
-		true,
-		state.previous_page_hovered,
-		page > 0,
-		theme = theme,
-	)
-	draw_shop_page_button(
-		special_node_next_page_bounds(canvas_width, canvas_height),
-		false,
-		state.next_page_hovered,
-		page+1 < page_count,
-		theme = theme,
-	)
+	draw_owned_deck_page(run, canvas_width, canvas_height, state.page,
+		state.hovered_card_id, state.selected_card_id,
+		state.previous_page_hovered, state.next_page_hovered, theme)
 	// MOSTRA EFFETTO of the owned card chosen for the upgrade.
-	_, chosen := game.owned_card_index_by_id(deck, state.selected_card_id)
+	_, chosen := game.owned_card_index_by_id(&run.player.deck, state.selected_card_id)
 	draw_owned_card_effect_button(theme, canvas_width, canvas_height, chosen)
 }
 

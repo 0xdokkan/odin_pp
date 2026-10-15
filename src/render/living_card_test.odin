@@ -66,6 +66,20 @@ test_living_frame_holds_the_last_drawing_and_loops :: proc(t: ^testing.T) {
 	testing.expect(t, frame == 1 && !finished)
 	frame, _ = gfx.living_frame(&loop, 0.35)
 	testing.expect(t, frame == 0)
+	// Loops always begin at drawing zero, even when a caller supplies a hit
+	// drawing; negative time still holds the selected first one-shot drawing.
+	frame, finished = gfx.living_frame(&loop, 0, 1)
+	testing.expect(t, frame == 0 && !finished)
+	frame, finished = gfx.living_frame(&once, -1, 1)
+	testing.expect(t, frame == 1 && !finished)
+	once.durations[0], once.durations[1], once.durations[2] = 125, 250, 125
+	testing.expect_value(t, gfx.living_clip_seconds(&once, 1), f64(0.375))
+	for expected, hit in ([5]f64{0, 0.125, 0.375, 0.5, 0.5}) {
+		once.hit = i32(hit)
+		testing.expect_value(t, gfx.living_hit_seconds(&once), expected)
+	}
+	once.hit = -1
+	testing.expect_value(t, gfx.living_hit_seconds(&once), f64(0))
 }
 
 // The card stays on its cell until the push, slides as one block, then stands

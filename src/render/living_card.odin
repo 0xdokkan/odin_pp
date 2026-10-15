@@ -551,18 +551,8 @@ living_billboard_geometry :: proc(renderer: ^Renderer, character: gfx.Flipbook_C
 	}
 	result.points = {pbl+top, pbl, pbl+half*2, pbl+half*2+top}
 	if fall := living_fall(actor, now); fall > 0 {
-		// The whole card topples backwards around its bottom edge.
-		angle := fall*fall*1.4
-		away := rl.Vector3Normalize(rl.Vector3{v.camera.target.x-v.camera.position.x, 0, v.camera.target.z-v.camera.position.z})
-		floor := f32(0.02)
-		for &point in result.points {
-			h := point.y-floor
-			point = {point.x, floor+h*math.cos(angle), point.z}+away*(h*math.sin(angle))
-		}
-		for &point in result.card_points {
-			h := point.y-floor
-			point = {point.x, floor+h*math.cos(angle), point.z}+away*(h*math.sin(angle))
-		}
+		topple_card_points(&result.points, v.camera, fall)
+		topple_card_points(&result.card_points, v.camera, fall)
 	}
 	return result
 }
@@ -576,13 +566,9 @@ living_card_hit :: proc(renderer: ^Renderer, quad: Tactical_Billboard, ray: rl.R
 	field := renderer.tactical.living_assets.fields[character]
 	width, height := int(quad.card.width), int(quad.card.height)
 	if len(field) < width*height || width <= 0 { return collision.distance, true }
-	u := points[3]-points[0]
-	w := points[1]-points[0]
-	delta := collision.point-points[0]
-	fx := clamp(rl.Vector3DotProduct(delta, u)/rl.Vector3DotProduct(u, u), 0, 0.9999)
-	fy := clamp(rl.Vector3DotProduct(delta, w)/rl.Vector3DotProduct(w, w), 0, 0.9999)
-	x := clamp(int(fx*f32(width)), 0, width-1)
-	y := clamp(int(fy*f32(height)), 0, height-1)
+	uv := card_hit_uv(points, collision.point)
+	x := clamp(int(uv.x*f32(width)), 0, width-1)
+	y := clamp(int(uv.y*f32(height)), 0, height-1)
 	if f32(field[y*width+x]) > (gfx.FLIPBOOK_PAPER+gfx.FLIPBOOK_INK)*gfx.FLIPBOOK_PAPER_SCALE { return }
 	return collision.distance, true
 }

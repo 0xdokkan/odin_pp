@@ -6,6 +6,7 @@ package platform3d
 import "core:math"
 import host "../../engine/host"
 import physics "../../engine/physics"
+import tween "../../engine/tween"
 
 Vec2 :: [2]f32
 Vec3 :: [3]f32
@@ -426,11 +427,6 @@ mover_solid :: proc "contextless" (m: Mover) -> bool {
 	return m.kind == .Shuttle || m.state == .Idle || m.state == .Shaking
 }
 
-ease :: proc "contextless" (t: f32) -> f32 {
-	k := clamp(t, 0, 1)
-	return k * k * (3 - 2*k)
-}
-
 // 0 at end a, 1 at end b; shuttles pause at both ends.
 shuttle_progress :: proc(m: Mover, time: f32) -> f32 {
 	s := math.mod(time+m.phase, m.period)
@@ -439,11 +435,11 @@ shuttle_progress :: proc(m: Mover, time: f32) -> f32 {
 	case s < SHUTTLE_PAUSE:
 		return 0
 	case s < SHUTTLE_PAUSE+tt:
-		return ease((s - SHUTTLE_PAUSE) / tt)
+		return tween.ease(.Smoothstep, (s - SHUTTLE_PAUSE) / tt)
 	case s < 2*SHUTTLE_PAUSE+tt:
 		return 1
 	}
-	return 1 - ease((s-2*SHUTTLE_PAUSE-tt)/tt)
+	return 1 - tween.ease(.Smoothstep, (s-2*SHUTTLE_PAUSE-tt)/tt)
 }
 
 // Which end the shuttle rests at (-1 while travelling) and for how long still.
@@ -489,7 +485,7 @@ sentinel_position :: proc(s: Sentinel, time: f32) -> Vec3 {
 	if u > 1 {
 		u = 2 - u
 	}
-	return s.a + (s.b-s.a)*ease(u)
+	return s.a + (s.b-s.a)*tween.ease(.Smoothstep, u)
 }
 
 update_movers :: proc(w: ^World, dt: f32) {

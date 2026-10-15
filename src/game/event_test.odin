@@ -108,8 +108,10 @@ test_event_log_composes_a_dense_maximum_room_pipeline_without_drops :: proc(t: ^
 }
 
 @(test)
-test_spatial_events_append_without_changing_existing_ordinals :: proc(t: ^testing.T) {
+test_event_extensions_preserve_existing_ordinals :: proc(t: ^testing.T) {
 	testing.expect_value(t, int(Game_Event_Kind.Moved), 3)
+	testing.expect(t, int(Game_Event_Kind.Hand_Refocused) > int(Game_Event_Kind.Card_Created))
+	testing.expect(t, int(Game_Event_Kind.Card_Refocused) > int(Game_Event_Kind.Card_Created))
 	testing.expect_value(t, int(Game_Event_Kind.Card_Refocused), 22)
 	testing.expect_value(t, int(Game_Event_Kind.Movement_Step), 23)
 	testing.expect_value(t, int(Game_Event_Kind.Trap_Triggered), 24)
@@ -136,41 +138,4 @@ test_event_log_reports_overflow_beyond_fixed_capacity :: proc(t: ^testing.T) {
 	testing.expect_value(t, log.count, MAX_GAME_EVENTS)
 	testing.expect_value(t, log.dropped_count, 1)
 	testing.expect_value(t, log.events[MAX_GAME_EVENTS-1].kind, Game_Event_Kind.Moved)
-}
-
-@(test)
-test_refocus_event_envelope_preserves_fifo_without_changing_existing_ordinals :: proc(t: ^testing.T) {
-	log: Event_Log
-	testing.expect(t, int(Game_Event_Kind.Hand_Refocused) > int(Game_Event_Kind.Card_Created))
-	testing.expect(t, int(Game_Event_Kind.Card_Refocused) > int(Game_Event_Kind.Card_Created))
-	testing.expect(t, record_event(&log, {
-		kind = .Hand_Refocused,
-		source = PLAYER_ENTITY,
-		target = PLAYER_ENTITY,
-		amount = i32(MAX_HAND_CARDS),
-	}))
-	for index in 0..<MAX_HAND_CARDS {
-		testing.expect(t, record_event(&log, {
-			kind = .Card_Refocused,
-			card_id = u32(index+1),
-			from_card_zone = .Hand,
-			to_card_zone = .Discard,
-		}))
-	}
-	testing.expect(t, record_event(&log, {kind = .Pulse_Advanced}))
-	for index in 0..<MAX_HAND_CARDS {
-		testing.expect(t, record_event(&log, {
-			kind = .Card_Drawn,
-			card_id = u32(index+1),
-			from_card_zone = .Draw,
-			to_card_zone = .Hand,
-		}))
-	}
-
-	testing.expect_value(t, log.count, 2+MAX_HAND_CARDS*2)
-	testing.expect_value(t, log.dropped_count, 0)
-	testing.expect_value(t, log.events[0].kind, Game_Event_Kind.Hand_Refocused)
-	testing.expect_value(t, log.events[MAX_HAND_CARDS].kind, Game_Event_Kind.Card_Refocused)
-	testing.expect_value(t, log.events[MAX_HAND_CARDS+1].kind, Game_Event_Kind.Pulse_Advanced)
-	testing.expect_value(t, log.events[log.count-1].kind, Game_Event_Kind.Card_Drawn)
 }

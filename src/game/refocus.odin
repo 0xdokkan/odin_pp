@@ -26,31 +26,9 @@ refocus_was_committed :: proc(result: Refocus_Result) -> bool {
 }
 
 record_refocused_card :: proc(log: ^Event_Log, outcome: Card_Refocus_Outcome) -> bool {
-	return record_event(log, {
-		kind = .Card_Refocused,
-		source = PLAYER_ENTITY,
-		target = PLAYER_ENTITY,
-		card_id = outcome.card.id,
-		card_definition = outcome.card.definition_id,
-		card_upgrade_level = outcome.card.upgrade_level,
-		card_lifetime = outcome.card.lifetime,
-		from_card_zone = .Hand,
-		to_card_zone = outcome.destination,
-	})
-}
-
-record_refocus_draw :: proc(log: ^Event_Log, card: Card_Instance) -> bool {
-	return record_event(log, {
-		kind = .Card_Drawn,
-		source = PLAYER_ENTITY,
-		target = PLAYER_ENTITY,
-		card_id = card.id,
-		card_definition = card.definition_id,
-		card_upgrade_level = card.upgrade_level,
-		card_lifetime = card.lifetime,
-		from_card_zone = .Draw,
-		to_card_zone = .Hand,
-	})
+	return record_event(log, make_card_zone_event(
+		.Card_Refocused, PLAYER_ENTITY, PLAYER_ENTITY, outcome.card, .Hand, outcome.destination,
+	))
 }
 
 refocus_player_hand :: proc(room: ^Room) -> (refocus: Refocus_Report) {
@@ -140,7 +118,7 @@ refocus_player_hand :: proc(room: ^Room) -> (refocus: Refocus_Report) {
 		}
 		refocus.drawn_cards[refocus.drawn_count] = card
 		refocus.drawn_count += 1
-		record_refocus_draw(&room.recent_events, card)
+		record_card_draw(&room.recent_events, card)
 	}
 	for card_outcome in refocus.hand_report.outcomes[:refocus.hand_report.outcome_count] {
 		if card_outcome.destination == .Exhaust {

@@ -217,6 +217,14 @@ test_low_zoom_square_corners_and_boss_shoulders_target_actor_over_northern_barre
 	defer free(scene)
 	init_object_interaction_test_scene(t, scene)
 	defer destroy_object_interaction_test_scene(scene)
+	// Keep archetypes readable at low zoom without freezing art-tuning sizes.
+	for zoom in ([2]f32{0.25, 1}) {
+		scene.renderer.camera.zoom = zoom
+		chaser := enemy_draw_radius(&scene.renderer, {archetype = .Chaser})
+		testing.expect(t, chaser > 0)
+		testing.expect(t, enemy_draw_radius(&scene.renderer, {archetype = .Archer}) > 0)
+		testing.expect(t, enemy_draw_radius(&scene.renderer, {archetype = .Brute}) > chaser)
+	}
 	scene.renderer.camera.zoom = 0.35
 	scene.room.enemies[0].position = {2, 2}
 	scene.room.objects[0].position = {2, 1}

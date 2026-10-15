@@ -90,42 +90,23 @@ Card_Demo_Glove_Print :: [CARD_DEMO_GLOVE_HEIGHT][CARD_DEMO_GLOVE_WIDTH]rl.Color
 
 card_demo_glove_paint :: proc(glove: Card_Demo_Glove) -> (print: Card_Demo_Glove_Print) {
 	rows := CARD_DEMO_GLOVE_POINT if glove == .Point else CARD_DEMO_GLOVE_GRAB
-	Layer :: enum u8 {Clear, Print, Ink, Paper, Cut}
-	layers: [CARD_DEMO_GLOVE_HEIGHT][CARD_DEMO_GLOVE_WIDTH]Layer
+	w, h := CARD_DEMO_GLOVE_WIDTH, CARD_DEMO_GLOVE_HEIGHT
+	layers, staged: [CARD_DEMO_GLOVE_WIDTH*CARD_DEMO_GLOVE_HEIGHT]Paper_Outline_Layer
 	m := CARD_DEMO_GLOVE_MARGIN
 	for row, y in rows {
 		for x in 0..<min(len(row), CARD_DEMO_GLOVE_COLUMNS) {
 			if color, ok := card_demo_glove_color(row[x]); ok {
 				print[y+m][x+m] = color
-				layers[y+m][x+m] = .Print
+				layers[(y+m)*w+x+m] = .Print
 			}
 		}
 	}
-	// Each ring grows round all before it, as the board's props' do.
-	grow :: proc(layers: ^[CARD_DEMO_GLOVE_HEIGHT][CARD_DEMO_GLOVE_WIDTH]Layer, into: Layer, diagonal: bool) {
-		staged := layers^
-		for y in 0..<CARD_DEMO_GLOVE_HEIGHT {
-			for x in 0..<CARD_DEMO_GLOVE_WIDTH {
-				if layers[y][x] != .Clear { continue }
-				near: for dy in -1..=1 {
-					for dx in -1..=1 {
-						if (dx == 0 && dy == 0) || (!diagonal && dx != 0 && dy != 0) { continue }
-						xx, yy := x+dx, y+dy
-						if xx < 0 || yy < 0 || xx >= CARD_DEMO_GLOVE_WIDTH || yy >= CARD_DEMO_GLOVE_HEIGHT || layers[yy][xx] == .Clear { continue }
-						staged[y][x] = into
-						break near
-					}
-				}
-			}
-		}
-		layers^ = staged
-	}
-	grow(&layers, .Ink, true)
-	for ring in 0..<CARD_DEMO_GLOVE_PAPER { grow(&layers, .Paper, ring%2 == 1) }
-	grow(&layers, .Cut, true)
+	paper_outline_grow(layers[:], staged[:], w, h, .Ink, true)
+	for ring in 0..<CARD_DEMO_GLOVE_PAPER { paper_outline_grow(layers[:], staged[:], w, h, .Paper, ring%2 == 1) }
+	paper_outline_grow(layers[:], staged[:], w, h, .Cut, true)
 	for y in 0..<CARD_DEMO_GLOVE_HEIGHT {
 		for x in 0..<CARD_DEMO_GLOVE_WIDTH {
-			#partial switch layers[y][x] {
+			#partial switch layers[y*w+x] {
 			case .Ink, .Cut: print[y][x] = LIVING_TOKEN_INK
 			case .Paper: print[y][x] = LIVING_TOKEN_PAPER
 			}
@@ -134,7 +115,7 @@ card_demo_glove_paint :: proc(glove: Card_Demo_Glove) -> (print: Card_Demo_Glove
 	// The cut edge shows the paper's thickness, down and right.
 	for y := CARD_DEMO_GLOVE_HEIGHT-1; y > 0; y -= 1 {
 		for x := CARD_DEMO_GLOVE_WIDTH-1; x > 0; x -= 1 {
-			if layers[y][x] == .Clear && layers[y-1][x-1] != .Clear { print[y][x] = LIVING_TOKEN_EDGE }
+			if layers[y*w+x] == .Clear && layers[(y-1)*w+x-1] != .Clear { print[y][x] = LIVING_TOKEN_EDGE }
 		}
 	}
 	return

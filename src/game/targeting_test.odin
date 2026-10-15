@@ -83,31 +83,6 @@ test_targeting_single_resolves_primary_target_and_affected_enemy :: proc(t: ^tes
 }
 
 @(test)
-test_targeting_single_supports_zero_range_anchor_at_origin :: proc(t: ^testing.T) {
-	level_data := create_targeting_test_level(t)
-	defer level.destroy(&level_data)
-	player := create_test_player(t)
-	room, ok := create_room(&level_data, &player, {})
-	testing.expect(t, ok)
-	defer destroy_room(&room)
-	spec := Targeting_Spec{
-		rule = .Cell,
-		cast_range = {.Manhattan, 0, 2},
-		shape = .Single,
-	}
-
-	result := evaluate_target_query(&room, PLAYER_ENTITY, spec, {
-		anchor = player.position,
-		has_anchor = true,
-	})
-
-	testing.expect_value(t, result.error, Target_Query_Error.None)
-	testing.expect_value(t, result.path_count, 0)
-	testing.expect_value(t, result.affected.count, 1)
-	testing.expect_value(t, result.affected.cells[0], player.position)
-}
-
-@(test)
 test_targeting_line_supports_all_eight_directions_and_rejects_other_slopes :: proc(t: ^testing.T) {
 	level_data := create_targeting_test_level(t)
 	defer level.destroy(&level_data)
@@ -160,42 +135,39 @@ test_targeting_line_supports_all_eight_directions_and_rejects_other_slopes :: pr
 }
 
 @(test)
-test_targeting_cast_range_includes_minimum_and_maximum :: proc(t: ^testing.T) {
+test_targeting_cast_range_includes_origin_and_exact_minimum_and_maximum :: proc(t: ^testing.T) {
 	level_data := create_targeting_test_level(t)
 	defer level.destroy(&level_data)
 	player := create_test_player(t)
 	room, ok := create_room(&level_data, &player, {})
 	testing.expect(t, ok)
 	defer destroy_room(&room)
-	spec := Targeting_Spec{
-		rule = .Cell,
-		cast_range = {.Manhattan, 2, 4},
-		shape = .Single,
+	Case :: struct {
+		range: Targeting_Range,
+		anchor: grid.Position,
+		error: Target_Query_Error,
+		path_count: int,
 	}
-
-	minimum := evaluate_target_query(&room, PLAYER_ENTITY, spec, {
-		anchor = {x = 3, y = 1},
-		has_anchor = true,
-	})
-	maximum := evaluate_target_query(&room, PLAYER_ENTITY, spec, {
-		anchor = {x = 5, y = 1},
-		has_anchor = true,
-	})
-	below := evaluate_target_query(&room, PLAYER_ENTITY, spec, {
-		anchor = {x = 2, y = 1},
-		has_anchor = true,
-	})
-	above := evaluate_target_query(&room, PLAYER_ENTITY, spec, {
-		anchor = {x = 6, y = 1},
-		has_anchor = true,
-	})
-
-	testing.expect_value(t, minimum.error, Target_Query_Error.None)
-	testing.expect_value(t, maximum.error, Target_Query_Error.None)
-	testing.expect_value(t, below.error, Target_Query_Error.Anchor_Out_Of_Range)
-	testing.expect_value(t, above.error, Target_Query_Error.Anchor_Out_Of_Range)
-	testing.expect(t, targeting_range_contains(spec.cast_range, player.position, {x = 3, y = 1}))
-	testing.expect(t, targeting_range_contains(spec.cast_range, player.position, {x = 5, y = 1}))
+	cases := [?]Case{
+		{range = {.Manhattan, 0, 2}, anchor = {1, 1}, error = .None},
+		{range = {.Manhattan, 2, 4}, anchor = {3, 1}, error = .None, path_count = 2},
+		{range = {.Manhattan, 2, 4}, anchor = {5, 1}, error = .None, path_count = 4},
+		{range = {.Manhattan, 2, 4}, anchor = {2, 1}, error = .Anchor_Out_Of_Range},
+		{range = {.Manhattan, 2, 4}, anchor = {6, 1}, error = .Anchor_Out_Of_Range},
+	}
+	for c in cases {
+		spec := Targeting_Spec{rule = .Cell, cast_range = c.range, shape = .Single}
+		result := evaluate_target_query(&room, PLAYER_ENTITY, spec, {anchor = c.anchor, has_anchor = true})
+		testing.expect_value(t, result.error, c.error)
+		testing.expect_value(t, targeting_range_contains(c.range, player.position, c.anchor), c.error == .None)
+		if c.error == .None {
+			testing.expect_value(t, result.path_count, c.path_count)
+			expected := [?]grid.Position{c.anchor}
+			expect_targeting_cells(t, &result.affected, expected[:])
+		} else {
+			testing.expect_value(t, result.affected.count, 0)
+		}
+	}
 }
 
 @(test)

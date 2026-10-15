@@ -423,7 +423,8 @@ test_effect_window_opens_for_every_card :: proc(t: ^testing.T) {
 		for id in game.Card_Id {
 			if id == .Count { continue }
 			definition, _ := game.card_definition_by_id(id, true)
-			for level in ([2]i32{0, game.card_max_upgrade_level(id)}) {
+			for level, index in ([2]i32{0, game.card_max_upgrade_level(id)}) {
+				if index > 0 && level == 0 { continue }
 				card := game.Card_Instance{id = 1, definition_id = id, upgrade_level = level, lifetime = .Combat if definition.temporary_only else .Permanent}
 				if !open_effect_window_in_run(rs, card, .None) {
 					testing.expectf(t, false, "%v +%d: the window does not open (%v)", id, level, effect_window_refusal(rs))
@@ -450,7 +451,9 @@ test_effect_window_opens_for_every_card :: proc(t: ^testing.T) {
 // the board the window lends it (flat or 3D, as the run's is), stepped by the
 // window's own frames, every card at every level it can reach plays its first
 // take to its end and shows all its card promises (card_demo_shown), then the
-// film starts afresh; the run stands still throughout.
+// film starts afresh; the run stands still throughout. Quick runs sample the
+// different integrations at their base/top levels; card_demo_test always
+// checks the entire catalog's actual effects and every upgrade.
 @(test)
 test_effect_window_films_show_every_card_at_every_level :: proc(t: ^testing.T) {
 	rs := effect_test_fight(t)
@@ -462,8 +465,15 @@ test_effect_window_films_show_every_card_at_every_level :: proc(t: ^testing.T) {
 		rs.iso_renderer.tactical.scene_3d, rs.iso_renderer.tactical.perspective = board_3d, board_3d
 		for id in game.Card_Id {
 			if id == .Count { continue }
+			when !ODIN_TEST_FULL {
+				quick_cards := bit_set[game.Card_Id]{.Strike, .Fate_Strike, .Tesla_Coil, .Shadow_Step, .Fishing_Rod, .First_Person}
+				if id not_in quick_cards { continue }
+			}
 			definition, _ := game.card_definition_by_id(id, true)
 			for level in i32(0)..=game.card_max_upgrade_level(id) {
+				when !ODIN_TEST_FULL {
+					if level != 0 && level != game.card_max_upgrade_level(id) { continue }
+				}
 				card := game.Card_Instance{id = 1, definition_id = id, upgrade_level = level, lifetime = .Combat if definition.temporary_only else .Permanent}
 				if !open_effect_window_in_run(rs, card, .None) {
 					testing.expectf(t, false, "%v +%d: the window does not open (%v)", id, level, effect_window_refusal(rs))

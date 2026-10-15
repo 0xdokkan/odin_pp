@@ -369,14 +369,7 @@ flipbook_billboard_geometry :: proc(renderer: ^Renderer, character: gfx.Flipbook
 	lean := right*pose.lean
 	result.points = {bl+top+lean, bl, bl+span, bl+span+top+lean}
 	if fall := flipbook_fall(actor, now); fall > 0 {
-		// Topple backwards around the card's bottom edge.
-		angle := fall*fall*1.4
-		away := rl.Vector3Normalize(rl.Vector3{v.camera.target.x-v.camera.position.x, 0, v.camera.target.z-v.camera.position.z})
-		floor := f32(0.02)
-		for &point in result.points {
-			h := point.y-floor
-			point = {point.x, floor+h*math.cos(angle), point.z}+away*(h*math.sin(angle))
-		}
+		topple_card_points(&result.points, v.camera, fall)
 	}
 	return result
 }
@@ -400,15 +393,11 @@ flipbook_card_hit :: proc(renderer: ^Renderer, quad: Tactical_Billboard, ray: rl
 	field := renderer.tactical.flipbook.fields[character]
 	width, height := int(quad.card.width), int(quad.card.height)
 	if len(field) < width*height || width <= 0 { return collision.distance, true }
-	u := points[3]-points[0]
-	w := points[1]-points[0]
-	delta := collision.point-points[0]
-	fx := clamp(rl.Vector3DotProduct(delta, u)/rl.Vector3DotProduct(u, u), 0, 0.9999)
-	fy := clamp(rl.Vector3DotProduct(delta, w)/rl.Vector3DotProduct(w, w), 0, 0.9999)
-	if quad.mirror { fx = 0.9999-fx }
+	uv := card_hit_uv(points, collision.point)
+	if quad.mirror { uv.x = 0.9999-uv.x }
 	// Picking follows the paper of the drawing on the card now.
-	x := clamp(int((quad.card_b.x+fx*quad.card_b.width)*f32(width)), 0, width-1)
-	y := clamp(int((quad.card_b.y+fy*quad.card_b.height)*f32(height)), 0, height-1)
+	x := clamp(int((quad.card_b.x+uv.x*quad.card_b.width)*f32(width)), 0, width-1)
+	y := clamp(int((quad.card_b.y+uv.y*quad.card_b.height)*f32(height)), 0, height-1)
 	if f32(field[y*width+x]) > (gfx.FLIPBOOK_PAPER+gfx.FLIPBOOK_INK)*gfx.FLIPBOOK_PAPER_SCALE { return }
 	return collision.distance, true
 }

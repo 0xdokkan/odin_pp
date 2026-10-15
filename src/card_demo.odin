@@ -380,9 +380,8 @@ card_demo_release :: proc(demo: ^Card_Demo, renderer: ^render.Renderer) -> bool 
 	demo.cards.dragged_card_id = 0
 	if r.tactical.enabled { demo.cards.selected_card_id = dragged }
 	if !r.has_hovered_cell || !render.card_drop_area_contains(r, demo.pointer) { return false }
-	target, has_target := game.card_drop_target(room, card, r.hovered_cell)
-	return has_target && commit_gameplay_command(room, r, &demo.cards,
-		{kind = .Play_Card, origin_phase = .Combat, card_id = card.id, target = target})
+	command, has_target := targeted_card_command(room, card, r.hovered_cell)
+	return has_target && commit_gameplay_command(room, r, &demo.cards, command)
 }
 
 // The board lets the player act (the hand's lane would take a press now).

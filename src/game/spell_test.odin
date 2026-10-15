@@ -39,20 +39,6 @@ spell_test_event_count :: proc(log: ^Event_Log, kind: Game_Event_Kind) -> int {
 }
 
 @(test)
-test_spell_cards_are_collectible_upgradable_and_append_only :: proc(t: ^testing.T) {
-	testing.expect_value(t, int(Card_Id.Fate_Strike), int(Card_Id.Volatile_Study)+1)
-	testing.expect_value(t, int(Card_Id.Chain_Lightning), int(Card_Id.Sundering_Blow)-1)
-	for id in ([2]Card_Id{.Fate_Strike, .Chain_Lightning}) {
-		definition, found := card_definition_by_id(id)
-		testing.expect(t, found && validate_card_definition(&definition))
-		testing.expect(t, !definition.temporary_only && definition.reward_weight > 0 && definition.shop_base_price > 0)
-		testing.expect_value(t, definition.cost, i32(2))
-		player := spell_test_player(t, id, 1)
-		testing.expect_value(t, player.deck.owned[0].upgrade_level, i32(1))
-	}
-}
-
-@(test)
 test_dice_stream_is_reproducible_bounded_and_separate_from_deck :: proc(t: ^testing.T) {
 	player := create_test_player(t)
 	player.dice = make_dice_state(0xFA7E)

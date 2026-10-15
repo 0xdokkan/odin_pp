@@ -89,13 +89,23 @@ test_arena_progression_seeded_geometry_roster_and_spread :: proc(t: ^testing.T) 
 	seen_families: [5]bool
 	for depth in ([?]int{2, 3, 4, 5, 6, 20}) {
 		for kind in ([?]Node_Kind{.Combat, .Elite, .Boss}) {
-			for seed in 1..=12 {
+			profile_families: [level.Room_Family]bool
+			// Some profiles need more than the original twelve seeds to select
+			// all four families. Quick mode searches profiles without generating
+			// repeated families; full mode retains its original seed matrix.
+			seed_limit := 12 if ODIN_TEST_FULL else 64
+			for seed in 1..=seed_limit {
 				node := test_generation_node(7, kind, depth, u64(seed)*7919)
+				when !ODIN_TEST_FULL {
+					profile, ok := room_generation_profile(&node, level.Room_Family(seed%5), true)
+					if !testing.expect(t, ok) { continue }
+					if profile_families[profile.level_config.family] { continue }
+				}
 				blueprint, err := generate_room_blueprint(&node, level.Room_Family(seed%5), true)
 				testing.expectf(t, err == .None, "depth=%v kind=%v seed=%v error=%v", depth, kind, seed, err)
 				if err != .None { continue }
 				seen_families[int(blueprint.profile.level_config.family)] = true
-				testing.expect(t, validate_room_blueprint(&blueprint))
+				profile_families[blueprint.profile.level_config.family] = true
 				testing.expect_value(t, len(blueprint.enemies), blueprint.profile.encounter_config.target_enemies)
 				roles, role_count := progressive_encounter_required_roles(&blueprint)
 				for role in roles[:role_count] {
@@ -121,6 +131,11 @@ test_arena_progression_seeded_geometry_roster_and_spread :: proc(t: ^testing.T) 
 					testing.expectf(t, occupied >= 3, "quadrants depth=%v kind=%v seed=%v count=%v", depth, kind, seed, occupied)
 				}
 				destroy_room_blueprint(&blueprint)
+			}
+			when !ODIN_TEST_FULL {
+				for family in ([?]level.Room_Family{.Pillars, .Ring, .Twin_Courts, .Asymmetric}) {
+					testing.expectf(t, profile_families[family], "depth=%v kind=%v missing family=%v", depth, kind, family)
+				}
 			}
 		}
 	}

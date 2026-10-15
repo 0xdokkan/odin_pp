@@ -46,32 +46,10 @@ mechanics_lab_pinball :: proc(window: ^app.Window, renderer: ^render.Renderer, r
 	cards: ^Card_Interaction_State, buffer: ^Buffered_Gameplay_Command) -> bool {
 	player := room.player
 	center := grid.Position{MECHANICS_LAB_WIDTH/2, MECHANICS_LAB_HEIGHT/2}
-	foe :: proc(room: ^game.Room, id: u32) -> ^game.Enemy {
-		index, found := game.enemy_index_by_id(room, id)
-		return &room.enemies[index] if found else nil
-	}
-	spawn :: proc(room: ^game.Room, at: grid.Position, health: i32, archetype: game.Enemy_Archetype) -> u32 {
-		id, placed := game.spawn_enemy(room, {position = at, health = health, attack = 1, archetype = archetype})
-		if placed { mechanics_lab_hold(room, id) }
-		return id
-	}
+	foe :: mechanics_lab_enemy
+	spawn :: mechanics_lab_spawn_enemy
 	// The aim as the board shows it with the mouse on `cell`.
-	aim :: proc(window: ^app.Window, renderer: ^render.Renderer, room: ^game.Room, card: u32, cell: grid.Position, name: cstring) {
-		for _ in 0..<3 {
-			render.update_renderer_frame_timeline(renderer, 0)
-			render.update_tactical_view(renderer, room, {}, false, true)
-			renderer.has_hovered_cell, renderer.hovered_cell = true, cell
-			app.begin_canvas(window, render.RESIN_BACKGROUND)
-			render.draw_tactical_world(renderer, room, card)
-			render.draw_tactical_status(renderer, room)
-			render.draw_tactical_hand(renderer, room, 0, card, 0, {})
-			render.draw_tactical_hud(renderer, room, false, false)
-			render.draw_mechanics_lab_banner(renderer, room)
-			app.present(window, render.LETTERBOX_COLOR)
-		}
-		rl.TakeScreenshot(name)
-		renderer.has_hovered_cell = false
-	}
+	aim :: mechanics_lab_capture_aim
 	// A free board and a window the strike and a step after it will not run out of.
 	for _ in 0..<1200 {
 		if player.tactical.phase == .Decision && player.tactical.remaining > 8 && !render.renderer_blocks_player_input(renderer) &&

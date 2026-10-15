@@ -99,31 +99,16 @@ play_card :: proc(room: ^Room, card_id: u32, target: Target) -> (play: Card_Play
 
 	resolved_card, finished_resolving := finish_resolving_card(deck, play.destination)
 	assert(finished_resolving && resolved_card == play.card)
-	record_event(&room.recent_events, {
-		kind = .Card_Played,
-		source = PLAYER_ENTITY,
-		target = PLAYER_ENTITY,
-		amount = definition.cost,
-		card_id = play.card.id,
-		card_definition = play.card.definition_id,
-		card_upgrade_level = play.card.upgrade_level,
-		card_lifetime = play.card.lifetime,
-		from_card_zone = .Hand,
-		to_card_zone = .Resolving,
-		area_mask = EVENT_CRITICAL_BIT if critical else 0,
-	})
+	played_event := make_card_zone_event(
+		.Card_Played, PLAYER_ENTITY, PLAYER_ENTITY, play.card, .Hand, .Resolving,
+	)
+	played_event.amount = definition.cost
+	played_event.area_mask = EVENT_CRITICAL_BIT if critical else 0
+	record_event(&room.recent_events, played_event)
 	append_event_log(&room.recent_events, &play.action_report.events)
-	record_event(&room.recent_events, {
-		kind = .Card_Moved,
-		source = PLAYER_ENTITY,
-		target = PLAYER_ENTITY,
-		card_id = play.card.id,
-		card_definition = play.card.definition_id,
-		card_upgrade_level = play.card.upgrade_level,
-		card_lifetime = play.card.lifetime,
-		from_card_zone = .Resolving,
-		to_card_zone = play.destination,
-	})
+	record_event(&room.recent_events, make_card_zone_event(
+		.Card_Moved, PLAYER_ENTITY, PLAYER_ENTITY, play.card, .Resolving, play.destination,
+	))
 	apply_card_relics(room, play.destination, &play.action_report)
 	// M8 pays the card's time through its cast. Classic still resolves a pulse.
 	pulse_report, outcome := finish_player_combat_command(room, 0)
@@ -158,17 +143,7 @@ play_card :: proc(room: ^Room, card_id: u32, target: Target) -> (play: Card_Play
 
 	play.drawn_card, play.drew_card = draw_card(deck)
 	if play.drew_card {
-		record_event(&room.recent_events, {
-			kind = .Card_Drawn,
-			source = PLAYER_ENTITY,
-			target = PLAYER_ENTITY,
-			card_id = play.drawn_card.id,
-			card_definition = play.drawn_card.definition_id,
-			card_upgrade_level = play.drawn_card.upgrade_level,
-			card_lifetime = play.drawn_card.lifetime,
-			from_card_zone = .Draw,
-			to_card_zone = .Hand,
-		})
+		record_card_draw(&room.recent_events, play.drawn_card)
 	}
 	assert(validate_deck_state(deck))
 	play.result = .Played

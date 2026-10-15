@@ -19,27 +19,6 @@ board_device_test_room :: proc(t: ^testing.T, data: ^level.Level, player: ^Playe
 }
 
 @(test)
-test_m8_d4_is_reproducible_bounded_and_rejects_without_mutation :: proc(t: ^testing.T) {
-	a, b := make_dice_state(9981), make_dice_state(9981)
-	seen: [4]bool
-	for _ in 0..<128 {
-		first, ok := roll_dice_pool(&a, 1, 4)
-		second, other_ok := roll_dice_pool(&b, 1, 4)
-		testing.expect(t, ok && other_ok && validate_dice_roll(&first))
-		testing.expect(t, first.total >= 1 && first.total <= 4)
-		testing.expect_value(t, first, second)
-		testing.expect_value(t, a, b)
-		seen[first.total-1] = true
-	}
-	for found in seen { testing.expect(t, found) }
-	a.roll_count = max(u64)
-	before := a
-	_, ok := roll_dice_pool(&a, 1, 4)
-	testing.expect(t, !ok)
-	testing.expect_value(t, a, before)
-}
-
-@(test)
 test_m8_floor_targeting_never_rolls_and_committed_deploy_uses_one_d4 :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
@@ -543,16 +522,26 @@ test_m8_endfight_removes_devices_preserves_room_objects_and_opens_loot_path :: p
 	defer level.destroy(&data)
 	defer destroy_room(&room)
 	log: Event_Log
+	first_device_id := room.next_object_id
 	testing.expect(t, deploy_board_device(&room, .Tesla_Coil, {2, 1}, 8, 0, &log))
 	testing.expect(t, deploy_board_device(&room, .Shock_Floor, {3, 1}, 1, 4, &log))
 	append(&room.objects, Grid_Object{id = room.next_object_id, kind = .Barrel, position = {5, 1}, health = 1, max_health = 1})
 	room.next_object_id += 1
+	// Storage order must not determine cleanup events: removal compacts the
+	// object slice while the sorted ID snapshot still includes both devices.
+	room.objects[0], room.objects[1] = room.objects[1], room.objects[0]
 	room.phase = .Loot
 	disarm_board_devices_after_combat(&room, &log)
 	testing.expect_value(t, len(room.objects), 1)
 	testing.expect_value(t, room.objects[0].kind, Grid_Object_Kind.Barrel)
 	testing.expect(t, !cell_blocks_movement(&room, {2, 1}))
 	testing.expect_value(t, spell_test_event_count(&log, .Entity_Defeated), 2)
+	defeated_count := u32(0)
+	for event in log.events[:log.count] {
+		if event.kind != .Entity_Defeated { continue }
+		testing.expect_value(t, event.target, object_entity(first_device_id+defeated_count))
+		defeated_count += 1
+	}
 	disarm_board_devices_after_combat(&room, &log)
 	testing.expect_value(t, spell_test_event_count(&log, .Entity_Defeated), 2)
 }

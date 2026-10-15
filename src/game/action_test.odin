@@ -5,44 +5,37 @@ import grid "../grid"
 import level "../level"
 
 @(test)
-test_invalid_move_action_does_not_mutate_player :: proc(t: ^testing.T) {
-	level_data := create_test_level(t)
-	defer level.destroy(&level_data)
-	player := create_test_player(t)
-	enemy_spawns := [?]Enemy_Spawn{{position = {x = 5, y = 3}, health = 4, attack = 1}}
-	room, ok := create_room(&level_data, &player, {enemies = enemy_spawns[:]})
-	testing.expect(t, ok)
-	defer destroy_room(&room)
+test_move_action_rejects_invalid_cells_and_applies_valid_movement_once :: proc(t: ^testing.T) {
+	Case :: struct {
+		destination, expected_position: grid.Position,
+		accepted: bool,
+	}
+	cases := [?]Case{
+		{destination = {0, 0}, expected_position = {1, 1}, accepted = false},
+		{destination = {1, 2}, expected_position = {1, 2}, accepted = true},
+	}
+	for c in cases {
+		level_data := create_test_level(t)
+		defer level.destroy(&level_data)
+		player := create_test_player(t)
+		enemy_spawns := [?]Enemy_Spawn{{position = {x = 5, y = 3}, health = 4, attack = 1}}
+		room, ok := create_room(&level_data, &player, {enemies = enemy_spawns[:]})
+		testing.expect(t, ok)
+		defer destroy_room(&room)
 
-	action := make_action(.Move, PLAYER_ENTITY, cell_target({x = 0, y = 0}), .Walkable_Cell)
-	testing.expect(t, add_effect(&action, move_effect(PLAYER_ENTITY, {x = 0, y = 0})))
-	report := resolve_action(&room, &action)
+		action := make_action(.Move, PLAYER_ENTITY, cell_target(c.destination), .Walkable_Cell)
+		testing.expect(t, add_effect(&action, move_effect(PLAYER_ENTITY, c.destination)))
+		report := resolve_action(&room, &action)
 
-	testing.expect(t, !report.accepted)
-	testing.expect_value(t, player.position, grid.Position{x = 1, y = 1})
-}
-
-@(test)
-test_move_action_applies_effect_once :: proc(t: ^testing.T) {
-	level_data := create_test_level(t)
-	defer level.destroy(&level_data)
-	player := create_test_player(t)
-	enemy_spawns := [?]Enemy_Spawn{{position = {x = 5, y = 3}, health = 4, attack = 1}}
-	room, ok := create_room(&level_data, &player, {enemies = enemy_spawns[:]})
-	testing.expect(t, ok)
-	defer destroy_room(&room)
-
-	destination := grid.Position{x = 1, y = 2}
-	action := make_action(.Move, PLAYER_ENTITY, cell_target(destination), .Walkable_Cell)
-	testing.expect(t, add_effect(&action, move_effect(PLAYER_ENTITY, destination)))
-	report := resolve_action(&room, &action)
-
-	testing.expect(t, report.accepted)
-	testing.expect_value(t, report.applied_effects, 1)
-	testing.expect_value(t, player.position, destination)
-	testing.expect_value(t, report.events.count, 1)
-	testing.expect_value(t, report.events.events[0].kind, Game_Event_Kind.Moved)
-	testing.expect_value(t, report.events.events[0].target, PLAYER_ENTITY)
+		testing.expect_value(t, report.accepted, c.accepted)
+		testing.expect_value(t, player.position, c.expected_position)
+		testing.expect_value(t, report.applied_effects, 1 if c.accepted else 0)
+		testing.expect_value(t, report.events.count, 1 if c.accepted else 0)
+		if c.accepted {
+			testing.expect_value(t, report.events.events[0].kind, Game_Event_Kind.Moved)
+			testing.expect_value(t, report.events.events[0].target, PLAYER_ENTITY)
+		}
+	}
 }
 
 @(test)

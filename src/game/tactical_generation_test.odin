@@ -38,15 +38,19 @@ test_tactical_rooms_expand_connected_layout_and_add_two_enemies_without_stat_inf
 
 @(test)
 test_tactical_central_spawn_preserves_encounter_safety_for_every_family :: proc(t: ^testing.T) {
-	seen: [level.Room_Family]bool
+	seen: [3][level.Room_Family]bool
 	for seed in u64(1)..=64 {
-		for kind in ([?]Node_Kind{.Combat, .Elite, .Boss}) {
+		for kind, kind_index in ([?]Node_Kind{.Combat, .Elite, .Boss}) {
 			node := test_generation_node(0, kind, 0 if kind == .Combat else 4, seed)
+			when !ODIN_TEST_FULL {
+				profile, ok := room_generation_profile(&node, tactical = true)
+				if !testing.expect(t, ok) { continue }
+				if seen[kind_index][profile.level_config.family] { continue }
+			}
 			blueprint, err := generate_room_blueprint(&node, tactical = true)
 			testing.expectf(t, err == .None, "kind=%v seed=%v error=%v", kind, seed, err)
 			if err != .None { continue }
-			seen[blueprint.profile.level_config.family] = true
-			testing.expect(t, validate_room_blueprint(&blueprint))
+			seen[kind_index][blueprint.profile.level_config.family] = true
 			spawn := blueprint.level_data.player_spawn
 			config := blueprint.profile.encounter_config
 			testing.expect(t, level.has_full_interior_clearance(spawn, blueprint.profile.level_config.spawn_clearance_radius,
@@ -58,5 +62,9 @@ test_tactical_central_spawn_preserves_encounter_safety_for_every_family :: proc(
 			destroy_room_blueprint(&blueprint)
 		}
 	}
-	for family in ([?]level.Room_Family{.Pillars, .Ring, .Twin_Courts, .Asymmetric}) { testing.expect(t, seen[family]) }
+	for families, kind_index in seen {
+		for family in ([?]level.Room_Family{.Pillars, .Ring, .Twin_Courts, .Asymmetric}) {
+			testing.expectf(t, families[family], "kind index=%v missing family=%v", kind_index, family)
+		}
+	}
 }

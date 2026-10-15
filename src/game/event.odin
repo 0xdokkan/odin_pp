@@ -136,6 +136,33 @@ Game_Event :: struct {
 	statuses_advanced: bool,
 }
 
+// Build card-zone metadata without recording it: action reports also dispatch
+// reactions, while room logs and staged Refocus logs only preserve event order.
+make_card_zone_event :: proc(
+	kind: Game_Event_Kind,
+	source, target: Entity_Ref,
+	card: Card_Instance,
+	from, to: Card_Zone,
+) -> Game_Event {
+	return {
+		kind = kind,
+		source = source,
+		target = target,
+		card_id = card.id,
+		card_definition = card.definition_id,
+		card_upgrade_level = card.upgrade_level,
+		card_lifetime = card.lifetime,
+		from_card_zone = from,
+		to_card_zone = to,
+	}
+}
+
+record_card_draw :: proc(log: ^Event_Log, card: Card_Instance) -> bool {
+	return record_event(log, make_card_zone_event(
+		.Card_Drawn, PLAYER_ENTITY, PLAYER_ENTITY, card, .Draw, .Hand,
+	))
+}
+
 // The 3x3 footprint uses nine bits of area_mask; its top bit marks an action
 // played on the tick (tactical_beat.odin) without growing every event log.
 EVENT_CRITICAL_BIT :: u16(1)<<15

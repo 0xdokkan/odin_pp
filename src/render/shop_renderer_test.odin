@@ -75,15 +75,6 @@ create_shop_render_test_run :: proc(t: ^testing.T, fill_deck: bool = false) -> g
 	return run
 }
 
-rectangle_center :: proc(bounds: rl.Rectangle) -> view.Vec2 {
-	return {x = bounds.x+bounds.width*0.5, y = bounds.y+bounds.height*0.5}
-}
-
-rectangles_overlap :: proc(first, second: rl.Rectangle) -> bool {
-	return first.x < second.x+second.width && first.x+first.width > second.x &&
-	       first.y < second.y+second.height && first.y+first.height > second.y
-}
-
 @(test)
 test_shop_offer_cards_and_prices_are_non_overlapping_and_hittable :: proc(t: ^testing.T) {
 	run := create_shop_render_test_run(t)
@@ -125,93 +116,53 @@ test_shop_offer_cards_and_prices_are_non_overlapping_and_hittable :: proc(t: ^te
 }
 
 @(test)
-test_shop_owned_deck_pages_return_instance_ids :: proc(t: ^testing.T) {
-	run := create_shop_render_test_run(t)
-	defer game.destroy_run(&run)
-	deck := &run.player.deck
-	page_count := shop_deck_page_count(deck)
-	testing.expect_value(
-		t,
-		page_count,
-		(deck.owned_count+SHOP_DECK_CARDS_PER_PAGE-1)/SHOP_DECK_CARDS_PER_PAGE,
-	)
-	testing.expect_value(t, shop_clamp_deck_page(deck, -4), 0)
-	testing.expect_value(t, shop_clamp_deck_page(deck, page_count+4), page_count-1)
+test_shop_owned_deck_pages_cover_partial_and_maximum_decks :: proc(t: ^testing.T) {
+	// The same pagination contract applies to a partially filled last page
+	// and to a deck at capacity. Keep an independent coverage map so repeated
+	// page starts cannot pass merely by agreeing with the hit-test.
+	for full_deck in ([2]bool{false, true}) {
+		run := create_shop_render_test_run(t, full_deck)
+		defer game.destroy_run(&run)
+		deck := &run.player.deck
+		page_count := shop_deck_page_count(deck)
+		testing.expect_value(t, page_count, (deck.owned_count+SHOP_DECK_CARDS_PER_PAGE-1)/SHOP_DECK_CARDS_PER_PAGE)
+		if full_deck { testing.expect_value(t, deck.owned_count, game.MAX_OWNED_CARDS) }
+		testing.expect_value(t, shop_clamp_deck_page(deck, -4), 0)
+		testing.expect_value(t, shop_clamp_deck_page(deck, page_count+4), page_count-1)
 
-	for page in 0..<page_count {
-		start, valid := shop_deck_page_start(deck, page)
-		testing.expect(t, valid)
-		visible_count := shop_deck_cards_on_page(deck, page)
-		testing.expect(t, visible_count > 0 && visible_count <= SHOP_DECK_CARDS_PER_PAGE)
-		previous_right: f32
-		for slot in 0..<visible_count {
-			bounds := shop_owned_card_bounds(960, 540, slot)
-			testing.expect(t, bounds.x >= 0 && bounds.x+bounds.width <= 960)
-			testing.expect(t, bounds.y >= SHOP_OWNED_CARD_TOP)
-			testing.expect(t, bounds.y+bounds.height < shop_continue_bounds(960, 540).y)
-			if slot > 0 {
-				testing.expect(t, bounds.x > previous_right)
+		seen: [game.MAX_OWNED_CARDS]bool
+		for page in 0..<page_count {
+			start, valid := shop_deck_page_start(deck, page)
+			testing.expect(t, valid)
+			visible_count := shop_deck_cards_on_page(deck, page)
+			testing.expect(t, visible_count > 0 && visible_count <= SHOP_DECK_CARDS_PER_PAGE)
+			if full_deck { testing.expect_value(t, visible_count, SHOP_DECK_CARDS_PER_PAGE) }
+			previous_right: f32
+			for slot in 0..<visible_count {
+				bounds := shop_owned_card_bounds(960, 540, slot)
+				testing.expect(t, bounds.x >= 0 && bounds.x+bounds.width <= 960)
+				testing.expect(t, bounds.y >= SHOP_OWNED_CARD_TOP)
+				testing.expect(t, bounds.y+bounds.height < shop_continue_bounds(960, 540).y)
+				if slot > 0 { testing.expect(t, bounds.x > previous_right) }
+				previous_right = bounds.x+bounds.width
+				card_id, found := shop_owned_card_at_point(&run, 960, 540, page, rectangle_center(bounds))
+				testing.expect(t, found)
+				testing.expect_value(t, card_id, deck.owned[start+slot].id)
+				seen[start+slot] = found
 			}
-			previous_right = bounds.x+bounds.width
-			card_id, found := shop_owned_card_at_point(
-				&run,
-				960,
-				540,
-				page,
-				rectangle_center(bounds),
-			)
-			testing.expect(t, found)
-			testing.expect_value(t, card_id, deck.owned[start+slot].id)
 		}
-	}
+		for was_seen in seen[:deck.owned_count] { testing.expect(t, was_seen) }
 
-	raised_card_id := deck.owned[1].id
-	raised := shop_owned_card_bounds(960, 540, 1, true)
-	raised_only_point := view.Vec2{x = raised.x+raised.width*0.5, y = raised.y+2}
-	_, found_without_raise := shop_owned_card_at_point(&run, 960, 540, 0, raised_only_point)
-	testing.expect(t, !found_without_raise)
-	card_id, found := shop_owned_card_at_point(
-		&run,
-		960,
-		540,
-		0,
-		raised_only_point,
-		raised_card_id,
-	)
-	testing.expect(t, found)
-	testing.expect_value(t, card_id, raised_card_id)
-	_, found = shop_owned_card_at_point(&run, 960, 540, page_count, {x = 480, y = 360})
-	testing.expect(t, !found)
-}
-
-@(test)
-test_shop_maximum_deck_uses_four_complete_pages :: proc(t: ^testing.T) {
-	run := create_shop_render_test_run(t, true)
-	defer game.destroy_run(&run)
-	deck := &run.player.deck
-	testing.expect_value(t, deck.owned_count, game.MAX_OWNED_CARDS)
-	testing.expect_value(t, shop_deck_page_count(deck), 4)
-
-	seen: [game.MAX_OWNED_CARDS]bool
-	for page in 0..<shop_deck_page_count(deck) {
-		start, valid := shop_deck_page_start(deck, page)
-		testing.expect(t, valid)
-		testing.expect_value(t, shop_deck_cards_on_page(deck, page), SHOP_DECK_CARDS_PER_PAGE)
-		for slot in 0..<SHOP_DECK_CARDS_PER_PAGE {
-			card_id, found := shop_owned_card_at_point(
-				&run,
-				960,
-				540,
-				page,
-				rectangle_center(shop_owned_card_bounds(960, 540, slot)),
-			)
-			testing.expect(t, found)
-			testing.expect_value(t, card_id, deck.owned[start+slot].id)
-			seen[start+slot] = found
-		}
-	}
-	for was_seen in seen {
-		testing.expect(t, was_seen)
+		raised_card_id := deck.owned[1].id
+		raised := shop_owned_card_bounds(960, 540, 1, true)
+		raised_only_point := view.Vec2{x = raised.x+raised.width*0.5, y = raised.y+2}
+		_, found_without_raise := shop_owned_card_at_point(&run, 960, 540, 0, raised_only_point)
+		testing.expect(t, !found_without_raise)
+		card_id, found := shop_owned_card_at_point(&run, 960, 540, 0, raised_only_point, raised_card_id)
+		testing.expect(t, found)
+		testing.expect_value(t, card_id, raised_card_id)
+		_, found = shop_owned_card_at_point(&run, 960, 540, page_count, {x = 480, y = 360})
+		testing.expect(t, !found)
 	}
 }
 

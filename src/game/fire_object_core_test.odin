@@ -5,24 +5,6 @@ import grid "../grid"
 import level "../level"
 
 @(test)
-test_fire_definition_is_a_persistent_traversable_hazard :: proc(t: ^testing.T) {
-	testing.expect(t, validate_grid_object_definitions())
-
-	definition, found := grid_object_definition(.Fire)
-	testing.expect(t, found)
-	testing.expect_value(t, definition.kind, Grid_Object_Kind.Fire)
-	testing.expect_value(t, definition.name, "Fire")
-	testing.expect_value(t, definition.max_health, i32(0))
-	testing.expect(t, !definition.blocks_movement)
-	testing.expect(t, !definition.blocks_line_of_sight)
-	testing.expect(t, !definition.targetable)
-	testing.expect(t, !definition.damageable)
-	testing.expect(t, !definition.movable)
-	testing.expect(t, definition.hazardous)
-	testing.expect_value(t, definition.hazard_damage, i32(2))
-}
-
-@(test)
 test_grid_object_definition_validation_couples_health_and_hazard_damage_to_capabilities :: proc(
 	t: ^testing.T,
 ) {

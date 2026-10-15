@@ -1,5 +1,6 @@
 package game
 
+import "core:slice"
 import grid "../grid"
 
 MAX_TESLA_COILS :: 4
@@ -422,11 +423,10 @@ disarm_board_devices_after_combat :: proc(room: ^Room, events: ^Event_Log) {
 	count := 0
 	for object in room.objects {
 		if !board_device_kind(object.kind) { continue }
-		at := count
-		for at > 0 && ids[at-1] > object.id { ids[at] = ids[at-1]; at -= 1 }
-		ids[at] = object.id
+		ids[count] = object.id
 		count += 1
 	}
+	slice.sort(ids[:count])
 	for id in ids[:count] {
 		index, found := object_index_by_id(room, id)
 		if !found { continue }

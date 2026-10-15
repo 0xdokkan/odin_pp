@@ -12,6 +12,7 @@ import host "../../engine/host"
 import physics "../../engine/physics"
 import rng "../../engine/rng"
 import ui "../../engine/ui"
+import tween "../../engine/tween"
 
 SPARK_COUNT :: 1024
 DUST_COUNT :: 384
@@ -473,7 +474,7 @@ view_update :: proc(v: ^View, w: ^World, frame: ^host.Frame, dt: f32) {
 	if limit < v.distance {
 		v.distance = limit
 	} else {
-		v.distance += (limit - v.distance) * (1 - math.exp(-3*dt))
+		v.distance = tween.damp(v.distance, limit, 3, dt)
 	}
 	v.cam.distance = v.distance
 	v.cam.shake.max_offset = 0.24 * v.shake_scale

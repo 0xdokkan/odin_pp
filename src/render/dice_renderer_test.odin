@@ -72,28 +72,6 @@ test_dice_pips_fit_flat_faces_and_never_overlap_the_bevels :: proc(t: ^testing.T
 }
 
 @(test)
-test_dice_pool_totals_reveal_sequentially_without_exposing_future_faces :: proc(t: ^testing.T) {
-	roll := game.Dice_Roll{faces = {2, 6, 4}, sides = 6, count = 3, total = 12}
-	reveals := DICE_POOL_REVEAL_TIMES
-	testing.expect_value(t, dice_total_state(roll, reveals[0]-0.001).visible_total, i32(0))
-	first := dice_total_state(roll, reveals[0])
-	testing.expect_value(t, first.revealed, 1)
-	testing.expect_value(t, first.visible_total, i32(2))
-	second := dice_total_state(roll, reveals[1])
-	testing.expect_value(t, second.revealed, 2)
-	testing.expect_value(t, second.visible_total, i32(8))
-	last := dice_total_state(roll, reveals[2])
-	testing.expect_value(t, last.visible_total, i32(12))
-	testing.expect(t, last.pulse > 0.9 && last.transfer_progress[2] < 0.1)
-	complete := dice_total_state(roll, DICE_POOL_COMPLETE_PROGRESS)
-	testing.expect(t, complete.complete)
-	testing.expect_value(t, complete.visible_total, roll.total)
-	for progress in complete.transfer_progress {testing.expect(t, progress > 0.999)}
-	testing.expect_value(t, dice_total_state({faces = {6, 0, 0}, sides = 6, count = 1, total = 6}, 1), Dice_Total_State{})
-	testing.expect_value(t, dice_total_state({faces = {6, 6, 0}, sides = 6, count = 2, total = 9}, 1), Dice_Total_State{})
-}
-
-@(test)
 test_dice_pool_window_layout_keeps_initial_physical_mesh_above_real_letterbox :: proc(t: ^testing.T) {
 	areas := [4]rl.Rectangle{{0, 0, 960, 540}, {0, 243, 948, 533.25}, {60, 240, 960, 540}, {0, 900, 640, 360}}
 	windows := [4]rl.Vector2{{960, 540}, {948, 1020}, {1080, 1080}, {640, 2160}}

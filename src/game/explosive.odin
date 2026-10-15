@@ -1,5 +1,6 @@
 package game
 
+import "core:slice"
 import grid "../grid"
 
 EXPLOSIVE_FUSE_PULSES :: 2
@@ -114,15 +115,11 @@ resolve_due_explosives :: proc(room: ^Room, pulse: ^Pulse_Report) {
 	count := 0
 	for object in room.objects {
 		if object.detonation_pulse != 0 && object.detonation_pulse <= room.pulse_count+1 {
-			insert_at := count
-			for insert_at > 0 && ids[insert_at-1] > object.id {
-				ids[insert_at] = ids[insert_at-1]
-				insert_at -= 1
-			}
-			ids[insert_at] = object.id
+			ids[count] = object.id
 			count += 1
 		}
 	}
+	slice.sort(ids[:count])
 	for id in ids[:count] {
 		if room.phase != .Combat {
 			break

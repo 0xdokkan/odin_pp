@@ -1,7 +1,7 @@
 package platform3d
 
-import "core:math"
 import rl "vendor:raylib"
+import camera "../../engine/camera"
 import fx "../../engine/fx"
 import host "../../engine/host"
 import input "../../engine/input"
@@ -130,15 +130,6 @@ advance_player_controls :: proc(g: ^Game, sample: input.Sample(Action), dt: f32)
 	}
 }
 
-// Camera-relative movement. camera.orbit_ground_basis returns a mirrored
-// right vector (screen right is -x when looking down +z), so the basis is
-// derived here from the yaw instead.
-camera_basis :: proc "contextless" (yaw: f32) -> (forward, right: Vec2) {
-	forward = Vec2{math.sin(yaw), math.cos(yaw)}
-	right = Vec2{-forward.y, forward.x}
-	return
-}
-
 @(private)
 game_step :: proc(data: rawptr, frame: ^host.Frame, playing: bool) -> host.Round_Status {
 	g := cast(^Game)data
@@ -165,7 +156,7 @@ game_step :: proc(data: rawptr, frame: ^host.Frame, playing: bool) -> host.Round
 	view_camera_input(&g.view, look, mouse, zoom, frame.dt)
 
 	stick := input.vector(c, Action.Left, Action.Right, Action.Forward, Action.Back)
-	forward, right := camera_basis(g.view.cam.yaw)
+	forward, right := camera.orbit_ground_basis(g.view.cam)
 	cmd := Player_Input{move = forward*(-stick.y) + right*stick.x, jump_held = .Jump in c.down}
 	dt := fx.hit_stop_filter(&g.hit_stop, frame.dt)
 	steps := timing.fixed_step_advance(&g.clock, dt)
