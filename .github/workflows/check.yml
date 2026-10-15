@@ -1,0 +1,84 @@
+name: Check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: check-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Official monthly release, matching the compiler used for local validation:
+# https://github.com/odin-lang/Odin/releases/tag/dev-2026-10
+# Source commit: 84bc3fc2100b0f7880a3af37f71bccdcda41c6f9.
+# Update both archive checksums when changing the release.
+env:
+  ODIN_RELEASE: dev-2026-10
+
+jobs:
+  macos:
+    name: macOS ARM64 / full
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install pinned Odin distribution
+        shell: bash
+        env:
+          ODIN_SHA256: b276c6ac87c3eea17446a6ca9080089b6e9f492057fb773591775ee49d92a1cf
+        run: |
+          test "$(uname -m)" = arm64
+          archive="$RUNNER_TEMP/odin.tar.gz"
+          install_dir="$RUNNER_TEMP/odin-toolchain"
+          curl --fail --location --retry 3 --output "$archive" \
+            "https://github.com/odin-lang/Odin/releases/download/$ODIN_RELEASE/odin-macos-arm64-$ODIN_RELEASE.tar.gz"
+          printf '%s  %s\n' "$ODIN_SHA256" "$archive" | shasum -a 256 --check
+          mkdir -p "$install_dir"
+          tar -xzf "$archive" -C "$install_dir" --strip-components=1
+          test -x "$install_dir/odin"
+          # Keep base/core/vendor beside the compiler, including static Raylib.
+          printf 'ODIN=%s/odin\n' "$install_dir" >> "$GITHUB_ENV"
+      - name: Check, test and link (asserts on and off)
+        run: sh scripts/check.sh
+
+  windows:
+    name: Windows x64 / full
+    runs-on: windows-2022
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install pinned Odin distribution
+        shell: pwsh
+        env:
+          ODIN_SHA256: b6b2e426a8b6f147b74ec7e18bef8df27cf40fe16193159df7ca09a0cc0c2011
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP 'odin.zip'
+          $installDir = Join-Path $env:RUNNER_TEMP 'odin-toolchain'
+          $url = "https://github.com/odin-lang/Odin/releases/download/$env:ODIN_RELEASE/odin-windows-amd64-$env:ODIN_RELEASE.zip"
+          Invoke-WebRequest -Uri $url -OutFile $archive -MaximumRetryCount 3
+          if ((Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash -ne $env:ODIN_SHA256) {
+              throw 'Odin archive SHA256 mismatch'
+          }
+          Expand-Archive -LiteralPath $archive -DestinationPath $installDir
+          $compilers = @(Get-ChildItem -LiteralPath $installDir -Filter odin.exe -File -Recurse)
+          if ($compilers.Count -ne 1) { throw 'Expected one Odin compiler in the archive' }
+          "ODIN=$($compilers[0].FullName)" >> $env:GITHUB_ENV
+      - name: Check, test and link (asserts on and off)
+        shell: pwsh
+        run: |
+          # The hosted image includes MSVC and the Windows SDK. Initialize their
+          # environment in this process before running the project's own script.
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+          $vsPath = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if ($LASTEXITCODE -ne 0 -or -not $vsPath) { throw 'MSVC x64 tools not found' }
+          & (Join-Path $vsPath 'Common7\Tools\Launch-VsDevShell.ps1') -Arch amd64 -HostArch amd64 -SkipAutomaticLocation
+          .\scripts\check.ps1

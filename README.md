@@ -2362,6 +2362,14 @@ non estende il targeting delle carte oltre la visibilità locale.
 i package e link della demo, sia con assert attivi sia con `-disable-assert`.
 I binari sono temporanei; `ODIN` può indicare un compilatore alternativo.
 
+La [CI](.github/workflows/check.yml) esegue gli stessi script completi su
+macOS ARM64 e Windows x64, per ogni pull request e push su `main`; è disponibile
+anche l'avvio manuale. La toolchain è la release ufficiale Odin `dev-2026-10`
+(commit `84bc3fc2100b0f7880a3af37f71bccdcda41c6f9`), con checksum degli archivi
+fissati nel workflow. Windows inizializza MSVC e Windows SDK già presenti sul
+runner. La CI controlla, testa e collega entrambe le configurazioni degli
+assert; gli smoke nella finestra 3D restano una verifica locale separata.
+
 ```sh
 sh scripts/check.sh
 sh scripts/check.sh --headless
@@ -2480,8 +2488,12 @@ che la carta promette.
 
 | Percorso | Responsabilità |
 |---|---|
-| [src/main.odin](src/main.odin) | punto di ingresso, preparazione e installazione delle stanze demo, comandi di gioco |
-| [src/roguelike_scene.odin](src/roguelike_scene.odin) | la run come scena dell'host: stato della sessione, schermate e transizioni |
+| [src/main.odin](src/main.odin) | punto di ingresso: selezione launcher/run e ownership dell'host nativo |
+| [src/gameplay_runtime.odin](src/gameplay_runtime.odin) | input di gioco, esecuzione dei comandi e collegamento con telemetria e presentazione |
+| [src/roguelike_scene.odin](src/roguelike_scene.odin) | la run come scena dell'host: stato della sessione, ordine dei frame, focus, menu e passaggio alle attività |
+| [src/roguelike_startup.odin](src/roguelike_startup.odin) | argomenti CLI, preparazione della run e collegamento alle risorse della finestra |
+| [src/roguelike_lifecycle.odin](src/roguelike_lifecycle.odin) | preparazione e installazione atomica delle stanze, riavvio, ingresso nodo, fine stanza e rilascio delle risorse |
+| [src/roguelike_capture.odin](src/roguelike_capture.odin) | fixture, avvio e catture degli smoke ai confini di attach e after-present |
 | [src/launcher.odin](src/launcher.odin), [minigame_registry.odin](src/minigame_registry.odin) | menu, impostazioni e catalogo dei minigiochi |
 | [src/engine](src/engine), [src/minigames](src/minigames) | engine condiviso e minigiochi (vedi [Engine e minigiochi](#engine-e-minigiochi)) |
 | [src/app](src/app) | finestra, canvas virtuale e presentazione |
@@ -2504,6 +2516,7 @@ che la carta promette.
 | [src/m9_session.odin](src/m9_session.odin) | proprietario di input/clock della modalità libera, pause, cursore, preset delle mosse e registrazione/replay |
 | [src/m9_lab.odin](src/m9_lab.odin), [m9_smoke.odin](src/m9_smoke.odin) | ciclo dei laboratori e verifica nativa riproducibile |
 | [src/game/board_device.odin](src/game/board_device.odin) | geometria condivisa, attivazione, scariche e cleanup dei dispositivi |
+| [src/game/tesla_ring.odin](src/game/tesla_ring.odin) | query locale condivisa per HUD Tesla e scelta fra ring e scarica; i comandi interrogano sempre lo stato corrente |
 | [src/game/m8_equipment.odin](src/game/m8_equipment.odin), [m8_ring.odin](src/game/m8_ring.odin) | armi a utilizzi, progressione del ring e compatibilità della simulazione M8 precedente |
 | [src/render/cast_playback.odin](src/render/cast_playback.odin) | policy Live/Cast/Cinematic e durata visiva del cast |
 | [src/render/m9_world.odin](src/render/m9_world.odin), [m9_controls.odin](src/render/m9_controls.odin) | scena/camera delle modalità libere, interpolazione, HUD e controlli mouse condivisi |
@@ -4903,6 +4916,48 @@ menu Event. Log, screenshot e probe restano fuori dal repository; Windows
 non verificato.
 
 
+### Tesla, confini della scena e CI — 16 ottobre 2026
+
+L'HUD Tesla usa una query locale che contiene rete, cooldown massimo,
+candidato ring e disponibilità. Etichetta e pulsante condividono il risultato;
+le condizioni di input del renderer restano separate dalle regole della rete.
+`activate_tesla` sceglie ring o scarica sulla stessa rete appena interrogata.
+I comandi non ricevono snapshot del renderer e non usano cache persistenti;
+`begin_tesla_ring` e `activate_board_devices` mantengono la loro API. Geometria,
+ordine dei bersagli, fuoco amico, cooldown, consumo delle quattro torri e costo
+temporale restano invariati.
+
+`main.odin` gestisce ora soltanto ingresso CLI e host (54 righe); il loop della
+run resta in `roguelike_scene.odin` (878 righe). Input/esecuzione dei comandi,
+startup, fixture/catture e lifecycle hanno quattro file con responsabilità
+esplicite. Riavvio, ingresso nodo e completamento stanza ricevono la sessione
+e mantengono i propri reset, report e ordine di rilascio delle risorse.
+Non cambia il modello di ownership e non è stato introdotto un loop generico
+comune a classico, M7 e minigiochi.
+
+I confronti con lo stato precedente verificano **28.800 combinazioni Tesla**
+(query, comandi, stato ed eventi) e **4.800 combinazioni HUD** senza differenze.
+Per l'estrazione della scena, 52 dichiarazioni sono identiche e i corpi di
+attach/update corrispondono espandendo i nuovi helper. Le regressioni esistenti
+ora coprono anche preview Tesla superate da un cooldown e il percorso
+timeline → ricompensa → Rest → nuova stanza → riavvio in classica e M7, con
+input cancellato, profilo preservato e puntatori riconnessi. Il conteggio resta
+**1.321 test completi / 1.314 rapidi**.
+
+Validazione macOS con l'archivio ufficiale Odin fissato nella CI: script completo
+superato, **1.321 test con assert attivi e disattivati**, strict/vet e due build.
+Passano M7 headless e gli smoke nativi M8, launcher, Shop, Rest, Event, Treasure
+e M7 view, compresi combattimento, ring, loot e cambio stanza. Il report M7 e
+tutte le **62 catture confrontabili sono identici byte per byte** allo stato
+precedente. Controllata visivamente anche la scena con i dispositivi Tesla.
+Log, screenshot e probe rimangono fuori dal repository.
+
+Il workflow macOS/Windows passa actionlint e i controlli di sintassi; checksum,
+layout ed esecuzione dell'archivio macOS sono verificati. **Windows resta da
+eseguire sul runner dopo la pubblicazione**: questo Mac non dispone del relativo
+SDK, richiesto anche dal typecheck incrociato. La presenza del workflow non
+equivale a una verifica Windows riuscita.
+
 ### M7G: lavoro restante dopo il prototipo
 
 Restano da svolgere le revisioni del codice e i playtest umani concordati:
@@ -4932,12 +4987,14 @@ corruzione diagnosticabili, replay dei comandi con stesso risultato finale.
 Velocità o disattivazione dei feedback non devono cambiare il gameplay.
 
 Restano fuori dallo scope attuale: Chest con stato/interazione e premio
-one-shot; fuoco periodico o propagazione; status e binding degli oggetti;
-status persistenti fra stanze, immunità e tipi di danno; cataloghi caricati da
-file; unlock, reroll, sconti e vendita di carte; eventi concatenati;
+one-shot; ulteriori status e binding degli oggetti; status persistenti fra
+stanze, immunità e tipi di danno; cataloghi caricati da file; reroll, sconti
+e vendita di carte; eventi concatenati;
 animazioni complete fra pile, direzioni dei personaggi e raggruppamento
 generale di azioni indipendenti. Audio, illustrazioni definitive, particelle,
 hit stop e screen shake ulteriori appartengono agli incrementi di game feel.
+Il fuoco con crescita e scadenza di Incendio e gli sblocchi persistenti delle
+sfide sono già implementati; non fanno più parte del backlog storico.
 
 ### Indicazioni conservate dall'audit
 
@@ -4959,7 +5016,7 @@ Le indicazioni di manutenzione ancora utili sono:
 - misurare preview, conteggi intenti, copie dei report e validazioni prima di introdurre cache;
 - conservare la validazione completa ai confini e controllare i budget di stack degli eventi;
 - se l'envelope cresce, valutare storage a blocchi con ownership esplicita invece di gonfiare gli array;
-- automatizzare check, test e link in CI, documentando la toolchain verificata.
+- mantenere check, test e link in CI, aggiornando insieme toolchain e checksum.
 
 Le nuove nozioni e decisioni vanno aggiornate nella sezione pertinente di questo
 README, mantenendo un unico riferimento e distinguendo implementato e pianificato.
