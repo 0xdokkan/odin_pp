@@ -102,6 +102,12 @@ Effect_Kind :: enum {
 	// CANNA DA PESCA: the room's fishings (`amount`), the rod's template only;
 	// its slot fishes through fish_with_rod, never through an action (fishing.odin).
 	Fish,
+	// PINBALL: `target` turned into a steel ball and struck away, its value
+	// `amount` (pinball.odin).
+	Pinball,
+	// FIRST PERSON SHOOTER: `amount` world seconds behind the player's eyes,
+	// his AK in hand (first_person.odin).
+	First_Person,
 }
 
 Effect :: struct {
@@ -399,6 +405,11 @@ effect_is_valid :: proc(room: ^Room, effect: Effect) -> bool {
 	if room == nil || !entity_exists(room, effect.target) {
 		return false
 	}
+	// PINBALL: nothing reaches the ball while it rolls, its burst aside
+	// (pinball_burst ends the roll first).
+	if effect.target.kind == .Enemy && enemy_is_pinball(room, effect.target.id) {
+		return false
+	}
 	switch effect.kind {
 	case .Enter_Shadow:
 		return effect.target == PLAYER_ENTITY && effect.amount > 0 && tactical_can_begin_shadow(room)
@@ -406,6 +417,8 @@ effect_is_valid :: proc(room: ^Room, effect: Effect) -> bool {
 		return effect.target == PLAYER_ENTITY && effect.amount > 0 && ground_can_place(room, effect.status, effect.destination)
 	case .Lasso:
 		return effect.target.kind == .Enemy && effect.amount > 0 && lasso_target_error(room, entity_target(effect.target)) == .None
+	case .Pinball:
+		return effect.target.kind == .Enemy && effect.amount > 0 && pinball_target_error(room, entity_target(effect.target)) == .None
 	// Never resolved: the rod fishes from its slot (fishing.odin).
 	case .Fish:
 		return false
@@ -475,6 +488,8 @@ effect_is_valid :: proc(room: ^Room, effect: Effect) -> bool {
 	case .Create_Card:
 		return effect.target == PLAYER_ENTITY && effect.amount > 0 && room.phase == .Combat &&
 		       can_create_temporary_card(&room.player.deck, effect.card_definition)
+	case .First_Person:
+		return effect.target == PLAYER_ENTITY && effect.amount > 0 && tactical_can_begin_first_person(room)
 	}
 	return false
 }
@@ -666,6 +681,9 @@ apply_effect :: proc(room: ^Room, source: Entity_Ref, effect: Effect, report: ^A
 	case .Lasso:
 		caught := begin_lasso(room, effect.target, effect.amount, report)
 		assert(caught)
+	case .Pinball:
+		struck := begin_pinball(room, effect.target, effect.amount, report)
+		assert(struck)
 	// effect_is_valid refuses it.
 	case .Fish:
 		unreachable()
@@ -827,6 +845,14 @@ apply_effect :: proc(room: ^Room, source: Entity_Ref, effect: Effect, report: ^A
 					to_card_zone = .Hand,
 				})
 		}
+	case .First_Person:
+		began := tactical_begin_first_person(room, f32(effect.amount))
+		assert(began)
+		at := room.player.position
+		record_report_event(report, {
+			kind = .First_Person_Begun, source = source, target = PLAYER_ENTITY,
+			from_position = at, to_position = at, duration = effect.amount, card_definition = .First_Person,
+		})
 	}
 	report.applied_effects += 1
 }

@@ -60,7 +60,8 @@ query_tesla_ring :: proc(room: ^Room) -> (ring: Tesla_Ring, ok: bool) {
 	ids, count := enemy_ids_in_planning_order(room)
 	for id in ids[:count] {
 		index, found := enemy_index_by_id(room, id)
-		if found && ring.count < MAX_TESLA_RING_ROSTER &&
+		// A foe out of play is pulled into no ring.
+		if found && ring.count < MAX_TESLA_RING_ROSTER && !enemy_is_out_of_play(room, id) &&
 		   board_device_network_contains_cell(room, &network, room.enemies[index].position) {
 			ring.enemy_ids[ring.count] = id
 			ring.count += 1

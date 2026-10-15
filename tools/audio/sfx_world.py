@@ -1141,3 +1141,165 @@ def world_fish_bite(seed):
                   (0.0, _norm(_drops(D, 14, 0.03, 0.32, seed + 4)), 0.35), (0.005, line, 0.12), (0.01, rod, 0.25)])
     _events("world_fish_bite", 0.0, 0.03, 0.35)
     return _finish(_limit(x, 0.65), D)
+
+
+# --------------------------------------------------------------------------
+# The Pinball's steel ball (Phase 4)
+
+_A5 = 880.0
+_D6 = 1174.66
+_A6 = 1760.0
+
+
+def _steel_ball(duration, seed, base=2900.0, t60=0.12):
+    """The ball's solid steel struck: a hard tick and a few stiff bright
+    modes dying fast (a solid ball, not a bell)."""
+    r = rng(seed)
+    modes = [(base * q * (1 + r.uniform(-0.01, 0.01)), t60 / (1 + 0.5 * i), a)
+             for i, (q, a) in enumerate(((1.0, 1.0), (1.61, 0.6), (2.37, 0.4), (3.3, 0.22), (0.47, 0.35)))]
+    x = _norm(_modes(duration, modes, attack=0.0001))
+    tick = pad_to(_click(seed + 1, length=0.004, tau=0.0003, hp=3000), duration)
+    return _norm(x + 0.45 * tick)
+
+
+@sound("world_pinball_launch", loudness=-16, wet=0.3, marks=(0.0,),
+       note="the player's lantern strikes the steel ball at 0.0, as the swing lands: a hard thwack (iron on steel: a sharp click, "
+            "a heavy body thud, the ball ringing D5-A5, the lantern's frame clanking under it) and the ball shot away in a "
+            "bright whoosh falling 1.9 kHz -> 600 Hz to 0.4, a soft paper flutter in its wake")
+def world_pinball_launch(seed):
+    D = 0.6
+    t = time_axis(D)
+    away = _moving_band(pink(D, seed) + 0.4 * white(D, seed + 1), _path([(0, 1900), (0.08, 1700), (0.4, 600), (D, 500)]), 1.3)
+    away = _norm(away) * env_points(D, [(0, 0), (0.012, 0.0), (0.05, 1.0), (0.4, 0.0), (D, 0.0)]) ** 1.4
+    flutter = _moving_band(white(D, seed + 2), _path([(0, 2600), (D, 1600)]), 1.2) * (0.5 + 0.5 * np.sin(2 * np.pi * 40 * t) ** 2)
+    flutter = _norm(flutter) * env_points(D, [(0, 0), (0.03, 0.0), (0.12, 1.0), (0.35, 0.0), (D, 0.0)])
+    ring = _modes(D, [(_D5, 0.35, 1.0), (_A5, 0.28, 0.7), (_D5 * 2.76, 0.12, 0.3), (_A5 * 2.76, 0.09, 0.2)], attack=0.0002)
+    x = place(D, [
+        (0.0, _click(seed + 3, hp=900, tau=0.0007), 0.55),
+        (0.0, _thud(0.35, seed + 4, f0=95, t60=0.14, lp=800, drop=0.8), 1.0),
+        (0.0, _steel_ball(0.4, seed + 5, base=3200, t60=0.16), 0.5),
+        (0.001, _norm(ring), 0.32),
+        (0.002, _iron(0.3, 1180, 0.12, seed + 6, count=8, dark=0.6), 0.22),
+        (0.0, away, 0.42),
+        (0.0, flutter, 0.12),
+    ])
+    x = _squash(x, threshold=0.28, ratio=2.5, window=0.005, smooth=0.003)
+    _events("world_pinball_launch", 0.0, 0.05, 0.4)
+    return _finish(_limit(x, 0.55), D)
+
+
+@sound("world_pinball_ding", loudness=-22, wet=0.2, marks=(0.0,),
+       note="the ball glances off a wall or a solid thing at 0.0: a small hard tock of steel on stone, the ball's bright tick "
+            "and a short ring on A6 dying by 0.2, a pinch of grit; very short and dry, it comes back several times a second")
+def world_pinball_ding(seed):
+    D = 0.3
+    ring = _modes(D, [(_A6, 0.16, 1.0), (_A6 * 2.0, 0.07, 0.25), (_D6, 0.1, 0.3)], attack=0.0002)
+    x = place(D, [
+        (0.0, _steel_ball(0.2, seed, base=3600, t60=0.06), 0.8),
+        (0.0, _norm(ring), 0.4),
+        (0.0, _stone_chunk(seed + 1, base=900, t60=0.025, length=0.1, low=0.25), 0.35),
+        (0.002, _grit(0.05, seed + 2, center=4200, tau=0.006, density=1200), 0.12),
+    ])
+    _events("world_pinball_ding", 0.0, 0.2)
+    return _finish(_limit(x, 0.7), D, fade_out=0.04)
+
+
+@sound("world_pinball_bong", loudness=-18, wet=0.25, marks=(0.0,),
+       note="the ball strikes a foe like a pop bumper at 0.0: a hollow bong (a round low tone on A3 dropping a little, its "
+            "box), the foe's card smacked (a dry paper slap and crumple to 0.06), its iron base knocking, and a bright "
+            "bumper chime (D6 over A5) ringing to 0.45; the lab plays it higher as the ball's value climbs")
+def world_pinball_bong(seed):
+    D = 0.6
+    t = time_axis(D)
+    f = _A3 * (1 + 0.35 * np.exp(-t / 0.012))
+    bong = sine(f, n=len(t)) * _t60(t, 0.32) * np.minimum(1, t / 0.0015)
+    box = _modes(D, [(_A3 * 2.02, 0.12, 0.5), (_A3 * 3.1, 0.07, 0.3), (_A3 * 0.5, 0.2, 0.4)], attack=0.0015)
+    chime = _modes(D, [(_D6, 0.42, 1.0), (_A5, 0.36, 0.7), (_D6 * 2.0, 0.12, 0.25)], attack=0.0004)
+    r = rng(seed + 1)
+    crumple = _paper(D, sorted(0.002 + 0.06 * r.random(8) ** 1.4), seed + 2, lo=1600, hi=7000, lmin=0.005, lmax=0.02)
+    x = place(D, [
+        (0.0, _norm(bong), 0.85),
+        (0.0, _norm(box), 0.35),
+        (0.0, _card_tap(seed + 3), 0.7),
+        (0.0, _norm(crumple), 0.25),
+        (0.002, _iron(0.25, 760, 0.12, seed + 4, count=8, dark=0.7), 0.16),
+        (0.004, _norm(chime), 0.3),
+        (0.0, _thud(0.3, seed + 5, f0=110, t60=0.12, lp=700, drop=0.5), 0.45),
+    ])
+    x = _squash(x, threshold=0.3, ratio=2.2, window=0.006, smooth=0.003)
+    _events("world_pinball_bong", 0.0, 0.06, 0.45)
+    return _finish(_limit(x, 0.6), D)
+
+
+@sound("world_pinball_burst", loudness=-15, wet=0.35, marks=(0.0, 0.55),
+       note="at its time the ball bursts at 0.0 like a paper balloon: a sharp pop (a paper crack over a low thump), shreds "
+            "and confetti torn and fluttering down 0.01-0.7 (paper grains thinning out), a soft puff of paper dust, and a "
+            "last small steel clink at 0.55 as what was left of the ball drops onto the stone")
+def world_pinball_burst(seed):
+    D = 0.9
+    t = time_axis(D)
+    crack = _norm(bandpass(white(D, seed), 2200, 0.55)) * np.minimum(1, t / 0.0004) * _t60(t, 0.03)
+    air = _norm(lowpass(pink(D, seed + 1), 900, 2)) * np.minimum(1, t / 0.002) * _t60(t, 0.12)
+    shreds_t = random_times(D, 140, seed + 2, start=0.01, end=0.7, envelope=lambda u: (1 - u) ** 1.6)
+    shreds = _paper(D, shreds_t, seed + 3, lo=1500, hi=7500, lmin=0.006, lmax=0.03)
+    flutter_t = random_times(D, 40, seed + 4, start=0.05, end=0.75, envelope=lambda u: 1 - u)
+    flutter = _paper(D, flutter_t, seed + 5, lo=900, hi=3500, lmin=0.02, lmax=0.05)
+    x = place(D, [
+        (0.0, _click(seed + 6, hp=600, tau=0.0008), 0.6),
+        (0.0, crack, 0.9),
+        (0.0, air, 0.55),
+        (0.0, _thud(0.3, seed + 7, f0=85, t60=0.12, lp=600, drop=0.8), 0.7),
+        (0.0, _norm(shreds), 0.35),
+        (0.0, _norm(flutter), 0.18),
+        (0.015, _puff(seed + 8, 0.35, 900), 0.4),
+        (0.55, _steel_ball(0.25, seed + 9, base=4100, t60=0.08), 0.18),
+    ])
+    x = _squash(x, threshold=0.3, ratio=2.5, window=0.005, smooth=0.003)
+    _events("world_pinball_burst", 0.0, 0.01, 0.55, 0.7)
+    return _finish(_limit(x, 0.5), D)
+
+
+# --------------------------------------------------------------------------
+# The First Person Shooter's rounds (Phase 4)
+
+@sound("world_ak_hit", loudness=-20, wet=0.2, marks=(0.0,),
+       note="a round punches a foe's card at 0.0: the paper torn through (a crisp tear 2-6 kHz, 10 ms), a muffled body thud "
+            "under it (80-250 Hz) and a few crinkles of the card to 0.05; short: it comes back up to six times a second")
+def world_ak_hit(seed):
+    D = 0.25
+    t = time_axis(D)
+    tear = _norm(bandpass(white(D, seed), 3600, 0.6)) * np.minimum(1, t / 0.0004) * _t60(t, 0.022)
+    r = rng(seed + 1)
+    crinkle = _paper(D, sorted(0.002 + 0.05 * r.random(5)), seed + 2, lo=2000, hi=7000, lmin=0.004, lmax=0.012)
+    x = place(D, [
+        (0.0, _click(seed + 3, hp=1200, tau=0.0004), 0.4),
+        (0.0, tear, 0.6),
+        (0.001, _thud(0.2, seed + 4, f0=120, t60=0.08, lp=500, drop=0.6), 0.9),
+        (0.001, _card_tap(seed + 5, 0.05), 0.4),
+        (0.0, _norm(crinkle), 0.2),
+    ])
+    # All onset: a gentle squash lets the body carry the loudness window.
+    x = _squash(x, threshold=0.24, ratio=2.5, window=0.005, smooth=0.003)
+    _events("world_ak_hit", 0.0, 0.05)
+    return _finish(_limit(x, 0.6), D, fade_out=0.03)
+
+
+@sound("world_ak_ricochet", loudness=-21, wet=0.3, marks=(0.0, 0.03),
+       note="a round strikes stone, cover or an object at 0.0: a hard chip of stone (a crack, a chunk, grit flying) and the "
+            "round whining away from 0.03 (a thin tone falling 3.2 -> 1.3 kHz with a little wobble, fading by 0.4)")
+def world_ak_ricochet(seed):
+    D = 0.5
+    t = time_axis(D)
+    after = np.clip(t - 0.03, 0, None)
+    f = 3200 * (1300 / 3200) ** np.clip(after / 0.37, 0, 1) * (1 + 0.012 * np.sin(2 * np.pi * 23 * t))
+    whine = sine(f, n=len(t)) * (t >= 0.03) * np.minimum(1, after / 0.008) * _t60(after, 0.42)
+    hiss = _moving_band(white(D, seed), _path([(0, 3600), (0.03, 3600), (D, 1500)]), 2.5)
+    hiss = _norm(hiss) * (t >= 0.03) * np.minimum(1, after / 0.01) * _t60(after, 0.3)
+    grit_t = random_times(D, 120, seed + 1, start=0.004, end=0.12, envelope=lambda u: (1 - u) ** 2)
+    x = place(D, [
+        (0.0, _click(seed + 2, hp=1500, tau=0.0005), 0.5),
+        (0.0, _stone_chunk(seed + 3, base=1200, t60=0.03, length=0.12, low=0.35), 0.9),
+        (0.0, _norm(_stone_ticks(D, grit_t, seed + 4, lo=2500, hi=8000, lmin=0.001, lmax=0.004)), 0.3),
+    ]) + 0.28 * whine + 0.12 * hiss
+    _events("world_ak_ricochet", 0.0, 0.03, 0.4)
+    return _finish(_limit(x, 0.65), D)

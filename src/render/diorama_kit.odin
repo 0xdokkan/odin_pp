@@ -169,9 +169,14 @@ draw_diorama_kit_wall :: proc(renderer: ^Renderer, room: ^game.Room, cell: grid.
 	kit := &renderer.tactical.kit
 	origin := rl.Vector3{f32(cell.x)+0.5, 0, f32(cell.y)+0.5}
 	h := diorama_wall_height(renderer, room, cell)
-	transparent := diorama_interior_wall(room, cell)
+	// Behind the player's eyes an inner wall thickens over the dive, then is
+	// opaque, drawn with the floor (first_person.odin).
+	transparent := diorama_interior_wall(room, cell) && !first_person_solid_walls(renderer)
 	brighten, alpha := f32(1), u8(255)
-	if transparent { brighten, alpha = 2.2, 52 }
+	if transparent {
+		ramp := first_person_wall_ramp(renderer)
+		brighten, alpha = 2.2+(1-2.2)*ramp, u8(52+(255-52)*ramp)
+	}
 	cut := h < DIORAMA_WALL_HEIGHT-0.001
 	lamp_side := diorama_lamp_side(renderer, room, cell)
 	exposed: [4]bool

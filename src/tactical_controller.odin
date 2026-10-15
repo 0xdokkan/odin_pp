@@ -10,6 +10,13 @@ import combatdebug "combatdebug"
 
 Tactical_Controller :: struct {
 	hologram, paused, was_focused: bool,
+	// FIRST PERSON SHOOTER (first_person_input.odin): the mouse is the view's
+	// (raylib's cursor hidden and held: update_tactical_controller follows
+	// this), the frames left before its moves turn the view, and a press made
+	// before the view took the mouse, which fires nothing until it is let go.
+	look_captured: bool,
+	look_settle: int,
+	fire_latched: bool,
 }
 
 M7_INPUT_TRACE :: #config(M7_INPUT_TRACE, false)
@@ -20,6 +27,12 @@ Tactical_Controller_Input :: struct {
 	diagonals: [4]bool,
 	defenses: [4]bool,
 	map_input: Tactical_Map_Input,
+	// FIRST PERSON SHOOTER: the mouse's move this frame in pixels (only while
+	// the view has the mouse), the left button held, and the profile's mouse
+	// sensitivity (0: as it comes).
+	look: [2]f32,
+	fire: bool,
+	sensitivity: f32,
 }
 
 // The decision clock and QTE deadline are independent of presentation speed.
@@ -28,13 +41,20 @@ update_tactical_controller :: proc(
 	controller: ^Tactical_Controller, room: ^game.Room, renderer: ^render.Renderer,
 	cards: ^Card_Interaction_State, buffer: ^Buffered_Gameplay_Command,
 	dt: f32, available: bool, mouse: view.Vec2, inside: bool, playtest: ^combatdebug.Playtest_Session,
+	sensitivity: f32 = 1,
 ) -> (blocks_input: bool) {
 	input := Tactical_Controller_Input{
-		focused = rl.IsWindowFocused(), pause = rl.IsKeyPressed(.P),
+		// Behind the player's eyes Esc pauses too, and gives the mouse back.
+		focused = rl.IsWindowFocused(), pause = first_person_pause_pressed(room),
 		shift = rl.IsKeyDown(.LEFT_SHIFT) || rl.IsKeyDown(.RIGHT_SHIFT),
 		map_input = {mouse = mouse, inside = inside, toggle = rl.IsKeyPressed(.TAB), close = rl.IsKeyPressed(.ESCAPE),
 			reset = rl.IsKeyPressed(.R), pressed = rl.IsMouseButtonPressed(.LEFT), down = rl.IsMouseButtonDown(.LEFT),
 			wheel = rl.GetMouseWheelMove()},
+		fire = rl.IsMouseButtonDown(.LEFT), sensitivity = sensitivity,
+	}
+	if controller.look_captured {
+		delta := rl.GetMouseDelta()
+		input.look = {clamp(delta.x, -FIRST_PERSON_LOOK_CLAMP, FIRST_PERSON_LOOK_CLAMP), clamp(delta.y, -FIRST_PERSON_LOOK_CLAMP, FIRST_PERSON_LOOK_CLAMP)}
 	}
 	for key, index in ([?]rl.KeyboardKey{.W, .D, .S, .A}) { input.directions[index] = rl.IsKeyPressed(key) }
 	for key, index in ([?]rl.KeyboardKey{.Q, .E, .Z, .C}) { input.diagonals[index] = rl.IsKeyPressed(key) }
@@ -42,6 +62,7 @@ update_tactical_controller :: proc(
 	// its landing; the diagonal keys are not read during a defence.
 	for key, index in ([?]rl.KeyboardKey{.J, .K, .L, .E}) { input.defenses[index] = rl.IsKeyPressed(key) }
 	blocked := step_tactical_controller(controller, room, renderer, cards, buffer, dt, available, input, playtest)
+	sync_first_person_cursor(controller)
 	if M7_INPUT_TRACE {
 		if input.directions != ([4]bool{}) || input.pause || input.map_input.toggle {
 			cue, has_cue := render.active_presentation_cue(&renderer.timeline)
@@ -70,6 +91,9 @@ step_tactical_controller :: proc(
 	dt: f32, available: bool, input: Tactical_Controller_Input, playtest: ^combatdebug.Playtest_Session = nil,
 ) -> (blocks_input: bool) {
 	if !game.tactical_enabled(room) { return false }
+	// The view behind the player's eyes takes the mouse, or gives it back, as
+	// this frame leaves things (first_person_input.odin).
+	defer first_person_follow_capture(controller, room, available, input)
 	if !available { controller.hologram = false; clear_gameplay_command_buffer(buffer); return true }
 	if !input.focused {
 		controller.was_focused = false
@@ -89,6 +113,8 @@ step_tactical_controller :: proc(
 		return true
 	}
 	if controller.paused { return true }
+	// The eyes turn whatever the world does: they are no action.
+	turn_first_person_look(controller, renderer, room, input)
 	simulation_dt := dt
 	cinematic_input := render.presentation_time_policy(&renderer.timeline) == .Cinematic ||
 		(renderer.frame_clock_valid && renderer.frame_had_cinematic)
@@ -137,8 +163,12 @@ step_tactical_controller :: proc(
 				if pressed { command.kind = .Defense; command.defense = game.Defense_Mode(index); break }
 			}
 		} else {
+			// A key the panel names is its own letter; a dodge's landing turns
+			// with the view behind the player's eyes.
+			keys := game.MOVEMENT_KEY_DIRECTIONS
+			if room.qte.kind == .Defense && room.qte.mode == .Dodge { keys = render.first_person_keys(renderer) }
 			for pressed, index in input.directions {
-				if pressed { command.kind = .QTE_Key; command.direction = game.Move_Direction(index); break }
+				if pressed { command.kind = .QTE_Key; command.direction = keys[index]; break }
 			}
 		}
 		if command.kind != .None {
@@ -168,8 +198,14 @@ step_tactical_controller :: proc(
 		}
 		return true
 	}
-	// LAZZO: the frame's seconds spun out, as world commands, after its beats.
+	// LAZZO: the frame's seconds spun out, as world commands, after its beats;
+	// then the PINBALL's ball rolls them out.
 	drain_lasso_spin_commands(room, renderer, cards, playtest)
+	drain_pinball_roll_commands(room, renderer, cards, playtest)
+	// FIRST PERSON SHOOTER: the trigger as the button holds it, then the shots
+	// due, as world commands too.
+	game.first_person_set_trigger(room, first_person_trigger(controller, renderer, room, input))
+	drain_first_person_fire(room, renderer, cards, playtest)
 	// Expiration is checked after all paid beats, including the last second.
 	if game.tactical_tick(room, 0, true, controller.hologram) {
 		controller.hologram = false
@@ -190,14 +226,18 @@ step_tactical_controller :: proc(
 		return true
 	}
 	if !controller.hologram && room.phase == .Combat && room.player.tactical.phase == .Decision {
+		// Behind the player's eyes the dodge turns with the view, and the
+		// diagonal keys are off.
+		fps := game.tactical_first_person_active(room)
+		keys := render.first_person_keys(renderer)
 		if input.shift {
 			for pressed, index in input.directions {
-				if pressed { command.kind = .Dodge; command.direction = game.Move_Direction(index); break }
+				if pressed { command.kind = .Dodge; command.direction = keys[index]; break }
 			}
 		}
 		offsets := [?]grid.Position{{-1, -1}, {1, -1}, {-1, 1}, {1, 1}}
 		for pressed, index in input.diagonals {
-			if command.kind == .None && pressed { command.kind = .Begin_Diagonal; command.offset = offsets[index]; break }
+			if !fps && command.kind == .None && pressed { command.kind = .Begin_Diagonal; command.offset = offsets[index]; break }
 		}
 	}
 	if command.kind != .None {
@@ -238,6 +278,21 @@ drain_lasso_spin_commands :: proc(room: ^game.Room, renderer: ^render.Renderer,
 	}
 }
 
+// A roll batch stops short of a full log; a frame's seconds (even a long
+// frame's at seven cells a second) fit in this many.
+PINBALL_ROLL_BATCHES :: 4
+
+// The Pinball's seconds waiting, rolled out in world commands
+// (game.resolve_pinball_roll): never more batches than the bound, never into
+// a full world bank.
+drain_pinball_roll_commands :: proc(room: ^game.Room, renderer: ^render.Renderer,
+	cards: ^Card_Interaction_State, playtest: ^combatdebug.Playtest_Session) {
+	for _ in 0..<PINBALL_ROLL_BATCHES {
+		if !game.tactical_pinball_due(room) { return }
+		if !commit_gameplay_command(room, renderer, cards, {kind = .Pinball_Roll, origin_phase = .Combat}, playtest) { return }
+	}
+}
+
 Tactical_Map_Input :: struct {
 	mouse: view.Vec2,
 	inside, toggle, close, reset, pressed, down: bool,
@@ -249,6 +304,12 @@ Tactical_Map_Input :: struct {
 update_tactical_map_controls :: proc(controller: ^Tactical_Controller, room: ^game.Room, renderer: ^render.Renderer,
 	cards: ^Card_Interaction_State, buffer: ^Buffered_Gameplay_Command, input: Tactical_Map_Input) -> bool {
 	if room.qte.kind != .None { return false }
+	// Behind the player's eyes there is no map: TAB and the button do nothing.
+	if game.tactical_first_person_active(room) {
+		controller.hologram = false
+		renderer.tactical.hologram_orbit.dragging = false
+		return false
+	}
 	map_clicked := input.inside && input.pressed && render.point_in_rectangle(input.mouse, render.tactical_map_button_bounds(renderer))
 	toggled := input.toggle || map_clicked || (controller.hologram && input.close)
 	if toggled {

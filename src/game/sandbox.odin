@@ -111,6 +111,8 @@ sandbox_distance :: proc(room: ^Room, cell: grid.Position) -> int {
 sandbox_clear_for_fishing :: proc(room: ^Room) -> (report: Action_Report, ok: bool) {
 	if room == nil || room.player == nil || !room.endless || (room.phase != .Combat && room.phase != .Loot) ||
 	   room.qte.kind != .None || tactical_is_casting(room) || tactical_shadow_active(room) || room.tesla_ring.pending { return }
+	// The Pinball's ball falls with the rest: its roll ends first.
+	room.pinball = {}
 	action := make_action(.Trigger, SYSTEM_ENTITY)
 	for enemy in room.enemies {
 		if !add_effect(&action, damage_effect(enemy_entity(enemy.id), enemy.health+1000)) { return }

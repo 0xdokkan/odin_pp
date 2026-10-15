@@ -307,6 +307,16 @@ pressed_hand_slot :: proc() -> int {
 	return -1
 }
 
+// A slot of the hand: 1 to 8 as everywhere, then 9 and 0 for the ninth and
+// tenth card of a hand that holds more (PROVA MECCANICHE's whole deck;
+// render.tactical_hand_slot_key).
+pressed_hand_card_slot :: proc() -> int {
+	if slot := pressed_hand_slot(); slot >= 0 { return slot }
+	if rl.IsKeyPressed(.NINE) { return 8 }
+	if rl.IsKeyPressed(.ZERO) { return 9 }
+	return -1
+}
+
 card_requires_chosen_target :: proc(definition: game.Card_Definition) -> bool {
 	return game.card_requires_spatial_target(definition)
 }
@@ -353,9 +363,10 @@ arrows_aiming :: proc(room: ^game.Room) -> bool {
 	return arrows_aiming_at(room, rl.IsKeyDown(.LEFT_CONTROL) || rl.IsKeyDown(.RIGHT_CONTROL))
 }
 
-// The same with Ctrl `held` or not.
+// The same with Ctrl `held` or not. Behind his eyes he looses none.
 arrows_aiming_at :: proc(room: ^game.Room, held: bool) -> bool {
-	return held && game.tactical_enabled(room) && room.phase == .Combat && game.player_charges(room, .Arrows) > 0
+	return held && game.tactical_enabled(room) && room.phase == .Combat && game.player_charges(room, .Arrows) > 0 &&
+	       !game.tactical_first_person_active(room)
 }
 
 // FERETRO's click while `aiming`: an arrow at the foe under the mouse when
@@ -430,9 +441,11 @@ poll_fishing_command :: proc(room: ^game.Room, renderer: ^render.Renderer, cards
 	return
 }
 
-poll_walk_command :: proc(phase: game.Room_Phase) -> (Gameplay_Command, bool) {
+// W, D, S and A step the ways of `keys` (north, east, south and west, but
+// behind the player's eyes: render.first_person_keys).
+poll_walk_command :: proc(phase: game.Room_Phase, keys := game.MOVEMENT_KEY_DIRECTIONS) -> (Gameplay_Command, bool) {
 	for key, index in ([4]rl.KeyboardKey{.W, .D, .S, .A}) {
-		if key_pressed(key) { return {kind = .Move, origin_phase = phase, direction = game.Move_Direction(index)}, true }
+		if key_pressed(key) { return {kind = .Move, origin_phase = phase, direction = keys[index]}, true }
 	}
 	return {}, false
 }
@@ -447,6 +460,15 @@ poll_gameplay_command :: proc(
 	debug_abilities: bool = false,
 ) -> (command: Gameplay_Command, has_command: bool) {
 	assert(room != nil && room.player != nil && renderer != nil && card_interaction != nil)
+	// FIRST PERSON SHOOTER: the mouse is the view's and the hand is put away;
+	// only steps and waits are left (first_person_input.odin).
+	if game.tactical_first_person_active(room) {
+		clear_card_interaction(card_interaction)
+		pressed: [4]bool
+		for key, index in ([4]rl.KeyboardKey{.W, .D, .S, .A}) { pressed[index] = key_pressed(key) }
+		return first_person_lane_command(pressed, rl.IsKeyDown(.LEFT_SHIFT) || rl.IsKeyDown(.RIGHT_SHIFT), key_pressed(.SPACE),
+			render.first_person_keys(renderer))
+	}
 	raised_card_id := card_interaction.hovered_card_id
 	if raised_card_id == 0 { raised_card_id = card_interaction.selected_card_id }
 	if card_interaction.dragged_card_id != 0 { raised_card_id = 0 }
@@ -548,7 +570,7 @@ poll_gameplay_command :: proc(
 		return Gameplay_Command{kind = .Refocus, origin_phase = .Combat}, true
 	}
 
-	requested_slot := pressed_hand_slot()
+	requested_slot := pressed_hand_card_slot()
 	if spatial_interaction_enabled && mouse_inside && rl.IsMouseButtonPressed(.LEFT) &&
 	   card_interaction.hovered_card_id != 0 {
 		if renderer.tactical.enabled && card_interaction.selected_card_id == card_interaction.hovered_card_id {
@@ -631,11 +653,11 @@ capture_gameplay_command_telemetry :: proc(
 		// A shadow step walks from the shadow's cell and never bumps.
 		if game.tactical_shadow_active(room) { resolved_kind = .Move }
 	case .Dodge, .Wait, .Timeout, .Continue_Pulse, .Begin_Diagonal, .QTE_Key, .QTE_Fail, .Defense, .Activate, .Equip,
-	     .Shadow_Emerge, .Lasso_Spin:
+	     .Shadow_Emerge, .Lasso_Spin, .Pinball_Roll:
 		resolved_kind = .Wait
 	// An arrow is neither a step nor a bump nor a card, and the rod's cast is
-	// no card either.
-	case .Ability, .Shoot, .Fish:
+	// no card either; nor is a shot of the AK.
+	case .Ability, .Shoot, .Fish, .First_Person_Fire:
 		resolved_kind = .Ability
 	case .Play_Card:
 		resolved_kind = .Play_Card
@@ -690,6 +712,8 @@ execute_gameplay_command :: proc(room: ^game.Room, command: Gameplay_Command) ->
 		execution.committed = game.tactical_end_shadow(room)
 	case .Lasso_Spin:
 		execution.committed = game.resolve_lasso_spin(room)
+	case .Pinball_Roll:
+		execution.committed = game.resolve_pinball_roll(room)
 	case .Move:
 		// Inside Movimento Ombra the keys walk the shadow, on its own beats.
 		if game.tactical_shadow_active(room) {
@@ -745,6 +769,8 @@ execute_gameplay_command :: proc(room: ^game.Room, command: Gameplay_Command) ->
 		refocus := game.refocus_player_hand(room)
 		execution.committed = game.refocus_was_committed(refocus.result)
 		execution.clears_card_interaction = execution.committed
+	case .First_Person_Fire:
+		_, execution.committed = game.first_person_fire(room, command.aim)
 	}
 	game.tactical_end_combat(room)
 	return
@@ -793,8 +819,9 @@ commit_gameplay_command :: proc(
 ) -> bool {
 	if room == nil || renderer == nil || card_interaction == nil { return false }
 	world_command := game.tactical_enabled(room) &&
-		(command.kind == .Continue_Pulse || command.kind == .Timeout || command.kind == .Lasso_Spin ||
-		 command.kind == .Defense || ((command.kind == .QTE_Key || command.kind == .QTE_Fail) && room.qte.kind == .Defense))
+		(command.kind == .Continue_Pulse || command.kind == .Timeout || command.kind == .Lasso_Spin || command.kind == .Pinball_Roll ||
+		 command.kind == .Defense || ((command.kind == .QTE_Key || command.kind == .QTE_Fail) && room.qte.kind == .Defense) ||
+		 command.kind == .First_Person_Fire)
 	if world_command {
 		// Reserve a whole event log before mutating gameplay: no committed beat
 		// can lose its presentation when the bounded world bank is full.

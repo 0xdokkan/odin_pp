@@ -91,9 +91,11 @@ begin_tactical_lighting :: proc(renderer: ^Renderer, hologram: bool = false, acc
 }
 draw_tactical_actor_bases :: proc(renderer: ^Renderer) {
 	snapshot := renderer.tactical.snapshot
+	// The Pinball's ball has its own shadow, and no stand (pinball.odin).
+	draw_pinball_shadow(renderer)
 	for actor in snapshot.enemies[:snapshot.enemy_count] {
 		cell := grid.Position{int(math.round(actor.position.x)), int(math.round(actor.position.y))}
-		if !actor.visible || !tactical_render_visible(renderer, cell) { continue }
+		if !actor.visible || !tactical_render_visible(renderer, cell) || tactical_pinball_holds(renderer, actor.entity) { continue }
 		key := sprite_key_for_enemy(actor.archetype)
 		at, _ := living_card_position(renderer, actor.entity, key, actor.position)
 		p := rl.Vector3{at.x+0.5, 0.048, at.y+0.5}
@@ -108,7 +110,8 @@ draw_tactical_actor_bases :: proc(renderer: ^Renderer) {
 		rl.DrawCircle3D(p+rl.Vector3{0, 0.01, 0}, 0.32, {1, 0, 0}, 90, GOTHIC_RED)
 		if renderer.tactical.flipbook.loaded { draw_flipbook_stand(renderer, key, actor.position, GOTHIC_RED, actor.entity) }
 	}
-	if !snapshot.player.visible { return }
+	// Behind his eyes the player stands on no stand of his own.
+	if !snapshot.player.visible || first_person_hides_player(renderer) { return }
 	// In the shadow the pool takes the stand's place while the card is under
 	// the floor; out of it (casting before it sinks, or sprung out at the end
 	// of the rise) the card keeps its stand.

@@ -9,7 +9,7 @@ import grid "../grid"
 import view "../view"
 
 Tactical_Alpha_Entry :: struct {
-	kind: enum {Sprite, Wall, Attack, Ground, Lasso, Fishing},
+	kind: enum {Sprite, Wall, Attack, Ground, Lasso, Fishing, Pinball, First_Person},
 	// An Attack entry: its blow's slot in Attack_Fx_State.
 	attack: i32,
 	// A Ground entry: its flame's cell, or past the cells its splash (ground_fx.odin).
@@ -18,6 +18,10 @@ Tactical_Alpha_Entry :: struct {
 	lasso: i32,
 	// A Fishing entry: the rod and its line, the bobber, or the catch (fishing.odin).
 	fishing: Fishing_Piece,
+	// A Pinball entry: the ball (0), or a contact's star (pinball.odin).
+	pinball: i32,
+	// A First_Person entry: a tracer in flight, or past them its spark (first_person.odin).
+	first_person: i32,
 	key: Sprite_Key,
 	entity: game.Entity_Ref,
 	position: view.Vec2,
@@ -54,23 +58,27 @@ collect_tactical_translucents :: proc(renderer: ^Renderer, room: ^game.Room = ni
 	snapshot := v.snapshot
 	for actor in snapshot.enemies[:snapshot.enemy_count] {
 		cell := grid.Position{int(math.round(actor.position.x)), int(math.round(actor.position.y))}
-		if actor.visible && tactical_render_visible(renderer, cell) {
+		// The Pinball's ball has taken its foe's card's place (pinball.odin).
+		if actor.visible && tactical_render_visible(renderer, cell) && !tactical_pinball_holds(renderer, actor.entity) {
 			key := sprite_key_for_enemy(actor.archetype)
 			opacity := living_opacity(renderer, actor.entity, key, actor.opacity) if living else
 				flipbook_opacity(renderer, actor.entity, key, actor.position, actor.opacity)
+			opacity *= pinball_card_opacity(renderer, actor.entity)
 			append(entries, Tactical_Alpha_Entry{key = key, entity = actor.entity, position = actor.position, opacity = opacity})
 		}
 	}
-	if snapshot.player.visible {
+	// Behind his eyes the player's card fades as the camera reaches it.
+	if snapshot.player.visible && !first_person_hides_player(renderer) {
 		opacity := living_opacity(renderer, game.PLAYER_ENTITY, .Player, snapshot.player.opacity) if living else
 			flipbook_opacity(renderer, game.PLAYER_ENTITY, .Player, snapshot.player.position, snapshot.player.opacity)
-		append(entries, Tactical_Alpha_Entry{key = .Player, entity = game.PLAYER_ENTITY, position = snapshot.player.position, opacity = opacity})
+		append(entries, Tactical_Alpha_Entry{key = .Player, entity = game.PLAYER_ENTITY, position = snapshot.player.position,
+			opacity = opacity*first_person_player_shown(renderer)})
 	}
 	// Living cards removed from the board mid-death finish toppling first.
 	if living {
 		for &actor in v.living_state.actors {
 			cell := grid.Position{int(math.round(actor.position.x)), int(math.round(actor.position.y))}
-			if !actor.used || !actor.ghost || !tactical_render_visible(renderer, cell) { continue }
+			if !actor.used || !actor.ghost || !tactical_render_visible(renderer, cell) || tactical_pinball_holds(renderer, actor.entity) { continue }
 			key := flipbook_key(actor.character)
 			append(entries, Tactical_Alpha_Entry{key = key, entity = actor.entity, position = actor.position,
 				opacity = living_opacity(renderer, actor.entity, key, 1)})
@@ -80,7 +88,7 @@ collect_tactical_translucents :: proc(renderer: ^Renderer, room: ^game.Room = ni
 	if v.flipbook_state != nil && v.flipbook.loaded {
 		for &actor in v.flipbook_state.actors {
 			cell := grid.Position{int(math.round(actor.position.x)), int(math.round(actor.position.y))}
-			if !actor.used || !actor.ghost || !tactical_render_visible(renderer, cell) { continue }
+			if !actor.used || !actor.ghost || !tactical_render_visible(renderer, cell) || tactical_pinball_holds(renderer, actor.entity) { continue }
 			key := flipbook_key(actor.character)
 			append(entries, Tactical_Alpha_Entry{key = key, entity = actor.entity, position = actor.position,
 				opacity = flipbook_opacity(renderer, actor.entity, key, actor.position, 1)})
@@ -90,9 +98,13 @@ collect_tactical_translucents :: proc(renderer: ^Renderer, room: ^game.Room = ni
 	if room != nil { collect_ground_entries(renderer, room, entries) }
 	if room != nil { collect_lasso_entries(renderer, entries) }
 	if room != nil { collect_fishing_entries(renderer, entries) }
+	// The Pinball's ball shows on the map's hologram too.
+	collect_pinball_entries(renderer, entries)
+	if room != nil { collect_first_person_entries(renderer, entries) }
 	// The hologram intentionally supplies no room: its own miniature walls
 	// remain in the table pass, and it only needs sorted actor billboards.
-	if room != nil {
+	// Behind the player's eyes they are opaque, with the floor.
+	if room != nil && !first_person_solid_walls(renderer) {
 		for y in 0..<room.level_data.tiles.height { for x in 0..<room.level_data.tiles.width {
 			if tactical_cell_on_screen(renderer, {x, y}) && tactical_render_visible(renderer, {x, y}) && diorama_interior_wall(room, {x, y}) {
 				append(entries, Tactical_Alpha_Entry{kind = .Wall, position = {f32(x), f32(y)}})
@@ -134,6 +146,12 @@ draw_tactical_billboards :: proc(renderer: ^Renderer, room: ^game.Room = nil, li
 		} else if entry.kind == .Fishing {
 			if walls_active { rl.EndShaderMode(); walls_active = false }
 			draw_fishing_entry(renderer, entry)
+		} else if entry.kind == .Pinball {
+			if walls_active { rl.EndShaderMode(); walls_active = false }
+			draw_pinball_entry(renderer, entry)
+		} else if entry.kind == .First_Person {
+			if walls_active { rl.EndShaderMode(); walls_active = false }
+			draw_first_person_entry(renderer, entry)
 		} else {
 			if walls_active { rl.EndShaderMode(); walls_active = false }
 			tactical_billboard(renderer, entry.key, entry.position, entry.opacity, entry.entity)

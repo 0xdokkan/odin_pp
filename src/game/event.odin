@@ -77,6 +77,28 @@ Game_Event_Kind :: enum {
 	// Fishing_Food; its d4 and the cure follow), or a card added to the run
 	// deck (card_definition and card_id the new card).
 	Fish_Caught,
+	// PINBALL (pinball.odin): the foe `target` turned into a steel ball on its
+	// cell (from_position = to_position); `amount` is the ball's value,
+	// `duration` its seconds.
+	Pinball_Made,
+	// The player at from_position strikes the ball on to_position away;
+	// `amount` is its value, `duration` the launch's turn off the line (degrees,
+	// + clockwise on a north-up board).
+	Pinball_Launched,
+	// The ball (`source`, on the cell from_position) touched the solid cell
+	// to_position; its value `duration` goes back to `amount`.
+	Pinball_Bounced,
+	// The ball (`source`, on from_position) struck the foe `target` on
+	// to_position: `amount` is the value it took.
+	Pinball_Bumped,
+	// The ball's time is up: it bursts on its cell and the foe falls there;
+	// `amount` is the foes it struck, `duration` the solid things it touched.
+	Pinball_Burst,
+	// FIRST PERSON SHOOTER (first_person.odin): the player at from_position
+	// (= to_position) goes behind his own eyes for `duration` world seconds
+	// (card_definition the card). Its end records nothing: the board follows
+	// the room's state, and so do the AK's shots (First_Person_State.trail).
+	First_Person_Begun,
 }
 
 Game_Event :: struct {
@@ -160,6 +182,16 @@ event_is_lasso :: proc(event: Game_Event) -> bool {
 
 event_is_lasso_turn :: proc(event: Game_Event) -> bool {
 	return event.area_mask&(EVENT_LASSO_BIT|EVENT_LASSO_TURN_BIT) == EVENT_LASSO_BIT|EVENT_LASSO_TURN_BIT
+}
+
+// The PINBALL's wounds (pinball.odin): the player's damage that no blow of his
+// swings, the ball's. area_mask has no bit left, so they carry the turn bit
+// alone, which the Lazzo only ever sets together with its own: nothing else
+// may set it alone.
+EVENT_PINBALL_BIT :: EVENT_LASSO_TURN_BIT
+
+event_is_pinball :: proc(event: Game_Event) -> bool {
+	return event.area_mask&(EVENT_LASSO_BIT|EVENT_LASSO_TURN_BIT) == EVENT_PINBALL_BIT
 }
 
 event_is_attack :: proc(event: Game_Event) -> bool {

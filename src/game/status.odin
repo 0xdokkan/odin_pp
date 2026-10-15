@@ -162,6 +162,10 @@ can_apply_status :: proc(room: ^Room, entity: Entity_Ref, kind: Status_Kind) -> 
 	if status_kind_is_player_charge(kind) && entity.kind != .Player {
 		return false
 	}
+	// The Pinball's ball carries none (pinball.odin).
+	if entity.kind == .Enemy && enemy_is_pinball(room, entity.id) {
+		return false
+	}
 	_, already_present := status_index(statuses, kind)
 	return already_present || statuses.count < MAX_STATUSES_PER_ENTITY
 }

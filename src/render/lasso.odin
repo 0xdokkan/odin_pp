@@ -928,17 +928,17 @@ draw_lasso_spin_arrow :: proc(renderer: ^Renderer, centre: grid.Position, radius
 	rl.DrawLineEx(outer, tip, 3, {123, 235, 169, 255})
 }
 
-// While the Lazzo is aimed, TROPPO PESANTE under each foe in reach it cannot
-// take: drawn after the cards and the seals (draw_tactical_world), so none of
-// them hides it, and kept in the labels' layout, so the words over the board
-// drawn after it keep clear.
+// While the Lazzo (or the Pinball: pinball.odin) is aimed, TROPPO PESANTE
+// under each foe in reach it cannot take: drawn after the cards and the seals
+// (draw_tactical_world), so none of them hides it, and kept in the labels'
+// layout, so the words over the board drawn after it keep clear.
 draw_lasso_heavy_labels :: proc(renderer: ^Renderer, room: ^game.Room, card_id: u32) {
 	if renderer == nil || room == nil || room.player == nil || room.level_data == nil || room.phase != .Combat || card_id == 0 { return }
 	if !tactical_telegraphs_are_visible(renderer, room) || renderer_blocks_player_input(renderer) { return }
 	index, found := game.hand_card_index_by_id(&room.player.deck, card_id)
 	if !found { return }
 	card := room.player.deck.hand[index]
-	if card.definition_id != .Lasso { return }
+	if card.definition_id != .Lasso && card.definition_id != .Pinball { return }
 	definition, known := game.card_definition_by_id(card.definition_id, game.tactical_enabled(room))
 	if !known { return }
 	for enemy in room.enemies {
@@ -949,12 +949,13 @@ draw_lasso_heavy_labels :: proc(renderer: ^Renderer, room: ^game.Room, card_id: 
 }
 
 // TROPPO PESANTE under the feet of a foe the rope cannot take (over its head
-// it would sit under its heart, or under the HUD).
+// it would sit under its heart, or under the HUD), clear of the hearts and
+// labels already placed (lasso_heavy_label_place).
 draw_lasso_heavy_label :: proc(renderer: ^Renderer, cell: grid.Position) {
 	label: cstring = "TROPPO PESANTE"
 	anchor := tactical_project(renderer, {f32(cell.x)+0.5, f32(cell.y)+0.5})
 	width := gothic_text_width(renderer, label, 12)+12
-	bounds := rl.Rectangle{math.round(anchor.x-width*0.5), math.round(anchor.y+12), width, 19}
+	bounds := lasso_heavy_label_place(renderer.tactical.labels, anchor, width, tactical_world_bounds(renderer))
 	rl.DrawRectangleRec(bounds, {8, 15, 26, 235})
 	rl.DrawRectangleRec({bounds.x, bounds.y, 2, bounds.height}, LASSO_HEAVY)
 	gothic_text(renderer, label, bounds.x+6, bounds.y+3, 12, LASSO_HEAVY)
@@ -962,6 +963,26 @@ draw_lasso_heavy_label :: proc(renderer: ^Renderer, cell: grid.Position) {
 		layout.bounds[layout.count] = bounds
 		layout.count += 1
 	}
+}
+
+// Where TROPPO PESANTE goes under feet projected at `anchor`, `width` wide:
+// just under them, else a row lower at a time, then beside them, left then
+// right, the first place clear of the labels and hearts in `layout` (a
+// neighbour's heart below them stays readable), inside `viewport`; with none
+// clear, just under them still.
+lasso_heavy_label_place :: proc(layout: ^Tactical_Label_Layout, anchor: view.Vec2, width: f32, viewport: rl.Rectangle) -> rl.Rectangle {
+	first := rl.Rectangle{math.round(anchor.x-width*0.5), math.round(anchor.y+12), width, 19}
+	if layout == nil { return first }
+	for side in ([3]f32{0, -1, 1}) {
+		for row in 0..<4 {
+			x := first.x+side*(width*0.5+8)
+			y := first.y+f32(row)*13
+			candidate := rl.Rectangle{math.round(clamp(x, viewport.x, viewport.x+viewport.width-width)),
+				math.round(clamp(y, viewport.y, viewport.y+viewport.height-first.height)), width, first.height}
+			if living_heart_is_clear(layout, candidate) { return candidate }
+		}
+	}
+	return first
 }
 
 // What would let the rope go now: a dodge (the controller takes Shift only in

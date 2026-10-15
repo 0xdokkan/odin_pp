@@ -8,7 +8,8 @@ Player_Ability :: enum {
 }
 
 use_player_ability :: proc(room: ^Room, ability: Player_Ability) -> Action_Result {
-	if !tactical_allows_action(room) { return .Invalid_Phase }
+	// Behind his eyes the AK is all he has (first_person.odin).
+	if !tactical_allows_action(room) || tactical_first_person_active(room) { return .Invalid_Phase }
 	if room == nil || room.player == nil || room.phase != .Combat {
 		return .Invalid_Phase
 	}

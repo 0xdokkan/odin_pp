@@ -86,6 +86,10 @@ reserve_tactical_actor_label_bounds :: proc(renderer: ^Renderer, actor: ^Present
 	// hood in its pool: labels and badges may lie over it (the CRITICO of a
 	// diagonal step just over the pool, a bomb's label by its cell).
 	if actor.entity == game.PLAYER_ENTITY && tactical_shadow_depth(renderer, game.PLAYER_ENTITY) > 0 { return }
+	// The Pinball's ball is no standing card either (pinball.odin).
+	if tactical_pinball_holds(renderer, actor.entity) { return }
+	// Behind his eyes there is no card of his to keep clear of.
+	if actor.entity == game.PLAYER_ENTITY && first_person_hides_player(renderer) { return }
 	bounds, ok := tactical_actor_screen_bounds(renderer, actor)
 	if !ok { return }
 	v.labels.actor_bounds[v.labels.actor_count] = bounds
@@ -148,12 +152,15 @@ draw_tactical_annotations :: proc(renderer: ^Renderer, room: ^game.Room) {
 	// them included; text badges avoid it.
 	for &actor in v.snapshot.enemies[:v.snapshot.enemy_count] {
 		cell := grid.Position{int(math.round(actor.position.x)), int(math.round(actor.position.y))}
-		if !actor.visible || actor.statuses.count == 0 || !tactical_render_visible(renderer, cell) { continue }
-		p := tactical_project(renderer, {actor.position.x+0.5, actor.position.y+0.5})
+		// The tags go with the card the Pinball's ball takes the place of.
+		if !actor.visible || actor.statuses.count == 0 || !tactical_overlay_visible(renderer, cell) ||
+		   tactical_pinball_holds(renderer, actor.entity) { continue }
+		p :=tactical_project(renderer, {actor.position.x+0.5, actor.position.y+0.5})
 		tags := draw_status_set(renderer, &actor.statuses, p, 14, actor.opacity, tactical_status_tag_pixel(renderer, actor.position))
 		if v.labels.count < len(v.labels.bounds) { v.labels.bounds[v.labels.count] = tactical_status_lane(p, tags); v.labels.count += 1 }
 	}
-	if v.snapshot.player.visible && v.snapshot.player.statuses.count > 0 {
+	// Behind his eyes his own tags are the HUD's chips alone.
+	if v.snapshot.player.visible && v.snapshot.player.statuses.count > 0 && !first_person_hides_player(renderer) {
 		player := &v.snapshot.player
 		p := tactical_project(renderer, {player.position.x+0.5, player.position.y+0.5})
 		tags := draw_status_set(renderer, &player.statuses, p, 14, player.opacity, tactical_status_tag_pixel(renderer, player.position))

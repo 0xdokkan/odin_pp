@@ -109,8 +109,9 @@ draw_living_rings :: proc(renderer: ^Renderer, room: ^game.Room) {
 		draw_living_ring(renderer, character, key, actor.position, actor.entity, living_ring_open(room, enemy), living_ring_color(kind))
 	}
 	// In the shadow the card is under the floor: the pool's own beat ring
-	// takes this one's place (draw_tactical_shadow_pool).
-	if snapshot.player.visible && snapshot.player.health > 0 && !tactical_shadow_showing(renderer) {
+	// takes this one's place (draw_tactical_shadow_pool). Behind his eyes he
+	// has no card to ring (the HUD's lamp keeps the beat: first_person.odin).
+	if snapshot.player.visible && snapshot.player.health > 0 && !tactical_shadow_showing(renderer) && first_person_amount(renderer) <= 0 {
 		if open, on := living_beat_open(room); on {
 			draw_living_ring(renderer, .Pilgrim, .Player, snapshot.player.position, game.PLAYER_ENTITY, open, living_ring_color(.Beat))
 		}

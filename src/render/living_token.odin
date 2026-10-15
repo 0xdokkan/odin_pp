@@ -161,8 +161,12 @@ update_living_tokens :: proc(renderer: ^Renderer, now, world: f64) {
 		heal := cue.kind == .Heal
 		if (cue.kind != .Damage && !heal) || cue.event.amount <= 0 { continue }
 		if _, actor := presentation_actor_in_view(renderer.tactical.snapshot, cue.event.target); !actor { continue }
+		// The Pinball's ball bursts with no wound to show (pinball.odin).
+		if tactical_pinball_holds(renderer, cue.event.target) { continue }
 		landing, _ := attack_fx_landing_in(renderer, cue.event.target, now, cue.event.source)
-		living_token_spawn(state, cue.event, heal, now, world, landing, cue.batch, game.event_is_lasso_turn(cue.event))
+		// A full turn of the Lazzo, and a shot of the AK, pop small ones.
+		small := game.event_is_lasso_turn(cue.event) || game.event_is_first_person_shot(cue.event)
+		living_token_spawn(state, cue.event, heal, now, world, landing, cue.batch, small)
 	}
 }
 
@@ -206,7 +210,9 @@ draw_living_tokens :: proc(renderer: ^Renderer) {
 		kept := token.small && token.at != {}
 		if actor, found := presentation_actor_in_view(v.snapshot, token.entity); found && actor.visible && !sunk && !kept {
 			cell := grid.Position{int(math.round(actor.position.x)), int(math.round(actor.position.y))}
-			if !tactical_render_visible(renderer, cell) { continue }
+			if !tactical_overlay_visible(renderer, cell) { continue }
+			// Behind his eyes his own tokens are not on show.
+			if token.entity == game.PLAYER_ENTITY && first_person_hides_player(renderer) { continue }
 			key := Sprite_Key.Player if token.entity == game.PLAYER_ENTITY else sprite_key_for_enemy(actor.archetype)
 			if character, ok := flipbook_character(key); ok {
 				p := living_billboard_geometry(renderer, character, key, actor.position, true, token.entity).card_points

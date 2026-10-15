@@ -228,7 +228,7 @@ lasso_target_error :: proc(room: ^Room, target: Target) -> Card_Compile_Error {
 	if room == nil || room.player == nil || room.level_data == nil { return .Invalid_Room }
 	if target.kind != .Entity || target.entity.kind != .Enemy { return .Invalid_Target }
 	index, found := enemy_index_by_id(room, target.entity.id)
-	if !found || enemy_is_lassoed(room, target.entity.id) { return .Invalid_Target }
+	if !found || enemy_is_out_of_play(room, target.entity.id) { return .Invalid_Target }
 	if enemy_is_boss(room.enemies[index].archetype) { return .Target_Too_Heavy }
 	if room.lasso.active { return .Target_Blocked }
 	state: Lasso_State

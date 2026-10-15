@@ -16,12 +16,12 @@ Beat_Chord :: struct {
 	active: bool,
 }
 
-// The diagonal formed by `primary` and a perpendicular direction key held now.
-beat_chord_offset :: proc(primary: game.Move_Direction) -> (offset: grid.Position, found: bool) {
-	keys := [4]rl.KeyboardKey{.W, .D, .S, .A}
+// The diagonal formed by `primary` and a perpendicular direction key held now
+// (W, D, S and A stepping the ways of `keys`: poll_walk_command).
+beat_chord_offset :: proc(primary: game.Move_Direction, keys := game.MOVEMENT_KEY_DIRECTIONS) -> (offset: grid.Position, found: bool) {
 	vertical := primary == .North || primary == .South
-	for key, index in keys {
-		direction := game.Move_Direction(index)
+	for key, index in ([4]rl.KeyboardKey{.W, .D, .S, .A}) {
+		direction := keys[index]
 		if (direction == .North || direction == .South) == vertical || !rl.IsKeyDown(key) { continue }
 		a, b := game.direction_offset(primary), game.direction_offset(direction)
 		return {a.x+b.x, a.y+b.y}, true
@@ -38,10 +38,10 @@ beat_stamp :: proc(room: ^game.Room, command: ^Gameplay_Command) {
 // Returns the command to commit this frame; ok is false while a tick move
 // waits for its diagonal partner.
 beat_input_command :: proc(chord: ^Beat_Chord, room: ^game.Room, command: Gameplay_Command, has_command: bool,
-	dt: f32) -> (result: Gameplay_Command, ok: bool) {
+	dt: f32, keys := game.MOVEMENT_KEY_DIRECTIONS) -> (result: Gameplay_Command, ok: bool) {
 	if chord.active {
 		chord.timer -= dt
-		if offset, found := beat_chord_offset(chord.command.direction); found {
+		if offset, found := beat_chord_offset(chord.command.direction, keys); found {
 			result = chord.command
 			result.diagonal = offset
 			chord.active = false
@@ -55,7 +55,7 @@ beat_input_command :: proc(chord: ^Beat_Chord, room: ^game.Room, command: Gamepl
 	result = command
 	beat_stamp(room, &result)
 	if result.kind == .Move && result.beat != 0 && result.origin_phase == .Combat {
-		if offset, found := beat_chord_offset(result.direction); found {
+		if offset, found := beat_chord_offset(result.direction, keys); found {
 			result.diagonal = offset
 			return result, true
 		}
@@ -69,10 +69,10 @@ beat_input_command :: proc(chord: ^Beat_Chord, room: ^game.Room, command: Gamepl
 // (`busy`: its animation or its timed seconds) the command is dropped, never
 // kept for when the action ends, and a pending chord is dropped with it.
 route_gameplay_command :: proc(held: ^Buffered_Gameplay_Command, room: ^game.Room, busy: bool,
-	command: Gameplay_Command, has_command: bool, dt: f32) -> (result: Gameplay_Command, ok: bool) {
+	command: Gameplay_Command, has_command: bool, dt: f32, keys := game.MOVEMENT_KEY_DIRECTIONS) -> (result: Gameplay_Command, ok: bool) {
 	if busy || room.phase == .Complete || room.phase == .Defeat {
 		clear_gameplay_command_buffer(held)
 		return
 	}
-	return beat_input_command(&held.chord, room, command, has_command, dt)
+	return beat_input_command(&held.chord, room, command, has_command, dt, keys)
 }

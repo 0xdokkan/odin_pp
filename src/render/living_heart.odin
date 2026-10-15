@@ -313,8 +313,8 @@ draw_living_hearts :: proc(renderer: ^Renderer, room: ^game.Room) {
 	}
 }
 
-// A living, visible enemy in sight.
+// A living, visible enemy in sight (never the Pinball's ball: pinball.odin).
 living_heart_shown :: proc(renderer: ^Renderer, actor: Presentation_Actor) -> bool {
 	cell := grid.Position{int(math.round(actor.position.x)), int(math.round(actor.position.y))}
-	return actor.visible && actor.health > 0 && tactical_render_visible(renderer, cell)
+	return actor.visible && actor.health > 0 && tactical_overlay_visible(renderer, cell) && !tactical_pinball_holds(renderer, actor.entity)
 }

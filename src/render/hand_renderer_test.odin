@@ -29,6 +29,95 @@ test_tactical_full_hand_is_readable_clickable_and_separate_from_grid :: proc(t: 
 	testing.expect(t, card_drop_area_contains(&renderer, {480, 240}))
 }
 
+// The game's hand never rises nor overlaps. PROVA MECCANICHE's ten cards keep
+// a full eight-card hand's width and overlap across the canvas but for its
+// gutters, each showing most of itself, evenly until the board has measured
+// what each one's words need, then as much as each needs and the spare width
+// shared out; the pointer finds the one on top; the card under it rises
+// whole, over the rest, and keeps the pointer from where it rested to where it
+// rose.
+@(test)
+test_tactical_hand_of_ten_overlaps_at_a_full_hands_width :: proc(t: ^testing.T) {
+	renderer := Renderer{canvas_width = 960, canvas_height = 540, tactical = {enabled = true}}
+	full := game.MAX_HAND_CARDS
+	first := tactical_hand_card_bounds(&renderer, 0, full)
+	last := tactical_hand_card_bounds(&renderer, full-1, full)
+	for count in 1..=full {
+		testing.expect(t, !tactical_hand_overlaps(count))
+		for index in 0..<count {
+			bounds := tactical_hand_card_bounds(&renderer, index, count)
+			testing.expect_value(t, tactical_hand_raised_card_bounds(&renderer, index, count), bounds)
+			testing.expect_value(t, hand_raised_card_bounds(&renderer, index, count), bounds)
+			testing.expect_value(t, tactical_hand_card_visible_width(&renderer, index, count), bounds.width)
+		}
+	}
+	count := game.MAX_HAND_CAPACITY
+	testing.expect(t, tactical_hand_overlaps(count))
+	deck := game.Deck_State{combat_active = true, hand_count = count}
+	for index in 0..<count { deck.hand[index].id = u32(index+1) }
+	for index in 0..<count {
+		bounds := tactical_hand_card_bounds(&renderer, index, count)
+		shown := tactical_hand_card_visible_width(&renderer, index, count)
+		testing.expect(t, bounds.width == first.width && bounds.height == first.height && bounds.y == first.y)
+		testing.expect(t, shown >= bounds.width*0.8 && (shown < bounds.width) == (index < count-1))
+		// Resting, the card shows where the next one does not cover it.
+		found_index, found := hand_card_at_point(&renderer, &deck, {bounds.x+shown*0.5, bounds.y+bounds.height*0.5})
+		testing.expect(t, found && found_index == index)
+		// Raised, it rises whole over the others, inside the canvas.
+		raised := tactical_hand_raised_card_bounds(&renderer, index, count)
+		testing.expect(t, raised.y == bounds.y-TACTICAL_HAND_RAISE && raised.x == bounds.x && raised.width == bounds.width)
+		testing.expect(t, raised.x >= 0 && raised.x+raised.width <= renderer.canvas_width && raised.y+raised.height <= renderer.canvas_height)
+		for point in ([3]view.Vec2{{raised.x+raised.width-3, raised.y+2}, {bounds.x+bounds.width-3, bounds.y+bounds.height-2},
+			{bounds.x+3, bounds.y+bounds.height-2}}) {
+			found_index, found = hand_card_at_point(&renderer, &deck, point, deck.hand[index].id)
+			testing.expect(t, found && found_index == index)
+		}
+	}
+	testing.expect_value(t, tactical_hand_card_bounds(&renderer, 0, count).x, TACTICAL_HAND_OVERLAP_GUTTER)
+	right := tactical_hand_card_bounds(&renderer, count-1, count)
+	testing.expect_value(t, right.x+right.width, renderer.canvas_width-TACTICAL_HAND_OVERLAP_GUTTER)
+	testing.expect(t, first.x > TACTICAL_HAND_OVERLAP_GUTTER && last.x+last.width < renderer.canvas_width-TACTICAL_HAND_OVERLAP_GUTTER)
+	// Measured: each card as far on as the ones before it show.
+	renderer.tactical.hand_reveal = {shown = {90, 100, 86, 95, 92, 88, 97, 86, 91, first.width}, count = count}
+	x := TACTICAL_HAND_OVERLAP_GUTTER
+	for index in 0..<count {
+		bounds := tactical_hand_card_bounds(&renderer, index, count)
+		testing.expect(t, abs(bounds.x-x) < 1e-3 && bounds.width == first.width)
+		testing.expect(t, abs(tactical_hand_card_visible_width(&renderer, index, count)-renderer.tactical.hand_reveal.shown[index]) < 1e-3)
+		x += renderer.tactical.hand_reveal.shown[index]
+	}
+	// For another hand than it was measured for: evenly again.
+	renderer.tactical.hand_reveal.count = count-1
+	testing.expect(t, abs(tactical_hand_card_visible_width(&renderer, 0, count)-tactical_hand_card_visible_width(&renderer, 4, count)) < 1e-3)
+	// Measured from the hand (here with no font: every card needs its icon
+	// only), the spare width shared out: the last card where the hand ends;
+	// the game's hand is never measured.
+	for &card in deck.hand[:count] { card.definition_id = .Strike }
+	update_tactical_hand_reveal(&renderer, &deck)
+	testing.expect_value(t, renderer.tactical.hand_reveal.count, count)
+	for shown in renderer.tactical.hand_reveal.shown[:count-1] { testing.expect(t, shown >= TACTICAL_HAND_REVEAL_ICON) }
+	right = tactical_hand_card_bounds(&renderer, count-1, count)
+	testing.expect(t, abs(right.x+right.width-(renderer.canvas_width-TACTICAL_HAND_OVERLAP_GUTTER)) < 1e-3)
+	eight := deck
+	eight.hand_count = full
+	update_tactical_hand_reveal(&renderer, &eight)
+	testing.expect_value(t, renderer.tactical.hand_reveal.count, 0)
+	// The card that rises: the one under the mouse, the one aimed, the one
+	// chosen; never one in the game's hand.
+	testing.expect_value(t, tactical_hand_raised_card(&deck, 3, 5, 7), u32(3))
+	testing.expect_value(t, tactical_hand_raised_card(&deck, 0, 5, 7), u32(7))
+	testing.expect_value(t, tactical_hand_raised_card(&deck, 0, 5, 0), u32(5))
+	testing.expect_value(t, tactical_hand_raised_card(&deck, 0, 0, 0), u32(0))
+	testing.expect_value(t, tactical_hand_raised_card(&deck, 99, 0, 0), u32(0))
+	game_hand := deck
+	game_hand.hand_count = full
+	testing.expect_value(t, tactical_hand_raised_card(&game_hand, 3, 5, 7), u32(0))
+	// Its keys: 1 to 9, then 0.
+	testing.expect_value(t, string(tactical_hand_slot_key(0)), "1")
+	testing.expect_value(t, string(tactical_hand_slot_key(8)), "9")
+	testing.expect_value(t, string(tactical_hand_slot_key(9)), "0")
+}
+
 @(test)
 test_overlapping_hand_headers_hit_the_visually_topmost_card :: proc(t: ^testing.T) {
 	renderer := Renderer{canvas_width = 960, canvas_height = 540}

@@ -1148,3 +1148,122 @@ def card_fishing_rod(seed):
         (0.32, hiss, 0.14),
     ])
     return _out(x, 0.06)
+
+
+# --------------------------------------------------------------------------
+# The ball and the AK (Phase 4)
+
+def _spring(dur, seed, f0, f1, t0, t1, rate=34.0):
+    """A coil spring stretched between t0 and t1: its wire singing a thin
+    metallic zing that rises f0 -> f1 (dispersive coils: a few inharmonic
+    partials swept together), its turns ticking over each other `rate` a
+    second, quiet outside the stretch."""
+    t = time_axis(dur)
+    u = np.clip((t - t0) / max(t1 - t0, 1e-4), 0, 1)
+    f = f0 * (f1 / f0) ** u
+    zing = np.zeros_like(t)
+    for q, a in ((1.0, 1.0), (2.73, 0.45), (5.41, 0.22)):
+        zing += a * np.sin(2 * np.pi * np.cumsum(f * q) / SR)
+    zing *= _gate(dur, t0, t1, a=0.02, r=0.03) * (0.55 + 0.45 * np.sin(2 * np.pi * rate * t) ** 2)
+    turns = crackle(dur, rate * 4 * _gate(dur, t0, t1, 0.01, 0.02) + 0.5, seed, decay=0.0006)
+    turns = bandpass(turns, 3600, 0.9)
+    return _norm(_norm(zing) + 0.35 * _norm(turns))
+
+
+def _ball(seed, base=3150.0, dur=0.3, tau=0.05):
+    """A small solid steel ball struck: a hard tick and a few stiff, short,
+    bright modes (no long ring: it is solid, not a bell)."""
+    t = time_axis(dur)
+    modes = [(base, tau, 1.0), (base * 1.62, tau * 0.6, 0.55), (base * 2.38, tau * 0.4, 0.35), (base * 0.51, tau * 1.3, 0.3)]
+    ring = _norm(_ring(dur, modes, seed, attack=0.0001, beat=4.0))
+    tick = _norm(highpass(white(dur, seed + 1), 4000, 2)) * np.exp(-t / 0.0006)
+    return _norm(ring + 0.5 * tick)
+
+
+def _crunch(dur, seed, t0, t1, rate=420.0):
+    """A sheet of paper balled up between t0 and t1: dense crinkles (sharp
+    fibre clicks), papery grains and the dull body of the folding wad,
+    swelling and squeezed shut at t1."""
+    env = _gate(dur, t0, t1, a=0.03, r=0.025)
+    clicks = bandpass(crackle(dur, rate * env + 1.0, seed, decay=0.0003), 4200, 0.6)
+    grain = grains(dur, random_times(dur, rate * 0.35, seed + 1, start=t0, end=t1), 0.012, seed + 2, band=(1500, 7000))
+    body = bandpass(pink(dur, seed + 3), 900, 0.8) * env
+    return _norm(_norm(clicks) * (0.4 + 0.6 * env) + 0.7 * _norm(grain) + 0.35 * _norm(body))
+
+
+@sound("card_pinball", loudness=LOUD, wet=WET, marks=(0.0, 0.04, 0.2, 0.25, 0.49))
+def card_pinball(seed):
+    """Pinball: a plunger drawn back from 0.04 (its rod rasping in its
+    sleeve, the coil spring zinging higher as it stretches, the ratchet
+    clicking ever faster) and caught at full draw at 0.2 (a click, the spring's
+    short boing); as the foe's card starts its puff (0.25, the Pinball_Made
+    cue) it is balled up like paper, squeezed shut, and the ball drops out
+    whole at 0.49: a solid steel tink and a soft puff of paper dust."""
+    dur = 0.85
+    r = rng(seed + 1)
+    rod = _norm(bandpass(white(0.18, seed + 10), 2600, 1.0)) * _swell(0.18, 0.12, a=1.2, b=1.0)
+    spring = _spring(dur, seed + 11, 900, 2300, 0.04, 0.2)
+    clicks = []
+    tt = 0.05
+    while tt < 0.195:
+        u = (tt - 0.05) / 0.145
+        clicks.append((tt, r.uniform(0.6, 1.0)))
+        tt += 1 / (22 * (64 / 22) ** u)
+    ratchet = _clatter(dur, clicks, [_pawl(seed + 40 + j, f) for j, f in enumerate((3400, 3900, 4400))], seed + 2)
+    boing = _ring(0.3, [(D4, 0.06, 1.0), (D4 * 2.76, 0.03, 0.4), (D4 * 5.4, 0.015, 0.2)], seed + 12, attack=0.002,
+                  bend=1 + 0.12 * np.exp(-time_axis(0.3) / 0.03))
+    catch = _iron(0.12, 1900, seed + 13, tau=0.02)
+    puff_l = 0.3
+    puff = _norm(bandpass(pink(puff_l, seed + 14), 1300, 0.8)) * _swell(puff_l, 0.05, a=1.0, b=1.6)
+    x = place(dur, [
+        (0.0, _flick(seed), FLICK),
+        (0.04, rod, 0.2),
+        (0.0, spring, 0.3),
+        (0.0, _norm(ratchet), 0.4),
+        (0.2, catch, 0.32),
+        (0.2, _norm(boing), 0.3),
+        (0.0, _crunch(dur, seed + 20, 0.25, 0.47), 0.55),
+        (0.47, _thump(0.15, seed + 21, f0=240, f1=150, drop=0.01, tau=0.012, lp=1800, noise=1.0, ntau=0.01), 0.2),
+        (0.49, _ball(seed + 22), 0.6),
+        (0.5, puff, 0.22),
+    ])
+    return _out(x, 0.08)
+
+
+def _rack(seed, base, dur=0.14, tau=0.018):
+    """A rifle's steel parts slammed home: a hard click and a short gritty
+    burst of stiff modes (the bolt, the receiver's sheet steel), saturated so
+    the clack is dense rather than a bare spike."""
+    t = time_axis(dur)
+    body = _iron(dur, base, seed, tau=tau)
+    grit = _norm(bandpass(white(dur, seed + 1), base * 2.1, 0.8)) * np.exp(-t / 0.004)
+    low = _thump(dur, seed + 2, f0=260, f1=170, drop=0.008, tau=0.014, lp=1500, noise=0.8, ntau=0.008)
+    return _ramp(_norm(drive(_norm(body + 0.6 * grit + 0.45 * low), 2.2)), 0.0005)
+
+
+@sound("card_first_person", loudness=LOUD, wet=WET, marks=(0.0, 0.05, 0.13, 0.19))
+def card_first_person(seed):
+    """First Person Shooter: the paper AK readied as the card leaves his
+    hand: the banana magazine rocked in and seated at 0.05 (a hollow steel
+    clack, its rattle), the charging handle hauled back at 0.13 (a dry
+    scrape, the bolt's spring) and let fly forward at 0.19 (the bolt slams
+    home, the receiver rings briefly); then the camera dives
+    (pilgrim_fps_dive) from 0.27."""
+    dur = 0.5
+    seat = _rack(seed + 10, 1450, tau=0.02)
+    rattle = grains(0.08, [0.004, 0.011, 0.02, 0.031], 0.004, seed + 11, band=(2500, 6000), gain_jitter=0.5)
+    pull = _norm(sweep_bandpass(white(0.07, seed + 12), 2200, 3800, q=1.3)) * _swell(0.07, 0.05, a=1.0, b=1.2)
+    spring = _spring(dur, seed + 13, 1500, 2600, 0.13, 0.185, rate=60)
+    back = _rack(seed + 14, 2100, dur=0.1, tau=0.012)
+    home = _rack(seed + 15, 1650, dur=0.2, tau=0.03)
+    x = place(dur, [
+        (0.0, _flick(seed), FLICK),
+        (0.04, _thump(0.1, seed + 16, f0=300, f1=200, drop=0.006, tau=0.01, lp=2000, noise=1.0, ntau=0.006), 0.18),
+        (0.05, seat, 0.62),
+        (0.055, _norm(rattle), 0.18),
+        (0.115, pull, 0.2),
+        (0.13, back, 0.42),
+        (0.0, spring, 0.12),
+        (0.19, home, 0.8),
+    ])
+    return _out(x, 0.08)

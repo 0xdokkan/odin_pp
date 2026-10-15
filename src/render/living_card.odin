@@ -88,6 +88,8 @@ forget_living_actors :: proc(renderer: ^Renderer) {
 	renderer.tactical.shadow = {}
 	lasso_view_reset(&renderer.tactical.lasso)
 	fishing_view_reset(&renderer.tactical.fishing)
+	pinball_view_reset(&renderer.tactical.pinball)
+	first_person_view_reset(&renderer.tactical.first_person)
 	forget_attack_fx(renderer)
 	forget_ground_fx(renderer)
 	lab_sounds_reset(renderer)
@@ -211,12 +213,14 @@ living_cue_action :: proc(cue: ^Presentation_Cue, entity: game.Entity_Ref) -> (a
 	#partial switch cue.kind {
 	case .Damage:
 		// LAZZO: a full turn's 1 shakes nothing, and no wound of the rope is a
-		// blow the pivot swings (lasso.odin).
-		if game.event_is_lasso_turn(event^) { break }
+		// blow the pivot swings (lasso.odin); nor any of the Pinball's ball
+		// (pinball.odin). Nor does the AK's (six a second: the struck card
+		// keeps its telegraph, only flinching; first_person.odin).
+		if game.event_is_lasso_turn(event^) || game.event_is_first_person_shot(event^) { break }
 		if event.target == entity { return .Hurt, true }
-		if event.source == entity && !returned && !game.event_is_lasso(event^) { return .Attack, true }
+		if event.source == entity && !returned && !game.event_is_lasso(event^) && !game.event_is_pinball(event^) { return .Attack, true }
 	case .Damage_Absorbed, .Move_Blocked:
-		if game.event_is_lasso_turn(event^) { break }
+		if game.event_is_lasso_turn(event^) || game.event_is_first_person_shot(event^) { break }
 		if event.target == entity { return .Block, true }
 		// A blow stopped by a guard was still struck.
 		if event.source == entity && game.event_is_attack(event^) && !returned { return .Attack, true }
@@ -440,7 +444,8 @@ update_living_actors :: proc(renderer: ^Renderer, room: ^game.Room) {
 	snapshot := v.snapshot
 	if snapshot.player.visible { living_observe(renderer, state, room, snapshot.player, .Pilgrim, now) }
 	for actor in snapshot.enemies[:snapshot.enemy_count] {
-		if !actor.visible { continue }
+		// The Pinball's ball is no card: no clip, no voice, no fall (pinball.odin).
+		if !actor.visible || tactical_pinball_holds(renderer, actor.entity) { continue }
 		if character, ok := flipbook_character(sprite_key_for_enemy(actor.archetype)); ok {
 			living_observe(renderer, state, room, actor, character, now)
 		}

@@ -175,7 +175,8 @@ draw_intent_seals :: proc(renderer: ^Renderer, room: ^game.Room) {
 	now := tactical_world_time(renderer)
 	for actor in v.snapshot.enemies[:v.snapshot.enemy_count] {
 		cell := grid.Position{int(math.round(actor.position.x)), int(math.round(actor.position.y))}
-		if !actor.visible || actor.health <= 0 || !tactical_render_visible(renderer, cell) { continue }
+		// The Pinball's ball intends nothing, and has no card to seal.
+		if !actor.visible || actor.health <= 0 || !tactical_overlay_visible(renderer, cell) || tactical_pinball_holds(renderer, actor.entity) { continue }
 		index, found := game.enemy_index_by_id(room, actor.entity.id)
 		if !found { continue }
 		enemy := &room.enemies[index]

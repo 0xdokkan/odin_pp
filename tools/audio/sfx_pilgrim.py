@@ -1061,3 +1061,66 @@ def pilgrim_catch(seed):
     settle = _cloak(0.2, seed + 4, env_points(0.2, [(0, 0), (0.04, 1), (0.2, 0)]), lo=350, hi=900)
     x = place(D, [(0.0, slap, 0.45), (0.0, body, 0.6), (0.0, glove, 0.25), (0.06, settle, 0.08)] + drops)
     return _finish(x, D, tail=0.03)
+
+
+# --------------------------------------------------------------------------
+# Behind his eyes (Phase 4): the First Person Shooter's dive, rise and AK
+
+@sound("pilgrim_fps_dive", loudness=-20, wet=0.25, marks=(0.0, 0.45, 0.6))
+def pilgrim_fps_dive(seed):
+    """FIRST PERSON SHOOTER: the camera dives into his eyes (the card's
+    First_Person_Begun cue, 0.6 s): the room rushing in (air through a band
+    rising 250 Hz -> 1.6 kHz, swelling to 0.45) over a low glide D2 -> D3,
+    his hood brushing past it (wool from 0.38) and closing round the view at
+    0.6 with a soft muffled thump, the lantern's globe chiming faintly as he
+    looks out."""
+    D = 0.85
+    t = time_axis(D)
+    rush = _track(pink(D, seed) + 0.35 * white(D, seed + 1), _path(D, [(0, 250), (0.45, 1600), (0.6, 900), (D, 600)]), 0.9)
+    rush = _norm(rush) * env_points(D, [(0, 0), (0.45, 1.0), (0.6, 0.25), (D, 0)]) ** 1.5
+    glide = np.sin(2 * np.pi * np.cumsum(_path(D, [(0, _hz("D", 2)), (0.6, _hz("D", 3)), (D, _hz("D", 3))])) / SR)
+    glide *= env_points(D, [(0, 0), (0.4, 1.0), (0.62, 0.0), (D, 0)])
+    hood = _cloak(D, seed + 2, env_points(D, [(0, 0), (0.38, 0.0), (0.55, 1.0), (0.68, 0.0), (D, 0)]), lo=350, hi=1400)
+    close = _thump(0.2, seed + 3, 140, 0.03, drop=0.5, attack=0.003, lp=500, sat=1.2)
+    x = (0.75 * rush + 0.22 * _norm(glide) + 0.3 * _norm(hood)
+         + place(D, [(0.6, close, 0.45), (0.61, _norm(_glass(0.25, tau=0.09)), 0.07)]))
+    return _finish(x, D, tail=0.04)
+
+
+@sound("pilgrim_fps_rise", loudness=-21, wet=0.25, marks=(0.0, 0.2, 0.6))
+def pilgrim_fps_rise(seed):
+    """FIRST PERSON SHOOTER, over: the camera rises back out of his eyes
+    (0.6 s): the hood falling open (wool to 0.15), the room drawing away
+    (air through a band falling 1.4 kHz -> 260 Hz, swelling to 0.2 and gone
+    by 0.6) over a low glide D3 -> D2, and the board's view settling at 0.6
+    with a faint low breath of air."""
+    D = 0.8
+    rush = _track(pink(D, seed) + 0.35 * white(D, seed + 1), _path(D, [(0, 1400), (0.2, 1100), (0.6, 260), (D, 220)]), 0.9)
+    rush = _norm(rush) * env_points(D, [(0, 0), (0.2, 1.0), (0.6, 0.0), (D, 0)]) ** 1.4
+    glide = np.sin(2 * np.pi * np.cumsum(_path(D, [(0, _hz("D", 3)), (0.6, _hz("D", 2)), (D, _hz("D", 2))])) / SR)
+    glide *= env_points(D, [(0, 0), (0.12, 1.0), (0.6, 0.0), (D, 0)])
+    hood = _cloak(D, seed + 2, env_points(D, [(0, 0), (0.03, 1.0), (0.15, 0.0), (D, 0)]), lo=350, hi=1400)
+    settle = _band(pink(0.25, seed + 3), 80, 400) * _env_ad(0.25, 0.03, 0.06)
+    x = 0.75 * rush + 0.22 * _norm(glide) + 0.32 * _norm(hood) + place(D, [(0.58, _norm(settle), 0.2)])
+    return _finish(x, D, tail=0.04)
+
+
+@sound("pilgrim_ak_shot", loudness=-20, wet=0.14, rt60=1.0, marks=(0.0, 0.022))
+def pilgrim_ak_shot(seed):
+    """FIRST PERSON SHOOTER: one round of his paper AK (six a second while
+    the trigger is held, so short and dry, never harsh): the muzzle's crack at
+    0.0 (a broadband blast with its sharp front and a dark low boom), the
+    paper of the rifle snapping with it, and the bolt cycling at 0.022 (a
+    short steel clack of the action); no casing, no tail."""
+    D = 0.22
+    front = _band(white(D, seed), 700, 9000) * _env_ad(D, 0.0003, 0.009)
+    crack = _band(white(D, seed + 6), 1800, 7000) * _env_ad(D, 0.0002, 0.0018)
+    boom = _band(pink(D, seed + 1), 70, 900) * _env_ad(D, 0.001, 0.018)
+    body = _thump(D, seed + 2, 120, 0.018, drop=1.0, attack=0.0008, lp=500, sat=2.0)
+    snap = _band(white(D, seed + 3), 2200, 6000) * _env_ad(D, 0.0003, 0.003)
+    bolt = _modes(0.08, [(2350, 0.009, 1.0), (3480, 0.006, 0.6), (5120, 0.004, 0.35)], seed=seed + 4)
+    bolt = _norm(bolt) + 0.4 * _norm(_band(white(0.08, seed + 5), 2500, 8000)) * _env_ad(0.08, 0.0002, 0.0015)
+    x = (1.0 * _norm(front) + 0.5 * _norm(crack) + 0.55 * _norm(boom) + 0.5 * _norm(body) + 0.3 * _norm(snap)
+         + place(D, [(0.022, _norm(bolt), 0.35)]))
+    x = lowpass(np.tanh(2.6 * _norm(x)), 10000, 2)
+    return _finish(_dc_block(x, 30.0), D, tail=0.03)

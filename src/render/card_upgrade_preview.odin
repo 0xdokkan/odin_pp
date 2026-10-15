@@ -40,6 +40,10 @@ card_upgrade_preview :: proc(card: game.Card_Instance, tactical: bool = false) -
 		case .Lasso: label = "PRIMO COLPO"
 		// CANNA DA PESCA: the room's fishings (its heal stays a d4).
 		case .Fish: label = "PESCHE"
+		// PINBALL: the ball's value (and the one every wall puts it back to).
+		case .Pinball: label = "VALORE"
+		// FIRST PERSON SHOOTER: its seconds behind the player's eyes.
+		case .First_Person: label = "SECONDI"
 		case .Move, .Remove_Status, .Enter_Shadow:
 		}
 		before := game.card_effect_amount(template, card.upgrade_level)

@@ -127,8 +127,9 @@ tactical_critical_scale :: proc(room: ^Room, action: ^Action) {
 			effect.amount += 1
 			if effect.charges > 0 { effect.charges += 1 }
 		// A pool or a fire gives a stack more; the Lazzo's first hit is one
-		// harder (and so is every one after it).
-		case .Draw_Cards, .Create_Card, .Gain_Energy, .Place_Ground, .Lasso:
+		// harder (and so is every one after it), and so is the Pinball's value
+		// (and the one every wall puts it back to).
+		case .Draw_Cards, .Create_Card, .Gain_Energy, .Place_Ground, .Lasso, .Pinball:
 			effect.amount += 1
 		case .Deploy_Device:
 			effect.amount = critical_damage(effect.amount)
@@ -136,6 +137,9 @@ tactical_critical_scale :: proc(room: ^Room, action: ^Action) {
 		// Unchanged; Movimento Ombra's four seconds never grow either, and the
 		// Canna da Pesca is never played on the tick.
 		case .Move, .Remove_Status, .Discard_Cards, .Enter_Shadow, .Fish:
+		// Two seconds more behind the player's eyes.
+		case .First_Person:
+			effect.amount += FIRST_PERSON_CRITICAL_SECONDS
 		}
 	}
 }

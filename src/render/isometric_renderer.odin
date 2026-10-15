@@ -121,7 +121,7 @@ hand_card_step :: proc(renderer: ^Renderer, card_count: int) -> f32 {
 }
 
 hand_card_bounds :: proc(renderer: ^Renderer, card_index, card_count: int) -> rl.Rectangle {
-	if renderer == nil || card_count <= 0 || card_count > game.MAX_HAND_CARDS ||
+	if renderer == nil || card_count <= 0 || card_count > game.MAX_HAND_CAPACITY ||
 	   card_index < 0 || card_index >= card_count {
 		return {}
 	}
@@ -140,7 +140,14 @@ hand_card_bounds :: proc(renderer: ^Renderer, card_index, card_count: int) -> rl
 }
 
 hand_raised_card_bounds :: proc(renderer: ^Renderer, card_index, card_count: int) -> rl.Rectangle {
-	if renderer != nil && renderer.tactical.enabled { return tactical_hand_card_bounds(renderer, card_index, card_count) }
+	// A raised card of an overlapping hand keeps the pointer from where it
+	// rests up to where it rose (tactical_hand_raised_card_bounds), so the
+	// rise never moves it away from under the mouse.
+	if renderer != nil && renderer.tactical.enabled {
+		resting := tactical_hand_card_bounds(renderer, card_index, card_count)
+		raised := tactical_hand_raised_card_bounds(renderer, card_index, card_count)
+		return {resting.x, raised.y, resting.width, resting.y+resting.height-raised.y}
+	}
 	resting := hand_card_bounds(renderer, card_index, card_count)
 	if resting.width <= 0 {
 		return {}
@@ -323,6 +330,12 @@ card_colors :: proc(id: game.Card_Id, affordable: bool) -> (fill, outline: rl.Co
 	// The Canna da Pesca's water.
 	case .Fishing_Rod:
 		fill, outline = rl.Color{26, 48, 72, 245}, rl.Color{118, 186, 236, 255}
+	// The Pinball's steel.
+	case .Pinball:
+		fill, outline = rl.Color{44, 50, 60, 245}, rl.Color{196, 206, 220, 255}
+	// The First Person Shooter's gunmetal and olive.
+	case .First_Person:
+		fill, outline = rl.Color{40, 46, 38, 245}, rl.Color{176, 186, 132, 255}
 	case .Count:
 		fill, outline = rl.Color{45, 49, 52, 245}, rl.Color{105, 116, 116, 255}
 	}
@@ -392,7 +405,7 @@ card_detail_lines :: proc(card: game.Card_Instance) -> (first, second: cstring) 
 	case .Chain_Lightning:
 		return fmt.ctprintf("%d DAMAGE EACH", 3+upgrade), "UP TO 3 / HOP 3"
 	case .Fate_Strike, .Sundering_Blow, .Prismatic_Barrage, .Twin_Venom, .Shock_Floor, .Fate_Dice, .Venom_Blade,
-	     .Shadow_Step, .Poison_Pool, .Wildfire, .Deflect, .Coffin, .Lasso, .Fishing_Rod:
+	     .Shadow_Step, .Poison_Pool, .Wildfire, .Deflect, .Coffin, .Lasso, .Fishing_Rod, .Pinball, .First_Person:
 	case .Tesla_Coil: return fmt.ctprintf("%d / DISTANCE DAMAGE", 8+upgrade), "FIELD CONSUMES 4 COILS"
 	case .Titan_Grip: return fmt.ctprintf("%d DAMAGE / THROW 2", 3+upgrade), "INTERRUPT / STAGGER 1"
 	case .Storm_Crown: return fmt.ctprintf("%d DAMAGE EACH", 5+upgrade), "LEGENDARY / CHAIN 3"
@@ -481,6 +494,8 @@ card_short_name :: proc(id: game.Card_Id) -> cstring {
 	case .Venom_Blade: return "LAMA"
 	case .Lasso: return "LAZZO"
 	case .Fishing_Rod: return "CANNA"
+	case .Pinball: return "PINBALL"
+	case .First_Person: return "FPS"
 	case .Count:
 	}
 	return ""
@@ -736,6 +751,21 @@ draw_card_sigil :: proc(bounds: rl.Rectangle, id: game.Card_Id, color: rl.Color)
 		rl.DrawLineEx({center.x+radius-6, center.y-radius+2}, {center.x+radius-2, center.y+6}, 1, color)
 		rl.DrawCircleV({center.x+radius-2, center.y+8}, 3, color)
 		rl.DrawEllipseLines(c.int(center.x+radius-2), c.int(center.y+12), 9, 3, color)
+	case .Pinball:
+		// A ball off a round bumper, two strokes of its run.
+		rl.DrawCircleLinesV({center.x-4, center.y+3}, 10, color)
+		rl.DrawCircleV({center.x-8, center.y-1}, 2, color)
+		rl.DrawCircleLinesV({center.x+13, center.y-11}, 5, color)
+		rl.DrawLineEx({center.x-radius, center.y+radius-2}, {center.x-12, center.y+11}, 2, color)
+		rl.DrawLineEx({center.x-radius+5, center.y+radius+2}, {center.x-7, center.y+14}, 2, color)
+	case .First_Person:
+		// A crosshair: a ring, four ticks and its dot.
+		rl.DrawCircleLinesV(center, radius-4, color)
+		rl.DrawCircleLinesV(center, radius-5, color)
+		for direction in ([4]rl.Vector2{{-1, 0}, {1, 0}, {0, -1}, {0, 1}}) {
+			rl.DrawLineEx(center+direction*(radius-10), center+direction*(radius+2), 3, color)
+		}
+		rl.DrawCircleV(center, 2, color)
 	case .Count:
 	}
 }
@@ -1829,6 +1859,8 @@ draw_card_target_range :: proc(renderer: ^Renderer, room: ^game.Room, card_id: u
 		}
 		// LAZZO: the foes it can take, the heavy ones, and its ring (lasso.odin).
 		if card.definition_id == .Lasso { draw_lasso_preview(renderer, room, card) }
+		// PINBALL: the foes it can take, the heavy ones, and the launch (pinball.odin).
+		if card.definition_id == .Pinball { draw_pinball_preview(renderer, room, card) }
 	} else {
 		request := game.card_target_request_at(definition, room.player.position)
 		evaluation := game.evaluate_card_targeting(room, card, request)
@@ -2465,7 +2497,8 @@ timeline_card_cue_verb :: proc(cue: ^Presentation_Cue) -> cstring {
 	     .Gold_Gained, .Energy_Gained, .Binding_Added, .Binding_Exhausted, .Binding_Expired,
 	     .Pulse_Advanced, .Refocus, .Object_Spawned, .Explosive_Armed, .Explosion, .Explosive_Disarmed, .Room_Hazard_Triggered,
 	     .Dice_Rolled, .Spell_Launched, .Spell_Impact, .Shadow_Entered, .Shadow_Emerged, .Attack_Deflected, .Fate_Rolled,
-	     .Lasso_Caught, .Lasso_Struck, .Lasso_Released, .Fish_Cast, .Fish_Bite, .Fish_Caught:
+	     .Lasso_Caught, .Lasso_Struck, .Lasso_Released, .Fish_Cast, .Fish_Bite, .Fish_Caught,
+	     .Pinball_Made, .Pinball_Launched, .Pinball_Bounced, .Pinball_Bumped, .Pinball_Burst, .First_Person_Begun:
 	}
 	return nil
 }
@@ -2584,9 +2617,13 @@ draw_presentation_cue :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) {
 		draw_timeline_loot_drop_cue(renderer, cue)
 		return
 	}
-	// The Lazzo's MOLLATO shows with its foe's fall (draw_lasso_release_badge).
+	// The Lazzo's MOLLATO shows with its foe's fall (draw_lasso_release_badge);
+	// the Pinball's strike is the player's swing, and its ball touching a solid
+	// thing says nothing (it rings off it); the dive into the player's eyes is
+	// the camera's (first_person.odin).
 	if cue.kind == .Move || cue.kind == .Defeat || cue.kind == .Pulse_Advanced ||
-	   cue.kind == .Shadow_Entered || cue.kind == .Shadow_Emerged || cue.kind == .Lasso_Released {
+	   cue.kind == .Shadow_Entered || cue.kind == .Shadow_Emerged || cue.kind == .Lasso_Released ||
+	   cue.kind == .Pinball_Launched || cue.kind == .Pinball_Bounced || cue.kind == .First_Person_Begun {
 		return
 	}
 	center, has_center := presentation_event_center(renderer, cue.event)
@@ -2685,10 +2722,21 @@ draw_presentation_cue :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) {
 	case .Fish_Caught:
 		label = fishing_catch_label(cue.event)
 		color = FISHING_WATER_LIGHT
+	// PINBALL (pinball.odin): the ball made, a foe struck and its value, the
+	// burst.
+	case .Pinball_Made:
+		label = "PINBALL"
+		color = PINBALL_STEEL_LIGHT
+	case .Pinball_Bumped:
+		label = fmt.ctprintf("COLPO %d", cue.event.amount)
+		color = rl.Color{255, 112, 102, 255}
+	case .Pinball_Burst:
+		label = "POP!"
+		color = PINBALL_STEEL_LIGHT
 	case .Move, .Card_Played, .Card_Drawn, .Card_Moved, .Card_Created, .Refocus,
 	     .Card_Refocused, .Defeat,
 	     .Loot_Dropped, .Loot, .Pulse_Advanced, .Dice_Rolled, .Spell_Launched, .Spell_Impact,
-	     .Shadow_Entered, .Shadow_Emerged, .Lasso_Released:
+	     .Shadow_Entered, .Shadow_Emerged, .Lasso_Released, .Pinball_Launched, .Pinball_Bounced, .First_Person_Begun:
 		unreachable()
 	}
 	draw_timeline_popup(renderer, label, color, center, presentation_cue_progress(cue))

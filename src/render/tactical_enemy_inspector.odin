@@ -15,6 +15,11 @@ tactical_inspected_enemy :: proc(renderer: ^Renderer, room: ^game.Room) -> (^gam
 		}
 	}
 	if !v.living || v.inspected == 0 { return nil, false }
+	// A foe the Pinball has turned into its ball is no longer one to inspect.
+	if game.enemy_is_pinball(room, v.inspected) {
+		v.inspected = 0
+		return nil, false
+	}
 	if renderer_blocks_player_input(renderer) || rl.GetMousePosition() == v.inspected_mouse {
 		if index, found := game.enemy_index_by_id(room, v.inspected); found { return &room.enemies[index], true }
 	}

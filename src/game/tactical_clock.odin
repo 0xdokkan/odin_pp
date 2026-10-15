@@ -112,6 +112,12 @@ tactical_advance_clock :: proc(room: ^Room, seconds: f32) {
 	s.remaining = max(f32(0), s.remaining-elapsed)
 	if s.remaining < 0.00001 { s.remaining = 0 }
 	s.clock_fraction += elapsed
+	// The Pinball's ball rolls on the world's every second, an action's cost
+	// spent at once included (the player acts while it rolls); the controller
+	// rolls them out.
+	tactical_pinball_tick(room, elapsed)
+	// The First Person Shooter's seconds are the world's (first_person.odin).
+	tactical_first_person_tick(room, elapsed)
 	// Frame partitions can leave a tiny rounding remainder at an integer edge.
 	beats := int(s.clock_fraction+0.00001)
 	s.clock_fraction = max(f32(0), s.clock_fraction-f32(beats))

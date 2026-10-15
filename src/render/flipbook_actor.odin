@@ -275,7 +275,8 @@ update_flipbook_actors :: proc(renderer: ^Renderer, room: ^game.Room) {
 	snapshot := v.snapshot
 	if snapshot.player.visible { flipbook_observe(renderer, state, room, snapshot.player, .Pilgrim, now, right) }
 	for actor in snapshot.enemies[:snapshot.enemy_count] {
-		if !actor.visible { continue }
+		// The Pinball's ball is no standee (pinball.odin).
+		if !actor.visible || tactical_pinball_holds(renderer, actor.entity) { continue }
 		if character, ok := flipbook_character(sprite_key_for_enemy(actor.archetype)); ok {
 			flipbook_observe(renderer, state, room, actor, character, now, right)
 		}

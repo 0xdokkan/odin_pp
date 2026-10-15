@@ -152,8 +152,10 @@ tactical_between_windows :: proc(s: ^Tactical_State) -> bool {
 	return s.phase == .Recovery || s.phase == .Stunned
 }
 
-// Cards are also the one thing a stunned player can still play.
+// Cards are also the one thing a stunned player can still play. Behind his
+// eyes (first_person.odin) he plays none: the AK is all he has.
 tactical_allows_cards :: proc(room: ^Room) -> bool {
+	if tactical_first_person_active(room) { return false }
 	if tactical_allows_action(room) { return true }
 	if !tactical_is_stunned(room) { return false }
 	s := &room.player.tactical
@@ -204,8 +206,13 @@ tactical_end_combat :: proc(room: ^Room) {
 	tactical_reset_shadow(s)
 	room.tactical_pulse = {}
 	room.qte = {}
-	// A fight over (the player fallen, or the room cleared) holds no rope.
+	// A fight over (the player fallen, or the room cleared) holds no rope and
+	// rolls no ball.
 	room.lasso = {}
+	room.pinball = {}
+	// Nor his eyes: the board rises back to its own view. The shots fired stay
+	// counted for it.
+	room.first_person.active, room.first_person.trigger = false, false
 }
 
 tactical_finish_cycle_pulse :: proc(room: ^Room, forced: bool) {
@@ -285,8 +292,8 @@ continue_tactical_pulse :: proc(room: ^Room) -> bool {
 		for protect_pass in 0..<2 {
 			for id in ids[:count] {
 				index, found := enemy_index_by_id(room, id)
-				// A foe the Lazzo holds in the air does nothing.
-				if !found || enemy_is_lassoed(room, id) { continue }
+				// A foe out of play (the Lazzo's, the Pinball's) does nothing.
+				if !found || enemy_is_out_of_play(room, id) { continue }
 				// Stagger interrupts committed telegraphs before its status expires,
 				// even when this enemy's ordinary cadence is not due yet.
 				if room.enemies[index].tactical_cooldown > 0 && !enemy_is_staggered(room, &room.enemies[index]) { continue }

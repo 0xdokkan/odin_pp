@@ -44,9 +44,9 @@ tactical_reset_shadow :: proc(s: ^Tactical_State) {
 
 // Only from a still world: the window open (or a stun, which leaves cards),
 // nothing resolving, queued, casting or running, no defence or ring pending,
-// no foe on the Lazzo's rope.
+// no foe on the Lazzo's rope, not behind his own eyes (first_person.odin).
 tactical_can_begin_shadow :: proc(room: ^Room) -> bool {
-	if !tactical_enabled(room) || room.phase != .Combat { return false }
+	if !tactical_enabled(room) || room.phase != .Combat || tactical_first_person_active(room) { return false }
 	s := &room.player.tactical
 	return (s.phase == .Decision || s.phase == .Stunned) && s.remaining > 0 &&
 	       !room.tactical_pulse.pending && s.queued_beats == 0 && room.qte.kind == .None &&

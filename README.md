@@ -92,19 +92,25 @@ Gli smoke e i laboratori non scrivono i profili.
 
 Il pulsante **Prova meccaniche** del menu (o `--mechanics-lab`) apre una sandbox
 per provare le meccaniche nuove, una alla volta. È un'arena grande 23x17 senza
-ostacoli né nebbia, con il giocatore al centro. Il combattimento non finisce mai:
-l'ultimo nemico ucciso non ripulisce la stanza, e ogni 4 secondi di gioco arriva
-un nemico casuale (Chaser, Archer, Brute, Bomber o Custode) su una casella libera
-ad almeno 4 celle dal giocatore, fino a 6 insieme; un'arena vuota si riempie
-subito. Gli easter egg si riaprono ogni volta. Il mazzo contiene **una copia di
-Movimento Ombra, una di ogni carta nuova della Fase 2** (Pozza di Veleno,
-Incendio, Deflect, Feretro, Dado del Destino e Lama Velenosa) **e una del
-Lazzo e della Canna da Pesca**: le prime otto in mano, una mano piena (energia
-12), la Canna in attesa fra le esaurite, perché non si pesca mai in mano (vedi
-[Movimento Ombra](#movimento-ombra),
+ostacoli né nebbia, con il giocatore al centro. Il combattimento non finisce
+mai: l'ultimo nemico ucciso non ripulisce la stanza, e ogni 4 secondi di gioco
+arriva un nemico casuale (Chaser, Archer, Brute, Bomber o Custode) su una
+casella libera ad almeno 4 celle dal giocatore, fino a 6 insieme; un'arena vuota
+si riempie subito. Gli easter egg si riaprono ogni volta. Il mazzo contiene
+**una copia di Movimento Ombra, una di ogni carta nuova della Fase 2** (Pozza di
+Veleno, Incendio, Deflect, Feretro, Dado del Destino e Lama Velenosa), **una del
+Lazzo e della Canna da Pesca e una del Pinball e di First Person Shooter**:
+tutte in mano (energia 12) tranne la Canna, in attesa fra le esaurite perché non
+si pesca mai in mano. Sono dieci carte, più di quante ne tenga mai la mano del
+gioco: restano larghe come in una mano piena di otto e si sovrappongono da un
+lato all'altro dello schermo, ognuna in vista quanto le serve per mostrare tutte
+le sue parole, l'icona, i segni della rarità e il tasto, in qualunque ordine
+stiano; quella sotto il mouse si alza intera sopra le altre, e `9` e `0` giocano
+la nona e la decima (vedi [Movimento Ombra](#movimento-ombra),
 [Pozza di Veleno e Incendio](#pozza-di-veleno-e-incendio),
 [Deflect, Feretro, Dado del Destino e Lama Velenosa](#deflect-feretro-dado-del-destino-e-lama-velenosa),
-[Lazzo](#lazzo) e [Canna da Pesca](#canna-da-pesca)). Niente ricompense, uscita o
+[Lazzo](#lazzo), [Canna da Pesca](#canna-da-pesca), [Pinball](#pinball) e
+[First Person Shooter](#first-person-shooter)). Niente ricompense, uscita o
 profilo; `F5` ricomincia, `F10` torna al menu. Arena, mazzo e ritmo degli arrivi
 sono in [mechanics_lab.odin](src/mechanics_lab.odin) e
 [sandbox.odin](src/game/sandbox.odin): per provare una nuova meccanica basta
@@ -133,8 +139,9 @@ i colpi che si vedono sul tavolo, ognuno con la sua arma di carta
 ([Il tavolo](#il-tavolo-cartoncini-vivi-cerchi-e-segnalini)). Le carte nuove della
 Fase 2 ([Pozza di Veleno e Incendio](#pozza-di-veleno-e-incendio) e
 [Deflect, Feretro, Dado del Destino e Lama Velenosa](#deflect-feretro-dado-del-destino-e-lama-velenosa))
-compaiono fra ricompense e negozio di ogni run tattica, come il [Lazzo](#lazzo) e
-la [Canna da Pesca](#canna-da-pesca).
+compaiono fra ricompense e negozio di ogni run tattica, come il [Lazzo](#lazzo),
+la [Canna da Pesca](#canna-da-pesca), il [Pinball](#pinball) e
+[First Person Shooter](#first-person-shooter).
 La prova resta la sandbox in cui provare le prossime.
 
 **Intenzioni dei nemici (`F6`).** Nel gioco i nemici mostrano cosa stanno per
@@ -184,7 +191,7 @@ misure e un ascolto di tutta la famiglia, senza toccare il gioco.
 | `--smoke-menu` | cattura `odin_pp_menu.png` dopo 30 frame ed esce |
 | `--animation-speed=2` | velocità delle animazioni ordinarie, fra 0.25x e 4x; non accelera cast o dadi M8 |
 | `--fast` | velocità 4x |
-| `--mechanics-lab` | Prova meccaniche: arena aperta senza fine, mazzo delle carte in prova (Movimento Ombra, Pozza di Veleno, Incendio, Deflect, Feretro, Dado del Destino, Lama Velenosa, Lazzo, Canna da Pesca), nemici che continuano ad arrivare; `F7` libera l'arena per la Canna da Pesca |
+| `--mechanics-lab` | Prova meccaniche: arena aperta senza fine, mazzo delle carte in prova (Movimento Ombra, Pozza di Veleno, Incendio, Deflect, Feretro, Dado del Destino, Lama Velenosa, Lazzo, Pinball, First Person Shooter, Canna da Pesca), nemici che continuano ad arrivare; `F7` libera l'arena per la Canna da Pesca |
 | `--spell-lab` | arena con Firebomb, Fate Strike, Chain Lightning, Sundering Blow e Guard |
 | `--dice-lab` | arena con Fate Strike, Sundering Blow, Prismatic Barrage, Twin Venom e Guard |
 | `--dice-set-lab` | tavolo 3D del set D4/D6/D8/D10/D%/D12/D20: selezione, lancio e rotazione con il mouse |
@@ -382,7 +389,7 @@ a Victory, la morte del player a Defeat.
 |---|---|
 | hover su carta | mostra regole, costo e range |
 | trascina carta sulla griglia | anteprima di area, percorso, landing e blocker; il rilascio prova la giocata |
-| `1`–`8` in Combat | gioca una carta non spaziale o seleziona una carta spaziale |
+| `1`–`8` in Combat | gioca una carta non spaziale o seleziona una carta spaziale (nella mano da dieci della Prova meccaniche anche `9` e `0`) |
 | click su cella | conferma il bersaglio della carta selezionata |
 | `Esc` / click destro | annulla selezione o drag |
 | `WASD` | un passo per pressione; contro un nemico esegue un bump attack senza muovere il player |
@@ -476,8 +483,9 @@ del movimento è solo il passo in diagonale.
 | Carta: danni | x1,5, almeno +2 |
 | Carta: scudo, cura, oro | x1,5, almeno +1 |
 | Carta: altri status | +1 potenza e +1 durata (Veleno, Bruciatura, Rallentamento e le cariche del Viandante: +1 stack, non hanno durata; Lama Velenosa: il dado più uno) |
-| Carta: pesca, energia, carte create, reazioni | +1 (anche il primo colpo del Lazzo) |
+| Carta: pesca, energia, carte create, reazioni | +1 (anche il primo colpo del Lazzo e il valore del Pinball, quello da cui parte e a cui lo riportano i muri) |
 | Carta-dispositivo | danno x1,5 (almeno +2); la Tesla nasce con vita doppia, la Shock Floor con un colpo in più (massimo 21: un 20 del D20 più uno) |
+| First Person Shooter | +2 s dietro gli occhi |
 | Movimento Ombra, Dado del Destino | nessun critico: giocate sul secondo lasciano lo scocco all'azione dopo |
 | Canna da Pesca | mai critica: pesca a stanza liberata, senza finestra |
 | Freccia di Feretro | mai critica: non prende lo scocco |
@@ -603,7 +611,7 @@ le celle che la pozza riempirebbe, e di brace la croce intera che il fuoco
 raggiungerebbe. Sul tavolo piatto (`--flat`) la pozza è un rombo verde con carta e
 inchiostro sui lati asciutti, il fuoco un rombo di brace con la sua fiammella.
 Le carte scrivono `2 VELENO A CELLA` / `SOLO NEMICI / STANZA` e
-`1 BRUCIATURA A CELLA` / `CROCE: +1 A FINESTRA` (con sette o otto carte in mano,
+`1 BRUCIATURA A CELLA` / `CROCE: +1 A FINESTRA` (con sette carte in mano o più,
 sulle carte strette, `Pozza` / `2 VELENO` / `A OGNI CELLA` e `1 BRUCIATURA` /
 `CRESCE A CROCE`); l'ispettore aggiunge
 `AREE CHIUSE: SI RIEMPIONO` / `OGNI CELLA ENTRATA AVVELENA` e
@@ -725,7 +733,7 @@ Destino possono caricare lo stesso urto.
 
 Le carte scrivono `+1 RIFLESSO` / `RIMANDA UN COLPO`, `3 FRECCE / CTRL+CLIC` /
 `1 DANNO + 1 STATUS`, `1d4 SU 3 COLPI` / `UN TIRO A OGNI COLPO` e
-`1d4 COLPI AVVELENATI` / `2 VELENO A COLPO` (con sette o otto carte in mano
+`1d4 COLPI AVVELENATI` / `2 VELENO A COLPO` (con sette carte in mano o più
 `+1 RIFLESSO` / `IL COLPO TORNA`, `3 FRECCE` / `CTRL+CLIC`, `Dado` /
 `1d4 A COLPO` / `PER 3 COLPI` e `Lama` / `1d4 COLPI` / `2 VELENO L'UNO`);
 l'ispettore aggiunge
@@ -856,15 +864,16 @@ accorcia. Sul tavolo piatto (`--flat`) l'anello è tratteggiato e la corda
 dritta.
 
 **Il mirino.** Con la carta in mano, i nemici che può prendere hanno un mirino
-color canapa, il boss e il miniboss in portata un mirino rosso e `TROPPO
-PESANTE` sotto i piedi (sopra gli adesivi degli intenti degli altri nemici, e
-le altre scritte del tavolo lo evitano); l'anello che farebbe si vede
-tratteggiato, con le sue caselle (rosse con una croce dove sbatterà, arancio
-dove colpirà un nemico) e, per il nemico sotto il mouse, la casella da cui
-partirà in verde e una freccia nel verso del giro.
+color canapa, il boss e il miniboss in portata un mirino rosso e
+`TROPPO PESANTE` sotto i piedi (sopra gli adesivi degli intenti degli altri
+nemici, e le altre scritte del tavolo lo evitano; se lì c'è già il cuore di un
+vicino, scende di una riga o si sposta di lato, senza coprirlo); l'anello che
+farebbe si vede tratteggiato, con le sue caselle (rosse con una croce dove
+sbatterà, arancio dove colpirà un nemico) e, per il nemico sotto il mouse, la
+casella da cui partirà in verde e una freccia nel verso del giro.
 
-La carta scrive `COLPI 1, 2, 3...` / `-1 VITA A OGNI GIRO` (con sette o otto
-carte in mano `COLPI 1, 2...` / `-1 VITA A GIRO`); l'ispettore aggiunge
+La carta scrive `COLPI 1, 2, 3...` / `-1 VITA A OGNI GIRO` (con sette carte in
+mano o più `COLPI 1, 2...` / `-1 VITA A GIRO`); l'ispettore aggiunge
 `BOSS E MINIBOSS: TROPPO PESANTI` / `SCHIVA O SPINTA: LO MOLLI`. L'icona, nella
 cella 23 dell'atlante (l'ultima della sesta riga,
 [build_card_icons.py](tools/art/build_card_icons.py)), è un cappio di canapa
@@ -999,6 +1008,299 @@ pane che cura il 2 del suo d4. Poi le pesche della stanza sono finite, e un altr
 Canna nel mazzo nessuna di 400 offerte, estratte come le estraggono ricompense,
 negozio e Armeria dimenticata (`card_offer_exclusions`), ne porta un'altra,
 mentre le stesse estrazioni senza di lei ne portano.
+
+### Pinball
+
+`Pinball` (rara, energia 3, **2 s** di finestra, solo tattica: compare fra
+ricompense e negozio delle run tattiche, le run classiche non la offrono e, se
+l'hanno in mano, la rifiutano) trasforma un nemico accanto al Viandante in una
+grossa palla d'acciaio e la manda a rimbalzare per la stanza per 20 secondi; poi
+la palla scoppia e il nemico cade. Regole in
+[pinball.odin](src/game/pinball.odin), tavolo in
+[pinball.odin](src/render/pinball.odin).
+
+**Il colpo.** Il bersaglio è un nemico su una delle otto caselle intorno al
+Viandante (diagonali comprese), visibile e in linea di vista: non dietro un
+angolo chiuso da due blocchi. Il boss (il Demolitore) e il miniboss (il Custode)
+sono troppo pesanti, come per il Lazzo e per il letale del Dado del Destino,
+perché alla fine la palla muore: la carta li rifiuta e la mano scrive
+`TROPPO PESANTE PER IL PINBALL`. Una palla alla volta: mentre una rotola, la
+carta non prende nessun altro (`UNA PALLA ALLA VOLTA`). Il colpo è il cast della
+carta: per i suoi 2 s il mondo è fermo, e la palla con lui. Il nemico diventa la
+palla dov'è; i suoi status spariscono nello sbuffo (anche Veleno e Bruciatura:
+la palla non ne porta), e con loro le sue reazioni e il suo intento. Il
+Viandante la colpisce e la manda via da sé, nella direzione che va da lui al
+nemico girata di 15–35 gradi interi a sinistra o a destra, perché non rimbalzi
+mai su un asse solo. Il giro lo decide il flusso proprio della stanza
+(`Room.pinball_random`, dal suo seme e dai dadi della run quando la stanza
+comincia), mai l'orologio.
+
+**La corsa.** La palla rotola sul tavolo a **7 caselle al secondo** per **20
+secondi del mondo**: un disco di raggio 0,45 che rimbalza elastico su ogni cosa
+solida (un muro, il bordo della stanza, una copertura, un oggetto che blocca il
+passo come un barile, un blocco di ghiaccio o una bobina Tesla, che però non
+prende mai danni) e su ogni nemico a terra, un respingente rotondo di raggio 0,4
+al centro della sua casella. Il moto si risolve da un evento al successivo (un
+contatto, il bordo della casella sotto la palla, la fine del suo tempo), mai a
+fotogrammi: nessun muro viene attraversato e nessun nemico saltato a qualunque
+frame rate, e la stessa stanza dà gli stessi rimbalzi comunque i secondi vengano
+divisi in fotogrammi. La palla passa sopra il Viandante senza fargli niente (né
+rimbalzo né danno) e sotto il nemico appeso al Lazzo. Un nemico che ci entra con
+un passo, una spinta o un arrivo viene colpito subito. Nessuna bobina si posa
+dove sta il suo disco; una cosa solida spinta lì comunque viene attraversata
+finché il disco non ne esce.
+
+**Il valore.** Parte da **2**. Un nemico toccato prende il valore come danno del
+Viandante, con le regole normali (lo Shield lo assorbe, le reazioni rispondono,
+la morte lascia il bottino, ma la stanza si libera solo con lo scoppio), e viene
+spinto di **una cella** via dalla palla, nella più vicina delle otto direzioni,
+con le regole della spinta: un muro, un ostacolo o un corpo lo fermano, e pozze,
+fuochi e trappole della casella in cui entra fanno il loro effetto. La palla
+rimbalza su di lui come su un respingente e il valore sale di uno: 2, 3, 4... Un
+colpo per contatto: lo stesso nemico si colpisce di nuovo solo dopo che la palla
+se n'è staccata. Ogni tocco di un muro o di un'altra cosa solida riporta il
+valore a 2 (al valore della carta).
+
+**La palla fuori dal mondo.** Per i suoi 20 secondi la palla è il nemico stesso,
+ma fuori dal gioco: non occupa una casella, non agisce, non annuncia niente, non
+porta status e niente la raggiunge: né danni, né status, né spinte, né carte
+(aree, catene e Toxic Wave comprese), né le frecce di Feretro, le pozze, i
+fuochi, le trappole, le esplosioni, le scariche Tesla o la protezione del
+Custode. Il mondo intanto va avanti e il Viandante agisce liberamente (passi,
+urti, carte, frecce); solo ciò che ferma il mondo (un cast, la scelta di difesa,
+i dadi a tutto schermo, l'ombra di Movimento Ombra, la pausa) ferma anche la
+palla. La stanza non si libera prima dello scoppio, perché la palla conta fra i
+nemici; se cade il Viandante, la palla si ferma con il combattimento.
+
+**Lo scoppio.** Finiti i 20 secondi la palla scoppia e il nemico cade dove si
+trova: un'uccisione normale del Viandante (nemmeno uno Shield lo salva), con il
+suo bottino lì e la stanza liberata se era l'ultimo.
+
+**Upgrade e secondo.** Ogni upgrade dà +1 al valore di partenza, che è anche
+quello a cui la riportano i muri, fino al livello 5 (`VALORE 2 -> 3`); giocata
+sul secondo, +1 anche lei.
+
+**Sul tavolo.** La palla è pixel art d'acciaio dipinta da codice, larga 1,2
+caselle: una sfera in sei toni che riflette la stanza (la luce in alto,
+l'orizzonte chiaro, il pavimento scuro in basso), il suo riflesso bianco, una
+fascia del colore del nemico perché si sappia chi era (rossa per il ghoul,
+azzurra per il balestriere, arancio per il bruto, viola per il bombarolo), la
+linea d'inchiostro e il margine bianco di carta dei cartoncini con il suo
+taglio. Durante il cast il cartoncino del nemico svanisce in uno sbuffo di carta
+e la palla si gonfia oltre la sua misura e si assesta; il cartoncino del
+Viandante tira il colpo con la sua lanterna (o con l'arma M8 che ha in mano) e
+lo fa arrivare sulla palla proprio quando il cast finisce e la palla parte, con
+una stella d'oro. Poi il tavolo la mostra dove la stanza dice che è, a ogni
+fotogramma, con la fascia che gira con la corsa e un'ombra tonda e morbida
+sotto. A ogni muro una stella grigia e uno sbuffo di polvere di pietra, a ogni
+nemico una stella rossa fra la palla e il cartoncino e `COLPO n` sopra di lui.
+Allo scoppio la palla si gonfia con un lampo bianco e si apre in carta e
+coriandoli del suo colore, con `POP!` sopra la sua cima gonfia (il lampo e la
+carta restano in vista); il cartoncino del nemico non torna più, nemmeno a
+cadere. La telecamera resta sul Viandante, non segue la palla. Sul tavolo piatto
+(`--flat`) lo stesso disegno sta sopra il pavimento; dietro gli occhi del
+Viandante ([First Person Shooter](#first-person-shooter)) la palla sbiadisce
+quando gli rotola addosso, e all'altezza degli occhi sparisce.
+
+**Il mirino.** Con la carta in mano i nemici che può prendere hanno un mirino
+d'acciaio, il boss e il miniboss in portata un mirino rosso e `TROPPO PESANTE`
+sotto i piedi, lontano dai cuori dei vicini come per il [Lazzo](#lazzo); per il
+nemico sotto il mouse il tavolo traccia la partenza della palla (trattini di
+carta sull'inchiostro, fino a dove il disco toccherebbe la prima cosa solida,
+quattro caselle al massimo, e una punta), già girata come la girerà il flusso
+della stanza.
+
+**L'HUD.** Mentre la palla rotola l'HUD ha un chip d'acciaio subito dopo Veleno
+e Bruciatura del Viandante: `PINBALL 14s x5`, i secondi che restano e il valore
+(con poco spazio `PIN 14s x5`).
+
+La carta scrive `COLPI 2, 3, 4...` / `MURO: TORNA A 2 / 20s` (con sette carte in
+mano o più `COLPI 2, 3...` / `MURO: 2 / 20s`; nel classico `SOLO TATTICA`);
+l'ispettore aggiunge `BOSS E MINIBOSS: TROPPO PESANTI` /
+`DOPO 20s SCOPPIA E CADE`. L'icona, nella cella 25 dell'atlante (la seconda
+della settima riga, [build_card_icons.py](tools/art/build_card_icons.py)), è una
+palla cromata illuminata dall'alto a sinistra che colpisce un respingente (un
+cappello rosso con un riflesso chiaro in cima, in un anello d'oro), con una
+scintilla fra i due. Nella Prova meccaniche ha i suoi suoni, fatti da codice
+come gli altri ([SOUND_SPEC.md](tools/audio/SOUND_SPEC.md)): la carta (uno
+stantuffo tirato indietro, la molla che sale di tono e il cricchetto sempre più
+fitto, fermato a fondo corsa; poi il cartoncino del nemico appallottolato come
+un foglio e la palla che cade intera, un tintinnio d'acciaio), il colpo che la
+manda via (ferro sull'acciaio, la palla che risuona, un fruscio che si
+allontana), il tocco di un muro (un piccolo toc d'acciaio sulla pietra, breve,
+anche più volte al secondo), il respingente di un nemico (un bong cavo, la carta
+schiaffeggiata e lo squillo del respingente, sempre più acuto man mano che il
+valore sale) e lo scoppio (un palloncino di carta, coriandoli che cadono, un
+ultimo tintinnio). Finché è la palla il nemico non fa sentire niente di suo, e
+il colpo del Viandante non aggiunge quello della lanterna.
+
+Lo smoke `--smoke-mechanics-lab` la gioca dalla mano, la filma
+([Verifica e smoke test](#verifica-e-smoke-test)) e ne controlla le regole. Il
+Viandante sta al centro di un'arena nuova con un balestriere avvelenato accanto
+a est, il Custode accanto a sud-ovest, un bruto a due celle e altri nemici
+fermi; il flusso della stanza è fissato su un giro di 30 gradi a sinistra, e tre
+ghoul fermi stanno sulla strada della palla. Per la corsa la telecamera si
+allontana, perché la fila e il muro nord restino in vista, e per lo scoppio
+ancora di più. Il mirino segna il balestriere e la sua partenza; sul Custode
+scrive `TROPPO PESANTE` e né la regola né la carta lasciata su di lui lo
+prendono, e il bruto a due celle è fuori portata. Il colpo costa 3 di energia,
+toglie il Veleno al balestriere e tiene fermi il mondo e la palla per tutto il
+cast; la palla parte nella direzione dal Viandante al balestriere girata di 30
+gradi, e la lanterna la raggiunge entro un fotogramma e mezzo dalla fine del
+cast. Poi la palla prende i tre ghoul uno dopo l'altro per 2, 3 e 4, ognuno
+spinto di una cella via da lei, e il muro nord riporta 5 a 2. Per tutti i 20
+secondi ogni nemico toccato prende il valore di quel momento, uno in più del
+precedente, ogni cosa solida lo riporta a 2, ogni spinta è di una cella via
+dalla palla e per ogni contatto il tavolo mostra la sua stella; la vita di ogni
+nemico colpito scende di quanto ha preso, e niente altro. A ogni fotogramma il
+disco della palla resta fuori da ogni casella solida, la sua direzione resta
+unitaria e la vita del balestriere non cambia; un colpo, uno status, una freccia
+o una carta su di lui vengono rifiutati. La palla rotola sopra il Viandante
+senza fargli niente, lui fa un passo mentre lei rotola e il mondo batte un
+secondo dopo l'altro. Il chip dell'HUD sta intero accanto ai morsi e alle
+cariche, anche con un valore di due cifre. Scoppia nel fotogramma che porta la
+palla ai suoi 20 secondi, dopo una ventina di battiti del mondo: il balestriere
+cade sulla casella della palla con il suo bottino, senza che il suo cartoncino
+ricompaia, e l'arena resta in combattimento.
+
+### First Person Shooter
+
+`First Person Shooter` (rara, energia 3, **0 s** di finestra, solo tattica:
+compare fra ricompense e negozio delle run tattiche, le run classiche non la
+offrono e, se l'hanno in mano, la rifiutano) mette il Viandante dietro i suoi
+occhi per **20 secondi del mondo**, con un AK di carta. Si gioca su di sé, con
+il suo tasto o con un secondo clic sulla carta, a finestra aperta o da storditi,
+ma non con la scelta di difesa aperta, con un nemico appeso al Lazzo o dentro
+un'altra prima persona. Non ha cast: la carta di rimpiazzo arriva subito e la
+finestra non perde niente. Regole in
+[first_person.odin](src/game/first_person.odin), tavolo in
+[first_person.odin](src/render/first_person.odin), mouse e tasti in
+[first_person_input.odin](src/first_person_input.odin).
+
+**La vista.** Mentre la carta si mostra, la telecamera scende dalla vista del
+tavolo negli occhi del Viandante, nella sua casella, a 1,05 sopra il pavimento,
+con un campo visivo di 70 gradi: guarda dove guarda lui se è entro 50 gradi da
+dove guardava la telecamera, altrimenti lungo la direzione della griglia più
+vicina a quello sguardo. Da lì la stanza è il tavolo 3D: nemici e oggetti sono i
+soliti cartoncini e pezzi di carta, girati verso di lui. Il suo cartoncino
+svanisce quando la telecamera lo raggiunge, i muri interni diventano interi e
+opachi, quelli del bordo non si abbassano più verso la telecamera, e cuori,
+sigilli e scritte restano solo sui nemici che l'occhio vede (mai dietro un
+muro). Con il tavolo piatto (`--flat`) il tavolo torna 3D per quei secondi, e
+dopo di nuovo piatto. Finiti i secondi, quando il combattimento finisce o se il
+Viandante cade, la telecamera risale com'era scesa, in 0,6 s.
+
+**Il mouse.** Il cursore sparisce ed è catturato: il mouse gira la vista (a
+destra gira a destra, in su guarda in su), libera intorno e fino a 0,55 radianti
+in su e in giù, con la sensibilità del mouse delle impostazioni. `P`, e qui
+anche `Esc`, mettono in pausa e liberano il mouse; lo liberano anche la perdita
+del focus, una finestra sopra il tavolo e la fine della vista. Un clic fatto
+prima (quello che riprende dalla pausa, il doppio clic della carta) non spara
+finché non lo si rilascia, come nella prova FPS di Cripta delle Rune, da cui
+vengono anche la cattura e la sensibilità.
+
+**L'AK.** In basso a destra c'è un AK di carta, pixel art dipinta da codice con
+gli strati dei cartoncini ritagliati (il margine bianco compreso), al centro un
+mirino. Tenendo premuto il tasto sinistro spara **6 colpi al secondo** da **1
+danno**, senza munizioni e senza tempo di finestra. Ogni colpo segue la linea
+del mirino dall'occhio, casella per casella, e il primo nemico che incontra lo
+prende: un attacco normale del Viandante (lo Shield lo assorbe, le reazioni
+rispondono, la morte lascia il bottino e può liberare la stanza). Un muro, il
+bordo della stanza, una copertura o un oggetto che blocca il passo lo fermano,
+qualunque sia la loro altezza, e così un angolo chiuso da due blocchi; il
+pavimento lo ferma dove la linea lo raggiunge, e una casella fuori vista lo
+perde. Ogni nemico è il suo cartoncino, girato verso l'occhio: il colpo lo
+prende dovunque la linea ne incontri la carta, bordo bianco compreso, larga a
+ogni altezza quanto la carta del cartoncino vivo (gli artigli larghi, la testa
+più stretta), anche dove sporge sulla casella accanto a quella che la linea
+attraversa; accanto alla carta e sopra la sua cima il colpo passa e va avanti.
+La linea parte dall'occhio dove la vista lo mostra, anche mentre scivola da una
+casella all'altra, e trova i cartoncini dove il tavolo li mostra, anche mentre
+scivolano verso la casella nuova o saltano: il colpo va dove il mirino stava
+sopra quello che si vedeva, e il mirino si scalda solo lì. Il nemico appeso al
+Lazzo e la palla del [Pinball](#pinball) non sono corpi per i colpi; gli oggetti
+non si danneggiano. Un colpo non è un'azione del Viandante: il suo Veleno non
+morde e il suo cartoncino non colpisce. Il grilletto spara un colpo ogni sesto
+di secondo e da un fotogramma all'altro porta al più il ritardo di un colpo,
+quindi sono 6 al secondo a qualunque frame rate; i colpi aspettano mentre si
+risolve un battito, mentre è aperta la scelta di difesa e durante un cast.
+
+**I passi.** `W`, `A`, `S` e `D` fanno un passo di una casella secondo la vista:
+`W` avanti (lungo la direzione della griglia più vicina alla vista), `S`
+indietro, `A` a sinistra e `D` a destra, ognuno con le regole e il tempo di un
+passo normale (contro un nemico è l'urto: si vede dove colpisce, sulla carta del
+nemico, perché la lanterna svanisce con il cartoncino del Viandante e non passa
+davanti agli occhi), e l'occhio scivola da una casella all'altra. Anche la
+schivata (`Shift` + `WASD`) e l'atterraggio della schivata di difesa seguono la
+vista; i tasti delle diagonali (`Q`, `E`, `Z`, `C`) tacciono, `Spazio` aspetta.
+
+**Niente carte.** Per tutti quei secondi la mano scivola sotto il bordo dello
+schermo e nessuna carta si gioca, nemmeno con i tasti; niente frecce di Feretro,
+Refocus, abilità, 6 RANCH 7 o Movimento Ombra, e niente mappa (`Tab` e il
+pulsante tacciono), e il puntatore non arriva a nessun pulsante: solo l'AK. Il
+resto va avanti come sempre: l'orologio della finestra, gli intenti e i colpi
+dei nemici con la loro scelta di difesa, i morsi della Bruciatura, i fuochi.
+
+**Il tavolo e l'HUD.** Ogni colpo vola come un tracciante di carta dalla bocca
+dell'AK fino a dove si ferma e lì fa una scintilla: una stella rossa su un
+nemico, una stella d'oro e schegge di pietra su una cosa solida (sul corpo che
+l'ha fermato, anche se basso), polvere sul pavimento. L'AK rincula a ogni colpo
+con una fiammata alla bocca, in due disegni che si alternano; il mirino si
+scalda sopra un nemico e ne segna gli angoli quando un colpo va a segno. Le
+ferite dell'AK non fanno animare né il Viandante né il colpito e lasciano
+piccoli segnalini di danno. In basso a sinistra, dove stava la mano, un riquadro
+conta i secondi (`FPS 12s`, rosso negli ultimi 3); la riga di stato dice
+`MIRA COL MOUSE / CLIC: SPARA / WASD: PASSI`, i pulsanti della mappa e del
+personaggio sono spenti (il puntatore è della vista) e, a ogni ferita (un colpo
+nemico, un morso della Bruciatura o del suo Veleno), i bordi dello schermo
+lampeggiano di rosso e la vista trema un poco. Vita e finestra restano al loro
+posto nell'HUD.
+
+**Upgrade e secondo.** Ogni upgrade dà +2 s, fino al livello 5 (30 s,
+`SECONDI 20 -> 22`); giocata sul secondo, +2 s anche lei.
+
+La carta scrive `PRIMA PERSONA 20s` / `AK: 6 COLPI/s, 1 DANNO` (con sette carte
+in mano o più `FPS` / `FPS 20s` / `AK: 6 COLPI/s`; nel classico `FPS 20s` /
+`SOLO TATTICA`); l'ispettore aggiunge `NIENTE CARTE: SOLO L'AK` /
+`WASD SECONDO LA VISTA`. L'icona, nella cella 26 dell'atlante (la terza della
+settima riga, [build_card_icons.py](tools/art/build_card_icons.py)), è un AK di
+profilo (calcio, impugnatura e paramano di legno, castello d'acciaio e
+caricatore a banana) con la fiammata alla bocca e tre bossoli d'ottone che
+volano via, dentro l'anello rosso di un mirino. Nella Prova meccaniche ha i suoi
+suoni, fatti da codice come gli altri
+([SOUND_SPEC.md](tools/audio/SOUND_SPEC.md)): la carta (l'AK preparato: il
+caricatore inserito, la leva d'armamento tirata indietro e lasciata andare), la
+discesa negli occhi (la stanza che arriva in un soffio, il cappuccio che si
+chiude intorno alla vista con un tonfo morbido) e la risalita, ogni colpo (breve
+e secco: lo schiocco della bocca, la carta del fucile, l'otturatore), il colpo
+che ferisce (il cartoncino bucato, un tonfo sordo) e quello che si ferma sulla
+pietra (una scheggia e il fischio del rimbalzo); il colpito non aggiunge la sua
+ferita.
+
+Lo smoke `--smoke-mechanics-lab` la gioca dalla mano, la filma
+([Verifica e smoke test](#verifica-e-smoke-test)) e ne controlla le regole. Le
+sue parole stanno sulla carta della mano a ogni livello, e anche su quelle più
+larghe del gioco (mani da cinque e da sei, negozio, ricompense), dove il nome è
+`FPS`. Giocata su di sé costa 3 di energia e nessun secondo di finestra, dura 20
+secondi e non ha cast; una carta, un Refocus e una freccia vengono rifiutati. La
+telecamera arriva negli occhi, il cartoncino del Viandante sparisce, la mano
+scivola via e la discesa suona. Un secondo di grilletto tenuto, a 60 fotogrammi
+al secondo, spara 6 colpi nel ghoul tre celle a nord, ognuno da un punto (il suo
+cuore va da 40 a 34); in quei 72 fotogrammi la finestra e i secondi della vista
+calano di 1,2 s e non di più, il Veleno del Viandante non morde e lui non perde
+vita; suonano 6 colpi, né la lanterna né la ferita del ghoul. A ovest un blocco
+di ghiaccio ferma un colpo e il balestriere dietro resta intatto; a sud il muro
+del bordo ne ferma un altro. Con la vista a est `W`, `D`, `S` e `A` vanno a est,
+sud, ovest e nord, e l'occhio scivola solo in avanti fino al centro della
+casella; `W` contro un nemico è un urto e `Shift` con `D` schiva di due celle a
+sud. Il colpo di un ghoul libero apre la scelta di difesa dietro gli occhi, con
+i secondi della vista fermi come quelli del mondo, e `E` poi `A` schiva a nord,
+la sinistra della vista; un colpo lasciato passare fa lampeggiare i bordi di
+rosso. Nel recupero dopo la fine della finestra l'AK spara ancora. Finiti i 20
+secondi, dopo una ventina di battiti del mondo, la vista finisce, la telecamera
+risale con il suo suono e il mouse torna libero. Una copia +5 dura 30 secondi, e
+un tavolo piatto diventa 3D per la vista e di nuovo piatto dopo `F7`. Il
+riquadro dei secondi e la riga dell'HUD ci stanno interi.
 
 ### Il tavolo: cartoncini vivi, cerchi e segnalini
 
@@ -1440,7 +1742,7 @@ odin run src -o:none -- --classic
 | `--smoke-m7-view` | prova grafica di scena, oggetti 3D, fog, ologramma, QTE e menu |
 | `--smoke-m8-view` | prova 3D di d4, dispositivi, offerta del ring, equipaggiamento, scheda personaggio, tag match e cambio stanza |
 | `--smoke-western` | nuvoletta 6 RANCH 7: apertura automatica, volo delle carte, insegna, porte, corsa a tempo e premio |
-| `--smoke-mechanics-lab` | Prova meccaniche: arena aperta, mano con tutto il mazzo in prova (e ogni parola di ogni sua carta, a ogni livello, misurata con il font del gioco sulle carte da 109 pixel della mano, la Canna sul suo slot, e nell'ispettore: ogni riga ci sta senza stringere le lettere, rimpicciolirsi o tagliarsi, nessun nome tagliato), ring riaperto, arrivi fino al massimo, ultima uccisione senza fine del combattimento, cartoncino del giocatore di nuovo in piedi dopo morte e riavvio, cartoncini vivi (un passo e un attacco fotogramma per fotogramma), cerchi d'azione e segnalini di danno e cura, gli status a stack (Veleno, Bruciatura e Rallentamento su un nemico, Bruciatura e Veleno sul giocatore: etichette di carta ai piedi, nomi e stack nell'HUD e nell'ispettore del nemico, `odin_pp_living_statuses_NN.png` e `odin_pp_mechanics_lab_statuses.png`; la finestra che scade subito dopo li fa bruciare), i suoni che ogni azione mette in coda (passo, colpo, ferita, caduta, cura, status, battito, stordimento: senza dispositivo audio, li conta) e infine un Movimento Ombra giocato dalla mano: finestra e clock del mondo fermi per tutta l'ombra, quattro passi dell'ombra con una diagonale sul suo primo battito, risalita sull'ultima casella dell'ombra, nessun passo del Viandante fra i suoni e tutti quelli dell'ombra (carta, sprofondare, passi, CRITICO, battiti, risalita); per finire ogni colpo uno alla volta, con la sua arma di carta: il dardo nel Viandante e nel pavimento, il fendente del bruto sulle tre caselle e la sua carica colpita all'arrivo, gli artigli del ghoul, il pastorale, il bastone, la bomba del bombarolo, la brace dell'arcimago su un barile e i colpi del Viandante con la lanterna e con le due armi M8 (ogni arma deve comparire); ultimo, il Rallentamento sul sigillo: un bruto rallentato di 2 compie il passo già annunciato, poi annuncia il prossimo intento 2 secondi più lungo (due tacche in più) e, compiuta quell'azione, perde uno stack e trattiene il successivo di un secondo solo; infine Pozza di Veleno e Incendio dalla mano: un anello di pozze chiuso dall'ultima, che allaga l'area (otto celle da 2 Veleno) e avvelena una volta sola il chaser rimasto dentro, un chaser che attraversa due pozze schizzando e prendendo 2 Veleno a ogni cella, il Viandante che entra in una pozza sua senza prendere niente, un fuoco accanto a un bruto che allunga i bracci per quattro finestre, lo prende alla seconda (Bruciatura 1, che morde dalla terza), brucia la casella del Viandante senza segnarlo e si spegne alla quinta, con i suoni delle carte, dello schizzo e del fuoco che si allarga e si spegne; ultime le cariche del Viandante: Deflect su un dardo (lo stesso dardo torna nel balestriere), su un fendente e su una carica (risposta con la lanterna), mai con la scelta di difesa, il Viandante illeso e fermo e l'attaccante con i 3 del colpo, Feretro con `Ctrl` (segnato il nemico sulla linea di tiro, non quello dietro una copertura, su cui il clic non scocca niente) e una freccia da 1 s scoccata dal clic, con 1 danno e uno status, il Dado del Destino su tre urti (un d4 che fa BRUCIATURA 2, una nuova giocata che riporta gli urti a 3, un d20 che fa LETALE e lo stesso 16 che sul Custode è solo un CRITICO) e Lama Velenosa con il suo dado e l'urto avvelenato (con tre cariche in più, i chip dell'HUD: ogni parola intera, il d20 di DESTINO compreso), con i suoni delle carte, delle cariche, del colpo rimandato, della freccia e del dado; per ultimo il Lazzo: a quattro celle dal muro ovest il raggio è 3 (una cella più in là sarebbe 4), il mirino (i nemici che prende, i tre fermi sull'anello, il Custode `TROPPO PESANTE`, che né la regola né la carta prendono), il lancio su un nemico a quattro celle tirato dentro sull'anello e il giro con il mondo che continua: colpi 1, 2 e 3 sui nemici fermi a nord, a sud e a nord-est, spinti di 1, 2 e 3 celle e feriti di 1, 2 e 3 come il nemico in volo, la vita di questo controllata a ogni fotogramma (meno i colpi, meno 1 a ogni giro intero), un balestriere libero che mira e tira al perno (la scelta di difesa si apre, il colpo passa, la corda tiene) e la caduta al dodicesimo giro, con la riga dell'HUD sul giro intera con la finestra fissa e con quella che si accorcia; poi raggio 1 accanto al muro, con gli schianti, ognuno col suo numero solo sul nemico in volo e il giro che torna indietro a ogni schianto, e una schivata che lo lascia andare (atterra sotto di sé e annuncia subito un intento nuovo, senza stordimento, e il suo cartoncino cade con `MOLLATO` mentre la schivata si vede), con i suoni della carta, del lancio, della stretta, dei giri, dei colpi, degli schianti e della corda mollata; infine la Canna da Pesca: `F7` libera l'arena (due nemici fermi cadono e si apre lo slot con `PESCA 1/1`), la canna presa dallo slot e lasciata su una casella a due celle pesca lì (lancio, galleggiante sull'acqua nuova, abboccata, un pesce tirato fuori che vola al Viandante, il suo d4 a 3 e 3 di vita, l'acqua sul tavolo 3D e su quello piatto), poi la pesca della stanza è finita; potenziata a +1, `F7` di nuovo dà una stanza nuova senza acqua e con due pesche (`PESCA 2/2`): dall'acqua esce una carta, mai un'altra canna, che entra nel mazzo, poi la stessa acqua (nessuna casella nuova) dà un pane per il 2 del suo d4 e le pesche finiscono, finché un altro `F7` le ridà tutte e due; per ultima nessuna di 400 offerte porta una seconda Canna a chi ne ha già una, mentre senza di lei ne arrivano, con i suoni della carta al lancio, del tonfo, dell'abboccata, del mulinello, della preda presa e della carta pescata |
+| `--smoke-mechanics-lab` | Prova meccaniche: arena aperta, mano con tutto il mazzo in prova (dieci carte sovrapposte, larghe come in una mano piena di otto, ognuna con tutte le parole della faccia, l'icona, i segni e il tasto in vista prima della successiva, nella mano come la dà e in qualunque ordine, e trovata dal puntatore, quella alzata intera dentro il canvas; ogni parola di ogni sua carta, a ogni livello, misurata con il font del gioco sulle carte da 109 pixel della mano, la Canna sul suo slot, e nell'ispettore: ogni riga ci sta senza stringere le lettere, rimpicciolirsi o tagliarsi, nessun nome tagliato; Pinball e First Person Shooter anche sulle carte più larghe del gioco, mani da cinque e sei, negozio e ricompense), ring riaperto, arrivi fino al massimo, ultima uccisione senza fine del combattimento, cartoncino del giocatore di nuovo in piedi dopo morte e riavvio, cartoncini vivi (un passo e un attacco fotogramma per fotogramma), cerchi d'azione e segnalini di danno e cura, gli status a stack (Veleno, Bruciatura e Rallentamento su un nemico, Bruciatura e Veleno sul giocatore: etichette di carta ai piedi, nomi e stack nell'HUD e nell'ispettore del nemico, `odin_pp_living_statuses_NN.png` e `odin_pp_mechanics_lab_statuses.png`; la finestra che scade subito dopo li fa bruciare), i suoni che ogni azione mette in coda (passo, colpo, ferita, caduta, cura, status, battito, stordimento: senza dispositivo audio, li conta) e infine un Movimento Ombra giocato dalla mano: finestra e clock del mondo fermi per tutta l'ombra, quattro passi dell'ombra con una diagonale sul suo primo battito, risalita sull'ultima casella dell'ombra, nessun passo del Viandante fra i suoni e tutti quelli dell'ombra (carta, sprofondare, passi, CRITICO, battiti, risalita); per finire ogni colpo uno alla volta, con la sua arma di carta: il dardo nel Viandante e nel pavimento, il fendente del bruto sulle tre caselle e la sua carica colpita all'arrivo, gli artigli del ghoul, il pastorale, il bastone, la bomba del bombarolo, la brace dell'arcimago su un barile e i colpi del Viandante con la lanterna e con le due armi M8 (ogni arma deve comparire); ultimo, il Rallentamento sul sigillo: un bruto rallentato di 2 compie il passo già annunciato, poi annuncia il prossimo intento 2 secondi più lungo (due tacche in più) e, compiuta quell'azione, perde uno stack e trattiene il successivo di un secondo solo; infine Pozza di Veleno e Incendio dalla mano: un anello di pozze chiuso dall'ultima, che allaga l'area (otto celle da 2 Veleno) e avvelena una volta sola il chaser rimasto dentro, un chaser che attraversa due pozze schizzando e prendendo 2 Veleno a ogni cella, il Viandante che entra in una pozza sua senza prendere niente, un fuoco accanto a un bruto che allunga i bracci per quattro finestre, lo prende alla seconda (Bruciatura 1, che morde dalla terza), brucia la casella del Viandante senza segnarlo e si spegne alla quinta, con i suoni delle carte, dello schizzo e del fuoco che si allarga e si spegne; ultime le cariche del Viandante: Deflect su un dardo (lo stesso dardo torna nel balestriere), su un fendente e su una carica (risposta con la lanterna), mai con la scelta di difesa, il Viandante illeso e fermo e l'attaccante con i 3 del colpo, Feretro con `Ctrl` (segnato il nemico sulla linea di tiro, non quello dietro una copertura, su cui il clic non scocca niente) e una freccia da 1 s scoccata dal clic, con 1 danno e uno status, il Dado del Destino su tre urti (un d4 che fa BRUCIATURA 2, una nuova giocata che riporta gli urti a 3, un d20 che fa LETALE e lo stesso 16 che sul Custode è solo un CRITICO) e Lama Velenosa con il suo dado e l'urto avvelenato (con tre cariche in più, i chip dell'HUD: ogni parola intera, il d20 di DESTINO compreso), con i suoni delle carte, delle cariche, del colpo rimandato, della freccia e del dado; per ultimo il Lazzo: a quattro celle dal muro ovest il raggio è 3 (una cella più in là sarebbe 4), il mirino (i nemici che prende, i tre fermi sull'anello, il Custode `TROPPO PESANTE`, che né la regola né la carta prendono), il lancio su un nemico a quattro celle tirato dentro sull'anello e il giro con il mondo che continua: colpi 1, 2 e 3 sui nemici fermi a nord, a sud e a nord-est, spinti di 1, 2 e 3 celle e feriti di 1, 2 e 3 come il nemico in volo, la vita di questo controllata a ogni fotogramma (meno i colpi, meno 1 a ogni giro intero), un balestriere libero che mira e tira al perno (la scelta di difesa si apre, il colpo passa, la corda tiene) e la caduta al dodicesimo giro, con la riga dell'HUD sul giro intera con la finestra fissa e con quella che si accorcia; poi raggio 1 accanto al muro, con gli schianti, ognuno col suo numero solo sul nemico in volo e il giro che torna indietro a ogni schianto, e una schivata che lo lascia andare (atterra sotto di sé e annuncia subito un intento nuovo, senza stordimento, e il suo cartoncino cade con `MOLLATO` mentre la schivata si vede), con i suoni della carta, del lancio, della stretta, dei giri, dei colpi, degli schianti e della corda mollata; poi il Pinball: il mirino sul balestriere accanto (i mirini d'acciaio e la partenza della palla, girata di 30 gradi dal flusso della stanza fissato) e sul Custode `TROPPO PESANTE`, che né la regola né la carta prendono, il bruto a due celle fuori portata, il colpo (3 di energia, il Veleno del balestriere sparito, mondo e palla fermi per tutto il cast, la lanterna sulla palla quando il cast finisce) e i 20 secondi della corsa: i tre ghoul in fila presi per 2, 3 e 4 e spinti di una cella, poi il muro nord che riporta 5 a 2 (la telecamera allontanata per la corsa), e per tutta la corsa ogni nemico ferito del valore di quel momento, uno in più a ogni colpo, ogni cosa solida che lo riporta a 2, ogni spinta di una cella via dalla palla e una stella sul tavolo per ogni contatto; a ogni fotogramma il disco fuori dalle caselle solide, la direzione unitaria e la vita del balestriere intatta, mentre un colpo, uno status, una freccia o una carta su di lui sono rifiutati; la palla che rotola sopra il Viandante senza ferirlo, un suo passo durante la corsa, i battiti del mondo uno al secondo, il chip dell'HUD intero anche con un valore di due cifre; lo scoppio nel fotogramma dei 20 secondi, con il balestriere che cade lì con il suo bottino e senza fantasma del cartoncino, con i suoni della carta, del colpo, dei muri, dei respingenti e dello scoppio; poi First Person Shooter: le sue parole a ogni livello, la giocata su di sé (3 di energia, nessun secondo di finestra, 20 secondi, niente cast), una carta, un Refocus e una freccia rifiutati, la discesa negli occhi (il cartoncino del Viandante nascosto, la mano scivolata via), un secondo di grilletto a 60 fotogrammi: 6 colpi nel ghoul da 1 danno l'uno, la finestra e i secondi della vista più corti solo del tempo passato, nessun morso del Veleno, né lanterna né ferita fra i suoni; un colpo fermato dal blocco di ghiaccio (il balestriere dietro intatto) e uno dal muro del bordo, i passi `WASD` secondo la vista con l'occhio che scivola, l'urto e la schivata, la scelta di difesa dietro gli occhi con i secondi fermi, i bordi rossi di una ferita, un colpo nel recupero, la fine dopo una ventina di battiti con la risalita e il mouse libero, una copia +5 da 30 secondi e il tavolo piatto che diventa 3D e torna piatto, con i suoni della carta, della discesa, dei colpi, delle ferite, dei colpi sulla pietra e della risalita; infine la Canna da Pesca: `F7` libera l'arena (due nemici fermi cadono e si apre lo slot con `PESCA 1/1`), la canna presa dallo slot e lasciata su una casella a due celle pesca lì (lancio, galleggiante sull'acqua nuova, abboccata, un pesce tirato fuori che vola al Viandante, il suo d4 a 3 e 3 di vita, l'acqua sul tavolo 3D e su quello piatto), poi la pesca della stanza è finita; potenziata a +1, `F7` di nuovo dà una stanza nuova senza acqua e con due pesche (`PESCA 2/2`): dall'acqua esce una carta, mai un'altra canna, che entra nel mazzo, poi la stessa acqua (nessuna casella nuova) dà un pane per il 2 del suo d4 e le pesche finiscono, finché un altro `F7` le ridà tutte e due; per ultima nessuna di 400 offerte porta una seconda Canna a chi ne ha già una, mentre senza di lei ne arrivano, con i suoni della carta al lancio, del tonfo, dell'abboccata, del mulinello, della preda presa e della carta pescata |
 | `--smoke-m9-view` | arena continua, duello con IA, presa in quattro pose, replay e FPS con ricarica e vittoria |
 
 Gli smoke classici e i laboratori `--spell-lab` / `--dice-lab` conservano il comportamento classico;
@@ -1514,28 +1816,50 @@ libero. Il renderer scarta solo geometria sicuramente fuori schermo, senza
 alterare fog, luce, minacce o picking; la fog continua a non memorizzare celle.
 
 La mano M7 è una fila senza sovrapposizioni: fino a otto carte completamente
-visibili, con energia richiesta, bersaglio/raggio, effetto, durata del cast in secondi e
-stato di disponibilità. Hover e selezione aprono un pannello di dettaglio;
-con sette–otto carte il titolo e l'illustrazione adottano un layout compatto;
-eventuali testi troppo lunghi terminano con puntini e restano nel dettaglio.
-Le carte le cui righe lì si rimpicciolirebbero o si taglierebbero ne hanno una
-forma corta (Shock Floor, Tesla Coil, Movimento Ombra con `OMBRA 4s` /
-`MONDO FERMO`, Pozza di Veleno, Incendio, Deflect, Feretro, Dado del Destino,
-Lama Velenosa e Lazzo) e quelle il cui nome lì si taglierebbe un nome corto (`Ombra`,
-`Pozza`, `Dado`, `Lama`; l'ispettore tiene il nome intero): la Prova meccaniche
-tiene in mano otto carte, tutto il suo mazzo tranne la Canna da Pesca, che non
+visibili, con energia richiesta, bersaglio/raggio, effetto, durata del cast in
+secondi e stato di disponibilità. Hover e selezione aprono un pannello di
+dettaglio; con sette–otto carte il titolo e l'illustrazione adottano un layout
+compatto; eventuali testi troppo lunghi terminano con puntini e restano nel
+dettaglio. Nel gioco la mano non supera mai otto carte (`MAX_HAND_CARDS`); solo
+regole che ne danno di più tutte insieme, come le dieci della Prova meccaniche,
+le tengono, e allora le carte si sovrappongono su tutta la larghezza del canvas,
+a 8 pixel dai bordi: restano larghe come in una mano piena di otto e ognuna
+resta in vista quanto serve perché la successiva copra solo carta: ogni parola
+della sua faccia (nome, righe, raggio), costo, tempo, l'icona intera (spostata
+nella parte in vista), i segni della rarità (sotto il tempo) e il tasto,
+misurati con il font del gioco a ogni fotogramma; lo spazio che avanza si divide
+fra tutte e l'ultima resta intera. Quella sotto il mouse, o altrimenti la carta
+mirata o scelta, si alza di 8 pixel e si disegna intera sopra le altre, e il
+puntatore la trova nella sua striscia anche mentre si alza
+([tactical_hand.odin](src/render/tactical_hand.odin)); `9` e `0` giocano la nona
+e la decima, mentre i menu restano su `1`–`8`. Le carte le cui righe lì si
+rimpicciolirebbero o si taglierebbero ne hanno una forma corta (Shock Floor,
+Tesla Coil, Movimento Ombra con `OMBRA 4s` / `MONDO FERMO`, Pozza di Veleno,
+Incendio, Deflect, Feretro, Dado del Destino, Lama Velenosa, Lazzo, Pinball e
+First Person Shooter) e quelle il cui nome lì si taglierebbe un nome corto
+(`Ombra`, `Pozza`, `Dado`, `Lama`, `FPS`; l'ispettore tiene il nome intero), che
+dicono anche sulle carte più larghe (mani da cinque o sei, negozio, ricompense)
+dove il nome intero, con il suo `+n`, non ci starebbe così com'è alla sua
+misura: First Person Shooter è `FPS` su ogni carta della mano e dei menu,
+`Movimento Ombra` diventa `Ombra` dove si stringerebbe: la Prova meccaniche
+tiene in mano dieci carte, tutto il suo mazzo tranne la Canna da Pesca, che non
 viene mai in mano (anche lei ha la sua forma corta, `Canna`, per uno slot più
 stretto su un canvas più piccolo). Le sue carte sono larghe 109 pixel sul canvas
-di 960, e il suo smoke misura con il font del gioco ogni parola di ogni carta del
-mazzo a ogni livello che può raggiungere, sulla carta della mano (la Canna sul
-suo slot) e nell'ispettore: ogni riga ci sta così com'è, senza stringere le
+di 960, e il suo smoke misura con il font del gioco ogni parola di ogni carta
+del mazzo a ogni livello che può raggiungere, sulla carta della mano (la Canna
+sul suo slot) e nell'ispettore: ogni riga ci sta così com'è, senza stringere le
 lettere (stretto, il font di pixel le attacca: `CTRL+CLIC` si leggerebbe
 `CTRL+CUC`), rimpicciolirsi o tagliarsi, e nessun nome si taglia (solo con il
-`+n` di un upgrade può stringersi o scendere di una misura).
+`+n` di un upgrade può stringersi o scendere di una misura); controlla anche che
+di ognuna delle dieci carte si vedano tutte le parole, l'icona e il tasto prima
+della successiva, nella mano come la dà e in qualunque ordine possa prendere,
+che il puntatore trovi ognuna e che quella alzata resti dentro il canvas;
+Pinball e First Person Shooter li misura anche sulle carte più larghe del gioco.
 Le carte difensive indicano anche i QTE che abilitano. Le carte restano nella
-loro posizione durante la selezione. Il catalogo tattico ora distingue mobilità protetta, interruzione, ricognizione
-e contrattacco; rarità, lifetime e regole di costruzione del mazzo restano condivisi.
-Il bilanciamento numerico è una prima proposta giocabile, ancora da provare in run.
+loro posizione durante la selezione. Il catalogo tattico ora distingue mobilità
+protetta, interruzione, ricognizione e contrattacco; rarità, lifetime e regole
+di costruzione del mazzo restano condivisi. Il bilanciamento numerico è una
+prima proposta giocabile, ancora da provare in run.
 
 Il rework dei nemici si applica al gameplay M7; il classico resta disponibile
 come confronto:
@@ -1587,11 +1911,12 @@ dal **costo temporale**, centralizzato in `game/tactical_action_cost.odin`:
 | Refocus | 2 s |
 | Clic su **ATTIVA** o **EQUIPAGGIA** in Combat | 1 s |
 | Supporto, Guard, Afterimage, Battle Focus, Spark, Pozza di Veleno, Deflect, Feretro, Dado del Destino, Lama Velenosa | 1 s |
-| Strike, Arc Bolt, Shove, Dash, Grappling Hook, Venom Needle, Fate Strike, Tesla Coil, Incendio, Lazzo (il lancio; il giro sta sul tempo del mondo) | 2 s |
+| Strike, Arc Bolt, Shove, Dash, Grappling Hook, Venom Needle, Fate Strike, Tesla Coil, Incendio, Lazzo (il lancio; il giro sta sul tempo del mondo), Pinball (il colpo; la corsa sta sul tempo del mondo) | 2 s |
 | Piercing Ray, Cross Slash, Heavy Blow, Sundering Blow, Twin Venom, Shock Floor, Titan Grip | 3 s |
 | Firebomb, Toxic Wave, Caustic Bloom, Chain Lightning, Prismatic Barrage, Storm Crown | 4 s |
 | [Movimento Ombra](#movimento-ombra) | 0 s: i suoi 4 s reali stanno fuori dalla finestra |
 | [Canna da Pesca](#canna-da-pesca) | 0 s: pesca a stanza liberata, dove non c'è finestra |
+| [First Person Shooter](#first-person-shooter) | 0 s: i suoi 20 s sono del mondo e i colpi dell'AK non costano tempo |
 
 Le carte mostrano la durata `Ns`: il cast spende quei secondi una sola volta,
 progressivamente, e ferma il mondo. Movimento Ombra mostra `0s`: non ha cast, la
@@ -1627,6 +1952,8 @@ La schivata base rimane accessibile fuori recupero, senza richiedere carte.
 | Lama Velenosa | 1 | tira il suo dado: tanti urti con 2 Veleno |
 | Lazzo | 2 | un nemico entro 4 celle (non boss né miniboss) gira intorno al Viandante fino alla morte: colpi 1, 2, 3... sui nemici che incontra (spinti di n celle), -1 vita a ogni giro; schivare lo lascia andare ([Lazzo](#lazzo)) |
 | Canna da Pesca | 0 | mai in mano: a stanza liberata pesca da un suo slot una casella libera entro 3 celle, che diventa acqua; 95% cibo che cura un d4, 5% una carta nel mazzo; 1 pesca a stanza +1 per upgrade (fino a 6); una sola per run ([Canna da Pesca](#canna-da-pesca)) |
+| Pinball | 3 | un nemico accanto (non boss né miniboss) diventa una palla d'acciaio che rimbalza per 20 s del mondo a 7 caselle al secondo: i nemici che tocca prendono 2, 3, 4... (+1 per upgrade) e sono spinti di una cella, ogni muro la riporta a 2; poi scoppia e il nemico cade ([Pinball](#pinball)) |
+| First Person Shooter | 3 | 20 s del mondo (+2 per upgrade) dietro gli occhi del Viandante: un AK di carta da 6 colpi al secondo, 1 danno lungo il mirino, passi secondo la vista, niente carte; 0 s di finestra ([First Person Shooter](#first-person-shooter)) |
 
 Afterimage mantiene il bypass del recupero della schivata e lo Shield dopo il
 movimento. Calculated Risk, Spark, Firebomb, Caustic Bloom e le formule delle
@@ -1648,8 +1975,9 @@ il numero massimo di carte scritto. Upgrade e keyword mantengono le policy esist
 | Trascinamento sinistro sulla mappa / rotella | ruota e inclina l’ologramma / zoom; `R` o **RICENTRA** ripristina la vista, `Esc` chiude |
 | Trascinamento col tasto centrale sulla scena / rotella | orbita la camera 3D / zoom; gli assi WASD restano quelli della griglia |
 | Clic su una carta / trascinamento | seleziona e mostra i dettagli / gioca sul bersaglio; un secondo clic gioca le carte senza bersaglio |
-| `1`–`8` / clic destro o `Esc` | seleziona una carta con bersaglio o gioca subito una carta senza bersaglio / annulla la selezione |
+| `1`–`8` / clic destro o `Esc` | seleziona una carta con bersaglio o gioca subito una carta senza bersaglio / annulla la selezione (nella mano da dieci della Prova meccaniche anche `9` e `0`) |
 | `Ctrl` + clic sinistro su un nemico | con le frecce di Feretro: scocca una freccia al nemico segnato (visibile e in linea di tiro); con `Ctrl` premuto il tavolo segna quelli raggiungibili |
+| mouse / tasto sinistro tenuto, dietro gli occhi di [First Person Shooter](#first-person-shooter) | gira la vista / spara l'AK, 6 colpi al secondo; `WASD` sono passi secondo la vista, `P` o `Esc` mettono in pausa e liberano il mouse |
 | `P` | pausa esplicita, con scena coperta; `P` riprende |
 | `Q`, `E`, `Z`, `C` | tenta rispettivamente diagonale nord-ovest, nord-est, sud-ovest, sud-est sulla griglia |
 | `WASD` durante QTE diagonale | due pressioni nell'ordine indicato: prima asse orizzontale, poi verticale |
@@ -1815,7 +2143,7 @@ le immagini sono output rigenerabili, non prerequisiti del checkout.
 | `--smoke-arenas-view` | quattro fasce di arene reali, combattimento, ologramma, Loot e cambio stanza; screenshot `odin_pp_arenas_*.png` |
 | `--smoke-m8-view` | dispositivi con APRI IL RING, campo, tag match, ritorno Loot: `odin_pp_m8_d4.png`, `devices`, `mega_combo`, `character`, `loot`, `tag_ring`, `next_room` (tutti con prefisso `odin_pp_m8_` e suffisso `.png`) |
 | `--smoke-western` | 6 RANCH 7 dalla mano al premio: `odin_pp_western_hand.png`, `cards`, `sign`, `gate`, `riders`, `ride`, `grab`, `win`, `reward` (prefisso `odin_pp_western_`) |
-| `--smoke-mechanics-lab` | sandbox: `odin_pp_mechanics_lab.png`, `_square`, `_full`, `_refill`, `_restart`, `_stun`, `_pause`, `_defeat` (prefisso `odin_pp_mechanics_lab`); cartoncini vivi: `odin_pp_living_move_00.png`–`_37` e `odin_pp_living_attack_00.png`–`_37`, un'immagine ogni due fotogrammi; modi degli intenti nemici (F6): `odin_pp_living_intents_0_00.png`–`_3_39` (0 sigilli + terreno, 1 sigilli, 2 terreno, 3 adesivi), ogni tre, e lo stesso istante con un colpo in arrivo nei modi 0 e 3 (`odin_pp_living_intent_both.png`, `_labels`); segnalino di cura: `odin_pp_living_heal_00.png`–`_39`, ogni due; status a stack: `odin_pp_living_statuses_00.png`–`_19`, ogni tre, e `odin_pp_mechanics_lab_statuses.png` (fermo, con l'ispettore del nemico); Movimento Ombra dalla mano: `odin_pp_living_shadow_00.png`–`_82` (sprofonda, quattro passi dell'ombra con la diagonale sul primo battito, risale), ogni quattro; colpi: `odin_pp_living_blow_<nome>_00.png`–`_23` per `bolt`, `bolt_miss`, `cleave`, `claws`, `crozier`, `staff`, `bomb` ed `ember`, `_00`–`_39` per `charge`, `_00`–`_37` per `lantern`, `iron_cleaver` e `storm_pike`, ogni due; Rallentamento sul sigillo: `odin_pp_mechanics_lab_slow.png` (l'intento trattenuto, con l'ispettore del bruto) e `odin_pp_mechanics_lab_slow_worn.png` (dopo l'azione, uno stack in meno); Pozza di Veleno e Incendio: `odin_pp_mechanics_lab_pool_preview.png` (l'anteprima con l'area che l'ultima pozza chiuderebbe), `odin_pp_living_pool_00.png`–`_29` (la fiala lanciata chiude l'anello e l'area si allaga), ogni tre, `odin_pp_living_pool_walk_NN.png` (un chaser attraversa due pozze, poi il Viandante entra in una sua), ogni sei, `odin_pp_living_fire_NN.png` (il fuoco accanto al bruto per cinque finestre), ogni quattro, `odin_pp_mechanics_lab_fire.png` (alla quarta finestra) e il tavolo piatto in `odin_pp_mechanics_lab_pool_flat.png` e `odin_pp_mechanics_lab_fire_flat.png`; le cariche: `odin_pp_mechanics_lab_card_Deflect.png`, `_Coffin`, `_Fate_Dice`, `_Venom_Blade` (ogni carta sotto il mouse, con l'ispettore), `odin_pp_living_deflect_bolt_00.png`–`_31`, `odin_pp_living_deflect_cleave_00.png`–`_31` e `odin_pp_living_deflect_charge_00.png`–`_39`, ogni due, `odin_pp_mechanics_lab_arrow_aim.png` (`Ctrl` premuto, il mouse sul nemico segnato; quello dietro la copertura resta senza segno), `odin_pp_living_arrow_00.png`–`_37`, `odin_pp_living_fate_00.png`–`_37`, `odin_pp_living_fate_lethal_00.png`–`_37` e `odin_pp_living_fate_boss_00.png`–`_37` (il Custode), ogni due, `odin_pp_mechanics_lab_fate_chip.png` (il chip `DESTINO 3 d4` dell'HUD), `odin_pp_mechanics_lab_fate_chips.png` (tre cariche in più: tre chip e il conto, `DES 2 d20` intero), `odin_pp_mechanics_lab_venom_roll.png` (il dado di Lama Velenosa) e `odin_pp_living_venom_00.png`–`_37`; il Lazzo: `odin_pp_mechanics_lab_card_Lasso.png`, `odin_pp_mechanics_lab_lasso_preview.png` (il mirino sul nemico a quattro celle: l'anello di raggio 3 accanto al muro e i tre nemici fermi sopra), `odin_pp_mechanics_lab_lasso_heavy.png` (il Custode, `TROPPO PESANTE`), `odin_pp_living_lasso_throw_NN.png` (il lancio), ogni quattro, `odin_pp_living_lasso_NN.png` (il giro: i tre colpi ogni tre fotogrammi, poi ogni otto i giri, la difesa che lascia passare la freccia del balestriere e la caduta), `odin_pp_mechanics_lab_lasso_flat.png` (il tavolo piatto durante il giro), `odin_pp_living_lasso_smash_NN.png` (gli schianti e i rimbalzi), ogni cinque, e `odin_pp_living_lasso_release_00.png`–`_14` (la schivata che lo lascia andare), ogni tre; la Canna da Pesca: `odin_pp_living_fishing_clear_NN.png` (`F7`: i due nemici cadono e si apre lo slot), ogni sei, `odin_pp_mechanics_lab_rod_slot.png` (lo slot sotto il mouse, con l'ispettore), `odin_pp_mechanics_lab_rod_preview.png` (la Canna presa: le caselle che può pescare e quella sotto il mouse), `odin_pp_living_fishing_NN.png` (lancio, galleggiante, abboccata, il pesce che vola al Viandante, il d4 e la cura), ogni cinque, `odin_pp_mechanics_lab_fishing_roll.png` (il d4 fermo sul 3), `odin_pp_mechanics_lab_fishing_flat.png` (l'acqua sul tavolo piatto), `odin_pp_mechanics_lab_rod_slot_upgraded.png` (la Canna +1 nella stanza nuova: `PESCA 2/2`), `odin_pp_living_fishing_card_NN.png` (la carta pescata) e `odin_pp_living_fishing_again_NN.png` (la stessa acqua di nuovo: il pane e il suo d4), ogni cinque |
+| `--smoke-mechanics-lab` | sandbox: `odin_pp_mechanics_lab.png`, `_square`, `_full`, `_refill`, `_restart`, `_stun`, `_pause`, `_defeat` (prefisso `odin_pp_mechanics_lab`); cartoncini vivi: `odin_pp_living_move_00.png`–`_37` e `odin_pp_living_attack_00.png`–`_37`, un'immagine ogni due fotogrammi; modi degli intenti nemici (F6): `odin_pp_living_intents_0_00.png`–`_3_39` (0 sigilli + terreno, 1 sigilli, 2 terreno, 3 adesivi), ogni tre, e lo stesso istante con un colpo in arrivo nei modi 0 e 3 (`odin_pp_living_intent_both.png`, `_labels`); segnalino di cura: `odin_pp_living_heal_00.png`–`_39`, ogni due; status a stack: `odin_pp_living_statuses_00.png`–`_19`, ogni tre, e `odin_pp_mechanics_lab_statuses.png` (fermo, con l'ispettore del nemico); Movimento Ombra dalla mano: `odin_pp_living_shadow_00.png`–`_82` (sprofonda, quattro passi dell'ombra con la diagonale sul primo battito, risale), ogni quattro; colpi: `odin_pp_living_blow_<nome>_00.png`–`_23` per `bolt`, `bolt_miss`, `cleave`, `claws`, `crozier`, `staff`, `bomb` ed `ember`, `_00`–`_39` per `charge`, `_00`–`_37` per `lantern`, `iron_cleaver` e `storm_pike`, ogni due; Rallentamento sul sigillo: `odin_pp_mechanics_lab_slow.png` (l'intento trattenuto, con l'ispettore del bruto) e `odin_pp_mechanics_lab_slow_worn.png` (dopo l'azione, uno stack in meno); Pozza di Veleno e Incendio: `odin_pp_mechanics_lab_pool_preview.png` (l'anteprima con l'area che l'ultima pozza chiuderebbe), `odin_pp_living_pool_00.png`–`_29` (la fiala lanciata chiude l'anello e l'area si allaga), ogni tre, `odin_pp_living_pool_walk_NN.png` (un chaser attraversa due pozze, poi il Viandante entra in una sua), ogni sei, `odin_pp_living_fire_NN.png` (il fuoco accanto al bruto per cinque finestre), ogni quattro, `odin_pp_mechanics_lab_fire.png` (alla quarta finestra) e il tavolo piatto in `odin_pp_mechanics_lab_pool_flat.png` e `odin_pp_mechanics_lab_fire_flat.png`; le cariche: `odin_pp_mechanics_lab_card_Deflect.png`, `_Coffin`, `_Fate_Dice`, `_Venom_Blade` (ogni carta sotto il mouse, con l'ispettore), `odin_pp_living_deflect_bolt_00.png`–`_31`, `odin_pp_living_deflect_cleave_00.png`–`_31` e `odin_pp_living_deflect_charge_00.png`–`_39`, ogni due, `odin_pp_mechanics_lab_arrow_aim.png` (`Ctrl` premuto, il mouse sul nemico segnato; quello dietro la copertura resta senza segno), `odin_pp_living_arrow_00.png`–`_37`, `odin_pp_living_fate_00.png`–`_37`, `odin_pp_living_fate_lethal_00.png`–`_37` e `odin_pp_living_fate_boss_00.png`–`_37` (il Custode), ogni due, `odin_pp_mechanics_lab_fate_chip.png` (il chip `DESTINO 3 d4` dell'HUD), `odin_pp_mechanics_lab_fate_chips.png` (tre cariche in più: tre chip e il conto, `DES 2 d20` intero), `odin_pp_mechanics_lab_venom_roll.png` (il dado di Lama Velenosa) e `odin_pp_living_venom_00.png`–`_37`; il Lazzo: `odin_pp_mechanics_lab_card_Lasso.png`, `odin_pp_mechanics_lab_lasso_preview.png` (il mirino sul nemico a quattro celle: l'anello di raggio 3 accanto al muro e i tre nemici fermi sopra), `odin_pp_mechanics_lab_lasso_heavy.png` (il Custode, `TROPPO PESANTE`), `odin_pp_living_lasso_throw_NN.png` (il lancio), ogni quattro, `odin_pp_living_lasso_NN.png` (il giro: i tre colpi ogni tre fotogrammi, poi ogni otto i giri, la difesa che lascia passare la freccia del balestriere e la caduta), `odin_pp_mechanics_lab_lasso_flat.png` (il tavolo piatto durante il giro), `odin_pp_living_lasso_smash_NN.png` (gli schianti e i rimbalzi), ogni cinque, e `odin_pp_living_lasso_release_00.png`–`_14` (la schivata che lo lascia andare), ogni tre; il Pinball: `odin_pp_mechanics_lab_card_Pinball.png`, `odin_pp_mechanics_lab_pinball_preview.png` (il mirino sul balestriere e la partenza della palla), `odin_pp_mechanics_lab_pinball_heavy.png` (il Custode, `TROPPO PESANTE`), `odin_pp_living_pinball_strike_NN.png` (il nemico che diventa la palla e il colpo che la manda via), ogni quattro, `odin_pp_living_pinball_NN.png` (la corsa, con la telecamera allontanata: ogni tre fotogrammi i primi 2,6 secondi, con i tre ghoul presi per 2, 3 e 4 e il muro nord che riporta 5 a 2, poi ogni venti fino a 3 secondi; il resto corre veloce senza immagini), `odin_pp_mechanics_lab_pinball_chip.png` (il chip della palla, con il valore a 5, accanto ai morsi e alle cariche), `odin_pp_mechanics_lab_pinball_flat.png` (il tavolo piatto durante la corsa) e `odin_pp_living_pinball_burst_NN.png` (l'ultimo mezzo secondo e lo scoppio, la telecamera ancora più lontana), ogni due; First Person Shooter: `odin_pp_mechanics_lab_card_First_Person.png`, `odin_pp_living_fps_dive_NN.png` (la discesa negli occhi), ogni tre, `odin_pp_mechanics_lab_fps.png` (la vista: l'AK, il mirino e il conto dei secondi), `odin_pp_living_fps_fire_NN.png` (il grilletto tenuto: traccianti, scintille, il cuore del ghoul da 40 a 34), ogni due, `odin_pp_mechanics_lab_fps_wall.png` (il colpo fermato dal ghiaccio), `odin_pp_mechanics_lab_fps_stone.png` (quello fermato dal muro del bordo, con le schegge di pietra), `odin_pp_living_fps_steps_NN.png` (il primo passo, con l'occhio che scivola) e `odin_pp_living_fps_bump_NN.png` (l'urto), ogni due, `odin_pp_mechanics_lab_fps_defense.png` (la scelta di difesa dietro gli occhi), `odin_pp_mechanics_lab_fps_hurt.png` (i bordi rossi), `odin_pp_living_fps_rise_NN.png` (la risalita), ogni due, `odin_pp_mechanics_lab_fps_flat.png` e `odin_pp_mechanics_lab_fps_flat_after.png` (il tavolo piatto diventato 3D, e di nuovo piatto); la Canna da Pesca: `odin_pp_living_fishing_clear_NN.png` (`F7`: i due nemici cadono e si apre lo slot), ogni sei, `odin_pp_mechanics_lab_rod_slot.png` (lo slot sotto il mouse, con l'ispettore), `odin_pp_mechanics_lab_rod_preview.png` (la Canna presa: le caselle che può pescare e quella sotto il mouse), `odin_pp_living_fishing_NN.png` (lancio, galleggiante, abboccata, il pesce che vola al Viandante, il d4 e la cura), ogni cinque, `odin_pp_mechanics_lab_fishing_roll.png` (il d4 fermo sul 3), `odin_pp_mechanics_lab_fishing_flat.png` (l'acqua sul tavolo piatto), `odin_pp_mechanics_lab_rod_slot_upgraded.png` (la Canna +1 nella stanza nuova: `PESCA 2/2`), `odin_pp_living_fishing_card_NN.png` (la carta pescata) e `odin_pp_living_fishing_again_NN.png` (la stessa acqua di nuovo: il pane e il suo d4), ogni cinque |
 | `--smoke` | `odin_pp_isometric.png` |
 | `--smoke-generation` | `odin_pp_procedural_room.png` |
 | `--smoke-map` | `odin_pp_route.png` |
@@ -2252,7 +2580,7 @@ scalano automaticamente.
 | `owned` | massimo 32 permanenti; rimozione consentita fino al minimo di 5 |
 | carte temporanee | massimo 16 presenti nel runtime, mai in owned |
 | draw / discard / exhaust | ciascuno può contenere tutte le 48 carte runtime |
-| mano | massimo 8; `hand_size = 5` è il target iniziale e di refill |
+| mano | massimo 8 (`MAX_HAND_CARDS`); regole che ne danno di più tutte insieme, come la Prova meccaniche, tengono la loro `hand_size`, fino a 10 (`MAX_HAND_CAPACITY`, `deck_hand_limit`); `hand_size = 5` è il target iniziale e di refill |
 | resolving | uno slot interno, durante la giocata |
 | energia | massimo 3, recupero 1 per pulse |
 | ID | unico `next_card_id` monotono, senza riciclo |
@@ -2378,6 +2706,8 @@ beneficio è il dado successivo, fino al D20.
 | `Venom_Blade` (Lama Velenosa) | Common | 1 | player, None | solo tattica, carta con dadi: il dado decide quanti urti lasciano 2 Veleno. 1 s di finestra |
 | `Lasso` (Lazzo) | Rare | 2 | nemico, Chebyshev 1-4, Single, LoS (non boss né miniboss: `Target_Too_Heavy`) | solo tattica: il nemico gira intorno al Viandante sul raggio libero più largo (4-1) fino alla morte; colpi crescenti dal primo (1, +1 per upgrade, fino al livello 5), -1 vita a ogni giro; schivate e spostamenti lo lasciano andare. 2 s di finestra. Il classico non la offre e la rifiuta |
 | `Fishing_Rod` (Canna da Pesca) | Uncommon | 0 | casella libera, Chebyshev 1-3, Single, LoS (`Walkable_Cell`; mai l'uscita, trappole, bottino, pozze o fuochi) | solo tattica e mai in mano (attende fra le esaurite): a stanza liberata pesca dal suo slot, la casella diventa acqua; 95% cibo che cura un d4 (sempre un d4), 5% una carta del pool tattico nel mazzo; 1 pesca a stanza, +1 per upgrade fino al livello 5; una sola per run (`card_offer_exclusions`). 0 s. Il classico non la offre e non può giocarla come carta (`Invalid_Phase`) |
+| `Pinball` | Rare | 3 | nemico, Chebyshev 1, Single, LoS (non boss né miniboss: `Target_Too_Heavy`; una palla alla volta: `Target_Blocked`) | solo tattica: il nemico diventa una palla d'acciaio che rotola a 7 caselle al secondo per 20 s del mondo, rimbalzando su muri, coperture, oggetti e nemici; valore 2 (+1 per upgrade fino al livello 5), +1 a ogni nemico colpito (spinto di una cella), di nuovo 2 a ogni cosa solida; poi scoppia e il nemico cade. 2 s di finestra. Il classico non la offre e la rifiuta |
+| `First_Person` (First Person Shooter) | Rare | 3 | player, None | solo tattica: 20 s del mondo in prima persona (+2 per upgrade fino al livello 5, 30 s); un AK di carta da 6 colpi al secondo, 1 danno l'uno; passi secondo la vista, niente carte né frecce. 0 s di finestra. Il classico non la offre e la rifiuta |
 
 ## Spell e dadi
 
@@ -2748,13 +3078,13 @@ può scegliere un nodo della mappa.
 Upgrade e rimozione richiedono deck inattivo e **ID della specifica istanza**.
 Upgrade conserva identità, ordine, RNG e prossimo ID; remove compatta owned
 senza riciclare ID e conserva almeno cinque carte. Il livello massimo è dieci,
-cinque per le carte con dadi (dal D4 al D20), per il Lazzo e per la Canna da
-Pesca (il suo d4 non cambia mai); deck, Shop e Rest rispondono
-`Maximum_Upgrade` oltre quel limite. La preview di una carta con dadi mostra
-soltanto il dado, per esempio `d4 -> d6`.
-`card_can_upgrade` richiede un beneficio effettivo: Battle Focus, Calculated
-Risk, Spark Forge e Dash non sono migliorabili. Shop e Rest condividono la
-query e la preview prima/dopo, restituendo `Upgrade_Unavailable` senza costi.
+cinque per le carte con dadi (dal D4 al D20), per il Lazzo, il Pinball, First
+Person Shooter e la Canna da Pesca (il suo d4 non cambia mai); deck, Shop e Rest
+rispondono `Maximum_Upgrade` oltre quel limite. La preview di una carta con dadi
+mostra soltanto il dado, per esempio `d4 -> d6`. `card_can_upgrade` richiede un
+beneficio effettivo: Battle Focus, Calculated Risk, Spark Forge e Dash non sono
+migliorabili. Shop e Rest condividono la query e la preview prima/dopo,
+restituendo `Upgrade_Unavailable` senza costi.
 
 ### Shop
 
@@ -2905,16 +3235,22 @@ pressione viene scartata; agisce solo una pressione fatta dopo la fine
 dell'azione. Il poll continua a girare, così hover, `Esc` e l'annullamento del
 drag rispondono, ma il suo comando non viene tenuto. Lo stesso vale per la
 freccia di Feretro (`Ctrl` + clic, il comando `Shoot`): un'azione da 1 s come le
-altre, mai tenuta per dopo e mai segnata con lo scocco. La schivata `Shift + WASD`
-che interrompe un'azione a tempo è una regola del gioco, non una coda. L'unico
-input che attraversa qualche fotogramma è il passo premuto sul secondo, che
-aspetta al massimo `BEAT_CHORD_SECONDS` (0,06 s) il tasto perpendicolare della
-diagonale: vive in `Buffered_Gameplay_Command`, e ogni confine che svuota
-quella struttura (controller bloccato, fine della finestra, QTE, pausa, mappa,
-schivata o diagonale, perdita del focus, restart, nuova stanza, schermate) lo
-lascia cadere. I comandi portano valori logici e ID, mai puntatori o indici
-visuali, e la fase d'origine: un Move nato in Combat non diventa implicitamente
-un Move in Loot. Tenere un tasto premuto non genera repeat.
+altre, mai tenuta per dopo e mai segnata con lo scocco. La schivata
+`Shift + WASD` che interrompe un'azione a tempo è una regola del gioco, non una
+coda, e così il grilletto dell'AK di
+[First Person Shooter](#first-person-shooter): finché il tasto è tenuto spara un
+colpo ogni sesto di secondo come comando del mondo (`First_Person_Fire`, come i
+giri del Lazzo e la corsa del Pinball), e da un fotogramma all'altro non porta
+più del ritardo di un colpo; un clic fatto prima che la vista prenda il mouse
+non spara finché non lo si rilascia. L'unico input che attraversa qualche
+fotogramma è il passo premuto sul secondo, che aspetta al massimo
+`BEAT_CHORD_SECONDS` (0,06 s) il tasto perpendicolare della diagonale: vive in
+`Buffered_Gameplay_Command`, e ogni confine che svuota quella struttura
+(controller bloccato, fine della finestra, QTE, pausa, mappa, schivata o
+diagonale, perdita del focus, restart, nuova stanza, schermate) lo lascia
+cadere. I comandi portano valori logici e ID, mai puntatori o indici visuali, e
+la fase d'origine: un Move nato in Combat non diventa implicitamente un Move in
+Loot. Tenere un tasto premuto non genera repeat.
 
 Nel classico, mentre lo snapshot è arretrato, drag, drop, click spaziali, range
 e intenti a terra sono sospesi; il drag attivo si annulla. Gli slot della

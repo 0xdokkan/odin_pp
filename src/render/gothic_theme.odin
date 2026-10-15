@@ -21,7 +21,8 @@ GOTHIC_FONT_SIZES :: [?]int{10, 12, 14, 16, 18, 24, 32}
 // The card icon atlas: the 16 painted icons in four rows of four, then the
 // rows added by tools/art/build_card_icons.py (cell 16: Movimento Ombra, 17:
 // Pozza di Veleno, 18: Incendio, 19: Deflect, 20: Feretro, 21: Dado del
-// Destino, 22: Lama Velenosa, 23: Lazzo, 24: Canna da Pesca).
+// Destino, 22: Lama Velenosa, 23: Lazzo, 24: Canna da Pesca, 25: Pinball,
+// 26: First Person Shooter; 27 is free).
 CARD_ICON_COLUMNS :: 4
 CARD_ICON_ROWS :: 7
 CARD_ICON_CELLS :: CARD_ICON_COLUMNS*CARD_ICON_ROWS
@@ -272,6 +273,8 @@ gothic_card_icon :: proc(id: game.Card_Id) -> int {
 	case .Venom_Blade: return 22
 	case .Lasso: return 23
 	case .Fishing_Rod: return 24
+	case .Pinball: return 25
+	case .First_Person: return 26
 	// Scopa cards draw their own art (draw_scopa_card); this is the fallback.
 	case .Sei_Denari, .Sette_Denari: return 9
 	case .Count: return 0

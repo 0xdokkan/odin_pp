@@ -3,7 +3,12 @@ package game
 import rng "../engine/rng"
 
 MAX_OWNED_CARDS     :: 32
+// A hand holds up to MAX_HAND_CARDS: its draws and the cards made into it
+// stop there. Rules that deal more at once (PROVA MECCANICHE's whole deck,
+// main/mechanics_lab.odin) hold their hand size instead, up to
+// MAX_HAND_CAPACITY, the hand's room (deck_hand_limit).
 MAX_HAND_CARDS      :: 8
+MAX_HAND_CAPACITY   :: 10
 MAX_TEMPORARY_CARDS :: 16
 MAX_COMBAT_CARDS    :: MAX_OWNED_CARDS+MAX_TEMPORARY_CARDS
 MIN_OWNED_CARDS     :: 5
@@ -51,7 +56,7 @@ Deck_State :: struct {
 	owned_count:       int,
 	draw_pile:         [MAX_COMBAT_CARDS]Card_Instance,
 	draw_count:        int,
-	hand:              [MAX_HAND_CARDS]Card_Instance,
+	hand:              [MAX_HAND_CAPACITY]Card_Instance,
 	hand_count:        int,
 	discard_pile:      [MAX_COMBAT_CARDS]Card_Instance,
 	discard_count:     int,
@@ -83,7 +88,7 @@ Card_Refocus_Outcome :: struct {
 }
 
 Deck_Refocus_Report :: struct {
-	outcomes:        [MAX_HAND_CARDS]Card_Refocus_Outcome,
+	outcomes:        [MAX_HAND_CAPACITY]Card_Refocus_Outcome,
 	outcome_count:   int,
 	retained_count:  int,
 	discarded_count: int,
@@ -91,8 +96,14 @@ Deck_Refocus_Report :: struct {
 }
 
 deck_rules_are_valid :: proc(rules: Deck_Rules) -> bool {
-	return rules.hand_size > 0 && rules.hand_size <= MAX_HAND_CARDS &&
+	return rules.hand_size > 0 && rules.hand_size <= MAX_HAND_CAPACITY &&
 	       rules.max_energy > 0 && rules.energy_regen_per_pulse >= 0
+}
+
+// How many cards the hand of `deck` may hold: MAX_HAND_CARDS, or its rules'
+// hand size when they deal more at once.
+deck_hand_limit :: proc(deck: ^Deck_State) -> int {
+	return max(MAX_HAND_CARDS, deck.rules.hand_size)
 }
 
 normalized_deck_seed :: proc(seed: u64) -> u64 {
@@ -131,7 +142,7 @@ owned_card_index_by_id :: proc(deck: ^Deck_State, id: u32) -> (int, bool) {
 }
 
 hand_card_index_by_id :: proc(deck: ^Deck_State, id: u32) -> (int, bool) {
-	if deck == nil || id == 0 || deck.hand_count < 0 || deck.hand_count > MAX_HAND_CARDS {
+	if deck == nil || id == 0 || deck.hand_count < 0 || deck.hand_count > MAX_HAND_CAPACITY {
 		return 0, false
 	}
 	for index in 0..<deck.hand_count {
@@ -264,7 +275,7 @@ shuffle_draw_pile :: proc(deck: ^Deck_State) {
 
 can_draw_card :: proc(deck: ^Deck_State) -> bool {
 	return deck != nil && deck.combat_active && deck_state_is_consistent(deck) &&
-	       deck.hand_count < MAX_HAND_CARDS &&
+	       deck.hand_count < deck_hand_limit(deck) &&
 	       (deck.draw_count > 0 || deck.discard_count > 0)
 }
 
@@ -563,7 +574,7 @@ can_create_temporary_card :: proc(
 	upgrade_level: i32 = 0,
 ) -> bool {
 	if deck == nil || !deck.combat_active || !deck_state_is_consistent(deck) ||
-	   deck.hand_count >= MAX_HAND_CARDS || deck.next_card_id == max(u32) ||
+	   deck.hand_count >= deck_hand_limit(deck) || deck.next_card_id == max(u32) ||
 	   combat_temporary_card_count(deck) >= MAX_TEMPORARY_CARDS ||
 	   deck.draw_count+deck.hand_count+deck.discard_count+deck.exhaust_count+
 	   (1 if deck.has_resolving_card else 0) >= MAX_COMBAT_CARDS {
@@ -615,7 +626,7 @@ deck_counts_are_valid :: proc(deck: ^Deck_State) -> bool {
 	return deck != nil && deck_rules_are_valid(deck.rules) && deck.random_state != 0 &&
 	       deck.next_card_id != 0 && deck.owned_count >= 0 && deck.owned_count <= MAX_OWNED_CARDS &&
 	       deck.draw_count >= 0 && deck.draw_count <= MAX_COMBAT_CARDS &&
-	       deck.hand_count >= 0 && deck.hand_count <= MAX_HAND_CARDS &&
+	       deck.hand_count >= 0 && deck.hand_count <= deck_hand_limit(deck) &&
 	       deck.discard_count >= 0 && deck.discard_count <= MAX_COMBAT_CARDS &&
 	       deck.exhaust_count >= 0 && deck.exhaust_count <= MAX_COMBAT_CARDS
 }

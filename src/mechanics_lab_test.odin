@@ -29,17 +29,20 @@ test_mechanics_lab_is_an_open_endless_arena_with_the_cards_under_test :: proc(t:
 		}
 	}
 	testing.expect(t, len(room.objects) == 0 && len(room.traps) == 0)
-	// The deck: one Movimento Ombra, one of each card of Phase 2, the Lazzo and
-	// the Canna da Pesca; all in hand (eight: a full hand) but the rod, which
-	// waits in Exhaust for a cleared room.
+	// The deck: one Movimento Ombra, one of each card of Phase 2, the Lazzo,
+	// the Canna da Pesca, the Pinball and the First Person Shooter; all in hand
+	// (ten: more than the game's hand ever holds, all the room a hand has) but
+	// the rod, which waits in Exhaust for a cleared room.
 	testing.expect_value(t, player.deck.owned_count, len(MECHANICS_LAB_DECK))
-	testing.expect_value(t, len(MECHANICS_LAB_DECK)-1, game.MAX_HAND_CARDS)
-	for id in ([?]game.Card_Id{.Shadow_Step, .Poison_Pool, .Wildfire, .Deflect, .Coffin, .Fate_Dice, .Venom_Blade, .Lasso, .Fishing_Rod}) {
+	testing.expect_value(t, len(MECHANICS_LAB_DECK)-1, game.MAX_HAND_CAPACITY)
+	for id in ([?]game.Card_Id{.Shadow_Step, .Poison_Pool, .Wildfire, .Deflect, .Coffin, .Fate_Dice, .Venom_Blade, .Lasso, .Fishing_Rod,
+		.Pinball, .First_Person}) {
 		copies := 0
 		for card in player.deck.owned[:player.deck.owned_count] { if card.definition_id == id { copies += 1 } }
 		testing.expectf(t, copies == 1, "%v: %d copies", id, copies)
 	}
-	testing.expect_value(t, player.deck.hand_count, game.MAX_HAND_CARDS)
+	testing.expect_value(t, player.deck.hand_count, game.MAX_HAND_CAPACITY)
+	testing.expect_value(t, game.deck_hand_limit(&player.deck), game.MAX_HAND_CAPACITY)
 	testing.expect_value(t, player.deck.exhaust_count, 1)
 	testing.expect_value(t, player.deck.exhaust_pile[0].definition_id, game.Card_Id.Fishing_Rod)
 	for card in player.deck.hand[:player.deck.hand_count] { testing.expect(t, card.definition_id != .Fishing_Rod) }

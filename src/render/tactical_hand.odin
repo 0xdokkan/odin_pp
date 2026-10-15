@@ -8,13 +8,130 @@ import game "../game"
 import view "../view"
 
 TACTICAL_HAND_HEIGHT :: f32(184)
+// How far the card under the mouse rises over an overlapping hand's others
+// (it stops short of the energy and the hint over the hand).
+TACTICAL_HAND_RAISE :: f32(8)
 
+// The game's hand (five to eight cards, game.MAX_HAND_CARDS) lies side by
+// side, as wide as it lets each card be. PROVA MECCANICHE deals its whole
+// deck, ten cards (game.deck_hand_limit): narrower than an eight-card hand's,
+// their words would shrink or be cut (tactical_card_text_misfit), so there
+// they keep that width and overlap across the canvas, each over the right
+// edge of the one before, every one showing all its words, its icon and its
+// key: each shows as much of itself as they need (tactical_hand_reveal), the
+// width to spare shared out among them, and the next covers only paper. The
+// card under the mouse (or aimed, or chosen) rises over them all, whole
+// (tactical_hand_raised_card). Behind the player's eyes the hand slides down
+// off the canvas (first_person_hand_drop).
 tactical_hand_card_bounds :: proc(renderer: ^Renderer, index, count: int) -> rl.Rectangle {
-	if count <= 0 || count > game.MAX_HAND_CARDS || index < 0 || index >= count { return {} }
+	if count <= 0 || count > game.MAX_HAND_CAPACITY || index < 0 || index >= count { return {} }
 	gap: f32 = 8
+	y := renderer.canvas_height-160+first_person_hand_drop(renderer)
+	if tactical_hand_overlaps(count) {
+		width := tactical_hand_overlap_card_width(renderer)
+		span := renderer.canvas_width-TACTICAL_HAND_OVERLAP_GUTTER*2
+		x := (renderer.canvas_width-span)*0.5
+		reveal := &renderer.tactical.hand_reveal
+		if reveal.count == count {
+			for shown in reveal.shown[:index] { x += shown }
+		} else {
+			// Not yet measured (no board frame since the hand changed):
+			// evenly.
+			x += f32(index)*(span-width)/f32(count-1)
+		}
+		return {x, y, width, 154}
+	}
 	width := min(f32(166), (renderer.canvas_width-32-gap*f32(count-1))/f32(count))
 	left := (renderer.canvas_width-width*f32(count)-gap*f32(count-1))*0.5
-	return {left+f32(index)*(width+gap), renderer.canvas_height-160, width, 154}
+	return {left+f32(index)*(width+gap), y, width, 154}
+}
+
+// More cards than the game's hand ever holds: they overlap (PROVA MECCANICHE).
+tactical_hand_overlaps :: proc(count: int) -> bool {
+	return count > game.MAX_HAND_CARDS
+}
+
+// An overlapping hand spans the canvas but for this much at either side; its
+// cards are as wide as a full hand of the game's.
+TACTICAL_HAND_OVERLAP_GUTTER :: f32(8)
+tactical_hand_overlap_card_width :: proc(renderer: ^Renderer) -> f32 {
+	full, gap := game.MAX_HAND_CARDS, f32(8)
+	return min(f32(166), (renderer.canvas_width-32-gap*f32(full-1))/f32(full))
+}
+
+// How much of each card of an overlapping hand shows (all of the last), for
+// the hand of `count` it was measured for (update_tactical_hand_reveal).
+Tactical_Hand_Reveal :: struct {
+	shown: [game.MAX_HAND_CAPACITY]f32,
+	count: int,
+}
+
+// A covered card shows at least its icon, whole (draw_tactical_card), and
+// its words end this far before the card over it.
+TACTICAL_HAND_REVEAL_ICON :: f32(86)
+TACTICAL_HAND_REVEAL_GAP :: f32(2)
+
+// How much of a hand card `width` wide must show for every word of its face
+// to end before the card over it, as the face sets it (tactical_card_text_misfit
+// with `shown`), and its icon to show whole.
+tactical_hand_reveal_need :: proc(renderer: ^Renderer, card: game.Card_Instance, definition: game.Card_Definition, width: f32) -> f32 {
+	need := TACTICAL_HAND_REVEAL_ICON
+	for words in tactical_card_face_words(renderer, card, definition, width) {
+		if words.text == "" { continue }
+		size, spacing, label, _ := gothic_text_fit_plan(renderer, words.text, words.room, words.size)
+		need = max(need, words.start+gothic_text_width(renderer, label, size, spacing)+words.after)
+	}
+	return min(need, width)
+}
+
+// Once a board frame, from the hand it shows: each covered card of an
+// overlapping hand shows what it needs (tactical_hand_reveal_need), the width
+// the hand has to spare shared out evenly among them; when they need more than
+// the hand has, each gives up its share.
+update_tactical_hand_reveal :: proc(renderer: ^Renderer, deck: ^game.Deck_State) {
+	reveal := &renderer.tactical.hand_reveal
+	reveal^ = {}
+	if deck == nil || !tactical_hand_overlaps(deck.hand_count) || deck.hand_count > game.MAX_HAND_CAPACITY { return }
+	count := deck.hand_count
+	width := tactical_hand_overlap_card_width(renderer)
+	needed := f32(0)
+	for card, index in deck.hand[:count-1] {
+		definition, found := game.card_definition_by_id(card.definition_id, true)
+		reveal.shown[index] = tactical_hand_reveal_need(renderer, card, definition, width) if found else width
+		needed += reveal.shown[index]
+	}
+	reveal.shown[count-1] = width
+	room := renderer.canvas_width-TACTICAL_HAND_OVERLAP_GUTTER*2-width
+	for &shown in reveal.shown[:count-1] {
+		if needed <= room { shown += (room-needed)/f32(count-1) } else { shown *= room/max(needed, 1) }
+	}
+	reveal.count = count
+}
+
+// How much of a hand card shows before the next one covers it: all of it,
+// but in an overlapping hand where the card is not the last one.
+tactical_hand_card_visible_width :: proc(renderer: ^Renderer, index, count: int) -> f32 {
+	bounds := tactical_hand_card_bounds(renderer, index, count)
+	if !tactical_hand_overlaps(count) || index >= count-1 { return bounds.width }
+	return tactical_hand_card_bounds(renderer, index+1, count).x-bounds.x
+}
+
+// Where a hand card is drawn when it rises over the others: an overlapping
+// hand lifts it, whole, the game's hand never moves it.
+tactical_hand_raised_card_bounds :: proc(renderer: ^Renderer, index, count: int) -> rl.Rectangle {
+	bounds := tactical_hand_card_bounds(renderer, index, count)
+	if tactical_hand_overlaps(count) && bounds.width > 0 { bounds.y -= TACTICAL_HAND_RAISE }
+	return bounds
+}
+
+// The card that rises over an overlapping hand: the one under the mouse, the
+// one aimed or the one chosen; none in the game's hand.
+tactical_hand_raised_card :: proc(deck: ^game.Deck_State, hovered, selected, dragged: u32) -> u32 {
+	if deck == nil || !tactical_hand_overlaps(deck.hand_count) { return 0 }
+	for id in ([3]u32{hovered, dragged, selected}) {
+		if _, found := game.hand_card_index_by_id(deck, id); found && id != 0 { return id }
+	}
+	return 0
 }
 
 gothic_card_accent :: proc(id: game.Card_Id) -> rl.Color {
@@ -22,7 +139,7 @@ gothic_card_accent :: proc(id: game.Card_Id) -> rl.Color {
 	switch gothic_card_icon(id) {
 	case 2, 7, 17, 22: return {72, 92, 42, 255}
 	case 4, 14, 16, 21: return {98, 57, 122, 255}
-	case 1, 5, 15, 19, 24: return {60, 84, 93, 255}
+	case 1, 5, 15, 19, 24, 25: return {60, 84, 93, 255}
 	case 3, 10, 11, 20, 23: return {122, 88, 34, 255}
 	case: return {130, 43, 45, 255}
 	}
@@ -92,9 +209,14 @@ draw_scopa_tactical_card :: proc(renderer: ^Renderer, bounds: rl.Rectangle, card
 	gothic_text(renderer, fmt.ctprintf("%d", slot+1), x+width-16, y+8, 12, GOTHIC_PAPER)
 }
 
-// `slot` is the hand's key for it (none: -1, the Canna da Pesca's own slot).
+// `slot` is the hand's key for it (none: -1, the Canna da Pesca's own slot),
+// `key` its label when the hand names it (tactical_hand_slot_key). A card of
+// an overlapping hand shows only `visible` of its width (0: all of it): its
+// key, its icon and its crest move left into what shows, and its rarity's
+// marks go under its time (the next card covers its right margin; its words
+// end before it: tactical_hand_reveal).
 draw_tactical_card :: proc(renderer: ^Renderer, bounds: rl.Rectangle, card: game.Card_Instance, definition: game.Card_Definition,
-	slot: int, affordable, selected, hovered, available: bool) {
+	slot: int, affordable, selected, hovered, available: bool, visible: f32 = 0, key: cstring = "") {
 	if game.card_is_scopa(card.definition_id) && renderer.tactical.art.scopa.id != 0 {
 		draw_scopa_tactical_card(renderer, bounds, card, definition, slot, affordable, selected, hovered, available)
 		return
@@ -108,7 +230,9 @@ draw_tactical_card :: proc(renderer: ^Renderer, bounds: rl.Rectangle, card: game
 	gothic_frame(bounds, GOTHIC_INK, edge, true, art)
 	ink := GOTHIC_INK if affordable && available else rl.Color{111, 102, 92, 255}
 	// The cost, name and action stay in fixed bounds while the inlay lights up.
-	// No animated raise changes the card's pointer target or masks its neighbor.
+	// No animated raise changes the card's pointer target or masks its neighbor
+	// (an overlapping hand lifts the card under the mouse whole, still under
+	// it: tactical_hand_raised_card_bounds).
 	rl.DrawRectangleRec({x+10, y+4, width-20, 2}, rarity)
 	if selected || hovered {
 		light := f32(0.72)+f32(math.sin(renderer.sprite_assets.elapsed*3))*0.12
@@ -120,16 +244,24 @@ draw_tactical_card :: proc(renderer: ^Renderer, bounds: rl.Rectangle, card: game
 	rl.DrawRectangleRec({x+10, y+11, 20, 22}, GOTHIC_INK)
 	rl.DrawRectangleRec({x+12, y+11, 16, 1}, GOTHIC_BLUE if affordable else GOTHIC_RED)
 	gothic_text(renderer, fmt.ctprintf("%d", definition.cost), x+15, y+10, 18, GOTHIC_BLUE if affordable else GOTHIC_RED)
-	gothic_text_fit(renderer, tactical_card_face_title(card, definition, width), {x+37, y+13, width-45, 21}, 16, ink)
+	gothic_text_fit(renderer, tactical_card_face_title(renderer, card, definition, width), {x+37, y+13, tactical_card_name_room(width), 21},
+		TACTICAL_CARD_NAME_SIZE, ink)
 	// A smaller recessed crest leaves room for both effect lines in an eight-card hand.
-	center_x := x+width*0.5+12
+	covered := visible > 0 && visible < width
+	icon_bounds := rl.Rectangle{x+40, y+36, width-56, 44}
+	if covered { icon_bounds.width = clamp(visible-42, 0, width-56) }
+	center_x := icon_bounds.x+icon_bounds.width*0.5
 	rl.DrawRectangleRec({center_x-23, y+43, 46, 32}, {99, 105, 111, 19})
 	rl.DrawRectangleRec({center_x-15, y+36, 30, 7}, {99, 105, 111, 19})
 	rl.DrawLineEx({center_x-25, y+44}, {center_x-25, y+75}, 1, {114, 102, 83, 75})
 	rl.DrawLineEx({center_x+25, y+44}, {center_x+25, y+75}, 1, {114, 102, 83, 75})
-	for mark in 0..=int(definition.rarity) { gothic_inlay(x+width-14, y+43+f32(mark)*8, 2, rarity) }
+	if covered {
+		marks_y := y+79 if game.card_is_board_device(card.definition_id) else y+70
+		for mark in 0..=int(definition.rarity) { gothic_inlay(x+15+f32(mark)*8, marks_y, 2, rarity) }
+	} else {
+		for mark in 0..=int(definition.rarity) { gothic_inlay(x+width-14, y+43+f32(mark)*8, 2, rarity) }
+	}
 	icon := gothic_card_icon(card.definition_id)
-	icon_bounds := rl.Rectangle{x+40, y+36, width-56, 44}
 	shadow_bounds := icon_bounds
 	shadow_bounds.y += 2
 	if game.card_is_board_device(card.definition_id) {
@@ -153,7 +285,15 @@ draw_tactical_card :: proc(renderer: ^Renderer, bounds: rl.Rectangle, card: game
 	rl.DrawRectangleRec({x+9, y+130, width-18, 17}, {41, 42, 45, 24})
 	gothic_rule(x+10, y+128, width-20, rarity)
 	gothic_text_fit(renderer, tactical_card_target_label(definition), {x+10, y+132, width-32, 17}, 12, accent)
-	if slot >= 0 { gothic_text(renderer, fmt.ctprintf("%d", slot+1), x+width-18, y+132, 12, ink) }
+	if slot >= 0 {
+		shown := visible if visible > 0 else width
+		gothic_text(renderer, key if key != "" else fmt.ctprintf("%d", slot+1), x+shown-18, y+132, 12, ink)
+	}
+}
+
+// The key of a hand's slot, as the keyboard plays it: 1 to 9, then 0.
+tactical_hand_slot_key :: proc(index: int) -> cstring {
+	return fmt.ctprintf("%d", (index+1)%10)
 }
 
 // A hand card's two lines as a card `width` wide shows them: a narrow card
@@ -172,13 +312,50 @@ tactical_card_title :: proc(card: game.Card_Instance, definition: game.Card_Defi
 	return fmt.ctprintf("%s", definition.name)
 }
 
-// The name on a hand card `width` wide: a narrow card's short name where the
-// whole one would be cut there.
-tactical_card_face_title :: proc(card: game.Card_Instance, definition: game.Card_Definition, width: f32) -> cstring {
+// The name on a hand card `width` wide (a menu's too): a card with a short
+// name says it on a narrow card, and on a wider one wherever the whole name,
+// its upgrade after it, would not hold there as it is, at the face's size
+// (smaller, closed up or cut: First Person Shooter on every face of the game's
+// hands, the rewards and the shop).
+tactical_card_face_title :: proc(renderer: ^Renderer, card: game.Card_Instance, definition: game.Card_Definition, width: f32) -> cstring {
+	whole := tactical_card_title(card, definition)
 	short, found := gothic_card_narrow_name(card.definition_id)
-	if width >= CARD_NARROW_WIDTH || !found { return tactical_card_title(card, definition) }
+	if !found { return whole }
+	if width >= CARD_NARROW_WIDTH {
+		if renderer == nil { return whole }
+		if _, _, _, fit := gothic_text_fit_plan(renderer, whole, tactical_card_name_room(width), TACTICAL_CARD_NAME_SIZE); fit == .Fits { return whole }
+	}
 	if card.upgrade_level > 0 { return fmt.ctprintf("%s +%d", short, card.upgrade_level) }
 	return short
+}
+
+// A hand card's name: its size, and the width it has on a card `width` wide.
+TACTICAL_CARD_NAME_SIZE :: 16
+tactical_card_name_room :: proc(width: f32) -> f32 {
+	return width-45
+}
+
+// A hand card's words as its face sets them (draw_tactical_card): from
+// `start`, in `room` on a card `width` wide, at `size`; covered by the next
+// card of an overlapping hand, they end `after` before it (the reach before
+// the key).
+Tactical_Card_Words :: struct {
+	what: string,
+	text: cstring,
+	start, room, after: f32,
+	size: int,
+	name: bool,
+}
+
+tactical_card_face_words :: proc(renderer: ^Renderer, card: game.Card_Instance, definition: game.Card_Definition, width: f32) -> [4]Tactical_Card_Words {
+	first, second := tactical_card_face_lines(card, definition, width)
+	gap := TACTICAL_HAND_REVEAL_GAP
+	return {
+		{"name", tactical_card_face_title(renderer, card, definition, width), 37, tactical_card_name_room(width), gap, TACTICAL_CARD_NAME_SIZE, true},
+		{"first line", first, 10, width-20, gap, 14, false},
+		{"second line", second, 10, width-20, gap, 12, false},
+		{"reach", tactical_card_target_label(definition), 10, width-32, 22, 12, false},
+	}
 }
 
 // The words of `card` that would not hold on a hand card `width` wide or in
@@ -186,36 +363,36 @@ tactical_card_face_title :: proc(card: game.Card_Instance, definition: game.Card
 // a line, the reach or the inspector's words that would not fit as they are
 // (closed up, the pixel font's letters touch: CTRL+CLIC reads CTRL+CUC), or
 // a name that would not, but for an upgrade's figures after it (then it may
-// close up or take a smaller size, never be cut). Empty when every one holds.
-tactical_card_text_misfit :: proc(renderer: ^Renderer, card: game.Card_Instance, definition: game.Card_Definition, width: f32) -> string {
-	Words :: struct {
-		what: string,
-		text: cstring,
-		room: f32,
-		size: int,
-		name: bool,
-	}
-	first, second := tactical_card_face_lines(card, definition, width)
+// close up or take a smaller size, never be cut); and on a card of which only
+// `shown` shows (an overlapping hand's, 0: all of it), a word of its face that
+// would end under the card over it. Empty when every one holds.
+tactical_card_text_misfit :: proc(renderer: ^Renderer, card: game.Card_Instance, definition: game.Card_Definition, width: f32, shown: f32 = 0) -> string {
 	whole_first, whole_second := gothic_card_lines(card, definition.tactical)
 	reaction, rule := tactical_card_inspector_rules(card, definition)
-	words := [?]Words{
-		{"name", tactical_card_face_title(card, definition, width), width-45, 16, true},
-		{"first line", first, width-20, 14, false},
-		{"second line", second, width-20, 12, false},
-		{"reach", tactical_card_target_label(definition), width-32, 12, false},
-		{"inspector name", tactical_card_title(card, definition), 195, 18, true},
-		{"inspector cost", tactical_card_cost_line(card, definition), 193, 14, false},
-		{"inspector first line", whole_first, 192, 16, false},
-		{"inspector second line", whole_second, 192, 14, false},
-		{"inspector reaction", reaction, 192, 12, false},
-		{"inspector rule", rule, 192, 12, false},
+	face := tactical_card_face_words(renderer, card, definition, width)
+	inspector := [?]Tactical_Card_Words{
+		{"inspector name", tactical_card_title(card, definition), 0, 195, 0, 18, true},
+		{"inspector cost", tactical_card_cost_line(card, definition), 0, 193, 0, 14, false},
+		{"inspector first line", whole_first, 0, 192, 0, 16, false},
+		{"inspector second line", whole_second, 0, 192, 0, 14, false},
+		{"inspector reaction", reaction, 0, 192, 0, 12, false},
+		{"inspector rule", rule, 0, 192, 0, 12, false},
 	}
 	said := ""
-	for w in words {
-		if w.text == "" { continue }
-		_, _, _, fit := gothic_text_fit_plan(renderer, w.text, w.room, w.size)
-		if fit == .Fits || (w.name && card.upgrade_level > 0 && fit != .Cut) { continue }
-		said = fmt.tprintf("%s%s%s \"%s\" (%v in %.0f px at %d)", said, "; " if said != "" else "", w.what, w.text, fit, w.room, w.size)
+	for group, index in ([2][]Tactical_Card_Words{face[:], inspector[:]}) {
+		for words in group {
+			if words.text == "" { continue }
+			size, spacing, label, fit := gothic_text_fit_plan(renderer, words.text, words.room, words.size)
+			if !(fit == .Fits || (words.name && card.upgrade_level > 0 && fit != .Cut)) {
+				said = fmt.tprintf("%s%s%s \"%s\" (%v in %.0f px at %d)", said, "; " if said != "" else "", words.what, words.text, fit, words.room, words.size)
+				continue
+			}
+			if index != 0 || !(shown > 0 && shown < width) { continue }
+			if end := words.start+gothic_text_width(renderer, label, size, spacing); end+words.after > shown {
+				said = fmt.tprintf("%s%s%s \"%s\" (ends at %.0f px, %.0f of %.0f showing)", said, "; " if said != "" else "", words.what, words.text,
+					end, shown, width)
+			}
+		}
 	}
 	return said
 }
@@ -263,6 +440,8 @@ tactical_card_inspector_rules :: proc(card: game.Card_Instance, definition: game
 	if card.definition_id == .Venom_Blade { reaction, rule = "IL DADO DECIDE I COLPI", "LE CARICHE SI SOMMANO" }
 	if card.definition_id == .Lasso { reaction, rule = "BOSS E MINIBOSS: TROPPO PESANTI", "SCHIVA O SPINTA: LO MOLLI" }
 	if card.definition_id == .Fishing_Rod { reaction, rule = "SOLO A STANZA LIBERATA", "MAI IN MANO / UNA PER RUN" }
+	if card.definition_id == .Pinball { reaction, rule = "BOSS E MINIBOSS: TROPPO PESANTI", fmt.ctprintf("DOPO %ds SCOPPIA E CADE", int(game.PINBALL_SECONDS)) }
+	if card.definition_id == .First_Person { reaction, rule = "NIENTE CARTE: SOLO L'AK", "WASD SECONDO LA VISTA" }
 	if card.definition_id == .Guard || card.definition_id == .Purifying_Guard { reaction = "QTE: BLOCK / PARRY" }
 	if card.definition_id == .Thorn_Coat { reaction = "QTE: DEVIAZIONE (FRECCE)" }
 	if card.definition_id == .Afterimage { reaction = "IGNORA RECUPERO SCHIVA" }
@@ -288,9 +467,12 @@ draw_tactical_hand :: proc(renderer: ^Renderer, room: ^game.Room,
 	// The room cleared: no hand, the Canna da Pesca's slot (fishing.odin).
 	if phase == .Loot { draw_fishing_slot(renderer, room, hovered, selected, dragged, mouse) }
 	if phase != .Combat || !deck.combat_active { return }
+	// Behind the player's eyes the hand is put away: it slides off the canvas.
+	drop := first_person_hand_drop(renderer)
+	if drop >= TACTICAL_HAND_HEIGHT+20 { return }
 	available := !renderer_blocks_player_input(renderer) && game.tactical_allows_cards(room)
 	recovering := game.tactical_is_recovering(room)
-	top := renderer.canvas_height-TACTICAL_HAND_HEIGHT
+	top := renderer.canvas_height-TACTICAL_HAND_HEIGHT+drop
 	first_bounds := tactical_hand_card_bounds(renderer, 0, deck.hand_count)
 	last_bounds := tactical_hand_card_bounds(renderer, max(0, deck.hand_count-1), deck.hand_count)
 	left := first_bounds.x if deck.hand_count > 0 else f32(24)
@@ -316,12 +498,15 @@ draw_tactical_hand :: proc(renderer: ^Renderer, room: ^game.Room,
 		hint = fmt.ctprintf("CTRL+CLIC SU UN NEMICO: FRECCIA (%d)", arrows)
 	}
 	if renderer.tactical.arrow_aim { hint = "CLIC SU UN NEMICO EVIDENZIATO: FRECCIA" }
-	// LAZZO: a boss under the aim is too heavy (lasso.odin).
+	// LAZZO: a boss under the aim is too heavy (lasso.odin); so for the
+	// PINBALL, which takes one ball at a time (pinball.odin).
 	if aimed := dragged if dragged != 0 else selected; aimed != 0 && renderer.has_hovered_cell {
-		if index, found := game.hand_card_index_by_id(deck, aimed); found && deck.hand[index].definition_id == .Lasso {
-			definition, _ := game.card_definition_by_id(.Lasso, true)
+		if index, found := game.hand_card_index_by_id(deck, aimed); found && (deck.hand[index].definition_id == .Lasso || deck.hand[index].definition_id == .Pinball) {
+			id := deck.hand[index].definition_id
+			definition, _ := game.card_definition_by_id(id, true)
 			evaluation := game.evaluate_card_targeting(room, deck.hand[index], game.card_target_request_at(definition, renderer.hovered_cell))
-			if evaluation.error == .Target_Too_Heavy { hint = "TROPPO PESANTE PER IL LAZZO" }
+			if id == .Lasso && evaluation.error == .Target_Too_Heavy { hint = "TROPPO PESANTE PER IL LAZZO" }
+			if id == .Pinball { if said := pinball_aim_hint(room, evaluation.error); said != "" { hint = said } }
 		}
 	}
 	if recovering { hint = "RECUPERO / PUOI MUOVERTI" }
@@ -330,13 +515,23 @@ draw_tactical_hand :: proc(renderer: ^Renderer, room: ^game.Room,
 	// The pivot holds the rope: only a dodge lets go, when one can be made.
 	if game.tactical_lasso_active(room) && !game.tactical_is_casting(room) { hint = lasso_hand_hint(room) }
 	if right-left > 580 { gothic_text_fit(renderer, hint, {left+180, top+5, right-left-398, 17}, 10, GOTHIC_BLUE) }
-	for card, index in deck.hand[:deck.hand_count] {
-		definition, found := game.card_definition_by_id(card.definition_id, true)
-		if !found { continue }
-		draw_tactical_card(renderer, tactical_hand_card_bounds(renderer, index, deck.hand_count), card, definition, index,
-			deck.energy >= definition.cost, card.id == selected || card.id == dragged, card.id == hovered, available)
+	// Left to right, each over the edge of the one before in an overlapping
+	// hand; the raised card last, over them all.
+	raised := tactical_hand_raised_card(deck, hovered, selected, dragged)
+	for pass in 0..<2 {
+		for card, index in deck.hand[:deck.hand_count] {
+			if (card.id == raised) != (pass == 1) { continue }
+			definition, found := game.card_definition_by_id(card.definition_id, true)
+			if !found { continue }
+			bounds := tactical_hand_card_bounds(renderer, index, deck.hand_count)
+			visible := tactical_hand_card_visible_width(renderer, index, deck.hand_count)
+			if card.id == raised { bounds, visible = tactical_hand_raised_card_bounds(renderer, index, deck.hand_count), bounds.width }
+			draw_tactical_card(renderer, bounds, card, definition, index, deck.energy >= definition.cost,
+				card.id == selected || card.id == dragged, card.id == hovered, available, visible, tactical_hand_slot_key(index))
+		}
 	}
 	active := dragged if dragged != 0 else (hovered if hovered != 0 else selected)
+	if drop > 0 { return }
 	if index, found := game.hand_card_index_by_id(deck, active); found {
 		card := deck.hand[index]
 		definition, _ := game.card_definition_by_id(card.definition_id, true)

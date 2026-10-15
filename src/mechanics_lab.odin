@@ -10,22 +10,27 @@ import game "game"
 import grid "grid"
 import level "level"
 import render "render"
+import view "view"
 
 // PROVA MECCANICHE: a sandbox for trying mechanics one at a time. A large
 // arena with no cover, a deck made only of the cards under test (one
 // Movimento Ombra, one of each card of Phase 2: Pozza di Veleno, Incendio,
-// Deflect, Feretro, Dado del Destino, Lama Velenosa, and the Lazzo and the
-// Canna da Pesca of Phase 3) and enemies that never stop coming
-// (game/sandbox.odin). F7 clears the arena at once for the rod
-// (mechanics_lab_begin_fishing); F5 brings the fight back. It never touches
-// the profile, gives no rewards and has no exit to walk to.
+// Deflect, Feretro, Dado del Destino, Lama Velenosa, the Lazzo and the Canna
+// da Pesca of Phase 3, the Pinball and the First Person Shooter of Phase 4)
+// and enemies that never stop coming (game/sandbox.odin). F7 clears the arena
+// at once for the rod (mechanics_lab_begin_fishing); F5 brings the fight
+// back. It never touches the profile, gives no rewards and has no exit to
+// walk to.
 MECHANICS_LAB_WIDTH :: 23
 MECHANICS_LAB_HEIGHT :: 17
-MECHANICS_LAB_DECK :: [9]game.Card_Id{.Shadow_Step, .Poison_Pool, .Wildfire, .Deflect, .Coffin, .Fate_Dice, .Venom_Blade, .Lasso, .Fishing_Rod}
-// The whole deck in hand, every card under test at once, but for the Canna da
-// Pesca: it never comes to hand (it waits in Exhaust for a cleared room).
+MECHANICS_LAB_DECK :: [11]game.Card_Id{.Shadow_Step, .Poison_Pool, .Wildfire, .Deflect, .Coffin, .Fate_Dice, .Venom_Blade, .Lasso,
+	.Pinball, .First_Person, .Fishing_Rod}
+// The whole deck in hand, every card under test at once (ten: more than the
+// game's hand ever holds, game.deck_hand_limit, so they overlap there,
+// render.tactical_hand_card_bounds), but for the Canna da Pesca: it never
+// comes to hand (it waits in Exhaust for a cleared room).
 MECHANICS_LAB_RULES :: game.Deck_Rules{hand_size = len(MECHANICS_LAB_DECK)-1, max_energy = 12, energy_regen_per_pulse = 3}
-#assert(len(MECHANICS_LAB_DECK)-1 <= game.MAX_HAND_CARDS)
+#assert(len(MECHANICS_LAB_DECK)-1 <= game.MAX_HAND_CAPACITY)
 MECHANICS_LAB_DECK_SEED :: u64(0x7E57_1AB)
 
 // The open arena: walls only around the edge, the player in the middle and
@@ -116,12 +121,14 @@ mechanics_lab_begin_fishing :: proc(rs: ^Roguelike_Session) -> bool {
 	return true
 }
 
-// With `dice`, a dice card's roll shows over the window as in the game.
+// With `dice`, a dice card's roll shows over the window as in the game;
+// `input` is the controller's (the first person act's mouse and keys).
 mechanics_lab_smoke_frame :: proc(window: ^app.Window, renderer: ^render.Renderer, room: ^game.Room, controller: ^Tactical_Controller,
-	cards: ^Card_Interaction_State, buffer: ^Buffered_Gameplay_Command, dt: f32, clock := false, dice: ^render.Dice_Renderer = nil) {
+	cards: ^Card_Interaction_State, buffer: ^Buffered_Gameplay_Command, dt: f32, clock := false, dice: ^render.Dice_Renderer = nil,
+	input := Tactical_Controller_Input{focused = true}) {
 	render.update_renderer_frame_timeline(renderer, dt)
 	// The board clock runs only where a capture needs real time to pass.
-	step_tactical_controller(controller, room, renderer, cards, buffer, dt if clock else 0, true, {focused = true})
+	step_tactical_controller(controller, room, renderer, cards, buffer, dt if clock else 0, true, input)
 	render.advance_sprite_assets(&renderer.sprite_assets, dt)
 	render.update_tactical_view(renderer, room, {}, false, true)
 	render.update_tactical_atmosphere(renderer, dt)
@@ -148,7 +155,9 @@ mechanics_lab_smoke_frame :: proc(window: ^app.Window, renderer: ^render.Rendere
 // coils around the arrivals, the last kill that keeps the combat going and the
 // refill; then Movimento Ombra played, the shadow walked and the rise, every
 // kind of blow, a slowed brute's seal, the pools and the fire, the player's
-// charges and, last, the Lazzo and the Canna da Pesca.
+// charges and, last, the Lazzo, the Pinball (mechanics_lab_pinball.odin), the
+// First Person Shooter (mechanics_lab_first_person.odin) and the Canna da
+// Pesca.
 run_mechanics_lab_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer, dice: ^render.Dice_Renderer) -> bool {
 	data: level.Level
 	defer level.destroy(&data)
@@ -323,17 +332,64 @@ run_mechanics_lab_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer,
 	if !mechanics_lab_ground(window, renderer, &room, &controller, &cards, &buffer) { return false }
 	if !mechanics_lab_charges(window, renderer, dice, &room, &controller, &cards, &buffer) { return false }
 	if !mechanics_lab_lasso(window, renderer, &room, &controller, &cards, &buffer) { return false }
+	if !mechanics_lab_pinball(window, renderer, &room, &controller, &cards, &buffer) { return false }
+	if !mechanics_lab_first_person(window, renderer, &room, &data, &controller, &cards, &buffer) { return false }
 	if !mechanics_lab_fishing(window, renderer, dice, &room, &controller, &cards, &buffer) { return false }
 	return mechanics_lab_sounds_heard(renderer)
 }
 
 // Every card of the lab's deck, at every level it can reach, says all its
-// words on the hand's own cards (eight at once: narrow ones) and in the
-// inspector without a line drawn smaller or cut, nor a name cut, measured
-// with the game's font (render.tactical_card_text_misfit); the Canna da Pesca
-// on its own slot.
+// words on the hand's own cards and in the inspector without a line drawn
+// smaller or cut, nor a name cut, measured with the game's font
+// (render.tactical_card_text_misfit); the Canna da Pesca on its own slot. The
+// hand holds ten cards, more than the game's: they keep the width of a full
+// hand of the game's (eight, narrow ones) and overlap. Each shows all the
+// words of its face, its cost, time, icon, marks and key before the next
+// covers it (render.tactical_hand_reveal), in the hand as it is dealt and in
+// any order it can take, the pointer finds it there, and raised it rises
+// whole inside the canvas, under the pointer still.
 mechanics_lab_card_words :: proc(renderer: ^render.Renderer, player: ^game.Player) -> bool {
-	width := render.tactical_hand_card_bounds(renderer, 0, player.deck.hand_count).width
+	deck := &player.deck
+	count := deck.hand_count
+	width := render.tactical_hand_card_bounds(renderer, 0, count).width
+	full := render.tactical_hand_card_bounds(renderer, 0, game.MAX_HAND_CARDS).width
+	if count != MECHANICS_LAB_RULES.hand_size || !render.tactical_hand_overlaps(count) || width != full ||
+	   renderer.tactical.hand_reveal.count != count {
+		fmt.eprintf("mechanics lab: %d cards %.0f px wide, a full hand's are %.0f px\n", count, width, full); return false
+	}
+	least := width
+	for index in 0..<count {
+		bounds := render.tactical_hand_card_bounds(renderer, index, count)
+		raised := render.tactical_hand_raised_card_bounds(renderer, index, count)
+		shown := render.tactical_hand_card_visible_width(renderer, index, count)
+		middle := view.Vec2{bounds.x+shown*0.5, bounds.y+bounds.height*0.5}
+		pointed, found := render.hand_card_at_point(renderer, deck, middle)
+		top := view.Vec2{bounds.x+bounds.width-4, raised.y+2}
+		lifted, kept := render.hand_card_at_point(renderer, deck, top, deck.hand[index].id)
+		definition, _ := game.card_definition_by_id(deck.hand[index].definition_id, true)
+		covered := render.tactical_card_text_misfit(renderer, deck.hand[index], definition, width, shown)
+		if bounds.width != width || shown < render.TACTICAL_HAND_REVEAL_ICON || covered != "" || raised.width != width ||
+		   raised.y >= bounds.y || raised.x < 0 || raised.y < 0 ||
+		   raised.x+raised.width > renderer.canvas_width || raised.y+raised.height > renderer.canvas_height ||
+		   !found || pointed != index || !kept || lifted != index {
+			fmt.eprintf("mechanics lab: hand card %d of %d: %v shows %.0f px (%s), raised to %v, pointed %v %d, lifted %v %d\n", index+1, count,
+				bounds, shown, covered, raised, found, pointed, kept, lifted); return false
+		}
+		if index < count-1 { least = min(least, shown) }
+	}
+	// Any order: the hand's whole need, with the card that needs least last
+	// (shown whole), still fits across it.
+	needed, smallest := f32(0), width
+	for card in deck.hand[:count] {
+		definition, _ := game.card_definition_by_id(card.definition_id, true)
+		need := render.tactical_hand_reveal_need(renderer, card, definition, width)
+		needed += need
+		smallest = min(smallest, need)
+	}
+	span := renderer.canvas_width-render.TACTICAL_HAND_OVERLAP_GUTTER*2
+	if needed-smallest+width > span {
+		fmt.eprintf("mechanics lab: the hand's words need %.0f px of %.0f in some order\n", needed-smallest+width, span); return false
+	}
 	checked := 0
 	for id in MECHANICS_LAB_DECK {
 		definition, found := game.card_definition_by_id(id, true)
@@ -350,7 +406,32 @@ mechanics_lab_card_words :: proc(renderer: ^render.Renderer, player: ^game.Playe
 			card.upgrade_level += 1
 		}
 	}
-	fmt.eprintf("mechanics lab words: %d cards and levels hold on %.0f px cards and in the inspector\n", checked, width)
+	// The Pinball and the First Person Shooter on the game's wider faces too:
+	// a hand of five or six, the shop's and the rewards' (render.menu_card_face).
+	faces := [4]f32{render.tactical_hand_card_bounds(renderer, 0, 5).width, render.tactical_hand_card_bounds(renderer, 0, 6).width,
+		render.shop_offer_bounds(renderer.canvas_width, renderer.canvas_height, 0).width,
+		render.reward_card_bounds(renderer.canvas_width, renderer.canvas_height, 0, game.CARD_REWARD_CHOICE_COUNT).width}
+	wide := 0
+	for id in ([2]game.Card_Id{.Pinball, .First_Person}) {
+		definition, _ := game.card_definition_by_id(id, true)
+		card := game.Card_Instance{id = 1, definition_id = id, lifetime = .Permanent}
+		for {
+			for face_width in faces {
+				if face_width < render.CARD_NARROW_WIDTH {
+					fmt.eprintf("mechanics lab: a %.0f px wide face is a narrow one\n", face_width); return false
+				}
+				if misfit := render.tactical_card_text_misfit(renderer, card, definition, face_width); misfit != "" {
+					fmt.eprintf("mechanics lab: %v +%d on a %.0f px card: %s\n", id, card.upgrade_level, face_width, misfit)
+					return false
+				}
+				wide += 1
+			}
+			if !game.card_can_upgrade(card) { break }
+			card.upgrade_level += 1
+		}
+	}
+	fmt.eprintf("mechanics lab words: %d cards and levels hold on %.0f px cards and in the inspector, the Pinball and the First Person Shooter on %d faces %.0f, %.0f, %.0f and %.0f px wide; %d cards in hand, at least %.0f px of each showing, all their words (%.0f of %.0f px in any order)\n",
+		checked, width, wide, faces[0], faces[1], faces[2], faces[3], count, least, needed-smallest+width, span)
 	return true
 }
 
@@ -1935,11 +2016,22 @@ mechanics_lab_sounds_heard :: proc(renderer: ^render.Renderer) -> bool {
 		.World_Lasso_Smash, .World_Lasso_Release}) {
 		if sounds.played[sfx] == 0 { fmt.eprintln("mechanics lab: no sound for the rope", sfx); return false }
 	}
+	// The Pinball's: its card, the strike, a ding, a bong and the burst.
+	for sfx in ([?]audio.Lab_Sfx{render.LAB_PINBALL_CARD, render.LAB_PINBALL_LAUNCH, render.LAB_PINBALL_DING, render.LAB_PINBALL_BONG,
+		render.LAB_PINBALL_BURST}) {
+		if sounds.played[sfx] == 0 { fmt.eprintln("mechanics lab: no sound for the Pinball", sfx); return false }
+	}
 	// The Canna da Pesca's: its card as it is cast, the plop, the bite, the
 	// reel, food caught and a card caught.
 	for sfx in ([?]audio.Lab_Sfx{.Card_Fishing_Rod, .World_Bobber_Plop, .World_Fish_Bite, .Pilgrim_Reel, .Pilgrim_Catch,
 		.Ui_Fish_Card}) {
 		if sounds.played[sfx] == 0 { fmt.eprintln("mechanics lab: no sound for the fishing", sfx); return false }
+	}
+	// The First Person Shooter's: its card, the dive in, a shot, a hit, a
+	// shot on stone and the rise out.
+	for sfx in ([?]audio.Lab_Sfx{render.LAB_FIRST_PERSON_CARD, render.LAB_FIRST_PERSON_ENTER, render.LAB_FIRST_PERSON_SHOT,
+		render.LAB_FIRST_PERSON_HIT, render.LAB_FIRST_PERSON_RICOCHET, render.LAB_FIRST_PERSON_EXIT}) {
+		if sounds.played[sfx] == 0 { fmt.eprintln("mechanics lab: no sound for the first person", sfx); return false }
 	}
 	fmt.eprintln("mechanics lab sounds:", heard)
 	return true

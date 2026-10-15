@@ -151,6 +151,27 @@ each sound starts with the drawing it belongs to:
   caught card reaches him. His card's clips (his cast as the rod is cast, its
   hold while the catch is reeled in) sound nothing of their own: never
   `pilgrim_attack`, `pilgrim_interact` or `pilgrim_cast`.
+- **The ball** (Pinball), at the ball: `card_pinball` when the card is
+  played (its foe's card starts to puff into the ball at about 0.25 of it,
+  the Pinball_Made cue, and the ball drops out whole at 0.49);
+  `world_pinball_launch` as the player's swing at the ball lands, when the
+  cast ends (his card's swing is silent of its own: never `pilgrim_attack`);
+  `world_pinball_ding` each time the ball glances off a wall, the room's
+  edge, cover or an object (the Pinball_Bounced cue, at 0.8, several a second
+  at most); `world_pinball_bong` each time it strikes a foe (Pinball_Bumped),
+  played higher as its value climbs (pitch 0.9, +0.04 a point over the
+  card's value, up to eight); `world_pinball_burst` when its twenty seconds
+  end (Pinball_Burst). Its foe makes no sound of its own while it is the ball
+  (no voice, no hurt, no death).
+- **Behind his eyes** (First Person Shooter), at the player:
+  `card_first_person` when the card is played; `pilgrim_fps_dive` as the
+  camera starts diving into his eyes (the card's First_Person_Begun cue, 0.6
+  s) and `pilgrim_fps_rise` as it starts rising back out when the seconds
+  end (0.6 s); `pilgrim_ak_shot` at every shot the board shows (six a second
+  while the trigger is held, at 0.8), `world_ak_hit` 0.04 s after a shot that
+  wounds a foe (at 0.9; the struck foe's own hurt stays silent: its card
+  starts no clip) and `world_ak_ricochet` 0.04 s after one stopped by stone,
+  cover or an object (at 0.8).
 - **The room**: `ui_beat_tick` on every whole second of an open window,
   `ui_critical` when an action claims the beat, `ui_window_end`, `ui_stun`,
   `ui_defense_prompt`, `pilgrim_parry` on a parry or deflection that lands,
@@ -195,6 +216,9 @@ chime and iron rattle when he moves hard). Warm, light, human scale.
 | pilgrim_lasso_throw | throws the Lazzo (its throw starts to show) | 0.62 | 0.0, 0.04, 0.53 | -19 | 0.22 | the loop let go in a full round whoosh peaking at 0.04 (the cloak flicks, the lantern knocks once), then the rope paying out through his glove (a fibrous hemp rasp, fast, then slowing) under the loop's own whistle falling away (doppler down, darker), until it drops over the foe at 0.53 |
 | pilgrim_reel | reels in the Canna da Pesca's catch | 0.7 | 0.0, 0.1, 0.45 | -20 | 0.22 | the reel cranked hard (its pawl clicking about 26 a second over the gears' dry whirr, to 0.45), the cane creaking under the load; the catch breaks the water at 0.10 (a heavy wet burst, drops raining back to 0.5), the taut line singing thin |
 | pilgrim_catch | the rod's food reaches his hand | 0.45 | 0.0 | -21 | 0.2 | a soft wet slap on the leather glove at 0.0 (a muffled body under a little splat), a few drops falling off onto the stone, the cloak settling |
+| pilgrim_fps_dive | the camera dives into his eyes (First Person Shooter) | 0.85 | 0.0, 0.45, 0.6 | -20 | 0.25 | the room rushing in (air through a band rising 250 Hz -> 1.6 kHz, swelling to 0.45) over a low glide D2 -> D3, his hood brushing past it (wool from 0.38) and closing round the view at 0.6 with a soft muffled thump, the lantern's globe chiming faintly |
+| pilgrim_fps_rise | the camera rises back out of his eyes | 0.8 | 0.0, 0.2, 0.6 | -21 | 0.25 | the hood falling open (wool to 0.15), the room drawing away (a band falling 1.4 kHz -> 260 Hz, swelling to 0.2, gone by 0.6) over a low glide D3 -> D2, the board's view settling at 0.6 with a faint low breath of air |
+| pilgrim_ak_shot | one shot of his paper AK (six a second at most) | 0.22 | 0.0, 0.022 | -20 | 0.14 (rt60 1.0) | short, dry and never harsh: the muzzle's crack at 0.0 (a broadband blast with a sharp front and a short dark boom), the rifle's paper snapping with it, the bolt cycling at 0.022 (a short steel clack); no casing, no tail |
 
 ### Family `ghoul` — the Chaser
 
@@ -307,6 +331,8 @@ Length ~0.5–0.9 s; loudness -19 unless noted; wet 0.25.
 | card_venom_blade | Lama Velenosa: its die is the bumps it poisons | a dagger drawn from its sheath (a bright scrape from 0.07, the blade ringing on D6), a drop of venom at 0.26 (a tight plip and a sizzle), two small bubbles |
 | card_lasso | Lazzo: a foe caught, lifted and swung round him | the coil of hemp shaken loose off his shoulder (a fibrous rasp from 0.03, the coils slapping softly at 0.04 and 0.09), the loop opened with a creak of its knot at 0.16, then whirled once overhead: a round swish peaking at 0.22 (240 -> 760 Hz, the rope's thin whistle riding it), handing on to the throw |
 | card_fishing_rod | Canna da Pesca: never played, heard as it is cast | the rod drawn back over his shoulder (a dry creak of the cane, a soft swish, 0.04-0.19), whipped forward (a thin fast swish peaking at 0.27, its tip whistling), the line let go at 0.32: the reel's pawl spinning out (a purring click train slowing from 70 to 20 a second) and the line hissing off the spool until the bobber is down (0.62) |
+| card_pinball | Pinball: a foe beside him made into a steel ball and struck away | a plunger drawn back from 0.04 (its rod rasping, the coil spring zinging higher as it stretches, the ratchet clicking ever faster) and caught at full draw at 0.2 (a click, the spring's short boing on D4); as the foe's card starts to puff (0.25) it is balled up like paper and squeezed shut, and the ball drops out whole at 0.49 (a solid steel tink, a soft puff of paper dust) |
+| card_first_person | First Person Shooter: twenty seconds behind his eyes with a paper AK | the AK readied: the banana magazine seated at 0.05 (a hollow steel clack, its rattle), the charging handle hauled back at 0.13 (a dry scrape, the bolt's spring) and let fly at 0.19 (the bolt slams home); the dive (`pilgrim_fps_dive`) follows from about 0.27 |
 
 ### Family `cards_arcana` — cards of storm, fire, poison and devices
 
@@ -358,6 +384,12 @@ Same rules as `cards_arms`.
 | world_lasso_release | the rope lets a living foe go | 0.6 | -21 | 0.25 | the tension let go in a soft falling swish of hemp (1.5 kHz -> 400 Hz), loose coils flopping (0.05, 0.12); the card lands back on the stone at 0.28 (a cardboard thump, its iron base, a short scrape, dust) |
 | world_bobber_plop | the rod's bobber lands (the water shows) | 0.5 | -22 | 0.25 | a small round plop at 0.0 (a bubble ringing up from 480 Hz), a light slap of water, fine drops falling back to 0.2, the ripples lapping softly away |
 | world_fish_bite | a fish takes the bait (the bobber dips) | 0.6 | -19 | 0.25 | the bobber yanked under at 0.0 (a deep gulp ringing up from 240 Hz, a smaller one after), a splash thrown up with drops raining back to 0.35, the taut line plucked high (A5), the rod's tip bending with a short creak |
+| world_pinball_launch | the player's swing strikes the Pinball's ball away | 0.6 | -16 | 0.3 | a hard thwack at 0.0 (iron on steel: a sharp click, a heavy body thud, the ball ringing D5-A5, the lantern's frame clanking under it), the ball shot away in a bright whoosh falling 1.9 kHz -> 600 Hz to 0.4, a soft paper flutter in its wake |
+| world_pinball_ding | the ball glances off a wall or a solid thing | 0.3 | -22 | 0.2 | very short and dry: a small hard tock of steel on stone at 0.0, the ball's bright tick, a short ring on A6 dying by 0.2, a pinch of grit; it comes back several times a second |
+| world_pinball_bong | the ball strikes a foe (a pop bumper) | 0.6 | -18 | 0.25 | a hollow bong at 0.0 (a round tone on A3 dropping a little, its box), the foe's card smacked (a dry paper slap and crumple to 0.06), its iron base knocking, a bright bumper chime (D6 over A5) ringing to 0.45; played higher as the value climbs |
+| world_pinball_burst | the ball bursts at the end of its twenty seconds | 0.9 | -15 | 0.35 | a paper balloon popping at 0.0 (a sharp paper crack over a low thump), shreds and confetti fluttering down 0.01-0.7 (paper grains thinning out), a soft puff of paper dust, a last small steel clink at 0.55 |
+| world_ak_hit | a round of the AK wounds a foe | 0.25 | -20 | 0.2 | the foe's paper card punched through at 0.0 (a crisp tear 2-6 kHz, 10 ms), a muffled body thud under it (80-250 Hz), a few crinkles to 0.05; short, up to six a second |
+| world_ak_ricochet | a round stops on stone, cover or an object | 0.5 | -21 | 0.3 | a hard chip of stone at 0.0 (a crack, a chunk, grit flying), the round whining away from 0.03 (a thin tone falling 3.2 -> 1.3 kHz with a little wobble, fading by 0.4) |
 
 ### Family `ui` — time, criticals, defence, statuses, rewards
 

@@ -49,6 +49,15 @@ PRESENTATION_FISH_CAST_DURATION :: f32(0.62)
 PRESENTATION_FISH_BITE_DURATION :: f32(1.15)
 PRESENTATION_FISH_CATCH_DURATION :: f32(0.95)
 PRESENTATION_FISH_CARD_DURATION :: f32(1.7)
+// PINBALL: the foe's card puffs into its ball, then the strike (the player's
+// swing, set as its cue starts, lands as the cast ends), both stretched with
+// the card's other cues over the cast (pinball.odin); the burst at the end of
+// its time.
+PRESENTATION_PINBALL_MADE_DURATION :: f32(0.6)*PRESENTATION_TIME_SCALE
+PRESENTATION_PINBALL_STRIKE_DURATION :: f32(0.6)*PRESENTATION_TIME_SCALE
+PRESENTATION_PINBALL_BURST_DURATION :: f32(0.32)*PRESENTATION_TIME_SCALE
+// FIRST PERSON SHOOTER: the camera's dive into the player's eyes (first_person.odin).
+PRESENTATION_FIRST_PERSON_DIVE_DURATION :: f32(0.45)*PRESENTATION_TIME_SCALE
 PRESENTATION_MAX_SEQUENCE_DURATION :: f32(12.0)
 PRESENTATION_TIME_EPSILON         :: f32(0.00001)
 
@@ -100,6 +109,15 @@ Presentation_Cue_Kind :: enum {
 	Fish_Cast,
 	Fish_Bite,
 	Fish_Caught,
+	// PINBALL: the card turned into its ball, the strike, a wall, a foe, the
+	// burst (game/pinball.odin).
+	Pinball_Made,
+	Pinball_Launched,
+	Pinball_Bounced,
+	Pinball_Bumped,
+	Pinball_Burst,
+	// FIRST PERSON SHOOTER: the dive into the player's eyes (game/first_person.odin).
+	First_Person_Begun,
 }
 
 Presentation_Actor :: struct {
@@ -510,6 +528,18 @@ presentation_cue_kind :: proc(event: game.Game_Event) -> Presentation_Cue_Kind {
 		return .Fish_Bite
 	case .Fish_Caught:
 		return .Fish_Caught
+	case .Pinball_Made:
+		return .Pinball_Made
+	case .Pinball_Launched:
+		return .Pinball_Launched
+	case .Pinball_Bounced:
+		return .Pinball_Bounced
+	case .Pinball_Bumped:
+		return .Pinball_Bumped
+	case .Pinball_Burst:
+		return .Pinball_Burst
+	case .First_Person_Begun:
+		return .First_Person_Begun
 	}
 	unreachable()
 }
@@ -587,6 +617,18 @@ presentation_cue_duration :: proc(kind: Presentation_Cue_Kind, event: game.Game_
 	// A caught card hangs over the player a while, its name shown.
 	case .Fish_Caught:
 		return PRESENTATION_FISH_CATCH_DURATION if event.card_definition == .Fishing_Rod else PRESENTATION_FISH_CARD_DURATION
+	// PINBALL: the card's puff and the swing share its cast; a ding, a bong and
+	// the burst are blows of the world's.
+	case .Pinball_Made:
+		return PRESENTATION_PINBALL_MADE_DURATION
+	case .Pinball_Launched:
+		return PRESENTATION_PINBALL_STRIKE_DURATION
+	case .Pinball_Bounced, .Pinball_Bumped:
+		return PRESENTATION_DAMAGE_DURATION
+	case .Pinball_Burst:
+		return PRESENTATION_PINBALL_BURST_DURATION
+	case .First_Person_Begun:
+		return PRESENTATION_FIRST_PERSON_DIVE_DURATION
 	}
 	unreachable()
 }
@@ -1284,8 +1326,22 @@ start_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^Presentat
 		   (game.card_is_room_tool(event.card_definition) || event.card_id == 0)) {
 			timeline.update_failures += 1
 		}
+	// PINBALL: the player's own ball, on a foe the board shows.
+	case .Pinball_Made, .Pinball_Launched, .Pinball_Burst:
+		if event.source != game.PLAYER_ENTITY || event.card_definition != .Pinball || !has_actor {
+			timeline.update_failures += 1
+		}
+	case .Pinball_Bounced, .Pinball_Bumped:
+		if event.card_definition != .Pinball || event.source.kind != .Enemy || event.amount <= 0 {
+			timeline.update_failures += 1
+		}
 	case .Attack_Missed, .Move_Blocked, .Attack_Deflected,
 	     .Binding_Added, .Binding_Exhausted, .Binding_Expired, .Shadow_Entered, .Shadow_Emerged:
+	// The player's own card, behind his eyes.
+	case .First_Person_Begun:
+		if event.source != game.PLAYER_ENTITY || event.card_definition != .First_Person || !has_actor {
+			timeline.update_failures += 1
+		}
 	}
 }
 
@@ -1326,7 +1382,8 @@ update_active_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^P
 	     .Binding_Expired, .Pulse_Advanced, .Object_Spawned, .Explosive_Armed,
 	     .Explosive_Disarmed, .Explosion, .Room_Hazard_Triggered, .Dice_Rolled, .Spell_Launched, .Spell_Impact,
 	     .Shadow_Entered, .Shadow_Emerged, .Attack_Deflected, .Fate_Rolled, .Lasso_Caught, .Lasso_Struck, .Lasso_Released,
-	     .Fish_Cast, .Fish_Bite, .Fish_Caught:
+	     .Fish_Cast, .Fish_Bite, .Fish_Caught, .Pinball_Made, .Pinball_Launched, .Pinball_Bounced, .Pinball_Bumped, .Pinball_Burst,
+	     .First_Person_Begun:
 	}
 }
 

@@ -50,6 +50,8 @@ board_device_can_deploy :: proc(room: ^Room, kind: Grid_Object_Kind, position: g
 	if kind == .Tesla_Coil {
 		if room.player.position == position { return false }
 		if _, occupied := enemy_index_at(room, position); occupied { return false }
+		// Never under the Pinball's rolling ball (pinball.odin).
+		if pinball_covers_cell(room, position) { return false }
 		return board_tesla_count(room) < MAX_TESLA_COILS
 	}
 	return board_device_count(room, .Shock_Floor) < MAX_SHOCK_FLOORS
@@ -315,7 +317,8 @@ activate_board_devices :: proc(room: ^Room) -> bool {
 	ids, count := enemy_ids_in_planning_order(room)
 	for id in ids[:count] {
 		index, found := enemy_index_by_id(room, id)
-		if found && board_device_network_contains_cell(room, &network, room.enemies[index].position) {
+		// The discharge never reaches a foe out of play.
+		if found && !enemy_is_out_of_play(room, id) && board_device_network_contains_cell(room, &network, room.enemies[index].position) {
 			added := add_effect(&action, damage_effect(enemy_entity(id), board_device_network_damage_at(room, &network, room.enemies[index].position)))
 			assert(added)
 		}
@@ -394,8 +397,9 @@ tick_board_devices :: proc(room: ^Room, pulse: ^Pulse_Report) {
 shock_floor_targets :: proc(room: ^Room, object: Grid_Object) -> (ids: [MAX_ENEMIES_PER_ROOM]u32, count: int) {
 	distances: [MAX_ENEMIES_PER_ROOM]int
 	for enemy in room.enemies {
-		// A foe the Lazzo swings over the floor is out of its reach.
-		if !shock_floor_contains_cell(room, object.position, enemy.position) || enemy_is_lassoed(room, enemy.id) { continue }
+		// A foe out of play (the Lazzo's over the floor, the Pinball's ball) is
+		// out of its reach.
+		if !shock_floor_contains_cell(room, object.position, enemy.position) || enemy_is_out_of_play(room, enemy.id) { continue }
 		distance := max(abs(object.position.x-enemy.position.x), abs(object.position.y-enemy.position.y))
 		at := count
 		for at > 0 && (distances[at-1] > distance || (distances[at-1] == distance && ids[at-1] > enemy.id)) {

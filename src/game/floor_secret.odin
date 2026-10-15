@@ -36,8 +36,10 @@ western_ranch_hand :: proc(room: ^Room) -> (six, seven: int, ok: bool) {
 }
 
 western_ranch_can_start :: proc(room: ^Room) -> bool {
+	// Behind his eyes (first_person.odin) the pair waits in the hand put away.
 	if room == nil || room.player == nil || room.phase != .Combat || .Western_Ranch in room.player.floor_secrets ||
-	   !room.player.deck.combat_active || room.qte.kind != .None || tactical_is_casting(room) { return false }
+	   !room.player.deck.combat_active || room.qte.kind != .None || tactical_is_casting(room) ||
+	   tactical_first_person_active(room) { return false }
 	_, _, ok := western_ranch_hand(room)
 	return ok
 }

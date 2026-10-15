@@ -73,6 +73,14 @@ Tactical_View :: struct {
 	lasso: Lasso_View,
 	// CANNA DA PESCA: the rod, its line, the bobber and the catch (fishing.odin).
 	fishing: Fishing_View,
+	// PINBALL: the steel ball, its contacts and its burst (pinball.odin).
+	pinball: Pinball_View,
+	// FIRST PERSON SHOOTER: the camera in the player's eyes, the AK and its
+	// shots (first_person.odin).
+	first_person: First_Person_View,
+	// PROVA MECCANICHE's overlapping hand: how much of each card shows
+	// (tactical_hand.odin).
+	hand_reveal: Tactical_Hand_Reveal,
 	// The last pointer seen by the view, for HUD hover states only.
 	pointer: view.Vec2,
 	pointer_inside: bool,
@@ -140,6 +148,8 @@ destroy_tactical_assets :: proc(renderer: ^Renderer) {
 	destroy_ground_fx(renderer)
 	destroy_lasso_view(renderer)
 	destroy_fishing_view(renderer)
+	destroy_pinball_view(renderer)
+	destroy_first_person_view(renderer)
 	if renderer.tactical.outline_shader.id != 0 { rl.UnloadShader(renderer.tactical.outline_shader); renderer.tactical.outline_shader = {} }
 	if renderer.tactical.labels != nil { free(renderer.tactical.labels); renderer.tactical.labels = nil }
 	if renderer.tactical.light_shader.id != 0 { rl.UnloadShader(renderer.tactical.light_shader); renderer.tactical.light_shader = {} }
@@ -175,14 +185,19 @@ update_tactical_view :: proc(renderer: ^Renderer, room: ^game.Room, mouse: view.
 	if !v.enabled { return }
 	tactical_hud_pointer(renderer, mouse, inside)
 	v.snapshot^ = renderer_presentation_snapshot(renderer, room)
+	update_tactical_hand_reveal(renderer, &v.snapshot.deck)
 	// Before the vision and the camera: in the shadow they follow the pool;
-	// the Lazzo's foe flies where the room's rope swings it.
+	// the Lazzo's foe flies where the room's rope swings it, the Pinball's
+	// ball rolls where the room says it is.
 	update_tactical_shadow(renderer, room)
 	update_tactical_lasso(renderer, room)
+	update_tactical_pinball(renderer, room)
 	update_tactical_fishing(renderer)
+	update_tactical_first_person(renderer, room)
 	v.no_fog = room.player.tactical.config.vision_size == 0 || tactical_room_is_clear(v.snapshot.phase)
 	if !tactical_room_is_clear(v.snapshot.phase) { v.clear_light = 0 }
-	v.refocus_enabled = room.phase == .Combat && game.tactical_allows_action(room)
+	// Behind the player's eyes his hand is put away: no refocus.
+	v.refocus_enabled = room.phase == .Combat && game.tactical_allows_action(room) && !game.tactical_first_person_active(room)
 	p := v.snapshot.player.position
 	origin := grid.Position{int(math.round(p.x)), int(math.round(p.y))}
 	v.visible_count = 0
@@ -214,6 +229,8 @@ update_tactical_view :: proc(renderer: ^Renderer, room: ^game.Room, mouse: view.
 	framed_orbit.distance *= footprint_scale*(1+LASSO_CAMERA_BACK*pull)
 	v.zoom = framed_orbit.distance*0.65
 	v.camera = tactical_orbit_camera(framed_orbit, target, v.perspective)
+	// FIRST PERSON SHOOTER: as far into the player's eyes as the dive has gone.
+	frame_first_person_camera(renderer, room)
 	v.draw_frustum = tactical_draw_frustum(v.camera, renderer.canvas_width, renderer.canvas_height)
 	renderer.camera.zoom = 1.1/footprint_scale*12.5/v.world_orbit.distance/(1+LASSO_CAMERA_BACK*pull)
 	renderer.camera.origin = {renderer.canvas_width*0.5, renderer.canvas_height*0.44}
@@ -241,7 +258,14 @@ update_tactical_view :: proc(renderer: ^Renderer, room: ^game.Room, mouse: view.
 
 tactical_project :: proc(renderer: ^Renderer, position: view.Vec2, height: f32 = 0) -> view.Vec2 {
 	if !renderer.tactical.scene_3d { return view.grid_point_to_canvas(&renderer.camera, &renderer.projection, position) }
-	p := rl.GetWorldToScreenEx({position.x, height, position.y}, renderer.tactical.camera,
+	camera := renderer.tactical.camera
+	// Behind the player's eyes a point behind the eye is off the canvas (the
+	// projection would mirror it in front).
+	if renderer.tactical.first_person.amount > 0 {
+		forward := rl.Vector3Normalize(camera.target-camera.position)
+		if rl.Vector3DotProduct(rl.Vector3{position.x, height, position.y}-camera.position, forward) < 0.05 { return {-100000, -100000} }
+	}
+	p := rl.GetWorldToScreenEx({position.x, height, position.y}, camera,
 		c.int(renderer.canvas_width), c.int(renderer.canvas_height))
 	return {p.x, p.y}
 }
@@ -409,7 +433,8 @@ update_tactical_body_hover :: proc(renderer: ^Renderer, mouse: view.Vec2) {
 	closest := f32(1.0e20)
 	for actor in v.snapshot.enemies[:v.snapshot.enemy_count] {
 		cell := grid.Position{int(math.round(actor.position.x)), int(math.round(actor.position.y))}
-		if !actor.visible || !tactical_render_visible(renderer, cell) { continue }
+		// The Pinball's ball is no card under the mouse (pinball.odin).
+		if !actor.visible || !tactical_render_visible(renderer, cell) || tactical_pinball_holds(renderer, actor.entity) { continue }
 		if distance, hit := tactical_billboard_hit(renderer, sprite_key_for_enemy(actor.archetype), actor.position, ray, actor.entity); hit && distance < closest {
 			closest = distance
 			renderer.hovered_cell = cell
@@ -479,13 +504,15 @@ draw_tactical_world :: proc(renderer: ^Renderer, room: ^game.Room, active_card: 
 	for &actor in snapshot.enemies[:snapshot.enemy_count] {
 		cell := grid.Position{int(math.round(actor.position.x)), int(math.round(actor.position.y))}
 		if !actor.visible || !tactical_render_visible(renderer, cell) { continue }
-		if !v.scene_3d {
+		// The Pinball's ball stands in for its foe (draw_pinball_flat).
+		if !v.scene_3d && !tactical_pinball_holds(renderer, actor.entity) {
 			// The Lazzo's foe flies over the board.
 			center := tactical_project(renderer, {actor.position.x+0.5, actor.position.y+0.5})
 			center.y -= tactical_lasso_lift(renderer, actor.entity)*LASSO_FLAT_LIFT_PIXELS*renderer.camera.zoom
-			draw_enemy_body(renderer, {archetype = actor.archetype, health = actor.health}, center, actor.opacity)
+			draw_enemy_body(renderer, {archetype = actor.archetype, health = actor.health}, center, actor.opacity*pinball_card_opacity(renderer, actor.entity))
 		}
 	}
+	if !v.scene_3d { draw_pinball_flat(renderer) }
 	if snapshot.player.visible && !v.scene_3d {
 		center := tactical_project(renderer, {snapshot.player.position.x+0.5, snapshot.player.position.y+0.5})
 		if tactical_shadow_showing(renderer) { draw_tactical_shadow_flat(renderer, center, snapshot.player.opacity) }

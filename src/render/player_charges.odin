@@ -201,7 +201,7 @@ draw_fate_tokens :: proc(renderer: ^Renderer) {
 		// Follow the card while it is on the board; a fallen foe keeps its spot.
 		if actor, found := presentation_actor_in_view(v.snapshot, entity); found && actor.visible {
 			cell := grid.Position{int(math.round(actor.position.x)), int(math.round(actor.position.y))}
-			if !tactical_render_visible(renderer, cell) { continue }
+			if !tactical_overlay_visible(renderer, cell) { continue }
 			key := sprite_key_for_enemy(actor.archetype)
 			if character, ok := flipbook_character(key); ok {
 				p := living_billboard_geometry(renderer, character, key, actor.position, true, entity).card_points

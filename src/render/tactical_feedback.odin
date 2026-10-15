@@ -209,7 +209,8 @@ draw_tactical_feedback :: proc(renderer: ^Renderer, layer: Tactical_Feedback_Lay
 		for &actor in renderer.tactical.snapshot.enemies[:renderer.tactical.snapshot.enemy_count] {
 			draw_tactical_status_rune(renderer, &actor)
 		}
-		draw_tactical_status_rune(renderer, &renderer.tactical.snapshot.player)
+		// Behind his eyes his own rune is under the eye.
+		if !first_person_hides_player(renderer) { draw_tactical_status_rune(renderer, &renderer.tactical.snapshot.player) }
 	}
 	for offset in 0..<renderer_active_cue_count(renderer) {
 		cue, found := renderer_active_cue_at(renderer, offset)
@@ -250,13 +251,20 @@ draw_tactical_feedback :: proc(renderer: ^Renderer, layer: Tactical_Feedback_Lay
 			}
 			continue
 		}
+		// Behind his eyes what befalls him shows on the HUD, not under the eye.
+		if cue.event.target == game.PLAYER_ENTITY && first_person_hides_player(renderer) { continue }
 		#partial switch cue.kind {
 		case .Damage:
 			color := TACTICAL_FEEDBACK_HIT
 			if cue.event.has_status_cause && cue.event.status_cause == .Poison { color = {126, 211, 174, 255} }
 			if cue.event.has_status_cause && cue.event.status_cause == .Burn { color = {244, 157, 104, 255} }
-			// The Lazzo's hits have their paper star (lasso.odin); a turn's 1 its token.
-			if !attack_fx_shows(renderer, cue) && !game.event_is_lasso(cue.event) { draw_tactical_hit(renderer, center, p, color) }
+			// The Lazzo's hits have their paper star (lasso.odin); a turn's 1 its
+			// token; and so have the Pinball's (pinball.odin). The AK's have their
+			// spark (first_person.odin).
+			if !attack_fx_shows(renderer, cue) && !game.event_is_lasso(cue.event) && !game.event_is_pinball(cue.event) &&
+			   !game.event_is_first_person_shot(cue.event) {
+				draw_tactical_hit(renderer, center, p, color)
+			}
 		case .Damage_Absorbed, .Attack_Deflected:
 			if !attack_fx_shows(renderer, cue) { draw_tactical_shield(renderer, center, p) }
 		case .Status_Applied:
@@ -281,7 +289,8 @@ draw_tactical_feedback :: proc(renderer: ^Renderer, layer: Tactical_Feedback_Lay
 		case .Heal:
 			draw_tactical_sparks(center, p, {128, 220, 190, 255}, 5, 0.27)
 		case .Defeat:
-			draw_tactical_sparks(center, p, {149, 165, 189, 255}, 6, 0.34)
+			// The Pinball's foe falls in its ball's burst (pinball.odin).
+			if !tactical_pinball_holds(renderer, cue.event.target) { draw_tactical_sparks(center, p, {149, 165, 189, 255}, 6, 0.34) }
 		case .Explosive_Armed, .Trap_Triggered:
 			draw_tactical_sparks(center, p, {227, 174, 105, 255}, 4, 0.26)
 		case:
@@ -333,7 +342,9 @@ draw_tactical_feedback_overlay :: proc(renderer: ^Renderer, cue: ^Presentation_C
 // and the Lazzo's MOLLATO with its foe's fall: lasso.odin).
 draw_tactical_feedback_badge :: proc(renderer: ^Renderer, badge: Tactical_Feedback_Badge, alpha: f32) {
 	center := tactical_feedback_position(renderer, badge.over, badge.fallback)
-	anchor := tactical_project(renderer, {center.x, center.z}, 0.9)
+	anchor := tactical_project(renderer, {center.x, center.z}, badge.height if badge.height > 0 else TACTICAL_FEEDBACK_BADGE_HEIGHT)
+	// Behind the player's eyes nothing is said of what the eye does not face.
+	if first_person_amount(renderer) > 0 && !first_person_on_canvas(renderer, anchor) { return }
 	width := gothic_text_width(renderer, badge.label, 12)+12
 	bounds, placed := place_tactical_label(renderer.tactical.labels, anchor, {width, 19}, tactical_world_bounds(renderer))
 	if !placed { return }
@@ -367,13 +378,17 @@ draw_tactical_cue_banner :: proc(renderer: ^Renderer, cue: ^Presentation_Cue, la
 }
 
 // A word a cue says over the board: over `over`'s figure (or the cell
-// `fallback` when it is not on the board).
+// `fallback` when it is not on the board), its foot `height` over the floor
+// (0: TACTICAL_FEEDBACK_BADGE_HEIGHT, over a card's middle).
 Tactical_Feedback_Badge :: struct {
 	label: cstring,
 	color: rl.Color,
 	over: game.Entity_Ref,
 	fallback: grid.Position,
+	height: f32,
 }
+
+TACTICAL_FEEDBACK_BADGE_HEIGHT :: f32(0.9)
 
 // What a cue says over the board (draw_tactical_feedback_overlay), at most
 // two words. Over its target, as a rule. A critical the Dado del Destino's
@@ -421,6 +436,15 @@ tactical_feedback_badges :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) ->
 	// CANNA DA PESCA: the food it caught, over him (a card says so below).
 	case .Fish_Caught:
 		if event.card_definition == .Fishing_Rod { label = fishing_catch_label(event); color = FISHING_WATER_LIGHT }
+	// PINBALL (pinball.odin): the value a foe took, over it; the burst over the
+	// ball, clear of its top as it swells, so its flash and its paper show. A
+	// solid thing touched says nothing: the ball rings off it.
+	case .Pinball_Bumped: label = fmt.ctprintf("COLPO %d", event.amount); color = TACTICAL_FEEDBACK_HIT
+	case .Pinball_Burst:
+		badges[count] = {label = "POP!", color = PINBALL_STEEL_LIGHT, over = event.target, fallback = event.to_position,
+			height = pinball_burst_badge_height()}
+		count += 1
+		return
 	case .Move_Blocked: label = "BLOCCATO"; color = {218, 187, 123, 255}
 	case .Explosive_Disarmed: label = "DISINNESCATA"
 	case .Gold_Gained: label = fmt.ctprintf("+%d ORO", event.amount); color = {218, 187, 123, 255}

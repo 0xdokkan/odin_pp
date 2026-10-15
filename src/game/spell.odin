@@ -57,7 +57,8 @@ query_spell_path :: proc(room: ^Room, instance: Card_Instance, target: Target) -
 			for entity in path.targets[:path.count] {
 				visited = visited || entity.id == enemy.id
 			}
-			if visited || enemy.health <= 0 || !tactical_card_enemy_in_area(room, instance.definition_id, enemy.position) { continue }
+			if visited || enemy.health <= 0 || enemy_is_out_of_play(room, enemy.id) ||
+			   !tactical_card_enemy_in_area(room, instance.definition_id, enemy.position) { continue }
 			distance := int(abs(origin.x-enemy.position.x)+abs(origin.y-enemy.position.y))
 			if distance <= 0 || distance > SPELL_BOUNCE_RANGE ||
 			   !shape_cell_has_clear_path(room, origin, enemy.position) { continue }

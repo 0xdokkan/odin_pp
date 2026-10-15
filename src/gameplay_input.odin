@@ -22,6 +22,13 @@ Gameplay_Command_Kind :: enum {
 	// CANNA DA PESCA: the rod cast at the cell `target`, once the room is
 	// cleared (its slot; game/fishing.odin).
 	Fish,
+	// PINBALL: the world's seconds waiting, rolled out (a world command, as a
+	// beat; game/pinball.odin).
+	Pinball_Roll,
+	// FIRST PERSON SHOOTER: one shot of the AK along `aim`, its trigger held (a
+	// world command, as a beat: never blocked by the player's own action;
+	// game/first_person.odin).
+	First_Person_Fire,
 }
 
 Gameplay_Command :: struct {
@@ -37,6 +44,8 @@ Gameplay_Command :: struct {
 	// made with two direction keys, its diagonal step.
 	beat: u32,
 	diagonal: grid.Position,
+	// The view a First_Person_Fire shot is fired along.
+	aim: game.First_Person_Aim,
 }
 
 // No command is ever kept for later. While the player's own action runs (its
@@ -59,11 +68,13 @@ gameplay_command_is_valid :: proc(command: Gameplay_Command) -> bool {
 	case .Activate:
 		return command.origin_phase == .Combat
 	case .Dodge, .Wait, .Ability, .Play_Card, .Refocus, .Timeout, .Continue_Pulse, .Begin_Diagonal, .QTE_Key, .QTE_Fail, .Defense,
-	     .Shadow_Emerge, .Shoot, .Lasso_Spin:
+	     .Shadow_Emerge, .Shoot, .Lasso_Spin, .Pinball_Roll:
 		return command.origin_phase == .Combat
 	// The rod fishes a room cleared, and nothing else.
 	case .Fish:
 		return command.origin_phase == .Loot && command.target.kind == .Cell
+	case .First_Person_Fire:
+		return command.origin_phase == .Combat
 	}
 	unreachable()
 }

@@ -848,6 +848,8 @@ roguelike_suspend_input :: proc(rs: ^Roguelike_Session) {
 	rs.iso_renderer.frame_clock_valid = false
 	rs.iso_renderer.tactical.world_orbit.dragging = false
 	rs.iso_renderer.tactical.hologram_orbit.dragging = false
+	// The view behind the player's eyes gives the mouse back.
+	if rs.attached && rs.options.tactical.enabled { release_first_person_mouse(&rs.tactical_controller, &rs.room) }
 	// The room's ambience waits for the scene to come back.
 	audio.lab_ambience(&rs.lab_bank, false)
 }
@@ -899,6 +901,10 @@ roguelike_update :: proc(data: rawptr, hf: ^host.Frame) {
 	rs.frame_time = (f32(1.0/60.0) if rs.options.m7_view_smoke else hf.dt)
 	rs.m8_modal = false
 	m8_mouse, m8_mouse_inside := view.Vec2{hf.mouse.x,hf.mouse.y}, hf.mouse_inside
+	// FIRST PERSON SHOOTER: behind the player's eyes the mouse is the view's
+	// (first_person_input.odin); its hidden pointer reaches nothing on the
+	// board, the hand or the HUD.
+	if rs.options.tactical.enabled && render.first_person_owns_pointer(&rs.iso_renderer, &rs.room) { m8_mouse_inside = false }
 	if !rs.smoke_test && !rs.options.m7_view_smoke && rs.options.tactical.enabled {
 		rs.m8_modal = update_m8_session(&rs.m8_session, &rs.room, &rs.iso_renderer, &rs.tactical_controller,
 			&rs.card_interaction, &rs.gameplay_buffer, rs.run_state.phase == .In_Room &&
@@ -923,7 +929,7 @@ roguelike_update :: proc(data: rawptr, hf: ^host.Frame) {
 	if render.presentation_time_policy(&rs.iso_renderer.timeline) != .Cinematic {
 		render.advance_sprite_assets(&rs.iso_renderer.sprite_assets, rs.frame_time if !rs.smoke_test else f32(1.0/60.0))
 	}
-	if !rs.m8_modal && !rl.IsKeyPressed(.P) && !rs.smoke_furnace && rs.spell_smoke == .None &&
+	if !rs.m8_modal && !first_person_pause_pressed(&rs.room) && !rs.smoke_furnace && rs.spell_smoke == .None &&
 	   (!rs.options.tactical.enabled || rs.options.m7_view_smoke || (!rs.tactical_controller.paused && rs.tactical_controller.was_focused && rl.IsWindowFocused())) {
 		render.update_renderer_frame_timeline(&rs.iso_renderer, rs.frame_time)
 	}
@@ -1038,6 +1044,8 @@ roguelike_update :: proc(data: rawptr, hf: ^host.Frame) {
 	rs.relic_skip_hovered = false
 	tactical_input_blocked := false
 	if rs.options.tactical.enabled {
+		// A flat board stands in 3D behind the player's eyes (first_person.odin).
+		render.sync_first_person_board(&rs.iso_renderer, &rs.room, rs.options.scene_3d, rs.window.canvas)
 		render.update_tactical_view(&rs.iso_renderer, &rs.room, rs.mouse_canvas, rs.mouse_inside && !rs.m8_modal &&
 			!render.m8_hud_contains_point(&rs.iso_renderer, &rs.room, rs.mouse_canvas) &&
 			!rs.tactical_controller.hologram && !rs.tactical_controller.paused && rl.IsWindowFocused())
@@ -1045,13 +1053,18 @@ roguelike_update :: proc(data: rawptr, hf: ^host.Frame) {
 		if !rs.options.m7_view_smoke && !rs.m8_modal { tactical_input_blocked = update_tactical_controller(&rs.tactical_controller, &rs.room, &rs.iso_renderer,
 			&rs.card_interaction, &rs.gameplay_buffer, rs.frame_time,
 			rs.run_state.phase == .In_Room && !relic_visible && !rs.route_visible && !rs.options.m7_view_smoke,
-			rs.mouse_canvas, rs.mouse_inside, rs.playtest_session_ptr) } else { tactical_input_blocked = true }
+			rs.mouse_canvas, rs.mouse_inside, rs.playtest_session_ptr, hf.profile.settings.mouse_sensitivity if hf.profile != nil else 1) } else {
+			tactical_input_blocked = true
+			// A modal over the board: the view gives the mouse back.
+			release_first_person_mouse(&rs.tactical_controller, &rs.room)
+		}
 		// A tick move waiting for its diagonal partner never outlives a frame in
 		// which the player's lane is not free.
 		if tactical_input_blocked { clear_gameplay_command_buffer(&rs.gameplay_buffer) }
 	}
-	// The board's characters are living cards, wherever the board is 3D.
-	render.set_living_cards(&rs.iso_renderer, rs.options.scene_3d)
+	// The board's characters are living cards, wherever the board is 3D (a flat
+	// one too, while the player is behind his eyes).
+	render.set_living_cards(&rs.iso_renderer, rs.iso_renderer.tactical.scene_3d if rs.options.tactical.enabled else rs.options.scene_3d)
 	render.set_mechanics_lab(&rs.iso_renderer, rs.options.mechanics_lab, rs.from_launcher)
 	// The game shows seals and ground; the lab compares the displays with F6.
 	if !rs.options.mechanics_lab { rs.iso_renderer.tactical.intent_display = .Both }
@@ -1511,7 +1524,7 @@ roguelike_update :: proc(data: rawptr, hf: ^host.Frame) {
 				rs.options.debug_abilities,
 			)
 			if ready, has_ready := route_gameplay_command(&rs.gameplay_buffer, &rs.room, rs.timeline_busy,
-				command, has_command, rs.frame_time); has_ready {
+				command, has_command, rs.frame_time, render.first_person_keys(&rs.iso_renderer)); has_ready {
 				commit_gameplay_command(
 					&rs.room,
 					&rs.iso_renderer,

@@ -550,8 +550,9 @@ validate_enemy_intents :: proc(room: ^Room) -> bool {
 		return true
 	}
 	for &enemy in room.enemies {
-		// A foe the Lazzo holds in the air intends nothing (lasso.odin).
-		if enemy_is_lassoed(room, enemy.id) {
+		// A foe out of play (the Lazzo's in the air, the Pinball's ball)
+		// intends nothing.
+		if enemy_is_out_of_play(room, enemy.id) {
 			if enemy.intent.kind != .None { return false }
 			continue
 		}
@@ -577,16 +578,17 @@ plan_enemy_intents :: proc(room: ^Room) {
 		enemy_index, found := enemy_index_by_id(room, ids[ordered_index])
 		assert(found)
 		predicted_positions[ordered_index] = room.enemies[enemy_index].position
-		// A foe the Lazzo holds stands on no cell: the others plan through it.
-		if enemy_is_lassoed(room, ids[ordered_index]) { predicted_positions[ordered_index] = LASSO_NO_CELL }
+		// A foe out of play stands on no cell: the others plan through it.
+		if enemy_is_out_of_play(room, ids[ordered_index]) { predicted_positions[ordered_index] = LASSO_NO_CELL }
 	}
 
 	for ordered_index in 0..<enemy_count {
 		enemy_index, found := enemy_index_by_id(room, ids[ordered_index])
 		assert(found)
 		enemy := &room.enemies[enemy_index]
-		// In the air it plans nothing: its next intent waits for its fall.
-		if enemy_is_lassoed(room, enemy.id) {
+		// In the air it plans nothing: its next intent waits for its fall. The
+		// ball plans nothing until it bursts.
+		if enemy_is_out_of_play(room, enemy.id) {
 			enemy.intent = {}
 			continue
 		}
@@ -755,7 +757,7 @@ resolve_enemy_intents :: proc(room: ^Room, pulse: ^Pulse_Report, only_id: u32 = 
 	for ordered_index in 0..<enemy_count {
 		if only_id != 0 && ids[ordered_index] != only_id { continue }
 		enemy_index, found := enemy_index_by_id(room, ids[ordered_index])
-		if !found || room.enemies[enemy_index].intent.kind != .Protect || enemy_is_lassoed(room, ids[ordered_index]) {
+		if !found || room.enemies[enemy_index].intent.kind != .Protect || enemy_is_out_of_play(room, ids[ordered_index]) {
 			continue
 		}
 		enemy := &room.enemies[enemy_index]
@@ -783,8 +785,8 @@ resolve_enemy_intents :: proc(room: ^Room, pulse: ^Pulse_Report, only_id: u32 = 
 			continue
 		}
 		enemy_index, found := enemy_index_by_id(room, ids[ordered_index])
-		// A foe the Lazzo holds in the air does nothing.
-		if !found || enemy_is_lassoed(room, ids[ordered_index]) {
+		// A foe out of play does nothing.
+		if !found || enemy_is_out_of_play(room, ids[ordered_index]) {
 			continue
 		}
 		enemy := &room.enemies[enemy_index]

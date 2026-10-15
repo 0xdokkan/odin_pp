@@ -214,6 +214,13 @@ Room :: struct {
 	// CANNA DA PESCA: the room's fishings so far, its water and its stream
 	// (fishing.odin); a new room starts them afresh.
 	fishing: Fishing_State,
+	// PINBALL: the ball rolling round the room (pinball.odin), and the room's
+	// own stream for its launches.
+	pinball: Pinball_State,
+	pinball_random: u64,
+	// FIRST PERSON SHOOTER: the seconds behind the player's eyes and his AK's
+	// shots (first_person.odin); a new room starts them afresh.
+	first_person: First_Person_State,
 }
 
 Move_Direction :: enum {
@@ -374,14 +381,22 @@ trap_index_at :: proc(room: ^Room, position: grid.Position) -> (int, bool) {
 	return 0, false
 }
 
-// Who stands on `position`. A foe the Lazzo holds is in the air: it stands on
-// no cell (others walk under it, nothing aims at it there; lasso.odin).
+// A foe out of the world: the one the Lazzo holds in the air (lasso.odin) and
+// the Pinball's ball (pinball.odin). It acts in nothing and nothing on the
+// floor, no card and no arrow reaches it.
+enemy_is_out_of_play :: proc(room: ^Room, id: u32) -> bool {
+	return enemy_is_lassoed(room, id) || enemy_is_pinball(room, id)
+}
+
+// Who stands on `position`. A foe out of play stands on no cell (others walk
+// under the Lazzo's foe and through the Pinball's ball, nothing aims at them
+// there).
 enemy_index_at :: proc(room: ^Room, position: grid.Position, ignored_index := -1) -> (int, bool) {
 	if room == nil {
 		return 0, false
 	}
 	for enemy, index in room.enemies {
-		if index != ignored_index && enemy.position == position && !enemy_is_lassoed(room, enemy.id) {
+		if index != ignored_index && enemy.position == position && !enemy_is_out_of_play(room, enemy.id) {
 			return index, true
 		}
 	}
@@ -440,6 +455,7 @@ create_room :: proc(level_data: ^level.Level, player: ^Player, content: Room_Con
 	result.family = content.family
 	result.modifier = content.modifier
 	result.fishing = begin_room_fishing(player, content)
+	result.pinball_random = pinball_room_stream(player, content)
 	result.next_enemy_id = 1
 	result.next_trap_id = 1
 	result.next_object_id = 1
@@ -699,8 +715,10 @@ kill_enemy :: proc(room: ^Room, enemy_index: int) -> (drops: [3]Loot, drop_count
 	assert(room != nil)
 	enemy := room.enemies[enemy_index]
 	position := enemy.position
-	// The foe the Lazzo held falls with the rope slack, on the cell under it.
+	// The foe the Lazzo held falls with the rope slack, on the cell under it;
+	// the Pinball's ball is gone with its foe.
 	if enemy_is_lassoed(room, enemy.id) { room.lasso = {} }
+	if enemy_is_pinball(room, enemy.id) { room.pinball = {} }
 	remove_reaction_bindings_for_owner(room, enemy_entity(enemy.id))
 	unordered_remove(&room.enemies, enemy_index)
 	drops[drop_count] = {position = position, kind = .Gold, amount = 1}

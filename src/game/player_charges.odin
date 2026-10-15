@@ -221,7 +221,7 @@ player_fate_event :: proc(roll: Dice_Roll, outcome: Fate_Outcome, target: Entity
 // line of fire, the line the game's shots and cards trace (walls, obstacles,
 // opaque objects and closed corners stop it; other fighters do not).
 player_arrow_target_is_valid :: proc(room: ^Room, target: Entity_Ref) -> bool {
-	if room == nil || room.player == nil || room.phase != .Combat || target.kind != .Enemy { return false }
+	if room == nil || room.player == nil || room.phase != .Combat || target.kind != .Enemy || enemy_is_out_of_play(room, target.id) { return false }
 	position, found := entity_position(room, target)
 	return found && position != room.player.position && tactical_cell_visible(room, position) &&
 	       shape_cell_has_clear_path(room, room.player.position, position)
@@ -232,7 +232,9 @@ player_arrow_target_is_valid :: proc(room: ^Room, target: Entity_Ref) -> bool {
 // he turns to face it. One damage and, by the player's dice, Veleno 2,
 // Bruciatura 1 or Rallentamento 1.
 shoot_player_arrow :: proc(room: ^Room, target: Entity_Ref) -> Action_Result {
-	if room == nil || room.player == nil || room.phase != .Combat || !tactical_enabled(room) || !tactical_allows_action(room) {
+	// Behind his eyes he shoots the AK, never an arrow (first_person.odin).
+	if room == nil || room.player == nil || room.phase != .Combat || !tactical_enabled(room) || !tactical_allows_action(room) ||
+	   tactical_first_person_active(room) {
 		return .Invalid_Phase
 	}
 	if player_charges(room, .Arrows) <= 0 || !player_arrow_target_is_valid(room, target) { return .Blocked }

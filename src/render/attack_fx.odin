@@ -923,10 +923,19 @@ draw_attack_impact :: proc(renderer: ^Renderer, fx: ^Attack_Fx, at: rl.Vector3, 
 	}
 }
 
+// How much of a blow's own weapon and its smear show: the attacker's card's
+// share. Behind the player's eyes his card fades as the camera reaches it
+// (first_person.odin), and his lantern with it: his bump shows where it
+// lands, never swung across the eye.
+attack_weapon_shown :: proc(renderer: ^Renderer, fx: ^Attack_Fx) -> f32 {
+	return first_person_player_shown(renderer) if fx.attacker == game.PLAYER_ENTITY else 1
+}
+
 draw_attack_swing :: proc(renderer: ^Renderer, fx: ^Attack_Fx, now: f64) {
 	plan, ok := attack_swing_plan(renderer, fx)
 	if !ok { return }
 	texel := attack_texel(fx.character)
+	held := attack_weapon_shown(renderer, fx)
 	passes := 2 if fx.kind == .Rake else 1
 	for pass in 0..<passes {
 		// The ghoul's second rake comes a moment later, with the other hand:
@@ -944,9 +953,13 @@ draw_attack_swing :: proc(renderer: ^Renderer, fx: ^Attack_Fx, now: f64) {
 		grip, tip: rl.Vector3
 		if fx.kind == .Thrust { grip, tip = attack_thrust_pose(&shifted, &swing, now) }
 		else { grip, tip = attack_swing_pose(&shifted, &swing, now) }
-		if !attack_point_visible(renderer, tip) && !attack_point_visible(renderer, grip) { continue }
+		// A blow off the canvas shows nothing; behind his eyes his own weapon
+		// is gone, where it lands still shows.
+		visible := attack_point_visible(renderer, tip) || attack_point_visible(renderer, grip)
+		if !visible && held > 0 { continue }
+		weapon := visible && held > 0
 		// The smear: the tip's last tenth of a second, from the start of the blow.
-		if now > begin {
+		if weapon && now > begin {
 			outer, inner: [10]rl.Vector3
 			from := max(begin, now-0.11)
 			for index in 0..<10 {
@@ -957,17 +970,17 @@ draw_attack_swing :: proc(renderer: ^Renderer, fx: ^Attack_Fx, now: f64) {
 				outer[index] = w
 				inner[index] = g+(w-g)*0.3
 			}
-			draw_attack_strip(renderer, outer[:], inner[:], fade*0.95)
+			draw_attack_strip(renderer, outer[:], inner[:], fade*0.95*held)
 			if fx.kind == .Rake {
 				// Three talons, three smears.
 				for offset in ([2]f32{-0.06, 0.06}) {
 					o, i := outer, inner
 					for index in 0..<10 { o[index].y += offset; i[index].y += offset }
-					draw_attack_strip(renderer, o[:], i[:], fade*0.8)
+					draw_attack_strip(renderer, o[:], i[:], fade*0.8*held)
 				}
 			}
 		}
-		draw_attack_prop(renderer, attack_look_prop(fx.look, now), grip, tip, texel, fade)
+		if weapon { draw_attack_prop(renderer, attack_look_prop(fx.look, now), grip, tip, texel, fade*held) }
 		// Each swept cell as the weapon passes it: a star on the struck card
 		// (or before the struck object), paper bits off an empty cell.
 		victim, _, standing := attack_card(renderer, fx.victim)

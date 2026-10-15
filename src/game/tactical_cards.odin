@@ -47,7 +47,8 @@ rework_tactical_card :: proc(definition: ^Card_Definition) {
 	case .Strike, .Toxic_Wave, .Afterimage, .Calculated_Risk, .Spark,
 	     .Firebomb, .Caustic_Bloom, .Fate_Strike, .Chain_Lightning,
 	     .Sundering_Blow, .Prismatic_Barrage, .Twin_Venom, .Shock_Floor, .Tesla_Coil, .Titan_Grip, .Storm_Crown,
-	     .Sei_Denari, .Sette_Denari, .Shadow_Step, .Poison_Pool, .Wildfire, .Deflect, .Coffin, .Fate_Dice, .Venom_Blade, .Lasso, .Fishing_Rod, .Count:
+	     .Sei_Denari, .Sette_Denari, .Shadow_Step, .Poison_Pool, .Wildfire, .Deflect, .Coffin, .Fate_Dice, .Venom_Blade, .Lasso, .Fishing_Rod, .Pinball,
+	     .First_Person, .Count:
 	}
 }
 

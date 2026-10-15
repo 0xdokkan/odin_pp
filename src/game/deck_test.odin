@@ -307,6 +307,52 @@ test_hand_size_is_a_refill_target_not_the_runtime_capacity :: proc(t: ^testing.T
 	testing.expect_value(t, deck, before)
 }
 
+// The game's hand stops at eight cards, whatever draws or makes more; rules
+// that deal more at once (PROVA MECCANICHE's ten) hold their hand size and no
+// more, up to the hand's room.
+@(test)
+test_a_hand_holds_eight_cards_unless_its_rules_deal_more :: proc(t: ^testing.T) {
+	for hand_size in ([2]int{STARTING_HAND_SIZE, MAX_HAND_CAPACITY}) {
+		deck: Deck_State
+		testing.expect(t, initialize_empty_deck(&deck, {hand_size = hand_size, max_energy = 3, energy_regen_per_pulse = 1}, 0x10AB))
+		for _ in 0..<MAX_HAND_CAPACITY+2 {
+			_, added := add_owned_card(&deck, .Strike)
+			testing.expect(t, added)
+		}
+		limit := MAX_HAND_CARDS if hand_size <= MAX_HAND_CARDS else hand_size
+		testing.expect_value(t, deck_hand_limit(&deck), limit)
+		testing.expect(t, begin_deck_combat(&deck))
+		testing.expect_value(t, deck.hand_count, hand_size)
+		for can_draw_card(&deck) {
+			_, drawn := draw_card(&deck)
+			testing.expect(t, drawn)
+		}
+		testing.expect_value(t, deck.hand_count, limit)
+		testing.expect(t, deck.draw_count > 0 && validate_deck_state(&deck))
+		before := deck
+		_, drawn := draw_card(&deck)
+		testing.expect(t, !drawn)
+		_, created := create_temporary_card(&deck, .Spark)
+		testing.expect(t, !created)
+		testing.expect_value(t, deck, before)
+		// The game's hand one card over its eight is no deck at all; the same
+		// cards are one under rules that deal ten.
+		if limit < MAX_HAND_CAPACITY {
+			over := deck
+			over.draw_count -= 1
+			over.hand[over.hand_count] = over.draw_pile[over.draw_count]
+			over.draw_pile[over.draw_count] = {}
+			over.hand_count += 1
+			testing.expect(t, !validate_deck_state(&over))
+			over.rules.hand_size = MAX_HAND_CAPACITY
+			testing.expect(t, validate_deck_state(&over))
+		}
+	}
+	// No rules deal more than the hand has room for.
+	testing.expect(t, !deck_rules_are_valid({hand_size = MAX_HAND_CAPACITY+1, max_energy = 3, energy_regen_per_pulse = 1}))
+	testing.expect(t, MAX_HAND_CARDS < MAX_HAND_CAPACITY)
+}
+
 @(test)
 test_exhausted_permanent_does_not_reshuffle_and_returns_next_combat :: proc(t: ^testing.T) {
 	deck: Deck_State

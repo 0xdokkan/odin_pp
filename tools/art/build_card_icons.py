@@ -30,6 +30,13 @@ pixel units, a few flat colours, a thick near-black outline):
     cell 24  Canna da Pesca: a wooden rod with a cork grip and a steel reel,
              its line hanging from the tip to a red and white bobber that
              floats on a blue pond, ripples round it.
+    cell 25  Pinball: a big chrome ball lit from the upper left striking a
+             pop bumper (a red cap with a pale highlight on its crown, in a
+             gold ring), a spark where they meet.
+    cell 26  First Person Shooter: an AK side on (a wooden stock, grip and
+             handguard, a steel receiver and banana magazine), its muzzle
+             flashing and three brass casings flying back, inside the red
+             ring of a crosshair.
 
 The PNG is read and written here with zlib and struct, never through Blender
 or an image library, so the painted pixels are never resampled or recoloured:
@@ -391,9 +398,80 @@ FISHING_ROD = (
 )
 
 
+# Phase 4: the Pinball, a chrome ball lit from the upper left striking a pop
+# bumper at the upper right (a red cap with a pale highlight on its crown, in
+# a gold ring), a spark in the gap where they meet.
+PINBALL = (
+    "....................KKKK....",
+    "...................KYYYYK...",
+    "..................KYYRRYYK..",
+    ".................KYYRRRRYYK.",
+    ".................KYRRUURRYK.",
+    ".................KQRRUURRQK.",
+    ".................KQFFUUFFQK.",
+    ".................OQQFFFFQQK.",
+    ".......KKKKKK...KYKQQFFQQK..",
+    ".....KKHHHHHMKKOYUYOQQQQK...",
+    "....KHHHHHHHHMMKKYK.KKKK....",
+    "...KHHHHHHHHHMMMKO..........",
+    "..KHHHHHHHHHMMMMmK..........",
+    "..KHHUUUHHHHMMMMmK..........",
+    ".KHHHUUUHHHMMMMMmmK.........",
+    ".KHHHHUHHHHMMMMMmmK.........",
+    ".KHHHHHHHHMMMMMmmmK.........",
+    ".KHHHHHHMMMMMMMmmmK.........",
+    ".KHHHHHMMMMMMMmmmmK.........",
+    ".KMMMMMMMMMMMmmmMMK.........",
+    ".KMMMMMMMMMMmmmmMMK.........",
+    "..KMMMMMMMmmmmmMMK..........",
+    "..KMMMMMmmmmmmmMMK..........",
+    "...KmmmmmmmmmMMMK...........",
+    "....KmmmmmMMMMMK............",
+    ".....KKmmmMMMKK.............",
+    ".......KKKKKK...............",
+    "............................",
+)
+
+
+# Phase 4: the First Person Shooter, an AK side on facing right (its wooden
+# stock, grip and handguard, its steel receiver and banana magazine), the
+# muzzle flashing and three brass casings flying back over it, all inside the
+# red ring of a crosshair.
+FIRST_PERSON = (
+    "..............K.............",
+    "..........KKKKRKKK..........",
+    "........KKRRRRRRRRKK........",
+    "......KKRRRKKKRKKRRRKK......",
+    ".....KRRKKK...K..KKKRRK.....",
+    "....KRRK............KRRK....",
+    "...KRRK..............KRRK...",
+    "...KRK.....KK.........KRK...",
+    "..KRK.....KYQK.........KRK..",
+    "..KRK...KK.KK.KK.......KRK..",
+    ".KRK...KQYK..KYQK.......KRK.",
+    ".KRK....KK....KK.....K..KRK.",
+    ".KRK..........K.....KMK.KKK.",
+    ".KKKKKKKKKKKKKMKKKKKKMK.KYKK",
+    "KBBBBBBHHHHHHHBBBBBMMMKKMYOK",
+    "KnnnnnnMmmmmMMnnnnnMMMMMUUYK",
+    "KnnnnnnmmmmmmmNNNNNKKKKKMYOK",
+    "KnnnnnnnnmmmmmmKKKK.....KYK.",
+    "KnnnnNKKKnnKMMMK........KKK.",
+    "KnnNKK..KnnKKMMMK......KRK..",
+    "KMNKK..KnnK.KmMMK......KRK..",
+    ".KKKRK.KnNK..KMMMK....KRK...",
+    "...KRRK.KK....KMMK...KRRK...",
+    "....KRRK.......KK...KRRK....",
+    ".....KRRKKK...K..KKKRRK.....",
+    "......KKRRRKKKRKKRRRKK......",
+    "........KKRRRRRRRRKK........",
+    "..........KKKKRKKK..........",
+)
+
+
 # The hand-made cells of the added rows, by atlas cell.
 ICONS = {16: SHADOW_STEP, 17: POISON_POOL, 18: WILDFIRE, 19: DEFLECT, 20: COFFIN, 21: FATE_DICE, 22: VENOM_BLADE, 23: LASSO,
-         24: FISHING_ROD}
+         24: FISHING_ROD, 25: PINBALL, 26: FIRST_PERSON}
 
 
 def chunk(kind, body):

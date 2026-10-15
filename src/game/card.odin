@@ -68,6 +68,8 @@ Card_Id :: enum {
 	Venom_Blade,
 	Lasso,
 	Fishing_Rod,
+	Pinball,
+	First_Person,
 	Count,
 }
 
@@ -82,9 +84,13 @@ card_is_scopa :: proc(id: Card_Id) -> bool {
 // (ground.odin); the player's charges load the tactical blows, arrows and
 // windows (player_charges.odin); the Lazzo spins on the world's running
 // seconds (lasso.odin); the Canna da Pesca fishes the tactical room once it is
-// cleared (fishing.odin): classic runs never offer them, and refuse to play them.
+// cleared (fishing.odin); the Pinball's ball rolls on those seconds too
+// (pinball.odin), and the First Person Shooter's seconds and shots are the
+// tactical world's (first_person.odin): classic runs never offer them, and
+// refuse to play them.
 card_requires_tactical :: proc(id: Card_Id) -> bool {
-	return id == .Shadow_Step || card_places_ground(id) || card_loads_player_charge(id) || id == .Lasso || id == .Fishing_Rod
+	return id == .Shadow_Step || card_places_ground(id) || card_loads_player_charge(id) || id == .Lasso || id == .Fishing_Rod ||
+	       id == .Pinball || id == .First_Person
 }
 
 // The Canna da Pesca: a room-end tool, never drawn in a fight (begin_deck_combat
@@ -110,10 +116,13 @@ card_dice_count :: proc(id: Card_Id) -> int {
 
 // A dice card's upgrades climb the dice ladder and stop at its top; the
 // Lazzo's raise its first hit five times at most, the Canna da Pesca's its
-// fishings a room (its heal stays a d4: it is no dice card).
+// fishings a room (its heal stays a d4: it is no dice card), the Pinball's its
+// ball's value, the First Person Shooter's its seconds.
 card_max_upgrade_level :: proc(id: Card_Id) -> i32 {
 	if id == .Lasso { return LASSO_MAX_UPGRADE_LEVEL }
 	if id == .Fishing_Rod { return FISHING_ROD_MAX_UPGRADE_LEVEL }
+	if id == .Pinball { return PINBALL_MAX_UPGRADE_LEVEL }
+	if id == .First_Person { return FIRST_PERSON_MAX_UPGRADE_LEVEL }
 	return MAX_DICE_UPGRADE_LEVEL if card_dice_count(id) > 0 else MAX_CARD_UPGRADE_LEVEL
 }
 
@@ -993,6 +1002,28 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 		effects = {{kind = .Fish, target = .Player, base_amount = 1, amount_per_upgrade = 1}, {}, {}, {}},
 		effect_count = 1,
 	},
+	{
+		// PINBALL: one foe beside the player turned into a steel ball and struck
+		// away; for twenty seconds it bounces round the room (pinball.odin). Its
+		// amount is the ball's value: 2 (+1 per upgrade, +1 on the tick), one
+		// more after each foe it strikes, back to it at every wall.
+		id = .Pinball, name = "Pinball", rarity = .Rare,
+		reward_weight = 60, shop_base_price = 8, cost = 3,
+		targeting = {rule = .Opponent, cast_range = {.Chebyshev, 1, PINBALL_RANGE}, shape = .Single, requires_line_of_sight = true, stops_on_wall = true},
+		effects = {{kind = .Pinball, target = .Chosen_Entity, base_amount = 2, amount_per_upgrade = 1}, {}, {}, {}},
+		effect_count = 1,
+	},
+	{
+		// FIRST PERSON SHOOTER: the player's own eyes and a paper AK for twenty
+		// seconds of the world's (first_person.odin): +2 per upgrade, +2 on the
+		// tick. It takes no window time, and no card is played meanwhile.
+		id = .First_Person, name = "First Person Shooter", rarity = .Rare,
+		reward_weight = 60, shop_base_price = 8, cost = 3,
+		targeting = {rule = .Self},
+		effects = {{kind = .First_Person, target = .Player, base_amount = FIRST_PERSON_SECONDS,
+			amount_per_upgrade = FIRST_PERSON_SECONDS_PER_UPGRADE}, {}, {}, {}},
+		effect_count = 1,
+	},
 }
 
 card_drop_target :: proc(
@@ -1079,6 +1110,11 @@ card_effect_template_is_valid :: proc(
 	case .Lasso:
 		return template.target == .Chosen_Entity && definition.targeting.rule == .Opponent &&
 		       definition.targeting.shape == .Single && card_amount_template_is_valid(template)
+	// One foe beside the player; the amount is the ball's value.
+	case .Pinball:
+		return template.target == .Chosen_Entity && definition.targeting.rule == .Opponent &&
+		       definition.targeting.shape == .Single && definition.targeting.cast_range.maximum == PINBALL_RANGE &&
+		       card_amount_template_is_valid(template)
 	// A cell to fish; the amount is the room's fishings.
 	case .Fish:
 		return template.target == .Player && definition.targeting.rule == .Walkable_Cell &&
@@ -1123,6 +1159,9 @@ card_effect_template_is_valid :: proc(
 		}
 		reaction, found := reaction_definition_by_id(template.reaction)
 		return found && validate_reaction_definition(&reaction) && card_amount_template_is_valid(template)
+	// The player's own seconds behind his eyes.
+	case .First_Person:
+		return template.target == .Player && definition.targeting.rule == .Self && card_amount_template_is_valid(template)
 	}
 	return false
 }
@@ -1298,11 +1337,15 @@ instantiate_card_effect :: proc(
 		return place_ground_effect({}, template.status, card_effect_amount(template, instance.upgrade_level)), true
 	case .Lasso:
 		return lasso_effect(target, card_effect_amount(template, instance.upgrade_level)), true
+	case .Pinball:
+		return pinball_effect(target, card_effect_amount(template, instance.upgrade_level)), true
 	// The rod's fishings, as its amount says; no action ever applies it.
 	case .Fish:
 		return {kind = .Fish, target = target, amount = card_effect_amount(template, instance.upgrade_level)}, true
 	case .Move, .Gain_Energy:
 			return {}, false
+	case .First_Person:
+		return first_person_effect(card_effect_amount(template, instance.upgrade_level)), true
 	}
 	return {}, false
 }
@@ -1504,6 +1547,13 @@ evaluate_card_targeting :: proc(
 			return
 		}
 	}
+	// PINBALL: never a boss's weight, and one ball at a time.
+	if instance.definition_id == .Pinball {
+		if refusal := pinball_target_error(room, evaluation.query.primary_target); refusal != .None {
+			evaluation.error = refusal
+			return
+		}
+	}
 
 	if tactical_enabled(room) {
 		visible_cells := 0
@@ -1563,8 +1613,11 @@ evaluate_card_targeting :: proc(
 	for index in 0..<definition.effect_count {
 		switch definition.effects[index].target {
 		case .Each_Enemy:
+			// Never the Pinball's ball, nor the Lazzo's foe in the air.
 			for enemy in room.enemies {
-				if tactical_card_enemy_in_area(room, instance.definition_id, enemy.position) { evaluation.required_effect_count += 1 }
+				if !enemy_is_out_of_play(room, enemy.id) && tactical_card_enemy_in_area(room, instance.definition_id, enemy.position) {
+					evaluation.required_effect_count += 1
+				}
 			}
 		case .Each_Affected_Enemy:
 			evaluation.required_effect_count += evaluation.query.enemy_count
@@ -1658,7 +1711,8 @@ compile_card_action :: proc(
 			ids, count := enemy_ids_in_planning_order(room)
 			for enemy_index in 0..<count {
 				entity_index, _ := enemy_index_by_id(room, ids[enemy_index])
-				if !tactical_card_enemy_in_area(room, instance.definition_id, room.enemies[entity_index].position) { continue }
+				if enemy_is_out_of_play(room, ids[enemy_index]) ||
+				   !tactical_card_enemy_in_area(room, instance.definition_id, room.enemies[entity_index].position) { continue }
 				effect, instantiated := instantiate_card_effect(
 					template,
 					enemy_entity(ids[enemy_index]),

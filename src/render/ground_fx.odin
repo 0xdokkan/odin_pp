@@ -539,7 +539,7 @@ update_ground_fx :: proc(renderer: ^Renderer, room: ^game.Room) {
 			// The fire catches under a card standing there (never one the
 			// Lazzo swings over it: lasso.odin).
 			for actor in v.snapshot.enemies[:v.snapshot.enemy_count] {
-				if actor.visible && !tactical_lasso_holds(renderer, actor.entity) &&
+				if actor.visible && !tactical_lasso_holds(renderer, actor.entity) && !tactical_pinball_holds(renderer, actor.entity) &&
 				   int(math.round(actor.position.x)) == at.x && int(math.round(actor.position.y)) == at.y { fx.catches += 1 }
 			}
 		} else if !now_burning && cell.fire {
@@ -585,11 +585,12 @@ update_ground_fx :: proc(renderer: ^Renderer, room: ^game.Room) {
 		ground_splash(fx, key.cell, cue.event.card_definition == .Wildfire, world)
 	}
 	// The cards that step into a pool or a fire (one in the air on the Lazzo's
-	// rope steps into nothing).
+	// rope steps into nothing, nor does the Pinball's ball rolling over them).
 	tracked: [game.MAX_ENEMIES_PER_ROOM]Ground_Tracked
 	tracked_count := 0
 	for actor in v.snapshot.enemies[:v.snapshot.enemy_count] {
-		if !actor.visible || actor.health <= 0 || tracked_count == len(tracked) || tactical_lasso_holds(renderer, actor.entity) { continue }
+		if !actor.visible || actor.health <= 0 || tracked_count == len(tracked) || tactical_lasso_holds(renderer, actor.entity) ||
+		   tactical_pinball_holds(renderer, actor.entity) { continue }
 		cell := grid.Position{int(math.round(actor.position.x)), int(math.round(actor.position.y))}
 		tracked[tracked_count] = {entity = actor.entity, cell = cell}
 		tracked_count += 1

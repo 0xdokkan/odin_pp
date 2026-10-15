@@ -2,9 +2,11 @@ package render
 
 import "core:math"
 import "core:testing"
+import rl "vendor:raylib"
 import game "../game"
 import grid "../grid"
 import level "../level"
+import view "../view"
 
 // An open room with space for the widest ring round the player (in the
 // middle, with one Lazzo): the foe to throw it at three cells east, another
@@ -498,4 +500,32 @@ test_lasso_turns_pop_small_tokens_and_shake_nothing :: proc(t: ^testing.T) {
 		}
 	}
 	testing.expect_value(t, found, 3)
+}
+
+// TROPPO PESANTE stands just under the heavy foe's feet; when a neighbour's
+// heart is there (a foe in the cell below it, the common case for the
+// Pinball's aim beside the player), it goes a row lower or beside, never
+// over the heart; inside the board's area, and where it was first meant when
+// nothing is clear.
+@(test)
+test_lasso_heavy_label_keeps_clear_of_the_hearts :: proc(t: ^testing.T) {
+	viewport := rl.Rectangle{12, 100, 936, 240}
+	layout: Tactical_Label_Layout
+	feet := view.Vec2{400, 200}
+	width := f32(110)
+	first := lasso_heavy_label_place(&layout, feet, width, viewport)
+	testing.expect_value(t, first, rl.Rectangle{345, 212, width, 19})
+	// A heart right where it would go.
+	heart := rl.Rectangle{360, 215, 70, 18}
+	layout.bounds[0], layout.count = heart, 1
+	placed := lasso_heavy_label_place(&layout, feet, width, viewport)
+	testing.expect(t, !rl.CheckCollisionRecs(placed, heart) && placed.width == width && placed.height == 19)
+	testing.expect(t, placed.x >= viewport.x && placed.x+placed.width <= viewport.x+viewport.width && placed.y+placed.height <= viewport.y+viewport.height)
+	testing.expect(t, abs(placed.y-first.y) <= 13*3 && abs(placed.x+width*0.5-feet.x) <= width)
+	// Near the board's bottom edge: pulled inside it.
+	low := lasso_heavy_label_place(&layout, {200, viewport.y+viewport.height-4}, width, viewport)
+	testing.expect(t, low.y+low.height <= viewport.y+viewport.height)
+	// Nothing clear: just under the feet still.
+	for &bounds, index in layout.bounds { bounds = {0, 0, 2000, 2000}; layout.count = index+1 }
+	testing.expect_value(t, lasso_heavy_label_place(&layout, feet, width, viewport), first)
 }

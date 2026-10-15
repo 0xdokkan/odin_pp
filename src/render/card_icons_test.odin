@@ -1,15 +1,19 @@
 package render
 
+import "core:c"
 import "core:testing"
+import rl "vendor:raylib"
 import game "../game"
 
 // The icon atlas grew a fifth, a sixth and a seventh row
 // (tools/art/build_card_icons.py): Movimento Ombra, the cards of Phase 2, the
-// Lazzo and the Canna da Pesca have their own icons there, every other card
-// keeps its painted one, and the painted cells are cut where they always were.
+// Lazzo, the Canna da Pesca, the Pinball and the First Person Shooter have
+// their own icons there, every other card keeps its painted one, and the
+// painted cells are cut where they always were.
 @(test)
 test_card_icons_add_rows_without_moving_the_painted_cells :: proc(t: ^testing.T) {
-	added := [?]game.Card_Id{.Shadow_Step, .Poison_Pool, .Wildfire, .Deflect, .Coffin, .Fate_Dice, .Venom_Blade, .Lasso, .Fishing_Rod}
+	added := [?]game.Card_Id{.Shadow_Step, .Poison_Pool, .Wildfire, .Deflect, .Coffin, .Fate_Dice, .Venom_Blade, .Lasso, .Fishing_Rod,
+		.Pinball, .First_Person}
 	for id, index in added { testing.expect_value(t, gothic_card_icon(id), 16+index) }
 	for id in game.Card_Id {
 		own := id == .Count
@@ -40,4 +44,17 @@ test_card_icons_add_rows_without_moving_the_painted_cells :: proc(t: ^testing.T)
 	_, first, _, _ := gothic_atlas_cell(16, CARD_ICON_ROWS, width, height)
 	_, _, _, last := gothic_atlas_cell(CARD_ICON_CELLS-1, CARD_ICON_ROWS, width, height)
 	testing.expect(t, first == painted && last == height)
+	// Every added icon is painted in its cell (the loader cuts it from what
+	// is opaque there); the cell after the last stays empty.
+	image := rl.LoadImageFromMemory(".png", raw_data(png), c.int(len(png)))
+	defer rl.UnloadImage(image)
+	if !testing.expect(t, image.data != nil && int(image.width) == width && int(image.height) == height) { return }
+	colors := rl.LoadImageColors(image)
+	defer rl.UnloadImageColors(colors)
+	for cell in 16..<CARD_ICON_CELLS {
+		left, top, right, bottom := gothic_atlas_cell(cell, CARD_ICON_ROWS, width, height)
+		opaque := 0
+		for y in top..<bottom { for x in left..<right { if colors[y*width+x].a > 32 { opaque += 1 } } }
+		testing.expectf(t, (opaque > 0) == (cell < 16+len(added)), "cell %d: %d opaque pixels", cell, opaque)
+	}
 }

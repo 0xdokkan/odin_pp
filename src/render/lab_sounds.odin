@@ -1,6 +1,7 @@
 package render
 
 import "core:math"
+import rl "vendor:raylib"
 import audio "../engine/audio"
 import gfx "../engine/gfx"
 import game "../game"
@@ -31,6 +32,27 @@ LAB_REEL_SPLASH_SECONDS :: f64(0.1)
 LAB_WHIRR_PITCH :: f32(0.85)
 LAB_WHIRR_PITCH_PER_TURN :: f32(0.05)
 LAB_WHIRR_TURNS :: i32(14)
+// PINBALL (pinball.odin): its card, the strike's thwack, a solid thing's
+// ding, a foe's bong and the burst.
+LAB_PINBALL_CARD :: audio.Lab_Sfx.Card_Pinball
+LAB_PINBALL_LAUNCH :: audio.Lab_Sfx.World_Pinball_Launch
+LAB_PINBALL_DING :: audio.Lab_Sfx.World_Pinball_Ding
+LAB_PINBALL_BONG :: audio.Lab_Sfx.World_Pinball_Bong
+LAB_PINBALL_BURST :: audio.Lab_Sfx.World_Pinball_Burst
+// The bong climbs a little with the value the foe took, up to this many over
+// the card's.
+LAB_BONG_PITCH :: f32(0.9)
+LAB_BONG_PITCH_PER_VALUE :: f32(0.04)
+LAB_BONG_STEPS :: i32(8)
+// FIRST PERSON SHOOTER (first_person.odin): its card, the dive in (as the
+// card's cue paces it) and the rise out, a shot at the muzzle, a hit on a
+// foe and a shot on stone.
+LAB_FIRST_PERSON_CARD :: audio.Lab_Sfx.Card_First_Person
+LAB_FIRST_PERSON_SHOT :: audio.Lab_Sfx.Pilgrim_Ak_Shot
+LAB_FIRST_PERSON_HIT :: audio.Lab_Sfx.World_Ak_Hit
+LAB_FIRST_PERSON_RICOCHET :: audio.Lab_Sfx.World_Ak_Ricochet
+LAB_FIRST_PERSON_ENTER :: audio.Lab_Sfx.Pilgrim_Fps_Dive
+LAB_FIRST_PERSON_EXIT :: audio.Lab_Sfx.Pilgrim_Fps_Rise
 
 Lab_Sound :: struct {
 	sfx: audio.Lab_Sfx,
@@ -74,6 +96,11 @@ Lab_Sounds :: struct {
 	shadow_steps, shadow_criticals, shadow_beats: u32,
 	// LAZZO as last heard (lasso.odin): its full turns and its releases.
 	lasso_whirrs, lasso_releases: int,
+	// PINBALL as last heard (pinball.odin): its strikes.
+	pinball_strikes: int,
+	// FIRST PERSON SHOOTER as last heard (first_person.odin): its shots, hits
+	// and shots on stone, and its rises (a dive is its card's cue).
+	first_person_shots, first_person_hits, first_person_ricochets, first_person_exits: int,
 	// What the lab has played so far (smoke and tests).
 	played: [audio.Lab_Sfx]int,
 }
@@ -82,9 +109,20 @@ Lab_Sounds :: struct {
 lab_sounds_reset :: proc(renderer: ^Renderer) {
 	if renderer == nil || renderer.tactical.lab_sounds == nil { return }
 	played := renderer.tactical.lab_sounds.played
-	// The rope's counts go on (lasso_view_reset keeps them): nothing to hear yet.
+	// The rope's counts go on (lasso_view_reset keeps them), and the ball's
+	// and the view's (pinball_view_reset, first_person_view_reset): nothing
+	// to hear yet.
 	lasso := &renderer.tactical.lasso
-	renderer.tactical.lab_sounds^ = {played = played, lasso_whirrs = lasso.whirrs, lasso_releases = lasso.releases}
+	fp := &renderer.tactical.first_person
+	renderer.tactical.lab_sounds^ = {played = played, lasso_whirrs = lasso.whirrs, lasso_releases = lasso.releases,
+		pinball_strikes = renderer.tactical.pinball.strikes,
+		first_person_shots = fp.shots, first_person_hits = fp.hits, first_person_ricochets = fp.ricochets,
+		first_person_exits = fp.exits}
+}
+
+// The bong's pitch for a foe struck at `value`, the card's being `base`.
+lab_bong_pitch :: proc(value, base: i32) -> f32 {
+	return LAB_BONG_PITCH+LAB_BONG_PITCH_PER_VALUE*f32(clamp(value-base, 0, LAB_BONG_STEPS))
 }
 
 destroy_lab_sounds :: proc(renderer: ^Renderer) {
@@ -106,10 +144,18 @@ lab_sound_queue :: proc(s: ^Lab_Sounds, sfx: audio.Lab_Sfx, at: f64, volume: f32
 	s.count += 1
 }
 
-// Left and right on the screen: the board's width, softened.
+// Left and right on the screen: the board's width, softened; behind the
+// player's eyes, left and right of the eye.
 lab_sound_pan :: proc(renderer: ^Renderer, entity: game.Entity_Ref) -> f32 {
 	actor, ok := presentation_actor_in_view(renderer.tactical.snapshot, entity)
 	if !ok || renderer.canvas_width <= 0 { return 0 }
+	if renderer.tactical.first_person.amount > 0 {
+		if entity == game.PLAYER_ENTITY { return 0 }
+		camera := renderer.tactical.camera
+		toward := rl.Vector3{actor.position.x+0.5, camera.position.y, actor.position.y+0.5}-camera.position
+		if rl.Vector3Length(toward) < 0.001 { return 0 }
+		return clamp(rl.Vector3DotProduct(rl.Vector3Normalize(toward), flipbook_camera_right(renderer)), -1, 1)*0.55
+	}
 	at := tactical_project(renderer, actor.position)
 	return clamp((at.x/f32(renderer.canvas_width))*2-1, -1, 1)*0.55
 }
@@ -129,9 +175,10 @@ lab_actor_sfx :: proc(character: gfx.Flipbook_Character, action: gfx.Living_Acti
 	travelled: int, shot := false) -> (sfx: audio.Lab_Sfx, ok: bool) {
 	// A blocked step bumps (the cue's own sound); a stopped blow is a block.
 	// A blow RIFLESSO turns back has its own (lab_cue_sounds), and so do the
-	// Lazzo's throw and the Canna da Pesca's cast and catch.
+	// Lazzo's throw, the Canna da Pesca's cast and catch and the Pinball's
+	// strike (update_lab_sounds).
 	if action == .Block && cause != .Damage_Absorbed { return }
-	if cause == .Lasso_Caught || cause == .Fish_Cast || cause == .Fish_Bite || cause == .Fish_Caught { return }
+	if cause == .Lasso_Caught || cause == .Fish_Cast || cause == .Fish_Bite || cause == .Fish_Caught || cause == .Pinball_Launched { return }
 	switch character {
 	case .Pilgrim:
 		#partial switch action {
@@ -257,6 +304,8 @@ lab_card_sfx :: proc(card: game.Card_Id) -> (sfx: audio.Lab_Sfx, ok: bool) {
 	case .Lasso: return .Card_Lasso, true
 	// Heard as the rod is cast (lab_cue_sounds): it is never played.
 	case .Fishing_Rod: return .Card_Fishing_Rod, true
+	case .Pinball: return LAB_PINBALL_CARD, true
+	case .First_Person: return LAB_FIRST_PERSON_CARD, true
 	case .Count:
 	}
 	return
@@ -390,6 +439,18 @@ lab_cue_sounds :: proc(renderer: ^Renderer, s: ^Lab_Sounds, cue: ^Presentation_C
 		} else {
 			lab_sound_queue(s, .Ui_Fish_Card, now+duration*f64(FISHING_CARD_LANDS), 1, player)
 		}
+	// PINBALL (pinball.odin), at the ball: it rings off a solid thing, a foe
+	// it strikes bongs (higher the more it took), and it bursts.
+	case .Pinball_Bounced:
+		lab_sound_queue(s, LAB_PINBALL_DING, now, 0.8, lab_sound_pan(renderer, event.source))
+	case .Pinball_Bumped:
+		lab_sound_queue(s, LAB_PINBALL_BONG, now, 1, lab_sound_pan(renderer, event.source), lab_bong_pitch(event.amount, renderer.tactical.pinball.base))
+	case .Pinball_Burst:
+		lab_sound_queue(s, LAB_PINBALL_BURST, now, 1, pan)
+	// FIRST PERSON SHOOTER (first_person.odin): the camera dives into his
+	// eyes as the card's own cue paces it.
+	case .First_Person_Begun:
+		lab_sound_queue(s, LAB_FIRST_PERSON_ENTER, now)
 	}
 }
 
@@ -456,6 +517,34 @@ update_lab_sounds :: proc(renderer: ^Renderer, room: ^game.Room, now: f64) {
 	if lasso.releases != s.lasso_releases {
 		s.lasso_releases = lasso.releases
 		lab_sound_queue(s, .World_Lasso_Release, now, 1, lab_sound_pan(renderer, lasso.enemy))
+	}
+	// PINBALL: the strike's thwack, as the swing set at the ball lands
+	// (pinball.odin): the player's card swings silently, its blow is the ball's.
+	ball := &v.pinball
+	if ball.strikes != s.pinball_strikes {
+		s.pinball_strikes = ball.strikes
+		lab_sound_queue(s, LAB_PINBALL_LAUNCH, max(now, ball.contact), 1, lab_sound_pan(renderer, ball.enemy))
+	}
+	// FIRST PERSON SHOOTER: the rise out swoops (the dive in is its card's
+	// cue, lab_cue_sounds); every shot cracks at the muzzle, a hit thuds, a
+	// shot on stone ricochets (first_person.odin). The struck foe's own voice
+	// stays still: no clip.
+	fp := &v.first_person
+	if fp.exits != s.first_person_exits {
+		s.first_person_exits = fp.exits
+		lab_sound_queue(s, LAB_FIRST_PERSON_EXIT, now)
+	}
+	if fp.shots != s.first_person_shots {
+		s.first_person_shots = fp.shots
+		lab_sound_queue(s, LAB_FIRST_PERSON_SHOT, now, 0.8)
+	}
+	if fp.hits != s.first_person_hits {
+		s.first_person_hits = fp.hits
+		lab_sound_queue(s, LAB_FIRST_PERSON_HIT, now+0.04, 0.9)
+	}
+	if fp.ricochets != s.first_person_ricochets {
+		s.first_person_ricochets = fp.ricochets
+		lab_sound_queue(s, LAB_FIRST_PERSON_RICOCHET, now+0.04, 0.8)
 	}
 	// The cues now showing, each once; the cards first, so what they put on
 	// the board knows they already sounded. What was heard is kept on the

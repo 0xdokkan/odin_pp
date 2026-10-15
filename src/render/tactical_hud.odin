@@ -111,13 +111,18 @@ HUD_CHIP_TEXT_MARGIN :: f32(9)
 // The chips share their room evenly, as wide as one another up to 96, while
 // every text holds so; when one would not (DESTINO 3 d20 beside two more and
 // a count), each is as wide as its own text asks and the rest of the room is
-// shared out, if that holds them all.
+// shared out, if that holds them all. While the Pinball's ball rolls its chip
+// (PINBALL 14s x5: pinball.odin) comes right after the bites.
 tactical_status_chip_layout :: proc(renderer: ^Renderer, room: ^game.Room) -> (chips: Tactical_Status_Chips) {
 	v := renderer_status_view(renderer, room)
 	b := tactical_hud_layout(renderer).vitals
 	ordered := tactical_status_chip_order(&v.statuses)
-	count := ordered.count
+	_, ball := pinball_chip(room, false)
+	count := ordered.count+(1 if ball else 0)
 	if count == 0 { return }
+	// The ball's place among the chips: after VELENO and BRUCIATURA.
+	bites := 0
+	for status in ordered.items[:ordered.count] { if status.kind == .Poison || status.kind == .Burn { bites += 1 } }
 	left := b.x+72
 	row := b.y+b.height-22
 	room_width := b.x+b.width-8-left
@@ -129,9 +134,15 @@ tactical_status_chip_layout :: proc(renderer: ^Renderer, room: ^game.Room) -> (c
 	widths: [3]f32
 	needed: f32
 	even := true
-	for status, index in ordered.items[:chips.shown] {
-		_, chips.accents[index] = tactical_status_label(status.kind, short)
-		chips.texts[index] = tactical_status_chip_text(status, short, v.fate_sides)
+	for index in 0..<chips.shown {
+		if ball && index == bites {
+			chips.accents[index] = PINBALL_STEEL_LIGHT
+			chips.texts[index], _ = pinball_chip(room, short)
+		} else {
+			status := ordered.items[index-1 if ball && index > bites else index]
+			_, chips.accents[index] = tactical_status_label(status.kind, short)
+			chips.texts[index] = tactical_status_chip_text(status, short, v.fate_sides)
+		}
 		widths[index] = math.ceil(gothic_text_width(renderer, chips.texts[index], 12))+HUD_CHIP_TEXT_MARGIN
 		needed += widths[index]
 		if widths[index] > chip { even = false }
@@ -148,7 +159,11 @@ tactical_status_chip_layout :: proc(renderer: ^Renderer, room: ^game.Room) -> (c
 }
 
 draw_tactical_hud :: proc(renderer: ^Renderer, room: ^game.Room, paused, hologram: bool) {
+	// FIRST PERSON SHOOTER: the AK, the crosshair and the countdown under the
+	// plates (first_person.odin).
+	draw_first_person_overlay(renderer, room)
 	s := &room.player.tactical
+	fps := game.tactical_first_person_active(room)
 	combat := renderer.tactical.snapshot.phase == .Combat
 	busy := renderer_blocks_player_input(renderer)
 	recovering := game.tactical_is_recovering(room)
@@ -236,6 +251,8 @@ draw_tactical_hud :: proc(renderer: ^Renderer, room: ^game.Room, paused, hologra
 	if cinematic { status = "TEMPO SOSPESO" }
 	if recovering { status = "MUOVITI / CARTE IN RECUPERO" }
 	if stunned { status = "SOLO CARTE" }
+	// Behind the player's eyes, how the AK and the steps are worked.
+	if fps && !cinematic { status = FIRST_PERSON_HUD_STATUS }
 	// The rope holds through a window's end and a stun: the pivot stays put.
 	if lasso && !cinematic { status = lasso_hud_status(room) }
 	if shadow { status = "MONDO FERMO / SOLO PASSI / DIAGONALE SUL BATTITO" }
@@ -251,7 +268,8 @@ draw_tactical_hud :: proc(renderer: ^Renderer, room: ^game.Room, paused, hologra
 	}
 	// COMANDI: a 2x2 grid under the right column.
 	hud_frame(layout.commands, GOTHIC_STEEL)
-	hud_button(renderer, layout.map_button, "TAB", "CHIUDI" if hologram else "MAPPA", room.qte.kind == .None)
+	// No map behind the player's eyes.
+	hud_button(renderer, layout.map_button, "TAB", "CHIUDI" if hologram else "MAPPA", room.qte.kind == .None && !fps)
 	if !hologram && combat {
 		hud_button(renderer, layout.refocus, "F", fmt.ctprintf("REFOCUS -%.0fs", game.TACTICAL_REFOCUS_SECONDS), refocus_button_is_enabled(renderer))
 		draw_tactical_dodge_chip(renderer, room, layout.dodge)
@@ -259,7 +277,7 @@ draw_tactical_hud :: proc(renderer: ^Renderer, room: ^game.Room, paused, hologra
 	if !hologram && m8_control_visible(room, .Character) {
 		hud_button(renderer, layout.character, nil, "PERSONAGGIO", m8_control_enabled(renderer, room, .Character), GOTHIC_PAPER)
 	}
-	if !hologram { draw_m8_active_bar(renderer, room) }
+	if !hologram && !fps { draw_m8_active_bar(renderer, room) }
 	if room.qte.kind != .None { draw_tactical_defense_hud(renderer, room) }
 	if paused { draw_pause_menu(renderer, renderer.tactical.pause_hovered, renderer.tactical.pause_menu) }
 }
@@ -267,14 +285,15 @@ draw_tactical_hud :: proc(renderer: ^Renderer, room: ^game.Room, paused, hologra
 // The plate's objective, at the right of its foot: the room's foes, or with
 // the shrinking window this window's length (between two windows, the one
 // coming's) and the cards counted toward the next won second, with any already
-// won. In the shadow and while the Lazzo spins no card can be played: the
-// short one keeps the line's room for their rule.
+// won. In the shadow, while the Lazzo spins and behind the player's eyes no
+// card can be played: the short one keeps the line's room for their rule.
 tactical_hud_objective :: proc(renderer: ^Renderer, room: ^game.Room) -> cstring {
 	s := &room.player.tactical
 	v := renderer_status_view(renderer, room)
 	if renderer.tactical.snapshot.phase != .Combat { return "STANZA LIBERATA" }
 	lasso := game.tactical_lasso_active(room) && !game.tactical_is_casting(room)
-	if !game.tactical_enabled(room) || !s.config.shrinking_window || game.tactical_shadow_active(room) || lasso {
+	if !game.tactical_enabled(room) || !s.config.shrinking_window || game.tactical_shadow_active(room) || lasso ||
+	   game.tactical_first_person_active(room) {
 		return tactical_hud_foes_objective(v.enemy_count)
 	}
 	window := s.next_budget if (game.tactical_is_recovering(room) || game.tactical_is_stunned(room)) && s.next_budget > 0 else s.budget
