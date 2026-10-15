@@ -33,6 +33,21 @@ Tesla_Ring_Report :: struct {
 	reward: Ring_Reward,
 }
 
+// One read-only answer for the active button's text and availability. It is a
+// local preview, never retained by the room or passed back to a command.
+Tesla_Control_Query :: struct {
+	network: Board_Device_Network,
+	ring: Tesla_Ring,
+	can_activate: bool,
+}
+
+query_tesla_controls :: proc(room: ^Room) -> (query: Tesla_Control_Query) {
+	query.network = query_board_device_network(room)
+	query.ring, _ = query_tesla_ring_in_network(room, &query.network)
+	query.can_activate = query.network.ready && board_devices_allow_action(room)
+	return
+}
+
 // The four coils sit exactly on the corners of one axis-aligned square.
 tesla_network_is_square :: proc(network: ^Board_Device_Network) -> bool {
 	if network == nil || network.count != MAX_TESLA_COILS || !network.field { return false }
@@ -54,15 +69,26 @@ tesla_network_is_square :: proc(network: ^Board_Device_Network) -> bool {
 
 // The enemies the next activation would pull into the ring, in planning order.
 query_tesla_ring :: proc(room: ^Room) -> (ring: Tesla_Ring, ok: bool) {
-	if room == nil || room.player == nil || room.phase != .Combat || .Tesla_Ring in room.player.floor_secrets { return }
+	if !tesla_ring_allows_query(room) { return }
 	network := query_board_device_network(room)
-	if !network.ready || !tesla_network_is_square(&network) { return }
+	return query_tesla_ring_in_network(room, &network)
+}
+
+@(private)
+tesla_ring_allows_query :: proc(room: ^Room) -> bool {
+	return room != nil && room.player != nil && room.phase == .Combat && .Tesla_Ring not_in room.player.floor_secrets
+}
+
+@(private)
+query_tesla_ring_in_network :: proc(room: ^Room, network: ^Board_Device_Network) -> (ring: Tesla_Ring, ok: bool) {
+	if !tesla_ring_allows_query(room) { return }
+	if !network.ready || !tesla_network_is_square(network) { return }
 	ids, count := enemy_ids_in_planning_order(room)
 	for id in ids[:count] {
 		index, found := enemy_index_by_id(room, id)
 		// A foe out of play is pulled into no ring.
 		if found && ring.count < MAX_TESLA_RING_ROSTER && !enemy_is_out_of_play(room, id) &&
-		   board_device_network_contains_cell(room, &network, room.enemies[index].position) {
+		   board_device_network_contains_cell(room, network, room.enemies[index].position) {
 			ring.enemy_ids[ring.count] = id
 			ring.count += 1
 		}
@@ -72,11 +98,33 @@ query_tesla_ring :: proc(room: ^Room) -> (ring: Tesla_Ring, ok: bool) {
 
 // Spends the square's coils without a discharge and opens the floor's ring.
 begin_tesla_ring :: proc(room: ^Room) -> bool {
-	if !board_devices_can_activate(room) || room.tesla_ring.pending { return false }
-	ring, ok := query_tesla_ring(room)
-	if !ok { return false }
-	clear_event_log(&room.recent_events)
+	if !board_devices_allow_action(room) || room.tesla_ring.pending { return false }
 	network := query_board_device_network(room)
+	ring, ok := query_tesla_ring_in_network(room, &network)
+	if !ok { return false }
+	open_tesla_ring(room, &network, ring)
+	return true
+}
+
+// The active command chooses the ring or a normal discharge from the same
+// freshly queried network. Opening the ring costs no board time.
+activate_tesla :: proc(room: ^Room) -> (committed, opened_ring: bool) {
+	if !board_devices_allow_action(room) { return }
+	network := query_board_device_network(room)
+	if !network.ready { return }
+	if !room.tesla_ring.pending {
+		if ring, ok := query_tesla_ring_in_network(room, &network); ok {
+			open_tesla_ring(room, &network, ring)
+			return true, true
+		}
+	}
+	discharge_board_device_network(room, &network)
+	return true, false
+}
+
+@(private)
+open_tesla_ring :: proc(room: ^Room, network: ^Board_Device_Network, ring: Tesla_Ring) {
+	clear_event_log(&room.recent_events)
 	for id in network.ids[:network.count] {
 		index, found := object_index_by_id(room, id)
 		if !found { continue }
@@ -86,10 +134,9 @@ begin_tesla_ring :: proc(room: ^Room) -> bool {
 			target = object_entity(id), object_kind = .Tesla_Coil,
 			from_position = position, to_position = position})
 	}
-	ring.pending = true
 	room.tesla_ring = ring
+	room.tesla_ring.pending = true
 	room.player.floor_secrets += {.Tesla_Ring}
-	return true
 }
 
 // A win defeats every opponent, loot included. A loss costs the player a

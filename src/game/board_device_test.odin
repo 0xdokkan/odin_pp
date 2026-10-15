@@ -337,7 +337,8 @@ test_m8_tesla_two_and_three_coils_keep_positions_across_repeated_activations_and
 			testing.expect(t, deploy_board_device(&room, .Tesla_Coil, position, 8, 0, &log))
 		}
 		for _ in 0..<2 {
-			testing.expect(t, activate_board_devices(&room))
+			committed, opened := activate_tesla(&room)
+			testing.expect(t, committed && !opened)
 			before_events := room.recent_events
 			testing.expect(t, !activate_board_devices(&room))
 			testing.expect_value(t, room.recent_events, before_events)

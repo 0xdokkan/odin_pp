@@ -44,7 +44,7 @@ test_tesla_square_activation_opens_the_tag_ring_and_freezes_the_run :: proc(t: ^
     defer roguelike_destroy(rs)
     _, ready := game.query_tesla_ring(&rs.room)
     testing.expect(t,ready)
-    title, _ := render.m8_tesla_control_labels(&rs.room)
+    title, _ := render.m8_tesla_control_labels(game.query_tesla_controls(&rs.room))
     testing.expect_value(t,string(title),"APRI IL RING")
     clock, pulse := rs.run_state.player.tactical.remaining, rs.room.pulse_count
     execution := execute_gameplay_command(&rs.room,{kind=.Activate,origin_phase=.Combat})

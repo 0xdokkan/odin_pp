@@ -18,6 +18,7 @@ Board_Device_Network :: struct {
 	damage: i32,
 	base_damage: i32,
 	active_links: u8,
+	cooldown: i32,
 }
 
 board_device_kind :: proc(kind: Grid_Object_Kind) -> bool {
@@ -118,7 +119,9 @@ query_board_device_network :: proc(room: ^Room) -> (network: Board_Device_Networ
 	if room == nil { return }
 	network.ready = true
 	for object in room.objects {
-		if object.kind != .Tesla_Coil || network.count == MAX_TESLA_COILS { continue }
+		if object.kind != .Tesla_Coil { continue }
+		network.cooldown = max(network.cooldown, object.device_cooldown)
+		if network.count == MAX_TESLA_COILS { continue }
 		at := network.count
 		for at > 0 && network.ids[at-1] > object.id {
 			network.ids[at] = network.ids[at-1]
@@ -282,17 +285,31 @@ trigger_shock_floors_on_entry :: proc(room: ^Room, entity: Entity_Ref, events: ^
 	}
 }
 
+@(private)
+board_devices_allow_action :: proc(room: ^Room) -> bool {
+	return room != nil && room.player != nil && room.phase == .Combat && tactical_allows_action(room)
+}
+
 board_devices_can_activate :: proc(room: ^Room) -> bool {
-	if room == nil || room.player == nil || room.phase != .Combat || !tactical_allows_action(room) { return false }
+	if !board_devices_allow_action(room) { return false }
 	return query_board_device_network(room).ready
 }
 
 // Only Tesla networks use the active command. Shock floors are passive traps;
 // neither their presence nor their state can enable or consume this action.
 activate_board_devices :: proc(room: ^Room) -> bool {
-	if !board_devices_can_activate(room) { return false }
-	clear_event_log(&room.recent_events)
+	if !board_devices_allow_action(room) { return false }
 	network := query_board_device_network(room)
+	if !network.ready { return false }
+	discharge_board_device_network(room, &network)
+	return true
+}
+
+// The caller owns this freshly queried network for the whole discharge.
+// Public commands never accept a cached preview as authorization.
+@(private)
+discharge_board_device_network :: proc(room: ^Room, network: ^Board_Device_Network) {
+	clear_event_log(&room.recent_events)
 	for &object in room.objects {
 		if object.kind == .Tesla_Coil { object.device_cooldown = TESLA_RECHARGE_BEATS }
 	}
@@ -311,16 +328,16 @@ activate_board_devices :: proc(room: ^Room) -> bool {
 	// terminal cleanup until every captured target has received its one hit.
 	action := make_action(.Trigger, SYSTEM_ENTITY)
 	action.visual_group = 1
-	if network.field && board_device_network_contains_cell(room, &network, room.player.position) {
-		added := add_effect(&action, damage_effect(PLAYER_ENTITY, board_device_network_damage_at(room, &network, room.player.position)))
+	if network.field && board_device_network_contains_cell(room, network, room.player.position) {
+		added := add_effect(&action, damage_effect(PLAYER_ENTITY, board_device_network_damage_at(room, network, room.player.position)))
 		assert(added)
 	}
 	ids, count := enemy_ids_in_planning_order(room)
 	for id in ids[:count] {
 		index, found := enemy_index_by_id(room, id)
 		// The discharge never reaches a foe out of play.
-		if found && !enemy_is_out_of_play(room, id) && board_device_network_contains_cell(room, &network, room.enemies[index].position) {
-			added := add_effect(&action, damage_effect(enemy_entity(id), board_device_network_damage_at(room, &network, room.enemies[index].position)))
+		if found && !enemy_is_out_of_play(room, id) && board_device_network_contains_cell(room, network, room.enemies[index].position) {
+			added := add_effect(&action, damage_effect(enemy_entity(id), board_device_network_damage_at(room, network, room.enemies[index].position)))
 			assert(added)
 		}
 	}
@@ -344,7 +361,6 @@ activate_board_devices :: proc(room: ^Room) -> bool {
 				from_position = position, to_position = position})
 		}
 	}
-	return true
 }
 
 // Dormant floors never spend charges. The first occupied beat also handles a

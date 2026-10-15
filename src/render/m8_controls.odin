@@ -66,10 +66,15 @@ m8_hud_contains_point :: proc(renderer: ^Renderer, room: ^game.Room, point: view
 // A control the pointer can use now. Behind the player's eyes (and while the
 // view rises from them) the pointer is the view's and reaches none: each one
 // is drawn off (first_person_owns_pointer).
-m8_control_enabled :: proc(renderer: ^Renderer, room: ^game.Room, control: M8_Control) -> bool {
-    if renderer == nil || room == nil || room.player == nil || !renderer.tactical.enabled || !m8_control_visible(room,control) ||
+@(private)
+m8_controls_allow_pointer :: proc(renderer: ^Renderer, room: ^game.Room) -> bool {
+    return !(renderer == nil || room == nil || room.player == nil || !renderer.tactical.enabled ||
        (room.phase != .Combat && room.phase != .Loot) || room.qte.kind != .None ||
-       game.tactical_is_casting(room) || renderer_blocks_player_input(renderer) || first_person_owns_pointer(renderer, room) { return false }
+       game.tactical_is_casting(room) || renderer_blocks_player_input(renderer) || first_person_owns_pointer(renderer, room))
+}
+
+m8_control_enabled :: proc(renderer: ^Renderer, room: ^game.Room, control: M8_Control) -> bool {
+    if !m8_controls_allow_pointer(renderer,room) || !m8_control_visible(room,control) { return false }
     switch control {
     case .Activate: return game.board_devices_can_activate(room)
     case .Equip:

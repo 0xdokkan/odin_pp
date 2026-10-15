@@ -4,18 +4,14 @@ import "core:fmt"
 import rl "vendor:raylib"
 import game "../game"
 
-m8_tesla_control_labels :: proc(room: ^game.Room) -> (title, detail: cstring) {
+m8_tesla_control_labels :: proc(query: game.Tesla_Control_Query) -> (title, detail: cstring) {
     title="ATTIVA"
-    if room == nil {return title,"NESSUN OGGETTO ATTIVO"}
-    network := game.query_board_device_network(room)
+    network := query.network
     if network.count == 0 {return title,"NESSUN OGGETTO ATTIVO"}
-    cooldown: i32
-    for object in room.objects {
-        if object.kind == .Tesla_Coil {cooldown=max(cooldown,object.device_cooldown)}
-    }
+    cooldown := network.cooldown
     // A square around enemies opens the floor's ring instead of discharging.
-    if ring, found := game.query_tesla_ring(room); found {
-        return "APRI IL RING","1 SFIDANTE / DUELLO" if ring.count == 1 else fmt.ctprintf("TAG MATCH / %d SFIDANTI",ring.count)
+    if query.ring.count > 0 {
+        return "APRI IL RING","1 SFIDANTE / DUELLO" if query.ring.count == 1 else fmt.ctprintf("TAG MATCH / %d SFIDANTI",query.ring.count)
     }
     if network.field {
         return "ATTIVA MEGA","CONSUMA 4 / FUOCO AMICO" if cooldown == 0 else fmt.ctprintf("RICARICA %ds / CONSUMA 4",cooldown)
@@ -27,9 +23,13 @@ m8_tesla_control_labels :: proc(room: ^game.Room) -> (title, detail: cstring) {
 
 draw_m8_active_bar :: proc(renderer: ^Renderer, room: ^game.Room) {
     if room == nil || room.player == nil { return }
-    if m8_control_visible(room,.Activate) {
-        title,label := m8_tesla_control_labels(room)
-        m8_mouse_button(renderer,m8_control_bounds(renderer,.Activate,room),title,m8_control_enabled(renderer,room,.Activate),label)
+    if room.phase == .Combat || room.phase == .Loot {
+        query := game.query_tesla_controls(room)
+        if query.network.count > 0 {
+            title,label := m8_tesla_control_labels(query)
+            enabled := query.can_activate && m8_controls_allow_pointer(renderer,room)
+            m8_mouse_button(renderer,m8_control_bounds(renderer,.Activate,room),title,enabled,label)
+        }
     }
     floors := game.board_device_count(room,.Shock_Floor)
     charges: i32

@@ -178,7 +178,7 @@ test_tesla_button_discloses_consumption_only_for_a_real_field :: proc(t: ^testin
     defer delete(room.objects)
     for position,index in ([4][2]int{{1,1},{5,1},{5,5},{1,5}}) {
         append(&room.objects,game.Grid_Object{kind=.Tesla_Coil,id=u32(index+1),position={position[0],position[1]},device_damage=8})
-        title,detail := m8_tesla_control_labels(&room)
+        title,detail := m8_tesla_control_labels(game.query_tesla_controls(&room))
         if index == 1 {
             testing.expect_value(t,string(title),"ATTIVA")
             testing.expect_value(t,string(detail),"TESLA 2/4 / PARETI RIUSABILI")
@@ -189,7 +189,7 @@ test_tesla_button_discloses_consumption_only_for_a_real_field :: proc(t: ^testin
     }
     // Four in a line still form reusable lightning walls, not the mega field.
     for &object,index in room.objects {object.position={index+1,1}}
-    title,detail := m8_tesla_control_labels(&room)
+    title,detail := m8_tesla_control_labels(game.query_tesla_controls(&room))
     testing.expect_value(t,string(title),"ATTIVA")
     testing.expect_value(t,string(detail),"TESLA 4/4 / PARETI RIUSABILI")
 }

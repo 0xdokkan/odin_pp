@@ -44,7 +44,22 @@ test_tesla_square_opens_the_ring_once_per_floor_around_enemies :: proc(t: ^testi
 	ring, ok := query_tesla_ring(&room)
 	testing.expect(t, ok)
 	testing.expect_value(t, ring.count, 2)
-	testing.expect(t, begin_tesla_ring(&room))
+	preview := query_tesla_controls(&room)
+	testing.expect(t, preview.can_activate && preview.network.ready)
+	testing.expect_value(t, preview.ring, ring)
+	// A previously drawn button cannot authorize a later, unavailable command.
+	room.objects[0].device_cooldown = 2
+	blocked := query_tesla_controls(&room)
+	testing.expect(t, !blocked.can_activate && blocked.ring.count == 0)
+	testing.expect_value(t, blocked.network.cooldown, i32(2))
+	before_events := room.recent_events
+	committed, opened := activate_tesla(&room)
+	testing.expect(t, !committed && !opened)
+	testing.expect_value(t, room.recent_events, before_events)
+	testing.expect_value(t, board_tesla_count(&room), 4)
+	room.objects[0].device_cooldown = 0
+	committed, opened = activate_tesla(&room)
+	testing.expect(t, committed && opened)
 	testing.expect(t, room.tesla_ring.pending && .Tesla_Ring in player.floor_secrets)
 	testing.expect(t, tesla_ring_holds(&room, room.enemies[0].id) && tesla_ring_holds(&room, room.enemies[1].id))
 	testing.expect(t, !tesla_ring_holds(&room, room.enemies[2].id))
