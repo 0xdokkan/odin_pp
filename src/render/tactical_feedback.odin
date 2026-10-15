@@ -472,13 +472,8 @@ fate_made_critical :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) -> bool 
 		return other.kind == .Fate_Rolled && other.batch == cue.batch && other.event.target == cue.event.target &&
 		       game.Fate_Outcome(other.event.duration) == .Critical
 	}
-	for offset in 0..<renderer.timeline.count {
-		if other, found := presentation_cue_at(&renderer.timeline, offset); found && matches(other, cue) { return true }
-	}
-	if renderer.world_playback != nil {
-		for &entry in renderer.world_playback.cues[:renderer.world_playback.count] {
-			if matches(&entry.cue, cue) { return true }
-		}
+	for offset in 0..<renderer_queued_cue_count(renderer) {
+		if other, found := renderer_queued_cue_at(renderer, offset); found && matches(other, cue) { return true }
 	}
 	return false
 }
@@ -491,13 +486,8 @@ reflected_blow_wounds :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) -> bo
 		return other.kind == .Damage && other.batch == cue.batch && game.event_is_reflected(other.event) &&
 		       other.event.source == cue.event.source && other.event.target == cue.event.target
 	}
-	for offset in 0..<renderer.timeline.count {
-		if other, found := presentation_cue_at(&renderer.timeline, offset); found && matches(other, cue) { return true }
-	}
-	if renderer.world_playback != nil {
-		for &entry in renderer.world_playback.cues[:renderer.world_playback.count] {
-			if matches(&entry.cue, cue) { return true }
-		}
+	for offset in 0..<renderer_queued_cue_count(renderer) {
+		if other, found := renderer_queued_cue_at(renderer, offset); found && matches(other, cue) { return true }
 	}
 	return false
 }

@@ -116,6 +116,29 @@ sweep_box :: proc(body: Body, delta: Vec3, bounds: AABB) -> (time: f32, normal: 
 	return time, normal, time <= 1
 }
 
+// First blocking contact along a horizontal segment. This query does not move
+// or depenetrate the body; callers choose whether to stop or slide at contact.
+// As with sweep_box/sweep_circle, inputs must be valid and initially separated.
+// Equal-time contacts preserve solid-before-actor and storage ordering.
+sweep_body :: proc(world: ^World, body: Body, delta: Vec3, mask: Layers = {.World, .Actor}) ->
+	(time: f32, normal: Vec3, hit_id: u32, hit: bool) {
+	time = 2
+	if .World in mask {
+		for solid in world.solids[:world.solid_count] {
+			candidate, contact, found := sweep_box(body, delta, solid.bounds)
+			if found && candidate < time { time = candidate; normal = contact; hit_id = solid.id }
+		}
+	}
+	if .Actor in mask {
+		for other in world.actors[:world.actor_count] {
+			if other.id == body.id || !actors_vertical_overlap(body, other) { continue }
+			candidate, contact, found := sweep_circle(body.position, delta, other.position, body.radius+other.radius)
+			if found && candidate < time { time = candidate; normal = contact; hit_id = other.id }
+		}
+	}
+	return time, normal, hit_id, time <= 1
+}
+
 // Flat-ground upright controller. Vertical motion, stairs and slopes deliberately
 // require another controller: rejecting nonzero Y avoids pretending to support them.
 move_character :: proc(world: ^World, body: ^Body, delta: Vec3, mask: Layers = {.World, .Actor}) -> Move_Result {
@@ -154,23 +177,8 @@ move_character :: proc(world: ^World, body: ^Body, delta: Vec3, mask: Layers = {
 	remaining := delta
 	for _ in 0..<MAX_MOVE_ITERATIONS {
 		if vec_dot(remaining, remaining) <= 1e-12 { break }
-		closest: f32 = 2
-		normal: Vec3
-		hit_id: u32
-		if .World in mask {
-			for solid in world.solids[:world.solid_count] {
-				time, contact, hit := sweep_box(staged, remaining, solid.bounds)
-				if hit && time < closest { closest = time; normal = contact; hit_id = solid.id }
-			}
-		}
-		if .Actor in mask {
-			for other in world.actors[:world.actor_count] {
-				if other.id == staged.id || !actors_vertical_overlap(staged, other) { continue }
-				time, contact, hit := sweep_circle(staged.position, remaining, other.position, staged.radius+other.radius)
-				if hit && time < closest { closest = time; normal = contact; hit_id = other.id }
-			}
-		}
-		if closest > 1 {
+		closest, normal, hit_id, hit := sweep_body(world, staged, remaining, mask)
+		if !hit {
 			staged.position = vec_add(staged.position, remaining)
 			remaining = {}
 			break

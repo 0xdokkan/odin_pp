@@ -1240,69 +1240,13 @@ roguelike_update :: proc(data: rawptr, hf: ^host.Frame) {
 			// MOSTRA EFFETTO of an offer or of the owned card chosen (or I): never
 			// a purchase, a page or a way out as well.
 			if roguelike_effect_entry(rs, rs.mouse_inside && rl.IsMouseButtonPressed(.LEFT), rs.mouse_canvas, rl.IsKeyPressed(.I)) { return }
-			offer_index := pressed_hand_slot()
-			if offer_index >= 0 && offer_index < game.SHOP_CARD_OFFER_COUNT {
-				game.buy_shop_card(&rs.run_state, offer_index)
+			input := Run_Menu_Input{
+				choice_index = pressed_hand_slot(), previous_page = rl.IsKeyPressed(.LEFT), next_page = rl.IsKeyPressed(.RIGHT),
+				upgrade = rl.IsKeyPressed(.U), remove = rl.IsKeyPressed(.R),
+				confirm = rl.IsKeyPressed(.ENTER), cancel = rl.IsKeyPressed(.ESCAPE),
+				clicked = rs.mouse_inside && rl.IsMouseButtonPressed(.LEFT),
 			}
-			if rl.IsKeyPressed(.LEFT) {
-				rs.shop_render_state.page = max(0, rs.shop_render_state.page-1)
-				rs.shop_render_state.selected_card_id = 0
-			} else if rl.IsKeyPressed(.RIGHT) {
-				rs.shop_render_state.page = min(
-					render.shop_deck_page_count(&rs.run_state.player.deck)-1,
-					rs.shop_render_state.page+1,
-				)
-				rs.shop_render_state.selected_card_id = 0
-			}
-			if rl.IsKeyPressed(.U) && rs.shop_render_state.selected_card_id != 0 {
-				game.buy_shop_upgrade(&rs.run_state, rs.shop_render_state.selected_card_id)
-			} else if rl.IsKeyPressed(.R) && rs.shop_render_state.selected_card_id != 0 {
-				result := game.buy_shop_removal(&rs.run_state, rs.shop_render_state.selected_card_id)
-				if result == .Removed {
-					rs.shop_render_state.selected_card_id = 0
-				}
-			}
-
-			leave_requested := rl.IsKeyPressed(.ENTER) || rl.IsKeyPressed(.ESCAPE)
-			if rs.mouse_inside && rl.IsMouseButtonPressed(.LEFT) {
-				switch shop_hit.kind {
-				case .None:
-				case .Offer:
-					game.buy_shop_card(&rs.run_state, shop_hit.offer_index)
-				case .Owned_Card:
-					rs.shop_render_state.selected_card_id = shop_hit.card_id
-				case .Previous_Page:
-					rs.shop_render_state.page = max(0, rs.shop_render_state.page-1)
-					rs.shop_render_state.selected_card_id = 0
-				case .Next_Page:
-					rs.shop_render_state.page = min(
-						render.shop_deck_page_count(&rs.run_state.player.deck)-1,
-						rs.shop_render_state.page+1,
-					)
-					rs.shop_render_state.selected_card_id = 0
-				case .Upgrade:
-					if rs.shop_render_state.selected_card_id != 0 {
-						game.buy_shop_upgrade(&rs.run_state, rs.shop_render_state.selected_card_id)
-					}
-				case .Remove:
-					if rs.shop_render_state.selected_card_id != 0 {
-						result := game.buy_shop_removal(
-							&rs.run_state,
-							rs.shop_render_state.selected_card_id,
-						)
-						if result == .Removed {
-							rs.shop_render_state.selected_card_id = 0
-						}
-					}
-				case .Continue:
-					leave_requested = true
-				}
-			}
-			rs.shop_render_state.page = render.shop_clamp_deck_page(
-				&rs.run_state.player.deck,
-				rs.shop_render_state.page,
-			)
-			if leave_requested && game.leave_shop(&rs.run_state) == .Left {
+			if step_shop_menu(&rs.run_state, &rs.shop_render_state, input, shop_hit) {
 				rs.shop_visible = false
 				rs.route_visible = true
 				rs.show_route_map = true
@@ -1368,94 +1312,16 @@ roguelike_update :: proc(data: rawptr, hf: ^host.Frame) {
 			// MOSTRA EFFETTO of the rest's owned card chosen (or I): never a
 			// choice as well.
 			if roguelike_effect_entry(rs, rs.mouse_inside && rl.IsMouseButtonPressed(.LEFT), rs.mouse_canvas, rl.IsKeyPressed(.I)) { return }
-			requested := render.Special_Node_Hit{kind = .None}
-			if game.special_node_can_continue(&rs.run_state) {
-				if rl.IsKeyPressed(.ENTER) {
-					requested.kind = .Continue
-				}
-			} else {
-				choice_index := pressed_hand_slot()
-				if choice_index == 0 {
-					requested.kind = .Primary
-				} else if choice_index == 1 {
-					requested.kind = .Secondary
-				}
-				if rl.IsKeyPressed(.L) {
-					requested.kind = .Leave
-				} else if rs.run_state.phase == .Rest && rl.IsKeyPressed(.U) {
-					requested.kind = .Secondary
-				}
+			input := Run_Menu_Input{
+				choice_index = pressed_hand_slot(), previous_page = rl.IsKeyPressed(.LEFT), next_page = rl.IsKeyPressed(.RIGHT),
+				upgrade = rl.IsKeyPressed(.U), leave = rl.IsKeyPressed(.L), confirm = rl.IsKeyPressed(.ENTER),
+				clicked = rs.mouse_inside && rl.IsMouseButtonPressed(.LEFT),
 			}
-			if rs.run_state.phase == .Rest && rl.IsKeyPressed(.LEFT) {
-				rs.special_render_state.page = max(0, rs.special_render_state.page-1)
-				rs.special_render_state.selected_card_id = 0
-			} else if rs.run_state.phase == .Rest && rl.IsKeyPressed(.RIGHT) {
-				rs.special_render_state.page = min(
-					render.special_node_deck_page_count(&rs.run_state.player.deck)-1,
-					rs.special_render_state.page+1,
-				)
-				rs.special_render_state.selected_card_id = 0
+			if step_special_node_menu(&rs.run_state, &rs.special_render_state, input, special_hit) {
+				rs.special_visible = false
+				rs.route_visible = true
+				rs.show_route_map = true
 			}
-			if rs.mouse_inside && rl.IsMouseButtonPressed(.LEFT) {
-				requested = special_hit
-			}
-			primary_enabled := render.special_node_primary_is_enabled(&rs.run_state)
-			secondary_enabled := render.special_node_secondary_is_enabled(
-				&rs.run_state,
-				rs.special_render_state.selected_card_id,
-			)
-			if requested.kind == .Primary && !primary_enabled {
-				requested.kind = .None
-			} else if requested.kind == .Secondary && !secondary_enabled {
-				requested.kind = .None
-			}
-
-			switch requested.kind {
-			case .None:
-			case .Owned_Card:
-				rs.special_render_state.selected_card_id = requested.card_id
-			case .Previous_Page:
-				rs.special_render_state.page = max(0, rs.special_render_state.page-1)
-				rs.special_render_state.selected_card_id = 0
-			case .Next_Page:
-				rs.special_render_state.page = min(
-					render.special_node_deck_page_count(&rs.run_state.player.deck)-1,
-					rs.special_render_state.page+1,
-				)
-				rs.special_render_state.selected_card_id = 0
-			case .Primary:
-				switch rs.run_state.phase {
-				case .Rest:
-					game.use_rest_recovery(&rs.run_state)
-				case .Event:
-					game.resolve_route_event(&rs.run_state, .Primary)
-				case .Treasure:
-					game.claim_treasure(&rs.run_state)
-				case .In_Room, .Reward, .Shop, .Choose_Path, .Victory, .Defeat:
-				}
-			case .Secondary:
-				if rs.run_state.phase == .Rest {
-					game.use_rest_upgrade(
-						&rs.run_state,
-						rs.special_render_state.selected_card_id,
-					)
-				} else if rs.run_state.phase == .Event {
-					game.resolve_route_event(&rs.run_state, .Secondary)
-				}
-			case .Leave:
-				game.leave_special_node(&rs.run_state)
-			case .Continue:
-				if game.continue_special_node(&rs.run_state) == .Continued {
-					rs.special_visible = false
-					rs.route_visible = true
-					rs.show_route_map = true
-					rs.special_render_state = {}
-				}
-			}
-			rs.special_render_state.page = render.special_node_clamp_deck_page(
-				&rs.run_state.player.deck,
-				rs.special_render_state.page,
-			)
 		}
 	} else if rs.route_visible {
 		if rs.mouse_inside {

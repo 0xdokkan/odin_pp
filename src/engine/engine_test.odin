@@ -185,6 +185,43 @@ test_layers_and_triggers_do_not_block_character :: proc(t: ^testing.T) {
 }
 
 @(test)
+test_body_sweep_preserves_first_contact_masks_and_segment_endpoints :: proc(t: ^testing.T) {
+	world: World
+	body := Body{position = {}, radius = 0.5, height = 2, id = 1, layer = .Actor}
+	// The two solids and the last actor all touch at x=1.5. Stable ties matter
+	// for movement normals and the identity reported to gameplay.
+	add_solid(&world, {{2, 0, -2}, {2.1, 3, 2}}, 91)
+	add_solid(&world, {{2, 0, -2}, {2.1, 3, 2}}, 92)
+	add_actor(&world, body)
+	add_actor(&world, Body{position = {1, 3, 0}, radius = 0.5, height = 2, id = 3})
+	add_actor(&world, Body{position = {2.5, 0, 0}, radius = 0.5, height = 2, id = 2})
+	add_trigger(&world, {{0.5, 0, -1}, {1, 3, 1}}, 7)
+	before := world
+	masks := [?]Layers{{.World, .Actor}, {.World}, {.Actor}, {.Trigger}, {}}
+	ids := [?]u32{91, 91, 2, 0, 0}
+	for mask, i in masks {
+		time, normal, id, hit := sweep_body(&world, body, {3, 0, 0}, mask)
+		testing.expect_value(t, hit, i < 3)
+		testing.expect_value(t, id, ids[i])
+		if hit {
+			testing.expect_value(t, time, 0.5)
+			testing.expect_value(t, normal, Vec3{-1, 0, 0})
+		}
+	}
+	time, _, id, hit := sweep_body(&world, body, {1.5, 0, 0})
+	testing.expect(t, hit && time == 1 && id == 91)
+	body.position.x = 1.5
+	time, _, id, hit = sweep_body(&world, body, {3, 0, 0})
+	testing.expect(t, hit && time == 0 && id == 91)
+	free_deltas := [?]Vec3{{-3, 0, 0}, {0, 0, 0}, {0, 0, 1}}
+	for delta in free_deltas {
+		_, _, _, hit = sweep_body(&world, body, delta)
+		testing.expect(t, !hit, "A touching contact permits outward, stationary and tangent motion")
+	}
+	testing.expect_value(t, world, before)
+}
+
+@(test)
 test_raycast_nearest_wall_occludes_actor_and_honors_masks :: proc(t: ^testing.T) {
 	world: World
 	add_solid(&world, {{2, 0, -1}, {2.1, 3, 1}}, 99)

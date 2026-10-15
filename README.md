@@ -4793,6 +4793,61 @@ Windows non verificato. Screenshot, log e confronti temporanei restano fuori
 dal repository.
 
 
+### Refactor del codice di produzione — 16 ottobre 2026
+
+Questo lotto riguarda le responsabilità e le regole del runtime:
+
+- **Shop:** disponibilità dei pulsanti e comandi di acquisto condividono i
+  controlli per carta, upgrade e rimozione. Restano invariati prezzi, priorità
+  degli errori e preparazione della mutazione del mazzo prima dell'addebito.
+- **Input dei menu:** `run_menu_input.odin` gestisce azioni e transizioni di
+  Shop, Rest, Event e Treasure; la scena campiona input, hover e visibilità.
+  Mouse e tastiera dello Shop usano lo stesso dispatcher. Conservate le
+  differenze: lo Shop può eseguire più azioni nello stesso frame, mentre un
+  click nei nodi speciali sostituisce la scelta della tastiera; il cambio
+  pagina azzera la selezione prima di valutare un upgrade.
+- **Colpi nemici:** attacco normale e colpo finale della carica condividono
+  Riflesso, danno/reazioni, eventi e spinta M7. Puntamento, cancellazione,
+  movimento della carica e conclusione dell'azione restano nei rispettivi
+  flussi, preservando le differenze fra Classica e M7.
+- **Collisioni:** `engine.sweep_body` ricerca il primo contatto per movimento
+  e lancio nel ring. Il controller conserva scorrimento e depenetrazione;
+  il lancio conserva traiettoria rettilinea e margine di arresto propri.
+  La query non modifica il mondo e mantiene filtri e ordine dei contatti.
+- **Presentazione:** il replay del mazzo è separato dalla timeline in
+  `render/presentation_deck.odin`, con un controllo comune dei metadati
+  carta/evento. Lazzo, critici e Riflesso condividono l'accesso alle cue
+  bufferizzate, anche future, mantenendo foreground prima di world. Il
+  disegno continua a scorrere soltanto le cue attive; restano i rollback
+  delle transazioni e la separazione fra stato reale e presentazione.
+
+Non cambiano bilanciamento, aspetto, catalogo o comportamento previsto.
+I confronti temporanei con il codice precedente danno risultati identici per
+52.020 movimenti e 47.685 traiettorie di lancio, 130.598 confronti Shop,
+576 scenari di attacco Classica/M7, 31.360 transazioni di replay del mazzo e
+12.672 query sui feedback. I probe sono stati rimossi dai sorgenti e
+conservati fuori dal repository.
+
+Nessun test eliminato in questo lotto: aggiunte tre regressioni sui contratti
+condivisi (collisioni e due flussi di menu), ed esteso un test esistente per
+distinguere cue future e attive. La suite comprende **1.319 procedure complete**
+(**1.312** nel profilo rapido). Il codice di produzione cala di 45 righe
+nette; la scena perde 134 righe e la timeline 159, ora collocate nei moduli
+che gestiscono rispettivamente menu e replay del mazzo.
+
+Validazione su macOS: **1.319/1.319 test con assert attivi e disattivati**,
+strict/vet e build in entrambe le configurazioni superati. Il report M7
+rimane identico byte per byte al terzo lotto. Passano gli smoke nativi di
+ring, FPS, M8 e il laboratorio completo, inclusi colpi riflessi, critici,
+Lazzo, Pinball, FPS temporaneo, pesca e feedback audio. M8 comprende cast,
+trappola passiva, campo Tesla, loot e passaggio alla stanza successiva.
+Passa anche Mostra effetto: ingressi Shop/Rest, chiusura, riavvio e resize,
+sei film campione (Strike, Guard e Tesla al livello base e massimo),
+48 catture e zero errori di timeline o dello smoke. Controllate visivamente
+le catture dei due menu, ring, FPS, loot, nuova stanza e Lazzo.
+Screenshot e log rimangono fuori dal repository. Windows resta da verificare.
+
+
 ### M7G: lavoro restante dopo il prototipo
 
 Restano da svolgere le revisioni del codice e i playtest umani concordati:

@@ -31,17 +31,8 @@ sweep_position :: proc(state: ^State, index: int, delta: engine.Vec3) -> engine.
 	// A throw follows one straight segment, so it stops at the first contact.
 	// Using the sliding movement controller's final position here would make
 	// the animated segment cut across a corner that locomotion walked around.
-	travel := f32(1)
-	contact := false
-	for solid in state.world.solids[:state.world.solid_count] {
-		time, _, hit := engine.sweep_box(body, delta, solid.bounds)
-		if hit && time <= travel { travel, contact = time, true }
-	}
-	for other in state.world.actors[:state.world.actor_count] {
-		if other.id == body.id || !engine.actors_vertical_overlap(body, other) { continue }
-		time, _, hit := engine.sweep_circle(body.position, delta, other.position, body.radius+other.radius)
-		if hit && time <= travel { travel, contact = time, true }
-	}
+	travel, _, _, contact := engine.sweep_body(&state.world, body, delta)
+	travel = min(travel, 1)
 	if contact {
 		travel = max(f32(0), travel-engine.CONTACT_EPSILON/max(engine.vec_length(delta), engine.CONTACT_EPSILON))
 	}

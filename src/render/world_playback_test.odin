@@ -99,6 +99,16 @@ test_world_waypoints_queue_per_actor_but_a_full_encounter_moves_concurrently :: 
 		testing.expect(t, begin_renderer_world_timeline(renderer, before, &events, &after))
 	}
 	testing.expect_value(t, renderer_active_cue_count(renderer), len(enemies))
+	// Effects correlating an action with its later waypoints must also see
+	// the delayed cues; the drawing iterator deliberately omits them.
+	testing.expect_value(t, renderer_queued_cue_count(renderer), len(enemies)*2)
+	pending, found := renderer_queued_cue_at(renderer, len(enemies))
+	testing.expect(t, found)
+	if found {
+		testing.expect(t, !pending.started)
+		testing.expect_value(t, pending.event.from_position.x, 6)
+		testing.expect_value(t, pending.event.from_position.y, 0)
+	}
 	update_renderer_event_timeline(renderer, PRESENTATION_ENEMY_MOVE_DURATION/2)
 	snapshot := renderer_presentation_snapshot(renderer, &room)
 	for actor, index in snapshot.enemies[:snapshot.enemy_count] { expect_presentation_position(t, actor.position, {6.5, f32(index)}) }

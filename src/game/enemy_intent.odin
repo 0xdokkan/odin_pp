@@ -735,6 +735,27 @@ enemy_attack_is_ranged :: proc(enemy: ^Enemy, intent: ^Enemy_Intent) -> bool {
 	return enemy.archetype == .Archer || enemy.archetype == .Bomber || intent.target_object != 0
 }
 
+// A confirmed attack and the blow after a charge share the same hit pipeline.
+// Their callers own aiming, cancellation and movement; the blow owns Deflect,
+// damage/reactions, attack cues and the tactical push, in that order.
+@(private)
+resolve_enemy_blow :: proc(room: ^Room, enemy: ^Enemy, intent: ^Enemy_Intent, ranged: bool, pulse: ^Pulse_Report) -> bool {
+	source := enemy_entity(enemy.id)
+	if deflect_enemy_blow(room, source, enemy.position, intent, ranged, pulse) {
+		return room.phase != .Combat
+	}
+	action := make_action(.Attack, source, entity_target(PLAYER_ENTITY), .Opponent)
+	added := add_effect(&action, damage_effect(PLAYER_ENTITY, intent.damage))
+	assert(added)
+	report := resolve_action(room, &action)
+	assert(report.accepted)
+	mark_attack_events(&report.events, 0, source, PLAYER_ENTITY, enemy.position, intent.threatened_cells[0],
+		intent.threatened_cells[:intent.threatened_cell_count], ranged)
+	merge_action_report(pulse, &report)
+	resolve_tactical_enemy_push(room, source, intent, &report, pulse)
+	return report.player_defeated || room.phase != .Combat
+}
+
 resolve_enemy_intents :: proc(room: ^Room, pulse: ^Pulse_Report, only_id: u32 = 0) {
 	assert(room != nil && room.player != nil && pulse != nil)
 	if room.phase != .Combat {
@@ -871,23 +892,7 @@ resolve_enemy_intents :: proc(room: ^Room, pulse: ^Pulse_Report, only_id: u32 = 
 				)
 				continue
 			}
-			// RIFLESSO: the blow goes back to its attacker instead.
-			if deflect_enemy_blow(room, source, enemy.position, &intent, ranged, pulse) {
-				if room.phase != .Combat { return }
-				continue
-			}
-			action := make_action(.Attack, source, entity_target(PLAYER_ENTITY), .Opponent)
-			added := add_effect(&action, damage_effect(PLAYER_ENTITY, intent.damage))
-			assert(added)
-			report := resolve_action(room, &action)
-			assert(report.accepted)
-			mark_attack_events(&report.events, 0, source, PLAYER_ENTITY, enemy.position, intent.threatened_cells[0],
-				intent.threatened_cells[:intent.threatened_cell_count], ranged)
-			merge_action_report(pulse, &report)
-			resolve_tactical_enemy_push(room, source, &intent, &report, pulse)
-			if report.player_defeated || room.phase != .Combat {
-				return
-			}
+			if resolve_enemy_blow(room, enemy, &intent, ranged, pulse) { return }
 		case .Move:
 			pulse.enemy_actions += 1
 			begin_demolitionist_approach(enemy)
@@ -956,23 +961,7 @@ resolve_enemy_intents :: proc(room: ^Room, pulse: ^Pulse_Report, only_id: u32 = 
 				)
 				continue
 			}
-			// RIFLESSO: the charge's blow goes back to the brute that struck it.
-			if deflect_enemy_blow(room, source, moved_enemy.position, &intent, false, pulse) {
-				if room.phase != .Combat { return }
-				continue
-			}
-			attack_action := make_action(.Attack, source, entity_target(PLAYER_ENTITY), .Opponent)
-			added_attack := add_effect(&attack_action, damage_effect(PLAYER_ENTITY, intent.damage))
-			assert(added_attack)
-			attack_report := resolve_action(room, &attack_action)
-			assert(attack_report.accepted)
-			mark_attack_events(&attack_report.events, 0, source, PLAYER_ENTITY, moved_enemy.position, intent.threatened_cells[0],
-				intent.threatened_cells[:intent.threatened_cell_count], false)
-			merge_action_report(pulse, &attack_report)
-			resolve_tactical_enemy_push(room, source, &intent, &attack_report, pulse)
-			if attack_report.player_defeated || room.phase != .Combat {
-				return
-			}
+			if resolve_enemy_blow(room, moved_enemy, &intent, false, pulse) { return }
 		}
 	}
 }

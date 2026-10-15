@@ -227,77 +227,66 @@ leave_shop :: proc(run: ^Run_State) -> Shop_Result {
 	return .Left
 }
 
-shop_offer_can_be_bought :: proc(run: ^Run_State, offer_index: int) -> bool {
+// The HUD and purchase commands use these same checks. They return the command's
+// first failure, or its successful result and the price to commit. No state is
+// changed here; the commands still stage the deck mutation before spending gold.
+@(private)
+shop_card_purchase_check :: proc(run: ^Run_State, offer_index: int) -> (Shop_Result, i32) {
 	if run == nil || run.phase != .Shop || !validate_shop_state(run) ||
 	   offer_index < 0 || offer_index >= run.shop.offer_count {
-		return false
+		return .Invalid, 0
 	}
 	offer := run.shop.offers[offer_index]
-	return !offer.sold && run.player.gold >= offer.price &&
-	       run.player.deck.owned_count < MAX_OWNED_CARDS && run.player.deck.next_card_id < max(u32)
+	if offer.sold { return .Already_Sold, 0 }
+	if run.player.gold < offer.price { return .Not_Enough_Gold, 0 }
+	if run.player.deck.owned_count >= MAX_OWNED_CARDS { return .Deck_Full, 0 }
+	if run.player.deck.next_card_id >= max(u32) { return .Invalid, 0 }
+	return .Purchased, offer.price
+}
+
+shop_offer_can_be_bought :: proc(run: ^Run_State, offer_index: int) -> bool {
+	result, _ := shop_card_purchase_check(run, offer_index)
+	return result == .Purchased
 }
 
 buy_shop_card :: proc(run: ^Run_State, offer_index: int) -> Shop_Result {
-	if run == nil || run.phase != .Shop || !validate_shop_state(run) ||
-	   offer_index < 0 || offer_index >= run.shop.offer_count {
-		return .Invalid
-	}
-	offer := run.shop.offers[offer_index]
-	if offer.sold {
-		return .Already_Sold
-	}
-	if run.player.gold < offer.price {
-		return .Not_Enough_Gold
-	}
-	if run.player.deck.owned_count >= MAX_OWNED_CARDS {
-		return .Deck_Full
-	}
-
+	result, price := shop_card_purchase_check(run, offer_index)
+	if result != .Purchased { return result }
 	staged_deck := run.player.deck
-	_, added := add_owned_card(&staged_deck, offer.definition_id)
-	if !added {
-		return .Invalid
-	}
+	_, added := add_owned_card(&staged_deck, run.shop.offers[offer_index].definition_id)
+	if !added { return .Invalid }
 	run.player.deck = staged_deck
-	run.player.gold -= offer.price
+	run.player.gold -= price
 	run.shop.offers[offer_index].sold = true
 	assert(validate_shop_state(run))
 	return .Purchased
 }
 
-shop_upgrade_can_be_bought :: proc(run: ^Run_State, card_id: u32) -> bool {
-	if run == nil || run.phase != .Shop || !validate_shop_state(run) || run.shop.upgrade_used {
-		return false
+@(private)
+shop_upgrade_purchase_check :: proc(run: ^Run_State, card_id: u32) -> (Shop_Result, i32) {
+	if run == nil || run.phase != .Shop || !validate_shop_state(run) {
+		return .Invalid, 0
 	}
-	price, found := shop_upgrade_price(run, card_id)
-	return found && run.player.gold >= price
+	if run.shop.upgrade_used { return .Service_Used, 0 }
+	card_index, found := owned_card_index_by_id(&run.player.deck, card_id)
+	if !found { return .Card_Not_Found, 0 }
+	card := run.player.deck.owned[card_index]
+	if card.upgrade_level >= card_max_upgrade_level(card.definition_id) { return .Maximum_Upgrade, 0 }
+	if !card_can_upgrade(card) { return .Upgrade_Unavailable, 0 }
+	price, price_ok := shop_upgrade_price(run, card_id)
+	if !price_ok { return .Invalid, 0 }
+	if run.player.gold < price { return .Not_Enough_Gold, 0 }
+	return .Upgraded, price
+}
+
+shop_upgrade_can_be_bought :: proc(run: ^Run_State, card_id: u32) -> bool {
+	result, _ := shop_upgrade_purchase_check(run, card_id)
+	return result == .Upgraded
 }
 
 buy_shop_upgrade :: proc(run: ^Run_State, card_id: u32) -> Shop_Result {
-	if run == nil || run.phase != .Shop || !validate_shop_state(run) {
-		return .Invalid
-	}
-	if run.shop.upgrade_used {
-		return .Service_Used
-	}
-	card_index, found := owned_card_index_by_id(&run.player.deck, card_id)
-	if !found {
-		return .Card_Not_Found
-	}
-	if run.player.deck.owned[card_index].upgrade_level >= card_max_upgrade_level(run.player.deck.owned[card_index].definition_id) {
-		return .Maximum_Upgrade
-	}
-	if !card_can_upgrade(run.player.deck.owned[card_index]) {
-		return .Upgrade_Unavailable
-	}
-	price, price_ok := shop_upgrade_price(run, card_id)
-	if !price_ok {
-		return .Invalid
-	}
-	if run.player.gold < price {
-		return .Not_Enough_Gold
-	}
-
+	result, price := shop_upgrade_purchase_check(run, card_id)
+	if result != .Upgraded { return result }
 	staged_deck := run.player.deck
 	if upgrade_owned_card(&staged_deck, card_id) != .Upgraded {
 		return .Invalid
@@ -309,37 +298,28 @@ buy_shop_upgrade :: proc(run: ^Run_State, card_id: u32) -> Shop_Result {
 	return .Upgraded
 }
 
-shop_removal_can_be_bought :: proc(run: ^Run_State, card_id: u32) -> bool {
-	if run == nil || run.phase != .Shop || !validate_shop_state(run) || run.shop.removal_used ||
-	   run.player.deck.owned_count <= MIN_OWNED_CARDS {
-		return false
+@(private)
+shop_removal_purchase_check :: proc(run: ^Run_State, card_id: u32) -> (Shop_Result, i32) {
+	if run == nil || run.phase != .Shop || !validate_shop_state(run) {
+		return .Invalid, 0
 	}
-	_, found := owned_card_index_by_id(&run.player.deck, card_id)
+	if run.shop.removal_used { return .Service_Used, 0 }
+	if run.player.deck.owned_count <= MIN_OWNED_CARDS { return .Minimum_Deck_Size, 0 }
+	if _, found := owned_card_index_by_id(&run.player.deck, card_id); !found { return .Card_Not_Found, 0 }
 	price, price_ok := shop_removal_price(run)
-	return found && price_ok && run.player.gold >= price
+	if !price_ok { return .Invalid, 0 }
+	if run.player.gold < price { return .Not_Enough_Gold, 0 }
+	return .Removed, price
+}
+
+shop_removal_can_be_bought :: proc(run: ^Run_State, card_id: u32) -> bool {
+	result, _ := shop_removal_purchase_check(run, card_id)
+	return result == .Removed
 }
 
 buy_shop_removal :: proc(run: ^Run_State, card_id: u32) -> Shop_Result {
-	if run == nil || run.phase != .Shop || !validate_shop_state(run) {
-		return .Invalid
-	}
-	if run.shop.removal_used {
-		return .Service_Used
-	}
-	if run.player.deck.owned_count <= MIN_OWNED_CARDS {
-		return .Minimum_Deck_Size
-	}
-	if _, found := owned_card_index_by_id(&run.player.deck, card_id); !found {
-		return .Card_Not_Found
-	}
-	price, price_ok := shop_removal_price(run)
-	if !price_ok {
-		return .Invalid
-	}
-	if run.player.gold < price {
-		return .Not_Enough_Gold
-	}
-
+	result, price := shop_removal_purchase_check(run, card_id)
+	if result != .Removed { return result }
 	staged_deck := run.player.deck
 	if remove_owned_card(&staged_deck, card_id) != .Removed {
 		return .Invalid

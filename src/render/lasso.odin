@@ -297,15 +297,9 @@ update_tactical_lasso :: proc(renderer: ^Renderer, room: ^game.Room) {
 // beat waits for its blow to land.
 lasso_release_waits :: proc(renderer: ^Renderer, foe: game.Entity_Ref) -> bool {
 	batch, found := u32(0), false
-	world := renderer.world_playback
-	for offset in 0..<renderer.timeline.count {
-		cue, ok := presentation_cue_at(&renderer.timeline, offset)
+	for offset in 0..<renderer_queued_cue_count(renderer) {
+		cue, ok := renderer_queued_cue_at(renderer, offset)
 		if ok && cue.kind == .Lasso_Released && cue.event.target == foe { batch, found = cue.batch, true }
-	}
-	if world != nil {
-		for &entry in world.cues[:world.count] {
-			if entry.cue.kind == .Lasso_Released && entry.cue.event.target == foe { batch, found = entry.cue.batch, true }
-		}
 	}
 	if !found { return false }
 	walks, begun := false, false
@@ -314,11 +308,8 @@ lasso_release_waits :: proc(renderer: ^Renderer, foe: game.Entity_Ref) -> bool {
 		walks^ = true
 		if cue.started { begun^ = true }
 	}
-	for offset in 0..<renderer.timeline.count {
-		if cue, ok := presentation_cue_at(&renderer.timeline, offset); ok { note(cue, batch, &walks, &begun) }
-	}
-	if world != nil {
-		for &entry in world.cues[:world.count] { note(&entry.cue, batch, &walks, &begun) }
+	for offset in 0..<renderer_queued_cue_count(renderer) {
+		if cue, ok := renderer_queued_cue_at(renderer, offset); ok { note(cue, batch, &walks, &begun) }
 	}
 	return walks && !begun
 }

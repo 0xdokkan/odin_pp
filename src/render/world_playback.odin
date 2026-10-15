@@ -212,6 +212,28 @@ update_renderer_world_playback :: proc(renderer: ^Renderer, dt: f32) -> bool {
 	return retained == 0
 }
 
+// All buffered cues, foreground first and world second, including cues whose
+// delay has not elapsed. Correlated effects (a release waiting for its move,
+// or a reflected hit following its guard) must inspect these future cues.
+// Drawing still uses the active-only iterator below.
+renderer_queued_cue_count :: proc(renderer: ^Renderer) -> int {
+	if renderer == nil { return 0 }
+	count := renderer.timeline.count
+	if renderer.world_playback != nil { count += renderer.world_playback.count }
+	return count
+}
+
+renderer_queued_cue_at :: proc(renderer: ^Renderer, offset: int) -> (^Presentation_Cue, bool) {
+	if renderer == nil || offset < 0 { return nil, false }
+	foreground := renderer.timeline.count
+	if offset < foreground { return presentation_cue_at(&renderer.timeline, offset) }
+	remaining := offset-foreground
+	if renderer.world_playback != nil && remaining < renderer.world_playback.count {
+		return &renderer.world_playback.cues[remaining].cue, true
+	}
+	return nil, false
+}
+
 // Active cue iteration is shared by sprite poses, ground FX and overlays.
 // Pending waypoints consume no drawing work and cannot hide a player effect.
 renderer_active_cue_count :: proc(renderer: ^Renderer) -> int {
