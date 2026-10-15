@@ -17,6 +17,11 @@ Gameplay_Command_Kind :: enum {
 	Shadow_Emerge,
 	// FERETRO: an arrow loosed at `target` (Ctrl and a left click on a foe).
 	Shoot,
+	// LAZZO: the world's seconds waiting, spun out (a world command, as a beat).
+	Lasso_Spin,
+	// CANNA DA PESCA: the rod cast at the cell `target`, once the room is
+	// cleared (its slot; game/fishing.odin).
+	Fish,
 }
 
 Gameplay_Command :: struct {
@@ -54,8 +59,11 @@ gameplay_command_is_valid :: proc(command: Gameplay_Command) -> bool {
 	case .Activate:
 		return command.origin_phase == .Combat
 	case .Dodge, .Wait, .Ability, .Play_Card, .Refocus, .Timeout, .Continue_Pulse, .Begin_Diagonal, .QTE_Key, .QTE_Fail, .Defense,
-	     .Shadow_Emerge, .Shoot:
+	     .Shadow_Emerge, .Shoot, .Lasso_Spin:
 		return command.origin_phase == .Combat
+	// The rod fishes a room cleared, and nothing else.
+	case .Fish:
+		return command.origin_phase == .Loot && command.target.kind == .Cell
 	}
 	unreachable()
 }

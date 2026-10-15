@@ -237,9 +237,10 @@ place_ground :: proc(room: ^Room, kind: Status_Kind, cell: grid.Position, amount
 
 // Every cell an enemy enters passes here (apply_movement_effect: a step, each
 // cell of a charge, a push or a pull, a teleport's landing): a pool gives its
-// Veleno, a fire its Bruciatura. The player is never touched.
+// Veleno, a fire its Bruciatura. The player is never touched, nor a foe the
+// Lazzo holds in the air.
 trigger_ground_on_entry :: proc(room: ^Room, mover: Entity_Ref, report: ^Action_Report) {
-	if room == nil || report == nil || room.phase != .Combat || mover.kind != .Enemy { return }
+	if room == nil || report == nil || room.phase != .Combat || mover.kind != .Enemy || enemy_is_lassoed(room, mover.id) { return }
 	position, present := entity_position(room, mover)
 	if !present { return }
 	ground_apply_status(room, mover, .Poison, ground_pool_at(room, position), report)
@@ -283,7 +284,8 @@ grow_ground_fires :: proc(room: ^Room, pulse: ^Pulse_Report) {
 	for id, at in ids[:count] {
 		index, _ := enemy_index_by_id(room, id)
 		burn := ground_burn_at(room, room.enemies[index].position)
-		if burning[at] || burn <= 0 { continue }
+		// A foe the Lazzo swings over the floor is out of the fire's reach.
+		if burning[at] || burn <= 0 || enemy_is_lassoed(room, id) { continue }
 		added := add_effect(&action, apply_status_effect(enemy_entity(id), .Burn, burn, 0))
 		assert(added)
 	}

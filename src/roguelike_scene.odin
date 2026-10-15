@@ -1052,10 +1052,12 @@ roguelike_update :: proc(data: rawptr, hf: ^host.Frame) {
 	}
 	// The board's characters are living cards, wherever the board is 3D.
 	render.set_living_cards(&rs.iso_renderer, rs.options.scene_3d)
-	render.set_mechanics_lab(&rs.iso_renderer, rs.options.mechanics_lab)
+	render.set_mechanics_lab(&rs.iso_renderer, rs.options.mechanics_lab, rs.from_launcher)
 	// The game shows seals and ground; the lab compares the displays with F6.
 	if !rs.options.mechanics_lab { rs.iso_renderer.tactical.intent_display = .Both }
 	else if hf.focused && rl.IsKeyPressed(.F6) { render.cycle_intent_display(&rs.iso_renderer) }
+	// F7: the arena cleared for the Canna da Pesca (mechanics_lab_begin_fishing).
+	if rs.options.mechanics_lab && hf.focused && !rs.m8_modal && rl.IsKeyPressed(.F7) { _ = mechanics_lab_begin_fishing(rs) }
 	// Arrivals follow the running board: never paused, in a modal or mid-animation.
 	if rs.options.mechanics_lab && !rs.m8_modal && !rs.tactical_controller.paused && rl.IsWindowFocused() &&
 	   rs.run_state.phase == .In_Room && !render.renderer_timeline_is_busy(&rs.iso_renderer) {
@@ -1760,7 +1762,7 @@ roguelike_draw :: proc(data: rawptr, hf: ^host.Frame) {
 			if rs.tactical_controller.hologram { render.draw_hologram(&rs.iso_renderer, &rs.room) }
 			render.draw_tactical_hud(&rs.iso_renderer, &rs.room, !rs.options.m7_view_smoke && (rs.tactical_controller.paused || !rl.IsWindowFocused()), rs.tactical_controller.hologram)
 		}
-		if rs.options.mechanics_lab { render.draw_mechanics_lab_banner(&rs.iso_renderer, &rs.room, rs.from_launcher) }
+		if rs.options.mechanics_lab { render.draw_mechanics_lab_banner(&rs.iso_renderer, &rs.room) }
 		if rs.options.spell_lab {
 			label: cstring = "DICE PRACTICE / F5 RESTART" if rs.options.dice_lab else "SPELL PRACTICE / F5 RESTART"
 			rl.DrawText(label, 265, 106, 11, rl.Color{172, 219, 222, 255})

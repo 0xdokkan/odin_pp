@@ -184,15 +184,19 @@ piccola cappella costruita con i pezzi del kit, illuminato dalla sua lanterna.
 python tools/art/build_card_icons.py
 ```
 
-Aggiunge ad `assets/gothic/card-icons-pixel.png` una quinta e una sesta riga di
+Aggiunge ad `assets/gothic/card-icons-pixel.png` una quinta, una sesta e una settima riga di
 celle in pixel art disegnate nello script (una griglia di 28x28 lettere di palette
 per icona; oggi la cella 16, Movimento Ombra, la 17, Pozza di Veleno: una fiala
 rovesciata nella sua pozza, la 18, Incendio: un fuoco su una croce bruciata, una
 fiamma in fondo a ogni braccio, la 19, Deflect: uno scudo tondo d'acciaio da cui un
 dardo rimbalza via in una scintilla, la 20, Feretro: una bara di legno scuro con la
 croce d'oro e tre frecce che spuntano dalla testa, la 21, Dado del Destino: un d20
-d'osso con il 20 sulla faccia illuminata in un anello viola, e la 22, Lama Velenosa:
-un pugnale dall'elsa d'oro con il filo verde che gocciola veleno) e lascia
+d'osso con il 20 sulla faccia illuminata in un anello viola, la 22, Lama Velenosa:
+un pugnale dall'elsa d'oro con il filo verde che gocciola veleno, la 23, Lazzo:
+un cappio di canapa intrecciata, aperto, con la corda che scende dal nodo a un
+rotolo e a un capo sfilacciato, e la 24, la prima della settima riga, Canna da Pesca:
+una canna di legno con l'impugnatura di sughero e il mulinello d'acciaio, la lenza
+che scende dalla punta a un galleggiante rosso e bianco su uno stagno blu) e lascia
 identiche, byte per byte, le 16 icone dipinte. Ogni riga aggiunta tiene il passo
 della quinta (314 pixel), così le icone di una riga non si spostano quando se ne
 aggiunge un'altra.
@@ -218,7 +222,15 @@ graffi del ghoul e i pezzetti di carta che volano dalle caselle vuote. Per il
 pavimento (`src/render/ground_fx.odin`): le fiamme dei fuochi di Incendio (due
 disegni grandi per il centro, due più piccoli per i bracci, che si alternano),
 la fiala di Pozza di Veleno in volo, le gocce del suo schizzo e le faville di
-una fiamma calpestata.
+una fiamma calpestata. Per la Canna da Pesca (`src/render/fishing.odin`): la
+canna lunga e sottile con le sue guide, il mulinello e l'impugnatura di
+sughero, il galleggiante rosso e bianco, le gocce d'acqua, il `!`
+dell'abboccata e le prede: un pesce, una mela, una pagnotta, una fetta di
+formaggio, una coscia di carne e il dorso di una carta, bordato d'oro. Per il
+Lazzo (`src/render/lasso.odin`): due sbuffi di polvere di pietra grigia, più
+chiari dove li prende la luce, che si alzano dal muro a ogni schianto. I pezzi
+nuovi si aggiungono in fondo: quelli che ci sono restano dove sono, pixel per
+pixel.
 
 Ogni pezzo è pixel art scritta nello script come righe di lettere di palette,
 nei colori delle figure; lo script aggiunge il contorno d'inchiostro (ogni pixel

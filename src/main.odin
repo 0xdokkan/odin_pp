@@ -105,6 +105,9 @@ create_demo_room :: proc(
 		traps = traps[:trap_count],
 		obstacles = obstacles[:],
 		objects = objects[:],
+		node_kind = node.kind,
+		node_depth = node.depth,
+		room_seed = node.room_seed,
 	})
 }
 
@@ -370,6 +373,63 @@ arrow_shot_command :: proc(room: ^game.Room, renderer: ^render.Renderer, aiming,
 	return {kind = .Shoot, origin_phase = .Combat, target = game.entity_target(foe)}, true, true
 }
 
+// The pointer for the Canna da Pesca's slot this frame.
+Fishing_Input :: struct {
+	mouse: view.Vec2,
+	inside, pressed, released, down, cancel: bool,
+}
+
+// CANNA DA PESCA (game/fishing.odin): once the room is cleared, its slot
+// (render.fishing_slot_bounds) holds the rod as the hand holds a card. A press
+// on it picks the rod up; let go over a cell it may fish, it fishes there, and
+// let go anywhere else it stays chosen, so that a click on such a cell fishes.
+// Esc or a right click puts it back. While the board still shows an action
+// (`spatial` false) nothing is picked up. A press that is the rod's is never
+// a step's as well (`taken`). Pure routing, shared by the scene and the tests.
+poll_fishing_command :: proc(room: ^game.Room, renderer: ^render.Renderer, cards: ^Card_Interaction_State, input: Fishing_Input,
+	spatial: bool) -> (command: Gameplay_Command, has_command, taken: bool) {
+	rod, held := game.fishing_rod(&room.player.deck)
+	if !held || !game.fishing_room_open(room) || game.fishing_casts_left(room) <= 0 {
+		clear_card_interaction(cards)
+		return
+	}
+	// The rod is all there is to hold in a cleared room.
+	if cards.hovered_card_id != rod.id { cards.hovered_card_id = 0 }
+	if cards.selected_card_id != rod.id { cards.selected_card_id = 0 }
+	if cards.dragged_card_id != rod.id { cards.dragged_card_id = 0 }
+	if input.cancel {
+		taken = cards.selected_card_id != 0 || cards.dragged_card_id != 0
+		clear_card_interaction(cards)
+		return
+	}
+	if !spatial { cards.dragged_card_id = 0 }
+	over_slot := input.inside && render.point_in_rectangle(input.mouse, render.fishing_slot_bounds(renderer))
+	cards.hovered_card_id = rod.id if over_slot && cards.dragged_card_id == 0 else 0
+	// The cell under the pointer, when the rod may fish it.
+	fish_at_pointer :: proc(room: ^game.Room, renderer: ^render.Renderer, rod: game.Card_Instance, input: Fishing_Input) -> (Gameplay_Command, bool) {
+		if !input.inside || !render.card_drop_area_contains(renderer, input.mouse) || !renderer.has_hovered_cell ||
+		   game.fishing_target_error(room, renderer.hovered_cell) != .Fished { return {}, false }
+		return {kind = .Fish, origin_phase = .Loot, card_id = rod.id, target = game.cell_target(renderer.hovered_cell)}, true
+	}
+	if cards.dragged_card_id == rod.id {
+		if input.released || !input.down {
+			cards.dragged_card_id, cards.selected_card_id = 0, rod.id
+			command, has_command = fish_at_pointer(room, renderer, rod, input)
+		}
+		return command, has_command, true
+	}
+	if !spatial { return }
+	if over_slot && input.pressed {
+		cards.dragged_card_id, cards.hovered_card_id, cards.selected_card_id = rod.id, 0, 0
+		return {}, false, true
+	}
+	if cards.selected_card_id == rod.id && input.pressed {
+		command, has_command = fish_at_pointer(room, renderer, rod, input)
+		return command, has_command, true
+	}
+	return
+}
+
 poll_walk_command :: proc(phase: game.Room_Phase) -> (Gameplay_Command, bool) {
 	for key, index in ([4]rl.KeyboardKey{.W, .D, .S, .A}) {
 		if key_pressed(key) { return {kind = .Move, origin_phase = phase, direction = game.Move_Direction(index)}, true }
@@ -396,7 +456,13 @@ poll_gameplay_command :: proc(
 		(!renderer.tactical.enabled || !render.m8_hud_contains_point(renderer, room, mouse_canvas))
 	input_deck, input_phase := render.renderer_hand_deck(renderer, room)
 	if input_phase == .Loot {
-		clear_card_interaction(card_interaction)
+		// The room cleared: the Canna da Pesca's slot takes its own presses.
+		fishing := Fishing_Input{mouse = mouse_canvas, inside = mouse_inside, pressed = rl.IsMouseButtonPressed(.LEFT),
+			released = rl.IsMouseButtonReleased(.LEFT), down = rl.IsMouseButtonDown(.LEFT),
+			cancel = rl.IsKeyPressed(.ESCAPE) || rl.IsMouseButtonPressed(.RIGHT)}
+		if fish, has_fish, taken := poll_fishing_command(room, renderer, card_interaction, fishing, spatial_interaction_enabled); taken {
+			return fish, has_fish
+		}
 		return poll_walk_command(.Loot)
 	}
 	if input_phase != .Combat || !input_deck.combat_active {
@@ -565,10 +631,11 @@ capture_gameplay_command_telemetry :: proc(
 		// A shadow step walks from the shadow's cell and never bumps.
 		if game.tactical_shadow_active(room) { resolved_kind = .Move }
 	case .Dodge, .Wait, .Timeout, .Continue_Pulse, .Begin_Diagonal, .QTE_Key, .QTE_Fail, .Defense, .Activate, .Equip,
-	     .Shadow_Emerge:
+	     .Shadow_Emerge, .Lasso_Spin:
 		resolved_kind = .Wait
-	// An arrow is neither a step nor a bump nor a card.
-	case .Ability, .Shoot:
+	// An arrow is neither a step nor a bump nor a card, and the rod's cast is
+	// no card either.
+	case .Ability, .Shoot, .Fish:
 		resolved_kind = .Ability
 	case .Play_Card:
 		resolved_kind = .Play_Card
@@ -621,6 +688,8 @@ execute_gameplay_command :: proc(room: ^game.Room, command: Gameplay_Command) ->
 		execution.committed = game.resolve_qte(room, false)
 	case .Shadow_Emerge:
 		execution.committed = game.tactical_end_shadow(room)
+	case .Lasso_Spin:
+		execution.committed = game.resolve_lasso_spin(room)
 	case .Move:
 		// Inside Movimento Ombra the keys walk the shadow, on its own beats.
 		if game.tactical_shadow_active(room) {
@@ -667,6 +736,10 @@ execute_gameplay_command :: proc(room: ^game.Room, command: Gameplay_Command) ->
 		// Never stamped with a beat: an arrow is never critical.
 		result := game.shoot_player_arrow(room, command.target.entity)
 		execution.committed = result != .Invalid_Phase && result != .Blocked
+		execution.clears_card_interaction = execution.committed
+	case .Fish:
+		report := game.fish_with_rod(room, command.target.cell)
+		execution.committed = report.result == .Fished
 		execution.clears_card_interaction = execution.committed
 	case .Refocus:
 		refocus := game.refocus_player_hand(room)
@@ -720,7 +793,7 @@ commit_gameplay_command :: proc(
 ) -> bool {
 	if room == nil || renderer == nil || card_interaction == nil { return false }
 	world_command := game.tactical_enabled(room) &&
-		(command.kind == .Continue_Pulse || command.kind == .Timeout ||
+		(command.kind == .Continue_Pulse || command.kind == .Timeout || command.kind == .Lasso_Spin ||
 		 command.kind == .Defense || ((command.kind == .QTE_Key || command.kind == .QTE_Fail) && room.qte.kind == .Defense))
 	if world_command {
 		// Reserve a whole event log before mutating gameplay: no committed beat

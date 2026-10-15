@@ -100,7 +100,11 @@ test_dice_cards_climb_the_ladder_from_d4_to_d20 :: proc(t: ^testing.T) {
 	for id in Card_Id {
 		if id == .Count { continue }
 		dice := card_dice_count(id) > 0
-		testing.expect_value(t, card_max_upgrade_level(id), MAX_DICE_UPGRADE_LEVEL if dice else MAX_CARD_UPGRADE_LEVEL)
+		// The Lazzo is no dice card, but its first hit grows five times only;
+		// so do the Canna da Pesca's fishings (its heal stays a d4).
+		top := MAX_DICE_UPGRADE_LEVEL if dice else (LASSO_MAX_UPGRADE_LEVEL if id == .Lasso else MAX_CARD_UPGRADE_LEVEL)
+		if id == .Fishing_Rod { top = FISHING_ROD_MAX_UPGRADE_LEVEL }
+		testing.expect_value(t, card_max_upgrade_level(id), top)
 		for level in i32(-1)..=MAX_CARD_UPGRADE_LEVEL {
 			expected := i32(0)
 			if dice && level >= 0 && level <= MAX_DICE_UPGRADE_LEVEL { expected = ladder[level] }

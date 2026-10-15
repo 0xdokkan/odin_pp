@@ -257,6 +257,7 @@ renderer_presentation_snapshot :: proc(renderer: ^Renderer, room: ^game.Room) ->
 			if result.pulse_count == final.pulse_count { result.pulse_count = shown.pulse_count }
 			if result.relics == final.relics { result.relics = shown.relics }
 			if result.weapon == final.weapon { result.weapon = shown.weapon }
+			if result.fate_sides == final.fate_sides { result.fate_sides = shown.fate_sides }
 			if result.modifier == final.modifier { result.modifier = shown.modifier }
 			merge_foreground_actor(&result.player, shown.player, final.player)
 			for actor in shown.enemies[:shown.enemy_count] {

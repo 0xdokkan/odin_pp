@@ -32,7 +32,8 @@ test_catalog_every_allowed_upgrade_changes_an_instantiated_effect :: proc(t: ^te
 				testing.expect_value(t, card_can_upgrade(card), upgrade < MAX_DICE_UPGRADE_LEVEL)
 				continue
 			}
-			testing.expect_value(t, card_can_upgrade(card), changed)
+			// A card with its own top (the Lazzo's five) sells no level past it.
+			testing.expect_value(t, card_can_upgrade(card), changed && upgrade < card_max_upgrade_level(definition.id))
 		}
 	}
 	testing.expect(t, !card_can_upgrade({}))

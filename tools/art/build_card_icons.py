@@ -7,7 +7,7 @@ library.)
 
 assets/gothic/card-icons-pixel.png holds the 16 painted icons
 (assets/gothic/generation-prompts.md) in four rows of four. This script keeps
-those rows byte for byte and appends a fifth and a sixth row of the same
+those rows byte for byte and appends a fifth, a sixth and a seventh row of the same
 cells, painted here as coarse pixel art in the atlas's style (24-28 square
 pixel units, a few flat colours, a thick near-black outline):
 
@@ -25,6 +25,11 @@ pixel units, a few flat colours, a thick near-black outline):
              violet ring of fate and sparks of gold.
     cell 22  Lama Velenosa: a dagger with a gold guard, its lower edge
              coated green and dripping poison.
+    cell 23  Lazzo: a noose of twisted hemp thrown open, its rope running
+             down from the knot to a coil and a frayed end.
+    cell 24  Canna da Pesca: a wooden rod with a cork grip and a steel reel,
+             its line hanging from the tip to a red and white bobber that
+             floats on a blue pond, ripples round it.
 
 The PNG is read and written here with zlib and struct, never through Blender
 or an image library, so the painted pixels are never resampled or recoloured:
@@ -33,7 +38,8 @@ chunks of the original (its content credentials too) are kept unchanged; they
 describe the painted sheet, so their image hash no longer matches. The same
 atlas in gives the same bytes out, and running the script again rebuilds the
 added rows from scratch. Every added row keeps the fifth row's pitch (314
-pixels), so the icons painted before the sixth row keep their pixels too.
+pixels), so the icons painted before the sixth and the seventh rows keep
+their pixels too.
 
 Options:
     --check        exit 1 if the atlas is not what this script would write
@@ -53,7 +59,7 @@ ATLAS = os.path.join(ROOT, "assets", "gothic", "card-icons-pixel.png")
 
 COLUMNS = 4
 PAINTED_ROWS = 4
-ROWS = 6
+ROWS = 7
 # One pixel unit of the icon, in atlas pixels (the painted icons' own size).
 SCALE = 10
 SIGNATURE = b"\x89PNG\r\n\x1a\n"
@@ -87,6 +93,12 @@ PALETTE = {
     "B": (172, 120, 64, 255),   # light wood: a shaft, a lit plank
     "e": (88, 150, 200, 255),   # the deflection's blue in shade
     "Q": (176, 120, 30, 255),   # gold in shade
+    "h": (196, 158, 96, 255),   # hemp rope
+    "j": (128, 92, 48, 255),    # rope in shade, its twist
+    "k": (232, 208, 154, 255),  # rope in the light; a cork grip
+    "C": (30, 70, 136, 255),    # water's depth
+    "c": (52, 120, 196, 255),   # water
+    "u": (150, 206, 244, 255),  # water's light, its ripples
 }
 
 # Movimento Ombra, 28x28 units, as the Viandante of the figure atlas: his hood
@@ -310,8 +322,78 @@ VENOM_BLADE = (
 )
 
 
+# Phase 3: the Lazzo, a noose of twisted hemp thrown open, its rope running
+# down from the knot to a coil and a frayed end.
+LASSO = (
+    "............................",
+    ".......KKKKKKKKKKK..........",
+    ".....KKKjkkkjkkkjKKK........",
+    "...KKKjkkkjkkkjkkkjKKK......",
+    "..KKjkkkKKKKKKKKKkkkjKK.....",
+    "..KkkkKKK.......KKKkkkK.....",
+    ".KKhjKK...........KKjhKK....",
+    ".KjhhK.............KhhjK....",
+    ".KhhKK.............KKhhK....",
+    ".KjhK...............KhjK....",
+    ".KhhKK.............KKhhK....",
+    ".KjhhK.............KhhjK....",
+    ".KKhjKK..........KKKjhKK....",
+    "..KhhhKKK.......KKjhjhK.....",
+    "..KKjhhhKKKKKKKKKhhjhKK.....",
+    "...KKKjhhhjhhhjhhhjhjKK.....",
+    ".....KKKjhhhjhhhjKKhjhKK....",
+    ".......KKKKKKKKKKKKKhhjK....",
+    "...................KKhhKK...",
+    ".................KKKKhjhK...",
+    "................KKhhjhhhKK..",
+    "...............KKhjhhhjhhK..",
+    "...............KjhhKKKhhjK..",
+    "...............KhhjKKKKhhK..",
+    "...............KKhhhjhhhjK..",
+    "................KKjhhhjKjKK.",
+    ".................KKKKKKjKjK.",
+    "......................KKKKK.",
+)
+
+
+# Phase 3: the Canna da Pesca, the first cell of the seventh row: a wooden
+# rod, its cork grip and steel reel low on the left, its line hanging from the
+# tip to a red and white bobber floating on a blue pond, ripples round it.
+FISHING_ROD = (
+    "............................",
+    "............................",
+    "....................KKKK....",
+    "...................KKnBKK...",
+    "..................KKnBKWK...",
+    ".................KKnnKKWK...",
+    ".................KnnKKKWK...",
+    "................KKnKK.KWK...",
+    "...............KKnKK..KWK...",
+    "..............KKnKK...KWK...",
+    ".............KKnBK....KWK...",
+    "............KKnBKK....KWK...",
+    "...........KKnBKK.....KWK...",
+    "..........KKnBKK......KWK...",
+    ".........KKnBKK.......KWK...",
+    "........KKnnBK........KWK...",
+    "....KKKKKnnBKK........KWKK..",
+    "....KHHMnnBKK........KKRRKK.",
+    "....KHKMmBKK.KKKKKKKKKRFRRK.",
+    "....KKmmBKKKKKcccccuccRRRRK.",
+    "...KKjjkKKKKccccccuccuIIIIKK",
+    "..KKjjkkK.KcccccccucuccIIcuK",
+    ".KKjjkkKK.KcccccccuccuucuucK",
+    ".KjjkkKK..KCCccccccccccccCCK",
+    ".KjkkKK...KKCCccccccccccCCKK",
+    ".KKkKK.....KKKCCCCccCCCCKKK.",
+    "..KKK........KKKKKKKKKKKK...",
+    "............................",
+)
+
+
 # The hand-made cells of the added rows, by atlas cell.
-ICONS = {16: SHADOW_STEP, 17: POISON_POOL, 18: WILDFIRE, 19: DEFLECT, 20: COFFIN, 21: FATE_DICE, 22: VENOM_BLADE}
+ICONS = {16: SHADOW_STEP, 17: POISON_POOL, 18: WILDFIRE, 19: DEFLECT, 20: COFFIN, 21: FATE_DICE, 22: VENOM_BLADE, 23: LASSO,
+         24: FISHING_ROD}
 
 
 def chunk(kind, body):

@@ -955,3 +955,109 @@ def pilgrim_shadow_rise(seed):
         (0.36, settle, 0.1), (0.36, still, 0.12),
     ])
     return _finish(x, D, tail=0.08)
+
+
+# --------------------------------------------------------------------------
+# The rope and the rod (Phase 3): hemp running through his glove, water
+
+def _rope(dur, seed, env, centre=1500.0, q=0.6, rate=260.0):
+    """Hemp rope running through his glove: a fibrous rasp (noise through a
+    mid band) roughened by stick-slip catches, following `env`, with a few
+    fibre ticks."""
+    n = n_samples(dur)
+    e = pad_to(np.asarray(env, float), dur)
+    en = e / (np.max(e) + 1e-9)
+    catches = np.abs(lowpass(np.abs(crackle(dur, rate * en + 1, seed, decay=0.0015)), 900, 1))
+    texture = 0.25 + 0.75 * _norm(catches) ** 0.7
+    body = bandpass(pink(dur, seed + 1) + 0.5 * white(dur, seed + 2), centre, q)
+    fib = _band(crackle(dur, 30 + 400 * en, seed + 3, decay=0.0004), 2000, 6000)
+    return (_norm(body) * texture + 0.15 * _norm(fib))[:n] * en
+
+
+def _plip(f0, length, rise=0.6):
+    """A drop's tight plip, or a small bubble closing: a short damped sine
+    whose pitch rises as it decays (a sharp onset)."""
+    t = time_axis(length)
+    f = f0 * (1 + rise * t / length)
+    return np.sin(2 * np.pi * np.cumsum(f) / SR) * np.clip(t / 0.0008, 0, 1) * np.exp(-t / (length * 0.25))
+
+
+def _splash(dur, seed, size=1.0, drops=14, spread=0.4):
+    """Water broken: a wet burst (noise 250 Hz-6 kHz, its brightest part dying
+    first), a few bubbles closing, and drops raining back for `spread` s."""
+    r = rng(seed)
+    burst = _band(white(dur, seed) + pink(dur, seed + 1), 250, 6000) * _env_ad(dur, 0.002, 0.03 * size)
+    burst = sweep_lowpass(burst, 7000, 1500)
+    events = []
+    for _ in range(drops):
+        t0 = 0.02 + spread * r.random() ** 1.6
+        drop = _plip(r.uniform(1400, 3800), r.uniform(0.012, 0.025), r.uniform(0.3, 0.9))
+        events.append((t0, drop, r.uniform(0.15, 0.45) * (1 - 0.6 * (t0 - 0.02) / spread)))
+    for k in range(3):
+        events.append((0.008 + 0.03 * k, _plip(r.uniform(380, 900), 0.06, 0.5), 0.5 / (1 + k)))
+    return _norm(burst) + place(dur, events)
+
+
+@sound("pilgrim_lasso_throw", loudness=-19, wet=0.22, marks=(0.0, 0.04, 0.53))
+def pilgrim_lasso_throw(seed):
+    """LAZZO thrown: his arm lets the loop go at 0.0 in a full round whoosh
+    peaking at 0.04 (the cloak flicks with it, the lantern knocks once on its
+    chain), then the rope pays out through his glove: a fibrous hemp rasp,
+    fast at first and slowing as the loop flies, under the loop's own whistle
+    falling away (doppler down, darker as it goes) until it drops over the foe
+    at 0.53 (world_lasso_wrap)."""
+    D = 0.62
+    arm = _whoosh(0.24, seed, 320, 1500, 650, peak_at=0.17, q=1.0, power=1.6, tone=0.25)
+    flick = _cloak(0.2, seed + 1, env_points(0.2, [(0, 0), (0.03, 1.0), (0.2, 0)]), lo=400, hi=1400)
+    pay = env_points(D, [(0, 0), (0.03, 0.0), (0.06, 1.0), (0.3, 0.55), (0.5, 0.2), (0.56, 0.0), (D, 0.0)])
+    rope = _rope(D, seed + 2, pay, centre=1600, q=0.6, rate=320)
+    loop = sweep_lowpass(_whoosh(0.5, seed + 3, 2200, 1900, 650, peak_at=0.12, q=1.8, power=1.4, tone=0.55), 9000, 1800)
+    lantern = _lantern(seed + 4, [(0.03, 0.6)], glass=0.15, dur=0.3)
+    x = place(D, [(0.0, arm, 0.7), (0.0, flick, 0.18), (0.0, rope, 0.4), (0.04, loop, 0.32), (0.0, lantern, 0.12)])
+    return _finish(x, D, tail=0.03)
+
+
+@sound("pilgrim_reel", loudness=-20, wet=0.22, marks=(0.0, 0.1, 0.45))
+def pilgrim_reel(seed):
+    """CANNA DA PESCA reeled in: he cranks the reel hard, its pawl clicking
+    about 26 times a second over the gears' dry whirr (0.0-0.45), the cane
+    creaking under the load; the catch breaks the water at 0.10 (a heavy wet
+    burst and a gush of drops raining back down to 0.5), the taut line
+    singing thin."""
+    D = 0.7
+    r = rng(seed)
+    t = time_axis(D)
+    events = []
+    tt, k = 0.0, 0
+    while tt < 0.45:
+        f = r.uniform(2900, 3500)
+        click = _modes(0.03, [(f, 0.004, 1.0), (f * 1.53, 0.003, 0.6), (f * 2.4, 0.002, 0.35)], seed=seed + 10 + k)
+        events.append((tt, _norm(click), r.uniform(0.55, 1.0)))
+        tt += r.uniform(0.034, 0.042)
+        k += 1
+    pawl = place(D, events)
+    turning = env_points(D, [(0, 0), (0.02, 1.0), (0.42, 0.8), (0.47, 0.0), (D, 0.0)])
+    gears = _band(white(D, seed + 2), 900, 3200) * (0.5 + 0.5 * np.sin(2 * np.pi * 26 * t) ** 2) * turning
+    cane = _creak(0.42, seed + 3, f0=38, f1=62, center=820, q=2.2)
+    splash = _splash(0.6, seed + 4, size=1.3, drops=18, spread=0.38)
+    sing = _band(white(0.3, seed + 5), 5000, 9000) * _env_ad(0.3, 0.01, 0.08)
+    x = place(D, [(0.0, pawl, 0.32), (0.0, _norm(gears), 0.12), (0.02, cane, 0.18), (0.1, splash, 0.75),
+                  (0.0, sing, 0.06)])
+    return _finish(x, D, tail=0.04)
+
+
+@sound("pilgrim_catch", loudness=-21, wet=0.2, marks=(0.0,))
+def pilgrim_catch(seed):
+    """CANNA DA PESCA: the catch lands in his hand at 0.0: a soft wet slap on
+    the leather glove (a muffled body under a little splat), a few drops
+    falling off it onto the stone, his cloak settling."""
+    D = 0.45
+    r = rng(seed + 3)
+    slap = _slap(0.1, seed, lo=600, hi=5000, tau=0.007)
+    body = _thump(0.18, seed + 1, 150, 0.022, drop=0.5, attack=0.001, lp=600, sat=1.5)
+    glove = _band(pink(0.1, seed + 2), 400, 1600) * _env_ad(0.1, 0.002, 0.02)
+    drops = [(0.05 + 0.25 * r.random() ** 1.3, _plip(r.uniform(1500, 3200), r.uniform(0.012, 0.02), 0.5),
+              r.uniform(0.1, 0.3)) for _ in range(6)]
+    settle = _cloak(0.2, seed + 4, env_points(0.2, [(0, 0), (0.04, 1), (0.2, 0)]), lo=350, hi=900)
+    x = place(D, [(0.0, slap, 0.45), (0.0, body, 0.6), (0.0, glove, 0.25), (0.06, settle, 0.08)] + drops)
+    return _finish(x, D, tail=0.03)

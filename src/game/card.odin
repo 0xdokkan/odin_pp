@@ -66,6 +66,8 @@ Card_Id :: enum {
 	Coffin,
 	Fate_Dice,
 	Venom_Blade,
+	Lasso,
+	Fishing_Rod,
 	Count,
 }
 
@@ -78,10 +80,18 @@ card_is_scopa :: proc(id: Card_Id) -> bool {
 // Movimento Ombra stops the tactical clock, which classic combat does not
 // have; a pool and a fire live on the tactical board's ground and windows
 // (ground.odin); the player's charges load the tactical blows, arrows and
-// windows (player_charges.odin): classic runs never offer them, and refuse to
-// play them.
+// windows (player_charges.odin); the Lazzo spins on the world's running
+// seconds (lasso.odin); the Canna da Pesca fishes the tactical room once it is
+// cleared (fishing.odin): classic runs never offer them, and refuse to play them.
 card_requires_tactical :: proc(id: Card_Id) -> bool {
-	return id == .Shadow_Step || card_places_ground(id) || card_loads_player_charge(id)
+	return id == .Shadow_Step || card_places_ground(id) || card_loads_player_charge(id) || id == .Lasso || id == .Fishing_Rod
+}
+
+// The Canna da Pesca: a room-end tool, never drawn in a fight (begin_deck_combat
+// leaves it in Exhaust) and never played as a card; its own slot casts it once
+// the room is cleared (fishing.odin).
+card_is_room_tool :: proc(id: Card_Id) -> bool {
+	return id == .Fishing_Rod
 }
 
 // Deflect, Feretro, Dado del Destino and Lama Velenosa: each loads one of the
@@ -98,8 +108,12 @@ card_dice_count :: proc(id: Card_Id) -> int {
 	return 0
 }
 
-// A dice card's upgrades climb the dice ladder and stop at its top.
+// A dice card's upgrades climb the dice ladder and stop at its top; the
+// Lazzo's raise its first hit five times at most, the Canna da Pesca's its
+// fishings a room (its heal stays a d4: it is no dice card).
 card_max_upgrade_level :: proc(id: Card_Id) -> i32 {
+	if id == .Lasso { return LASSO_MAX_UPGRADE_LEVEL }
+	if id == .Fishing_Rod { return FISHING_ROD_MAX_UPGRADE_LEVEL }
 	return MAX_DICE_UPGRADE_LEVEL if card_dice_count(id) > 0 else MAX_CARD_UPGRADE_LEVEL
 }
 
@@ -128,6 +142,8 @@ Card_Compile_Error :: enum {
 	Invalid_Target,
 	Target_Out_Of_Range,
 	Target_Blocked,
+	// LAZZO: a boss or a miniboss is too heavy to lasso (lasso.odin).
+	Target_Too_Heavy,
 	No_Effects,
 	Too_Many_Effects,
 }
@@ -957,6 +973,26 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 		effects = {{kind = .Apply_Status, target = .Player, base_amount = 1, status = .Venom_Blade}, {}, {}, {}},
 		effect_count = 1,
 	},
+	{
+		// LAZZO: one foe in reach is caught, lifted and swung round the player
+		// (lasso.odin). Its amount is the first hit's number: 1 (+1 per upgrade,
+		// +1 on the tick); every next hit strikes one harder.
+		id = .Lasso, name = "Lazzo", rarity = .Rare,
+		reward_weight = 60, shop_base_price = 8, cost = 2,
+		targeting = {rule = .Opponent, cast_range = {.Chebyshev, 1, LASSO_RANGE}, shape = .Single, requires_line_of_sight = true, stops_on_wall = true},
+		effects = {{kind = .Lasso, target = .Chosen_Entity, base_amount = 1, amount_per_upgrade = 1}, {}, {}, {}},
+		effect_count = 1,
+	},
+	{
+		// CANNA DA PESCA: never in the hand; once the room is cleared it fishes a
+		// free cell in reach, turned to water, from its own slot (fishing.odin).
+		// Its amount is the room's fishings: 1 (+1 per upgrade). At most one a run.
+		id = .Fishing_Rod, name = "Canna da Pesca", rarity = .Uncommon,
+		reward_weight = 70, shop_base_price = 5, cost = 0,
+		targeting = {rule = .Walkable_Cell, cast_range = {.Chebyshev, 1, FISHING_RANGE}, shape = .Single, requires_line_of_sight = true, stops_on_wall = true},
+		effects = {{kind = .Fish, target = .Player, base_amount = 1, amount_per_upgrade = 1}, {}, {}, {}},
+		effect_count = 1,
+	},
 }
 
 card_drop_target :: proc(
@@ -1039,6 +1075,14 @@ card_effect_template_is_valid :: proc(
 	case .Enter_Shadow:
 		return template.target == .Player && definition.targeting.rule == .Self &&
 		       template.amount_per_upgrade == 0 && card_amount_template_is_valid(template)
+	// One foe chosen on its cell; the amount is the first hit's number.
+	case .Lasso:
+		return template.target == .Chosen_Entity && definition.targeting.rule == .Opponent &&
+		       definition.targeting.shape == .Single && card_amount_template_is_valid(template)
+	// A cell to fish; the amount is the room's fishings.
+	case .Fish:
+		return template.target == .Player && definition.targeting.rule == .Walkable_Cell &&
+		       definition.targeting.shape == .Single && card_amount_template_is_valid(template)
 	case .Place_Ground:
 		// Its stacks are given on entry: no duration.
 		return template.target == .Player && definition.targeting.rule == .Walkable_Cell &&
@@ -1252,6 +1296,11 @@ instantiate_card_effect :: proc(
 		return enter_shadow_effect(card_effect_amount(template, instance.upgrade_level)), true
 	case .Place_Ground:
 		return place_ground_effect({}, template.status, card_effect_amount(template, instance.upgrade_level)), true
+	case .Lasso:
+		return lasso_effect(target, card_effect_amount(template, instance.upgrade_level)), true
+	// The rod's fishings, as its amount says; no action ever applies it.
+	case .Fish:
+		return {kind = .Fish, target = target, amount = card_effect_amount(template, instance.upgrade_level)}, true
 	case .Move, .Gain_Energy:
 			return {}, false
 	}
@@ -1424,7 +1473,8 @@ evaluate_card_targeting :: proc(
 	if !validate_card_instance(instance) {
 		return
 	}
-	if card_requires_tactical(instance.definition_id) && !tactical_enabled(room) {
+	// The Canna da Pesca is no card to play: its slot fishes (fishing.odin).
+	if (card_requires_tactical(instance.definition_id) && !tactical_enabled(room)) || card_is_room_tool(instance.definition_id) {
 		evaluation.error = .Invalid_Phase
 		return
 	}
@@ -1446,6 +1496,13 @@ evaluate_card_targeting :: proc(
 	if card_places_ground(instance.definition_id) && !ground_can_place(room, definition.effects[0].status, evaluation.query.anchor) {
 		evaluation.error = .Target_Blocked
 		return
+	}
+	// LAZZO: never a boss's weight, and a ring with room to swing the foe.
+	if instance.definition_id == .Lasso {
+		if refusal := lasso_target_error(room, evaluation.query.primary_target); refusal != .None {
+			evaluation.error = refusal
+			return
+		}
 	}
 
 	if tactical_enabled(room) {

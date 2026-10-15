@@ -53,6 +53,30 @@ Game_Event_Kind :: enum {
 	// lands on `target`; `duration` is its Fate_Outcome, `amount` the stacks it
 	// left or the life it stole.
 	Fate_Rolled,
+	// LAZZO (lasso.odin): the rope caught `target` at from_position and pulled
+	// it, off the floor, onto its ring at to_position; `amount` is the ring's
+	// radius, `duration` the first hit's number.
+	Lasso_Caught,
+	// LAZZO: the swung foe (`source`) struck `target`, a foe on the ring cell
+	// it entered (from_position = to_position), or smashed into the solid cell
+	// to_position (`target` SYSTEM_ENTITY): hit number `amount`.
+	Lasso_Struck,
+	// LAZZO: the player moved and let go; the held foe (`target`) fell from
+	// the cell under it (from_position) onto to_position. `amount` is the turns
+	// it was swung, `duration` its hits.
+	Lasso_Released,
+	// CANNA DA PESCA (fishing.odin): the player at from_position casts his rod
+	// (card_id, card_upgrade_level) at the cell to_position; `duration` is 1
+	// when the cell turns to water now, `amount` the room's fishings left.
+	Fish_Cast,
+	// The bobber floats on the water (from_position = to_position) and a fish
+	// bites.
+	Fish_Bite,
+	// The catch reeled out of the water (from_position) to the player
+	// (to_position): food (card_definition the rod, `duration` its
+	// Fishing_Food; its d4 and the cure follow), or a card added to the run
+	// deck (card_definition and card_id the new card).
+	Fish_Caught,
 }
 
 Game_Event :: struct {
@@ -122,6 +146,20 @@ EVENT_REFLECTED_BIT :: u16(1)<<11
 
 event_is_reflected :: proc(event: Game_Event) -> bool {
 	return event.area_mask&EVENT_REFLECTED_BIT != 0
+}
+
+// The two bits below mark the LAZZO's own wounds (lasso.odin): the player's
+// damage that no blow of his swings (his card keeps spinning), and among them
+// the 1 of a full turn (a small token, no flinch on the swung card).
+EVENT_LASSO_BIT :: u16(1)<<10
+EVENT_LASSO_TURN_BIT :: u16(1)<<9
+
+event_is_lasso :: proc(event: Game_Event) -> bool {
+	return event.area_mask&EVENT_LASSO_BIT != 0
+}
+
+event_is_lasso_turn :: proc(event: Game_Event) -> bool {
+	return event.area_mask&(EVENT_LASSO_BIT|EVENT_LASSO_TURN_BIT) == EVENT_LASSO_BIT|EVENT_LASSO_TURN_BIT
 }
 
 event_is_attack :: proc(event: Game_Event) -> bool {

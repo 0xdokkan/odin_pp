@@ -123,18 +123,20 @@ tactical_enabled :: proc(room: ^Room) -> bool {
 }
 
 // `ignore_busy` asks whether an action would be allowed once the player's
-// own timed action has finished (the dodge, which cuts that action short).
+// own timed action has finished (the dodge, which cuts that action short, and
+// lets the Lazzo's rope go: lasso.odin).
 tactical_allows_action :: proc(room: ^Room, ignore_busy := false) -> bool {
 	if !tactical_enabled(room) || room.phase != .Combat { return true }
 	s := &room.player.tactical
 	return !room.tactical_pulse.pending && room.qte.kind == .None && s.remaining > 0 && s.cast_remaining <= 0 &&
-	       s.phase == .Decision && (ignore_busy || s.action_remaining <= 0)
+	       s.phase == .Decision && (ignore_busy || (s.action_remaining <= 0 && !room.lasso.active))
 }
 
-// The player is still performing a timed action, or a shadow step.
+// The player is still performing a timed action, or a shadow step, or swings
+// the Lazzo's foe round him (he is its pivot).
 tactical_player_busy :: proc(room: ^Room) -> bool {
 	return tactical_enabled(room) && room.phase == .Combat &&
-	       (room.player.tactical.action_remaining > 0 || tactical_shadow_step_busy(room))
+	       (room.player.tactical.action_remaining > 0 || tactical_shadow_step_busy(room) || room.lasso.active)
 }
 
 tactical_is_recovering :: proc(room: ^Room) -> bool {
@@ -155,13 +157,14 @@ tactical_allows_cards :: proc(room: ^Room) -> bool {
 	if tactical_allows_action(room) { return true }
 	if !tactical_is_stunned(room) { return false }
 	s := &room.player.tactical
-	return !room.tactical_pulse.pending && room.qte.kind == .None && s.remaining > 0 && s.cast_remaining <= 0
+	return !room.tactical_pulse.pending && room.qte.kind == .None && s.remaining > 0 && s.cast_remaining <= 0 &&
+	       !room.lasso.active
 }
 
 tactical_allows_movement :: proc(room: ^Room, ignore_busy := false) -> bool {
 	if !tactical_is_recovering(room) { return tactical_allows_action(room, ignore_busy) }
 	return !room.tactical_pulse.pending && room.qte.kind == .None &&
-	       (ignore_busy || room.player.tactical.action_remaining <= 0)
+	       (ignore_busy || (room.player.tactical.action_remaining <= 0 && !room.lasso.active))
 }
 
 // Called only after a new room has been successfully built. Keep configuration
@@ -201,6 +204,8 @@ tactical_end_combat :: proc(room: ^Room) {
 	tactical_reset_shadow(s)
 	room.tactical_pulse = {}
 	room.qte = {}
+	// A fight over (the player fallen, or the room cleared) holds no rope.
+	room.lasso = {}
 }
 
 tactical_finish_cycle_pulse :: proc(room: ^Room, forced: bool) {
@@ -253,6 +258,8 @@ tactical_tick :: proc(room: ^Room, dt: f32, available: bool, hologram: bool) -> 
 	before := s.clock_fraction
 	tactical_advance_clock(room, elapsed)
 	tactical_note_beat_time(s, before, elapsed)
+	// The Lazzo spins on the same seconds; the controller spins them out.
+	tactical_lasso_tick(room, elapsed)
 	s.metrics.decision_seconds += f64(elapsed)
 	if hologram { s.metrics.hologram_seconds += f64(elapsed) }
 	if tactical_between_windows(s) { tactical_finish_recovery(room); return false }
@@ -278,7 +285,8 @@ continue_tactical_pulse :: proc(room: ^Room) -> bool {
 		for protect_pass in 0..<2 {
 			for id in ids[:count] {
 				index, found := enemy_index_by_id(room, id)
-				if !found { continue }
+				// A foe the Lazzo holds in the air does nothing.
+				if !found || enemy_is_lassoed(room, id) { continue }
 				// Stagger interrupts committed telegraphs before its status expires,
 				// even when this enemy's ordinary cadence is not due yet.
 				if room.enemies[index].tactical_cooldown > 0 && !enemy_is_staggered(room, &room.enemies[index]) { continue }

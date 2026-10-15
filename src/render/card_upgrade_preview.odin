@@ -36,6 +36,10 @@ card_upgrade_preview :: proc(card: game.Card_Instance, tactical: bool = false) -
 		case .Apply_Status: label = "FRECCE" if template.status == .Arrows else game.status_kind_name(template.status)
 		case .Add_Reaction_Binding: label = "COUNTER"
 		case .Place_Ground: label = "VELENO" if template.status == .Poison else "BRUCIATURA"
+		// LAZZO: the first hit's number (each next one strikes one harder).
+		case .Lasso: label = "PRIMO COLPO"
+		// CANNA DA PESCA: the room's fishings (its heal stays a d4).
+		case .Fish: label = "PESCHE"
 		case .Move, .Remove_Status, .Enter_Shadow:
 		}
 		before := game.card_effect_amount(template, card.upgrade_level)

@@ -15,14 +15,17 @@ tactical_card_time_cost :: proc(id: Card_Id) -> f32 {
 	     .Calculated_Risk, .Spark_Forge, .Spark, .Purifying_Guard, .Volatile_Study, .Sei_Denari, .Sette_Denari,
 	     .Poison_Pool, .Deflect, .Coffin, .Fate_Dice, .Venom_Blade:
 		return 1
-	case .Strike, .Arc_Bolt, .Shove, .Dash, .Grappling_Hook, .Venom_Needle, .Fate_Strike, .Tesla_Coil, .Wildfire:
+	// The Lazzo's two seconds are its throw; the spin after it runs on the
+	// world's own seconds (lasso.odin).
+	case .Strike, .Arc_Bolt, .Shove, .Dash, .Grappling_Hook, .Venom_Needle, .Fate_Strike, .Tesla_Coil, .Wildfire, .Lasso:
 		return 2
 	case .Piercing_Ray, .Cross_Slash, .Heavy_Blow, .Sundering_Blow, .Twin_Venom, .Shock_Floor, .Titan_Grip:
 		return 3
 	case .Firebomb, .Toxic_Wave, .Caustic_Bloom, .Chain_Lightning, .Prismatic_Barrage, .Storm_Crown:
 		return 4
 	// Movimento Ombra takes no window time: its four seconds stand outside it.
-	case .Shadow_Step, .Count:
+	// The Canna da Pesca fishes a cleared room, with no window to take from.
+	case .Shadow_Step, .Fishing_Rod, .Count:
 		return 0
 	}
 	return 0

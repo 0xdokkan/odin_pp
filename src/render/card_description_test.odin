@@ -1,5 +1,6 @@
 package render
 
+import "core:fmt"
 import "core:testing"
 import game "../game"
 
@@ -28,6 +29,8 @@ test_card_descriptions_preserve_classic_and_tactical_rules :: proc(t: ^testing.T
 		{.Coffin, "6 FRECCE", "SOLO TATTICA", "6 FRECCE / CTRL+CLIC", "1 DANNO + 1 STATUS"},
 		{.Fate_Dice, "1d10 SU 3 COLPI", "SOLO TATTICA", "1d10 SU 3 COLPI", "UN TIRO A OGNI COLPO"},
 		{.Venom_Blade, "1d10 COLPI AVVELENATI", "SOLO TATTICA", "1d10 COLPI AVVELENATI", "2 VELENO A COLPO"},
+		// LAZZO: the hits grow from the first (1, +1 a level); a turn costs 1.
+		{.Lasso, "COLPI 4, 5, 6...", "SOLO TATTICA", "COLPI 4, 5, 6...", "-1 VITA A OGNI GIRO"},
 	}
 	for row in cases {
 		card := game.Card_Instance{definition_id = row.id, upgrade_level = 3}
@@ -83,7 +86,9 @@ test_card_descriptions_keep_special_dice_rules_and_visibility :: proc(t: ^testin
 }
 
 // Seven or eight cards in hand: the cards whose lines would shrink or be cut
-// there say them shorter, the rest keep theirs; the classic face of a
+// there say them shorter, the rest keep theirs, and the names that would be
+// cut there are shorter too (the lab's smoke measures them all at the hand's
+// real width: tactical_card_text_misfit); the classic face of a
 // tactical-only card reads the catalog like the hand.
 @(test)
 test_card_descriptions_shorten_for_a_narrow_hand :: proc(t: ^testing.T) {
@@ -93,9 +98,14 @@ test_card_descriptions_shorten_for_a_narrow_hand :: proc(t: ^testing.T) {
 		first, second: string,
 	}{
 		{.Shadow_Step, 0, "OMBRA 4s", "MONDO FERMO"},
-		{.Wildfire, 2, "3 BRUCIATURA", "CROCE: +1 A FINESTRA"},
-		{.Coffin, 1, "4 FRECCE", "CTRL+CLIC: 1 DANNO"},
-		{.Venom_Blade, game.MAX_DICE_UPGRADE_LEVEL, "1d20 COLPI", "2 VELENO A COLPO"},
+		{.Poison_Pool, 1, "3 VELENO", "A OGNI CELLA"},
+		{.Wildfire, 2, "3 BRUCIATURA", "CRESCE A CROCE"},
+		{.Deflect, 0, "+1 RIFLESSO", "IL COLPO TORNA"},
+		{.Coffin, 1, "4 FRECCE", "CTRL+CLIC"},
+		{.Fate_Dice, 3, "1d10 A COLPO", "PER 3 COLPI"},
+		{.Venom_Blade, game.MAX_DICE_UPGRADE_LEVEL, "1d20 COLPI", "2 VELENO L'UNO"},
+		{.Lasso, 0, "COLPI 1, 2...", "-1 VITA A GIRO"},
+		{.Fishing_Rod, 0, "1 PESCA", "CIBO d4 O CARTA"},
 		{.Shock_Floor, 0, "1d4 COLPI + BERS.", "1 DANNO / 3X3"},
 		{.Tesla_Coil, 0, "8 / DIST. DANNI", "CAMPO USA 4 TESLA"},
 	}
@@ -105,9 +115,25 @@ test_card_descriptions_shorten_for_a_narrow_hand :: proc(t: ^testing.T) {
 		testing.expect_value(t, string(first), row.first)
 		testing.expect_value(t, string(second), row.second)
 	}
-	for id in ([?]game.Card_Id{.Strike, .Poison_Pool, .Deflect, .Fate_Dice}) {
+	for id in ([?]game.Card_Id{.Strike, .Guard}) {
 		_, _, found := gothic_card_narrow_lines({definition_id = id}, true)
 		testing.expectf(t, !found, "%v shortens its lines", id)
+	}
+	// The narrow names, an upgrade after them; a wide card, and the cards
+	// whose names hold, keep the whole name.
+	names := [?]struct {
+		id: game.Card_Id,
+		name: string,
+	}{{.Shadow_Step, "Ombra"}, {.Poison_Pool, "Pozza"}, {.Fate_Dice, "Dado"}, {.Venom_Blade, "Lama"}, {.Fishing_Rod, "Canna"}}
+	for row in names {
+		definition, _ := game.card_definition_by_id(row.id, true)
+		testing.expect_value(t, string(tactical_card_face_title({definition_id = row.id}, definition, 109)), row.name)
+		testing.expect_value(t, string(tactical_card_face_title({definition_id = row.id, upgrade_level = 2}, definition, 109)), fmt.tprintf("%s +2", row.name))
+		testing.expect_value(t, string(tactical_card_face_title({definition_id = row.id}, definition, 166)), definition.name)
+	}
+	for id in ([?]game.Card_Id{.Lasso, .Wildfire, .Deflect, .Coffin}) {
+		_, found := gothic_card_narrow_name(id)
+		testing.expectf(t, !found, "%v shortens its name", id)
 	}
 	for id in game.Card_Id {
 		if id == .Count || !game.card_requires_tactical(id) { continue }

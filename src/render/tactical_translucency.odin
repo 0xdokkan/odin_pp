@@ -9,11 +9,15 @@ import grid "../grid"
 import view "../view"
 
 Tactical_Alpha_Entry :: struct {
-	kind: enum {Sprite, Wall, Attack, Ground},
+	kind: enum {Sprite, Wall, Attack, Ground, Lasso, Fishing},
 	// An Attack entry: its blow's slot in Attack_Fx_State.
 	attack: i32,
 	// A Ground entry: its flame's cell, or past the cells its splash (ground_fx.odin).
 	ground: i32,
+	// A Lasso entry: a piece of its rope, a half of its loop or a hit's star (lasso.odin).
+	lasso: i32,
+	// A Fishing entry: the rod and its line, the bobber, or the catch (fishing.odin).
+	fishing: Fishing_Piece,
 	key: Sprite_Key,
 	entity: game.Entity_Ref,
 	position: view.Vec2,
@@ -84,6 +88,8 @@ collect_tactical_translucents :: proc(renderer: ^Renderer, room: ^game.Room = ni
 	}
 	if room != nil { collect_attack_fx_entries(renderer, entries) }
 	if room != nil { collect_ground_entries(renderer, room, entries) }
+	if room != nil { collect_lasso_entries(renderer, entries) }
+	if room != nil { collect_fishing_entries(renderer, entries) }
 	// The hologram intentionally supplies no room: its own miniature walls
 	// remain in the table pass, and it only needs sorted actor billboards.
 	if room != nil {
@@ -122,6 +128,12 @@ draw_tactical_billboards :: proc(renderer: ^Renderer, room: ^game.Room = nil, li
 		} else if entry.kind == .Ground {
 			if walls_active { rl.EndShaderMode(); walls_active = false }
 			draw_ground_entry(renderer, entry)
+		} else if entry.kind == .Lasso {
+			if walls_active { rl.EndShaderMode(); walls_active = false }
+			draw_lasso_entry(renderer, entry)
+		} else if entry.kind == .Fishing {
+			if walls_active { rl.EndShaderMode(); walls_active = false }
+			draw_fishing_entry(renderer, entry)
 		} else {
 			if walls_active { rl.EndShaderMode(); walls_active = false }
 			tactical_billboard(renderer, entry.key, entry.position, entry.opacity, entry.entity)

@@ -13,15 +13,19 @@ import render "render"
 
 // PROVA MECCANICHE: a sandbox for trying mechanics one at a time. A large
 // arena with no cover, a deck made only of the cards under test (one
-// Movimento Ombra and one of each card of Phase 2: Pozza di Veleno, Incendio,
-// Deflect, Feretro, Dado del Destino, Lama Velenosa) and enemies that never
-// stop coming (game/sandbox.odin). It never touches the profile, gives no
-// rewards and has no exit to walk to.
+// Movimento Ombra, one of each card of Phase 2: Pozza di Veleno, Incendio,
+// Deflect, Feretro, Dado del Destino, Lama Velenosa, and the Lazzo and the
+// Canna da Pesca of Phase 3) and enemies that never stop coming
+// (game/sandbox.odin). F7 clears the arena at once for the rod
+// (mechanics_lab_begin_fishing); F5 brings the fight back. It never touches
+// the profile, gives no rewards and has no exit to walk to.
 MECHANICS_LAB_WIDTH :: 23
 MECHANICS_LAB_HEIGHT :: 17
-MECHANICS_LAB_DECK :: [7]game.Card_Id{.Shadow_Step, .Poison_Pool, .Wildfire, .Deflect, .Coffin, .Fate_Dice, .Venom_Blade}
-// The whole deck in hand: every card under test can be tried at once.
-MECHANICS_LAB_RULES :: game.Deck_Rules{hand_size = len(MECHANICS_LAB_DECK), max_energy = 12, energy_regen_per_pulse = 3}
+MECHANICS_LAB_DECK :: [9]game.Card_Id{.Shadow_Step, .Poison_Pool, .Wildfire, .Deflect, .Coffin, .Fate_Dice, .Venom_Blade, .Lasso, .Fishing_Rod}
+// The whole deck in hand, every card under test at once, but for the Canna da
+// Pesca: it never comes to hand (it waits in Exhaust for a cleared room).
+MECHANICS_LAB_RULES :: game.Deck_Rules{hand_size = len(MECHANICS_LAB_DECK)-1, max_energy = 12, energy_regen_per_pulse = 3}
+#assert(len(MECHANICS_LAB_DECK)-1 <= game.MAX_HAND_CARDS)
 MECHANICS_LAB_DECK_SEED :: u64(0x7E57_1AB)
 
 // The open arena: walls only around the edge, the player in the middle and
@@ -88,6 +92,30 @@ prepare_mechanics_lab :: proc(rs: ^Roguelike_Session) -> bool {
 	return true
 }
 
+// F7 in PROVA MECCANICHE: the arena cleared at once, as a room is when its
+// last foe falls (game.sandbox_clear_for_fishing), every foe falling on the
+// board; the Canna da Pesca's slot opens, with a fresh room's fishings and no
+// water. F7 again starts the fishing afresh; F5 brings the fight back. Never
+// while the board still shows the player's own action.
+mechanics_lab_clear_for_fishing :: proc(room: ^game.Room, renderer: ^render.Renderer) -> bool {
+	if room == nil || renderer == nil || render.renderer_blocks_player_input(renderer) { return false }
+	before := render.capture_room_presentation(room)
+	if _, cleared := game.sandbox_clear_for_fishing(room); !cleared { return false }
+	// What the board still shows of the fight goes: the falls (and the loot
+	// they leave in reach) are all it shows.
+	render.clear_event_animations(renderer)
+	after := render.capture_room_presentation(room)
+	if room.recent_events.count > 0 { _ = render.begin_renderer_event_timeline(renderer, before, &room.recent_events, &after) }
+	return true
+}
+
+mechanics_lab_begin_fishing :: proc(rs: ^Roguelike_Session) -> bool {
+	if rs.run_state.phase != .In_Room || rs.tactical_controller.paused || !mechanics_lab_clear_for_fishing(&rs.room, &rs.iso_renderer) { return false }
+	clear_card_interaction(&rs.card_interaction)
+	clear_gameplay_command_buffer(&rs.gameplay_buffer)
+	return true
+}
+
 // With `dice`, a dice card's roll shows over the window as in the game.
 mechanics_lab_smoke_frame :: proc(window: ^app.Window, renderer: ^render.Renderer, room: ^game.Room, controller: ^Tactical_Controller,
 	cards: ^Card_Interaction_State, buffer: ^Buffered_Gameplay_Command, dt: f32, clock := false, dice: ^render.Dice_Renderer = nil) {
@@ -110,7 +138,7 @@ mechanics_lab_smoke_frame :: proc(window: ^app.Window, renderer: ^render.Rendere
 	render.draw_tactical_status(renderer, room)
 	render.draw_tactical_hand(renderer, room, 0, 0, 0, {})
 	render.draw_tactical_hud(renderer, room, false, false)
-	render.draw_mechanics_lab_banner(renderer, room, true)
+	render.draw_mechanics_lab_banner(renderer, room)
 	app.present(window, render.LETTERBOX_COLOR, overlay, &dice_state)
 	// The sounds are counted, not played: the smoke runs without a device.
 	render.play_lab_sounds(renderer, nil, 0)
@@ -119,8 +147,8 @@ mechanics_lab_smoke_frame :: proc(window: ^app.Window, renderer: ^render.Rendere
 // The sandbox in the real window: the lab's whole deck in hand, a square of
 // coils around the arrivals, the last kill that keeps the combat going and the
 // refill; then Movimento Ombra played, the shadow walked and the rise, every
-// kind of blow, a slowed brute's seal, the pools and the fire and, last, the
-// player's charges.
+// kind of blow, a slowed brute's seal, the pools and the fire, the player's
+// charges and, last, the Lazzo and the Canna da Pesca.
 run_mechanics_lab_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer, dice: ^render.Dice_Renderer) -> bool {
 	data: level.Level
 	defer level.destroy(&data)
@@ -129,8 +157,13 @@ run_mechanics_lab_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer,
 	room, built := create_mechanics_lab_room(&data, &player, game.DEFAULT_TACTICAL_CONFIG)
 	if !built { fmt.eprintln("mechanics lab: arena not built"); return false }
 	defer game.destroy_room(&room)
-	if player.deck.hand_count != len(MECHANICS_LAB_DECK) { fmt.eprintln("mechanics lab: not the whole deck in hand"); return false }
+	if player.deck.hand_count != MECHANICS_LAB_RULES.hand_size { fmt.eprintln("mechanics lab: not the whole deck in hand"); return false }
 	for id in MECHANICS_LAB_DECK {
+		// The Canna da Pesca waits in Exhaust, never in hand.
+		if game.card_is_room_tool(id) {
+			if player.deck.exhaust_count != 1 || player.deck.exhaust_pile[0].definition_id != id { fmt.eprintln("mechanics lab: the", id, "is not waiting in Exhaust"); return false }
+			continue
+		}
 		if _, held := mechanics_lab_hand_card(&player, id); !held { fmt.eprintln("mechanics lab: no", id, "in hand"); return false }
 	}
 	render.clear_event_animations(renderer)
@@ -138,7 +171,7 @@ run_mechanics_lab_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer,
 	render.frame_level(renderer, &data)
 	render.set_living_cards(renderer, true)
 	defer render.set_living_cards(renderer, false)
-	render.set_mechanics_lab(renderer, true)
+	render.set_mechanics_lab(renderer, true, true)
 	defer render.set_mechanics_lab(renderer, false)
 	controller := Tactical_Controller{was_focused = true}
 	cards: Card_Interaction_State
@@ -146,6 +179,7 @@ run_mechanics_lab_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer,
 	sandbox := game.begin_sandbox(7)
 	for _ in 0..<20 { mechanics_lab_smoke_frame(window, renderer, &room, &controller, &cards, &buffer, 1.0/60.0) }
 	rl.TakeScreenshot("odin_pp_mechanics_lab.png")
+	if !mechanics_lab_card_words(renderer, &player) { return false }
 	// A square of coils around an arrival offers the ring, every time.
 	log: game.Event_Log
 	center := grid.Position{MECHANICS_LAB_WIDTH/2, MECHANICS_LAB_HEIGHT/2}
@@ -288,7 +322,36 @@ run_mechanics_lab_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer,
 	if !mechanics_lab_slow(window, renderer, &room, &controller, &cards, &buffer) { return false }
 	if !mechanics_lab_ground(window, renderer, &room, &controller, &cards, &buffer) { return false }
 	if !mechanics_lab_charges(window, renderer, dice, &room, &controller, &cards, &buffer) { return false }
+	if !mechanics_lab_lasso(window, renderer, &room, &controller, &cards, &buffer) { return false }
+	if !mechanics_lab_fishing(window, renderer, dice, &room, &controller, &cards, &buffer) { return false }
 	return mechanics_lab_sounds_heard(renderer)
+}
+
+// Every card of the lab's deck, at every level it can reach, says all its
+// words on the hand's own cards (eight at once: narrow ones) and in the
+// inspector without a line drawn smaller or cut, nor a name cut, measured
+// with the game's font (render.tactical_card_text_misfit); the Canna da Pesca
+// on its own slot.
+mechanics_lab_card_words :: proc(renderer: ^render.Renderer, player: ^game.Player) -> bool {
+	width := render.tactical_hand_card_bounds(renderer, 0, player.deck.hand_count).width
+	checked := 0
+	for id in MECHANICS_LAB_DECK {
+		definition, found := game.card_definition_by_id(id, true)
+		if !found { return false }
+		card := game.Card_Instance{id = 1, definition_id = id, lifetime = .Permanent}
+		card_width := render.fishing_slot_bounds(renderer).width if game.card_is_room_tool(id) else width
+		for {
+			if misfit := render.tactical_card_text_misfit(renderer, card, definition, card_width); misfit != "" {
+				fmt.eprintf("mechanics lab: %v +%d on a %.0f px card: %s\n", id, card.upgrade_level, card_width, misfit)
+				return false
+			}
+			checked += 1
+			if !game.card_can_upgrade(card) { break }
+			card.upgrade_level += 1
+		}
+	}
+	fmt.eprintf("mechanics lab words: %d cards and levels hold on %.0f px cards and in the inspector\n", checked, width)
+	return true
 }
 
 // The id of a `card` in the hand.
@@ -631,7 +694,7 @@ mechanics_lab_ground :: proc(window: ^app.Window, renderer: ^render.Renderer, ro
 		render.draw_tactical_status(renderer, room)
 		render.draw_tactical_hand(renderer, room, 0, pool_card, 0, {})
 		render.draw_tactical_hud(renderer, room, false, false)
-		render.draw_mechanics_lab_banner(renderer, room, true)
+		render.draw_mechanics_lab_banner(renderer, room)
 		app.present(window, render.LETTERBOX_COLOR)
 	}
 	rl.TakeScreenshot("odin_pp_mechanics_lab_pool_preview.png")
@@ -799,10 +862,12 @@ mechanics_lab_hold :: proc(room: ^game.Room, id: u32) {
 // rolls the card's d4 at the hit, its die on a paper tag at the struck card, and
 // its 2 leaves Bruciatura 2 (odin_pp_living_fate_NN.png); the card played again
 // loads back to three bumps, never more; on a d20 a 16 fells the foe
-// (odin_pp_living_fate_lethal_NN.png) but is only a critical on the Custodian, a
-// miniboss (odin_pp_living_fate_boss_NN.png). LAMA VELENOSA: its die rolled as it
-// is played (odin_pp_mechanics_lab_venom_roll.png), the bumps it poisons after
-// (odin_pp_living_venom_NN.png).
+// (odin_pp_living_fate_lethal_NN.png), and with three more charges beside it
+// the HUD's three chips and count say every word whole, its d20 too
+// (odin_pp_mechanics_lab_fate_chips.png); the 16 is only a critical on the
+// Custodian, a miniboss (odin_pp_living_fate_boss_NN.png). LAMA VELENOSA: its
+// die rolled as it is played (odin_pp_mechanics_lab_venom_roll.png), the bumps
+// it poisons after (odin_pp_living_venom_NN.png).
 mechanics_lab_charges :: proc(window: ^app.Window, renderer: ^render.Renderer, dice: ^render.Dice_Renderer, room: ^game.Room,
 	controller: ^Tactical_Controller, cards: ^Card_Interaction_State, buffer: ^Buffered_Gameplay_Command) -> bool {
 	player := room.player
@@ -987,6 +1052,15 @@ mechanics_lab_charges :: proc(window: ^app.Window, renderer: ^render.Renderer, d
 	if game.player_charges(room, .Fate) != game.FATE_DICE_CHARGES || game.player_fate_sides(room) != 4 {
 		fmt.eprintln("mechanics lab: Dado del Destino loaded", game.player_charges(room, .Fate), "bumps with a d", game.player_fate_sides(room)); return false
 	}
+	// DESTINO's chip names the die its bumps will roll (the HUD's chip text).
+	fate_chip :: proc(renderer: ^render.Renderer, room: ^game.Room) -> string {
+		status := render.renderer_status_view(renderer, room)
+		index, loaded := game.status_index(&status.statuses, .Fate)
+		if !loaded { return "" }
+		return string(render.tactical_status_chip_text(status.statuses.items[index], false, status.fate_sides))
+	}
+	if chip := fate_chip(renderer, room); chip != "DESTINO 3 d4" { fmt.eprintln("mechanics lab: the DESTINO chip says", chip); return false }
+	mechanics_lab_still(window, renderer, room, 0, "odin_pp_mechanics_lab_fate_chip.png")
 	fated_id, fated_placed := game.spawn_enemy(room, {position = {center.x, center.y-1}, health = 60, attack = 1, archetype = .Chaser})
 	if !fated_placed { fmt.eprintln("mechanics lab: no room for the fated foe"); return false }
 	mechanics_lab_hold(room, fated_id)
@@ -1013,6 +1087,22 @@ mechanics_lab_charges :: proc(window: ^app.Window, renderer: ^render.Renderer, d
 		fmt.eprintln("mechanics lab: the d20's 16 did not fell the foe"); return false
 	}
 	mechanics_lab_film(window, renderer, room, controller, cards, buffer, 76, 2, "fate_lethal")
+	if chip := fate_chip(renderer, room); chip != "DESTINO 2 d20" { fmt.eprintln("mechanics lab: after the d20 the DESTINO chip says", chip); return false }
+	// Three more charges beside it: three chips and a count, DESTINO's d20 among
+	// them, every word whole in its chip (each takes the room its words ask,
+	// render.tactical_status_chip_layout; odin_pp_mechanics_lab_fate_chips.png).
+	others := [3]game.Status_Kind{.Deflect, .Arrows, .Venom_Blade}
+	for kind in others { _, _ = game.apply_status(room, game.PLAYER_ENTITY, kind, 2, 0) }
+	for _ in 0..<2 { mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 0) }
+	chips := render.tactical_status_chip_layout(renderer, room)
+	if chips.shown != 3 || chips.more != 1 { fmt.eprintln("mechanics lab: the HUD shows", chips.shown, "chips and", chips.more, "more"); return false }
+	for index in 0..<chips.shown {
+		if _, _, _, fit := render.gothic_text_fit_plan(renderer, chips.texts[index], chips.bounds[index].width-render.HUD_CHIP_TEXT_MARGIN, 12); fit != .Fits {
+			fmt.eprintln("mechanics lab: the HUD chip", chips.texts[index], "does not hold in", chips.bounds[index].width, "px:", fit); return false
+		}
+	}
+	mechanics_lab_still(window, renderer, room, 0, "odin_pp_mechanics_lab_fate_chips.png")
+	for kind in others { _, _ = game.remove_status(room, game.PLAYER_ENTITY, kind) }
 	// The Custodian is a miniboss: the same 16 is only a critical, the bump's
 	// 2 doubled.
 	custodian_id, custodian_placed := game.spawn_enemy(room, {position = {center.x, center.y-1}, health = 60, attack = 1, archetype = .Custodian})
@@ -1064,6 +1154,563 @@ mechanics_lab_charges :: proc(window: ^app.Window, renderer: ^render.Renderer, d
 	return true
 }
 
+// LAZZO from the hand (game/lasso.odin), as the lane plays it. Four cells from
+// the west wall the ring is 3, where one cell further east it would be 4: the
+// wall stands on the fourth cell. Aimed, the board marks the foes it can take,
+// the Custodian too heavy (TROPPO PESANTE) and the ring it would spin on, the
+// three foes held on it in orange (odin_pp_mechanics_lab_lasso_preview.png,
+// odin_pp_mechanics_lab_lasso_heavy.png). Thrown four cells north-north-east,
+// the rope flies, wraps and lifts the foe onto its ring
+// (odin_pp_living_lasso_throw_NN.png), then swings it round the player while
+// the world runs (odin_pp_living_lasso_NN.png, every third frame through the
+// hits, then every eighth; the flat board at odin_pp_mechanics_lab_lasso_flat.png):
+// hits 1, 2 and 3 on the foes held north, south and north-east, each knocked
+// straight away from the player as many cells as its number (the last one
+// diagonally) and wounded as much, the swung foe with it; every full turn
+// takes 1 more from the swung foe (its life checked at every frame); meanwhile
+// a free archer, set down after the aim's stills, aims and shoots the pivot,
+// the defence prompt opens, the blow goes through and the rope holds; on its
+// 18th point the swung foe falls and the rope goes slack. Beside the west wall
+// the ring is 1: the swung foe smashes into the wall, each smash's number on
+// it alone, and turns back at every one (odin_pp_living_lasso_smash_NN.png); the
+// HUD's rope line holds whole in either window; a dodge then lets it go: it
+// lands under itself and plans a fresh intent at once, no daze, its card
+// falling with MOLLATO as the dodge shows (odin_pp_living_lasso_release_NN.png).
+mechanics_lab_lasso :: proc(window: ^app.Window, renderer: ^render.Renderer, room: ^game.Room, controller: ^Tactical_Controller,
+	cards: ^Card_Interaction_State, buffer: ^Buffered_Gameplay_Command) -> bool {
+	player := room.player
+	center := grid.Position{MECHANICS_LAB_WIDTH/2, MECHANICS_LAB_HEIGHT/2}
+	foe :: proc(room: ^game.Room, id: u32) -> ^game.Enemy {
+		index, found := game.enemy_index_by_id(room, id)
+		return &room.enemies[index] if found else nil
+	}
+	// A fresh arena, the player at `at` with a whole window and his dodge
+	// ready, nothing on him from the acts before.
+	reset :: proc(room: ^game.Room, at: grid.Position) -> bool {
+		if !mechanics_lab_clear_arena(room) { return false }
+		game.clear_ground(room)
+		clear(&room.loot)
+		room.player.health = room.player.stats.max_health
+		room.player.position = at
+		room.player.equipment = {}
+		for kind in ([6]game.Status_Kind{.Deflect, .Arrows, .Fate, .Venom_Blade, .Poison, .Burn}) { _, _ = game.remove_status(room, game.PLAYER_ENTITY, kind) }
+		room.player.tactical.dodge_recovery = 0
+		return true
+	}
+	// A foe held where it stands, unless `free`: then it plans as any foe.
+	spawn :: proc(room: ^game.Room, at: grid.Position, health: i32, archetype: game.Enemy_Archetype = .Chaser, free := false) -> u32 {
+		id, placed := game.spawn_enemy(room, {position = at, health = health, attack = 1, archetype = archetype})
+		if placed && !free { mechanics_lab_hold(room, id) }
+		return id
+	}
+	// The aim as the board shows it with the mouse on `cell`.
+	aim :: proc(window: ^app.Window, renderer: ^render.Renderer, room: ^game.Room, card: u32, cell: grid.Position, name: cstring) {
+		for _ in 0..<3 {
+			render.update_renderer_frame_timeline(renderer, 0)
+			render.update_tactical_view(renderer, room, {}, false, true)
+			renderer.has_hovered_cell, renderer.hovered_cell = true, cell
+			app.begin_canvas(window, render.RESIN_BACKGROUND)
+			render.draw_tactical_world(renderer, room, card)
+			render.draw_tactical_status(renderer, room)
+			render.draw_tactical_hand(renderer, room, 0, card, 0, {})
+			render.draw_tactical_hud(renderer, room, false, false)
+			render.draw_mechanics_lab_banner(renderer, room)
+			app.present(window, render.LETTERBOX_COLOR)
+		}
+		rl.TakeScreenshot(name)
+		renderer.has_hovered_cell = false
+	}
+	// Frames with the clock running until a window opens that the throw and
+	// its spin will not run out of.
+	wait_window :: proc(window: ^app.Window, renderer: ^render.Renderer, room: ^game.Room, controller: ^Tactical_Controller,
+		cards: ^Card_Interaction_State, buffer: ^Buffered_Gameplay_Command, seconds: f32) {
+		for _ in 0..<600 {
+			if room.player.tactical.phase == .Decision && room.player.tactical.remaining > seconds && !render.renderer_blocks_player_input(renderer) &&
+			   !game.tactical_player_busy(room) && !room.tactical_pulse.pending && room.qte.kind == .None { break }
+			mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0, true)
+		}
+	}
+	// What the rope's hits have taken from the swung foe so far: hit n takes n,
+	// counted from the first hit's number.
+	struck :: proc(state: game.Lasso_State) -> i32 {
+		return state.hits*state.first_hit+state.hits*(state.hits-1)/2
+	}
+	// One frame of a film with the clock running, saved as
+	// odin_pp_living_<name>_NN.png when `save` (NN counted by `shot`).
+	reel :: proc(window: ^app.Window, renderer: ^render.Renderer, room: ^game.Room, controller: ^Tactical_Controller,
+		cards: ^Card_Interaction_State, buffer: ^Buffered_Gameplay_Command, name: string, save: bool, shot: ^int) {
+		mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0, true)
+		if save {
+			rl.TakeScreenshot(fmt.ctprintf("odin_pp_living_%s_%02d.png", name, shot^))
+			shot^ += 1
+		}
+	}
+	wait_window(window, renderer, room, controller, cards, buffer, 12)
+	// I. The west wall on the fourth cell: a ring of 3.
+	at := grid.Position{4, center.y}
+	if !reset(room, at) { return false }
+	player.tactical.facing = .East
+	open, _ := game.lasso_radius(room, {at.x+1, at.y})
+	walled, walled_smash := game.lasso_radius(room, at)
+	if open != 4 || walled != 3 || walled_smash {
+		fmt.eprintln("mechanics lab: four cells from the wall the Lazzo spins at", walled, "and a cell further at", open); return false
+	}
+	SWUNG :: i32(18)
+	// The foe to swing, four cells off: it is pulled in onto the ring.
+	target_id := spawn(room, {at.x+2, at.y-4}, SWUNG)
+	// Three foes held on the ring, struck in the spin's order: north, south,
+	// north-east (each knocked off it where the board shows it).
+	standing := [3]struct{id: u32, cell: grid.Position}{{cell = {at.x, at.y-3}}, {cell = {at.x, at.y+3}}, {cell = {at.x+2, at.y-2}}}
+	for &stander in standing { stander.id = spawn(room, stander.cell, 30) }
+	custodian_id := spawn(room, {at.x+4, at.y-3}, 40, .Custodian)
+	if target_id == 0 || standing[0].id == 0 || standing[1].id == 0 || standing[2].id == 0 || custodian_id == 0 {
+		fmt.eprintln("mechanics lab: no room for the lasso's foes"); return false
+	}
+	render.clear_event_animations(renderer)
+	for _ in 0..<12 { mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0) }
+	card, held := mechanics_lab_hand_card(player, .Lasso)
+	if !held { fmt.eprintln("mechanics lab: no Lazzo in hand"); return false }
+	index, _ := game.hand_card_index_by_id(&player.deck, card)
+	instance := player.deck.hand[index]
+	mechanics_lab_still(window, renderer, room, card, "odin_pp_mechanics_lab_card_Lasso.png")
+	aim(window, renderer, room, card, foe(room, target_id).position, "odin_pp_mechanics_lab_lasso_preview.png")
+	// The Custodian is a miniboss: too heavy for the rule and for the drop.
+	custodian := foe(room, custodian_id).position
+	_, takes := game.card_drop_target(room, instance, custodian)
+	if takes || game.lasso_target_error(room, game.entity_target(game.enemy_entity(custodian_id))) != .Target_Too_Heavy {
+		fmt.eprintln("mechanics lab: the Lazzo took the Custodian"); return false
+	}
+	aim(window, renderer, room, card, custodian, "odin_pp_mechanics_lab_lasso_heavy.png")
+	// Then a free archer east, four cells down a clear line, off the ring: it
+	// takes aim at once.
+	archer_id := spawn(room, {at.x+4, at.y}, 30, .Archer, free = true)
+	if archer_id == 0 { fmt.eprintln("mechanics lab: no room for the archer"); return false }
+	for _ in 0..<12 { mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0) }
+	if aiming := foe(room, archer_id); aiming == nil || aiming.intent.kind != .Attack || !aiming.intent.windup {
+		fmt.eprintln("mechanics lab: the free archer takes no aim at the pivot"); return false
+	}
+	lasso := &renderer.tactical.lasso
+	hits, smashes, whirrs, releases, drops := lasso.spawned_hits, lasso.spawned_smashes, lasso.whirrs, lasso.releases, lasso.drops
+	health, pulses := player.health, room.pulse_count
+	if !mechanics_lab_play(window, renderer, room, controller, cards, buffer, .Lasso, game.entity_target(game.enemy_entity(target_id))) ||
+	   !room.lasso.active || room.lasso.radius != 3 || room.lasso.smash || room.lasso.first_hit != 1 {
+		fmt.eprintln("mechanics lab: the Lazzo by the wall was not thrown at radius 3:", room.lasso.radius, room.lasso.first_hit); return false
+	}
+	frame := 0
+	for _ in 0..<240 {
+		if !game.tactical_is_casting(room) && !render.renderer_blocks_player_input(renderer) { break }
+		mechanics_lab_reel_frame(window, renderer, room, controller, cards, buffer, "lasso_throw", 4, &frame)
+	}
+	// The spin. At every frame the swung foe has lost its hits' numbers and one
+	// a turn, nothing else; the archer's blow opens a defence prompt that lets it
+	// through, and the rope holds.
+	seen: game.Lasso_State
+	shot, spun := 0, 0
+	prompted, held_on, wounded := false, false, false
+	for _ in 0..<1800 {
+		if !room.lasso.active { break }
+		reel(window, renderer, room, controller, cards, buffer, "lasso", spun%(3 if spun < 60 else 8) == 0, &shot)
+		spun += 1
+		if room.lasso.active {
+			seen = room.lasso
+			swung := foe(room, target_id)
+			if swung == nil || swung.health != SWUNG-struck(seen)-seen.turns {
+				fmt.eprintln("mechanics lab: the swung foe has", swung.health if swung != nil else -1, "hp after", seen.hits, "hits and",
+					seen.turns, "turns"); return false
+			}
+		}
+		if room.qte.kind == .Defense && room.qte.enemy_id == archer_id { prompted = true }
+		if prompted && room.qte.kind == .None && room.lasso.active { held_on = true }
+		if room.lasso.active && player.health < health { wounded = true }
+		if spun == 60 {
+			renderer.tactical.scene_3d = false
+			for _ in 0..<2 { mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 0) }
+			rl.TakeScreenshot("odin_pp_mechanics_lab_lasso_flat.png")
+			renderer.tactical.scene_3d = true
+			for _ in 0..<2 { mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 0) }
+		}
+	}
+	// The rope slack, the body falling.
+	for after in 0..<24 { reel(window, renderer, room, controller, cards, buffer, "lasso", after%6 == 0, &shot) }
+	mechanics_lab_hold(room, archer_id)
+	if room.lasso.active || foe(room, target_id) != nil || room.phase != .Combat || game.tactical_player_busy(room) {
+		fmt.eprintln("mechanics lab: the lassoed foe did not fall"); return false
+	}
+	// Hits 1, 2 and 3, each struck foe knocked as many cells away from the
+	// player as its hit's number (snapped to the eight ways) and wounded as
+	// much; every turn before the fatal one seen.
+	for stander, order in standing {
+		hit := seen.first_hit+i32(order)
+		step := game.lasso_radial_step(at, stander.cell)
+		landing := grid.Position{stander.cell.x+step.x*int(hit), stander.cell.y+step.y*int(hit)}
+		struck_foe := foe(room, stander.id)
+		if struck_foe == nil || struck_foe.position != landing || struck_foe.health != 30-hit {
+			fmt.eprintln("mechanics lab: hit", hit, "left the foe from", stander.cell, "on", struck_foe.position if struck_foe != nil else stander.cell,
+				"with", struck_foe.health if struck_foe != nil else -1, "hp, not on", landing); return false
+		}
+	}
+	if seen.hits != 3 || seen.turns != SWUNG-struck(seen)-1 {
+		fmt.eprintln("mechanics lab: the rope made", seen.hits, "hits and", seen.turns, "turns"); return false
+	}
+	// The world ran through the spin: its beats, the archer's aim and its one
+	// shot, which reached the pivot while the rope still held.
+	archer := foe(room, archer_id)
+	if archer == nil || room.pulse_count < pulses+4 || !prompted || !held_on || !wounded || player.health != health-archer.attack {
+		fmt.eprintln("mechanics lab: the world did not run under the rope:", room.pulse_count-pulses, "beats, prompt", prompted, "held", held_on,
+			"player", player.health, "of", health); return false
+	}
+	if lasso.spawned_hits < hits+3 || lasso.whirrs <= whirrs || lasso.drops <= drops || lasso.ring_texture.id == 0 {
+		fmt.eprintln("mechanics lab: the lasso was not shown:", lasso.spawned_hits-hits, "hits,", lasso.whirrs-whirrs, "whirrs"); return false
+	}
+	turns := seen.turns+1
+	// II. Beside the west wall: a ring of 1, smashes into the wall and back.
+	wait_window(window, renderer, room, controller, cards, buffer, 6)
+	if !reset(room, {1, center.y}) { return false }
+	SMASHED :: i32(60)
+	// Free, not held: let go, it plans afresh.
+	smashed_id := spawn(room, {4, center.y}, SMASHED, free = true)
+	if smashed_id == 0 { fmt.eprintln("mechanics lab: no room for the smashed foe"); return false }
+	render.clear_event_animations(renderer)
+	for _ in 0..<12 { mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0) }
+	if !mechanics_lab_play(window, renderer, room, controller, cards, buffer, .Lasso, game.entity_target(game.enemy_entity(smashed_id))) ||
+	   !room.lasso.active || room.lasso.radius != 1 || !room.lasso.smash {
+		fmt.eprintln("mechanics lab: the Lazzo beside the wall did not smash:", room.lasso.radius, room.lasso.smash); return false
+	}
+	for _ in 0..<240 {
+		if !game.tactical_is_casting(room) && !render.renderer_blocks_player_input(renderer) { break }
+		mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0, true)
+	}
+	// Each smash's number on the swung foe alone, a turn's 1 too, and the spin
+	// turned back at each: its way flips with every smash.
+	frame = 0
+	for _ in 0..<150 {
+		if !room.lasso.active { break }
+		mechanics_lab_reel_frame(window, renderer, room, controller, cards, buffer, "lasso_smash", 5, &frame)
+		if !room.lasso.active { break }
+		state := room.lasso
+		swung := foe(room, smashed_id)
+		if swung == nil || swung.health != SMASHED-struck(state)-state.turns || state.direction != (-1 if state.hits%2 == 0 else 1) {
+			fmt.eprintln("mechanics lab: after", state.hits, "smashes and", state.turns, "turns the swung foe has",
+				swung.health if swung != nil else -1, "hp, turning", state.direction); return false
+		}
+	}
+	if !room.lasso.active || room.lasso.hits < 2 || lasso.spawned_smashes < smashes+2 {
+		fmt.eprintln("mechanics lab: the lasso smashed", room.lasso.hits, "times,", lasso.spawned_smashes-smashes, "shown"); return false
+	}
+	bounces := room.lasso.hits
+	// The HUD's rope line holds whole beside the plate's objective, in the
+	// lab's fixed window and in the game's shrinking one, and with two figures
+	// each and a full room (render.lasso_hud_line beside the rope's short
+	// objective), whatever lets it go.
+	for shrinking in ([2]bool{false, true}) {
+		player.tactical.config.shrinking_window = shrinking
+		line := render.lasso_hud_status(room)
+		room_width := render.tactical_hud_status_room(renderer, render.tactical_hud_objective(renderer, room))
+		if _, _, _, fit := render.gothic_text_fit_plan(renderer, line, room_width, 10); fit != .Fits {
+			fmt.eprintln("mechanics lab: the HUD's rope line", line, "does not hold in", room_width, "px:", fit); return false
+		}
+	}
+	player.tactical.config.shrinking_window = false
+	worst := render.tactical_hud_status_room(renderer, render.tactical_hud_foes_objective(game.MAX_ENEMIES_PER_ROOM))
+	for way in render.Lasso_Let_Go {
+		line := render.lasso_hud_line(88, 88, way, 8)
+		if _, _, _, fit := render.gothic_text_fit_plan(renderer, line, worst, 10); fit != .Fits {
+			fmt.eprintln("mechanics lab: the HUD's rope line", line, "does not hold in", worst, "px:", fit); return false
+		}
+	}
+	// A dodge lets go (away from the cell under the foe): it lands under
+	// itself and plans a fresh intent at once, no daze; its card falls with
+	// MOLLATO as the dodge shows, not once it has played.
+	under := game.lasso_arc_cell(&room.lasso, room.lasso.arc)
+	dodge := game.Move_Direction.South
+	for direction in ([3]game.Move_Direction{.South, .North, .East}) {
+		if landing, clear := game.tactical_dodge_destination(room, direction); clear && landing != under { dodge = direction; break }
+	}
+	if !commit_gameplay_command(room, renderer, cards, {kind = .Dodge, origin_phase = .Combat, direction = dodge}) || room.lasso.active {
+		fmt.eprintln("mechanics lab: the dodge did not let the lasso go"); return false
+	}
+	smashed := foe(room, smashed_id)
+	if smashed == nil || smashed.position != under || smashed.recovery_pulses != 0 ||
+	   smashed.intent.kind == .Recover || smashed.intent.kind == .Wait || smashed.intent.kind == .None {
+		fmt.eprintln("mechanics lab: the released foe did not land on", under, "with a fresh intent:",
+			smashed.intent.kind if smashed != nil else game.Enemy_Intent_Kind.None); return false
+	}
+	planned := smashed.intent.kind
+	frame = 0
+	dropped := -1
+	for after in 0..<45 {
+		mechanics_lab_reel_frame(window, renderer, room, controller, cards, buffer, "lasso_release", 3, &frame)
+		if dropped < 0 && lasso.releases > releases { dropped = after }
+	}
+	if dropped < 0 || dropped > 2 || lasso.released <= 0 {
+		fmt.eprintln("mechanics lab: the board let the lasso go", dropped, "frames after the dodge"); return false
+	}
+	mechanics_lab_hold(room, smashed_id)
+	fmt.eprintf("mechanics lab lasso: radius 3 by the wall (4 a cell further), hits 1, 2, 3 and %d turns, the archer's blow through the rope; " +
+		"radius 1 with %d smashes and as many turns back, let go on %v, then %v\n", turns, bounces, under, planned)
+	return true
+}
+
+// A stream for the room's catches whose next one is a card, or else food of
+// `food`: the lab shows chosen catches.
+mechanics_lab_fishing_stream :: proc(card: bool, food := game.Fishing_Food.Fish) -> (seed: u64, ok: bool) {
+	for candidate in u64(1)..<u64(400_000) {
+		random := candidate
+		if game.fishing_catch_is_card(&random) != card { continue }
+		if card || game.fishing_catch_food(&random) == food { return candidate, true }
+	}
+	return
+}
+
+// CANNA DA PESCA (game/fishing.odin), as F7 and its slot play it, last. F7
+// clears the arena as a room's last fall clears it: two held foes fall and the
+// rod's slot opens with PESCA 1/1 (odin_pp_living_fishing_clear_NN.png). Its
+// inspector under the mouse (odin_pp_mechanics_lab_rod_slot.png); then chosen,
+// with the mouse on the water's cell, the cells it may fish and that one green
+// (odin_pp_mechanics_lab_rod_preview.png). Picked up on the slot and let go
+// over that cell, it fishes there: the cast, the bobber on the new water, the
+// bite, a fish reeled out and flying to the player, its d4 over the window (a
+// 3: odin_pp_mechanics_lab_fishing_roll.png) and its 3 of life
+// (odin_pp_living_fishing_NN.png); the room's one fishing is then spent, and
+// the board, flat too, shows the water (odin_pp_mechanics_lab_fishing_flat.png).
+// The rod upgraded, F7 again starts afresh, no water and two fishings
+// (PESCA 2/2: odin_pp_mechanics_lab_rod_slot_upgraded.png): first a card comes
+// out of the water into the run deck, never another rod
+// (odin_pp_living_fishing_card_NN.png), then the same water fished again, no
+// new pool, gives bread for its d4's 2 (odin_pp_living_fishing_again_NN.png),
+// and the room's fishings are made; F7 once more gives the new room its two.
+// No fishing sounds the player's own clips (his lantern's blow, the pickup's
+// coins, a card's cast).
+// Last, the rule of one rod a run: with the rod in the deck no offer draws
+// another, where the same draws without it do.
+mechanics_lab_fishing :: proc(window: ^app.Window, renderer: ^render.Renderer, dice: ^render.Dice_Renderer, room: ^game.Room,
+	controller: ^Tactical_Controller, cards: ^Card_Interaction_State, buffer: ^Buffered_Gameplay_Command) -> bool {
+	player := room.player
+	center := grid.Position{MECHANICS_LAB_WIDTH/2, MECHANICS_LAB_HEIGHT/2}
+	// Plays frames with the clock running until the board is done showing,
+	// every `every`th saved as odin_pp_living_<name>_NN.png (the dice over the
+	// window as the game shows them); the roll's still once it has settled.
+	film :: proc(window: ^app.Window, renderer: ^render.Renderer, dice: ^render.Dice_Renderer, room: ^game.Room, controller: ^Tactical_Controller,
+		cards: ^Card_Interaction_State, buffer: ^Buffered_Gameplay_Command, name: string, every: int, roll: cstring = nil) -> (rolled: bool) {
+		frame := 0
+		for _ in 0..<720 {
+			mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0, true, dice)
+			if frame%every == 0 { rl.TakeScreenshot(fmt.ctprintf("odin_pp_living_%s_%02d.png", name, frame/every)) }
+			frame += 1
+			cue, showing := render.active_presentation_cue(&renderer.timeline)
+			if roll != nil && !rolled && showing && cue.kind == .Dice_Rolled && render.presentation_cue_progress(cue) > 0.86 {
+				rl.TakeScreenshot(roll)
+				rolled = true
+			}
+			if !render.renderer_blocks_player_input(renderer) { break }
+		}
+		for _ in 0..<2*every {
+			mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0, true, dice)
+			if frame%every == 0 { rl.TakeScreenshot(fmt.ctprintf("odin_pp_living_%s_%02d.png", name, frame/every)) }
+			frame += 1
+		}
+		return
+	}
+	// The board with the rod chosen (`selected`) or under the mouse, the mouse
+	// on `cell` (none: off the board).
+	still :: proc(window: ^app.Window, renderer: ^render.Renderer, room: ^game.Room, hovered, selected: u32, cell: grid.Position, on_cell: bool, name: cstring) {
+		for _ in 0..<3 {
+			render.update_renderer_frame_timeline(renderer, 0)
+			render.update_tactical_view(renderer, room, {}, false, true)
+			renderer.has_hovered_cell, renderer.hovered_cell = on_cell, cell
+			app.begin_canvas(window, render.RESIN_BACKGROUND)
+			render.draw_tactical_world(renderer, room, selected)
+			render.draw_tactical_status(renderer, room)
+			render.draw_tactical_hand(renderer, room, hovered, selected, 0, {})
+			render.draw_tactical_hud(renderer, room, false, false)
+			render.draw_mechanics_lab_banner(renderer, room)
+			app.present(window, render.LETTERBOX_COLOR)
+		}
+		rl.TakeScreenshot(name)
+		renderer.has_hovered_cell = false
+	}
+	// The board shows `cell` as the rod's water.
+	shows_water :: proc(renderer: ^render.Renderer, cell: grid.Position) -> bool {
+		return renderer.tactical.snapshot != nil && render.presentation_ground_water(&renderer.tactical.snapshot.ground, cell)
+	}
+	// Waits for a free board, then a fresh arena around the player in the
+	// middle, a little hurt, nothing on him from the acts before.
+	for _ in 0..<600 {
+		if !render.renderer_blocks_player_input(renderer) && !game.tactical_player_busy(room) && !game.tactical_is_casting(room) &&
+		   room.qte.kind == .None && !room.tactical_pulse.pending { break }
+		mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0, true)
+	}
+	if !mechanics_lab_clear_arena(room) { return false }
+	game.clear_ground(room)
+	clear(&room.loot)
+	player.position = center
+	player.equipment = {}
+	for kind in ([6]game.Status_Kind{.Deflect, .Arrows, .Fate, .Venom_Blade, .Poison, .Burn}) { _, _ = game.remove_status(room, game.PLAYER_ENTITY, kind) }
+	player.health = player.stats.max_health-6
+	for at in ([2]grid.Position{{center.x+3, center.y-2}, {center.x-3, center.y+1}}) {
+		id, placed := game.spawn_enemy(room, {position = at, health = 30, attack = 1, archetype = .Chaser})
+		if !placed { fmt.eprintln("mechanics lab: no room for the foes F7 clears"); return false }
+		mechanics_lab_hold(room, id)
+	}
+	render.clear_event_animations(renderer)
+	for _ in 0..<12 { mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0) }
+	if game.fishing_room_open(room) { fmt.eprintln("mechanics lab: the rod opened in a fight"); return false }
+	// F7: every foe falls and the room is cleared, its exit still shut.
+	if !mechanics_lab_clear_for_fishing(room, renderer) { fmt.eprintln("mechanics lab: F7 did not clear the arena"); return false }
+	if room.phase != .Loot || len(room.enemies) != 0 || !game.fishing_room_open(room) || game.fishing_casts_left(room) != 1 {
+		fmt.eprintln("mechanics lab: the cleared arena does not open the rod:", room.phase, len(room.enemies), game.fishing_casts_left(room)); return false
+	}
+	_ = film(window, renderer, dice, room, controller, cards, buffer, "fishing_clear", 6)
+	// The fallen cards finish toppling.
+	for _ in 0..<150 { mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0, true) }
+	sandbox := game.begin_sandbox(11)
+	if _, spawned := game.sandbox_tick(room, &sandbox, 10); spawned { fmt.eprintln("mechanics lab: a foe arrived in the cleared arena"); return false }
+	rod, held := game.fishing_rod(&player.deck)
+	if !held { fmt.eprintln("mechanics lab: no rod in the deck"); return false }
+	water := grid.Position{center.x+2, center.y-1}
+	still(window, renderer, room, rod.id, 0, {}, false, "odin_pp_mechanics_lab_rod_slot.png")
+	still(window, renderer, room, 0, rod.id, water, true, "odin_pp_mechanics_lab_rod_preview.png")
+	if game.fishing_target_error(room, water) != .Fished || game.fishing_target_error(room, {center.x+4, center.y}) != .Out_Of_Reach ||
+	   game.fishing_target_error(room, center) == .Fished {
+		fmt.eprintln("mechanics lab: the rod's aim is wrong"); return false
+	}
+	// Picked up on the slot, let go over the cell: the lane's own fishing.
+	slot := render.fishing_slot_bounds(renderer)
+	cards^ = {}
+	_, picked, taken := poll_fishing_command(room, renderer, cards, {mouse = {slot.x+slot.width*0.5, slot.y+40}, inside = true, pressed = true, down = true}, true)
+	if picked || !taken || cards.dragged_card_id != rod.id { fmt.eprintln("mechanics lab: the slot did not pick the rod up"); return false }
+	renderer.has_hovered_cell, renderer.hovered_cell = true, water
+	command, dropped, _ := poll_fishing_command(room, renderer, cards, {mouse = render.cell_center(renderer, water), inside = true, released = true}, true)
+	renderer.has_hovered_cell = false
+	if !dropped || command.kind != .Fish || command.target != game.cell_target(water) { fmt.eprintln("mechanics lab: the rod let go over the water fished nothing"); return false }
+	// A fish, its d4 a 3.
+	stream, found := mechanics_lab_fishing_stream(false, .Fish)
+	if !found { return false }
+	room.fishing.random = stream
+	forced, forced_found := mechanics_lab_dice_for_face(3, 4)
+	if !forced_found { return false }
+	player.dice = forced
+	health, owned := player.health, player.deck.owned_count
+	view := &renderer.tactical.fishing
+	casts, bites, catches, cards_caught := view.casts, view.bites, view.catches, view.cards
+	failures := renderer.timeline.update_failures
+	// The player's card sounds no clip of its own while it fishes: neither the
+	// lantern's blow, the pickup's coins nor a card's cast (render.lab_actor_sfx).
+	clip_sounds :: proc(renderer: ^render.Renderer) -> [3]int {
+		s := renderer.tactical.lab_sounds
+		if s == nil { return {} }
+		return {s.played[.Pilgrim_Attack], s.played[.Pilgrim_Interact], s.played[.Pilgrim_Cast]}
+	}
+	voiced := clip_sounds(renderer)
+	if !commit_gameplay_command(room, renderer, cards, command) { fmt.eprintln("mechanics lab: the fishing was not taken"); return false }
+	if player.health != health+3 || !game.fishing_cell_is_water(room, water) || game.fishing_casts_left(room) != 0 || player.deck.owned_count != owned {
+		fmt.eprintln("mechanics lab: the fish gave", player.health-health, "life"); return false
+	}
+	if !film(window, renderer, dice, room, controller, cards, buffer, "fishing", 5, "odin_pp_mechanics_lab_fishing_roll.png") {
+		fmt.eprintln("mechanics lab: the fish's d4 did not show"); return false
+	}
+	if clip_sounds(renderer) != voiced { fmt.eprintln("mechanics lab: the fishing sounded the player's blow, pickup or cast:", clip_sounds(renderer), voiced); return false }
+	if view.casts != casts+1 || view.bites != bites+1 || view.catches != catches+1 || view.cards != cards_caught ||
+	   renderer.timeline.update_failures != failures {
+		fmt.eprintln("mechanics lab: the fishing was not shown:", view.casts-casts, view.bites-bites, view.catches-catches); return false
+	}
+	// The room's one fishing is made; the board shows the new water.
+	if game.fishing_target_error(room, water) != .Spent { fmt.eprintln("mechanics lab: a second fishing was allowed"); return false }
+	if !shows_water(renderer, water) { fmt.eprintln("mechanics lab: the board shows no water on", water); return false }
+	renderer.tactical.scene_3d = false
+	for _ in 0..<3 { mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 0) }
+	rl.TakeScreenshot("odin_pp_mechanics_lab_fishing_flat.png")
+	renderer.tactical.scene_3d = true
+	for _ in 0..<2 { mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 0) }
+	// The rod upgraded out of a fight, as a rest or a shop upgrades it: a room's
+	// fishings are 1 + its level, two now.
+	if game.upgrade_owned_card(&player.deck, rod.id) != .Upgraded { fmt.eprintln("mechanics lab: the rod was not upgraded"); return false }
+	// F7 again: afresh, no water, and two fishings (PESCA 2/2).
+	if !mechanics_lab_clear_for_fishing(room, renderer) || room.fishing.water_count != 0 || game.fishing_casts_allowed(room) != 2 ||
+	   game.fishing_casts_left(room) != 2 {
+		fmt.eprintln("mechanics lab: F7 again did not start two fishings afresh:", game.fishing_casts_left(room)); return false
+	}
+	for _ in 0..<12 { mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0) }
+	if shows_water(renderer, water) { fmt.eprintln("mechanics lab: the last room's water still shows"); return false }
+	still(window, renderer, room, rod.id, 0, {}, false, "odin_pp_mechanics_lab_rod_slot_upgraded.png")
+	// The first: a card out of the water, into the run deck, never another rod.
+	stream, found = mechanics_lab_fishing_stream(true)
+	if !found { return false }
+	room.fishing.random = stream
+	owned = player.deck.owned_count
+	health = player.health
+	voiced = clip_sounds(renderer)
+	if !commit_gameplay_command(room, renderer, cards, {kind = .Fish, origin_phase = .Loot, card_id = rod.id, target = game.cell_target(water)}) {
+		fmt.eprintln("mechanics lab: the second room's fishing was not taken"); return false
+	}
+	caught := player.deck.owned[player.deck.owned_count-1]
+	if player.deck.owned_count != owned+1 || caught.definition_id == .Fishing_Rod || player.health != health || !game.validate_deck_state(&player.deck) ||
+	   game.fishing_casts_left(room) != 1 || room.fishing.water_count != 1 {
+		fmt.eprintln("mechanics lab: the card caught is", caught.definition_id); return false
+	}
+	_ = film(window, renderer, dice, room, controller, cards, buffer, "fishing_card", 5)
+	if view.cards != cards_caught+1 || renderer.timeline.update_failures != failures {
+		fmt.eprintln("mechanics lab: the card caught was not shown"); return false
+	}
+	// The second on the same water, fished again (no new pool): bread, its d4
+	// a 2. Then the room's two fishings are made.
+	stream, found = mechanics_lab_fishing_stream(false, .Bread)
+	if !found { return false }
+	room.fishing.random = stream
+	forced, forced_found = mechanics_lab_dice_for_face(2, 4)
+	if !forced_found { return false }
+	player.dice = forced
+	health = player.health
+	catches = view.catches
+	if !commit_gameplay_command(room, renderer, cards, {kind = .Fish, origin_phase = .Loot, card_id = rod.id, target = game.cell_target(water)}) {
+		fmt.eprintln("mechanics lab: the same water was not fished again"); return false
+	}
+	if player.health != health+2 || room.fishing.water_count != 1 || game.fishing_casts_left(room) != 0 || game.fishing_target_error(room, water) != .Spent {
+		fmt.eprintln("mechanics lab: the bread gave", player.health-health, "life,", game.fishing_casts_left(room), "fishings left"); return false
+	}
+	_ = film(window, renderer, dice, room, controller, cards, buffer, "fishing_again", 5)
+	if view.catches != catches+1 || renderer.timeline.update_failures != failures || !shows_water(renderer, water) {
+		fmt.eprintln("mechanics lab: the second fishing was not shown"); return false
+	}
+	if clip_sounds(renderer) != voiced { fmt.eprintln("mechanics lab: the fishings sounded the player's blow, pickup or cast:", clip_sounds(renderer), voiced); return false }
+	// F7 once more: a new room, its two fishings afresh.
+	if !mechanics_lab_clear_for_fishing(room, renderer) || game.fishing_casts_left(room) != 2 || room.fishing.water_count != 0 {
+		fmt.eprintln("mechanics lab: a new room did not give the rod its two fishings again"); return false
+	}
+	for _ in 0..<12 { mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0) }
+	// One rod a run: while the deck holds it, no offer brings another. The
+	// rewards, the shop, the Armory and a catch all draw with the deck's
+	// exclusions (card_offer_exclusions); the same draws without them bring
+	// rods.
+	excluded := game.card_offer_exclusions(&player.deck)
+	rod_definition, _ := game.card_definition_by_id(.Fishing_Rod)
+	node := game.Run_Node{kind = .Combat, depth = 4}
+	if excluded != {.Fishing_Rod} || game.card_offer_weight(rod_definition, &node) == 0 ||
+	   game.card_offer_weight(rod_definition, &node, &player.m8_profile, true, excluded) != 0 {
+		fmt.eprintln("mechanics lab: the deck's rod does not leave the rod out of the offers:", excluded); return false
+	}
+	with_rod, without_rod := 0, 0
+	for seed in u64(1)..=400 {
+		for leave_out in ([2]bool{true, false}) {
+			random := seed
+			offer: [3]game.Card_Id
+			if !game.generate_weighted_card_choices(&random, &node, offer[:], &player.m8_profile, true, excluded if leave_out else {}) {
+				fmt.eprintln("mechanics lab: no offer drawn for seed", seed); return false
+			}
+			for id in offer {
+				if id != .Fishing_Rod { continue }
+				if leave_out { with_rod += 1 } else { without_rod += 1 }
+			}
+		}
+	}
+	if with_rod != 0 || without_rod == 0 {
+		fmt.eprintln("mechanics lab: rods offered:", with_rod, "with one in the deck,", without_rod, "without"); return false
+	}
+	fmt.eprintf("mechanics lab fishing: F7 cleared the arena, a fish for 3 life on %v; the rod at +1 fished there twice, a %v and bread for 2; " +
+		"no rod in 400 offers with one in the deck (%d in as many without)\n", water, caught.definition_id, without_rod)
+	return true
+}
+
 // Empties the arena for the next act: every foe falls with its own clip.
 mechanics_lab_clear_arena :: proc(room: ^game.Room) -> bool {
 	action := game.Action{kind = .Ability, source = game.PLAYER_ENTITY}
@@ -1085,7 +1732,7 @@ mechanics_lab_still :: proc(window: ^app.Window, renderer: ^render.Renderer, roo
 		render.draw_tactical_status(renderer, room)
 		render.draw_tactical_hand(renderer, room, hovered, 0, 0, {})
 		render.draw_tactical_hud(renderer, room, false, false)
-		render.draw_mechanics_lab_banner(renderer, room, true)
+		render.draw_mechanics_lab_banner(renderer, room)
 		app.present(window, render.LETTERBOX_COLOR)
 	}
 	rl.TakeScreenshot(name)
@@ -1105,7 +1752,7 @@ mechanics_lab_inspect_still :: proc(window: ^app.Window, renderer: ^render.Rende
 		render.draw_tactical_status(renderer, room)
 		render.draw_tactical_hand(renderer, room, 0, 0, 0, {})
 		render.draw_tactical_hud(renderer, room, false, false)
-		render.draw_mechanics_lab_banner(renderer, room, true)
+		render.draw_mechanics_lab_banner(renderer, room)
 		app.present(window, render.LETTERBOX_COLOR)
 	}
 	rl.TakeScreenshot(name)
@@ -1281,6 +1928,18 @@ mechanics_lab_sounds_heard :: proc(renderer: ^render.Renderer) -> bool {
 	// What they do: a blow turned back, an arrow loosed, a die at a bump.
 	for sfx in ([?]audio.Lab_Sfx{.Pilgrim_Deflect, .Pilgrim_Shoot, .Ui_Fate_Die}) {
 		if sounds.played[sfx] == 0 { fmt.eprintln("mechanics lab: no sound for", sfx); return false }
+	}
+	// The Lazzo's: its card, the throw, the loop cinching, the whirr of its
+	// turns, a hit, a smash and the rope let go.
+	for sfx in ([?]audio.Lab_Sfx{.Card_Lasso, .Pilgrim_Lasso_Throw, .World_Lasso_Wrap, .World_Lasso_Whirr, .World_Lasso_Hit,
+		.World_Lasso_Smash, .World_Lasso_Release}) {
+		if sounds.played[sfx] == 0 { fmt.eprintln("mechanics lab: no sound for the rope", sfx); return false }
+	}
+	// The Canna da Pesca's: its card as it is cast, the plop, the bite, the
+	// reel, food caught and a card caught.
+	for sfx in ([?]audio.Lab_Sfx{.Card_Fishing_Rod, .World_Bobber_Plop, .World_Fish_Bite, .Pilgrim_Reel, .Pilgrim_Catch,
+		.Ui_Fish_Card}) {
+		if sounds.played[sfx] == 0 { fmt.eprintln("mechanics lab: no sound for the fishing", sfx); return false }
 	}
 	fmt.eprintln("mechanics lab sounds:", heard)
 	return true

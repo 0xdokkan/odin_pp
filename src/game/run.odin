@@ -641,7 +641,7 @@ enter_node :: proc(run: ^Run_State, id: Node_Id) -> Node_Entry_Result {
 		next_phase = .Rest
 	case .Event:
 		event_ok: bool
-		next_event, event_ok = build_route_event_state(&run.player, node)
+		next_event, event_ok = build_route_event_state(&run.player, node, card_offer_exclusions(&run.player.deck))
 		if !event_ok {
 			return .Invalid
 		}

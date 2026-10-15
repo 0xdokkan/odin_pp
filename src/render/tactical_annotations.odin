@@ -139,9 +139,9 @@ draw_tactical_annotations :: proc(renderer: ^Renderer, room: ^game.Room) {
 	}
 	if room.qte.kind != .None { v.labels.bounds[0] = {14, TACTICAL_HUD_HEIGHT+13, 237, 143}; v.labels.count = 1 }
 	if v.mechanics_lab {
-		// The mechanics lab's banner is drawn over the board: labels keep clear.
-		v.labels.bounds[v.labels.count] = mechanics_lab_banner_bounds(renderer, "PROVA MECCANICHE",
-			"NEMICI 0/0  /  F5 RICOMINCIA  /  F6 INTENTI: SIGILLI + TERRENO  /  F10 MENU")
+		// The mechanics lab's banner is drawn over the board: labels keep clear
+		// of it, as wide as it is drawn now.
+		v.labels.bounds[v.labels.count] = mechanics_lab_banner_bounds(renderer, room)
 		v.labels.count += 1
 	}
 	// Existing status glyphs retain their ground lane, the paper tags under
@@ -164,7 +164,8 @@ draw_tactical_annotations :: proc(renderer: ^Renderer, room: ^game.Room) {
 	// Enemies keep their own clock: their health and intent stay on screen
 	// while the player's move or cast plays, and only leave with the enemy.
 	draw_living_hearts(renderer, room)
-	if tactical_room_is_clear(v.snapshot.phase) {
+	// The mechanics sandbox cleared for the rod keeps its exit shut: no USCITA.
+	if tactical_exit_is_open(room, v.snapshot.phase) {
 		p := room.exit_position
 		draw_tactical_label(renderer, tactical_project(renderer, {f32(p.x)+0.5, f32(p.y)+0.5}, 1.3), "USCITA", "", {124, 199, 215, 255})
 	}

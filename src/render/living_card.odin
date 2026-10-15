@@ -86,6 +86,8 @@ forget_living_actors :: proc(renderer: ^Renderer) {
 	if renderer == nil { return }
 	renderer.tactical.intent_traces = {}
 	renderer.tactical.shadow = {}
+	lasso_view_reset(&renderer.tactical.lasso)
+	fishing_view_reset(&renderer.tactical.fishing)
 	forget_attack_fx(renderer)
 	forget_ground_fx(renderer)
 	lab_sounds_reset(renderer)
@@ -181,20 +183,23 @@ living_travel_lift :: proc(kind: gfx.Living_Travel, u: f32) -> f32 {
 	return 0
 }
 
-// Where the card stands now: on its cell, or partway through its slide.
+// Where the card stands now: on its cell, or partway through its slide; and
+// how far it is off the board (a hop, the Lazzo's rope: lasso.odin).
 living_card_position :: proc(renderer: ^Renderer, entity: game.Entity_Ref, key: Sprite_Key, position: view.Vec2) -> (at: view.Vec2, lift: f32) {
 	at = position
+	lift = tactical_lasso_lift(renderer, entity)
 	if !renderer.tactical.living || renderer.tactical.living_state == nil { return }
 	character, ok := flipbook_character(key)
 	if !ok { return }
 	actor := living_find(renderer, entity, character)
-	if actor == nil || !actor.sliding { return }
+	// The rope carries the swung card: no slide of its own.
+	if actor == nil || !actor.sliding || tactical_lasso_holds(renderer, entity) { return }
 	now := living_clock(renderer, entity)
 	u := f32((now-actor.slide_start)*1000/f64(max(actor.slide_ms, 1)))
 	if u >= 1 { return }
 	p := living_travel_progress(actor.slide_kind, u) if u > 0 else 0
 	at = {actor.slide_from.x+(actor.slide_to.x-actor.slide_from.x)*p, actor.slide_from.y+(actor.slide_to.y-actor.slide_from.y)*p}
-	if u > 0 { lift = living_travel_lift(actor.slide_kind, u) }
+	if u > 0 { lift += living_travel_lift(actor.slide_kind, u) }
 	return
 }
 
@@ -205,12 +210,22 @@ living_cue_action :: proc(cue: ^Presentation_Cue, entity: game.Entity_Ref) -> (a
 	returned := game.event_is_reflected(event^) && game.event_is_ranged_attack(event^)
 	#partial switch cue.kind {
 	case .Damage:
+		// LAZZO: a full turn's 1 shakes nothing, and no wound of the rope is a
+		// blow the pivot swings (lasso.odin).
+		if game.event_is_lasso_turn(event^) { break }
 		if event.target == entity { return .Hurt, true }
-		if event.source == entity && !returned { return .Attack, true }
+		if event.source == entity && !returned && !game.event_is_lasso(event^) { return .Attack, true }
 	case .Damage_Absorbed, .Move_Blocked:
+		if game.event_is_lasso_turn(event^) { break }
 		if event.target == entity { return .Block, true }
 		// A blow stopped by a guard was still struck.
 		if event.source == entity && game.event_is_attack(event^) && !returned { return .Attack, true }
+	// The Lazzo's throw and the Canna da Pesca's cast (fishing.odin): he rises
+	// into his cast, arm up, and holds it (the channel beneath), never the
+	// lantern's leaping blow and back flip; the props in his hand stay put.
+	// The catch is reeled in with the rod alone: he holds still, channeling.
+	case .Lasso_Caught, .Fish_Cast:
+		if entity == game.PLAYER_ENTITY { return .Cast, true }
 	case .Attack_Deflected:
 		// RIFLESSO: the player guards and the blow turns back; it was struck
 		// all the same.
@@ -399,12 +414,16 @@ living_observe :: proc(renderer: ^Renderer, state: ^Living_State, room: ^game.Ro
 	if room != nil && actor.entity.kind == .Enemy {
 		for &enemy in room.enemies {
 			if game.enemy_entity(enemy.id) != actor.entity { continue }
-			if enemy.intent.kind == .Recover { base = .Stunned }
+			// Swung round on the Lazzo's rope, it is dazed.
+			if enemy.intent.kind == .Recover || game.enemy_is_lassoed(room, enemy.id) { base = .Stunned }
 			else if enemy.intent.windup { base = .Windup }
 			break
 		}
 	}
-	if room != nil && actor.entity == game.PLAYER_ENTITY && game.tactical_is_casting(room) { base = .Channel }
+	// Casting, or holding the Lazzo's rope as its pivot, or the Canna da Pesca
+	// over the water.
+	if room != nil && actor.entity == game.PLAYER_ENTITY && (game.tactical_is_casting(room) || game.tactical_lasso_active(room) ||
+	   fishing_cue_showing(renderer)) { base = .Channel }
 	base = gfx.living_resolve(character, base)
 	if base != slot.base {
 		slot.base = base

@@ -1062,3 +1062,89 @@ def card_venom_blade(seed):
         (0.41, _drop(0.06, 760, 0.12, 0.011), 0.16),
     ])
     return _out(x, 0.08)
+
+
+# --------------------------------------------------------------------------
+# The rope and the rod (Phase 3)
+
+def _hemp(dur, seed, t0, t1, rate=260.0, centre=1500.0, q=0.6, rough=0.75):
+    """Hemp rope running over itself or through a glove between t0 and t1: a
+    fibrous rasp (pink and white noise through a mid band, roughened by
+    stick-slip catches about `rate` a second), swelling in and fading out,
+    with a few fibre ticks."""
+    env = _gate(dur, t0, t1, a=max(0.004, (t1 - t0) * 0.25), r=max(0.006, (t1 - t0) * 0.45))
+    catches = np.abs(lowpass(np.abs(crackle(dur, rate * env + 1.0, seed, decay=0.0015)), 900, 1))
+    texture = (1 - rough) + rough * _norm(catches) ** 0.7
+    body = _norm(bandpass(pink(dur, seed + 1) + 0.5 * white(dur, seed + 2), centre, q))
+    ticks = grains(dur, random_times(dur, rate * 0.2, seed + 3, start=t0, end=t1), 0.004, seed + 4, band=(1800, 5500))
+    return _norm(body * texture * env) + 0.25 * _norm(ticks)
+
+
+def _pawl(seed, base):
+    """A reel's pawl ticking over its gear: a small stiff steel tick."""
+    modes = [(base, 0.004, 1.0), (base * 1.53, 0.003, 0.6), (base * 2.41, 0.002, 0.35)]
+    return _norm(_ring(0.03, modes, seed, attack=0.0001))
+
+
+@sound("card_lasso", loudness=LOUD, wet=WET, marks=(0.0, 0.04, 0.16, 0.22))
+def card_lasso(seed):
+    """Lazzo: the coil of hemp shaken loose off his shoulder (a fibrous rasp
+    from 0.03, the coils slapping softly against each other at 0.04 and
+    0.09), the loop opened with a creak of its knot at 0.16, then whirled once
+    overhead: a round swish peaking at 0.22 (a band rising 240 -> 760 Hz and
+    falling, the rope's thin whistle riding it, a darker body under it), which
+    hands on to the throw (pilgrim_lasso_throw) as the loop flies."""
+    dur = 0.6
+    coil = _hemp(dur, seed + 10, 0.03, 0.15, rate=300, centre=2000, q=0.55)
+    knot = _creak(dur, seed + 30, 70, 120, [(560, 1.0), (1250, 0.6), (2600, 0.3)], t0=0.15, t1=0.2, jitter=0.25, tau=0.006)
+    knot *= _gate(dur, 0.15, 0.2, 0.01, 0.015)
+    whirl = _whoosh(0.34, seed + 20, 240, 760, 360, t_peak=0.14, q=1.0, a=1.6, b=1.4, whistle=0.3)
+    body = _whoosh(0.34, seed + 21, 110, 260, 130, t_peak=0.14, q=0.9, a=1.6, b=1.4)
+    x = place(dur, [
+        (0.0, _flick(seed), FLICK),
+        (0.0, coil, 0.55),
+        (0.04, _thump(0.12, seed + 11, f0=260, f1=150, drop=0.01, tau=0.012, lp=1800, noise=1.0, ntau=0.01), 0.3),
+        (0.09, _thump(0.12, seed + 12, f0=240, f1=140, drop=0.01, tau=0.012, lp=1800, noise=1.0, ntau=0.01), 0.22),
+        (0.0, _norm(knot), 0.2),
+        (0.08, whirl, 0.75),
+        (0.08, body, 0.35),
+    ])
+    return _out(x, 0.1)
+
+
+@sound("card_fishing_rod", loudness=LOUD, wet=WET, marks=(0.0, 0.19, 0.27, 0.32))
+def card_fishing_rod(seed):
+    """Canna da Pesca, as it is cast (it is never played from the hand): the
+    card leaves its slot, the rod is drawn back over his shoulder (a dry creak
+    of the cane and a soft swish, 0.04-0.19), whipped forward (a thin fast
+    swish peaking at 0.27, its tip whistling) and the line let go at 0.32: the
+    reel's pawl spinning out, a purring click train slowing from 70 to 20 a
+    second as the bobber flies, the line hissing off the spool, until the
+    bobber is down at 0.62 (world_bobber_plop)."""
+    dur = 0.75
+    r = rng(seed + 1)
+    back = _whoosh(0.2, seed + 10, 260, 900, 520, t_peak=0.13, q=1.1, a=1.4, b=1.6, whistle=0.1)
+    cane = _creak(dur, seed + 11, 55, 95, [(820, 1.0), (1750, 0.55), (3400, 0.25)], t0=0.05, t1=0.19, jitter=0.3, tau=0.005)
+    cane *= _gate(dur, 0.05, 0.19, 0.04, 0.02)
+    whip = _whoosh(0.2, seed + 20, 1100, 4200, 2000, t_peak=0.075, q=1.7, a=1.3, b=1.8, whistle=0.55)
+    clicks = []
+    tt = 0.32
+    while tt < 0.64:
+        u = (tt - 0.32) / 0.32
+        clicks.append((tt, r.uniform(0.6, 1.0) * (1 - 0.55 * u)))
+        tt += 1 / (70 * (20 / 70) ** u)
+    reel = _clatter(dur, clicks, [_pawl(seed + 40 + j, f) for j, f in enumerate((2900, 3300, 3700))], seed + 2)
+    spool = _clatter(dur, clicks, [_wood(0.04, b, seed + 50 + j, tau=0.006, click=0.2) for j, b in enumerate((520, 610))],
+                     seed + 3)
+    hiss_l = 0.32
+    hiss = _norm(bandpass(white(hiss_l, seed + 4), 6200, 0.9)) * _swell(hiss_l, 0.02, a=1.0, b=1.4)
+    x = place(dur, [
+        (0.0, _flick(seed), FLICK),
+        (0.04, back, 0.35),
+        (0.0, _norm(cane), 0.22),
+        (0.19, whip, 0.7),
+        (0.0, _norm(reel), 0.45),
+        (0.0, _norm(spool), 0.2),
+        (0.32, hiss, 0.14),
+    ])
+    return _out(x, 0.06)

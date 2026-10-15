@@ -58,12 +58,29 @@ card_rarity_weight :: proc(weights: Card_Rarity_Weights, rarity: Card_Rarity) ->
 	return 0
 }
 
+// The cards an offer leaves out (card_offer_exclusions).
+Card_Offer_Exclusions :: bit_set[Card_Id; u64]
+
+// The cards a run holds at most once (the Canna da Pesca), while `deck` holds
+// one: every card offer leaves them out (rewards, the shop, the Armory, a
+// catch). `ignore` is an instance not to count: the card the Armory just
+// added, when its offer is checked again (route_event_state_is_valid).
+card_offer_exclusions :: proc(deck: ^Deck_State, ignore: u32 = 0) -> (excluded: Card_Offer_Exclusions) {
+	if deck == nil { return }
+	for card in deck.owned[:clamp(deck.owned_count, 0, MAX_OWNED_CARDS)] {
+		if card.id != ignore && card.definition_id == .Fishing_Rod { excluded += {.Fishing_Rod} }
+	}
+	return
+}
+
 // `tactical` is the run's mode: a classic run is never offered the cards that
-// need the tactical clock (card_requires_tactical).
-card_offer_weight :: proc(definition: Card_Definition, node: ^Run_Node, profile: ^M8_Profile = nil, tactical := true) -> u64 {
+// need the tactical clock (card_requires_tactical). `excluded` are left out
+// (card_offer_exclusions).
+card_offer_weight :: proc(definition: Card_Definition, node: ^Run_Node, profile: ^M8_Profile = nil, tactical := true,
+	excluded: Card_Offer_Exclusions = {}) -> u64 {
 	validated_definition := definition
 	if node == nil || !validate_card_definition(&validated_definition) || definition.temporary_only || !m8_card_unlocked(definition.id, profile) ||
-	   card_is_scopa(definition.id) || (!tactical && card_requires_tactical(definition.id)) {
+	   card_is_scopa(definition.id) || (!tactical && card_requires_tactical(definition.id)) || definition.id in excluded {
 		return 0
 	}
 	weights, ok := card_rarity_weights(node.kind, node.depth)
@@ -85,6 +102,7 @@ generate_weighted_card_choices :: proc(
 	destination: []Card_Id,
 	profile: ^M8_Profile = nil,
 	tactical := true,
+	excluded: Card_Offer_Exclusions = {},
 ) -> bool {
 	if random_state == nil || random_state^ == 0 || node == nil || node.depth < 0 ||
 	   len(destination) <= 0 || len(destination) > int(Card_Id.Count) {
@@ -92,7 +110,7 @@ generate_weighted_card_choices :: proc(
 	}
 	collectible_count := 0
 	for definition in CARD_DEFINITIONS {
-		if card_offer_weight(definition, node, profile, tactical) > 0 {
+		if card_offer_weight(definition, node, profile, tactical, excluded) > 0 {
 			collectible_count += 1
 		}
 	}
@@ -107,7 +125,7 @@ generate_weighted_card_choices :: proc(
 		total_weight: u64
 		for definition in CARD_DEFINITIONS {
 			if !selected[int(definition.id)] {
-				total_weight += card_offer_weight(definition, node, profile, tactical)
+				total_weight += card_offer_weight(definition, node, profile, tactical, excluded)
 			}
 		}
 		if total_weight == 0 {
@@ -120,7 +138,7 @@ generate_weighted_card_choices :: proc(
 			if selected[int(definition.id)] {
 				continue
 			}
-			weight := card_offer_weight(definition, node, profile, tactical)
+			weight := card_offer_weight(definition, node, profile, tactical, excluded)
 			if roll < weight {
 				chosen = definition.id
 				break

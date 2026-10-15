@@ -9,8 +9,12 @@ M8_Control :: enum {None, Activate, Equip, Character}
 // One layout drives drawing, hit testing and board occlusion. Loot controls
 // move to the footer; hidden equipment never leaves an invisible hit region.
 m8_active_bar_bounds :: proc(renderer: ^Renderer, room: ^game.Room = nil) -> rl.Rectangle {
+    return m8_bar_bounds(renderer, room != nil && room.phase == .Loot)
+}
+
+// The bar in a fight, or in the footer once the room is cleared (`loot`).
+m8_bar_bounds :: proc(renderer: ^Renderer, loot: bool) -> rl.Rectangle {
     width := min(f32(932), renderer.canvas_width-28)
-    loot := room != nil && room.phase == .Loot
     return {(renderer.canvas_width-width)*0.5, renderer.canvas_height-(46 if loot else 218), width, 28}
 }
 

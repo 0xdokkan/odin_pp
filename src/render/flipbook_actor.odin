@@ -357,8 +357,10 @@ flipbook_billboard_geometry :: proc(renderer: ^Renderer, character: gfx.Flipbook
 	lift := (gfx.FLIPBOOK_PAPER+gfx.FLIPBOOK_INK)*scale+0.03
 	if v.outline_mode == .Hologram { lift = 0; result.card = {} }
 	base := rl.Vector3{position.x+0.5, 0.02+lift+pose.lift, position.y+0.5}
-	// The player's card in its shadow, as on the living board (shadow_step.odin).
+	// The player's card in its shadow, as on the living board (shadow_step.odin);
+	// the Lazzo's foe up on its rope (lasso.odin).
 	base.y -= tactical_shadow_depth(renderer, entity)*sheet.world_height
+	base.y += tactical_lasso_lift(renderer, entity)
 	sy := scale*pose.scale_y
 	bl := base-right*(feet_x*scale*width)-up*(below*sy)
 	span := right*(cell.x*scale*width)

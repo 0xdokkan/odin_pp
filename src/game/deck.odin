@@ -327,8 +327,17 @@ begin_deck_combat :: proc(deck: ^Deck_State) -> bool {
 	staged.energy = staged.rules.max_energy
 	staged.combat_card_id_floor = staged.next_card_id
 	staged.combat_active = true
-	for index in 0..<staged.owned_count {
-		staged.draw_pile[index] = staged.owned[index]
+	// A room tool (the Canna da Pesca) is never drawn: it waits out the fight
+	// in Exhaust, which nothing draws or reshuffles from.
+	staged.draw_count = 0
+	for card in staged.owned[:staged.owned_count] {
+		if card_is_room_tool(card.definition_id) {
+			staged.exhaust_pile[staged.exhaust_count] = card
+			staged.exhaust_count += 1
+		} else {
+			staged.draw_pile[staged.draw_count] = card
+			staged.draw_count += 1
+		}
 	}
 	shuffle_draw_pile(&staged)
 	draw_to_hand_size(&staged)
@@ -337,6 +346,16 @@ begin_deck_combat :: proc(deck: ^Deck_State) -> bool {
 	}
 	deck^ = staged
 	return true
+}
+
+// The cards a fight exhausted, not counting the room tools that only wait
+// there (begin_deck_combat): what the hand's counters show.
+deck_exhausted_count :: proc(deck: ^Deck_State) -> (count: int) {
+	if deck == nil { return }
+	for card in deck.exhaust_pile[:clamp(deck.exhaust_count, 0, MAX_COMBAT_CARDS)] {
+		if !card_is_room_tool(card.definition_id) { count += 1 }
+	}
+	return
 }
 
 finish_deck_combat :: proc(deck: ^Deck_State) {

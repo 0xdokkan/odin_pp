@@ -23,11 +23,21 @@ LAB_SOUND_REPEAT_SECONDS :: f64(0.05)
 LAB_SOUND_DEAL_SECONDS :: f64(0.07)
 // A card that puts its device on the board sounds for both.
 LAB_SOUND_CARD_DEVICE_SECONDS :: f64(1)
+// The reel's own splash (pilgrim_reel's mark), lined up with the catch
+// breaking the water.
+LAB_REEL_SPLASH_SECONDS :: f64(0.1)
+// The rope's whirr at each full turn climbs with the spin: from this pitch,
+// this much a turn, up to the fourteenth.
+LAB_WHIRR_PITCH :: f32(0.85)
+LAB_WHIRR_PITCH_PER_TURN :: f32(0.05)
+LAB_WHIRR_TURNS :: i32(14)
 
 Lab_Sound :: struct {
 	sfx: audio.Lab_Sfx,
 	at: f64,
 	volume, pan: f32,
+	// The play's pitch (0: as recorded): the Lazzo's whirr climbs with its speed.
+	pitch: f32,
 }
 
 // A cue heard: its kind, its event and its command (Presentation_Cue.batch).
@@ -62,6 +72,8 @@ Lab_Sounds :: struct {
 	// a beat and beats so far.
 	shadow: bool,
 	shadow_steps, shadow_criticals, shadow_beats: u32,
+	// LAZZO as last heard (lasso.odin): its full turns and its releases.
+	lasso_whirrs, lasso_releases: int,
 	// What the lab has played so far (smoke and tests).
 	played: [audio.Lab_Sfx]int,
 }
@@ -70,7 +82,9 @@ Lab_Sounds :: struct {
 lab_sounds_reset :: proc(renderer: ^Renderer) {
 	if renderer == nil || renderer.tactical.lab_sounds == nil { return }
 	played := renderer.tactical.lab_sounds.played
-	renderer.tactical.lab_sounds^ = {played = played}
+	// The rope's counts go on (lasso_view_reset keeps them): nothing to hear yet.
+	lasso := &renderer.tactical.lasso
+	renderer.tactical.lab_sounds^ = {played = played, lasso_whirrs = lasso.whirrs, lasso_releases = lasso.releases}
 }
 
 destroy_lab_sounds :: proc(renderer: ^Renderer) {
@@ -79,11 +93,16 @@ destroy_lab_sounds :: proc(renderer: ^Renderer) {
 	renderer.tactical.lab_sounds = nil
 }
 
-lab_sound_queue :: proc(s: ^Lab_Sounds, sfx: audio.Lab_Sfx, at: f64, volume: f32 = 1, pan: f32 = 0) {
+// The whirr's pitch after `turns` full turns of the rope.
+lab_whirr_pitch :: proc(turns: i32) -> f32 {
+	return LAB_WHIRR_PITCH+LAB_WHIRR_PITCH_PER_TURN*f32(clamp(turns, 0, LAB_WHIRR_TURNS))
+}
+
+lab_sound_queue :: proc(s: ^Lab_Sounds, sfx: audio.Lab_Sfx, at: f64, volume: f32 = 1, pan: f32 = 0, pitch: f32 = 0) {
 	if at-s.last_played[sfx] < LAB_SOUND_REPEAT_SECONDS && at >= s.last_played[sfx] { return }
 	s.last_played[sfx] = at
 	if s.count == LAB_SOUND_QUEUE { return }
-	s.queue[s.count] = {sfx = sfx, at = at, volume = volume, pan = pan}
+	s.queue[s.count] = {sfx = sfx, at = at, volume = volume, pan = pan, pitch = pitch}
 	s.count += 1
 }
 
@@ -109,8 +128,10 @@ lab_sound_heard :: proc(s: ^Lab_Sounds, kind: Presentation_Cue_Kind, event: game
 lab_actor_sfx :: proc(character: gfx.Flipbook_Character, action: gfx.Living_Action, cause: Presentation_Cue_Kind,
 	travelled: int, shot := false) -> (sfx: audio.Lab_Sfx, ok: bool) {
 	// A blocked step bumps (the cue's own sound); a stopped blow is a block.
-	// A blow RIFLESSO turns back has its own (lab_cue_sounds).
+	// A blow RIFLESSO turns back has its own (lab_cue_sounds), and so do the
+	// Lazzo's throw and the Canna da Pesca's cast and catch.
 	if action == .Block && cause != .Damage_Absorbed { return }
+	if cause == .Lasso_Caught || cause == .Fish_Cast || cause == .Fish_Bite || cause == .Fish_Caught { return }
 	switch character {
 	case .Pilgrim:
 		#partial switch action {
@@ -233,6 +254,9 @@ lab_card_sfx :: proc(card: game.Card_Id) -> (sfx: audio.Lab_Sfx, ok: bool) {
 	case .Coffin: return .Card_Coffin, true
 	case .Fate_Dice: return .Card_Fate_Dice, true
 	case .Venom_Blade: return .Card_Venom_Blade, true
+	case .Lasso: return .Card_Lasso, true
+	// Heard as the rod is cast (lab_cue_sounds): it is never played.
+	case .Fishing_Rod: return .Card_Fishing_Rod, true
 	case .Count:
 	}
 	return
@@ -337,6 +361,35 @@ lab_cue_sounds :: proc(renderer: ^Renderer, s: ^Lab_Sounds, cue: ^Presentation_C
 		}
 	case .Defeat:
 		if event.target == game.PLAYER_ENTITY { lab_sound_queue(s, .Ui_Defeat, now+0.6) }
+	// LAZZO (lasso.odin): the throw from his hand, then the loop cinching as
+	// it drops round the foe (and the rope jerking taut as the card is
+	// lifted); each hit on a foe, or a smash into the wall, at the swung card.
+	case .Lasso_Caught:
+		lab_sound_queue(s, .Pilgrim_Lasso_Throw, now, 1, lab_sound_pan(renderer, game.PLAYER_ENTITY))
+		lab_sound_queue(s, .World_Lasso_Wrap, now+f64(cue.duration*LASSO_THROW_FLOWN), 1, pan)
+	case .Lasso_Struck:
+		smash := event.target == game.SYSTEM_ENTITY
+		lab_sound_queue(s, .World_Lasso_Smash if smash else .World_Lasso_Hit, now, 1, lab_sound_pan(renderer, event.source))
+	// CANNA DA PESCA (fishing.odin), at the player: the card as the rod is
+	// cast; the bobber's plop as the bite's cue starts (the water shows), the
+	// bite's gulp and splash as the bobber dips; the reel, its splash where
+	// the catch breaks the water, then the catch reaching his hand (food) or
+	// a caught card reaching him.
+	case .Fish_Cast:
+		lab_sound_queue(s, .Card_Fishing_Rod, now, 1, lab_sound_pan(renderer, game.PLAYER_ENTITY))
+	case .Fish_Bite:
+		player := lab_sound_pan(renderer, game.PLAYER_ENTITY)
+		lab_sound_queue(s, .World_Bobber_Plop, now, 1, player)
+		lab_sound_queue(s, .World_Fish_Bite, now+f64(cue.duration*FISHING_BITE_AT), 1, player)
+	case .Fish_Caught:
+		player := lab_sound_pan(renderer, game.PLAYER_ENTITY)
+		duration := f64(cue.duration)
+		lab_sound_queue(s, .Pilgrim_Reel, now+max(0, duration*f64(FISHING_REEL*FISHING_REEL_BREAKS)-LAB_REEL_SPLASH_SECONDS), 1, player)
+		if event.card_definition == .Fishing_Rod {
+			lab_sound_queue(s, .Pilgrim_Catch, now+duration*f64(fishing_food_taken()), 1, player)
+		} else {
+			lab_sound_queue(s, .Ui_Fish_Card, now+duration*f64(FISHING_CARD_LANDS), 1, player)
+		}
 	}
 }
 
@@ -391,6 +444,18 @@ update_lab_sounds :: proc(renderer: ^Renderer, room: ^game.Room, now: f64) {
 	if shadow.beats != s.shadow_beats {
 		s.shadow_beats = shadow.beats
 		lab_sound_queue(s, .Ui_Beat_Tick, now)
+	}
+	// LAZZO: the rope whirrs at each full turn, higher as it speeds up, and
+	// goes slack when it lets a living foe go, its card dropping back to the
+	// floor (lasso.odin); a foe that dies on it falls with its own death.
+	lasso := &v.lasso
+	if lasso.whirrs != s.lasso_whirrs {
+		s.lasso_whirrs = lasso.whirrs
+		lab_sound_queue(s, .World_Lasso_Whirr, now, 0.8, lab_sound_pan(renderer, lasso.enemy), lab_whirr_pitch(lasso.turns))
+	}
+	if lasso.releases != s.lasso_releases {
+		s.lasso_releases = lasso.releases
+		lab_sound_queue(s, .World_Lasso_Release, now, 1, lab_sound_pan(renderer, lasso.enemy))
 	}
 	// The cues now showing, each once; the cards first, so what they put on
 	// the board knows they already sounded. What was heard is kept on the
@@ -460,7 +525,8 @@ play_lab_sounds :: proc(renderer: ^Renderer, bank: ^audio.Lab_Bank, volume: f32)
 		wobble := f32(seed%1000)/500-1
 		wobble2 := f32((seed/1000)%1000)/500-1
 		gain := sound.volume*math.pow(10, wobble2*1.5/20)
-		audio.lab_play(bank, sound.sfx, volume*gain, 1+0.04*wobble, sound.pan)
+		pitch := sound.pitch if sound.pitch > 0 else 1
+		audio.lab_play(bank, sound.sfx, volume*gain, pitch*(1+0.04*wobble), sound.pan)
 	}
 	s.count = kept
 }

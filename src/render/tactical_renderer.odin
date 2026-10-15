@@ -47,8 +47,9 @@ Tactical_View :: struct {
 	inspected: u32,
 	inspected_mouse: rl.Vector2,
 	// The mechanics lab is running: its banner sits over the board and its
-	// trial extras show (the enemies' action rings).
-	mechanics_lab: bool,
+	// trial extras show (the enemies' action rings); opened from the menu, the
+	// banner names F10 too (mechanics_lab_hud.odin).
+	mechanics_lab, mechanics_lab_menu: bool,
 	// The pause menu: the button under the mouse, and whether there is a main
 	// menu to go back to.
 	pause_hovered: Pause_Choice,
@@ -68,6 +69,10 @@ Tactical_View :: struct {
 	// FERETRO: the player holds Ctrl with arrows to loose; the board marks the
 	// foes they reach (player_charges.odin). The scene sets it every frame.
 	arrow_aim: bool,
+	// LAZZO: the rope, the swung card and the ring on the floor (lasso.odin).
+	lasso: Lasso_View,
+	// CANNA DA PESCA: the rod, its line, the bobber and the catch (fishing.odin).
+	fishing: Fishing_View,
 	// The last pointer seen by the view, for HUD hover states only.
 	pointer: view.Vec2,
 	pointer_inside: bool,
@@ -133,6 +138,8 @@ destroy_tactical_assets :: proc(renderer: ^Renderer) {
 	destroy_living_cards(renderer)
 	destroy_lab_sounds(renderer)
 	destroy_ground_fx(renderer)
+	destroy_lasso_view(renderer)
+	destroy_fishing_view(renderer)
 	if renderer.tactical.outline_shader.id != 0 { rl.UnloadShader(renderer.tactical.outline_shader); renderer.tactical.outline_shader = {} }
 	if renderer.tactical.labels != nil { free(renderer.tactical.labels); renderer.tactical.labels = nil }
 	if renderer.tactical.light_shader.id != 0 { rl.UnloadShader(renderer.tactical.light_shader); renderer.tactical.light_shader = {} }
@@ -168,8 +175,11 @@ update_tactical_view :: proc(renderer: ^Renderer, room: ^game.Room, mouse: view.
 	if !v.enabled { return }
 	tactical_hud_pointer(renderer, mouse, inside)
 	v.snapshot^ = renderer_presentation_snapshot(renderer, room)
-	// Before the vision and the camera: in the shadow they follow the pool.
+	// Before the vision and the camera: in the shadow they follow the pool;
+	// the Lazzo's foe flies where the room's rope swings it.
 	update_tactical_shadow(renderer, room)
+	update_tactical_lasso(renderer, room)
+	update_tactical_fishing(renderer)
 	v.no_fog = room.player.tactical.config.vision_size == 0 || tactical_room_is_clear(v.snapshot.phase)
 	if !tactical_room_is_clear(v.snapshot.phase) { v.clear_light = 0 }
 	v.refocus_enabled = room.phase == .Combat && game.tactical_allows_action(room)
@@ -188,20 +198,24 @@ update_tactical_view :: proc(renderer: ^Renderer, room: ^game.Room, mouse: view.
 			v.visible_count += 1
 		}
 	}
+	lasso_extend_vision(renderer, room)
 	if !v.world_orbit.initialized { reset_tactical_orbit(&v.world_orbit) }
 	if inside && !refresh_only {
 		update_tactical_orbit_input(&v.world_orbit, mouse, point_in_rectangle(mouse, tactical_world_bounds(renderer)), .MIDDLE)
 	}
-	// Aim slightly in front of the player to reserve the bottom for a full hand.
+	// Aim slightly in front of the player to reserve the bottom for a full hand
+	// (while the Lazzo spins a wide ring: farther back and nearer him, so all
+	// of it shows between the HUD and the hand).
+	pull := lasso_camera_pull(renderer)
 	forward := rl.Vector3{math.cos(v.world_orbit.yaw), 0, math.sin(v.world_orbit.yaw)}
 	footprint_scale := 1.1+f32(max(0, size-5))*0.065
-	target := rl.Vector3{p.x+0.5, 0, p.y+0.5}+forward*(1.10*footprint_scale)
+	target := rl.Vector3{p.x+0.5, 0, p.y+0.5}+forward*(1.10*footprint_scale*(1-LASSO_CAMERA_AIM*pull))
 	framed_orbit := v.world_orbit
-	framed_orbit.distance *= footprint_scale
+	framed_orbit.distance *= footprint_scale*(1+LASSO_CAMERA_BACK*pull)
 	v.zoom = framed_orbit.distance*0.65
 	v.camera = tactical_orbit_camera(framed_orbit, target, v.perspective)
 	v.draw_frustum = tactical_draw_frustum(v.camera, renderer.canvas_width, renderer.canvas_height)
-	renderer.camera.zoom = 1.1/footprint_scale*12.5/v.world_orbit.distance
+	renderer.camera.zoom = 1.1/footprint_scale*12.5/v.world_orbit.distance/(1+LASSO_CAMERA_BACK*pull)
 	renderer.camera.origin = {renderer.canvas_width*0.5, renderer.canvas_height*0.44}
 	center := view.grid_point_to_world(&renderer.projection, {p.x+0.5, p.y+0.5})
 	renderer.camera.origin.x -= center.x*renderer.camera.zoom
@@ -445,7 +459,7 @@ draw_tactical_world :: proc(renderer: ^Renderer, room: ^game.Room, active_card: 
 		if v.scene_3d { draw_voxel_cover(renderer, obstacle.position) }
 		else { draw_diamond(inset_vertices(tile_vertices(renderer, obstacle.position), 0.7), rl.GRAY, rl.LIGHTGRAY) }
 	}
-	if !v.scene_3d { draw_ground_flat(renderer, room) }
+	if !v.scene_3d { draw_ground_flat(renderer, room); draw_lasso_flat_ring(renderer, room) }
 	for trap in snapshot.traps[:snapshot.trap_count] {
 		if !trap.armed || !tactical_cell_on_screen(renderer, trap.position) || !tactical_render_visible(renderer, trap.position) { continue }
 		if v.scene_3d { draw_voxel_trap(renderer, trap) }
@@ -465,16 +479,25 @@ draw_tactical_world :: proc(renderer: ^Renderer, room: ^game.Room, active_card: 
 	for &actor in snapshot.enemies[:snapshot.enemy_count] {
 		cell := grid.Position{int(math.round(actor.position.x)), int(math.round(actor.position.y))}
 		if !actor.visible || !tactical_render_visible(renderer, cell) { continue }
-		if !v.scene_3d { draw_enemy_body(renderer, {archetype = actor.archetype, health = actor.health}, tactical_project(renderer, {actor.position.x+0.5, actor.position.y+0.5}), actor.opacity) }
+		if !v.scene_3d {
+			// The Lazzo's foe flies over the board.
+			center := tactical_project(renderer, {actor.position.x+0.5, actor.position.y+0.5})
+			center.y -= tactical_lasso_lift(renderer, actor.entity)*LASSO_FLAT_LIFT_PIXELS*renderer.camera.zoom
+			draw_enemy_body(renderer, {archetype = actor.archetype, health = actor.health}, center, actor.opacity)
+		}
 	}
 	if snapshot.player.visible && !v.scene_3d {
 		center := tactical_project(renderer, {snapshot.player.position.x+0.5, snapshot.player.position.y+0.5})
 		if tactical_shadow_showing(renderer) { draw_tactical_shadow_flat(renderer, center, snapshot.player.opacity) }
 		else { draw_player_body(renderer, center, snapshot.player.opacity) }
+		draw_lasso_flat_rope(renderer)
+		draw_fishing_flat(renderer)
 	}
 	if v.scene_3d {
 		rl.EndShaderMode()
 		draw_ground_decal(renderer, room)
+		draw_fishing_ripples(renderer)
+		draw_lasso_ring(renderer, room)
 		draw_tactical_ground_shadows(renderer, room)
 		draw_diorama_accents(renderer, room)
 		draw_tactical_clear_markers(renderer, room)
@@ -487,6 +510,7 @@ draw_tactical_world :: proc(renderer: ^Renderer, room: ^game.Room, active_card: 
 		if surface { rl.BeginMode2D({zoom = 2}) }
 		if !renderer_blocks_player_input(renderer) {
 			draw_card_target_range(renderer, room, active_card)
+			draw_fishing_target_range(renderer, room, active_card)
 			draw_arrow_aim(renderer, room)
 		}
 		if !v.scene_3d { for &enemy in room.enemies {
@@ -515,7 +539,10 @@ draw_tactical_world :: proc(renderer: ^Renderer, room: ^game.Room, active_card: 
 	}
 	draw_tactical_annotations(renderer, room)
 	draw_intent_seals(renderer, room)
+	// After the seals, so another foe's sticker never covers it.
+	draw_lasso_heavy_labels(renderer, room, active_card)
 	draw_tactical_shadow_overlay(renderer)
+	draw_lasso_release_badge(renderer)
 	// Filter each member of simultaneous impacts, not only the first event.
 	for offset in 0..<renderer_active_cue_count(renderer) {
 		cue, found := renderer_active_cue_at(renderer, offset)

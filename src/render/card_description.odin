@@ -72,6 +72,10 @@ gothic_card_lines :: proc(card: game.Card_Instance, tactical: bool = false) -> (
 		case .Coffin: return fmt.ctprintf("%d FRECCE / CTRL+CLIC", a), fmt.ctprintf("%d DANNO + 1 STATUS", game.COFFIN_ARROW_DAMAGE)
 		case .Fate_Dice: return fmt.ctprintf("%s SU %d COLPI", card_dice_label(card), game.FATE_DICE_CHARGES), "UN TIRO A OGNI COLPO"
 		case .Venom_Blade: return fmt.ctprintf("%s COLPI AVVELENATI", card_dice_label(card)), fmt.ctprintf("%d VELENO A COLPO", game.VENOM_BLADE_POISON)
+		// LAZZO (game/lasso.odin): the hits it numbers, and a full turn's bite.
+		case .Lasso: return fmt.ctprintf("COLPI %d, %d, %d...", a, a+1, a+2), fmt.ctprintf("-%d VITA A OGNI GIRO", game.LASSO_TURN_DAMAGE)
+		// CANNA DA PESCA (game/fishing.odin): the room's fishings, and the catch.
+		case .Fishing_Rod: return fishing_rod_first_line(a), fmt.ctprintf("CIBO %s / %d%% CARTA", die_label(game.FISHING_HEAL_SIDES), game.FISHING_CARD_PERCENT)
 		case .Sei_Denari, .Sette_Denari: return fmt.ctprintf("+%d ORO", a), "SCOPA / UNA VOLTA PER STANZA"
 		case .Titan_Grip, .Storm_Crown, .Shock_Floor, .Tesla_Coil, .Firebomb, .Calculated_Risk, .Spark, .Grappling_Hook,
 		     .Fate_Strike, .Sundering_Blow, .Prismatic_Barrage, .Twin_Venom, .Count:
@@ -123,13 +127,22 @@ gothic_card_lines :: proc(card: game.Card_Instance, tactical: bool = false) -> (
 	case .Coffin: return fmt.ctprintf("%d FRECCE", a), "SOLO TATTICA"
 	case .Fate_Dice: return fmt.ctprintf("%s SU %d COLPI", card_dice_label(card), game.FATE_DICE_CHARGES), "SOLO TATTICA"
 	case .Venom_Blade: return fmt.ctprintf("%s COLPI AVVELENATI", card_dice_label(card)), "SOLO TATTICA"
+	case .Lasso: return fmt.ctprintf("COLPI %d, %d, %d...", a, a+1, a+2), "SOLO TATTICA"
+	case .Fishing_Rod: return fishing_rod_first_line(a), "SOLO TATTICA"
 	case .Count: return "", ""
 	}
 	return "", ""
 }
 
+// The Canna da Pesca's fishings a room: "1 PESCA A STANZA", "2 PESCHE...".
+fishing_rod_first_line :: proc(casts: i32) -> cstring {
+	return fmt.ctprintf("%d PESCA A STANZA" if casts == 1 else "%d PESCHE A STANZA", casts)
+}
+
 // A hand of seven or eight cards: narrower than this, a card's lines shrink
-// or are cut. PROVA MECCANICHE holds its whole deck, seven cards, at once.
+// or are cut. PROVA MECCANICHE holds its whole deck in hand, eight cards (the
+// Canna da Pesca waits in Exhaust), 109 pixels wide on the 960 canvas: its
+// smoke measures every one of their words there (tactical_card_text_misfit).
 CARD_NARROW_WIDTH :: f32(130)
 
 // The short lines of the cards whose hand lines would not hold their size on
@@ -143,9 +156,30 @@ gothic_card_narrow_lines :: proc(card: game.Card_Instance, tactical: bool = fals
 	case .Shock_Floor: return fmt.ctprintf("%s COLPI + BERS.", card_dice_label(card)), fmt.ctprintf("%d DANNO / 3X3", a), true
 	case .Tesla_Coil: return fmt.ctprintf("%d / DIST. DANNI", a), "CAMPO USA 4 TESLA", true
 	case .Shadow_Step: return fmt.ctprintf("OMBRA %ds", a), "MONDO FERMO", true
-	case .Wildfire: return fmt.ctprintf("%d BRUCIATURA", a), "CROCE: +1 A FINESTRA", true
-	case .Coffin: return fmt.ctprintf("%d FRECCE", a), fmt.ctprintf("CTRL+CLIC: %d DANNO", game.COFFIN_ARROW_DAMAGE), true
-	case .Venom_Blade: return fmt.ctprintf("%s COLPI", card_dice_label(card)), fmt.ctprintf("%d VELENO A COLPO", game.VENOM_BLADE_POISON), true
+	case .Poison_Pool: return fmt.ctprintf("%d VELENO", a), "A OGNI CELLA", true
+	case .Wildfire: return fmt.ctprintf("%d BRUCIATURA", a), "CRESCE A CROCE", true
+	case .Deflect: return fmt.ctprintf("+%d RIFLESSO", a), "IL COLPO TORNA", true
+	case .Coffin: return fmt.ctprintf("%d FRECCE", a), "CTRL+CLIC", true
+	case .Fate_Dice: return fmt.ctprintf("%s A COLPO", card_dice_label(card)), fmt.ctprintf("PER %d COLPI", game.FATE_DICE_CHARGES), true
+	case .Venom_Blade: return fmt.ctprintf("%s COLPI", card_dice_label(card)), fmt.ctprintf("%d VELENO L'UNO", game.VENOM_BLADE_POISON), true
+	case .Lasso: return fmt.ctprintf("COLPI %d, %d...", a, a+1), fmt.ctprintf("-%d VITA A GIRO", game.LASSO_TURN_DAMAGE), true
+	// Its slot is narrower on a canvas narrower than the game's.
+	case .Fishing_Rod:
+		return fmt.ctprintf("%d PESCA" if a == 1 else "%d PESCHE", a), fmt.ctprintf("CIBO %s O CARTA", die_label(game.FISHING_HEAL_SIDES)), true
+	}
+	return
+}
+
+// The short name a narrow card gives a card whose name would be cut there
+// (the inspector keeps the whole name). found is false for the cards whose
+// names hold as they are.
+gothic_card_narrow_name :: proc(id: game.Card_Id) -> (name: cstring, found: bool) {
+	#partial switch id {
+	case .Shadow_Step: return "Ombra", true
+	case .Poison_Pool: return "Pozza", true
+	case .Fate_Dice: return "Dado", true
+	case .Venom_Blade: return "Lama", true
+	case .Fishing_Rod: return "Canna", true
 	}
 	return
 }

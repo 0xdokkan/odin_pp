@@ -8,7 +8,10 @@ library.)
 The weapons the living cards swing, the bolts, bomb and embers they throw and
 the paper bits of an impact (src/render/attack_fx.odin); the flames of the
 ground's fires, the flask a pool is thrown in, its drops and the cinders a
-fire throws (src/render/ground_fx.odin). Each prop is pixel
+fire throws (src/render/ground_fx.odin); the Canna da Pesca's rod, its
+bobber, the water's drops, the bite's "!" and what it catches: a fish, an
+apple, bread, cheese, meat or a card (src/render/fishing.odin); the stone dust
+of the Lazzo's smash into a wall (src/render/lasso.odin). Each prop is pixel
 art written here as rows of palette letters, in the figures' own colours;
 the script adds its ink outline (every empty texel touching the body, 8-way)
 and closes hollows of a texel or two. Its paper is an exact distance field
@@ -76,6 +79,10 @@ PALETTE = {
     "H": (250, 250, 246),                                           # white print, tinted at run time
     "a": (28, 74, 52), "c": (52, 128, 72), "h": (150, 222, 132),    # venom
     "k": (196, 226, 214), "m": (150, 104, 64),                      # glass, cork
+    "A": (36, 84, 150), "C": (70, 140, 208), "E": (186, 226, 248),  # water, foam
+    "M": (126, 156, 184), "J": (74, 100, 134),                      # a fish
+    "u": (242, 198, 74), "t": (196, 146, 44),                       # cheese
+    "V": (204, 198, 188), "D": (158, 152, 144), "Z": (112, 106, 100),  # stone dust
 }
 
 # name, rows (None: an analytic shape), grip, tip (texels of the rows, x to the
@@ -359,6 +366,133 @@ PROPS = [
     ("Drop_B", ["..h.", ".hcc", "hcca", ".aa."], (1.5, 3.5), (2.5, 0.5), True, True, 1.2),
     # A cinder a fire throws: a spark in its glow.
     ("Cinder", [".g.", "gUg", ".F."], (1.5, 2.5), (1.5, 0.5), True, True, 1.6),
+    # CANNA DA PESCA: the rod, held at its cork grip under the reel, its line
+    # guides on one side, the tip leading.
+    ("Rod", [
+        ".w..",
+        ".w..",
+        ".w..",
+        ".ws.",
+        ".w..",
+        ".w..",
+        ".w..",
+        ".w..",
+        ".ws.",
+        ".w..",
+        ".w..",
+        ".w..",
+        ".w..",
+        ".W..",
+        ".Ws.",
+        ".W..",
+        ".W..",
+        ".W..",
+        ".W..",
+        ".W..",
+        ".Ws.",
+        ".W..",
+        ".W..",
+        ".W..",
+        ".W..",
+        ".W..",
+        ".W..",
+        ".Ws.",
+        ".W..",
+        ".W..",
+        "sSs.",
+        "SsSj",
+        "sSs.",
+        ".L..",
+        ".l..",
+        ".L..",
+        ".l..",
+        ".L..",
+        ".v..",
+    ], (1.5, 34.5), (1.5, 0.5), True, True, 1.6),
+    # Its bobber, red over white, its quill up.
+    ("Bobber", [".v.", ".v.", "rRr", "RrR", "nNn", "NnN", ".N."], (1.5, 6.5), (1.5, 0.5), True, True, 1.8),
+    # The drops of the water it lands in and a catch comes out of.
+    ("Wet_A", [".E.", "ECC", "ECC", "CCA", ".A."], (1.5, 4.5), (1.5, 0.5), True, True, 1.2),
+    ("Wet_B", ["..E.", ".ECC", "ECCA", ".AA."], (1.5, 3.5), (2.5, 0.5), True, True, 1.2),
+    # The bite's "!".
+    ("Bang", ["rr", "rR", "rR", "rR", "RR", "..", "rR"], (1.0, 6.5), (1.0, 0.5), True, True, 2.6),
+    # What it catches: the foods (a fish, an apple, a loaf, a wedge of cheese,
+    # a leg of meat) held at their bottom, and a card, its gold-edged back.
+    ("Fish", [
+        "....JJJJ....",
+        "..JJMMMMJJ.J",
+        ".JKMMMMMMMJJ",
+        "JMMMMMMMMMJJ",
+        ".JMEEEEEEMJJ",
+        "..JJEEEEJJ.J",
+        "....JJJJ....",
+    ], (6.0, 6.5), (6.0, 0.5), True, True, 1.6),
+    ("Apple", [
+        "....vh..",
+        "...vhhc.",
+        ".rrvrr..",
+        "rrRRRRr.",
+        "rRRRRRRd",
+        "rRRRRRRd",
+        ".RRRRRd.",
+        "..dddd..",
+    ], (4.0, 7.5), (4.0, 0.5), True, True, 1.6),
+    ("Bread", [
+        "..yyyyyy..",
+        ".yYeYeYey.",
+        "yYYYYYYYYy",
+        "yYYYYYYYYy",
+        "WyyyyyyyyW",
+        ".WWWWWWWW.",
+    ], (5.0, 5.5), (5.0, 0.5), True, True, 1.6),
+    ("Cheese", [
+        "......uu.",
+        "....uuuut",
+        "..uuutuut",
+        "uuuuuuuut",
+        "uutuuuutt",
+        "tttttttt.",
+    ], (4.5, 5.5), (4.5, 0.5), True, True, 1.6),
+    ("Meat", [
+        "..qqqq....",
+        ".qppppq...",
+        "qpprppq...",
+        "qppppppq..",
+        ".qppppqnn.",
+        "..qqqqnNnn",
+        "......nNNn",
+        ".......nn.",
+    ], (5.0, 7.5), (5.0, 0.5), True, True, 1.6),
+    ("Card_Back", [
+        "YYYYYYYY",
+        "YTTTTTTY",
+        "YTTeeTTY",
+        "YTeTTeTY",
+        "YTTeeTTY",
+        "YTTTTTTY",
+        "YTTeeTTY",
+        "YTeTTeTY",
+        "YTTeeTTY",
+        "YTTTTTTY",
+        "YYYYYYYY",
+    ], (4.0, 10.5), (4.0, 0.5), True, True, 2.2),
+    # LAZZO: the stone dust a swung foe knocks off a wall it smashes into, two
+    # puffs, pale where the light takes them, held at their foot
+    # (src/render/lasso.odin).
+    ("Dust_A", [
+        "..VVV.VV.",
+        ".VVVVVVDV",
+        "VVVDDDDDD",
+        "VDDDDDDZD",
+        ".DDZDDZZ.",
+        "..ZZZZZ..",
+    ], (4.0, 5.5), (4.0, 0.5), True, True, 1.4),
+    ("Dust_B", [
+        ".VV.V.",
+        "VVVVDV",
+        "VDDDDD",
+        ".DZZZ.",
+    ], (2.5, 3.5), (2.5, 0.5), True, True, 1.4),
 ]
 
 

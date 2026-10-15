@@ -855,3 +855,29 @@ def ui_defeat(seed):
     bell = _norm(lowpass(_bell(_hz("D4"), 1.0, tau=0.75, attack=0.006), 2200, 2))
     x = place(dur, [(0.0, drone, 0.45), (0.0, wind, 0.08), (0.0, crumple, 0.22), (1.0, bell, 0.22)])
     return _finish(x, 0.05)
+
+
+# --------------------------------------------------------------------------
+# The Canna da Pesca's find (Phase 3)
+
+@sound("ui_fish_card", loudness=-20, wet=0.35)
+def ui_fish_card(seed):
+    """CARTA PESCATA: the caught card shaken twice in the air as it reaches
+    him (dull wet paper flaps at 0.0 and 0.08, drops flung off it), then the
+    find: crystal A5, D6 and A6 rising (0.12, 0.18, 0.25) over a warm D5 and
+    A4, a few sparkles."""
+    dur = 0.9
+    r = rng(seed)
+    events = []
+    for k, t0 in enumerate((0.0, 0.08)):
+        times = sorted(t0 + 0.03 * r.random(7) ** 1.5)
+        events.append((0.0, _paper(dur, times, seed + 10 + k, band=(900.0, 4500.0), glen=(0.008, 0.025)), 0.5 - 0.15 * k))
+    for _ in range(6):
+        events.append((0.02 + 0.2 * r.random(), _bubble(r.uniform(1600, 3400), 0.6, 0.004), 0.12))
+    warm = (sine(_hz("D5"), dur) + 0.5 * sine(_hz("A4"), dur)) * _env(dur, [(0, 0), (0.12, 0), (0.2, 1), (0.8, 0)])
+    sparkle = _paper(dur, sorted(0.15 + 0.4 * r.random(10) ** 1.5), seed + 20, band=(6000, 12000), glen=(0.002, 0.005))
+    events += [(0.12, _crystal(_hz("A5"), 0.6, tau=0.16, bright=0.8), 0.45),
+               (0.18, _crystal(_hz("D6"), 0.6, tau=0.18, bright=0.9), 0.55),
+               (0.25, _crystal(_hz("A6"), 0.62, tau=0.22, bright=1.0), 0.6),
+               (0.0, warm, 0.12), (0.0, sparkle, 0.05)]
+    return _finish(place(dur, events), 0.15)

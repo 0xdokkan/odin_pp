@@ -98,6 +98,12 @@ draw_tactical_actor_bases :: proc(renderer: ^Renderer) {
 		at, _ := living_card_position(renderer, actor.entity, key, actor.position)
 		p := rl.Vector3{at.x+0.5, 0.048, at.y+0.5}
 		draw_tactical_actor_shadow(p)
+		// Up on the Lazzo's rope: its shadow on the floor, and the stand it
+		// carries (lasso.odin).
+		if tactical_lasso_holds(renderer, actor.entity) {
+			if renderer.tactical.flipbook.loaded { draw_flipbook_stand(renderer, key, actor.position, GOTHIC_RED, actor.entity) }
+			continue
+		}
 		rl.DrawCylinder(p, 0.3, 0.3, 0.01, 24, GOTHIC_INK)
 		rl.DrawCircle3D(p+rl.Vector3{0, 0.01, 0}, 0.32, {1, 0, 0}, 90, GOTHIC_RED)
 		if renderer.tactical.flipbook.loaded { draw_flipbook_stand(renderer, key, actor.position, GOTHIC_RED, actor.entity) }

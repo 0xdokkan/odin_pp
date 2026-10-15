@@ -394,7 +394,8 @@ tick_board_devices :: proc(room: ^Room, pulse: ^Pulse_Report) {
 shock_floor_targets :: proc(room: ^Room, object: Grid_Object) -> (ids: [MAX_ENEMIES_PER_ROOM]u32, count: int) {
 	distances: [MAX_ENEMIES_PER_ROOM]int
 	for enemy in room.enemies {
-		if !shock_floor_contains_cell(room, object.position, enemy.position) { continue }
+		// A foe the Lazzo swings over the floor is out of its reach.
+		if !shock_floor_contains_cell(room, object.position, enemy.position) || enemy_is_lassoed(room, enemy.id) { continue }
 		distance := max(abs(object.position.x-enemy.position.x), abs(object.position.y-enemy.position.y))
 		at := count
 		for at > 0 && (distances[at-1] > distance || (distances[at-1] == distance && ids[at-1] > enemy.id)) {

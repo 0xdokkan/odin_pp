@@ -53,9 +53,17 @@ GROUND_CHAR_DEEP :: rl.Color{46, 20, 22, 255}
 GROUND_CHAR :: rl.Color{92, 34, 26, 255}
 GROUND_CHAR_EMBER :: rl.Color{196, 76, 34, 255}
 GROUND_CHAR_HOT :: rl.Color{244, 157, 104, 255}
+// The Canna da Pesca's water (fishing.odin): blue, with ripples round each
+// cell's middle.
+GROUND_WATER_DEEP :: rl.Color{24, 54, 102, 255}
+GROUND_WATER :: rl.Color{44, 98, 164, 255}
+GROUND_WATER_LIGHT :: rl.Color{102, 168, 222, 255}
+GROUND_WATER_RIPPLE :: rl.Color{140, 196, 238, 255}
+GROUND_WATER_GLINT :: rl.Color{220, 242, 252, 255}
 
-// The scorch lies under the pool where both are.
-Ground_Layer :: enum u8 {Char, Pool}
+// The scorch lies under the pool where both are; the water never shares a
+// cell with either (game.fishing_cell_is_free).
+Ground_Layer :: enum u8 {Char, Pool, Water}
 Ground_Layers :: bit_set[Ground_Layer; u8]
 
 Ground_Fx_Cell :: struct {
@@ -195,7 +203,7 @@ ground_fx_profiles :: proc(fx: ^Ground_Fx) {
 	if fx.profile_texels == t { return }
 	fx.profile_texels = t
 	for layer in Ground_Layer {
-		radius := max(2, t/5 if layer == .Pool else t/6)
+		radius := max(2, t/6 if layer == .Char else t/5)
 		line, blurred: [GROUND_TEXELS*5]f32
 		for i in 2*t..<3*t { line[i] = 1 }
 		for _ in 0..<2 {
@@ -231,6 +239,7 @@ ground_noise :: proc(x, y: f32, period: f32, seed: int) -> f32 {
 ground_liquid_cut :: proc(layer: Ground_Layer, value: f32, gx, gy, texels: int) -> bool {
 	level, wobble, seed := f32(0.62), f32(0.30), 1
 	if layer == .Char { level, wobble, seed = 0.60, 0.18, 3 }
+	if layer == .Water { seed = 5 }
 	if value <= 0.53 { return false }
 	if value >= level+wobble*0.5 { return true }
 	x, y := f32(gx)+0.5, f32(gy)+0.5
@@ -317,11 +326,11 @@ bake_ground_cell :: proc(fx: ^Ground_Fx, cell: grid.Position) -> (content: bool)
 		x, y := u+M, v+M
 		gx, gy := cell.x*t+u, cell.y*t+v
 		colour := rl.BLANK
-		for layer in ([2]Ground_Layer{.Pool, .Char}) {
+		for layer in ([3]Ground_Layer{.Pool, .Water, .Char}) {
 			if !present[layer] { continue }
 			at := y*size+x
 			if liquid[layer][at] {
-				colour = ground_liquid_colour(layer, &e1[layer], &e2[layer], &e3[layer], size, x, y, gx, gy, sx, sz)
+				colour = ground_liquid_colour(layer, &e1[layer], &e2[layer], &e3[layer], size, x, y, gx, gy, sx, sz, t)
 			} else if paper[layer][at] {
 				colour = LIVING_TOKEN_PAPER
 			} else if sheet[layer][at] {
@@ -383,8 +392,10 @@ ground_mask_erode :: proc(from, to: ^Ground_Mask, size: int) {
 }
 
 // A liquid texel's colour, (x, y) in the baked region, (gx, gy) in the room;
-// (sx, sz) the texel step toward the camera (ground_fx_toward).
-ground_liquid_colour :: proc(layer: Ground_Layer, e1, e2, e3: ^Ground_Mask, size, x, y, gx, gy: int, sx := 1, sz := 1) -> rl.Color {
+// (sx, sz) the texel step toward the camera (ground_fx_toward); `texels` a
+// cell's side in texels.
+ground_liquid_colour :: proc(layer: Ground_Layer, e1, e2, e3: ^Ground_Mask, size, x, y, gx, gy: int, sx := 1, sz := 1,
+	texels := GROUND_TEXELS) -> rl.Color {
 	at := y*size+x
 	n := gothic_hash(gx*3+int(layer)*101, gy*5+7)
 	if layer == .Char {
@@ -392,6 +403,22 @@ ground_liquid_colour :: proc(layer: Ground_Layer, e1, e2, e3: ^Ground_Mask, size
 		if e2[at] && n%41 == 0 { return GROUND_CHAR_EMBER }
 		if e2[at] && n%113 == 0 { return GROUND_CHAR_HOT }
 		return GROUND_CHAR
+	}
+	if layer == .Water {
+		if !e1[at] { return GROUND_WATER_DEEP }
+		if !e3[at] { return GROUND_WATER }
+		far_x, far_y := x-2*sx, y-2*sz
+		if far_x >= 0 && far_y >= 0 && far_x < size && far_y < size && !e3[far_y*size+far_x] { return GROUND_WATER_LIGHT }
+		// Two rings of ripples round the middle of the cell, and a glint here
+		// and there on them.
+		t := max(texels, 1)
+		cx, cy := (gx/t)*t, (gy/t)*t
+		dx, dy := f32(gx-cx)+0.5-f32(t)*0.5, f32(gy-cy)+0.5-f32(t)*0.5
+		d := math.sqrt(dx*dx+dy*dy)
+		for ring in ([2]f32{0.17, 0.33}) {
+			if abs(d-f32(t)*ring) < 0.62 { return GROUND_WATER_GLINT if n%23 == 0 else GROUND_WATER_RIPPLE }
+		}
+		return GROUND_WATER
 	}
 	if !e1[at] { return GROUND_VENOM_DEEP }
 	if !e3[at] { return GROUND_VENOM }
@@ -472,9 +499,9 @@ update_ground_fx :: proc(renderer: ^Renderer, room: ^game.Room) {
 	v := &renderer.tactical
 	if !v.enabled || v.snapshot == nil || room == nil || room.level_data == nil { return }
 	shown := &v.snapshot.ground
-	// A board that never had a pool or a fire needs nothing.
+	// A board that never had a pool, a fire or water needs nothing.
 	if v.ground == nil {
-		if shown.fire_count == 0 && shown.pool == {} { return }
+		if shown.fire_count == 0 && shown.pool == {} && shown.water_count == 0 { return }
 		v.ground = new(Ground_Fx)
 	}
 	fx := v.ground
@@ -487,6 +514,9 @@ update_ground_fx :: proc(renderer: ^Renderer, room: ^game.Room) {
 	for index in 0..<len(fx.cells) {
 		wanted[index], centre[index], last[index] = {}, false, false
 		if presentation_ground_pool(shown, {index%fx.width, index/fx.width}) { wanted[index] += {.Pool} }
+	}
+	for water in shown.water[:clamp(shown.water_count, 0, len(shown.water))] {
+		if at := ground_fx_cell(fx, water); at != nil { wanted[water.y*fx.width+water.x] += {.Water} }
 	}
 	steps := game.GROUND_ARM_STEPS
 	for fire in shown.fires[:shown.fire_count] {
@@ -506,9 +536,11 @@ update_ground_fx :: proc(renderer: ^Renderer, room: ^game.Room) {
 		now_burning := .Char in wanted[index]
 		if now_burning && !cell.fire {
 			cell.lit, cell.quenched = world, 0
-			// The fire catches under a card standing there.
+			// The fire catches under a card standing there (never one the
+			// Lazzo swings over it: lasso.odin).
 			for actor in v.snapshot.enemies[:v.snapshot.enemy_count] {
-				if actor.visible && int(math.round(actor.position.x)) == at.x && int(math.round(actor.position.y)) == at.y { fx.catches += 1 }
+				if actor.visible && !tactical_lasso_holds(renderer, actor.entity) &&
+				   int(math.round(actor.position.x)) == at.x && int(math.round(actor.position.y)) == at.y { fx.catches += 1 }
 			}
 		} else if !now_burning && cell.fire {
 			cell.quenched = world
@@ -552,11 +584,12 @@ update_ground_fx :: proc(renderer: ^Renderer, room: ^game.Room) {
 		fx.seed = key.cell
 		ground_splash(fx, key.cell, cue.event.card_definition == .Wildfire, world)
 	}
-	// The cards that step into a pool or a fire.
+	// The cards that step into a pool or a fire (one in the air on the Lazzo's
+	// rope steps into nothing).
 	tracked: [game.MAX_ENEMIES_PER_ROOM]Ground_Tracked
 	tracked_count := 0
 	for actor in v.snapshot.enemies[:v.snapshot.enemy_count] {
-		if !actor.visible || actor.health <= 0 || tracked_count == len(tracked) { continue }
+		if !actor.visible || actor.health <= 0 || tracked_count == len(tracked) || tactical_lasso_holds(renderer, actor.entity) { continue }
 		cell := grid.Position{int(math.round(actor.position.x)), int(math.round(actor.position.y))}
 		tracked[tracked_count] = {entity = actor.entity, cell = cell}
 		tracked_count += 1
@@ -790,8 +823,10 @@ draw_ground_flat :: proc(renderer: ^Renderer, room: ^game.Room) {
 		if !tactical_render_visible(renderer, at) { continue }
 		vertices := tile_vertices(renderer, at)
 		if .Char in cell.layers { draw_diamond(inset_vertices(vertices, 0.9), {92, 34, 26, 210}, {196, 76, 34, 255}) }
-		if .Pool in cell.layers {
-			draw_diamond(inset_vertices(vertices, 0.94), {52, 128, 72, 200}, {52, 128, 72, 200})
+		for layer in ([2]Ground_Layer{.Pool, .Water}) {
+			if layer not_in cell.layers { continue }
+			fill := rl.Color{52, 128, 72, 200} if layer == .Pool else rl.Color{44, 98, 164, 210}
+			draw_diamond(inset_vertices(vertices, 0.94), fill, fill)
 			// Each side whose neighbour is dry: paper, and its ink outside.
 			sides := [4]struct{offset: grid.Position, a, b: rl.Vector2}{
 				{{0, -1}, to_raylib(vertices.top), to_raylib(vertices.right)},
@@ -801,10 +836,16 @@ draw_ground_flat :: proc(renderer: ^Renderer, room: ^game.Room) {
 			}
 			centre := to_raylib(cell_center(renderer, at))
 			for side in sides {
-				if .Pool in ground_fx_layers(fx, {at.x+side.offset.x, at.y+side.offset.y}) { continue }
+				if layer in ground_fx_layers(fx, {at.x+side.offset.x, at.y+side.offset.y}) { continue }
 				inward := rl.Vector2Normalize(centre-(side.a+side.b)*0.5)
 				rl.DrawLineEx(side.a+inward*2, side.b+inward*2, 2, LIVING_TOKEN_PAPER)
 				rl.DrawLineEx(side.a, side.b, 1, LIVING_TOKEN_INK)
+			}
+			// The water's ripple.
+			if layer == .Water {
+				r := f32(math.mod(world*0.7+f64(index%5)*0.2, 1))
+				zoom := renderer.camera.zoom
+				rl.DrawEllipseLines(i32(centre.x), i32(centre.y), (4+14*r)*zoom, (2+7*r)*zoom, color_with_opacity(GROUND_WATER_GLINT, (1-r)*0.8))
 			}
 		}
 		if .Char in cell.layers {

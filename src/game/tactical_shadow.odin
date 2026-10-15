@@ -43,13 +43,14 @@ tactical_reset_shadow :: proc(s: ^Tactical_State) {
 }
 
 // Only from a still world: the window open (or a stun, which leaves cards),
-// nothing resolving, queued, casting or running, no defence or ring pending.
+// nothing resolving, queued, casting or running, no defence or ring pending,
+// no foe on the Lazzo's rope.
 tactical_can_begin_shadow :: proc(room: ^Room) -> bool {
 	if !tactical_enabled(room) || room.phase != .Combat { return false }
 	s := &room.player.tactical
 	return (s.phase == .Decision || s.phase == .Stunned) && s.remaining > 0 &&
 	       !room.tactical_pulse.pending && s.queued_beats == 0 && room.qte.kind == .None &&
-	       s.cast_remaining <= 0 && s.action_remaining <= 0 && !room.tesla_ring.pending
+	       s.cast_remaining <= 0 && s.action_remaining <= 0 && !room.tesla_ring.pending && !room.lasso.active
 }
 
 tactical_begin_shadow :: proc(room: ^Room, seconds: f32) -> bool {

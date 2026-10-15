@@ -782,3 +782,53 @@ test_riflesso_on_a_guard_says_it_once_and_keeps_parata :: proc(t: ^testing.T) {
 		testing.expect(t, turned)
 	}
 }
+
+// DESTINO's chip names the die its loaded bumps will roll (DESTINO 3 d8): the
+// die of the card that loaded them, shown with the charges as their cue
+// shows them, never before.
+@(test)
+test_destino_chip_names_the_die_its_bumps_roll :: proc(t: ^testing.T) {
+	testing.expect_value(t, string(tactical_status_chip_text({kind = .Fate, potency = 3}, false, 8)), "DESTINO 3 d8")
+	testing.expect_value(t, string(tactical_status_chip_text({kind = .Fate, potency = 2}, true, 20)), "DES 2 d20")
+	testing.expect_value(t, string(tactical_status_chip_text({kind = .Fate, potency = 3}, false)), "DESTINO 3")
+	testing.expect_value(t, string(tactical_status_chip_text({kind = .Arrows, potency = 3}, false, 8)), "FRECCE 3")
+	data := ground_test_level(t)
+	defer level.destroy(&data)
+	player: game.Player
+	enemies := [?]game.Enemy_Spawn{{position = {data.player_spawn.x+4, data.player_spawn.y}, health = 20, attack = 1}}
+	room := charges_test_room(t, &data, &player, enemies[:])
+	defer game.destroy_room(&room)
+	// A Dado del Destino +2 in hand: a d8.
+	deck := &room.player.deck
+	id := deck.hand[0].id
+	deck.hand[0].definition_id, deck.hand[0].upgrade_level = .Fate_Dice, 2
+	for &owned in deck.owned[:deck.owned_count] { if owned.id == id { owned.definition_id, owned.upgrade_level = .Fate_Dice, 2 } }
+	testing.expect(t, game.validate_deck_state(deck))
+	deck.energy = deck.rules.max_energy
+	snapshot: Room_Presentation
+	renderer := attack_test_renderer(&snapshot)
+	defer attack_test_free(renderer)
+	renderer.tactical.living_state = new(Living_State)
+	before := capture_room_presentation(&room)
+	testing.expect_value(t, before.fate_sides, i32(4))
+	game.clear_event_log(&room.recent_events)
+	testing.expect_value(t, game.play_card(&room, id, game.entity_target(game.PLAYER_ENTITY)).result, game.Card_Play_Result.Played)
+	after := capture_room_presentation(&room)
+	testing.expect_value(t, after.fate_sides, i32(8))
+	testing.expect(t, begin_renderer_event_timeline(renderer, before, &room.recent_events, &after))
+	charged, early := false, false
+	for _ in 0..<240 {
+		charges_test_live_frame(renderer, &room, &snapshot, 1.0/60)
+		status := renderer_status_view(renderer, &room)
+		index, loaded := game.status_index(&status.statuses, .Fate)
+		if !loaded {
+			early = early || status.fate_sides != 4
+			continue
+		}
+		charged = true
+		testing.expect_value(t, status.fate_sides, i32(8))
+		testing.expect_value(t, string(tactical_status_chip_text(status.statuses.items[index], false, status.fate_sides)), "DESTINO 3 d8")
+	}
+	testing.expect(t, charged && !early)
+	testing.expect(t, !renderer_timeline_is_busy(renderer))
+}

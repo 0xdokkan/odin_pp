@@ -127,6 +127,30 @@ each sound starts with the drawing it belongs to:
   flight first); FERETRO's arrow is his attack clip, so it plays
   `pilgrim_shoot` instead of `pilgrim_attack`; a loaded bump's die plays
   `ui_fate_die` at the struck foe as it shows.
+- **The rope** (Lazzo): `card_lasso` when the card is played; as its throw
+  starts to show (the Lasso_Caught cue, about 1.5 s of the card's 2 s cast)
+  `pilgrim_lasso_throw` at the player (the throw is his cast clip, silent of
+  its own: never `pilgrim_attack`), and `world_lasso_wrap` at the foe when
+  the loop reaches it (0.35 of that cue: the rope jerks taut in it as the
+  card is lifted, 0.3 s later); once it spins, `world_lasso_whirr` at each
+  full turn, played higher as the spin speeds up (pitch 0.85, +0.05 a turn,
+  up to 1.55 at the fourteenth; up to eight a second); each hit on a foe
+  `world_lasso_hit` and each smash on a wall `world_lasso_smash` (the
+  Lasso_Struck cue), at the swung card; `world_lasso_release` when the rope
+  lets a living foe go, as the board shows what moved the player (his dodge
+  at once, a push once its blow lands), with its MOLLATO and its card's fall
+  (it lands 0.28 s later). A foe that dies on the rope falls with its own
+  death.
+- **The rod** (Canna da Pesca), at the player: it is never played, so
+  `card_fishing_rod` sounds as it is cast (the Fish_Cast cue, 0.62 s: the
+  bobber lands at its end); `world_bobber_plop` as the bite's cue starts
+  (the water shows) and `world_fish_bite` as the bobber dips (0.64 of that
+  cue); `pilgrim_reel` as the catch's cue starts, placed so that its splash
+  (0.10) is where the catch breaks the water; then `pilgrim_catch` as food
+  reaches his hand (its d4 and `pilgrim_heal` follow) or `ui_fish_card` as a
+  caught card reaches him. His card's clips (his cast as the rod is cast, its
+  hold while the catch is reeled in) sound nothing of their own: never
+  `pilgrim_attack`, `pilgrim_interact` or `pilgrim_cast`.
 - **The room**: `ui_beat_tick` on every whole second of an open window,
   `ui_critical` when an action claims the beat, `ui_window_end`, `ui_stun`,
   `ui_defense_prompt`, `pilgrim_parry` on a parry or deflection that lands,
@@ -168,6 +192,9 @@ chime and iron rattle when he moves hard). Warm, light, human scale.
 | pilgrim_shadow_sink | sinks into his shadow (Movimento Ombra) | 0.65 | 0.0, 0.27 | -21 | 0.3 | a soft inky down-swell (a dark band falling 700 -> 110 Hz, peak 0.15) as the card goes down, the card folding under it (a cardboard creak and crease crackles, muffled as through ink), flat at 0.27 with a soft low gulp; a faint muffled chime of the lantern globe |
 | pilgrim_shadow_step | one step of the shadow (one every 0.4 s at most) | 0.35 | 0.0, 0.07 | -24 | 0.2 | very short, soft, airy, ink-like: a dark swish slipping one cell, no attack, peak 0.07 where the pool glides fastest; no boots, no card scrape; must not tire |
 | pilgrim_shadow_rise | rises out of his shadow (the world resumes) | 0.8 | 0.0, 0.13, 0.34 | -20 | 0.3 | an inky up-swell (120 -> 900 Hz, peak 0.12), the card unfolding as it comes out of the floor at 0.13 (a flex creak, crisp paper grains, a spring), a light thud of the card set down on stone at 0.34 (its iron base knocks, the lantern jingles), the cloak settles |
+| pilgrim_lasso_throw | throws the Lazzo (its throw starts to show) | 0.62 | 0.0, 0.04, 0.53 | -19 | 0.22 | the loop let go in a full round whoosh peaking at 0.04 (the cloak flicks, the lantern knocks once), then the rope paying out through his glove (a fibrous hemp rasp, fast, then slowing) under the loop's own whistle falling away (doppler down, darker), until it drops over the foe at 0.53 |
+| pilgrim_reel | reels in the Canna da Pesca's catch | 0.7 | 0.0, 0.1, 0.45 | -20 | 0.22 | the reel cranked hard (its pawl clicking about 26 a second over the gears' dry whirr, to 0.45), the cane creaking under the load; the catch breaks the water at 0.10 (a heavy wet burst, drops raining back to 0.5), the taut line singing thin |
+| pilgrim_catch | the rod's food reaches his hand | 0.45 | 0.0 | -21 | 0.2 | a soft wet slap on the leather glove at 0.0 (a muffled body under a little splat), a few drops falling off onto the stone, the cloak settling |
 
 ### Family `ghoul` — the Chaser
 
@@ -278,6 +305,8 @@ Length ~0.5–0.9 s; loudness -19 unless noted; wet 0.25.
 | card_coffin | Feretro: three arrows | a coffin lid creaks open (0.06), drops on its hinge with a hollow knock (0.30), three arrows drawn out of it (0.42, 0.50, 0.58: a shaft's knock, an iron head's tick, a fletching's hiss) |
 | card_fate_dice | Dado del Destino: three bumps that roll its die | one bone die rolled across wood (0.05 to 0.27), then fate sealed at 0.34: a low D bell struck softly, a crystal shimmer (A6) over it |
 | card_venom_blade | Lama Velenosa: its die is the bumps it poisons | a dagger drawn from its sheath (a bright scrape from 0.07, the blade ringing on D6), a drop of venom at 0.26 (a tight plip and a sizzle), two small bubbles |
+| card_lasso | Lazzo: a foe caught, lifted and swung round him | the coil of hemp shaken loose off his shoulder (a fibrous rasp from 0.03, the coils slapping softly at 0.04 and 0.09), the loop opened with a creak of its knot at 0.16, then whirled once overhead: a round swish peaking at 0.22 (240 -> 760 Hz, the rope's thin whistle riding it), handing on to the throw |
+| card_fishing_rod | Canna da Pesca: never played, heard as it is cast | the rod drawn back over his shoulder (a dry creak of the cane, a soft swish, 0.04-0.19), whipped forward (a thin fast swish peaking at 0.27, its tip whistling), the line let go at 0.32: the reel's pawl spinning out (a purring click train slowing from 70 to 20 a second) and the line hissing off the spool until the bobber is down (0.62) |
 
 ### Family `cards_arcana` — cards of storm, fire, poison and devices
 
@@ -322,6 +351,13 @@ Same rules as `cards_arms`.
 | world_bomb_fizzle | a bomb is disarmed | 0.7 | -21 | 0.2 | the fuse is pinched out: a hiss that dies, a little puff |
 | world_object_hit | a device or object is struck | 0.5 | -19 | 0.22 | wood-and-iron knock |
 | world_spawn | an enemy arrives in the lab | 1.2 | -21 | 0.4 | a card set down on stone at once (the game hears an arrival only when the enemy already stands there), a dust puff, and the dark it came from swelling behind it and sinking back |
+| world_lasso_wrap | the Lazzo's loop reaches the foe | 0.65 | -20 | 0.25 | the loop drops over the card at 0.0 (a soft slap of rope on paper), runs tight through its knot (a rising fibrous zip, 700 Hz -> 2.6 kHz, to 0.12), cinches with a creak of hemp and the card's paper squeezed, and jerks taut at 0.3 as the card is lifted (a dull thrum on D2, the knock of its base leaving the stone) |
+| world_lasso_whirr | each full turn of the swung foe (pitched up with the speed) | 0.32 | -24 | 0.15 (rt60 1.0) | a round swish swelling to 0.07 and falling away by 0.3 (a band 380 -> 1250 -> 420 Hz, a dark rope hum under it), the card's paper fluttering in the wind; quiet and dry: it comes back up to eight times a second |
+| world_lasso_hit | the swung foe strikes another | 0.5 | -19 | 0.25 | two cardboard bodies slammed together at 0.0 (a heavy flam, 6 ms), a body thud under them, their iron bases knocking, the paper crumpling to 0.09, the rope jolted (a dull thrum on A2) |
+| world_lasso_smash | the swung foe smashes into a wall | 0.8 | -16 | 0.35 | the card smashed into stone at 0.0: a heavy stone thud and chunk, its paper crushed, its iron base clanking, grit and pebbles falling to 0.6, a puff of dust from 0.02, the rope jolted |
+| world_lasso_release | the rope lets a living foe go | 0.6 | -21 | 0.25 | the tension let go in a soft falling swish of hemp (1.5 kHz -> 400 Hz), loose coils flopping (0.05, 0.12); the card lands back on the stone at 0.28 (a cardboard thump, its iron base, a short scrape, dust) |
+| world_bobber_plop | the rod's bobber lands (the water shows) | 0.5 | -22 | 0.25 | a small round plop at 0.0 (a bubble ringing up from 480 Hz), a light slap of water, fine drops falling back to 0.2, the ripples lapping softly away |
+| world_fish_bite | a fish takes the bait (the bobber dips) | 0.6 | -19 | 0.25 | the bobber yanked under at 0.0 (a deep gulp ringing up from 240 Hz, a smaller one after), a splash thrown up with drops raining back to 0.35, the taut line plucked high (A5), the rod's tip bending with a short creak |
 
 ### Family `ui` — time, criticals, defence, statuses, rewards
 
@@ -355,6 +391,7 @@ Quiet and clear; they must never mask the action sounds.
 | ui_status_venom_blade | LAMA loaded | 0.5 | -22 | 0.2 | a blade's thin ting (Eb6), a drop of venom and two small bubbles over a sickly fall A5 -> Eb5 |
 | ui_fate_die | the Dado del Destino's die at a bump | 0.4 | -22 | 0.25 | a bone die bouncing on stone, each bounce lower, landing with a soft D6 ping |
 | ui_status_expired | a status wears off | 0.4 | -28 | 0.2 | a soft fading puff |
+| ui_fish_card | a card caught by the Canna da Pesca reaches him (CARTA PESCATA) | 0.9 | -20 | 0.35 | the wet card shaken twice in the air (dull paper flaps at 0.0 and 0.08, drops flung off it), then the find: crystal A5, D6 and A6 rising (0.12, 0.18, 0.25) over a warm D5 and A4, a few sparkles |
 | ui_defeat | the Viandante falls (defeat) | 2.0 | -18 | 0.5 | a low drone sinks, paper crumples, a distant bell |
 
 ### Family `ambience` — the room

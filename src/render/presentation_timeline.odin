@@ -38,6 +38,17 @@ PRESENTATION_SHADOW_RISE_DURATION :: f32(0.25)*PRESENTATION_TIME_SCALE
 // DADO DEL DESTINO: its die at the struck foe, as the blow lands (its paper
 // token stays a while longer: player_charges.odin).
 PRESENTATION_FATE_DURATION :: f32(0.24)*PRESENTATION_TIME_SCALE
+// LAZZO: the throw (the rope flies, wraps the foe, lifts it and pulls it onto
+// its ring), stretched with the card's other cues over the cast (lasso.odin).
+PRESENTATION_LASSO_THROW_DURATION :: f32(1.1)*PRESENTATION_TIME_SCALE
+// CANNA DA PESCA, about three seconds in all (fishing.odin): the rod swings
+// and its line flies to the cell; the bobber floats on the new water until a
+// fish bites; the catch is reeled out and flies to the player (a caught card
+// then hangs over him a moment, its name shown).
+PRESENTATION_FISH_CAST_DURATION :: f32(0.62)
+PRESENTATION_FISH_BITE_DURATION :: f32(1.15)
+PRESENTATION_FISH_CATCH_DURATION :: f32(0.95)
+PRESENTATION_FISH_CARD_DURATION :: f32(1.7)
 PRESENTATION_MAX_SEQUENCE_DURATION :: f32(12.0)
 PRESENTATION_TIME_EPSILON         :: f32(0.00001)
 
@@ -81,6 +92,14 @@ Presentation_Cue_Kind :: enum {
 	// RIFLESSO and the Dado del Destino's die (game.Game_Event_Kind).
 	Attack_Deflected,
 	Fate_Rolled,
+	// LAZZO: the throw, a hit or a smash, the rope let go (game/lasso.odin).
+	Lasso_Caught,
+	Lasso_Struck,
+	Lasso_Released,
+	// CANNA DA PESCA: the cast, the bite, the catch (game/fishing.odin).
+	Fish_Cast,
+	Fish_Bite,
+	Fish_Caught,
 }
 
 Presentation_Actor :: struct {
@@ -116,12 +135,15 @@ Presentation_Grid_Object :: struct {
 }
 
 // The pools and fires on the floor as the board shows them (game/ground.odin):
-// a bit a pool's cell, row-major, `width` cells a row; the fires as they stand.
+// a bit a pool's cell, row-major, `width` cells a row; the fires as they stand;
+// the Canna da Pesca's water (game/fishing.odin).
 Presentation_Ground :: struct {
 	width: int,
 	pool: [MAX_PRESENTATION_GROUND_CELLS/64]u64,
 	fires: [game.MAX_GROUND_FIRES]game.Ground_Fire,
 	fire_count: int,
+	water: [game.MAX_FISHING_WATERS]grid.Position,
+	water_count: int,
 }
 
 Room_Presentation :: struct {
@@ -134,6 +156,9 @@ Room_Presentation :: struct {
 	// The M8 weapon in the player's hand as the board shows him (the look of
 	// his blows, attack_fx.odin): a blow's last use is still in it while it plays.
 	weapon: game.Weapon_Id,
+	// DADO DEL DESTINO: the die the player's loaded bumps roll
+	// (game.player_fate_sides), shown from the cue that loads them.
+	fate_sides: i32,
 	player:      Presentation_Actor,
 	deck:        game.Deck_State,
 	enemies:     [game.MAX_ENEMIES_PER_ROOM]Presentation_Actor,
@@ -194,6 +219,7 @@ capture_room_presentation :: proc(room: ^game.Room) -> (result: Room_Presentatio
 	result.family = room.family
 	result.relics = room.player.relics
 	result.weapon = room.player.equipment.weapon.id
+	result.fate_sides = game.player_fate_sides(room)
 	result.gold = room.player.gold
 	result.pulse_count = room.pulse_count
 	result.deck = room.player.deck
@@ -273,7 +299,18 @@ capture_presentation_ground :: proc(room: ^game.Room, ground: ^Presentation_Grou
 	}
 	ground.fire_count = min(room.ground.fire_count, len(ground.fires))
 	copy(ground.fires[:], room.ground.fires[:ground.fire_count])
+	ground.water_count = clamp(room.fishing.water_count, 0, len(ground.water))
+	copy(ground.water[:], room.fishing.water[:ground.water_count])
 	return
+}
+
+// Whether `cell` is the Canna da Pesca's water in the shown ground.
+presentation_ground_water :: proc(ground: ^Presentation_Ground, cell: grid.Position) -> bool {
+	if ground == nil { return false }
+	for water in ground.water[:clamp(ground.water_count, 0, len(ground.water))] {
+		if water == cell { return true }
+	}
+	return false
 }
 
 // Whether `cell` is a pool's in the shown ground.
@@ -461,6 +498,18 @@ presentation_cue_kind :: proc(event: game.Game_Event) -> Presentation_Cue_Kind {
 		return .Attack_Deflected
 	case .Fate_Rolled:
 		return .Fate_Rolled
+	case .Lasso_Caught:
+		return .Lasso_Caught
+	case .Lasso_Struck:
+		return .Lasso_Struck
+	case .Lasso_Released:
+		return .Lasso_Released
+	case .Fish_Cast:
+		return .Fish_Cast
+	case .Fish_Bite:
+		return .Fish_Bite
+	case .Fish_Caught:
+		return .Fish_Caught
 	}
 	unreachable()
 }
@@ -524,6 +573,20 @@ presentation_cue_duration :: proc(kind: Presentation_Cue_Kind, event: game.Game_
 		return PRESENTATION_DAMAGE_DURATION
 	case .Fate_Rolled:
 		return PRESENTATION_FATE_DURATION
+	case .Lasso_Caught:
+		return PRESENTATION_LASSO_THROW_DURATION
+	// A hit is a blow; letting go only marks the fall.
+	case .Lasso_Struck:
+		return PRESENTATION_DAMAGE_DURATION
+	case .Lasso_Released:
+		return PRESENTATION_NOTICE_DURATION
+	case .Fish_Cast:
+		return PRESENTATION_FISH_CAST_DURATION
+	case .Fish_Bite:
+		return PRESENTATION_FISH_BITE_DURATION
+	// A caught card hangs over the player a while, its name shown.
+	case .Fish_Caught:
+		return PRESENTATION_FISH_CATCH_DURATION if event.card_definition == .Fishing_Rod else PRESENTATION_FISH_CARD_DURATION
 	}
 	unreachable()
 }
@@ -917,6 +980,7 @@ sync_presentation_statuses_from_final :: proc(timeline: ^Presentation_Timeline) 
 		return false
 	}
 	timeline.view.player.statuses = timeline.final_view.player.statuses
+	timeline.view.fate_sides = timeline.final_view.fate_sides
 	for index in 0..<timeline.view.enemy_count {
 		actor := &timeline.view.enemies[index]
 		if final_actor, found := presentation_actor_in_view(&timeline.final_view, actor.entity); found {
@@ -1014,6 +1078,15 @@ start_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^Presentat
 
 	switch cue.kind {
 	case .Dice_Rolled:
+		// The Canna da Pesca's food: one d4 of life, at every level of the rod
+		// (it is no dice card: game/fishing.odin).
+		if event.card_definition == .Fishing_Rod {
+			if !game.validate_dice_roll(&event.dice_roll) || event.amount != event.dice_roll.total || event.dice_roll.count != 1 ||
+			   event.dice_roll.sides != game.FISHING_HEAL_SIDES || event.source != game.PLAYER_ENTITY {
+				timeline.update_failures += 1
+			}
+			break
+		}
 		expected_dice := game.card_dice_count(event.card_definition)
 		// The die must be the one of the card's logged level.
 		if !game.validate_dice_roll(&event.dice_roll) || event.amount != event.dice_roll.total ||
@@ -1109,6 +1182,10 @@ start_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^Presentat
 		) {
 			timeline.update_failures += 1
 		}
+		// DESTINO loaded: its bumps' die shows with it.
+		if event.status == .Fate && event.target == game.PLAYER_ENTITY && timeline.final_view.valid {
+			timeline.view.fate_sides = timeline.final_view.fate_sides
+		}
 	case .Status_Removed, .Status_Expired:
 		if !has_actor || !remove_presentation_status(&actor.statuses, event.status) {
 			timeline.update_failures += 1
@@ -1186,6 +1263,27 @@ start_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^Presentat
 			timeline.update_failures += 1
 		}
 		sync_presentation_player_charges_from_final(timeline)
+	case .Lasso_Caught, .Lasso_Released:
+		// The player's own rope, on a foe the board shows.
+		if event.source != game.PLAYER_ENTITY || event.card_definition != .Lasso || !has_actor {
+			timeline.update_failures += 1
+		}
+	case .Lasso_Struck:
+		if event.card_definition != .Lasso || event.source.kind != .Enemy || event.amount <= 0 {
+			timeline.update_failures += 1
+		}
+	// CANNA DA PESCA: the player's own rod; its water shows from the bobber's
+	// landing, as the bite's cue starts.
+	case .Fish_Cast, .Fish_Bite:
+		if event.source != game.PLAYER_ENTITY || event.card_definition != .Fishing_Rod || !has_actor {
+			timeline.update_failures += 1
+		}
+		if cue.kind == .Fish_Bite && timeline.final_view.valid { timeline.view.ground = timeline.final_view.ground }
+	case .Fish_Caught:
+		if event.source != game.PLAYER_ENTITY || !has_actor || (event.card_definition != .Fishing_Rod &&
+		   (game.card_is_room_tool(event.card_definition) || event.card_id == 0)) {
+			timeline.update_failures += 1
+		}
 	case .Attack_Missed, .Move_Blocked, .Attack_Deflected,
 	     .Binding_Added, .Binding_Exhausted, .Binding_Expired, .Shadow_Entered, .Shadow_Emerged:
 	}
@@ -1227,7 +1325,8 @@ update_active_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^P
 	     .Move_Blocked, .Gold_Gained, .Energy_Gained, .Binding_Added, .Binding_Exhausted,
 	     .Binding_Expired, .Pulse_Advanced, .Object_Spawned, .Explosive_Armed,
 	     .Explosive_Disarmed, .Explosion, .Room_Hazard_Triggered, .Dice_Rolled, .Spell_Launched, .Spell_Impact,
-	     .Shadow_Entered, .Shadow_Emerged, .Attack_Deflected, .Fate_Rolled:
+	     .Shadow_Entered, .Shadow_Emerged, .Attack_Deflected, .Fate_Rolled, .Lasso_Caught, .Lasso_Struck, .Lasso_Released,
+	     .Fish_Cast, .Fish_Bite, .Fish_Caught:
 	}
 }
 

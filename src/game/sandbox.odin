@@ -99,3 +99,34 @@ sandbox_spawn_cell :: proc(room: ^Room, sandbox: ^Sandbox_State) -> (grid.Positi
 sandbox_distance :: proc(room: ^Room, cell: grid.Position) -> int {
 	return max(abs(cell.x-room.player.position.x), abs(cell.y-room.player.position.y))
 }
+
+// The arena cleared at once (PROVA MECCANICHE's F7), as a room is when its
+// last foe falls: every foe falls, the loot in reach comes to the player, the
+// fight ends and the deck is put away, and nobody arrives any more
+// (sandbox_tick waits for a fight). The room stays endless, so its exit stays
+// shut. The Canna da Pesca's fishings start afresh, as in a new room, with no
+// water. Never while a defence, a cast, the shadow or a ring of coils holds
+// the board. The falls and the loot are the room's recent events; `report`
+// has the falls.
+sandbox_clear_for_fishing :: proc(room: ^Room) -> (report: Action_Report, ok: bool) {
+	if room == nil || room.player == nil || !room.endless || (room.phase != .Combat && room.phase != .Loot) ||
+	   room.qte.kind != .None || tactical_is_casting(room) || tactical_shadow_active(room) || room.tesla_ring.pending { return }
+	action := make_action(.Trigger, SYSTEM_ENTITY)
+	for enemy in room.enemies {
+		if !add_effect(&action, damage_effect(enemy_entity(enemy.id), enemy.health+1000)) { return }
+	}
+	clear_event_log(&room.recent_events)
+	if action.effect_count > 0 {
+		report = resolve_action(room, &action)
+		if !report.accepted || len(room.enemies) > 0 { return }
+		append_event_log(&room.recent_events, &report.events)
+	}
+	if room.phase == .Defeat { return }
+	room.phase = .Loot
+	clear_enemy_intents(room)
+	collect_loot_in_magnet_range(room)
+	sync_deck_with_room_phase(room)
+	tactical_end_combat(room)
+	room.fishing.casts, room.fishing.water_count = 0, 0
+	return report, true
+}

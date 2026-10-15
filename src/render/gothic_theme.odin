@@ -21,9 +21,9 @@ GOTHIC_FONT_SIZES :: [?]int{10, 12, 14, 16, 18, 24, 32}
 // The card icon atlas: the 16 painted icons in four rows of four, then the
 // rows added by tools/art/build_card_icons.py (cell 16: Movimento Ombra, 17:
 // Pozza di Veleno, 18: Incendio, 19: Deflect, 20: Feretro, 21: Dado del
-// Destino, 22: Lama Velenosa).
+// Destino, 22: Lama Velenosa, 23: Lazzo, 24: Canna da Pesca).
 CARD_ICON_COLUMNS :: 4
-CARD_ICON_ROWS :: 6
+CARD_ICON_ROWS :: 7
 CARD_ICON_CELLS :: CARD_ICON_COLUMNS*CARD_ICON_ROWS
 // The figure atlas: four rows of four.
 GOTHIC_FIGURE_CELLS :: 16
@@ -40,7 +40,7 @@ Gothic_Art :: struct {
 
 // A cell of a four-column atlas `rows` cells high, in pixels (right and
 // bottom excluded). The icons' added rows leave the painted four where they
-// were: 1881/6 and 1254/4 rows start on the same pixels.
+// were: 2195/7, 1881/6 and 1254/4 rows start on the same pixels.
 gothic_atlas_cell :: proc(cell, rows, width, height: int) -> (left, top, right, bottom: int) {
 	return cell%CARD_ICON_COLUMNS*width/CARD_ICON_COLUMNS, cell/CARD_ICON_COLUMNS*height/rows,
 		(cell%CARD_ICON_COLUMNS+1)*width/CARD_ICON_COLUMNS, (cell/CARD_ICON_COLUMNS+1)*height/rows
@@ -149,26 +149,30 @@ gothic_text :: proc(renderer: ^Renderer, text: cstring, x, y: f32, size: int, co
 	font, actual := gothic_font(renderer, size)
 	rl.DrawTextEx(font, text, {math.round(x), math.round(y)}, actual, spacing, color)
 }
-gothic_text_fit :: proc(renderer: ^Renderer, text: cstring, bounds: rl.Rectangle, size: int, color: rl.Color) {
+// How gothic_text_fit sets a text in a width: as it is, its letters closed up,
+// a size smaller, or cut short ("...").
+Gothic_Fit :: enum {Fits, Closed, Smaller, Cut}
+
+// The size, letter spacing and words gothic_text_fit draws `text` with in
+// `width`, and how it had to fit them.
+gothic_text_fit_plan :: proc(renderer: ^Renderer, text: cstring, width: f32, size: int) -> (chosen: int, spacing: f32, label: cstring, fit: Gothic_Fit) {
+	if gothic_text_width(renderer, text, size) <= width { return size, 1, text, .Fits }
 	// The pixel font is crisp only at some sizes; a smaller one bends its
 	// figures (an "o" reads as an "a"). Close the letters up first.
-	if gothic_text_width(renderer, text, size) > bounds.width && gothic_text_width(renderer, text, size, 0) <= bounds.width {
-		rl.BeginScissorMode(c.int(bounds.x), c.int(bounds.y), c.int(bounds.width), c.int(bounds.height))
-		gothic_text(renderer, text, bounds.x, bounds.y, size, color, 0)
-		rl.EndScissorMode()
-		return
-	}
-	chosen := size
-	for chosen > 10 && gothic_text_width(renderer, text, chosen) > bounds.width { chosen -= 2 }
-	label := text
-	if gothic_text_width(renderer, label, chosen) > bounds.width {
-		value := string(text)
-		end := len(value)
-		for end > 0 && gothic_text_width(renderer, fmt.ctprintf("%s...", value[:end]), chosen) > bounds.width { end -= 1 }
-		label = fmt.ctprintf("%s...", value[:end])
-	}
+	if gothic_text_width(renderer, text, size, 0) <= width { return size, 0, text, .Closed }
+	chosen = size
+	for chosen > 10 && gothic_text_width(renderer, text, chosen) > width { chosen -= 2 }
+	if gothic_text_width(renderer, text, chosen) <= width { return chosen, 1, text, .Smaller }
+	value := string(text)
+	end := len(value)
+	for end > 0 && gothic_text_width(renderer, fmt.ctprintf("%s...", value[:end]), chosen) > width { end -= 1 }
+	return chosen, 1, fmt.ctprintf("%s...", value[:end]), .Cut
+}
+
+gothic_text_fit :: proc(renderer: ^Renderer, text: cstring, bounds: rl.Rectangle, size: int, color: rl.Color) {
+	chosen, spacing, label, _ := gothic_text_fit_plan(renderer, text, bounds.width, size)
 	rl.BeginScissorMode(c.int(bounds.x), c.int(bounds.y), c.int(bounds.width), c.int(bounds.height))
-	gothic_text(renderer, label, bounds.x, bounds.y, chosen, color)
+	gothic_text(renderer, label, bounds.x, bounds.y, chosen, color, spacing)
 	rl.EndScissorMode()
 }
 gothic_wrapped_text :: proc(renderer: ^Renderer, value: string, x, y, width: f32, color: rl.Color) {
@@ -266,6 +270,8 @@ gothic_card_icon :: proc(id: game.Card_Id) -> int {
 	case .Coffin: return 20
 	case .Fate_Dice: return 21
 	case .Venom_Blade: return 22
+	case .Lasso: return 23
+	case .Fishing_Rod: return 24
 	// Scopa cards draw their own art (draw_scopa_card); this is the fallback.
 	case .Sei_Denari, .Sette_Denari: return 9
 	case .Count: return 0

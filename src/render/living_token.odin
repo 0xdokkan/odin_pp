@@ -18,6 +18,10 @@ import grid "../grid"
 LIVING_MAX_TOKENS :: 16
 LIVING_MAX_BLOWS :: LIVING_MAX_TOKENS*2
 LIVING_TOKEN_SECONDS :: f64(1.15)
+// A small token (a full turn's 1 of the Lazzo, lasso.odin) pops where the card
+// is as its turn ends and rises there, briefly: at eight turns a second a
+// ring of them trails the card round.
+LIVING_TOKEN_SMALL_SECONDS :: f64(0.7)
 // The hurt drawings land their blow ~0.1 s into the cue.
 LIVING_TOKEN_DELAY :: f64(0.1)
 
@@ -29,6 +33,8 @@ LIVING_TOKEN_HEAL :: rl.Color{40, 150, 76, 255}
 
 Living_Token :: struct {
 	used, heal: bool,
+	// A small one: a full turn of the Lazzo's.
+	small: bool,
 	amount: i32,
 	// What makes a blow this one: one token per blow, however long its cue,
 	// and the command it came with (Presentation_Cue.batch): two bumps of the
@@ -101,7 +107,7 @@ living_token_size :: proc(text: string) -> (width, height: int) {
 // `landing` the seconds until the blow lands (a bolt still flying to the card);
 // `batch` the command whose cue it is.
 living_token_spawn :: proc(state: ^Living_State, event: game.Game_Event, heal: bool, now: f64, world := f64(-1), landing := f64(0),
-	batch := u32(0)) -> bool {
+	batch := u32(0), small := false) -> bool {
 	world := world if world >= 0 else now
 	for blow in state.blows {
 		if blow.used && world-blow.at <= LIVING_TOKEN_SECONDS && blow.entity == event.target && blow.source == event.source &&
@@ -113,8 +119,10 @@ living_token_spawn :: proc(state: ^Living_State, event: game.Game_Event, heal: b
 		if !token.used { continue }
 		if token.entity == event.target && token.source == event.source && token.amount == event.amount &&
 		   token.pulse == event.pulse_count && token.group == event.visual_group && token.heal == heal && token.batch == batch { return false }
-		if token.entity == event.target { stack += 1 }
+		// Small tokens rise on their own, beside nothing.
+		if token.entity == event.target && !token.small { stack += 1 }
 	}
+	if small { stack = 0 }
 	state.blows[state.blow_next] = {used = true, heal = heal, amount = event.amount, entity = event.target, source = event.source,
 		pulse = event.pulse_count, group = event.visual_group, batch = batch, at = world}
 	state.blow_next = (state.blow_next+1)%len(state.blows)
@@ -125,8 +133,8 @@ living_token_spawn :: proc(state: ^Living_State, event: game.Game_Event, heal: b
 		for &token in state.tokens { if token.born < slot.born { slot = &token } }
 		living_token_free(slot)
 	}
-	slot^ = {used = true, heal = heal, amount = event.amount, entity = event.target, source = event.source,
-		pulse = event.pulse_count, group = event.visual_group, batch = batch, born = now+max(LIVING_TOKEN_DELAY, landing), stack = stack}
+	slot^ = {used = true, heal = heal, small = small, amount = event.amount, entity = event.target, source = event.source,
+		pulse = event.pulse_count, group = event.visual_group, batch = batch, born = now if small else now+max(LIVING_TOKEN_DELAY, landing), stack = stack}
 	return true
 }
 
@@ -145,7 +153,7 @@ living_tokens_free :: proc(state: ^Living_State) {
 update_living_tokens :: proc(renderer: ^Renderer, now, world: f64) {
 	state := renderer.tactical.living_state
 	for &token in state.tokens {
-		if token.used && now-token.born > LIVING_TOKEN_SECONDS { living_token_free(&token) }
+		if token.used && now-token.born > (LIVING_TOKEN_SMALL_SECONDS if token.small else LIVING_TOKEN_SECONDS) { living_token_free(&token) }
 	}
 	for offset in 0..<renderer_active_cue_count(renderer) {
 		cue, found := renderer_active_cue_at(renderer, offset)
@@ -154,7 +162,7 @@ update_living_tokens :: proc(renderer: ^Renderer, now, world: f64) {
 		if (cue.kind != .Damage && !heal) || cue.event.amount <= 0 { continue }
 		if _, actor := presentation_actor_in_view(renderer.tactical.snapshot, cue.event.target); !actor { continue }
 		landing, _ := attack_fx_landing_in(renderer, cue.event.target, now, cue.event.source)
-		living_token_spawn(state, cue.event, heal, now, world, landing, cue.batch)
+		living_token_spawn(state, cue.event, heal, now, world, landing, cue.batch, game.event_is_lasso_turn(cue.event))
 	}
 }
 
@@ -192,9 +200,11 @@ draw_living_tokens :: proc(renderer: ^Renderer) {
 	for &token in v.living_state.tokens {
 		if !token.used || now < token.born { continue }
 		// Follow the card while it is on the board; a fallen foe keeps its
-		// spot, and so does the player's card gone into its shadow.
+		// spot, and so does the player's card gone into its shadow, and a small
+		// token where it popped.
 		sunk := token.entity == game.PLAYER_ENTITY && tactical_shadow_showing(renderer) && token.at != {}
-		if actor, found := presentation_actor_in_view(v.snapshot, token.entity); found && actor.visible && !sunk {
+		kept := token.small && token.at != {}
+		if actor, found := presentation_actor_in_view(v.snapshot, token.entity); found && actor.visible && !sunk && !kept {
 			cell := grid.Position{int(math.round(actor.position.x)), int(math.round(actor.position.y))}
 			if !tactical_render_visible(renderer, cell) { continue }
 			key := Sprite_Key.Player if token.entity == game.PLAYER_ENTITY else sprite_key_for_enemy(actor.archetype)
@@ -210,6 +220,17 @@ draw_living_tokens :: proc(renderer: ^Renderer) {
 		if token.at == {} { continue }
 		if token.texture.id == 0 { token.texture = living_token_texture(living_token_text(token.amount, token.heal), token.heal) }
 		t := f32(now-token.born)
+		if token.small {
+			// A pixel-sized pop, then it rises and fades where it came out.
+			life := f32(LIVING_TOKEN_SMALL_SECONDS)
+			scale := f32(2) if t < 0.06 else 1
+			base := tactical_project(renderer, {token.at.x, token.at.z}, token.at.y)
+			w, h := f32(token.texture.width)*scale, f32(token.texture.height)*scale
+			position := rl.Vector2{math.round(base.x-w*0.5), math.round(base.y-h-22*t/life)}
+			alpha := clamp((life-t)/(life*0.4), 0, 1)
+			rl.DrawTextureEx(token.texture, position, 0, scale, {255, 255, 255, u8(alpha*255)})
+			continue
+		}
 		// Flicked out of the figure's chest (a small pop on the pixel grid) to
 		// just past the paper's side, a moment's hang, then it drops away.
 		scale := f32(2)

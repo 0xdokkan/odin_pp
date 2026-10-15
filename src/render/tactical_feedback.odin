@@ -44,8 +44,9 @@ tactical_feedback_pose :: proc(renderer: ^Renderer, key: Sprite_Key, position: v
 			result.lift = 0.095*envelope
 			result.lean = 0.028*math.sin(p*2*math.PI)
 			result.scale_y = 1+0.045*envelope
-		} else if cue.kind == .Damage && !attack_fx_shows(renderer, cue) {
-			// A blow shown with its props has its own impact (attack_fx.odin).
+		} else if cue.kind == .Damage && !attack_fx_shows(renderer, cue) && !game.event_is_lasso_turn(cue.event) {
+			// A blow shown with its props has its own impact (attack_fx.odin);
+			// the Lazzo's full turn shakes nothing (lasso.odin).
 			result.lean = math.sin(p*3*math.PI)*(1-p)*0.07
 			result.scale_y = 1-0.07*envelope
 			result.tint = {255, u8(255-145*envelope), u8(255-115*envelope), 255}
@@ -254,7 +255,8 @@ draw_tactical_feedback :: proc(renderer: ^Renderer, layer: Tactical_Feedback_Lay
 			color := TACTICAL_FEEDBACK_HIT
 			if cue.event.has_status_cause && cue.event.status_cause == .Poison { color = {126, 211, 174, 255} }
 			if cue.event.has_status_cause && cue.event.status_cause == .Burn { color = {244, 157, 104, 255} }
-			if !attack_fx_shows(renderer, cue) { draw_tactical_hit(renderer, center, p, color) }
+			// The Lazzo's hits have their paper star (lasso.odin); a turn's 1 its token.
+			if !attack_fx_shows(renderer, cue) && !game.event_is_lasso(cue.event) { draw_tactical_hit(renderer, center, p, color) }
 		case .Damage_Absorbed, .Attack_Deflected:
 			if !attack_fx_shows(renderer, cue) { draw_tactical_shield(renderer, center, p) }
 		case .Status_Applied:
@@ -312,42 +314,56 @@ draw_tactical_feedback_overlay :: proc(renderer: ^Renderer, cue: ^Presentation_C
 			label = fmt.ctprintf("%s", definition.name)
 			if game.event_is_critical(cue.event) { label = fmt.ctprintf("CRITICO / %s", definition.name) }
 		}
-		viewport := tactical_world_bounds(renderer)
-		width := min(f32(280), gothic_text_width(renderer, label, 13)+35)
-		anchor := view.Vec2{viewport.x+viewport.width/2, viewport.y+viewport.height-5}
-		bounds, placed := place_tactical_label(renderer.tactical.labels, anchor, {width, 23}, viewport)
-		if placed {
-			alpha := tactical_feedback_alpha(presentation_cue_progress(cue))
-			rl.DrawRectangleRec(bounds, color_with_opacity({10, 19, 33, 244}, alpha))
-			accent := TACTICAL_FEEDBACK_CRITICAL if game.event_is_critical(cue.event) else TACTICAL_FEEDBACK_BLUE
-			rl.DrawRectangleRec({bounds.x, bounds.y+bounds.height-1, bounds.width, 1}, color_with_opacity(accent, alpha*0.7))
-			gothic_text(renderer, "+", bounds.x+7, bounds.y+4, 13, color_with_opacity(accent, alpha))
-			gothic_text_fit(renderer, label, {bounds.x+23, bounds.y+4, bounds.width-28, 15}, 13, color_with_opacity(TACTICAL_FEEDBACK_WHITE, alpha))
-		}
+		draw_tactical_cue_banner(renderer, cue, label, TACTICAL_FEEDBACK_CRITICAL if game.event_is_critical(cue.event) else TACTICAL_FEEDBACK_BLUE)
+		return true
+	}
+	// CANNA DA PESCA (fishing.odin): its name as it is cast and a caught
+	// card's as it comes out, where a played card's shows.
+	if label, accent, shown := fishing_cue_banner(cue); shown {
+		draw_tactical_cue_banner(renderer, cue, label, accent)
 		return true
 	}
 	badges, count := tactical_feedback_badges(renderer, cue)
 	alpha := tactical_feedback_alpha(presentation_cue_progress(cue))
-	for badge in badges[:count] {
-		center := tactical_feedback_position(renderer, badge.over, badge.fallback)
-		anchor := tactical_project(renderer, {center.x, center.z}, 0.9)
-		width := gothic_text_width(renderer, badge.label, 12)+12
-		bounds, placed := place_tactical_label(renderer.tactical.labels, anchor, {width, 19}, tactical_world_bounds(renderer))
-		if !placed { continue }
-		color := badge.color
-		// Collision avoidance can place a badge beside another actor. A fine
-		// leader and pixel dot preserve ownership without adding another label.
-		badge_center := rl.Vector2{bounds.x+bounds.width/2, bounds.y+bounds.height/2}
-		if abs(badge_center.x-anchor.x) > 12 || abs(badge_center.y-anchor.y) > 18 {
-			edge := rl.Vector2{clamp(anchor.x, bounds.x, bounds.x+bounds.width), clamp(anchor.y, bounds.y, bounds.y+bounds.height)}
-			rl.DrawLineEx(edge, to_raylib(anchor), 1, color_with_opacity(color, alpha*0.7))
-			rl.DrawRectangleRec({anchor.x-1, anchor.y-1, 2, 2}, color_with_opacity(color, alpha))
-		}
-		rl.DrawRectangleRec(bounds, color_with_opacity({8, 15, 26, 235}, alpha))
-		rl.DrawRectangleRec({bounds.x, bounds.y, 2, bounds.height}, color_with_opacity(color, alpha))
-		gothic_text(renderer, badge.label, bounds.x+6, bounds.y+3, 12, color_with_opacity(color, alpha))
-	}
+	for badge in badges[:count] { draw_tactical_feedback_badge(renderer, badge, alpha) }
 	return true
+}
+
+// One word over the board, over its figure (draw_tactical_feedback_overlay,
+// and the Lazzo's MOLLATO with its foe's fall: lasso.odin).
+draw_tactical_feedback_badge :: proc(renderer: ^Renderer, badge: Tactical_Feedback_Badge, alpha: f32) {
+	center := tactical_feedback_position(renderer, badge.over, badge.fallback)
+	anchor := tactical_project(renderer, {center.x, center.z}, 0.9)
+	width := gothic_text_width(renderer, badge.label, 12)+12
+	bounds, placed := place_tactical_label(renderer.tactical.labels, anchor, {width, 19}, tactical_world_bounds(renderer))
+	if !placed { return }
+	color := badge.color
+	// Collision avoidance can place a badge beside another actor. A fine
+	// leader and pixel dot preserve ownership without adding another label.
+	badge_center := rl.Vector2{bounds.x+bounds.width/2, bounds.y+bounds.height/2}
+	if abs(badge_center.x-anchor.x) > 12 || abs(badge_center.y-anchor.y) > 18 {
+		edge := rl.Vector2{clamp(anchor.x, bounds.x, bounds.x+bounds.width), clamp(anchor.y, bounds.y, bounds.y+bounds.height)}
+		rl.DrawLineEx(edge, to_raylib(anchor), 1, color_with_opacity(color, alpha*0.7))
+		rl.DrawRectangleRec({anchor.x-1, anchor.y-1, 2, 2}, color_with_opacity(color, alpha))
+	}
+	rl.DrawRectangleRec(bounds, color_with_opacity({8, 15, 26, 235}, alpha))
+	rl.DrawRectangleRec({bounds.x, bounds.y, 2, bounds.height}, color_with_opacity(color, alpha))
+	gothic_text(renderer, badge.label, bounds.x+6, bounds.y+3, 12, color_with_opacity(color, alpha))
+}
+
+// A cue's name under the board, where a played card's shows: its `label`
+// after a "+" in `accent`, fading with the cue.
+draw_tactical_cue_banner :: proc(renderer: ^Renderer, cue: ^Presentation_Cue, label: cstring, accent: rl.Color) {
+	viewport := tactical_world_bounds(renderer)
+	width := min(f32(280), gothic_text_width(renderer, label, 13)+35)
+	anchor := view.Vec2{viewport.x+viewport.width/2, viewport.y+viewport.height-5}
+	bounds, placed := place_tactical_label(renderer.tactical.labels, anchor, {width, 23}, viewport)
+	if !placed { return }
+	alpha := tactical_feedback_alpha(presentation_cue_progress(cue))
+	rl.DrawRectangleRec(bounds, color_with_opacity({10, 19, 33, 244}, alpha))
+	rl.DrawRectangleRec({bounds.x, bounds.y+bounds.height-1, bounds.width, 1}, color_with_opacity(accent, alpha*0.7))
+	gothic_text(renderer, "+", bounds.x+7, bounds.y+4, 13, color_with_opacity(accent, alpha))
+	gothic_text_fit(renderer, label, {bounds.x+23, bounds.y+4, bounds.width-28, 15}, 13, color_with_opacity(TACTICAL_FEEDBACK_WHITE, alpha))
 }
 
 // A word a cue says over the board: over `over`'s figure (or the cell
@@ -391,6 +407,20 @@ tactical_feedback_badges :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) ->
 		if event.status == .Stagger { label = "INTERROTTO"; color = {218, 187, 123, 255} }
 		else if event.status == .Shield { label = fmt.ctprintf("SCUDO +%d", event.amount) }
 	case .Attack_Missed: label = "MANCATO"
+	// LAZZO (lasso.odin): a hit over the foe struck, a smash over the swung one.
+	// The rope let go says MOLLATO with its foe's fall, which the board starts
+	// as it shows what moved the player (draw_lasso_release_badge), never after.
+	case .Lasso_Struck:
+		color = TACTICAL_FEEDBACK_HIT
+		if event.target == game.SYSTEM_ENTITY {
+			badges[count] = {label = fmt.ctprintf("SCHIANTO %d", event.amount), color = color, over = event.source, fallback = event.from_position}
+			count += 1
+			return
+		}
+		label = fmt.ctprintf("COLPO %d", event.amount)
+	// CANNA DA PESCA: the food it caught, over him (a card says so below).
+	case .Fish_Caught:
+		if event.card_definition == .Fishing_Rod { label = fishing_catch_label(event); color = FISHING_WATER_LIGHT }
 	case .Move_Blocked: label = "BLOCCATO"; color = {218, 187, 123, 255}
 	case .Explosive_Disarmed: label = "DISINNESCATA"
 	case .Gold_Gained: label = fmt.ctprintf("+%d ORO", event.amount); color = {218, 187, 123, 255}

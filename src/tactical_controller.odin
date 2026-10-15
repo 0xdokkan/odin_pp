@@ -168,6 +168,8 @@ step_tactical_controller :: proc(
 		}
 		return true
 	}
+	// LAZZO: the frame's seconds spun out, as world commands, after its beats.
+	drain_lasso_spin_commands(room, renderer, cards, playtest)
 	// Expiration is checked after all paid beats, including the last second.
 	if game.tactical_tick(room, 0, true, controller.hologram) {
 		controller.hologram = false
@@ -220,6 +222,20 @@ drain_tactical_world_commands :: proc(room: ^game.Room, renderer: ^render.Render
 			{kind = .Continue_Pulse, origin_phase = .Combat}, playtest) { return false }
 	}
 	return room.qte.kind == .None && !room.tactical_pulse.pending
+}
+
+// A spin batch stops short of a full log; a frame's seconds (even a long
+// frame's at the fastest spin) fit in this many.
+LASSO_SPIN_BATCHES :: 4
+
+// The Lazzo's seconds waiting, spun out in world commands (game.resolve_lasso_spin):
+// never more batches than the bound, never into a full world bank.
+drain_lasso_spin_commands :: proc(room: ^game.Room, renderer: ^render.Renderer,
+	cards: ^Card_Interaction_State, playtest: ^combatdebug.Playtest_Session) {
+	for _ in 0..<LASSO_SPIN_BATCHES {
+		if !game.tactical_lasso_due(room) { return }
+		if !commit_gameplay_command(room, renderer, cards, {kind = .Lasso_Spin, origin_phase = .Combat}, playtest) { return }
+	}
 }
 
 Tactical_Map_Input :: struct {

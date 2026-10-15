@@ -171,6 +171,12 @@ Room_Content :: struct {
 	traps:     []Trap_Spawn,
 	obstacles: []grid.Position,
 	objects:   []Grid_Object_Spawn,
+	// The run node the room stands for and its seed: a card the Canna da Pesca
+	// catches is weighed as that node's rewards are, from a stream of the room's
+	// own (fishing.odin). A combat at depth 0 unless said.
+	node_kind: Node_Kind,
+	node_depth: int,
+	room_seed: u64,
 }
 
 Room :: struct {
@@ -203,6 +209,11 @@ Room :: struct {
 	ground: Ground_State,
 	// The mechanics sandbox never clears: the last kill keeps the combat going.
 	endless: bool,
+	// LAZZO: the foe swung round the player, while the rope holds (lasso.odin).
+	lasso: Lasso_State,
+	// CANNA DA PESCA: the room's fishings so far, its water and its stream
+	// (fishing.odin); a new room starts them afresh.
+	fishing: Fishing_State,
 }
 
 Move_Direction :: enum {
@@ -363,12 +374,14 @@ trap_index_at :: proc(room: ^Room, position: grid.Position) -> (int, bool) {
 	return 0, false
 }
 
+// Who stands on `position`. A foe the Lazzo holds is in the air: it stands on
+// no cell (others walk under it, nothing aims at it there; lasso.odin).
 enemy_index_at :: proc(room: ^Room, position: grid.Position, ignored_index := -1) -> (int, bool) {
 	if room == nil {
 		return 0, false
 	}
 	for enemy, index in room.enemies {
-		if index != ignored_index && enemy.position == position {
+		if index != ignored_index && enemy.position == position && !enemy_is_lassoed(room, enemy.id) {
 			return index, true
 		}
 	}
@@ -426,6 +439,7 @@ create_room :: proc(level_data: ^level.Level, player: ^Player, content: Room_Con
 	result.encounter_kind = content.encounter_kind
 	result.family = content.family
 	result.modifier = content.modifier
+	result.fishing = begin_room_fishing(player, content)
 	result.next_enemy_id = 1
 	result.next_trap_id = 1
 	result.next_object_id = 1
@@ -685,6 +699,8 @@ kill_enemy :: proc(room: ^Room, enemy_index: int) -> (drops: [3]Loot, drop_count
 	assert(room != nil)
 	enemy := room.enemies[enemy_index]
 	position := enemy.position
+	// The foe the Lazzo held falls with the rope slack, on the cell under it.
+	if enemy_is_lassoed(room, enemy.id) { room.lasso = {} }
 	remove_reaction_bindings_for_owner(room, enemy_entity(enemy.id))
 	unordered_remove(&room.enemies, enemy_index)
 	drops[drop_count] = {position = position, kind = .Gold, amount = 1}
@@ -824,7 +840,9 @@ try_move_player :: proc(room: ^Room, direction: Move_Direction) -> Action_Result
 	if room.phase == .Loot {
 		collect_loot_in_magnet_range(room)
 		sync_deck_with_room_phase(room)
-		if room.player.position == room.exit_position {
+		// The mechanics sandbox cleared for the rod (sandbox_clear_for_fishing)
+		// keeps its exit shut: it has no next room.
+		if room.player.position == room.exit_position && !room.endless {
 			room.phase = .Complete
 			return .Room_Completed
 		}

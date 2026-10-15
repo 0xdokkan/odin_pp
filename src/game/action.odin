@@ -96,6 +96,12 @@ Effect_Kind :: enum {
 	// Pozza di Veleno (`status` Poison) or Incendio (Burn) on `destination`:
 	// `amount` stacks to an enemy for each cell of it entered (ground.odin).
 	Place_Ground,
+	// LAZZO: `target` caught and swung round the player, its first hit
+	// numbered `amount` (lasso.odin).
+	Lasso,
+	// CANNA DA PESCA: the room's fishings (`amount`), the rod's template only;
+	// its slot fishes through fish_with_rod, never through an action (fishing.odin).
+	Fish,
 }
 
 Effect :: struct {
@@ -398,6 +404,11 @@ effect_is_valid :: proc(room: ^Room, effect: Effect) -> bool {
 		return effect.target == PLAYER_ENTITY && effect.amount > 0 && tactical_can_begin_shadow(room)
 	case .Place_Ground:
 		return effect.target == PLAYER_ENTITY && effect.amount > 0 && ground_can_place(room, effect.status, effect.destination)
+	case .Lasso:
+		return effect.target.kind == .Enemy && effect.amount > 0 && lasso_target_error(room, entity_target(effect.target)) == .None
+	// Never resolved: the rod fishes from its slot (fishing.odin).
+	case .Fish:
+		return false
 	case .Deploy_Device:
 		return effect.target == PLAYER_ENTITY && effect.amount > 0 &&
 		       (effect.object_kind != .Shock_Floor || (effect.charges >= 1 && effect.charges <= TACTICAL_SHOCK_FLOOR_MAX_CHARGES)) &&
@@ -652,6 +663,12 @@ apply_effect :: proc(room: ^Room, source: Entity_Ref, effect: Effect, report: ^A
 	case .Place_Ground:
 		placed := place_ground(room, effect.status, effect.destination, effect.amount, report)
 		assert(placed)
+	case .Lasso:
+		caught := begin_lasso(room, effect.target, effect.amount, report)
+		assert(caught)
+	// effect_is_valid refuses it.
+	case .Fish:
+		unreachable()
 	case .Damage:
 		apply_damage_effect(room, source, effect, report)
 	case .Heal:

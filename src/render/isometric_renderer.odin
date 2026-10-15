@@ -317,6 +317,12 @@ card_colors :: proc(id: game.Card_Id, affordable: bool) -> (fill, outline: rl.Co
 		fill, outline = rl.Color{52, 34, 70, 245}, rl.Color{214, 170, 250, 255}
 	case .Venom_Blade:
 		fill, outline = rl.Color{30, 56, 40, 245}, rl.Color{150, 226, 110, 255}
+	// The Lazzo's hemp.
+	case .Lasso:
+		fill, outline = rl.Color{70, 52, 30, 245}, rl.Color{222, 178, 110, 255}
+	// The Canna da Pesca's water.
+	case .Fishing_Rod:
+		fill, outline = rl.Color{26, 48, 72, 245}, rl.Color{118, 186, 236, 255}
 	case .Count:
 		fill, outline = rl.Color{45, 49, 52, 245}, rl.Color{105, 116, 116, 255}
 	}
@@ -386,7 +392,7 @@ card_detail_lines :: proc(card: game.Card_Instance) -> (first, second: cstring) 
 	case .Chain_Lightning:
 		return fmt.ctprintf("%d DAMAGE EACH", 3+upgrade), "UP TO 3 / HOP 3"
 	case .Fate_Strike, .Sundering_Blow, .Prismatic_Barrage, .Twin_Venom, .Shock_Floor, .Fate_Dice, .Venom_Blade,
-	     .Shadow_Step, .Poison_Pool, .Wildfire, .Deflect, .Coffin:
+	     .Shadow_Step, .Poison_Pool, .Wildfire, .Deflect, .Coffin, .Lasso, .Fishing_Rod:
 	case .Tesla_Coil: return fmt.ctprintf("%d / DISTANCE DAMAGE", 8+upgrade), "FIELD CONSUMES 4 COILS"
 	case .Titan_Grip: return fmt.ctprintf("%d DAMAGE / THROW 2", 3+upgrade), "INTERRUPT / STAGGER 1"
 	case .Storm_Crown: return fmt.ctprintf("%d DAMAGE EACH", 5+upgrade), "LEGENDARY / CHAIN 3"
@@ -473,6 +479,8 @@ card_short_name :: proc(id: game.Card_Id) -> cstring {
 	case .Coffin: return "FERETRO"
 	case .Fate_Dice: return "DESTINO"
 	case .Venom_Blade: return "LAMA"
+	case .Lasso: return "LAZZO"
+	case .Fishing_Rod: return "CANNA"
 	case .Count:
 	}
 	return ""
@@ -716,6 +724,18 @@ draw_card_sigil :: proc(bounds: rl.Rectangle, id: game.Card_Id, color: rl.Color)
 		rl.DrawLineEx({center.x-radius, center.y+radius}, {center.x+radius-4, center.y-radius+4}, 4, color)
 		rl.DrawLineEx({center.x-radius+2, center.y+5}, {center.x-5, center.y+radius-2}, 3, color)
 		rl.DrawCircleV({center.x+radius-1, center.y-radius+12}, 3, color)
+	case .Lasso:
+		// A noose thrown open, its rope trailing down to a coil.
+		rl.DrawEllipseLines(c.int(center.x-3), c.int(center.y-6), radius-2, 10, color)
+		rl.DrawEllipseLines(c.int(center.x-3), c.int(center.y-6), radius-4, 8, color)
+		rl.DrawLineEx({center.x+9, center.y+2}, {center.x+14, center.y+12}, 3, color)
+		rl.DrawCircleLinesV({center.x+12, center.y+15}, 4, color)
+	case .Fishing_Rod:
+		// A rod bent over its line, the bobber on a ripple.
+		rl.DrawLineEx({center.x-radius, center.y+radius}, {center.x+radius-6, center.y-radius+2}, 3, color)
+		rl.DrawLineEx({center.x+radius-6, center.y-radius+2}, {center.x+radius-2, center.y+6}, 1, color)
+		rl.DrawCircleV({center.x+radius-2, center.y+8}, 3, color)
+		rl.DrawEllipseLines(c.int(center.x+radius-2), c.int(center.y+12), 9, 3, color)
 	case .Count:
 	}
 }
@@ -925,7 +945,8 @@ draw_hand_counters :: proc(renderer: ^Renderer, deck: ^game.Deck_State) {
 	rl.DrawRectangle(right-116, c.int(bottom-48), 116, 48, rl.Color{12, 16, 19, 225})
 	rl.DrawRectangleLines(right-116, c.int(bottom-48), 116, 48, rl.Color{75, 86, 87, 255})
 	labels := [?]cstring{"DRAW", "DISC", "EXH"}
-	counts := [?]int{deck.draw_count, deck.discard_count, deck.exhaust_count}
+	// The Canna da Pesca waiting in Exhaust was never played.
+	counts := [?]int{deck.draw_count, deck.discard_count, game.deck_exhausted_count(deck)}
 	column_width: f32 = 116.0/3.0
 	for label, index in labels {
 		center_x := f32(right-116)+column_width*(f32(index)+0.5)
@@ -1806,6 +1827,8 @@ draw_card_target_range :: proc(renderer: ^Renderer, room: ^game.Room, card_id: u
 				}
 			}
 		}
+		// LAZZO: the foes it can take, the heavy ones, and its ring (lasso.odin).
+		if card.definition_id == .Lasso { draw_lasso_preview(renderer, room, card) }
 	} else {
 		request := game.card_target_request_at(definition, room.player.position)
 		evaluation := game.evaluate_card_targeting(room, card, request)
@@ -2046,6 +2069,8 @@ Renderer_Status_View :: struct {
 	gold:        i32,
 	pulse_count: u64,
 	statuses:    game.Status_Set,
+	// The die DESTINO's bumps roll (its chip names it).
+	fate_sides:  i32,
 }
 
 renderer_status_view :: proc(renderer: ^Renderer, room: ^game.Room) -> (result: Renderer_Status_View) {
@@ -2061,6 +2086,7 @@ renderer_status_view :: proc(renderer: ^Renderer, room: ^game.Room) -> (result: 
 		result.gold = presentation.gold
 		result.pulse_count = presentation.pulse_count
 		result.statuses = presentation.player.statuses
+		result.fate_sides = presentation.fate_sides
 		return
 	}
 	result.phase = room.phase
@@ -2070,6 +2096,7 @@ renderer_status_view :: proc(renderer: ^Renderer, room: ^game.Room) -> (result: 
 	result.gold = room.player.gold
 	result.pulse_count = room.pulse_count
 	result.statuses = room.player.statuses
+	result.fate_sides = game.player_fate_sides(room)
 	return
 }
 
@@ -2437,7 +2464,8 @@ timeline_card_cue_verb :: proc(cue: ^Presentation_Cue) -> cstring {
 	     .Attack_Missed, .Move_Blocked,
 	     .Gold_Gained, .Energy_Gained, .Binding_Added, .Binding_Exhausted, .Binding_Expired,
 	     .Pulse_Advanced, .Refocus, .Object_Spawned, .Explosive_Armed, .Explosion, .Explosive_Disarmed, .Room_Hazard_Triggered,
-	     .Dice_Rolled, .Spell_Launched, .Spell_Impact, .Shadow_Entered, .Shadow_Emerged, .Attack_Deflected, .Fate_Rolled:
+	     .Dice_Rolled, .Spell_Launched, .Spell_Impact, .Shadow_Entered, .Shadow_Emerged, .Attack_Deflected, .Fate_Rolled,
+	     .Lasso_Caught, .Lasso_Struck, .Lasso_Released, .Fish_Cast, .Fish_Bite, .Fish_Caught:
 	}
 	return nil
 }
@@ -2556,8 +2584,9 @@ draw_presentation_cue :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) {
 		draw_timeline_loot_drop_cue(renderer, cue)
 		return
 	}
+	// The Lazzo's MOLLATO shows with its foe's fall (draw_lasso_release_badge).
 	if cue.kind == .Move || cue.kind == .Defeat || cue.kind == .Pulse_Advanced ||
-	   cue.kind == .Shadow_Entered || cue.kind == .Shadow_Emerged {
+	   cue.kind == .Shadow_Entered || cue.kind == .Shadow_Emerged || cue.kind == .Lasso_Released {
 		return
 	}
 	center, has_center := presentation_event_center(renderer, cue.event)
@@ -2639,10 +2668,27 @@ draw_presentation_cue :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) {
 		color = rl.Color{101, 174, 218, 255}
 	case .Fate_Rolled:
 		label, color = fate_outcome_label(cue.event, true)
+	// LAZZO (lasso.odin): the throw, a hit or a smash.
+	case .Lasso_Caught:
+		label = "LAZZO"
+		color = LASSO_ROPE_LIGHT
+	case .Lasso_Struck:
+		label = fmt.ctprintf("SCHIANTO %d", cue.event.amount) if cue.event.target == game.SYSTEM_ENTITY else fmt.ctprintf("COLPO %d", cue.event.amount)
+		color = rl.Color{255, 112, 102, 255}
+	// CANNA DA PESCA (fishing.odin): the cast, the bite, the catch.
+	case .Fish_Cast:
+		label = "PESCA"
+		color = FISHING_WATER_LIGHT
+	case .Fish_Bite:
+		label = "!"
+		color = FISHING_BITE_RED
+	case .Fish_Caught:
+		label = fishing_catch_label(cue.event)
+		color = FISHING_WATER_LIGHT
 	case .Move, .Card_Played, .Card_Drawn, .Card_Moved, .Card_Created, .Refocus,
 	     .Card_Refocused, .Defeat,
 	     .Loot_Dropped, .Loot, .Pulse_Advanced, .Dice_Rolled, .Spell_Launched, .Spell_Impact,
-	     .Shadow_Entered, .Shadow_Emerged:
+	     .Shadow_Entered, .Shadow_Emerged, .Lasso_Released:
 		unreachable()
 	}
 	draw_timeline_popup(renderer, label, color, center, presentation_cue_progress(cue))

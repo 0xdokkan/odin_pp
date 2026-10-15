@@ -126,14 +126,16 @@ tactical_critical_scale :: proc(room: ^Room, action: ^Action) {
 		case .Add_Reaction_Binding:
 			effect.amount += 1
 			if effect.charges > 0 { effect.charges += 1 }
-		// A pool or a fire gives a stack more.
-		case .Draw_Cards, .Create_Card, .Gain_Energy, .Place_Ground:
+		// A pool or a fire gives a stack more; the Lazzo's first hit is one
+		// harder (and so is every one after it).
+		case .Draw_Cards, .Create_Card, .Gain_Energy, .Place_Ground, .Lasso:
 			effect.amount += 1
 		case .Deploy_Device:
 			effect.amount = critical_damage(effect.amount)
 			if effect.object_kind == .Shock_Floor { effect.charges = min(effect.charges+1, TACTICAL_SHOCK_FLOOR_MAX_CHARGES) }
-		// Unchanged; Movimento Ombra's four seconds never grow either.
-		case .Move, .Remove_Status, .Discard_Cards, .Enter_Shadow:
+		// Unchanged; Movimento Ombra's four seconds never grow either, and the
+		// Canna da Pesca is never played on the tick.
+		case .Move, .Remove_Status, .Discard_Cards, .Enter_Shadow, .Fish:
 		}
 	}
 }

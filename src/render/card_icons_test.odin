@@ -3,13 +3,13 @@ package render
 import "core:testing"
 import game "../game"
 
-// The icon atlas grew a fifth and a sixth row (tools/art/build_card_icons.py):
-// Movimento Ombra and the cards of Phase 2 have their own icons there, every
-// other card keeps its painted one, and the painted cells are cut where they
-// always were.
+// The icon atlas grew a fifth, a sixth and a seventh row
+// (tools/art/build_card_icons.py): Movimento Ombra, the cards of Phase 2, the
+// Lazzo and the Canna da Pesca have their own icons there, every other card
+// keeps its painted one, and the painted cells are cut where they always were.
 @(test)
 test_card_icons_add_rows_without_moving_the_painted_cells :: proc(t: ^testing.T) {
-	added := [?]game.Card_Id{.Shadow_Step, .Poison_Pool, .Wildfire, .Deflect, .Coffin, .Fate_Dice, .Venom_Blade}
+	added := [?]game.Card_Id{.Shadow_Step, .Poison_Pool, .Wildfire, .Deflect, .Coffin, .Fate_Dice, .Venom_Blade, .Lasso, .Fishing_Rod}
 	for id, index in added { testing.expect_value(t, gothic_card_icon(id), 16+index) }
 	for id in game.Card_Id {
 		own := id == .Count

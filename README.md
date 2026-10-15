@@ -97,15 +97,27 @@ l'ultimo nemico ucciso non ripulisce la stanza, e ogni 4 secondi di gioco arriva
 un nemico casuale (Chaser, Archer, Brute, Bomber o Custode) su una casella libera
 ad almeno 4 celle dal giocatore, fino a 6 insieme; un'arena vuota si riempie
 subito. Gli easter egg si riaprono ogni volta. Il mazzo contiene **una copia di
-Movimento Ombra e una di ogni carta nuova della Fase 2** (Pozza di Veleno,
-Incendio, Deflect, Feretro, Dado del Destino e Lama Velenosa), tutte e sette in
-mano (energia 12; vedi [Movimento Ombra](#movimento-ombra),
-[Pozza di Veleno e Incendio](#pozza-di-veleno-e-incendio) e
-[Deflect, Feretro, Dado del Destino e Lama Velenosa](#deflect-feretro-dado-del-destino-e-lama-velenosa)). Niente ricompense, uscita o
+Movimento Ombra, una di ogni carta nuova della Fase 2** (Pozza di Veleno,
+Incendio, Deflect, Feretro, Dado del Destino e Lama Velenosa) **e una del
+Lazzo e della Canna da Pesca**: le prime otto in mano, una mano piena (energia
+12), la Canna in attesa fra le esaurite, perché non si pesca mai in mano (vedi
+[Movimento Ombra](#movimento-ombra),
+[Pozza di Veleno e Incendio](#pozza-di-veleno-e-incendio),
+[Deflect, Feretro, Dado del Destino e Lama Velenosa](#deflect-feretro-dado-del-destino-e-lama-velenosa),
+[Lazzo](#lazzo) e [Canna da Pesca](#canna-da-pesca)). Niente ricompense, uscita o
 profilo; `F5` ricomincia, `F10` torna al menu. Arena, mazzo e ritmo degli arrivi
 sono in [mechanics_lab.odin](src/mechanics_lab.odin) e
 [sandbox.odin](src/game/sandbox.odin): per provare una nuova meccanica basta
 cambiare `MECHANICS_LAB_DECK`.
+
+**Arena libera (`F7`).** L'arena non si libera mai da sola, quindi `F7` la
+libera subito, come una stanza quando cade il suo ultimo nemico: tutti i nemici
+cadono, il bottino a portata arriva al Viandante, il combattimento finisce e non
+arriva più nessuno. Si apre lo slot della Canna da Pesca, con le pesche e senza
+acqua di una stanza nuova; l'uscita resta chiusa (sul tavolo niente portale né
+`USCITA`). Il cartello scrive
+`ARENA LIBERA / PESCA n/m / F7 DA CAPO / F5 RICOMINCIA`: `F7` di nuovo ricomincia
+la pesca da capo (senza acqua), `F5` riporta il combattimento.
 
 Le novità nate qui ora valgono in tutto il gioco: le azioni che durano il loro
 costo e la finestra che si accorcia ([Modalità tattica M7](#modalità-tattica-m7)),
@@ -121,8 +133,9 @@ i colpi che si vedono sul tavolo, ognuno con la sua arma di carta
 ([Il tavolo](#il-tavolo-cartoncini-vivi-cerchi-e-segnalini)). Le carte nuove della
 Fase 2 ([Pozza di Veleno e Incendio](#pozza-di-veleno-e-incendio) e
 [Deflect, Feretro, Dado del Destino e Lama Velenosa](#deflect-feretro-dado-del-destino-e-lama-velenosa))
-compaiono fra ricompense e negozio di ogni run tattica. La prova resta la sandbox in cui
-provare le prossime.
+compaiono fra ricompense e negozio di ogni run tattica, come il [Lazzo](#lazzo) e
+la [Canna da Pesca](#canna-da-pesca).
+La prova resta la sandbox in cui provare le prossime.
 
 **Intenzioni dei nemici (`F6`).** Nel gioco i nemici mostrano cosa stanno per
 fare con sigilli e terreno ([Il tavolo](#il-tavolo-cartoncini-vivi-cerchi-e-segnalini));
@@ -171,7 +184,7 @@ misure e un ascolto di tutta la famiglia, senza toccare il gioco.
 | `--smoke-menu` | cattura `odin_pp_menu.png` dopo 30 frame ed esce |
 | `--animation-speed=2` | velocità delle animazioni ordinarie, fra 0.25x e 4x; non accelera cast o dadi M8 |
 | `--fast` | velocità 4x |
-| `--mechanics-lab` | Prova meccaniche: arena aperta senza fine, mazzo delle carte in prova (Movimento Ombra, Pozza di Veleno, Incendio, Deflect, Feretro, Dado del Destino, Lama Velenosa), nemici che continuano ad arrivare |
+| `--mechanics-lab` | Prova meccaniche: arena aperta senza fine, mazzo delle carte in prova (Movimento Ombra, Pozza di Veleno, Incendio, Deflect, Feretro, Dado del Destino, Lama Velenosa, Lazzo, Canna da Pesca), nemici che continuano ad arrivare; `F7` libera l'arena per la Canna da Pesca |
 | `--spell-lab` | arena con Firebomb, Fate Strike, Chain Lightning, Sundering Blow e Guard |
 | `--dice-lab` | arena con Fate Strike, Sundering Blow, Prismatic Barrage, Twin Venom e Guard |
 | `--dice-set-lab` | tavolo 3D del set D4/D6/D8/D10/D%/D12/D20: selezione, lancio e rotazione con il mouse |
@@ -463,9 +476,10 @@ del movimento è solo il passo in diagonale.
 | Carta: danni | x1,5, almeno +2 |
 | Carta: scudo, cura, oro | x1,5, almeno +1 |
 | Carta: altri status | +1 potenza e +1 durata (Veleno, Bruciatura, Rallentamento e le cariche del Viandante: +1 stack, non hanno durata; Lama Velenosa: il dado più uno) |
-| Carta: pesca, energia, carte create, reazioni | +1 |
+| Carta: pesca, energia, carte create, reazioni | +1 (anche il primo colpo del Lazzo) |
 | Carta-dispositivo | danno x1,5 (almeno +2); la Tesla nasce con vita doppia, la Shock Floor con un colpo in più (massimo 21: un 20 del D20 più uno) |
 | Movimento Ombra, Dado del Destino | nessun critico: giocate sul secondo lasciano lo scocco all'azione dopo |
+| Canna da Pesca | mai critica: pesca a stanza liberata, senza finestra |
 | Freccia di Feretro | mai critica: non prende lo scocco |
 
 Le regole e i numeri sono in [tactical_beat.odin](src/game/tactical_beat.odin).
@@ -589,8 +603,9 @@ le celle che la pozza riempirebbe, e di brace la croce intera che il fuoco
 raggiungerebbe. Sul tavolo piatto (`--flat`) la pozza è un rombo verde con carta e
 inchiostro sui lati asciutti, il fuoco un rombo di brace con la sua fiammella.
 Le carte scrivono `2 VELENO A CELLA` / `SOLO NEMICI / STANZA` e
-`1 BRUCIATURA A CELLA` / `CROCE: +1 A FINESTRA` (con sette o otto carte in mano
-`1 BRUCIATURA`); l'ispettore aggiunge
+`1 BRUCIATURA A CELLA` / `CROCE: +1 A FINESTRA` (con sette o otto carte in mano,
+sulle carte strette, `Pozza` / `2 VELENO` / `A OGNI CELLA` e `1 BRUCIATURA` /
+`CRESCE A CROCE`); l'ispettore aggiunge
 `AREE CHIUSE: SI RIEMPIONO` / `OGNI CELLA ENTRATA AVVELENA` e
 `CRESCE A OGNI NUOVA FINESTRA` / `SI SPEGNE ALLA QUINTA`. Le icone, nella quinta
 riga dell'atlante ([build_card_icons.py](tools/art/build_card_icons.py)), sono una
@@ -628,8 +643,10 @@ compaiono fra ricompense e negozio delle run tattiche, le run classiche non le
 offrono e, se le hanno in mano, le rifiutano (`Invalid_Phase`). Nell'HUD vengono
 prima Veleno e Bruciatura del Viandante, che lo mordono (con tre o quattro cariche
 non finiscono mai nel `+n`), poi le cariche: `RIFLESSO n`, `FRECCE n`,
-`DESTINO n`, `LAMA n` (con poco spazio `RIF`, `FRE`, `DES`, `LAM`), poi gli altri
-status. Una carica si vede spesa quando il suo colpo arriva (la lanterna cala, la
+`DESTINO n d8` (con il dado che tireranno gli urti caricati: quello dell'ultimo
+Dado del Destino giocato, che compare con le sue cariche; un d4 se nella stanza
+non ne è stato giocato nessuno), `LAMA n` (con poco spazio `RIF`, `FRE`,
+`DES 3 d8`, `LAM`), poi gli altri status. Una carica si vede spesa quando il suo colpo arriva (la lanterna cala, la
 freccia colpisce, il colpo rimandato raggiunge il Viandante), non quando parte;
 l'ultima carica spesa fa sparire il suo chip. Un colpo, un urto o una freccia spendono le
 loro cariche solo se vengono accettati. Ogni status ha ora un posto per tipo
@@ -676,7 +693,8 @@ carte); sulla mano il clic resta della mano. La riga della mano scrive
 `CLIC SU UN NEMICO EVIDENZIATO: FRECCIA`.
 
 `Dado del Destino` (rara, energia 2, carta con dadi: d4 al livello 0, poi la
-scala fino al d20) carica i prossimi **3 attacchi a urto** (`DESTINO 3`): una
+scala fino al d20) carica i prossimi **3 attacchi a urto** (`DESTINO 3 d4`: il
+chip dice anche il dado che tireranno): una
 nuova giocata li riporta a 3, mai oltre, e il dado è quello dell'ultima carta
 giocata. Giocata sul secondo non consuma lo scocco, come Movimento Ombra: non ha
 una versione critica. A ogni urto caricato, dritto o in diagonale, il dado si
@@ -708,7 +726,9 @@ Destino possono caricare lo stesso urto.
 Le carte scrivono `+1 RIFLESSO` / `RIMANDA UN COLPO`, `3 FRECCE / CTRL+CLIC` /
 `1 DANNO + 1 STATUS`, `1d4 SU 3 COLPI` / `UN TIRO A OGNI COLPO` e
 `1d4 COLPI AVVELENATI` / `2 VELENO A COLPO` (con sette o otto carte in mano
-`3 FRECCE` / `CTRL+CLIC: 1 DANNO` e `1d4 COLPI`); l'ispettore aggiunge
+`+1 RIFLESSO` / `IL COLPO TORNA`, `3 FRECCE` / `CTRL+CLIC`, `Dado` /
+`1d4 A COLPO` / `PER 3 COLPI` e `Lama` / `1d4 COLPI` / `2 VELENO L'UNO`);
+l'ispettore aggiunge
 `IL NEMICO PRENDE IL COLPO` / `NO BOMBE, TRAPPOLE, STATUS`,
 `+ VEL 2 O BRU 1 O RAL 1` / `LINEA DI TIRO / 1s L'UNA`,
 `1 VEL 2 BRU 3 RAL 4 VITA` / `5 CRITICO / 6+ LETALE` e
@@ -741,6 +761,244 @@ uno solo fra Veleno 2, Bruciatura 1 e Rallentamento 1. Il Dado del Destino caric
 Bruciatura 2. Giocato di nuovo, riporta gli urti a 3 e non oltre. Un 16 del d20
 fa cadere il nemico, ma sul Custode è solo un critico (4 danni). Lama Velenosa
 tira 3 e il suo urto lascia 2 danni e Veleno 2, con 2 cariche rimaste.
+
+### Lazzo
+
+`Lazzo` (rara, energia 2, **2 s** di finestra, solo tattica: compare fra
+ricompense e negozio delle run tattiche, le run classiche non lo offrono e, se
+lo hanno in mano, lo rifiutano) prende al lazo un nemico e lo fa girare intorno
+al Viandante finché non muore. Regole in [lasso.odin](src/game/lasso.odin),
+tavolo in [lasso.odin](src/render/lasso.odin).
+
+**Il lancio.** Il bersaglio è un nemico entro 4 celle (Chebyshev), visibile e
+in linea di vista. Il boss (il Demolitore) e il miniboss (il Custode) sono
+troppo pesanti: la carta li rifiuta e la mano scrive `TROPPO PESANTE PER IL
+LAZZO`. Il lancio è il cast della carta: per i suoi 2 s il mondo è fermo, come
+per ogni carta. Il nemico gira su un vero cerchio intorno al centro della
+casella del Viandante, e l'**anello** di raggio r sono tutte le caselle che quel
+cerchio attraversa. Il **raggio** del giro, scelto prima di girare, è il più
+grande fra 4 e 1 il cui anello non ha caselle solide (muri, fuori dalla stanza,
+coperture, oggetti che bloccano il passo): un muro sulla quarta cella in linea
+retta dà raggio 3, mentre una copertura più vicina, dentro l'anello di 4, non lo
+accorcia (il nemico in volo ci passa sopra). Se anche l'anello di 1 ha una
+casella solida (il Viandante accanto a un muro, che taglia tutti gli anelli) il
+raggio è 1 e il nemico sbatte (vedi sotto). Il nemico viene tirato sulla casella
+dell'anello dalla sua parte (se è solida, sulla libera più vicina lungo
+l'anello; a pari distanza, nel verso del giro), perde il suo intento e il giro
+parte da lì, in senso antiorario sul tavolo.
+
+**Il giro.** Il primo giro dura 0,9 s, ogni giro dopo dura il 12% in meno di
+quello prima (0,88 volte), fino a 8 giri al secondo (dal diciassettesimo): un
+nemico da 60 di vita, da solo e senza colpi, cade dopo 60 giri, in 12,03 s, e i
+colpi lo accorciano molto (`LASSO_FIRST_TURN_SECONDS`, `LASSO_TURN_SPEEDUP` e
+`LASSO_FASTEST_TURN_SECONDS` in [lasso.odin](src/game/lasso.odin)). Il moto è
+continuo e si risolve a passi esatti, casella per casella, sul tempo del mondo:
+un fotogramma lungo non salta niente. Ogni volta che il nemico in volo entra in
+una casella dell'anello occupata da un altro nemico è il **colpo n** (1, poi
+2, 3...): tutti e due prendono n danni dal Viandante e il colpito viene spinto
+di n celle via dal Viandante (nella più vicina delle otto direzioni, al massimo
+12), con le regole della spinta: si ferma prima di un muro o di un altro corpo,
+e le caselle in cui entra (pozze, fuochi, scosse, pericoli) fanno il loro
+effetto. Se la casella dopo è solida (con raggio 1, o un oggetto messo
+sull'anello durante il giro) è uno **schianto**: il colpo n lo prende solo il
+nemico in volo, che rimbalza e torna indietro nell'altro verso. Ogni giro
+intero percorso (360°, in un verso o nell'altro) gli costa **1 vita**. Il
+giro finisce solo con la sua morte, e il suo loot cade dove muore.
+
+**Il perno.** Il mondo continua: i nemici agiscono e la finestra scorre. Il
+Viandante fa da perno: niente passi, urti, carte o frecce (premuti si perdono,
+non restano in coda); i colpi nemici, la scelta di difesa, i QTE e Deflect
+valgono come sempre. Ogni schivata o spostamento del Viandante, una spinta
+compresa, **lascia andare** la corda: il nemico atterra sotto di sé o, se la
+casella è occupata, sulla libera più vicina (entrandoci), e riparte subito con
+un intento nuovo, senza stordimento (il tempo in volo chiude anche un recupero
+in cui era; se la corda si molla nel mezzo di un battito, per una spinta o per
+la schivata della scelta di difesa, l'intento arriva alla fine di quel battito,
+con quelli degli altri). La mano lo ricorda quando si può: `LAZZO / SHIFT+WASD:
+LO MOLLI`, e con la scelta di difesa aperta `LAZZO / E, POI WASD: LO MOLLI` (o
+`LAZZO / DIFESA`, se la scelta non offre la schivata); a finestra scaduta, da
+stordito o con la schivata in ricarica dice invece `LAZZO / IN RECUPERO`,
+`LAZZO / STORDITO` o `LAZZO / SCHIVA FRA n`. In volo il nemico non agisce (il
+suo Veleno quindi non morde), non entra in pozze, fuochi o scosse e nessuno lo
+prende di mira; la sua Bruciatura continua a mordere.
+
+**Upgrade e secondo.** Ogni upgrade dà +1 al primo colpo, fino al livello 5
+(`PRIMO COLPO 1 -> 2`); giocato sul secondo, il primo colpo ha +1. La vita
+persa a ogni giro resta 1.
+
+**Sul tavolo.** La corda è una striscia di carta in pixel art: due trefoli di
+canapa intrecciati fra due linee d'inchiostro, dentro il margine bianco. Durante
+il lancio il Viandante si alza nella posa del suo cast, il braccio in su (mai
+il salto con la lanterna e la capriola di un colpo), e il cappio aperto vola
+dalla sua mano sopra il nemico, gli cade intorno alla vita e si stringe con una
+torsione; il cartoncino si solleva e viene tirato su una curva alta fino
+all'anello. Poi vola intorno al Viandante, sollevato dal pavimento, dove la
+stanza dice che è, con la corda che resta indietro rispetto al giro e si
+affloscia quando è lento; sul pavimento un anello di carta tratteggiato mostra
+il raggio (senza le caselle solide, con tacche rosse dove sbatterà). Il
+Viandante canalizza e si gira a seguirlo finché il giro non supera i 3 giri al
+secondo. Ogni colpo fa una stella di carta rossa fra i due cartoncini, `COLPO n`
+sopra il colpito e i segnalini di danno, e il colpito scivola via; uno schianto
+fa una stella grigia e sbuffi di polvere di pietra al muro (pezzi di carta in
+pixel art di [build_attack_props.py](tools/art/build_attack_props.py), come la
+stella), con `SCHIANTO n`; a ogni giro intero un piccolo `-1` resta dove il
+nemico era. Quando la corda lo lascia cade molle e il
+cartoncino torna a terra con `MOLLATO` sopra, mentre il tavolo mostra quello che
+ha mosso il Viandante (la schivata subito, una spinta quando il colpo del bruto
+arriva); fino ad allora resta appeso alla corda tesa. Con un anello largo la
+telecamera si allontana un poco e si accosta al Viandante, perché l'anello
+intero si veda fra l'HUD e la mano, poi torna dov'era. L'HUD scrive `LAZZO` /
+`GIRO n` e `LAZZO: COLPI n / PROSSIMO n / SCHIVA: LO MOLLI` (o, quando una
+schivata non si può fare, `IN RECUPERO`, `STORDITO` o `SCHIVA FRA n` in fondo);
+mentre gira, come nell'ombra, il riquadro tiene a destra solo `NEMICI n`, perché
+le carte non si giocano e la riga ci stia intera anche con la finestra che si
+accorcia. Sul tavolo piatto (`--flat`) l'anello è tratteggiato e la corda
+dritta.
+
+**Il mirino.** Con la carta in mano, i nemici che può prendere hanno un mirino
+color canapa, il boss e il miniboss in portata un mirino rosso e `TROPPO
+PESANTE` sotto i piedi (sopra gli adesivi degli intenti degli altri nemici, e
+le altre scritte del tavolo lo evitano); l'anello che farebbe si vede
+tratteggiato, con le sue caselle (rosse con una croce dove sbatterà, arancio
+dove colpirà un nemico) e, per il nemico sotto il mouse, la casella da cui
+partirà in verde e una freccia nel verso del giro.
+
+La carta scrive `COLPI 1, 2, 3...` / `-1 VITA A OGNI GIRO` (con sette o otto
+carte in mano `COLPI 1, 2...` / `-1 VITA A GIRO`); l'ispettore aggiunge
+`BOSS E MINIBOSS: TROPPO PESANTI` / `SCHIVA O SPINTA: LO MOLLI`. L'icona, nella
+cella 23 dell'atlante (l'ultima della sesta riga,
+[build_card_icons.py](tools/art/build_card_icons.py)), è un cappio di canapa
+intrecciata, aperto, con la corda che scende dal nodo a un rotolo e a un capo
+sfilacciato. Nella Prova meccaniche ha i suoi suoni, fatti da codice come gli
+altri ([SOUND_SPEC.md](tools/audio/SOUND_SPEC.md)): la carta (il rotolo di canapa
+sciolto dalla spalla e il cappio fatto girare una volta sopra la testa), il
+lancio (il cappio lasciato andare in un fruscio pieno, la corda che scorre nel
+guanto e il fischio del cappio che si allontana), la stretta quando il cappio
+arriva al nemico (la corda che scorre nel nodo, il cigolio della canapa, la carta
+stretta e lo strattone quando il cartoncino si alza), un fruscio a ogni giro che
+sale di tono man mano che accelera (fino a otto al secondo), il colpo (due
+cartoncini sbattuti insieme), lo schianto sul muro (pietra, sassolini, polvere)
+e la corda mollata (la canapa che si allenta e il cartoncino che ricade).
+
+Lo smoke `--smoke-mechanics-lab` lo gioca dalla mano, lo filma
+([Verifica e smoke test](#verifica-e-smoke-test)) e ne controlla le regole. A
+quattro celle dal muro ovest il raggio è 3, dove una cella più in là sarebbe 4:
+il muro sta sulla quarta cella. Il mirino segna i nemici che può prendere e
+l'anello, con i tre nemici fermi che ci stanno sopra; sul Custode scrive
+`TROPPO PESANTE` e né la regola né la carta lasciata su di lui lo prendono.
+Lanciato su un nemico a quattro celle, che viene tirato dentro sull'anello, lo
+fa girare mentre il mondo va avanti: colpo 1 sul nemico fermo a nord, spinto di una
+cella, colpo 2 su quello a sud, spinto di due, colpo 3 su quello a nord-est,
+spinto di tre in diagonale, ognuno ferito del numero del suo colpo e il nemico in
+volo con lui; a ogni fotogramma la vita del nemico in volo è quella di partenza
+meno i colpi e meno un punto per ogni giro intero, e niente altro. Intanto un
+balestriere libero, messo giù dopo le immagini del mirino, prende la mira e tira
+al perno: si apre la scelta di difesa, che nessuno sceglie, il colpo arriva e la
+corda tiene. Il nemico in volo cade al dodicesimo giro e la corda si affloscia;
+l'arena resta in combattimento, perché la stanza della prova non si libera mai.
+Accanto al muro ovest il raggio è 1: il nemico sbatte nel muro, ogni schianto
+con il suo numero solo su di lui, e a ogni schianto il giro torna indietro.
+Intanto la riga dell'HUD sul giro sta intera, misurata con il font del gioco,
+con la finestra fissa della prova e con quella che si accorcia del gioco, anche
+con due cifre e una stanza piena. Una schivata lo lascia andare: atterra sotto
+di sé e annuncia subito un intento nuovo, senza stordimento, e il suo
+cartoncino cade con `MOLLATO` mentre la schivata si vede.
+
+### Canna da Pesca
+
+`Canna da Pesca` (non comune, energia 0, **0 s**, solo tattica: compare fra
+ricompense e negozio delle run tattiche, le run classiche non la offrono) non si
+gioca mai in combattimento: è un attrezzo da fine stanza. Regole in
+[fishing.odin](src/game/fishing.odin), tavolo in [fishing.odin](src/render/fishing.odin).
+
+**Mai in mano.** Quando comincia un combattimento la Canna va subito fra le
+esaurite e ci resta: non si pesca, non si scarta, non torna con i rimescolamenti
+(le esaurite non si rimescolano mai) e i contatori della mano non la contano.
+Resta però una carta del mazzo come le altre: la scheda del personaggio la
+mostra, il riposo e il negozio la potenziano, il negozio la può togliere.
+
+**Lo slot.** Liberata la stanza (cade il suo ultimo nemico), in basso a destra,
+dove starebbe la carta di una mano, compare lo slot della Canna con `PESCA n/m`
+(le pesche che restano alla stanza, sulle sue). Si prende come una carta: la si
+trascina su una casella, oppure un clic sulla Canna e poi un clic sulla casella;
+`Esc` o il destro la rimettono giù. Mentre è presa il tavolo segna in blu le
+caselle che può pescare, più chiare quelle già d'acqua, e in verde (o in rosso)
+quella sotto il mouse. L'HUD scrive `CANNA DA PESCA n/m / RAGGIUNGI L'USCITA` e,
+finite le pesche, `PESCHE FINITE`.
+
+**La casella.** Una casella entro 3 celle (Chebyshev), in linea di vista, con le
+regole della Pozza di Veleno (pavimento libero: niente coperture, oggetti,
+nemici, non la propria) e in più, scelte della Canna, mai l'uscita, una
+trappola, un bottino per terra, una pozza o un fuoco. Diventa **acqua** finché
+non si lascia la stanza: la decalcomania di carta delle pozze, ma blu, con due
+anelli di increspature intorno al centro di ogni casella e cerchi di luce che si
+allargano. Un'acqua già fatta si pesca di nuovo.
+
+**La pesca.** Circa tre secondi in cui il Viandante è occupato (i tasti premuti
+intanto si perdono, come sempre): tira indietro la canna di carta e la lancia,
+la lenza vola con il galleggiante sulla casella, che diventa acqua al tonfo; il
+galleggiante galleggia finché un pesce abbocca (uno schizzo e un `!` di carta);
+il Viandante tira su la canna, la preda esce dall'acqua fra gli spruzzi e gli
+vola addosso. Il suo cartoncino si gira verso l'acqua e al lancio si alza nella
+posa del suo cast, il braccio in su (mai il salto con la lanterna e la capriola
+di un colpo), poi tiene ferma la canna, canalizzando, mentre è la canna a
+riavvolgere (nessun chinarsi a raccogliere). L'HUD scrive `PESCA` / `PESCA IN
+CORSO`.
+
+**La preda.** Dal flusso proprio della stanza (il suo seme e i dadi della run,
+mai l'orologio): **95% cibo** (pesce, mela, pane, formaggio o carne, che dice il
+suo nome sopra il Viandante) che cura un **d4** tirato sui dadi della run e
+mostrato con il dado 3D come gli altri tiri, fino alla vita massima, con il
+segnalino verde `+n`; **5% una carta** del pool delle ricompense tattiche, con i
+pesi di rarità del nodo della stanza e mai la Canna, che esce dall'acqua, resta
+un momento sopra il Viandante con `CARTA PESCATA / nome` sotto il tavolo ed
+entra nel mazzo della run. Con il mazzo pieno (32 carte) la preda è cibo.
+
+**Pesche e upgrade.** Ogni stanza dà 1 pesca più il livello della Canna (fino al
+livello 5: 6 pesche), da capo in ogni stanza. Gli upgrade alzano solo le pesche
+(`PESCHE 1 -> 2`): la cura resta un d4 a ogni livello, perché la Canna non è
+una carta dei dadi.
+
+**Una per run.** Finché il mazzo ne ha una, nessuna offerta ne porta un'altra:
+ricompense, negozio, Armeria dimenticata e prede la lasciano fuori. Tolta al
+negozio, si può trovare di nuovo.
+
+La carta scrive `1 PESCA A STANZA` (o `n PESCHE A STANZA`) / `CIBO d4 / 5% CARTA`
+(su una carta stretta `Canna` / `1 PESCA` / `CIBO d4 O CARTA`, ma lo slot del
+canvas del gioco è largo come la carta di una mano di cinque);
+l'ispettore aggiunge `SOLO A STANZA LIBERATA` / `MAI IN MANO / UNA PER RUN`.
+L'icona, nella cella 24 dell'atlante (la prima della settima riga,
+[build_card_icons.py](tools/art/build_card_icons.py)), è una canna di legno con
+l'impugnatura di sughero e il mulinello d'acciaio, la lenza che scende dalla
+punta a un galleggiante rosso e bianco su uno stagno blu. La canna, il
+galleggiante, le gocce, il `!` e le prede sono pezzi di carta di
+[build_attack_props.py](tools/art/build_attack_props.py). Nella Prova meccaniche
+ha i suoi suoni, fatti da codice come gli altri
+([SOUND_SPEC.md](tools/audio/SOUND_SPEC.md)): la carta al lancio (la canna tirata
+indietro e frustata in avanti, il mulinello che gira libero mentre la lenza
+vola), il tonfo del galleggiante sull'acqua nuova, l'abboccata (il galleggiante
+tirato sotto, uno schizzo, la lenza tesa), il mulinello che riavvolge con lo
+spruzzo della preda che esce dall'acqua proprio quando si vede, la preda che
+arriva nella mano (uno schiaffo bagnato sul guanto) o la carta pescata (la carta
+scossa due volte e tre note di cristallo che salgono); il cartoncino del
+Viandante non ne aggiunge di suoi (né il colpo di lanterna né le monete del
+bottino raccolto).
+
+La si prova con `F7`, che libera l'arena ([Prova meccaniche](#prova-meccaniche)),
+e lo smoke `--smoke-mechanics-lab` la gioca, la filma
+([Verifica e smoke test](#verifica-e-smoke-test)) e ne controlla le regole: la
+Canna presa dallo slot e lasciata su una casella pesca un pesce (il suo d4 fa 3,
+3 di vita) e la casella diventa acqua, sul tavolo 3D e su quello piatto; la
+stanza ha finito la sua pesca. In nessuna pesca il cartoncino del Viandante fa
+sentire il colpo di lanterna, le monete del bottino o il cast di una carta. Potenziata a +1, come la potenzierebbero un
+riposo o un negozio, `F7` di nuovo dà una stanza nuova senza acqua e con due
+pesche (`PESCA 2/2`): dalla prima esce una carta, mai un'altra Canna, che entra
+nel mazzo; la seconda, sulla stessa acqua (nessuna casella nuova), tira fuori un
+pane che cura il 2 del suo d4. Poi le pesche della stanza sono finite, e un altro
+`F7` le ridà tutte e due. Per ultima la regola di una Canna per run: con la
+Canna nel mazzo nessuna di 400 offerte, estratte come le estraggono ricompense,
+negozio e Armeria dimenticata (`card_offer_exclusions`), ne porta un'altra,
+mentre le stesse estrazioni senza di lei ne portano.
 
 ### Il tavolo: cartoncini vivi, cerchi e segnalini
 
@@ -1182,7 +1440,7 @@ odin run src -o:none -- --classic
 | `--smoke-m7-view` | prova grafica di scena, oggetti 3D, fog, ologramma, QTE e menu |
 | `--smoke-m8-view` | prova 3D di d4, dispositivi, offerta del ring, equipaggiamento, scheda personaggio, tag match e cambio stanza |
 | `--smoke-western` | nuvoletta 6 RANCH 7: apertura automatica, volo delle carte, insegna, porte, corsa a tempo e premio |
-| `--smoke-mechanics-lab` | Prova meccaniche: arena aperta, mano con tutto il mazzo in prova, ring riaperto, arrivi fino al massimo, ultima uccisione senza fine del combattimento, cartoncino del giocatore di nuovo in piedi dopo morte e riavvio, cartoncini vivi (un passo e un attacco fotogramma per fotogramma), cerchi d'azione e segnalini di danno e cura, gli status a stack (Veleno, Bruciatura e Rallentamento su un nemico, Bruciatura e Veleno sul giocatore: etichette di carta ai piedi, nomi e stack nell'HUD e nell'ispettore del nemico, `odin_pp_living_statuses_NN.png` e `odin_pp_mechanics_lab_statuses.png`; la finestra che scade subito dopo li fa bruciare), i suoni che ogni azione mette in coda (passo, colpo, ferita, caduta, cura, status, battito, stordimento: senza dispositivo audio, li conta) e infine un Movimento Ombra giocato dalla mano: finestra e clock del mondo fermi per tutta l'ombra, quattro passi dell'ombra con una diagonale sul suo primo battito, risalita sull'ultima casella dell'ombra, nessun passo del Viandante fra i suoni e tutti quelli dell'ombra (carta, sprofondare, passi, CRITICO, battiti, risalita); per finire ogni colpo uno alla volta, con la sua arma di carta: il dardo nel Viandante e nel pavimento, il fendente del bruto sulle tre caselle e la sua carica colpita all'arrivo, gli artigli del ghoul, il pastorale, il bastone, la bomba del bombarolo, la brace dell'arcimago su un barile e i colpi del Viandante con la lanterna e con le due armi M8 (ogni arma deve comparire); ultimo, il Rallentamento sul sigillo: un bruto rallentato di 2 compie il passo già annunciato, poi annuncia il prossimo intento 2 secondi più lungo (due tacche in più) e, compiuta quell'azione, perde uno stack e trattiene il successivo di un secondo solo; infine Pozza di Veleno e Incendio dalla mano: un anello di pozze chiuso dall'ultima, che allaga l'area (otto celle da 2 Veleno) e avvelena una volta sola il chaser rimasto dentro, un chaser che attraversa due pozze schizzando e prendendo 2 Veleno a ogni cella, il Viandante che entra in una pozza sua senza prendere niente, un fuoco accanto a un bruto che allunga i bracci per quattro finestre, lo prende alla seconda (Bruciatura 1, che morde dalla terza), brucia la casella del Viandante senza segnarlo e si spegne alla quinta, con i suoni delle carte, dello schizzo e del fuoco che si allarga e si spegne; ultime le cariche del Viandante: Deflect su un dardo (lo stesso dardo torna nel balestriere), su un fendente e su una carica (risposta con la lanterna), mai con la scelta di difesa, il Viandante illeso e fermo e l'attaccante con i 3 del colpo, Feretro con `Ctrl` (segnato il nemico sulla linea di tiro, non quello dietro una copertura, su cui il clic non scocca niente) e una freccia da 1 s scoccata dal clic, con 1 danno e uno status, il Dado del Destino su tre urti (un d4 che fa BRUCIATURA 2, una nuova giocata che riporta gli urti a 3, un d20 che fa LETALE e lo stesso 16 che sul Custode è solo un CRITICO) e Lama Velenosa con il suo dado e l'urto avvelenato, con i suoni delle carte, delle cariche, del colpo rimandato, della freccia e del dado |
+| `--smoke-mechanics-lab` | Prova meccaniche: arena aperta, mano con tutto il mazzo in prova (e ogni parola di ogni sua carta, a ogni livello, misurata con il font del gioco sulle carte da 109 pixel della mano, la Canna sul suo slot, e nell'ispettore: ogni riga ci sta senza stringere le lettere, rimpicciolirsi o tagliarsi, nessun nome tagliato), ring riaperto, arrivi fino al massimo, ultima uccisione senza fine del combattimento, cartoncino del giocatore di nuovo in piedi dopo morte e riavvio, cartoncini vivi (un passo e un attacco fotogramma per fotogramma), cerchi d'azione e segnalini di danno e cura, gli status a stack (Veleno, Bruciatura e Rallentamento su un nemico, Bruciatura e Veleno sul giocatore: etichette di carta ai piedi, nomi e stack nell'HUD e nell'ispettore del nemico, `odin_pp_living_statuses_NN.png` e `odin_pp_mechanics_lab_statuses.png`; la finestra che scade subito dopo li fa bruciare), i suoni che ogni azione mette in coda (passo, colpo, ferita, caduta, cura, status, battito, stordimento: senza dispositivo audio, li conta) e infine un Movimento Ombra giocato dalla mano: finestra e clock del mondo fermi per tutta l'ombra, quattro passi dell'ombra con una diagonale sul suo primo battito, risalita sull'ultima casella dell'ombra, nessun passo del Viandante fra i suoni e tutti quelli dell'ombra (carta, sprofondare, passi, CRITICO, battiti, risalita); per finire ogni colpo uno alla volta, con la sua arma di carta: il dardo nel Viandante e nel pavimento, il fendente del bruto sulle tre caselle e la sua carica colpita all'arrivo, gli artigli del ghoul, il pastorale, il bastone, la bomba del bombarolo, la brace dell'arcimago su un barile e i colpi del Viandante con la lanterna e con le due armi M8 (ogni arma deve comparire); ultimo, il Rallentamento sul sigillo: un bruto rallentato di 2 compie il passo già annunciato, poi annuncia il prossimo intento 2 secondi più lungo (due tacche in più) e, compiuta quell'azione, perde uno stack e trattiene il successivo di un secondo solo; infine Pozza di Veleno e Incendio dalla mano: un anello di pozze chiuso dall'ultima, che allaga l'area (otto celle da 2 Veleno) e avvelena una volta sola il chaser rimasto dentro, un chaser che attraversa due pozze schizzando e prendendo 2 Veleno a ogni cella, il Viandante che entra in una pozza sua senza prendere niente, un fuoco accanto a un bruto che allunga i bracci per quattro finestre, lo prende alla seconda (Bruciatura 1, che morde dalla terza), brucia la casella del Viandante senza segnarlo e si spegne alla quinta, con i suoni delle carte, dello schizzo e del fuoco che si allarga e si spegne; ultime le cariche del Viandante: Deflect su un dardo (lo stesso dardo torna nel balestriere), su un fendente e su una carica (risposta con la lanterna), mai con la scelta di difesa, il Viandante illeso e fermo e l'attaccante con i 3 del colpo, Feretro con `Ctrl` (segnato il nemico sulla linea di tiro, non quello dietro una copertura, su cui il clic non scocca niente) e una freccia da 1 s scoccata dal clic, con 1 danno e uno status, il Dado del Destino su tre urti (un d4 che fa BRUCIATURA 2, una nuova giocata che riporta gli urti a 3, un d20 che fa LETALE e lo stesso 16 che sul Custode è solo un CRITICO) e Lama Velenosa con il suo dado e l'urto avvelenato (con tre cariche in più, i chip dell'HUD: ogni parola intera, il d20 di DESTINO compreso), con i suoni delle carte, delle cariche, del colpo rimandato, della freccia e del dado; per ultimo il Lazzo: a quattro celle dal muro ovest il raggio è 3 (una cella più in là sarebbe 4), il mirino (i nemici che prende, i tre fermi sull'anello, il Custode `TROPPO PESANTE`, che né la regola né la carta prendono), il lancio su un nemico a quattro celle tirato dentro sull'anello e il giro con il mondo che continua: colpi 1, 2 e 3 sui nemici fermi a nord, a sud e a nord-est, spinti di 1, 2 e 3 celle e feriti di 1, 2 e 3 come il nemico in volo, la vita di questo controllata a ogni fotogramma (meno i colpi, meno 1 a ogni giro intero), un balestriere libero che mira e tira al perno (la scelta di difesa si apre, il colpo passa, la corda tiene) e la caduta al dodicesimo giro, con la riga dell'HUD sul giro intera con la finestra fissa e con quella che si accorcia; poi raggio 1 accanto al muro, con gli schianti, ognuno col suo numero solo sul nemico in volo e il giro che torna indietro a ogni schianto, e una schivata che lo lascia andare (atterra sotto di sé e annuncia subito un intento nuovo, senza stordimento, e il suo cartoncino cade con `MOLLATO` mentre la schivata si vede), con i suoni della carta, del lancio, della stretta, dei giri, dei colpi, degli schianti e della corda mollata; infine la Canna da Pesca: `F7` libera l'arena (due nemici fermi cadono e si apre lo slot con `PESCA 1/1`), la canna presa dallo slot e lasciata su una casella a due celle pesca lì (lancio, galleggiante sull'acqua nuova, abboccata, un pesce tirato fuori che vola al Viandante, il suo d4 a 3 e 3 di vita, l'acqua sul tavolo 3D e su quello piatto), poi la pesca della stanza è finita; potenziata a +1, `F7` di nuovo dà una stanza nuova senza acqua e con due pesche (`PESCA 2/2`): dall'acqua esce una carta, mai un'altra canna, che entra nel mazzo, poi la stessa acqua (nessuna casella nuova) dà un pane per il 2 del suo d4 e le pesche finiscono, finché un altro `F7` le ridà tutte e due; per ultima nessuna di 400 offerte porta una seconda Canna a chi ne ha già una, mentre senza di lei ne arrivano, con i suoni della carta al lancio, del tonfo, dell'abboccata, del mulinello, della preda presa e della carta pescata |
 | `--smoke-m9-view` | arena continua, duello con IA, presa in quattro pose, replay e FPS con ricarica e vittoria |
 
 Gli smoke classici e i laboratori `--spell-lab` / `--dice-lab` conservano il comportamento classico;
@@ -1262,8 +1520,18 @@ con sette–otto carte il titolo e l'illustrazione adottano un layout compatto;
 eventuali testi troppo lunghi terminano con puntini e restano nel dettaglio.
 Le carte le cui righe lì si rimpicciolirebbero o si taglierebbero ne hanno una
 forma corta (Shock Floor, Tesla Coil, Movimento Ombra con `OMBRA 4s` /
-`MONDO FERMO`, Incendio, Feretro e Lama Velenosa): la Prova meccaniche tiene in
-mano tutte e sette le sue carte.
+`MONDO FERMO`, Pozza di Veleno, Incendio, Deflect, Feretro, Dado del Destino,
+Lama Velenosa e Lazzo) e quelle il cui nome lì si taglierebbe un nome corto (`Ombra`,
+`Pozza`, `Dado`, `Lama`; l'ispettore tiene il nome intero): la Prova meccaniche
+tiene in mano otto carte, tutto il suo mazzo tranne la Canna da Pesca, che non
+viene mai in mano (anche lei ha la sua forma corta, `Canna`, per uno slot più
+stretto su un canvas più piccolo). Le sue carte sono larghe 109 pixel sul canvas
+di 960, e il suo smoke misura con il font del gioco ogni parola di ogni carta del
+mazzo a ogni livello che può raggiungere, sulla carta della mano (la Canna sul
+suo slot) e nell'ispettore: ogni riga ci sta così com'è, senza stringere le
+lettere (stretto, il font di pixel le attacca: `CTRL+CLIC` si leggerebbe
+`CTRL+CUC`), rimpicciolirsi o tagliarsi, e nessun nome si taglia (solo con il
+`+n` di un upgrade può stringersi o scendere di una misura).
 Le carte difensive indicano anche i QTE che abilitano. Le carte restano nella
 loro posizione durante la selezione. Il catalogo tattico ora distingue mobilità protetta, interruzione, ricognizione
 e contrattacco; rarità, lifetime e regole di costruzione del mazzo restano condivisi.
@@ -1319,10 +1587,11 @@ dal **costo temporale**, centralizzato in `game/tactical_action_cost.odin`:
 | Refocus | 2 s |
 | Clic su **ATTIVA** o **EQUIPAGGIA** in Combat | 1 s |
 | Supporto, Guard, Afterimage, Battle Focus, Spark, Pozza di Veleno, Deflect, Feretro, Dado del Destino, Lama Velenosa | 1 s |
-| Strike, Arc Bolt, Shove, Dash, Grappling Hook, Venom Needle, Fate Strike, Tesla Coil, Incendio | 2 s |
+| Strike, Arc Bolt, Shove, Dash, Grappling Hook, Venom Needle, Fate Strike, Tesla Coil, Incendio, Lazzo (il lancio; il giro sta sul tempo del mondo) | 2 s |
 | Piercing Ray, Cross Slash, Heavy Blow, Sundering Blow, Twin Venom, Shock Floor, Titan Grip | 3 s |
 | Firebomb, Toxic Wave, Caustic Bloom, Chain Lightning, Prismatic Barrage, Storm Crown | 4 s |
 | [Movimento Ombra](#movimento-ombra) | 0 s: i suoi 4 s reali stanno fuori dalla finestra |
+| [Canna da Pesca](#canna-da-pesca) | 0 s: pesca a stanza liberata, dove non c'è finestra |
 
 Le carte mostrano la durata `Ns`: il cast spende quei secondi una sola volta,
 progressivamente, e ferma il mondo. Movimento Ombra mostra `0s`: non ha cast, la
@@ -1356,6 +1625,8 @@ La schivata base rimane accessibile fuori recupero, senza richiedere carte.
 | Feretro | 2 | 3 frecce (+1 per upgrade): `Ctrl` + clic su un nemico in linea di tiro, 1 danno + Veleno 2, Bruciatura 1 o Rallentamento 1; 1 s a freccia |
 | Dado del Destino | 2 | i prossimi 3 urti tirano il dado del suo livello: 1-3 status, 4 ruba vita, 5 critico, 6+ letale (boss e miniboss: critico) |
 | Lama Velenosa | 1 | tira il suo dado: tanti urti con 2 Veleno |
+| Lazzo | 2 | un nemico entro 4 celle (non boss né miniboss) gira intorno al Viandante fino alla morte: colpi 1, 2, 3... sui nemici che incontra (spinti di n celle), -1 vita a ogni giro; schivare lo lascia andare ([Lazzo](#lazzo)) |
+| Canna da Pesca | 0 | mai in mano: a stanza liberata pesca da un suo slot una casella libera entro 3 celle, che diventa acqua; 95% cibo che cura un d4, 5% una carta nel mazzo; 1 pesca a stanza +1 per upgrade (fino a 6); una sola per run ([Canna da Pesca](#canna-da-pesca)) |
 
 Afterimage mantiene il bypass del recupero della schivata e lo Shield dopo il
 movimento. Calculated Risk, Spark, Firebomb, Caustic Bloom e le formule delle
@@ -1544,7 +1815,7 @@ le immagini sono output rigenerabili, non prerequisiti del checkout.
 | `--smoke-arenas-view` | quattro fasce di arene reali, combattimento, ologramma, Loot e cambio stanza; screenshot `odin_pp_arenas_*.png` |
 | `--smoke-m8-view` | dispositivi con APRI IL RING, campo, tag match, ritorno Loot: `odin_pp_m8_d4.png`, `devices`, `mega_combo`, `character`, `loot`, `tag_ring`, `next_room` (tutti con prefisso `odin_pp_m8_` e suffisso `.png`) |
 | `--smoke-western` | 6 RANCH 7 dalla mano al premio: `odin_pp_western_hand.png`, `cards`, `sign`, `gate`, `riders`, `ride`, `grab`, `win`, `reward` (prefisso `odin_pp_western_`) |
-| `--smoke-mechanics-lab` | sandbox: `odin_pp_mechanics_lab.png`, `_square`, `_full`, `_refill`, `_restart`, `_stun`, `_pause`, `_defeat` (prefisso `odin_pp_mechanics_lab`); cartoncini vivi: `odin_pp_living_move_00.png`–`_37` e `odin_pp_living_attack_00.png`–`_37`, un'immagine ogni due fotogrammi; modi degli intenti nemici (F6): `odin_pp_living_intents_0_00.png`–`_3_39` (0 sigilli + terreno, 1 sigilli, 2 terreno, 3 adesivi), ogni tre, e lo stesso istante con un colpo in arrivo nei modi 0 e 3 (`odin_pp_living_intent_both.png`, `_labels`); segnalino di cura: `odin_pp_living_heal_00.png`–`_39`, ogni due; status a stack: `odin_pp_living_statuses_00.png`–`_19`, ogni tre, e `odin_pp_mechanics_lab_statuses.png` (fermo, con l'ispettore del nemico); Movimento Ombra dalla mano: `odin_pp_living_shadow_00.png`–`_82` (sprofonda, quattro passi dell'ombra con la diagonale sul primo battito, risale), ogni quattro; colpi: `odin_pp_living_blow_<nome>_00.png`–`_23` per `bolt`, `bolt_miss`, `cleave`, `claws`, `crozier`, `staff`, `bomb` ed `ember`, `_00`–`_39` per `charge`, `_00`–`_37` per `lantern`, `iron_cleaver` e `storm_pike`, ogni due; Rallentamento sul sigillo: `odin_pp_mechanics_lab_slow.png` (l'intento trattenuto, con l'ispettore del bruto) e `odin_pp_mechanics_lab_slow_worn.png` (dopo l'azione, uno stack in meno); Pozza di Veleno e Incendio: `odin_pp_mechanics_lab_pool_preview.png` (l'anteprima con l'area che l'ultima pozza chiuderebbe), `odin_pp_living_pool_00.png`–`_29` (la fiala lanciata chiude l'anello e l'area si allaga), ogni tre, `odin_pp_living_pool_walk_NN.png` (un chaser attraversa due pozze, poi il Viandante entra in una sua), ogni sei, `odin_pp_living_fire_NN.png` (il fuoco accanto al bruto per cinque finestre), ogni quattro, `odin_pp_mechanics_lab_fire.png` (alla quarta finestra) e il tavolo piatto in `odin_pp_mechanics_lab_pool_flat.png` e `odin_pp_mechanics_lab_fire_flat.png`; le cariche: `odin_pp_mechanics_lab_card_Deflect.png`, `_Coffin`, `_Fate_Dice`, `_Venom_Blade` (ogni carta sotto il mouse, con l'ispettore), `odin_pp_living_deflect_bolt_00.png`–`_31`, `odin_pp_living_deflect_cleave_00.png`–`_31` e `odin_pp_living_deflect_charge_00.png`–`_39`, ogni due, `odin_pp_mechanics_lab_arrow_aim.png` (`Ctrl` premuto, il mouse sul nemico segnato; quello dietro la copertura resta senza segno), `odin_pp_living_arrow_00.png`–`_37`, `odin_pp_living_fate_00.png`–`_37`, `odin_pp_living_fate_lethal_00.png`–`_37` e `odin_pp_living_fate_boss_00.png`–`_37` (il Custode), ogni due, `odin_pp_mechanics_lab_venom_roll.png` (il dado di Lama Velenosa) e `odin_pp_living_venom_00.png`–`_37` |
+| `--smoke-mechanics-lab` | sandbox: `odin_pp_mechanics_lab.png`, `_square`, `_full`, `_refill`, `_restart`, `_stun`, `_pause`, `_defeat` (prefisso `odin_pp_mechanics_lab`); cartoncini vivi: `odin_pp_living_move_00.png`–`_37` e `odin_pp_living_attack_00.png`–`_37`, un'immagine ogni due fotogrammi; modi degli intenti nemici (F6): `odin_pp_living_intents_0_00.png`–`_3_39` (0 sigilli + terreno, 1 sigilli, 2 terreno, 3 adesivi), ogni tre, e lo stesso istante con un colpo in arrivo nei modi 0 e 3 (`odin_pp_living_intent_both.png`, `_labels`); segnalino di cura: `odin_pp_living_heal_00.png`–`_39`, ogni due; status a stack: `odin_pp_living_statuses_00.png`–`_19`, ogni tre, e `odin_pp_mechanics_lab_statuses.png` (fermo, con l'ispettore del nemico); Movimento Ombra dalla mano: `odin_pp_living_shadow_00.png`–`_82` (sprofonda, quattro passi dell'ombra con la diagonale sul primo battito, risale), ogni quattro; colpi: `odin_pp_living_blow_<nome>_00.png`–`_23` per `bolt`, `bolt_miss`, `cleave`, `claws`, `crozier`, `staff`, `bomb` ed `ember`, `_00`–`_39` per `charge`, `_00`–`_37` per `lantern`, `iron_cleaver` e `storm_pike`, ogni due; Rallentamento sul sigillo: `odin_pp_mechanics_lab_slow.png` (l'intento trattenuto, con l'ispettore del bruto) e `odin_pp_mechanics_lab_slow_worn.png` (dopo l'azione, uno stack in meno); Pozza di Veleno e Incendio: `odin_pp_mechanics_lab_pool_preview.png` (l'anteprima con l'area che l'ultima pozza chiuderebbe), `odin_pp_living_pool_00.png`–`_29` (la fiala lanciata chiude l'anello e l'area si allaga), ogni tre, `odin_pp_living_pool_walk_NN.png` (un chaser attraversa due pozze, poi il Viandante entra in una sua), ogni sei, `odin_pp_living_fire_NN.png` (il fuoco accanto al bruto per cinque finestre), ogni quattro, `odin_pp_mechanics_lab_fire.png` (alla quarta finestra) e il tavolo piatto in `odin_pp_mechanics_lab_pool_flat.png` e `odin_pp_mechanics_lab_fire_flat.png`; le cariche: `odin_pp_mechanics_lab_card_Deflect.png`, `_Coffin`, `_Fate_Dice`, `_Venom_Blade` (ogni carta sotto il mouse, con l'ispettore), `odin_pp_living_deflect_bolt_00.png`–`_31`, `odin_pp_living_deflect_cleave_00.png`–`_31` e `odin_pp_living_deflect_charge_00.png`–`_39`, ogni due, `odin_pp_mechanics_lab_arrow_aim.png` (`Ctrl` premuto, il mouse sul nemico segnato; quello dietro la copertura resta senza segno), `odin_pp_living_arrow_00.png`–`_37`, `odin_pp_living_fate_00.png`–`_37`, `odin_pp_living_fate_lethal_00.png`–`_37` e `odin_pp_living_fate_boss_00.png`–`_37` (il Custode), ogni due, `odin_pp_mechanics_lab_fate_chip.png` (il chip `DESTINO 3 d4` dell'HUD), `odin_pp_mechanics_lab_fate_chips.png` (tre cariche in più: tre chip e il conto, `DES 2 d20` intero), `odin_pp_mechanics_lab_venom_roll.png` (il dado di Lama Velenosa) e `odin_pp_living_venom_00.png`–`_37`; il Lazzo: `odin_pp_mechanics_lab_card_Lasso.png`, `odin_pp_mechanics_lab_lasso_preview.png` (il mirino sul nemico a quattro celle: l'anello di raggio 3 accanto al muro e i tre nemici fermi sopra), `odin_pp_mechanics_lab_lasso_heavy.png` (il Custode, `TROPPO PESANTE`), `odin_pp_living_lasso_throw_NN.png` (il lancio), ogni quattro, `odin_pp_living_lasso_NN.png` (il giro: i tre colpi ogni tre fotogrammi, poi ogni otto i giri, la difesa che lascia passare la freccia del balestriere e la caduta), `odin_pp_mechanics_lab_lasso_flat.png` (il tavolo piatto durante il giro), `odin_pp_living_lasso_smash_NN.png` (gli schianti e i rimbalzi), ogni cinque, e `odin_pp_living_lasso_release_00.png`–`_14` (la schivata che lo lascia andare), ogni tre; la Canna da Pesca: `odin_pp_living_fishing_clear_NN.png` (`F7`: i due nemici cadono e si apre lo slot), ogni sei, `odin_pp_mechanics_lab_rod_slot.png` (lo slot sotto il mouse, con l'ispettore), `odin_pp_mechanics_lab_rod_preview.png` (la Canna presa: le caselle che può pescare e quella sotto il mouse), `odin_pp_living_fishing_NN.png` (lancio, galleggiante, abboccata, il pesce che vola al Viandante, il d4 e la cura), ogni cinque, `odin_pp_mechanics_lab_fishing_roll.png` (il d4 fermo sul 3), `odin_pp_mechanics_lab_fishing_flat.png` (l'acqua sul tavolo piatto), `odin_pp_mechanics_lab_rod_slot_upgraded.png` (la Canna +1 nella stanza nuova: `PESCA 2/2`), `odin_pp_living_fishing_card_NN.png` (la carta pescata) e `odin_pp_living_fishing_again_NN.png` (la stessa acqua di nuovo: il pane e il suo d4), ogni cinque |
 | `--smoke` | `odin_pp_isometric.png` |
 | `--smoke-generation` | `odin_pp_procedural_room.png` |
 | `--smoke-map` | `odin_pp_route.png` |
@@ -1725,7 +1996,7 @@ consuma; ogni applicazione aggiunge i propri stack.
 | Survey | potenza e durata maggiori | M7: lato della vista +2 (2×2 → 5×5), massimo 9, rispettando LoS e senza memoria |
 | Deflect (RIFLESSO) | somma saturata degli stack, senza durata | solo il Viandante: il prossimo colpo nemico che lo colpirebbe torna all'attaccante; uno stack per colpo, fino alla fine della stanza |
 | Arrows (FRECCE) | somma saturata degli stack, senza durata | solo il Viandante: frecce da scoccare con `Ctrl` + clic; uno stack a freccia, fino alla fine della stanza |
-| Fate (DESTINO) | il massimo degli stack (3), senza durata | solo il Viandante: gli urti caricati tirano il dado dell'ultimo Dado del Destino; uno stack a urto, fino alla fine della stanza |
+| Fate (DESTINO) | il massimo degli stack (3), senza durata | solo il Viandante: gli urti caricati tirano il dado dell'ultimo Dado del Destino, che il chip nomina (`DESTINO 3 d8`); uno stack a urto, fino alla fine della stanza |
 | Venom_Blade (LAMA) | somma saturata degli stack, senza durata | solo il Viandante: urti con 2 Veleno; uno stack a urto, fino alla fine della stanza |
 
 Il danno al player segue `danno base -> difesa -> Shield -> salute`; i nemici
@@ -1940,7 +2211,7 @@ Gli eventi `Object_Spawned`, `Explosive_Armed`, `Explosion` ed
 
 Il magnete raccoglie in Combat e Loot entro distanza Chebyshev tre, quindi
 un quadrato massimo 7x7. Si controlla dopo l'azione accettata, dopo il pulse e
-dopo gli spostamenti in Loot. La raccolta non paga energia o pulse e ignora
+dopo gli spostamenti in Loot (in Loot pesca anche la [Canna da Pesca](#canna-da-pesca)). La raccolta non paga energia o pulse e ignora
 LoS, muri, ostacoli, trappole e uscita: raccogliere da quelle celle non significa
 entrarci.
 
@@ -1995,11 +2266,14 @@ aggiunge una Shock Floor, una Tesla Coil, il 6 e il 7 di denari e un
 **Movimento Ombra**: quindici carte. Il classico resta a dieci. In entrambi la
 mano è mescolata, senza pesca garantita.
 `begin_deck_combat` copia owned nel draw, imposta `combat_card_id_floor`,
-mescola e pesca cinque carte. Fisher–Yates usa uno xorshift64* locale separato
+mescola e pesca cinque carte. Un attrezzo da fine stanza, la
+[Canna da Pesca](#canna-da-pesca), va invece subito fra le esaurite, da cui
+nessuna pesca e nessun rimescolamento la riprendono. Fisher–Yates usa uno xorshift64* locale separato
 dagli RNG della run. Si pesca dalla fine del draw in fondo alla mano; quando
 serve, il discard diventa draw e viene rimescolato.
 
-Una permanente compare esattamente in una zona durante Combat. Una carta con
+Una permanente compare esattamente in una zona durante Combat (la Canna da
+Pesca nell'Exhaust, per tutto il combattimento). Una carta con
 lifetime `Combat` usa un ID almeno pari al floor del fight, non entra in owned
 e scompare a fine stanza; gli ID consumati restano consumati. Una definizione
 `temporary_only`, come Spark, non è collezionabile e ha peso/prezzo zero.
@@ -2102,6 +2376,8 @@ beneficio è il dado successivo, fino al D20.
 | `Coffin` (Feretro) | Uncommon | 2 | player, None | solo tattica: 3 frecce, +1 per upgrade, da scoccare con `Ctrl` + clic. 1 s di finestra, e 1 s a freccia |
 | `Fate_Dice` (Dado del Destino) | Rare | 2 | player, None | solo tattica, carta con dadi: 3 urti che tirano il dado del suo livello. 1 s di finestra |
 | `Venom_Blade` (Lama Velenosa) | Common | 1 | player, None | solo tattica, carta con dadi: il dado decide quanti urti lasciano 2 Veleno. 1 s di finestra |
+| `Lasso` (Lazzo) | Rare | 2 | nemico, Chebyshev 1-4, Single, LoS (non boss né miniboss: `Target_Too_Heavy`) | solo tattica: il nemico gira intorno al Viandante sul raggio libero più largo (4-1) fino alla morte; colpi crescenti dal primo (1, +1 per upgrade, fino al livello 5), -1 vita a ogni giro; schivate e spostamenti lo lasciano andare. 2 s di finestra. Il classico non la offre e la rifiuta |
+| `Fishing_Rod` (Canna da Pesca) | Uncommon | 0 | casella libera, Chebyshev 1-3, Single, LoS (`Walkable_Cell`; mai l'uscita, trappole, bottino, pozze o fuochi) | solo tattica e mai in mano (attende fra le esaurite): a stanza liberata pesca dal suo slot, la casella diventa acqua; 95% cibo che cura un d4 (sempre un d4), 5% una carta del pool tattico nel mazzo; 1 pesca a stanza, +1 per upgrade fino al livello 5; una sola per run (`card_offer_exclusions`). 0 s. Il classico non la offre e non può giocarla come carta (`Invalid_Phase`) |
 
 ## Spell e dadi
 
@@ -2458,7 +2734,10 @@ Common/Uncommon/Rare per tipo di nodo e profondità, limitata a 12.
 Il sampling è pesato senza rimpiazzo, in ordine stabile di catalogo.
 Reward e Shop preparano offerta e avanzamento RNG su copie, confermandoli solo
 dopo la validazione; gli stream sono separati dal deck e fra loro.
-Le carte `temporary_only` sono escluse.
+Le carte `temporary_only` sono escluse. Una run ha al massimo una
+[Canna da Pesca](#canna-da-pesca): finché il mazzo ne ha una,
+`card_offer_exclusions` la toglie da ogni offerta (reward, Shop, Armory e le
+carte pescate).
 
 `choose_card_reward` modifica una copia del deck, valida la run risultante,
 azzera l'offerta e passa a Choose_Path. Skip fa lo stesso senza creare carte.
@@ -2469,7 +2748,8 @@ può scegliere un nodo della mappa.
 Upgrade e rimozione richiedono deck inattivo e **ID della specifica istanza**.
 Upgrade conserva identità, ordine, RNG e prossimo ID; remove compatta owned
 senza riciclare ID e conserva almeno cinque carte. Il livello massimo è dieci,
-cinque per le carte con dadi (dal D4 al D20); deck, Shop e Rest rispondono
+cinque per le carte con dadi (dal D4 al D20), per il Lazzo e per la Canna da
+Pesca (il suo d4 non cambia mai); deck, Shop e Rest rispondono
 `Maximum_Upgrade` oltre quel limite. La preview di una carta con dadi mostra
 soltanto il dado, per esempio `d4 -> d6`.
 `card_can_upgrade` richiede un beneficio effettivo: Battle Focus, Calculated
@@ -2513,7 +2793,9 @@ Si può entrare solo in un'uscita disponibile non già visitata.
 | Treasure | Claim assegna `7 + 2*d` oro e nella demo offre anche una reliquia; oppure Leave |
 
 Event e carta dell'Armory derivano dal seed del nodo, indipendentemente da
-pescate e rendering. Blood Offering richiede vita strettamente maggiore del
+pescate e rendering; l'Armory lascia fuori soltanto una Canna da Pesca che il
+mazzo ha già quando si entra nel nodo (ricontrollando l'offerta dopo la scelta
+non conta quella appena presa). Blood Offering richiede vita strettamente maggiore del
 costo. Le cure non superano max_health; Recover a vita piena è valido con
 beneficio zero. Overflow dell'oro, deck pieno, ID esauriti e upgrade invalido
 non risolvono il nodo e non alterano lo stato.

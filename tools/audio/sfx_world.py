@@ -968,3 +968,176 @@ def world_spawn(seed):
     x = 0.35 * noise + 0.04 * air + 0.32 * core * swell ** 1.3 + 0.35 * rumble * swell ** 1.5 + card
     _events("world_spawn", top, down)
     return _finish(_limit(x, 0.5), D)
+
+
+# --------------------------------------------------------------------------
+# The Lazzo's rope (Phase 3): hemp, the swung card, its blows
+
+def _rasp(duration, seed, env, centres, q=0.7, rate=280.0):
+    """Hemp rope running through its knot or over a card: a fibrous rasp
+    (noise through a band following `centres`, a function of time) roughened
+    by stick-slip catches, shaped by `env` (per sample)."""
+    catches = np.abs(lowpass(np.abs(crackle(duration, rate * env + 1.0, seed, decay=0.0015)), 900, 1))
+    texture = 0.25 + 0.75 * _norm(catches) ** 0.7
+    body = _moving_band(pink(duration, seed + 1) + 0.5 * white(duration, seed + 2), centres, q)
+    return _norm(body) * texture * env
+
+
+def _thrum(duration, f0, seed, t60=0.25):
+    """A hemp rope jerked taut: a dull string quickly damped (Karplus-Strong,
+    dark), no ring of metal."""
+    s = karplus(f0, duration, damping=0.985, brightness=0.2, seed=seed)
+    return _norm(lowpass(s, 1400, 2) * _t60(time_axis(duration), t60))
+
+
+@sound("world_lasso_wrap", loudness=-20, wet=0.25, marks=(0.0, 0.12, 0.3),
+       note="the loop drops over the foe's card at 0.0 (a soft slap of rope on paper), runs tight through its knot 0.01-0.12 "
+            "(a rising fibrous zip), cinches at 0.12 with a creak of hemp and the card's paper squeezed, and the rope jerks "
+            "taut at 0.3 as the card is lifted (a dull thrum on D2, the soft knock of its base leaving the stone)")
+def world_lasso_wrap(seed):
+    D = 0.65
+    zip_env = env_points(D, [(0, 0), (0.01, 0.3), (0.11, 1.0), (0.125, 0.0), (D, 0.0)])
+    zipped = _rasp(D, seed, zip_env, _path([(0, 700), (0.12, 2600), (D, 2600)]), q=0.8, rate=420)
+    cinch = _creak(0.12, seed + 1, 95, 60, body=(620.0, 1300.0, 2500.0))
+    cinch *= env_points(0.12, [(0, 0), (0.015, 1.0), (0.12, 0.0)])
+    squeeze = _paper(D, [0.122, 0.13, 0.142, 0.156, 0.175], seed + 2, lo=1800, hi=6500, lmin=0.006, lmax=0.02)
+    x = place(D, [(0.0, _card_tap(seed + 3, 0.06), 0.45), (0.0, zipped, 0.5), (0.12, cinch, 0.4), (0.0, _norm(squeeze), 0.2),
+                  (0.3, _thrum(0.35, _D2, seed + 4, t60=0.3), 0.55),
+                  (0.3, _thud(0.15, seed + 5, f0=180, t60=0.05, lp=900, drop=0.2), 0.35),
+                  (0.302, _scrape(0.04, seed + 6), 0.18)])
+    _events("world_lasso_wrap", 0.0, 0.12, 0.3)
+    return _finish(_limit(x, 0.7), D)
+
+
+@sound("world_lasso_whirr", loudness=-24, wet=0.15, rt60=1.0, marks=(0.07,),
+       note="one full turn of the swung card: a round swish swelling to 0.07 and falling away by 0.3 (a band 380 -> 1250 -> "
+            "420 Hz, a dark rope hum under it), the card's paper fluttering in the wind; quiet and dry (a short hall): it "
+            "comes back every turn, up to eight a second, played higher as the spin speeds up")
+def world_lasso_whirr(seed):
+    D = 0.32
+    t = time_axis(D)
+    env = env_points(D, [(0, 0), (0.07, 1.0), (0.18, 0.35), (D, 0.0)]) ** 1.3
+    air = _moving_band(pink(D, seed) + 0.3 * white(D, seed + 1), _path([(0, 380), (0.07, 1250), (D, 420)]), 1.1)
+    hum = _moving_band(brown(D, seed + 2), _path([(0, 120), (0.07, 190), (D, 110)]), 1.4)
+    flutter = _moving_band(white(D, seed + 3), _path([(0, 2200), (D, 1800)]), 1.2) * (0.5 + 0.5 * np.sin(2 * np.pi * 34 * t) ** 2)
+    x = (_norm(air) + 0.3 * _norm(hum) + 0.18 * _norm(flutter)) * env
+    _events("world_lasso_whirr", 0.07)
+    return _finish(x, D, fade_out=0.04)
+
+
+@sound("world_lasso_hit", loudness=-19, wet=0.25, marks=(0.0,),
+       note="the swung card slams into another at 0.0: two cardboard bodies struck together (a heavy flam, 6 ms), a body "
+            "thud under them, their iron bases knocking, the paper crumpling 0.0-0.09 and the rope jolted (a dull thrum)")
+def world_lasso_hit(seed):
+    D = 0.5
+    r = rng(seed)
+    crumple = _paper(D, sorted(0.002 + 0.09 * r.random(12) ** 1.4), seed + 1, lo=1600, hi=7000, lmin=0.005, lmax=0.022)
+    x = place(D, [
+        (0.0, _click(seed + 2, hp=900, tau=0.0006), 0.35),
+        (0.0, _card_tap(seed + 3), 1.0),
+        (0.006, _card_tap(seed + 4), 0.8),
+        (0.0, _thud(0.35, seed + 5, f0=105, t60=0.16, lp=700, drop=0.6), 0.9),
+        (0.003, _iron(0.25, 760, 0.14, seed + 6, count=8, dark=0.7), 0.16),
+        (0.0, _norm(crumple), 0.3),
+        (0.004, _thrum(0.3, _A2, seed + 7, t60=0.22), 0.3),
+    ])
+    # All onset: a gentle squash lets the bodies carry the loudness window.
+    x = _squash(x, threshold=0.26, ratio=2.5, window=0.005, smooth=0.003)
+    _events("world_lasso_hit", 0.0, 0.006)
+    return _finish(_limit(x, 0.55), D)
+
+
+@sound("world_lasso_smash", loudness=-16, wet=0.35, marks=(0.0,),
+       note="the swung card smashed into stone at 0.0: a heavy stone thud and chunk, the card's paper crushed, its iron base "
+            "clanking, grit and pebbles falling 0.02-0.6, a puff of dust from 0.02, the rope jolted")
+def world_lasso_smash(seed):
+    D = 0.8
+    r = rng(seed)
+    grit_t = random_times(D, 160, seed + 1, start=0.02, end=0.6, envelope=lambda u: (1 - u) ** 2)
+    pebbles = _stone_ticks(D, grit_t, seed + 2, lo=1400, hi=6500, lmin=0.0015, lmax=0.006, power=1.7,
+                           fall=lambda tt: max(0.0, 1 - tt / 0.6))
+    crush = _paper(D, sorted(0.002 + 0.07 * r.random(10) ** 1.5), seed + 3, lo=1500, hi=6500, lmin=0.006, lmax=0.025)
+    x = place(D, [
+        (0.0, _click(seed + 4, hp=700, tau=0.0008), 0.4),
+        (0.0, _stone_chunk(seed + 5, base=420, t60=0.08, length=0.35, low=0.9), 1.0),
+        (0.0, _thud(0.5, seed + 6, f0=75, t60=0.3, lp=600, drop=0.7), 1.0),
+        (0.002, _card_tap(seed + 7), 0.6),
+        (0.004, _iron(0.3, 640, 0.18, seed + 8, count=8, dark=0.7), 0.15),
+        (0.0, _norm(crush), 0.3),
+        (0.0, _norm(pebbles), 0.35),
+        (0.02, _puff(seed + 9, 0.4, 650), 0.5),
+        (0.004, _thrum(0.3, _D2 * 1.335, seed + 10, t60=0.2), 0.25),
+    ])
+    x = _squash(x, threshold=0.3, ratio=2.5, window=0.006, smooth=0.004)
+    _events("world_lasso_smash", 0.0, 0.02, 0.6)
+    return _finish(_limit(x, 0.5), D)
+
+
+@sound("world_lasso_release", loudness=-21, wet=0.25, marks=(0.0, 0.28),
+       note="the rope let go at 0.0: its tension goes in a soft falling swish of hemp (1.5 kHz -> 400 Hz) and loose coils flop "
+            "(0.05, 0.12); the card drops back onto the stone at 0.28 (a cardboard thump, its iron base, a short scrape, dust)")
+def world_lasso_release(seed):
+    D = 0.6
+    slack_env = env_points(D, [(0, 0), (0.015, 1.0), (0.2, 0.25), (0.3, 0.0), (D, 0.0)])
+    slack = _rasp(D, seed, slack_env, _path([(0, 1500), (0.25, 400), (D, 400)]), q=0.7, rate=220)
+    x = 0.45 * slack + place(D, [
+        (0.05, _thud(0.1, seed + 1, f0=230, t60=0.05, lp=1500, drop=0.2), 0.3),
+        (0.12, _thud(0.1, seed + 2, f0=210, t60=0.05, lp=1500, drop=0.2), 0.22),
+        (0.28, _card_tap(seed + 3), 1.0),
+        (0.28, _thud(0.2, seed + 4, f0=150, t60=0.08, lp=900, drop=0.3), 0.6),
+        (0.283, _scrape(0.05, seed + 5), 0.3),
+        (0.285, _puff(seed + 6, 0.22, 900), 0.3),
+    ])
+    _events("world_lasso_release", 0.0, 0.05, 0.12, 0.28)
+    return _finish(_limit(x, 0.6), D)
+
+
+# --------------------------------------------------------------------------
+# The Canna da Pesca's water (Phase 3)
+
+def _drops(duration, count, start, spread, seed, lo=1300.0, hi=3800.0):
+    """Drops raining back onto water: tiny bubbles closing (_blub), fewer and
+    softer as they go."""
+    r = rng(seed)
+    out = silence(duration)
+    for _ in range(count):
+        t0 = start + spread * r.random() ** 1.5
+        b = _blub(math.exp(r.uniform(math.log(lo), math.log(hi))), r.uniform(0.012, 0.024), r.uniform(0.3, 0.9))
+        i = int(t0 * SR)
+        if i >= len(out):
+            continue
+        e = min(len(out), i + len(b))
+        out[i:e] += r.uniform(0.2, 0.6) * (1 - 0.5 * (t0 - start) / spread) * b[:e - i]
+    return out
+
+
+@sound("world_bobber_plop", loudness=-22, wet=0.25, marks=(0.0,),
+       note="the cork bobber lands on the water at 0.0: a small round plop (a bubble ringing up from 480 Hz), a light slap of "
+            "water and a spray of fine drops falling back 0.02-0.2, then the ripples lapping softly away to 0.45")
+def world_bobber_plop(seed):
+    D = 0.5
+    t = time_axis(D)
+    slap = _norm(highpass(lowpass(white(D, seed), 3500, 2), 300, 2)) * np.minimum(1, t / 0.0008) * _t60(t, 0.04)
+    lap = _norm(_moving_band(pink(D, seed + 1), _path([(0, 500), (D, 260)]), 1.0))
+    lap *= env_points(D, [(0, 0), (0.04, 0.0), (0.12, 1.0), (D, 0.0)]) * (0.6 + 0.4 * np.sin(2 * np.pi * 7 * t))
+    x = place(D, [(0.0, _blub(480, 0.09, rise=0.9), 0.9)]) + 0.3 * slap + 0.3 * _norm(_drops(D, 9, 0.02, 0.18, seed + 2)) \
+        + 0.12 * lap
+    _events("world_bobber_plop", 0.0, 0.02, 0.2)
+    return _finish(_limit(x, 0.7), D)
+
+
+@sound("world_fish_bite", loudness=-19, wet=0.25, marks=(0.0,),
+       note="a fish takes the bait at 0.0: the bobber yanked under (a deep gulp ringing up from 240 Hz, a second smaller one), "
+            "a splash thrown up with drops raining back to 0.35, the taut line plucked high (A5) and the rod's tip bending "
+            "with a short creak")
+def world_fish_bite(seed):
+    D = 0.6
+    t = time_axis(D)
+    splash = _moving_lowpass(highpass(white(D, seed) + pink(D, seed + 1), 250, 2), _path([(0, 7000), (0.1, 1800), (D, 1500)]))
+    splash = _norm(splash) * np.minimum(1, t / 0.002) * _t60(t, 0.12)
+    line = _norm(karplus(880.0, 0.25, damping=0.992, brightness=0.6, seed=seed + 2) * _t60(time_axis(0.25), 0.2))
+    rod = _creak(0.1, seed + 3, 110, 70, body=(900.0, 1900.0, 3400.0)) * env_points(0.1, [(0, 0), (0.02, 1.0), (0.1, 0.0)])
+    x = place(D, [(0.0, _blub(240, 0.12, rise=0.7), 0.8), (0.03, _blub(380, 0.07, rise=0.9), 0.35), (0.0, splash, 0.55),
+                  (0.0, _norm(_drops(D, 14, 0.03, 0.32, seed + 4)), 0.35), (0.005, line, 0.12), (0.01, rod, 0.25)])
+    _events("world_fish_bite", 0.0, 0.03, 0.35)
+    return _finish(_limit(x, 0.65), D)
