@@ -70,22 +70,10 @@ sheet_stage_projection :: proc(renderer: ^Renderer, stage: rl.Rectangle, fovy: f
 begin_sheet_lighting :: proc(renderer: ^Renderer, camera: rl.Camera3D, lantern: rl.Vector3) -> bool {
 	v := &renderer.tactical
 	if v.light_shader.id == 0 { return false }
-	eye := camera.position
-	local := lantern+rl.Vector3{0, 0.4, 0.3}
-	mode: c.int = 0
-	clear := f32(0.12)
-	lights := [4]rl.Vector4{
-		{lantern.x, lantern.y, lantern.z, 1.3},
-		{-1.6, 2.2, -0.9, 0.55},
-		{1.1, 1.1, -1.25, 0.7},
-		{},
-	}
-	rl.SetShaderValue(v.light_shader, v.light_position_location, &local, .VEC3)
-	rl.SetShaderValue(v.light_shader, v.light_eye_location, &eye, .VEC3)
-	rl.SetShaderValue(v.light_shader, v.light_hologram_location, &mode, .INT)
-	rl.SetShaderValue(v.light_shader, v.light_clear_location, &clear, .FLOAT)
-	rl.SetShaderValueV(v.light_shader, v.light_accents_location, raw_data(lights[:]), .VEC4, 4)
-	rl.BeginShaderMode(v.light_shader)
+	begin_resin_lighting(renderer, {
+		eye = camera.position, lantern = lantern+rl.Vector3{0, 0.4, 0.3}, mode = .Board, clear = 0.12,
+		accents = {{lantern.x, lantern.y, lantern.z, 1.3}, {-1.6, 2.2, -0.9, 0.55}, {1.1, 1.1, -1.25, 0.7}, {}},
+	})
 	return true
 }
 

@@ -61,24 +61,8 @@ special_node_point_in_bounds :: proc(point: view.Vec2, bounds: rl.Rectangle) -> 
 	return bounds.width > 0 && bounds.height > 0 && point_in_rectangle(point, bounds)
 }
 
-special_node_is_resolved :: proc(run: ^game.Run_State) -> bool {
-	if run == nil {
-		return false
-	}
-	switch run.phase {
-	case .Rest:
-		return run.rest.resolved
-	case .Event:
-		return run.route_event.resolved
-	case .Treasure:
-		return run.treasure.resolved
-	case .In_Room, .Reward, .Shop, .Choose_Path, .Victory, .Defeat:
-	}
-	return false
-}
-
 special_node_action_count :: proc(run: ^game.Run_State) -> int {
-	if run == nil || special_node_is_resolved(run) {
+	if run == nil || game.special_node_is_resolved(run) {
 		return 0
 	}
 	switch run.phase {
@@ -186,53 +170,6 @@ special_node_owned_card_at_point :: proc(
 	return owned_deck_card_at_point(&run.player.deck, canvas_width, canvas_height, page, point, raised_card_id)
 }
 
-special_node_primary_is_enabled :: proc(run: ^game.Run_State) -> bool {
-	if run == nil || special_node_is_resolved(run) {
-		return false
-	}
-	switch run.phase {
-	case .Rest:
-		return true
-	case .Event:
-		switch run.route_event.kind {
-		case .Blood_Offering:
-			return run.player.health > run.route_event.health_cost &&
-			       i64(run.player.gold)+i64(run.route_event.primary_gold) <= i64(max(i32))
-		case .Healing_Spring:
-			return true
-		case .Forgotten_Armory:
-			return run.player.deck.owned_count < game.MAX_OWNED_CARDS &&
-			       run.player.deck.next_card_id < max(u32)
-		case .Count:
-		}
-	case .Treasure:
-		return i64(run.player.gold)+i64(run.treasure.gold_amount) <= i64(max(i32))
-	case .In_Room, .Reward, .Shop, .Choose_Path, .Victory, .Defeat:
-	}
-	return false
-}
-
-special_node_secondary_is_enabled :: proc(
-	run: ^game.Run_State,
-	selected_card_id: u32,
-) -> bool {
-	if run == nil || special_node_is_resolved(run) {
-		return false
-	}
-	switch run.phase {
-	case .Rest:
-		card_index, found := game.owned_card_index_by_id(&run.player.deck, selected_card_id)
-		return found && game.card_can_upgrade(run.player.deck.owned[card_index])
-	case .Event:
-		if run.route_event.kind == .Blood_Offering {
-			return true
-		}
-		return i64(run.player.gold)+i64(run.route_event.secondary_gold) <= i64(max(i32))
-	case .Treasure, .In_Room, .Reward, .Shop, .Choose_Path, .Victory, .Defeat:
-	}
-	return false
-}
-
 special_node_hit_test :: proc(
 	run: ^game.Run_State,
 	canvas_width, canvas_height: f32,
@@ -246,7 +183,7 @@ special_node_hit_test :: proc(
 	   !special_node_canvas_is_supported(canvas_width, canvas_height) {
 		return {}
 	}
-	if special_node_is_resolved(run) {
+	if game.special_node_is_resolved(run) {
 		if special_node_point_in_bounds(
 			point,
 			special_node_continue_bounds(canvas_width, canvas_height),
@@ -284,13 +221,13 @@ special_node_hit_test :: proc(
 	}
 
 	action_count := special_node_action_count(run)
-	if special_node_primary_is_enabled(run) && special_node_point_in_bounds(
+	if game.special_node_primary_is_enabled(run) && special_node_point_in_bounds(
 		point,
 		special_node_action_bounds(canvas_width, canvas_height, 0, action_count),
 	) {
 		return {kind = .Primary}
 	}
-	if action_count == 3 && special_node_secondary_is_enabled(run, selected_card_id) &&
+	if action_count == 3 && game.special_node_secondary_is_enabled(run, selected_card_id) &&
 	   special_node_point_in_bounds(
 		point,
 		special_node_action_bounds(canvas_width, canvas_height, 1, action_count),
@@ -503,7 +440,7 @@ draw_rest_actions :: proc(
 		"RECOVER",
 		fmt.ctprintf("UP TO %d HP", run.rest.heal_amount),
 		state.primary_hovered,
-		special_node_primary_is_enabled(run),
+		game.special_node_primary_is_enabled(run),
 		accent,
 		theme = theme,
 	)
@@ -512,7 +449,7 @@ draw_rest_actions :: proc(
 		"UPGRADE",
 		"SELECTED CARD",
 		state.secondary_hovered,
-		special_node_secondary_is_enabled(run, state.selected_card_id),
+		game.special_node_secondary_is_enabled(run, state.selected_card_id),
 		accent,
 		theme = theme,
 	)
@@ -571,7 +508,7 @@ draw_event_actions :: proc(
 		primary_title,
 		primary_detail,
 		state.primary_hovered,
-		special_node_primary_is_enabled(run),
+		game.special_node_primary_is_enabled(run),
 		accent,
 		theme = theme,
 	)
@@ -580,7 +517,7 @@ draw_event_actions :: proc(
 		secondary_title,
 		secondary_detail,
 		state.secondary_hovered,
-		special_node_secondary_is_enabled(run, state.selected_card_id),
+		game.special_node_secondary_is_enabled(run, state.selected_card_id),
 		accent,
 		theme = theme,
 	)
@@ -607,7 +544,7 @@ draw_treasure_actions :: proc(
 		"CLAIM",
 		fmt.ctprintf("+%d GOLD", run.treasure.gold_amount),
 		state.primary_hovered,
-		special_node_primary_is_enabled(run),
+		game.special_node_primary_is_enabled(run),
 		accent,
 		theme = theme,
 	)
@@ -633,7 +570,7 @@ draw_special_node_screen :: proc(
 	menu_rectangle(theme, 0, 0, c.int(canvas_width), c.int(canvas_height), CANVAS_BACKGROUND)
 	draw_special_node_header(run, canvas_width, theme = theme)
 
-	if special_node_is_resolved(run) {
+	if game.special_node_is_resolved(run) {
 		draw_special_node_result(run, canvas_width, canvas_height, theme = theme)
 		draw_shop_button(
 			special_node_continue_bounds(canvas_width, canvas_height),

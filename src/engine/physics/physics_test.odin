@@ -3,6 +3,43 @@ package physics
 import "core:testing"
 
 @(test)
+test_platformer_dash_refill_and_cooldown_order :: proc(t: ^testing.T) {
+	m2, _ := tile_map_create(12, 12, 16, .Empty)
+	defer tile_map_destroy(&m2)
+	m3, _ := voxel_map_create(12, 12, 12, 1)
+	defer voxel_map_destroy(&m3)
+	p2 := platformer_create({50, 50}, {10, 14})
+	p3 := platformer3_create({5, 5, 5}, {0.6, 1.6, 0.6})
+	p2.air_dashes_used, p3.air_dashes_used = 1, 1
+	p2.dash_cooldown, p3.dash_cooldown = 0.01, 0.01
+	p2.wall_side = -1
+	_, wall := platformer_step(&p2, DEFAULT_PLATFORMER, {dash_pressed = true}, &m2, 0.01)
+	_, air := platformer3_step(&p3, DEFAULT_PLATFORMER3, {dash_pressed = true}, &m3, 0.01)
+	// Expiring cooldown permits a dash on the same step. A wall replenishes
+	// the 2D controller's allowance; the airborne 3D controller stays spent.
+	testing.expect(t, wall.dashed && !air.dashed)
+	testing.expect_value(t, p2.air_dashes_used, 1)
+	testing.expect_value(t, p3.air_dashes_used, 1)
+
+	// Landing refreshes jump/dash allowances before processing input. A
+	// zero-duration dash still emits its event, then normal jumping runs.
+	p2.grounded, p3.grounded = true, true
+	p2.wall_side = 0
+	p2.dash_remaining, p3.dash_remaining = 0, 0
+	p2.dash_cooldown, p3.dash_cooldown = 0, 0
+	p2.air_jumps_left, p3.air_jumps_left = 0, 0
+	params2, params3 := DEFAULT_PLATFORMER, DEFAULT_PLATFORMER3
+	params2.dash_time, params3.dash_time = 0, 0
+	_, ground2 := platformer_step(&p2, params2, {dash_pressed = true, jump_pressed = true, jump_held = true}, &m2, 0)
+	_, ground3 := platformer3_step(&p3, params3, {dash_pressed = true, jump_pressed = true, jump_held = true}, &m3, 0)
+	testing.expect(t, ground2.dashed && ground2.jumped && ground3.dashed && ground3.jumped)
+	testing.expect_value(t, p2.air_dashes_used, 0)
+	testing.expect_value(t, p3.air_dashes_used, 0)
+	testing.expect_value(t, p2.air_jumps_left, params2.air_jumps)
+	testing.expect_value(t, p3.air_jumps_left, params3.air_jumps)
+}
+
+@(test)
 test_tile_ray_enters_open_map_from_outside :: proc(t: ^testing.T) {
 	m, ok := tile_map_create(6, 3, 1, .Empty)
 	testing.expect(t, ok)

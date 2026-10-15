@@ -4848,6 +4848,61 @@ le catture dei due menu, ring, FPS, loot, nuova stanza e Lazzo.
 Screenshot e log rimangono fuori dal repository. Windows resta da verificare.
 
 
+### Secondo lotto sul codice di produzione — 16 ottobre 2026
+
+Rest, Event e Treasure usano ora query di disponibilità del dominio `game`,
+condivise con i comandi e richiamate direttamente da HUD, picking e input.
+Le query controllano i vincoli locali senza copiare o validare l'intera run
+per ogni pulsante; i comandi conservano validazione completa, stato temporaneo
+e commit atomico. Rimangono distinti i risultati e le priorità degli errori,
+la cura a salute piena, la seconda scelta gratuita di Blood Offering e la
+reliquia del tesoro da risolvere prima di proseguire. Rimossi i controlli
+paralleli dal renderer e accorpato il premio in oro secondario condiviso
+da Healing Spring e Forgotten Armory.
+
+I platform 2D/3D condividono l'aggiornamento di coyote time, jump buffer,
+cooldown e avvio dash in un helper privato limitato ai due controller.
+Struct, parametri e API restano invariati. Il contatto muro ricarica le dash
+solo nel 2D; gravità, wall jump, integrazione e collisioni restano nei loro
+controller. Non cambia l'ordine fra aggiornamento timer, avvio e consumo
+della dash nel primo step.
+
+La configurazione dello shader resin è unica per stanza, ologramma, scheda
+personaggio, ring e dadi. Le modalità Board/Hologram/Model hanno valori
+espliciti; i preset rimangono nelle scene. GLSL, gestione delle risorse,
+guardie sullo shader assente e chiusura del pass sono invariati. Model
+continua ad aggiornare solo camera, lanterna e modalità, conservando le
+uniform della stanza che questa modalità non legge.
+
+I confronti temporanei con la versione precedente danno risultati identici
+su **432.000 step** dei controller (stato, collisioni ed eventi), **12.600
+transazioni** dei nodi speciali e **3.000 stati validi** per la disponibilità
+HUD. Il probe shader confronta **192 configurazioni** e **96 casi senza
+shader**, con gli stessi valori e le stesse uniform modificate. I probe
+rimangono fuori dal repository.
+
+Aggiunte due regressioni: timer/refill/dash nei platform e una matrice di
+25 limiti dei nodi speciali, inclusi overflow, salute, capienza, ID, upgrade
+e fallimenti senza mutazioni. Nessun test eliminato: **1.321 procedure complete**
+(**1.314** rapide), con **71 righe nette in meno nel codice di produzione**.
+
+Validazione su macOS: `scripts/check.sh` completo superato, **1.321 test
+con assert attivi e disattivati**, strict/vet e due build. Il report M7
+resta identico al lotto precedente. Passano nella finestra nativa M8,
+set dadi (sette modelli e quattro facce D4), ring, platform 2D/3D, Rest,
+Event e Treasure. Passa anche l'intero smoke M7 view: QTE, ritmo indipendente
+dei nemici, recupero, ologramma, feedback visivi, loot, stanza successiva,
+reset della luce e quattro angoli della camera.
+
+Su 62 catture comuni prima/dopo, **61 PNG sono identici byte per byte**,
+compresi dadi, scheda personaggio, stanza e ologramma. Nel ring la cattura
+in tempo reale mostra uno stato diverso dei combattenti e della relativa
+barra HUD; tutti i pixel fuori da queste due aree sono identici. Controllate
+visivamente anche le schermate dei due platform, del ring e dei dadi e il
+menu Event. Log, screenshot e probe restano fuori dal repository; Windows
+non verificato.
+
+
 ### M7G: lavoro restante dopo il prototipo
 
 Restano da svolgere le revisioni del codice e i playtest umani concordati:

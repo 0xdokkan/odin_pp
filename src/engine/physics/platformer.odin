@@ -94,29 +94,7 @@ platformer_step :: proc(p: ^Platformer, params: Platformer_Params, input: Platfo
 		p.facing = math.sign(move)
 	}
 
-	// Timers: coyote keeps the jump available briefly after leaving a ledge,
-	// the buffer remembers a jump pressed just before landing.
-	if p.grounded {
-		p.coyote = params.coyote_time
-		p.air_jumps_left = params.air_jumps
-	} else {
-		p.coyote = max(p.coyote-dt, 0)
-	}
-	if p.grounded || p.wall_side != 0 {
-		p.air_dashes_used = 0
-	}
-	p.jump_buffer = params.jump_buffer_time if input.jump_pressed else max(p.jump_buffer-dt, 0)
-	p.dash_cooldown = max(p.dash_cooldown-dt, 0)
-
-	air_dash_ok := p.grounded || params.air_dashes <= 0 || p.air_dashes_used < params.air_dashes
-	if input.dash_pressed && params.dash_speed > 0 && p.dash_cooldown <= 0 && p.dash_remaining <= 0 && air_dash_ok {
-		p.dash_remaining = params.dash_time
-		p.dash_cooldown = params.dash_cooldown
-		if !p.grounded && params.air_dashes > 0 {
-			p.air_dashes_used += 1
-		}
-		events.dashed = true
-	}
+	events.dashed = platformer_begin_abilities(p, params, input.jump_pressed, input.dash_pressed, dt)
 
 	if p.dash_remaining > 0 {
 		p.dash_remaining = max(p.dash_remaining-dt, 0)

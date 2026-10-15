@@ -80,9 +80,9 @@ step_special_node_menu :: proc(run: ^game.Run_State, state: ^render.Special_Node
 		else if input.next_page { change_owned_deck_page(&run.player.deck, &state.page, &state.selected_card_id, 1) }
 	}
 	if input.clicked { requested = hit }
-	if requested.kind == .Primary && !render.special_node_primary_is_enabled(run) {
+	if requested.kind == .Primary && !game.special_node_primary_is_enabled(run) {
 		requested.kind = .None
-	} else if requested.kind == .Secondary && !render.special_node_secondary_is_enabled(run, state.selected_card_id) {
+	} else if requested.kind == .Secondary && !game.special_node_secondary_is_enabled(run, state.selected_card_id) {
 		requested.kind = .None
 	}
 	switch requested.kind {

@@ -1,7 +1,6 @@
 package render
 
 import "core:math"
-import "core:c"
 import "core:fmt"
 import engine "../engine"
 import fight "../fight"
@@ -13,16 +12,10 @@ import rl "vendor:raylib"
 begin_m9_ring_lighting :: proc(renderer: ^Renderer, camera: rl.Camera3D) -> bool {
 	v := &renderer.tactical
 	if v.light_shader.id == 0 {return false}
-	eye, light := camera.position, rl.Vector3{-1.5,5,1.5}
-	mode: c.int = 0
-	clear := f32(0.20)
-	lights := [4]rl.Vector4{{-4.6,1.2,-4.6,0.8},{4.6,1.2,-4.6,0.8},{-4.6,1.2,4.6,0.45},{4.6,1.2,4.6,0.45}}
-	rl.SetShaderValue(v.light_shader,v.light_eye_location,&eye,.VEC3)
-	rl.SetShaderValue(v.light_shader,v.light_position_location,&light,.VEC3)
-	rl.SetShaderValue(v.light_shader,v.light_hologram_location,&mode,.INT)
-	rl.SetShaderValue(v.light_shader,v.light_clear_location,&clear,.FLOAT)
-	rl.SetShaderValueV(v.light_shader,v.light_accents_location,raw_data(lights[:]),.VEC4,4)
-	rl.BeginShaderMode(v.light_shader)
+	begin_resin_lighting(renderer, {
+		eye = camera.position, lantern = {-1.5, 5, 1.5}, mode = .Board, clear = 0.20,
+		accents = {{-4.6, 1.2, -4.6, 0.8}, {4.6, 1.2, -4.6, 0.8}, {-4.6, 1.2, 4.6, 0.45}, {4.6, 1.2, 4.6, 0.45}},
+	})
 	return true
 }
 

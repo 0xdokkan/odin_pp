@@ -78,16 +78,10 @@ create_tactical_lighting :: proc(renderer: ^Renderer) {
 begin_tactical_lighting :: proc(renderer: ^Renderer, hologram: bool = false, accents: [4]rl.Vector4 = {}) {
 	v := &renderer.tactical
 	p := v.snapshot.player.position
-	lantern := rl.Vector3{p.x+0.5, 2.8, p.y+0.5}
-	rl.SetShaderValue(v.light_shader, v.light_position_location, &lantern, .VEC3)
-	eye := v.camera.position
-	rl.SetShaderValue(v.light_shader, v.light_eye_location, &eye, .VEC3)
-	mode: c.int = 1 if hologram else 0
-	rl.SetShaderValue(v.light_shader, v.light_hologram_location, &mode, .INT)
-	rl.SetShaderValue(v.light_shader, v.light_clear_location, &v.clear_light, .FLOAT)
-	lights := accents
-	rl.SetShaderValueV(v.light_shader, v.light_accents_location, raw_data(lights[:]), .VEC4, 4)
-	rl.BeginShaderMode(v.light_shader)
+	begin_resin_lighting(renderer, {
+		eye = v.camera.position, lantern = {p.x+0.5, 2.8, p.y+0.5},
+		mode = .Hologram if hologram else .Board, clear = v.clear_light, accents = accents,
+	})
 }
 draw_tactical_actor_bases :: proc(renderer: ^Renderer) {
 	snapshot := renderer.tactical.snapshot

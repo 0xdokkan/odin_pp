@@ -332,180 +332,183 @@ validate_special_node_state :: proc(run: ^Run_State) -> bool {
 	return false
 }
 
+// Availability queries are read-only and deliberately local to the action.
+// Commands retain full run validation before checking these rules, then stage
+// and validate the result before committing it. HUD polling need not copy or
+// validate the entire run merely to display a button.
+special_node_is_resolved :: proc(run: ^Run_State) -> bool {
+	if run == nil { return false }
+	switch run.phase {
+	case .Rest: return run.rest.resolved
+	case .Event: return run.route_event.resolved
+	case .Treasure: return run.treasure.resolved
+	case .In_Room, .Reward, .Shop, .Choose_Path, .Victory, .Defeat:
+	}
+	return false
+}
+
+@(private)
+rest_recovery_check :: proc(run: ^Run_State) -> (Special_Node_Result, i32, i32) {
+	if run == nil || run.phase != .Rest { return .Invalid, 0, 0 }
+	if run.rest.resolved { return .Already_Resolved, 0, 0 }
+	health, applied, ok := safe_heal(run.player.health, run.player.stats.max_health, run.rest.heal_amount)
+	if !ok { return .Invalid, 0, 0 }
+	return .Recovered, health, applied
+}
+
+@(private)
+rest_upgrade_check :: proc(run: ^Run_State, card_id: u32) -> Special_Node_Result {
+	if run == nil || run.phase != .Rest { return .Invalid }
+	if run.rest.resolved { return .Already_Resolved }
+	index, found := owned_card_index_by_id(&run.player.deck, card_id)
+	if !found { return .Card_Not_Found }
+	card := run.player.deck.owned[index]
+	if card.upgrade_level >= card_max_upgrade_level(card.definition_id) { return .Maximum_Upgrade }
+	if !card_can_upgrade(card) { return .Upgrade_Unavailable }
+	return .Upgraded
+}
+
+@(private)
+route_event_choice_check :: proc(run: ^Run_State, choice: Route_Event_Choice) -> (
+	result: Special_Node_Result, health, gold, applied: i32,
+) {
+	if run == nil || run.phase != .Event || int(choice) < 0 || int(choice) > int(Route_Event_Choice.Secondary) {
+		return .Invalid, 0, 0, 0
+	}
+	if run.route_event.resolved { return .Already_Resolved, 0, 0, 0 }
+	health, gold = run.player.health, run.player.gold
+	switch run.route_event.kind {
+	case .Blood_Offering:
+		if choice == .Primary {
+			if health <= run.route_event.health_cost { return .Not_Enough_Health, 0, 0, 0 }
+			ok: bool
+			gold, ok = safe_add_nonnegative_i32(gold, run.route_event.primary_gold)
+			if !ok { return .Overflow, 0, 0, 0 }
+			health -= run.route_event.health_cost
+			applied = run.route_event.primary_gold
+		}
+	case .Healing_Spring, .Forgotten_Armory:
+		if choice == .Secondary {
+			ok: bool
+			gold, ok = safe_add_nonnegative_i32(gold, run.route_event.secondary_gold)
+			if !ok { return .Overflow, 0, 0, 0 }
+			applied = run.route_event.secondary_gold
+		} else if run.route_event.kind == .Healing_Spring {
+			ok: bool
+			health, applied, ok = safe_heal(health, run.player.stats.max_health, run.route_event.heal_amount)
+			if !ok { return .Invalid, 0, 0, 0 }
+		} else {
+			if run.player.deck.owned_count >= MAX_OWNED_CARDS { return .Deck_Full, 0, 0, 0 }
+			if run.player.deck.next_card_id >= max(u32) { return .Instance_Id_Exhausted, 0, 0, 0 }
+		}
+	case .Count:
+		return .Invalid, 0, 0, 0
+	}
+	return .Event_Resolved, health, gold, applied
+}
+
+@(private)
+treasure_claim_check :: proc(run: ^Run_State) -> (Special_Node_Result, i32) {
+	if run == nil || run.phase != .Treasure { return .Invalid, 0 }
+	if run.treasure.resolved { return .Already_Resolved, 0 }
+	gold, ok := safe_add_nonnegative_i32(run.player.gold, run.treasure.gold_amount)
+	if !ok { return .Overflow, 0 }
+	return .Treasure_Claimed, gold
+}
+
+special_node_primary_is_enabled :: proc(run: ^Run_State) -> bool {
+	if run == nil { return false }
+	switch run.phase {
+	case .Rest:
+		result, _, _ := rest_recovery_check(run)
+		return result == .Recovered
+	case .Event:
+		result, _, _, _ := route_event_choice_check(run, .Primary)
+		return result == .Event_Resolved
+	case .Treasure:
+		result, _ := treasure_claim_check(run)
+		return result == .Treasure_Claimed
+	case .In_Room, .Reward, .Shop, .Choose_Path, .Victory, .Defeat:
+	}
+	return false
+}
+
+special_node_secondary_is_enabled :: proc(run: ^Run_State, selected_card_id: u32) -> bool {
+	if run == nil { return false }
+	switch run.phase {
+	case .Rest:
+		return rest_upgrade_check(run, selected_card_id) == .Upgraded
+	case .Event:
+		result, _, _, _ := route_event_choice_check(run, .Secondary)
+		return result == .Event_Resolved
+	case .Treasure, .In_Room, .Reward, .Shop, .Choose_Path, .Victory, .Defeat:
+	}
+	return false
+}
+
 use_rest_recovery :: proc(run: ^Run_State) -> Special_Node_Result {
-	if run == nil || run.phase != .Rest || !validate_run_state(run) {
-		return .Invalid
-	}
-	if run.rest.resolved {
-		return .Already_Resolved
-	}
-	new_health, applied, healed := safe_heal(
-		run.player.health,
-		run.player.stats.max_health,
-		run.rest.heal_amount,
-	)
-	if !healed {
-		return .Invalid
-	}
+	if run == nil || run.phase != .Rest || !validate_run_state(run) { return .Invalid }
+	result, health, applied := rest_recovery_check(run)
+	if result != .Recovered { return result }
 	staged := run^
-	staged.player.health = new_health
+	staged.player.health = health
 	staged.rest.resolved = true
 	staged.rest.outcome = .Recovered
 	staged.rest.applied_amount = applied
-	if !validate_run_state(&staged) {
-		return .Invalid
-	}
+	if !validate_run_state(&staged) { return .Invalid }
 	run.player.health = staged.player.health
 	run.rest = staged.rest
 	return .Recovered
 }
 
 use_rest_upgrade :: proc(run: ^Run_State, card_id: u32) -> Special_Node_Result {
-	if run == nil || run.phase != .Rest || !validate_run_state(run) {
-		return .Invalid
-	}
-	if run.rest.resolved {
-		return .Already_Resolved
-	}
+	if run == nil || run.phase != .Rest || !validate_run_state(run) { return .Invalid }
+	result := rest_upgrade_check(run, card_id)
+	if result != .Upgraded { return result }
 	staged_deck := run.player.deck
-	mutation := upgrade_owned_card(&staged_deck, card_id)
-	switch mutation {
-	case .Card_Not_Found:
-		return .Card_Not_Found
-	case .Maximum_Upgrade:
-		return .Maximum_Upgrade
-	case .Upgrade_Unavailable:
-		return .Upgrade_Unavailable
-	case .Upgraded:
-	case .Invalid, .Removed, .Minimum_Deck_Size:
-		return .Invalid
-	}
+	if upgrade_owned_card(&staged_deck, card_id) != .Upgraded { return .Invalid }
 	staged := run^
 	staged.player.deck = staged_deck
 	staged.rest.resolved = true
 	staged.rest.outcome = .Upgraded
 	staged.rest.target_card_id = card_id
-	if !validate_run_state(&staged) {
-		return .Invalid
-	}
+	if !validate_run_state(&staged) { return .Invalid }
 	run.player.deck = staged.player.deck
 	run.rest = staged.rest
 	return .Upgraded
 }
 
 resolve_route_event :: proc(run: ^Run_State, choice: Route_Event_Choice) -> Special_Node_Result {
-	if run == nil || run.phase != .Event || !validate_run_state(run) ||
-	   int(choice) < 0 || int(choice) > int(Route_Event_Choice.Secondary) {
-		return .Invalid
-	}
-	if run.route_event.resolved {
-		return .Already_Resolved
-	}
+	if run == nil || run.phase != .Event || !validate_run_state(run) { return .Invalid }
+	result, health, gold, applied := route_event_choice_check(run, choice)
+	if result != .Event_Resolved { return result }
 	staged := run^
+	staged.player.health, staged.player.gold = health, gold
 	staged.route_event.resolved = true
-	if choice == .Primary {
-		staged.route_event.outcome = .Event_Primary
-	} else {
-		staged.route_event.outcome = .Event_Secondary
+	staged.route_event.outcome = .Event_Primary if choice == .Primary else .Event_Secondary
+	staged.route_event.applied_amount = applied
+	if run.route_event.kind == .Forgotten_Armory && choice == .Primary {
+		instance, added := add_owned_card(&staged.player.deck, run.route_event.offered_card)
+		if !added { return .Invalid }
+		staged.route_event.added_card_id = instance.id
 	}
-
-	switch run.route_event.kind {
-	case .Blood_Offering:
-		if choice == .Primary {
-			if run.player.health <= run.route_event.health_cost {
-				return .Not_Enough_Health
-			}
-			new_gold, gold_ok := safe_add_nonnegative_i32(
-				run.player.gold,
-				run.route_event.primary_gold,
-			)
-			if !gold_ok {
-				return .Overflow
-			}
-			staged.player.health -= run.route_event.health_cost
-			staged.player.gold = new_gold
-			staged.route_event.applied_amount = run.route_event.primary_gold
-		}
-	case .Healing_Spring:
-		if choice == .Primary {
-			new_health, applied, healed := safe_heal(
-				run.player.health,
-				run.player.stats.max_health,
-				run.route_event.heal_amount,
-			)
-			if !healed {
-				return .Invalid
-			}
-			staged.player.health = new_health
-			staged.route_event.applied_amount = applied
-		} else {
-			new_gold, gold_ok := safe_add_nonnegative_i32(
-				run.player.gold,
-				run.route_event.secondary_gold,
-			)
-			if !gold_ok {
-				return .Overflow
-			}
-			staged.player.gold = new_gold
-			staged.route_event.applied_amount = run.route_event.secondary_gold
-		}
-	case .Forgotten_Armory:
-		if choice == .Primary {
-			if run.player.deck.owned_count >= MAX_OWNED_CARDS {
-				return .Deck_Full
-			}
-			if run.player.deck.next_card_id >= max(u32) {
-				return .Instance_Id_Exhausted
-			}
-			staged_deck := run.player.deck
-			instance, added := add_owned_card(&staged_deck, run.route_event.offered_card)
-			if !added {
-				return .Invalid
-			}
-			staged.player.deck = staged_deck
-			staged.route_event.added_card_id = instance.id
-		} else {
-			new_gold, gold_ok := safe_add_nonnegative_i32(
-				run.player.gold,
-				run.route_event.secondary_gold,
-			)
-			if !gold_ok {
-				return .Overflow
-			}
-			staged.player.gold = new_gold
-			staged.route_event.applied_amount = run.route_event.secondary_gold
-		}
-	case .Count:
-		return .Invalid
-	}
-	if !validate_run_state(&staged) {
-		return .Invalid
-	}
+	if !validate_run_state(&staged) { return .Invalid }
 	run.player = staged.player
 	run.route_event = staged.route_event
 	return .Event_Resolved
 }
 
 claim_treasure :: proc(run: ^Run_State) -> Special_Node_Result {
-	if run == nil || run.phase != .Treasure || !validate_run_state(run) {
-		return .Invalid
-	}
-	if run.treasure.resolved {
-		return .Already_Resolved
-	}
-	new_gold, gold_ok := safe_add_nonnegative_i32(run.player.gold, run.treasure.gold_amount)
-	if !gold_ok {
-		return .Overflow
-	}
+	if run == nil || run.phase != .Treasure || !validate_run_state(run) { return .Invalid }
+	result, gold := treasure_claim_check(run)
+	if result != .Treasure_Claimed { return result }
 	staged := run^
-	staged.player.gold = new_gold
+	staged.player.gold = gold
 	staged.treasure.resolved = true
 	staged.treasure.outcome = .Treasure_Claimed
 	staged.treasure.applied_amount = run.treasure.gold_amount
 	staged.relic_reward = make_run_relic_reward(&staged, .Treasure)
-	if !validate_run_state(&staged) {
-		return .Invalid
-	}
+	if !validate_run_state(&staged) { return .Invalid }
 	run.player.gold = staged.player.gold
 	run.treasure = staged.treasure
 	run.relic_reward = staged.relic_reward

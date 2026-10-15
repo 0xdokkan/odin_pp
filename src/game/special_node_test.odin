@@ -584,3 +584,119 @@ test_special_node_validation_rejects_corrupt_payloads_without_mutation :: proc(t
 	testing.expect_value(t, leave_special_node(&treasure_run), Special_Node_Result.Invalid)
 	expect_special_node_test_snapshot(t, &treasure_run, before)
 }
+
+// The HUD's local queries and the guarded transactions must agree at actual
+// action boundaries. Each command runs on its own copy; querying or rejecting
+// an action must leave the live node and random streams untouched.
+@(test)
+test_special_node_availability_matches_transaction_boundaries :: proc(t: ^testing.T) {
+	Limit :: enum {None, Gold_Limit, Gold_Overflow, Health_Limit, Health_And_Gold,
+		Full_Deck, Id_Exhausted, Full_And_Exhausted, Maximum_Upgrade, Noop_Upgrade, No_Card, Resolved}
+	Case :: struct {kind: Node_Kind, event: Route_Event_Kind, secondary: bool, limit: Limit, expected: Special_Node_Result}
+	cases := [?]Case{
+		{.Rest, .Count, false, .None, .Recovered}, // Full HP is a valid choice.
+		{.Rest, .Count, true, .None, .Upgraded},
+		{.Rest, .Count, true, .No_Card, .Card_Not_Found},
+		{.Rest, .Count, true, .Maximum_Upgrade, .Maximum_Upgrade},
+		{.Rest, .Count, true, .Noop_Upgrade, .Upgrade_Unavailable},
+		{.Rest, .Count, true, .Resolved, .Already_Resolved},
+		{.Event, .Blood_Offering, false, .None, .Event_Resolved},
+		{.Event, .Blood_Offering, false, .Health_Limit, .Not_Enough_Health},
+		{.Event, .Blood_Offering, false, .Gold_Limit, .Event_Resolved},
+		{.Event, .Blood_Offering, false, .Gold_Overflow, .Overflow},
+		{.Event, .Blood_Offering, false, .Health_And_Gold, .Not_Enough_Health},
+		{.Event, .Blood_Offering, true, .Health_And_Gold, .Event_Resolved},
+		{.Event, .Blood_Offering, false, .Resolved, .Already_Resolved},
+		{.Event, .Healing_Spring, false, .None, .Event_Resolved},
+		{.Event, .Healing_Spring, true, .Gold_Limit, .Event_Resolved},
+		{.Event, .Healing_Spring, true, .Gold_Overflow, .Overflow},
+		{.Event, .Forgotten_Armory, false, .None, .Event_Resolved},
+		{.Event, .Forgotten_Armory, false, .Full_Deck, .Deck_Full},
+		{.Event, .Forgotten_Armory, false, .Id_Exhausted, .Instance_Id_Exhausted},
+		{.Event, .Forgotten_Armory, false, .Full_And_Exhausted, .Deck_Full},
+		{.Event, .Forgotten_Armory, true, .Gold_Limit, .Event_Resolved},
+		{.Event, .Forgotten_Armory, true, .Gold_Overflow, .Overflow},
+		{.Treasure, .Count, false, .Gold_Limit, .Treasure_Claimed},
+		{.Treasure, .Count, false, .Gold_Overflow, .Overflow},
+		{.Treasure, .Count, false, .Resolved, .Already_Resolved},
+	}
+	for row in cases {
+		run := create_special_node_test_run(t, row.kind, row.event)
+		card_id := run.player.deck.owned[0].id
+		switch row.limit {
+		case .None:
+		case .Gold_Limit, .Gold_Overflow:
+			amount := run.treasure.gold_amount if row.kind == .Treasure else
+			          (run.route_event.secondary_gold if row.secondary else run.route_event.primary_gold)
+			run.player.gold = max(i32)-amount+(1 if row.limit == .Gold_Overflow else 0)
+		case .Health_Limit, .Health_And_Gold:
+			run.player.health = run.route_event.health_cost
+			if row.limit == .Health_And_Gold { run.player.gold = max(i32) }
+		case .Full_Deck, .Id_Exhausted, .Full_And_Exhausted:
+			if row.limit != .Id_Exhausted {
+				for run.player.deck.owned_count < MAX_OWNED_CARDS {
+					_, added := add_owned_card(&run.player.deck, .Strike)
+					testing.expect(t, added)
+				}
+			}
+			if row.limit != .Full_Deck { run.player.deck.next_card_id = max(u32) }
+		case .Maximum_Upgrade:
+			run.player.deck.owned[0].upgrade_level = card_max_upgrade_level(run.player.deck.owned[0].definition_id)
+		case .Noop_Upgrade:
+			card, added := add_owned_card(&run.player.deck, .Dash)
+			testing.expect(t, added)
+			card_id = card.id
+		case .No_Card:
+			card_id = 0
+		case .Resolved:
+			testing.expect_value(t, leave_special_node(&run), Special_Node_Result.Left)
+		}
+		testing.expect(t, validate_run_state(&run))
+		before := capture_special_node_test_snapshot(&run)
+		relic_before := run.relic_reward
+		enabled := special_node_secondary_is_enabled(&run, card_id) if row.secondary else special_node_primary_is_enabled(&run)
+		expect_special_node_test_snapshot(t, &run, before)
+		testing.expect(t, run.relic_reward == relic_before)
+		staged := run
+		result: Special_Node_Result
+		switch row.kind {
+		case .Rest:
+			result = use_rest_upgrade(&staged, card_id) if row.secondary else use_rest_recovery(&staged)
+		case .Event:
+			result = resolve_route_event(&staged, .Secondary if row.secondary else .Primary)
+		case .Treasure:
+			result = claim_treasure(&staged)
+		case .Combat, .Elite, .Boss, .Shop, .Count:
+		}
+		testing.expect_value(t, result, row.expected)
+		succeeded := result == .Recovered || result == .Upgraded || result == .Event_Resolved || result == .Treasure_Claimed
+		testing.expect_value(t, enabled, succeeded)
+		if succeeded {
+			testing.expect(t, !special_node_primary_is_enabled(&staged) && !special_node_secondary_is_enabled(&staged, card_id))
+			testing.expect(t, validate_run_state(&staged))
+		} else {
+			expect_special_node_test_snapshot(t, &staged, before)
+			testing.expect(t, staged.relic_reward == relic_before)
+		}
+		// A broken run must still fail before Already_Resolved or any local
+		// affordability failure, even though HUD queries intentionally stay local.
+		staged = run
+		staged.seed = 0
+		invalid_before := capture_special_node_test_snapshot(&staged)
+		switch row.kind {
+		case .Rest:
+			testing.expect_value(t, use_rest_recovery(&staged), Special_Node_Result.Invalid)
+			testing.expect_value(t, use_rest_upgrade(&staged, card_id), Special_Node_Result.Invalid)
+		case .Event:
+			testing.expect_value(t, resolve_route_event(&staged, .Primary), Special_Node_Result.Invalid)
+			testing.expect_value(t, resolve_route_event(&staged, .Secondary), Special_Node_Result.Invalid)
+		case .Treasure:
+			testing.expect_value(t, claim_treasure(&staged), Special_Node_Result.Invalid)
+		case .Combat, .Elite, .Boss, .Shop, .Count:
+		}
+		expect_special_node_test_snapshot(t, &staged, invalid_before)
+		testing.expect(t, staged.seed == 0 && staged.relic_reward == relic_before)
+		destroy_run(&run)
+	}
+	testing.expect(t, !special_node_primary_is_enabled(nil) && !special_node_secondary_is_enabled(nil, 0))
+}

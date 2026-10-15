@@ -62,5 +62,5 @@ test_upgrade_preview_uses_effect_values_and_rest_disables_no_op_upgrade :: proc(
 	testing.expect(t, game.initialize_empty_deck(&run.player.deck))
 	card, added := game.add_owned_card(&run.player.deck, .Dash)
 	testing.expect(t, added)
-	testing.expect(t, !special_node_secondary_is_enabled(&run, card.id))
+	testing.expect(t, !game.special_node_secondary_is_enabled(&run, card.id))
 }

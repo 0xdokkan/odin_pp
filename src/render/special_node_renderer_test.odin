@@ -89,7 +89,7 @@ test_blood_offering_primary_is_disabled_when_gold_would_overflow :: proc(t: ^tes
 	defer game.destroy_run(&run)
 	run.player.gold = max(i32)
 	testing.expect(t, game.validate_special_node_state(&run))
-	testing.expect(t, !special_node_primary_is_enabled(&run))
+	testing.expect(t, !game.special_node_primary_is_enabled(&run))
 	primary := special_node_action_bounds(960, 540, 0, 3)
 	testing.expect_value(
 		t,
@@ -285,7 +285,7 @@ test_resolved_rest_exposes_only_continue :: proc(t: ^testing.T) {
 	defer game.destroy_run(&run)
 	result := game.use_rest_recovery(&run)
 	testing.expect_value(t, result, game.Special_Node_Result.Recovered)
-	testing.expect(t, special_node_is_resolved(&run))
+	testing.expect(t, game.special_node_is_resolved(&run))
 	testing.expect_value(t, special_node_action_count(&run), 0)
 
 	old_action := special_node_action_bounds(960, 540, 0, 3)

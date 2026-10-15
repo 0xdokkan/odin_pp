@@ -1,5 +1,6 @@
 package render
 
+import "core:c"
 import rl "vendor:raylib"
 import rlgl "vendor:raylib/rlgl"
 
@@ -7,6 +8,36 @@ RESIN_BACKGROUND :: rl.Color{5, 7, 11, 255}
 RESIN_DARK :: rl.Color{13, 20, 31, 255}
 RESIN_WALL :: rl.Color{21, 30, 43, 255}
 RESIN_CAP :: rl.Color{65, 83, 107, 255}
+
+// Values of the shared shader's `hologram` uniform. Model mode samples the
+// numeral atlas and omits the board's fog, clear-room light and accents.
+Resin_Light_Mode :: enum c.int {Board = 0, Hologram = 1, Model = 2}
+
+Resin_Lighting :: struct {
+	eye, lantern: rl.Vector3,
+	mode: Resin_Light_Mode,
+	clear: f32,
+	accents: [4]rl.Vector4,
+}
+
+// Bind one resin pass. Callers keep their shader-availability guards and pair
+// this with EndShaderMode after their geometry. Scene presets stay with the
+// scene; the uniform contract belongs to the material.
+begin_resin_lighting :: proc(renderer: ^Renderer, lighting: Resin_Lighting) {
+	v := &renderer.tactical
+	values := lighting
+	mode := c.int(values.mode)
+	rl.SetShaderValue(v.light_shader, v.light_position_location, &values.lantern, .VEC3)
+	rl.SetShaderValue(v.light_shader, v.light_eye_location, &values.eye, .VEC3)
+	rl.SetShaderValue(v.light_shader, v.light_hologram_location, &mode, .INT)
+	// Preserve the model pass's three-uniform contract: these board values
+	// are neither read nor replaced while drawing dice or model previews.
+	if values.mode != .Model {
+		rl.SetShaderValue(v.light_shader, v.light_clear_location, &values.clear, .FLOAT)
+		rl.SetShaderValueV(v.light_shader, v.light_accents_location, raw_data(values.accents[:]), .VEC4, 4)
+	}
+	rl.BeginShaderMode(v.light_shader)
+}
 
 // The level and dice share a fine moulded grain and a clear glossy coat.
 // Dice provide local face UVs so the grain stays attached while they tumble.

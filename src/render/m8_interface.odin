@@ -1,6 +1,5 @@
 package render
 
-import "core:c"
 import "core:fmt"
 import rl "vendor:raylib"
 import game "../game"
@@ -63,11 +62,6 @@ draw_m8_character_panel :: proc(renderer: ^Renderer, room: ^game.Room, state: Ch
 begin_m8_model_lighting :: proc(renderer: ^Renderer, camera: rl.Camera3D) -> bool {
     v := &renderer.tactical
     if v.light_shader.id == 0 { return false }
-    eye, light := camera.position, rl.Vector3{-2,4,3}
-    mode: c.int = 2
-    rl.SetShaderValue(v.light_shader,v.light_eye_location,&eye,.VEC3)
-    rl.SetShaderValue(v.light_shader,v.light_position_location,&light,.VEC3)
-    rl.SetShaderValue(v.light_shader,v.light_hologram_location,&mode,.INT)
-    rl.BeginShaderMode(v.light_shader)
+    begin_resin_lighting(renderer, {eye = camera.position, lantern = {-2,4,3}, mode = .Model})
     return true
 }

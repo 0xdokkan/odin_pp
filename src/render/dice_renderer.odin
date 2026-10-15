@@ -211,13 +211,7 @@ update_dice_pool_texture :: proc(renderer: ^Dice_Renderer, roll: game.Dice_Roll,
 	rlgl.EnableDepthMask()
 	resin := menu_themed(renderer.theme) && renderer.theme.tactical.light_shader.id != 0
 	if resin {
-		v := &renderer.theme.tactical
-		eye, light := layout.camera.position, rl.Vector3{-3, 5, 4}
-		mode: c.int = 2
-		rl.SetShaderValue(v.light_shader, v.light_eye_location, &eye, .VEC3)
-		rl.SetShaderValue(v.light_shader, v.light_position_location, &light, .VEC3)
-		rl.SetShaderValue(v.light_shader, v.light_hologram_location, &mode, .INT)
-		rl.BeginShaderMode(v.light_shader)
+		begin_resin_lighting(renderer.theme, {eye = layout.camera.position, lantern = {-3, 5, 4}, mode = .Model})
 	}
 	kind := polyhedral_die_for_sides(int(roll.sides))
 	font := rl.GetFontDefault()
