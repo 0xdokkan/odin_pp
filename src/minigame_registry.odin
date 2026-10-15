@@ -7,12 +7,9 @@ import platform2d "minigames/platform2d"
 import platform3d "minigames/platform3d"
 import puzzle "minigames/puzzle"
 
-// Minigames offered by the menu and by run challenges, in display order.
-// Keep the first EXTRA_CHALLENGE_COUNT entries stable for seeded run offers.
+// Minigames offered by the menu, in display order. A run opens only the
+// ring, from a square of Tesla coils.
 MINIGAME_COUNT :: 6
-// Preserve the existing seeded extra-challenge sequence. The ring has its
-// own single-attempt offer and card unlocks instead of the gold reward.
-EXTRA_CHALLENGE_COUNT :: 5
 
 minigame_info :: proc(index: int) -> (host.Minigame_Info, bool) {
 	switch index {

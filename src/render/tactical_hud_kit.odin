@@ -16,6 +16,8 @@ HUD_TROUGH :: rl.Color{4, 7, 12, 255}
 HUD_AMBER :: rl.Color{218, 169, 90, 255}
 HUD_VENOM :: rl.Color{148, 166, 116, 255}
 HUD_SHADE :: rl.Color{164, 144, 183, 255}
+HUD_EMBER :: rl.Color{226, 122, 74, 255}
+HUD_FROST :: rl.Color{142, 186, 214, 255}
 
 Tactical_Hud_Layout :: struct {
 	vitals, pulse, commands: rl.Rectangle,

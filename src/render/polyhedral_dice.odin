@@ -308,9 +308,12 @@ polyhedral_support_height :: proc(die: ^Polyhedral_Die, rotation: rl.Quaternion)
 	return
 }
 
-polyhedral_face_label :: proc(die: ^Polyhedral_Die, face: Polyhedral_Face) -> (digits: [2]int, count: int) {
+// A face's figures. The set's D10 reads 0-9, its 0 the 10, as the dice-set lab
+// shows it; with `values` (the dice thrown in play) the 10 reads 10, as the
+// cards name that face.
+polyhedral_face_label :: proc(die: ^Polyhedral_Die, face: Polyhedral_Face, values := false) -> (digits: [2]int, count: int) {
 	value := face.value
-	if die.kind == .D10 && value == 10 {value = 0}
+	if die.kind == .D10 && value == 10 && !values {value = 0}
 	if die.kind == .D100 || value >= 10 {return {int(value/10), int(value%10)}, 2}
 	return {int(value), 0}, 1
 }

@@ -10,7 +10,7 @@ test_dice_rebound_timing_keeps_second_flight_large_on_screen_at_playback_speeds 
 	for count in 1..=3 {
 		layout := dice_pool_layout(640, 360)
 		dice := new(Dice_Renderer)
-		roll := game.Dice_Roll{faces = {4, 0, 0}, count = count, total = 4}
+		roll := game.Dice_Roll{faces = {4, 0, 0}, sides = 6, count = i32(count), total = 4}
 		if count >= 2 {roll.faces[1], roll.total = 5, 9}
 		if count == 3 {roll.faces[2], roll.total = 2, 11}
 		prepare_dice_pool(dice, roll, 0x0C1E37E209629011, layout)
@@ -30,7 +30,7 @@ test_dice_rebound_timing_keeps_second_flight_large_on_screen_at_playback_speeds 
 			renderer.playback_speed = speed
 			id := game.Card_Id.Fate_Strike if count == 1 else game.Card_Id.Sundering_Blow if count == 2 else game.Card_Id.Prismatic_Barrage
 			event := game.Game_Event{kind = .Dice_Rolled, source = game.PLAYER_ENTITY, card_id = 1,
-				card_definition = id, dice_roll = roll, amount = roll.total}
+				card_definition = id, card_upgrade_level = 1, dice_roll = roll, amount = roll.total}
 			renderer.timeline.count = 1
 			renderer.timeline.cues[0] = {kind = .Dice_Rolled, event = event, duration = presentation_cue_duration(.Dice_Rolled, event)}
 			peak, visible := f32(0), 0
@@ -85,7 +85,7 @@ test_dice_playback_tumble_measure_rejects_frozen_and_yaw_only_dice :: proc(t: ^t
 test_live_dice_show_substantial_xz_tumbling_in_both_rebound_flights :: proc(t: ^testing.T) {
 	for count in 1..=3 {
 		dice := new(Dice_Renderer)
-		roll := game.Dice_Roll{faces = {4, 0, 0}, count = count, total = 4}
+		roll := game.Dice_Roll{faces = {4, 0, 0}, sides = 6, count = i32(count), total = 4}
 		if count >= 2 {roll.faces[1], roll.total = 5, 9}
 		if count == 3 {roll.faces[2], roll.total = 2, 11}
 		prepare_dice_pool(dice, roll, 0x0C1E37E209629011, dice_pool_layout(948, 1020, {0, 243, 948, 533.25}))
@@ -96,7 +96,7 @@ test_live_dice_show_substantial_xz_tumbling_in_both_rebound_flights :: proc(t: ^
 			renderer.playback_speed = speed
 			id := game.Card_Id.Fate_Strike if count == 1 else game.Card_Id.Sundering_Blow if count == 2 else game.Card_Id.Prismatic_Barrage
 			event := game.Game_Event{kind = .Dice_Rolled, source = game.PLAYER_ENTITY, card_id = 1,
-				card_definition = id, dice_roll = roll, amount = roll.total}
+				card_definition = id, card_upgrade_level = 1, dice_roll = roll, amount = roll.total}
 			renderer.timeline.count = 1
 			renderer.timeline.cues[0] = {kind = .Dice_Rolled, event = event, duration = presentation_cue_duration(.Dice_Rolled, event)}
 			observed: [2][3][32]rl.Quaternion
@@ -199,7 +199,7 @@ test_dice_settling_preserves_early_seconds_and_eases_continuously_to_rest :: pro
 test_live_dice_settling_displays_multiple_changing_poses_before_reveal :: proc(t: ^testing.T) {
 	for count in 1..=3 {
 		dice := new(Dice_Renderer)
-		roll := game.Dice_Roll{faces = {4, 0, 0}, count = count, total = 4}
+		roll := game.Dice_Roll{faces = {4, 0, 0}, sides = 6, count = i32(count), total = 4}
 		if count >= 2 {roll.faces[1], roll.total = 5, 9}
 		if count == 3 {roll.faces[2], roll.total = 2, 11}
 		prepare_dice_pool(dice, roll, 0x0C1E37E209629011, dice_pool_layout(948, 1020, {0, 243, 948, 533.25}))
@@ -209,7 +209,7 @@ test_live_dice_settling_displays_multiple_changing_poses_before_reveal :: proc(t
 			renderer.playback_speed = speed
 			id := game.Card_Id.Fate_Strike if count == 1 else game.Card_Id.Sundering_Blow if count == 2 else game.Card_Id.Prismatic_Barrage
 			event := game.Game_Event{kind = .Dice_Rolled, source = game.PLAYER_ENTITY, card_id = 1,
-				card_definition = id, dice_roll = roll, amount = roll.total}
+				card_definition = id, card_upgrade_level = 1, dice_roll = roll, amount = roll.total}
 			renderer.timeline.count = 1
 			renderer.timeline.cues[0] = {kind = .Dice_Rolled, event = event, duration = presentation_cue_duration(.Dice_Rolled, event)}
 			previous := sample_dice_throw(throw, DICE_THIRD_IMPACT_PROGRESS)

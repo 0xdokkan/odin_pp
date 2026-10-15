@@ -151,7 +151,9 @@ draw_m9_fight_cues :: proc(state: ^fight.State) {
 }
 
 m9_ring_hint :: proc(state: ^fight.State) -> (cstring,rl.Color) {
-	if state.result == .Won {return "CAMPIONE SCONFITTO",GOTHIC_BLUE}
+	if state.result == .Won {return "AVVERSARI SCONFITTI" if state.roster_count > 1 else "CAMPIONE SCONFITTO",GOTHIC_BLUE}
+	if state.tag_flash_ticks > 0 {return "TAG! CAMBIO SUL RING",GOTHIC_PAPER}
+	if state.tag_target >= 0 {return "CORRE A DARE IL CAMBIO / FERMALO",GOTHIC_RED}
 	if state.result == .Lost {return "LA SFIDA FINISCE QUI",GOTHIC_RED}
 	if state.throw_active {
 		names := [4]cstring{"PRESA A DUE MANI","SOLLEVA","LANCIA","IMPATTO"}
@@ -162,21 +164,32 @@ m9_ring_hint :: proc(state: ^fight.State) -> (cstring,rl.Color) {
 		if enemy.action_tick<enemy.active_move.startup {return "ATTACCO IN ARRIVO / SCHIVA O PARA",GOTHIC_RED}
 		if enemy.action_tick>=enemy.active_move.startup+enemy.active_move.active {return "CAMPIONE IN RECUPERO / CONTRATTACCA",GOTHIC_BLUE}
 	}
+	if state.roster_count > 1 {return "BATTILI TUTTI / UNO ALLA VOLTA",GOTHIC_MUTED}
 	return "BATTI IL CAMPIONE / CERCA LA PRESA",GOTHIC_MUTED
 }
 
 draw_m9_fight_hud :: proc(renderer: ^Renderer, state: ^fight.State, v: M9_View) {
 	w,h := renderer.canvas_width,renderer.canvas_height
 	gothic_text(renderer,"ARENA DELLE OMBRE" if v.kind == .Arena else "IL RING DELLE OMBRE",20,16,22,GOTHIC_PAPER)
-	if !v.practice {gothic_text(renderer,"PROVA DELLA TORRE / DUELLO",21,44,11,GOTHIC_MUTED)}
+	if !v.practice {gothic_text(renderer,"QUADRATO DI TESLA / TAG MATCH" if state.roster_count > 1 else "PROVA DELLA TORRE / DUELLO",21,44,11,GOTHIC_MUTED)}
 	for actor,i in state.fighters {
 		x := f32(20) if i == 0 else w-246
 		tactical_hud_panel({x,105,226,55},GOTHIC_BLUE if i == 0 else GOTHIC_RED)
-		gothic_text(renderer,"IL VIANDANTE" if i == 0 else "IL CAMPIONE",x+10,111,14,GOTHIC_PAPER)
+		gothic_text(renderer,"IL VIANDANTE" if i == 0 else m9_opponent_name(state,state.active),x+10,111,14,GOTHIC_PAPER)
 		gothic_text_fit(renderer,fmt.ctprintf("%d / %d",actor.health,actor.max_health),{x+155,111,61,18},14,GOTHIC_MUTED)
 		ui.hud_meter(nil,{x+10,133,206,5},f32(actor.health)/f32(max(actor.max_health,1)),GOTHIC_RED)
 		detail := fmt.ctprintf("%s / %df",m9_move_name(actor.action),actor.action_tick) if v.tools else m9_move_name(actor.action)
 		gothic_text(renderer,detail,x+10,143,11,GOTHIC_BLUE if i == 0 else GOTHIC_MUTED)
+	}
+	// Tag match: one pip per opponent, lit while they can still fight.
+	if state.roster_count > 1 {
+		standing := 0
+		for index in 0..<state.roster_count {
+			down := state.roster[index].ko
+			if !down {standing += 1}
+			gothic_inlay(w-232+f32(index)*16,170,5,GOTHIC_STEEL if down else GOTHIC_RED)
+		}
+		gothic_text(renderer,fmt.ctprintf("%d IN PIEDI",standing),w-226+f32(state.roster_count)*16,163,11,GOTHIC_MUTED)
 	}
 	status,accent := m9_ring_hint(state)
 	gothic_text_fit(renderer,status,{w*0.5-190,116,380,20},12,accent)

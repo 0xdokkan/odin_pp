@@ -77,8 +77,13 @@ Roguelike_Session :: struct {
 	reward_skip_hovered:     bool,
 	shop_render_state:       render.Shop_Render_State,
 	special_render_state:    render.Special_Node_Render_State,
+	// MOSTRA EFFETTO (effect_window.odin): open, it owns the frame.
+	effect_window:           Effect_Window,
 	smoke_frame_count:       int,
 	smoke_fire_entity:       game.Entity_Ref,
+
+	// The mechanics lab's sounds (render/lab_sounds.odin).
+	lab_bank:                audio.Lab_Bank,
 
 	// Which resources exist, so destroy mirrors the old deferred cleanup.
 	run_created:             bool,
@@ -91,7 +96,8 @@ Roguelike_Session :: struct {
 	m8_modal:                bool,
 	mouse_canvas:            view.Vec2,
 	mouse_inside:            bool,
-	defeat_restart_hovered:  bool,
+	defeat_hovered:          render.Defeat_Choice,
+	pause_hovered:           render.Pause_Choice,
 	timeline_busy:           bool,
 	defeat_visible:          bool,
 	reward_visible:          bool,
@@ -107,6 +113,8 @@ Roguelike_Session :: struct {
 
 	// Launched from the menu: F10 returns there instead of quitting.
 	from_launcher:           bool,
+	// PROVA MECCANICHE: the endless arena's arrivals.
+	sandbox:                 game.Sandbox_State,
 
 	// Minigame challenge feedback shown after returning to the run.
 	challenge_message:       string,
@@ -303,6 +311,9 @@ roguelike_parse_arguments :: proc(rs: ^Roguelike_Session, args: []string) {
 	if rs.options.m7_smoke { rs.smoke_mode_count += 1 }
 	if rs.options.m7_view_smoke { rs.smoke_mode_count += 1 }
 	if rs.options.m8_view_smoke { rs.smoke_mode_count += 1 }
+	if rs.options.western_smoke { rs.smoke_mode_count += 1 }
+	if rs.options.mechanics_lab_smoke { rs.smoke_mode_count += 1 }
+	if rs.options.effect_window_smoke { rs.smoke_mode_count += 1 }
 	if rs.options.arena_view_smoke { rs.smoke_mode_count += 1 }
 	if rs.options.dice_set_smoke { rs.smoke_mode_count += 1 }
 	if rs.options.m9_smoke { rs.smoke_mode_count += 1 }
@@ -318,7 +329,13 @@ roguelike_parse_arguments :: proc(rs: ^Roguelike_Session, args: []string) {
 		fmt.eprintln("dice set lab requires tactical mode and cannot be combined with another lab or smoke")
 		os.exit(2)
 	}
-	if (rs.options.m7_view_smoke || rs.options.m8_view_smoke || rs.options.arena_view_smoke) && !rs.options.tactical.enabled {
+	if rs.options.mechanics_lab && (!rs.options.tactical.enabled || rs.options.spell_lab || rs.options.dice_set_lab ||
+	   rs.options.m9_lab != .None || rs.smoke_mode_count > 0 || rs.playtest_report) {
+		fmt.eprintln("the mechanics lab requires tactical mode and cannot be combined with another lab, report or smoke")
+		os.exit(2)
+	}
+	if (rs.options.m7_view_smoke || rs.options.m8_view_smoke || rs.options.arena_view_smoke || rs.options.western_smoke ||
+	    rs.options.mechanics_lab_smoke || rs.options.effect_window_smoke) && !rs.options.tactical.enabled {
 		fmt.eprintln("tactical view smoke requires tactical mode; omit --classic")
 		os.exit(2)
 	}
@@ -343,22 +360,23 @@ roguelike_parse_arguments :: proc(rs: ^Roguelike_Session, args: []string) {
 // Smoke, lab and report modes run the roguelike directly, without the menu.
 roguelike_requires_direct_start :: proc(rs: ^Roguelike_Session) -> bool {
 	return rs.smoke_mode_count > 0 || rs.options.spell_lab || rs.options.dice_set_lab ||
-	       rs.options.m9_lab != .None || rs.playtest_report
+	       rs.options.m9_lab != .None || rs.playtest_report || rs.options.mechanics_lab
 }
 
 // Labs and captures never read or write persistent progression.
 roguelike_profile_enabled :: proc(rs: ^Roguelike_Session) -> bool {
-	return rs.smoke_mode_count == 0 && !rs.smoke_test && !rs.options.spell_lab &&
+	return rs.smoke_mode_count == 0 && !rs.smoke_test && !rs.options.spell_lab && !rs.options.mechanics_lab &&
 	       !rs.options.dice_set_lab && !rs.options.dice_set_smoke &&
 	       rs.options.m9_lab == .None && !rs.options.m9_smoke
 }
 
 roguelike_prepare :: proc(rs: ^Roguelike_Session) -> Session_Start {
-	rs.procedural_rooms = (!rs.smoke_test && !rs.options.spell_lab) || rs.smoke_generation || rs.smoke_family != .Scattered || rs.smoke_relics
+	rs.procedural_rooms = (!rs.smoke_test && !rs.options.spell_lab && !rs.options.mechanics_lab) || rs.smoke_generation || rs.smoke_family != .Scattered || rs.smoke_relics
 
 
 	rs.run_seed = rs.options.seed
-	if rs.smoke_shop || rs.smoke_rest || rs.smoke_event || rs.smoke_treasure || rs.smoke_special_result {
+	// MOSTRA EFFETTO's smoke goes from the first room to a shop as well.
+	if rs.smoke_shop || rs.smoke_rest || rs.smoke_event || rs.smoke_treasure || rs.smoke_special_result || rs.options.effect_window_smoke {
 		desired_kind := game.Node_Kind.Shop
 		if rs.smoke_rest {
 			desired_kind = .Rest
@@ -378,7 +396,8 @@ roguelike_prepare :: proc(rs: ^Roguelike_Session) -> Session_Start {
 		rs.run_seed = selected
 	}
 	run_ok: bool
-	rs.run_state, run_ok = game.create_run(DEMO_PLAYER_STATS, DEMO_RUN_CONFIG, rs.run_seed, (!rs.smoke_test && !rs.options.spell_lab) || rs.smoke_relics)
+	rs.run_state, run_ok = game.create_run(DEMO_PLAYER_STATS, DEMO_RUN_CONFIG, rs.run_seed,
+		(!rs.smoke_test && !rs.options.spell_lab && !rs.options.mechanics_lab) || rs.smoke_relics)
 	if !run_ok {
 		return .Failed}
 	rs.run_created = true
@@ -392,6 +411,7 @@ roguelike_prepare :: proc(rs: ^Roguelike_Session) -> Session_Start {
 		return .Failed}
 	rs.room_created = true
 	if rs.options.spell_lab && !prepare_spell_lab(&rs.room, rs.options.dice_lab) { fmt.eprintln("could not prepare card practice"); return .Failed}
+	if rs.options.mechanics_lab && !prepare_mechanics_lab(rs) { fmt.eprintln("could not prepare the mechanics lab"); return .Failed}
 	if rs.smoke_playtest {
 		if !run_headless_playtest_smoke(&rs.run_state, &rs.room, rs.run_seed, rs.options.playtest_output) {
 			fmt.eprintln("failed to write headless playtest report")
@@ -406,7 +426,8 @@ roguelike_prepare :: proc(rs: ^Roguelike_Session) -> Session_Start {
 		return .Finished
 	}
 	if rs.smoke_test || rs.options.spell_lab { rs.options.tactical.enabled = false; rs.options.scene_3d = false }
-	if rs.options.tactical.enabled {
+	// The mechanics lab configured its own fogless arena.
+	if rs.options.tactical.enabled && !rs.options.mechanics_lab {
 		configured := game.configure_tactical_room(&rs.room, rs.options.tactical)
 		assert(configured)
 	}
@@ -588,6 +609,12 @@ roguelike_attach :: proc(rs: ^Roguelike_Session, window: ^app.Window) -> Session
 		game.use_player_ability(&rs.room, .Guard)
 		game.use_player_ability(&rs.room, .Thorn_Coat)
 		game.use_player_ability(&rs.room, .Afterimage)
+		// The stacks on show too: Bruciatura on the player, every one on a foe.
+		if len(rs.room.enemies) > 0 {
+			foe := game.enemy_entity(rs.room.enemies[0].id)
+			for kind in ([3]game.Status_Kind{.Poison, .Burn, .Slow}) { _, _ = game.apply_status(&rs.room, foe, kind, 2, 0) }
+		}
+		_, _ = game.apply_status(&rs.room, game.PLAYER_ENTITY, .Burn, 1, 0)
 	} else if rs.smoke_loot {
 		rs.room.player.position = {x = 10, y = 2}
 		rs.room.enemies[0].health = rs.room.player.stats.attack
@@ -767,6 +794,18 @@ roguelike_attach :: proc(rs: ^Roguelike_Session, window: ^app.Window) -> Session
 		if !run_m8_view_smoke(rs.window, &rs.iso_renderer, &rs.dice_renderer) { fmt.eprintln("M8 native smoke failed"); os.exit(2) }
 		return .Finished
 	}
+	if rs.options.western_smoke {
+		if !run_western_smoke(rs.window, &rs.iso_renderer, &rs.dice_renderer) { fmt.eprintln("6 RANCH 7 smoke failed"); os.exit(2) }
+		return .Finished
+	}
+	if rs.options.mechanics_lab_smoke {
+		if !run_mechanics_lab_smoke(rs.window, &rs.iso_renderer, &rs.dice_renderer) { fmt.eprintln("mechanics lab smoke failed"); os.exit(2) }
+		return .Finished
+	}
+	if rs.options.effect_window_smoke {
+		if !run_effect_window_smoke(rs) { fmt.eprintln("effect window smoke failed"); os.exit(2) }
+		return .Finished
+	}
 	if rs.options.m9_lab != .None {
 		run_m9_lab(rs.window, &rs.iso_renderer, rs.options.m9_lab)
 		return .Finished
@@ -817,6 +856,23 @@ roguelike_suspend_input :: proc(rs: ^Roguelike_Session) {
 	rs.iso_renderer.frame_clock_valid = false
 	rs.iso_renderer.tactical.world_orbit.dragging = false
 	rs.iso_renderer.tactical.hologram_orbit.dragging = false
+	// The view behind the player's eyes gives the mouse back.
+	if rs.attached && rs.options.tactical.enabled { release_first_person_mouse(&rs.tactical_controller, &rs.room) }
+	// The room's ambience waits for the scene to come back.
+	audio.lab_ambience(&rs.lab_bank, false)
+}
+
+// The mechanics lab's sounds: what the board pass queued, and the room's
+// ambience, at the player's effects volume (and silent when muted).
+roguelike_lab_sounds :: proc(rs: ^Roguelike_Session, hf: ^host.Frame) {
+	bank := hf.audio
+	if bank == nil || !bank.ready || bank.muted || !audio.lab_bank_load(&rs.lab_bank) {
+		render.play_lab_sounds(&rs.iso_renderer, nil, 0)
+		audio.lab_ambience(&rs.lab_bank, false)
+		return
+	}
+	render.play_lab_sounds(&rs.iso_renderer, &rs.lab_bank, bank.sfx_volume)
+	audio.lab_ambience(&rs.lab_bank, rs.run_state.phase == .In_Room, .Amb_Crypt_Loop, bank.sfx_volume)
 }
 
 roguelike_suspend :: proc(data: rawptr) {
@@ -830,10 +886,28 @@ roguelike_update :: proc(data: rawptr, hf: ^host.Frame) {
 		roguelike_suspend_input(rs)
 		return
 	}
+	// MOSTRA EFFETTO: while it is open the frame is its own. Nothing below reads
+	// a key or a click, and none of the run's clocks, timelines and arrivals runs.
+	if rs.effect_window.open {
+		update_effect_window_in_run(rs, hf)
+		return
+	}
 	if rs.from_launcher && hf.focused && rl.IsKeyPressed(.F10) {
 		host.pop(hf)
 		return
 	}
+	// The pause menu: resume, or back to the main menu.
+	rs.pause_hovered = .None
+	if rs.tactical_controller.paused && hf.mouse_inside {
+		rs.pause_hovered = render.pause_choice_at_point(&rs.iso_renderer, {hf.mouse.x, hf.mouse.y}, rs.from_launcher)
+	}
+	if rs.pause_hovered != .None && hf.focused && rl.IsMouseButtonPressed(.LEFT) {
+		if rs.pause_hovered == .Menu { host.pop(hf); return }
+		rs.tactical_controller.paused = false
+		rs.iso_renderer.frame_clock_valid = false
+		rs.pause_hovered = .None
+	}
+	rs.iso_renderer.tactical.pause_hovered, rs.iso_renderer.tactical.pause_menu = rs.pause_hovered, rs.from_launcher
 	if !rs.smoke_test && rl.IsKeyPressed(.F4) {
 		speed := f32(1) if rs.iso_renderer.playback_speed >= 4 else min(f32(4), rs.iso_renderer.playback_speed*2)
 		render.set_renderer_playback_speed(&rs.iso_renderer, speed)
@@ -841,11 +915,19 @@ roguelike_update :: proc(data: rawptr, hf: ^host.Frame) {
 	rs.frame_time = (f32(1.0/60.0) if rs.options.m7_view_smoke else hf.dt)
 	rs.m8_modal = false
 	m8_mouse, m8_mouse_inside := view.Vec2{hf.mouse.x,hf.mouse.y}, hf.mouse_inside
+	// FIRST PERSON SHOOTER: behind the player's eyes the mouse is the view's
+	// (first_person_input.odin); its hidden pointer reaches nothing on the
+	// board, the hand or the HUD.
+	if rs.options.tactical.enabled && render.first_person_owns_pointer(&rs.iso_renderer, &rs.room) { m8_mouse_inside = false }
 	if !rs.smoke_test && !rs.options.m7_view_smoke && rs.options.tactical.enabled {
 		rs.m8_modal = update_m8_session(&rs.m8_session, &rs.room, &rs.iso_renderer, &rs.tactical_controller,
 			&rs.card_interaction, &rs.gameplay_buffer, rs.run_state.phase == .In_Room &&
 			!rs.show_route_map && !game.run_has_relic_choice(&rs.run_state), rs.frame_time, m8_mouse, m8_mouse_inside)
 	}
+	// MOSTRA EFFETTO asked from the sheet or the card inspector: the frame is
+	// the window's.
+	if roguelike_take_effect_request(rs) { return }
+	roguelike_ranch_feedback(rs, hf)
 	if roguelike_open_activity(rs,hf) {
         rs.overlay=nil
         rs.overlay_data={}
@@ -864,7 +946,7 @@ roguelike_update :: proc(data: rawptr, hf: ^host.Frame) {
 	if render.presentation_time_policy(&rs.iso_renderer.timeline) != .Cinematic {
 		render.advance_sprite_assets(&rs.iso_renderer.sprite_assets, rs.frame_time if !rs.smoke_test else f32(1.0/60.0))
 	}
-	if !rs.m8_modal && !rl.IsKeyPressed(.P) && !rs.smoke_furnace && rs.spell_smoke == .None &&
+	if !rs.m8_modal && !first_person_pause_pressed(&rs.room) && !rs.smoke_furnace && rs.spell_smoke == .None &&
 	   (!rs.options.tactical.enabled || rs.options.m7_view_smoke || (!rs.tactical_controller.paused && rs.tactical_controller.was_focused && rl.IsWindowFocused())) {
 		render.update_renderer_frame_timeline(&rs.iso_renderer, rs.frame_time)
 	}
@@ -880,15 +962,19 @@ roguelike_update :: proc(data: rawptr, hf: ^host.Frame) {
 		render.update_object_target_hover(&rs.iso_renderer, &rs.room, rs.mouse_canvas, rs.card_interaction.selected_card_id)
 	}
 	mouse_delta := app.mouse_canvas_delta(rs.window)
-	rs.defeat_restart_hovered = rs.run_state.phase == .Defeat && rs.mouse_inside &&
-		render.defeat_restart_at_point(
-			f32(rs.window.config.canvas_width),
-			f32(rs.window.config.canvas_height),
-			rs.mouse_canvas,
-		)
+	rs.defeat_hovered = .None
+	if rs.run_state.phase == .Defeat && rs.mouse_inside {
+		rs.defeat_hovered = render.defeat_choice_at_point(f32(rs.window.config.canvas_width),
+			f32(rs.window.config.canvas_height), rs.mouse_canvas, rs.from_launcher)
+	}
+	// After a defeat: back to the main menu, or out of the game.
+	if !rs.m8_modal && rl.IsMouseButtonPressed(.LEFT) {
+		if rs.defeat_hovered == .Menu { host.pop(hf); return }
+		if rs.defeat_hovered == .Quit { host.quit(hf); return }
+	}
 	restart_requested := !rs.m8_modal && (rl.IsKeyPressed(.F5) ||
 		(rs.run_state.phase == .Defeat && rl.IsKeyPressed(.ENTER)) ||
-		(rs.defeat_restart_hovered && rl.IsMouseButtonPressed(.LEFT)))
+		(rs.defeat_hovered == .Restart && rl.IsMouseButtonPressed(.LEFT)))
 	if restart_requested {
 		if rs.playtest_session_ptr != nil {
 			if !rs.playtest_report_written {
@@ -931,6 +1017,10 @@ roguelike_update :: proc(data: rawptr, hf: ^host.Frame) {
 		if rs.options.spell_lab {
 			if !prepare_spell_lab(&rs.room, rs.options.dice_lab) { fmt.eprintln("could not reset card practice"); host.quit(hf); return }
 		}
+		if rs.options.mechanics_lab {
+			if !prepare_mechanics_lab(rs) { fmt.eprintln("could not reset the mechanics lab"); host.quit(hf); return }
+			rs.tactical_controller = {}
+		}
 		if rs.playtest_report && !game.run_has_relic_choice(&rs.run_state) {
 			playtest_started := begin_playtest_run(&rs.playtest_session, rs.run_seed, &rs.run_state, &rs.room)
 			assert(playtest_started)
@@ -944,7 +1034,7 @@ roguelike_update :: proc(data: rawptr, hf: ^host.Frame) {
 		rs.reward_skip_hovered = false
 		rs.shop_render_state = {hovered_offer_index = -1}
 		rs.special_render_state = {}
-		rs.defeat_restart_hovered = false
+		rs.defeat_hovered = .None
 		render.frame_level(&rs.iso_renderer, &rs.level_data)
 		render.clear_event_animations(&rs.iso_renderer)
 	}
@@ -971,15 +1061,41 @@ roguelike_update :: proc(data: rawptr, hf: ^host.Frame) {
 	rs.relic_skip_hovered = false
 	tactical_input_blocked := false
 	if rs.options.tactical.enabled {
-		render.update_tactical_view(&rs.iso_renderer, &rs.room, rs.mouse_canvas, rs.mouse_inside && !rs.m8_modal &&
-			!render.m8_hud_contains_point(&rs.iso_renderer, &rs.room, rs.mouse_canvas) &&
-			!rs.tactical_controller.hologram && !rs.tactical_controller.paused && rl.IsWindowFocused())
+		// A flat board stands in 3D behind the player's eyes (first_person.odin).
+		render.sync_first_person_board(&rs.iso_renderer, &rs.room, rs.options.scene_3d, rs.window.canvas)
+		// The view never under the HUD's controls; MOSTRA EFFETTO's buttons light
+		// under the mouse wherever they are (roguelike_pointer_inside).
+		view_inside, hud_inside := roguelike_pointer_inside(rs, rl.IsWindowFocused())
+		render.update_tactical_view(&rs.iso_renderer, &rs.room, rs.mouse_canvas, view_inside)
+		render.tactical_hud_pointer(&rs.iso_renderer, rs.mouse_canvas, hud_inside)
 		render.update_tactical_atmosphere(&rs.iso_renderer, rs.frame_time if rs.options.m7_view_smoke || (!rs.tactical_controller.paused && rl.IsWindowFocused()) else 0)
 		if !rs.options.m7_view_smoke && !rs.m8_modal { tactical_input_blocked = update_tactical_controller(&rs.tactical_controller, &rs.room, &rs.iso_renderer,
 			&rs.card_interaction, &rs.gameplay_buffer, rs.frame_time,
 			rs.run_state.phase == .In_Room && !relic_visible && !rs.route_visible && !rs.options.m7_view_smoke,
-			rs.mouse_canvas, rs.mouse_inside, rs.playtest_session_ptr) } else { tactical_input_blocked = true }
+			rs.mouse_canvas, rs.mouse_inside, rs.playtest_session_ptr, hf.profile.settings.mouse_sensitivity if hf.profile != nil else 1) } else {
+			tactical_input_blocked = true
+			// A modal over the board: the view gives the mouse back.
+			release_first_person_mouse(&rs.tactical_controller, &rs.room)
+		}
+		// A tick move waiting for its diagonal partner never outlives a frame in
+		// which the player's lane is not free.
+		if tactical_input_blocked { clear_gameplay_command_buffer(&rs.gameplay_buffer) }
 	}
+	// The board's characters are living cards, wherever the board is 3D (a flat
+	// one too, while the player is behind his eyes).
+	render.set_living_cards(&rs.iso_renderer, rs.iso_renderer.tactical.scene_3d if rs.options.tactical.enabled else rs.options.scene_3d)
+	render.set_mechanics_lab(&rs.iso_renderer, rs.options.mechanics_lab, rs.from_launcher)
+	// The game shows seals and ground; the lab compares the displays with F6.
+	if !rs.options.mechanics_lab { rs.iso_renderer.tactical.intent_display = .Both }
+	else if hf.focused && rl.IsKeyPressed(.F6) { render.cycle_intent_display(&rs.iso_renderer) }
+	// F7: the arena cleared for the Canna da Pesca (mechanics_lab_begin_fishing).
+	if rs.options.mechanics_lab && hf.focused && !rs.m8_modal && rl.IsKeyPressed(.F7) { _ = mechanics_lab_begin_fishing(rs) }
+	// Arrivals follow the running board: never paused, in a modal or mid-animation.
+	if rs.options.mechanics_lab && !rs.m8_modal && !rs.tactical_controller.paused && rl.IsWindowFocused() &&
+	   rs.run_state.phase == .In_Room && !render.renderer_timeline_is_busy(&rs.iso_renderer) {
+		_, _ = game.sandbox_tick(&rs.room, &rs.sandbox, rs.frame_time)
+	}
+	if rs.options.mechanics_lab { roguelike_lab_sounds(rs, hf) }
 
 	if relic_visible {
 		clear_card_interaction(&rs.card_interaction)
@@ -1034,6 +1150,9 @@ roguelike_update :: proc(data: rawptr, hf: ^host.Frame) {
 			}
 		}
 
+		// MOSTRA EFFETTO under a card, or I on the card under the mouse: never a
+		// choice as well.
+		if roguelike_effect_entry(rs, rs.mouse_inside && rl.IsMouseButtonPressed(.LEFT), rs.mouse_canvas, rl.IsKeyPressed(.I)) { return }
 		choice_index := pressed_hand_slot()
 		choice_requested := choice_index >= 0 && choice_index < game.CARD_REWARD_CHOICE_COUNT
 		skip_requested := rl.IsKeyPressed(.S)
@@ -1118,6 +1237,9 @@ roguelike_update :: proc(data: rawptr, hf: ^host.Frame) {
 		}
 
 		if !rs.smoke_shop {
+			// MOSTRA EFFETTO of an offer or of the owned card chosen (or I): never
+			// a purchase, a page or a way out as well.
+			if roguelike_effect_entry(rs, rs.mouse_inside && rl.IsMouseButtonPressed(.LEFT), rs.mouse_canvas, rl.IsKeyPressed(.I)) { return }
 			offer_index := pressed_hand_slot()
 			if offer_index >= 0 && offer_index < game.SHOP_CARD_OFFER_COUNT {
 				game.buy_shop_card(&rs.run_state, offer_index)
@@ -1243,6 +1365,9 @@ roguelike_update :: proc(data: rawptr, hf: ^host.Frame) {
 		}
 
 		if !special_smoke {
+			// MOSTRA EFFETTO of the rest's owned card chosen (or I): never a
+			// choice as well.
+			if roguelike_effect_entry(rs, rs.mouse_inside && rl.IsMouseButtonPressed(.LEFT), rs.mouse_canvas, rl.IsKeyPressed(.I)) { return }
 			requested := render.Special_Node_Hit{kind = .None}
 			if game.special_node_can_continue(&rs.run_state) {
 				if rl.IsKeyPressed(.ENTER) {
@@ -1413,39 +1538,26 @@ roguelike_update :: proc(data: rawptr, hf: ^host.Frame) {
 		}
 		if !tactical_input_blocked && !rs.smoke_card && !rs.smoke_targeting && !rs.smoke_spatial && !rs.smoke_object && !rs.smoke_content &&
 		   !rs.smoke_encounters && !rs.smoke_miniboss && !rs.smoke_furnace && rs.spell_smoke == .None {
-			rs.timeline_busy = render.renderer_blocks_player_input(&rs.iso_renderer)
+			// The player's own action, its animation or its timed seconds, owns
+			// the input lane: a command pressed now is dropped, never kept for when
+			// the action ends. Only a press made after it acts.
+			rs.timeline_busy = render.renderer_blocks_player_input(&rs.iso_renderer) || game.tactical_player_busy(&rs.room)
 			command, has_command := poll_gameplay_command(
 				&rs.room,
 				&rs.iso_renderer,
 				&rs.card_interaction,
 				rs.mouse_canvas,
 				rs.mouse_inside,
-				!rs.timeline_busy && !rs.gameplay_buffer.occupied,
+				!rs.timeline_busy,
 				rs.options.debug_abilities,
 			)
-			if rs.room.phase == .Complete || rs.room.phase == .Defeat {
-				clear_gameplay_command_buffer(&rs.gameplay_buffer)
-			} else if rs.timeline_busy {
-				if has_command {
-					offer_gameplay_command(&rs.gameplay_buffer, command)
-				}
-			} else if buffered, has_buffered := take_gameplay_command(&rs.gameplay_buffer); has_buffered {
-				if has_command {
-					offer_gameplay_command(&rs.gameplay_buffer, command)
-				}
+			if ready, has_ready := route_gameplay_command(&rs.gameplay_buffer, &rs.room, rs.timeline_busy,
+				command, has_command, rs.frame_time, render.first_person_keys(&rs.iso_renderer)); has_ready {
 				commit_gameplay_command(
 					&rs.room,
 					&rs.iso_renderer,
 					&rs.card_interaction,
-					buffered,
-					rs.playtest_session_ptr,
-				)
-			} else if has_command {
-				commit_gameplay_command(
-					&rs.room,
-					&rs.iso_renderer,
-					&rs.card_interaction,
-					command,
+					ready,
 					rs.playtest_session_ptr,
 				)
 			}
@@ -1498,64 +1610,50 @@ roguelike_update :: proc(data: rawptr, hf: ^host.Frame) {
 		update_window_dice_overlay(rs.window, &rs.overlay_data)
 	}
 
-	roguelike_offer_challenge(rs, hf)
+	rs.challenge_message_ttl = max(rs.challenge_message_ttl-hf.dt, 0)
 }
 
-// FPS and ring use the same catalog scenes from the menu and the run.
-// The M9 editor and its diagnostic shooter remain explicit CLI laboratories.
+// A square of Tesla coils around enemies hands the duel to the catalog ring
+// scene. The run waits, frozen, until roguelike_resume settles the result.
 roguelike_open_activity :: proc(rs: ^Roguelike_Session, hf: ^host.Frame) -> bool {
-    requested := rs.m8_session.requested
-    if requested == .None {return false}
-    rs.m8_session.requested=.None
-    info, found := m8_requested_activity_info(requested)
-    if !found {return false}
-    config := host.Minigame_Config{seed=rs.run_seed, challenge=requested==.Ring}
+    if !rs.room.tesla_ring.pending || rs.m8_session.ring_pending {return false}
+    info, found := minigame_info(minigame_index_by_id("ring"))
+    if !found {
+        // Without a ring the spent coils simply fizzle.
+        rs.room.tesla_ring={}
+        return false
+    }
+    rs.m8_session.ring_pending=true
+    rs.m8_session.ring_link=tesla_ring_link(&rs.room)
+    rs.m8_session.report={}
+    clear_card_interaction(&rs.card_interaction)
+    clear_gameplay_command_buffer(&rs.gameplay_buffer)
     audio.play(hf.audio,.Confirm)
-    host.push(hf,info.create(config))
+    host.push(hf,info.create({seed=rs.run_seed, challenge=true, payload=&rs.m8_session.ring_link}))
     return true
 }
 
-m8_requested_activity_info :: proc(requested: render.M8_Control) -> (host.Minigame_Info, bool) {
-    if requested != .Ring && requested != .FPS {return {},false}
-    id := "ring" if requested == .Ring else "fps"
-    return minigame_info(minigame_index_by_id(id))
-}
-
-// One gate is shared by the offer and its regression tests. Suspended input,
-// cinematics and progression choices cannot start a second activity.
-roguelike_challenge_available :: proc(rs: ^Roguelike_Session, hf: ^host.Frame) -> bool {
-	return MINIGAME_COUNT > 0 && rs.smoke_mode_count == 0 && !rs.smoke_test &&
-	       !rs.options.spell_lab && !rs.options.dice_set_lab && rs.options.m9_lab == .None &&
-	       !rs.m8_modal && !rs.m8_session.character_open && rs.m8_session.requested == .None && !rs.m8_session.ring_pending &&
-	       !rs.show_route_map && hf.visible && hf.focused && hf.window_focused &&
-	       !rs.tactical_controller.paused && !rs.tactical_controller.hologram &&
-	       rs.room.qte.kind == .None && !game.tactical_is_casting(&rs.room) &&
-	       !game.run_has_relic_choice(&rs.run_state) && !render.renderer_timeline_is_busy(&rs.iso_renderer) &&
-	       game.minigame_challenge_available(&rs.run_state, &rs.room)
-}
-
-roguelike_challenge_bounds :: proc(canvas_width: f32, canvas_height: f32 = 540) -> ui.Rect {
-	// Optional activities share a compact dock beside the exit, not over it.
-	return render.m8_extra_challenge_bounds(canvas_width, canvas_height)
-}
-
-// Mouse-only: the run owns the keyboard, so the button never takes focus.
-roguelike_offer_challenge :: proc(rs: ^Roguelike_Session, hf: ^host.Frame) {
-	rs.challenge_message_ttl = max(rs.challenge_message_ttl-hf.dt, 0)
-	if !roguelike_challenge_available(rs, hf) { return }
-	if !ui.button(hf.ui, roguelike_challenge_bounds(hf.canvas.width, hf.canvas.height),
-		"SFIDA EXTRA", size = .Small, focusable = false) { return }
-	challenge, ok := game.begin_minigame_challenge(&rs.run_state, &rs.room, EXTRA_CHALLENGE_COUNT)
-	if !ok { return }
-	info, found := minigame_info(challenge.minigame)
-	if !found {
-		game.settle_minigame_challenge(&rs.run_state, &rs.room, challenge, .Abandoned, 0)
-		return
+// Sounds of the ranch duel and its verdict, once per step.
+roguelike_ranch_feedback :: proc(rs: ^Roguelike_Session, hf: ^host.Frame) {
+	ranch := &rs.m8_session.ranch
+	if !ranch.active && !ranch.finished {return}
+	cues := ranch.state.cues
+	if .Card_Slot in cues {audio.play(hf.audio,.Confirm)}
+	if .Gate in cues {audio.play(hf.audio,.Push)}
+	if .Tick in cues {audio.play(hf.audio,.Blip)}
+	if .Press in cues {audio.play(hf.audio,.Step)}
+	if .Coin_Player in cues {audio.play(hf.audio,.Coin)}
+	if .Coin_Rival in cues {audio.play(hf.audio,.Hurt,0.6)}
+	if .Win in cues {audio.play(hf.audio,.Win)}
+	if .Lose in cues {audio.play(hf.audio,.Lose)}
+	if !ranch.finished {return}
+	delete(rs.challenge_message)
+	if ranch.reward.won {
+		rs.challenge_message=fmt.aprintf("6 RANCH 7: vita piena e +%d oro!",ranch.reward.gold)
+	} else {
+		rs.challenge_message=fmt.aprintf("%s","6 RANCH 7: il cowboy vince, nessuna perdita")
 	}
-	clear_card_interaction(&rs.card_interaction)
-	clear_gameplay_command_buffer(&rs.gameplay_buffer)
-	audio.play(hf.audio, .Confirm)
-	host.push(hf, info.create(host.Minigame_Config{seed = challenge.seed, challenge = true}))
+	rs.challenge_message_ttl=5
 }
 
 roguelike_resume :: proc(data: rawptr, hf: ^host.Frame, from: string, result: Maybe(host.Result)) {
@@ -1563,51 +1661,43 @@ roguelike_resume :: proc(data: rawptr, hf: ^host.Frame, from: string, result: Ma
 	roguelike_suspend_input(rs)
 	audio.stop_music(hf.audio)
 	host.persist_profile(hf)
-    if settle_m8_host_activity(&rs.m8_session,&rs.room,from,result) {
-        delete(rs.challenge_message)
-        reward := rs.m8_session.reward
-        if reward.has_unlock {
-            title := "Titan Grip" if reward.unlocked == .Titan_Grip else "Storm Crown"
-            rs.challenge_message=fmt.aprintf("Ring vinto / carta sbloccata: %s%s",title,"" if reward.card_added else " (disponibile nelle ricompense)")
-        } else {
-            rs.challenge_message=fmt.aprintf("%s", "Ring vinto / vittoria registrata" if reward.won else "Ring concluso / nessuna penalita alla run")
-        }
-        if len(rs.m8_session.status)>0 {
-            delete(rs.challenge_message)
-            rs.challenge_message=fmt.aprintf("%s",rs.m8_session.status)
-        }
-        rs.challenge_message_ttl=5
-        return
-    }
-	if !rs.room.minigame_challenge_pending { return }
-	challenge := rs.room.minigame_challenge
-	info, found := minigame_info(challenge.minigame)
-	if !found || info.id != from { return }
-	r, has := result.?
-	if has && r.minigame != info.id { return }
-	outcome := game.Minigame_Challenge_Outcome.Abandoned
-	stars: u8
-	if has {
-		stars = r.stars
-		switch r.outcome {
-		case .Won: outcome = .Won
-		case .Lost: outcome = .Lost
-		case .Abandoned:
-		}
+	before := render.capture_room_presentation(&rs.room)
+	if !settle_m8_host_activity(&rs.m8_session,&rs.room,from,result) {return}
+	// The board shows the duel's toll: knockouts fall and drop their loot.
+	after := render.capture_room_presentation(&rs.room)
+	if rs.room.recent_events.count > 0 {
+		if render.renderer_blocks_player_input(&rs.iso_renderer) {render.clear_event_animations(&rs.iso_renderer)}
+		_ = render.begin_renderer_event_timeline(&rs.iso_renderer,before,&rs.room.recent_events,&after)
 	}
-	gold := game.settle_minigame_challenge(&rs.run_state, &rs.room, challenge, outcome, stars)
+	if rs.room.phase != .Combat {clear_card_interaction(&rs.card_interaction)}
 	delete(rs.challenge_message)
-	if gold > 0 {
-		rs.challenge_message = fmt.aprintf("Sfida vinta: +%d oro", gold)
-	} else {
-		rs.challenge_message = fmt.aprintf("Sfida %s: nessuna ricompensa", "persa" if outcome == .Lost else "abbandonata")
+	report := rs.m8_session.report
+	reward := report.reward
+	switch {
+	case len(rs.m8_session.status)>0:
+		rs.challenge_message=fmt.aprintf("%s",rs.m8_session.status)
+	case reward.has_unlock:
+		title := "Titan Grip" if reward.unlocked == .Titan_Grip else "Storm Crown"
+		rs.challenge_message=fmt.aprintf("Ring vinto / carta sbloccata: %s%s",title,"" if reward.card_added else " (disponibile nelle ricompense)")
+	case report.won:
+		rs.challenge_message=fmt.aprintf("%s","Ring vinto: sfidante sconfitto" if report.defeated == 1 else "Ring vinto: sfidanti sconfitti")
+	case report.defeated > 0:
+		rs.challenge_message=fmt.aprintf("Ring perso: -%d vita / %d al tappeto",report.player_damage,report.defeated)
+	case:
+		rs.challenge_message=fmt.aprintf("Ring perso: -%d vita",report.player_damage)
 	}
-	rs.challenge_message_ttl = 4
+	rs.challenge_message_ttl=5
 }
 
 roguelike_draw :: proc(data: rawptr, hf: ^host.Frame) {
 	rs := cast(^Roguelike_Session)data
-	defer if rs.challenge_message_ttl > 0 {
+	// MOSTRA EFFETTO: the frozen run as it was last drawn, under the window.
+	if rs.effect_window.open && rs.effect_window.backdrop_ready {
+		draw_effect_window_backdrop(&rs.effect_window, hf.canvas.width, hf.canvas.height)
+		draw_effect_window(&rs.effect_window, &rs.iso_renderer, hf.canvas.width, hf.canvas.height)
+		return
+	}
+	defer if rs.challenge_message_ttl > 0 && !rs.effect_window.open {
 		alpha := min(rs.challenge_message_ttl, 1)
 		ui.draw_text_centered(hf.theme, rs.challenge_message, {hf.canvas.width * 0.5, 88}, .Body,
 			ui.with_alpha(rl.Color{232, 196, 112, 255}, alpha))
@@ -1671,6 +1761,9 @@ roguelike_draw :: proc(data: rawptr, hf: ^host.Frame) {
 			render.update_object_target_hover(&rs.iso_renderer, &rs.room, rs.mouse_canvas, active_card_id)
 		}
 		if rs.options.tactical.enabled {
+			// FERETRO's aim shows while a click would loose an arrow.
+			rs.iso_renderer.tactical.arrow_aim = arrows_aiming(&rs.room) && !rs.m8_modal && !rs.timeline_busy &&
+				game.tactical_allows_action(&rs.room) && !game.tactical_player_busy(&rs.room)
 			render.update_tactical_view(&rs.iso_renderer, &rs.room, rs.mouse_canvas, false, true)
 			render.draw_tactical_world(&rs.iso_renderer, &rs.room, active_card_id)
 		} else {
@@ -1716,6 +1809,7 @@ roguelike_draw :: proc(data: rawptr, hf: ^host.Frame) {
 			if rs.tactical_controller.hologram { render.draw_hologram(&rs.iso_renderer, &rs.room) }
 			render.draw_tactical_hud(&rs.iso_renderer, &rs.room, !rs.options.m7_view_smoke && (rs.tactical_controller.paused || !rl.IsWindowFocused()), rs.tactical_controller.hologram)
 		}
+		if rs.options.mechanics_lab { render.draw_mechanics_lab_banner(&rs.iso_renderer, &rs.room) }
 		if rs.options.spell_lab {
 			label: cstring = "DICE PRACTICE / F5 RESTART" if rs.options.dice_lab else "SPELL PRACTICE / F5 RESTART"
 			rl.DrawText(label, 265, 106, 11, rl.Color{172, 219, 222, 255})
@@ -1725,18 +1819,28 @@ roguelike_draw :: proc(data: rawptr, hf: ^host.Frame) {
 				&rs.run_state,
 				f32(rs.window.config.canvas_width),
 				f32(rs.window.config.canvas_height),
-				rs.defeat_restart_hovered,
+				rs.defeat_hovered,
+				rs.from_launcher,
 				theme = &rs.iso_renderer,
 			)
 		}
 	}
-	if rs.m8_session.character_open { render.draw_m8_character_panel(&rs.iso_renderer, &rs.room) }
-
+	if rs.m8_session.ranch.active {
+		render.draw_western_bubble(&rs.iso_renderer, &rs.room, &rs.m8_session.ranch.state, rs.m8_session.ranch.card_from)
+	}
+	if rs.m8_session.character_open { render.draw_m8_character_panel(&rs.iso_renderer, &rs.room, rs.m8_session.sheet) }
+	// MOSTRA EFFETTO over everything (no backdrop: the run drawn as it is).
+	if rs.effect_window.open { draw_effect_window(&rs.effect_window, &rs.iso_renderer, hf.canvas.width, hf.canvas.height) }
 }
 
 roguelike_draw_window :: proc(data: rawptr, hf: ^host.Frame) {
 	rs := cast(^Roguelike_Session)data
-	if rs.m8_session.requested == .None && !rs.m8_session.ring_pending && rs.overlay != nil {
+	// MOSTRA EFFETTO: its stage on the window's own pixels; the run's dice wait.
+	if rs.effect_window.open {
+		draw_window_effect_stage(rs.window, &rs.effect_window)
+		return
+	}
+	if !rs.m8_session.ring_pending && rs.overlay != nil {
 		rs.overlay(rs.window, &rs.overlay_data)
 	}
 }
@@ -1875,6 +1979,8 @@ roguelike_after_present :: proc(data: rawptr, hf: ^host.Frame) {
 
 roguelike_destroy :: proc(data: rawptr) {
 	rs := cast(^Roguelike_Session)data
+	// MOSTRA EFFETTO's film borrows the run renderer's assets: it goes first.
+	destroy_effect_window(&rs.effect_window)
 	if rs.attached {
 		rl.EnableCursor()
 		if rs.playtest_session_ptr != nil && !rs.playtest_report_written {
@@ -1896,6 +2002,7 @@ roguelike_destroy :: proc(data: rawptr) {
 		if rs.playtest_report && !write_m7_metrics(&rs.run_state.player, rs.run_seed, rs.options.playtest_output) {
 			fmt.eprintln("failed to write M7 metrics")
 		}
+		audio.lab_bank_unload(&rs.lab_bank)
 		render.destroy_tactical_assets(&rs.iso_renderer)
 		combatdebug.destroy_playtest_session(&rs.playtest_session)
 		render.destroy_dice_renderer(&rs.dice_renderer)

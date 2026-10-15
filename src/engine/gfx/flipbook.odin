@@ -16,6 +16,8 @@ import rlgl "vendor:raylib/rlgl"
 
 // How long the paper takes to follow the print to a new drawing.
 FLIPBOOK_MORPH_SECONDS :: f64(0.09)
+// The card's paper colour (living cards draw on a whiter sheet, living.odin).
+FLIPBOOK_SHEET_COLOR :: [3]f32{0.894, 0.867, 0.788}
 
 // Samples two drawings' fields and blends them, then cuts paper, the
 // visible card edge (offset down-right) and the ink line from the result.
@@ -28,6 +30,7 @@ uniform vec4 frameB;
 uniform float morph;
 uniform vec2 cell;
 uniform vec2 edgeDir;
+uniform vec3 sheetColor;
 out vec4 finalColor;
 float field(vec4 r, vec2 uv) {
     vec2 p = r.xy + clamp(uv, vec2(0.002), vec2(0.998))*r.zw;
@@ -46,7 +49,7 @@ void main() {
     if (ink < 0.01) discard;
     vec2 px = floor(uv*cell*4.0);
     float grain = (hash(px) - 0.5)*0.026 + (hash(floor(uv*cell*0.6)) - 0.5)*0.022;
-    vec3 sheet = vec3(0.894, 0.867, 0.788) + grain;
+    vec3 sheet = sheetColor + grain;
     vec3 col = mix(vec3(0.051, 0.078, 0.118), vec3(0.643, 0.596, 0.514), body);
     col = mix(col, sheet, paper);
     finalColor = vec4(col*fragColor.rgb, ink*fragColor.a);
@@ -57,7 +60,7 @@ Flipbook_Assets :: struct {
 	// CPU copies of the fields, for picking on the paper itself.
 	fields: [Flipbook_Character][]u8,
 	paper_shader: rl.Shader,
-	frame_a_location, frame_b_location, morph_location, cell_location, edge_location: c.int,
+	frame_a_location, frame_b_location, morph_location, cell_location, edge_location, sheet_location: c.int,
 	loaded: bool,
 }
 
@@ -104,6 +107,7 @@ create_flipbook_assets :: proc(assets: ^Flipbook_Assets) {
 		assets.morph_location = rl.GetShaderLocation(assets.paper_shader, "morph")
 		assets.cell_location = rl.GetShaderLocation(assets.paper_shader, "cell")
 		assets.edge_location = rl.GetShaderLocation(assets.paper_shader, "edgeDir")
+		assets.sheet_location = rl.GetShaderLocation(assets.paper_shader, "sheetColor")
 	}
 	assets.loaded = assets.paper_shader.id != 0
 	for character in Flipbook_Character {
@@ -239,6 +243,8 @@ draw_flipbook_paper :: proc(assets: ^Flipbook_Assets, character: Flipbook_Charac
 	rl.SetShaderValue(assets.paper_shader, assets.morph_location, &morph, .FLOAT)
 	rl.SetShaderValue(assets.paper_shader, assets.cell_location, &cell, .VEC2)
 	rl.SetShaderValue(assets.paper_shader, assets.edge_location, &edge, .VEC2)
+	paper_color := FLIPBOOK_SHEET_COLOR
+	rl.SetShaderValue(assets.paper_shader, assets.sheet_location, &paper_color, .VEC3)
 	rl.BeginShaderMode(assets.paper_shader)
 	rlgl.SetTexture(assets.papers[character].id)
 	rlgl.Begin(rlgl.QUADS)

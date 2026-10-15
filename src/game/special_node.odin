@@ -155,7 +155,9 @@ build_rest_node_state :: proc(player: ^Player, node: ^Run_Node) -> (Rest_Node_St
 	return {source_node = node.id, heal_amount = heal_amount}, true
 }
 
-build_route_event_state :: proc(player: ^Player, node: ^Run_Node) -> (result: Route_Event_State, ok: bool) {
+// `excluded`: the cards the Armory leaves out (card_offer_exclusions of the
+// player's deck as the event opens).
+build_route_event_state :: proc(player: ^Player, node: ^Run_Node, excluded: Card_Offer_Exclusions = {}) -> (result: Route_Event_State, ok: bool) {
 	if player == nil || !valid_special_source_node(node, .Event) {
 		return {}, false
 	}
@@ -180,7 +182,7 @@ build_route_event_state :: proc(player: ^Player, node: ^Run_Node) -> (result: Ro
 	case .Forgotten_Armory:
 		random_state := normalized_card_reward_seed(node.room_seed~ROUTE_EVENT_CARD_SEED_SALT)
 		choice: [1]Card_Id
-		if !generate_weighted_card_choices(&random_state, node, choice[:], &player.m8_profile) {
+		if !generate_weighted_card_choices(&random_state, node, choice[:], &player.m8_profile, player.tactical.config.enabled, excluded) {
 			return {}, false
 		}
 		result.has_offered_card = true
@@ -241,7 +243,9 @@ route_event_state_is_valid :: proc(run: ^Run_State) -> bool {
 	if !found || !node.entered || node.cleared || run.route_event.source_node != node.id {
 		return false
 	}
-	expected, expected_ok := build_route_event_state(&run.player, node)
+	// The offer as the event opened: the card the Armory added since (a Canna
+	// da Pesca) was not in the deck then.
+	expected, expected_ok := build_route_event_state(&run.player, node, card_offer_exclusions(&run.player.deck, run.route_event.added_card_id))
 	if !expected_ok || run.route_event.kind != expected.kind ||
 	   run.route_event.has_offered_card != expected.has_offered_card ||
 	   run.route_event.offered_card != expected.offered_card ||

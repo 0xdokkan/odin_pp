@@ -4,14 +4,15 @@ import "core:testing"
 import grid "../grid"
 import level "../level"
 
-shatter_test_dice_for_total :: proc(t: ^testing.T, total: i32) -> Dice_State {
-	for seed in u64(1)..<u64(2000) {
+// sides 4 is the 2D4 of an unupgraded Sundering Blow.
+shatter_test_dice_for_total :: proc(t: ^testing.T, total: i32, sides: i32 = 4) -> Dice_State {
+	for seed in u64(1)..<u64(4000) {
 		original := make_dice_state(seed)
 		staged := original
-		roll, ok := roll_d6_pool(&staged, 2)
+		roll, ok := roll_dice_pool(&staged, 2, sides)
 		if ok && roll.total == total { return original }
 	}
-	testing.expect(t, false, "could not find deterministic 2d6 fixture")
+	testing.expect(t, false, "could not find deterministic 2-dice fixture")
 	return make_dice_state(1)
 }
 
@@ -43,7 +44,8 @@ test_sunder_card_is_append_only_collectible_and_previews_minimum_damage_without_
 		action, err := compile_card_action(&room, card, entity_target(enemy_entity(1)))
 		testing.expect_value(t, err, Card_Compile_Error.None)
 		testing.expect_value(t, action.effect_count, 2)
-		testing.expect_value(t, action.effects[0].amount, i32(4))
+		// The compiled minimum stays the base two: upgrades raise only the dice.
+		testing.expect_value(t, action.effects[0].amount, i32(2))
 		testing.expect_value(t, action.effects[1].kind, Effect_Kind.Move)
 		testing.expect_value(t, player, before)
 	}
@@ -53,10 +55,11 @@ test_sunder_card_is_append_only_collectible_and_previews_minimum_damage_without_
 test_sunder_two_dice_commit_total_damage_and_raw_eight_threshold_with_one_pulse :: proc(t: ^testing.T) {
 	for total in i32(7)..=i32(8) {
 		data := spell_test_level(t)
+		// Three upgrades: 2D10, and still no bonus on top of the dice.
 		player := spell_test_player(t, .Sundering_Blow, 3)
-		player.dice = shatter_test_dice_for_total(t, total)
+		player.dice = shatter_test_dice_for_total(t, total, 10)
 		expected_dice := player.dice
-		expected_roll, expected_ok := roll_d6_pool(&expected_dice, 2)
+		expected_roll, expected_ok := roll_dice_pool(&expected_dice, 2, 10)
 		testing.expect(t, expected_ok)
 		enemies := [?]Enemy_Spawn{{position = {3, 1}, health = 40, attack = 1}}
 		room, ok := create_room(&data, &player, {enemies = enemies[:]})
@@ -66,7 +69,7 @@ test_sunder_two_dice_commit_total_damage_and_raw_eight_threshold_with_one_pulse 
 		testing.expect_value(t, play.result, Card_Play_Result.Played)
 		testing.expect_value(t, player.dice, expected_dice)
 		testing.expect_value(t, player.dice.roll_count, u64(2))
-		testing.expect_value(t, room.enemies[0].health, i32(40)-total-3)
+		testing.expect_value(t, room.enemies[0].health, i32(40)-total)
 		testing.expect_value(t, room.enemies[0].position, grid.Position{4, 1} if total == 8 else grid.Position{3, 1})
 		testing.expect_value(t, spell_test_event_count(&play.action_report.events, .Moved), 1 if total == 8 else 0)
 		testing.expect_value(t, spell_test_event_count(&room.recent_events, .Dice_Rolled), 1)
@@ -159,7 +162,7 @@ test_sunder_lethal_hit_does_not_move_removed_target_and_commits_both_dice :: pro
 	data := spell_test_level(t)
 	defer level.destroy(&data)
 	player := spell_test_player(t, .Sundering_Blow)
-	player.dice = shatter_test_dice_for_total(t, 12)
+	player.dice = shatter_test_dice_for_total(t, 8)
 	enemies := [?]Enemy_Spawn{{position = {3, 1}, health = 1, attack = 1}}
 	room, ok := create_room(&data, &player, {enemies = enemies[:]})
 	testing.expect(t, ok)

@@ -34,7 +34,7 @@ test_input_snapshots_preserve_blocked_state_and_previous_capture :: proc(t: ^tes
 	controller := Tactical_Controller{was_focused = true}
 	cards := Card_Interaction_State{dragged_card_id = 32}
 	buffer: Buffered_Gameplay_Command
-	testing.expect(t, offer_gameplay_command(&buffer, {kind = .Move, origin_phase = .Combat, direction = .East}))
+	buffer.chord = {command = {kind = .Move, origin_phase = .Combat, direction = .East, beat = 1}, timer = BEAT_CHORD_SECONDS, active = true}
 	frame := Input_Diagnostic_Frame{dt = 1.0/60.0, focused = true, wasd_down = {false, true, false, false}}
 	before_player, before_qte, before_pulse := run.player, room.qte, room.tactical_pulse
 	first, first_ok := write_input_diagnostic(&run, &room, renderer, &controller, &cards, &buffer, frame, directory)
@@ -56,7 +56,7 @@ test_input_snapshots_preserve_blocked_state_and_previous_capture :: proc(t: ^tes
 	report := string(first_bytes)
 	testing.expect(t, len(report) < INPUT_DIAGNOSTIC_MAX_BYTES)
 	for expected in ([?]string{"seed=98765", "phase=Resolving", "pulse_pending=true", "qte=Defense",
-		"timeline_busy=true", "dragged=32", "object=Ice_Block", "movement_query=Actor_Blocker", "movement_query=Static_Blocker"}) {
+		"timeline_busy=true", "dragged=32", "chord_active=true", "object=Ice_Block", "movement_query=Actor_Blocker", "movement_query=Static_Blocker"}) {
 		testing.expect(t, strings.contains(report, expected), expected)
 	}
 	testing.expect(t, !strings.contains(report, "frame_dt=0.250000000"), "the second capture must not overwrite the first")
@@ -68,5 +68,5 @@ test_input_snapshots_preserve_blocked_state_and_previous_capture :: proc(t: ^tes
 	testing.expect_value(t, room.qte, before_qte)
 	testing.expect_value(t, room.tactical_pulse, before_pulse)
 	testing.expect_value(t, cards.dragged_card_id, u32(32))
-	testing.expect(t, buffer.occupied)
+	testing.expect(t, buffer.chord.active)
 }

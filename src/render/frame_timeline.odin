@@ -13,9 +13,12 @@ update_renderer_frame_timeline :: proc(renderer: ^Renderer, dt: f32) -> bool {
 	renderer.frame_had_cinematic = false
 	cast_frame := renderer.timeline.card_cast && event_timeline_is_busy(&renderer.timeline)
 	timeline := &renderer.timeline
+	// While the player is in his shadow the world's cues hold, like the world
+	// itself; the frame's real time still reaches the shadow's clock.
+	world_runs := !renderer.tactical.shadow.active
 	if !event_timeline_is_busy(timeline) {
 		renderer.frame_simulation_dt = dt
-		update_renderer_world_playback(renderer, dt*renderer_playback_speed(renderer))
+		if world_runs { update_renderer_world_playback(renderer, dt*renderer_playback_speed(renderer)) }
 		return was_busy && !renderer_timeline_is_busy(renderer)
 	}
 	// Casting has a gameplay duration: F4 cannot accelerate its paid seconds.
@@ -23,6 +26,14 @@ update_renderer_frame_timeline :: proc(renderer: ^Renderer, dt: f32) -> bool {
 	remaining := dt*speed
 	for remaining > 0 && event_timeline_is_busy(timeline) {
 		cue, _ := active_presentation_cue(timeline)
+		// What follows a blow of the player's (the status an arrow leaves, the
+		// foe it fells, the charge it spends) waits until the blow lands, as its
+		// token and the struck card do; the world runs on meanwhile.
+		if !cue.started && attack_fx_foreground_pending(renderer) {
+			renderer.frame_simulation_dt += remaining/speed
+			remaining = 0
+			break
+		}
 		cinematic := presentation_cue_is_cinematic(cue.kind)
 		renderer.frame_had_cinematic = renderer.frame_had_cinematic || cinematic
 		available := max(f32(0), cue.duration-cue.elapsed)
@@ -61,6 +72,6 @@ update_renderer_frame_timeline :: proc(renderer: ^Renderer, dt: f32) -> bool {
 		if limited { break }
 	}
 	if !event_timeline_is_busy(timeline) { renderer.frame_simulation_dt += remaining/speed }
-	if !cast_frame { update_renderer_world_playback(renderer, renderer.frame_simulation_dt*renderer_playback_speed(renderer)) }
+	if !cast_frame && world_runs { update_renderer_world_playback(renderer, renderer.frame_simulation_dt*renderer_playback_speed(renderer)) }
 	return was_busy && !renderer_timeline_is_busy(renderer)
 }

@@ -135,7 +135,7 @@ arena_smoke_encounter :: proc(window: ^app.Window, renderer: ^render.Renderer,
 		moved = m7_independent_fresh_move(&controller, &room, renderer, &cards, &buffer, direction)
 		if moved { report.combat_moves += 1; break }
 	}
-	if !m7_polish_check(moved && !buffer.occupied, "fresh movement failed while large roster animated") { return false }
+	if !m7_polish_check(moved, "fresh movement failed while large roster animated") { return false }
 	if !arena_smoke_settle(window, renderer, &room, &controller, &cards, &buffer, report) { return false }
 	// Exercise the actual mixed roster long enough for every normal cadence.
 	// Health is intentionally high: this probes flow and CPU cost, not balance.

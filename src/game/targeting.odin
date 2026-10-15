@@ -410,6 +410,8 @@ collect_targeted_enemy_ids :: proc(room: ^Room, result: ^Target_Query_Result) {
 	for index in 0..<count {
 		enemy_index, found := enemy_index_by_id(room, ids[index])
 		assert(found)
+		// A foe out of play is on none of them.
+		if enemy_is_out_of_play(room, ids[index]) { continue }
 		if target_cell_set_contains(&result.affected, room.enemies[enemy_index].position) {
 			result.enemy_ids[result.enemy_count] = ids[index]
 			result.enemy_count += 1

@@ -4,6 +4,11 @@ import grid "../grid"
 
 MAX_SPELL_TARGETS :: 3
 SPELL_BOUNCE_RANGE :: 3
+// Dice card rules. Thresholds stay fixed numbers, so a bigger die clears them
+// more often; Fate Strike bounces on its die's highest face.
+FATE_BOUNCE_DAMAGE :: i32(3)
+SUNDERING_PUSH_TOTAL :: i32(8)
+PRISMATIC_HIT_DAMAGE :: i32(3)
 
 Spell_Path :: struct {
 	targets: [MAX_SPELL_TARGETS]Entity_Ref,
@@ -13,7 +18,7 @@ Spell_Path :: struct {
 }
 
 // Both paths are certain spatial queries. Fate's second target is conditional on
-// a later committed six; querying or compiling never rolls the die.
+// a later committed top face; querying or compiling never rolls the die.
 query_spell_path :: proc(room: ^Room, instance: Card_Instance, target: Target) -> (path: Spell_Path) {
 	path.error = .Invalid_Target
 	if instance.definition_id != .Fate_Strike && instance.definition_id != .Chain_Lightning && instance.definition_id != .Storm_Crown &&
@@ -52,7 +57,8 @@ query_spell_path :: proc(room: ^Room, instance: Card_Instance, target: Target) -
 			for entity in path.targets[:path.count] {
 				visited = visited || entity.id == enemy.id
 			}
-			if visited || enemy.health <= 0 || !tactical_card_enemy_in_area(room, instance.definition_id, enemy.position) { continue }
+			if visited || enemy.health <= 0 || enemy_is_out_of_play(room, enemy.id) ||
+			   !tactical_card_enemy_in_area(room, instance.definition_id, enemy.position) { continue }
 			distance := int(abs(origin.x-enemy.position.x)+abs(origin.y-enemy.position.y))
 			if distance <= 0 || distance > SPELL_BOUNCE_RANGE ||
 			   !shape_cell_has_clear_path(room, origin, enemy.position) { continue }
@@ -102,14 +108,15 @@ resolve_sundering_blow :: proc(
 	path := query_spell_path(room, instance, target)
 	if path.error != .None || path.count != 1 { return }
 	staged_dice := room.player.dice
-	roll, rolled := roll_d6_pool(&staged_dice, 2)
+	roll, rolled := roll_card_dice(&staged_dice, instance)
 	if !rolled { return }
 	action := compiled^
-	action.effects[0].amount = roll.total+instance.upgrade_level
-	if roll.total < 8 {
+	action.effects[0].amount = roll.total
+	if roll.total < SUNDERING_PUSH_TOTAL {
 		action.effects[1] = {}
 		action.effect_count = 1
 	}
+	tactical_critical_scale(room, &action)
 	origin := room.player.position
 	hit := resolve_action(room, &action)
 	if !hit.accepted { return }
@@ -140,7 +147,7 @@ resolve_pattern_dice_spell :: proc(
 	path := query_spell_path(room, instance, target)
 	if path.error != .None || path.count != 1 { return }
 	staged_dice := room.player.dice
-	roll, rolled := roll_d6_pool(&staged_dice, card_dice_count(instance.definition_id))
+	roll, rolled := roll_card_dice(&staged_dice, instance)
 	if !rolled { return }
 	action := compiled^
 	action.effects = {}
@@ -148,25 +155,26 @@ resolve_pattern_dice_spell :: proc(
 	damage: i32
 	if barrage {
 		successes := dice_success_count(&roll)
-		failures := i32(roll.count-successes)
+		failures := roll.count-i32(successes)
 		if failures > 0 {
 			added := add_effect(&action, apply_status_effect(PLAYER_ENTITY, .Shield, failures, 2))
 			assert(added)
 		}
-		damage = i32(successes)*(3+instance.upgrade_level)
+		damage = i32(successes)*PRISMATIC_HIT_DAMAGE
 		if damage > 0 {
 			added := add_effect(&action, damage_effect(target.entity, damage))
 			assert(added)
 		}
 	} else {
-		damage = 1+max(roll.faces[0], roll.faces[1])+instance.upgrade_level
+		damage = 1+max(roll.faces[0], roll.faces[1])
 		added := add_effect(&action, damage_effect(target.entity, damage))
 		assert(added)
 		if dice_has_pair(&roll) {
-			added = add_effect(&action, apply_status_effect(target.entity, .Poison, 2, 2))
+			added = add_effect(&action, apply_status_effect(target.entity, .Poison, 2, 0))
 			assert(added)
 		}
 	}
+	tactical_critical_scale(room, &action)
 	origin := room.player.position
 	hit := resolve_action(room, &action)
 	if !hit.accepted { return }
@@ -177,6 +185,24 @@ resolve_pattern_dice_spell :: proc(
 		record_report_event(&report, spell_card_event(.Spell_Launched, instance, origin, path.positions[0], target.entity))
 		record_report_event(&report, spell_card_event(.Spell_Impact, instance, origin, path.positions[0], target.entity, damage))
 	}
+	merge_spell_hit_report(&report, &hit)
+	return
+}
+
+// A pool or a fire is thrown to its cell (Spell_Launched) and lands there
+// (Spell_Impact): the board shows the ground from the landing on, and then
+// whoever a closed area poisons.
+resolve_ground_card :: proc(room: ^Room, instance: Card_Instance, target: Target, compiled: ^Action) -> (report: Action_Report) {
+	if compiled == nil || !card_places_ground(instance.definition_id) || compiled.kind != .Card ||
+	   compiled.source != PLAYER_ENTITY || compiled.target != target || target.kind != .Cell || compiled.effect_count != 1 ||
+	   compiled.effects[0].kind != .Place_Ground || compiled.effects[0].destination != target.cell { return }
+	action := compiled^
+	tactical_critical_scale(room, &action)
+	origin := room.player.position
+	hit := resolve_action(room, &action)
+	if !hit.accepted { return }
+	record_report_event(&report, spell_card_event(.Spell_Launched, instance, origin, target.cell))
+	record_report_event(&report, spell_card_event(.Spell_Impact, instance, origin, target.cell, amount = action.effects[0].amount))
 	merge_spell_hit_report(&report, &hit)
 	return
 }
@@ -204,8 +230,15 @@ resolve_played_card_action :: proc(
 	if card_is_board_device(instance.definition_id) {
 		return resolve_board_device_card(room, instance, target, compiled)
 	}
+	if card_places_ground(instance.definition_id) {
+		return resolve_ground_card(room, instance, target, compiled)
+	}
 	if instance.definition_id == .Sundering_Blow {
 		return resolve_sundering_blow(room, instance, target, compiled)
+	}
+	// Lama Velenosa rolls the bumps it loads; the Dado del Destino keeps its die.
+	if instance.definition_id == .Venom_Blade || instance.definition_id == .Fate_Dice {
+		return resolve_loading_card(room, instance, target, compiled)
 	}
 	if instance.definition_id == .Prismatic_Barrage || instance.definition_id == .Twin_Venom {
 		return resolve_pattern_dice_spell(room, instance, target, compiled)
@@ -213,6 +246,7 @@ resolve_played_card_action :: proc(
 	if instance.definition_id == .Firebomb {
 		action := compiled^
 		action.visual_group = 1
+		tactical_critical_scale(room, &action)
 		origin := room.player.position
 		definition, _ := card_definition_by_id(instance.definition_id, tactical_enabled(room))
 		query := evaluate_card_targeting(room, instance, card_target_request_at(definition, target.cell))
@@ -229,7 +263,9 @@ resolve_played_card_action :: proc(
 		return
 	}
 	if instance.definition_id != .Fate_Strike && instance.definition_id != .Chain_Lightning && instance.definition_id != .Storm_Crown {
-		return resolve_action(room, compiled)
+		action := compiled^
+		tactical_critical_scale(room, &action)
+		return resolve_action(room, &action)
 	}
 	path := query_spell_path(room, instance, target)
 	if path.error != .None || path.count == 0 { return }
@@ -237,9 +273,10 @@ resolve_played_card_action :: proc(
 	roll: Dice_Roll
 	if instance.definition_id == .Fate_Strike {
 		rolled: bool
-		roll, rolled = roll_d6_pool(&staged_dice, 1)
+		roll, rolled = roll_card_dice(&staged_dice, instance)
 		if !rolled { return }
-		if roll.total != 6 { path.count = 1 }
+		// Only the die's highest face carries fate to a second enemy.
+		if roll.total != roll.sides { path.count = 1 }
 	}
 	origin := room.player.position
 	for index in 0..<path.count {
@@ -250,12 +287,12 @@ resolve_played_card_action :: proc(
 		}
 		damage := i32(3)+instance.upgrade_level
 		if instance.definition_id == .Storm_Crown { damage = 5+instance.upgrade_level }
-		if instance.definition_id == .Fate_Strike && index == 0 {
-			damage = 2+instance.upgrade_level+roll.total
-		}
+		// Fate's upgrades raise only its die.
+		if instance.definition_id == .Fate_Strike { damage = 2+roll.total if index == 0 else FATE_BOUNCE_DAMAGE }
 		action := make_action(.Card, PLAYER_ENTITY, entity_target(path.targets[index]), .Opponent)
 		added := add_effect(&action, damage_effect(path.targets[index], damage))
 		assert(added)
+		tactical_critical_scale(room, &action)
 		hit := resolve_action(room, &action)
 		if !hit.accepted {
 			report.skipped_effects += path.count-index

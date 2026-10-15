@@ -19,6 +19,9 @@ prepare_m7_view_room :: proc(data: ^level.Level, run: ^game.Run_State, room: ^ga
 	if err != .None { return false }
 	player := run.player
 	game.finish_deck_combat(&player.deck)
+	// A probe of the bare timing rules, like the other M7 probes: costs are
+	// paid at once and every window is whole.
+	if !game.configure_tactical(&player, game.DEFAULT_TACTICAL_CONFIG) { return false }
 	enemies := [?]game.Enemy_Spawn{
 		{position = {5, 4}, health = 12, attack = 2},
 		{position = {7, 3}, health = 10, attack = 2, archetype = .Archer},

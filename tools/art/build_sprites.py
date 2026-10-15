@@ -176,6 +176,7 @@ def build_character(name, spec, px, opts):
         mode, frames = entry[0], entry[1]
         hit = entry[2] if len(entry) > 2 else -1
         row = []
+        scraps = []
         for f in frames:
             if isinstance(f[0], str):
                 key, pose, dur = f
@@ -184,8 +185,11 @@ def build_character(name, spec, px, opts):
                 pose, dur = f
             rig, (ax, ay) = rigs[key]
             origin = (feet[0] - ax, feet[1] - ay)
-            out = pr.outline(pr.clean_frame(rig.render(pose, size, origin)))
+            # Mend before the ink line, which would join a scrap lying a pixel away.
+            out = pr.outline(pr.mend(pr.clean_frame(rig.render(pose, size, origin)), log=scraps))
             row.append((pr.to_rgba(rig.palette, out), dur))
+        if scraps:
+            print("MENDED", name, action, scraps)
         rendered.append((action, mode, hit, row))
     union = np.zeros(size, bool)
     for _, _, _, row in rendered:
@@ -349,4 +353,6 @@ def main():
     print("DONE")
 
 
-main()
+# build_living.py imports the helpers above without rebuilding the classic set.
+if __name__ == "__main__":
+    main()

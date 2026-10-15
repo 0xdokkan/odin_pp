@@ -141,6 +141,24 @@ query_entity_movement :: proc(
 	if !found {
 		return
 	}
+	return query_movement_from(room, mover, origin, destination, mode)
+}
+
+// The same rules from an explicit origin: the shadow of Movimento Ombra walks
+// away from the body that stays at player.position (tactical_shadow.odin).
+query_movement_from :: proc(
+	room: ^Room,
+	mover: Entity_Ref,
+	origin, destination: grid.Position,
+	mode: Movement_Mode = .Traverse,
+) -> (query: Movement_Query) {
+	query.error = .Invalid_Room
+	query.mode = mode
+	query.mover = mover
+	query.destination = destination
+	if room == nil || room.player == nil || room.level_data == nil {
+		return
+	}
 	query.origin = origin
 	query.error = .Same_Position
 	if origin == destination {
@@ -256,10 +274,10 @@ apply_movement_effect :: proc(
 			target = effect.target,
 			from_position = from_position,
 			to_position = to_position,
+			area_mask = EVENT_TELEPORT_BIT if effect.movement_mode == .Teleport else 0,
 		})
 		movement_recorded := report.events.count > movement_event_index
-		trigger_shock_floors_on_entry(room, effect.target, &report.events)
-		trigger_cell_hazard(room, effect.target, report)
+		trigger_cell_entry(room, effect.target, report)
 		if effect.target.kind == .Object {
 			ignite_barrel_near_fire(room, effect.target.id, &report.events)
 		}
@@ -271,4 +289,16 @@ apply_movement_effect :: proc(
 		}
 		from_position = to_position
 	}
+	// LAZZO: whatever moves the player (a dodge, a push, a teleport) lets the
+	// rope go (lasso.odin).
+	if effect.target == PLAYER_ENTITY { release_lasso(room, report) }
+}
+
+// What a cell does to whoever enters it: a shock floor's trap, a hazard's
+// bite, a pool's Veleno or a fire's Bruciatura. Every cell a movement enters,
+// and the Lazzo's foe falling where it was held (lasso.odin).
+trigger_cell_entry :: proc(room: ^Room, target: Entity_Ref, report: ^Action_Report) {
+	trigger_shock_floors_on_entry(room, target, &report.events)
+	trigger_cell_hazard(room, target, report)
+	trigger_ground_on_entry(room, target, report)
 }

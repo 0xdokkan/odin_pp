@@ -25,11 +25,14 @@ test_new_tactical_run_and_restart_keep_expanded_rooms_and_starter_dice :: proc(t
 		testing.expect_value(t, len(room.enemies), 4)
 		testing.expect_value(t, run.player.tactical.config.vision_size, 7)
 		testing.expect_value(t, run.player.tactical.dodge_recovery, 0)
-		count := 0
+		count, shadows := 0, 0
 		for card in run.player.deck.owned[:run.player.deck.owned_count] {
 			if card.definition_id == .Fate_Strike { count += 1 }
+			if card.definition_id == .Shadow_Step { shadows += 1 }
 		}
 		testing.expect_value(t, count, 1)
+		// One Movimento Ombra in every tactical run, a restart included.
+		testing.expect_value(t, shadows, 1)
 		for definition in ([?]game.Card_Id{.Heavy_Blow, .Battle_Focus, .Dash}) {
 			found := false
 			for card in run.player.deck.owned[:run.player.deck.owned_count] { found = found || card.definition_id == definition }

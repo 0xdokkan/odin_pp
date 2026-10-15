@@ -6,7 +6,6 @@ import rl "vendor:raylib"
 import game "../game"
 import fight "../fight"
 import level "../level"
-import view "../view"
 
 @(test)
 test_ring_grab_has_four_distinct_held_poses_and_safe_endpoints :: proc(t: ^testing.T) {
@@ -30,7 +29,7 @@ test_ring_grab_has_four_distinct_held_poses_and_safe_endpoints :: proc(t: ^testi
 test_m8_device_descriptions_keep_d4_targets_separate_from_damage :: proc(t: ^testing.T) {
     for tactical in ([2]bool{false,true}) {
         first,second := gothic_card_lines({definition_id=.Shock_Floor,upgrade_level=0},tactical)
-        testing.expect_value(t,string(first),"D4 SCARICHE / D4 BERSAGLI")
+        testing.expect_value(t,string(first),"1d4 SCARICHE / 1d4 BERSAGLI")
         testing.expect_value(t,string(second),"1 DANNO / TRAPPOLA 3X3")
         first,second=gothic_card_lines({definition_id=.Tesla_Coil},tactical)
         testing.expect_value(t,string(first),"8 / DISTANZA DANNI")
@@ -101,7 +100,7 @@ test_m8_pointer_controls_match_drawn_buttons_and_respect_action_gates :: proc(t:
     renderer.tactical.enabled=true
     player := game.Player{}
     room := game.Room{player=&player,phase=.Loot}
-    for control in ([2]M8_Control{.Character,.Ring}) {
+    for control in ([1]M8_Control{.Character}) {
         b := m8_control_bounds(renderer,control,&room)
         testing.expect_value(t,m8_control_at_point(renderer,&room,{b.x+b.width/2,b.y+b.height/2}),control)
     }
@@ -110,9 +109,6 @@ test_m8_pointer_controls_match_drawn_buttons_and_respect_action_gates :: proc(t:
     testing.expect_value(t,m8_control_at_point(renderer,&room,{point[0],point[1]}),M8_Control.None)
     player.equipment.reserve={.Iron_Cleaver,4}
     testing.expect_value(t,m8_control_at_point(renderer,&room,{point[0],point[1]}),M8_Control.Equip)
-    ring := m8_control_bounds(renderer,.Ring,&room)
-    room.ring_challenge_attempted=true
-    testing.expect_value(t,m8_control_at_point(renderer,&room,{ring.x+3,ring.y+3}),M8_Control.None)
     room.phase=.Combat
     append(&room.objects,game.Grid_Object{kind=.Shock_Floor,device_charges=3})
     defer delete(room.objects)
@@ -250,38 +246,19 @@ test_m8_footer_controls_fit_and_do_not_overlap_between_phases :: proc(t: ^testin
         renderer.canvas_width,renderer.canvas_height=width,540
         for phase in ([2]game.Room_Phase{.Combat,.Loot}) {
             room.phase=phase
-            controls := [5]M8_Control{.Activate,.Equip,.Character,.Ring,.FPS}
+            controls := [3]M8_Control{.Activate,.Equip,.Character}
             for control,i in controls {
-                if phase == .Combat && i>=3 {continue}
                 a := m8_control_bounds(renderer,control,&room)
                 testing.expect(t,a.x>=0 && a.y>=0 && a.x+a.width<=width && a.y+a.height<=540)
                 for other,j in controls {
-                    if j<=i || (phase == .Combat && j>=3) {continue}
+                    if j<=i {continue}
                     b := m8_control_bounds(renderer,other,&room)
                     testing.expect(t,!rl.CheckCollisionRecs(a,b))
                 }
                 if phase == .Combat {
                     for card in 0..<8 {testing.expect(t,!rl.CheckCollisionRecs(a,tactical_hand_card_bounds(renderer,card,8)))}
-                } else {testing.expect(t,!rl.CheckCollisionRecs(a,m8_extra_challenge_bounds(width,540)))}
+                }
             }
         }
     }
-}
-
-@(test)
-test_extra_challenge_offer_blocks_board_only_while_visible :: proc(t: ^testing.T) {
-    renderer:=new(Renderer)
-    defer free(renderer)
-    renderer.canvas_width,renderer.canvas_height=960,540
-    player: game.Player
-    room:=game.Room{player=&player,phase=.Loot}
-    bounds:=m8_extra_challenge_bounds(960,540)
-    point:=view.Vec2{bounds.x+bounds.width/2,bounds.y+bounds.height/2}
-    testing.expect(t,m8_hud_contains_point(renderer,&room,point))
-    testing.expect_value(t,m8_control_at_point(renderer,&room,point),M8_Control.None)
-    room.minigame_challenge_attempted=true
-    testing.expect(t,!m8_hud_contains_point(renderer,&room,point))
-    room.minigame_challenge_attempted=false
-    room.phase=.Combat
-    testing.expect(t,!m8_hud_contains_point(renderer,&room,point))
 }

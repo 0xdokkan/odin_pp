@@ -1,7 +1,7 @@
 package render
 
-import "core:c"
 import "core:fmt"
+import "core:math"
 import rl "vendor:raylib"
 import game "../game"
 
@@ -28,11 +28,47 @@ tactical_status_label :: proc(kind: game.Status_Kind, short: bool) -> (label: st
 	case .Poison: label, accent = "VELENO", HUD_VENOM
 	case .Shield: label = "SCUDO"
 	case .Thorns: label, accent = "SPINE", HUD_VENOM
-	case .Afterimage: label, accent = "OMBRA", HUD_SHADE
+	case .Afterimage: label, accent = "SCIA", HUD_SHADE
 	case .Stagger: label, accent = "STORDITO", GOTHIC_RED
 	case .Survey: label = "VISTA"
+	case .Burn: label, accent = "BRUCIATURA", HUD_EMBER
+	case .Slow: label, accent = "RALLENTAMENTO", HUD_FROST
+	// The player's charges (game/player_charges.odin).
+	case .Deflect: label, accent = "RIFLESSO", HUD_FROST
+	case .Arrows: label, accent = "FRECCE", HUD_AMBER
+	case .Fate: label, accent = "DESTINO", HUD_SHADE
+	case .Venom_Blade: label, accent = "LAMA", HUD_VENOM
 	}
 	if short && len(label) > 3 { label = label[:3] }
+	return
+}
+
+// A stack status shows its stacks; the others their potency and seconds.
+// DESTINO also names the die its loaded bumps roll (`die`, its sides: DESTINO
+// 3 d8), when it is given one.
+tactical_status_chip_text :: proc(status: game.Status, short: bool, die := i32(0)) -> cstring {
+	label, _ := tactical_status_label(status.kind, short)
+	if status.kind == .Fate && die > 0 { return fmt.ctprintf("%s %d %s", label, status.potency, die_label(die)) }
+	if game.status_kind_stacks(status.kind) { return fmt.ctprintf("%s %d", label, status.potency) }
+	return fmt.ctprintf("%s %d / %ds", label, status.potency, status.remaining_pulses)
+}
+
+// The order of the HUD's status chips (the first three show, the rest are a
+// count): what bites the player first (VELENO, BRUCIATURA), so that it never
+// hides behind the count, then his charges (what his cards loaded him with:
+// RIFLESSO, FRECCE, DESTINO, LAMA), then the rest, each group as it was gained.
+tactical_status_chip_order :: proc(statuses: ^game.Status_Set) -> (ordered: game.Status_Set) {
+	group :: proc(kind: game.Status_Kind) -> int {
+		if kind == .Poison || kind == .Burn { return 0 }
+		return 1 if game.status_kind_is_player_charge(kind) else 2
+	}
+	for rank in 0..<3 {
+		for status in statuses.items[:clamp(statuses.count, 0, len(statuses.items))] {
+			if group(status.kind) != rank { continue }
+			ordered.items[ordered.count] = status
+			ordered.count += 1
+		}
+	}
 	return
 }
 
@@ -49,104 +85,247 @@ draw_tactical_status :: proc(renderer: ^Renderer, room: ^game.Room) {
 	row := b.y+b.height-22
 	gothic_inlay(b.x+16, row+8, 4, HUD_AMBER)
 	gothic_text_fit(renderer, fmt.ctprintf("%d", v.gold), {b.x+24, row, 42, 17}, 12, HUD_AMBER)
-	count := v.statuses.count
-	if count == 0 { return }
-	left := b.x+72
-	room_width := b.x+b.width-8-left
-	shown := min(count, 3)
-	chip := min(f32(96), (room_width-f32(shown-1)*4-(26 if count > shown else 0))/f32(shown))
-	for status, index in v.statuses.items[:shown] {
-		label, accent := tactical_status_label(status.kind, chip < 80)
-		hud_chip(renderer, {left+f32(index)*(chip+4), row-1, chip, 18}, fmt.ctprintf("%s %d / %ds", label, status.potency, status.remaining_pulses), accent)
+	chips := tactical_status_chip_layout(renderer, room)
+	for index in 0..<chips.shown {
+		hud_chip(renderer, chips.bounds[index], chips.texts[index], chips.accents[index])
 	}
-	if count > shown {
-		gothic_text_fit(renderer, fmt.ctprintf("+%d", count-shown), {left+f32(shown)*(chip+4), row, 24, 17}, 12, GOTHIC_MUTED)
+	if chips.more > 0 {
+		gothic_text_fit(renderer, fmt.ctprintf("+%d", chips.more), chips.counter, 12, GOTHIC_MUTED)
 	}
 }
 
+// The status chips under VITA (draw_tactical_status): the first three of
+// tactical_status_chip_order, their words short when the chips are narrow,
+// and a count of the rest.
+Tactical_Status_Chips :: struct {
+	bounds: [3]rl.Rectangle,
+	texts: [3]cstring,
+	accents: [3]rl.Color,
+	shown, more: int,
+	counter: rl.Rectangle,
+}
+
+// The text room of a chip: its width less this (hud_chip).
+HUD_CHIP_TEXT_MARGIN :: f32(9)
+
+// The chips share their room evenly, as wide as one another up to 96, while
+// every text holds so; when one would not (DESTINO 3 d20 beside two more and
+// a count), each is as wide as its own text asks and the rest of the room is
+// shared out, if that holds them all. While the Pinball's ball rolls its chip
+// (PINBALL 14s x5: pinball.odin) comes right after the bites.
+tactical_status_chip_layout :: proc(renderer: ^Renderer, room: ^game.Room) -> (chips: Tactical_Status_Chips) {
+	v := renderer_status_view(renderer, room)
+	b := tactical_hud_layout(renderer).vitals
+	ordered := tactical_status_chip_order(&v.statuses)
+	_, ball := pinball_chip(room, false)
+	count := ordered.count+(1 if ball else 0)
+	if count == 0 { return }
+	// The ball's place among the chips: after VELENO and BRUCIATURA.
+	bites := 0
+	for status in ordered.items[:ordered.count] { if status.kind == .Poison || status.kind == .Burn { bites += 1 } }
+	left := b.x+72
+	row := b.y+b.height-22
+	room_width := b.x+b.width-8-left
+	chips.shown = min(count, 3)
+	chips.more = count-chips.shown
+	available := room_width-f32(chips.shown-1)*4-(26 if chips.more > 0 else 0)
+	chip := min(f32(96), available/f32(chips.shown))
+	short := chip < 80
+	widths: [3]f32
+	needed: f32
+	even := true
+	for index in 0..<chips.shown {
+		if ball && index == bites {
+			chips.accents[index] = PINBALL_STEEL_LIGHT
+			chips.texts[index], _ = pinball_chip(room, short)
+		} else {
+			status := ordered.items[index-1 if ball && index > bites else index]
+			_, chips.accents[index] = tactical_status_label(status.kind, short)
+			chips.texts[index] = tactical_status_chip_text(status, short, v.fate_sides)
+		}
+		widths[index] = math.ceil(gothic_text_width(renderer, chips.texts[index], 12))+HUD_CHIP_TEXT_MARGIN
+		needed += widths[index]
+		if widths[index] > chip { even = false }
+	}
+	spare := (available-needed)/f32(chips.shown)
+	x := left
+	for index in 0..<chips.shown {
+		width := chip if even || spare < 0 else f32(int(widths[index]+spare))
+		chips.bounds[index] = {x, row-1, width, 18}
+		x += width+4
+	}
+	chips.counter = {x, row, 24, 17}
+	return
+}
+
 draw_tactical_hud :: proc(renderer: ^Renderer, room: ^game.Room, paused, hologram: bool) {
+	// FIRST PERSON SHOOTER: the AK, the crosshair and the countdown under the
+	// plates (first_person.odin).
+	draw_first_person_overlay(renderer, room)
 	s := &room.player.tactical
+	fps := game.tactical_first_person_active(room)
 	combat := renderer.tactical.snapshot.phase == .Combat
 	busy := renderer_blocks_player_input(renderer)
 	recovering := game.tactical_is_recovering(room)
+	stunned := game.tactical_is_stunned(room)
+	shadow := game.tactical_shadow_active(room)
+	// LAZZO: the foe swung round the player once the throw is over (lasso.odin).
+	lasso := game.tactical_lasso_active(room) && !game.tactical_is_casting(room)
 	cinematic := presentation_time_policy(&renderer.timeline) == .Cinematic
 	layout := tactical_hud_layout(renderer)
 	bounds := layout.pulse
 	x, y, width := bounds.x, bounds.y, bounds.width
 	label: cstring = "AGISCI"
 	switch s.phase {
-	case .Decision:
+	case .Decision, .Shadow:
 	case .Recovery: label = "RECUPERO"
 	case .Resolving: label = "AZIONE"
+	case .Stunned: label = "STORDITO"
 	}
-	if !combat { label = "ESPLORA" }
+	// MOVIMENTO OMBRA: the window waits, frozen, while the shadow walks. The
+	// room cleared: exploring it, or fishing it (fishing.odin).
+	if !combat { label = "PESCA" if fishing_in_progress(renderer) else "ESPLORA" }
+	else if shadow { label = "OMBRA" }
 	else if room.qte.kind != .None { label = "DIFESA" }
 	else if recovering { label = "RECUPERO" }
+	else if stunned { label = "STORDITO" }
 	else if cinematic { label = "DADI" }
 	else if game.tactical_is_casting(room) { label = "LANCIO" }
-	else if busy { label = "AZIONE" }
+	else if lasso { label = "LAZZO" }
+	else if busy || game.tactical_player_busy(room) { label = "AZIONE" }
 	// The pulse continues during casting; cinematic dice and QTE own a full pause.
 	timed := combat
 	accent := GOTHIC_RED if timed && s.remaining <= 5 else GOTHIC_BLUE
 	if recovering { accent = HUD_AMBER }
+	if stunned { accent = GOTHIC_RED }
+	if shadow { accent = HUD_SHADE }
+	if lasso && combat && room.qte.kind == .None && !recovering && !stunned { accent = HUD_AMBER }
 	hud_frame(bounds, accent)
 	gothic_text_fit(renderer, label, {x+12, y+5, 150, 24}, 18, GOTHIC_PAPER)
-	gothic_text_fit(renderer, fmt.ctprintf("PULSE %d", min(s.cycle, max(int)-1)+1), {x+12, y+26, 90, 14}, 10, GOTHIC_MUTED)
+	sub := fmt.ctprintf("PULSE %d", min(s.cycle, max(int)-1)+1)
+	// The window's own seconds wait, shown still, while the shadow's run.
+	if shadow { sub = fmt.ctprintf("FERMO %.1fs", s.remaining) }
+	// The turn the rope is in.
+	if lasso { sub = fmt.ctprintf("GIRO %d", room.lasso.turns+1) }
+	gothic_text_fit(renderer, sub, {x+12, y+26, 90, 14}, 10, GOTHIC_MUTED)
 	if timed {
-		timer := fmt.ctprintf("%.1fs", s.remaining)
+		timer := fmt.ctprintf("%.1fs", s.shadow_remaining if shadow else s.remaining)
 		timer_width := gothic_text_width(renderer, timer, 24)
-		gothic_text(renderer, timer, x+width-12-timer_width, y+3, 24, accent)
+		// The tick: a lamp fills toward each whole second and flares gold in
+		// the window where moves, bumps and cards turn critical. In the shadow,
+		// the shadow's own beats (a two-key step on one goes diagonally); after
+		// its last one the lamp rests.
+		approach, on_beat := game.tactical_beat_glow(room)
+		if shadow && !on_beat && game.tactical_shadow_elapsed(s) >= f32(game.TACTICAL_SHADOW_BEATS) { approach = 0 }
+		lamp := rl.Vector2{x+width-24-timer_width, y+15}
+		gothic_text(renderer, timer, x+width-12-timer_width, y+3, 24, TACTICAL_FEEDBACK_CRITICAL if on_beat else accent)
+		rl.DrawCircleV(lamp, 6, HUD_TROUGH)
+		rl.DrawCircleSector(lamp, 5, -90, -90+360*approach, 16, color_with_opacity(TACTICAL_FEEDBACK_CRITICAL, 0.55))
+		if on_beat {
+			rl.DrawCircleV(lamp, 5, TACTICAL_FEEDBACK_CRITICAL)
+			rl.DrawRing(lamp, 7, 9, 0, 360, 20, color_with_opacity(TACTICAL_FEEDBACK_CRITICAL, 0.7))
+		}
+		rl.DrawCircleLinesV(lamp, 6, HUD_EDGE)
 	}
 	budget := max(f32(1), f32(s.budget))
 	if recovering { budget = game.TACTICAL_RECOVERY_SECONDS }
+	if stunned { budget = max(f32(1), s.stun_duration) }
 	meter := rl.Rectangle{x+104, y+29, width-116, 7}
-	if timed { hud_bar(meter, s.remaining/budget, accent, int(min(budget, 30))) }
+	if shadow { hud_bar(meter, s.shadow_remaining/max(s.shadow_duration, 0.001), HUD_SHADE, int(s.shadow_duration+0.5)) }
+	else if timed { hud_bar(meter, s.remaining/budget, accent, int(min(budget, 30))) }
 	else { hud_bar(meter, 1, GOTHIC_BLUE if !combat else GOTHIC_STEEL) }
+	// A timed action: a thin gold line drains as it plays out; a shadow's
+	// step, a violet one.
+	if game.tactical_shadow_step_busy(room) {
+		left := clamp(s.shadow_step_remaining/game.TACTICAL_SHADOW_STEP_SECONDS, 0, 1)
+		rl.DrawRectangleRec({meter.x, meter.y+meter.height+2, meter.width*left, 2}, SHADOW_RIM)
+	} else if game.tactical_player_busy(room) && s.action_duration > 0 && s.action_remaining > 0 {
+		left := clamp(s.action_remaining/s.action_duration, 0, 1)
+		rl.DrawRectangleRec({meter.x, meter.y+meter.height+2, meter.width*left, 2}, TACTICAL_FEEDBACK_CRITICAL)
+	}
 	// One context line, only when it says something the plate does not.
 	status: cstring
 	if busy { status = "I NEMICI CONTINUANO" }
+	if game.tactical_player_busy(room) { status = fmt.ctprintf("AZIONE %.1fs / I NEMICI CONTINUANO", s.action_remaining) }
 	if game.tactical_is_casting(room) { status = fmt.ctprintf("LANCIO %.1fs / NEMICI SOSPESI", s.cast_remaining) }
 	if cinematic { status = "TEMPO SOSPESO" }
 	if recovering { status = "MUOVITI / CARTE IN RECUPERO" }
+	if stunned { status = "SOLO CARTE" }
+	// Behind the player's eyes, how the AK and the steps are worked.
+	if fps && !cinematic { status = FIRST_PERSON_HUD_STATUS }
+	// The rope holds through a window's end and a stun: the pivot stays put.
+	if lasso && !cinematic { status = lasso_hud_status(room) }
+	if shadow { status = "MONDO FERMO / SOLO PASSI / DIAGONALE SUL BATTITO" }
 	if room.qte.kind != .None { status = "PULSE SOSPESO" }
-	if !combat { status = "RACCOGLI IL BOTTINO / RAGGIUNGI L'USCITA" }
+	if !combat { status = fishing_hud_status(renderer, room) }
 	if hologram && combat && room.qte.kind == .None { status = "MAPPA APERTA / IL TEMPO SCORRE" }
-	v := renderer_status_view(renderer, room)
-	objective: cstring = fmt.ctprintf("NEMICI %d", v.enemy_count) if combat else "STANZA LIBERATA"
+	objective := tactical_hud_objective(renderer, room)
 	objective_width := gothic_text_width(renderer, objective, 10)
 	gothic_text(renderer, objective, x+width-12-objective_width, y+bounds.height-17, 10, GOTHIC_BLUE if !combat else GOTHIC_MUTED)
 	if status != nil {
-		gothic_text_fit(renderer, status, {x+12, y+bounds.height-18, width-36-objective_width, 14}, 10, accent if hologram || recovering else GOTHIC_MUTED)
+		gothic_text_fit(renderer, status, {x+12, y+bounds.height-18, tactical_hud_status_room(renderer, objective), 14}, 10,
+			accent if hologram || recovering else GOTHIC_MUTED)
 	}
-	// COMANDI: a 2x2 grid under the right column.
-	hud_frame(layout.commands, GOTHIC_STEEL)
-	hud_button(renderer, layout.map_button, "TAB", "CHIUDI" if hologram else "MAPPA", room.qte.kind == .None)
-	if !hologram && combat {
-		hud_button(renderer, layout.refocus, "F", fmt.ctprintf("REFOCUS -%.0fs", game.TACTICAL_REFOCUS_SECONDS), refocus_button_is_enabled(renderer))
-		draw_tactical_dodge_chip(renderer, room, layout.dodge)
+	// COMANDI: a 2x2 grid under the right column. MOSTRA EFFETTO's board is a
+	// film: it has no commands to give.
+	if !renderer.tactical.showcase {
+		hud_frame(layout.commands, GOTHIC_STEEL)
+		// No map behind the player's eyes.
+		hud_button(renderer, layout.map_button, "TAB", "CHIUDI" if hologram else "MAPPA", room.qte.kind == .None && !fps)
+		if !hologram && combat {
+			hud_button(renderer, layout.refocus, "F", fmt.ctprintf("REFOCUS -%.0fs", game.TACTICAL_REFOCUS_SECONDS), refocus_button_is_enabled(renderer))
+			draw_tactical_dodge_chip(renderer, room, layout.dodge)
+		}
+		if !hologram && m8_control_visible(room, .Character) {
+			hud_button(renderer, layout.character, nil, "PERSONAGGIO", m8_control_enabled(renderer, room, .Character), GOTHIC_PAPER)
+		}
 	}
-	if !hologram && m8_control_visible(room, .Character) {
-		hud_button(renderer, layout.character, nil, "PERSONAGGIO", m8_control_enabled(renderer, room, .Character), GOTHIC_PAPER)
-	}
-	if !hologram { draw_m8_active_bar(renderer, room) }
+	if !hologram && !fps { draw_m8_active_bar(renderer, room) }
 	if room.qte.kind != .None { draw_tactical_defense_hud(renderer, room) }
-	if paused {
-		rl.DrawRectangle(0, 0, c.int(renderer.canvas_width), c.int(renderer.canvas_height), {3, 7, 12, 185})
-		px, py := renderer.canvas_width*0.5-120, renderer.canvas_height*0.5-43
-		hud_frame({px, py, 240, 86}, GOTHIC_BLUE)
-		gothic_text(renderer, "PAUSA", px+78, py+12, 32, GOTHIC_PAPER)
-		gothic_text(renderer, "P PER RIPRENDERE", px+48, py+56, 16, GOTHIC_MUTED)
+	if paused { draw_pause_menu(renderer, renderer.tactical.pause_hovered, renderer.tactical.pause_menu) }
+}
+
+// The plate's objective, at the right of its foot: the room's foes, or with
+// the shrinking window this window's length (between two windows, the one
+// coming's) and the cards counted toward the next won second, with any already
+// won. In the shadow, while the Lazzo spins and behind the player's eyes no
+// card can be played: the short one keeps the line's room for their rule.
+tactical_hud_objective :: proc(renderer: ^Renderer, room: ^game.Room) -> cstring {
+	s := &room.player.tactical
+	v := renderer_status_view(renderer, room)
+	if renderer.tactical.snapshot.phase != .Combat { return "STANZA LIBERATA" }
+	lasso := game.tactical_lasso_active(room) && !game.tactical_is_casting(room)
+	if !game.tactical_enabled(room) || !s.config.shrinking_window || game.tactical_shadow_active(room) || lasso ||
+	   game.tactical_first_person_active(room) {
+		return tactical_hud_foes_objective(v.enemy_count)
 	}
+	window := s.next_budget if (game.tactical_is_recovering(room) || game.tactical_is_stunned(room)) && s.next_budget > 0 else s.budget
+	won := fmt.ctprintf(" +%ds", s.won_seconds) if s.won_seconds > 0 else ""
+	return fmt.ctprintf("MAX %ds / CARTE %d/%d%s / NEMICI %d", window, s.cards_toward_second,
+		game.TACTICAL_CARDS_PER_SECOND, won, v.enemy_count)
+}
+
+tactical_hud_foes_objective :: proc(foes: int) -> cstring {
+	return fmt.ctprintf("NEMICI %d", foes)
+}
+
+// The room the plate's context line has beside its `objective`.
+tactical_hud_status_room :: proc(renderer: ^Renderer, objective: cstring) -> f32 {
+	return tactical_hud_layout(renderer).pulse.width-36-gothic_text_width(renderer, objective, 10)
 }
 
 // The dash is a key, not a button: a keycap, its cost and a recharge meter.
 draw_tactical_dodge_chip :: proc(renderer: ^Renderer, room: ^game.Room, bounds: rl.Rectangle) {
 	s := &room.player.tactical
 	recovering := game.tactical_is_recovering(room)
-	ready := game.tactical_dodge_ready(room) && !recovering
+	stunned := game.tactical_is_stunned(room)
+	shadow := game.tactical_shadow_active(room)
+	ready := game.tactical_dodge_ready(room) && !recovering && !stunned && !shadow
 	recovery := max(0, s.dodge_recovery-(1 if room.tactical_pulse.pending else 0))
 	detail := fmt.ctprintf("-%.0fs", game.TACTICAL_DODGE_SECONDS) if ready else fmt.ctprintf("PRONTA FRA %d", recovery)
 	if recovering { detail = "IN RECUPERO" }
+	if stunned { detail = "STORDITO" }
+	if shadow { detail = "OMBRA" }
 	rl.DrawRectangleRec(bounds, {12, 18, 27, 200})
 	rl.DrawRectangleLinesEx(bounds, 1, {28, 38, 52, 255})
 	cap_bounds := rl.Rectangle{bounds.x+4, bounds.y+4, 40, bounds.height-8}
@@ -167,7 +346,7 @@ draw_tactical_defense_hud :: proc(renderer: ^Renderer, room: ^game.Room) {
 		line := y+50
 		if .Block in q.defenses { hud_button(renderer, {x+12, line, 213, 24}, "J", "BLOCK   K: PARRY", true, GOTHIC_RED); line += 29 }
 		if .Deflect in q.defenses { hud_button(renderer, {x+12, line, 213, 24}, "L", "DEVIAZIONE", true, GOTHIC_RED); line += 29 }
-		if .Dodge in q.defenses { hud_button(renderer, {x+12, line, 213, 24}, "I", "SCHIVA, POI WASD", true, GOTHIC_RED) }
+		if .Dodge in q.defenses { hud_button(renderer, {x+12, line, 213, 24}, "E", "SCHIVA, POI WASD", true, GOTHIC_RED) }
 	} else if q.kind == .Defense && q.mode == .Dodge {
 		gothic_text(renderer, "WASD: SCEGLI LA CELLA", x+12, y+66, 16, GOTHIC_PAPER)
 	} else {

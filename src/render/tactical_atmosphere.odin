@@ -12,6 +12,13 @@ tactical_room_is_clear :: proc(phase: game.Room_Phase) -> bool {
 	return phase == .Loot || phase == .Complete
 }
 
+// A cleared room's exit is open: its portal and its USCITA show. The
+// mechanics sandbox cleared for the rod (F7) keeps it shut, as
+// try_move_player does.
+tactical_exit_is_open :: proc(room: ^game.Room, phase: game.Room_Phase) -> bool {
+	return room != nil && tactical_room_is_clear(phase) && !room.endless
+}
+
 // Presentation owns this fade: killing the final enemy must still play its hit
 // before revealing the room. Combat always resets it, including a reused Room.
 update_tactical_atmosphere :: proc(renderer: ^Renderer, dt: f32) {
@@ -62,12 +69,15 @@ draw_tactical_clear_markers :: proc(renderer: ^Renderer, room: ^game.Room) {
 	if !tactical_room_is_clear(v.snapshot.phase) { return }
 	alpha := 0.4+v.clear_light*0.6
 	color := color_with_opacity(rl.Color{124, 199, 215, 255}, alpha)
-	exit := room.exit_position
-	p := rl.Vector3{f32(exit.x)+0.5, 0.06, f32(exit.y)+0.5}
-	rl.DrawCubeWires(p, 0.91, 0.02, 0.91, color)
-	// Low, open portal rails keep the actor and walkable tile unobscured.
-	for sign in ([2]f32{-1, 1}) {
-		rl.DrawCube(p+rl.Vector3{sign*0.34, 0.42, 0.16}, 0.035, 0.8, 0.04, color)
+	// The mechanics sandbox cleared for the rod keeps its exit shut: no portal.
+	if tactical_exit_is_open(room, v.snapshot.phase) {
+		exit := room.exit_position
+		p := rl.Vector3{f32(exit.x)+0.5, 0.06, f32(exit.y)+0.5}
+		rl.DrawCubeWires(p, 0.91, 0.02, 0.91, color)
+		// Low, open portal rails keep the actor and walkable tile unobscured.
+		for sign in ([2]f32{-1, 1}) {
+			rl.DrawCube(p+rl.Vector3{sign*0.34, 0.42, 0.16}, 0.035, 0.8, 0.04, color)
+		}
 	}
 	for item in v.snapshot.loot[:v.snapshot.loot_count] {
 		if !item.visible { continue }

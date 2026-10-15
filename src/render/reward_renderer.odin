@@ -153,6 +153,10 @@ draw_reward_screen :: proc(
 			can_add,
 		 theme = theme)
 	}
+	// MOSTRA EFFETTO under each card: the card as it is offered.
+	for index in 0..<len(choices) {
+		draw_effect_entry_button(theme, reward_effect_bounds(canvas_width, canvas_height, index, len(choices)))
+	}
 
 	skip_bounds := reward_skip_bounds(canvas_width, canvas_height)
 	skip_fill := rl.Color{31, 36, 39, 255}

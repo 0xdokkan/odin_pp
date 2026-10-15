@@ -26,7 +26,10 @@ Come funziona:
 3. Ogni fotogramma è una posa chiave scritta a mano, renderizzata con 8x8
    sottocampioni per pixel su una tela 4x e ridotta a voto di maggioranza: compaiono
    solo i colori originali, quindi resta pixel art pulita. Il contorno viene rifatto
-   a ogni posa.
+   a ogni posa, dopo aver cancellato i frammenti che la posa stacca dal corpo (un
+   angolo di veste o una scheggia di pastorale rimasti su un osso fermo): è `mend`
+   di `pixel_rig.py`, lo stesso dei cartoncini vivi, e il log della build elenca
+   ciò che cancella (`MENDED`).
 4. La carta non è un ritaglio fisso: ogni disegno ha il suo campo di distanza esatto
    dalla sagoma e lo shader della carta (`src/engine/gfx/flipbook.odin`) taglia il
    cartoncino poco oltre la figura. Quando la stampa cambia disegno, la carta passa
@@ -72,6 +75,68 @@ Per aggiungere un'azione: aggiungila ad `ACTION_ORDER` in `build_sprites.py`,
 scrivi le pose in `characters.py`, rigenera e collega la cue in
 `flipbook_cue_action` (`src/render/flipbook_actor.odin`).
 
+## Cartoncini vivi
+
+```bash
+blender -b --factory-startup --python tools/art/build_living.py
+```
+
+I personaggi del tavolo 3D: stesse figure e stessi rig dei cartoncini classici
+(che restano ai minigiochi), ma la figura è un disegno animato su un cartoncino
+fermo. Scrive:
+
+- `assets/gothic/flipbook/living/<nome>.png`: i disegni, 16 per riga, una clip dopo l'altra;
+- `assets/gothic/flipbook/living/<nome>-paper.png`: il campo del cartoncino, uno solo per personaggio;
+- `src/engine/gfx/living_data.odin`: le tabelle delle clip (file generato, non modificarlo).
+
+Cosa cambia rispetto al flipbook classico:
+
+1. **Il cartoncino non si muove e non cambia forma.** È l'unione (anche
+   specchiata) delle sagome a riposo, allargata di 1/0,89 attorno ai piedi: la
+   figura è stampata all'89% e ha un po' di spazio per muoversi. Ciò che esce dalla carta
+   viene tagliato dal bordo, come un disegno che esce dal foglio. Linea
+   d'inchiostro e taglio hanno lo spessore dei cartoncini classici.
+2. **Le clip sono chiavi nel tempo**, scritte in `living_actions.py` (ms, con
+   easing), non disegni singoli. Il generatore le campiona a 12 disegni al
+   secondo, a 24 negli intervalli `ones` (i momenti più rapidi), e unisce i
+   disegni uguali in una pausa più lunga. Il canale `root` sposta, ruota e
+   schiaccia la figura intera dentro la carta.
+3. **Principi dell'animazione a mano**: anticipo prima di ogni sforzo,
+   schiacciamento e allungamento in base alla velocità, archi, pause sui disegni
+   più forti, follow-through con molle sulle parti morbide (mantelli, orli,
+   lanterne). Linea viva: a ogni disegno qualche pixel d'inchiostro del bordo
+   cambia. Segni a matita piccoli (polvere, urto, velocità) e la traccia leggera
+   del disegno precedente quando la figura scatta. I frammenti che una posa
+   stacca dal corpo (un angolo di veste su un osso rimasto fermo, la punta di
+   un bastone tagliata dal bordo) vengono cancellati (`mend`); il log della
+   build elenca, azione per azione, le dimensioni di ciò che ha cancellato.
+4. **Il cartoncino scivola rigido, spinto dal personaggio.** Ogni clip di
+   movimento dice quando e come la carta passa alla casella successiva
+   (`travel`: `shove`, `run`, `stomp`, `hop`, `glide`, `dash`, `float`). Il
+   runtime (`src/render/living_card.odin`) usa le stesse curve.
+
+Ogni personaggio si muove a modo suo: il Viandante dà una spallata (o un calcio,
+o un balzo) alla sua carta; il ghoul corre a quattro zampe; il balestriere scatta
+basso; il bruto pesta due volte; il bombarolo saltella; il custode levita e
+spinge la carta con il pastorale; l'arcimago fluttua.
+
+| Azione | Quando |
+|---|---|
+| `idle`, `windup`, `stunned`, `channel` | loop sotto le altre; `channel` è il Viandante durante un cast |
+| `move_side`, `move_up`, `move_down` | cue `Move`, secondo la direzione sullo schermo |
+| `dodge` | scatto di due celle del giocatore |
+| `attack`, `cast` | come nei cartoncini classici |
+| `hurt`, `hurt_back` | colpo dal lato verso cui guarda, o da dietro; `hurt_back` anche quando viene spinto (la carta scivola via) |
+| `block`, `interact`, `death` | come nei cartoncini classici |
+
+Anteprime (un PNG animato per azione e fogli di contatto) senza toccare assets/ e src/:
+
+```bash
+blender -b --factory-startup --python tools/art/build_living.py -- --preview C:/tmp/vivi --no-write
+# solo alcuni personaggi (non riscrive le tabelle)
+blender -b --factory-startup --python tools/art/build_living.py -- --only ghoul,brute --preview C:/tmp/vivi --no-write
+```
+
 ## Mura gotiche
 
 ```bash
@@ -112,3 +177,75 @@ cappuccio usano la suddivisione; l'esportazione è nello stesso formato ODM del
 kit (`assets/models/pilgrim.odm`). La scheda lo mette su un piedistallo in una
 piccola cappella costruita con i pezzi del kit, illuminato dalla sua lanterna.
 `--blend FILE` salva anche la scena .blend per ritoccarla a mano.
+
+## Icone delle carte fatte a mano
+
+```bash
+python tools/art/build_card_icons.py
+```
+
+Aggiunge ad `assets/gothic/card-icons-pixel.png` una quinta, una sesta e una settima riga di
+celle in pixel art disegnate nello script (una griglia di 28x28 lettere di palette
+per icona; oggi la cella 16, Movimento Ombra, la 17, Pozza di Veleno: una fiala
+rovesciata nella sua pozza, la 18, Incendio: un fuoco su una croce bruciata, una
+fiamma in fondo a ogni braccio, la 19, Deflect: uno scudo tondo d'acciaio da cui un
+dardo rimbalza via in una scintilla, la 20, Feretro: una bara di legno scuro con la
+croce d'oro e tre frecce che spuntano dalla testa, la 21, Dado del Destino: un d20
+d'osso con il 20 sulla faccia illuminata in un anello viola, la 22, Lama Velenosa:
+un pugnale dall'elsa d'oro con il filo verde che gocciola veleno, la 23, Lazzo:
+un cappio di canapa intrecciata, aperto, con la corda che scende dal nodo a un
+rotolo e a un capo sfilacciato, e la 24, la prima della settima riga, Canna da Pesca:
+una canna di legno con l'impugnatura di sughero e il mulinello d'acciaio, la lenza
+che scende dalla punta a un galleggiante rosso e bianco su uno stagno blu) e lascia
+identiche, byte per byte, le 16 icone dipinte. Ogni riga aggiunta tiene il passo
+della quinta (314 pixel), così le icone di una riga non si spostano quando se ne
+aggiunge un'altra.
+Usa solo la libreria standard di Python (va bene anche quello di Blender) e non passa
+mai l'atlante da Blender né da altre librerie d'immagine. `--check` dice se l'atlante
+è aggiornato; `--preview C:/tmp/icone --no-write` scrive le celle aggiunte senza
+toccarlo. I dettagli sono in `assets/gothic/generation-prompts.md`.
+
+## Armi e colpi di carta
+
+```bash
+python tools/art/build_attack_props.py
+```
+
+Le armi che i cartoncini vivi menano sul tavolo e quello che lanciano
+(`src/render/attack_fx.odin`): la lanterna di ferro del Viandante, le due armi
+M8 (Mannaia di ferro e Picca della tempesta), gli artigli del ghoul, la mannaia
+del bruto, il pastorale del custode, il bastone dell'arcimago, il dardo della
+balestra, la bomba, la brace in due disegni che si alternano, e i pezzi di un
+impatto: la scia di carta di un fendente, la stella del colpo (stampata in
+bianco e colorata dal colpo: rossa, blu se lo scudo para, oro se critico), i
+graffi del ghoul e i pezzetti di carta che volano dalle caselle vuote. Per il
+pavimento (`src/render/ground_fx.odin`): le fiamme dei fuochi di Incendio (due
+disegni grandi per il centro, due più piccoli per i bracci, che si alternano),
+la fiala di Pozza di Veleno in volo, le gocce del suo schizzo e le faville di
+una fiamma calpestata. Per la Canna da Pesca (`src/render/fishing.odin`): la
+canna lunga e sottile con le sue guide, il mulinello e l'impugnatura di
+sughero, il galleggiante rosso e bianco, le gocce d'acqua, il `!`
+dell'abboccata e le prede: un pesce, una mela, una pagnotta, una fetta di
+formaggio, una coscia di carne e il dorso di una carta, bordato d'oro. Per il
+Lazzo (`src/render/lasso.odin`): due sbuffi di polvere di pietra grigia, più
+chiari dove li prende la luce, che si alzano dal muro a ogni schianto. I pezzi
+nuovi si aggiungono in fondo: quelli che ci sono restano dove sono, pixel per
+pixel.
+
+Ogni pezzo è pixel art scritta nello script come righe di lettere di palette,
+nei colori delle figure; lo script aggiunge il contorno d'inchiostro (ogni pixel
+vuoto che tocca la figura, anche in diagonale) e chiude i buchi di un pixel o
+due. La carta è il campo di distanza esatto dalla stampa, tagliato dallo stesso
+shader dei cartoncini (`FLIPBOOK_PAPER_FRAGMENT`) sul loro foglio più bianco: il
+campo è salvato stirato, così i 5,5 px di carta dello shader diventano una carta
+più sottile, larga quanto dice ogni pezzo. Scrive, con lo stesso impaccamento:
+
+- `assets/gothic/attack-props.png`: le stampe (mai filtrate);
+- `assets/gothic/attack-props-paper.png`: i loro campi, un canale;
+- `src/engine/gfx/attack_props_data.odin`: la tabella (file generato, non modificarlo).
+
+Usa solo la libreria standard di Python (va bene anche quello di Blender); lo
+stesso script dà gli stessi byte. `--check` dice se i tre file sono aggiornati;
+`--preview C:/tmp/armi --no-write` scrive, senza toccarli, ogni pezzo sulla sua
+carta ingrandito e una prova di volo e di fendente che imita lo shader, con il
+taglio sempre in basso a destra come lo tiene il gioco.

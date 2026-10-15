@@ -54,6 +54,10 @@ State :: struct {
 	hit_flash_ticks: int,
 	last_hit_blocked: bool,
 	landed_hits, blocked_hits: [2]int,
+	// Tag match (tag.odin): the roster, who is in the ring, and the tag in progress.
+	roster: [MAX_RING_ROSTER]Roster_Entry,
+	roster_count, active, tag_target: int,
+	tag_cooldown, tag_flash_ticks, tags: int,
 }
 
 BODY_RADIUS :: f32(0.36)
@@ -103,9 +107,9 @@ set_move :: proc(state: ^State, action: Action, move: Move_Def) -> bool {
 is_move :: proc(action: Action) -> bool { return action == .Jab || action == .Heavy || action == .Dodge || action == .Grab }
 
 begin :: proc(practice := false, dummy := false) -> State {
-	state := State{moves = default_moves(), practice = practice, dummy = dummy, ai_wait = 50}
-	state.fighters[0] = {position = {-1.3, 0, 0}, previous = {-1.3, 0, 0}, facing = {1, 0, 0}, health = 8, max_health = 8}
-	state.fighters[1] = {position = {1.3, 0, 0}, previous = {1.3, 0, 0}, facing = {-1, 0, 0}, health = 12, max_health = 12}
+	state := State{moves = default_moves(), practice = practice, dummy = dummy, ai_wait = 50, active = -1, tag_target = -1}
+	state.fighters[0] = {position = {-1.3, 0, 0}, previous = {-1.3, 0, 0}, facing = {1, 0, 0}, health = RING_PLAYER_HEALTH, max_health = RING_PLAYER_HEALTH}
+	state.fighters[1] = {position = {1.3, 0, 0}, previous = {1.3, 0, 0}, facing = {-1, 0, 0}, health = RING_CHAMPION_HEALTH, max_health = RING_CHAMPION_HEALTH}
 	init_world(&state)
 	return state
 }
@@ -205,7 +209,7 @@ check_result :: proc(state: ^State) {
 		return
 	}
 	if state.fighters[0].health <= 0 { state.result = .Lost }
-	else if state.fighters[1].health <= 0 { state.result = .Won }
+	else if state.fighters[1].health <= 0 && !roster_replace_knockout(state) { state.result = .Won }
 }
 
 impact :: proc(state: ^State, attacker_index: int, move: Move_Def, blocked: bool) {
@@ -357,6 +361,11 @@ enemy_input :: proc(state: ^State) -> Input {
 	player := state.fighters[0]
 	distance := distance_squared(player.position, enemy.position)
 	if state.ai_wait > 0 { state.ai_wait -= 1 }
+	// Running for a tag: head for the ally's post and ignore the player.
+	if state.tag_target >= 0 && state.tag_target < state.roster_count {
+		post := tag_post(state.roster[state.tag_target].corner)
+		return {move = {post.x-enemy.position.x, 0, post.z-enemy.position.z}}
+	}
 	if distance > 1.08*1.08 {
 		return {move = {player.position.x-enemy.position.x, 0, player.position.z-enemy.position.z}}
 	}
@@ -382,6 +391,7 @@ tick :: proc(state: ^State, input: Input) {
 	}
 	state.combat_ticks += 1
 	if state.throw_active { tick_throw(state); return }
+	tick_tag(state)
 	ai := enemy_input(state)
 	tick_fighter(state, 0, input)
 	tick_fighter(state, 1, ai)

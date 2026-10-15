@@ -54,7 +54,7 @@ capture_m7_menu :: proc(window: ^app.Window, renderer: ^render.Renderer, run: ^g
 			case .Reward: render.draw_reward_screen(run, w, h, 0, theme = renderer)
 			case .Shop: render.draw_shop_screen(run, w, h, {selected_card_id = run.player.deck.owned[0].id}, theme = renderer)
 			case .Rest, .Event, .Treasure: render.draw_special_node_screen(run, w, h, {selected_card_id = run.player.deck.owned[0].id}, theme = renderer)
-			case .Defeat: render.draw_defeat_overlay(run, w, h, true, theme = renderer)
+			case .Defeat: render.draw_defeat_overlay(run, w, h, .Restart, true, theme = renderer)
 			case .In_Room, .Choose_Path, .Victory: render.draw_run_map(run, w, h, theme = renderer)
 			}
 		}

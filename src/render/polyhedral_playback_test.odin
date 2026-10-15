@@ -90,3 +90,43 @@ test_polyhedral_playback_is_stateless_deterministic_and_does_not_change_numberin
 	}
 	testing.expect_value(t,throw^,original_throw^)
 }
+
+// The cube throw lets a D10, D12 or D20 rest partly inside a neighbour; the
+// cosmetic rest offsets part every pool and leave clear pools untouched.
+@(test)
+test_polyhedral_pools_never_rest_inside_each_other :: proc(t: ^testing.T) {
+	throw := new(Dice_Throw)
+	defer free(throw)
+	die := build_polyhedral_die(.D6)
+	// A corner (0.5, 0.5, 0.5) sinks 0.1 into a cube moved by (0.3, 0.2, 0.1).
+	testing.expect(t, polyhedral_overlap(&die, {}, 1, {0.3, 0.2, 0.1}, 1) > 0.09)
+	testing.expect_value(t, polyhedral_overlap(&die, {}, 1, {2, 0, 0}, 1), f32(0))
+	parted := 0
+	for kind in ([6]Polyhedral_Die_Kind{.D4, .D6, .D8, .D10, .D12, .D20}) {
+		die = build_polyhedral_die(kind)
+		for seed in u64(1)..=32 {
+			build_dice_throw(throw, 3, seed*0x9E3779B97F4A7C15, 9)
+			results := [3]i32{die.faces[seed%u64(die.face_count)].value, die.faces[(seed*7)%u64(die.face_count)].value, die.faces[0].value}
+			offsets := polyhedral_rest_offsets(&die, throw, results, 3)
+			poses: [3]rl.Vector3
+			rotations: [3]rl.Quaternion
+			for index in 0..<3 {
+				poses[index], rotations[index] = polyhedral_dice_pose(&die, throw, index, 1, results[index])
+				testing.expect(t, abs(offsets[index].y) < 0.00001 && rl.Vector3Length(offsets[index]) < 0.35)
+				if offsets[index] != {} { parted += 1 }
+				poses[index] += offsets[index]
+			}
+			for a in 0..<3 {
+				for b in a+1..<3 {
+					testing.expectf(t, polyhedral_overlap(&die, poses[a], rotations[a], poses[b], rotations[b]) <= POLYHEDRAL_REST_CLEARANCE,
+						"%v seed %v: dice %v and %v rest inside each other", kind, seed, a, b)
+				}
+			}
+		}
+	}
+	testing.expect(t, parted > 0, "the fixture must exercise at least one parted pool")
+	// The settle eases in: in flight the pose is the throw's own.
+	testing.expect_value(t, polyhedral_rest_settle(DICE_THIRD_IMPACT_PROGRESS), f32(0))
+	testing.expect_value(t, polyhedral_rest_settle(DICE_PHYSICS_REVEAL_PROGRESS), f32(1))
+	testing.expect_value(t, polyhedral_rest_offsets(&die, throw, {1, 2, 3}, 1), [3]rl.Vector3{})
+}

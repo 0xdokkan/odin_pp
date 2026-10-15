@@ -149,7 +149,7 @@ draw_spell_cue :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) {
 	}
 	opacity := clamp((1-p)*2, f32(0), f32(1))
 	if id == .Prismatic_Barrage {
-		hits := clamp(cue.event.amount/max(i32(1), 3+cue.event.card_upgrade_level), i32(1), i32(3))
+		hits := clamp(cue.event.amount/game.PRISMATIC_HIT_DAMAGE, i32(1), i32(3))
 		for index in 0..<int(hits)*4 {
 			angle := f32(index)*2*math.PI/f32(hits*4)
 			ray_color := color_with_opacity(prismatic_ray_color(index%int(hits)), opacity)
@@ -242,18 +242,12 @@ draw_spell_path_preview :: proc(renderer: ^Renderer, room: ^game.Room, card_id: 
 			continue // A single primary target; conditional effects are described below.
 		}
 		label := fmt.ctprintf("%d", hit+1)
-		if conditional { label = "6 ONLY" }
+		if conditional { label = fmt.ctprintf("SOLO %d", game.card_die_sides(card.definition_id, card.upgrade_level)) }
 		label_x := c.int(center.x)+13
 		label_y := c.int(center.y)+7
 		rl.DrawRectangle(label_x-3, label_y-2, rl.MeasureText(label, 11)+6, 15, {12, 19, 26, 240})
 		rl.DrawText(label, label_x, label_y, 11, color)
 		previous = center
-	}
-	if card.definition_id == .Fate_Strike {
-		rl.DrawText("D6: 1-6 EQUALLY LIKELY / BOUNCE ON 6 (1/6)", 265, 121, 10, spell_color(.Fate_Strike))
-	}
-	if card.definition_id == .Sundering_Blow {
-		rl.DrawText("2D6: 2-12 / 8+: PUSH 1 (15/36) / RANGE 1-2", 265, 121, 10, spell_color(.Sundering_Blow))
 	}
 	lines, count := dice_spell_preview_lines(card)
 	for line, line_index in lines[:count] {
@@ -261,17 +255,32 @@ draw_spell_path_preview :: proc(renderer: ^Renderer, room: ^game.Room, card_id: 
 	}
 }
 
-// Only the card definition and upgrade influence preview text, never a dice stream.
+// Only the card definition and upgrade influence preview text, never a dice
+// stream. The odds follow the die of the card's level.
 dice_spell_preview_lines :: proc(card: game.Card_Instance) -> (lines: [3]cstring, count: int) {
-	if card.definition_id == .Prismatic_Barrage {
-		return {"3D6: EACH 4+ HITS (50%) / RANGE 1-3 / LOS",
-			fmt.ctprintf("HIT: %d DAMAGE / OTHER DIE: SHIELD 1 FOR 2 PULSES", 3+card.upgrade_level),
-			"SHIELD FIRST / ONE COMBINED HIT / ZERO HITS: SHIELD 3"}, 3
-	}
-	if card.definition_id == .Twin_Venom {
-		return {fmt.ctprintf("2D6: HIGHER DIE +%d DAMAGE / RANGE 1-3 / LOS", 1+card.upgrade_level),
-			"ANY PAIR (1/6): POISON 2 FOR 2 PULSES",
-			"POISON ONLY IF THE TARGET SURVIVES THE HIT"}, 3
+	sides := game.card_die_sides(card.definition_id, card.upgrade_level)
+	if sides == 0 { return }
+	dice := card_dice_label(card)
+	#partial switch card.definition_id {
+	case .Fate_Strike:
+		return {fmt.ctprintf("%s: 1-%d ALLA PARI / RIMBALZO SU %d (1/%d)", dice, sides, sides, sides), "", ""}, 1
+	case .Sundering_Blow:
+		// Pairs of faces that reach the push, out of every pair.
+		pushes := 0
+		for a in 1..=int(sides) {
+			for b in 1..=int(sides) { if i32(a+b) >= game.SUNDERING_PUSH_TOTAL { pushes += 1 } }
+		}
+		return {fmt.ctprintf("%s: 2-%d / %d+: SPINTA 1 (%d/%d) / RAGGIO 1-2", dice, sides*2, game.SUNDERING_PUSH_TOTAL,
+			pushes, sides*sides), "", ""}, 1
+	case .Prismatic_Barrage:
+		hits := sides-game.DICE_SUCCESS_THRESHOLD+1
+		return {fmt.ctprintf("%s: OGNI %d+ COLPISCE (%d%%) / RAGGIO 1-3 / VISTA", dice, game.DICE_SUCCESS_THRESHOLD, hits*100/sides),
+			fmt.ctprintf("COLPO: %d DANNI / ALTRO DADO: SCUDO 1 PER 2 PULSE", game.PRISMATIC_HIT_DAMAGE),
+			"SCUDO PRIMA / UN SOLO COLPO / ZERO COLPI: SCUDO 3"}, 3
+	case .Twin_Venom:
+		return {fmt.ctprintf("%s: DADO MAGGIORE +1 DANNI / RAGGIO 1-3 / VISTA", dice),
+			fmt.ctprintf("COPPIA (1/%d): 2 VELENO", sides),
+			"VELENO SOLO SE IL BERSAGLIO SOPRAVVIVE"}, 3
 	}
 	return
 }

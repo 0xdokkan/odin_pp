@@ -37,7 +37,8 @@ tactical_dodge_destination :: proc(room: ^Room, direction: Move_Direction) -> (d
 }
 
 try_dodge_player :: proc(room: ^Room, direction: Move_Direction) -> bool {
-	if !tactical_dodge_ready(room) || !tactical_allows_action(room) { return false }
+	// A dodge may cut the player's own timed action short.
+	if !tactical_dodge_ready(room) || !tactical_allows_action(room, true) { return false }
 	destination, clear := tactical_dodge_destination(room, direction)
 	if !clear { return false }
 	action := make_action(.Move, PLAYER_ENTITY, cell_target(destination), .Walkable_Cell)

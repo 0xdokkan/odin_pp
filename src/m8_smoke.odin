@@ -3,6 +3,7 @@ package main
 import "core:fmt"
 import rl "vendor:raylib"
 import app "app"
+import fight "fight"
 import game "game"
 import grid "grid"
 import level "level"
@@ -133,6 +134,10 @@ run_m8_view_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer, dice:
 	                         room.objects[floor_index].device_charges != floor_charges-1)) {
 		fmt.eprintln("M8 passive trap did not trigger on the world beat"); return false
 	}
+	// The square around enemies offers the floor's ring (the devices capture
+	// shows its button). This floor's ring is spent: the square discharges.
+	if _, ring_ready := game.query_tesla_ring(&room); !ring_ready { fmt.eprintln("M8 square did not offer the ring"); return false }
+	player.floor_secrets += {.Tesla_Ring}
 	before_health := player.health
 	active_button := render.m8_control_bounds(renderer, .Activate, &room)
 	active_command, active_clicked := m8_pointer_gameplay_command(&room, renderer,
@@ -164,15 +169,17 @@ run_m8_view_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer, dice:
 	render.clear_event_animations(renderer)
 	for _ in 0..<90 { m8_smoke_frame(window, renderer, dice, &room, &controller, &cards, &buffer) }
 	rl.TakeScreenshot("odin_pp_m8_loot.png")
-	ring, entered := game.begin_ring_challenge(&room)
-	if !entered { return false }
-	// Exercise actual controls against the deterministic opponent, including all
-	// four grab poses. The arena remains untouched while this modal runs.
+	// A tag match as the run hands it to the ring: one opponent fights, the
+	// other waits on the apron and steps in after the knockout. The arena
+	// remains untouched while this modal runs.
 	room_clock, room_pulse := player.tactical.remaining, room.pulse_count
+	link := Ring_Run_Link{entered = {count = 2, player_health = fight.RING_PLAYER_HEALTH, player_max = fight.RING_PLAYER_HEALTH}}
+	link.entered.entries[0] = {kind = int(game.Enemy_Archetype.Brute), enemy_id = 1, health = 3, max_health = fight.ring_opponent_health(2)}
+	link.entered.entries[1] = {kind = int(game.Enemy_Archetype.Chaser), enemy_id = 2, health = 3, max_health = fight.ring_opponent_health(2)}
     duel := Ring_Minigame{}
-    ring_minigame_reset(&duel,{})
+    ring_minigame_reset(&duel,{payload = &link})
     defer destroy_m9_session(&duel.session)
-    for tick in 0..<1800 {
+    for tick in 0..<3600 {
         if duel.session.ring.result != .Active {break}
         ring_minigame_advance(&duel,1.0/60.0,true,ring_minigame_bot(&duel.session.ring))
         if tick%6==0 {
@@ -180,11 +187,12 @@ run_m8_view_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer, dice:
             v:=m9_view(&duel.session); v.hosted=true; v.alpha=1
             render.draw_m9_fight(renderer,&duel.session.ring,v)
             app.present(window,render.LETTERBOX_COLOR)
+            if tick == 90 {rl.TakeScreenshot("odin_pp_m8_tag_ring.png")}
         }
     }
-    ring.phase=.Won if duel.session.ring.result==.Won else .Lost
-    if ring.phase != .Won || !game.settle_ring_challenge(&room,&ring).has_unlock || player.tactical.remaining != room_clock || room.pulse_count != room_pulse {
-        fmt.eprintln("M8 canonical ring return failed"); return false
+    if duel.session.ring.result != .Won || duel.session.ring.tags < 1 || !link.reported || !link.final.entries[0].ko ||
+       player.tactical.remaining != room_clock || room.pulse_count != room_pulse {
+        fmt.eprintln("M8 tag ring did not run to a win"); return false
     }
 	for _ in 0..<30 {
 		if room.phase == .Complete { break }

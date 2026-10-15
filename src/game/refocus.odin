@@ -14,7 +14,7 @@ Refocus_Result :: enum {
 Refocus_Report :: struct {
 	result:        Refocus_Result,
 	hand_report:   Deck_Refocus_Report,
-	drawn_cards:   [MAX_HAND_CARDS]Card_Instance,
+	drawn_cards:   [MAX_HAND_CAPACITY]Card_Instance,
 	drawn_count:   int,
 	energy_before: i32,
 	energy_after:  i32,
@@ -58,7 +58,8 @@ refocus_player_hand :: proc(room: ^Room) -> (refocus: Refocus_Report) {
 	if room == nil || room.player == nil {
 		return
 	}
-	if room.phase != .Combat || !tactical_allows_action(room) {
+	// Behind his eyes his hand is put away (first_person.odin).
+	if room.phase != .Combat || !tactical_allows_action(room) || tactical_first_person_active(room) {
 		refocus.result = .Invalid_Phase
 		return
 	}

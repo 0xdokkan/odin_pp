@@ -193,6 +193,9 @@ room_blueprint_content :: proc(blueprint: ^Room_Blueprint) -> Room_Content {
 		traps = blueprint.traps[:],
 		obstacles = blueprint.obstacles[:],
 		objects = blueprint.objects[:],
+		node_kind = blueprint.node_kind,
+		node_depth = blueprint.node_depth,
+		room_seed = blueprint.seed,
 	}
 }
 

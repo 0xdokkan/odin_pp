@@ -6,19 +6,15 @@ import game "../game"
 // Le cifre della preview provengono dagli stessi template del resolver.
 card_upgrade_preview :: proc(card: game.Card_Instance, tactical: bool = false) -> cstring {
 	if !game.card_can_upgrade(card) {
-		if card.upgrade_level >= game.MAX_CARD_UPGRADE_LEVEL {
+		if card.upgrade_level >= game.card_max_upgrade_level(card.definition_id) {
 			return "MAX UPGRADE"
 		}
 		return "NO UPGRADE AVAILABLE"
 	}
-	if card.definition_id == .Sundering_Blow {
-		return fmt.ctprintf("2D6 BONUS +%d -> +%d / PUSH ON 8+", card.upgrade_level, card.upgrade_level+1)
-	}
-	if card.definition_id == .Prismatic_Barrage {
-		return fmt.ctprintf("DAMAGE PER 4+: %d -> %d / SHIELD 1 PER OTHER DIE, %s", 3+card.upgrade_level, 4+card.upgrade_level, "2s" if tactical else "2 PULSES")
-	}
-	if card.definition_id == .Twin_Venom {
-		return fmt.ctprintf("HIGHER D6 BONUS +%d -> +%d / PAIR: POISON 2, %s IF ALIVE", 1+card.upgrade_level, 2+card.upgrade_level, "2s" if tactical else "2 PULSES")
+	// A dice card's upgrade changes only its die.
+	if game.card_dice_count(card.definition_id) > 0 {
+		return fmt.ctprintf("%s -> %s", die_label(game.card_die_sides(card.definition_id, card.upgrade_level)),
+			die_label(game.card_die_sides(card.definition_id, card.upgrade_level+1)))
 	}
 	definition, _ := game.card_definition_by_id(card.definition_id, tactical)
 	line := ""
@@ -36,9 +32,19 @@ card_upgrade_preview :: proc(card: game.Card_Instance, tactical: bool = false) -
 		case .Draw_Cards: label = "DRAW"
 		case .Discard_Cards: label = "DISCARD"
 		case .Create_Card: label = "CREATE"
-		case .Apply_Status: label = game.status_kind_name(template.status)
+		// FERETRO's arrows say so in Italian.
+		case .Apply_Status: label = "FRECCE" if template.status == .Arrows else game.status_kind_name(template.status)
 		case .Add_Reaction_Binding: label = "COUNTER"
-		case .Move, .Remove_Status:
+		case .Place_Ground: label = "VELENO" if template.status == .Poison else "BRUCIATURA"
+		// LAZZO: the first hit's number (each next one strikes one harder).
+		case .Lasso: label = "PRIMO COLPO"
+		// CANNA DA PESCA: the room's fishings (its heal stays a d4).
+		case .Fish: label = "PESCHE"
+		// PINBALL: the ball's value (and the one every wall puts it back to).
+		case .Pinball: label = "VALORE"
+		// FIRST PERSON SHOOTER: its seconds behind the player's eyes.
+		case .First_Person: label = "SECONDI"
+		case .Move, .Remove_Status, .Enter_Shadow:
 		}
 		before := game.card_effect_amount(template, card.upgrade_level)
 		after := game.card_effect_amount(template, card.upgrade_level+1)

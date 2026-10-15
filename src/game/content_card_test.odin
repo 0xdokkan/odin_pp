@@ -49,7 +49,7 @@ test_content_card_definitions_are_valid_collectible_and_append_only :: proc(t: ^
 	testing.expect_value(t, needle.effects[0].kind, Effect_Kind.Damage)
 	testing.expect_value(t, needle.effects[1].kind, Effect_Kind.Apply_Status)
 	testing.expect_value(t, needle.effects[1].status, Status_Kind.Poison)
-	testing.expect_value(t, needle.effects[1].duration, i32(3))
+	testing.expect_value(t, needle.effects[1].duration, i32(0))
 
 	bloom, bloom_found := card_definition_by_id(.Caustic_Bloom)
 	testing.expect(t, bloom_found)
@@ -118,7 +118,7 @@ test_heavy_blow_and_venom_needle_compile_targets_scaling_and_order :: proc(t: ^t
 	testing.expect_value(
 		t,
 		needle_action.effects[1],
-		apply_status_effect(needle_target, .Poison, 1, 3),
+		apply_status_effect(needle_target, .Poison, 1, 0),
 	)
 
 	blocked_level := create_test_level(t)
@@ -166,7 +166,7 @@ test_caustic_bloom_applies_upgraded_poison_only_inside_square :: proc(t: ^testin
 	for index in 0..<action.effect_count {
 		testing.expect_value(t, action.effects[index].kind, Effect_Kind.Apply_Status)
 		testing.expect_value(t, action.effects[index].amount, i32(4))
-		testing.expect_value(t, action.effects[index].duration, i32(2))
+		testing.expect_value(t, action.effects[index].duration, i32(0))
 	}
 
 	report := resolve_action(&room, &action)
@@ -177,7 +177,7 @@ test_caustic_bloom_applies_upgraded_poison_only_inside_square :: proc(t: ^testin
 		testing.expect(t, found)
 		if found {
 			testing.expect_value(t, poison.potency, i32(4))
-			testing.expect_value(t, poison.remaining_pulses, i32(2))
+			testing.expect_value(t, poison.remaining_pulses, i32(0))
 		}
 	}
 	_, outside_poisoned := status_for_entity(&room, outside, .Poison)

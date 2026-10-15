@@ -13,6 +13,7 @@ import view "../view"
 TACTICAL_FEEDBACK_BLUE :: rl.Color{108, 192, 250, 255}
 TACTICAL_FEEDBACK_HIT :: rl.Color{237, 93, 105, 255}
 TACTICAL_FEEDBACK_WHITE :: rl.Color{221, 241, 255, 255}
+TACTICAL_FEEDBACK_CRITICAL :: rl.Color{240, 198, 92, 255}
 MAX_TACTICAL_FEEDBACK_CUES :: 32
 
 Tactical_Feedback_Layer :: enum {Ground, Accent}
@@ -43,11 +44,13 @@ tactical_feedback_pose :: proc(renderer: ^Renderer, key: Sprite_Key, position: v
 			result.lift = 0.095*envelope
 			result.lean = 0.028*math.sin(p*2*math.PI)
 			result.scale_y = 1+0.045*envelope
-		} else if cue.kind == .Damage {
+		} else if cue.kind == .Damage && !attack_fx_shows(renderer, cue) && !game.event_is_lasso_turn(cue.event) {
+			// A blow shown with its props has its own impact (attack_fx.odin);
+			// the Lazzo's full turn shakes nothing (lasso.odin).
 			result.lean = math.sin(p*3*math.PI)*(1-p)*0.07
 			result.scale_y = 1-0.07*envelope
 			result.tint = {255, u8(255-145*envelope), u8(255-115*envelope), 255}
-		} else if cue.kind == .Damage_Absorbed {
+		} else if (cue.kind == .Damage_Absorbed || cue.kind == .Attack_Deflected) && !attack_fx_shows(renderer, cue) {
 			result.tint = {u8(255-80*envelope), u8(255-25*envelope), 255, 255}
 		} else if cue.kind == .Card_Played {
 			result.lift = envelope*0.04
@@ -56,9 +59,20 @@ tactical_feedback_pose :: proc(renderer: ^Renderer, key: Sprite_Key, position: v
 	return result
 }
 
+// Where the cues aimed at an actor show: on the actor as the board shows it,
+// except the player sunk in his shadow. The pool takes his place in the
+// snapshot, but his body stays where it sank, and so does what the held world
+// shows of him (a miss, a block, a shield, their sparks).
+tactical_cue_actor_position :: proc(renderer: ^Renderer, entity: game.Entity_Ref) -> (position: view.Vec2, found: bool) {
+	if entity == game.PLAYER_ENTITY && renderer.tactical.shadow.active { return renderer.tactical.shadow.body, true }
+	actor, ok := presentation_actor_in_view(renderer.tactical.snapshot, entity)
+	if !ok { return }
+	return actor.position, true
+}
+
 tactical_feedback_position :: proc(renderer: ^Renderer, entity: game.Entity_Ref, fallback: grid.Position) -> rl.Vector3 {
-	if actor, found := presentation_actor_in_view(renderer.tactical.snapshot, entity); found {
-		return {actor.position.x+0.5, 0.055, actor.position.y+0.5}
+	if position, found := tactical_cue_actor_position(renderer, entity); found {
+		return {position.x+0.5, 0.055, position.y+0.5}
 	}
 	for object in renderer.tactical.snapshot.objects[:renderer.tactical.snapshot.object_count] {
 		if object.entity == entity { return {object.position.x+0.5, 0.055, object.position.y+0.5} }
@@ -68,6 +82,11 @@ tactical_feedback_position :: proc(renderer: ^Renderer, entity: game.Entity_Ref,
 
 tactical_feedback_alpha :: proc(p: f32) -> f32 {
 	return clamp(p*12, f32(0), f32(1))*clamp((1-p)*3, f32(0), f32(1))
+}
+
+// A played card's rune and sparks: blue, or the shadow's violet.
+tactical_card_played_color :: proc(cue: ^Presentation_Cue) -> rl.Color {
+	return SHADOW_RIM if cue.kind == .Card_Played && cue.event.card_definition == .Shadow_Step else TACTICAL_FEEDBACK_BLUE
 }
 
 // Eight angular strokes leave the cell center and grid edges readable.
@@ -133,6 +152,8 @@ tactical_feedback_spell_color :: proc(id: game.Card_Id) -> rl.Color {
 	if id == .Sundering_Blow { return TACTICAL_FEEDBACK_HIT }
 	if id == .Twin_Venom { return {126, 211, 174, 255} }
 	if id == .Fate_Strike { return {172, 170, 241, 255} }
+	if id == .Poison_Pool { return GROUND_VENOM_BUBBLE }
+	if id == .Wildfire { return GROUND_CHAR_HOT }
 	return TACTICAL_FEEDBACK_BLUE
 }
 
@@ -143,6 +164,11 @@ tactical_feedback_projectile :: proc(from, to: rl.Vector3, p: f32, arc: bool) ->
 }
 
 draw_tactical_spell_flight :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) {
+	// A pool's flask and a fire's ember fly as paper.
+	if game.card_places_ground(cue.event.card_definition) && renderer.tactical.attack_props.loaded {
+		draw_ground_throw(renderer, cue)
+		return
+	}
 	p := presentation_cue_progress(cue)
 	from := rl.Vector3{f32(cue.event.from_position.x)+0.5, 0.65, f32(cue.event.from_position.y)+0.5}
 	to := rl.Vector3{f32(cue.event.to_position.x)+0.5, 0.6, f32(cue.event.to_position.y)+0.5}
@@ -183,7 +209,8 @@ draw_tactical_feedback :: proc(renderer: ^Renderer, layer: Tactical_Feedback_Lay
 		for &actor in renderer.tactical.snapshot.enemies[:renderer.tactical.snapshot.enemy_count] {
 			draw_tactical_status_rune(renderer, &actor)
 		}
-		draw_tactical_status_rune(renderer, &renderer.tactical.snapshot.player)
+		// Behind his eyes his own rune is under the eye.
+		if !first_person_hides_player(renderer) { draw_tactical_status_rune(renderer, &renderer.tactical.snapshot.player) }
 	}
 	for offset in 0..<renderer_active_cue_count(renderer) {
 		cue, found := renderer_active_cue_at(renderer, offset)
@@ -192,7 +219,8 @@ draw_tactical_feedback :: proc(renderer: ^Renderer, layer: Tactical_Feedback_Lay
 		alpha := tactical_feedback_alpha(p)
 		center := tactical_feedback_position(renderer, cue.event.target, cue.event.to_position)
 		if layer == .Ground {
-			if cue.kind == .Move {
+			// A teleport leaves no trail of steps behind it.
+			if cue.kind == .Move && !game.event_is_teleport(cue.event) {
 				from := rl.Vector3{f32(cue.event.from_position.x)+0.5, 0.056, f32(cue.event.from_position.y)+0.5}
 				color := TACTICAL_FEEDBACK_BLUE if cue.event.target == game.PLAYER_ENTITY else TACTICAL_FEEDBACK_HIT
 				for index in 0..<3 {
@@ -203,7 +231,7 @@ draw_tactical_feedback :: proc(renderer: ^Renderer, layer: Tactical_Feedback_Lay
 				}
 			} else if cue.kind == .Card_Played || cue.kind == .Refocus {
 				center = tactical_feedback_position(renderer, game.PLAYER_ENTITY, cue.event.from_position)
-				draw_tactical_rune(center, 0.24+0.19*p, p*0.3, color_with_opacity(TACTICAL_FEEDBACK_BLUE, alpha))
+				draw_tactical_rune(center, 0.24+0.19*p, p*0.3, color_with_opacity(tactical_card_played_color(cue), alpha))
 				draw_tactical_rune(center+rl.Vector3{0, 0.002, 0}, 0.17+0.14*p, -p*0.3, color_with_opacity(TACTICAL_FEEDBACK_WHITE, alpha*0.6))
 			} else if cue.kind == .Explosion || cue.kind == .Spell_Impact || cue.kind == .Room_Hazard_Triggered {
 				color := tactical_feedback_spell_color(cue.event.card_definition)
@@ -223,13 +251,22 @@ draw_tactical_feedback :: proc(renderer: ^Renderer, layer: Tactical_Feedback_Lay
 			}
 			continue
 		}
+		// Behind his eyes what befalls him shows on the HUD, not under the eye.
+		if cue.event.target == game.PLAYER_ENTITY && first_person_hides_player(renderer) { continue }
 		#partial switch cue.kind {
 		case .Damage:
 			color := TACTICAL_FEEDBACK_HIT
 			if cue.event.has_status_cause && cue.event.status_cause == .Poison { color = {126, 211, 174, 255} }
-			draw_tactical_hit(renderer, center, p, color)
-		case .Damage_Absorbed:
-			draw_tactical_shield(renderer, center, p)
+			if cue.event.has_status_cause && cue.event.status_cause == .Burn { color = {244, 157, 104, 255} }
+			// The Lazzo's hits have their paper star (lasso.odin); a turn's 1 its
+			// token; and so have the Pinball's (pinball.odin). The AK's have their
+			// spark (first_person.odin).
+			if !attack_fx_shows(renderer, cue) && !game.event_is_lasso(cue.event) && !game.event_is_pinball(cue.event) &&
+			   !game.event_is_first_person_shot(cue.event) {
+				draw_tactical_hit(renderer, center, p, color)
+			}
+		case .Damage_Absorbed, .Attack_Deflected:
+			if !attack_fx_shows(renderer, cue) { draw_tactical_shield(renderer, center, p) }
 		case .Status_Applied:
 			if cue.event.status == .Shield { draw_tactical_shield(renderer, center, p) }
 			else if cue.event.status == .Stagger {
@@ -242,7 +279,7 @@ draw_tactical_feedback :: proc(renderer: ^Renderer, layer: Tactical_Feedback_Lay
 			} else { draw_tactical_sparks(center, p, TACTICAL_FEEDBACK_BLUE, 4, 0.28) }
 		case .Card_Played:
 			center = tactical_feedback_position(renderer, game.PLAYER_ENTITY, cue.event.from_position)
-			draw_tactical_sparks(center+rl.Vector3{0, 0.12, 0}, p, TACTICAL_FEEDBACK_BLUE, 5, 0.25)
+			draw_tactical_sparks(center+rl.Vector3{0, 0.12, 0}, p, tactical_card_played_color(cue), 5, 0.25)
 		case .Spell_Launched:
 			draw_tactical_spell_flight(renderer, cue)
 		case .Spell_Impact:
@@ -252,7 +289,8 @@ draw_tactical_feedback :: proc(renderer: ^Renderer, layer: Tactical_Feedback_Lay
 		case .Heal:
 			draw_tactical_sparks(center, p, {128, 220, 190, 255}, 5, 0.27)
 		case .Defeat:
-			draw_tactical_sparks(center, p, {149, 165, 189, 255}, 6, 0.34)
+			// The Pinball's foe falls in its ball's burst (pinball.odin).
+			if !tactical_pinball_holds(renderer, cue.event.target) { draw_tactical_sparks(center, p, {149, 165, 189, 255}, 6, 0.34) }
 		case .Explosive_Armed, .Trap_Triggered:
 			draw_tactical_sparks(center, p, {227, 174, 105, 255}, 4, 0.26)
 		case:
@@ -273,7 +311,7 @@ draw_tactical_status_rune :: proc(renderer: ^Renderer, actor: ^Presentation_Acto
 }
 
 // Called after actor annotations: compact feedback shares their collision
-// allocator and viewport instead of painting floating text across health bars.
+// allocator and viewport instead of painting floating text across the hearts.
 draw_tactical_feedback_overlay :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) -> bool {
 	if !renderer.tactical.enabled || !renderer.tactical.scene_3d { return false }
 	if cue.kind == .Loot || cue.kind == .Loot_Dropped { return false }
@@ -283,54 +321,183 @@ draw_tactical_feedback_overlay :: proc(renderer: ^Renderer, cue: ^Presentation_C
 			definition, found := game.card_definition_by_id(cue.event.card_definition, true)
 			if !found { return true }
 			label = fmt.ctprintf("%s", definition.name)
+			if game.event_is_critical(cue.event) { label = fmt.ctprintf("CRITICO / %s", definition.name) }
 		}
-		viewport := tactical_world_bounds(renderer)
-		width := min(f32(280), gothic_text_width(renderer, label, 13)+35)
-		anchor := view.Vec2{viewport.x+viewport.width/2, viewport.y+viewport.height-5}
-		bounds, placed := place_tactical_label(renderer.tactical.labels, anchor, {width, 23}, viewport)
-		if placed {
-			alpha := tactical_feedback_alpha(presentation_cue_progress(cue))
-			rl.DrawRectangleRec(bounds, color_with_opacity({10, 19, 33, 244}, alpha))
-			rl.DrawRectangleRec({bounds.x, bounds.y+bounds.height-1, bounds.width, 1}, color_with_opacity(TACTICAL_FEEDBACK_BLUE, alpha*0.7))
-			gothic_text(renderer, "+", bounds.x+7, bounds.y+4, 13, color_with_opacity(TACTICAL_FEEDBACK_BLUE, alpha))
-			gothic_text_fit(renderer, label, {bounds.x+23, bounds.y+4, bounds.width-28, 15}, 13, color_with_opacity(TACTICAL_FEEDBACK_WHITE, alpha))
-		}
+		draw_tactical_cue_banner(renderer, cue, label, TACTICAL_FEEDBACK_CRITICAL if game.event_is_critical(cue.event) else TACTICAL_FEEDBACK_BLUE)
 		return true
 	}
+	// CANNA DA PESCA (fishing.odin): its name as it is cast and a caught
+	// card's as it comes out, where a played card's shows.
+	if label, accent, shown := fishing_cue_banner(cue); shown {
+		draw_tactical_cue_banner(renderer, cue, label, accent)
+		return true
+	}
+	badges, count := tactical_feedback_badges(renderer, cue)
+	alpha := tactical_feedback_alpha(presentation_cue_progress(cue))
+	for badge in badges[:count] { draw_tactical_feedback_badge(renderer, badge, alpha) }
+	return true
+}
+
+// One word over the board, over its figure (draw_tactical_feedback_overlay,
+// and the Lazzo's MOLLATO with its foe's fall: lasso.odin).
+draw_tactical_feedback_badge :: proc(renderer: ^Renderer, badge: Tactical_Feedback_Badge, alpha: f32) {
+	center := tactical_feedback_position(renderer, badge.over, badge.fallback)
+	anchor := tactical_project(renderer, {center.x, center.z}, badge.height if badge.height > 0 else TACTICAL_FEEDBACK_BADGE_HEIGHT)
+	// Behind the player's eyes nothing is said of what the eye does not face.
+	if first_person_amount(renderer) > 0 && !first_person_on_canvas(renderer, anchor) { return }
+	width := gothic_text_width(renderer, badge.label, 12)+12
+	bounds, placed := place_tactical_label(renderer.tactical.labels, anchor, {width, 19}, tactical_world_bounds(renderer))
+	if !placed { return }
+	color := badge.color
+	// Collision avoidance can place a badge beside another actor. A fine
+	// leader and pixel dot preserve ownership without adding another label.
+	badge_center := rl.Vector2{bounds.x+bounds.width/2, bounds.y+bounds.height/2}
+	if abs(badge_center.x-anchor.x) > 12 || abs(badge_center.y-anchor.y) > 18 {
+		edge := rl.Vector2{clamp(anchor.x, bounds.x, bounds.x+bounds.width), clamp(anchor.y, bounds.y, bounds.y+bounds.height)}
+		rl.DrawLineEx(edge, to_raylib(anchor), 1, color_with_opacity(color, alpha*0.7))
+		rl.DrawRectangleRec({anchor.x-1, anchor.y-1, 2, 2}, color_with_opacity(color, alpha))
+	}
+	rl.DrawRectangleRec(bounds, color_with_opacity({8, 15, 26, 235}, alpha))
+	rl.DrawRectangleRec({bounds.x, bounds.y, 2, bounds.height}, color_with_opacity(color, alpha))
+	gothic_text(renderer, badge.label, bounds.x+6, bounds.y+3, 12, color_with_opacity(color, alpha))
+}
+
+// A cue's name under the board, where a played card's shows: its `label`
+// after a "+" in `accent`, fading with the cue.
+draw_tactical_cue_banner :: proc(renderer: ^Renderer, cue: ^Presentation_Cue, label: cstring, accent: rl.Color) {
+	viewport := tactical_world_bounds(renderer)
+	width := min(f32(280), gothic_text_width(renderer, label, 13)+35)
+	anchor := view.Vec2{viewport.x+viewport.width/2, viewport.y+viewport.height-5}
+	bounds, placed := place_tactical_label(renderer.tactical.labels, anchor, {width, 23}, viewport)
+	if !placed { return }
+	alpha := tactical_feedback_alpha(presentation_cue_progress(cue))
+	rl.DrawRectangleRec(bounds, color_with_opacity({10, 19, 33, 244}, alpha))
+	rl.DrawRectangleRec({bounds.x, bounds.y+bounds.height-1, bounds.width, 1}, color_with_opacity(accent, alpha*0.7))
+	gothic_text(renderer, "+", bounds.x+7, bounds.y+4, 13, color_with_opacity(accent, alpha))
+	gothic_text_fit(renderer, label, {bounds.x+23, bounds.y+4, bounds.width-28, 15}, 13, color_with_opacity(TACTICAL_FEEDBACK_WHITE, alpha))
+}
+
+// A word a cue says over the board: over `over`'s figure (or the cell
+// `fallback` when it is not on the board), its foot `height` over the floor
+// (0: TACTICAL_FEEDBACK_BADGE_HEIGHT, over a card's middle).
+Tactical_Feedback_Badge :: struct {
+	label: cstring,
+	color: rl.Color,
+	over: game.Entity_Ref,
+	fallback: grid.Position,
+	height: f32,
+}
+
+TACTICAL_FEEDBACK_BADGE_HEIGHT :: f32(0.9)
+
+// What a cue says over the board (draw_tactical_feedback_overlay), at most
+// two words. Over its target, as a rule. A critical the Dado del Destino's
+// die made is said by the die as it shows (fate_made_critical), never first by
+// the blow it doubles. RIFLESSO's answer says RIFLESSO over the player who gave
+// the blow back, as the bolt turns or his riposte starts, once a blow: by its
+// wound, or by its guard when the attacker's Shield takes all of it; that
+// guard still says PARATA over the attacker.
+tactical_feedback_badges :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) -> (badges: [2]Tactical_Feedback_Badge, count: int) {
+	event := cue.event
 	label: cstring
 	color := TACTICAL_FEEDBACK_BLUE
 	#partial switch cue.kind {
-	case .Damage: label = fmt.ctprintf("-%d", cue.event.amount); color = TACTICAL_FEEDBACK_HIT
-	case .Damage_Absorbed: label = fmt.ctprintf("PARATA %d", cue.event.amount)
-	case .Heal: label = fmt.ctprintf("+%d", cue.event.amount); color = {128, 220, 190, 255}
+	case .Damage:
+		critical := game.event_is_critical(event) && !fate_made_critical(renderer, cue)
+		label = fmt.ctprintf("-%d", event.amount); color = TACTICAL_FEEDBACK_HIT
+		if critical { label = fmt.ctprintf("CRITICO -%d", event.amount); color = TACTICAL_FEEDBACK_CRITICAL }
+		// A living board shows the amount on a paper token; a critical blow
+		// still says so.
+		if renderer.tactical.living { label = "CRITICO" if critical else nil }
+	case .Move:
+		if game.event_is_critical(event) && event.target == game.PLAYER_ENTITY { label = "CRITICO!"; color = TACTICAL_FEEDBACK_CRITICAL }
+	case .Damage_Absorbed: label = fmt.ctprintf("PARATA %d", event.amount)
+	// The die of a loaded bump and what it did; a living board shows the die
+	// itself on its paper token (player_charges.odin).
+	case .Fate_Rolled: label, color = fate_outcome_label(event, !renderer.tactical.living)
+	case .Heal:
+		if renderer.tactical.living { return }
+		label = fmt.ctprintf("+%d", event.amount); color = {128, 220, 190, 255}
 	case .Status_Applied:
-		if cue.event.status == .Stagger { label = "INTERROTTO"; color = {218, 187, 123, 255} }
-		else if cue.event.status == .Shield { label = fmt.ctprintf("SCUDO +%d", cue.event.amount) }
+		if event.status == .Stagger { label = "INTERROTTO"; color = {218, 187, 123, 255} }
+		else if event.status == .Shield { label = fmt.ctprintf("SCUDO +%d", event.amount) }
 	case .Attack_Missed: label = "MANCATO"
+	// LAZZO (lasso.odin): a hit over the foe struck, a smash over the swung one.
+	// The rope let go says MOLLATO with its foe's fall, which the board starts
+	// as it shows what moved the player (draw_lasso_release_badge), never after.
+	case .Lasso_Struck:
+		color = TACTICAL_FEEDBACK_HIT
+		if event.target == game.SYSTEM_ENTITY {
+			badges[count] = {label = fmt.ctprintf("SCHIANTO %d", event.amount), color = color, over = event.source, fallback = event.from_position}
+			count += 1
+			return
+		}
+		label = fmt.ctprintf("COLPO %d", event.amount)
+	// CANNA DA PESCA: the food it caught, over him (a card says so below).
+	case .Fish_Caught:
+		if event.card_definition == .Fishing_Rod { label = fishing_catch_label(event); color = FISHING_WATER_LIGHT }
+	// PINBALL (pinball.odin): the value a foe took, over it; the burst over the
+	// ball, clear of its top as it swells, so its flash and its paper show. A
+	// solid thing touched says nothing: the ball rings off it.
+	case .Pinball_Bumped: label = fmt.ctprintf("COLPO %d", event.amount); color = TACTICAL_FEEDBACK_HIT
+	case .Pinball_Burst:
+		badges[count] = {label = "POP!", color = PINBALL_STEEL_LIGHT, over = event.target, fallback = event.to_position,
+			height = pinball_burst_badge_height()}
+		count += 1
+		return
 	case .Move_Blocked: label = "BLOCCATO"; color = {218, 187, 123, 255}
 	case .Explosive_Disarmed: label = "DISINNESCATA"
-	case .Gold_Gained: label = fmt.ctprintf("+%d ORO", cue.event.amount); color = {218, 187, 123, 255}
-	case .Energy_Gained: label = fmt.ctprintf("+%d ENERGIA", cue.event.amount)
+	case .Gold_Gained: label = fmt.ctprintf("+%d ORO", event.amount); color = {218, 187, 123, 255}
+	case .Energy_Gained: label = fmt.ctprintf("+%d ENERGIA", event.amount)
 	case:
 	}
-	if label == nil { return true }
-	center := tactical_feedback_position(renderer, cue.event.target, cue.event.to_position)
-	anchor := tactical_project(renderer, {center.x, center.z}, 0.9)
-	width := gothic_text_width(renderer, label, 12)+12
-	bounds, placed := place_tactical_label(renderer.tactical.labels, anchor, {width, 19}, tactical_world_bounds(renderer))
-	if placed {
-		alpha := tactical_feedback_alpha(presentation_cue_progress(cue))
-		// Collision avoidance can place a badge beside another actor. A fine
-		// leader and pixel dot preserve ownership without adding another label.
-		badge_center := rl.Vector2{bounds.x+bounds.width/2, bounds.y+bounds.height/2}
-		if abs(badge_center.x-anchor.x) > 12 || abs(badge_center.y-anchor.y) > 18 {
-			edge := rl.Vector2{clamp(anchor.x, bounds.x, bounds.x+bounds.width), clamp(anchor.y, bounds.y, bounds.y+bounds.height)}
-			rl.DrawLineEx(edge, to_raylib(anchor), 1, color_with_opacity(color, alpha*0.7))
-			rl.DrawRectangleRec({anchor.x-1, anchor.y-1, 2, 2}, color_with_opacity(color, alpha))
-		}
-		rl.DrawRectangleRec(bounds, color_with_opacity({8, 15, 26, 235}, alpha))
-		rl.DrawRectangleRec({bounds.x, bounds.y, 2, bounds.height}, color_with_opacity(color, alpha))
-		gothic_text(renderer, label, bounds.x+6, bounds.y+3, 12, color_with_opacity(color, alpha))
+	if label != nil {
+		badges[count] = {label = label, color = color, over = event.target, fallback = event.to_position}
+		count += 1
 	}
-	return true
+	reflected := game.event_is_reflected(event) &&
+		(cue.kind == .Damage || (cue.kind == .Damage_Absorbed && !reflected_blow_wounds(renderer, cue)))
+	if reflected {
+		badges[count] = {label = "RIFLESSO", color = TACTICAL_FEEDBACK_BLUE, over = event.source, fallback = event.from_position}
+		count += 1
+	}
+	return
+}
+
+// Whether the Dado del Destino's die made this blow critical: a Fate_Rolled of
+// its command on its target whose face was a critical (game.player_bump).
+fate_made_critical :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) -> bool {
+	if cue.batch == 0 || cue.event.source != game.PLAYER_ENTITY { return false }
+	matches :: proc(other: ^Presentation_Cue, cue: ^Presentation_Cue) -> bool {
+		return other.kind == .Fate_Rolled && other.batch == cue.batch && other.event.target == cue.event.target &&
+		       game.Fate_Outcome(other.event.duration) == .Critical
+	}
+	for offset in 0..<renderer.timeline.count {
+		if other, found := presentation_cue_at(&renderer.timeline, offset); found && matches(other, cue) { return true }
+	}
+	if renderer.world_playback != nil {
+		for &entry in renderer.world_playback.cues[:renderer.world_playback.count] {
+			if matches(&entry.cue, cue) { return true }
+		}
+	}
+	return false
+}
+
+// Whether the blow RIFLESSO gives back, met by a guard (`cue`, its
+// Damage_Absorbed), also wounds: its Damaged in the same command. The wound's
+// cue starts with the guard's and lasts at least as long.
+reflected_blow_wounds :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) -> bool {
+	matches :: proc(other: ^Presentation_Cue, cue: ^Presentation_Cue) -> bool {
+		return other.kind == .Damage && other.batch == cue.batch && game.event_is_reflected(other.event) &&
+		       other.event.source == cue.event.source && other.event.target == cue.event.target
+	}
+	for offset in 0..<renderer.timeline.count {
+		if other, found := presentation_cue_at(&renderer.timeline, offset); found && matches(other, cue) { return true }
+	}
+	if renderer.world_playback != nil {
+		for &entry in renderer.world_playback.cues[:renderer.world_playback.count] {
+			if matches(&entry.cue, cue) { return true }
+		}
+	}
+	return false
 }

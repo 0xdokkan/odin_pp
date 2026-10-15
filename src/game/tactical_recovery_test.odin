@@ -100,7 +100,8 @@ test_tactical_recovery_shares_enemy_bomb_status_and_energy_clock :: proc(t: ^tes
 	room.enemies[0].tactical_cooldown = 1
 	initial_position := room.enemies[0].position
 	player.deck.energy = 0
-	_, _ = apply_status(&room, PLAYER_ENTITY, .Poison, 2, 1)
+	// A status that runs by the beat (Veleno now waits for his own actions).
+	_, _ = apply_status(&room, PLAYER_ENTITY, .Thorns, 2, 1)
 	testing.expect(t, spawn_bomb(&room, enemy_entity(1), player.position, &room.recent_events))
 	room.objects[0].detonation_pulse = 3
 	player.tactical.remaining = 0
@@ -113,11 +114,11 @@ test_tactical_recovery_shares_enemy_bomb_status_and_energy_clock :: proc(t: ^tes
 	testing.expect(t, !tactical_tick(&room, 0.5, true, false))
 	drain_tactical_test_pulse(t, &room)
 	testing.expect_value(t, room.pulse_count, u64(3))
-	testing.expect_value(t, player.health, i32(95))
+	testing.expect_value(t, player.health, i32(97))
 	testing.expect_value(t, active_bomb_count(&room), 0)
 	testing.expect(t, room.enemies[0].position != initial_position)
-	_, poisoned := status_for_entity(&room, PLAYER_ENTITY, .Poison)
-	testing.expect(t, !poisoned)
+	_, thorned := status_for_entity(&room, PLAYER_ENTITY, .Thorns)
+	testing.expect(t, !thorned)
 	testing.expect_value(t, player.deck.energy, i32(1))
 	testing.expect_value(t, player.tactical.phase, Tactical_Phase.Decision)
 }
@@ -177,7 +178,9 @@ test_tactical_recovery_lethal_world_beat_cleans_up_without_an_extra_window :: pr
 	room := tactical_clock_test_room(t, &data, &player)
 	defer level.destroy(&data)
 	defer destroy_room(&room)
-	_, _ = apply_status(&room, enemy_entity(1), .Poison, 100, 1)
+	// Its own move on the recovery's beat is what its poison bites.
+	room.enemies[0].tactical_cooldown = 1
+	_, _ = apply_status(&room, enemy_entity(1), .Poison, 100, 0)
 	player.tactical.remaining = 0
 	testing.expect(t, tactical_expire_window(&room))
 	testing.expect(t, !tactical_tick(&room, 1, true, false))

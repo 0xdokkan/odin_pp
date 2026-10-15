@@ -145,6 +145,31 @@ test_polyhedral_d4_repeats_vertex_value_and_percentile_has_tens :: proc(t: ^test
 	}
 }
 
+// In play a D10 reads the value it rolls: the face that lands for a 10 says
+// 10, as the cards name it. The dice-set lab keeps the set's 0.
+@(test)
+test_polyhedral_d10_in_play_reads_ten_where_the_lab_reads_zero :: proc(t: ^testing.T) {
+	die := build_polyhedral_die(.D10)
+	for value in i32(1)..=10 {
+		face := die.faces[polyhedral_face_for_result(&die,value)]
+		testing.expect_value(t,face.value,value)
+		digits,count := polyhedral_face_label(&die,face,true)
+		testing.expect_value(t,digits[0] if count == 1 else digits[0]*10+digits[1],int(value))
+		lab,lab_count := polyhedral_face_label(&die,face)
+		testing.expect_value(t,lab_count,1)
+		testing.expect_value(t,lab[0],int(value%10))
+	}
+	// Every other die reads the same in play and in the lab.
+	for kind in ([5]Polyhedral_Die_Kind{.D6,.D8,.D100,.D12,.D20}) {
+		other := build_polyhedral_die(kind)
+		for face in other.faces[:other.face_count] {
+			shown,shown_count := polyhedral_face_label(&other,face,true)
+			lab,lab_count := polyhedral_face_label(&other,face)
+			testing.expect(t,shown == lab && shown_count == lab_count)
+		}
+	}
+}
+
 @(test)
 test_polyhedral_tumbling_support_is_finite_and_clears_floor :: proc(t: ^testing.T) {
 	for kind in Polyhedral_Die_Kind.D4..<Polyhedral_Die_Kind.Count {

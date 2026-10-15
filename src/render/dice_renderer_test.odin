@@ -73,7 +73,7 @@ test_dice_pips_fit_flat_faces_and_never_overlap_the_bevels :: proc(t: ^testing.T
 
 @(test)
 test_dice_pool_totals_reveal_sequentially_without_exposing_future_faces :: proc(t: ^testing.T) {
-	roll := game.Dice_Roll{faces = {2, 6, 4}, count = 3, total = 12}
+	roll := game.Dice_Roll{faces = {2, 6, 4}, sides = 6, count = 3, total = 12}
 	reveals := DICE_POOL_REVEAL_TIMES
 	testing.expect_value(t, dice_total_state(roll, reveals[0]-0.001).visible_total, i32(0))
 	first := dice_total_state(roll, reveals[0])
@@ -89,8 +89,8 @@ test_dice_pool_totals_reveal_sequentially_without_exposing_future_faces :: proc(
 	testing.expect(t, complete.complete)
 	testing.expect_value(t, complete.visible_total, roll.total)
 	for progress in complete.transfer_progress {testing.expect(t, progress > 0.999)}
-	testing.expect_value(t, dice_total_state({faces = {6, 0, 0}, count = 1, total = 6}, 1), Dice_Total_State{})
-	testing.expect_value(t, dice_total_state({faces = {6, 6, 0}, count = 2, total = 9}, 1), Dice_Total_State{})
+	testing.expect_value(t, dice_total_state({faces = {6, 0, 0}, sides = 6, count = 1, total = 6}, 1), Dice_Total_State{})
+	testing.expect_value(t, dice_total_state({faces = {6, 6, 0}, sides = 6, count = 2, total = 9}, 1), Dice_Total_State{})
 }
 
 @(test)
@@ -140,7 +140,7 @@ test_dice_pool_window_layout_keeps_initial_physical_mesh_above_real_letterbox ::
 test_dice_pool_cached_numbering_and_texture_budget_are_bounded :: proc(t: ^testing.T) {
 	layout := dice_pool_layout(948, 1020, {0, 243, 948, 533.25})
 	renderer: Dice_Renderer
-	roll := game.Dice_Roll{faces = {1, 4, 6}, count = 3, total = 11}
+	roll := game.Dice_Roll{faces = {1, 4, 6}, sides = 6, count = 3, total = 11}
 	prepare_dice_pool(&renderer, roll, 113, layout)
 	numbering, initial := renderer.numbering, renderer.throw_state.frames[0]
 	steps := renderer.throw_state.physics_steps
@@ -157,7 +157,11 @@ test_dice_pool_cached_numbering_and_texture_budget_are_bounded :: proc(t: ^testi
 	testing.expect(t, !dice_pool_layout(100, math.nan_f32()).valid)
 	testing.expect(t, !dice_pool_layout(100, 100, {500, 0, 100, 100}).valid)
 	testing.expect(t, !dice_pool_roll_valid({count = 4}))
-	testing.expect(t, !dice_pool_roll_valid({faces = {3, 5, 6}, count = 2, total = 8}))
+	testing.expect(t, !dice_pool_roll_valid({faces = {3, 5, 6}, sides = 6, count = 2, total = 8}))
+	// A roll must name a die of the ladder, and its faces must fit it.
+	testing.expect(t, !dice_pool_roll_valid({faces = {3, 5, 0}, count = 2, total = 8}))
+	testing.expect(t, !dice_pool_roll_valid({faces = {3, 5, 0}, sides = 4, count = 2, total = 8}))
+	testing.expect(t, dice_pool_roll_valid({faces = {3, 5, 0}, sides = 8, count = 2, total = 8}))
 }
 
 @(test)
@@ -165,7 +169,7 @@ test_dice_pool_total_keeps_clear_of_final_meshes_and_the_hand :: proc(t: ^testin
 	for seed in u64(1)..=12 {
 		for count in 2..=3 {
 			renderer: Dice_Renderer
-			roll := game.Dice_Roll{faces = {2, 5, 0}, count = count, total = 7}
+			roll := game.Dice_Roll{faces = {2, 5, 0}, sides = 6, count = i32(count), total = 7}
 			if count == 3 {roll.faces[2], roll.total = 6, 13}
 			layout := dice_pool_layout(948, 1020, {0, 243, 948, 533.25})
 			prepare_dice_pool(&renderer, roll, seed, layout)

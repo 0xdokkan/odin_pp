@@ -34,7 +34,7 @@ test_m7_fresh_walk_on_an_autonomous_world_beat_executes_in_the_same_frame :: pro
 	// remain available to poll and commit the fresh physical press immediately.
 	testing.expect(t, !step_tactical_controller(&controller, &room, renderer, &cards, &buffer,
 		1, true, {focused = true, directions = {false, true, false, false}}))
-	testing.expect(t, !buffer.occupied)
+	testing.expect(t, !buffer.chord.active)
 	testing.expect_value(t, player.position, origin)
 	testing.expect_value(t, player.tactical.metrics.decisions, u64(0))
 	testing.expect_value(t, player.tactical.remaining, f32(19))
@@ -45,12 +45,10 @@ test_m7_fresh_walk_on_an_autonomous_world_beat_executes_in_the_same_frame :: pro
 	testing.expect_value(t, player.position, game.add_position(origin, {1, 0}))
 	testing.expect_value(t, player.tactical.metrics.decisions, u64(1))
 	testing.expect_value(t, player.tactical.remaining, f32(18))
-	_, duplicated := take_gameplay_command(&buffer)
-	testing.expect(t, !duplicated)
 }
 
 @(test)
-test_m7_timed_deadline_discards_a_queued_walk_before_recovery :: proc(t: ^testing.T) {
+test_m7_timed_deadline_discards_a_pending_chord_before_recovery :: proc(t: ^testing.T) {
 	data := create_gameplay_command_test_level(t)
 	defer level.destroy(&data)
 	player := create_gameplay_command_test_player(t)
@@ -67,7 +65,7 @@ test_m7_timed_deadline_discards_a_queued_walk_before_recovery :: proc(t: ^testin
 	controller := Tactical_Controller{was_focused = true}
 	cards: Card_Interaction_State
 	buffer: Buffered_Gameplay_Command
-	testing.expect(t, offer_gameplay_command(&buffer, {kind = .Move, origin_phase = .Combat, direction = .East}))
+	buffer.chord = {command = {kind = .Move, origin_phase = .Combat, direction = .East, beat = 1}, timer = BEAT_CHORD_SECONDS, active = true}
 	origin := player.position
 	testing.expect(t, !step_tactical_controller(&controller, &room, renderer, &cards, &buffer,
 		1, true, {focused = true}))
@@ -81,7 +79,7 @@ test_m7_timed_deadline_discards_a_queued_walk_before_recovery :: proc(t: ^testin
 	testing.expect_value(t, room.pulse_count, u64(1))
 	testing.expect_value(t, player.position, origin)
 	testing.expect_value(t, player.tactical.metrics.decisions, u64(0))
-	testing.expect(t, !buffer.occupied)
+	testing.expect(t, !buffer.chord.active)
 }
 
 @(test)

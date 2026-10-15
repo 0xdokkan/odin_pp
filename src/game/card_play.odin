@@ -37,7 +37,7 @@ play_card :: proc(room: ^Room, card_id: u32, target: Target) -> (play: Card_Play
 	if room == nil || room.player == nil {
 		return
 	}
-	if room.phase != .Combat || !tactical_allows_action(room) {
+	if room.phase != .Combat || !tactical_allows_cards(room) {
 		play.result = .Invalid_Phase
 		return
 	}
@@ -84,7 +84,12 @@ play_card :: proc(room: ^Room, card_id: u32, target: Target) -> (play: Card_Play
 	resolving_card, began_resolving := begin_resolving_hand_card(deck, hand_index)
 	assert(began_resolving && resolving_card == play.card)
 
+	// A card played on the tick resolves its critical version.
+	critical := tactical_take_critical(room)
+	room.player.tactical.critical_card = critical
 	play.action_report = resolve_played_card_action(room, play.card, target, &action)
+	room.player.tactical.critical_card = false
+	if critical { mark_critical_events(&play.action_report.events) }
 	if !play.action_report.accepted {
 		deck^ = deck_before
 		play.result = .Action_Rejected
@@ -105,6 +110,7 @@ play_card :: proc(room: ^Room, card_id: u32, target: Target) -> (play: Card_Play
 		card_lifetime = play.card.lifetime,
 		from_card_zone = .Hand,
 		to_card_zone = .Resolving,
+		area_mask = EVENT_CRITICAL_BIT if critical else 0,
 	})
 	append_event_log(&room.recent_events, &play.action_report.events)
 	record_event(&room.recent_events, {
@@ -135,8 +141,16 @@ play_card :: proc(room: ^Room, card_id: u32, target: Target) -> (play: Card_Play
 	}
 
 	if tactical_enabled(room) {
-		tactical_begin_card_cast(room, tactical_card_time_cost(play.card.definition_id))
+		seconds := tactical_card_time_cost(play.card.definition_id)
+		tactical_begin_card_cast(room, seconds)
+		tactical_count_card(room)
 		room.tactical_pulse.deferred_draws += 1
+		// A card that takes no time has no cast to wait for: it is a decision
+		// of its own, and its replacement is drawn now.
+		if seconds <= 0 {
+			room.player.tactical.metrics.decisions += 1
+			tactical_refill(room)
+		}
 		play.result = .Played
 		play.energy_after = deck.energy
 		return

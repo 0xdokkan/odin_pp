@@ -2,14 +2,27 @@ package game
 
 import grid "../grid"
 
-Tactical_Phase :: enum { Decision, Recovery, Resolving }
+// Recovery leaves only walking; Stunned (an exhausted window) only cards;
+// Shadow (Movimento Ombra, tactical_shadow.odin) only the shadow's own steps,
+// with the whole world frozen.
+Tactical_Phase :: enum { Decision, Recovery, Resolving, Stunned, Shadow }
 Tactical_Config :: struct {
 	enabled: bool,
 	timer_seconds: int,
 	vision_size: int,
 	qte_seconds: f32,
+	// Timed actions: an action lasts its cost in real time instead of spending
+	// it at once (tactical_clock.odin).
+	timed_actions: bool,
+	// The shrinking window: each window that runs out leaves the next a second
+	// shorter, down to a stun (tactical_clock.odin).
+	shrinking_window: bool,
 }
-DEFAULT_TACTICAL_CONFIG :: Tactical_Config{true, 20, 7, 1.2}
+// The bare rules, which the regression probes are written against.
+DEFAULT_TACTICAL_CONFIG :: Tactical_Config{enabled = true, timer_seconds = 20, vision_size = 7, qte_seconds = 1.2}
+// The game as it is played: actions last their cost, the window shrinks.
+GAME_TACTICAL_CONFIG :: Tactical_Config{enabled = true, timer_seconds = 20, vision_size = 7, qte_seconds = 1.2,
+	timed_actions = true, shrinking_window = true}
 MAX_TACTICAL_VISION :: 9
 TACTICAL_DODGE_RECOVERY :: 2
 
@@ -29,12 +42,41 @@ Tactical_State :: struct {
 	remaining: f32,
 	// Casting spends pulse time gradually, without advancing the world clock.
 	cast_remaining, cast_duration: f32,
+	// With timed actions, the player's own action still running (seconds);
+	// the world clock runs through it as usual.
+	action_remaining, action_duration: f32,
 	// World time advances in bounded one-second beats; animations never add time.
 	clock_fraction: f32,
 	queued_beats: int,
 	facing: Move_Direction,
 	dodge_recovery: int,
 	metrics: Tactical_Metrics,
+	// On-beat criticals (tactical_beat.odin): beats crossed by real time in
+	// this room, seconds since the last one, the last beat rewarded, and the
+	// one-shot flags read by the critical action.
+	beat_index, beat_spent: u32,
+	beat_age: f32,
+	critical_next, critical_card: bool,
+	// The shrinking window (tactical_clock.odin): the window the current
+	// recovery or stun leads to, cards played toward the next won second and
+	// the seconds won in this window, and how many stuns this room has dealt.
+	next_budget: int,
+	cards_toward_second, won_seconds: int,
+	stuns: int,
+	stun_duration: f32,
+	// Movimento Ombra (tactical_shadow.odin): the phase the shadow interrupted,
+	// its own real-time clock, the current step's lockout, the cell the body
+	// sank on (player.position stays there), the shadow's cell and the one it
+	// left, the shadow beats already rewarded and the steps taken.
+	shadow_resume: Tactical_Phase,
+	shadow_remaining, shadow_duration: f32,
+	shadow_step_remaining: f32,
+	shadow_origin, shadow_position, shadow_from: grid.Position,
+	shadow_beats_spent: bit_set[0..<8; u8],
+	shadow_steps: int,
+	// DADO DEL DESTINO: the die its loaded bumps roll, the one of the last
+	// card played (player_charges.odin); a new room forgets it with the charges.
+	fate_sides: i32,
 }
 Tactical_Pulse :: struct {
 	pending, started, forced: bool,
@@ -80,20 +122,51 @@ tactical_enabled :: proc(room: ^Room) -> bool {
 	return room != nil && room.player != nil && room.player.tactical.config.enabled
 }
 
-tactical_allows_action :: proc(room: ^Room) -> bool {
+// `ignore_busy` asks whether an action would be allowed once the player's
+// own timed action has finished (the dodge, which cuts that action short, and
+// lets the Lazzo's rope go: lasso.odin).
+tactical_allows_action :: proc(room: ^Room, ignore_busy := false) -> bool {
 	if !tactical_enabled(room) || room.phase != .Combat { return true }
 	s := &room.player.tactical
 	return !room.tactical_pulse.pending && room.qte.kind == .None && s.remaining > 0 && s.cast_remaining <= 0 &&
-	       s.phase == .Decision
+	       s.phase == .Decision && (ignore_busy || (s.action_remaining <= 0 && !room.lasso.active))
+}
+
+// The player is still performing a timed action, or a shadow step, or swings
+// the Lazzo's foe round him (he is its pivot).
+tactical_player_busy :: proc(room: ^Room) -> bool {
+	return tactical_enabled(room) && room.phase == .Combat &&
+	       (room.player.tactical.action_remaining > 0 || tactical_shadow_step_busy(room) || room.lasso.active)
 }
 
 tactical_is_recovering :: proc(room: ^Room) -> bool {
 	return tactical_enabled(room) && room.phase == .Combat && room.player.tactical.phase == .Recovery
 }
 
-tactical_allows_movement :: proc(room: ^Room) -> bool {
-	if !tactical_is_recovering(room) { return tactical_allows_action(room) }
-	return !room.tactical_pulse.pending && room.qte.kind == .None
+tactical_is_stunned :: proc(room: ^Room) -> bool {
+	return tactical_enabled(room) && room.phase == .Combat && room.player.tactical.phase == .Stunned
+}
+
+// Recovery and stun both stand between two windows.
+tactical_between_windows :: proc(s: ^Tactical_State) -> bool {
+	return s.phase == .Recovery || s.phase == .Stunned
+}
+
+// Cards are also the one thing a stunned player can still play. Behind his
+// eyes (first_person.odin) he plays none: the AK is all he has.
+tactical_allows_cards :: proc(room: ^Room) -> bool {
+	if tactical_first_person_active(room) { return false }
+	if tactical_allows_action(room) { return true }
+	if !tactical_is_stunned(room) { return false }
+	s := &room.player.tactical
+	return !room.tactical_pulse.pending && room.qte.kind == .None && s.remaining > 0 && s.cast_remaining <= 0 &&
+	       !room.lasso.active
+}
+
+tactical_allows_movement :: proc(room: ^Room, ignore_busy := false) -> bool {
+	if !tactical_is_recovering(room) { return tactical_allows_action(room, ignore_busy) }
+	return !room.tactical_pulse.pending && room.qte.kind == .None &&
+	       (ignore_busy || (room.player.tactical.action_remaining <= 0 && !room.lasso.active))
 }
 
 // Called only after a new room has been successfully built. Keep configuration
@@ -105,10 +178,15 @@ begin_tactical_room :: proc(room: ^Room) {
 	s.budget = s.config.timer_seconds
 	s.remaining = f32(s.budget)
 	s.cycle = 0
+	tactical_reset_window_pressure(s)
 	s.dodge_recovery = 0
 	s.clock_fraction = 0
 	s.queued_beats = 0
 	s.cast_remaining, s.cast_duration = 0, 0
+	s.action_remaining, s.action_duration = 0, 0
+	tactical_reset_beats(s)
+	tactical_reset_shadow(s)
+	s.fate_sides = 0
 	for &enemy in room.enemies { enemy.tactical_cooldown = 0 }
 }
 
@@ -118,19 +196,32 @@ tactical_end_combat :: proc(room: ^Room) {
 	s.budget = s.config.timer_seconds
 	s.phase = .Decision
 	s.remaining = f32(s.budget)
+	tactical_reset_window_pressure(s)
 	s.dodge_recovery = 0
 	s.clock_fraction = 0
 	s.queued_beats = 0
 	s.cast_remaining, s.cast_duration = 0, 0
+	s.action_remaining, s.action_duration = 0, 0
+	tactical_reset_beats(s)
+	tactical_reset_shadow(s)
 	room.tactical_pulse = {}
 	room.qte = {}
+	// A fight over (the player fallen, or the room cleared) holds no rope and
+	// rolls no ball.
+	room.lasso = {}
+	room.pinball = {}
+	// Nor his eyes: the board rises back to its own view. The shots fired stay
+	// counted for it.
+	room.first_person.active, room.first_person.trigger = false, false
 }
 
 tactical_finish_cycle_pulse :: proc(room: ^Room, forced: bool) {
 	s := &room.player.tactical
 	s.dodge_recovery = max(0, s.dodge_recovery-1)
 	if forced { s.metrics.forced_pulses += 1 }
-	if s.phase != .Recovery { s.phase = .Decision }
+	// Only the beat's own Resolving hands the window back: no pulse ever
+	// finishes inside a shadow, and none may end one.
+	if s.phase == .Resolving { s.phase = .Decision }
 	tactical_queue_next_beat(room)
 	tactical_finish_recovery(room)
 }
@@ -141,7 +232,10 @@ tactical_tick :: proc(room: ^Room, dt: f32, available: bool, hologram: bool) -> 
 	if !tactical_enabled(room) || room.phase != .Combat || !available ||
 	   room.tactical_pulse.pending || room.qte.kind != .None { return false }
 	s := &room.player.tactical
-	if s.phase != .Decision && s.phase != .Recovery { return false }
+	// Inside the shadow only its own clock runs: the window, the world beats,
+	// the enemies and any stun stay exactly where they were.
+	if s.phase == .Shadow { tactical_shadow_tick(room, dt); return false }
+	if s.phase != .Decision && !tactical_between_windows(s) { return false }
 	if s.cast_remaining > 0 {
 		elapsed := min(max(f32(0), dt), s.cast_remaining)
 		s.cast_remaining = max(f32(0), s.cast_remaining-elapsed)
@@ -158,15 +252,24 @@ tactical_tick :: proc(room: ^Room, dt: f32, available: bool, hologram: bool) -> 
 	// The final charged beat can finish on a zero-delta controller frame. A
 	// deadline already reached must still publish its explicit timeout command.
 	if s.remaining <= 0 {
-		if s.phase == .Recovery { tactical_finish_recovery(room); return false }
+		if tactical_between_windows(s) { tactical_finish_recovery(room); return false }
 		return true
 	}
 	if !(dt > 0) { return false }
+	// A timed action runs on the same real seconds as the window.
+	if s.action_remaining > 0 {
+		s.action_remaining = max(f32(0), s.action_remaining-dt)
+		if s.action_remaining < 0.00001 { s.action_remaining = 0 }
+	}
 	elapsed := min(dt, max(f32(0), s.remaining))
+	before := s.clock_fraction
 	tactical_advance_clock(room, elapsed)
+	tactical_note_beat_time(s, before, elapsed)
+	// The Lazzo spins on the same seconds; the controller spins them out.
+	tactical_lasso_tick(room, elapsed)
 	s.metrics.decision_seconds += f64(elapsed)
 	if hologram { s.metrics.hologram_seconds += f64(elapsed) }
-	if s.phase == .Recovery { tactical_finish_recovery(room); return false }
+	if tactical_between_windows(s) { tactical_finish_recovery(room); return false }
 	return s.remaining <= 0 && !room.tactical_pulse.pending
 }
 
@@ -189,7 +292,8 @@ continue_tactical_pulse :: proc(room: ^Room) -> bool {
 		for protect_pass in 0..<2 {
 			for id in ids[:count] {
 				index, found := enemy_index_by_id(room, id)
-				if !found { continue }
+				// A foe out of play (the Lazzo's, the Pinball's) does nothing.
+				if !found || enemy_is_out_of_play(room, id) { continue }
 				// Stagger interrupts committed telegraphs before its status expires,
 				// even when this enemy's ordinary cadence is not due yet.
 				if room.enemies[index].tactical_cooldown > 0 && !enemy_is_staggered(room, &room.enemies[index]) { continue }
@@ -305,7 +409,7 @@ tactical_cell_visible :: proc(room: ^Room, position: grid.Position) -> bool {
 	if !grid.contains(&room.level_data.tiles, position) { return false }
 	s := &room.player.tactical
 	if !s.config.enabled || s.config.vision_size == 0 { return true }
-	origin := room.player.position
+	origin := tactical_view_origin(room)
 	return tactical_in_footprint(tactical_vision_size(s.config, &room.player.statuses), s.facing, origin, position) &&
 		tactical_line_visible(origin, position, tactical_room_opaque, room)
 }
@@ -338,6 +442,8 @@ begin_diagonal_qte :: proc(room: ^Room, offset: grid.Position) -> bool {
 }
 
 offer_defense_qte :: proc(room: ^Room, enemy: ^Enemy) -> bool {
+	// A stunned player cannot defend: only cards are left.
+	if tactical_is_stunned(room) { return false }
 	intent := &enemy.intent
 	if enemy_is_staggered(room, enemy) || intent.windup || (intent.kind != .Attack && intent.kind != .Charge) || intent.target_object != 0 || enemy.position != intent.origin ||
 	   !enemy_intent_cell_is_threatened(intent, room.player.position) ||
@@ -346,6 +452,8 @@ offer_defense_qte :: proc(room: ^Room, enemy: ^Enemy) -> bool {
 		index, found := enemy_index_by_id(room, enemy.id)
 		if !found || !enemy_charge_path_is_clear(room, index, intent) { return false }
 	}
+	// RIFLESSO answers this blow by itself (deflect_enemy_blow): no defence to choose.
+	if player_charges(room, .Deflect) > 0 { return false }
 	defenses: bit_set[Defense_Mode]
 	if _, found := status_for_entity(room, PLAYER_ENTITY, .Shield); found { defenses += {.Block, .Parry} }
 	if _, found := status_for_entity(room, PLAYER_ENTITY, .Thorns); found && enemy.archetype == .Archer { defenses += {.Deflect} }
@@ -374,6 +482,8 @@ resolve_qte :: proc(room: ^Room, requested_success: bool, dodge_direction: Move_
 	q := room.qte
 	room.qte = {}
 	clear_event_log(&room.recent_events)
+	// One report for the dodge's bite and the pulse a terminal answer ends.
+	pulse: Pulse_Report
 	if q.kind == .Diagonal {
 		if success {
 			action := make_action(.Move, PLAYER_ENTITY, cell_target(q.destination), .Walkable_Cell)
@@ -414,14 +524,21 @@ resolve_qte :: proc(room: ^Room, requested_success: bool, dodge_direction: Move_
 				report := resolve_action(room, &action)
 				success = report.accepted
 				append_event_log(&room.recent_events, &report.events)
-				if success { start_tactical_dodge_recovery(room); room.player.tactical.facing = dodge_direction }
+				if success {
+					start_tactical_dodge_recovery(room)
+					room.player.tactical.facing = dodge_direction
+					// A dodge is the player's action, whichever key starts it: his
+					// poison bites. Block, parry and deflect answer a blow only.
+					tick_poison_on_action(room, PLAYER_ENTITY, &pulse)
+					append_event_log(&room.recent_events, &pulse.events)
+					pulse = {}
+				}
 			}
 		}
 	}
 	if success { room.player.tactical.metrics.qte_successes += 1 }
 	else { room.player.tactical.metrics.qte_failures += 1 }
 	if q.kind == .Defense && room.phase != .Combat && room.tactical_pulse.started {
-		pulse: Pulse_Report
 		finish_combat_pulse(room, &pulse)
 		append_event_log(&room.recent_events, &pulse.events)
 		collect_loot_in_magnet_range(room)

@@ -77,6 +77,11 @@ Renderer :: struct {
 	frame_clock_valid: bool,
 	frame_had_cinematic: bool,
 	sprite_assets: Sprite_Assets,
+	// Every command's presentation gets the next number (Presentation_Cue.batch).
+	cue_batches: u32,
+	// Every kind of game event the board was handed to show, since its owner
+	// last cleared this (MOSTRA EFFETTO's takes: main/card_demo.odin).
+	shown_events: bit_set[game.Game_Event_Kind],
 }
 
 Tile_Vertices :: struct {
@@ -119,7 +124,7 @@ hand_card_step :: proc(renderer: ^Renderer, card_count: int) -> f32 {
 }
 
 hand_card_bounds :: proc(renderer: ^Renderer, card_index, card_count: int) -> rl.Rectangle {
-	if renderer == nil || card_count <= 0 || card_count > game.MAX_HAND_CARDS ||
+	if renderer == nil || card_count <= 0 || card_count > game.MAX_HAND_CAPACITY ||
 	   card_index < 0 || card_index >= card_count {
 		return {}
 	}
@@ -138,7 +143,14 @@ hand_card_bounds :: proc(renderer: ^Renderer, card_index, card_count: int) -> rl
 }
 
 hand_raised_card_bounds :: proc(renderer: ^Renderer, card_index, card_count: int) -> rl.Rectangle {
-	if renderer != nil && renderer.tactical.enabled { return tactical_hand_card_bounds(renderer, card_index, card_count) }
+	// A raised card of an overlapping hand keeps the pointer from where it
+	// rests up to where it rose (tactical_hand_raised_card_bounds), so the
+	// rise never moves it away from under the mouse.
+	if renderer != nil && renderer.tactical.enabled {
+		resting := tactical_hand_card_bounds(renderer, card_index, card_count)
+		raised := tactical_hand_raised_card_bounds(renderer, card_index, card_count)
+		return {resting.x, raised.y, resting.width, resting.y+resting.height-raised.y}
+	}
 	resting := hand_card_bounds(renderer, card_index, card_count)
 	if resting.width <= 0 {
 		return {}
@@ -293,12 +305,40 @@ card_colors :: proc(id: game.Card_Id, affordable: bool) -> (fill, outline: rl.Co
 		fill, outline = rl.Color{61, 42, 77, 245}, rl.Color{230, 180, 255, 255}
 	case .Chain_Lightning, .Shock_Floor, .Tesla_Coil, .Storm_Crown:
 		fill, outline = rl.Color{25, 52, 73, 245}, rl.Color{119, 224, 255, 255}
+	case .Sei_Denari, .Sette_Denari:
+		fill, outline = rl.Color{72, 54, 24, 245}, rl.Color{236, 196, 96, 255}
 	case .Sundering_Blow:
 		fill, outline = rl.Color{74, 29, 34, 245}, rl.Color{245, 94, 100, 255}
 	case .Prismatic_Barrage:
 		fill, outline = rl.Color{65, 48, 75, 245}, rl.Color{247, 198, 112, 255}
 	case .Twin_Venom:
 		fill, outline = rl.Color{40, 58, 31, 245}, rl.Color{179, 237, 111, 255}
+	case .Shadow_Step:
+		fill, outline = rl.Color{33, 26, 48, 245}, rl.Color{164, 144, 183, 255}
+	case .Poison_Pool:
+		fill, outline = rl.Color{28, 58, 40, 245}, rl.Color{126, 206, 104, 255}
+	case .Wildfire:
+		fill, outline = rl.Color{78, 36, 22, 245}, rl.Color{250, 136, 60, 255}
+	case .Deflect:
+		fill, outline = rl.Color{30, 50, 66, 245}, rl.Color{150, 196, 228, 255}
+	case .Coffin:
+		fill, outline = rl.Color{60, 46, 30, 245}, rl.Color{226, 186, 120, 255}
+	case .Fate_Dice:
+		fill, outline = rl.Color{52, 34, 70, 245}, rl.Color{214, 170, 250, 255}
+	case .Venom_Blade:
+		fill, outline = rl.Color{30, 56, 40, 245}, rl.Color{150, 226, 110, 255}
+	// The Lazzo's hemp.
+	case .Lasso:
+		fill, outline = rl.Color{70, 52, 30, 245}, rl.Color{222, 178, 110, 255}
+	// The Canna da Pesca's water.
+	case .Fishing_Rod:
+		fill, outline = rl.Color{26, 48, 72, 245}, rl.Color{118, 186, 236, 255}
+	// The Pinball's steel.
+	case .Pinball:
+		fill, outline = rl.Color{44, 50, 60, 245}, rl.Color{196, 206, 220, 255}
+	// The First Person Shooter's gunmetal and olive.
+	case .First_Person:
+		fill, outline = rl.Color{40, 46, 38, 245}, rl.Color{176, 186, 132, 255}
 	case .Count:
 		fill, outline = rl.Color{45, 49, 52, 245}, rl.Color{105, 116, 116, 255}
 	}
@@ -311,6 +351,15 @@ card_colors :: proc(id: game.Card_Id, affordable: bool) -> (fill, outline: rl.Co
 
 card_detail_lines :: proc(card: game.Card_Instance) -> (first, second: cstring) {
 	upgrade := card.upgrade_level
+	// Dice cards share the tactical hand's die-aware text; the floor takes the
+	// narrow hand's shorter form to fit the classic card.
+	if card.definition_id == .Shock_Floor {
+		first, second, _ = gothic_card_narrow_lines(card)
+		return
+	}
+	// So do the tactical-only cards ("SOLO TATTICA"): the catalog gives their
+	// amounts, never a second table here.
+	if game.card_dice_count(card.definition_id) > 0 || game.card_requires_tactical(card.definition_id) { return gothic_card_lines(card) }
 	switch card.definition_id {
 	case .Strike:
 		return fmt.ctprintf("DEAL %d DAMAGE", 3+upgrade), "RANGE 1"
@@ -349,28 +398,22 @@ card_detail_lines :: proc(card: game.Card_Instance) -> (first, second: cstring) 
 	case .Heavy_Blow:
 		return fmt.ctprintf("DEAL %d DAMAGE", 5+upgrade), "RANGE 1"
 	case .Venom_Needle:
-		return fmt.ctprintf("%d DMG + 1 POISON", 1+upgrade), "LASTS 3 PULSES"
+		return fmt.ctprintf("%d DANNO + 1 VELENO", 1+upgrade), POISON_RULE_SHORT
 	case .Caustic_Bloom:
-		return fmt.ctprintf("APPLY %d POISON", 2+upgrade), "3X3 - 2 PULSES"
+		return fmt.ctprintf("%d VELENO NEL 3X3", 2+upgrade), POISON_RULE_SHORT
 	case .Purifying_Guard:
 		return fmt.ctprintf("GAIN %d SHIELD", 2+upgrade), "3 PULSES + CLEANSE"
 	case .Volatile_Study:
 		return "CREATE 1 SPARK", fmt.ctprintf("DRAW %d - EXHAUST", 1+upgrade)
-	case .Fate_Strike:
-		return fmt.ctprintf("%d + D6 DAMAGE", 2+upgrade), fmt.ctprintf("6: BOUNCE FOR %d", 3+upgrade)
 	case .Chain_Lightning:
 		return fmt.ctprintf("%d DAMAGE EACH", 3+upgrade), "UP TO 3 / HOP 3"
-	case .Sundering_Blow:
-		if upgrade == 0 { return "2D6 DAMAGE", "ROLL 8+: PUSH 1" }
-		return fmt.ctprintf("2D6 + %d DAMAGE", upgrade), "ROLL 8+: PUSH 1"
-	case .Prismatic_Barrage:
-		return fmt.ctprintf("3D6: 4+ = %d DMG", 3+upgrade), "1-3: 1 SHIELD EACH"
-	case .Twin_Venom:
-		return fmt.ctprintf("HIGHER D6 +%d DMG", 1+upgrade), "2D6 / PAIR: POISON 2"
-	case .Shock_Floor: return "D4 SHOCKS / D4 TARGETS", fmt.ctprintf("%d DMG / 3X3 / TRAP", 1+upgrade)
+	case .Fate_Strike, .Sundering_Blow, .Prismatic_Barrage, .Twin_Venom, .Shock_Floor, .Fate_Dice, .Venom_Blade,
+	     .Shadow_Step, .Poison_Pool, .Wildfire, .Deflect, .Coffin, .Lasso, .Fishing_Rod, .Pinball, .First_Person:
 	case .Tesla_Coil: return fmt.ctprintf("%d / DISTANCE DAMAGE", 8+upgrade), "FIELD CONSUMES 4 COILS"
 	case .Titan_Grip: return fmt.ctprintf("%d DAMAGE / THROW 2", 3+upgrade), "INTERRUPT / STAGGER 1"
 	case .Storm_Crown: return fmt.ctprintf("%d DAMAGE EACH", 5+upgrade), "LEGENDARY / CHAIN 3"
+	case .Sei_Denari: return "+6 GOLD", "SCOPA / EXHAUST"
+	case .Sette_Denari: return "+7 GOLD", "SCOPA / EXHAUST"
 	case .Count:
 	}
 	return "", ""
@@ -378,8 +421,8 @@ card_detail_lines :: proc(card: game.Card_Instance) -> (first, second: cstring) 
 
 dice_card_detail_lines :: proc(card: game.Card_Instance) -> (lines: [4]cstring) {
 	lines[0], lines[1] = card_detail_lines(card)
-	lines[2] = "SHIELD FIRST / 2P" if card.definition_id == .Prismatic_Barrage else "2 PULSES / IF ALIVE"
-	lines[3] = "RANGE 1-3 / LOS"
+	lines[2] = "SCUDO PRIMA / 2P" if card.definition_id == .Prismatic_Barrage else POISON_RULE_SHORT
+	lines[3] = "RAGGIO 1-3 / VISTA"
 	return
 }
 
@@ -443,6 +486,19 @@ card_short_name :: proc(id: game.Card_Id) -> cstring {
 	case .Tesla_Coil: return "TESLA"
 	case .Titan_Grip: return "TITAN"
 	case .Storm_Crown: return "CROWN"
+	case .Sei_Denari: return "6 ORO"
+	case .Sette_Denari: return "7 ORO"
+	case .Shadow_Step: return "OMBRA"
+	case .Poison_Pool: return "POZZA"
+	case .Wildfire: return "FUOCO"
+	case .Deflect: return "RIFLESSO"
+	case .Coffin: return "FERETRO"
+	case .Fate_Dice: return "DESTINO"
+	case .Venom_Blade: return "LAMA"
+	case .Lasso: return "LAZZO"
+	case .Fishing_Rod: return "CANNA"
+	case .Pinball: return "PINBALL"
+	case .First_Person: return "FPS"
 	case .Count:
 	}
 	return ""
@@ -640,6 +696,79 @@ draw_card_sigil :: proc(bounds: rl.Rectangle, id: game.Card_Id, color: rl.Color)
 			rl.DrawLineEx({x+sign*5, center.y-5}, {x-sign*3, center.y+12}, 3, color)
 			rl.DrawCircleV({x-sign*3, center.y+18}, 3, color)
 		}
+	case .Sei_Denari, .Sette_Denari:
+		coins := 6 if id == .Sei_Denari else 7
+		for index in 0..<coins {
+			p := center+rl.Vector2{f32(index%2)*16-8, f32(index/2)*12-14}
+			if index == 6 { p = center }
+			rl.DrawCircleLinesV(p, 5, color)
+		}
+	case .Shadow_Step:
+		// A hood sinking into its pool.
+		rl.DrawEllipse(c.int(center.x), c.int(center.y+12), radius, 6, color)
+		rl.DrawCircleLinesV({center.x, center.y-4}, 9, color)
+		rl.DrawLineEx({center.x-9, center.y-4}, {center.x-13, center.y+10}, 3, color)
+		rl.DrawLineEx({center.x+9, center.y-4}, {center.x+13, center.y+10}, 3, color)
+	case .Poison_Pool:
+		// A drop falling into its puddle.
+		rl.DrawEllipse(c.int(center.x), c.int(center.y+10), radius, 6, color)
+		rl.DrawCircleV({center.x, center.y-6}, 5, color)
+		rl.DrawTriangle({center.x, center.y-17}, {center.x-5, center.y-6}, {center.x+5, center.y-6}, color)
+	case .Wildfire:
+		// A flame and the plus it grows into.
+		rl.DrawTriangle({center.x, center.y-radius}, {center.x-8, center.y+8}, {center.x+8, center.y+8}, color)
+		for direction in ([4]rl.Vector2{{-1, 0}, {1, 0}, {0, -1}, {0, 1}}) {
+			rl.DrawCircleV(center+direction*(radius+4), 3, color)
+		}
+	case .Deflect:
+		// A buckler and the bolt it sends back.
+		rl.DrawCircleLinesV({center.x-6, center.y}, 12, color)
+		rl.DrawLineEx({center.x+4, center.y-6}, {center.x+radius+6, center.y-14}, 3, color)
+		rl.DrawTriangle({center.x+radius+8, center.y-15}, {center.x+radius-1, center.y-17}, {center.x+radius+3, center.y-8}, color)
+	case .Coffin:
+		// Three arrows, upright.
+		for index in 0..<3 {
+			x := center.x+f32(index-1)*10
+			rl.DrawLineEx({x, center.y+radius}, {x, center.y-radius+5}, 2, color)
+			rl.DrawTriangle({x, center.y-radius-1}, {x-4, center.y-radius+6}, {x+4, center.y-radius+6}, color)
+		}
+	case .Fate_Dice:
+		// One die showing its five, the critical face.
+		rl.DrawRectangleRoundedLinesEx({center.x-13, center.y-13, 26, 26}, 0.22, 4, 2, color)
+		rl.DrawCircleV(center, 3, color)
+		for pip in ([4]rl.Vector2{{-7, -7}, {7, -7}, {-7, 7}, {7, 7}}) { rl.DrawCircleV(center+pip, 2, color) }
+	case .Venom_Blade:
+		// A dagger, a drop at its point.
+		rl.DrawLineEx({center.x-radius, center.y+radius}, {center.x+radius-4, center.y-radius+4}, 4, color)
+		rl.DrawLineEx({center.x-radius+2, center.y+5}, {center.x-5, center.y+radius-2}, 3, color)
+		rl.DrawCircleV({center.x+radius-1, center.y-radius+12}, 3, color)
+	case .Lasso:
+		// A noose thrown open, its rope trailing down to a coil.
+		rl.DrawEllipseLines(c.int(center.x-3), c.int(center.y-6), radius-2, 10, color)
+		rl.DrawEllipseLines(c.int(center.x-3), c.int(center.y-6), radius-4, 8, color)
+		rl.DrawLineEx({center.x+9, center.y+2}, {center.x+14, center.y+12}, 3, color)
+		rl.DrawCircleLinesV({center.x+12, center.y+15}, 4, color)
+	case .Fishing_Rod:
+		// A rod bent over its line, the bobber on a ripple.
+		rl.DrawLineEx({center.x-radius, center.y+radius}, {center.x+radius-6, center.y-radius+2}, 3, color)
+		rl.DrawLineEx({center.x+radius-6, center.y-radius+2}, {center.x+radius-2, center.y+6}, 1, color)
+		rl.DrawCircleV({center.x+radius-2, center.y+8}, 3, color)
+		rl.DrawEllipseLines(c.int(center.x+radius-2), c.int(center.y+12), 9, 3, color)
+	case .Pinball:
+		// A ball off a round bumper, two strokes of its run.
+		rl.DrawCircleLinesV({center.x-4, center.y+3}, 10, color)
+		rl.DrawCircleV({center.x-8, center.y-1}, 2, color)
+		rl.DrawCircleLinesV({center.x+13, center.y-11}, 5, color)
+		rl.DrawLineEx({center.x-radius, center.y+radius-2}, {center.x-12, center.y+11}, 2, color)
+		rl.DrawLineEx({center.x-radius+5, center.y+radius+2}, {center.x-7, center.y+14}, 2, color)
+	case .First_Person:
+		// A crosshair: a ring, four ticks and its dot.
+		rl.DrawCircleLinesV(center, radius-4, color)
+		rl.DrawCircleLinesV(center, radius-5, color)
+		for direction in ([4]rl.Vector2{{-1, 0}, {1, 0}, {0, -1}, {0, 1}}) {
+			rl.DrawLineEx(center+direction*(radius-10), center+direction*(radius+2), 3, color)
+		}
+		rl.DrawCircleV(center, 2, color)
 	case .Count:
 	}
 }
@@ -849,7 +978,8 @@ draw_hand_counters :: proc(renderer: ^Renderer, deck: ^game.Deck_State) {
 	rl.DrawRectangle(right-116, c.int(bottom-48), 116, 48, rl.Color{12, 16, 19, 225})
 	rl.DrawRectangleLines(right-116, c.int(bottom-48), 116, 48, rl.Color{75, 86, 87, 255})
 	labels := [?]cstring{"DRAW", "DISC", "EXH"}
-	counts := [?]int{deck.draw_count, deck.discard_count, deck.exhaust_count}
+	// The Canna da Pesca waiting in Exhaust was never played.
+	counts := [?]int{deck.draw_count, deck.discard_count, game.deck_exhausted_count(deck)}
 	column_width: f32 = 116.0/3.0
 	for label, index in labels {
 		center_x := f32(right-116)+column_width*(f32(index)+0.5)
@@ -1014,6 +1144,7 @@ clear_event_animations :: proc(renderer: ^Renderer) {
 	if renderer != nil {
 		clear_event_timeline(&renderer.timeline)
 		clear_renderer_world_playback(renderer)
+		forget_flipbook_actors(renderer)
 	}
 }
 
@@ -1032,7 +1163,15 @@ begin_renderer_event_timeline :: proc(
 	}
 	clear_loot_animations(renderer)
 	clear_enemy_move_animations(renderer)
-	return begin_event_timeline(&renderer.timeline, before, events, after)
+	started := begin_event_timeline(&renderer.timeline, before, events, after)
+	if started && events != nil {
+		for event in events.events[:clamp(events.count, 0, len(events.events))] { renderer.shown_events += {event.kind} }
+	}
+	renderer.cue_batches += 1
+	for offset in 0..<renderer.timeline.count {
+		renderer.timeline.cues[(renderer.timeline.head+offset)%MAX_PRESENTATION_CUES].batch = renderer.cue_batches
+	}
+	return started
 }
 
 renderer_playback_speed :: proc(renderer: ^Renderer) -> f32 {
@@ -1058,7 +1197,8 @@ update_renderer_event_timeline :: proc(renderer: ^Renderer, dt: f32) -> bool {
 	was_busy := renderer_timeline_is_busy(renderer)
 	step := dt*renderer_playback_speed(renderer)
 	update_event_timeline(&renderer.timeline, step)
-	update_renderer_world_playback(renderer, step)
+	// The world's cues hold while the player is in his shadow.
+	if !renderer.tactical.shadow.active { update_renderer_world_playback(renderer, step) }
 	return was_busy && !renderer_timeline_is_busy(renderer)
 }
 
@@ -1723,6 +1863,10 @@ draw_card_target_range :: proc(renderer: ^Renderer, room: ^game.Room, card_id: u
 				}
 			}
 		}
+		// LAZZO: the foes it can take, the heavy ones, and its ring (lasso.odin).
+		if card.definition_id == .Lasso { draw_lasso_preview(renderer, room, card) }
+		// PINBALL: the foes it can take, the heavy ones, and the launch (pinball.odin).
+		if card.definition_id == .Pinball { draw_pinball_preview(renderer, room, card) }
 	} else {
 		request := game.card_target_request_at(definition, room.player.position)
 		evaluation := game.evaluate_card_targeting(room, card, request)
@@ -1801,6 +1945,10 @@ draw_card_target_range :: proc(renderer: ^Renderer, room: ^game.Room, card_id: u
 		)
 	}
 
+	// A pool's cells and the areas it closes, a fire's whole reach.
+	if game.card_places_ground(card.definition_id) {
+		draw_ground_preview(renderer, room, card.definition_id, evaluation.query.anchor, evaluation.error == .None)
+	}
 	// The anchor is drawn last so the intended drop cell remains unambiguous.
 	draw_card_range_cell(
 		renderer,
@@ -1829,13 +1977,16 @@ draw_card_target_range :: proc(renderer: ^Renderer, room: ^game.Room, card_id: u
 	}
 }
 
+// The statuses at a fighter's feet; the bounds of their paper tags (empty when
+// it has none). `tag_pixel` 0 sizes the tags by the board's zoom.
 draw_status_set :: proc(
 	renderer: ^Renderer,
 	statuses: ^game.Status_Set,
 	center: view.Vec2,
 	entity_radius: f32,
 	opacity: f32 = 1,
-) {
+	tag_pixel: f32 = 0,
+) -> (tags: rl.Rectangle) {
 	assert(renderer != nil && statuses != nil)
 	if index, found := game.status_index(statuses, .Shield); found {
 		shield := &statuses.items[index]
@@ -1928,6 +2079,11 @@ draw_status_set :: proc(
 			color,
 		)
 	}
+	// Bruciatura and Rallentamento: paper tags in a row under the feet, below
+	// the lower round markers.
+	pixel := tag_pixel if tag_pixel > 0 else (f32(2) if renderer.camera.zoom >= 2 else f32(1))
+	below := center.y+entity_radius*0.62+max(f32(4), 5*renderer.camera.zoom)+2
+	return draw_status_tags(statuses, to_raylib(center), below, opacity, pixel)
 }
 
 draw_entity_statuses :: proc(
@@ -1951,6 +2107,8 @@ Renderer_Status_View :: struct {
 	gold:        i32,
 	pulse_count: u64,
 	statuses:    game.Status_Set,
+	// The die DESTINO's bumps roll (its chip names it).
+	fate_sides:  i32,
 }
 
 renderer_status_view :: proc(renderer: ^Renderer, room: ^game.Room) -> (result: Renderer_Status_View) {
@@ -1966,6 +2124,7 @@ renderer_status_view :: proc(renderer: ^Renderer, room: ^game.Room) -> (result: 
 		result.gold = presentation.gold
 		result.pulse_count = presentation.pulse_count
 		result.statuses = presentation.player.statuses
+		result.fate_sides = presentation.fate_sides
 		return
 	}
 	result.phase = room.phase
@@ -1975,6 +2134,7 @@ renderer_status_view :: proc(renderer: ^Renderer, room: ^game.Room) -> (result: 
 	result.gold = room.player.gold
 	result.pulse_count = room.pulse_count
 	result.statuses = room.player.statuses
+	result.fate_sides = game.player_fate_sides(room)
 	return
 }
 
@@ -2264,14 +2424,21 @@ presentation_event_center :: proc(
 		return {}, false
 	}
 	presentation := renderer.tactical.snapshot if renderer.tactical.enabled && renderer.tactical.snapshot != nil else &renderer.timeline.view
+	// The player sunk in his shadow keeps the held world's cues on his body,
+	// not on the gliding pool (tactical_cue_actor_position).
+	shown_center :: proc(renderer: ^Renderer, actor: ^Presentation_Actor) -> view.Vec2 {
+		shown := actor^
+		if actor.entity == game.PLAYER_ENTITY && renderer.tactical.shadow.active { shown.position = renderer.tactical.shadow.body }
+		return presentation_actor_center(renderer, &shown)
+	}
 	if actor, found := presentation_actor_in_view(presentation, event.target); found {
-		return presentation_actor_center(renderer, actor), true
+		return shown_center(renderer, actor), true
 	}
 	if object, found := presentation_grid_object_in_view(presentation, event.target); found {
 		return presentation_grid_object_center(renderer, object), true
 	}
 	if actor, found := presentation_actor_in_view(presentation, event.source); found {
-		return presentation_actor_center(renderer, actor), true
+		return shown_center(renderer, actor), true
 	}
 	if object, found := presentation_grid_object_in_view(presentation, event.source); found {
 		return presentation_grid_object_center(renderer, object), true
@@ -2335,7 +2502,9 @@ timeline_card_cue_verb :: proc(cue: ^Presentation_Cue) -> cstring {
 	     .Attack_Missed, .Move_Blocked,
 	     .Gold_Gained, .Energy_Gained, .Binding_Added, .Binding_Exhausted, .Binding_Expired,
 	     .Pulse_Advanced, .Refocus, .Object_Spawned, .Explosive_Armed, .Explosion, .Explosive_Disarmed, .Room_Hazard_Triggered,
-	     .Dice_Rolled, .Spell_Launched, .Spell_Impact:
+	     .Dice_Rolled, .Spell_Launched, .Spell_Impact, .Shadow_Entered, .Shadow_Emerged, .Attack_Deflected, .Fate_Rolled,
+	     .Lasso_Caught, .Lasso_Struck, .Lasso_Released, .Fish_Cast, .Fish_Bite, .Fish_Caught,
+	     .Pinball_Made, .Pinball_Launched, .Pinball_Bounced, .Pinball_Bumped, .Pinball_Burst, .First_Person_Begun:
 	}
 	return nil
 }
@@ -2454,7 +2623,13 @@ draw_presentation_cue :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) {
 		draw_timeline_loot_drop_cue(renderer, cue)
 		return
 	}
-	if cue.kind == .Move || cue.kind == .Defeat || cue.kind == .Pulse_Advanced {
+	// The Lazzo's MOLLATO shows with its foe's fall (draw_lasso_release_badge);
+	// the Pinball's strike is the player's swing, and its ball touching a solid
+	// thing says nothing (it rings off it); the dive into the player's eyes is
+	// the camera's (first_person.odin).
+	if cue.kind == .Move || cue.kind == .Defeat || cue.kind == .Pulse_Advanced ||
+	   cue.kind == .Shadow_Entered || cue.kind == .Shadow_Emerged || cue.kind == .Lasso_Released ||
+	   cue.kind == .Pinball_Launched || cue.kind == .Pinball_Bounced || cue.kind == .First_Person_Begun {
 		return
 	}
 	center, has_center := presentation_event_center(renderer, cue.event)
@@ -2478,13 +2653,16 @@ draw_presentation_cue :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) {
 		label = fmt.ctprintf("+%d", cue.event.amount)
 		color = rl.Color{92, 220, 151, 255}
 	case .Status_Applied:
-		label = fmt.ctprintf("+%s %d", game.status_kind_name(cue.event.status), cue.event.amount)
+		name, _ := tactical_status_label(cue.event.status, false)
+		label = fmt.ctprintf("+%s %d", name, cue.event.amount)
 		color = rl.Color{169, 210, 216, 255}
 	case .Status_Removed:
-		label = fmt.ctprintf("-%s", game.status_kind_name(cue.event.status))
+		name, _ := tactical_status_label(cue.event.status, false)
+		label = fmt.ctprintf("-%s", name)
 		color = rl.Color{169, 183, 177, 255}
 	case .Status_Expired:
-		label = fmt.ctprintf("%s END", game.status_kind_name(cue.event.status))
+		name, _ := tactical_status_label(cue.event.status, false)
+		label = fmt.ctprintf("FINE %s", name)
 		color = rl.Color{169, 183, 177, 255}
 	case .Attack_Missed:
 		label = "MISS"
@@ -2528,9 +2706,43 @@ draw_presentation_cue :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) {
 	case .Binding_Expired:
 		label = "BINDING END"
 		color = rl.Color{169, 183, 177, 255}
+	case .Attack_Deflected:
+		label = "RIFLESSO"
+		color = rl.Color{101, 174, 218, 255}
+	case .Fate_Rolled:
+		label, color = fate_outcome_label(cue.event, true)
+	// LAZZO (lasso.odin): the throw, a hit or a smash.
+	case .Lasso_Caught:
+		label = "LAZZO"
+		color = LASSO_ROPE_LIGHT
+	case .Lasso_Struck:
+		label = fmt.ctprintf("SCHIANTO %d", cue.event.amount) if cue.event.target == game.SYSTEM_ENTITY else fmt.ctprintf("COLPO %d", cue.event.amount)
+		color = rl.Color{255, 112, 102, 255}
+	// CANNA DA PESCA (fishing.odin): the cast, the bite, the catch.
+	case .Fish_Cast:
+		label = "PESCA"
+		color = FISHING_WATER_LIGHT
+	case .Fish_Bite:
+		label = "!"
+		color = FISHING_BITE_RED
+	case .Fish_Caught:
+		label = fishing_catch_label(cue.event)
+		color = FISHING_WATER_LIGHT
+	// PINBALL (pinball.odin): the ball made, a foe struck and its value, the
+	// burst.
+	case .Pinball_Made:
+		label = "PINBALL"
+		color = PINBALL_STEEL_LIGHT
+	case .Pinball_Bumped:
+		label = fmt.ctprintf("COLPO %d", cue.event.amount)
+		color = rl.Color{255, 112, 102, 255}
+	case .Pinball_Burst:
+		label = "POP!"
+		color = PINBALL_STEEL_LIGHT
 	case .Move, .Card_Played, .Card_Drawn, .Card_Moved, .Card_Created, .Refocus,
 	     .Card_Refocused, .Defeat,
-	     .Loot_Dropped, .Loot, .Pulse_Advanced, .Dice_Rolled, .Spell_Launched, .Spell_Impact:
+	     .Loot_Dropped, .Loot, .Pulse_Advanced, .Dice_Rolled, .Spell_Launched, .Spell_Impact,
+	     .Shadow_Entered, .Shadow_Emerged, .Lasso_Released, .Pinball_Launched, .Pinball_Bounced, .First_Person_Begun:
 		unreachable()
 	}
 	draw_timeline_popup(renderer, label, color, center, presentation_cue_progress(cue))
@@ -2695,32 +2907,25 @@ draw_status :: proc(renderer: ^Renderer, room: ^game.Room, scale_mode: view.Scal
 	rl.DrawText(pulse_text, status_x, 74, status_font_size, rl.Color{169, 183, 177, 255})
 	status_x += rl.MeasureText(pulse_text, status_font_size)+status_gap
 
-	shield_index, has_shield := game.status_index(&status_view.statuses, .Shield)
-	poison_index, has_poison := game.status_index(&status_view.statuses, .Poison)
-	thorns_index, has_thorns := game.status_index(&status_view.statuses, .Thorns)
-	afterimage_index, has_afterimage := game.status_index(&status_view.statuses, .Afterimage)
-	if has_shield {
-		shield := &status_view.statuses.items[shield_index]
-		label := fmt.ctprintf("SHIELD %d:%d", shield.potency, shield.remaining_pulses)
-		rl.DrawText(label, status_x, 74, status_font_size, rl.Color{101, 174, 218, 255})
-		status_x += rl.MeasureText(label, status_font_size)+status_gap
+	// The player's statuses, each in its colour: a stack status its stacks,
+	// the others their potency and pulses left.
+	Classic_Status :: struct {
+		kind:  game.Status_Kind,
+		color: rl.Color,
 	}
-	if has_poison {
-		poison := &status_view.statuses.items[poison_index]
-		label := fmt.ctprintf("POISON %d:%d", poison.potency, poison.remaining_pulses)
-		rl.DrawText(label, status_x, 74, status_font_size, rl.Color{113, 190, 91, 255})
-		status_x += rl.MeasureText(label, status_font_size)+status_gap
+	classic_statuses := [?]Classic_Status{
+		{.Shield, {101, 174, 218, 255}}, {.Poison, {113, 190, 91, 255}}, {.Thorns, {238, 174, 73, 255}},
+		{.Afterimage, {194, 184, 226, 255}}, {.Burn, HUD_EMBER},
 	}
-	if has_thorns {
-		thorns := &status_view.statuses.items[thorns_index]
-		label := fmt.ctprintf("THORNS %d:%d", thorns.potency, thorns.remaining_pulses)
-		rl.DrawText(label, status_x, 74, status_font_size, rl.Color{238, 174, 73, 255})
+	for entry in classic_statuses {
+		index, found := game.status_index(&status_view.statuses, entry.kind)
+		if !found { continue }
+		status := status_view.statuses.items[index]
+		name, _ := tactical_status_label(entry.kind, false)
+		label := fmt.ctprintf("%s %d", name, status.potency) if game.status_kind_stacks(entry.kind) else
+			fmt.ctprintf("%s %d:%d", name, status.potency, status.remaining_pulses)
+		rl.DrawText(label, status_x, 74, status_font_size, entry.color)
 		status_x += rl.MeasureText(label, status_font_size)+status_gap
-	}
-	if has_afterimage {
-		afterimage := &status_view.statuses.items[afterimage_index]
-		label := fmt.ctprintf("AFTERIMAGE %d:%d", afterimage.potency, afterimage.remaining_pulses)
-		rl.DrawText(label, status_x, 74, status_font_size, rl.Color{194, 184, 226, 255})
 	}
 	rl.DrawFPS(c.int(renderer.canvas_width)-96, 18)
 }

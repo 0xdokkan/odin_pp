@@ -38,14 +38,14 @@ create_m7_independent_world_room :: proc(data: ^level.Level, player: ^game.Playe
 }
 
 // Feed a fresh movement press through the same controller/poll/commit path as
-// the native loop. A buffered command does not satisfy this fixture: movement
-// must be accepted on the exact frame on which the press arrives.
+// the native loop. Nothing is ever held for later: movement must be accepted
+// on the exact frame on which the press arrives.
 m7_independent_fresh_move :: proc(controller: ^Tactical_Controller, room: ^game.Room,
 	renderer: ^render.Renderer, cards: ^Card_Interaction_State,
 	buffer: ^Buffered_Gameplay_Command, direction: game.Move_Direction) -> bool {
 	input := Tactical_Controller_Input{focused = true}
 	input.directions[int(direction)] = true
-	if step_tactical_controller(controller, room, renderer, cards, buffer, 0, true, input) || buffer.occupied { return false }
+	if step_tactical_controller(controller, room, renderer, cards, buffer, 0, true, input) { return false }
 	return commit_gameplay_command(room, renderer, cards,
 		{kind = .Move, origin_phase = .Combat, direction = direction})
 }
@@ -134,5 +134,5 @@ run_m7_independent_world_smoke :: proc(window: ^app.Window, renderer: ^render.Re
 	return player.tactical.metrics.decision_seconds > 2 &&
 		player.tactical.remaining < f32(player.tactical.config.timer_seconds)-5 &&
 		!render.renderer_timeline_is_busy(renderer) && !room.tactical_pulse.pending &&
-		!buffer.occupied && room.qte.kind == .None && renderer.timeline.update_failures == 0
+		!buffer.chord.active && room.qte.kind == .None && renderer.timeline.update_failures == 0
 }

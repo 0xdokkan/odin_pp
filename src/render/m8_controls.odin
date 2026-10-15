@@ -4,27 +4,18 @@ import rl "vendor:raylib"
 import game "../game"
 import view "../view"
 
-M8_Control :: enum {None, Activate, Equip, Character, Ring, FPS}
+M8_Control :: enum {None, Activate, Equip, Character}
 
 // One layout drives drawing, hit testing and board occlusion. Loot controls
 // move to the footer; hidden equipment never leaves an invisible hit region.
 m8_active_bar_bounds :: proc(renderer: ^Renderer, room: ^game.Room = nil) -> rl.Rectangle {
+    return m8_bar_bounds(renderer, room != nil && room.phase == .Loot)
+}
+
+// The bar in a fight, or in the footer once the room is cleared (`loot`).
+m8_bar_bounds :: proc(renderer: ^Renderer, loot: bool) -> rl.Rectangle {
     width := min(f32(932), renderer.canvas_width-28)
-    loot := room != nil && room.phase == .Loot
     return {(renderer.canvas_width-width)*0.5, renderer.canvas_height-(46 if loot else 218), width, 28}
-}
-
-m8_activity_bounds :: proc(width, height: f32, index: int) -> rl.Rectangle {
-    total := min(f32(320), width-28)
-    cell := (total-6)/2
-    // The center stays open for the exit arch and the path to it.
-    return {width-total-14+f32(index%2)*(cell+6), height-114+f32(index/2)*32, cell, 26}
-}
-
-// The host draws this offer, but it participates in the same board occlusion
-// as the item buttons. An offer click must never also target the tile beneath.
-m8_extra_challenge_bounds :: proc(width,height:f32) -> rl.Rectangle {
-    return m8_activity_bounds(width,height,2)
 }
 
 m8_control_bounds :: proc(renderer: ^Renderer, control: M8_Control, room: ^game.Room = nil) -> rl.Rectangle {
@@ -36,8 +27,6 @@ m8_control_bounds :: proc(renderer: ^Renderer, control: M8_Control, room: ^game.
     case .Equip: return {b.x+b.width*0.64,b.y,b.width*0.14-6,b.height}
     // The character sheet lives with the other commands in the top dock.
     case .Character: return tactical_hud_layout(renderer).character
-    case .Ring: return m8_activity_bounds(renderer.canvas_width,renderer.canvas_height,0)
-    case .FPS: return m8_activity_bounds(renderer.canvas_width,renderer.canvas_height,1)
     case .None: return {}
     }
     return {}
@@ -59,8 +48,6 @@ m8_control_visible :: proc(room: ^game.Room, control: M8_Control) -> bool {
     case .Activate: return game.board_device_count(room,.Tesla_Coil)>0
     case .Equip: return room.player.equipment.reserve.id != .None
     case .Character: return true
-    case .Ring: return room.phase == .Loot && !room.ring_challenge_attempted
-    case .FPS: return room.phase == .Loot
     case .None: return false
     }
     return false
@@ -71,17 +58,18 @@ m8_hud_contains_point :: proc(renderer: ^Renderer, room: ^game.Room, point: view
         if m8_control_visible(room,control) && point_in_rectangle(point,m8_control_bounds(renderer,control,room)) {return true}
     }
     if room == nil || room.player == nil {return false}
-    if room.phase == .Loot && !room.minigame_challenge_attempted &&
-       point_in_rectangle(point,m8_extra_challenge_bounds(renderer.canvas_width,renderer.canvas_height)) {return true}
     equipment := room.player.equipment
     if (equipment.weapon.id != .None || equipment.reserve.id != .None) && point_in_rectangle(point,m8_weapon_bounds(renderer,room)) {return true}
     return game.board_device_count(room,.Shock_Floor)>0 && point_in_rectangle(point,m8_trap_status_bounds(renderer,room))
 }
 
+// A control the pointer can use now. Behind the player's eyes (and while the
+// view rises from them) the pointer is the view's and reaches none: each one
+// is drawn off (first_person_owns_pointer).
 m8_control_enabled :: proc(renderer: ^Renderer, room: ^game.Room, control: M8_Control) -> bool {
     if renderer == nil || room == nil || room.player == nil || !renderer.tactical.enabled || !m8_control_visible(room,control) ||
        (room.phase != .Combat && room.phase != .Loot) || room.qte.kind != .None ||
-       game.tactical_is_casting(room) || renderer_blocks_player_input(renderer) { return false }
+       game.tactical_is_casting(room) || renderer_blocks_player_input(renderer) || first_person_owns_pointer(renderer, room) { return false }
     switch control {
     case .Activate: return game.board_devices_can_activate(room)
     case .Equip:
@@ -89,15 +77,13 @@ m8_control_enabled :: proc(renderer: ^Renderer, room: ^game.Room, control: M8_Co
         return game.tactical_allows_action(room) && equipment.reserve.id != .None &&
             game.weapon_slot_valid(equipment.reserve) && game.weapon_slot_valid(equipment.weapon)
     case .Character: return !renderer_timeline_is_busy(renderer)
-    case .Ring: return room.phase == .Loot && !room.ring_challenge_attempted && !renderer_timeline_is_busy(renderer)
-    case .FPS: return room.phase == .Loot && !renderer_timeline_is_busy(renderer)
     case .None: return false
     }
     return false
 }
 
 m8_control_at_point :: proc(renderer: ^Renderer, room: ^game.Room, point: view.Vec2) -> M8_Control {
-    for control in ([5]M8_Control{.Activate,.Equip,.Character,.Ring,.FPS}) {
+    for control in ([3]M8_Control{.Activate,.Equip,.Character}) {
         if m8_control_enabled(renderer,room,control) && point_in_rectangle(point,m8_control_bounds(renderer,control,room)) { return control }
     }
     return .None

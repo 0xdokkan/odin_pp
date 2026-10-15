@@ -18,11 +18,33 @@ GOTHIC_BLUE :: ui.GOTHIC_PALETTE.focus
 GOTHIC_RECESS :: ui.GOTHIC_PALETTE.panel
 GOTHIC_FONT_SIZES :: [?]int{10, 12, 14, 16, 18, 24, 32}
 
+// The card icon atlas: the 16 painted icons in four rows of four, then the
+// rows added by tools/art/build_card_icons.py (cell 16: Movimento Ombra, 17:
+// Pozza di Veleno, 18: Incendio, 19: Deflect, 20: Feretro, 21: Dado del
+// Destino, 22: Lama Velenosa, 23: Lazzo, 24: Canna da Pesca, 25: Pinball,
+// 26: First Person Shooter; 27 is free).
+CARD_ICON_COLUMNS :: 4
+CARD_ICON_ROWS :: 7
+CARD_ICON_CELLS :: CARD_ICON_COLUMNS*CARD_ICON_ROWS
+// The figure atlas: four rows of four.
+GOTHIC_FIGURE_CELLS :: 16
+
 Gothic_Art :: struct {
 	icons, figures, paper: rl.Texture2D,
-	figure_sources, icon_sources: [16]rl.Rectangle,
+	// The Scopa 6 and 7 of coins (tools/art/build_scopa.py), side by side.
+	scopa: rl.Texture2D,
+	figure_sources: [GOTHIC_FIGURE_CELLS]rl.Rectangle,
+	icon_sources: [CARD_ICON_CELLS]rl.Rectangle,
 	figure_alpha: []u8,
 	fonts: [len(GOTHIC_FONT_SIZES)]rl.Font,
+}
+
+// A cell of a four-column atlas `rows` cells high, in pixels (right and
+// bottom excluded). The icons' added rows leave the painted four where they
+// were: 2195/7, 1881/6 and 1254/4 rows start on the same pixels.
+gothic_atlas_cell :: proc(cell, rows, width, height: int) -> (left, top, right, bottom: int) {
+	return cell%CARD_ICON_COLUMNS*width/CARD_ICON_COLUMNS, cell/CARD_ICON_COLUMNS*height/rows,
+		(cell%CARD_ICON_COLUMNS+1)*width/CARD_ICON_COLUMNS, (cell/CARD_ICON_COLUMNS+1)*height/rows
 }
 
 gothic_hash :: proc(x, y: int) -> u32 {
@@ -42,16 +64,16 @@ create_gothic_art :: proc(art: ^Gothic_Art) {
 		colors := rl.LoadImageColors(img)
 		texture := rl.LoadTextureFromImage(img)
 		rl.SetTextureFilter(texture, .POINT)
-		sources := &art.icon_sources if index == 0 else &art.figure_sources
+		sources := art.icon_sources[:] if index == 0 else art.figure_sources[:]
+		atlas_rows := len(sources)/CARD_ICON_COLUMNS
 		if index == 0 { art.icons = texture }
 		else {
 			art.figures = texture
 			art.figure_alpha = make([]u8, int(img.width)*int(img.height))
 			for &alpha, at in art.figure_alpha { alpha = colors[at].a }
 		}
-		for cell in 0..<16 {
-			left, right := cell%4*int(img.width)/4, (cell%4+1)*int(img.width)/4
-			top, bottom := cell/4*int(img.height)/4, (cell/4+1)*int(img.height)/4
+		for cell in 0..<len(sources) {
+			left, top, right, bottom := gothic_atlas_cell(cell, atlas_rows, int(img.width), int(img.height))
 			if index == 1 {
 				// The generated 1254px sheet has uneven transparent gutters.
 				// Explicit regions keep every figure whole and isolated; crop
@@ -80,6 +102,12 @@ create_gothic_art :: proc(art: ^Gothic_Art) {
 		rl.ImageDrawPixel(&paper, c.int(x), c.int(y), {u8(218+shade), u8(207+shade), u8(184+shade), 255})
 	} }
 	art.paper = rl.LoadTextureFromImage(paper)
+	scopa_bytes := #load("../../assets/gothic/scopa-denari.png")
+	if scopa := rl.LoadImageFromMemory(".png", raw_data(scopa_bytes), c.int(len(scopa_bytes))); scopa.data != nil {
+		art.scopa = rl.LoadTextureFromImage(scopa)
+		rl.SetTextureFilter(art.scopa, .POINT)
+		rl.UnloadImage(scopa)
+	}
 	rl.SetTextureFilter(art.paper, .POINT)
 	rl.UnloadImage(paper)
 	body_bytes := #load("../../assets/fonts/Jersey10-Regular.ttf")
@@ -101,7 +129,7 @@ create_gothic_art :: proc(art: ^Gothic_Art) {
 	}
 }
 destroy_gothic_art :: proc(art: ^Gothic_Art) {
-	for texture in ([?]rl.Texture2D{art.icons, art.figures, art.paper}) { if texture.id != 0 { rl.UnloadTexture(texture) } }
+	for texture in ([?]rl.Texture2D{art.icons, art.figures, art.paper, art.scopa}) { if texture.id != 0 { rl.UnloadTexture(texture) } }
 	for font in art.fonts { if font.texture.id != 0 { rl.UnloadFont(font) } }
 	delete(art.figure_alpha)
 	art^ = {}
@@ -114,26 +142,38 @@ gothic_font :: proc(renderer: ^Renderer, size: int) -> (rl.Font, f32) {
 	if font.texture.id == 0 { return rl.GetFontDefault(), f32(size) }
 	return font, f32(sizes[index]+4 if sizes[index] < 24 else sizes[index]+8)
 }
-gothic_text_width :: proc(renderer: ^Renderer, text: cstring, size: int) -> f32 {
+gothic_text_width :: proc(renderer: ^Renderer, text: cstring, size: int, spacing: f32 = 1) -> f32 {
 	font, actual := gothic_font(renderer, size)
-	return rl.MeasureTextEx(font, text, actual, 1).x
+	return rl.MeasureTextEx(font, text, actual, spacing).x
 }
-gothic_text :: proc(renderer: ^Renderer, text: cstring, x, y: f32, size: int, color: rl.Color) {
+gothic_text :: proc(renderer: ^Renderer, text: cstring, x, y: f32, size: int, color: rl.Color, spacing: f32 = 1) {
 	font, actual := gothic_font(renderer, size)
-	rl.DrawTextEx(font, text, {math.round(x), math.round(y)}, actual, 1, color)
+	rl.DrawTextEx(font, text, {math.round(x), math.round(y)}, actual, spacing, color)
 }
+// How gothic_text_fit sets a text in a width: as it is, its letters closed up,
+// a size smaller, or cut short ("...").
+Gothic_Fit :: enum {Fits, Closed, Smaller, Cut}
+
+// The size, letter spacing and words gothic_text_fit draws `text` with in
+// `width`, and how it had to fit them.
+gothic_text_fit_plan :: proc(renderer: ^Renderer, text: cstring, width: f32, size: int) -> (chosen: int, spacing: f32, label: cstring, fit: Gothic_Fit) {
+	if gothic_text_width(renderer, text, size) <= width { return size, 1, text, .Fits }
+	// The pixel font is crisp only at some sizes; a smaller one bends its
+	// figures (an "o" reads as an "a"). Close the letters up first.
+	if gothic_text_width(renderer, text, size, 0) <= width { return size, 0, text, .Closed }
+	chosen = size
+	for chosen > 10 && gothic_text_width(renderer, text, chosen) > width { chosen -= 2 }
+	if gothic_text_width(renderer, text, chosen) <= width { return chosen, 1, text, .Smaller }
+	value := string(text)
+	end := len(value)
+	for end > 0 && gothic_text_width(renderer, fmt.ctprintf("%s...", value[:end]), chosen) > width { end -= 1 }
+	return chosen, 1, fmt.ctprintf("%s...", value[:end]), .Cut
+}
+
 gothic_text_fit :: proc(renderer: ^Renderer, text: cstring, bounds: rl.Rectangle, size: int, color: rl.Color) {
-	chosen := size
-	for chosen > 10 && gothic_text_width(renderer, text, chosen) > bounds.width { chosen -= 2 }
-	label := text
-	if gothic_text_width(renderer, label, chosen) > bounds.width {
-		value := string(text)
-		end := len(value)
-		for end > 0 && gothic_text_width(renderer, fmt.ctprintf("%s...", value[:end]), chosen) > bounds.width { end -= 1 }
-		label = fmt.ctprintf("%s...", value[:end])
-	}
+	chosen, spacing, label, _ := gothic_text_fit_plan(renderer, text, bounds.width, size)
 	rl.BeginScissorMode(c.int(bounds.x), c.int(bounds.y), c.int(bounds.width), c.int(bounds.height))
-	gothic_text(renderer, label, bounds.x, bounds.y, chosen, color)
+	gothic_text(renderer, label, bounds.x, bounds.y, chosen, color, spacing)
 	rl.EndScissorMode()
 }
 gothic_wrapped_text :: proc(renderer: ^Renderer, value: string, x, y, width: f32, color: rl.Color) {
@@ -224,6 +264,19 @@ gothic_card_icon :: proc(id: game.Card_Id) -> int {
 	case .Fate_Strike, .Prismatic_Barrage: return 13
 	case .Chain_Lightning, .Tesla_Coil, .Shock_Floor, .Storm_Crown: return 14
 	case .Purifying_Guard: return 15
+	case .Shadow_Step: return 16
+	case .Poison_Pool: return 17
+	case .Wildfire: return 18
+	case .Deflect: return 19
+	case .Coffin: return 20
+	case .Fate_Dice: return 21
+	case .Venom_Blade: return 22
+	case .Lasso: return 23
+	case .Fishing_Rod: return 24
+	case .Pinball: return 25
+	case .First_Person: return 26
+	// Scopa cards draw their own art (draw_scopa_card); this is the fallback.
+	case .Sei_Denari, .Sette_Denari: return 9
 	case .Count: return 0
 	}
 	return 0

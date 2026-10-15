@@ -9,8 +9,14 @@ import render "render"
 // One scene for the menu and the room challenge. Only the caller settles
 // run unlocks; standalone retries can never mutate the roguelike profile.
 Ring_Input_Action :: enum { Left, Right, Forward, Back, Jab, Heavy, Grab, Dodge, Guard }
+// A ring opened from the run: who enters, and what the duel leaves of them.
+Ring_Run_Link :: struct {
+	entered, final: fight.Roster,
+	reported: bool,
+}
 Ring_Minigame :: struct {
 	session: M9_Session,
+	link: ^Ring_Run_Link,
 	renderer: ^render.Renderer,
 	assets_ready, demo: bool,
 	actions: input.Action_Map(Ring_Input_Action),
@@ -20,7 +26,7 @@ Ring_Minigame :: struct {
 
 ring_minigame_info :: proc() -> host.Minigame_Info {
 	return {id="ring", title="Il Ring delle Ombre", genre="Duello 3D",
-		tagline="Sfida il campione. Schiva il colpo, spezza la guardia e chiudi con una presa. Nella run, le vittorie sbloccano carte.",
+		tagline="Sfida il campione. Schiva il colpo, spezza la guardia e chiudi con una presa. Nella run si apre chiudendo i nemici in un quadrato di quattro Tesla.",
 		controls="WASD / stick: muovi   1 / X: pugno   2 / Y: pesante\n3 / RB: presa   Spazio / A: schiva   Shift / LB: para",
 		accent=render.GOTHIC_BLUE, create=ring_minigame_create}
 }
@@ -52,7 +58,17 @@ ring_minigame_create :: proc(config: host.Minigame_Config) -> host.Scene {
 ring_minigame_reset :: proc(data: rawptr, config: host.Minigame_Config) {
 	g := cast(^Ring_Minigame)data
 	begin_m9_session(&g.session,.Ring,false,false)
+	// From the run the roster enters: one opponent alone, or a tag match.
+	g.link = cast(^Ring_Run_Link)config.payload
+	if g.link != nil {fight.apply_roster(&g.session.ring,g.link.entered)}
+	ring_minigame_report(g)
 	input.suspend(&g.controls,&g.gate)
+}
+
+ring_minigame_report :: proc(g: ^Ring_Minigame) {
+	if g.link == nil {return}
+	g.link.final = fight.roster_outcome(&g.session.ring)
+	g.link.reported = true
 }
 
 ring_minigame_command :: proc(g: ^Ring_Minigame, sample: input.Sample(Ring_Input_Action), dt: f32) -> fight.Input {
@@ -76,6 +92,7 @@ ring_minigame_advance :: proc(g: ^Ring_Minigame, dt: f32, playing: bool, command
 		g.session.paused=false
 		step_m9_session(&g.session,dt,{focused=true,ring=command})
 	}
+	ring_minigame_report(g)
 	switch g.session.ring.result {
 	case .Active: return .Playing
 	case .Won: return .Won

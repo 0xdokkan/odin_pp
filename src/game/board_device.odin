@@ -50,6 +50,8 @@ board_device_can_deploy :: proc(room: ^Room, kind: Grid_Object_Kind, position: g
 	if kind == .Tesla_Coil {
 		if room.player.position == position { return false }
 		if _, occupied := enemy_index_at(room, position); occupied { return false }
+		// Never under the Pinball's rolling ball (pinball.odin).
+		if pinball_covers_cell(room, position) { return false }
 		return board_tesla_count(room) < MAX_TESLA_COILS
 	}
 	return board_device_count(room, .Shock_Floor) < MAX_SHOCK_FLOORS
@@ -62,11 +64,14 @@ deploy_device_effect :: proc(kind: Grid_Object_Kind, position: grid.Position, da
 deploy_board_device :: proc(room: ^Room, kind: Grid_Object_Kind, position: grid.Position, damage, charges: i32, events: ^Event_Log) -> bool {
 	if events == nil || events.count < 0 || events.count >= MAX_GAME_EVENTS ||
 	   !board_device_can_deploy(room, kind, position) || damage <= 0 ||
-	   (kind == .Shock_Floor && (charges < 1 || charges > 4)) { return false }
+	   (kind == .Shock_Floor && (charges < 1 || charges > TACTICAL_SHOCK_FLOOR_MAX_CHARGES)) { return false }
 	definition, _ := grid_object_definition(kind)
+	// A coil deployed on the tick is built twice as sturdy.
+	health := definition.max_health
+	if room.player != nil && room.player.tactical.critical_card && definition.max_health > 0 { health *= 2 }
 	object := Grid_Object{
 		id = room.next_object_id, kind = kind, position = position,
-		health = definition.max_health, max_health = definition.max_health,
+		health = health, max_health = health,
 		device_damage = damage, device_charges = charges, device_target_limit = charges,
 	}
 	room.next_object_id += 1
@@ -85,10 +90,11 @@ resolve_board_device_card :: proc(room: ^Room, instance: Card_Instance, target: 
 	roll: Dice_Roll
 	if instance.definition_id == .Shock_Floor {
 		rolled: bool
-		roll, rolled = roll_d4(&staged_dice)
+		roll, rolled = roll_card_dice(&staged_dice, instance)
 		if !rolled { return }
 		action.effects[0].charges = roll.total
 	}
+	tactical_critical_scale(room, &action)
 	origin := room.player.position
 	hit := resolve_action(room, &action)
 	if !hit.accepted { return }
@@ -311,7 +317,8 @@ activate_board_devices :: proc(room: ^Room) -> bool {
 	ids, count := enemy_ids_in_planning_order(room)
 	for id in ids[:count] {
 		index, found := enemy_index_by_id(room, id)
-		if found && board_device_network_contains_cell(room, &network, room.enemies[index].position) {
+		// The discharge never reaches a foe out of play.
+		if found && !enemy_is_out_of_play(room, id) && board_device_network_contains_cell(room, &network, room.enemies[index].position) {
 			added := add_effect(&action, damage_effect(enemy_entity(id), board_device_network_damage_at(room, &network, room.enemies[index].position)))
 			assert(added)
 		}
@@ -340,7 +347,7 @@ activate_board_devices :: proc(room: ^Room) -> bool {
 }
 
 // Dormant floors never spend charges. The first occupied beat also handles a
-// floor placed underneath an enemy. Once tripped, the committed d4 sequence
+// floor placed underneath an enemy. Once tripped, the committed die's sequence
 // runs to completion even if the area becomes empty again.
 tick_board_devices :: proc(room: ^Room, pulse: ^Pulse_Report) {
 	if room == nil || pulse == nil || room.phase != .Combat { return }
@@ -385,12 +392,14 @@ tick_board_devices :: proc(room: ^Room, pulse: ^Pulse_Report) {
 }
 
 
-// The committed d4 controls both repetition and target count. Equal distances
+// The committed die controls both repetition and target count. Equal distances
 // always use entity ID, independent of removals or physical array ordering.
 shock_floor_targets :: proc(room: ^Room, object: Grid_Object) -> (ids: [MAX_ENEMIES_PER_ROOM]u32, count: int) {
 	distances: [MAX_ENEMIES_PER_ROOM]int
 	for enemy in room.enemies {
-		if !shock_floor_contains_cell(room, object.position, enemy.position) { continue }
+		// A foe out of play (the Lazzo's over the floor, the Pinball's ball) is
+		// out of its reach.
+		if !shock_floor_contains_cell(room, object.position, enemy.position) || enemy_is_out_of_play(room, enemy.id) { continue }
 		distance := max(abs(object.position.x-enemy.position.x), abs(object.position.y-enemy.position.y))
 		at := count
 		for at > 0 && (distances[at-1] > distance || (distances[at-1] == distance && ids[at-1] > enemy.id)) {

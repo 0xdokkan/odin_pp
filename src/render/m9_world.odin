@@ -4,6 +4,7 @@ import "core:fmt"
 import "core:math"
 import engine "../engine"
 import fight "../fight"
+import game "../game"
 import shooter "../shooter"
 import view "../view"
 import ui "../engine/ui"
@@ -213,7 +214,7 @@ draw_m9_fight :: proc(renderer: ^Renderer, state: ^fight.State, v: M9_View) {
 	for i in order {
 		actor := state.fighters[i]
 		p := m9_mix_position(actor.previous,actor.position,1 if v.paused else v.alpha)
-		key := Sprite_Key.Player if i == 0 else .Brute
+		key := Sprite_Key.Player if i == 0 else m9_opponent_key(state, state.active)
 		lean,angle := f32(0),f32(0)
 		tint := rl.WHITE
 		if actor.action == .Jab || actor.action == .Heavy || actor.action == .Grab {
@@ -230,6 +231,15 @@ draw_m9_fight :: proc(renderer: ^Renderer, state: ^fight.State, v: M9_View) {
 		}
 		draw_m9_actor(renderer,key,p,lean,angle,tint)
 	}
+	// Tag partners wait on the apron at their corner posts.
+	for index in 0..<state.roster_count {
+		if !fight.roster_waiting(state,index) {continue}
+		post := m9_vector(fight.apron_post(state.roster[index].corner))
+		calling := index == state.tag_target
+		tint := rl.Color{255,236,190,255} if calling else rl.Color{196,200,214,255}
+		draw_m9_contact_shadow(post,fight.BODY_RADIUS)
+		draw_m9_actor(renderer,m9_opponent_key(state,index),post,0.08 if calling else 0,0,tint)
+	}
 	rlgl.DrawRenderBatchActive(); rlgl.EnableDepthMask()
 	if v.debug {
 		for body in state.world.actors[:state.world.actor_count] {draw_m9_body_debug(body,GOTHIC_BLUE)}
@@ -243,6 +253,28 @@ draw_m9_fight :: proc(renderer: ^Renderer, state: ^fight.State, v: M9_View) {
 	rl.EndMode3D()
 	draw_m9_fight_hud(renderer,state,v)
 	if !v.hosted {draw_m9_controls(renderer,v,&state.moves)}
+}
+
+// The board archetype behind a roster entry, or the classic champion.
+m9_opponent_key :: proc(state: ^fight.State, index: int) -> Sprite_Key {
+	if index < 0 || index >= state.roster_count { return .Brute }
+	kind := state.roster[index].kind
+	if kind < 0 || kind >= int(game.Enemy_Archetype.Count) { return .Brute }
+	return sprite_key_for_enemy(game.Enemy_Archetype(kind))
+}
+
+m9_opponent_name :: proc(state: ^fight.State, index: int) -> cstring {
+	if index < 0 || index >= state.roster_count { return "IL CAMPIONE" }
+	switch game.Enemy_Archetype(state.roster[index].kind) {
+	case .Chaser: return "IL GHOUL"
+	case .Archer: return "L'ARCIERE"
+	case .Brute: return "IL BRUTO"
+	case .Bomber: return "IL BOMBAROLO"
+	case .Custodian: return "IL CUSTODE"
+	case .Demolitionist: return "IL DEMOLITORE"
+	case .Count:
+	}
+	return "IL CAMPIONE"
 }
 
 draw_m9_fps :: proc(renderer: ^Renderer, state, prior: ^shooter.State, v: M9_View) {

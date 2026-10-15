@@ -172,10 +172,12 @@ minigame_smoke_after_present :: proc(data: rawptr, frame: ^host.Frame) {
 }
 
 @(private = "file")
-launcher_start_run :: proc(l: ^Launcher, frame: ^host.Frame) {
+launcher_start_run :: proc(l: ^Launcher, frame: ^host.Frame, mechanics_lab := false) {
 	rs := roguelike_session_new()
 	rs.options = l.options
 	rs.options.seed = rng.next_u64(&l.seeds)
+	rs.options.mechanics_lab = mechanics_lab
+	if mechanics_lab { rs.options.tactical.enabled = true }
 	rs.from_launcher = true
 	if roguelike_prepare(rs) != .Ready || roguelike_attach(rs, frame.window) != .Ready {
 		roguelike_destroy(rs)
@@ -223,11 +225,18 @@ launcher_update :: proc(data: rawptr, frame: ^host.Frame) {
 	ui.cut_top(&run, 8)
 	ui.paragraph(ctx, ui.cut_top(&run, 76), "Carte, dadi e reliquie.\nSette livelli per raggiungere\nil cuore della torre.", .Body, p.text_dim)
 	start := ui.cut_bottom(&run, 42)
-	ui.cut_bottom(&run, 10)
-	ui.paragraph(ctx, run, "Leggi gli intenti. Scegli il momento.\nLe sfide nelle stanze ripulite\nricompensano la tua audacia.", .Small, p.text_dim)
+	ui.cut_bottom(&run, 8)
+	lab := ui.cut_bottom(&run, 32)
+	ui.cut_bottom(&run, 8)
+	ui.paragraph(ctx, run, "Leggi gli intenti. Colpisci sul\nsecondo: la torre nasconde\nsegreti per chi osa.", .Small, p.text_dim)
 	if ui.button(ctx, start, "Inizia l'ascesa", primary = true) {
 		audio.play(frame.audio, .Confirm)
 		launcher_start_run(l, frame)
+	}
+	// A sandbox for trying new mechanics: an open arena, endless enemies.
+	if ui.button(ctx, lab, "Prova meccaniche") {
+		audio.play(frame.audio, .Confirm)
+		launcher_start_run(l, frame, true)
 	}
 
 	count := MINIGAME_COUNT

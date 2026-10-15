@@ -600,6 +600,10 @@ draw_shop_screen :: proc(
 	   state.hovered_offer_index < run.shop.offer_count {
 		draw_shop_offer(run, state.hovered_offer_index, canvas_width, canvas_height, true, theme = theme)
 	}
+	// MOSTRA EFFETTO under each offer: the card as it is offered.
+	for index in 0..<run.shop.offer_count {
+		draw_effect_entry_button(theme, shop_offer_effect_bounds(canvas_width, canvas_height, index))
+	}
 
 	deck_label := fmt.ctprintf("OWNED DECK    PAGE %d/%d", page+1, page_count)
 	menu_text(theme, deck_label, 45, 292, 13, rl.Color{151, 163, 158, 255})
@@ -705,5 +709,7 @@ draw_shop_screen :: proc(
 		rl.Color{246, 207, 92, 255},
 		theme = theme,
 	)
+	// MOSTRA EFFETTO of the owned card chosen for an upgrade or a removal.
+	draw_owned_card_effect_button(theme, canvas_width, canvas_height, selected_found)
 
 }

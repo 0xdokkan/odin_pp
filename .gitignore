@@ -24,6 +24,9 @@
 /odin_pp_playtest_*.json
 /odin_pp_input_*.txt
 
+# Strumenti Python (tools/art, tools/audio)
+__pycache__/
+
 # Segreti
 .env
 .env.*
@@ -47,3 +50,9 @@
 /odin_pp_fps.png
 /odin_pp_puzzle.png
 /odin_pp_ring.png
+
+# Screenshot rigenerabili delle nuove meccaniche e anteprime carte
+/odin_pp_western_*.png
+/odin_pp_living_*.png
+/odin_pp_mechanics_lab*.png
+/odin_pp_effect_*.png

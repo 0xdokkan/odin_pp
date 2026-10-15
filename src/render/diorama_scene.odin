@@ -25,6 +25,10 @@ diorama_interior_wall :: proc(room: ^game.Room, cell: grid.Position) -> bool {
 diorama_wall_height :: proc(renderer: ^Renderer, room: ^game.Room, cell: grid.Position) -> f32 {
 	w, h := room.level_data.tiles.width, room.level_data.tiles.height
 	if !level.is_border_position(cell, w, h) { return DIORAMA_WALL_HEIGHT }
+	// Behind the player's eyes the edge stands whole: no cutaway at the
+	// screen's sides (first_person.odin).
+	whole := first_person_amount(renderer)
+	if whole >= 1 { return DIORAMA_WALL_HEIGHT }
 	direction := renderer.tactical.camera.position-renderer.tactical.camera.target
 	direction.y = 0
 	direction = rl.Vector3Normalize(direction)
@@ -37,7 +41,7 @@ diorama_wall_height :: proc(renderer: ^Renderer, room: ^game.Room, cell: grid.Po
 	if cell.y == 0 { facing = max(facing, -direction.z) }
 	if cell.y == h-1 { facing = max(facing, direction.z) }
 	t := clamp(facing/0.35, f32(0), f32(1))
-	return DIORAMA_WALL_HEIGHT+(DIORAMA_CUTAWAY_HEIGHT-DIORAMA_WALL_HEIGHT)*tween.smoothstep(t)
+	return DIORAMA_WALL_HEIGHT+(DIORAMA_CUTAWAY_HEIGHT-DIORAMA_WALL_HEIGHT)*tween.smoothstep(t)*(1-whole)
 }
 
 diorama_wall_face :: proc(room: ^game.Room, cell, offset: grid.Position) -> bool {
@@ -109,7 +113,7 @@ draw_diorama_wall :: proc(renderer: ^Renderer, room: ^game.Room, cell: grid.Posi
 	p := rl.Vector3{f32(cell.x)+0.5, 0, f32(cell.y)+0.5}
 	n := gothic_hash(cell.x, cell.y)
 	h := diorama_wall_height(renderer, room, cell)
-	transparent := diorama_interior_wall(room, cell)
+	transparent := diorama_interior_wall(room, cell) && !first_person_solid_walls(renderer)
 	edge := rl.Color{92, 142, 171, 62} if transparent else DIORAMA_EDGE
 	ink := rl.Color{22, 41, 64, 35} if transparent else DIORAMA_INK
 	core := rl.Color{58, 91, 118, 46} if transparent else RESIN_WALL
@@ -148,7 +152,7 @@ draw_tactical_tile :: proc(renderer: ^Renderer, room: ^game.Room, tile: level.Ti
 	draw_resin_cube(renderer, p+rl.Vector3{0, -0.05, 0}, 0.945, 0.135, 0.945, floor)
 	if tile.kind == .Wall {
 		draw_resin_cube(renderer, p+rl.Vector3{0, 0.10, 0}, 0.98, 0.16, 0.98, DIORAMA_EDGE)
-		if !diorama_interior_wall(room, cell) { draw_diorama_wall(renderer, room, cell) }
+		if !diorama_interior_wall(room, cell) || first_person_solid_walls(renderer) { draw_diorama_wall(renderer, room, cell) }
 		return
 	}
 	// Slim inset corner fittings and occasional engraving preserve empty centers.
@@ -176,7 +180,7 @@ draw_tactical_tile :: proc(renderer: ^Renderer, room: ^game.Room, tile: level.Ti
 }
 
 draw_diorama_lamp_glow :: proc(renderer: ^Renderer, lamp: rl.Vector3, cell: grid.Position, opacity: f32 = 1) {
-	time := f32(renderer.sprite_assets.elapsed)
+	time := f32(tactical_world_time(renderer))
 	flicker := f32(0.86+0.14*math.sin(time*2.6+f32(cell.x+cell.y)))
 	core := DIORAMA_GLOW
 	core.a = u8(255*opacity)
@@ -193,7 +197,8 @@ draw_diorama_accents :: proc(renderer: ^Renderer, room: ^game.Room) {
 	rlgl.DrawRenderBatchActive()
 	rlgl.DisableDepthMask()
 	defer { rlgl.DrawRenderBatchActive(); rlgl.EnableDepthMask() }
-	time := f32(renderer.sprite_assets.elapsed)
+	// The world's clock: the lamps and the dust hold still with it.
+	time := f32(tactical_world_time(renderer))
 	for y in 0..<room.level_data.tiles.height { for x in 0..<room.level_data.tiles.width {
 		cell := grid.Position{x, y}
 		if !tactical_cell_on_screen(renderer, cell) || !tactical_render_visible(renderer, cell) { continue }

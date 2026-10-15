@@ -239,7 +239,9 @@ test_tactical_clock_lethal_first_beat_discards_later_charged_beats :: proc(t: ^t
 	room := tactical_clock_test_room(t, &data, &player)
 	defer level.destroy(&data)
 	defer destroy_room(&room)
-	_, _ = apply_status(&room, enemy_entity(1), .Poison, 100, 1)
+	// Its own move on the first beat is what its poison bites.
+	room.enemies[0].tactical_cooldown = 1
+	_, _ = apply_status(&room, enemy_entity(1), .Poison, 100, 0)
 	tactical_spend_action_time(&room, 4)
 	drain_tactical_test_pulse(t, &room)
 	testing.expect_value(t, room.phase, Room_Phase.Loot)

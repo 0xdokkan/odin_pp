@@ -160,7 +160,7 @@ test_execute_gameplay_command_commits_refocus_and_clears_card_interaction :: pro
 }
 
 @(test)
-test_execute_gameplay_command_rejects_a_buffered_command_after_phase_change :: proc(t: ^testing.T) {
+test_execute_gameplay_command_rejects_a_stale_command_after_phase_change :: proc(t: ^testing.T) {
 	level_data := create_gameplay_command_test_level(t)
 	defer level.destroy(&level_data)
 	player := create_gameplay_command_test_player(t)

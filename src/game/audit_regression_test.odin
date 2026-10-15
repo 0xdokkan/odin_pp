@@ -26,11 +26,55 @@ test_catalog_every_allowed_upgrade_changes_an_instantiated_effect :: proc(t: ^te
 				testing.expect(t, before_ok && after_ok)
 				changed = changed || before != after
 			}
-			testing.expect_value(t, card_can_upgrade(card), changed)
+			if card_dice_count(definition.id) > 0 {
+				// A dice card's upgrade changes only its die, up to the D20.
+				testing.expect(t, !changed, definition.name)
+				testing.expect_value(t, card_can_upgrade(card), upgrade < MAX_DICE_UPGRADE_LEVEL)
+				continue
+			}
+			// A card with its own top (the Lazzo's five) sells no level past it.
+			testing.expect_value(t, card_can_upgrade(card), changed && upgrade < card_max_upgrade_level(definition.id))
 		}
 	}
 	testing.expect(t, !card_can_upgrade({}))
 	testing.expect(t, !card_can_upgrade({id = 1, definition_id = .Strike, upgrade_level = MAX_CARD_UPGRADE_LEVEL}))
+	testing.expect(t, !card_can_upgrade({id = 1, definition_id = .Fate_Strike, upgrade_level = MAX_DICE_UPGRADE_LEVEL}))
+	testing.expect(t, !validate_card_instance({id = 1, definition_id = .Fate_Strike, upgrade_level = MAX_DICE_UPGRADE_LEVEL+1}))
+}
+
+@(test)
+test_dice_card_upgrade_services_stop_at_the_d20 :: proc(t: ^testing.T) {
+	shop := create_shop_test_run(t)
+	defer destroy_run(&shop)
+	rest := create_special_node_test_run(t, .Rest)
+	defer destroy_run(&rest)
+	for definition in ([5]Card_Id{.Fate_Strike, .Shock_Floor, .Sundering_Blow, .Twin_Venom, .Prismatic_Barrage}) {
+		deck: Deck_State
+		testing.expect(t, initialize_empty_deck(&deck))
+		card, added := add_owned_card(&deck, definition)
+		testing.expect(t, added)
+		for level in i32(1)..=MAX_DICE_UPGRADE_LEVEL {
+			testing.expect_value(t, upgrade_owned_card(&deck, card.id), Deck_Mutation_Result.Upgraded)
+			testing.expect_value(t, deck.owned[0].upgrade_level, level)
+		}
+		before := deck
+		testing.expect_value(t, upgrade_owned_card(&deck, card.id), Deck_Mutation_Result.Maximum_Upgrade)
+		testing.expect(t, deck == before)
+		_, over := add_owned_card(&deck, definition, MAX_DICE_UPGRADE_LEVEL+1)
+		testing.expect(t, !over)
+		// Shop and rest refuse the D20 card without touching gold, deck or node.
+		shop_card, shop_added := add_owned_card(&shop.player.deck, definition, MAX_DICE_UPGRADE_LEVEL)
+		rest_card, rest_added := add_owned_card(&rest.player.deck, definition, MAX_DICE_UPGRADE_LEVEL)
+		testing.expect(t, shop_added && rest_added)
+		shop_before := capture_shop_test_snapshot(&shop)
+		rest_before := capture_special_node_test_snapshot(&rest)
+		_, has_price := shop_upgrade_price(&shop, shop_card.id)
+		testing.expect(t, !has_price && !shop_upgrade_can_be_bought(&shop, shop_card.id))
+		testing.expect_value(t, buy_shop_upgrade(&shop, shop_card.id), Shop_Result.Maximum_Upgrade)
+		testing.expect_value(t, use_rest_upgrade(&rest, rest_card.id), Special_Node_Result.Maximum_Upgrade)
+		expect_shop_test_snapshot(t, &shop, shop_before)
+		expect_special_node_test_snapshot(t, &rest, rest_before)
+	}
 }
 
 @(test)

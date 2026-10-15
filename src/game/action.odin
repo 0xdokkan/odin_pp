@@ -91,6 +91,23 @@ Effect_Kind :: enum {
 	Create_Card,
 	Gain_Energy,
 	Deploy_Device,
+	// Movimento Ombra: `amount` seconds inside the player's shadow.
+	Enter_Shadow,
+	// Pozza di Veleno (`status` Poison) or Incendio (Burn) on `destination`:
+	// `amount` stacks to an enemy for each cell of it entered (ground.odin).
+	Place_Ground,
+	// LAZZO: `target` caught and swung round the player, its first hit
+	// numbered `amount` (lasso.odin).
+	Lasso,
+	// CANNA DA PESCA: the room's fishings (`amount`), the rod's template only;
+	// its slot fishes through fish_with_rod, never through an action (fishing.odin).
+	Fish,
+	// PINBALL: `target` turned into a steel ball and struck away, its value
+	// `amount` (pinball.odin).
+	Pinball,
+	// FIRST PERSON SHOOTER: `amount` world seconds behind the player's eyes,
+	// his AK in hand (first_person.odin).
+	First_Person,
 }
 
 Effect :: struct {
@@ -139,6 +156,10 @@ gain_gold_effect :: proc(amount: i32) -> Effect {
 
 gain_energy_effect :: proc(amount: i32) -> Effect {
 	return {kind = .Gain_Energy, target = PLAYER_ENTITY, amount = amount}
+}
+
+enter_shadow_effect :: proc(seconds: i32) -> Effect {
+	return {kind = .Enter_Shadow, target = PLAYER_ENTITY, amount = seconds}
 }
 
 draw_cards_effect :: proc(amount: i32) -> Effect {
@@ -384,10 +405,26 @@ effect_is_valid :: proc(room: ^Room, effect: Effect) -> bool {
 	if room == nil || !entity_exists(room, effect.target) {
 		return false
 	}
+	// PINBALL: nothing reaches the ball while it rolls, its burst aside
+	// (pinball_burst ends the roll first).
+	if effect.target.kind == .Enemy && enemy_is_pinball(room, effect.target.id) {
+		return false
+	}
 	switch effect.kind {
+	case .Enter_Shadow:
+		return effect.target == PLAYER_ENTITY && effect.amount > 0 && tactical_can_begin_shadow(room)
+	case .Place_Ground:
+		return effect.target == PLAYER_ENTITY && effect.amount > 0 && ground_can_place(room, effect.status, effect.destination)
+	case .Lasso:
+		return effect.target.kind == .Enemy && effect.amount > 0 && lasso_target_error(room, entity_target(effect.target)) == .None
+	case .Pinball:
+		return effect.target.kind == .Enemy && effect.amount > 0 && pinball_target_error(room, entity_target(effect.target)) == .None
+	// Never resolved: the rod fishes from its slot (fishing.odin).
+	case .Fish:
+		return false
 	case .Deploy_Device:
 		return effect.target == PLAYER_ENTITY && effect.amount > 0 &&
-		       (effect.object_kind != .Shock_Floor || (effect.charges >= 1 && effect.charges <= 4)) &&
+		       (effect.object_kind != .Shock_Floor || (effect.charges >= 1 && effect.charges <= TACTICAL_SHOCK_FLOOR_MAX_CHARGES)) &&
 		       board_device_can_deploy(room, effect.object_kind, effect.destination)
 	case .Damage:
 		if effect.amount <= 0 {
@@ -422,7 +459,8 @@ effect_is_valid :: proc(room: ^Room, effect: Effect) -> bool {
 		)
 		return movement_query_is_clear(&query)
 	case .Apply_Status:
-		return effect.amount > 0 && effect.duration > 0 &&
+		// Stacks carry no duration; every other status needs one.
+		return effect.amount > 0 && (effect.duration > 0 || status_kind_stacks(effect.status)) &&
 		       (effect.target.kind == .Player || effect.target.kind == .Enemy) &&
 		       can_apply_status(room, effect.target, effect.status)
 	case .Remove_Status:
@@ -450,6 +488,8 @@ effect_is_valid :: proc(room: ^Room, effect: Effect) -> bool {
 	case .Create_Card:
 		return effect.target == PLAYER_ENTITY && effect.amount > 0 && room.phase == .Combat &&
 		       can_create_temporary_card(&room.player.deck, effect.card_definition)
+	case .First_Person:
+		return effect.target == PLAYER_ENTITY && effect.amount > 0 && tactical_can_begin_first_person(room)
 	}
 	return false
 }
@@ -503,15 +543,26 @@ absorb_damage_with_shield :: proc(
 	return damage-absorbed
 }
 
+// What a blow of `amount` takes from the player before any Shield: his
+// defense counted, never below 1. RIFLESSO sends back the same.
+player_blow_damage :: proc(room: ^Room, amount: i32) -> i32 {
+	return max(i32(1), amount-room.player.stats.defense)
+}
+
 apply_damage_effect :: proc(
 	room: ^Room,
 	source: Entity_Ref,
 	effect: Effect,
 	report: ^Action_Report,
 ) {
+	// Every hit on the player passes here, hazards included: nothing reaches
+	// a player sunk in his shadow (no shield spent, no Damaged, no reactions).
+	if effect.target.kind == .Player && tactical_player_intangible(room) { return }
 	damage := effect.amount
-	if effect.target.kind == .Player {
-		damage = max(i32(1), damage-room.player.stats.defense)
+	// A status's bite (Veleno, Bruciatura) is its stacks: no defense takes
+	// from it, only a Shield.
+	if effect.target.kind == .Player && !effect.has_status_cause {
+		damage = player_blow_damage(room, damage)
 	}
 	if effect.target.kind == .Player || effect.target.kind == .Enemy {
 		damage = absorb_damage_with_shield(
@@ -613,9 +664,29 @@ apply_effect :: proc(room: ^Room, source: Entity_Ref, effect: Effect, report: ^A
 	assert(room != nil && report != nil && effect_is_valid(room, effect))
 
 	switch effect.kind {
+	case .Enter_Shadow:
+		origin := room.player.position
+		began := tactical_begin_shadow(room, f32(effect.amount))
+		assert(began)
+		record_report_event(report, {
+			kind = .Shadow_Entered, source = source, target = PLAYER_ENTITY,
+			from_position = origin, to_position = origin, duration = effect.amount,
+		})
 	case .Deploy_Device:
 		deployed := deploy_board_device(room, effect.object_kind, effect.destination, effect.amount, effect.charges, &report.events)
 		assert(deployed)
+	case .Place_Ground:
+		placed := place_ground(room, effect.status, effect.destination, effect.amount, report)
+		assert(placed)
+	case .Lasso:
+		caught := begin_lasso(room, effect.target, effect.amount, report)
+		assert(caught)
+	case .Pinball:
+		struck := begin_pinball(room, effect.target, effect.amount, report)
+		assert(struck)
+	// effect_is_valid refuses it.
+	case .Fish:
+		unreachable()
 	case .Damage:
 		apply_damage_effect(room, source, effect, report)
 	case .Heal:
@@ -774,6 +845,14 @@ apply_effect :: proc(room: ^Room, source: Entity_Ref, effect: Effect, report: ^A
 					to_card_zone = .Hand,
 				})
 		}
+	case .First_Person:
+		began := tactical_begin_first_person(room, f32(effect.amount))
+		assert(began)
+		at := room.player.position
+		record_report_event(report, {
+			kind = .First_Person_Begun, source = source, target = PLAYER_ENTITY,
+			from_position = at, to_position = at, duration = effect.amount, card_definition = .First_Person,
+		})
 	}
 	report.applied_effects += 1
 }

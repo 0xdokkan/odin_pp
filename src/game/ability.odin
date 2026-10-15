@@ -8,7 +8,8 @@ Player_Ability :: enum {
 }
 
 use_player_ability :: proc(room: ^Room, ability: Player_Ability) -> Action_Result {
-	if !tactical_allows_action(room) { return .Invalid_Phase }
+	// Behind his eyes the AK is all he has (first_person.odin).
+	if !tactical_allows_action(room) || tactical_first_person_active(room) { return .Invalid_Phase }
 	if room == nil || room.player == nil || room.phase != .Combat {
 		return .Invalid_Phase
 	}
@@ -26,7 +27,7 @@ use_player_ability :: proc(room: ^Room, ability: Player_Ability) -> Action_Resul
 	case .Toxic_Wave:
 		action = make_action(.Ability, PLAYER_ENTITY, {}, .None)
 		for enemy in room.enemies {
-			added := add_effect(&action, apply_status_effect(enemy_entity(enemy.id), .Poison, 1, 3))
+			added := add_effect(&action, apply_status_effect(enemy_entity(enemy.id), .Poison, 1, 0))
 			assert(added)
 		}
 	case .Thorn_Coat:

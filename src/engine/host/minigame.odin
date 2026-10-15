@@ -13,6 +13,8 @@ import ui "../ui"
 Minigame_Config :: struct {
 	seed:      u64,
 	challenge: bool,
+	// Caller-owned data a run hands to the scene it launches; nil from the menu.
+	payload:   rawptr,
 }
 
 Minigame_Info :: struct {

@@ -57,14 +57,73 @@ Card_Id :: enum {
 	Tesla_Coil,
 	Titan_Grip,
 	Storm_Crown,
+	Sei_Denari,
+	Sette_Denari,
+	Shadow_Step,
+	Poison_Pool,
+	Wildfire,
+	Deflect,
+	Coffin,
+	Fate_Dice,
+	Venom_Blade,
+	Lasso,
+	Fishing_Rod,
+	Pinball,
+	First_Person,
 	Count,
 }
 
+// The 6 and 7 of coins from a Scopa deck: gold now, and together in hand
+// they open the western easter egg. They never appear as rewards or wares.
+card_is_scopa :: proc(id: Card_Id) -> bool {
+	return id == .Sei_Denari || id == .Sette_Denari
+}
+
+// Movimento Ombra stops the tactical clock, which classic combat does not
+// have; a pool and a fire live on the tactical board's ground and windows
+// (ground.odin); the player's charges load the tactical blows, arrows and
+// windows (player_charges.odin); the Lazzo spins on the world's running
+// seconds (lasso.odin); the Canna da Pesca fishes the tactical room once it is
+// cleared (fishing.odin); the Pinball's ball rolls on those seconds too
+// (pinball.odin), and the First Person Shooter's seconds and shots are the
+// tactical world's (first_person.odin): classic runs never offer them, and
+// refuse to play them.
+card_requires_tactical :: proc(id: Card_Id) -> bool {
+	return id == .Shadow_Step || card_places_ground(id) || card_loads_player_charge(id) || id == .Lasso || id == .Fishing_Rod ||
+	       id == .Pinball || id == .First_Person
+}
+
+// The Canna da Pesca: a room-end tool, never drawn in a fight (begin_deck_combat
+// leaves it in Exhaust) and never played as a card; its own slot casts it once
+// the room is cleared (fishing.odin).
+card_is_room_tool :: proc(id: Card_Id) -> bool {
+	return id == .Fishing_Rod
+}
+
+// Deflect, Feretro, Dado del Destino and Lama Velenosa: each loads one of the
+// player's charges (status.odin) and nothing else.
+card_loads_player_charge :: proc(id: Card_Id) -> bool {
+	return id == .Deflect || id == .Coffin || id == .Fate_Dice || id == .Venom_Blade
+}
+
+// The dice cards and how many dice each rolls (dice.odin: roll_card_dice).
 card_dice_count :: proc(id: Card_Id) -> int {
-	if id == .Fate_Strike || id == .Shock_Floor { return 1 }
+	if id == .Fate_Strike || id == .Shock_Floor || id == .Fate_Dice || id == .Venom_Blade { return 1 }
 	if id == .Sundering_Blow || id == .Twin_Venom { return 2 }
 	if id == .Prismatic_Barrage { return 3 }
 	return 0
+}
+
+// A dice card's upgrades climb the dice ladder and stop at its top; the
+// Lazzo's raise its first hit five times at most, the Canna da Pesca's its
+// fishings a room (its heal stays a d4: it is no dice card), the Pinball's its
+// ball's value, the First Person Shooter's its seconds.
+card_max_upgrade_level :: proc(id: Card_Id) -> i32 {
+	if id == .Lasso { return LASSO_MAX_UPGRADE_LEVEL }
+	if id == .Fishing_Rod { return FISHING_ROD_MAX_UPGRADE_LEVEL }
+	if id == .Pinball { return PINBALL_MAX_UPGRADE_LEVEL }
+	if id == .First_Person { return FIRST_PERSON_MAX_UPGRADE_LEVEL }
+	return MAX_DICE_UPGRADE_LEVEL if card_dice_count(id) > 0 else MAX_CARD_UPGRADE_LEVEL
 }
 
 Card_Target_Selector :: enum {
@@ -92,6 +151,8 @@ Card_Compile_Error :: enum {
 	Invalid_Target,
 	Target_Out_Of_Range,
 	Target_Blocked,
+	// LAZZO: a boss or a miniboss is too heavy to lasso (lasso.odin).
+	Target_Too_Heavy,
 	No_Effects,
 	Too_Many_Effects,
 }
@@ -313,7 +374,6 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 				base_amount = 1,
 				amount_per_upgrade = 1,
 				status = .Poison,
-				duration = 3,
 			},
 			{},
 			{},
@@ -623,7 +683,6 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 				target = .Chosen_Entity,
 				base_amount = 1,
 				status = .Poison,
-				duration = 3,
 			},
 			{},
 			{},
@@ -652,7 +711,6 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 				base_amount = 2,
 				amount_per_upgrade = 1,
 				status = .Poison,
-				duration = 2,
 			},
 			{},
 			{},
@@ -730,7 +788,7 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 			requires_line_of_sight = true,
 			stops_on_wall = true,
 		},
-		effects = {{kind = .Damage, target = .Chosen_Entity, base_amount = 2, amount_per_upgrade = 1}, {}, {}, {}},
+		effects = {{kind = .Damage, target = .Chosen_Entity, base_amount = 2}, {}, {}, {}},
 		effect_count = 1,
 	},
 	{
@@ -765,7 +823,7 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 			stops_on_wall = true,
 		},
 		effects = {
-			{kind = .Damage, target = .Chosen_Entity, base_amount = 2, amount_per_upgrade = 1},
+			{kind = .Damage, target = .Chosen_Entity, base_amount = 2},
 			{kind = .Move, target = .Chosen_Entity, movement = .Away_From_Player, movement_distance = 1},
 			{}, {},
 		},
@@ -787,7 +845,7 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 		},
 		effects = {
 			{kind = .Apply_Status, target = .Player, base_amount = 1, status = .Shield, duration = 2},
-			{kind = .Damage, target = .Chosen_Entity, base_amount = 3, amount_per_upgrade = 1},
+			{kind = .Damage, target = .Chosen_Entity, base_amount = 3},
 			{}, {},
 		},
 		effect_count = 2,
@@ -807,8 +865,8 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 			stops_on_wall = true,
 		},
 		effects = {
-			{kind = .Damage, target = .Chosen_Entity, base_amount = 2, amount_per_upgrade = 1},
-			{kind = .Apply_Status, target = .Chosen_Entity, base_amount = 2, status = .Poison, duration = 2},
+			{kind = .Damage, target = .Chosen_Entity, base_amount = 2},
+			{kind = .Apply_Status, target = .Chosen_Entity, base_amount = 2, status = .Poison},
 			{}, {},
 		},
 		effect_count = 2,
@@ -817,7 +875,7 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 		id = .Shock_Floor, name = "Shock Floor", rarity = .Uncommon,
 		reward_weight = 85, shop_base_price = 6, cost = 2,
 		targeting = {rule = .Walkable_Cell, cast_range = {.Chebyshev, 1, 3}, shape = .Single, requires_line_of_sight = true, stops_on_wall = true},
-		effects = {{kind = .Deploy_Device, target = .Player, base_amount = 1, amount_per_upgrade = 1, object_kind = .Shock_Floor}, {}, {}, {}},
+		effects = {{kind = .Deploy_Device, target = .Player, base_amount = 1, object_kind = .Shock_Floor}, {}, {}, {}},
 		effect_count = 1,
 	},
 	{
@@ -842,6 +900,128 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 		reward_weight = 35, shop_base_price = 12, cost = 3,
 		targeting = {rule = .Opponent, cast_range = {.Manhattan, 1, 4}, shape = .Single, requires_line_of_sight = true, stops_on_wall = true},
 		effects = {{kind = .Damage, target = .Chosen_Entity, base_amount = 5, amount_per_upgrade = 1}, {}, {}, {}},
+		effect_count = 1,
+	},
+	{
+		id = .Sei_Denari, name = "6 di denari", rarity = .Common,
+		reward_weight = 1, shop_base_price = 6, cost = 1, exhaust_on_play = true,
+		targeting = {rule = .Self},
+		effects = {{kind = .Gain_Gold, target = .Player, base_amount = 6}, {}, {}, {}},
+		effect_count = 1,
+	},
+	{
+		id = .Sette_Denari, name = "7 di denari", rarity = .Common,
+		reward_weight = 1, shop_base_price = 7, cost = 1, exhaust_on_play = true,
+		targeting = {rule = .Self},
+		effects = {{kind = .Gain_Gold, target = .Player, base_amount = 7}, {}, {}, {}},
+		effect_count = 1,
+	},
+	{
+		// Four real seconds inside the player's shadow (tactical_shadow.odin).
+		// Its length never scales: there is no upgrade.
+		id = .Shadow_Step, name = "Movimento Ombra", rarity = .Rare,
+		reward_weight = 60, shop_base_price = 8, cost = 3,
+		targeting = {rule = .Self},
+		effects = {{kind = .Enter_Shadow, target = .Player, base_amount = 4}, {}, {}, {}},
+		effect_count = 1,
+	},
+	{
+		// A pool of poison on a free cell for the rest of the room: Veleno 2 (+1
+		// per upgrade) to an enemy for each of its cells it enters; the areas
+		// pools close fill by themselves (ground.odin).
+		id = .Poison_Pool, name = "Pozza di Veleno", rarity = .Common,
+		reward_weight = 85, shop_base_price = 4, cost = 1,
+		targeting = {rule = .Walkable_Cell, cast_range = {.Chebyshev, 1, 3}, shape = .Single, requires_line_of_sight = true, stops_on_wall = true},
+		effects = {{kind = .Place_Ground, target = .Player, base_amount = 2, amount_per_upgrade = 1, status = .Poison}, {}, {}, {}},
+		effect_count = 1,
+	},
+	{
+		// A fire on a free cell that grows as a plus at each new window and goes
+		// out at the fifth: Bruciatura 1 (+1 per upgrade) to an enemy entering a
+		// burning cell, or standing where it catches (ground.odin).
+		id = .Wildfire, name = "Incendio", rarity = .Uncommon,
+		reward_weight = 75, shop_base_price = 6, cost = 2,
+		targeting = {rule = .Walkable_Cell, cast_range = {.Chebyshev, 1, 3}, shape = .Single, requires_line_of_sight = true, stops_on_wall = true},
+		effects = {{kind = .Place_Ground, target = .Player, base_amount = 1, amount_per_upgrade = 1, status = .Burn}, {}, {}, {}},
+		effect_count = 1,
+	},
+	{
+		// RIFLESSO: the next enemy blow that would hit the player goes back to
+		// its attacker (player_charges.odin). Each play adds a charge; no upgrade.
+		id = .Deflect, name = "Deflect", rarity = .Uncommon,
+		reward_weight = 80, shop_base_price = 5, cost = 1,
+		targeting = {rule = .Self},
+		effects = {{kind = .Apply_Status, target = .Player, base_amount = 1, status = .Deflect}, {}, {}, {}},
+		effect_count = 1,
+	},
+	{
+		// FRECCE: three arrows (+1 per upgrade), loosed with Ctrl and a click on
+		// a foe in the line of fire (shoot_player_arrow). Plays add up.
+		id = .Coffin, name = "Feretro", rarity = .Uncommon,
+		reward_weight = 75, shop_base_price = 6, cost = 2,
+		targeting = {rule = .Self},
+		effects = {{kind = .Apply_Status, target = .Player, base_amount = 3, amount_per_upgrade = 1, status = .Arrows}, {}, {}, {}},
+		effect_count = 1,
+	},
+	{
+		// DESTINO: the next three bumps each roll the card's die at the hit
+		// (player_bump); a new play loads them back to three. A dice card: its
+		// upgrades climb the die.
+		id = .Fate_Dice, name = "Dado del Destino", rarity = .Rare,
+		reward_weight = 60, shop_base_price = 8, cost = 2,
+		targeting = {rule = .Self},
+		effects = {{kind = .Apply_Status, target = .Player, base_amount = FATE_DICE_CHARGES, status = .Fate}, {}, {}, {}},
+		effect_count = 1,
+	},
+	{
+		// LAMA: its die, rolled as it is played, is how many bumps it poisons
+		// (resolve_loading_card); the template's one stands for that roll.
+		id = .Venom_Blade, name = "Lama Velenosa", rarity = .Common,
+		reward_weight = 85, shop_base_price = 4, cost = 1,
+		targeting = {rule = .Self},
+		effects = {{kind = .Apply_Status, target = .Player, base_amount = 1, status = .Venom_Blade}, {}, {}, {}},
+		effect_count = 1,
+	},
+	{
+		// LAZZO: one foe in reach is caught, lifted and swung round the player
+		// (lasso.odin). Its amount is the first hit's number: 1 (+1 per upgrade,
+		// +1 on the tick); every next hit strikes one harder.
+		id = .Lasso, name = "Lazzo", rarity = .Rare,
+		reward_weight = 60, shop_base_price = 8, cost = 2,
+		targeting = {rule = .Opponent, cast_range = {.Chebyshev, 1, LASSO_RANGE}, shape = .Single, requires_line_of_sight = true, stops_on_wall = true},
+		effects = {{kind = .Lasso, target = .Chosen_Entity, base_amount = 1, amount_per_upgrade = 1}, {}, {}, {}},
+		effect_count = 1,
+	},
+	{
+		// CANNA DA PESCA: never in the hand; once the room is cleared it fishes a
+		// free cell in reach, turned to water, from its own slot (fishing.odin).
+		// Its amount is the room's fishings: 1 (+1 per upgrade). At most one a run.
+		id = .Fishing_Rod, name = "Canna da Pesca", rarity = .Uncommon,
+		reward_weight = 70, shop_base_price = 5, cost = 0,
+		targeting = {rule = .Walkable_Cell, cast_range = {.Chebyshev, 1, FISHING_RANGE}, shape = .Single, requires_line_of_sight = true, stops_on_wall = true},
+		effects = {{kind = .Fish, target = .Player, base_amount = 1, amount_per_upgrade = 1}, {}, {}, {}},
+		effect_count = 1,
+	},
+	{
+		// PINBALL: one foe beside the player turned into a steel ball and struck
+		// away; for twenty seconds it bounces round the room (pinball.odin). Its
+		// amount is the ball's value: 2 (+1 per upgrade, +1 on the tick), one
+		// more after each foe it strikes, back to it at every wall.
+		id = .Pinball, name = "Pinball", rarity = .Rare,
+		reward_weight = 60, shop_base_price = 8, cost = 3,
+		targeting = {rule = .Opponent, cast_range = {.Chebyshev, 1, PINBALL_RANGE}, shape = .Single, requires_line_of_sight = true, stops_on_wall = true},
+		effects = {{kind = .Pinball, target = .Chosen_Entity, base_amount = 2, amount_per_upgrade = 1}, {}, {}, {}},
+		effect_count = 1,
+	},
+	{
+		// FIRST PERSON SHOOTER: the player's own eyes and a paper AK for twenty
+		// seconds of the world's (first_person.odin): +2 per upgrade, +2 on the
+		// tick. It takes no window time, and no card is played meanwhile.
+		id = .First_Person, name = "First Person Shooter", rarity = .Rare,
+		reward_weight = 60, shop_base_price = 8, cost = 3,
+		targeting = {rule = .Self},
+		effects = {{kind = .First_Person, target = .Player, base_amount = FIRST_PERSON_SECONDS,
+			amount_per_upgrade = FIRST_PERSON_SECONDS_PER_UPGRADE}, {}, {}, {}},
 		effect_count = 1,
 	},
 }
@@ -923,6 +1103,27 @@ card_effect_template_is_valid :: proc(
 	}
 
 	switch template.kind {
+	case .Enter_Shadow:
+		return template.target == .Player && definition.targeting.rule == .Self &&
+		       template.amount_per_upgrade == 0 && card_amount_template_is_valid(template)
+	// One foe chosen on its cell; the amount is the first hit's number.
+	case .Lasso:
+		return template.target == .Chosen_Entity && definition.targeting.rule == .Opponent &&
+		       definition.targeting.shape == .Single && card_amount_template_is_valid(template)
+	// One foe beside the player; the amount is the ball's value.
+	case .Pinball:
+		return template.target == .Chosen_Entity && definition.targeting.rule == .Opponent &&
+		       definition.targeting.shape == .Single && definition.targeting.cast_range.maximum == PINBALL_RANGE &&
+		       card_amount_template_is_valid(template)
+	// A cell to fish; the amount is the room's fishings.
+	case .Fish:
+		return template.target == .Player && definition.targeting.rule == .Walkable_Cell &&
+		       definition.targeting.shape == .Single && card_amount_template_is_valid(template)
+	case .Place_Ground:
+		// Its stacks are given on entry: no duration.
+		return template.target == .Player && definition.targeting.rule == .Walkable_Cell &&
+		       definition.targeting.shape == .Single && ground_kind_is_valid(template.status) &&
+		       template.duration == 0 && card_amount_template_is_valid(template)
 	case .Deploy_Device:
 		return template.target == .Player && definition.targeting.rule == .Walkable_Cell &&
 		       board_device_kind(template.object_kind) && card_amount_template_is_valid(template)
@@ -943,7 +1144,11 @@ card_effect_template_is_valid :: proc(
 		return template.target == .Player && template.has_card_definition && found &&
 		       card_amount_template_is_valid(template)
 	case .Apply_Status:
-		return status_kind_is_valid(template.status) && template.duration > 0 &&
+		// Stacks carry no duration; every other status needs one. The player's
+		// charges go to the player alone.
+		return status_kind_is_valid(template.status) &&
+		       (template.duration == 0 if status_kind_stacks(template.status) else template.duration > 0) &&
+		       (!status_kind_is_player_charge(template.status) || template.target == .Player) &&
 		       card_amount_template_is_valid(template)
 	case .Add_Reaction_Binding:
 		if template.charges != REACTION_BINDING_UNLIMITED && template.charges <= 0 {
@@ -954,6 +1159,9 @@ card_effect_template_is_valid :: proc(
 		}
 		reaction, found := reaction_definition_by_id(template.reaction)
 		return found && validate_reaction_definition(&reaction) && card_amount_template_is_valid(template)
+	// The player's own seconds behind his eyes.
+	case .First_Person:
+		return template.target == .Player && definition.targeting.rule == .Self && card_amount_template_is_valid(template)
 	}
 	return false
 }
@@ -1012,7 +1220,7 @@ card_definition_by_id :: proc(id: Card_Id, tactical: bool = false) -> (Card_Defi
 }
 
 validate_card_instance :: proc(instance: Card_Instance) -> bool {
-	if instance.id == 0 || instance.upgrade_level < 0 || instance.upgrade_level > MAX_CARD_UPGRADE_LEVEL ||
+	if instance.id == 0 || instance.upgrade_level < 0 || instance.upgrade_level > card_max_upgrade_level(instance.definition_id) ||
 	   int(instance.lifetime) < 0 || int(instance.lifetime) >= int(Card_Lifetime.Count) {
 		return false
 	}
@@ -1025,9 +1233,11 @@ validate_card_instance :: proc(instance: Card_Instance) -> bool {
 // livelli privi di benefici, anche quando l'istanza e formalmente valida.
 card_can_upgrade :: proc(instance: Card_Instance) -> bool {
 	if !validate_card_instance(instance) || instance.lifetime != .Permanent ||
-	   instance.upgrade_level >= MAX_CARD_UPGRADE_LEVEL {
+	   instance.upgrade_level >= card_max_upgrade_level(instance.definition_id) {
 		return false
 	}
+	// A dice card's benefit is the next die of its ladder.
+	if card_dice_count(instance.definition_id) > 0 { return true }
 	definition, _ := card_definition_by_id(instance.definition_id)
 	for index in 0..<definition.effect_count {
 		if definition.effects[index].amount_per_upgrade > 0 {
@@ -1121,8 +1331,21 @@ instantiate_card_effect :: proc(
 		), true
 	case .Deploy_Device:
 		return deploy_device_effect(template.object_kind, {}, card_effect_amount(template, instance.upgrade_level)), true
+	case .Enter_Shadow:
+		return enter_shadow_effect(card_effect_amount(template, instance.upgrade_level)), true
+	case .Place_Ground:
+		return place_ground_effect({}, template.status, card_effect_amount(template, instance.upgrade_level)), true
+	case .Lasso:
+		return lasso_effect(target, card_effect_amount(template, instance.upgrade_level)), true
+	case .Pinball:
+		return pinball_effect(target, card_effect_amount(template, instance.upgrade_level)), true
+	// The rod's fishings, as its amount says; no action ever applies it.
+	case .Fish:
+		return {kind = .Fish, target = target, amount = card_effect_amount(template, instance.upgrade_level)}, true
 	case .Move, .Gain_Energy:
 			return {}, false
+	case .First_Person:
+		return first_person_effect(card_effect_amount(template, instance.upgrade_level)), true
 	}
 	return {}, false
 }
@@ -1293,6 +1516,11 @@ evaluate_card_targeting :: proc(
 	if !validate_card_instance(instance) {
 		return
 	}
+	// The Canna da Pesca is no card to play: its slot fishes (fishing.odin).
+	if (card_requires_tactical(instance.definition_id) && !tactical_enabled(room)) || card_is_room_tool(instance.definition_id) {
+		evaluation.error = .Invalid_Phase
+		return
+	}
 	if tactical_enabled(room) && request.has_anchor && !tactical_cell_visible(room, request.anchor) {
 		evaluation.error = .Invalid_Target
 		return
@@ -1306,6 +1534,25 @@ evaluate_card_targeting :: proc(
 	if card_is_board_device(instance.definition_id) && !board_device_can_deploy(room, definition.effects[0].object_kind, evaluation.query.anchor) {
 		evaluation.error = .Target_Blocked
 		return
+	}
+	// A pool or a fire needs a free cell: no enemy, object or player on it.
+	if card_places_ground(instance.definition_id) && !ground_can_place(room, definition.effects[0].status, evaluation.query.anchor) {
+		evaluation.error = .Target_Blocked
+		return
+	}
+	// LAZZO: never a boss's weight, and a ring with room to swing the foe.
+	if instance.definition_id == .Lasso {
+		if refusal := lasso_target_error(room, evaluation.query.primary_target); refusal != .None {
+			evaluation.error = refusal
+			return
+		}
+	}
+	// PINBALL: never a boss's weight, and one ball at a time.
+	if instance.definition_id == .Pinball {
+		if refusal := pinball_target_error(room, evaluation.query.primary_target); refusal != .None {
+			evaluation.error = refusal
+			return
+		}
 	}
 
 	if tactical_enabled(room) {
@@ -1366,8 +1613,11 @@ evaluate_card_targeting :: proc(
 	for index in 0..<definition.effect_count {
 		switch definition.effects[index].target {
 		case .Each_Enemy:
+			// Never the Pinball's ball, nor the Lazzo's foe in the air.
 			for enemy in room.enemies {
-				if tactical_card_enemy_in_area(room, instance.definition_id, enemy.position) { evaluation.required_effect_count += 1 }
+				if !enemy_is_out_of_play(room, enemy.id) && tactical_card_enemy_in_area(room, instance.definition_id, enemy.position) {
+					evaluation.required_effect_count += 1
+				}
 			}
 		case .Each_Affected_Enemy:
 			evaluation.required_effect_count += evaluation.query.enemy_count
@@ -1461,7 +1711,8 @@ compile_card_action :: proc(
 			ids, count := enemy_ids_in_planning_order(room)
 			for enemy_index in 0..<count {
 				entity_index, _ := enemy_index_by_id(room, ids[enemy_index])
-				if !tactical_card_enemy_in_area(room, instance.definition_id, room.enemies[entity_index].position) { continue }
+				if enemy_is_out_of_play(room, ids[enemy_index]) ||
+				   !tactical_card_enemy_in_area(room, instance.definition_id, room.enemies[entity_index].position) { continue }
 				effect, instantiated := instantiate_card_effect(
 					template,
 					enemy_entity(ids[enemy_index]),
@@ -1505,7 +1756,7 @@ compile_card_action :: proc(
 		effect_target, has_target := card_effect_target(template.target, target)
 		assert(has_target)
 		effect, instantiated := instantiate_card_effect(template, effect_target, instance)
-		if effect.kind == .Deploy_Device { effect.destination = evaluation.query.anchor }
+		if effect.kind == .Deploy_Device || effect.kind == .Place_Ground { effect.destination = evaluation.query.anchor }
 		if instance.definition_id == .Strike && effect.kind == .Damage { effect.amount += tactical_strike_bonus(room, effect_target) }
 		if !instantiated {
 			return {}, .Invalid_Definition

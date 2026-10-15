@@ -3,7 +3,6 @@ package main
 import "core:testing"
 import game "game"
 import host "engine/host"
-import render "render"
 
 @(test)
 test_host_cli_minigame_and_capture_preserve_explicit_seed :: proc(t: ^testing.T) {
@@ -60,90 +59,18 @@ test_host_preserves_direct_m9_and_dice_lab_commands_without_profile_writes :: pr
 }
 
 @(test)
-test_host_challenge_cannot_overlap_input_owners_or_m9_buttons :: proc(t: ^testing.T) {
-	rs := host_run_fixture(t)
-	defer roguelike_destroy(rs)
-	frame := host.Frame{focused = true, window_focused = true, visible = true}
-	testing.expect(t, roguelike_challenge_available(rs, &frame))
-	for gate in 0..<8 {
-		switch gate {
-		case 0: rs.tactical_controller.paused = true
-		case 1: rs.tactical_controller.hologram = true
-		case 2: frame.focused = false
-		case 3: frame.window_focused = false
-		case 4: rs.m8_modal = true
-		case 5: rs.m8_session.character_open = true
-		case 6: rs.m8_session.requested = .FPS
-		case 7: rs.show_route_map = true
-		}
-		testing.expect(t, !roguelike_challenge_available(rs, &frame))
-		rs.tactical_controller = {}
-		frame.focused, frame.window_focused = true, true
-		rs.m8_modal, rs.m8_session.character_open, rs.show_route_map = false, false, false
-		rs.m8_session.requested = .None
-	}
-	challenge := roguelike_challenge_bounds(960)
-	for control in ([?]render.M8_Control{.Character, .Ring, .FPS}) {
-		button := render.m8_control_bounds(&rs.iso_renderer, control, &rs.room)
-		testing.expect(t, challenge.y >= button.y+button.height || challenge.y+challenge.height <= button.y ||
-			challenge.x >= button.x+button.width || challenge.x+challenge.width <= button.x)
-	}
-}
-
-@(test)
-test_host_challenge_accepts_only_its_result_once_and_preserves_run :: proc(t: ^testing.T) {
-	rs := host_run_fixture(t)
-	defer roguelike_destroy(rs)
-	challenge, begun := game.begin_minigame_challenge(&rs.run_state, &rs.room, EXTRA_CHALLENGE_COUNT)
-	testing.expect(t, begun)
-	info, found := minigame_info(challenge.minigame)
-	testing.expect(t, found)
-	before := rs.run_state.player
-	frame: host.Frame
-	result := host.Result{minigame = info.id, outcome = .Won, stars = 3}
-	roguelike_resume(rs, &frame, "unrelated-scene", result)
-	testing.expect(t, rs.room.minigame_challenge_pending)
-	testing.expect_value(t, rs.run_state.player, before)
-	result.minigame = "wrong-result"
-	roguelike_resume(rs, &frame, info.id, result)
-	testing.expect(t, rs.room.minigame_challenge_pending)
-	testing.expect_value(t, rs.run_state.player, before)
-	result.minigame = info.id
-	roguelike_resume(rs, &frame, info.id, result)
-	before.gold += 18
-	testing.expect(t, !rs.room.minigame_challenge_pending)
-	testing.expect_value(t, rs.run_state.player, before)
-	roguelike_resume(rs, &frame, info.id, result)
-	testing.expect_value(t, rs.run_state.player, before)
-}
-
-@(test)
-test_host_challenge_missing_result_abandons_without_reward :: proc(t: ^testing.T) {
-	rs := host_run_fixture(t)
-	defer roguelike_destroy(rs)
-	challenge, begun := game.begin_minigame_challenge(&rs.run_state, &rs.room, EXTRA_CHALLENGE_COUNT)
-	testing.expect(t, begun)
-	info, _ := minigame_info(challenge.minigame)
-	before := rs.run_state.player
-	frame: host.Frame
-	roguelike_resume(rs, &frame, info.id, nil)
-	testing.expect(t, !rs.room.minigame_challenge_pending)
-	testing.expect_value(t, rs.run_state.player, before)
-}
-
-@(test)
 test_host_suspension_clears_run_input_without_advancing_gameplay :: proc(t: ^testing.T) {
     rs := host_run_fixture(t)
     defer roguelike_destroy(rs)
     before := rs.run_state.player
     pulse := rs.room.pulse_count
     rs.card_interaction.selected_card_id=42
-    rs.gameplay_buffer.occupied=true
+    rs.gameplay_buffer.chord.active=true
     rs.iso_renderer.frame_clock_valid=true
     rs.iso_renderer.tactical.world_orbit.dragging=true
     rs.iso_renderer.tactical.hologram_orbit.dragging=true
     roguelike_suspend_input(rs)
-    testing.expect(t,rs.card_interaction.selected_card_id==0 && !rs.gameplay_buffer.occupied)
+    testing.expect(t,rs.card_interaction.selected_card_id==0 && !rs.gameplay_buffer.chord.active)
     testing.expect(t,!rs.iso_renderer.frame_clock_valid && !rs.tactical_controller.was_focused)
     testing.expect(t,!rs.iso_renderer.tactical.world_orbit.dragging && !rs.iso_renderer.tactical.hologram_orbit.dragging)
     testing.expect_value(t,rs.run_state.player,before)

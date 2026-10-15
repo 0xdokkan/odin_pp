@@ -26,13 +26,11 @@ tactical_liveness_frame :: proc(probe: ^Tactical_Liveness_Probe, room: ^game.Roo
 		dt, true, input)
 	if blocked { return false }
 	probe.released += 1
-	command, buffered := take_gameplay_command(&probe.buffer)
-	if !buffered {
-		command = requested
-		if command.kind == .None {
-			for pressed, index in input.directions {
-				if pressed { command = {kind = .Move, origin_phase = room.phase, direction = game.Move_Direction(index)}; break }
-			}
+	// Nothing is held across frames: only this frame's request or press acts.
+	command := requested
+	if command.kind == .None {
+		for pressed, index in input.directions {
+			if pressed { command = {kind = .Move, origin_phase = room.phase, direction = game.Move_Direction(index)}; break }
 		}
 	}
 	if command.kind == .None { return false }
@@ -142,7 +140,8 @@ test_m7_controller_survives_terminal_recovery_and_defense_then_enters_next_room 
 		}
 		testing.expect(t, guard != 0)
 		if ending == .Recovery_Poison {
-			applied, _ := game.apply_status(&room, game.enemy_entity(1), .Poison, 1, 3)
+			// Its two stacks bite its first action, on the recovery beat: lethal.
+			applied, _ := game.apply_status(&room, game.enemy_entity(1), .Poison, 2, 0)
 			testing.expect(t, applied)
 		}
 		guard_played, saw_recovery, saw_recovery_parry: bool

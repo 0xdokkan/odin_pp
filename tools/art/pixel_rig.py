@@ -18,6 +18,9 @@ import numpy as np
 INK = (13, 20, 30)
 SUB = 8      # sub-samples per source pixel and axis
 CANVAS = 4   # canvas cells per logical pixel and axis
+# A piece of a drawing smaller than this share of its body is a scrap torn
+# off by the pose and is rubbed out (mend).
+MEND_KEEP = 0.03
 
 
 # --------------------------------------------------------------------------
@@ -473,6 +476,43 @@ def clean_frame(idx, min_island=8, max_hole=48):
             target |= labels == label
     if target.any():
         out = _inpaint(out, target)
+    return out
+
+
+def mend(idx, keep=MEND_KEEP, log=None):
+    """Rub out the scraps a pose tears off the body: a corner of cloth or a
+    bit of staff whose pixels belong to a bone that stayed behind, or the tip
+    of a limb cut off by the card's edge. Pieces are 8-connected; every figure
+    is a single piece at rest. The sizes rubbed out go to `log`."""
+    solid = idx >= 0
+    h, w = solid.shape
+    labels = np.full((h, w), -1, np.int32)
+    sizes = []
+    for sy, sx in zip(*np.nonzero(solid)):
+        if labels[sy, sx] >= 0:
+            continue
+        label = len(sizes)
+        labels[sy, sx] = label
+        stack, count = [(sy, sx)], 0
+        while stack:
+            y, x = stack.pop()
+            count += 1
+            for yy in (y - 1, y, y + 1):
+                for xx in (x - 1, x, x + 1):
+                    if 0 <= yy < h and 0 <= xx < w and solid[yy, xx] and labels[yy, xx] < 0:
+                        labels[yy, xx] = label
+                        stack.append((yy, xx))
+        sizes.append(count)
+    if len(sizes) < 2:
+        return idx
+    sizes = np.array(sizes)
+    scraps = np.nonzero(sizes < keep * sizes.max())[0]
+    if not len(scraps):
+        return idx
+    if log is not None:
+        log.extend(int(sizes[i]) for i in scraps)
+    out = idx.copy()
+    out[np.isin(labels, scraps)] = -1
     return out
 
 

@@ -32,7 +32,9 @@ plan_custodian_intent :: proc(
 	best_id: u32
 	best_score := max(int)
 	for &ally in room.enemies {
-		if ally.id == enemy.id || (tactical_enabled(room) && ally.archetype == .Custodian) || !custodian_has_support_line(room, origin, ally.position) {
+		// Never one out of play (the Lazzo's in the air, the Pinball's ball).
+		if ally.id == enemy.id || (tactical_enabled(room) && ally.archetype == .Custodian) || enemy_is_out_of_play(room, ally.id) ||
+		   !custodian_has_support_line(room, origin, ally.position) {
 			continue
 		}
 		shield, shielded := status_for_entity(room, enemy_entity(ally.id), .Shield)
@@ -62,7 +64,7 @@ plan_custodian_intent :: proc(
 	best_distance := max(int)
 	best_id = 0
 	for ally in room.enemies {
-		if ally.id == enemy.id || (tactical_enabled(room) && ally.archetype == .Custodian) {
+		if ally.id == enemy.id || (tactical_enabled(room) && ally.archetype == .Custodian) || enemy_is_out_of_play(room, ally.id) {
 			continue
 		}
 		distance := abs(origin.x-ally.position.x)+abs(origin.y-ally.position.y)
@@ -100,7 +102,9 @@ resolve_custodian_protection :: proc(room: ^Room, enemy: ^Enemy, pulse: ^Pulse_R
 	enemy.recovery_pulses = 2 if tactical_enabled(room) else 1
 	pulse.enemy_actions += 1
 	ally_index, found := enemy_index_by_id(room, intent.protected_ally.id)
-	if enemy.position != intent.origin || !found ||
+	// An ally caught by the Lazzo since is out of reach in the air, and one
+	// the Pinball turned into its ball takes no Shield.
+	if enemy.position != intent.origin || !found || enemy_is_out_of_play(room, intent.protected_ally.id) ||
 	   room.enemies[ally_index].position != intent.destination ||
 	   !custodian_has_support_line(room, enemy.position, intent.destination) {
 		record_event(&pulse.events, {

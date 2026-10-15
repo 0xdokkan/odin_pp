@@ -14,14 +14,15 @@ spell_presentation_player :: proc(t: ^testing.T, definition: game.Card_Id) -> ga
 	return player
 }
 
-spell_presentation_six :: proc(t: ^testing.T) -> game.Dice_State {
+// The next roll of an unupgraded dice card shows the D4's top face.
+spell_presentation_top_face :: proc(t: ^testing.T) -> game.Dice_State {
 	for seed in u64(1)..<u64(1000) {
 		dice := game.make_dice_state(seed)
 		staged := dice
-		face, ok := game.roll_d6(&staged)
-		if ok && face == 6 { return dice }
+		face, ok := game.roll_die(&staged, 4)
+		if ok && face == 4 { return dice }
 	}
-	testing.expect(t, false, "missing deterministic six fixture")
+	testing.expect(t, false, "missing deterministic top face fixture")
 	return game.make_dice_state(1)
 }
 
@@ -186,7 +187,7 @@ test_spell_fate_die_cue_preserves_health_until_impacts_and_replays_final_deck ::
 	data := create_encounter_presentation_test_level(t)
 	defer level.destroy(&data)
 	player := spell_presentation_player(t, .Fate_Strike)
-	player.dice = spell_presentation_six(t)
+	player.dice = spell_presentation_top_face(t)
 	enemies := [?]game.Enemy_Spawn{{position = {3, 1}, health = 40, attack = 1}, {position = {4, 1}, health = 40, attack = 1}}
 	room, ok := game.create_room(&data, &player, {enemies = enemies[:]})
 	testing.expect(t, ok)
@@ -201,7 +202,7 @@ test_spell_fate_die_cue_preserves_health_until_impacts_and_replays_final_deck ::
 	die, found := active_presentation_cue(&timeline)
 	testing.expect(t, found)
 	testing.expect_value(t, die.kind, Presentation_Cue_Kind.Dice_Rolled)
-	testing.expect_value(t, die.event.amount, i32(6))
+	testing.expect_value(t, die.event.amount, i32(4))
 	update_event_timeline(&timeline, 0.1)
 	first, _ := presentation_actor(&timeline, game.enemy_entity(1))
 	second, _ := presentation_actor(&timeline, game.enemy_entity(2))
@@ -209,7 +210,7 @@ test_spell_fate_die_cue_preserves_health_until_impacts_and_replays_final_deck ::
 	testing.expect_value(t, second.health, i32(40))
 	testing.expect_value(t, timeline.view.deck.energy, i32(1))
 	testing.expect_value(t, timeline.view.pulse_count, u64(0))
-	testing.expect_value(t, room.enemies[0].health, i32(32))
+	testing.expect_value(t, room.enemies[0].health, i32(34))
 	testing.expect_value(t, room.enemies[1].health, i32(37))
 	update_event_timeline(&timeline, 1000)
 	spell_presentation_expect_room(t, &timeline, &room)
@@ -263,7 +264,7 @@ test_spell_replay_large_dt_and_small_steps_produce_identical_final_state :: proc
 	for definition in ([3]game.Card_Id{.Firebomb, .Fate_Strike, .Chain_Lightning}) {
 		data := create_encounter_presentation_test_level(t)
 		player := spell_presentation_player(t, definition)
-		player.dice = spell_presentation_six(t)
+		player.dice = spell_presentation_top_face(t)
 		enemies := [?]game.Enemy_Spawn{{position = {3, 1}, health = 40, attack = 1}, {position = {4, 1}, health = 40, attack = 1}, {position = {3, 2}, health = 40, attack = 1}}
 		room, ok := game.create_room(&data, &player, {enemies = enemies[:]})
 		testing.expect(t, ok)

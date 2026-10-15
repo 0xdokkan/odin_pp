@@ -13,6 +13,22 @@ Gameplay_Command_Kind :: enum {
 	Refocus,
 	Activate, Equip,
 	Timeout, Continue_Pulse, Begin_Diagonal, QTE_Key, QTE_Fail, Defense,
+	// Movimento Ombra's time is up: the player rises at the shadow's cell.
+	Shadow_Emerge,
+	// FERETRO: an arrow loosed at `target` (Ctrl and a left click on a foe).
+	Shoot,
+	// LAZZO: the world's seconds waiting, spun out (a world command, as a beat).
+	Lasso_Spin,
+	// CANNA DA PESCA: the rod cast at the cell `target`, once the room is
+	// cleared (its slot; game/fishing.odin).
+	Fish,
+	// PINBALL: the world's seconds waiting, rolled out (a world command, as a
+	// beat; game/pinball.odin).
+	Pinball_Roll,
+	// FIRST PERSON SHOOTER: one shot of the AK along `aim`, its trigger held (a
+	// world command, as a beat: never blocked by the player's own action;
+	// game/first_person.odin).
+	First_Person_Fire,
 }
 
 Gameplay_Command :: struct {
@@ -24,14 +40,21 @@ Gameplay_Command :: struct {
 	target:       game.Target,
 	offset: grid.Position,
 	defense: game.Defense_Mode,
+	// The tick this action was pressed on (0: off the tick), and for a move
+	// made with two direction keys, its diagonal step.
+	beat: u32,
+	diagonal: grid.Position,
+	// The view a First_Person_Fire shot is fired along.
+	aim: game.First_Person_Aim,
 }
 
+// No command is ever kept for later. While the player's own action runs (its
+// animation or its timed seconds) a press is dropped; only a press made after
+// the action ends acts. The one input held across frames is a move pressed on
+// the tick, waiting BEAT_CHORD_SECONDS for its diagonal partner key
+// (beat_input.odin): every boundary that clears this struct drops it too.
 Buffered_Gameplay_Command :: struct {
-	command:       Gameplay_Command,
-	occupied:      bool,
-	offered_count: int,
-	dropped_count: int,
-	consumed_count: int,
+	chord: Beat_Chord,
 }
 
 gameplay_command_is_valid :: proc(command: Gameplay_Command) -> bool {
@@ -44,41 +67,16 @@ gameplay_command_is_valid :: proc(command: Gameplay_Command) -> bool {
 		return command.origin_phase == .Combat || command.origin_phase == .Loot
 	case .Activate:
 		return command.origin_phase == .Combat
-	case .Dodge, .Wait, .Ability, .Play_Card, .Refocus, .Timeout, .Continue_Pulse, .Begin_Diagonal, .QTE_Key, .QTE_Fail, .Defense:
+	case .Dodge, .Wait, .Ability, .Play_Card, .Refocus, .Timeout, .Continue_Pulse, .Begin_Diagonal, .QTE_Key, .QTE_Fail, .Defense,
+	     .Shadow_Emerge, .Shoot, .Lasso_Spin, .Pinball_Roll:
+		return command.origin_phase == .Combat
+	// The rod fishes a room cleared, and nothing else.
+	case .Fish:
+		return command.origin_phase == .Loot && command.target.kind == .Cell
+	case .First_Person_Fire:
 		return command.origin_phase == .Combat
 	}
 	unreachable()
-}
-
-offer_gameplay_command :: proc(
-	buffer: ^Buffered_Gameplay_Command,
-	command: Gameplay_Command,
-) -> bool {
-	if buffer == nil || !gameplay_command_is_valid(command) {
-		return false
-	}
-	buffer.offered_count += 1
-	if buffer.occupied {
-		buffer.dropped_count += 1
-		return false
-	}
-	buffer.command = command
-	buffer.occupied = true
-	return true
-}
-
-take_gameplay_command :: proc(
-	buffer: ^Buffered_Gameplay_Command,
-) -> (command: Gameplay_Command, ok: bool) {
-	if buffer == nil || !buffer.occupied {
-		return
-	}
-	command = buffer.command
-	buffer.command = {}
-	buffer.occupied = false
-	buffer.consumed_count += 1
-	ok = true
-	return
 }
 
 clear_gameplay_command_buffer :: proc(buffer: ^Buffered_Gameplay_Command) {

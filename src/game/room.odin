@@ -46,6 +46,8 @@ Player :: struct {
 	tactical: Tactical_State,
 	equipment: Equipment_State,
 	m8_profile: M8_Profile,
+	// Easter eggs already opened on this floor (tesla_ring.odin).
+	floor_secrets: bit_set[Floor_Secret; u8],
 }
 
 create_player :: proc(stats: Player_Stats) -> (Player, bool) {
@@ -169,6 +171,16 @@ Room_Content :: struct {
 	traps:     []Trap_Spawn,
 	obstacles: []grid.Position,
 	objects:   []Grid_Object_Spawn,
+	// The run node the room stands for and its seed: a card the Canna da Pesca
+	// catches is weighed as that node's rewards are, from a stream of the room's
+	// own (fishing.odin). A combat at depth 0 unless said.
+	node_kind: Node_Kind,
+	node_depth: int,
+	room_seed: u64,
+	// A fight that never ends by itself (Room.endless): even with no foe at all
+	// the room is a fight, and the last kill keeps it going (MOSTRA EFFETTO's
+	// takes, game/card_demo.odin).
+	endless: bool,
 }
 
 Room :: struct {
@@ -195,10 +207,24 @@ Room :: struct {
 	tactical_pulse: Tactical_Pulse,
 	qte: QTE_State,
 	reaction_bindings: Reaction_Binding_Set,
-	ring_challenge_attempted: bool,
-	minigame_challenge_attempted: bool,
-	minigame_challenge_pending: bool,
-	minigame_challenge: Minigame_Challenge,
+	// A ring opened by a square of coils, awaiting the duel's result.
+	tesla_ring: Tesla_Ring,
+	// Pools and fires on the floor (ground.odin); they last as long as the room.
+	ground: Ground_State,
+	// The mechanics sandbox never clears: the last kill keeps the combat going.
+	endless: bool,
+	// LAZZO: the foe swung round the player, while the rope holds (lasso.odin).
+	lasso: Lasso_State,
+	// CANNA DA PESCA: the room's fishings so far, its water and its stream
+	// (fishing.odin); a new room starts them afresh.
+	fishing: Fishing_State,
+	// PINBALL: the ball rolling round the room (pinball.odin), and the room's
+	// own stream for its launches.
+	pinball: Pinball_State,
+	pinball_random: u64,
+	// FIRST PERSON SHOOTER: the seconds behind the player's eyes and his AK's
+	// shots (first_person.odin); a new room starts them afresh.
+	first_person: First_Person_State,
 }
 
 Move_Direction :: enum {
@@ -359,12 +385,22 @@ trap_index_at :: proc(room: ^Room, position: grid.Position) -> (int, bool) {
 	return 0, false
 }
 
+// A foe out of the world: the one the Lazzo holds in the air (lasso.odin) and
+// the Pinball's ball (pinball.odin). It acts in nothing and nothing on the
+// floor, no card and no arrow reaches it.
+enemy_is_out_of_play :: proc(room: ^Room, id: u32) -> bool {
+	return enemy_is_lassoed(room, id) || enemy_is_pinball(room, id)
+}
+
+// Who stands on `position`. A foe out of play stands on no cell (others walk
+// under the Lazzo's foe and through the Pinball's ball, nothing aims at them
+// there).
 enemy_index_at :: proc(room: ^Room, position: grid.Position, ignored_index := -1) -> (int, bool) {
 	if room == nil {
 		return 0, false
 	}
 	for enemy, index in room.enemies {
-		if index != ignored_index && enemy.position == position {
+		if index != ignored_index && enemy.position == position && !enemy_is_out_of_play(room, enemy.id) {
 			return index, true
 		}
 	}
@@ -422,6 +458,8 @@ create_room :: proc(level_data: ^level.Level, player: ^Player, content: Room_Con
 	result.encounter_kind = content.encounter_kind
 	result.family = content.family
 	result.modifier = content.modifier
+	result.fishing = begin_room_fishing(player, content)
+	result.pinball_random = pinball_room_stream(player, content)
 	result.next_enemy_id = 1
 	result.next_trap_id = 1
 	result.next_object_id = 1
@@ -440,6 +478,7 @@ create_room :: proc(level_data: ^level.Level, player: ^Player, content: Room_Con
 	result.loot = make([dynamic]Loot, 0, loot_capacity)
 	result.enemy_path_distances = make([]int, len(level_data.tiles.cells))
 	result.enemy_path_queue = make([]grid.Position, len(level_data.tiles.cells))
+	result.ground.pool = make([]i32, len(level_data.tiles.cells))
 	spawn_position := level_data.player_spawn
 
 	for position in content.obstacles {
@@ -516,7 +555,8 @@ create_room :: proc(level_data: ^level.Level, player: ^Player, content: Room_Con
 		destroy_room(&result)
 		return {}, false
 	}
-	result.phase = .Combat if len(result.enemies) > 0 else .Loot
+	result.endless = content.endless
+	result.phase = .Combat if len(result.enemies) > 0 || content.endless else .Loot
 	disarm_room_modifier_after_combat(&result)
 	if result.phase == .Combat {
 		if !begin_deck_combat(&player.deck) {
@@ -547,6 +587,7 @@ destroy_room :: proc(room: ^Room) {
 	delete(room.loot)
 	delete(room.enemy_path_distances)
 	delete(room.enemy_path_queue)
+	delete(room.ground.pool)
 	room^ = {}
 }
 
@@ -641,12 +682,20 @@ player_command_outcome_for_phase :: proc(phase: Room_Phase) -> Player_Command_Ou
 
 // Accepted commands share loot and terminal cleanup. Classic advances one
 // response pulse; M7 pays combat time and queues the world beats it crosses.
-finish_player_combat_command :: proc(room: ^Room, time_cost: f32 = TACTICAL_ATTACK_SECONDS) -> (
+// Each one is an action of the player's (`acted`): his poison bites. Rising
+// from Movimento Ombra is the shadow's end, not an action.
+finish_player_combat_command :: proc(room: ^Room, time_cost: f32 = TACTICAL_ATTACK_SECONDS, acted := true) -> (
 	pulse: Pulse_Report,
 	outcome: Player_Command_Outcome,
 ) {
 	assert(room != nil && room.player != nil)
 	collect_loot_in_magnet_range(room)
+	if acted && room.phase == .Combat {
+		// `pulse` doubles as the bite's report: no second report on this deep stack.
+		tick_poison_on_action(room, PLAYER_ENTITY, &pulse)
+		append_event_log(&room.recent_events, &pulse.events)
+		pulse = {}
+	}
 	outcome = player_command_outcome_for_phase(room.phase)
 	if outcome != .Combat_Continues {
 		sync_deck_with_room_phase(room)
@@ -671,6 +720,10 @@ kill_enemy :: proc(room: ^Room, enemy_index: int) -> (drops: [3]Loot, drop_count
 	assert(room != nil)
 	enemy := room.enemies[enemy_index]
 	position := enemy.position
+	// The foe the Lazzo held falls with the rope slack, on the cell under it;
+	// the Pinball's ball is gone with its foe.
+	if enemy_is_lassoed(room, enemy.id) { room.lasso = {} }
+	if enemy_is_pinball(room, enemy.id) { room.pinball = {} }
 	remove_reaction_bindings_for_owner(room, enemy_entity(enemy.id))
 	unordered_remove(&room.enemies, enemy_index)
 	drops[drop_count] = {position = position, kind = .Gold, amount = 1}
@@ -687,13 +740,45 @@ kill_enemy :: proc(room: ^Room, enemy_index: int) -> (drops: [3]Loot, drop_count
 		append(&room.loot, drops[drop_count])
 		drop_count += 1
 	}
-	if len(room.enemies) == 0 {
+	if len(room.enemies) == 0 && !room.endless {
 		if room.phase != .Defeat {
 			room.phase = .Loot
 		}
 		clear_enemy_intents(room)
 	}
 	return
+}
+
+// A free cell for a newcomer: walkable, and nobody or nothing already on it.
+enemy_spawn_cell_is_free :: proc(room: ^Room, cell: grid.Position) -> bool {
+	if room == nil || room.player == nil || !base_cell_is_walkable(room, cell) || cell_blocks_movement(room, cell) ||
+	   cell == room.player.position || cell == room.exit_position { return false }
+	if _, found := enemy_index_at(room, cell); found { return false }
+	if _, found := object_index_at(room, cell); found { return false }
+	if _, found := trap_index_at(room, cell); found { return false }
+	return true
+}
+
+// Adds an enemy to a room already in combat, with the same rules as the
+// room's own spawns, and plans its first intent.
+spawn_enemy :: proc(room: ^Room, spawn: Enemy_Spawn) -> (id: u32, ok: bool) {
+	if room == nil || room.player == nil || room.phase != .Combat || len(room.enemies) >= MAX_ENEMIES_PER_ROOM ||
+	   spawn.health <= 0 || spawn.attack <= 0 || spawn.archetype >= .Count ||
+	   !enemy_spawn_cell_is_free(room, spawn.position) { return }
+	id = room.next_enemy_id
+	room.next_enemy_id += 1
+	append(&room.enemies, Enemy{
+		id = id,
+		archetype = spawn.archetype,
+		position = spawn.position,
+		max_health = spawn.health,
+		health = spawn.health,
+		attack = spawn.attack,
+		drops_healing = spawn.drops_healing,
+		boss_phase = 1 if spawn.archetype == .Demolitionist else 0,
+	})
+	plan_enemy_intents(room)
+	return id, true
 }
 
 enemy_can_move_to :: proc(room: ^Room, enemy_index: int, position: grid.Position) -> bool {
@@ -715,6 +800,7 @@ try_move_player :: proc(room: ^Room, direction: Move_Direction) -> Action_Result
 	if room == nil || room.player == nil || (room.phase != .Combat && room.phase != .Loot) {
 		return .Invalid_Phase
 	}
+	critical := tactical_take_critical(room)
 	target := add_position(room.player.position, direction_offset(direction))
 	// Walking remains available during recovery, but walking into an enemy is
 	// an attack and must pass the offensive gate before mutating the event log.
@@ -724,14 +810,9 @@ try_move_player :: proc(room: ^Room, direction: Move_Direction) -> Action_Result
 	clear_event_log(&room.recent_events)
 	if room.phase == .Combat {
 		if enemy_index, found := enemy_index_at(room, target); found {
-			enemy := room.enemies[enemy_index]
-			action := make_action(.Attack, PLAYER_ENTITY, entity_target(enemy_entity(enemy.id)), .Adjacent_Opponent)
-			added := add_effect(&action, damage_effect(enemy_entity(enemy.id), player_basic_attack_damage(room.player)))
-			assert(added)
-			report := resolve_action(room, &action)
-			assert(report.accepted)
-			consume_equipped_weapon_use(room.player)
-			append_event_log(&room.recent_events, &report.events)
+			// The bump, loaded with whatever the player's charges add (player_charges.odin).
+			struck := player_bump(room, enemy_index, target, .Adjacent_Opponent, critical)
+			assert(struck)
 			_, outcome := finish_player_combat_command(room)
 			switch outcome {
 			case .Player_Defeated:
@@ -757,6 +838,7 @@ try_move_player :: proc(room: ^Room, direction: Move_Direction) -> Action_Result
 					report := resolve_action(room, &action)
 					if report.accepted {
 						consume_equipped_weapon_use(room.player)
+						mark_attack_events(&report.events, 0, PLAYER_ENTITY, ref, room.player.position, target, {}, false)
 						append_event_log(&room.recent_events, &report.events)
 						return .Attacked
 					}
@@ -766,6 +848,8 @@ try_move_player :: proc(room: ^Room, direction: Move_Direction) -> Action_Result
 		return .Blocked
 	}
 
+	// A straight step is one cell, on the tick or not: the tick's step is the
+	// diagonal (try_move_player_diagonal).
 	action := make_action(.Move, PLAYER_ENTITY, cell_target(target), .Walkable_Cell)
 	added := add_effect(&action, move_effect(PLAYER_ENTITY, target))
 	assert(added)
@@ -779,7 +863,9 @@ try_move_player :: proc(room: ^Room, direction: Move_Direction) -> Action_Result
 	if room.phase == .Loot {
 		collect_loot_in_magnet_range(room)
 		sync_deck_with_room_phase(room)
-		if room.player.position == room.exit_position {
+		// The mechanics sandbox cleared for the rod (sandbox_clear_for_fishing)
+		// keeps its exit shut: it has no next room.
+		if room.player.position == room.exit_position && !room.endless {
 			room.phase = .Complete
 			return .Room_Completed
 		}

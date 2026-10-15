@@ -91,21 +91,40 @@ begin_tactical_lighting :: proc(renderer: ^Renderer, hologram: bool = false, acc
 }
 draw_tactical_actor_bases :: proc(renderer: ^Renderer) {
 	snapshot := renderer.tactical.snapshot
+	// The Pinball's ball has its own shadow, and no stand (pinball.odin).
+	draw_pinball_shadow(renderer)
 	for actor in snapshot.enemies[:snapshot.enemy_count] {
 		cell := grid.Position{int(math.round(actor.position.x)), int(math.round(actor.position.y))}
-		if !actor.visible || !tactical_render_visible(renderer, cell) { continue }
-		p := rl.Vector3{actor.position.x+0.5, 0.048, actor.position.y+0.5}
+		if !actor.visible || !tactical_render_visible(renderer, cell) || tactical_pinball_holds(renderer, actor.entity) { continue }
+		key := sprite_key_for_enemy(actor.archetype)
+		at, _ := living_card_position(renderer, actor.entity, key, actor.position)
+		p := rl.Vector3{at.x+0.5, 0.048, at.y+0.5}
 		draw_tactical_actor_shadow(p)
+		// Up on the Lazzo's rope: its shadow on the floor, and the stand it
+		// carries (lasso.odin).
+		if tactical_lasso_holds(renderer, actor.entity) {
+			if renderer.tactical.flipbook.loaded { draw_flipbook_stand(renderer, key, actor.position, GOTHIC_RED, actor.entity) }
+			continue
+		}
 		rl.DrawCylinder(p, 0.3, 0.3, 0.01, 24, GOTHIC_INK)
 		rl.DrawCircle3D(p+rl.Vector3{0, 0.01, 0}, 0.32, {1, 0, 0}, 90, GOTHIC_RED)
-		if renderer.tactical.flipbook.loaded { draw_flipbook_stand(renderer, sprite_key_for_enemy(actor.archetype), actor.position, GOTHIC_RED) }
+		if renderer.tactical.flipbook.loaded { draw_flipbook_stand(renderer, key, actor.position, GOTHIC_RED, actor.entity) }
 	}
-	if !snapshot.player.visible { return }
-	p := rl.Vector3{snapshot.player.position.x+0.5, 0.05, snapshot.player.position.y+0.5}
+	// Behind his eyes the player stands on no stand of his own.
+	if !snapshot.player.visible || first_person_hides_player(renderer) { return }
+	// In the shadow the pool takes the stand's place while the card is under
+	// the floor; out of it (casting before it sinks, or sprung out at the end
+	// of the rise) the card keeps its stand.
+	if tactical_shadow_showing(renderer) {
+		draw_tactical_shadow_pool(renderer)
+		if tactical_shadow_depth(renderer, game.PLAYER_ENTITY) > 0 { return }
+	}
+	at, _ := living_card_position(renderer, game.PLAYER_ENTITY, .Player, snapshot.player.position)
+	p := rl.Vector3{at.x+0.5, 0.05, at.y+0.5}
 	draw_tactical_actor_shadow(p)
 	rl.DrawCylinder(p, 0.32, 0.32, 0.01, 24, GOTHIC_INK)
 	rl.DrawCircle3D(p+rl.Vector3{0, 0.01, 0}, 0.34, {1, 0, 0}, 90, GOTHIC_PAPER)
-	if renderer.tactical.flipbook.loaded { draw_flipbook_stand(renderer, .Player, snapshot.player.position, GOTHIC_PAPER) }
+	if renderer.tactical.flipbook.loaded { draw_flipbook_stand(renderer, .Player, snapshot.player.position, GOTHIC_PAPER, game.PLAYER_ENTITY) }
 }
 
 draw_tactical_actor_shadow :: proc(position: rl.Vector3) {

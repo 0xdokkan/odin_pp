@@ -46,6 +46,17 @@ test_upgrade_preview_uses_effect_values_and_rest_disables_no_op_upgrade :: proc(
 	testing.expect_value(t, string(card_upgrade_preview({id = 1, definition_id = .Strike})), "DAMAGE 3 -> 4")
 	testing.expect_value(t, string(card_upgrade_preview({id = 1, definition_id = .Volatile_Study, upgrade_level = 2})), "DRAW 3 -> 4")
 	testing.expect_value(t, string(card_upgrade_preview({id = 1, definition_id = .Dash})), "NO UPGRADE AVAILABLE")
+	// A dice card's upgrade shows only its next die, up to the D20.
+	for id in ([5]game.Card_Id{.Fate_Strike, .Shock_Floor, .Sundering_Blow, .Twin_Venom, .Prismatic_Barrage}) {
+		for tactical in ([2]bool{false, true}) {
+			testing.expect_value(t, string(card_upgrade_preview({id = 1, definition_id = id}, tactical)), "d4 -> d6")
+			testing.expect_value(t, string(card_upgrade_preview({id = 1, definition_id = id, upgrade_level = 4}, tactical)), "d12 -> d20")
+			testing.expect_value(t, string(card_upgrade_preview({id = 1, definition_id = id, upgrade_level = game.MAX_DICE_UPGRADE_LEVEL}, tactical)), "MAX UPGRADE")
+		}
+	}
+	// The themed shop and rest say the cap in Italian.
+	testing.expect_value(t, string(menu_label("MAX UPGRADE")), "POTENZIAMENTO MASSIMO")
+	testing.expect_value(t, string(menu_label("NO UPGRADE AVAILABLE")), "NESSUN POTENZIAMENTO")
 	run: game.Run_State
 	run.phase = .Rest
 	testing.expect(t, game.initialize_empty_deck(&run.player.deck))

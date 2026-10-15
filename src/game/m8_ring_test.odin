@@ -3,28 +3,6 @@ package game
 import "core:testing"
 import level "../level"
 
-@(test)
-test_m8_ring_loss_never_changes_main_player_health_or_advances_room :: proc(t: ^testing.T) {
-	data := create_test_level(t)
-	defer level.destroy(&data)
-	player := create_test_player(t)
-	room, ok := create_room(&data, &player, {})
-	testing.expect(t, ok)
-	defer destroy_room(&room)
-	ring, started := begin_ring_challenge(&room)
-	testing.expect(t, started)
-	_, started = begin_ring_challenge(&room)
-	testing.expect(t, !started)
-	before := player
-	ring.phase = .Lost // Combat outcome arrives from the canonical fight scene.
-	testing.expect_value(t, ring.phase, Ring_Phase.Lost)
-	reward := settle_ring_challenge(&room, &ring)
-	testing.expect(t, reward.settled && !reward.won && !reward.has_unlock)
-	testing.expect_value(t, player, before)
-	testing.expect_value(t, room.phase, Room_Phase.Loot)
-	testing.expect_value(t, room.pulse_count, u64(0))
-	testing.expect(t, !settle_ring_challenge(&room, &ring).settled)
-}
 
 @(test)
 test_m8_ring_unlock_milestones_grant_once_and_filter_all_card_offers :: proc(t: ^testing.T) {
@@ -40,9 +18,8 @@ test_m8_ring_unlock_milestones_grant_once_and_filter_all_card_offers :: proc(t: 
 	testing.expect_value(t, card_offer_weight(titan, &node, &player.m8_profile), u64(0))
 	testing.expect_value(t, card_offer_weight(crown, &node, &player.m8_profile), u64(0))
 	for wins in 1..=4 {
-		ring := Ring_Challenge{phase = .Won}
 		owned_before := player.deck.owned_count
-		reward := settle_ring_challenge(&room, &ring)
+		reward := record_ring_win(&room)
 		testing.expect(t, reward.settled && reward.won)
 		testing.expect_value(t, player.m8_profile.ring_wins, u32(wins))
 		if wins == 1 || wins == 3 {
@@ -53,7 +30,6 @@ test_m8_ring_unlock_milestones_grant_once_and_filter_all_card_offers :: proc(t: 
 			testing.expect(t, !reward.has_unlock && !reward.card_added)
 			testing.expect_value(t, player.deck.owned_count, owned_before)
 		}
-		testing.expect(t, !settle_ring_challenge(&room, &ring).settled)
 		testing.expect(t, card_offer_weight(titan, &node, &player.m8_profile) > 0)
 		testing.expect_value(t, card_offer_weight(crown, &node, &player.m8_profile) > 0, wins >= 3)
 	}
@@ -71,7 +47,7 @@ test_m8_locked_cards_never_leak_into_reward_pool :: proc(t: ^testing.T) {
 		for id in choices { testing.expect(t, id != .Titan_Grip && id != .Storm_Crown) }
 	}
 	profile.ring_wins = 3
-	all: [int(Card_Id.Count)-1]Card_Id // Spark alone is temporary-only.
+	all: [int(Card_Id.Count)-3]Card_Id // Spark is temporary-only; the Scopa pair is never offered.
 	random := u64(1)
 	testing.expect(t, generate_weighted_card_choices(&random, &node, all[:], &profile))
 	found_titan, found_crown := false, false
@@ -91,8 +67,7 @@ test_m8_unlock_survives_full_deck_and_remains_available_in_offers :: proc(t: ^te
 		_, added := add_owned_card(&player.deck, .Strike)
 		testing.expect(t, added)
 	}
-	ring := Ring_Challenge{phase = .Won}
-	reward := settle_ring_challenge(&room, &ring)
+	reward := record_ring_win(&room)
 	testing.expect(t, reward.settled && reward.has_unlock && !reward.card_added)
 	testing.expect(t, m8_card_unlocked(.Titan_Grip, &player.m8_profile))
 	testing.expect_value(t, player.deck.owned_count, MAX_OWNED_CARDS)

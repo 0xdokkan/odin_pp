@@ -11,6 +11,8 @@ MAX_PRESENTATION_CUES :: game.MAX_GAME_EVENTS
 MAX_PRESENTATION_LOOT :: game.MAX_ENEMIES_PER_ROOM*3
 MAX_PRESENTATION_TRAPS :: game.MAX_TRAPS_PER_ROOM
 MAX_PRESENTATION_GRID_OBJECTS :: game.MAX_GRID_OBJECTS_PER_ROOM
+// One bit a cell of the largest level: the pools on its floor.
+MAX_PRESENTATION_GROUND_CELLS :: level.MAX_GENERATED_ROOM_DIMENSION*level.MAX_GENERATED_ROOM_DIMENSION
 
 // Values above one slow every cue while preserving their relative rhythm.
 PRESENTATION_TIME_SCALE           :: f32(1.35)
@@ -30,6 +32,32 @@ PRESENTATION_DEFEAT_DURATION      :: f32(0.22)*PRESENTATION_TIME_SCALE
 PRESENTATION_LOOT_DURATION        :: f32(0.28)*PRESENTATION_TIME_SCALE
 PRESENTATION_NOTICE_DURATION      :: f32(0.12)*PRESENTATION_TIME_SCALE
 PRESENTATION_PULSE_DURATION       :: f32(0.06)*PRESENTATION_TIME_SCALE
+// Movimento Ombra: the player sinking into his shadow, and rising from it.
+PRESENTATION_SHADOW_SINK_DURATION :: f32(0.2)*PRESENTATION_TIME_SCALE
+PRESENTATION_SHADOW_RISE_DURATION :: f32(0.25)*PRESENTATION_TIME_SCALE
+// DADO DEL DESTINO: its die at the struck foe, as the blow lands (its paper
+// token stays a while longer: player_charges.odin).
+PRESENTATION_FATE_DURATION :: f32(0.24)*PRESENTATION_TIME_SCALE
+// LAZZO: the throw (the rope flies, wraps the foe, lifts it and pulls it onto
+// its ring), stretched with the card's other cues over the cast (lasso.odin).
+PRESENTATION_LASSO_THROW_DURATION :: f32(1.1)*PRESENTATION_TIME_SCALE
+// CANNA DA PESCA, about three seconds in all (fishing.odin): the rod swings
+// and its line flies to the cell; the bobber floats on the new water until a
+// fish bites; the catch is reeled out and flies to the player (a caught card
+// then hangs over him a moment, its name shown).
+PRESENTATION_FISH_CAST_DURATION :: f32(0.62)
+PRESENTATION_FISH_BITE_DURATION :: f32(1.15)
+PRESENTATION_FISH_CATCH_DURATION :: f32(0.95)
+PRESENTATION_FISH_CARD_DURATION :: f32(1.7)
+// PINBALL: the foe's card puffs into its ball, then the strike (the player's
+// swing, set as its cue starts, lands as the cast ends), both stretched with
+// the card's other cues over the cast (pinball.odin); the burst at the end of
+// its time.
+PRESENTATION_PINBALL_MADE_DURATION :: f32(0.6)*PRESENTATION_TIME_SCALE
+PRESENTATION_PINBALL_STRIKE_DURATION :: f32(0.6)*PRESENTATION_TIME_SCALE
+PRESENTATION_PINBALL_BURST_DURATION :: f32(0.32)*PRESENTATION_TIME_SCALE
+// FIRST PERSON SHOOTER: the camera's dive into the player's eyes (first_person.odin).
+PRESENTATION_FIRST_PERSON_DIVE_DURATION :: f32(0.45)*PRESENTATION_TIME_SCALE
 PRESENTATION_MAX_SEQUENCE_DURATION :: f32(12.0)
 PRESENTATION_TIME_EPSILON         :: f32(0.00001)
 
@@ -68,6 +96,28 @@ Presentation_Cue_Kind :: enum {
 	Dice_Rolled,
 	Spell_Launched,
 	Spell_Impact,
+	Shadow_Entered,
+	Shadow_Emerged,
+	// RIFLESSO and the Dado del Destino's die (game.Game_Event_Kind).
+	Attack_Deflected,
+	Fate_Rolled,
+	// LAZZO: the throw, a hit or a smash, the rope let go (game/lasso.odin).
+	Lasso_Caught,
+	Lasso_Struck,
+	Lasso_Released,
+	// CANNA DA PESCA: the cast, the bite, the catch (game/fishing.odin).
+	Fish_Cast,
+	Fish_Bite,
+	Fish_Caught,
+	// PINBALL: the card turned into its ball, the strike, a wall, a foe, the
+	// burst (game/pinball.odin).
+	Pinball_Made,
+	Pinball_Launched,
+	Pinball_Bounced,
+	Pinball_Bumped,
+	Pinball_Burst,
+	// FIRST PERSON SHOOTER: the dive into the player's eyes (game/first_person.odin).
+	First_Person_Begun,
 }
 
 Presentation_Actor :: struct {
@@ -102,6 +152,18 @@ Presentation_Grid_Object :: struct {
 	device_armed: bool,
 }
 
+// The pools and fires on the floor as the board shows them (game/ground.odin):
+// a bit a pool's cell, row-major, `width` cells a row; the fires as they stand;
+// the Canna da Pesca's water (game/fishing.odin).
+Presentation_Ground :: struct {
+	width: int,
+	pool: [MAX_PRESENTATION_GROUND_CELLS/64]u64,
+	fires: [game.MAX_GROUND_FIRES]game.Ground_Fire,
+	fire_count: int,
+	water: [game.MAX_FISHING_WATERS]grid.Position,
+	water_count: int,
+}
+
 Room_Presentation :: struct {
 	tactical: bool,
 	phase:       game.Room_Phase,
@@ -109,6 +171,12 @@ Room_Presentation :: struct {
 	modifier: game.Room_Modifier,
 	family: level.Room_Family,
 	relics: game.Relic_State,
+	// The M8 weapon in the player's hand as the board shows him (the look of
+	// his blows, attack_fx.odin): a blow's last use is still in it while it plays.
+	weapon: game.Weapon_Id,
+	// DADO DEL DESTINO: the die the player's loaded bumps roll
+	// (game.player_fate_sides), shown from the cue that loads them.
+	fate_sides: i32,
 	player:      Presentation_Actor,
 	deck:        game.Deck_State,
 	enemies:     [game.MAX_ENEMIES_PER_ROOM]Presentation_Actor,
@@ -119,6 +187,8 @@ Room_Presentation :: struct {
 	object_count: int,
 	loot:        [MAX_PRESENTATION_LOOT]Presentation_Loot,
 	loot_count:  int,
+	// Shown from a pool's or a fire's landing (start_presentation_cue).
+	ground:      Presentation_Ground,
 	gold:        i32,
 	pulse_count: u64,
 	valid:       bool,
@@ -131,6 +201,9 @@ Presentation_Cue :: struct {
 	elapsed:  f32,
 	duration: f32,
 	started:  bool,
+	// The command whose events these are (Renderer.cue_batches): the cues of
+	// one blow share it, and no later blow ever does.
+	batch:    u32,
 }
 
 Presentation_Timeline :: struct {
@@ -142,6 +215,10 @@ Presentation_Timeline :: struct {
 	update_failures: int,
 	view:           Room_Presentation,
 	final_view:     Room_Presentation,
+	// The stacks of the player's charges his blow spent, as it found them
+	// (sync_presentation_player_charges_from_final; 0: none spent): the board
+	// keeps them on show until the blow lands (hold_unlanded_blows).
+	charges_before: [game.Status_Kind]i32,
 }
 
 presentation_position :: proc(position: grid.Position) -> view.Vec2 {
@@ -159,6 +236,8 @@ capture_room_presentation :: proc(room: ^game.Room) -> (result: Room_Presentatio
 	result.modifier = room.modifier
 	result.family = room.family
 	result.relics = room.player.relics
+	result.weapon = room.player.equipment.weapon.id
+	result.fate_sides = game.player_fate_sides(room)
 	result.gold = room.player.gold
 	result.pulse_count = room.pulse_count
 	result.deck = room.player.deck
@@ -211,6 +290,7 @@ capture_room_presentation :: proc(room: ^game.Room) -> (result: Room_Presentatio
 		}
 	}
 
+	result.dropped += capture_presentation_ground(room, &result.ground)
 	result.loot_count = min(len(room.loot), MAX_PRESENTATION_LOOT)
 	result.dropped += max(0, len(room.loot)-result.loot_count)
 	for index in 0..<result.loot_count {
@@ -221,6 +301,51 @@ capture_room_presentation :: proc(room: ^game.Room) -> (result: Room_Presentatio
 			amount = item.amount,
 			visible = true,
 		}
+	}
+	return
+}
+
+// The room's ground into `ground`; the pool cells it had no bit for.
+capture_presentation_ground :: proc(room: ^game.Room, ground: ^Presentation_Ground) -> (dropped: int) {
+	ground^ = {}
+	if room == nil || room.level_data == nil { return }
+	ground.width = room.level_data.tiles.width
+	for value, index in room.ground.pool {
+		if value <= 0 { continue }
+		if index >= MAX_PRESENTATION_GROUND_CELLS { dropped += 1; continue }
+		ground.pool[index/64] |= u64(1)<<u64(index%64)
+	}
+	ground.fire_count = min(room.ground.fire_count, len(ground.fires))
+	copy(ground.fires[:], room.ground.fires[:ground.fire_count])
+	ground.water_count = clamp(room.fishing.water_count, 0, len(ground.water))
+	copy(ground.water[:], room.fishing.water[:ground.water_count])
+	return
+}
+
+// Whether `cell` is the Canna da Pesca's water in the shown ground.
+presentation_ground_water :: proc(ground: ^Presentation_Ground, cell: grid.Position) -> bool {
+	if ground == nil { return false }
+	for water in ground.water[:clamp(ground.water_count, 0, len(ground.water))] {
+		if water == cell { return true }
+	}
+	return false
+}
+
+// Whether `cell` is a pool's in the shown ground.
+presentation_ground_pool :: proc(ground: ^Presentation_Ground, cell: grid.Position) -> bool {
+	if ground == nil || cell.x < 0 || cell.y < 0 || cell.x >= ground.width || ground.width <= 0 { return false }
+	index := cell.y*ground.width+cell.x
+	return index < MAX_PRESENTATION_GROUND_CELLS && ground.pool[index/64]&(u64(1)<<u64(index%64)) != 0
+}
+
+// The strongest shown fire on `cell` (0: none), and whether it is a fire's centre.
+presentation_ground_burn :: proc(ground: ^Presentation_Ground, cell: grid.Position) -> (burn: i32, centre: bool, last: bool) {
+	if ground == nil { return }
+	for fire in ground.fires[:ground.fire_count] {
+		if !game.ground_fire_covers(fire, cell) { continue }
+		burn = max(burn, fire.burn)
+		centre = centre || fire.center == cell
+		last = last || fire.stage >= game.GROUND_FIRE_STAGES
 	}
 	return
 }
@@ -383,6 +508,38 @@ presentation_cue_kind :: proc(event: game.Game_Event) -> Presentation_Cue_Kind {
 		return .Binding_Expired
 	case .Pulse_Advanced:
 		return .Pulse_Advanced
+	case .Shadow_Entered:
+		return .Shadow_Entered
+	case .Shadow_Emerged:
+		return .Shadow_Emerged
+	case .Attack_Deflected:
+		return .Attack_Deflected
+	case .Fate_Rolled:
+		return .Fate_Rolled
+	case .Lasso_Caught:
+		return .Lasso_Caught
+	case .Lasso_Struck:
+		return .Lasso_Struck
+	case .Lasso_Released:
+		return .Lasso_Released
+	case .Fish_Cast:
+		return .Fish_Cast
+	case .Fish_Bite:
+		return .Fish_Bite
+	case .Fish_Caught:
+		return .Fish_Caught
+	case .Pinball_Made:
+		return .Pinball_Made
+	case .Pinball_Launched:
+		return .Pinball_Launched
+	case .Pinball_Bounced:
+		return .Pinball_Bounced
+	case .Pinball_Bumped:
+		return .Pinball_Bumped
+	case .Pinball_Burst:
+		return .Pinball_Burst
+	case .First_Person_Begun:
+		return .First_Person_Begun
 	}
 	unreachable()
 }
@@ -398,6 +555,10 @@ presentation_cue_duration :: proc(kind: Presentation_Cue_Kind, event: game.Game_
 	case .Move:
 		if event.kind == .Movement_Step {
 			return PRESENTATION_MOVEMENT_STEP_DURATION
+		}
+		// A teleport has no road to walk: it only marks the landing.
+		if game.event_is_teleport(event) {
+			return PRESENTATION_NOTICE_DURATION
 		}
 		if event.target.kind == .Enemy || event.target.kind == .Object {
 			return PRESENTATION_ENEMY_MOVE_DURATION
@@ -433,6 +594,41 @@ presentation_cue_duration :: proc(kind: Presentation_Cue_Kind, event: game.Game_
 		return PRESENTATION_NOTICE_DURATION
 	case .Pulse_Advanced:
 		return PRESENTATION_PULSE_DURATION
+	case .Shadow_Entered:
+		return PRESENTATION_SHADOW_SINK_DURATION
+	case .Shadow_Emerged:
+		return PRESENTATION_SHADOW_RISE_DURATION
+	// The blow RIFLESSO turns back is still a blow.
+	case .Attack_Deflected:
+		return PRESENTATION_DAMAGE_DURATION
+	case .Fate_Rolled:
+		return PRESENTATION_FATE_DURATION
+	case .Lasso_Caught:
+		return PRESENTATION_LASSO_THROW_DURATION
+	// A hit is a blow; letting go only marks the fall.
+	case .Lasso_Struck:
+		return PRESENTATION_DAMAGE_DURATION
+	case .Lasso_Released:
+		return PRESENTATION_NOTICE_DURATION
+	case .Fish_Cast:
+		return PRESENTATION_FISH_CAST_DURATION
+	case .Fish_Bite:
+		return PRESENTATION_FISH_BITE_DURATION
+	// A caught card hangs over the player a while, its name shown.
+	case .Fish_Caught:
+		return PRESENTATION_FISH_CATCH_DURATION if event.card_definition == .Fishing_Rod else PRESENTATION_FISH_CARD_DURATION
+	// PINBALL: the card's puff and the swing share its cast; a ding, a bong and
+	// the burst are blows of the world's.
+	case .Pinball_Made:
+		return PRESENTATION_PINBALL_MADE_DURATION
+	case .Pinball_Launched:
+		return PRESENTATION_PINBALL_STRIKE_DURATION
+	case .Pinball_Bounced, .Pinball_Bumped:
+		return PRESENTATION_DAMAGE_DURATION
+	case .Pinball_Burst:
+		return PRESENTATION_PINBALL_BURST_DURATION
+	case .First_Person_Begun:
+		return PRESENTATION_FIRST_PERSON_DIVE_DURATION
 	}
 	unreachable()
 }
@@ -533,12 +729,30 @@ presentation_cue_can_group :: proc(kind: Presentation_Cue_Kind) -> bool {
 presentation_group_size :: proc(timeline: ^Presentation_Timeline, offset: int = 0) -> int {
 	first, found := presentation_cue_at(timeline, offset)
 	if !found { return 0 }
+	if first.kind == .Damage_Absorbed && game.event_is_attack(first.event) { return presentation_blow_span(timeline, offset) }
 	if first.event.visual_group == 0 || !presentation_cue_can_group(first.kind) { return 1 }
 	span := 1
 	for index in offset+1..<timeline.count {
 		cue, _ := presentation_cue_at(timeline, index)
 		if cue.event.visual_group != first.event.visual_group || !presentation_cue_can_group(cue.kind) { break }
 		span += 1
+	}
+	return span
+}
+
+// A blow met by a guard (game.mark_attack_events) is one blow, as the world
+// shows it: its guard, the Shield it breaks and the wound that gets through
+// start together.
+presentation_blow_span :: proc(timeline: ^Presentation_Timeline, offset: int) -> int {
+	first, _ := presentation_cue_at(timeline, offset)
+	span := 1
+	for index in offset+1..<timeline.count {
+		cue, _ := presentation_cue_at(timeline, index)
+		event := cue.event
+		if event.source != first.event.source || event.target != first.event.target { break }
+		if cue.kind == .Status_Removed && event.status == .Shield { span += 1; continue }
+		if cue.kind == .Damage && game.event_is_attack(event) && event.to_position == first.event.to_position { span += 1 }
+		break
 	}
 	return span
 }
@@ -583,7 +797,8 @@ apply_presentation_status :: proc(
 	kind: game.Status_Kind,
 	potency, duration: i32,
 ) -> bool {
-	if statuses == nil || !game.status_kind_is_valid(kind) || potency <= 0 || duration <= 0 ||
+	if statuses == nil || !game.status_kind_is_valid(kind) || potency <= 0 ||
+	   (duration <= 0 && !game.status_kind_stacks(kind)) ||
 	   statuses.count < 0 || statuses.count > len(statuses.items) {
 		return false
 	}
@@ -807,6 +1022,7 @@ sync_presentation_statuses_from_final :: proc(timeline: ^Presentation_Timeline) 
 		return false
 	}
 	timeline.view.player.statuses = timeline.final_view.player.statuses
+	timeline.view.fate_sides = timeline.final_view.fate_sides
 	for index in 0..<timeline.view.enemy_count {
 		actor := &timeline.view.enemies[index]
 		if final_actor, found := presentation_actor_in_view(&timeline.final_view, actor.entity); found {
@@ -814,6 +1030,39 @@ sync_presentation_statuses_from_final :: proc(timeline: ^Presentation_Timeline) 
 		}
 	}
 	return true
+}
+
+// A poison bite wears a stack without an event of its own: at the bite, the
+// bitten actor's poison takes the final view's stacks. A bite that ends it
+// leaves it for its Status_Expired to remove. (A command bites each actor at
+// most once: the player's own action, each enemy's in its pulse.)
+sync_presentation_poison_from_final :: proc(timeline: ^Presentation_Timeline, actor: ^Presentation_Actor) {
+	if timeline == nil || actor == nil || !timeline.final_view.valid { return }
+	index, poisoned := game.status_index(&actor.statuses, .Poison)
+	if !poisoned { return }
+	final_actor, found := presentation_actor_in_view(&timeline.final_view, actor.entity)
+	if !found { return }
+	if final_index, kept := game.status_index(&final_actor.statuses, .Poison); kept {
+		actor.statuses.items[index].potency = final_actor.statuses.items[final_index].potency
+	}
+}
+
+// The player's charges his own blow spends (a bump's Lama and Destino, an
+// arrow) wear without an event of their own: at the blow, they take the final
+// view's stacks, and what they were is kept in charges_before. A last one spent
+// is left for its Status_Expired to remove.
+sync_presentation_player_charges_from_final :: proc(timeline: ^Presentation_Timeline) {
+	if timeline == nil || !timeline.final_view.valid { return }
+	shown, final := &timeline.view.player.statuses, &timeline.final_view.player.statuses
+	for kind in game.Status_Kind {
+		if !game.status_kind_is_player_charge(kind) { continue }
+		index, carried := game.status_index(shown, kind)
+		if !carried { continue }
+		final_index, kept := game.status_index(final, kind)
+		if !kept { continue }
+		if shown.items[index].potency != final.items[final_index].potency { timeline.charges_before[kind] = shown.items[index].potency }
+		shown.items[index].potency = final.items[final_index].potency
+	}
 }
 
 apply_presentation_trap_triggered :: proc(
@@ -871,17 +1120,33 @@ start_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^Presentat
 
 	switch cue.kind {
 	case .Dice_Rolled:
+		// The Canna da Pesca's food: one d4 of life, at every level of the rod
+		// (it is no dice card: game/fishing.odin).
+		if event.card_definition == .Fishing_Rod {
+			if !game.validate_dice_roll(&event.dice_roll) || event.amount != event.dice_roll.total || event.dice_roll.count != 1 ||
+			   event.dice_roll.sides != game.FISHING_HEAL_SIDES || event.source != game.PLAYER_ENTITY {
+				timeline.update_failures += 1
+			}
+			break
+		}
 		expected_dice := game.card_dice_count(event.card_definition)
+		// The die must be the one of the card's logged level.
 		if !game.validate_dice_roll(&event.dice_roll) || event.amount != event.dice_roll.total ||
-		   event.dice_roll.count != expected_dice ||
+		   int(event.dice_roll.count) != expected_dice ||
+		   event.dice_roll.sides != game.card_die_sides(event.card_definition, event.card_upgrade_level) ||
 		   expected_dice == 0 ||
 		   event.source != game.PLAYER_ENTITY {
 			timeline.update_failures += 1
 		}
 	case .Spell_Launched, .Spell_Impact:
-		if event.card_definition != .Firebomb && event.card_definition != .Chain_Lightning &&
-		   game.card_dice_count(event.card_definition) == 0 && !game.card_is_board_device(event.card_definition) {
+		if event.card_definition != .Firebomb && event.card_definition != .Chain_Lightning && event.card_definition != .Storm_Crown &&
+		   game.card_dice_count(event.card_definition) == 0 && !game.card_is_board_device(event.card_definition) &&
+		   !game.card_places_ground(event.card_definition) {
 			timeline.update_failures += 1
+		}
+		// A pool or a fire is on the floor from its landing on.
+		if cue.kind == .Spell_Impact && game.card_places_ground(event.card_definition) && timeline.final_view.valid {
+			timeline.view.ground = timeline.final_view.ground
 		}
 	case .Room_Hazard_Triggered:
 		timeline.view.modifier.activation_pulse = event.pulse_count
@@ -903,10 +1168,13 @@ start_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^Presentat
 			}
 		}
 	case .Move:
+		// A teleport shows the body on its landing at once, never on the line
+		// between.
+		start := event.to_position if game.event_is_teleport(event) else event.from_position
 		if has_actor {
-			actor.position = presentation_position(event.from_position)
+			actor.position = presentation_position(start)
 		} else if has_object {
-			object.position = presentation_position(event.from_position)
+			object.position = presentation_position(start)
 		} else {
 			timeline.update_failures += 1
 		}
@@ -921,19 +1189,23 @@ start_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^Presentat
 			object.device_armed = true
 		}
 	case .Damage:
+		if event.source == game.PLAYER_ENTITY && game.event_is_attack(event) { sync_presentation_player_charges_from_final(timeline) }
 		if has_actor {
 			actor.health = max(i32(0), actor.health-max(i32(0), event.amount))
+			if event.has_status_cause && event.status_cause == .Poison { sync_presentation_poison_from_final(timeline, actor) }
 		} else if has_object {
 			object.health = max(i32(0), object.health-max(i32(0), event.amount))
 		} else {
 			timeline.update_failures += 1
 		}
 	case .Damage_Absorbed:
+		if event.source == game.PLAYER_ENTITY && game.event_is_attack(event) { sync_presentation_player_charges_from_final(timeline) }
 		if has_actor {
 			if index, found := game.status_index(&actor.statuses, .Shield); found {
 				actor.statuses.items[index].potency =
 					max(i32(0), actor.statuses.items[index].potency-max(i32(0), event.amount))
 			}
+			if event.has_status_cause && event.status_cause == .Poison { sync_presentation_poison_from_final(timeline, actor) }
 		} else {
 			timeline.update_failures += 1
 		}
@@ -951,6 +1223,10 @@ start_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^Presentat
 			event.duration,
 		) {
 			timeline.update_failures += 1
+		}
+		// DESTINO loaded: its bumps' die shows with it.
+		if event.status == .Fate && event.target == game.PLAYER_ENTITY && timeline.final_view.valid {
+			timeline.view.fate_sides = timeline.final_view.fate_sides
 		}
 	case .Status_Removed, .Status_Expired:
 		if !has_actor || !remove_presentation_status(&actor.statuses, event.status) {
@@ -1021,8 +1297,51 @@ start_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^Presentat
 		if event.statuses_advanced && !sync_presentation_statuses_from_final(timeline) {
 			timeline.update_failures += 1
 		}
-	case .Attack_Missed, .Move_Blocked,
-	     .Binding_Added, .Binding_Exhausted, .Binding_Expired:
+	case .Fate_Rolled:
+		// One die of the ladder, rolled by the player's own bump.
+		roll := event.dice_roll
+		if !game.validate_dice_roll(&roll) || roll.count != 1 || event.source != game.PLAYER_ENTITY ||
+		   event.duration < 0 || event.duration > i32(max(game.Fate_Outcome)) {
+			timeline.update_failures += 1
+		}
+		sync_presentation_player_charges_from_final(timeline)
+	case .Lasso_Caught, .Lasso_Released:
+		// The player's own rope, on a foe the board shows.
+		if event.source != game.PLAYER_ENTITY || event.card_definition != .Lasso || !has_actor {
+			timeline.update_failures += 1
+		}
+	case .Lasso_Struck:
+		if event.card_definition != .Lasso || event.source.kind != .Enemy || event.amount <= 0 {
+			timeline.update_failures += 1
+		}
+	// CANNA DA PESCA: the player's own rod; its water shows from the bobber's
+	// landing, as the bite's cue starts.
+	case .Fish_Cast, .Fish_Bite:
+		if event.source != game.PLAYER_ENTITY || event.card_definition != .Fishing_Rod || !has_actor {
+			timeline.update_failures += 1
+		}
+		if cue.kind == .Fish_Bite && timeline.final_view.valid { timeline.view.ground = timeline.final_view.ground }
+	case .Fish_Caught:
+		if event.source != game.PLAYER_ENTITY || !has_actor || (event.card_definition != .Fishing_Rod &&
+		   (game.card_is_room_tool(event.card_definition) || event.card_id == 0)) {
+			timeline.update_failures += 1
+		}
+	// PINBALL: the player's own ball, on a foe the board shows.
+	case .Pinball_Made, .Pinball_Launched, .Pinball_Burst:
+		if event.source != game.PLAYER_ENTITY || event.card_definition != .Pinball || !has_actor {
+			timeline.update_failures += 1
+		}
+	case .Pinball_Bounced, .Pinball_Bumped:
+		if event.card_definition != .Pinball || event.source.kind != .Enemy || event.amount <= 0 {
+			timeline.update_failures += 1
+		}
+	case .Attack_Missed, .Move_Blocked, .Attack_Deflected,
+	     .Binding_Added, .Binding_Exhausted, .Binding_Expired, .Shadow_Entered, .Shadow_Emerged:
+	// The player's own card, behind his eyes.
+	case .First_Person_Begun:
+		if event.source != game.PLAYER_ENTITY || event.card_definition != .First_Person || !has_actor {
+			timeline.update_failures += 1
+		}
 	}
 }
 
@@ -1038,6 +1357,7 @@ update_active_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^P
 	case .Move:
 		from := presentation_position(cue.event.from_position)
 		to := presentation_position(cue.event.to_position)
+		if game.event_is_teleport(cue.event) { from = to }
 		position := view.Vec2{
 			x = from.x+(to.x-from.x)*progress,
 			y = from.y+(to.y-from.y)*progress,
@@ -1060,7 +1380,10 @@ update_active_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^P
 	     .Loot_Dropped, .Loot, .Attack_Missed,
 	     .Move_Blocked, .Gold_Gained, .Energy_Gained, .Binding_Added, .Binding_Exhausted,
 	     .Binding_Expired, .Pulse_Advanced, .Object_Spawned, .Explosive_Armed,
-	     .Explosive_Disarmed, .Explosion, .Room_Hazard_Triggered, .Dice_Rolled, .Spell_Launched, .Spell_Impact:
+	     .Explosive_Disarmed, .Explosion, .Room_Hazard_Triggered, .Dice_Rolled, .Spell_Launched, .Spell_Impact,
+	     .Shadow_Entered, .Shadow_Emerged, .Attack_Deflected, .Fate_Rolled, .Lasso_Caught, .Lasso_Struck, .Lasso_Released,
+	     .Fish_Cast, .Fish_Bite, .Fish_Caught, .Pinball_Made, .Pinball_Launched, .Pinball_Bounced, .Pinball_Bumped, .Pinball_Burst,
+	     .First_Person_Begun:
 	}
 }
 
@@ -1075,7 +1398,9 @@ finish_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^Presenta
 		if cue.event.target == game.PLAYER_ENTITY {
 			timeline.view.phase = .Defeat
 			timeline.view.modifier.activation_pulse = 0
-		} else if visible_presentation_enemy_count(&timeline.view) == 0 && timeline.view.phase != .Defeat {
+		} else if visible_presentation_enemy_count(&timeline.view) == 0 && timeline.view.phase != .Defeat &&
+		          !(timeline.final_view.valid && timeline.final_view.phase == .Combat) {
+			// A room that stays in combat (the endless sandbox) is not cleared.
 			timeline.view.phase = .Loot
 			timeline.view.modifier.activation_pulse = 0
 		}

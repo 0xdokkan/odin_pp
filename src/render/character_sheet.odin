@@ -6,6 +6,7 @@ import "core:math"
 import rl "vendor:raylib"
 import rlgl "vendor:raylib/rlgl"
 import game "../game"
+import view "../view"
 
 // The character sheet: the Viandante modelled in Blender
 // (tools/art/build_pilgrim.py) stands on a plinth in a small chapel built
@@ -149,7 +150,7 @@ sheet_stat :: proc(renderer: ^Renderer, bounds: rl.Rectangle, label, value: cstr
 	if detail != nil { gothic_text_fit(renderer, detail, {bounds.x, bounds.y+36, bounds.width, 14}, 10, GOTHIC_MUTED) }
 }
 
-draw_character_sheet :: proc(renderer: ^Renderer, room: ^game.Room) {
+draw_character_sheet :: proc(renderer: ^Renderer, room: ^game.Room, state: Character_Sheet_State = {}) {
 	width, height := renderer.canvas_width, renderer.canvas_height
 	player := room.player
 	rl.DrawRectangleRec({0, 0, width, height}, {3, 7, 13, 225})
@@ -158,16 +159,16 @@ draw_character_sheet :: proc(renderer: ^Renderer, room: ^game.Room) {
 	gothic_text(renderer, "IL VIANDANTE", panel.x+22, panel.y+12, 32, GOTHIC_PAPER)
 	gothic_text(renderer, "SCHEDA DEL PELLEGRINO / TEMPO SOSPESO", panel.x+24, panel.y+48, 12, GOTHIC_MUTED)
 	hud_button(renderer, m8_modal_control_bounds(renderer, .Close_Character), "ESC", "CHIUDI", true, GOTHIC_PAPER)
-	stage := rl.Rectangle{panel.x+14, panel.y+72, panel.width*0.40, panel.height-86}
+	frame := character_sheet_frame(renderer)
+	stage := frame.stage
 	draw_character_stage(renderer, stage)
 	rl.DrawRectangleLinesEx(stage, 1, HUD_EDGE)
 	gothic_text(renderer, "LANTERNA DEL PELLEGRINO", stage.x+12, stage.y+stage.height-22, 10, {120, 200, 236, 255})
 
-	x := stage.x+stage.width+14
-	right := panel.x+panel.width-14
-	w := right-x
+	x := frame.stats.x
+	w := frame.stats.width
 	// STATISTICHE: six tiles.
-	stats := rl.Rectangle{x, stage.y, w, 140}
+	stats := frame.stats
 	sheet_section(renderer, stats, "STATISTICHE", GOTHIC_BLUE)
 	tile_w := (w-24)/3
 	base_attack := player.stats.attack
@@ -187,7 +188,7 @@ draw_character_sheet :: proc(renderer: ^Renderer, room: ^game.Room) {
 	hud_bar({x+12+tile_w*0.62, stats.y+46, tile_w*0.38-14, 8}, f32(player.health)/f32(max(i32(1), player.stats.max_health)), GOTHIC_RED)
 
 	// EQUIPAGGIAMENTO: weapon and reserve, uses as pips.
-	gear := rl.Rectangle{x, stats.y+stats.height+10, w, 86}
+	gear := frame.gear
 	sheet_section(renderer, gear, "EQUIPAGGIAMENTO", HUD_AMBER)
 	slots := [2]game.Weapon_Slot{player.equipment.weapon, player.equipment.reserve}
 	names := [2]cstring{"ARMA", "RISERVA"}
@@ -205,9 +206,7 @@ draw_character_sheet :: proc(renderer: ^Renderer, room: ^game.Room) {
 	}
 
 	// PASSIVE and MAZZO share the last row.
-	row_y := gear.y+gear.height+10
-	row_h := stage.y+stage.height-row_y
-	relics := rl.Rectangle{x, row_y, w*0.56-5, row_h}
+	relics := frame.relics
 	sheet_section(renderer, relics, fmt.ctprintf("PASSIVE / %d", player.relics.count), {164, 144, 183, 255})
 	if player.relics.count == 0 {
 		gothic_text(renderer, "NESSUNA RELIQUIA", relics.x+12, relics.y+34, 12, GOTHIC_MUTED)
@@ -220,26 +219,135 @@ draw_character_sheet :: proc(renderer: ^Renderer, room: ^game.Room) {
 		bounds := rl.Rectangle{relics.x+12+f32(index%2)*cell_w, relics.y+32+f32(index/2)*22, cell_w-6, 19}
 		hud_chip(renderer, bounds, fmt.ctprintf("%s %s", relic_mark(id), definition.name), relic_color(id))
 	}
-	deck := rl.Rectangle{relics.x+relics.width+10, row_y, right-(relics.x+relics.width+10), row_h}
-	sheet_section(renderer, deck, fmt.ctprintf("MAZZO / %d", player.deck.owned_count), GOTHIC_PAPER)
-	// Count each card once, in the order the deck first holds it.
-	seen: [16]game.Card_Id
-	counts: [16]int
-	kinds := 0
-	for card in player.deck.owned[:player.deck.owned_count] {
-		found := false
-		for kind in 0..<kinds {
-			if seen[kind] == card.definition_id { counts[kind] += 1; found = true; break }
+	draw_character_sheet_deck(renderer, room, state)
+}
+
+// The sheet's plates (draw_character_sheet): the panel, the chapel's stage at
+// the left, and at the right STATISTICHE, EQUIPAGGIAMENTO, then PASSIVE and
+// MAZZO side by side, half the row each.
+Character_Sheet_Frame :: struct {
+	panel, stage, stats, gear, relics, deck: rl.Rectangle,
+}
+
+character_sheet_frame :: proc(renderer: ^Renderer) -> (frame: Character_Sheet_Frame) {
+	width, height := renderer.canvas_width, renderer.canvas_height
+	frame.panel = {36, 38, width-72, height-76}
+	panel := frame.panel
+	frame.stage = {panel.x+14, panel.y+72, panel.width*0.40, panel.height-86}
+	stage := frame.stage
+	x := stage.x+stage.width+14
+	right := panel.x+panel.width-14
+	w := right-x
+	frame.stats = {x, stage.y, w, 140}
+	frame.gear = {x, frame.stats.y+frame.stats.height+10, w, 86}
+	row_y := frame.gear.y+frame.gear.height+10
+	row_h := stage.y+stage.height-row_y
+	frame.relics = {x, row_y, w*0.5-5, row_h}
+	frame.deck = {frame.relics.x+frame.relics.width+10, row_y, right-(frame.relics.x+frame.relics.width+10), row_h}
+	return
+}
+
+// The sheet's MAZZO: the run's deck a line for each card and level, in the
+// order the deck first holds them ("2x Strike", "1x Pinball +2"), a page at a
+// time (< n/m >). A click chooses a line; MOSTRA EFFETTO in the section's head
+// (or I) shows the one chosen (src/effect_window.odin). The drawing and the
+// clicks (step_m8_session) share this layout.
+Character_Deck_Row :: struct {
+	card: game.Card_Instance,
+	count: int,
+}
+
+Character_Deck_Layout :: struct {
+	section, button, previous, next: rl.Rectangle,
+	rows: [game.MAX_OWNED_CARDS]Character_Deck_Row,
+	row_count, per_page, page, pages: int,
+}
+
+// The page shown and the line chosen (an index into the layout's rows: the
+// first line of the page once a page is turned).
+Character_Sheet_State :: struct {
+	deck_page, deck_selected: int,
+}
+
+CHARACTER_DECK_ROW_HEIGHT :: f32(17)
+CHARACTER_DECK_BUTTON_WIDTH :: f32(140)
+
+character_sheet_deck_layout :: proc(renderer: ^Renderer, room: ^game.Room, page: int) -> (layout: Character_Deck_Layout) {
+	layout.section = character_sheet_frame(renderer).deck
+	s := layout.section
+	layout.button = {s.x+s.width-10-CHARACTER_DECK_BUTTON_WIDTH, s.y+3, CHARACTER_DECK_BUTTON_WIDTH, 20}
+	if room != nil && room.player != nil {
+		deck := &room.player.deck
+		for card in deck.owned[:clamp(deck.owned_count, 0, game.MAX_OWNED_CARDS)] {
+			found := false
+			for &row in layout.rows[:layout.row_count] {
+				if row.card.definition_id == card.definition_id && row.card.upgrade_level == card.upgrade_level { row.count += 1; found = true; break }
+			}
+			if !found { layout.rows[layout.row_count] = {card = card, count = 1}; layout.row_count += 1 }
 		}
-		if !found && kinds < len(seen) { seen[kinds] = card.definition_id; counts[kinds] = 1; kinds += 1 }
 	}
-	lines := max(0, int((deck.height-34)/17))
-	for kind in 0..<min(kinds, lines) {
-		definition, found := game.card_definition_by_id(seen[kind], true)
-		if !found { continue }
-		gothic_text_fit(renderer, fmt.ctprintf("%dx %s", counts[kind], definition.name), {deck.x+12, deck.y+32+f32(kind)*17, deck.width-24, 16}, 12, GOTHIC_PAPER)
+	// The lines that fit under the head; one fewer when the pager takes the
+	// last.
+	layout.per_page = max(1, int((s.height-34)/CHARACTER_DECK_ROW_HEIGHT))
+	if layout.row_count > layout.per_page { layout.per_page = max(1, layout.per_page-1) }
+	layout.pages = max(1, (layout.row_count+layout.per_page-1)/layout.per_page)
+	layout.page = clamp(page, 0, layout.pages-1)
+	layout.previous = {s.x+10, s.y+s.height-23, 24, 18}
+	layout.next = {s.x+s.width-34, s.y+s.height-23, 24, 18}
+	return
+}
+
+// The line in `slot` of the page shown.
+character_sheet_deck_row_bounds :: proc(layout: ^Character_Deck_Layout, slot: int) -> rl.Rectangle {
+	s := layout.section
+	return {s.x+8, s.y+30+f32(slot)*CHARACTER_DECK_ROW_HEIGHT, s.width-16, CHARACTER_DECK_ROW_HEIGHT}
+}
+
+// The lines of the page shown: the first one's index and how many.
+character_sheet_deck_page_rows :: proc(layout: ^Character_Deck_Layout) -> (first, count: int) {
+	first = layout.page*layout.per_page
+	return first, clamp(layout.row_count-first, 0, layout.per_page)
+}
+
+// The line of the page shown under `point`, by its index into the rows.
+character_sheet_deck_row_at :: proc(layout: ^Character_Deck_Layout, point: view.Vec2) -> (row: int, found: bool) {
+	first, count := character_sheet_deck_page_rows(layout)
+	for slot in 0..<count {
+		if point_in_rectangle(point, character_sheet_deck_row_bounds(layout, slot)) { return first+slot, true }
 	}
-	if kinds > lines && lines > 0 {
-		gothic_text(renderer, fmt.ctprintf("+%d", kinds-lines), deck.x+deck.width-34, deck.y+6, 12, GOTHIC_MUTED)
+	return
+}
+
+// A line's words: how many, the card's name and its upgrade.
+character_sheet_deck_row_text :: proc(row: Character_Deck_Row) -> cstring {
+	definition, found := game.card_definition_by_id(row.card.definition_id, true)
+	if !found { return "" }
+	return fmt.ctprintf("%dx %s", row.count, tactical_card_title(row.card, definition))
+}
+
+draw_character_sheet_deck :: proc(renderer: ^Renderer, room: ^game.Room, state: Character_Sheet_State) {
+	layout := character_sheet_deck_layout(renderer, room, state.deck_page)
+	deck := layout.section
+	sheet_section(renderer, deck, fmt.ctprintf("MAZZO / %d", room.player.deck.owned_count), GOTHIC_PAPER)
+	chosen := clamp(state.deck_selected, 0, max(0, layout.row_count-1))
+	hud_button(renderer, layout.button, EFFECT_ENTRY_KEY, EFFECT_ENTRY_LABEL, layout.row_count > 0)
+	first, count := character_sheet_deck_page_rows(&layout)
+	for slot in 0..<count {
+		index := first+slot
+		bounds := character_sheet_deck_row_bounds(&layout, slot)
+		if index == chosen {
+			rl.DrawRectangleRec(bounds, HUD_FILL_HOVER)
+			rl.DrawRectangleRec({bounds.x, bounds.y+1, 2, bounds.height-2}, GOTHIC_BLUE)
+		} else if hud_hovered(renderer, bounds) {
+			rl.DrawRectangleRec(bounds, HUD_FILL)
+		}
+		gothic_text_fit(renderer, character_sheet_deck_row_text(layout.rows[index]), {bounds.x+6, bounds.y+1, bounds.width-10, 16}, 12,
+			GOTHIC_PAPER if index == chosen else GOTHIC_MUTED)
+	}
+	if layout.pages > 1 {
+		hud_button(renderer, layout.previous, nil, "<", layout.page > 0)
+		hud_button(renderer, layout.next, nil, ">", layout.page+1 < layout.pages)
+		label := fmt.ctprintf("%d/%d", layout.page+1, layout.pages)
+		gothic_text(renderer, label, math.round(deck.x+(deck.width-gothic_text_width(renderer, label, 10))*0.5), layout.previous.y+3, 10, GOTHIC_MUTED)
 	}
 }
