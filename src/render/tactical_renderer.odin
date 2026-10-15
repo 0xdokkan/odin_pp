@@ -84,6 +84,13 @@ Tactical_View :: struct {
 	// The last pointer seen by the view, for HUD hover states only.
 	pointer: view.Vec2,
 	pointer_inside: bool,
+	// MOSTRA EFFETTO's board (effect_stage.odin): a film, not a game. Its HUD
+	// keeps its plates and leaves the run's commands out (COMANDI), and its
+	// inspectors follow the film alone: no enemy inspector (it reads the real
+	// mouse) and no MOSTRA EFFETTO of its own; in the lab its labels keep clear
+	// of no banner (it draws none). Its camera aims nearer the player
+	// (TACTICAL_SHOWCASE_AIM).
+	showcase: bool,
 }
 
 create_tactical_assets :: proc(renderer: ^Renderer, parent: rl.RenderTexture2D = {}) {
@@ -131,6 +138,10 @@ create_tactical_assets :: proc(renderer: ^Renderer, parent: rl.RenderTexture2D =
 	}
 }
 
+// A board's own state goes with its assets here; a borrowed renderer frees the
+// same own state and none of the assets (destroy_borrowed_renderer, and
+// BORROWED_RENDERER_OWN_HANDLES for a view's lazily made textures): a new asset
+// or a new piece of a board's state belongs in both.
 destroy_tactical_assets :: proc(renderer: ^Renderer) {
 	destroy_renderer_world_playback(renderer)
 	destroy_tactical_translucents(renderer)
@@ -180,6 +191,12 @@ tactical_presentation_opaque :: proc(renderer: ^Renderer, room: ^game.Room, posi
 	return false
 }
 
+// How far in front of the player the board's camera aims, in cells (scaled
+// with its footprint): the game's leaves the bottom to a full hand; MOSTRA
+// EFFETTO's film (Tactical_View.showcase) aims nearer him.
+TACTICAL_HAND_AIM :: f32(1.10)
+TACTICAL_SHOWCASE_AIM :: f32(0.30)
+
 update_tactical_view :: proc(renderer: ^Renderer, room: ^game.Room, mouse: view.Vec2, inside: bool, refresh_only: bool = false) {
 	v := &renderer.tactical
 	if !v.enabled { return }
@@ -220,11 +237,14 @@ update_tactical_view :: proc(renderer: ^Renderer, room: ^game.Room, mouse: view.
 	}
 	// Aim slightly in front of the player to reserve the bottom for a full hand
 	// (while the Lazzo spins a wide ring: farther back and nearer him, so all
-	// of it shows between the HUD and the hand).
+	// of it shows between the HUD and the hand). MOSTRA EFFETTO's film holds a
+	// card or a few: it aims nearer him, so that what stands beyond him in its
+	// room shows under the HUD's plates.
 	pull := lasso_camera_pull(renderer)
 	forward := rl.Vector3{math.cos(v.world_orbit.yaw), 0, math.sin(v.world_orbit.yaw)}
 	footprint_scale := 1.1+f32(max(0, size-5))*0.065
-	target := rl.Vector3{p.x+0.5, 0, p.y+0.5}+forward*(1.10*footprint_scale*(1-LASSO_CAMERA_AIM*pull))
+	aim := TACTICAL_SHOWCASE_AIM if v.showcase else TACTICAL_HAND_AIM
+	target := rl.Vector3{p.x+0.5, 0, p.y+0.5}+forward*(aim*footprint_scale*(1-LASSO_CAMERA_AIM*pull))
 	framed_orbit := v.world_orbit
 	framed_orbit.distance *= footprint_scale*(1+LASSO_CAMERA_BACK*pull)
 	v.zoom = framed_orbit.distance*0.65

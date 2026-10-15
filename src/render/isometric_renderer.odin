@@ -79,6 +79,9 @@ Renderer :: struct {
 	sprite_assets: Sprite_Assets,
 	// Every command's presentation gets the next number (Presentation_Cue.batch).
 	cue_batches: u32,
+	// Every kind of game event the board was handed to show, since its owner
+	// last cleared this (MOSTRA EFFETTO's takes: main/card_demo.odin).
+	shown_events: bit_set[game.Game_Event_Kind],
 }
 
 Tile_Vertices :: struct {
@@ -1161,6 +1164,9 @@ begin_renderer_event_timeline :: proc(
 	clear_loot_animations(renderer)
 	clear_enemy_move_animations(renderer)
 	started := begin_event_timeline(&renderer.timeline, before, events, after)
+	if started && events != nil {
+		for event in events.events[:clamp(events.count, 0, len(events.events))] { renderer.shown_events += {event.kind} }
+	}
 	renderer.cue_batches += 1
 	for offset in 0..<renderer.timeline.count {
 		renderer.timeline.cues[(renderer.timeline.head+offset)%MAX_PRESENTATION_CUES].batch = renderer.cue_batches

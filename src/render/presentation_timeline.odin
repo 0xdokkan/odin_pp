@@ -1139,7 +1139,7 @@ start_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^Presentat
 			timeline.update_failures += 1
 		}
 	case .Spell_Launched, .Spell_Impact:
-		if event.card_definition != .Firebomb && event.card_definition != .Chain_Lightning &&
+		if event.card_definition != .Firebomb && event.card_definition != .Chain_Lightning && event.card_definition != .Storm_Crown &&
 		   game.card_dice_count(event.card_definition) == 0 && !game.card_is_board_device(event.card_definition) &&
 		   !game.card_places_ground(event.card_definition) {
 			timeline.update_failures += 1

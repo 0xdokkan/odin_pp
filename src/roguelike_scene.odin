@@ -77,6 +77,8 @@ Roguelike_Session :: struct {
 	reward_skip_hovered:     bool,
 	shop_render_state:       render.Shop_Render_State,
 	special_render_state:    render.Special_Node_Render_State,
+	// MOSTRA EFFETTO (effect_window.odin): open, it owns the frame.
+	effect_window:           Effect_Window,
 	smoke_frame_count:       int,
 	smoke_fire_entity:       game.Entity_Ref,
 
@@ -311,6 +313,7 @@ roguelike_parse_arguments :: proc(rs: ^Roguelike_Session, args: []string) {
 	if rs.options.m8_view_smoke { rs.smoke_mode_count += 1 }
 	if rs.options.western_smoke { rs.smoke_mode_count += 1 }
 	if rs.options.mechanics_lab_smoke { rs.smoke_mode_count += 1 }
+	if rs.options.effect_window_smoke { rs.smoke_mode_count += 1 }
 	if rs.options.arena_view_smoke { rs.smoke_mode_count += 1 }
 	if rs.options.dice_set_smoke { rs.smoke_mode_count += 1 }
 	if rs.options.m9_smoke { rs.smoke_mode_count += 1 }
@@ -332,7 +335,7 @@ roguelike_parse_arguments :: proc(rs: ^Roguelike_Session, args: []string) {
 		os.exit(2)
 	}
 	if (rs.options.m7_view_smoke || rs.options.m8_view_smoke || rs.options.arena_view_smoke || rs.options.western_smoke ||
-	    rs.options.mechanics_lab_smoke) && !rs.options.tactical.enabled {
+	    rs.options.mechanics_lab_smoke || rs.options.effect_window_smoke) && !rs.options.tactical.enabled {
 		fmt.eprintln("tactical view smoke requires tactical mode; omit --classic")
 		os.exit(2)
 	}
@@ -372,7 +375,8 @@ roguelike_prepare :: proc(rs: ^Roguelike_Session) -> Session_Start {
 
 
 	rs.run_seed = rs.options.seed
-	if rs.smoke_shop || rs.smoke_rest || rs.smoke_event || rs.smoke_treasure || rs.smoke_special_result {
+	// MOSTRA EFFETTO's smoke goes from the first room to a shop as well.
+	if rs.smoke_shop || rs.smoke_rest || rs.smoke_event || rs.smoke_treasure || rs.smoke_special_result || rs.options.effect_window_smoke {
 		desired_kind := game.Node_Kind.Shop
 		if rs.smoke_rest {
 			desired_kind = .Rest
@@ -798,6 +802,10 @@ roguelike_attach :: proc(rs: ^Roguelike_Session, window: ^app.Window) -> Session
 		if !run_mechanics_lab_smoke(rs.window, &rs.iso_renderer, &rs.dice_renderer) { fmt.eprintln("mechanics lab smoke failed"); os.exit(2) }
 		return .Finished
 	}
+	if rs.options.effect_window_smoke {
+		if !run_effect_window_smoke(rs) { fmt.eprintln("effect window smoke failed"); os.exit(2) }
+		return .Finished
+	}
 	if rs.options.m9_lab != .None {
 		run_m9_lab(rs.window, &rs.iso_renderer, rs.options.m9_lab)
 		return .Finished
@@ -878,6 +886,12 @@ roguelike_update :: proc(data: rawptr, hf: ^host.Frame) {
 		roguelike_suspend_input(rs)
 		return
 	}
+	// MOSTRA EFFETTO: while it is open the frame is its own. Nothing below reads
+	// a key or a click, and none of the run's clocks, timelines and arrivals runs.
+	if rs.effect_window.open {
+		update_effect_window_in_run(rs, hf)
+		return
+	}
 	if rs.from_launcher && hf.focused && rl.IsKeyPressed(.F10) {
 		host.pop(hf)
 		return
@@ -910,6 +924,9 @@ roguelike_update :: proc(data: rawptr, hf: ^host.Frame) {
 			&rs.card_interaction, &rs.gameplay_buffer, rs.run_state.phase == .In_Room &&
 			!rs.show_route_map && !game.run_has_relic_choice(&rs.run_state), rs.frame_time, m8_mouse, m8_mouse_inside)
 	}
+	// MOSTRA EFFETTO asked from the sheet or the card inspector: the frame is
+	// the window's.
+	if roguelike_take_effect_request(rs) { return }
 	roguelike_ranch_feedback(rs, hf)
 	if roguelike_open_activity(rs,hf) {
         rs.overlay=nil
@@ -1046,9 +1063,11 @@ roguelike_update :: proc(data: rawptr, hf: ^host.Frame) {
 	if rs.options.tactical.enabled {
 		// A flat board stands in 3D behind the player's eyes (first_person.odin).
 		render.sync_first_person_board(&rs.iso_renderer, &rs.room, rs.options.scene_3d, rs.window.canvas)
-		render.update_tactical_view(&rs.iso_renderer, &rs.room, rs.mouse_canvas, rs.mouse_inside && !rs.m8_modal &&
-			!render.m8_hud_contains_point(&rs.iso_renderer, &rs.room, rs.mouse_canvas) &&
-			!rs.tactical_controller.hologram && !rs.tactical_controller.paused && rl.IsWindowFocused())
+		// The view never under the HUD's controls; MOSTRA EFFETTO's buttons light
+		// under the mouse wherever they are (roguelike_pointer_inside).
+		view_inside, hud_inside := roguelike_pointer_inside(rs, rl.IsWindowFocused())
+		render.update_tactical_view(&rs.iso_renderer, &rs.room, rs.mouse_canvas, view_inside)
+		render.tactical_hud_pointer(&rs.iso_renderer, rs.mouse_canvas, hud_inside)
 		render.update_tactical_atmosphere(&rs.iso_renderer, rs.frame_time if rs.options.m7_view_smoke || (!rs.tactical_controller.paused && rl.IsWindowFocused()) else 0)
 		if !rs.options.m7_view_smoke && !rs.m8_modal { tactical_input_blocked = update_tactical_controller(&rs.tactical_controller, &rs.room, &rs.iso_renderer,
 			&rs.card_interaction, &rs.gameplay_buffer, rs.frame_time,
@@ -1131,6 +1150,9 @@ roguelike_update :: proc(data: rawptr, hf: ^host.Frame) {
 			}
 		}
 
+		// MOSTRA EFFETTO under a card, or I on the card under the mouse: never a
+		// choice as well.
+		if roguelike_effect_entry(rs, rs.mouse_inside && rl.IsMouseButtonPressed(.LEFT), rs.mouse_canvas, rl.IsKeyPressed(.I)) { return }
 		choice_index := pressed_hand_slot()
 		choice_requested := choice_index >= 0 && choice_index < game.CARD_REWARD_CHOICE_COUNT
 		skip_requested := rl.IsKeyPressed(.S)
@@ -1215,6 +1237,9 @@ roguelike_update :: proc(data: rawptr, hf: ^host.Frame) {
 		}
 
 		if !rs.smoke_shop {
+			// MOSTRA EFFETTO of an offer or of the owned card chosen (or I): never
+			// a purchase, a page or a way out as well.
+			if roguelike_effect_entry(rs, rs.mouse_inside && rl.IsMouseButtonPressed(.LEFT), rs.mouse_canvas, rl.IsKeyPressed(.I)) { return }
 			offer_index := pressed_hand_slot()
 			if offer_index >= 0 && offer_index < game.SHOP_CARD_OFFER_COUNT {
 				game.buy_shop_card(&rs.run_state, offer_index)
@@ -1340,6 +1365,9 @@ roguelike_update :: proc(data: rawptr, hf: ^host.Frame) {
 		}
 
 		if !special_smoke {
+			// MOSTRA EFFETTO of the rest's owned card chosen (or I): never a
+			// choice as well.
+			if roguelike_effect_entry(rs, rs.mouse_inside && rl.IsMouseButtonPressed(.LEFT), rs.mouse_canvas, rl.IsKeyPressed(.I)) { return }
 			requested := render.Special_Node_Hit{kind = .None}
 			if game.special_node_can_continue(&rs.run_state) {
 				if rl.IsKeyPressed(.ENTER) {
@@ -1663,7 +1691,13 @@ roguelike_resume :: proc(data: rawptr, hf: ^host.Frame, from: string, result: Ma
 
 roguelike_draw :: proc(data: rawptr, hf: ^host.Frame) {
 	rs := cast(^Roguelike_Session)data
-	defer if rs.challenge_message_ttl > 0 {
+	// MOSTRA EFFETTO: the frozen run as it was last drawn, under the window.
+	if rs.effect_window.open && rs.effect_window.backdrop_ready {
+		draw_effect_window_backdrop(&rs.effect_window, hf.canvas.width, hf.canvas.height)
+		draw_effect_window(&rs.effect_window, &rs.iso_renderer, hf.canvas.width, hf.canvas.height)
+		return
+	}
+	defer if rs.challenge_message_ttl > 0 && !rs.effect_window.open {
 		alpha := min(rs.challenge_message_ttl, 1)
 		ui.draw_text_centered(hf.theme, rs.challenge_message, {hf.canvas.width * 0.5, 88}, .Body,
 			ui.with_alpha(rl.Color{232, 196, 112, 255}, alpha))
@@ -1794,12 +1828,18 @@ roguelike_draw :: proc(data: rawptr, hf: ^host.Frame) {
 	if rs.m8_session.ranch.active {
 		render.draw_western_bubble(&rs.iso_renderer, &rs.room, &rs.m8_session.ranch.state, rs.m8_session.ranch.card_from)
 	}
-	if rs.m8_session.character_open { render.draw_m8_character_panel(&rs.iso_renderer, &rs.room) }
-
+	if rs.m8_session.character_open { render.draw_m8_character_panel(&rs.iso_renderer, &rs.room, rs.m8_session.sheet) }
+	// MOSTRA EFFETTO over everything (no backdrop: the run drawn as it is).
+	if rs.effect_window.open { draw_effect_window(&rs.effect_window, &rs.iso_renderer, hf.canvas.width, hf.canvas.height) }
 }
 
 roguelike_draw_window :: proc(data: rawptr, hf: ^host.Frame) {
 	rs := cast(^Roguelike_Session)data
+	// MOSTRA EFFETTO: its stage on the window's own pixels; the run's dice wait.
+	if rs.effect_window.open {
+		draw_window_effect_stage(rs.window, &rs.effect_window)
+		return
+	}
 	if !rs.m8_session.ring_pending && rs.overlay != nil {
 		rs.overlay(rs.window, &rs.overlay_data)
 	}
@@ -1939,6 +1979,8 @@ roguelike_after_present :: proc(data: rawptr, hf: ^host.Frame) {
 
 roguelike_destroy :: proc(data: rawptr) {
 	rs := cast(^Roguelike_Session)data
+	// MOSTRA EFFETTO's film borrows the run renderer's assets: it goes first.
+	destroy_effect_window(&rs.effect_window)
 	if rs.attached {
 		rl.EnableCursor()
 		if rs.playtest_session_ptr != nil && !rs.playtest_report_written {

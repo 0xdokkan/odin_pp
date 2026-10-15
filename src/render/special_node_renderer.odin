@@ -604,6 +604,9 @@ draw_rest_actions :: proc(
 		page+1 < page_count,
 		theme = theme,
 	)
+	// MOSTRA EFFETTO of the owned card chosen for the upgrade.
+	_, chosen := game.owned_card_index_by_id(deck, state.selected_card_id)
+	draw_owned_card_effect_button(theme, canvas_width, canvas_height, chosen)
 }
 
 draw_event_actions :: proc(

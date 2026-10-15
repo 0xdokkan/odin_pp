@@ -474,8 +474,11 @@ poll_gameplay_command :: proc(
 	if card_interaction.dragged_card_id != 0 { raised_card_id = 0 }
 	if clicked, accepted := m8_pointer_gameplay_command(room, renderer, mouse_canvas, mouse_in_canvas,
 		rl.IsMouseButtonPressed(.LEFT), spatial_interaction_enabled); accepted { return clicked, true }
+	// The inspector's MOSTRA EFFETTO button is no cell of the board.
 	mouse_inside := mouse_in_canvas && !render.relic_bar_contains_point(renderer, room, mouse_canvas, raised_card_id) &&
-		(!renderer.tactical.enabled || !render.m8_hud_contains_point(renderer, room, mouse_canvas))
+		(!renderer.tactical.enabled || !render.m8_hud_contains_point(renderer, room, mouse_canvas)) &&
+		!render.tactical_inspector_effect_contains(renderer, room, card_interaction.hovered_card_id, card_interaction.selected_card_id,
+			card_interaction.dragged_card_id, mouse_canvas)
 	input_deck, input_phase := render.renderer_hand_deck(renderer, room)
 	if input_phase == .Loot {
 		// The room cleared: the Canna da Pesca's slot takes its own presses.

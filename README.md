@@ -170,7 +170,8 @@ e i colpi sull'impatto (un dardo che manca suona quando arriva a terra, e chi
 lo schiva quando lo schiva), con piccole variazioni di altezza e volume a ogni
 colpo, e un limitatore sull'uscita tiene puliti i momenti più fitti (un colpo,
 una caduta e un'esplosione insieme); seguono il volume degli effetti e il muto
-delle impostazioni. Nel gioco normale per ora non suonano. Per rifarli dopo
+delle impostazioni. Nel gioco normale per ora non suonano, e così i film di
+[Mostra effetto](#mostra-effetto), che si sentono solo qui. Per rifarli dopo
 aver cambiato una ricetta (`tools/audio/sfx_<famiglia>.py`):
 
 ```bash
@@ -409,6 +410,8 @@ a Victory, la morte del player a Defeat.
 | `1` in Rest, Event, Treasure | Recover, prima scelta Event o Claim |
 | `2` in Rest o Event | upgrade della selezione o seconda scelta Event |
 | `U` al Rest | upgrade della carta selezionata |
+| clic su **MOSTRA EFFETTO** / `I` in Reward, Shop o Rest (solo tattico) | apre il film della carta ([Mostra effetto](#mostra-effetto)): sotto una carta offerta quella, al livello 0; nella riga dei comandi di Shop e Rest la carta posseduta scelta / la ricompensa o l'offerta sotto il mouse, altrimenti la carta scelta |
+| `Esc`, clic destro o **CHIUDI** / `R` o **RICOMINCIA**, nella finestra Mostra effetto | la chiude, senza clic che arrivino alla run / fa ripartire il film dal primo fotogramma |
 | `L` / Leave | risolve un nodo speciale senza ricompensa |
 | `Enter` / Continue dopo il risultato | completa il nodo speciale e torna alla mappa |
 | `Enter` / Restart in Defeat | avvia una nuova run |
@@ -447,6 +450,7 @@ ricompense e offerte delle run tattiche.
 | Cast di una carta da `Ns` | scorre per la durata effettiva del cast, senza doppio addebito | fermi, compresa la presentazione nemica già in corso |
 | Dadi / cinematica, pausa, scheda personaggio o attività M9 | fermo | fermi |
 | [Movimento Ombra](#movimento-ombra) | fermo; scorrono solo i 4 s dell'ombra | fermi, comprese le loro animazioni |
+| Finestra [Mostra effetto](#mostra-effetto) aperta | fermo | fermi, con le loro animazioni: la run non riceve il fotogramma, che è tutto del film e della sua stanza di prova |
 
 Il cast occupa i comandi del player per la durata indicata sulla carta. Un
 lancio di dadi all'interno della carta è una pausa completa aggiuntiva: non
@@ -1302,6 +1306,252 @@ risale con il suo suono e il mouse torna libero. Una copia +5 dura 30 secondi, e
 un tavolo piatto diventa 3D per la vista e di nuovo piatto dopo `F7`. Il
 riquadro dei secondi e la riga dell'HUD ci stanno interi.
 
+### Mostra effetto
+
+Ovunque si guardi una carta, **MOSTRA EFFETTO** apre sopra la run una finestra
+che la mostra al lavoro: un piccolo film in cui un guanto di carta la prende da
+una piccola mano, la gioca sul suo bersaglio e una stanza di prova la risolve
+con le regole vere del gioco. Ogni carta ha il suo film, a ogni livello, e così
+ogni carta che verrà aggiunta. Solo nel gioco tattico: le run classiche
+(`--classic`) non mostrano pulsanti. Finestra in
+[effect_window.odin](src/effect_window.odin), film in
+[card_demo.odin](src/card_demo.odin), scene in
+[card_demo.odin](src/game/card_demo.odin), guanto e didascalie in
+[card_demo.odin](src/render/card_demo.odin), pulsanti delle schermate in
+[effect_entries.odin](src/render/effect_entries.odin).
+
+**Dove si apre.** I pulsanti hanno lo stile gotico dell'HUD e non stanno mai
+sopra una carta (nemmeno quella che si alza sotto il mouse), un prezzo, una
+scritta o un altro comando: un clic su di loro non sceglie, non compra e non
+gira pagina.
+
+- **L'ispettore della carta**, in combattimento. Con il mouse su una carta della
+  mano l'ispettore aggiunge in fondo una riga spenta, `I` `MOSTRA EFFETTO`: lì
+  un clic prenderebbe la carta, quindi basta il tasto `I`. Scelta la carta (un
+  clic, o il suo numero se ha un bersaglio), l'ispettore resta anche quando il
+  mouse se ne va e la riga diventa un pulsante, che si clicca senza giocare,
+  mirare o muovere niente; `I` vale ancora. Pulsante e tasto tacciono mentre il
+  tavolo è occupato (una difesa, un cast, [Movimento Ombra](#movimento-ombra),
+  un'azione o una pesca che si stanno ancora mostrando), e intanto il pulsante
+  resta spento, come **PERSONAGGIO**; non c'è mentre la carta è trascinata né
+  dietro gli occhi di [First Person Shooter](#first-person-shooter).
+- **Lo slot della [Canna da Pesca](#canna-da-pesca)**, a stanza liberata: lo
+  stesso ispettore, con il mouse sulla Canna o con la Canna scelta.
+- **La scheda del personaggio** (**PERSONAGGIO**). Il riquadro **MAZZO** elenca
+  il mazzo della run, una riga per carta e livello, nell'ordine in cui il mazzo
+  li tiene la prima volta (`2x Strike`, `1x Pinball +2`): cinque righe, oppure
+  quattro per pagina con `<`, `n/m` e `>` in fondo quando non ci stanno tutte.
+  Un clic sceglie una riga (girare pagina sceglie la prima della pagina), e
+  `I` `MOSTRA EFFETTO`, nella testa del riquadro, o il tasto `I` mostrano quella
+  scelta. La finestra si apre sopra la scheda: `Esc` chiude la finestra e lascia
+  aperta la scheda.
+- **La ricompensa**: un pulsante sotto ogni carta offerta; `I` mostra quella
+  sotto il mouse.
+- **Il negozio**: un pulsante sotto il prezzo di ogni offerta, e
+  `I  MOSTRA EFFETTO` nella riga dei comandi, a sinistra dell'upgrade, per la
+  carta posseduta scelta per l'upgrade o la rimozione; `I` mostra l'offerta
+  sotto il mouse, altrimenti la carta scelta.
+- **Il riposo**: lo stesso `I  MOSTRA EFFETTO`, per la carta scelta per
+  l'upgrade, finché il riposo non è risolto; anche qui `I`.
+
+Le carte offerte si vedono come sono offerte, al livello 0; quelle del mazzo
+come il mazzo le tiene, con il loro upgrade. La testa della finestra scrive il
+nome della carta con il suo `+n` e
+`MOSTRA EFFETTO / LE REGOLE DEL GIOCO IN UNA STANZA DI PROVA / TEMPO SOSPESO`.
+
+**I comandi.** `Esc`, un clic destro o **CHIUDI** (in alto a destra, con il suo
+`ESC`) chiudono la finestra; `R` o **RICOMINCIA** fanno ripartire il film dal
+primo fotogramma. Un clic altrove, sul film compreso, non fa niente: il film non
+si comanda, si guarda. Senza il focus la finestra non risponde e il film resta
+fermo dov'è. `F1`–`F3`, `F9` e `F11` valgono anche a finestra aperta (il film
+segue la scala); gli altri tasti della run, come `F5` e `F10`, aspettano che si
+chiuda.
+
+**La run ferma.** La finestra non è una scena dell'host ([Scene](#scene)) ma un
+modale dentro la run: niente dissolvenza, niente `resume`. Finché è aperta,
+`roguelike_update` le dà tutto il fotogramma, subito dopo il controllo del
+focus: alla run non arriva nessun tasto né clic e non scorre nessuno dei suoi
+orologi (la finestra del pulse e il mondo, la timeline, gli arrivi della Prova,
+i cartoncini), quindi niente di quello che la run possiede cambia; sotto un velo
+scuro resta la run com'era nell'ultimo fotogramma disegnato. Aprendosi, la
+finestra fa lasciare alla run quello che teneva, come quando la finestra del
+gioco perde il focus (`roguelike_suspend_input`: la carta presa o scelta, il
+passo in attesa della diagonale, il trascinamento della camera, il mouse dietro
+gli occhi); chiudendosi, la run riprende come al ritorno del focus: il primo
+fotogramma legge i tasti come sono e non conta tempo, quindi né il clic che l'ha
+chiusa né un tasto di quel fotogramma arrivano al tavolo. Non si apre mentre il
+tavolo è occupato (`effect_window_refusal`): in pausa, con la mappa olografica,
+con 6 RANCH 7 o il ring (anche quando un quadrato di Tesla sta per aprirlo),
+durante la scelta di difesa, un cast o i dadi, dietro gli occhi di First Person
+Shooter (anche mentre la vista scende o risale), in Movimento Ombra e finché il
+tavolo mostra ancora un'azione. Ricompensa, negozio e riposo non mostrano il
+tavolo: lì si apre sempre, qualunque cosa abbia lasciato la stanza.
+
+**Le regole vere in una stanza di prova.** Il film non è un'animazione fatta a
+mano. Ogni ripresa costruisce una stanza tattica sua (`create_card_demo_room`):
+11x9 caselle muri compresi, il Viandante al centro con 22 di vita massima e 3 di
+energia, la carta sola in mano (o la Canna nel mazzo), le regole del gioco con
+le azioni a tempo, una finestra che non si accorcia, niente nebbia e quello che
+la scena chiede. La carta si gioca come la gioca la mano, per le sue stesse
+strade: un trascinamento lasciato sul bersaglio (`card_drop_target`), un clic e
+un secondo clic per le carte senza bersaglio, lo slot della Canna con
+`poll_fishing_command`. Poi la stanza va avanti solo con il proprio
+`step_tactical_controller`, il controller del gioco, e le azioni della scena (un
+passo, una freccia, ATTIVA, il grilletto dell'AK) passano dagli stessi comandi
+del gioco quando il tavolo le lascia passare. La disegna il renderer del gioco
+(tavolo, cartoncini vivi, colpi, dadi, HUD e mano): un renderer prestato
+([effect_stage.odin](src/render/effect_stage.odin)) con il suo stato di vista
+(timeline, snapshot, etichette, attori, la superficie del tavolo) e gli asset
+GPU del renderer della run, presi in prestito e mai scaricati. La run non viene
+mai toccata: stanza, livello, giocatore, mazzo e dadi del film sono del film.
+Tutto è deterministico, mai l'orologio: semi fissi per la stanza e per il mazzo,
+i dadi della ripresa cercati una volta fra i semi perché il primo tiro mostri le
+facce che la scena vuole, il flusso della Canna scelto perché la prima preda sia
+cibo. I nemici stanno fermi dove sono, senza piani né colpi, tranne quelli che
+la scena lascia liberi, e la stanza non si libera da sola all'ultima uccisione
+(`Room_Content.endless`), salvo quella della Canna, già liberata.
+
+**Il film.** Un guanto di cuoio in pixel art, ritagliato nella carta come i
+pezzi del tavolo (la stampa, la linea d'inchiostro, il margine bianco, il
+taglio), aspetta in basso, va alla carta, la prende chiudendo la mano e la porta
+sul bersaglio: un nemico, una casella, una casella in linea retta. Le carte su
+di sé o senza bersaglio si giocano con un doppio clic, come nella mano: il primo
+la sceglie, il secondo la gioca. Ogni clic lascia sotto il dito un anello di
+carta. Mentre il guanto porta la carta il mondo del film aspetta: il suo orologio
+parte quando la carta è lasciata, così ogni ripresa mostra lo stesso. Una
+didascalia in basso a sinistra dice cosa si fa, con il tasto da premere su un
+tastino di carta quando ce n'è uno: `TRASCINA LA CARTA SUL NEMICO`,
+`TRASCINA LA CARTA SU UNA CASELLA`, `TRASCINA LA CARTA IN LINEA RETTA` (o
+`TRASCINA SUL NEMICO IN LINEA RETTA`), `DOPPIO CLIC SULLA CARTA`,
+`TRASCINA LA CANNA SU UNA CASELLA`; poi `L'EFFETTO, CON LE REGOLE DEL GIOCO` e,
+quando la scena lo chiede, quello che il Viandante fa dopo la carta:
+`W: UN PASSO` (con il tasto della sua direzione), `W: COLPISCI IL NEMICO`,
+`W: UN PASSO NELL'OMBRA`, `CTRL + CLIC SUL NEMICO: FRECCIA`,
+`CLIC SU ATTIVA: SCARICA LE TESLA`, `MUOVI IL MOUSE: GIRI LA VISTA` e
+`TIENI PREMUTO IL CLIC: SPARI`. Nei film in cui la mano cresce (carte che
+pescano o creano carte) la didascalia sale sopra la riga dell'`ENERGIA`; non
+copre mai una carta, lo slot della Canna o la barra degli oggetti. Quando la
+carta cambia quello che la piastra VITA dell'HUD mostra del Viandante (uno
+scudo, l'oro, una ferita, una cura, uno status), la piastra si accende con una
+cornice di carta che batte tre volte mentre si spegne: Guard la accende con
+`SCUDO 4`. Dietro gli occhi di First Person Shooter il guanto sparisce: la vista
+gira e spara secondo il copione della ripresa, e il mouse vero non viene mai
+catturato. Il tavolo del film è una vetrina (`Tactical_View.showcase`): tiene le
+piastre dell'HUD e la barra degli oggetti (la Tesla vi clicca ATTIVA), non i
+COMANDI, l'ispettore del nemico o un MOSTRA EFFETTO suo, e la sua camera mira
+più vicino al Viandante (0,30 celle avanti invece di 1,10, che nel gioco
+lasciano il fondo a una mano piena), perché quello che gli sta oltre resti in
+vista sotto le piastre dell'HUD.
+
+**Da capo.** Quando la carta ha mostrato tutto e la stanza si è fermata, la
+ripresa resta un momento, il film si scurisce e riparte da capo: la stessa
+stanza, gli stessi semi, la stessa ripresa, finché la finestra resta aperta.
+**RICOMINCIA** la fa ripartire subito dal primo fotogramma. Una ripresa dura al
+massimo 40 secondi (`CARD_DEMO_TAKE_LIMIT`); le più lunghe seguono le regole
+delle loro carte: il Pinball circa 27 s (la palla rotola 20 s), l'Incendio 21 s
+(finestre da 2 s, perché il fuoco cresca e si spenga), First Person Shooter +5
+33 s (30 s di vista, con una raffica dell'AK ogni 3 s). Un fotogramma lento non
+fa saltare il film: ogni passo conta al più un quindicesimo di secondo.
+
+**La scala.** Il film si disegna in uno stage, un render target di 960x540,
+durante l'update (i render target di raylib non si annidano: mai dentro il passo
+del canvas, e i dadi del film prima ancora, fuori da ogni render target), e si
+mostra opaco dopo il canvas, sui pixel della finestra, a tre quarti del canvas:
+alla misura predefinita, 1280x720, lo stage sta in {160, 116, 960, 540} e ogni
+suo pixel è un pixel della finestra. Alle altre misure segue il canvas (`F1`–`F3`
+compresi), con il filtro nearest da 1:1 in su (a 1600x900 in
+{200, 145, 1200, 675}) e bilineare quando la finestra è più piccola, perché
+nessuna riga si perda (a 960x540 è largo 720). Su quei 960x540 il film disegna
+tavolo, HUD e mano nelle misure del gioco, con la camera un po' più vicina (10
+invece di 12,5), perché i cartoncini sembrino grandi come nel gioco.
+
+**Una carta nuova.** Ogni carta ha un film senza scriverne una riga.
+`card_demo_default_scene` ricava la scena dal targeting e dagli effetti della
+carta: il gesto che il targeting chiede (doppio clic per `Self`, `Player` e
+`None`; trascinata su un nemico, su una casella o lungo una linea per gli
+altri), un nemico dove il bersaglio è un nemico, a due celle (dentro la portata,
+mai oltre tre; accanto, se la carta lo vuole adiacente) alla destra del
+Viandante sullo schermo; due nemici dentro l'area che colpisce, e un barile se
+tocca gli oggetti; due nemici a portata di una carta che colpisce tutti; altre
+carte nel mazzo (Strike, Guard e Arc Bolt) se pesca o scarta; sul Viandante lo
+status che toglie. Quello che la ripresa deve mostrare viene dalla definizione
+della carta (`card_demo_expected_events`): gli eventi di ogni suo effetto,
+quanti nemici deve ferire, la pozza o il fuoco che lascia
+(`card_demo_ground_expected`) e i colpi dell'AK. Lo switch su `Effect_Kind` è
+esaustivo, e così quello su `Status_Kind` per ciò che il Viandante porta
+(`card_demo_status_use`): un nuovo tipo di effetto o di status non compila
+finché non dice come la sua ripresa lo mostra.
+`test_every_card_has_a_demo_that_shows_its_effect` gioca ogni `Card_Id` a ogni
+livello, due riprese uguali, e per una carta nuova che il default non mostra
+fallisce dicendo quali eventi mancano. Vuole anche che ogni didascalia venga
+dalla tabella del film (`CARD_DEMO_WORDS`), che lo smoke misura tutta nella sua
+piastra: una didascalia nuova va lì.
+
+Allora serve un override in `card_demo_scene`, la scena della carta che parte
+dal default: un nemico libero che colpisca dopo la carta (Thorn Coat e Counter
+Rune, il balestriere di Deflect), un'azione del Viandante dopo la carta (il
+passo di Afterimage, l'urto caricato del Dado del Destino e di Lama Velenosa, la
+freccia di Feretro, ATTIVA della Tesla, i quattro passi dell'ombra, le raffiche
+dell'AK), altri nemici in fila o intorno (Chain Lightning, Storm Crown, Lazzo,
+Pinball), le facce dei dadi (Sundering Blow 4+4, Prismatic Barrage 4/1/4, Twin
+Venom 3/3, la faccia più alta di Fate Strike, Shock Floor 3, il d4 della Canna
+a 3), una stanza diversa (già liberata per la Canna, finestre da 2 s per
+l'Incendio, la nebbia per Battle Focus) o pozze già versate (l'anello della
+Pozza di Veleno). Una scena può anche chiedere eventi oltre a quelli della carta
+(`expects`) e più nemici feriti (`foe_hurt`), e cambiare con il livello (le
+raffiche di First Person Shooter seguono i secondi della vista). Un override
+serve anche quando il test passa ma la ripresa si vede male:
+`test_card_demo_frames_its_scene` vuole ogni nemico, oggetto, bobina, pozza e
+bersaglio di ogni scena sullo stage, dai piedi alla testa, fuori dalle piastre
+VITA e del pulse, dall'ispettore, dalla mano, dallo slot della Canna e dalla
+didascalia, sul tavolo 3D e su quello piatto; il resto si guarda nelle immagini
+dello smoke.
+
+**Suoni.** Fuori dalla Prova meccaniche il film tace. Nella Prova il suo tavolo
+è quello della prova: mette in coda i suoni della prova come il tavolo della
+run, e la finestra li suona al volume degli effetti
+(`effect_window_film_sounds`); il fondo della cripta tace finché la finestra è
+aperta.
+
+**Le verifiche.** [effect_window_test.odin](src/effect_window_test.odin) apre la
+finestra da ogni ingresso e vuole la carta giusta al livello giusto, senza
+scelte, acquisti o pagine girate; la run ferma e intatta mentre è aperta; la
+chiusura solo con `Esc`, il clic destro o CHIUDI, senza clic che passino al
+tavolo; un rifiuto per ogni stato occupato; lo stage 1:1 a 1280x720; ogni carta,
+al primo livello e all'ultimo, che si apre, gira e si chiude senza lasciare
+memoria; e con ogni carta a ogni livello, sul tavolo piatto e su quello 3D, una
+prima ripresa che mostra tutto quello che la carta promette e una seconda che
+riparte da capo. [card_demo_test.odin](src/card_demo_test.odin) tiene i film a
+30 e a 144 fotogrammi al secondo e a fotogrammi irregolari, sul tavolo della
+vetrina con la didascalia mai sopra la mano, e la loro inquadratura;
+[card_demo_test.odin](src/game/card_demo_test.odin) costruisce la stanza di
+ogni scena a ogni livello e tiene i default sul targeting delle carte;
+[effect_entry_test.odin](src/render/effect_entry_test.odin) tiene i pulsanti
+lontani da carte, prezzi e comandi;
+[effect_stage_test.odin](src/render/effect_stage_test.odin) percorre con
+`core:reflect` tutto il `Renderer` e fallisce se il renderer prestato non prende
+in prestito una texture, uno shader, un font, una mesh o un modello, o se divide
+con quello della run uno stato che deve essere suo.
+
+Lo smoke `--smoke-effect-window` ([Verifica e smoke test](#verifica-e-smoke-test))
+apre la finestra vera da ogni ingresso, sulla run della sessione, e poi filma
+una ripresa intera di ogni carta, al livello 0 e al più alto, attraverso la
+finestra: ognuna deve mostrare l'effetto nel suo tempo, senza errori della
+timeline e con la run ferma; a ogni fotogramma la didascalia sta intera nella
+sua piastra, misurata con il font del gioco, la piastra non copre niente e il
+guanto resta sullo stage; fuori dalla Prova non va in coda nessun suono, mentre
+una ripresa di Strike come nella Prova suona i suoi, e il cursore non sparisce
+mai. Misura anche il costo del fotogramma: con la finestra aperta il gioco deve
+tenere i 60 fotogrammi al secondo, e più di un fotogramma su cinquanta in
+ritardo lo fa fallire. Dura circa dieci minuti;
+`-define:EFFECT_SMOKE_CARDS=,Strike,Pinball,` filma solo le carte nominate (con
+i nomi di `Card_Id`) e `--flat` le filma sul tavolo piatto:
+
+```sh
+odin run src -o:none -- --smoke-effect-window
+odin run src -o:none -define:EFFECT_SMOKE_CARDS=,Strike,Pinball, -- --smoke-effect-window --flat
+```
+
 ### Il tavolo: cartoncini vivi, cerchi e segnalini
 
 I personaggi del tavolo 3D sono **cartoncini vivi**: la figura è un disegno
@@ -1509,8 +1759,10 @@ pulsanti usati **solo con il mouse**. Disegno e hitbox condividono le stesse
 coordinate; i comandi disabilitati non cliccano la board. **PERSONAGGIO**
 apre una scheda in pausa: modellino **realmente 3D** del player a sinistra,
 statistiche a destra, arma, riserva e reliquie esplicitamente indicate come
-**passive**. Il pulsante **CHIUDI**, in alto a destra, torna al gioco.
-Il danno mostrato include l'arma.
+**passive**. Accanto alle passive, nell'altra metà della riga, il **MAZZO**
+elenca le carte della run una riga per carta e livello, a pagine, e mostra il
+film di quella scelta ([Mostra effetto](#mostra-effetto)). Il pulsante
+**CHIUDI**, in alto a destra, torna al gioco. Il danno mostrato include l'arma.
 
 ### Il Ring delle Ombre e gli sblocchi
 
@@ -1743,6 +1995,7 @@ odin run src -o:none -- --classic
 | `--smoke-m8-view` | prova 3D di d4, dispositivi, offerta del ring, equipaggiamento, scheda personaggio, tag match e cambio stanza |
 | `--smoke-western` | nuvoletta 6 RANCH 7: apertura automatica, volo delle carte, insegna, porte, corsa a tempo e premio |
 | `--smoke-mechanics-lab` | Prova meccaniche: arena aperta, mano con tutto il mazzo in prova (dieci carte sovrapposte, larghe come in una mano piena di otto, ognuna con tutte le parole della faccia, l'icona, i segni e il tasto in vista prima della successiva, nella mano come la dà e in qualunque ordine, e trovata dal puntatore, quella alzata intera dentro il canvas; ogni parola di ogni sua carta, a ogni livello, misurata con il font del gioco sulle carte da 109 pixel della mano, la Canna sul suo slot, e nell'ispettore: ogni riga ci sta senza stringere le lettere, rimpicciolirsi o tagliarsi, nessun nome tagliato; Pinball e First Person Shooter anche sulle carte più larghe del gioco, mani da cinque e sei, negozio e ricompense), ring riaperto, arrivi fino al massimo, ultima uccisione senza fine del combattimento, cartoncino del giocatore di nuovo in piedi dopo morte e riavvio, cartoncini vivi (un passo e un attacco fotogramma per fotogramma), cerchi d'azione e segnalini di danno e cura, gli status a stack (Veleno, Bruciatura e Rallentamento su un nemico, Bruciatura e Veleno sul giocatore: etichette di carta ai piedi, nomi e stack nell'HUD e nell'ispettore del nemico, `odin_pp_living_statuses_NN.png` e `odin_pp_mechanics_lab_statuses.png`; la finestra che scade subito dopo li fa bruciare), i suoni che ogni azione mette in coda (passo, colpo, ferita, caduta, cura, status, battito, stordimento: senza dispositivo audio, li conta) e infine un Movimento Ombra giocato dalla mano: finestra e clock del mondo fermi per tutta l'ombra, quattro passi dell'ombra con una diagonale sul suo primo battito, risalita sull'ultima casella dell'ombra, nessun passo del Viandante fra i suoni e tutti quelli dell'ombra (carta, sprofondare, passi, CRITICO, battiti, risalita); per finire ogni colpo uno alla volta, con la sua arma di carta: il dardo nel Viandante e nel pavimento, il fendente del bruto sulle tre caselle e la sua carica colpita all'arrivo, gli artigli del ghoul, il pastorale, il bastone, la bomba del bombarolo, la brace dell'arcimago su un barile e i colpi del Viandante con la lanterna e con le due armi M8 (ogni arma deve comparire); ultimo, il Rallentamento sul sigillo: un bruto rallentato di 2 compie il passo già annunciato, poi annuncia il prossimo intento 2 secondi più lungo (due tacche in più) e, compiuta quell'azione, perde uno stack e trattiene il successivo di un secondo solo; infine Pozza di Veleno e Incendio dalla mano: un anello di pozze chiuso dall'ultima, che allaga l'area (otto celle da 2 Veleno) e avvelena una volta sola il chaser rimasto dentro, un chaser che attraversa due pozze schizzando e prendendo 2 Veleno a ogni cella, il Viandante che entra in una pozza sua senza prendere niente, un fuoco accanto a un bruto che allunga i bracci per quattro finestre, lo prende alla seconda (Bruciatura 1, che morde dalla terza), brucia la casella del Viandante senza segnarlo e si spegne alla quinta, con i suoni delle carte, dello schizzo e del fuoco che si allarga e si spegne; ultime le cariche del Viandante: Deflect su un dardo (lo stesso dardo torna nel balestriere), su un fendente e su una carica (risposta con la lanterna), mai con la scelta di difesa, il Viandante illeso e fermo e l'attaccante con i 3 del colpo, Feretro con `Ctrl` (segnato il nemico sulla linea di tiro, non quello dietro una copertura, su cui il clic non scocca niente) e una freccia da 1 s scoccata dal clic, con 1 danno e uno status, il Dado del Destino su tre urti (un d4 che fa BRUCIATURA 2, una nuova giocata che riporta gli urti a 3, un d20 che fa LETALE e lo stesso 16 che sul Custode è solo un CRITICO) e Lama Velenosa con il suo dado e l'urto avvelenato (con tre cariche in più, i chip dell'HUD: ogni parola intera, il d20 di DESTINO compreso), con i suoni delle carte, delle cariche, del colpo rimandato, della freccia e del dado; per ultimo il Lazzo: a quattro celle dal muro ovest il raggio è 3 (una cella più in là sarebbe 4), il mirino (i nemici che prende, i tre fermi sull'anello, il Custode `TROPPO PESANTE`, che né la regola né la carta prendono), il lancio su un nemico a quattro celle tirato dentro sull'anello e il giro con il mondo che continua: colpi 1, 2 e 3 sui nemici fermi a nord, a sud e a nord-est, spinti di 1, 2 e 3 celle e feriti di 1, 2 e 3 come il nemico in volo, la vita di questo controllata a ogni fotogramma (meno i colpi, meno 1 a ogni giro intero), un balestriere libero che mira e tira al perno (la scelta di difesa si apre, il colpo passa, la corda tiene) e la caduta al dodicesimo giro, con la riga dell'HUD sul giro intera con la finestra fissa e con quella che si accorcia; poi raggio 1 accanto al muro, con gli schianti, ognuno col suo numero solo sul nemico in volo e il giro che torna indietro a ogni schianto, e una schivata che lo lascia andare (atterra sotto di sé e annuncia subito un intento nuovo, senza stordimento, e il suo cartoncino cade con `MOLLATO` mentre la schivata si vede), con i suoni della carta, del lancio, della stretta, dei giri, dei colpi, degli schianti e della corda mollata; poi il Pinball: il mirino sul balestriere accanto (i mirini d'acciaio e la partenza della palla, girata di 30 gradi dal flusso della stanza fissato) e sul Custode `TROPPO PESANTE`, che né la regola né la carta prendono, il bruto a due celle fuori portata, il colpo (3 di energia, il Veleno del balestriere sparito, mondo e palla fermi per tutto il cast, la lanterna sulla palla quando il cast finisce) e i 20 secondi della corsa: i tre ghoul in fila presi per 2, 3 e 4 e spinti di una cella, poi il muro nord che riporta 5 a 2 (la telecamera allontanata per la corsa), e per tutta la corsa ogni nemico ferito del valore di quel momento, uno in più a ogni colpo, ogni cosa solida che lo riporta a 2, ogni spinta di una cella via dalla palla e una stella sul tavolo per ogni contatto; a ogni fotogramma il disco fuori dalle caselle solide, la direzione unitaria e la vita del balestriere intatta, mentre un colpo, uno status, una freccia o una carta su di lui sono rifiutati; la palla che rotola sopra il Viandante senza ferirlo, un suo passo durante la corsa, i battiti del mondo uno al secondo, il chip dell'HUD intero anche con un valore di due cifre; lo scoppio nel fotogramma dei 20 secondi, con il balestriere che cade lì con il suo bottino e senza fantasma del cartoncino, con i suoni della carta, del colpo, dei muri, dei respingenti e dello scoppio; poi First Person Shooter: le sue parole a ogni livello, la giocata su di sé (3 di energia, nessun secondo di finestra, 20 secondi, niente cast), una carta, un Refocus e una freccia rifiutati, la discesa negli occhi (il cartoncino del Viandante nascosto, la mano scivolata via), un secondo di grilletto a 60 fotogrammi: 6 colpi nel ghoul da 1 danno l'uno, la finestra e i secondi della vista più corti solo del tempo passato, nessun morso del Veleno, né lanterna né ferita fra i suoni; un colpo fermato dal blocco di ghiaccio (il balestriere dietro intatto) e uno dal muro del bordo, i passi `WASD` secondo la vista con l'occhio che scivola, l'urto e la schivata, la scelta di difesa dietro gli occhi con i secondi fermi, i bordi rossi di una ferita, un colpo nel recupero, la fine dopo una ventina di battiti con la risalita e il mouse libero, una copia +5 da 30 secondi e il tavolo piatto che diventa 3D e torna piatto, con i suoni della carta, della discesa, dei colpi, delle ferite, dei colpi sulla pietra e della risalita; infine la Canna da Pesca: `F7` libera l'arena (due nemici fermi cadono e si apre lo slot con `PESCA 1/1`), la canna presa dallo slot e lasciata su una casella a due celle pesca lì (lancio, galleggiante sull'acqua nuova, abboccata, un pesce tirato fuori che vola al Viandante, il suo d4 a 3 e 3 di vita, l'acqua sul tavolo 3D e su quello piatto), poi la pesca della stanza è finita; potenziata a +1, `F7` di nuovo dà una stanza nuova senza acqua e con due pesche (`PESCA 2/2`): dall'acqua esce una carta, mai un'altra canna, che entra nel mazzo, poi la stessa acqua (nessuna casella nuova) dà un pane per il 2 del suo d4 e le pesche finiscono, finché un altro `F7` le ridà tutte e due; per ultima nessuna di 400 offerte porta una seconda Canna a chi ne ha già una, mentre senza di lei ne arrivano, con i suoni della carta al lancio, del tonfo, dell'abboccata, del mulinello, della preda presa e della carta pescata |
+| `--smoke-effect-window` | [Mostra effetto](#mostra-effetto) nella finestra vera, sulla run della sessione: il costo del fotogramma (il tavolo da solo, poi la finestra aperta a 60 fotogrammi al secondo sui film di Strike, Pinball, Incendio e First Person Shooter: più di un fotogramma su cinquanta in ritardo lo fa fallire); ogni ingresso, cioè l'ispettore con il tasto e con il pulsante (spento, e senza richieste, in Movimento Ombra), il MAZZO della scheda alla seconda pagina con una riga scelta (`Esc` chiude la finestra e non la scheda), lo slot della Canna, la ricompensa, l'offerta e la carta posseduta del negozio e il riposo, ognuno con la carta giusta, la run ferma a finestra aperta e un primo fotogramma senza tempo né clic dopo la chiusura; le chiusure con `Esc`, clic destro e CHIUDI, RICOMINCIA, la finestra a 1600x900, 960x540 e 1280x720 (lì lo stage 1:1); una ripresa di Strike come nella Prova meccaniche, con i suoi suoni; poi una ripresa intera di ogni carta, al livello 0 e al più alto, attraverso la finestra (l'effetto mostrato nel suo tempo, nessun errore della timeline, la run ferma, a ogni fotogramma una didascalia che sta nella sua piastra senza coprire niente, il guanto sullo stage, nessun suono fuori dalla Prova, il cursore mai nascosto); infine ogni parola nuova misurata con il font del gioco nel suo spazio e il costo dei film. Circa dieci minuti; `-define:EFFECT_SMOKE_CARDS=,Strike,Pinball,` filma solo quelle carte, `--flat` le filma sul tavolo piatto |
 | `--smoke-m9-view` | arena continua, duello con IA, presa in quattro pose, replay e FPS con ricarica e vittoria |
 
 Gli smoke classici e i laboratori `--spell-lab` / `--dice-lab` conservano il comportamento classico;
@@ -1818,9 +2071,10 @@ alterare fog, luce, minacce o picking; la fog continua a non memorizzare celle.
 La mano M7 è una fila senza sovrapposizioni: fino a otto carte completamente
 visibili, con energia richiesta, bersaglio/raggio, effetto, durata del cast in
 secondi e stato di disponibilità. Hover e selezione aprono un pannello di
-dettaglio; con sette–otto carte il titolo e l'illustrazione adottano un layout
-compatto; eventuali testi troppo lunghi terminano con puntini e restano nel
-dettaglio. Nel gioco la mano non supera mai otto carte (`MAX_HAND_CARDS`); solo
+dettaglio, con il tasto `I` e, a carta scelta, il pulsante **MOSTRA EFFETTO**
+([Mostra effetto](#mostra-effetto)); con sette–otto carte il titolo e
+l'illustrazione adottano un layout compatto; eventuali testi troppo lunghi
+terminano con puntini e restano nel dettaglio. Nel gioco la mano non supera mai otto carte (`MAX_HAND_CARDS`); solo
 regole che ne danno di più tutte insieme, come le dieci della Prova meccaniche,
 le tengono, e allora le carte si sovrappongono su tutta la larghezza del canvas,
 a 8 pixel dai bordi: restano larghe come in una mano piena di otto e ognuna
@@ -1977,6 +2231,8 @@ il numero massimo di carte scritto. Upgrade e keyword mantengono le policy esist
 | Clic su una carta / trascinamento | seleziona e mostra i dettagli / gioca sul bersaglio; un secondo clic gioca le carte senza bersaglio |
 | `1`–`8` / clic destro o `Esc` | seleziona una carta con bersaglio o gioca subito una carta senza bersaglio / annulla la selezione (nella mano da dieci della Prova meccaniche anche `9` e `0`) |
 | `Ctrl` + clic sinistro su un nemico | con le frecce di Feretro: scocca una freccia al nemico segnato (visibile e in linea di tiro); con `Ctrl` premuto il tavolo segna quelli raggiungibili |
+| `I` / clic su **MOSTRA EFFETTO** nell'ispettore della carta | apre il film della carta sotto il mouse o di quella scelta, anche della Canna nel suo slot ([Mostra effetto](#mostra-effetto)); il pulsante compare a carta scelta, e pulsante e tasto tacciono mentre il tavolo è occupato |
+| nella scheda **PERSONAGGIO**: clic su una riga del **MAZZO** / `<`, `>` / **MOSTRA EFFETTO** o `I` | sceglie la carta con il suo livello / gira pagina / apre il film della riga scelta; `Esc` chiude prima la finestra, poi la scheda |
 | mouse / tasto sinistro tenuto, dietro gli occhi di [First Person Shooter](#first-person-shooter) | gira la vista / spara l'AK, 6 colpi al secondo; `WASD` sono passi secondo la vista, `P` o `Esc` mettono in pausa e liberano il mouse |
 | `P` | pausa esplicita, con scena coperta; `P` riprende |
 | `Q`, `E`, `Z`, `C` | tenta rispettivamente diagonale nord-ovest, nord-est, sud-ovest, sud-est sulla griglia |
@@ -2050,7 +2306,8 @@ lunghezza della finestra, carte contate e stordimenti si azzerano. Le statistich
 la finestra una sola volta, dopo la risoluzione del tempo già pagato; il secondo
 di recupero trascorre realmente, senza aggiungere una Wait o beat immediati.
 
-Dadi, QTE, pausa, scheda personaggio, attività M9 e perdita del focus sospendono il
+Dadi, QTE, pausa, scheda personaggio, la finestra di
+[Mostra effetto](#mostra-effetto), attività M9 e perdita del focus sospendono il
 countdown dell’arena; Movimento Ombra lo ferma per i suoi 4 secondi. Cast,
 movimento, animazioni nemiche, hover, targeting e
 ologramma consumano tempo; durante il cast sono sospesi mondo e input ordinari.
@@ -2144,6 +2401,7 @@ le immagini sono output rigenerabili, non prerequisiti del checkout.
 | `--smoke-m8-view` | dispositivi con APRI IL RING, campo, tag match, ritorno Loot: `odin_pp_m8_d4.png`, `devices`, `mega_combo`, `character`, `loot`, `tag_ring`, `next_room` (tutti con prefisso `odin_pp_m8_` e suffisso `.png`) |
 | `--smoke-western` | 6 RANCH 7 dalla mano al premio: `odin_pp_western_hand.png`, `cards`, `sign`, `gate`, `riders`, `ride`, `grab`, `win`, `reward` (prefisso `odin_pp_western_`) |
 | `--smoke-mechanics-lab` | sandbox: `odin_pp_mechanics_lab.png`, `_square`, `_full`, `_refill`, `_restart`, `_stun`, `_pause`, `_defeat` (prefisso `odin_pp_mechanics_lab`); cartoncini vivi: `odin_pp_living_move_00.png`–`_37` e `odin_pp_living_attack_00.png`–`_37`, un'immagine ogni due fotogrammi; modi degli intenti nemici (F6): `odin_pp_living_intents_0_00.png`–`_3_39` (0 sigilli + terreno, 1 sigilli, 2 terreno, 3 adesivi), ogni tre, e lo stesso istante con un colpo in arrivo nei modi 0 e 3 (`odin_pp_living_intent_both.png`, `_labels`); segnalino di cura: `odin_pp_living_heal_00.png`–`_39`, ogni due; status a stack: `odin_pp_living_statuses_00.png`–`_19`, ogni tre, e `odin_pp_mechanics_lab_statuses.png` (fermo, con l'ispettore del nemico); Movimento Ombra dalla mano: `odin_pp_living_shadow_00.png`–`_82` (sprofonda, quattro passi dell'ombra con la diagonale sul primo battito, risale), ogni quattro; colpi: `odin_pp_living_blow_<nome>_00.png`–`_23` per `bolt`, `bolt_miss`, `cleave`, `claws`, `crozier`, `staff`, `bomb` ed `ember`, `_00`–`_39` per `charge`, `_00`–`_37` per `lantern`, `iron_cleaver` e `storm_pike`, ogni due; Rallentamento sul sigillo: `odin_pp_mechanics_lab_slow.png` (l'intento trattenuto, con l'ispettore del bruto) e `odin_pp_mechanics_lab_slow_worn.png` (dopo l'azione, uno stack in meno); Pozza di Veleno e Incendio: `odin_pp_mechanics_lab_pool_preview.png` (l'anteprima con l'area che l'ultima pozza chiuderebbe), `odin_pp_living_pool_00.png`–`_29` (la fiala lanciata chiude l'anello e l'area si allaga), ogni tre, `odin_pp_living_pool_walk_NN.png` (un chaser attraversa due pozze, poi il Viandante entra in una sua), ogni sei, `odin_pp_living_fire_NN.png` (il fuoco accanto al bruto per cinque finestre), ogni quattro, `odin_pp_mechanics_lab_fire.png` (alla quarta finestra) e il tavolo piatto in `odin_pp_mechanics_lab_pool_flat.png` e `odin_pp_mechanics_lab_fire_flat.png`; le cariche: `odin_pp_mechanics_lab_card_Deflect.png`, `_Coffin`, `_Fate_Dice`, `_Venom_Blade` (ogni carta sotto il mouse, con l'ispettore), `odin_pp_living_deflect_bolt_00.png`–`_31`, `odin_pp_living_deflect_cleave_00.png`–`_31` e `odin_pp_living_deflect_charge_00.png`–`_39`, ogni due, `odin_pp_mechanics_lab_arrow_aim.png` (`Ctrl` premuto, il mouse sul nemico segnato; quello dietro la copertura resta senza segno), `odin_pp_living_arrow_00.png`–`_37`, `odin_pp_living_fate_00.png`–`_37`, `odin_pp_living_fate_lethal_00.png`–`_37` e `odin_pp_living_fate_boss_00.png`–`_37` (il Custode), ogni due, `odin_pp_mechanics_lab_fate_chip.png` (il chip `DESTINO 3 d4` dell'HUD), `odin_pp_mechanics_lab_fate_chips.png` (tre cariche in più: tre chip e il conto, `DES 2 d20` intero), `odin_pp_mechanics_lab_venom_roll.png` (il dado di Lama Velenosa) e `odin_pp_living_venom_00.png`–`_37`; il Lazzo: `odin_pp_mechanics_lab_card_Lasso.png`, `odin_pp_mechanics_lab_lasso_preview.png` (il mirino sul nemico a quattro celle: l'anello di raggio 3 accanto al muro e i tre nemici fermi sopra), `odin_pp_mechanics_lab_lasso_heavy.png` (il Custode, `TROPPO PESANTE`), `odin_pp_living_lasso_throw_NN.png` (il lancio), ogni quattro, `odin_pp_living_lasso_NN.png` (il giro: i tre colpi ogni tre fotogrammi, poi ogni otto i giri, la difesa che lascia passare la freccia del balestriere e la caduta), `odin_pp_mechanics_lab_lasso_flat.png` (il tavolo piatto durante il giro), `odin_pp_living_lasso_smash_NN.png` (gli schianti e i rimbalzi), ogni cinque, e `odin_pp_living_lasso_release_00.png`–`_14` (la schivata che lo lascia andare), ogni tre; il Pinball: `odin_pp_mechanics_lab_card_Pinball.png`, `odin_pp_mechanics_lab_pinball_preview.png` (il mirino sul balestriere e la partenza della palla), `odin_pp_mechanics_lab_pinball_heavy.png` (il Custode, `TROPPO PESANTE`), `odin_pp_living_pinball_strike_NN.png` (il nemico che diventa la palla e il colpo che la manda via), ogni quattro, `odin_pp_living_pinball_NN.png` (la corsa, con la telecamera allontanata: ogni tre fotogrammi i primi 2,6 secondi, con i tre ghoul presi per 2, 3 e 4 e il muro nord che riporta 5 a 2, poi ogni venti fino a 3 secondi; il resto corre veloce senza immagini), `odin_pp_mechanics_lab_pinball_chip.png` (il chip della palla, con il valore a 5, accanto ai morsi e alle cariche), `odin_pp_mechanics_lab_pinball_flat.png` (il tavolo piatto durante la corsa) e `odin_pp_living_pinball_burst_NN.png` (l'ultimo mezzo secondo e lo scoppio, la telecamera ancora più lontana), ogni due; First Person Shooter: `odin_pp_mechanics_lab_card_First_Person.png`, `odin_pp_living_fps_dive_NN.png` (la discesa negli occhi), ogni tre, `odin_pp_mechanics_lab_fps.png` (la vista: l'AK, il mirino e il conto dei secondi), `odin_pp_living_fps_fire_NN.png` (il grilletto tenuto: traccianti, scintille, il cuore del ghoul da 40 a 34), ogni due, `odin_pp_mechanics_lab_fps_wall.png` (il colpo fermato dal ghiaccio), `odin_pp_mechanics_lab_fps_stone.png` (quello fermato dal muro del bordo, con le schegge di pietra), `odin_pp_living_fps_steps_NN.png` (il primo passo, con l'occhio che scivola) e `odin_pp_living_fps_bump_NN.png` (l'urto), ogni due, `odin_pp_mechanics_lab_fps_defense.png` (la scelta di difesa dietro gli occhi), `odin_pp_mechanics_lab_fps_hurt.png` (i bordi rossi), `odin_pp_living_fps_rise_NN.png` (la risalita), ogni due, `odin_pp_mechanics_lab_fps_flat.png` e `odin_pp_mechanics_lab_fps_flat_after.png` (il tavolo piatto diventato 3D, e di nuovo piatto); la Canna da Pesca: `odin_pp_living_fishing_clear_NN.png` (`F7`: i due nemici cadono e si apre lo slot), ogni sei, `odin_pp_mechanics_lab_rod_slot.png` (lo slot sotto il mouse, con l'ispettore), `odin_pp_mechanics_lab_rod_preview.png` (la Canna presa: le caselle che può pescare e quella sotto il mouse), `odin_pp_living_fishing_NN.png` (lancio, galleggiante, abboccata, il pesce che vola al Viandante, il d4 e la cura), ogni cinque, `odin_pp_mechanics_lab_fishing_roll.png` (il d4 fermo sul 3), `odin_pp_mechanics_lab_fishing_flat.png` (l'acqua sul tavolo piatto), `odin_pp_mechanics_lab_rod_slot_upgraded.png` (la Canna +1 nella stanza nuova: `PESCA 2/2`), `odin_pp_living_fishing_card_NN.png` (la carta pescata) e `odin_pp_living_fishing_again_NN.png` (la stessa acqua di nuovo: il pane e il suo d4), ogni cinque |
+| `--smoke-effect-window` | [Mostra effetto](#mostra-effetto): ogni ingresso con il suo pulsante, `odin_pp_effect_entry_inspector_hover.png` (una carta sotto il mouse, la riga del tasto), `_inspector_chosen` (la carta scelta, il pulsante), `_inspector_busy` (spento in Movimento Ombra), `_sheet` (il MAZZO alla seconda pagina, una riga scelta), `_sheet_after` (la scheda rimasta aperta dopo `Esc`), `_rod_hover`, `_rod_chosen`, `_reward`, `_shop_offer`, `_shop_owned` e `_rest` (prefisso `odin_pp_effect_entry`); la finestra aperta da ognuno, `odin_pp_effect_window_<ingresso>_00.png`–`_02` (ogni 24 fotogrammi) e `_close` (con CHIUDI sotto il mouse) per `inspector_key`, `inspector_button`, `sheet`, `rod`, `reward`, `shop_offer`, `shop_owned` e `rest`, e `odin_pp_effect_window_reward_restart.png` (dopo RICOMINCIA); la finestra a tre misure, `odin_pp_effect_scale_1600x900.png`, `_960x540` e `_1280x720`; il film di ogni carta al livello 0 e al più alto, `odin_pp_effect_film_<Card_Id>_<livello>_NN.png` (lo stage nei suoi 960x540 pixel: il guanto sulla carta, in viaggio, sul bersaglio, poi l'effetto ogni 0,6 s, ogni 1,5 s dall'ottavo secondo, e la ripresa ferma alla fine; al più 40) e `odin_pp_effect_film_<Card_Id>_<livello>_window.png` (tutta la finestra, con il guanto sul bersaglio) |
 | `--smoke` | `odin_pp_isometric.png` |
 | `--smoke-generation` | `odin_pp_procedural_room.png` |
 | `--smoke-map` | `odin_pp_route.png` |
@@ -2184,6 +2442,11 @@ e raggi senza attraversamenti, finestre delle mosse, parata/schivata/prese,
 replay esatto, input al cambio focus e transizioni fra run e attività.
 [m9_transition_test.odin](src/m9_transition_test.odin) copre anche ricompense
 una sola volta, isolamento della pratica e chiusura senza click-through.
+[effect_window_test.odin](src/effect_window_test.odin) e
+[card_demo_test.odin](src/card_demo_test.odin) fanno lo stesso per
+[Mostra effetto](#mostra-effetto): ingressi, run ferma, rifiuti, chiusura senza
+click-through e il film di ogni carta a ogni livello, che deve mostrare quello
+che la carta promette.
 
 ## Architettura e ownership
 
@@ -2205,7 +2468,11 @@ una sola volta, isolamento della pratica e chiusura senza click-through.
 | [src/combatdebug](src/combatdebug) | observer, scenari headless e report |
 | [src/gameplay_input.odin](src/gameplay_input.odin) | comandi logici, fase d'origine e l'unico input in attesa (il passo sul secondo che aspetta la diagonale, [beat_input.odin](src/beat_input.odin)) |
 | [src/runtime_options.odin](src/runtime_options.odin) | opzioni della sessione |
-| [src/m8_session.odin](src/m8_session.odin) | scheda personaggio, ingresso/ritorno dalle attività, ricevuta del ring e persistenza degli sblocchi |
+| [src/m8_session.odin](src/m8_session.odin) | scheda personaggio con il suo MAZZO, richieste di MOSTRA EFFETTO dalla scheda e dall'ispettore, ingresso/ritorno dalle attività, ricevuta del ring e persistenza degli sblocchi |
+| [src/effect_window.odin](src/effect_window.odin), [effect_window_smoke.odin](src/effect_window_smoke.odin) | la finestra di [Mostra effetto](#mostra-effetto): modale della run che prende tutto il fotogramma, rifiuti a tavolo occupato, ingressi di ricompensa, negozio e riposo, stage 960x540 sopra il canvas, proprietà del film e del suo renderer; lo smoke |
+| [src/card_demo.odin](src/card_demo.odin) | il film di una carta, dietro `card_demo_open`, `card_demo_step`, `card_demo_restart`, `card_demo_prepare`, `card_demo_draw`, `card_demo_close` e `card_demo_caption`: la ripresa, il guanto che gioca la carta come la mano, il controller della ripresa, le didascalie, il ritorno da capo |
+| [src/game/card_demo.odin](src/game/card_demo.odin) | le scene dei film: default dal targeting, override per carta, eventi attesi esaustivi su `Effect_Kind` e `Status_Kind`, dadi e stanza di prova |
+| [src/render/effect_stage.odin](src/render/effect_stage.odin), [card_demo.odin](src/render/card_demo.odin), [effect_entries.odin](src/render/effect_entries.odin) | il renderer prestato del film (stato proprio, asset GPU della run), guanto, clic, didascalie e luce della piastra VITA, pulsanti MOSTRA EFFETTO delle schermate |
 | [src/m9_session.odin](src/m9_session.odin) | proprietario di input/clock della modalità libera, pause, cursore, preset delle mosse e registrazione/replay |
 | [src/m9_lab.odin](src/m9_lab.odin), [m9_smoke.odin](src/m9_smoke.odin) | ciclo dei laboratori e verifica nativa riproducibile |
 | [src/game/board_device.odin](src/game/board_device.odin) | geometria condivisa, attivazione, scariche e cleanup dei dispositivi |
@@ -2224,6 +2491,19 @@ isometrica. La profondità visiva non aggiunge movimento verticale. Il canvas vi
 possiede la propria `Grid(Tile)`. `Room` possiede nemici, trappole, ostacoli,
 oggetti, loot e scratch buffer, ma prende in prestito `^Level` e `^Player`.
 Il renderer possiede soltanto risorse e copie di presentazione.
+
+`Effect_Window`, nella sessione della run, possiede il film di
+[Mostra effetto](#mostra-effetto) (`Card_Demo`, sull'heap: la sua stanza punta
+dentro di lui), il suo renderer e i render target dello stage. Il film possiede
+la sua stanza, il suo livello e il suo giocatore, e non tocca mai quelli della
+run. Il suo renderer possiede soltanto il proprio stato di vista e prende in
+prestito le risorse GPU del renderer della run, che vive più a lungo
+(`destroy_effect_window` è la prima cosa di `roguelike_destroy`). Un asset nuovo
+del `Renderer` va preso in prestito anche in `borrow_renderer_assets`: il test
+che percorre il `Renderer` con `core:reflect` fallisce finché non c'è, e così se
+il renderer prestato divide con quello della run un puntatore o uno stato. Un
+pezzo di stato nuovo che `destroy_tactical_assets` libera va liberato anche in
+`destroy_borrowed_renderer`.
 
 `engine`, `fight` e `shooter` non importano Raylib, `game` o la griglia tattica.
 Le due simulazioni libere possiedono ciascuna il proprio `engine.World` e

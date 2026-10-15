@@ -80,6 +80,7 @@ begin_renderer_world_timeline :: proc(renderer: ^Renderer, before: Room_Presenta
 	// The blows' timing follows the attack clips, which only a living board has.
 	living := renderer.tactical.living
 	for event in events.events[:events.count] {
+		renderer.shown_events += {event.kind}
 		kind := presentation_cue_kind(event)
 		entry := &world.cues[world.count]
 		entry^ = {cue = {kind = kind, event = event, duration = presentation_cue_duration(kind, event), batch = renderer.cue_batches}}

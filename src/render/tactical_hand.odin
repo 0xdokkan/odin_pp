@@ -397,9 +397,88 @@ tactical_card_text_misfit :: proc(renderer: ^Renderer, card: game.Card_Instance,
 	return said
 }
 
-draw_tactical_card_inspector :: proc(renderer: ^Renderer, card: game.Card_Instance, definition: game.Card_Definition, selected: bool) {
+// MOSTRA EFFETTO in the card inspector (src/effect_window.odin): a button once
+// the card is chosen (the inspector then stays while the mouse goes to it), its
+// key I while the mouse is only over the card (a click there picks the card
+// up); none while it is dragged, behind the player's eyes or on MOSTRA
+// EFFETTO's own board.
+Inspector_Effect :: enum u8 {None, Hint, Button}
+// How much taller the inspector stands with its MOSTRA EFFETTO row: its frame
+// then ends over the board's bar and the traps' line above it
+// (m8_trap_status_bounds), clear of both.
+TACTICAL_INSPECTOR_EFFECT_ROOM :: f32(26)
+
+// The row under the inspector's last line (its tags, at 156), as far from it
+// as the HUD's commands are from one another.
+tactical_inspector_effect_bounds :: proc() -> rl.Rectangle {
 	x, y := f32(25), TACTICAL_HUD_HEIGHT+f32(26)
-	gothic_frame({x-11, y-8, 218, 172}, GOTHIC_RECESS, GOTHIC_STEEL)
+	return {x-4, y+160, 204, 24}
+}
+
+// The card inspector's frame, its MOSTRA EFFETTO row too when it shows one.
+tactical_card_inspector_bounds :: proc(effect := Inspector_Effect.None) -> rl.Rectangle {
+	x, y := f32(25), TACTICAL_HUD_HEIGHT+f32(26)
+	return {x-11, y-8, 218, f32(172)+(TACTICAL_INSPECTOR_EFFECT_ROOM if effect != .None else 0)}
+}
+
+// The card the inspector shows now (draw_tactical_hand, draw_fishing_slot: the
+// same choice as their drawing) and what its MOSTRA EFFETTO is.
+tactical_inspector_effect :: proc(renderer: ^Renderer, room: ^game.Room, hovered, selected, dragged: u32) -> (card: game.Card_Instance, effect: Inspector_Effect) {
+	if renderer == nil || room == nil || room.player == nil || !renderer.tactical.enabled || renderer.tactical.showcase || dragged != 0 { return }
+	deck, phase := renderer_hand_deck(renderer, room)
+	if phase == .Loot {
+		// The room cleared: the Canna da Pesca, in its slot.
+		rod, held := game.fishing_rod(&room.player.deck)
+		if !held || !game.fishing_room_open(room) { return }
+		if rod.id == hovered { return rod, .Button if rod.id == selected else .Hint }
+		if rod.id == selected { return rod, .Button }
+		return
+	}
+	if phase != .Combat || !deck.combat_active || game.tactical_first_person_active(room) || first_person_hand_drop(renderer) > 0 { return }
+	active := hovered if hovered != 0 else selected
+	index, found := game.hand_card_index_by_id(deck, active)
+	if !found { return }
+	return deck.hand[index], .Button if active == selected else .Hint
+}
+
+// The inspector's button is the board's no more: the cell under it is never
+// aimed at (poll_gameplay_command, and the scene's hover).
+tactical_inspector_effect_contains :: proc(renderer: ^Renderer, room: ^game.Room, hovered, selected, dragged: u32, point: view.Vec2) -> bool {
+	_, effect := tactical_inspector_effect(renderer, room, hovered, selected, dragged)
+	return effect == .Button && point_in_rectangle(point, tactical_inspector_effect_bounds())
+}
+
+// Whether the board lets the window open now (src/effect_window.odin refuses
+// it while a defence, a cast, Movimento Ombra or an action still showing,
+// a fishing too, holds the board): the button stands dimmed meanwhile, as
+// PERSONAGGIO does.
+tactical_inspector_effect_ready :: proc(renderer: ^Renderer, room: ^game.Room) -> bool {
+	return renderer != nil && room != nil && room.qte.kind == .None && !game.tactical_is_casting(room) &&
+		!game.tactical_shadow_active(room) && !renderer_timeline_is_busy(renderer)
+}
+
+// The inspector's MOSTRA EFFETTO row: the button (dimmed while the board is
+// busy), or the key alone.
+draw_tactical_inspector_effect :: proc(renderer: ^Renderer, effect: Inspector_Effect, ready := true) {
+	bounds := tactical_inspector_effect_bounds()
+	switch effect {
+	case .None:
+	case .Button:
+		hud_button(renderer, bounds, EFFECT_ENTRY_KEY, EFFECT_ENTRY_LABEL, ready)
+	case .Hint:
+		// No button to click (the mouse is on the card): its key, dimmed.
+		cap := effect_entry_key_bounds(bounds)
+		rl.DrawRectangleRec(cap, GOTHIC_STEEL)
+		gothic_text_fit(renderer, EFFECT_ENTRY_KEY, {cap.x+4, cap.y+(cap.height-15)*0.5, cap.width-6, 16}, 12, GOTHIC_INK)
+		gothic_text_fit(renderer, EFFECT_ENTRY_LABEL, effect_entry_label_bounds(bounds, true), 14, GOTHIC_MUTED)
+	}
+}
+
+draw_tactical_card_inspector :: proc(renderer: ^Renderer, card: game.Card_Instance, definition: game.Card_Definition, selected: bool,
+	effect := Inspector_Effect.None, effect_ready := true) {
+	x, y := f32(25), TACTICAL_HUD_HEIGHT+f32(26)
+	frame := tactical_card_inspector_bounds(effect)
+	gothic_frame(frame, GOTHIC_RECESS, GOTHIC_STEEL)
 	gothic_text_fit(renderer, tactical_card_title(card, definition), {x, y, 195, 25}, 18, GOTHIC_PAPER)
 	gothic_rule(x, y+29, 190, gothic_rarity_accent(definition.rarity))
 	gothic_text_fit(renderer, tactical_card_cost_line(card, definition), {x, y+35, 193, 18}, 14, GOTHIC_BLUE)
@@ -420,7 +499,8 @@ draw_tactical_card_inspector :: proc(renderer: ^Renderer, card: game.Card_Instan
 		rl.DrawRectangleRec({bounds.x, bounds.y, 1, bounds.height}, GOTHIC_STEEL)
 		gothic_text_fit(renderer, label, {bounds.x+4, bounds.y+1, bounds.width-7, 17}, 12, GOTHIC_MUTED)
 	}
-	if selected { rl.DrawRectangle(c.int(x-11), c.int(y-8), 3, 172, GOTHIC_RED) }
+	draw_tactical_inspector_effect(renderer, effect, effect_ready)
+	if selected { rl.DrawRectangle(c.int(frame.x), c.int(frame.y), 3, c.int(frame.height), GOTHIC_RED) }
 }
 
 // The inspector's energy and time: "ENERGIA 2 / TEMPO -2s".
@@ -535,8 +615,11 @@ draw_tactical_hand :: proc(renderer: ^Renderer, room: ^game.Room,
 	if index, found := game.hand_card_index_by_id(deck, active); found {
 		card := deck.hand[index]
 		definition, _ := game.card_definition_by_id(card.definition_id, true)
-		draw_tactical_card_inspector(renderer, card, definition, selected == active)
+		_, effect := tactical_inspector_effect(renderer, room, hovered, selected, dragged)
+		draw_tactical_card_inspector(renderer, card, definition, selected == active, effect, tactical_inspector_effect_ready(renderer, room))
 		if dragged != 0 { gothic_text(renderer, fmt.ctprintf("%s", definition.name), mouse.x+14, mouse.y-18, 16, GOTHIC_PAPER) }
 	}
-	if active == 0 { draw_tactical_enemy_inspector(renderer, room) }
+	// MOSTRA EFFETTO's film has its own pointer: the enemy inspector follows
+	// the real mouse.
+	if active == 0 && !renderer.tactical.showcase { draw_tactical_enemy_inspector(renderer, room) }
 }

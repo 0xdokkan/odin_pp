@@ -21,6 +21,13 @@ M8_Session :: struct {
 	report: game.Tesla_Ring_Report,
 	status: string,
 	ranch: Ranch_Session,
+	// The sheet's MAZZO: its page and the line chosen.
+	sheet: render.Character_Sheet_State,
+	// MOSTRA EFFETTO asked for this frame, from the sheet or the card
+	// inspector: the scene opens the window (roguelike_take_effect_request).
+	effect_request: game.Card_Instance,
+	effect_source: Effect_Window_Source,
+	has_effect_request: bool,
 }
 
 // 6 RANCH 7 plays in a bubble over the frozen board, inside the run scene.
@@ -38,6 +45,9 @@ M8_Session_Input :: struct {
 	focused, inside, pressed, escape: bool,
 	// The ranch's press edge: Space, Enter or a click inside the canvas.
 	ranch_press: bool,
+	// I: MOSTRA EFFETTO of the card the inspector shows, or of the sheet's
+	// line chosen.
+	inspect: bool,
 	mouse: view.Vec2,
 }
 
@@ -153,7 +163,7 @@ update_m8_session :: proc(session: ^M8_Session, room: ^game.Room, renderer: ^ren
 	controller: ^Tactical_Controller, cards: ^Card_Interaction_State,
 	buffer: ^Buffered_Gameplay_Command, available: bool, dt: f32, mouse: view.Vec2, inside: bool) -> bool {
 	input := M8_Session_Input{focused = rl.IsWindowFocused(), inside = inside, mouse = mouse,
-		pressed = rl.IsMouseButtonPressed(.LEFT), escape = rl.IsKeyPressed(.ESCAPE)}
+		pressed = rl.IsMouseButtonPressed(.LEFT), escape = rl.IsKeyPressed(.ESCAPE), inspect = rl.IsKeyPressed(.I)}
 	input.ranch_press = rl.IsKeyPressed(.SPACE) || rl.IsKeyPressed(.ENTER) || (input.pressed && inside)
 	consumed := step_m8_session(session, room, renderer, controller, cards, buffer, available, dt, input)
 	return consumed
@@ -174,7 +184,11 @@ step_m8_session :: proc(session: ^M8_Session, room: ^game.Room, renderer: ^rende
 	if !available || !input.focused { return session.character_open }
 	left_click := input.inside && input.pressed
 	if session.character_open {
-		if input.escape || left_click && render.point_in_rectangle(input.mouse, render.m8_modal_control_bounds(renderer, .Close_Character)) { session.character_open = false }
+		if input.escape || left_click && render.point_in_rectangle(input.mouse, render.m8_modal_control_bounds(renderer, .Close_Character)) {
+			session.character_open = false
+			return true
+		}
+		step_character_sheet_deck(session, room, renderer, input, left_click)
 		return true
 	}
 	if controller.paused || controller.hologram || room.qte.kind != .None ||
@@ -182,7 +196,18 @@ step_m8_session :: proc(session: ^M8_Session, room: ^game.Room, renderer: ^rende
 	   game.tactical_is_casting(room) || render.renderer_timeline_is_busy(renderer) { return false }
 	clicked: render.M8_Control
 	if left_click { clicked = render.m8_control_at_point(renderer, room, input.mouse) }
-	if clicked == .Character { session.character_open = true }
+	if clicked == .Character { session.character_open, session.sheet = true, {} }
+	// MOSTRA EFFETTO of the card the inspector shows: its key, or a click on
+	// its button once the card is chosen; never a step or a play as well.
+	// Movimento Ombra keeps it dimmed too (tactical_inspector_effect_ready).
+	if !session.character_open && render.tactical_inspector_effect_ready(renderer, room) {
+		if card, effect := render.tactical_inspector_effect(renderer, room, cards.hovered_card_id, cards.selected_card_id, cards.dragged_card_id);
+		   effect != .None && (input.inspect || effect == .Button && left_click &&
+		   render.point_in_rectangle(input.mouse, render.tactical_inspector_effect_bounds())) {
+			m8_request_effect(session, card, .Inspector)
+			return true
+		}
+	}
 	// Holding the 6 and the 7 together opens the ranch at once.
 	if !session.character_open && begin_ranch_session(&session.ranch, room, renderer) {
 		clear_card_interaction(cards)
@@ -195,6 +220,40 @@ step_m8_session :: proc(session: ^M8_Session, room: ^game.Room, renderer: ^rende
 		return true
 	}
 	return false
+}
+
+m8_request_effect :: proc(session: ^M8_Session, card: game.Card_Instance, source: Effect_Window_Source) {
+	session.effect_request, session.effect_source, session.has_effect_request = card, source, true
+}
+
+// The sheet's MAZZO (render.character_sheet_deck_layout): a click chooses a
+// line, or turns the page (to its first line); MOSTRA EFFETTO, or I, asks for
+// the window on the line chosen, as the deck holds it (its upgrade too).
+step_character_sheet_deck :: proc(session: ^M8_Session, room: ^game.Room, renderer: ^render.Renderer, input: M8_Session_Input, left_click: bool) {
+	layout := render.character_sheet_deck_layout(renderer, room, session.sheet.deck_page)
+	sheet := &session.sheet
+	sheet.deck_page = layout.page
+	if layout.row_count == 0 {
+		sheet.deck_selected = 0
+		return
+	}
+	sheet.deck_selected = clamp(sheet.deck_selected, 0, layout.row_count-1)
+	ask := input.inspect
+	if left_click {
+		switch {
+		case render.point_in_rectangle(input.mouse, layout.button):
+			ask = true
+		case layout.pages > 1 && layout.page > 0 && render.point_in_rectangle(input.mouse, layout.previous):
+			sheet.deck_page = layout.page-1
+			sheet.deck_selected = sheet.deck_page*layout.per_page
+		case layout.pages > 1 && layout.page+1 < layout.pages && render.point_in_rectangle(input.mouse, layout.next):
+			sheet.deck_page = layout.page+1
+			sheet.deck_selected = sheet.deck_page*layout.per_page
+		case:
+			if row, found := render.character_sheet_deck_row_at(&layout, input.mouse); found { sheet.deck_selected = row }
+		}
+	}
+	if ask { m8_request_effect(session, layout.rows[sheet.deck_selected].card, .Sheet) }
 }
 
 // Accept only the outstanding Tesla ring. Standalone victories and foreign

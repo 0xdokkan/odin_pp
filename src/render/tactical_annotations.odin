@@ -142,9 +142,10 @@ draw_tactical_annotations :: proc(renderer: ^Renderer, room: ^game.Room) {
 		reserve_tactical_actor_label_bounds(renderer, &actor)
 	}
 	if room.qte.kind != .None { v.labels.bounds[0] = {14, TACTICAL_HUD_HEIGHT+13, 237, 143}; v.labels.count = 1 }
-	if v.mechanics_lab {
+	if v.mechanics_lab && !v.showcase {
 		// The mechanics lab's banner is drawn over the board: labels keep clear
-		// of it, as wide as it is drawn now.
+		// of it, as wide as it is drawn now. MOSTRA EFFETTO's film has the lab's
+		// flag for the lab's sounds alone, and no banner.
 		v.labels.bounds[v.labels.count] = mechanics_lab_banner_bounds(renderer, room)
 		v.labels.count += 1
 	}

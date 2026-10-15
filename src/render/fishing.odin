@@ -566,7 +566,10 @@ draw_fishing_slot :: proc(renderer: ^Renderer, room: ^game.Room, hovered, select
 	if busy { hint = "PESCA IN CORSO" if fishing_in_progress(renderer) else "ATTENDI" }
 	width := gothic_text_width(renderer, hint, 10)
 	gothic_text(renderer, hint, math.round(bounds.x+bounds.width-width), bounds.y-27, 10, GOTHIC_BLUE if left > 0 else GOTHIC_MUTED)
-	if rod.id == hovered || rod.id == selected || rod.id == dragged { draw_tactical_card_inspector(renderer, rod, definition, rod.id == selected) }
+	if rod.id == hovered || rod.id == selected || rod.id == dragged {
+		_, effect := tactical_inspector_effect(renderer, room, hovered, selected, dragged)
+		draw_tactical_card_inspector(renderer, rod, definition, rod.id == selected, effect, tactical_inspector_effect_ready(renderer, room))
+	}
 	if rod.id == dragged { gothic_text(renderer, fmt.ctprintf("%s", definition.name), mouse.x+14, mouse.y-18, 16, GOTHIC_PAPER) }
 }
 

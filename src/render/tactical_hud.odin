@@ -266,16 +266,19 @@ draw_tactical_hud :: proc(renderer: ^Renderer, room: ^game.Room, paused, hologra
 		gothic_text_fit(renderer, status, {x+12, y+bounds.height-18, tactical_hud_status_room(renderer, objective), 14}, 10,
 			accent if hologram || recovering else GOTHIC_MUTED)
 	}
-	// COMANDI: a 2x2 grid under the right column.
-	hud_frame(layout.commands, GOTHIC_STEEL)
-	// No map behind the player's eyes.
-	hud_button(renderer, layout.map_button, "TAB", "CHIUDI" if hologram else "MAPPA", room.qte.kind == .None && !fps)
-	if !hologram && combat {
-		hud_button(renderer, layout.refocus, "F", fmt.ctprintf("REFOCUS -%.0fs", game.TACTICAL_REFOCUS_SECONDS), refocus_button_is_enabled(renderer))
-		draw_tactical_dodge_chip(renderer, room, layout.dodge)
-	}
-	if !hologram && m8_control_visible(room, .Character) {
-		hud_button(renderer, layout.character, nil, "PERSONAGGIO", m8_control_enabled(renderer, room, .Character), GOTHIC_PAPER)
+	// COMANDI: a 2x2 grid under the right column. MOSTRA EFFETTO's board is a
+	// film: it has no commands to give.
+	if !renderer.tactical.showcase {
+		hud_frame(layout.commands, GOTHIC_STEEL)
+		// No map behind the player's eyes.
+		hud_button(renderer, layout.map_button, "TAB", "CHIUDI" if hologram else "MAPPA", room.qte.kind == .None && !fps)
+		if !hologram && combat {
+			hud_button(renderer, layout.refocus, "F", fmt.ctprintf("REFOCUS -%.0fs", game.TACTICAL_REFOCUS_SECONDS), refocus_button_is_enabled(renderer))
+			draw_tactical_dodge_chip(renderer, room, layout.dodge)
+		}
+		if !hologram && m8_control_visible(room, .Character) {
+			hud_button(renderer, layout.character, nil, "PERSONAGGIO", m8_control_enabled(renderer, room, .Character), GOTHIC_PAPER)
+		}
 	}
 	if !hologram && !fps { draw_m8_active_bar(renderer, room) }
 	if room.qte.kind != .None { draw_tactical_defense_hud(renderer, room) }

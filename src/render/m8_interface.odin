@@ -54,9 +54,9 @@ draw_m8_active_bar :: proc(renderer: ^Renderer, room: ^game.Room) {
     if m8_control_visible(room,.Equip) {m8_mouse_button(renderer,m8_control_bounds(renderer,.Equip,room),"EQUIPAGGIA",m8_control_enabled(renderer,room,.Equip))}
 }
 
-draw_m8_character_panel :: proc(renderer: ^Renderer, room: ^game.Room) {
+draw_m8_character_panel :: proc(renderer: ^Renderer, room: ^game.Room, state: Character_Sheet_State = {}) {
     if renderer == nil || room == nil || room.player == nil { return }
-    draw_character_sheet(renderer, room)
+    draw_character_sheet(renderer, room, state)
 }
 
 

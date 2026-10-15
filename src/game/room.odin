@@ -177,6 +177,10 @@ Room_Content :: struct {
 	node_kind: Node_Kind,
 	node_depth: int,
 	room_seed: u64,
+	// A fight that never ends by itself (Room.endless): even with no foe at all
+	// the room is a fight, and the last kill keeps it going (MOSTRA EFFETTO's
+	// takes, game/card_demo.odin).
+	endless: bool,
 }
 
 Room :: struct {
@@ -551,7 +555,8 @@ create_room :: proc(level_data: ^level.Level, player: ^Player, content: Room_Con
 		destroy_room(&result)
 		return {}, false
 	}
-	result.phase = .Combat if len(result.enemies) > 0 else .Loot
+	result.endless = content.endless
+	result.phase = .Combat if len(result.enemies) > 0 || content.endless else .Loot
 	disarm_room_modifier_after_combat(&result)
 	if result.phase == .Combat {
 		if !begin_deck_combat(&player.deck) {
