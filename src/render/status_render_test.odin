@@ -97,17 +97,17 @@ test_presentation_poison_wears_at_its_bite :: proc(t: ^testing.T) {
 	}
 }
 
-// Rallentamento's seconds are part of the seal's whole countdown.
+// Rallentamento's seconds are part of the ground threat's whole countdown.
 @(test)
 test_intent_timing_counts_the_slowed_seconds :: proc(t: ^testing.T) {
 	player: game.Player
-	player.tactical.config.enabled = true
+
 	room := game.Room{player = &player, phase = .Combat}
 	enemy := game.Enemy{archetype = .Chaser, intent = {kind = .Move, slowed = 2}, tactical_cooldown = 3}
 	left, total, progress := intent_timing(&room, &enemy)
-	testing.expect_value(t, total, f32(4))
+	testing.expect_value(t, total, f32(5))
 	testing.expect_value(t, left, f32(3))
-	testing.expect_value(t, progress, f32(0.25))
+	testing.expect(t, abs(progress-0.4) < 1e-5)
 }
 
 // The tags' lane keeps the round markers' square and the row under it.

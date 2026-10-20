@@ -2,7 +2,7 @@ package render
 
 import gfx "../engine/gfx"
 import game "../game"
-import view "../view"
+import view "../engine/view"
 
 // World beats are already committed by gameplay. They own visual cues only,
 // never an old room snapshot or an input lock. The bound covers the maximum
@@ -41,11 +41,13 @@ renderer_world_available_cues :: proc(renderer: ^Renderer) -> int {
 	return MAX_WORLD_PRESENTATION_CUES-(renderer.world_playback.count if renderer.world_playback != nil else 0)
 }
 
+@(private)
 renderer_world_can_accept :: proc(renderer: ^Renderer, events: ^game.Event_Log) -> bool {
 	return renderer != nil && events != nil && events.count >= 0 && events.count <= len(events.events) &&
 	       events.dropped_count == 0 && events.count <= renderer_world_available_cues(renderer)
 }
 
+@(private)
 clear_renderer_world_playback :: proc(renderer: ^Renderer) {
 	if renderer != nil && renderer.world_playback != nil {
 		renderer.world_playback.count = 0
@@ -141,6 +143,7 @@ begin_renderer_world_timeline :: proc(renderer: ^Renderer, before: Room_Presenta
 
 // Seconds from a blow's cue until its attacker, as the batch's first view
 // shows it, is done striking (attack_fx_done_seconds).
+@(private)
 world_blow_done :: proc(origin: ^Room_Presentation, blow: game.Game_Event) -> f32 {
 	ranged := game.event_is_ranged_attack(blow)
 	// The player's shot is an arrow (attack_look), whatever is in his hand.
@@ -156,6 +159,7 @@ world_blow_done :: proc(origin: ^Room_Presentation, blow: game.Game_Event) -> f3
 }
 
 // Where the walks queued for a body leave it (`from` when none is).
+@(private = "file")
 world_walks_end :: proc(world: ^World_Playback, entity: game.Entity_Ref, from: view.Vec2) -> view.Vec2 {
 	last := from
 	for &entry in world.cues[:world.count] {
@@ -167,6 +171,7 @@ world_walks_end :: proc(world: ^World_Playback, entity: game.Entity_Ref, from: v
 // Seconds until a pending walk of a body has shown: its cue and, on a living
 // board, its card's slide, which can outlast the cue (gfx.Living_Clip's
 // travel_start+travel_ms: the brute stomps for longer than his step).
+@(private = "file")
 world_walk_left :: proc(renderer: ^Renderer, walk: World_Presentation_Cue) -> f32 {
 	shown := walk.cue.duration
 	event := walk.cue.event
@@ -183,6 +188,7 @@ world_walk_left :: proc(renderer: ^Renderer, walk: World_Presentation_Cue) -> f3
 	return walk.delay+shown-walk.cue.elapsed
 }
 
+@(private)
 update_renderer_world_playback :: proc(renderer: ^Renderer, dt: f32) -> bool {
 	if !renderer_world_is_busy(renderer) || !(dt > 0 && dt < max(f32)) { return false }
 	world := renderer.world_playback
@@ -216,6 +222,7 @@ update_renderer_world_playback :: proc(renderer: ^Renderer, dt: f32) -> bool {
 // delay has not elapsed. Correlated effects (a release waiting for its move,
 // or a reflected hit following its guard) must inspect these future cues.
 // Drawing still uses the active-only iterator below.
+@(private)
 renderer_queued_cue_count :: proc(renderer: ^Renderer) -> int {
 	if renderer == nil { return 0 }
 	count := renderer.timeline.count
@@ -223,6 +230,7 @@ renderer_queued_cue_count :: proc(renderer: ^Renderer) -> int {
 	return count
 }
 
+@(private)
 renderer_queued_cue_at :: proc(renderer: ^Renderer, offset: int) -> (^Presentation_Cue, bool) {
 	if renderer == nil || offset < 0 { return nil, false }
 	foreground := renderer.timeline.count
@@ -259,6 +267,7 @@ renderer_active_cue_at :: proc(renderer: ^Renderer, offset: int) -> (^Presentati
 // Preserve a foreground cue's reveal timing only for fields which gameplay
 // has not changed again. A later enemy hit, shield consumption, movement or
 // expiry always wins over the older foreground snapshot.
+@(private = "file")
 merge_foreground_actor :: proc(current: ^Presentation_Actor, shown, final: Presentation_Actor) {
 	if current.position == final.position { current.position = shown.position }
 	if current.health == final.health { current.health = shown.health }
@@ -327,6 +336,7 @@ renderer_presentation_snapshot :: proc(renderer: ^Renderer, room: ^game.Room) ->
 // lands), and the player keeps on show the charges the blow spends: those his
 // own blow spent (a bump's Lama and Destino, an arrow), and the RIFLESSO that
 // turns an enemy's back as it reaches him.
+@(private = "file")
 hold_unlanded_blows :: proc(renderer: ^Renderer, result: ^Room_Presentation) {
 	// A body whose death is still to come in the world's cues already stands
 	// as its command found it (apply_world_presentation): nothing to give back.
@@ -348,7 +358,7 @@ hold_unlanded_blows :: proc(renderer: ^Renderer, result: ^Room_Presentation) {
 	// A blow the board shows with its props waits for it: on the frame its
 	// cue starts, before the prop is on the board (observe_attack_cues), then
 	// for as long as the prop carries it.
-	props := renderer.tactical.enabled && renderer.tactical.scene_3d && renderer.tactical.living
+	props := renderer.tactical.living
 	waiting :: proc(renderer: ^Renderer, cue: ^Presentation_Cue, props: bool) -> bool {
 		return game.event_is_attack(cue.event) && (!cue.started || (props && !attack_fx_shown(renderer, cue)))
 	}
@@ -395,6 +405,7 @@ hold_unlanded_blows :: proc(renderer: ^Renderer, result: ^Room_Presentation) {
 // `count` more of the player's charge `kind` than `statuses` carry; when its
 // last one is already gone, back at `slot` among them (its chip's place in
 // the HUD's order: as it was gained), or last.
+@(private = "file")
 hold_player_charge :: proc(statuses: ^game.Status_Set, kind: game.Status_Kind, count: i32, slot: int) {
 	if count <= 0 || statuses.count < 0 || statuses.count > len(statuses.items) { return }
 	if index, found := game.status_index(statuses, kind); found {
@@ -410,6 +421,7 @@ hold_player_charge :: proc(statuses: ^game.Status_Set, kind: game.Status_Kind, c
 
 // One bounded scan per visible body, rather than a scan per queued waypoint.
 // This stays linear in queue size even after a long clock hitch.
+@(private = "file")
 world_presentation_position :: proc(world: ^World_Playback, entity: game.Entity_Ref, logical: view.Vec2) -> view.Vec2 {
 	first: ^Presentation_Cue
 	last := logical
@@ -426,6 +438,7 @@ world_presentation_position :: proc(world: ^World_Playback, entity: game.Entity_
 	return {from.x+(to.x-from.x)*p, from.y+(to.y-from.y)*p}
 }
 
+@(private = "file")
 apply_world_presentation :: proc(renderer: ^Renderer, result: ^Room_Presentation) {
 	if !renderer_world_is_busy(renderer) { return }
 	world := renderer.world_playback

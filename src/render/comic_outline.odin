@@ -4,7 +4,7 @@ import "core:math"
 import "core:c"
 import rl "vendor:raylib"
 import rlgl "vendor:raylib/rlgl"
-import view "../view"
+import view "../engine/view"
 
 COMIC_OUTLINE_OUTER :: f32(8)
 COMIC_OUTLINE_INNER :: f32(6)
@@ -42,15 +42,18 @@ void main() {
     finalColor = vec4(mix(vec3(0.025,0.036,0.05), fragColor.rgb, inner), outer*fragColor.a);
 }`
 
+@(private)
 comic_pose_frame :: proc(elapsed: f64) -> int {
     if math.is_nan(elapsed) || math.is_inf(elapsed) { return 0 }
     return int(max(f64(0), elapsed)*5)%4
 }
 
+@(private)
 comic_clip_progress :: proc(progress: f32) -> f32 {
     return f32(clamp(int(progress*4), 0, 3))/3
 }
 
+@(private)
 create_comic_outline :: proc(renderer: ^Renderer) {
     v := &renderer.tactical
     v.outline_shader = rl.LoadShaderFromMemory(nil, COMIC_OUTLINE_FRAGMENT)
@@ -64,6 +67,7 @@ create_comic_outline :: proc(renderer: ^Renderer) {
 // Source texels are not screen pixels: the same atlas figure is much smaller
 // in a room than in the ring. Measure the actual projected quad, including its
 // current pose and camera zoom, before choosing the source-space dilation.
+@(private)
 comic_source_pixel_scale :: proc(renderer: ^Renderer, quad: Tactical_Billboard) -> f32 {
     if quad.source.width <= 0 || quad.source.height <= 0 || renderer.canvas_width <= 0 || renderer.canvas_height <= 0 { return 1 }
     camera := renderer.tactical.camera
@@ -77,6 +81,7 @@ comic_source_pixel_scale :: proc(renderer: ^Renderer, quad: Tactical_Billboard) 
     return max(f32(0.01), min(horizontal, vertical))
 }
 
+@(private)
 comic_outline_radii :: proc(renderer: ^Renderer, quad: Tactical_Billboard) -> rl.Vector2 {
     if renderer.tactical.outline_mode == .Ring { return {COMIC_OUTLINE_OUTER, COMIC_OUTLINE_INNER} }
     scale := comic_source_pixel_scale(renderer, quad)
@@ -89,9 +94,10 @@ comic_outline_radii :: proc(renderer: ^Renderer, quad: Tactical_Billboard) -> rl
         max(COMIC_OUTLINE_INNER, COMIC_WORLD_INNER_PIXELS/scale)}
 }
 
+@(private)
 comic_world_ground_clearance :: proc(renderer: ^Renderer, original: Tactical_Billboard) -> (result: Tactical_Billboard) {
     result = original
-    if !renderer.tactical.scene_3d || renderer.tactical.outline_mode != .World ||
+    if renderer.tactical.outline_mode != .World ||
         original.source.width <= 0 || original.source.height <= 0 { return }
     radii := comic_outline_radii(renderer, original)
     right := (original.points[2]-original.points[1])/original.source.width
@@ -104,6 +110,7 @@ comic_world_ground_clearance :: proc(renderer: ^Renderer, original: Tactical_Bil
     return
 }
 
+@(private)
 comic_cutout_geometry :: proc(quad: Tactical_Billboard, position: view.Vec2, elapsed: f64,
     radius: f32 = COMIC_OUTLINE_OUTER) -> (result: Tactical_Billboard) {
     result = quad
@@ -123,6 +130,7 @@ comic_cutout_geometry :: proc(quad: Tactical_Billboard, position: view.Vec2, ela
     return
 }
 
+@(private)
 draw_comic_cutout :: proc(renderer: ^Renderer, quad: Tactical_Billboard, position: view.Vec2, opacity: f32) {
     v := &renderer.tactical
     if v.outline_shader.id == 0 || quad.source.width <= 0 || quad.source.height <= 0 { return }

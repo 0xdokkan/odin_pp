@@ -5,13 +5,15 @@ import "core:fmt"
 import "core:math"
 import rl "vendor:raylib"
 import game "../game"
-import view "../view"
+import view "../engine/view"
 
+@(private = "file")
 spell_has_visuals :: proc(id: game.Card_Id) -> bool {
 	return id == .Firebomb || id == .Fate_Strike || id == .Chain_Lightning || id == .Sundering_Blow ||
 	       id == .Prismatic_Barrage || id == .Twin_Venom
 }
 
+@(private = "file")
 spell_color :: proc(id: game.Card_Id) -> rl.Color {
 	if id == .Firebomb { return {255, 149, 55, 255} }
 	if id == .Fate_Strike { return {225, 173, 255, 255} }
@@ -21,6 +23,7 @@ spell_color :: proc(id: game.Card_Id) -> rl.Color {
 	return {112, 226, 255, 255}
 }
 
+@(private = "file")
 prismatic_ray_color :: proc(index: int) -> rl.Color {
 	switch index%3 {
 	case 0: return {255, 170, 105, 255}
@@ -30,6 +33,7 @@ prismatic_ray_color :: proc(index: int) -> rl.Color {
 	return {247, 198, 112, 255}
 }
 
+@(private = "file")
 draw_player_event_clip :: proc(renderer: ^Renderer, center: view.Vec2, opacity: f32) -> bool {
 	for offset in 0..<presentation_group_size(&renderer.timeline) {
 		cue, found := presentation_cue_at(&renderer.timeline, offset)
@@ -40,18 +44,19 @@ draw_player_event_clip :: proc(renderer: ^Renderer, center: view.Vec2, opacity: 
 		} else if cue.kind == .Damage && cue.event.target == game.PLAYER_ENTITY {
 			key = .Player_Hit
 		} else { continue }
-		return draw_sprite_clip(&renderer.sprite_assets, key, center, renderer.camera.zoom,
+		return draw_sprite_clip(&renderer.sprite_assets, key, center, renderer.overlay_scale,
 			presentation_cue_progress(cue), opacity)
 	}
 	return false
 }
 
+@(private)
 draw_spell_cast :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) {
 	id := cue.event.card_definition
 	if !spell_has_visuals(id) { return }
 	center := presentation_actor_center(renderer, &renderer.timeline.view.player)
 	p := presentation_cue_progress(cue)
-	zoom := renderer.camera.zoom
+	zoom := renderer.overlay_scale
 	key := Sprite_Key.Fate_Cast
 	if id == .Firebomb { key = .Firebomb_Cast }
 	if (id == .Firebomb || id == .Fate_Strike) &&
@@ -74,11 +79,13 @@ draw_spell_cast :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) {
 	}
 }
 
+@(private = "file")
 spell_projectile_position :: proc(from, to: view.Vec2, progress, zoom: f32) -> view.Vec2 {
 	p := clamp(progress, f32(0), f32(1))
 	return {from.x+(to.x-from.x)*p, from.y+(to.y-from.y)*p-math.sin(p*math.PI)*42*zoom}
 }
 
+@(private = "file")
 draw_spell_bolt :: proc(from, to: view.Vec2, progress, zoom: f32, color: rl.Color, dashed: bool = false) {
 	delta := view.Vec2{to.x-from.x, to.y-from.y}
 	length := max(f32(1), math.sqrt(delta.x*delta.x+delta.y*delta.y))
@@ -97,11 +104,12 @@ draw_spell_bolt :: proc(from, to: view.Vec2, progress, zoom: f32, color: rl.Colo
 	}
 }
 
+@(private)
 draw_spell_cue :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) {
 	id := cue.event.card_definition
 	if !spell_has_visuals(id) { return }
 	p := presentation_cue_progress(cue)
-	zoom := renderer.camera.zoom
+	zoom := renderer.overlay_scale
 	from := cell_center(renderer, cue.event.from_position)
 	to := cell_center(renderer, cue.event.to_position)
 	from.y -= 12*zoom
@@ -217,6 +225,7 @@ draw_spell_cue :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) {
 	}
 }
 
+@(private = "file")
 draw_spell_path_preview :: proc(renderer: ^Renderer, room: ^game.Room, card_id: u32) {
 	if renderer == nil || room == nil || room.player == nil || !renderer.has_hovered_cell ||
 	   renderer_blocks_player_input(renderer) { return }
@@ -236,7 +245,7 @@ draw_spell_path_preview :: proc(renderer: ^Renderer, room: ^game.Room, card_id: 
 		conditional := card.definition_id == .Fate_Strike && hit > 0
 		color := spell_color(card.definition_id)
 		draw_card_range_cell(renderer, path.positions[hit], color_with_opacity(color, 0.25), color)
-		draw_spell_bolt(previous, center, 0, renderer.camera.zoom, color, conditional)
+		draw_spell_bolt(previous, center, 0, renderer.overlay_scale, color, conditional)
 		if card.definition_id == .Sundering_Blow || card.definition_id == .Prismatic_Barrage || card.definition_id == .Twin_Venom {
 			previous = center
 			continue // A single primary target; conditional effects are described below.
@@ -257,6 +266,7 @@ draw_spell_path_preview :: proc(renderer: ^Renderer, room: ^game.Room, card_id: 
 
 // Only the card definition and upgrade influence preview text, never a dice
 // stream. The odds follow the die of the card's level.
+@(private)
 dice_spell_preview_lines :: proc(card: game.Card_Instance) -> (lines: [3]cstring, count: int) {
 	sides := game.card_die_sides(card.definition_id, card.upgrade_level)
 	if sides == 0 { return }

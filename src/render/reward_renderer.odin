@@ -4,7 +4,7 @@ import "core:c"
 import "core:fmt"
 import rl "vendor:raylib"
 import game "../game"
-import view "../view"
+import view "../engine/view"
 
 REWARD_CARD_WIDTH       :: f32(156)
 REWARD_CARD_HEIGHT      :: f32(190)
@@ -42,6 +42,7 @@ reward_card_bounds :: proc(
 	}
 }
 
+@(private)
 reward_skip_bounds :: proc(canvas_width, canvas_height: f32) -> rl.Rectangle {
 	if canvas_width <= 0 || canvas_height <= 0 {
 		return {}
@@ -83,13 +84,14 @@ reward_skip_at_point :: proc(canvas_width, canvas_height: f32, point: view.Vec2)
 	return point_in_rectangle(point, reward_skip_bounds(canvas_width, canvas_height))
 }
 
+@(private = "file")
 draw_reward_card :: proc(
 	choice: game.Card_Id,
 	choice_index, choice_count: int,
 	canvas_width, canvas_height: f32,
 	raised, enabled: bool, theme: ^Renderer = nil,
 ) {
-	definition, found := game.card_definition_by_id(choice, menu_themed(theme))
+	definition, found := game.card_definition_by_id(choice)
 	assert(found)
 	preview := game.Card_Instance{definition_id = choice}
 	menu_card_face(theme,

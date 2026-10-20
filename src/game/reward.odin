@@ -17,6 +17,7 @@ Card_Reward_Result :: enum {
 	Deck_Full,
 }
 
+@(private)
 normalized_card_reward_seed :: proc(seed: u64) -> u64 {
 	if seed == 0 {
 		return DEFAULT_CARD_REWARD_SEED
@@ -24,6 +25,7 @@ normalized_card_reward_seed :: proc(seed: u64) -> u64 {
 	return seed
 }
 
+@(private)
 validate_card_reward_state :: proc(run: ^Run_State) -> bool {
 	if run == nil || run.reward_random_state == 0 || run.shop_random_state == 0 ||
 	   run.player.gold < 0 || !validate_deck_state(&run.player.deck) {
@@ -56,6 +58,7 @@ validate_card_reward_state :: proc(run: ^Run_State) -> bool {
 	return true
 }
 
+@(private)
 begin_card_reward :: proc(run: ^Run_State) -> bool {
 	if run == nil || run.phase != .In_Room || run.card_reward.choice_count != 0 ||
 	   run.reward_random_state == 0 || run.player.deck.combat_active ||
@@ -75,7 +78,6 @@ begin_card_reward :: proc(run: ^Run_State) -> bool {
 		node,
 		staged_reward.choices[:CARD_REWARD_CHOICE_COUNT],
 		&run.player.m8_profile,
-		run.player.tactical.config.enabled,
 		card_offer_exclusions(&run.player.deck),
 	) {
 		return false
@@ -101,6 +103,7 @@ card_reward_can_be_added :: proc(run: ^Run_State) -> bool {
 	       run.player.deck.next_card_id < max(u32)
 }
 
+@(private)
 finish_card_reward :: proc(run: ^Run_State) -> bool {
 	if run == nil || run.phase != .Reward || run_has_relic_choice(run) || !validate_card_reward_state(run) {
 		return false

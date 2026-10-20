@@ -1,7 +1,7 @@
 package game
 
 import "core:testing"
-import grid "../grid"
+import grid "../engine/grid"
 import level "../level"
 
 // An open hall of 11x9 cells inside its walls, the player in the middle (6, 5)
@@ -96,22 +96,19 @@ test_ground_cards_are_tactical_cells_with_their_rules :: proc(t: ^testing.T) {
 	energy := [2]i32{1, 2}
 	rarities := [2]Card_Rarity{.Common, .Uncommon}
 	for id, index in ([2]Card_Id{.Poison_Pool, .Wildfire}) {
-		for tactical in ([2]bool{false, true}) {
-			definition, found := card_definition_by_id(id, tactical)
-			testing.expect(t, found && validate_card_definition(&definition))
-			testing.expect_value(t, definition.cost, energy[index])
-			testing.expect_value(t, definition.rarity, rarities[index])
-			testing.expect_value(t, definition.targeting.rule, Target_Rule.Walkable_Cell)
-			testing.expect_value(t, definition.effects[0].kind, Effect_Kind.Place_Ground)
-			testing.expect_value(t, definition.effects[0].status, kinds[index])
-		}
-		testing.expect(t, card_requires_tactical(id) && card_places_ground(id) && !card_is_board_device(id))
+		definition, found := card_definition_by_id(id)
+		testing.expect(t, found && validate_card_definition(&definition))
+		testing.expect_value(t, definition.cost, energy[index])
+		testing.expect_value(t, definition.rarity, rarities[index])
+		testing.expect_value(t, definition.targeting.rule, Target_Rule.Walkable_Cell)
+		testing.expect_value(t, definition.effects[0].kind, Effect_Kind.Place_Ground)
+		testing.expect_value(t, definition.effects[0].status, kinds[index])
+
+		testing.expect(t, card_places_ground(id) && !card_is_board_device(id))
 		testing.expect_value(t, tactical_card_time_cost(id), seconds[index])
 		testing.expect_value(t, card_dice_count(id), 0)
-		definition, _ := card_definition_by_id(id, true)
 		node := Run_Node{kind = .Combat, depth = 2}
 		testing.expect(t, card_offer_weight(definition, &node) > 0)
-		testing.expect_value(t, card_offer_weight(definition, &node, nil, false), u64(0))
 		// Each upgrade gives a stack more: 2, 3, 4... and 1, 2, 3...
 		for upgrade in i32(0)..=3 {
 			effect, made := instantiate_card_effect(definition.effects[0], PLAYER_ENTITY, {id = 1, definition_id = id, upgrade_level = upgrade})
@@ -121,19 +118,7 @@ test_ground_cards_are_tactical_cells_with_their_rules :: proc(t: ^testing.T) {
 		}
 		testing.expect(t, card_can_upgrade({id = 1, definition_id = id, lifetime = .Permanent}))
 	}
-	// A classic room refuses them before any payment.
-	data := create_test_level(t)
-	defer level.destroy(&data)
-	player := create_test_player(t)
-	enemies := [?]Enemy_Spawn{{position = {5, 3}, health = 8, attack = 1}}
-	room, ok := create_room(&data, &player, {enemies = enemies[:]})
-	testing.expect(t, ok)
-	defer destroy_room(&room)
-	for id in ([2]Card_Id{.Poison_Pool, .Wildfire}) {
-		card := rework_hand_card(t, &room, id)
-		_, error := compile_card_action(&room, card, cell_target({player.position.x+1, player.position.y}))
-		testing.expect_value(t, error, Card_Compile_Error.Invalid_Phase)
-	}
+
 }
 
 // A free walkable cell: no enemy, no object of any kind, not the player's, in
@@ -417,7 +402,7 @@ test_fire_burns_the_enemies_it_catches_and_those_who_enter :: proc(t: ^testing.T
 	testing.expect_value(t, ground_test_potency(&room, foe, .Burn), i32(0))
 	// Both reach it at the second window: the strongest, once, and no bite yet.
 	testing.expect(t, ground_test_window(t, &room))
-	count, last := ground_test_statuses(&room.recent_events, foe, .Burn)
+	count, last := ground_test_statuses(room.recent_events, foe, .Burn)
 	testing.expect(t, count == 1 && last == 2)
 	testing.expect_value(t, ground_test_potency(&room, foe, .Burn), i32(2))
 	testing.expect_value(t, room.enemies[0].health, i32(50))
@@ -427,7 +412,7 @@ test_fire_burns_the_enemies_it_catches_and_those_who_enter :: proc(t: ^testing.T
 	// It stays put in the fire: the next window bites, and gives no more.
 	testing.expect(t, ground_test_window(t, &room))
 	testing.expect_value(t, room.enemies[0].health, i32(48))
-	count, _ = ground_test_statuses(&room.recent_events, foe, .Burn)
+	count, _ = ground_test_statuses(room.recent_events, foe, .Burn)
 	testing.expect_value(t, count, 0)
 	// The other one is shoved along the burning row: a dose per cell.
 	other := enemy_entity(room.enemies[1].id)

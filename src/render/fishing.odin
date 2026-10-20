@@ -7,8 +7,8 @@ import rl "vendor:raylib"
 import rlgl "vendor:raylib/rlgl"
 import gfx "../engine/gfx"
 import game "../game"
-import grid "../grid"
-import view "../view"
+import grid "../engine/grid"
+import view "../engine/view"
 
 // CANNA DA PESCA on the board (game/fishing.odin), cut from paper like the
 // cards and the props. Once the room is cleared its slot stands at the right
@@ -100,20 +100,24 @@ Fishing_View :: struct {
 }
 
 // A fresh board: what was shown goes, the counts stay.
+@(private)
 fishing_view_reset :: proc(f: ^Fishing_View) {
 	f^ = {casts = f.casts, bites = f.bites, catches = f.catches, cards = f.cards}
 }
 
+@(private)
 destroy_fishing_view :: proc(renderer: ^Renderer) {
 	if renderer != nil { renderer.tactical.fishing = {} }
 }
 
+@(private)
 fishing_cue_kind :: proc(kind: Presentation_Cue_Kind) -> bool {
 	return kind == .Fish_Cast || kind == .Fish_Bite || kind == .Fish_Caught
 }
 
 // The fishing cue the board shows now: always the player's own, in the
 // foreground (the game's fish_with_rod is his command).
+@(private = "file")
 fishing_active_cue :: proc(renderer: ^Renderer) -> (^Presentation_Cue, bool) {
 	if renderer == nil { return nil, false }
 	cue, found := active_presentation_cue(&renderer.timeline)
@@ -122,12 +126,14 @@ fishing_active_cue :: proc(renderer: ^Renderer) -> (^Presentation_Cue, bool) {
 }
 
 // The rod is out over the water: the player's card holds it, channeling.
+@(private)
 fishing_cue_showing :: proc(renderer: ^Renderer) -> bool {
 	_, found := fishing_active_cue(renderer)
 	return found
 }
 
 // The fishing and what follows it (its d4) show: the HUD says PESCA.
+@(private)
 fishing_in_progress :: proc(renderer: ^Renderer) -> bool {
 	if fishing_cue_showing(renderer) { return true }
 	cue, found := active_presentation_cue(&renderer.timeline)
@@ -135,6 +141,7 @@ fishing_in_progress :: proc(renderer: ^Renderer) -> bool {
 }
 
 // What a catch says: the food's name, or that a card was caught.
+@(private)
 fishing_catch_label :: proc(event: game.Game_Event) -> cstring {
 	if event.card_definition != .Fishing_Rod { return "CARTA PESCATA" }
 	if event.duration < 0 || event.duration > i32(max(game.Fishing_Food)) { return "PESCATO" }
@@ -143,15 +150,16 @@ fishing_catch_label :: proc(event: game.Game_Event) -> cstring {
 
 // The words under the board, where a played card's show: the rod's name as
 // it is cast, and a caught card's.
+@(private)
 fishing_cue_banner :: proc(cue: ^Presentation_Cue) -> (label: cstring, accent: rl.Color, shown: bool) {
 	#partial switch cue.kind {
 	case .Fish_Cast:
-		definition, found := game.card_definition_by_id(.Fishing_Rod, true)
+		definition, found := game.card_definition_by_id(.Fishing_Rod)
 		if !found { return }
 		return fmt.ctprintf("%s", definition.name), FISHING_WATER_LIGHT, true
 	case .Fish_Caught:
 		if cue.event.card_definition == .Fishing_Rod { return }
-		definition, found := game.card_definition_by_id(cue.event.card_definition, true)
+		definition, found := game.card_definition_by_id(cue.event.card_definition)
 		if !found { return }
 		return fmt.ctprintf("CARTA PESCATA / %s", definition.name), TACTICAL_FEEDBACK_CRITICAL, true
 	}
@@ -159,6 +167,7 @@ fishing_cue_banner :: proc(cue: ^Presentation_Cue) -> (label: cstring, accent: r
 }
 
 // The HUD's line in a cleared room (draw_tactical_hud).
+@(private)
 fishing_hud_status :: proc(renderer: ^Renderer, room: ^game.Room) -> cstring {
 	way: cstring = "F5 RICOMINCIA" if room.endless else "RAGGIUNGI L'USCITA"
 	if fishing_in_progress(renderer) { return "PESCA IN CORSO" }
@@ -174,6 +183,7 @@ fishing_hud_status :: proc(renderer: ^Renderer, room: ^game.Room) -> cstring {
 // Once per frame (update_tactical_view, which may run twice a frame): each
 // fishing cue counted as it starts showing; the player's card turned to the
 // water as he casts.
+@(private)
 update_tactical_fishing :: proc(renderer: ^Renderer) {
 	f := &renderer.tactical.fishing
 	cue, found := fishing_active_cue(renderer)
@@ -204,6 +214,7 @@ update_tactical_fishing :: proc(renderer: ^Renderer) {
 
 // The far end of a prop laid by draw_attack_prop from `grip` toward `long`:
 // the prop keeps its own length, in the plane facing the eye.
+@(private = "file")
 fishing_prop_end :: proc(renderer: ^Renderer, prop: gfx.Attack_Prop, grip, long: rl.Vector3, texel: f32) -> rl.Vector3 {
 	camera := renderer.tactical.camera
 	view_dir := rl.Vector3Normalize(camera.target-camera.position)
@@ -213,6 +224,7 @@ fishing_prop_end :: proc(renderer: ^Renderer, prop: gfx.Attack_Prop, grip, long:
 	return grip+rl.Vector3Normalize(along)*attack_prop_length(prop, texel)
 }
 
+@(private = "file")
 fishing_smooth :: proc(u: f32) -> f32 {
 	v := clamp(u, 0, 1)
 	return v*v*(3-2*v)
@@ -220,6 +232,7 @@ fishing_smooth :: proc(u: f32) -> f32 {
 
 // The rod's lean from upright toward the water's side of the screen
 // (radians) at `u` of a cue.
+@(private = "file")
 fishing_rod_angle :: proc(kind: Presentation_Cue_Kind, u: f32, now: f64) -> f32 {
 	#partial switch kind {
 	case .Fish_Cast:
@@ -242,8 +255,8 @@ fishing_rod_angle :: proc(kind: Presentation_Cue_Kind, u: f32, now: f64) -> f32 
 }
 
 // The fishing on the 3D board this frame, from its cue.
+@(private = "file")
 fishing_pose :: proc(renderer: ^Renderer) -> (pose: Fishing_Pose) {
-	if !renderer.tactical.scene_3d { return }
 	cue, found := fishing_active_cue(renderer)
 	if !found { return }
 	feet, height, ok := attack_card(renderer, game.PLAYER_ENTITY)
@@ -331,6 +344,7 @@ fishing_pose :: proc(renderer: ^Renderer) -> (pose: Fishing_Pose) {
 
 // The rod with its line (just in front of the player's card), the bobber and
 // what it caught, sorted with the cards and walls (one entry each).
+@(private)
 collect_fishing_entries :: proc(renderer: ^Renderer, entries: ^[dynamic]Tactical_Alpha_Entry) {
 	f := &renderer.tactical.fishing
 	f.pose = fishing_pose(renderer)
@@ -349,6 +363,7 @@ collect_fishing_entries :: proc(renderer: ^Renderer, entries: ^[dynamic]Tactical
 	}
 }
 
+@(private)
 draw_fishing_entry :: proc(renderer: ^Renderer, entry: Tactical_Alpha_Entry) {
 	pose := &renderer.tactical.fishing.pose
 	if !pose.shown { return }
@@ -388,6 +403,7 @@ draw_fishing_entry :: proc(renderer: ^Renderer, entry: Tactical_Alpha_Entry) {
 	}
 }
 
+@(private = "file")
 fishing_food_prop :: proc(food: game.Fishing_Food) -> gfx.Attack_Prop {
 	switch food {
 	case .Fish: return .Fish
@@ -400,6 +416,7 @@ fishing_food_prop :: proc(food: game.Fishing_Food) -> gfx.Attack_Prop {
 }
 
 // Drops of water thrown up from `at`, `t` seconds after it was struck.
+@(private = "file")
 draw_fishing_splash :: proc(renderer: ^Renderer, at: rl.Vector3, t: f32, count, seed: int) {
 	p := t/FISHING_SPLASH_SECONDS
 	if p < 0 || p > 1 { return }
@@ -419,6 +436,7 @@ draw_fishing_splash :: proc(renderer: ^Renderer, at: rl.Vector3, t: f32, count, 
 
 // The line, a thin strip of ink in its paper margin from the rod's tip to
 // `end`, sagging by `sag` of its length.
+@(private = "file")
 draw_fishing_line :: proc(renderer: ^Renderer, tip, end: rl.Vector3, sag: f32) {
 	camera := renderer.tactical.camera
 	view_dir := rl.Vector3Normalize(camera.target-camera.position)
@@ -456,6 +474,7 @@ draw_fishing_line :: proc(renderer: ^Renderer, tip, end: rl.Vector3, sag: f32) {
 // Rings of light spreading on the water (after the ground's decal): two on
 // each cell of it, slowly, and a quick one where the bobber plops, where the
 // fish bites and where the catch breaks the water.
+@(private)
 draw_fishing_ripples :: proc(renderer: ^Renderer) {
 	v := &renderer.tactical
 	if v.snapshot == nil { return }
@@ -489,45 +508,6 @@ draw_fishing_ripples :: proc(renderer: ^Renderer) {
 }
 
 // --------------------------------------------------------------------------
-// The flat board (--flat): the line from the player to the water, the bobber
-// as a red and white dot, the "!" at the bite, the catch flying to him.
-draw_fishing_flat :: proc(renderer: ^Renderer) {
-	cue, found := fishing_active_cue(renderer)
-	snapshot := renderer.tactical.snapshot
-	if !found || snapshot == nil { return }
-	u := presentation_cue_progress(cue)
-	zoom := renderer.camera.zoom
-	cell := cue.event.to_position if cue.kind == .Fish_Cast else cue.event.from_position
-	hand := tactical_project(renderer, {snapshot.player.position.x+0.5, snapshot.player.position.y+0.5})
-	hand.y -= 16*zoom
-	water := tactical_project(renderer, {f32(cell.x)+0.5, f32(cell.y)+0.5})
-	bobber := water
-	if cue.kind == .Fish_Cast {
-		p := clamp((u-FISHING_CAST_RELEASE)/(1-FISHING_CAST_RELEASE), 0, 1)
-		bobber = {hand.x+(water.x-hand.x)*p, hand.y+(water.y-hand.y)*p-math.sin(p*math.PI)*18*zoom}
-	}
-	catch := water
-	food := cue.event.card_definition == .Fishing_Rod
-	if cue.kind == .Fish_Caught {
-		p := clamp((u-FISHING_REEL)/((1 if food else FISHING_CARD_LANDS)-FISHING_REEL), 0, 1)
-		catch = {water.x+(hand.x-water.x)*p, water.y+(hand.y-water.y)*p-math.sin(p*math.PI)*20*zoom}
-		bobber = catch
-	}
-	rl.DrawLineEx(to_raylib(hand), to_raylib(bobber), 3, LIVING_TOKEN_PAPER)
-	rl.DrawLineEx(to_raylib(hand), to_raylib(bobber), 1, LIVING_TOKEN_INK)
-	radius := max(f32(2.5), 3*zoom)
-	rl.DrawCircleV(to_raylib(bobber), radius+1, LIVING_TOKEN_INK)
-	rl.DrawCircleV(to_raylib(bobber), radius, LIVING_TOKEN_PAPER)
-	rl.DrawCircleSector(to_raylib(bobber), radius, 180, 360, 8, FISHING_BITE_RED)
-	if cue.kind == .Fish_Bite && u >= FISHING_BITE_AT {
-		gothic_text(renderer, "!", water.x-3, water.y-26*zoom, 18, FISHING_BITE_RED)
-	}
-	if cue.kind == .Fish_Caught {
-		rl.DrawCircleV(to_raylib(catch), radius+2, LIVING_TOKEN_INK)
-		rl.DrawCircleV(to_raylib(catch), radius+1, FISHING_WATER_LIGHT if food else TACTICAL_FEEDBACK_CRITICAL)
-	}
-}
-
 // --------------------------------------------------------------------------
 // The slot and the aim.
 
@@ -543,10 +523,11 @@ fishing_slot_bounds :: proc(renderer: ^Renderer) -> rl.Rectangle {
 // n/m over it (the fishings left of the room's), dimmed once they are spent
 // or while the board shows an action; the hint above it, the inspector while
 // it is under the mouse or held, its name by the mouse while it is dragged.
+@(private)
 draw_fishing_slot :: proc(renderer: ^Renderer, room: ^game.Room, hovered, selected, dragged: u32, mouse: view.Vec2) {
 	if !game.fishing_room_open(room) { return }
 	rod, held := game.fishing_rod(&room.player.deck)
-	definition, found := game.card_definition_by_id(.Fishing_Rod, true)
+	definition, found := game.card_definition_by_id(.Fishing_Rod)
 	if !held || !found { return }
 	bounds := fishing_slot_bounds(renderer)
 	left, total := game.fishing_casts_left(room), game.fishing_casts_allowed(room)
@@ -576,6 +557,7 @@ draw_fishing_slot :: proc(renderer: ^Renderer, room: ^game.Room, hovered, select
 // While the rod is held (picked up or chosen): the cells it may fish within
 // its reach blue, the water already there brighter, and the cell under the
 // mouse green, or red where it may not fish.
+@(private)
 draw_fishing_target_range :: proc(renderer: ^Renderer, room: ^game.Room, card_id: u32) {
 	if renderer == nil || room == nil || room.player == nil || room.level_data == nil || card_id == 0 || !game.fishing_room_open(room) { return }
 	rod, held := game.fishing_rod(&room.player.deck)
@@ -602,6 +584,7 @@ draw_fishing_target_range :: proc(renderer: ^Renderer, room: ^game.Room, card_id
 
 // The share of a food catch's cue at which it reaches his hand (the lab's
 // catch sounds then: lab_cue_sounds).
+@(private)
 fishing_food_taken :: proc() -> f32 {
 	return FISHING_REEL+(1-FISHING_REEL)*FISHING_FOOD_TAKEN
 }

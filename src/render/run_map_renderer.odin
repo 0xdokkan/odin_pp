@@ -4,12 +4,13 @@ import "core:c"
 import "core:fmt"
 import rl "vendor:raylib"
 import game "../game"
-import view "../view"
+import view "../engine/view"
 
 RUN_NODE_RADIUS :: f32(18)
 RUN_SHOP_BUTTON_WIDTH  :: f32(120)
 RUN_SHOP_BUTTON_HEIGHT :: f32(40)
 
+@(private)
 run_shop_button_bounds :: proc(canvas_width, canvas_height: f32) -> rl.Rectangle {
 	if canvas_width < 246 || canvas_height < 24+RUN_SHOP_BUTTON_HEIGHT {
 		return {}
@@ -27,6 +28,7 @@ run_shop_button_at_point :: proc(canvas_width, canvas_height: f32, point: view.V
 	return bounds.width > 0 && bounds.height > 0 && point_in_rectangle(point, bounds)
 }
 
+@(private)
 run_node_center :: proc(run: ^game.Run_State, node: ^game.Run_Node, canvas_width, canvas_height: f32) -> view.Vec2 {
 	assert(run != nil && node != nil)
 	layer_count := len(run.route_map.layer_starts)
@@ -41,7 +43,7 @@ run_node_center :: proc(run: ^game.Run_State, node: ^game.Run_Node, canvas_width
 		y_ratio := f32(node.lane)/f32(node.lane_count-1)
 		y = vertical_padding+y_ratio*usable_height
 	}
-	return {x = horizontal_padding+x_ratio*usable_width, y = y}
+	return {horizontal_padding+x_ratio*usable_width, y}
 }
 
 run_node_at_point :: proc(
@@ -63,10 +65,12 @@ run_node_at_point :: proc(
 	return game.INVALID_NODE_ID, false
 }
 
+@(private = "file")
 node_is_available :: proc(run: ^game.Run_State, id: game.Node_Id) -> bool {
 	return game.can_choose_node(run, id)
 }
 
+@(private = "file")
 edge_color :: proc(run: ^game.Run_State, source, target: ^game.Run_Node) -> rl.Color {
 	assert(run != nil && source != nil && target != nil)
 	if source.cleared && target.entered {
@@ -81,6 +85,7 @@ edge_color :: proc(run: ^game.Run_State, source, target: ^game.Run_Node) -> rl.C
 	return rl.Color{48, 55, 58, 255}
 }
 
+@(private = "file")
 node_colors :: proc(run: ^game.Run_State, node: ^game.Run_Node) -> (fill, outline: rl.Color) {
 	assert(run != nil && node != nil)
 	fill = rl.Color{48, 55, 58, 255}
@@ -124,6 +129,7 @@ node_colors :: proc(run: ^game.Run_State, node: ^game.Run_Node) -> (fill, outlin
 	return
 }
 
+@(private = "file")
 node_symbol :: proc(kind: game.Node_Kind) -> cstring {
 	switch kind {
 	case .Combat:

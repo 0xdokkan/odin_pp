@@ -22,6 +22,7 @@ run_has_relic_choice :: proc(run: ^Run_State) -> bool {
 	return run != nil && run.relic_reward.origin != .None
 }
 
+@(private)
 validate_run_relic_reward :: proc(run: ^Run_State) -> bool {
 	if run == nil { return false }
 	reward := run.relic_reward

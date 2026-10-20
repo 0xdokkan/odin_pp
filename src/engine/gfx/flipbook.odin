@@ -194,35 +194,14 @@ draw_flipbook_paper :: proc(assets: ^Flipbook_Assets, character: Flipbook_Charac
 	paper: Flipbook_Paper, mirror: bool, opacity: f32 = 1, tint: rl.Color = rl.WHITE) {
 	if assets.paper_shader.id == 0 { return }
 	sheet := &FLIPBOOK_SHEETS[character]
-	margin := f32(sheet.card_margin)
-	right := (print[2]-print[1])/f32(max(sheet.cell.x, 1))
-	up := (print[0]-print[1])/f32(max(sheet.cell.y, 1))
-	points := [4]Vec3{print[0]+(-right+up)*margin, print[1]+(-right-up)*margin,
-		print[2]+(right-up)*margin, print[3]+(right+up)*margin}
+	points := paper_quad_points(print, {f32(sheet.cell.x), f32(sheet.cell.y)}, f32(sheet.card_margin))
 	uv := [4]Vec2{{0, 0}, {0, 1}, {1, 1}, {1, 0}}
 	if mirror { uv = {{1, 0}, {1, 1}, {0, 1}, {0, 0}} }
-	a := [4]f32{paper.from.x, paper.from.y, paper.from.width, paper.from.height}
-	b := [4]f32{paper.to.x, paper.to.y, paper.to.width, paper.to.height}
-	morph := paper.morph
-	cell := Vec2{f32(sheet.paper_cell.x), f32(sheet.paper_cell.y)}
-	edge := Vec2{-1 if mirror else 1, 1}
-	rl.SetShaderValue(assets.paper_shader, assets.frame_a_location, &a, .VEC4)
-	rl.SetShaderValue(assets.paper_shader, assets.frame_b_location, &b, .VEC4)
-	rl.SetShaderValue(assets.paper_shader, assets.morph_location, &morph, .FLOAT)
-	rl.SetShaderValue(assets.paper_shader, assets.cell_location, &cell, .VEC2)
-	rl.SetShaderValue(assets.paper_shader, assets.edge_location, &edge, .VEC2)
-	paper_color := FLIPBOOK_SHEET_COLOR
-	rl.SetShaderValue(assets.paper_shader, assets.sheet_location, &paper_color, .VEC3)
-	rl.BeginShaderMode(assets.paper_shader)
-	rlgl.SetTexture(assets.papers[character].id)
-	rlgl.Begin(rlgl.QUADS)
-	rlgl.Color4ub(tint.r, tint.g, tint.b, u8(clamp(opacity, 0, 1)*f32(tint.a)))
-	for point, index in points {
-		rlgl.TexCoord2f(uv[index].x, uv[index].y)
-		rlgl.Vertex3f(point.x, point.y, point.z)
-	}
-	rlgl.End()
-	rlgl.SetTexture(0)
+	begin_paper_material(assets, {
+		frames = paper, cell = {f32(sheet.paper_cell.x), f32(sheet.paper_cell.y)},
+		edge = {-1 if mirror else 1, 1}, sheet = FLIPBOOK_SHEET_COLOR,
+	})
+	draw_texture_quad(assets.papers[character].id, points, uv, {tint.r, tint.g, tint.b, u8(clamp(opacity, 0, 1)*f32(tint.a))})
 	rl.EndShaderMode()
 }
 
@@ -235,15 +214,10 @@ draw_flipbook_print :: proc(assets: ^Flipbook_Assets, character: Flipbook_Charac
 	source := rl.Rectangle{f32(frame)*w, f32(row)*h, w, h}
 	uv := [4]Vec2{{0, 0}, {0, 1}, {1, 1}, {1, 0}}
 	if mirror { uv = {{1, 0}, {1, 1}, {0, 1}, {0, 0}} }
-	rlgl.SetTexture(texture.id)
-	rlgl.Begin(rlgl.QUADS)
-	rlgl.Color4ub(tint.r, tint.g, tint.b, tint.a)
-	for point, index in print {
-		rlgl.TexCoord2f((source.x+uv[index].x*source.width)/f32(texture.width), (source.y+uv[index].y*source.height)/f32(texture.height))
-		rlgl.Vertex3f(point.x, point.y, point.z)
+	for &coord in uv {
+		coord = {(source.x+coord.x*source.width)/f32(texture.width), (source.y+coord.y*source.height)/f32(texture.height)}
 	}
-	rlgl.End()
-	rlgl.SetTexture(0)
+	draw_texture_quad(texture.id, print, uv, tint)
 }
 
 // --------------------------------------------------------------------------

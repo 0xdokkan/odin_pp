@@ -34,8 +34,9 @@ void main() {
 }
 `
 
+@(private)
 create_tactical_surface :: proc(renderer: ^Renderer, parent: rl.RenderTexture2D) {
-	if !renderer.tactical.scene_3d || parent.id == 0 || renderer.tactical.surface != nil { return }
+	if parent.id == 0 || renderer.tactical.surface != nil { return }
 	target := rl.LoadRenderTexture(c.int(renderer.canvas_width)*2, c.int(renderer.canvas_height)*2)
 	if !rl.IsRenderTextureValid(target) {
 		if target.id != 0 { rl.UnloadRenderTexture(target) }
@@ -52,6 +53,7 @@ create_tactical_surface :: proc(renderer: ^Renderer, parent: rl.RenderTexture2D)
 		rl.GetShaderLocation(resolve, "focus"), rl.GetShaderLocation(resolve, "aspect")}
 }
 
+@(private)
 destroy_tactical_surface :: proc(renderer: ^Renderer) {
 	surface := renderer.tactical.surface
 	if surface == nil { return }
@@ -61,13 +63,15 @@ destroy_tactical_surface :: proc(renderer: ^Renderer) {
 	renderer.tactical.surface = nil
 }
 
+@(private)
 begin_tactical_surface :: proc(renderer: ^Renderer) -> bool {
 	surface := renderer.tactical.surface
-	if !renderer.tactical.scene_3d || surface == nil { return false }
+	if surface == nil { return false }
 	rl.BeginTextureMode(surface.target)
 	return true
 }
 
+@(private)
 end_tactical_surface :: proc(renderer: ^Renderer, active: bool) {
 	if !active { return }
 	surface := renderer.tactical.surface
@@ -93,6 +97,7 @@ end_tactical_surface :: proc(renderer: ^Renderer, active: bool) {
 	rl.EndShaderMode()
 }
 
+@(private)
 draw_tactical_backdrop :: proc(renderer: ^Renderer) {
 	rl.ClearBackground(RESIN_BACKGROUND)
 	rl.DrawRectangleGradientV(0, 0, c.int(renderer.canvas_width), c.int(renderer.canvas_height), {8, 14, 23, 255}, RESIN_BACKGROUND)

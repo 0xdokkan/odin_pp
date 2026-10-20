@@ -9,14 +9,14 @@ Player_Ability :: enum {
 
 use_player_ability :: proc(room: ^Room, ability: Player_Ability) -> Action_Result {
 	// Behind his eyes the AK is all he has (first_person.odin).
-	if !tactical_allows_action(room) || tactical_first_person_active(room) { return .Invalid_Phase }
+	if !tactical_control_allowed(room, .Board_Action) { return .Invalid_Phase }
 	if room == nil || room.player == nil || room.phase != .Combat {
 		return .Invalid_Phase
 	}
 	if ability == .Toxic_Wave && len(room.enemies) > MAX_ACTION_EFFECTS {
 		return .Invalid_Phase
 	}
-	clear_event_log(&room.recent_events)
+	clear_event_log(room.recent_events)
 
 	action: Action
 	switch ability {
@@ -44,8 +44,8 @@ use_player_ability :: proc(room: ^Room, ability: Player_Ability) -> Action_Resul
 	if !report.accepted {
 		return .Invalid_Phase
 	}
-	append_event_log(&room.recent_events, &report.events)
-	_, outcome := finish_player_combat_command(room)
+	append_event_log(room.recent_events, &report.events)
+	outcome := finish_player_combat_command(room)
 	switch outcome {
 	case .Player_Defeated:
 		return .Player_Defeated

@@ -3,7 +3,7 @@ package render
 import "core:math"
 import rl "vendor:raylib"
 import game "../game"
-import view "../view"
+import view "../engine/view"
 
 // MOSTRA EFFETTO's film (main/card_demo.odin): its pointer, a leather glove of
 // pixel art cut from paper as the board's props are (the print, its ink line,
@@ -73,6 +73,7 @@ CARD_DEMO_GLOVE_GRAB_TIP :: [2]f32{6.5, 4}
 CARD_DEMO_GLOVE_WIDTH :: CARD_DEMO_GLOVE_COLUMNS+CARD_DEMO_GLOVE_MARGIN*2
 CARD_DEMO_GLOVE_HEIGHT :: CARD_DEMO_GLOVE_ROWS+CARD_DEMO_GLOVE_MARGIN*2
 
+@(private = "file")
 card_demo_glove_color :: proc(letter: u8) -> (color: rl.Color, ok: bool) {
 	switch letter {
 	case 'L': return {238, 196, 136, 255}, true
@@ -88,6 +89,7 @@ card_demo_glove_color :: proc(letter: u8) -> (color: rl.Color, ok: bool) {
 // A drawing of the glove with its paper, texel by texel (0: clear).
 Card_Demo_Glove_Print :: [CARD_DEMO_GLOVE_HEIGHT][CARD_DEMO_GLOVE_WIDTH]rl.Color
 
+@(private = "file")
 card_demo_glove_paint :: proc(glove: Card_Demo_Glove) -> (print: Card_Demo_Glove_Print) {
 	rows := CARD_DEMO_GLOVE_POINT if glove == .Point else CARD_DEMO_GLOVE_GRAB
 	w, h := CARD_DEMO_GLOVE_WIDTH, CARD_DEMO_GLOVE_HEIGHT
@@ -122,6 +124,7 @@ card_demo_glove_paint :: proc(glove: Card_Demo_Glove) -> (print: Card_Demo_Glove
 }
 
 // The glove's top left on the stage for its tip at `at`, on whole pixels.
+@(private = "file")
 card_demo_glove_origin :: proc(at: view.Vec2, glove: Card_Demo_Glove) -> rl.Vector2 {
 	tip := CARD_DEMO_GLOVE_POINT_TIP if glove == .Point else CARD_DEMO_GLOVE_GRAB_TIP
 	p := CARD_DEMO_GLOVE_PIXEL
@@ -193,6 +196,7 @@ card_demo_caption_text_bounds :: proc(renderer: ^Renderer, b: rl.Rectangle, key:
 
 CARD_DEMO_CAPTION_SIZE :: 16
 
+@(private = "file")
 card_demo_caption_key_width :: proc(renderer: ^Renderer, key: cstring) -> f32 {
 	return max(f32(24), gothic_text_width(renderer, key, 14)+12)
 }

@@ -1,7 +1,7 @@
 package level
 
 import "core:testing"
-import grid "../grid"
+import grid "../engine/grid"
 
 @(test)
 test_central_spawn_selects_nearest_clear_cell_without_carving_room_shapes :: proc(t: ^testing.T) {

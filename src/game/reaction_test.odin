@@ -1,7 +1,7 @@
 package game
 
 import "core:testing"
-import grid "../grid"
+import grid "../engine/grid"
 import level "../level"
 
 @(test)
@@ -232,9 +232,11 @@ test_thorns_can_remove_current_enemies_without_breaking_the_scheduler :: proc(t:
 	defer destroy_room(&room)
 	apply_status(&room, PLAYER_ENTITY, .Thorns, 1, 3)
 
+	for &enemy in room.enemies { enemy.tactical_cooldown = 1 }
 	result := wait_player_turn(&room)
 
-	testing.expect_value(t, result, Action_Result.Combat_Ended)
+	testing.expect_value(t, result, Action_Result.None)
+	drain_tactical_test_pulse(t, &room)
 	testing.expect_value(t, player.health, i32(8))
 	testing.expect_value(t, len(room.enemies), 0)
 	testing.expect_value(t, room.phase, Room_Phase.Loot)
@@ -250,9 +252,11 @@ test_thorn_coat_is_one_action_and_reacts_in_the_same_pulse :: proc(t: ^testing.T
 	testing.expect(t, ok)
 	defer destroy_room(&room)
 
+	for &enemy in room.enemies { enemy.tactical_cooldown = 1 }
 	result := use_player_ability(&room, .Thorn_Coat)
 
 	testing.expect_value(t, result, Action_Result.Used_Ability)
+	drain_tactical_test_pulse(t, &room)
 	testing.expect_value(t, room.pulse_count, u64(1))
 	testing.expect_value(t, player.health, i32(9))
 	testing.expect_value(t, room.enemies[0].health, i32(3))
@@ -277,13 +281,23 @@ test_afterimage_ability_arms_future_movement_reactions :: proc(t: ^testing.T) {
 	testing.expect(t, !shielded_on_cast)
 	afterimage, found := status_for_entity(&room, PLAYER_ENTITY, .Afterimage)
 	testing.expect(t, found)
-	testing.expect_value(t, afterimage.remaining_pulses, i32(3))
+	testing.expect_value(t, afterimage.remaining_pulses, i32(4))
 
+	drain_tactical_test_pulse(t, &room)
 	result = try_move_player(&room, .South)
 	testing.expect_value(t, result, Action_Result.Moved)
+	drain_tactical_test_pulse(t, &room)
 	shield, shielded_after_move := status_for_entity(&room, PLAYER_ENTITY, .Shield)
 	testing.expect(t, shielded_after_move)
 	testing.expect_value(t, shield.potency, i32(1))
+	// The shorter step triggers the shield immediately but does not spend
+	// its first pulse until the world's next beat arrives.
+	testing.expect_value(t, shield.remaining_pulses, i32(2))
+	testing.expect_value(t, room.pulse_count, u64(1))
+	tactical_tick(&room, 1-TACTICAL_MOVE_SECONDS, true, false)
+	drain_tactical_test_pulse(t, &room)
+	shield, shielded_after_move = status_for_entity(&room, PLAYER_ENTITY, .Shield)
+	testing.expect(t, shielded_after_move)
 	testing.expect_value(t, shield.remaining_pulses, i32(1))
 	testing.expect_value(t, room.pulse_count, u64(2))
 }

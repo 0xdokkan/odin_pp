@@ -1,13 +1,12 @@
 package game
 
-import grid "../grid"
+import grid "../engine/grid"
 
 // Recovery leaves only walking; Stunned (an exhausted window) only cards;
 // Shadow (Movimento Ombra, tactical_shadow.odin) only the shadow's own steps,
 // with the whole world frozen.
 Tactical_Phase :: enum { Decision, Recovery, Resolving, Stunned, Shadow }
 Tactical_Config :: struct {
-	enabled: bool,
 	timer_seconds: int,
 	vision_size: int,
 	qte_seconds: f32,
@@ -19,9 +18,9 @@ Tactical_Config :: struct {
 	shrinking_window: bool,
 }
 // The bare rules, which the regression probes are written against.
-DEFAULT_TACTICAL_CONFIG :: Tactical_Config{enabled = true, timer_seconds = 20, vision_size = 7, qte_seconds = 1.2}
+DEFAULT_TACTICAL_CONFIG :: Tactical_Config{timer_seconds = 20, vision_size = 7, qte_seconds = 1.2}
 // The game as it is played: actions last their cost, the window shrinks.
-GAME_TACTICAL_CONFIG :: Tactical_Config{enabled = true, timer_seconds = 20, vision_size = 7, qte_seconds = 1.2,
+GAME_TACTICAL_CONFIG :: Tactical_Config{timer_seconds = 20, vision_size = 7, qte_seconds = 1.2,
 	timed_actions = true, shrinking_window = true}
 MAX_TACTICAL_VISION :: 9
 TACTICAL_DODGE_RECOVERY :: 2
@@ -100,17 +99,21 @@ QTE_State :: struct {
 	selected: bool,
 }
 
+@(private)
+valid_tactical_config :: proc(config: Tactical_Config) -> bool {
+	return config.timer_seconds >= 1 && config.timer_seconds <= 60 &&
+	       valid_tactical_vision(config.vision_size) && config.qte_seconds >= 0.2 && config.qte_seconds <= 5
+}
+
 configure_tactical :: proc(player: ^Player, config: Tactical_Config) -> bool {
-	if player == nil || config.timer_seconds < 1 || config.timer_seconds > 60 ||
-	   !valid_tactical_vision(config.vision_size) ||
-	   !(config.qte_seconds >= 0.2 && config.qte_seconds <= 5) { return false }
+	if player == nil || !valid_tactical_config(config) { return false }
 	player.tactical = {config = config, budget = config.timer_seconds,
 		remaining = f32(config.timer_seconds), facing = .South}
 	return true
 }
 
-// Startup/restart may construct a room before applying CLI mode options.
-// Rebuild its first telegraphs with the chosen rules before any action occurs.
+// Startup/restart may construct a room before applying clock configuration.
+// Rebuild its first telegraphs before any action occurs.
 configure_tactical_room :: proc(room: ^Room, config: Tactical_Config) -> bool {
 	if room == nil || room.level_data == nil || !configure_tactical(room.player, config) { return false }
 	for &enemy in room.enemies { enemy.bomb_ready = false; enemy.bomb_anchor = {}; enemy.intent = {}; enemy.tactical_cooldown = 0 }
@@ -118,83 +121,44 @@ configure_tactical_room :: proc(room: ^Room, config: Tactical_Config) -> bool {
 	return true
 }
 
-tactical_enabled :: proc(room: ^Room) -> bool {
-	return room != nil && room.player != nil && room.player.tactical.config.enabled
-}
-
-// `ignore_busy` asks whether an action would be allowed once the player's
-// own timed action has finished (the dodge, which cuts that action short, and
-// lets the Lazzo's rope go: lasso.odin).
-tactical_allows_action :: proc(room: ^Room, ignore_busy := false) -> bool {
-	if !tactical_enabled(room) || room.phase != .Combat { return true }
-	s := &room.player.tactical
-	return !room.tactical_pulse.pending && room.qte.kind == .None && s.remaining > 0 && s.cast_remaining <= 0 &&
-	       s.phase == .Decision && (ignore_busy || (s.action_remaining <= 0 && !room.lasso.active))
-}
-
 // The player is still performing a timed action, or a shadow step, or swings
 // the Lazzo's foe round him (he is its pivot).
 tactical_player_busy :: proc(room: ^Room) -> bool {
-	return tactical_enabled(room) && room.phase == .Combat &&
+	return room != nil && room.player != nil && room.phase == .Combat &&
 	       (room.player.tactical.action_remaining > 0 || tactical_shadow_step_busy(room) || room.lasso.active)
 }
 
 tactical_is_recovering :: proc(room: ^Room) -> bool {
-	return tactical_enabled(room) && room.phase == .Combat && room.player.tactical.phase == .Recovery
+	return room != nil && room.player != nil && room.phase == .Combat && room.player.tactical.phase == .Recovery
 }
 
 tactical_is_stunned :: proc(room: ^Room) -> bool {
-	return tactical_enabled(room) && room.phase == .Combat && room.player.tactical.phase == .Stunned
+	return room != nil && room.player != nil && room.phase == .Combat && room.player.tactical.phase == .Stunned
 }
 
 // Recovery and stun both stand between two windows.
+@(private)
 tactical_between_windows :: proc(s: ^Tactical_State) -> bool {
 	return s.phase == .Recovery || s.phase == .Stunned
 }
 
-// Cards are also the one thing a stunned player can still play. Behind his
-// eyes (first_person.odin) he plays none: the AK is all he has.
-tactical_allows_cards :: proc(room: ^Room) -> bool {
-	if tactical_first_person_active(room) { return false }
-	if tactical_allows_action(room) { return true }
-	if !tactical_is_stunned(room) { return false }
-	s := &room.player.tactical
-	return !room.tactical_pulse.pending && room.qte.kind == .None && s.remaining > 0 && s.cast_remaining <= 0 &&
-	       !room.lasso.active
-}
-
-tactical_allows_movement :: proc(room: ^Room, ignore_busy := false) -> bool {
-	if !tactical_is_recovering(room) { return tactical_allows_action(room, ignore_busy) }
-	return !room.tactical_pulse.pending && room.qte.kind == .None &&
-	       (ignore_busy || (room.player.tactical.action_remaining <= 0 && !room.lasso.active))
-}
-
 // Called only after a new room has been successfully built. Keep configuration
 // and run telemetry, but give each encounter its own window counter.
+@(private)
 begin_tactical_room :: proc(room: ^Room) {
-	if !tactical_enabled(room) { return }
-	s := &room.player.tactical
-	s.phase = .Decision
-	s.budget = s.config.timer_seconds
-	s.remaining = f32(s.budget)
-	s.cycle = 0
-	tactical_reset_window_pressure(s)
-	s.dodge_recovery = 0
-	s.clock_fraction = 0
-	s.queued_beats = 0
-	s.cast_remaining, s.cast_duration = 0, 0
-	s.action_remaining, s.action_duration = 0, 0
-	tactical_reset_beats(s)
-	tactical_reset_shadow(s)
-	s.fate_sides = 0
+	if room == nil || room.player == nil { return }
+	tactical_reset_room_clock(&room.player.tactical)
+	room.player.tactical.cycle = 0
+	room.player.tactical.fate_sides = 0
 	for &enemy in room.enemies { enemy.tactical_cooldown = 0 }
 }
 
-tactical_end_combat :: proc(room: ^Room) {
-	if !tactical_enabled(room) || room.phase == .Combat { return }
-	s := &room.player.tactical
-	s.budget = s.config.timer_seconds
+// Reset clock-local state at a room boundary. Configuration, facing, the
+// room's cycle count and run telemetry have different lifetimes and stay.
+@(private = "file")
+tactical_reset_room_clock :: proc(s: ^Tactical_State) {
 	s.phase = .Decision
+	s.budget = s.config.timer_seconds
 	s.remaining = f32(s.budget)
 	tactical_reset_window_pressure(s)
 	s.dodge_recovery = 0
@@ -204,17 +168,21 @@ tactical_end_combat :: proc(room: ^Room) {
 	s.action_remaining, s.action_duration = 0, 0
 	tactical_reset_beats(s)
 	tactical_reset_shadow(s)
+}
+
+tactical_end_combat :: proc(room: ^Room) {
+	if room == nil || room.player == nil || room.phase == .Combat { return }
+	tactical_reset_room_clock(&room.player.tactical)
 	room.tactical_pulse = {}
 	room.qte = {}
-	// A fight over (the player fallen, or the room cleared) holds no rope and
-	// rolls no ball.
+	// End only combat activities. Terrain, devices, fishing and shot history
+	// still belong to this room; they are not part of an exclusive takeover.
 	room.lasso = {}
 	room.pinball = {}
-	// Nor his eyes: the board rises back to its own view. The shots fired stay
-	// counted for it.
 	room.first_person.active, room.first_person.trigger = false, false
 }
 
+@(private = "file")
 tactical_finish_cycle_pulse :: proc(room: ^Room, forced: bool) {
 	s := &room.player.tactical
 	s.dodge_recovery = max(0, s.dodge_recovery-1)
@@ -229,14 +197,11 @@ tactical_finish_cycle_pulse :: proc(room: ^Room, forced: bool) {
 // Clock input is supplied by the app; this module never reads wall time.
 // Returning true requests an explicit timeout command, at most once per frame.
 tactical_tick :: proc(room: ^Room, dt: f32, available: bool, hologram: bool) -> bool {
-	if !tactical_enabled(room) || room.phase != .Combat || !available ||
-	   room.tactical_pulse.pending || room.qte.kind != .None { return false }
+	clock := tactical_clock_mode(room, available)
+	if clock == .Paused { return false }
+	if clock == .Shadow { tactical_shadow_tick(room, dt); return false }
 	s := &room.player.tactical
-	// Inside the shadow only its own clock runs: the window, the world beats,
-	// the enemies and any stun stay exactly where they were.
-	if s.phase == .Shadow { tactical_shadow_tick(room, dt); return false }
-	if s.phase != .Decision && !tactical_between_windows(s) { return false }
-	if s.cast_remaining > 0 {
+	if clock == .Cast {
 		elapsed := min(max(f32(0), dt), s.cast_remaining)
 		s.cast_remaining = max(f32(0), s.cast_remaining-elapsed)
 		if s.cast_remaining < 0.00001 { s.cast_remaining = 0 }
@@ -276,11 +241,11 @@ tactical_tick :: proc(room: ^Room, dt: f32, available: bool, hologram: bool) -> 
 // Each continuation owns one bounded event log. Only elapsed world time queues
 // beats: calling this repeatedly cannot accelerate or complete recovery.
 continue_tactical_pulse :: proc(room: ^Room) -> bool {
-	if !tactical_enabled(room) || room.phase != .Combat || room.qte.kind != .None { return false }
+	if room == nil || room.player == nil || room.phase != .Combat || room.qte.kind != .None { return false }
 	p := &room.tactical_pulse
 	s := &room.player.tactical
 	if !p.pending { return false }
-	clear_event_log(&room.recent_events)
+	clear_event_log(room.recent_events)
 	pulse: Pulse_Report
 	if !p.started {
 		p.started = true
@@ -320,7 +285,7 @@ continue_tactical_pulse :: proc(room: ^Room) -> bool {
 		p.cursor += 1
 	} else {
 		finish_combat_pulse(room, &pulse)
-		append_event_log(&room.recent_events, &pulse.events)
+		append_event_log(room.recent_events, &pulse.events)
 		collect_loot_in_magnet_range(room)
 		forced := p.forced
 		p.pending = false
@@ -335,12 +300,12 @@ continue_tactical_pulse :: proc(room: ^Room) -> bool {
 		tactical_end_combat(room)
 		return true
 	}
-	append_event_log(&room.recent_events, &pulse.events)
+	append_event_log(room.recent_events, &pulse.events)
 	if room.phase != .Combat {
 		// A pulse already started still emits its terminal marker exactly once.
 		pulse = {}
 		finish_combat_pulse(room, &pulse)
-		append_event_log(&room.recent_events, &pulse.events)
+		append_event_log(room.recent_events, &pulse.events)
 		collect_loot_in_magnet_range(room)
 		tactical_finish_cycle_pulse(room, p.forced)
 		sync_deck_with_room_phase(room)
@@ -349,13 +314,14 @@ continue_tactical_pulse :: proc(room: ^Room) -> bool {
 	return true
 }
 
+@(private)
 tactical_refill :: proc(room: ^Room) {
 	p := &room.tactical_pulse
 	deck := &room.player.deck
 	for p.deferred_draws > 0 || (p.refill && deck.hand_count < deck.rules.hand_size) {
 		card, drawn := draw_card(deck)
 		if !drawn { break }
-		record_card_draw(&room.recent_events, card)
+		record_card_draw(room.recent_events, card)
 		p.deferred_draws = max(0, p.deferred_draws-1)
 	}
 	if p.exhaust_relic { apply_card_relics(room, .Exhaust, nil) }
@@ -400,6 +366,7 @@ tactical_line_visible :: proc(origin, destination: grid.Position,
 	return true
 }
 
+@(private)
 tactical_room_opaque :: proc(data: rawptr, position: grid.Position) -> bool {
 	return cell_blocks_line_of_sight(cast(^Room)data, position)
 }
@@ -408,14 +375,14 @@ tactical_cell_visible :: proc(room: ^Room, position: grid.Position) -> bool {
 	if room == nil || room.player == nil || room.level_data == nil { return false }
 	if !grid.contains(&room.level_data.tiles, position) { return false }
 	s := &room.player.tactical
-	if !s.config.enabled || s.config.vision_size == 0 { return true }
+	if s.config.vision_size == 0 { return true }
 	origin := tactical_view_origin(room)
 	return tactical_in_footprint(tactical_vision_size(s.config, &room.player.statuses), s.facing, origin, position) &&
 		tactical_line_visible(origin, position, tactical_room_opaque, room)
 }
 
 tactical_target_visible :: proc(room: ^Room, target: Target) -> bool {
-	if !tactical_enabled(room) { return true }
+	if room == nil || room.player == nil { return true }
 	switch target.kind {
 	case .None: return true
 	case .Cell: return tactical_cell_visible(room, target.cell)
@@ -428,12 +395,12 @@ tactical_target_visible :: proc(room: ^Room, target: Target) -> bool {
 }
 
 begin_diagonal_qte :: proc(room: ^Room, offset: grid.Position) -> bool {
-	if !tactical_enabled(room) || room.phase != .Combat || !tactical_allows_action(room) ||
+	if room == nil || room.player == nil || room.phase != .Combat || !tactical_allows_action(room) ||
 	   abs(offset.x) != 1 || abs(offset.y) != 1 { return false }
 	destination := add_position(room.player.position, offset)
 	query := query_entity_movement(room, PLAYER_ENTITY, destination)
 	if query.error != .None { return false }
-	clear_event_log(&room.recent_events)
+	clear_event_log(room.recent_events)
 	room.qte = {kind = .Diagonal, remaining = room.player.tactical.config.qte_seconds,
 		destination = destination, length = 2, selected = true,
 		keys = {(.West if offset.x < 0 else .East), (.North if offset.y < 0 else .South)}}
@@ -477,11 +444,11 @@ select_defense :: proc(room: ^Room, mode: Defense_Mode) -> bool {
 }
 
 resolve_qte :: proc(room: ^Room, requested_success: bool, dodge_direction: Move_Direction = .North) -> bool {
-	if !tactical_enabled(room) || room.qte.kind == .None { return false }
+	if room == nil || room.player == nil || room.qte.kind == .None { return false }
 	success := requested_success
 	q := room.qte
 	room.qte = {}
-	clear_event_log(&room.recent_events)
+	clear_event_log(room.recent_events)
 	// One report for the dodge's bite and the pulse a terminal answer ends.
 	pulse: Pulse_Report
 	if q.kind == .Diagonal {
@@ -491,9 +458,9 @@ resolve_qte :: proc(room: ^Room, requested_success: bool, dodge_direction: Move_
 			assert(added)
 			report := resolve_action(room, &action)
 			success = report.accepted
-			append_event_log(&room.recent_events, &report.events)
+			append_event_log(room.recent_events, &report.events)
 		}
-		_, _ = finish_player_combat_command(room)
+		finish_player_combat_command(room)
 	} else {
 		p := &room.tactical_pulse
 		p.defense_answered = q.enemy_id
@@ -507,7 +474,7 @@ resolve_qte :: proc(room: ^Room, requested_success: bool, dodge_direction: Move_
 				added := add_effect(&action, apply_status_effect(PLAYER_ENTITY, .Shield, 2, 1))
 				assert(added)
 				report := resolve_action(room, &action)
-				append_event_log(&room.recent_events, &report.events)
+				append_event_log(room.recent_events, &report.events)
 			case .Parry, .Deflect:
 				p.cancel_attack = q.enemy_id
 				action := make_action(.Trigger, PLAYER_ENTITY, entity_target(enemy_entity(enemy.id)), .Opponent)
@@ -515,7 +482,7 @@ resolve_qte :: proc(room: ^Room, requested_success: bool, dodge_direction: Move_
 				added := add_effect(&action, damage_effect(enemy_entity(enemy.id), damage))
 				assert(added)
 				report := resolve_action(room, &action)
-				append_event_log(&room.recent_events, &report.events)
+				append_event_log(room.recent_events, &report.events)
 			case .Dodge:
 				destination := add_position(room.player.position, direction_offset(dodge_direction))
 				action := make_action(.Move, PLAYER_ENTITY, cell_target(destination), .Walkable_Cell)
@@ -523,14 +490,14 @@ resolve_qte :: proc(room: ^Room, requested_success: bool, dodge_direction: Move_
 				assert(added)
 				report := resolve_action(room, &action)
 				success = report.accepted
-				append_event_log(&room.recent_events, &report.events)
+				append_event_log(room.recent_events, &report.events)
 				if success {
 					start_tactical_dodge_recovery(room)
 					room.player.tactical.facing = dodge_direction
 					// A dodge is the player's action, whichever key starts it: his
 					// poison bites. Block, parry and deflect answer a blow only.
 					tick_poison_on_action(room, PLAYER_ENTITY, &pulse)
-					append_event_log(&room.recent_events, &pulse.events)
+					append_event_log(room.recent_events, &pulse.events)
 					pulse = {}
 				}
 			}
@@ -540,7 +507,7 @@ resolve_qte :: proc(room: ^Room, requested_success: bool, dodge_direction: Move_
 	else { room.player.tactical.metrics.qte_failures += 1 }
 	if q.kind == .Defense && room.phase != .Combat && room.tactical_pulse.started {
 		finish_combat_pulse(room, &pulse)
-		append_event_log(&room.recent_events, &pulse.events)
+		append_event_log(room.recent_events, &pulse.events)
 		collect_loot_in_magnet_range(room)
 		tactical_finish_cycle_pulse(room, room.tactical_pulse.forced)
 	}

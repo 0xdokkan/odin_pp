@@ -21,7 +21,7 @@ test_board_device_card_casts_replay_launch_impact_and_spawn_without_failures :: 
 		after := capture_room_presentation(&room)
 		timeline := new(Presentation_Timeline)
 		defer free(timeline)
-		testing.expect(t,begin_event_timeline(timeline,before,&room.recent_events,&after))
+		testing.expect(t,begin_event_timeline(timeline,before,room.recent_events,&after))
 		launched,impacted,spawned,rolled := 0,0,0,0
 		for cue in timeline.cues[:timeline.count] {
 			if cue.kind == .Spell_Launched {launched+=1}
@@ -56,7 +56,7 @@ test_tesla_activation_replays_walls_or_consumes_four_field_models_after_damage :
 		defer game.destroy_room(&room)
 		positions := [4][2]int{{2,1},{6,1},{6,4},{2,4}}
 		for point in positions[:count] {
-			testing.expect(t,game.deploy_board_device(&room,.Tesla_Coil,{point[0],point[1]},8,0,&room.recent_events))
+			testing.expect(t,game.deploy_board_device(&room,.Tesla_Coil,{point[0],point[1]},8,0,room.recent_events))
 		}
 		before := capture_room_presentation(&room)
 		testing.expect(t,game.activate_board_devices(&room))
@@ -64,7 +64,7 @@ test_tesla_activation_replays_walls_or_consumes_four_field_models_after_damage :
 		after := capture_room_presentation(&room)
 		timeline := new(Presentation_Timeline)
 		defer free(timeline)
-		testing.expect(t,begin_event_timeline(timeline,before,&room.recent_events,&after))
+		testing.expect(t,begin_event_timeline(timeline,before,room.recent_events,&after))
 		defeated := 0
 		for cue in timeline.cues[:timeline.count] {
 			if cue.kind == .Defeat && cue.event.target.kind == .Object {defeated+=1}

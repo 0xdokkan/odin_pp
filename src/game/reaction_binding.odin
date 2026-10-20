@@ -42,6 +42,7 @@ Reaction_Binding_Set :: struct {
 	next_id: u32,
 }
 
+@(private = "file")
 reaction_binding_index_by_id :: proc(room: ^Room, id: u32) -> (int, bool) {
 	if room == nil || id == 0 || room.reaction_bindings.count < 0 ||
 	   room.reaction_bindings.count > MAX_REACTION_BINDINGS_PER_ROOM {
@@ -55,6 +56,7 @@ reaction_binding_index_by_id :: proc(room: ^Room, id: u32) -> (int, bool) {
 	return 0, false
 }
 
+@(private)
 reaction_binding_by_id :: proc(room: ^Room, id: u32) -> (^Reaction_Binding, bool) {
 	index, found := reaction_binding_index_by_id(room, id)
 	if !found {
@@ -63,6 +65,7 @@ reaction_binding_by_id :: proc(room: ^Room, id: u32) -> (^Reaction_Binding, bool
 	return &room.reaction_bindings.items[index], true
 }
 
+@(private)
 reaction_binding_is_active :: proc(room: ^Room, binding: ^Reaction_Binding) -> bool {
 	return room != nil && binding != nil && binding.id != 0 && binding.potency > 0 &&
 	       (binding.remaining_charges == REACTION_BINDING_UNLIMITED || binding.remaining_charges > 0) &&
@@ -70,6 +73,7 @@ reaction_binding_is_active :: proc(room: ^Room, binding: ^Reaction_Binding) -> b
 	       entity_exists(room, binding.owner)
 }
 
+@(private)
 can_add_reaction_binding :: proc(room: ^Room, config: Reaction_Binding_Config) -> bool {
 	if room == nil || room.reaction_bindings.count < 0 ||
 	   room.reaction_bindings.count >= MAX_REACTION_BINDINGS_PER_ROOM ||
@@ -83,6 +87,7 @@ can_add_reaction_binding :: proc(room: ^Room, config: Reaction_Binding_Config) -
 	return found && validate_reaction_definition(&definition)
 }
 
+@(private)
 add_reaction_binding :: proc(
 	room: ^Room,
 	config: Reaction_Binding_Config,
@@ -113,6 +118,7 @@ add_reaction_binding :: proc(
 	return binding_id, true
 }
 
+@(private = "file")
 remove_reaction_binding :: proc(
 	room: ^Room,
 	binding_id: u32,
@@ -130,6 +136,7 @@ remove_reaction_binding :: proc(
 	return removed, true
 }
 
+@(private)
 remove_reaction_bindings_for_owner :: proc(room: ^Room, owner: Entity_Ref) -> (removed_count: int) {
 	if room == nil {
 		return
@@ -148,11 +155,13 @@ remove_reaction_bindings_for_owner :: proc(room: ^Room, owner: Entity_Ref) -> (r
 	return
 }
 
+@(private)
 reaction_binding_priority :: proc(base, modifier: i32) -> i32 {
 	value := i64(base)+i64(modifier)
 	return i32(clamp(value, i64(min(i32)), i64(max(i32))))
 }
 
+@(private)
 consume_reaction_binding :: proc(
 	room: ^Room,
 	binding_id: u32,
@@ -180,6 +189,7 @@ consume_reaction_binding :: proc(
 	}, true
 }
 
+@(private)
 tick_reaction_bindings :: proc(room: ^Room, pulse: ^Pulse_Report) {
 	assert(room != nil && pulse != nil)
 	if room.phase != .Combat {

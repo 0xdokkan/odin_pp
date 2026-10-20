@@ -4,10 +4,11 @@ import "core:c"
 import "core:math"
 import rl "vendor:raylib"
 import game "../game"
-import grid "../grid"
-import view "../view"
+import grid "../engine/grid"
+import view "../engine/view"
 
 Tactical_Visibility_Context :: struct {renderer: ^Renderer, room: ^game.Room}
+@(private)
 tactical_snapshot_opaque :: proc(data: rawptr, position: grid.Position) -> bool {
 	state := cast(^Tactical_Visibility_Context)data
 	return tactical_presentation_opaque(state.renderer, state.room, position)
@@ -27,9 +28,6 @@ adjust_tactical_orbit :: proc(orbit: ^Tactical_Orbit, delta: view.Vec2, wheel: f
 	orbit.pitch = clamp(orbit.pitch+delta.y*0.007, f32(0.3), f32(1.45))
 	orbit.distance = clamp(orbit.distance-wheel*0.7, f32(7), f32(24))
 }
-update_tactical_orbit_input :: proc(orbit: ^Tactical_Orbit, mouse: view.Vec2, inside: bool, button: rl.MouseButton) {
-	update_tactical_orbit_pointer(orbit, mouse, inside, rl.IsMouseButtonPressed(button), rl.IsMouseButtonDown(button), rl.GetMouseWheelMove())
-}
 update_tactical_orbit_pointer :: proc(orbit: ^Tactical_Orbit, mouse: view.Vec2, inside, pressed, down: bool, wheel: f32) {
 	if !orbit.initialized { reset_tactical_orbit(orbit) }
 	if !down { orbit.dragging = false }
@@ -40,6 +38,7 @@ update_tactical_orbit_pointer :: proc(orbit: ^Tactical_Orbit, mouse: view.Vec2, 
 	}
 	if inside { adjust_tactical_orbit(orbit, {}, wheel) }
 }
+@(private)
 tactical_orbit_camera :: proc(orbit: Tactical_Orbit, target: rl.Vector3, perspective: bool) -> rl.Camera3D {
 	distance := orbit.distance
 	return {position = target+rl.Vector3{math.cos(orbit.yaw)*math.cos(orbit.pitch), math.sin(orbit.pitch),
@@ -58,6 +57,7 @@ tactical_map_reset_bounds :: proc() -> rl.Rectangle { return {809, 486, 137, 25}
 tactical_map_drag_bounds :: proc(renderer: ^Renderer) -> rl.Rectangle {
 	return {14, TACTICAL_HUD_HEIGHT, renderer.canvas_width-28, renderer.canvas_height-TACTICAL_HUD_HEIGHT-78}
 }
+@(private = "file")
 draw_tactical_button :: proc(bounds: rl.Rectangle, label: cstring, color: rl.Color) {
 	rl.DrawRectangleRec(bounds, rl.Color{18, 39, 54, 255})
 	rl.DrawRectangleLinesEx(bounds, 1, color)
@@ -66,6 +66,7 @@ draw_tactical_button :: proc(bounds: rl.Rectangle, label: cstring, color: rl.Col
 
 // Raylib's OpenGL 3.3 renderer supplies real perspective, normals and depth.
 // These vertices are world-space immediate geometry; actors keep their 2D art.
+@(private)
 create_tactical_lighting :: proc(renderer: ^Renderer) {
 	v := &renderer.tactical
 	v.light_shader = rl.LoadShaderFromMemory(TACTICAL_LIGHT_VERTEX, TACTICAL_LIGHT_FRAGMENT)
@@ -75,6 +76,7 @@ create_tactical_lighting :: proc(renderer: ^Renderer) {
 	v.light_clear_location = rl.GetShaderLocation(v.light_shader, "roomClear")
 	v.light_accents_location = rl.GetShaderLocation(v.light_shader, "accentLights[0]")
 }
+@(private)
 begin_tactical_lighting :: proc(renderer: ^Renderer, hologram: bool = false, accents: [4]rl.Vector4 = {}) {
 	v := &renderer.tactical
 	p := v.snapshot.player.position
@@ -83,6 +85,7 @@ begin_tactical_lighting :: proc(renderer: ^Renderer, hologram: bool = false, acc
 		mode = .Hologram if hologram else .Board, clear = v.clear_light, accents = accents,
 	})
 }
+@(private)
 draw_tactical_actor_bases :: proc(renderer: ^Renderer) {
 	snapshot := renderer.tactical.snapshot
 	// The Pinball's ball has its own shadow, and no stand (pinball.odin).
@@ -121,6 +124,7 @@ draw_tactical_actor_bases :: proc(renderer: ^Renderer) {
 	if renderer.tactical.flipbook.loaded { draw_flipbook_stand(renderer, .Player, snapshot.player.position, GOTHIC_PAPER, game.PLAYER_ENTITY) }
 }
 
+@(private = "file")
 draw_tactical_actor_shadow :: proc(position: rl.Vector3) {
 	// Nested low-opacity discs give the sprite a soft contact edge, contained
 	// within its tile and independent of animation duration or gameplay state.

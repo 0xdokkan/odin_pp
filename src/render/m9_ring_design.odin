@@ -9,6 +9,7 @@ import rl "vendor:raylib"
 
 // A moulded diorama, not an extra collision layer. All ornaments stay below
 // the playing surface or outside the four physical walls of the ring.
+@(private)
 begin_m9_ring_lighting :: proc(renderer: ^Renderer, camera: rl.Camera3D) -> bool {
 	v := &renderer.tactical
 	if v.light_shader.id == 0 {return false}
@@ -19,6 +20,7 @@ begin_m9_ring_lighting :: proc(renderer: ^Renderer, camera: rl.Camera3D) -> bool
 	return true
 }
 
+@(private)
 draw_m9_ring_stage :: proc(renderer: ^Renderer, world: ^engine.World) {
 	extent := m9_world_extent(world)
 	x,z := extent.x,extent.y
@@ -74,9 +76,10 @@ draw_m9_ring_stage :: proc(renderer: ^Renderer, world: ^engine.World) {
 
 // The three ropes remain attached to the physical perimeter. Front ropes are
 // lower contrast to keep paper figures and attack cues easy to distinguish.
+@(private)
 draw_m9_ring_ropes :: proc(world: ^engine.World) {
 	for solid in world.solids[:world.solid_count] {
-		a,b := m9_vector(solid.bounds.min),m9_vector(solid.bounds.max)
+		a,b := solid.bounds.min,solid.bounds.max
 		center,size := (a+b)*0.5,b-a
 		along_x := size.x>size.z
 		near_camera := center.z>0 if along_x else center.x>0
@@ -92,14 +95,15 @@ draw_m9_ring_ropes :: proc(world: ^engine.World) {
 
 // Telegraph the actual startup/active/recovery phases, with no new timers and
 // no guessed AI windows. Short angular strokes preserve the paper aesthetic.
+@(private)
 draw_m9_fight_cues :: proc(state: ^fight.State) {
 	for actor,index in state.fighters {
-		p := m9_vector(actor.position)
+		p := actor.position
 		p.y=0.035
 		color := GOTHIC_BLUE if index == 0 else GOTHIC_RED
 		draw_tactical_rune(p,0.42,0,color)
 		if actor.action == .Guard {
-			front := p+m9_vector(actor.facing)*0.53
+			front := p+actor.facing*0.53
 			side := rl.Vector3{-actor.facing.z,0,actor.facing.x}*0.32
 			rl.DrawLine3D(front-side,front+rl.Vector3{0,1.25,0}-side*0.5,GOTHIC_BLUE)
 			rl.DrawLine3D(front+side,front+rl.Vector3{0,1.25,0}+side*0.5,GOTHIC_BLUE)
@@ -118,10 +122,10 @@ draw_m9_fight_cues :: proc(state: ^fight.State) {
 	}
 	if state.throw_active {
 		pose := fight.throw_pose(state)
-		attacker := m9_vector(state.fighters[state.throw_attacker].position)
-		victim := m9_vector(state.fighters[state.throw_victim].position)
+		attacker := state.fighters[state.throw_attacker].position
+		victim := state.fighters[state.throw_victim].position
 		if pose<=1 {
-			facing := m9_vector(state.fighters[state.throw_attacker].facing)
+			facing := state.fighters[state.throw_attacker].facing
 			side := rl.Vector3{-facing.z,0,facing.x}
 			for sign in ([2]f32{-1,1}) {
 				a := attacker+rl.Vector3{0,0.82,0}+side*(sign*0.19)+facing*0.13
@@ -132,7 +136,7 @@ draw_m9_fight_cues :: proc(state: ^fight.State) {
 		} else if pose == 3 {draw_tactical_rune({victim.x,0.035,victim.z},0.8,0,GOTHIC_BLUE)}
 	}
 	if state.hit_flash_ticks>0 {
-		p := m9_vector(state.last_hit_position)
+		p := state.last_hit_position
 		p.y=max(p.y,f32(0.10))
 		color := GOTHIC_BLUE if state.last_hit_blocked else GOTHIC_PAPER
 		for i in 0..<7 {
@@ -143,6 +147,7 @@ draw_m9_fight_cues :: proc(state: ^fight.State) {
 	}
 }
 
+@(private)
 m9_ring_hint :: proc(state: ^fight.State) -> (cstring,rl.Color) {
 	if state.result == .Won {return "AVVERSARI SCONFITTI" if state.roster_count > 1 else "CAMPIONE SCONFITTO",GOTHIC_BLUE}
 	if state.tag_flash_ticks > 0 {return "TAG! CAMBIO SUL RING",GOTHIC_PAPER}
@@ -161,6 +166,7 @@ m9_ring_hint :: proc(state: ^fight.State) -> (cstring,rl.Color) {
 	return "BATTI IL CAMPIONE / CERCA LA PRESA",GOTHIC_MUTED
 }
 
+@(private)
 draw_m9_fight_hud :: proc(renderer: ^Renderer, state: ^fight.State, v: M9_View) {
 	w,h := renderer.canvas_width,renderer.canvas_height
 	gothic_text(renderer,"ARENA DELLE OMBRE" if v.kind == .Arena else "IL RING DELLE OMBRE",20,16,22,GOTHIC_PAPER)

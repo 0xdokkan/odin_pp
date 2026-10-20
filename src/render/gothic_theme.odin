@@ -42,11 +42,13 @@ Gothic_Art :: struct {
 // A cell of a four-column atlas `rows` cells high, in pixels (right and
 // bottom excluded). The icons' added rows leave the painted four where they
 // were: 2195/7, 1881/6 and 1254/4 rows start on the same pixels.
+@(private)
 gothic_atlas_cell :: proc(cell, rows, width, height: int) -> (left, top, right, bottom: int) {
 	return cell%CARD_ICON_COLUMNS*width/CARD_ICON_COLUMNS, cell/CARD_ICON_COLUMNS*height/rows,
 		(cell%CARD_ICON_COLUMNS+1)*width/CARD_ICON_COLUMNS, (cell/CARD_ICON_COLUMNS+1)*height/rows
 }
 
+@(private)
 gothic_hash :: proc(x, y: int) -> u32 {
 	n := u32(x)*0x45d9f3b+u32(y)*0x119de1f3+0x27d4eb2d
 	n = (n~(n>>16))*0x45d9f3b
@@ -55,6 +57,7 @@ gothic_hash :: proc(x, y: int) -> u32 {
 
 // Embedded art works from any working directory. External sprite packs still
 // override these defaults through the existing --sprites interface.
+@(private)
 create_gothic_art :: proc(art: ^Gothic_Art) {
 	icon_bytes := #load("../../assets/gothic/card-icons-pixel.png")
 	figure_bytes := #load("../../assets/gothic/figures-v2.png")
@@ -128,6 +131,7 @@ create_gothic_art :: proc(art: ^Gothic_Art) {
 		art.fonts[index] = font
 	}
 }
+@(private)
 destroy_gothic_art :: proc(art: ^Gothic_Art) {
 	for texture in ([?]rl.Texture2D{art.icons, art.figures, art.paper, art.scopa}) { if texture.id != 0 { rl.UnloadTexture(texture) } }
 	for font in art.fonts { if font.texture.id != 0 { rl.UnloadFont(font) } }
@@ -176,6 +180,7 @@ gothic_text_fit :: proc(renderer: ^Renderer, text: cstring, bounds: rl.Rectangle
 	gothic_text(renderer, label, bounds.x, bounds.y, chosen, color, spacing)
 	rl.EndScissorMode()
 }
+@(private)
 gothic_wrapped_text :: proc(renderer: ^Renderer, value: string, x, y, width: f32, color: rl.Color) {
 	start, last_space := 0, -1
 	line_y := y
@@ -216,17 +221,20 @@ gothic_frame :: proc(bounds: rl.Rectangle, fill, edge: rl.Color, parchment: bool
 }
 // Pixel-cut inlay shared by resource gems and rarity marks. No smooth shapes
 // or per-frame textures are needed for the small decorative details.
+@(private)
 gothic_inlay :: proc(x, y, radius: f32, color: rl.Color) {
 	rl.DrawPoly({x, y}, 4, radius+1, 0, GOTHIC_INK)
 	rl.DrawPoly({x, y}, 4, radius, 0, color)
 	rl.DrawRectangleRec({x-1, y-radius+2, 2, 2}, {235, 237, 224, 195})
 	rl.DrawRectangleRec({x-1, y+radius-3, 2, 2}, {13, 20, 33, 110})
 }
+@(private)
 gothic_rule :: proc(x, y, width: f32, color: rl.Color = GOTHIC_MUTED) {
 	rl.DrawRectangle(c.int(x), c.int(y), c.int(width), 1, color)
 	rl.DrawRectangle(c.int(x), c.int(y-1), 3, 3, color)
 	rl.DrawRectangle(c.int(x+width-3), c.int(y-1), 3, 3, color)
 }
+@(private)
 gothic_button :: proc(renderer: ^Renderer, bounds: rl.Rectangle, key, label: cstring, enabled: bool = true) {
 	color := GOTHIC_PAPER if enabled else GOTHIC_MUTED
 	rl.DrawRectangleRec(bounds, GOTHIC_RECESS)
@@ -239,6 +247,7 @@ gothic_button :: proc(renderer: ^Renderer, bounds: rl.Rectangle, key, label: cst
 	gothic_text(renderer, key, bounds.x+8, bounds.y+3, 16, GOTHIC_INK)
 	gothic_text_fit(renderer, label, {bounds.x+key_width+10, bounds.y+4, bounds.width-key_width-15, bounds.height-6}, 14, color)
 }
+@(private)
 gothic_atlas_icon :: proc(texture: rl.Texture2D, source, bounds: rl.Rectangle, tint: rl.Color = rl.WHITE) {
 	if texture.id == 0 || source.width <= 0 || source.height <= 0 { return }
 	scale := min(bounds.width/source.width, bounds.height/source.height)
@@ -246,41 +255,7 @@ gothic_atlas_icon :: proc(texture: rl.Texture2D, source, bounds: rl.Rectangle, t
 	rl.DrawTexturePro(texture, source, {math.floor(bounds.x+(bounds.width-w)*0.5), math.floor(bounds.y+(bounds.height-h)*0.5), w, h}, {}, 0, tint)
 }
 
-gothic_card_icon :: proc(id: game.Card_Id) -> int {
-	switch id {
-	case .Strike, .Cross_Slash: return 0
-	case .Guard: return 1
-	case .Toxic_Wave, .Venom_Needle, .Caustic_Bloom, .Twin_Venom: return 2
-	case .Shove: return 3
-	case .Arc_Bolt, .Piercing_Ray: return 4
-	case .Dash, .Afterimage: return 5
-	case .Firebomb: return 6
-	case .Thorn_Coat: return 7
-	case .Counter_Rune: return 8
-	case .Battle_Focus, .Calculated_Risk, .Volatile_Study: return 9
-	case .Spark_Forge, .Spark: return 10
-	case .Grappling_Hook: return 11
-	case .Heavy_Blow, .Sundering_Blow, .Titan_Grip: return 12
-	case .Fate_Strike, .Prismatic_Barrage: return 13
-	case .Chain_Lightning, .Tesla_Coil, .Shock_Floor, .Storm_Crown: return 14
-	case .Purifying_Guard: return 15
-	case .Shadow_Step: return 16
-	case .Poison_Pool: return 17
-	case .Wildfire: return 18
-	case .Deflect: return 19
-	case .Coffin: return 20
-	case .Fate_Dice: return 21
-	case .Venom_Blade: return 22
-	case .Lasso: return 23
-	case .Fishing_Rod: return 24
-	case .Pinball: return 25
-	case .First_Person: return 26
-	// Scopa cards draw their own art (draw_scopa_card); this is the fallback.
-	case .Sei_Denari, .Sette_Denari: return 9
-	case .Count: return 0
-	}
-	return 0
-}
+@(private)
 gothic_figure_index :: proc(key: Sprite_Key) -> int {
 	if key == .Player_Cast { return 12 }
 	if key == .Player_Hit { return 13 }
@@ -289,6 +264,7 @@ gothic_figure_index :: proc(key: Sprite_Key) -> int {
 	return 0
 }
 
+@(private = "file")
 draw_gothic_backdrop :: proc(renderer: ^Renderer) {
 	rl.ClearBackground(GOTHIC_INK)
 	p := renderer.tactical.snapshot.player.position
@@ -309,6 +285,7 @@ draw_gothic_backdrop :: proc(renderer: ^Renderer) {
 	}
 }
 
+@(private)
 draw_gothic_status :: proc(renderer: ^Renderer, room: ^game.Room) {
 	draw_tactical_status(renderer, room)
 }

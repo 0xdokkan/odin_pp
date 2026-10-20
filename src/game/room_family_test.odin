@@ -1,7 +1,7 @@
 package game
 
 import "core:testing"
-import grid "../grid"
+import grid "../engine/grid"
 import level "../level"
 
 @(test)

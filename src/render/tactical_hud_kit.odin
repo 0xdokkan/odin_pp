@@ -2,7 +2,7 @@ package render
 
 import rl "vendor:raylib"
 import ui "../engine/ui"
-import view "../view"
+import view "../engine/view"
 
 // One look for every in-run HUD surface: a dark resin plate with a coloured
 // spine and small gothic corner brackets, one button with hover and disabled
@@ -58,6 +58,7 @@ hud_frame :: proc(bounds: rl.Rectangle, accent: rl.Color = GOTHIC_STEEL) {
 	}
 }
 
+@(private)
 hud_bar :: proc(bounds: rl.Rectangle, value01: f32, color: rl.Color, segments: int = 0) {
 	rl.DrawRectangleRec(bounds, HUD_TROUGH)
 	inner := rl.Rectangle{bounds.x+1, bounds.y+1, bounds.width-2, bounds.height-2}
@@ -76,6 +77,7 @@ hud_bar :: proc(bounds: rl.Rectangle, value01: f32, color: rl.Color, segments: i
 	rl.DrawRectangleLinesEx(bounds, 1, HUD_EDGE)
 }
 
+@(private)
 hud_hovered :: proc(renderer: ^Renderer, bounds: rl.Rectangle) -> bool {
 	v := &renderer.tactical
 	return v.pointer_inside && point_in_rectangle(v.pointer, bounds)
@@ -112,6 +114,7 @@ hud_button :: proc(renderer: ^Renderer, bounds: rl.Rectangle, key, label: cstrin
 	gothic_text_fit(renderer, label, {left, bounds.y+(bounds.height-17)*0.5, width, 18}, 14, ink)
 }
 
+@(private)
 hud_chip :: proc(renderer: ^Renderer, bounds: rl.Rectangle, text: cstring, accent: rl.Color) {
 	rl.DrawRectangleRec(bounds, {14, 21, 31, 232})
 	rl.DrawRectangleLinesEx(bounds, 1, {30, 41, 56, 255})

@@ -1,7 +1,7 @@
 package game
 
 import "core:testing"
-import grid "../grid"
+import grid "../engine/grid"
 import level "../level"
 
 create_test_level :: proc(t: ^testing.T) -> level.Level {
@@ -24,7 +24,32 @@ create_test_player :: proc(t: ^testing.T) -> Player {
 		defense = 1,
 	})
 	testing.expect(t, ok)
+	result.tactical.config.vision_size = 0
 	return result
+}
+
+@(test)
+test_rooms_own_independent_event_storage_through_teardown_and_failed_creation :: proc(t: ^testing.T) {
+	data := create_test_level(t)
+	defer level.destroy(&data)
+	first_player, second_player := create_test_player(t), create_test_player(t)
+	first, first_ok := create_room(&data, &first_player, {})
+	second, second_ok := create_room(&data, &second_player, {})
+	defer destroy_room(&first)
+	defer destroy_room(&second)
+	if !testing.expect(t, first_ok && second_ok) { return }
+	testing.expect(t, first.recent_events != nil && second.recent_events != nil && first.recent_events != second.recent_events)
+	testing.expect(t, record_event(first.recent_events, {kind = .Gold_Gained, amount = 7}))
+	testing.expect(t, record_event(second.recent_events, {kind = .Card_Drawn, card_id = 42}))
+	destroy_room(&first)
+	testing.expect(t, first.recent_events == nil)
+	testing.expect_value(t, second.recent_events.count, 1)
+	testing.expect_value(t, second.recent_events.events[0].card_id, u32(42))
+	// Rejected content fails after storage is allocated; the test allocator
+	// also checks that this path releases it together with the room arrays.
+	bad_obstacles := [?]grid.Position{data.player_spawn}
+	failed, ok := create_room(&data, &first_player, {obstacles = bad_obstacles[:]})
+	testing.expect(t, !ok && failed.recent_events == nil)
 }
 
 @(test)
@@ -40,7 +65,7 @@ test_create_room_rejects_traps_beyond_presentation_capacity :: proc(t: ^testing.
 }
 
 @(test)
-test_combat_move_advances_pulse_but_blocked_move_does_not :: proc(t: ^testing.T) {
+test_combat_move_charges_time_but_blocked_move_does_not :: proc(t: ^testing.T) {
 	level_data := create_test_level(t)
 	defer level.destroy(&level_data)
 	player := create_test_player(t)
@@ -52,12 +77,16 @@ test_combat_move_advances_pulse_but_blocked_move_does_not :: proc(t: ^testing.T)
 	result := try_move_player(&room, .South)
 	testing.expect_value(t, result, Action_Result.Moved)
 	testing.expect_value(t, player.position, grid.Position{x = 1, y = 2})
-	testing.expect_value(t, room.pulse_count, u64(1))
+	drain_tactical_test_pulse(t, &room)
+	testing.expect_value(t, room.pulse_count, u64(0))
+	testing.expect_value(t, player.tactical.clock_fraction, TACTICAL_MOVE_SECONDS)
+	clock_before := player.tactical
 
 	enemy_before := room.enemies[0].position
 	result = try_move_player(&room, .West)
 	testing.expect_value(t, result, Action_Result.Blocked)
-	testing.expect_value(t, room.pulse_count, u64(1))
+	testing.expect_value(t, room.pulse_count, u64(0))
+	testing.expect_value(t, player.tactical, clock_before)
 	testing.expect_value(t, room.enemies[0].position, enemy_before)
 }
 
@@ -132,7 +161,7 @@ test_loot_magnet_collects_enemy_drop_while_combat_continues :: proc(t: ^testing.
 	testing.expect_value(t, len(room.enemies), 1)
 	testing.expect_value(t, len(room.loot), 0)
 	testing.expect_value(t, player.gold, i32(1))
-		testing.expect(t, room.recent_events.count >= 6)
+		testing.expect(t, room.recent_events.count >= 5)
 		drop := room.recent_events.events[2]
 		testing.expect_value(t, drop.kind, Game_Event_Kind.Loot_Dropped)
 		testing.expect_value(t, drop.source, enemy_entity(1))
@@ -162,6 +191,7 @@ test_combat_movement_collects_existing_loot_after_entering_range :: proc(t: ^tes
 	testing.expect_value(t, player.gold, i32(0))
 	testing.expect_value(t, len(room.loot), 1)
 
+	drain_tactical_test_pulse(t, &room)
 	testing.expect_value(t, try_move_player(&room, .East), Action_Result.Moved)
 	testing.expect_value(t, room.phase, Room_Phase.Combat)
 	testing.expect_value(t, player.gold, i32(2))
@@ -257,13 +287,13 @@ test_wait_lets_adjacent_enemy_attack :: proc(t: ^testing.T) {
 	testing.expect(t, ok)
 	defer destroy_room(&room)
 
-	wait_player_turn(&room)
+	advance_enemy_rework_seconds(t, &room, 3)
 	testing.expect_value(t, player.health, i32(8))
 	testing.expect_value(t, room.enemies[0].position, grid.Position{x = 2, y = 1})
 }
 
 @(test)
-test_adjacent_bump_attack_does_not_move_player_and_advances_pulse :: proc(t: ^testing.T) {
+test_adjacent_bump_attack_charges_time_without_moving_player :: proc(t: ^testing.T) {
 	level_data := create_test_level(t)
 	defer level.destroy(&level_data)
 	player := create_test_player(t)
@@ -276,35 +306,8 @@ test_adjacent_bump_attack_does_not_move_player_and_advances_pulse :: proc(t: ^te
 	testing.expect_value(t, result, Action_Result.Attacked)
 	testing.expect_value(t, room.enemies[0].health, i32(2))
 	testing.expect_value(t, player.position, grid.Position{x = 1, y = 1})
-	testing.expect_value(t, room.pulse_count, u64(1))
-}
-
-@(test)
-test_combat_movement_never_exhausts_and_advances_one_pulse_per_step :: proc(t: ^testing.T) {
-	level_data := create_test_level(t)
-	defer level.destroy(&level_data)
-	player := create_test_player(t)
-	enemy_spawns := [?]Enemy_Spawn{{position = {x = 5, y = 3}, health = 8, attack = 1}}
-	obstacles := [?]grid.Position{{x = 4, y = 3}, {x = 5, y = 2}}
-	room, ok := create_room(&level_data, &player, {
-		enemies = enemy_spawns[:],
-		obstacles = obstacles[:],
-	})
-	testing.expect(t, ok)
-	defer destroy_room(&room)
-	enemy_position := room.enemies[0].position
-
-	for step in 0..<32 {
-		direction := Move_Direction.South if step%2 == 0 else .North
-		result := try_move_player(&room, direction)
-
-		testing.expect_value(t, result, Action_Result.Moved)
-		expected_y := 2 if step%2 == 0 else 1
-		testing.expect_value(t, player.position, grid.Position{x = 1, y = expected_y})
-		testing.expect_value(t, room.pulse_count, u64(step+1))
-		testing.expect_value(t, room.enemies[0].position, enemy_position)
-	}
-	testing.expect(t, validate_enemy_intents(&room))
+	testing.expect_value(t, room.pulse_count, u64(0))
+	testing.expect_value(t, player.tactical.queued_beats, 1)
 }
 
 @(test)
@@ -356,29 +359,10 @@ test_enemy_can_defeat_player :: proc(t: ^testing.T) {
 	testing.expect(t, ok)
 	defer destroy_room(&room)
 
-	result := wait_player_turn(&room)
-	testing.expect_value(t, result, Action_Result.Player_Defeated)
+	advance_enemy_rework_seconds(t, &room, 3)
 	testing.expect_value(t, room.phase, Room_Phase.Defeat)
 	testing.expect_value(t, player.health, i32(0))
 	testing.expect(t, !player.deck.combat_active)
-}
-
-@(test)
-test_non_card_pulse_regenerates_deck_energy :: proc(t: ^testing.T) {
-	level_data := create_test_level(t)
-	defer level.destroy(&level_data)
-	player := create_test_player(t)
-	enemy_spawns := [?]Enemy_Spawn{{position = {x = 5, y = 3}, health = 8, attack = 1}}
-	room, ok := create_room(&level_data, &player, {enemies = enemy_spawns[:]})
-	testing.expect(t, ok)
-	defer destroy_room(&room)
-	player.deck.energy = 0
-
-	result := try_move_player(&room, .South)
-
-	testing.expect_value(t, result, Action_Result.Moved)
-	testing.expect_value(t, room.pulse_count, u64(1))
-	testing.expect_value(t, player.deck.energy, i32(1))
 }
 
 @(test)

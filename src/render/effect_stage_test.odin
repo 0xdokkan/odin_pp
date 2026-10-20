@@ -152,7 +152,7 @@ test_borrowed_renderer_borrows_every_asset_and_owns_its_view :: proc(t: ^testing
 	main := new(Renderer)
 	defer free(main)
 	main.canvas_width, main.canvas_height = 960, 540
-	main.tactical.enabled, main.tactical.scene_3d, main.tactical.perspective = true, true, true
+	main.tactical.perspective = true
 	seen: map[typeid]bool
 	defer delete(seen)
 	fields: [dynamic]Effect_Stage_Field
@@ -241,8 +241,8 @@ test_borrowed_renderer_borrows_every_asset_and_owns_its_view :: proc(t: ^testing
 			}
 		}
 		v := &borrowed.tactical
-		testing.expect(t, v.showcase && v.enabled && v.scene_3d == main.tactical.scene_3d && v.perspective == main.tactical.perspective)
-		testing.expect(t, borrowed.projection.tile_width == 64 && borrowed.projection.tile_height == 32)
+		testing.expect(t, v.showcase && v.perspective == main.tactical.perspective)
+		testing.expect_value(t, borrowed.overlay_scale, f32(1))
 		testing.expect(t, borrowed.canvas_width == 960 && borrowed.canvas_height == 540 && borrowed.playback_speed == 1)
 		testing.expect(t, v.snapshot != nil && v.labels != nil && v.flipbook_state != nil, "the view's own state is made")
 		testing.expect(t, v.surface == nil, "no render target headless")

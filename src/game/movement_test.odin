@@ -1,7 +1,7 @@
 package game
 
 import "core:testing"
-import grid "../grid"
+import grid "../engine/grid"
 import level "../level"
 
 create_movement_test_level :: proc(t: ^testing.T) -> level.Level {

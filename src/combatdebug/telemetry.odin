@@ -1,7 +1,7 @@
 package combatdebug
 
 import game "../game"
-import grid "../grid"
+import grid "../engine/grid"
 
 Command_Kind :: enum {
 	Move,
@@ -241,7 +241,7 @@ capture_card_descriptor :: proc(
 		return
 	}
 	card := room.player.deck.hand[hand_index]
-	definition, definition_found := game.card_definition_by_id(card.definition_id, game.tactical_enabled(room))
+	definition, definition_found := game.card_definition_by_id(card.definition_id)
 	if !definition_found {
 		return
 	}
@@ -391,7 +391,7 @@ observe_command_detailed :: proc(
 	committed: bool,
 	room: ^game.Room,
 ) -> (sample: Command_Sample, ok: bool) {
-	if metrics == nil || room == nil || room.player == nil || !snapshot.valid ||
+	if metrics == nil || room == nil || room.player == nil || room.recent_events == nil || !snapshot.valid ||
 	   !command_kind_is_valid(resolved_kind) || room.pulse_count < snapshot.pulse_count ||
 	   room.recent_events.count < 0 || room.recent_events.count > game.MAX_GAME_EVENTS {
 		return

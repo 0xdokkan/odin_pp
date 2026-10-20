@@ -1,7 +1,7 @@
 package game
 
 import "core:testing"
-import grid "../grid"
+import grid "../engine/grid"
 import level "../level"
 
 @(test)
@@ -22,7 +22,7 @@ test_starter_damage_cards_can_ignite_barrels :: proc(t: ^testing.T) {
 		testing.expect_value(t, play.result, Card_Play_Result.Played)
 		testing.expect_value(t, room.objects[0].detonation_pulse, u64(3))
 		testing.expect_value(t, room.objects[0].health, i32(1))
-		testing.expect_value(t, spatial_card_event_count(&room.recent_events, .Explosive_Armed), 1)
+		testing.expect_value(t, spatial_card_event_count(room.recent_events, .Explosive_Armed), 1)
 		destroy_room(&room)
 	}
 }
@@ -60,7 +60,7 @@ make_explosive_test_room :: proc(t: ^testing.T, data: ^level.Level, player: ^Pla
 }
 
 @(test)
-test_shove_arms_and_moves_barrel_with_two_further_decisions :: proc(t: ^testing.T) {
+test_shove_keeps_barrel_fuse_during_cast_then_explodes_at_world_deadline :: proc(t: ^testing.T) {
 	data := create_enemy_archetype_test_level(t)
 	defer level.destroy(&data)
 	player := create_test_player(t)
@@ -72,19 +72,29 @@ test_shove_arms_and_moves_barrel_with_two_further_decisions :: proc(t: ^testing.
 	play := play_card(&room, card_id, entity_target(object_entity(id)))
 	testing.expect_value(t, play.result, Card_Play_Result.Played)
 	testing.expect_value(t, room.objects[0].position, grid.Position{3, 1})
-	testing.expect_value(t, room.pulse_count, u64(1))
+	testing.expect_value(t, room.pulse_count, u64(0))
 	testing.expect_value(t, explosive_pulses_remaining(room.objects[0].detonation_pulse, room.pulse_count), 2)
-	testing.expect_value(t, spatial_card_event_count(&room.recent_events, .Explosive_Armed), 1)
+	testing.expect_value(t, spatial_card_event_count(room.recent_events, .Explosive_Armed), 1)
+	drain_tactical_test_pulse(t, &room)
 	testing.expect_value(t, try_move_player(&room, .North), Action_Result.Blocked)
-	testing.expect_value(t, room.pulse_count, u64(1))
-	testing.expect(t, !arm_explosive(&room, id, PLAYER_ENTITY, &room.recent_events))
+	testing.expect_value(t, room.pulse_count, u64(0))
+	testing.expect(t, !arm_explosive(&room, id, PLAYER_ENTITY, room.recent_events))
 	testing.expect_value(t, wait_player_turn(&room), Action_Result.None)
+	drain_tactical_test_pulse(t, &room)
+	testing.expect_value(t, explosive_pulses_remaining(room.objects[0].detonation_pulse, room.pulse_count), 2)
+	testing.expect_value(t, wait_player_turn(&room), Action_Result.None)
+	drain_tactical_test_pulse(t, &room)
 	testing.expect_value(t, explosive_pulses_remaining(room.objects[0].detonation_pulse, room.pulse_count), 1)
 	testing.expect_value(t, wait_player_turn(&room), Action_Result.None)
+	explosions := 0
+	for room.tactical_pulse.pending {
+		testing.expect(t, continue_tactical_pulse(&room))
+		explosions += spatial_card_event_count(room.recent_events, .Explosion)
+	}
 	_, exists := object_index_by_id(&room, id)
 	testing.expect(t, !exists)
 	testing.expect_value(t, player.health, i32(10))
-	testing.expect_value(t, spatial_card_event_count(&room.recent_events, .Explosion), 1)
+	testing.expect_value(t, explosions, 1)
 }
 
 @(test)
@@ -94,7 +104,7 @@ test_armed_bomb_can_be_shoved_without_resetting_fuse :: proc(t: ^testing.T) {
 	player := create_test_player(t)
 	room := make_explosive_test_room(t, &data, &player, nil)
 	defer destroy_room(&room)
-	testing.expect(t, spawn_bomb(&room, SYSTEM_ENTITY, {2, 1}, &room.recent_events))
+	testing.expect(t, spawn_bomb(&room, SYSTEM_ENTITY, {2, 1}, room.recent_events))
 	id := room.objects[0].id
 	deadline := room.objects[0].detonation_pulse
 	card := Card_Instance{id = 901, definition_id = .Shove}
@@ -210,14 +220,14 @@ test_bombs_disarm_when_player_finishes_combat :: proc(t: ^testing.T) {
 	player := create_test_player(t)
 	room := make_explosive_test_room(t, &data, &player, nil)
 	defer destroy_room(&room)
-	testing.expect(t, spawn_bomb(&room, SYSTEM_ENTITY, player.position, &room.recent_events))
+	testing.expect(t, spawn_bomb(&room, SYSTEM_ENTITY, player.position, room.recent_events))
 	room.enemies[0].position = {2, 1}
 	room.enemies[0].health = 1
 	plan_enemy_intents(&room)
 	testing.expect_value(t, try_move_player(&room, .East), Action_Result.Combat_Ended)
 	testing.expect_value(t, room.objects[0].detonation_pulse, u64(0))
 	testing.expect_value(t, player.health, i32(10))
-	testing.expect_value(t, spatial_card_event_count(&room.recent_events, .Explosive_Disarmed), 1)
+	testing.expect_value(t, spatial_card_event_count(room.recent_events, .Explosive_Disarmed), 1)
 }
 
 @(test)
@@ -228,19 +238,19 @@ test_bomb_capacity_failed_spawn_is_atomic_and_ids_are_not_reused :: proc(t: ^tes
 	room := make_explosive_test_room(t, &data, &player, nil)
 	defer destroy_room(&room)
 	for x in 2..<2+MAX_ACTIVE_BOMBS {
-		testing.expect(t, spawn_bomb(&room, SYSTEM_ENTITY, {x, 2}, &room.recent_events))
+		testing.expect(t, spawn_bomb(&room, SYSTEM_ENTITY, {x, 2}, room.recent_events))
 	}
 	next_id := room.next_object_id
 	count := room.recent_events.count
-	testing.expect(t, !spawn_bomb(&room, SYSTEM_ENTITY, {7, 2}, &room.recent_events))
+	testing.expect(t, !spawn_bomb(&room, SYSTEM_ENTITY, {7, 2}, room.recent_events))
 	testing.expect_value(t, room.next_object_id, next_id)
 	testing.expect_value(t, room.recent_events.count, count)
 	testing.expect(t, remove_grid_object(&room, 0))
-	testing.expect(t, spawn_bomb(&room, SYSTEM_ENTITY, {7, 2}, &room.recent_events))
+	testing.expect(t, spawn_bomb(&room, SYSTEM_ENTITY, {7, 2}, room.recent_events))
 	testing.expect_value(t, room.objects[len(room.objects)-1].id, next_id)
 	testing.expect(t, remove_grid_object(&room, 0))
 	room.next_object_id = max(u32)
-	testing.expect(t, !spawn_bomb(&room, SYSTEM_ENTITY, {7, 3}, &room.recent_events))
+	testing.expect(t, !spawn_bomb(&room, SYSTEM_ENTITY, {7, 3}, room.recent_events))
 	testing.expect_value(t, room.next_object_id, max(u32))
 }
 

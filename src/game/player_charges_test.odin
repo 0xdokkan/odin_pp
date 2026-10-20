@@ -1,7 +1,7 @@
 package game
 
 import "core:testing"
-import grid "../grid"
+import grid "../engine/grid"
 import level "../level"
 
 // The player's charges (player_charges.odin): RIFLESSO, FRECCE, DESTINO and
@@ -60,20 +60,20 @@ test_charges_stack_on_the_player_alone :: proc(t: ^testing.T) {
 	_, _ = apply_status(&room, PLAYER_ENTITY, .Arrows, 4, 0)
 	testing.expect_value(t, player_charges(&room, .Arrows), i32(7))
 	_, _ = apply_status(&room, PLAYER_ENTITY, .Fate, FATE_DICE_CHARGES, 0)
-	testing.expect(t, spend_player_charge(&room, .Fate, &room.recent_events))
-	testing.expect(t, spend_player_charge(&room, .Fate, &room.recent_events))
+	testing.expect(t, spend_player_charge(&room, .Fate, room.recent_events))
+	testing.expect(t, spend_player_charge(&room, .Fate, room.recent_events))
 	testing.expect_value(t, player_charges(&room, .Fate), i32(1))
 	_, _ = apply_status(&room, PLAYER_ENTITY, .Fate, FATE_DICE_CHARGES, 0)
 	_, _ = apply_status(&room, PLAYER_ENTITY, .Fate, FATE_DICE_CHARGES, 0)
 	testing.expect_value(t, player_charges(&room, .Fate), FATE_DICE_CHARGES)
 	// The last charge spent ends the status, with its event; then there is none.
 	_, _ = apply_status(&room, PLAYER_ENTITY, .Deflect, 1, 0)
-	clear_event_log(&room.recent_events)
-	testing.expect(t, spend_player_charge(&room, .Deflect, &room.recent_events))
+	clear_event_log(room.recent_events)
+	testing.expect(t, spend_player_charge(&room, .Deflect, room.recent_events))
 	testing.expect_value(t, player_charges(&room, .Deflect), i32(0))
-	expired, found := charges_test_event(&room.recent_events, .Status_Expired, SYSTEM_ENTITY, PLAYER_ENTITY)
+	expired, found := charges_test_event(room.recent_events, .Status_Expired, SYSTEM_ENTITY, PLAYER_ENTITY)
 	testing.expect(t, found && expired.status == .Deflect)
-	testing.expect(t, !spend_player_charge(&room, .Deflect, &room.recent_events))
+	testing.expect(t, !spend_player_charge(&room, .Deflect, room.recent_events))
 	// Every kind the player can carry at once: none refused for want of room.
 	clear_statuses(&room.player.statuses)
 	for kind in Status_Kind {
@@ -94,7 +94,7 @@ test_charges_stack_on_the_player_alone :: proc(t: ^testing.T) {
 	testing.expect_value(t, action.effects[1].duration, i32(0))
 }
 
-// Each loads one charge on the player; all four are tactical only, take a
+// Each loads one charge on the player; all four take a
 // second of the window and keep the spec's energy and rarity. Deflect has no
 // upgrade, Feretro gains an arrow a level, the two dice cards climb the die.
 @(test)
@@ -105,29 +105,25 @@ test_charge_cards_are_tactical_self_cards_with_their_rules :: proc(t: ^testing.T
 	rarities := [4]Card_Rarity{.Uncommon, .Uncommon, .Rare, .Common}
 	names := [4]string{"Deflect", "Feretro", "Dado del Destino", "Lama Velenosa"}
 	for id, index in ids {
-		for tactical in ([2]bool{false, true}) {
-			definition, found := card_definition_by_id(id, tactical)
-			testing.expect(t, found && validate_card_definition(&definition))
-			testing.expect_value(t, definition.targeting.rule, Target_Rule.Self)
-			testing.expect_value(t, definition.cost, energy[index])
-			testing.expect_value(t, definition.rarity, rarities[index])
-			testing.expect_value(t, definition.name, names[index])
-			testing.expect_value(t, definition.effect_count, 1)
-			testing.expect_value(t, definition.effects[0].kind, Effect_Kind.Apply_Status)
-			testing.expect_value(t, definition.effects[0].target, Card_Target_Selector.Player)
-			testing.expect_value(t, definition.effects[0].status, kinds[index])
-			testing.expect(t, !card_requires_spatial_target(definition))
-		}
-		testing.expect(t, card_requires_tactical(id) && card_loads_player_charge(id))
+		definition, found := card_definition_by_id(id)
+		testing.expect(t, found && validate_card_definition(&definition))
+		testing.expect_value(t, definition.targeting.rule, Target_Rule.Self)
+		testing.expect_value(t, definition.cost, energy[index])
+		testing.expect_value(t, definition.rarity, rarities[index])
+		testing.expect_value(t, definition.name, names[index])
+		testing.expect_value(t, definition.effect_count, 1)
+		testing.expect_value(t, definition.effects[0].kind, Effect_Kind.Apply_Status)
+		testing.expect_value(t, definition.effects[0].target, Card_Target_Selector.Player)
+		testing.expect_value(t, definition.effects[0].status, kinds[index])
+		testing.expect(t, !card_requires_spatial_target(definition))
+		testing.expect(t, card_loads_player_charge(id))
 		testing.expect_value(t, tactical_card_time_cost(id), f32(1))
-		definition, _ := card_definition_by_id(id, true)
 		node := Run_Node{kind = .Combat, depth = 2}
 		testing.expect(t, card_offer_weight(definition, &node) > 0)
-		testing.expect_value(t, card_offer_weight(definition, &node, nil, false), u64(0))
 	}
 	testing.expect(t, !card_can_upgrade({id = 1, definition_id = .Deflect, lifetime = .Permanent}))
 	testing.expect(t, card_can_upgrade({id = 1, definition_id = .Coffin, lifetime = .Permanent}))
-	coffin, _ := card_definition_by_id(.Coffin, true)
+	coffin, _ := card_definition_by_id(.Coffin)
 	for upgrade in i32(0)..=3 {
 		effect, made := instantiate_card_effect(coffin.effects[0], PLAYER_ENTITY, {id = 1, definition_id = .Coffin, upgrade_level = upgrade})
 		testing.expect(t, made && effect.amount == 3+upgrade)
@@ -138,25 +134,7 @@ test_charge_cards_are_tactical_self_cards_with_their_rules :: proc(t: ^testing.T
 		testing.expect_value(t, card_die_sides(id, 0), i32(4))
 		testing.expect_value(t, card_die_sides(id, MAX_DICE_UPGRADE_LEVEL), i32(20))
 	}
-	// A classic room refuses them before any payment.
-	data := create_test_level(t)
-	defer level.destroy(&data)
-	player := create_test_player(t)
-	enemies := [?]Enemy_Spawn{{position = {5, 3}, health = 8, attack = 1}}
-	room, ok := create_room(&data, &player, {enemies = enemies[:]})
-	testing.expect(t, ok)
-	defer destroy_room(&room)
-	for id in ids {
-		card := rework_hand_card(t, &room, id)
-		deck := player.deck
-		play := play_card(&room, card.id, entity_target(PLAYER_ENTITY))
-		testing.expect_value(t, play.result, Card_Play_Result.Compile_Failed)
-		testing.expect_value(t, play.compile_error, Card_Compile_Error.Invalid_Phase)
-		testing.expect(t, player.deck == deck)
-	}
-	// No arrow flies in classic combat, even with arrows.
-	_, _ = apply_status(&room, PLAYER_ENTITY, .Arrows, 3, 0)
-	testing.expect_value(t, shoot_player_arrow(&room, enemy_entity(room.enemies[0].id)), Action_Result.Invalid_Phase)
+
 }
 
 // RIFLESSO on an archer's shot, a brute's cleave and a brute's charge: the
@@ -314,11 +292,11 @@ test_coffin_arrows_fly_to_the_foes_in_the_line_of_fire :: proc(t: ^testing.T) {
 	testing.expect_value(t, player_charges(&room, .Arrows), i32(2))
 	testing.expect_value(t, room.player.tactical.remaining, window-TACTICAL_ARROW_SECONDS)
 	testing.expect_value(t, room.player.tactical.facing, Move_Direction.East)
-	hit, found := charges_test_event(&room.recent_events, .Damaged, PLAYER_ENTITY, near)
+	hit, found := charges_test_event(room.recent_events, .Damaged, PLAYER_ENTITY, near)
 	testing.expect(t, found && event_is_ranged_attack(hit) && !event_is_reflected(hit) && hit.amount == COFFIN_ARROW_DAMAGE)
 	testing.expect_value(t, hit.from_position, grid.Position{4, 4})
 	testing.expect_value(t, hit.to_position, at)
-	applied, marked := charges_test_event(&room.recent_events, .Status_Applied, PLAYER_ENTITY, near)
+	applied, marked := charges_test_event(room.recent_events, .Status_Applied, PLAYER_ENTITY, near)
 	testing.expect(t, marked)
 	testing.expect(t, (applied.status == .Poison && applied.amount == 2) || (applied.status == .Burn && applied.amount == 1) ||
 		(applied.status == .Slow && applied.amount == 1))
@@ -328,7 +306,7 @@ test_coffin_arrows_fly_to_the_foes_in_the_line_of_fire :: proc(t: ^testing.T) {
 		if !player_arrow_target_is_valid(&room, near) { break }
 		testing.expect_value(t, shoot_player_arrow(&room, near), Action_Result.Attacked)
 		// The last arrow ends the status, with its event.
-		_, emptied = charges_test_event(&room.recent_events, .Status_Expired, SYSTEM_ENTITY, PLAYER_ENTITY)
+		_, emptied = charges_test_event(room.recent_events, .Status_Expired, SYSTEM_ENTITY, PLAYER_ENTITY)
 		drain_tactical_test_pulse(t, &room)
 	}
 	testing.expect_value(t, player_charges(&room, .Arrows), i32(0))
@@ -378,14 +356,14 @@ test_fate_dice_rolls_its_die_at_each_loaded_bump :: proc(t: ^testing.T) {
 		player.health = 50
 		result := try_move_player(&room, .North)
 		testing.expectf(t, result == (.Combat_Ended if face >= 6 else .Attacked), "face %d: %v", face, result)
-		rolled, found := charges_test_event(&room.recent_events, .Fate_Rolled, PLAYER_ENTITY, foe)
+		rolled, found := charges_test_event(room.recent_events, .Fate_Rolled, PLAYER_ENTITY, foe)
 		testing.expectf(t, found && rolled.dice_roll.total == face && rolled.dice_roll.sides == 8, "face %d", face)
 		testing.expect_value(t, Fate_Outcome(rolled.duration), fate_outcome(face, false))
 		testing.expect_value(t, player_charges(&room, .Fate), FATE_DICE_CHARGES-1)
-		hit, _ := charges_test_event(&room.recent_events, .Damaged, PLAYER_ENTITY, foe)
+		hit, _ := charges_test_event(room.recent_events, .Damaged, PLAYER_ENTITY, foe)
 		switch {
 		case face <= 3:
-			applied, statused := charges_test_event(&room.recent_events, .Status_Applied, PLAYER_ENTITY, foe)
+			applied, statused := charges_test_event(room.recent_events, .Status_Applied, PLAYER_ENTITY, foe)
 			kinds := [3]Status_Kind{.Poison, .Burn, .Slow}
 			testing.expectf(t, statused && applied.status == kinds[face-1] && applied.amount == face, "face %d", face)
 			testing.expect_value(t, rolled.amount, face)
@@ -395,7 +373,7 @@ test_fate_dice_rolls_its_die_at_each_loaded_bump :: proc(t: ^testing.T) {
 		case face == 5:
 			testing.expect(t, event_is_critical(hit) && hit.amount == critical_bump_damage(player_basic_attack_damage(&player)))
 		case:
-			_, defeated := charges_test_event(&room.recent_events, .Entity_Defeated, PLAYER_ENTITY, foe)
+			_, defeated := charges_test_event(room.recent_events, .Entity_Defeated, PLAYER_ENTITY, foe)
 			testing.expect(t, defeated)
 		}
 		// The die shows right after the blow's own events.
@@ -414,7 +392,7 @@ test_fate_dice_rolls_its_die_at_each_loaded_bump :: proc(t: ^testing.T) {
 		charges_test_load_fate(t, &room, 8, 8)
 		testing.expect_value(t, try_move_player(&room, .North), Action_Result.Attacked)
 		testing.expect_value(t, room.enemies[0].health, i32(40)-critical_bump_damage(player_basic_attack_damage(&player)))
-		rolled, _ := charges_test_event(&room.recent_events, .Fate_Rolled, PLAYER_ENTITY, enemy_entity(room.enemies[0].id))
+		rolled, _ := charges_test_event(room.recent_events, .Fate_Rolled, PLAYER_ENTITY, enemy_entity(room.enemies[0].id))
 		testing.expect_value(t, Fate_Outcome(rolled.duration), Fate_Outcome.Critical)
 		destroy_room(&room)
 		level.destroy(&data)
@@ -437,10 +415,10 @@ test_fate_dice_faces_through_guards_and_full_health :: proc(t: ^testing.T) {
 		_, _ = apply_status(&room, foe, .Shield, 5, 3)
 		charges_test_load_fate(t, &room, 7, 8)
 		testing.expect_value(t, try_move_player(&room, .North), Action_Result.Combat_Ended)
-		_, defeated := charges_test_event(&room.recent_events, .Entity_Defeated, PLAYER_ENTITY, foe)
+		_, defeated := charges_test_event(room.recent_events, .Entity_Defeated, PLAYER_ENTITY, foe)
 		testing.expect(t, defeated)
-		at := charges_test_index(&room.recent_events, .Fate_Rolled)
-		testing.expect(t, at > charges_test_index(&room.recent_events, .Damaged) && at < charges_test_index(&room.recent_events, .Entity_Defeated))
+		at := charges_test_index(room.recent_events, .Fate_Rolled)
+		testing.expect(t, at > charges_test_index(room.recent_events, .Damaged) && at < charges_test_index(room.recent_events, .Entity_Defeated))
 	}
 	{
 		data: level.Level
@@ -453,9 +431,9 @@ test_fate_dice_faces_through_guards_and_full_health :: proc(t: ^testing.T) {
 		charges_test_load_fate(t, &room, 2, 4)
 		testing.expect_value(t, try_move_player(&room, .North), Action_Result.Attacked)
 		testing.expect_value(t, room.enemies[0].health, i32(40))
-		absorbed := charges_test_index(&room.recent_events, .Damage_Absorbed)
-		at := charges_test_index(&room.recent_events, .Fate_Rolled)
-		applied := charges_test_index(&room.recent_events, .Status_Applied)
+		absorbed := charges_test_index(room.recent_events, .Damage_Absorbed)
+		at := charges_test_index(room.recent_events, .Fate_Rolled)
+		applied := charges_test_index(room.recent_events, .Status_Applied)
 		testing.expect(t, absorbed >= 0 && at == absorbed+1 && applied > at)
 		burn, burning := status_for_entity(&room, foe, .Burn)
 		testing.expect(t, burning && burn.potency == 2)
@@ -469,10 +447,10 @@ test_fate_dice_faces_through_guards_and_full_health :: proc(t: ^testing.T) {
 		foe := enemy_entity(room.enemies[0].id)
 		charges_test_load_fate(t, &room, 4, 4)
 		testing.expect_value(t, try_move_player(&room, .North), Action_Result.Attacked)
-		rolled, _ := charges_test_event(&room.recent_events, .Fate_Rolled, PLAYER_ENTITY, foe)
+		rolled, _ := charges_test_event(room.recent_events, .Fate_Rolled, PLAYER_ENTITY, foe)
 		testing.expect_value(t, Fate_Outcome(rolled.duration), Fate_Outcome.Lifesteal)
 		testing.expect_value(t, rolled.amount, i32(0))
-		testing.expect_value(t, charges_test_count(&room.recent_events, .Healed), 0)
+		testing.expect_value(t, charges_test_count(room.recent_events, .Healed), 0)
 		testing.expect_value(t, player.health, player.stats.max_health)
 	}
 }
@@ -495,7 +473,7 @@ test_venom_blade_and_fate_dice_load_the_same_bump :: proc(t: ^testing.T) {
 	testing.expect(t, poisoned && poison.potency == VENOM_BLADE_POISON && burning && burn.potency == 2)
 	testing.expect_value(t, player_charges(&room, .Venom_Blade), i32(0))
 	testing.expect_value(t, player_charges(&room, .Fate), FATE_DICE_CHARGES-1)
-	_, worn := charges_test_event(&room.recent_events, .Status_Expired, SYSTEM_ENTITY, PLAYER_ENTITY)
+	_, worn := charges_test_event(room.recent_events, .Status_Expired, SYSTEM_ENTITY, PLAYER_ENTITY)
 	testing.expect(t, worn)
 	testing.expect_value(t, room.enemies[0].health, i32(40)-player_basic_attack_damage(&player))
 }
@@ -520,7 +498,7 @@ test_fate_dice_card_loads_three_bumps_with_its_level_die :: proc(t: ^testing.T) 
 	testing.expect_value(t, player_charges(&room, .Fate), FATE_DICE_CHARGES)
 	testing.expect_value(t, room.player.tactical.fate_sides, i32(8))
 	testing.expect_value(t, player_fate_sides(&room), i32(8))
-	testing.expect_value(t, charges_test_count(&room.recent_events, .Dice_Rolled), 0)
+	testing.expect_value(t, charges_test_count(room.recent_events, .Dice_Rolled), 0)
 	testing.expect(t, room.player.dice == dice)
 	// No card played yet: a d4.
 	room.player.tactical.fate_sides = 0
@@ -559,7 +537,7 @@ test_venom_blade_rolls_the_bumps_it_poisons :: proc(t: ^testing.T) {
 	north := enemy_entity(room.enemies[0].id)
 	for bump in 0..<4 {
 		testing.expect_value(t, try_move_player(&room, .North), Action_Result.Attacked)
-		applied, poisoned := charges_test_event(&room.recent_events, .Status_Applied, PLAYER_ENTITY, north)
+		applied, poisoned := charges_test_event(room.recent_events, .Status_Applied, PLAYER_ENTITY, north)
 		testing.expectf(t, poisoned == (bump < 3), "bump %d", bump)
 		if poisoned { testing.expect(t, applied.status == .Poison) }
 		drain_tactical_test_pulse(t, &room)
@@ -570,7 +548,7 @@ test_venom_blade_rolls_the_bumps_it_poisons :: proc(t: ^testing.T) {
 	room.enemies[1].position = {5, 3}
 	east := enemy_entity(room.enemies[1].id)
 	testing.expect_value(t, try_move_player_diagonal(&room, {1, -1}), Action_Result.Attacked)
-	applied, poisoned := charges_test_event(&room.recent_events, .Status_Applied, PLAYER_ENTITY, east)
+	applied, poisoned := charges_test_event(room.recent_events, .Status_Applied, PLAYER_ENTITY, east)
 	testing.expect(t, poisoned && applied.status == .Poison && applied.amount >= VENOM_BLADE_POISON)
 	testing.expect_value(t, player_charges(&room, .Venom_Blade), i32(0))
 }

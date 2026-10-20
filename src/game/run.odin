@@ -41,6 +41,7 @@ SPECIAL_NODE_KINDS :: [SPECIAL_NODE_KIND_COUNT]Node_Kind{
 	.Treasure,
 }
 
+@(private)
 node_kind_is_valid :: proc(kind: Node_Kind) -> bool {
 	return int(kind) >= 0 && int(kind) < int(Node_Kind.Count)
 }
@@ -53,6 +54,7 @@ node_kind_is_special :: proc(kind: Node_Kind) -> bool {
 	return kind == .Shop || kind == .Rest || kind == .Event || kind == .Treasure
 }
 
+@(private)
 special_node_kind_for_depth :: proc(seed: u64, depth: int) -> (Node_Kind, bool) {
 	if depth <= 0 {
 		return .Count, false
@@ -138,6 +140,7 @@ Run_Node :: struct {
 	cleared:          bool,
 }
 
+@(private)
 mix_room_seed :: proc(value: u64) -> u64 {
 	return rng.mix(value)
 }
@@ -198,6 +201,7 @@ Node_Entry_Result :: enum {
 	Treasure,
 }
 
+@(private = "file")
 valid_run_map_config :: proc(config: Run_Map_Config) -> bool {
 	return config.layer_count >= 3 && config.layer_count <= MAX_RUN_MAP_LAYERS &&
 	       config.min_nodes_per_middle_layer >= 2 &&
@@ -205,6 +209,7 @@ valid_run_map_config :: proc(config: Run_Map_Config) -> bool {
 	       config.max_nodes_per_middle_layer <= MAX_NODE_CONNECTIONS
 }
 
+@(private = "file")
 append_layer :: proc(run_map: ^Run_Map, depth, node_count: int, kind: Node_Kind) {
 	assert(run_map != nil && node_count > 0)
 	start := len(run_map.nodes)
@@ -222,6 +227,7 @@ append_layer :: proc(run_map: ^Run_Map, depth, node_count: int, kind: Node_Kind)
 	}
 }
 
+@(private = "file")
 connect_nodes :: proc(run_map: ^Run_Map, source_id, target_id: Node_Id) -> bool {
 	if run_map == nil {
 		return false
@@ -248,6 +254,7 @@ connect_nodes :: proc(run_map: ^Run_Map, source_id, target_id: Node_Id) -> bool 
 	return true
 }
 
+@(private = "file")
 sort_connections_by_lane :: proc(run_map: ^Run_Map, source_id: Node_Id) {
 	assert(run_map != nil)
 	source := &run_map.nodes[int(source_id)]
@@ -266,6 +273,7 @@ sort_connections_by_lane :: proc(run_map: ^Run_Map, source_id: Node_Id) {
 	}
 }
 
+@(private = "file")
 has_incoming_from_layer :: proc(run_map: ^Run_Map, target_id: Node_Id, source_start, source_count: int) -> bool {
 	assert(run_map != nil)
 	for source_index in source_start..<source_start+source_count {
@@ -279,6 +287,7 @@ has_incoming_from_layer :: proc(run_map: ^Run_Map, target_id: Node_Id, source_st
 	return false
 }
 
+@(private = "file")
 connect_layers :: proc(run_map: ^Run_Map, depth: int, generator: rand.Generator) {
 	assert(run_map != nil && depth >= 0 && depth+1 < len(run_map.layer_starts))
 	source_start := run_map.layer_starts[depth]
@@ -398,6 +407,7 @@ destroy_run_map :: proc(run_map: ^Run_Map) {
 	run_map^ = {}
 }
 
+@(private)
 validate_run_map :: proc(run_map: ^Run_Map) -> bool {
 	if run_map == nil || len(run_map.nodes) == 0 ||
 	   len(run_map.nodes) > MAX_RUN_MAP_NODES ||
@@ -690,6 +700,7 @@ enter_node :: proc(run: ^Run_State, id: Node_Id) -> Node_Entry_Result {
 	return entry_result
 }
 
+@(private)
 choose_node :: proc(run: ^Run_State, id: Node_Id) -> bool {
 	return enter_node(run, id) != .Invalid
 }

@@ -143,14 +143,14 @@ game_step :: proc(data: rawptr, frame: ^host.Frame, playing: bool) -> host.Round
 	if !frame.focused {
 		suspend_player_input(g)
 	} else if !g.demo {
-		advance_player_controls(g, input.sample(&g.actions), frame.dt)
+		advance_player_controls(g, input.sample(&g.actions, frame.devices), frame.dt)
 	}
 	c := &g.controls
 	sensitivity := frame.profile.settings.mouse_sensitivity if frame.profile != nil else 1
 	look := Vec2{input.axis(c, Action.Cam_Right, Action.Cam_Left), input.axis(c, Action.Cam_Up, Action.Cam_Down)}
 	mouse: Vec2
 	if .Orbit in c.down {
-		mouse = input.mouse_delta() * sensitivity
+		mouse = input.mouse_delta(frame.devices) * sensitivity
 	}
 	zoom := c.value[.Zoom_Out] - c.value[.Zoom_In]
 	view_camera_input(&g.view, look, mouse, zoom, frame.dt)

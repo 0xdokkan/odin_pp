@@ -45,20 +45,21 @@ test_relic_dash_energy_replays_refund_before_pulse_regeneration :: proc(t: ^test
 	before := capture_room_presentation(&room)
 	play := game.play_card(&room, id, game.cell_target({3, 1}))
 	testing.expect_value(t, play.result, game.Card_Play_Result.Played)
+	advance_presentation_test_clock(t, &room, 1)
 	after := capture_room_presentation(&room)
 	timeline: Presentation_Timeline
-	testing.expect(t, begin_event_timeline(&timeline, before, &room.recent_events, &after))
+	testing.expect(t, begin_event_timeline(&timeline, before, room.recent_events, &after))
 	energy_seen, pulse_seen := false, false
 	for event_timeline_is_busy(&timeline) {
 		cue := timeline.cues[timeline.head]
 		if cue.kind == .Energy_Gained {
 			testing.expect(t, !pulse_seen)
-			testing.expect_value(t, timeline.view.deck.energy, i32(1))
+			testing.expect_value(t, timeline.view.deck.energy, i32(2))
 		}
 		finish_encounter_test_cue(t, &timeline)
 		if cue.kind == .Energy_Gained {
 			energy_seen = true
-			testing.expect_value(t, timeline.view.deck.energy, i32(2))
+			testing.expect_value(t, timeline.view.deck.energy, i32(3))
 			testing.expect_value(t, timeline.view.pulse_count, u64(0))
 		}
 		if cue.kind == .Pulse_Advanced {
@@ -87,9 +88,10 @@ test_relic_exhaust_bonus_draw_replays_after_exhaust_and_before_pulse :: proc(t: 
 	before := capture_room_presentation(&room)
 	play := game.play_card(&room, id, game.entity_target(game.PLAYER_ENTITY))
 	testing.expect_value(t, play.result, game.Card_Play_Result.Played)
+	advance_presentation_test_clock(t, &room, 1)
 	after := capture_room_presentation(&room)
 	timeline: Presentation_Timeline
-	testing.expect(t, begin_event_timeline(&timeline, before, &room.recent_events, &after))
+	testing.expect(t, begin_event_timeline(&timeline, before, room.recent_events, &after))
 	exhaust_seen, bonus_seen, pulse_seen := false, false, false
 	for event_timeline_is_busy(&timeline) {
 		cue := timeline.cues[timeline.head]
@@ -127,9 +129,10 @@ test_relic_refocus_bonus_draw_replays_after_pulse_and_normal_refill :: proc(t: ^
 	before := capture_room_presentation(&room)
 	refocus := game.refocus_player_hand(&room)
 	testing.expect_value(t, refocus.result, game.Refocus_Result.Refocused)
+	advance_presentation_test_clock(t, &room, 1)
 	after := capture_room_presentation(&room)
 	timeline: Presentation_Timeline
-	testing.expect(t, begin_event_timeline(&timeline, before, &room.recent_events, &after))
+	testing.expect(t, begin_event_timeline(&timeline, before, room.recent_events, &after))
 	bonus_seen, pulse_seen := false, false
 	for event_timeline_is_busy(&timeline) {
 		cue := timeline.cues[timeline.head]
@@ -165,7 +168,7 @@ test_relic_mending_terminal_heal_replays_after_enemy_defeat_without_pulse :: pro
 	testing.expect_value(t, game.try_move_player(&room, .East), game.Action_Result.Combat_Ended)
 	after := capture_room_presentation(&room)
 	timeline: Presentation_Timeline
-	testing.expect(t, begin_event_timeline(&timeline, before, &room.recent_events, &after))
+	testing.expect(t, begin_event_timeline(&timeline, before, room.recent_events, &after))
 	defeat_seen, heal_seen := false, false
 	for event_timeline_is_busy(&timeline) {
 		cue := timeline.cues[timeline.head]

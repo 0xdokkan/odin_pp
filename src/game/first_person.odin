@@ -1,7 +1,7 @@
 package game
 
 import "core:math"
-import grid "../grid"
+import grid "../engine/grid"
 
 // FIRST PERSON SHOOTER. The card puts the player behind his own eyes for
 // FIRST_PERSON_SECONDS of the world's seconds (two more for each upgrade and on
@@ -125,20 +125,13 @@ First_Person_State :: struct {
 	trail: [FIRST_PERSON_TRAIL]First_Person_Shot,
 }
 
+@(private)
 first_person_effect :: proc(seconds: i32) -> Effect {
 	return {kind = .First_Person, target = PLAYER_ENTITY, amount = seconds}
 }
 
 tactical_first_person_active :: proc(room: ^Room) -> bool {
-	return room != nil && room.first_person.active && room.phase == .Combat && tactical_enabled(room)
-}
-
-// From a window open (or a stun, which leaves cards), no defence pending, no
-// foe on the Lazzo's rope, not already behind his eyes.
-tactical_can_begin_first_person :: proc(room: ^Room) -> bool {
-	if !tactical_enabled(room) || room.phase != .Combat || room.first_person.active { return false }
-	s := &room.player.tactical
-	return (s.phase == .Decision || s.phase == .Stunned) && room.qte.kind == .None && !room.lasso.active
+	return room != nil && room.player != nil && room.first_person.active && room.phase == .Combat
 }
 
 // The shots and hits of the room go on counting: the board numbers its
@@ -189,7 +182,7 @@ first_person_fire_due :: proc(room: ^Room) -> bool {
 // way.
 first_person_fire :: proc(room: ^Room, aim: First_Person_Aim) -> (shot: First_Person_Shot, fired: bool) {
 	if !first_person_fire_due(room) { return }
-	clear_event_log(&room.recent_events)
+	clear_event_log(room.recent_events)
 	fp := &room.first_person
 	fp.cooldown += FIRST_PERSON_SHOT_SECONDS
 	fp.shots += 1
@@ -205,7 +198,7 @@ first_person_fire :: proc(room: ^Room, aim: First_Person_Aim) -> (shot: First_Pe
 		if report.accepted {
 			shot.damage = player_damage_dealt(&report, shot.target)
 			fp.hits += 1
-			append_event_log(&room.recent_events, &report.events)
+			append_event_log(room.recent_events, &report.events)
 		}
 	}
 	fp.trail[(shot.number-1)%FIRST_PERSON_TRAIL] = shot
@@ -246,6 +239,7 @@ first_person_outline_top :: proc(archetype: Enemy_Archetype) -> f32 {
 
 // The eye a shot of `aim` leaves from: the view's own when it framed one near
 // the centre of `from` and over an open cell, else that centre.
+@(private = "file")
 first_person_eye :: proc(room: ^Room, from: grid.Position, aim: First_Person_Aim) -> [2]f32 {
 	centre := [2]f32{f32(from.x)+0.5, f32(from.y)+0.5}
 	if !aim.framed { return centre }
@@ -258,6 +252,7 @@ first_person_eye :: proc(room: ^Room, from: grid.Position, aim: First_Person_Aim
 // Where the card of `enemy` stands for a shot of `aim`: where the view showed
 // it, when that is near its cell, else on its cell's centre; and how far it
 // is lifted off its stand.
+@(private = "file")
 first_person_card :: proc(enemy: Enemy, aim: First_Person_Aim) -> (at: [2]f32, lift: f32) {
 	at = {f32(enemy.position.x)+0.5, f32(enemy.position.y)+0.5}
 	if !aim.framed { return }
@@ -388,6 +383,7 @@ MOVEMENT_KEY_DIRECTIONS :: [4]Move_Direction{.North, .East, .South, .West}
 FIRST_PERSON_WAYS :: [4]Move_Direction{.East, .South, .West, .North}
 
 // The grid way nearest the view's yaw (an exact tie goes clockwise).
+@(private = "file")
 first_person_way_index :: proc(yaw: f32) -> int {
 	turns := lasso_wrap(f64(yaw))/(math.PI/2)
 	return int(math.floor(turns+0.5))%4

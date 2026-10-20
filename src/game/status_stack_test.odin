@@ -1,7 +1,7 @@
 package game
 
 import "core:testing"
-import grid "../grid"
+import grid "../engine/grid"
 import level "../level"
 
 status_stack_test_events :: proc(log: ^Event_Log, kind: Game_Event_Kind, cause: Status_Kind) -> (count: int) {
@@ -33,7 +33,7 @@ test_burn_bites_at_each_new_tactical_window_and_never_wears :: proc(t: ^testing.
 		testing.expect(t, tactical_expire_window(&room))
 		testing.expect_value(t, player.health, i32(100-2*window))
 		testing.expect_value(t, room.enemies[0].health, i32(50-3*window))
-		testing.expect_value(t, status_stack_test_events(&room.recent_events, .Damaged, .Burn), 2)
+		testing.expect_value(t, status_stack_test_events(room.recent_events, .Damaged, .Burn), 2)
 		burn, found := status_for_entity(&room, enemy, .Burn)
 		testing.expect(t, found && burn.potency == 3)
 		testing.expect_value(t, player.tactical.cycle, window)
@@ -44,33 +44,6 @@ test_burn_bites_at_each_new_tactical_window_and_never_wears :: proc(t: ^testing.
 	}
 }
 
-// Classic combat has no windows: Bruciatura bites at every pulse, before a
-// Shield about to run out stops guarding.
-@(test)
-test_burn_bites_every_classic_pulse :: proc(t: ^testing.T) {
-	level_data := create_test_level(t)
-	defer level.destroy(&level_data)
-	player := create_test_player(t)
-	enemy_spawns := [?]Enemy_Spawn{{position = {x = 5, y = 3}, health = 10, attack = 1}}
-	room, ok := create_room(&level_data, &player, {enemies = enemy_spawns[:]})
-	testing.expect(t, ok)
-	defer destroy_room(&room)
-	enemy := enemy_entity(room.enemies[0].id)
-	_, _ = apply_status(&room, enemy, .Burn, 2, 0)
-	_, _ = apply_status(&room, enemy, .Shield, 1, 1)
-	for pulse in 1..=3 {
-		room.enemies[0].intent = make_wait_intent(&room, room.enemies[0].position)
-		report := advance_combat_pulse(&room)
-		// The first bite spends the last pulse of the shield's single point.
-		testing.expect_value(t, room.enemies[0].health, i32(10-2*pulse+1))
-		testing.expect_value(t, status_stack_test_events(&report.events, .Damage_Absorbed, .Burn), 1 if pulse == 1 else 0)
-	}
-	burn, found := status_for_entity(&room, enemy, .Burn)
-	testing.expect(t, found && burn.potency == 2)
-}
-
-// A lethal burn at the window's end closes the fight like any blow: loot,
-// deck and the tactical state are settled on the same command.
 @(test)
 test_lethal_burn_at_the_window_end_finishes_the_fight :: proc(t: ^testing.T) {
 	data: level.Level
@@ -156,59 +129,32 @@ test_slow_holds_each_planned_intent_by_its_stacks_then_wears :: proc(t: ^testing
 	defer destroy_room(&room)
 	enemy := enemy_entity(room.enemies[0].id)
 	testing.expect_value(t, room.enemies[0].intent.kind, Enemy_Intent_Kind.Move)
-	testing.expect_value(t, room.enemies[0].tactical_cooldown, f32(2))
+	testing.expect_value(t, room.enemies[0].tactical_cooldown, f32(3))
 	_, _ = apply_status(&room, enemy, .Slow, 2, 0)
-	testing.expect_value(t, room.enemies[0].tactical_cooldown, f32(2))
+	testing.expect_value(t, room.enemies[0].tactical_cooldown, f32(3))
 	start := room.enemies[0].position
-	advance_enemy_rework_seconds(t, &room, 2)
+	advance_enemy_rework_seconds(t, &room, 3)
 	testing.expect(t, room.enemies[0].position != start)
 	slow, found := status_for_entity(&room, enemy, .Slow)
 	testing.expect(t, found && slow.potency == 2)
 	testing.expect_value(t, room.enemies[0].intent.slowed, i32(2))
-	testing.expect_value(t, room.enemies[0].tactical_cooldown, f32(4))
-	testing.expect_value(t, tactical_enemy_intent_seconds(&room.enemies[0]), f32(4))
+	testing.expect_value(t, room.enemies[0].tactical_cooldown, f32(5))
+	testing.expect_value(t, tactical_enemy_intent_seconds(&room.enemies[0]), f32(5))
 	held := room.enemies[0].position
-	advance_enemy_rework_seconds(t, &room, 3)
+	advance_enemy_rework_seconds(t, &room, 4)
 	testing.expect_value(t, room.enemies[0].position, held)
 	advance_enemy_rework_seconds(t, &room, 1)
 	testing.expect(t, room.enemies[0].position != held)
 	slow, found = status_for_entity(&room, enemy, .Slow)
 	testing.expect(t, found && slow.potency == 1)
-	testing.expect_value(t, room.enemies[0].tactical_cooldown, f32(3))
-	advance_enemy_rework_seconds(t, &room, 3)
+	testing.expect_value(t, room.enemies[0].tactical_cooldown, f32(4))
+	advance_enemy_rework_seconds(t, &room, 4)
 	_, found = status_for_entity(&room, enemy, .Slow)
 	testing.expect(t, !found)
 	testing.expect_value(t, room.enemies[0].intent.slowed, i32(0))
-	testing.expect_value(t, room.enemies[0].tactical_cooldown, f32(2))
+	testing.expect_value(t, room.enemies[0].tactical_cooldown, f32(3))
 }
 
-// Classic combat has no seconds to hold: each of the enemy's actions wears a
-// stack all the same, and its intents keep no slowed seconds.
-@(test)
-test_slow_wears_by_the_action_in_classic_combat :: proc(t: ^testing.T) {
-	level_data := create_test_level(t)
-	defer level.destroy(&level_data)
-	player := create_test_player(t)
-	enemy_spawns := [?]Enemy_Spawn{{position = {x = 5, y = 3}, health = 10, attack = 1}}
-	room, ok := create_room(&level_data, &player, {enemies = enemy_spawns[:]})
-	testing.expect(t, ok)
-	defer destroy_room(&room)
-	enemy := enemy_entity(room.enemies[0].id)
-	_, _ = apply_status(&room, enemy, .Slow, 2, 0)
-	for stacks in ([2]i32{1, 0}) {
-		room.enemies[0].intent = make_wait_intent(&room, room.enemies[0].position)
-		_ = advance_combat_pulse(&room)
-		testing.expect_value(t, room.enemies[0].intent.slowed, i32(0))
-		slow, found := status_for_entity(&room, enemy, .Slow)
-		testing.expect_value(t, found, stacks > 0)
-		if found { testing.expect_value(t, slow.potency, stacks) }
-	}
-	testing.expect_value(t, room.enemies[0].health, i32(10))
-}
-
-// Every committed action of the player bites (a step, a wait, a dodge, a
-// card), but nothing in Movimento Ombra does: not its card, not the shadow's
-// steps, not the rise.
 @(test)
 test_player_poison_bites_his_actions_but_not_movimento_ombra :: proc(t: ^testing.T) {
 	data: level.Level
@@ -272,7 +218,7 @@ test_reactive_dodge_bites_poison_but_a_block_does_not :: proc(t: ^testing.T) {
 		poison, poisoned := status_for_entity(&room, PLAYER_ENTITY, .Poison)
 		testing.expect(t, poisoned && poison.potency == (3 if dodge else 4))
 		testing.expect_value(t, player.health, health-4 if dodge else health)
-		testing.expect_value(t, status_stack_test_events(&room.recent_events, .Damaged, .Poison), 1 if dodge else 0)
+		testing.expect_value(t, status_stack_test_events(room.recent_events, .Damaged, .Poison), 1 if dodge else 0)
 		drain_tactical_test_pulse(t, &room)
 		testing.expect_value(t, player.tactical.metrics.qte_successes, u64(1))
 	}
@@ -307,18 +253,17 @@ test_lethal_poison_on_a_reactive_dodge_is_a_defeat :: proc(t: ^testing.T) {
 test_status_templates_keep_stacks_without_a_duration :: proc(t: ^testing.T) {
 	for id in Card_Id {
 		if id == .Count { continue }
-		for tactical in ([2]bool{false, true}) {
-			definition, found := card_definition_by_id(id, tactical)
-			testing.expect(t, found)
-			for template in definition.effects[:definition.effect_count] {
-				if template.kind != .Apply_Status { continue }
-				if status_kind_stacks(template.status) {
-					testing.expect_value(t, template.duration, i32(0))
-				} else {
-					testing.expect(t, template.duration > 0)
-				}
+		definition, found := card_definition_by_id(id)
+		testing.expect(t, found)
+		for template in definition.effects[:definition.effect_count] {
+			if template.kind != .Apply_Status { continue }
+			if status_kind_stacks(template.status) {
+				testing.expect_value(t, template.duration, i32(0))
+			} else {
+				testing.expect(t, template.duration > 0)
 			}
 		}
+
 	}
 	needle, _ := card_definition_by_id(.Venom_Needle)
 	testing.expect(t, validate_card_definition(&needle))

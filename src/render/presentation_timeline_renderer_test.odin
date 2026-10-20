@@ -4,7 +4,7 @@ import "core:testing"
 import game "../game"
 
 @(test)
-test_renderer_timeline_wrappers_take_precedence_and_clear_legacy_animations :: proc(t: ^testing.T) {
+test_renderer_timeline_wrappers_advance_and_clear_playback :: proc(t: ^testing.T) {
 	player := game.Player{stats = {max_health = 10}, health = 10}
 	room := make_presentation_timeline_test_room(&player, nil, nil)
 	defer game.destroy_room(&room)
@@ -12,15 +12,10 @@ test_renderer_timeline_wrappers_take_precedence_and_clear_legacy_animations :: p
 	game.record_event(&events, {
 		kind = .Moved,
 		target = game.PLAYER_ENTITY,
-		from_position = {x = 1, y = 1},
-		to_position = {x = 2, y = 1},
+		from_position = {1, 1},
+		to_position = {2, 1},
 	})
-	renderer := Renderer{
-		loot_animation_count = 1,
-		loot_animations_dropped = 2,
-		enemy_move_animation_count = 1,
-		enemy_move_animations_dropped = 3,
-	}
+	renderer: Renderer
 
 	testing.expect(t, begin_renderer_event_timeline(
 		&renderer,
@@ -28,10 +23,6 @@ test_renderer_timeline_wrappers_take_precedence_and_clear_legacy_animations :: p
 		&events,
 	))
 	testing.expect(t, renderer_timeline_is_busy(&renderer))
-	testing.expect_value(t, renderer.loot_animation_count, 0)
-	testing.expect_value(t, renderer.loot_animations_dropped, 0)
-	testing.expect_value(t, renderer.enemy_move_animation_count, 0)
-	testing.expect_value(t, renderer.enemy_move_animations_dropped, 0)
 
 	testing.expect(t, !update_renderer_event_timeline(
 		&renderer,
@@ -45,12 +36,8 @@ test_renderer_timeline_wrappers_take_precedence_and_clear_legacy_animations :: p
 	testing.expect(t, !renderer_timeline_is_busy(&renderer))
 
 	begin_renderer_event_timeline(&renderer, capture_room_presentation(&room), &events)
-	renderer.loot_animation_count = 1
-	renderer.enemy_move_animation_count = 1
 	clear_event_animations(&renderer)
 	testing.expect(t, !renderer_timeline_is_busy(&renderer))
-	testing.expect_value(t, renderer.loot_animation_count, 0)
-	testing.expect_value(t, renderer.enemy_move_animation_count, 0)
 	testing.expect_value(t, renderer.timeline, Presentation_Timeline{})
 }
 
@@ -64,8 +51,8 @@ test_renderer_status_view_uses_snapshot_until_timeline_becomes_idle :: proc(t: ^
 	player.statuses.items[0] = {.Shield, 3, 2}
 	player.statuses.count = 1
 	enemies := [?]game.Enemy{
-		{id = 1, position = {x = 4, y = 1}, max_health = 5, health = 5},
-		{id = 2, position = {x = 5, y = 1}, max_health = 5, health = 5},
+		{id = 1, position = {4, 1}, max_health = 5, health = 5},
+		{id = 2, position = {5, 1}, max_health = 5, health = 5},
 	}
 	room := make_presentation_timeline_test_room(&player, enemies[:], nil)
 	defer game.destroy_room(&room)

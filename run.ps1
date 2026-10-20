@@ -3,5 +3,6 @@
 $ErrorActionPreference = 'Stop'
 Set-Location -LiteralPath $PSScriptRoot
 $odin = if ($env:ODIN) { $env:ODIN } else { 'odin' }
-& $odin run src -o:none -- @args
+New-Item -ItemType Directory -Path 'build' -Force | Out-Null
+& $odin run src '-o:none' '-out:build/odin_pp.exe' -- @args
 exit $LASTEXITCODE

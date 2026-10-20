@@ -1,7 +1,7 @@
 package game
 
 import "core:testing"
-import grid "../grid"
+import grid "../engine/grid"
 import level "../level"
 
 @(test)
@@ -26,7 +26,7 @@ test_stale_attack_intent_misses_after_enemy_displacement :: proc(t: ^testing.T) 
 	displaced_position := grid.Position{x = 2, y = 2}
 	health_before := player.health
 	room.enemies[0].position = displaced_position
-	testing.expect(t, !validate_enemy_intent(&room, &room.enemies[0]))
+	testing.expect(t, validate_enemy_intent(&room, &room.enemies[0]))
 	testing.expect(t, validate_enemy_intent_structure(&room, &room.enemies[0].intent))
 
 	pulse: Pulse_Report
@@ -66,7 +66,7 @@ test_stale_move_intent_reports_block_after_enemy_displacement :: proc(t: ^testin
 	planned_destination := room.enemies[0].intent.destination
 	displaced_position := grid.Position{x = 7, y = 2}
 	room.enemies[0].position = displaced_position
-	testing.expect(t, !validate_enemy_intents(&room))
+	testing.expect(t, validate_enemy_intents(&room))
 	testing.expect(t, validate_enemy_intent_structure(&room, &room.enemies[0].intent))
 
 	pulse: Pulse_Report
@@ -105,7 +105,7 @@ test_stale_charge_intent_reports_block_without_moving_or_attacking :: proc(t: ^t
 	displaced_position := grid.Position{x = 5, y = 2}
 	health_before := player.health
 	room.enemies[0].position = displaced_position
-	testing.expect(t, !validate_enemy_intent(&room, &room.enemies[0]))
+	testing.expect(t, validate_enemy_intent(&room, &room.enemies[0]))
 	testing.expect(t, validate_enemy_intent_structure(&room, &room.enemies[0].intent))
 
 	pulse: Pulse_Report

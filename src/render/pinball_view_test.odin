@@ -5,8 +5,9 @@ import "core:testing"
 import rl "vendor:raylib"
 import audio "../engine/audio"
 import game "../game"
-import grid "../grid"
+import grid "../engine/grid"
 import level "../level"
+import view "../engine/view"
 
 // An open room, the player in the middle with one Pinball, the foe to strike
 // beside him to the east and a bumper three cells further east; both held.
@@ -59,20 +60,20 @@ pinball_view_test_frame :: proc(t: ^testing.T, renderer: ^Renderer, room: ^game.
 		before := capture_room_presentation(room)
 		if game.tactical_expire_window(room) {
 			after := capture_room_presentation(room)
-			if room.recent_events.count > 0 { begin_renderer_world_timeline(renderer, before, &room.recent_events, &after) }
+			if room.recent_events.count > 0 { begin_renderer_world_timeline(renderer, before, room.recent_events, &after) }
 		}
 	}
 	for room.tactical_pulse.pending {
 		before := capture_room_presentation(room)
 		if !game.continue_tactical_pulse(room) { break }
 		after := capture_room_presentation(room)
-		if room.recent_events.count > 0 { begin_renderer_world_timeline(renderer, before, &room.recent_events, &after) }
+		if room.recent_events.count > 0 { begin_renderer_world_timeline(renderer, before, room.recent_events, &after) }
 	}
 	for game.tactical_pinball_due(room) {
 		before := capture_room_presentation(room)
 		testing.expect(t, game.resolve_pinball_roll(room))
 		after := capture_room_presentation(room)
-		if room.recent_events.count > 0 { testing.expect(t, begin_renderer_world_timeline(renderer, before, &room.recent_events, &after)) }
+		if room.recent_events.count > 0 { testing.expect(t, begin_renderer_world_timeline(renderer, before, room.recent_events, &after)) }
 	}
 	shadow_view_test_frame(renderer, room, dt)
 }
@@ -104,7 +105,7 @@ test_pinball_view_follows_the_ball_of_the_room :: proc(t: ^testing.T) {
 	play := game.play_card(&room, player.deck.hand[0].id, game.entity_target(foe))
 	testing.expect_value(t, play.result, game.Card_Play_Result.Played)
 	after := capture_room_presentation(&room)
-	testing.expect(t, begin_renderer_event_timeline(renderer, before, &room.recent_events, &after))
+	testing.expect(t, begin_renderer_event_timeline(renderer, before, room.recent_events, &after))
 	fit_card_cast_timeline(renderer, player.tactical.cast_duration)
 	update_tactical_view(renderer, &room, {}, false)
 	testing.expect(t, b.active && b.enemy == foe && b.made_paced && b.made == 0 && b.makes == 1 && b.archetype == .Archer)
@@ -256,30 +257,25 @@ test_pinball_sprite_is_steel_in_white_paper :: proc(t: ^testing.T) {
 // chip and the hand's hints.
 @(test)
 test_pinball_card_reads_its_value_and_the_wall :: proc(t: ^testing.T) {
-	first, second := gothic_card_lines({definition_id = .Pinball}, true)
+	first, second := gothic_card_lines({definition_id = .Pinball})
 	testing.expect_value(t, string(first), "COLPI 2, 3, 4...")
 	testing.expect_value(t, string(second), "MURO: TORNA A 2 / 20s")
-	first, second = gothic_card_lines({definition_id = .Pinball, upgrade_level = 3}, true)
+	first, second = gothic_card_lines({definition_id = .Pinball, upgrade_level = 3})
 	testing.expect_value(t, string(first), "COLPI 5, 6, 7...")
 	testing.expect_value(t, string(second), "MURO: TORNA A 5 / 20s")
-	first, second = gothic_card_lines({definition_id = .Pinball})
-	testing.expect_value(t, string(first), "COLPI 2, 3, 4...")
-	testing.expect_value(t, string(second), "SOLO TATTICA")
-	short_first, short_second, short := gothic_card_narrow_lines({definition_id = .Pinball}, true)
+	short_first, short_second, short := gothic_card_narrow_lines({definition_id = .Pinball})
 	testing.expect(t, short && string(short_first) == "COLPI 2, 3..." && string(short_second) == "MURO: 2 / 20s")
 	// Its name holds on a narrow card as it is.
 	_, renamed := gothic_card_narrow_name(.Pinball)
 	testing.expect(t, !renamed)
-	detail_first, detail_second := card_detail_lines({definition_id = .Pinball, upgrade_level = 2})
-	testing.expect(t, string(detail_first) == "COLPI 4, 5, 6..." && string(detail_second) == "SOLO TATTICA")
 	testing.expect_value(t, string(card_short_name(.Pinball)), "PINBALL")
 	// Its own icon (the atlas's cell 25), in the steel cards' accent.
 	testing.expect_value(t, gothic_card_icon(.Pinball), 25)
 	testing.expect_value(t, gothic_card_accent(.Pinball), gothic_card_accent(.Guard))
-	testing.expect_value(t, string(card_upgrade_preview({id = 1, definition_id = .Pinball}, true)), "VALORE 2 -> 3")
-	testing.expect_value(t, string(card_upgrade_preview({id = 1, definition_id = .Pinball, upgrade_level = 4}, true)), "VALORE 6 -> 7")
-	testing.expect_value(t, string(card_upgrade_preview({id = 1, definition_id = .Pinball, upgrade_level = game.PINBALL_MAX_UPGRADE_LEVEL}, true)), "MAX UPGRADE")
-	definition, _ := game.card_definition_by_id(.Pinball, true)
+	testing.expect_value(t, string(card_upgrade_preview({id = 1, definition_id = .Pinball})), "VALORE 2 -> 3")
+	testing.expect_value(t, string(card_upgrade_preview({id = 1, definition_id = .Pinball, upgrade_level = 4})), "VALORE 6 -> 7")
+	testing.expect_value(t, string(card_upgrade_preview({id = 1, definition_id = .Pinball, upgrade_level = game.PINBALL_MAX_UPGRADE_LEVEL})), "MAX UPGRADE")
+	definition, _ := game.card_definition_by_id(.Pinball)
 	reaction, rule := tactical_card_inspector_rules({definition_id = .Pinball}, definition)
 	testing.expect_value(t, string(reaction), "BOSS E MINIBOSS: TROPPO PESANTI")
 	testing.expect_value(t, string(rule), "DOPO 20s SCOPPIA E CADE")
@@ -409,4 +405,32 @@ test_pinball_aim_shows_the_launch_the_strike_gives :: proc(t: ^testing.T) {
 	testing.expect_value(t, room.pinball.turn, turn)
 	testing.expect(t, room.pinball.heading == heading)
 	testing.expect_value(t, room.pinball.cell, grid.Position{7, 6})
+}
+
+// TROPPO PESANTE stands just under the heavy foe's feet; when a neighbour's
+// heart is there (a foe in the cell below it, the common case for the
+// Pinball's aim beside the player), it goes a row lower or beside, never
+// over the heart; inside the board's area, and where it was first meant when
+// nothing is clear.
+@(test)
+test_pinball_heavy_label_keeps_clear_of_the_hearts :: proc(t: ^testing.T) {
+	viewport := rl.Rectangle{12, 100, 936, 240}
+	layout: Tactical_Label_Layout
+	feet := view.Vec2{400, 200}
+	width := f32(110)
+	first := pinball_heavy_label_place(&layout, feet, width, viewport)
+	testing.expect_value(t, first, rl.Rectangle{345, 212, width, 19})
+	// A heart right where it would go.
+	heart := rl.Rectangle{360, 215, 70, 18}
+	layout.bounds[0], layout.count = heart, 1
+	placed := pinball_heavy_label_place(&layout, feet, width, viewport)
+	testing.expect(t, !rl.CheckCollisionRecs(placed, heart) && placed.width == width && placed.height == 19)
+	testing.expect(t, placed.x >= viewport.x && placed.x+placed.width <= viewport.x+viewport.width && placed.y+placed.height <= viewport.y+viewport.height)
+	testing.expect(t, abs(placed.y-first.y) <= 13*3 && abs(placed.x+width*0.5-feet.x) <= width)
+	// Near the board's bottom edge: pulled inside it.
+	low := pinball_heavy_label_place(&layout, {200, viewport.y+viewport.height-4}, width, viewport)
+	testing.expect(t, low.y+low.height <= viewport.y+viewport.height)
+	// Nothing clear: just under the feet still.
+	for &bounds, index in layout.bounds { bounds = {0, 0, 2000, 2000}; layout.count = index+1 }
+	testing.expect_value(t, pinball_heavy_label_place(&layout, feet, width, viewport), first)
 }

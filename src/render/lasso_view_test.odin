@@ -2,11 +2,9 @@ package render
 
 import "core:math"
 import "core:testing"
-import rl "vendor:raylib"
 import game "../game"
-import grid "../grid"
+import grid "../engine/grid"
 import level "../level"
-import view "../view"
 
 // An open room with space for the widest ring round the player (in the
 // middle, with one Lazzo): the foe to throw it at three cells east, another
@@ -60,13 +58,13 @@ lasso_view_test_frame :: proc(t: ^testing.T, renderer: ^Renderer, room: ^game.Ro
 		before := capture_room_presentation(room)
 		if !game.continue_tactical_pulse(room) { break }
 		after := capture_room_presentation(room)
-		if room.recent_events.count > 0 { begin_renderer_world_timeline(renderer, before, &room.recent_events, &after) }
+		if room.recent_events.count > 0 { begin_renderer_world_timeline(renderer, before, room.recent_events, &after) }
 	}
 	for game.tactical_lasso_due(room) {
 		before := capture_room_presentation(room)
 		testing.expect(t, game.resolve_lasso_spin(room))
 		after := capture_room_presentation(room)
-		if room.recent_events.count > 0 { testing.expect(t, begin_renderer_world_timeline(renderer, before, &room.recent_events, &after)) }
+		if room.recent_events.count > 0 { testing.expect(t, begin_renderer_world_timeline(renderer, before, room.recent_events, &after)) }
 	}
 	shadow_view_test_frame(renderer, room, dt)
 }
@@ -100,7 +98,7 @@ test_lasso_view_follows_the_rope_of_the_room :: proc(t: ^testing.T) {
 	play := game.play_card(&room, player.deck.hand[0].id, game.entity_target(foe))
 	testing.expect_value(t, play.result, game.Card_Play_Result.Played)
 	after := capture_room_presentation(&room)
-	testing.expect(t, begin_renderer_event_timeline(renderer, before, &room.recent_events, &after))
+	testing.expect(t, begin_renderer_event_timeline(renderer, before, room.recent_events, &after))
 	fit_card_cast_timeline(renderer, player.tactical.cast_duration)
 	update_tactical_view(renderer, &room, {}, false)
 	testing.expect(t, l.active && l.enemy == foe && l.throws == 1)
@@ -166,6 +164,59 @@ test_lasso_view_follows_the_rope_of_the_room :: proc(t: ^testing.T) {
 	testing.expect_value(t, l.throws, 1)
 }
 
+// An interior contact slides the target out to the ring without playing a
+// hit star or a wound cue. The presentation must show the displacement even
+// though no Lasso_Struck event accompanies it.
+@(test)
+test_lasso_view_shows_interior_push_without_hit_feedback :: proc(t: ^testing.T) {
+	data: level.Level
+	player: game.Player
+	room := lasso_view_test_room(t, &data, &player)
+	defer level.destroy(&data)
+	defer game.destroy_room(&room)
+	// Two cells from the perimeter: the whole slide must reach the ring,
+	// including at the first contact's strength of one.
+	room.enemies[1].position = {7, 5}
+	other := game.enemy_entity(room.enemies[1].id)
+	snapshot: Room_Presentation
+	renderer := shadow_view_test_renderer(&data, &snapshot)
+	defer free(renderer)
+	defer destroy_renderer_world_playback(renderer)
+	update_tactical_view(renderer, &room, {}, false)
+	before := capture_room_presentation(&room)
+	play := game.play_card(&room, player.deck.hand[0].id, game.entity_target(game.enemy_entity(room.enemies[0].id)))
+	testing.expect_value(t, play.result, game.Card_Play_Result.Played)
+	after := capture_room_presentation(&room)
+	testing.expect(t, begin_renderer_event_timeline(renderer, before, room.recent_events, &after))
+	fit_card_cast_timeline(renderer, player.tactical.cast_duration)
+	for frame := 0; frame < 600 && (game.tactical_is_casting(&room) || renderer_blocks_player_input(renderer)); frame += 1 {
+		lasso_view_test_frame(t, renderer, &room, 0.01)
+	}
+	// Less than one turn, long enough for the contact. Longer pushes have
+	// longer movement cues: finish that presentation without another turn.
+	for _ in 0..<70 {
+		lasso_view_test_frame(t, renderer, &room, 0.01)
+		for offset in 0..<renderer_active_cue_count(renderer) {
+			cue, found := renderer_active_cue_at(renderer, offset)
+			if !found { continue }
+			testing.expect(t, cue.kind != .Lasso_Struck && cue.kind != .Damage)
+		}
+	}
+	for frame := 0; frame < 100 && renderer_world_is_busy(renderer); frame += 1 {
+		shadow_view_test_frame(renderer, &room, 0.01)
+	}
+	testing.expect(t, !renderer_world_is_busy(renderer))
+	testing.expect_value(t, room.enemies[1].position, grid.Position{9, 3})
+	testing.expect_value(t, room.enemies[1].health, i32(30))
+	testing.expect_value(t, room.enemies[0].health, i32(30))
+	shown, found := presentation_actor_in_view(&snapshot, other)
+	testing.expect(t, found)
+	testing.expect_value(t, shown.position, presentation_position(grid.Position{9, 3}))
+	testing.expect_value(t, renderer.tactical.lasso.spawned_hits, 0)
+	testing.expect_value(t, renderer.tactical.lasso.spawned_smashes, 0)
+	testing.expect_value(t, renderer.timeline.update_failures, 0)
+}
+
 // The rope let go falls as the board shows what moved the player, MOLLATO over
 // it and the slack heard with the fall: his dodge, the foreground's first cue,
 // at once (not once the dodge has played, as the release's own cue would); a
@@ -193,7 +244,7 @@ test_lasso_lets_go_as_the_board_shows_the_move :: proc(t: ^testing.T) {
 	before := capture_room_presentation(&room)
 	testing.expect(t, game.try_dodge_player(&room, .West))
 	after := capture_room_presentation(&room)
-	testing.expect(t, begin_renderer_event_timeline(renderer, before, &room.recent_events, &after))
+	testing.expect(t, begin_renderer_event_timeline(renderer, before, room.recent_events, &after))
 	update_tactical_view(renderer, &room, {}, false)
 	// Not a frame of the dodge played yet: the card hangs on.
 	testing.expect(t, l.active && !l.ending && l.releases == 0 && tactical_lasso_lift(renderer, foe) > 0)
@@ -247,7 +298,7 @@ test_lasso_says_a_dodge_lets_go_only_when_one_can :: proc(t: ^testing.T) {
 	snapshot := capture_room_presentation(&room)
 	renderer := new(Renderer)
 	defer free(renderer)
-	renderer.tactical = {enabled = true, snapshot = &snapshot}
+	renderer.tactical = {snapshot = &snapshot}
 	player.tactical.config.shrinking_window = true
 	testing.expect_value(t, string(tactical_hud_objective(renderer, &room)), "MAX 20s / CARTE 0/6 / NEMICI 2")
 	play := game.play_card(&room, player.deck.hand[0].id, game.entity_target(game.enemy_entity(room.enemies[0].id)))
@@ -388,12 +439,16 @@ test_lasso_ring_key_tells_every_ring_apart :: proc(t: ^testing.T) {
 @(test)
 test_lasso_card_reads_its_hits_and_turns :: proc(t: ^testing.T) {
 	testing.expect_value(t, string(card_short_name(.Lasso)), "LAZZO")
-	testing.expect_value(t, string(card_upgrade_preview({id = 1, definition_id = .Lasso}, true)), "PRIMO COLPO 1 -> 2")
-	testing.expect_value(t, string(card_upgrade_preview({id = 1, definition_id = .Lasso, upgrade_level = 4}, true)), "PRIMO COLPO 5 -> 6")
-	testing.expect_value(t, string(card_upgrade_preview({id = 1, definition_id = .Lasso, upgrade_level = game.LASSO_MAX_UPGRADE_LEVEL}, true)), "MAX UPGRADE")
-	first, second := gothic_card_lines({definition_id = .Lasso}, true)
+	testing.expect_value(t, string(card_upgrade_preview({id = 1, definition_id = .Lasso})), "PRIMO COLPO 1 -> 2")
+	testing.expect_value(t, string(card_upgrade_preview({id = 1, definition_id = .Lasso, upgrade_level = 4})), "PRIMO COLPO 5 -> 6")
+	testing.expect_value(t, string(card_upgrade_preview({id = 1, definition_id = .Lasso, upgrade_level = game.LASSO_MAX_UPGRADE_LEVEL})), "MAX UPGRADE")
+	first, second := gothic_card_lines({definition_id = .Lasso})
 	testing.expect_value(t, string(first), "COLPI 1, 2, 3...")
 	testing.expect_value(t, string(second), "-1 VITA A OGNI GIRO")
+	definition, _ := game.card_definition_by_id(.Lasso)
+	reaction, rule := tactical_card_inspector_rules({definition_id = .Lasso}, definition)
+	testing.expect_value(t, string(reaction), "DENTRO IL RAGGIO: SOLO SPINTA")
+	testing.expect_value(t, string(rule), "SCHIVA O SPINTA: LO MOLLI")
 }
 
 // The lab hears the rope with its own sounds: the card, the throw at once and
@@ -500,32 +555,4 @@ test_lasso_turns_pop_small_tokens_and_shake_nothing :: proc(t: ^testing.T) {
 		}
 	}
 	testing.expect_value(t, found, 3)
-}
-
-// TROPPO PESANTE stands just under the heavy foe's feet; when a neighbour's
-// heart is there (a foe in the cell below it, the common case for the
-// Pinball's aim beside the player), it goes a row lower or beside, never
-// over the heart; inside the board's area, and where it was first meant when
-// nothing is clear.
-@(test)
-test_lasso_heavy_label_keeps_clear_of_the_hearts :: proc(t: ^testing.T) {
-	viewport := rl.Rectangle{12, 100, 936, 240}
-	layout: Tactical_Label_Layout
-	feet := view.Vec2{400, 200}
-	width := f32(110)
-	first := lasso_heavy_label_place(&layout, feet, width, viewport)
-	testing.expect_value(t, first, rl.Rectangle{345, 212, width, 19})
-	// A heart right where it would go.
-	heart := rl.Rectangle{360, 215, 70, 18}
-	layout.bounds[0], layout.count = heart, 1
-	placed := lasso_heavy_label_place(&layout, feet, width, viewport)
-	testing.expect(t, !rl.CheckCollisionRecs(placed, heart) && placed.width == width && placed.height == 19)
-	testing.expect(t, placed.x >= viewport.x && placed.x+placed.width <= viewport.x+viewport.width && placed.y+placed.height <= viewport.y+viewport.height)
-	testing.expect(t, abs(placed.y-first.y) <= 13*3 && abs(placed.x+width*0.5-feet.x) <= width)
-	// Near the board's bottom edge: pulled inside it.
-	low := lasso_heavy_label_place(&layout, {200, viewport.y+viewport.height-4}, width, viewport)
-	testing.expect(t, low.y+low.height <= viewport.y+viewport.height)
-	// Nothing clear: just under the feet still.
-	for &bounds, index in layout.bounds { bounds = {0, 0, 2000, 2000}; layout.count = index+1 }
-	testing.expect_value(t, lasso_heavy_label_place(&layout, feet, width, viewport), first)
 }

@@ -1,6 +1,6 @@
 package game
 
-import grid "../grid"
+import grid "../engine/grid"
 import level "../level"
 
 // MOSTRA EFFETTO: every card shown at work in a small room of its own, built
@@ -137,12 +137,14 @@ Card_Demo_Scene :: struct {
 	expects: bit_set[Game_Event_Kind],
 }
 
+@(private = "file")
 card_demo_add_foe :: proc(scene: ^Card_Demo_Scene, at: grid.Position, archetype := Enemy_Archetype.Chaser, health := i32(30), free := false) {
 	if scene.foe_count >= CARD_DEMO_MAX_FOES { return }
 	scene.foes[scene.foe_count] = {at = at, archetype = archetype, health = health, attack = 1, free = free}
 	scene.foe_count += 1
 }
 
+@(private = "file")
 card_demo_add_action :: proc(scene: ^Card_Demo_Scene, action: Card_Demo_Action) {
 	if scene.action_count >= CARD_DEMO_MAX_ACTIONS { return }
 	scene.actions[scene.action_count] = action
@@ -150,6 +152,7 @@ card_demo_add_action :: proc(scene: ^Card_Demo_Scene, action: Card_Demo_Action) 
 }
 
 // A cell `dx` east and `dy` south of the player (north is -dy).
+@(private)
 card_demo_offset :: proc(dx, dy: int) -> grid.Position {
 	return {CARD_DEMO_PLAYER.x+dx, CARD_DEMO_PLAYER.y+dy}
 }
@@ -159,6 +162,7 @@ card_demo_offset :: proc(dx, dy: int) -> grid.Position {
 // him is right of him at his own depth, and what he aims at stands beside him,
 // never in front of him or behind. A step north where the reach is odd and
 // the metric counts steps (north is up and right, never under his card).
+@(private = "file")
 card_demo_reach :: proc(metric: Targeting_Range_Metric, reach: int) -> grid.Position {
 	switch metric {
 	case .Chebyshev: return card_demo_offset(reach, -reach)
@@ -171,6 +175,7 @@ card_demo_reach :: proc(metric: Targeting_Range_Metric, reach: int) -> grid.Posi
 
 // A line runs straight or diagonal from the player: diagonal where the metric
 // lets it (to his right on the screen), else north.
+@(private = "file")
 card_demo_line :: proc(metric: Targeting_Range_Metric, reach: int) -> grid.Position {
 	return card_demo_offset(reach, -reach) if metric == .Chebyshev else card_demo_offset(0, -reach)
 }
@@ -181,6 +186,7 @@ card_demo_line :: proc(metric: Targeting_Range_Metric, reach: int) -> grid.Posit
 // a card that strikes every foe; the deck's other cards when it draws or
 // discards; on the player the status it washes away. A card that needs more
 // gets it in card_demo_scene.
+@(private)
 card_demo_default_scene :: proc(given: Card_Definition) -> (scene: Card_Demo_Scene) {
 	definition := given
 	spec := definition.targeting
@@ -250,7 +256,7 @@ card_demo_default_scene :: proc(given: Card_Definition) -> (scene: Card_Demo_Sce
 // it needs instead (a scene that changes with the level: the AK's, whose view
 // lasts longer).
 card_demo_scene :: proc(id: Card_Id, upgrade_level: i32 = 0) -> (scene: Card_Demo_Scene) {
-	definition, _ := card_definition_by_id(id, true)
+	definition, _ := card_definition_by_id(id)
 	scene = card_demo_default_scene(definition)
 	#partial switch id {
 	// Two 4s: the 8 that pushes.
@@ -395,7 +401,7 @@ card_demo_scene :: proc(id: Card_Id, upgrade_level: i32 = 0) -> (scene: Card_Dem
 // card's take is held to it with no word of its own. Every kind of effect is
 // named, so a new one does not compile until it says how its take shows it.
 card_demo_expected_events :: proc(id: Card_Id) -> (events: bit_set[Game_Event_Kind], foes_hurt: int) {
-	definition, found := card_definition_by_id(id, true)
+	definition, found := card_definition_by_id(id)
 	if !found { return }
 	// The rod is no card played: its slot casts it (Fish_Cast).
 	if !card_is_room_tool(id) { events += {.Card_Played} }
@@ -449,6 +455,7 @@ card_demo_expected_events :: proc(id: Card_Id) -> (events: bit_set[Game_Event_Ki
 // How a status the player carries shows in use, beyond its chip: the events
 // its use makes and whether a foe is wounded by it. Every kind of status is
 // named, so a new one does not compile until it says how its take shows it.
+@(private = "file")
 card_demo_status_use :: proc(kind: Status_Kind) -> (events: bit_set[Game_Event_Kind], foe_hurt: bool) {
 	switch kind {
 	// Their chips and the paper tags say it all.
@@ -474,7 +481,7 @@ card_demo_status_use :: proc(kind: Status_Kind) -> (events: bit_set[Game_Event_K
 Card_Demo_Ground :: enum u8 {None, Pool, Fire}
 
 card_demo_ground_expected :: proc(id: Card_Id) -> Card_Demo_Ground {
-	definition, found := card_definition_by_id(id, true)
+	definition, found := card_definition_by_id(id)
 	if !found { return .None }
 	for template in definition.effects[:definition.effect_count] {
 		if template.kind != .Place_Ground { continue }
@@ -485,7 +492,7 @@ card_demo_ground_expected :: proc(id: Card_Id) -> Card_Demo_Ground {
 
 // Whether the card's take must count the room's own hits of the AK.
 card_demo_counts_shots :: proc(id: Card_Id) -> bool {
-	definition, found := card_definition_by_id(id, true)
+	definition, found := card_definition_by_id(id)
 	if !found { return false }
 	for template in definition.effects[:definition.effect_count] {
 		if template.kind == .First_Person { return true }
@@ -516,6 +523,7 @@ card_demo_dice :: proc(card: Card_Instance, faces: [MAX_ROLL_DICE]i32, sides: i3
 }
 
 // The rod's stream whose next catch is food.
+@(private = "file")
 card_demo_fish_stream :: proc() -> (random: u64, ok: bool) {
 	for candidate in u64(1)..<u64(100_000) {
 		stream := candidate
@@ -559,7 +567,7 @@ create_card_demo_room :: proc(given: Card_Demo_Scene, card: Card_Instance, dice:
 	player^, created = create_player(CARD_DEMO_PLAYER_STATS)
 	if !created { return }
 	config := tactical
-	config.enabled, config.vision_size, config.timed_actions = true, scene.vision, true
+	config.vision_size, config.timed_actions = scene.vision, true
 	config.shrinking_window = false
 	if scene.window_seconds > 0 { config.timer_seconds = scene.window_seconds }
 	if !configure_tactical(player, config) { return }
@@ -613,7 +621,7 @@ create_card_demo_room :: proc(given: Card_Demo_Scene, card: Card_Instance, dice:
 	plan_enemy_intents(room)
 	for at in scene.coils[:scene.coil_count] {
 		// The coil's own event goes nowhere: the take starts with it standing.
-		if !deploy_board_device(room, .Tesla_Coil, at, 8, 0, &room.recent_events) { return }
+		if !deploy_board_device(room, .Tesla_Coil, at, 8, 0, room.recent_events) { return }
 	}
 	for cell in scene.pools[:scene.pool_count] {
 		action := make_action(.Card, PLAYER_ENTITY, cell_target(cell), .Walkable_Cell)
@@ -627,7 +635,7 @@ create_card_demo_room :: proc(given: Card_Demo_Scene, card: Card_Instance, dice:
 	if scene.cleared {
 		if stream, found := card_demo_fish_stream(); found { room.fishing.random = stream }
 	}
-	clear_event_log(&room.recent_events)
+	clear_event_log(room.recent_events)
 	ok = true
 	return
 }

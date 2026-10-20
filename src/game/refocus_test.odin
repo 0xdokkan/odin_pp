@@ -44,7 +44,7 @@ place_refocus_test_card_in_hand :: proc(
 }
 
 @(test)
-test_refocus_player_hand_cleans_pulses_then_refills_in_fifo_order :: proc(t: ^testing.T) {
+test_refocus_player_hand_preserves_cleanup_order_before_deferred_refill :: proc(t: ^testing.T) {
 	level_data := create_test_level(t)
 	defer level.destroy(&level_data)
 	player := create_test_player(t)
@@ -75,16 +75,14 @@ test_refocus_player_hand_cleans_pulses_then_refills_in_fifo_order :: proc(t: ^te
 
 	testing.expect_value(t, refocus.result, Refocus_Result.Refocused)
 	testing.expect(t, refocus_was_committed(refocus.result))
-	testing.expect(t, refocus.pulse_report.advanced)
 	testing.expect_value(t, refocus.hand_report.outcome_count, 3)
 	testing.expect_value(t, refocus.hand_report.retained_count, 1)
 	testing.expect_value(t, refocus.hand_report.discarded_count, 1)
 	testing.expect_value(t, refocus.hand_report.exhausted_count, 1)
-	testing.expect_value(t, refocus.drawn_count, 2)
 	testing.expect_value(t, refocus.energy_before, i32(0))
-	testing.expect_value(t, refocus.energy_after, i32(1))
-	testing.expect_value(t, room.pulse_count, u64(1))
-	testing.expect_value(t, player.deck.hand_count, 3)
+	testing.expect_value(t, refocus.energy_after, i32(0))
+	testing.expect_value(t, room.pulse_count, u64(0))
+	testing.expect_value(t, player.deck.hand_count, 1)
 	testing.expect_value(t, player.deck.hand[0], counter)
 	testing.expect_value(t, player.deck.discard_count, 1)
 	testing.expect_value(t, player.deck.discard_pile[0], strike)
@@ -92,7 +90,7 @@ test_refocus_player_hand_cleans_pulses_then_refills_in_fifo_order :: proc(t: ^te
 	testing.expect_value(t, player.deck.exhaust_pile[0], battle)
 	testing.expect(t, validate_deck_state(&player.deck))
 
-	testing.expect_value(t, room.recent_events.count, 7)
+	testing.expect_value(t, room.recent_events.count, 4)
 	testing.expect_value(t, room.recent_events.events[0].kind, Game_Event_Kind.Hand_Refocused)
 	testing.expect_value(t, room.recent_events.events[0].amount, i32(3))
 	expected_cards := [?]Card_Instance{counter, battle, strike}
@@ -105,9 +103,11 @@ test_refocus_player_hand_cleans_pulses_then_refills_in_fifo_order :: proc(t: ^te
 		testing.expect_value(t, event.from_card_zone, Card_Zone.Hand)
 		testing.expect_value(t, event.to_card_zone, expected_destinations[index])
 	}
-	testing.expect_value(t, room.recent_events.events[4].kind, Game_Event_Kind.Pulse_Advanced)
-	testing.expect_value(t, room.recent_events.events[5].kind, Game_Event_Kind.Card_Drawn)
-	testing.expect_value(t, room.recent_events.events[6].kind, Game_Event_Kind.Card_Drawn)
+	drain_tactical_test_pulse(t, &room)
+	testing.expect_value(t, player.deck.hand_count, 3)
+	testing.expect_value(t, player.deck.hand[0], counter)
+	testing.expect_value(t, room.pulse_count, u64(2))
+	testing.expect_value(t, player.deck.energy, i32(0))
 }
 
 @(test)
@@ -144,8 +144,7 @@ test_refocus_discards_combat_lifetime_then_replays_reshuffle :: proc(t: ^testing
 	testing.expect_value(t, refocus.hand_report.outcomes[0].destination, Card_Zone.Discard)
 	testing.expect_value(t, refocus.hand_report.outcomes[1].destination, Card_Zone.Discard)
 	testing.expect_value(t, refocus.hand_report.exhausted_count, 0)
-	testing.expect_value(t, refocus.drawn_count, 1)
-	testing.expect_value(t, refocus.drawn_cards[0], expected_draw)
+	drain_tactical_test_pulse(t, &room)
 	testing.expect_value(t, player.deck.random_state, expected.random_state)
 	testing.expect_value(t, player.deck.hand[0], expected_draw)
 	testing.expect_value(t, player.deck.draw_count, 1)
@@ -171,17 +170,17 @@ test_refocus_terminal_pulse_commits_cleanup_without_refill :: proc(t: ^testing.T
 	testing.expect(t, ok)
 	defer destroy_room(&room)
 
+	room.enemies[0].tactical_cooldown = 1
 	refocus := refocus_player_hand(&room)
 
-	testing.expect_value(t, refocus.result, Refocus_Result.Player_Defeated)
+	testing.expect_value(t, refocus.result, Refocus_Result.Refocused)
 	testing.expect(t, refocus_was_committed(refocus.result))
-	testing.expect(t, refocus.pulse_report.advanced && refocus.pulse_report.player_defeated)
-	testing.expect_value(t, refocus.drawn_count, 0)
+	drain_tactical_test_pulse(t, &room)
 	testing.expect_value(t, room.phase, Room_Phase.Defeat)
 	testing.expect_value(t, room.pulse_count, u64(1))
 	testing.expect(t, !player.deck.combat_active)
 	testing.expect_value(t, player.deck.hand_count, 0)
-	testing.expect_value(t, refocus.energy_after, i32(0))
+	testing.expect_value(t, player.deck.energy, i32(0))
 	for event in room.recent_events.events[:room.recent_events.count] {
 		testing.expect(t, event.kind != .Card_Drawn)
 	}
@@ -207,12 +206,12 @@ test_refocus_combat_end_from_status_skips_refill_and_clears_runtime_zones :: pro
 	applied, _ := apply_status(&room, enemy, .Poison, 1, 1)
 	testing.expect(t, applied)
 
+	room.enemies[0].tactical_cooldown = 1
 	refocus := refocus_player_hand(&room)
 
-	testing.expect_value(t, refocus.result, Refocus_Result.Combat_Ended)
+	testing.expect_value(t, refocus.result, Refocus_Result.Refocused)
 	testing.expect(t, refocus_was_committed(refocus.result))
-	testing.expect(t, refocus.pulse_report.advanced && refocus.pulse_report.combat_ended)
-	testing.expect_value(t, refocus.drawn_count, 0)
+	drain_tactical_test_pulse(t, &room)
 	testing.expect_value(t, room.phase, Room_Phase.Loot)
 	testing.expect_value(t, room.pulse_count, u64(1))
 	testing.expect(t, !player.deck.combat_active)
@@ -234,12 +233,12 @@ test_refocus_rejections_preserve_deck_pulse_and_recent_events :: proc(t: ^testin
 	room, ok := create_room(&level_data, &player, {enemies = enemies[:]})
 	testing.expect(t, ok)
 	defer destroy_room(&room)
-	record_event(&room.recent_events, {kind = .Gold_Gained, amount = 7})
+	record_event(room.recent_events, {kind = .Gold_Gained, amount = 7})
 	active_before := player.deck
 	_, began_resolving := begin_resolving_hand_card(&player.deck, 0)
 	testing.expect(t, began_resolving)
 	deck_before := player.deck
-	events_before := room.recent_events
+	events_before := room.recent_events^
 	health_before := player.health
 
 	refocus := refocus_player_hand(&room)
@@ -247,7 +246,7 @@ test_refocus_rejections_preserve_deck_pulse_and_recent_events :: proc(t: ^testin
 	testing.expect_value(t, refocus.result, Refocus_Result.Card_Resolving)
 	testing.expect(t, !refocus_was_committed(refocus.result))
 	testing.expect_value(t, player.deck, deck_before)
-	testing.expect_value(t, room.recent_events, events_before)
+	testing.expect_value(t, room.recent_events^, events_before)
 	testing.expect_value(t, player.health, health_before)
 	testing.expect_value(t, room.pulse_count, u64(0))
 
@@ -257,7 +256,7 @@ test_refocus_rejections_preserve_deck_pulse_and_recent_events :: proc(t: ^testin
 	refocus = refocus_player_hand(&room)
 	testing.expect_value(t, refocus.result, Refocus_Result.Invalid_Deck)
 	testing.expect_value(t, player.deck, corrupted_before)
-	testing.expect_value(t, room.recent_events, events_before)
+	testing.expect_value(t, room.recent_events^, events_before)
 	testing.expect_value(t, room.pulse_count, u64(0))
 
 	player.deck = active_before
@@ -266,7 +265,7 @@ test_refocus_rejections_preserve_deck_pulse_and_recent_events :: proc(t: ^testin
 	refocus = refocus_player_hand(&room)
 	testing.expect_value(t, refocus.result, Refocus_Result.Invalid_Phase)
 	testing.expect_value(t, player.deck, phase_deck_before)
-	testing.expect_value(t, room.recent_events, events_before)
+	testing.expect_value(t, room.recent_events^, events_before)
 	testing.expect_value(t, room.pulse_count, u64(0))
 
 	refocus = refocus_player_hand(nil)
@@ -274,7 +273,7 @@ test_refocus_rejections_preserve_deck_pulse_and_recent_events :: proc(t: ^testin
 }
 
 @(test)
-test_refocus_empty_hand_still_advances_exactly_one_pulse :: proc(t: ^testing.T) {
+test_refocus_empty_hand_still_costs_time_without_immediate_world_pulse :: proc(t: ^testing.T) {
 	level_data := create_test_level(t)
 	defer level.destroy(&level_data)
 	player := create_test_player(t)
@@ -296,10 +295,11 @@ test_refocus_empty_hand_still_advances_exactly_one_pulse :: proc(t: ^testing.T) 
 
 	testing.expect_value(t, refocus.result, Refocus_Result.Refocused)
 	testing.expect_value(t, refocus.hand_report.outcome_count, 0)
-	testing.expect_value(t, refocus.drawn_count, 0)
-	testing.expect_value(t, room.pulse_count, u64(1))
-	testing.expect_value(t, room.recent_events.count, 2)
+	testing.expect_value(t, room.pulse_count, u64(0))
+	testing.expect_value(t, room.recent_events.count, 1)
 	testing.expect_value(t, room.recent_events.events[0].kind, Game_Event_Kind.Hand_Refocused)
 	testing.expect_value(t, room.recent_events.events[0].amount, i32(0))
-	testing.expect_value(t, room.recent_events.events[1].kind, Game_Event_Kind.Pulse_Advanced)
+	testing.expect_value(t, player.tactical.remaining, f32(18))
+	drain_tactical_test_pulse(t, &room)
+	testing.expect_value(t, room.pulse_count, u64(2))
 }

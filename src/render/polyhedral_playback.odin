@@ -29,6 +29,7 @@ polyhedral_dice_pose :: proc(die: ^Polyhedral_Die, throw: ^Dice_Throw, index: in
 
 // How deep any corner of one solid sinks into the other (0 when apart). The
 // faces of a convex die bound it, so a corner inside every face plane is inside.
+@(private)
 polyhedral_overlap :: proc(die: ^Polyhedral_Die, a: rl.Vector3, a_rotation: rl.Quaternion,
 	b: rl.Vector3, b_rotation: rl.Quaternion) -> (depth: f32) {
 	if die == nil { return }
@@ -51,6 +52,7 @@ polyhedral_overlap :: proc(die: ^Polyhedral_Die, a: rl.Vector3, a_rotation: rl.Q
 // so three of them can come to rest inside each other: these floor offsets
 // part the resting solids, and the pose eases into them while the dice settle.
 // Cosmetic only, like the throw; a single die or a clear pool never moves.
+@(private)
 polyhedral_rest_offsets :: proc(die: ^Polyhedral_Die, throw: ^Dice_Throw, results: [3]i32, count: int) -> (offsets: [3]rl.Vector3) {
 	if die == nil || throw == nil || count < 2 || count > throw.count { return }
 	rest, positions: [3]rl.Vector3
@@ -79,6 +81,7 @@ polyhedral_rest_offsets :: proc(die: ^Polyhedral_Die, throw: ^Dice_Throw, result
 }
 
 // 0 in flight, 1 at rest: the parting happens during the last settle.
+@(private)
 polyhedral_rest_settle :: proc(progress: f32) -> f32 {
 	u := (dice_progress(progress)-DICE_THIRD_IMPACT_PROGRESS)/(DICE_PHYSICS_REVEAL_PROGRESS-DICE_THIRD_IMPACT_PROGRESS)
 	return tween.smoothstep(clamp(u, f32(0), f32(1)))

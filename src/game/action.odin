@@ -1,6 +1,6 @@
 package game
 
-import grid "../grid"
+import grid "../engine/grid"
 
 // One simultaneous area discharge can hit every enemy plus the player.
 // Multi-template area cards still validate their expansion against this bound.
@@ -132,6 +132,7 @@ damage_effect :: proc(target: Entity_Ref, amount: i32) -> Effect {
 	return {kind = .Damage, target = target, amount = amount}
 }
 
+@(private)
 status_damage_effect :: proc(
 	target: Entity_Ref,
 	amount: i32,
@@ -150,26 +151,32 @@ heal_effect :: proc(target: Entity_Ref, amount: i32) -> Effect {
 	return {kind = .Heal, target = target, amount = amount}
 }
 
+@(private)
 gain_gold_effect :: proc(amount: i32) -> Effect {
 	return {kind = .Gain_Gold, target = PLAYER_ENTITY, amount = amount}
 }
 
+@(private)
 gain_energy_effect :: proc(amount: i32) -> Effect {
 	return {kind = .Gain_Energy, target = PLAYER_ENTITY, amount = amount}
 }
 
+@(private)
 enter_shadow_effect :: proc(seconds: i32) -> Effect {
 	return {kind = .Enter_Shadow, target = PLAYER_ENTITY, amount = seconds}
 }
 
+@(private)
 draw_cards_effect :: proc(amount: i32) -> Effect {
 	return {kind = .Draw_Cards, target = PLAYER_ENTITY, amount = amount}
 }
 
+@(private)
 discard_cards_effect :: proc(amount: i32) -> Effect {
 	return {kind = .Discard_Cards, target = PLAYER_ENTITY, amount = amount}
 }
 
+@(private)
 create_card_effect :: proc(definition_id: Card_Id, amount: i32) -> Effect {
 	return {
 		kind = .Create_Card,
@@ -202,10 +209,12 @@ apply_status_effect :: proc(target: Entity_Ref, status: Status_Kind, potency, du
 	}
 }
 
+@(private)
 remove_status_effect :: proc(target: Entity_Ref, status: Status_Kind) -> Effect {
 	return {kind = .Remove_Status, target = target, status = status}
 }
 
+@(private)
 add_reaction_binding_effect :: proc(
 	target: Entity_Ref,
 	reaction: Reaction_Id,
@@ -307,6 +316,7 @@ entity_exists :: proc(room: ^Room, entity: Entity_Ref) -> bool {
 	return false
 }
 
+@(private = "file")
 target_is_valid :: proc(room: ^Room, target: Target) -> bool {
 	if room == nil {
 		return false
@@ -322,6 +332,7 @@ target_is_valid :: proc(room: ^Room, target: Target) -> bool {
 	return false
 }
 
+@(private)
 entity_position :: proc(room: ^Room, entity: Entity_Ref) -> (grid.Position, bool) {
 	if room == nil || !entity_exists(room, entity) {
 		return {}, false
@@ -347,11 +358,13 @@ entity_position :: proc(room: ^Room, entity: Entity_Ref) -> (grid.Position, bool
 	return {}, false
 }
 
+@(private)
 entities_are_opponents :: proc(source, target: Entity_Ref) -> bool {
 	return (source.kind == .Player && target.kind == .Enemy) ||
 	       (source.kind == .Enemy && target.kind == .Player)
 }
 
+@(private)
 entity_is_targetable_object :: proc(room: ^Room, entity: Entity_Ref) -> bool {
 	if room == nil || entity.kind != .Object {
 		return false
@@ -364,6 +377,7 @@ entity_is_targetable_object :: proc(room: ^Room, entity: Entity_Ref) -> bool {
 	return definition_found && definition.targetable
 }
 
+@(private)
 target_matches_rule :: proc(room: ^Room, source: Entity_Ref, target: Target, rule: Target_Rule) -> bool {
 	if !target_is_valid(room, target) {
 		return false
@@ -401,6 +415,7 @@ target_matches_rule :: proc(room: ^Room, source: Entity_Ref, target: Target, rul
 	return false
 }
 
+@(private)
 effect_is_valid :: proc(room: ^Room, effect: Effect) -> bool {
 	if room == nil || !entity_exists(room, effect.target) {
 		return false
@@ -494,6 +509,7 @@ effect_is_valid :: proc(room: ^Room, effect: Effect) -> bool {
 	return false
 }
 
+@(private)
 record_report_event :: proc(report: ^Action_Report, event: Game_Event) {
 	assert(report != nil)
 	if !record_event(&report.events, event) {
@@ -503,6 +519,7 @@ record_report_event :: proc(report: ^Action_Report, event: Game_Event) {
 	}
 }
 
+@(private = "file")
 absorb_damage_with_shield :: proc(
 	room: ^Room,
 	source, target: Entity_Ref,
@@ -545,10 +562,12 @@ absorb_damage_with_shield :: proc(
 
 // What a blow of `amount` takes from the player before any Shield: his
 // defense counted, never below 1. RIFLESSO sends back the same.
+@(private)
 player_blow_damage :: proc(room: ^Room, amount: i32) -> i32 {
 	return max(i32(1), amount-room.player.stats.defense)
 }
 
+@(private)
 apply_damage_effect :: proc(
 	room: ^Room,
 	source: Entity_Ref,
@@ -660,6 +679,7 @@ apply_damage_effect :: proc(
 	}
 }
 
+@(private = "file")
 apply_effect :: proc(room: ^Room, source: Entity_Ref, effect: Effect, report: ^Action_Report) {
 	assert(room != nil && report != nil && effect_is_valid(room, effect))
 
@@ -833,7 +853,12 @@ apply_effect :: proc(room: ^Room, source: Entity_Ref, effect: Effect, report: ^A
 	report.applied_effects += 1
 }
 
-resolve_action_once :: proc(room: ^Room, action: ^Action) -> (report: Action_Report) {
+// Each resolution writes into its caller's distinct storage. Nested reactions
+// and relic actions must never reuse their parent's report while it is live.
+@(private)
+resolve_action_once :: proc(room: ^Room, action: ^Action, report: ^Action_Report) {
+	if report == nil { return }
+	report^ = {}
 	if room == nil || room.player == nil || action == nil ||
 	   room.phase == .Complete || room.phase == .Defeat ||
 	   action.effect_count < 0 || action.effect_count > MAX_ACTION_EFFECTS ||
@@ -864,21 +889,21 @@ resolve_action_once :: proc(room: ^Room, action: ^Action) -> (report: Action_Rep
 			report.skipped_effects += 1
 			continue
 		}
-		apply_effect(room, action.source, effect, &report)
+		apply_effect(room, action.source, effect, report)
 	}
 	if action.visual_group != 0 {
 		for &event in report.events.events[:report.events.count] {
 			event.visual_group = action.visual_group
 		}
 	}
-	apply_action_relics(room, action, &report)
+	apply_action_relics(room, action, report)
 	report.combat_ended = initial_phase == .Combat && room.phase == .Loot
 	report.player_defeated = room.phase == .Defeat
 	return
 }
 
 resolve_action :: proc(room: ^Room, action: ^Action) -> (report: Action_Report) {
-	report = resolve_action_once(room, action)
+	resolve_action_once(room, action, &report)
 	if report.accepted {
 		dispatch_reactions(room, &report)
 		append_room_clear_relic(room, &report)

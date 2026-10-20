@@ -1,7 +1,8 @@
 // Logical actions bound to keyboard, mouse and gamepad.
 //
 // Each game declares an enum of actions and an Action_Map that binds them.
-// `sample` is the only procedure that reads raylib; `advance` turns samples
+// `capture_devices` reads raylib once per frame; `sample` maps that snapshot,
+// and `advance` turns samples
 // into pressed/held/released edges and is pure, so gameplay input can be
 // scripted in tests by feeding Samples directly.
 //
@@ -98,6 +99,9 @@ rebind :: proc(m: ^Action_Map($A), action: A, slot: int, binding: Binding) -> bo
 // One frame of raw device state, already mapped to actions.
 Sample :: struct($A: typeid) {
 	down:  bit_set[A],
+	// Native edges are available to discrete consumers; advance keeps its
+	// action-history semantics for held input, repeats and resume gates.
+	pressed, released: bit_set[A],
 	value: [A]f32,
 }
 
@@ -109,11 +113,12 @@ State :: struct($A: typeid) {
 	held_time: [A]f32,
 }
 
-// Reads the devices. Gamepad bindings are ignored when no pad is present.
-sample :: proc(m: ^Action_Map($A)) -> Sample(A) {
+// Maps the same frame for every input owner without reading the devices again.
+sample :: proc(m: ^Action_Map($A), devices: ^Device_Snapshot) -> Sample(A) {
 	s: Sample(A)
-	pad_ok := rl.IsGamepadAvailable(m.gamepad)
-	wheel_move := rl.GetMouseWheelMove()
+	if devices == nil { return s }
+	pad_ok := m.gamepad >= 0 && m.gamepad < MAX_GAMEPADS && devices.gamepads[m.gamepad].available
+	wheel_move := devices.wheel
 	for action in A {
 		best: f32
 		for b in m.bindings[action] {
@@ -121,16 +126,22 @@ sample :: proc(m: ^Action_Map($A)) -> Sample(A) {
 			switch b.kind {
 			case .None:
 			case .Key:
-				v = 1 if rl.IsKeyDown(b.key) else 0
+				v = 1 if key_down(devices, b.key) else 0
+				if key_pressed(devices, b.key) { s.pressed += {action} }
+				if key_released(devices, b.key) { s.released += {action} }
 			case .Mouse_Button:
-				v = 1 if rl.IsMouseButtonDown(b.mouse) else 0
+				v = 1 if mouse_down(devices, b.mouse) else 0
+				if mouse_pressed(devices, b.mouse) { s.pressed += {action} }
+				if mouse_released(devices, b.mouse) { s.released += {action} }
 			case .Gamepad_Button:
 				if pad_ok {
-					v = 1 if rl.IsGamepadButtonDown(m.gamepad, b.button) else 0
+					v = 1 if devices.gamepads[m.gamepad].buttons[b.button] else 0
+					if devices.gamepads[m.gamepad].pressed[b.button] { s.pressed += {action} }
+					if devices.gamepads[m.gamepad].released[b.button] { s.released += {action} }
 				}
 			case .Gamepad_Axis_Positive, .Gamepad_Axis_Negative:
 				if pad_ok {
-					raw := rl.GetGamepadAxisMovement(m.gamepad, b.axis)
+					raw := devices.gamepads[m.gamepad].axes[b.axis]
 					if b.kind == .Gamepad_Axis_Negative {
 						raw = -raw
 					}
@@ -173,8 +184,8 @@ advance :: proc(s: ^State($A), sample: Sample(A), dt: f32) {
 	}
 }
 
-poll :: proc(m: ^Action_Map($A), s: ^State(A), dt: f32) {
-	advance(s, sample(m), dt)
+poll :: proc(m: ^Action_Map($A), s: ^State(A), dt: f32, devices: ^Device_Snapshot) {
+	advance(s, sample(m, devices), dt)
 }
 
 // Forgets all device history. Use suspend/advance_resumable at menu or focus
@@ -261,12 +272,6 @@ sqrt_f32 :: proc "contextless" (x: f32) -> f32 {
 		r = 0.5 * (r + x/r)
 	}
 	return r
-}
-
-// Raw mouse motion in window pixels, for first-person look.
-mouse_delta :: proc() -> [2]f32 {
-	d := rl.GetMouseDelta()
-	return {d.x, d.y}
 }
 
 // Hides and locks the cursor for mouse-look; false restores it.

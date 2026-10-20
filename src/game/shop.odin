@@ -35,6 +35,7 @@ Shop_Result :: enum {
 	Service_Used,
 }
 
+@(private)
 normalized_shop_seed :: proc(seed: u64) -> u64 {
 	if seed == 0 {
 		return DEFAULT_SHOP_SEED
@@ -42,6 +43,7 @@ normalized_shop_seed :: proc(seed: u64) -> u64 {
 	return seed
 }
 
+@(private)
 shop_card_price :: proc(definition: Card_Definition, depth: int) -> (i32, bool) {
 	validated_definition := definition
 	if !validate_card_definition(&validated_definition) || definition.temporary_only || depth < 0 {
@@ -94,6 +96,7 @@ shop_removal_price :: proc(run: ^Run_State) -> (i32, bool) {
 	return i32(price), true
 }
 
+@(private)
 build_shop_state_for_node :: proc(
 	run: ^Run_State,
 	node: ^Run_Node,
@@ -106,7 +109,7 @@ build_shop_state_for_node :: proc(
 	}
 
 	choices: [SHOP_CARD_OFFER_COUNT]Card_Id
-	if !generate_weighted_card_choices(random_state, node, choices[:], &run.player.m8_profile, run.player.tactical.config.enabled,
+	if !generate_weighted_card_choices(random_state, node, choices[:], &run.player.m8_profile,
 		card_offer_exclusions(&run.player.deck)) {
 		return {}, false
 	}
@@ -126,6 +129,7 @@ build_shop_state_for_node :: proc(
 	return result, true
 }
 
+@(private = "file")
 build_shop_state :: proc(run: ^Run_State, random_state: ^u64) -> (Shop_State, bool) {
 	if run == nil {
 		return {}, false
@@ -137,6 +141,7 @@ build_shop_state :: proc(run: ^Run_State, random_state: ^u64) -> (Shop_State, bo
 	return build_shop_state_for_node(run, node, random_state)
 }
 
+@(private = "file")
 shop_payload_is_valid :: proc(run: ^Run_State) -> bool {
 	if run == nil || run.shop.offer_count != SHOP_CARD_OFFER_COUNT ||
 	   run.shop.source_node != run.current_node || run.player.deck.combat_active {

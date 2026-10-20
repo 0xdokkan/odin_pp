@@ -4,7 +4,7 @@ import "core:math"
 import "core:testing"
 import rl "vendor:raylib"
 import game "../game"
-import grid "../grid"
+import grid "../engine/grid"
 import level "../level"
 
 @(test)
@@ -20,9 +20,9 @@ test_tactical_visibility_uses_presented_snapshot_and_matches_game :: proc(t: ^te
 	room, built := game.create_room(&data, &player, {enemies = enemies[:]})
 	testing.expect(t, built)
 	defer game.destroy_room(&room)
-	renderer := create(960, 540, &data)
+	renderer := create(960, 540)
 	snapshot: Room_Presentation
-	renderer.tactical = {enabled = true, snapshot = &snapshot}
+	renderer.tactical = {snapshot = &snapshot}
 	for size in ([?]int{2, 3, 5, 7, 9}) {
 		player.tactical.config.vision_size = size
 		update_tactical_view(&renderer, &room, {}, false)
@@ -73,7 +73,7 @@ test_tactical_orbit_clamps_and_keeps_rotated_grid_pickable :: proc(t: ^testing.T
 test_tactical_camera_grid_round_trip_orthographic_and_perspective :: proc(t: ^testing.T) {
 	renderer: Renderer
 	renderer.canvas_width, renderer.canvas_height = 960, 540
-	renderer.tactical.enabled, renderer.tactical.scene_3d = true, true
+
 	for mode in 0..<2 {
 		renderer.tactical.camera = {position = {10, 9, 10}, target = {3, 0, 3}, up = {0, 1, 0},
 			fovy = (f32(38) if mode == 1 else 7), projection = (.PERSPECTIVE if mode == 1 else .ORTHOGRAPHIC)}
@@ -133,7 +133,7 @@ test_tactical_simultaneous_cues_filter_each_hidden_target :: proc(t: ^testing.T)
 	snapshot := Room_Presentation{valid = true, enemy_count = 2}
 	snapshot.enemies[0] = {entity = game.enemy_entity(1), position = {2, 2}, visible = true}
 	snapshot.enemies[1] = {entity = game.enemy_entity(2), position = {6, 6}, visible = true}
-	renderer.tactical = {enabled = true, snapshot = &snapshot, visible_count = 1}
+	renderer.tactical = {snapshot = &snapshot, visible_count = 1}
 	renderer.tactical.visible[0] = {2, 2}
 	visible := Presentation_Cue{kind = .Damage, event = {target = game.enemy_entity(1)}}
 	hidden := Presentation_Cue{kind = .Damage, event = {target = game.enemy_entity(2)}}
@@ -147,7 +147,7 @@ test_tactical_voxel_props_are_pickable_after_orbit_but_not_through_fog :: proc(t
 	renderer.canvas_width, renderer.canvas_height = 960, 540
 	snapshot := Room_Presentation{valid = true, object_count = 1}
 	snapshot.objects[0] = {position = {3, 3}, visible = true}
-	renderer.tactical = {enabled = true, scene_3d = true, snapshot = &snapshot, visible_count = 1}
+	renderer.tactical = {snapshot = &snapshot, visible_count = 1}
 	renderer.tactical.visible[0] = {3, 3}
 	for kind in ([?]game.Grid_Object_Kind{.Ice_Block, .Barrel, .Bomb, .Fire}) {
 		snapshot.objects[0].kind = kind

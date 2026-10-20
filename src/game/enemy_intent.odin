@@ -1,7 +1,7 @@
 package game
 
 import "core:slice"
-import grid "../grid"
+import grid "../engine/grid"
 
 MAX_ENEMY_INTENT_PATH_CELLS   :: 8
 MAX_ENEMY_INTENT_THREAT_CELLS :: 16
@@ -36,10 +36,11 @@ Enemy_Intent :: struct {
 	target_object:         u32,
 	push:                  bool,
 	// M7: the seconds Rallentamento added when this intent was planned
-	// (tactical_schedule_enemy); its countdown and seal include them.
+	// (tactical_schedule_enemy); its countdown and ground warning include them.
 	slowed:                i32,
 }
 
+@(private = "file")
 enemy_intent_kind_name :: proc(kind: Enemy_Intent_Kind) -> string {
 	switch kind {
 	case .None:
@@ -74,6 +75,7 @@ enemy_intent_cell_is_threatened :: proc(intent: ^Enemy_Intent, position: grid.Po
 	return false
 }
 
+@(private)
 clear_enemy_intents :: proc(room: ^Room) {
 	if room == nil {
 		return
@@ -83,6 +85,7 @@ clear_enemy_intents :: proc(room: ^Room) {
 	}
 }
 
+@(private)
 enemy_ids_in_planning_order :: proc(room: ^Room) -> (
 	ids: [MAX_ENEMIES_PER_ROOM]u32,
 	count: int,
@@ -99,6 +102,7 @@ enemy_ids_in_planning_order :: proc(room: ^Room) -> (
 	return
 }
 
+@(private)
 planned_cell_is_available :: proc(
 	room: ^Room,
 	positions: ^[MAX_ENEMIES_PER_ROOM]grid.Position,
@@ -117,6 +121,7 @@ planned_cell_is_available :: proc(
 	return true
 }
 
+@(private)
 orthogonal_step_and_distance :: proc(origin, target: grid.Position) -> (
 	step: grid.Position,
 	distance: int,
@@ -133,6 +138,7 @@ orthogonal_step_and_distance :: proc(origin, target: grid.Position) -> (
 	return
 }
 
+@(private)
 has_clear_orthogonal_line :: proc(room: ^Room, origin, target: grid.Position) -> bool {
 	if room == nil {
 		return false
@@ -176,38 +182,12 @@ make_attack_intent :: proc(
 
 // Campo delle distanze statiche al player. Gli attori vengono considerati dalle
 // prenotazioni del singolo passo, cosi le destinazioni restano ordinate per ID.
+@(private = "file")
 rebuild_enemy_path_distances :: proc(room: ^Room) {
-	if tactical_enabled(room) { rebuild_tactical_enemy_distances(room, room.enemy_path_distances, .Melee); return }
-	for &distance in room.enemy_path_distances {
-		distance = -1
-	}
-	tiles := &room.level_data.tiles
-	start, valid := grid.index_of(tiles, room.player.position)
-	if !valid {
-		return
-	}
-	room.enemy_path_distances[start] = 0
-	room.enemy_path_queue[0] = room.player.position
-	head := 0
-	count := 1
-	steps := [?]grid.Position{{0, -1}, {1, 0}, {0, 1}, {-1, 0}}
-	for head < count {
-		position := room.enemy_path_queue[head]
-		head += 1
-		index, _ := grid.index_of(tiles, position)
-		for step in steps {
-			next := add_position(position, step)
-			next_index, in_bounds := grid.index_of(tiles, next)
-			if !in_bounds || room.enemy_path_distances[next_index] >= 0 || cell_blocks_movement(room, next) {
-				continue
-			}
-			room.enemy_path_distances[next_index] = room.enemy_path_distances[index]+1
-			room.enemy_path_queue[count] = next
-			count += 1
-		}
-	}
+	rebuild_tactical_enemy_distances(room, room.enemy_path_distances, .Melee)
 }
 
+@(private)
 plan_chaser_intent :: proc(
 	room: ^Room,
 	enemy: ^Enemy,
@@ -252,7 +232,7 @@ plan_chaser_intent :: proc(
 		}
 		index, _ := grid.index_of(&room.level_data.tiles, target)
 		distance := room.enemy_path_distances[index]
-		if tactical_enabled(room) && distance >= 0 { distance += enemy_terrain_danger(room, target) }
+		if distance >= 0 { distance += enemy_terrain_danger(room, target) }
 		if distance < 0 || distance >= best_distance {
 			continue
 		}
@@ -265,69 +245,7 @@ plan_chaser_intent :: proc(
 	return intent
 }
 
-plan_archer_intent :: proc(
-	room: ^Room,
-	enemy: ^Enemy,
-	origin: grid.Position,
-	predicted_positions: ^[MAX_ENEMIES_PER_ROOM]grid.Position,
-	enemy_count, ordered_index: int,
-) -> Enemy_Intent {
-	assert(room != nil && room.player != nil && enemy != nil && predicted_positions != nil)
-	if tactical_enabled(room) { return plan_tactical_archer(room, enemy, origin, predicted_positions, enemy_count, ordered_index) }
-	player_position := room.player.position
-	distance := abs(player_position.x-origin.x)+abs(player_position.y-origin.y)
-	if distance == 1 {
-		steps := [?]grid.Position{
-			{x = 0, y = -1},
-			{x = 1, y = 0},
-			{x = 0, y = 1},
-			{x = -1, y = 0},
-		}
-		intent := make_wait_intent(room, origin)
-		best_distance := distance
-		for step in steps {
-			target := add_position(origin, step)
-			if !planned_cell_is_available(
-				room,
-				predicted_positions,
-				enemy_count,
-				ordered_index,
-				target,
-			) {
-				continue
-			}
-			candidate_distance := abs(player_position.x-target.x)+abs(player_position.y-target.y)
-			if candidate_distance <= best_distance {
-				continue
-			}
-			best_distance = candidate_distance
-			intent.kind = .Move
-			intent.destination = target
-			intent.path[0] = target
-			intent.path_count = 1
-		}
-		if intent.kind == .Move {
-			return intent
-		}
-		return make_attack_intent(room, origin, player_position, enemy.attack)
-	}
-
-	_, _, aligned := orthogonal_step_and_distance(origin, player_position)
-	if aligned && distance >= ARCHER_MIN_ATTACK_RANGE &&
-	   distance <= ARCHER_MAX_ATTACK_RANGE &&
-	   has_clear_orthogonal_line(room, origin, player_position) {
-		return make_attack_intent(room, origin, player_position, enemy.attack)
-	}
-	return plan_chaser_intent(
-		room,
-		enemy,
-		origin,
-		predicted_positions,
-		enemy_count,
-		ordered_index,
-	)
-}
-
+@(private = "file")
 planned_path_is_available :: proc(
 	room: ^Room,
 	positions: ^[MAX_ENEMIES_PER_ROOM]grid.Position,
@@ -348,6 +266,7 @@ planned_path_is_available :: proc(
 	return true
 }
 
+@(private = "file")
 brute_charge_damage :: proc(attack: i32) -> i32 {
 	if attack > max(i32)/2 {
 		return max(i32)
@@ -355,6 +274,7 @@ brute_charge_damage :: proc(attack: i32) -> i32 {
 	return attack*2
 }
 
+@(private)
 plan_brute_intent :: proc(
 	room: ^Room,
 	enemy: ^Enemy,
@@ -406,14 +326,13 @@ plan_brute_intent :: proc(
 	)
 }
 
+@(private)
 validate_enemy_intent_structure :: proc(room: ^Room, intent: ^Enemy_Intent) -> bool {
 	if room == nil || intent == nil || room.level_data == nil || room.phase != .Combat {
 		return false
 	}
-	// Classic telegraphs target the next pulse. Timed M7 telegraphs can remain
-	// committed across several world beats while their own deadline counts down.
-	valid_plan_time := intent.planned_pulse == room.pulse_count+1
-	if tactical_enabled(room) { valid_plan_time = intent.planned_pulse > 0 && intent.planned_pulse <= room.pulse_count+1 }
+	// Telegraphs remain committed across world beats until their own deadline.
+	valid_plan_time := intent.planned_pulse > 0 && intent.planned_pulse <= room.pulse_count+1
 	if intent.kind == .None || !valid_plan_time ||
 	   intent.path_count < 0 || intent.path_count > MAX_ENEMY_INTENT_PATH_CELLS ||
 	   intent.threatened_cell_count < 0 ||
@@ -462,7 +381,7 @@ validate_enemy_intent_structure :: proc(room: ^Room, intent: ^Enemy_Intent) -> b
 		}
 		return true
 	case .Bombard:
-		if intent.path_count != 0 || intent.damage != (TACTICAL_BOMB_DAMAGE if tactical_enabled(room) else EXPLOSIVE_DAMAGE) ||
+		if intent.path_count != 0 || intent.damage != TACTICAL_BOMB_DAMAGE ||
 		   !base_cell_is_walkable(room, intent.destination) || obstacle_at(room, intent.destination) {
 			return false
 		}
@@ -523,11 +442,11 @@ validate_enemy_intent_structure :: proc(room: ^Room, intent: ^Enemy_Intent) -> b
 	return false
 }
 
+@(private)
 validate_enemy_intent :: proc(room: ^Room, enemy: ^Enemy) -> bool {
 	// M7 keeps a committed telegraph when a player pushes its owner. Its original
 	// origin deliberately survives until the deadline so that the action misses.
-	return enemy != nil && (enemy.intent.origin == enemy.position || tactical_enabled(room)) &&
-	       validate_enemy_intent_structure(room, &enemy.intent)
+	return enemy != nil && validate_enemy_intent_structure(room, &enemy.intent)
 }
 
 validate_enemy_intents :: proc(room: ^Room) -> bool {
@@ -586,7 +505,7 @@ plan_enemy_intents :: proc(room: ^Room) {
 			continue
 		}
 		origin := predicted_positions[ordered_index]
-		if tactical_enabled(room) && enemy.intent.kind != .None && enemy.tactical_cooldown > 0 {
+		if enemy.intent.kind != .None && enemy.tactical_cooldown > 0 {
 			// Reserve the same committed destination while other enemies plan; a
 			// one-second world beat must not retarget a slower enemy's telegraph.
 			if enemy.intent.kind == .Move || enemy.intent.kind == .Charge {
@@ -605,7 +524,7 @@ plan_enemy_intents :: proc(room: ^Room) {
 			tactical_schedule_enemy(room, enemy)
 			continue
 		}
-		if tactical_enabled(room) && !enemy.bomb_ready && !enemy.aim_ready {
+		if !enemy.bomb_ready && !enemy.aim_ready {
 			if escape, fleeing := tactical_enemy_escape(room, origin, &predicted_positions, enemy_count, ordered_index); fleeing {
 				enemy.intent = escape
 				tactical_schedule_enemy(room, enemy)
@@ -625,7 +544,7 @@ plan_enemy_intents :: proc(room: ^Room) {
 				ordered_index,
 			)
 		case .Archer:
-			intent = plan_archer_intent(
+			intent = plan_tactical_archer(
 				room,
 				enemy,
 				origin,
@@ -643,7 +562,7 @@ plan_enemy_intents :: proc(room: ^Room) {
 				ordered_index,
 			)
 		case .Bomber:
-			intent = plan_bomber_intent(room, enemy, origin, &predicted_positions,
+			intent = plan_tactical_bomber(room, enemy, origin, &predicted_positions,
 				enemy_count, ordered_index, bomb_anchors[:bomb_anchor_count])
 		case .Custodian:
 			intent = plan_custodian_intent(room, enemy, origin, &predicted_positions,
@@ -654,7 +573,7 @@ plan_enemy_intents :: proc(room: ^Room) {
 		case .Count:
 			unreachable()
 		}
-		if tactical_enabled(room) && enemy.archetype == .Brute && intent.kind == .Attack {
+		if enemy.archetype == .Brute && intent.kind == .Attack {
 			step, _, aligned := orthogonal_step_and_distance(origin, intent.threatened_cells[0])
 			if aligned {
 				center := intent.threatened_cells[0]
@@ -671,7 +590,7 @@ plan_enemy_intents :: proc(room: ^Room) {
 			bomb_anchors[bomb_anchor_count] = intent.destination
 			bomb_anchor_count += 1
 		}
-		if tactical_enabled(room) && (enemy.archetype == .Brute || enemy.archetype == .Demolitionist) &&
+		if (enemy.archetype == .Brute || enemy.archetype == .Demolitionist) &&
 		   (intent.kind == .Attack || intent.kind == .Charge) { intent.push = true }
 		if intent.kind == .Move || intent.kind == .Charge {
 			predicted_positions[ordered_index] = intent.destination
@@ -682,6 +601,7 @@ plan_enemy_intents :: proc(room: ^Room) {
 	assert(validate_enemy_intents(room))
 }
 
+@(private)
 enemy_charge_path_is_clear :: proc(
 	room: ^Room,
 	enemy_index: int,
@@ -704,6 +624,7 @@ enemy_charge_path_is_clear :: proc(
 }
 
 // A miss on the player, or on the object a shot was aimed at (`target`).
+@(private)
 record_enemy_attack_miss :: proc(
 	pulse: ^Pulse_Report,
 	source: Entity_Ref,
@@ -731,6 +652,7 @@ record_enemy_attack_miss :: proc(
 }
 
 // Archers shoot and bombers throw; an object is struck from afar.
+@(private = "file")
 enemy_attack_is_ranged :: proc(enemy: ^Enemy, intent: ^Enemy_Intent) -> bool {
 	return enemy.archetype == .Archer || enemy.archetype == .Bomber || intent.target_object != 0
 }
@@ -835,9 +757,9 @@ resolve_enemy_intents :: proc(room: ^Room, pulse: ^Pulse_Report, only_id: u32 = 
 			enemy.bomb_ready = false
 			enemy.recovery_pulses = 1
 			begin_demolitionist_offense(enemy, intent.kind)
-			if tactical_enabled(room) { enemy.recovery_pulses = max(enemy.recovery_pulses, TACTICAL_BOMBER_RECOVERY) }
+			enemy.recovery_pulses = max(enemy.recovery_pulses, TACTICAL_BOMBER_RECOVERY)
 			if enemy.position != intent.origin ||
-			   (tactical_enabled(room) && (active_bomb_count(room) >= TACTICAL_BOMB_LIMIT || !enemy_has_lob_line(room, enemy.position, intent.destination))) ||
+			   (active_bomb_count(room) >= TACTICAL_BOMB_LIMIT || !enemy_has_lob_line(room, enemy.position, intent.destination)) ||
 			   !spawn_bomb(room, source, intent.destination, &pulse.events) {
 				record_enemy_attack_miss(pulse, source, enemy.position, intent.destination)
 			}
@@ -852,7 +774,7 @@ resolve_enemy_intents :: proc(room: ^Room, pulse: ^Pulse_Report, only_id: u32 = 
 			}
 			enemy.aim_ready = false
 			begin_demolitionist_offense(enemy, intent.kind)
-			if tactical_enabled(room) { enemy.recovery_pulses = max(i32(1), enemy.recovery_pulses) }
+			enemy.recovery_pulses = max(i32(1), enemy.recovery_pulses)
 			if intent.target_object != 0 {
 				object_index, present := object_index_by_id(room, intent.target_object)
 				if enemy.position != intent.origin || !present ||
@@ -921,7 +843,7 @@ resolve_enemy_intents :: proc(room: ^Room, pulse: ^Pulse_Report, only_id: u32 = 
 			pulse.enemy_actions += 1
 			enemy.recovery_pulses = 1
 			begin_demolitionist_offense(enemy, intent.kind)
-			if tactical_enabled(room) { enemy.recovery_pulses = max(i32(2), enemy.recovery_pulses) }
+			enemy.recovery_pulses = max(i32(2), enemy.recovery_pulses)
 			// Parried before it ran: the brute never left his cell, so no blow.
 			if room.tactical_pulse.cancel_attack == enemy.id {
 				record_enemy_attack_miss(pulse, source, enemy.position, intent.threatened_cells[0])

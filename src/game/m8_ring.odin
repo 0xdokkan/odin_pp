@@ -24,6 +24,7 @@ m8_card_unlocked :: proc(id: Card_Id, profile: ^M8_Profile = nil) -> bool {
 }
 
 // Every ring won counts toward the durable card unlocks.
+@(private)
 record_ring_win :: proc(room: ^Room) -> (result: Ring_Reward) {
 	if room == nil || room.player == nil || !m8_profile_valid(room.player.m8_profile) { return }
 	result.settled, result.won = true, true

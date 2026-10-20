@@ -1,6 +1,6 @@
 package game
 
-import grid "../grid"
+import grid "../engine/grid"
 
 MAX_SPELL_TARGETS :: 3
 SPELL_BOUNCE_RANGE :: 3
@@ -30,7 +30,7 @@ query_spell_path :: proc(room: ^Room, instance: Card_Instance, target: Target) -
 		path.error = .Invalid_Room
 		return
 	}
-	definition, found := card_definition_by_id(instance.definition_id, tactical_enabled(room))
+	definition, found := card_definition_by_id(instance.definition_id)
 	if !found { return }
 	request, has_request := card_target_request_from_target(room, definition, target)
 	if !has_request { return }
@@ -76,6 +76,7 @@ query_spell_path :: proc(room: ^Room, instance: Card_Instance, target: Target) -
 	return
 }
 
+@(private)
 spell_card_event :: proc(
 	kind: Game_Event_Kind,
 	instance: Card_Instance,
@@ -91,12 +92,14 @@ spell_card_event :: proc(
 	}
 }
 
+@(private)
 spell_dice_event :: proc(instance: Card_Instance, from, to: grid.Position, target: Entity_Ref, roll: Dice_Roll) -> Game_Event {
 	event := spell_card_event(.Dice_Rolled, instance, from, to, target, roll.total)
 	event.dice_roll = roll
 	return event
 }
 
+@(private = "file")
 resolve_sundering_blow :: proc(
 	room: ^Room, instance: Card_Instance, target: Target, compiled: ^Action,
 ) -> (report: Action_Report) {
@@ -128,6 +131,7 @@ resolve_sundering_blow :: proc(
 	return
 }
 
+@(private = "file")
 resolve_pattern_dice_spell :: proc(
 	room: ^Room, instance: Card_Instance, target: Target, compiled: ^Action,
 ) -> (report: Action_Report) {
@@ -192,6 +196,7 @@ resolve_pattern_dice_spell :: proc(
 // A pool or a fire is thrown to its cell (Spell_Launched) and lands there
 // (Spell_Impact): the board shows the ground from the landing on, and then
 // whoever a closed area poisons.
+@(private = "file")
 resolve_ground_card :: proc(room: ^Room, instance: Card_Instance, target: Target, compiled: ^Action) -> (report: Action_Report) {
 	if compiled == nil || !card_places_ground(instance.definition_id) || compiled.kind != .Card ||
 	   compiled.source != PLAYER_ENTITY || compiled.target != target || target.kind != .Cell || compiled.effect_count != 1 ||
@@ -207,6 +212,7 @@ resolve_ground_card :: proc(room: ^Room, instance: Card_Instance, target: Target
 	return
 }
 
+@(private)
 merge_spell_hit_report :: proc(destination, hit: ^Action_Report) {
 	if !hit.accepted { return }
 	destination.accepted = true
@@ -221,6 +227,7 @@ merge_spell_hit_report :: proc(destination, hit: ^Action_Report) {
 
 // The card stays in Resolving throughout the spell. Each hit settles its normal
 // reactions before the next hit, but only play_card pays, pulses and draws.
+@(private)
 resolve_played_card_action :: proc(
 	room: ^Room, instance: Card_Instance, target: Target, compiled: ^Action,
 ) -> (report: Action_Report) {
@@ -248,7 +255,7 @@ resolve_played_card_action :: proc(
 		action.visual_group = 1
 		tactical_critical_scale(room, &action)
 		origin := room.player.position
-		definition, _ := card_definition_by_id(instance.definition_id, tactical_enabled(room))
+		definition, _ := card_definition_by_id(instance.definition_id)
 		query := evaluate_card_targeting(room, instance, card_target_request_at(definition, target.cell))
 		impact := spell_card_event(.Spell_Impact, instance, origin, target.cell)
 		for cell in query.query.affected.cells[:query.query.affected.count] {

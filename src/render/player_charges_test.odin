@@ -5,7 +5,7 @@ import "core:math"
 import "core:testing"
 import rl "vendor:raylib"
 import game "../game"
-import grid "../grid"
+import grid "../engine/grid"
 import level "../level"
 
 // The player's charges on the board (player_charges.odin): their chips and
@@ -77,13 +77,13 @@ charges_test_dice :: proc(t: ^testing.T, face, sides: i32) -> game.Dice_State {
 charges_test_bump :: proc(t: ^testing.T, renderer: ^Renderer, room: ^game.Room, cell: grid.Position, face: i32 = 1,
 	critical := false) -> bool {
 	room.player.dice = charges_test_dice(t, face, game.player_fate_sides(room))
-	game.clear_event_log(&room.recent_events)
+	game.clear_event_log(room.recent_events)
 	clear_event_timeline(&renderer.timeline)
 	before := capture_room_presentation(room)
 	index, found := game.enemy_index_at(room, cell)
 	if !found || !game.player_bump(room, index, cell, .Adjacent_Opponent, critical) { return false }
 	after := capture_room_presentation(room)
-	return begin_renderer_event_timeline(renderer, before, &room.recent_events, &after)
+	return begin_renderer_event_timeline(renderer, before, room.recent_events, &after)
 }
 
 // What the board says over the first cue of `kind` in the player's timeline,
@@ -137,8 +137,8 @@ test_charge_chips_and_labels_are_italian_and_come_first :: proc(t: ^testing.T) {
 	shown := [3]game.Status_Kind{.Burn, .Deflect, .Arrows}
 	for kind, index in shown { testing.expect_value(t, ordered.items[index].kind, kind) }
 	// FERETRO's upgrade reads in Italian too.
-	testing.expect_value(t, string(card_upgrade_preview({id = 1, definition_id = .Coffin, lifetime = .Permanent}, true)), "FRECCE 3 -> 4")
-	testing.expect_value(t, string(card_upgrade_preview({id = 1, definition_id = .Fate_Dice, lifetime = .Permanent}, true)), "d4 -> d6")
+	testing.expect_value(t, string(card_upgrade_preview({id = 1, definition_id = .Coffin, lifetime = .Permanent})), "FRECCE 3 -> 4")
+	testing.expect_value(t, string(card_upgrade_preview({id = 1, definition_id = .Fate_Dice, lifetime = .Permanent})), "d4 -> d6")
 }
 
 @(test)
@@ -353,11 +353,7 @@ test_hearts_wait_for_the_blow_to_land :: proc(t: ^testing.T) {
 		else if snapshot.player.health == 7 { landed = true }
 	}
 	testing.expect(t, landed)
-	// A flat board has no bolt to wait for: the started blow shows at once.
-	renderer.tactical.scene_3d = false
-	testing.expect(t, begin_renderer_world_timeline(renderer, before, &events, &after))
-	snapshot = renderer_presentation_snapshot(renderer, &room)
-	testing.expect_value(t, snapshot.player.health, i32(7))
+
 }
 
 // The Dado del Destino's cue: not cinematic, a die of the ladder rolled by
@@ -553,7 +549,7 @@ test_an_arrows_status_shows_as_it_lands :: proc(t: ^testing.T) {
 		if event.kind == .Status_Applied && event.target == foe { kind, marked = event.status, true }
 	}
 	testing.expect(t, marked)
-	testing.expect(t, begin_renderer_event_timeline(renderer, before, &room.recent_events, &after))
+	testing.expect(t, begin_renderer_event_timeline(renderer, before, room.recent_events, &after))
 	flew, waited, struck := false, false, false
 	for _ in 0..<120 {
 		charges_test_live_frame(renderer, &room, &snapshot, 1.0/60)
@@ -660,12 +656,12 @@ test_his_blows_spend_their_charges_as_they_land :: proc(t: ^testing.T) {
 	}
 	testing.expect(t, charges_test_bump(t, renderer, &room, north))
 	watch(t, renderer, &room, &snapshot, .Venom_Blade, 2, 1)
-	game.clear_event_log(&room.recent_events)
+	game.clear_event_log(room.recent_events)
 	clear_event_timeline(&renderer.timeline)
 	before := capture_room_presentation(&room)
 	testing.expect_value(t, game.shoot_player_arrow(&room, far), game.Action_Result.Attacked)
 	after := capture_room_presentation(&room)
-	testing.expect(t, begin_renderer_event_timeline(renderer, before, &room.recent_events, &after))
+	testing.expect(t, begin_renderer_event_timeline(renderer, before, room.recent_events, &after))
 	watch(t, renderer, &room, &snapshot, .Arrows, 3, 2)
 }
 
@@ -705,13 +701,13 @@ test_a_felling_blow_keeps_the_heart_until_it_lands :: proc(t: ^testing.T) {
 	testing.expect(t, charges_test_bump(t, renderer, &room, north))
 	testing.expect(t, !game.entity_exists(&room, near))
 	watch(t, renderer, &room, &snapshot, near, 2)
-	game.clear_event_log(&room.recent_events)
+	game.clear_event_log(room.recent_events)
 	clear_event_timeline(&renderer.timeline)
 	before := capture_room_presentation(&room)
 	testing.expect_value(t, game.shoot_player_arrow(&room, far), game.Action_Result.Attacked)
 	after := capture_room_presentation(&room)
 	testing.expect(t, !game.entity_exists(&room, far))
-	testing.expect(t, begin_renderer_event_timeline(renderer, before, &room.recent_events, &after))
+	testing.expect(t, begin_renderer_event_timeline(renderer, before, room.recent_events, &after))
 	watch(t, renderer, &room, &snapshot, far, 1)
 }
 
@@ -811,11 +807,11 @@ test_destino_chip_names_the_die_its_bumps_roll :: proc(t: ^testing.T) {
 	renderer.tactical.living_state = new(Living_State)
 	before := capture_room_presentation(&room)
 	testing.expect_value(t, before.fate_sides, i32(4))
-	game.clear_event_log(&room.recent_events)
+	game.clear_event_log(room.recent_events)
 	testing.expect_value(t, game.play_card(&room, id, game.entity_target(game.PLAYER_ENTITY)).result, game.Card_Play_Result.Played)
 	after := capture_room_presentation(&room)
 	testing.expect_value(t, after.fate_sides, i32(8))
-	testing.expect(t, begin_renderer_event_timeline(renderer, before, &room.recent_events, &after))
+	testing.expect(t, begin_renderer_event_timeline(renderer, before, room.recent_events, &after))
 	charged, early := false, false
 	for _ in 0..<240 {
 		charges_test_live_frame(renderer, &room, &snapshot, 1.0/60)

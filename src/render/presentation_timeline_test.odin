@@ -2,8 +2,8 @@ package render
 
 import "core:testing"
 import game "../game"
-import grid "../grid"
-import view "../view"
+import grid "../engine/grid"
+import view "../engine/view"
 
 make_presentation_timeline_test_room :: proc(
 	player: ^game.Player,
@@ -55,7 +55,7 @@ advance_current_presentation_cue :: proc(t: ^testing.T, timeline: ^Presentation_
 @(test)
 test_capture_room_presentation_copies_fixed_actor_and_loot_state :: proc(t: ^testing.T) {
 	player := game.Player{
-		position = {x = 1, y = 2},
+		position = {1, 2},
 		stats = {max_health = 10, attack = 2, defense = 1},
 		health = 8,
 		gold = 7,
@@ -66,13 +66,13 @@ test_capture_room_presentation_copies_fixed_actor_and_loot_state :: proc(t: ^tes
 	testing.expect(t, game.begin_deck_combat(&player.deck))
 	captured_deck := player.deck
 	enemies := [?]game.Enemy{
-		{id = 4, archetype = .Archer, position = {x = 5, y = 2}, max_health = 6, health = 4},
-		{id = 9, archetype = .Brute, position = {x = 7, y = 3}, max_health = 9, health = 9},
+		{id = 4, archetype = .Archer, position = {5, 2}, max_health = 6, health = 4},
+		{id = 9, archetype = .Brute, position = {7, 3}, max_health = 9, health = 9},
 	}
-	loot := [?]game.Loot{{position = {x = 3, y = 2}, kind = .Gold, amount = 2}}
+	loot := [?]game.Loot{{position = {3, 2}, kind = .Gold, amount = 2}}
 	room := make_presentation_timeline_test_room(&player, enemies[:], loot[:])
 	defer game.destroy_room(&room)
-	append(&room.traps, game.Trap{id = 8, position = {x = 2, y = 2}, damage = 3, armed = true})
+	append(&room.traps, game.Trap{id = 8, position = {2, 2}, damage = 3, armed = true})
 	room.pulse_count = 12
 
 	presentation := capture_room_presentation(&room)
@@ -87,7 +87,7 @@ test_capture_room_presentation_copies_fixed_actor_and_loot_state :: proc(t: ^tes
 	testing.expect_value(t, presentation.loot_count, 1)
 	testing.expect(t, presentation.loot[0].visible)
 	testing.expect_value(t, presentation.deck, captured_deck)
-	expect_presentation_position(t, presentation.player.position, {x = 1, y = 2})
+	expect_presentation_position(t, presentation.player.position, {1, 2})
 	testing.expect_value(t, presentation.player.statuses.items[0].kind, game.Status_Kind.Shield)
 	player.deck.energy = 0
 	testing.expect_value(t, presentation.deck, captured_deck)
@@ -98,7 +98,7 @@ test_capture_room_presentation_copies_fixed_actor_and_loot_state :: proc(t: ^tes
 	if found {
 		testing.expect_value(t, archer.archetype, game.Enemy_Archetype.Archer)
 		testing.expect_value(t, archer.health, i32(4))
-		expect_presentation_position(t, archer.position, {x = 5, y = 2})
+		expect_presentation_position(t, archer.position, {5, 2})
 	}
 	_, missing := presentation_actor(&timeline, game.enemy_entity(99))
 	testing.expect(t, !missing)
@@ -262,14 +262,14 @@ test_invalid_trap_trigger_is_fail_soft_and_keeps_presentation_armed :: proc(t: ^
 	player := game.Player{stats = {max_health = 10}, health = 10}
 	room := make_presentation_timeline_test_room(&player, nil, nil)
 	defer game.destroy_room(&room)
-	append(&room.traps, game.Trap{id = 4, position = {x = 2, y = 1}, damage = 3, armed = true})
+	append(&room.traps, game.Trap{id = 4, position = {2, 1}, damage = 3, armed = true})
 	events: game.Event_Log
 	game.record_event(&events, {
 		kind = .Trap_Triggered,
 		source = game.trap_entity(4),
 		target = game.PLAYER_ENTITY,
-		from_position = {x = 3, y = 1},
-		to_position = {x = 3, y = 1},
+		from_position = {3, 1},
+		to_position = {3, 1},
 	})
 	timeline: Presentation_Timeline
 	testing.expect(t, begin_event_timeline(&timeline, capture_room_presentation(&room), &events))
@@ -563,7 +563,7 @@ test_refocus_cues_replay_each_original_hand_card_and_reject_mismatches_atomicall
 test_timeline_preserves_event_fifo_and_rejects_replacement_while_busy :: proc(t: ^testing.T) {
 	player := game.Player{stats = {max_health = 10}, health = 10}
 	enemies := [?]game.Enemy{
-		{id = 5, archetype = .Chaser, position = {x = 5, y = 2}, max_health = 6, health = 6},
+		{id = 5, archetype = .Chaser, position = {5, 2}, max_health = 6, health = 6},
 	}
 	room := make_presentation_timeline_test_room(&player, enemies[:], nil)
 	defer game.destroy_room(&room)
@@ -578,8 +578,8 @@ test_timeline_preserves_event_fifo_and_rejects_replacement_while_busy :: proc(t:
 	game.record_event(&events, {
 		kind = .Moved,
 		target = game.enemy_entity(5),
-		from_position = {x = 5, y = 2},
-		to_position = {x = 4, y = 2},
+		from_position = {5, 2},
+		to_position = {4, 2},
 	})
 	game.record_event(&events, {
 		kind = .Damaged,
@@ -725,28 +725,28 @@ test_pulse_cue_syncs_status_energy_and_count_from_the_final_snapshot :: proc(t: 
 @(test)
 test_trap_disarms_on_explicit_trigger_before_damage_starts :: proc(t: ^testing.T) {
 	player := game.Player{
-		position = {x = 1, y = 1},
+		position = {1, 1},
 		stats = {max_health = 10},
 		health = 10,
 	}
 	room := make_presentation_timeline_test_room(&player, nil, nil)
 	defer game.destroy_room(&room)
-	append(&room.traps, game.Trap{id = 4, position = {x = 2, y = 1}, damage = 3, armed = true})
+	append(&room.traps, game.Trap{id = 4, position = {2, 1}, damage = 3, armed = true})
 	before := capture_room_presentation(&room)
 	room.traps[0].armed = false
 	events: game.Event_Log
 	game.record_event(&events, {
 		kind = .Moved,
 		target = game.PLAYER_ENTITY,
-		from_position = {x = 1, y = 1},
-		to_position = {x = 2, y = 1},
+		from_position = {1, 1},
+		to_position = {2, 1},
 	})
 	game.record_event(&events, {
 		kind = .Trap_Triggered,
 		source = game.trap_entity(4),
 		target = game.PLAYER_ENTITY,
-		from_position = {x = 2, y = 1},
-		to_position = {x = 2, y = 1},
+		from_position = {2, 1},
+		to_position = {2, 1},
 	})
 	game.record_event(&events, {
 		kind = .Damaged,
@@ -782,13 +782,13 @@ test_trap_disarms_on_explicit_trigger_before_damage_starts :: proc(t: ^testing.T
 @(test)
 test_dropped_loot_appears_before_the_magnetic_collection_cue :: proc(t: ^testing.T) {
 	player := game.Player{
-		position = {x = 1, y = 1},
+		position = {1, 1},
 		stats = {max_health = 10},
 		health = 10,
 	}
 	room := make_presentation_timeline_test_room(&player, nil, nil)
 	defer game.destroy_room(&room)
-	position := grid.Position{x = 2, y = 1}
+	position := grid.Position{2, 1}
 	events: game.Event_Log
 	game.record_event(&events, {
 		kind = .Loot_Dropped,
@@ -834,7 +834,7 @@ test_repeated_moves_remain_distinct_and_interpolate_from_committed_pose :: proc(
 	player := game.Player{stats = {max_health = 10}, health = 10}
 	enemy_ref := game.enemy_entity(7)
 	enemies := [?]game.Enemy{
-		{id = enemy_ref.id, archetype = .Chaser, position = {x = 5, y = 2}, max_health = 6, health = 6},
+		{id = enemy_ref.id, archetype = .Chaser, position = {5, 2}, max_health = 6, health = 6},
 	}
 	room := make_presentation_timeline_test_room(&player, enemies[:], nil)
 	defer game.destroy_room(&room)
@@ -842,20 +842,20 @@ test_repeated_moves_remain_distinct_and_interpolate_from_committed_pose :: proc(
 	game.record_event(&events, {
 		kind = .Movement_Step,
 		target = enemy_ref,
-		from_position = {x = 5, y = 2},
-		to_position = {x = 4, y = 2},
+		from_position = {5, 2},
+		to_position = {4, 2},
 	})
 	game.record_event(&events, {
 		kind = .Movement_Step,
 		target = enemy_ref,
-		from_position = {x = 4, y = 2},
-		to_position = {x = 3, y = 2},
+		from_position = {4, 2},
+		to_position = {3, 2},
 	})
 	game.record_event(&events, {
 		kind = .Moved,
 		target = enemy_ref,
-		from_position = {x = 3, y = 2},
-		to_position = {x = 2, y = 2},
+		from_position = {3, 2},
+		to_position = {2, 2},
 	})
 	timeline: Presentation_Timeline
 	testing.expect(t, begin_event_timeline(&timeline, capture_room_presentation(&room), &events))
@@ -865,32 +865,32 @@ test_repeated_moves_remain_distinct_and_interpolate_from_committed_pose :: proc(
 	actor, found := presentation_actor(&timeline, enemy_ref)
 	testing.expect(t, found)
 	if found {
-		expect_presentation_position(t, actor.position, {x = 4.5, y = 2})
+		expect_presentation_position(t, actor.position, {4.5, 2})
 	}
 	testing.expect(t, !update_event_timeline(&timeline, PRESENTATION_MOVEMENT_STEP_DURATION*0.5))
 	actor, found = presentation_actor(&timeline, enemy_ref)
 	if found {
-		expect_presentation_position(t, actor.position, {x = 4, y = 2})
+		expect_presentation_position(t, actor.position, {4, 2})
 	}
 	testing.expect_value(t, timeline.count, 2)
 
 	update_event_timeline(&timeline, PRESENTATION_MOVEMENT_STEP_DURATION*0.5)
 	actor, found = presentation_actor(&timeline, enemy_ref)
 	if found {
-		expect_presentation_position(t, actor.position, {x = 3.5, y = 2})
+		expect_presentation_position(t, actor.position, {3.5, 2})
 	}
 	testing.expect(t, !update_event_timeline(&timeline, PRESENTATION_MOVEMENT_STEP_DURATION*0.5))
 	testing.expect_value(t, timeline.count, 1)
 	update_event_timeline(&timeline, PRESENTATION_ENEMY_MOVE_DURATION*0.5)
 	actor, found = presentation_actor(&timeline, enemy_ref)
 	if found {
-		expect_presentation_position(t, actor.position, {x = 2.5, y = 2})
+		expect_presentation_position(t, actor.position, {2.5, 2})
 	}
 	testing.expect(t, update_event_timeline(&timeline, PRESENTATION_ENEMY_MOVE_DURATION*0.5))
 	testing.expect(t, !event_timeline_is_busy(&timeline))
 	actor, found = presentation_actor(&timeline, enemy_ref)
 	if found {
-		expect_presentation_position(t, actor.position, {x = 2, y = 2})
+		expect_presentation_position(t, actor.position, {2, 2})
 	}
 }
 
@@ -901,7 +901,7 @@ test_damage_heal_absorb_and_status_events_update_only_the_snapshot :: proc(t: ^t
 	player.statuses.count = 1
 	enemy_ref := game.enemy_entity(12)
 	enemies := [?]game.Enemy{
-		{id = enemy_ref.id, archetype = .Archer, position = {x = 5, y = 2}, max_health = 8, health = 6},
+		{id = enemy_ref.id, archetype = .Archer, position = {5, 2}, max_health = 8, health = 6},
 	}
 	room := make_presentation_timeline_test_room(&player, enemies[:], nil)
 	defer game.destroy_room(&room)
@@ -982,7 +982,7 @@ test_defeated_enemy_survives_authoritative_removal_until_its_cue_finishes :: pro
 	player := game.Player{stats = {max_health = 10}, health = 10}
 	enemy_ref := game.enemy_entity(3)
 	enemies := [?]game.Enemy{
-		{id = enemy_ref.id, archetype = .Brute, position = {x = 3, y = 2}, max_health = 2, health = 2},
+		{id = enemy_ref.id, archetype = .Brute, position = {3, 2}, max_health = 2, health = 2},
 	}
 	room := make_presentation_timeline_test_room(&player, enemies[:], nil)
 	defer game.destroy_room(&room)

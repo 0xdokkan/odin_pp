@@ -1,16 +1,16 @@
 package render
 
 import "core:fmt"
-import rl "vendor:raylib"
 import game "../game"
 
 // The enemy under the mouse. A living board keeps showing it while an
 // animation plays, and while the camera glides under a mouse that stays still.
+@(private)
 tactical_inspected_enemy :: proc(renderer: ^Renderer, room: ^game.Room) -> (^game.Enemy, bool) {
 	v := &renderer.tactical
 	if renderer.has_hovered_cell && !renderer_blocks_player_input(renderer) && tactical_render_visible(renderer, renderer.hovered_cell) {
 		if index, found := game.enemy_index_at(room, renderer.hovered_cell); found {
-			if v.living { v.inspected, v.inspected_mouse = room.enemies[index].id, rl.GetMousePosition() }
+			if v.living { v.inspected, v.inspected_mouse = room.enemies[index].id, v.pointer_window }
 			return &room.enemies[index], true
 		}
 	}
@@ -20,7 +20,7 @@ tactical_inspected_enemy :: proc(renderer: ^Renderer, room: ^game.Room) -> (^gam
 		v.inspected = 0
 		return nil, false
 	}
-	if renderer_blocks_player_input(renderer) || rl.GetMousePosition() == v.inspected_mouse {
+	if renderer_blocks_player_input(renderer) || v.pointer_window == v.inspected_mouse {
 		if index, found := game.enemy_index_by_id(room, v.inspected); found { return &room.enemies[index], true }
 	}
 	v.inspected = 0
@@ -31,6 +31,7 @@ tactical_inspected_enemy :: proc(renderer: ^Renderer, room: ^game.Room) -> (^gam
 // shows of it (the snapshot: a blow still on its way, as its heart and its
 // paper tags, has not yet taken the health nor left the status), else the
 // room's.
+@(private)
 tactical_inspected_state :: proc(renderer: ^Renderer, enemy: ^game.Enemy) -> (health, max_health: i32, statuses: game.Status_Set) {
 	health, max_health, statuses = enemy.health, enemy.max_health, enemy.statuses
 	if actor, shown := presentation_actor_in_view(renderer.tactical.snapshot, game.enemy_entity(enemy.id)); shown {
@@ -39,6 +40,7 @@ tactical_inspected_state :: proc(renderer: ^Renderer, enemy: ^game.Enemy) -> (he
 	return
 }
 
+@(private)
 draw_tactical_enemy_inspector :: proc(renderer: ^Renderer, room: ^game.Room) {
 	// A defence prompt takes the same corner; it comes first.
 	if renderer.tactical.living && room.qte.kind != .None { return }

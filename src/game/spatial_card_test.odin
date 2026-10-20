@@ -1,7 +1,7 @@
 package game
 
 import "core:testing"
-import grid "../grid"
+import grid "../engine/grid"
 import level "../level"
 
 create_spatial_card_test_level :: proc(t: ^testing.T) -> level.Level {
@@ -58,8 +58,8 @@ test_shove_preview_compile_and_hazard_resolution_share_destination :: proc(t: ^t
 	action, compile_error := compile_card_action(&room, card, entity_target(target_enemy))
 	testing.expect_value(t, compile_error, Card_Compile_Error.None)
 	testing.expect_value(t, action.effect_count, 2)
-	testing.expect_value(t, action.effects[1].kind, Effect_Kind.Move)
-	testing.expect_value(t, action.effects[1].destination, evaluation.movement.destination)
+	testing.expect_value(t, action.effects[0].kind, Effect_Kind.Move)
+	testing.expect_value(t, action.effects[0].destination, evaluation.movement.destination)
 
 	report := resolve_action(&room, &action)
 
@@ -139,7 +139,7 @@ test_dash_traverses_two_traps_and_triggers_afterimage_once :: proc(t: ^testing.T
 
 	testing.expect(t, report.accepted)
 	testing.expect_value(t, player.position, grid.Position{x = 4, y = 1})
-	testing.expect_value(t, player.health, i32(8))
+	testing.expect_value(t, player.health, i32(10))
 	testing.expect_value(t, spatial_card_event_count(&report.events, .Movement_Step), 2)
 	testing.expect_value(t, spatial_card_event_count(&report.events, .Moved), 1)
 	testing.expect_value(t, spatial_card_event_count(&report.events, .Trap_Triggered), 2)
@@ -158,7 +158,7 @@ test_lethal_dash_promotes_reached_step_and_stops_the_path :: proc(t: ^testing.T)
 	player := create_test_player(t)
 	player.health = 1
 	enemies := [?]Enemy_Spawn{{position = {x = 6, y = 2}, health = 8, attack = 1}}
-	traps := [?]Trap_Spawn{{position = {x = 2, y = 1}, damage = 2}}
+	traps := [?]Trap_Spawn{{position = {x = 2, y = 1}, damage = 4}}
 	room, ok := create_room(&level_data, &player, {
 		enemies = enemies[:],
 		traps = traps[:],
@@ -180,7 +180,7 @@ test_lethal_dash_promotes_reached_step_and_stops_the_path :: proc(t: ^testing.T)
 	testing.expect_value(t, player.position, grid.Position{x = 2, y = 1})
 	testing.expect_value(t, spatial_card_event_count(&report.events, .Movement_Step), 0)
 	testing.expect_value(t, spatial_card_event_count(&report.events, .Moved), 1)
-	testing.expect_value(t, report.events.events[0].kind, Game_Event_Kind.Moved)
+	testing.expect_value(t, report.events.events[0].kind, Game_Event_Kind.Status_Applied)
 }
 
 @(test)
@@ -219,7 +219,7 @@ test_dash_blocker_is_shared_by_preview_drop_and_compile_without_cost :: proc(t: 
 }
 
 @(test)
-test_grappling_hook_pulls_to_adjacent_and_leaves_committed_intent_stale :: proc(
+test_grappling_hook_pulls_to_adjacent_and_preserves_committed_intent_until_resolution :: proc(
 	t: ^testing.T,
 ) {
 	level_data := create_spatial_card_test_level(t)
@@ -252,7 +252,7 @@ test_grappling_hook_pulls_to_adjacent_and_leaves_committed_intent_stale :: proc(
 	if found {
 		testing.expect_value(t, room.enemies[index].position, grid.Position{x = 2, y = 1})
 		testing.expect_value(t, room.enemies[index].intent, intent_before)
-		testing.expect(t, !validate_enemy_intent(&room, &room.enemies[index]))
+		testing.expect(t, validate_enemy_intent(&room, &room.enemies[index]))
 		testing.expect(t, validate_enemy_intent_structure(&room, &room.enemies[index].intent))
 	}
 }

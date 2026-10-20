@@ -18,10 +18,6 @@ test_kiting_waits_instead_of_walking_into_an_ice_block :: proc(t: ^testing.T) {
 	decision := choose_max_distance_command(&room, nil)
 	testing.expect(t, decision.valid)
 	testing.expect_value(t, decision.kind, Command_Kind.Wait)
-	report := run_max_distance_scenario(&room, 3)
-	testing.expect_value(t, report.termination, Scenario_Termination.Pulse_Budget)
-	testing.expect_value(t, report.commands_executed, u64(3))
-	testing.expect_value(t, report.final_pulse, u64(3))
 }
 
 @(test)

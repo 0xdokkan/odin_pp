@@ -36,13 +36,14 @@ test_starter_deck_has_unique_valid_instances :: proc(t: ^testing.T) {
 		.Dash,
 	}
 	for definition, index in CARD_DEFINITIONS {
+		if definition.id == .Count { continue }
 		expected := 0
 		for starter_id in expected_starter {
 			if definition.id == starter_id {
 				expected += 1
 			}
 		}
-		testing.expect_value(t, definition_counts[index], expected)
+		testing.expect_value(t, definition_counts[int(index)], expected)
 	}
 }
 
@@ -726,6 +727,7 @@ test_deck_validator_rejects_corrupted_resolving_slot :: proc(t: ^testing.T) {
 test_temporary_only_definition_cannot_be_owned_but_can_be_created_in_combat :: proc(t: ^testing.T) {
 	temporary_definition := Card_Id.Count
 	for definition in CARD_DEFINITIONS {
+		if definition.id == .Count { continue }
 		if definition.temporary_only {
 			temporary_definition = definition.id
 			break

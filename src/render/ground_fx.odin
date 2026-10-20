@@ -5,7 +5,7 @@ import rl "vendor:raylib"
 import rlgl "vendor:raylib/rlgl"
 import gfx "../engine/gfx"
 import game "../game"
-import grid "../grid"
+import grid "../engine/grid"
 
 // POZZA DI VELENO and INCENDIO on the board (game/ground.odin), cut from paper
 // like the cards and the props. The pools and the scorch under the fires are
@@ -135,11 +135,13 @@ Ground_Fx :: struct {
 // --------------------------------------------------------------------------
 // Bookkeeping.
 
+@(private = "file")
 ground_fx_texels :: proc(width, height: int) -> int {
 	return clamp(GROUND_TEXTURE_MAX/max(width, height, 1), 4, GROUND_TEXELS)
 }
 
 // A fresh board starts with a dry floor.
+@(private)
 forget_ground_fx :: proc(renderer: ^Renderer) {
 	if renderer == nil || renderer.tactical.ground == nil { return }
 	fx := renderer.tactical.ground
@@ -153,6 +155,7 @@ forget_ground_fx :: proc(renderer: ^Renderer) {
 	fx.fire_count = 0
 }
 
+@(private)
 destroy_ground_fx :: proc(renderer: ^Renderer) {
 	if renderer == nil || renderer.tactical.ground == nil { return }
 	fx := renderer.tactical.ground
@@ -166,17 +169,20 @@ destroy_ground_fx :: proc(renderer: ^Renderer) {
 	renderer.tactical.ground = nil
 }
 
+@(private = "file")
 ground_fx_cell :: proc(fx: ^Ground_Fx, cell: grid.Position) -> ^Ground_Fx_Cell {
 	if fx == nil || cell.x < 0 || cell.y < 0 || cell.x >= fx.width || cell.y >= fx.height { return nil }
 	return &fx.cells[cell.y*fx.width+cell.x]
 }
 
+@(private = "file")
 ground_fx_layers :: proc(fx: ^Ground_Fx, cell: grid.Position) -> Ground_Layers {
 	at := ground_fx_cell(fx, cell)
 	return at.layers if at != nil else {}
 }
 
 // The board's size: a new one starts over.
+@(private)
 ground_fx_resize :: proc(fx: ^Ground_Fx, width, height: int) {
 	if fx.width == width && fx.height == height && fx.cells != nil { return }
 	delete(fx.cells)
@@ -198,6 +204,7 @@ ground_fx_resize :: proc(fx: ^Ground_Fx, width, height: int) {
 }
 
 // Each layer's twice box-blurred cell square, sampled at its texels' centres.
+@(private = "file")
 ground_fx_profiles :: proc(fx: ^Ground_Fx) {
 	t := fx.texels
 	if fx.profile_texels == t { return }
@@ -223,6 +230,7 @@ ground_fx_profiles :: proc(fx: ^Ground_Fx) {
 // --------------------------------------------------------------------------
 // The decal.
 
+@(private = "file")
 ground_noise :: proc(x, y: f32, period: f32, seed: int) -> f32 {
 	fx, fy := x/period, y/period
 	ix, iy := int(math.floor(fx)), int(math.floor(fy))
@@ -236,6 +244,7 @@ ground_noise :: proc(x, y: f32, period: f32, seed: int) -> f32 {
 
 // The cut of a texel whose blurred cells come to `value`: at a level the noise
 // wobbles, never so low that two cells meeting at a corner join.
+@(private = "file")
 ground_liquid_cut :: proc(layer: Ground_Layer, value: f32, gx, gy, texels: int) -> bool {
 	level, wobble, seed := f32(0.62), f32(0.30), 1
 	if layer == .Char { level, wobble, seed = 0.60, 0.18, 3 }
@@ -250,6 +259,7 @@ ground_liquid_cut :: proc(layer: Ground_Layer, value: f32, gx, gy, texels: int) 
 // Whether the texel (gx, gy) of the room is liquid in `layer`: its cell and
 // the eight around it blurred together, then cut. Texel by texel (the bake
 // computes the same in rows).
+@(private)
 ground_texel_liquid :: proc(fx: ^Ground_Fx, layer: Ground_Layer, gx, gy: int) -> bool {
 	t := fx.texels
 	cx, cy := int(math.floor(f32(gx)/f32(t))), int(math.floor(f32(gy)/f32(t)))
@@ -266,6 +276,7 @@ Ground_Mask :: [GROUND_BAKE_SIZE*GROUND_BAKE_SIZE]bool
 
 // The colour of every texel of `cell` (RGBA rows of the room's texture), from
 // the region GROUND_BAKE_MARGIN texels around it.
+@(private)
 bake_ground_cell :: proc(fx: ^Ground_Fx, cell: grid.Position) -> (content: bool) {
 	t := fx.texels
 	if t <= 0 || t > GROUND_TEXELS { return }
@@ -350,6 +361,7 @@ bake_ground_cell :: proc(fx: ^Ground_Fx, cell: grid.Position) -> (content: bool)
 
 // The paper: the liquid grown GROUND_PAPER_TEXELS round (a 5x5 square less its
 // corners), in rows: a run of five, or of three two rows away.
+@(private = "file")
 ground_mask_paper :: proc(from, to: ^Ground_Mask, size: int) {
 	wide, narrow: Ground_Mask
 	for y in 0..<size { for x in 0..<size {
@@ -374,6 +386,7 @@ ground_mask_paper :: proc(from, to: ^Ground_Mask, size: int) {
 }
 
 // One texel grown all round (3x3): the ink line's outer edge.
+@(private = "file")
 ground_mask_grow :: proc(from, to: ^Ground_Mask, size: int) {
 	across: Ground_Mask
 	for y in 0..<size { for x in 0..<size {
@@ -384,6 +397,7 @@ ground_mask_grow :: proc(from, to: ^Ground_Mask, size: int) {
 	} }
 }
 
+@(private = "file")
 ground_mask_erode :: proc(from, to: ^Ground_Mask, size: int) {
 	for y in 0..<size { for x in 0..<size {
 		to[y*size+x] = from[y*size+x] && (x > 0 && from[y*size+x-1]) && (x < size-1 && from[y*size+x+1]) &&
@@ -394,6 +408,7 @@ ground_mask_erode :: proc(from, to: ^Ground_Mask, size: int) {
 // A liquid texel's colour, (x, y) in the baked region, (gx, gy) in the room;
 // (sx, sz) the texel step toward the camera (ground_fx_toward); `texels` a
 // cell's side in texels.
+@(private = "file")
 ground_liquid_colour :: proc(layer: Ground_Layer, e1, e2, e3: ^Ground_Mask, size, x, y, gx, gy: int, sx := 1, sz := 1,
 	texels := GROUND_TEXELS) -> rl.Color {
 	at := y*size+x
@@ -438,6 +453,7 @@ ground_liquid_colour :: proc(layer: Ground_Layer, e1, e2, e3: ^Ground_Mask, size
 
 // The texel step toward the camera across the board, each of x and z one way
 // or the other, as the decal is baked (Ground_Fx.camera_west, camera_north).
+@(private = "file")
 ground_fx_toward :: proc(fx: ^Ground_Fx) -> (sx, sz: int) {
 	return -1 if fx.camera_west else 1, -1 if fx.camera_north else 1
 }
@@ -446,6 +462,7 @@ ground_fx_toward :: proc(fx: ^Ground_Fx) -> (sx, sz: int) {
 // board well away from the diagonal it was baked for (GROUND_FACING_SLACK), it
 // takes the diagonal nearest the camera and every cell that draws anything
 // bakes again, from the cell the camera looks at out. True when it turned.
+@(private)
 ground_fx_face :: proc(fx: ^Ground_Fx, toward: rl.Vector3, looked_at: grid.Position) -> bool {
 	if !(abs(toward.x)+abs(toward.z) > 0.01) { return false }
 	sx, sz := ground_fx_toward(fx)
@@ -462,6 +479,7 @@ ground_fx_face :: proc(fx: ^Ground_Fx, toward: rl.Vector3, looked_at: grid.Posit
 
 // The cells whose layers changed since last seen make the cells around them
 // stale: a texel's colour depends on the cells two away from its own.
+@(private)
 ground_fx_mark :: proc(fx: ^Ground_Fx, cell: grid.Position) {
 	for dy in -2..=2 { for dx in -2..=2 {
 		at := ground_fx_cell(fx, {cell.x+dx, cell.y+dy})
@@ -472,6 +490,7 @@ ground_fx_mark :: proc(fx: ^Ground_Fx, cell: grid.Position) {
 }
 
 // Bakes up to `budget` stale cells, the nearest to the seed first.
+@(private)
 ground_fx_bake :: proc(fx: ^Ground_Fx, budget: int) {
 	for _ in 0..<budget {
 		if fx.pending <= 0 { return }
@@ -495,9 +514,10 @@ ground_fx_bake :: proc(fx: ^Ground_Fx, budget: int) {
 
 // Once per frame, as the board begins (draw_tactical_world): before its decal
 // and the sorted pass that stands the flames, one budget of cells baked.
+@(private)
 update_ground_fx :: proc(renderer: ^Renderer, room: ^game.Room) {
 	v := &renderer.tactical
-	if !v.enabled || v.snapshot == nil || room == nil || room.level_data == nil { return }
+	if v.snapshot == nil || room == nil || room.level_data == nil { return }
 	shown := &v.snapshot.ground
 	// A board that never had a pool, a fire or water needs nothing.
 	if v.ground == nil {
@@ -615,11 +635,13 @@ update_ground_fx :: proc(renderer: ^Renderer, room: ^game.Room) {
 }
 
 // How many cells a fire's arms cover beyond its centre.
+@(private = "file")
 ground_fx_fire_reach :: proc(fire: game.Ground_Fire) -> (cells: i32) {
 	for arm in fire.arms { cells += arm }
 	return
 }
 
+@(private = "file")
 ground_fx_mark_fire :: proc(fx: ^Ground_Fx, cell: grid.Position, final: bool) {
 	if ground_fx_cell(fx, cell) == nil { return }
 	index := cell.y*fx.width+cell.x
@@ -627,6 +649,7 @@ ground_fx_mark_fire :: proc(fx: ^Ground_Fx, cell: grid.Position, final: bool) {
 	fx.last[index] = fx.last[index] || final
 }
 
+@(private = "file")
 ground_splash :: proc(fx: ^Ground_Fx, cell: grid.Position, fire: bool, world: f64) {
 	fx.splashes[fx.splash_next] = {used = true, fire = fire, cell = cell, born = world, seed = cell.x*7+cell.y*13+fx.splash_next}
 	fx.splash_next = (fx.splash_next+1)%len(fx.splashes)
@@ -637,6 +660,7 @@ ground_splash :: proc(fx: ^Ground_Fx, cell: grid.Position, fire: bool, world: f6
 
 // The decal, in the 3D pass after the lit floor: depth kept, never written,
 // one quad for every cell drawn on (draw_tactical_world).
+@(private)
 draw_ground_decal :: proc(renderer: ^Renderer, room: ^game.Room) {
 	fx := renderer.tactical.ground
 	if fx == nil || fx.cells == nil || room == nil { return }
@@ -695,6 +719,7 @@ draw_ground_decal :: proc(renderer: ^Renderer, room: ^game.Room) {
 }
 
 // The flames and splashes, sorted with the cards and walls (one entry each).
+@(private)
 collect_ground_entries :: proc(renderer: ^Renderer, room: ^game.Room, entries: ^[dynamic]Tactical_Alpha_Entry) {
 	fx := renderer.tactical.ground
 	if fx == nil || fx.cells == nil || room == nil || !renderer.tactical.attack_props.loaded { return }
@@ -714,6 +739,7 @@ collect_ground_entries :: proc(renderer: ^Renderer, room: ^game.Room, entries: ^
 	}
 }
 
+@(private)
 draw_ground_entry :: proc(renderer: ^Renderer, entry: Tactical_Alpha_Entry) {
 	fx := renderer.tactical.ground
 	if fx == nil || entry.ground < 0 { return }
@@ -730,6 +756,7 @@ draw_ground_entry :: proc(renderer: ^Renderer, entry: Tactical_Alpha_Entry) {
 	if index < len(fx.splashes) { draw_ground_splash(renderer, &fx.splashes[index], world) }
 }
 
+@(private = "file")
 draw_ground_flame :: proc(renderer: ^Renderer, fx: ^Ground_Fx, index: int, world: f64) {
 	cell := &fx.cells[index]
 	at := grid.Position{index%fx.width, index/fx.width}
@@ -758,6 +785,7 @@ draw_ground_flame :: proc(renderer: ^Renderer, fx: ^Ground_Fx, index: int, world
 	draw_attack_prop(renderer, prop, grip, tip, attack_texel(.Pilgrim)*size*scale, clamp(scale*1.6, 0, 1))
 }
 
+@(private = "file")
 draw_ground_splash :: proc(renderer: ^Renderer, splash: ^Ground_Splash, world: f64) {
 	t := f32((world-splash.born)/GROUND_SPLASH_SECONDS)
 	if t < 0 || t > 1 { return }
@@ -783,6 +811,7 @@ draw_ground_splash :: proc(renderer: ^Renderer, splash: ^Ground_Splash, world: f
 
 // The thrown flask or ember of a ground card's Spell_Launched: on a paper arc
 // from the player to its cell (draw_tactical_spell_flight's place).
+@(private)
 draw_ground_throw :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) {
 	if !renderer.tactical.attack_props.loaded { return }
 	p := presentation_cue_progress(cue)
@@ -810,63 +839,7 @@ draw_ground_throw :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) {
 	draw_attack_prop(renderer, .Flask, point-axis*length*0.5, point+axis, texel*1.2, 1)
 }
 
-// The flat board's ground (draw_tactical_world without the 3D scene): a pool
-// a green diamond edged with paper and ink where the floor is dry beside it, a
-// burning cell an ember diamond and its pixel flame.
-draw_ground_flat :: proc(renderer: ^Renderer, room: ^game.Room) {
-	fx := renderer.tactical.ground
-	if fx == nil || fx.cells == nil { return }
-	world := tactical_world_time(renderer)
-	pixel := max(f32(2), 2.5*renderer.camera.zoom)
-	for cell, index in fx.cells {
-		if cell.layers == {} { continue }
-		at := grid.Position{index%fx.width, index/fx.width}
-		if !tactical_render_visible(renderer, at) { continue }
-		vertices := tile_vertices(renderer, at)
-		if .Char in cell.layers { draw_diamond(inset_vertices(vertices, 0.9), {92, 34, 26, 210}, {196, 76, 34, 255}) }
-		for layer in ([2]Ground_Layer{.Pool, .Water}) {
-			if layer not_in cell.layers { continue }
-			fill := rl.Color{52, 128, 72, 200} if layer == .Pool else rl.Color{44, 98, 164, 210}
-			draw_diamond(inset_vertices(vertices, 0.94), fill, fill)
-			// Each side whose neighbour is dry: paper, and its ink outside.
-			sides := [4]struct{offset: grid.Position, a, b: rl.Vector2}{
-				{{0, -1}, to_raylib(vertices.top), to_raylib(vertices.right)},
-				{{1, 0}, to_raylib(vertices.right), to_raylib(vertices.bottom)},
-				{{0, 1}, to_raylib(vertices.bottom), to_raylib(vertices.left)},
-				{{-1, 0}, to_raylib(vertices.left), to_raylib(vertices.top)},
-			}
-			centre := to_raylib(cell_center(renderer, at))
-			for side in sides {
-				if layer in ground_fx_layers(fx, {at.x+side.offset.x, at.y+side.offset.y}) { continue }
-				inward := rl.Vector2Normalize(centre-(side.a+side.b)*0.5)
-				rl.DrawLineEx(side.a+inward*2, side.b+inward*2, 2, LIVING_TOKEN_PAPER)
-				rl.DrawLineEx(side.a, side.b, 1, LIVING_TOKEN_INK)
-			}
-			// The water's ripple.
-			if layer == .Water {
-				r := f32(math.mod(world*0.7+f64(index%5)*0.2, 1))
-				zoom := renderer.camera.zoom
-				rl.DrawEllipseLines(i32(centre.x), i32(centre.y), (4+14*r)*zoom, (2+7*r)*zoom, color_with_opacity(GROUND_WATER_GLINT, (1-r)*0.8))
-			}
-		}
-		if .Char in cell.layers {
-			centre := cell_center(renderer, at)
-			size := pixel+(1 if cell.centre else 0)
-			x := math.round(centre.x-f32(STATUS_TAG_WIDTH)*size*0.5)
-			y := math.round(centre.y-7*size*0.8)
-			glow := int(math.floor(world*6+f64(index)))%2 == 0
-			for row in 0..<7 {
-				draw_pixel_row(STATUS_TAG_FLAME[row]&~(STATUS_TAG_FLAME_CORE[row] if glow else 0), STATUS_TAG_WIDTH, x, y+f32(row)*size, size, STATUS_TAG_EMBER)
-				if glow { draw_pixel_row(STATUS_TAG_FLAME_CORE[row], STATUS_TAG_WIDTH, x, y+f32(row)*size, size, STATUS_TAG_EMBER_CORE) }
-			}
-		}
-	}
-	_ = room
-}
-
-// The cells a ground card would cover from the hovered cell: a pool's own and
-// those it would close (game.ground_pool_fill), a fire's whole reach. Drawn
-// by the card's target range (draw_card_target_range).
+@(private)
 draw_ground_preview :: proc(renderer: ^Renderer, room: ^game.Room, id: game.Card_Id, anchor: grid.Position, valid: bool) {
 	if !valid { return }
 	if id == .Poison_Pool {

@@ -1,9 +1,8 @@
-// Rendering helpers shared by minigames: pixel-art sprites authored as rows of
-// characters, a lit/fogged 3D material, greedy-free voxel meshing and a few
-// procedural backdrops. Content stays in code, so no asset files are needed.
+// Shared sprite drawing and loading: embedded pixel-art sheets or procedural rows.
 package gfx
 
 import "core:math"
+import "core:c"
 import rl "vendor:raylib"
 
 Vec2 :: [2]f32
@@ -26,6 +25,42 @@ Sprite :: struct {
 	texture:       rl.Texture2D,
 	width, height: int, // one frame, in pixels
 	frames:        int,
+}
+
+// One horizontal sheet. Frames retain their transparent margins and exact size.
+Sprite_Asset :: struct {
+	png: []u8,
+	frames: int,
+}
+
+// CPU staging works without a window. The caller owns a successful image.
+sprite_asset_image :: proc(asset: Sprite_Asset, silhouette := false) -> rl.Image {
+	if len(asset.png) == 0 || len(asset.png) > int(max(c.int)) || asset.frames <= 0 { return {} }
+	img := rl.LoadImageFromMemory(".png", raw_data(asset.png), c.int(len(asset.png)))
+	if img.data == nil { return {} }
+	if img.width <= 0 || img.height <= 0 || int(img.width) % asset.frames != 0 {
+		rl.UnloadImage(img)
+		return {}
+	}
+	if silhouette {
+		pixels := rl.LoadImageColors(img)
+		defer rl.UnloadImageColors(pixels)
+		for y in 0..<int(img.height) { for x in 0..<int(img.width) {
+			alpha := pixels[y*int(img.width)+x].a
+			if alpha > 0 { rl.ImageDrawPixel(&img, i32(x), i32(y), {255, 255, 255, alpha}) }
+		} }
+	}
+	return img
+}
+
+sprite_load :: proc(asset: Sprite_Asset, silhouette := false) -> (Sprite, bool) {
+	img := sprite_asset_image(asset, silhouette)
+	if img.data == nil { return {}, false }
+	defer rl.UnloadImage(img)
+	texture := rl.LoadTextureFromImage(img)
+	if texture.id == 0 { return {}, false }
+	rl.SetTextureFilter(texture, .POINT)
+	return Sprite{texture = texture, width = int(img.width)/asset.frames, height = int(img.height), frames = asset.frames}, true
 }
 
 // Packs the frames side by side into one texture with nearest filtering.

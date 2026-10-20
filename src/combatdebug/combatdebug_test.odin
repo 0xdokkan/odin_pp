@@ -2,7 +2,6 @@ package combatdebug
 
 import "core:testing"
 import game "../game"
-import grid "../grid"
 import level "../level"
 
 debug_test_level :: proc(t: ^testing.T, rows: []string) -> level.Level {
@@ -26,6 +25,34 @@ debug_test_single_card_deck :: proc(t: ^testing.T, player: ^game.Player, card: g
 	}, 41))
 	_, added := game.add_owned_card(&player.deck, card)
 	testing.expect(t, added)
+}
+
+// Observe the same bounded batches as the runtime's Continue_Pulse / QTE
+// commands. Enemy effects belong to the world's Wait bucket, not the action
+// that happened to precede them.
+debug_test_drain_world :: proc(t: ^testing.T, room: ^game.Room, metrics: ^Combat_Metrics) {
+	for _ in 0..<256 {
+		if !game.tactical_is_casting(room) && room.qte.kind == .None && !room.tactical_pulse.pending { return }
+		snapshot, captured := capture_command_snapshot(room)
+		testing.expect(t, captured)
+		game.clear_event_log(room.recent_events)
+		if game.tactical_is_casting(room) {
+			game.tactical_tick(room, room.player.tactical.cast_remaining, true, false)
+		} else if room.qte.kind != .None {
+			testing.expect(t, game.resolve_qte(room, false))
+		} else {
+			testing.expect(t, game.continue_tactical_pulse(room))
+		}
+		testing.expect(t, observe_command(metrics, snapshot, .Wait, true, room))
+	}
+	testing.expect(t, false, "world did not settle within its bounded fixture")
+}
+
+debug_test_world_seconds :: proc(t: ^testing.T, room: ^game.Room, metrics: ^Combat_Metrics, seconds: int) {
+	for _ in 0..<seconds {
+		testing.expect(t, !game.tactical_tick(room, 1, true, false))
+		debug_test_drain_world(t, room, metrics)
+	}
 }
 
 @(test)
@@ -65,11 +92,14 @@ test_observer_classifies_bump_damage_and_full_energy_waste :: proc(t: ^testing.T
 		metrics.direct_damage_by_command[int(Command_Kind.Bump_Attack)],
 		i64(2),
 	)
+	testing.expect_value(t, metrics.damage_taken, i64(0))
+	debug_test_drain_world(t, &room, &metrics)
+	debug_test_world_seconds(t, &room, &metrics, 2)
 	testing.expect_value(t, metrics.damage_taken, i64(1))
-	testing.expect_value(t, metrics.damage_taken_by_command[int(Command_Kind.Bump_Attack)], i64(1))
-	testing.expect_value(t, metrics.pulses, u64(1))
+	testing.expect_value(t, metrics.damage_taken_by_command[int(Command_Kind.Bump_Attack)], i64(0))
+	testing.expect_value(t, metrics.pulses, u64(3))
 	testing.expect_value(t, metrics.energy_spent, i64(0))
-	testing.expect_value(t, metrics.pulse_events, u64(1))
+	testing.expect_value(t, metrics.pulse_events, u64(3))
 	testing.expect_value(t, metrics.energy_restored, i64(0))
 	testing.expect_value(t, metrics.energy_wasted, i64(1))
 	testing.expect_value(t, metrics.integrity_mismatches, u64(0))
@@ -101,7 +131,6 @@ test_terminal_bump_keeps_its_command_kind_when_result_reports_combat_end :: proc
 	testing.expect(t, captured)
 	result := game.try_move_player(&room, .East)
 	testing.expect_value(t, result, game.Action_Result.Combat_Ended)
-	testing.expect(t, move_result_was_committed(result))
 	metrics: Combat_Metrics
 	testing.expect(t, observe_command(&metrics, snapshot, resolved_kind, true, &room))
 
@@ -154,8 +183,8 @@ test_observer_keeps_card_damage_and_energy_in_the_card_bucket :: proc(t: ^testin
 	testing.expect_value(t, metrics.direct_damage_by_command[int(Command_Kind.Play_Card)], i64(3))
 	testing.expect_value(t, metrics.energy_spent, i64(1))
 	testing.expect_value(t, metrics.energy_spent_by_command[int(Command_Kind.Play_Card)], i64(1))
-	testing.expect_value(t, metrics.pulses, u64(1))
-	testing.expect_value(t, metrics.energy_restored, i64(1))
+	testing.expect_value(t, metrics.pulses, u64(0))
+	testing.expect_value(t, metrics.energy_restored, i64(0))
 	testing.expect_value(t, metrics.energy_wasted, i64(0))
 }
 
@@ -192,17 +221,25 @@ test_observer_counts_refocus_and_enemy_misses_without_guessing_commands :: proc(
 	testing.expect_value(t, metrics.refocus_retained, u64(0))
 	testing.expect_value(t, metrics.refocus_discarded, u64(1))
 	testing.expect_value(t, metrics.refocus_exhausted, u64(0))
-	testing.expect_value(t, metrics.energy_wasted, i64(1))
-	testing.expect_value(t, metrics.energy_wasted_by_command[int(Command_Kind.Refocus)], i64(1))
+	testing.expect_value(t, metrics.energy_wasted, i64(0))
+	testing.expect_value(t, metrics.energy_wasted_by_command[int(Command_Kind.Refocus)], i64(0))
 
+	debug_test_drain_world(t, &room, &metrics)
+	// Refocus spent two seconds; this archer finishes aiming at four.
+	debug_test_world_seconds(t, &room, &metrics, 2)
+	testing.expect(t, room.enemies[0].aim_ready)
 	damage_before_move := metrics.damage_taken
 	move_before, move_captured := capture_command_snapshot(&room)
 	testing.expect(t, move_captured)
 	move := game.try_move_player(&room, .South)
 	testing.expect_value(t, move, game.Action_Result.Moved)
 	testing.expect(t, observe_command(&metrics, move_before, .Move, true, &room))
+	debug_test_drain_world(t, &room, &metrics)
+	testing.expect_value(t, metrics.enemy_attack_misses, u64(0))
+	game.tactical_tick(&room, 1-game.TACTICAL_MOVE_SECONDS, true, false)
+	debug_test_drain_world(t, &room, &metrics)
 	testing.expect_value(t, metrics.enemy_attack_misses, u64(1))
-	testing.expect_value(t, metrics.misses_by_command[int(Command_Kind.Move)], u64(1))
+	testing.expect_value(t, metrics.misses_by_command[int(Command_Kind.Move)], u64(0))
 	testing.expect_value(t, metrics.damage_taken, damage_before_move)
 	testing.expect_value(t, metrics.player_moves, u64(1))
 }
@@ -255,11 +292,17 @@ test_detailed_observer_attributes_caustic_bloom_targets_and_poison_ticks :: proc
 	testing.expect_value(t, sample.planned_affected_enemies, 3)
 	testing.expect_value(t, sample.actual_affected_enemies, 3)
 	testing.expect_value(t, sample.card_poison_applications, u64(3))
-	testing.expect_value(t, sample.poison_ticks, u64(3))
-	testing.expect_value(t, sample.poison_potential_damage, i64(6))
-	testing.expect_value(t, sample.poison_damage_to_enemies, i64(6))
+	testing.expect_value(t, sample.poison_ticks, u64(0))
+	testing.expect_value(t, sample.poison_potential_damage, i64(0))
+	testing.expect_value(t, sample.poison_damage_to_enemies, i64(0))
 	testing.expect_value(t, sample.card_damage_to_enemies, i64(0))
-	testing.expect_value(t, sample.pulse_delta, u64(1))
+	testing.expect_value(t, sample.pulse_delta, u64(0))
+	debug_test_drain_world(t, &room, &metrics)
+	// Poison bites each chaser's first action, now on its third world beat.
+	debug_test_world_seconds(t, &room, &metrics, 3)
+	testing.expect_value(t, metrics.poison_ticks, u64(3))
+	testing.expect_value(t, metrics.poison_potential_damage, i64(6))
+	testing.expect_value(t, metrics.poison_damage_to_enemies, i64(6))
 	card_index := int(game.Card_Id.Caustic_Bloom)
 	testing.expect_value(t, metrics.card_committed[card_index], u64(1))
 	testing.expect_value(t, metrics.card_planned_targets[card_index], u64(3))
@@ -293,8 +336,8 @@ test_detailed_observer_deduplicates_partially_absorbed_poison_ticks :: proc(
 	first := game.enemy_entity(room.enemies[0].id)
 	second := game.enemy_entity(room.enemies[1].id)
 	room.pulse_count += 1
-	room.recent_events = {}
-	game.record_event(&room.recent_events, {
+	room.recent_events^ = {}
+	game.record_event(room.recent_events, {
 		kind = .Damage_Absorbed,
 		source = game.SYSTEM_ENTITY,
 		target = first,
@@ -302,7 +345,7 @@ test_detailed_observer_deduplicates_partially_absorbed_poison_ticks :: proc(
 		has_status_cause = true,
 		status_cause = .Poison,
 	})
-	game.record_event(&room.recent_events, {
+	game.record_event(room.recent_events, {
 		kind = .Damaged,
 		source = game.SYSTEM_ENTITY,
 		target = first,
@@ -310,7 +353,7 @@ test_detailed_observer_deduplicates_partially_absorbed_poison_ticks :: proc(
 		has_status_cause = true,
 		status_cause = .Poison,
 	})
-	game.record_event(&room.recent_events, {
+	game.record_event(room.recent_events, {
 		kind = .Damaged,
 		source = game.SYSTEM_ENTITY,
 		target = second,
@@ -318,7 +361,7 @@ test_detailed_observer_deduplicates_partially_absorbed_poison_ticks :: proc(
 		has_status_cause = true,
 		status_cause = .Poison,
 	})
-	game.record_event(&room.recent_events, {
+	game.record_event(room.recent_events, {
 		kind = .Pulse_Advanced,
 		source = game.SYSTEM_ENTITY,
 		target = game.PLAYER_ENTITY,
@@ -571,55 +614,4 @@ test_max_distance_policy_is_deterministic_and_prefers_safety :: proc(t: ^testing
 	safe := choose_max_distance_command(&room, &state)
 	testing.expect(t, safe.valid)
 	testing.expect_value(t, safe.kind, Command_Kind.Wait)
-}
-
-create_ring_scenario :: proc(t: ^testing.T, level_data: ^level.Level, player: ^game.Player) -> (
-	room: game.Room,
-	ok: bool,
-) {
-	rows := [?]string{
-		"#########",
-		"#@......#",
-		"#.#####.#",
-		"#.#####.#",
-		"#.#####.#",
-		"#......>#",
-		"#########",
-	}
-	level_data^ = debug_test_level(t, rows[:])
-	player^ = debug_test_player(t)
-	enemies := [?]game.Enemy_Spawn{{
-		position = {x = 1, y = 4},
-		health = 100,
-		attack = 2,
-		archetype = .Chaser,
-	}}
-	return game.create_room(level_data, player, {enemies = enemies[:]})
-}
-
-@(test)
-test_headless_kiting_scenario_repeats_the_same_integer_report :: proc(t: ^testing.T) {
-	first_level, second_level: level.Level
-	first_player, second_player: game.Player
-	first_room, first_ok := create_ring_scenario(t, &first_level, &first_player)
-	testing.expect(t, first_ok)
-	defer level.destroy(&first_level)
-	defer game.destroy_room(&first_room)
-	second_room, second_ok := create_ring_scenario(t, &second_level, &second_player)
-	testing.expect(t, second_ok)
-	defer level.destroy(&second_level)
-	defer game.destroy_room(&second_room)
-
-	first := run_max_distance_scenario(&first_room, 20)
-	second := run_max_distance_scenario(&second_room, 20)
-
-	testing.expect_value(t, first, second)
-	testing.expect(t, first.valid)
-	testing.expect_value(t, first.termination, Scenario_Termination.Pulse_Budget)
-	testing.expect_value(t, first.commands_executed, u64(20))
-	testing.expect_value(t, first.final_pulse-first.initial_pulse, u64(20))
-	testing.expect_value(t, first.metrics.damage_taken, i64(0))
-	testing.expect(t, first.metrics.maximum_no_damage_streak >= 20)
-	testing.expect_value(t, first.metrics.integrity_mismatches, u64(0))
-	testing.expect(t, first.final_position != grid.Position{})
 }

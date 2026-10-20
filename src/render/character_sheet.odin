@@ -6,7 +6,7 @@ import "core:math"
 import rl "vendor:raylib"
 import rlgl "vendor:raylib/rlgl"
 import game "../game"
-import view "../view"
+import view "../engine/view"
 
 // The character sheet: the Viandante modelled in Blender
 // (tools/art/build_pilgrim.py) stands on a plinth in a small chapel built
@@ -17,6 +17,7 @@ PILGRIM_MODEL_BYTES := #load("../../assets/models/pilgrim.odm")
 PILGRIM_LANTERN :: rl.Vector3{0.46, 0.98, 0.36}
 SHEET_PLINTH :: f32(0.14)
 
+@(private)
 load_pilgrim_model :: proc(model: ^[]Diorama_Vertex) -> bool {
 	delete(model^)
 	vertices, ok := load_odm_vertices(PILGRIM_MODEL_BYTES)
@@ -24,11 +25,13 @@ load_pilgrim_model :: proc(model: ^[]Diorama_Vertex) -> bool {
 	return ok
 }
 
+@(private = "file")
 sheet_turn :: proc(v: rl.Vector3, angle: f32) -> rl.Vector3 {
 	c, s := math.cos(angle), math.sin(angle)
 	return {v.x*c+v.z*s, v.y, -v.x*s+v.z*c}
 }
 
+@(private = "file")
 draw_sheet_model :: proc(vertices: []Diorama_Vertex, origin: rl.Vector3, angle: f32) {
 	if len(vertices) == 0 { return }
 	rlgl.SetTexture(rlgl.GetTextureIdDefault())
@@ -52,6 +55,7 @@ draw_sheet_model :: proc(vertices: []Diorama_Vertex, origin: rl.Vector3, angle: 
 // BeginMode3D centres the camera on the whole canvas. An off-centre frustum
 // moves the principal point to the stage, keeping its own field of view and
 // aspect, so the figure is framed by the camera rather than by target hacks.
+@(private = "file")
 sheet_stage_projection :: proc(renderer: ^Renderer, stage: rl.Rectangle, fovy: f32) {
 	w, h := renderer.canvas_width, renderer.canvas_height
 	near, far := f64(0.05), f64(60)
@@ -67,6 +71,7 @@ sheet_stage_projection :: proc(renderer: ^Renderer, stage: rl.Rectangle, fovy: f
 	rlgl.MatrixMode(rlgl.MODELVIEW)
 }
 
+@(private = "file")
 begin_sheet_lighting :: proc(renderer: ^Renderer, camera: rl.Camera3D, lantern: rl.Vector3) -> bool {
 	v := &renderer.tactical
 	if v.light_shader.id == 0 { return false }
@@ -79,6 +84,7 @@ begin_sheet_lighting :: proc(renderer: ^Renderer, camera: rl.Camera3D, lantern: 
 
 // A three-bay chapel wall with a lancet in the middle, two rose windows and
 // a lantern sconce, over a few floor slabs: the board's own masonry.
+@(private = "file")
 draw_sheet_chapel :: proc(renderer: ^Renderer) {
 	kit := &renderer.tactical.kit
 	for z in -2..=1 { for x in -2..=2 {
@@ -101,6 +107,7 @@ draw_sheet_chapel :: proc(renderer: ^Renderer) {
 	draw_diorama_piece(kit, .Sconce, {1.12, DIORAMA_WALL_HEIGHT*0.58, -1.03}, 0)
 }
 
+@(private = "file")
 draw_character_stage :: proc(renderer: ^Renderer, stage: rl.Rectangle) {
 	rl.BeginScissorMode(c.int(stage.x), c.int(stage.y), c.int(stage.width), c.int(stage.height))
 	defer rl.EndScissorMode()
@@ -126,18 +133,21 @@ draw_character_stage :: proc(renderer: ^Renderer, stage: rl.Rectangle) {
 	}
 }
 
+@(private = "file")
 sheet_section :: proc(renderer: ^Renderer, bounds: rl.Rectangle, title: cstring, accent: rl.Color) {
 	hud_frame(bounds, accent)
 	gothic_text(renderer, title, bounds.x+12, bounds.y+6, 12, accent)
 	gothic_rule(bounds.x+12, bounds.y+24, bounds.width-24, {34, 46, 62, 255})
 }
 
+@(private = "file")
 sheet_stat :: proc(renderer: ^Renderer, bounds: rl.Rectangle, label, value: cstring, accent: rl.Color, detail: cstring = nil) {
 	gothic_text(renderer, label, bounds.x, bounds.y, 10, GOTHIC_MUTED)
 	gothic_text_fit(renderer, value, {bounds.x, bounds.y+11, bounds.width, 24}, 24, accent)
 	if detail != nil { gothic_text_fit(renderer, detail, {bounds.x, bounds.y+36, bounds.width, 14}, 10, GOTHIC_MUTED) }
 }
 
+@(private)
 draw_character_sheet :: proc(renderer: ^Renderer, room: ^game.Room, state: Character_Sheet_State = {}) {
 	width, height := renderer.canvas_width, renderer.canvas_height
 	player := room.player
@@ -217,6 +227,7 @@ Character_Sheet_Frame :: struct {
 	panel, stage, stats, gear, relics, deck: rl.Rectangle,
 }
 
+@(private)
 character_sheet_frame :: proc(renderer: ^Renderer) -> (frame: Character_Sheet_Frame) {
 	width, height := renderer.canvas_width, renderer.canvas_height
 	frame.panel = {36, 38, width-72, height-76}
@@ -292,6 +303,7 @@ character_sheet_deck_row_bounds :: proc(layout: ^Character_Deck_Layout, slot: in
 }
 
 // The lines of the page shown: the first one's index and how many.
+@(private)
 character_sheet_deck_page_rows :: proc(layout: ^Character_Deck_Layout) -> (first, count: int) {
 	first = layout.page*layout.per_page
 	return first, clamp(layout.row_count-first, 0, layout.per_page)
@@ -308,11 +320,12 @@ character_sheet_deck_row_at :: proc(layout: ^Character_Deck_Layout, point: view.
 
 // A line's words: how many, the card's name and its upgrade.
 character_sheet_deck_row_text :: proc(row: Character_Deck_Row) -> cstring {
-	definition, found := game.card_definition_by_id(row.card.definition_id, true)
+	definition, found := game.card_definition_by_id(row.card.definition_id)
 	if !found { return "" }
 	return fmt.ctprintf("%dx %s", row.count, tactical_card_title(row.card, definition))
 }
 
+@(private = "file")
 draw_character_sheet_deck :: proc(renderer: ^Renderer, room: ^game.Room, state: Character_Sheet_State) {
 	layout := character_sheet_deck_layout(renderer, room, state.deck_page)
 	deck := layout.section

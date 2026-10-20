@@ -1,7 +1,7 @@
 package game
 
 import "core:testing"
-import grid "../grid"
+import grid "../engine/grid"
 import level "../level"
 
 board_device_test_room :: proc(t: ^testing.T, data: ^level.Level, player: ^Player) -> Room {
@@ -128,9 +128,9 @@ test_m8_passive_floor_waits_indefinitely_and_player_cannot_trigger_or_activate_i
 	report := resolve_action(&room, &action)
 	testing.expect(t, report.accepted)
 	testing.expect_value(t, spell_test_event_count(&report.events, .Hazard_Triggered), 0)
-	before, before_events := room.objects[0], room.recent_events
+	before, before_events := room.objects[0], room.recent_events^
 	testing.expect(t, !board_devices_can_activate(&room) && !activate_board_devices(&room))
-	testing.expect_value(t, room.recent_events, before_events)
+	testing.expect_value(t, room.recent_events^, before_events)
 	for _ in 0..<100 {
 		pulse: Pulse_Report
 		tick_board_devices(&room, &pulse)
@@ -215,15 +215,15 @@ test_m8_passive_floor_enemy_clock_triggers_without_player_action_and_respects_ca
 	testing.expect_value(t, room.pulse_count, u64(0))
 	testing.expect(t, !room.objects[0].device_armed)
 	testing.expect_value(t, room.objects[0].device_charges, i32(2))
-	advance_enemy_rework_seconds(t, &room, 1)
+	advance_enemy_rework_seconds(t, &room, 2)
 	testing.expect(t, !room.objects[0].device_armed)
 	advance_enemy_rework_seconds(t, &room, 1)
 	testing.expect(t, room.objects[0].device_armed)
 	testing.expect_value(t, room.objects[0].device_charges, i32(1))
 	testing.expect_value(t, room.enemies[0].health, i32(29))
-	testing.expect_value(t, room.pulse_count, u64(2))
+	testing.expect_value(t, room.pulse_count, u64(3))
 	testing.expect_value(t, player.position, position)
-	testing.expect_value(t, player.tactical.remaining, before.remaining-4)
+	testing.expect_value(t, player.tactical.remaining, before.remaining-5)
 }
 
 @(test)
@@ -241,7 +241,7 @@ test_m8_tesla_activation_never_arms_unoccupied_passive_floors :: proc(t: ^testin
 	testing.expect(t, board_devices_can_activate(&room) && activate_board_devices(&room))
 	testing.expect_value(t, room.objects[0], before)
 	testing.expect(t, !board_devices_can_activate(&room))
-	testing.expect_value(t, spell_test_event_count(&room.recent_events, .Hazard_Triggered), 0)
+	testing.expect_value(t, spell_test_event_count(room.recent_events, .Hazard_Triggered), 0)
 }
 
 @(test)
@@ -339,9 +339,9 @@ test_m8_tesla_two_and_three_coils_keep_positions_across_repeated_activations_and
 		for _ in 0..<2 {
 			committed, opened := activate_tesla(&room)
 			testing.expect(t, committed && !opened)
-			before_events := room.recent_events
+			before_events := room.recent_events^
 			testing.expect(t, !activate_board_devices(&room))
-			testing.expect_value(t, room.recent_events, before_events)
+			testing.expect_value(t, room.recent_events^, before_events)
 			for beat in 1..=12 {
 				pulse: Pulse_Report
 				tick_board_devices(&room, &pulse)
@@ -416,7 +416,7 @@ test_m8_tesla_four_collinear_coils_remain_lightning_walls_without_mega_consumpti
 	testing.expect(t, !network.field && network.ready)
 	testing.expect(t, activate_board_devices(&room))
 	testing.expect_value(t, board_tesla_count(&room), MAX_TESLA_COILS)
-	testing.expect_value(t, spell_test_event_count(&room.recent_events, .Entity_Defeated), 0)
+	testing.expect_value(t, spell_test_event_count(room.recent_events, .Entity_Defeated), 0)
 	for _ in 0..<TESLA_RECHARGE_BEATS {
 		pulse: Pulse_Report
 		tick_board_devices(&room, &pulse)
@@ -440,10 +440,10 @@ test_m8_tesla_joining_fourth_coil_respects_existing_cooldown_before_consuming_me
 	testing.expect(t, deploy_board_device(&room, .Tesla_Coil, {2, 4}, 8, 0, &log))
 	network := query_board_device_network(&room)
 	testing.expect(t, network.field && !network.ready)
-	before_events := room.recent_events
+	before_events := room.recent_events^
 	testing.expect(t, !activate_board_devices(&room))
 	testing.expect_value(t, board_tesla_count(&room), MAX_TESLA_COILS)
-	testing.expect_value(t, room.recent_events, before_events)
+	testing.expect_value(t, room.recent_events^, before_events)
 	for _ in 0..<TESLA_RECHARGE_BEATS {
 		pulse: Pulse_Report
 		tick_board_devices(&room, &pulse)
@@ -561,9 +561,9 @@ test_m8_tesla_blocked_link_rejects_activation_without_mutation :: proc(t: ^testi
 	network := query_board_device_network(&room)
 	testing.expect(t, !network.ready && network.active_links == 0)
 	testing.expect_value(t, board_device_network_damage_at(&room, &network, {3, 2}), i32(0))
-	before_log := room.recent_events
+	before_log := room.recent_events^
 	testing.expect(t, !activate_board_devices(&room))
-	testing.expect_value(t, room.recent_events, before_log)
+	testing.expect_value(t, room.recent_events^, before_log)
 	for object in room.objects { testing.expect_value(t, object.device_cooldown, i32(0)) }
 	for enemy in room.enemies { testing.expect_value(t, enemy.health, i32(30)) }
 	clear(&room.obstacles)

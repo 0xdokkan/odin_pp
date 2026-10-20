@@ -1,7 +1,7 @@
 package game
 
 import "core:testing"
-import grid "../grid"
+import grid "../engine/grid"
 import level "../level"
 
 fire_hazard_event_count :: proc(log: ^Event_Log, kind: Game_Event_Kind) -> int {
@@ -137,8 +137,8 @@ test_fire_stays_dangerous_in_loot_without_advancing_a_pulse :: proc(t: ^testing.
 	testing.expect_value(t, player.health, i32(9))
 	testing.expect_value(t, room.pulse_count, pulse_before)
 	testing.expect_value(t, len(room.objects), 1)
-	testing.expect_value(t, fire_hazard_event_count(&room.recent_events, .Hazard_Triggered), 1)
-	testing.expect_value(t, fire_hazard_event_count(&room.recent_events, .Damaged), 1)
+	testing.expect_value(t, fire_hazard_event_count(room.recent_events, .Hazard_Triggered), 1)
+	testing.expect_value(t, fire_hazard_event_count(room.recent_events, .Damaged), 1)
 }
 
 @(test)
@@ -157,16 +157,18 @@ test_wait_while_standing_on_fire_does_not_retrigger_it :: proc(t: ^testing.T) {
 
 	move_result := try_move_player(&room, .East)
 	testing.expect_value(t, move_result, Action_Result.Moved)
-	testing.expect_value(t, fire_hazard_event_count(&room.recent_events, .Hazard_Triggered), 1)
+	testing.expect_value(t, fire_hazard_event_count(room.recent_events, .Hazard_Triggered), 1)
+	drain_tactical_test_pulse(t, &room)
 	health_after_entry := player.health
 	pulse_after_entry := room.pulse_count
 
 	wait_result := wait_player_turn(&room)
+	drain_tactical_test_pulse(t, &room)
 
 	testing.expect_value(t, wait_result, Action_Result.None)
 	testing.expect_value(t, room.pulse_count, pulse_after_entry+1)
 	testing.expect_value(t, player.health, health_after_entry)
-	testing.expect_value(t, fire_hazard_event_count(&room.recent_events, .Hazard_Triggered), 0)
+	testing.expect_value(t, fire_hazard_event_count(room.recent_events, .Hazard_Triggered), 0)
 	testing.expect_value(t, len(room.objects), 1)
 }
 

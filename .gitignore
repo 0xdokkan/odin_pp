@@ -7,6 +7,7 @@
 
 # Build Odin
 /build/
+/game
 /odin_pp_m8_*.png
 /odin_pp_m9_*.png
 /odin_pp_moves.json

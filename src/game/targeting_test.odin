@@ -1,7 +1,7 @@
 package game
 
 import "core:testing"
-import grid "../grid"
+import grid "../engine/grid"
 import level "../level"
 
 create_targeting_test_level :: proc(t: ^testing.T) -> level.Level {
@@ -475,7 +475,7 @@ test_target_query_is_deterministic_and_does_not_mutate_room :: proc(t: ^testing.
 	}
 	phase_before := room.phase
 	pulse_before := room.pulse_count
-	events_before := room.recent_events
+	events_before := room.recent_events^
 	spec := Targeting_Spec{
 		rule = .Cell,
 		cast_range = {.Chebyshev, 1, 6},
@@ -491,7 +491,7 @@ test_target_query_is_deterministic_and_does_not_mutate_room :: proc(t: ^testing.
 	testing.expect_value(t, player, player_before)
 	testing.expect_value(t, room.phase, phase_before)
 	testing.expect_value(t, room.pulse_count, pulse_before)
-	testing.expect_value(t, room.recent_events, events_before)
+	testing.expect_value(t, room.recent_events^, events_before)
 	testing.expect_value(t, len(room.enemies), len(enemies))
 	for enemy, index in room.enemies {
 		testing.expect_value(t, enemy, enemies_before[index])

@@ -2,6 +2,7 @@ package render
 
 import game "../game"
 
+@(private)
 show_spawned_presentation_object :: proc(presentation: ^Room_Presentation, event: game.Game_Event) -> bool {
 	if presentation == nil || !presentation.valid || event.target.kind != .Object || event.target.id == 0 ||
 	   presentation.object_count < 0 || presentation.object_count > len(presentation.objects) {

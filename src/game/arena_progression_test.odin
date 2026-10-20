@@ -1,7 +1,7 @@
 package game
 
 import "core:testing"
-import grid "../grid"
+import grid "../engine/grid"
 import level "../level"
 
 arena_compatibility_hash :: proc(blueprint: ^Room_Blueprint) -> u64 {
@@ -24,29 +24,21 @@ arena_compatibility_hash :: proc(blueprint: ^Room_Blueprint) -> u64 {
 }
 
 @(test)
-test_arena_progression_preserves_legacy_rooms :: proc(t: ^testing.T) {
-	// Captured before the progression change: geometry, anchors, roster, traps
-	// and objects must all keep their seeded ordering in the legacy paths.
+test_arena_progression_preserves_opening_rooms :: proc(t: ^testing.T) {
+	// Keep the seeded opening geometry, anchors, roster, traps and objects.
 	expected := [?]u64{
-		8121667582311555035, 2405377929276258985, 11537757873144908426,
-		17734044712456417097, 6574506746188810855, 10033635374348756734,
-		2648737434455942221, 3148738511542268274, 2847178824596872397,
-		12177049974555128568, 4695759264541062819, 15747700827686040169,
 		1345742107051187227, 14616536019589972991, 12178865995150018295,
 		658043700574800456, 16121760560638974580, 12633176597817086690,
 	}
 	index := 0
-	for tactical in ([?]bool{false, true}) {
-		for depth in ([?]int{0, 1, 5, 8}) {
-			if tactical && depth > 1 { continue }
-			for kind in ([?]Node_Kind{.Combat, .Elite, .Boss}) {
-				node := test_generation_node(7, kind, depth, 0xCAFE)
-				blueprint, err := generate_room_blueprint(&node, .Scattered, tactical)
-				testing.expect_value(t, err, Room_Blueprint_Error.None)
-				testing.expect_value(t, arena_compatibility_hash(&blueprint), expected[index])
-				index += 1
-				destroy_room_blueprint(&blueprint)
-			}
+	for depth in ([?]int{0, 1}) {
+		for kind in ([?]Node_Kind{.Combat, .Elite, .Boss}) {
+			node := test_generation_node(7, kind, depth, 0xCAFE)
+			blueprint, err := generate_room_blueprint(&node, .Scattered)
+			testing.expect_value(t, err, Room_Blueprint_Error.None)
+			testing.expect_value(t, arena_compatibility_hash(&blueprint), expected[index])
+			index += 1
+			destroy_room_blueprint(&blueprint)
 		}
 	}
 }
@@ -56,7 +48,7 @@ test_arena_progression_scales_area_rosters_and_caps :: proc(t: ^testing.T) {
 	for kind in ([?]Node_Kind{.Combat, .Elite, .Boss}) {
 		for depth in ([?]int{0, 1, 2, 3, 4, 5, 6, 8, 127, max(int)}) {
 			node := Run_Node{id = 7, kind = kind, depth = depth, room_seed = 0xCAFE}
-			profile, ok := room_generation_profile(&node, .Scattered, true)
+			profile, ok := room_generation_profile(&node, .Scattered)
 			testing.expect(t, ok)
 			tier := tactical_arena_tier(depth)
 			expected_width, expected_height := 17+8*tier, 11+6*tier
@@ -66,13 +58,6 @@ test_arena_progression_scales_area_rosters_and_caps :: proc(t: ^testing.T) {
 			testing.expect_value(t, profile.level_config.height, expected_height)
 			testing.expect_value(t, profile.level_config.complexity, tier)
 			testing.expect(t, profile.encounter_config.enemy_health > 0 && profile.encounter_config.enemy_attack > 0)
-			if depth < MAX_RUN_MAP_LAYERS {
-				classic, classic_ok := room_generation_profile(&node)
-				testing.expect(t, classic_ok)
-				testing.expect_value(t, profile.encounter_config.enemy_health, classic.encounter_config.enemy_health)
-				testing.expect_value(t, profile.encounter_config.enemy_attack, classic.encounter_config.enemy_attack)
-				testing.expect_value(t, profile.encounter_config.trap_damage, classic.encounter_config.trap_damage)
-			}
 			if tier > 0 {
 				expected_count := 4+4*tier
 				if kind == .Elite { expected_count += 2 }
@@ -97,11 +82,11 @@ test_arena_progression_seeded_geometry_roster_and_spread :: proc(t: ^testing.T) 
 			for seed in 1..=seed_limit {
 				node := test_generation_node(7, kind, depth, u64(seed)*7919)
 				when !ODIN_TEST_FULL {
-					profile, ok := room_generation_profile(&node, level.Room_Family(seed%5), true)
+					profile, ok := room_generation_profile(&node, level.Room_Family(seed%5))
 					if !testing.expect(t, ok) { continue }
 					if profile_families[profile.level_config.family] { continue }
 				}
-				blueprint, err := generate_room_blueprint(&node, level.Room_Family(seed%5), true)
+				blueprint, err := generate_room_blueprint(&node, level.Room_Family(seed%5))
 				testing.expectf(t, err == .None, "depth=%v kind=%v seed=%v error=%v", depth, kind, seed, err)
 				if err != .None { continue }
 				seen_families[int(blueprint.profile.level_config.family)] = true
@@ -139,7 +124,7 @@ test_arena_progression_seeded_geometry_roster_and_spread :: proc(t: ^testing.T) 
 			}
 		}
 	}
-	// Scattered remains a classic generator; run rooms choose these four families.
+	// Run rooms choose these four families; Scattered remains a level fixture.
 	for seen in seen_families[1:] { testing.expect(t, seen) }
 }
 
@@ -147,8 +132,8 @@ test_arena_progression_seeded_geometry_roster_and_spread :: proc(t: ^testing.T) 
 test_arena_progression_determinism_and_roster_validation :: proc(t: ^testing.T) {
 	for depth in ([?]int{2, 4, 6}) {
 		node := test_generation_node(7, .Boss, depth, 0xBEEF)
-		first, first_error := generate_room_blueprint(&node, .Pillars, true)
-		second, second_error := generate_room_blueprint(&node, .Pillars, true)
+		first, first_error := generate_room_blueprint(&node, .Pillars)
+		second, second_error := generate_room_blueprint(&node, .Pillars)
 		testing.expect_value(t, first_error, Room_Blueprint_Error.None)
 		testing.expect_value(t, second_error, Room_Blueprint_Error.None)
 		if first_error == .None && second_error == .None {

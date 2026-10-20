@@ -1,9 +1,9 @@
 package render
 
 import game "../game"
-import grid "../grid"
+import grid "../engine/grid"
 import level "../level"
-import view "../view"
+import view "../engine/view"
 import tween "../engine/tween"
 
 MAX_PRESENTATION_CUES :: game.MAX_GAME_EVENTS
@@ -165,7 +165,6 @@ Presentation_Ground :: struct {
 }
 
 Room_Presentation :: struct {
-	tactical: bool,
 	phase:       game.Room_Phase,
 	encounter_kind: game.Encounter_Kind,
 	modifier: game.Room_Modifier,
@@ -222,7 +221,7 @@ Presentation_Timeline :: struct {
 }
 
 presentation_position :: proc(position: grid.Position) -> view.Vec2 {
-	return {x = f32(position.x), y = f32(position.y)}
+	return {f32(position.x), f32(position.y)}
 }
 
 capture_room_presentation :: proc(room: ^game.Room) -> (result: Room_Presentation) {
@@ -230,7 +229,6 @@ capture_room_presentation :: proc(room: ^game.Room) -> (result: Room_Presentatio
 		return
 	}
 	result.valid = true
-	result.tactical = game.tactical_enabled(room)
 	result.phase = room.phase
 	result.encounter_kind = room.encounter_kind
 	result.modifier = room.modifier
@@ -306,6 +304,7 @@ capture_room_presentation :: proc(room: ^game.Room) -> (result: Room_Presentatio
 }
 
 // The room's ground into `ground`; the pool cells it had no bit for.
+@(private = "file")
 capture_presentation_ground :: proc(room: ^game.Room, ground: ^Presentation_Ground) -> (dropped: int) {
 	ground^ = {}
 	if room == nil || room.level_data == nil { return }
@@ -332,6 +331,7 @@ presentation_ground_water :: proc(ground: ^Presentation_Ground, cell: grid.Posit
 }
 
 // Whether `cell` is a pool's in the shown ground.
+@(private)
 presentation_ground_pool :: proc(ground: ^Presentation_Ground, cell: grid.Position) -> bool {
 	if ground == nil || cell.x < 0 || cell.y < 0 || cell.x >= ground.width || ground.width <= 0 { return false }
 	index := cell.y*ground.width+cell.x
@@ -339,6 +339,7 @@ presentation_ground_pool :: proc(ground: ^Presentation_Ground, cell: grid.Positi
 }
 
 // The strongest shown fire on `cell` (0: none), and whether it is a fire's centre.
+@(private)
 presentation_ground_burn :: proc(ground: ^Presentation_Ground, cell: grid.Position) -> (burn: i32, centre: bool, last: bool) {
 	if ground == nil { return }
 	for fire in ground.fires[:ground.fire_count] {
@@ -382,6 +383,7 @@ presentation_actor :: proc(
 	return presentation_actor_in_view(&timeline.view, entity)
 }
 
+@(private)
 presentation_grid_object_in_view :: proc(
 	presentation: ^Room_Presentation,
 	entity: game.Entity_Ref,
@@ -408,6 +410,7 @@ presentation_grid_object :: proc(
 	return presentation_grid_object_in_view(&timeline.view, entity)
 }
 
+@(private)
 presentation_trap :: proc(
 	presentation: ^Room_Presentation,
 	id: u32,
@@ -424,6 +427,7 @@ presentation_trap :: proc(
 	return nil, false
 }
 
+@(private)
 visible_presentation_enemy_count :: proc(presentation: ^Room_Presentation) -> int {
 	if presentation == nil || !presentation.valid ||
 	   presentation.enemy_count < 0 || presentation.enemy_count > len(presentation.enemies) {
@@ -438,6 +442,7 @@ visible_presentation_enemy_count :: proc(presentation: ^Room_Presentation) -> in
 	return result
 }
 
+@(private)
 presentation_cue_kind :: proc(event: game.Game_Event) -> Presentation_Cue_Kind {
 	switch event.kind {
 	case .Damaged:
@@ -544,6 +549,7 @@ presentation_cue_kind :: proc(event: game.Game_Event) -> Presentation_Cue_Kind {
 	unreachable()
 }
 
+@(private)
 presentation_cue_duration :: proc(kind: Presentation_Cue_Kind, event: game.Game_Event) -> f32 {
 	switch kind {
 	case .Dice_Rolled:
@@ -633,11 +639,13 @@ presentation_cue_duration :: proc(kind: Presentation_Cue_Kind, event: game.Game_
 	unreachable()
 }
 
+@(private)
 event_timeline_is_busy :: proc(timeline: ^Presentation_Timeline) -> bool {
 	return timeline != nil && timeline.count > 0 && timeline.count <= MAX_PRESENTATION_CUES &&
 	       timeline.head >= 0 && timeline.head < MAX_PRESENTATION_CUES
 }
 
+@(private)
 clear_event_timeline :: proc(timeline: ^Presentation_Timeline) {
 	if timeline != nil {
 		timeline^ = {}
@@ -704,6 +712,7 @@ begin_event_timeline :: proc(
 	return timeline.count > 0
 }
 
+@(private)
 presentation_cue_at :: proc(
 	timeline: ^Presentation_Timeline,
 	offset: int,
@@ -721,11 +730,13 @@ active_presentation_cue :: proc(timeline: ^Presentation_Timeline) -> (^Presentat
 
 // Explicit groups combine direct impacts only; movement, reactions and pulse
 // boundaries retain FIFO timing. Mutations within a group retain log order.
+@(private = "file")
 presentation_cue_can_group :: proc(kind: Presentation_Cue_Kind) -> bool {
 	return kind == .Damage || kind == .Damage_Absorbed || kind == .Status_Removed ||
 	       kind == .Defeat || kind == .Loot_Dropped || kind == .Explosive_Armed
 }
 
+@(private)
 presentation_group_size :: proc(timeline: ^Presentation_Timeline, offset: int = 0) -> int {
 	first, found := presentation_cue_at(timeline, offset)
 	if !found { return 0 }
@@ -743,6 +754,7 @@ presentation_group_size :: proc(timeline: ^Presentation_Timeline, offset: int = 
 // A blow met by a guard (game.mark_attack_events) is one blow, as the world
 // shows it: its guard, the Shield it breaks and the wound that gets through
 // start together.
+@(private = "file")
 presentation_blow_span :: proc(timeline: ^Presentation_Timeline, offset: int) -> int {
 	first, _ := presentation_cue_at(timeline, offset)
 	span := 1
@@ -764,11 +776,13 @@ presentation_cue_progress :: proc(cue: ^Presentation_Cue) -> f32 {
 	return clamp(cue.elapsed/cue.duration, f32(0), f32(1))
 }
 
+@(private)
 presentation_cue_eased_progress :: proc(cue: ^Presentation_Cue) -> f32 {
 	linear := presentation_cue_progress(cue)
 	return tween.smoothstep(linear)
 }
 
+@(private = "file")
 active_presentation_cue_progress :: proc(timeline: ^Presentation_Timeline) -> f32 {
 	if cue, found := active_presentation_cue(timeline); found {
 		return presentation_cue_progress(cue)
@@ -776,6 +790,7 @@ active_presentation_cue_progress :: proc(timeline: ^Presentation_Timeline) -> f3
 	return 0
 }
 
+@(private = "file")
 remove_presentation_status :: proc(statuses: ^game.Status_Set, kind: game.Status_Kind) -> bool {
 	if statuses == nil {
 		return false
@@ -792,6 +807,7 @@ remove_presentation_status :: proc(statuses: ^game.Status_Set, kind: game.Status
 	return true
 }
 
+@(private)
 apply_presentation_status :: proc(
 	statuses: ^game.Status_Set,
 	kind: game.Status_Kind,
@@ -819,6 +835,7 @@ apply_presentation_status :: proc(
 	return true
 }
 
+@(private)
 hide_collected_presentation_loot :: proc(
 	presentation: ^Room_Presentation,
 	event: game.Game_Event,
@@ -837,6 +854,7 @@ hide_collected_presentation_loot :: proc(
 	}
 }
 
+@(private = "file")
 show_dropped_presentation_loot :: proc(
 	presentation: ^Room_Presentation,
 	event: game.Game_Event,
@@ -858,6 +876,7 @@ show_dropped_presentation_loot :: proc(
 	return true
 }
 
+@(private = "file")
 sync_presentation_statuses_from_final :: proc(timeline: ^Presentation_Timeline) -> bool {
 	if timeline == nil || !timeline.view.valid || !timeline.final_view.valid {
 		return false
@@ -877,6 +896,7 @@ sync_presentation_statuses_from_final :: proc(timeline: ^Presentation_Timeline) 
 // bitten actor's poison takes the final view's stacks. A bite that ends it
 // leaves it for its Status_Expired to remove. (A command bites each actor at
 // most once: the player's own action, each enemy's in its pulse.)
+@(private = "file")
 sync_presentation_poison_from_final :: proc(timeline: ^Presentation_Timeline, actor: ^Presentation_Actor) {
 	if timeline == nil || actor == nil || !timeline.final_view.valid { return }
 	index, poisoned := game.status_index(&actor.statuses, .Poison)
@@ -892,6 +912,7 @@ sync_presentation_poison_from_final :: proc(timeline: ^Presentation_Timeline, ac
 // arrow) wear without an event of their own: at the blow, they take the final
 // view's stacks, and what they were is kept in charges_before. A last one spent
 // is left for its Status_Expired to remove.
+@(private = "file")
 sync_presentation_player_charges_from_final :: proc(timeline: ^Presentation_Timeline) {
 	if timeline == nil || !timeline.final_view.valid { return }
 	shown, final := &timeline.view.player.statuses, &timeline.final_view.player.statuses
@@ -906,6 +927,7 @@ sync_presentation_player_charges_from_final :: proc(timeline: ^Presentation_Time
 	}
 }
 
+@(private = "file")
 apply_presentation_trap_triggered :: proc(
 	timeline: ^Presentation_Timeline,
 	event: game.Game_Event,
@@ -923,6 +945,7 @@ apply_presentation_trap_triggered :: proc(
 	return true
 }
 
+@(private = "file")
 presentation_hazard_trigger_is_valid :: proc(
 	timeline: ^Presentation_Timeline,
 	event: game.Game_Event,
@@ -952,6 +975,7 @@ presentation_hazard_trigger_is_valid :: proc(
 	       definition.hazard_damage == event.amount
 }
 
+@(private)
 start_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^Presentation_Cue) {
 	assert(timeline != nil && cue != nil && !cue.started)
 	cue.started = true
@@ -1100,7 +1124,7 @@ start_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^Presentat
 			timeline.view.deck.energy = event.energy
 		}
 	case .Card_Played:
-		if !apply_presentation_card_played(&timeline.view.deck, event, timeline.view.tactical) {
+		if !apply_presentation_card_played(&timeline.view.deck, event) {
 			timeline.update_failures += 1
 		}
 	case .Card_Drawn:
@@ -1186,6 +1210,7 @@ start_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^Presentat
 	}
 }
 
+@(private = "file")
 update_active_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^Presentation_Cue) {
 	assert(timeline != nil && cue != nil && cue.started)
 	actor, has_actor := presentation_actor(timeline, cue.event.target)
@@ -1199,10 +1224,7 @@ update_active_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^P
 		from := presentation_position(cue.event.from_position)
 		to := presentation_position(cue.event.to_position)
 		if game.event_is_teleport(cue.event) { from = to }
-		position := view.Vec2{
-			x = from.x+(to.x-from.x)*progress,
-			y = from.y+(to.y-from.y)*progress,
-		}
+		position := view.Vec2{from.x+(to.x-from.x)*progress, from.y+(to.y-from.y)*progress}
 		if has_actor {
 			actor.position = position
 		} else {
@@ -1228,6 +1250,7 @@ update_active_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^P
 	}
 }
 
+@(private = "file")
 finish_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^Presentation_Cue) {
 	assert(timeline != nil && cue != nil && cue.started)
 	if cue.kind != .Defeat {
@@ -1254,6 +1277,7 @@ finish_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^Presenta
 	}
 }
 
+@(private = "file")
 pop_presentation_cue :: proc(timeline: ^Presentation_Timeline) {
 	assert(event_timeline_is_busy(timeline))
 	timeline.cues[timeline.head] = {}

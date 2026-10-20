@@ -1,5 +1,9 @@
 package arena
 
+import gfx "../../engine/gfx"
+
+import rl "vendor:raylib"
+
 import "core:math"
 import "core:testing"
 import host "../../engine/host"
@@ -378,17 +382,25 @@ test_important_events_survive_a_full_buffer :: proc(t: ^testing.T) {
 }
 
 @(test)
-test_sprite_rows_are_rectangular :: proc(t: ^testing.T) {
+test_sprite_atlases_preserve_frame_layout :: proc(t: ^testing.T) {
+	expected := [Sprite_Id][3]int{
+		.Player = {14, 14, 2},
+		.Chaser = {10, 10, 2},
+		.Caster = {12, 14, 2},
+		.Charger = {16, 16, 2},
+		.Splitter = {14, 12, 1},
+		.Shard = {8, 7, 1},
+		.Boss = {22, 22, 2},
+		.Heart = {9, 8, 1},
+		.Gem = {9, 9, 1},
+	}
 	for id in Sprite_Id {
-		first := sprite_rows(id, 0)
-		testing.expect(t, len(first) > 0 && len(first[0]) > 0)
-		for f in 0..<sprite_frame_count(id) {
-			rows := sprite_rows(id, f)
-			testing.expectf(t, len(rows) == len(first), "%v frame %d has %d rows", id, f, len(rows))
-			for row in rows {
-				testing.expectf(t, len(row) == len(first[0]), "%v frame %d: row %q", id, f, row)
-			}
-		}
+		asset := SPRITE_ASSETS[id]
+		img := gfx.sprite_asset_image(asset)
+		testing.expectf(t, img.data != nil, "%v: embedded atlas did not decode", id)
+		if img.data == nil { continue }
+		testing.expect_value(t, [3]int{int(img.width)/asset.frames, int(img.height), asset.frames}, expected[id])
+		rl.UnloadImage(img)
 	}
 }
 

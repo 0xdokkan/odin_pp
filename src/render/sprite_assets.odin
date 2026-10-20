@@ -9,7 +9,7 @@ import "core:path/filepath"
 import "core:strings"
 import rl "vendor:raylib"
 import game "../game"
-import view "../view"
+import view "../engine/view"
 
 Sprite_Key :: enum {
 	Player, Chaser, Archer, Brute, Bomber, Custodian, Demolitionist, Ice_Block, Fire, Barrel, Bomb,
@@ -65,6 +65,7 @@ Sprite_Manifest_Entry :: struct {
 Sprite_Manifest :: struct {version: int, sprites: []Sprite_Manifest_Entry}
 Sprite_Image_Metadata :: struct {width, height, frames: int, is_gif: bool}
 
+@(private)
 sprite_key_from_name :: proc(name: string) -> (key: Sprite_Key, valid: bool) {
 	switch name {
 	case "player": return .Player, true
@@ -90,10 +91,12 @@ sprite_key_from_name :: proc(name: string) -> (key: Sprite_Key, valid: bool) {
 	return .Count, false
 }
 
+@(private)
 sprite_key_is_clip :: proc(key: Sprite_Key) -> bool {
 	return key >= .Player_Cast && key < .Count
 }
 
+@(private)
 sprite_key_for_enemy :: proc(kind: game.Enemy_Archetype) -> Sprite_Key {
 	switch kind {
 	case .Chaser: return .Chaser
@@ -107,32 +110,24 @@ sprite_key_for_enemy :: proc(kind: game.Enemy_Archetype) -> Sprite_Key {
 	return .Count
 }
 
-sprite_key_for_object :: proc(kind: game.Grid_Object_Kind) -> Sprite_Key {
-	switch kind {
-	case .Ice_Block: return .Ice_Block
-	case .Fire: return .Fire
-	case .Barrel: return .Barrel
-	case .Bomb: return .Bomb
-	case .Shock_Floor, .Tesla_Coil: return .Count
-	case .Count: return .Count
-	}
-	return .Count
-}
-
+@(private = "file")
 sprite_read_u16 :: proc(data: []u8, offset: int) -> int {
 	return int(data[offset]) | int(data[offset+1])<<8
 }
 
+@(private = "file")
 sprite_read_be32 :: proc(data: []u8, offset: int) -> u32 {
 	return u32(data[offset])<<24 | u32(data[offset+1])<<16 | u32(data[offset+2])<<8 | u32(data[offset+3])
 }
 
+@(private)
 sprite_dimensions_valid :: proc(width, height, frames: int) -> bool {
 	return width > 0 && width <= MAX_SPRITE_TEXTURE_EDGE && height > 0 &&
 	       height <= MAX_SPRITE_TEXTURE_EDGE && frames > 0 && frames <= MAX_SPRITE_FRAMES &&
 	       i64(width)*i64(height)*i64(frames) <= MAX_SPRITE_PIXELS
 }
 
+@(private = "file")
 sprite_skip_gif_blocks :: proc(data: []u8, cursor: ^int) -> bool {
 	for cursor^ < len(data) {
 		length := int(data[cursor^])
@@ -146,6 +141,7 @@ sprite_skip_gif_blocks :: proc(data: []u8, cursor: ^int) -> bool {
 
 // Inspect dimensions and every GIF frame before handing compressed bytes to
 // Raylib. Limits therefore apply before a decoder can allocate frame buffers.
+@(private)
 sprite_image_metadata :: proc(data: []u8) -> (metadata: Sprite_Image_Metadata, valid: bool) {
 	if len(data) >= 33 && string(data[:8]) == "\x89PNG\r\n\x1a\n" &&
 	   string(data[12:16]) == "IHDR" && sprite_read_be32(data, 8) == 13 {
@@ -186,6 +182,7 @@ sprite_image_metadata :: proc(data: []u8) -> (metadata: Sprite_Image_Metadata, v
 	return metadata, false
 }
 
+@(private)
 sprite_entry_config :: proc(entry: Sprite_Manifest_Entry, texture: ^Sprite_Texture) -> (asset: Sprite_Asset, valid: bool) {
 	if texture == nil || entry.width < 0 || entry.height < 0 || entry.width > 256 || entry.height > 256 ||
 	   math.is_nan(entry.width) || math.is_nan(entry.height) || math.is_nan(entry.fps) ||
@@ -220,6 +217,7 @@ sprite_entry_config :: proc(entry: Sprite_Manifest_Entry, texture: ^Sprite_Textu
 	return asset, true
 }
 
+@(private)
 sprite_read_file :: proc(filename: string, limit: int, allocator: mem.Allocator) -> (data: []u8, valid: bool) {
 	file, open_error := os.open(filename)
 	if open_error != nil {return}
@@ -241,6 +239,7 @@ sprite_read_file :: proc(filename: string, limit: int, allocator: mem.Allocator)
 
 // One RGBA atlas is uploaded per unique file. GIFs need no texture uploads
 // during gameplay, and only a compact alpha mask remains in CPU memory.
+@(private)
 sprite_decode_atlas :: proc(data: []u8, metadata: Sprite_Image_Metadata) -> (atlas: rl.Image, columns: int, valid: bool) {
 	if !sprite_dimensions_valid(metadata.width, metadata.height, metadata.frames) || len(data) == 0 {return}
 	if !metadata.is_gif {
@@ -384,6 +383,7 @@ advance_sprite_assets :: proc(assets: ^Sprite_Assets, dt: f32) {
 	}
 }
 
+@(private)
 sprite_frame_index :: proc(asset: ^Sprite_Asset, elapsed: f64) -> int {
 	if asset == nil || asset.frames <= 1 || asset.fps <= 0 || math.is_nan(asset.fps) || math.is_inf(asset.fps) ||
 	   elapsed <= 0 || math.is_nan(elapsed) || math.is_inf(elapsed) {return 0}
@@ -391,10 +391,12 @@ sprite_frame_index :: proc(asset: ^Sprite_Asset, elapsed: f64) -> int {
 	return min(asset.frames-1, int(math.floor(math.mod(elapsed, period)*asset.fps)))
 }
 
+@(private)
 sprite_asset_rectangles :: proc(asset: ^Sprite_Asset, elapsed: f64, center: view.Vec2, zoom: f32) -> (source, destination: rl.Rectangle) {
 	return sprite_frame_rectangles(asset, sprite_frame_index(asset, elapsed), center, zoom)
 }
 
+@(private = "file")
 sprite_frame_rectangles :: proc(asset: ^Sprite_Asset, requested_frame: int, center: view.Vec2, zoom: f32) -> (source, destination: rl.Rectangle) {
 	if asset == nil || !asset.configured || asset.columns <= 0 || asset.frames <= 0 ||
 	   zoom <= 0 || math.is_nan(zoom) || math.is_inf(zoom) {return}
@@ -406,25 +408,19 @@ sprite_frame_rectangles :: proc(asset: ^Sprite_Asset, requested_frame: int, cent
 
 // A clip belongs to a presentation cue. Its caller supplies progress rather
 // than mutating the shared asset: simultaneous effects can use distinct frames.
+@(private)
 sprite_clip_frame_index :: proc(asset: ^Sprite_Asset, progress: f32) -> int {
 	if asset == nil || asset.frames <= 1 || math.is_nan(progress) || progress <= 0 {return 0}
 	if progress >= 1 {return asset.frames-1}
 	return min(asset.frames-1, int(math.floor(progress*f32(asset.frames))))
 }
 
+@(private)
 sprite_clip_rectangles :: proc(asset: ^Sprite_Asset, progress: f32, center: view.Vec2, zoom: f32) -> (source, destination: rl.Rectangle) {
 	return sprite_frame_rectangles(asset, sprite_clip_frame_index(asset, progress), center, zoom)
 }
 
-draw_sprite_asset :: proc(assets: ^Sprite_Assets, key: Sprite_Key, center: view.Vec2, zoom: f32, opacity: f32 = 1) -> bool {
-	if assets == nil || int(key) < 0 || key >= .Count || sprite_key_is_clip(key) {return false}
-	asset := &assets.sprites[int(key)]
-	if !asset.configured || asset.texture_index < 0 || asset.texture_index >= assets.texture_count {return false}
-	source, destination := sprite_asset_rectangles(asset, assets.elapsed, center, zoom)
-	rl.DrawTexturePro(assets.textures[asset.texture_index].texture, source, destination, {}, 0, color_with_opacity(rl.WHITE, opacity))
-	return true
-}
-
+@(private)
 draw_sprite_clip :: proc(assets: ^Sprite_Assets, key: Sprite_Key, center: view.Vec2, zoom: f32, progress: f32, opacity: f32 = 1) -> bool {
 	if assets == nil || !sprite_key_is_clip(key) {return false}
 	asset := &assets.sprites[int(key)]
@@ -433,20 +429,4 @@ draw_sprite_clip :: proc(assets: ^Sprite_Assets, key: Sprite_Key, center: view.V
 	if destination.width <= 0 || destination.height <= 0 {return false}
 	rl.DrawTexturePro(assets.textures[asset.texture_index].texture, source, destination, {}, 0, color_with_opacity(rl.WHITE, opacity))
 	return true
-}
-
-sprite_asset_contains_point :: proc(assets: ^Sprite_Assets, key: Sprite_Key, center, point: view.Vec2, zoom: f32) -> (hit, configured: bool) {
-	if assets == nil || int(key) < 0 || key >= .Count || sprite_key_is_clip(key) {return}
-	asset := &assets.sprites[int(key)]
-	if !asset.configured || asset.texture_index < 0 || asset.texture_index >= assets.texture_count {return}
-	configured = true
-	source, destination := sprite_asset_rectangles(asset, assets.elapsed, center, zoom)
-	if destination.width <= 0 || destination.height <= 0 || point.x < destination.x || point.y < destination.y ||
-	   point.x >= destination.x+destination.width || point.y >= destination.y+destination.height {return}
-	x := int(source.x+(point.x-destination.x)*source.width/destination.width)
-	y := int(source.y+(point.y-destination.y)*source.height/destination.height)
-	texture := &assets.textures[asset.texture_index]
-	index := y*int(texture.texture.width)+x
-	if index >= 0 && index < len(texture.alpha) {hit = texture.alpha[index] > 16}
-	return
 }

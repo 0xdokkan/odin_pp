@@ -88,6 +88,7 @@ route_event_kind_name :: proc(kind: Route_Event_Kind) -> string {
 	return "Unknown"
 }
 
+@(private = "file")
 special_node_outcome_name :: proc(outcome: Special_Node_Outcome) -> string {
 	switch outcome {
 	case .None:
@@ -108,11 +109,13 @@ special_node_outcome_name :: proc(outcome: Special_Node_Outcome) -> string {
 	return "Unknown"
 }
 
+@(private)
 valid_special_source_node :: proc(node: ^Run_Node, expected_kind: Node_Kind) -> bool {
 	return node != nil && node.kind == expected_kind && int(node.id) > 0 && node.depth > 0 &&
 	       node.room_seed != 0 && node.outgoing_count > 0
 }
 
+@(private = "file")
 percent_of_max_health :: proc(max_health, percent: i32) -> (i32, bool) {
 	if max_health <= 0 || percent <= 0 || percent > 100 {
 		return 0, false
@@ -125,6 +128,7 @@ percent_of_max_health :: proc(max_health, percent: i32) -> (i32, bool) {
 	return i32(amount), true
 }
 
+@(private = "file")
 safe_add_nonnegative_i32 :: proc(value, amount: i32) -> (i32, bool) {
 	if value < 0 || amount < 0 {
 		return 0, false
@@ -136,6 +140,7 @@ safe_add_nonnegative_i32 :: proc(value, amount: i32) -> (i32, bool) {
 	return i32(result), true
 }
 
+@(private = "file")
 safe_heal :: proc(health, max_health, amount: i32) -> (new_health, applied: i32, ok: bool) {
 	if health < 0 || max_health <= 0 || health > max_health || amount < 0 {
 		return 0, 0, false
@@ -144,6 +149,7 @@ safe_heal :: proc(health, max_health, amount: i32) -> (new_health, applied: i32,
 	return i32(result), i32(result)-health, true
 }
 
+@(private)
 build_rest_node_state :: proc(player: ^Player, node: ^Run_Node) -> (Rest_Node_State, bool) {
 	if player == nil || !valid_special_source_node(node, .Rest) {
 		return {}, false
@@ -157,6 +163,7 @@ build_rest_node_state :: proc(player: ^Player, node: ^Run_Node) -> (Rest_Node_St
 
 // `excluded`: the cards the Armory leaves out (card_offer_exclusions of the
 // player's deck as the event opens).
+@(private)
 build_route_event_state :: proc(player: ^Player, node: ^Run_Node, excluded: Card_Offer_Exclusions = {}) -> (result: Route_Event_State, ok: bool) {
 	if player == nil || !valid_special_source_node(node, .Event) {
 		return {}, false
@@ -182,7 +189,7 @@ build_route_event_state :: proc(player: ^Player, node: ^Run_Node, excluded: Card
 	case .Forgotten_Armory:
 		random_state := normalized_card_reward_seed(node.room_seed~ROUTE_EVENT_CARD_SEED_SALT)
 		choice: [1]Card_Id
-		if !generate_weighted_card_choices(&random_state, node, choice[:], &player.m8_profile, player.tactical.config.enabled, excluded) {
+		if !generate_weighted_card_choices(&random_state, node, choice[:], &player.m8_profile, excluded) {
 			return {}, false
 		}
 		result.has_offered_card = true
@@ -194,6 +201,7 @@ build_route_event_state :: proc(player: ^Player, node: ^Run_Node, excluded: Card
 	return result, true
 }
 
+@(private)
 build_treasure_node_state :: proc(node: ^Run_Node) -> (Treasure_Node_State, bool) {
 	if !valid_special_source_node(node, .Treasure) {
 		return {}, false
@@ -202,6 +210,7 @@ build_treasure_node_state :: proc(node: ^Run_Node) -> (Treasure_Node_State, bool
 	return {source_node = node.id, gold_amount = i32(7+depth*2)}, true
 }
 
+@(private = "file")
 rest_node_state_is_valid :: proc(run: ^Run_State) -> bool {
 	if run == nil || run.phase != .Rest || (run.route_event != Route_Event_State{}) ||
 	   (run.treasure != Treasure_Node_State{}) || run.player.deck.combat_active {
@@ -234,6 +243,7 @@ rest_node_state_is_valid :: proc(run: ^Run_State) -> bool {
 	return false
 }
 
+@(private = "file")
 route_event_state_is_valid :: proc(run: ^Run_State) -> bool {
 	if run == nil || run.phase != .Event || (run.rest != Rest_Node_State{}) ||
 	   (run.treasure != Treasure_Node_State{}) || run.player.deck.combat_active {
@@ -288,6 +298,7 @@ route_event_state_is_valid :: proc(run: ^Run_State) -> bool {
 	return false
 }
 
+@(private = "file")
 treasure_node_state_is_valid :: proc(run: ^Run_State) -> bool {
 	if run == nil || run.phase != .Treasure || (run.rest != Rest_Node_State{}) ||
 	   (run.route_event != Route_Event_State{}) || run.player.deck.combat_active {

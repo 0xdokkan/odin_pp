@@ -1,6 +1,6 @@
 package game
 
-import grid "../grid"
+import grid "../engine/grid"
 
 // Multi-cell movement and neutral hazards need headroom beyond dense 32-enemy AoE.
 MAX_GAME_EVENTS :: 416
@@ -138,6 +138,7 @@ Game_Event :: struct {
 
 // Build card-zone metadata without recording it: action reports also dispatch
 // reactions, while room logs and staged Refocus logs only preserve event order.
+@(private)
 make_card_zone_event :: proc(
 	kind: Game_Event_Kind,
 	source, target: Entity_Ref,
@@ -157,6 +158,7 @@ make_card_zone_event :: proc(
 	}
 }
 
+@(private)
 record_card_draw :: proc(log: ^Event_Log, card: Card_Instance) -> bool {
 	return record_event(log, make_card_zone_event(
 		.Card_Drawn, PLAYER_ENTITY, PLAYER_ENTITY, card, .Draw, .Hand,
@@ -231,6 +233,7 @@ event_is_ranged_attack :: proc(event: Game_Event) -> bool {
 
 // The footprint bit of `cell` around `center` (row-major 3x3, as a spell's);
 // not ok beyond it.
+@(private)
 event_footprint_bit :: proc(center, cell: grid.Position) -> (bit: u16, ok: bool) {
 	dx, dy := cell.x-center.x, cell.y-center.y
 	if abs(dx) > 1 || abs(dy) > 1 { return }
@@ -263,6 +266,8 @@ mark_attack_events :: proc(log: ^Event_Log, first: int, source, target: Entity_R
 	}
 }
 
+// Only events[:count] is valid. Clearing a log retains its backing storage;
+// callers that need a snapshot must copy the valid prefix into their own log.
 Event_Log :: struct {
 	events:        [MAX_GAME_EVENTS]Game_Event,
 	count:         int,
@@ -271,7 +276,7 @@ Event_Log :: struct {
 
 clear_event_log :: proc(log: ^Event_Log) {
 	if log != nil {
-		log^ = {}
+		log.count, log.dropped_count = 0, 0
 	}
 }
 
@@ -299,4 +304,17 @@ append_event_log :: proc(destination: ^Event_Log, source: ^Event_Log) {
 		record_event(destination, source.events[index])
 	}
 	destination.dropped_count += source.dropped_count
+}
+
+// Replace a log without copying the unused tail. The destination owns its
+// storage; this never aliases source storage and is safe for self-assignment.
+@(private)
+copy_event_log :: proc(destination, source: ^Event_Log) {
+	if destination == nil || destination == source { return }
+	clear_event_log(destination)
+	if source == nil { return }
+	count := clamp(source.count, 0, MAX_GAME_EVENTS)
+	copy(destination.events[:count], source.events[:count])
+	destination.count = count
+	destination.dropped_count = source.dropped_count+max(0, source.count-MAX_GAME_EVENTS)
 }

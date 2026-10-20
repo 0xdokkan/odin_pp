@@ -22,10 +22,7 @@ Card_Play_Report :: struct {
 	energy_before:      i32,
 	energy_after:       i32,
 	destination:        Card_Zone,
-	drawn_card:         Card_Instance,
-	drew_card:          bool,
 	action_report:      Action_Report,
-	pulse_report:       Pulse_Report,
 }
 
 card_play_was_committed :: proc(result: Card_Play_Result) -> bool {
@@ -42,7 +39,7 @@ play_card :: proc(room: ^Room, card_id: u32, target: Target) -> (play: Card_Play
 		return
 	}
 	if !tactical_target_visible(room, target) { play.result = .Action_Rejected; return }
-	clear_event_log(&room.recent_events)
+	clear_event_log(room.recent_events)
 	deck := &room.player.deck
 	if !deck.combat_active || !validate_deck_state(deck) {
 		play.result = .Invalid_Deck
@@ -55,7 +52,7 @@ play_card :: proc(room: ^Room, card_id: u32, target: Target) -> (play: Card_Play
 		return
 	}
 	play.card = deck.hand[hand_index]
-	definition, definition_found := card_definition_by_id(play.card.definition_id, tactical_enabled(room))
+	definition, definition_found := card_definition_by_id(play.card.definition_id)
 	if !definition_found || !validate_card_instance(play.card) || !validate_card_definition(&definition) {
 		play.result = .Invalid_Card
 		return
@@ -104,15 +101,14 @@ play_card :: proc(room: ^Room, card_id: u32, target: Target) -> (play: Card_Play
 	)
 	played_event.amount = definition.cost
 	played_event.area_mask = EVENT_CRITICAL_BIT if critical else 0
-	record_event(&room.recent_events, played_event)
-	append_event_log(&room.recent_events, &play.action_report.events)
-	record_event(&room.recent_events, make_card_zone_event(
+	record_event(room.recent_events, played_event)
+	append_event_log(room.recent_events, &play.action_report.events)
+	record_event(room.recent_events, make_card_zone_event(
 		.Card_Moved, PLAYER_ENTITY, PLAYER_ENTITY, play.card, .Resolving, play.destination,
 	))
 	apply_card_relics(room, play.destination, &play.action_report)
-	// M8 pays the card's time through its cast. Classic still resolves a pulse.
-	pulse_report, outcome := finish_player_combat_command(room, 0)
-	play.pulse_report = pulse_report
+	// The card pays its time through its cast.
+	outcome := finish_player_combat_command(room, 0)
 	switch outcome {
 	case .Player_Defeated:
 		play.result = .Player_Defeated
@@ -125,27 +121,16 @@ play_card :: proc(room: ^Room, card_id: u32, target: Target) -> (play: Card_Play
 	case .Combat_Continues:
 	}
 
-	if tactical_enabled(room) {
-		seconds := tactical_card_time_cost(play.card.definition_id)
-		tactical_begin_card_cast(room, seconds)
-		tactical_count_card(room)
-		room.tactical_pulse.deferred_draws += 1
-		// A card that takes no time has no cast to wait for: it is a decision
-		// of its own, and its replacement is drawn now.
-		if seconds <= 0 {
-			room.player.tactical.metrics.decisions += 1
-			tactical_refill(room)
-		}
-		play.result = .Played
-		play.energy_after = deck.energy
-		return
+	seconds := tactical_card_time_cost(play.card.definition_id)
+	tactical_begin_card_cast(room, seconds)
+	tactical_count_card(room)
+	room.tactical_pulse.deferred_draws += 1
+	// A card that takes no time has no cast to wait for: it is a decision
+	// of its own, and its replacement is drawn now.
+	if seconds <= 0 {
+		room.player.tactical.metrics.decisions += 1
+		tactical_refill(room)
 	}
-
-	play.drawn_card, play.drew_card = draw_card(deck)
-	if play.drew_card {
-		record_card_draw(&room.recent_events, play.drawn_card)
-	}
-	assert(validate_deck_state(deck))
 	play.result = .Played
 	play.energy_after = deck.energy
 	return

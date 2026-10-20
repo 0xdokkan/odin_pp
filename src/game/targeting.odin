@@ -1,6 +1,6 @@
 package game
 
-import grid "../grid"
+import grid "../engine/grid"
 
 MAX_TARGETING_RANGE       :: 12
 MAX_TARGETING_RADIUS      :: 4
@@ -78,6 +78,7 @@ Target_Query_Result :: struct {
 	enemy_count:       int,
 }
 
+@(private = "file")
 targeting_range_is_valid :: proc(target_range: Targeting_Range) -> bool {
 	switch target_range.metric {
 	case .None:
@@ -89,6 +90,7 @@ targeting_range_is_valid :: proc(target_range: Targeting_Range) -> bool {
 	return false
 }
 
+@(private = "file")
 targeting_range_distance :: proc(
 	metric: Targeting_Range_Metric,
 	origin, target: grid.Position,
@@ -106,6 +108,7 @@ targeting_range_distance :: proc(
 	return 0, false
 }
 
+@(private)
 targeting_range_contains :: proc(
 	target_range: Targeting_Range,
 	origin, target: grid.Position,
@@ -117,6 +120,7 @@ targeting_range_contains :: proc(
 	return ok && distance >= target_range.minimum && distance <= target_range.maximum
 }
 
+@(private = "file")
 targeting_rule_uses_anchor :: proc(rule: Target_Rule) -> bool {
 	switch rule {
 	case .Entity, .Opponent, .Opponent_Or_Object, .Adjacent_Opponent, .Cell, .Walkable_Cell:
@@ -127,6 +131,7 @@ targeting_rule_uses_anchor :: proc(rule: Target_Rule) -> bool {
 	return false
 }
 
+@(private)
 targeting_spec_is_valid :: proc(spec: Targeting_Spec) -> bool {
 	if int(spec.shape) < 0 || spec.shape >= .Count || !targeting_range_is_valid(spec.cast_range) ||
 	   spec.radius < 0 || spec.radius > MAX_TARGETING_RADIUS || spec.rule == .Any {
@@ -166,6 +171,7 @@ target_cell_set_contains :: proc(set: ^Target_Cell_Set, position: grid.Position)
 	return false
 }
 
+@(private = "file")
 add_target_cell :: proc(set: ^Target_Cell_Set, position: grid.Position) -> bool {
 	if set == nil || set.count < 0 || set.count > MAX_TARGETING_SHAPE_CELLS {
 		return false
@@ -181,10 +187,12 @@ add_target_cell :: proc(set: ^Target_Cell_Set, position: grid.Position) -> bool 
 	return true
 }
 
+@(private = "file")
 targeting_static_blocker_at :: proc(room: ^Room, position: grid.Position) -> bool {
 	return room == nil || cell_blocks_line_of_sight(room, position)
 }
 
+@(private = "file")
 targeting_actor_at :: proc(room: ^Room, position: grid.Position) -> bool {
 	if room == nil || room.player == nil {
 		return false
@@ -229,6 +237,7 @@ trace_targeting_line :: proc(
 	return count, true
 }
 
+@(private)
 targeting_path_blocker :: proc(
 	room: ^Room,
 	origin: grid.Position,
@@ -261,6 +270,7 @@ targeting_path_blocker :: proc(
 	return
 }
 
+@(private)
 targeting_line_is_aligned :: proc(origin, anchor: grid.Position) -> bool {
 	delta_x := abs(anchor.x-origin.x)
 	delta_y := abs(anchor.y-origin.y)
@@ -268,6 +278,7 @@ targeting_line_is_aligned :: proc(origin, anchor: grid.Position) -> bool {
 	       (delta_x > 0 && delta_x == delta_y)
 }
 
+@(private = "file")
 targeting_target_at_anchor :: proc(
 	room: ^Room,
 	source: Entity_Ref,
@@ -322,6 +333,7 @@ targeting_target_at_anchor :: proc(
 	return {}, false
 }
 
+@(private = "file")
 append_shape_cell :: proc(room: ^Room, set: ^Target_Cell_Set, position: grid.Position) -> bool {
 	if room == nil || room.level_data == nil || !grid.contains(&room.level_data.tiles, position) ||
 	   targeting_static_blocker_at(room, position) {
@@ -330,6 +342,7 @@ append_shape_cell :: proc(room: ^Room, set: ^Target_Cell_Set, position: grid.Pos
 	return add_target_cell(set, position)
 }
 
+@(private)
 shape_cell_has_clear_path :: proc(room: ^Room, origin, target: grid.Position) -> bool {
 	if origin == target {
 		return true
@@ -343,6 +356,7 @@ shape_cell_has_clear_path :: proc(room: ^Room, origin, target: grid.Position) ->
 	return !blocked
 }
 
+@(private = "file")
 build_target_shape :: proc(
 	room: ^Room,
 	spec: Targeting_Spec,
@@ -404,6 +418,7 @@ build_target_shape :: proc(
 	return false
 }
 
+@(private)
 collect_targeted_enemy_ids :: proc(room: ^Room, result: ^Target_Query_Result) {
 	assert(room != nil && result != nil)
 	ids, count := enemy_ids_in_planning_order(room)
@@ -419,6 +434,7 @@ collect_targeted_enemy_ids :: proc(room: ^Room, result: ^Target_Query_Result) {
 	}
 }
 
+@(private)
 evaluate_target_query :: proc(
 	room: ^Room,
 	source: Entity_Ref,

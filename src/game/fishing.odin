@@ -1,6 +1,6 @@
 package game
 
-import grid "../grid"
+import grid "../engine/grid"
 import rng "../engine/rng"
 
 // CANNA DA PESCA: a room-end tool. It is never drawn in a fight
@@ -87,6 +87,7 @@ Fishing_Report :: struct {
 
 // A fresh room's fishing: no cast yet, no water, and its stream from the
 // room's seed and the run's dice as the room begins (create_room).
+@(private)
 begin_room_fishing :: proc(player: ^Player, content: Room_Content) -> (state: Fishing_State) {
 	seed := content.room_seed~FISHING_SEED_SALT
 	if player != nil { seed ~= player.dice.random_state }
@@ -123,7 +124,7 @@ fishing_casts_left :: proc(room: ^Room) -> i32 {
 
 // A cleared tactical room and a rod to fish it with.
 fishing_room_open :: proc(room: ^Room) -> bool {
-	return room != nil && room.player != nil && room.level_data != nil && tactical_enabled(room) && room.phase == .Loot &&
+	return room != nil && room.player != nil && room.level_data != nil && room.phase == .Loot &&
 	       fishing_casts_allowed(room) > 0
 }
 
@@ -139,6 +140,7 @@ fishing_cell_is_water :: proc(room: ^Room, cell: grid.Position) -> bool {
 // no cover, no object of any kind, nobody on it, not the player's own cell)
 // and, further, never the exit, a trap, an item lying there, a pool or a fire.
 // Water already there is fished again.
+@(private = "file")
 fishing_cell_is_free :: proc(room: ^Room, cell: grid.Position) -> bool {
 	if room == nil || room.player == nil || !base_cell_is_walkable(room, cell) || cell_blocks_movement(room, cell) ||
 	   cell == room.player.position || cell == room.exit_position || ground_pool_at(room, cell) > 0 || ground_burn_at(room, cell) > 0 {
@@ -156,7 +158,7 @@ fishing_target_error :: proc(room: ^Room, cell: grid.Position) -> Fishing_Result
 	if room == nil || room.player == nil || room.level_data == nil { return .Invalid }
 	if !fishing_room_open(room) { return .Not_Open }
 	if fishing_casts_left(room) <= 0 { return .Spent }
-	definition, _ := card_definition_by_id(.Fishing_Rod, true)
+	definition, _ := card_definition_by_id(.Fishing_Rod)
 	query := evaluate_target_query(room, PLAYER_ENTITY, definition.targeting, {anchor = cell, has_anchor = true})
 	#partial switch query.error {
 	case .None:
@@ -192,7 +194,7 @@ fish_with_rod :: proc(room: ^Room, cell: grid.Position) -> (report: Fishing_Repo
 		node := Run_Node{kind = room.fishing.node_kind, depth = room.fishing.node_depth}
 		choice: [1]Card_Id
 		// Never the rod: the run holds it already.
-		if generate_weighted_card_choices(&random, &node, choice[:], &room.player.m8_profile, true, {.Fishing_Rod}) {
+		if generate_weighted_card_choices(&random, &node, choice[:], &room.player.m8_profile, {.Fishing_Rod}) {
 			report.added, report.card = add_owned_card(&deck, choice[0])
 		}
 	}
@@ -202,30 +204,30 @@ fish_with_rod :: proc(room: ^Room, cell: grid.Position) -> (report: Fishing_Repo
 		report.roll, rolled = roll_dice_pool(&dice, 1, FISHING_HEAL_SIDES)
 		if !rolled { report.result = .Invalid; return }
 	}
-	clear_event_log(&room.recent_events)
+	clear_event_log(room.recent_events)
 	origin := room.player.position
 	report.new_water = !fishing_cell_is_water(room, cell)
 	rod := report.rod
 	thrown := Game_Event{kind = .Fish_Cast, source = PLAYER_ENTITY, target = PLAYER_ENTITY, from_position = origin, to_position = cell,
 		card_id = rod.id, card_definition = .Fishing_Rod, card_upgrade_level = rod.upgrade_level, card_lifetime = rod.lifetime,
 		amount = fishing_casts_left(room)-1, duration = 1 if report.new_water else 0}
-	record_event(&room.recent_events, thrown)
+	record_event(room.recent_events, thrown)
 	bite := thrown
 	bite.kind, bite.from_position = .Fish_Bite, cell
-	record_event(&room.recent_events, bite)
+	record_event(room.recent_events, bite)
 	caught := Game_Event{kind = .Fish_Caught, source = PLAYER_ENTITY, target = PLAYER_ENTITY, from_position = cell, to_position = origin,
 		card_id = rod.id, card_definition = .Fishing_Rod, card_upgrade_level = rod.upgrade_level, duration = i32(report.food)}
 	if report.card {
 		caught.card_id, caught.card_definition, caught.card_upgrade_level, caught.duration = report.added.id, report.added.definition_id, 0, 0
 	}
-	record_event(&room.recent_events, caught)
+	record_event(room.recent_events, caught)
 	if report.card {
 		room.player.deck = deck
 	} else {
 		room.player.dice = dice
 		// Its die over the window as the other rolls show; the cast's number
 		// varies the throw of a room's catches (dice_event_visual_seed).
-		record_event(&room.recent_events, {kind = .Dice_Rolled, source = PLAYER_ENTITY, target = PLAYER_ENTITY, from_position = origin,
+		record_event(room.recent_events, {kind = .Dice_Rolled, source = PLAYER_ENTITY, target = PLAYER_ENTITY, from_position = origin,
 			to_position = origin, amount = report.roll.total, dice_roll = report.roll, card_id = rod.id, card_definition = .Fishing_Rod,
 			card_upgrade_level = rod.upgrade_level, card_lifetime = rod.lifetime, pulse_count = room.pulse_count+u64(room.fishing.casts)})
 		action := make_action(.Collect, PLAYER_ENTITY, entity_target(PLAYER_ENTITY), .Self)
@@ -233,7 +235,7 @@ fish_with_rod :: proc(room: ^Room, cell: grid.Position) -> (report: Fishing_Repo
 		assert(added)
 		cure := resolve_action(room, &action)
 		report.healed = cure.healing_done
-		append_event_log(&room.recent_events, &cure.events)
+		append_event_log(room.recent_events, &cure.events)
 	}
 	room.fishing.random = random
 	room.fishing.casts += 1

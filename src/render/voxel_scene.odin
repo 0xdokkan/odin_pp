@@ -4,9 +4,10 @@ import rl "vendor:raylib"
 import "core:fmt"
 import "core:math"
 import game "../game"
-import grid "../grid"
-import view "../view"
+import grid "../engine/grid"
+import view "../engine/view"
 
+@(private = "file")
 draw_voxel_marker :: proc(cell: grid.Position, color: rl.Color) {
 	p := rl.Vector3{f32(cell.x)+0.5, 0.043, f32(cell.y)+0.5}
 	rl.DrawPlane(p, {0.87, 0.87}, {color.r, color.g, color.b, 45})
@@ -15,10 +16,12 @@ draw_voxel_marker :: proc(cell: grid.Position, color: rl.Color) {
 
 // Recovery remains a movement window: choosing a safe cell requires the
 // same current telegraphs while a player's recovery step is animating.
+@(private)
 tactical_telegraphs_are_visible :: proc(renderer: ^Renderer, room: ^game.Room) -> bool {
 	return !renderer_blocks_player_input(renderer) || game.tactical_is_recovering(room)
 }
 
+@(private)
 draw_voxel_threats :: proc(renderer: ^Renderer, room: ^game.Room) {
 	// The lab's ground display draws the enemies' threats its own way.
 	if tactical_telegraphs_are_visible(renderer, room) && !intent_ground_on(renderer) {
@@ -48,6 +51,7 @@ draw_voxel_threats :: proc(renderer: ^Renderer, room: ^game.Room) {
 	}
 }
 
+@(private)
 draw_voxel_fuse_labels :: proc(renderer: ^Renderer, room: ^game.Room) {
 	snapshot := renderer.tactical.snapshot
 	if tactical_telegraphs_are_visible(renderer, room) {
@@ -70,6 +74,7 @@ draw_voxel_fuse_labels :: proc(renderer: ^Renderer, room: ^game.Room) {
 	}
 }
 
+@(private)
 tactical_intent_label :: proc(intent: game.Enemy_Intent) -> cstring {
 	switch intent.kind {
 	case .Attack:
@@ -88,6 +93,7 @@ tactical_intent_label :: proc(intent: game.Enemy_Intent) -> cstring {
 }
 
 // All environmental props have volume. The same extents drive their ray pick.
+@(private)
 voxel_object_bounds :: proc(kind: game.Grid_Object_Kind, position: view.Vec2) -> rl.BoundingBox {
 	width, height := f32(0.68), f32(0.72)
 	switch kind {
@@ -103,6 +109,7 @@ voxel_object_bounds :: proc(kind: game.Grid_Object_Kind, position: view.Vec2) ->
 	return {p-rl.Vector3{width/2, 0, width/2}, p+rl.Vector3{width/2, height, width/2}}
 }
 
+@(private)
 draw_voxel_object :: proc(renderer: ^Renderer, object: Presentation_Grid_Object) {
 	bounds := voxel_object_bounds(object.kind, object.position)
 	p := (bounds.min+bounds.max)*0.5
@@ -140,6 +147,7 @@ draw_voxel_object :: proc(renderer: ^Renderer, object: Presentation_Grid_Object)
 	}
 }
 
+@(private)
 draw_voxel_cover :: proc(renderer: ^Renderer, cell: grid.Position) {
 	p := rl.Vector3{f32(cell.x)+0.5, 0.2, f32(cell.y)+0.5}
 	draw_resin_cube(renderer, p, 0.72, 0.4, 0.72, RESIN_WALL)
@@ -147,6 +155,7 @@ draw_voxel_cover :: proc(renderer: ^Renderer, cell: grid.Position) {
 	draw_resin_cube(renderer, p+rl.Vector3{-0.13, 0.31, 0.05}, 0.33, 0.11, 0.4, rl.Color{62, 79, 100, 255})
 }
 
+@(private)
 draw_voxel_trap :: proc(renderer: ^Renderer, trap: game.Trap) {
 	p := rl.Vector3{f32(trap.position.x)+0.5, 0.06, f32(trap.position.y)+0.5}
 	draw_resin_cube(renderer, p, 0.7, 0.06, 0.7, {44, 36, 39, 255})
@@ -155,6 +164,7 @@ draw_voxel_trap :: proc(renderer: ^Renderer, trap: game.Trap) {
 	}
 }
 
+@(private)
 draw_voxel_exit :: proc(renderer: ^Renderer, cell: grid.Position) {
 	p := rl.Vector3{f32(cell.x)+0.5, 0, f32(cell.y)+0.5}
 	for sign in ([?]f32{-1, 1}) {
@@ -177,6 +187,7 @@ draw_voxel_exit :: proc(renderer: ^Renderer, cell: grid.Position) {
 
 // Unknown cells share identical, opaque 3D fog blocks: neither wall height,
 // props nor visited terrain can be inferred from them. No exploration memory.
+@(private)
 draw_voxel_fog :: proc(renderer: ^Renderer, room: ^game.Room) {
 	if renderer.tactical.no_fog { return }
 	for y in 0..<room.level_data.tiles.height {

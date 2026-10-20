@@ -27,14 +27,14 @@ test_ring_grab_has_four_distinct_held_poses_and_safe_endpoints :: proc(t: ^testi
 
 @(test)
 test_m8_device_descriptions_keep_d4_targets_separate_from_damage :: proc(t: ^testing.T) {
-    for tactical in ([2]bool{false,true}) {
-        first,second := gothic_card_lines({definition_id=.Shock_Floor,upgrade_level=0},tactical)
+    {
+        first,second := gothic_card_lines({definition_id=.Shock_Floor,upgrade_level=0})
         testing.expect_value(t,string(first),"1d4 SCARICHE / 1d4 BERSAGLI")
         testing.expect_value(t,string(second),"1 DANNO / TRAPPOLA 3X3")
-        first,second=gothic_card_lines({definition_id=.Tesla_Coil},tactical)
+        first,second=gothic_card_lines({definition_id=.Tesla_Coil})
         testing.expect_value(t,string(first),"8 / DISTANZA DANNI")
         testing.expect_value(t,string(second),"CAMPO: CONSUMA 4 TESLA")
-        first,second=gothic_card_lines({definition_id=.Storm_Crown},tactical)
+        first,second=gothic_card_lines({definition_id=.Storm_Crown})
         testing.expect_value(t,string(second),"LEGGENDARIA / RIMBALZO 3")
     }
 }
@@ -97,8 +97,9 @@ test_m8_pointer_controls_match_drawn_buttons_and_respect_action_gates :: proc(t:
     renderer := new(Renderer)
     defer free(renderer)
     renderer.canvas_width,renderer.canvas_height=960,540
-    renderer.tactical.enabled=true
+
     player := game.Player{}
+    testing.expect(t, game.configure_tactical(&player, game.DEFAULT_TACTICAL_CONFIG))
     room := game.Room{player=&player,phase=.Loot}
     for control in ([1]M8_Control{.Character}) {
         b := m8_control_bounds(renderer,control,&room)
@@ -123,7 +124,7 @@ test_m8_pointer_controls_match_drawn_buttons_and_respect_action_gates :: proc(t:
     append(&room.objects,game.Grid_Object{kind=.Tesla_Coil,id=2,position={1,1},device_damage=8})
     append(&room.objects,game.Grid_Object{kind=.Tesla_Coil,id=3,position={2,1},device_damage=8})
     testing.expect_value(t,m8_control_at_point(renderer,&room,{active.x+3,active.y+3}),M8_Control.Activate)
-    player.tactical.config.enabled=true
+
     player.tactical.phase=.Recovery
     player.tactical.remaining=0.5
     testing.expect_value(t,m8_control_at_point(renderer,&room,{active.x+3,active.y+3}),M8_Control.None)
@@ -219,7 +220,7 @@ test_m8_hidden_controls_do_not_occlude_board_and_visible_disabled_controls_do ::
     renderer := new(Renderer)
     defer free(renderer)
     renderer.canvas_width,renderer.canvas_height=960,540
-    renderer.tactical.enabled=true
+
     player: game.Player
     room := game.Room{player=&player,phase=.Combat}
     defer delete(room.objects)

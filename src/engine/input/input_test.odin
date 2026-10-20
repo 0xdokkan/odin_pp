@@ -112,3 +112,30 @@ test_resume_gate_suppresses_held_fire_until_release :: proc(t: ^testing.T) {
 	advance_resumable(&s, &gate, held({.Right, .Jump}), 0.016, bit_set[Test_Action]{.Jump})
 	testing.expect(t, .Jump not_in s.pressed && .Jump in s.down)
 }
+
+// Every owner maps one immutable device frame. A native press may already be
+// released, so discrete controls must not be reconstructed only from held keys.
+@(test)
+test_device_snapshot_maps_edges_rebinding_and_pad_without_polling :: proc(t: ^testing.T) {
+	m := make_map(Test_Action)
+	bind(&m, .Jump, key(.SPACE))
+	bind(&m, .Left, pad_axis(.LEFT_X, false))
+	bind(&m, .Right, pad(.RIGHT_FACE_DOWN))
+	devices := Device_Snapshot{focused = true}
+	devices.keys_pressed[.SPACE], devices.keys_released[.SPACE] = true, true
+	devices.gamepads[0].available = true
+	devices.gamepads[0].axes[.LEFT_X] = -0.6
+	devices.gamepads[0].buttons[.RIGHT_FACE_DOWN], devices.gamepads[0].pressed[.RIGHT_FACE_DOWN] = true, true
+	first := sample(&m, &devices)
+	testing.expect(t, .Jump in first.pressed && .Jump in first.released && .Jump not_in first.down)
+	testing.expect(t, .Left in first.down && abs(first.value[.Left]-0.5) < 1e-5)
+	testing.expect(t, .Right in first.down && .Right in first.pressed)
+	testing.expect(t, sample(&m, &devices) == first, "mapping another owner must not consume native edges")
+	testing.expect(t, rebind(&m, .Jump, 0, mouse(.LEFT)))
+	testing.expect(t, .Jump not_in sample(&m, &devices).pressed)
+	devices.buttons_pressed[.LEFT] = true
+	testing.expect(t, .Jump in sample(&m, &devices).pressed)
+	m.gamepad = MAX_GAMEPADS
+	testing.expect(t, .Left not_in sample(&m, &devices).down && .Right not_in sample(&m, &devices).down)
+	testing.expect_value(t, sample(&m, nil), Sample(Test_Action){})
+}

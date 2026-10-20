@@ -1,7 +1,7 @@
 package game
 
 import "core:testing"
-import grid "../grid"
+import grid "../engine/grid"
 import level "../level"
 
 shadow_test_room :: proc(t: ^testing.T, data: ^level.Level, player: ^Player, spawns: []Enemy_Spawn = nil) -> Room {
@@ -259,25 +259,24 @@ test_shadow_stops_the_sandbox_arrivals :: proc(t: ^testing.T) {
 }
 
 // The card: Rare, three energy and no window time, four seconds that no
-// upgrade lengthens, an ordinary collectible kept out of the classic starter.
+// upgrade lengthens, an ordinary collectible kept out of the starter deck.
 @(test)
 test_shadow_card_is_a_rare_untimed_self_card_without_upgrades :: proc(t: ^testing.T) {
-	for tactical in ([?]bool{false, true}) {
-		d, found := card_definition_by_id(.Shadow_Step, tactical)
-		testing.expect(t, found && validate_card_definition(&d))
-		testing.expect_value(t, d.name, "Movimento Ombra")
-		testing.expect_value(t, d.rarity, Card_Rarity.Rare)
-		testing.expect_value(t, d.reward_weight, u32(60))
-		testing.expect_value(t, d.shop_base_price, i32(8))
-		testing.expect_value(t, d.cost, i32(3))
-		testing.expect(t, !d.temporary_only && !d.exhaust_on_play && !d.retain_on_refocus && !d.ethereal)
-		testing.expect_value(t, d.targeting.rule, Target_Rule.Self)
-		testing.expect_value(t, d.effect_count, 1)
-		testing.expect_value(t, d.effects[0].kind, Effect_Kind.Enter_Shadow)
-		testing.expect_value(t, f32(d.effects[0].base_amount), TACTICAL_SHADOW_SECONDS)
-		testing.expect_value(t, d.effects[0].amount_per_upgrade, i32(0))
-	}
-	testing.expect(t, card_requires_tactical(.Shadow_Step) && !card_is_scopa(.Shadow_Step))
+	d, found := card_definition_by_id(.Shadow_Step)
+	testing.expect(t, found && validate_card_definition(&d))
+	testing.expect_value(t, d.name, "Movimento Ombra")
+	testing.expect_value(t, d.rarity, Card_Rarity.Rare)
+	testing.expect_value(t, d.reward_weight, u32(60))
+	testing.expect_value(t, d.shop_base_price, i32(8))
+	testing.expect_value(t, d.cost, i32(3))
+	testing.expect(t, !d.temporary_only && !d.exhaust_on_play && !d.retain_on_refocus && !d.ethereal)
+	testing.expect_value(t, d.targeting.rule, Target_Rule.Self)
+	testing.expect_value(t, d.effect_count, 1)
+	testing.expect_value(t, d.effects[0].kind, Effect_Kind.Enter_Shadow)
+	testing.expect_value(t, f32(d.effects[0].base_amount), TACTICAL_SHADOW_SECONDS)
+	testing.expect_value(t, d.effects[0].amount_per_upgrade, i32(0))
+
+	testing.expect(t, !card_is_scopa(.Shadow_Step))
 	testing.expect_value(t, tactical_card_time_cost(.Shadow_Step), f32(0))
 	card := Card_Instance{id = 1, definition_id = .Shadow_Step}
 	testing.expect(t, validate_card_instance(card) && !card_can_upgrade(card))
@@ -352,40 +351,12 @@ test_shadow_card_leaves_the_tick_and_gains_nothing_from_a_critical :: proc(t: ^t
 	testing.expect_value(t, player.tactical.shadow_remaining, TACTICAL_SHADOW_SECONDS)
 }
 
-// A classic room has no tactical clock to stop: the card is refused before
-// any payment, and its effect could not resolve there anyway.
+// Rewards, wares and the armoury share one pool containing Movimento Ombra.
 @(test)
-test_shadow_card_is_refused_in_classic_combat :: proc(t: ^testing.T) {
-	data := create_test_level(t)
-	defer level.destroy(&data)
-	player := create_test_player(t)
-	enemies := [?]Enemy_Spawn{{position = {5, 3}, health = 8, attack = 1}}
-	room, ok := create_room(&data, &player, {enemies = enemies[:]})
-	testing.expect(t, ok)
-	defer destroy_room(&room)
-	testing.expect(t, !tactical_enabled(&room))
-	card := rework_hand_card(t, &room, .Shadow_Step)
-	deck := player.deck
-	_, error := compile_card_action(&room, card, entity_target(PLAYER_ENTITY))
-	testing.expect_value(t, error, Card_Compile_Error.Invalid_Phase)
-	_, droppable := card_drop_target(&room, card, player.position)
-	testing.expect(t, !droppable)
-	play := play_card(&room, card.id, entity_target(PLAYER_ENTITY))
-	testing.expect_value(t, play.result, Card_Play_Result.Compile_Failed)
-	testing.expect_value(t, play.compile_error, Card_Compile_Error.Invalid_Phase)
-	testing.expect(t, player.deck == deck)
-	testing.expect(t, !effect_is_valid(&room, enter_shadow_effect(4)))
-	testing.expect(t, !tactical_begin_shadow(&room, TACTICAL_SHADOW_SECONDS))
-}
-
-// Rewards, wares and the armoury share one pool: a tactical run finds
-// Movimento Ombra there at its Rare price, a classic run never does.
-@(test)
-test_shadow_card_is_offered_to_tactical_runs_only :: proc(t: ^testing.T) {
+test_shadow_card_is_offered_by_rewards_shops_and_armory :: proc(t: ^testing.T) {
 	definition, _ := card_definition_by_id(.Shadow_Step)
 	node := Run_Node{kind = .Shop, depth = 9}
 	testing.expect(t, card_offer_weight(definition, &node) > 0)
-	testing.expect_value(t, card_offer_weight(definition, &node, nil, false), u64(0))
 	profile := M8_Profile{ring_wins = 3}
 	// Spark is temporary-only and the Scopa pair is never offered.
 	all: [int(Card_Id.Count)-3]Card_Id
@@ -394,51 +365,34 @@ test_shadow_card_is_offered_to_tactical_runs_only :: proc(t: ^testing.T) {
 	offered := false
 	for id in all { offered = offered || id == .Shadow_Step }
 	testing.expect(t, offered)
-	// Classic also leaves out Movimento Ombra, the cards of the ground, the
-	// ones that load the player's charges, the Lazzo, the Canna da Pesca, the
-	// Pinball and the First Person Shooter.
-	classic: [int(Card_Id.Count)-14]Card_Id
-	random = 1
-	testing.expect(t, !generate_weighted_card_choices(&random, &node, all[:], &profile, false))
-	testing.expect(t, generate_weighted_card_choices(&random, &node, classic[:], &profile, false))
-	for id in classic { testing.expect(t, !card_requires_tactical(id)) }
 	price, priced := shop_card_price(definition, 9)
 	testing.expect(t, priced)
 	testing.expect_value(t, price, i32(8+9/3))
-	// The shop reads the run's own mode.
+	// Shop sampling includes the card at its Rare price.
 	run, shop_node := create_shop_test_source(t, 0x5AD0)
 	defer destroy_run(&run)
 	source, source_found := node_at(&run, shop_node)
 	testing.expect(t, source_found)
 	if !source_found { return }
-	for tactical in ([?]bool{false, true}) {
-		run.player.tactical.config.enabled = tactical
-		wares := 0
-		for seed in u64(1)..=300 {
-			state := seed
-			shop, built := build_shop_state_for_node(&run, source, &state)
-			testing.expect(t, built)
-			for offer in shop.offers[:shop.offer_count] { if offer.definition_id == .Shadow_Step { wares += 1 } }
-		}
-		testing.expect_value(t, wares > 0, tactical)
+	wares := 0
+	for seed in u64(1)..=300 {
+		state := seed
+		shop, built := build_shop_state_for_node(&run, source, &state)
+		testing.expect(t, built)
+		for offer in shop.offers[:shop.offer_count] { if offer.definition_id == .Shadow_Step { wares += 1 } }
 	}
-	// So does the reward: a seed whose tactical reward holds the card offers
-	// the classic run something else.
+	testing.expect(t, wares > 0)
+
+	// Room rewards can offer the same card.
 	rewarded := false
 	for seed in u64(0)..<u64(4000) {
 		tactical_run, tactical_ok := create_run(REWARD_TEST_PLAYER_STATS, REWARD_TEST_RUN_CONFIG, seed)
 		if !tactical_ok { continue }
-		tactical_run.player.tactical.config.enabled = true
 		testing.expect_value(t, finish_room(&tactical_run, .Complete), Run_Transition.Reward)
 		found := false
 		for id in available_card_rewards(&tactical_run) { found = found || id == .Shadow_Step }
 		destroy_run(&tactical_run)
 		if !found { continue }
-		classic_run, classic_ok := create_run(REWARD_TEST_PLAYER_STATS, REWARD_TEST_RUN_CONFIG, seed)
-		testing.expect(t, classic_ok)
-		testing.expect_value(t, finish_room(&classic_run, .Complete), Run_Transition.Reward)
-		for id in available_card_rewards(&classic_run) { testing.expect(t, id != .Shadow_Step) }
-		destroy_run(&classic_run)
 		rewarded = true
 		break
 	}

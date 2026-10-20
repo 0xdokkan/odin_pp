@@ -13,7 +13,8 @@ presentation_card_matches_event :: proc(card: game.Card_Instance, event: game.Ga
 	       card.upgrade_level == event.card_upgrade_level && card.lifetime == event.card_lifetime
 }
 
-apply_presentation_card_played :: proc(deck: ^game.Deck_State, event: game.Game_Event, tactical: bool = false) -> bool {
+@(private)
+apply_presentation_card_played :: proc(deck: ^game.Deck_State, event: game.Game_Event) -> bool {
 	if deck == nil || !game.validate_deck_state(deck) || event.amount < 0 ||
 	   event.amount > deck.energy || event.from_card_zone != .Hand ||
 	   event.to_card_zone != .Resolving || event.source != game.PLAYER_ENTITY ||
@@ -25,7 +26,7 @@ apply_presentation_card_played :: proc(deck: ^game.Deck_State, event: game.Game_
 		return false
 	}
 	card := deck.hand[hand_index]
-	definition, definition_found := game.card_definition_by_id(card.definition_id, tactical)
+	definition, definition_found := game.card_definition_by_id(card.definition_id)
 	if !game.validate_card_instance(card) || !presentation_card_matches_event(card, event) ||
 	   !definition_found || definition.cost != event.amount {
 		return false
@@ -41,6 +42,7 @@ apply_presentation_card_played :: proc(deck: ^game.Deck_State, event: game.Game_
 	return true
 }
 
+@(private)
 apply_presentation_card_moved :: proc(deck: ^game.Deck_State, event: game.Game_Event) -> bool {
 	if deck == nil || !game.validate_deck_state(deck) || event.target != game.PLAYER_ENTITY ||
 	   (event.from_card_zone != .Hand && event.from_card_zone != .Resolving) ||
@@ -86,6 +88,7 @@ apply_presentation_card_moved :: proc(deck: ^game.Deck_State, event: game.Game_E
 	return true
 }
 
+@(private)
 apply_presentation_card_drawn :: proc(deck: ^game.Deck_State, event: game.Game_Event) -> bool {
 	if deck == nil || !game.validate_deck_state(deck) || event.target != game.PLAYER_ENTITY ||
 	   event.from_card_zone != .Draw || event.to_card_zone != .Hand {
@@ -100,6 +103,7 @@ apply_presentation_card_drawn :: proc(deck: ^game.Deck_State, event: game.Game_E
 	return true
 }
 
+@(private)
 apply_presentation_card_created :: proc(deck: ^game.Deck_State, event: game.Game_Event) -> bool {
 	if deck == nil || !game.validate_deck_state(deck) || event.target != game.PLAYER_ENTITY ||
 	   event.from_card_zone != .Count || event.to_card_zone != .Hand ||
@@ -120,11 +124,13 @@ apply_presentation_card_created :: proc(deck: ^game.Deck_State, event: game.Game
 	return true
 }
 
+@(private)
 apply_presentation_hand_refocused :: proc(deck: ^game.Deck_State, event: game.Game_Event) -> bool {
 	return deck != nil && game.validate_deck_state(deck) && event.source == game.PLAYER_ENTITY &&
 	       event.target == game.PLAYER_ENTITY && event.amount == i32(deck.hand_count)
 }
 
+@(private)
 apply_presentation_card_refocused :: proc(deck: ^game.Deck_State, event: game.Game_Event) -> bool {
 	if deck == nil || !game.validate_deck_state(deck) || event.source != game.PLAYER_ENTITY ||
 	   event.target != game.PLAYER_ENTITY || event.from_card_zone != .Hand {

@@ -1,17 +1,21 @@
 package engine
 
 import "core:math"
+import "core:math/linalg"
 
-Vec3 :: struct {x, y, z: f32}
-vec_add :: proc(a, b: Vec3) -> Vec3 { return {a.x+b.x, a.y+b.y, a.z+b.z} }
-vec_sub :: proc(a, b: Vec3) -> Vec3 { return {a.x-b.x, a.y-b.y, a.z-b.z} }
-vec_scale :: proc(a: Vec3, scale: f32) -> Vec3 { return {a.x*scale, a.y*scale, a.z*scale} }
-vec_dot :: proc(a, b: Vec3) -> f32 { return a.x*b.x+a.y*b.y+a.z*b.z }
-vec_length :: proc(a: Vec3) -> f32 { return math.sqrt(vec_dot(a, a)) }
+// The same native vector representation used by physics, cameras and raylib.
+Vec3 :: [3]f32
+vec_add :: proc(a, b: Vec3) -> Vec3 { return a+b }
+vec_sub :: proc(a, b: Vec3) -> Vec3 { return a-b }
+vec_scale :: proc(a: Vec3, scale: f32) -> Vec3 { return a*scale }
+vec_dot :: linalg.dot
+vec_length :: linalg.length
 vec_normalize :: proc(a: Vec3) -> Vec3 {
 	length := vec_length(a)
 	if length <= 0.000001 || !finite(length) { return {} }
-	return vec_scale(a, 1/length)
+	// Preserve the collision policy and its reciprocal multiplication: the
+	// physics and particle normalizers intentionally use different cutoffs.
+	return a*(1/length)
 }
 finite :: proc(value: f32) -> bool { return !math.is_nan(value) && !math.is_inf(value) }
 finite_vec :: proc(value: Vec3) -> bool { return finite(value.x) && finite(value.y) && finite(value.z) }

@@ -1,7 +1,7 @@
 package game
 
 import "core:testing"
-import grid "../grid"
+import grid "../engine/grid"
 import level "../level"
 
 @(test)
@@ -24,8 +24,10 @@ test_heavy_blow_and_venom_needle_compile_targets_scaling_and_order :: proc(t: ^t
 		entity_target(heavy_target),
 	)
 	testing.expect_value(t, heavy_error, Card_Compile_Error.None)
-	testing.expect_value(t, heavy_action.effect_count, 1)
-	testing.expect_value(t, heavy_action.effects[0], damage_effect(heavy_target, 8))
+	testing.expect_value(t, heavy_action.effect_count, 2)
+	testing.expect_value(t, heavy_action.effects[0], damage_effect(heavy_target, 7))
+
+	testing.expect_value(t, heavy_action.effects[1], apply_status_effect(heavy_target, .Stagger, 1, 1))
 
 	needle_target := enemy_entity(room.enemies[1].id)
 	needle_action, needle_error := compile_card_action(
@@ -39,7 +41,7 @@ test_heavy_blow_and_venom_needle_compile_targets_scaling_and_order :: proc(t: ^t
 	testing.expect_value(
 		t,
 		needle_action.effects[1],
-		apply_status_effect(needle_target, .Poison, 1, 0),
+		apply_status_effect(needle_target, .Poison, 2, 0),
 	)
 
 	blocked_level := create_test_level(t)
@@ -121,7 +123,7 @@ test_purifying_guard_keeps_cleanse_optional_and_preserves_effect_order :: proc(t
 		entity_target(PLAYER_ENTITY),
 	)
 	testing.expect_value(t, clean_error, Card_Compile_Error.None)
-	testing.expect_value(t, clean_action.effects[0], apply_status_effect(PLAYER_ENTITY, .Shield, 4, 3))
+	testing.expect_value(t, clean_action.effects[0], apply_status_effect(PLAYER_ENTITY, .Shield, 5, 2))
 	testing.expect_value(t, clean_action.effects[1], remove_status_effect(PLAYER_ENTITY, .Poison))
 	clean_report := resolve_action(&room, &clean_action)
 	testing.expect(t, clean_report.accepted)

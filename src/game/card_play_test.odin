@@ -1,7 +1,7 @@
 package game
 
 import "core:testing"
-import grid "../grid"
+import grid "../engine/grid"
 import level "../level"
 
 configure_test_deck :: proc(
@@ -154,7 +154,7 @@ test_insufficient_energy_does_not_pay_or_discard_card :: proc(t: ^testing.T) {
 }
 
 @(test)
-test_successful_card_play_pays_resolves_pulses_and_draws :: proc(t: ^testing.T) {
+test_successful_card_play_pays_then_draws_after_cast_without_world_pulse :: proc(t: ^testing.T) {
 	level_data := create_test_level(t)
 	defer level.destroy(&level_data)
 	player := create_test_player(t)
@@ -175,28 +175,31 @@ test_successful_card_play_pays_resolves_pulses_and_draws :: proc(t: ^testing.T) 
 	testing.expect_value(t, play.result, Card_Play_Result.Played)
 	testing.expect(t, card_play_was_committed(play.result))
 	testing.expect(t, play.action_report.accepted)
-	testing.expect(t, play.pulse_report.advanced)
 	testing.expect_value(t, play.cost, i32(1))
 	testing.expect_value(t, play.energy_before, i32(3))
-	testing.expect_value(t, play.energy_after, i32(3))
-	testing.expect(t, play.drew_card)
-	testing.expect_value(t, room.pulse_count, u64(1))
-	testing.expect_value(t, player.deck.hand_count, 3)
+	testing.expect_value(t, play.energy_after, i32(2))
+	testing.expect_value(t, room.pulse_count, u64(0))
+	testing.expect_value(t, player.deck.hand_count, 2)
 	testing.expect(t, validate_deck_state(&player.deck))
 	shield, has_shield := status_for_entity(&room, PLAYER_ENTITY, .Shield)
 	testing.expect(t, has_shield)
-	testing.expect_value(t, shield.potency, i32(3))
+	testing.expect_value(t, shield.potency, i32(4))
 	testing.expect_value(t, shield.remaining_pulses, i32(2))
 	testing.expect_value(t, room.recent_events.events[0].kind, Game_Event_Kind.Card_Played)
 	testing.expect_value(t, room.recent_events.events[0].card_id, card_id)
 	testing.expect_value(t, room.recent_events.events[2].kind, Game_Event_Kind.Card_Moved)
 	testing.expect_value(t, room.recent_events.events[2].from_card_zone, Card_Zone.Resolving)
 	testing.expect_value(t, room.recent_events.events[2].to_card_zone, Card_Zone.Discard)
+	testing.expect(t, tactical_is_casting(&room))
+	drain_tactical_test_pulse(t, &room)
+	testing.expect_value(t, player.deck.hand_count, 3)
+	testing.expect_value(t, room.pulse_count, u64(0))
+	testing.expect_value(t, player.deck.energy, i32(2))
 	testing.expect_value(t, room.recent_events.events[room.recent_events.count-1].kind, Game_Event_Kind.Card_Drawn)
 }
 
 @(test)
-test_area_card_play_damages_only_footprint_and_advances_one_pulse :: proc(t: ^testing.T) {
+test_area_card_play_damages_only_footprint_without_advancing_world :: proc(t: ^testing.T) {
 	level_data := create_test_level(t)
 	defer level.destroy(&level_data)
 	player := create_test_player(t)
@@ -226,10 +229,8 @@ test_area_card_play_damages_only_footprint_and_advances_one_pulse :: proc(t: ^te
 	testing.expect_value(t, play.action_report.events.events[1].kind, Game_Event_Kind.Spell_Impact)
 	testing.expect_value(t, play.action_report.events.events[2].target, enemy_entity(1))
 	testing.expect_value(t, play.action_report.events.events[3].target, enemy_entity(2))
-	testing.expect(t, play.pulse_report.advanced)
-	testing.expect_value(t, room.pulse_count, u64(1))
-	testing.expect_value(t, player.deck.energy, i32(2))
-	testing.expect(t, play.drew_card)
+	testing.expect_value(t, room.pulse_count, u64(0))
+	testing.expect_value(t, player.deck.energy, i32(1))
 
 	inside_index, inside_found := enemy_index_by_id(&room, 1)
 	second_inside_index, second_inside_found := enemy_index_by_id(&room, 2)
@@ -247,9 +248,9 @@ test_energy_costs_accumulate_between_pulses :: proc(t: ^testing.T) {
 	level_data := create_test_level(t)
 	defer level.destroy(&level_data)
 	player := create_test_player(t)
-	definitions := [?]Card_Id{.Toxic_Wave}
+	definitions := [?]Card_Id{.Guard, .Guard, .Guard, .Guard}
 	configure_test_deck(t, &player, definitions[:], {
-		hand_size = 1,
+		hand_size = 4,
 		max_energy = 3,
 		energy_regen_per_pulse = 1,
 	})
@@ -258,17 +259,23 @@ test_energy_costs_accumulate_between_pulses :: proc(t: ^testing.T) {
 	testing.expect(t, ok)
 	defer destroy_room(&room)
 
-	first := play_card(&room, player.deck.hand[0].id, {})
+	first := play_card(&room, player.deck.hand[0].id, entity_target(PLAYER_ENTITY))
 	testing.expect_value(t, first.result, Card_Play_Result.Played)
 	testing.expect_value(t, player.deck.energy, i32(2))
-	second := play_card(&room, player.deck.hand[0].id, {})
+	drain_tactical_test_pulse(t, &room)
+	second := play_card(&room, player.deck.hand[0].id, entity_target(PLAYER_ENTITY))
 	testing.expect_value(t, second.result, Card_Play_Result.Played)
 	testing.expect_value(t, player.deck.energy, i32(1))
+	drain_tactical_test_pulse(t, &room)
+	third := play_card(&room, player.deck.hand[0].id, entity_target(PLAYER_ENTITY))
+	testing.expect_value(t, third.result, Card_Play_Result.Played)
+	testing.expect_value(t, player.deck.energy, i32(0))
+	drain_tactical_test_pulse(t, &room)
 	deck_before := player.deck
-	third := play_card(&room, player.deck.hand[0].id, {})
-	testing.expect_value(t, third.result, Card_Play_Result.Not_Enough_Energy)
+	fourth := play_card(&room, player.deck.hand[0].id, entity_target(PLAYER_ENTITY))
+	testing.expect_value(t, fourth.result, Card_Play_Result.Not_Enough_Energy)
 	testing.expect_value(t, player.deck, deck_before)
-	testing.expect_value(t, room.pulse_count, u64(2))
+	testing.expect_value(t, room.pulse_count, u64(0))
 }
 
 @(test)
@@ -293,7 +300,6 @@ test_card_that_ends_combat_commits_without_extra_pulse :: proc(t: ^testing.T) {
 
 	testing.expect_value(t, play.result, Card_Play_Result.Combat_Ended)
 	testing.expect(t, card_play_was_committed(play.result))
-	testing.expect(t, !play.pulse_report.advanced)
 	testing.expect_value(t, room.phase, Room_Phase.Loot)
 	testing.expect_value(t, room.pulse_count, u64(0))
 	testing.expect_value(t, player.gold, i32(1))
@@ -332,11 +338,10 @@ test_battle_focus_draws_before_moving_to_exhaust :: proc(t: ^testing.T) {
 	testing.expect_value(t, play.result, Card_Play_Result.Played)
 	testing.expect_value(t, play.destination, Card_Zone.Exhaust)
 	testing.expect_value(t, play.action_report.cards_drawn, 2)
-	testing.expect_value(t, play.action_report.events.count, 2)
+	testing.expect_value(t, play.action_report.events.count, 3)
 	testing.expect_value(t, player.deck.exhaust_count, 1)
 	testing.expect_value(t, player.deck.exhaust_pile[0].id, card_id)
-	testing.expect(t, play.drew_card)
-	testing.expect_value(t, player.deck.hand_count, 5)
+	testing.expect_value(t, player.deck.hand_count, 4)
 	testing.expect_value(t, player.deck.discard_count, 0)
 	testing.expect(t, !player.deck.has_resolving_card)
 	_, battle_focus_in_hand := hand_card_index_by_id(&player.deck, card_id)
@@ -346,9 +351,11 @@ test_battle_focus_draws_before_moving_to_exhaust :: proc(t: ^testing.T) {
 	testing.expect_value(t, room.recent_events.events[0].kind, Game_Event_Kind.Card_Played)
 	testing.expect_value(t, room.recent_events.events[1].kind, Game_Event_Kind.Card_Drawn)
 	testing.expect_value(t, room.recent_events.events[2].kind, Game_Event_Kind.Card_Drawn)
-	testing.expect_value(t, room.recent_events.events[3].kind, Game_Event_Kind.Card_Moved)
-	testing.expect_value(t, room.recent_events.events[3].from_card_zone, Card_Zone.Resolving)
-	testing.expect_value(t, room.recent_events.events[3].to_card_zone, Card_Zone.Exhaust)
+	testing.expect_value(t, room.recent_events.events[3].kind, Game_Event_Kind.Status_Applied)
+	testing.expect_value(t, room.recent_events.events[3].status, Status_Kind.Survey)
+	testing.expect_value(t, room.recent_events.events[4].kind, Game_Event_Kind.Card_Moved)
+	testing.expect_value(t, room.recent_events.events[4].from_card_zone, Card_Zone.Resolving)
+	testing.expect_value(t, room.recent_events.events[4].to_card_zone, Card_Zone.Exhaust)
 }
 
 @(test)
@@ -399,7 +406,7 @@ test_calculated_risk_draws_then_discards_the_leftmost_remaining_card :: proc(t: 
 	testing.expect_value(t, player.deck.discard_count, 2)
 	testing.expect_value(t, player.deck.discard_pile[0].id, expected_discard_id)
 	testing.expect_value(t, player.deck.discard_pile[1].id, card_id)
-	testing.expect_value(t, player.deck.hand_count, 4)
+	testing.expect_value(t, player.deck.hand_count, 3)
 	testing.expect(t, validate_deck_state(&player.deck))
 }
 
@@ -429,8 +436,8 @@ test_spark_forge_creates_a_temporary_card_that_exhausts_on_play :: proc(t: ^test
 	forge_play := play_card(&room, forge_id, entity_target(PLAYER_ENTITY))
 
 	testing.expect_value(t, forge_play.result, Card_Play_Result.Played)
-	testing.expect_value(t, forge_play.action_report.cards_created, 1)
-	testing.expect_value(t, player.deck.next_card_id, next_id_before+1)
+	testing.expect_value(t, forge_play.action_report.cards_created, 2)
+	testing.expect_value(t, player.deck.next_card_id, next_id_before+2)
 	spark_id := hand_card_id_for_definition(t, &player.deck, .Spark)
 	spark_index, spark_found := hand_card_index_by_id(&player.deck, spark_id)
 	testing.expect(t, spark_found)
@@ -440,6 +447,7 @@ test_spark_forge_creates_a_temporary_card_that_exhausts_on_play :: proc(t: ^test
 	testing.expect_value(t, create_event.card_id, spark_id)
 	testing.expect_value(t, create_event.card_lifetime, Card_Lifetime.Combat)
 
+	drain_tactical_test_pulse(t, &room)
 	enemy_ref := enemy_entity(room.enemies[0].id)
 	health_before := room.enemies[0].health
 	spark_play := play_card(&room, spark_id, entity_target(enemy_ref))

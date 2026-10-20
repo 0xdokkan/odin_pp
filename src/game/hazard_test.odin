@@ -109,7 +109,7 @@ test_enemy_trap_resolution_honors_shield_death_and_explicit_drops :: proc(t: ^te
 		2,
 	)
 	testing.expect_value(t, room.recent_events.count, 0)
-	append_event_log(&room.recent_events, &resolution.report.events)
+	append_event_log(room.recent_events, &resolution.report.events)
 	testing.expect_value(t, room.recent_events.count, resolution.report.events.count)
 }
 

@@ -1,6 +1,6 @@
 package game
 
-import grid "../grid"
+import grid "../engine/grid"
 
 MAX_CARD_DEFINITION_EFFECTS :: 4
 MAX_CARD_UPGRADE_LEVEL :: 10
@@ -73,57 +73,36 @@ Card_Id :: enum {
 	Count,
 }
 
-// The 6 and 7 of coins from a Scopa deck: gold now, and together in hand
-// they open the western easter egg. They never appear as rewards or wares.
-card_is_scopa :: proc(id: Card_Id) -> bool {
-	return id == .Sei_Denari || id == .Sette_Denari
+// Static card traits live with the definition; rules, previews and menus query
+// these through the existing predicates instead of maintaining card lists.
+Card_Trait :: enum { Scopa, Room_Tool, Player_Charge, Board_Device, Ground }
+
+@(private = "file")
+card_has_trait :: proc(id: Card_Id, trait: Card_Trait) -> bool {
+	return id >= .Strike && id < .Count && trait in CARD_DEFINITIONS[id].traits
 }
 
-// Movimento Ombra stops the tactical clock, which classic combat does not
-// have; a pool and a fire live on the tactical board's ground and windows
-// (ground.odin); the player's charges load the tactical blows, arrows and
-// windows (player_charges.odin); the Lazzo spins on the world's running
-// seconds (lasso.odin); the Canna da Pesca fishes the tactical room once it is
-// cleared (fishing.odin); the Pinball's ball rolls on those seconds too
-// (pinball.odin), and the First Person Shooter's seconds and shots are the
-// tactical world's (first_person.odin): classic runs never offer them, and
-// refuse to play them.
-card_requires_tactical :: proc(id: Card_Id) -> bool {
-	return id == .Shadow_Step || card_places_ground(id) || card_loads_player_charge(id) || id == .Lasso || id == .Fishing_Rod ||
-	       id == .Pinball || id == .First_Person
-}
+card_is_scopa :: proc(id: Card_Id) -> bool { return card_has_trait(id, .Scopa) }
+// A room tool waits in Exhaust during combat and uses its own slot after it.
+card_is_room_tool :: proc(id: Card_Id) -> bool { return card_has_trait(id, .Room_Tool) }
+@(private)
+card_loads_player_charge :: proc(id: Card_Id) -> bool { return card_has_trait(id, .Player_Charge) }
+card_is_board_device :: proc(id: Card_Id) -> bool { return card_has_trait(id, .Board_Device) }
+card_places_ground :: proc(id: Card_Id) -> bool { return card_has_trait(id, .Ground) }
 
-// The Canna da Pesca: a room-end tool, never drawn in a fight (begin_deck_combat
-// leaves it in Exhaust) and never played as a card; its own slot casts it once
-// the room is cleared (fishing.odin).
-card_is_room_tool :: proc(id: Card_Id) -> bool {
-	return id == .Fishing_Rod
-}
-
-// Deflect, Feretro, Dado del Destino and Lama Velenosa: each loads one of the
-// player's charges (status.odin) and nothing else.
-card_loads_player_charge :: proc(id: Card_Id) -> bool {
-	return id == .Deflect || id == .Coffin || id == .Fate_Dice || id == .Venom_Blade
-}
-
-// The dice cards and how many dice each rolls (dice.odin: roll_card_dice).
 card_dice_count :: proc(id: Card_Id) -> int {
-	if id == .Fate_Strike || id == .Shock_Floor || id == .Fate_Dice || id == .Venom_Blade { return 1 }
-	if id == .Sundering_Blow || id == .Twin_Venom { return 2 }
-	if id == .Prismatic_Barrage { return 3 }
-	return 0
+	return CARD_DEFINITIONS[id].dice_count if id >= .Strike && id < .Count else 0
 }
 
-// A dice card's upgrades climb the dice ladder and stop at its top; the
-// Lazzo's raise its first hit five times at most, the Canna da Pesca's its
-// fishings a room (its heal stays a d4: it is no dice card), the Pinball's its
-// ball's value, the First Person Shooter's its seconds.
+// Dice upgrades climb the shared ladder; special tools keep their own caps.
 card_max_upgrade_level :: proc(id: Card_Id) -> i32 {
-	if id == .Lasso { return LASSO_MAX_UPGRADE_LEVEL }
-	if id == .Fishing_Rod { return FISHING_ROD_MAX_UPGRADE_LEVEL }
-	if id == .Pinball { return PINBALL_MAX_UPGRADE_LEVEL }
-	if id == .First_Person { return FIRST_PERSON_MAX_UPGRADE_LEVEL }
-	return MAX_DICE_UPGRADE_LEVEL if card_dice_count(id) > 0 else MAX_CARD_UPGRADE_LEVEL
+	return CARD_DEFINITIONS[id].upgrade_limit if id >= .Strike && id < .Count else MAX_CARD_UPGRADE_LEVEL
+}
+
+// The cast's price, shared by gameplay, the hand and the inspector. A lasting
+// effect's own seconds (shadow, lasso, pinball, FPS) belong to its mechanic.
+tactical_card_time_cost :: proc(id: Card_Id) -> f32 {
+	return CARD_DEFINITIONS[id].time_cost if id >= .Strike && id < .Count else 0
 }
 
 Card_Target_Selector :: enum {
@@ -151,7 +130,7 @@ Card_Compile_Error :: enum {
 	Invalid_Target,
 	Target_Out_Of_Range,
 	Target_Blocked,
-	// LAZZO: a boss or a miniboss is too heavy to lasso (lasso.odin).
+	// PINBALL: a boss or a miniboss is too heavy to become a ball.
 	Target_Too_Heavy,
 	No_Effects,
 	Too_Many_Effects,
@@ -176,7 +155,10 @@ Card_Effect_Template :: struct {
 }
 
 Card_Definition :: struct {
-	tactical: bool,
+	traits:          bit_set[Card_Trait],
+	dice_count:      int,
+	upgrade_limit:   i32,
+	time_cost:       f32,
 	id:              Card_Id,
 	name:            string,
 	rarity:          Card_Rarity,
@@ -199,8 +181,13 @@ Card_Instance :: struct {
 	lifetime:       Card_Lifetime,
 }
 
-CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
-	{
+// An exhaustive enum array: adding a Card_Id without its definition is a
+// compile error. Count is explicitly invalid and never enters an offer pool.
+// Read-only storage avoids copying the full catalog for a dynamic lookup.
+@(private, rodata)
+CARD_DEFINITIONS := [Card_Id]Card_Definition{
+	.Strike = {
+		upgrade_limit = MAX_CARD_UPGRADE_LEVEL, time_cost = 2,
 		id = .Strike,
 		name = "Strike",
 		rarity = .Common,
@@ -225,13 +212,14 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 		},
 		effect_count = 1,
 	},
-	{
+	.Arc_Bolt = {
+		upgrade_limit = MAX_CARD_UPGRADE_LEVEL, time_cost = 2,
 		id = .Arc_Bolt,
 		name = "Arc Bolt",
 		rarity = .Common,
 		reward_weight = 90,
 		shop_base_price = 3,
-		cost = 2,
+		cost = 1,
 		targeting = {
 			rule = .Opponent_Or_Object,
 			cast_range = {.Manhattan, 1, 3},
@@ -243,7 +231,7 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 			{
 				kind = .Damage,
 				target = .Chosen_Entity,
-				base_amount = 3,
+				base_amount = 2,
 				amount_per_upgrade = 1,
 			},
 			{},
@@ -252,7 +240,8 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 		},
 		effect_count = 1,
 	},
-	{
+	.Piercing_Ray = {
+		upgrade_limit = MAX_CARD_UPGRADE_LEVEL, time_cost = 3,
 		id = .Piercing_Ray,
 		name = "Piercing Ray",
 		rarity = .Uncommon,
@@ -270,7 +259,7 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 			{
 				kind = .Damage,
 				target = .Each_Affected_Enemy,
-				base_amount = 2,
+				base_amount = 3,
 				amount_per_upgrade = 1,
 			},
 			{},
@@ -279,7 +268,8 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 		},
 		effect_count = 1,
 	},
-	{
+	.Cross_Slash = {
+		upgrade_limit = MAX_CARD_UPGRADE_LEVEL, time_cost = 3,
 		id = .Cross_Slash,
 		name = "Cross Slash",
 		rarity = .Uncommon,
@@ -298,7 +288,7 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 			{
 				kind = .Damage,
 				target = .Each_Affected_Enemy,
-				base_amount = 2,
+				base_amount = 3,
 				amount_per_upgrade = 1,
 			},
 			{},
@@ -307,7 +297,8 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 		},
 		effect_count = 1,
 	},
-	{
+	.Firebomb = {
+		upgrade_limit = MAX_CARD_UPGRADE_LEVEL, time_cost = 4,
 		id = .Firebomb,
 		name = "Firebomb",
 		rarity = .Rare,
@@ -336,7 +327,8 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 		},
 		effect_count = 1,
 	},
-	{
+	.Guard = {
+		upgrade_limit = MAX_CARD_UPGRADE_LEVEL, time_cost = 1,
 		id = .Guard,
 		name = "Guard",
 		rarity = .Common,
@@ -348,10 +340,10 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 			{
 				kind = .Apply_Status,
 				target = .Player,
-				base_amount = 3,
+				base_amount = 4,
 				amount_per_upgrade = 1,
 				status = .Shield,
-				duration = 3,
+				duration = 2,
 			},
 			{},
 			{},
@@ -359,7 +351,8 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 		},
 		effect_count = 1,
 	},
-	{
+	.Toxic_Wave = {
+		upgrade_limit = MAX_CARD_UPGRADE_LEVEL, time_cost = 4,
 		id = .Toxic_Wave,
 		name = "Toxic Wave",
 		rarity = .Rare,
@@ -381,7 +374,8 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 		},
 		effect_count = 1,
 	},
-	{
+	.Thorn_Coat = {
+		upgrade_limit = MAX_CARD_UPGRADE_LEVEL, time_cost = 1,
 		id = .Thorn_Coat,
 		name = "Thorn Coat",
 		rarity = .Uncommon,
@@ -393,7 +387,7 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 			{
 				kind = .Apply_Status,
 				target = .Player,
-				base_amount = 1,
+				base_amount = 2,
 				amount_per_upgrade = 1,
 				status = .Thorns,
 				duration = 3,
@@ -404,7 +398,8 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 		},
 		effect_count = 1,
 	},
-	{
+	.Afterimage = {
+		upgrade_limit = MAX_CARD_UPGRADE_LEVEL, time_cost = 1,
 		id = .Afterimage,
 		name = "Afterimage",
 		rarity = .Uncommon,
@@ -427,7 +422,8 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 		},
 		effect_count = 1,
 	},
-	{
+	.Counter_Rune = {
+		upgrade_limit = MAX_CARD_UPGRADE_LEVEL, time_cost = 1,
 		id = .Counter_Rune,
 		name = "Counter Rune",
 		rarity = .Rare,
@@ -440,7 +436,7 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 			{
 				kind = .Add_Reaction_Binding,
 				target = .Player,
-				base_amount = 2,
+				base_amount = 3,
 				amount_per_upgrade = 1,
 				duration = 4,
 				reaction = .Thorns_Counter,
@@ -452,7 +448,8 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 		},
 		effect_count = 1,
 	},
-	{
+	.Battle_Focus = {
+		upgrade_limit = MAX_CARD_UPGRADE_LEVEL, time_cost = 1,
 		id = .Battle_Focus,
 		name = "Battle Focus",
 		rarity = .Rare,
@@ -468,13 +465,14 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 				target = .Player,
 				base_amount = 2,
 			},
-			{},
+			{kind = .Apply_Status, target = .Player, status = .Survey, base_amount = 1, duration = 3},
 			{},
 			{},
 		},
-		effect_count = 1,
+		effect_count = 2,
 	},
-	{
+	.Calculated_Risk = {
+		upgrade_limit = MAX_CARD_UPGRADE_LEVEL, time_cost = 1,
 		id = .Calculated_Risk,
 		name = "Calculated Risk",
 		rarity = .Uncommon,
@@ -498,7 +496,8 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 		},
 			effect_count = 2,
 	},
-	{
+	.Spark_Forge = {
+		upgrade_limit = MAX_CARD_UPGRADE_LEVEL, time_cost = 1,
 		id = .Spark_Forge,
 		name = "Spark Forge",
 		rarity = .Uncommon,
@@ -510,7 +509,7 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 			{
 				kind = .Create_Card,
 				target = .Player,
-				base_amount = 1,
+				base_amount = 2,
 				card_definition = .Spark,
 				has_card_definition = true,
 			},
@@ -520,7 +519,8 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 		},
 		effect_count = 1,
 	},
-	{
+	.Spark = {
+		upgrade_limit = MAX_CARD_UPGRADE_LEVEL, time_cost = 1,
 		id = .Spark,
 		name = "Spark",
 		rarity = .Common,
@@ -544,7 +544,8 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 		},
 		effect_count = 1,
 	},
-	{
+	.Shove = {
+		upgrade_limit = MAX_CARD_UPGRADE_LEVEL, time_cost = 2,
 		id = .Shove,
 		name = "Shove",
 		rarity = .Common,
@@ -558,37 +559,39 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 		},
 		effects = {
 			{
-				kind = .Damage,
-				target = .Chosen_Entity,
-				base_amount = 1,
-				amount_per_upgrade = 1,
-			},
-			{
 				kind = .Move,
 				target = .Chosen_Entity,
 				movement = .Away_From_Player,
 				movement_distance = 1,
+			},
+			{
+				kind = .Damage,
+				target = .Chosen_Entity,
+				base_amount = 1,
+				amount_per_upgrade = 1,
 			},
 			{},
 			{},
 		},
 		effect_count = 2,
 	},
-	{
+	.Dash = {
+		upgrade_limit = MAX_CARD_UPGRADE_LEVEL, time_cost = 2,
 		id = .Dash,
 		name = "Dash",
 		rarity = .Uncommon,
 		reward_weight = 75,
 		shop_base_price = 5,
-		cost = 2,
+		cost = 1,
 		targeting = {
 			rule = .Walkable_Cell,
-			cast_range = {.Chebyshev, 1, 3},
+			cast_range = {.Chebyshev, 1, 4},
 			shape = .Line,
 			requires_line_of_sight = true,
 			stops_on_wall = true,
 		},
 		effects = {
+			{kind = .Apply_Status, target = .Player, status = .Shield, base_amount = 2, duration = 2},
 			{
 				kind = .Move,
 				target = .Player,
@@ -596,17 +599,17 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 			},
 			{},
 			{},
-			{},
 		},
-		effect_count = 1,
+		effect_count = 2,
 	},
-	{
+	.Grappling_Hook = {
+		upgrade_limit = MAX_CARD_UPGRADE_LEVEL, time_cost = 2,
 		id = .Grappling_Hook,
 		name = "Grappling Hook",
 		rarity = .Rare,
 		reward_weight = 60,
 		shop_base_price = 8,
-		cost = 2,
+		cost = 1,
 		targeting = {
 			rule = .Opponent,
 			cast_range = {.Chebyshev, 2, 4},
@@ -632,7 +635,8 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 		},
 		effect_count = 2,
 	},
-	{
+	.Heavy_Blow = {
+		upgrade_limit = MAX_CARD_UPGRADE_LEVEL, time_cost = 3,
 		id = .Heavy_Blow,
 		name = "Heavy Blow",
 		rarity = .Common,
@@ -648,16 +652,17 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 			{
 				kind = .Damage,
 				target = .Chosen_Entity,
-				base_amount = 5,
+				base_amount = 4,
 				amount_per_upgrade = 1,
 			},
-			{},
+			{kind = .Apply_Status, target = .Chosen_Entity, status = .Stagger, base_amount = 1, duration = 1},
 			{},
 			{},
 		},
-		effect_count = 1,
+		effect_count = 2,
 	},
-	{
+	.Venom_Needle = {
+		upgrade_limit = MAX_CARD_UPGRADE_LEVEL, time_cost = 2,
 		id = .Venom_Needle,
 		name = "Venom Needle",
 		rarity = .Common,
@@ -681,7 +686,7 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 			{
 				kind = .Apply_Status,
 				target = .Chosen_Entity,
-				base_amount = 1,
+				base_amount = 2,
 				status = .Poison,
 			},
 			{},
@@ -689,7 +694,8 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 		},
 		effect_count = 2,
 	},
-	{
+	.Caustic_Bloom = {
+		upgrade_limit = MAX_CARD_UPGRADE_LEVEL, time_cost = 4,
 		id = .Caustic_Bloom,
 		name = "Caustic Bloom",
 		rarity = .Uncommon,
@@ -718,7 +724,8 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 		},
 		effect_count = 1,
 	},
-	{
+	.Purifying_Guard = {
+		upgrade_limit = MAX_CARD_UPGRADE_LEVEL, time_cost = 1,
 		id = .Purifying_Guard,
 		name = "Purifying Guard",
 		rarity = .Uncommon,
@@ -730,10 +737,10 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 			{
 				kind = .Apply_Status,
 				target = .Player,
-				base_amount = 2,
+				base_amount = 3,
 				amount_per_upgrade = 1,
 				status = .Shield,
-				duration = 3,
+				duration = 2,
 			},
 			{
 				kind = .Remove_Status,
@@ -745,7 +752,8 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 		},
 		effect_count = 2,
 	},
-	{
+	.Volatile_Study = {
+		upgrade_limit = MAX_CARD_UPGRADE_LEVEL, time_cost = 1,
 		id = .Volatile_Study,
 		name = "Volatile Study",
 		rarity = .Rare,
@@ -766,7 +774,7 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 			{
 				kind = .Draw_Cards,
 				target = .Player,
-				base_amount = 1,
+				base_amount = 2,
 				amount_per_upgrade = 1,
 			},
 			{},
@@ -774,7 +782,9 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 		},
 		effect_count = 2,
 	},
-	{
+	.Fate_Strike = {
+		upgrade_limit = MAX_DICE_UPGRADE_LEVEL, time_cost = 2,
+		dice_count = 1,
 		id = .Fate_Strike,
 		name = "Fate Strike",
 		rarity = .Uncommon,
@@ -791,7 +801,8 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 		effects = {{kind = .Damage, target = .Chosen_Entity, base_amount = 2}, {}, {}, {}},
 		effect_count = 1,
 	},
-	{
+	.Chain_Lightning = {
+		upgrade_limit = MAX_CARD_UPGRADE_LEVEL, time_cost = 4,
 		id = .Chain_Lightning,
 		name = "Chain Lightning",
 		rarity = .Rare,
@@ -808,7 +819,9 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 		effects = {{kind = .Damage, target = .Chosen_Entity, base_amount = 3, amount_per_upgrade = 1}, {}, {}, {}},
 		effect_count = 1,
 	},
-	{
+	.Sundering_Blow = {
+		upgrade_limit = MAX_DICE_UPGRADE_LEVEL, time_cost = 3,
+		dice_count = 2,
 		id = .Sundering_Blow,
 		name = "Sundering Blow",
 		rarity = .Uncommon,
@@ -829,7 +842,9 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 		},
 		effect_count = 2,
 	},
-	{
+	.Prismatic_Barrage = {
+		upgrade_limit = MAX_DICE_UPGRADE_LEVEL, time_cost = 4,
+		dice_count = 3,
 		id = .Prismatic_Barrage,
 		name = "Prismatic Barrage",
 		rarity = .Uncommon,
@@ -850,7 +865,9 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 		},
 		effect_count = 2,
 	},
-	{
+	.Twin_Venom = {
+		upgrade_limit = MAX_DICE_UPGRADE_LEVEL, time_cost = 3,
+		dice_count = 2,
 		id = .Twin_Venom,
 		name = "Twin Venom",
 		rarity = .Uncommon,
@@ -871,21 +888,26 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 		},
 		effect_count = 2,
 	},
-	{
+	.Shock_Floor = {
+		upgrade_limit = MAX_DICE_UPGRADE_LEVEL, time_cost = 3,
+		traits = {.Board_Device}, dice_count = 1,
 		id = .Shock_Floor, name = "Shock Floor", rarity = .Uncommon,
 		reward_weight = 85, shop_base_price = 6, cost = 2,
 		targeting = {rule = .Walkable_Cell, cast_range = {.Chebyshev, 1, 3}, shape = .Single, requires_line_of_sight = true, stops_on_wall = true},
 		effects = {{kind = .Deploy_Device, target = .Player, base_amount = 1, object_kind = .Shock_Floor}, {}, {}, {}},
 		effect_count = 1,
 	},
-	{
+	.Tesla_Coil = {
+		upgrade_limit = MAX_CARD_UPGRADE_LEVEL, time_cost = 2,
+		traits = {.Board_Device},
 		id = .Tesla_Coil, name = "Tesla Coil", rarity = .Uncommon,
 		reward_weight = 90, shop_base_price = 5, cost = 1,
 		targeting = {rule = .Walkable_Cell, cast_range = {.Chebyshev, 1, 3}, shape = .Single, requires_line_of_sight = true, stops_on_wall = true},
 		effects = {{kind = .Deploy_Device, target = .Player, base_amount = 8, amount_per_upgrade = 1, object_kind = .Tesla_Coil}, {}, {}, {}},
 		effect_count = 1,
 	},
-	{
+	.Titan_Grip = {
+		upgrade_limit = MAX_CARD_UPGRADE_LEVEL, time_cost = 3,
 		id = .Titan_Grip, name = "Titan Grip", rarity = .Rare,
 		reward_weight = 65, shop_base_price = 9, cost = 2,
 		targeting = {rule = .Opponent, cast_range = {.Manhattan, 1, 1}, shape = .Single},
@@ -895,28 +917,34 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 			{kind = .Apply_Status, target = .Chosen_Entity, base_amount = 1, status = .Stagger, duration = 1}, {},
 		}, effect_count = 3,
 	},
-	{
+	.Storm_Crown = {
+		upgrade_limit = MAX_CARD_UPGRADE_LEVEL, time_cost = 4,
 		id = .Storm_Crown, name = "Storm Crown", rarity = .Rare,
 		reward_weight = 35, shop_base_price = 12, cost = 3,
 		targeting = {rule = .Opponent, cast_range = {.Manhattan, 1, 4}, shape = .Single, requires_line_of_sight = true, stops_on_wall = true},
 		effects = {{kind = .Damage, target = .Chosen_Entity, base_amount = 5, amount_per_upgrade = 1}, {}, {}, {}},
 		effect_count = 1,
 	},
-	{
+	.Sei_Denari = {
+		upgrade_limit = MAX_CARD_UPGRADE_LEVEL, time_cost = 1,
+		traits = {.Scopa},
 		id = .Sei_Denari, name = "6 di denari", rarity = .Common,
 		reward_weight = 1, shop_base_price = 6, cost = 1, exhaust_on_play = true,
 		targeting = {rule = .Self},
 		effects = {{kind = .Gain_Gold, target = .Player, base_amount = 6}, {}, {}, {}},
 		effect_count = 1,
 	},
-	{
+	.Sette_Denari = {
+		upgrade_limit = MAX_CARD_UPGRADE_LEVEL, time_cost = 1,
+		traits = {.Scopa},
 		id = .Sette_Denari, name = "7 di denari", rarity = .Common,
 		reward_weight = 1, shop_base_price = 7, cost = 1, exhaust_on_play = true,
 		targeting = {rule = .Self},
 		effects = {{kind = .Gain_Gold, target = .Player, base_amount = 7}, {}, {}, {}},
 		effect_count = 1,
 	},
-	{
+	.Shadow_Step = {
+		upgrade_limit = MAX_CARD_UPGRADE_LEVEL, time_cost = 0,
 		// Four real seconds inside the player's shadow (tactical_shadow.odin).
 		// Its length never scales: there is no upgrade.
 		id = .Shadow_Step, name = "Movimento Ombra", rarity = .Rare,
@@ -925,7 +953,9 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 		effects = {{kind = .Enter_Shadow, target = .Player, base_amount = 4}, {}, {}, {}},
 		effect_count = 1,
 	},
-	{
+	.Poison_Pool = {
+		upgrade_limit = MAX_CARD_UPGRADE_LEVEL, time_cost = 1,
+		traits = {.Ground},
 		// A pool of poison on a free cell for the rest of the room: Veleno 2 (+1
 		// per upgrade) to an enemy for each of its cells it enters; the areas
 		// pools close fill by themselves (ground.odin).
@@ -935,7 +965,9 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 		effects = {{kind = .Place_Ground, target = .Player, base_amount = 2, amount_per_upgrade = 1, status = .Poison}, {}, {}, {}},
 		effect_count = 1,
 	},
-	{
+	.Wildfire = {
+		upgrade_limit = MAX_CARD_UPGRADE_LEVEL, time_cost = 2,
+		traits = {.Ground},
 		// A fire on a free cell that grows as a plus at each new window and goes
 		// out at the fifth: Bruciatura 1 (+1 per upgrade) to an enemy entering a
 		// burning cell, or standing where it catches (ground.odin).
@@ -945,7 +977,9 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 		effects = {{kind = .Place_Ground, target = .Player, base_amount = 1, amount_per_upgrade = 1, status = .Burn}, {}, {}, {}},
 		effect_count = 1,
 	},
-	{
+	.Deflect = {
+		upgrade_limit = MAX_CARD_UPGRADE_LEVEL, time_cost = 1,
+		traits = {.Player_Charge},
 		// RIFLESSO: the next enemy blow that would hit the player goes back to
 		// its attacker (player_charges.odin). Each play adds a charge; no upgrade.
 		id = .Deflect, name = "Deflect", rarity = .Uncommon,
@@ -954,7 +988,9 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 		effects = {{kind = .Apply_Status, target = .Player, base_amount = 1, status = .Deflect}, {}, {}, {}},
 		effect_count = 1,
 	},
-	{
+	.Coffin = {
+		upgrade_limit = MAX_CARD_UPGRADE_LEVEL, time_cost = 1,
+		traits = {.Player_Charge},
 		// FRECCE: three arrows (+1 per upgrade), loosed with Ctrl and a click on
 		// a foe in the line of fire (shoot_player_arrow). Plays add up.
 		id = .Coffin, name = "Feretro", rarity = .Uncommon,
@@ -963,7 +999,9 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 		effects = {{kind = .Apply_Status, target = .Player, base_amount = 3, amount_per_upgrade = 1, status = .Arrows}, {}, {}, {}},
 		effect_count = 1,
 	},
-	{
+	.Fate_Dice = {
+		upgrade_limit = MAX_DICE_UPGRADE_LEVEL, time_cost = 1,
+		traits = {.Player_Charge}, dice_count = 1,
 		// DESTINO: the next three bumps each roll the card's die at the hit
 		// (player_bump); a new play loads them back to three. A dice card: its
 		// upgrades climb the die.
@@ -973,7 +1011,9 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 		effects = {{kind = .Apply_Status, target = .Player, base_amount = FATE_DICE_CHARGES, status = .Fate}, {}, {}, {}},
 		effect_count = 1,
 	},
-	{
+	.Venom_Blade = {
+		upgrade_limit = MAX_DICE_UPGRADE_LEVEL, time_cost = 1,
+		traits = {.Player_Charge}, dice_count = 1,
 		// LAMA: its die, rolled as it is played, is how many bumps it poisons
 		// (resolve_loading_card); the template's one stands for that roll.
 		id = .Venom_Blade, name = "Lama Velenosa", rarity = .Common,
@@ -982,7 +1022,8 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 		effects = {{kind = .Apply_Status, target = .Player, base_amount = 1, status = .Venom_Blade}, {}, {}, {}},
 		effect_count = 1,
 	},
-	{
+	.Lasso = {
+		upgrade_limit = LASSO_MAX_UPGRADE_LEVEL, time_cost = 2,
 		// LAZZO: one foe in reach is caught, lifted and swung round the player
 		// (lasso.odin). Its amount is the first hit's number: 1 (+1 per upgrade,
 		// +1 on the tick); every next hit strikes one harder.
@@ -992,7 +1033,9 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 		effects = {{kind = .Lasso, target = .Chosen_Entity, base_amount = 1, amount_per_upgrade = 1}, {}, {}, {}},
 		effect_count = 1,
 	},
-	{
+	.Fishing_Rod = {
+		upgrade_limit = FISHING_ROD_MAX_UPGRADE_LEVEL, time_cost = 0,
+		traits = {.Room_Tool},
 		// CANNA DA PESCA: never in the hand; once the room is cleared it fishes a
 		// free cell in reach, turned to water, from its own slot (fishing.odin).
 		// Its amount is the room's fishings: 1 (+1 per upgrade). At most one a run.
@@ -1002,7 +1045,8 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 		effects = {{kind = .Fish, target = .Player, base_amount = 1, amount_per_upgrade = 1}, {}, {}, {}},
 		effect_count = 1,
 	},
-	{
+	.Pinball = {
+		upgrade_limit = PINBALL_MAX_UPGRADE_LEVEL, time_cost = 2,
 		// PINBALL: one foe beside the player turned into a steel ball and struck
 		// away; for twenty seconds it bounces round the room (pinball.odin). Its
 		// amount is the ball's value: 2 (+1 per upgrade, +1 on the tick), one
@@ -1013,7 +1057,8 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 		effects = {{kind = .Pinball, target = .Chosen_Entity, base_amount = 2, amount_per_upgrade = 1}, {}, {}, {}},
 		effect_count = 1,
 	},
-	{
+	.First_Person = {
+		upgrade_limit = FIRST_PERSON_MAX_UPGRADE_LEVEL, time_cost = 0,
 		// FIRST PERSON SHOOTER: the player's own eyes and a paper AK for twenty
 		// seconds of the world's (first_person.odin): +2 per upgrade, +2 on the
 		// tick. It takes no window time, and no card is played meanwhile.
@@ -1024,6 +1069,7 @@ CARD_DEFINITIONS :: [int(Card_Id.Count)]Card_Definition{
 			amount_per_upgrade = FIRST_PERSON_SECONDS_PER_UPGRADE}, {}, {}, {}},
 		effect_count = 1,
 	},
+	.Count = {id = .Count},
 }
 
 card_drop_target :: proc(
@@ -1034,7 +1080,7 @@ card_drop_target :: proc(
 	if room == nil || room.player == nil || room.level_data == nil {
 		return {}, false
 	}
-	definition, found := card_definition_by_id(instance.definition_id, tactical_enabled(room))
+	definition, found := card_definition_by_id(instance.definition_id)
 	if !found {
 		return {}, false
 	}
@@ -1044,6 +1090,7 @@ card_drop_target :: proc(
 	       evaluation.error == .None && evaluation.query.has_primary_target
 }
 
+@(private = "file")
 card_target_rule_selects_effect_entity :: proc(rule: Target_Rule) -> bool {
 	switch rule {
 	case .Self, .Player, .Opponent, .Opponent_Or_Object, .Adjacent_Opponent:
@@ -1054,6 +1101,7 @@ card_target_rule_selects_effect_entity :: proc(rule: Target_Rule) -> bool {
 	return false
 }
 
+@(private = "file")
 card_amount_template_is_valid :: proc(template: Card_Effect_Template) -> bool {
 	if template.base_amount <= 0 || template.amount_per_upgrade < 0 {
 		return false
@@ -1062,6 +1110,7 @@ card_amount_template_is_valid :: proc(template: Card_Effect_Template) -> bool {
 	return maximum <= i64(max(i32))
 }
 
+@(private = "file")
 card_movement_template_is_valid :: proc(
 	definition: ^Card_Definition,
 	template: Card_Effect_Template,
@@ -1089,6 +1138,7 @@ card_movement_template_is_valid :: proc(
 	return false
 }
 
+@(private)
 card_effect_template_is_valid :: proc(
 	definition: ^Card_Definition,
 	template: Card_Effect_Template,
@@ -1166,6 +1216,7 @@ card_effect_template_is_valid :: proc(
 	return false
 }
 
+@(private)
 validate_card_definition :: proc(definition: ^Card_Definition) -> bool {
 	if definition == nil || int(definition.id) < 0 || int(definition.id) >= int(Card_Id.Count) ||
 	   len(definition.name) == 0 || int(definition.rarity) < 0 ||
@@ -1198,25 +1249,23 @@ validate_card_definition :: proc(definition: ^Card_Definition) -> bool {
 	return true
 }
 
+@(private)
 validate_card_definitions :: proc() -> bool {
-	definitions := CARD_DEFINITIONS
-	for &definition, index in definitions {
-		if int(definition.id) != index || !validate_card_definition(&definition) {
-			return false
-		}
+	for definition, id in CARD_DEFINITIONS {
+		if id == .Count { continue }
+		checked := definition
+		if definition.id != id || !validate_card_definition(&checked) ||
+		   definition.dice_count < 0 || definition.dice_count > MAX_ROLL_DICE ||
+		   definition.upgrade_limit < 0 || definition.upgrade_limit > MAX_CARD_UPGRADE_LEVEL ||
+		   definition.time_cost < 0 ||
+		   (definition.dice_count > 0 && definition.upgrade_limit != MAX_DICE_UPGRADE_LEVEL) { return false }
 	}
 	return true
 }
 
-card_definition_by_id :: proc(id: Card_Id, tactical: bool = false) -> (Card_Definition, bool) {
-	definitions := CARD_DEFINITIONS
-	index := int(id)
-	if index < 0 || index >= len(definitions) {
-		return {}, false
-	}
-	definition := definitions[index]
-	if tactical { rework_tactical_card(&definition) }
-	return definition, true
+card_definition_by_id :: proc(id: Card_Id) -> (Card_Definition, bool) {
+	if id < .Strike || id >= .Count { return {}, false }
+	return CARD_DEFINITIONS[id], true
 }
 
 validate_card_instance :: proc(instance: Card_Instance) -> bool {
@@ -1259,6 +1308,7 @@ card_destination_after_play :: proc(instance: Card_Instance) -> (Card_Zone, bool
 	return .Discard, true
 }
 
+@(private)
 card_definition_destination_after_refocus :: proc(definition: Card_Definition) -> (Card_Zone, bool) {
 	validated_definition := definition
 	if !validate_card_definition(&validated_definition) {
@@ -1289,6 +1339,7 @@ card_effect_amount :: proc(template: Card_Effect_Template, upgrade_level: i32) -
 	return i32(amount)
 }
 
+@(private)
 instantiate_card_effect :: proc(
 	template: Card_Effect_Template,
 	target: Entity_Ref,
@@ -1350,6 +1401,7 @@ instantiate_card_effect :: proc(
 	return {}, false
 }
 
+@(private = "file")
 card_effect_target :: proc(selector: Card_Target_Selector, chosen: Target) -> (Entity_Ref, bool) {
 	switch selector {
 	case .Chosen_Entity:
@@ -1371,6 +1423,7 @@ Card_Target_Evaluation :: struct {
 	required_effect_count: int,
 }
 
+@(private = "file")
 card_movement_destination :: proc(
 	room: ^Room,
 	template: Card_Effect_Template,
@@ -1422,6 +1475,7 @@ card_movement_destination :: proc(
 	return
 }
 
+@(private = "file")
 card_compile_error_from_movement :: proc(err: Movement_Error) -> Card_Compile_Error {
 	switch err {
 	case .None:
@@ -1466,6 +1520,7 @@ card_target_request_from_target :: proc(
 	return {}, false
 }
 
+@(private = "file")
 card_compile_error_from_query :: proc(err: Target_Query_Error) -> Card_Compile_Error {
 	switch err {
 	case .None:
@@ -1504,15 +1559,14 @@ validated_card_definition_for_action :: proc(
 		return {}, .Invalid_Instance
 	}
 	found: bool
-	definition, found = card_definition_by_id(instance.definition_id, tactical_enabled(room))
+	definition, found = card_definition_by_id(instance.definition_id)
 	if !found {
 		return {}, .Unknown_Definition
 	}
 	if !validate_card_definition(&definition) {
 		return {}, .Invalid_Definition
 	}
-	// Instance validity still checks the canonical catalog, including temporary
-	// lifetimes and per-card upgrade limits, independently of tactical rewrites.
+	// Instance validity includes temporary lifetimes and per-card upgrade limits.
 	if !validate_card_instance(instance) {
 		return {}, .Invalid_Instance
 	}
@@ -1537,13 +1591,14 @@ evaluate_validated_card_targeting :: proc(
 	instance: Card_Instance,
 	definition: Card_Definition,
 	request: Target_Request,
+	plan: ^Card_Target_Plan = nil,
 ) -> (evaluation: Card_Target_Evaluation) {
 	// The Canna da Pesca is no card to play: its slot fishes (fishing.odin).
-	if (card_requires_tactical(instance.definition_id) && !tactical_enabled(room)) || card_is_room_tool(instance.definition_id) {
+	if card_is_room_tool(instance.definition_id) {
 		evaluation.error = .Invalid_Phase
 		return
 	}
-	if tactical_enabled(room) && request.has_anchor && !tactical_cell_visible(room, request.anchor) {
+	if request.has_anchor && !tactical_cell_visible(room, request.anchor) {
 		evaluation.error = .Invalid_Target
 		return
 	}
@@ -1577,23 +1632,21 @@ evaluate_validated_card_targeting :: proc(
 		}
 	}
 
-	if tactical_enabled(room) {
-		visible_cells := 0
-		for cell in evaluation.query.affected.cells[:evaluation.query.affected.count] {
-			if !tactical_cell_visible(room, cell) { continue }
-			evaluation.query.affected.cells[visible_cells] = cell
-			visible_cells += 1
-		}
-		evaluation.query.affected.count = visible_cells
-		visible_enemies := 0
-		for id in evaluation.query.enemy_ids[:evaluation.query.enemy_count] {
-			i, present := enemy_index_by_id(room, id)
-			if !present || !tactical_card_enemy_in_area(room, instance.definition_id, room.enemies[i].position) { continue }
-			evaluation.query.enemy_ids[visible_enemies] = id
-			visible_enemies += 1
-		}
-		evaluation.query.enemy_count = visible_enemies
+	visible_cells := 0
+	for cell in evaluation.query.affected.cells[:evaluation.query.affected.count] {
+		if !tactical_cell_visible(room, cell) { continue }
+		evaluation.query.affected.cells[visible_cells] = cell
+		visible_cells += 1
 	}
+	evaluation.query.affected.count = visible_cells
+	visible_enemies := 0
+	for id in evaluation.query.enemy_ids[:evaluation.query.enemy_count] {
+		i, present := enemy_index_by_id(room, id)
+		if !present || !tactical_card_enemy_in_area(room, instance.definition_id, room.enemies[i].position) { continue }
+		evaluation.query.enemy_ids[visible_enemies] = id
+		visible_enemies += 1
+	}
+	evaluation.query.enemy_count = visible_enemies
 
 	for index in 0..<definition.effect_count {
 		template := definition.effects[index]
@@ -1632,26 +1685,9 @@ evaluate_validated_card_targeting :: proc(
 		}
 	}
 
-	for index in 0..<definition.effect_count {
-		switch definition.effects[index].target {
-		case .Each_Enemy:
-			// Never the Pinball's ball, nor the Lazzo's foe in the air.
-			for enemy in room.enemies {
-				if !enemy_is_out_of_play(room, enemy.id) && tactical_card_enemy_in_area(room, instance.definition_id, enemy.position) {
-					evaluation.required_effect_count += 1
-				}
-			}
-		case .Each_Affected_Enemy:
-			evaluation.required_effect_count += evaluation.query.enemy_count
-			if definition.effects[index].affects_objects {
-				_, object_count := affected_damageable_object_ids(room, &evaluation.query.affected)
-				evaluation.required_effect_count += object_count
-			}
-		case .Chosen_Entity, .Player:
-			evaluation.required_effect_count += 1
-		case .Count:
-		}
-	}
+	targets := build_card_target_plan(room, instance.definition_id, definition, &evaluation.query, plan != nil)
+	evaluation.required_effect_count = targets.count
+	if plan != nil { plan^ = targets }
 	if evaluation.required_effect_count == 0 {
 		evaluation.error = .No_Effects
 		return
@@ -1659,6 +1695,64 @@ evaluate_validated_card_targeting :: proc(
 	if evaluation.required_effect_count > MAX_ACTION_EFFECTS {
 		evaluation.error = .Too_Many_Effects
 		return
+	}
+	return
+}
+
+// The preview counts the same expansion that compilation consumes. Capture is
+// local to a compilation: previews need no sorting, target lookup or stored plan.
+@(private="file")
+Card_Effect_Target :: struct { template_index: int, entity: Entity_Ref }
+
+@(private="file")
+Card_Target_Plan :: struct {
+	targets: [MAX_ACTION_EFFECTS]Card_Effect_Target,
+	count: int,
+	capture: bool,
+}
+
+@(private="file")
+append_card_target :: proc(plan: ^Card_Target_Plan, template_index: int, entity: Entity_Ref) {
+	if plan.capture && plan.count < len(plan.targets) { plan.targets[plan.count] = {template_index, entity} }
+	// Keep the full count on overflow; evaluation reports it before compiling.
+	plan.count += 1
+}
+
+@(private="file")
+build_card_target_plan :: proc(room: ^Room, card: Card_Id, definition: Card_Definition,
+	query: ^Target_Query_Result, capture: bool) -> (plan: Card_Target_Plan) {
+	plan.capture = capture
+	for index in 0..<definition.effect_count {
+		template := definition.effects[index]
+		switch template.target {
+		case .Each_Enemy:
+			start := plan.count
+			for enemy in room.enemies {
+				if enemy_is_out_of_play(room, enemy.id) || !tactical_card_enemy_in_area(room, card, enemy.position) { continue }
+				append_card_target(&plan, index, enemy_entity(enemy.id))
+			}
+			// Stable IDs, as enemy planning; storage order may change after a kill.
+			if capture && plan.count <= len(plan.targets) {
+				for i in start+1..<plan.count {
+					target, at := plan.targets[i], i
+					for at > start && plan.targets[at-1].entity.id > target.entity.id {
+						plan.targets[at] = plan.targets[at-1]
+						at -= 1
+					}
+					plan.targets[at] = target
+				}
+			}
+		case .Each_Affected_Enemy:
+			if template.affects_objects {
+				ids, count := affected_damageable_object_ids(room, &query.affected)
+				for id in ids[:count] { append_card_target(&plan, index, object_entity(id)) }
+			}
+			for id in query.enemy_ids[:query.enemy_count] { append_card_target(&plan, index, enemy_entity(id)) }
+		case .Chosen_Entity, .Player:
+			entity, _ := card_effect_target(template.target, query.primary_target)
+			append_card_target(&plan, index, entity)
+		case .Count:
+		}
 	}
 	return
 }
@@ -1677,7 +1771,8 @@ compile_card_action :: proc(
 	if !has_request {
 		return {}, .Invalid_Target
 	}
-	evaluation := evaluate_validated_card_targeting(room, instance, definition, request)
+	plan: Card_Target_Plan
+	evaluation := evaluate_validated_card_targeting(room, instance, definition, request, &plan)
 	if evaluation.error != .None {
 		return {}, evaluation.error
 	}
@@ -1697,80 +1792,22 @@ compile_card_action :: proc(
 	}
 	// Fate's template is its deterministic base. The die is materialized only by
 	// resolve_played_card_action after all play validation and payment checks.
-	for index in 0..<definition.effect_count {
-		template := definition.effects[index]
+	for entry in plan.targets[:plan.count] {
+		template := definition.effects[entry.template_index]
 		if template.kind == .Move {
-			effect_target, has_target := card_effect_target(template.target, target)
-			assert(has_target && evaluation.has_movement)
-			destination, has_destination := card_movement_destination(
-				room,
-				template,
-				effect_target,
-				&evaluation.query,
-			)
+			assert(evaluation.has_movement)
+			destination, has_destination := card_movement_destination(room, template, entry.entity, &evaluation.query)
 			assert(has_destination)
-			if !add_effect(&action, move_effect(effect_target, destination)) {
-				return {}, .Too_Many_Effects
-			}
+			if !add_effect(&action, move_effect(entry.entity, destination)) { return {}, .Too_Many_Effects }
 			continue
 		}
-		if template.target == .Each_Enemy {
-			ids, count := enemy_ids_in_planning_order(room)
-			for enemy_index in 0..<count {
-				entity_index, _ := enemy_index_by_id(room, ids[enemy_index])
-				if enemy_is_out_of_play(room, ids[enemy_index]) ||
-				   !tactical_card_enemy_in_area(room, instance.definition_id, room.enemies[entity_index].position) { continue }
-				effect, instantiated := instantiate_card_effect(
-					template,
-					enemy_entity(ids[enemy_index]),
-					instance,
-				)
-				if !instantiated {
-					return {}, .Invalid_Definition
-				}
-				if !add_effect(&action, effect) {
-					return {}, .Too_Many_Effects
-				}
-			}
-			continue
-		}
-		if template.target == .Each_Affected_Enemy {
-			if template.affects_objects {
-				ids, count := affected_damageable_object_ids(room, &evaluation.query.affected)
-				for id in ids[:count] {
-					effect, valid := instantiate_card_effect(template, object_entity(id), instance)
-					if !valid || !add_effect(&action, effect) {
-						return {}, .Too_Many_Effects
-					}
-				}
-			}
-			for enemy_index in 0..<evaluation.query.enemy_count {
-				effect, instantiated := instantiate_card_effect(
-					template,
-					enemy_entity(evaluation.query.enemy_ids[enemy_index]),
-					instance,
-				)
-				if !instantiated {
-					return {}, .Invalid_Definition
-				}
-				if !add_effect(&action, effect) {
-					return {}, .Too_Many_Effects
-				}
-			}
-			continue
-		}
-
-		effect_target, has_target := card_effect_target(template.target, target)
-		assert(has_target)
-		effect, instantiated := instantiate_card_effect(template, effect_target, instance)
+		effect, instantiated := instantiate_card_effect(template, entry.entity, instance)
 		if effect.kind == .Deploy_Device || effect.kind == .Place_Ground { effect.destination = evaluation.query.anchor }
-		if instance.definition_id == .Strike && effect.kind == .Damage { effect.amount += tactical_strike_bonus(room, effect_target) }
+		if instance.definition_id == .Strike && effect.kind == .Damage { effect.amount += tactical_strike_bonus(room, entry.entity) }
 		if !instantiated {
-			return {}, .Invalid_Definition
+			return {}, .Too_Many_Effects if template.target == .Each_Affected_Enemy && entry.entity.kind == .Object else .Invalid_Definition
 		}
-		if !add_effect(&action, effect) {
-			return {}, .Too_Many_Effects
-		}
+		if !add_effect(&action, effect) { return {}, .Too_Many_Effects }
 	}
 	return action, .None
 }

@@ -1,11 +1,11 @@
 package game
 
 import "core:testing"
-import grid "../grid"
+import grid "../engine/grid"
 import level "../level"
 
 @(test)
-test_m7_configuration_replaces_classic_first_bomb_intent_on_startup :: proc(t: ^testing.T) {
+test_room_creation_and_reconfiguration_prepare_first_bomb_intent :: proc(t: ^testing.T) {
 	data := create_enemy_archetype_test_level(t)
 	defer level.destroy(&data)
 	player := create_test_player(t)
@@ -13,7 +13,7 @@ test_m7_configuration_replaces_classic_first_bomb_intent_on_startup :: proc(t: ^
 	room, ok := create_room(&data, &player, {enemies = spawns[:]})
 	testing.expect(t, ok)
 	defer destroy_room(&room)
-	testing.expect_value(t, room.enemies[0].intent.damage, EXPLOSIVE_DAMAGE)
+	testing.expect_value(t, room.enemies[0].intent.damage, TACTICAL_BOMB_DAMAGE)
 	testing.expect(t, configure_tactical_room(&room, DEFAULT_TACTICAL_CONFIG))
 	testing.expect(t, room.enemies[0].intent.windup)
 	testing.expect_value(t, room.enemies[0].intent.damage, TACTICAL_BOMB_DAMAGE)
@@ -51,7 +51,7 @@ test_m7_bombers_prepare_one_frozen_throw_with_three_pulses_to_escape :: proc(t: 
 	testing.expect_value(t, count, 1)
 	anchor := player.position
 	initial := room.enemies[0].intent
-	testing.expect(t, !tactical_tick(&room, 3, true, false))
+	testing.expect(t, !tactical_tick(&room, 4, true, false))
 	drain_tactical_test_pulse(t, &room)
 	testing.expect_value(t, room.enemies[0].intent, initial)
 	testing.expect(t, !room.enemies[0].bomb_ready)
@@ -62,6 +62,7 @@ test_m7_bombers_prepare_one_frozen_throw_with_three_pulses_to_escape :: proc(t: 
 	testing.expect_value(t, room.enemies[0].intent.destination, anchor)
 	testing.expect(t, !room.enemies[0].intent.windup)
 	try_move_player(&room, .West)
+	tactical_tick(&room, 1-TACTICAL_MOVE_SECONDS, true, false)
 	drain_tactical_test_pulse(t, &room)
 	testing.expect_value(t, active_bomb_count(&room), 1)
 	testing.expect_value(t, room.objects[0].position, anchor)
@@ -79,7 +80,7 @@ test_m7_shoving_a_prepared_bomber_cancels_throw_and_still_grants_recovery :: pro
 	room := create_enemy_rework_room(t, &data, &player, spawns[:])
 	defer level.destroy(&data)
 	defer destroy_room(&room)
-	testing.expect(t, !tactical_tick(&room, 4, true, false))
+	testing.expect(t, !tactical_tick(&room, 5, true, false))
 	drain_tactical_test_pulse(t, &room)
 	testing.expect(t, room.enemies[0].bomb_ready)
 	action := make_action(.Trigger, PLAYER_ENTITY, entity_target(enemy_entity(1)), .Opponent)
@@ -101,7 +102,7 @@ test_m7_enemy_bomb_damage_is_reduced_without_nerfing_player_explosives :: proc(t
 		spawns := [?]Enemy_Spawn{{position = {7, 1}, health = 100, attack = 1}}
 		room := create_enemy_rework_room(t, &data, &player, spawns[:])
 		source := enemy_entity(1) if hostile else PLAYER_ENTITY
-		testing.expect(t, spawn_bomb(&room, source, player.position, &room.recent_events))
+		testing.expect(t, spawn_bomb(&room, source, player.position, room.recent_events))
 		object := room.objects[0]
 		testing.expect_value(t, object.fuse_pulses, 3 if hostile else 2)
 		room.pulse_count = object.detonation_pulse-1
@@ -162,8 +163,8 @@ test_m7_charge_can_be_parried_once_and_retains_recovery :: proc(t: ^testing.T) {
 	room := create_enemy_rework_room(t, &data, &player, spawns[:])
 	defer level.destroy(&data)
 	defer destroy_room(&room)
-	// Wait through the brute's first three seconds, then defend its deadline.
-	testing.expect(t, !tactical_tick(&room, 3, true, false))
+	// Wait through the brute's first four seconds, then defend its deadline.
+	testing.expect(t, !tactical_tick(&room, 4, true, false))
 	drain_tactical_test_pulse(t, &room)
 	_, _ = apply_status(&room, PLAYER_ENTITY, .Shield, 3, 3)
 	testing.expect_value(t, room.enemies[0].intent.kind, Enemy_Intent_Kind.Charge)
@@ -177,7 +178,7 @@ test_m7_charge_can_be_parried_once_and_retains_recovery :: proc(t: ^testing.T) {
 	testing.expect_value(t, room.enemies[0].position, grid.Position{7, 4})
 	testing.expect_value(t, room.enemies[0].health, i32(18))
 	testing.expect_value(t, room.enemies[0].intent.kind, Enemy_Intent_Kind.Recover)
-	testing.expect_value(t, room.pulse_count, u64(4))
+	testing.expect_value(t, room.pulse_count, u64(5))
 }
 
 @(test)

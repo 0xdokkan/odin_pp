@@ -125,7 +125,7 @@ game_step :: proc(data: rawptr, frame: ^host.Frame, playing: bool) -> host.Round
 		return w.status
 	}
 	if frame.focused && !g.autoplay {
-		advance_player_controls(g, input.sample(&g.actions), frame.dt)
+		advance_player_controls(g, input.sample(&g.actions, frame.devices), frame.dt)
 	} else {
 		suspend_player_input(g)
 	}

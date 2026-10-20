@@ -5,7 +5,7 @@ import "core:testing"
 import rl "vendor:raylib"
 import audio "../engine/audio"
 import game "../game"
-import grid "../grid"
+import grid "../engine/grid"
 import level "../level"
 
 // The ground on the board (ground_fx.odin): the snapshot carries it and shows
@@ -92,7 +92,7 @@ test_ground_snapshot_shows_a_pool_from_its_landing :: proc(t: ^testing.T) {
 	testing.expect(t, !presentation_ground_pool(&after.ground, {4, 1}) && after.ground.width == data.tiles.width)
 	renderer := new(Renderer)
 	defer { destroy_renderer_world_playback(renderer); free(renderer) }
-	testing.expect(t, begin_renderer_event_timeline(renderer, before, &room.recent_events, &after))
+	testing.expect(t, begin_renderer_event_timeline(renderer, before, room.recent_events, &after))
 	timeline := &renderer.timeline
 	landed := false
 	for _ in 0..<2000 {
@@ -422,7 +422,7 @@ test_a_fire_catches_with_its_flames_at_the_window :: proc(t: ^testing.T) {
 	testing.expect(t, ground_test_pour(&room, .Burn, {3, 1}, 1))
 	foe := game.enemy_entity(room.enemies[0].id)
 	_, _ = game.apply_status(&room, game.enemy_entity(room.enemies[1].id), .Burn, 1, 0)
-	game.clear_event_log(&room.recent_events)
+	game.clear_event_log(room.recent_events)
 	before := capture_room_presentation(&room)
 	player.tactical.remaining, player.tactical.phase = 0, .Decision
 	testing.expect(t, game.tactical_expire_window(&room))
@@ -435,7 +435,7 @@ test_a_fire_catches_with_its_flames_at_the_window :: proc(t: ^testing.T) {
 	// As the game shows a window's end (commit_gameplay_command): a world command.
 	renderer := new(Renderer)
 	defer { destroy_renderer_world_playback(renderer); free(renderer) }
-	testing.expect(t, begin_renderer_world_timeline(renderer, before, &room.recent_events, &after))
+	testing.expect(t, begin_renderer_world_timeline(renderer, before, room.recent_events, &after))
 	seen := false
 	for _ in 0..<200 {
 		snapshot := renderer_presentation_snapshot(renderer, &room)

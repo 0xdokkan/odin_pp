@@ -7,8 +7,7 @@ import "core:mem"
 import "core:os"
 import "core:testing"
 import rl "vendor:raylib"
-import game "../game"
-import view "../view"
+import view "../engine/view"
 
 // Original 1x1 GIF fixture: transparent first frame, opaque white second.
 SPRITE_TEST_GIF :: [?]u8{
@@ -87,30 +86,28 @@ test_sprite_manifest_sheet_and_gif_configuration_enforce_frame_boundaries :: pro
 @(test)
 test_sprite_sheet_clock_and_alpha_picking_follow_the_visible_frame :: proc(t: ^testing.T) {
 	alpha := [?]u8{0,255,255,0, 0,255,255,0}
-	assets := Sprite_Assets{texture_count = 1}
+	renderer: Renderer
+	renderer.tactical.camera = {position = {9, 8, 9}, target = {2, 0, 2}, up = {0, 1, 0}, fovy = 7}
+	assets := &renderer.sprite_assets
+	assets.texture_count = 1
 	assets.textures[0] = {texture = {width = 4, height = 2}, alpha = alpha[:]}
-	asset := &assets.sprites[int(Sprite_Key.Barrel)]
+	asset := &assets.sprites[int(Sprite_Key.Chaser)]
 	asset^ = {configured = true, columns = 2, frames = 2, frame_width = 2, frame_height = 2, width = 20, height = 20, anchor = {0.5, 1}, fps = 2}
-	center := view.Vec2{100, 100}
-	source, destination := sprite_asset_rectangles(asset, 0, center, 2)
-	testing.expect_value(t, destination, rl.Rectangle{80, 60, 40, 40})
-	testing.expect_value(t, source, rl.Rectangle{0, 0, 2, 2})
-	hit, configured := sprite_asset_contains_point(&assets, .Barrel, center, {85, 70}, 2)
-	testing.expect(t, configured && !hit, "transparent sprite pixels must not steal clicks")
-	hit, _ = sprite_asset_contains_point(&assets, .Barrel, center, {105, 70}, 2)
-	testing.expect(t, hit)
-	advance_sprite_assets(&assets, 0.5)
-	hit, _ = sprite_asset_contains_point(&assets, .Barrel, center, {85, 70}, 2)
-	testing.expect(t, hit, "the second frame swaps the opaque column")
-	hit, _ = sprite_asset_contains_point(&assets, .Barrel, center, {105, 70}, 2)
-	testing.expect(t, !hit)
-	advance_sprite_assets(&assets, 0.5)
+	quad := tactical_billboard_geometry(&renderer, .Chaser, {2, 2})
+	// Two points in the quad, one in each atlas column. The opaque column
+	// swaps when its second frame is shown; picking follows that same frame.
+	front := rl.Vector3Normalize(rl.Vector3{1, 0, 1})
+	for frame in 0..<2 {
+		for column in 0..<2 {
+			u := f32(column)*0.5+0.25
+			point := quad.points[0]+(quad.points[3]-quad.points[0])*u+(quad.points[1]-quad.points[0])*0.5
+			_, hit := tactical_billboard_hit(&renderer, .Chaser, {2, 2}, {point+front*10, -front})
+			testing.expect_value(t, hit, column != frame)
+		}
+		advance_sprite_assets(assets, 0.5)
+	}
 	testing.expect_value(t, sprite_frame_index(asset, assets.elapsed), 0)
 	testing.expect_value(t, sprite_frame_index(asset, 1000000.5), 1)
-	hit, configured = sprite_asset_contains_point(&assets, .Player, center, center, 1)
-	testing.expect(t, !hit && !configured, "missing assets preserve procedural fallback")
-	hit, configured = sprite_asset_contains_point(&assets, .Barrel, center, {120, 100}, 2)
-	testing.expect(t, !hit && configured, "right and bottom sprite bounds are exclusive")
 }
 
 @(test)
@@ -128,23 +125,6 @@ test_sprite_gif_decode_packs_real_frames_and_preserves_transparency_without_a_wi
 	pixels := ([^]u8)(atlas.data)
 	testing.expect_value(t, pixels[3], u8(0))
 	testing.expect_value(t, pixels[7], u8(255))
-}
-
-@(test)
-test_sprite_actor_picking_uses_image_alpha_instead_of_the_previous_circle :: proc(t: ^testing.T) {
-	alpha := [?]u8{0,255,0,255}
-	renderer := Renderer{camera = view.make_camera(), projection = {tile_width = 64, tile_height = 32}}
-	renderer.camera.zoom = 1
-	renderer.sprite_assets.texture_count = 1
-	renderer.sprite_assets.textures[0] = {texture = {width = 2, height = 2}, alpha = alpha[:]}
-	renderer.sprite_assets.sprites[int(Sprite_Key.Chaser)] = {
-		configured = true, columns = 1, frames = 1, frame_width = 2, frame_height = 2,
-		width = 32, height = 48, anchor = {0.5, 1}, fps = 8,
-	}
-	enemy := game.Enemy{archetype = .Chaser}
-	center := view.Vec2{100, 100}
-	testing.expect(t, enemy_body_contains_point(&renderer, enemy, center, {108, 56}), "raised sprite head remains clickable")
-	testing.expect(t, !enemy_body_contains_point(&renderer, enemy, center, {95, 95}), "transparent pixels inside the former circle pass through")
 }
 
 @(test)

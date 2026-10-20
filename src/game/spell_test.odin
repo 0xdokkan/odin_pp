@@ -1,7 +1,7 @@
 package game
 
 import "core:testing"
-import grid "../grid"
+import grid "../engine/grid"
 import level "../level"
 
 spell_test_level :: proc(t: ^testing.T) -> level.Level {
@@ -179,9 +179,9 @@ test_fate_every_face_of_every_die_uses_one_roll_and_only_the_top_face_bounces ::
 			// Upgrades raise only the die: two plus the face, three on the bounce.
 			testing.expect_value(t, room.enemies[0].health, i32(100)-(2+desired))
 			testing.expect_value(t, room.enemies[1].health, i32(100)-FATE_BOUNCE_DAMAGE if bounce else i32(100))
-			testing.expect_value(t, spell_test_event_count(&room.recent_events, .Dice_Rolled), 1)
-			testing.expect_value(t, spell_test_event_count(&room.recent_events, .Spell_Launched), 1)
-			testing.expect_value(t, spell_test_event_count(&room.recent_events, .Spell_Impact), 2 if bounce else 1)
+			testing.expect_value(t, spell_test_event_count(room.recent_events, .Dice_Rolled), 1)
+			testing.expect_value(t, spell_test_event_count(room.recent_events, .Spell_Launched), 1)
+			testing.expect_value(t, spell_test_event_count(room.recent_events, .Spell_Impact), 2 if bounce else 1)
 			testing.expect_value(t, room.recent_events.events[0].kind, Game_Event_Kind.Card_Played)
 			die_event := room.recent_events.events[1]
 			testing.expect_value(t, die_event.kind, Game_Event_Kind.Dice_Rolled)
@@ -189,9 +189,9 @@ test_fate_every_face_of_every_die_uses_one_roll_and_only_the_top_face_bounces ::
 			testing.expect_value(t, die_event.dice_roll, Dice_Roll{faces = {desired, 0, 0}, sides = sides, count = 1, total = desired})
 			testing.expect_value(t, die_event.card_id, card.id)
 			testing.expect_value(t, die_event.card_upgrade_level, upgrade)
-			testing.expect_value(t, room.pulse_count, u64(1))
-			testing.expect_value(t, player.deck.energy, i32(2))
-			testing.expect_value(t, spell_test_event_count(&room.recent_events, .Card_Drawn), 1)
+			testing.expect_value(t, room.pulse_count, u64(0))
+			testing.expect_value(t, player.deck.energy, i32(1))
+			testing.expect_value(t, spell_test_event_count(room.recent_events, .Card_Drawn), 0)
 			testing.expect_value(t, room.recent_events.dropped_count, 0)
 			destroy_room(&room)
 			level.destroy(&data)
@@ -234,10 +234,10 @@ test_chain_settles_each_hit_and_reaction_in_order_with_one_card_economy :: proc(
 		from = impact.to_position
 	}
 	testing.expect_value(t, player.dice, dice_before)
-	testing.expect_value(t, room.pulse_count, u64(1))
-	testing.expect_value(t, player.deck.energy, i32(2))
-	testing.expect_value(t, spell_test_event_count(&room.recent_events, .Card_Played), 1)
-	testing.expect_value(t, spell_test_event_count(&room.recent_events, .Card_Drawn), 1)
+	testing.expect_value(t, room.pulse_count, u64(0))
+	testing.expect_value(t, player.deck.energy, i32(1))
+	testing.expect_value(t, spell_test_event_count(room.recent_events, .Card_Played), 1)
+	testing.expect_value(t, spell_test_event_count(room.recent_events, .Card_Drawn), 0)
 }
 
 @(test)
@@ -256,10 +256,9 @@ test_spell_bounces_stop_immediately_after_player_dies_to_first_hit_reaction :: p
 		play := play_card(&room, player.deck.hand[0].id, entity_target(enemy_entity(1)))
 		testing.expect_value(t, play.result, Card_Play_Result.Player_Defeated)
 		testing.expect_value(t, room.enemies[1].health, i32(40))
-		testing.expect_value(t, spell_test_event_count(&room.recent_events, .Spell_Impact), 1)
+		testing.expect_value(t, spell_test_event_count(room.recent_events, .Spell_Impact), 1)
 		testing.expect_value(t, player.dice.roll_count, u64(1) if id == .Fate_Strike else u64(0))
 		testing.expect_value(t, room.pulse_count, u64(0))
-		testing.expect(t, !play.drew_card)
 		testing.expect_value(t, room.recent_events.dropped_count, 0)
 		destroy_room(&room)
 		level.destroy(&data)
@@ -298,7 +297,7 @@ test_firebomb_announces_one_area_impact_groups_only_direct_effects_then_reaction
 			testing.expect_value(t, event.target, PLAYER_ENTITY)
 		}
 	}
-	testing.expect_value(t, spell_test_event_count(&room.recent_events, .Spell_Launched), 1)
-	testing.expect_value(t, spell_test_event_count(&room.recent_events, .Spell_Impact), 1)
+	testing.expect_value(t, spell_test_event_count(room.recent_events, .Spell_Launched), 1)
+	testing.expect_value(t, spell_test_event_count(room.recent_events, .Spell_Impact), 1)
 	testing.expect_value(t, player.dice, dice_before)
 }

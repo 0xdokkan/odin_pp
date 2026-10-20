@@ -2,7 +2,7 @@ package render
 
 import "core:math"
 import rl "vendor:raylib"
-import grid "../grid"
+import grid "../engine/grid"
 
 // A camera-space sphere test discards geometry that cannot reach the canvas.
 // This is deliberately independent of gameplay sight: it never reveals cells,
@@ -13,6 +13,7 @@ Tactical_Draw_Frustum :: struct {
 	horizontal, vertical, horizontal_margin, vertical_margin: f32,
 }
 
+@(private)
 tactical_draw_frustum :: proc(camera: rl.Camera3D, width, height: f32) -> (result: Tactical_Draw_Frustum) {
 	if width <= 0 || height <= 0 || camera.fovy <= 0 || rl.Vector3LengthSqr(camera.target-camera.position) < 0.0001 { return }
 	result.valid, result.perspective = true, camera.projection == .PERSPECTIVE
@@ -27,9 +28,10 @@ tactical_draw_frustum :: proc(camera: rl.Camera3D, width, height: f32) -> (resul
 	return
 }
 
+@(private)
 tactical_cell_on_screen :: proc(renderer: ^Renderer, cell: grid.Position) -> bool {
 	f := &renderer.tactical.draw_frustum
-	if !renderer.tactical.scene_3d || !f.valid { return true }
+	if !f.valid { return true }
 	// Covers a complete wall, cap, lamp, floor bevel, shadow and drifting mote.
 	// The generous sphere also avoids geometry popping at the edge of the view.
 	radius :: f32(1.8)
@@ -44,6 +46,7 @@ tactical_cell_on_screen :: proc(renderer: ^Renderer, cell: grid.Position) -> boo
 // Fit the full board and standing actors into the map's actual scissored area.
 // The orbit distance remains a relative zoom, so the wheel still intentionally
 // permits a closer inspection and reset restores an unclipped overview.
+@(private)
 tactical_hologram_camera :: proc(renderer: ^Renderer, width, height: int, orbit: Tactical_Orbit) -> rl.Camera3D {
 	target := rl.Vector3{f32(width)*0.5, 0, f32(height)*0.5}
 	view_orbit := orbit

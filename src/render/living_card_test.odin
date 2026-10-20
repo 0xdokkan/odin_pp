@@ -3,7 +3,7 @@ package render
 import "core:testing"
 import gfx "../engine/gfx"
 import game "../game"
-import view "../view"
+import view "../engine/view"
 
 // Every action of every character lands on a drawn clip, and a move's card
 // slide ends before its drawings do.

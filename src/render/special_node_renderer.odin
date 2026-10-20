@@ -4,7 +4,7 @@ import "core:c"
 import "core:fmt"
 import rl "vendor:raylib"
 import game "../game"
-import view "../view"
+import view "../engine/view"
 
 SPECIAL_NODE_MIN_CANVAS_WIDTH  :: f32(900)
 SPECIAL_NODE_MIN_CANVAS_HEIGHT :: f32(520)
@@ -48,19 +48,23 @@ Special_Node_Render_State :: struct {
 	continue_hovered:      bool,
 }
 
+@(private = "file")
 special_node_phase_is_supported :: proc(phase: game.Run_Phase) -> bool {
 	return phase == .Rest || phase == .Event || phase == .Treasure
 }
 
+@(private)
 special_node_canvas_is_supported :: proc(canvas_width, canvas_height: f32) -> bool {
 	return canvas_width >= SPECIAL_NODE_MIN_CANVAS_WIDTH &&
 	       canvas_height >= SPECIAL_NODE_MIN_CANVAS_HEIGHT
 }
 
+@(private = "file")
 special_node_point_in_bounds :: proc(point: view.Vec2, bounds: rl.Rectangle) -> bool {
 	return bounds.width > 0 && bounds.height > 0 && point_in_rectangle(point, bounds)
 }
 
+@(private)
 special_node_action_count :: proc(run: ^game.Run_State) -> int {
 	if run == nil || game.special_node_is_resolved(run) {
 		return 0
@@ -75,6 +79,7 @@ special_node_action_count :: proc(run: ^game.Run_State) -> int {
 	return 0
 }
 
+@(private)
 special_node_action_bounds :: proc(
 	canvas_width, canvas_height: f32,
 	action_index, action_count: int,
@@ -95,6 +100,7 @@ special_node_action_bounds :: proc(
 	}
 }
 
+@(private)
 special_node_result_bounds :: proc(canvas_width, canvas_height: f32) -> rl.Rectangle {
 	if !special_node_canvas_is_supported(canvas_width, canvas_height) {
 		return {}
@@ -107,6 +113,7 @@ special_node_result_bounds :: proc(canvas_width, canvas_height: f32) -> rl.Recta
 	}
 }
 
+@(private)
 special_node_continue_bounds :: proc(canvas_width, canvas_height: f32) -> rl.Rectangle {
 	if !special_node_canvas_is_supported(canvas_width, canvas_height) {
 		return {}
@@ -114,6 +121,7 @@ special_node_continue_bounds :: proc(canvas_width, canvas_height: f32) -> rl.Rec
 	return shop_continue_bounds(canvas_width, canvas_height)
 }
 
+@(private)
 special_node_previous_page_bounds :: proc(canvas_width, canvas_height: f32) -> rl.Rectangle {
 	if !special_node_canvas_is_supported(canvas_width, canvas_height) {
 		return {}
@@ -121,6 +129,7 @@ special_node_previous_page_bounds :: proc(canvas_width, canvas_height: f32) -> r
 	return shop_previous_page_bounds(canvas_width, canvas_height)
 }
 
+@(private)
 special_node_next_page_bounds :: proc(canvas_width, canvas_height: f32) -> rl.Rectangle {
 	if !special_node_canvas_is_supported(canvas_width, canvas_height) {
 		return {}
@@ -128,6 +137,7 @@ special_node_next_page_bounds :: proc(canvas_width, canvas_height: f32) -> rl.Re
 	return shop_next_page_bounds(canvas_width, canvas_height)
 }
 
+@(private)
 special_node_owned_card_bounds :: proc(
 	canvas_width, canvas_height: f32,
 	page_slot: int,
@@ -139,6 +149,7 @@ special_node_owned_card_bounds :: proc(
 	return shop_owned_card_bounds(canvas_width, canvas_height, page_slot, raised)
 }
 
+@(private)
 special_node_deck_page_count :: proc(deck: ^game.Deck_State) -> int {
 	return shop_deck_page_count(deck)
 }
@@ -147,14 +158,17 @@ special_node_clamp_deck_page :: proc(deck: ^game.Deck_State, page: int) -> int {
 	return shop_clamp_deck_page(deck, page)
 }
 
+@(private)
 special_node_deck_page_start :: proc(deck: ^game.Deck_State, page: int) -> (int, bool) {
 	return shop_deck_page_start(deck, page)
 }
 
+@(private)
 special_node_deck_cards_on_page :: proc(deck: ^game.Deck_State, page: int) -> int {
 	return shop_deck_cards_on_page(deck, page)
 }
 
+@(private = "file")
 special_node_owned_card_at_point :: proc(
 	run: ^game.Run_State,
 	canvas_width, canvas_height: f32,
@@ -244,6 +258,7 @@ special_node_hit_test :: proc(
 	return {}
 }
 
+@(private = "file")
 special_node_accent :: proc(phase: game.Run_Phase) -> rl.Color {
 	switch phase {
 	case .Rest:
@@ -257,6 +272,7 @@ special_node_accent :: proc(phase: game.Run_Phase) -> rl.Color {
 	return rl.Color{151, 163, 158, 255}
 }
 
+@(private = "file")
 draw_special_node_action :: proc(
 	bounds: rl.Rectangle,
 	title, detail: cstring,
@@ -299,6 +315,7 @@ draw_special_node_action :: proc(
 	)
 }
 
+@(private = "file")
 draw_special_node_header :: proc(
 	run: ^game.Run_State,
 	canvas_width: f32, theme: ^Renderer = nil,
@@ -340,6 +357,7 @@ draw_special_node_header :: proc(
 	)
 }
 
+@(private = "file")
 draw_special_node_result :: proc(
 	run: ^game.Run_State,
 	canvas_width, canvas_height: f32, theme: ^Renderer = nil,
@@ -364,7 +382,7 @@ draw_special_node_result :: proc(
 				&run.player.deck,
 				run.rest.target_card_id,
 			); found {
-				definition, definition_found := game.card_definition_by_id(run.player.deck.owned[card_index].definition_id, menu_themed(theme))
+				definition, definition_found := game.card_definition_by_id(run.player.deck.owned[card_index].definition_id)
 				if definition_found {
 					detail = fmt.ctprintf("%s +%d", definition.name, run.player.deck.owned[card_index].upgrade_level)
 				}
@@ -385,7 +403,7 @@ draw_special_node_result :: proc(
 		case .None, .Recovered, .Upgraded, .Treasure_Claimed:
 		}
 		if run.route_event.added_card_id != 0 {
-			definition, found := game.card_definition_by_id(run.route_event.offered_card, menu_themed(theme))
+			definition, found := game.card_definition_by_id(run.route_event.offered_card)
 			if found {
 				detail = fmt.ctprintf("ADDED %s", definition.name)
 			}
@@ -424,6 +442,7 @@ draw_special_node_result :: proc(
 	)
 }
 
+@(private = "file")
 draw_rest_actions :: proc(
 	run: ^game.Run_State,
 	canvas_width, canvas_height: f32,
@@ -432,7 +451,7 @@ draw_rest_actions :: proc(
 	action_count := special_node_action_count(run)
 	accent := special_node_accent(run.phase)
 	if index, found := game.owned_card_index_by_id(&run.player.deck, state.selected_card_id); found {
-		menu_text(theme, card_upgrade_preview(run.player.deck.owned[index], menu_themed(theme)), 45, 454, 12,
+		menu_text(theme, card_upgrade_preview(run.player.deck.owned[index]), 45, 454, 12,
 			rl.Color{169, 183, 177, 255})
 	}
 	draw_special_node_action(
@@ -471,6 +490,7 @@ draw_rest_actions :: proc(
 	draw_owned_card_effect_button(theme, canvas_width, canvas_height, chosen)
 }
 
+@(private = "file")
 draw_event_actions :: proc(
 	run: ^game.Run_State,
 	canvas_width, canvas_height: f32,
@@ -492,7 +512,7 @@ draw_event_actions :: proc(
 		secondary_title = "BOTTLE"
 		secondary_detail = fmt.ctprintf("+%d GOLD", run.route_event.secondary_gold)
 	case .Forgotten_Armory:
-		definition, found := game.card_definition_by_id(run.route_event.offered_card, menu_themed(theme))
+		definition, found := game.card_definition_by_id(run.route_event.offered_card)
 		assert(found)
 		primary_title = "TAKE CARD"
 		primary_detail = fmt.ctprintf("%s", definition.name)
@@ -532,6 +552,7 @@ draw_event_actions :: proc(
 	)
 }
 
+@(private = "file")
 draw_treasure_actions :: proc(
 	run: ^game.Run_State,
 	canvas_width, canvas_height: f32,

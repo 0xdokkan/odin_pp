@@ -1,6 +1,7 @@
 package game
 
-import grid "../grid"
+import "core:mem"
+import grid "../engine/grid"
 import level "../level"
 
 MAX_ENEMIES_PER_ROOM :: 32
@@ -62,6 +63,8 @@ create_player :: proc(stats: Player_Stats) -> (Player, bool) {
 	if !initialize_starter_deck(&result.deck) {
 		return {}, false
 	}
+	configured := configure_tactical(&result, DEFAULT_TACTICAL_CONFIG)
+	assert(configured)
 	return result, true
 }
 
@@ -75,6 +78,7 @@ Enemy_Archetype :: enum {
 	Count,
 }
 
+@(private = "file")
 enemy_archetype_name :: proc(archetype: Enemy_Archetype) -> string {
 	switch archetype {
 	case .Chaser:
@@ -198,12 +202,14 @@ Room :: struct {
 	loot:          [dynamic]Loot,
 	// Campo delle distanze condiviso; M7 usa costi pesati per i pericoli.
 	enemy_path_distances: []int,
-	enemy_path_queue:     []grid.Position,
 	next_enemy_id:  u32,
 	next_trap_id:   u32,
 	next_object_id: u32,
 	pulse_count:   u64,
-	recent_events: Event_Log,
+	// Owned with the room, like its dynamic arrays. Copies of Room are shallow;
+	// ownership may be transferred, but only one owner may destroy it.
+	recent_events: ^Event_Log,
+	event_allocator: mem.Allocator,
 	tactical_pulse: Tactical_Pulse,
 	qte: QTE_State,
 	reaction_bindings: Reaction_Binding_Set,
@@ -264,6 +270,7 @@ add_position :: proc(a, b: grid.Position) -> grid.Position {
 	return {x = a.x+b.x, y = a.y+b.y}
 }
 
+@(private)
 find_exit :: proc(level_data: ^level.Level) -> (position: grid.Position, ok: bool) {
 	if level_data == nil {
 		return {}, false
@@ -419,6 +426,7 @@ enemy_index_by_id :: proc(room: ^Room, id: u32) -> (int, bool) {
 	return 0, false
 }
 
+@(private)
 trap_index_by_id :: proc(room: ^Room, id: u32) -> (int, bool) {
 	if room == nil || id == 0 {
 		return 0, false
@@ -443,7 +451,8 @@ create_room :: proc(level_data: ^level.Level, player: ^Player, content: Room_Con
 	   player.stats.attack <= 0 || player.stats.defense < 0 ||
 	   player.gold < 0 || !validate_deck_state(&player.deck) || !validate_relic_state(&player.relics) ||
 	   !validate_dice_state(&player.dice) || !weapon_slot_valid(player.equipment.weapon) ||
-	   !weapon_slot_valid(player.equipment.reserve) || !m8_profile_valid(player.m8_profile) {
+	   !weapon_slot_valid(player.equipment.reserve) || !m8_profile_valid(player.m8_profile) ||
+	   !valid_tactical_config(player.tactical.config) {
 		return {}, false
 	}
 
@@ -452,6 +461,8 @@ create_room :: proc(level_data: ^level.Level, player: ^Player, content: Room_Con
 		return {}, false
 	}
 
+	result.event_allocator = context.allocator
+	result.recent_events = new(Event_Log, result.event_allocator)
 	result.level_data = level_data
 	result.player = player
 	result.exit_position = exit_position
@@ -470,14 +481,13 @@ create_room :: proc(level_data: ^level.Level, player: ^Player, content: Room_Con
 	result.objects = make([dynamic]Grid_Object, 0, MAX_GRID_OBJECTS_PER_ROOM)
 	loot_capacity := len(content.enemies)
 	for spawn in content.enemies {
-		if tactical_enabled(&result) && spawn.archetype == .Brute { loot_capacity += 1 }
+		if spawn.archetype == .Brute { loot_capacity += 1 }
 		if spawn.drops_healing {
 			loot_capacity += 1
 		}
 	}
 	result.loot = make([dynamic]Loot, 0, loot_capacity)
 	result.enemy_path_distances = make([]int, len(level_data.tiles.cells))
-	result.enemy_path_queue = make([]grid.Position, len(level_data.tiles.cells))
 	result.ground.pool = make([]i32, len(level_data.tiles.cells))
 	spawn_position := level_data.player_spawn
 
@@ -586,24 +596,27 @@ destroy_room :: proc(room: ^Room) {
 	delete(room.objects)
 	delete(room.loot)
 	delete(room.enemy_path_distances)
-	delete(room.enemy_path_queue)
 	delete(room.ground.pool)
+	free(room.recent_events, room.event_allocator)
 	room^ = {}
 }
 
+@(private)
 trigger_trap :: proc(room: ^Room) {
 	assert(room != nil && room.player != nil)
 	resolution := resolve_trap_for_entity(room, PLAYER_ENTITY)
 	if resolution.triggered {
-		append_event_log(&room.recent_events, &resolution.report.events)
+		append_event_log(room.recent_events, &resolution.report.events)
 	}
 }
 
+@(private)
 loot_is_in_magnet_range :: proc(player_position, loot_position: grid.Position) -> bool {
 	distance := max(abs(player_position.x-loot_position.x), abs(player_position.y-loot_position.y))
 	return distance <= LOOT_MAGNET_RANGE_CELLS
 }
 
+@(private)
 collect_loot_in_magnet_range :: proc(room: ^Room) -> (collected: int) {
 	assert(room != nil && room.player != nil)
 	if room.phase != .Combat && room.phase != .Loot {
@@ -620,7 +633,7 @@ collect_loot_in_magnet_range :: proc(room: ^Room) -> (collected: int) {
 
 		if item.kind == .Weapon {
 			if collect_weapon(room.player, item.weapon_id, item.amount) {
-				record_event(&room.recent_events, {
+				record_event(room.recent_events, {
 					kind = .Loot_Collected, source = PLAYER_ENTITY, target = PLAYER_ENTITY,
 					amount = item.amount, from_position = item.position, to_position = room.player.position, loot_kind = .Weapon,
 				})
@@ -643,7 +656,7 @@ collect_loot_in_magnet_range :: proc(room: ^Room) -> (collected: int) {
 		assert(added)
 		report := resolve_action(room, &action)
 		if report.accepted {
-			record_event(&room.recent_events, {
+			record_event(room.recent_events, {
 				kind = .Loot_Collected,
 				source = PLAYER_ENTITY,
 				target = PLAYER_ENTITY,
@@ -652,7 +665,7 @@ collect_loot_in_magnet_range :: proc(room: ^Room) -> (collected: int) {
 				to_position = room.player.position,
 				loot_kind = item.kind,
 			})
-			append_event_log(&room.recent_events, &report.events)
+			append_event_log(room.recent_events, &report.events)
 			unordered_remove(&room.loot, index)
 			collected += 1
 		} else {
@@ -668,6 +681,7 @@ Player_Command_Outcome :: enum {
 	Player_Defeated,
 }
 
+@(private = "file")
 player_command_outcome_for_phase :: proc(phase: Room_Phase) -> Player_Command_Outcome {
 	switch phase {
 	case .Combat:
@@ -680,21 +694,17 @@ player_command_outcome_for_phase :: proc(phase: Room_Phase) -> Player_Command_Ou
 	return .Combat_Continues
 }
 
-// Accepted commands share loot and terminal cleanup. Classic advances one
-// response pulse; M7 pays combat time and queues the world beats it crosses.
+// Accepted commands share loot and terminal cleanup, pay combat time and queue
+// the world beats they cross.
 // Each one is an action of the player's (`acted`): his poison bites. Rising
 // from Movimento Ombra is the shadow's end, not an action.
-finish_player_combat_command :: proc(room: ^Room, time_cost: f32 = TACTICAL_ATTACK_SECONDS, acted := true) -> (
-	pulse: Pulse_Report,
-	outcome: Player_Command_Outcome,
-) {
+finish_player_combat_command :: proc(room: ^Room, time_cost: f32 = TACTICAL_ATTACK_SECONDS, acted := true) -> (outcome: Player_Command_Outcome) {
 	assert(room != nil && room.player != nil)
 	collect_loot_in_magnet_range(room)
 	if acted && room.phase == .Combat {
-		// `pulse` doubles as the bite's report: no second report on this deep stack.
-		tick_poison_on_action(room, PLAYER_ENTITY, &pulse)
-		append_event_log(&room.recent_events, &pulse.events)
-		pulse = {}
+		poison: Pulse_Report
+		tick_poison_on_action(room, PLAYER_ENTITY, &poison)
+		append_event_log(room.recent_events, &poison.events)
 	}
 	outcome = player_command_outcome_for_phase(room.phase)
 	if outcome != .Combat_Continues {
@@ -702,17 +712,7 @@ finish_player_combat_command :: proc(room: ^Room, time_cost: f32 = TACTICAL_ATTA
 		tactical_end_combat(room)
 		return
 	}
-	if tactical_enabled(room) {
-		tactical_spend_action_time(room, time_cost)
-		return
-	}
-	pulse = advance_combat_pulse(room)
-	append_event_log(&room.recent_events, &pulse.events)
-	collect_loot_in_magnet_range(room)
-	outcome = player_command_outcome_for_phase(room.phase)
-	if outcome != .Combat_Continues {
-		sync_deck_with_room_phase(room)
-	}
+	tactical_spend_action_time(room, time_cost)
 	return
 }
 
@@ -734,7 +734,7 @@ kill_enemy :: proc(room: ^Room, enemy_index: int) -> (drops: [3]Loot, drop_count
 		append(&room.loot, drops[drop_count])
 		drop_count += 1
 	}
-	if tactical_enabled(room) && enemy.archetype == .Brute {
+	if enemy.archetype == .Brute {
 		definition, _ := weapon_definition(.Iron_Cleaver)
 		drops[drop_count] = {position = position, kind = .Weapon, amount = definition.max_uses, weapon_id = .Iron_Cleaver}
 		append(&room.loot, drops[drop_count])
@@ -750,6 +750,7 @@ kill_enemy :: proc(room: ^Room, enemy_index: int) -> (drops: [3]Loot, drop_count
 }
 
 // A free cell for a newcomer: walkable, and nobody or nothing already on it.
+@(private)
 enemy_spawn_cell_is_free :: proc(room: ^Room, cell: grid.Position) -> bool {
 	if room == nil || room.player == nil || !base_cell_is_walkable(room, cell) || cell_blocks_movement(room, cell) ||
 	   cell == room.player.position || cell == room.exit_position { return false }
@@ -781,6 +782,7 @@ spawn_enemy :: proc(room: ^Room, spawn: Enemy_Spawn) -> (id: u32, ok: bool) {
 	return id, true
 }
 
+@(private)
 enemy_can_move_to :: proc(room: ^Room, enemy_index: int, position: grid.Position) -> bool {
 	if cell_blocks_movement(room, position) || position == room.player.position {
 		return false
@@ -789,6 +791,7 @@ enemy_can_move_to :: proc(room: ^Room, enemy_index: int, position: grid.Position
 	return !occupied
 }
 
+@(private)
 sign :: proc(value: int) -> int {
 	if value < 0 do return -1
 	if value > 0 do return 1
@@ -807,13 +810,13 @@ try_move_player :: proc(room: ^Room, direction: Move_Direction) -> Action_Result
 	if room.phase == .Combat && !tactical_allows_action(room) {
 		if _, found := enemy_index_at(room, target); found { return .Invalid_Phase }
 	}
-	clear_event_log(&room.recent_events)
+	clear_event_log(room.recent_events)
 	if room.phase == .Combat {
 		if enemy_index, found := enemy_index_at(room, target); found {
 			// The bump, loaded with whatever the player's charges add (player_charges.odin).
 			struck := player_bump(room, enemy_index, target, .Adjacent_Opponent, critical)
 			assert(struck)
-			_, outcome := finish_player_combat_command(room)
+			outcome := finish_player_combat_command(room)
 			switch outcome {
 			case .Player_Defeated:
 				return .Player_Defeated
@@ -839,7 +842,7 @@ try_move_player :: proc(room: ^Room, direction: Move_Direction) -> Action_Result
 					if report.accepted {
 						consume_equipped_weapon_use(room.player)
 						mark_attack_events(&report.events, 0, PLAYER_ENTITY, ref, room.player.position, target, {}, false)
-						append_event_log(&room.recent_events, &report.events)
+						append_event_log(room.recent_events, &report.events)
 						return .Attacked
 					}
 				}
@@ -857,7 +860,7 @@ try_move_player :: proc(room: ^Room, direction: Move_Direction) -> Action_Result
 	if !report.accepted {
 		return .Blocked
 	}
-	append_event_log(&room.recent_events, &report.events)
+	append_event_log(room.recent_events, &report.events)
 	collect_loot_in_magnet_range(room)
 
 	if room.phase == .Loot {
@@ -872,7 +875,7 @@ try_move_player :: proc(room: ^Room, direction: Move_Direction) -> Action_Result
 		return .Moved
 	}
 
-	_, outcome := finish_player_combat_command(room)
+	outcome := finish_player_combat_command(room, TACTICAL_MOVE_SECONDS)
 	switch outcome {
 	case .Player_Defeated:
 		return .Player_Defeated
@@ -888,12 +891,12 @@ wait_player_turn :: proc(room: ^Room) -> Action_Result {
 	if room == nil || room.phase != .Combat {
 		return .Invalid_Phase
 	}
-	clear_event_log(&room.recent_events)
+	clear_event_log(room.recent_events)
 	action := make_action(.Wait, PLAYER_ENTITY, {}, .None)
 	report := resolve_action(room, &action)
 	if !report.accepted do return .Invalid_Phase
-	append_event_log(&room.recent_events, &report.events)
-	_, outcome := finish_player_combat_command(room)
+	append_event_log(room.recent_events, &report.events)
+	outcome := finish_player_combat_command(room)
 	switch outcome {
 	case .Player_Defeated:
 		return .Player_Defeated

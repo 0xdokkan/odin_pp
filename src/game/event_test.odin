@@ -120,6 +120,7 @@ test_event_extensions_preserve_existing_ordinals :: proc(t: ^testing.T) {
 
 @(test)
 test_inline_event_storage_stays_within_the_stack_budget :: proc(t: ^testing.T) {
+	testing.expect(t, size_of(Room) < 8*1024)
 	testing.expect(t, size_of(Event_Log) <= 96*1024)
 	testing.expect(t, size_of(Action_Report) <= 96*1024)
 	testing.expect(t, size_of(Pulse_Report) <= 96*1024)
@@ -138,4 +139,36 @@ test_event_log_reports_overflow_beyond_fixed_capacity :: proc(t: ^testing.T) {
 	testing.expect_value(t, log.count, MAX_GAME_EVENTS)
 	testing.expect_value(t, log.dropped_count, 1)
 	testing.expect_value(t, log.events[MAX_GAME_EVENTS-1].kind, Game_Event_Kind.Moved)
+}
+
+@(test)
+test_event_log_reuse_and_snapshot_preserve_only_the_valid_prefix :: proc(t: ^testing.T) {
+	log, snapshot, combined: Event_Log
+	for index in 0..<MAX_GAME_EVENTS {
+		testing.expect(t, record_event(&log, {kind = .Moved, amount = i32(index)}))
+	}
+	testing.expect(t, !record_event(&log, {kind = .Card_Drawn}))
+	copy_event_log(&snapshot, &log)
+	copy_event_log(&snapshot, &snapshot)
+	clear_event_log(&log)
+	testing.expect_value(t, log.count, 0)
+	testing.expect_value(t, log.dropped_count, 0)
+	testing.expect(t, record_event(&log, {kind = .Card_Played, amount = 7}))
+	append_event_log(&combined, &log)
+	testing.expect_value(t, combined.count, 1)
+	testing.expect_value(t, combined.events[0].kind, Game_Event_Kind.Card_Played)
+	testing.expect_value(t, snapshot.count, MAX_GAME_EVENTS)
+	testing.expect_value(t, snapshot.dropped_count, 1)
+	testing.expect_value(t, snapshot.events[MAX_GAME_EVENTS-1].amount, i32(MAX_GAME_EVENTS-1))
+	copy_event_log(&snapshot, &log)
+	testing.expect_value(t, snapshot.count, 1)
+	testing.expect_value(t, snapshot.dropped_count, 0)
+	testing.expect_value(t, snapshot.events[0], log.events[0])
+	copy_event_log(&snapshot, nil)
+	testing.expect_value(t, snapshot.count, 0)
+	// A corrupt count cannot make a copied view read beyond fixed storage.
+	log.count, log.dropped_count = MAX_GAME_EVENTS+2, 3
+	copy_event_log(&snapshot, &log)
+	testing.expect_value(t, snapshot.count, MAX_GAME_EVENTS)
+	testing.expect_value(t, snapshot.dropped_count, 5)
 }

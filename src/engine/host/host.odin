@@ -3,8 +3,9 @@ package host
 import "core:fmt"
 import "core:strings"
 import rl "vendor:raylib"
-import app "../../app"
-import view "../../view"
+import app "../app"
+import input "../input"
+import view "../view"
 import audio "../audio"
 import timing "../timing"
 import save "../save"
@@ -137,8 +138,9 @@ run :: proc(h: ^Host) {
 // One frame. Exposed so tools (smoke tests) can drive the loop themselves.
 step :: proc(h: ^Host) -> bool {
 	free_all(context.temp_allocator)
-	app.update_window_controls(&h.window)
-	if rl.IsKeyPressed(.F9) {
+	devices := input.capture_devices()
+	app.update_window_controls(&h.window, &devices)
+	if input.key_pressed(&devices, .F9) {
 		h.debug = !h.debug
 	}
 	if h.profile.settings != h.last_settings {
@@ -152,10 +154,11 @@ step :: proc(h: ^Host) -> bool {
 	h.frame_ms[h.frame_cursor] = rl.GetFrameTime() * 1000
 	h.frame_cursor = (h.frame_cursor + 1) % len(h.frame_ms)
 
-	mouse, inside := app.mouse_canvas_position(&h.window)
+	mouse, inside := app.mouse_canvas_position(&h.window, &devices)
 	canvas := rl.Rectangle{0, 0, f32(h.window.config.canvas_width), f32(h.window.config.canvas_height)}
-	window_focused := h.force_focus || rl.IsWindowFocused()
+	window_focused := h.force_focus || devices.focused
 	frame := Frame{
+		devices        = &devices,
 		dt             = dt,
 		time           = h.time,
 		index          = h.frame_index,
@@ -174,7 +177,7 @@ step :: proc(h: ^Host) -> bool {
 		commands       = &h.commands,
 	}
 
-	gui.begin_frame(h.ui, frame.mouse, inside, dt)
+	gui.begin_frame(h.ui, frame.mouse, inside, dt, &devices)
 	gui.set_interactive(h.ui, window_focused)
 	if !window_focused {
 		gui.cancel_interaction(h.ui)

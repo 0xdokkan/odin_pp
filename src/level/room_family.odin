@@ -1,7 +1,7 @@
 package level
 
 import "core:math/rand"
-import grid "../grid"
+import grid "../engine/grid"
 
 Room_Family :: enum { Scattered, Pillars, Ring, Twin_Courts, Asymmetric }
 

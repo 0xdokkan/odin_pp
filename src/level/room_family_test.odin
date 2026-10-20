@@ -1,7 +1,7 @@
 package level
 
 import "core:testing"
-import grid "../grid"
+import grid "../engine/grid"
 
 family_test_config :: proc(family: Room_Family, width, height: int) -> Room_Generation_Config {
 	config := default_room_generation_config(width, height)

@@ -1,7 +1,7 @@
 package level
 
 import "core:math/rand"
-import grid "../grid"
+import grid "../engine/grid"
 
 Tile_Kind :: enum u8 {
 	Void,

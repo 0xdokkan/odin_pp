@@ -2,7 +2,7 @@ package render
 
 import "core:testing"
 import game "../game"
-import grid "../grid"
+import grid "../engine/grid"
 import level "../level"
 
 spell_presentation_player :: proc(t: ^testing.T, definition: game.Card_Id) -> game.Player {
@@ -94,7 +94,7 @@ test_spell_firebomb_group_starts_all_damage_shield_death_and_loot_before_reactio
 	testing.expect_value(t, play.action_report.events.events[1].area_mask, expected_mask)
 	after := capture_room_presentation(&room)
 	timeline: Presentation_Timeline
-	testing.expect(t, begin_event_timeline(&timeline, before, &room.recent_events, &after))
+	testing.expect(t, begin_event_timeline(&timeline, before, room.recent_events, &after))
 	for event_timeline_is_busy(&timeline) && timeline.cues[timeline.head].event.visual_group == 0 {
 		if timeline.cues[timeline.head].kind == .Spell_Impact {
 			testing.expect_value(t, timeline.cues[timeline.head].event.area_mask, expected_mask)
@@ -160,7 +160,7 @@ test_spell_firebomb_direct_cast_duration_does_not_scale_with_damage_target_count
 		testing.expect_value(t, play.result, game.Card_Play_Result.Played)
 		after := capture_room_presentation(&room)
 		timeline: Presentation_Timeline
-		testing.expect(t, begin_event_timeline(&timeline, before, &room.recent_events, &after))
+		testing.expect(t, begin_event_timeline(&timeline, before, room.recent_events, &after))
 		duration: f32
 		direct_groups := 0
 		for offset := 0; offset < timeline.count; {
@@ -197,7 +197,7 @@ test_spell_fate_die_cue_preserves_health_until_impacts_and_replays_final_deck ::
 	testing.expect_value(t, play.result, game.Card_Play_Result.Played)
 	after := capture_room_presentation(&room)
 	timeline: Presentation_Timeline
-	testing.expect(t, begin_event_timeline(&timeline, before, &room.recent_events, &after))
+	testing.expect(t, begin_event_timeline(&timeline, before, room.recent_events, &after))
 	spell_presentation_finish_group(t, &timeline)
 	die, found := active_presentation_cue(&timeline)
 	testing.expect(t, found)
@@ -217,7 +217,7 @@ test_spell_fate_die_cue_preserves_health_until_impacts_and_replays_final_deck ::
 }
 
 @(test)
-test_spell_chain_replays_three_impacts_in_order_and_one_pulse_boundary :: proc(t: ^testing.T) {
+test_spell_chain_replays_visible_impacts_before_the_next_world_beat :: proc(t: ^testing.T) {
 	data := create_encounter_presentation_test_level(t)
 	defer level.destroy(&data)
 	player := spell_presentation_player(t, .Chain_Lightning)
@@ -228,9 +228,10 @@ test_spell_chain_replays_three_impacts_in_order_and_one_pulse_boundary :: proc(t
 	before := capture_room_presentation(&room)
 	play := game.play_card(&room, player.deck.hand[0].id, game.entity_target(game.enemy_entity(1)))
 	testing.expect_value(t, play.result, game.Card_Play_Result.Played)
+	advance_presentation_test_clock(t, &room, 1)
 	after := capture_room_presentation(&room)
 	timeline: Presentation_Timeline
-	testing.expect(t, begin_event_timeline(&timeline, before, &room.recent_events, &after))
+	testing.expect(t, begin_event_timeline(&timeline, before, room.recent_events, &after))
 	impacts, damage_hits, pulses := 0, 0, 0
 	for event_timeline_is_busy(&timeline) {
 		cue := timeline.cues[timeline.head]
@@ -250,11 +251,11 @@ test_spell_chain_replays_three_impacts_in_order_and_one_pulse_boundary :: proc(t
 		}
 		if cue.kind == .Pulse_Advanced {
 			pulses += 1
-			testing.expect_value(t, damage_hits, 3)
+			testing.expect_value(t, damage_hits, 2)
 		}
 	}
-	testing.expect_value(t, impacts, 3)
-	testing.expect_value(t, damage_hits, 3)
+	testing.expect_value(t, impacts, 2)
+	testing.expect_value(t, damage_hits, 2)
 	testing.expect_value(t, pulses, 1)
 	spell_presentation_expect_room(t, &timeline, &room)
 }
@@ -274,8 +275,8 @@ test_spell_replay_large_dt_and_small_steps_produce_identical_final_state :: proc
 		testing.expect_value(t, play.result, game.Card_Play_Result.Played)
 		after := capture_room_presentation(&room)
 		fast, slow: Presentation_Timeline
-		testing.expect(t, begin_event_timeline(&fast, before, &room.recent_events, &after))
-		testing.expect(t, begin_event_timeline(&slow, before, &room.recent_events, &after))
+		testing.expect(t, begin_event_timeline(&fast, before, room.recent_events, &after))
+		testing.expect(t, begin_event_timeline(&slow, before, room.recent_events, &after))
 		update_event_timeline(&fast, 1000)
 		for _ in 0..<10000 {
 			if !event_timeline_is_busy(&slow) { break }

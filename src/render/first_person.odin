@@ -8,8 +8,8 @@ import rlgl "vendor:raylib/rlgl"
 import gfx "../engine/gfx"
 import tween "../engine/tween"
 import game "../game"
-import grid "../grid"
-import view "../view"
+import grid "../engine/grid"
+import view "../engine/view"
 
 // FIRST PERSON SHOOTER on the board (game/first_person.odin). As the card's
 // cue plays (First_Person_Begun) the camera dives from the board's own view
@@ -21,8 +21,8 @@ import view "../view"
 // the orbit's). The player's own card fades as the camera reaches it; the
 // inner walls stand whole and opaque, the edge's no longer cut toward the
 // camera, and what the overlays show of a foe behind a wall is left out. At
-// the bottom right a paper AK, pixel art painted by code with the paper
-// cutout's layers, kicks back at each shot with a flash at its muzzle; a
+// the bottom right a paper AK, an embedded pixel-art cutout matching the
+// reference artwork, kicks back at each shot with a flash at its muzzle; a
 // crosshair marks the middle (warm over a foe, its corners marked on a hit);
 // a plate at the bottom left counts the seconds left, the hand slides away
 // under the canvas, and the edges flash red when he is hurt. Each shot of the
@@ -58,34 +58,23 @@ FIRST_PERSON_SHAKE :: f32(0.06)
 // Canvas pixels a texel of the AK, its flash and the countdown's plate.
 FIRST_PERSON_AK_SCALE :: f32(4)
 FIRST_PERSON_HURT_SEEN :: 8
-FIRST_PERSON_PRINT_TEXELS :: 72*32
+FIRST_PERSON_PRINT_TEXELS :: 24*24
 FIRST_PERSON_OLIVE :: rl.Color{176, 186, 132, 255}
 
-// The AK's print, side on, the muzzle to the left: palette letters, steel and
-// wood ('.' clear); the paper cutout's layers are added round it
-// (first_person_paint). Drafted by a scratch tool, as the board's props are.
+// Embedded paper print from the supplied reference, with no hands or arms.
+// Native art resolution is independent of its logical HUD size, so replacing
+// a cutout does not multiply the weapon's footprint or its recoil distance.
+// Provenance and edit prompt: assets/gothic/first-person-ak.md.
 @(rodata)
-FIRST_PERSON_AK_ROWS := [?]string{
-	"..........M.................M.................................",
-	".........MMM...............MMM................................",
-	"..........M.mmmBBBBBBBBBBBBMmmHHHHHHHHHHHHHHHH................",
-	".........MMMMMMNnnnnnnnnnnN.mmmmmMMMMMMmmmmmmmBBBB............",
-	"mHmmmmmmmmmmMMMBBBBBBBBBBBBBmmmmmmmmmmmHHHMmmmnnnnBBBBBBBB....",
-	"MMMMMMMMMMMMMMMnnnNnnNnnNnnnmmmmmmmmmmmmmmmmmmnnnnnnnnnnnnBBmm",
-	"MMM.........MMMNNNNNNNNNNNNNMMMMMMMMMMMMMMMMMMNNNNNnnnnnnnnnMM",
-	"...............................mMMMMMM.H.MBnnN..NNNnnnnnnnnnMM",
-	"...............................mmmmmMM.M.MBnnN.....NNNnnnnnnMM",
-	"..............................mMMMMM.MMMMM.BnnN.......NNNnnnMM",
-	"..............................mMMMMM.......BnnN..........NNNMM",
-	".............................mmmmmM.........BnnN............MM",
-	"............................mMMMMM..........BnnN..............",
-	"...........................mMMMMM............BnnN.............",
-	"..........................mmmmmM..............................",
-	".........................MMMMMM...............................",
-}
-// The muzzle's texel in the print, where the flash and the tracers start.
-FIRST_PERSON_AK_MUZZLE :: [2]f32{0, 5}
-FIRST_PERSON_AK_MARGIN :: 5
+FIRST_PERSON_AK_PNG := #load("../../assets/gothic/first-person-ak.png")
+FIRST_PERSON_AK_TEXTURE_SIZE :: [2]f32{1589, 990}
+FIRST_PERSON_AK_WIDTH :: f32(128)
+FIRST_PERSON_AK_TEXEL :: FIRST_PERSON_AK_WIDTH/FIRST_PERSON_AK_TEXTURE_SIZE.x
+FIRST_PERSON_AK_SIZE :: [2]f32{FIRST_PERSON_AK_WIDTH, FIRST_PERSON_AK_TEXTURE_SIZE.y*FIRST_PERSON_AK_TEXEL}
+// The barrel opening in source texels (not the front sight). Flash and world
+// tracer use its logical position, including the entry slide and recoil.
+FIRST_PERSON_AK_MUZZLE_TEXEL :: [2]f32{244, 183}
+FIRST_PERSON_AK_MUZZLE :: [2]f32{FIRST_PERSON_AK_MUZZLE_TEXEL.x*FIRST_PERSON_AK_TEXEL, FIRST_PERSON_AK_MUZZLE_TEXEL.y*FIRST_PERSON_AK_TEXEL}
 
 // The muzzle's flashes, one shot the one, the next the other.
 @(rodata)
@@ -132,7 +121,7 @@ FIRST_PERSON_TRACER_ROWS := [?]string{
 }
 FIRST_PERSON_TRACER_MARGIN :: 3
 
-// A print and its paper, ready for a texture (first_person_paint).
+// A small flash/tracer print and its paper, ready for a texture.
 First_Person_Print :: struct {
 	width, height: int,
 	pixels: [FIRST_PERSON_PRINT_TEXELS]rl.Color,
@@ -201,11 +190,13 @@ First_Person_View :: struct {
 
 // A fresh board: what was shown of the last view goes, the prints and the
 // counts stay.
+@(private)
 first_person_view_reset :: proc(f: ^First_Person_View) {
 	f^ = {ak_texture = f.ak_texture, tracer_texture = f.tracer_texture, flash_textures = f.flash_textures,
 		shots = f.shots, hits = f.hits, ricochets = f.ricochets, enters = f.enters, exits = f.exits}
 }
 
+@(private)
 destroy_first_person_view :: proc(renderer: ^Renderer) {
 	f := &renderer.tactical.first_person
 	if f.ak_texture.id != 0 { rl.UnloadTexture(f.ak_texture) }
@@ -220,6 +211,7 @@ destroy_first_person_view :: proc(renderer: ^Renderer) {
 // Once per frame, before the vision and the camera (update_tactical_view,
 // which may run twice a frame): follows the room's view, paces the dive and
 // the rise, and takes the room's new shots and the player's wounds.
+@(private)
 update_tactical_first_person :: proc(renderer: ^Renderer, room: ^game.Room) {
 	v := &renderer.tactical
 	f := &v.first_person
@@ -295,6 +287,7 @@ update_tactical_first_person :: proc(renderer: ^Renderer, room: ^game.Room) {
 // glide from cell to cell; then the tracers of this frame leave the muzzle,
 // and the eye's sight, the foes' cards where they stand now (sliding from cell
 // to cell, hopping) and the crosshair's mark are taken.
+@(private)
 frame_first_person_camera :: proc(renderer: ^Renderer, room: ^game.Room) {
 	v := &renderer.tactical
 	f := &v.first_person
@@ -360,6 +353,7 @@ frame_first_person_camera :: proc(renderer: ^Renderer, room: ^game.Room) {
 // way nearest that look.
 FIRST_PERSON_DIVE_FACING :: f32(50*math.PI/180)
 
+@(private)
 first_person_dive_way :: proc(look_yaw: f32, facing: game.Move_Direction) -> game.Move_Direction {
 	if abs(first_person_wrap(game.first_person_yaw(facing)-look_yaw)) <= FIRST_PERSON_DIVE_FACING { return facing }
 	return game.first_person_key_directions(look_yaw)[0]
@@ -374,6 +368,7 @@ FIRST_PERSON_COVER_HEIGHT :: f32(0.49)
 // where the shot's line meets it, or on the body's edge nearest that line when
 // the line passes over a low one or above a wall (the trace stops the shot at
 // the cell, whatever stands there: game/first_person.odin).
+@(private)
 first_person_landing :: proc(room: ^game.Room, shot: game.First_Person_Shot) -> rl.Vector3 {
 	point := rl.Vector3{shot.point.x, shot.point.y, shot.point.z}
 	if shot.hit != .Solid || room == nil { return point }
@@ -388,6 +383,7 @@ first_person_landing :: proc(room: ^game.Room, shot: game.First_Person_Shot) -> 
 
 // The body a solid cell shows: a wall's whole height (or past the room's
 // edge), a cover block, an object's box (voxel_object_bounds).
+@(private = "file")
 first_person_solid_box :: proc(room: ^game.Room, cell: grid.Position) -> rl.BoundingBox {
 	wall := rl.BoundingBox{{f32(cell.x), 0, f32(cell.y)}, {f32(cell.x)+1, DIORAMA_WALL_HEIGHT, f32(cell.y)+1}}
 	if !game.base_cell_is_walkable(room, cell) { return wall }
@@ -409,6 +405,7 @@ first_person_wrap :: proc(angle: f32) -> f32 {
 }
 
 // How hard a wound shakes the eye now (0 when it does not).
+@(private)
 first_person_trauma :: proc(f: ^First_Person_View, now: f64) -> f32 {
 	t := now-f.hurt_at
 	if f.hurt_at <= 0 || t < 0 || t >= FIRST_PERSON_HURT_SECONDS { return 0 }
@@ -431,29 +428,16 @@ first_person_diving :: proc(renderer: ^Renderer) -> bool {
 	return f.engaged && f.amount < 1
 }
 
-// The board stands in 3D while the view is behind his eyes or rising from
-// them, whatever the flat board's option says.
-first_person_board_3d :: proc(renderer: ^Renderer, room: ^game.Room) -> bool {
+// The view remains active until its return to the board has finished.
+@(private = "file")
+first_person_transition_active :: proc(renderer: ^Renderer, room: ^game.Room) -> bool {
 	return game.tactical_first_person_active(room) || first_person_amount(renderer) > 0
 }
 
 // The pointer is the view's (hidden, or the camera still rising): it reaches
 // nothing on the board, the hand or the HUD.
 first_person_owns_pointer :: proc(renderer: ^Renderer, room: ^game.Room) -> bool {
-	return first_person_board_3d(renderer, room)
-}
-
-// The board's scene as the option and the view want it: a flat board turns 3D
-// behind the player's eyes (its 2x surface made the first time, on `parent`).
-// The scene sets it every frame; the lab's smoke too, where it tries it.
-sync_first_person_board :: proc(renderer: ^Renderer, room: ^game.Room, option_3d: bool, parent: rl.RenderTexture2D = {}) {
-	if renderer == nil || !renderer.tactical.enabled { return }
-	board_3d := option_3d || first_person_board_3d(renderer, room)
-	if board_3d && !renderer.tactical.scene_3d && renderer.tactical.surface == nil {
-		renderer.tactical.scene_3d = true
-		create_tactical_surface(renderer, parent)
-	}
-	renderer.tactical.scene_3d = board_3d
+	return first_person_transition_active(renderer, room)
 }
 
 // The view's aim, for the AK's shots and the crosshair's mark: its look, and
@@ -482,6 +466,7 @@ turn_first_person_view :: proc(renderer: ^Renderer, yaw, pitch: f32) {
 }
 
 // How much of the player's own card shows (it fades as the camera reaches it).
+@(private)
 first_person_player_shown :: proc(renderer: ^Renderer) -> f32 {
 	return 1-clamp((first_person_amount(renderer)-FIRST_PERSON_HIDE_FROM)/FIRST_PERSON_HIDE_SPAN, 0, 1)
 }
@@ -492,11 +477,13 @@ first_person_hides_player :: proc(renderer: ^Renderer) -> bool {
 }
 
 // The inner walls are opaque, drawn with the floor (depth hides what is behind).
+@(private)
 first_person_solid_walls :: proc(renderer: ^Renderer) -> bool {
 	return first_person_amount(renderer) >= FIRST_PERSON_SOLID_WALLS
 }
 
 // 0..1 toward opaque inner walls over the start of the dive.
+@(private)
 first_person_wall_ramp :: proc(renderer: ^Renderer) -> f32 {
 	return clamp(first_person_amount(renderer)/FIRST_PERSON_SOLID_WALLS, 0, 1)
 }
@@ -505,6 +492,7 @@ first_person_wall_ramp :: proc(renderer: ^Renderer) -> f32 {
 // before the eye on the canvas (a label pinned to the edge would point at
 // nothing) and not behind a wall from it (the overlays have no depth to hide
 // them).
+@(private)
 tactical_overlay_visible :: proc(renderer: ^Renderer, cell: grid.Position) -> bool {
 	if !tactical_render_visible(renderer, cell) { return false }
 	f := &renderer.tactical.first_person
@@ -515,6 +503,7 @@ tactical_overlay_visible :: proc(renderer: ^Renderer, cell: grid.Position) -> bo
 }
 
 // A projected point on the canvas, or near enough to it.
+@(private)
 first_person_on_canvas :: proc(renderer: ^Renderer, point: view.Vec2) -> bool {
 	margin :: f32(40)
 	return point.x >= -margin && point.y >= -margin && point.x <= renderer.canvas_width+margin && point.y <= renderer.canvas_height+margin
@@ -528,16 +517,10 @@ first_person_hand_drop :: proc(renderer: ^Renderer) -> f32 {
 // --------------------------------------------------------------------------
 // The prints.
 
+@(private)
 first_person_print_color :: proc(letter: u8) -> (color: rl.Color, ok: bool) {
 	switch letter {
-	// Steel, dark to light; wood, dark to light; the flash's white, gold and
-	// orange.
-	case 'M': return {52, 56, 64, 255}, true
-	case 'm': return {90, 96, 108, 255}, true
-	case 'H': return {156, 164, 178, 255}, true
-	case 'N': return {88, 46, 26, 255}, true
-	case 'n': return {140, 80, 40, 255}, true
-	case 'B': return {192, 120, 62, 255}, true
+	// Flash and tracer: white, gold and orange. The weapon is an embedded PNG.
 	case 'W': return {255, 250, 222, 255}, true
 	case 'Y': return {250, 206, 92, 255}, true
 	case 'O': return {232, 128, 52, 255}, true
@@ -548,6 +531,7 @@ first_person_print_color :: proc(letter: u8) -> (color: rl.Color, ok: bool) {
 // `rows` of palette letters cut from paper as the board's props are: an ink
 // line round the print, `paper` texels of white paper, an ink cut round that,
 // and the cut edge one texel down and right of it; `margin` texels of room.
+@(private)
 first_person_paint :: proc(rows: []string, margin, paper: int) -> (print: First_Person_Print) {
 	if len(rows) == 0 { return }
 	print.width, print.height = len(rows[0])+margin*2, len(rows)+margin*2
@@ -580,6 +564,7 @@ first_person_paint :: proc(rows: []string, margin, paper: int) -> (print: First_
 	return
 }
 
+@(private = "file")
 first_person_texture :: proc(texture: ^rl.Texture2D, rows: []string, margin, paper: int) -> rl.Texture2D {
 	if texture.id != 0 { return texture^ }
 	print := first_person_paint(rows, margin, paper)
@@ -594,45 +579,61 @@ first_person_texture :: proc(texture: ^rl.Texture2D, rows: []string, margin, pap
 	return texture^
 }
 
+@(private = "file")
 first_person_ak_texture :: proc(f: ^First_Person_View) -> rl.Texture2D {
-	return first_person_texture(&f.ak_texture, FIRST_PERSON_AK_ROWS[:], FIRST_PERSON_AK_MARGIN, 2)
+	if f.ak_texture.id == 0 {
+		if sprite, ok := gfx.sprite_load({FIRST_PERSON_AK_PNG, 1}); ok { f.ak_texture = sprite.texture }
+	}
+	return f.ak_texture
 }
 
+@(private = "file")
 first_person_flash_texture :: proc(f: ^First_Person_View, which: int) -> rl.Texture2D {
 	return first_person_texture(&f.flash_textures[which], FIRST_PERSON_FLASH_ROWS[which][:], FIRST_PERSON_FLASH_MARGIN, 2)
 }
 
+@(private = "file")
 first_person_tracer_texture :: proc(f: ^First_Person_View) -> rl.Texture2D {
 	return first_person_texture(&f.tracer_texture, FIRST_PERSON_TRACER_ROWS[:], FIRST_PERSON_TRACER_MARGIN, 1)
 }
 
 // The AK's print's top left on the canvas now: at the bottom right, sliding up
 // into place over the end of the dive, kicked back and down by a shot.
+@(private)
 first_person_ak_origin :: proc(renderer: ^Renderer, now: f64) -> rl.Vector2 {
 	f := &renderer.tactical.first_person
-	w := f32(len(FIRST_PERSON_AK_ROWS[0])+FIRST_PERSON_AK_MARGIN*2)*FIRST_PERSON_AK_SCALE
-	h := f32(len(FIRST_PERSON_AK_ROWS)+FIRST_PERSON_AK_MARGIN*2)*FIRST_PERSON_AK_SCALE
+	scale := first_person_ak_scale(renderer)
+	w, h := FIRST_PERSON_AK_SIZE.x*scale, FIRST_PERSON_AK_SIZE.y*scale
 	ready := tween.smoothstep(clamp((first_person_amount(renderer)-FIRST_PERSON_AK_FROM)/(1-FIRST_PERSON_AK_FROM), 0, 1))
-	at := rl.Vector2{renderer.canvas_width-w+FIRST_PERSON_AK_SCALE*6, renderer.canvas_height-h+FIRST_PERSON_AK_SCALE*3}
+	// The magazine and stock continue beyond the canvas; the source cutout's
+	// bottom and right crop never appears as a floating paper edge.
+	at := rl.Vector2{renderer.canvas_width-w+scale*6, renderer.canvas_height-h+scale*6}
 	at.y += (1-ready)*h*1.2
 	if t := now-f.kick_at; f.kick_at > 0 && t >= 0 && t < FIRST_PERSON_KICK_SECONDS {
 		k := f32(1-t/FIRST_PERSON_KICK_SECONDS)
-		at += {5*k, 7*k}
+		at += rl.Vector2{1.25*k, 1.75*k}*scale
 	}
-	return {math.round(at.x/FIRST_PERSON_AK_SCALE)*FIRST_PERSON_AK_SCALE, math.round(at.y/FIRST_PERSON_AK_SCALE)*FIRST_PERSON_AK_SCALE}
+	return {math.round(at.x/scale)*scale, math.round(at.y/scale)*scale}
+}
+
+// Integer texels at every canvas size, including the smaller effect window.
+@(private)
+first_person_ak_scale :: proc(renderer: ^Renderer) -> f32 {
+	return max(1, math.floor(FIRST_PERSON_AK_SCALE*min(renderer.canvas_width/960, renderer.canvas_height/540)))
 }
 
 // The muzzle's tip on the canvas now.
+@(private)
 first_person_muzzle :: proc(renderer: ^Renderer, now: f64) -> rl.Vector2 {
 	at := first_person_ak_origin(renderer, now)
-	tip := FIRST_PERSON_AK_MUZZLE+FIRST_PERSON_AK_MARGIN
-	return at+rl.Vector2{tip.x, tip.y+0.5}*FIRST_PERSON_AK_SCALE
+	return at+(FIRST_PERSON_AK_MUZZLE+0.5)*first_person_ak_scale(renderer)
 }
 
 // --------------------------------------------------------------------------
 // The board's pass: tracers and sparks.
 
 // The tracers in flight and the sparks of those landed, for the sorted pass.
+@(private)
 collect_first_person_entries :: proc(renderer: ^Renderer, entries: ^[dynamic]Tactical_Alpha_Entry) {
 	f := &renderer.tactical.first_person
 	now := renderer.sprite_assets.elapsed
@@ -653,11 +654,13 @@ collect_first_person_entries :: proc(renderer: ^Renderer, entries: ^[dynamic]Tac
 	}
 }
 
+@(private = "file")
 first_person_tracer_point :: proc(tracer: ^First_Person_Tracer, t: f64) -> rl.Vector3 {
 	u := f32(clamp(t/max(tracer.flight, 1e-6), 0, 1))
 	return tracer.from+(tracer.to-tracer.from)*u
 }
 
+@(private)
 draw_first_person_entry :: proc(renderer: ^Renderer, entry: Tactical_Alpha_Entry) {
 	f := &renderer.tactical.first_person
 	now := renderer.sprite_assets.elapsed
@@ -677,6 +680,7 @@ draw_first_person_entry :: proc(renderer: ^Renderer, entry: Tactical_Alpha_Entry
 
 // The streak at `at`, laid along `way` as the screen shows it, the same size
 // on screen however far it has flown.
+@(private = "file")
 draw_first_person_tracer :: proc(renderer: ^Renderer, at, way: rl.Vector3) {
 	texture := first_person_tracer_texture(&renderer.tactical.first_person)
 	if texture.id == 0 { return }
@@ -700,6 +704,7 @@ draw_first_person_tracer :: proc(renderer: ^Renderer, at, way: rl.Vector3) {
 
 // A shot landed `t` seconds ago: a paper star where it stopped (red on a foe,
 // gold on stone, grey on the floor), stone chips or floor dust thrown off it.
+@(private = "file")
 draw_first_person_spark :: proc(renderer: ^Renderer, tracer: ^First_Person_Tracer, t: f64) {
 	if t < 0 || t > FIRST_PERSON_SPARK_SECONDS || !renderer.tactical.attack_props.loaded { return }
 	camera := renderer.tactical.camera
@@ -744,6 +749,7 @@ draw_first_person_spark :: proc(renderer: ^Renderer, tracer: ^First_Person_Trace
 
 // At the top of the HUD (draw_tactical_hud), so every pass that shows the
 // board's HUD shows it.
+@(private)
 draw_first_person_overlay :: proc(renderer: ^Renderer, room: ^game.Room) {
 	f := &renderer.tactical.first_person
 	if f.amount <= 0 { return }
@@ -761,13 +767,15 @@ draw_first_person_overlay :: proc(renderer: ^Renderer, room: ^game.Room) {
 	ak := first_person_ak_texture(f)
 	if ak.id != 0 {
 		at := first_person_ak_origin(renderer, now)
-		rl.DrawTextureEx(ak, at, 0, FIRST_PERSON_AK_SCALE, rl.WHITE)
+		scale := first_person_ak_scale(renderer)
+		weapon_size := FIRST_PERSON_AK_SIZE*scale
+		rl.DrawTexturePro(ak, {0, 0, f32(ak.width), f32(ak.height)}, {at.x, at.y, weapon_size.x, weapon_size.y}, {}, 0, rl.WHITE)
 		if t := now-f.kick_at; f.kick_at > 0 && t >= 0 && t < FIRST_PERSON_FLASH_SECONDS {
 			flash := first_person_flash_texture(f, int(f.flash)%2)
 			if flash.id != 0 {
 				muzzle := first_person_muzzle(renderer, now)
-				size := rl.Vector2{f32(flash.width), f32(flash.height)}*FIRST_PERSON_AK_SCALE
-				rl.DrawTextureEx(flash, {math.round(muzzle.x-size.x*0.62), math.round(muzzle.y-size.y*0.5)}, 0, FIRST_PERSON_AK_SCALE, rl.WHITE)
+				size := rl.Vector2{f32(flash.width), f32(flash.height)}*scale
+				rl.DrawTextureEx(flash, {math.round(muzzle.x-size.x*0.5), math.round(muzzle.y-size.y*0.5)}, 0, scale, rl.WHITE)
 			}
 		}
 	}
@@ -785,6 +793,7 @@ draw_first_person_overlay :: proc(renderer: ^Renderer, room: ^game.Room) {
 	hud_bar({bounds.x+12, bounds.y+bounds.height-12, bounds.width-24, 6}, left/duration, accent, int(min(duration, 30)))
 }
 
+@(private = "file")
 draw_first_person_crosshair :: proc(renderer: ^Renderer, on_foe, hit: bool) {
 	color := rl.Color{255, 196, 150, 255} if on_foe else GOTHIC_PAPER
 	cx, cy := math.round(renderer.canvas_width*0.5), math.round(renderer.canvas_height*0.5)

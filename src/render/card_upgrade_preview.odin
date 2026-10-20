@@ -4,7 +4,8 @@ import "core:fmt"
 import game "../game"
 
 // Le cifre della preview provengono dagli stessi template del resolver.
-card_upgrade_preview :: proc(card: game.Card_Instance, tactical: bool = false) -> cstring {
+@(private)
+card_upgrade_preview :: proc(card: game.Card_Instance) -> cstring {
 	if !game.card_can_upgrade(card) {
 		if card.upgrade_level >= game.card_max_upgrade_level(card.definition_id) {
 			return "MAX UPGRADE"
@@ -16,7 +17,7 @@ card_upgrade_preview :: proc(card: game.Card_Instance, tactical: bool = false) -
 		return fmt.ctprintf("%s -> %s", die_label(game.card_die_sides(card.definition_id, card.upgrade_level)),
 			die_label(game.card_die_sides(card.definition_id, card.upgrade_level+1)))
 	}
-	definition, _ := game.card_definition_by_id(card.definition_id, tactical)
+	definition, _ := game.card_definition_by_id(card.definition_id)
 	line := ""
 	for index in 0..<definition.effect_count {
 		template := definition.effects[index]

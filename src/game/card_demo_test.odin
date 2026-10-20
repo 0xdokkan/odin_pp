@@ -1,7 +1,7 @@
 package game
 
 import "core:testing"
-import grid "../grid"
+import grid "../engine/grid"
 import level "../level"
 
 card_demo_test_inside :: proc(cell: grid.Position) -> bool {
@@ -84,32 +84,32 @@ test_card_demo_scenes_build_their_rooms :: proc(t: ^testing.T) {
 // twice, an area card's foes stand inside its area.
 @(test)
 test_card_demo_default_scenes_follow_the_targeting :: proc(t: ^testing.T) {
-	strike, _ := card_definition_by_id(.Strike, true)
+	strike, _ := card_definition_by_id(.Strike)
 	scene := card_demo_default_scene(strike)
 	testing.expect(t, scene.gesture == .Drag_To_Foe && scene.foe_count == 1 && scene.foes[0].at == card_demo_offset(0, -1))
-	bolt, _ := card_definition_by_id(.Arc_Bolt, true)
+	bolt, _ := card_definition_by_id(.Arc_Bolt)
 	scene = card_demo_default_scene(bolt)
 	testing.expect(t, scene.gesture == .Drag_To_Foe && scene.foes[0].at == card_demo_offset(1, -1))
-	guard, _ := card_definition_by_id(.Guard, true)
+	guard, _ := card_definition_by_id(.Guard)
 	scene = card_demo_default_scene(guard)
 	testing.expect(t, scene.gesture == .Double_Click && scene.foe_count == 0)
-	bomb, _ := card_definition_by_id(.Firebomb, true)
+	bomb, _ := card_definition_by_id(.Firebomb)
 	scene = card_demo_default_scene(bomb)
 	testing.expect(t, scene.gesture == .Drag_To_Cell && scene.foe_count == 2 && scene.object_count == 1 && scene.objects[0].kind == .Barrel)
 	for foe in scene.foes[:scene.foe_count] {
 		testing.expect(t, max(abs(foe.at.x-scene.target.x), abs(foe.at.y-scene.target.y)) <= bomb.targeting.radius)
 	}
-	ray, _ := card_definition_by_id(.Piercing_Ray, true)
+	ray, _ := card_definition_by_id(.Piercing_Ray)
 	scene = card_demo_default_scene(ray)
 	testing.expect(t, scene.gesture == .Drag_Along_Line && scene.foe_count == 2 && scene.target == card_demo_offset(3, -3))
 	// A card with no target at all is clicked twice too; one that draws has
 	// cards to draw; one that washes a status away finds it on the player.
-	wave, _ := card_definition_by_id(.Toxic_Wave, true)
+	wave, _ := card_definition_by_id(.Toxic_Wave)
 	scene = card_demo_default_scene(wave)
 	testing.expect(t, scene.gesture == .Double_Click && scene.foe_count == 2)
-	focus, _ := card_definition_by_id(.Battle_Focus, true)
+	focus, _ := card_definition_by_id(.Battle_Focus)
 	testing.expect(t, card_demo_default_scene(focus).filler_count > 0)
-	purifying, _ := card_definition_by_id(.Purifying_Guard, true)
+	purifying, _ := card_definition_by_id(.Purifying_Guard)
 	scene = card_demo_default_scene(purifying)
 	testing.expect(t, scene.player_status == .Poison && scene.player_stacks > 0)
 }

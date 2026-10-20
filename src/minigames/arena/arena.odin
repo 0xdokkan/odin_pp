@@ -160,7 +160,7 @@ consume_player_input :: proc(g: ^Game, held: Player_Input) -> Player_Input {
 @(private)
 read_input :: proc(g: ^Game, frame: ^host.Frame) -> Player_Input {
 	s := &g.controls
-	advance_player_controls(g, input.sample(&g.actions), frame.dt)
+	advance_player_controls(g, input.sample(&g.actions, frame.devices), frame.dt)
 	result := Player_Input{
 		move = input.vector(s, Action.Left, Action.Right, Action.Up, Action.Down),
 		fire = .Fire in s.down,

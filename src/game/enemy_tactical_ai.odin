@@ -1,6 +1,6 @@
 package game
 
-import grid "../grid"
+import grid "../engine/grid"
 
 TACTICAL_BOMB_FUSE :: 3
 TACTICAL_BOMB_DAMAGE :: i32(3)
@@ -9,6 +9,7 @@ TACTICAL_BOMB_LIMIT :: 1
 
 Enemy_Path_Goal :: enum {Melee, Archer, Bomber}
 
+@(private)
 enemy_terrain_danger :: proc(room: ^Room, cell: grid.Position) -> int {
 	danger := 0
 	for trap in room.traps { if trap.armed && trap.position == cell { danger += 12 } }
@@ -21,6 +22,7 @@ enemy_terrain_danger :: proc(room: ^Room, cell: grid.Position) -> int {
 	return danger
 }
 
+@(private)
 enemy_has_lob_line :: proc(room: ^Room, origin, target: grid.Position) -> bool {
 	path: [MAX_TARGETING_PATH_CELLS]grid.Position
 	count, traced := trace_targeting_line(origin, target, &path)
@@ -29,6 +31,7 @@ enemy_has_lob_line :: proc(room: ^Room, origin, target: grid.Position) -> bool {
 	return !blocked
 }
 
+@(private)
 enemy_position_is_goal :: proc(room: ^Room, cell: grid.Position, goal: Enemy_Path_Goal) -> bool {
 	p := room.player.position
 	if goal == .Melee { return cell == p }
@@ -42,10 +45,12 @@ enemy_position_is_goal :: proc(room: ^Room, cell: grid.Position, goal: Enemy_Pat
 // Stable cell/step order keeps identical seeds and replays deterministic.
 // Indexed heap holds each frontier cell once; decreasing a distance moves it
 // upwards in place. Cost ties use the row-major cell index, as the old scan did.
+@(private = "file")
 enemy_path_precedes :: proc(a, b: int, distances: []int) -> bool {
 	return distances[a] < distances[b] || (distances[a] == distances[b] && a < b)
 }
 
+@(private = "file")
 enemy_path_heap_up :: proc(heap, slots, distances: []int, start: int) {
 	at := start
 	for at > 0 {
@@ -57,6 +62,7 @@ enemy_path_heap_up :: proc(heap, slots, distances: []int, start: int) {
 	}
 }
 
+@(private = "file")
 enemy_path_heap_pop :: proc(heap, slots, distances: []int, count: ^int) -> int {
 	cell := heap[0]
 	count^ -= 1
@@ -77,6 +83,7 @@ enemy_path_heap_pop :: proc(heap, slots, distances: []int, count: ^int) -> int {
 	return cell
 }
 
+@(private)
 rebuild_tactical_enemy_distances :: proc(room: ^Room, distances: []int, goal: Enemy_Path_Goal) {
 	visited := make([]bool, len(distances))
 	costs := make([]int, len(distances))
@@ -120,6 +127,7 @@ rebuild_tactical_enemy_distances :: proc(room: ^Room, distances: []int, goal: En
 	}
 }
 
+@(private = "file")
 tactical_ranged_move :: proc(room: ^Room, enemy: ^Enemy, origin: grid.Position,
 	positions: ^[MAX_ENEMIES_PER_ROOM]grid.Position, count, index: int, goal: Enemy_Path_Goal) -> Enemy_Intent {
 	distances := make([]int, len(room.level_data.tiles.cells))
@@ -142,6 +150,7 @@ tactical_ranged_move :: proc(room: ^Room, enemy: ^Enemy, origin: grid.Position,
 	return intent
 }
 
+@(private)
 plan_tactical_archer :: proc(room: ^Room, enemy: ^Enemy, origin: grid.Position,
 	positions: ^[MAX_ENEMIES_PER_ROOM]grid.Position, count, index: int) -> Enemy_Intent {
 	if enemy.aim_ready { return make_attack_intent(room, origin, enemy.aim_anchor, enemy.attack) }
@@ -157,6 +166,7 @@ plan_tactical_archer :: proc(room: ^Room, enemy: ^Enemy, origin: grid.Position,
 	return intent
 }
 
+@(private)
 tactical_enemy_escape :: proc(room: ^Room, origin: grid.Position,
 	positions: ^[MAX_ENEMIES_PER_ROOM]grid.Position, count, index: int) -> (intent: Enemy_Intent, found: bool) {
 	best := enemy_terrain_danger(room, origin)
@@ -173,6 +183,7 @@ tactical_enemy_escape :: proc(room: ^Room, origin: grid.Position,
 	return
 }
 
+@(private = "file")
 make_tactical_bomb_intent :: proc(room: ^Room, origin, anchor: grid.Position, windup: bool) -> Enemy_Intent {
 	intent := make_wait_intent(room, origin)
 	intent.kind, intent.destination, intent.windup = .Bombard, anchor, windup
@@ -187,6 +198,7 @@ make_tactical_bomb_intent :: proc(room: ^Room, origin, anchor: grid.Position, wi
 	return intent
 }
 
+@(private)
 plan_tactical_bomber :: proc(room: ^Room, enemy: ^Enemy, origin: grid.Position,
 	positions: ^[MAX_ENEMIES_PER_ROOM]grid.Position, count, index: int, reserved: []grid.Position) -> Enemy_Intent {
 	if enemy.bomb_ready {
@@ -221,6 +233,7 @@ plan_tactical_bomber :: proc(room: ^Room, enemy: ^Enemy, origin: grid.Position,
 	return tactical_ranged_move(room, enemy, origin, positions, count, index, .Bomber)
 }
 
+@(private)
 resolve_tactical_enemy_push :: proc(room: ^Room, source: Entity_Ref, intent: ^Enemy_Intent,
 	report: ^Action_Report, pulse: ^Pulse_Report) {
 	if !intent.push || room.phase != .Combat { return }

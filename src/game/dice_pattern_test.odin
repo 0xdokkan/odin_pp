@@ -1,7 +1,7 @@
 package game
 
 import "core:testing"
-import grid "../grid"
+import grid "../engine/grid"
 import level "../level"
 
 // sides 4 is the die of an unupgraded dice card.
@@ -19,10 +19,10 @@ pattern_test_dice_for_faces :: proc(t: ^testing.T, faces: [MAX_ROLL_DICE]i32, co
 pattern_test_expect_commit :: proc(t: ^testing.T, room: ^Room, play: ^Card_Play_Report, roll: Dice_Roll, dice: Dice_State) {
 	testing.expect_value(t, play.result, Card_Play_Result.Played)
 	testing.expect_value(t, room.player.dice, dice)
-	testing.expect_value(t, room.player.deck.energy, i32(2))
-	testing.expect_value(t, room.pulse_count, u64(1))
-	for kind in ([4]Game_Event_Kind{.Card_Played, .Dice_Rolled, .Card_Drawn, .Pulse_Advanced}) {
-		testing.expect_value(t, spell_test_event_count(&room.recent_events, kind), 1)
+	testing.expect_value(t, room.player.deck.energy, i32(1))
+	testing.expect_value(t, room.pulse_count, u64(0))
+	for kind in ([2]Game_Event_Kind{.Card_Played, .Dice_Rolled}) {
+		testing.expect_value(t, spell_test_event_count(room.recent_events, kind), 1)
 	}
 	testing.expect_value(t, room.recent_events.events[0].kind, Game_Event_Kind.Card_Played)
 	event := room.recent_events.events[1]
@@ -158,7 +158,7 @@ test_barrage_commits_each_success_count_with_shield_first_and_single_economy :: 
 			testing.expect_value(t, found, successes < 3)
 			if found {
 				testing.expect_value(t, shield.potency, i32(3-successes))
-				testing.expect_value(t, shield.remaining_pulses, i32(1))
+				testing.expect_value(t, shield.remaining_pulses, i32(2))
 			}
 			direct_start := 3 if successes > 0 else 1
 			if successes < 3 {
@@ -198,9 +198,8 @@ test_twin_venom_all_face_pairs_use_highest_die_and_only_doubles_poison :: proc(t
 				play := play_card(&room, player.deck.hand[0].id, entity_target(enemy_entity(1)))
 				pattern_test_expect_commit(t, &room, &play, expected_roll, expected_dice)
 				damage := 1+max(first, second)
-				poison_tick := i32(2) if first == second else i32(0)
 				testing.expect_value(t, play.action_report.damage_dealt, damage)
-				testing.expect_value(t, room.enemies[0].health, i32(100)-damage-poison_tick)
+				testing.expect_value(t, room.enemies[0].health, i32(100)-damage)
 				testing.expect_value(t, spell_test_event_count(&play.action_report.events, .Damaged), 1)
 				testing.expect_value(t, spell_test_event_count(&play.action_report.events, .Status_Applied), 1 if first == second else 0)
 				testing.expect_value(t, play.action_report.events.events[2].kind, Game_Event_Kind.Spell_Impact)
@@ -209,8 +208,8 @@ test_twin_venom_all_face_pairs_use_highest_die_and_only_doubles_poison :: proc(t
 				poison, found := status_for_entity(&room, enemy_entity(1), .Poison)
 				testing.expect_value(t, found, first == second)
 				if found {
-					// Two stacks; the enemy's wait bit once and wore one.
-					testing.expect_value(t, poison.potency, i32(1))
+					// The cast applies two stacks; the enemy has not acted yet.
+					testing.expect_value(t, poison.potency, i32(2))
 					event := play.action_report.events.events[4]
 					testing.expect_value(t, event.kind, Game_Event_Kind.Status_Applied)
 					testing.expect_value(t, event.amount, i32(2))
@@ -301,9 +300,9 @@ test_pattern_spells_commit_lethal_hits_without_postmortem_poison_or_extra_pulse 
 		testing.expect_value(t, player.dice.roll_count, u64(card_dice_count(id)))
 		testing.expect_value(t, len(room.enemies), 0)
 		testing.expect_value(t, spell_test_event_count(&play.action_report.events, .Status_Applied), 0)
-		testing.expect_value(t, spell_test_event_count(&room.recent_events, .Dice_Rolled), 1)
+		testing.expect_value(t, spell_test_event_count(room.recent_events, .Dice_Rolled), 1)
 		testing.expect_value(t, room.pulse_count, u64(0))
-		testing.expect(t, !play.drew_card && !player.deck.combat_active && !player.relics.combat.poison_used)
+		testing.expect(t, !player.deck.combat_active && !player.relics.combat.poison_used)
 		destroy_room(&room)
 		level.destroy(&data)
 	}
@@ -332,7 +331,7 @@ test_pattern_spell_reaction_death_commits_rng_and_stops_further_damage_and_pulse
 			if dead { testing.expect(t, event.kind != .Damaged && event.kind != .Status_Applied) }
 			if event.kind == .Entity_Defeated && event.target == PLAYER_ENTITY { dead = true }
 		}
-		testing.expect(t, dead && !play.drew_card)
+		testing.expect(t, dead)
 		testing.expect_value(t, room.pulse_count, u64(0))
 		testing.expect_value(t, room.recent_events.dropped_count, 0)
 		destroy_room(&room)
@@ -361,16 +360,17 @@ test_twin_venom_pair_uses_existing_poison_relic_once_and_never_bonus_economy :: 
 		play := play_card(&room, player.deck.hand[0].id, entity_target(target))
 		testing.expect_value(t, play.result, Card_Play_Result.Played)
 		potency := i32(3) if cast_index == 0 else i32(2)
-		testing.expect_value(t, room.enemies[cast_index].health, i32(40)-5-potency)
+		testing.expect_value(t, room.enemies[cast_index].health, i32(40)-5)
 		poison, found := status_for_entity(&room, target, .Poison)
-		// Its wait bit once and wore a stack.
-		testing.expect(t, found && poison.potency == potency-1)
+		// No enemy action occurs during the cast.
+		testing.expect(t, found && poison.potency == potency)
 		testing.expect(t, player.relics.combat.poison_used)
 		testing.expect_value(t, spell_test_event_count(&play.action_report.events, .Status_Applied), 1)
 		testing.expect_value(t, play.action_report.events.events[4].amount, potency)
-		testing.expect_value(t, spell_test_event_count(&room.recent_events, .Card_Drawn), 1)
-		testing.expect_value(t, spell_test_event_count(&room.recent_events, .Pulse_Advanced), 1)
-		testing.expect_value(t, player.deck.energy, i32(2))
+		testing.expect_value(t, spell_test_event_count(room.recent_events, .Card_Drawn), 0)
+		testing.expect_value(t, spell_test_event_count(room.recent_events, .Pulse_Advanced), 0)
+		testing.expect_value(t, player.deck.energy, i32(1))
 		testing.expect_value(t, room.recent_events.dropped_count, 0)
+		drain_tactical_test_pulse(t, &room)
 	}
 }

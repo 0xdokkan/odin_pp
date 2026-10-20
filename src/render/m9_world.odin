@@ -6,18 +6,19 @@ import engine "../engine"
 import fight "../fight"
 import game "../game"
 import shooter "../shooter"
-import view "../view"
+import view "../engine/view"
 import ui "../engine/ui"
 import rl "vendor:raylib"
 import rlgl "vendor:raylib/rlgl"
 
-m9_vector :: proc(v: engine.Vec3) -> rl.Vector3 {return {v.x,v.y,v.z}}
+@(private = "file")
 m9_mix_position :: proc(a,b: engine.Vec3, alpha: f32) -> rl.Vector3 {
-	return m9_vector(a)+(m9_vector(b)-m9_vector(a))*clamp(alpha,0,1)
+	return a+(b-a)*clamp(alpha,0,1)
 }
 
 // Reuse the pixel cutout and its independent paper border, with no tactical
 // timeline feedback: another suspended mode cannot select this actor's pose.
+@(private = "file")
 draw_m9_actor :: proc(renderer: ^Renderer, key: Sprite_Key, position: rl.Vector3, lean: f32 = 0, angle: f32 = 0, tint: rl.Color = rl.WHITE, body_height: f32 = fight.BODY_HEIGHT) {
 	p := view.Vec2{position.x-0.5,position.z-0.5}
 	quad := tactical_billboard_geometry(renderer,key,p,false)
@@ -30,6 +31,7 @@ draw_m9_actor :: proc(renderer: ^Renderer, key: Sprite_Key, position: rl.Vector3
 	draw_tactical_billboard_quad(renderer,quad,p,1,tint)
 }
 
+@(private = "file")
 draw_m9_contact_shadow :: proc(position: rl.Vector3, radius: f32) {
 	// Bounded contact shading anchors cutouts without a per-actor shadow map.
 	shadow_radius:=radius
@@ -38,6 +40,7 @@ draw_m9_contact_shadow :: proc(position: rl.Vector3, radius: f32) {
 	rl.DrawCylinderEx({position.x,0.010,position.z},{position.x,0.013,position.z},shadow_radius*0.76,shadow_radius*0.76,20,{9,15,24,255})
 }
 
+@(private)
 m9_world_extent :: proc(world: ^engine.World) -> rl.Vector2 {
 	x,z := f32(4.8),f32(4.8)
 	for solid in world.solids[:world.solid_count] {
@@ -47,12 +50,13 @@ m9_world_extent :: proc(world: ^engine.World) -> rl.Vector2 {
 	return {x,z}
 }
 
+@(private = "file")
 draw_m9_geometry :: proc(renderer: ^Renderer, world: ^engine.World, debug: bool) {
 	extent := m9_world_extent(world)
 	draw_resin_cube(renderer,{0,-0.22,0},extent.x*2+0.5,0.42,extent.y*2+0.5,RESIN_DARK)
 	draw_resin_cube(renderer,{0,-0.02,0},extent.x*2,0.035,extent.y*2,{35,48,66,255})
 	for solid in world.solids[:world.solid_count] {
-		a,b := m9_vector(solid.bounds.min),m9_vector(solid.bounds.max)
+		a,b := solid.bounds.min,solid.bounds.max
 		center,size := (a+b)*0.5,b-a
 		draw_resin_cube_v(renderer,center,size,RESIN_WALL)
 		// Trim follows the same solid bounds; it adds no apparent playable
@@ -89,6 +93,7 @@ draw_m9_geometry :: proc(renderer: ^Renderer, world: ^engine.World, debug: bool)
 	}
 }
 
+@(private = "file")
 draw_m9_floor_marks :: proc(world: ^engine.World) {
 	extent:=m9_world_extent(world)
 	x,z:=extent.x-0.85,extent.y-0.85
@@ -115,18 +120,20 @@ draw_m9_floor_marks :: proc(world: ^engine.World) {
 	rl.DrawLine3D({0.20,0.019,0},{0,0.019,0.37},{49,71,96,255})
 	rl.DrawLine3D({0,0.019,0.37},{-0.20,0.019,0},{49,71,96,255})
 	for trigger in world.triggers[:world.trigger_count] {
-		p := (m9_vector(trigger.bounds.min)+m9_vector(trigger.bounds.max))*0.5
+		p := (trigger.bounds.min+trigger.bounds.max)*0.5
 		draw_tactical_rune({p.x,0.035,p.z},0.5,0,GOTHIC_BLUE)
 	}
 }
 
+@(private = "file")
 draw_m9_body_debug :: proc(body: engine.Body, color: rl.Color) {
-	p := m9_vector(body.position)
+	p := body.position
 	rl.DrawCylinderWiresEx(p+rl.Vector3{0,body.radius,0},p+rl.Vector3{0,body.height-body.radius,0},body.radius,body.radius,12,color)
 	rl.DrawSphereWires(p+rl.Vector3{0,body.radius,0},body.radius,5,8,color)
 	rl.DrawSphereWires(p+rl.Vector3{0,body.height-body.radius,0},body.radius,5,8,color)
 }
 
+@(private = "file")
 m9_weapon_quad :: proc(origin: rl.Vector2, scale: f32, local: [4]rl.Vector2, color: rl.Color) {
 	points: [4]rl.Vector2
 	for p,i in local {
@@ -137,6 +144,7 @@ m9_weapon_quad :: proc(origin: rl.Vector2, scale: f32, local: [4]rl.Vector2, col
 	rl.DrawTriangle(points[0],points[3],points[2],color)
 }
 
+@(private = "file")
 draw_m9_weapon :: proc(renderer: ^Renderer, state: ^shooter.State) {
 	// A few snapped planes form a hand cannon with a readable muzzle, slide,
 	// sight and gloved grip; the screen-space illustration has no hit volume.
@@ -201,15 +209,15 @@ draw_m9_fight :: proc(renderer: ^Renderer, state: ^fight.State, v: M9_View) {
 	if extent.x<6 {
 		draw_m9_ring_ropes(&state.world)
 		if v.debug {for solid in state.world.solids[:state.world.solid_count] {
-			rl.DrawBoundingBox({m9_vector(solid.bounds.min),m9_vector(solid.bounds.max)},{70,190,230,180})
+			rl.DrawBoundingBox({solid.bounds.min,solid.bounds.max},{70,190,230,180})
 		}}
 	}
 	draw_m9_floor_marks(&state.world)
 	draw_m9_fight_cues(state)
-	for actor in state.fighters {draw_m9_contact_shadow(m9_vector(actor.position),fight.BODY_RADIUS)}
+	for actor in state.fighters {draw_m9_contact_shadow(actor.position,fight.BODY_RADIUS)}
 	// Sort cutouts by camera distance; depth still clips them against solid cover.
 	order := [2]int{0,1}
-	if rl.Vector3Distance(camera.position,m9_vector(state.fighters[0].position))<rl.Vector3Distance(camera.position,m9_vector(state.fighters[1].position)) {order={1,0}}
+	if rl.Vector3Distance(camera.position,state.fighters[0].position)<rl.Vector3Distance(camera.position,state.fighters[1].position) {order={1,0}}
 	rlgl.DrawRenderBatchActive(); rlgl.DisableDepthMask()
 	for i in order {
 		actor := state.fighters[i]
@@ -234,7 +242,7 @@ draw_m9_fight :: proc(renderer: ^Renderer, state: ^fight.State, v: M9_View) {
 	// Tag partners wait on the apron at their corner posts.
 	for index in 0..<state.roster_count {
 		if !fight.roster_waiting(state,index) {continue}
-		post := m9_vector(fight.apron_post(state.roster[index].corner))
+		post := fight.apron_post(state.roster[index].corner)
 		calling := index == state.tag_target
 		tint := rl.Color{255,236,190,255} if calling else rl.Color{196,200,214,255}
 		draw_m9_contact_shadow(post,fight.BODY_RADIUS)
@@ -245,17 +253,18 @@ draw_m9_fight :: proc(renderer: ^Renderer, state: ^fight.State, v: M9_View) {
 		for body in state.world.actors[:state.world.actor_count] {draw_m9_body_debug(body,GOTHIC_BLUE)}
 		for i in 0..<2 {
 			hurt := fight.hurtbox(state,i)
-			rl.DrawSphereWires(m9_vector(hurt.center),hurt.radius,6,10,{97,211,154,255})
-			if hit,active := fight.hitbox(state,i); active {rl.DrawSphereWires(m9_vector(hit.center),hit.radius,6,10,GOTHIC_RED)}
+			rl.DrawSphereWires(hurt.center,hurt.radius,6,10,{97,211,154,255})
+			if hit,active := fight.hitbox(state,i); active {rl.DrawSphereWires(hit.center,hit.radius,6,10,GOTHIC_RED)}
 		}
 	}
-	if state.hit_flash_ticks>0 {draw_tactical_rune(m9_vector(state.last_hit_position),0.45,0,GOTHIC_PAPER)}
+	if state.hit_flash_ticks>0 {draw_tactical_rune(state.last_hit_position,0.45,0,GOTHIC_PAPER)}
 	rl.EndMode3D()
 	draw_m9_fight_hud(renderer,state,v)
 	if !v.hosted {draw_m9_controls(renderer,v,&state.moves)}
 }
 
-// The board archetype behind a roster entry, or the classic champion.
+// The board archetype behind a roster entry, or the default champion.
+@(private = "file")
 m9_opponent_key :: proc(state: ^fight.State, index: int) -> Sprite_Key {
 	if index < 0 || index >= state.roster_count { return .Brute }
 	kind := state.roster[index].kind
@@ -263,6 +272,7 @@ m9_opponent_key :: proc(state: ^fight.State, index: int) -> Sprite_Key {
 	return sprite_key_for_enemy(game.Enemy_Archetype(kind))
 }
 
+@(private)
 m9_opponent_name :: proc(state: ^fight.State, index: int) -> cstring {
 	if index < 0 || index >= state.roster_count { return "IL CAMPIONE" }
 	switch game.Enemy_Archetype(state.roster[index].kind) {
@@ -282,7 +292,7 @@ draw_m9_fps :: proc(renderer: ^Renderer, state, prior: ^shooter.State, v: M9_Vie
 	rl.DrawRectangleRec({0,0,w,h},{7,13,24,255})
 	position := m9_mix_position(prior.player.position,state.player.position,1 if v.paused else v.alpha)
 	eye := position+rl.Vector3{0,shooter.EYE_HEIGHT,0}
-	direction := m9_vector(shooter.look_direction(state.player.yaw,state.player.pitch))
+	direction := shooter.look_direction(state.player.yaw,state.player.pitch)
 	camera := rl.Camera3D{position=eye,target=eye+direction,up={0,1,0},fovy=66,projection=.PERSPECTIVE}
 	previous,outline := renderer.tactical.camera,renderer.tactical.outline_mode
 	renderer.tactical.camera,renderer.tactical.outline_mode=camera,.World
@@ -293,11 +303,11 @@ draw_m9_fps :: proc(renderer: ^Renderer, state, prior: ^shooter.State, v: M9_Vie
 	if lit {rl.EndShaderMode()}
 	draw_m9_floor_marks(&state.world)
 	for enemy in state.enemies[:state.enemy_count] {
-		if enemy.health>0 {draw_m9_contact_shadow(m9_vector(enemy.position),shooter.ENEMY_RADIUS)}
+		if enemy.health>0 {draw_m9_contact_shadow(enemy.position,shooter.ENEMY_RADIUS)}
 	}
 	order := [3]int{0,1,2}
 	for i in 0..<state.enemy_count {for j in i+1..<state.enemy_count {
-		if rl.Vector3Distance(eye,m9_vector(state.enemies[order[j]].position))>rl.Vector3Distance(eye,m9_vector(state.enemies[order[i]].position)) {order[i],order[j]=order[j],order[i]}
+		if rl.Vector3Distance(eye,state.enemies[order[j]].position)>rl.Vector3Distance(eye,state.enemies[order[i]].position) {order[i],order[j]=order[j],order[i]}
 	}}
 	rlgl.DrawRenderBatchActive();rlgl.DisableDepthMask()
 	for index in order[:state.enemy_count] {
@@ -310,7 +320,7 @@ draw_m9_fps :: proc(renderer: ^Renderer, state, prior: ^shooter.State, v: M9_Vie
 	}
 	rlgl.DrawRenderBatchActive();rlgl.EnableDepthMask()
 	for shot in state.shots {
-		if shot.remaining>0 {rl.DrawLine3D(m9_vector(shot.start),m9_vector(shot.end),GOTHIC_RED if shot.enemy else GOTHIC_BLUE)}
+		if shot.remaining>0 {rl.DrawLine3D(shot.start,shot.end,GOTHIC_RED if shot.enemy else GOTHIC_BLUE)}
 	}
 	if v.debug {for body in state.world.actors[:state.world.actor_count] {draw_m9_body_debug(body,GOTHIC_BLUE)}}
 	rl.EndMode3D()

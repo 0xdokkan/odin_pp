@@ -2,7 +2,7 @@ package game
 
 import "core:math"
 import "core:testing"
-import grid "../grid"
+import grid "../engine/grid"
 import level "../level"
 
 // A walled 13x13 room, the player in its middle (6, 6) with 100 health, the
@@ -72,13 +72,12 @@ FIRST_PERSON_TEST_NORTH :: First_Person_Aim{yaw = -math.PI/2}
 @(test)
 test_first_person_card_is_a_rare_tactical_self_card :: proc(t: ^testing.T) {
 	testing.expect(t, validate_card_definitions())
-	definition, found := card_definition_by_id(.First_Person, true)
+	definition, found := card_definition_by_id(.First_Person)
 	testing.expect(t, found && definition.name == "First Person Shooter")
 	testing.expect_value(t, definition.rarity, Card_Rarity.Rare)
 	testing.expect_value(t, definition.cost, i32(3))
 	testing.expect_value(t, definition.targeting.rule, Target_Rule.Self)
 	testing.expect(t, !card_requires_spatial_target(definition))
-	testing.expect(t, card_requires_tactical(.First_Person))
 	testing.expect_value(t, tactical_card_time_cost(.First_Person), f32(0))
 	testing.expect_value(t, card_max_upgrade_level(.First_Person), FIRST_PERSON_MAX_UPGRADE_LEVEL)
 	testing.expect_value(t, card_dice_count(.First_Person), 0)
@@ -102,31 +101,15 @@ test_first_person_card_is_a_rare_tactical_self_card :: proc(t: ^testing.T) {
 	// Offered to tactical runs only, rewards and wares alike.
 	node := Run_Node{kind = .Combat, depth = 4}
 	testing.expect(t, card_offer_weight(definition, &node) > 0)
-	testing.expect_value(t, card_offer_weight(definition, &node, nil, false), u64(0))
 	offered := false
 	for seed in u64(1)..=400 {
 		random := seed
 		choices: [3]Card_Id
 		testing.expect(t, generate_weighted_card_choices(&random, &node, choices[:]))
 		for id in choices { offered = offered || id == .First_Person }
-		random = seed
-		testing.expect(t, generate_weighted_card_choices(&random, &node, choices[:], nil, false))
-		for id in choices { testing.expect(t, id != .First_Person) }
 	}
 	testing.expect(t, offered)
-	// A classic room refuses to play it.
-	data: level.Level
-	classic_player: Player
-	foes := [?]Enemy_Spawn{{position = {6, 2}, health = 20, attack = 1}}
-	classic := first_person_test_room(t, &data, &classic_player, foes[:])
-	defer level.destroy(&data)
-	defer destroy_room(&classic)
-	testing.expect_value(t, classic.phase, Room_Phase.Combat)
-	classic_player.tactical.config.enabled = false
-	card := rework_hand_card(t, &classic, .First_Person)
-	_, refused := compile_card_action(&classic, card, entity_target(PLAYER_ENTITY))
-	testing.expect_value(t, refused, Card_Compile_Error.Invalid_Phase)
-	testing.expect(t, !tactical_can_begin_first_person(&classic))
+
 }
 
 @(test)
@@ -194,7 +177,8 @@ test_first_person_begins_on_self_and_locks_the_cards :: proc(t: ^testing.T) {
 	drain_tactical_test_pulse(t, &room)
 	testing.expect(t, tactical_first_person_active(&room))
 	// Where actions do not last their cost, each one's seconds were the world's.
-	testing.expect(t, abs(room.first_person.remaining-15) < 0.001)
+	// Two walks (0.8 each), a wait, a bump and a dodge spend 4.6 seconds.
+	testing.expect(t, abs(room.first_person.remaining-15.4) < 0.001)
 	// Nothing else begins it: not inside the shadow, nor with a foe on the rope.
 	room.first_person = {}
 	room.lasso.active = true

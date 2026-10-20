@@ -4,7 +4,7 @@ import "core:c"
 import "core:fmt"
 import rl "vendor:raylib"
 import game "../game"
-import view "../view"
+import view "../engine/view"
 
 DEFEAT_RESTART_WIDTH  :: f32(220)
 DEFEAT_RESTART_HEIGHT :: f32(42)
@@ -14,6 +14,7 @@ DEFEAT_BUTTON_GAP     :: f32(10)
 // from it) or quit the game.
 Defeat_Choice :: enum u8 {None, Restart, Menu, Quit}
 
+@(private)
 defeat_restart_bounds :: proc(canvas_width, canvas_height: f32) -> rl.Rectangle {
 	return {
 		x = (canvas_width-DEFEAT_RESTART_WIDTH)*0.5,
@@ -23,6 +24,7 @@ defeat_restart_bounds :: proc(canvas_width, canvas_height: f32) -> rl.Rectangle 
 	}
 }
 
+@(private)
 defeat_restart_at_point :: proc(
 	canvas_width, canvas_height: f32,
 	point: view.Vec2,
@@ -31,6 +33,7 @@ defeat_restart_at_point :: proc(
 }
 
 // The buttons stack under the restart one; without a menu, quit moves up.
+@(private)
 defeat_choice_bounds :: proc(canvas_width, canvas_height: f32, choice: Defeat_Choice, menu: bool) -> rl.Rectangle {
 	bounds := defeat_restart_bounds(canvas_width, canvas_height)
 	row := f32(0)

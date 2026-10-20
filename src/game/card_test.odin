@@ -1,12 +1,22 @@
 package game
 
 import "core:testing"
-import grid "../grid"
+import grid "../engine/grid"
 import level "../level"
 
 @(test)
 test_builtin_card_definitions_are_valid :: proc(t: ^testing.T) {
 	testing.expect(t, validate_card_definitions())
+	// The exhaustive enum table includes Count for compiler coverage, but it
+	// must never become a playable definition or index out of bounds.
+	for id in ([3]Card_Id{Card_Id(-1), .Count, Card_Id(int(Card_Id.Count)+1)}) {
+		definition, found := card_definition_by_id(id)
+		testing.expect(t, !found && definition == Card_Definition{})
+		testing.expect(t, !card_is_scopa(id) && !card_is_room_tool(id) && !card_loads_player_charge(id) &&
+			!card_is_board_device(id) && !card_places_ground(id))
+		testing.expect_value(t, card_dice_count(id), 0)
+		testing.expect_value(t, tactical_card_time_cost(id), f32(0))
+	}
 	// Keep persisted catalog boundaries stable when extending the enum.
 	testing.expect_value(t, int(Card_Id.Heavy_Blow), int(Card_Id.Grappling_Hook)+1)
 	testing.expect_value(t, int(Card_Id.Volatile_Study), int(Card_Id.Fate_Strike)-1)
@@ -142,6 +152,7 @@ test_refocus_keywords_are_exclusive_and_ignore_play_lifecycle :: proc(t: ^testin
 test_card_economy_metadata_is_valid_and_covers_every_rarity :: proc(t: ^testing.T) {
 	rarity_counts: [int(Card_Rarity.Count)]int
 	for definition in CARD_DEFINITIONS {
+		if definition.id == .Count { continue }
 		if definition.temporary_only {
 			testing.expect_value(t, definition.reward_weight, u32(0))
 			testing.expect_value(t, definition.shop_base_price, i32(0))
@@ -385,15 +396,15 @@ test_card_compiler_rejects_invalid_instance_and_target :: proc(t: ^testing.T) {
 	_, err := compile_card_action(&room, {id = 1, definition_id = .Strike}, target)
 	testing.expect_value(t, err, Card_Compile_Error.Target_Out_Of_Range)
 
-	// An unresolved entity is rejected before the compiler checks mode rules;
+	// An unresolved entity is rejected before the compiler checks targeting rules;
 	// the preview receives an anchor request and has no entity to resolve.
 	lasso := Card_Instance{id = 6, definition_id = .Lasso}
 	_, err = compile_card_action(&room, lasso, entity_target(enemy_entity(max(u32))))
 	testing.expect_value(t, err, Card_Compile_Error.Invalid_Target)
 	_, err = compile_card_action(&room, lasso, target)
-	testing.expect_value(t, err, Card_Compile_Error.Invalid_Phase)
+	testing.expect_value(t, err, Card_Compile_Error.None)
 	preview := evaluate_card_targeting(&room, lasso, {})
-	testing.expect_value(t, preview.error, Card_Compile_Error.Invalid_Phase)
+	testing.expect_value(t, preview.error, Card_Compile_Error.Invalid_Target)
 
 	room.phase = .Loot
 	_, err = compile_card_action(&room, {}, {})
@@ -422,7 +433,7 @@ test_arc_bolt_uses_targeting_range_and_helpers_support_diagonals :: proc(t: ^tes
 	in_range := entity_target(enemy_entity(room.enemies[0].id))
 	action, err := compile_card_action(&room, {id = 8, definition_id = .Arc_Bolt}, in_range)
 	testing.expect_value(t, err, Card_Compile_Error.None)
-	testing.expect_value(t, action.effects[0].amount, i32(3))
+	testing.expect_value(t, action.effects[0].amount, i32(2))
 
 	out_of_range := entity_target(enemy_entity(room.enemies[1].id))
 	_, err = compile_card_action(&room, {id = 9, definition_id = .Arc_Bolt}, out_of_range)
@@ -440,7 +451,7 @@ test_toxic_wave_card_expands_one_effect_per_enemy :: proc(t: ^testing.T) {
 	player := create_test_player(t)
 	enemy_spawns := [?]Enemy_Spawn{
 		{position = {x = 2, y = 1}, health = 6, attack = 1},
-		{position = {x = 4, y = 1}, health = 6, attack = 1},
+		{position = {x = 3, y = 1}, health = 6, attack = 1},
 	}
 	room, ok := create_room(&level_data, &player, {enemies = enemy_spawns[:]})
 	testing.expect(t, ok)
@@ -463,7 +474,7 @@ test_toxic_wave_card_expands_one_effect_per_enemy :: proc(t: ^testing.T) {
 }
 
 @(test)
-test_global_card_supports_nine_enemies_without_truncation :: proc(t: ^testing.T) {
+test_local_wave_supports_nine_enemies_without_truncation :: proc(t: ^testing.T) {
 	level_data := create_test_level(t)
 	defer level.destroy(&level_data)
 	player := create_test_player(t)
@@ -482,6 +493,7 @@ test_global_card_supports_nine_enemies_without_truncation :: proc(t: ^testing.T)
 	testing.expect(t, ok)
 	defer destroy_room(&room)
 
+	player.position = {3, 2}
 	action, err := compile_card_action(&room, {id = 9, definition_id = .Toxic_Wave}, {})
 	testing.expect_value(t, err, Card_Compile_Error.None)
 	testing.expect_value(t, action.effect_count, len(enemy_spawns))
@@ -537,7 +549,7 @@ test_area_card_compilation_preserves_shape_and_stable_enemy_order :: proc(t: ^te
 		for effect, index in action.effects[:action.effect_count] {
 			testing.expect_value(t, effect.kind, Effect_Kind.Damage)
 			testing.expect_value(t, effect.target, enemy_entity(fixture.expected_ids[index]))
-			testing.expect_value(t, effect.amount, i32(2))
+			testing.expect_value(t, effect.amount, i32(2) if fixture.definition_id == .Firebomb else i32(3))
 		}
 	}
 }
@@ -591,7 +603,7 @@ test_counter_rune_card_preserves_instance_as_binding_source :: proc(t: ^testing.
 	}, entity_target(PLAYER_ENTITY))
 	testing.expect_value(t, err, Card_Compile_Error.None)
 	testing.expect_value(t, action.effects[0].binding_source, Reaction_Binding_Source{kind = .Card, id = 42})
-	testing.expect_value(t, action.effects[0].amount, i32(3))
+	testing.expect_value(t, action.effects[0].amount, i32(4))
 
 	report := resolve_action(&room, &action)
 	testing.expect(t, report.accepted)

@@ -1,11 +1,10 @@
 package render
 
-import "core:c"
 import "core:math"
 import rl "vendor:raylib"
 import game "../game"
-import grid "../grid"
-import view "../view"
+import grid "../engine/grid"
+import view "../engine/view"
 
 // MOVIMENTO OMBRA on the board. The player's card sinks into its own shadow,
 // a pool of ink that glides from cell to cell at each of the shadow's steps
@@ -75,11 +74,13 @@ Shadow_View :: struct {
 // The world's clock for its drawings: the sprite clock less every moment the
 // world spent stopped. It stands still while the player is in his shadow,
 // then goes on from there.
+@(private)
 tactical_world_time :: proc(renderer: ^Renderer) -> f64 {
 	return tactical_world_time_at(renderer, renderer.sprite_assets.elapsed)
 }
 
 // The same at sprite time `now`.
+@(private)
 tactical_world_time_at :: proc(renderer: ^Renderer, now: f64) -> f64 {
 	s := &renderer.tactical.shadow
 	if s.active { return s.frozen_at-s.held }
@@ -88,10 +89,12 @@ tactical_world_time_at :: proc(renderer: ^Renderer, now: f64) -> f64 {
 
 // The time an actor's drawings see: the player keeps the sprite clock, the
 // world (every other card) its own (tactical_world_time).
+@(private)
 living_clock :: proc(renderer: ^Renderer, entity: game.Entity_Ref) -> f64 {
 	return living_clock_at(renderer, entity, renderer.sprite_assets.elapsed)
 }
 
+@(private)
 living_clock_at :: proc(renderer: ^Renderer, entity: game.Entity_Ref, now: f64) -> f64 {
 	if entity == game.PLAYER_ENTITY { return now }
 	return tactical_world_time_at(renderer, now)
@@ -99,6 +102,7 @@ living_clock_at :: proc(renderer: ^Renderer, entity: game.Entity_Ref, now: f64) 
 
 // The progress of the card's own cue of `kind` in the player's lane (0 until
 // it starts); not found once it is over.
+@(private)
 shadow_cue_progress :: proc(renderer: ^Renderer, kind: Presentation_Cue_Kind) -> (progress: f32, found: bool) {
 	for offset in 0..<renderer.timeline.count {
 		cue, ok := presentation_cue_at(&renderer.timeline, offset)
@@ -110,6 +114,7 @@ shadow_cue_progress :: proc(renderer: ^Renderer, kind: Presentation_Cue_Kind) ->
 // Where the pool is now: easing out of the cell the shadow left toward its
 // cell (fast at first) over the step's own lockout, so it arrives when the
 // next press is taken.
+@(private = "file")
 tactical_shadow_glide :: proc(t: ^game.Tactical_State) -> view.Vec2 {
 	u := clamp(1-t.shadow_step_remaining/game.TACTICAL_SHADOW_STEP_SECONDS, 0, 1)
 	p := 1-(1-u)*(1-u)*(1-u)
@@ -121,6 +126,7 @@ tactical_shadow_glide :: proc(t: ^game.Tactical_State) -> view.Vec2 {
 // run twice a frame): follows the room's shadow and moves the shown player
 // onto the pool, so the camera, the vision, the lantern and the player's
 // glyphs follow it.
+@(private)
 update_tactical_shadow :: proc(renderer: ^Renderer, room: ^game.Room) {
 	v := &renderer.tactical
 	s := &v.shadow
@@ -200,6 +206,7 @@ tactical_shadow_showing :: proc(renderer: ^Renderer) -> bool {
 
 // How far under the floor the player's card is: 0 on the board, SHADOW_DEPTH
 // sunk (a share of the figure's height).
+@(private)
 tactical_shadow_depth :: proc(renderer: ^Renderer, entity: game.Entity_Ref) -> f32 {
 	s := &renderer.tactical.shadow
 	if entity != game.PLAYER_ENTITY { return 0 }
@@ -219,6 +226,7 @@ tactical_shadow_depth :: proc(renderer: ^Renderer, entity: game.Entity_Ref) -> f
 }
 
 // The sunk figure is dark and half seen; it clears as it rises.
+@(private)
 tactical_shadow_tint :: proc(renderer: ^Renderer, entity: game.Entity_Ref) -> (tint: rl.Color, opacity: f32) {
 	d := clamp(tactical_shadow_depth(renderer, entity)/SHADOW_DEPTH, 0, 1)
 	if d <= 0 { return rl.WHITE, 1 }
@@ -229,6 +237,7 @@ tactical_shadow_tint :: proc(renderer: ^Renderer, entity: game.Entity_Ref) -> (t
 // The pool, its trail of drops and the shadow's own metronome: in the 3D
 // pass, in place of the player's stand while the card is under the floor
 // (draw_tactical_actor_bases).
+@(private)
 draw_tactical_shadow_pool :: proc(renderer: ^Renderer) {
 	s := &renderer.tactical.shadow
 	now := renderer.sprite_assets.elapsed
@@ -281,18 +290,7 @@ draw_tactical_shadow_pool :: proc(renderer: ^Renderer) {
 	rl.DrawCircle3D(p+{0, 0.008, 0}, r, {1, 0, 0}, 90, color_with_opacity(gold, (0.25+0.45*(1-s.beat_open))*open))
 }
 
-// The flat board's shadow: an ink pool under a faded body (draw_tactical_world).
-draw_tactical_shadow_flat :: proc(renderer: ^Renderer, center: view.Vec2, opacity: f32) {
-	sunk := clamp(tactical_shadow_depth(renderer, game.PLAYER_ENTITY)/SHADOW_DEPTH, 0, 1)
-	if sunk > 0 {
-		r := max(f32(10), 16*renderer.camera.zoom)*sunk
-		rl.DrawEllipse(c.int(center.x), c.int(center.y+4), r, r*0.5, color_with_opacity(SHADOW_INK, 0.85*opacity))
-		rl.DrawEllipseLines(c.int(center.x), c.int(center.y+4), r, r*0.5, color_with_opacity(SHADOW_RIM, opacity))
-	}
-	draw_player_body(renderer, center, opacity*(1-0.65*sunk))
-}
-
-// Over the board, after the seals: the CRITICO of a diagonal step on a beat.
+@(private)
 draw_tactical_shadow_overlay :: proc(renderer: ^Renderer) {
 	s := &renderer.tactical.shadow
 	now := renderer.sprite_assets.elapsed

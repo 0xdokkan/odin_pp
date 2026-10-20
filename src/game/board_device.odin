@@ -1,7 +1,7 @@
 package game
 
 import "core:slice"
-import grid "../grid"
+import grid "../engine/grid"
 
 MAX_TESLA_COILS :: 4
 MAX_SHOCK_FLOORS :: 4
@@ -21,13 +21,12 @@ Board_Device_Network :: struct {
 	cooldown: i32,
 }
 
+@(private)
 board_device_kind :: proc(kind: Grid_Object_Kind) -> bool {
 	return kind == .Shock_Floor || kind == .Tesla_Coil
 }
 
-card_is_board_device :: proc(id: Card_Id) -> bool {
-	return id == .Shock_Floor || id == .Tesla_Coil
-}
+
 
 board_device_count :: proc(room: ^Room, kind: Grid_Object_Kind) -> (count: int) {
 	if room == nil { return }
@@ -41,6 +40,7 @@ board_tesla_count :: proc(room: ^Room) -> int {
 	return board_device_count(room, .Tesla_Coil)
 }
 
+@(private)
 board_device_can_deploy :: proc(room: ^Room, kind: Grid_Object_Kind, position: grid.Position) -> bool {
 	if room == nil || room.player == nil || room.phase != .Combat || !board_device_kind(kind) ||
 	   len(room.objects) >= MAX_GRID_OBJECTS_PER_ROOM || room.next_object_id == 0 || room.next_object_id == max(u32) ||
@@ -59,6 +59,7 @@ board_device_can_deploy :: proc(room: ^Room, kind: Grid_Object_Kind, position: g
 	return board_device_count(room, .Shock_Floor) < MAX_SHOCK_FLOORS
 }
 
+@(private)
 deploy_device_effect :: proc(kind: Grid_Object_Kind, position: grid.Position, damage: i32) -> Effect {
 	return {kind = .Deploy_Device, target = PLAYER_ENTITY, object_kind = kind, destination = position, amount = damage, charges = 1 if kind == .Shock_Floor else 0}
 }
@@ -83,6 +84,7 @@ deploy_board_device :: proc(room: ^Room, kind: Grid_Object_Kind, position: grid.
 	return true
 }
 
+@(private)
 resolve_board_device_card :: proc(room: ^Room, instance: Card_Instance, target: Target, compiled: ^Action) -> (report: Action_Report) {
 	if compiled == nil || !card_is_board_device(instance.definition_id) || compiled.kind != .Card ||
 	   compiled.source != PLAYER_ENTITY || compiled.target != target || compiled.effect_count != 1 ||
@@ -110,6 +112,7 @@ resolve_board_device_card :: proc(room: ^Room, instance: Card_Instance, target: 
 	return
 }
 
+@(private = "file")
 board_device_cross :: proc(a, b, c: grid.Position) -> int {
 	return (b.x-a.x)*(c.y-a.y)-(b.y-a.y)*(c.x-a.x)
 }
@@ -179,18 +182,21 @@ query_board_device_network :: proc(room: ^Room) -> (network: Board_Device_Networ
 
 // Coils cannot conduct through opaque walls or cover. The same trace handles
 // diagonal sealed corners as card targeting, so preview and damage agree.
+@(private)
 board_device_link_is_clear :: proc(room: ^Room, a, b: grid.Position) -> bool {
 	return a != b && board_device_clear_path(room, a, b)
 }
 
 // Device networks span a room, so they do not inherit the twelve-cell bound of
 // card targeting's fixed path buffer. This uses the same corner occlusion rule.
+@(private = "file")
 board_device_clear_path :: proc(room: ^Room, origin, target: grid.Position) -> bool {
 	return room != nil && base_cell_is_walkable(room, origin) && base_cell_is_walkable(room, target) &&
 	       !cell_blocks_line_of_sight(room, target) &&
 	       tactical_line_visible(origin, target, tactical_room_opaque, room)
 }
 
+@(private = "file")
 finalize_board_device_network :: proc(room: ^Room, network: ^Board_Device_Network) {
 	if network.count < 2 { network.ready = false; return }
 	links := network.count if network.count > 2 else 1
@@ -212,11 +218,13 @@ finalize_board_device_network :: proc(room: ^Room, network: ^Board_Device_Networ
 
 // Each doubling of separation halves damage; rounding up keeps a distant
 // connection meaningful. The shared helper also supplies the inspection HUD.
+@(private)
 board_device_link_damage :: proc(base_damage: i32, a, b: grid.Position) -> i32 {
 	distance := max(1, max(abs(a.x-b.x), abs(a.y-b.y)))
 	return max(i32(1), (base_damage+i32(distance)-1)/i32(distance))
 }
 
+@(private)
 board_device_network_damage_at :: proc(room: ^Room, network: ^Board_Device_Network, cell: grid.Position) -> i32 {
 	if !board_device_network_contains_cell(room, network, cell) { return 0 }
 	if network.field { return network.damage }
@@ -231,6 +239,7 @@ board_device_network_damage_at :: proc(room: ^Room, network: ^Board_Device_Netwo
 	return damage
 }
 
+@(private = "file")
 board_device_segment_contains :: proc(a, b, cell: grid.Position) -> bool {
 	if cell.x < min(a.x,b.x) || cell.x > max(a.x,b.x) || cell.y < min(a.y,b.y) || cell.y > max(a.y,b.y) { return false }
 	return abs(board_device_cross(a, b, cell))*2 <= max(abs(b.x-a.x), abs(b.y-a.y))
@@ -273,6 +282,7 @@ arm_shock_floor :: proc(object: ^Grid_Object, enemy: Entity_Ref, events: ^Event_
 // All movement, including pushes, charges and teleport landings, enters here
 // through the shared movement resolver. Crossing an entire area still trips
 // its trap; discharges retain the world's one-second cadence.
+@(private)
 trigger_shock_floors_on_entry :: proc(room: ^Room, entity: Entity_Ref, events: ^Event_Log) {
 	if room == nil || room.phase != .Combat || entity.kind != .Enemy { return }
 	position, present := entity_position(room, entity)
@@ -309,7 +319,7 @@ activate_board_devices :: proc(room: ^Room) -> bool {
 // Public commands never accept a cached preview as authorization.
 @(private)
 discharge_board_device_network :: proc(room: ^Room, network: ^Board_Device_Network) {
-	clear_event_log(&room.recent_events)
+	clear_event_log(room.recent_events)
 	for &object in room.objects {
 		if object.kind == .Tesla_Coil { object.device_cooldown = TESLA_RECHARGE_BEATS }
 	}
@@ -319,7 +329,7 @@ discharge_board_device_network :: proc(room: ^Room, network: ^Board_Device_Netwo
 		a := network.hull[i] if network.field else network.positions[i]
 		b := network.hull[(i+1)%network.hull_count] if network.field else network.positions[(i+1)%network.count]
 		damage := network.damage if network.field else board_device_link_damage(network.base_damage, a, b)
-		record_event(&room.recent_events, {kind = .Spell_Impact, source = PLAYER_ENTITY,
+		record_event(room.recent_events, {kind = .Spell_Impact, source = PLAYER_ENTITY,
 			target = SYSTEM_ENTITY, card_definition = .Tesla_Coil,
 			from_position = a, to_position = b, amount = damage})
 	}
@@ -344,7 +354,7 @@ discharge_board_device_network :: proc(room: ^Room, network: ^Board_Device_Netwo
 	if action.effect_count > 0 {
 		report := resolve_action(room, &action)
 		assert(report.accepted)
-		append_event_log(&room.recent_events, &report.events)
+		append_event_log(room.recent_events, &report.events)
 	}
 	// Lightning walls leave their coils anchored for later combinations. Only
 	// a complete electromagnetic field spends its four participating coils,
@@ -356,7 +366,7 @@ discharge_board_device_network :: proc(room: ^Room, network: ^Board_Device_Netwo
 			if !found { continue }
 			position := room.objects[index].position
 			remove_grid_object(room, index)
-			record_event(&room.recent_events, {kind = .Entity_Defeated, source = SYSTEM_ENTITY,
+			record_event(room.recent_events, {kind = .Entity_Defeated, source = SYSTEM_ENTITY,
 				target = object_entity(id), object_kind = .Tesla_Coil,
 				from_position = position, to_position = position})
 		}
@@ -366,6 +376,7 @@ discharge_board_device_network :: proc(room: ^Room, network: ^Board_Device_Netwo
 // Dormant floors never spend charges. The first occupied beat also handles a
 // floor placed underneath an enemy. Once tripped, the committed die's sequence
 // runs to completion even if the area becomes empty again.
+@(private)
 tick_board_devices :: proc(room: ^Room, pulse: ^Pulse_Report) {
 	if room == nil || pulse == nil || room.phase != .Combat { return }
 	ids: [MAX_SHOCK_FLOORS]u32
@@ -411,6 +422,7 @@ tick_board_devices :: proc(room: ^Room, pulse: ^Pulse_Report) {
 
 // The committed die controls both repetition and target count. Equal distances
 // always use entity ID, independent of removals or physical array ordering.
+@(private)
 shock_floor_targets :: proc(room: ^Room, object: Grid_Object) -> (ids: [MAX_ENEMIES_PER_ROOM]u32, count: int) {
 	distances: [MAX_ENEMIES_PER_ROOM]int
 	for enemy in room.enemies {
@@ -433,6 +445,7 @@ shock_floor_targets :: proc(room: ^Room, object: Grid_Object) -> (ids: [MAX_ENEM
 
 // Deployed devices belong to one fight. Clearing them also restores every loot
 // corridor the player could have sealed with a solid coil during combat.
+@(private)
 disarm_board_devices_after_combat :: proc(room: ^Room, events: ^Event_Log) {
 	if room == nil || room.phase == .Combat { return }
 	ids: [MAX_GRID_OBJECTS_PER_ROOM]u32

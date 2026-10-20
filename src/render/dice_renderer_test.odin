@@ -36,30 +36,6 @@ test_dice_bevel_mesh_is_closed_outward_and_removes_the_sharp_cube_corners :: pro
 }
 
 @(test)
-test_dice_numbering_rotates_the_entire_set_and_preserves_opposites_and_handedness :: proc(t: ^testing.T) {
-	for step in 0..<24 {
-		orientation := rl.QuaternionFromEuler(f32(step)*0.41, f32(step)*0.73, f32(step)*0.29)
-		for result in i32(1)..=6 {
-			numbering := dice_numbering_for_result(orientation, result)
-			testing.expect_value(t, numbering.values[numbering.dominant_face], result)
-			seen: [7]bool
-			numbered_normals: [7]rl.Vector3
-			for face in 0..<6 {
-				value := numbering.values[face]
-				testing.expect(t, value >= 1 && value <= 6 && !seen[value])
-				seen[value] = true
-				normal, _, _ := dice_face_basis(i32(face+1))
-				numbered_normals[value] = normal
-				testing.expect_value(t, value+numbering.values[5-face], i32(7))
-				testing.expect(t, rl.Vector3Distance(rl.Vector3CrossProduct(numbering.u[face], numbering.v[face]), normal) < 0.0001)
-			}
-			testing.expect(t, rl.Vector3Distance(rl.Vector3CrossProduct(numbered_normals[2], numbered_normals[3]), numbered_normals[1]) < 0.0001,
-				"the remapping must be a proper cube rotation, never a reflection or isolated face replacement")
-		}
-	}
-}
-
-@(test)
 test_dice_pips_fit_flat_faces_and_never_overlap_the_bevels :: proc(t: ^testing.T) {
 	for value in i32(1)..=6 {
 		positions, count := dice_pip_positions(value)
@@ -115,15 +91,14 @@ test_dice_pool_window_layout_keeps_initial_physical_mesh_above_real_letterbox ::
 }
 
 @(test)
-test_dice_pool_cached_numbering_and_texture_budget_are_bounded :: proc(t: ^testing.T) {
+test_dice_pool_reuses_throw_and_keeps_texture_budget_bounded :: proc(t: ^testing.T) {
 	layout := dice_pool_layout(948, 1020, {0, 243, 948, 533.25})
 	renderer: Dice_Renderer
 	roll := game.Dice_Roll{faces = {1, 4, 6}, sides = 6, count = 3, total = 11}
 	prepare_dice_pool(&renderer, roll, 113, layout)
-	numbering, initial := renderer.numbering, renderer.throw_state.frames[0]
+	initial := renderer.throw_state.frames[0]
 	steps := renderer.throw_state.physics_steps
 	prepare_dice_pool(&renderer, roll, 113, dice_pool_layout(1920, 1080))
-	testing.expect_value(t, renderer.numbering, numbering)
 	testing.expect_value(t, renderer.throw_state.frames[0], initial)
 	testing.expect_value(t, renderer.throw_state.physics_steps, steps)
 	for size in ([4]rl.Vector2{{960, 540}, {948, 1020}, {8192, 8192}, {16384, 1080}}) {

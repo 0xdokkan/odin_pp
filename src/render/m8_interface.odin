@@ -21,6 +21,7 @@ m8_tesla_control_labels :: proc(query: game.Tesla_Control_Query) -> (title, deta
     return title,"TESLA 1/4 / SERVONO 2"
 }
 
+@(private)
 draw_m8_active_bar :: proc(renderer: ^Renderer, room: ^game.Room) {
     if room == nil || room.player == nil { return }
     if room.phase == .Combat || room.phase == .Loot {

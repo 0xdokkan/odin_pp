@@ -2,9 +2,10 @@ package render
 
 import rl "vendor:raylib"
 import game "../game"
-import grid "../grid"
+import grid "../engine/grid"
 
 // Small code-native pixel crests stay sharp at hand-card resolution.
+@(private)
 draw_device_card_icon :: proc(id: game.Card_Id, bounds: rl.Rectangle, color: rl.Color) {
     x, y := bounds.x+bounds.width*0.5, bounds.y+bounds.height*0.5
     s := min(bounds.width/52, bounds.height/44)
@@ -22,6 +23,7 @@ draw_device_card_icon :: proc(id: game.Card_Id, bounds: rl.Rectangle, color: rl.
     for i in 0..<len(bolt)-1 { rl.DrawLineEx(bolt[i], bolt[i+1], max(f32(2),3*s), GOTHIC_PAPER) }
 }
 
+@(private)
 draw_m8_device_object :: proc(renderer: ^Renderer, object: Presentation_Grid_Object) {
     p := rl.Vector3{object.position.x+0.5, 0.075, object.position.y+0.5}
     blue := rl.Color{82, 181, 238, 255}
@@ -55,6 +57,7 @@ draw_m8_device_object :: proc(renderer: ^Renderer, object: Presentation_Grid_Obj
 
 // Ground coverage is the exact resolver query, not a separate polygon approximation.
 // All overlays are fog-clipped, including every cell along long Tesla links.
+@(private)
 draw_m8_device_network :: proc(renderer: ^Renderer, room: ^game.Room) {
     network := game.query_board_device_network(room)
     blue := rl.Color{88, 176, 230, 130} if network.ready else rl.Color{76, 101, 128, 85}
@@ -92,6 +95,7 @@ draw_m8_device_network :: proc(renderer: ^Renderer, room: ^game.Room) {
 
 // Clip each short beam section against current visibility. This keeps a wire
 // from disclosing the position of its unseen endpoint through tactical fog.
+@(private = "file")
 draw_m8_tesla_link :: proc(renderer: ^Renderer, a,b: grid.Position, ready: bool) {
     start := rl.Vector3{f32(a.x)+0.5,0,f32(a.y)+0.5}
     delta := rl.Vector3{f32(b.x-a.x),0,f32(b.y-a.y)}

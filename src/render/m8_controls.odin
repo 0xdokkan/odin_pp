@@ -2,7 +2,7 @@ package render
 
 import rl "vendor:raylib"
 import game "../game"
-import view "../view"
+import view "../engine/view"
 
 M8_Control :: enum {None, Activate, Equip, Character}
 
@@ -13,6 +13,7 @@ m8_active_bar_bounds :: proc(renderer: ^Renderer, room: ^game.Room = nil) -> rl.
 }
 
 // The bar in a fight, or in the footer once the room is cleared (`loot`).
+@(private)
 m8_bar_bounds :: proc(renderer: ^Renderer, loot: bool) -> rl.Rectangle {
     width := min(f32(932), renderer.canvas_width-28)
     return {(renderer.canvas_width-width)*0.5, renderer.canvas_height-(46 if loot else 218), width, 28}
@@ -37,11 +38,13 @@ m8_weapon_bounds :: proc(renderer: ^Renderer, room: ^game.Room) -> rl.Rectangle 
     return {b.x+b.width*0.28,b.y,b.width*0.35-6,b.height}
 }
 
+@(private)
 m8_trap_status_bounds :: proc(renderer: ^Renderer, room: ^game.Room) -> rl.Rectangle {
     b := m8_active_bar_bounds(renderer,room)
     return {b.x,b.y-20,min(b.width,370),16}
 }
 
+@(private)
 m8_control_visible :: proc(room: ^game.Room, control: M8_Control) -> bool {
     if room == nil || room.player == nil || (room.phase != .Combat && room.phase != .Loot) {return false}
     switch control {
@@ -68,11 +71,12 @@ m8_hud_contains_point :: proc(renderer: ^Renderer, room: ^game.Room, point: view
 // is drawn off (first_person_owns_pointer).
 @(private)
 m8_controls_allow_pointer :: proc(renderer: ^Renderer, room: ^game.Room) -> bool {
-    return !(renderer == nil || room == nil || room.player == nil || !renderer.tactical.enabled ||
+    return !(renderer == nil || room == nil || room.player == nil ||
        (room.phase != .Combat && room.phase != .Loot) || room.qte.kind != .None ||
        game.tactical_is_casting(room) || renderer_blocks_player_input(renderer) || first_person_owns_pointer(renderer, room))
 }
 
+@(private)
 m8_control_enabled :: proc(renderer: ^Renderer, room: ^game.Room, control: M8_Control) -> bool {
     if !m8_controls_allow_pointer(renderer,room) || !m8_control_visible(room,control) { return false }
     switch control {

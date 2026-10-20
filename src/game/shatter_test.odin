@@ -1,7 +1,7 @@
 package game
 
 import "core:testing"
-import grid "../grid"
+import grid "../engine/grid"
 import level "../level"
 
 // sides 4 is the 2D4 of an unupgraded Sundering Blow.
@@ -52,7 +52,7 @@ test_sunder_card_is_append_only_collectible_and_previews_minimum_damage_without_
 }
 
 @(test)
-test_sunder_two_dice_commit_total_damage_and_raw_eight_threshold_with_one_pulse :: proc(t: ^testing.T) {
+test_sunder_two_dice_commit_total_damage_and_raw_eight_threshold_without_advancing_the_world :: proc(t: ^testing.T) {
 	for total in i32(7)..=i32(8) {
 		data := spell_test_level(t)
 		// Three upgrades: 2D10, and still no bonus on top of the dice.
@@ -72,11 +72,11 @@ test_sunder_two_dice_commit_total_damage_and_raw_eight_threshold_with_one_pulse 
 		testing.expect_value(t, room.enemies[0].health, i32(40)-total)
 		testing.expect_value(t, room.enemies[0].position, grid.Position{4, 1} if total == 8 else grid.Position{3, 1})
 		testing.expect_value(t, spell_test_event_count(&play.action_report.events, .Moved), 1 if total == 8 else 0)
-		testing.expect_value(t, spell_test_event_count(&room.recent_events, .Dice_Rolled), 1)
-		testing.expect_value(t, spell_test_event_count(&room.recent_events, .Card_Played), 1)
-		testing.expect_value(t, spell_test_event_count(&room.recent_events, .Card_Drawn), 1)
-		testing.expect_value(t, spell_test_event_count(&room.recent_events, .Pulse_Advanced), 1)
-		testing.expect_value(t, player.deck.energy, i32(2))
+		testing.expect_value(t, spell_test_event_count(room.recent_events, .Dice_Rolled), 1)
+		testing.expect_value(t, spell_test_event_count(room.recent_events, .Card_Played), 1)
+		testing.expect_value(t, spell_test_event_count(room.recent_events, .Card_Drawn), 0)
+		testing.expect_value(t, spell_test_event_count(room.recent_events, .Pulse_Advanced), 0)
+		testing.expect_value(t, player.deck.energy, i32(1))
 		testing.expect_value(t, room.recent_events.events[0].kind, Game_Event_Kind.Card_Played)
 		dice_event := room.recent_events.events[1]
 		testing.expect_value(t, dice_event.kind, Game_Event_Kind.Dice_Rolled)
@@ -170,11 +170,11 @@ test_sunder_lethal_hit_does_not_move_removed_target_and_commits_both_dice :: pro
 	play := play_card(&room, player.deck.hand[0].id, entity_target(enemy_entity(1)))
 	testing.expect_value(t, play.result, Card_Play_Result.Combat_Ended)
 	testing.expect_value(t, player.dice.roll_count, u64(2))
-	testing.expect_value(t, spell_test_event_count(&room.recent_events, .Moved), 0)
-	testing.expect_value(t, spell_test_event_count(&room.recent_events, .Spell_Impact), 1)
-	testing.expect_value(t, spell_test_event_count(&room.recent_events, .Dice_Rolled), 1)
+	testing.expect_value(t, spell_test_event_count(room.recent_events, .Moved), 0)
+	testing.expect_value(t, spell_test_event_count(room.recent_events, .Spell_Impact), 1)
+	testing.expect_value(t, spell_test_event_count(room.recent_events, .Dice_Rolled), 1)
 	testing.expect_value(t, room.pulse_count, u64(0))
-	testing.expect(t, !play.drew_card && !player.deck.combat_active)
+	testing.expect(t, !player.deck.combat_active)
 	testing.expect_value(t, len(room.enemies), 0)
 }
 
@@ -196,10 +196,9 @@ test_sunder_reaction_death_stops_the_command_without_pulse_or_draw :: proc(t: ^t
 	testing.expect_value(t, room.enemies[0].health, i32(33))
 	testing.expect_value(t, player.dice.roll_count, u64(2))
 	testing.expect_value(t, play.action_report.reactions_triggered, 1)
-	testing.expect_value(t, spell_test_event_count(&room.recent_events, .Spell_Impact), 1)
-	testing.expect_value(t, spell_test_event_count(&room.recent_events, .Moved), 0)
+	testing.expect_value(t, spell_test_event_count(room.recent_events, .Spell_Impact), 1)
+	testing.expect_value(t, spell_test_event_count(room.recent_events, .Moved), 0)
 	testing.expect_value(t, room.pulse_count, u64(0))
-	testing.expect(t, !play.drew_card)
 }
 
 @(test)

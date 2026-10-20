@@ -106,6 +106,7 @@ Lab_Sounds :: struct {
 }
 
 // A fresh board hears afresh.
+@(private)
 lab_sounds_reset :: proc(renderer: ^Renderer) {
 	if renderer == nil || renderer.tactical.lab_sounds == nil { return }
 	played := renderer.tactical.lab_sounds.played
@@ -121,10 +122,12 @@ lab_sounds_reset :: proc(renderer: ^Renderer) {
 }
 
 // The bong's pitch for a foe struck at `value`, the card's being `base`.
+@(private)
 lab_bong_pitch :: proc(value, base: i32) -> f32 {
 	return LAB_BONG_PITCH+LAB_BONG_PITCH_PER_VALUE*f32(clamp(value-base, 0, LAB_BONG_STEPS))
 }
 
+@(private)
 destroy_lab_sounds :: proc(renderer: ^Renderer) {
 	if renderer == nil || renderer.tactical.lab_sounds == nil { return }
 	free(renderer.tactical.lab_sounds)
@@ -132,10 +135,12 @@ destroy_lab_sounds :: proc(renderer: ^Renderer) {
 }
 
 // The whirr's pitch after `turns` full turns of the rope.
+@(private)
 lab_whirr_pitch :: proc(turns: i32) -> f32 {
 	return LAB_WHIRR_PITCH+LAB_WHIRR_PITCH_PER_TURN*f32(clamp(turns, 0, LAB_WHIRR_TURNS))
 }
 
+@(private)
 lab_sound_queue :: proc(s: ^Lab_Sounds, sfx: audio.Lab_Sfx, at: f64, volume: f32 = 1, pan: f32 = 0, pitch: f32 = 0) {
 	if at-s.last_played[sfx] < LAB_SOUND_REPEAT_SECONDS && at >= s.last_played[sfx] { return }
 	s.last_played[sfx] = at
@@ -146,6 +151,7 @@ lab_sound_queue :: proc(s: ^Lab_Sounds, sfx: audio.Lab_Sfx, at: f64, volume: f32
 
 // Left and right on the screen: the board's width, softened; behind the
 // player's eyes, left and right of the eye.
+@(private)
 lab_sound_pan :: proc(renderer: ^Renderer, entity: game.Entity_Ref) -> f32 {
 	actor, ok := presentation_actor_in_view(renderer.tactical.snapshot, entity)
 	if !ok || renderer.canvas_width <= 0 { return 0 }
@@ -160,6 +166,7 @@ lab_sound_pan :: proc(renderer: ^Renderer, entity: game.Entity_Ref) -> f32 {
 	return clamp((at.x/f32(renderer.canvas_width))*2-1, -1, 1)*0.55
 }
 
+@(private)
 lab_sound_heard :: proc(s: ^Lab_Sounds, kind: Presentation_Cue_Kind, event: game.Game_Event, now: f64, batch := u32(0)) -> bool {
 	for heard in s.heard {
 		if heard.at > 0 && now-heard.at < LAB_SOUND_HEARD_SECONDS && heard.kind == kind && heard.batch == batch && heard.event == event { return true }
@@ -171,6 +178,7 @@ lab_sound_heard :: proc(s: ^Lab_Sounds, kind: Presentation_Cue_Kind, event: game
 
 // A character's sound for the clip its card just started. `cause` is the cue
 // that started it (.Move for a step); `shot`, an attack that looses a shot.
+@(private)
 lab_actor_sfx :: proc(character: gfx.Flipbook_Character, action: gfx.Living_Action, cause: Presentation_Cue_Kind,
 	travelled: int, shot := false) -> (sfx: audio.Lab_Sfx, ok: bool) {
 	// A blocked step bumps (the cue's own sound); a stopped blow is a block.
@@ -244,6 +252,7 @@ lab_actor_sfx :: proc(character: gfx.Flipbook_Character, action: gfx.Living_Acti
 }
 
 // The loop a card falls into: an enemy's telegraph, the pilgrim's daze.
+@(private)
 lab_base_sfx :: proc(character: gfx.Flipbook_Character, base: gfx.Living_Action) -> (sfx: audio.Lab_Sfx, ok: bool) {
 	#partial switch base {
 	case .Windup:
@@ -255,58 +264,6 @@ lab_base_sfx :: proc(character: gfx.Flipbook_Character, base: gfx.Living_Action)
 		}
 	case .Stunned:
 		if character == .Pilgrim { return .Pilgrim_Stunned, true }
-	}
-	return
-}
-
-lab_card_sfx :: proc(card: game.Card_Id) -> (sfx: audio.Lab_Sfx, ok: bool) {
-	switch card {
-	case .Strike: return .Card_Strike, true
-	case .Arc_Bolt: return .Card_Arc_Bolt, true
-	case .Piercing_Ray: return .Card_Piercing_Ray, true
-	case .Cross_Slash: return .Card_Cross_Slash, true
-	case .Firebomb: return .Card_Firebomb, true
-	case .Guard: return .Card_Guard, true
-	case .Toxic_Wave: return .Card_Toxic_Wave, true
-	case .Thorn_Coat: return .Card_Thorn_Coat, true
-	case .Afterimage: return .Card_Afterimage, true
-	case .Counter_Rune: return .Card_Counter_Rune, true
-	case .Battle_Focus: return .Card_Battle_Focus, true
-	case .Calculated_Risk: return .Card_Calculated_Risk, true
-	case .Spark_Forge: return .Card_Spark_Forge, true
-	case .Spark: return .Card_Spark, true
-	case .Shove: return .Card_Shove, true
-	case .Dash: return .Card_Dash, true
-	case .Grappling_Hook: return .Card_Grappling_Hook, true
-	case .Heavy_Blow: return .Card_Heavy_Blow, true
-	case .Venom_Needle: return .Card_Venom_Needle, true
-	case .Caustic_Bloom: return .Card_Caustic_Bloom, true
-	case .Purifying_Guard: return .Card_Purifying_Guard, true
-	case .Volatile_Study: return .Card_Volatile_Study, true
-	case .Fate_Strike: return .Card_Fate_Strike, true
-	case .Chain_Lightning: return .Card_Chain_Lightning, true
-	case .Sundering_Blow: return .Card_Sundering_Blow, true
-	case .Prismatic_Barrage: return .Card_Prismatic_Barrage, true
-	case .Twin_Venom: return .Card_Twin_Venom, true
-	case .Shock_Floor: return .Card_Shock_Floor, true
-	case .Tesla_Coil: return .Card_Tesla_Coil, true
-	case .Titan_Grip: return .Card_Titan_Grip, true
-	case .Storm_Crown: return .Card_Storm_Crown, true
-	case .Sei_Denari: return .Card_Sei_Denari, true
-	case .Sette_Denari: return .Card_Sette_Denari, true
-	case .Shadow_Step: return .Card_Shadow_Step, true
-	case .Poison_Pool: return .Card_Poison_Pool, true
-	case .Wildfire: return .Card_Wildfire, true
-	case .Deflect: return .Card_Deflect, true
-	case .Coffin: return .Card_Coffin, true
-	case .Fate_Dice: return .Card_Fate_Dice, true
-	case .Venom_Blade: return .Card_Venom_Blade, true
-	case .Lasso: return .Card_Lasso, true
-	// Heard as the rod is cast (lab_cue_sounds): it is never played.
-	case .Fishing_Rod: return .Card_Fishing_Rod, true
-	case .Pinball: return LAB_PINBALL_CARD, true
-	case .First_Person: return LAB_FIRST_PERSON_CARD, true
-	case .Count:
 	}
 	return
 }
@@ -329,6 +286,7 @@ lab_status_sfx :: proc(status: game.Status_Kind) -> (sfx: audio.Lab_Sfx, ok: boo
 	return
 }
 
+@(private = "file")
 lab_object_kind :: proc(renderer: ^Renderer, entity: game.Entity_Ref) -> (kind: game.Grid_Object_Kind, ok: bool) {
 	snapshot := renderer.tactical.snapshot
 	if snapshot == nil || entity.kind != .Object { return }
@@ -340,6 +298,7 @@ lab_object_kind :: proc(renderer: ^Renderer, entity: game.Entity_Ref) -> (kind: 
 
 // A cue's own sound: cards, devices, rewards, statuses. Characters' actions
 // sound through their cards' clips (lab_actor_sfx).
+@(private)
 lab_cue_sounds :: proc(renderer: ^Renderer, s: ^Lab_Sounds, cue: ^Presentation_Cue, now: f64, impacts: ^int) {
 	event := cue.event
 	pan := lab_sound_pan(renderer, event.target)
@@ -455,6 +414,7 @@ lab_cue_sounds :: proc(renderer: ^Renderer, s: ^Lab_Sounds, cue: ^Presentation_C
 }
 
 // Once per frame with the living cards, in the lab only.
+@(private)
 update_lab_sounds :: proc(renderer: ^Renderer, room: ^game.Room, now: f64) {
 	v := &renderer.tactical
 	if !v.mechanics_lab || v.living_state == nil || room == nil || room.player == nil { return }
@@ -565,6 +525,7 @@ update_lab_sounds :: proc(renderer: ^Renderer, room: ^game.Room, now: f64) {
 }
 
 // The room's own moments: the clock, criticals, the window, the defence.
+@(private)
 lab_watch_room :: proc(s: ^Lab_Sounds, room: ^game.Room, now: f64) {
 	t := &room.player.tactical
 	arrived := false
@@ -578,7 +539,7 @@ lab_watch_room :: proc(s: ^Lab_Sounds, room: ^game.Room, now: f64) {
 	}
 	if !s.watching {
 		s.watching = true
-	} else if game.tactical_enabled(room) && room.phase == .Combat {
+	} else if room.phase == .Combat {
 		if t.beat_index > s.beat && t.phase == .Decision { lab_sound_queue(s, .Ui_Beat_Tick, now) }
 		if t.beat_spent != s.beat_spent && t.beat_spent != 0 { lab_sound_queue(s, .Ui_Critical, now) }
 		if t.phase != s.phase {

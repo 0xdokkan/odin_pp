@@ -92,16 +92,16 @@ destroy :: proc(ctx: ^Context) {
 	free(ctx)
 }
 
-// Samples raylib for navigation and the left button; `mouse` is canvas space.
-begin_frame :: proc(ctx: ^Context, mouse: [2]f32, inside: bool, dt: f32) {
+// Maps the host frame for navigation and the left button; `mouse` is canvas space.
+begin_frame :: proc(ctx: ^Context, mouse: [2]f32, inside: bool, dt: f32, devices: ^input.Device_Snapshot) {
 	p := Pointer{
 		position = mouse,
 		inside   = inside,
-		pressed  = inside && rl.IsMouseButtonPressed(.LEFT),
-		down     = rl.IsMouseButtonDown(.LEFT),
-		released = rl.IsMouseButtonReleased(.LEFT),
+		pressed  = inside && input.mouse_pressed(devices, .LEFT),
+		down     = input.mouse_down(devices, .LEFT),
+		released = input.mouse_released(devices, .LEFT),
 	}
-	begin(ctx, p, input.sample(&ctx.nav_map), dt)
+	begin(ctx, p, input.sample(&ctx.nav_map, devices), dt)
 }
 
 // Pure entry point used by tests and by begin_frame.

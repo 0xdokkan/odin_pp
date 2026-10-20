@@ -235,7 +235,7 @@ game_step :: proc(data: rawptr, frame: ^host.Frame, playing: bool) -> host.Round
 	command: Action
 	has_command := false
 	if frame.focused {
-		if input.advance_resumable(&g.controls, &g.input_gate, input.sample(&g.actions), dt, bit_set[Action]{}) {
+		if input.advance_resumable(&g.controls, &g.input_gate, input.sample(&g.actions, frame.devices), dt, bit_set[Action]{}) {
 			g.repeat = {}
 		}
 		command, has_command = repeat_update(&g.repeat, &g.controls, dt)

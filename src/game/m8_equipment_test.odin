@@ -53,24 +53,19 @@ test_m8_weapon_reserve_is_transactional_and_swaps_remaining_uses :: proc(t: ^tes
 }
 
 @(test)
-test_m8_brute_drops_weapon_only_in_tactical_and_pickup_stays_unequipped :: proc(t: ^testing.T) {
-	for tactical in ([?]bool{false, true}) {
-		data := create_test_level(t)
-		player := create_test_player(t)
-		spawns := [?]Enemy_Spawn{{position = {2, 1}, health = 1, attack = 1, archetype = .Brute, drops_healing = true}}
-		room, ok := create_room(&data, &player, {enemies = spawns[:]})
-		testing.expect(t, ok)
-		if tactical { configure_tactical_room(&room, DEFAULT_TACTICAL_CONFIG) }
-		drops, count := kill_enemy(&room, 0)
-		testing.expect_value(t, count, 3 if tactical else 2)
-		if tactical {
-			testing.expect_value(t, drops[2].kind, Loot_Kind.Weapon)
-			testing.expect_value(t, drops[2].weapon_id, Weapon_Id.Iron_Cleaver)
-		}
-		collect_loot_in_magnet_range(&room)
-		testing.expect_value(t, player.equipment.weapon, Weapon_Slot{})
-		testing.expect_value(t, player.equipment.reserve.id, Weapon_Id.Iron_Cleaver if tactical else Weapon_Id.None)
-		destroy_room(&room)
-		level.destroy(&data)
-	}
+test_m8_brute_drops_weapon_and_pickup_stays_unequipped :: proc(t: ^testing.T) {
+	data := create_test_level(t)
+	defer level.destroy(&data)
+	player := create_test_player(t)
+	spawns := [?]Enemy_Spawn{{position = {2, 1}, health = 1, attack = 1, archetype = .Brute, drops_healing = true}}
+	room, ok := create_room(&data, &player, {enemies = spawns[:]})
+	testing.expect(t, ok)
+	defer destroy_room(&room)
+	drops, count := kill_enemy(&room, 0)
+	testing.expect_value(t, count, 3)
+	testing.expect_value(t, drops[2].kind, Loot_Kind.Weapon)
+	testing.expect_value(t, drops[2].weapon_id, Weapon_Id.Iron_Cleaver)
+	collect_loot_in_magnet_range(&room)
+	testing.expect_value(t, player.equipment.weapon, Weapon_Slot{})
+	testing.expect_value(t, player.equipment.reserve.id, Weapon_Id.Iron_Cleaver)
 }

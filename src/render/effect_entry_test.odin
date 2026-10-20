@@ -94,7 +94,7 @@ test_character_sheet_deck_lines_group_by_card_and_level_and_page :: proc(t: ^tes
 	}
 	room := game.Room{player = &player, level_data = &data}
 	renderer := Renderer{canvas_width = 960, canvas_height = 540}
-	renderer.tactical.enabled = true
+
 	layout := character_sheet_deck_layout(&renderer, &room, 0)
 	testing.expect_value(t, layout.row_count, 7)
 	expected := [?]struct{id: game.Card_Id, level: i32, count: int}{{.Strike, 0, 2}, {.Guard, 0, 2}, {.Strike, 1, 1}, {.Pinball, 2, 1},
@@ -158,7 +158,7 @@ test_inspector_effect_follows_the_inspector :: proc(t: ^testing.T) {
 	renderer := new(Renderer)
 	defer free(renderer)
 	renderer.canvas_width, renderer.canvas_height = 960, 540
-	renderer.tactical.enabled = true
+
 	testing.expect_value(t, player.deck.hand_count, 2)
 	first, second := player.deck.hand[0], player.deck.hand[1]
 	button := tactical_inspector_effect_bounds()

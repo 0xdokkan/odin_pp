@@ -78,7 +78,7 @@ test_flipbook_every_action_resolves_to_a_drawn_clip :: proc(t: ^testing.T) {
 flipbook_test_renderer :: proc() -> ^Renderer {
 	renderer := new(Renderer)
 	renderer.canvas_width, renderer.canvas_height = 960, 540
-	renderer.tactical.enabled, renderer.tactical.scene_3d, renderer.tactical.no_fog = true, true, true
+	renderer.tactical.no_fog = true
 	renderer.tactical.camera = tactical_orbit_camera({yaw = 0.78, pitch = 0.68, distance = 12.5}, {3.5, 0, 3.5}, true)
 	renderer.tactical.flipbook.loaded = true
 	renderer.tactical.flipbook_state = new(Flipbook_State)

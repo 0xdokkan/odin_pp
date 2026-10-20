@@ -8,6 +8,7 @@ Card_Rarity_Weights :: struct {
 	common, uncommon, rare: u32,
 }
 
+@(private)
 card_rarity_weights :: proc(kind: Node_Kind, depth: int) -> (result: Card_Rarity_Weights, ok: bool) {
 	if depth < 0 || !node_kind_is_valid(kind) ||
 	   (kind != .Combat && kind != .Elite && kind != .Boss && kind != .Shop && kind != .Event) {
@@ -45,6 +46,7 @@ card_rarity_weights :: proc(kind: Node_Kind, depth: int) -> (result: Card_Rarity
 	}, true
 }
 
+@(private)
 card_rarity_weight :: proc(weights: Card_Rarity_Weights, rarity: Card_Rarity) -> u32 {
 	switch rarity {
 	case .Common:
@@ -73,14 +75,12 @@ card_offer_exclusions :: proc(deck: ^Deck_State, ignore: u32 = 0) -> (excluded: 
 	return
 }
 
-// `tactical` is the run's mode: a classic run is never offered the cards that
-// need the tactical clock (card_requires_tactical). `excluded` are left out
-// (card_offer_exclusions).
-card_offer_weight :: proc(definition: Card_Definition, node: ^Run_Node, profile: ^M8_Profile = nil, tactical := true,
+// Explicit exclusions come from the cards already owned (card_offer_exclusions).
+card_offer_weight :: proc(definition: Card_Definition, node: ^Run_Node, profile: ^M8_Profile = nil,
 	excluded: Card_Offer_Exclusions = {}) -> u64 {
 	validated_definition := definition
 	if node == nil || !validate_card_definition(&validated_definition) || definition.temporary_only || !m8_card_unlocked(definition.id, profile) ||
-	   card_is_scopa(definition.id) || (!tactical && card_requires_tactical(definition.id)) || definition.id in excluded {
+	   card_is_scopa(definition.id) || definition.id in excluded {
 		return 0
 	}
 	weights, ok := card_rarity_weights(node.kind, node.depth)
@@ -91,6 +91,7 @@ card_offer_weight :: proc(definition: Card_Definition, node: ^Run_Node, profile:
 	return u64(rarity_weight)*u64(definition.reward_weight)
 }
 
+@(private)
 economy_next_random :: proc(random_state: ^u64) -> u64 {
 	assert(random_state != nil && random_state^ != 0)
 	return rng.step(random_state)
@@ -101,7 +102,6 @@ generate_weighted_card_choices :: proc(
 	node: ^Run_Node,
 	destination: []Card_Id,
 	profile: ^M8_Profile = nil,
-	tactical := true,
 	excluded: Card_Offer_Exclusions = {},
 ) -> bool {
 	if random_state == nil || random_state^ == 0 || node == nil || node.depth < 0 ||
@@ -110,7 +110,8 @@ generate_weighted_card_choices :: proc(
 	}
 	collectible_count := 0
 	for definition in CARD_DEFINITIONS {
-		if card_offer_weight(definition, node, profile, tactical, excluded) > 0 {
+		if definition.id == .Count { continue }
+		if card_offer_weight(definition, node, profile, excluded) > 0 {
 			collectible_count += 1
 		}
 	}
@@ -124,8 +125,9 @@ generate_weighted_card_choices :: proc(
 	for choice_index in 0..<len(destination) {
 		total_weight: u64
 		for definition in CARD_DEFINITIONS {
+			if definition.id == .Count { continue }
 			if !selected[int(definition.id)] {
-				total_weight += card_offer_weight(definition, node, profile, tactical, excluded)
+				total_weight += card_offer_weight(definition, node, profile, excluded)
 			}
 		}
 		if total_weight == 0 {
@@ -135,10 +137,11 @@ generate_weighted_card_choices :: proc(
 		roll := economy_next_random(&staged_random_state)%total_weight
 		chosen := Card_Id.Count
 		for definition in CARD_DEFINITIONS {
+			if definition.id == .Count { continue }
 			if selected[int(definition.id)] {
 				continue
 			}
-			weight := card_offer_weight(definition, node, profile, tactical, excluded)
+			weight := card_offer_weight(definition, node, profile, excluded)
 			if roll < weight {
 				chosen = definition.id
 				break

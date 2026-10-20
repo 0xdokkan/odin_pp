@@ -6,7 +6,7 @@ import "core:testing"
 test_tactical_card_catalog_has_bounded_nonzero_time_costs :: proc(t: ^testing.T) {
 	for index in 0..<int(Card_Id.Count) {
 		id := Card_Id(index)
-		definition, found := card_definition_by_id(id, true)
+		definition, found := card_definition_by_id(id)
 		testing.expect(t, found)
 		cost := tactical_card_time_cost(id)
 		// Movimento Ombra stands outside the window: its four seconds freeze

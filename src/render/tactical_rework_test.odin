@@ -24,7 +24,7 @@ test_reworked_card_costs_replay_in_the_same_catalog_as_the_hand :: proc(t: ^test
 	testing.expect_value(t, play.result, game.Card_Play_Result.Played)
 	after := capture_room_presentation(&room)
 	timeline: Presentation_Timeline
-	testing.expect(t, begin_event_timeline(&timeline, before, &room.recent_events, &after))
+	testing.expect(t, begin_event_timeline(&timeline, before, room.recent_events, &after))
 	for _ in 0..<100 {
 		if !event_timeline_is_busy(&timeline) { break }
 		update_event_timeline(&timeline, 1)
@@ -34,8 +34,7 @@ test_reworked_card_costs_replay_in_the_same_catalog_as_the_hand :: proc(t: ^test
 	testing.expect_value(t, timeline.view.deck, player.deck)
 	testing.expect_value(t, timeline.view.player.statuses, player.statuses)
 	testing.expect_value(t, player.deck.energy, i32(2))
-	d, _ := game.card_definition_by_id(.Dash, true)
-	first, second := gothic_card_lines({definition_id = .Dash}, d.tactical)
+	first, second := gothic_card_lines({definition_id = .Dash})
 	testing.expect_value(t, string(first), "MUOVI 1-4 / SCUDO 2")
 	testing.expect_value(t, string(second), "SCUDO PRIMA / 2s")
 }
@@ -55,9 +54,9 @@ test_survey_visibility_waits_for_the_presented_status_then_forgets_it :: proc(t:
 	room, built := game.create_room(&data, &player, {enemies = enemies[:]})
 	testing.expect(t, built)
 	defer game.destroy_room(&room)
-	renderer := create(960, 540, &data)
+	renderer := create(960, 540)
 	snapshot: Room_Presentation
-	renderer.tactical = {enabled = true, snapshot = &snapshot}
+	renderer.tactical = {snapshot = &snapshot}
 	update_tactical_view(&renderer, &room, {}, false)
 	renderer.timeline.view = snapshot
 	renderer.timeline.count = 1

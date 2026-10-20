@@ -5,7 +5,8 @@ package host
 
 import "core:strings"
 import rl "vendor:raylib"
-import app "../../app"
+import app "../app"
+import input "../input"
 import audio "../audio"
 import gui "../ui"
 import save "../save"
@@ -26,6 +27,8 @@ Result :: struct {
 }
 
 Frame :: struct {
+	// Shared, read-only and borrowed for this host frame; scenes retain mapped values.
+	devices:        ^input.Device_Snapshot,
 	dt:             f32,
 	time:           f64,
 	index:          u64,

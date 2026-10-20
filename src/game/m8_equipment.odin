@@ -50,6 +50,7 @@ player_basic_attack_damage :: proc(player: ^Player) -> i32 {
 	return damage
 }
 
+@(private)
 consume_equipped_weapon_use :: proc(player: ^Player) {
 	if player == nil || player.equipment.weapon.id == .None { return }
 	assert(weapon_slot_valid(player.equipment.weapon))

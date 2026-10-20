@@ -23,6 +23,7 @@ Resin_Lighting :: struct {
 // Bind one resin pass. Callers keep their shader-availability guards and pair
 // this with EndShaderMode after their geometry. Scene presets stay with the
 // scene; the uniform contract belongs to the material.
+@(private)
 begin_resin_lighting :: proc(renderer: ^Renderer, lighting: Resin_Lighting) {
 	v := &renderer.tactical
 	values := lighting
@@ -134,6 +135,7 @@ void main() {
     finalColor = vec4(mix(lit,vec3(0.02,0.03,0.055),mist),material.a);
 }`
 
+@(private)
 draw_resin_cube_v :: proc(renderer: ^Renderer, position, size: rl.Vector3, color: rl.Color) {
 	mesh := &renderer.tactical.block_mesh
 	bevel := min(f32(0.055), min(size.x, min(size.y, size.z))*0.22)
@@ -160,6 +162,7 @@ draw_resin_cube_v :: proc(renderer: ^Renderer, position, size: rl.Vector3, color
 	rlgl.SetTexture(0)
 }
 
+@(private)
 draw_resin_cube :: proc(renderer: ^Renderer, position: rl.Vector3, width, height, length: f32, color: rl.Color) {
 	draw_resin_cube_v(renderer, position, {width, height, length}, color)
 }

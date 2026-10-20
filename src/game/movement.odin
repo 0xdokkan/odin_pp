@@ -1,6 +1,6 @@
 package game
 
-import grid "../grid"
+import grid "../engine/grid"
 
 MAX_MOVEMENT_PATH_CELLS :: MAX_TARGETING_PATH_CELLS
 
@@ -34,6 +34,7 @@ Movement_Query :: struct {
 	has_blocker: bool,
 }
 
+@(private = "file")
 movement_actor_blocks :: proc(
 	room: ^Room,
 	mover: Entity_Ref,
@@ -65,6 +66,7 @@ movement_actor_blocks :: proc(
 	return true
 }
 
+@(private = "file")
 movement_object_blocks :: proc(
 	room: ^Room,
 	mover: Entity_Ref,
@@ -82,6 +84,7 @@ movement_object_blocks :: proc(
 	return occupied
 }
 
+@(private = "file")
 movement_path_blocker :: proc(
 	room: ^Room,
 	origin: grid.Position,
@@ -146,6 +149,7 @@ query_entity_movement :: proc(
 
 // The same rules from an explicit origin: the shadow of Movimento Ombra walks
 // away from the body that stays at player.position (tactical_shadow.odin).
+@(private)
 query_movement_from :: proc(
 	room: ^Room,
 	mover: Entity_Ref,
@@ -229,6 +233,7 @@ movement_query_is_clear :: proc(query: ^Movement_Query) -> bool {
 	       query.count <= MAX_MOVEMENT_PATH_CELLS && !query.has_blocker
 }
 
+@(private = "file")
 set_entity_position :: proc(room: ^Room, entity: Entity_Ref, position: grid.Position) {
 	assert(room != nil && room.player != nil)
 	switch entity.kind {
@@ -247,6 +252,7 @@ set_entity_position :: proc(room: ^Room, entity: Entity_Ref, position: grid.Posi
 	}
 }
 
+@(private)
 apply_movement_effect :: proc(
 	room: ^Room,
 	source: Entity_Ref,
@@ -297,6 +303,7 @@ apply_movement_effect :: proc(
 // What a cell does to whoever enters it: a shock floor's trap, a hazard's
 // bite, a pool's Veleno or a fire's Bruciatura. Every cell a movement enters,
 // and the Lazzo's foe falling where it was held (lasso.odin).
+@(private)
 trigger_cell_entry :: proc(room: ^Room, target: Entity_Ref, report: ^Action_Report) {
 	trigger_shock_floors_on_entry(room, target, &report.events)
 	trigger_cell_hazard(room, target, report)

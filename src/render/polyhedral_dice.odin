@@ -27,6 +27,7 @@ Polyhedral_Die :: struct {
 	triangle_count: int,
 }
 
+@(private)
 polyhedral_die_for_sides :: proc(sides: int) -> Polyhedral_Die_Kind {
 	switch sides {
 	case 4: return .D4
@@ -53,12 +54,14 @@ polyhedral_die_name :: proc(kind: Polyhedral_Die_Kind) -> cstring {
 	unreachable()
 }
 
+@(private = "file")
 polyhedral_add_vertex :: proc(die: ^Polyhedral_Die, vertex: rl.Vector3) {
 	assert(die.vertex_count < len(die.vertices))
 	die.vertices[die.vertex_count] = vertex
 	die.vertex_count += 1
 }
 
+@(private = "file")
 polyhedral_sort_polygon :: proc(points: []rl.Vector3, center, normal: rl.Vector3) {
 	u := rl.Vector3Normalize(points[0]-center)
 	v := rl.Vector3CrossProduct(normal, u)
@@ -77,6 +80,7 @@ polyhedral_sort_polygon :: proc(points: []rl.Vector3, center, normal: rl.Vector3
 
 // Convex face extraction runs only during creation; coplanar supporting planes
 // are merged into one polygon, so D10 stays ten kites, not twenty triangles.
+@(private = "file")
 polyhedral_build_faces :: proc(die: ^Polyhedral_Die) {
 	epsilon :: f32(0.0001)
 	for a in 0..<die.vertex_count-2 {
@@ -134,6 +138,7 @@ polyhedral_build_faces :: proc(die: ^Polyhedral_Die) {
 	}
 }
 
+@(private = "file")
 polyhedral_assign_numbers :: proc(die: ^Polyhedral_Die) {
 	if die.kind == .D4 {
 		// Face values identify the opposite vertex; visible labels instead use
@@ -168,10 +173,12 @@ polyhedral_assign_numbers :: proc(die: ^Polyhedral_Die) {
 	}
 }
 
+@(private = "file")
 polyhedral_inset_vertex :: proc(die: ^Polyhedral_Die, face: Polyhedral_Face, index: int) -> rl.Vector3 {
 	return die.vertices[index]*(1-POLYHEDRAL_BEVEL)+face.center*POLYHEDRAL_BEVEL
 }
 
+@(private = "file")
 polyhedral_add_triangle :: proc(die: ^Polyhedral_Die, a, b, c: rl.Vector3, bevel: bool) {
 	assert(die.triangle_count < len(die.triangles))
 	normal := rl.Vector3Normalize(rl.Vector3CrossProduct(b-a, c-a))
@@ -182,6 +189,7 @@ polyhedral_add_triangle :: proc(die: ^Polyhedral_Die, a, b, c: rl.Vector3, bevel
 	die.triangle_count += 1
 }
 
+@(private = "file")
 polyhedral_bevel_mesh :: proc(die: ^Polyhedral_Die) {
 	for face, face_index in die.faces[:die.face_count] {
 		a := polyhedral_inset_vertex(die, face, face.vertices[0])
@@ -271,6 +279,7 @@ build_polyhedral_die :: proc(kind: Polyhedral_Die_Kind) -> (die: Polyhedral_Die)
 	return
 }
 
+@(private)
 polyhedral_face_for_result :: proc(die: ^Polyhedral_Die, result: i32) -> int {
 	for face, index in die.faces[:die.face_count] {if face.value == result {return index}}
 	return 0
@@ -278,6 +287,7 @@ polyhedral_face_for_result :: proc(die: ^Polyhedral_Die, result: i32) -> int {
 
 // Numbering belongs to the solid permanently. Only its orientation changes to
 // present the already committed game result. The final pose has a flat base.
+@(private)
 polyhedral_result_orientation :: proc(die: ^Polyhedral_Die, result: i32) -> rl.Quaternion {
 	if die == nil || die.face_count == 0 {return rl.Quaternion(1)}
 	if die.kind == .D4 {
@@ -311,6 +321,7 @@ polyhedral_support_height :: proc(die: ^Polyhedral_Die, rotation: rl.Quaternion)
 // A face's figures. The set's D10 reads 0-9, its 0 the 10, as the dice-set lab
 // shows it; with `values` (the dice thrown in play) the 10 reads 10, as the
 // cards name that face.
+@(private)
 polyhedral_face_label :: proc(die: ^Polyhedral_Die, face: Polyhedral_Face, values := false) -> (digits: [2]int, count: int) {
 	value := face.value
 	if die.kind == .D10 && value == 10 && !values {value = 0}

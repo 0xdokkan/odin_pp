@@ -1,7 +1,7 @@
 package render
 
 import rl "vendor:raylib"
-import view "../view"
+import view "../engine/view"
 
 // Independent test geometry shared by menus; do not use production hit-tests
 // as the oracle for their own bounds and overlap checks.

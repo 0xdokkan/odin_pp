@@ -4,6 +4,7 @@ import "core:math"
 import rl "vendor:raylib"
 import rlgl "vendor:raylib/rlgl"
 
+@(private = "file")
 polyhedral_body_color :: proc(normal: rl.Vector3, bevel, resin: bool) -> rl.Color {
 	if resin {return {58,102,154,255} if bevel else {20,46,87,255}}
 	light := rl.Vector3Normalize(rl.Vector3{-0.55,0.86,0.36})
@@ -17,12 +18,14 @@ polyhedral_body_color :: proc(normal: rl.Vector3, bevel, resin: bool) -> rl.Colo
 		u8(min(f32(255), 122*brightness*edge+170*specular)), 255}
 }
 
+@(private = "file")
 polyhedral_ink_vertex :: proc(point: rl.Vector3, uv: rl.Vector2, position: rl.Vector3, rotation: rl.Quaternion) {
 	p := rl.Vector3RotateByQuaternion(point, rotation)+position
 	rlgl.TexCoord2f(uv.x, uv.y)
 	rlgl.Vertex3f(p.x, p.y, p.z)
 }
 
+@(private = "file")
 polyhedral_draw_label :: proc(font: rl.Font, digits: [2]int, count: int,
 	center, u, v, normal: rl.Vector3, height: f32, position: rl.Vector3, rotation: rl.Quaternion, underline: bool) {
 	world_normal := rl.Vector3RotateByQuaternion(normal, rotation)

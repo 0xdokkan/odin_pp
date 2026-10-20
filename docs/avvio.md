@@ -1,0 +1,175 @@
+[← Odin PP](../README.md)
+
+## Avvio
+
+Serve Odin con i binding e le librerie native Raylib della distribuzione.
+La toolchain usata nelle verifiche correnti è
+`odin version dev-2026-10:84bc3fc21`; non è un vincolo imposto automaticamente.
+Eseguire i comandi dalla radice della repo:
+
+```sh
+./run.sh
+./run.sh --seed=0xC0FFEE --fast
+```
+
+Il launcher usa `odin run src -o:none`, passa gli argomenti al gioco e funziona
+anche se invocato da un'altra directory. `ODIN` può indicare un compilatore
+alternativo. Ricompila i sorgenti a ogni avvio, per eseguire sempre le modifiche
+correnti. Il comando senza `-o:none` abilita invece l'ottimizzazione predefinita
+(`minimal`), che su questo progetto può rendere molto lunga l'attesa **prima**
+dell'apertura della finestra.
+
+Comando equivalente, oppure build da riutilizzare senza ricompilare:
+
+```sh
+odin run src -o:none
+odin build src -o:none -out:odin_pp
+./odin_pp
+```
+
+Su Windows (PowerShell) gli equivalenti sono `.\run.ps1` e
+`.\scripts\check.ps1` (`-Headless` salta le build finali); `odin run src -o:none`
+funziona anche a mano. Windows riserva al thread principale 1 MiB di stack
+contro gli 8 MiB di macOS: [windows_stack.odin](../src/windows_stack.odin) porta la
+riserva a 16 MiB dal sorgente, senza flag del linker sulla riga di comando.
+
+Dopo modifiche ai sorgenti, ricompilare prima di riutilizzare `./odin_pp`.
+Le build rapide mantengono assert e controlli di sicurezza; non riducono asset
+o qualità grafica. `-o:none` permette build senza ottimizzazione. `--seed` accetta un `u64`
+decimale o esadecimale con prefisso `0x`; seed e percorso scelto rendono la run
+riproducibile per la versione corrente del generatore.
+
+Senza argomenti si apre il **menu**: la run del roguelike, i minigiochi con i
+record e le impostazioni (volumi, scuotimento, sensibilità del
+mouse, FPS), salvate con i record in `odin_pp/profilo.json` nella cartella dati
+dell'utente. Se il file è corrotto o appartiene a una versione futura, la sessione
+usa valori predefiniti e disabilita le scritture per conservare il file originale.
+Smoke, laboratori e report di playtest avviano la run direttamente, come prima.
+Gli smoke e i laboratori non scrivono i profili.
+
+### Prova meccaniche
+
+Il pulsante **Prova meccaniche** del menu (o `--mechanics-lab`) apre una sandbox
+per provare le meccaniche nuove, una alla volta. È un'arena grande 23x17 senza
+ostacoli né nebbia, con il giocatore al centro. Il combattimento non finisce
+mai: l'ultimo nemico ucciso non ripulisce la stanza, e ogni 4 secondi di gioco
+arriva un nemico casuale (Chaser, Archer, Brute, Bomber o Custode) su una
+casella libera ad almeno 4 celle dal giocatore, fino a 6 insieme; un'arena vuota
+si riempie subito. Gli easter egg si riaprono ogni volta. Il mazzo contiene
+**una copia di Movimento Ombra, una di ogni carta nuova della Fase 2** (Pozza di
+Veleno, Incendio, Deflect, Feretro, Dado del Destino e Lama Velenosa), **una del
+Lazzo e della Canna da Pesca e una del Pinball e di First Person Shooter**:
+tutte in mano (energia 12) tranne la Canna, in attesa fra le esaurite perché non
+si pesca mai in mano. Sono dieci carte, più di quante ne tenga mai la mano del
+gioco: restano larghe come in una mano piena di otto e si sovrappongono da un
+lato all'altro dello schermo, ognuna in vista quanto le serve per mostrare tutte
+le sue parole, l'icona, i segni della rarità e il tasto, in qualunque ordine
+stiano; quella sotto il mouse si alza intera sopra le altre, e `9` e `0` giocano
+la nona e la decima (vedi [Movimento Ombra](regole/meccaniche.md#movimento-ombra),
+[Pozza di Veleno e Incendio](regole/meccaniche.md#pozza-di-veleno-e-incendio),
+[Deflect, Feretro, Dado del Destino e Lama Velenosa](regole/meccaniche.md#deflect-feretro-dado-del-destino-e-lama-velenosa),
+[Lazzo](regole/meccaniche.md#lazzo), [Canna da Pesca](regole/meccaniche.md#canna-da-pesca), [Pinball](regole/meccaniche.md#pinball) e
+[First Person Shooter](regole/meccaniche.md#first-person-shooter)). Niente ricompense, uscita o
+profilo; `F5` ricomincia, `F10` torna al menu. Arena, mazzo e ritmo degli arrivi
+sono in [mechanics_lab.odin](../src/devtools/mechanics_lab.odin) e
+[sandbox.odin](../src/game/sandbox.odin): per provare una nuova meccanica basta
+cambiare `MECHANICS_LAB_DECK`.
+
+**Arena libera (`F7`).** L'arena non si libera mai da sola, quindi `F7` la
+libera subito, come una stanza quando cade il suo ultimo nemico: tutti i nemici
+cadono, il bottino a portata arriva al Viandante, il combattimento finisce e non
+arriva più nessuno. Si apre lo slot della Canna da Pesca, con le pesche e senza
+acqua di una stanza nuova; l'uscita resta chiusa (sul tavolo niente portale né
+`USCITA`). Il cartello scrive
+`ARENA LIBERA / PESCA n/m / F7 DA CAPO / F5 RICOMINCIA`: `F7` di nuovo ricomincia
+la pesca da capo (senza acqua), `F5` riporta il combattimento.
+
+Le novità nate qui ora valgono in tutto il gioco: le azioni che durano il loro
+costo e la finestra che si accorcia ([Modalità tattica M7](regole/combattimento.md#modalità-tattica-m7)),
+i cartoncini vivi, il cerchio d'azione del Viandante, le intenzioni dei nemici
+nel cartellino della vita e sul terreno, i segnalini di carta e la vita di ogni nemico sempre
+visibile in un cuore di carta sopra la testa
+([Il tavolo](presentazione.md#il-tavolo-cartoncini-vivi-cerchi-e-segnalini)). Anche
+[Movimento Ombra](regole/meccaniche.md#movimento-ombra), la carta che si prova qui adesso, è nel
+mazzo iniziale di ogni run tattica. Lo stesso vale per gli status a stack
+Veleno, Bruciatura e Rallentamento ([Status](regole/combattimento.md#status)), per i dadi delle carte
+che salgono dal D4 al D20 con gli upgrade ([Spell e dadi](regole/carte.md#spell-e-dadi)) e per
+i colpi che si vedono sul tavolo, ognuno con la sua arma di carta
+([Il tavolo](presentazione.md#il-tavolo-cartoncini-vivi-cerchi-e-segnalini)). Le carte nuove della
+Fase 2 ([Pozza di Veleno e Incendio](regole/meccaniche.md#pozza-di-veleno-e-incendio) e
+[Deflect, Feretro, Dado del Destino e Lama Velenosa](regole/meccaniche.md#deflect-feretro-dado-del-destino-e-lama-velenosa))
+compaiono fra ricompense e negozio di ogni run tattica, come il [Lazzo](regole/meccaniche.md#lazzo),
+la [Canna da Pesca](regole/meccaniche.md#canna-da-pesca), il [Pinball](regole/meccaniche.md#pinball) e
+[First Person Shooter](regole/meccaniche.md#first-person-shooter).
+La prova resta la sandbox in cui provare le prossime.
+
+**Intenzioni dei nemici (`F6`).** Il simbolo dell'azione sta dentro il cartellino
+della vita, vicino al cuore e alle cifre. Nella run è affiancato dalle minacce
+sul terreno ([Il tavolo](presentazione.md#il-tavolo-cartoncini-vivi-cerchi-e-segnalini)).
+Nel laboratorio `F6` alterna `HUD + TERRENO` e `SOLO HUD` per confrontarli:
+i simboli compatti restano in entrambi i modi, senza icone separate sopra gli
+attori. Il cartello mostra il modo attivo.
+
+**Suoni (solo qui).** La prova ha i suoi effetti sonori: ogni azione di ogni
+personaggio (passi, colpi, ferite, parate, caduta e i telegrafi come la MIRA
+dell'arciere o la CARICA del bruto), ogni carta, i dispositivi, le bombe, gli
+status, il battito del secondo, il colpo a tempo, la fine della finestra, lo
+stordimento e l'avviso di difesa, sopra il fondo di una cripta in loop. Ogni
+status ha la sua voce: il Veleno gorgoglia, la Bruciatura è la carta che prende
+fuoco (uno sfregamento, la vampata, le braci che crepitano) e il Rallentamento
+è lo scappamento del battito che ticchetta sempre più lento e più grave, con un
+filo di sabbia di clessidra. Sono **tutti fatti da codice**, senza registrazioni
+né librerie (quindi senza licenze):
+[tools/audio](../tools/audio/SOUND_SPEC.md) li sintetizza dalla materia
+dell'azione (cuoio, ferro, legno, osso, pietra e la carta del cartoncino che
+striscia sulla pietra), li mette tutti nella stessa sala di pietra e tiene
+magie e segnali in Re frigio. Partono con il disegno che li mostra
+([lab_sounds.odin](../src/render/lab_sounds.odin)), così i passi cadono sui passi
+e i colpi sull'impatto (un dardo che manca suona quando arriva a terra, e chi
+lo schiva quando lo schiva), con piccole variazioni di altezza e volume a ogni
+colpo, e un limitatore sull'uscita tiene puliti i momenti più fitti (un colpo,
+una caduta e un'esplosione insieme); seguono il volume degli effetti e il muto
+delle impostazioni. Nel gioco normale per ora non suonano, e così i film di
+[Mostra effetto](presentazione.md#mostra-effetto), che si sentono solo qui. Per rifarli dopo
+aver cambiato una ricetta (`tools/audio/sfx_<famiglia>.py`):
+
+```bash
+"C:/Program Files/Blender Foundation/Blender 3.5/3.5/python/bin/python.exe" tools/audio/build_sfx.py
+```
+
+Il comando riscrive `assets/audio/lab/*.ogg` (Ogg Vorbis a 192 kbit/s: un terzo
+dei WAV, e raylib lo decodifica campione per campione; lo codifica il modulo
+audio di Blender) e la tabella generata
+[lab_sfx_data.odin](../src/engine/audio/lab_sfx_data.odin); con
+`--only <famiglia> --preview <cartella> --no-write` produce invece spettrogrammi,
+misure e un ascolto di tutta la famiglia, senza toccare il gioco.
+
+| Opzione | Uso |
+|---|---|
+| `--run` | salta il menu ed entra subito nella run |
+| `--minigame=<id>` | apre un minigioco sopra il menu (`platform2d`, `platform3d`, `arena`, `fps`, `puzzle`, `ring`) |
+| `--smoke-menu` | cattura `odin_pp_menu.png` dopo 30 frame ed esce |
+| `--animation-speed=2` | velocità delle animazioni ordinarie, fra 0.25x e 4x; non accelera cast o dadi M8 |
+| `--fast` | velocità 4x |
+| `--mechanics-lab` | Prova meccaniche: arena aperta senza fine, mazzo delle carte in prova (Movimento Ombra, Pozza di Veleno, Incendio, Deflect, Feretro, Dado del Destino, Lama Velenosa, Lazzo, Pinball, First Person Shooter, Canna da Pesca), nemici che continuano ad arrivare; `F7` libera l'arena per la Canna da Pesca |
+| `--spell-lab` | arena con Firebomb, Fate Strike, Chain Lightning, Sundering Blow e Guard |
+| `--dice-lab` | arena con Fate Strike, Sundering Blow, Prismatic Barrage, Twin Venom e Guard |
+| `--dice-set-lab` | tavolo 3D del set D4/D6/D8/D10/D%/D12/D20: selezione, lancio e rotazione con il mouse |
+| `--engine-lab` / `--arena-lab` | arena libera con collisioni, dummy e strumenti M9 |
+| `--ring-lab` | ring 1v1 di pratica con strumenti M9; non assegna sblocchi |
+| `--fps-lab` | prova FPS con strumenti M9 e due livelli selezionabili |
+| `--sprites=/percorso/sprites.json` | manifest grafico alternativo |
+| `--debug-abilities` | abilita gli shortcut di debug `C` e `V` |
+| `--playtest-report` | registra una sessione interattiva |
+| `--playtest-output=/percorso/sessione.json` | attiva la telemetria e sceglie il percorso di base |
+
+Nei laboratori spell e dice le carte sono già in mano, nell'ordine indicato; `F5` ricrea
+l'arena con un nuovo seed. Restano attivi costi, pulse e risposta dei nemici.
+Il tavolo `--dice-set-lab` è invece una galleria autonoma: non modifica la run,
+il profilo o i risultati dei dadi del gameplay. I sette modelli sono disponibili
+nel renderer; in gioco le carte con dadi lanciano dal D4 al D20 secondo il
+livello di upgrade (il D% resta soltanto nel tavolo).
+Usare i laboratori senza opzioni smoke o report di playtest. Gli smoke grafici
+mantengono velocità 1x per rendere riproducibile la cattura.
+I laboratori M9 non si combinano con altri laboratori, smoke o report. `--m9` è un alias del tattico corrente;
+non sostituisce il combattimento principale con il movimento libero.

@@ -4,7 +4,7 @@ import "core:math"
 import rl "vendor:raylib"
 import rlgl "vendor:raylib/rlgl"
 import game "../game"
-import grid "../grid"
+import grid "../engine/grid"
 import level "../level"
 import tween "../engine/tween"
 
@@ -14,6 +14,7 @@ DIORAMA_GLOW :: rl.Color{98, 192, 229, 255}
 DIORAMA_WALL_HEIGHT :: f32(1.58)
 DIORAMA_CUTAWAY_HEIGHT :: f32(0.5)
 
+@(private)
 diorama_interior_wall :: proc(room: ^game.Room, cell: grid.Position) -> bool {
 	tile, found := level.tile_at(room.level_data, cell)
 	return found && tile.kind == .Wall &&
@@ -22,6 +23,7 @@ diorama_interior_wall :: proc(room: ^game.Room, cell: grid.Position) -> bool {
 
 // Decorations fit the original tile volume. They do not add colliders, hide
 // walkable cells, consume RNG or consult terrain beyond current visibility.
+@(private)
 diorama_wall_height :: proc(renderer: ^Renderer, room: ^game.Room, cell: grid.Position) -> f32 {
 	w, h := room.level_data.tiles.width, room.level_data.tiles.height
 	if !level.is_border_position(cell, w, h) { return DIORAMA_WALL_HEIGHT }
@@ -44,11 +46,13 @@ diorama_wall_height :: proc(renderer: ^Renderer, room: ^game.Room, cell: grid.Po
 	return DIORAMA_WALL_HEIGHT+(DIORAMA_CUTAWAY_HEIGHT-DIORAMA_WALL_HEIGHT)*tween.smoothstep(t)*(1-whole)
 }
 
+@(private)
 diorama_wall_face :: proc(room: ^game.Room, cell, offset: grid.Position) -> bool {
 	tile, found := level.tile_at(room.level_data, {cell.x+offset.x, cell.y+offset.y})
 	return found && level.is_walkable(tile.kind)
 }
 
+@(private)
 diorama_lamp :: proc(renderer: ^Renderer, room: ^game.Room, cell: grid.Position) -> (position: rl.Vector3, ok: bool) {
 	if !tactical_render_visible(renderer, cell) || gothic_hash(cell.x, cell.y)%3 != 0 { return }
 	tile, found := level.tile_at(room.level_data, cell)
@@ -60,6 +64,7 @@ diorama_lamp :: proc(renderer: ^Renderer, room: ^game.Room, cell: grid.Position)
 	return
 }
 
+@(private)
 prepare_diorama_lights :: proc(renderer: ^Renderer, room: ^game.Room) -> (lights: [4]rl.Vector4) {
 	v := &renderer.tactical
 	distances := [4]f32{1e10, 1e10, 1e10, 1e10}
@@ -82,6 +87,7 @@ prepare_diorama_lights :: proc(renderer: ^Renderer, room: ^game.Room) -> (lights
 }
 
 // Axis-aligned carved face details use simple boxes rather than bevel meshes.
+@(private = "file")
 draw_diorama_wall_face :: proc(center, normal: rl.Vector3, height: f32, variant: u32, transparent: bool) {
 	ink := rl.Color{22, 41, 64, 35} if transparent else DIORAMA_INK
 	edge := rl.Color{92, 142, 171, 62} if transparent else DIORAMA_EDGE
@@ -108,6 +114,7 @@ draw_diorama_wall_face :: proc(center, normal: rl.Vector3, height: f32, variant:
 
 // Internal walls keep their complete silhouette. Only their low plinth is
 // opaque; the upper body is submitted with actors in the sorted alpha pass.
+@(private)
 draw_diorama_wall :: proc(renderer: ^Renderer, room: ^game.Room, cell: grid.Position) {
 	if renderer.tactical.kit.loaded { draw_diorama_kit_wall(renderer, room, cell); return }
 	p := rl.Vector3{f32(cell.x)+0.5, 0, f32(cell.y)+0.5}
@@ -141,13 +148,15 @@ draw_diorama_wall :: proc(renderer: ^Renderer, room: ^game.Room, cell: grid.Posi
 	}
 }
 
-draw_tactical_tile :: proc(renderer: ^Renderer, room: ^game.Room, tile: level.Tile, cell: grid.Position) {
+@(private)
+draw_tactical_tile :: proc(renderer: ^Renderer, room: ^game.Room, tile: level.Tile, cell: grid.Position, preview: ^Card_Range_Preview = nil) {
 	if tile.kind == .Void { return }
 	p := rl.Vector3{f32(cell.x)+0.5, 0, f32(cell.y)+0.5}
 	n := gothic_hash(cell.x, cell.y)
 	shade := u8(n%11)
 	floor := rl.Color{43+shade, 52+shade, 65+shade, 255}
 	if renderer.tactical.snapshot.family == .Twin_Courts { floor = {38+shade, 51+shade, 69+shade, 255} }
+	if tile.kind != .Wall { floor = card_range_floor_color(preview, cell, floor) }
 	draw_resin_cube(renderer, p+rl.Vector3{0, -0.155, 0}, 0.99, 0.31, 0.99, RESIN_DARK)
 	draw_resin_cube(renderer, p+rl.Vector3{0, -0.05, 0}, 0.945, 0.135, 0.945, floor)
 	if tile.kind == .Wall {
@@ -179,6 +188,7 @@ draw_tactical_tile :: proc(renderer: ^Renderer, room: ^game.Room, tile: level.Ti
 	}
 }
 
+@(private)
 draw_diorama_lamp_glow :: proc(renderer: ^Renderer, lamp: rl.Vector3, cell: grid.Position, opacity: f32 = 1) {
 	time := f32(tactical_world_time(renderer))
 	flicker := f32(0.86+0.14*math.sin(time*2.6+f32(cell.x+cell.y)))
@@ -193,6 +203,7 @@ draw_diorama_lamp_glow :: proc(renderer: ^Renderer, lamp: rl.Vector3, cell: grid
 }
 
 // Sparse luminous pixels stay inside the current visible footprint. No memory.
+@(private)
 draw_diorama_accents :: proc(renderer: ^Renderer, room: ^game.Room) {
 	rlgl.DrawRenderBatchActive()
 	rlgl.DisableDepthMask()

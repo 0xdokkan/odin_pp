@@ -105,6 +105,7 @@ REACTION_DEFINITIONS :: [int(Reaction_Id.Count)]Reaction_Definition{
 	},
 }
 
+@(private = "file")
 reaction_effect_template_is_valid :: proc(
 	definition: ^Reaction_Definition,
 	template: Reaction_Effect_Template,
@@ -134,6 +135,7 @@ reaction_effect_template_is_valid :: proc(
 	return false
 }
 
+@(private)
 validate_reaction_definition :: proc(definition: ^Reaction_Definition) -> bool {
 	if definition == nil || len(definition.name) == 0 || definition.minimum_event_amount < 0 ||
 	   definition.effect_count <= 0 || definition.effect_count > MAX_REACTION_DEFINITION_EFFECTS {
@@ -147,6 +149,7 @@ validate_reaction_definition :: proc(definition: ^Reaction_Definition) -> bool {
 	return true
 }
 
+@(private)
 validate_reaction_definitions :: proc() -> bool {
 	definitions := REACTION_DEFINITIONS
 	for &definition, index in definitions {
@@ -157,6 +160,7 @@ validate_reaction_definitions :: proc() -> bool {
 	return true
 }
 
+@(private)
 reaction_definition_by_id :: proc(id: Reaction_Id) -> (Reaction_Definition, bool) {
 	definitions := REACTION_DEFINITIONS
 	index := int(id)
@@ -166,6 +170,7 @@ reaction_definition_by_id :: proc(id: Reaction_Id) -> (Reaction_Definition, bool
 	return definitions[index], true
 }
 
+@(private = "file")
 reaction_reactor_for_event :: proc(
 	event: Game_Event,
 	selector: Reaction_Reactor_Selector,
@@ -179,6 +184,7 @@ reaction_reactor_for_event :: proc(
 	return {}
 }
 
+@(private = "file")
 reaction_source_matches :: proc(
 	relation: Reaction_Source_Relation,
 	event: Game_Event,
@@ -195,6 +201,7 @@ reaction_source_matches :: proc(
 	return false
 }
 
+@(private = "file")
 reaction_definition_matches :: proc(
 	room: ^Room,
 	definition: ^Reaction_Definition,
@@ -213,6 +220,7 @@ reaction_definition_matches :: proc(
 	return reactor, true
 }
 
+@(private)
 collect_reactions :: proc(room: ^Room, event: Game_Event) -> (batch: Reaction_Batch) {
 	if room == nil {
 		return
@@ -255,6 +263,7 @@ collect_reactions :: proc(room: ^Room, event: Game_Event) -> (batch: Reaction_Ba
 	return
 }
 
+@(private = "file")
 reaction_effect_target :: proc(
 	selector: Reaction_Entity_Selector,
 	request: Reaction_Request,
@@ -270,6 +279,7 @@ reaction_effect_target :: proc(
 	return {}
 }
 
+@(private = "file")
 reaction_effect_amount :: proc(
 	room: ^Room,
 	definition: ^Reaction_Definition,
@@ -287,6 +297,7 @@ reaction_effect_amount :: proc(
 	return 0, false
 }
 
+@(private = "file")
 reaction_activation_potency :: proc(
 	room: ^Room,
 	definition: ^Reaction_Definition,
@@ -316,6 +327,7 @@ reaction_activation_potency :: proc(
 	return 0, false
 }
 
+@(private = "file")
 build_reaction_effect :: proc(
 	room: ^Room,
 	definition: ^Reaction_Definition,
@@ -358,6 +370,7 @@ build_reaction_effect :: proc(
 	return {}, false
 }
 
+@(private)
 build_reaction_action :: proc(room: ^Room, request: Reaction_Request) -> (action: Action, ok: bool) {
 	definition, found := reaction_definition_by_id(request.definition_id)
 	if room == nil || !found || !validate_reaction_definition(&definition) {

@@ -1,6 +1,6 @@
 package game
 
-import grid "../grid"
+import grid "../engine/grid"
 
 // Acting on the tick. When the decision clock crosses a whole second, a move,
 // a bump or a card played within TACTICAL_BEAT_WINDOW of that instant is
@@ -21,6 +21,7 @@ TACTICAL_BEAT_GRACE :: f32(0.45)
 TACTICAL_SHOCK_FLOOR_MAX_CHARGES :: MAX_DIE_SIDES+1
 
 // Called by tactical_tick with the fraction before real time advanced.
+@(private)
 tactical_note_beat_time :: proc(s: ^Tactical_State, before, elapsed: f32) {
 	if before+elapsed >= 1-0.00001 {
 		s.beat_index += u32(max(f32(1), before+elapsed+0.00001))
@@ -30,6 +31,7 @@ tactical_note_beat_time :: proc(s: ^Tactical_State, before, elapsed: f32) {
 	}
 }
 
+@(private)
 tactical_reset_beats :: proc(s: ^Tactical_State) {
 	s.beat_index, s.beat_spent, s.beat_age = 0, 0, 99
 	s.critical_next, s.critical_card = false, false
@@ -37,7 +39,7 @@ tactical_reset_beats :: proc(s: ^Tactical_State) {
 
 // The beat an action pressed now lands on, or 0 when it is off the tick.
 tactical_beat_target :: proc(room: ^Room) -> u32 {
-	if room == nil || room.player == nil || !tactical_enabled(room) || room.phase != .Combat { return 0 }
+	if room == nil || room.player == nil || room.phase != .Combat { return 0 }
 	s := &room.player.tactical
 	// Inside the shadow the press is judged against the shadow's own beats.
 	if s.phase == .Shadow { return tactical_shadow_beat_target(room) }
@@ -50,7 +52,7 @@ tactical_beat_target :: proc(room: ^Room) -> u32 {
 // 0..1 nearness to the next tick, for the HUD metronome; `on` within the window.
 // Inside the shadow, the nearness to the shadow's own next beat.
 tactical_beat_glow :: proc(room: ^Room) -> (approach: f32, on: bool) {
-	if room == nil || room.player == nil || !tactical_enabled(room) { return }
+	if room == nil || room.player == nil { return }
 	s := &room.player.tactical
 	approach = s.clock_fraction
 	if tactical_shadow_active(room) {
@@ -63,7 +65,7 @@ tactical_beat_glow :: proc(room: ^Room) -> (approach: f32, on: bool) {
 
 // Spends a beat for one action; true when that action is critical.
 tactical_claim_beat :: proc(room: ^Room, beat: u32) -> bool {
-	if beat == 0 || room == nil || room.player == nil || !tactical_enabled(room) || room.phase != .Combat { return false }
+	if beat == 0 || room == nil || room.player == nil || room.phase != .Combat { return false }
 	s := &room.player.tactical
 	// The world's beats are frozen with it; the shadow claims its own.
 	if s.phase == .Shadow { return false }
@@ -86,6 +88,7 @@ tactical_card_claims_beat :: proc(room: ^Room, card_id: u32) -> bool {
 }
 
 // Read once by the action that the claim was made for.
+@(private)
 tactical_take_critical :: proc(room: ^Room) -> bool {
 	if room == nil || room.player == nil { return false }
 	critical := room.player.tactical.critical_next
@@ -93,14 +96,17 @@ tactical_take_critical :: proc(room: ^Room) -> bool {
 	return critical
 }
 
+@(private = "file")
 critical_damage :: proc(amount: i32) -> i32 {
 	return max(amount+2, (amount*3+1)/2)
 }
 
+@(private = "file")
 critical_boost :: proc(amount: i32) -> i32 {
 	return max(amount+1, (amount*3+1)/2)
 }
 
+@(private)
 critical_bump_damage :: proc(amount: i32) -> i32 {
 	return amount*2
 }
@@ -108,6 +114,7 @@ critical_bump_damage :: proc(amount: i32) -> i32 {
 // The critical version of a card: more damage, stronger guards and gains,
 // longer and stronger statuses, one more card drawn or created, stronger
 // devices (a Tesla Coil also doubles its health when it is deployed).
+@(private)
 tactical_critical_scale :: proc(room: ^Room, action: ^Action) {
 	if room == nil || room.player == nil || action == nil || !room.player.tactical.critical_card { return }
 	for &effect in action.effects[:action.effect_count] {
@@ -144,11 +151,12 @@ tactical_critical_scale :: proc(room: ^Room, action: ^Action) {
 	}
 }
 
-// Marks the movement and damage of a critical action for the presentation.
+// Marks a critical action for presentation, including its roll: the face
+// itself does not include the stronger effect applied after rolling.
 mark_critical_events :: proc(log: ^Event_Log) {
 	if log == nil { return }
 	for &event in log.events[:log.count] {
-		if event.kind == .Moved || event.kind == .Damaged { event.area_mask |= EVENT_CRITICAL_BIT }
+		if event.kind == .Moved || event.kind == .Damaged || event.kind == .Dice_Rolled { event.area_mask |= EVENT_CRITICAL_BIT }
 	}
 }
 
@@ -160,10 +168,10 @@ try_move_player_diagonal :: proc(room: ^Room, offset: grid.Position) -> Action_R
 	target := add_position(room.player.position, offset)
 	if enemy_index, found := enemy_index_at(room, target); found {
 		if !tactical_allows_action(room) { return .Invalid_Phase }
-		clear_event_log(&room.recent_events)
+		clear_event_log(room.recent_events)
 		// Always critical, loaded like a straight bump (player_charges.odin).
 		if !player_bump(room, enemy_index, target, .Opponent, true) { return .Blocked }
-		_, outcome := finish_player_combat_command(room)
+		outcome := finish_player_combat_command(room)
 		switch outcome {
 		case .Player_Defeated: return .Player_Defeated
 		case .Combat_Ended: return .Combat_Ended
@@ -173,17 +181,17 @@ try_move_player_diagonal :: proc(room: ^Room, offset: grid.Position) -> Action_R
 	}
 	query := query_entity_movement(room, PLAYER_ENTITY, target)
 	if !movement_query_is_clear(&query) { return .Blocked }
-	clear_event_log(&room.recent_events)
+	clear_event_log(room.recent_events)
 	action := make_action(.Move, PLAYER_ENTITY, cell_target(target), .Walkable_Cell)
 	added := add_effect(&action, move_effect(PLAYER_ENTITY, target))
 	assert(added)
 	report := resolve_action(room, &action)
 	if !report.accepted { return .Blocked }
 	mark_critical_events(&report.events)
-	append_event_log(&room.recent_events, &report.events)
+	append_event_log(room.recent_events, &report.events)
 	collect_loot_in_magnet_range(room)
 	room.player.tactical.facing = .North if offset.y < 0 else .South
-	_, outcome := finish_player_combat_command(room)
+	outcome := finish_player_combat_command(room, TACTICAL_MOVE_SECONDS)
 	switch outcome {
 	case .Player_Defeated: return .Player_Defeated
 	case .Combat_Ended: return .Combat_Ended

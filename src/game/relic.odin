@@ -60,6 +60,7 @@ relic_definition :: proc(id: Relic_Id) -> (Relic_Definition, bool) {
 	return definitions[int(id)-1], true
 }
 
+@(private)
 validate_relic_state :: proc(state: ^Relic_State) -> bool {
 	if state == nil || state.count < 0 || state.count > MAX_RUN_RELICS {
 		return false
@@ -107,6 +108,7 @@ acquire_relic :: proc(player: ^Player, id: Relic_Id) -> bool {
 	return true
 }
 
+@(private)
 make_relic_offers :: proc(player: ^Player, seed: u64) -> (offers: Relic_Offers) {
 	if player == nil || !validate_relic_state(&player.relics) {
 		return
@@ -133,6 +135,7 @@ make_relic_offers :: proc(player: ^Player, seed: u64) -> (offers: Relic_Offers) 
 	return
 }
 
+@(private)
 validate_relic_offers :: proc(player: ^Player, offers: ^Relic_Offers) -> bool {
 	if player == nil || offers == nil || !validate_relic_state(&player.relics) ||
 	   offers.count < 0 || offers.count > RELIC_OFFER_COUNT {

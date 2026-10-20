@@ -1,7 +1,7 @@
 package game
 
 import "core:testing"
-import grid "../grid"
+import grid "../engine/grid"
 import level "../level"
 
 relic_test_events :: proc(log: ^Event_Log, kind: Game_Event_Kind) -> int {
@@ -65,7 +65,7 @@ test_relic_guard_entry_persists_inventory_resets_usage_and_cannot_repeat :: proc
 	testing.expect(t, found)
 	testing.expect_value(t, shield.potency, i32(2))
 	testing.expect_value(t, shield.remaining_pulses, i32(3))
-	testing.expect_value(t, relic_test_events(&room.recent_events, .Status_Applied), 1)
+	testing.expect_value(t, relic_test_events(room.recent_events, .Status_Applied), 1)
 	apply_entry_relic(&room)
 	testing.expect_value(t, shield.potency, i32(2))
 	player.relics.combat.exhaust_used = true
@@ -107,6 +107,7 @@ test_relic_shove_ignores_blocked_push_then_shields_successful_barrel_push :: pro
 	testing.expect(t, card_play_was_committed(play.result))
 	testing.expect(t, !player.relics.combat.push_used)
 	testing.expect_value(t, room.objects[0].position, grid.Position{2, 1})
+	drain_tactical_test_pulse(t, &room)
 	clear(&room.obstacles)
 	id = force_card_definition_into_hand(t, &player.deck, .Shove)
 	play = play_card(&room, id, entity_target(object_entity(room.objects[0].id)))
@@ -115,7 +116,7 @@ test_relic_shove_ignores_blocked_push_then_shields_successful_barrel_push :: pro
 	testing.expect_value(t, room.objects[0].position, grid.Position{3, 1})
 	testing.expect_value(t, play.action_report.statuses_applied, 1)
 	shield, found := status_for_entity(&room, PLAYER_ENTITY, .Shield)
-	testing.expect(t, found && shield.potency == 1 && shield.remaining_pulses == 1)
+	testing.expect(t, found && shield.potency == 1 && shield.remaining_pulses == 2)
 	testing.expect_value(t, room.recent_events.dropped_count, 0)
 }
 
@@ -165,14 +166,15 @@ test_relic_swift_soles_rejects_bad_target_and_refunds_only_first_movement_card :
 	testing.expect_value(t, player.relics, before)
 	play := play_card(&room, id, cell_target({3, 1}))
 	testing.expect_value(t, play.result, Card_Play_Result.Played)
-	testing.expect_value(t, player.deck.energy, i32(4))
-	testing.expect_value(t, relic_test_events(&room.recent_events, .Energy_Gained), 1)
+	testing.expect_value(t, player.deck.energy, i32(5))
+	testing.expect_value(t, relic_test_events(room.recent_events, .Energy_Gained), 1)
 	testing.expect(t, player.relics.combat.movement_used)
+	drain_tactical_test_pulse(t, &room)
 	id = force_card_definition_into_hand(t, &player.deck, .Dash)
 	play = play_card(&room, id, cell_target({1, 1}))
 	testing.expect_value(t, play.result, Card_Play_Result.Played)
-	testing.expect_value(t, player.deck.energy, i32(2))
-	testing.expect_value(t, relic_test_events(&room.recent_events, .Energy_Gained), 0)
+	testing.expect_value(t, player.deck.energy, i32(4))
+	testing.expect_value(t, relic_test_events(room.recent_events, .Energy_Gained), 0)
 }
 
 @(test)
@@ -191,7 +193,7 @@ test_relic_ash_bookmark_draws_once_after_exhaust_zone_commit :: proc(t: ^testing
 	play := play_card(&room, id, entity_target(PLAYER_ENTITY))
 	testing.expect_value(t, play.result, Card_Play_Result.Played)
 	testing.expect_value(t, play.destination, Card_Zone.Exhaust)
-	testing.expect_value(t, player.deck.hand_count, 6)
+	testing.expect_value(t, player.deck.hand_count, 5)
 	testing.expect(t, player.relics.combat.exhaust_used)
 	exhaust_index := -1
 	bonus_index := -1
@@ -204,11 +206,14 @@ test_relic_ash_bookmark_draws_once_after_exhaust_zone_commit :: proc(t: ^testing
 		}
 	}
 	testing.expect(t, exhaust_index >= 0 && bonus_index > exhaust_index)
+	drain_tactical_test_pulse(t, &room)
+	testing.expect_value(t, player.deck.hand_count, 6)
 	id = force_card_definition_into_hand(t, &player.deck, .Battle_Focus)
 	play = play_card(&room, id, entity_target(PLAYER_ENTITY))
 	testing.expect_value(t, play.result, Card_Play_Result.Played)
+	drain_tactical_test_pulse(t, &room)
 	testing.expect_value(t, player.deck.hand_count, 8)
-	testing.expect_value(t, relic_test_events(&room.recent_events, .Card_Drawn), 3)
+	testing.expect_value(t, relic_test_events(room.recent_events, .Card_Drawn), 3)
 	testing.expect(t, validate_deck_state(&player.deck))
 }
 
@@ -227,10 +232,13 @@ test_relic_ash_bookmark_refocus_ethereal_grants_card_beyond_normal_refill :: pro
 	force_card_definition_into_hand(t, &player.deck, .Battle_Focus)
 	refocus := refocus_player_hand(&room)
 	testing.expect_value(t, refocus.result, Refocus_Result.Refocused)
+	// The first completed world beat performs the deferred refill and relic draw.
+	testing.expect(t, continue_tactical_pulse(&room))
+	testing.expect(t, continue_tactical_pulse(&room))
 	testing.expect_value(t, player.deck.hand_count, 4)
 	testing.expect_value(t, player.deck.exhaust_count, 1)
 	testing.expect(t, player.relics.combat.exhaust_used)
-	testing.expect_value(t, relic_test_events(&room.recent_events, .Card_Drawn), 4)
+	testing.expect_value(t, relic_test_events(room.recent_events, .Card_Drawn), 4)
 	testing.expect(t, validate_deck_state(&player.deck))
 }
 
@@ -253,8 +261,8 @@ test_relic_movement_death_does_not_refund_energy_or_fire_other_bonuses :: proc(t
 	play := play_card(&room, id, cell_target({3, 1}))
 	testing.expect_value(t, play.result, Card_Play_Result.Player_Defeated)
 	testing.expect(t, !player.relics.combat.movement_used)
-	testing.expect_value(t, relic_test_events(&room.recent_events, .Energy_Gained), 0)
-	testing.expect_value(t, relic_test_events(&room.recent_events, .Healed), 0)
+	testing.expect_value(t, relic_test_events(room.recent_events, .Energy_Gained), 0)
+	testing.expect_value(t, relic_test_events(room.recent_events, .Healed), 0)
 	testing.expect_value(t, player.health, i32(0))
 }
 
@@ -270,6 +278,7 @@ test_relic_venom_vial_boosts_one_enemy_application_and_preserves_rejection :: pr
 	room, ok := create_room(&level_data, &player, {enemies = spawns[:]})
 	testing.expect(t, ok)
 	defer destroy_room(&room)
+	player.position = {3, 2}
 	id := force_card_definition_into_hand(t, &player.deck, .Toxic_Wave)
 	player.deck.energy = 0
 	bad := play_card(&room, id, {})
@@ -278,14 +287,14 @@ test_relic_venom_vial_boosts_one_enemy_application_and_preserves_rejection :: pr
 	player.deck.energy = 3
 	play := play_card(&room, id, {})
 	testing.expect_value(t, play.result, Card_Play_Result.Played)
-	// Two stacks (the vial's one more) bit once and wore one; the other's single stack is spent.
+	// The cast applies stacks without an enemy response or status tick.
 	first, found := status_for_entity(&room, enemy_entity(1), .Poison)
-	testing.expect(t, found && first.potency == 1)
-	_, second_found := status_for_entity(&room, enemy_entity(2), .Poison)
-	testing.expect(t, !second_found)
+	testing.expect(t, found && first.potency == 2)
+	second, second_found := status_for_entity(&room, enemy_entity(2), .Poison)
+	testing.expect(t, second_found && second.potency == 1)
 	testing.expect(t, player.relics.combat.poison_used)
-	testing.expect_value(t, room.enemies[0].health, i32(38))
-	testing.expect_value(t, room.enemies[1].health, i32(39))
+	testing.expect_value(t, room.enemies[0].health, i32(40))
+	testing.expect_value(t, room.enemies[1].health, i32(40))
 }
 
 @(test)
@@ -303,7 +312,7 @@ test_relic_mending_heals_automatically_after_last_kill_exactly_once :: proc(t: ^
 	testing.expect_value(t, result, Action_Result.Combat_Ended)
 	testing.expect_value(t, player.health, i32(7))
 	testing.expect(t, player.relics.combat.clear_used)
-	testing.expect_value(t, relic_test_events(&room.recent_events, .Healed), 1)
+	testing.expect_value(t, relic_test_events(room.recent_events, .Healed), 1)
 	bonus := apply_room_clear_relics(&room)
 	testing.expect(t, !bonus.accepted)
 	testing.expect_value(t, player.health, i32(7))

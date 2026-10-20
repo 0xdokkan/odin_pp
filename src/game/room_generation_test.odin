@@ -126,9 +126,11 @@ test_room_generation_profiles_scale_by_node_kind :: proc(t: ^testing.T) {
 test_room_blueprints_hold_invariants_across_run_seeds :: proc(t: ^testing.T) {
 	kinds := [?]Node_Kind{.Combat, .Elite, .Boss}
 	generated_count := 0
-	// The first 135 combinations cover all 27 kind/depth profiles with each
-	// of the five previous families. Full runs preserve the original seeds.
+	// Quick covers all kind/depth/previous-family profiles. Full searches the
+	// original seeds for one representative of every allowed family transition;
+	// repeatedly building the same large-arena profile adds no new invariant.
 	combinations := 4096 if ODIN_TEST_FULL else len(kinds)*9*5
+	when ODIN_TEST_FULL { seen: [3][9][level.Room_Family][level.Room_Family]bool }
 	for combination in 0..<combinations {
 		profile_index := combination%(len(kinds)*9)
 		kind := kinds[profile_index/9]
@@ -137,6 +139,11 @@ test_room_blueprints_hold_invariants_across_run_seeds :: proc(t: ^testing.T) {
 		run_seed := u64(seed_index)*0x9E3779B97F4A7C15~u64(profile_index)
 		node := test_generation_node(combination, kind, depth, run_seed)
 		previous_family := level.Room_Family(combination%5)
+		when ODIN_TEST_FULL {
+			family := room_family_for_node(&node, previous_family)
+			if seen[profile_index/9][depth][previous_family][family] { continue }
+			seen[profile_index/9][depth][previous_family][family] = true
+		}
 		blueprint, err := generate_room_blueprint(&node, previous_family)
 		expect_generation_invariant(
 			t, err == .None, "blueprint generated", combination, run_seed, kind, depth,
@@ -223,7 +230,21 @@ test_room_blueprints_hold_invariants_across_run_seeds :: proc(t: ^testing.T) {
 		}
 		destroy_room_blueprint(&blueprint)
 	}
-	testing.expectf(t, generated_count == combinations, "generated=%v expected=%v", generated_count, combinations)
+	when ODIN_TEST_FULL {
+		// Four families after Scattered; three after each of those four.
+		testing.expect_value(t, generated_count, len(kinds)*9*(4+4*3))
+		for kind, kind_index in kinds { for depth in 0..<9 {
+			for previous in level.Room_Family {
+				for family in ([?]level.Room_Family{.Pillars, .Ring, .Twin_Courts, .Asymmetric}) {
+					if family == previous { continue }
+					testing.expectf(t, seen[kind_index][depth][previous][family],
+						"kind=%v depth=%v missing family transition %v -> %v", kind, depth, previous, family)
+				}
+			}
+		} }
+	} else {
+		testing.expect_value(t, generated_count, combinations)
+	}
 }
 
 @(test)

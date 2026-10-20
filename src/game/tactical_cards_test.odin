@@ -1,7 +1,7 @@
 package game
 
 import "core:testing"
-import grid "../grid"
+import grid "../engine/grid"
 import level "../level"
 
 rework_hand_card :: proc(t: ^testing.T, room: ^Room, definition: Card_Id) -> Card_Instance {
@@ -14,23 +14,7 @@ rework_hand_card :: proc(t: ^testing.T, room: ^Room, definition: Card_Id) -> Car
 	return card^
 }
 
-@(test)
-test_tactical_catalog_validates_without_changing_collection_lifetimes :: proc(t: ^testing.T) {
-	for id in Card_Id {
-		if id == .Count { continue }
-		base, _ := card_definition_by_id(id)
-		d, found := card_definition_by_id(id, true)
-		testing.expect(t, found && d.tactical && validate_card_definition(&d), base.name)
-		testing.expect_value(t, d.exhaust_on_play, base.exhaust_on_play)
-		testing.expect_value(t, d.temporary_only, base.temporary_only)
-		testing.expect_value(t, d.retain_on_refocus, base.retain_on_refocus)
-		testing.expect_value(t, d.ethereal, base.ethereal)
-		base_scales, tactical_scales := false, false
-		for e in base.effects[:base.effect_count] { base_scales = base_scales || e.amount_per_upgrade > 0 }
-		for e in d.effects[:d.effect_count] { tactical_scales = tactical_scales || e.amount_per_upgrade > 0 }
-		testing.expect_value(t, tactical_scales, base_scales)
-	}
-}
+
 
 @(test)
 test_tactical_dash_pays_one_shields_before_hazards_and_rejects_blocked_paths :: proc(t: ^testing.T) {
@@ -153,7 +137,7 @@ test_tactical_splash_and_bounces_do_not_reveal_or_hit_hidden_enemies :: proc(t: 
 	player.tactical.config.vision_size = 5
 	for id in ([?]Card_Id{.Firebomb, .Caustic_Bloom}) {
 		card := Card_Instance{id = 100, definition_id = id}
-		d, _ := card_definition_by_id(id, true)
+		d, _ := card_definition_by_id(id)
 		query := evaluate_card_targeting(&room, card, card_target_request_at(d, {6, 4}))
 		testing.expect_value(t, query.error, Card_Compile_Error.None)
 		testing.expect_value(t, query.query.enemy_count, 1)
@@ -179,7 +163,7 @@ test_tactical_shove_relocates_a_bomb_before_arming_its_impact :: proc(t: ^testin
 	room := create_enemy_rework_room(t, &data, &player, spawns[:])
 	defer level.destroy(&data)
 	defer destroy_room(&room)
-	testing.expect(t, spawn_bomb(&room, enemy_entity(1), {5, 4}, &room.recent_events))
+	testing.expect(t, spawn_bomb(&room, enemy_entity(1), {5, 4}, room.recent_events))
 	card := rework_hand_card(t, &room, .Shove)
 	play := play_card(&room, card.id, entity_target(object_entity(room.objects[0].id)))
 	testing.expect_value(t, play.result, Card_Play_Result.Played)

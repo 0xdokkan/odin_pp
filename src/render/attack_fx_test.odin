@@ -5,7 +5,7 @@ import "core:testing"
 import rl "vendor:raylib"
 import gfx "../engine/gfx"
 import game "../game"
-import grid "../grid"
+import grid "../engine/grid"
 import level "../level"
 
 // The board's blows (attack_fx.odin): one prop per blow, landing on the hit
@@ -13,7 +13,7 @@ import level "../level"
 
 attack_test_renderer :: proc(snapshot: ^Room_Presentation) -> ^Renderer {
 	renderer := new(Renderer)
-	renderer.tactical.enabled, renderer.tactical.scene_3d, renderer.tactical.living, renderer.tactical.no_fog = true, true, true, true
+	renderer.tactical.living, renderer.tactical.no_fog = true, true
 	renderer.tactical.snapshot = snapshot
 	renderer.tactical.camera = {position = {4, 9, 12}, target = {4, 0, 3}, up = {0, 1, 0}, fovy = 45}
 	renderer.canvas_width, renderer.canvas_height = 1280, 720
@@ -434,7 +434,7 @@ test_world_attacker_killed_by_its_own_bite_strikes_first :: proc(t: ^testing.T) 
 
 // An archer's bolt on a player wearing Thorns: their answer waits for the
 // bolt to land, so the archer is seen to shoot, then to flinch, and its
-// token comes after the bolt. A flat board, with no bolts, answers at once.
+// token comes after the bolt. With no attack assets, the fallback answers at once.
 @(test)
 test_world_thorns_answer_waits_for_the_blow_it_answers :: proc(t: ^testing.T) {
 	player := game.Player{position = {2, 2}, health = 10, stats = {max_health = 10}}
@@ -478,10 +478,10 @@ test_world_thorns_answer_waits_for_the_blow_it_answers :: proc(t: ^testing.T) {
 		}
 	}
 	testing.expect(t, flinched)
-	flat := new(Renderer)
-	defer { destroy_renderer_world_playback(flat); free(flat) }
-	testing.expect(t, begin_renderer_world_timeline(flat, before, &events, &before))
-	testing.expect(t, flat.world_playback.cues[1].cue.started)
+	unconfigured := new(Renderer)
+	defer { destroy_renderer_world_playback(unconfigured); free(unconfigured) }
+	testing.expect(t, begin_renderer_world_timeline(unconfigured, before, &events, &before))
+	testing.expect(t, unconfigured.world_playback.cues[1].cue.started)
 }
 
 // The impact's star is centred on the struck point (its sheet's grip is its
@@ -656,7 +656,7 @@ test_attack_fx_from_the_game_bump_and_cleave :: proc(t: ^testing.T) {
 	before := capture_room_presentation(&room)
 	testing.expect_value(t, game.try_move_player(&room, .West), game.Action_Result.Attacked)
 	after := capture_room_presentation(&room)
-	testing.expect(t, begin_renderer_event_timeline(renderer, before, &room.recent_events, &after))
+	testing.expect(t, begin_renderer_event_timeline(renderer, before, room.recent_events, &after))
 	update_renderer_event_timeline(renderer, 0.001)
 	snapshot = renderer_presentation_snapshot(renderer, &room)
 	observe_attack_cues(renderer)

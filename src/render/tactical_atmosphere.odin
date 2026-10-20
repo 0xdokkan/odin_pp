@@ -3,11 +3,12 @@ package render
 import "core:math"
 import rl "vendor:raylib"
 import game "../game"
-import grid "../grid"
+import grid "../engine/grid"
 import level "../level"
 
 TACTICAL_CLEAR_SECONDS :: f32(1.2)
 
+@(private)
 tactical_room_is_clear :: proc(phase: game.Room_Phase) -> bool {
 	return phase == .Loot || phase == .Complete
 }
@@ -23,13 +24,14 @@ tactical_exit_is_open :: proc(room: ^game.Room, phase: game.Room_Phase) -> bool 
 // before revealing the room. Combat always resets it, including a reused Room.
 update_tactical_atmosphere :: proc(renderer: ^Renderer, dt: f32) {
 	v := &renderer.tactical
-	if !v.enabled || v.snapshot == nil { return }
+	if v.snapshot == nil { return }
 	if !tactical_room_is_clear(v.snapshot.phase) { v.clear_light = 0; return }
 	if dt > 0 && dt < max(f32) { v.clear_light = min(f32(1), v.clear_light+dt/TACTICAL_CLEAR_SECONDS) }
 }
 
 // Bounded, terrain-clipped contact shadows; no extra render target or shadow map.
 // The key light comes from -X/-Z, so the short wall shadows fall toward +X/+Z.
+@(private)
 draw_tactical_ground_shadows :: proc(renderer: ^Renderer, room: ^game.Room) {
 	for y in 0..<room.level_data.tiles.height {
 		for x in 0..<room.level_data.tiles.width {
@@ -52,6 +54,7 @@ draw_tactical_ground_shadows :: proc(renderer: ^Renderer, room: ^game.Room) {
 	}
 }
 
+@(private)
 draw_tactical_loot :: proc(renderer: ^Renderer, item: Presentation_Loot) {
 	p := rl.Vector3{f32(item.position.x)+0.5, 0.13, f32(item.position.y)+0.5}
 	if item.kind == .Weapon {
@@ -64,6 +67,7 @@ draw_tactical_loot :: proc(renderer: ^Renderer, item: Presentation_Loot) {
 	draw_resin_cube(renderer, p+rl.Vector3{0, 0.1, 0}, 0.12, 0.06, 0.12, GOTHIC_PAPER)
 }
 
+@(private)
 draw_tactical_clear_markers :: proc(renderer: ^Renderer, room: ^game.Room) {
 	v := &renderer.tactical
 	if !tactical_room_is_clear(v.snapshot.phase) { return }

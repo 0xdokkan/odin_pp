@@ -23,6 +23,7 @@ mechanics_lab_banner_detail :: proc(renderer: ^Renderer, room: ^game.Room) -> cs
 
 // The banner's frame, around the words it writes now: the board's labels keep
 // clear of it while the lab runs (draw_tactical_annotations).
+@(private)
 mechanics_lab_banner_bounds :: proc(renderer: ^Renderer, room: ^game.Room) -> rl.Rectangle {
 	width := max(gothic_text_width(renderer, MECHANICS_LAB_TITLE, 16), gothic_text_width(renderer, mechanics_lab_banner_detail(renderer, room), 10))+28
 	return {(renderer.canvas_width-width)*0.5, TACTICAL_HUD_HEIGHT+4, width, 38}

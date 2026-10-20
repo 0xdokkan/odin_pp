@@ -5,8 +5,8 @@ import rl "vendor:raylib"
 import rlgl "vendor:raylib/rlgl"
 import gfx "../engine/gfx"
 import game "../game"
-import grid "../grid"
-import view "../view"
+import grid "../engine/grid"
+import view "../engine/view"
 
 // The action ring of a living board: a thin line with the shape of a living
 // card's cut that closes in on the card and touches it the moment its owner
@@ -40,6 +40,7 @@ Living_Ring_Kind :: enum u8 {
 // threats are red and orange. Green and violet sit next to blue and are kept
 // light; red and green also differ in lightness, for colour-blind players.
 // Gold is the player's alone (a critical action's colour).
+@(private)
 living_ring_color :: proc(kind: Living_Ring_Kind) -> rl.Color {
 	switch kind {
 	case .Strike: return {255, 66, 66, 255}
@@ -53,6 +54,7 @@ living_ring_color :: proc(kind: Living_Ring_Kind) -> rl.Color {
 }
 
 // What an enemy's intent announces. Waiting and recovering announce nothing.
+@(private)
 living_ring_kind :: proc(enemy: ^game.Enemy) -> Living_Ring_Kind {
 	intent := &enemy.intent
 	switch intent.kind {
@@ -73,6 +75,7 @@ living_ring_kind :: proc(enemy: ^game.Enemy) -> Living_Ring_Kind {
 }
 
 // 1 when the enemy has just committed to its action, 0 when it acts.
+@(private)
 living_ring_open :: proc(room: ^game.Room, enemy: ^game.Enemy) -> f32 {
 	total := game.tactical_enemy_intent_seconds(enemy)
 	if total <= 0 { return 0 }
@@ -80,11 +83,13 @@ living_ring_open :: proc(room: ^game.Room, enemy: ^game.Enemy) -> f32 {
 }
 
 // The share of the current second still to run, through the whole combat.
+@(private)
 living_beat_open :: proc(room: ^game.Room) -> (open: f32, on: bool) {
-	if !game.tactical_enabled(room) || room.phase != .Combat { return }
+	if room.phase != .Combat { return }
 	return clamp(1-room.player.tactical.clock_fraction, 0, 1), true
 }
 
+@(private)
 draw_living_rings :: proc(renderer: ^Renderer, room: ^game.Room) {
 	v := &renderer.tactical
 	if room == nil || !v.living || !v.living_assets.loaded || v.living_assets.ring_shader.id == 0 ||
@@ -118,6 +123,7 @@ draw_living_rings :: proc(renderer: ^Renderer, room: ^game.Room) {
 	}
 }
 
+@(private = "file")
 draw_living_ring :: proc(renderer: ^Renderer, character: gfx.Flipbook_Character, key: Sprite_Key, position: view.Vec2,
 	entity: game.Entity_Ref, open: f32, color: rl.Color) {
 	assets := &renderer.tactical.living_assets

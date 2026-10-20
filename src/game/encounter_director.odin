@@ -1,6 +1,6 @@
 package game
 
-import grid "../grid"
+import grid "../engine/grid"
 
 ROOM_RECIPE_SEED_SALT :: u64(0x589965CC75374CC3)
 
@@ -25,6 +25,7 @@ encounter_kind_for_node :: proc(node: ^Run_Node) -> Encounter_Kind {
 	return kinds[seed%3]
 }
 
+@(private)
 encounter_required_enemies :: proc(kind: Encounter_Kind) -> [2]Enemy_Archetype {
 	switch kind {
 	case .Standard: return {.Chaser, .Chaser}
@@ -37,6 +38,7 @@ encounter_required_enemies :: proc(kind: Encounter_Kind) -> [2]Enemy_Archetype {
 }
 
 // A nearby pair creates an actual formation, with an unobstructed orthogonal link.
+@(private = "file")
 encounter_pair_has_clear_link :: proc(blueprint: ^Room_Blueprint, a, b: grid.Position) -> bool {
 	distance := abs(a.x-b.x)+abs(a.y-b.y)
 	if distance == 0 || distance > 2 || (a.x != b.x && a.y != b.y) { return false }
@@ -46,6 +48,7 @@ encounter_pair_has_clear_link :: proc(blueprint: ^Room_Blueprint, a, b: grid.Pos
 	return true
 }
 
+@(private)
 arrange_encounter_spawn_candidates :: proc(blueprint: ^Room_Blueprint, candidates: []grid.Position) -> bool {
 	required := encounter_required_enemies(blueprint.encounter_kind)
 	scores_a := make([]int, len(candidates))
@@ -87,6 +90,7 @@ arrange_encounter_spawn_candidates :: proc(blueprint: ^Room_Blueprint, candidate
 	return true
 }
 
+@(private)
 validate_blueprint_encounter :: proc(blueprint: ^Room_Blueprint) -> bool {
 	node := Run_Node{id = blueprint.source_node, kind = blueprint.node_kind,
 		depth = blueprint.node_depth, room_seed = blueprint.seed}
@@ -120,6 +124,7 @@ validate_blueprint_encounter :: proc(blueprint: ^Room_Blueprint) -> bool {
 	return true
 }
 
+@(private)
 encounter_position_open :: proc(blueprint: ^Room_Blueprint, position: grid.Position, extra_blocker: grid.Position = {-1, -1}) -> bool {
 	if position == extra_blocker || !cell_is_walkable(&blueprint.level_data, position) ||
 	   position_in_list(blueprint.obstacles[:], position) { return false }
@@ -129,6 +134,7 @@ encounter_position_open :: proc(blueprint: ^Room_Blueprint, position: grid.Posit
 	return true
 }
 
+@(private)
 encounter_position_lanes :: proc(blueprint: ^Room_Blueprint, position: grid.Position, extra_blocker: grid.Position = {-1, -1}) -> (neighbors, longest, cover: int) {
 	directions := [4]grid.Position{{0, -1}, {1, 0}, {0, 1}, {-1, 0}}
 	for direction in directions {
@@ -150,6 +156,7 @@ encounter_position_lanes :: proc(blueprint: ^Room_Blueprint, position: grid.Posi
 	return
 }
 
+@(private = "file")
 encounter_role_position_score :: proc(blueprint: ^Room_Blueprint, archetype: Enemy_Archetype, position: grid.Position) -> int {
 	neighbors, lane, cover := encounter_position_lanes(blueprint, position)
 	spawn := blueprint.level_data.player_spawn
@@ -172,6 +179,7 @@ encounter_role_position_score :: proc(blueprint: ^Room_Blueprint, archetype: Ene
 	return -1000
 }
 
+@(private)
 arrange_role_spawn_candidate :: proc(blueprint: ^Room_Blueprint, candidates: []grid.Position, start: int, archetype: Enemy_Archetype) {
 	best, best_score := start, -100000
 	for index in start..<len(candidates) {
@@ -185,6 +193,7 @@ arrange_role_spawn_candidate :: proc(blueprint: ^Room_Blueprint, candidates: []g
 	candidates[start], candidates[best] = candidates[best], candidates[start]
 }
 
+@(private)
 object_preserves_enemy_lanes :: proc(blueprint: ^Room_Blueprint, candidate: grid.Position) -> bool {
 	for enemy in blueprint.enemies {
 		if enemy.archetype != .Archer && enemy.archetype != .Brute && enemy.archetype != .Demolitionist { continue }

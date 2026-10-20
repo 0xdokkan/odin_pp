@@ -4,7 +4,7 @@ import "core:fmt"
 import "core:math"
 import rl "vendor:raylib"
 import game "../game"
-import view "../view"
+import view "../engine/view"
 
 // Bruciatura and Rallentamento at a fighter's feet: little paper tags cut and
 // inked like the hearts and the damage tokens (draw_paper_tag), each with its
@@ -31,17 +31,20 @@ STATUS_TAG_GAP :: f32(3)
 // The statuses shown as tags, in the row's order.
 STATUS_TAG_KINDS :: [2]game.Status_Kind{.Burn, .Slow}
 
+@(private)
 status_tag_text :: proc(status: game.Status) -> string {
 	return fmt.tprintf("%d", max(status.potency, 0))
 }
 
 // In tag pixels, as a heart's tag: the pictogram, a pixel of paper, the figures.
+@(private)
 status_tag_size :: proc(text: string) -> (width, height: int) {
 	return living_heart_size(text)
 }
 
 // The tag with its top left at `at` (whole screen pixels), `pixel` screen
 // pixels to a tag pixel. Its two colours never overlap, so a fading tag stays even.
+@(private = "file")
 draw_status_tag :: proc(at: rl.Vector2, kind: game.Status_Kind, text: string, pixel: f32, alpha: f32 = 1) {
 	w, h := status_tag_size(text)
 	ink := draw_paper_tag(at, w, h, pixel, alpha)
@@ -61,6 +64,7 @@ draw_status_tag :: proc(at: rl.Vector2, kind: game.Status_Kind, text: string, pi
 
 // The row of tags centred on `center` (the cell's centre on screen) with its
 // top at `top`; its bounds, empty when the fighter has none of these statuses.
+@(private)
 draw_status_tags :: proc(statuses: ^game.Status_Set, center: rl.Vector2, top: f32, opacity: f32, pixel: f32 = 1) -> (bounds: rl.Rectangle) {
 	shown: [len(STATUS_TAG_KINDS)]game.Status
 	count := 0
@@ -89,6 +93,7 @@ draw_status_tags :: proc(statuses: ^game.Status_Set, center: rl.Vector2, top: f3
 
 // The ground lane a fighter's status glyphs keep at `feet` on screen: the
 // round markers' square and the row of tags under it.
+@(private)
 tactical_status_lane :: proc(feet: view.Vec2, tags: rl.Rectangle) -> rl.Rectangle {
 	lane := rl.Rectangle{feet.x-30, feet.y-18, 60, 36}
 	if tags.width <= 0 { return lane }
@@ -99,8 +104,9 @@ tactical_status_lane :: proc(feet: view.Vec2, tags: rl.Rectangle) -> rl.Rectangl
 
 // The tags' pixel at a figure's feet on the 3D board: doubled with the hearts
 // (tactical_enemy_head), once a world unit there is LIVING_HEART_DOUBLE wide.
+@(private)
 tactical_status_tag_pixel :: proc(renderer: ^Renderer, position: view.Vec2) -> f32 {
-	if !renderer.tactical.scene_3d { return 1 }
+
 	right := flipbook_camera_right(renderer)*0.5
 	feet := view.Vec2{position.x+0.5, position.y+0.5}
 	a := tactical_project(renderer, {feet.x-right.x, feet.y-right.z})

@@ -95,6 +95,7 @@ Deck_Refocus_Report :: struct {
 	exhausted_count: int,
 }
 
+@(private)
 deck_rules_are_valid :: proc(rules: Deck_Rules) -> bool {
 	return rules.hand_size > 0 && rules.hand_size <= MAX_HAND_CAPACITY &&
 	       rules.max_energy > 0 && rules.energy_regen_per_pulse >= 0
@@ -106,6 +107,7 @@ deck_hand_limit :: proc(deck: ^Deck_State) -> int {
 	return max(MAX_HAND_CARDS, deck.rules.hand_size)
 }
 
+@(private = "file")
 normalized_deck_seed :: proc(seed: u64) -> u64 {
 	if seed == 0 {
 		return DEFAULT_DECK_SEED
@@ -207,6 +209,7 @@ upgrade_owned_card :: proc(deck: ^Deck_State, card_id: u32) -> Deck_Mutation_Res
 	return .Upgraded
 }
 
+@(private)
 remove_owned_card :: proc(deck: ^Deck_State, card_id: u32) -> Deck_Mutation_Result {
 	if deck == nil || deck.combat_active || !validate_deck_state(deck) {
 		return .Invalid
@@ -251,6 +254,7 @@ initialize_starter_deck :: proc(deck: ^Deck_State, seed: u64 = DEFAULT_DECK_SEED
 	return validate_deck_state(deck)
 }
 
+@(private)
 reseed_deck :: proc(deck: ^Deck_State, seed: u64) -> bool {
 	if deck == nil || deck.combat_active {
 		return false
@@ -259,11 +263,13 @@ reseed_deck :: proc(deck: ^Deck_State, seed: u64) -> bool {
 	return true
 }
 
+@(private)
 deck_next_random :: proc(deck: ^Deck_State) -> u64 {
 	assert(deck != nil && deck.random_state != 0)
 	return rng.step(&deck.random_state)
 }
 
+@(private = "file")
 shuffle_draw_pile :: proc(deck: ^Deck_State) {
 	assert(deck != nil && deck.draw_count >= 0 && deck.draw_count <= MAX_COMBAT_CARDS)
 	for index := deck.draw_count-1; index > 0; index -= 1 {
@@ -273,6 +279,7 @@ shuffle_draw_pile :: proc(deck: ^Deck_State) {
 	}
 }
 
+@(private)
 can_draw_card :: proc(deck: ^Deck_State) -> bool {
 	return deck != nil && deck.combat_active && deck_state_is_consistent(deck) &&
 	       deck.hand_count < deck_hand_limit(deck) &&
@@ -305,6 +312,7 @@ draw_card :: proc(deck: ^Deck_State) -> (card: Card_Instance, ok: bool) {
 	return card, true
 }
 
+@(private)
 draw_to_hand_size :: proc(deck: ^Deck_State) -> (drawn: int) {
 	if deck == nil || !deck.combat_active {
 		return
@@ -388,12 +396,14 @@ finish_deck_combat :: proc(deck: ^Deck_State) {
 	deck.combat_active = false
 }
 
+@(private)
 sync_deck_with_room_phase :: proc(room: ^Room) {
 	if room != nil && room.player != nil && room.phase != .Combat {
 		finish_deck_combat(&room.player.deck)
 	}
 }
 
+@(private = "file")
 can_move_hand_card_to_zone :: proc(
 	deck: ^Deck_State,
 	hand_index: int,
@@ -413,6 +423,7 @@ can_move_hand_card_to_zone :: proc(
 	return false
 }
 
+@(private)
 can_discard_hand_card :: proc(deck: ^Deck_State, hand_index: int) -> bool {
 	return can_move_hand_card_to_zone(deck, hand_index, .Discard)
 }
@@ -452,6 +463,7 @@ discard_hand_card :: proc(deck: ^Deck_State, hand_index: int) -> (Card_Instance,
 	return move_hand_card_to_zone(deck, hand_index, .Discard)
 }
 
+@(private)
 exhaust_hand_card :: proc(deck: ^Deck_State, hand_index: int) -> (Card_Instance, bool) {
 	return move_hand_card_to_zone(deck, hand_index, .Exhaust)
 }
@@ -555,6 +567,7 @@ finish_resolving_card :: proc(
 	return card, true
 }
 
+@(private)
 combat_temporary_card_count :: proc(deck: ^Deck_State) -> int {
 	if deck == nil || !deck.combat_active {
 		return 0
@@ -568,6 +581,7 @@ combat_temporary_card_count :: proc(deck: ^Deck_State) -> int {
 	       deck.owned_count
 }
 
+@(private)
 can_create_temporary_card :: proc(
 	deck: ^Deck_State,
 	definition_id: Card_Id,
@@ -613,6 +627,7 @@ create_temporary_card :: proc(
 	return instance, true
 }
 
+@(private)
 restore_deck_energy_after_pulse :: proc(deck: ^Deck_State) -> i32 {
 	if deck == nil || !deck.combat_active || deck.energy >= deck.rules.max_energy {
 		return 0
@@ -622,6 +637,7 @@ restore_deck_energy_after_pulse :: proc(deck: ^Deck_State) -> i32 {
 	return deck.energy-before
 }
 
+@(private = "file")
 deck_counts_are_valid :: proc(deck: ^Deck_State) -> bool {
 	return deck != nil && deck_rules_are_valid(deck.rules) && deck.random_state != 0 &&
 	       deck.next_card_id != 0 && deck.owned_count >= 0 && deck.owned_count <= MAX_OWNED_CARDS &&
@@ -631,6 +647,7 @@ deck_counts_are_valid :: proc(deck: ^Deck_State) -> bool {
 	       deck.exhaust_count >= 0 && deck.exhaust_count <= MAX_COMBAT_CARDS
 }
 
+@(private = "file")
 deck_state_is_consistent :: proc(deck: ^Deck_State) -> bool {
 	when DECK_DEEP_VALIDATION {
 		return validate_deck_state(deck)

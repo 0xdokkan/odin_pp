@@ -9,7 +9,7 @@ test_world_characters_keep_thick_projected_outlines_at_every_combat_zoom :: proc
     renderer := new(Renderer)
     defer free(renderer)
     renderer.canvas_width, renderer.canvas_height = 960, 540
-    renderer.tactical.enabled, renderer.tactical.scene_3d = true, true
+
     renderer.tactical.art.figures = {id = 1, width = 1254, height = 1254}
     for &source in renderer.tactical.art.figure_sources { source = {0, 0, 240, 320} }
     for key in ([9]Sprite_Key{.Player,.Player_Cast,.Player_Hit,.Chaser,.Archer,.Brute,.Bomber,.Custodian,.Demolitionist}) {

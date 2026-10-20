@@ -3,6 +3,19 @@ package game
 import "core:testing"
 import level "../level"
 
+// Low-level resolver fixture: scheduler integration is covered by tactical tests.
+advance_combat_pulse :: proc(room: ^Room) -> (pulse: Pulse_Report) {
+	if room == nil || room.phase != .Combat {
+		return
+	}
+	pulse.advanced = true
+	resolve_due_explosives(room, &pulse)
+	resolve_due_room_modifier(room, &pulse)
+	resolve_enemy_intents(room, &pulse)
+	finish_combat_pulse(room, &pulse)
+	return
+}
+
 @(test)
 test_continuing_combat_emits_terminal_pulse_snapshot_after_ticks_and_energy_restore :: proc(
 	t: ^testing.T,
@@ -20,11 +33,12 @@ test_continuing_combat_emits_terminal_pulse_snapshot_after_ticks_and_energy_rest
 	applied, created := apply_status(&room, PLAYER_ENTITY, .Shield, 2, 1)
 	testing.expect(t, applied && created)
 
+	room.pulse_count = 2
 	pulse := advance_combat_pulse(&room)
 
 	testing.expect(t, pulse.advanced)
 	testing.expect_value(t, room.phase, Room_Phase.Combat)
-	testing.expect_value(t, room.pulse_count, u64(1))
+	testing.expect_value(t, room.pulse_count, u64(3))
 	testing.expect_value(t, pulse.events.dropped_count, 0)
 	testing.expect_value(t, pulse.events.count, 2)
 	testing.expect_value(t, pulse.events.events[0].kind, Game_Event_Kind.Status_Expired)
@@ -106,6 +120,7 @@ test_full_energy_records_regen_wasted_at_cap :: proc(t: ^testing.T) {
 
 	room.enemies[0].intent = make_wait_intent(&room, room.enemies[0].position)
 	testing.expect_value(t, player.deck.energy, player.deck.rules.max_energy)
+	room.pulse_count = 2
 	pulse := advance_combat_pulse(&room)
 
 	testing.expect(t, pulse.advanced)

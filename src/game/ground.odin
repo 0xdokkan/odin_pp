@@ -1,6 +1,6 @@
 package game
 
-import grid "../grid"
+import grid "../engine/grid"
 
 // POZZA DI VELENO and INCENDIO: what the player pours or lights on the floor
 // of a tactical room. The ground is no Grid_Object: it lies under everything,
@@ -49,11 +49,8 @@ Ground_State :: struct {
 	next_fire_id: u32,
 }
 
-// The cards that pour or light the ground.
-card_places_ground :: proc(id: Card_Id) -> bool {
-	return id == .Poison_Pool || id == .Wildfire
-}
 
+@(private)
 ground_kind_is_valid :: proc(kind: Status_Kind) -> bool {
 	return kind == .Poison || kind == .Burn
 }
@@ -62,6 +59,7 @@ place_ground_effect :: proc(cell: grid.Position, kind: Status_Kind, amount: i32)
 	return {kind = .Place_Ground, target = PLAYER_ENTITY, destination = cell, status = kind, amount = amount}
 }
 
+@(private)
 ground_index :: proc(room: ^Room, cell: grid.Position) -> (index: int, ok: bool) {
 	if room == nil || room.level_data == nil { return }
 	index, ok = grid.index_of(&room.level_data.tiles, cell)
@@ -86,6 +84,7 @@ ground_fire_covers :: proc(fire: Ground_Fire, cell: grid.Position) -> bool {
 }
 
 // The strongest fire burning on `cell` (0: none).
+@(private)
 ground_burn_at :: proc(room: ^Room, cell: grid.Position) -> (burn: i32) {
 	if room == nil { return }
 	for fire in room.ground.fires[:room.ground.fire_count] {
@@ -97,8 +96,9 @@ ground_burn_at :: proc(room: ^Room, cell: grid.Position) -> (burn: i32) {
 // A cell a pool or a fire may be poured on: walkable floor in a fight, no
 // cover, no object of any kind, no enemy and not the player's own cell. Traps
 // and the exit take them.
+@(private = "file")
 ground_cell_is_free :: proc(room: ^Room, cell: grid.Position) -> bool {
-	if room == nil || room.player == nil || room.phase != .Combat || !tactical_enabled(room) ||
+	if room == nil || room.player == nil || room.phase != .Combat ||
 	   !base_cell_is_walkable(room, cell) || obstacle_at(room, cell) || room.player.position == cell { return false }
 	if _, found := object_index_at(room, cell); found { return false }
 	if _, found := enemy_index_at(room, cell); found { return false }
@@ -107,6 +107,7 @@ ground_cell_is_free :: proc(room: ^Room, cell: grid.Position) -> bool {
 
 // A pool needs a dry cell; a fire a free slot (a fire may burn over a pool or
 // another fire).
+@(private)
 ground_can_place :: proc(room: ^Room, kind: Status_Kind, cell: grid.Position) -> bool {
 	if !ground_kind_is_valid(kind) || !ground_cell_is_free(room, cell) { return false }
 	if kind == .Poison {
@@ -118,6 +119,7 @@ ground_can_place :: proc(room: ^Room, kind: Status_Kind, cell: grid.Position) ->
 
 // Floor a pool can still spread over: walkable, no cover, no blocking object,
 // not yet pool. Actors never stop it.
+@(private = "file")
 ground_cell_is_open :: proc(room: ^Room, cell: grid.Position, anchor: grid.Position) -> bool {
 	return cell != anchor && !cell_blocks_movement(room, cell) && ground_pool_at(room, cell) == 0
 }
@@ -197,6 +199,7 @@ ground_fire_reach :: proc(room: ^Room, center: grid.Position) -> (fire: Ground_F
 
 // A status from the ground: a System's, as the board's devices give theirs,
 // so the player's relics and reactions take no part in it.
+@(private = "file")
 ground_apply_status :: proc(room: ^Room, entity: Entity_Ref, kind: Status_Kind, potency: i32, report: ^Action_Report) -> bool {
 	if room == nil || report == nil || potency <= 0 || !entity_exists(room, entity) || !can_apply_status(room, entity, kind) { return false }
 	applied, _ := apply_status(room, entity, kind, potency, 0)
@@ -211,6 +214,7 @@ ground_apply_status :: proc(room: ^Room, entity: Entity_Ref, kind: Status_Kind, 
 // Pours a pool (`kind` Poison) or lights a fire (Burn) on `cell`, its stacks
 // `amount`. A pool's closed areas fill at once: every enemy standing on one
 // gets its Veleno.
+@(private)
 place_ground :: proc(room: ^Room, kind: Status_Kind, cell: grid.Position, amount: i32, report: ^Action_Report) -> bool {
 	if report == nil || amount <= 0 || !ground_can_place(room, kind, cell) { return false }
 	if kind == .Burn {
@@ -239,6 +243,7 @@ place_ground :: proc(room: ^Room, kind: Status_Kind, cell: grid.Position, amount
 // cell of a charge, a push or a pull, a teleport's landing): a pool gives its
 // Veleno, a fire its Bruciatura. The player is never touched, nor a foe the
 // Lazzo holds in the air.
+@(private)
 trigger_ground_on_entry :: proc(room: ^Room, mover: Entity_Ref, report: ^Action_Report) {
 	if room == nil || report == nil || room.phase != .Combat || mover.kind != .Enemy || enemy_is_out_of_play(room, mover.id) { return }
 	position, present := entity_position(room, mover)

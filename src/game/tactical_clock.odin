@@ -11,6 +11,7 @@ TACTICAL_RECOVERY_SECONDS :: f32(1)
 // window. A new room starts afresh.
 TACTICAL_CARDS_PER_SECOND :: 6
 
+@(private)
 tactical_reset_window_pressure :: proc(s: ^Tactical_State) {
 	s.next_budget = 0
 	s.cards_toward_second, s.won_seconds = 0, 0
@@ -19,8 +20,9 @@ tactical_reset_window_pressure :: proc(s: ^Tactical_State) {
 }
 
 // Every card played counts toward the next won second.
+@(private)
 tactical_count_card :: proc(room: ^Room) {
-	if !tactical_enabled(room) || room.phase != .Combat { return }
+	if room == nil || room.player == nil || room.phase != .Combat { return }
 	s := &room.player.tactical
 	s.cards_toward_second += 1
 	if s.cards_toward_second >= TACTICAL_CARDS_PER_SECOND {
@@ -32,6 +34,7 @@ tactical_count_card :: proc(room: ^Room) {
 // The window after this one: a second shorter, or longer by the seconds the
 // cards won (the drop forgiven), never past the starting window. Without the
 // shrinking window every window is whole.
+@(private = "file")
 tactical_next_window :: proc(s: ^Tactical_State) -> int {
 	if !s.config.shrinking_window { return s.config.timer_seconds }
 	next := s.budget+s.won_seconds if s.won_seconds > 0 else s.budget-1
@@ -39,18 +42,19 @@ tactical_next_window :: proc(s: ^Tactical_State) -> int {
 }
 
 tactical_is_casting :: proc(room: ^Room) -> bool {
-	return tactical_enabled(room) && room.phase == .Combat && room.player.tactical.cast_remaining > 0
+	return room != nil && room.player != nil && room.phase == .Combat && room.player.tactical.cast_remaining > 0
 }
 
 tactical_begin_card_cast :: proc(room: ^Room, seconds: f32) {
-	if !tactical_enabled(room) || room.phase != .Combat || seconds <= 0 { return }
+	if room == nil || room.player == nil || room.phase != .Combat || seconds <= 0 { return }
 	s := &room.player.tactical
 	s.cast_remaining, s.cast_duration = seconds, seconds
 	s.metrics.decisions += 1
 }
 
-// Each telegraph has a deadline of its own. Recovery and an already prepared
-// projectile advance faster than a fresh action; classic combat ignores this.
+// Each telegraph has a deadline of its own. Fresh actions give the player
+// three to five beats to respond; recovery and an already prepared projectile
+// still advance on the next beat.
 // Rallentamento's seconds, added when the intent was planned, are part of it.
 tactical_enemy_intent_seconds :: proc(enemy: ^Enemy) -> f32 {
 	return tactical_enemy_base_seconds(enemy)+f32(max(i32(0), enemy.intent.slowed))
@@ -59,28 +63,30 @@ tactical_enemy_intent_seconds :: proc(enemy: ^Enemy) -> f32 {
 tactical_enemy_base_seconds :: proc(enemy: ^Enemy) -> f32 {
 	if enemy.intent.kind == .Recover || enemy.aim_ready || enemy.bomb_ready { return 1 }
 	switch enemy.archetype {
-	case .Chaser: return 2
-	case .Archer, .Custodian: return 3
-	case .Brute, .Bomber, .Demolitionist: return 4
+	case .Chaser: return 3
+	case .Archer, .Custodian: return 4
+	case .Brute, .Bomber, .Demolitionist: return 5
 	case .Count: return 1
 	}
 	return 1
 }
 
 tactical_enemy_seconds :: proc(room: ^Room, enemy: ^Enemy) -> f32 {
-	if !tactical_enabled(room) || enemy == nil { return 0 }
+	if room == nil || room.player == nil || enemy == nil { return 0 }
 	return max(f32(0), enemy.tactical_cooldown-room.player.tactical.clock_fraction)
 }
 
 // A freshly planned intent: each stack of Rallentamento holds it a second
 // longer (the stack wears once that action is carried out, pulse.odin).
+@(private)
 tactical_schedule_enemy :: proc(room: ^Room, enemy: ^Enemy) {
-	if !tactical_enabled(room) { return }
+	if room == nil || room.player == nil { return }
 	enemy.intent.slowed = 0
 	if index, slowed := status_index(&enemy.statuses, .Slow); slowed { enemy.intent.slowed = enemy.statuses.items[index].potency }
 	enemy.tactical_cooldown = tactical_enemy_intent_seconds(enemy)
 }
 
+@(private)
 tactical_queue_next_beat :: proc(room: ^Room) {
 	s := &room.player.tactical
 	if room.phase != .Combat || (s.phase != .Decision && !tactical_between_windows(s)) ||
@@ -92,6 +98,7 @@ tactical_queue_next_beat :: proc(room: ^Room) {
 
 // Recovery is timed by the same active clock as the world. A beat may finish
 // before the recovery deadline; a QTE may defer its final beat beyond it.
+@(private)
 tactical_finish_recovery :: proc(room: ^Room) {
 	if !(tactical_is_recovering(room) || tactical_is_stunned(room)) || room.tactical_pulse.pending || room.qte.kind != .None { return }
 	s := &room.player.tactical
@@ -106,6 +113,7 @@ tactical_finish_recovery :: proc(room: ^Room) {
 // The same elapsed-time path receives frame time and the extra cost of accepted
 // actions. It never executes gameplay recursively: the controller drains beats
 // through Continue_Pulse, preserving bounded logs and defense QTE suspension.
+@(private)
 tactical_advance_clock :: proc(room: ^Room, seconds: f32) {
 	s := &room.player.tactical
 	elapsed := min(max(f32(0), seconds), max(f32(0), s.remaining))
@@ -126,7 +134,7 @@ tactical_advance_clock :: proc(room: ^Room, seconds: f32) {
 }
 
 tactical_spend_action_time :: proc(room: ^Room, seconds: f32) {
-	if !tactical_enabled(room) || room.phase != .Combat || !(seconds > 0) { return }
+	if room == nil || room.player == nil || room.phase != .Combat || !(seconds > 0) { return }
 	s := &room.player.tactical
 	if s.config.timed_actions {
 		// The action lasts its cost: the window and the world run through it
@@ -146,11 +154,11 @@ tactical_spend_action_time :: proc(room: ^Room, seconds: f32) {
 // Expiry waits until all charged world time has resolved, so a lethal final
 // beat cannot accidentally start another window or carry work into the loot.
 tactical_expire_window :: proc(room: ^Room) -> bool {
-	if !tactical_enabled(room) || room.phase != .Combat || room.tactical_pulse.pending ||
+	if room == nil || room.player == nil || room.phase != .Combat || room.tactical_pulse.pending ||
 	   room.qte.kind != .None || room.player.tactical.remaining > 0 { return false }
 	s := &room.player.tactical
 	if s.phase != .Decision || s.queued_beats > 0 || s.cast_remaining > 0 { return false }
-	clear_event_log(&room.recent_events)
+	clear_event_log(room.recent_events)
 	s.cycle = min(s.cycle, max(int)-1)+1
 	s.metrics.pauses += 1
 	s.phase = .Recovery
@@ -175,7 +183,7 @@ tactical_expire_window :: proc(room: ^Room) -> bool {
 	burn: Pulse_Report
 	tick_combatants(room, &burn, burn_status)
 	grow_ground_fires(room, &burn)
-	append_event_log(&room.recent_events, &burn.events)
+	append_event_log(room.recent_events, &burn.events)
 	if room.phase != .Combat {
 		collect_loot_in_magnet_range(room)
 		sync_deck_with_room_phase(room)

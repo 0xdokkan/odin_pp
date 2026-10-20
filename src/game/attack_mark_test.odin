@@ -1,7 +1,7 @@
 package game
 
 import "core:testing"
-import grid "../grid"
+import grid "../engine/grid"
 import level "../level"
 
 // Every physical blow marks its own events for the board (mark_attack_events):
@@ -58,7 +58,7 @@ test_attack_marks_a_bump_with_its_two_cells :: proc(t: ^testing.T) {
 	defer level.destroy(&data)
 	defer destroy_room(&room)
 	testing.expect_value(t, try_move_player(&room, .North), Action_Result.Attacked)
-	hit, found := attack_mark_find(&room.recent_events, .Damaged, PLAYER_ENTITY, enemy_entity(room.enemies[0].id))
+	hit, found := attack_mark_find(room.recent_events, .Damaged, PLAYER_ENTITY, enemy_entity(room.enemies[0].id))
 	testing.expect(t, found && event_is_attack(hit) && !event_is_ranged_attack(hit) && !event_is_critical(hit))
 	testing.expect_value(t, hit.from_position, grid.Position{4, 4})
 	testing.expect_value(t, hit.to_position, grid.Position{4, 3})
@@ -75,7 +75,7 @@ test_attack_marks_a_critical_diagonal_bump_and_keeps_it_critical :: proc(t: ^tes
 	defer level.destroy(&data)
 	defer destroy_room(&room)
 	testing.expect_value(t, try_move_player_diagonal(&room, {1, -1}), Action_Result.Attacked)
-	hit, found := attack_mark_find(&room.recent_events, .Damaged, PLAYER_ENTITY, enemy_entity(room.enemies[0].id))
+	hit, found := attack_mark_find(room.recent_events, .Damaged, PLAYER_ENTITY, enemy_entity(room.enemies[0].id))
 	testing.expect(t, found && event_is_attack(hit) && event_is_critical(hit))
 	testing.expect_value(t, hit.from_position, grid.Position{4, 4})
 	testing.expect_value(t, hit.to_position, grid.Position{5, 3})

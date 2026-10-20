@@ -2,7 +2,7 @@ package render
 
 import "core:testing"
 import rl "vendor:raylib"
-import view "../view"
+import view "../engine/view"
 
 @(test)
 test_tactical_labels_pack_shared_anchor_without_overlap_or_leaving_viewport :: proc(t: ^testing.T) {

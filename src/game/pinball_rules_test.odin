@@ -2,7 +2,7 @@ package game
 
 import "core:math"
 import "core:testing"
-import grid "../grid"
+import grid "../engine/grid"
 import level "../level"
 
 // The events of a roll of their kind, in order.

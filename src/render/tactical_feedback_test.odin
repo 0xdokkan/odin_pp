@@ -3,13 +3,13 @@ package render
 import "core:testing"
 import rl "vendor:raylib"
 import game "../game"
-import view "../view"
+import view "../engine/view"
 
 @(test)
 test_tactical_feedback_targets_one_actor_and_never_advances_presentation :: proc(t: ^testing.T) {
 	renderer := new(Renderer)
 	defer free(renderer)
-	renderer.tactical = {enabled = true, scene_3d = true}
+	renderer.tactical = {}
 	renderer.timeline.view.valid = true
 	renderer.timeline.view.enemy_count = 2
 	for &enemy, index in renderer.timeline.view.enemies[:2] {
@@ -28,19 +28,14 @@ test_tactical_feedback_targets_one_actor_and_never_advances_presentation :: proc
 		testing.expect_value(t, other.scale_y, f32(1))
 	}
 	testing.expect_value(t, renderer.timeline, before)
-	// Identical cue state must not alter classic rendering or the M7 2D view.
-	renderer.tactical.scene_3d = false
-	testing.expect_value(t, tactical_feedback_pose(renderer, sprite_key_for_enemy(.Chaser), {2, 3}).tint, rl.WHITE)
-	renderer.tactical.scene_3d = true
-	renderer.tactical.enabled = false
-	testing.expect_value(t, tactical_feedback_pose(renderer, sprite_key_for_enemy(.Chaser), {2, 3}).tint, rl.WHITE)
+
 }
 
 @(test)
 test_tactical_move_feedback_returns_to_ground_without_an_extra_timeline :: proc(t: ^testing.T) {
 	renderer := new(Renderer)
 	defer free(renderer)
-	renderer.tactical = {enabled = true, scene_3d = true}
+	renderer.tactical = {}
 	renderer.timeline.view.valid = true
 	renderer.timeline.view.player = {entity = game.PLAYER_ENTITY, position = {2, 3}, visible = true}
 	renderer.timeline.count = 1

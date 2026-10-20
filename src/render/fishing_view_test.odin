@@ -4,7 +4,7 @@ import "core:testing"
 import rl "vendor:raylib"
 import audio "../engine/audio"
 import game "../game"
-import grid "../grid"
+import grid "../engine/grid"
 import level "../level"
 
 // The Canna da Pesca on the board (fishing.odin): its card's texts, its slot
@@ -48,25 +48,22 @@ fishing_test_stream :: proc(card: bool) -> u64 {
 @(test)
 test_fishing_rod_card_says_its_fishings_and_its_catch :: proc(t: ^testing.T) {
 	rod := game.Card_Instance{id = 1, definition_id = .Fishing_Rod}
-	first, second := gothic_card_lines(rod, true)
+	first, second := gothic_card_lines(rod)
 	testing.expect_value(t, string(first), "1 PESCA A STANZA")
 	testing.expect_value(t, string(second), "CIBO d4 / 5% CARTA")
 	upgraded := rod
 	upgraded.upgrade_level = 2
-	first, second = gothic_card_lines(upgraded, true)
-	testing.expect_value(t, string(first), "3 PESCHE A STANZA")
-	testing.expect_value(t, string(second), "CIBO d4 / 5% CARTA")
 	first, second = gothic_card_lines(upgraded)
 	testing.expect_value(t, string(first), "3 PESCHE A STANZA")
-	testing.expect_value(t, string(second), "SOLO TATTICA")
-	narrow_first, narrow_second, short := gothic_card_narrow_lines(upgraded, true)
+	testing.expect_value(t, string(second), "CIBO d4 / 5% CARTA")
+	narrow_first, narrow_second, short := gothic_card_narrow_lines(upgraded)
 	testing.expect(t, short)
 	testing.expect_value(t, string(narrow_first), "3 PESCHE")
 	testing.expect_value(t, string(narrow_second), "CIBO d4 O CARTA")
 	// Its upgrades raise the fishings alone.
-	testing.expect_value(t, string(card_upgrade_preview(rod, true)), "PESCHE 1 -> 2")
-	testing.expect_value(t, string(card_upgrade_preview({id = 1, definition_id = .Fishing_Rod, upgrade_level = 5}, true)), "MAX UPGRADE")
-	definition, _ := game.card_definition_by_id(.Fishing_Rod, true)
+	testing.expect_value(t, string(card_upgrade_preview(rod)), "PESCHE 1 -> 2")
+	testing.expect_value(t, string(card_upgrade_preview({id = 1, definition_id = .Fishing_Rod, upgrade_level = 5})), "MAX UPGRADE")
+	definition, _ := game.card_definition_by_id(.Fishing_Rod)
 	testing.expect_value(t, string(tactical_card_target_label(definition)), "RAGGIO 1-3")
 	testing.expect_value(t, string(tactical_card_time_badge(.Fishing_Rod)), "0s")
 	testing.expect_value(t, string(card_short_name(.Fishing_Rod)), "CANNA")
@@ -119,7 +116,7 @@ test_fishing_cues_show_the_water_from_the_plop :: proc(t: ^testing.T) {
 		after := capture_room_presentation(&room)
 		testing.expect(t, before.ground.water_count == 0 && after.ground.water_count == 1 && presentation_ground_water(&after.ground, cell))
 		renderer := new(Renderer)
-		testing.expect(t, begin_renderer_event_timeline(renderer, before, &room.recent_events, &after))
+		testing.expect(t, begin_renderer_event_timeline(renderer, before, room.recent_events, &after))
 		timeline := &renderer.timeline
 		kinds: [dynamic]Presentation_Cue_Kind
 		fishing_seconds: f32
@@ -165,7 +162,7 @@ test_fishing_dice_cue_accepts_the_rods_d4_only :: proc(t: ^testing.T) {
 }
 
 // What the cues say: the rod's name as it is cast and a caught card's under
-// the board, the food's name over the player; the flat board's words.
+// the board and the food's name over the player.
 @(test)
 test_fishing_cues_say_their_catch :: proc(t: ^testing.T) {
 	names := [game.Fishing_Food]string{.Fish = "PESCE", .Apple = "MELA", .Bread = "PANE", .Cheese = "FORMAGGIO", .Meat = "CARNE"}
@@ -281,7 +278,7 @@ test_fishing_lab_board_plays_the_rod_alone :: proc(t: ^testing.T) {
 		report := game.fish_with_rod(&room, {7, 3})
 		testing.expect(t, report.result == .Fished && report.card == card)
 		after := capture_room_presentation(&room)
-		testing.expect(t, begin_renderer_event_timeline(renderer, before, &room.recent_events, &after))
+		testing.expect(t, begin_renderer_event_timeline(renderer, before, room.recent_events, &after))
 		risen, swung, stooped := false, false, false
 		for _ in 0..<600 {
 			lab_shadow_test_frame(renderer, &room, 1.0/60.0)

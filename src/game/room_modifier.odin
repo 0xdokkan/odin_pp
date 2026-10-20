@@ -1,6 +1,6 @@
 package game
 
-import grid "../grid"
+import grid "../engine/grid"
 
 MAX_ROOM_HAZARD_CELLS :: 16
 ROOM_HAZARD_WARNING_PULSES :: u64(2)
@@ -18,6 +18,7 @@ Room_Modifier :: struct {
 	damage: i32,
 }
 
+@(private = "file")
 room_modifier_kind_name :: proc(kind: Room_Modifier_Kind) -> string {
 	switch kind {
 	case .None: return "Calm"
@@ -42,6 +43,7 @@ room_modifier_warning_active :: proc(modifier: ^Room_Modifier, pulse: u64) -> bo
 	return remaining > 0 && remaining <= int(ROOM_HAZARD_WARNING_PULSES)
 }
 
+@(private)
 valid_room_modifier :: proc(room: ^Room, modifier: ^Room_Modifier) -> bool {
 	if modifier.kind == .None {
 		return modifier.cell_count == 0 && modifier.activation_pulse == 0 && modifier.damage == 0
@@ -61,10 +63,12 @@ valid_room_modifier :: proc(room: ^Room, modifier: ^Room_Modifier) -> bool {
 	return row || column
 }
 
+@(private)
 disarm_room_modifier_after_combat :: proc(room: ^Room) {
 	if room != nil && room.phase != .Combat { room.modifier.activation_pulse = 0 }
 }
 
+@(private)
 resolve_due_room_modifier :: proc(room: ^Room, pulse: ^Pulse_Report) {
 	modifier := &room.modifier
 	if room.phase != .Combat || modifier.kind == .None || modifier.activation_pulse == 0 ||
@@ -100,6 +104,7 @@ resolve_due_room_modifier :: proc(room: ^Room, pulse: ^Pulse_Report) {
 	disarm_room_modifier_after_combat(room)
 }
 
+@(private = "file")
 blueprint_hazard_escape_cell_is_safe :: proc(blueprint: ^Room_Blueprint, cell: grid.Position) -> bool {
 	if !cell_is_walkable(&blueprint.level_data, cell) ||
 	   position_in_list(blueprint.obstacles[:], cell) { return false }
@@ -110,6 +115,7 @@ blueprint_hazard_escape_cell_is_safe :: proc(blueprint: ^Room_Blueprint, cell: g
 }
 
 // Every marked cell has a route off the lane within its two-decision warning.
+@(private)
 blueprint_hazard_cell_has_escape :: proc(blueprint: ^Room_Blueprint, cell: grid.Position, rows: bool) -> bool {
 	for direction in Move_Direction {
 		step := add_position(cell, direction_offset(direction))
@@ -124,6 +130,7 @@ blueprint_hazard_cell_has_escape :: proc(blueprint: ^Room_Blueprint, cell: grid.
 	return false
 }
 
+@(private)
 generate_blueprint_modifier :: proc(blueprint: ^Room_Blueprint) -> Room_Modifier {
 	if blueprint.node_depth <= 1 || blueprint.node_kind == .Boss { return {} }
 	seed := derive_room_stream_seed(blueprint.seed, ROOM_MODIFIER_SEED_SALT)

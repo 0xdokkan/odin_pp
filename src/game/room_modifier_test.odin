@@ -1,7 +1,7 @@
 package game
 
 import "core:testing"
-import grid "../grid"
+import grid "../engine/grid"
 import level "../level"
 
 test_furnace_modifier :: proc() -> Room_Modifier {
@@ -26,7 +26,7 @@ make_furnace_test_room :: proc(t: ^testing.T, data: ^level.Level, player: ^Playe
 }
 
 @(test)
-test_furnace_warns_two_decisions_and_hits_actors_and_objects :: proc(t: ^testing.T) {
+test_furnace_warns_two_beats_and_hits_actors_and_objects :: proc(t: ^testing.T) {
 	data := create_enemy_archetype_test_level(t)
 	defer level.destroy(&data)
 	player := create_test_player(t)
@@ -34,15 +34,15 @@ test_furnace_warns_two_decisions_and_hits_actors_and_objects :: proc(t: ^testing
 	defer destroy_room(&room)
 	player.position = {2, 1}
 	testing.expect(t, room_modifier_warning_active(&room.modifier, room.pulse_count))
-	testing.expect_value(t, wait_player_turn(&room), Action_Result.None)
+	room.recent_events^ = advance_combat_pulse(&room).events
 	testing.expect_value(t, player.health, i32(10))
 	testing.expect_value(t, room_modifier_pulses_remaining(&room.modifier, room.pulse_count), 1)
-	testing.expect_value(t, wait_player_turn(&room), Action_Result.None)
+	room.recent_events^ = advance_combat_pulse(&room).events
 	testing.expect_value(t, player.health, i32(8))
 	testing.expect_value(t, room.enemies[0].health, i32(17))
 	testing.expect_value(t, room.objects[1].health, i32(1))
 	testing.expect_value(t, explosive_pulses_remaining(room.objects[0].detonation_pulse, room.pulse_count), 2)
-	testing.expect_value(t, spatial_card_event_count(&room.recent_events, .Room_Hazard_Triggered), 1)
+	testing.expect_value(t, spatial_card_event_count(room.recent_events, .Room_Hazard_Triggered), 1)
 	testing.expect_value(t, room.recent_events.events[0].kind, Game_Event_Kind.Room_Hazard_Triggered)
 }
 
@@ -59,18 +59,18 @@ test_furnace_has_two_cooldown_pulses_before_next_warning :: proc(t: ^testing.T) 
 	plan_enemy_intents(&room)
 	testing.expect_value(t, try_move_player(&room, .North), Action_Result.Blocked)
 	testing.expect_value(t, room.pulse_count, u64(0))
-	wait_player_turn(&room)
-	wait_player_turn(&room)
+	room.recent_events^ = advance_combat_pulse(&room).events
+	room.recent_events^ = advance_combat_pulse(&room).events
 	testing.expect_value(t, room_modifier_pulses_remaining(&room.modifier, room.pulse_count), 4)
 	testing.expect(t, !room_modifier_warning_active(&room.modifier, room.pulse_count))
-	wait_player_turn(&room)
+	room.recent_events^ = advance_combat_pulse(&room).events
 	testing.expect(t, !room_modifier_warning_active(&room.modifier, room.pulse_count))
-	wait_player_turn(&room)
+	room.recent_events^ = advance_combat_pulse(&room).events
 	testing.expect(t, room_modifier_warning_active(&room.modifier, room.pulse_count))
-	wait_player_turn(&room)
-	testing.expect_value(t, spatial_card_event_count(&room.recent_events, .Room_Hazard_Triggered), 0)
-	wait_player_turn(&room)
-	testing.expect_value(t, spatial_card_event_count(&room.recent_events, .Room_Hazard_Triggered), 1)
+	room.recent_events^ = advance_combat_pulse(&room).events
+	testing.expect_value(t, spatial_card_event_count(room.recent_events, .Room_Hazard_Triggered), 0)
+	room.recent_events^ = advance_combat_pulse(&room).events
+	testing.expect_value(t, spatial_card_event_count(room.recent_events, .Room_Hazard_Triggered), 1)
 	testing.expect_value(t, player.health, i32(10))
 }
 

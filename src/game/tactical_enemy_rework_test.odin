@@ -1,7 +1,7 @@
 package game
 
 import "core:testing"
-import grid "../grid"
+import grid "../engine/grid"
 import level "../level"
 
 // Drive real elapsed time through the same clock as the controller. A role's
@@ -23,7 +23,7 @@ test_tactical_archer_aims_without_qte_then_fires_at_frozen_cell_and_recovers :: 
 		testing.expect(t, room.enemies[0].intent.windup)
 		testing.expect(t, !offer_defense_qte(&room, &room.enemies[0]))
 		initial := room.enemies[0].intent
-		for _ in 0..<2 {
+		for _ in 0..<3 {
 			advance_enemy_rework_seconds(t, &room, 1)
 			testing.expect_value(t, room.enemies[0].intent, initial)
 			testing.expect(t, !room.enemies[0].aim_ready)
@@ -35,13 +35,15 @@ test_tactical_archer_aims_without_qte_then_fires_at_frozen_cell_and_recovers :: 
 		testing.expect(t, !room.enemies[0].intent.windup)
 		testing.expect_value(t, room.enemies[0].intent.threatened_cells[0], grid.Position{4, 4})
 		if evade { try_move_player(&room, .North) } else { wait_player_turn(&room) }
+		// Evading now finishes before the prepared shot's one-second deadline.
+		if evade { tactical_tick(&room, 1-TACTICAL_MOVE_SECONDS, true, false) }
 		drain_tactical_test_pulse(t, &room)
 		testing.expect_value(t, player.health, i32(100) if evade else i32(97))
 		testing.expect(t, !room.enemies[0].aim_ready)
 		testing.expect_value(t, room.enemies[0].intent.kind, Enemy_Intent_Kind.Recover)
 		testing.expect_value(t, room.enemies[0].recovery_pulses, i32(1))
-		testing.expect_value(t, room.pulse_count, u64(4))
-		testing.expect_value(t, player.tactical.remaining, f32(16))
+		testing.expect_value(t, room.pulse_count, u64(5))
+		testing.expect(t, abs(player.tactical.remaining-15) < 0.001)
 		testing.expect_value(t, player.tactical.cycle, 0)
 		destroy_room(&room)
 		level.destroy(&data)
@@ -95,7 +97,7 @@ test_tactical_brute_cleave_has_three_fixed_cells_and_charge_recovers_two :: proc
 			for cell in ([?]grid.Position{{4, 3}, {4, 4}, {4, 5}}) { testing.expect(t, enemy_intent_cell_is_threatened(&intent, cell)) }
 			testing.expect(t, !enemy_intent_cell_is_threatened(&intent, {3, 4}))
 		}
-		advance_enemy_rework_seconds(t, &room, 3)
+		advance_enemy_rework_seconds(t, &room, 4)
 		testing.expect_value(t, room.enemies[0].intent, intent)
 		testing.expect_value(t, room.enemies[0].recovery_pulses, i32(0))
 		advance_enemy_rework_seconds(t, &room, 1)
@@ -118,7 +120,7 @@ test_tactical_custodian_cannot_shield_loop_and_exposes_two_pulse_window :: proc(
 			for enemy in room.enemies { testing.expect(t, enemy.intent.kind != .Protect) }
 		} else {
 			testing.expect_value(t, room.enemies[0].intent.kind, Enemy_Intent_Kind.Protect)
-			advance_enemy_rework_seconds(t, &room, 2)
+			advance_enemy_rework_seconds(t, &room, 3)
 			_, early_shield := status_for_entity(&room, enemy_entity(2), .Shield)
 			testing.expect(t, !early_shield)
 			advance_enemy_rework_seconds(t, &room, 1)

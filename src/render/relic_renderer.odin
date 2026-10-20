@@ -4,8 +4,9 @@ import "core:c"
 import "core:fmt"
 import rl "vendor:raylib"
 import game "../game"
-import view "../view"
+import view "../engine/view"
 
+@(private)
 relic_color :: proc(id: game.Relic_Id) -> rl.Color {
 	switch id {
 	case .Iron_Knuckle: return {107, 217, 192, 255}
@@ -19,6 +20,7 @@ relic_color :: proc(id: game.Relic_Id) -> rl.Color {
 	return {}
 }
 
+@(private)
 relic_mark :: proc(id: game.Relic_Id) -> cstring {
 	switch id {
 	case .Iron_Knuckle: return "K"
@@ -32,6 +34,7 @@ relic_mark :: proc(id: game.Relic_Id) -> cstring {
 	return "?"
 }
 
+@(private = "file")
 draw_relic_text :: proc(value: string, x, y, width, size: c.int, color: rl.Color, theme: ^Renderer = nil) {
 	start, last_space := 0, -1
 	line_y := y
@@ -46,6 +49,7 @@ draw_relic_text :: proc(value: string, x, y, width, size: c.int, color: rl.Color
 	if start < len(value) { menu_text(theme, fmt.ctprintf("%s", value[start:]), x, line_y, size, color) }
 }
 
+@(private = "file")
 relic_choice_bounds :: proc(width, height: f32, index, count: int) -> rl.Rectangle {
 	if count < 1 || count > game.RELIC_OFFER_COUNT || index < 0 || index >= count || width <= 0 || height <= 0 { return {} }
 	gap: f32 = 22
@@ -119,7 +123,7 @@ relic_bar_contains_point :: proc(renderer: ^Renderer, room: ^game.Room, point: v
 	raised_card_id: u32 = 0) -> bool {
 	if renderer == nil || room == nil || room.player == nil { return false }
 	relics := &room.player.relics
-	if renderer.tactical.enabled && renderer.tactical.snapshot != nil && renderer.tactical.snapshot.valid {
+	if renderer.tactical.snapshot != nil && renderer.tactical.snapshot.valid {
 		relics = &renderer.tactical.snapshot.relics
 	} else if renderer_blocks_player_input(renderer) && renderer.timeline.view.valid {
 		relics = &renderer.timeline.view.relics
@@ -131,55 +135,35 @@ relic_bar_contains_point :: proc(renderer: ^Renderer, room: ^game.Room, point: v
 	return point_in_rectangle(point, relic_bar_bounds(renderer, relics.count))
 }
 
+@(private)
 relic_bar_bounds :: proc(renderer: ^Renderer, count: int) -> rl.Rectangle {
-	if renderer.tactical.enabled { return {18, TACTICAL_HUD_HEIGHT+3, f32(count)*25, 20} }
-	return {14, renderer.canvas_height-HAND_RESERVED_HEIGHT-34, f32(count)*32, 27}
+	return {18, TACTICAL_HUD_HEIGHT+3, f32(count)*25, 20}
 }
 
 draw_relic_bar :: proc(renderer: ^Renderer, room: ^game.Room, point: view.Vec2, mouse_inside: bool,
 	raised_card_id: u32 = 0) {
 	relics := &room.player.relics
-	if renderer.tactical.enabled && renderer.tactical.snapshot != nil && renderer.tactical.snapshot.valid {
+	if renderer.tactical.snapshot != nil && renderer.tactical.snapshot.valid {
 		relics = &renderer.tactical.snapshot.relics
 	} else if renderer_blocks_player_input(renderer) && renderer.timeline.view.valid {
 		relics = &renderer.timeline.view.relics
 	}
 	if relics.count == 0 { return }
 	can_hover := mouse_inside && relic_bar_contains_point(renderer, room, point, raised_card_id)
-	if renderer.tactical.enabled {
-		bar := relic_bar_bounds(renderer, relics.count)
-		hovered: game.Relic_Id
-		for id, index in relics.owned[:relics.count] {
-			bounds := rl.Rectangle{bar.x+f32(index)*25, bar.y, 20, 20}
-			over := can_hover && point_in_rectangle(point, bounds)
-			rl.DrawRectangleRec(bounds, HUD_FILL_HOVER if over else HUD_FILL)
-			rl.DrawRectangleLinesEx(bounds, 1, relic_color(id) if over else HUD_EDGE)
-			rl.DrawRectangleRec({bounds.x+1, bounds.y+bounds.height-3, bounds.width-2, 2}, relic_color(id))
-			gothic_text(renderer, relic_mark(id), bounds.x+5, bounds.y+1, 14, GOTHIC_PAPER)
-			if over { hovered = id }
-		}
-		if definition, found := game.relic_definition(hovered); found {
-			hud_frame({14, 137, 310, 105}, relic_color(hovered))
-			gothic_text(renderer, fmt.ctprintf("%s", definition.name), 25, 145, 18, GOTHIC_PAPER)
-			gothic_wrapped_text(renderer, definition.description, 25, 171, 286, GOTHIC_MUTED)
-		}
-		return
-	}
-	y := renderer.canvas_height-HAND_RESERVED_HEIGHT-34
-	rl.DrawText("RELICS", 14, c.int(y)-14, 10, rl.Color{178, 182, 166, 255})
+	bar := relic_bar_bounds(renderer, relics.count)
 	hovered: game.Relic_Id
 	for id, index in relics.owned[:relics.count] {
-		bounds := rl.Rectangle{14+f32(index)*32, y, 27, 27}
-		color := relic_color(id)
-		rl.DrawRectangleRec(bounds, rl.Color{16, 20, 24, 245})
-		rl.DrawRectangleLinesEx(bounds, 1, color)
-		rl.DrawText(relic_mark(id), c.int(bounds.x)+8, c.int(bounds.y)+6, 15, color)
-		if can_hover && point_in_rectangle(point, bounds) { hovered = id }
+		bounds := rl.Rectangle{bar.x+f32(index)*25, bar.y, 20, 20}
+		over := can_hover && point_in_rectangle(point, bounds)
+		rl.DrawRectangleRec(bounds, HUD_FILL_HOVER if over else HUD_FILL)
+		rl.DrawRectangleLinesEx(bounds, 1, relic_color(id) if over else HUD_EDGE)
+		rl.DrawRectangleRec({bounds.x+1, bounds.y+bounds.height-3, bounds.width-2, 2}, relic_color(id))
+		gothic_text(renderer, relic_mark(id), bounds.x+5, bounds.y+1, 14, GOTHIC_PAPER)
+		if over { hovered = id }
 	}
 	if definition, found := game.relic_definition(hovered); found {
-		rl.DrawRectangle(14, c.int(y)-109, 324, 91, rl.Color{12, 15, 18, 245})
-		rl.DrawRectangleLines(14, c.int(y)-109, 324, 91, relic_color(hovered))
-		rl.DrawText(fmt.ctprintf("%s", definition.name), 24, c.int(y)-99, 15, relic_color(hovered))
-		draw_relic_text(definition.description, 24, c.int(y)-74, 302, 12, rl.Color{216, 223, 215, 255})
+		hud_frame({14, 137, 310, 105}, relic_color(hovered))
+		gothic_text(renderer, fmt.ctprintf("%s", definition.name), 25, 145, 18, GOTHIC_PAPER)
+		gothic_wrapped_text(renderer, definition.description, 25, 171, 286, GOTHIC_MUTED)
 	}
 }

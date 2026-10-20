@@ -26,6 +26,7 @@ Dice_Roll :: struct {
 	count: i32,
 }
 
+@(private)
 dice_sides_are_valid :: proc(sides: i32) -> bool {
 	for step in DICE_LADDER {
 		if sides == step { return true }
@@ -78,6 +79,7 @@ make_dice_state :: proc(seed: u64) -> Dice_State {
 	return {random_state = state if state != 0 else DEFAULT_DICE_SEED}
 }
 
+@(private)
 validate_dice_state :: proc(dice: ^Dice_State) -> bool {
 	return dice != nil && dice.random_state != 0
 }

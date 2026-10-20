@@ -1,13 +1,13 @@
 package game
 
 import "core:math"
-import grid "../grid"
+import grid "../engine/grid"
 
 // LAZZO. The card's two seconds are the throw (a cast, the world still): the
 // rope catches one foe within LASSO_RANGE cells (the game's Chebyshev range),
 // in sight and in the line the cards trace, lifts it off the floor and pulls
-// it onto its ring around the player. A boss or a miniboss is too heavy
-// (Target_Too_Heavy), as the Dado del Destino's death never fells them.
+// it onto its ring around the player. Every enemy archetype can be caught,
+// including bosses and minibosses; range and line of sight still apply.
 //
 // The ring of radius r is every cell a true circle of r cells around the
 // centre of the player's cell passes through (lasso_ring): 8r cells, each an
@@ -30,14 +30,19 @@ import grid "../grid"
 // stops it too. The spin is stepped from one event to the next (a cell's edge,
 // a full turn), never by frames: no cell, hit or smash is skipped at any speed.
 //
-// Each time the swung foe enters a ring cell holding another foe, that is hit
-// number n of this lasso (the card's amount, then one more each time): both
-// take n, the player's damage, and the struck one is knocked back n cells
+// Each contact advances this lasso's strength n (the card's amount, then one
+// more each time). When the swung foe enters a ring cell holding another foe,
+// both take n, the player's damage, and the struck one is knocked back n cells
 // radially away from the player (snapped to the eight directions) under the
 // game's push rules: a wall, an obstacle or an actor stops it, and pools,
 // fires and traps act on every cell it enters. A smash is a hit n too, on the
 // swung foe alone, and the spin bounces back. Every full turn (2 pi of travel,
 // either way) takes LASSO_TURN_DAMAGE from it.
+// Inside the ring the rope pushes to the first ring cell along that radial
+// direction, stopping earlier if blocked, regardless of the hit's strength.
+// Neither foe takes direct damage and there is no damage/reaction cue. Ground
+// effects along the push still apply. Each interior foe is swept once per
+// turn; being pushed onto the ring cannot make that same pass a damaging hit.
 //
 // The player is its pivot and is busy: no steps, bumps, cards or arrows while
 // it spins (and, as ever, nothing is kept for later). Enemy blows reach him as
@@ -63,10 +68,11 @@ LASSO_TURN_SPEEDUP :: f64(0.88)
 LASSO_FASTEST_TURN_SECONDS :: f64(0.125)
 LASSO_TURN_DAMAGE :: i32(1)
 LASSO_EPSILON :: f64(1e-9)
-// A spin batch stops this far short of a full event log: what one more hit
-// brings (two wounds and their guards, a push of up to twelve cells and what
-// its cells do, a fall and its loot) always fits.
-LASSO_EVENT_HEADROOM :: 96
+// A spin batch reserves room for the ring contact plus every interior foe
+// sharing that direction (at most radius contacts). Each reserves two wounds
+// and their guards, a push and its cell effects, a fall and its loot.
+LASSO_EVENT_HEADROOM :: 96*int(LASSO_MAX_RADIUS)
+LASSO_MAX_SWEEP_TARGETS :: (2*int(LASSO_MAX_RADIUS)+1)*(2*int(LASSO_MAX_RADIUS)+1)
 // A guard on one batch's steps (each crosses one edge or one turn at most).
 LASSO_MAX_STEPS :: 100_000
 // Where the planner sees a foe held in the air: on no cell of any board.
@@ -106,8 +112,13 @@ Lasso_State :: struct {
 	started: bool,
 	// Where the rope caught it.
 	caught_from: grid.Position,
+	// Interior contacts in this turn. The disk fits in this many board cells;
+	// an outward push must not immediately hit the same foe again.
+	swept_ids: [LASSO_MAX_SWEEP_TARGETS]u32,
+	swept_count: int,
 }
 
+@(private)
 lasso_effect :: proc(target: Entity_Ref, first_hit: i32) -> Effect {
 	return {kind = .Lasso, target = target, amount = first_hit}
 }
@@ -173,6 +184,7 @@ lasso_cell_is_solid :: proc(room: ^Room, cell: grid.Position) -> bool {
 	return room == nil || room.level_data == nil || !grid.contains(&room.level_data.tiles, cell) || cell_blocks_movement(room, cell)
 }
 
+@(private = "file")
 lasso_ring_is_clear :: proc(room: ^Room, centre: grid.Position, radius: i32) -> bool {
 	arcs, count := lasso_ring(radius)
 	for arc in arcs[:count] {
@@ -222,14 +234,13 @@ lasso_nearest_free_arc :: proc(room: ^Room, state: ^Lasso_State, from: int, dire
 	return
 }
 
-// Why the Lazzo cannot take `target` now (.None: it can): no foe, a boss's
-// weight, a rope already out, or a ring with no free cell to swing it on.
+// Why the Lazzo cannot take `target` now (.None: it can): no foe, a rope
+// already out, or a ring with no free cell to swing it on.
 lasso_target_error :: proc(room: ^Room, target: Target) -> Card_Compile_Error {
 	if room == nil || room.player == nil || room.level_data == nil { return .Invalid_Room }
 	if target.kind != .Entity || target.entity.kind != .Enemy { return .Invalid_Target }
-	index, found := enemy_index_by_id(room, target.entity.id)
+	_, found := enemy_index_by_id(room, target.entity.id)
 	if !found || enemy_is_out_of_play(room, target.entity.id) { return .Invalid_Target }
-	if enemy_is_boss(room.enemies[index].archetype) { return .Target_Too_Heavy }
 	if room.lasso.active { return .Target_Blocked }
 	state: Lasso_State
 	state.centre = room.player.position
@@ -242,6 +253,7 @@ lasso_target_error :: proc(room: ^Room, target: Target) -> Card_Compile_Error {
 // The throw (apply_effect): the foe off the floor and onto its ring, at its
 // own direction from the player, its intent dropped; the spin begins with the
 // world's next seconds.
+@(private)
 begin_lasso :: proc(room: ^Room, target: Entity_Ref, first_hit: i32, report: ^Action_Report) -> bool {
 	if report == nil || lasso_target_error(room, entity_target(target)) != .None { return false }
 	index, _ := enemy_index_by_id(room, target.id)
@@ -289,6 +301,7 @@ lasso_next_hit :: proc(state: ^Lasso_State) -> i32 {
 }
 
 // World seconds for the spin (tactical_tick, with the world's own).
+@(private)
 tactical_lasso_tick :: proc(room: ^Room, seconds: f32) {
 	if !tactical_lasso_active(room) || !(seconds > 0) { return }
 	room.lasso.pending += f64(seconds)
@@ -297,7 +310,7 @@ tactical_lasso_tick :: proc(room: ^Room, seconds: f32) {
 // Seconds wait to be spun, and nothing holds the world: the controller commits
 // the spin (resolve_lasso_spin) as a world command, as it does a beat.
 tactical_lasso_due :: proc(room: ^Room) -> bool {
-	return tactical_lasso_active(room) && tactical_enabled(room) && !room.tactical_pulse.pending &&
+	return tactical_lasso_active(room) && room.player != nil && !room.tactical_pulse.pending &&
 	       room.qte.kind == .None && room.player.tactical.cast_remaining <= 0 && room.lasso.pending > LASSO_EPSILON
 }
 
@@ -306,7 +319,7 @@ tactical_lasso_due :: proc(room: ^Room) -> bool {
 // comes near a full log leaves the rest for the next.
 resolve_lasso_spin :: proc(room: ^Room) -> bool {
 	if !tactical_lasso_due(room) { return false }
-	clear_event_log(&room.recent_events)
+	clear_event_log(room.recent_events)
 	if !room.lasso.started {
 		room.lasso.started = true
 		lasso_enter(room)
@@ -326,13 +339,15 @@ resolve_lasso_spin :: proc(room: ^Room) -> bool {
 // One step of the spin: up to the next edge of its cell, the end of its turn
 // or the seconds waiting, whichever comes first. The angular speed is the
 // turn's own throughout.
+@(private = "file")
 lasso_step :: proc(room: ^Room) {
 	s := &room.lasso
 	omega := math.TAU/lasso_turn_seconds(s.turns)
 	arc := s.arcs[s.arc]
 	span := arc.to-arc.from
 	to_edge := (1-s.along)*span if s.direction > 0 else s.along*span
-	step := min(to_edge, s.turn_left, omega*s.pending)
+	to_sweep, _, _ := lasso_next_sweep(room)
+	step := min(to_edge, to_sweep, s.turn_left, omega*s.pending)
 	edge := to_edge-step <= LASSO_EPSILON
 	turn := s.turn_left-step <= LASSO_EPSILON
 	s.along = clamp(s.along+f64(s.direction)*step/span, 0, 1)
@@ -341,14 +356,70 @@ lasso_step :: proc(room: ^Room) {
 	if turn {
 		s.turns += 1
 		s.turn_left = math.TAU
+		s.swept_count = 0
 		lasso_turn_damage(room)
 		if !tactical_lasso_active(room) { return }
 	}
 	if edge { lasso_cross_edge(room) }
+	// At most radius-1 interior cells share a direction. Resolve all contacts
+	// at this angle, even if this frame ended exactly on it.
+	for _ in 0..<int(LASSO_MAX_RADIUS) {
+		if !tactical_lasso_active(room) { return }
+		distance, id, _ := lasso_next_sweep(room)
+		if distance > LASSO_EPSILON { break }
+		assert(s.swept_count < len(s.swept_ids))
+		s.swept_ids[s.swept_count] = id
+		s.swept_count += 1
+		// Contacts still build strength, but an interior push ends at the
+		// ring regardless of that strength, without damage or a hit cue.
+		s.hits += 1
+		lasso_knock_back(room, id, s.radius, stop_on_ring = true)
+	}
+}
+
+@(private = "file")
+lasso_cell_on_ring :: proc(state: ^Lasso_State, cell: grid.Position) -> bool {
+	offset := grid.Position{cell.x-state.centre.x, cell.y-state.centre.y}
+	for arc in state.arcs[:state.arc_count] { if arc.cell == offset { return true } }
+	return false
+}
+
+// The next interior foe crossed by the rotating rope. Ring cells retain
+// their original edge-contact rule; inside it the ray crosses cell centres.
+// Equal-angle contacts run farthest first so their radial pushes can clear
+// a path for the closer foe, independently of the enemy array's order.
+@(private = "file")
+lasso_next_sweep :: proc(room: ^Room) -> (distance: f64, id: u32, cell: grid.Position) {
+	s := &room.lasso
+	distance = math.TAU+1
+	angle := lasso_angle(s)
+	farthest := 0
+	for enemy in room.enemies {
+		if enemy_is_out_of_play(room, enemy.id) { continue }
+		if lasso_was_swept(s, enemy.id) { continue }
+		dx, dy := enemy.position.x-s.centre.x, enemy.position.y-s.centre.y
+		range_squared := dx*dx+dy*dy
+		if range_squared == 0 || range_squared >= int(s.radius*s.radius) { continue }
+		if lasso_cell_on_ring(s, enemy.position) { continue }
+		to_enemy := lasso_wrap(f64(s.direction)*(math.atan2(f64(dy), f64(dx))-angle))
+		if math.TAU-to_enemy <= LASSO_EPSILON { to_enemy = 0 }
+		if to_enemy < distance-LASSO_EPSILON ||
+		   (abs(to_enemy-distance) <= LASSO_EPSILON && (range_squared > farthest || (range_squared == farthest && enemy.id < id))) {
+			distance, id, cell, farthest = to_enemy, enemy.id, enemy.position, range_squared
+		}
+	}
+	return
+}
+
+@(private = "file")
+lasso_was_swept :: proc(state: ^Lasso_State, id: u32) -> bool {
+	for struck in state.swept_ids[:state.swept_count] { if struck == id { return true } }
+	return false
 }
 
 // The swung foe reaches the edge of its cell: the next cell along its way, or
 // a smash into it and the bounce back when it is solid.
+@(private = "file")
 lasso_cross_edge :: proc(room: ^Room) {
 	s := &room.lasso
 	next := ((s.arc+int(s.direction))%s.arc_count+s.arc_count)%s.arc_count
@@ -367,6 +438,7 @@ lasso_cross_edge :: proc(room: ^Room) {
 
 // The swung foe over a new cell: its place on the board (the cell under it)
 // follows, and a foe standing there is struck.
+@(private = "file")
 lasso_enter :: proc(room: ^Room) {
 	s := &room.lasso
 	cell := lasso_arc_cell(s, s.arc)
@@ -376,11 +448,14 @@ lasso_enter :: proc(room: ^Room) {
 		return
 	}
 	room.enemies[swung].position = cell
-	if other, struck := enemy_index_at(room, cell); struck { lasso_strike(room, room.enemies[other].id, cell) }
+	if other, struck := enemy_index_at(room, cell); struck && !lasso_was_swept(s, room.enemies[other].id) {
+		lasso_strike(room, room.enemies[other].id, cell)
+	}
 }
 
 // The LASSO marks on the wounds a lasso's action gave (lasso_turn: a full
 // turn's): no blow of the player's swings them (event.odin).
+@(private = "file")
 lasso_mark_events :: proc(log: ^Event_Log, first: int, turn: bool) {
 	if log == nil { return }
 	mark := EVENT_LASSO_BIT|(EVENT_LASSO_TURN_BIT if turn else 0)
@@ -390,14 +465,15 @@ lasso_mark_events :: proc(log: ^Event_Log, first: int, turn: bool) {
 	}
 }
 
-// Hit number n: the swung foe and the one standing on its cell both take n,
-// then the struck one is knocked back n cells.
+// Ring collision n: the swung foe and the one struck by it both take n,
+// then the struck one is knocked back n cells. Interior sweeps skip damage.
+@(private = "file")
 lasso_strike :: proc(room: ^Room, struck_id: u32, cell: grid.Position) {
 	s := &room.lasso
 	n := lasso_next_hit(s)
 	s.hits += 1
 	swung, struck := enemy_entity(s.enemy_id), enemy_entity(struck_id)
-	record_event(&room.recent_events, {kind = .Lasso_Struck, source = swung, target = struck, amount = n,
+	record_event(room.recent_events, {kind = .Lasso_Struck, source = swung, target = struck, amount = n,
 		from_position = cell, to_position = cell, card_definition = .Lasso})
 	action := make_action(.Trigger, PLAYER_ENTITY, entity_target(struck), .Opponent)
 	added := add_effect(&action, damage_effect(struck, n))
@@ -406,7 +482,7 @@ lasso_strike :: proc(room: ^Room, struck_id: u32, cell: grid.Position) {
 	assert(added)
 	report := resolve_action(room, &action)
 	lasso_mark_events(&report.events, 0, false)
-	append_event_log(&room.recent_events, &report.events)
+	append_event_log(room.recent_events, &report.events)
 	if room.phase != .Combat { return }
 	if _, standing := enemy_index_by_id(room, struck_id); standing { lasso_knock_back(room, struck_id, n) }
 }
@@ -423,8 +499,9 @@ lasso_radial_step :: proc(centre, cell: grid.Position) -> grid.Position {
 
 // The struck foe pushed `cells` away from the player, as far as its way is
 // clear (the game's push rules, as a card's push): one movement, so every cell
-// it enters acts on it.
-lasso_knock_back :: proc(room: ^Room, id: u32, cells: i32) {
+// it enters acts on it. Interior sweeps also stop at the first ring cell.
+@(private)
+lasso_knock_back :: proc(room: ^Room, id: u32, cells: i32, stop_on_ring := false) {
 	index, found := enemy_index_by_id(room, id)
 	if !found { return }
 	from := room.enemies[index].position
@@ -437,34 +514,37 @@ lasso_knock_back :: proc(room: ^Room, id: u32, cells: i32) {
 		query := query_entity_movement(room, mover, cell)
 		if !movement_query_is_clear(&query) { break }
 		destination = cell
+		if stop_on_ring && lasso_cell_on_ring(&room.lasso, cell) { break }
 	}
 	if destination == from { return }
 	action := make_action(.Trigger, PLAYER_ENTITY, entity_target(mover), .Opponent)
 	added := add_effect(&action, move_effect(mover, destination))
 	assert(added)
 	report := resolve_action(room, &action)
-	append_event_log(&room.recent_events, &report.events)
+	append_event_log(room.recent_events, &report.events)
 }
 
 // A smash into the solid cell `cell` (radius 1 beside a wall, or an object
 // set down on the ring): hit number n on the swung foe alone.
+@(private = "file")
 lasso_smash :: proc(room: ^Room, cell: grid.Position) {
 	s := &room.lasso
 	n := lasso_next_hit(s)
 	s.hits += 1
 	swung := enemy_entity(s.enemy_id)
-	record_event(&room.recent_events, {kind = .Lasso_Struck, source = swung, target = SYSTEM_ENTITY, amount = n,
+	record_event(room.recent_events, {kind = .Lasso_Struck, source = swung, target = SYSTEM_ENTITY, amount = n,
 		from_position = lasso_arc_cell(s, s.arc), to_position = cell, card_definition = .Lasso})
 	action := make_action(.Trigger, PLAYER_ENTITY, entity_target(swung), .Opponent)
 	added := add_effect(&action, damage_effect(swung, n))
 	assert(added)
 	report := resolve_action(room, &action)
 	lasso_mark_events(&report.events, 0, false)
-	append_event_log(&room.recent_events, &report.events)
+	append_event_log(room.recent_events, &report.events)
 }
 
 // A full turn round the player: LASSO_TURN_DAMAGE to the swung foe (a Shield
 // takes it, as any of the player's damage).
+@(private = "file")
 lasso_turn_damage :: proc(room: ^Room) {
 	swung := enemy_entity(room.lasso.enemy_id)
 	action := make_action(.Trigger, PLAYER_ENTITY, entity_target(swung), .Opponent)
@@ -472,13 +552,14 @@ lasso_turn_damage :: proc(room: ^Room) {
 	assert(added)
 	report := resolve_action(room, &action)
 	lasso_mark_events(&report.events, 0, true)
-	append_event_log(&room.recent_events, &report.events)
+	append_event_log(room.recent_events, &report.events)
 }
 
 // Where a released foe lands: on the cell under it when it is free (on the
 // board, no wall, cover or blocking object, not the player's, no other foe),
 // or the nearest free cell (by Chebyshev distance, row by row); not ok on a
 // board with no free cell left.
+@(private = "file")
 lasso_landing :: proc(room: ^Room, index: int, under: grid.Position) -> (landing: grid.Position, ok: bool) {
 	free :: proc(room: ^Room, index: int, cell: grid.Position) -> bool {
 		if !grid.contains(&room.level_data.tiles, cell) || cell_blocks_movement(room, cell) || cell == room.player.position { return false }
@@ -506,6 +587,7 @@ lasso_landing :: proc(room: ^Room, index: int, under: grid.Position) -> (landing
 // (spawn_enemy); in the middle of a beat (a brute's push, the defence prompt's
 // dodge) the planner's work waits for the beat's end, so it holds a wait of no
 // length that the end of the beat plans afresh (finish_combat_pulse).
+@(private)
 release_lasso :: proc(room: ^Room, report: ^Action_Report) {
 	if room == nil || report == nil || !room.lasso.active { return }
 	held := room.lasso

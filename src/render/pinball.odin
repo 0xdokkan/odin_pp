@@ -6,8 +6,8 @@ import rl "vendor:raylib"
 import rlgl "vendor:raylib/rlgl"
 import gfx "../engine/gfx"
 import game "../game"
-import grid "../grid"
-import view "../view"
+import grid "../engine/grid"
+import view "../engine/view"
 
 // PINBALL on the board (game/pinball.odin). The foe's card turns into a big
 // steel ball of pixel art painted by code (pinball_ball_pixels): a sphere in
@@ -26,9 +26,8 @@ import view "../view"
 // it, a grey star flashes where it touches a solid thing and a red one between
 // it and a foe it strikes (COLPO n over the foe). When its time is up it swells
 // with a white flash and bursts into paper and confetti of its colour (POP!);
-// the foe falls there, its card never shown again. On the flat board the same
-// sprite stands over the floor; behind the player's eyes (first_person.odin)
-// it fades as it rolls over him, gone at the eye. Nothing here gates gameplay
+// the foe falls there, its card never shown again. Behind the player's eyes
+// (first_person.odin) it fades as it rolls over him, gone at the eye. Nothing here gates gameplay
 // or input.
 
 PINBALL_STEEL_LIGHT :: rl.Color{214, 222, 232, 255}
@@ -74,8 +73,6 @@ PINBALL_TOWARD_EYE :: f32(0.3)
 // it fades as it nears and is gone this near, before it would fill the view.
 PINBALL_EYE_CLEAR :: f32(1.4)
 PINBALL_EYE_GONE :: f32(0.75)
-// The flat board's ball: its steel's radius in screen pixels at zoom 1.
-PINBALL_FLAT_RADIUS :: f32(17)
 // A touch of a solid thing (stone grey), of a foe (red), the strike (gold).
 PINBALL_WALL_GREY :: rl.Color{176, 170, 160, 255}
 PINBALL_HIT_RED :: rl.Color{196, 44, 44, 255}
@@ -151,6 +148,7 @@ Pinball_View :: struct {
 
 // A fresh ball (or board): what was shown of the last one goes, the texture
 // and the counts stay.
+@(private)
 pinball_view_reset :: proc(b: ^Pinball_View) {
 	texture := b.texture
 	makes, strikes, bounces, bumps, bursts := b.makes, b.strikes, b.bounces, b.bumps, b.bursts
@@ -161,6 +159,7 @@ pinball_view_reset :: proc(b: ^Pinball_View) {
 	b.seen, b.seen_next = seen, seen_next
 }
 
+@(private)
 destroy_pinball_view :: proc(renderer: ^Renderer) {
 	b := &renderer.tactical.pinball
 	if b.texture.id != 0 { rl.UnloadTexture(b.texture) }
@@ -168,12 +167,13 @@ destroy_pinball_view :: proc(renderer: ^Renderer) {
 }
 
 // The steel's radius in world units: the ball's centre stands that high.
+@(private)
 pinball_steel_radius :: proc() -> f32 {
 	return PINBALL_SPRITE_STEEL*attack_texel(.Pilgrim)
 }
 
-// The band of the foe the ball is (the colours its body has on the flat
-// board): who it was.
+// The band identifies the archetype of the foe inside the ball.
+@(private)
 pinball_band_color :: proc(archetype: game.Enemy_Archetype) -> rl.Color {
 	switch archetype {
 	case .Chaser: return {224, 99, 86, 255}
@@ -187,24 +187,28 @@ pinball_band_color :: proc(archetype: game.Enemy_Archetype) -> rl.Color {
 }
 
 // The ball's centre in the world as the board shows it at `at`.
+@(private)
 pinball_centre_at :: proc(at: view.Vec2) -> rl.Vector3 {
 	return {at.x+0.5, pinball_steel_radius(), at.y+0.5}
 }
 
 // Where the burst's POP! stands (tactical_feedback_badges): its foot over the
 // top of the ball at its fullest swell, paper rim and all.
+@(private)
 pinball_burst_badge_height :: proc() -> f32 {
 	return pinball_steel_radius()+(pinball_steel_radius()+PINBALL_SPRITE_PAPER*attack_texel(.Pilgrim))*(1+PINBALL_BURST_GROWTH)+
 		PINBALL_BURST_BADGE_CLEAR
 }
 
 // The snapshot's `entity` shown at `at` (the ball, or where it burst).
+@(private = "file")
 pinball_override :: proc(renderer: ^Renderer, entity: game.Entity_Ref, at: view.Vec2) {
 	if actor, found := presentation_actor_in_view(renderer.tactical.snapshot, entity); found { actor.position = at }
 }
 
 // The card the ball has taken the place of: past the making's hide (or
 // bursting, or fallen), its card never shows.
+@(private)
 tactical_pinball_holds :: proc(renderer: ^Renderer, entity: game.Entity_Ref) -> bool {
 	if renderer == nil { return false }
 	b := &renderer.tactical.pinball
@@ -213,6 +217,7 @@ tactical_pinball_holds :: proc(renderer: ^Renderer, entity: game.Entity_Ref) -> 
 
 // How much of the foe's card shows while it turns into the ball: whole, then
 // fading in the puff of paper, then none (tactical_pinball_holds).
+@(private)
 pinball_card_opacity :: proc(renderer: ^Renderer, entity: game.Entity_Ref) -> f32 {
 	if renderer == nil { return 1 }
 	b := &renderer.tactical.pinball
@@ -224,6 +229,7 @@ pinball_card_opacity :: proc(renderer: ^Renderer, entity: game.Entity_Ref) -> f3
 // The ball's size now (1: its own) and how white its flash is: nothing before
 // the making's hide, then a swell past its size and back; at its burst a swell
 // with a flash, then nothing.
+@(private)
 pinball_ball_scale :: proc(b: ^Pinball_View, now: f64) -> (scale, flash: f32) {
 	if b.ending {
 		t := now-b.ended
@@ -240,6 +246,7 @@ pinball_ball_scale :: proc(b: ^Pinball_View, now: f64) -> (scale, flash: f32) {
 }
 
 // `v` turned `angle` radians round the unit axis `k`.
+@(private = "file")
 pinball_rotate :: proc(v, k: rl.Vector3, angle: f32) -> rl.Vector3 {
 	c, s := math.cos(angle), math.sin(angle)
 	return v*c+rl.Vector3CrossProduct(k, v)*s+k*(rl.Vector3DotProduct(k, v)*(1-c))
@@ -247,6 +254,7 @@ pinball_rotate :: proc(v, k: rl.Vector3, angle: f32) -> rl.Vector3 {
 
 // The band turns as the ball rolls on the floor without slipping: round the
 // axis across its way, by the distance over its radius.
+@(private = "file")
 pinball_turn_ball :: proc(b: ^Pinball_View) {
 	d := rl.Vector3{b.at.x-b.turned_at.x, 0, b.at.y-b.turned_at.y}
 	b.turned_at = b.at
@@ -259,6 +267,7 @@ pinball_turn_ball :: proc(b: ^Pinball_View) {
 // Once per frame, right after the Lazzo's (update_tactical_view, which may run
 // twice a frame): follows the room's ball and shows its foe where it rolls;
 // then the strike, the burst and the cues of its contacts.
+@(private)
 update_tactical_pinball :: proc(renderer: ^Renderer, room: ^game.Room) {
 	v := &renderer.tactical
 	b := &v.pinball
@@ -320,6 +329,7 @@ update_tactical_pinball :: proc(renderer: ^Renderer, room: ^game.Room) {
 // it) the player's card is set to swing its weapon at the ball, the blow
 // landing as the cast ends, when the ball rolls; at that contact a star
 // flashes on the ball.
+@(private = "file")
 pinball_strike :: proc(renderer: ^Renderer, room: ^game.Room, b: ^Pinball_View, now: f64) {
 	if !b.struck {
 		waiting := false
@@ -353,6 +363,7 @@ pinball_strike :: proc(renderer: ^Renderer, room: ^game.Room, b: ^Pinball_View, 
 	}
 }
 
+@(private = "file")
 pinball_impact :: proc(b: ^Pinball_View, kind: Pinball_Impact_Kind, at: rl.Vector3, cell: grid.Position, now: f64, seed: int) {
 	b.impacts[b.impact_next] = {used = true, kind = kind, at = at, cell = cell, born = now, seed = seed}
 	b.impact_next = (b.impact_next+1)%len(b.impacts)
@@ -361,6 +372,7 @@ pinball_impact :: proc(b: ^Pinball_View, kind: Pinball_Impact_Kind, at: rl.Vecto
 // A star for each contact as its cue starts showing: at the solid thing's
 // side nearest the ball (grey, with stone dust), or between the ball and the
 // foe it struck (red); either a little toward the camera.
+@(private = "file")
 observe_pinball_cues :: proc(renderer: ^Renderer, now: f64) {
 	b := &renderer.tactical.pinball
 	for offset in 0..<renderer_active_cue_count(renderer) {
@@ -396,6 +408,7 @@ observe_pinball_cues :: proc(renderer: ^Renderer, now: f64) {
 // The ball (its making's puffs and its burst with it) and the contacts'
 // stars, sorted with the cards and walls (one entry each). The ball sorts
 // where it rolls; it is drawn without a room too (the map's hologram).
+@(private)
 collect_pinball_entries :: proc(renderer: ^Renderer, entries: ^[dynamic]Tactical_Alpha_Entry) {
 	b := &renderer.tactical.pinball
 	now := renderer.sprite_assets.elapsed
@@ -413,6 +426,7 @@ collect_pinball_entries :: proc(renderer: ^Renderer, entries: ^[dynamic]Tactical
 	}
 }
 
+@(private)
 draw_pinball_entry :: proc(renderer: ^Renderer, entry: Tactical_Alpha_Entry) {
 	b := &renderer.tactical.pinball
 	rlgl.DrawRenderBatchActive()
@@ -428,6 +442,7 @@ draw_pinball_entry :: proc(renderer: ^Renderer, entry: Tactical_Alpha_Entry) {
 
 // The band's axis on screen (x right, y down, z toward the eye), as the
 // painter takes it.
+@(private = "file")
 pinball_view_axis :: proc(renderer: ^Renderer, axis: rl.Vector3) -> rl.Vector3 {
 	camera := renderer.tactical.camera
 	right, up := attack_screen_axes(renderer)
@@ -437,6 +452,7 @@ pinball_view_axis :: proc(renderer: ^Renderer, axis: rl.Vector3) -> rl.Vector3 {
 
 // The sprite's texture, painted afresh when its band or its axis on screen
 // has changed.
+@(private = "file")
 pinball_texture :: proc(renderer: ^Renderer, b: ^Pinball_View) -> rl.Texture2D {
 	if b.texture.id == 0 {
 		image := rl.GenImageColor(PINBALL_SPRITE, PINBALL_SPRITE, rl.BLANK)
@@ -457,6 +473,7 @@ pinball_texture :: proc(renderer: ^Renderer, b: ^Pinball_View) -> rl.Texture2D {
 	return b.texture
 }
 
+@(private = "file")
 draw_pinball_ball :: proc(renderer: ^Renderer, b: ^Pinball_View) {
 	now := renderer.sprite_assets.elapsed
 	centre := pinball_centre_at(b.end_at if b.ending else b.at)
@@ -497,6 +514,7 @@ draw_pinball_ball :: proc(renderer: ^Renderer, b: ^Pinball_View) {
 // How much of the ball shows with its centre at `centre`: all of it, but
 // behind the player's eyes it fades as it nears the eye (it rolls over him
 // harmlessly), as far as the camera has gone into them.
+@(private)
 pinball_eye_opacity :: proc(renderer: ^Renderer, centre: rl.Vector3) -> f32 {
 	amount := first_person_amount(renderer)
 	if amount <= 0 { return 1 }
@@ -506,6 +524,7 @@ pinball_eye_opacity :: proc(renderer: ^Renderer, centre: rl.Vector3) -> f32 {
 }
 
 // The puff of paper the card goes up in as it turns into the ball.
+@(private = "file")
 draw_pinball_puffs :: proc(renderer: ^Renderer, b: ^Pinball_View, centre: rl.Vector3) {
 	if b.made < PINBALL_CARD_FADE || b.made >= PINBALL_MADE_PUFF_END { return }
 	p := (b.made-PINBALL_CARD_FADE)/(PINBALL_MADE_PUFF_END-PINBALL_CARD_FADE)
@@ -532,6 +551,7 @@ draw_pinball_puffs :: proc(renderer: ^Renderer, b: ^Pinball_View, centre: rl.Vec
 
 // The burst: a white paper star where the ball was, steel-grey paper and
 // confetti of its colour flung out and falling, and puffs of paper.
+@(private = "file")
 draw_pinball_burst :: proc(renderer: ^Renderer, b: ^Pinball_View, centre: rl.Vector3, now: f64) {
 	t := now-b.ended
 	if t < PINBALL_BURST_SWELL || t > PINBALL_BURST_SECONDS { return }
@@ -566,6 +586,7 @@ draw_pinball_burst :: proc(renderer: ^Renderer, b: ^Pinball_View, centre: rl.Vec
 
 // A contact's paper star (grey at a wall, red on a foe, gold at the strike)
 // and paper bits thrown off it; a wall's, stone dust too.
+@(private = "file")
 draw_pinball_impact :: proc(renderer: ^Renderer, impact: ^Pinball_Impact) {
 	t := renderer.sprite_assets.elapsed-impact.born
 	if !impact.used || t < 0 || t > PINBALL_IMPACT_SECONDS || !tactical_render_visible(renderer, impact.cell) { return }
@@ -604,6 +625,7 @@ draw_pinball_impact :: proc(renderer: ^Renderer, impact: ^Pinball_Impact) {
 
 // Under the ball, in place of its card's stand (draw_tactical_actor_bases): a
 // soft round shadow on the floor, as wide as the ball is now.
+@(private)
 draw_pinball_shadow :: proc(renderer: ^Renderer) {
 	b := &renderer.tactical.pinball
 	scale, _ := pinball_ball_scale(b, renderer.sprite_assets.elapsed)
@@ -616,37 +638,15 @@ draw_pinball_shadow :: proc(renderer: ^Renderer) {
 	}
 }
 
-// The flat board's ball (draw_tactical_world): its sprite standing over the
-// floor in place of the foe's body, a dark ellipse under it.
-draw_pinball_flat :: proc(renderer: ^Renderer) {
-	b := &renderer.tactical.pinball
-	scale, flash := pinball_ball_scale(b, renderer.sprite_assets.elapsed)
-	if scale <= 0.01 { return }
-	at := b.end_at if b.ending else b.at
-	if !tactical_render_visible(renderer, {int(math.round(at.x)), int(math.round(at.y))}) { return }
-	texture := pinball_texture(renderer, b)
-	if texture.id == 0 { return }
-	feet := tactical_project(renderer, {at.x+0.5, at.y+0.5})
-	r := PINBALL_FLAT_RADIUS*max(renderer.camera.zoom, 0.5)*scale
-	rl.DrawEllipse(i32(feet.x), i32(feet.y+2), r*0.9, r*0.4, {1, 5, 12, 120})
-	size := r*f32(PINBALL_SPRITE)/PINBALL_SPRITE_STEEL
-	dest := rl.Rectangle{feet.x, feet.y-r*0.85, size, size}
-	source := rl.Rectangle{0, 0, f32(PINBALL_SPRITE), f32(PINBALL_SPRITE)}
-	rl.DrawTexturePro(texture, source, dest, {size*0.5, size*0.5}, 0, rl.WHITE)
-	if flash > 0.01 {
-		rl.BeginBlendMode(.ADDITIVE)
-		rl.DrawTexturePro(texture, source, dest, {size*0.5, size*0.5}, 0, {255, 255, 255, u8(clamp(flash, 0, 1)*230)})
-		rl.EndBlendMode()
-	}
-}
-
 // --------------------------------------------------------------------------
 // The ball's sprite.
 
+@(private = "file")
 pinball_dot3 :: proc(a, b: [3]f32) -> f32 {
 	return a.x*b.x+a.y*b.y+a.z*b.z
 }
 
+@(private = "file")
 pinball_normalize3 :: proc(v: [3]f32) -> [3]f32 {
 	length := math.sqrt(pinball_dot3(v, v))
 	return v/length if length > 0.000001 else {0, 1, 0}
@@ -659,6 +659,7 @@ pinball_normalize3 :: proc(v: [3]f32) -> [3]f32 {
 // view: x right, y down, z toward the eye) between two ink lines; an ink line
 // round the steel, the white paper round it, its ink cut, and the cut edge
 // one texel down and to the right.
+@(private)
 pinball_ball_pixels :: proc(band: rl.Color, axis: [3]f32, out: []u8) {
 	if len(out) < PINBALL_SPRITE*PINBALL_SPRITE*4 { return }
 	put :: proc(out: []u8, x, y: int, colour: rl.Color) {
@@ -710,22 +711,25 @@ pinball_ball_pixels :: proc(band: rl.Color, axis: [3]f32, out: []u8) {
 }
 
 // --------------------------------------------------------------------------
-// The card's aim (draw_card_target_range).
+// The card's aim (draw_card_target_details).
+
+PINBALL_HEAVY :: rl.Color{235, 91, 91, 255}
 
 // While the Pinball is aimed: every foe beside the player it can take marked
 // with a steel reticle, a boss or a miniboss there with a red one (and
-// TROPPO PESANTE, after the cards: draw_lasso_heavy_labels); for the foe under
+// TROPPO PESANTE, after the cards: draw_pinball_heavy_labels); for the foe under
 // the mouse, the way the strike would send the ball now, up to the first solid
 // thing on it.
+@(private)
 draw_pinball_preview :: proc(renderer: ^Renderer, room: ^game.Room, card: game.Card_Instance) {
 	if renderer == nil || room == nil || room.player == nil || room.level_data == nil { return }
-	definition, found := game.card_definition_by_id(card.definition_id, game.tactical_enabled(room))
+	definition, found := game.card_definition_by_id(card.definition_id)
 	if !found { return }
 	for enemy in room.enemies {
 		if game.enemy_is_out_of_play(room, enemy.id) || !tactical_render_visible(renderer, enemy.position) { continue }
 		evaluation := game.evaluate_card_targeting(room, card, game.card_target_request_at(definition, enemy.position))
 		if evaluation.error == .Target_Too_Heavy {
-			draw_aim_reticle(renderer, enemy.position, 0.46, 2, LASSO_HEAVY)
+			draw_aim_reticle(renderer, enemy.position, 0.46, 2, PINBALL_HEAVY)
 			continue
 		}
 		if evaluation.error != .None { continue }
@@ -735,9 +739,70 @@ draw_pinball_preview :: proc(renderer: ^Renderer, room: ^game.Room, card: game.C
 	}
 }
 
+// While the Pinball is aimed, TROPPO PESANTE
+// under each foe in reach it cannot take: drawn after the cards and the seals
+// (draw_tactical_world), so none of them hides it, and kept in the labels'
+// layout, so the words over the board drawn after it keep clear.
+@(private)
+draw_pinball_heavy_labels :: proc(renderer: ^Renderer, room: ^game.Room, card_id: u32) {
+	if renderer == nil || room == nil || room.player == nil || room.level_data == nil || room.phase != .Combat || card_id == 0 { return }
+	if !tactical_telegraphs_are_visible(renderer, room) || renderer_blocks_player_input(renderer) { return }
+	index, found := game.hand_card_index_by_id(&room.player.deck, card_id)
+	if !found { return }
+	card := room.player.deck.hand[index]
+	if card.definition_id != .Pinball { return }
+	definition, known := game.card_definition_by_id(card.definition_id)
+	if !known { return }
+	for enemy in room.enemies {
+		if !tactical_render_visible(renderer, enemy.position) { continue }
+		evaluation := game.evaluate_card_targeting(room, card, game.card_target_request_at(definition, enemy.position))
+		if evaluation.error == .Target_Too_Heavy { draw_pinball_heavy_label(renderer, enemy.position) }
+	}
+}
+
+// TROPPO PESANTE under the feet of a foe that cannot become a ball (over its head
+// it would sit under its heart, or under the HUD), clear of the hearts and
+// labels already placed (pinball_heavy_label_place).
+@(private = "file")
+draw_pinball_heavy_label :: proc(renderer: ^Renderer, cell: grid.Position) {
+	label: cstring = "TROPPO PESANTE"
+	anchor := tactical_project(renderer, {f32(cell.x)+0.5, f32(cell.y)+0.5})
+	width := gothic_text_width(renderer, label, 12)+12
+	bounds := pinball_heavy_label_place(renderer.tactical.labels, anchor, width, tactical_world_bounds(renderer))
+	rl.DrawRectangleRec(bounds, {8, 15, 26, 235})
+	rl.DrawRectangleRec({bounds.x, bounds.y, 2, bounds.height}, PINBALL_HEAVY)
+	gothic_text(renderer, label, bounds.x+6, bounds.y+3, 12, PINBALL_HEAVY)
+	if layout := renderer.tactical.labels; layout != nil && layout.count < len(layout.bounds) {
+		layout.bounds[layout.count] = bounds
+		layout.count += 1
+	}
+}
+
+// Where TROPPO PESANTE goes under feet projected at `anchor`, `width` wide:
+// just under them, else a row lower at a time, then beside them, left then
+// right, the first place clear of the labels and hearts in `layout` (a
+// neighbour's heart below them stays readable), inside `viewport`; with none
+// clear, just under them still.
+@(private)
+pinball_heavy_label_place :: proc(layout: ^Tactical_Label_Layout, anchor: view.Vec2, width: f32, viewport: rl.Rectangle) -> rl.Rectangle {
+	first := rl.Rectangle{math.round(anchor.x-width*0.5), math.round(anchor.y+12), width, 19}
+	if layout == nil { return first }
+	for side in ([3]f32{0, -1, 1}) {
+		for row in 0..<4 {
+			x := first.x+side*(width*0.5+8)
+			y := first.y+f32(row)*13
+			candidate := rl.Rectangle{math.round(clamp(x, viewport.x, viewport.x+viewport.width-width)),
+				math.round(clamp(y, viewport.y, viewport.y+viewport.height-first.height)), width, first.height}
+			if living_heart_is_clear(layout, candidate) { return candidate }
+		}
+	}
+	return first
+}
+
 // The launch a strike at `cell` would give now (game.pinball_next_launch):
 // paper dashes over ink from the ball's cell along its way, up to where its
 // disc would first touch a solid thing (four cells at most), and a chevron.
+@(private = "file")
 draw_pinball_launch_line :: proc(renderer: ^Renderer, room: ^game.Room, cell: grid.Position) {
 	heading, _ := game.pinball_next_launch(room, cell)
 	start := [2]f64{f64(cell.x), f64(cell.y)}
@@ -782,18 +847,21 @@ draw_pinball_launch_line :: proc(renderer: ^Renderer, room: ^game.Room, cell: gr
 
 // The ball's chip after the bites (tactical_status_chip_layout): its seconds
 // left, a whole second up, and the value the next foe takes.
+@(private)
 pinball_chip_text :: proc(seconds: f64, value: i32, short: bool) -> cstring {
 	left := int(math.ceil(max(seconds, 0)-0.000001))
 	return fmt.ctprintf("PIN %ds x%d" if short else "PINBALL %ds x%d", left, value)
 }
 
 // Whether the HUD shows the ball's chip, and its words.
+@(private)
 pinball_chip :: proc(room: ^game.Room, short: bool) -> (text: cstring, shown: bool) {
 	if !game.tactical_pinball_active(room) { return }
 	return pinball_chip_text(game.pinball_seconds_left(&room.pinball), room.pinball.value, short), true
 }
 
 // The hand's hint while the Pinball is aimed at `error`'s cell.
+@(private)
 pinball_aim_hint :: proc(room: ^game.Room, error: game.Card_Compile_Error) -> cstring {
 	#partial switch error {
 	case .Target_Too_Heavy: return "TROPPO PESANTE PER IL PINBALL"

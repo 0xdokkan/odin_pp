@@ -165,16 +165,16 @@ hook_step :: proc(data: rawptr, frame: ^host.Frame, playing: bool) -> host.Round
 	}
 	if frame.focused && !g.demo {
 		resuming := !g.input_gate.active
-		base = advance_player_controls(g, input.sample(&g.actions), frame.dt)
+		base = advance_player_controls(g, input.sample(&g.actions, frame.devices), frame.dt)
 		if resuming {
 			// Keys still held from the menu (Space, Enter) must not fire edges.
-			_ = input.mouse_delta()
+			_ = input.mouse_delta(frame.devices)
 		} else {
 			sensitivity := MOUSE_SENSITIVITY
 			if frame.profile != nil {
 				sensitivity *= frame.profile.settings.mouse_sensitivity
 			}
-			mouse := input.mouse_delta()
+			mouse := input.mouse_delta(frame.devices)
 			mouse.x = clamp(mouse.x, -300, 300)
 			mouse.y = clamp(mouse.y, -300, 300)
 			look = Vec2{-mouse.x, -mouse.y} * sensitivity

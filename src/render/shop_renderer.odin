@@ -4,7 +4,7 @@ import "core:c"
 import "core:fmt"
 import rl "vendor:raylib"
 import game "../game"
-import view "../view"
+import view "../engine/view"
 
 SHOP_DECK_CARDS_PER_PAGE :: 8
 
@@ -64,10 +64,12 @@ Shop_Render_State :: struct {
 	continue_hovered:      bool,
 }
 
+@(private)
 shop_canvas_is_supported :: proc(canvas_width, canvas_height: f32) -> bool {
 	return canvas_width >= SHOP_MIN_CANVAS_WIDTH && canvas_height >= SHOP_MIN_CANVAS_HEIGHT
 }
 
+@(private)
 shop_point_in_bounds :: proc(point: view.Vec2, bounds: rl.Rectangle) -> bool {
 	return bounds.width > 0 && bounds.height > 0 && point_in_rectangle(point, bounds)
 }
@@ -96,6 +98,7 @@ shop_offer_bounds :: proc(
 	}
 }
 
+@(private)
 shop_offer_price_bounds :: proc(
 	canvas_width, canvas_height: f32,
 	offer_index: int,
@@ -113,6 +116,7 @@ shop_offer_price_bounds :: proc(
 	}
 }
 
+@(private)
 shop_offer_contains :: proc(
 	canvas_width, canvas_height: f32,
 	offer_index: int,
@@ -128,6 +132,7 @@ shop_offer_contains :: proc(
 	)
 }
 
+@(private)
 shop_offer_at_point :: proc(
 	run: ^game.Run_State,
 	canvas_width, canvas_height: f32,
@@ -158,6 +163,7 @@ shop_deck_page_count :: proc(deck: ^game.Deck_State) -> int {
 	return (deck.owned_count+SHOP_DECK_CARDS_PER_PAGE-1)/SHOP_DECK_CARDS_PER_PAGE
 }
 
+@(private = "file")
 shop_deck_page_is_valid :: proc(deck: ^game.Deck_State, page: int) -> bool {
 	return page >= 0 && page < shop_deck_page_count(deck)
 }
@@ -170,6 +176,7 @@ shop_clamp_deck_page :: proc(deck: ^game.Deck_State, page: int) -> int {
 	return clamp(page, 0, page_count-1)
 }
 
+@(private)
 shop_deck_page_start :: proc(deck: ^game.Deck_State, page: int) -> (int, bool) {
 	if !shop_deck_page_is_valid(deck, page) {
 		return 0, false
@@ -177,6 +184,7 @@ shop_deck_page_start :: proc(deck: ^game.Deck_State, page: int) -> (int, bool) {
 	return page*SHOP_DECK_CARDS_PER_PAGE, true
 }
 
+@(private)
 shop_deck_cards_on_page :: proc(deck: ^game.Deck_State, page: int) -> int {
 	start, ok := shop_deck_page_start(deck, page)
 	if !ok {
@@ -185,6 +193,7 @@ shop_deck_cards_on_page :: proc(deck: ^game.Deck_State, page: int) -> int {
 	return min(SHOP_DECK_CARDS_PER_PAGE, deck.owned_count-start)
 }
 
+@(private)
 shop_owned_card_bounds :: proc(
 	canvas_width, canvas_height: f32,
 	page_slot: int,
@@ -209,6 +218,7 @@ shop_owned_card_bounds :: proc(
 	}
 }
 
+@(private)
 shop_owned_card_at_point :: proc(
 	run: ^game.Run_State,
 	canvas_width, canvas_height: f32,
@@ -226,6 +236,7 @@ shop_owned_card_at_point :: proc(
 // Shop and Rest share the deck row. Keep its picking order in one place:
 // the raised card is drawn last, then ordinary cards are picked back to front.
 // Each screen validates its own phase and interaction rules before calling.
+@(private)
 owned_deck_card_at_point :: proc(
 	deck: ^game.Deck_State,
 	canvas_width, canvas_height: f32,
@@ -258,6 +269,7 @@ owned_deck_card_at_point :: proc(
 	return 0, false
 }
 
+@(private)
 shop_previous_page_bounds :: proc(canvas_width, canvas_height: f32) -> rl.Rectangle {
 	if !shop_canvas_is_supported(canvas_width, canvas_height) {
 		return {}
@@ -270,6 +282,7 @@ shop_previous_page_bounds :: proc(canvas_width, canvas_height: f32) -> rl.Rectan
 	}
 }
 
+@(private)
 shop_next_page_bounds :: proc(canvas_width, canvas_height: f32) -> rl.Rectangle {
 	previous := shop_previous_page_bounds(canvas_width, canvas_height)
 	if previous.width <= 0 {
@@ -283,6 +296,7 @@ shop_next_page_bounds :: proc(canvas_width, canvas_height: f32) -> rl.Rectangle 
 	}
 }
 
+@(private)
 shop_continue_bounds :: proc(canvas_width, canvas_height: f32) -> rl.Rectangle {
 	if !shop_canvas_is_supported(canvas_width, canvas_height) {
 		return {}
@@ -295,6 +309,7 @@ shop_continue_bounds :: proc(canvas_width, canvas_height: f32) -> rl.Rectangle {
 	}
 }
 
+@(private)
 shop_remove_bounds :: proc(canvas_width, canvas_height: f32) -> rl.Rectangle {
 	continue_bounds := shop_continue_bounds(canvas_width, canvas_height)
 	if continue_bounds.width <= 0 {
@@ -308,6 +323,7 @@ shop_remove_bounds :: proc(canvas_width, canvas_height: f32) -> rl.Rectangle {
 	}
 }
 
+@(private)
 shop_upgrade_bounds :: proc(canvas_width, canvas_height: f32) -> rl.Rectangle {
 	remove_bounds := shop_remove_bounds(canvas_width, canvas_height)
 	if remove_bounds.width <= 0 {
@@ -321,22 +337,27 @@ shop_upgrade_bounds :: proc(canvas_width, canvas_height: f32) -> rl.Rectangle {
 	}
 }
 
+@(private)
 shop_previous_page_at_point :: proc(canvas_width, canvas_height: f32, point: view.Vec2) -> bool {
 	return shop_point_in_bounds(point, shop_previous_page_bounds(canvas_width, canvas_height))
 }
 
+@(private)
 shop_next_page_at_point :: proc(canvas_width, canvas_height: f32, point: view.Vec2) -> bool {
 	return shop_point_in_bounds(point, shop_next_page_bounds(canvas_width, canvas_height))
 }
 
+@(private)
 shop_upgrade_at_point :: proc(canvas_width, canvas_height: f32, point: view.Vec2) -> bool {
 	return shop_point_in_bounds(point, shop_upgrade_bounds(canvas_width, canvas_height))
 }
 
+@(private)
 shop_remove_at_point :: proc(canvas_width, canvas_height: f32, point: view.Vec2) -> bool {
 	return shop_point_in_bounds(point, shop_remove_bounds(canvas_width, canvas_height))
 }
 
+@(private)
 shop_continue_at_point :: proc(canvas_width, canvas_height: f32, point: view.Vec2) -> bool {
 	return shop_point_in_bounds(point, shop_continue_bounds(canvas_width, canvas_height))
 }
@@ -394,6 +415,7 @@ shop_hit_test :: proc(
 	return {}
 }
 
+@(private = "file")
 shop_rarity_color :: proc(rarity: game.Card_Rarity) -> rl.Color {
 	switch rarity {
 	case .Common:
@@ -407,6 +429,7 @@ shop_rarity_color :: proc(rarity: game.Card_Rarity) -> rl.Color {
 	return rl.Color{105, 116, 116, 255}
 }
 
+@(private = "file")
 draw_shop_offer :: proc(
 	run: ^game.Run_State,
 	offer_index: int,
@@ -415,7 +438,7 @@ draw_shop_offer :: proc(
 ) {
 	assert(run != nil && offer_index >= 0 && offer_index < run.shop.offer_count)
 	offer := run.shop.offers[offer_index]
-	definition, found := game.card_definition_by_id(offer.definition_id, menu_themed(theme))
+	definition, found := game.card_definition_by_id(offer.definition_id)
 	assert(found)
 	enabled := game.shop_offer_can_be_bought(run, offer_index)
 	preview := game.Card_Instance{definition_id = offer.definition_id}
@@ -472,6 +495,7 @@ draw_shop_offer :: proc(
 	}
 }
 
+@(private = "file")
 draw_shop_owned_card :: proc(
 	run: ^game.Run_State,
 	card_index, page_slot: int,
@@ -480,7 +504,7 @@ draw_shop_owned_card :: proc(
 ) {
 	assert(run != nil && card_index >= 0 && card_index < run.player.deck.owned_count)
 	card := run.player.deck.owned[card_index]
-	definition, found := game.card_definition_by_id(card.definition_id, menu_themed(theme))
+	definition, found := game.card_definition_by_id(card.definition_id)
 	assert(found)
 	bounds := shop_owned_card_bounds(canvas_width, canvas_height, page_slot, raised)
 	fill, outline := card_colors(card.definition_id, true)
@@ -509,7 +533,7 @@ draw_shop_owned_card :: proc(
 		icon := gothic_card_icon(card.definition_id)
 		gothic_atlas_icon(theme.tactical.art.icons, theme.tactical.art.icon_sources[icon],
 			{bounds.x+18, bounds.y+37, bounds.width-36, 66})
-	} else { draw_card_sigil(bounds, card.definition_id, outline) }
+	}
 	if card.upgrade_level > 0 {
 		menu_text(theme,
 			fmt.ctprintf("+%d", card.upgrade_level),
@@ -521,6 +545,7 @@ draw_shop_owned_card :: proc(
 	}
 }
 
+@(private)
 draw_shop_button :: proc(
 	bounds: rl.Rectangle,
 	label: cstring,
@@ -552,6 +577,7 @@ draw_shop_button :: proc(
 	)
 }
 
+@(private = "file")
 draw_shop_page_button :: proc(bounds: rl.Rectangle, previous, hovered, enabled: bool, theme: ^Renderer = nil) {
 	fill := rl.Color{31, 36, 39, 255}
 	outline := rl.Color{105, 116, 116, 255}
@@ -581,6 +607,7 @@ draw_shop_page_button :: proc(bounds: rl.Rectangle, previous, hovered, enabled: 
 
 // Shop and Rest share the same deck page. Draw the hovered card last so
 // the raised card stays above its neighbours in both menus.
+@(private)
 draw_owned_deck_page :: proc(
 	run: ^game.Run_State,
 	canvas_width, canvas_height: f32,
@@ -690,7 +717,7 @@ draw_shop_screen :: proc(
 	selected_id := state.selected_card_id
 	selected_index, selected_found := game.owned_card_index_by_id(&run.player.deck, selected_id)
 	if selected_found {
-		menu_text(theme, card_upgrade_preview(run.player.deck.owned[selected_index], menu_themed(theme)), 45, 454, 12,
+		menu_text(theme, card_upgrade_preview(run.player.deck.owned[selected_index]), 45, 454, 12,
 			rl.Color{169, 183, 177, 255})
 	}
 	upgrade_label: cstring = "UPGRADE"

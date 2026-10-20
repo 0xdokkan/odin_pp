@@ -1,13 +1,15 @@
 package game
 
-import grid "../grid"
+import grid "../engine/grid"
 
 // The first two route layers retain the compact introductory encounter. Later
 // tiers grow footprint and roster together; depth cannot grow either unboundedly.
+@(private)
 tactical_arena_tier :: proc(depth: int) -> int {
 	return clamp(depth/2, 0, 3)
 }
 
+@(private)
 configure_progressive_tactical_arena :: proc(profile: ^Room_Generation_Profile, node: ^Run_Node) {
 	tier := tactical_arena_tier(node.depth)
 	if tier == 0 { return }
@@ -45,6 +47,7 @@ configure_progressive_tactical_arena :: proc(profile: ^Room_Generation_Profile, 
 	encounter.enemy_budget = encounter.target_enemies*2+(4 if node.kind == .Boss else 0)
 }
 
+@(private)
 progressive_encounter_required_roles :: proc(blueprint: ^Room_Blueprint) -> (roles: [5]Enemy_Archetype, count: int) {
 	if blueprint.profile.encounter_config.target_enemies == 0 { return }
 	roles = {.Chaser, .Archer, .Bomber, .Custodian, .Brute}
@@ -54,6 +57,7 @@ progressive_encounter_required_roles :: proc(blueprint: ^Room_Blueprint) -> (rol
 
 // After the initial recipe pair, groups of three occupy successive sectors.
 // Local role scoring still selects cover, firing lanes and open charge routes.
+@(private)
 progressive_encounter_sector_score :: proc(blueprint: ^Room_Blueprint, index: int, position: grid.Position) -> int {
 	if blueprint.profile.encounter_config.target_enemies == 0 { return 0 }
 	sectors := [?]grid.Position{{-1, -1}, {1, 1}, {-1, 1}, {1, -1}, {0, -1}, {0, 1}, {-1, 0}, {1, 0}}

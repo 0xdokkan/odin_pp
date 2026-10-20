@@ -2,6 +2,37 @@ package gfx
 
 import "core:testing"
 import physics "../physics"
+import rl "vendor:raylib"
+
+@(test)
+test_embedded_sprite_staging_preserves_alpha_and_rejects_invalid_sheets :: proc(t: ^testing.T) {
+	// The translucent wraith also has an opaque fifth hit-flash frame.
+	asset := Sprite_Asset{#load("../../../assets/minigames/fps/wraith.png"), 5}
+	image := sprite_asset_image(asset)
+	white := sprite_asset_image(asset, silhouette = true)
+	testing.expect(t, image.data != nil && white.data != nil)
+	defer rl.UnloadImage(image)
+	defer rl.UnloadImage(white)
+	if image.data == nil || white.data == nil { return }
+	pixels, silhouette := rl.LoadImageColors(image), rl.LoadImageColors(white)
+	defer rl.UnloadImageColors(pixels)
+	defer rl.UnloadImageColors(silhouette)
+	translucent, opaque, transparent := false, false, false
+	for i in 0..<int(image.width)*int(image.height) {
+		color := pixels[i]
+		translucent ||= color.a > 0 && color.a < 255
+		opaque ||= color.a == 255
+		transparent ||= color.a == 0
+		expected := rl.Color{255, 255, 255, color.a} if color.a > 0 else color
+		testing.expect_value(t, silhouette[i], expected)
+	}
+	testing.expect(t, translucent && opaque && transparent)
+	for bad in ([4]Sprite_Asset{{}, {asset.png, 0}, {asset.png, 6}, {[]u8{1, 2, 3, 4}, 1}}) {
+		invalid := sprite_asset_image(bad)
+		testing.expect(t, invalid.data == nil)
+		if invalid.data != nil { rl.UnloadImage(invalid) }
+	}
+}
 
 @(test)
 test_face_count_hides_shared_faces :: proc(t: ^testing.T) {

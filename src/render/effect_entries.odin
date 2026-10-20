@@ -2,7 +2,7 @@ package render
 
 import rl "vendor:raylib"
 import game "../game"
-import view "../view"
+import view "../engine/view"
 
 // MOSTRA EFFETTO's buttons on the run's screens (src/effect_window.odin opens
 // the window from them): one under each card of the reward and of the shop,
@@ -10,8 +10,8 @@ import view "../view"
 // chosen there; the sheet's MAZZO and the card inspector have their own
 // (character_sheet.odin, tactical_hand.odin). Each stands clear of every card
 // (raised too), price, label and control, so that a click on it never picks,
-// buys or turns a page. Only the game's board has them (menu_themed): the
-// classic screens draw none.
+// buys or turns a page. A renderer must be available to open the film;
+// text-only resource fallbacks do not draw effect buttons.
 
 EFFECT_ENTRY_LABEL : cstring : "MOSTRA EFFETTO"
 // The key that shows the card a screen has chosen: the inspector's, the
@@ -71,6 +71,7 @@ owned_card_effect_bounds :: proc(canvas_width, canvas_height: f32) -> rl.Rectang
 
 // A MOSTRA EFFETTO button under a card of the run's screens, on the game's
 // board only.
+@(private)
 draw_effect_entry_button :: proc(theme: ^Renderer, bounds: rl.Rectangle, enabled: bool = true) {
 	if !menu_themed(theme) || bounds.width <= 0 { return }
 	hud_button(theme, bounds, nil, EFFECT_ENTRY_LABEL, enabled)
@@ -79,6 +80,7 @@ draw_effect_entry_button :: proc(theme: ^Renderer, bounds: rl.Rectangle, enabled
 // The owned card's, in the controls row of the shop and of the rest: one of
 // the row's own buttons, its key in its words (as the relic choice's S  PASSA).
 EFFECT_ENTRY_OWNED_LABEL : cstring : "I  MOSTRA EFFETTO"
+@(private)
 draw_owned_card_effect_button :: proc(theme: ^Renderer, canvas_width, canvas_height: f32, enabled: bool) {
 	bounds := owned_card_effect_bounds(canvas_width, canvas_height)
 	if !menu_themed(theme) || bounds.width <= 0 { return }
@@ -87,6 +89,7 @@ draw_owned_card_effect_button :: proc(theme: ^Renderer, canvas_width, canvas_hei
 
 // hud_button's own layout for a one-letter key: its cap, and the room its
 // label has with a key or without (the fit checks and the inspector's hint).
+@(private)
 effect_entry_key_bounds :: proc(bounds: rl.Rectangle) -> rl.Rectangle {
 	return {bounds.x+4, bounds.y+4, 20, bounds.height-8}
 }

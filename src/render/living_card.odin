@@ -4,7 +4,7 @@ import "core:math"
 import rl "vendor:raylib"
 import gfx "../engine/gfx"
 import game "../game"
-import view "../view"
+import view "../engine/view"
 
 // Living cards (the 3D board): each character is a drawing animated on a
 // still paper card (gfx.LIVING_SHEETS). The card never bends or turns: the
@@ -63,6 +63,7 @@ set_living_cards :: proc(renderer: ^Renderer, on: bool) {
 	renderer.tactical.living = on
 }
 
+@(private)
 living_cards_ready :: proc(renderer: ^Renderer) -> bool {
 	v := &renderer.tactical
 	if !v.living || v.living_assets.failed { return false }
@@ -74,6 +75,7 @@ living_cards_ready :: proc(renderer: ^Renderer) -> bool {
 	return true
 }
 
+@(private)
 destroy_living_cards :: proc(renderer: ^Renderer) {
 	v := &renderer.tactical
 	living_tokens_free(v.living_state)
@@ -82,6 +84,7 @@ destroy_living_cards :: proc(renderer: ^Renderer) {
 }
 
 // A fresh board starts with fresh drawings (and a world that never stopped).
+@(private)
 forget_living_actors :: proc(renderer: ^Renderer) {
 	if renderer == nil { return }
 	renderer.tactical.intent_traces = {}
@@ -98,6 +101,7 @@ forget_living_actors :: proc(renderer: ^Renderer) {
 	renderer.tactical.living_state^ = {}
 }
 
+@(private)
 living_slot :: proc(state: ^Living_State, entity: game.Entity_Ref, character: gfx.Flipbook_Character, now: f64) -> ^Living_Actor {
 	free_slot: ^Living_Actor
 	for &actor in state.actors {
@@ -135,6 +139,7 @@ living_find_dying :: proc(renderer: ^Renderer, entity: game.Entity_Ref) -> ^Livi
 	return nil
 }
 
+@(private = "file")
 living_death_done :: proc(actor: ^Living_Actor, now: f64) -> bool {
 	if actor.action != .Death { return false }
 	clip := &gfx.LIVING_SHEETS[actor.character].clips[.Death]
@@ -142,6 +147,7 @@ living_death_done :: proc(actor: ^Living_Actor, now: f64) -> bool {
 }
 
 // 0..1 progress of the card toppling after the death drawings.
+@(private)
 living_fall :: proc(actor: ^Living_Actor, now: f64) -> f32 {
 	if actor == nil || actor.action != .Death { return 0 }
 	clip := &gfx.LIVING_SHEETS[actor.character].clips[.Death]
@@ -150,6 +156,7 @@ living_fall :: proc(actor: ^Living_Actor, now: f64) -> f32 {
 }
 
 // The same curves as tools/art/living.py: how the card follows the push.
+@(private)
 living_travel_progress :: proc(kind: gfx.Living_Travel, progress: f32) -> f32 {
 	u := clamp(progress, 0, 1)
 	switch kind {
@@ -176,6 +183,7 @@ living_travel_progress :: proc(kind: gfx.Living_Travel, progress: f32) -> f32 {
 }
 
 // A hopping or floating card leaves the board for a moment; the others slide.
+@(private)
 living_travel_lift :: proc(kind: gfx.Living_Travel, u: f32) -> f32 {
 	#partial switch kind {
 	case .Hop: return abs(math.sin(u*2*math.PI))*0.1
@@ -187,6 +195,7 @@ living_travel_lift :: proc(kind: gfx.Living_Travel, u: f32) -> f32 {
 
 // Where the card stands now: on its cell, or partway through its slide; and
 // how far it is off the board (a hop, the Lazzo's rope: lasso.odin).
+@(private)
 living_card_position :: proc(renderer: ^Renderer, entity: game.Entity_Ref, key: Sprite_Key, position: view.Vec2) -> (at: view.Vec2, lift: f32) {
 	at = position
 	lift = tactical_lasso_lift(renderer, entity)
@@ -205,6 +214,7 @@ living_card_position :: proc(renderer: ^Renderer, entity: game.Entity_Ref, key: 
 	return
 }
 
+@(private)
 living_cue_action :: proc(cue: ^Presentation_Cue, entity: game.Entity_Ref) -> (action: gfx.Living_Action, matched: bool) {
 	event := &cue.event
 	// A shot RIFLESSO gives back is the shooter's own bolt coming home: the
@@ -261,6 +271,7 @@ living_cue_action :: proc(cue: ^Presentation_Cue, entity: game.Entity_Ref) -> (a
 	return .Idle, false
 }
 
+@(private)
 living_face :: proc(actor: ^Living_Actor, sideways: f32, now: f64) {
 	if abs(sideways) < 0.2 { return }
 	left := sideways < 0
@@ -269,17 +280,20 @@ living_face :: proc(actor: ^Living_Actor, sideways: f32, now: f64) {
 	actor.turn_started = now
 }
 
+@(private = "file")
 living_camera_forward :: proc(renderer: ^Renderer) -> rl.Vector3 {
 	camera := renderer.tactical.camera
 	return rl.Vector3Normalize(rl.Vector3{camera.target.x-camera.position.x, 0, camera.target.z-camera.position.z})
 }
 
+@(private)
 living_start :: proc(actor: ^Living_Actor, action: gfx.Living_Action, now: f64) {
 	resolved := gfx.living_resolve(actor.character, action)
 	actor.action, actor.started = resolved, now
 }
 
 // The clips that answer a blow: they land it LIVING_REACT_STRIKE in.
+@(private = "file")
 living_reacts :: proc(action: gfx.Living_Action) -> bool {
 	#partial switch action {
 	case .Hurt, .Hurt_Back, .Block, .Dodge, .Death: return true
@@ -287,6 +301,7 @@ living_reacts :: proc(action: gfx.Living_Action) -> bool {
 	return false
 }
 
+@(private)
 living_busy :: proc(actor: ^Living_Actor, now: f64) -> bool {
 	if actor.action == .Idle { return false }
 	if actor.action == .Death { return true }
@@ -294,6 +309,7 @@ living_busy :: proc(actor: ^Living_Actor, now: f64) -> bool {
 	return now-actor.started < gfx.living_clip_seconds(clip)
 }
 
+@(private = "file")
 living_past_hit :: proc(actor: ^Living_Actor, now: f64) -> bool {
 	clip := &gfx.LIVING_SHEETS[actor.character].clips[actor.action]
 	if clip.hit < 0 { return true }
@@ -301,6 +317,7 @@ living_past_hit :: proc(actor: ^Living_Actor, now: f64) -> bool {
 	return frame > clip.hit
 }
 
+@(private)
 living_observe :: proc(renderer: ^Renderer, state: ^Living_State, room: ^game.Room, actor: Presentation_Actor,
 	character: gfx.Flipbook_Character, now: f64) {
 	// The drawings keep the actor's own clock (living_clock: the world's
@@ -436,6 +453,7 @@ living_observe :: proc(renderer: ^Renderer, state: ^Living_State, room: ^game.Ro
 }
 
 // Once per frame, before the board is drawn: read the cues and states.
+@(private)
 update_living_actors :: proc(renderer: ^Renderer, room: ^game.Room) {
 	v := &renderer.tactical
 	if !living_cards_ready(renderer) || v.snapshot == nil { return }
@@ -465,6 +483,7 @@ update_living_actors :: proc(renderer: ^Renderer, room: ^game.Room) {
 }
 
 // The drawing to print right now.
+@(private)
 living_drawing :: proc(actor: ^Living_Actor, now: f64) -> (action: gfx.Living_Action, frame: i32) {
 	sheet := &gfx.LIVING_SHEETS[actor.character]
 	// A reaction waiting for its blow to land: the loop beneath goes on until then.
@@ -479,6 +498,7 @@ living_drawing :: proc(actor: ^Living_Actor, now: f64) -> (action: gfx.Living_Ac
 }
 
 // Dying drawings keep full opacity, then fade as the card topples.
+@(private)
 living_opacity :: proc(renderer: ^Renderer, entity: game.Entity_Ref, key: Sprite_Key, opacity: f32) -> f32 {
 	character, ok := flipbook_character(key)
 	if !ok { return opacity }
@@ -488,6 +508,7 @@ living_opacity :: proc(renderer: ^Renderer, entity: game.Entity_Ref, key: Sprite
 	return clamp(1-(fall-0.55)/0.45, 0, 1)
 }
 
+@(private)
 living_billboard_geometry :: proc(renderer: ^Renderer, character: gfx.Flipbook_Character, key: Sprite_Key, position: view.Vec2,
 	feedback: bool, entity: game.Entity_Ref) -> Tactical_Billboard {
 	v := &renderer.tactical
@@ -557,6 +578,7 @@ living_billboard_geometry :: proc(renderer: ^Renderer, character: gfx.Flipbook_C
 	return result
 }
 
+@(private)
 living_card_hit :: proc(renderer: ^Renderer, quad: Tactical_Billboard, ray: rl.Ray) -> (distance: f32, hit: bool) {
 	points := quad.card_points
 	collision := rl.GetRayCollisionQuad(ray, points[0], points[1], points[2], points[3])

@@ -2,7 +2,7 @@ package render
 
 import "core:testing"
 import game "../game"
-import view "../view"
+import view "../engine/view"
 
 @(test)
 test_world_movement_and_foreground_move_animate_without_a_shared_input_lock :: proc(t: ^testing.T) {

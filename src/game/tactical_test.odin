@@ -2,7 +2,7 @@ package game
 
 import "core:testing"
 import level "../level"
-import grid "../grid"
+import grid "../engine/grid"
 
 @(test)
 test_larger_fog_exposes_blockers_but_not_cells_behind_them :: proc(t: ^testing.T) {

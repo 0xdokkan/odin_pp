@@ -7,8 +7,8 @@ import rl "vendor:raylib"
 import rlgl "vendor:raylib/rlgl"
 import gfx "../engine/gfx"
 import game "../game"
-import grid "../grid"
-import view "../view"
+import grid "../engine/grid"
+import view "../engine/view"
 
 // LAZZO on the board (game/lasso.odin), cut from paper like the cards and the
 // props. The rope is a strip of paper pixel art drawn by code: two strands of
@@ -67,8 +67,6 @@ LASSO_RING_DASH_ON :: f32(12)
 // once the foe goes round faster than this many turns a second.
 LASSO_FACE_SECONDS :: f64(0.15)
 LASSO_FACE_TURNS :: f32(3)
-// The flat board's lift, in screen pixels at zoom 1.
-LASSO_FLAT_LIFT_PIXELS :: f32(18)
 // While the widest ring spins the camera stands this share farther back and
 // drops this share of its lead before the player (update_tactical_view), so
 // the swung card shows whole between the HUD and the hand; it eases there
@@ -166,12 +164,14 @@ Lasso_View :: struct {
 
 // A fresh rope (or board): what was shown of the last one goes, the textures
 // and the counts stay.
+@(private)
 lasso_view_reset :: proc(l: ^Lasso_View) {
 	l^ = {rope_texture = l.rope_texture, ring_texture = l.ring_texture, ring_key = l.ring_key, ring_baked = l.ring_baked,
 		spawned_hits = l.spawned_hits, spawned_smashes = l.spawned_smashes, whirrs = l.whirrs, releases = l.releases,
 		drops = l.drops, throws = l.throws, seen = l.seen, seen_next = l.seen_next, frame = l.frame, framed = l.framed}
 }
 
+@(private)
 destroy_lasso_view :: proc(renderer: ^Renderer) {
 	l := &renderer.tactical.lasso
 	if l.rope_texture.id != 0 { rl.UnloadTexture(l.rope_texture) }
@@ -181,6 +181,7 @@ destroy_lasso_view :: proc(renderer: ^Renderer) {
 
 // The swung foe's place on the board at `angle`: round the centre of the
 // player's cell, `radius` cells out (actor positions are cells' corners).
+@(private)
 lasso_orbit_point :: proc(centre: grid.Position, radius: i32, angle: f64) -> view.Vec2 {
 	r := f64(radius)
 	return {f32(f64(centre.x)+r*math.cos(angle)), f32(f64(centre.y)+r*math.sin(angle))}
@@ -188,6 +189,7 @@ lasso_orbit_point :: proc(centre: grid.Position, radius: i32, angle: f64) -> vie
 
 // The swung card during the throw at `u` (0..1): standing where it was
 // caught, lifted, then pulled on a raised curve onto its ring at `orbit`.
+@(private)
 lasso_throw_pose :: proc(from, orbit: view.Vec2, u: f32) -> (at: view.Vec2, lift: f32) {
 	switch {
 	case u < LASSO_THROW_CINCHED:
@@ -207,6 +209,7 @@ lasso_throw_pose :: proc(from, orbit: view.Vec2, u: f32) -> (at: view.Vec2, lift
 }
 
 // The snapshot's `entity` shown at `at` (the airborne card, or its fall).
+@(private = "file")
 lasso_override :: proc(renderer: ^Renderer, entity: game.Entity_Ref, at: view.Vec2) {
 	snapshot := renderer.tactical.snapshot
 	if actor, found := presentation_actor_in_view(snapshot, entity); found { actor.position = at }
@@ -215,6 +218,7 @@ lasso_override :: proc(renderer: ^Renderer, entity: game.Entity_Ref, at: view.Ve
 // Once per frame, right after the shadow's (update_tactical_view, which may
 // run twice a frame): follows the room's rope and shows the swung card where
 // it flies; then the cues of its hits.
+@(private)
 update_tactical_lasso :: proc(renderer: ^Renderer, room: ^game.Room) {
 	v := &renderer.tactical
 	l := &v.lasso
@@ -295,6 +299,7 @@ update_tactical_lasso :: proc(renderer: ^Renderer, room: ^game.Room) {
 // not begun, none of its steps started yet. His dodge is the foreground's
 // first cue and starts with the next frame; a brute's push in the world's
 // beat waits for its blow to land.
+@(private)
 lasso_release_waits :: proc(renderer: ^Renderer, foe: game.Entity_Ref) -> bool {
 	batch, found := u32(0), false
 	for offset in 0..<renderer_queued_cue_count(renderer) {
@@ -317,6 +322,7 @@ lasso_release_waits :: proc(renderer: ^Renderer, foe: game.Entity_Ref) -> bool {
 // MOLLATO over a foe the rope let go, from the start of its fall, on either
 // board (its labels keep clear of what was placed before it). The release's
 // own cue says nothing (draw_tactical_feedback_overlay, draw_presentation_cue).
+@(private)
 draw_lasso_release_badge :: proc(renderer: ^Renderer) {
 	l := &renderer.tactical.lasso
 	if l.released <= 0 || l.died || renderer.tactical.snapshot == nil { return }
@@ -330,12 +336,14 @@ draw_lasso_release_badge :: proc(renderer: ^Renderer) {
 }
 
 // How far back the camera stands for the ring now (0: where it always is).
+@(private)
 lasso_camera_pull :: proc(renderer: ^Renderer) -> f32 {
 	if renderer == nil { return 0 }
 	return clamp(renderer.tactical.lasso.frame, 0, 1)
 }
 
 // The pivot turns to follow the foe round him, as fast as his card can turn.
+@(private = "file")
 lasso_face_pivot :: proc(renderer: ^Renderer, l: ^Lasso_View, now: f64) {
 	if !l.spinning || l.turns_per_second > LASSO_FACE_TURNS || now-l.faced < LASSO_FACE_SECONDS { return }
 	pivot := living_find(renderer, game.PLAYER_ENTITY, .Pilgrim)
@@ -348,6 +356,7 @@ lasso_face_pivot :: proc(renderer: ^Renderer, l: ^Lasso_View, now: f64) {
 // How high `entity`'s card flies on the rope now (world units; 0 for any
 // other card): living_card_position lifts the card, its stand and all it
 // carries (its heart, its tokens, the blows that reach it).
+@(private)
 tactical_lasso_lift :: proc(renderer: ^Renderer, entity: game.Entity_Ref) -> f32 {
 	if renderer == nil { return 0 }
 	l := &renderer.tactical.lasso
@@ -356,6 +365,7 @@ tactical_lasso_lift :: proc(renderer: ^Renderer, entity: game.Entity_Ref) -> f32
 }
 
 // The card the rope holds (or lets fall): no floor of its own under it.
+@(private)
 tactical_lasso_holds :: proc(renderer: ^Renderer, entity: game.Entity_Ref) -> bool {
 	if renderer == nil { return false }
 	l := &renderer.tactical.lasso
@@ -366,6 +376,7 @@ tactical_lasso_holds :: proc(renderer: ^Renderer, entity: game.Entity_Ref) -> bo
 // ring's cells, where his foe flies, join the board's view (by the radius
 // rule the ring holds no solid cell, but for a smash's ring beside him, whose
 // walls are in sight anyway).
+@(private)
 lasso_extend_vision :: proc(renderer: ^Renderer, room: ^game.Room) {
 	v := &renderer.tactical
 	if !game.tactical_lasso_active(room) { return }
@@ -381,8 +392,9 @@ lasso_extend_vision :: proc(renderer: ^Renderer, room: ^game.Room) {
 	}
 }
 
-// A star for each hit as its cue starts showing: between the two cards' chests,
-// or (a smash) by the wall, with stone dust; either a little toward the camera.
+// A star for each perimeter hit on the struck card; an interior push has
+// movement cues only. A smash is by the wall with stone dust.
+@(private = "file")
 observe_lasso_cues :: proc(renderer: ^Renderer, now: f64) {
 	l := &renderer.tactical.lasso
 	for offset in 0..<renderer_active_cue_count(renderer) {
@@ -402,7 +414,7 @@ observe_lasso_cues :: proc(renderer: ^Renderer, now: f64) {
 				wall := attack_cell_center(cue.event.to_position, swung.y)
 				at = swung+(wall-swung)*0.42
 			} else if struck, hit := attack_struck_point(renderer, cue.event.target); hit {
-				at = (swung+struck)*0.5
+				at = struck
 			}
 			// In front of the cards (a wall on the camera's side: no further
 			// than its face), or their paper would hide it.
@@ -424,6 +436,7 @@ observe_lasso_cues :: proc(renderer: ^Renderer, now: f64) {
 // A texel of the rope strip at column `x`, row `y`: white paper at the edges,
 // an ink line inside them, and two strands of hemp twisting between, their
 // grooves running across.
+@(private = "file")
 lasso_rope_texel :: proc(x, y: int) -> rl.Color {
 	switch y {
 	case 0, LASSO_ROPE_TEXELS-1: return LIVING_TOKEN_PAPER
@@ -439,6 +452,7 @@ lasso_rope_texel :: proc(x, y: int) -> rl.Color {
 	return LASSO_ROPE_SHADE if underside else LASSO_ROPE_HEMP
 }
 
+@(private = "file")
 lasso_rope_texture :: proc(l: ^Lasso_View) -> rl.Texture2D {
 	if l.rope_texture.id != 0 { return l.rope_texture }
 	image := rl.GenImageColor(LASSO_ROPE_TILE, LASSO_ROPE_TEXELS, rl.BLANK)
@@ -455,12 +469,14 @@ lasso_rope_texture :: proc(l: ^Lasso_View) -> rl.Texture2D {
 }
 
 // The size of one texel of the rope, the props' own.
+@(private = "file")
 lasso_texel :: proc() -> f32 {
 	return attack_texel(.Pilgrim)
 }
 
 // The sideways half widths of a strip through `points` (camera-facing, across
 // the strip on screen) and its length coordinate (in repeats).
+@(private = "file")
 lasso_strip_sides :: proc(renderer: ^Renderer, points: []rl.Vector3, sides: []rl.Vector3, us: []f32, closed: bool, start_u: f32 = 0) {
 	camera := renderer.tactical.camera
 	view_dir := rl.Vector3Normalize(camera.target-camera.position)
@@ -485,10 +501,11 @@ lasso_strip_sides :: proc(renderer: ^Renderer, points: []rl.Vector3, sides: []rl
 // loop, and the loop round the foe (or flying open to it): its shape follows
 // the throw, the spin (it trails against it, sagging when slow) and its end
 // (slack, fading).
+@(private = "file")
 lasso_rope_geometry :: proc(renderer: ^Renderer) -> bool {
 	l := &renderer.tactical.lasso
 	l.rope_ready = false
-	if !(l.active || l.ending) || !renderer.tactical.scene_3d { return false }
+	if !(l.active || l.ending) { return false }
 	pfeet, pheight, pfound := attack_card(renderer, game.PLAYER_ENTITY)
 	ffeet, fheight, ffound := attack_card(renderer, l.enemy)
 	if !pfound || !ffound { return false }
@@ -568,6 +585,7 @@ lasso_rope_geometry :: proc(renderer: ^Renderer) -> bool {
 // The rope's pieces, the loop's two halves and the hits' stars, sorted with
 // the cards and walls (one entry each): the rope passes behind a card or in
 // front of it as it really does.
+@(private)
 collect_lasso_entries :: proc(renderer: ^Renderer, entries: ^[dynamic]Tactical_Alpha_Entry) {
 	l := &renderer.tactical.lasso
 	if lasso_rope_geometry(renderer) {
@@ -590,6 +608,7 @@ collect_lasso_entries :: proc(renderer: ^Renderer, entries: ^[dynamic]Tactical_A
 	}
 }
 
+@(private)
 draw_lasso_entry :: proc(renderer: ^Renderer, entry: Tactical_Alpha_Entry) {
 	l := &renderer.tactical.lasso
 	piece := int(entry.lasso)
@@ -616,6 +635,7 @@ draw_lasso_entry :: proc(renderer: ^Renderer, entry: Tactical_Alpha_Entry) {
 
 // One stretch of the rope strip: its texels on the camera-facing quads
 // between the points.
+@(private = "file")
 draw_lasso_strip :: proc(renderer: ^Renderer, points, sides: []rl.Vector3, us: []f32, alpha: f32) {
 	if len(points) < 2 || alpha <= 0.01 { return }
 	l := &renderer.tactical.lasso
@@ -641,6 +661,7 @@ draw_lasso_strip :: proc(renderer: ^Renderer, points, sides: []rl.Vector3, us: [
 
 // A hit's paper star between the two cards (red), or a smash's at the wall
 // (stone grey) with dust; paper bits thrown off either.
+@(private = "file")
 draw_lasso_impact :: proc(renderer: ^Renderer, impact: ^Lasso_Impact) {
 	t := renderer.sprite_assets.elapsed-impact.born
 	if !impact.used || t < 0 || t > LASSO_IMPACT_SECONDS || !tactical_render_visible(renderer, impact.cell) { return }
@@ -677,6 +698,7 @@ draw_lasso_impact :: proc(renderer: ^Renderer, impact: ^Lasso_Impact) {
 // The floor ring.
 
 // The ring's arcs over solid cells (a smash's walls), as the bake needs them.
+@(private = "file")
 lasso_ring_solids :: proc(room: ^game.Room, centre: grid.Position, radius: i32) -> (solid: [game.LASSO_MAX_RING_CELLS]bool, arcs: [game.LASSO_MAX_RING_CELLS]game.Lasso_Arc, count: int) {
 	arcs, count = game.lasso_ring(radius)
 	for arc, index in arcs[:count] { solid[index] = game.lasso_cell_is_solid(room, game.add_position(centre, arc.cell)) }
@@ -687,6 +709,7 @@ lasso_ring_solids :: proc(room: ^game.Room, centre: grid.Position, radius: i32) 
 // side, centred on the player's cell): a dashed pixel circle at the ring's
 // radius, two texels of paper between an ink texel on each side; the arcs over
 // solid cells left out, with red ticks where a free arc meets a solid one.
+@(private)
 lasso_ring_pixels :: proc(radius: i32, arcs: []game.Lasso_Arc, solid: []bool, allocator := context.allocator) -> (pixels: []u8, size: int) {
 	if radius < 1 || len(arcs) == 0 || len(solid) < len(arcs) { return }
 	T := f32(LASSO_RING_TEXELS)
@@ -732,6 +755,7 @@ Lasso_Ring_Key :: struct {
 	solid: u64,
 }
 
+@(private)
 lasso_ring_key :: proc(centre: grid.Position, radius: i32, solid: []bool) -> (key: Lasso_Ring_Key) {
 	#assert(game.LASSO_MAX_RING_CELLS <= 64)
 	key.centre, key.radius = centre, radius
@@ -742,6 +766,7 @@ lasso_ring_key :: proc(centre: grid.Position, radius: i32, solid: []bool) -> (ke
 // The ring under the spin, in the 3D pass after the ground's decal: one quad
 // on the floor, depth kept and never written. It fades in as the foe reaches
 // its ring and out once the rope is gone.
+@(private)
 draw_lasso_ring :: proc(renderer: ^Renderer, room: ^game.Room) {
 	l := &renderer.tactical.lasso
 	if room == nil || !(l.active || l.ending) || l.radius < 1 { return }
@@ -786,19 +811,9 @@ draw_lasso_ring :: proc(renderer: ^Renderer, room: ^game.Room) {
 	rlgl.SetTexture(0)
 }
 
-// --------------------------------------------------------------------------
-// The flat board (--flat).
-
-// Its ring: paper and ink dashes on the projected circle.
-draw_lasso_flat_ring :: proc(renderer: ^Renderer, room: ^game.Room) {
-	l := &renderer.tactical.lasso
-	if !l.active || l.throw < LASSO_THROW_LIFTED || l.radius < 1 { return }
-	draw_lasso_projected_ring(renderer, room, l.centre, l.radius, 1)
-}
-
-// A dashed ring of paper over ink, projected on the board (the flat board's
-// spin, the card's aim in either view): `radius` cells round the centre of
-// `centre`, the arcs over solid cells left out.
+// The card's aim: paper and ink dashes projected `radius` cells around
+// `centre`, with arcs over solid cells left out.
+@(private = "file")
 draw_lasso_projected_ring :: proc(renderer: ^Renderer, room: ^game.Room, centre: grid.Position, radius: i32, alpha: f32) {
 	if room == nil || radius < 1 || alpha <= 0.01 { return }
 	solid, arcs, count := lasso_ring_solids(room, centre, radius)
@@ -817,40 +832,21 @@ draw_lasso_projected_ring :: proc(renderer: ^Renderer, room: ^game.Room, centre:
 	}
 }
 
-// Its rope: from the player's body to the swung one, paper round ink round hemp.
-draw_lasso_flat_rope :: proc(renderer: ^Renderer) {
-	l := &renderer.tactical.lasso
-	snapshot := renderer.tactical.snapshot
-	if !l.active || snapshot == nil { return }
-	foe, found := presentation_actor_in_view(snapshot, l.enemy)
-	if !found { return }
-	zoom := renderer.camera.zoom
-	from := tactical_project(renderer, {snapshot.player.position.x+0.5, snapshot.player.position.y+0.5})
-	to := tactical_project(renderer, {foe.position.x+0.5, foe.position.y+0.5})
-	from.y -= 12*zoom
-	to.y -= 8*zoom+tactical_lasso_lift(renderer, l.enemy)*LASSO_FLAT_LIFT_PIXELS*zoom
-	if l.throw < LASSO_THROW_FLOWN { to = {from.x+(to.x-from.x)*l.throw/LASSO_THROW_FLOWN, from.y+(to.y-from.y)*l.throw/LASSO_THROW_FLOWN} }
-	rl.DrawLineEx(to_raylib(from), to_raylib(to), 5, LIVING_TOKEN_PAPER)
-	rl.DrawLineEx(to_raylib(from), to_raylib(to), 3, LIVING_TOKEN_INK)
-	rl.DrawLineEx(to_raylib(from), to_raylib(to), 1.5, LASSO_ROPE_HEMP)
-	rl.DrawCircleLinesV(to_raylib(to), 6*zoom, LASSO_ROPE_HEMP)
-}
-
 // --------------------------------------------------------------------------
-// The card's aim (draw_card_target_range).
+// The card's aim (draw_card_target_details).
 
 LASSO_AIM_LINE :: rl.Color{232, 196, 128, 235}
 LASSO_AIM_HOT :: rl.Color{255, 232, 168, 255}
-LASSO_HEAVY :: rl.Color{235, 91, 91, 255}
 
-// While the Lazzo is aimed: every foe it can take marked with a hemp reticle,
-// a boss or a miniboss in reach with a red one (and TROPPO PESANTE, after the
-// cards: draw_lasso_heavy_labels); the ring it would spin on (its cells, red with a cross where the foe would smash, orange
-// where it would strike a foe) and, for the foe under the mouse, the cell the
+// While the Lazzo is aimed: every foe it can take, bosses included, marked
+// with a hemp reticle; the ring it would spin on (its cells, red with a cross
+// where the foe would smash, orange where it would strike a foe) and, for
+// the foe under the mouse, the cell the
 // spin starts on and its way round.
+@(private)
 draw_lasso_preview :: proc(renderer: ^Renderer, room: ^game.Room, card: game.Card_Instance) {
 	if renderer == nil || room == nil || room.player == nil || room.level_data == nil { return }
-	definition, found := game.card_definition_by_id(card.definition_id, game.tactical_enabled(room))
+	definition, found := game.card_definition_by_id(card.definition_id)
 	if !found { return }
 	centre := room.player.position
 	radius, smash := game.lasso_radius(room, centre)
@@ -862,7 +858,7 @@ draw_lasso_preview :: proc(renderer: ^Renderer, room: ^game.Room, card: game.Car
 			draw_card_range_cell(renderer, cell, {190, 68, 70, 70}, {255, 112, 102, 255})
 			if tactical_render_visible(renderer, cell) {
 				p := cell_center(renderer, cell)
-				k := max(f32(3), 5*renderer.camera.zoom)
+				k := max(f32(3), 5*renderer.overlay_scale)
 				rl.DrawLineEx({p.x-k, p.y-k*0.5}, {p.x+k, p.y+k*0.5}, 2, {255, 112, 102, 255})
 				rl.DrawLineEx({p.x-k, p.y+k*0.5}, {p.x+k, p.y-k*0.5}, 2, {255, 112, 102, 255})
 			}
@@ -877,10 +873,6 @@ draw_lasso_preview :: proc(renderer: ^Renderer, room: ^game.Room, card: game.Car
 	for enemy in room.enemies {
 		if game.enemy_is_lassoed(room, enemy.id) || !tactical_render_visible(renderer, enemy.position) { continue }
 		evaluation := game.evaluate_card_targeting(room, card, game.card_target_request_at(definition, enemy.position))
-		if evaluation.error == .Target_Too_Heavy {
-			draw_aim_reticle(renderer, enemy.position, 0.46, 2, LASSO_HEAVY)
-			continue
-		}
 		if evaluation.error != .None { continue }
 		hot := renderer.has_hovered_cell && hovered_cell == enemy.position
 		draw_aim_reticle(renderer, enemy.position, 0.5 if hot else 0.46, 3 if hot else 2, LASSO_AIM_HOT if hot else LASSO_AIM_LINE)
@@ -902,6 +894,7 @@ draw_lasso_preview :: proc(renderer: ^Renderer, room: ^game.Room, card: game.Car
 }
 
 // A chevron on the ring past the start, pointing the spin's way.
+@(private = "file")
 draw_lasso_spin_arrow :: proc(renderer: ^Renderer, centre: grid.Position, radius: i32, arc: game.Lasso_Arc) {
 	r := f32(radius)
 	c := rl.Vector2{f32(centre.x)+0.5, f32(centre.y)+0.5}
@@ -919,63 +912,6 @@ draw_lasso_spin_arrow :: proc(renderer: ^Renderer, centre: grid.Position, radius
 	rl.DrawLineEx(outer, tip, 3, {123, 235, 169, 255})
 }
 
-// While the Lazzo (or the Pinball: pinball.odin) is aimed, TROPPO PESANTE
-// under each foe in reach it cannot take: drawn after the cards and the seals
-// (draw_tactical_world), so none of them hides it, and kept in the labels'
-// layout, so the words over the board drawn after it keep clear.
-draw_lasso_heavy_labels :: proc(renderer: ^Renderer, room: ^game.Room, card_id: u32) {
-	if renderer == nil || room == nil || room.player == nil || room.level_data == nil || room.phase != .Combat || card_id == 0 { return }
-	if !tactical_telegraphs_are_visible(renderer, room) || renderer_blocks_player_input(renderer) { return }
-	index, found := game.hand_card_index_by_id(&room.player.deck, card_id)
-	if !found { return }
-	card := room.player.deck.hand[index]
-	if card.definition_id != .Lasso && card.definition_id != .Pinball { return }
-	definition, known := game.card_definition_by_id(card.definition_id, game.tactical_enabled(room))
-	if !known { return }
-	for enemy in room.enemies {
-		if !tactical_render_visible(renderer, enemy.position) { continue }
-		evaluation := game.evaluate_card_targeting(room, card, game.card_target_request_at(definition, enemy.position))
-		if evaluation.error == .Target_Too_Heavy { draw_lasso_heavy_label(renderer, enemy.position) }
-	}
-}
-
-// TROPPO PESANTE under the feet of a foe the rope cannot take (over its head
-// it would sit under its heart, or under the HUD), clear of the hearts and
-// labels already placed (lasso_heavy_label_place).
-draw_lasso_heavy_label :: proc(renderer: ^Renderer, cell: grid.Position) {
-	label: cstring = "TROPPO PESANTE"
-	anchor := tactical_project(renderer, {f32(cell.x)+0.5, f32(cell.y)+0.5})
-	width := gothic_text_width(renderer, label, 12)+12
-	bounds := lasso_heavy_label_place(renderer.tactical.labels, anchor, width, tactical_world_bounds(renderer))
-	rl.DrawRectangleRec(bounds, {8, 15, 26, 235})
-	rl.DrawRectangleRec({bounds.x, bounds.y, 2, bounds.height}, LASSO_HEAVY)
-	gothic_text(renderer, label, bounds.x+6, bounds.y+3, 12, LASSO_HEAVY)
-	if layout := renderer.tactical.labels; layout != nil && layout.count < len(layout.bounds) {
-		layout.bounds[layout.count] = bounds
-		layout.count += 1
-	}
-}
-
-// Where TROPPO PESANTE goes under feet projected at `anchor`, `width` wide:
-// just under them, else a row lower at a time, then beside them, left then
-// right, the first place clear of the labels and hearts in `layout` (a
-// neighbour's heart below them stays readable), inside `viewport`; with none
-// clear, just under them still.
-lasso_heavy_label_place :: proc(layout: ^Tactical_Label_Layout, anchor: view.Vec2, width: f32, viewport: rl.Rectangle) -> rl.Rectangle {
-	first := rl.Rectangle{math.round(anchor.x-width*0.5), math.round(anchor.y+12), width, 19}
-	if layout == nil { return first }
-	for side in ([3]f32{0, -1, 1}) {
-		for row in 0..<4 {
-			x := first.x+side*(width*0.5+8)
-			y := first.y+f32(row)*13
-			candidate := rl.Rectangle{math.round(clamp(x, viewport.x, viewport.x+viewport.width-width)),
-				math.round(clamp(y, viewport.y, viewport.y+viewport.height-first.height)), width, first.height}
-			if living_heart_is_clear(layout, candidate) { return candidate }
-		}
-	}
-	return first
-}
-
 // What would let the rope go now: a dodge (the controller takes Shift only in
 // the window, the dodge ready), the defence prompt's dodge while one is
 // offered, or why none can be made yet: a prompt without one, the window's
@@ -983,6 +919,7 @@ lasso_heavy_label_place :: proc(layout: ^Tactical_Label_Layout, anchor: view.Vec
 // counts them).
 Lasso_Let_Go :: enum {Dodge, Prompt_Dodge, Prompt, Recovery, Stunned, Recharging}
 
+@(private)
 lasso_let_go :: proc(room: ^game.Room) -> (way: Lasso_Let_Go, wait: int) {
 	if room.qte.kind != .None { return .Prompt_Dodge if room.qte.kind == .Defense && .Dodge in room.qte.defenses else .Prompt, 0 }
 	if game.tactical_is_stunned(room) { return .Stunned, 0 }
@@ -1016,6 +953,7 @@ lasso_hud_line :: proc(hits, next: i32, way: Lasso_Let_Go, wait: int) -> cstring
 
 // The hand's hint while the rope holds (draw_tactical_hand): the dodge that
 // lets it go, only while one can be made.
+@(private)
 lasso_hand_hint :: proc(room: ^game.Room) -> cstring {
 	way, wait := lasso_let_go(room)
 	switch way {

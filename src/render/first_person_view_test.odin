@@ -7,9 +7,9 @@ import rl "vendor:raylib"
 import audio "../engine/audio"
 import gfx "../engine/gfx"
 import game "../game"
-import grid "../grid"
+import grid "../engine/grid"
 import level "../level"
-import view "../view"
+import view "../engine/view"
 
 // An open room with a wall stub: the player in the middle (6, 6) with one
 // First Person Shooter in hand, a foe held three cells north, one held three
@@ -60,7 +60,7 @@ first_person_view_test_play :: proc(t: ^testing.T, renderer: ^Renderer, room: ^g
 	play := game.play_card(room, room.player.deck.hand[0].id, game.entity_target(game.PLAYER_ENTITY))
 	testing.expect_value(t, play.result, game.Card_Play_Result.Played)
 	after := capture_room_presentation(room)
-	testing.expect(t, begin_renderer_event_timeline(renderer, before, &room.recent_events, &after))
+	testing.expect(t, begin_renderer_event_timeline(renderer, before, room.recent_events, &after))
 }
 
 // Frames until the camera is in his eyes (the card's cue played out).
@@ -124,7 +124,7 @@ test_first_person_view_dives_into_his_eyes_and_rises_back :: proc(t: ^testing.T)
 	testing.expect(t, first_person_hides_player(renderer) && first_person_solid_walls(renderer) && first_person_wall_ramp(renderer) == 1)
 	// Behind the eye is off the canvas; in front, where the camera puts it
 	// (on the 3D board the view stands on).
-	renderer.tactical.scene_3d = true
+
 	behind := rl.Vector3{eye.x-math.cos(f.yaw)*2, 0.5, eye.z-math.sin(f.yaw)*2}
 	off := tactical_project(renderer, {behind.x, behind.z}, behind.y)
 	testing.expect(t, off.x == -100000 && off.y == -100000)
@@ -209,6 +209,8 @@ test_first_person_overlays_leave_out_what_a_wall_hides :: proc(t: ^testing.T) {
 	testing.expect(t, tactical_overlay_visible(renderer, north) && tactical_overlay_visible(renderer, behind))
 	first_person_view_test_play(t, renderer, &room)
 	first_person_view_test_dive(t, renderer, &room)
+	turn_first_person_view(renderer, first_person_wrap(-math.PI/2-renderer.tactical.first_person.yaw), -renderer.tactical.first_person.pitch)
+	shadow_view_test_frame(renderer, &room, 0.02)
 	testing.expect(t, tactical_overlay_visible(renderer, north))
 	testing.expect(t, !tactical_overlay_visible(renderer, behind))
 	actor, found := presentation_actor_in_view(renderer.tactical.snapshot, game.enemy_entity(room.enemies[1].id))
@@ -217,7 +219,7 @@ test_first_person_overlays_leave_out_what_a_wall_hides :: proc(t: ^testing.T) {
 
 // The room's shots: each one a tracer from the muzzle to where it stopped,
 // then its spark; the kick, and a foe's hit marked; the player's wound
-// flashing the edges once a blow; the board turned 3D while the view is in.
+// flashing the edges once a blow, with a smooth return to the board.
 @(test)
 test_first_person_view_shows_each_shot_and_each_wound :: proc(t: ^testing.T) {
 	data: level.Level
@@ -231,13 +233,7 @@ test_first_person_view_shows_each_shot_and_each_wound :: proc(t: ^testing.T) {
 	defer destroy_renderer_world_playback(renderer)
 	f := &renderer.tactical.first_person
 	shadow_view_test_frame(renderer, &room, 0.02)
-	// A flat board: 3D while the view is in.
-	renderer.tactical.scene_3d = false
-	sync_first_person_board(renderer, &room, false)
-	testing.expect(t, !renderer.tactical.scene_3d)
 	first_person_view_test_play(t, renderer, &room)
-	sync_first_person_board(renderer, &room, false)
-	testing.expect(t, renderer.tactical.scene_3d)
 	first_person_view_test_dive(t, renderer, &room)
 	// North: the foe; the crosshair is on it.
 	turn_first_person_view(renderer, first_person_wrap(-math.PI/2-f.yaw), -f.pitch)
@@ -249,7 +245,7 @@ test_first_person_view_shows_each_shot_and_each_wound :: proc(t: ^testing.T) {
 		_, fired := game.first_person_fire(room, first_person_aim(renderer))
 		testing.expect(t, fired)
 		after := capture_room_presentation(room)
-		if room.recent_events.count > 0 { testing.expect(t, begin_renderer_world_timeline(renderer, before, &room.recent_events, &after)) }
+		if room.recent_events.count > 0 { testing.expect(t, begin_renderer_world_timeline(renderer, before, room.recent_events, &after)) }
 	}
 	fire(t, renderer, &room)
 	shadow_view_test_frame(renderer, &room, 0)
@@ -287,18 +283,14 @@ test_first_person_view_shows_each_shot_and_each_wound :: proc(t: ^testing.T) {
 	testing.expect(t, hurt > 0 && first_person_trauma(f, renderer.sprite_assets.elapsed) > 0)
 	shadow_view_test_frame(renderer, &room, 0.02)
 	testing.expect_value(t, f.hurt_at, hurt)
-	// The view out: the flat board flat again once the camera is back.
+	// The view out: input ownership returns once the camera is back.
 	room.first_person.remaining = 0.01
 	game.tactical_first_person_tick(&room, 0.02)
 	for _ in 0..<60 {
 		shadow_view_test_frame(renderer, &room, 0.02)
-		sync_first_person_board(renderer, &room, false)
 		if f.amount <= 0 { break }
-		testing.expect(t, renderer.tactical.scene_3d)
 	}
-	testing.expect(t, f.amount == 0 && !renderer.tactical.scene_3d)
-	sync_first_person_board(renderer, &room, true)
-	testing.expect(t, renderer.tactical.scene_3d)
+	testing.expect(t, f.amount == 0)
 }
 
 // A shot stopped by a solid cell sparks on the body standing there: on a cover
@@ -478,7 +470,7 @@ test_first_person_shots_follow_the_glides_the_view_shows :: proc(t: ^testing.T) 
 	before := capture_room_presentation(&room)
 	testing.expect_value(t, game.try_move_player(&room, keys[1]), game.Action_Result.Moved)
 	after := capture_room_presentation(&room)
-	testing.expect(t, begin_renderer_event_timeline(renderer, before, &room.recent_events, &after))
+	testing.expect(t, begin_renderer_event_timeline(renderer, before, room.recent_events, &after))
 	glide: Counts
 	for _ in 0..<45 {
 		shadow_view_test_frame(renderer, &room, 1.0/60.0)
@@ -497,10 +489,10 @@ test_first_person_shots_follow_the_glides_the_view_shows :: proc(t: ^testing.T) 
 	testing.expect(t, game.add_effect(&action, game.move_effect(foe, {7, 3})))
 	report := game.resolve_action(&room, &action)
 	testing.expect(t, report.accepted && room.enemies[0].position == grid.Position{7, 3})
-	game.clear_event_log(&room.recent_events)
-	game.append_event_log(&room.recent_events, &report.events)
+	game.clear_event_log(room.recent_events)
+	game.append_event_log(room.recent_events, &report.events)
 	after = capture_room_presentation(&room)
-	testing.expect(t, begin_renderer_world_timeline(renderer, before, &room.recent_events, &after))
+	testing.expect(t, begin_renderer_world_timeline(renderer, before, room.recent_events, &after))
 	slide: Counts
 	for _ in 0..<45 {
 		shadow_view_test_frame(renderer, &room, 1.0/60.0)
@@ -509,38 +501,58 @@ test_first_person_shots_follow_the_glides_the_view_shows :: proc(t: ^testing.T) 
 	testing.expectf(t, slide.wrong == 0 && slide.on > 0 && slide.off > 0, "its slide: %v", slide)
 }
 
-// The AK, its flashes and the tracer are pixel art cut from paper: each print
-// texel its palette colour, an ink line round it, white paper, an ink cut,
-// the cut edge down and right, nothing beyond.
+// The reference AK has actual alpha transparency, light paper and dark ink;
+// flashes and tracers retain their procedural paper palette. Neither needs
+// a GPU to validate the embedded art and its muzzle anchor.
 @(test)
 test_first_person_prints_are_paper_cutouts :: proc(t: ^testing.T) {
-	ak := first_person_paint(FIRST_PERSON_AK_ROWS[:], FIRST_PERSON_AK_MARGIN, 2)
-	m := FIRST_PERSON_AK_MARGIN
-	testing.expect(t, ak.width == len(FIRST_PERSON_AK_ROWS[0])+2*m && ak.height == len(FIRST_PERSON_AK_ROWS)+2*m)
-	pixel :: proc(print: ^First_Person_Print, x, y: int) -> rl.Color { return print.pixels[y*print.width+x] }
-	for row, y in FIRST_PERSON_AK_ROWS {
-		for x in 0..<len(row) {
-			color, printed := first_person_print_color(row[x])
-			if printed { testing.expect_value(t, pixel(&ak, x+m, y+m), color) }
-		}
+	// The AK is embedded with the same paper layers; decoding needs no GPU.
+	ak := gfx.sprite_asset_image({FIRST_PERSON_AK_PNG, 1})
+	defer rl.UnloadImage(ak)
+	testing.expect(t, ak.data != nil)
+	if ak.data == nil { return }
+	testing.expect(t, f32(ak.width) == FIRST_PERSON_AK_TEXTURE_SIZE.x && f32(ak.height) == FIRST_PERSON_AK_TEXTURE_SIZE.y)
+	colors := rl.LoadImageColors(ak)
+	defer rl.UnloadImageColors(colors)
+	paper, ink, transparent := 0, 0, 0
+	for color in colors[:int(ak.width*ak.height)] {
+		if color.a >= 250 && color.r > 220 && color.g > 215 && color.b > 190 { paper += 1 }
+		if color.a >= 250 && color.r < 35 && color.g < 40 && color.b < 55 { ink += 1 }
+		if color.a == 0 { transparent += 1 }
 	}
-	// Left of the muzzle: ink, two of paper, the ink cut, then clear.
-	muzzle := FIRST_PERSON_AK_MUZZLE
-	y := int(muzzle.y)+m
-	testing.expect_value(t, pixel(&ak, m-1, y), LIVING_TOKEN_INK)
-	testing.expect_value(t, pixel(&ak, m-2, y), LIVING_TOKEN_PAPER)
-	testing.expect_value(t, pixel(&ak, m-3, y), LIVING_TOKEN_PAPER)
-	testing.expect_value(t, pixel(&ak, m-4, y), LIVING_TOKEN_INK)
-	testing.expect_value(t, pixel(&ak, m-5, y).a, u8(0))
-	edges, clear_corner := 0, pixel(&ak, 0, 0).a == 0 && pixel(&ak, ak.width-1, 0).a == 0
-	for index in 0..<ak.width*ak.height { if ak.pixels[index] == LIVING_TOKEN_EDGE { edges += 1 } }
-	testing.expect(t, edges > 0 && clear_corner)
+	testing.expect(t, paper > 0 && ink > 0 && transparent > int(ak.width*ak.height)/4 && colors[0].a == 0)
+	muzzle := FIRST_PERSON_AK_MUZZLE_TEXEL
+	testing.expect(t, colors[int(muzzle.y)*int(ak.width)+int(muzzle.x)].a >= 250)
+	pixel :: proc(print: ^First_Person_Print, x, y: int) -> rl.Color { return print.pixels[y*print.width+x] }
 	for which in 0..<2 {
 		flash := first_person_paint(FIRST_PERSON_FLASH_ROWS[which][:], FIRST_PERSON_FLASH_MARGIN, 2)
 		testing.expect(t, flash.width == 13+2*FIRST_PERSON_FLASH_MARGIN && pixel(&flash, flash.width/2, flash.height/2) == rl.Color{255, 250, 222, 255})
 	}
 	tracer := first_person_paint(FIRST_PERSON_TRACER_ROWS[:], FIRST_PERSON_TRACER_MARGIN, 1)
 	testing.expect(t, tracer.width > 0 && pixel(&tracer, FIRST_PERSON_TRACER_MARGIN-2, FIRST_PERSON_TRACER_MARGIN) == LIVING_TOKEN_PAPER)
+}
+
+// The shouldered print stays attached to the bottom/right at rest and under
+// recoil. Its muzzle stays beside the crosshair, in the visible world; this
+// exact anchor also launches the 3D tracers (covered by the shot test above).
+@(test)
+test_first_person_weapon_is_shouldered_and_muzzle_tracks_recoil :: proc(t: ^testing.T) {
+	r := new(Renderer)
+	defer free(r)
+	r.tactical.first_person.amount = 1
+	for size in ([3][2]f32{{640, 360}, {960, 540}, {1280, 720}}) {
+		r.canvas_width, r.canvas_height = size.x, size.y
+		scale := first_person_ak_scale(r)
+		at := first_person_ak_origin(r, 1)
+		muzzle := first_person_muzzle(r, 1)
+		testing.expect(t, at.x+FIRST_PERSON_AK_SIZE.x*scale > size.x && at.y+FIRST_PERSON_AK_SIZE.y*scale > size.y)
+		testing.expect(t, muzzle.x > size.x*0.5 && muzzle.x < size.x*0.75 && muzzle.y > size.y*0.35 && muzzle.y < size.y*0.7)
+		r.tactical.first_person.kick_at = 2
+		kicked, kicked_muzzle := first_person_ak_origin(r, 2), first_person_muzzle(r, 2)
+		testing.expect(t, kicked.x > at.x && kicked.y > at.y)
+		testing.expect_value(t, kicked_muzzle-muzzle, kicked-at)
+		r.tactical.first_person.kick_at = 0
+	}
 }
 
 // The HUD behind his eyes: the countdown's whole seconds counted up.
@@ -558,10 +570,10 @@ test_first_person_countdown_counts_whole_seconds :: proc(t: ^testing.T) {
 @(test)
 test_first_person_card_says_its_seconds_and_its_ak :: proc(t: ^testing.T) {
 	card := game.Card_Instance{id = 1, definition_id = .First_Person}
-	testing.expect_value(t, string(card_upgrade_preview(card, true)), "SECONDI 20 -> 22")
-	testing.expect_value(t, string(card_upgrade_preview({id = 1, definition_id = .First_Person, upgrade_level = 4}, true)), "SECONDI 28 -> 30")
-	testing.expect_value(t, string(card_upgrade_preview({id = 1, definition_id = .First_Person, upgrade_level = 5}, true)), "MAX UPGRADE")
-	definition, _ := game.card_definition_by_id(.First_Person, true)
+	testing.expect_value(t, string(card_upgrade_preview(card)), "SECONDI 20 -> 22")
+	testing.expect_value(t, string(card_upgrade_preview({id = 1, definition_id = .First_Person, upgrade_level = 4})), "SECONDI 28 -> 30")
+	testing.expect_value(t, string(card_upgrade_preview({id = 1, definition_id = .First_Person, upgrade_level = 5})), "MAX UPGRADE")
+	definition, _ := game.card_definition_by_id(.First_Person)
 	reaction, rule := tactical_card_inspector_rules(card, definition)
 	testing.expect_value(t, string(reaction), "NIENTE CARTE: SOLO L'AK")
 	testing.expect_value(t, string(rule), "WASD SECONDO LA VISTA")
@@ -574,9 +586,6 @@ test_first_person_card_says_its_seconds_and_its_ak :: proc(t: ^testing.T) {
 	// holds.
 	testing.expect_value(t, string(tactical_card_face_title(nil, card, definition, 109)), "FPS")
 	testing.expect_value(t, string(tactical_card_face_title(nil, card, definition, 166)), "First Person Shooter")
-	first, second := card_detail_lines(card)
-	testing.expect_value(t, string(first), "FPS 20s")
-	testing.expect_value(t, string(second), "SOLO TATTICA")
 	sfx, sounds := lab_card_sfx(.First_Person)
 	testing.expect(t, sounds && sfx == LAB_FIRST_PERSON_CARD)
 	testing.expect_value(t, gothic_card_icon(.First_Person), 26)
@@ -632,7 +641,7 @@ test_first_person_lab_sounds_follow_the_view :: proc(t: ^testing.T) {
 		_, fired := game.first_person_fire(room, first_person_aim(renderer))
 		testing.expect(t, fired)
 		after := capture_room_presentation(room)
-		if room.recent_events.count > 0 { testing.expect(t, begin_renderer_world_timeline(renderer, before, &room.recent_events, &after)) }
+		if room.recent_events.count > 0 { testing.expect(t, begin_renderer_world_timeline(renderer, before, room.recent_events, &after)) }
 	}
 	fire(t, renderer, &room)
 	for _ in 0..<6 { frame(renderer, &room, 0.01) }

@@ -1,7 +1,7 @@
 package game
 
 import "core:testing"
-import grid "../grid"
+import grid "../engine/grid"
 import level "../level"
 
 tactical_clock_test_room :: proc(t: ^testing.T, data: ^level.Level, player: ^Player,
@@ -36,13 +36,14 @@ test_tactical_clock_actions_preserve_the_window_and_share_fractional_time :: pro
 
 @(test)
 test_tactical_clock_enemies_keep_independent_deadlines_and_frozen_telegraphs :: proc(t: ^testing.T) {
-	for archetype in ([?]Enemy_Archetype{.Chaser, .Archer, .Brute, .Bomber, .Custodian, .Demolitionist}) {
+	deadlines := [6]int{3, 4, 5, 5, 4, 5}
+	for archetype, role in ([?]Enemy_Archetype{.Chaser, .Archer, .Brute, .Bomber, .Custodian, .Demolitionist}) {
 		data: level.Level
 		player: Player
 		room := tactical_clock_test_room(t, &data, &player, archetype)
 		initial := room.enemies[0].intent
 		seconds := int(room.enemies[0].tactical_cooldown)
-		testing.expect(t, seconds >= 2 && seconds <= 4)
+		testing.expect_value(t, seconds, deadlines[role])
 		for second in 1..<seconds {
 			tactical_spend_action_time(&room, 1)
 			drain_tactical_test_pulse(t, &room)
@@ -139,7 +140,7 @@ test_tactical_clock_stagger_cancels_a_slow_enemy_before_status_expiry :: proc(t:
 	room := tactical_clock_test_room(t, &data, &player, .Archer)
 	defer level.destroy(&data)
 	defer destroy_room(&room)
-	testing.expect_value(t, room.enemies[0].tactical_cooldown, f32(3))
+	testing.expect_value(t, room.enemies[0].tactical_cooldown, f32(4))
 	_, _ = apply_status(&room, enemy_entity(1), .Stagger, 1, 1)
 	tactical_spend_action_time(&room, 1)
 	drain_tactical_test_pulse(t, &room)
@@ -221,7 +222,8 @@ test_tactical_clock_walks_do_not_retarget_a_committed_archer_shot :: proc(t: ^te
 	testing.expect_value(t, try_move_player(&room, .West), Action_Result.Moved)
 	drain_tactical_test_pulse(t, &room)
 	testing.expect_value(t, room.enemies[0].intent, initial)
-	tactical_tick(&room, 1, true, false)
+	// Two shorter walks spend 1.6 seconds; the frozen aim completes at four.
+	tactical_tick(&room, 4-2*TACTICAL_MOVE_SECONDS, true, false)
 	drain_tactical_test_pulse(t, &room)
 	testing.expect(t, room.enemies[0].aim_ready)
 	testing.expect_value(t, room.enemies[0].aim_anchor, grid.Position{4, 4})
@@ -229,7 +231,7 @@ test_tactical_clock_walks_do_not_retarget_a_committed_archer_shot :: proc(t: ^te
 	drain_tactical_test_pulse(t, &room)
 	testing.expect_value(t, player.health, i32(100))
 	testing.expect_value(t, room.enemies[0].recovery_pulses, i32(1))
-	testing.expect_value(t, player.tactical.remaining, f32(16))
+	testing.expect(t, abs(player.tactical.remaining-15) < 0.001)
 }
 
 @(test)
@@ -265,8 +267,13 @@ test_tactical_clock_energy_regenerates_every_third_shared_beat_and_stays_capped 
 	drain_tactical_test_pulse(t, &room)
 	testing.expect_value(t, room.pulse_count, u64(1))
 	testing.expect_value(t, player.deck.energy, i32(0))
-	testing.expect_value(t, player.tactical.remaining, f32(18.5))
+	testing.expect(t, abs(player.tactical.remaining-18.7) < 0.001)
 	testing.expect(t, !tactical_tick(&room, 0.5, true, false))
+	drain_tactical_test_pulse(t, &room)
+	// The cheaper step left 0.2 seconds to the world's second beat.
+	testing.expect_value(t, room.pulse_count, u64(1))
+	testing.expect_value(t, player.deck.energy, i32(0))
+	testing.expect(t, !tactical_tick(&room, 1-TACTICAL_MOVE_SECONDS, true, false))
 	drain_tactical_test_pulse(t, &room)
 	testing.expect_value(t, room.pulse_count, u64(2))
 	testing.expect_value(t, player.deck.energy, i32(0))
@@ -274,7 +281,7 @@ test_tactical_clock_energy_regenerates_every_third_shared_beat_and_stays_capped 
 	drain_tactical_test_pulse(t, &room)
 	testing.expect_value(t, room.pulse_count, u64(3))
 	testing.expect_value(t, player.deck.energy, i32(1))
-	// Two real seconds plus exactly one second for the accepted movement.
+	// The movement spends 0.8 seconds; the other 2.2 seconds are elapsed time.
 	testing.expect_value(t, player.tactical.remaining, f32(17))
 	testing.expect_value(t, player.tactical.metrics.decisions, u64(1))
 	for beat in 4..=12 {

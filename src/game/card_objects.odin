@@ -2,6 +2,7 @@ package game
 
 import "core:slice"
 
+@(private)
 affected_damageable_object_ids :: proc(room: ^Room, cells: ^Target_Cell_Set) -> (ids: [MAX_GRID_OBJECTS_PER_ROOM]u32, count: int) {
 	for object in room.objects {
 		if !target_cell_set_contains(cells, object.position) ||

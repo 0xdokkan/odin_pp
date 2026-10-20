@@ -4,7 +4,7 @@ import "core:fmt"
 import "core:math"
 import rl "vendor:raylib"
 import game "../game"
-import grid "../grid"
+import grid "../engine/grid"
 
 // Damage and healing tokens of a living board: little paper cards, cut and
 // inked like the standees, that flick out of a card when it is struck or
@@ -82,6 +82,7 @@ LIVING_TOKEN_GLYPHS := [13][7]u8{
 	{0b00001, 0b00010, 0b00010, 0b00100, 0b01000, 0b01000, 0b10000}, // /
 }
 
+@(private)
 living_token_glyph :: proc(r: u8) -> (index: int, ok: bool) {
 	switch r {
 	case '0'..='9': return int(r-'0'), true
@@ -92,12 +93,14 @@ living_token_glyph :: proc(r: u8) -> (index: int, ok: bool) {
 	return
 }
 
+@(private)
 living_token_text :: proc(amount: i32, heal: bool) -> string {
 	return fmt.tprintf("+%d" if heal else "-%d", amount)
 }
 
 // The token's picture in pixels: the paper with its ink line, the cut edge
 // one pixel down and right, and the figures with two pixels of paper around.
+@(private)
 living_token_size :: proc(text: string) -> (width, height: int) {
 	return len(text)*6-1+4+2+1, 7+4+2+1
 }
@@ -106,6 +109,7 @@ living_token_size :: proc(text: string) -> (width, height: int) {
 // its cue lasts. `world` is the world's clock (the sprite clock when left out);
 // `landing` the seconds until the blow lands (a bolt still flying to the card);
 // `batch` the command whose cue it is.
+@(private)
 living_token_spawn :: proc(state: ^Living_State, event: game.Game_Event, heal: bool, now: f64, world := f64(-1), landing := f64(0),
 	batch := u32(0), small := false) -> bool {
 	world := world if world >= 0 else now
@@ -138,11 +142,13 @@ living_token_spawn :: proc(state: ^Living_State, event: game.Game_Event, heal: b
 	return true
 }
 
+@(private)
 living_token_free :: proc(token: ^Living_Token) {
 	if token.texture.id != 0 { rl.UnloadTexture(token.texture) }
 	token^ = {}
 }
 
+@(private)
 living_tokens_free :: proc(state: ^Living_State) {
 	if state == nil { return }
 	for &token in state.tokens { if token.used { living_token_free(&token) } }
@@ -150,6 +156,7 @@ living_tokens_free :: proc(state: ^Living_State) {
 
 // Once per frame with the actors: a token for every blow and cure now playing.
 // The tokens keep the sprite clock; `world` is the world's (tactical_world_time).
+@(private)
 update_living_tokens :: proc(renderer: ^Renderer, now, world: f64) {
 	state := renderer.tactical.living_state
 	for &token in state.tokens {
@@ -170,6 +177,7 @@ update_living_tokens :: proc(renderer: ^Renderer, now, world: f64) {
 	}
 }
 
+@(private = "file")
 living_token_texture :: proc(text: string, heal: bool) -> rl.Texture2D {
 	width, height := living_token_size(text)
 	image := rl.GenImageColor(i32(width), i32(height), rl.BLANK)
@@ -197,6 +205,7 @@ living_token_texture :: proc(text: string, heal: bool) -> rl.Texture2D {
 	return texture
 }
 
+@(private)
 draw_living_tokens :: proc(renderer: ^Renderer) {
 	v := &renderer.tactical
 	if !v.living || v.living_state == nil || v.snapshot == nil || !living_cards_ready(renderer) { return }

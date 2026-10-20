@@ -1,7 +1,7 @@
 package game
 
 import "core:testing"
-import grid "../grid"
+import grid "../engine/grid"
 import level "../level"
 
 @(test)
@@ -393,7 +393,7 @@ test_failed_room_creation_preserves_statuses_but_success_clears_them :: proc(t: 
 }
 
 @(test)
-test_player_command_collects_action_and_pulse_events :: proc(t: ^testing.T) {
+test_player_action_and_world_pulse_publish_separate_event_batches :: proc(t: ^testing.T) {
 	level_data := create_test_level(t)
 	defer level.destroy(&level_data)
 	player := create_test_player(t)
@@ -405,9 +405,18 @@ test_player_command_collects_action_and_pulse_events :: proc(t: ^testing.T) {
 	result := try_move_player(&room, .South)
 
 	testing.expect_value(t, result, Action_Result.Moved)
-	testing.expect_value(t, room.pulse_count, u64(1))
-	testing.expect(t, room.recent_events.count >= 2)
+	testing.expect_value(t, room.pulse_count, u64(0))
+	testing.expect_value(t, room.recent_events.count, 1)
 	testing.expect_value(t, room.recent_events.events[0].kind, Game_Event_Kind.Moved)
+	drain_tactical_test_pulse(t, &room)
+	// Walking spent less than a beat: preserve its batch until world time
+	// actually reaches the next beat, then publish the separate world batch.
+	testing.expect_value(t, room.pulse_count, u64(0))
+	testing.expect_value(t, room.recent_events.events[0].kind, Game_Event_Kind.Moved)
+	tactical_tick(&room, 1-TACTICAL_MOVE_SECONDS, true, false)
+	drain_tactical_test_pulse(t, &room)
+	testing.expect_value(t, room.pulse_count, u64(1))
+	testing.expect_value(t, room.recent_events.events[0].kind, Game_Event_Kind.Pulse_Advanced)
 }
 
 @(test)
@@ -420,9 +429,11 @@ test_guard_is_one_action_and_shields_the_enemy_response :: proc(t: ^testing.T) {
 	testing.expect(t, ok)
 	defer destroy_room(&room)
 
+	for &enemy in room.enemies { enemy.tactical_cooldown = 1 }
 	result := use_player_ability(&room, .Guard)
 
 	testing.expect_value(t, result, Action_Result.Used_Ability)
+	drain_tactical_test_pulse(t, &room)
 	testing.expect_value(t, room.pulse_count, u64(1))
 	testing.expect_value(t, player.health, i32(10))
 	shield, found := status_for_entity(&room, PLAYER_ENTITY, .Shield)
@@ -446,9 +457,11 @@ test_toxic_wave_targets_every_enemy_but_advances_one_pulse :: proc(t: ^testing.T
 	first_ref := enemy_entity(room.enemies[0].id)
 	second_ref := enemy_entity(room.enemies[1].id)
 
+	for &enemy in room.enemies { enemy.tactical_cooldown = 1 }
 	result := use_player_ability(&room, .Toxic_Wave)
 
 	testing.expect_value(t, result, Action_Result.Used_Ability)
+	drain_tactical_test_pulse(t, &room)
 	testing.expect_value(t, room.pulse_count, u64(1))
 	first_index, first_found := enemy_index_by_id(&room, first_ref.id)
 	second_index, second_found := enemy_index_by_id(&room, second_ref.id)

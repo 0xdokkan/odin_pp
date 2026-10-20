@@ -45,18 +45,18 @@ test_living_ring_colour_follows_the_intent :: proc(t: ^testing.T) {
 @(test)
 test_living_rings_close_on_the_action_and_on_the_tick :: proc(t: ^testing.T) {
 	player: game.Player
-	player.tactical.config.enabled = true
+
 	room := game.Room{player = &player, phase = .Combat}
 	open, on := living_beat_open(&room)
 	testing.expect(t, on && open == 1)
 	player.tactical.clock_fraction = 0.25
 	open, on = living_beat_open(&room)
 	testing.expect(t, on && abs(open-0.75) < 1e-5)
-	enemy := game.Enemy{archetype = .Chaser, intent = {kind = .Move}, tactical_cooldown = 2}
-	testing.expect(t, abs(living_ring_open(&room, &enemy)-0.875) < 1e-5)
+	enemy := game.Enemy{archetype = .Chaser, intent = {kind = .Move}, tactical_cooldown = 3}
+	testing.expect(t, abs(living_ring_open(&room, &enemy)-11.0/12) < 1e-5)
 	enemy.tactical_cooldown = 1
 	player.tactical.clock_fraction = 0.75
-	testing.expect(t, abs(living_ring_open(&room, &enemy)-0.125) < 1e-5)
+	testing.expect(t, abs(living_ring_open(&room, &enemy)-1.0/12) < 1e-5)
 	enemy.tactical_cooldown = 0
 	testing.expect(t, living_ring_open(&room, &enemy) == 0)
 	// Out of combat there is no tick to beat.

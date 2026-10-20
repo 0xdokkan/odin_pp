@@ -21,9 +21,9 @@ test_clear_room_light_follows_presentation_then_resets_in_next_combat :: proc(t:
 	defer game.destroy_room(&room)
 	renderer := new(Renderer)
 	defer free(renderer)
-	renderer^ = create(960, 540, &data)
+	renderer^ = create(960, 540)
 	snapshot: Room_Presentation
-	renderer.tactical = {enabled = true, snapshot = &snapshot}
+	renderer.tactical = {snapshot = &snapshot}
 	update_tactical_view(renderer, &room, {}, false)
 	before := snapshot
 	testing.expect_value(t, before.phase, game.Room_Phase.Combat)
@@ -73,7 +73,7 @@ test_clear_room_light_takes_real_seconds_independent_of_animation_speed :: proc(
 		renderer := new(Renderer)
 		defer free(renderer)
 		snapshot := Room_Presentation{valid = true, phase = .Loot}
-		renderer.tactical = {enabled = true, snapshot = &snapshot}
+		renderer.tactical = {snapshot = &snapshot}
 		testing.expect(t, set_renderer_playback_speed(renderer, speed))
 		previous: f32
 		for step in 1..=4 {

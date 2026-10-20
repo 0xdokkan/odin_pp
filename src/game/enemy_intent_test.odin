@@ -1,7 +1,7 @@
 package game
 
 import "core:testing"
-import grid "../grid"
+import grid "../engine/grid"
 import level "../level"
 
 create_enemy_intent_reservation_level :: proc(t: ^testing.T) -> level.Level {
@@ -125,11 +125,13 @@ test_player_can_evade_a_telegraphed_attack :: proc(t: ^testing.T) {
 	health_before := player.health
 
 	result := try_move_player(&room, .South)
+	pulse := advance_combat_pulse(&room)
+	room.recent_events^ = pulse.events
 
 	testing.expect_value(t, result, Action_Result.Moved)
 	testing.expect_value(t, player.health, health_before)
 	testing.expect_value(t, room.pulse_count, u64(1))
-	miss, found := enemy_intent_test_event(&room.recent_events, .Attack_Missed)
+	miss, found := enemy_intent_test_event(room.recent_events, .Attack_Missed)
 	testing.expect(t, found)
 	testing.expect_value(t, miss.source, enemy_entity(enemy_id))
 	testing.expect_value(t, miss.target, PLAYER_ENTITY)
@@ -150,11 +152,13 @@ test_move_intent_reports_block_when_player_occupies_its_destination :: proc(t: ^
 	testing.expect_value(t, room.enemies[0].intent.destination, grid.Position{x = 2, y = 1})
 
 	result := try_move_player(&room, .East)
+	pulse := advance_combat_pulse(&room)
+	room.recent_events^ = pulse.events
 
 	testing.expect_value(t, result, Action_Result.Moved)
 	testing.expect_value(t, player.position, grid.Position{x = 2, y = 1})
 	testing.expect_value(t, room.enemies[0].position, grid.Position{x = 3, y = 1})
-	blocked, found := enemy_intent_test_event(&room.recent_events, .Move_Blocked)
+	blocked, found := enemy_intent_test_event(room.recent_events, .Move_Blocked)
 	testing.expect(t, found)
 	testing.expect_value(t, blocked.source, enemy_entity(enemy_id))
 	testing.expect_value(t, blocked.target, enemy_entity(enemy_id))
@@ -197,9 +201,10 @@ test_enemy_deaths_during_resolution_preserve_snapshot_id_order :: proc(t: ^testi
 	second_id := room.enemies[1].id
 	apply_status(&room, PLAYER_ENTITY, .Thorns, 1, 3)
 
-	result := wait_player_turn(&room)
+	pulse := advance_combat_pulse(&room)
+	room.recent_events^ = pulse.events
 
-	testing.expect_value(t, result, Action_Result.Combat_Ended)
+	testing.expect(t, pulse.combat_ended)
 	testing.expect_value(t, room.phase, Room_Phase.Loot)
 	testing.expect_value(t, len(room.enemies), 0)
 	testing.expect_value(t, player.health, i32(8))
@@ -229,8 +234,8 @@ test_enemy_intents_replan_for_the_next_pulse :: proc(t: ^testing.T) {
 	defer destroy_room(&room)
 	testing.expect_value(t, room.enemies[0].intent.planned_pulse, u64(1))
 
-	first_result := wait_player_turn(&room)
-	testing.expect_value(t, first_result, Action_Result.None)
+	first_pulse := advance_combat_pulse(&room)
+	testing.expect(t, first_pulse.advanced)
 	testing.expect_value(t, room.pulse_count, u64(1))
 	testing.expect_value(t, room.enemies[0].position, grid.Position{x = 4, y = 3})
 	testing.expect_value(t, room.enemies[0].intent.origin, room.enemies[0].position)
@@ -238,8 +243,8 @@ test_enemy_intents_replan_for_the_next_pulse :: proc(t: ^testing.T) {
 	testing.expect_value(t, room.enemies[0].intent.planned_pulse, u64(2))
 	testing.expect(t, validate_enemy_intents(&room))
 
-	second_result := wait_player_turn(&room)
-	testing.expect_value(t, second_result, Action_Result.None)
+	second_pulse := advance_combat_pulse(&room)
+	testing.expect(t, second_pulse.advanced)
 	testing.expect_value(t, room.pulse_count, u64(2))
 	testing.expect_value(t, room.enemies[0].position, grid.Position{x = 3, y = 3})
 	testing.expect_value(t, room.enemies[0].intent.planned_pulse, u64(3))

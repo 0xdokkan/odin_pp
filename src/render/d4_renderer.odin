@@ -5,12 +5,14 @@ import "core:fmt"
 import rl "vendor:raylib"
 import game "../game"
 
-// The floor's one die decides both its discharges and its targets.
+// A raw throw without committed effects (for example the dice laboratory).
+// Gameplay supplies Dice_Outcome, including bonuses, instead of this label.
+@(private)
 draw_shock_floor_result_label :: proc(renderer: ^Dice_Renderer, layout: Dice_Pool_Layout, progress: f32, roll: game.Dice_Roll) {
     theme := renderer.theme if renderer != nil else nil
-    title := fmt.ctprintf("%s / SCARICHE + BERSAGLI", die_label(roll.sides))
+    title := fmt.ctprintf("%s / RISULTATO BASE", die_label(roll.sides))
     value := roll.total
-    result := "LANCIO / TEMPO SOSPESO" if progress < DICE_PHYSICS_REVEAL_PROGRESS else fmt.ctprintf("%d SCARICHE / FINO A %d NEMICI",value,value)
+    result := "LANCIO / TEMPO SOSPESO" if progress < DICE_PHYSICS_REVEAL_PROGRESS else fmt.ctprintf("DADO %d / PRIMA DEI BONUS",value)
     size := c.int(max(f32(12),14*layout.scale))
     x := c.int(layout.ground.x)
     y := c.int(layout.ground.y-layout.pixels_per_world*1.75)

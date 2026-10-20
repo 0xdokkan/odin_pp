@@ -1,6 +1,6 @@
 package game
 
-import grid "../grid"
+import grid "../engine/grid"
 
 MAX_GRID_OBJECTS_PER_ROOM :: 32
 
@@ -104,6 +104,7 @@ grid_object_definition :: proc(kind: Grid_Object_Kind) -> (Grid_Object_Definitio
 	return definitions[index], true
 }
 
+@(private)
 validate_grid_object_definition :: proc(definition: Grid_Object_Definition) -> bool {
 	if definition.kind >= .Count || len(definition.name) == 0 ||
 	   definition.max_health < 0 || definition.hazard_damage < 0 {
@@ -118,6 +119,7 @@ validate_grid_object_definition :: proc(definition: Grid_Object_Definition) -> b
 	return true
 }
 
+@(private)
 validate_grid_object_definitions :: proc() -> bool {
 	definitions := GRID_OBJECT_DEFINITIONS
 	for definition, index in definitions {

@@ -31,6 +31,7 @@ Reaction_Event_Queue :: struct {
 	dropped_count: int,
 }
 
+@(private)
 reaction_queue_push :: proc(queue: ^Reaction_Event_Queue, event: Game_Event) -> bool {
 	if queue == nil || queue.head < 0 || queue.head >= MAX_REACTION_QUEUE_EVENTS ||
 	   queue.count < 0 || queue.count >= MAX_REACTION_QUEUE_EVENTS {
@@ -45,6 +46,7 @@ reaction_queue_push :: proc(queue: ^Reaction_Event_Queue, event: Game_Event) -> 
 	return true
 }
 
+@(private)
 reaction_queue_pop :: proc(queue: ^Reaction_Event_Queue) -> (event: Game_Event, ok: bool) {
 	if queue == nil || queue.head < 0 || queue.head >= MAX_REACTION_QUEUE_EVENTS ||
 	   queue.count <= 0 || queue.count > MAX_REACTION_QUEUE_EVENTS {
@@ -57,6 +59,7 @@ reaction_queue_pop :: proc(queue: ^Reaction_Event_Queue) -> (event: Game_Event, 
 	return event, true
 }
 
+@(private)
 add_reaction_request :: proc(batch: ^Reaction_Batch, request: Reaction_Request) -> bool {
 	if batch == nil || batch.count < 0 || batch.count >= MAX_REACTIONS_PER_EVENT {
 		if batch != nil {
@@ -69,6 +72,7 @@ add_reaction_request :: proc(batch: ^Reaction_Batch, request: Reaction_Request) 
 	return true
 }
 
+@(private = "file")
 reaction_request_precedes :: proc(left, right: Reaction_Request) -> bool {
 	if left.priority != right.priority {
 		return left.priority > right.priority
@@ -76,6 +80,7 @@ reaction_request_precedes :: proc(left, right: Reaction_Request) -> bool {
 	return int(left.definition_id) < int(right.definition_id)
 }
 
+@(private)
 sort_reaction_batch :: proc(batch: ^Reaction_Batch) {
 	if batch == nil || batch.count <= 1 || batch.count > MAX_REACTIONS_PER_EVENT {
 		return
@@ -91,6 +96,7 @@ sort_reaction_batch :: proc(batch: ^Reaction_Batch) {
 	}
 }
 
+@(private)
 merge_reaction_action_report :: proc(destination, source: ^Action_Report) {
 	assert(destination != nil && source != nil && source.accepted)
 	destination.applied_effects += source.applied_effects
@@ -112,6 +118,7 @@ merge_reaction_action_report :: proc(destination, source: ^Action_Report) {
 	destination.player_defeated = destination.player_defeated || source.player_defeated
 }
 
+@(private)
 dispatch_reactions :: proc(room: ^Room, report: ^Action_Report) {
 	if room == nil || report == nil || !report.accepted {
 		return
@@ -140,7 +147,8 @@ dispatch_reactions :: proc(room: ^Room, report: ^Action_Report) {
 			if !built {
 				continue
 			}
-			reaction_report := resolve_action_once(room, &action)
+			reaction_report: Action_Report
+			resolve_action_once(room, &action, &reaction_report)
 			if !reaction_report.accepted {
 				continue
 			}

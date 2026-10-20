@@ -2,7 +2,7 @@ package game
 
 import "core:math"
 import "core:testing"
-import grid "../grid"
+import grid "../engine/grid"
 import level "../level"
 
 // The Pinball from the hand at the foe `id`, at `upgrade`, on the tick when
@@ -74,14 +74,13 @@ pinball_test_roll :: proc(t: ^testing.T, room: ^Room, seconds, dt: f64, events: 
 @(test)
 test_pinball_card_is_a_rare_tactical_ball_with_five_upgrades :: proc(t: ^testing.T) {
 	testing.expect(t, validate_card_definitions())
-	definition, found := card_definition_by_id(.Pinball, true)
+	definition, found := card_definition_by_id(.Pinball)
 	testing.expect(t, found && definition.name == "Pinball")
 	testing.expect_value(t, definition.rarity, Card_Rarity.Rare)
 	testing.expect_value(t, definition.cost, i32(3))
 	testing.expect_value(t, definition.targeting.rule, Target_Rule.Opponent)
 	testing.expect_value(t, definition.targeting.cast_range, Targeting_Range{.Chebyshev, 1, 1})
 	testing.expect_value(t, definition.targeting.shape, Target_Shape.Single)
-	testing.expect(t, card_requires_tactical(.Pinball))
 	testing.expect_value(t, tactical_card_time_cost(.Pinball), f32(2))
 	testing.expect_value(t, card_max_upgrade_level(.Pinball), i32(5))
 	testing.expect_value(t, card_dice_count(.Pinball), 0)
@@ -93,7 +92,6 @@ test_pinball_card_is_a_rare_tactical_ball_with_five_upgrades :: proc(t: ^testing
 	testing.expect(t, !validate_card_instance({id = 1, definition_id = .Pinball, upgrade_level = 6}))
 	node := Run_Node{kind = .Combat, depth = 4}
 	testing.expect(t, card_offer_weight(definition, &node) > 0)
-	testing.expect_value(t, card_offer_weight(definition, &node, nil, false), u64(0))
 	// On the tick, the value is one higher.
 	room: Room
 	player: Player
@@ -121,7 +119,7 @@ test_pinball_takes_one_foe_beside_the_player_never_the_heavy :: proc(t: ^testing
 	defer destroy_room(&room)
 	for enemy in room.enemies { lasso_test_hold(&room, enemy.id) }
 	card := rework_hand_card(t, &room, .Pinball)
-	definition, _ := card_definition_by_id(.Pinball, true)
+	definition, _ := card_definition_by_id(.Pinball)
 	aim :: proc(room: ^Room, card: Card_Instance, definition: Card_Definition, cell: grid.Position) -> Card_Compile_Error {
 		return evaluate_card_targeting(room, card, card_target_request_at(definition, cell)).error
 	}

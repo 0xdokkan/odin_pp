@@ -3,7 +3,7 @@ package render
 import "core:testing"
 import rl "vendor:raylib"
 import game "../game"
-import grid "../grid"
+import grid "../engine/grid"
 import level "../level"
 
 @(test)
@@ -112,9 +112,9 @@ test_diorama_transparent_interior_wall_preserves_collision_sight_and_fog :: proc
 	defer game.destroy_room(&room)
 	renderer := new(Renderer)
 	defer free(renderer)
-	renderer^ = create(960, 540, &data)
+	renderer^ = create(960, 540)
 	snapshot: Room_Presentation
-	renderer.tactical = {enabled = true, scene_3d = true, snapshot = &snapshot}
+	renderer.tactical = {snapshot = &snapshot}
 	update_tactical_view(renderer, &room, {}, false)
 	for direction in ([4]rl.Vector3{{8, 9, 8}, {-8, 9, 8}, {-8, 9, -8}, {8, 9, -8}}) {
 		renderer.tactical.camera = {position = direction}
@@ -144,7 +144,7 @@ test_diorama_translucents_share_actor_depth_order_and_obey_visibility :: proc(t:
 	snapshot.player = {position = {5, 4}, visible = true, opacity = 1}
 	snapshot.enemies[0] = {position = {3, 2}, visible = true, opacity = 1}
 	snapshot.enemies[1] = {position = {6, 3}, visible = false, opacity = 1}
-	renderer.tactical = {enabled = true, no_fog = true, snapshot = &snapshot}
+	renderer.tactical = {no_fog = true, snapshot = &snapshot}
 	for sign in ([2]f32{1, -1}) {
 		renderer.tactical.camera = {position = {sign*10, 8, sign*10}}
 		entries := collect_tactical_translucents(renderer, &room)

@@ -1,7 +1,7 @@
 package level
 
 import "core:testing"
-import grid "../grid"
+import grid "../engine/grid"
 
 @(test)
 test_ascii_map_parses_tiles_and_spawn :: proc(t: ^testing.T) {

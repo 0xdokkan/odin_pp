@@ -5,7 +5,7 @@ import rl "vendor:raylib"
 import rlgl "vendor:raylib/rlgl"
 import gfx "../engine/gfx"
 import game "../game"
-import grid "../grid"
+import grid "../engine/grid"
 
 // Blows on the 3D board, cut from paper like the living cards. The game marks
 // every physical blow (game.mark_attack_events): a bump, an enemy's Attack or
@@ -98,6 +98,7 @@ Attack_Fx_State :: struct {
 // --------------------------------------------------------------------------
 // Who strikes with what.
 
+@(private = "file")
 attack_character :: proc(renderer: ^Renderer, entity: game.Entity_Ref) -> (character: gfx.Flipbook_Character, archetype: game.Enemy_Archetype, ok: bool) {
 	if entity == game.PLAYER_ENTITY { return .Pilgrim, .Count, true }
 	if actor, found := presentation_actor_in_view(renderer.tactical.snapshot, entity); found {
@@ -109,6 +110,7 @@ attack_character :: proc(renderer: ^Renderer, entity: game.Entity_Ref) -> (chara
 
 // The player's iron lantern, or the M8 weapon in his hand as the board shows
 // him, and the arrow he looses (FERETRO); every enemy its own.
+@(private)
 attack_look :: proc(renderer: ^Renderer, attacker: game.Entity_Ref, ranged: bool) -> Attack_Look {
 	if attacker == game.PLAYER_ENTITY {
 		if ranged { return .Bolt }
@@ -119,6 +121,7 @@ attack_look :: proc(renderer: ^Renderer, attacker: game.Entity_Ref, ranged: bool
 	return attack_enemy_look(archetype, ranged)
 }
 
+@(private)
 attack_player_look :: proc(weapon: game.Weapon_Id) -> Attack_Look {
 	switch weapon {
 	case .Iron_Cleaver: return .Iron_Cleaver
@@ -128,6 +131,7 @@ attack_player_look :: proc(weapon: game.Weapon_Id) -> Attack_Look {
 	return .Lantern
 }
 
+@(private)
 attack_enemy_look :: proc(archetype: game.Enemy_Archetype, ranged: bool) -> Attack_Look {
 	switch archetype {
 	case .Chaser: return .Claws
@@ -141,6 +145,7 @@ attack_enemy_look :: proc(archetype: game.Enemy_Archetype, ranged: bool) -> Atta
 	return .Claws
 }
 
+@(private = "file")
 attack_fx_kind :: proc(look: Attack_Look, ranged: bool) -> Attack_Fx_Kind {
 	if ranged || look == .Bolt || look == .Bomb || look == .Ember { return .Projectile }
 	if look == .Storm_Pike { return .Thrust }
@@ -148,6 +153,7 @@ attack_fx_kind :: proc(look: Attack_Look, ranged: bool) -> Attack_Fx_Kind {
 	return .Swing
 }
 
+@(private)
 attack_look_prop :: proc(look: Attack_Look, t: f64) -> gfx.Attack_Prop {
 	switch look {
 	case .Lantern: return .Lantern
@@ -167,15 +173,18 @@ attack_look_prop :: proc(look: Attack_Look, t: f64) -> gfx.Attack_Prop {
 }
 
 // Seconds from the start of a character's attack clip to its hit drawing.
+@(private)
 attack_fx_impact_seconds :: proc(character: gfx.Flipbook_Character) -> f64 {
 	return gfx.living_hit_seconds(&gfx.LIVING_SHEETS[character].clips[gfx.living_resolve(character, .Attack)])
 }
 
+@(private = "file")
 attack_flight_seconds :: proc(look: Attack_Look, cells: f32) -> f64 {
 	flight := clamp(0.11+0.04*f64(cells), 0.14, 0.34)
 	return flight*1.35 if look == .Bomb else flight
 }
 
+@(private = "file")
 attack_flight_arc :: proc(look: Attack_Look, cells: f32) -> f32 {
 	#partial switch look {
 	case .Bomb: return 0.42+0.08*cells
@@ -185,6 +194,7 @@ attack_flight_arc :: proc(look: Attack_Look, cells: f32) -> f32 {
 }
 
 // A swing's follow-through after its contact, longer the more cells it sweeps.
+@(private = "file")
 attack_swing_follow :: proc(cells: int) -> f64 {
 	return ATTACK_SWING_FOLLOW+ATTACK_SWING_FOLLOW_PER_CELL*f64(max(cells, 1)-1)
 }
@@ -192,6 +202,7 @@ attack_swing_follow :: proc(cells: int) -> f64 {
 // Seconds from the start of a marked blow until its attacker is done with it:
 // the hit drawing of its attack clip, then a bolt's flight (from its cell to
 // the aim) or a swing's follow-through and the ghoul's second rake.
+@(private)
 attack_fx_done_seconds :: proc(character: gfx.Flipbook_Character, look: Attack_Look, blow: game.Game_Event) -> f64 {
 	contact := attack_fx_impact_seconds(character)
 	kind := attack_fx_kind(look, game.event_is_ranged_attack(blow))
@@ -210,6 +221,7 @@ attack_fx_done_seconds :: proc(character: gfx.Flipbook_Character, look: Attack_L
 // held where it sank in his shadow) and its drawing's height; an object's
 // cell and a lower height. A card that has left the board but still falls
 // (living_find_dying) stands where it fell: a blow it struck plays on.
+@(private)
 attack_card :: proc(renderer: ^Renderer, entity: game.Entity_Ref) -> (feet: rl.Vector3, height: f32, ok: bool) {
 	position, found := tactical_cue_actor_position(renderer, entity)
 	if !found {
@@ -232,6 +244,7 @@ attack_card :: proc(renderer: ^Renderer, entity: game.Entity_Ref) -> (feet: rl.V
 // Where a blow lands on `entity`: a card's middle (a bolt sticks a little in
 // front of it), or the camera's side of an object's box, so that the box
 // never hides the impact.
+@(private)
 attack_struck_point :: proc(renderer: ^Renderer, entity: game.Entity_Ref, bolt := false) -> (point: rl.Vector3, ok: bool) {
 	feet, height, found := attack_card(renderer, entity)
 	if !found { return }
@@ -251,20 +264,24 @@ attack_struck_point :: proc(renderer: ^Renderer, entity: game.Entity_Ref, bolt :
 }
 
 // The size of one texel of a prop in the hand of `character`.
+@(private)
 attack_texel :: proc(character: gfx.Flipbook_Character) -> f32 {
 	sheet := &gfx.LIVING_SHEETS[character]
 	return sheet.world_height/max(sheet.rest_height, 1)*ATTACK_PROP_SCALE
 }
 
+@(private)
 attack_cell_center :: proc(cell: grid.Position, height: f32 = 0) -> rl.Vector3 {
 	return {f32(cell.x)+0.5, height, f32(cell.y)+0.5}
 }
 
+@(private)
 attack_board_cell :: proc(point: rl.Vector3) -> grid.Position {
 	return {int(math.floor(point.x)), int(math.floor(point.z))}
 }
 
 // The cells a blow sweeps, decoded around its aim (game.event_footprint_bit).
+@(private)
 attack_swept_cells :: proc(aim: grid.Position, swept: u16) -> (cells: [9]grid.Position, count: int) {
 	for bit in 0..<9 {
 		if swept&(u16(1)<<u32(bit)) == 0 { continue }
@@ -275,6 +292,7 @@ attack_swept_cells :: proc(aim: grid.Position, swept: u16) -> (cells: [9]grid.Po
 	return
 }
 
+@(private)
 attack_prop_length :: proc(prop: gfx.Attack_Prop, texel: f32) -> f32 {
 	sheet := gfx.ATTACK_PROPS[prop]
 	dx, dy := sheet.tip.x-sheet.grip.x, sheet.tip.y-sheet.grip.y
@@ -284,17 +302,21 @@ attack_prop_length :: proc(prop: gfx.Attack_Prop, texel: f32) -> f32 {
 // --------------------------------------------------------------------------
 // The swing's path.
 
+@(private = "file")
 attack_ease_in :: proc(u: f32) -> f32 { v := clamp(u, 0, 1); return v*v }
+@(private)
 attack_ease_out :: proc(u: f32) -> f32 { v := clamp(u, 0, 1); return 1-(1-v)*(1-v) }
 
 // When a swing starts to come down: the last stretch before its contact,
 // never before its clip began.
+@(private)
 attack_swing_begin :: proc(fx: ^Attack_Fx) -> f64 {
 	return fx.contact-min(ATTACK_SWING_LEAD, max(fx.contact-fx.start, 0))
 }
 
 // The yaw at `t`: held at `start` until `begin`, speeding up to `aim` at
 // `contact`, slowing down to `finish` over `follow`.
+@(private)
 attack_swing_yaw :: proc(t, begin, contact, follow: f64, start, aim, finish: f32) -> f32 {
 	if t <= begin { return start }
 	if t <= contact {
@@ -305,6 +327,7 @@ attack_swing_yaw :: proc(t, begin, contact, follow: f64, start, aim, finish: f32
 }
 
 // When the swing's yaw passes `yaw` (-1: never).
+@(private)
 attack_swing_passes :: proc(begin, contact, follow: f64, start, aim, finish, yaw: f32) -> f64 {
 	previous := attack_swing_yaw(begin, begin, contact, follow, start, aim, finish)
 	for step in 1..=96 {
@@ -316,6 +339,7 @@ attack_swing_passes :: proc(begin, contact, follow: f64, start, aim, finish, yaw
 	return -1
 }
 
+@(private = "file")
 attack_wrap :: proc(angle: f32) -> f32 {
 	a := angle
 	for a > math.PI { a -= math.TAU }
@@ -336,6 +360,7 @@ Attack_Swing :: struct {
 // A swing's plan from where the attacker's card stands now: it sweeps from
 // its cell farthest from the camera to its nearest, so the blow comes toward
 // the eye, and its weapon's tip crosses the aim's centre at the contact.
+@(private)
 attack_swing_plan :: proc(renderer: ^Renderer, fx: ^Attack_Fx) -> (plan: Attack_Swing, ok: bool) {
 	feet, height, found := attack_card(renderer, fx.attacker)
 	if !found { return }
@@ -363,6 +388,7 @@ attack_swing_plan :: proc(renderer: ^Renderer, fx: ^Attack_Fx) -> (plan: Attack_
 
 // The weapon's grip and tip at `t`: raised behind before the blow, coming
 // down over the cells as it sweeps, low after it.
+@(private)
 attack_swing_pose :: proc(fx: ^Attack_Fx, plan: ^Attack_Swing, t: f64) -> (grip, tip: rl.Vector3) {
 	begin := attack_swing_begin(fx)
 	yaw := attack_swing_yaw(t, begin, fx.contact, plan.follow, plan.start, plan.aim, plan.finish)
@@ -377,6 +403,7 @@ attack_swing_pose :: proc(fx: ^Attack_Fx, plan: ^Attack_Swing, t: f64) -> (grip,
 }
 
 // The pike's lunge at `t`: straight at its cell and back.
+@(private)
 attack_thrust_pose :: proc(fx: ^Attack_Fx, plan: ^Attack_Swing, t: f64) -> (grip, tip: rl.Vector3) {
 	begin := attack_swing_begin(fx)
 	out := rl.Vector3{math.cos(plan.aim), 0, math.sin(plan.aim)}
@@ -391,6 +418,7 @@ attack_thrust_pose :: proc(fx: ^Attack_Fx, plan: ^Attack_Swing, t: f64) -> (grip
 // --------------------------------------------------------------------------
 // The bolt's path.
 
+@(private)
 attack_flight_point :: proc(origin, target: rl.Vector3, arc, u: f32) -> (point, heading: rl.Vector3) {
 	v := clamp(u, 0, 1)
 	point = origin+(target-origin)*v+rl.Vector3{0, arc*4*v*(1-v), 0}
@@ -399,6 +427,7 @@ attack_flight_point :: proc(origin, target: rl.Vector3, arc, u: f32) -> (point, 
 }
 
 // The camera's side of a card, on the board's plane.
+@(private)
 attack_toward_camera :: proc(renderer: ^Renderer) -> rl.Vector3 {
 	camera := renderer.tactical.camera
 	return rl.Vector3Normalize(rl.Vector3{camera.position.x-camera.target.x, 0, camera.position.z-camera.target.z})
@@ -406,6 +435,7 @@ attack_toward_camera :: proc(renderer: ^Renderer) -> rl.Vector3 {
 
 // Fixes a bolt's flight: from the attacker's card at chest height to the
 // victim's (a hit or a guard), or into the floor beyond the aim (a miss).
+@(private = "file")
 attack_aim_flight :: proc(renderer: ^Renderer, fx: ^Attack_Fx) {
 	feet, height, found := attack_card(renderer, fx.attacker)
 	if !found { feet, height = attack_cell_center(fx.from, 0.02), 1.2 }
@@ -430,12 +460,14 @@ attack_aim_flight :: proc(renderer: ^Renderer, fx: ^Attack_Fx) {
 // Playing blows: from the cues, and for the other phases.
 
 // The board is new: no blow of the old one stays on it.
+@(private)
 forget_attack_fx :: proc(renderer: ^Renderer) {
 	if renderer == nil { return }
 	spawned := renderer.tactical.attack_fx.spawned
 	renderer.tactical.attack_fx = {spawned = spawned}
 }
 
+@(private)
 attack_fx_end :: proc(fx: ^Attack_Fx) -> f64 {
 	if fx.kind == .Projectile {
 		tail := ATTACK_STUCK_SECONDS+0.2 if fx.outcome == .Hit else (0.3 if fx.outcome == .Absorbed else ATTACK_GROUNDED_SECONDS+0.2)
@@ -447,6 +479,7 @@ attack_fx_end :: proc(fx: ^Attack_Fx) -> f64 {
 }
 
 // A free slot, or the oldest blow's.
+@(private = "file")
 attack_fx_slot :: proc(state: ^Attack_Fx_State) -> ^Attack_Fx {
 	for &fx in state.items { if !fx.used { return &fx } }
 	oldest := &state.items[0]
@@ -454,6 +487,7 @@ attack_fx_slot :: proc(state: ^Attack_Fx_State) -> ^Attack_Fx {
 	return oldest
 }
 
+@(private = "file")
 attack_fx_begin :: proc(renderer: ^Renderer, attacker, victim: game.Entity_Ref, look: Attack_Look, kind: Attack_Fx_Kind,
 	outcome: Attack_Outcome, aim: grid.Position, swept: u16, fallback: gfx.Flipbook_Character) -> ^Attack_Fx {
 	character, _, known := attack_character(renderer, attacker)
@@ -472,6 +506,7 @@ attack_fx_begin :: proc(renderer: ^Renderer, attacker, victim: game.Entity_Ref, 
 // A weapon swung by `attacker` over `swept` (footprint bits around `aim`),
 // the blow landing `contact` seconds from now on its clock (-1: on its attack
 // clip's hit drawing). A swing nobody's cue asked for: Phase 2's riposte.
+@(private)
 play_attack_swing :: proc(renderer: ^Renderer, attacker, victim: game.Entity_Ref, look: Attack_Look, aim: grid.Position,
 	swept: u16 = 1<<4, outcome := Attack_Outcome.Hit, contact := f64(-1)) -> (id: u32, ok: bool) {
 	if renderer == nil || look == .None { return }
@@ -484,6 +519,7 @@ play_attack_swing :: proc(renderer: ^Renderer, attacker, victim: game.Entity_Ref
 // A bolt (or bomb, or ember) from `shooter` at `aim`, loosed `release`
 // seconds from now (-1: on the attack clip's hit drawing). Returns the
 // seconds until it lands.
+@(private)
 play_attack_projectile :: proc(renderer: ^Renderer, shooter, victim: game.Entity_Ref, look: Attack_Look, aim: grid.Position,
 	outcome := Attack_Outcome.Hit, release := f64(-1)) -> (id: u32, landing: f64, ok: bool) {
 	if renderer == nil || look == .None { return }
@@ -493,6 +529,7 @@ play_attack_projectile :: proc(renderer: ^Renderer, shooter, victim: game.Entity
 	return fx.id, fx.landing-fx.start, true
 }
 
+@(private)
 attack_fx_by_id :: proc(renderer: ^Renderer, id: u32) -> ^Attack_Fx {
 	if id == 0 { return nil }
 	for &fx in renderer.tactical.attack_fx.items { if fx.used && fx.id == id { return &fx } }
@@ -501,6 +538,7 @@ attack_fx_by_id :: proc(renderer: ^Renderer, id: u32) -> ^Attack_Fx {
 
 // Phase 2 (Deflect): a bolt in flight, or just landed, flies back from where
 // it is to its shooter, now the struck one. Returns the seconds until it lands.
+@(private)
 reflect_attack_projectile :: proc(renderer: ^Renderer, id: u32, outcome := Attack_Outcome.Hit) -> (landing: f64, ok: bool) {
 	fx := attack_fx_by_id(renderer, id)
 	if fx == nil || fx.kind != .Projectile { return }
@@ -526,6 +564,7 @@ reflect_attack_projectile :: proc(renderer: ^Renderer, id: u32, outcome := Attac
 // (where the reflected cues aim: attack_fx_of_cue finds it for them), and
 // lands as its answer does: a wound, or a guard when the shooter's Shield takes
 // all of it; a swing waits for the riposte its own cue brings.
+@(private = "file")
 attack_fx_answer_deflection :: proc(renderer: ^Renderer, fx: ^Attack_Fx) {
 	if fx == nil || fx.answered { return }
 	fx.answered = true
@@ -537,6 +576,7 @@ attack_fx_answer_deflection :: proc(renderer: ^Renderer, fx: ^Attack_Fx) {
 // How a deflected bolt (`fx`, not yet turned) lands back on its shooter: as
 // the answer RIFLESSO's command gives it (game.deflect_enemy_blow), its wound
 // or, with none, its guard. A hit when the board holds no answer.
+@(private = "file")
 attack_fx_returned_outcome :: proc(renderer: ^Renderer, fx: ^Attack_Fx) -> Attack_Outcome {
 	outcome := Attack_Outcome.Missed
 	if renderer.world_playback != nil {
@@ -550,6 +590,7 @@ attack_fx_returned_outcome :: proc(renderer: ^Renderer, fx: ^Attack_Fx) -> Attac
 }
 
 // The newest prop of `attacker` of a kind still on the board.
+@(private)
 attack_fx_find :: proc(renderer: ^Renderer, attacker: game.Entity_Ref, kind: Attack_Fx_Kind) -> (id: u32, ok: bool) {
 	newest := f64(-1)
 	for fx in renderer.tactical.attack_fx.items {
@@ -558,6 +599,7 @@ attack_fx_find :: proc(renderer: ^Renderer, attacker: game.Entity_Ref, kind: Att
 	return
 }
 
+@(private = "file")
 attack_fx_key :: proc(cue: ^Presentation_Cue) -> Attack_Fx_Key {
 	return {batch = cue.batch, attacker = cue.event.source, victim = cue.event.target, aim = cue.event.to_position,
 		swept = cue.event.area_mask&game.EVENT_FOOTPRINT_BITS}
@@ -565,6 +607,7 @@ attack_fx_key :: proc(cue: ^Presentation_Cue) -> Attack_Fx_Key {
 
 // A deflected blow reaches the player's guard: it is stopped there, as one a
 // Shield takes.
+@(private = "file")
 attack_cue_outcome :: proc(kind: Presentation_Cue_Kind) -> Attack_Outcome {
 	#partial switch kind {
 	case .Damage, .Explosive_Armed: return .Hit
@@ -573,6 +616,7 @@ attack_cue_outcome :: proc(kind: Presentation_Cue_Kind) -> Attack_Outcome {
 	return .Missed
 }
 
+@(private = "file")
 attack_cue_is_blow :: proc(cue: ^Presentation_Cue) -> bool {
 	if cue == nil || !cue.started || !game.event_is_attack(cue.event) { return false }
 	#partial switch cue.kind {
@@ -583,12 +627,14 @@ attack_cue_is_blow :: proc(cue: ^Presentation_Cue) -> bool {
 
 // RIFLESSO's answer to a shot: the shooter's own bolt coming home, not an
 // arrow of the player's.
+@(private = "file")
 attack_cue_returns_bolt :: proc(cue: ^Presentation_Cue) -> bool {
 	return cue != nil && game.event_is_reflected(cue.event) && game.event_is_ranged_attack(cue.event)
 }
 
 // The deflected bolt a returned shot's cue answers: the shooter's, aimed at the
 // player, in the same batch.
+@(private = "file")
 attack_fx_deflected_bolt :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) -> ^Attack_Fx {
 	for &fx in renderer.tactical.attack_fx.items {
 		if fx.used && fx.deflect && fx.kind == .Projectile && fx.batch == cue.batch &&
@@ -600,6 +646,7 @@ attack_fx_deflected_bolt :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) ->
 
 // The prop showing the blow of `cue`, if any. A returned shot is shown by the
 // bolt it turned round.
+@(private)
 attack_fx_of_cue :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) -> ^Attack_Fx {
 	if !attack_cue_is_blow(cue) { return nil }
 	if attack_cue_returns_bolt(cue) {
@@ -615,9 +662,10 @@ attack_fx_of_cue :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) -> ^Attack
 
 // Once per frame, before the cards read their cues: a prop for every blow
 // that has started showing, one per blow however many of its cues show.
+@(private)
 observe_attack_cues :: proc(renderer: ^Renderer) {
 	v := &renderer.tactical
-	if !v.enabled || !v.scene_3d || !v.living || v.snapshot == nil { return }
+	if !v.living || v.snapshot == nil { return }
 	state := &v.attack_fx
 	now := renderer.sprite_assets.elapsed
 	for &fx in state.items {
@@ -679,6 +727,7 @@ observe_attack_cues :: proc(renderer: ^Renderer) {
 // Whether the board has put this blow's prop on it already (it keeps the blows
 // it has shown): a returned shot once its bolt has turned carrying the wound,
 // or when that bolt is gone.
+@(private)
 attack_fx_shown :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) -> bool {
 	if attack_cue_returns_bolt(cue) {
 		fx := attack_fx_deflected_bolt(renderer, cue)
@@ -693,6 +742,7 @@ attack_fx_shown :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) -> bool {
 // Seconds until the earliest blow still to land on `victim` (a bolt in
 // flight, a swing not yet down), sprite time `now`; only the blows of
 // `attacker` when one is given.
+@(private)
 attack_fx_landing_in :: proc(renderer: ^Renderer, victim: game.Entity_Ref, now: f64,
 	attacker: Maybe(game.Entity_Ref) = nil) -> (seconds: f64, pending: bool) {
 	best := max(f64)
@@ -707,6 +757,7 @@ attack_fx_landing_in :: proc(renderer: ^Renderer, victim: game.Entity_Ref, now: 
 }
 
 // How long a struck card waits so that its reaction lands with the blow.
+@(private)
 attack_fx_reaction_delay :: proc(renderer: ^Renderer, victim: game.Entity_Ref, now: f64,
 	attacker: Maybe(game.Entity_Ref) = nil) -> f64 {
 	left, pending := attack_fx_landing_in(renderer, victim, now, attacker)
@@ -719,10 +770,11 @@ attack_fx_reaction_delay :: proc(renderer: ^Renderer, victim: game.Entity_Ref, n
 // landed yet (on the player's clock, which always runs). What follows the blow
 // waits for it (update_renderer_frame_timeline), and the charges it spent stay
 // on show until it lands (hold_unlanded_blows).
+@(private)
 attack_fx_foreground_pending :: proc(renderer: ^Renderer) -> bool {
 	v := &renderer.tactical
 	head, busy := active_presentation_cue(&renderer.timeline)
-	if !busy || head.batch == 0 || !(v.enabled && v.scene_3d && v.living) { return false }
+	if !busy || head.batch == 0 || !(v.living) { return false }
 	for offset in 0..<presentation_group_size(&renderer.timeline) {
 		cue, _ := presentation_cue_at(&renderer.timeline, offset)
 		if attack_cue_is_blow(cue) && cue.event.source == game.PLAYER_ENTITY && !attack_fx_shown(renderer, cue) { return true }
@@ -735,6 +787,7 @@ attack_fx_foreground_pending :: proc(renderer: ^Renderer) -> bool {
 }
 
 // The board shows this blow with its props: the cue's generic hit stays away.
+@(private)
 attack_fx_shows :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) -> bool {
 	return renderer.tactical.attack_props.loaded && attack_fx_of_cue(renderer, cue) != nil
 }
@@ -745,6 +798,7 @@ attack_fx_shows :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) -> bool {
 // A prop's texel axes in the world. It faces the viewer like a cut-out held
 // up to the eye: its grip-to-tip axis is `long` as the screen shows it, so a
 // blow struck toward the camera is never foreshortened; never mirrored.
+@(private)
 attack_prop_axes :: proc(long, view: rl.Vector3, axis: [2]f32, texel: f32) -> (u, v: rl.Vector3) {
 	along := long-view*rl.Vector3DotProduct(long, view)
 	if rl.Vector3Length(along) < 0.0001 {
@@ -762,6 +816,7 @@ attack_prop_axes :: proc(long, view: rl.Vector3, axis: [2]f32, texel: f32) -> (u
 }
 
 // The cut edge, in texels, that shows down and to the right on screen.
+@(private)
 attack_edge_dir :: proc(renderer: ^Renderer, at, u, v: rl.Vector3) -> rl.Vector2 {
 	o := tactical_project(renderer, {at.x, at.z}, at.y)
 	pu := tactical_project(renderer, {at.x+u.x, at.z+u.z}, at.y+u.y)
@@ -775,6 +830,7 @@ attack_edge_dir :: proc(renderer: ^Renderer, at, u, v: rl.Vector3) -> rl.Vector2
 }
 
 // The cards' paper shader set for one prop's field.
+@(private = "file")
 attack_paper_begin :: proc(renderer: ^Renderer, prop: gfx.Attack_Prop, edge: rl.Vector2) -> bool {
 	assets := &renderer.tactical.flipbook
 	props := &renderer.tactical.attack_props
@@ -782,22 +838,14 @@ attack_paper_begin :: proc(renderer: ^Renderer, prop: gfx.Attack_Prop, edge: rl.
 	if assets.paper_shader.id == 0 || sheet.paper <= 0 || renderer.tactical.outline_mode == .Hologram { return false }
 	m := f32(gfx.ATTACK_PROP_MARGIN)
 	w, h := f32(props.paper.width), f32(props.paper.height)
-	frame := rl.Vector4{(f32(sheet.rect.x)-m)/w, (f32(sheet.rect.y)-m)/h, (f32(sheet.rect.z)+m*2)/w, (f32(sheet.rect.w)+m*2)/h}
+	frame := rl.Rectangle{(f32(sheet.rect.x)-m)/w, (f32(sheet.rect.y)-m)/h, (f32(sheet.rect.z)+m*2)/w, (f32(sheet.rect.w)+m*2)/h}
 	cell := rl.Vector2{f32(sheet.rect.z)+m*2, f32(sheet.rect.w)+m*2}
-	morph := f32(1)
-	paper := gfx.LIVING_SHEET_COLOR
-	edge := edge
-	rl.SetShaderValue(assets.paper_shader, assets.sheet_location, &paper, .VEC3)
-	rl.SetShaderValue(assets.paper_shader, assets.frame_a_location, &frame, .VEC4)
-	rl.SetShaderValue(assets.paper_shader, assets.frame_b_location, &frame, .VEC4)
-	rl.SetShaderValue(assets.paper_shader, assets.morph_location, &morph, .FLOAT)
-	rl.SetShaderValue(assets.paper_shader, assets.cell_location, &cell, .VEC2)
-	rl.SetShaderValue(assets.paper_shader, assets.edge_location, &edge, .VEC2)
-	rl.BeginShaderMode(assets.paper_shader)
+	gfx.begin_paper_material(assets, {frames = {frame, frame, 1}, cell = cell, edge = edge, sheet = gfx.LIVING_SHEET_COLOR})
 	rlgl.SetTexture(props.paper.id)
 	return true
 }
 
+@(private = "file")
 attack_paper_end :: proc() {
 	rlgl.SetTexture(0)
 	rl.EndShaderMode()
@@ -805,6 +853,7 @@ attack_paper_end :: proc() {
 
 // One prop laid from `grip` toward `tip` (only the direction counts: it keeps
 // its own length), facing the viewer, its paper cut by the cards' shader.
+@(private)
 draw_attack_prop :: proc(renderer: ^Renderer, prop: gfx.Attack_Prop, grip, tip: rl.Vector3, texel, opacity: f32, tint := rl.WHITE) {
 	props := &renderer.tactical.attack_props
 	if !props.loaded || opacity <= 0.01 { return }
@@ -849,6 +898,7 @@ draw_attack_prop :: proc(renderer: ^Renderer, prop: gfx.Attack_Prop, grip, tip: 
 
 // The swing's smear: a strip of paper bent along the tip's path, its tail
 // thin and its head as wide as the weapon (gfx Attack_Prop.Swoosh).
+@(private = "file")
 draw_attack_strip :: proc(renderer: ^Renderer, outer, inner: []rl.Vector3, opacity: f32) {
 	if len(outer) < 2 || len(inner) != len(outer) || opacity <= 0.01 { return }
 	mid := len(outer)/2
@@ -872,10 +922,12 @@ draw_attack_strip :: proc(renderer: ^Renderer, outer, inner: []rl.Vector3, opaci
 	attack_paper_end()
 }
 
+@(private = "file")
 attack_point_visible :: proc(renderer: ^Renderer, point: rl.Vector3) -> bool {
 	return tactical_render_visible(renderer, attack_board_cell(point))
 }
 
+@(private)
 attack_impact_tint :: proc(fx: ^Attack_Fx) -> rl.Color {
 	if fx.critical { return TACTICAL_FEEDBACK_CRITICAL }
 	if fx.outcome == .Absorbed { return TACTICAL_FEEDBACK_BLUE }
@@ -883,6 +935,7 @@ attack_impact_tint :: proc(fx: ^Attack_Fx) -> rl.Color {
 }
 
 // The screen's right and up, in the world.
+@(private)
 attack_screen_axes :: proc(renderer: ^Renderer) -> (right, up: rl.Vector3) {
 	camera := renderer.tactical.camera
 	right = flipbook_camera_right(renderer)
@@ -893,6 +946,7 @@ attack_screen_axes :: proc(renderer: ^Renderer) -> (right, up: rl.Vector3) {
 // The star of a blow `t` seconds after it lands on `at`, laid as
 // draw_attack_prop lays it: its grip, the Impact sheet's centre, on the
 // struck point; it swells at once, then shrinks, turns and fades.
+@(private)
 attack_impact_star :: proc(renderer: ^Renderer, at: rl.Vector3, t: f64, seed: int) -> (grip, tip: rl.Vector3, texel, opacity: f32) {
 	right, up := attack_screen_axes(renderer)
 	p := f32(t/ATTACK_IMPACT_SECONDS)
@@ -902,6 +956,7 @@ attack_impact_star :: proc(renderer: ^Renderer, at: rl.Vector3, t: f64, seed: in
 }
 
 // A star of paper over the struck point, and paper bits thrown off it.
+@(private = "file")
 draw_attack_impact :: proc(renderer: ^Renderer, fx: ^Attack_Fx, at: rl.Vector3, t: f64, seed: int, star := true) {
 	if t < 0 || t > ATTACK_SHARD_SECONDS || !attack_point_visible(renderer, at) { return }
 	right, up := attack_screen_axes(renderer)
@@ -927,10 +982,12 @@ draw_attack_impact :: proc(renderer: ^Renderer, fx: ^Attack_Fx, at: rl.Vector3, 
 // share. Behind the player's eyes his card fades as the camera reaches it
 // (first_person.odin), and his lantern with it: his bump shows where it
 // lands, never swung across the eye.
+@(private)
 attack_weapon_shown :: proc(renderer: ^Renderer, fx: ^Attack_Fx) -> f32 {
 	return first_person_player_shown(renderer) if fx.attacker == game.PLAYER_ENTITY else 1
 }
 
+@(private = "file")
 draw_attack_swing :: proc(renderer: ^Renderer, fx: ^Attack_Fx, now: f64) {
 	plan, ok := attack_swing_plan(renderer, fx)
 	if !ok { return }
@@ -1005,6 +1062,7 @@ draw_attack_swing :: proc(renderer: ^Renderer, fx: ^Attack_Fx, now: f64) {
 	}
 }
 
+@(private = "file")
 draw_attack_projectile :: proc(renderer: ^Renderer, fx: ^Attack_Fx, now: f64) {
 	if now < fx.contact { return }
 	texel := attack_texel(fx.character)
@@ -1063,6 +1121,7 @@ draw_attack_projectile :: proc(renderer: ^Renderer, fx: ^Attack_Fx, now: f64) {
 // cards it comes from and lands on; a bolt sorts where it is, in flight and
 // once landed (stuck in the front of the struck card, or in the floor of a
 // cell behind another card, which hides it).
+@(private)
 collect_attack_fx_entries :: proc(renderer: ^Renderer, entries: ^[dynamic]Tactical_Alpha_Entry) {
 	if !renderer.tactical.attack_props.loaded { return }
 	camera := renderer.tactical.camera.position
@@ -1088,6 +1147,7 @@ collect_attack_fx_entries :: proc(renderer: ^Renderer, entries: ^[dynamic]Tactic
 	}
 }
 
+@(private)
 draw_attack_fx_entry :: proc(renderer: ^Renderer, entry: Tactical_Alpha_Entry) {
 	state := &renderer.tactical.attack_fx
 	if entry.attack < 0 || int(entry.attack) >= len(state.items) { return }

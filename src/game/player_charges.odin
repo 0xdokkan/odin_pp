@@ -1,6 +1,6 @@
 package game
 
-import grid "../grid"
+import grid "../engine/grid"
 
 // The player's charges (status.odin): four cards load stacks on him that are
 // spent one at a time, until they run out or the room ends (create_room clears
@@ -26,6 +26,7 @@ COFFIN_ARROW_STACKS :: [3]i32{2, 1, 1}
 // miniboss only takes a critical.
 Fate_Outcome :: enum u8 {Poison, Burn, Slow, Lifesteal, Critical, Lethal}
 
+@(private)
 fate_outcome :: proc(face: i32, boss: bool) -> Fate_Outcome {
 	switch {
 	case face <= 1: return .Poison
@@ -39,6 +40,7 @@ fate_outcome :: proc(face: i32, boss: bool) -> Fate_Outcome {
 
 // The boss (the Demolitionist) and the miniboss (the Custodian): no die kills
 // them outright.
+@(private)
 enemy_is_boss :: proc(archetype: Enemy_Archetype) -> bool {
 	return archetype == .Demolitionist || archetype == .Custodian
 }
@@ -51,6 +53,7 @@ player_charges :: proc(room: ^Room, kind: Status_Kind) -> i32 {
 
 // One charge of the player's `kind` spent; the last one ends it, with a
 // Status_Expired in `events` so the board drops its chip. False without one.
+@(private)
 spend_player_charge :: proc(room: ^Room, kind: Status_Kind, events: ^Event_Log) -> bool {
 	status, found := status_for_entity(room, PLAYER_ENTITY, kind)
 	if !found { return false }
@@ -102,6 +105,7 @@ deflect_enemy_blow :: proc(room: ^Room, source: Entity_Ref, origin: grid.Positio
 }
 
 // The damage the player's own blows dealt `target` in `report` (no status's bite).
+@(private)
 player_damage_dealt :: proc(report: ^Action_Report, target: Entity_Ref) -> (dealt: i32) {
 	for event in report.events.events[:report.events.count] {
 		if event.kind == .Damaged && event.source == PLAYER_ENTITY && event.target == target && !event.has_status_cause {
@@ -114,6 +118,7 @@ player_damage_dealt :: proc(report: ^Action_Report, target: Entity_Ref) -> (deal
 // Where a blow's own events end in `log`: after its last marked event on
 // `target` (game.mark_attack_events) and the Shield that blow broke. The
 // count when the blow has none.
+@(private = "file")
 player_blow_events_end :: proc(log: ^Event_Log, target: Entity_Ref) -> int {
 	end := -1
 	for event, index in log.events[:log.count] {
@@ -190,22 +195,23 @@ player_bump :: proc(room: ^Room, enemy_index: int, aim: grid.Position, rule: Tar
 	// The die shows as the blow lands: its event follows the blow's own.
 	shown := player_blow_events_end(&report.events, ref) if fated else -1
 	for event, index in report.events.events[:report.events.count] {
-		if index == shown { record_event(&room.recent_events, player_fate_event(roll, outcome, ref, aim, room, &cure)) }
-		record_event(&room.recent_events, event)
+		if index == shown { record_event(room.recent_events, player_fate_event(roll, outcome, ref, aim, room, &cure)) }
+		record_event(room.recent_events, event)
 	}
-	if shown == report.events.count { record_event(&room.recent_events, player_fate_event(roll, outcome, ref, aim, room, &cure)) }
+	if shown == report.events.count { record_event(room.recent_events, player_fate_event(roll, outcome, ref, aim, room, &cure)) }
 	room.recent_events.dropped_count += report.events.dropped_count
-	if cure.accepted { append_event_log(&room.recent_events, &cure.events) }
+	if cure.accepted { append_event_log(room.recent_events, &cure.events) }
 	if fated {
 		room.player.dice = staged_dice
-		spend_player_charge(room, .Fate, &room.recent_events)
+		spend_player_charge(room, .Fate, room.recent_events)
 	}
-	if venom { spend_player_charge(room, .Venom_Blade, &room.recent_events) }
+	if venom { spend_player_charge(room, .Venom_Blade, room.recent_events) }
 	return true
 }
 
 // The Dado del Destino's event for a bump on `target`: the roll, what it did
 // (in `duration`) and its stacks or the life it gave back.
+@(private = "file")
 player_fate_event :: proc(roll: Dice_Roll, outcome: Fate_Outcome, target: Entity_Ref, aim: grid.Position, room: ^Room,
 	cure: ^Action_Report) -> Game_Event {
 	amount: i32
@@ -233,7 +239,7 @@ player_arrow_target_is_valid :: proc(room: ^Room, target: Entity_Ref) -> bool {
 // Bruciatura 1 or Rallentamento 1.
 shoot_player_arrow :: proc(room: ^Room, target: Entity_Ref) -> Action_Result {
 	// Behind his eyes he shoots the AK, never an arrow (first_person.odin).
-	if room == nil || room.player == nil || room.phase != .Combat || !tactical_enabled(room) || !tactical_allows_action(room) ||
+	if room == nil || room.player == nil || room.phase != .Combat || !tactical_allows_action(room) ||
 	   tactical_first_person_active(room) {
 		return .Invalid_Phase
 	}
@@ -248,18 +254,18 @@ shoot_player_arrow :: proc(room: ^Room, target: Entity_Ref) -> Action_Result {
 	assert(added)
 	added = add_effect(&action, apply_status_effect(target, statuses[pick-1], stacks[pick-1], 0))
 	assert(added)
-	clear_event_log(&room.recent_events)
+	clear_event_log(room.recent_events)
 	report := resolve_action(room, &action)
 	if !report.accepted { return .Blocked }
 	room.player.dice = staged_dice
 	from := room.player.position
 	mark_attack_events(&report.events, 0, PLAYER_ENTITY, target, from, aim, {}, true)
-	append_event_log(&room.recent_events, &report.events)
-	spend_player_charge(room, .Arrows, &room.recent_events)
+	append_event_log(room.recent_events, &report.events)
+	spend_player_charge(room, .Arrows, room.recent_events)
 	dx, dy := aim.x-from.x, aim.y-from.y
 	if abs(dx) > abs(dy) { room.player.tactical.facing = .East if dx > 0 else .West }
 	else { room.player.tactical.facing = .South if dy > 0 else .North }
-	_, outcome := finish_player_combat_command(room, TACTICAL_ARROW_SECONDS)
+	outcome := finish_player_combat_command(room, TACTICAL_ARROW_SECONDS)
 	switch outcome {
 	case .Player_Defeated: return .Player_Defeated
 	case .Combat_Ended: return .Combat_Ended
@@ -272,6 +278,7 @@ shoot_player_arrow :: proc(room: ^Room, target: Entity_Ref) -> Action_Result {
 // (Dice_Rolled, before the charges it loads): the face is the bumps it
 // poisons. The Dado del Destino rolls nothing yet: its bumps will roll the die
 // of its level.
+@(private)
 resolve_loading_card :: proc(room: ^Room, instance: Card_Instance, target: Target, compiled: ^Action) -> (report: Action_Report) {
 	if compiled == nil || (instance.definition_id != .Venom_Blade && instance.definition_id != .Fate_Dice) ||
 	   compiled.kind != .Card || compiled.source != PLAYER_ENTITY || compiled.target != target ||

@@ -3,36 +3,13 @@ package render
 import "core:math"
 import rl "vendor:raylib"
 import game "../game"
-import grid "../grid"
-import view "../view"
+import grid "../engine/grid"
 
-// How a living board shows what each enemy is about to do. The game uses
-// SIGILLI + TERRENO; the mechanics lab cycles the four displays with F6 to
-// compare them. The rules they follow come from how vision works away from
-// where one looks:
-// the edge of the eye misses colour and detail but catches luminance changes
-// (flicker around 5-10 Hz) and motion. So an intent says what it is with a
-// large pictogram and a consistent colour (red blow, orange shot or area,
-// green move, violet protection), how soon with a gauge that fills toward the
-// action, and that it is now with a flicker and a tremble in its last moments
-// and a flash outward when it lands. Only actions about to happen are loud:
-// the others stay quiet, so six enemies do not shout at once.
-//
-//   SIGILLI   a wax seal pinned to the enemy's card: the pictogram on paper,
-//             a gauge around it; the figure trembles inside the card.
-//   TERRENO   the consequence drawn where it lands (Into the Breach): the
-//             cells about to be struck fill from their edges inward, the
-//             player's own cell outlined when it is one of them; a move is an
-//             arrow to its cell, a protection a thread to the ally.
-//   SIGILLI + TERRENO  both (the game's).
-//   ADESIVI   the board as it was: the small sticker, now beside the heart
-//             over the enemy's head (living_heart.odin).
-//
-// Under fog nothing gives a hidden enemy away: its seal, arrow and thread
-// show only while it is in sight, and a threatened cell only while that cell
-// is.
-
-Intent_Display :: enum u8 {Both, Seals, Ground, Labels}
+// Enemy intents live in the small health tag (living_heart.odin). The main
+// game also shows the threatened cells, movement arrows and protection links
+// on the floor; F6 in the mechanics lab compares that with tags alone.
+// Hidden enemies and cells remain hidden under the combat fog.
+Intent_Display :: enum u8 {Both, Labels}
 
 // The last seconds before an action, which are loud; the last of them flicker.
 INTENT_LOUD_SECONDS :: f32(1.5)
@@ -55,15 +32,13 @@ Intent_Trace :: struct {
 	flash_kind: Living_Ring_Kind,
 	flash_cells: [game.MAX_ENEMY_INTENT_THREAT_CELLS]grid.Position,
 	flash_count: int,
-	flash_at: view.Vec2,
 }
 
+@(private)
 intent_display_name :: proc(mode: Intent_Display) -> cstring {
 	switch mode {
-	case .Both: return "SIGILLI + TERRENO"
-	case .Seals: return "SIGILLI"
-	case .Ground: return "TERRENO"
-	case .Labels: return "ADESIVI"
+	case .Both: return "HUD + TERRENO"
+	case .Labels: return "SOLO HUD"
 	}
 	return ""
 }
@@ -73,17 +48,14 @@ cycle_intent_display :: proc(renderer: ^Renderer) {
 	v.intent_display = Intent_Display((int(v.intent_display)+1)%len(Intent_Display))
 }
 
-intent_seals_on :: proc(renderer: ^Renderer) -> bool {
-	v := &renderer.tactical
-	return v.living && (v.intent_display == .Both || v.intent_display == .Seals)
-}
-
+@(private)
 intent_ground_on :: proc(renderer: ^Renderer) -> bool {
 	v := &renderer.tactical
-	return v.living && (v.intent_display == .Both || v.intent_display == .Ground)
+	return v.living && v.intent_display == .Both
 }
 
 // Seconds to the action and its whole countdown; `progress` runs 0..1 to it.
+@(private)
 intent_timing :: proc(room: ^game.Room, enemy: ^game.Enemy) -> (left, total, progress: f32) {
 	total = game.tactical_enemy_intent_seconds(enemy)
 	left = game.tactical_enemy_seconds(room, enemy)
@@ -92,15 +64,18 @@ intent_timing :: proc(room: ^game.Room, enemy: ^game.Enemy) -> (left, total, pro
 }
 
 // 0 while the action is far, 1 as it lands.
+@(private)
 intent_loudness :: proc(left: f32) -> f32 { return clamp(1-left/INTENT_LOUD_SECONDS, 0, 1) }
 
 // A luminance flicker in the last moments: 1 lit, low dark.
+@(private)
 intent_flicker :: proc(left: f32, now: f64, low: f32 = 0.35) -> f32 {
 	if left > INTENT_FLICKER_SECONDS { return 1 }
 	phase := math.sin(f32(now)*math.TAU*INTENT_FLICKER_HZ)
 	return 1 if phase >= 0 else low
 }
 
+@(private)
 intent_trace :: proc(renderer: ^Renderer, id: u32) -> ^Intent_Trace {
 	traces := &renderer.tactical.intent_traces
 	free_slot: ^Intent_Trace
@@ -116,6 +91,7 @@ intent_trace :: proc(renderer: ^Renderer, id: u32) -> ^Intent_Trace {
 // Once per frame in the board pass: notes each enemy's intent, and flashes
 // the one that has just been carried out (its countdown ran out and a new
 // plan took its place).
+@(private)
 update_intent_traces :: proc(renderer: ^Renderer, room: ^game.Room, now: f64) {
 	if room == nil || !renderer.tactical.living { return }
 	for &trace in renderer.tactical.intent_traces {
@@ -132,7 +108,6 @@ update_intent_traces :: proc(renderer: ^Renderer, room: ^game.Room, now: f64) {
 			if trace.kind != .None && trace.left < 0.5 {
 				trace.flash, trace.flash_kind = now, trace.kind
 				trace.flash_cells, trace.flash_count = trace.cells, trace.count
-				trace.flash_at = {f32(enemy.position.x), f32(enemy.position.y)}
 			}
 		}
 		trace.planned, trace.kind, trace.left = enemy.intent.planned_pulse, kind, left
@@ -145,9 +120,10 @@ update_intent_traces :: proc(renderer: ^Renderer, room: ^game.Room, now: f64) {
 	}
 }
 
-// The tremble of a figure about to act (the seals): 0..1.
+// The subtle tremble of a figure about to act: 0..1.
+@(private)
 intent_tremble :: proc(renderer: ^Renderer, room: ^game.Room, entity: game.Entity_Ref) -> f32 {
-	if !intent_seals_on(renderer) || room == nil || entity.kind != .Enemy { return 0 }
+	if !renderer.tactical.living || room == nil || entity.kind != .Enemy { return 0 }
 	index, found := game.enemy_index_by_id(room, entity.id)
 	if !found { return 0 }
 	enemy := &room.enemies[index]
@@ -156,77 +132,8 @@ intent_tremble :: proc(renderer: ^Renderer, room: ^game.Room, entity: game.Entit
 	return clamp(1-left/INTENT_TREMBLE_SECONDS, 0, 1)
 }
 
-// Where an enemy's seal is pinned: by the top right corner of its card. The
-// hearts over the heads (living_heart.odin) keep clear of it.
-intent_seal_center :: proc(renderer: ^Renderer, actor: Presentation_Actor) -> (center: rl.Vector2, ok: bool) {
-	key := sprite_key_for_enemy(actor.archetype)
-	character, found := flipbook_character(key)
-	if !found { return }
-	corner := living_billboard_geometry(renderer, character, key, actor.position, true, actor.entity).card_points[3]
-	at := tactical_project(renderer, {corner.x, corner.z}, corner.y)
-	return {at.x-4, at.y+8}, true
-}
-
-// SIGILLI: over the board, after the hearts.
-draw_intent_seals :: proc(renderer: ^Renderer, room: ^game.Room) {
-	v := &renderer.tactical
-	if !intent_seals_on(renderer) || v.snapshot == nil || !living_cards_ready(renderer) { return }
-	// The world's clock: still while the player is in his shadow.
-	now := tactical_world_time(renderer)
-	for actor in v.snapshot.enemies[:v.snapshot.enemy_count] {
-		cell := grid.Position{int(math.round(actor.position.x)), int(math.round(actor.position.y))}
-		// The Pinball's ball intends nothing, and has no card to seal.
-		if !actor.visible || actor.health <= 0 || !tactical_overlay_visible(renderer, cell) || tactical_pinball_holds(renderer, actor.entity) { continue }
-		index, found := game.enemy_index_by_id(room, actor.entity.id)
-		if !found { continue }
-		enemy := &room.enemies[index]
-		center, ok := intent_seal_center(renderer, actor)
-		if !ok { continue }
-		icon := tactical_intent_icon(room, enemy)
-		kind := living_ring_kind(enemy)
-		if kind == .None || game.enemy_is_staggered(room, enemy) {
-			// Waiting, recovering or interrupted: a small quiet seal.
-			draw_intent_sticker(center, icon, false, now, int(enemy.id), 11)
-			continue
-		}
-		left, total, progress := intent_timing(room, enemy)
-		loud := intent_loudness(left)
-		lit := intent_flicker(left, now)
-		color := living_ring_color(kind)
-		radius := 13+4*loud
-		if left < INTENT_FLICKER_SECONDS && lit == 1 { radius += 1.5 }
-		// A glow of the action's colour behind it as the action nears: a patch
-		// of colour survives the blur of the eye's edge, a thin line does not.
-		inner, outer := radius+3, radius+3+4+4*loud
-		if loud > 0 { rl.DrawCircleV(center, outer+5*loud, color_with_opacity(color, 0.3*loud*lit)) }
-		// The gauge: a thin dark track, the colour filling it clockwise to the
-		// action, a notch per second of the countdown.
-		rl.DrawRing(center, outer-1, outer+1, 0, 360, 40, {13, 20, 30, 220})
-		rl.DrawRing(center, inner-1, inner+1, 0, 360, 40, {13, 20, 30, 220})
-		rl.DrawRing(center, inner, outer, -90, -90+360*progress, 40, color_with_opacity(color, (0.55+0.45*loud)*lit))
-		seconds := int(math.round(total))
-		for notch in 1..<max(seconds, 1) {
-			a := (-90+360*f32(notch)/f32(seconds))*math.RAD_PER_DEG
-			d := rl.Vector2{math.cos(a), math.sin(a)}
-			rl.DrawLineEx(center+d*(inner-1), center+d*(outer+1), 2, {13, 20, 30, 255})
-		}
-		if left < INTENT_FLICKER_SECONDS && lit == 1 {
-			rl.DrawRing(center, outer+1, outer+3, 0, 360, 40, color_with_opacity({255, 250, 235, 255}, 0.9))
-		}
-		draw_intent_sticker(center, icon, false, now, int(enemy.id), radius)
-	}
-	// The flash of an action just carried out: a ring bursting outward.
-	for &trace in v.intent_traces {
-		if !trace.used || trace.flash_kind == .None { continue }
-		t := f32((now-trace.flash)/INTENT_FLASH_SECONDS)
-		if t < 0 || t >= 1 || !tactical_render_visible(renderer, {int(trace.flash_at.x), int(trace.flash_at.y)}) { continue }
-		p := tactical_project(renderer, {trace.flash_at.x+0.5, trace.flash_at.y+0.5}, 1.1)
-		r := 18+46*t
-		rl.DrawRing({p.x, p.y}, r, r+5*(1-t)+1, 0, 360, 48, color_with_opacity(living_ring_color(trace.flash_kind), 1-t))
-	}
-}
-
 // TERRENO: on the floor, inside the 3D pass.
+@(private)
 draw_intent_ground :: proc(renderer: ^Renderer, room: ^game.Room) {
 	v := &renderer.tactical
 	if !intent_ground_on(renderer) || room == nil { return }
@@ -290,6 +197,7 @@ draw_intent_ground :: proc(renderer: ^Renderer, room: ^game.Room) {
 }
 
 // A cell striking: a frame that closes in from the edges to the middle.
+@(private = "file")
 draw_intent_cell :: proc(cell: grid.Position, progress: f32, color: rl.Color, alpha: f32) {
 	x, z := f32(cell.x), f32(cell.y)
 	y := f32(0.045)
@@ -304,6 +212,7 @@ draw_intent_cell :: proc(cell: grid.Position, progress: f32, color: rl.Color, al
 	draw_intent_cell_outline(cell, 0.03, color_with_opacity(color, clamp(alpha+0.3, 0, 1)))
 }
 
+@(private = "file")
 draw_intent_cell_outline :: proc(cell: grid.Position, width: f32, color: rl.Color) {
 	x, z := f32(cell.x), f32(cell.y)
 	y := f32(0.05)
@@ -315,6 +224,7 @@ draw_intent_cell_outline :: proc(cell: grid.Position, width: f32, color: rl.Colo
 
 // A move: a shaft from the enemy's cell and a head on the cell it goes to,
 // the head filling as the step comes.
+@(private = "file")
 draw_intent_arrow :: proc(from, to: grid.Position, progress: f32, color: rl.Color) {
 	a := rl.Vector3{f32(from.x)+0.5, 0.05, f32(from.y)+0.5}
 	b := rl.Vector3{f32(to.x)+0.5, 0.05, f32(to.y)+0.5}

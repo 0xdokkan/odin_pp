@@ -1,5 +1,7 @@
 package fps
 
+import rl "vendor:raylib"
+
 import "core:math"
 import "core:testing"
 import gfx "../../engine/gfx"
@@ -437,19 +439,27 @@ when ODIN_TEST_FULL {
 }
 
 @(test)
-test_sprite_art_frames_are_rectangular :: proc(t: ^testing.T) {
-	art := sprite_art()
-	for id in Sprite_Id {
-		frames: [8]gfx.Frame_Rows
-		n := sprite_frames(&art, id, frames[:])
-		testing.expectf(t, n > 0, "%v has no frames", id)
-		width, height := len(frames[0][0]), len(frames[0])
-		for f in frames[:n] {
-			testing.expectf(t, len(f) == height, "%v: frame height %d != %d", id, len(f), height)
-			for row in f {
-				testing.expectf(t, len(row) == width, "%v: row %q has width %d, want %d", id, row, len(row), width)
-			}
-		}
+test_sprite_atlases_preserve_frame_layout :: proc(t: ^testing.T) {
+	expected := [Sprite_Id][3]int{
+		.Ghoul = {16, 20, 5},
+		.Wraith = {16, 20, 5},
+		.Cultist = {16, 20, 5},
+		.Rune = {12, 16, 2},
+		.Health = {10, 12, 1},
+		.Mana = {10, 12, 1},
+		.Staff = {12, 32, 2},
+		.Candle = {6, 8, 1},
+		.Flame = {5, 8, 2},
+		.Skull = {8, 7, 1},
+		.Bones = {12, 5, 1},
+		.Brazier = {10, 12, 1},
 	}
-	free_all(context.temp_allocator)
+	for id in Sprite_Id {
+		asset := SPRITE_ASSETS[id]
+		img := gfx.sprite_asset_image(asset)
+		testing.expectf(t, img.data != nil, "%v: embedded atlas did not decode", id)
+		if img.data == nil { continue }
+		testing.expect_value(t, [3]int{int(img.width)/asset.frames, int(img.height), asset.frames}, expected[id])
+		rl.UnloadImage(img)
+	}
 }

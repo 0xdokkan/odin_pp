@@ -1,7 +1,7 @@
 package game
 
 import "core:testing"
-import grid "../grid"
+import grid "../engine/grid"
 import level "../level"
 
 tesla_ring_test_room :: proc(t: ^testing.T, data: ^level.Level, player: ^Player) -> Room {
@@ -52,10 +52,10 @@ test_tesla_square_opens_the_ring_once_per_floor_around_enemies :: proc(t: ^testi
 	blocked := query_tesla_controls(&room)
 	testing.expect(t, !blocked.can_activate && blocked.ring.count == 0)
 	testing.expect_value(t, blocked.network.cooldown, i32(2))
-	before_events := room.recent_events
+	before_events := room.recent_events^
 	committed, opened := activate_tesla(&room)
 	testing.expect(t, !committed && !opened)
-	testing.expect_value(t, room.recent_events, before_events)
+	testing.expect_value(t, room.recent_events^, before_events)
 	testing.expect_value(t, board_tesla_count(&room), 4)
 	room.objects[0].device_cooldown = 0
 	committed, opened = activate_tesla(&room)

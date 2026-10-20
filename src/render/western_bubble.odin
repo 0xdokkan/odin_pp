@@ -54,6 +54,7 @@ Western_Layout :: struct {
 	scale: f32,
 }
 
+@(private = "file")
 western_layout :: proc(renderer: ^Renderer, room: ^game.Room) -> (layout: Western_Layout) {
 	width := renderer.canvas_width*WESTERN_PANEL_SHARE
 	height := width*WESTERN_PAGE.y/WESTERN_PAGE.x
@@ -80,10 +81,12 @@ western_layout :: proc(renderer: ^Renderer, room: ^game.Room) -> (layout: Wester
 	return
 }
 
+@(private = "file")
 western_page_to_screen :: proc(layout: Western_Layout, p: rl.Vector2) -> rl.Vector2 {
 	return {layout.panel.x+p.x*layout.scale, layout.panel.y+p.y*layout.scale}
 }
 
+@(private = "file")
 western_hash :: proc(a, b: int) -> f32 {
 	h := u32(a)*0x9E37_79B1 ~ u32(b)*0x85EB_CA77
 	h ~= h >> 15
@@ -92,21 +95,25 @@ western_hash :: proc(a, b: int) -> f32 {
 	return f32(h & 0xFFFF)/65535
 }
 
+@(private = "file")
 western_smooth :: proc(x: f32) -> f32 {
 	t := clamp(x, 0, 1)
 	return t*t*(3-2*t)
 }
 
+@(private = "file")
 western_back :: proc(x: f32) -> f32 {
 	t := clamp(x, 0, 1)-1
 	return 1+t*t*(2.7*t+1.7)
 }
 
+@(private = "file")
 western_progress :: proc(time, start, length: f32) -> f32 {
 	return clamp((time-start)/length, 0, 1)
 }
 
 // Inked primitives in page units. Each fill sits on a slightly larger ink.
+@(private = "file")
 western_ellipse :: proc(c: rl.Vector2, rx, ry: f32, color: rl.Color, angle: f32 = 0) {
 	rlgl.PushMatrix()
 	rlgl.Translatef(c.x, c.y, 0)
@@ -116,21 +123,25 @@ western_ellipse :: proc(c: rl.Vector2, rx, ry: f32, color: rl.Color, angle: f32 
 	rlgl.PopMatrix()
 }
 
+@(private = "file")
 western_inked_ellipse :: proc(c: rl.Vector2, rx, ry: f32, color: rl.Color, angle: f32 = 0, ink: f32 = 1.6) {
 	western_ellipse(c, rx+ink, ry+ink, WESTERN_INK, angle)
 	western_ellipse(c, rx, ry, color, angle)
 }
 
+@(private = "file")
 western_inked_box :: proc(r: rl.Rectangle, color: rl.Color, ink: f32 = 1.6) {
 	rl.DrawRectangleRec({r.x-ink, r.y-ink, r.width+ink*2, r.height+ink*2}, WESTERN_INK)
 	rl.DrawRectangleRec(r, color)
 }
 
+@(private = "file")
 western_text_center :: proc(renderer: ^Renderer, text: cstring, x, y: f32, size: int, color: rl.Color) {
 	gothic_text(renderer, text, x-gothic_text_width(renderer, text, size)*0.5, y, size, color)
 }
 
 // Comic lettering: dark outline around light letters.
+@(private = "file")
 western_lettering :: proc(renderer: ^Renderer, text: cstring, x, y: f32, size: int, color: rl.Color) {
 	width := gothic_text_width(renderer, text, size)
 	left := x-width*0.5
@@ -141,6 +152,7 @@ western_lettering :: proc(renderer: ^Renderer, text: cstring, x, y: f32, size: i
 }
 
 // A jagged comic burst behind a sound effect or a number.
+@(private = "file")
 western_burst :: proc(c: rl.Vector2, radius: f32, color: rl.Color, spikes: int = 12, spin: f32 = 0) {
 	for pass in 0..<2 {
 		r := radius+(2.2 if pass == 0 else 0)
@@ -160,6 +172,7 @@ western_burst :: proc(c: rl.Vector2, radius: f32, color: rl.Color, spikes: int =
 	}
 }
 
+@(private = "file")
 western_bumps :: proc(cloud: rl.Rectangle, grow: f32, color: rl.Color) {
 	columns := max(3, int(cloud.width/34))
 	rows := max(2, int(cloud.height/34))
@@ -181,6 +194,7 @@ western_bumps :: proc(cloud: rl.Rectangle, grow: f32, color: rl.Color) {
 }
 
 // The scalloped cloud and its trail of thought puffs, popped by `scale`.
+@(private = "file")
 draw_western_cloud :: proc(layout: Western_Layout, scale: f32, trail: f32) {
 	center := rl.Vector2{layout.cloud.x+layout.cloud.width*0.5, layout.cloud.y+layout.cloud.height*0.5}
 	cloud := layout.cloud
@@ -209,6 +223,7 @@ draw_western_cloud :: proc(layout: Western_Layout, scale: f32, trail: f32) {
 }
 
 // Seconds of scrolling: the ride clock, continued through the outro.
+@(private = "file")
 western_ride_clock :: proc(s: ^western.State) -> f32 {
 	#partial switch s.phase {
 	case .Ride: return s.time
@@ -220,12 +235,14 @@ western_ride_clock :: proc(s: ^western.State) -> f32 {
 }
 
 // Hand rectangle of a Scopa card's face, as the hand draws it.
+@(private = "file")
 western_hand_face :: proc(bounds: rl.Rectangle) -> rl.Rectangle {
 	scale := max(f32(0.5), f32(int((bounds.height-12)/SCOPA_CARD_SIZE.y*2))*0.5)
 	return {bounds.x+bounds.width*0.5, bounds.y+bounds.height*0.5, SCOPA_CARD_SIZE.x*scale, SCOPA_CARD_SIZE.y*scale}
 }
 
 // Sign slots for the 6 (left of RANCH) and the 7 (right), page units, center form.
+@(private = "file")
 western_slot :: proc(index: int) -> rl.Rectangle {
 	return {82 if index == 0 else 254, 39, 25, 40}
 }
@@ -264,6 +281,7 @@ draw_western_bubble :: proc(renderer: ^Renderer, room: ^game.Room, s: ^western.S
 }
 
 // The 6 and the 7 rise from where they sat in the hand and fly to the sign.
+@(private = "file")
 draw_western_flying_cards :: proc(renderer: ^Renderer, layout: Western_Layout, s: ^western.State, card_from: [2]rl.Rectangle) {
 	starts := [2]f32{western.INTRO_CARD_SIX, western.INTRO_CARD_SEVEN}
 	ids := [2]game.Card_Id{.Sei_Denari, .Sette_Denari}
@@ -297,6 +315,7 @@ draw_western_flying_cards :: proc(renderer: ^Renderer, layout: Western_Layout, s
 }
 
 // Sky, mesas and sand behind both scenes.
+@(private = "file")
 draw_western_backdrop :: proc(horizon: f32) {
 	page := WESTERN_PAGE
 	rl.DrawRectangleGradientV(0, 0, i32(page.x), i32(horizon), WESTERN_SKY_TOP, WESTERN_SKY_LOW)
@@ -329,6 +348,7 @@ draw_western_backdrop :: proc(horizon: f32) {
 	rl.DrawRectangleRec({0, horizon, page.x, 1.6}, WESTERN_INK)
 }
 
+@(private = "file")
 draw_western_ranch :: proc(renderer: ^Renderer, s: ^western.State) {
 	t := s.time
 	horizon := f32(118)
@@ -440,6 +460,7 @@ draw_western_ranch :: proc(renderer: ^Renderer, s: ^western.State) {
 }
 
 // Riders burst out of the gate toward the reader, front view.
+@(private = "file")
 draw_western_riders_out :: proc(p: f32, t: f32) {
 	e := western_smooth(p)
 	// Speed lines from the doorway.
@@ -466,6 +487,7 @@ draw_western_riders_out :: proc(p: f32, t: f32) {
 	}
 }
 
+@(private = "file")
 draw_western_front_rider :: proc(c: rl.Vector2, k: f32, player: bool, t: f32) {
 	horse := WESTERN_BAY if player else WESTERN_PALOMINO
 	// Front legs, alternating.
@@ -496,6 +518,7 @@ draw_western_front_rider :: proc(c: rl.Vector2, k: f32, player: bool, t: f32) {
 }
 
 // Top-down horse and rider galloping toward the top of the page.
+@(private = "file")
 draw_western_top_rider :: proc(c: rl.Vector2, player: bool, clock: f32, reach: f32) {
 	phase := clock*14+(0 if player else 1.3)
 	horse := WESTERN_BAY if player else WESTERN_PALOMINO
@@ -538,6 +561,7 @@ draw_western_top_rider :: proc(c: rl.Vector2, player: bool, clock: f32, reach: f
 	}
 }
 
+@(private = "file")
 draw_western_coin :: proc(c: rl.Vector2, clock: f32, scale: f32 = 1, grey: bool = false) {
 	turn := max(f32(0.25), abs(math.cos(clock*6)))
 	gold := rl.Color{170, 160, 140, 255} if grey else WESTERN_GOLD
@@ -547,6 +571,7 @@ draw_western_coin :: proc(c: rl.Vector2, clock: f32, scale: f32 = 1, grey: bool 
 	western_ellipse({c.x-1.4*turn*scale, c.y-1.6*scale}, 1.6*turn*scale, 1.6*scale, {255, 250, 214, 255})
 }
 
+@(private = "file")
 draw_western_ride :: proc(renderer: ^Renderer, s: ^western.State) {
 	page := WESTERN_PAGE
 	clock := western_ride_clock(s)
@@ -666,6 +691,7 @@ draw_western_ride :: proc(renderer: ^Renderer, s: ^western.State) {
 }
 
 // How far a rider's arm is out, from the moment of its press.
+@(private = "file")
 western_reach :: proc(s: ^western.State, side: int, clock: f32) -> f32 {
 	pressed := f32(-10)
 	if s.phase == .Ride && s.offsets[side] != western.NO_PRESS {
@@ -679,6 +705,7 @@ western_reach :: proc(s: ^western.State, side: int, clock: f32) -> f32 {
 	return math.sin(since/0.35*math.PI)
 }
 
+@(private = "file")
 draw_western_ride_hud :: proc(renderer: ^Renderer, s: ^western.State, clock: f32) {
 	page := WESTERN_PAGE
 	// Purses: three coin places each.

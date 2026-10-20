@@ -1,10 +1,11 @@
 package game
 
-import grid "../grid"
+import grid "../engine/grid"
 import level "../level"
 
 GENERATED_OBJECT_KINDS :: [?]Grid_Object_Kind{.Barrel, .Ice_Block, .Fire}
 
+@(private = "file")
 generated_object_kind :: proc(blueprint: ^Room_Blueprint, index: int) -> Grid_Object_Kind {
 	if blueprint.encounter_kind == .Powder_Keg {
 		kinds := [?]Grid_Object_Kind{.Barrel, .Barrel, .Ice_Block, .Fire}
@@ -14,12 +15,14 @@ generated_object_kind :: proc(blueprint: ^Room_Blueprint, index: int) -> Grid_Ob
 	return kinds[index%len(kinds)]
 }
 
+@(private = "file")
 object_preserves_encounter_link :: proc(blueprint: ^Room_Blueprint, candidate: grid.Position) -> bool {
 	if blueprint.encounter_kind != .Escort || len(blueprint.enemies) < 2 { return true }
 	a, b := blueprint.enemies[0].position, blueprint.enemies[1].position
 	return candidate != (grid.Position{(a.x+b.x)/2, (a.y+b.y)/2})
 }
 
+@(private)
 generate_blueprint_objects :: proc(blueprint: ^Room_Blueprint, candidates: []grid.Position) -> bool {
 	blockers: [MAX_GENERATED_OBSTACLES+MAX_GRID_OBJECTS_PER_ROOM]grid.Position
 	count := len(blueprint.obstacles)
@@ -51,6 +54,7 @@ generate_blueprint_objects :: proc(blueprint: ^Room_Blueprint, candidates: []gri
 	return len(blueprint.objects) == blueprint.profile.encounter_config.object_count
 }
 
+@(private)
 validate_blueprint_objects :: proc(blueprint: ^Room_Blueprint) -> bool {
 	config := blueprint.profile.encounter_config
 	if len(blueprint.objects) != config.object_count {
@@ -85,6 +89,7 @@ validate_blueprint_objects :: proc(blueprint: ^Room_Blueprint) -> bool {
 	       all_unblocked_walkable_cells_are_connected(&blueprint.level_data, blockers[:count])
 }
 
+@(private = "file")
 generated_barrel_lane_cell_open :: proc(blueprint: ^Room_Blueprint, position, extra_blocker: grid.Position) -> bool {
 	if !encounter_position_open(blueprint, position, extra_blocker) { return false }
 	for trap in blueprint.traps { if trap.position == position { return false } }
@@ -93,6 +98,7 @@ generated_barrel_lane_cell_open :: proc(blueprint: ^Room_Blueprint, position, ex
 }
 
 // Require a reachable stance and a free destination on opposite sides of every barrel.
+@(private)
 generated_barrel_has_push_lane :: proc(blueprint: ^Room_Blueprint, position: grid.Position, extra_blocker: grid.Position = {-1, -1}) -> bool {
 	directions := [2]grid.Position{{1, 0}, {0, 1}}
 	for direction in directions {
@@ -104,6 +110,7 @@ generated_barrel_has_push_lane :: proc(blueprint: ^Room_Blueprint, position: gri
 	return false
 }
 
+@(private = "file")
 object_preserves_barrel_lanes :: proc(blueprint: ^Room_Blueprint, candidate: grid.Position) -> bool {
 	for object in blueprint.objects {
 		if object.kind == .Barrel && !generated_barrel_has_push_lane(blueprint, object.position, candidate) { return false }

@@ -4,7 +4,7 @@ import "core:math"
 import "core:testing"
 import rl "vendor:raylib"
 import game "../game"
-import grid "../grid"
+import grid "../engine/grid"
 import level "../level"
 
 @(test)
@@ -54,7 +54,7 @@ test_large_arena_culling_keeps_projected_geometry_and_grid_picking :: proc(t: ^t
 	renderer := new(Renderer)
 	defer free(renderer)
 	renderer.canvas_width, renderer.canvas_height = 960, 540
-	renderer.tactical.scene_3d = true
+
 	for perspective in ([2]bool{false, true}) {
 		for target in ([3]rl.Vector3{{3.5, 0, 3.5}, {22.5, 0, 15.5}, {41.5, 0, 27.5}}) {
 			for step in 0..<8 {
@@ -118,7 +118,7 @@ test_large_arena_alpha_buffer_grows_without_truncating_walls_or_actors :: proc(t
 	for &enemy, i in snapshot.enemies[:snapshot.enemy_count] {
 		enemy = {visible = true, position = {f32(i+1), 5}, opacity = 1}
 	}
-	renderer.tactical = {enabled = true, no_fog = true, snapshot = &snapshot,
+	renderer.tactical = {no_fog = true, snapshot = &snapshot,
 		camera = {position = {40, 30, 40}, target = {22, 0, 15}}}
 	entries := collect_tactical_translucents(renderer, &room)
 	testing.expect(t, walls > 128)
@@ -152,9 +152,9 @@ test_large_arena_culling_never_changes_fog_or_clear_room_light :: proc(t: ^testi
 	defer game.destroy_room(&room)
 	renderer := new(Renderer)
 	defer free(renderer)
-	renderer^ = create(960, 540, &data)
+	renderer^ = create(960, 540)
 	snapshot: Room_Presentation
-	renderer.tactical = {enabled = true, scene_3d = true, perspective = true, snapshot = &snapshot}
+	renderer.tactical = {perspective = true, snapshot = &snapshot}
 	update_tactical_view(renderer, &room, {}, false)
 	testing.expect(t, tactical_render_visible(renderer, player.position))
 	testing.expect(t, !tactical_render_visible(renderer, room.exit_position))

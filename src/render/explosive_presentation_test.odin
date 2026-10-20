@@ -16,16 +16,18 @@ test_bomb_spawn_arm_and_explosion_replay_without_reading_future_state :: proc(t:
 	room, ok := game.create_room(&data, &player, {enemies = enemies[:]})
 	testing.expect(t, ok)
 	defer game.destroy_room(&room)
+	advance_presentation_test_clock(t, &room, 5)
 	timeline: Presentation_Timeline
-	for step in 0..<3 {
+	for step in 0..<4 {
 		before := capture_room_presentation(&room)
 		game.wait_player_turn(&room)
+		advance_presentation_test_clock(t, &room, 1)
 		after := capture_room_presentation(&room)
-		testing.expect(t, begin_event_timeline(&timeline, before, &room.recent_events, &after))
+		testing.expect(t, begin_event_timeline(&timeline, before, room.recent_events, &after))
 		if step == 0 {
 			testing.expect_value(t, timeline.view.object_count, 0)
 		}
-		if step == 2 {
+		if step == 3 {
 			// Bomb 1 has disappeared from the simulation, but must exist until its cue.
 			object, found := presentation_grid_object(&timeline, game.object_entity(1))
 			testing.expect(t, found && object.visible)
@@ -42,7 +44,7 @@ test_bomb_spawn_arm_and_explosion_replay_without_reading_future_state :: proc(t:
 			testing.expect_value(t, visual.detonation_pulse, object.detonation_pulse)
 		}
 	}
-	testing.expect_value(t, player.health, i32(16))
+	testing.expect_value(t, player.health, i32(17))
 }
 
 @(test)

@@ -30,7 +30,7 @@ test_barrage_zero_and_three_successes_replay_one_throw_before_any_effect :: proc
 		testing.expect(t, game.card_play_was_committed(play.result))
 		after := capture_room_presentation(&room)
 		timeline: Presentation_Timeline
-		testing.expect(t, begin_event_timeline(&timeline, before, &room.recent_events, &after))
+		testing.expect(t, begin_event_timeline(&timeline, before, room.recent_events, &after))
 		rolls, impacts := 0, 0
 		for cue in timeline.cues[:timeline.count] {
 			if cue.kind == .Dice_Rolled {rolls += 1}
@@ -81,7 +81,7 @@ test_dice_pool_is_one_cue_and_holds_health_and_position_until_the_hit :: proc(t:
 	testing.expect_value(t, play.result, game.Card_Play_Result.Played)
 	after := capture_room_presentation(&room)
 	timeline: Presentation_Timeline
-	testing.expect(t, begin_event_timeline(&timeline, before, &room.recent_events, &after))
+	testing.expect(t, begin_event_timeline(&timeline, before, room.recent_events, &after))
 	roll_cues := 0
 	for cue in timeline.cues[:timeline.count] { if cue.kind == .Dice_Rolled { roll_cues += 1 } }
 	testing.expect_value(t, roll_cues, 1)
@@ -135,7 +135,7 @@ test_dice_cue_rolls_the_die_of_its_card_level :: proc(t: ^testing.T) {
 	testing.expect(t, game.card_play_was_committed(play.result))
 	after := capture_room_presentation(&room)
 	timeline: Presentation_Timeline
-	testing.expect(t, begin_event_timeline(&timeline, before, &room.recent_events, &after))
+	testing.expect(t, begin_event_timeline(&timeline, before, room.recent_events, &after))
 	rolls := 0
 	for cue in timeline.cues[:timeline.count] {
 		if cue.kind != .Dice_Rolled { continue }

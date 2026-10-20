@@ -71,6 +71,7 @@ Dice_Physics_SAT :: struct {
 	face_body, axis_a, axis_b: int, // face_body = -1 means an edge/edge contact.
 }
 
+@(private)
 dice_physics_axes :: proc(body: ^Dice_Physics_Body) -> [3]rl.Vector3 {
 	if body.cached_orientation == body.orientation { return body.cached_axes }
 	body.cached_axes = {rl.Vector3RotateByQuaternion({1, 0, 0}, body.orientation),
@@ -80,15 +81,18 @@ dice_physics_axes :: proc(body: ^Dice_Physics_Body) -> [3]rl.Vector3 {
 	return body.cached_axes
 }
 
+@(private = "file")
 dice_physics_projected_radius :: proc(axes: [3]rl.Vector3, direction: rl.Vector3) -> f32 {
 	return 0.5*(abs(rl.Vector3DotProduct(axes[0], direction))+
 		abs(rl.Vector3DotProduct(axes[1], direction))+abs(rl.Vector3DotProduct(axes[2], direction)))
 }
 
+@(private)
 dice_physics_support_height :: proc(body: ^Dice_Physics_Body) -> f32 {
 	return dice_physics_projected_radius(dice_physics_axes(body), {0, 1, 0})
 }
 
+@(private)
 dice_physics_sat :: proc(a, b: ^Dice_Physics_Body) -> (result: Dice_Physics_SAT) {
 	axes_a, axes_b :=dice_physics_axes(a),dice_physics_axes(b)
 	delta := b.position-a.position
@@ -118,6 +122,7 @@ dice_physics_sat :: proc(a, b: ^Dice_Physics_Body) -> (result: Dice_Physics_SAT)
 	return
 }
 
+@(private = "file")
 dice_physics_add_contact :: proc(contacts: ^Dice_Physics_Contacts, a, b: int, point, normal: rl.Vector3, penetration: f32) {
 	if contacts.count >= len(contacts.items) { return }
 	contacts.touched_bodies[a] = true
@@ -131,6 +136,7 @@ dice_physics_add_contact :: proc(contacts: ^Dice_Physics_Contacts, a, b: int, po
 
 // Clip the incident face against the four side planes of the reference face.
 // Keeping several contact points lets cubes rest on faces rather than wobble on one point.
+@(private = "file")
 dice_physics_clip_polygon :: proc(input: []rl.Vector3, normal: rl.Vector3, limit: f32, output: ^[16]rl.Vector3) -> (count: int) {
 	if len(input) == 0 { return }
 	previous := input[len(input)-1]
@@ -148,6 +154,7 @@ dice_physics_clip_polygon :: proc(input: []rl.Vector3, normal: rl.Vector3, limit
 	return
 }
 
+@(private = "file")
 dice_physics_face_contacts :: proc(bodies: []Dice_Physics_Body, a, b: int, sat: Dice_Physics_SAT, contacts: ^Dice_Physics_Contacts) {
 	reference := &bodies[a] if sat.face_body == 0 else &bodies[b]
 	incident := &bodies[b] if sat.face_body == 0 else &bodies[a]
@@ -181,6 +188,7 @@ dice_physics_face_contacts :: proc(bodies: []Dice_Physics_Body, a, b: int, sat: 
 	}
 }
 
+@(private = "file")
 dice_physics_closest_segments :: proc(a0, a1, b0, b1: rl.Vector3) -> (point_a, point_b: rl.Vector3) {
 	d1, d2, r := a1-a0, b1-b0, a0-b0
 	a, e := rl.Vector3DotProduct(d1, d1), rl.Vector3DotProduct(d2, d2)
@@ -194,6 +202,7 @@ dice_physics_closest_segments :: proc(a0, a1, b0, b1: rl.Vector3) -> (point_a, p
 	return a0+d1*s, b0+d2*t
 }
 
+@(private = "file")
 dice_physics_edge_contacts :: proc(bodies: []Dice_Physics_Body, a, b: int, sat: Dice_Physics_SAT, contacts: ^Dice_Physics_Contacts) {
 	axes_a, axes_b :=dice_physics_axes(&bodies[a]),dice_physics_axes(&bodies[b])
 	center_a, center_b := bodies[a].position, bodies[b].position
@@ -208,6 +217,7 @@ dice_physics_edge_contacts :: proc(bodies: []Dice_Physics_Body, a, b: int, sat: 
 	dice_physics_add_contact(contacts, a, b, (point_a+point_b)*0.5, sat.normal, sat.depth)
 }
 
+@(private = "file")
 dice_physics_plane_contacts :: proc(body: ^Dice_Physics_Body, body_index: int, normal: rl.Vector3, plane_offset: f32, contacts: ^Dice_Physics_Contacts) {
 	axes :=dice_physics_axes(body)
 	// Plane normal points into the permitted region; contact normal points body -> plane.
@@ -223,16 +233,19 @@ dice_physics_plane_contacts :: proc(body: ^Dice_Physics_Body, body_index: int, n
 	} } }
 }
 
+@(private = "file")
 dice_physics_velocity_at :: proc(body: ^Dice_Physics_Body, point: rl.Vector3) -> rl.Vector3 {
 	return body.velocity+rl.Vector3CrossProduct(body.angular_velocity, point-body.position)
 }
 
+@(private = "file")
 dice_physics_relative_velocity :: proc(bodies: []Dice_Physics_Body, contact: ^Dice_Physics_Contact) -> rl.Vector3 {
 	velocity := -dice_physics_velocity_at(&bodies[contact.a], contact.point)
 	if contact.b >= 0 { velocity +=dice_physics_velocity_at(&bodies[contact.b], contact.point) }
 	return velocity
 }
 
+@(private = "file")
 dice_physics_impulse_denominator :: proc(bodies: []Dice_Physics_Body, contact: ^Dice_Physics_Contact, direction: rl.Vector3) -> f32 {
 	ra := rl.Vector3CrossProduct(contact.point-bodies[contact.a].position, direction)
 	denominator := 1+DICE_PHYSICS_INVERSE_INERTIA*rl.Vector3DotProduct(ra, ra)
@@ -243,6 +256,7 @@ dice_physics_impulse_denominator :: proc(bodies: []Dice_Physics_Body, contact: ^
 	return denominator
 }
 
+@(private = "file")
 dice_physics_apply_impulse :: proc(bodies: []Dice_Physics_Body, contact: ^Dice_Physics_Contact, impulse: rl.Vector3) {
 	a := &bodies[contact.a]
 	if a.asleep && rl.Vector3Length(impulse) > 0.02 { a.asleep = false; a.quiet_steps = 0 }
@@ -256,6 +270,7 @@ dice_physics_apply_impulse :: proc(bodies: []Dice_Physics_Body, contact: ^Dice_P
 	}
 }
 
+@(private = "file")
 dice_physics_solve_contacts :: proc(bodies: []Dice_Physics_Body, contacts: ^Dice_Physics_Contacts) {
 	for &contact in contacts.items[:contacts.count] {
 		closing := rl.Vector3DotProduct(dice_physics_relative_velocity(bodies, &contact), contact.normal)
@@ -295,6 +310,7 @@ dice_physics_solve_contacts :: proc(bodies: []Dice_Physics_Body, contacts: ^Dice
 
 // Conservative position correction is separate from velocity impulses so resting
 // penetration is not converted into an artificial source of bounce energy.
+@(private = "file")
 dice_physics_correct_positions :: proc(bodies: []Dice_Physics_Body) {
 	for _ in 0..<4 {
 		for &body in bodies {
@@ -312,6 +328,7 @@ dice_physics_correct_positions :: proc(bodies: []Dice_Physics_Body) {
 	}
 }
 
+@(private)
 dice_physics_apply_floor_kick :: proc(body: ^Dice_Physics_Body, ground_contact: bool, incoming_velocity_y: f32) {
 	new_impact := ground_contact && !body.floor_contact
 	body.floor_contact = ground_contact
@@ -330,6 +347,7 @@ dice_physics_apply_floor_kick :: proc(body: ^Dice_Physics_Body, ground_contact: 
 	body.quiet_steps, body.stationary_steps, body.asleep = 0, 0, false
 }
 
+@(private)
 dice_physics_step :: proc(bodies: []Dice_Physics_Body) -> (pair_contacts: int, ground_contact: bool) {
 	incoming_velocity_y: [DICE_PHYSICS_MAX_BODIES]f32
 	for &body, index in bodies {
@@ -407,6 +425,7 @@ dice_cosmetic_random :: proc(random: ^Dice_Cosmetic_Random) -> f32 {
 
 // Solve only the initial release. During playback every pose still comes from
 // gravity and rigid-body contact impulses, including all X/Z tumbling.
+@(private = "file")
 dice_physics_free_fall_factors :: proc(height: f32) -> (rotation, aligned_height: f32) {
 	y, velocity := height, f32(0)
 	angular_decay := f32(1)
@@ -423,6 +442,7 @@ dice_physics_free_fall_factors :: proc(height: f32) -> (rotation, aligned_height
 	return
 }
 
+@(private)
 dice_physics_initial_bodies :: proc(count: int, seed: u64, release_height: f32, controlled: bool = false) -> (bodies: [3]Dice_Physics_Body) {
 	random := Dice_Cosmetic_Random{seed if seed != 0 else 0xCC891031DB61EF12}
 	group_yaw := (dice_cosmetic_random(&random)-0.5)*0.20
@@ -459,6 +479,7 @@ dice_physics_initial_bodies :: proc(count: int, seed: u64, release_height: f32, 
 	return
 }
 
+@(private)
 dice_physics_frame :: proc(bodies: []Dice_Physics_Body) -> (frame: Dice_Physics_Frame) {
 	for body, index in bodies {
 		frame.positions[index] = body.position
@@ -467,6 +488,7 @@ dice_physics_frame :: proc(bodies: []Dice_Physics_Body) -> (frame: Dice_Physics_
 	return
 }
 
+@(private = "file")
 dice_physics_rest_target :: proc(body: ^Dice_Physics_Body) -> Dice_Physics_Body {
 	result := body^
 	axes := dice_physics_axes(body)
@@ -481,6 +503,7 @@ dice_physics_rest_target :: proc(body: ^Dice_Physics_Body) -> Dice_Physics_Body 
 	return result
 }
 
+@(private)
 dice_physics_finish_quiet_tail :: proc(throw: ^Dice_Throw, bodies: []Dice_Physics_Body, final_index: int) -> bool {
 	visible_bounces := 0
 	for body in bodies {
@@ -513,6 +536,7 @@ dice_physics_finish_quiet_tail :: proc(throw: ^Dice_Throw, bodies: []Dice_Physic
 	return true
 }
 
+@(private)
 dice_physics_hold_tail :: proc(throw: ^Dice_Throw, last_frame: int) {
 	if throw == nil || last_frame < 0 || last_frame >= DICE_THROW_FRAME_COUNT { return }
 	last := throw.frames[last_frame]

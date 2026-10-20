@@ -6,12 +6,13 @@ import "core:math"
 import rl "vendor:raylib"
 import rlgl "vendor:raylib/rlgl"
 import game "../game"
-import grid "../grid"
+import grid "../engine/grid"
 import level "../level"
 
 HOLOGRAM_EDGE :: rl.Color{58, 108, 140, 255}
 HOLOGRAM_GLOW :: rl.Color{113, 207, 230, 255}
 
+@(private = "file")
 draw_hologram_table :: proc(renderer: ^Renderer, room: ^game.Room) {
 	w, h := f32(room.level_data.tiles.width), f32(room.level_data.tiles.height)
 	draw_resin_cube(renderer, {w*0.5, -0.13, h*0.5}, w+0.24, 0.08, h+0.24, {8, 17, 28, 255})
@@ -43,6 +44,7 @@ draw_hologram_table :: proc(renderer: ^Renderer, room: ^game.Room) {
 	}
 }
 
+@(private = "file")
 draw_hologram_threat :: proc(room: ^game.Room, cell: grid.Position) {
 	tile, found := level.tile_at(room.level_data, cell)
 	if !found || !level.is_walkable(tile.kind) { return }
@@ -51,6 +53,7 @@ draw_hologram_threat :: proc(room: ^game.Room, cell: grid.Position) {
 	rl.DrawCubeWires(p, 0.88, 0.006, 0.88, {221, 74, 89, 225})
 }
 
+@(private = "file")
 draw_hologram_projection :: proc(renderer: ^Renderer, room: ^game.Room) {
 	w, h := f32(room.level_data.tiles.width), f32(room.level_data.tiles.height)
 	rl.DrawCubeWires({w*0.5, -0.064, h*0.5}, w+0.14, 0.026, h+0.14, HOLOGRAM_GLOW)
@@ -116,6 +119,7 @@ draw_hologram_projection :: proc(renderer: ^Renderer, room: ^game.Room) {
 	draw_tactical_actor_bases(renderer)
 }
 
+@(private = "file")
 draw_hologram_chrome :: proc(renderer: ^Renderer, room: ^game.Room) {
 	tactical_hud_panel({14, 12, 270, 57}, HOLOGRAM_GLOW)
 	gothic_text(renderer, "MAPPA OLOGRAFICA", 26, 19, 20, GOTHIC_PAPER)

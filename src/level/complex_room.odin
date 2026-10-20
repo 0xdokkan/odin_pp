@@ -1,7 +1,7 @@
 package level
 
 import "core:math/rand"
-import grid "../grid"
+import grid "../engine/grid"
 
 // These routes remain clear of both architecture and generated solid objects.
 // Wide approaches let large encounters flank instead of forming a single queue.

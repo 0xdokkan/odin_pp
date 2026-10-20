@@ -3,7 +3,7 @@ package render
 import "core:math"
 import "core:testing"
 import rl "vendor:raylib"
-import view "../view"
+import view "../engine/view"
 
 @(test)
 test_sprite_clip_keys_extend_the_manifest_without_renumbering_idle_sprites :: proc(t: ^testing.T) {
@@ -98,9 +98,6 @@ test_sprite_clip_fallback_prevents_event_assets_from_becoming_idle_or_click_targ
 		configured = true, texture_index = 0, columns = 1, frames = 1, frame_width = 20, frame_height = 20,
 		width = 40, height = 40, anchor = {0.5, 0.5}, fps = 8,
 	}
-	testing.expect(t, !draw_sprite_asset(&assets, .Firebomb_Impact, center, 1), "event clips cannot enter the idle draw path")
 	testing.expect(t, !draw_sprite_clip(&assets, .Player, center, 1, 0.5), "idle body keys cannot replace event clips implicitly")
-	hit, configured := sprite_asset_contains_point(&assets, .Firebomb_Impact, center, center, 1)
-	testing.expect(t, !hit && !configured, "cosmetic effects must not steal target selection")
 	testing.expect(t, !draw_sprite_clip(&assets, .Firebomb_Impact, center, 0, 0.5))
 }

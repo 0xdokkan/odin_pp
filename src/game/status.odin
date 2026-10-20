@@ -11,8 +11,7 @@ Status_Kind :: enum {
 	Afterimage,
 	Stagger,
 	Survey,
-	// Bruciatura: damage equal to its stacks at each new tactical window
-	// (each pulse in classic combat); its stacks never wear.
+	// Bruciatura: damage equal to its stacks at each new window; they never wear.
 	Burn,
 	// Rallentamento: each stack holds an enemy's next planned intent a second
 	// longer; the action it held wears a stack. No effect on the player.
@@ -117,6 +116,7 @@ status_index :: proc(statuses: ^Status_Set, kind: Status_Kind) -> (int, bool) {
 	return 0, false
 }
 
+@(private = "file")
 status_set_for_entity :: proc(room: ^Room, entity: Entity_Ref) -> (^Status_Set, bool) {
 	if room == nil || room.player == nil {
 		return nil, false
@@ -224,6 +224,7 @@ remove_status :: proc(room: ^Room, entity: Entity_Ref, kind: Status_Kind) -> (re
 	return removed, true
 }
 
+@(private)
 clear_statuses :: proc(statuses: ^Status_Set) {
 	if statuses != nil {
 		statuses^ = {}

@@ -5,6 +5,7 @@ import rl "vendor:raylib"
 
 // Both standee styles fall around the same floor edge; only their animation
 // clocks and the set of quads being transformed differ.
+@(private)
 topple_card_points :: proc(points: ^[4]rl.Vector3, camera: rl.Camera3D, fall: f32) {
 	angle := fall*fall*1.4
 	away := rl.Vector3Normalize(rl.Vector3{camera.target.x-camera.position.x, 0, camera.target.z-camera.position.z})
@@ -17,6 +18,7 @@ topple_card_points :: proc(points: ^[4]rl.Vector3, camera: rl.Camera3D, fall: f3
 
 // Local coordinates of a confirmed quad hit, clamped inside the last texel.
 // Callers retain their own mirroring and atlas-frame selection.
+@(private)
 card_hit_uv :: proc(points: [4]rl.Vector3, hit: rl.Vector3) -> rl.Vector2 {
 	u := points[3]-points[0]
 	v := points[1]-points[0]

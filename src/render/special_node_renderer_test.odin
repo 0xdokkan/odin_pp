@@ -3,7 +3,7 @@ package render
 import "core:testing"
 import rl "vendor:raylib"
 import game "../game"
-import view "../view"
+import view "../engine/view"
 
 SPECIAL_NODE_RENDER_TEST_PLAYER_STATS :: game.Player_Stats{
 	max_health = 20,
@@ -162,7 +162,7 @@ test_special_node_geometry_and_hit_tests_reject_invalid_inputs :: proc(t: ^testi
 	defer game.destroy_run(&run)
 	testing.expect_value(
 		t,
-		special_node_hit_test(&run, 960, 540, 0, {x = 480, y = 180}).kind,
+		special_node_hit_test(&run, 960, 540, 0, {480, 180}).kind,
 		Special_Node_Hit_Kind.None,
 	)
 }
@@ -203,7 +203,7 @@ test_rest_deck_adapter_preserves_page_and_hover_selection :: proc(t: ^testing.T)
 
 	raised_card_id := deck.owned[1].id
 	raised := special_node_owned_card_bounds(960, 540, 1, true)
-	raised_only_point := view.Vec2{x = raised.x+raised.width*0.5, y = raised.y+2}
+	raised_only_point := view.Vec2{raised.x+raised.width*0.5, raised.y+2}
 	testing.expect_value(
 		t,
 		special_node_hit_test(&run, 960, 540, 0, raised_only_point).kind,

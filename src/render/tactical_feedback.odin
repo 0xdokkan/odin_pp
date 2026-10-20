@@ -5,8 +5,8 @@ import "core:math"
 import rl "vendor:raylib"
 import rlgl "vendor:raylib/rlgl"
 import game "../game"
-import grid "../grid"
-import view "../view"
+import grid "../engine/grid"
+import view "../engine/view"
 
 // These effects are a read-only interpretation of the presentation snapshot.
 // No particles survive a cue or require timers, RNG, allocations or input locks.
@@ -24,9 +24,10 @@ Tactical_Feedback_Pose :: struct {
 	tint: rl.Color,
 }
 
+@(private)
 tactical_feedback_pose :: proc(renderer: ^Renderer, key: Sprite_Key, position: view.Vec2) -> Tactical_Feedback_Pose {
 	result := Tactical_Feedback_Pose{scale_y = 1, tint = rl.WHITE}
-	if renderer == nil || !renderer.tactical.enabled || !renderer.tactical.scene_3d { return result }
+	if renderer == nil { return result }
 	for offset in 0..<renderer_active_cue_count(renderer) {
 		cue, found := renderer_active_cue_at(renderer, offset)
 		if !found || !cue.started { continue }
@@ -63,6 +64,7 @@ tactical_feedback_pose :: proc(renderer: ^Renderer, key: Sprite_Key, position: v
 // except the player sunk in his shadow. The pool takes his place in the
 // snapshot, but his body stays where it sank, and so does what the held world
 // shows of him (a miss, a block, a shield, their sparks).
+@(private)
 tactical_cue_actor_position :: proc(renderer: ^Renderer, entity: game.Entity_Ref) -> (position: view.Vec2, found: bool) {
 	if entity == game.PLAYER_ENTITY && renderer.tactical.shadow.active { return renderer.tactical.shadow.body, true }
 	actor, ok := presentation_actor_in_view(renderer.tactical.snapshot, entity)
@@ -70,6 +72,7 @@ tactical_cue_actor_position :: proc(renderer: ^Renderer, entity: game.Entity_Ref
 	return actor.position, true
 }
 
+@(private)
 tactical_feedback_position :: proc(renderer: ^Renderer, entity: game.Entity_Ref, fallback: grid.Position) -> rl.Vector3 {
 	if position, found := tactical_cue_actor_position(renderer, entity); found {
 		return {position.x+0.5, 0.055, position.y+0.5}
@@ -80,16 +83,19 @@ tactical_feedback_position :: proc(renderer: ^Renderer, entity: game.Entity_Ref,
 	return {f32(fallback.x)+0.5, 0.055, f32(fallback.y)+0.5}
 }
 
+@(private)
 tactical_feedback_alpha :: proc(p: f32) -> f32 {
 	return clamp(p*12, f32(0), f32(1))*clamp((1-p)*3, f32(0), f32(1))
 }
 
 // A played card's rune and sparks: blue, or the shadow's violet.
+@(private = "file")
 tactical_card_played_color :: proc(cue: ^Presentation_Cue) -> rl.Color {
 	return SHADOW_RIM if cue.kind == .Card_Played && cue.event.card_definition == .Shadow_Step else TACTICAL_FEEDBACK_BLUE
 }
 
 // Eight angular strokes leave the cell center and grid edges readable.
+@(private)
 draw_tactical_rune :: proc(center: rl.Vector3, radius, phase: f32, color: rl.Color, broken: bool = true) {
 	for index in 0..<8 {
 		angle := f32(index)*math.PI/4+phase
@@ -104,6 +110,7 @@ draw_tactical_rune :: proc(center: rl.Vector3, radius, phase: f32, color: rl.Col
 	}
 }
 
+@(private = "file")
 draw_tactical_sparks :: proc(center: rl.Vector3, p: f32, color: rl.Color, count: int = 7, radius: f32 = 0.52, scale: f32 = 1) {
 	alpha := tactical_feedback_alpha(p)
 	for index in 0..<count {
@@ -117,6 +124,7 @@ draw_tactical_sparks :: proc(center: rl.Vector3, p: f32, color: rl.Color, count:
 	}
 }
 
+@(private)
 draw_tactical_shield :: proc(renderer: ^Renderer, origin: rl.Vector3, p: f32) {
 	alpha := tactical_feedback_alpha(p)
 	right := rl.Vector3Normalize(rl.Vector3CrossProduct({0, 1, 0}, renderer.tactical.camera.position-renderer.tactical.camera.target))
@@ -132,6 +140,7 @@ draw_tactical_shield :: proc(renderer: ^Renderer, origin: rl.Vector3, p: f32) {
 	draw_tactical_sparks(center-rl.Vector3{0, 0.2, 0}, p, TACTICAL_FEEDBACK_BLUE, 4, 0.42)
 }
 
+@(private = "file")
 draw_tactical_hit :: proc(renderer: ^Renderer, origin: rl.Vector3, p: f32, color: rl.Color) {
 	alpha := tactical_feedback_alpha(p)
 	right := rl.Vector3Normalize(rl.Vector3CrossProduct({0, 1, 0}, renderer.tactical.camera.position-renderer.tactical.camera.target))
@@ -147,6 +156,7 @@ draw_tactical_hit :: proc(renderer: ^Renderer, origin: rl.Vector3, p: f32, color
 	draw_tactical_sparks(center-rl.Vector3{0, 0.12, 0}, p, color, 4, 0.4)
 }
 
+@(private = "file")
 tactical_feedback_spell_color :: proc(id: game.Card_Id) -> rl.Color {
 	if id == .Firebomb { return {244, 157, 104, 255} }
 	if id == .Sundering_Blow { return TACTICAL_FEEDBACK_HIT }
@@ -157,12 +167,14 @@ tactical_feedback_spell_color :: proc(id: game.Card_Id) -> rl.Color {
 	return TACTICAL_FEEDBACK_BLUE
 }
 
+@(private = "file")
 tactical_feedback_projectile :: proc(from, to: rl.Vector3, p: f32, arc: bool) -> rl.Vector3 {
 	point := from+(to-from)*p
 	if arc { point.y += math.sin(p*math.PI)*0.65 }
 	return point
 }
 
+@(private = "file")
 draw_tactical_spell_flight :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) {
 	// A pool's flask and a fire's ember fly as paper.
 	if game.card_places_ground(cue.event.card_definition) && renderer.tactical.attack_props.loaded {
@@ -200,8 +212,9 @@ draw_tactical_spell_flight :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) 
 	}
 }
 
+@(private)
 draw_tactical_feedback :: proc(renderer: ^Renderer, layer: Tactical_Feedback_Layer) {
-	if renderer == nil || !renderer.tactical.enabled || !renderer.tactical.scene_3d || renderer.tactical.snapshot == nil { return }
+	if renderer == nil || renderer.tactical.snapshot == nil { return }
 	// Read depth, but never leave translucent fragments in the terrain buffer.
 	rlgl.DrawRenderBatchActive()
 	rlgl.DisableDepthMask()
@@ -300,6 +313,7 @@ draw_tactical_feedback :: proc(renderer: ^Renderer, layer: Tactical_Feedback_Lay
 	rlgl.EnableDepthMask()
 }
 
+@(private = "file")
 draw_tactical_status_rune :: proc(renderer: ^Renderer, actor: ^Presentation_Actor) {
 	if !actor.visible || actor.opacity <= 0 { return }
 	cell := grid.Position{int(math.round(actor.position.x)), int(math.round(actor.position.y))}
@@ -312,13 +326,13 @@ draw_tactical_status_rune :: proc(renderer: ^Renderer, actor: ^Presentation_Acto
 
 // Called after actor annotations: compact feedback shares their collision
 // allocator and viewport instead of painting floating text across the hearts.
+@(private)
 draw_tactical_feedback_overlay :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) -> bool {
-	if !renderer.tactical.enabled || !renderer.tactical.scene_3d { return false }
 	if cue.kind == .Loot || cue.kind == .Loot_Dropped { return false }
 	if cue.kind == .Card_Played || cue.kind == .Refocus {
 		label: cstring = "RICONCENTRAZIONE"
 		if cue.kind == .Card_Played {
-			definition, found := game.card_definition_by_id(cue.event.card_definition, true)
+			definition, found := game.card_definition_by_id(cue.event.card_definition)
 			if !found { return true }
 			label = fmt.ctprintf("%s", definition.name)
 			if game.event_is_critical(cue.event) { label = fmt.ctprintf("CRITICO / %s", definition.name) }
@@ -340,6 +354,7 @@ draw_tactical_feedback_overlay :: proc(renderer: ^Renderer, cue: ^Presentation_C
 
 // One word over the board, over its figure (draw_tactical_feedback_overlay,
 // and the Lazzo's MOLLATO with its foe's fall: lasso.odin).
+@(private)
 draw_tactical_feedback_badge :: proc(renderer: ^Renderer, badge: Tactical_Feedback_Badge, alpha: f32) {
 	center := tactical_feedback_position(renderer, badge.over, badge.fallback)
 	anchor := tactical_project(renderer, {center.x, center.z}, badge.height if badge.height > 0 else TACTICAL_FEEDBACK_BADGE_HEIGHT)
@@ -364,6 +379,7 @@ draw_tactical_feedback_badge :: proc(renderer: ^Renderer, badge: Tactical_Feedba
 
 // A cue's name under the board, where a played card's shows: its `label`
 // after a "+" in `accent`, fading with the cue.
+@(private = "file")
 draw_tactical_cue_banner :: proc(renderer: ^Renderer, cue: ^Presentation_Cue, label: cstring, accent: rl.Color) {
 	viewport := tactical_world_bounds(renderer)
 	width := min(f32(280), gothic_text_width(renderer, label, 13)+35)
@@ -397,6 +413,7 @@ TACTICAL_FEEDBACK_BADGE_HEIGHT :: f32(0.9)
 // the blow back, as the bolt turns or his riposte starts, once a blow: by its
 // wound, or by its guard when the attacker's Shield takes all of it; that
 // guard still says PARATA over the attacker.
+@(private)
 tactical_feedback_badges :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) -> (badges: [2]Tactical_Feedback_Badge, count: int) {
 	event := cue.event
 	label: cstring
@@ -466,6 +483,7 @@ tactical_feedback_badges :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) ->
 
 // Whether the Dado del Destino's die made this blow critical: a Fate_Rolled of
 // its command on its target whose face was a critical (game.player_bump).
+@(private = "file")
 fate_made_critical :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) -> bool {
 	if cue.batch == 0 || cue.event.source != game.PLAYER_ENTITY { return false }
 	matches :: proc(other: ^Presentation_Cue, cue: ^Presentation_Cue) -> bool {
@@ -481,6 +499,7 @@ fate_made_critical :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) -> bool 
 // Whether the blow RIFLESSO gives back, met by a guard (`cue`, its
 // Damage_Absorbed), also wounds: its Damaged in the same command. The wound's
 // cue starts with the guard's and lasts at least as long.
+@(private = "file")
 reflected_blow_wounds :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) -> bool {
 	matches :: proc(other: ^Presentation_Cue, cue: ^Presentation_Cue) -> bool {
 		return other.kind == .Damage && other.batch == cue.batch && game.event_is_reflected(other.event) &&

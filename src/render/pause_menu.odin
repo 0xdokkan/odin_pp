@@ -2,7 +2,7 @@ package render
 
 import "core:c"
 import rl "vendor:raylib"
-import view "../view"
+import view "../engine/view"
 
 // The pause menu over the board: resume, or go back to the main menu when the
 // run was opened from it. The scene reads the choice under the mouse.
@@ -12,6 +12,7 @@ PAUSE_BUTTON_WIDTH :: f32(240)
 PAUSE_BUTTON_HEIGHT :: f32(38)
 PAUSE_BUTTON_GAP :: f32(10)
 
+@(private)
 pause_choice_bounds :: proc(renderer: ^Renderer, choice: Pause_Choice) -> rl.Rectangle {
 	row := f32(int(choice)-1)
 	return {renderer.canvas_width*0.5-PAUSE_BUTTON_WIDTH*0.5, renderer.canvas_height*0.5+row*(PAUSE_BUTTON_HEIGHT+PAUSE_BUTTON_GAP),
@@ -24,6 +25,7 @@ pause_choice_at_point :: proc(renderer: ^Renderer, point: view.Vec2, menu: bool)
 	return .None
 }
 
+@(private)
 draw_pause_menu :: proc(renderer: ^Renderer, hovered: Pause_Choice, menu: bool) {
 	rl.DrawRectangle(0, 0, c.int(renderer.canvas_width), c.int(renderer.canvas_height), {3, 7, 12, 185})
 	top := renderer.canvas_height*0.5-96
@@ -33,6 +35,7 @@ draw_pause_menu :: proc(renderer: ^Renderer, hovered: Pause_Choice, menu: bool) 
 	if menu { draw_pause_button(renderer, pause_choice_bounds(renderer, .Menu), "F10", "MENU PRINCIPALE", hovered == .Menu) }
 }
 
+@(private = "file")
 draw_pause_button :: proc(renderer: ^Renderer, bounds: rl.Rectangle, key, label: cstring, hovered: bool) {
 	accent := GOTHIC_PAPER if hovered else GOTHIC_BLUE
 	hud_frame(bounds, accent)

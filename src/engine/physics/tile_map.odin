@@ -1,7 +1,7 @@
 package physics
 
 import "core:math"
-import grid "../../grid"
+import grid "../grid"
 
 Tile_Shape :: enum u8 {
 	Empty,

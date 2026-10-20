@@ -14,17 +14,15 @@ Refocus_Result :: enum {
 Refocus_Report :: struct {
 	result:        Refocus_Result,
 	hand_report:   Deck_Refocus_Report,
-	drawn_cards:   [MAX_HAND_CAPACITY]Card_Instance,
-	drawn_count:   int,
 	energy_before: i32,
 	energy_after:  i32,
-	pulse_report:  Pulse_Report,
 }
 
 refocus_was_committed :: proc(result: Refocus_Result) -> bool {
 	return result == .Refocused || result == .Combat_Ended || result == .Player_Defeated
 }
 
+@(private = "file")
 record_refocused_card :: proc(log: ^Event_Log, outcome: Card_Refocus_Outcome) -> bool {
 	return record_event(log, make_card_zone_event(
 		.Card_Refocused, PLAYER_ENTITY, PLAYER_ENTITY, outcome.card, .Hand, outcome.destination,
@@ -37,7 +35,7 @@ refocus_player_hand :: proc(room: ^Room) -> (refocus: Refocus_Report) {
 		return
 	}
 	// Behind his eyes his hand is put away (first_person.odin).
-	if room.phase != .Combat || !tactical_allows_action(room) || tactical_first_person_active(room) {
+	if room.phase != .Combat || !tactical_control_allowed(room, .Board_Action) {
 		refocus.result = .Invalid_Phase
 		return
 	}
@@ -86,9 +84,8 @@ refocus_player_hand :: proc(room: ^Room) -> (refocus: Refocus_Report) {
 	}
 
 	deck^ = staged_deck
-	room.recent_events = staged_events
-	pulse_report, outcome := finish_player_combat_command(room, TACTICAL_REFOCUS_SECONDS)
-	refocus.pulse_report = pulse_report
+	copy_event_log(room.recent_events, &staged_events)
+	outcome := finish_player_combat_command(room, TACTICAL_REFOCUS_SECONDS)
 	switch outcome {
 	case .Player_Defeated:
 		refocus.result = .Player_Defeated
@@ -101,32 +98,10 @@ refocus_player_hand :: proc(room: ^Room) -> (refocus: Refocus_Report) {
 	case .Combat_Continues:
 	}
 
-	if tactical_enabled(room) {
-		room.tactical_pulse.refill = true
-		for card_outcome in refocus.hand_report.outcomes[:refocus.hand_report.outcome_count] {
-			if card_outcome.destination == .Exhaust { room.tactical_pulse.exhaust_relic = true }
-		}
-		refocus.result = .Refocused
-		refocus.energy_after = deck.energy
-		return
-	}
-
-	for deck.hand_count < deck.rules.hand_size {
-		card, drawn := draw_card(deck)
-		if !drawn {
-			break
-		}
-		refocus.drawn_cards[refocus.drawn_count] = card
-		refocus.drawn_count += 1
-		record_card_draw(&room.recent_events, card)
-	}
+	room.tactical_pulse.refill = true
 	for card_outcome in refocus.hand_report.outcomes[:refocus.hand_report.outcome_count] {
-		if card_outcome.destination == .Exhaust {
-			apply_card_relics(room, .Exhaust, nil)
-			break
-		}
+		if card_outcome.destination == .Exhaust { room.tactical_pulse.exhaust_relic = true }
 	}
-	assert(validate_deck_state(deck))
 	refocus.result = .Refocused
 	refocus.energy_after = deck.energy
 	return

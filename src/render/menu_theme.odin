@@ -4,10 +4,12 @@ import "core:c"
 import rl "vendor:raylib"
 import game "../game"
 
-// Explicit per-screen theme: layout, hitboxes and classic rendering keep the
-// same contracts. Menus share the battle font and palette without global state.
-menu_themed :: proc(theme: ^Renderer) -> bool { return theme != nil && theme.tactical.enabled }
+// Explicit per-screen resources. Menus share the battle font and palette;
+// nil keeps resource-free drawing helpers usable without a loaded theme.
+@(private)
+menu_themed :: proc(theme: ^Renderer) -> bool { return theme != nil }
 
+@(private = "file")
 menu_color :: proc(theme: ^Renderer, input: rl.Color) -> rl.Color {
 	color := input
 	if !menu_themed(theme) { return color }
@@ -21,6 +23,7 @@ menu_color :: proc(theme: ^Renderer, input: rl.Color) -> rl.Color {
 	color.a = alpha
 	return color
 }
+@(private)
 menu_label :: proc(text: cstring) -> cstring {
 	switch string(text) {
 	case "ROUTE": return "ASCESA ALLA TORRE"
@@ -66,6 +69,7 @@ menu_label :: proc(text: cstring) -> cstring {
 	}
 	return text
 }
+@(private)
 menu_text :: proc(theme: ^Renderer, text: cstring, x, y, size: c.int, color: rl.Color) {
 	if menu_themed(theme) { gothic_text(theme, menu_label(text), f32(x), f32(y), int(size), menu_color(theme, color)) }
 	else { rl.DrawText(text, x, y, size, color) }
@@ -74,44 +78,54 @@ menu_measure_text :: proc(theme: ^Renderer, text: cstring, size: c.int) -> c.int
 	if menu_themed(theme) { return c.int(gothic_text_width(theme, menu_label(text), int(size))) }
 	return rl.MeasureText(text, size)
 }
+@(private)
 menu_rectangle :: proc(theme: ^Renderer, x, y, w, h: c.int, color: rl.Color) {
 	rl.DrawRectangle(x, y, w, h, menu_color(theme, color))
 	if menu_themed(theme) && x == 0 && y == 0 && h < 100 && w > 500 { gothic_rule(18, f32(h), f32(w)-36) }
 }
+@(private)
 menu_rectangle_rec :: proc(theme: ^Renderer, bounds: rl.Rectangle, color: rl.Color) {
 	rl.DrawRectangleRec(bounds, menu_color(theme, color))
 }
+@(private)
 menu_outline :: proc(theme: ^Renderer, bounds: rl.Rectangle, thickness: f32, color: rl.Color) {
 	if menu_themed(theme) && bounds.height > 28 && bounds.width > 48 {
 		gothic_frame(bounds, GOTHIC_INK, menu_color(theme, color))
 	} else { rl.DrawRectangleLinesEx(bounds, thickness, menu_color(theme, color)) }
 }
+@(private = "file")
 menu_rectangle_lines :: proc(theme: ^Renderer, x, y, w, h: c.int, color: rl.Color) {
 	menu_outline(theme, {f32(x), f32(y), f32(w), f32(h)}, 1, color)
 }
+@(private)
 menu_circle :: proc(theme: ^Renderer, center: rl.Vector2, radius: f32, color: rl.Color) {
 	if menu_themed(theme) { rl.DrawPoly(center, 8, radius, 22.5, menu_color(theme, color)) }
 	else { rl.DrawCircleV(center, radius, color) }
 }
+@(private)
 menu_circle_lines :: proc(theme: ^Renderer, center: rl.Vector2, radius: f32, color: rl.Color) {
 	if menu_themed(theme) { rl.DrawPolyLinesEx(center, 8, radius, 22.5, 1, menu_color(theme, color)) }
 	else { rl.DrawCircleLinesV(center, radius, color) }
 }
+@(private)
 menu_poly :: proc(theme: ^Renderer, center: rl.Vector2, sides: c.int, radius, rotation: f32, color: rl.Color) {
 	rl.DrawPoly(center, sides, radius, rotation, menu_color(theme, color))
 }
+@(private)
 menu_poly_lines :: proc(theme: ^Renderer, center: rl.Vector2, sides: c.int, radius, rotation, thickness: f32, color: rl.Color) {
 	rl.DrawPolyLinesEx(center, sides, radius, rotation, thickness, menu_color(theme, color))
 }
+@(private)
 menu_line :: proc(theme: ^Renderer, a, b: rl.Vector2, thickness: f32, color: rl.Color) {
 	rl.DrawLineEx(a, b, thickness, menu_color(theme, color))
 }
+@(private)
 menu_triangle :: proc(theme: ^Renderer, a, b, c: rl.Vector2, color: rl.Color) {
 	rl.DrawTriangle(a, b, c, menu_color(theme, color))
 }
+@(private)
 menu_card_face :: proc(theme: ^Renderer, bounds: rl.Rectangle, card: game.Card_Instance,
 	definition: game.Card_Definition, slot: int, affordable, expanded, highlighted, selected: bool) {
-	if menu_themed(theme) {
-		draw_tactical_card(theme, bounds, card, definition, slot, affordable, selected, highlighted, true)
-	} else { draw_card_face(bounds, card, definition, slot, affordable, expanded, highlighted, selected) }
+	assert(theme != nil, "card menus require the game renderer")
+	draw_tactical_card(theme, bounds, card, definition, slot, affordable, selected, highlighted, true)
 }

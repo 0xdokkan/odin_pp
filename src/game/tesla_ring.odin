@@ -1,6 +1,6 @@
 package game
 
-import grid "../grid"
+import grid "../engine/grid"
 
 // Four coils on the corners of a square whose inside, coils excluded, spans at
 // least 2x2 cells form a ring. Activating it while enemies stand in the field
@@ -49,6 +49,7 @@ query_tesla_controls :: proc(room: ^Room) -> (query: Tesla_Control_Query) {
 }
 
 // The four coils sit exactly on the corners of one axis-aligned square.
+@(private = "file")
 tesla_network_is_square :: proc(network: ^Board_Device_Network) -> bool {
 	if network == nil || network.count != MAX_TESLA_COILS || !network.field { return false }
 	lo, hi := network.positions[0], network.positions[0]
@@ -124,13 +125,13 @@ activate_tesla :: proc(room: ^Room) -> (committed, opened_ring: bool) {
 
 @(private)
 open_tesla_ring :: proc(room: ^Room, network: ^Board_Device_Network, ring: Tesla_Ring) {
-	clear_event_log(&room.recent_events)
+	clear_event_log(room.recent_events)
 	for id in network.ids[:network.count] {
 		index, found := object_index_by_id(room, id)
 		if !found { continue }
 		position := room.objects[index].position
 		remove_grid_object(room, index)
-		record_event(&room.recent_events, {kind = .Entity_Defeated, source = SYSTEM_ENTITY,
+		record_event(room.recent_events, {kind = .Entity_Defeated, source = SYSTEM_ENTITY,
 			target = object_entity(id), object_kind = .Tesla_Coil,
 			from_position = position, to_position = position})
 	}
@@ -147,7 +148,7 @@ settle_tesla_ring :: proc(room: ^Room, outcome: Tesla_Ring_Outcome) -> (report: 
 	ring := room.tesla_ring
 	room.tesla_ring = {}
 	report.settled, report.won = true, outcome.won
-	clear_event_log(&room.recent_events)
+	clear_event_log(room.recent_events)
 	action := make_action(.Trigger, SYSTEM_ENTITY)
 	for slot in 0..<ring.count {
 		index, found := enemy_index_by_id(room, ring.enemy_ids[slot])
@@ -170,7 +171,7 @@ settle_tesla_ring :: proc(room: ^Room, outcome: Tesla_Ring_Outcome) -> (report: 
 	if action.effect_count > 0 {
 		resolved := resolve_action(room, &action)
 		assert(resolved.accepted)
-		append_event_log(&room.recent_events, &resolved.events)
+		append_event_log(room.recent_events, &resolved.events)
 	}
 	collect_loot_in_magnet_range(room)
 	if room.phase != .Combat {

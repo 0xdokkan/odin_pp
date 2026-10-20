@@ -1,15 +1,17 @@
 package game
 
-import grid "../grid"
+import grid "../engine/grid"
 
 DEMOLITIONIST_ENRAGED_CHARGE_RANGE :: 6
 DEMOLITIONIST_CHARGE_RECOVERY      :: 2
 DEMOLITIONIST_MAX_APPROACH_PULSES  :: 2
 
+@(private = "file")
 demolitionist_phase_name :: proc(phase: i32) -> string {
 	return "Overdrive" if phase >= 2 else "Demolition"
 }
 
+@(private)
 update_demolitionist_phase :: proc(enemy: ^Enemy) {
 	if enemy == nil || enemy.archetype != .Demolitionist {
 		return
@@ -24,6 +26,7 @@ update_demolitionist_phase :: proc(enemy: ^Enemy) {
 	}
 }
 
+@(private)
 plan_demolitionist_intent :: proc(
 	room: ^Room, enemy: ^Enemy, origin: grid.Position,
 	predicted_positions: ^[MAX_ENEMIES_PER_ROOM]grid.Position,
@@ -31,7 +34,7 @@ plan_demolitionist_intent :: proc(
 ) -> Enemy_Intent {
 	bomb_stages: u32 = 2 if enemy.boss_phase >= 2 else 1
 	if enemy.boss_cycle < bomb_stages {
-		return plan_bomber_intent(room, enemy, origin, predicted_positions,
+		return plan_tactical_bomber(room, enemy, origin, predicted_positions,
 			enemy_count, ordered_index, reserved_bombs)
 	}
 	attacker := enemy^
@@ -46,6 +49,7 @@ plan_demolitionist_intent :: proc(
 
 // Progress even interrupted attacks: the player earns the same recovery window
 // when a committed charge is pushed aside or blocked.
+@(private)
 begin_demolitionist_offense :: proc(enemy: ^Enemy, kind: Enemy_Intent_Kind) {
 	if enemy.archetype != .Demolitionist {
 		return
@@ -62,6 +66,7 @@ begin_demolitionist_offense :: proc(enemy: ^Enemy, kind: Enemy_Intent_Kind) {
 	}
 }
 
+@(private)
 begin_demolitionist_approach :: proc(enemy: ^Enemy) {
 	if enemy.archetype != .Demolitionist {
 		return

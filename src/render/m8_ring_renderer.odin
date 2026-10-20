@@ -6,6 +6,7 @@ import rl "vendor:raylib"
 // Discrete choreography is independent of combat interpolation: exactly four
 // silhouettes for reach, lift, throw and landing, each held for 0.3 seconds.
 M8_Ring_Pose :: struct { enemy_offset: rl.Vector2, enemy_angle, player_lean: f32 }
+@(private)
 m8_ring_pose :: proc(frame: int) -> M8_Ring_Pose {
     poses := [4]M8_Ring_Pose{
         {{0,0}, 0, 0.12}, {{-0.34,1.04}, -0.4, -0.08},
@@ -14,6 +15,7 @@ m8_ring_pose :: proc(frame: int) -> M8_Ring_Pose {
     return poses[clamp(frame,0,3)]
 }
 
+@(private)
 m8_ring_transform_quad :: proc(original: Tactical_Billboard, lift,angle,lean: f32) -> Tactical_Billboard {
     quad := original
     base := (quad.points[1]+quad.points[2])*0.5

@@ -1,13 +1,13 @@
 package game
 
 import "core:math"
-import grid "../grid"
+import grid "../engine/grid"
 import rng "../engine/rng"
 
 // PINBALL. The card's two seconds are the strike (a cast, the world still):
 // one foe beside the player (the eight cells round him, in sight), never a
-// boss or a miniboss (Target_Too_Heavy: the Lazzo and the Dado del Destino's
-// death refuse them too), turns into a steel ball, and the player strikes it
+// boss or a miniboss (Target_Too_Heavy; unlike the Lazzo, this card keeps its
+// weight restriction), turns into a steel ball, and the player strikes it
 // away from him: from him toward it, turned PINBALL_MIN_TURN to
 // PINBALL_MAX_TURN degrees left or right by the room's own stream
 // (Room.pinball_random), so that it never just bounces on one axis.
@@ -96,6 +96,7 @@ Pinball_State :: struct {
 	turn: i32,
 }
 
+@(private)
 pinball_effect :: proc(target: Entity_Ref, value: i32) -> Effect {
 	return {kind = .Pinball, target = target, amount = value}
 }
@@ -111,6 +112,7 @@ tactical_pinball_active :: proc(room: ^Room) -> bool {
 
 // The room's own stream for its launches: from its seed and the run's dice as
 // the room begins (create_room), never a clock.
+@(private)
 pinball_room_stream :: proc(player: ^Player, content: Room_Content) -> u64 {
 	seed := content.room_seed~PINBALL_SEED_SALT
 	if player != nil { seed ~= player.dice.random_state }
@@ -145,6 +147,7 @@ pinball_next_launch :: proc(room: ^Room, cell: grid.Position) -> (heading: Pinba
 
 // Whether the rolling ball's disc lies over `cell`: no blocking thing is set
 // down there while it does (board_device_can_deploy).
+@(private)
 pinball_covers_cell :: proc(room: ^Room, cell: grid.Position) -> bool {
 	if !tactical_pinball_active(room) { return false }
 	p := pinball_position(&room.pinball)
@@ -171,6 +174,7 @@ pinball_target_error :: proc(room: ^Room, target: Target) -> Card_Compile_Error 
 // The strike (apply_effect): the foe turns into the ball where it stands, its
 // statuses, reactions and intent gone, and the player strikes it away; it
 // rolls with the world's next seconds.
+@(private)
 begin_pinball :: proc(room: ^Room, target: Entity_Ref, value: i32, report: ^Action_Report) -> bool {
 	if report == nil || value <= 0 || pinball_target_error(room, entity_target(target)) != .None { return false }
 	index, _ := enemy_index_by_id(room, target.id)
@@ -216,6 +220,7 @@ pinball_seconds_left :: proc(s: ^Pinball_State) -> f64 {
 }
 
 // World seconds for the ball (tactical_tick, with the world's own).
+@(private)
 tactical_pinball_tick :: proc(room: ^Room, seconds: f32) {
 	if !tactical_pinball_active(room) || !(seconds > 0) { return }
 	room.pinball.pending += f64(seconds)
@@ -224,7 +229,7 @@ tactical_pinball_tick :: proc(room: ^Room, seconds: f32) {
 // Seconds wait to be rolled, and nothing holds the world: the controller
 // commits the roll (resolve_pinball_roll) as a world command, as it does a beat.
 tactical_pinball_due :: proc(room: ^Room) -> bool {
-	return tactical_pinball_active(room) && tactical_enabled(room) && !room.tactical_pulse.pending &&
+	return tactical_pinball_active(room) && room.player != nil && !room.tactical_pulse.pending &&
 	       room.qte.kind == .None && room.player.tactical.cast_remaining <= 0 && room.pinball.pending > PINBALL_EPSILON
 }
 
@@ -233,7 +238,7 @@ tactical_pinball_due :: proc(room: ^Room) -> bool {
 // comes near a full log leaves the rest for the next.
 resolve_pinball_roll :: proc(room: ^Room) -> bool {
 	if !tactical_pinball_due(room) { return false }
-	clear_event_log(&room.recent_events)
+	clear_event_log(room.recent_events)
 	for steps := 0; steps < PINBALL_MAX_STEPS && tactical_pinball_active(room) && room.pinball.pending > PINBALL_EPSILON &&
 	    room.recent_events.count <= MAX_GAME_EVENTS-PINBALL_EVENT_HEADROOM; steps += 1 {
 		pinball_step(room)
@@ -246,16 +251,19 @@ resolve_pinball_roll :: proc(room: ^Room) -> bool {
 	return true
 }
 
+@(private = "file")
 pinball_dot :: proc(a, b: Pinball_Vec) -> f64 {
 	return a.x*b.x+a.y*b.y
 }
 
+@(private)
 pinball_length :: proc(a: Pinball_Vec) -> f64 {
 	return math.sqrt(pinball_dot(a, a))
 }
 
 // Where a run from `origin` along `heading` first touches the circle of
 // `radius` round `centre`, no nearer than `run`: the entering distance.
+@(private = "file")
 pinball_circle_contact :: proc(origin, heading: Pinball_Vec, run: f64, centre: Pinball_Vec, radius: f64) -> (t: f64, ok: bool) {
 	w := origin-centre
 	b := pinball_dot(heading, w)
@@ -269,6 +277,7 @@ pinball_circle_contact :: proc(origin, heading: Pinball_Vec, run: f64, centre: P
 // Where a run first touches the solid cell `cell` (the ball's disc on its
 // square), no nearer than `run`, and the way back out of it there. A cell the
 // disc already overlaps (a thing set down under the ball) is rolled through.
+@(private = "file")
 pinball_square_contact :: proc(origin, heading: Pinball_Vec, run: f64, cell: grid.Position) -> (t: f64, normal: Pinball_Vec, ok: bool) {
 	lo := Pinball_Vec{f64(cell.x)-0.5, f64(cell.y)-0.5}
 	hi := Pinball_Vec{f64(cell.x)+0.5, f64(cell.y)+0.5}
@@ -305,6 +314,7 @@ pinball_square_contact :: proc(origin, heading: Pinball_Vec, run: f64, cell: gri
 
 // The distance along the run to the edge of the cell under the ball, and the
 // ways it crosses there (both at a corner).
+@(private = "file")
 pinball_edge_distance :: proc(s: ^Pinball_State) -> (t: f64, step: grid.Position, ok: bool) {
 	t = max(f64)
 	ways := [2]int{0, 0}
@@ -323,22 +333,26 @@ pinball_edge_distance :: proc(s: ^Pinball_State) -> (t: f64, step: grid.Position
 	return
 }
 
+@(private = "file")
 pinball_touching :: proc(s: ^Pinball_State, id: u32) -> bool {
 	for touched in s.touching[:s.touching_count] { if touched == id { return true } }
 	return false
 }
 
 // A foe on the floor the ball meets: not the ball, not the Lazzo's foe.
+@(private = "file")
 pinball_bumper :: proc(room: ^Room, enemy: Enemy) -> bool {
 	return enemy.id != room.pinball.enemy_id && !enemy_is_out_of_play(room, enemy.id)
 }
 
+@(private = "file")
 pinball_foe_centre :: proc(enemy: Enemy) -> Pinball_Vec {
 	return {f64(enemy.position.x), f64(enemy.position.y)}
 }
 
 // One step of the roll: up to the next contact, the edge of the cell under the
 // ball, the end of its time or of the seconds waiting, whichever comes first.
+@(private = "file")
 pinball_step :: proc(room: ^Room) {
 	s := &room.pinball
 	p := pinball_position(s)
@@ -402,6 +416,7 @@ pinball_step :: proc(room: ^Room) {
 }
 
 // A new straight run from where the ball is, along `heading`.
+@(private = "file")
 pinball_turn :: proc(s: ^Pinball_State, heading: Pinball_Vec) {
 	s.origin = pinball_position(s)
 	s.before += s.run/PINBALL_SPEED
@@ -412,6 +427,7 @@ pinball_turn :: proc(s: ^Pinball_State, heading: Pinball_Vec) {
 
 // The heading mirrored off a surface whose way out is `normal`, when it
 // was going into it.
+@(private = "file")
 pinball_reflect :: proc(heading, normal: Pinball_Vec) -> Pinball_Vec {
 	into := pinball_dot(heading, normal)
 	if into >= 0 { return heading }
@@ -420,9 +436,10 @@ pinball_reflect :: proc(heading, normal: Pinball_Vec) -> Pinball_Vec {
 
 // The ball touches the solid cell `cell`: it bounces off, and its value goes
 // back to the card's amount.
+@(private = "file")
 pinball_bounce :: proc(room: ^Room, normal: Pinball_Vec, cell: grid.Position) {
 	s := &room.pinball
-	record_event(&room.recent_events, {kind = .Pinball_Bounced, source = enemy_entity(s.enemy_id), target = SYSTEM_ENTITY,
+	record_event(room.recent_events, {kind = .Pinball_Bounced, source = enemy_entity(s.enemy_id), target = SYSTEM_ENTITY,
 		amount = s.base, duration = s.value, from_position = s.cell, to_position = cell, card_definition = .Pinball})
 	s.value = s.base
 	s.bounces += 1
@@ -431,6 +448,7 @@ pinball_bounce :: proc(room: ^Room, normal: Pinball_Vec, cell: grid.Position) {
 
 // The PINBALL marks on the wounds the ball gave (event.odin): no blow of the
 // player's swings them.
+@(private = "file")
 pinball_mark_events :: proc(log: ^Event_Log, first: int) {
 	if log == nil { return }
 	for &event in log.events[clamp(first, 0, log.count):log.count] {
@@ -442,6 +460,7 @@ pinball_mark_events :: proc(log: ^Event_Log, first: int) {
 // The eight-way step from `from` toward `to`: straight within 22.5 degrees of
 // an axis (tan 22.5 degrees < 0.414), diagonal otherwise; `fallback` when they
 // are one point.
+@(private = "file")
 pinball_eight_way :: proc(from, to, fallback: Pinball_Vec) -> grid.Position {
 	d := to-from
 	if pinball_length(d) < PINBALL_EPSILON { d = fallback }
@@ -456,6 +475,7 @@ pinball_eight_way :: proc(from, to, fallback: Pinball_Vec) -> grid.Position {
 // The ball touches the foe `id`: it takes the value, the player's damage; then
 // it is knocked back a cell away from the ball, the ball bounces off it and the
 // value grows by one.
+@(private = "file")
 pinball_bump :: proc(room: ^Room, id: u32) {
 	s := &room.pinball
 	index, found := enemy_index_by_id(room, id)
@@ -464,7 +484,7 @@ pinball_bump :: proc(room: ^Room, id: u32) {
 	centre := pinball_foe_centre(room.enemies[index])
 	struck := enemy_entity(id)
 	value := s.value
-	record_event(&room.recent_events, {kind = .Pinball_Bumped, source = enemy_entity(s.enemy_id), target = struck, amount = value,
+	record_event(room.recent_events, {kind = .Pinball_Bumped, source = enemy_entity(s.enemy_id), target = struck, amount = value,
 		from_position = s.cell, to_position = room.enemies[index].position, card_definition = .Pinball})
 	s.hits += 1
 	s.value = min(value, max(i32)-1)+1
@@ -480,7 +500,7 @@ pinball_bump :: proc(room: ^Room, id: u32) {
 	assert(added)
 	report := resolve_action(room, &action)
 	pinball_mark_events(&report.events, 0)
-	append_event_log(&room.recent_events, &report.events)
+	append_event_log(room.recent_events, &report.events)
 	if room.phase != .Combat { return }
 	pinball_knock_back(room, id, p)
 }
@@ -488,6 +508,7 @@ pinball_bump :: proc(room: ^Room, id: u32) {
 // The foe struck pushed one cell away from the ball at `from`, when its way
 // is clear (the game's push rules, as the Lazzo's): every cell it enters acts
 // on it.
+@(private = "file")
 pinball_knock_back :: proc(room: ^Room, id: u32, from: Pinball_Vec) {
 	index, found := enemy_index_by_id(room, id)
 	if !found { return }
@@ -502,18 +523,19 @@ pinball_knock_back :: proc(room: ^Room, id: u32, from: Pinball_Vec) {
 	added := add_effect(&action, move_effect(mover, destination))
 	assert(added)
 	report := resolve_action(room, &action)
-	append_event_log(&room.recent_events, &report.events)
+	append_event_log(room.recent_events, &report.events)
 }
 
 // Its time is up: the ball bursts and the foe falls where it is, a normal kill
 // of the player's.
+@(private = "file")
 pinball_burst :: proc(room: ^Room) {
 	s := room.pinball
 	room.pinball = {}
 	index, found := enemy_index_by_id(room, s.enemy_id)
 	if !found { return }
 	foe := enemy_entity(s.enemy_id)
-	record_event(&room.recent_events, {kind = .Pinball_Burst, source = PLAYER_ENTITY, target = foe, amount = s.hits,
+	record_event(room.recent_events, {kind = .Pinball_Burst, source = PLAYER_ENTITY, target = foe, amount = s.hits,
 		duration = s.bounces, from_position = s.cell, to_position = s.cell, card_definition = .Pinball})
 	// It carries nothing that could guard it (its statuses went as it turned):
 	// whatever it has left, and any Shield over it, it falls.
@@ -527,5 +549,5 @@ pinball_burst :: proc(room: ^Room) {
 	assert(added)
 	report := resolve_action(room, &action)
 	pinball_mark_events(&report.events, 0)
-	append_event_log(&room.recent_events, &report.events)
+	append_event_log(room.recent_events, &report.events)
 }

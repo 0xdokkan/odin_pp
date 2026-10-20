@@ -1,7 +1,7 @@
 package game
 
 import "core:testing"
-import grid "../grid"
+import grid "../engine/grid"
 import level "../level"
 
 @(test)
@@ -16,8 +16,8 @@ test_tactical_recovery_walks_are_free_but_attacks_and_cards_are_unavailable :: p
 	before := player.tactical
 	deck := player.deck
 	health := room.enemies[0].health
-	record_event(&room.recent_events, {kind = .Pulse_Advanced})
-	log := room.recent_events
+	record_event(room.recent_events, {kind = .Pulse_Advanced})
+	log := room.recent_events^
 	testing.expect(t, tactical_allows_movement(&room))
 	testing.expect(t, !tactical_allows_action(&room))
 	testing.expect_value(t, try_move_player(&room, .East), Action_Result.Invalid_Phase)
@@ -27,7 +27,7 @@ test_tactical_recovery_walks_are_free_but_attacks_and_cards_are_unavailable :: p
 	testing.expect_value(t, use_player_ability(&room, .Guard), Action_Result.Invalid_Phase)
 	testing.expect(t, !try_dodge_player(&room, .South))
 	testing.expect(t, !begin_diagonal_qte(&room, {1, 1}))
-	testing.expect_value(t, room.recent_events, log)
+	testing.expect_value(t, room.recent_events^, log)
 	testing.expect_value(t, room.enemies[0].health, health)
 	testing.expect_value(t, player.deck, deck)
 	for direction in ([?]Move_Direction{.South, .South, .East, .West, .North, .North}) {
@@ -102,7 +102,7 @@ test_tactical_recovery_shares_enemy_bomb_status_and_energy_clock :: proc(t: ^tes
 	player.deck.energy = 0
 	// A status that runs by the beat (Veleno now waits for his own actions).
 	_, _ = apply_status(&room, PLAYER_ENTITY, .Thorns, 2, 1)
-	testing.expect(t, spawn_bomb(&room, enemy_entity(1), player.position, &room.recent_events))
+	testing.expect(t, spawn_bomb(&room, enemy_entity(1), player.position, room.recent_events))
 	room.objects[0].detonation_pulse = 3
 	player.tactical.remaining = 0
 	testing.expect(t, tactical_expire_window(&room))

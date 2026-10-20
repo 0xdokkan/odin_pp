@@ -25,6 +25,7 @@ Pulse_Report :: struct {
 	events:            Event_Log,
 }
 
+@(private)
 merge_action_report :: proc(pulse: ^Pulse_Report, action: ^Action_Report) {
 	if pulse == nil || action == nil || !action.accepted {
 		return
@@ -48,6 +49,7 @@ merge_action_report :: proc(pulse: ^Pulse_Report, action: ^Action_Report) {
 	append_event_log(&pulse.events, &action.events)
 }
 
+@(private = "file")
 expire_status :: proc(room: ^Room, entity: Entity_Ref, kind: Status_Kind, pulse: ^Pulse_Report) {
 	assert(room != nil && pulse != nil)
 	removed, ok := remove_status(room, entity, kind)
@@ -64,6 +66,7 @@ expire_status :: proc(room: ^Room, entity: Entity_Ref, kind: Status_Kind, pulse:
 // A status that deals its stacks as damage: a System hit with the status as
 // its cause. A Shield absorbs it and the presentation shows it as any blow;
 // the player's defense never takes from it (apply_damage_effect).
+@(private = "file")
 status_damage_tick :: proc(room: ^Room, entity: Entity_Ref, kind: Status_Kind, pulse: ^Pulse_Report) {
 	status, found := status_for_entity(room, entity, kind)
 	if !found {
@@ -79,6 +82,7 @@ status_damage_tick :: proc(room: ^Room, entity: Entity_Ref, kind: Status_Kind, p
 }
 
 // One stack less; the last one ends the status.
+@(private)
 wear_status_stack :: proc(room: ^Room, entity: Entity_Ref, kind: Status_Kind, pulse: ^Pulse_Report) {
 	status, found := status_for_entity(room, entity, kind)
 	if !found {
@@ -93,6 +97,7 @@ wear_status_stack :: proc(room: ^Room, entity: Entity_Ref, kind: Status_Kind, pu
 // Poison bites its bearer's own actions: damage equal to its stacks, then a
 // stack less. Nothing reaches the player sunk in his shadow, and the shadow's
 // own steps are no action: there it neither bites nor wears.
+@(private)
 tick_poison_on_action :: proc(room: ^Room, entity: Entity_Ref, pulse: ^Pulse_Report) {
 	assert(room != nil && pulse != nil)
 	if room.phase != .Combat || !entity_exists(room, entity) ||
@@ -109,16 +114,17 @@ tick_poison_on_action :: proc(room: ^Room, entity: Entity_Ref, pulse: ^Pulse_Rep
 }
 
 // After an enemy carries out an intent (any kind, hit, miss or blocked): its
-// poison bites, and the slow that held this intent wears a stack. Classic
-// combat has no seconds to hold, so there each action wears one.
+// poison bites, and the slow that held this intent wears a stack.
+@(private)
 finish_enemy_action :: proc(room: ^Room, enemy: Entity_Ref, slowed: bool, pulse: ^Pulse_Report) {
 	tick_poison_on_action(room, enemy, pulse)
-	if (slowed || !tactical_enabled(room)) && room.phase == .Combat && entity_exists(room, enemy) {
+	if slowed && room.phase == .Combat && entity_exists(room, enemy) {
 		wear_status_stack(room, enemy, .Slow, pulse)
 	}
 }
 
 // Bruciatura: its stacks as damage; they never wear.
+@(private)
 burn_status :: proc(room: ^Room, entity: Entity_Ref, pulse: ^Pulse_Report) {
 	assert(room != nil && pulse != nil)
 	if room.phase != .Combat || !entity_exists(room, entity) {
@@ -127,6 +133,7 @@ burn_status :: proc(room: ^Room, entity: Entity_Ref, pulse: ^Pulse_Report) {
 	status_damage_tick(room, entity, .Burn, pulse)
 }
 
+@(private = "file")
 tick_status_kind :: proc(room: ^Room, entity: Entity_Ref, kind: Status_Kind, pulse: ^Pulse_Report) {
 	status, found := status_for_entity(room, entity, kind)
 	if !found {
@@ -137,10 +144,7 @@ tick_status_kind :: proc(room: ^Room, entity: Entity_Ref, kind: Status_Kind, pul
 		// Worn by their bearer's actions (a charge: by its use), never by the clock.
 		return
 	case .Burn:
-		// A tactical room burns at each new window (tactical_expire_window).
-		if !tactical_enabled(room) {
-			burn_status(room, entity, pulse)
-		}
+		// Burn bites at each new window (tactical_expire_window).
 		return
 	case .Shield, .Thorns, .Afterimage, .Stagger, .Survey:
 	}
@@ -151,10 +155,11 @@ tick_status_kind :: proc(room: ^Room, entity: Entity_Ref, kind: Status_Kind, pul
 	}
 }
 
+@(private)
 tick_entity_statuses :: proc(room: ^Room, entity: Entity_Ref, pulse: ^Pulse_Report) {
 	assert(room != nil && pulse != nil)
-	// Burn's blow first, while a Shield about to run out still guards.
-	status_order := [?]Status_Kind{.Burn, .Shield, .Thorns, .Afterimage, .Stagger, .Survey}
+	// Only timed statuses expire on world beats. Burn ticks at window expiry.
+	status_order := [?]Status_Kind{.Shield, .Thorns, .Afterimage, .Stagger, .Survey}
 	for kind in status_order {
 		if room.phase != .Combat || !entity_exists(room, entity) {
 			return
@@ -165,6 +170,7 @@ tick_entity_statuses :: proc(room: ^Room, entity: Entity_Ref, pulse: ^Pulse_Repo
 
 // The player, then every enemy in turn; an enemy that dies on its own tick
 // leaves the next one in its place.
+@(private)
 tick_combatants :: proc(room: ^Room, pulse: ^Pulse_Report, tick: proc(room: ^Room, entity: Entity_Ref, pulse: ^Pulse_Report)) {
 	assert(room != nil && pulse != nil)
 	if room.phase != .Combat {
@@ -183,22 +189,12 @@ tick_combatants :: proc(room: ^Room, pulse: ^Pulse_Report, tick: proc(room: ^Roo
 	}
 }
 
+@(private = "file")
 tick_all_statuses :: proc(room: ^Room, pulse: ^Pulse_Report) {
 	tick_combatants(room, pulse, tick_entity_statuses)
 }
 
-advance_combat_pulse :: proc(room: ^Room) -> (pulse: Pulse_Report) {
-	if room == nil || room.phase != .Combat {
-		return
-	}
-	pulse.advanced = true
-	resolve_due_explosives(room, &pulse)
-	resolve_due_room_modifier(room, &pulse)
-	resolve_enemy_intents(room, &pulse)
-	finish_combat_pulse(room, &pulse)
-	return
-}
-
+@(private)
 finish_combat_pulse :: proc(room: ^Room, pulse: ^Pulse_Report) {
 	pulse.advanced = true
 	if room.phase == .Combat { tick_board_devices(room, pulse) }
@@ -214,7 +210,7 @@ finish_combat_pulse :: proc(room: ^Room, pulse: ^Pulse_Report) {
 	pulse.player_defeated = pulse.player_defeated || room.phase == .Defeat
 	// M7's world beat is one second. Energy needs its own cadence so a costly
 	// spell does not automatically refund all the energy it just spent.
-	if room.phase == .Combat && (!tactical_enabled(room) || (room.pulse_count+1)%3 == 0) {
+	if room.phase == .Combat && (room.pulse_count+1)%3 == 0 {
 		regen := room.player.deck.rules.energy_regen_per_pulse
 		pulse.energy_restored = restore_deck_energy_after_pulse(&room.player.deck)
 		pulse.energy_wasted = max(0, regen-pulse.energy_restored)

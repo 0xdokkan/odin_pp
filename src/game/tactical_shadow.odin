@@ -1,6 +1,6 @@
 package game
 
-import grid "../grid"
+import grid "../engine/grid"
 
 // Movimento Ombra. The player sinks into his shadow for TACTICAL_SHADOW_SECONDS
 // of real time. Meanwhile the world is frozen: tactical_tick runs only the
@@ -21,7 +21,7 @@ TACTICAL_SHADOW_BEATS :: 3
 TACTICAL_SHADOW_BEAT_GRACE :: f32(0.1)
 
 tactical_shadow_active :: proc(room: ^Room) -> bool {
-	return tactical_enabled(room) && room.phase == .Combat && room.player.tactical.phase == .Shadow
+	return room != nil && room.player != nil && room.phase == .Combat && room.player.tactical.phase == .Shadow
 }
 
 // No damage of any kind reaches the player while he is in his shadow.
@@ -34,6 +34,7 @@ tactical_shadow_step_busy :: proc(room: ^Room) -> bool {
 	return tactical_shadow_active(room) && room.player.tactical.shadow_step_remaining > 0
 }
 
+@(private)
 tactical_reset_shadow :: proc(s: ^Tactical_State) {
 	s.shadow_resume = .Decision
 	s.shadow_remaining, s.shadow_duration, s.shadow_step_remaining = 0, 0, 0
@@ -42,17 +43,7 @@ tactical_reset_shadow :: proc(s: ^Tactical_State) {
 	s.shadow_steps = 0
 }
 
-// Only from a still world: the window open (or a stun, which leaves cards),
-// nothing resolving, queued, casting or running, no defence or ring pending,
-// no foe on the Lazzo's rope, not behind his own eyes (first_person.odin).
-tactical_can_begin_shadow :: proc(room: ^Room) -> bool {
-	if !tactical_enabled(room) || room.phase != .Combat || tactical_first_person_active(room) { return false }
-	s := &room.player.tactical
-	return (s.phase == .Decision || s.phase == .Stunned) && s.remaining > 0 &&
-	       !room.tactical_pulse.pending && s.queued_beats == 0 && room.qte.kind == .None &&
-	       s.cast_remaining <= 0 && s.action_remaining <= 0 && !room.tesla_ring.pending && !room.lasso.active
-}
-
+@(private)
 tactical_begin_shadow :: proc(room: ^Room, seconds: f32) -> bool {
 	if !(seconds > 0) || !tactical_can_begin_shadow(room) { return false }
 	s := &room.player.tactical
@@ -67,6 +58,7 @@ tactical_begin_shadow :: proc(room: ^Room, seconds: f32) -> bool {
 }
 
 // Called by tactical_tick in place of the world clock.
+@(private)
 tactical_shadow_tick :: proc(room: ^Room, dt: f32) {
 	if !tactical_shadow_active(room) || !(dt > 0) { return }
 	s := &room.player.tactical
@@ -99,6 +91,7 @@ tactical_shadow_beat_target :: proc(room: ^Room) -> u32 {
 }
 
 // Spends a shadow beat stamped at the press; true when the step is critical.
+@(private = "file")
 tactical_claim_shadow_beat :: proc(room: ^Room, beat: u32) -> bool {
 	if !tactical_shadow_active(room) || beat == 0 || beat > TACTICAL_SHADOW_BEATS { return false }
 	s := &room.player.tactical
@@ -133,7 +126,7 @@ try_shadow_step :: proc(room: ^Room, direction: Move_Direction, diagonal: grid.P
 		if critical { s.shadow_beats_spent -= {int(beat)} }
 		return .Blocked
 	}
-	clear_event_log(&room.recent_events)
+	clear_event_log(room.recent_events)
 	s.shadow_from, s.shadow_position = s.shadow_position, destination
 	s.shadow_step_remaining = TACTICAL_SHADOW_STEP_SECONDS
 	s.shadow_steps += 1
@@ -149,7 +142,7 @@ try_shadow_step :: proc(room: ^Room, direction: Move_Direction, diagonal: grid.P
 tactical_end_shadow :: proc(room: ^Room) -> bool {
 	if !tactical_shadow_due(room) { return false }
 	s := &room.player.tactical
-	clear_event_log(&room.recent_events)
+	clear_event_log(room.recent_events)
 	origin, landing := room.player.position, s.shadow_position
 	s.phase = s.shadow_resume
 	tactical_reset_shadow(s)
@@ -158,12 +151,12 @@ tactical_end_shadow :: proc(room: ^Room) -> bool {
 		added := add_effect(&action, move_effect(PLAYER_ENTITY, landing, .Teleport))
 		assert(added)
 		report := resolve_action(room, &action)
-		if report.accepted { append_event_log(&room.recent_events, &report.events) }
+		if report.accepted { append_event_log(room.recent_events, &report.events) }
 	}
-	record_event(&room.recent_events, {
+	record_event(room.recent_events, {
 		kind = .Shadow_Emerged, source = PLAYER_ENTITY, target = PLAYER_ENTITY,
 		from_position = origin, to_position = room.player.position,
 	})
-	_, _ = finish_player_combat_command(room, 0, acted = false)
+	finish_player_combat_command(room, 0, acted = false)
 	return true
 }

@@ -1,7 +1,7 @@
 package game
 
 import "core:testing"
-import grid "../grid"
+import grid "../engine/grid"
 import level "../level"
 
 make_ice_block_combat_room :: proc(
@@ -231,6 +231,8 @@ test_ice_block_moved_into_committed_archer_line_causes_miss :: proc(t: ^testing.
 	testing.expect(t, ok)
 	defer destroy_room(&room)
 	testing.expect_value(t, room.enemies[0].intent.kind, Enemy_Intent_Kind.Attack)
+	advance_combat_pulse(&room)
+	testing.expect(t, room.enemies[0].aim_ready)
 	health_before := player.health
 
 	room.objects[0].position = {x = 3, y = 1}

@@ -1,7 +1,7 @@
 package game
 
 import "core:testing"
-import grid "../grid"
+import grid "../engine/grid"
 import level "../level"
 
 create_enemy_archetype_test_level :: proc(t: ^testing.T) -> level.Level {
@@ -105,7 +105,7 @@ test_archer_does_not_shoot_through_an_obstacle :: proc(t: ^testing.T) {
 
 	intent := room.enemies[0].intent
 	testing.expect_value(t, intent.kind, Enemy_Intent_Kind.Move)
-	testing.expect_value(t, intent.destination, grid.Position{x = 5, y = 1})
+	testing.expect_value(t, intent.destination, grid.Position{x = 6, y = 2})
 }
 
 @(test)
@@ -155,12 +155,15 @@ test_player_can_dodge_archer_committed_target :: proc(t: ^testing.T) {
 	enemy_id := room.enemies[0].id
 	health_before := player.health
 
+	advance_combat_pulse(&room) // Complete the aim before evading the committed shot.
 	result := try_move_player(&room, .South)
+	pulse := advance_combat_pulse(&room)
+	room.recent_events^ = pulse.events
 
 	testing.expect_value(t, result, Action_Result.Moved)
 	testing.expect_value(t, player.health, health_before)
 	miss_index, found := enemy_archetype_test_event_index(
-		&room.recent_events,
+		room.recent_events,
 		.Attack_Missed,
 		enemy_entity(enemy_id),
 		PLAYER_ENTITY,
@@ -270,19 +273,20 @@ test_brute_charge_hits_after_moving :: proc(t: ^testing.T) {
 	defer destroy_room(&room)
 	enemy_id := room.enemies[0].id
 
-	result := wait_player_turn(&room)
+	pulse := advance_combat_pulse(&room)
+	room.recent_events^ = pulse.events
 
-	testing.expect_value(t, result, Action_Result.None)
+	testing.expect(t, pulse.advanced)
 	testing.expect_value(t, room.enemies[0].position, grid.Position{x = 2, y = 1})
 	testing.expect_value(t, player.health, i32(7))
 	moved_index, moved := enemy_archetype_test_event_index(
-		&room.recent_events,
+		room.recent_events,
 		.Moved,
 		enemy_entity(enemy_id),
 		enemy_entity(enemy_id),
 	)
 	damaged_index, damaged := enemy_archetype_test_event_index(
-		&room.recent_events,
+		room.recent_events,
 		.Damaged,
 		enemy_entity(enemy_id),
 		PLAYER_ENTITY,
@@ -313,18 +317,20 @@ test_dodged_brute_charge_moves_then_misses :: proc(t: ^testing.T) {
 	health_before := player.health
 
 	result := try_move_player(&room, .South)
+	pulse := advance_combat_pulse(&room)
+	room.recent_events^ = pulse.events
 
 	testing.expect_value(t, result, Action_Result.Moved)
 	testing.expect_value(t, room.enemies[0].position, grid.Position{x = 2, y = 1})
 	testing.expect_value(t, player.health, health_before)
 	moved_index, moved := enemy_archetype_test_event_index(
-		&room.recent_events,
+		room.recent_events,
 		.Moved,
 		enemy_entity(enemy_id),
 		enemy_entity(enemy_id),
 	)
 	miss_index, missed := enemy_archetype_test_event_index(
-		&room.recent_events,
+		room.recent_events,
 		.Attack_Missed,
 		enemy_entity(enemy_id),
 		PLAYER_ENTITY,
@@ -354,20 +360,22 @@ test_player_entering_charge_path_blocks_the_whole_charge :: proc(t: ^testing.T) 
 	health_before := player.health
 
 	result := try_move_player(&room, .East)
+	pulse := advance_combat_pulse(&room)
+	room.recent_events^ = pulse.events
 
 	testing.expect_value(t, result, Action_Result.Moved)
 	testing.expect_value(t, player.position, grid.Position{x = 2, y = 1})
 	testing.expect_value(t, room.enemies[0].position, grid.Position{x = 5, y = 1})
 	testing.expect_value(t, player.health, health_before)
 	_, blocked := enemy_archetype_test_event_index(
-		&room.recent_events,
+		room.recent_events,
 		.Move_Blocked,
 		enemy_entity(enemy_id),
 		enemy_entity(enemy_id),
 	)
 	testing.expect(t, blocked)
 	_, damaged := enemy_archetype_test_event_index(
-		&room.recent_events,
+		room.recent_events,
 		.Damaged,
 		enemy_entity(enemy_id),
 		PLAYER_ENTITY,

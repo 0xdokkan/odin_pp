@@ -1,9 +1,9 @@
 package game
 
-import grid "../grid"
+import grid "../engine/grid"
 
 tactical_dodge_ready :: proc(room: ^Room) -> bool {
-	if !tactical_enabled(room) || room.phase != .Combat { return false }
+	if room == nil || room.player == nil || room.phase != .Combat { return false }
 	_, afterimage := status_for_entity(room, PLAYER_ENTITY, .Afterimage)
 	return room.player.tactical.dodge_recovery == 0 || afterimage
 }
@@ -16,6 +16,7 @@ tactical_dodge_has_landing :: proc(room: ^Room) -> bool {
 	return false
 }
 
+@(private)
 start_tactical_dodge_recovery :: proc(room: ^Room) {
 	// Pay the dodge's second, then leave two whole world seconds of recovery.
 	// Window recovery beats count; opening/closing UI does not.
@@ -46,11 +47,11 @@ try_dodge_player :: proc(room: ^Room, direction: Move_Direction) -> bool {
 	assert(added)
 	report := resolve_action(room, &action)
 	if !report.accepted { return false }
-	clear_event_log(&room.recent_events)
-	append_event_log(&room.recent_events, &report.events)
+	clear_event_log(room.recent_events)
+	append_event_log(room.recent_events, &report.events)
 	start_tactical_dodge_recovery(room)
 	room.player.tactical.facing = direction
 	collect_loot_in_magnet_range(room)
-	_, _ = finish_player_combat_command(room, TACTICAL_DODGE_SECONDS)
+	finish_player_combat_command(room, TACTICAL_DODGE_SECONDS)
 	return true
 }

@@ -1,7 +1,7 @@
 package game
 
 import "core:testing"
-import grid "../grid"
+import grid "../engine/grid"
 import level "../level"
 
 // A walled room, the player in its middle (5, 5) with 20 of 30 health, a wall
@@ -22,7 +22,7 @@ FISHING_TEST_ROWS :: [?]string{
 }
 
 fishing_test_room :: proc(t: ^testing.T, data: ^level.Level, player: ^Player, spawns: []Enemy_Spawn = nil, rod := i32(0),
-	tactical := true, content: Room_Content = {}) -> Room {
+	content: Room_Content = {}) -> Room {
 	rows := FISHING_TEST_ROWS
 	parsed: level.Parse_Error
 	data^, parsed, _ = level.from_ascii(rows[:])
@@ -31,7 +31,6 @@ fishing_test_room :: proc(t: ^testing.T, data: ^level.Level, player: ^Player, sp
 	player.stats.max_health, player.health = 30, 20
 	config := DEFAULT_TACTICAL_CONFIG
 	config.vision_size = 0
-	config.enabled = tactical
 	testing.expect(t, configure_tactical(player, config))
 	if rod >= 0 {
 		_, added := add_owned_card(&player.deck, .Fishing_Rod, rod)
@@ -56,7 +55,7 @@ fishing_test_stream :: proc(card: bool) -> u64 {
 @(test)
 test_fishing_rod_is_an_uncommon_tactical_room_tool_with_five_upgrades :: proc(t: ^testing.T) {
 	testing.expect(t, validate_card_definitions())
-	definition, found := card_definition_by_id(.Fishing_Rod, true)
+	definition, found := card_definition_by_id(.Fishing_Rod)
 	testing.expect(t, found && definition.name == "Canna da Pesca")
 	testing.expect_value(t, definition.rarity, Card_Rarity.Uncommon)
 	testing.expect_value(t, definition.cost, i32(0))
@@ -64,7 +63,7 @@ test_fishing_rod_is_an_uncommon_tactical_room_tool_with_five_upgrades :: proc(t:
 	testing.expect_value(t, definition.targeting.cast_range, Targeting_Range{.Chebyshev, 1, FISHING_RANGE})
 	testing.expect_value(t, definition.targeting.shape, Target_Shape.Single)
 	testing.expect(t, definition.targeting.requires_line_of_sight)
-	testing.expect(t, card_requires_tactical(.Fishing_Rod) && card_is_room_tool(.Fishing_Rod))
+	testing.expect(t, card_is_room_tool(.Fishing_Rod))
 	for id in Card_Id { testing.expect_value(t, card_is_room_tool(id), id == .Fishing_Rod) }
 	testing.expect_value(t, tactical_card_time_cost(.Fishing_Rod), f32(0))
 	testing.expect_value(t, card_max_upgrade_level(.Fishing_Rod), i32(5))
@@ -79,7 +78,6 @@ test_fishing_rod_is_an_uncommon_tactical_room_tool_with_five_upgrades :: proc(t:
 	testing.expect(t, !validate_card_instance({id = 1, definition_id = .Fishing_Rod, upgrade_level = 6}))
 	node := Run_Node{kind = .Combat, depth = 4}
 	testing.expect(t, card_offer_weight(definition, &node) > 0)
-	testing.expect_value(t, card_offer_weight(definition, &node, nil, false), u64(0))
 	// Never on the tick: no critical changes it.
 	room: Room
 	player: Player
@@ -135,20 +133,11 @@ card_effect_amount_is_targeted_never :: proc(room: ^Room, rod: Card_Instance) ->
 	return evaluation.error == .Invalid_Phase && err == .Invalid_Phase
 }
 
-// A cleared tactical room with a rod in the deck, and nothing else: a classic
-// room, a room without the rod, a fight or a room already left never fish.
+// Fishing requires a cleared room and a rod. A fight, missing rod or room
+// already left refuses the interaction.
 @(test)
 test_fishing_opens_only_in_a_cleared_tactical_room_with_a_rod :: proc(t: ^testing.T) {
-	{
-		data: level.Level
-		player: Player
-		room := fishing_test_room(t, &data, &player, tactical = false)
-		defer level.destroy(&data)
-		defer destroy_room(&room)
-		testing.expect_value(t, room.phase, Room_Phase.Loot)
-		testing.expect(t, !fishing_room_open(&room))
-		testing.expect_value(t, fish_with_rod(&room, {6, 5}).result, Fishing_Result.Not_Open)
-	}
+
 	{
 		data: level.Level
 		player: Player
@@ -328,6 +317,8 @@ test_fishing_catches_cards_one_in_twenty_never_the_rod :: proc(t: ^testing.T) {
 	cards, foods := 0, 0
 	for seed in u64(1)..=2000 {
 		trial := room
+		trial_events: Event_Log
+		trial.recent_events = &trial_events
 		trial_player := player
 		trial.player = &trial_player
 		trial.fishing = {random = seed}
@@ -355,6 +346,8 @@ test_fishing_catches_cards_one_in_twenty_never_the_rod :: proc(t: ^testing.T) {
 	card_stream := fishing_test_stream(true)
 	first_player, second_player := player, player
 	first, second := room, room
+	first_events, second_events: Event_Log
+	first.recent_events, second.recent_events = &first_events, &second_events
 	first.player, second.player = &first_player, &second_player
 	first.fishing.random, second.fishing.random = card_stream, card_stream
 	a, b := fish_with_rod(&first, {6, 5}), fish_with_rod(&second, {6, 5})
@@ -363,6 +356,8 @@ test_fishing_catches_cards_one_in_twenty_never_the_rod :: proc(t: ^testing.T) {
 	full_player := player
 	for full_player.deck.owned_count < MAX_OWNED_CARDS { _, _ = add_owned_card(&full_player.deck, .Strike) }
 	full := room
+	full_events: Event_Log
+	full.recent_events = &full_events
 	full.player = &full_player
 	full.fishing.random = card_stream
 	report := fish_with_rod(&full, {6, 5})
@@ -399,12 +394,12 @@ test_one_rod_a_run_leaves_it_out_of_every_offer :: proc(t: ^testing.T) {
 	definition, _ := card_definition_by_id(.Fishing_Rod)
 	node := Run_Node{kind = .Shop, depth = 9}
 	testing.expect(t, card_offer_weight(definition, &node) > 0)
-	testing.expect_value(t, card_offer_weight(definition, &node, nil, true, card_offer_exclusions(&deck)), u64(0))
+	testing.expect_value(t, card_offer_weight(definition, &node, nil, card_offer_exclusions(&deck)), u64(0))
 	// Every other card is still offered: the whole tactical pool, but the rod.
 	profile := M8_Profile{ring_wins = 3}
 	all: [int(Card_Id.Count)-4]Card_Id
 	random := u64(1)
-	testing.expect(t, generate_weighted_card_choices(&random, &node, all[:], &profile, true, {.Fishing_Rod}))
+	testing.expect(t, generate_weighted_card_choices(&random, &node, all[:], &profile, {.Fishing_Rod}))
 	for id in all { testing.expect(t, id != .Fishing_Rod) }
 	// Rewards and the shop, over runs whose deck holds the rod or not.
 	offered, offered_with_rod := 0, 0
@@ -412,7 +407,6 @@ test_one_rod_a_run_leaves_it_out_of_every_offer :: proc(t: ^testing.T) {
 		for with_rod in ([2]bool{false, true}) {
 			run, run_ok := create_run(REWARD_TEST_PLAYER_STATS, REWARD_TEST_RUN_CONFIG, seed)
 			testing.expect(t, run_ok)
-			run.player.tactical.config.enabled = true
 			if with_rod { _, _ = add_owned_card(&run.player.deck, .Fishing_Rod) }
 			testing.expect_value(t, finish_room(&run, .Complete), Run_Transition.Reward)
 			for choice in available_card_rewards(&run) {
@@ -443,7 +437,6 @@ test_one_rod_a_run_leaves_it_out_of_every_offer :: proc(t: ^testing.T) {
 @(test)
 test_the_armorys_rod_is_taken_and_its_offer_still_checks :: proc(t: ^testing.T) {
 	player, _ := create_player(SPECIAL_NODE_TEST_PLAYER_STATS)
-	player.tactical.config.enabled = true
 	found_seed := u64(0)
 	found_node := INVALID_NODE_ID
 	for seed := u64(1); seed < u64(40_000) && found_seed == 0; seed += 1 {
@@ -461,7 +454,6 @@ test_the_armorys_rod_is_taken_and_its_offer_still_checks :: proc(t: ^testing.T) 
 	run, run_ok := create_run(SPECIAL_NODE_TEST_PLAYER_STATS, SPECIAL_NODE_BEHAVIOR_TEST_CONFIG, found_seed)
 	testing.expect(t, run_ok)
 	defer destroy_run(&run)
-	run.player.tactical.config.enabled = true
 	testing.expect_value(t, finish_room(&run, .Complete), Run_Transition.Reward)
 	testing.expect_value(t, skip_card_reward(&run), Card_Reward_Result.Skipped)
 	testing.expect_value(t, enter_node(&run, found_node), Node_Entry_Result.Event)
@@ -473,7 +465,6 @@ test_the_armorys_rod_is_taken_and_its_offer_still_checks :: proc(t: ^testing.T) 
 	again, again_ok := create_run(SPECIAL_NODE_TEST_PLAYER_STATS, SPECIAL_NODE_BEHAVIOR_TEST_CONFIG, found_seed)
 	testing.expect(t, again_ok)
 	defer destroy_run(&again)
-	again.player.tactical.config.enabled = true
 	_, _ = add_owned_card(&again.player.deck, .Fishing_Rod)
 	testing.expect_value(t, finish_room(&again, .Complete), Run_Transition.Reward)
 	testing.expect_value(t, skip_card_reward(&again), Card_Reward_Result.Skipped)

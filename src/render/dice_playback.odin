@@ -5,6 +5,7 @@ import rl "vendor:raylib"
 
 // Find two actual return contacts once after baking. Timing follows these
 // contacts rather than compressing the second bounce into the quiet tail.
+@(private)
 prepare_dice_playback :: proc(throw: ^Dice_Throw) {
 	if throw == nil { return }
 	throw.rebound_frames = {}

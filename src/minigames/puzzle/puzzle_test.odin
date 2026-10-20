@@ -1,5 +1,7 @@
 package puzzle
 
+import rl "vendor:raylib"
+
 import rng "../../engine/rng"
 import "core:testing"
 import gfx "../../engine/gfx"
@@ -575,30 +577,28 @@ test_held_direction_repeats_after_delay :: proc(t: ^testing.T) {
 }
 
 @(test)
-test_sprite_rows_are_rectangular :: proc(t: ^testing.T) {
-	check :: proc(t: ^testing.T, frames: []gfx.Frame_Rows, name: string) {
-		w := len(frames[0][0])
-		h := len(frames[0])
-		for f in frames {
-			testing.expectf(t, len(f) == h, "%s: frame height", name)
-			for row in f {
-				testing.expectf(t, len(row) == w, "%s: row %q has width %d, want %d", name, row, len(row), w)
-			}
-		}
+test_sprite_atlases_preserve_frame_layout :: proc(t: ^testing.T) {
+	expected := [Sprite_Id][3]int{
+		.Floor = {16, 16, 3},
+		.Ice = {16, 16, 2},
+		.Sigil = {16, 16, 1},
+		.Plate = {16, 16, 2},
+		.Gate_Slot = {16, 16, 1},
+		.Gate_Bars = {16, 20, 1},
+		.Wall_Top = {16, 16, 2},
+		.Wall_Front = {16, 6, 2},
+		.Crate = {16, 18, 2},
+		.Hero = {16, 16, 6},
+		.Flame = {6, 8, 3},
 	}
-	check(t, FLOOR_ROWS[:], "floor")
-	check(t, ICE_ROWS[:], "ice")
-	check(t, SIGIL_ROWS[:], "sigil")
-	check(t, PLATE_ROWS[:], "plate")
-	check(t, GATE_SLOT_ROWS[:], "gate slot")
-	check(t, GATE_BARS_ROWS[:], "gate bars")
-	check(t, WALL_TOP_ROWS[:], "wall top")
-	check(t, WALL_FRONT_ROWS[:], "wall front")
-	check(t, CRATE_ROWS[:], "crate")
-	check(t, HERO_ROWS[:], "hero")
-	check(t, FLAME_ROWS[:], "flame")
-	testing.expect_value(t, len(FLOOR_ROWS[0][0]), TILE_PX)
-	testing.expect_value(t, len(WALL_FRONT_ROWS[0]), WALL_FRONT_PX)
+	for id in Sprite_Id {
+		asset := SPRITE_ASSETS[id]
+		img := gfx.sprite_asset_image(asset)
+		testing.expectf(t, img.data != nil, "%v: embedded atlas did not decode", id)
+		if img.data == nil { continue }
+		testing.expect_value(t, [3]int{int(img.width)/asset.frames, int(img.height), asset.frames}, expected[id])
+		rl.UnloadImage(img)
+	}
 }
 
 @(test)

@@ -4,7 +4,7 @@ import "core:fmt"
 import "core:math"
 import rl "vendor:raylib"
 import game "../game"
-import grid "../grid"
+import grid "../engine/grid"
 
 // The player's charges on the board (game/player_charges.odin): the foes
 // FERETRO's arrows reach while Ctrl is held, and the die of the DADO DEL
@@ -57,6 +57,7 @@ FATE_DIE_GLYPHS := [6][7]u8{
 	{0b0011100, 0b0100010, 0b1001001, 0b1010101, 0b1111111, 0b0100010, 0b0011100},
 }
 
+@(private)
 fate_die_glyph :: proc(sides: i32) -> int {
 	ladder := game.DICE_LADDER
 	for step, index in ladder { if step == sides { return index } }
@@ -64,6 +65,7 @@ fate_die_glyph :: proc(sides: i32) -> int {
 }
 
 // The ink of what a face did: venom, ember, frost, a cure, gold, blood.
+@(private = "file")
 fate_outcome_ink :: proc(outcome: game.Fate_Outcome) -> rl.Color {
 	switch outcome {
 	case .Poison: return {40, 128, 70, 255}
@@ -79,6 +81,7 @@ fate_outcome_ink :: proc(outcome: game.Fate_Outcome) -> rl.Color {
 // What the Dado del Destino's face did, in Italian (VELENO 1, BRUCIATURA 2,
 // RALLENTAMENTO 3, RUBA VITA +2, CRITICO, LETALE), after the die and its face
 // (d8 4 / ...) where no paper token shows them.
+@(private)
 fate_outcome_label :: proc(event: game.Game_Event, with_die: bool) -> (label: cstring, color: rl.Color) {
 	text: string
 	switch game.Fate_Outcome(event.duration) {
@@ -94,6 +97,7 @@ fate_outcome_label :: proc(event: game.Game_Event, with_die: bool) -> (label: cs
 }
 
 // The tag's size in tag pixels: the die, a pixel of paper, the face's figures.
+@(private)
 fate_token_size :: proc(face: i32) -> (width, height: int) {
 	return living_heart_size(fmt.tprintf("%d", max(face, 0)))
 }
@@ -103,6 +107,7 @@ fate_token_size :: proc(face: i32) -> (width, height: int) {
 // screen pixels to a tag pixel, its bottom 10 over the chest): just out of the
 // card's left side, or out past the card's own heart (`heart`, when shown)
 // where it would cover it, as a narrow card's heart reaches past that side.
+@(private)
 fate_tag_reach :: proc(base: rl.Vector2, half: f32, w, h: int, heart: rl.Rectangle, hearted: bool) -> (reach: f32) {
 	reach = half*0.9+8
 	if !hearted { return }
@@ -114,6 +119,7 @@ fate_tag_reach :: proc(base: rl.Vector2, half: f32, w, h: int, heart: rl.Rectang
 }
 
 // The heart's tag and the two pixels around it that the die's tag never takes.
+@(private = "file")
 fate_heart_keep :: proc(heart: rl.Rectangle) -> rl.Rectangle {
 	return {heart.x-2, heart.y-2, heart.width+4, heart.height+4}
 }
@@ -124,6 +130,7 @@ fate_heart_keep :: proc(heart: rl.Rectangle) -> rl.Rectangle {
 // and drops away. While the struck card's heart shows, no frame of it takes
 // the heart's place, the pop's larger pixels included: where it would, the tag
 // stands just short of the heart's left side.
+@(private)
 fate_tag_place :: proc(base: rl.Vector2, half: f32, w, h: int, t: f32, heart: rl.Rectangle, hearted: bool) -> (at: rl.Vector2, pixel, alpha: f32) {
 	pixel = 2
 	if t < 0.05 { pixel = 1 } else if t < 0.12 { pixel = 3 }
@@ -146,6 +153,7 @@ fate_tag_place :: proc(base: rl.Vector2, half: f32, w, h: int, t: f32, heart: rl
 
 // Once per frame with the living cards: a token for each die now showing,
 // once however long its cue lasts.
+@(private)
 update_fate_tokens :: proc(renderer: ^Renderer, now: f64) {
 	state := renderer.tactical.living_state
 	if state == nil { return }
@@ -164,6 +172,7 @@ update_fate_tokens :: proc(renderer: ^Renderer, now: f64) {
 
 // A token for `event`, rolled by command `batch`, born at `born`, unless that
 // die already showed.
+@(private)
 living_fate_spawn :: proc(fates: ^Living_Fates, event: game.Game_Event, born: f64, batch := u32(0)) -> bool {
 	for seen in fates.seen {
 		if seen.at > 0 && born-seen.at < LIVING_FATE_SEEN_SECONDS && seen.batch == batch && seen.event == event { return false }
@@ -180,6 +189,7 @@ living_fate_spawn :: proc(fates: ^Living_Fates, event: game.Game_Event, born: f6
 }
 
 // The tag with its top left at `at` (whole screen pixels).
+@(private = "file")
 draw_fate_tag :: proc(at: rl.Vector2, sides, face: i32, outcome: game.Fate_Outcome, pixel: f32, alpha: f32 = 1) {
 	text := fmt.tprintf("%d", max(face, 0))
 	w, h := living_heart_size(text)
@@ -191,6 +201,7 @@ draw_fate_tag :: proc(at: rl.Vector2, sides, face: i32, outcome: game.Fate_Outco
 	draw_paper_tag_text(at, f32(3+LIVING_HEART_WIDTH+1), text, pixel, color_with_opacity(fate_outcome_ink(outcome), alpha))
 }
 
+@(private)
 draw_fate_tokens :: proc(renderer: ^Renderer) {
 	v := &renderer.tactical
 	if !v.living || v.living_state == nil || v.snapshot == nil || !living_cards_ready(renderer) { return }
@@ -228,6 +239,7 @@ FERETRO_AIM_HOT :: rl.Color{255, 236, 170, 255}
 
 // A ring on the floor around `cell` (screen lines over the board), cut by
 // four ticks: the mark of a foe the arrows reach.
+@(private)
 draw_aim_reticle :: proc(renderer: ^Renderer, cell: grid.Position, radius, thick: f32, color: rl.Color) {
 	center := rl.Vector2{f32(cell.x)+0.5, f32(cell.y)+0.5}
 	at :: proc(renderer: ^Renderer, center: rl.Vector2, angle, radius: f32) -> rl.Vector2 {
@@ -250,6 +262,7 @@ draw_aim_reticle :: proc(renderer: ^Renderer, cell: grid.Position, radius, thick
 // FERETRO while Ctrl is held (Tactical_View.arrow_aim): every foe the arrows
 // reach marked on its cell and by a ring at its feet, the one under the mouse
 // brighter, with the line its arrow would fly.
+@(private)
 draw_arrow_aim :: proc(renderer: ^Renderer, room: ^game.Room) {
 	if renderer == nil || room == nil || room.player == nil || !renderer.tactical.arrow_aim || game.player_charges(room, .Arrows) <= 0 { return }
 	hovered: grid.Position

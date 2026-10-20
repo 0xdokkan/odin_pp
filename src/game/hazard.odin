@@ -12,6 +12,7 @@ Grid_Object_Hazard_Resolution :: struct {
 	report:    Action_Report,
 }
 
+@(private = "file")
 trigger_trap_hazard :: proc(
 	room: ^Room,
 	mover: Entity_Ref,
@@ -44,6 +45,7 @@ trigger_trap_hazard :: proc(
 	return true, trap.id
 }
 
+@(private = "file")
 trigger_grid_object_hazard :: proc(
 	room: ^Room,
 	mover: Entity_Ref,
@@ -81,6 +83,7 @@ trigger_grid_object_hazard :: proc(
 	return true, object.id
 }
 
+@(private)
 trigger_cell_hazard :: proc(
 	room: ^Room,
 	mover: Entity_Ref,
@@ -106,6 +109,7 @@ trigger_cell_hazard :: proc(
 }
 
 // Restituisce gli eventi nel report: il chiamante ne possiede l'accodamento.
+@(private)
 resolve_trap_for_entity :: proc(room: ^Room, mover: Entity_Ref) -> (result: Trap_Resolution) {
 	if room == nil || room.player == nil ||
 	   (room.phase != .Combat && room.phase != .Loot) ||
@@ -125,6 +129,7 @@ resolve_trap_for_entity :: proc(room: ^Room, mover: Entity_Ref) -> (result: Trap
 	return
 }
 
+@(private)
 resolve_grid_object_hazard_for_entity :: proc(
 	room: ^Room,
 	mover: Entity_Ref,

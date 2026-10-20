@@ -2,7 +2,7 @@ package render
 
 import "core:fmt"
 import rl "vendor:raylib"
-import view "../view"
+import view "../engine/view"
 import fight "../fight"
 
 M9_Kind :: enum {None, Arena, Ring, FPS}
@@ -71,6 +71,7 @@ m9_control_at_point :: proc(renderer: ^Renderer, v: M9_View, point: view.Vec2) -
 	return .None
 }
 
+@(private)
 m9_move_name :: proc(action: fight.Action) -> cstring {
 	switch action {
 	case .Idle: return "PRONTO"
@@ -85,6 +86,7 @@ m9_move_name :: proc(action: fight.Action) -> cstring {
 	return ""
 }
 
+@(private)
 draw_m9_controls :: proc(renderer: ^Renderer, v: M9_View, moves: ^[fight.Action]fight.Move_Def = nil) {
 	w,h := renderer.canvas_width,renderer.canvas_height
 	if v.practice {

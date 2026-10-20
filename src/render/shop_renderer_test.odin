@@ -3,7 +3,7 @@ package render
 import "core:testing"
 import rl "vendor:raylib"
 import game "../game"
-import view "../view"
+import view "../engine/view"
 
 SHOP_RENDER_TEST_PLAYER_STATS :: game.Player_Stats{
 	max_health = 10,
@@ -105,13 +105,13 @@ test_shop_offer_cards_and_prices_are_non_overlapping_and_hittable :: proc(t: ^te
 	}
 
 	raised := shop_offer_bounds(960, 540, 1, true)
-	raised_only_point := view.Vec2{x = raised.x+raised.width*0.5, y = raised.y+2}
+	raised_only_point := view.Vec2{raised.x+raised.width*0.5, raised.y+2}
 	_, found_without_raise := shop_offer_at_point(&run, 960, 540, raised_only_point)
 	testing.expect(t, !found_without_raise)
 	index, found := shop_offer_at_point(&run, 960, 540, raised_only_point, 1)
 	testing.expect(t, found)
 	testing.expect_value(t, index, 1)
-	_, found = shop_offer_at_point(&run, 960, 540, {x = 10, y = 10})
+	_, found = shop_offer_at_point(&run, 960, 540, {10, 10})
 	testing.expect(t, !found)
 }
 
@@ -155,13 +155,13 @@ test_shop_owned_deck_pages_cover_partial_and_maximum_decks :: proc(t: ^testing.T
 
 		raised_card_id := deck.owned[1].id
 		raised := shop_owned_card_bounds(960, 540, 1, true)
-		raised_only_point := view.Vec2{x = raised.x+raised.width*0.5, y = raised.y+2}
+		raised_only_point := view.Vec2{raised.x+raised.width*0.5, raised.y+2}
 		_, found_without_raise := shop_owned_card_at_point(&run, 960, 540, 0, raised_only_point)
 		testing.expect(t, !found_without_raise)
 		card_id, found := shop_owned_card_at_point(&run, 960, 540, 0, raised_only_point, raised_card_id)
 		testing.expect(t, found)
 		testing.expect_value(t, card_id, raised_card_id)
-		_, found = shop_owned_card_at_point(&run, 960, 540, page_count, {x = 480, y = 360})
+		_, found = shop_owned_card_at_point(&run, 960, 540, page_count, {480, 360})
 		testing.expect(t, !found)
 	}
 }
@@ -222,7 +222,7 @@ test_shop_controls_are_disjoint_and_have_stable_hit_targets :: proc(t: ^testing.
 	)
 	testing.expect_value(t, owned_hit.kind, Shop_Hit_Kind.Owned_Card)
 	testing.expect_value(t, owned_hit.card_id, run.player.deck.owned[3].id)
-	testing.expect_value(t, shop_hit_test(&run, 960, 540, 0, {x = 10, y = 280}).kind, Shop_Hit_Kind.None)
+	testing.expect_value(t, shop_hit_test(&run, 960, 540, 0, {10, 280}).kind, Shop_Hit_Kind.None)
 }
 
 @(test)
@@ -235,9 +235,9 @@ test_shop_geometry_rejects_unsupported_canvas_and_invalid_state :: proc(t: ^test
 	testing.expect(t, !shop_offer_contains(899, 540, 0, {}))
 	testing.expect(t, !shop_previous_page_at_point(899, 540, {}))
 	testing.expect(t, !shop_continue_at_point(960, 519, {}))
-	_, offer_found := shop_offer_at_point(nil, 960, 540, {x = 480, y = 180})
+	_, offer_found := shop_offer_at_point(nil, 960, 540, {480, 180})
 	testing.expect(t, !offer_found)
-	_, card_found := shop_owned_card_at_point(nil, 960, 540, 0, {x = 480, y = 360})
+	_, card_found := shop_owned_card_at_point(nil, 960, 540, 0, {480, 360})
 	testing.expect(t, !card_found)
 	run := create_shop_render_test_run(t)
 	defer game.destroy_run(&run)

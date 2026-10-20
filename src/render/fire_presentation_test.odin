@@ -2,7 +2,6 @@ package render
 
 import "core:testing"
 import game "../game"
-import view "../view"
 
 make_fire_presentation_test_room :: proc(player: ^game.Player) -> game.Room {
 	result := game.Room{player = player, phase = .Combat}
@@ -12,7 +11,7 @@ make_fire_presentation_test_room :: proc(player: ^game.Player) -> game.Room {
 	append(&result.objects, game.Grid_Object{
 		id = 19,
 		kind = .Fire,
-		position = {x = 4, y = 3},
+		position = {4, 3},
 		max_health = definition.max_health,
 		health = definition.max_health,
 	})
@@ -22,7 +21,7 @@ make_fire_presentation_test_room :: proc(player: ^game.Player) -> game.Room {
 @(test)
 test_fire_presentation_snapshot_keeps_persistent_hazard_identity :: proc(t: ^testing.T) {
 	player := game.Player{
-		position = {x = 4, y = 3},
+		position = {4, 3},
 		stats = {max_health = 10},
 		health = 10,
 	}
@@ -39,14 +38,14 @@ test_fire_presentation_snapshot_keeps_persistent_hazard_identity :: proc(t: ^tes
 		testing.expect_value(t, object.kind, game.Grid_Object_Kind.Fire)
 		testing.expect(t, object.visible)
 		testing.expect_value(t, object.opacity, f32(1))
-		expect_presentation_position(t, object.position, {x = 4, y = 3})
+		expect_presentation_position(t, object.position, {4, 3})
 	}
 }
 
 @(test)
 test_fire_hazard_cue_targets_actor_without_consuming_persistent_fire :: proc(t: ^testing.T) {
 	player := game.Player{
-		position = {x = 4, y = 3},
+		position = {4, 3},
 		stats = {max_health = 10},
 		health = 10,
 	}
@@ -61,8 +60,8 @@ test_fire_hazard_cue_targets_actor_without_consuming_persistent_fire :: proc(t: 
 		source = game.object_entity(19),
 		target = game.PLAYER_ENTITY,
 		amount = fire_definition.hazard_damage,
-		from_position = {x = 4, y = 3},
-		to_position = {x = 4, y = 3},
+		from_position = {4, 3},
+		to_position = {4, 3},
 	}
 	events: game.Event_Log
 	testing.expect(t, game.record_event(&events, event))
@@ -77,8 +76,8 @@ test_fire_hazard_cue_targets_actor_without_consuming_persistent_fire :: proc(t: 
 	}
 
 	renderer := Renderer{
-		projection = {tile_width = 64, tile_height = 32},
-		camera = view.make_camera({x = 100, y = 80}),
+		canvas_width = 960, canvas_height = 540,
+		tactical = {camera = {position = {9, 8, 9}, target = {4, 0, 3}, up = {0, 1, 0}, fovy = 7}},
 		timeline = timeline,
 	}
 	center, has_center := presentation_event_center(&renderer, event)

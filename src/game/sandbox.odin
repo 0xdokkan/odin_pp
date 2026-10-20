@@ -1,6 +1,6 @@
 package game
 
-import grid "../grid"
+import grid "../engine/grid"
 import rng "../engine/rng"
 
 // The mechanics sandbox ("PROVA MECCANICHE"): one open arena where the combat
@@ -32,6 +32,7 @@ begin_sandbox :: proc(seed: u64) -> Sandbox_State {
 	return {random = seed if seed != 0 else 0x5A9D_B0C5, timer = SANDBOX_SPAWN_SECONDS}
 }
 
+@(private = "file")
 sandbox_random :: proc(sandbox: ^Sandbox_State, below: int) -> int {
 	return int(rng.step(&sandbox.random)%u64(max(below, 1)))
 }
@@ -65,6 +66,7 @@ sandbox_tick :: proc(room: ^Room, sandbox: ^Sandbox_State, dt: f32) -> (id: u32,
 
 // A random free cell at least SANDBOX_SPAWN_DISTANCE from the player; in a
 // room too small for that, one of the farthest free cells.
+@(private = "file")
 sandbox_spawn_cell :: proc(room: ^Room, sandbox: ^Sandbox_State) -> (grid.Position, bool) {
 	data := room.level_data
 	if data == nil { return {}, false }
@@ -96,6 +98,7 @@ sandbox_spawn_cell :: proc(room: ^Room, sandbox: ^Sandbox_State) -> (grid.Positi
 	return {}, false
 }
 
+@(private)
 sandbox_distance :: proc(room: ^Room, cell: grid.Position) -> int {
 	return max(abs(cell.x-room.player.position.x), abs(cell.y-room.player.position.y))
 }
@@ -117,11 +120,11 @@ sandbox_clear_for_fishing :: proc(room: ^Room) -> (report: Action_Report, ok: bo
 	for enemy in room.enemies {
 		if !add_effect(&action, damage_effect(enemy_entity(enemy.id), enemy.health+1000)) { return }
 	}
-	clear_event_log(&room.recent_events)
+	clear_event_log(room.recent_events)
 	if action.effect_count > 0 {
 		report = resolve_action(room, &action)
 		if !report.accepted || len(room.enemies) > 0 { return }
-		append_event_log(&room.recent_events, &report.events)
+		append_event_log(room.recent_events, &report.events)
 	}
 	if room.phase == .Defeat { return }
 	room.phase = .Loot

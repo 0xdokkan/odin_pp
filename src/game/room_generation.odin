@@ -1,7 +1,7 @@
 package game
 
 import "core:math/rand"
-import grid "../grid"
+import grid "../engine/grid"
 import level "../level"
 
 ROOM_LAYOUT_SEED_SALT    :: u64(0xE7037ED1A0B428DB)
@@ -14,7 +14,7 @@ MAX_ENEMY_BUDGET_COST   :: 3
 Encounter_Generation_Config :: struct {
 	enemy_budget:       int,
 	max_enemies:        int,
-	target_enemies:     int, // Zero retains the classic budget-driven roster.
+	target_enemies:     int, // Zero uses the opening budget-driven roster.
 	trap_count:         int,
 	obstacle_count:     int,
 	object_count:       int,
@@ -41,7 +41,6 @@ Room_Blueprint_Error :: enum {
 }
 
 Room_Blueprint :: struct {
-	tactical: bool,
 	previous_family: level.Room_Family,
 	encounter_kind: Encounter_Kind,
 	modifier: Room_Modifier,
@@ -58,6 +57,7 @@ Room_Blueprint :: struct {
 	objects:       [dynamic]Grid_Object_Spawn,
 }
 
+@(private)
 derive_room_stream_seed :: proc(room_seed, salt: u64) -> u64 {
 	result := mix_room_seed(room_seed~salt)
 	if result == 0 {
@@ -66,6 +66,7 @@ derive_room_stream_seed :: proc(room_seed, salt: u64) -> u64 {
 	return result
 }
 
+@(private = "file")
 valid_encounter_generation_config :: proc(config: Encounter_Generation_Config) -> bool {
 	return config.enemy_budget > 0 &&
 	       config.max_enemies > 0 && config.max_enemies <= MAX_ENEMIES_PER_ROOM &&
@@ -79,65 +80,65 @@ valid_encounter_generation_config :: proc(config: Encounter_Generation_Config) -
 	       config.enemy_health > 0 && config.enemy_attack > 0 && config.trap_damage > 0
 }
 
-room_generation_profile :: proc(node: ^Run_Node, previous_family: level.Room_Family = .Scattered, tactical: bool = false) -> (result: Room_Generation_Profile, ok: bool) {
+room_generation_profile :: proc(node: ^Run_Node, previous_family: level.Room_Family = .Scattered) -> (result: Room_Generation_Profile, ok: bool) {
 	if node == nil || int(node.id) < 0 || node.depth < 0 || node.room_seed == 0 ||
 	   !node_kind_has_room(node.kind) || !level.room_family_is_valid(previous_family) {
 		return {}, false
 	}
 
 	result.level_config = {
-		width = 15,
-		height = 9,
+		width = 17,
+		height = 11,
+		central_spawn = true,
 		wall_density_percent = 7,
 		spawn_clearance_radius = 1,
 		exit_center_radius = 2,
 		exit_clearance_radius = 1,
-		min_spawn_exit_distance = 6,
+		min_spawn_exit_distance = 7,
 		min_walkable_percent = 68,
 		max_attempts = 64,
 	}
-	depth := node.depth
-	if tactical { depth = min(depth, MAX_RUN_MAP_LAYERS-1) }
+	depth := min(node.depth, MAX_RUN_MAP_LAYERS-1)
 	switch node.kind {
 	case .Combat:
 		result.encounter_config = {
-			enemy_budget = min(8, 3+depth/2),
-			max_enemies = 6,
+			enemy_budget = min(11, 6+depth/2),
+			max_enemies = 8,
 			trap_count = min(3, 1+depth/3),
 			obstacle_count = min(4, 2+depth/4),
-			player_safe_radius = 2,
+			player_safe_radius = 3,
 			exit_safe_radius = 1,
 			enemy_health = i32(4+depth/3),
 			enemy_attack = i32(2+depth/4),
 			trap_damage = i32(3+depth/3),
 		}
 	case .Elite:
-		result.level_config.width = 17
-		result.level_config.height = 10
+		result.level_config.width = 19
+		result.level_config.height = 12
 		result.level_config.wall_density_percent = 9
-		result.level_config.min_spawn_exit_distance = 7
+		result.level_config.min_spawn_exit_distance = 8
 		result.encounter_config = {
-			enemy_budget = min(12, 6+depth/2),
-			max_enemies = 8,
+			enemy_budget = min(15, 9+depth/2),
+			max_enemies = 10,
 			trap_count = min(5, 3+depth/4),
 			obstacle_count = min(6, 4+depth/4),
-			player_safe_radius = 2,
+			player_safe_radius = 3,
 			exit_safe_radius = 1,
 			enemy_health = i32(5+depth/3),
 			enemy_attack = i32(3+depth/4),
 			trap_damage = i32(4+depth/3),
 		}
 	case .Boss:
-		result.level_config.width = 19
-		result.level_config.height = 11
+		result.level_config.width = 21
+		result.level_config.height = 13
 		result.level_config.wall_density_percent = 10
 		result.level_config.spawn_clearance_radius = 2
 		result.level_config.exit_center_radius = 1
-		result.level_config.min_spawn_exit_distance = 8
+		result.level_config.min_spawn_exit_distance = 9
 		result.level_config.min_walkable_percent = 72
 		result.encounter_config = {
-			enemy_budget = min(16, 10+depth/2),
-			max_enemies = 9,
+			enemy_budget = min(19, 13+depth/2),
+			max_enemies = 11,
 			trap_count = min(6, 4+depth/4),
 			obstacle_count = min(7, 5+depth/4),
 			player_safe_radius = 3,
@@ -150,16 +151,7 @@ room_generation_profile :: proc(node: ^Run_Node, previous_family: level.Room_Fam
 		return {}, false
 	}
 	result.encounter_config.object_count = 3 if node.kind == .Combat else 6
-	if tactical {
-		result.level_config.central_spawn = true
-		result.level_config.width += 2
-		result.level_config.height += 2
-		result.level_config.min_spawn_exit_distance += 1
-		result.encounter_config.enemy_budget += 3
-		result.encounter_config.max_enemies = min(MAX_ENEMIES_PER_ROOM, result.encounter_config.max_enemies+2)
-		result.encounter_config.player_safe_radius = max(3, result.encounter_config.player_safe_radius)
-		configure_progressive_tactical_arena(&result, node)
-	}
+	configure_progressive_tactical_arena(&result, node)
 	result.level_config.family = room_family_for_node(node, previous_family)
 	result.level_config.exit_center_radius = result.level_config.width/2
 	if node.kind == .Combat && encounter_kind_for_node(node) == .Powder_Keg &&
@@ -199,6 +191,7 @@ room_blueprint_content :: proc(blueprint: ^Room_Blueprint) -> Room_Content {
 	}
 }
 
+@(private)
 position_in_list :: proc(positions: []grid.Position, position: grid.Position) -> bool {
 	for current in positions {
 		if current == position {
@@ -208,11 +201,13 @@ position_in_list :: proc(positions: []grid.Position, position: grid.Position) ->
 	return false
 }
 
+@(private)
 cell_is_walkable :: proc(level_data: ^level.Level, position: grid.Position) -> bool {
 	tile, found := level.tile_at(level_data, position)
 	return found && level.is_walkable(tile.kind)
 }
 
+@(private = "file")
 cell_is_blocked :: proc(
 	position: grid.Position,
 	blockers: []grid.Position,
@@ -222,6 +217,7 @@ cell_is_blocked :: proc(
 	return (has_extra_blocker && position == extra_blocker) || position_in_list(blockers, position)
 }
 
+@(private)
 all_unblocked_walkable_cells_are_connected :: proc(
 	level_data: ^level.Level,
 	blockers: []grid.Position,
@@ -288,10 +284,12 @@ all_unblocked_walkable_cells_are_connected :: proc(
 	return reachable_count == open_count
 }
 
+@(private)
 grid_distance :: proc(a, b: grid.Position) -> int {
 	return max(abs(a.x-b.x), abs(a.y-b.y))
 }
 
+@(private)
 position_is_safe_from_room_anchors :: proc(
 	position, player_spawn, exit_position: grid.Position,
 	config: Encounter_Generation_Config,
@@ -300,6 +298,7 @@ position_is_safe_from_room_anchors :: proc(
 	       grid_distance(position, exit_position) > config.exit_safe_radius
 }
 
+@(private)
 enemy_archetype_budget_cost :: proc(archetype: Enemy_Archetype) -> int {
 	switch archetype {
 	case .Chaser:
@@ -315,6 +314,7 @@ enemy_archetype_budget_cost :: proc(archetype: Enemy_Archetype) -> int {
 	return max(int)
 }
 
+@(private = "file")
 random_feasible_archetype :: proc(
 	remaining_budget, remaining_slots: int,
 	generator: rand.Generator,
@@ -347,6 +347,7 @@ random_feasible_archetype :: proc(
 	return affordable[rand.int_range(0, affordable_count, generator)], true
 }
 
+@(private)
 enemy_stats_for_archetype :: proc(
 	config: Encounter_Generation_Config,
 	archetype: Enemy_Archetype,
@@ -371,6 +372,7 @@ enemy_stats_for_archetype :: proc(
 	return
 }
 
+@(private = "file")
 generate_obstacles :: proc(
 	blueprint: ^Room_Blueprint,
 	candidates: []grid.Position,
@@ -394,6 +396,7 @@ generate_obstacles :: proc(
 	return len(blueprint.obstacles) == desired_count
 }
 
+@(private)
 validate_room_blueprint :: proc(blueprint: ^Room_Blueprint) -> bool {
 	if blueprint == nil || blueprint.seed == 0 || int(blueprint.source_node) < 0 ||
 	   blueprint.node_depth < 0 || !valid_encounter_generation_config(blueprint.profile.encounter_config) {
@@ -405,7 +408,7 @@ validate_room_blueprint :: proc(blueprint: ^Room_Blueprint) -> bool {
 		depth = blueprint.node_depth,
 		room_seed = blueprint.seed,
 	}
-	expected_profile, profile_ok := room_generation_profile(&source_node, blueprint.previous_family, blueprint.tactical)
+	expected_profile, profile_ok := room_generation_profile(&source_node, blueprint.previous_family)
 	if !profile_ok || expected_profile != blueprint.profile {
 		return false
 	}
@@ -477,8 +480,8 @@ validate_room_blueprint :: proc(blueprint: ^Room_Blueprint) -> bool {
 	       blueprint.modifier == generate_blueprint_modifier(blueprint)
 }
 
-generate_room_blueprint :: proc(node: ^Run_Node, previous_family: level.Room_Family = .Scattered, tactical: bool = false) -> (result: Room_Blueprint, err: Room_Blueprint_Error) {
-	profile, profile_ok := room_generation_profile(node, previous_family, tactical)
+generate_room_blueprint :: proc(node: ^Run_Node, previous_family: level.Room_Family = .Scattered) -> (result: Room_Blueprint, err: Room_Blueprint_Error) {
+	profile, profile_ok := room_generation_profile(node, previous_family)
 	if !profile_ok {
 		return {}, .Invalid_Node
 	}
@@ -487,7 +490,6 @@ generate_room_blueprint :: proc(node: ^Run_Node, previous_family: level.Room_Fam
 	}
 
 	result.seed = node.room_seed
-	result.tactical = tactical
 	result.previous_family = previous_family
 	result.source_node = node.id
 	result.node_kind = node.kind
@@ -554,9 +556,8 @@ generate_room_blueprint :: proc(node: ^Run_Node, previous_family: level.Room_Fam
 			enemy_archetype_count += 1
 			remaining_budget -= enemy_archetype_budget_cost(archetype)
 		}
-	} else if tactical {
-		// Two extra roles use the extra budget exactly. The remaining random
-		// roster keeps the classic seed stream and slot budget unchanged.
+	} else {
+		// Two extra roles use the extra budget exactly.
 		for archetype in ([?]Enemy_Archetype{.Chaser, .Archer}) {
 			enemy_archetypes[enemy_archetype_count] = archetype
 			enemy_archetype_count += 1

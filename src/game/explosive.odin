@@ -1,13 +1,14 @@
 package game
 
 import "core:slice"
-import grid "../grid"
+import grid "../engine/grid"
 
 EXPLOSIVE_FUSE_PULSES :: 2
 EXPLOSIVE_DAMAGE :: i32(4)
 MAX_ACTIVE_BOMBS :: 4
 
-// The arming command finishes its pulse first, then two further decisions remain.
+// World beats advance the fuse; the arming beat completes before its countdown.
+@(private)
 arm_explosive :: proc(room: ^Room, id: u32, source: Entity_Ref, events: ^Event_Log) -> bool {
 	if room == nil || room.phase != .Combat {
 		return false
@@ -23,7 +24,7 @@ arm_explosive :: proc(room: ^Room, id: u32, source: Entity_Ref, events: ^Event_L
 	}
 	fuse := EXPLOSIVE_FUSE_PULSES
 	object.explosion_damage = EXPLOSIVE_DAMAGE
-	if tactical_enabled(room) && object.kind == .Bomb && source.kind == .Enemy {
+	if room != nil && room.player != nil && object.kind == .Bomb && source.kind == .Enemy {
 		fuse = TACTICAL_BOMB_FUSE
 		object.explosion_damage = TACTICAL_BOMB_DAMAGE
 	}
@@ -47,6 +48,7 @@ explosion_contains_cell :: proc(room: ^Room, center, cell: grid.Position) -> boo
 	       !obstacle_at(room, cell)
 }
 
+@(private)
 active_bomb_count :: proc(room: ^Room) -> (count: int) {
 	for object in room.objects {
 		if object.kind == .Bomb && object.detonation_pulse != 0 {
@@ -56,6 +58,7 @@ active_bomb_count :: proc(room: ^Room) -> (count: int) {
 	return
 }
 
+@(private)
 bomb_cell_is_available :: proc(room: ^Room, position: grid.Position) -> bool {
 	_, occupied := object_index_at(room, position)
 	return base_cell_is_walkable(room, position) && !obstacle_at(room, position) && !occupied
@@ -80,6 +83,7 @@ spawn_bomb :: proc(room: ^Room, source: Entity_Ref, position: grid.Position, eve
 	return true
 }
 
+@(private)
 ignite_barrel_near_fire :: proc(room: ^Room, id: u32, events: ^Event_Log) {
 	index, found := object_index_by_id(room, id)
 	if !found || room.objects[index].kind != .Barrel {
@@ -94,6 +98,7 @@ ignite_barrel_near_fire :: proc(room: ^Room, id: u32, events: ^Event_Log) {
 	}
 }
 
+@(private)
 disarm_explosives_after_combat :: proc(room: ^Room, events: ^Event_Log) {
 	if room == nil || room.phase == .Combat {
 		return
@@ -109,6 +114,7 @@ disarm_explosives_after_combat :: proc(room: ^Room, events: ^Event_Log) {
 	}
 }
 
+@(private)
 resolve_due_explosives :: proc(room: ^Room, pulse: ^Pulse_Report) {
 	// Snapshot and sort IDs: removals and chain ignition cannot alter this batch.
 	ids: [MAX_GRID_OBJECTS_PER_ROOM]u32

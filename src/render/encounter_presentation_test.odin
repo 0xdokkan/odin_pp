@@ -2,7 +2,7 @@ package render
 
 import "core:testing"
 import game "../game"
-import grid "../grid"
+import grid "../engine/grid"
 import level "../level"
 
 create_encounter_presentation_test_level :: proc(t: ^testing.T) -> level.Level {
@@ -35,6 +35,25 @@ finish_encounter_test_cue :: proc(t: ^testing.T, timeline: ^Presentation_Timelin
 	testing.expect_value(t, timeline.count, old_count-1)
 }
 
+// Collect the real clock's bounded batches for replay as one test sequence.
+// Casts finish before world time advances; no player action manufactures a beat.
+advance_presentation_test_clock :: proc(t: ^testing.T, room: ^game.Room, seconds: int) {
+	if game.tactical_is_casting(room) { game.tactical_tick(room, room.player.tactical.cast_remaining, true, false) }
+	events := room.recent_events^
+	for _ in 0..<seconds {
+		game.tactical_tick(room, 1, true, false)
+		for step in 0..<400 {
+			if room.qte.kind != .None { testing.expect(t, game.resolve_qte(room, false)) }
+			if !room.tactical_pulse.pending { break }
+			testing.expect(t, game.continue_tactical_pulse(room))
+			game.append_event_log(&events, room.recent_events)
+			testing.expect(t, step < 399)
+		}
+	}
+	room.recent_events^ = events
+	testing.expect_value(t, events.dropped_count, 0)
+}
+
 @(test)
 test_custodian_shield_replays_before_ally_moves_then_absorbs_a_real_card :: proc(t: ^testing.T) {
 	data := create_encounter_presentation_test_level(t)
@@ -51,11 +70,15 @@ test_custodian_shield_replays_before_ally_moves_then_absorbs_a_real_card :: proc
 	ally := game.enemy_entity(room.enemies[0].id)
 	custodian := game.enemy_entity(room.enemies[1].id)
 	testing.expect_value(t, room.enemies[1].intent.kind, game.Enemy_Intent_Kind.Protect)
+	// Align the ally with the custodian's fourth beat: protection must replay first.
+	room.enemies[0].tactical_cooldown = 4
+	advance_presentation_test_clock(t, &room, 3)
 	before := capture_room_presentation(&room)
 	game.wait_player_turn(&room)
+	advance_presentation_test_clock(t, &room, 1)
 	after := capture_room_presentation(&room)
 	timeline: Presentation_Timeline
-	testing.expect(t, begin_event_timeline(&timeline, before, &room.recent_events, &after))
+	testing.expect(t, begin_event_timeline(&timeline, before, room.recent_events, &after))
 	testing.expect_value(t, timeline.view.encounter_kind, game.Encounter_Kind.Escort)
 	visual, found := presentation_actor(&timeline, ally)
 	testing.expect(t, found)
@@ -74,7 +97,7 @@ test_custodian_shield_replays_before_ally_moves_then_absorbs_a_real_card :: proc
 			testing.expect_value(t, cue.event.source, custodian)
 			index, has_shield := game.status_index(&visual.statuses, .Shield)
 			testing.expect(t, has_shield)
-			testing.expect_value(t, visual.statuses.items[index].potency, i32(3))
+			testing.expect_value(t, visual.statuses.items[index].potency, i32(2))
 			// The application is visible before this pulse's status tick.
 			testing.expect_value(t, visual.statuses.items[index].remaining_pulses, i32(3))
 			testing.expect_value(t, visual.position, presentation_position({3, 2}))
@@ -97,15 +120,15 @@ test_custodian_shield_replays_before_ally_moves_then_absorbs_a_real_card :: proc
 	before = capture_room_presentation(&room)
 	play := game.play_card(&room, bolt.id, game.entity_target(ally))
 	testing.expect(t, game.card_play_was_committed(play.result))
-	testing.expect_value(t, play.action_report.damage_absorbed, i32(3))
+	testing.expect_value(t, play.action_report.damage_absorbed, i32(2))
 	after = capture_room_presentation(&room)
-	testing.expect(t, begin_event_timeline(&timeline, before, &room.recent_events, &after))
+	testing.expect(t, begin_event_timeline(&timeline, before, room.recent_events, &after))
 	absorption_seen := false
 	for event_timeline_is_busy(&timeline) {
 		cue := timeline.cues[timeline.head]
 		if cue.kind == .Damage_Absorbed && cue.event.target == ally {
 			absorption_seen = true
-			testing.expect_value(t, cue.event.amount, i32(3))
+			testing.expect_value(t, cue.event.amount, i32(2))
 		}
 		finish_encounter_test_cue(t, &timeline)
 	}
@@ -131,7 +154,9 @@ test_boss_snapshot_changes_phase_only_at_pulse_boundary_after_announced_charge :
 	defer game.destroy_room(&room)
 	room.enemies[0].health = 12
 	room.enemies[0].boss_cycle = 1
+	room.enemies[0].intent, room.enemies[0].tactical_cooldown = {}, 0
 	game.plan_enemy_intents(&room)
+	advance_presentation_test_clock(t, &room, 4)
 	testing.expect_value(t, room.enemies[0].intent.kind, game.Enemy_Intent_Kind.Charge)
 	bolt, card_created := game.create_temporary_card(&player.deck, .Arc_Bolt)
 	testing.expect(t, card_created)
@@ -139,12 +164,13 @@ test_boss_snapshot_changes_phase_only_at_pulse_boundary_after_announced_charge :
 	before := capture_room_presentation(&room)
 	play := game.play_card(&room, bolt.id, game.entity_target(boss))
 	testing.expect(t, game.card_play_was_committed(play.result))
-	testing.expect_value(t, room.enemies[0].health, i32(9))
+	advance_presentation_test_clock(t, &room, 1)
+	testing.expect_value(t, room.enemies[0].health, i32(10))
 	testing.expect_value(t, room.enemies[0].boss_phase, i32(2))
 	testing.expect_value(t, room.enemies[0].recovery_pulses, i32(2))
 	after := capture_room_presentation(&room)
 	timeline: Presentation_Timeline
-	testing.expect(t, begin_event_timeline(&timeline, before, &room.recent_events, &after))
+	testing.expect(t, begin_event_timeline(&timeline, before, room.recent_events, &after))
 	visual, found := presentation_actor(&timeline, boss)
 	testing.expect(t, found)
 	testing.expect_value(t, visual.boss_phase, i32(1))
@@ -164,7 +190,7 @@ test_boss_snapshot_changes_phase_only_at_pulse_boundary_after_announced_charge :
 		finish_encounter_test_cue(t, &timeline)
 		if cue.kind == .Damage && cue.event.target == boss {
 			damage_seen = true
-			testing.expect_value(t, visual.health, i32(9))
+			testing.expect_value(t, visual.health, i32(10))
 			testing.expect_value(t, visual.boss_phase, i32(1))
 		}
 		if cue.kind == .Move && cue.event.target == boss {
@@ -200,9 +226,10 @@ test_furnace_warning_snapshot_and_trigger_precede_damage_and_restart_countdown :
 	testing.expect_value(t, game.room_modifier_pulses_remaining(&before.modifier, before.pulse_count), 2)
 	testing.expect(t, game.room_modifier_warning_active(&before.modifier, before.pulse_count))
 	game.try_move_player(&room, .East)
+	advance_presentation_test_clock(t, &room, 1)
 	after := capture_room_presentation(&room)
 	timeline: Presentation_Timeline
-	testing.expect(t, begin_event_timeline(&timeline, before, &room.recent_events, &after))
+	testing.expect(t, begin_event_timeline(&timeline, before, room.recent_events, &after))
 	testing.expect_value(t, game.room_modifier_pulses_remaining(&timeline.view.modifier, timeline.view.pulse_count), 2)
 	testing.expect(t, update_event_timeline(&timeline, 1000))
 	testing.expect_value(t, game.room_modifier_pulses_remaining(&timeline.view.modifier, timeline.view.pulse_count), 1)
@@ -211,11 +238,12 @@ test_furnace_warning_snapshot_and_trigger_precede_damage_and_restart_countdown :
 
 	before = capture_room_presentation(&room)
 	game.try_move_player(&room, .South)
+	advance_presentation_test_clock(t, &room, 1)
 	testing.expect_value(t, player.position, grid.Position{2, 2})
 	testing.expect_value(t, player.health, i32(17))
 	testing.expect_value(t, room.modifier.activation_pulse, u64(6))
 	after = capture_room_presentation(&room)
-	testing.expect(t, begin_event_timeline(&timeline, before, &room.recent_events, &after))
+	testing.expect(t, begin_event_timeline(&timeline, before, room.recent_events, &after))
 	testing.expect_value(t, timeline.view.modifier.activation_pulse, u64(2))
 	testing.expect_value(t, timeline.view.player.health, i32(20))
 	hazard_seen, damage_seen := false, false
@@ -250,8 +278,9 @@ test_furnace_warning_snapshot_and_trigger_precede_damage_and_restart_countdown :
 	for step in 0..<2 {
 		before = capture_room_presentation(&room)
 		game.wait_player_turn(&room)
+		advance_presentation_test_clock(t, &room, 1)
 		after = capture_room_presentation(&room)
-		testing.expect(t, begin_event_timeline(&timeline, before, &room.recent_events, &after))
+		testing.expect(t, begin_event_timeline(&timeline, before, room.recent_events, &after))
 		testing.expect(t, update_event_timeline(&timeline, 1000))
 		testing.expect_value(t, game.room_modifier_warning_active(&timeline.view.modifier, timeline.view.pulse_count), step == 1)
 		testing.expect_value(t, timeline.view.modifier, room.modifier)
@@ -279,7 +308,7 @@ test_furnace_snapshot_disarms_after_final_player_kill_without_a_pulse_event :: p
 	}
 	after := capture_room_presentation(&room)
 	timeline: Presentation_Timeline
-	testing.expect(t, begin_event_timeline(&timeline, before, &room.recent_events, &after))
+	testing.expect(t, begin_event_timeline(&timeline, before, room.recent_events, &after))
 	testing.expect_value(t, timeline.view.modifier.activation_pulse, u64(2))
 	testing.expect(t, update_event_timeline(&timeline, 1000))
 	testing.expect_value(t, timeline.view.phase, game.Room_Phase.Loot)
@@ -306,11 +335,12 @@ test_furnace_death_cues_preserve_defeat_and_disarm_when_last_enemy_dies_too :: p
 	game.plan_enemy_intents(&room)
 	before := capture_room_presentation(&room)
 	game.wait_player_turn(&room)
+		advance_presentation_test_clock(t, &room, 1)
 	testing.expect_value(t, room.phase, game.Room_Phase.Defeat)
 	testing.expect_value(t, len(room.enemies), 0)
 	after := capture_room_presentation(&room)
 	timeline: Presentation_Timeline
-	testing.expect(t, begin_event_timeline(&timeline, before, &room.recent_events, &after))
+	testing.expect(t, begin_event_timeline(&timeline, before, room.recent_events, &after))
 	player_defeated := false
 	enemy_defeated := false
 	for event_timeline_is_busy(&timeline) {

@@ -165,12 +165,8 @@ view_init :: proc(v: ^View) {
 	}
 	v.figures = gfx.paper_figures_create()
 	gfx.create_flipbook_assets(&v.book)
-	art := sprite_art()
 	for id in Sprite_Id {
-		frames: [8]gfx.Frame_Rows
-		n := sprite_frames(&art, id, frames[:])
-		palette := palette_for(id)
-		v.sprites[id], _ = gfx.sprite_create(frames[:n], &palette)
+		v.sprites[id], _ = gfx.sprite_load(SPRITE_ASSETS[id])
 	}
 	img := rl.GenImageGradientRadial(64, 64, 0, rl.WHITE, rl.BLANK)
 	v.glow = rl.LoadTextureFromImage(img)

@@ -7,21 +7,26 @@ import game "../game"
 
 TACTICAL_HUD_HEIGHT :: f32(84)
 
+@(private)
 tactical_refocus_bounds :: proc(renderer: ^Renderer) -> rl.Rectangle {
 	return tactical_hud_layout(renderer).refocus
 }
+@(private)
 tactical_map_controls_bounds :: proc(renderer: ^Renderer) -> rl.Rectangle {
 	return tactical_hud_layout(renderer).map_button
 }
+@(private = "file")
 tactical_phase_bounds :: proc(renderer: ^Renderer) -> rl.Rectangle {
 	return tactical_hud_layout(renderer).pulse
 }
 
 // Kept for callers that tint a plate by state.
+@(private)
 tactical_hud_panel :: proc(bounds: rl.Rectangle, accent: rl.Color = GOTHIC_STEEL) {
 	hud_frame(bounds, accent)
 }
 
+@(private)
 tactical_status_label :: proc(kind: game.Status_Kind, short: bool) -> (label: string, accent: rl.Color) {
 	accent = GOTHIC_BLUE
 	switch kind {
@@ -57,6 +62,7 @@ tactical_status_chip_text :: proc(status: game.Status, short: bool, die := i32(0
 // count): what bites the player first (VELENO, BRUCIATURA), so that it never
 // hides behind the count, then his charges (what his cards loaded him with:
 // RIFLESSO, FRECCE, DESTINO, LAMA), then the rest, each group as it was gained.
+@(private)
 tactical_status_chip_order :: proc(statuses: ^game.Status_Set) -> (ordered: game.Status_Set) {
 	group :: proc(kind: game.Status_Kind) -> int {
 		if kind == .Poison || kind == .Burn { return 0 }
@@ -295,7 +301,7 @@ tactical_hud_objective :: proc(renderer: ^Renderer, room: ^game.Room) -> cstring
 	v := renderer_status_view(renderer, room)
 	if renderer.tactical.snapshot.phase != .Combat { return "STANZA LIBERATA" }
 	lasso := game.tactical_lasso_active(room) && !game.tactical_is_casting(room)
-	if !game.tactical_enabled(room) || !s.config.shrinking_window || game.tactical_shadow_active(room) || lasso ||
+	if !s.config.shrinking_window || game.tactical_shadow_active(room) || lasso ||
 	   game.tactical_first_person_active(room) {
 		return tactical_hud_foes_objective(v.enemy_count)
 	}
@@ -315,6 +321,7 @@ tactical_hud_status_room :: proc(renderer: ^Renderer, objective: cstring) -> f32
 }
 
 // The dash is a key, not a button: a keycap, its cost and a recharge meter.
+@(private = "file")
 draw_tactical_dodge_chip :: proc(renderer: ^Renderer, room: ^game.Room, bounds: rl.Rectangle) {
 	s := &room.player.tactical
 	recovering := game.tactical_is_recovering(room)
@@ -336,6 +343,7 @@ draw_tactical_dodge_chip :: proc(renderer: ^Renderer, room: ^game.Room, bounds: 
 	gothic_text_fit(renderer, detail, {left, bounds.y+13, bounds.x+bounds.width-left-6, 12}, 10, GOTHIC_BLUE if ready else GOTHIC_MUTED)
 }
 
+@(private = "file")
 draw_tactical_defense_hud :: proc(renderer: ^Renderer, room: ^game.Room) {
 	q := &room.qte
 	x, y := f32(14), TACTICAL_HUD_HEIGHT+13

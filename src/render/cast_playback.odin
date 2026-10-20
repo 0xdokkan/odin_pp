@@ -4,6 +4,7 @@ package render
 // each animation's kind. The foreground alone owns cinematic suspension.
 Presentation_Time_Policy :: enum { Live, Cast, Cinematic }
 
+@(private)
 presentation_cue_is_cinematic :: proc(kind: Presentation_Cue_Kind) -> bool {
 	return kind == .Dice_Rolled
 }

@@ -9,6 +9,7 @@ Floor_Secret :: enum u8 {
 	Western_Ranch,
 }
 
+@(private)
 begin_floor :: proc(player: ^Player) {
 	if player != nil { player.floor_secrets = {} }
 }

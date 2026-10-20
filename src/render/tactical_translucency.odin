@@ -5,8 +5,8 @@ import "core:slice"
 import rl "vendor:raylib"
 import rlgl "vendor:raylib/rlgl"
 import game "../game"
-import grid "../grid"
-import view "../view"
+import grid "../engine/grid"
+import view "../engine/view"
 
 Tactical_Alpha_Entry :: struct {
 	kind: enum {Sprite, Wall, Attack, Ground, Lasso, Fishing, Pinball, First_Person},
@@ -31,6 +31,7 @@ Tactical_Alpha_Entry :: struct {
 // Retain the scratch capacity between frames and release it with the renderer.
 Tactical_Alpha_Buffer :: struct {entries: [dynamic]Tactical_Alpha_Entry}
 
+@(private)
 destroy_tactical_translucents :: proc(renderer: ^Renderer) {
 	buffer := renderer.tactical.translucents
 	if buffer == nil { return }
@@ -39,6 +40,7 @@ destroy_tactical_translucents :: proc(renderer: ^Renderer) {
 	renderer.tactical.translucents = nil
 }
 
+@(private)
 collect_tactical_translucents :: proc(renderer: ^Renderer, room: ^game.Room = nil) -> []Tactical_Alpha_Entry {
 	v := &renderer.tactical
 	if v.translucents == nil {
@@ -122,6 +124,7 @@ collect_tactical_translucents :: proc(renderer: ^Renderer, room: ^game.Room = ni
 	return entries^[:]
 }
 
+@(private)
 draw_tactical_billboards :: proc(renderer: ^Renderer, room: ^game.Room = nil, lights: [4]rl.Vector4 = {}) {
 	entries := collect_tactical_translucents(renderer, room)
 	// All upper wall layers share actor alpha ordering. Keeping their depth

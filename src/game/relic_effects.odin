@@ -1,10 +1,12 @@
 package game
 
+@(private = "file")
 relic_combat_is_active :: proc(room: ^Room) -> bool {
 	return room != nil && room.player != nil && room.phase == .Combat &&
 	       room.player.health > 0 && room.player.relics.combat.started
 }
 
+@(private)
 begin_room_relics :: proc(room: ^Room) {
 	if room == nil || room.player == nil {
 		return
@@ -24,10 +26,11 @@ apply_entry_relic :: proc(room: ^Room) {
 	added := add_effect(&action, apply_status_effect(PLAYER_ENTITY, .Shield, 2, 3))
 	assert(added)
 	report := resolve_action(room, &action)
-	append_event_log(&room.recent_events, &report.events)
+	append_event_log(room.recent_events, &report.events)
 }
 
 // Called only after a validated status effect is about to be committed.
+@(private)
 relic_poison_potency :: proc(room: ^Room, source: Entity_Ref, effect: Effect) -> i32 {
 	if !relic_combat_is_active(room) || source != PLAYER_ENTITY ||
 	   effect.target.kind != .Enemy || effect.status != .Poison ||
@@ -40,6 +43,7 @@ relic_poison_potency :: proc(room: ^Room, source: Entity_Ref, effect: Effect) ->
 
 // Runs before the normal reaction dispatcher. The bonus is an ordinary System
 // action; its events join this chain once, and cannot trigger another push.
+@(private)
 apply_action_relics :: proc(room: ^Room, action: ^Action, report: ^Action_Report) {
 	if !relic_combat_is_active(room) || action == nil || report == nil ||
 	   !report.accepted || action.source != PLAYER_ENTITY ||
@@ -67,13 +71,15 @@ apply_action_relics :: proc(room: ^Room, action: ^Action, report: ^Action_Report
 	bonus := make_action(.Trigger, SYSTEM_ENTITY, entity_target(PLAYER_ENTITY), .Player)
 	added := add_effect(&bonus, apply_status_effect(PLAYER_ENTITY, .Shield, 1, 2))
 	assert(added)
-	bonus_report := resolve_action_once(room, &bonus)
+	bonus_report: Action_Report
+	resolve_action_once(room, &bonus, &bonus_report)
 	if bonus_report.accepted {
 		merge_reaction_action_report(report, &bonus_report)
 		append_event_log(&report.events, &bonus_report.events)
 	}
 }
 
+@(private)
 apply_card_relics :: proc(room: ^Room, destination: Card_Zone, played_report: ^Action_Report) {
 	if !relic_combat_is_active(room) {
 		return
@@ -100,12 +106,13 @@ apply_card_relics :: proc(room: ^Room, destination: Card_Zone, played_report: ^A
 	}
 	if action.effect_count > 0 {
 		report := resolve_action(room, &action)
-		append_event_log(&room.recent_events, &report.events)
+		append_event_log(room.recent_events, &report.events)
 	}
 }
 
 // A room which started without enemies never pays this reward. The once-only
 // flag is consumed even at full HP, so acquiring or damaging later cannot farm it.
+@(private)
 apply_room_clear_relics :: proc(room: ^Room) -> (report: Action_Report) {
 	if room == nil || room.player == nil || room.phase != .Loot ||
 	   room.player.health <= 0 || !room.player.relics.combat.started ||
@@ -122,6 +129,7 @@ apply_room_clear_relics :: proc(room: ^Room) -> (report: Action_Report) {
 	return resolve_action(room, &action)
 }
 
+@(private)
 append_room_clear_relic :: proc(room: ^Room, report: ^Action_Report) {
 	bonus := apply_room_clear_relics(room)
 	if bonus.accepted {

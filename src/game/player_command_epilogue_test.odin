@@ -20,7 +20,7 @@ player_command_epilogue_test_event_count :: proc(
 }
 
 @(test)
-test_player_command_epilogue_collects_loot_before_and_after_exactly_one_pulse :: proc(
+test_player_command_collects_loot_before_and_after_independent_world_beat :: proc(
 	t: ^testing.T,
 ) {
 	level_data := create_test_level(t)
@@ -46,34 +46,26 @@ test_player_command_epilogue_collects_loot_before_and_after_exactly_one_pulse ::
 		amount = 2,
 	})
 
-	pulse, outcome := finish_player_combat_command(&room)
+	room.enemies[0].tactical_cooldown = 1
+	outcome := finish_player_combat_command(&room)
 
 	testing.expect_value(t, outcome, Player_Command_Outcome.Combat_Continues)
-	testing.expect(t, pulse.advanced)
-	testing.expect(t, !pulse.combat_ended)
-	testing.expect(t, !pulse.player_defeated)
+	testing.expect_value(t, room.pulse_count, u64(0))
+	testing.expect_value(t, player.gold, i32(2))
+	testing.expect_value(t, len(room.enemies), 2)
+	testing.expect_value(t, player_command_epilogue_test_event_count(room.recent_events, .Loot_Collected), 1)
+	testing.expect_value(t, room.recent_events.events[0].kind, Game_Event_Kind.Loot_Collected)
+
+	// The command pays time; the scheduler later settles poison and its drop.
+	drain_tactical_test_pulse(t, &room)
 	testing.expect_value(t, room.phase, Room_Phase.Combat)
 	testing.expect_value(t, room.pulse_count, u64(1))
 	testing.expect_value(t, len(room.enemies), 1)
 	testing.expect_value(t, len(room.loot), 0)
 	testing.expect_value(t, player.gold, i32(3))
 	testing.expect(t, player.deck.combat_active)
-	testing.expect_value(
-		t,
-		player_command_epilogue_test_event_count(&room.recent_events, .Pulse_Advanced),
-		1,
-	)
-	testing.expect_value(
-		t,
-		player_command_epilogue_test_event_count(&room.recent_events, .Loot_Collected),
-		2,
-	)
-	testing.expect_value(t, room.recent_events.events[0].kind, Game_Event_Kind.Loot_Collected)
-	testing.expect_value(
-		t,
-		room.recent_events.events[room.recent_events.count-2].kind,
-		Game_Event_Kind.Loot_Collected,
-	)
+	testing.expect_value(t, player_command_epilogue_test_event_count(room.recent_events, .Pulse_Advanced), 1)
+	testing.expect_value(t, player_command_epilogue_test_event_count(room.recent_events, .Loot_Collected), 1)
 }
 
 @(test)
@@ -97,14 +89,13 @@ test_player_command_epilogue_skips_pulse_when_command_already_ended_combat :: pr
 	testing.expect_value(t, room.phase, Room_Phase.Loot)
 	testing.expect(t, player.deck.combat_active)
 
-	pulse, outcome := finish_player_combat_command(&room)
+	outcome := finish_player_combat_command(&room)
 
 	testing.expect_value(t, outcome, Player_Command_Outcome.Combat_Ended)
-	testing.expect(t, !pulse.advanced)
 	testing.expect_value(t, room.pulse_count, u64(0))
 	testing.expect_value(
 		t,
-		player_command_epilogue_test_event_count(&room.recent_events, .Pulse_Advanced),
+		player_command_epilogue_test_event_count(room.recent_events, .Pulse_Advanced),
 		0,
 	)
 	testing.expect_value(t, len(room.loot), 0)
@@ -115,7 +106,7 @@ test_player_command_epilogue_skips_pulse_when_command_already_ended_combat :: pr
 }
 
 @(test)
-test_player_command_epilogue_syncs_deck_when_player_loses_during_pulse :: proc(
+test_world_beat_syncs_deck_when_queued_command_cost_defeats_player :: proc(
 	t: ^testing.T,
 ) {
 	level_data := create_test_level(t)
@@ -127,11 +118,10 @@ test_player_command_epilogue_syncs_deck_when_player_loses_during_pulse :: proc(
 	testing.expect(t, ok)
 	defer destroy_room(&room)
 
-	pulse, outcome := finish_player_combat_command(&room)
-
-	testing.expect_value(t, outcome, Player_Command_Outcome.Player_Defeated)
-	testing.expect(t, pulse.advanced)
-	testing.expect(t, pulse.player_defeated)
+	room.enemies[0].tactical_cooldown = 1
+	outcome := finish_player_combat_command(&room)
+	testing.expect_value(t, outcome, Player_Command_Outcome.Combat_Continues)
+	drain_tactical_test_pulse(t, &room)
 	testing.expect_value(t, room.phase, Room_Phase.Defeat)
 	testing.expect_value(t, room.pulse_count, u64(1))
 	testing.expect_value(t, player.health, i32(0))
@@ -140,7 +130,7 @@ test_player_command_epilogue_syncs_deck_when_player_loses_during_pulse :: proc(
 	testing.expect_value(t, player.deck.energy, i32(0))
 	testing.expect_value(
 		t,
-		player_command_epilogue_test_event_count(&room.recent_events, .Pulse_Advanced),
+		player_command_epilogue_test_event_count(room.recent_events, .Pulse_Advanced),
 		1,
 	)
 }

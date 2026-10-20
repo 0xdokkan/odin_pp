@@ -3,8 +3,8 @@ package render
 import "core:math"
 import rl "vendor:raylib"
 import game "../game"
-import grid "../grid"
-import view "../view"
+import grid "../engine/grid"
+import view "../engine/view"
 
 Tactical_Label_Layout :: struct {
 	bounds: [96]rl.Rectangle,
@@ -19,6 +19,7 @@ Tactical_Label_Layout :: struct {
 }
 
 // Where the heart of enemy `id` stands this frame, when it is shown.
+@(private)
 tactical_label_heart :: proc(layout: ^Tactical_Label_Layout, id: u32) -> (bounds: rl.Rectangle, found: bool) {
 	if layout == nil { return }
 	for heart_id, index in layout.heart_ids[:layout.heart_count] {
@@ -27,6 +28,7 @@ tactical_label_heart :: proc(layout: ^Tactical_Label_Layout, id: u32) -> (bounds
 	return
 }
 
+@(private = "file")
 tactical_label_candidate_is_clear :: proc(layout: ^Tactical_Label_Layout, candidate: rl.Rectangle) -> bool {
 	for occupied in layout.bounds[:layout.count] {
 		padded := rl.Rectangle{occupied.x-3, occupied.y-3, occupied.width+6, occupied.height+6}
@@ -40,8 +42,9 @@ tactical_label_candidate_is_clear :: proc(layout: ^Tactical_Label_Layout, candid
 }
 
 // One allocator for bomb labels and feedback badges (the hearts over the heads
-// and the seals keep their places in it too). Small fixed storage keeps
+// keep their places in it too). Small fixed storage keeps
 // frame cost bounded. Prefer above the anchor, then a nearby side column.
+@(private)
 place_tactical_label :: proc(layout: ^Tactical_Label_Layout, anchor: view.Vec2,
 	size: view.Vec2, viewport: rl.Rectangle) -> (result: rl.Rectangle, ok: bool) {
 	if size.x > viewport.width || size.y > viewport.height || layout.count >= len(layout.bounds) { return }
@@ -79,6 +82,7 @@ place_tactical_label :: proc(layout: ^Tactical_Label_Layout, anchor: view.Vec2,
 // Use the drawn quad, including actor-specific height and the current cue pose.
 // Body occupancy is separate from labels so a full encounter keeps its existing
 // fuse/status/QTE budget. Only 3D billboards participate in this reservation.
+@(private)
 reserve_tactical_actor_label_bounds :: proc(renderer: ^Renderer, actor: ^Presentation_Actor) {
 	v := &renderer.tactical
 	if v.labels.actor_count >= len(v.labels.actor_bounds) { return }
@@ -96,10 +100,10 @@ reserve_tactical_actor_label_bounds :: proc(renderer: ^Renderer, actor: ^Present
 	v.labels.actor_count += 1
 }
 
-// A 3D actor's drawn quad on screen; false on the flat board or out of sight.
+// A 3D actor's drawn quad on screen; false out of sight.
+@(private)
 tactical_actor_screen_bounds :: proc(renderer: ^Renderer, actor: ^Presentation_Actor) -> (bounds: rl.Rectangle, ok: bool) {
-	v := &renderer.tactical
-	if !v.scene_3d || !actor.visible || actor.opacity <= 0 { return }
+	if !actor.visible || actor.opacity <= 0 { return }
 	cell := grid.Position{int(math.round(actor.position.x)), int(math.round(actor.position.y))}
 	if !tactical_render_visible(renderer, cell) { return }
 	key := Sprite_Key.Player if actor.entity == game.PLAYER_ENTITY else sprite_key_for_enemy(actor.archetype)
@@ -117,6 +121,7 @@ tactical_actor_screen_bounds :: proc(renderer: ^Renderer, actor: ^Presentation_A
 
 // The bomb, fuse and exit labels. (Enemy health is a paper heart over the
 // head, living_heart.odin.)
+@(private)
 draw_tactical_label :: proc(renderer: ^Renderer, anchor: view.Vec2, first, second: cstring, color: rl.Color) {
 	viewport := tactical_world_bounds(renderer)
 	if !point_in_rectangle(anchor, {viewport.x-30, viewport.y-35, viewport.width+60, viewport.height+80}) { return }
@@ -134,6 +139,7 @@ draw_tactical_label :: proc(renderer: ^Renderer, anchor: view.Vec2, first, secon
 	if second != "" { gothic_text(renderer, second, bounds.x+6, bounds.y+14, 10, color) }
 }
 
+@(private)
 draw_tactical_annotations :: proc(renderer: ^Renderer, room: ^game.Room) {
 	v := &renderer.tactical
 	v.labels^ = {}
@@ -167,11 +173,11 @@ draw_tactical_annotations :: proc(renderer: ^Renderer, room: ^game.Room) {
 		tags := draw_status_set(renderer, &player.statuses, p, 14, player.opacity, tactical_status_tag_pixel(renderer, player.position))
 		if v.labels.count < len(v.labels.bounds) { v.labels.bounds[v.labels.count] = tactical_status_lane(p, tags); v.labels.count += 1 }
 	}
-	// Critical fuse labels reserve space before actors and their ordinary intents.
-	draw_voxel_fuse_labels(renderer, room)
 	// Enemies keep their own clock: their health and intent stay on screen
 	// while the player's move or cast plays, and only leave with the enemy.
 	draw_living_hearts(renderer, room)
+	// Bomb/fuse labels find space around the fixed health attachments.
+	draw_voxel_fuse_labels(renderer, room)
 	// The mechanics sandbox cleared for the rod keeps its exit shut: no USCITA.
 	if tactical_exit_is_open(room, v.snapshot.phase) {
 		p := room.exit_position

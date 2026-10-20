@@ -4,7 +4,7 @@ import "core:math"
 import "core:testing"
 import game "../game"
 import level "../level"
-import view "../view"
+import view "../engine/view"
 
 // PINBALL behind the player's eyes (first_person.odin): the ball keeps its
 // foe's place on the board with the camera in his eyes, the crosshair never

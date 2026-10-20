@@ -5,7 +5,7 @@ import "core:encoding/endian"
 import rl "vendor:raylib"
 import rlgl "vendor:raylib/rlgl"
 import game "../game"
-import grid "../grid"
+import grid "../engine/grid"
 import level "../level"
 
 // The gothic wall kit modelled in Blender (tools/art/build_walls.py). Pieces
@@ -45,6 +45,7 @@ Diorama_Kit :: struct {
 DIORAMA_ODM_VERTEX_SIZE :: 20
 
 // Every vertex of an ODM file (see tools/art/build_walls.py), unsplit.
+@(private)
 load_odm_vertices :: proc(bytes: []u8) -> (vertices: []Diorama_Vertex, ok: bool) {
 	if len(bytes) < 8 || string(bytes[:4]) != "ODM1" { return }
 	piece_count, _ := endian.get_u32(bytes[4:], .Little)
@@ -66,6 +67,7 @@ load_odm_vertices :: proc(bytes: []u8) -> (vertices: []Diorama_Vertex, ok: bool)
 	return vertices, true
 }
 
+@(private)
 load_diorama_kit :: proc(kit: ^Diorama_Kit, bytes: []u8) -> bool {
 	destroy_diorama_kit(kit)
 	vertices, ok := load_odm_vertices(bytes)
@@ -94,12 +96,14 @@ load_diorama_kit :: proc(kit: ^Diorama_Kit, bytes: []u8) -> bool {
 	return kit.loaded
 }
 
+@(private)
 destroy_diorama_kit :: proc(kit: ^Diorama_Kit) {
 	delete(kit.vertices)
 	kit^ = {}
 }
 
 // Quarter turns taking the authored +Z face to the given side.
+@(private)
 diorama_turn :: proc(v: rl.Vector3, side: int) -> rl.Vector3 {
 	switch side & 3 {
 	case 1: return {v.z, v.y, -v.x}
@@ -112,6 +116,7 @@ diorama_turn :: proc(v: rl.Vector3, side: int) -> rl.Vector3 {
 // `clip` flattens everything above it onto the cut (a retracted near wall);
 // triangles wholly above it are skipped. `brighten` lifts the dark resin for
 // the translucent shells, whose `alpha` replaces the opaque vertex alpha.
+@(private)
 draw_diorama_piece :: proc(kit: ^Diorama_Kit, piece: Diorama_Piece, origin: rl.Vector3, side: int,
 	clip: f32 = 1e9, brighten: f32 = 1, alpha: u8 = 255) {
 	vertices := kit.pieces[piece]
@@ -140,6 +145,7 @@ draw_diorama_piece :: proc(kit: ^Diorama_Kit, piece: Diorama_Piece, origin: rl.V
 	rlgl.SetTexture(0)
 }
 
+@(private = "file")
 diorama_neighbour_is_wall :: proc(room: ^game.Room, cell: grid.Position) -> bool {
 	tile, found := level.tile_at(room.level_data, cell)
 	// Beyond the border the mass simply continues: no carved outer faces.
@@ -147,6 +153,7 @@ diorama_neighbour_is_wall :: proc(room: ^game.Room, cell: grid.Position) -> bool
 }
 
 // A deterministic face per wall side, weighted toward plain coursed stone.
+@(private = "file")
 diorama_face_piece :: proc(cell: grid.Position, side: int) -> Diorama_Piece {
 	switch gothic_hash(cell.x*4+side, cell.y*3+side)%20 {
 	case 0..=7: return .Face_Ashlar
@@ -157,6 +164,7 @@ diorama_face_piece :: proc(cell: grid.Position, side: int) -> Diorama_Piece {
 }
 
 // Mirrors diorama_lamp: the side its sconce hangs on, or -1.
+@(private = "file")
 diorama_lamp_side :: proc(renderer: ^Renderer, room: ^game.Room, cell: grid.Position) -> int {
 	if _, found := diorama_lamp(renderer, room, cell); !found { return -1 }
 	for offset, side in DIORAMA_SIDES {
@@ -165,6 +173,7 @@ diorama_lamp_side :: proc(renderer: ^Renderer, room: ^game.Room, cell: grid.Posi
 	return -1
 }
 
+@(private)
 draw_diorama_kit_wall :: proc(renderer: ^Renderer, room: ^game.Room, cell: grid.Position) {
 	kit := &renderer.tactical.kit
 	origin := rl.Vector3{f32(cell.x)+0.5, 0, f32(cell.y)+0.5}

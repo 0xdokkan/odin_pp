@@ -28,8 +28,8 @@ shadow_view_test_room :: proc(t: ^testing.T, data: ^level.Level, player: ^game.P
 
 shadow_view_test_renderer :: proc(data: ^level.Level, snapshot: ^Room_Presentation) -> ^Renderer {
 	renderer := new(Renderer)
-	renderer^ = create(960, 540, data)
-	renderer.tactical = {enabled = true, snapshot = snapshot}
+	renderer^ = create(960, 540)
+	renderer.tactical = {snapshot = snapshot}
 	renderer.sprite_assets.elapsed = 10
 	return renderer
 }
@@ -67,7 +67,7 @@ test_shadow_pool_follows_the_room_and_the_world_holds :: proc(t: ^testing.T) {
 	play := game.play_card(&room, player.deck.hand[0].id, game.entity_target(game.PLAYER_ENTITY))
 	testing.expect_value(t, play.result, game.Card_Play_Result.Played)
 	after := capture_room_presentation(&room)
-	testing.expect(t, begin_renderer_event_timeline(renderer, before, &room.recent_events, &after))
+	testing.expect(t, begin_renderer_event_timeline(renderer, before, room.recent_events, &after))
 	update_tactical_view(renderer, &room, {}, false)
 	testing.expect(t, s.active && s.sink_paced && s.frozen_at == 10)
 	// The card plays first: the figure still stands.
@@ -135,7 +135,7 @@ test_shadow_pool_follows_the_room_and_the_world_holds :: proc(t: ^testing.T) {
 	before = capture_room_presentation(&room)
 	testing.expect(t, game.tactical_end_shadow(&room))
 	after = capture_room_presentation(&room)
-	testing.expect(t, begin_renderer_event_timeline(renderer, before, &room.recent_events, &after))
+	testing.expect(t, begin_renderer_event_timeline(renderer, before, room.recent_events, &after))
 	risen := renderer.sprite_assets.elapsed
 	update_tactical_view(renderer, &room, {}, false)
 	testing.expect(t, !s.active && s.rising && s.rise_paced)
@@ -299,7 +299,7 @@ test_shadow_card_under_the_floor_keeps_no_room_from_the_labels :: proc(t: ^testi
 	renderer := shadow_view_test_renderer(&data, &snapshot)
 	defer free(renderer)
 	defer destroy_renderer_world_playback(renderer)
-	renderer.tactical.scene_3d = true
+
 	renderer.tactical.labels = new(Tactical_Label_Layout)
 	defer free(renderer.tactical.labels)
 	reserved :: proc(renderer: ^Renderer) -> bool {
@@ -359,10 +359,10 @@ test_shadow_walk_after_the_rise_over_the_last_walk_is_a_walk :: proc(t: ^testing
 	sounds := renderer.tactical.lab_sounds
 	walk :: proc(t: ^testing.T, renderer: ^Renderer, room: ^game.Room, direction: game.Move_Direction) {
 		before := capture_room_presentation(room)
-		game.clear_event_log(&room.recent_events)
+		game.clear_event_log(room.recent_events)
 		testing.expect_value(t, game.try_move_player(room, direction), game.Action_Result.Moved)
 		after := capture_room_presentation(room)
-		testing.expect(t, begin_renderer_event_timeline(renderer, before, &room.recent_events, &after))
+		testing.expect(t, begin_renderer_event_timeline(renderer, before, room.recent_events, &after))
 		lab_shadow_test_frame(renderer, room, 0.02)
 	}
 	// Until the world's answer has played and the player is free again.
@@ -388,7 +388,7 @@ test_shadow_walk_after_the_rise_over_the_last_walk_is_a_walk :: proc(t: ^testing
 	play := game.play_card(&room, player.deck.hand[0].id, game.entity_target(game.PLAYER_ENTITY))
 	testing.expect_value(t, play.result, game.Card_Play_Result.Played)
 	after := capture_room_presentation(&room)
-	testing.expect(t, begin_renderer_event_timeline(renderer, before, &room.recent_events, &after))
+	testing.expect(t, begin_renderer_event_timeline(renderer, before, room.recent_events, &after))
 	for _ in 0..<200 {
 		if !renderer_blocks_player_input(renderer) { break }
 		lab_shadow_test_frame(renderer, &room, 0.02)
@@ -402,7 +402,7 @@ test_shadow_walk_after_the_rise_over_the_last_walk_is_a_walk :: proc(t: ^testing
 	before = capture_room_presentation(&room)
 	testing.expect(t, game.tactical_end_shadow(&room))
 	after = capture_room_presentation(&room)
-	testing.expect(t, begin_renderer_event_timeline(renderer, before, &room.recent_events, &after))
+	testing.expect(t, begin_renderer_event_timeline(renderer, before, room.recent_events, &after))
 	settle(renderer, &room)
 	testing.expect_value(t, player.position, start)
 	// East again, over the same two cells as the walk before the shadow.

@@ -1,7 +1,7 @@
 package combatdebug
 
 import game "../game"
-import grid "../grid"
+import grid "../engine/grid"
 
 Max_Distance_Policy_State :: struct {
 	has_last_direction: bool,
@@ -21,29 +21,6 @@ Kiting_Score :: struct {
 	total_distance:   int,
 	continues_heading: bool,
 	order:             int,
-}
-
-Scenario_Termination :: enum {
-	Invalid,
-	Pulse_Budget,
-	Combat_Ended,
-	Player_Defeated,
-	Command_Rejected,
-}
-
-Scenario_Report :: struct {
-	valid:             bool,
-	termination:       Scenario_Termination,
-	commands_executed: u64,
-	initial_pulse:     u64,
-	final_pulse:       u64,
-	initial_health:    i32,
-	final_health:      i32,
-	initial_phase:     game.Room_Phase,
-	final_phase:       game.Room_Phase,
-	initial_position:  grid.Position,
-	final_position:    grid.Position,
-	metrics:           Combat_Metrics,
 }
 
 predicted_enemy_position :: proc(enemy: ^game.Enemy) -> grid.Position {
@@ -170,16 +147,6 @@ choose_max_distance_command :: proc(
 	return decision
 }
 
-move_result_was_committed :: proc(result: game.Action_Result) -> bool {
-	switch result {
-	case .Moved, .Attacked, .Combat_Ended, .Used_Ability, .Room_Completed, .Player_Defeated:
-		return true
-	case .None, .Blocked, .Invalid_Phase:
-		return false
-	}
-	unreachable()
-}
-
 command_kind_for_move :: proc(
 	room: ^game.Room,
 	direction: game.Move_Direction,
@@ -194,70 +161,4 @@ command_kind_for_move :: proc(
 		}
 	}
 	return .Move, true
-}
-
-finish_scenario_report :: proc(report: ^Scenario_Report, room: ^game.Room) {
-	assert(report != nil && room != nil && room.player != nil)
-	report.final_pulse = room.pulse_count
-	report.final_health = room.player.health
-	report.final_phase = room.phase
-	report.final_position = room.player.position
-	if room.phase == .Defeat {
-		report.termination = .Player_Defeated
-	} else if room.phase != .Combat {
-		report.termination = .Combat_Ended
-	}
-}
-
-run_max_distance_scenario :: proc(room: ^game.Room, pulse_budget: u64) -> (report: Scenario_Report) {
-	if room == nil || room.player == nil || room.phase != .Combat || pulse_budget == 0 {
-		return
-	}
-	report.valid = true
-	report.initial_pulse = room.pulse_count
-	report.initial_health = room.player.health
-	report.initial_phase = room.phase
-	report.initial_position = room.player.position
-	state: Max_Distance_Policy_State
-
-	for room.phase == .Combat && room.pulse_count-report.initial_pulse < pulse_budget {
-		decision := choose_max_distance_command(room, &state)
-		if !decision.valid {
-			report.termination = .Command_Rejected
-			break
-		}
-		snapshot, captured := capture_command_snapshot(room)
-		assert(captured)
-		resolved_kind := decision.kind
-		committed := false
-		if decision.kind == .Move {
-			move_kind, classified := command_kind_for_move(room, decision.direction)
-			assert(classified)
-			resolved_kind = move_kind
-			result := game.try_move_player(room, decision.direction)
-			committed = move_result_was_committed(result)
-			if committed && room.player.position != snapshot.position {
-				state.has_last_direction = true
-				state.last_direction = decision.direction
-			}
-		} else {
-			result := game.wait_player_turn(room)
-			committed = result != .Invalid_Phase
-		}
-		observed := observe_command(&report.metrics, snapshot, resolved_kind, committed, room)
-		assert(observed)
-		if !committed {
-			report.termination = .Command_Rejected
-			break
-		}
-		report.commands_executed += 1
-	}
-
-	if report.termination == .Invalid {
-		if room.phase == .Combat && room.pulse_count-report.initial_pulse >= pulse_budget {
-			report.termination = .Pulse_Budget
-		}
-	}
-	finish_scenario_report(&report, room)
-	return
 }

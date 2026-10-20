@@ -1,7 +1,7 @@
 package game
 
 import "core:testing"
-import grid "../grid"
+import grid "../engine/grid"
 
 // Deliberately simple O(cells²) oracle: guards cost direction, unreachable cells
 // and every goal kind while the production solver changes its frontier data.
@@ -41,7 +41,7 @@ test_arena_weighted_paths_match_scan_solver :: proc(t: ^testing.T) {
 	for depth in ([?]int{0, 2, 4, 6}) {
 		for seed in ([?]u64{17, 94}) {
 			node := test_generation_node(1, .Boss, depth, seed)
-			blueprint, error := generate_room_blueprint(&node, .Scattered, true)
+			blueprint, error := generate_room_blueprint(&node, .Scattered)
 			testing.expect_value(t, error, Room_Blueprint_Error.None)
 			if error != .None { continue }
 			player := create_test_player(t)
