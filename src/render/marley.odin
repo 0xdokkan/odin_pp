@@ -35,6 +35,14 @@ MARLEY_FIGURE_W :: 32
 MARLEY_FIGURE_H :: 38
 MARLEY_FIGURE_MARGIN :: 3
 MARLEY_FIGURE_TEXELS :: (MARLEY_FIGURE_W+2*MARLEY_FIGURE_MARGIN)*(MARLEY_FIGURE_H+2*MARLEY_FIGURE_MARGIN)
+// The bomb's print, and the puff's, in texels.
+MARLEY_BOMB_SIZE :: 20
+MARLEY_PUFF_SIZE :: 12
+// A thrown bomb bounces down its column: one hop every this many cells, this
+// high; it is as big as this in the world.
+MARLEY_BOUNCE_CELLS :: f32(3)
+MARLEY_BOUNCE_HEIGHT :: f32(0.95)
+MARLEY_BOMB_SCALE :: f32(1.2)
 
 Marley_View :: struct {
 	// How far down the ball is, 0 (gone) to 1 (at rest), and over which point.
@@ -43,8 +51,9 @@ Marley_View :: struct {
 	// The column the figure stands over.
 	figure_x: f32,
 	last_time: f64,
-	// The figure's print, made the first time it is drawn.
-	figure: rl.Texture2D,
+	// The prints, made the first time they are drawn: the figure, the bomb and
+	// the puffs of smoke it leaves, all cut from paper.
+	figure, bomb, puff: rl.Texture2D,
 	// The party's shown seconds the last time (the clock's chip blinks on a change).
 	last_remaining: i32,
 	earned_at: f64,
@@ -54,6 +63,8 @@ Marley_View :: struct {
 destroy_marley_view :: proc(renderer: ^Renderer) {
 	m := &renderer.tactical.marley
 	if m.figure.id != 0 { rl.UnloadTexture(m.figure) }
+	if m.bomb.id != 0 { rl.UnloadTexture(m.bomb) }
+	if m.puff.id != 0 { rl.UnloadTexture(m.puff) }
 	m^ = {}
 }
 
@@ -211,7 +222,8 @@ draw_marley_floor :: proc(renderer: ^Renderer, room: ^game.Room) {
 	rl.BeginBlendMode(.ADDITIVE)
 	if party.active || m.ball > 0 {
 		// The spots of the lit cells.
-		for light, index in party.lights[:party.light_count] {
+		for index in 0..<party.light_count {
+			light := game.marley_light(party, index)
 			if !marley_cell_drawn(renderer, room, light) { continue }
 			height := marley_floor_height(renderer, light)
 			color := marley_light_color(index, t)
@@ -220,13 +232,24 @@ draw_marley_floor :: proc(renderer: ^Renderer, room: ^game.Room) {
 			marley_glow(f32(light.x)+0.5, height+0.005, f32(light.y)+0.5, 0.36, {255, 255, 255, 255}, 0.55*pulse*lit)
 			marley_frame(f32(light.x)+0.5, height+0.006, f32(light.y)+0.5, 0.47, 0.045, marley_alpha(MARLEY_GOLD, (0.55+0.35*pulse)*lit))
 		}
-		// The next lights, shown ahead of their turn: only their edges, blinking.
+		// The next lights, on show all the while but not safe yet: a pale cold
+		// glow under a thin frame whose corners run round, much fainter than the
+		// lit cells, so that the two never read alike.
 		if party.has_next {
-			blink := 0.3+0.35*(0.5+0.5*math.sin(f32(t)*9))
-			for light in party.next_lights[:party.next_count] {
-				if !marley_cell_drawn(renderer, room, light) { continue }
+			breath := 0.5+0.5*math.sin(f32(t)*3)
+			for index in 0..<party.next_count {
+				light := game.marley_next_light(party, index)
+				if !marley_cell_drawn(renderer, room, light) || marley_shown_lit(party, light) { continue }
 				height := marley_floor_height(renderer, light)
-				marley_frame(f32(light.x)+0.5, height+0.006, f32(light.y)+0.5, 0.42, 0.035, marley_alpha({255, 255, 255, 255}, blink*lit))
+				x, z := f32(light.x)+0.5, f32(light.y)+0.5
+				marley_glow(x, height+0.004, z, 0.62, {150, 200, 255, 255}, (0.16+0.1*breath)*lit)
+				marley_frame(x, height+0.006, z, 0.42, 0.03, marley_alpha({200, 228, 255, 255}, (0.4+0.3*breath)*lit))
+				// A bright spark running round the frame.
+				run := math.mod(f32(t)*0.9+f32(index)*0.37, f32(1))*4
+				side, along := int(run), run-f32(int(run))
+				corner := [4][2]f32{{-1, -1}, {1, -1}, {1, 1}, {-1, 1}}
+				a, b := corner[side%4], corner[(side+1)%4]
+				marley_square(x+(a[0]+(b[0]-a[0])*along)*0.42, height+0.008, z+(a[1]+(b[1]-a[1])*along)*0.42, 0.05, marley_alpha({255, 255, 255, 255}, 0.9*lit))
 			}
 		}
 		// The glints: tiny spots wheeling round the ball over the floor.
@@ -250,7 +273,8 @@ draw_marley_floor :: proc(renderer: ^Renderer, room: ^game.Room) {
 // Whether the shown party lights `cell`.
 @(private = "file")
 marley_shown_lit :: proc(party: ^game.Marley_State, cell: grid.Position) -> bool {
-	for light in party.lights[:party.light_count] { if light == cell { return true } }
+	packed := game.marley_cell(cell)
+	for light in party.lights[:party.light_count] { if light == packed { return true } }
 	return false
 }
 
@@ -324,7 +348,8 @@ draw_marley_sky :: proc(renderer: ^Renderer, room: ^game.Room) {
 	// The beams: additive ribbons from the ball to every lit cell.
 	rlgl.DisableDepthMask()
 	rl.BeginBlendMode(.ADDITIVE)
-	for light, index in party.lights[:party.light_count] {
+	for index in 0..<party.light_count {
+		light := game.marley_light(party, index)
 		if !marley_cell_drawn(renderer, room, light) { continue }
 		color := marley_light_color(index, t)
 		sway := 0.06*math.sin(f32(t)*2.3+f32(index))
@@ -350,51 +375,137 @@ draw_marley_sky :: proc(renderer: ^Renderer, room: ^game.Room) {
 	rlgl.EnableBackfaceCulling()
 }
 
-// The bomb crossing its column: it rolls from beyond the north wall to beyond
-// the south one, trailing smoke, leaving a flash on every cell it has passed
-// (a lit cell glows green instead: it is safe).
+// Where the thrown bomb is at `p` (0 to 1 of its flight) over `column`: thrown
+// from the figure in an arc to the column's first cell, then bouncing down it,
+// a hop every MARLEY_BOUNCE_CELLS cells, beyond the south wall at the end.
+// `landing` is how far through a hop it is (0 on the floor), `hops` the hops
+// made so far.
+@(private = "file")
+marley_bomb_at :: proc(origin: rl.Vector3, column, board_height: f32, p: f32) -> (at: rl.Vector3, landing: f32, hops: int) {
+	throw_end :: f32(0.16)
+	start := rl.Vector3{column, 0.3, 0.6}
+	if p < throw_end {
+		k := p/throw_end
+		at = origin+(start-origin)*k
+		at.y = origin.y+(start.y-origin.y)*k+1.1*math.sin(k*math.PI)
+		return at, 0, 0
+	}
+	k := (p-throw_end)/(1-throw_end)
+	reach := board_height+1.4-start.z
+	z := start.z+k*reach
+	hop := (z-start.z)/MARLEY_BOUNCE_CELLS
+	landing = hop-f32(int(hop))
+	hops = int(hop)
+	return {column, 0.3+MARLEY_BOUNCE_HEIGHT*math.abs(math.sin(landing*math.PI)), z}, landing, hops
+}
+
+// A paper print stood on the board: always facing the camera, spun by
+// `rotation` degrees.
+@(private = "file")
+marley_draw_print :: proc(renderer: ^Renderer, texture: rl.Texture2D, at: rl.Vector3, height, rotation: f32, tint: rl.Color) {
+	if texture.id == 0 { return }
+	ratio := f32(texture.width)/f32(texture.height)
+	size := rl.Vector2{height*ratio, height}
+	source := rl.Rectangle{0, 0, f32(texture.width), f32(texture.height)}
+	rl.DrawBillboardPro(renderer.tactical.camera, texture, source, at, {0, 1, 0}, size, size*0.5, rotation, tint)
+}
+
+// The bomb on its way down its column: a paper bomb thrown by the figure, that
+// bounces every few cells, a soft shadow on the floor under it, paper puffs
+// behind it and a ring where it lands. It strikes wherever it is, in the air
+// or on the floor (marley_resolve_column): the hops are only its manner. Each
+// cell it has passed flashes (green where a light saves).
 @(private = "file")
 draw_marley_bomb :: proc(renderer: ^Renderer, room: ^game.Room, cue: ^Presentation_Cue) {
+	m := &renderer.tactical.marley
 	p := presentation_cue_progress(cue)
-	height := f32(room.level_data.tiles.height)
+	board := f32(room.level_data.tiles.height)
 	party := &renderer.tactical.snapshot.marley
 	x := f32(cue.event.from_position.x)+0.5
-	span := height+3.2
-	z := -2.2+p*span
-	// Flashes on the cells it has passed.
+	if m.bomb.id == 0 { m.bomb = marley_bomb_texture() }
+	if m.puff.id == 0 { m.puff = marley_puff_texture() }
+	origin := marley_figure_center(renderer, room)
+	t := tactical_world_time(renderer)
+	at, landing, _ := marley_bomb_at(origin, x, board, p)
 	rl.BeginBlendMode(.ADDITIVE)
 	rlgl.DisableDepthMask()
 	rlgl.DisableBackfaceCulling()
+	// A flash on every cell the bomb has crossed, and a ring where it lands.
 	for y in 0..<room.level_data.tiles.height {
 		cell := grid.Position{cue.event.from_position.x, y}
 		if !marley_cell_drawn(renderer, room, cell) { continue }
-		arrival := (f32(y)+0.5+2.2)/span
-		age := (p-arrival)*cue.duration
-		if age < 0 || age > 0.4 { continue }
-		fade := 1-age/0.4
 		floor := marley_floor_height(renderer, cell)
+		crossed := marley_bomb_arrival(origin, x, board, f32(y)+0.5)
+		age := (p-crossed)*cue.duration
+		if age < 0 || age > 0.45 { continue }
+		fade := 1-age/0.45
 		if marley_shown_lit(party, cell) {
-			marley_glow(x, floor+0.01, f32(y)+0.5, 0.9, MARLEY_GREEN, 0.6*fade)
+			marley_glow(x, floor+0.01, f32(y)+0.5, 0.85, MARLEY_GREEN, 0.55*fade)
 		} else {
-			marley_glow(x, floor+0.01, f32(y)+0.5, 0.95, {255, 150, 60, 255}, 0.85*fade)
-			marley_glow(x, floor+0.012, f32(y)+0.5, 0.5, {255, 244, 200, 255}, 0.8*fade)
+			marley_glow(x, floor+0.01, f32(y)+0.5, 0.8, {255, 150, 60, 255}, 0.55*fade)
 		}
+	}
+	// A ring where it touches the floor.
+	for hop in 0..<int((board+1.4)/MARLEY_BOUNCE_CELLS)+1 {
+		z := 0.6+f32(hop)*MARLEY_BOUNCE_CELLS
+		touched := marley_bomb_arrival(origin, x, board, z)
+		age := (p-touched)*cue.duration
+		if z > board+0.5 || age < 0 || age > 0.35 { continue }
+		cell := grid.Position{cue.event.from_position.x, clamp(int(z), 0, room.level_data.tiles.height-1)}
+		floor := marley_floor_height(renderer, cell)
+		ring := 0.2+age*2.6
+		marley_glow(x, floor+0.014, z, ring, {255, 230, 170, 255}, 0.8*(1-age/0.35))
 	}
 	rl.EndBlendMode()
 	rlgl.DrawRenderBatchActive()
-	rlgl.EnableDepthMask()
-	// The smoke behind it, then the bomb.
-	for puff in 1..=6 {
-		behind := z-f32(puff)*0.45
-		fade := 1-f32(puff)/7
-		rl.DrawSphereEx({x, 0.55+0.04*f32(puff), behind}, 0.2*fade+0.04, 6, 8, {120, 118, 124, u8(150*fade)})
+	// A soft shadow on the floor under it, smaller the higher it is.
+	floor_cell := grid.Position{cue.event.from_position.x, clamp(int(at.z), 0, room.level_data.tiles.height-1)}
+	if at.z > 0 && at.z < board {
+		lift := clamp(at.y/(MARLEY_BOUNCE_HEIGHT+0.3), f32(0), f32(1))
+		radius := 0.34*(1-0.45*lift)
+		rl.BeginBlendMode(.ALPHA)
+		marley_glow(x, marley_floor_height(renderer, floor_cell)+0.02, at.z, radius, {0, 0, 8, 255}, 0.55*(1-0.5*lift))
+		rl.EndBlendMode()
+		rlgl.DrawRenderBatchActive()
 	}
-	bounce := 0.1*math.abs(math.sin(p*math.PI*10))
-	rl.DrawSphereEx({x, 0.55+bounce, z}, 0.3, 10, 12, {24, 24, 30, 255})
-	rl.DrawSphereEx({x-0.1, 0.65+bounce, z-0.1}, 0.07, 6, 8, {170, 176, 190, 255})
-	flicker := 0.5+0.5*math.sin(p*80)
-	rl.DrawSphere({x, 0.9+bounce, z}, 0.07+0.04*flicker, {255, u8(160+80*flicker), 60, 255})
-	rl.DrawLine3D({x, 0.82+bounce, z}, {x, 0.9+bounce, z}, {96, 60, 30, 255})
+	rlgl.EnableDepthMask()
+	// Paper puffs of smoke on its way behind it, then the bomb, spinning.
+	for puff in 1..=6 {
+		back, _, _ := marley_bomb_at(origin, x, board, max(f32(0), p-f32(puff)*0.03))
+		fade := 1-f32(puff)/7
+		marley_draw_print(renderer, m.puff, back+{0, 0.14, 0}, (0.34-0.03*f32(puff))*MARLEY_BOMB_SCALE*1.2, f32(puff)*40+p*120, {255, 255, 255, u8(235*fade)})
+	}
+	spin := p*900
+	marley_draw_print(renderer, m.bomb, at, 0.62*MARLEY_BOMB_SCALE*(1+0.08*math.sin(f32(t)*30)*(1-landing)), spin, rl.WHITE)
+}
+
+// The cue progress at which the bomb has crossed the world z `z` of its column.
+@(private = "file")
+marley_bomb_arrival :: proc(origin: rl.Vector3, column, board_height, z: f32) -> f32 {
+	throw_end :: f32(0.16)
+	start_z := f32(0.6)
+	reach := board_height+1.4-start_z
+	return throw_end+(1-throw_end)*clamp((z-start_z)/reach, f32(0), f32(1))
+}
+
+// The figure's centre now: on the north wall over his column; when that is
+// off the screen, on the nearest cell of his column the screen shows.
+@(private = "file")
+marley_figure_center :: proc(renderer: ^Renderer, room: ^game.Room) -> rl.Vector3 {
+	m := &renderer.tactical.marley
+	size := MARLEY_FIGURE_HEIGHT
+	x := clamp(m.figure_x, 0.6, f32(room.level_data.tiles.width)-0.6)
+	column := int(x)
+	at := rl.Vector3{x, 1.58+size*0.5-0.15+0.3, 0.5}
+	if !tactical_cell_on_screen(renderer, {column, 0}) {
+		for row in 1..<room.level_data.tiles.height {
+			if tactical_cell_on_screen(renderer, {column, row}) {
+				at = {x, size*0.5+0.1+0.3, f32(row)+0.5}
+				break
+			}
+		}
+	}
+	return at
 }
 
 // The figure: Bomb Marley's paper cut-out on top of the north wall over the
@@ -410,22 +521,9 @@ draw_marley_figure :: proc(renderer: ^Renderer, room: ^game.Room) {
 	hop := 0.12*math.abs(math.sin(beat*math.PI))
 	throw := math.exp(-beat*6)
 	size := MARLEY_FIGURE_HEIGHT*(1+0.1*throw)*tween.smoothstep(m.ball)
-	ratio := f32(m.figure.width)/f32(m.figure.height)
-	source := rl.Rectangle{0, 0, f32(m.figure.width), f32(m.figure.height)}
-	// On the north wall; when that is off the screen, on the nearest cell of his
-	// column the screen shows, at the edge of the view.
-	x := clamp(m.figure_x, 0.6, f32(room.level_data.tiles.width)-0.6)
-	column := int(x)
-	at := rl.Vector3{x, 1.58+size*0.5+hop-0.15, 0.5}
-	if !tactical_cell_on_screen(renderer, {column, 0}) {
-		for row in 1..<room.level_data.tiles.height {
-			if tactical_cell_on_screen(renderer, {column, row}) {
-				at = {x, size*0.5+hop+0.1, f32(row)+0.5}
-				break
-			}
-		}
-	}
-	rl.DrawBillboardRec(renderer.tactical.camera, m.figure, source, at, {size*ratio, size}, rl.WHITE)
+	at := marley_figure_center(renderer, room)
+	at.y += hop-0.3
+	marley_draw_print(renderer, m.figure, at, size, 0, rl.WHITE)
 }
 
 // --------------------------------------------------------------------------
@@ -500,46 +598,103 @@ marley_figure_pixels :: proc() -> (pixels: [MARLEY_FIGURE_W*MARLEY_FIGURE_H]rl.C
 	return
 }
 
-// The print: the pixels cut from paper as the board's props are (an ink line,
-// white paper, an ink cut, the cut edge down and right).
+// A print: `pixels` (w by h, transparent where nothing is) cut from paper as
+// the board's props are: an ink line, `paper` rings of white paper, an ink
+// cut, the cut edge down and right, with `margin` texels of room round it.
 @(private = "file")
-marley_figure_texture :: proc() -> rl.Texture2D {
+marley_paper_texture :: proc(pixels: []rl.Color, w, h, margin, paper: int) -> rl.Texture2D {
 	if !rl.IsWindowReady() { return {} }
-	pixels := marley_figure_pixels()
-	margin :: MARLEY_FIGURE_MARGIN
-	w, h :: MARLEY_FIGURE_W+2*margin, MARLEY_FIGURE_H+2*margin
-	out: [MARLEY_FIGURE_TEXELS]rl.Color
-	layers, staged: [MARLEY_FIGURE_TEXELS]Paper_Outline_Layer
-	for y in 0..<MARLEY_FIGURE_H {
-		for x in 0..<MARLEY_FIGURE_W {
-			color := pixels[y*MARLEY_FIGURE_W+x]
+	tw, th := w+2*margin, h+2*margin
+	out := make([]rl.Color, tw*th)
+	layers := make([]Paper_Outline_Layer, tw*th)
+	staged := make([]Paper_Outline_Layer, tw*th)
+	defer { delete(out); delete(layers); delete(staged) }
+	for y in 0..<h {
+		for x in 0..<w {
+			color := pixels[y*w+x]
 			if color.a == 0 { continue }
-			out[(y+margin)*w+x+margin] = color
-			layers[(y+margin)*w+x+margin] = .Print
+			out[(y+margin)*tw+x+margin] = color
+			layers[(y+margin)*tw+x+margin] = .Print
 		}
 	}
-	paper_outline_grow(layers[:], staged[:], w, h, .Ink, true)
-	for ring in 0..<2 { paper_outline_grow(layers[:], staged[:], w, h, .Paper, ring%2 == 1) }
-	paper_outline_grow(layers[:], staged[:], w, h, .Cut, true)
-	for index in 0..<w*h {
+	paper_outline_grow(layers, staged, tw, th, .Ink, true)
+	for ring in 0..<paper { paper_outline_grow(layers, staged, tw, th, .Paper, ring%2 == 1) }
+	paper_outline_grow(layers, staged, tw, th, .Cut, true)
+	for index in 0..<tw*th {
 		#partial switch layers[index] {
 		case .Ink, .Cut: out[index] = LIVING_TOKEN_INK
 		case .Paper: out[index] = LIVING_TOKEN_PAPER
 		}
 	}
-	for y := h-1; y > 0; y -= 1 {
-		for x := w-1; x > 0; x -= 1 {
-			if layers[y*w+x] == .Clear && layers[(y-1)*w+x-1] != .Clear { out[y*w+x] = LIVING_TOKEN_EDGE }
+	for y := th-1; y > 0; y -= 1 {
+		for x := tw-1; x > 0; x -= 1 {
+			if layers[y*tw+x] == .Clear && layers[(y-1)*tw+x-1] != .Clear { out[y*tw+x] = LIVING_TOKEN_EDGE }
 		}
 	}
-	image := rl.GenImageColor(c.int(w), c.int(h), rl.BLANK)
+	image := rl.GenImageColor(c.int(tw), c.int(th), rl.BLANK)
 	defer rl.UnloadImage(image)
-	for y in 0..<h {
-		for x in 0..<w { rl.ImageDrawPixel(&image, c.int(x), c.int(y), out[y*w+x]) }
+	for y in 0..<th {
+		for x in 0..<tw { rl.ImageDrawPixel(&image, c.int(x), c.int(y), out[y*tw+x]) }
 	}
 	texture := rl.LoadTextureFromImage(image)
 	if texture.id != 0 { rl.SetTextureFilter(texture, .POINT) }
 	return texture
+}
+
+@(private = "file")
+marley_figure_texture :: proc() -> rl.Texture2D {
+	pixels := marley_figure_pixels()
+	return marley_paper_texture(pixels[:], MARLEY_FIGURE_W, MARLEY_FIGURE_H, MARLEY_FIGURE_MARGIN, 2)
+}
+
+// The bomb: a round black bomb with a stripe of red, gold and green round its
+// middle, a glint, and a fuse with a spark.
+@(private = "file")
+marley_bomb_texture :: proc() -> rl.Texture2D {
+	pixels: [MARLEY_BOMB_SIZE*MARLEY_BOMB_SIZE]rl.Color
+	set :: proc(pixels: ^[MARLEY_BOMB_SIZE*MARLEY_BOMB_SIZE]rl.Color, x, y: int, color: rl.Color) {
+		if x < 0 || y < 0 || x >= MARLEY_BOMB_SIZE || y >= MARLEY_BOMB_SIZE { return }
+		pixels[y*MARLEY_BOMB_SIZE+x] = color
+	}
+	black, shade := rl.Color{26, 26, 34, 255}, rl.Color{70, 70, 88, 255}
+	for y in 0..<MARLEY_BOMB_SIZE {
+		for x in 0..<MARLEY_BOMB_SIZE {
+			dx, dy := f32(x)-9.5, f32(y)-12
+			d := dx*dx+dy*dy
+			if d > 7.6*7.6 { continue }
+			set(&pixels, x, y, shade if d > 6.2*6.2 && dx < 0 && dy > 0 else black)
+		}
+	}
+	// The stripe: red, gold, green, thirds of the bomb's width.
+	for y in 12..<14 {
+		for x in 3..<17 {
+			dx, dy := f32(x)-9.5, f32(y)-12
+			if dx*dx+dy*dy > 7.6*7.6 { continue }
+			stripe := [3]rl.Color{{214, 48, 40, 255}, {246, 204, 60, 255}, {52, 164, 76, 255}}
+			set(&pixels, x, y, stripe[min((x-3)/5, 2)])
+		}
+	}
+	for point in ([?][2]int{{6, 9}, {7, 8}, {6, 8}, {8, 7}}) { set(&pixels, point.x, point.y, rl.Color{200, 206, 220, 255}) }
+	// The fuse and its spark.
+	for y in 2..<6 { set(&pixels, 10+(1 if y < 4 else 0), y, rl.Color{120, 72, 34, 255}) }
+	for point in ([?][2]int{{12, 1}, {13, 1}, {12, 0}, {11, 1}}) { set(&pixels, point.x, point.y, rl.Color{255, 150, 44, 255}) }
+	set(&pixels, 12, 1, rl.Color{255, 244, 190, 255})
+	return marley_paper_texture(pixels[:], MARLEY_BOMB_SIZE, MARLEY_BOMB_SIZE, 2, 1)
+}
+
+// A puff of smoke: a pale round blot with a grey lower edge.
+@(private = "file")
+marley_puff_texture :: proc() -> rl.Texture2D {
+	pixels: [MARLEY_PUFF_SIZE*MARLEY_PUFF_SIZE]rl.Color
+	for y in 0..<MARLEY_PUFF_SIZE {
+		for x in 0..<MARLEY_PUFF_SIZE {
+			dx, dy := f32(x)-5.5, f32(y)-5.5
+			d := dx*dx+dy*dy
+			if d > 4.8*4.8 { continue }
+			pixels[y*MARLEY_PUFF_SIZE+x] = rl.Color{176, 176, 186, 255} if (dx+dy > 2.5 && d > 3*3) else rl.Color{222, 222, 230, 255}
+		}
+	}
+	return marley_paper_texture(pixels[:], MARLEY_PUFF_SIZE, MARLEY_PUFF_SIZE, 2, 1)
 }
 
 // --------------------------------------------------------------------------

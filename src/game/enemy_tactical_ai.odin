@@ -40,7 +40,8 @@ tactical_marley_shelter :: proc(room: ^Room, origin: grid.Position,
 	if abs(origin.x-room.player.position.x)+abs(origin.y-room.player.position.y) <= 1 { return }
 	target: grid.Position
 	best := MARLEY_SHELTER_REACH+1
-	for light in room.marley.lights[:room.marley.light_count] {
+	for packed in room.marley.lights[:room.marley.light_count] {
+		light := marley_position(packed)
 		distance := abs(origin.x-light.x)+abs(origin.y-light.y)
 		if distance >= best || !planned_cell_is_available(room, positions, count, index, light) { continue }
 		best, target = distance, light

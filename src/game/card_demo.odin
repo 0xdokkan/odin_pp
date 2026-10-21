@@ -116,8 +116,8 @@ Card_Demo_Scene :: struct {
 	fire_count: int,
 	// BOMB MARLEY's script: the lights and the first column (marley_demo).
 	marley: bool,
-	marley_lights: [3]grid.Position,
-	marley_light_count: int,
+	marley_lights, marley_next_lights: [3]grid.Position,
+	marley_light_count, marley_next_count: int,
 	marley_column: int,
 	// More cards in the deck, so that draws have something to draw.
 	fillers: [CARD_DEMO_MAX_FILLERS]Card_Id,
@@ -409,6 +409,9 @@ card_demo_scene :: proc(id: Card_Id, upgrade_level: i32 = 0) -> (scene: Card_Dem
 		scene.marley = true
 		scene.marley_lights = {card_demo_offset(3, -2), card_demo_offset(-2, 1), {}}
 		scene.marley_light_count = 2
+		// The cells the lights will move to, on show meanwhile.
+		scene.marley_next_lights = {card_demo_offset(-3, -2), card_demo_offset(1, 3), card_demo_offset(-1, -3)}
+		scene.marley_next_count = 3
 		scene.marley_column = CARD_DEMO_PLAYER.x+3
 		scene.seconds = 4
 		scene.foe_hurt = 1
@@ -672,7 +675,8 @@ create_card_demo_room :: proc(given: Card_Demo_Scene, card: Card_Instance, dice:
 		if !add_effect(&action, place_ground_effect(cell, .Burn, 1)) || !resolve_action(room, &action).accepted { return }
 	}
 	if scene.marley {
-		room.marley_demo = {scripted = true, lights = scene.marley_lights, light_count = scene.marley_light_count, column = scene.marley_column}
+		room.marley_demo = {scripted = true, lights = scene.marley_lights, light_count = scene.marley_light_count,
+			next_lights = scene.marley_next_lights, next_count = scene.marley_next_count, column = scene.marley_column}
 	}
 	if scene.player_stacks > 0 {
 		if applied, _ := apply_status(room, PLAYER_ENTITY, scene.player_status, scene.player_stacks, 0); !applied { return }

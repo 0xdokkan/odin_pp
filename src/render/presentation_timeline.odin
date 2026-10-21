@@ -61,7 +61,7 @@ PRESENTATION_FIRST_PERSON_DIVE_DURATION :: f32(0.45)*PRESENTATION_TIME_SCALE
 // BOMB MARLEY: the ball coming down (stretched over the cast), a bomb falling
 // across its column, the party's end.
 PRESENTATION_MARLEY_BALL_DURATION :: f32(1.0)*PRESENTATION_TIME_SCALE
-PRESENTATION_MARLEY_BOMB_DURATION :: f32(0.5)*PRESENTATION_TIME_SCALE
+PRESENTATION_MARLEY_BOMB_DURATION :: f32(0.85)*PRESENTATION_TIME_SCALE
 PRESENTATION_MARLEY_END_DURATION :: f32(0.6)*PRESENTATION_TIME_SCALE
 // INONDAZIONE: the wave crossing the board.
 PRESENTATION_FLOOD_DURATION :: f32(1.4)*PRESENTATION_TIME_SCALE
@@ -787,7 +787,7 @@ active_presentation_cue :: proc(timeline: ^Presentation_Timeline) -> (^Presentat
 presentation_cue_can_group :: proc(kind: Presentation_Cue_Kind) -> bool {
 	return kind == .Damage || kind == .Damage_Absorbed || kind == .Status_Removed ||
 	       kind == .Defeat || kind == .Loot_Dropped || kind == .Explosive_Armed ||
-	       kind == .Move || kind == .Flood_Swept || kind == .Fire_Extinguished || kind == .Status_Applied ||
+	       kind == .Move || kind == .Marley_Bomb || kind == .Flood_Swept || kind == .Fire_Extinguished || kind == .Status_Applied ||
 	       kind == .Trap_Triggered || kind == .Hazard_Triggered
 }
 

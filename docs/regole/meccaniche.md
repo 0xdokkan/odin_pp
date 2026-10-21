@@ -874,11 +874,16 @@ come fermano il mondo. Ogni battito:
   (anche se l'ha spinto lì il Viandante);
 - il tempo cala di un secondo; alla fine, con il combattimento o con la morte del
   Viandante, la festa finisce;
-- le **luci** si spostano ogni 5 battiti, e le prossime si vedono 2 battiti prima
-  (solo i bordi, lampeggianti). Sono tante quanti i personaggi in gioco meno 2,
-  una meno ogni 10 secondi, mai meno di una e mai più di 16, così che non tutti
-  possano salvarsi; una è sempre entro 3 caselle dal Viandante; le nuove luci cadono
-  di preferenza dove non sta nessuno;
+- le **luci** si spostano ogni 5 battiti, e le caselle a cui passeranno al turno
+  dopo si vedono per tutto il tempo (un alone freddo e una cornice sottile con una
+  scintilla che corre, molto più deboli delle luci vere): in anteprima, non
+  salvano nessuno. Sono 4 più dei personaggi in gioco (il Viandante e i nemici)
+  all'inizio, una in meno ogni 5 secondi, mai meno della metà dei personaggi (2 al
+  minimo) e mai più di 32: la stanza è generosa all'inizio e dopo mezzo minuto
+  circa non c'è più posto per tutti. Sono sparse sul pavimento (fra alcune
+  candidate vince la più lontana dalle altre), una è sempre entro 3 caselle dal
+  Viandante, e le nuove cadono di preferenza dove non sta nessuno e mai sulle
+  luci accese;
 - vengono annunciate **nuove colonne**: poche all'inizio (una ogni due secondi), poi
   una, due e tre al secondo ogni 10 secondi, in proporzione per una stanza più
   larga di 17 caselle; metà sono la colonna di un personaggio.
@@ -898,9 +903,16 @@ i fasci colorati (magenta, ciano, oro, verde, arancio) vanno dalla sfera alle ca
 salve, dove ci sono macchie di luce e un bordo d'oro; puntini di riflesso girano sul
 pavimento. Le luci e le colonne si vedono anche nella nebbia (sopra i blocchi
 della nebbia). Le colonne annunciate sono rosse, più accese e lampeggianti
-all'ultimo battito, con una freccia che scende. La bomba rotola lungo la colonna
-(mezzo secondo), lascia un lampo su ogni casella (verde dove si è salvi) e i
-danni arrivano dopo. Bomb Marley è un cartoncino originale: una bomba con un berretto
+all'ultimo battito, con una freccia che scende. La bomba è un cartoncino di carta
+(nero, con una fascia rossa, oro e verde, miccia e scintilla, linea d'inchiostro,
+margine bianco e taglio come gli altri pezzi del tavolo): Bomb Marley la lancia in
+un arco fino alla prima casella della colonna e poi rimbalza lungo tutta la
+colonna, un salto ogni 3 caselle, girando, con un'ombra morbida sul pavimento,
+cartoncini di fumo dietro di sé e un anello di luce dove tocca terra. Rimbalzare
+è solo il suo modo di andare: colpisce chiunque stia in un punto qualunque del suo
+percorso, a terra o in aria (una colonna dà danno a tutta la colonna). Le bombe
+di uno stesso battito volano insieme. Lascia un lampo su ogni casella (verde dove
+si è salvi) e i danni arrivano dopo. Bomb Marley è un cartoncino originale: una bomba con un berretto
 rosso, oro e verde, occhiali scuri e dreadlock di miccia, che balla a tempo sul
 muro nord sopra la colonna che sta per bombardare. L'HUD mostra `MARLEY 23s` fra i
 chip. Nella Prova meccaniche suonano la carta, la sfera, le luci, l'avviso, la

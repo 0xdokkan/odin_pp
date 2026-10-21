@@ -128,11 +128,16 @@ mechanics_lab_marley :: proc(window: ^app.Window, renderer: ^render.Renderer, ro
 	id, held := mechanics_lab_hand_card(player, .Bomb_Marley)
 	if !held { fmt.eprintln("mechanics lab: no Bomb Marley in hand"); return false }
 	mechanics_lab_still(window, renderer, room, id, "odin_pp_mechanics_lab_card_Bomb_Marley.png")
+	// The film's script (as Mostra effetto's) fixes the first lights and the
+	// first column, so that the bomb lands where this act wants it; the script
+	// is dropped once it has landed and the party runs on its own.
+	room.marley_demo = {scripted = true, lights = {lit, {}, {}}, light_count = 1,
+		next_lights = {{center.x-5, center.y+1}, {center.x+7, center.y-6}, {}}, next_count = 2, column = column}
 	if !mechanics_lab_play(window, renderer, room, controller, cards, buffer, .Bomb_Marley, game.entity_target(game.PLAYER_ENTITY)) {
 		fmt.eprintln("mechanics lab: Bomb Marley was not played"); return false
 	}
 	m := &room.marley
-	if !m.active || m.remaining != game.MARLEY_SECONDS || m.damage != game.MARLEY_BASE_DAMAGE || m.light_count != 4 {
+	if !m.active || m.remaining != game.MARLEY_SECONDS || m.damage != game.MARLEY_BASE_DAMAGE || m.light_count != 1 || m.next_count != 2 || !m.has_next {
 		fmt.eprintln("mechanics lab: the party began with", m.remaining, "s,", m.damage, "damage and", m.light_count, "lights"); return false
 	}
 	frame := 0
@@ -141,15 +146,25 @@ mechanics_lab_marley :: proc(window: ^app.Window, renderer: ^render.Renderer, ro
 		mechanics_lab_reel_frame(window, renderer, room, controller, cards, buffer, "marley", 6, &frame)
 		if frame > 30 && !game.tactical_is_casting(room) && !render.renderer_blocks_player_input(renderer) { break }
 	}
-	// The bomb lands at the next beat: the foe in the light is spared.
-	m.lights[0], m.light_count = lit, 1
-	m.column_count = 1
-	m.columns[0] = {x = i32(column), beats = 1}
+	// The column is warned at the first beat and its bomb lands two beats on:
+	// the foe in the light is spared.
 	before := m.earned
+	flights := 0
 	for _ in 0..<420 {
 		mechanics_lab_reel_frame(window, renderer, room, controller, cards, buffer, "marley", 6, &frame)
-		if m.earned > before && !render.renderer_blocks_player_input(renderer) { break }
+		// The bomb in flight, bouncing down its column: two stills of it.
+		for offset in 0..<render.renderer_active_cue_count(renderer) {
+			cue, showing := render.renderer_active_cue_at(renderer, offset)
+			if !showing || !cue.started || cue.kind != .Marley_Bomb { continue }
+			progress := render.presentation_cue_progress(cue)
+			if flights == 0 && progress > 0.45 { artifacts.screenshot("odin_pp_mechanics_lab_marley_flight_a.png"); flights = 1 }
+			if flights == 1 && progress > 0.72 { artifacts.screenshot("odin_pp_mechanics_lab_marley_flight_b.png"); flights = 2 }
+		}
+		// The party's earning is the beat's; its cues play after it.
+		if m.earned > before && (flights == 2 || frame > 600) && !render.renderer_blocks_player_input(renderer) { break }
 	}
+	room.marley_demo = {}
+	script_dropped := m.elapsed
 	spared, killed, wounded := foe(room, lit_id), foe(room, doomed_id), foe(room, hurt_id)
 	if spared == nil || spared.health != 99 { fmt.eprintln("mechanics lab: the foe in the light was hurt"); return false }
 	if killed != nil { fmt.eprintln("mechanics lab: the foe with one life stood through the bomb"); return false }
@@ -165,6 +180,13 @@ mechanics_lab_marley :: proc(window: ^app.Window, renderer: ^render.Renderer, ro
 		if m.elapsed >= 9 && warned && ahead { break }
 	}
 	if !warned || !ahead { fmt.eprintln("mechanics lab: no column warned or no light shown ahead"); return false }
+	// Once on its own the party lights many cells, and as many are on show.
+	for _ in 0..<600 {
+		// Two turns after the script's: the first lights the script's own next ones.
+		if m.elapsed%game.MARLEY_LIGHT_CYCLE == 0 && m.elapsed >= script_dropped+2*game.MARLEY_LIGHT_CYCLE { break }
+		mechanics_lab_reel_frame(window, renderer, room, controller, cards, buffer, "marley", 12, &frame)
+	}
+	if m.light_count < 5 || m.next_count < 5 { fmt.eprintln("mechanics lab: the lights are few:", m.light_count, "and", m.next_count); return false }
 	artifacts.screenshot("odin_pp_mechanics_lab_marley_party.png")
 	// The chip of the HUD holds whole beside the bites.
 	chips := render.tactical_status_chip_layout(renderer, room)

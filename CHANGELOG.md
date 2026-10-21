@@ -24,6 +24,11 @@ per i comandi disponibili oggi valgono il [README](README.md) e la documentazion
 - Catalogo a 46 carte. Icone, suoni (compreso un groove reggae a 60 BPM),
   testi, chip dell'HUD, film di Mostra effetto (quello di Bomb Marley finisce
   alla prima bomba, non dopo l'intera festa) e atti della Prova meccaniche.
+- Bomb Marley, ritocco: bombe di cartoncino che vengono lanciate dalla figura e
+  rimbalzano lungo la colonna (un salto ogni 3 caselle) senza cambiare il danno,
+  che colpisce chiunque sia nella colonna; luci molto più numerose (4 più dei
+  personaggi, una in meno ogni 5 s) e sparse; le caselle del turno dopo si vedono
+  in anteprima per tutto il tempo.
 - Il mazzo della Prova meccaniche resta di dieci carte più la Canna: Movimento
   Ombra e Lama Velenosa lasciano il posto alle due nuove (restano nel gioco).
 

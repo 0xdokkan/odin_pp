@@ -74,14 +74,21 @@ test_marley_ramps_up_bombs_and_wears_down_lights :: proc(t: ^testing.T) {
 	room := ground_test_room(t, &data, &player, {enemies = spawns[:]})
 	defer level.destroy(&data)
 	defer destroy_room(&room)
-	// Eleven characters.
-	testing.expect_value(t, marley_light_count(&room, 0), 11-MARLEY_SPARE)
-	testing.expect_value(t, marley_light_count(&room, 9), 11-MARLEY_SPARE)
-	testing.expect_value(t, marley_light_count(&room, 10), 11-MARLEY_SPARE-1)
-	testing.expect_value(t, marley_light_count(&room, 35), 11-MARLEY_SPARE-3)
-	testing.expect_value(t, marley_light_count(&room, 90), 1)
-	// Not everybody can be saved.
-	for elapsed in i32(0)..<90 { testing.expect(t, marley_light_count(&room, elapsed) < 11) }
+	// Eleven characters: generous at first, one fewer every five seconds, at
+	// least half of them.
+	testing.expect_value(t, marley_light_count(&room, 0), 11+MARLEY_EXTRA)
+	testing.expect_value(t, marley_light_count(&room, 4), 11+MARLEY_EXTRA)
+	testing.expect_value(t, marley_light_count(&room, 5), 11+MARLEY_EXTRA-1)
+	testing.expect_value(t, marley_light_count(&room, 35), 11+MARLEY_EXTRA-7)
+	testing.expect_value(t, marley_light_count(&room, 90), 11/2)
+	level_previous := marley_light_count(&room, 0)
+	for elapsed in i32(1)..<90 {
+		count := marley_light_count(&room, elapsed)
+		testing.expect(t, count <= level_previous && count >= 11/2)
+		level_previous = count
+	}
+	// Not everybody can be saved once the party is old.
+	testing.expect(t, marley_light_count(&room, 60) < 11)
 }
 
 @(test)
@@ -99,12 +106,18 @@ test_marley_card_starts_the_party_after_its_cast :: proc(t: ^testing.T) {
 	testing.expect(t, m.active && tactical_marley_active(&room))
 	testing.expect_value(t, m.remaining, MARLEY_SECONDS)
 	testing.expect_value(t, m.damage, MARLEY_BASE_DAMAGE+2)
-	// Four characters: two lights; one of them within three cells of the player.
-	testing.expect_value(t, m.light_count, 2)
+	// Four characters and four more: eight lights, and one fewer shown ahead,
+	// none on the cells now lit; one within three cells of the player.
+	testing.expect_value(t, m.light_count, 4+MARLEY_EXTRA)
+	testing.expect_value(t, m.next_count, 4+MARLEY_EXTRA-1)
+	testing.expect(t, m.has_next)
 	near := false
-	for light in m.lights[:m.light_count] {
+	for index in 0..<m.light_count {
+		light := marley_light(m, index)
 		testing.expect(t, base_cell_is_walkable(&room, light) && !cell_blocks_movement(&room, light))
 		if max(abs(light.x-player.position.x), abs(light.y-player.position.y)) <= MARLEY_NEAR { near = true }
+		for other in 0..<m.light_count { if other != index { testing.expect(t, marley_light(m, other) != light) } }
+		for ahead in 0..<m.next_count { testing.expect(t, marley_next_light(m, ahead) != light) }
 	}
 	testing.expect(t, near)
 	testing.expect_value(t, marley_test_count(room.recent_events, .Marley_Begun), 1)
@@ -146,7 +159,7 @@ test_marley_bomb_hurts_everyone_off_the_lights :: proc(t: ^testing.T) {
 	defer destroy_room(&room)
 	testing.expect_value(t, marley_test_play(t, &room).result, Card_Play_Result.Played)
 	m := &room.marley
-	m.lights[0], m.light_count = room.enemies[0].position, 1
+	marley_set_lights(m, {room.enemies[0].position})
 	m.column_count = 1
 	m.columns[0] = {x = 6, beats = 1}
 	pulse := marley_test_beat(&room)
@@ -165,7 +178,7 @@ test_marley_bomb_hurts_everyone_off_the_lights :: proc(t: ^testing.T) {
 		if event.kind == .Marley_Saved { testing.expect_value(t, event.target, enemy_entity(room.enemies[0].id)) }
 	}
 	// The player on a light is safe too.
-	m.lights[0], m.light_count = player.position, 1
+	marley_set_lights(m, {player.position})
 	m.column_count = 1
 	m.columns[0] = {x = i32(player.position.x), beats = 1}
 	before := player.health
@@ -269,7 +282,8 @@ test_marley_is_deterministic :: proc(t: ^testing.T) {
 		testing.expect_value(t, marley_test_play(t, &room).result, Card_Play_Result.Played)
 		for _ in 0..<30 {
 			marley_test_beat(&room)
-			for light in room.marley.lights[:room.marley.light_count] { append(lights, light) }
+			for index in 0..<room.marley.light_count { append(lights, marley_light(&room.marley, index)) }
+			for index in 0..<room.marley.next_count { append(lights, marley_next_light(&room.marley, index)) }
 			for column in room.marley.columns[:room.marley.column_count] { append(columns, column.x) }
 		}
 	}
@@ -285,9 +299,10 @@ test_marley_is_deterministic :: proc(t: ^testing.T) {
 	for i in 0..<min(len(a_columns), len(b_columns)) { testing.expect_value(t, a_columns[i], b_columns[i]) }
 }
 
-// The lights move every five beats, shown two beats ahead.
+// The lights move every five beats; the cells they will move to are on show
+// all the while, never the cells now lit, and become the lit ones at the turn.
 @(test)
-test_marley_lights_move_every_five_beats_shown_ahead :: proc(t: ^testing.T) {
+test_marley_lights_move_every_five_beats_with_the_next_always_shown :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
 	spawns := [?]Enemy_Spawn{{position = {3, 3}, health = 500, attack = 1}, {position = {9, 7}, health = 500, attack = 1}, {position = {6, 2}, health = 500, attack = 1}, {position = {2, 8}, health = 500, attack = 1}}
@@ -298,17 +313,75 @@ test_marley_lights_move_every_five_beats_shown_ahead :: proc(t: ^testing.T) {
 	testing.expect_value(t, marley_test_play(t, &room).result, Card_Play_Result.Played)
 	m := &room.marley
 	first := m.lights
-	for beat in 1..=4 {
+	next := m.next_lights
+	testing.expect(t, m.has_next)
+	for _ in 1..=4 {
 		marley_test_beat(&room)
 		testing.expect_value(t, m.lights, first)
-		testing.expect_value(t, m.has_next, beat >= 3)
+		testing.expect_value(t, m.next_lights, next)
+		testing.expect(t, m.has_next)
 	}
-	next := m.next_lights
 	pulse := marley_test_beat(&room)
 	testing.expect_value(t, m.elapsed, i32(5))
 	testing.expect_value(t, m.lights, next)
-	testing.expect(t, !m.has_next)
+	// New cells are on show at once, apart from the ones now lit.
+	testing.expect(t, m.has_next && m.next_lights != next)
+	for index in 0..<m.next_count {
+		for lit in 0..<m.light_count { testing.expect(t, marley_next_light(m, index) != marley_light(m, lit)) }
+	}
 	testing.expect_value(t, marley_test_count(&pulse.events, .Marley_Lights), 1)
+}
+
+// The lights are spread over the floor rather than clumped: no two of them
+// side by side when the floor has room.
+@(test)
+test_marley_lights_are_spread_out :: proc(t: ^testing.T) {
+	data: level.Level
+	player: Player
+	spawns := [?]Enemy_Spawn{{position = {3, 3}, health = 500, attack = 1}, {position = {9, 7}, health = 500, attack = 1}}
+	room := ground_test_room(t, &data, &player, {enemies = spawns[:]})
+	defer level.destroy(&data)
+	defer destroy_room(&room)
+	testing.expect_value(t, marley_test_play(t, &room).result, Card_Play_Result.Played)
+	m := &room.marley
+	side_by_side := 0
+	for a in 0..<m.light_count {
+		for b in a+1..<m.light_count {
+			la, lb := marley_light(m, a), marley_light(m, b)
+			if max(abs(la.x-lb.x), abs(la.y-lb.y)) <= 1 { side_by_side += 1 }
+		}
+	}
+	testing.expect(t, side_by_side <= 2)
+}
+
+// The bombs of one beat are recorded together, before any damage, in one visual
+// group: they fly side by side.
+@(test)
+test_marley_bombs_of_a_beat_share_a_group :: proc(t: ^testing.T) {
+	data: level.Level
+	player: Player
+	spawns := [?]Enemy_Spawn{{position = {3, 3}, health = 500, attack = 1}, {position = {9, 7}, health = 500, attack = 1}}
+	room := ground_test_room(t, &data, &player, {enemies = spawns[:]})
+	defer level.destroy(&data)
+	defer destroy_room(&room)
+	player.health, player.stats.max_health = 100000, 100000
+	testing.expect_value(t, marley_test_play(t, &room).result, Card_Play_Result.Played)
+	m := &room.marley
+	m.light_count = 0
+	m.column_count = 3
+	m.columns[0], m.columns[1], m.columns[2] = {x = 3, beats = 1}, {x = 9, beats = 1}, {x = 6, beats = 1}
+	pulse := marley_test_beat(&room)
+	bombs, last_bomb, first_damage := 0, -1, -1
+	for event, index in pulse.events.events[:pulse.events.count] {
+		if event.kind == .Marley_Bomb {
+			bombs += 1
+			last_bomb = index
+			testing.expect_value(t, event.visual_group, MARLEY_BOMB_GROUP)
+		}
+		if event.kind == .Damaged && first_damage < 0 { first_damage = index }
+	}
+	testing.expect_value(t, bombs, 3)
+	testing.expect(t, first_damage > last_bomb)
 }
 
 // Bombs set a barrel in the column off; the player in Movimento Ombra is not hurt.
@@ -348,7 +421,7 @@ test_marley_enemies_flee_columns_and_make_for_the_lights :: proc(t: ^testing.T) 
 	m := &room.marley
 	// Foe 0 stands in a warned column; foe 1 has a light two cells off; foe 2
 	// is beside the player (6, 5).
-	m.lights[0], m.light_count = {8, 8}, 1
+	marley_set_lights(m, {{8, 8}})
 	m.column_count = 1
 	m.columns[0] = {x = 3, beats = 2}
 	for &enemy in room.enemies { enemy.intent, enemy.tactical_cooldown = {}, 0 }
@@ -360,7 +433,7 @@ test_marley_enemies_flee_columns_and_make_for_the_lights :: proc(t: ^testing.T) 
 	testing.expect(t, room.enemies[2].intent.kind != .Move || !marley_cell_is_lit(&room, room.enemies[2].intent.destination))
 	// A lit cell in a warned column is safe: no blast zone there.
 	testing.expect_value(t, enemy_terrain_danger(&room, {3, 3}), MARLEY_COLUMN_DANGER)
-	m.lights[0], m.light_count = {3, 3}, 1
+	marley_set_lights(m, {{3, 3}})
 	testing.expect_value(t, enemy_terrain_danger(&room, {3, 3}), 0)
 	testing.expect_value(t, enemy_terrain_danger(&room, {3, 4}), MARLEY_COLUMN_DANGER)
 }

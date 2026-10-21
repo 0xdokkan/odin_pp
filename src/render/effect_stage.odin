@@ -23,6 +23,8 @@ BORROWED_RENDERER_OWN_HANDLES :: [?]string{
 	"tactical.lasso.ring_texture",
 	"tactical.pinball.texture",
 	"tactical.marley.figure",
+	"tactical.marley.bomb",
+	"tactical.marley.puff",
 	"tactical.first_person.ak_texture",
 	"tactical.first_person.tracer_texture",
 	"tactical.first_person.flash_textures[0]",
