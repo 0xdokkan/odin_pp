@@ -45,6 +45,7 @@ create_borrowed_renderer :: proc(main: ^Renderer, canvas_width, canvas_height: i
 	r.playback_speed = 1
 	v := &r.tactical
 	v.perspective = m.perspective
+	v.theme = m.theme
 	v.living = m.living
 	v.mechanics_lab, v.mechanics_lab_menu = m.mechanics_lab, m.mechanics_lab_menu
 	v.intent_display = m.intent_display

@@ -1,5 +1,6 @@
 package integration
 import application "../application"
+import render "../render"
 
 import "core:testing"
 
@@ -67,5 +68,32 @@ test_runtime_options_reject_invalid_values_without_mutation :: proc(t: ^testing.
 		handled, ok := application.apply_runtime_option(&options, argument)
 		testing.expect(t, handled && !ok)
 		testing.expect_value(t, options, application.DEFAULT_RUNTIME_OPTIONS)
+	}
+}
+
+@(test)
+test_runtime_options_choose_the_environment_theme :: proc(t: ^testing.T) {
+	options := application.DEFAULT_RUNTIME_OPTIONS
+	// The neon world is the default; the gothic look is a hidden option.
+	testing.expect_value(t, options.environment_theme, render.Environment_Theme.Neon)
+	handled, ok := application.apply_runtime_option(&options, "--theme=gothic")
+	testing.expect(t, handled && ok)
+	testing.expect_value(t, options.environment_theme, render.Environment_Theme.Gothic)
+	handled, ok = application.apply_runtime_option(&options, "--theme=neon")
+	testing.expect(t, handled && ok)
+	testing.expect_value(t, options.environment_theme, render.Environment_Theme.Neon)
+	// The theme combines with every other option and parses like them.
+	application.roguelike_parse_arguments(&options, []string{"--seed=7", "--theme=gothic", "--vision=5"})
+	testing.expect_value(t, options.environment_theme, render.Environment_Theme.Gothic)
+	testing.expect_value(t, options.seed, u64(7))
+	testing.expect_value(t, options.tactical.vision_size, 5)
+	// Parsing alone never changes what renderers start with: the application
+	// sets that when it starts.
+	testing.expect_value(t, render.startup_environment_theme_choice(), render.Environment_Theme.Neon)
+	for argument in ([?]string{"--theme=", "--theme=Gothic", "--theme=sepia", "--theme=neon "}) {
+		fresh := application.DEFAULT_RUNTIME_OPTIONS
+		handled, ok = application.apply_runtime_option(&fresh, argument)
+		testing.expectf(t, handled && !ok, "%q", argument)
+		testing.expect_value(t, fresh, application.DEFAULT_RUNTIME_OPTIONS)
 	}
 }

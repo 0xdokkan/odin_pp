@@ -312,7 +312,8 @@ Il colore sul terreno dice il tipo di azione:
 | verde | movimento |
 | viola | protezione di un alleato |
 
-Recupero e attesa non hanno colore. I colori caldi staccano dal pavimento blu e
+Recupero e attesa non hanno colore. I colori caldi staccano dal pavimento (blu
+nel tema gotico, nero con fili cremisi nel [mondo neon](#il-mondo-neon)) e
 segnano le minacce;
 verde e viola, vicini al blu, sono chiari; rosso e verde differiscono anche per
 luminosità, per chi è daltonico ([living_ring.odin](../src/render/living_ring.odin)).
@@ -393,6 +394,55 @@ piedi, e le etichette scure restano solo per bombe, micce e uscita. Il riquadro
 del nemico sotto il mouse
 resta visibile anche durante le animazioni e mentre la telecamera scorre con il
 mouse fermo; lascia il posto solo alla difesa.
+
+### Il mondo neon
+
+Il livello è un vecchio mondo virtuale: pianure nere, pavimento lucido e neon
+che tende al rosso. Cambia soltanto l'ambiente; carte, HUD, mano, cartoncini
+dei personaggi, dadi, minacce, luce della portata e ogni effetto restano come
+sono. Codice in [neon_world.odin](../src/render/neon_world.odin), materiale
+nello stesso programma della resina ([resin_material.odin](../src/render/resin_material.odin),
+modalità 3).
+
+- **Pavimento.** Piastrelle nere e lucide che si toccano: lo shader accende
+  come filo cremisi i bordi smussati fra l'una e l'altra, e il filo respira
+  molto lentamente sull'orologio del mondo (`tactical_world_time`), quindi sta
+  fermo quando il mondo è fermo. Sulle piastrelle, radi, piccoli circuiti
+  incisi in rosso spento (tracce e nodi, scelti dalle coordinate della cella).
+  Sotto il Viandante una pozza di luce rossastra aiuta a leggere dov'è; il
+  rosso delle minacce, l'ambra delle esplosioni, il blu della portata e i
+  segni delle intenzioni restano più chiari e più caldi dei fili.
+- **Mura.** Blocchi neri sfaccettati (base, spalla e corona, con i vertici
+  della corona spostati dall'hash della cella) bordati da linee neon rosse.
+  Il perimetro che si abbassa verso la camera è quello di prima; le mura
+  interne restano trasparenti e mostrano solo i bordi, così i nemici dietro si
+  vedono. Le lampade sono tubi neon rossi con un'anima chiara; la polvere che
+  sale è rosso scuro. Gli ostacoli (`draw_voxel_cover`) sono rocce nere a poche
+  facce, con i bordi rossi.
+- **Fog.** Ogni cella nascosta è lo stesso blocco nero con un contorno rosso
+  spento: nessun dato del terreno entra nel disegno, solo le coordinate e
+  l'orologio del mondo.
+- **Fondale.** Un vuoto nero con un debole alone rosso all'orizzonte e, oltre
+  le mura, un anello di basse colline poligonali (al massimo 26 mesh): sagome
+  nere sfaccettate con un filo neon sottile sugli spigoli. Nascono soltanto da
+  dimensioni, famiglia, tipo d'incontro e uscita della stanza, mai da un
+  orologio o da un RNG globale; stanno sempre oltre le mura, fuori dalla
+  vista del gameplay, e quando la camera è bassa un'altura fra l'occhio e la
+  stanza si abbassa fino a non coprire alcuna cella. Quelle fuori dall'inquadratura
+  non vengono disegnate. La mappa (`Tab`) usa lo stesso fondale senza colline.
+- **Famiglie.** La famiglia della stanza sposta di poco il tono del neon:
+  rosso, cremisi (Pilastri), rosso magenta (Anello), rosso arancio (Corti
+  gemelle) e rosso sangue (Asimmetrica).
+- **Grana.** La risoluzione finale della scena aggiunge righe e grana molto
+  tenui, pesate sul buio: gli sprite e le carte non vengono toccati.
+- **Prima persona e Mostra effetto** disegnano lo stesso mondo: l'AK, le mura
+  piene dietro gli occhi e il film delle carte usano gli stessi blocchi, fili e
+  colline.
+
+L'aspetto gotico precedente resta disponibile come opzione nascosta,
+`--theme=gothic` (e `--theme=neon`, l'impostazione predefinita; vedi
+[Avvio](avvio.md)): il tema è `Tactical_View.theme` e ogni percorso neon è un
+ramo su di esso, il codice gotico non è stato toccato.
 
 ### Direzione grafica e perimetro della milestone
 

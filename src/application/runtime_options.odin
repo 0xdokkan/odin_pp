@@ -1,5 +1,6 @@
 package application
 import devtools "../devtools"
+import render "../render"
 import run_session "../run"
 
 import "core:strconv"
@@ -8,6 +9,8 @@ import game "../game"
 Runtime_Options :: struct {
 	using gameplay: run_session.Options,
 	using tools: devtools.Tool_Options,
+	// The look of the level: neon by default, `--theme=gothic` for the old one.
+	environment_theme: render.Environment_Theme,
 }
 DEFAULT_RUNTIME_OPTIONS :: Runtime_Options{gameplay=run_session.DEFAULT_OPTIONS}
 
@@ -70,6 +73,11 @@ apply_runtime_option :: proc(options: ^Runtime_Options, argument: string) -> (ha
 	if argument == "--no-fog" { options.tactical.vision_size = 0; return true, true }
 	if argument == "--smoke-m7" { options.m7_smoke = true; return true, true }
 	if argument == "--smoke-m7-view" { options.m7_view_smoke = true; return true, true }
+	if strings.has_prefix(argument, "--theme=") {
+		theme, valid := render.parse_environment_theme(argument[len("--theme="):])
+		if valid { options.environment_theme = theme }
+		return true, valid
+	}
 	if strings.has_prefix(argument, "--decision-time=") {
 		value, valid := strconv.parse_int(argument[len("--decision-time="):])
 		valid = valid && value >= 1 && value <= 60
