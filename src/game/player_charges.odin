@@ -83,14 +83,15 @@ player_fate_sides :: proc(room: ^Room) -> i32 {
 deflect_enemy_blow :: proc(room: ^Room, source: Entity_Ref, origin: grid.Position, blow: ^Enemy_Intent, ranged: bool,
 	pulse: ^Pulse_Report) -> bool {
 	if room == nil || room.player == nil || pulse == nil || blow == nil || source.kind != .Enemy ||
-	   blow.threatened_cell_count <= 0 || tactical_player_intangible(room) || player_charges(room, .Deflect) <= 0 { return false }
+	   blow.threatened_cell_count <= 0 || tactical_player_intangible(room) || (player_charges(room, .Deflect) <= 0 && !ride_deflects(room)) { return false }
 	damage := player_blow_damage(room, blow.damage)
 	first := pulse.events.count
 	// The blow itself, struck as it was aimed: the board shows it reach him.
 	record_event(&pulse.events, {kind = .Attack_Deflected, source = source, target = PLAYER_ENTITY, amount = damage, status = .Deflect})
 	mark_attack_events(&pulse.events, first, source, PLAYER_ENTITY, origin, blow.threatened_cells[0],
 		blow.threatened_cells[:blow.threatened_cell_count], ranged)
-	wear_status_stack(room, PLAYER_ENTITY, .Deflect, pulse)
+	// The Stegosauro keeps no charge to spend.
+	if player_charges(room, .Deflect) > 0 { wear_status_stack(room, PLAYER_ENTITY, .Deflect, pulse) }
 	// And back (EVENT_REFLECTED_BIT): the attacker's own bolt flying home, or a
 	// swing of the player's at the attacker.
 	answer := make_action(.Trigger, PLAYER_ENTITY, entity_target(source), .Opponent)
@@ -159,6 +160,8 @@ player_bump :: proc(room: ^Room, enemy_index: int, aim: grid.Position, rule: Tar
 	}
 	damage := player_basic_attack_damage(room.player)
 	if critical { damage = critical_bump_damage(damage) }
+	// The Giganotosauro's bite: a small foe falls, the rest take the great blow.
+	if bite := giga_bite_damage(room, enemy); bite > 0 { damage = max(damage, bite) }
 	if fated && outcome == .Lethal {
 		// Whatever guards it, it falls.
 		guard: i32
@@ -170,6 +173,11 @@ player_bump :: proc(room: ^Room, enemy_index: int, aim: grid.Position, rule: Tar
 	assert(added)
 	if venom {
 		added = add_effect(&action, apply_status_effect(ref, .Poison, VENOM_BLADE_POISON, 0))
+		assert(added)
+	}
+	// The Velociraptor's claws leave a stack of Sanguinamento.
+	if ride_is(room, .Raptor) {
+		added = add_effect(&action, apply_status_effect(ref, .Bleed, 1, 0))
 		assert(added)
 	}
 	if fated && outcome <= .Slow {

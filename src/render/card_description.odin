@@ -86,6 +86,13 @@ gothic_card_lines :: proc(card: game.Card_Instance) -> (cstring, cstring) {
 	// INONDAZIONE (game/flood.odin): the push, and the fires.
 	case .Bomb_Marley: return fmt.ctprintf("BOMBE DA %d DANNI", a), fmt.ctprintf("%ds / LUCI = SALVI", d.effects[0].duration)
 	case .Flood: return fmt.ctprintf("SPINGE TUTTI DI %d", a), "SPEGNE I FUOCHI"
+	// CANNONE (game/cannon.odin), BUCO NERO (game/black_hole.odin), DINOSAURO
+	// (game/dinosaur.odin).
+	case .Cannon: return fmt.ctprintf("1 PALLA/s: %d DANNI", a), fmt.ctprintf("%ds / ROTELLA: MIRA", game.CANNON_SECONDS)
+	case .Laser_Cannon: return fmt.ctprintf("RAGGIO/s: %d DANNI", a), fmt.ctprintf("%ds / TUTTA LA LINEA", game.CANNON_SECONDS)
+	case .Black_Hole:
+		return fmt.ctprintf("%d DANNI NEL %dX%d", a, game.black_hole_radius(u)*2+1, game.black_hole_radius(u)*2+1), fmt.ctprintf("%ds / TIRA I NEMICI", game.BLACK_HOLE_SECONDS)
+	case .Dinosaur: return fmt.ctprintf("D4: UN DINO PER %ds", a), "RAPTOR STEGO DILO GIGA"
 	case .Sei_Denari, .Sette_Denari: return fmt.ctprintf("+%d ORO", a), "SCOPA / UNA VOLTA PER STANZA"
 	case .Firebomb: return fmt.ctprintf("%d DANNI NEL %dX%d", a, d.targeting.radius*2+1, d.targeting.radius*2+1), "ACCENDE I BARILI"
 	case .Calculated_Risk: return fmt.ctprintf("PESCA %d", a), fmt.ctprintf("SCARTA %d", b)
@@ -149,6 +156,10 @@ gothic_card_narrow_lines :: proc(card: game.Card_Instance) -> (first, second: cs
 	case .First_Person: return fmt.ctprintf("FPS %ds", a), fmt.ctprintf("AK: %d COLPI/s", game.FIRST_PERSON_SHOTS_PER_SECOND), true
 	case .Bomb_Marley: return fmt.ctprintf("BOMBE %d", a), "LUCI: SALVI", true
 	case .Flood: return fmt.ctprintf("SPINTA %d", a), "NO FUOCHI", true
+	case .Cannon: return fmt.ctprintf("PALLA %d", a), fmt.ctprintf("%ds", game.CANNON_SECONDS), true
+	case .Laser_Cannon: return fmt.ctprintf("RAGGIO %d", a), fmt.ctprintf("%ds", game.CANNON_SECONDS), true
+	case .Black_Hole: return fmt.ctprintf("BUCO %d", a), fmt.ctprintf("%ds", game.BLACK_HOLE_SECONDS), true
+	case .Dinosaur: return fmt.ctprintf("D4 %ds", a), "UN DINO", true
 	}
 	return
 }

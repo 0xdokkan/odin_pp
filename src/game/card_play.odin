@@ -59,6 +59,8 @@ play_card :: proc(room: ^Room, card_id: u32, target: Target) -> (play: Card_Play
 	}
 	play.cost = definition.cost
 	play.energy_before = deck.energy
+	// The wheel's aim is for this play alone.
+	defer { room.has_aim = false }
 
 	action, compile_error := compile_card_action(room, play.card, target)
 	play.compile_error = compile_error

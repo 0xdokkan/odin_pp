@@ -1,5 +1,6 @@
 package render
 
+import "core:math"
 import game "../game"
 import grid "../engine/grid"
 import level "../level"
@@ -65,6 +66,14 @@ PRESENTATION_MARLEY_BOMB_DURATION :: f32(0.85)*PRESENTATION_TIME_SCALE
 PRESENTATION_MARLEY_END_DURATION :: f32(0.6)*PRESENTATION_TIME_SCALE
 // INONDAZIONE: the wave crossing the board.
 PRESENTATION_FLOOD_DURATION :: f32(1.4)*PRESENTATION_TIME_SCALE
+// CANNONE: a shot's flight, the cannon falling apart; BUCO NERO: a foe spun
+// down the hole, the hole closing; DINOSAURO: mounting, a stomp.
+PRESENTATION_CANNON_FIRE_DURATION :: f32(0.42)*PRESENTATION_TIME_SCALE
+PRESENTATION_CANNON_BREAK_DURATION :: f32(0.7)*PRESENTATION_TIME_SCALE
+PRESENTATION_HOLE_SWALLOW_DURATION :: f32(0.75)*PRESENTATION_TIME_SCALE
+PRESENTATION_HOLE_CLOSE_DURATION :: f32(0.7)*PRESENTATION_TIME_SCALE
+PRESENTATION_RIDE_DURATION :: f32(0.9)*PRESENTATION_TIME_SCALE
+PRESENTATION_STOMP_DURATION :: f32(0.35)*PRESENTATION_TIME_SCALE
 PRESENTATION_MAX_SEQUENCE_DURATION :: f32(12.0)
 PRESENTATION_TIME_EPSILON         :: f32(0.00001)
 
@@ -137,6 +146,19 @@ Presentation_Cue_Kind :: enum {
 	// INONDAZIONE (game/flood.odin): the wave's sweep and the steam of a fire put out.
 	Flood_Swept,
 	Fire_Extinguished,
+	// CANNONE and BUCO NERO (game/cannon.odin, black_hole.odin): a shot, a cannon
+	// falling apart, a hole's beat, a foe swallowed, the hole closing.
+	Cannon_Fired,
+	Cannon_Broken,
+	Black_Hole_Tick,
+	Black_Hole_Swallowed,
+	Black_Hole_Closed,
+	// DINOSAURO (game/dinosaur.odin): the ride begins and ends, a stomp; and
+	// Sanguinamento's extra bite.
+	Ride_Begun,
+	Ride_Ended,
+	Dino_Stomp,
+	Bleed_Bite,
 }
 
 Presentation_Actor :: struct {
@@ -169,6 +191,11 @@ Presentation_Grid_Object :: struct {
 	detonation_pulse: u64,
 	fuse_pulses: int,
 	device_armed: bool,
+	// An emplacement's (game/emplacement.odin): its way, its beam, the beats left
+	// and the beats it had, its damage radius.
+	facing: game.Move_Direction,
+	laser: bool,
+	life, max_life, radius: i32,
 }
 
 // The pools and fires on the floor as the board shows them (game/ground.odin):
@@ -210,6 +237,8 @@ Room_Presentation :: struct {
 	// BOMB MARLEY's party: its lights, its warned columns and its seconds, as
 	// the cues of the party's events show them.
 	marley:      game.Marley_State,
+	// The dinosaur the player rides, as the cues show it.
+	ride:        game.Ride_State,
 	gold:        i32,
 	pulse_count: u64,
 	valid:       bool,
@@ -302,6 +331,7 @@ capture_room_presentation :: proc(room: ^game.Room) -> (result: Room_Presentatio
 			detonation_pulse = object.detonation_pulse,
 			fuse_pulses = object.fuse_pulses,
 			device_armed = object.device_armed,
+			facing = object.facing, laser = object.laser, life = object.life, max_life = object.life, radius = object.radius,
 			position = presentation_position(object.position),
 			health = object.health,
 			max_health = object.max_health,
@@ -312,6 +342,7 @@ capture_room_presentation :: proc(room: ^game.Room) -> (result: Room_Presentatio
 
 	result.dropped += capture_presentation_ground(room, &result.ground)
 	result.marley = room.marley
+	result.ride = room.ride
 	result.loot_count = min(len(room.loot), MAX_PRESENTATION_LOOT)
 	result.dropped += max(0, len(room.loot)-result.loot_count)
 	for index in 0..<result.loot_count {
@@ -586,6 +617,24 @@ presentation_cue_kind :: proc(event: game.Game_Event) -> Presentation_Cue_Kind {
 		return .Flood_Swept
 	case .Fire_Extinguished:
 		return .Fire_Extinguished
+	case .Cannon_Fired:
+		return .Cannon_Fired
+	case .Cannon_Broken:
+		return .Cannon_Broken
+	case .Black_Hole_Tick:
+		return .Black_Hole_Tick
+	case .Black_Hole_Swallowed:
+		return .Black_Hole_Swallowed
+	case .Black_Hole_Closed:
+		return .Black_Hole_Closed
+	case .Ride_Begun:
+		return .Ride_Begun
+	case .Ride_Ended:
+		return .Ride_Ended
+	case .Dino_Stomp:
+		return .Dino_Stomp
+	case .Bleed_Bite:
+		return .Bleed_Bite
 	}
 	unreachable()
 }
@@ -688,6 +737,20 @@ presentation_cue_duration :: proc(kind: Presentation_Cue_Kind, event: game.Game_
 		return PRESENTATION_NOTICE_DURATION
 	case .Flood_Swept:
 		return PRESENTATION_FLOOD_DURATION
+	case .Cannon_Fired:
+		return PRESENTATION_CANNON_FIRE_DURATION
+	case .Cannon_Broken:
+		return PRESENTATION_CANNON_BREAK_DURATION
+	case .Black_Hole_Swallowed:
+		return PRESENTATION_HOLE_SWALLOW_DURATION
+	case .Black_Hole_Closed:
+		return PRESENTATION_HOLE_CLOSE_DURATION
+	case .Ride_Begun, .Ride_Ended:
+		return PRESENTATION_RIDE_DURATION
+	case .Dino_Stomp:
+		return PRESENTATION_STOMP_DURATION
+	case .Black_Hole_Tick, .Bleed_Bite:
+		return PRESENTATION_NOTICE_DURATION
 	}
 	unreachable()
 }
@@ -788,6 +851,7 @@ presentation_cue_can_group :: proc(kind: Presentation_Cue_Kind) -> bool {
 	return kind == .Damage || kind == .Damage_Absorbed || kind == .Status_Removed ||
 	       kind == .Defeat || kind == .Loot_Dropped || kind == .Explosive_Armed ||
 	       kind == .Move || kind == .Marley_Bomb || kind == .Flood_Swept || kind == .Fire_Extinguished || kind == .Status_Applied ||
+	       kind == .Black_Hole_Swallowed ||
 	       kind == .Trap_Triggered || kind == .Hazard_Triggered
 }
 
@@ -1275,6 +1339,22 @@ start_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^Presentat
 				if fire.kind == .Fire && fire.position == presentation_position(event.from_position) { fire.visible, fire.opacity = false, 0 }
 			}
 		}
+	// CANNONE: a cannon of the board fires (its beats left count down).
+	case .Cannon_Fired:
+		if event.object_kind != .Cannon { timeline.update_failures += 1 }
+		if emplacement, found := presentation_grid_object(timeline, event.source); found { emplacement.life = max(i32(0), emplacement.life-1) } else { timeline.update_failures += 1 }
+	case .Cannon_Broken, .Black_Hole_Closed:
+		if _, found := presentation_grid_object(timeline, event.target); !found { timeline.update_failures += 1 }
+	// BUCO NERO: the hole's beat; the foe it will swallow starts to spin.
+	case .Black_Hole_Tick:
+		if emplacement, found := presentation_grid_object(timeline, event.target); found { emplacement.life = event.amount } else { timeline.update_failures += 1 }
+	case .Black_Hole_Swallowed:
+		if !has_actor { timeline.update_failures += 1 }
+	// DINOSAURO: the ride as the cues show it.
+	case .Ride_Begun, .Ride_Ended:
+		if event.source != game.PLAYER_ENTITY || event.card_definition != .Dinosaur { timeline.update_failures += 1 }
+		if timeline.final_view.valid { timeline.view.ride = timeline.final_view.ride }
+	case .Dino_Stomp, .Bleed_Bite:
 	case .Attack_Missed, .Move_Blocked, .Attack_Deflected,
 	     .Binding_Added, .Binding_Exhausted, .Binding_Expired, .Shadow_Entered, .Shadow_Emerged:
 	// The player's own card, behind his eyes.
@@ -1333,13 +1413,31 @@ update_active_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^P
 	     .Shadow_Entered, .Shadow_Emerged, .Attack_Deflected, .Fate_Rolled, .Lasso_Caught, .Lasso_Struck, .Lasso_Released,
 	     .Fish_Cast, .Fish_Bite, .Fish_Caught, .Pinball_Made, .Pinball_Launched, .Pinball_Bounced, .Pinball_Bumped, .Pinball_Burst,
 	     .First_Person_Begun, .Marley_Begun, .Marley_Lights, .Marley_Warned, .Marley_Bomb, .Marley_Saved, .Marley_Bonus,
-	     .Marley_Ended, .Flood_Swept, .Fire_Extinguished:
+	     .Marley_Ended, .Flood_Swept, .Fire_Extinguished, .Cannon_Fired, .Cannon_Broken, .Black_Hole_Tick, .Black_Hole_Closed,
+	     .Ride_Begun, .Ride_Ended, .Dino_Stomp, .Bleed_Bite:
+	// A foe swallowed by the hole spins down it toward the hole's centre.
+	case .Black_Hole_Swallowed:
+		if has_actor {
+			centre := presentation_position(cue.event.to_position)
+			start := presentation_position(cue.event.from_position)
+			linear := presentation_cue_progress(cue)
+			turn := linear*linear*10
+			radius := 1-linear
+			dx, dy := start.x-centre.x, start.y-centre.y
+			actor.position = {centre.x+(dx*math.cos(turn)-dy*math.sin(turn))*radius, centre.y+(dx*math.sin(turn)+dy*math.cos(turn))*radius}
+			actor.opacity = 1-linear*0.85
+		}
 	}
 }
 
 @(private = "file")
 finish_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^Presentation_Cue) {
 	assert(timeline != nil && cue != nil && cue.started)
+	// A cannon that fell apart, a hole that closed: gone with the cue.
+	if cue.kind == .Cannon_Broken || cue.kind == .Black_Hole_Closed {
+		if emplacement, found := presentation_grid_object(timeline, cue.event.target); found { emplacement.visible, emplacement.opacity = false, 0 }
+		return
+	}
 	if cue.kind != .Defeat {
 		return
 	}

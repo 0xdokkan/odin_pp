@@ -140,7 +140,7 @@ tick_status_kind :: proc(room: ^Room, entity: Entity_Ref, kind: Status_Kind, pul
 		return
 	}
 	switch kind {
-	case .Poison, .Slow, .Deflect, .Arrows, .Fate, .Venom_Blade:
+	case .Poison, .Slow, .Deflect, .Arrows, .Fate, .Venom_Blade, .Bleed:
 		// Worn by their bearer's actions (a charge: by its use), never by the clock.
 		return
 	case .Burn:

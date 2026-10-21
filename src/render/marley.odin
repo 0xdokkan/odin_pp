@@ -110,13 +110,13 @@ marley_light_color :: proc(index: int, t: f64) -> rl.Color {
 	return lights[(index+int(t*0.9))%len(lights)]
 }
 
-@(private = "file")
+@(private)
 marley_alpha :: proc(color: rl.Color, alpha: f32) -> rl.Color {
 	return {color.r, color.g, color.b, u8(clamp(alpha, f32(0), f32(1))*255)}
 }
 
 // A soft round spot on the floor: `alpha` at its middle, nothing at its edge.
-@(private = "file")
+@(private)
 marley_glow :: proc(cx, y, cz, radius: f32, color: rl.Color, alpha: f32) {
 	segments :: 20
 	rlgl.Begin(rlgl.TRIANGLES)
@@ -133,7 +133,7 @@ marley_glow :: proc(cx, y, cz, radius: f32, color: rl.Color, alpha: f32) {
 }
 
 // A flat square on the floor.
-@(private = "file")
+@(private)
 marley_square :: proc(cx, y, cz, half: f32, color: rl.Color) {
 	rlgl.Begin(rlgl.QUADS)
 	rlgl.Color4ub(color.r, color.g, color.b, color.a)
@@ -145,7 +145,7 @@ marley_square :: proc(cx, y, cz, half: f32, color: rl.Color) {
 }
 
 // The outline of a cell, `inset` in from its edge, `width` thick.
-@(private = "file")
+@(private)
 marley_frame :: proc(cx, y, cz, half, width: f32, color: rl.Color) {
 	marley_square_rect(cx-half, cz-half, cx+half, cz-half+width, y, color)
 	marley_square_rect(cx-half, cz+half-width, cx+half, cz+half, y, color)
@@ -153,7 +153,7 @@ marley_frame :: proc(cx, y, cz, half, width: f32, color: rl.Color) {
 	marley_square_rect(cx+half-width, cz-half+width, cx+half, cz+half-width, y, color)
 }
 
-@(private = "file")
+@(private)
 marley_square_rect :: proc(x0, z0, x1, z1, y: f32, color: rl.Color) {
 	rlgl.Begin(rlgl.QUADS)
 	rlgl.Color4ub(color.r, color.g, color.b, color.a)
@@ -165,12 +165,12 @@ marley_square_rect :: proc(x0, z0, x1, z1, y: f32, color: rl.Color) {
 }
 
 // The height a cell's overlay lies at: on the floor, or over the fog's blocks.
-@(private = "file")
+@(private)
 marley_floor_height :: proc(renderer: ^Renderer, cell: grid.Position) -> f32 {
 	return 0.031 if tactical_render_visible(renderer, cell) else 0.56
 }
 
-@(private = "file")
+@(private)
 marley_cell_drawn :: proc(renderer: ^Renderer, room: ^game.Room, cell: grid.Position) -> bool {
 	return grid.contains(&room.level_data.tiles, cell) && tactical_cell_on_screen(renderer, cell) && !game.cell_blocks_movement(room, cell)
 }
@@ -280,7 +280,7 @@ marley_shown_lit :: proc(party: ^game.Marley_State, cell: grid.Position) -> bool
 
 // A ribbon from `from` down to `to`, wider and fainter at the bottom, turned
 // to the camera.
-@(private = "file")
+@(private)
 marley_beam :: proc(eye, from, to: rl.Vector3, w0, w1: f32, color: rl.Color, a0, a1: f32) {
 	dir := to-from
 	mid := (from+to)*0.5
@@ -401,7 +401,7 @@ marley_bomb_at :: proc(origin: rl.Vector3, column, board_height: f32, p: f32) ->
 
 // A paper print stood on the board: always facing the camera, spun by
 // `rotation` degrees.
-@(private = "file")
+@(private)
 marley_draw_print :: proc(renderer: ^Renderer, texture: rl.Texture2D, at: rl.Vector3, height, rotation: f32, tint: rl.Color) {
 	if texture.id == 0 { return }
 	ratio := f32(texture.width)/f32(texture.height)
@@ -601,7 +601,7 @@ marley_figure_pixels :: proc() -> (pixels: [MARLEY_FIGURE_W*MARLEY_FIGURE_H]rl.C
 // A print: `pixels` (w by h, transparent where nothing is) cut from paper as
 // the board's props are: an ink line, `paper` rings of white paper, an ink
 // cut, the cut edge down and right, with `margin` texels of room round it.
-@(private = "file")
+@(private)
 marley_paper_texture :: proc(pixels: []rl.Color, w, h, margin, paper: int) -> rl.Texture2D {
 	if !rl.IsWindowReady() { return {} }
 	tw, th := w+2*margin, h+2*margin
@@ -683,7 +683,7 @@ marley_bomb_texture :: proc() -> rl.Texture2D {
 }
 
 // A puff of smoke: a pale round blot with a grey lower edge.
-@(private = "file")
+@(private)
 marley_puff_texture :: proc() -> rl.Texture2D {
 	pixels: [MARLEY_PUFF_SIZE*MARLEY_PUFF_SIZE]rl.Color
 	for y in 0..<MARLEY_PUFF_SIZE {

@@ -233,6 +233,12 @@ Room :: struct {
 	marley: Marley_State,
 	marley_random: u64,
 	marley_demo: Marley_Demo,
+	// DINOSAURO: the dinosaur the player rides (dinosaur.odin).
+	ride: Ride_State,
+	// The way the player aimed the card he plays (the mouse wheel's, for a
+	// cannon): the controller sets it before the play, the play clears it.
+	aim: Move_Direction,
+	has_aim: bool,
 	// FIRST PERSON SHOOTER: the seconds behind the player's eyes and his AK's
 	// shots (first_person.odin); a new room starts them afresh.
 	first_person: First_Person_State,
@@ -881,7 +887,9 @@ try_move_player :: proc(room: ^Room, direction: Move_Direction) -> Action_Result
 		return .Moved
 	}
 
-	outcome := finish_player_combat_command(room, TACTICAL_MOVE_SECONDS)
+	// The Giganotosauro's step stomps the foes round where he lands.
+	ride_stomp(room)
+	outcome := finish_player_combat_command(room, player_move_seconds(room))
 	switch outcome {
 	case .Player_Defeated:
 		return .Player_Defeated

@@ -77,6 +77,8 @@ Tactical_View :: struct {
 	pinball: Pinball_View,
 	// BOMB MARLEY: the ball, the beams, the bomb and the figure (marley.odin).
 	marley: Marley_View,
+	// CANNONE, BUCO NERO and DINOSAURO: the prints, the climb and the walk (arsenal.odin).
+	arsenal: Arsenal_View,
 	// INONDAZIONE: the way of its wave while the card is held over the board.
 	flood_aim: Flood_Aim,
 	// FIRST PERSON SHOOTER: the camera in the player's eyes, the AK and its
@@ -165,6 +167,7 @@ destroy_tactical_assets :: proc(renderer: ^Renderer) {
 	destroy_fishing_view(renderer)
 	destroy_pinball_view(renderer)
 	destroy_marley_view(renderer)
+	destroy_arsenal_view(renderer)
 	destroy_first_person_view(renderer)
 	if renderer.tactical.outline_shader.id != 0 { rl.UnloadShader(renderer.tactical.outline_shader); renderer.tactical.outline_shader = {} }
 	if renderer.tactical.labels != nil { free(renderer.tactical.labels); renderer.tactical.labels = nil }
@@ -223,6 +226,7 @@ update_tactical_view :: proc(renderer: ^Renderer, room: ^game.Room, mouse: view.
 	update_tactical_lasso(renderer, room)
 	update_tactical_pinball(renderer, room)
 	update_tactical_marley(renderer, room)
+	update_tactical_arsenal(renderer, room)
 	update_tactical_fishing(renderer)
 	update_tactical_first_person(renderer, room)
 	v.no_fog = room.player.tactical.config.vision_size == 0 || tactical_room_is_clear(v.snapshot.phase)
@@ -540,6 +544,7 @@ draw_tactical_world :: proc(renderer: ^Renderer, room: ^game.Room, active_card: 
 	draw_voxel_threats(renderer, room)
 	draw_intent_ground(renderer, room)
 	draw_marley_floor(renderer, room)
+	draw_arsenal_floor(renderer, room)
 	draw_m8_device_network(renderer, room)
 	rl.EndMode3D()
 
@@ -561,6 +566,7 @@ draw_tactical_world :: proc(renderer: ^Renderer, room: ^game.Room, active_card: 
 	draw_tactical_billboards(renderer, room, lights)
 	draw_marley_sky(renderer, room)
 	draw_flood_wave(renderer, room)
+	draw_arsenal_sky(renderer, room)
 	draw_tactical_feedback(renderer, .Accent)
 	rl.EndMode3D()
 

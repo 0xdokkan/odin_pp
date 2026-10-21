@@ -219,7 +219,8 @@ poll_gameplay_command :: proc(
 			   renderer.has_hovered_cell {
 				if hand_index, found := game.hand_card_index_by_id(input_deck, dragged_card_id); found {
 					card := input_deck.hand[hand_index]
-					return targeted_card_command(room, card, flood_anchor(room, card, renderer.hovered_cell, card_interaction^))
+					return targeted_card_command(room, card, flood_anchor(room, card, renderer.hovered_cell, card_interaction^),
+						card_interaction.flood_way, card_interaction.flood_way_set)
 				}
 			}
 		}
@@ -273,7 +274,8 @@ poll_gameplay_command :: proc(
 			card_interaction.selected_card_id,
 		); found {
 			card := input_deck.hand[hand_index]
-			return targeted_card_command(room, card, flood_anchor(room, card, renderer.hovered_cell, card_interaction^))
+			return targeted_card_command(room, card, flood_anchor(room, card, renderer.hovered_cell, card_interaction^),
+				card_interaction.flood_way, card_interaction.flood_way_set)
 		}
 		return
 	}
@@ -411,6 +413,8 @@ execute_gameplay_command :: proc(room: ^game.Room, command: Gameplay_Command) ->
 		if game.tactical_card_claims_beat(room, command.card_id) {
 			room.player.tactical.critical_next = game.tactical_claim_beat(room, command.beat)
 		}
+		// A cannon's way, as the wheel turned it (play_card clears it).
+		room.aim, room.has_aim = command.aim_way, command.has_aim_way
 		play := game.play_card(room, command.card_id, command.target)
 		room.player.tactical.critical_next = false
 		execution.committed = game.card_play_was_committed(play.result)

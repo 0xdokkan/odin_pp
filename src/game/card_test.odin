@@ -157,7 +157,8 @@ test_card_economy_metadata_is_valid_and_covers_every_rarity :: proc(t: ^testing.
 			testing.expect_value(t, definition.reward_weight, u32(0))
 			testing.expect_value(t, definition.shop_base_price, i32(0))
 		} else {
-			testing.expect(t, definition.reward_weight > 0)
+			// The Cannone laser is what the Cannone becomes: never offered.
+			testing.expect(t, definition.reward_weight > 0 || definition.evolution_only)
 			testing.expect(t, definition.shop_base_price > 0)
 		}
 		rarity_counts[int(definition.rarity)] += 1

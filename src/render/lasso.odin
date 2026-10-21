@@ -359,6 +359,8 @@ lasso_face_pivot :: proc(renderer: ^Renderer, l: ^Lasso_View, now: f64) {
 @(private)
 tactical_lasso_lift :: proc(renderer: ^Renderer, entity: game.Entity_Ref) -> f32 {
 	if renderer == nil { return 0 }
+	// DINOSAURO: the player's card sits up on the saddle (arsenal.odin).
+	if entity == game.PLAYER_ENTITY { return tactical_ride_lift(renderer) }
 	l := &renderer.tactical.lasso
 	if entity.kind != .Enemy || entity != l.enemy || !(l.active || l.ending) { return 0 }
 	return max(f32(0), l.lift)

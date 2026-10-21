@@ -281,6 +281,7 @@ lab_status_sfx :: proc(status: game.Status_Kind) -> (sfx: audio.Lab_Sfx, ok: boo
 	case .Arrows: return .Ui_Status_Arrows, true
 	case .Fate: return .Ui_Status_Fate, true
 	case .Venom_Blade: return .Ui_Status_Venom_Blade, true
+	case .Bleed: return .Ui_Status_Venom_Blade, true
 	case .Survey:
 	}
 	return

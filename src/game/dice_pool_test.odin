@@ -116,10 +116,15 @@ test_dice_cards_climb_the_ladder_from_d4_to_d20 :: proc(t: ^testing.T) {
 		if id == .First_Person { top = FIRST_PERSON_MAX_UPGRADE_LEVEL }
 		if id == .Bomb_Marley { top = MARLEY_MAX_UPGRADE_LEVEL }
 		if id == .Flood { top = FLOOD_MAX_UPGRADE_LEVEL }
+		if id == .Cannon { top = CANNON_MAX_UPGRADE_LEVEL }
+		if id == .Laser_Cannon { top = LASER_MAX_UPGRADE_LEVEL }
+		if id == .Black_Hole { top = BLACK_HOLE_MAX_UPGRADE_LEVEL }
 		testing.expect_value(t, card_max_upgrade_level(id), top)
 		for level in i32(-1)..=MAX_CARD_UPGRADE_LEVEL {
 			expected := i32(0)
 			if dice && level >= 0 && level <= MAX_DICE_UPGRADE_LEVEL { expected = ladder[level] }
+			// The Dinosauro rolls a d4 at every level.
+			if id == .Dinosaur && level >= 0 && level <= MAX_DICE_UPGRADE_LEVEL { expected = 4 }
 			testing.expect_value(t, card_die_sides(id, level), expected)
 		}
 	}

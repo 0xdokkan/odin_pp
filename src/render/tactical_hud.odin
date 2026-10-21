@@ -43,6 +43,8 @@ tactical_status_label :: proc(kind: game.Status_Kind, short: bool) -> (label: st
 	case .Arrows: label, accent = "FRECCE", HUD_AMBER
 	case .Fate: label, accent = "DESTINO", HUD_SHADE
 	case .Venom_Blade: label, accent = "LAMA", HUD_VENOM
+	// SANGUINAMENTO (game/dinosaur.odin): a foe's stacks.
+	case .Bleed: label, accent = "SANGUE", GOTHIC_RED
 	}
 	if short && len(label) > 3 { label = label[:3] }
 	return
@@ -125,7 +127,8 @@ tactical_status_chip_layout :: proc(renderer: ^Renderer, room: ^game.Room) -> (c
 	ordered := tactical_status_chip_order(&v.statuses)
 	_, ball := pinball_chip(room, false)
 	_, party := marley_chip(renderer, false)
-	count := ordered.count+(1 if ball else 0)+(1 if party else 0)
+	_, ride := ride_chip(renderer, false)
+	count := ordered.count+(1 if ball else 0)+(1 if party else 0)+(1 if ride else 0)
 	if count == 0 { return }
 	// The ball's place among the chips: after VELENO and BRUCIATURA.
 	bites := 0
@@ -142,13 +145,16 @@ tactical_status_chip_layout :: proc(renderer: ^Renderer, room: ^game.Room) -> (c
 	needed: f32
 	even := true
 	for index in 0..<chips.shown {
-		extras := (1 if ball else 0)+(1 if party else 0)
+		extras := (1 if ball else 0)+(1 if party else 0)+(1 if ride else 0)
 		if ball && index == bites {
 			chips.accents[index] = PINBALL_STEEL_LIGHT
 			chips.texts[index], _ = pinball_chip(room, short)
 		} else if party && index == bites+(1 if ball else 0) {
 			chips.accents[index] = MARLEY_GOLD
 			chips.texts[index], _ = marley_chip(renderer, short)
+		} else if ride && index == bites+(1 if ball else 0)+(1 if party else 0) {
+			chips.accents[index] = DINO_AURA[int(renderer.tactical.snapshot.ride.kind)]
+			chips.texts[index], _ = ride_chip(renderer, short)
 		} else {
 			status := ordered.items[index if index < bites else index-extras]
 			_, chips.accents[index] = tactical_status_label(status.kind, short)

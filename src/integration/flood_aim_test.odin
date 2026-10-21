@@ -74,7 +74,7 @@ test_flood_wheel_turns_the_waves_way_and_the_drop_follows :: proc(t: ^testing.T)
 	testing.expect(t, ok && way == .West)
 	// The wheel with another card held turns nothing.
 	other: u32
-	for card in player.deck.hand[:player.deck.hand_count] { if card.definition_id == .Deflect { other = card.id } }
+	for card in player.deck.hand[:player.deck.hand_count] { if card.definition_id == .Wildfire { other = card.id } }
 	cards = {dragged_card_id = other}
 	_, _ = poll(&room, renderer, &cards, on_board, {left_down = true, wheel = 1})
 	testing.expect(t, !cards.flood_way_set && !render.flood_aim_active(renderer))

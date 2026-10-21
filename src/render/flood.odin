@@ -189,7 +189,7 @@ flood_aim_active :: proc(renderer: ^Renderer) -> bool {
 	return renderer != nil && renderer.tactical.flood_aim.active
 }
 
-@(private = "file")
+@(private)
 flood_label :: proc(renderer: ^Renderer, text: cstring, at: rl.Vector2, color: rl.Color) {
 	size := c.int(14)
 	width := rl.MeasureText(text, size)

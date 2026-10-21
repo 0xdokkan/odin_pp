@@ -7,16 +7,17 @@ import render "../render"
 
 // PROVA MECCANICHE: a sandbox for trying mechanics one at a time. A large
 // arena with no cover, a deck made only of the cards under test (one of each:
-// Bomb Marley, Inondazione, Pozza di Veleno, Incendio, Deflect, Feretro, Dado
-// del Destino, the Lazzo and the Canna da Pesca, the Pinball and the First
-// Person Shooter; Movimento Ombra and Lama Velenosa left it for the first two)
+// Bomb Marley, Inondazione, Cannone, Incendio, Buco Nero, Dinosauro, Dado del
+// Destino, the Lazzo and the Canna da Pesca, the Pinball and the First Person
+// Shooter; the Cannone laser is what the Cannone becomes at its second upgrade;
+// Pozza di Veleno, Deflect and Feretro left it for the three new cards)
 // and enemies that never stop coming (game/sandbox.odin). F7 clears the arena
 // at once for the rod (mechanics_lab_begin_fishing); F5 brings the fight
 // back. It never touches the profile, gives no rewards and has no exit to
 // walk to.
 MECHANICS_LAB_WIDTH :: 23
 MECHANICS_LAB_HEIGHT :: 17
-MECHANICS_LAB_DECK :: [11]game.Card_Id{.Bomb_Marley, .Flood, .Poison_Pool, .Wildfire, .Deflect, .Coffin, .Fate_Dice, .Lasso,
+MECHANICS_LAB_DECK :: [11]game.Card_Id{.Bomb_Marley, .Flood, .Cannon, .Wildfire, .Black_Hole, .Dinosaur, .Fate_Dice, .Lasso,
 	.Pinball, .First_Person, .Fishing_Rod}
 // The whole deck in hand, every card under test at once (ten: more than the
 // game's hand ever holds, game.deck_hand_limit, so they overlap there,

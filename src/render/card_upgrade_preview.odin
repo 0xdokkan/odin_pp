@@ -48,6 +48,9 @@ card_upgrade_preview :: proc(card: game.Card_Instance) -> cstring {
 		// BOMB MARLEY: the bombs' damage; INONDAZIONE: the push in cells.
 		case .Marley: label = "DANNO"
 		case .Flood: label = "SPINTA"
+		// CANNONE: the ball's damage; BUCO NERO: its damage a beat; DINOSAURO: the ride.
+		case .Place_Cannon, .Open_Black_Hole: label = "DANNO"
+		case .Ride: label = "SECONDI"
 		case .Move, .Remove_Status, .Enter_Shadow:
 		}
 		before := game.card_effect_amount(template, card.upgrade_level)

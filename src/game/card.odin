@@ -72,12 +72,17 @@ Card_Id :: enum {
 	First_Person,
 	Bomb_Marley,
 	Flood,
+	Cannon,
+	// What the Cannone becomes at its second upgrade (never offered).
+	Laser_Cannon,
+	Black_Hole,
+	Dinosaur,
 	Count,
 }
 
 // Static card traits live with the definition; rules, previews and menus query
 // these through the existing predicates instead of maintaining card lists.
-Card_Trait :: enum { Scopa, Room_Tool, Player_Charge, Board_Device, Ground }
+Card_Trait :: enum { Scopa, Room_Tool, Player_Charge, Board_Device, Ground, Emplacement }
 
 @(private = "file")
 card_has_trait :: proc(id: Card_Id, trait: Card_Trait) -> bool {
@@ -91,6 +96,14 @@ card_is_room_tool :: proc(id: Card_Id) -> bool { return card_has_trait(id, .Room
 card_loads_player_charge :: proc(id: Card_Id) -> bool { return card_has_trait(id, .Player_Charge) }
 card_is_board_device :: proc(id: Card_Id) -> bool { return card_has_trait(id, .Board_Device) }
 card_places_ground :: proc(id: Card_Id) -> bool { return card_has_trait(id, .Ground) }
+// A cannon, a laser cannon or a black hole: set down on a free cell for a while (emplacement.odin).
+card_is_emplacement :: proc(id: Card_Id) -> bool { return card_has_trait(id, .Emplacement) }
+// The kind of object an emplacement card sets down.
+card_emplacement_kind :: proc(id: Card_Id) -> Grid_Object_Kind {
+	return .Black_Hole if id == .Black_Hole else .Cannon
+}
+// A card the player aims with the mouse wheel before he plays it.
+card_is_wheel_aimed :: proc(id: Card_Id) -> bool { return id == .Flood || id == .Cannon || id == .Laser_Cannon }
 
 card_dice_count :: proc(id: Card_Id) -> int {
 	return CARD_DEFINITIONS[id].dice_count if id >= .Strike && id < .Count else 0
@@ -171,6 +184,12 @@ Card_Definition :: struct {
 	exhaust_on_play: bool,
 	retain_on_refocus: bool,
 	ethereal:          bool,
+	// A card that becomes another when its upgrade reaches `evolve_level` (the
+	// new card starts at upgrade 0), and the card nobody is offered but an
+	// upgrade makes (evolution_only).
+	evolves_to:        Card_Id,
+	evolve_level:      i32,
+	evolution_only:    bool,
 	targeting:       Targeting_Spec,
 	effects:         [MAX_CARD_DEFINITION_EFFECTS]Card_Effect_Template,
 	effect_count:    int,
@@ -1094,6 +1113,55 @@ CARD_DEFINITIONS := [Card_Id]Card_Definition{
 		effects = {{kind = .Flood, target = .Player, base_amount = FLOOD_BASE_PUSH, amount_per_upgrade = 1}, {}, {}, {}},
 		effect_count = 1,
 	},
+	.Cannon = {
+		upgrade_limit = CANNON_MAX_UPGRADE_LEVEL, time_cost = 2,
+		traits = {.Emplacement},
+		// CANNONE: a cannon on its stand, aimed with the wheel, that fires a ball
+		// every world second for 20 and then falls apart: 2 damage (+1 an upgrade) to
+		// the first foe in its line. At its second upgrade it becomes the Cannone
+		// laser (cannon.odin).
+		evolves_to = .Laser_Cannon, evolve_level = CANNON_EVOLVE_LEVEL,
+		id = .Cannon, name = "Cannone", rarity = .Uncommon,
+		reward_weight = 70, shop_base_price = 6, cost = 2,
+		targeting = {rule = .Walkable_Cell, cast_range = {.Chebyshev, 1, 3}, shape = .Single, requires_line_of_sight = true, stops_on_wall = true},
+		effects = {{kind = .Place_Cannon, target = .Player, base_amount = CANNON_BASE_DAMAGE, amount_per_upgrade = 1, duration = CANNON_SECONDS}, {}, {}, {}},
+		effect_count = 1,
+	},
+	.Laser_Cannon = {
+		upgrade_limit = LASER_MAX_UPGRADE_LEVEL, time_cost = 2,
+		traits = {.Emplacement},
+		// CANNONE LASER: the same stand, a beam in place of the ball: every foe on the
+		// line takes 3 damage (+1 an upgrade).
+		evolution_only = true,
+		id = .Laser_Cannon, name = "Cannone Laser", rarity = .Rare,
+		reward_weight = 0, shop_base_price = 8, cost = 2,
+		targeting = {rule = .Walkable_Cell, cast_range = {.Chebyshev, 1, 3}, shape = .Single, requires_line_of_sight = true, stops_on_wall = true},
+		effects = {{kind = .Place_Cannon, target = .Player, base_amount = LASER_BASE_DAMAGE, amount_per_upgrade = 1, duration = CANNON_SECONDS}, {}, {}, {}},
+		effect_count = 1,
+	},
+	.Black_Hole = {
+		upgrade_limit = BLACK_HOLE_MAX_UPGRADE_LEVEL, time_cost = 2,
+		traits = {.Emplacement},
+		// BUCO NERO: a hole of 3x3 that draws the foes of the 5x5 round it in and
+		// hurts them, 8 world seconds; its upgrades widen both and add damage
+		// (black_hole.odin).
+		id = .Black_Hole, name = "Buco Nero", rarity = .Rare,
+		reward_weight = 60, shop_base_price = 8, cost = 3,
+		targeting = {rule = .Walkable_Cell, cast_range = {.Chebyshev, 1, 3}, shape = .Single, requires_line_of_sight = true, stops_on_wall = true},
+		effects = {{kind = .Open_Black_Hole, target = .Player, base_amount = BLACK_HOLE_BASE_DAMAGE, amount_per_upgrade = 1, duration = BLACK_HOLE_SECONDS}, {}, {}, {}},
+		effect_count = 1,
+	},
+	.Dinosaur = {
+		upgrade_limit = MAX_DICE_UPGRADE_LEVEL, time_cost = 2, dice_count = 1,
+		// DINOSAURO: a d4 names the dinosaur the player rides for 20 world seconds
+		// (+3 an upgrade): Velociraptor, Stegosauro, Dilophosaurus, Giganotosauro
+		// (dinosaur.odin).
+		id = .Dinosaur, name = "Dinosauro", rarity = .Rare,
+		reward_weight = 60, shop_base_price = 8, cost = 3,
+		targeting = {rule = .Self},
+		effects = {{kind = .Ride, target = .Player, base_amount = RIDE_SECONDS, amount_per_upgrade = RIDE_SECONDS_PER_UPGRADE}, {}, {}, {}},
+		effect_count = 1,
+	},
 	.Count = {id = .Count},
 }
 
@@ -1241,6 +1309,12 @@ card_effect_template_is_valid :: proc(
 	case .Marley:
 		return template.target == .Player && definition.targeting.rule == .Self && template.duration > 0 &&
 		       card_amount_template_is_valid(template)
+	// A cell to set an emplacement on; the Dinosauro's ride on the player.
+	case .Place_Cannon, .Open_Black_Hole:
+		return template.target == .Player && definition.targeting.rule == .Walkable_Cell && definition.targeting.shape == .Single &&
+		       template.duration > 0 && card_amount_template_is_valid(template)
+	case .Ride:
+		return template.target == .Player && definition.targeting.rule == .Self && definition.dice_count > 0 && card_amount_template_is_valid(template)
 	// A cell aimed at: the wave's way.
 	case .Flood:
 		return template.target == .Player && definition.targeting.rule == .Cell && definition.targeting.shape == .Single &&
@@ -1259,8 +1333,9 @@ validate_card_definition :: proc(definition: ^Card_Definition) -> bool {
 	   definition.effect_count <= 0 || definition.effect_count > MAX_CARD_DEFINITION_EFFECTS {
 		return false
 	}
-	if (!definition.temporary_only &&
+	if (!definition.temporary_only && !definition.evolution_only &&
 	    (definition.reward_weight == 0 || definition.shop_base_price <= 0)) ||
+	   (definition.evolution_only && (definition.reward_weight != 0 || definition.shop_base_price <= 0 || definition.temporary_only)) ||
 	   (definition.temporary_only &&
 	    (definition.reward_weight != 0 || definition.shop_base_price != 0 || definition.exhaust_on_play)) {
 		return false
@@ -1434,6 +1509,12 @@ instantiate_card_effect :: proc(
 		return marley_effect(card_effect_amount(template, instance.upgrade_level), template.duration), true
 	case .Flood:
 		return flood_effect(card_effect_amount(template, instance.upgrade_level), {}), true
+	case .Place_Cannon:
+		return place_cannon_effect(card_effect_amount(template, instance.upgrade_level), template.duration, instance.definition_id == .Laser_Cannon), true
+	case .Open_Black_Hole:
+		return open_black_hole_effect(card_effect_amount(template, instance.upgrade_level), template.duration, black_hole_radius(instance.upgrade_level)), true
+	case .Ride:
+		return ride_effect(card_effect_amount(template, instance.upgrade_level), .Raptor), true
 	}
 	return {}, false
 }
@@ -1654,6 +1735,11 @@ evaluate_validated_card_targeting :: proc(
 		evaluation.error = .Target_Blocked
 		return
 	}
+	// CANNONE and BUCO NERO: a free cell, and room for one more of the kind.
+	if card_is_emplacement(instance.definition_id) && !emplacement_can_place(room, card_emplacement_kind(instance.definition_id), evaluation.query.anchor) {
+		evaluation.error = .Target_Blocked
+		return
+	}
 	// LAZZO: never a boss's weight, and a ring with room to swing the foe.
 	if instance.definition_id == .Lasso {
 		if refusal := lasso_target_error(room, evaluation.query.primary_target); refusal != .None {
@@ -1839,7 +1925,15 @@ compile_card_action :: proc(
 			continue
 		}
 		effect, instantiated := instantiate_card_effect(template, entry.entity, instance)
-		if effect.kind == .Deploy_Device || effect.kind == .Place_Ground || effect.kind == .Flood { effect.destination = evaluation.query.anchor }
+		if effect.kind == .Deploy_Device || effect.kind == .Place_Ground || effect.kind == .Flood || effect.kind == .Place_Cannon || effect.kind == .Open_Black_Hole {
+				effect.destination = evaluation.query.anchor
+			}
+			// A cannon's way: the wheel's, else the way from the player to its cell.
+			if effect.kind == .Place_Cannon {
+				way, derived := flood_direction(room.player.position, evaluation.query.anchor)
+				if room.has_aim { way, derived = room.aim, true }
+				effect.charges = i32(way) if derived else 0
+			}
 		if instance.definition_id == .Strike && effect.kind == .Damage { effect.amount += tactical_strike_bonus(room, entry.entity) }
 		if !instantiated {
 			return {}, .Too_Many_Effects if template.target == .Each_Affected_Enemy && entry.entity.kind == .Object else .Invalid_Definition

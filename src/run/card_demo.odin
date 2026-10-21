@@ -371,7 +371,7 @@ card_demo_release :: proc(demo: ^Card_Demo, renderer: ^render.Renderer) -> bool 
 	demo.cards.dragged_card_id = 0
 	demo.cards.selected_card_id = dragged
 	if !r.has_hovered_cell || !render.card_drop_area_contains(r, demo.pointer) { return false }
-	command, has_target := targeted_card_command(room, card, r.hovered_cell)
+	command, has_target := targeted_card_command(room, card, r.hovered_cell, demo.scene.aim, demo.scene.has_aim)
 	return has_target && commit_gameplay_command(room, r, &demo.cards, command)
 }
 
@@ -826,7 +826,7 @@ card_demo_draw :: proc(demo: ^Card_Demo, renderer: ^render.Renderer) {
 // with the ground and the AK's hits: the events missing, and whether all is shown.
 card_demo_shown :: proc(demo: ^Card_Demo, renderer: ^render.Renderer) -> (missing: bit_set[game.Game_Event_Kind], ok: bool) {
 	id := demo.card.definition_id
-	expected, hurt := game.card_demo_expected_events(id)
+	expected, hurt := game.card_demo_expected_events(id, demo.card.upgrade_level)
 	missing = expected-renderer.shown_events
 	ok = demo.played && card(missing) == 0 && card_demo_foes_hurt(demo) >= hurt
 	switch game.card_demo_ground_expected(id) {

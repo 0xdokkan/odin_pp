@@ -397,7 +397,7 @@ test_one_rod_a_run_leaves_it_out_of_every_offer :: proc(t: ^testing.T) {
 	testing.expect_value(t, card_offer_weight(definition, &node, nil, card_offer_exclusions(&deck)), u64(0))
 	// Every other card is still offered: the whole tactical pool, but the rod.
 	profile := M8_Profile{ring_wins = 3}
-	all: [int(Card_Id.Count)-4]Card_Id
+	all: [int(Card_Id.Count)-5]Card_Id
 	random := u64(1)
 	testing.expect(t, generate_weighted_card_choices(&random, &node, all[:], &profile, {.Fishing_Rod}))
 	for id in all { testing.expect(t, id != .Fishing_Rod) }

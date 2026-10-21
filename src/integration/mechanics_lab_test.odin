@@ -32,14 +32,14 @@ test_mechanics_lab_is_an_open_endless_arena_with_the_cards_under_test :: proc(t:
 		}
 	}
 	testing.expect(t, len(room.objects) == 0 && len(room.traps) == 0)
-	// The deck: one of each card under test (Bomb Marley, Inondazione, the six
-	// of Phase 2 that stay, the Lazzo, the Canna da Pesca, the Pinball and the
-	// First Person Shooter); all in hand
+	// The deck: one of each card under test (Bomb Marley, Inondazione, Cannone,
+	// Incendio, Buco Nero, Dinosauro, the Dado del Destino, the Lazzo, the Canna
+	// da Pesca, the Pinball and the First Person Shooter); all in hand
 	// (ten: more than the game's hand ever holds, all the room a hand has) but
 	// the rod, which waits in Exhaust for a cleared room.
 	testing.expect_value(t, player.deck.owned_count, len(run_session.MECHANICS_LAB_DECK))
 	testing.expect_value(t, len(run_session.MECHANICS_LAB_DECK)-1, game.MAX_HAND_CAPACITY)
-	for id in ([?]game.Card_Id{.Bomb_Marley, .Flood, .Poison_Pool, .Wildfire, .Deflect, .Coffin, .Fate_Dice, .Lasso, .Fishing_Rod,
+	for id in ([?]game.Card_Id{.Bomb_Marley, .Flood, .Cannon, .Wildfire, .Black_Hole, .Dinosaur, .Fate_Dice, .Lasso, .Fishing_Rod,
 		.Pinball, .First_Person}) {
 		copies := 0
 		for card in player.deck.owned[:player.deck.owned_count] { if card.definition_id == id { copies += 1 } }

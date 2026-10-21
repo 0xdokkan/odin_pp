@@ -141,6 +141,11 @@ tactical_critical_scale :: proc(room: ^Room, action: ^Action) {
 		// The wave pushes one cell more; the party lasts five seconds longer.
 		case .Flood:
 			effect.amount += 1
+		// A cannon and a hole hurt more; the ride lasts longer.
+		case .Place_Cannon, .Open_Black_Hole:
+			effect.amount = critical_damage(effect.amount)
+		case .Ride:
+			effect.amount += RIDE_CRITICAL_SECONDS
 		case .Marley:
 			effect.duration += MARLEY_CRITICAL_SECONDS
 		case .Deploy_Device:
@@ -196,7 +201,8 @@ try_move_player_diagonal :: proc(room: ^Room, offset: grid.Position) -> Action_R
 	append_event_log(room.recent_events, &report.events)
 	collect_loot_in_magnet_range(room)
 	room.player.tactical.facing = .North if offset.y < 0 else .South
-	outcome := finish_player_combat_command(room, TACTICAL_MOVE_SECONDS)
+	ride_stomp(room)
+	outcome := finish_player_combat_command(room, player_move_seconds(room))
 	switch outcome {
 	case .Player_Defeated: return .Player_Defeated
 	case .Combat_Ended: return .Combat_Ended

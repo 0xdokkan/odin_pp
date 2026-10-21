@@ -77,11 +77,12 @@ test_charges_stack_on_the_player_alone :: proc(t: ^testing.T) {
 	// Every kind the player can carry at once: none refused for want of room.
 	clear_statuses(&room.player.statuses)
 	for kind in Status_Kind {
-		if kind == .Slow { continue }
+		// Slow and Sanguinamento are what foes carry.
+		if kind == .Slow || kind == .Bleed { continue }
 		applied, _ := apply_status(&room, PLAYER_ENTITY, kind, 1, 0 if status_kind_stacks(kind) else 1)
 		testing.expectf(t, applied, "%v", kind)
 	}
-	testing.expect_value(t, room.player.statuses.count, len(Status_Kind)-1)
+	testing.expect_value(t, room.player.statuses.count, len(Status_Kind)-2)
 	// A critical play adds a charge, but Destino stays at its three.
 	action := make_action(.Card, PLAYER_ENTITY, entity_target(PLAYER_ENTITY), .Self)
 	_ = add_effect(&action, apply_status_effect(PLAYER_ENTITY, .Fate, FATE_DICE_CHARGES, 0))

@@ -325,6 +325,28 @@ mechanics_lab_card_words :: proc(renderer: ^render.Renderer, player: ^game.Playe
 	return true
 }
 
+// The lab's deck no longer holds Pozza di Veleno, Deflect and Feretro (the
+// Cannone, the Buco Nero and the Dinosauro took their places), but their acts
+// still test them: for the act's time `to` takes the place of `from` (the same
+// instance, wherever it lies), and the act puts it back with the two turned.
+mechanics_lab_borrow :: proc(player: ^game.Player, from, to: game.Card_Id) -> bool {
+	deck := &player.deck
+	swapped := 0
+	swap :: proc(cards: []game.Card_Instance, count: int, from, to: game.Card_Id) -> (done: int) {
+		for &card in cards[:count] {
+			if card.definition_id == from { card.definition_id, card.upgrade_level = to, 0; done += 1 }
+		}
+		return
+	}
+	swapped += swap(deck.owned[:], deck.owned_count, from, to)
+	hand := swap(deck.hand[:], deck.hand_count, from, to)
+	swapped += swap(deck.draw_pile[:], deck.draw_count, from, to)
+	swapped += swap(deck.discard_pile[:], deck.discard_count, from, to)
+	swapped += swap(deck.exhaust_pile[:], deck.exhaust_count, from, to)
+	if swapped == 0 || hand == 0 { fmt.eprintln("mechanics lab: no", from, "to stand for", to); return false }
+	return true
+}
+
 // The id of a `card` in the hand.
 mechanics_lab_hand_card :: proc(player: ^game.Player, card: game.Card_Id) -> (id: u32, ok: bool) {
 	for held in player.deck.hand[:player.deck.hand_count] {
@@ -599,6 +621,9 @@ mechanics_lab_slow :: proc(window: ^app.Window, renderer: ^render.Renderer, room
 mechanics_lab_ground :: proc(window: ^app.Window, renderer: ^render.Renderer, room: ^game.Room, controller: ^run_session.Tactical_Controller,
 	cards: ^run_session.Card_Interaction_State, buffer: ^run_session.Buffered_Gameplay_Command) -> bool {
 	player := room.player
+	// The Pozza di Veleno takes the Dinosauro's place for this act.
+	if !mechanics_lab_borrow(player, .Dinosaur, .Poison_Pool) { return false }
+	defer mechanics_lab_borrow(player, .Poison_Pool, .Dinosaur)
 	foe :: mechanics_lab_enemy
 	stacks :: proc(room: ^game.Room, id: u32, kind: game.Status_Kind) -> i32 {
 		status, found := game.status_for_entity(room, game.enemy_entity(id), kind)
@@ -827,6 +852,12 @@ mechanics_lab_charges :: proc(window: ^app.Window, renderer: ^render.Renderer, d
 	controller: ^run_session.Tactical_Controller, cards: ^run_session.Card_Interaction_State, buffer: ^run_session.Buffered_Gameplay_Command) -> bool {
 	player := room.player
 	center := grid.Position{run_session.MECHANICS_LAB_WIDTH/2, run_session.MECHANICS_LAB_HEIGHT/2}
+	// Deflect and Feretro take the Cannone's and the Buco Nero's places for this act.
+	if !mechanics_lab_borrow(player, .Cannon, .Deflect) || !mechanics_lab_borrow(player, .Black_Hole, .Coffin) { return false }
+	defer {
+		mechanics_lab_borrow(player, .Deflect, .Cannon)
+		mechanics_lab_borrow(player, .Coffin, .Black_Hole)
+	}
 	foe :: mechanics_lab_enemy
 	stacks :: proc(room: ^game.Room, id: u32, kind: game.Status_Kind) -> i32 {
 		status, found := game.status_for_entity(room, game.enemy_entity(id), kind)

@@ -114,6 +114,9 @@ Card_Demo_Scene :: struct {
 	// Fires lit before the take (Bruciatura 1).
 	fires: [CARD_DEMO_MAX_FIRES]grid.Position,
 	fire_count: int,
+	// The way a cannon is turned to (CANNONE: the wheel's), when the scene aims it.
+	aim: Move_Direction,
+	has_aim: bool,
 	// BOMB MARLEY's script: the lights and the first column (marley_demo).
 	marley: bool,
 	marley_lights, marley_next_lights: [3]grid.Position,
@@ -430,6 +433,63 @@ card_demo_scene :: proc(id: Card_Id, upgrade_level: i32 = 0) -> (scene: Card_Dem
 		scene.object_count = 1
 		scene.seconds = 2
 		scene.expects = {.Moved, .Fire_Extinguished}
+	// CANNONE and its laser: set down at his right and turned north, up the
+	// board, at two foes one behind the other (the cell stays high: a drop must
+	// be above the hand): the ball strikes the first, the
+	// beam both.
+	case .Cannon, .Laser_Cannon:
+		scene.target = card_demo_offset(2, -1)
+		scene.aim, scene.has_aim = .North, true
+		scene.foes[0] = {at = card_demo_offset(2, -2), archetype = .Chaser, health = 30, attack = 1}
+		scene.foes[1] = {at = card_demo_offset(2, -3), archetype = .Chaser, health = 30, attack = 1}
+		scene.foe_count = 2
+		scene.seconds = 4
+		scene.foe_hurt = 1 if id == .Cannon else 2
+		scene.expects = {.Damaged}
+	// BUCO NERO: dropped at his right with a weak foe in its middle (it dies
+	// on the second beat, swallowed) and one at the edge of the pull, up and
+	// to the left, drawn in to be hurt.
+	case .Black_Hole:
+		power := BLACK_HOLE_BASE_DAMAGE+upgrade_level
+		radius := int(black_hole_radius(upgrade_level))
+		scene.target = card_demo_offset(2, -1)
+		scene.foes[0] = {at = {scene.target.x+1, scene.target.y}, archetype = .Chaser, health = power*2-1, attack = 1}
+		scene.foes[1] = {at = {scene.target.x-radius-1, scene.target.y}, archetype = .Chaser, health = 40, attack = 1}
+		scene.foe_count = 2
+		scene.seconds = 5
+		scene.foe_hurt = 1
+		scene.expects = {.Moved, .Black_Hole_Swallowed, .Entity_Defeated}
+	// DINOSAURO: the d4 shows a different dinosaur at each level, and a scene
+	// of its own for each: the raptor's quick steps and its bleeding bumps, the
+	// stegosaurus turning an archer's bolt back, the dilophosaurus's venom, the
+	// giganotosaurus's stomps and the bite that kills.
+	case .Dinosaur:
+		face := upgrade_level%4+1
+		scene.faces = {face, 0, 0}
+		switch face {
+		case 1:
+			card_demo_add_foe(&scene, card_demo_offset(0, -3))
+			for step in 0..<4 { card_demo_add_action(&scene, {kind = .Step, after = 0.3+0.5*f32(step), direction = .North}) }
+			scene.expects = {.Status_Applied}
+			scene.foe_hurt = 1
+		case 2:
+			card_demo_add_foe(&scene, card_demo_offset(0, -3), .Archer, free = true)
+			scene.seconds = 4
+			scene.expects = {.Attack_Deflected}
+			scene.foe_hurt = 1
+		case 3:
+			card_demo_add_foe(&scene, card_demo_offset(0, -2))
+			for step in 0..<3 { card_demo_add_action(&scene, {kind = .Step, after = 0.3+0.9*f32(step), direction = .North}) }
+			scene.expects = {.Status_Applied}
+			scene.foe_hurt = 1
+		case:
+			card_demo_add_foe(&scene, card_demo_offset(1, -1))
+			card_demo_add_foe(&scene, card_demo_offset(-1, -1))
+			card_demo_add_foe(&scene, card_demo_offset(0, -3))
+			for step in 0..<3 { card_demo_add_action(&scene, {kind = .Step, after = 0.3+1.0*f32(step), direction = .North}) }
+			scene.expects = {.Dino_Stomp, .Entity_Defeated}
+			scene.foe_hurt = 2
+		}
 	case .Fishing_Rod:
 		scene = {gesture = .Rod_Slot, target = card_demo_offset(2, -2), cleared = true, faces = {3, 0, 0}, seconds = 1, wounds = 6}
 	}
@@ -440,7 +500,7 @@ card_demo_scene :: proc(id: Card_Id, upgrade_level: i32 = 0) -> (scene: Card_Dem
 // of the scene's foes it must hurt: from its definition alone, so that a new
 // card's take is held to it with no word of its own. Every kind of effect is
 // named, so a new one does not compile until it says how its take shows it.
-card_demo_expected_events :: proc(id: Card_Id) -> (events: bit_set[Game_Event_Kind], foes_hurt: int) {
+card_demo_expected_events :: proc(id: Card_Id, upgrade_level: i32 = 0) -> (events: bit_set[Game_Event_Kind], foes_hurt: int) {
 	definition, found := card_definition_by_id(id)
 	if !found { return }
 	// The rod is no card played: its slot casts it (Fish_Cast).
@@ -484,12 +544,15 @@ card_demo_expected_events :: proc(id: Card_Id) -> (events: bit_set[Game_Event_Ki
 		// The party begins under the ball's lights; the wave sweeps the board.
 		case .Marley: events += {.Marley_Begun, .Marley_Lights}
 		case .Flood: events += {.Flood_Swept}
+		case .Place_Cannon: events += {.Object_Spawned, .Cannon_Fired}
+		case .Open_Black_Hole: events += {.Object_Spawned, .Black_Hole_Tick}
+		case .Ride: events += {.Ride_Begun}
 		}
 	}
 	// A dice card shows its roll; the Dado del Destino's die rolls at the bump
 	// it loads (its scene's Fate_Rolled).
 	if card_dice_count(id) > 0 && id != .Fate_Dice { events += {.Dice_Rolled} }
-	scene := card_demo_scene(id)
+	scene := card_demo_scene(id, upgrade_level)
 	events += scene.expects
 	foes_hurt = max(foes_hurt, scene.foe_hurt)
 	return
@@ -502,7 +565,7 @@ card_demo_expected_events :: proc(id: Card_Id) -> (events: bit_set[Game_Event_Ki
 card_demo_status_use :: proc(kind: Status_Kind) -> (events: bit_set[Game_Event_Kind], foe_hurt: bool) {
 	switch kind {
 	// Their chips and the paper tags say it all.
-	case .Poison, .Shield, .Stagger, .Survey, .Burn, .Slow:
+	case .Poison, .Shield, .Stagger, .Survey, .Burn, .Slow, .Bleed:
 	// SPINE: a blow on him answered.
 	case .Thorns: return {.Damaged}, true
 	// SCIA: a step that shields him.

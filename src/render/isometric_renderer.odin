@@ -556,7 +556,8 @@ timeline_card_cue_verb :: proc(cue: ^Presentation_Cue) -> cstring {
 	     .Lasso_Caught, .Lasso_Struck, .Lasso_Released, .Fish_Cast, .Fish_Bite, .Fish_Caught,
 	     .Pinball_Made, .Pinball_Launched, .Pinball_Bounced, .Pinball_Bumped, .Pinball_Burst, .First_Person_Begun,
 	     .Marley_Begun, .Marley_Lights, .Marley_Warned, .Marley_Bomb, .Marley_Saved, .Marley_Bonus, .Marley_Ended,
-	     .Flood_Swept, .Fire_Extinguished:
+	     .Flood_Swept, .Fire_Extinguished, .Cannon_Fired, .Cannon_Broken, .Black_Hole_Tick, .Black_Hole_Swallowed, .Black_Hole_Closed,
+	     .Ride_Begun, .Ride_Ended, .Dino_Stomp, .Bleed_Bite:
 	}
 	return nil
 }
@@ -681,7 +682,9 @@ draw_presentation_cue :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) {
 	   cue.kind == .Shadow_Entered || cue.kind == .Shadow_Emerged || cue.kind == .Lasso_Released ||
 	   cue.kind == .Pinball_Launched || cue.kind == .Pinball_Bounced || cue.kind == .First_Person_Begun ||
 	   cue.kind == .Marley_Lights || cue.kind == .Marley_Warned || cue.kind == .Marley_Bomb || cue.kind == .Marley_Ended ||
-	   cue.kind == .Flood_Swept || cue.kind == .Fire_Extinguished {
+	   cue.kind == .Flood_Swept || cue.kind == .Fire_Extinguished ||
+	   cue.kind == .Cannon_Fired || cue.kind == .Cannon_Broken || cue.kind == .Black_Hole_Tick || cue.kind == .Black_Hole_Swallowed ||
+	   cue.kind == .Black_Hole_Closed || cue.kind == .Dino_Stomp {
 		return
 	}
 	center, has_center := presentation_event_center(renderer, cue.event)
@@ -802,7 +805,18 @@ draw_presentation_cue :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) {
 	case .Marley_Bonus:
 		label = fmt.ctprintf("+%ds", cue.event.amount)
 		color = rl.Color{240, 196, 64, 255}
-	case .Marley_Lights, .Marley_Warned, .Marley_Bomb, .Marley_Ended, .Flood_Swept, .Fire_Extinguished:
+	// DINOSAURO: which one the die gave; SANGUINAMENTO's extra bite.
+	case .Ride_Begun:
+		label = fmt.ctprintf("%s %ds", game.dino_name(game.Dino_Kind(cue.event.duration)), cue.event.amount)
+		color = rl.Color{124, 206, 96, 255}
+	case .Ride_Ended:
+		label = "SMONTA"
+		color = rl.Color{169, 183, 177, 255}
+	case .Bleed_Bite:
+		label = fmt.ctprintf("SANGUE +%d", cue.event.amount)
+		color = rl.Color{255, 82, 82, 255}
+	case .Marley_Lights, .Marley_Warned, .Marley_Bomb, .Marley_Ended, .Flood_Swept, .Fire_Extinguished,
+	     .Cannon_Fired, .Cannon_Broken, .Black_Hole_Tick, .Black_Hole_Swallowed, .Black_Hole_Closed, .Dino_Stomp:
 		unreachable()
 	case .Move, .Card_Played, .Card_Drawn, .Card_Moved, .Card_Created, .Refocus,
 	     .Card_Refocused, .Defeat,
