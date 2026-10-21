@@ -936,3 +936,86 @@ groove reggae a 60 BPM (un battito `a`, uno `b`).
 la prima colonna fissate: due nemici in una colonna, uno in una luce e uno no. La
 bomba salva il primo, ferisce il secondo e il film finisce pochi secondi dopo,
 molto prima dei 35 secondi della festa.
+
+
+### Cannone e Cannone Laser
+
+`Cannone` (non comune, energia 2, **2 s** di finestra, fino a 2 potenziamenti) e
+`Cannone Laser` (rara, energia 2, 2 s, fino a 3) mettono sulla mappa una
+torretta d'acciaio su un piedistallo: si trascina la carta su una casella libera
+entro 3 celle e, **con la carta in mano, la rotella del mouse gira la canna** di
+un quarto di giro a scatto (come l'onda dell'Inondazione: la camera non zooma
+e la mappa mostra la freccia della linea di tiro, fino al primo nemico o al
+muro). Senza rotella la direzione è quella dal Viandante alla casella.
+
+- **Cannone.** Ogni secondo del mondo, per **20 s**, spara una palla dritta
+  davanti a sé: il primo nemico sulla linea prende 2 danni (+1 per upgrade);
+  muri, coperture e oggetti che bloccano il passo fermano la palla, e un
+  barile sulla linea la prende e salta. Al termine si sbriciola.
+- **Evoluzione.** Il **secondo upgrade** non aumenta il danno: la carta
+  *diventa* Cannone Laser (stesso posto nel mazzo, livello 0). Il Cannone Laser
+  è `evolution_only`: peso di offerta 0, mai in premi, negozio o armeria.
+- **Cannone Laser.** Un raggio rosso ogni secondo colpisce **tutti** i nemici
+  della linea fino al muro (3 danni, +1 per upgrade, fino a 3 upgrade).
+- Il cannone è solido (blocca il passo come una bobina Tesla), nessuno lo prende
+  di mira, e al massimo due cannoni stanno insieme sulla mappa. Un colpo a tempo
+  fa il danno x1,5.
+- Sopra il cannone c'è `CANNONE 14s`; il suo lampo, il fumo di carta, la palla
+  di cartoncino che vola (con la sua ombra) e il raggio additivo sono in
+  `render/arsenal.odin`; le regole in `game/cannon.odin`.
+
+### Buco Nero
+
+`Buco Nero` (rara, energia 3, **2 s**, fino a 4 potenziamenti) apre un buco su
+una casella libera entro 3 celle per **8 battiti** del mondo. Ogni battito:
+
+- chi sta nell'**area di danno** (3x3, raggio 1 + upgrade/2: 5x5 a +2, 7x7 a +4)
+  prende 4 danni (+1 per upgrade), boss e miniboss compresi;
+- chi sta nell'**area di tiro** (una casella più larga: 5x5 di base) ma fuori
+  dall'area di danno è tirato di **una casella** verso il centro con le normali
+  regole di movimento (un muro, un corpo o un oggetto lo fermano; pozze, trappole
+  e fuochi agiscono sulla casella in cui entra); **boss e miniboss non vengono
+  tirati**;
+- un nemico che muore per il danno del buco viene **inghiottito**: il tavolo lo
+  mostra mentre gira a spirale verso il centro prima di cadere.
+
+Il buco non blocca il passo. L'anteprima della carta mostra le due aree; sul
+tavolo il buco è un disco nero con spirali viola e arancio, una sfera scura
+sospesa, aree evidenziate e un anello che a ogni battito scorre verso il centro;
+sopra c'è `BUCO NERO 5s`. Regole in `game/black_hole.odin`.
+
+### Dinosauro e Sanguinamento
+
+`Dinosauro` (rara, energia 3, **2 s**, fino a 5 potenziamenti) tira **un d4**
+(sempre un d4, a ogni livello) e il lato sceglie il dinosauro che il Viandante
+cavalca per **20 s** (+3 s per upgrade, +3 s sul colpo a tempo). Si cavalca un
+dinosauro alla volta: la carta non si gioca finché dura la cavalcata, e finisce
+con la stanza.
+
+| d4 | Dinosauro | Effetto |
+|---|---|---|
+| 1 | Velociraptor | un passo costa 0,4 s invece di 0,8 s; il colpo d'urto mette 1 Sanguinamento |
+| 2 | Stegosauro | ogni colpo di un nemico sul Viandante gli viene restituito senza spendere cariche e senza richiesta di difesa |
+| 3 | Dilophosaurus | 1 Veleno su ogni nemico che il Viandante ferisce e su ogni nemico che lo ferisce |
+| 4 | Giganotosauro | dopo ogni passo i nemici sulle 4 caselle intorno prendono 6 danni; il suo urto uccide all'istante Chaser, Archer e Bomber, e fa 12 danni a Brute, Custode e Demolitore |
+
+**Sanguinamento.** Nuovo status dei nemici (il Viandante non lo porta): un
+nemico con N stack prende **+N danni** da qualsiasi danno di qualsiasi fonte,
+una sola volta (senza ricorsione), prima dello scudo. Gli stack non calano mai.
+`Bleed` ha il suo suono (`ui_status_bleed`) e un morso `SANGUE +N` sul tavolo.
+
+Il dinosauro è una pixel art di cartoncino (quattro bestie originali, due
+fotogrammi di camminata) sotto la carta del Viandante, che sta sulla sua sella;
+cammina a tempo con il Viandante e si gira dove va. L'HUD mostra `RAPTOR 14s`
+fra i chip. Regole in `game/dinosaur.odin`, disegno in `render/arsenal.odin` e
+`render/dino_art.odin`.
+
+**Prova meccaniche e Mostra effetto.** Nella Prova meccaniche il mazzo ha
+Cannone, Buco Nero e Dinosauro (Pozza di Veleno, Deflect e Feretro non ci sono
+più: i loro atti nello smoke li riprendono in prestito per un momento). Gli atti
+di `--smoke-mechanics-lab` verificano la palla sul primo di due nemici, il
+raggio su entrambi, la caduta del cannone, il nemico inghiottito, quello tirato
+dentro, il boss che resta, la chiusura e i quattro dinosauri con i loro effetti.
+I film di Mostra effetto mostrano a ogni livello la scena giusta: il Cannone
+colpisce il primo nemico e il Laser entrambi, il Buco Nero inghiotte e tira, il
+Dinosauro mostra un dinosauro diverso a ogni livello (livello mod 4 + 1).

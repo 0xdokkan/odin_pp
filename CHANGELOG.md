@@ -5,6 +5,33 @@ I riferimenti a Classica, `--flat` e ai vecchi smoke descrivono versioni precede
 per i comandi disponibili oggi valgono il [README](README.md) e la documentazione collegata.
 
 
+## 2026-10-21 — Cannone, Buco Nero, Dinosauro e Sanguinamento
+
+- **Cannone** (non comune, energia 2, 2 s, fino a +2): una torretta su una casella
+  libera, girata con la rotella, spara ogni secondo del mondo per 20 s una palla
+  da 2 danni (+1) al primo nemico della linea e poi si sbriciola. Al secondo
+  upgrade **diventa Cannone Laser** (rara, mai offerta): un raggio da 3 danni
+  (+1, fino a 3 upgrade) a tutti i nemici della linea. Massimo due cannoni.
+- **Buco Nero** (rara, energia 3, 2 s, fino a +4): un buco per 8 s del mondo; il
+  3x3 prende 4 danni a battito (+1 per upgrade; l'area cresce con gli upgrade),
+  il 5x5 intorno viene tirato di una casella verso il centro, boss e miniboss
+  esclusi; chi muore viene inghiottito con una spirale.
+- **Dinosauro** (rara, energia 3, 2 s, fino a +5): un d4 sceglie per 20 s (+3 per
+  upgrade) Velociraptor (passi da 0,4 s, urto che sanguina), Stegosauro (ogni
+  colpo ricevuto torna indietro senza cariche), Dilophosaurus (1 Veleno a chi
+  ferisce o è ferito) o Giganotosauro (passi che schiacciano le 4 caselle intorno
+  per 6, urto che uccide Chaser, Archer e Bomber all'istante).
+- **Sanguinamento**: nuovo status dei nemici, +N danni da ogni fonte, una volta,
+  gli stack non calano.
+- Catalogo a 50 carte (il Cannone Laser non si offre). Icone, 25 suoni
+  originali, pixel art dei quattro dinosauri, testi, chip `RAPTOR 14s`, film di
+  Mostra effetto a ogni livello e atti della Prova meccaniche.
+- Il mazzo della Prova meccaniche cambia: Pozza di Veleno, Deflect e Feretro
+  lasciano il posto a Cannone, Buco Nero e Dinosauro (restano nel gioco; lo smoke
+  li riprende per i loro atti).
+- Regole in `game/emplacement.odin`, `cannon.odin`, `black_hole.odin`,
+  `dinosaur.odin`; disegno in `render/arsenal.odin` e `render/dino_art.odin`.
+
 ## 2026-10-21 — Bomb Marley e Inondazione
 
 - **Inondazione** (non comune, energia 2, 2 s, fino a +3): un'onda attraversa

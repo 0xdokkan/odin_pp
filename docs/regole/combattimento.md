@@ -124,6 +124,8 @@ del movimento è solo il passo in diagonale.
 | Carta: altri status | +1 potenza e +1 durata (Veleno, Bruciatura, Rallentamento e le cariche del Viandante: +1 stack, non hanno durata; Lama Velenosa: il dado più uno) |
 | Carta: pesca, energia, carte create, reazioni | +1 (anche il primo colpo del Lazzo e il valore del Pinball, quello da cui parte e a cui lo riportano i muri) |
 | Inondazione, Bomb Marley | +1 casella di spinta; +5 s di festa |
+| Cannone, Buco Nero | danno x1,5 (almeno +2) a ogni colpo della palla, del raggio o del buco |
+| Dinosauro | +3 s di cavalcata |
 | Carta-dispositivo | danno x1,5 (almeno +2); la Tesla nasce con vita doppia, la Shock Floor con un colpo in più (massimo 21: un 20 del D20 più uno) |
 | First Person Shooter | +2 s dietro gli occhi |
 | Movimento Ombra, Dado del Destino | nessun critico: giocate sul secondo lasciano lo scocco all'azione dopo |
@@ -377,6 +379,10 @@ La schivata base rimane accessibile fuori recupero, senza richiedere carte.
 | First Person Shooter | 3 | 20 s del mondo (+2 per upgrade) dietro gli occhi del Viandante: un AK di carta da 6 colpi al secondo, 1 danno lungo il mirino, passi secondo la vista, niente carte; 0 s di finestra ([First Person Shooter](meccaniche.md#first-person-shooter)) |
 | Inondazione | 2 | trascinata su una casella intorno al Viandante, un'onda attraversa tutta la mappa nel verso di quel lato: spinge ogni nemico di 1 casella (+1 per upgrade, massimo 3) e spegne tutti i fuochi; nessun danno ([Inondazione](meccaniche.md#inondazione)) |
 | Bomb Marley | 3 | una festa di 35 s del mondo (+5 s per nemico ucciso da una bomba, 90 in tutto): bombe da 6 danni (+1 per upgrade) a ogni battito lungo colonne intere, che non toccano chi sta su una casella illuminata ([Bomb Marley](meccaniche.md#bomb-marley)) |
+| Cannone | 2 | una torretta d'acciaio su una casella libera entro 3 celle, girata con la rotella: ogni secondo del mondo, per 20 s, spara una palla dritta davanti a sé che colpisce il primo nemico della linea (2 danni, +1 per upgrade, massimo 2 colpi di cannone insieme); poi si sbriciola. Al **secondo upgrade diventa Cannone Laser** ([Cannone](meccaniche.md#cannone-e-cannone-laser)) |
+| Cannone Laser | 2 | l'evoluzione del Cannone, non si offre mai: un raggio rosso a ogni secondo colpisce tutti i nemici della linea (3 danni, +1 per upgrade, fino a 3) |
+| Buco Nero | 3 | un buco su una casella libera entro 3 celle per 8 s del mondo: chi sta nel 3x3 prende 4 danni a battito (+1 per upgrade), chi sta nel 5x5 intorno è tirato di una casella verso il centro, tranne boss e miniboss (che prendono solo danno); fino a 4 upgrade, che allargano buco e tiro ([Buco Nero](meccaniche.md#buco-nero)) |
+| Dinosauro | 3 | un d4 sceglie il dinosauro che il Viandante cavalca per 20 s (+3 per upgrade): 1 Velociraptor, 2 Stegosauro, 3 Dilophosaurus, 4 Giganotosauro ([Dinosauro](meccaniche.md#dinosauro-e-sanguinamento)) |
 
 Afterimage mantiene il bypass del recupero della schivata e lo Shield dopo il
 movimento. Calculated Risk, Spark, Firebomb, Caustic Bloom e le formule delle
