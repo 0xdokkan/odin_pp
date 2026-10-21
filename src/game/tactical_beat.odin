@@ -179,6 +179,8 @@ try_move_player_diagonal :: proc(room: ^Room, offset: grid.Position) -> Action_R
 	if enemy_index, found := enemy_index_at(room, target); found {
 		if !tactical_allows_action(room) { return .Invalid_Phase }
 		clear_event_log(room.recent_events)
+		// The Giganotosauro walks onto a foe his bump would kill.
+		if giga_crushes(room, enemy_index, true) { return giga_crush_step(room, enemy_index, target, .Opponent, true) }
 		// Always critical, loaded like a straight bump (player_charges.odin).
 		if !player_bump(room, enemy_index, target, .Opponent, true) { return .Blocked }
 		outcome := finish_player_combat_command(room)

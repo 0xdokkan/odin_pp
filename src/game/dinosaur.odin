@@ -17,7 +17,9 @@ import grid "../engine/grid"
 //   4 Giganotosauro: each step stomps: the foes on the four cells round where
 //     he lands take GIGA_STOMP_DAMAGE; his bump kills a Chaser, an Archer or a
 //     Bomber on the spot and does GIGA_BITE_DAMAGE to anything bigger (a Brute,
-//     a Custodian, a boss).
+//     a Custodian, a boss). A foe his bump would kill is not struck: he walks
+//     onto its cell and crushes it (giga_crush_step); one that would survive
+//     is bitten as before, by the dinosaur.
 //
 // Sanguinamento (Status_Kind.Bleed) is a foe's stack status: whenever it takes
 // damage, from any source, the damage is raised by its stacks (once: the extra
@@ -136,7 +138,65 @@ ride_stomp :: proc(room: ^Room) {
 		assert(added)
 	}
 	report := resolve_action(room, &action)
+	// The dinosaur's own damage: the board shows its stomp, not a blow of his.
+	for &event in report.events.events[:report.events.count] { if event.kind == .Damaged { event.card_definition = .Dinosaur } }
 	if report.accepted { append_event_log(room.recent_events, &report.events) }
+}
+
+// Whether the Giganotosauro's bump on `enemy_index` would kill it, whatever
+// the foe's shield: then he does not strike, he walks onto it (giga_crush_step).
+@(private)
+giga_crushes :: proc(room: ^Room, enemy_index: int, critical: bool) -> bool {
+	if !ride_is(room, .Giga) || room.player == nil { return false }
+	enemy := room.enemies[enemy_index]
+	damage := player_basic_attack_damage(room.player)
+	if critical { damage = critical_bump_damage(damage) }
+	damage = max(damage, giga_bite_damage(room, enemy))
+	guard: i32
+	if shield, shielded := status_for_entity(room, enemy_entity(enemy.id), .Shield); shielded { guard = shield.potency }
+	return enemy.health+guard <= damage
+}
+
+// The Giganotosauro's step onto a foe he kills: the foe dies, he is on its cell
+// (events in that order for the board: the step, the stomp that crushes, the
+// foe's fall), the foes round his new cell are stomped as in any step, and it
+// costs a step's time. A foe that somehow stands on is bitten instead.
+@(private)
+giga_crush_step :: proc(room: ^Room, enemy_index: int, aim: grid.Position, rule: Target_Rule, diagonal: bool) -> Action_Result {
+	enemy := room.enemies[enemy_index]
+	ref := enemy_entity(enemy.id)
+	offset := grid.Position{aim.x-room.player.position.x, aim.y-room.player.position.y}
+	guard: i32
+	if shield, shielded := status_for_entity(room, ref, .Shield); shielded { guard = shield.potency }
+	blow := enemy.health+guard
+	kill := make_action(.Attack, PLAYER_ENTITY, entity_target(ref), rule)
+	added := add_effect(&kill, damage_effect(ref, blow))
+	assert(added)
+	killed := resolve_action(room, &kill)
+	if !killed.accepted { return .Blocked }
+	for &event in killed.events.events[:killed.events.count] { if event.kind == .Damaged { event.card_definition = .Dinosaur } }
+	moved: Action_Report
+	query := query_entity_movement(room, PLAYER_ENTITY, aim)
+	if movement_query_is_clear(&query) {
+		step := make_action(.Move, PLAYER_ENTITY, cell_target(aim), .Walkable_Cell)
+		added = add_effect(&step, move_effect(PLAYER_ENTITY, aim))
+		assert(added)
+		moved = resolve_action(room, &step)
+	}
+	if moved.accepted { append_event_log(room.recent_events, &moved.events) }
+	record_event(room.recent_events, {kind = .Dino_Stomp, source = PLAYER_ENTITY, target = ref, from_position = aim, to_position = aim,
+		amount = blow, duration = 0, card_definition = .Dinosaur})
+	append_event_log(room.recent_events, &killed.events)
+	collect_loot_in_magnet_range(room)
+	if diagonal && moved.accepted { room.player.tactical.facing = .North if offset.y < 0 else .South }
+	ride_stomp(room)
+	outcome := finish_player_combat_command(room, player_move_seconds(room))
+	switch outcome {
+	case .Player_Defeated: return .Player_Defeated
+	case .Combat_Ended: return .Combat_Ended
+	case .Combat_Continues:
+	}
+	return .Moved if moved.accepted else .Attacked
 }
 
 // The Giganotosauro's bump on `enemy`: a small foe falls at once, the rest take

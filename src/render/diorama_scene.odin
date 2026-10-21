@@ -216,7 +216,7 @@ draw_diorama_accents :: proc(renderer: ^Renderer, room: ^game.Room) {
 	for y in 0..<room.level_data.tiles.height { for x in 0..<room.level_data.tiles.width {
 		cell := grid.Position{x, y}
 		if !tactical_cell_on_screen(renderer, cell) || !tactical_render_visible(renderer, cell) { continue }
-		if !diorama_interior_wall(room, cell) {
+		if !diorama_interior_wall(room, cell) && !(neon && neon_is_border(room, cell)) {
 			if lamp, found := diorama_lamp(renderer, room, cell); found {
 				if neon { draw_neon_lamp_glow(renderer, lamp, cell) } else { draw_diorama_lamp_glow(renderer, lamp, cell) }
 			}

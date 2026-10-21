@@ -204,6 +204,8 @@ draw_voxel_fog :: proc(renderer: ^Renderer, room: ^game.Room) {
 		for x in 0..<room.level_data.tiles.width {
 			if !tactical_cell_on_screen(renderer, {x, y}) { continue }
 			if tactical_render_visible(renderer, {x, y}) { continue }
+			// No wall round the board in the neon world: no fog over its ring.
+			if neon && neon_is_border(room, {x, y}) { continue }
 			if neon { draw_neon_fog_block(renderer, x, y, time); continue }
 			p := rl.Vector3{f32(x)+0.5, 0, f32(y)+0.5}
 			rl.DrawCube(p+rl.Vector3{0, -0.15, 0}, 1, 0.3, 1, {7, 10, 16, 255})

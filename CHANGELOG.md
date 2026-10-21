@@ -21,6 +21,13 @@ per i comandi disponibili oggi valgono il [README](README.md) e la documentazion
   colpo ricevuto torna indietro senza cariche), Dilophosaurus (1 Veleno a chi
   ferisce o è ferito) o Giganotosauro (passi che schiacciano le 4 caselle intorno
   per 6, urto che uccide Chaser, Archer e Bomber all'istante).
+- Dinosauro, ritocco: il dinosauro si gira come la carta del Viandante (prima poteva
+  tornare indietro dopo il passo); mentre si cavalca i passi e i colpi li fa il
+  dinosauro (scatto in avanti a testa bassa), non il disegno del Viandante; il
+  **Giganotosauro**, se il suo urto ucciderebbe il nemico, ne prende la casella e
+  lo schiaccia invece di colpirlo; se sopravvive lo morde.
+- Mondo neon, ritocco: tolte le mura attorno alla griglia (restano le interne): il
+  pavimento finisce nel vuoto con una linea rossa sul bordo, per dare desolazione.
 - **Sanguinamento**: nuovo status dei nemici, +N danni da ogni fonte, una volta,
   gli stack non calano.
 - Catalogo a 50 carte (il Cannone Laser non si offre). Icone, 25 suoni

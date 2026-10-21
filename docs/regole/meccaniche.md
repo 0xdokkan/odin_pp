@@ -997,7 +997,7 @@ con la stanza.
 | 1 | Velociraptor | un passo costa 0,4 s invece di 0,8 s; il colpo d'urto mette 1 Sanguinamento |
 | 2 | Stegosauro | ogni colpo di un nemico sul Viandante gli viene restituito senza spendere cariche e senza richiesta di difesa |
 | 3 | Dilophosaurus | 1 Veleno su ogni nemico che il Viandante ferisce e su ogni nemico che lo ferisce |
-| 4 | Giganotosauro | dopo ogni passo i nemici sulle 4 caselle intorno prendono 6 danni; il suo urto uccide all'istante Chaser, Archer e Bomber, e fa 12 danni a Brute, Custode e Demolitore |
+| 4 | Giganotosauro | dopo ogni passo i nemici sulle 4 caselle intorno prendono 6 danni; il suo urto uccide all'istante Chaser, Archer e Bomber, e fa 12 danni a Brute, Custode e Demolitore. **Se l'urto ucciderebbe il nemico, non lo colpisce: cammina sulla sua casella e lo schiaccia** (passo, schiacciamento, caduta del nemico; costa un passo e calpesta anche le caselle intorno); se invece il nemico sopravvive, lo morde come prima |
 
 **Sanguinamento.** Nuovo status dei nemici (il Viandante non lo porta): un
 nemico con N stack prende **+N danni** da qualsiasi danno di qualsiasi fonte,
@@ -1006,7 +1006,12 @@ una sola volta (senza ricorsione), prima dello scudo. Gli stack non calano mai.
 
 Il dinosauro è una pixel art di cartoncino (quattro bestie originali, due
 fotogrammi di camminata) sotto la carta del Viandante, che sta sulla sua sella;
-cammina a tempo con il Viandante e si gira dove va. L'HUD mostra `RAPTOR 14s`
+cammina a tempo con il Viandante e si gira esattamente come la carta del
+Viandante (verso dove va o verso il nemico che colpisce, con lo stesso giro da
+figurina). **Mentre lo cavalca, il Viandante non esegue né passi né colpi: li
+esegue il dinosauro.** Un colpo è uno scatto in avanti verso il nemico a testa
+bassa (si carica indietro, scatta, torna), con il Viandante che lo segue sulla
+sella; il Giganotosauro ha inoltre un colpo di calpestio con onda e polvere. L'HUD mostra `RAPTOR 14s`
 fra i chip. Regole in `game/dinosaur.odin`, disegno in `render/arsenal.odin` e
 `render/dino_art.odin`.
 

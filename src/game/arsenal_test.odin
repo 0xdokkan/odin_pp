@@ -466,3 +466,59 @@ test_the_ride_and_the_emplacements_go_with_the_combat :: proc(t: ^testing.T) {
 	// An emplacement is only set down in a fight.
 	testing.expect(t, !emplacement_can_place(&room, .Cannon, {7, 5}))
 }
+
+// A foe his bump would kill is not struck: the Giganotosauro walks onto its cell
+// and crushes it; the step first, then the crush, then the foe's fall. A foe that
+// would survive is bitten where it stands.
+@(test)
+test_giganotosaurus_crushes_the_foe_his_bump_would_kill_and_bites_the_rest :: proc(t: ^testing.T) {
+	data: level.Level
+	player: Player
+	spawns := [?]Enemy_Spawn{
+		{position = {6, 4}, health = 40, attack = 1},                       // a chaser: always dies to his bump
+		{position = {8, 5}, health = 12, attack = 1, archetype = .Brute},   // a brute with the bite's 12 left: crushed
+		{position = {3, 5}, health = 60, attack = 1, archetype = .Brute},   // a brute that survives the bite
+	}
+	room := ground_test_room(t, &data, &player, {enemies = spawns[:]})
+	defer level.destroy(&data)
+	defer destroy_room(&room)
+	testing.expect_value(t, arsenal_test_ride(t, &room, 4).result, Card_Play_Result.Played)
+	free_window :: proc(room: ^Room) {
+		room.player.tactical.phase, room.player.tactical.remaining, room.player.tactical.cast_remaining, room.player.tactical.action_remaining = .Decision, 20, 0, 0
+		room.tactical_pulse = {}
+	}
+	free_window(&room)
+	chaser := room.enemies[0].id
+	testing.expect_value(t, try_move_player(&room, .North), Action_Result.Moved)
+	testing.expect_value(t, player.position, grid.Position{6, 4})
+	_, chaser_alive := enemy_index_by_id(&room, chaser)
+	testing.expect(t, !chaser_alive)
+	moved, crushed, fell := -1, -1, -1
+	for event, index in room.recent_events.events[:room.recent_events.count] {
+		if event.kind == .Moved && event.target == PLAYER_ENTITY && moved < 0 { moved = index }
+		if event.kind == .Dino_Stomp && event.target.kind == .Enemy && crushed < 0 { crushed = index }
+		if event.kind == .Entity_Defeated && event.target == enemy_entity(chaser) { fell = index }
+		// Nothing of it is a blow of the player's own.
+		if event.kind == .Damaged && event.target == enemy_entity(chaser) { testing.expect_value(t, event.card_definition, Card_Id.Dinosaur) }
+	}
+	testing.expect(t, moved >= 0 && crushed > moved && fell > crushed)
+	// A brute with 12 left is crushed too (from (6, 5): east, then its cell).
+	player.position = {7, 5}
+	free_window(&room)
+	brute_at, _ := enemy_index_at(&room, {8, 5})
+	brute := room.enemies[brute_at].id
+	testing.expect_value(t, try_move_player(&room, .East), Action_Result.Moved)
+	testing.expect_value(t, player.position, grid.Position{8, 5})
+	_, brute_alive := enemy_index_by_id(&room, brute)
+	testing.expect(t, !brute_alive)
+	// One with 60 takes the bite and stays: a bump.
+	player.position = {4, 5}
+	free_window(&room)
+	big_at, _ := enemy_index_at(&room, {3, 5})
+	big := room.enemies[big_at].id
+	testing.expect_value(t, try_move_player(&room, .West), Action_Result.Attacked)
+	index, still := enemy_index_by_id(&room, big)
+	testing.expect(t, still)
+	testing.expect_value(t, player.position, grid.Position{4, 5})
+	testing.expect_value(t, room.enemies[index].health, 60-GIGA_BITE_DAMAGE)
+}

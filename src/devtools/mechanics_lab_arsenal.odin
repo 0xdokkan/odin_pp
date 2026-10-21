@@ -178,7 +178,7 @@ mechanics_lab_black_hole :: proc(window: ^app.Window, renderer: ^render.Renderer
 // chip of the HUD, and what each does. Velociraptor: a quick step and a bump
 // that bleeds; Stegosauro: a brute's blow is turned back at it with no prompt;
 // Dilophosaurus: a bump that poisons; Giganotosauro: a step that stomps the
-// foes round it and a bump that kills a chaser outright.
+// foes round it and a bump that would kill a chaser walks onto it instead and crushes it.
 mechanics_lab_dinosaur :: proc(window: ^app.Window, renderer: ^render.Renderer, room: ^game.Room, controller: ^run_session.Tactical_Controller,
 	cards: ^run_session.Card_Interaction_State, buffer: ^run_session.Buffered_Gameplay_Command) -> bool {
 	player := room.player
@@ -270,7 +270,11 @@ mechanics_lab_dinosaur :: proc(window: ^app.Window, renderer: ^render.Renderer, 
 			}
 			if !step(window, renderer, room, controller, cards, buffer, .North) || !step(window, renderer, room, controller, cards, buffer, .North) { return false }
 			for _ in 0..<80 { mechanics_lab_reel_frame(window, renderer, room, controller, cards, buffer, "dino_giga_bite", 6, &frame) }
-			if foe(room, victim) != nil { fmt.eprintln("mechanics lab: the giganotosaurus's bite did not kill the chaser"); return false }
+			// His bump would kill the chaser: he walks onto it and crushes it.
+			if foe(room, victim) != nil || player.position != (grid.Position{center.x, center.y-3}) {
+				fmt.eprintln("mechanics lab: the giganotosaurus did not crush the chaser under him"); return false
+			}
+			if .Dino_Stomp not_in renderer.shown_events { fmt.eprintln("mechanics lab: no crush was shown"); return false }
 		}
 		artifacts.screenshot(fmt.ctprintf("odin_pp_mechanics_lab_dino_%d_after.png", face))
 		// The ride's end: the dinosaur goes.

@@ -311,6 +311,9 @@ neon_ribbon :: proc(renderer: ^Renderer, a, b: rl.Vector3, width: f32, color: rl
 draw_neon_tile :: proc(renderer: ^Renderer, room: ^game.Room, tile: level.Tile, cell: grid.Position, preview: ^Card_Range_Preview) {
 	p := rl.Vector3{f32(cell.x)+0.5, 0, f32(cell.y)+0.5}
 	if tile.kind == .Wall {
+		// No wall round the board: the floor just ends over the void, a red line
+		// along its edge. Only the walls inside the room stand.
+		if neon_is_border(room, cell) { draw_neon_board_rim(renderer, room, cell); return }
 		if !diorama_interior_wall(room, cell) || first_person_solid_walls(renderer) { draw_neon_wall(renderer, room, cell) }
 		return
 	}
@@ -329,6 +332,39 @@ draw_neon_tile :: proc(renderer: ^Renderer, room: ^game.Room, tile: level.Tile, 
 		draw_voxel_exit(renderer, cell)
 		neon_use_board_material(renderer, false)
 	}
+}
+
+// Whether `cell` is on the board's outer ring (where the gothic walls stand).
+@(private)
+neon_is_border :: proc(room: ^game.Room, cell: grid.Position) -> bool {
+	return level.is_border_position(cell, room.level_data.tiles.width, room.level_data.tiles.height)
+}
+
+// The edge of the floor where the room's wall used to be: a red neon line along
+// each side of the ring cell that touches the playable floor, a little under the
+// tiles' top so that it reads as the rim of a slab hanging in the void.
+@(private)
+draw_neon_board_rim :: proc(renderer: ^Renderer, room: ^game.Room, cell: grid.Position) {
+	glow := neon_glow(renderer)
+	pulse := neon_pulse(f32(tactical_world_time(renderer)), f32(cell.x), f32(cell.y))
+	line := neon_color(glow, 0.9*pulse)
+	cx, cz := f32(cell.x)+0.5, f32(cell.y)+0.5
+	toward := [4]grid.Position{{0, -1}, {1, 0}, {0, 1}, {-1, 0}}
+	rlgl.CheckRenderBatchLimit(c.int(48))
+	rlgl.SetTexture(rlgl.GetTextureIdDefault())
+	rlgl.Begin(rlgl.TRIANGLES)
+	for side in 0..<4 {
+		neighbour, found := level.tile_at(room.level_data, {cell.x+toward[side].x, cell.y+toward[side].y})
+		if !found || neighbour.kind == .Wall || neighbour.kind == .Void { continue }
+		dx, dz := f32(toward[side].x)*0.5, f32(toward[side].y)*0.5
+		// The shared edge runs across the side's direction.
+		ax, az := f32(toward[side].y)*0.5, f32(toward[side].x)*0.5
+		a := rl.Vector3{cx+dx-ax, 0.03, cz+dz-az}
+		b := rl.Vector3{cx+dx+ax, 0.03, cz+dz+az}
+		neon_ribbon(renderer, a, b, 0.04, line)
+	}
+	rlgl.End()
+	rlgl.SetTexture(0)
 }
 
 @(private = "file")

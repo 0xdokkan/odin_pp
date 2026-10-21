@@ -199,6 +199,8 @@ living_travel_lift :: proc(kind: gfx.Living_Travel, u: f32) -> f32 {
 living_card_position :: proc(renderer: ^Renderer, entity: game.Entity_Ref, key: Sprite_Key, position: view.Vec2) -> (at: view.Vec2, lift: f32) {
 	at = position
 	lift = tactical_lasso_lift(renderer, entity)
+	// The dinosaur lunge carries its rider with it (arsenal.odin).
+	defer if entity == game.PLAYER_ENTITY { off := tactical_ride_offset(renderer); at.x += off.x; at.y += off.y }
 	if !renderer.tactical.living || renderer.tactical.living_state == nil { return }
 	character, ok := flipbook_character(key)
 	if !ok { return }
@@ -370,9 +372,12 @@ living_observe :: proc(renderer: ^Renderer, state: ^Living_State, room: ^game.Ro
 			else if length > 0.001 && abs(f) >= 0.38*length { move = .Move_Up if f > 0 else .Move_Down }
 			if !pushed { living_face(slot, h, clock) }
 			if slot.action != .Death {
-				living_start(slot, move, clock)
+				// Riding, the card does not walk: the dinosaur feet do; the card
+				// only slides with it.
+				riding := actor.entity == game.PLAYER_ENTITY && snapshot.ride.active
+				if !riding { living_start(slot, move, clock) }
 				slot.cause, slot.shot = .Move, false
-				clip := &sheet.clips[slot.action]
+				clip := &sheet.clips[gfx.living_resolve(character, move) if riding else slot.action]
 				// The card goes from wherever it stands now, at the push.
 				here, _ := living_card_position(renderer, actor.entity, flipbook_key(character), from)
 				slot.slide_from, slot.slide_to = here, to
@@ -407,6 +412,17 @@ living_observe :: proc(renderer: ^Renderer, state: ^Living_State, room: ^game.Ro
 				side := rl.Vector3DotProduct(delta, right)
 				if abs(side) > 0.2 && (side < 0) != slot.facing_left { action = .Hurt_Back }
 			}
+		}
+		// Riding, the player card never swings: the dinosaur attacks, lunging
+		// at the foe (its stomps and crushes have their own drawing).
+		if action == .Attack && actor.entity == game.PLAYER_ENTITY && snapshot.ride.active {
+			if event.card_definition != .Dinosaur {
+				dir := rl.Vector2{}
+				if target, ok := presentation_actor_in_view(snapshot, event.target); ok { dir = {target.position.x-actor.position.x, target.position.y-actor.position.y} }
+				else { dir = {f32(event.to_position.x)-actor.position.x, f32(event.to_position.y)-actor.position.y} }
+				arsenal_begin_attack(renderer, {dir.x, dir.y})
+			}
+			continue
 		}
 		if gfx.living_priority(action) > gfx.living_priority(wanted) {
 			wanted, cause, blow, striker = action, cue.kind, blow_id, event.source

@@ -825,6 +825,8 @@ try_move_player :: proc(room: ^Room, direction: Move_Direction) -> Action_Result
 	clear_event_log(room.recent_events)
 	if room.phase == .Combat {
 		if enemy_index, found := enemy_index_at(room, target); found {
+			// The Giganotosauro walks onto a foe his bump would kill.
+			if giga_crushes(room, enemy_index, critical) { return giga_crush_step(room, enemy_index, target, .Adjacent_Opponent, false) }
 			// The bump, loaded with whatever the player's charges add (player_charges.odin).
 			struck := player_bump(room, enemy_index, target, .Adjacent_Opponent, critical)
 			assert(struck)

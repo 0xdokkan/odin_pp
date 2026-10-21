@@ -8,6 +8,7 @@ import game "../game"
 import grid "../engine/grid"
 import view "../engine/view"
 import tween "../engine/tween"
+import gfx "../engine/gfx"
 
 // CANNONE, BUCO NERO and DINOSAURO on the board (game/cannon.odin,
 // black_hole.odin, dinosaur.odin).
@@ -33,6 +34,8 @@ DINO_KINDS :: 4
 DINO_FEET_ROWS :: 39
 HOLE_SLOTS :: 4
 ARSENAL_MOUNT_SECONDS :: f32(0.35)
+// The dinosaur's own attack: its lunge, in seconds.
+DINO_ATTACK_SECONDS :: f64(0.46)
 
 CANNON_STEEL :: rl.Color{62, 66, 78, 255}
 CANNON_STEEL_DARK :: rl.Color{34, 36, 46, 255}
@@ -64,6 +67,10 @@ Arsenal_View :: struct {
 	stride, moving: f32,
 	last_at: view.Vec2,
 	faces_right: bool,
+	// The dinosaur's attack (the player's card never swings while he rides): when
+	// it began (the player's clock) and the way it goes, in cells.
+	attack_started: f64,
+	attack_dir: view.Vec2,
 	// When each hole was first seen (its opening).
 	hole_born: [HOLE_SLOTS]struct{entity: game.Entity_Ref, born: f64},
 }
@@ -99,14 +106,58 @@ update_tactical_arsenal :: proc(renderer: ^Renderer, room: ^game.Room) {
 		a.mount = max(f32(0), a.mount-dt/(ARSENAL_MOUNT_SECONDS*0.8))
 	}
 	if a.mount <= 0 { return }
+	// Where the rider stands, without the lunge of an attack: the walk is the dinosaur's feet.
 	at, _ := living_card_position(renderer, game.PLAYER_ENTITY, .Player, snapshot.player.position)
+	off := tactical_ride_offset(renderer)
+	at -= off
 	step := at-a.last_at
-	right := flipbook_camera_right(renderer)
-	along := step.x*right.x+step.y*right.z
-	if abs(along) > 0.0005 { a.faces_right = along > 0 }
+	// It faces as the player's card does (his living card turns toward where he
+	// goes or means to go, a bump included).
+	if actor := living_find(renderer, game.PLAYER_ENTITY, gfx.Flipbook_Character.Pilgrim); actor != nil { a.faces_right = !actor.facing_left }
 	if abs(step.x)+abs(step.y) > 0.0005 { a.moving = 0.22 } else { a.moving = max(f32(0), a.moving-dt) }
 	if a.moving > 0 { a.stride += dt }
 	a.last_at = at
+}
+
+// The dinosaur's attack begins, toward `dir` (cells): a lunge with its head down.
+// The player's card does not swing: this is the attack he rides (the living
+// cards hand it here instead of starting the clip).
+@(private)
+arsenal_begin_attack :: proc(renderer: ^Renderer, dir: view.Vec2) {
+	a := &renderer.tactical.arsenal
+	now := renderer.sprite_assets.elapsed
+	// One lunge per blow, whatever cues the blow makes.
+	if a.attack_dir != {} && now-a.attack_started < 0.18 { return }
+	length := math.sqrt(dir.x*dir.x+dir.y*dir.y)
+	a.attack_dir = {0, -1} if length < 0.001 else dir/length
+	a.attack_started = now
+}
+
+// How far into its attack the dinosaur is: 0..1, or false when it is not.
+@(private = "file")
+arsenal_attack_progress :: proc(renderer: ^Renderer) -> (p: f32, active: bool) {
+	a := &renderer.tactical.arsenal
+	if a.attack_dir == {} { return }
+	p = f32((renderer.sprite_assets.elapsed-a.attack_started)/DINO_ATTACK_SECONDS)
+	return p, p >= 0 && p < 1
+}
+
+// The lunge's shape: it draws back, strikes forward and returns.
+@(private = "file")
+arsenal_lunge :: proc(p: f32) -> f32 {
+	if p < 0.3 { return -0.16*tween.smoothstep(p/0.3) }
+	if p < 0.5 { return -0.16+0.76*tween.smoothstep((p-0.3)/0.2) }
+	return 0.6*(1-tween.smoothstep((p-0.5)/0.5))
+}
+
+// How far the lunge has carried the dinosaur and the rider on its back (cells),
+// added to the card place (living_card_position).
+@(private)
+tactical_ride_offset :: proc(renderer: ^Renderer) -> (offset: view.Vec2) {
+	a := &renderer.tactical.arsenal
+	if a.mount <= 0 { return }
+	if p, active := arsenal_attack_progress(renderer); active { offset = a.attack_dir*(arsenal_lunge(p)*(1.2 if a.kind == .Giga else 1)) }
+	return
 }
 
 // Where the dinosaur is in its walk: 0 or 1 (standing, it keeps the first).
@@ -550,7 +601,31 @@ draw_dino_entry :: proc(renderer: ^Renderer, entry: Tactical_Alpha_Entry) {
 	size := rl.Vector2{f32(texture.width)*unit*mount*breath, f32(texture.height)*unit*mount*breath}
 	right := flipbook_camera_right(renderer)
 	seat := DINO_ART_SEAT[kind]
-	sign := f32(1) if a.faces_right else f32(-1)
+	// The print turns round as the player card does: it narrows, flips, widens.
+	faces_right := a.faces_right
+	turned := f32(1)
+	if actor := living_find(renderer, game.PLAYER_ENTITY, gfx.Flipbook_Character.Pilgrim); actor != nil {
+		faces_right = !actor.facing_left
+		turn := (renderer.sprite_assets.elapsed-actor.turn_started)/LIVING_TURN_SECONDS
+		if actor.turn_started >= 0 && turn < 1 {
+			turned = max(f32(0.04), abs(f32(math.cos(turn*math.PI))))
+			if turn < 0.5 { faces_right = !faces_right }
+		}
+	}
+	sign := f32(1) if faces_right else f32(-1)
+	// The attack: a head-down lunge (squashed as it strikes, the nose dipping);
+	// a stomp (a Giganotosauro step, a crush) lands heavy.
+	squash, tilt := f32(0), f32(0)
+	if p, active := arsenal_attack_progress(renderer); active {
+		strike := math.sin(clamp((p-0.25)/0.35, f32(0), f32(1))*math.PI)
+		squash, tilt = 0.10*strike, 14*strike
+	}
+	for offset in 0..<renderer_active_cue_count(renderer) {
+		cue, found := renderer_active_cue_at(renderer, offset)
+		if found && cue.started && cue.kind == .Dino_Stomp { squash = max(squash, 0.14*math.sin(presentation_cue_progress(cue)*math.PI)) }
+	}
+	size.x *= (1+squash*0.8)*turned
+	size.y *= 1-squash
 	shift := f32(DINO_ART_W/2-seat.x)*unit*sign*mount
 	feet := f32(DINO_FEET_ROWS+DINO_MARGIN)
 	centre := rl.Vector3{at.x+0.5+right.x*shift, 0.05+(feet-f32(texture.height)*0.5)*unit*mount+drop, at.y+0.5+right.z*shift}
@@ -566,7 +641,8 @@ draw_dino_entry :: proc(renderer: ^Renderer, entry: Tactical_Alpha_Entry) {
 	rlgl.DrawRenderBatchActive()
 	source := rl.Rectangle{0, 0, f32(texture.width)*sign, f32(texture.height)}
 	tint := color_with_opacity(rl.WHITE, entry.opacity)
-	rl.DrawBillboardPro(renderer.tactical.camera, texture, source, centre, {0, 1, 0}, size, size*0.5, 0, tint)
+	// Clockwise on the screen is the nose going down for a print that faces right.
+	rl.DrawBillboardPro(renderer.tactical.camera, texture, source, centre, {0, 1, 0}, size, size*0.5, -tilt*sign, tint)
 }
 
 // A Giganotosauro's stomp: a shockwave out across the four cells round him,
@@ -578,6 +654,21 @@ draw_dino_stomp :: proc(renderer: ^Renderer, room: ^game.Room, cue: ^Presentatio
 	cx, cz := f32(at.x)+0.5, f32(at.y)+0.5
 	rlgl.DrawRenderBatchActive()
 	rlgl.DisableDepthMask()
+	// A crush (the foe has a name): he has walked onto it; dust and a sharp ring.
+	if cue.event.target != game.SYSTEM_ENTITY {
+		a := &renderer.tactical.arsenal
+		if a.puff.id == 0 { a.puff = marley_puff_texture() }
+		rl.BeginBlendMode(.ADDITIVE)
+		marley_glow(cx, 0.06, cz, 0.3+0.9*p, DINO_AURA[3], 0.9*(1-p))
+		marley_frame(cx, 0.062, cz, 0.2+0.8*p, 0.05, color_with_opacity(DINO_AURA[3], 0.9*(1-p)))
+		rl.EndBlendMode()
+		rlgl.DrawRenderBatchActive()
+		for puff in 0..<6 {
+			angle := f32(puff)*math.PI/3+0.4
+			reach := 0.2+0.55*p
+			marley_draw_print(renderer, a.puff, {cx+math.cos(angle)*reach, 0.12+0.25*p, cz+math.sin(angle)*reach}, 0.28+0.18*p, f32(puff)*40+p*120, {255, 255, 255, u8(220*(1-p))})
+		}
+	}
 	rl.BeginBlendMode(.ADDITIVE)
 	marley_glow(cx, 0.06, cz, 0.4+1.3*p, DINO_AURA[3], 0.85*(1-p))
 	for offset in ([4]grid.Position{{0, -1}, {1, 0}, {0, 1}, {-1, 0}}) {
