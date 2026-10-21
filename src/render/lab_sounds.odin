@@ -281,7 +281,7 @@ lab_status_sfx :: proc(status: game.Status_Kind) -> (sfx: audio.Lab_Sfx, ok: boo
 	case .Arrows: return .Ui_Status_Arrows, true
 	case .Fate: return .Ui_Status_Fate, true
 	case .Venom_Blade: return .Ui_Status_Venom_Blade, true
-	case .Bleed: return .Ui_Status_Venom_Blade, true
+	case .Bleed: return .Ui_Status_Bleed, true
 	case .Survey:
 	}
 	return
@@ -355,6 +355,9 @@ lab_cue_sounds :: proc(renderer: ^Renderer, s: ^Lab_Sounds, cue: ^Presentation_C
 			// for a coil that comes any other way.
 			if now-s.last_played[.Card_Tesla_Coil] > LAB_SOUND_CARD_DEVICE_SECONDS { lab_sound_queue(s, .World_Tesla_Deploy, now) }
 		case .Fire: lab_sound_queue(s, .World_Fire, now)
+		// CANNONE and BUCO NERO set down.
+		case .Cannon: lab_sound_queue(s, .World_Cannon_Place, now)
+		case .Black_Hole: lab_sound_queue(s, .World_Black_Hole_Open, now)
 		}
 	case .Spell_Impact:
 		#partial switch event.card_definition {
@@ -430,6 +433,32 @@ lab_cue_sounds :: proc(renderer: ^Renderer, s: ^Lab_Sounds, cue: ^Presentation_C
 		lab_sound_queue(s, .World_Marley_Bonus, now)
 	case .Marley_Ended:
 		lab_sound_queue(s, .World_Marley_End, now)
+	// CANNONE (cannon.odin): the shot, and its strike on a foe as the ball (or
+	// the beam) arrives; the cannon falling apart.
+	case .Cannon_Fired:
+		lab_sound_queue(s, .World_Laser_Fire if event.duration == 1 else .World_Cannon_Fire, now)
+		if event.target != game.SYSTEM_ENTITY { lab_sound_queue(s, .World_Cannon_Hit, now+f64(cue.duration)*0.7, 0.9, lab_sound_pan(renderer, event.target)) }
+	case .Cannon_Broken:
+		lab_sound_queue(s, .World_Cannon_Break, now)
+	// BUCO NERO (black_hole.odin): the hum on every beat, a foe swallowed, the
+	// hole closing.
+	case .Black_Hole_Tick:
+		lab_sound_queue(s, .World_Black_Hole_Hum, now, 0.8)
+	case .Black_Hole_Swallowed:
+		lab_sound_queue(s, .World_Black_Hole_Swallow, now, 1, pan)
+	case .Black_Hole_Closed:
+		lab_sound_queue(s, .World_Black_Hole_Close, now)
+	// DINOSAURO (dinosaur.odin): the roar of the dinosaur the die gave, its
+	// stomp, and the climb down; SANGUINAMENTO's extra bite.
+	case .Ride_Begun:
+		roars := [game.Dino_Kind]audio.Lab_Sfx{.Raptor = .World_Dino_Roar_Raptor, .Stego = .World_Dino_Roar_Stego, .Dilo = .World_Dino_Roar_Dilo, .Giga = .World_Dino_Roar_Giga}
+		lab_sound_queue(s, roars[game.Dino_Kind(clamp(event.duration, 0, 3))], now)
+	case .Ride_Ended:
+		lab_sound_queue(s, .World_Dino_Dismount, now)
+	case .Dino_Stomp:
+		lab_sound_queue(s, .World_Dino_Stomp, now)
+	case .Bleed_Bite:
+		lab_sound_queue(s, .World_Bleed_Tick, now+landing, 0.8, pan)
 	case .Pulse_Advanced:
 		if party := &renderer.tactical.snapshot.marley; party.active {
 			lab_sound_queue(s, .World_Marley_Groove_A if party.elapsed%2 == 0 else .World_Marley_Groove_B, now, 0.8)
@@ -440,6 +469,12 @@ lab_cue_sounds :: proc(renderer: ^Renderer, s: ^Lab_Sounds, cue: ^Presentation_C
 		lab_sound_queue(s, .World_Flood_Wave, now)
 	// A foe the wave pushes splashes as the front reaches it.
 	case .Move:
+		// A step on the dinosaur: light for the raptor, heavy for the others; a
+		// foe the hole draws in whirs.
+		if event.target == game.PLAYER_ENTITY && renderer.tactical.snapshot.ride.active {
+			lab_sound_queue(s, .World_Dino_Step_Small if renderer.tactical.snapshot.ride.kind == .Raptor else .World_Dino_Step_Heavy, now)
+		}
+		if event.card_definition == .Black_Hole { lab_sound_queue(s, .World_Black_Hole_Pull, now, 0.8, pan) }
 		if event.card_definition == .Flood {
 			delay := f64(0)
 			if head, led := flood_group_head(&renderer.timeline); led {

@@ -53,6 +53,20 @@ added rows from scratch. Every added row keeps the fifth row's pitch (314
 pixels), so the icons painted before the sixth, the seventh and the eighth rows keep
 their pixels too.
 
+Phase 6 adds four more cells (the last three of the eighth row and the first
+of a ninth), painted the same way with a few more palette letters:
+
+    cell 29  Cannone: a small black cannon on a raised stepped stand of grey
+             steel, its barrel pointing up and to the right, a flash at the
+             muzzle.
+    cell 30  Cannone laser: the same stand, a black barrel ringed with cyan
+             coils, a glowing magenta emitter and a straight beam.
+    cell 31  Buco nero: a black disc in a thin bright ring, an accretion disc
+             of violet, orange and white-hot light across it, streaks of
+             matter curling in.
+    cell 32  Dinosauro: a cheerful green cartoon dinosaur head with an orange
+             crest, a bone d4 showing a 4 beside it.
+
 Options:
     --check        exit 1 if the atlas is not what this script would write
     --preview DIR  also write each added cell on a dark ground,
@@ -71,7 +85,7 @@ ATLAS = os.path.join(ROOT, "assets", "gothic", "card-icons-pixel.png")
 
 COLUMNS = 4
 PAINTED_ROWS = 4
-ROWS = 8
+ROWS = 9
 # One pixel unit of the icon, in atlas pixels (the painted icons' own size).
 SCALE = 10
 SIGNATURE = b"\x89PNG\r\n\x1a\n"
@@ -111,6 +125,12 @@ PALETTE = {
     "C": (30, 70, 136, 255),    # water's depth
     "c": (52, 120, 196, 255),   # water
     "u": (150, 206, 244, 255),  # water's light, its ripples
+    "Z": (48, 52, 70, 255),     # black iron
+    "z": (80, 86, 110, 255),    # black iron in the light
+    "b": (24, 26, 38, 255),     # black iron in shade
+    "X": (80, 240, 255, 255),   # energy cyan
+    "P": (236, 70, 210, 255),   # energy magenta
+    "y": (214, 252, 255, 255),  # a beam's white core
 }
 
 # Movimento Ombra, 28x28 units, as the Viandante of the figure atlas: his hood
@@ -546,6 +566,146 @@ FLOOD = (
 # The hand-made cells of the added rows, by atlas cell.
 ICONS = {16: SHADOW_STEP, 17: POISON_POOL, 18: WILDFIRE, 19: DEFLECT, 20: COFFIN, 21: FATE_DICE, 22: VENOM_BLADE, 23: LASSO,
          24: FISHING_ROD, 25: PINBALL, 26: FIRST_PERSON, 27: BOMB_MARLEY, 28: FLOOD}
+
+
+# Phase 6: the Cannone, a small black cannon on a raised stepped stand of
+# grey steel, its barrel (two proud rings, a flared lip, a round breech)
+# pointing up and to the right, a flash at its muzzle.
+CANNON = (
+    "............................",
+    "......................O.....",
+    "......................O.....",
+    "....................YYY.....",
+    "...................YYUYYO...",
+    "...............KKOOYUUUY....",
+    "..............KzzDKYUUUY.OO.",
+    ".............KKzzDDYYUYY....",
+    "...........KKzzzzDDDYYYO....",
+    "..........KzzzZZZZDDO.......",
+    ".......KKKzzzZZZZbZZO.......",
+    "......KzzzHZzzZZbbZZK.......",
+    ".....KKzzzZZZzZbbKKK........",
+    "...KKzzzzzZZZbZbK...........",
+    "..KzzzzZZzzZbbZZKK..........",
+    ".KzzzzZZZZZbbMMMMMK.........",
+    ".KzzzZZZZbZZmmmmmmK.........",
+    ".KzZZZZZbbbZHHHHHHHK........",
+    ".KZZZZbbbbMMmMMMMMmK........",
+    ".KZZZbbbKmmmmmmmmmmKKK......",
+    "..KbbbbHHHHHHHHHHHHHHHK.....",
+    "...KKKMMMmMMMMMmMMMMMmK.....",
+    "...KKKmmmmmmmmmmmmmmmmKKK...",
+    "..KHHHHHHHHHHHHHHHHHHHHHHK..",
+    "..KMMHmMMMHMmMMMMHmMMMHMmK..",
+    "..KmmmmmmmmmmmmmmmmmmmmmmK..",
+    "...KKKKKKKKKKKKKKKKKKKKKK...",
+    "............................",
+)
+
+# Phase 6: the Cannone laser, the same stand and barrel with cyan coils round
+# it, a glowing magenta emitter at the muzzle and a straight beam off to the
+# upper right.
+LASER_CANNON = (
+    "..........................Xy",
+    "........................XXyy",
+    ".......................XXyyX",
+    "......................XyyXX.",
+    "....................XXyyX...",
+    "...............KKK.XXyXX....",
+    "............KKKmmmXyyXX.....",
+    "...........KzzmPPPyyX.......",
+    "...........KzzPXyXPX........",
+    ".........KKzzzPXyXPmK.......",
+    "........KXXzZZmPXPPK........",
+    "......KKzzXXZZZmPmK.........",
+    ".....KXXzHZXzZbZZZK.........",
+    "...KKzzXXZZzXbbKZK..........",
+    "..KzzzzZXzZZXXKKKK..........",
+    ".KzzzzZZzXbbbXMMMMK.........",
+    ".KzzzZZZZXXbmmmmmmK.........",
+    ".KzzZZZZbbXXHHHHHHHK........",
+    ".KZZZZbbbbMMmMMMMMmK........",
+    ".KZZZbbbKmmmmmmmmmmKKK......",
+    "..KZbbbHHHHHHHHHHHHHHHK.....",
+    "...KKKMMMmMMMMMmMMMMMmK.....",
+    "...KKKmmmmmmmmmmmmmmmmKKK...",
+    "..KHHHHHHHHHHHHHHHHHHHHHHK..",
+    "..KMMHmMMMHMmMMMMHmMMMHMmK..",
+    "..KmmmmmmmmmmmmmmmmmmmmmmK..",
+    "...KKKKKKKKKKKKKKKKKKKKKK...",
+    "............................",
+)
+
+# Phase 6: the Buco nero, a black disc inside a thin bright photon ring, the
+# flat accretion disc blazing across it (violet, orange, white-hot), streaks of
+# matter curling in on four spiral arms.
+BLACK_HOLE = (
+    "....................K.......",
+    "...................KvK......",
+    ".......KKKKKKK.....KvvK...U.",
+    ".U...KKvvEEEEEK.....KvvK....",
+    "...KKvvvKKKKKEEKK....KvK....",
+    "..KvvKKK.....KKEEK....KvK...",
+    ".KvvK.....KKKKKKKK....KvK...",
+    "KvvK.....KYOYOYOYOK...KvvK..",
+    ".KK.....KYOSKKKKKYOKKKKKvKK.",
+    ".......KYOSKKKKKKKYOOOOOEvvK",
+    ".....KKYOSKKKKKKKKKOYYYYOvvK",
+    "....KEKOKSKKKKKKKKKKUUYYOvK.",
+    "....KEKYKKKKKKKKKKKUUYOOEK..",
+    "...KEKvOKKKKKKKKUUUYYOvEEK..",
+    "..KEEvOYKKKKYUUUYYOOOvKEK...",
+    "..KEOOYUKYUUUYYYOOKKYKEK....",
+    ".KvOYYUUUUYYYOOOKKKKOKEK....",
+    "KvvOYYYYOOOOKKKKKKKOYKK.....",
+    "KvvEOOOOOYKKKKKKKKOYK.......",
+    ".KKvKKKKKOYKKKKKKOYK.....KK.",
+    "..KvvK...KOYOYOYOYK.....KvvK",
+    "...KvK....KKKKKKKK.....KvvK.",
+    "...KvK....KEEKK.....KKKvvK..",
+    "....KvK....KKEEKKKKKvvvKK...",
+    "....KvvK.....KEEEEEvvKK.....",
+    "..U..KvvK.....KKKKKKK....U..",
+    "......KvK...................",
+    ".......K....................",
+)
+
+# Phase 6: the Dinosauro, the first cell of the ninth row: a cheerful green
+# cartoon dinosaur head in profile (an orange crest, a big eye, a wide smile),
+# a bone d4 with its 4 beside it.
+DINOSAUR = (
+    "............................",
+    "........KK.KK...............",
+    ".....KKKOOKOOK..............",
+    "....KOOOYOOYOOK.............",
+    "...KOYOOOOOOOOK.............",
+    "...KOOOOOOgOOLLKK...........",
+    "...KLOOgggGGGGGLLK..........",
+    "...KggggggWWWWWggK..........",
+    "..KLggggggWWDUDggLK.........",
+    "..KgggggggWWDDDgggK.........",
+    ".KLgggggggWWDDDggGGK........",
+    ".KGggggggggWWWgggggK.K......",
+    ".KgggggggOOggggggggKKUK.....",
+    "KgggggggggggggggggKKKUK.....",
+    "KggggggggKKKUKKUKKKKKIK.....",
+    "KggggggggggFFFFFFFIKUIIK....",
+    "KgggggGGIIIIIIIIIIKKIIIK....",
+    "KggggGGGIIIIIIIIIIKUIIIIK...",
+    "KgggGGKKGiiiiiiiiKKUIIIIK...",
+    "KgGGGK..KKKKKKKKK.KIIIIIK...",
+    "KGGGK............KUIRIRIIK..",
+    "KGKK.............KIIRIRIIK..",
+    ".K..............KUIIRRRIIiK.",
+    "................KUIIIIRIIiK.",
+    "................KIIIIIRIIiK.",
+    "...............KUIIIIIIIIIiK",
+    "...............KiiiiiiiiiiiK",
+    "................KKKKKKKKKKK.",
+)
+
+
+ICONS.update({29: CANNON, 30: LASER_CANNON, 31: BLACK_HOLE, 32: DINOSAUR})
 
 
 def chunk(kind, body):
