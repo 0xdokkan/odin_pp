@@ -77,6 +77,8 @@ Tactical_View :: struct {
 	pinball: Pinball_View,
 	// BOMB MARLEY: the ball, the beams, the bomb and the figure (marley.odin).
 	marley: Marley_View,
+	// INONDAZIONE: the way of its wave while the card is held over the board.
+	flood_aim: Flood_Aim,
 	// FIRST PERSON SHOOTER: the camera in the player's eyes, the AK and its
 	// shots (first_person.odin).
 	first_person: First_Person_View,

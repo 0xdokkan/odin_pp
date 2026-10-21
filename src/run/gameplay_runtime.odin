@@ -12,6 +12,10 @@ Card_Interaction_State :: struct {
 	hovered_card_id:  u32,
 	selected_card_id: u32,
 	dragged_card_id:  u32,
+	// INONDAZIONE: the wave's way once the wheel has turned it (else the mouse's
+	// cell gives it).
+	flood_way_set: bool,
+	flood_way: game.Move_Direction,
 }
 
 clear_card_interaction :: proc(state: ^Card_Interaction_State) {
@@ -131,6 +135,8 @@ poll_gameplay_command :: proc(
 	controls: Run_Input = {},
 ) -> (command: Gameplay_Command, has_command: bool) {
 	assert(room != nil && room.player != nil && renderer != nil && card_interaction != nil)
+	// INONDAZIONE's aim is set again below whenever the card is held.
+	render.set_flood_aim(renderer, false, false, .East)
 	// FIRST PERSON SHOOTER: the mouse is the view's and the hand is put away;
 	// only steps and waits are left (first_person_input.odin).
 	if game.tactical_first_person_active(room) {
@@ -182,6 +188,7 @@ poll_gameplay_command :: proc(
 		card_interaction.dragged_card_id = 0
 	}
 
+	update_flood_aim(room, renderer, card_interaction, input_deck, controls.wheel)
 	card_interaction.hovered_card_id = 0
 	if card_interaction.dragged_card_id == 0 && mouse_inside {
 		if hand_index, found := render.hand_card_at_point(
@@ -211,7 +218,8 @@ poll_gameplay_command :: proc(
 			if mouse_inside && render.card_drop_area_contains(renderer, mouse_canvas) &&
 			   renderer.has_hovered_cell {
 				if hand_index, found := game.hand_card_index_by_id(input_deck, dragged_card_id); found {
-					return targeted_card_command(room, input_deck.hand[hand_index], renderer.hovered_cell)
+					card := input_deck.hand[hand_index]
+					return targeted_card_command(room, card, flood_anchor(room, card, renderer.hovered_cell, card_interaction^))
 				}
 			}
 		}
@@ -264,7 +272,8 @@ poll_gameplay_command :: proc(
 			input_deck,
 			card_interaction.selected_card_id,
 		); found {
-			return targeted_card_command(room, input_deck.hand[hand_index], renderer.hovered_cell)
+			card := input_deck.hand[hand_index]
+			return targeted_card_command(room, card, flood_anchor(room, card, renderer.hovered_cell, card_interaction^))
 		}
 		return
 	}

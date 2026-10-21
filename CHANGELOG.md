@@ -29,6 +29,10 @@ per i comandi disponibili oggi valgono il [README](README.md) e la documentazion
   che colpisce chiunque sia nella colonna; luci molto più numerose (4 più dei
   personaggi, una in meno ogni 5 s) e sparse; le caselle del turno dopo si vedono
   in anteprima per tutto il tempo.
+- Inondazione, ritocco: con la carta in mano la rotella del mouse gira la
+  direzione dell'onda di un quarto di giro a scatto (la camera non zooma) e la
+  mappa mostra una freccia grande dal muro di partenza a quello di arrivo, con
+  barre `PARTE` e `FINE` e frecce più sottili sulle altre corsie.
 - Il mazzo della Prova meccaniche resta di dieci carte più la Canna: Movimento
   Ombra e Lama Velenosa lasciano il posto alle due nuove (restano nel gioco).
 

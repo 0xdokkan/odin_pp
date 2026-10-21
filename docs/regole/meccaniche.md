@@ -821,12 +821,25 @@ tutta la mappa e sposta ogni nemico. Regole in
 [flood.odin](../../src/game/flood.odin), onda in
 [flood.odin](../../src/render/flood.odin).
 
-**La direzione.** Si trascina la carta su una casella intorno al Viandante, da 1 a
-3 celle di Chebyshev (la sua stessa casella non vale): l'onda va nel verso
-dell'asse principale dal Viandante a quella casella, una delle quattro
-direzioni, e in parità lungo la riga (est o ovest). Parte dal muro dietro di
-sé, a metà del lato opposto, e corre fino al muro davanti, dove finisce: la
-mappa intera, vista o no.
+**La direzione.** Si trascina la carta (o la si sceglie e poi si clicca) su una
+casella intorno al Viandante, da 1 a 3 celle di Chebyshev (la sua stessa casella
+non vale): l'onda va nel verso dell'asse principale dal Viandante a quella casella,
+una delle quattro direzioni, e in parità lungo la riga (est o ovest). **Con la
+carta in mano la rotella del mouse gira la direzione** di un quarto di giro a
+scatto (in su in senso orario: nord, est, sud, ovest) e la direzione scelta resta
+anche muovendo il mouse, finché la carta non viene giocata o rimessa a posto; la
+rotella intanto non zooma la camera. Giocata dopo la rotella, la carta va su una
+casella che quella direzione indica (la prima delle tre celle in quel verso che il
+gioco accetta), qualunque casella tocchi il mouse. L'onda parte dal muro dietro di
+sé e corre fino al muro davanti, dove finisce: la mappa intera, vista o no.
+
+**L'anteprima.** Con la carta in mano la mappa mostra una freccia grande dal muro da
+cui l'onda parte al muro in cui finisce, lungo la corsia del Viandante (spessa, con
+la punta bianca e le chevron che scorrono), altre frecce più sottili ogni tre
+corsie, una barra ciano sul muro di partenza (`PARTE`) e una bianca su quello di
+arrivo (`FINE`), il pavimento visibile tinto di blu, la corsia del Viandante più
+forte e i nemici che l'onda spingerà cerchiati; sopra il Viandante la scritta
+`ROTELLA: DIREZIONE`.
 
 **L'effetto.** Tutto si risolve in una sola giocata, nell'ordine in cui il fronte
 raggiunge le file dei nemici dalla parte lontana: la testa di una fila si

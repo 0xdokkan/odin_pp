@@ -258,7 +258,9 @@ update_run_board_view :: proc(rs: ^Roguelike_Session, hf: ^host.Frame, screen: R
 	// under the mouse wherever they are (roguelike_pointer_inside).
 	view_inside, hud_inside := roguelike_pointer_inside(rs, rs.frame_input.focused)
 	render.update_tactical_view(&rs.iso_renderer, &rs.room, rs.mouse_canvas, view_inside, input = {
-		orbit_pressed = rs.frame_input.middle_pressed, orbit_down = rs.frame_input.middle_down, wheel = rs.frame_input.wheel,
+		orbit_pressed = rs.frame_input.middle_pressed, orbit_down = rs.frame_input.middle_down,
+		// The wheel turns INONDAZIONE's wave while the card is aimed.
+		wheel = 0 if render.flood_aim_active(&rs.iso_renderer) else rs.frame_input.wheel,
 		window_mouse = {rs.frame_input.mouse_window.x, rs.frame_input.mouse_window.y},
 	})
 	render.tactical_hud_pointer(&rs.iso_renderer, rs.mouse_canvas, hud_inside)

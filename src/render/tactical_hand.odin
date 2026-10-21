@@ -530,7 +530,7 @@ tactical_card_inspector_rules :: proc(card: game.Card_Instance, definition: game
 	if card.definition_id == .Pinball { reaction, rule = "BOSS E MINIBOSS: TROPPO PESANTI", fmt.ctprintf("DOPO %ds SCOPPIA E CADE", int(game.PINBALL_SECONDS)) }
 	if card.definition_id == .First_Person { reaction, rule = "NIENTE CARTE: SOLO L'AK", "WASD SECONDO LA VISTA" }
 	if card.definition_id == .Bomb_Marley { reaction, rule = "SOLO SULLE CASELLE LUCI", fmt.ctprintf("+%ds A UCCISIONE / MAX %ds", game.MARLEY_KILL_SECONDS, game.MARLEY_MAX_SECONDS) }
-	if card.definition_id == .Flood { reaction, rule = "UNA CASELLA PER NEMICO", "TRASCINA: LA DIREZIONE" }
+	if card.definition_id == .Flood { reaction, rule = "UNA CASELLA PER NEMICO", "ROTELLA: GIRA LA FRECCIA" }
 	if card.definition_id == .Guard || card.definition_id == .Purifying_Guard { reaction = "QTE: BLOCK / PARRY" }
 	if card.definition_id == .Thorn_Coat { reaction = "QTE: DEVIAZIONE (FRECCE)" }
 	if card.definition_id == .Afterimage { reaction = "IGNORA RECUPERO SCHIVA" }

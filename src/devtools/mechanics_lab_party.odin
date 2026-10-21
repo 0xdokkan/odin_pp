@@ -70,6 +70,13 @@ mechanics_lab_flood :: proc(window: ^app.Window, renderer: ^render.Renderer, roo
 	id, held := mechanics_lab_hand_card(player, .Flood)
 	if !held { fmt.eprintln("mechanics lab: no Inondazione in hand"); return false }
 	mechanics_lab_still(window, renderer, room, id, "odin_pp_mechanics_lab_card_Flood.png")
+	// The card held over the board: the arrow of its way from the mouse's cell
+	// (east), and the way the wheel turned it to (north).
+	render.set_flood_aim(renderer, true, false, .East)
+	mechanics_lab_capture_aim(window, renderer, room, id, {center.x+2, center.y}, "odin_pp_mechanics_lab_flood_aim_east.png")
+	render.set_flood_aim(renderer, true, true, .North)
+	mechanics_lab_capture_aim(window, renderer, room, id, {center.x+2, center.y}, "odin_pp_mechanics_lab_flood_aim_north.png")
+	render.set_flood_aim(renderer, false, false, .East)
 	if !mechanics_lab_play(window, renderer, room, controller, cards, buffer, .Flood, game.cell_target({center.x+2, center.y})) {
 		fmt.eprintln("mechanics lab: the Inondazione was not played"); return false
 	}
