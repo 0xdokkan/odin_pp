@@ -10,7 +10,6 @@ import render "../render"
 
 // A fresh arena for an act of the party: the player in the middle, nothing on
 // him and no window about to run out, no loot, no fire, no foe.
-@(private = "file")
 mechanics_lab_party_arena :: proc(window: ^app.Window, renderer: ^render.Renderer, room: ^game.Room, controller: ^run_session.Tactical_Controller,
 	cards: ^run_session.Card_Interaction_State, buffer: ^run_session.Buffered_Gameplay_Command, name: string) -> bool {
 	player := room.player
@@ -25,6 +24,8 @@ mechanics_lab_party_arena :: proc(window: ^app.Window, renderer: ^render.Rendere
 	game.clear_ground(room)
 	clear(&room.loot)
 	room.marley = {}
+	room.ride = {}
+	clear(&room.objects)
 	player.tactical.config.shrinking_window = false
 	player.health = player.stats.max_health
 	player.position = {run_session.MECHANICS_LAB_WIDTH/2, run_session.MECHANICS_LAB_HEIGHT/2}

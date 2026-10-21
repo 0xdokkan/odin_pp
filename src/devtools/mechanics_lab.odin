@@ -48,7 +48,8 @@ mechanics_lab_smoke_frame :: proc(window: ^app.Window, renderer: ^render.Rendere
 // fire, the player's charges and, last, the Lazzo, the Pinball
 // (mechanics_lab_pinball.odin), the First Person Shooter
 // (mechanics_lab_first_person.odin), the Inondazione and Bomb Marley
-// (mechanics_lab_party.odin) and the Canna da Pesca.
+// (mechanics_lab_party.odin), the Cannone, the Buco Nero and the Dinosauro
+// (mechanics_lab_arsenal.odin) and the Canna da Pesca.
 run_mechanics_lab_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer, dice: ^render.Dice_Renderer) -> bool {
 	data: level.Level
 	defer level.destroy(&data)
@@ -224,6 +225,9 @@ run_mechanics_lab_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer,
 	if !mechanics_lab_first_person(window, renderer, &room, &data, &controller, &cards, &buffer) { return false }
 	if !mechanics_lab_flood(window, renderer, &room, &controller, &cards, &buffer) { return false }
 	if !mechanics_lab_marley(window, renderer, &room, &controller, &cards, &buffer) { return false }
+	if !mechanics_lab_cannon(window, renderer, &room, &controller, &cards, &buffer) { return false }
+	if !mechanics_lab_black_hole(window, renderer, &room, &controller, &cards, &buffer) { return false }
+	if !mechanics_lab_dinosaur(window, renderer, &room, &controller, &cards, &buffer) { return false }
 	if !mechanics_lab_fishing(window, renderer, dice, &room, &controller, &cards, &buffer) { return false }
 	return mechanics_lab_sounds_heard(renderer)
 }
@@ -1755,6 +1759,16 @@ mechanics_lab_sounds_heard :: proc(renderer: ^render.Renderer) -> bool {
 	for sfx in ([?]audio.Lab_Sfx{.Card_Bomb_Marley, .World_Marley_Ball, .World_Marley_Lights, .World_Marley_Warn, .World_Marley_Bomb,
 		.World_Marley_Blast, .World_Marley_Safe, .World_Marley_Bonus, .World_Marley_Groove_A, .World_Marley_Groove_B, .World_Marley_End}) {
 		if sounds.played[sfx] == 0 { fmt.eprintln("mechanics lab: no sound for the party", sfx); return false }
+	}
+	// The Cannone's: its card, the stand, a shot, a strike, the beam, the fall;
+	// the Buco Nero's: its card, the opening, the hum, the pull, a foe swallowed,
+	// the closing; the Dinosauro's: its card, a roar of each, the steps, a stomp
+	// and the climb down; the Sanguinamento's.
+	for sfx in ([?]audio.Lab_Sfx{.Card_Cannon, .Card_Laser_Cannon, .World_Cannon_Place, .World_Cannon_Fire, .World_Cannon_Hit, .World_Laser_Fire,
+		.World_Cannon_Break, .Card_Black_Hole, .World_Black_Hole_Open, .World_Black_Hole_Hum, .World_Black_Hole_Pull, .World_Black_Hole_Swallow,
+		.World_Black_Hole_Close, .Card_Dinosaur, .World_Dino_Roar_Raptor, .World_Dino_Roar_Stego, .World_Dino_Roar_Dilo, .World_Dino_Roar_Giga,
+		.World_Dino_Step_Small, .World_Dino_Step_Heavy, .World_Dino_Stomp, .World_Dino_Dismount, .Ui_Status_Bleed, .World_Bleed_Tick}) {
+		if sounds.played[sfx] == 0 { fmt.eprintln("mechanics lab: no sound for the arsenal", sfx); return false }
 	}
 	fmt.eprintln("mechanics lab sounds:", heard)
 	return true

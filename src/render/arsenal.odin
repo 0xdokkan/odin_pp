@@ -26,7 +26,7 @@ import tween "../engine/tween"
 
 ARSENAL_BALL_SIZE :: 12
 // How tall the dinosaurs' 40-pixel canvas stands in the world.
-DINO_WORLD_HEIGHT :: f32(1.15)
+DINO_WORLD_HEIGHT :: f32(1.9)
 DINO_MARGIN :: 3
 DINO_KINDS :: 4
 // The row of the canvas the dinosaur's feet end on (dino_art.odin).
