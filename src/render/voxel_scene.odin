@@ -156,6 +156,7 @@ draw_voxel_object :: proc(renderer: ^Renderer, object: Presentation_Grid_Object)
 
 @(private)
 draw_voxel_cover :: proc(renderer: ^Renderer, cell: grid.Position) {
+	if neon_active(renderer) { draw_neon_rock(renderer, cell); return }
 	p := rl.Vector3{f32(cell.x)+0.5, 0.2, f32(cell.y)+0.5}
 	draw_resin_cube(renderer, p, 0.72, 0.4, 0.72, RESIN_WALL)
 	draw_resin_cube(renderer, p+rl.Vector3{0.03, 0.23, -0.02}, 0.76, 0.12, 0.76, RESIN_CAP)
@@ -197,10 +198,13 @@ draw_voxel_exit :: proc(renderer: ^Renderer, cell: grid.Position) {
 @(private)
 draw_voxel_fog :: proc(renderer: ^Renderer, room: ^game.Room) {
 	if renderer.tactical.no_fog { return }
+	neon := neon_active(renderer)
+	time := f32(tactical_world_time(renderer))
 	for y in 0..<room.level_data.tiles.height {
 		for x in 0..<room.level_data.tiles.width {
 			if !tactical_cell_on_screen(renderer, {x, y}) { continue }
 			if tactical_render_visible(renderer, {x, y}) { continue }
+			if neon { draw_neon_fog_block(renderer, x, y, time); continue }
 			p := rl.Vector3{f32(x)+0.5, 0, f32(y)+0.5}
 			rl.DrawCube(p+rl.Vector3{0, -0.15, 0}, 1, 0.3, 1, {7, 10, 16, 255})
 			for layer in 0..<2 {

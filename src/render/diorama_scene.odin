@@ -116,6 +116,7 @@ draw_diorama_wall_face :: proc(center, normal: rl.Vector3, height: f32, variant:
 // opaque; the upper body is submitted with actors in the sorted alpha pass.
 @(private)
 draw_diorama_wall :: proc(renderer: ^Renderer, room: ^game.Room, cell: grid.Position) {
+	if neon_active(renderer) { draw_neon_wall(renderer, room, cell); return }
 	if renderer.tactical.kit.loaded { draw_diorama_kit_wall(renderer, room, cell); return }
 	p := rl.Vector3{f32(cell.x)+0.5, 0, f32(cell.y)+0.5}
 	n := gothic_hash(cell.x, cell.y)
@@ -151,6 +152,7 @@ draw_diorama_wall :: proc(renderer: ^Renderer, room: ^game.Room, cell: grid.Posi
 @(private)
 draw_tactical_tile :: proc(renderer: ^Renderer, room: ^game.Room, tile: level.Tile, cell: grid.Position, preview: ^Card_Range_Preview = nil) {
 	if tile.kind == .Void { return }
+	if neon_active(renderer) { draw_neon_tile(renderer, room, tile, cell, preview); return }
 	p := rl.Vector3{f32(cell.x)+0.5, 0, f32(cell.y)+0.5}
 	n := gothic_hash(cell.x, cell.y)
 	shade := u8(n%11)
@@ -210,11 +212,14 @@ draw_diorama_accents :: proc(renderer: ^Renderer, room: ^game.Room) {
 	defer { rlgl.DrawRenderBatchActive(); rlgl.EnableDepthMask() }
 	// The world's clock: the lamps and the dust hold still with it.
 	time := f32(tactical_world_time(renderer))
+	neon := neon_active(renderer)
 	for y in 0..<room.level_data.tiles.height { for x in 0..<room.level_data.tiles.width {
 		cell := grid.Position{x, y}
 		if !tactical_cell_on_screen(renderer, cell) || !tactical_render_visible(renderer, cell) { continue }
 		if !diorama_interior_wall(room, cell) {
-			if lamp, found := diorama_lamp(renderer, room, cell); found { draw_diorama_lamp_glow(renderer, lamp, cell) }
+			if lamp, found := diorama_lamp(renderer, room, cell); found {
+				if neon { draw_neon_lamp_glow(renderer, lamp, cell) } else { draw_diorama_lamp_glow(renderer, lamp, cell) }
+			}
 		}
 		tile, _ := level.tile_at(room.level_data, cell)
 		n := gothic_hash(x, y)
@@ -222,6 +227,10 @@ draw_diorama_accents :: proc(renderer: ^Renderer, room: ^game.Room) {
 		phase := math.mod(time*0.14+f32(n%29)/29, f32(1))
 		p := rl.Vector3{f32(x)+0.5+math.sin(time*0.5+f32(n%9))*0.17, 0.14+phase*0.9, f32(y)+0.5}
 		alpha := u8(math.sin(phase*math.PI)*65)
-		rl.DrawCube(p, 0.024, 0.024, 0.024, {128, 177, 214, alpha})
+		if neon {
+			rl.DrawCube(p, 0.024, 0.024, 0.024, neon_mote_color(renderer, u8(f32(alpha)*0.8)))
+		} else {
+			rl.DrawCube(p, 0.024, 0.024, 0.024, {128, 177, 214, alpha})
+		}
 	} }
 }

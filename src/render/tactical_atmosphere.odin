@@ -33,6 +33,8 @@ update_tactical_atmosphere :: proc(renderer: ^Renderer, dt: f32) {
 // The key light comes from -X/-Z, so the short wall shadows fall toward +X/+Z.
 @(private)
 draw_tactical_ground_shadows :: proc(renderer: ^Renderer, room: ^game.Room) {
+	// A black floor shows no shadow: the neon world skips them.
+	if neon_active(renderer) { return }
 	for y in 0..<room.level_data.tiles.height {
 		for x in 0..<room.level_data.tiles.width {
 			cell := grid.Position{x, y}

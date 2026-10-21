@@ -17,6 +17,8 @@ start :: proc(args: []string) {
 	defer delete(rest)
 	options := DEFAULT_RUNTIME_OPTIONS
 	roguelike_parse_arguments(&options, rest[:])
+	// Every renderer made from here on starts with this look.
+	render.set_startup_environment_theme(options.environment_theme)
 	rs := run_session.roguelike_session_new(options.gameplay)
 	if (launch.minigame != "" || launch.smoke_menu) && (launch.run || roguelike_requires_direct_start(&options)) {
 		fmt.eprintln("choose a run/lab/smoke or a launcher minigame, not both")

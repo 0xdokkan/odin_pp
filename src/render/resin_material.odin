@@ -11,13 +11,18 @@ RESIN_CAP :: rl.Color{65, 83, 107, 255}
 
 // Values of the shared shader's `hologram` uniform. Model mode samples the
 // numeral atlas and omits the board's fog, clear-room light and accents.
-Resin_Light_Mode :: enum c.int {Board = 0, Hologram = 1, Model = 2}
+// Neon (3) is the neon-void environment (neon_world.odin): black gloss, seams
+// and facets, drawn through the same program.
+Resin_Light_Mode :: enum c.int {Board = 0, Hologram = 1, Model = 2, Neon = 3}
 
 Resin_Lighting :: struct {
 	eye, lantern: rl.Vector3,
 	mode: Resin_Light_Mode,
 	clear: f32,
 	accents: [4]rl.Vector4,
+	// Neon only: the world's clock and the room's glow colour.
+	neon_time: f32,
+	neon_glow: [3]f32,
 }
 
 // Bind one resin pass. Callers keep their shader-availability guards and pair
@@ -37,6 +42,7 @@ begin_resin_lighting :: proc(renderer: ^Renderer, lighting: Resin_Lighting) {
 		rl.SetShaderValue(v.light_shader, v.light_clear_location, &values.clear, .FLOAT)
 		rl.SetShaderValueV(v.light_shader, v.light_accents_location, raw_data(values.accents[:]), .VEC4, 4)
 	}
+	if values.mode == .Neon { neon_bind_uniforms(v.light_shader, values.neon_time, values.neon_glow) }
 	rl.BeginShaderMode(v.light_shader)
 }
 
@@ -60,7 +66,9 @@ void main() {
     gl_Position = mvp * vec4(vertexPosition, 1.0);
 }`
 
-TACTICAL_LIGHT_FRAGMENT :: `#version 330
+TACTICAL_LIGHT_FRAGMENT :: TACTICAL_LIGHT_FRAGMENT_HEAD + NEON_GLSL_DECLS + TACTICAL_LIGHT_FRAGMENT_BODY
+
+TACTICAL_LIGHT_FRAGMENT_HEAD :: `#version 330
 in vec3 worldPosition;
 in vec3 normal;
 in vec2 surfaceUV;
@@ -73,7 +81,9 @@ uniform vec4 accentLights[4];
 uniform sampler2D texture0;
 out vec4 finalColor;
 float grain(vec2 p) { return fract(sin(dot(p, vec2(127.1,311.7)))*43758.5453); }
-void main() {
+`
+
+TACTICAL_LIGHT_FRAGMENT_BODY :: `void main() {
     vec3 n = normalize(normal);
     vec4 material = color;
     // Model numerals share the resin shader with the body. Their font atlas
@@ -89,7 +99,7 @@ void main() {
         finalColor = vec4(base*(0.48+sun*0.58), color.a);
         return;
     }
-    vec2 uv = abs(n.y) > 0.5 ? worldPosition.xz :
+`+NEON_GLSL_BRANCH+`    vec2 uv = abs(n.y) > 0.5 ? worldPosition.xz :
               (abs(n.z) > 0.5 ? worldPosition.xy : worldPosition.zy);
     if (hologram == 2) uv = surfaceUV;
     float noise = grain(floor(uv*28.0));

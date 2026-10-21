@@ -9,6 +9,9 @@ Tactical_Surface :: struct {
 	target, parent: rl.RenderTexture2D,
 	resolve: rl.Shader,
 	frozen_location, focus_location, aspect_location: c.int,
+	// The neon world's grade (neon_world.odin): a faint scan and grain on the
+	// dark of the board, off in the gothic look.
+	neon_location, time_location: c.int,
 }
 
 // `frozen` (MOVIMENTO OMBRA): the world's colours drain toward a cold grey,
@@ -20,6 +23,8 @@ uniform sampler2D texture0;
 uniform float frozen;
 uniform vec3 focus;
 uniform float aspect;
+uniform float neon;
+uniform float time;
 out vec4 finalColor;
 void main() {
     vec3 c = texture(texture0, fragTexCoord).rgb;
@@ -29,6 +34,15 @@ void main() {
         vec2 d = (fragTexCoord-focus.xy)*vec2(aspect, 1.0);
         float keep = 1.0-smoothstep(focus.z*0.45, focus.z, length(d));
         c = mix(c, still, frozen*(1.0-keep));
+    }
+    if (neon > 0.5) {
+        // Weighted by the darkness, so sprites, cards and light keep their
+        // pixels: only the black of the void and the floor is touched.
+        float lum = dot(c, vec3(0.299, 0.587, 0.114));
+        float dark = 1.0-smoothstep(0.05, 0.35, lum);
+        float scan = 0.5+0.5*sin(gl_FragCoord.y*1.5708);
+        float g = fract(sin(dot(gl_FragCoord.xy+vec2(floor(time*8.0)*17.0, 0.0), vec2(12.9898, 78.233)))*43758.5453);
+        c += dark*(scan*vec3(0.012, 0.0015, 0.003)+(g-0.5)*vec3(0.014, 0.006, 0.008));
     }
     finalColor = vec4(c, 1.0);
 }
@@ -50,7 +64,8 @@ create_tactical_surface :: proc(renderer: ^Renderer, parent: rl.RenderTexture2D)
 	// or room that was drawn into the parent canvas earlier in the same frame.
 	resolve := rl.LoadShaderFromMemory(nil, TACTICAL_SURFACE_RESOLVE)
 	renderer.tactical.surface^ = {target, parent, resolve, rl.GetShaderLocation(resolve, "frozen"),
-		rl.GetShaderLocation(resolve, "focus"), rl.GetShaderLocation(resolve, "aspect")}
+		rl.GetShaderLocation(resolve, "focus"), rl.GetShaderLocation(resolve, "aspect"),
+		rl.GetShaderLocation(resolve, "neon"), rl.GetShaderLocation(resolve, "time")}
 }
 
 @(private)
@@ -82,6 +97,10 @@ end_tactical_surface :: proc(renderer: ^Renderer, active: bool) {
 	rl.ClearBackground(RESIN_BACKGROUND)
 	frozen := renderer.tactical.shadow.frozen
 	rl.SetShaderValue(surface.resolve, surface.frozen_location, &frozen, .FLOAT)
+	neon := f32(1) if neon_active(renderer) else f32(0)
+	time := f32(tactical_world_time(renderer))
+	rl.SetShaderValue(surface.resolve, surface.neon_location, &neon, .FLOAT)
+	rl.SetShaderValue(surface.resolve, surface.time_location, &time, .FLOAT)
 	if frozen > 0 {
 		// The surface's uv runs bottom up.
 		at := renderer.tactical.shadow.at
@@ -99,6 +118,7 @@ end_tactical_surface :: proc(renderer: ^Renderer, active: bool) {
 
 @(private)
 draw_tactical_backdrop :: proc(renderer: ^Renderer) {
+	if neon_active(renderer) { draw_neon_backdrop(renderer); return }
 	rl.ClearBackground(RESIN_BACKGROUND)
 	rl.DrawRectangleGradientV(0, 0, c.int(renderer.canvas_width), c.int(renderer.canvas_height), {8, 14, 23, 255}, RESIN_BACKGROUND)
 	rl.DrawCircleGradient({renderer.canvas_width*0.51, renderer.canvas_height*0.4}, renderer.canvas_width*0.43,

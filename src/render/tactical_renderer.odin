@@ -14,6 +14,8 @@ Tactical_View :: struct {
 	art: Gothic_Art,
 	perspective, no_fog: bool,
 	refocus_enabled: bool,
+	// The look of the level (neon_world.odin); the zero value is neon.
+	theme: Environment_Theme,
 	camera: rl.Camera3D,
 	draw_frustum: Tactical_Draw_Frustum,
 	zoom: f32,
@@ -101,6 +103,7 @@ Tactical_View :: struct {
 
 create_tactical_assets :: proc(renderer: ^Renderer, parent: rl.RenderTexture2D = {}) {
 	renderer.tactical.snapshot = new(Room_Presentation)
+	renderer.tactical.theme = startup_environment_theme
 	renderer.tactical.labels = new(Tactical_Label_Layout)
 	renderer.tactical.block_mesh = build_dice_bevel_mesh()
 	create_tactical_lighting(renderer)
@@ -504,6 +507,7 @@ draw_tactical_world :: proc(renderer: ^Renderer, room: ^game.Room, active_card: 
 	if surface { rl.EndMode2D() }
 	lights = prepare_diorama_lights(renderer, room)
 	rl.BeginMode3D(v.camera)
+	draw_neon_hills(renderer, room)
 	draw_voxel_fog(renderer, room)
 	begin_tactical_lighting(renderer, accents = lights)
 
@@ -520,6 +524,8 @@ draw_tactical_world :: proc(renderer: ^Renderer, room: ^game.Room, active_card: 
 		draw_voxel_cover(renderer, obstacle.position)
 	}
 
+	// The props and the loot keep the board's own lighting and colours.
+	neon_use_board_material(renderer, true)
 	for trap in snapshot.traps[:snapshot.trap_count] {
 		if !trap.armed || !tactical_cell_on_screen(renderer, trap.position) || !tactical_render_visible(renderer, trap.position) { continue }
 		draw_voxel_trap(renderer, trap)

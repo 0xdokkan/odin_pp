@@ -36,6 +36,30 @@ per i comandi disponibili oggi valgono il [README](README.md) e la documentazion
 - Il mazzo della Prova meccaniche resta di dieci carte più la Canna: Movimento
   Ombra e Lama Velenosa lasciano il posto alle due nuove (restano nel gioco).
 
+## 2026-10-21 — Mondo neon: ambiente da vecchio mondo virtuale
+
+- Nuovo aspetto del livello, predefinito: pavimento nero lucido con fili
+  cremisi fra le piastrelle che respirano sull'orologio del mondo, circuiti
+  incisi radi, mura a blocchi neri sfaccettati con spigoli neon, ostacoli come
+  rocce nere poligonali, lampade a tubo rosso, polvere rosso scuro, fog nera
+  con contorno rosso spento (identica per ogni cella nascosta) e fondale nero
+  con alone rosso all'orizzonte e un anello di basse colline poligonali
+  generate da dimensioni, famiglia, incontro e uscita della stanza (al massimo
+  26 mesh, ritagliate dall'inquadratura, mai sopra una cella di gioco).
+- La famiglia della stanza sposta il tono del neon (rosso, cremisi, rosso
+  magenta, rosso arancio, rosso sangue). Righe e grana molto tenui nella
+  risoluzione della scena, pesate sul buio. Carte, HUD, mano, cartoncini,
+  dadi, minacce, luce della portata, uscita e prima persona restano invariati.
+- Il tema gotico resta come opzione nascosta: `Environment_Theme` in
+  `Tactical_View`, `--theme=gothic` / `--theme=neon` da riga di comando
+  ([Avvio](docs/avvio.md)). Stesso programma per resina e neon, selezionato
+  dalla modalità 3; il percorso gotico non è stato modificato.
+- Misura (`--smoke-arenas-view`, tempo CPU di disegno del mondo, stanze fino a
+  45x31): neon 4,8 ms a frame contro 9,7-10,1 ms del gotico, perché il
+  pavimento è una piastrella sola invece di due.
+- Test: parsing dell'opzione, tema predefinito, colline (determinismo, numero,
+  distanza dalle mura, nessuna cella coperta per ogni orbita) e materiale.
+
 ## 2026-10-20 — Verifica prima della pubblicazione
 
 - Ripristinato `scripts/check.sh --quick`: il registro delle combinazioni

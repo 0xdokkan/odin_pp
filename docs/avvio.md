@@ -149,6 +149,7 @@ misure e un ascolto di tutta la famiglia, senza toccare il gioco.
 | Opzione | Uso |
 |---|---|
 | `--run` | salta il menu ed entra subito nella run |
+| `--theme=neon` / `--theme=gothic` | aspetto del livello: `neon` (predefinito) è il mondo virtuale nero con neon rosso ([Il mondo neon](presentazione.md#il-mondo-neon)); `gothic` riporta il diorama blu di prima. Opzione nascosta, vale per tutta la sessione, anche per Mostra effetto |
 | `--minigame=<id>` | apre un minigioco sopra il menu (`platform2d`, `platform3d`, `arena`, `fps`, `puzzle`, `ring`) |
 | `--smoke-menu` | cattura `odin_pp_menu.png` dopo 30 frame ed esce |
 | `--animation-speed=2` | velocità delle animazioni ordinarie, fra 0.25x e 4x; non accelera cast o dadi M8 |

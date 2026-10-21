@@ -80,9 +80,11 @@ create_tactical_lighting :: proc(renderer: ^Renderer) {
 begin_tactical_lighting :: proc(renderer: ^Renderer, hologram: bool = false, accents: [4]rl.Vector4 = {}) {
 	v := &renderer.tactical
 	p := v.snapshot.player.position
+	mode := Resin_Light_Mode.Hologram if hologram else (Resin_Light_Mode.Neon if neon_active(renderer) else Resin_Light_Mode.Board)
 	begin_resin_lighting(renderer, {
 		eye = v.camera.position, lantern = {p.x+0.5, 2.8, p.y+0.5},
-		mode = .Hologram if hologram else .Board, clear = v.clear_light, accents = accents,
+		mode = mode, clear = v.clear_light, accents = accents,
+		neon_time = f32(tactical_world_time(renderer)), neon_glow = neon_glow(renderer),
 	})
 }
 @(private)
