@@ -250,6 +250,7 @@ draw_card_target_details :: proc(renderer: ^Renderer, room: ^game.Room, preview:
 	if card.definition_id == .Pinball { draw_pinball_preview(renderer, room, card) }
 	if !preview.has_hover { return }
 	evaluation := &preview.hover
+	if card.definition_id == .Flood { draw_flood_preview(renderer, room, evaluation.query.anchor, evaluation.error == .None && preview.affordable) }
 	if game.card_places_ground(card.definition_id) {
 		draw_ground_preview(renderer, room, card.definition_id, evaluation.query.anchor, evaluation.error == .None && preview.affordable)
 	}

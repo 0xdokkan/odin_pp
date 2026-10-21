@@ -25,6 +25,7 @@ CARD_DEMO_MAX_FOES :: 6
 CARD_DEMO_MAX_OBJECTS :: 4
 CARD_DEMO_MAX_COILS :: 2
 CARD_DEMO_MAX_POOLS :: 8
+CARD_DEMO_MAX_FIRES :: 2
 CARD_DEMO_MAX_FILLERS :: 3
 CARD_DEMO_MAX_ACTIONS :: 12
 // FIRST PERSON SHOOTER's take: a burst of the AK every this many seconds,
@@ -110,6 +111,14 @@ Card_Demo_Scene :: struct {
 	// Veleno 2 poured before the take.
 	pools: [CARD_DEMO_MAX_POOLS]grid.Position,
 	pool_count: int,
+	// Fires lit before the take (Bruciatura 1).
+	fires: [CARD_DEMO_MAX_FIRES]grid.Position,
+	fire_count: int,
+	// BOMB MARLEY's script: the lights and the first column (marley_demo).
+	marley: bool,
+	marley_lights: [3]grid.Position,
+	marley_light_count: int,
+	marley_column: int,
 	// More cards in the deck, so that draws have something to draw.
 	fillers: [CARD_DEMO_MAX_FILLERS]Card_Id,
 	filler_count: int,
@@ -390,6 +399,34 @@ card_demo_scene :: proc(id: Card_Id, upgrade_level: i32 = 0) -> (scene: Card_Dem
 		scene.foe_hurt = 3
 	// CANNA DA PESCA: a cleared room, the rod's slot, the water at his right,
 	// the player a little hurt so that the food's cure shows.
+	// BOMB MARLEY: one column warned, and two foes in it, one standing in a
+	// light and one not: the bomb hurts the one and spares the other. The film
+	// ends a few seconds after, long before the party would.
+	case .Bomb_Marley:
+		scene.foes[0] = {at = card_demo_offset(3, -2), archetype = .Chaser, health = 30, attack = 1}
+		scene.foes[1] = {at = card_demo_offset(3, 1), archetype = .Chaser, health = 30, attack = 1}
+		scene.foe_count = 2
+		scene.marley = true
+		scene.marley_lights = {card_demo_offset(3, -2), card_demo_offset(-2, 1), {}}
+		scene.marley_light_count = 2
+		scene.marley_column = CARD_DEMO_PLAYER.x+3
+		scene.seconds = 4
+		scene.foe_hurt = 1
+		scene.expects = {.Marley_Warned, .Marley_Bomb, .Marley_Saved, .Damaged}
+	// INONDAZIONE: foes in the wave's way, one against the far wall, and two
+	// fires (one a card's, one the board's) it puts out. Dropped north east of
+	// the player, the aim is a tie: the wave goes east.
+	case .Flood:
+		scene.foes[0] = {at = card_demo_offset(-2, -1), archetype = .Chaser, health = 30, attack = 1}
+		scene.foes[1] = {at = card_demo_offset(1, 2), archetype = .Chaser, health = 30, attack = 1}
+		scene.foes[2] = {at = card_demo_offset(4, 0), archetype = .Chaser, health = 30, attack = 1}
+		scene.foe_count = 3
+		scene.fires[0] = card_demo_offset(-1, 3)
+		scene.fire_count = 1
+		scene.objects[0] = {kind = .Fire, position = card_demo_offset(2, -3)}
+		scene.object_count = 1
+		scene.seconds = 2
+		scene.expects = {.Moved, .Fire_Extinguished}
 	case .Fishing_Rod:
 		scene = {gesture = .Rod_Slot, target = card_demo_offset(2, -2), cleared = true, faces = {3, 0, 0}, seconds = 1, wounds = 6}
 	}
@@ -629,6 +666,13 @@ create_card_demo_room :: proc(given: Card_Demo_Scene, card: Card_Instance, dice:
 	for cell in scene.pools[:scene.pool_count] {
 		action := make_action(.Card, PLAYER_ENTITY, cell_target(cell), .Walkable_Cell)
 		if !add_effect(&action, place_ground_effect(cell, .Poison, 2)) || !resolve_action(room, &action).accepted { return }
+	}
+	for cell in scene.fires[:scene.fire_count] {
+		action := make_action(.Card, PLAYER_ENTITY, cell_target(cell), .Walkable_Cell)
+		if !add_effect(&action, place_ground_effect(cell, .Burn, 1)) || !resolve_action(room, &action).accepted { return }
+	}
+	if scene.marley {
+		room.marley_demo = {scripted = true, lights = scene.marley_lights, light_count = scene.marley_light_count, column = scene.marley_column}
 	}
 	if scene.player_stacks > 0 {
 		if applied, _ := apply_status(room, PLAYER_ENTITY, scene.player_status, scene.player_stacks, 0); !applied { return }

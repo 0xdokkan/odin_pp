@@ -232,6 +232,7 @@ Room :: struct {
 	// the columns (marley.odin).
 	marley: Marley_State,
 	marley_random: u64,
+	marley_demo: Marley_Demo,
 	// FIRST PERSON SHOOTER: the seconds behind the player's eyes and his AK's
 	// shots (first_person.odin); a new room starts them afresh.
 	first_person: First_Person_State,

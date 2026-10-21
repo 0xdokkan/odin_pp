@@ -5,6 +5,28 @@ I riferimenti a Classica, `--flat` e ai vecchi smoke descrivono versioni precede
 per i comandi disponibili oggi valgono il [README](README.md) e la documentazione collegata.
 
 
+## 2026-10-21 — Bomb Marley e Inondazione
+
+- **Inondazione** (non comune, energia 2, 2 s, fino a +3): un'onda attraversa
+  tutta la mappa dal muro dietro la direzione scelta al muro davanti, spegne
+  tutti i fuochi e spinge ogni nemico di una casella (+1 per upgrade, +1 sul
+  colpo a tempo) con le normali regole di spinta; nessun danno. Regole in
+  `game/flood.odin`, onda e vapore in `render/flood.odin`.
+- **Bomb Marley** (rara, energia 3, 2 s, fino a +5): una festa di 35 s del
+  mondo (+5 s per nemico ucciso da una bomba, 90 in tutto) a battiti di un
+  secondo. Una sfera da discoteca illumina caselle che salvano; bombe da 6
+  danni (+1 per upgrade) attraversano colonne intere, annunciate due battiti
+  prima, e non toccano chi sta su una luce. Poche bombe all'inizio, poi sempre
+  di più; le luci calano con il tempo. Bomb Marley non è un'entità della stanza:
+  nessuno lo tocca né lo vede come bersaglio. I nemici evitano le colonne
+  annunciate e cercano le luci vicine. Regole in `game/marley.odin`, tavolo in
+  `render/marley.odin`.
+- Catalogo a 46 carte. Icone, suoni (compreso un groove reggae a 60 BPM),
+  testi, chip dell'HUD, film di Mostra effetto (quello di Bomb Marley finisce
+  alla prima bomba, non dopo l'intera festa) e atti della Prova meccaniche.
+- Il mazzo della Prova meccaniche resta di dieci carte più la Canna: Movimento
+  Ombra e Lama Velenosa lasciano il posto alle due nuove (restano nel gioco).
+
 ## 2026-10-20 — Verifica prima della pubblicazione
 
 - Ripristinato `scripts/check.sh --quick`: il registro delle combinazioni

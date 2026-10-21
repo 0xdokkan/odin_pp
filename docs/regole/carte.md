@@ -118,7 +118,7 @@ si perde: non resta in coda.
 
 ### Catalogo delle carte
 
-Esiste un solo catalogo di **44 carte**, in [card.odin](../../src/game/card.odin)
+Esiste un solo catalogo di **46 carte**, in [card.odin](../../src/game/card.odin)
 (`CARD_DEFINITIONS`): costo, targeting, effetti, rarità e metadati sono condivisi
 da gameplay, preview, HUD e offerte. Non ci sono più sovrascritture per modalità.
 Il bilanciamento delle carte originarie è descritto nella sezione

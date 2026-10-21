@@ -89,7 +89,7 @@ le immagini sono output rigenerabili, non prerequisiti del checkout.
 | `--smoke-arenas-view` | quattro fasce di arene reali, combattimento, ologramma, Loot e cambio stanza; screenshot `odin_pp_arenas_*.png` |
 | `--smoke-m8-view` | dispositivi con APRI IL RING, campo, tag match, ritorno Loot: `odin_pp_m8_d4.png`, `devices`, `mega_combo`, `character`, `loot`, `tag_ring`, `next_room` (tutti con prefisso `odin_pp_m8_` e suffisso `.png`) |
 | `--smoke-western` | 6 RANCH 7 dalla mano al premio: `odin_pp_western_hand.png`, `cards`, `sign`, `gate`, `riders`, `ride`, `grab`, `win`, `reward` (prefisso `odin_pp_western_`) |
-| `--smoke-mechanics-lab` | Prova meccaniche in 3D: mano e testi, status, intenti, colpi, ombra, pozze, incendio, cariche, Lazzo, Pinball, FPS e pesca; replay e screenshot `odin_pp_mechanics_lab_*.png` / `odin_pp_living_*.png` |
+| `--smoke-mechanics-lab` | Prova meccaniche in 3D: mano e testi, status, intenti, colpi, pozze, incendio, cariche, Lazzo, Pinball, FPS, Inondazione, Bomb Marley e pesca; replay e screenshot `odin_pp_mechanics_lab_*.png` / `odin_pp_living_*.png` |
 | `--smoke-effect-window` | Mostra effetto: ingressi da ogni menu, isolamento della run, chiusura senza click-through, testi, film delle carte e tempi dei frame. `-define:EFFECT_SMOKE_CARDS=,Strike,Pinball,` limita le carte filmate. Screenshot `odin_pp_effect_*.png` |
 | `--smoke-playtest` | headless: al massimo venti decisioni, `odin_pp_playtest_smoke.json` |
 

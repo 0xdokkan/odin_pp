@@ -57,8 +57,19 @@ MARLEY_BASE_WIDTH :: 17
 // keeps the state inline: event_test's stack budget).
 MAX_MARLEY_LIGHTS :: 16
 // Two beats of the widest room's throws.
-MAX_MARLEY_COLUMNS :: 24
+MAX_MARLEY_COLUMNS :: 16
 MARLEY_SEED_SALT :: u64(0xB0B_4A12_1E70_D15C)
+
+// MOSTRA EFFETTO's script (game/card_demo.odin): the film's room fixes the
+// lights and the first column so that its take shows a bomb that hurts and a
+// character it spares. Everything else is the party's own rules; the lights
+// stay where they are and no other column is thrown.
+Marley_Demo :: struct {
+	scripted: bool,
+	lights: [3]grid.Position,
+	light_count: int,
+	column: int,
+}
 
 Marley_Column :: struct {
 	x: i32,
@@ -229,7 +240,12 @@ begin_marley :: proc(room: ^Room, damage, seconds: i32, report: ^Action_Report) 
 	if report == nil || damage <= 0 || seconds <= 0 || !marley_can_begin(room) { return false }
 	room.marley = {active = true, remaining = min(seconds, MARLEY_MAX_SECONDS), damage = damage}
 	m := &room.marley
-	m.light_count = marley_choose_lights(room, marley_light_count(room, 0), &m.lights)
+	if room.marley_demo.scripted {
+		for light, index in room.marley_demo.lights[:room.marley_demo.light_count] { m.lights[index] = light }
+		m.light_count = room.marley_demo.light_count
+	} else {
+		m.light_count = marley_choose_lights(room, marley_light_count(room, 0), &m.lights)
+	}
 	at := room.player.position
 	record_report_event(report, {kind = .Marley_Begun, source = PLAYER_ENTITY, target = SYSTEM_ENTITY, from_position = at,
 		to_position = at, amount = damage, duration = m.remaining, card_definition = .Bomb_Marley})
@@ -364,8 +380,10 @@ marley_beat :: proc(room: ^Room, pulse: ^Pulse_Report) {
 		room.marley = {}
 		return
 	}
-	// The lights: the next ones shown ahead, then turned on.
-	switch m.elapsed%MARLEY_LIGHT_CYCLE {
+	// The lights: the next ones shown ahead, then turned on (a film's stay put).
+	cycle := m.elapsed%MARLEY_LIGHT_CYCLE
+	if room.marley_demo.scripted { cycle = -1 }
+	switch cycle {
 	case MARLEY_LIGHT_CYCLE-MARLEY_WARN_BEATS:
 		m.next_count = marley_choose_lights(room, marley_light_count(room, m.elapsed+MARLEY_WARN_BEATS), &m.next_lights)
 		m.has_next = true
@@ -380,7 +398,14 @@ marley_beat :: proc(room: ^Room, pulse: ^Pulse_Report) {
 	}
 	// New columns are warned.
 	before := m.column_count
-	marley_warn_columns(room, marley_throw_count(m.elapsed, room.level_data.tiles.width))
+	if room.marley_demo.scripted {
+		if m.elapsed == 1 && m.column_count < MAX_MARLEY_COLUMNS {
+			m.columns[m.column_count] = {x = i32(room.marley_demo.column), beats = MARLEY_WARN_BEATS}
+			m.column_count += 1
+		}
+	} else {
+		marley_warn_columns(room, marley_throw_count(m.elapsed, room.level_data.tiles.width))
+	}
 	for index in before..<m.column_count {
 		record_event(&pulse.events, {kind = .Marley_Warned, source = SYSTEM_ENTITY, target = SYSTEM_ENTITY,
 			from_position = {int(m.columns[index].x), 0}, to_position = {int(m.columns[index].x), room.level_data.tiles.height-1},

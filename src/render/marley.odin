@@ -24,8 +24,8 @@ MARLEY_GREEN :: rl.Color{102, 220, 96, 255}
 // The beams and spots cycle through these.
 MARLEY_LIGHTS :: [5]rl.Color{{255, 64, 168, 255}, {64, 224, 255, 255}, {255, 214, 72, 255}, {128, 255, 96, 255}, {255, 120, 64, 255}}
 // The ball hangs this high at rest and comes down from this high.
-MARLEY_BALL_HEIGHT :: f32(3.3)
-MARLEY_BALL_FROM :: f32(8.5)
+MARLEY_BALL_HEIGHT :: f32(2.15)
+MARLEY_BALL_FROM :: f32(6.5)
 MARLEY_BALL_RADIUS :: f32(0.5)
 MARLEY_BALL_SECONDS :: f32(1.0)
 MARLEY_GLINTS :: 44
@@ -67,7 +67,8 @@ update_tactical_marley :: proc(renderer: ^Renderer, room: ^game.Room) {
 	dt := f32(clamp(now-m.last_time, 0, 0.1))
 	m.last_time = now
 	player := renderer.tactical.snapshot.player.position
-	target_x, target_z := player.x+0.5, player.y+0.5
+	// Over the player, a little to the north so that it hangs clear of his head.
+	target_x, target_z := player.x+0.5, player.y-0.4
 	if party.active {
 		if m.ball <= 0 { m.ball_x, m.ball_z, m.figure_x = target_x, target_z, target_x }
 		m.ball = min(f32(1), m.ball+dt/MARLEY_BALL_SECONDS)
@@ -411,7 +412,19 @@ draw_marley_figure :: proc(renderer: ^Renderer, room: ^game.Room) {
 	size := MARLEY_FIGURE_HEIGHT*(1+0.1*throw)*tween.smoothstep(m.ball)
 	ratio := f32(m.figure.width)/f32(m.figure.height)
 	source := rl.Rectangle{0, 0, f32(m.figure.width), f32(m.figure.height)}
-	at := rl.Vector3{clamp(m.figure_x, 0.6, f32(room.level_data.tiles.width)-0.6), 1.58+size*0.5+hop-0.15, 0.5}
+	// On the north wall; when that is off the screen, on the nearest cell of his
+	// column the screen shows, at the edge of the view.
+	x := clamp(m.figure_x, 0.6, f32(room.level_data.tiles.width)-0.6)
+	column := int(x)
+	at := rl.Vector3{x, 1.58+size*0.5+hop-0.15, 0.5}
+	if !tactical_cell_on_screen(renderer, {column, 0}) {
+		for row in 1..<room.level_data.tiles.height {
+			if tactical_cell_on_screen(renderer, {column, row}) {
+				at = {x, size*0.5+hop+0.1, f32(row)+0.5}
+				break
+			}
+		}
+	}
 	rl.DrawBillboardRec(renderer.tactical.camera, m.figure, source, at, {size*ratio, size}, rl.WHITE)
 }
 

@@ -44,11 +44,11 @@ mechanics_lab_smoke_frame :: proc(window: ^app.Window, renderer: ^render.Rendere
 
 // The sandbox in the real window: the lab's whole deck in hand, a square of
 // coils around the arrivals, the last kill that keeps the combat going and the
-// refill; then Movimento Ombra played, the shadow walked and the rise, every
-// kind of blow, a slowed brute's seal, the pools and the fire, the player's
-// charges and, last, the Lazzo, the Pinball (mechanics_lab_pinball.odin), the
-// First Person Shooter (mechanics_lab_first_person.odin) and the Canna da
-// Pesca.
+// refill; then every kind of blow, a slowed brute's seal, the pools and the
+// fire, the player's charges and, last, the Lazzo, the Pinball
+// (mechanics_lab_pinball.odin), the First Person Shooter
+// (mechanics_lab_first_person.odin), the Inondazione and Bomb Marley
+// (mechanics_lab_party.odin) and the Canna da Pesca.
 run_mechanics_lab_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer, dice: ^render.Dice_Renderer) -> bool {
 	data: level.Level
 	defer level.destroy(&data)
@@ -215,7 +215,6 @@ run_mechanics_lab_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer,
 		artifacts.screenshot("odin_pp_mechanics_lab_pause.png" if screen == 0 else "odin_pp_mechanics_lab_defeat.png")
 	}
 	renderer.tactical.pause_hovered, renderer.tactical.pause_menu = .None, false
-	if !mechanics_lab_shadow(window, renderer, &room, &controller, &cards, &buffer) { return false }
 	if !mechanics_lab_blows(window, renderer, &room, &controller, &cards, &buffer) { return false }
 	if !mechanics_lab_slow(window, renderer, &room, &controller, &cards, &buffer) { return false }
 	if !mechanics_lab_ground(window, renderer, &room, &controller, &cards, &buffer) { return false }
@@ -223,6 +222,8 @@ run_mechanics_lab_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer,
 	if !mechanics_lab_lasso(window, renderer, &room, &controller, &cards, &buffer) { return false }
 	if !mechanics_lab_pinball(window, renderer, &room, &controller, &cards, &buffer) { return false }
 	if !mechanics_lab_first_person(window, renderer, &room, &data, &controller, &cards, &buffer) { return false }
+	if !mechanics_lab_flood(window, renderer, &room, &controller, &cards, &buffer) { return false }
+	if !mechanics_lab_marley(window, renderer, &room, &controller, &cards, &buffer) { return false }
 	if !mechanics_lab_fishing(window, renderer, dice, &room, &controller, &cards, &buffer) { return false }
 	return mechanics_lab_sounds_heard(renderer)
 }
@@ -821,9 +822,7 @@ mechanics_lab_hold :: proc(room: ^game.Room, id: u32) {
 // (odin_pp_living_fate_lethal_NN.png), and with three more charges beside it
 // the HUD's three chips and count say every word whole, its d20 too
 // (odin_pp_mechanics_lab_fate_chips.png); the 16 is only a critical on the
-// Custodian, a miniboss (odin_pp_living_fate_boss_NN.png). LAMA VELENOSA: its
-// die rolled as it is played (odin_pp_mechanics_lab_venom_roll.png), the bumps
-// it poisons after (odin_pp_living_venom_NN.png).
+// Custodian, a miniboss (odin_pp_living_fate_boss_NN.png).
 mechanics_lab_charges :: proc(window: ^app.Window, renderer: ^render.Renderer, dice: ^render.Dice_Renderer, room: ^game.Room,
 	controller: ^run_session.Tactical_Controller, cards: ^run_session.Card_Interaction_State, buffer: ^run_session.Buffered_Gameplay_Command) -> bool {
 	player := room.player
@@ -851,9 +850,9 @@ mechanics_lab_charges :: proc(window: ^app.Window, renderer: ^render.Renderer, d
 	self := game.entity_target(game.PLAYER_ENTITY)
 	if !reset(room, center) { return false }
 	player.tactical.facing = .East
-	// The four cards in hand, each under the mouse: its inspector's lines
+	// The three cards in hand, each under the mouse: its inspector's lines
 	// (odin_pp_mechanics_lab_card_<Card>.png).
-	for card in ([4]game.Card_Id{.Deflect, .Coffin, .Fate_Dice, .Venom_Blade}) {
+	for card in ([3]game.Card_Id{.Deflect, .Coffin, .Fate_Dice}) {
 		id, held := mechanics_lab_hand_card(player, card)
 		if !held { fmt.eprintln("mechanics lab: no", card, "in hand"); return false }
 		mechanics_lab_still(window, renderer, room, id, fmt.ctprintf("odin_pp_mechanics_lab_card_%v.png", card))
@@ -1069,41 +1068,7 @@ mechanics_lab_charges :: proc(window: ^app.Window, renderer: ^render.Renderer, d
 		fmt.eprintln("mechanics lab: the d20's 16 on the Custodian left him", custodian.health if custodian != nil else -1, "hp"); return false
 	}
 	mechanics_lab_film(window, renderer, room, controller, cards, buffer, 76, 2, "fate_boss")
-	// LAMA VELENOSA, from the hand: its roll over the window, then a bump.
-	if !reset(room, center) { return false }
-	venom_id, venom_placed := game.spawn_enemy(room, {position = {center.x, center.y-1}, health = 60, attack = 1, archetype = .Chaser})
-	if !venom_placed { fmt.eprintln("mechanics lab: no room for the venom's foe"); return false }
-	mechanics_lab_hold(room, venom_id)
-	mechanics_lab_wait_free(window, renderer, room, controller, cards, buffer)
-	forced, found := mechanics_lab_dice_for_face(3, 4)
-	if !found { return false }
-	player.dice = forced
-	if !mechanics_lab_play(window, renderer, room, controller, cards, buffer, .Venom_Blade, self) {
-		fmt.eprintln("mechanics lab: Lama Velenosa was not played"); return false
-	}
-	rolled := false
-	for _ in 0..<300 {
-		mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0, true, dice)
-		cue, showing := render.active_presentation_cue(&renderer.timeline)
-		if showing && cue.kind == .Dice_Rolled && render.presentation_cue_progress(cue) > 0.86 && !rolled {
-			artifacts.screenshot("odin_pp_mechanics_lab_venom_roll.png")
-			rolled = true
-		}
-		if !render.renderer_blocks_player_input(renderer) { break }
-	}
-	if !rolled || game.player_charges(room, .Venom_Blade) != 3 { fmt.eprintln("mechanics lab: Lama Velenosa rolled no 3"); return false }
-	// The loaded bump: its 2 and Veleno 2, one charge spent (the Veleno bites
-	// the foe's own next action, in the film).
-	if !mechanics_lab_commit(window, renderer, room, controller, cards, buffer, {kind = .Move, origin_phase = .Combat, direction = .North}) {
-		fmt.eprintln("mechanics lab: the loaded bump was not taken"); return false
-	}
-	venomed := foe(room, venom_id)
-	if venomed == nil || venomed.health != 58 || stacks(room, venom_id, .Poison) != game.VENOM_BLADE_POISON || game.player_charges(room, .Venom_Blade) != 2 {
-		fmt.eprintln("mechanics lab: the loaded bump left Veleno", stacks(room, venom_id, .Poison), "and", game.player_charges(room, .Venom_Blade), "charges"); return false
-	}
-	mechanics_lab_film(window, renderer, room, controller, cards, buffer, 76, 2, "venom")
-	fmt.eprintf("mechanics lab charges: deflected a bolt, a cleave and a charge, an arrow (none through cover), three fated bumps " +
-		"(Bruciatura 2, lethal, critical on the Custodian), Lama %d left\n", game.player_charges(room, .Venom_Blade))
+	fmt.eprintln("mechanics lab charges: deflected a bolt, a cleave and a charge, an arrow (none through cover), three fated bumps (Bruciatura 2, lethal, critical on the Custodian)")
 	return true
 }
 
@@ -1679,129 +1644,6 @@ mechanics_lab_inspect_still :: proc(window: ^app.Window, renderer: ^render.Rende
 	renderer.has_hovered_cell = false
 }
 
-// MOVIMENTO OMBRA from the hand, as the lane plays it, filmed every fourth
-// frame as odin_pp_living_shadow_NN.png: the card sinks the player into his
-// shadow, the shadow steps, takes a diagonal on its first beat and steps
-// again while the world stands still, and when the four seconds are over he
-// rises where it stopped. The window, the world's beats and every footstep
-// wait for him; only the shadow's own sounds play.
-mechanics_lab_shadow :: proc(window: ^app.Window, renderer: ^render.Renderer, room: ^game.Room, controller: ^run_session.Tactical_Controller,
-	cards: ^run_session.Card_Interaction_State, buffer: ^run_session.Buffered_Gameplay_Command) -> bool {
-	player := room.player
-	// From an open window, the stun above over and a second and a half into
-	// it (the world's clock between two beats), nothing resolving or running.
-	for _ in 0..<600 {
-		if player.tactical.phase == .Decision && player.tactical.remaining <= f32(player.tactical.budget)-1.5 &&
-		   game.tactical_can_begin_shadow(room) && !render.renderer_blocks_player_input(renderer) { break }
-		mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0, true)
-	}
-	if room.phase != .Combat || player.tactical.phase != .Decision || !game.tactical_can_begin_shadow(room) {
-		fmt.eprintln("mechanics lab: no open window for the shadow"); return false
-	}
-	sounds := renderer.tactical.lab_sounds
-	if sounds == nil { fmt.eprintln("mechanics lab: no sounds before the shadow"); return false }
-	heard := sounds.played
-	left, clock, pulses, body := player.tactical.remaining, player.tactical.clock_fraction, room.pulse_count, player.position
-	shadow_card, held := mechanics_lab_hand_card(player, .Shadow_Step)
-	if !held || !run_session.commit_gameplay_command(room, renderer, cards, {kind = .Play_Card, origin_phase = .Combat,
-		card_id = shadow_card, target = game.entity_target(game.PLAYER_ENTITY)}) || !game.tactical_shadow_active(room) {
-		fmt.eprintln("mechanics lab: Movimento Ombra was not played"); return false
-	}
-	frame := 0
-	// The card and the sinking hold the shadow's four seconds.
-	for _ in 0..<120 {
-		if !render.renderer_blocks_player_input(renderer) { break }
-		mechanics_lab_reel_frame(window, renderer, room, controller, cards, buffer, "shadow", 4, &frame)
-	}
-	if render.renderer_blocks_player_input(renderer) || player.tactical.shadow_remaining < game.TACTICAL_SHADOW_SECONDS-2.0/60.0 {
-		fmt.eprintln("mechanics lab: the sinking ate the shadow's seconds"); return false
-	}
-	// Four steps, each as soon as the shadow's own lockout and its moment
-	// allow: one straight away, the diagonal on the first beat, two more. The
-	// first free way of each list is taken.
-	Planned_Step :: struct {
-		after: f32,
-		beat: bool,
-		ways: [4]grid.Position,
-	}
-	steps := [4]Planned_Step{
-		{after = 0, ways = {{1, 0}, {0, 1}, {-1, 0}, {0, -1}}},
-		{beat = true, ways = {{1, 1}, {1, -1}, {-1, 1}, {-1, -1}}},
-		{after = 1.6, ways = {{0, 1}, {1, 0}, {-1, 0}, {0, -1}}},
-		{after = 2.3, ways = {{1, 0}, {0, 1}, {0, -1}, {-1, 0}}},
-	}
-	shadow_cell := player.tactical.shadow_position
-	for step, index in steps {
-		for _ in 0..<240 {
-			if !game.tactical_shadow_active(room) { break }
-			if !render.renderer_blocks_player_input(renderer) && !game.tactical_player_busy(room) &&
-			   game.tactical_shadow_elapsed(&player.tactical) >= step.after && (!step.beat || game.tactical_beat_target(room) != 0) { break }
-			mechanics_lab_reel_frame(window, renderer, room, controller, cards, buffer, "shadow", 4, &frame)
-		}
-		if !game.tactical_shadow_active(room) { fmt.eprintln("mechanics lab: the shadow ended before step", index); return false }
-		stepped := false
-		for way in step.ways {
-			// A diagonal is the lane's two keys on a beat: the first key's
-			// direction, both keys' offset and the beat stamped at the press.
-			command := run_session.Gameplay_Command{kind = .Move, origin_phase = .Combat}
-			if step.beat {
-				command.direction = .East if way.x > 0 else .West
-				command.diagonal, command.beat = way, game.tactical_beat_target(room)
-			} else {
-				for direction in game.Move_Direction {
-					if game.direction_offset(direction) == way { command.direction = direction }
-				}
-			}
-			if run_session.commit_gameplay_command(room, renderer, cards, command) {
-				stepped = player.tactical.shadow_position == game.add_position(shadow_cell, way)
-				break
-			}
-		}
-		if !stepped || player.position != body {
-			fmt.eprintln("mechanics lab: shadow step", index, "not taken from", shadow_cell); return false
-		}
-		shadow_cell = player.tactical.shadow_position
-		mechanics_lab_reel_frame(window, renderer, room, controller, cards, buffer, "shadow", 4, &frame)
-	}
-	// The rest of the four seconds, then the rise (the controller's own
-	// command). Up to the rise the window and the world's clock stay where
-	// they stopped; the body lands on the shadow's cell.
-	risen := false
-	rising: [audio.Lab_Sfx]int
-	for _ in 0..<360 {
-		if player.tactical.remaining != left || player.tactical.clock_fraction != clock || room.pulse_count != pulses {
-			fmt.eprintf("mechanics lab: the world moved in the shadow (window %.3f -> %.3f s)\n", left, player.tactical.remaining); return false
-		}
-		if !game.tactical_shadow_active(room) { risen, rising = true, sounds.played; break }
-		mechanics_lab_reel_frame(window, renderer, room, controller, cards, buffer, "shadow", 4, &frame)
-	}
-	if !risen || player.position != shadow_cell || shadow_cell == body {
-		fmt.eprintln("mechanics lab: the player did not rise on the shadow's cell", shadow_cell, "but at", player.position); return false
-	}
-	// The card climbs out and the world's colours come back.
-	for _ in 0..<120 {
-		if !render.tactical_shadow_showing(renderer) && !render.renderer_blocks_player_input(renderer) && renderer.tactical.shadow.frozen <= 0 { break }
-		mechanics_lab_reel_frame(window, renderer, room, controller, cards, buffer, "shadow", 4, &frame)
-	}
-	for _ in 0..<8 { mechanics_lab_reel_frame(window, renderer, room, controller, cards, buffer, "shadow", 4, &frame) }
-	// The shadow's steps start no clip on the card: never the boots and the
-	// card's scrape, nor a dodge for the diagonal; the rise is no walk either.
-	// (Once risen the world's blows are back, and one that now misses him
-	// rightly makes his card dodge.) Its own sounds all played.
-	for sfx in ([?]audio.Lab_Sfx{.Pilgrim_Move_Side, .Pilgrim_Move_Up, .Pilgrim_Move_Down}) {
-		if sounds.played[sfx] != heard[sfx] { fmt.eprintln("mechanics lab: a footstep in the shadow:", sfx); return false }
-	}
-	if rising[.Pilgrim_Dodge] != heard[.Pilgrim_Dodge] { fmt.eprintln("mechanics lab: a shadow step played the dodge"); return false }
-	if sounds.played[.Card_Shadow_Step] != heard[.Card_Shadow_Step]+1 || sounds.played[.Pilgrim_Shadow_Sink] != heard[.Pilgrim_Shadow_Sink]+1 ||
-	   sounds.played[.Pilgrim_Shadow_Step] != heard[.Pilgrim_Shadow_Step]+len(steps) ||
-	   sounds.played[.Pilgrim_Shadow_Rise] != heard[.Pilgrim_Shadow_Rise]+1 || sounds.played[.Ui_Critical] <= heard[.Ui_Critical] ||
-	   sounds.played[.Ui_Beat_Tick] < heard[.Ui_Beat_Tick]+game.TACTICAL_SHADOW_BEATS {
-		fmt.eprintln("mechanics lab: the shadow's sounds did not all play"); return false
-	}
-	fmt.eprintf("mechanics lab shadow: %d steps, risen at %v from %v, window %.2f s kept, %d frames\n", len(steps), player.position, body, left, frame)
-	return true
-}
-
 // One frame of a film with the clock running; every `every`th one is saved
 // as odin_pp_living_<name>_NN.png.
 mechanics_lab_reel_frame :: proc(window: ^app.Window, renderer: ^render.Renderer, room: ^game.Room, controller: ^run_session.Tactical_Controller,
@@ -1837,11 +1679,11 @@ mechanics_lab_sounds_heard :: proc(renderer: ^render.Renderer) -> bool {
 		if sounds.played[sfx] == 0 { fmt.eprintln("mechanics lab: no sound for", sfx); return false }
 	}
 	// The player's charges: each card, and each charge as it is loaded.
-	for card in ([4]game.Card_Id{.Deflect, .Coffin, .Fate_Dice, .Venom_Blade}) {
+	for card in ([3]game.Card_Id{.Deflect, .Coffin, .Fate_Dice}) {
 		sfx, _ := render.lab_card_sfx(card)
 		if sounds.played[sfx] == 0 { fmt.eprintln("mechanics lab: no sound for the card", card, sfx); return false }
 	}
-	for kind in ([4]game.Status_Kind{.Deflect, .Arrows, .Fate, .Venom_Blade}) {
+	for kind in ([3]game.Status_Kind{.Deflect, .Arrows, .Fate}) {
 		sfx, _ := render.lab_status_sfx(kind)
 		if sounds.played[sfx] == 0 { fmt.eprintln("mechanics lab: no sound for the charge", kind, sfx); return false }
 	}
@@ -1871,6 +1713,17 @@ mechanics_lab_sounds_heard :: proc(renderer: ^render.Renderer) -> bool {
 	for sfx in ([?]audio.Lab_Sfx{render.LAB_FIRST_PERSON_CARD, render.LAB_FIRST_PERSON_ENTER, render.LAB_FIRST_PERSON_SHOT,
 		render.LAB_FIRST_PERSON_HIT, render.LAB_FIRST_PERSON_RICOCHET, render.LAB_FIRST_PERSON_EXIT}) {
 		if sounds.played[sfx] == 0 { fmt.eprintln("mechanics lab: no sound for the first person", sfx); return false }
+	}
+	// The Inondazione's: its card, the wave, a foe splashed and a fire's steam.
+	for sfx in ([?]audio.Lab_Sfx{.Card_Flood, .World_Flood_Wave, .World_Flood_Splash, .World_Flood_Steam}) {
+		if sounds.played[sfx] == 0 { fmt.eprintln("mechanics lab: no sound for the flood", sfx); return false }
+	}
+	// Bomb Marley's: its card, the ball, the lights, a warning, a bomb and its
+	// blast, a character saved, the seconds earned, the groove in both beats
+	// and the end.
+	for sfx in ([?]audio.Lab_Sfx{.Card_Bomb_Marley, .World_Marley_Ball, .World_Marley_Lights, .World_Marley_Warn, .World_Marley_Bomb,
+		.World_Marley_Blast, .World_Marley_Safe, .World_Marley_Bonus, .World_Marley_Groove_A, .World_Marley_Groove_B, .World_Marley_End}) {
+		if sounds.played[sfx] == 0 { fmt.eprintln("mechanics lab: no sound for the party", sfx); return false }
 	}
 	fmt.eprintln("mechanics lab sounds:", heard)
 	return true

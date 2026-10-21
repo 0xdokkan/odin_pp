@@ -67,7 +67,7 @@ negozio e riposo consentono di aprire **Mostra effetto** per provare una carta.
 | [Engine e minigiochi](docs/engine.md) | host, scene, input, minigiochi e atlanti incorporati |
 | [Combattimento](docs/regole/combattimento.md) | clock, comandi, status, reazioni, movimento e oggetti |
 | [Carte e dadi](docs/regole/carte.md) | catalogo, mazzo, targeting, spell e RNG |
-| [Meccaniche delle carte](docs/regole/meccaniche.md) | ombra, terreno, cariche, lazzo, pesca, Pinball e FPS |
+| [Meccaniche delle carte](docs/regole/meccaniche.md) | ombra, terreno, cariche, lazzo, pesca, Pinball, FPS, Inondazione e Bomb Marley |
 | [Dispositivi e attività](docs/regole/dispositivi.md) | Tesla, trappole, equipaggiamento, ring e sblocchi |
 | [Nemici e progressione](docs/regole/progressione.md) | incontri, stanze, rotta, economia e reliquie |
 | [Presentazione](docs/presentazione.md) | film delle carte, timeline, HUD, sprite e animazioni |

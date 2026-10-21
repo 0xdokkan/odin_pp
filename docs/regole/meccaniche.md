@@ -812,3 +812,102 @@ rosso. Nel recupero dopo la fine della finestra l'AK spara ancora. Finiti i 20
 secondi, dopo una ventina di battiti del mondo, la vista finisce, la telecamera
 risale con il suo suono e il mouse torna libero. Una copia +5 dura 30 secondi. Il
 riquadro dei secondi e la riga dell'HUD ci stanno interi.
+
+### Inondazione
+
+`Inondazione` (non comune, energia 2, **2 s** di finestra, fino a tre
+potenziamenti; compare fra ricompense e negozio) lancia un'onda che attraversa
+tutta la mappa e sposta ogni nemico. Regole in
+[flood.odin](../../src/game/flood.odin), onda in
+[flood.odin](../../src/render/flood.odin).
+
+**La direzione.** Si trascina la carta su una casella intorno al Viandante, da 1 a
+3 celle di Chebyshev (la sua stessa casella non vale): l'onda va nel verso
+dell'asse principale dal Viandante a quella casella, una delle quattro
+direzioni, e in parità lungo la riga (est o ovest). Parte dal muro dietro di
+sé, a metà del lato opposto, e corre fino al muro davanti, dove finisce: la
+mappa intera, vista o no.
+
+**L'effetto.** Tutto si risolve in una sola giocata, nell'ordine in cui il fronte
+raggiunge le file dei nemici dalla parte lontana: la testa di una fila si
+sposta per prima, così una fila con spazio davanti si sposta insieme. Prima si
+spengono **tutti i fuochi** (gli Incendi del Viandante e gli oggetti Fuoco della
+stanza), così nessun nemico finisce in una fiamma. Poi ogni nemico a terra viene
+spinto di **1 casella** (+1 per upgrade, +1 sul colpo a tempo; fino a 4) nel
+verso dell'onda, una sola volta, con le regole di spinta del gioco: un muro, una
+copertura, un oggetto che blocca o un corpo (il Viandante compreso) fermano la
+spinta prima, e su ogni casella in cui entra agiscono pozze, trappole e pericoli
+(un nemico può morire così). L'onda non fa danni, non sposta il Viandante né gli
+oggetti, e non tocca il nemico appeso al Lazzo né la palla del Pinball.
+
+**Sul tavolo.** Un muro d'acqua a blocchi semitrasparenti, con la schiuma in cima,
+attraversa la stanza in circa 1,9 secondi del cast, mentre il mondo è fermo: ogni
+nemico parte spinto nel momento in cui il fronte lo raggiunge, e dove passa
+sopra un fuoco sale un po' di vapore. Nella Prova meccaniche suonano la carta,
+l'onda, ogni nemico bagnato e ogni fuoco spento. Il film di Mostra effetto
+mostra tre nemici (uno contro il muro) e due fuochi.
+
+### Bomb Marley
+
+`Bomb Marley` (rara, energia 3, **2 s** di finestra, fino a cinque potenziamenti;
+compare fra ricompense e negozio) apre una festa nella stanza: dal soffitto
+scende una sfera da discoteca che illumina alcune caselle, e Bomb Marley lancia
+bombe a ritmo lungo colonne intere. Chi sta su una casella illuminata è salvo.
+Regole in [marley.odin](../../src/game/marley.odin), tavolo in
+[marley.odin](../../src/render/marley.odin).
+
+**Bomb Marley non è un nemico.** Non è un'entità della stanza: non ha casella,
+vita né ID, quindi nessuna carta, colpo, freccia o palla lo raggiunge e nessun
+nemico lo ha come bersaglio. Sta dietro il muro nord e lancia.
+
+**Il ritmo.** La festa dura **35 secondi del mondo** e va a battiti di un
+secondo, quindi il cast, i dadi, una difesa, Movimento Ombra e la pausa la fermano
+come fermano il mondo. Ogni battito:
+
+- le colonne annunciate **due battiti prima** cadono: la bomba attraversa tutta la
+  colonna, sopra muri e coperture, e ogni personaggio (il Viandante e i nemici,
+  boss e miniboss compresi) che non sta su una casella illuminata prende **6
+  danni** (+1 per upgrade; lo Scudo li assorbe; niente scelta di difesa, Deflect non
+  li rimanda); chi sta su una luce è salvo (`SALVO`); un barile nella colonna si
+  accende; nell'ombra di Movimento Ombra il Viandante non li subisce. Ogni nemico
+  ucciso da una bomba aggiunge **5 secondi** alla festa, **90 in tutto** al massimo
+  (anche se l'ha spinto lì il Viandante);
+- il tempo cala di un secondo; alla fine, con il combattimento o con la morte del
+  Viandante, la festa finisce;
+- le **luci** si spostano ogni 5 battiti, e le prossime si vedono 2 battiti prima
+  (solo i bordi, lampeggianti). Sono tante quanti i personaggi in gioco meno 2,
+  una meno ogni 10 secondi, mai meno di una e mai più di 16, così che non tutti
+  possano salvarsi; una è sempre entro 3 caselle dal Viandante; le nuove luci cadono
+  di preferenza dove non sta nessuno;
+- vengono annunciate **nuove colonne**: poche all'inizio (una ogni due secondi), poi
+  una, due e tre al secondo ogni 10 secondi, in proporzione per una stanza più
+  larga di 17 caselle; metà sono la colonna di un personaggio.
+
+Le luci e le colonne nascono dal solo flusso della stanza (`Room.marley_random`),
+mai dall'orologio. Una sola festa alla volta: mentre suona, la carta viene
+rifiutata. Il colpo a tempo aggiunge 5 secondi.
+
+**I nemici.** Una colonna annunciata è una zona di pericolo, come lo scoppio di
+una bomba: i nemici ne escono e non la attraversano se c'è un'altra strada. Un
+nemico fuori dalle luci e non accanto al Viandante muove verso la luce libera più
+vicina entro 3 celle. First Person Shooter si può giocare durante la festa e la vista
+negli occhi mostra le stesse luci e colonne.
+
+**Sul tavolo.** La sfera a specchietti scende in un secondo sopra il Viandante e ruota;
+i fasci colorati (magenta, ciano, oro, verde, arancio) vanno dalla sfera alle caselle
+salve, dove ci sono macchie di luce e un bordo d'oro; puntini di riflesso girano sul
+pavimento. Le luci e le colonne si vedono anche nella nebbia (sopra i blocchi
+della nebbia). Le colonne annunciate sono rosse, più accese e lampeggianti
+all'ultimo battito, con una freccia che scende. La bomba rotola lungo la colonna
+(mezzo secondo), lascia un lampo su ogni casella (verde dove si è salvi) e i
+danni arrivano dopo. Bomb Marley è un cartoncino originale: una bomba con un berretto
+rosso, oro e verde, occhiali scuri e dreadlock di miccia, che balla a tempo sul
+muro nord sopra la colonna che sta per bombardare. L'HUD mostra `MARLEY 23s` fra i
+chip. Nella Prova meccaniche suonano la carta, la sfera, le luci, l'avviso, la
+bomba e il suo scoppio, la salvezza, i secondi guadagnati, la fine e un
+groove reggae a 60 BPM (un battito `a`, uno `b`).
+
+**Mostra effetto.** Il film mostra la carta sopra una stanza di prova con le luci e
+la prima colonna fissate: due nemici in una colonna, uno in una luce e uno no. La
+bomba salva il primo, ferisce il secondo e il film finisce pochi secondi dopo,
+molto prima dei 35 secondi della festa.

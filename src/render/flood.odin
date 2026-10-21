@@ -17,9 +17,9 @@ import grid "../engine/grid"
 // last pushes settle.
 FLOOD_FRONT_SHARE :: f32(0.78)
 
-FLOOD_WATER :: rl.Color{58, 138, 222, 140}
-FLOOD_WATER_LIGHT :: rl.Color{140, 200, 244, 170}
-FLOOD_FOAM :: rl.Color{236, 248, 255, 220}
+FLOOD_WATER :: rl.Color{30, 100, 196, 150}
+FLOOD_WATER_LIGHT :: rl.Color{90, 170, 232, 150}
+FLOOD_FOAM :: rl.Color{214, 238, 252, 200}
 FLOOD_STEAM :: rl.Color{226, 232, 238, 150}
 
 // The place along its way a wave has at a cell: 0 at the wall it starts from.
@@ -121,8 +121,15 @@ draw_flood_sweep :: proc(renderer: ^Renderer, room: ^game.Room, cue: ^Presentati
 				wobble := 0.06*math.sin(f32(t)*7+f32(cell.x)*1.3+f32(cell.y)*0.9)
 				body := height+wobble
 				rl.DrawCube({x, body*0.5, z}, 1.0, body, 1.0, FLOOD_WATER)
-				// Foam along the top, and a drop or two thrown up at the crest.
-				rl.DrawCube({x, body+0.02, z}, 1.0, 0.05, 1.0, FLOOD_FOAM)
+				// A crest of foam along the leading edge, thinning behind the front,
+				// and a drop or two thrown up at it.
+				if age < 2.2 {
+					lead := game.direction_offset(direction)
+					crest := 0.22*max(0, 1-age/2.2)+0.04
+					across_axis := direction == .East || direction == .West
+					rl.DrawCube({x+f32(lead.x)*(0.5-crest*0.5), body+0.015, z+f32(lead.y)*(0.5-crest*0.5)},
+						crest if across_axis else 1.0, 0.04, 1.0 if across_axis else crest, FLOOD_FOAM)
+				}
 				if age < 1.2 {
 					seed := gothic_hash(cell.x*5+index, cell.y*3+across)
 					rise_t := age/1.2
@@ -159,4 +166,45 @@ marley_flood_square :: proc(cx, y, cz, half: f32, color: rl.Color) {
 	rlgl.Vertex3f(cx+half, y, cz+half)
 	rlgl.Vertex3f(cx+half, y, cz-half)
 	rlgl.End()
+}
+
+// The aim of the card as the board shows it with the mouse on `anchor`: the
+// board's visible floor tinted, the line the player's way of the wave runs
+// along (from the wall behind him to the wall in front) stronger, an arrow on
+// the aimed cell, and the foes the wave will push marked.
+@(private)
+draw_flood_preview :: proc(renderer: ^Renderer, room: ^game.Room, anchor: grid.Position, valid: bool) {
+	if !valid || room == nil || room.player == nil { return }
+	direction, ok := game.flood_direction(room.player.position, anchor)
+	if !ok { return }
+	step := game.direction_offset(direction)
+	tiles := &room.level_data.tiles
+	for cell in renderer.tactical.visible[:renderer.tactical.visible_count] {
+		if game.cell_blocks_movement(room, cell) { continue }
+		draw_card_range_cell(renderer, cell, {64, 140, 226, 24}, {120, 190, 240, 40})
+	}
+	// The line through the player, from the wall behind him to the wall in front.
+	start := room.player.position
+	for grid.contains(tiles, {start.x-step.x, start.y-step.y}) { start = {start.x-step.x, start.y-step.y} }
+	for cell := start; grid.contains(tiles, cell); cell = {cell.x+step.x, cell.y+step.y} {
+		if game.cell_blocks_movement(room, cell) { continue }
+		draw_card_range_cell(renderer, cell, {64, 140, 226, 70}, {160, 214, 250, 150})
+	}
+	for enemy in room.enemies {
+		if game.enemy_is_out_of_play(room, enemy.id) { continue }
+		draw_card_range_cell(renderer, enemy.position, {236, 248, 255, 70}, {236, 248, 255, 255})
+	}
+	// An arrow on the aimed cell, pointing the wave's way.
+	tail := cell_center(renderer, anchor)
+	head := cell_center(renderer, {anchor.x+step.x, anchor.y+step.y})
+	along := head-tail
+	length := math.sqrt(along.x*along.x+along.y*along.y)
+	if length < 0.001 { return }
+	along /= length
+	side := [2]f32{-along.y, along.x}
+	tip := tail+along*(length*0.55)
+	base := tail-along*(length*0.1)
+	color := rl.Color{236, 248, 255, 255}
+	rl.DrawLineEx({tail.x-along.x*length*0.5, tail.y-along.y*length*0.5}, {tip.x, tip.y}, 3, color)
+	rl.DrawTriangle({tip.x+along.x*length*0.18, tip.y+along.y*length*0.18}, {base.x+side.x*length*0.22, base.y+side.y*length*0.22}, {base.x-side.x*length*0.22, base.y-side.y*length*0.22}, color)
 }
