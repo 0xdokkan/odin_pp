@@ -5,15 +5,16 @@ import "core:testing"
 import rl "vendor:raylib"
 import game "../game"
 
-// The icon atlas grew a fifth, a sixth and a seventh row
-// (tools/art/build_card_icons.py): Movimento Ombra, the cards of Phase 2, the
-// Lazzo, the Canna da Pesca, the Pinball and the First Person Shooter have
-// their own icons there, every other card keeps its painted one, and the
-// painted cells are cut where they always were.
+// The icon atlas grew five rows (tools/art/build_card_icons.py): Movimento
+// Ombra, the cards of Phase 2, the Lazzo, the Canna da Pesca, the Pinball, the
+// First Person Shooter, Bomb Marley, Inondazione, the Cannone, the Cannone
+// laser, the Buco nero and the Dinosauro have their own icons there, every
+// other card keeps its painted one, and the painted cells are cut where they
+// always were.
 @(test)
 test_card_icons_add_rows_without_moving_the_painted_cells :: proc(t: ^testing.T) {
 	added := [?]game.Card_Id{.Shadow_Step, .Poison_Pool, .Wildfire, .Deflect, .Coffin, .Fate_Dice, .Venom_Blade, .Lasso, .Fishing_Rod,
-		.Pinball, .First_Person}
+		.Pinball, .First_Person, .Bomb_Marley, .Flood, .Cannon, .Laser_Cannon, .Black_Hole, .Dinosaur}
 	for id, index in added { testing.expect_value(t, gothic_card_icon(id), 16+index) }
 	for id in game.Card_Id {
 		own := id == .Count
