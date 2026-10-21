@@ -82,6 +82,10 @@ gothic_card_lines :: proc(card: game.Card_Instance) -> (cstring, cstring) {
 	// FIRST PERSON SHOOTER (game/first_person.odin): its seconds, and the AK.
 	case .First_Person:
 		return fmt.ctprintf("PRIMA PERSONA %ds", a), fmt.ctprintf("AK: %d COLPI/s, %d DANNO", game.FIRST_PERSON_SHOTS_PER_SECOND, game.FIRST_PERSON_SHOT_DAMAGE)
+	// BOMB MARLEY (game/marley.odin): the bombs' damage and the party's seconds;
+	// INONDAZIONE (game/flood.odin): the push, and the fires.
+	case .Bomb_Marley: return fmt.ctprintf("BOMBE DA %d DANNI", a), fmt.ctprintf("%ds / LUCI = SALVI", d.effects[0].duration)
+	case .Flood: return fmt.ctprintf("SPINGE TUTTI DI %d", a), "SPEGNE I FUOCHI"
 	case .Sei_Denari, .Sette_Denari: return fmt.ctprintf("+%d ORO", a), "SCOPA / UNA VOLTA PER STANZA"
 	case .Firebomb: return fmt.ctprintf("%d DANNI NEL %dX%d", a, d.targeting.radius*2+1, d.targeting.radius*2+1), "ACCENDE I BARILI"
 	case .Calculated_Risk: return fmt.ctprintf("PESCA %d", a), fmt.ctprintf("SCARTA %d", b)
@@ -143,6 +147,8 @@ gothic_card_narrow_lines :: proc(card: game.Card_Instance) -> (first, second: cs
 	case .Fishing_Rod:
 		return fmt.ctprintf("%d PESCA" if a == 1 else "%d PESCHE", a), fmt.ctprintf("CIBO %s O CARTA", die_label(game.FISHING_HEAL_SIDES)), true
 	case .First_Person: return fmt.ctprintf("FPS %ds", a), fmt.ctprintf("AK: %d COLPI/s", game.FIRST_PERSON_SHOTS_PER_SECOND), true
+	case .Bomb_Marley: return fmt.ctprintf("BOMBE %d", a), "LUCI: SALVI", true
+	case .Flood: return fmt.ctprintf("SPINTA %d", a), "NO FUOCHI", true
 	}
 	return
 }

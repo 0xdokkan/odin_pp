@@ -115,6 +115,10 @@ CARD_VISUALS := [game.Card_Id]Card_Visual{
 		fill = {44, 50, 60, 245}, outline = {196, 206, 220, 255}},
 	.First_Person = {icon = 26, short_name = "FPS", accent = .Red, sound = LAB_FIRST_PERSON_CARD, narrow_name = "FPS",
 		fill = {40, 46, 38, 245}, outline = {176, 186, 132, 255}},
+	.Bomb_Marley = {icon = 27, short_name = "MARLEY", accent = .Gold, sound = .Card_Bomb_Marley, narrow_name = "Marley",
+		fill = {46, 50, 28, 245}, outline = {240, 196, 64, 255}},
+	.Flood = {icon = 28, short_name = "ONDA", accent = .Blue, sound = .Card_Flood, narrow_name = "Onda",
+		fill = {22, 50, 76, 245}, outline = {96, 176, 240, 255}},
 	.Count = {icon = 0, short_name = "", accent = .Red,
 		fill = {45, 49, 52, 245}, outline = {105, 116, 116, 255}},
 }

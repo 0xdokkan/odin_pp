@@ -228,6 +228,10 @@ Room :: struct {
 	// own stream for its launches.
 	pinball: Pinball_State,
 	pinball_random: u64,
+	// BOMB MARLEY: the party in the room and its own stream for the lights and
+	// the columns (marley.odin).
+	marley: Marley_State,
+	marley_random: u64,
 	// FIRST PERSON SHOOTER: the seconds behind the player's eyes and his AK's
 	// shots (first_person.odin); a new room starts them afresh.
 	first_person: First_Person_State,
@@ -471,6 +475,7 @@ create_room :: proc(level_data: ^level.Level, player: ^Player, content: Room_Con
 	result.modifier = content.modifier
 	result.fishing = begin_room_fishing(player, content)
 	result.pinball_random = pinball_room_stream(player, content)
+	result.marley_random = marley_room_stream(player, content)
 	result.next_enemy_id = 1
 	result.next_trap_id = 1
 	result.next_object_id = 1

@@ -410,6 +410,45 @@ lab_cue_sounds :: proc(renderer: ^Renderer, s: ^Lab_Sounds, cue: ^Presentation_C
 	// eyes as the card's own cue paces it.
 	case .First_Person_Begun:
 		lab_sound_queue(s, LAB_FIRST_PERSON_ENTER, now)
+	// BOMB MARLEY (marley.odin): the ball coming down, the lights turning, a
+	// column warned, the bomb's whistle and its blast at the far end, a
+	// character saved, the seconds earned, the end; and a groove on the
+	// world's every beat, one a and one b in turn.
+	case .Marley_Begun:
+		lab_sound_queue(s, .World_Marley_Ball, now)
+	case .Marley_Lights:
+		lab_sound_queue(s, .World_Marley_Lights, now)
+	case .Marley_Warned:
+		lab_sound_queue(s, .World_Marley_Warn, now)
+	case .Marley_Bomb:
+		lab_sound_queue(s, .World_Marley_Bomb, now)
+		lab_sound_queue(s, .World_Marley_Blast, now+f64(cue.duration)*0.55)
+	case .Marley_Saved:
+		lab_sound_queue(s, .World_Marley_Safe, now+f64(cue.duration)*0.4, 1, pan)
+	case .Marley_Bonus:
+		lab_sound_queue(s, .World_Marley_Bonus, now)
+	case .Marley_Ended:
+		lab_sound_queue(s, .World_Marley_End, now)
+	case .Pulse_Advanced:
+		if party := &renderer.tactical.snapshot.marley; party.active {
+			lab_sound_queue(s, .World_Marley_Groove_A if party.elapsed%2 == 0 else .World_Marley_Groove_B, now, 0.8)
+		}
+	// INONDAZIONE (flood.odin): the wave over the whole sweep, the steam of
+	// each fire it puts out.
+	case .Flood_Swept:
+		lab_sound_queue(s, .World_Flood_Wave, now)
+	// A foe the wave pushes splashes as the front reaches it.
+	case .Move:
+		if event.card_definition == .Flood {
+			delay := f64(0)
+			if head, led := flood_group_head(&renderer.timeline); led {
+				length := flood_length(head.event)
+				delay = f64(flood_arrival(flood_progress_index(game.Move_Direction(head.event.duration), event.from_position, length), length)*cue.duration)
+			}
+			lab_sound_queue(s, .World_Flood_Splash, now+delay, 0.8, pan)
+		}
+	case .Fire_Extinguished:
+		lab_sound_queue(s, .World_Flood_Steam, now+f64(cue.duration)*0.3)
 	}
 }
 

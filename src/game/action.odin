@@ -108,6 +108,12 @@ Effect_Kind :: enum {
 	// FIRST PERSON SHOOTER: `amount` world seconds behind the player's eyes,
 	// his AK in hand (first_person.odin).
 	First_Person,
+	// BOMB MARLEY: the party begins, its bombs hurting for `amount` and lasting
+	// `duration` world seconds (marley.odin).
+	Marley,
+	// INONDAZIONE: a wave sweeps the board the way of the player's aim at
+	// `destination`, pushing every foe `amount` cells (flood.odin).
+	Flood,
 }
 
 Effect :: struct {
@@ -505,6 +511,10 @@ effect_is_valid :: proc(room: ^Room, effect: Effect) -> bool {
 		       can_create_temporary_card(&room.player.deck, effect.card_definition)
 	case .First_Person:
 		return effect.target == PLAYER_ENTITY && effect.amount > 0 && tactical_can_begin_first_person(room)
+	case .Marley:
+		return effect.target == PLAYER_ENTITY && effect.amount > 0 && effect.duration > 0 && marley_can_begin(room)
+	case .Flood:
+		return effect.target == PLAYER_ENTITY && effect.amount > 0 && flood_can_begin(room, effect.destination)
 	}
 	return false
 }
@@ -841,6 +851,12 @@ apply_effect :: proc(room: ^Room, source: Entity_Ref, effect: Effect, report: ^A
 				.Card_Created, source, PLAYER_ENTITY, card, .Count, .Hand,
 			))
 		}
+	case .Marley:
+		begun := begin_marley(room, effect.amount, effect.duration, report)
+		assert(begun)
+	case .Flood:
+		swept := begin_flood(room, effect.destination, effect.amount, report)
+		assert(swept)
 	case .First_Person:
 		began := tactical_begin_first_person(room, f32(effect.amount))
 		assert(began)

@@ -58,6 +58,13 @@ PRESENTATION_PINBALL_STRIKE_DURATION :: f32(0.6)*PRESENTATION_TIME_SCALE
 PRESENTATION_PINBALL_BURST_DURATION :: f32(0.32)*PRESENTATION_TIME_SCALE
 // FIRST PERSON SHOOTER: the camera's dive into the player's eyes (first_person.odin).
 PRESENTATION_FIRST_PERSON_DIVE_DURATION :: f32(0.45)*PRESENTATION_TIME_SCALE
+// BOMB MARLEY: the ball coming down (stretched over the cast), a bomb falling
+// across its column, the party's end.
+PRESENTATION_MARLEY_BALL_DURATION :: f32(1.0)*PRESENTATION_TIME_SCALE
+PRESENTATION_MARLEY_BOMB_DURATION :: f32(0.5)*PRESENTATION_TIME_SCALE
+PRESENTATION_MARLEY_END_DURATION :: f32(0.6)*PRESENTATION_TIME_SCALE
+// INONDAZIONE: the wave crossing the board.
+PRESENTATION_FLOOD_DURATION :: f32(1.4)*PRESENTATION_TIME_SCALE
 PRESENTATION_MAX_SEQUENCE_DURATION :: f32(12.0)
 PRESENTATION_TIME_EPSILON         :: f32(0.00001)
 
@@ -118,6 +125,18 @@ Presentation_Cue_Kind :: enum {
 	Pinball_Burst,
 	// FIRST PERSON SHOOTER: the dive into the player's eyes (game/first_person.odin).
 	First_Person_Begun,
+	// BOMB MARLEY (game/marley.odin): the ball comes down, the lights, a column
+	// warned, a bomb across it, someone saved, the seconds earned, the end.
+	Marley_Begun,
+	Marley_Lights,
+	Marley_Warned,
+	Marley_Bomb,
+	Marley_Saved,
+	Marley_Bonus,
+	Marley_Ended,
+	// INONDAZIONE (game/flood.odin): the wave's sweep and the steam of a fire put out.
+	Flood_Swept,
+	Fire_Extinguished,
 }
 
 Presentation_Actor :: struct {
@@ -188,6 +207,9 @@ Room_Presentation :: struct {
 	loot_count:  int,
 	// Shown from a pool's or a fire's landing (start_presentation_cue).
 	ground:      Presentation_Ground,
+	// BOMB MARLEY's party: its lights, its warned columns and its seconds, as
+	// the cues of the party's events show them.
+	marley:      game.Marley_State,
 	gold:        i32,
 	pulse_count: u64,
 	valid:       bool,
@@ -289,6 +311,7 @@ capture_room_presentation :: proc(room: ^game.Room) -> (result: Room_Presentatio
 	}
 
 	result.dropped += capture_presentation_ground(room, &result.ground)
+	result.marley = room.marley
 	result.loot_count = min(len(room.loot), MAX_PRESENTATION_LOOT)
 	result.dropped += max(0, len(room.loot)-result.loot_count)
 	for index in 0..<result.loot_count {
@@ -545,6 +568,24 @@ presentation_cue_kind :: proc(event: game.Game_Event) -> Presentation_Cue_Kind {
 		return .Pinball_Burst
 	case .First_Person_Begun:
 		return .First_Person_Begun
+	case .Marley_Begun:
+		return .Marley_Begun
+	case .Marley_Lights:
+		return .Marley_Lights
+	case .Marley_Warned:
+		return .Marley_Warned
+	case .Marley_Bomb:
+		return .Marley_Bomb
+	case .Marley_Saved:
+		return .Marley_Saved
+	case .Marley_Bonus:
+		return .Marley_Bonus
+	case .Marley_Ended:
+		return .Marley_Ended
+	case .Flood_Swept:
+		return .Flood_Swept
+	case .Fire_Extinguished:
+		return .Fire_Extinguished
 	}
 	unreachable()
 }
@@ -566,6 +607,8 @@ presentation_cue_duration :: proc(kind: Presentation_Cue_Kind, event: game.Game_
 		if game.event_is_teleport(event) {
 			return PRESENTATION_NOTICE_DURATION
 		}
+		// The wave's pushes last as long as the wave: each starts as it arrives.
+		if event.card_definition == .Flood { return PRESENTATION_FLOOD_DURATION }
 		if event.target.kind == .Enemy || event.target.kind == .Object {
 			return PRESENTATION_ENEMY_MOVE_DURATION
 		}
@@ -635,6 +678,16 @@ presentation_cue_duration :: proc(kind: Presentation_Cue_Kind, event: game.Game_
 		return PRESENTATION_PINBALL_BURST_DURATION
 	case .First_Person_Begun:
 		return PRESENTATION_FIRST_PERSON_DIVE_DURATION
+	case .Marley_Begun:
+		return PRESENTATION_MARLEY_BALL_DURATION
+	case .Marley_Bomb:
+		return PRESENTATION_MARLEY_BOMB_DURATION
+	case .Marley_Ended:
+		return PRESENTATION_MARLEY_END_DURATION
+	case .Marley_Lights, .Marley_Warned, .Marley_Saved, .Marley_Bonus, .Fire_Extinguished:
+		return PRESENTATION_NOTICE_DURATION
+	case .Flood_Swept:
+		return PRESENTATION_FLOOD_DURATION
 	}
 	unreachable()
 }
@@ -733,7 +786,9 @@ active_presentation_cue :: proc(timeline: ^Presentation_Timeline) -> (^Presentat
 @(private = "file")
 presentation_cue_can_group :: proc(kind: Presentation_Cue_Kind) -> bool {
 	return kind == .Damage || kind == .Damage_Absorbed || kind == .Status_Removed ||
-	       kind == .Defeat || kind == .Loot_Dropped || kind == .Explosive_Armed
+	       kind == .Defeat || kind == .Loot_Dropped || kind == .Explosive_Armed ||
+	       kind == .Move || kind == .Flood_Swept || kind == .Fire_Extinguished || kind == .Status_Applied ||
+	       kind == .Trap_Triggered || kind == .Hazard_Triggered
 }
 
 @(private)
@@ -1033,6 +1088,8 @@ start_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^Presentat
 			}
 		}
 	case .Move:
+		// The wave's pushes wait for its front (update_active_presentation_cue).
+		if event.card_definition == .Flood { break }
 		// A teleport shows the body on its landing at once, never on the line
 		// between.
 		start := event.to_position if game.event_is_teleport(event) else event.from_position
@@ -1200,6 +1257,24 @@ start_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^Presentat
 		if event.card_definition != .Pinball || event.source.kind != .Enemy || event.amount <= 0 {
 			timeline.update_failures += 1
 		}
+	// BOMB MARLEY: the party as the cue shows it. The lights and the warned
+	// columns follow the party's own events; a bomb's column stays on show
+	// until its cue is over (finish_presentation_cue).
+	case .Marley_Begun, .Marley_Lights, .Marley_Warned, .Marley_Bonus, .Marley_Ended:
+		if event.card_definition != .Bomb_Marley { timeline.update_failures += 1 }
+		if timeline.final_view.valid { timeline.view.marley = timeline.final_view.marley }
+	case .Marley_Bomb, .Marley_Saved:
+		if event.card_definition != .Bomb_Marley { timeline.update_failures += 1 }
+	// INONDAZIONE: the player's own wave, and the steam of the fires it puts out.
+	case .Flood_Swept, .Fire_Extinguished:
+		if event.card_definition != .Flood || event.source != game.PLAYER_ENTITY { timeline.update_failures += 1 }
+		if cue.kind == .Fire_Extinguished {
+			if timeline.final_view.valid { timeline.view.ground = timeline.final_view.ground }
+			// A fire the board burned on goes out with its steam.
+			for &fire in timeline.view.objects[:timeline.view.object_count] {
+				if fire.kind == .Fire && fire.position == presentation_position(event.from_position) { fire.visible, fire.opacity = false, 0 }
+			}
+		}
 	case .Attack_Missed, .Move_Blocked, .Attack_Deflected,
 	     .Binding_Added, .Binding_Exhausted, .Binding_Expired, .Shadow_Entered, .Shadow_Emerged:
 	// The player's own card, behind his eyes.
@@ -1224,6 +1299,17 @@ update_active_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^P
 		from := presentation_position(cue.event.from_position)
 		to := presentation_position(cue.event.to_position)
 		if game.event_is_teleport(cue.event) { from = to }
+		// INONDAZIONE: a push of the wave starts as its front reaches the foe
+		// and lasts as long as the front takes to cross a cell.
+		if cue.event.card_definition == .Flood {
+			head, led := flood_group_head(timeline)
+			if !led { break }
+			length := flood_length(head.event)
+			index := flood_progress_index(game.Move_Direction(head.event.duration), cue.event.from_position, length)
+			push := clamp((presentation_cue_progress(cue)-flood_arrival(index, length))/flood_push_share(length), f32(0), f32(1))
+			if push <= 0 { break }
+			progress = tween.smoothstep(push)
+		}
 		position := view.Vec2{from.x+(to.x-from.x)*progress, from.y+(to.y-from.y)*progress}
 		if has_actor {
 			actor.position = position
@@ -1246,7 +1332,8 @@ update_active_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^P
 	     .Explosive_Disarmed, .Explosion, .Room_Hazard_Triggered, .Dice_Rolled, .Spell_Launched, .Spell_Impact,
 	     .Shadow_Entered, .Shadow_Emerged, .Attack_Deflected, .Fate_Rolled, .Lasso_Caught, .Lasso_Struck, .Lasso_Released,
 	     .Fish_Cast, .Fish_Bite, .Fish_Caught, .Pinball_Made, .Pinball_Launched, .Pinball_Bounced, .Pinball_Bumped, .Pinball_Burst,
-	     .First_Person_Begun:
+	     .First_Person_Begun, .Marley_Begun, .Marley_Lights, .Marley_Warned, .Marley_Bomb, .Marley_Saved, .Marley_Bonus,
+	     .Marley_Ended, .Flood_Swept, .Fire_Extinguished:
 	}
 }
 

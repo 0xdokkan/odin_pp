@@ -554,7 +554,9 @@ timeline_card_cue_verb :: proc(cue: ^Presentation_Cue) -> cstring {
 	     .Pulse_Advanced, .Refocus, .Object_Spawned, .Explosive_Armed, .Explosion, .Explosive_Disarmed, .Room_Hazard_Triggered,
 	     .Dice_Rolled, .Spell_Launched, .Spell_Impact, .Shadow_Entered, .Shadow_Emerged, .Attack_Deflected, .Fate_Rolled,
 	     .Lasso_Caught, .Lasso_Struck, .Lasso_Released, .Fish_Cast, .Fish_Bite, .Fish_Caught,
-	     .Pinball_Made, .Pinball_Launched, .Pinball_Bounced, .Pinball_Bumped, .Pinball_Burst, .First_Person_Begun:
+	     .Pinball_Made, .Pinball_Launched, .Pinball_Bounced, .Pinball_Bumped, .Pinball_Burst, .First_Person_Begun,
+	     .Marley_Begun, .Marley_Lights, .Marley_Warned, .Marley_Bomb, .Marley_Saved, .Marley_Bonus, .Marley_Ended,
+	     .Flood_Swept, .Fire_Extinguished:
 	}
 	return nil
 }
@@ -677,7 +679,9 @@ draw_presentation_cue :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) {
 	// the camera's (first_person.odin).
 	if cue.kind == .Move || cue.kind == .Defeat || cue.kind == .Pulse_Advanced ||
 	   cue.kind == .Shadow_Entered || cue.kind == .Shadow_Emerged || cue.kind == .Lasso_Released ||
-	   cue.kind == .Pinball_Launched || cue.kind == .Pinball_Bounced || cue.kind == .First_Person_Begun {
+	   cue.kind == .Pinball_Launched || cue.kind == .Pinball_Bounced || cue.kind == .First_Person_Begun ||
+	   cue.kind == .Marley_Lights || cue.kind == .Marley_Warned || cue.kind == .Marley_Bomb || cue.kind == .Marley_Ended ||
+	   cue.kind == .Flood_Swept || cue.kind == .Fire_Extinguished {
 		return
 	}
 	center, has_center := presentation_event_center(renderer, cue.event)
@@ -787,6 +791,19 @@ draw_presentation_cue :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) {
 	case .Pinball_Burst:
 		label = "POP!"
 		color = PINBALL_STEEL_LIGHT
+	// BOMB MARLEY (marley.odin): the party, a character the lights saved, the
+	// seconds a kill earned. The rest is the board's own drawing.
+	case .Marley_Begun:
+		label = "BOMB MARLEY"
+		color = rl.Color{240, 196, 64, 255}
+	case .Marley_Saved:
+		label = "SALVO"
+		color = rl.Color{150, 226, 110, 255}
+	case .Marley_Bonus:
+		label = fmt.ctprintf("+%ds", cue.event.amount)
+		color = rl.Color{240, 196, 64, 255}
+	case .Marley_Lights, .Marley_Warned, .Marley_Bomb, .Marley_Ended, .Flood_Swept, .Fire_Extinguished:
+		unreachable()
 	case .Move, .Card_Played, .Card_Drawn, .Card_Moved, .Card_Created, .Refocus,
 	     .Card_Refocused, .Defeat,
 	     .Loot_Dropped, .Loot, .Pulse_Advanced, .Dice_Rolled, .Spell_Launched, .Spell_Impact,

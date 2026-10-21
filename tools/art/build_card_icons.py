@@ -7,7 +7,7 @@ library.)
 
 assets/gothic/card-icons-pixel.png holds the 16 painted icons
 (assets/gothic/generation-prompts.md) in four rows of four. This script keeps
-those rows byte for byte and appends a fifth, a sixth and a seventh row of the same
+those rows byte for byte and appends a fifth, a sixth, a seventh and an eighth row of the same
 cells, painted here as coarse pixel art in the atlas's style (24-28 square
 pixel units, a few flat colours, a thick near-black outline):
 
@@ -37,6 +37,11 @@ pixel units, a few flat colours, a thick near-black outline):
              handguard, a steel receiver and banana magazine), its muzzle
              flashing and three brass casings flying back, inside the red
              ring of a crosshair.
+    cell 27  Bomb Marley: a mirrored disco ball that is also a bomb, a cap
+             and a sputtering fuse on top, red, yellow and green mirror
+             tiles in its mosaic, sparkles round it.
+    cell 28  Inondazione: a blue wave curling over a dark hollow, foam along
+             its lip, a sea of light dashes below, three drops flung up.
 
 The PNG is read and written here with zlib and struct, never through Blender
 or an image library, so the painted pixels are never resampled or recoloured:
@@ -45,7 +50,7 @@ chunks of the original (its content credentials too) are kept unchanged; they
 describe the painted sheet, so their image hash no longer matches. The same
 atlas in gives the same bytes out, and running the script again rebuilds the
 added rows from scratch. Every added row keeps the fifth row's pitch (314
-pixels), so the icons painted before the sixth and the seventh rows keep
+pixels), so the icons painted before the sixth, the seventh and the eighth rows keep
 their pixels too.
 
 Options:
@@ -66,7 +71,7 @@ ATLAS = os.path.join(ROOT, "assets", "gothic", "card-icons-pixel.png")
 
 COLUMNS = 4
 PAINTED_ROWS = 4
-ROWS = 7
+ROWS = 8
 # One pixel unit of the icon, in atlas pixels (the painted icons' own size).
 SCALE = 10
 SIGNATURE = b"\x89PNG\r\n\x1a\n"
@@ -469,9 +474,78 @@ FIRST_PERSON = (
 )
 
 
+# Phase 5: Bomb Marley, a mirrored disco ball that is also a bomb: its cap and
+# fuse sputtering a spark at the top, its facets a mosaic of mirror grey with a
+# few red, yellow and green tiles (the reggae colours), sparkles round it.
+BOMB_MARLEY = (
+    ".................OUOY.......",
+    "..............KKKKYO........",
+    "..............KjjKOY........",
+    ".............KjKK...........",
+    ".............KjK............",
+    "............KKKK............",
+    "...........KMHmmK...........",
+    "...........KKKKKK........Y..",
+    ".........KKKmmmmKKK.....YUY.",
+    "...Y....KmHmHmRmmmmK.....Y..",
+    "..YUY..KmUmmmmmmmmmmK.......",
+    "...Y..KHURmHHmMMmHmmmK......",
+    ".....KmHmRmHHmMMmHHmYmK.....",
+    ".....KmmmmmmmmmmmmmmmmK.....",
+    "....KmYmHHmHHmHHHmMMmMKK....",
+    "....KmYmHHmHMmHHHmMMmMKK....",
+    "....KmYmHHmMMmHHMmMMmMKK....",
+    "....KmmmmmmmmmmmmmmmmKKK....",
+    "....KmgmMMmHHmRRRmMMKmKK....",
+    "....KmgmMMmHHmRRRmMMKmKK....",
+    ".....KmmmmmmmmmmmmmKKKK.Y...",
+    ".....KmmmMmMMmGGmmmKmmKYUY..",
+    "......KRmMmMMmGGKmmKmK..Y...",
+    "......KmmmmmmmmKKKKKKK......",
+    ".......KKmQmMKmmKmKKK.......",
+    ".........KKKKKKKmKK.........",
+    "...........KKKKKK...........",
+    "............................",
+)
+
+
+# Phase 5: Inondazione, a flood wave: a blue crest curling over a dark hollow,
+# foam along its lip and a sea of light dashes under it, three drops flung up.
+FLOOD = (
+    "............................",
+    ".........................K..",
+    "..............KKKKKK....KWK.",
+    "....K.......KKWWWWWWKK..KuK.",
+    "...KWK.....KWWWWWWWWWWK..K..",
+    "...KuK....KWWWuuuuuuWWWK....",
+    "....K....KWWuuuuuuuuuuWWK...",
+    "........KWWCCCccccccuuuWWK..",
+    "..K.....KWCKKKCcccccccWuWWK.",
+    ".KWK...KWCKCCCKCcccccccuuWK.",
+    ".KuK...KCKCCcCCKcccWccccuuK.",
+    "..K...KWKCCcCcCCKCCCcccccuK.",
+    "......KWCCCCcCCCKCCCCCccWcK.",
+    "......KCCCCCCCcCKCCCCWCcccK.",
+    ".......KCCCCCCCCKCCCCCCCccK.",
+    "........KCCCCCCCKCCCCCCCCcK.",
+    "..KKKKK..KCCCCCCKCCCCCCCCCK.",
+    ".KWWWWWKKKCCCCCCKCCCCCCCCCK.",
+    "KWWWWWWWWWKCCCCCKCCCCCCCCCK.",
+    "KWWuWWuWWuWKKKKKuWWWuWWWuWWK",
+    "KuccccccuuuccccccuuuccccccuK",
+    "KccccccccccccccccccccccccccK",
+    "KuuuccccccuuuccccccuuucccccK",
+    "KccccccccccccccccccccccccccK",
+    "KCCcccCCCCCCcccCCCCCCcccCCCK",
+    ".KCCCCCCCCCCCCCCCCCCCCCCCCKK",
+    "..KccCCCCCCcccCCCCCCcccCCK..",
+    "...KKKKKKKKKKKKKKKKKKKKKK...",
+)
+
+
 # The hand-made cells of the added rows, by atlas cell.
 ICONS = {16: SHADOW_STEP, 17: POISON_POOL, 18: WILDFIRE, 19: DEFLECT, 20: COFFIN, 21: FATE_DICE, 22: VENOM_BLADE, 23: LASSO,
-         24: FISHING_ROD, 25: PINBALL, 26: FIRST_PERSON}
+         24: FISHING_ROD, 25: PINBALL, 26: FIRST_PERSON, 27: BOMB_MARLEY, 28: FLOOD}
 
 
 def chunk(kind, body):

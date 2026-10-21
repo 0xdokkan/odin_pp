@@ -45,6 +45,9 @@ card_upgrade_preview :: proc(card: game.Card_Instance) -> cstring {
 		case .Pinball: label = "VALORE"
 		// FIRST PERSON SHOOTER: its seconds behind the player's eyes.
 		case .First_Person: label = "SECONDI"
+		// BOMB MARLEY: the bombs' damage; INONDAZIONE: the push in cells.
+		case .Marley: label = "DANNO"
+		case .Flood: label = "SPINTA"
 		case .Move, .Remove_Status, .Enter_Shadow:
 		}
 		before := game.card_effect_amount(template, card.upgrade_level)

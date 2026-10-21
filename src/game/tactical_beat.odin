@@ -138,6 +138,11 @@ tactical_critical_scale :: proc(room: ^Room, action: ^Action) {
 		// (and the one every wall puts it back to).
 		case .Draw_Cards, .Create_Card, .Gain_Energy, .Place_Ground, .Lasso, .Pinball:
 			effect.amount += 1
+		// The wave pushes one cell more; the party lasts five seconds longer.
+		case .Flood:
+			effect.amount += 1
+		case .Marley:
+			effect.duration += MARLEY_CRITICAL_SECONDS
 		case .Deploy_Device:
 			effect.amount = critical_damage(effect.amount)
 			if effect.object_kind == .Shock_Floor { effect.charges = min(effect.charges+1, TACTICAL_SHOCK_FLOOR_MAX_CHARGES) }

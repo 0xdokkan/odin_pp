@@ -70,6 +70,8 @@ Card_Id :: enum {
 	Fishing_Rod,
 	Pinball,
 	First_Person,
+	Bomb_Marley,
+	Flood,
 	Count,
 }
 
@@ -1069,6 +1071,29 @@ CARD_DEFINITIONS := [Card_Id]Card_Definition{
 			amount_per_upgrade = FIRST_PERSON_SECONDS_PER_UPGRADE}, {}, {}, {}},
 		effect_count = 1,
 	},
+	.Bomb_Marley = {
+		upgrade_limit = MARLEY_MAX_UPGRADE_LEVEL, time_cost = 2,
+		// BOMB MARLEY: a party in the room for MARLEY_SECONDS world seconds (+5 a
+		// foe its bombs kill, 90 in all): lit cells that save, bombs down whole
+		// columns that hurt for 6 (+1 per upgrade) (marley.odin).
+		id = .Bomb_Marley, name = "Bomb Marley", rarity = .Rare,
+		reward_weight = 60, shop_base_price = 8, cost = 3,
+		targeting = {rule = .Self},
+		effects = {{kind = .Marley, target = .Player, base_amount = MARLEY_BASE_DAMAGE, amount_per_upgrade = 1,
+			duration = MARLEY_SECONDS}, {}, {}, {}},
+		effect_count = 1,
+	},
+	.Flood = {
+		upgrade_limit = FLOOD_MAX_UPGRADE_LEVEL, time_cost = 2,
+		// INONDAZIONE: dropped on a cell round the player, a wave sweeps the board
+		// from the wall behind to the wall in front of that way, pushing every foe
+		// 1 cell (+1 per upgrade) and putting out the fires (flood.odin).
+		id = .Flood, name = "Inondazione", rarity = .Uncommon,
+		reward_weight = 75, shop_base_price = 6, cost = 2,
+		targeting = {rule = .Cell, cast_range = {.Chebyshev, 1, 3}, shape = .Single},
+		effects = {{kind = .Flood, target = .Player, base_amount = FLOOD_BASE_PUSH, amount_per_upgrade = 1}, {}, {}, {}},
+		effect_count = 1,
+	},
 	.Count = {id = .Count},
 }
 
@@ -1212,6 +1237,14 @@ card_effect_template_is_valid :: proc(
 	// The player's own seconds behind his eyes.
 	case .First_Person:
 		return template.target == .Player && definition.targeting.rule == .Self && card_amount_template_is_valid(template)
+	// The party's bombs and seconds.
+	case .Marley:
+		return template.target == .Player && definition.targeting.rule == .Self && template.duration > 0 &&
+		       card_amount_template_is_valid(template)
+	// A cell aimed at: the wave's way.
+	case .Flood:
+		return template.target == .Player && definition.targeting.rule == .Cell && definition.targeting.shape == .Single &&
+		       card_amount_template_is_valid(template)
 	}
 	return false
 }
@@ -1397,6 +1430,10 @@ instantiate_card_effect :: proc(
 			return {}, false
 	case .First_Person:
 		return first_person_effect(card_effect_amount(template, instance.upgrade_level)), true
+	case .Marley:
+		return marley_effect(card_effect_amount(template, instance.upgrade_level), template.duration), true
+	case .Flood:
+		return flood_effect(card_effect_amount(template, instance.upgrade_level), {}), true
 	}
 	return {}, false
 }
@@ -1802,7 +1839,7 @@ compile_card_action :: proc(
 			continue
 		}
 		effect, instantiated := instantiate_card_effect(template, entry.entity, instance)
-		if effect.kind == .Deploy_Device || effect.kind == .Place_Ground { effect.destination = evaluation.query.anchor }
+		if effect.kind == .Deploy_Device || effect.kind == .Place_Ground || effect.kind == .Flood { effect.destination = evaluation.query.anchor }
 		if instance.definition_id == .Strike && effect.kind == .Damage { effect.amount += tactical_strike_bonus(room, entry.entity) }
 		if !instantiated {
 			return {}, .Too_Many_Effects if template.target == .Each_Affected_Enemy && entry.entity.kind == .Object else .Invalid_Definition

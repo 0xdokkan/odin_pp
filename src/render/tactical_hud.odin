@@ -124,7 +124,8 @@ tactical_status_chip_layout :: proc(renderer: ^Renderer, room: ^game.Room) -> (c
 	b := tactical_hud_layout(renderer).vitals
 	ordered := tactical_status_chip_order(&v.statuses)
 	_, ball := pinball_chip(room, false)
-	count := ordered.count+(1 if ball else 0)
+	_, party := marley_chip(renderer, false)
+	count := ordered.count+(1 if ball else 0)+(1 if party else 0)
 	if count == 0 { return }
 	// The ball's place among the chips: after VELENO and BRUCIATURA.
 	bites := 0
@@ -141,11 +142,15 @@ tactical_status_chip_layout :: proc(renderer: ^Renderer, room: ^game.Room) -> (c
 	needed: f32
 	even := true
 	for index in 0..<chips.shown {
+		extras := (1 if ball else 0)+(1 if party else 0)
 		if ball && index == bites {
 			chips.accents[index] = PINBALL_STEEL_LIGHT
 			chips.texts[index], _ = pinball_chip(room, short)
+		} else if party && index == bites+(1 if ball else 0) {
+			chips.accents[index] = MARLEY_GOLD
+			chips.texts[index], _ = marley_chip(renderer, short)
 		} else {
-			status := ordered.items[index-1 if ball && index > bites else index]
+			status := ordered.items[index if index < bites else index-extras]
 			_, chips.accents[index] = tactical_status_label(status.kind, short)
 			chips.texts[index] = tactical_status_chip_text(status, short, v.fate_sides)
 		}

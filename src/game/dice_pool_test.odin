@@ -114,6 +114,8 @@ test_dice_cards_climb_the_ladder_from_d4_to_d20 :: proc(t: ^testing.T) {
 		if id == .Fishing_Rod { top = FISHING_ROD_MAX_UPGRADE_LEVEL }
 		if id == .Pinball { top = PINBALL_MAX_UPGRADE_LEVEL }
 		if id == .First_Person { top = FIRST_PERSON_MAX_UPGRADE_LEVEL }
+		if id == .Bomb_Marley { top = MARLEY_MAX_UPGRADE_LEVEL }
+		if id == .Flood { top = FLOOD_MAX_UPGRADE_LEVEL }
 		testing.expect_value(t, card_max_upgrade_level(id), top)
 		for level in i32(-1)..=MAX_CARD_UPGRADE_LEVEL {
 			expected := i32(0)

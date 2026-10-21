@@ -99,6 +99,30 @@ Game_Event_Kind :: enum {
 	// (card_definition the card). Its end records nothing: the board follows
 	// the room's state, and so do the AK's shots (First_Person_State.trail).
 	First_Person_Begun,
+	// BOMB MARLEY (marley.odin): the party begins at the player's cell
+	// (from_position = to_position); `amount` is the bombs' damage and `duration`
+	// its world seconds.
+	Marley_Begun,
+	// The lights are on (at the start, and at every turn of them): `amount` is how many.
+	Marley_Lights,
+	// A column is warned: the bomb will cross it from from_position (north end)
+	// to to_position (south end) in `amount` beats.
+	Marley_Warned,
+	// A bomb lands on its column, from_position to to_position, `amount` damage.
+	Marley_Bomb,
+	// `target` stood in a lit cell (from_position = to_position) as the bomb
+	// crossed its column: no damage.
+	Marley_Saved,
+	// The bombs killed a foe: `amount` seconds more, `duration` the seconds left.
+	Marley_Bonus,
+	// The party is over: `amount` is the foes the bombs killed, `duration` its seconds.
+	Marley_Ended,
+	// INONDAZIONE (flood.odin): the wave goes from from_position (the middle of
+	// the wall behind it) to to_position (the wall in front); `amount` is the
+	// push in cells and `duration` its Move_Direction.
+	Flood_Swept,
+	// A fire went out on from_position (one event a cell it burned over).
+	Fire_Extinguished,
 }
 
 Game_Event :: struct {

@@ -172,6 +172,20 @@ each sound starts with the drawing it belongs to:
   wounds a foe (at 0.9; the struck foe's own hurt stays silent: its card
   starts no clip) and `world_ak_ricochet` 0.04 s after one stopped by stone,
   cover or an object (at 0.8).
+- **The disco** (Bomb Marley), on the board: `card_bomb_marley` when the card is
+  played; `world_marley_ball` as the mirror ball falls from above and
+  `world_marley_lights` each time the lit tiles swap; `world_marley_warn` when a
+  column is marked for a throw, `world_marley_bomb` as the bomb flies down it
+  and `world_marley_blast` as it bursts; `world_marley_safe` for each character
+  standing in the light that survives, `world_marley_bonus` when +5 seconds are
+  earned and `world_marley_end` as the ball rises and the party ends. Under it
+  all the reggae plays one beat a second (60 BPM) as the world's own beat:
+  `world_marley_groove_a`, `world_marley_groove_b`, `a`, `b`, ... (one-drop:
+  bass and kick, then rim and offbeat skank).
+- **The flood** (Inondazione): `card_flood` when the card is played;
+  `world_flood_wave` as the wave sweeps from one wall to the other,
+  `world_flood_splash` at each enemy it pushes and `world_flood_steam` at each
+  fire it puts out.
 - **The room**: `ui_beat_tick` on every whole second of an open window,
   `ui_critical` when an action claims the beat, `ui_window_end`, `ui_stun`,
   `ui_defense_prompt`, `pilgrim_parry` on a parry or deflection that lands,
@@ -390,6 +404,34 @@ Same rules as `cards_arms`.
 | world_pinball_burst | the ball bursts at the end of its twenty seconds | 0.9 | -15 | 0.35 | a paper balloon popping at 0.0 (a sharp paper crack over a low thump), shreds and confetti fluttering down 0.01-0.7 (paper grains thinning out), a soft puff of paper dust, a last small steel clink at 0.55 |
 | world_ak_hit | a round of the AK wounds a foe | 0.25 | -20 | 0.2 | the foe's paper card punched through at 0.0 (a crisp tear 2-6 kHz, 10 ms), a muffled body thud under it (80-250 Hz), a few crinkles to 0.05; short, up to six a second |
 | world_ak_ricochet | a round stops on stone, cover or an object | 0.5 | -21 | 0.3 | a hard chip of stone at 0.0 (a crack, a chunk, grit flying), the round whining away from 0.03 (a thin tone falling 3.2 -> 1.3 kHz with a little wobble, fading by 0.4) |
+
+### Family `marley` — Bomb Marley and Inondazione
+
+Module `sfx_marley.py` (it reuses the `world` family's water, blast and stone
+materials). Mirror-ball sounds are glints (tiny pings on D5-D8 of D Phrygian
+with a tick of noise each) and detuned shimmers; the reggae is in D minor
+seventh at **60 BPM**: a drawbar organ (with a Leslie wobble), a round bass on
+D2, a soft kick, a rim click and a muted guitar-and-organ skank with dub echoes.
+Length is the recipe's (the build's hall adds a tail: the built length is in
+brackets; every sound stays under 3.5 s).
+
+| name | when | length | marks | loud | wet | what |
+|---|---|---|---|---|---|---|
+| card_bomb_marley | Bomb Marley is played | 2.0 (1.9) | 0.0, 0.8, 0.95, 1.1 | -19 | 0.3 (rt60 1.2) | a paper flick, a low fuse spitting while a mirror ball's glints climb D5 -> D8 over a high shimmer, then a reggae organ bubbles twice (0.8, 0.95: short D minor seventh stabs over a round bass) and holds the chord at 1.1 with its Leslie wobble |
+| card_flood | Inondazione is played | 1.4 (1.6) | 0.0, 0.7 | -19 | 0.25 (rt60 0.9) | a paper flick, a surge of water rising (a wide band 200 -> 2.4 kHz over a swelling low rumble, bubbles ringing up through it), cresting and crashing at 0.7 (foam falling 6 -> 1.5 kHz) and draining away in froth and drops |
+| world_marley_ball | the mirror ball falls | 1.75 (2.2) | 0.0, 1.5 | -21 | 0.3 (rt60 1.0) | a shimmer gliding down D7 -> D5 as the ball comes down its chain, tiny metal ticks of the winch slowing from 14 to 3 a second, a soft wind falling, glints scattered over it; at 1.5 the ball hangs: a lightly struck D6 chime |
+| world_marley_warn | a column is warned | 0.25 (0.36) | 0.0, 0.11 | -23 | 0.1 (rt60 0.5) | a short, dry two-tone tick: two woodblock knocks, A5 then D6 (rising) |
+| world_marley_bomb | a bomb is thrown down a column | 0.9 (1.2) | 0.0, 0.62 | -19 | 0.2 (rt60 0.8) | a falling whistle (2.8 kHz -> 700 Hz, swelling, a little air and fuse fizz), then at 0.62 the landing: a dull iron-and-stone thud, a short rattle of grit |
+| world_marley_blast | a bomb bursts | 1.5 (1.45) | 0.004, 0.06 | -13 | 0.35 (rt60 1.1) | a heavy blast (pressure front, falling boom, stone shatter, debris to 1.3) and in it a dub bass drop: a round sine diving from 200 Hz to D2 at 0.06 and ringing on, an octave of sub under it |
+| world_marley_safe | a character in the light survives | 0.45 (0.53) | 0.0, 0.045 | -22 | 0.25 (rt60 0.8) | a bright soft chime: a glockenspiel D6 with A6 a breath later, a few glints |
+| world_marley_lights | the lit tiles swap | 0.65 (0.9) | 0.0, 0.5 | -22 | 0.25 (rt60 0.8) | a sparkle sweep: glints rising D5 -> D8 over a thin band sliding 2.5 -> 10 kHz, a tiny ping at 0.5 |
+| world_marley_bonus | +5 seconds earned | 0.4 (0.4) | 0.0, 0.075 | -21 | 0.15 (rt60 0.6) | a coin-like ding: two bright metal strikes a fifth apart (D6, A6) |
+| world_marley_end | the ball rises, the party ends | 1.3 (1.5) | 0.0, 0.18, 0.95 | -20 | 0.3 (rt60 1.0) | the ball hauled up (a soft up-swish, chain ticks) as a descending sparkle falls over a D minor chord that slows like a stopped record (speed 1 -> 0 from 0.18 to 0.93, darkening, a few crackles), a last low thump at 0.95 |
+| world_marley_groove_a | beat A of the groove (every other second) | 1.0 (1.03) | 0.0, 0.72 | -22 | 0.1 (rt60 0.5) | one beat at 60 BPM: a deep round bass note on D2 with a soft kick under it on the beat, ringing on, and a quiet A2 pickup at 0.72 |
+| world_marley_groove_b | beat B of the groove | 1.0 (1.07) | 0.0, 0.5, 0.73 | -23 | 0.12 (rt60 0.3) | one beat: a dry rim click on the beat, the offbeat skank at 0.5 (a muted guitar chop over an organ chop and the pick's chk), its dub echoes falling away at 0.73 and 0.96; a, b, a, b is one-drop |
+| world_flood_wave | the wave sweeps the room | 2.3 (3.2) | 0.0, 1.25 | -16 | 0.25 (rt60 0.8) | a long swell of filtered noise (pink through a wide band 180 -> 700 -> 260 Hz, a low brown roll, a foam hiss 2.5 -> 5.5 -> 2.5 kHz) breathing slowly, cresting at 1.25, bubbles and drops in its wake |
+| world_flood_splash | the wave hits an enemy | 0.55 (0.77) | 0.0 | -19 | 0.2 (rt60 0.8) | a heavy wet slap (a band falling 6 -> 1.4 kHz, a low whump under it, the soaked card's paper flap), bubbles bursting and a rain of drops |
+| world_flood_steam | a fire is put out | 0.75 (0.94) | 0.0, 0.03 | -21 | 0.2 (rt60 0.8) | water on embers: a wet gulp, a dense sizzle thinning out, then a long turbulent hiss of steam (7 -> 3 kHz) fading with a soft puff |
 
 ### Family `ui` — time, criticals, defence, statuses, rewards
 

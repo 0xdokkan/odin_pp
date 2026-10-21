@@ -441,6 +441,9 @@ card_demo_expected_events :: proc(id: Card_Id) -> (events: bit_set[Game_Event_Ki
 		case .Pinball: events += {.Pinball_Made, .Pinball_Launched, .Pinball_Bumped, .Pinball_Burst}
 		// Its shots record no event: the take counts the room's hits.
 		case .First_Person: events += {.First_Person_Begun}
+		// The party begins under the ball's lights; the wave sweeps the board.
+		case .Marley: events += {.Marley_Begun, .Marley_Lights}
+		case .Flood: events += {.Flood_Swept}
 		}
 	}
 	// A dice card shows its roll; the Dado del Destino's die rolls at the bump

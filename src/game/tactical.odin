@@ -179,6 +179,7 @@ tactical_end_combat :: proc(room: ^Room) {
 	// still belong to this room; they are not part of an exclusive takeover.
 	room.lasso = {}
 	room.pinball = {}
+	room.marley = {}
 	room.first_person.active, room.first_person.trigger = false, false
 }
 
@@ -253,6 +254,8 @@ continue_tactical_pulse :: proc(room: ^Room) -> bool {
 		for &enemy in room.enemies { enemy.tactical_cooldown = max(f32(0), enemy.tactical_cooldown-1) }
 		resolve_due_explosives(room, &pulse)
 		resolve_due_room_modifier(room, &pulse)
+		// BOMB MARLEY: the party's beat (marley.odin).
+		marley_beat(room, &pulse)
 		ids, count := enemy_ids_in_planning_order(room)
 		for protect_pass in 0..<2 {
 			for id in ids[:count] {
