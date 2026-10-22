@@ -10,8 +10,9 @@ per i comandi disponibili oggi valgono il [README](README.md) e la documentazion
 - [Direzione del gioco](docs/direzione.md): fissa la direzione in quattro ambiti
   (mappa aperta per bioma, progressione da extraction, combattimento senza timer,
   design e narrativa del robot nella memoria del creatore), le decisioni prese
-  (fra cui i tre slot di salvataggio, aggiornati di continuo e non copiabili, e
-  la mappa dei biomi come galassia di isolette 3D),
+  (fra cui i tre slot di salvataggio, aggiornati di continuo e non copiabili, la
+  mappa dei biomi come galassia di isolette 3D e la rotella che sceglie e
+  piazza le carte),
   quelle aperte con una proposta e la roadmap in nove fasi. Il gioco non cambia
   ancora: le regole di oggi restano finché le fasi non le sostituiscono.
 

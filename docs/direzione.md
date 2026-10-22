@@ -2,7 +2,7 @@
 
 # Direzione del gioco
 
-Documento di direzione, versione 1.3 (22 ottobre 2026). Fissa dove va il gioco in
+Documento di direzione, versione 1.4 (22 ottobre 2026). Fissa dove va il gioco in
 quattro ambiti: **Mappa**, **Progressione**, **Gameplay** e **Design**. Gli altri
 documenti descrivono il gioco di oggi e restano validi finché una fase della
 [roadmap](#6-roadmap) non ne sostituisce le regole.
@@ -114,7 +114,8 @@ bioma e porta a casa ciò che ha raccolto. Se muore perde lo zaino, ma ciò che 
 - **Niente zoom né rotazione.** La camera ha angolo e distanza fissi, con un
   ampio margine di vista *(proposta: circa 25×15 celle attorno al robot)*, e lo
   segue con un leggero ritardo.
-- **La rotella resta alle carte** che si mirano con essa (Inondazione, Cannone).
+- **La rotella è delle carte.** In uno scontro sceglie le carte della mano e,
+  nel piazzamento, gira l'oggetto da piazzare (vedi [Controlli](#33-controlli)).
 - **Prestazioni.** Il mondo si disegna e si simula a blocchi (chunk). Lontano
   dal robot i nemici dormono.
 
@@ -413,7 +414,10 @@ alla volta.
 | Cabinati *(proposta)* | rigiocare i minigiochi sbloccati per i record, senza premi |
 | Prova meccaniche | il laboratorio delle carte di oggi |
 
-### 3.3 Controlli *(proposta)*
+### 3.3 Controlli
+
+La tabella è una proposta, tranne la rotella con le carte, che è decisa (vedi
+sotto).
 
 | Input | Fuori dallo scontro | In scontro |
 |---|---|---|
@@ -423,7 +427,64 @@ alla volta.
 | `Z` | zaino | zaino; un consumabile costa tempo |
 | `Tab` | ologramma del bioma | ologramma; il tempo continua |
 | **PERSONAGGIO** | mazzo, punti, reliquie | come oggi, in pausa |
-| carte, `1`–`8`, `F`, rotella | — | come oggi; la rotella mira le carte che la usano |
+| rotella | — | sceglie le carte della mano; nel piazzamento gira l'oggetto |
+| clic sinistro | — | gioca la carta scelta sul bersaglio; con una carta da piazzare entra nel piazzamento, poi piazza |
+| clic destro | — | esce dal piazzamento; poi toglie la scelta |
+| trascinare le carte, `1`–`8`, `F` | — | come oggi |
+
+#### La rotella e le carte
+
+In uno scontro la rotella sceglie e gioca le carte senza dover andare sulla mano
+con il mouse.
+
+1. **Scorrere.** Se nessuna carta è scelta, il primo scatto della rotella
+   sceglie la prima carta della mano. Ogni scatto in giù passa alla carta dopo.
+   *(proposta: lo scatto in su torna alla carta prima, e ai bordi della mano la
+   scelta ricomincia dall'altro capo; se una carta è già scelta con un tasto o
+   un clic, la rotella parte da lei)*
+2. **Giocare una carta normale.** Con una carta scelta, il clic sinistro su un
+   bersaglio valido la gioca, come la scelta con i tasti di oggi. *(proposta:
+   una carta su di sé si gioca con un clic sinistro in un punto qualsiasi della
+   board)*
+3. **Entrare nel piazzamento.** Se la carta scelta è da piazzare e da orientare
+   (il Cannone, il Cannone laser, l'Inondazione: le carte che oggi usano la
+   rotella), il clic sinistro entra nel **piazzamento**. L'oggetto segue il mouse
+   sulla griglia con la sua anteprima e da quel momento la rotella serve
+   **solo** a girarlo, un quarto di giro a scatto.
+4. **Piazzare.** Il secondo clic sinistro piazza l'oggetto sulla cella sotto il
+   mouse. Se la cella non è valida non succede nulla e si resta nel piazzamento.
+5. **Ripensarci.** Il clic destro nel piazzamento ne esce senza giocare la carta.
+   La carta resta scelta e la rotella torna a scorrere le carte dopo. Un altro
+   clic destro toglie anche la scelta, come oggi.
+6. **Dopo una giocata** la scelta si azzera, e lo scatto successivo riparte dalla
+   prima carta *(proposta)*.
+
+```text
+NESSUNA CARTA ── rotella ──► CARTA SCELTA ── rotella ──► la carta dopo
+      ▲                         │      ▲
+      └──── clic destro ────────┘      │ clic destro
+                                       │
+              carta normale:           │       carta da piazzare:
+              clic sinistro sul        │       clic sinistro
+              bersaglio ──► GIOCATA    ▼
+                                   PIAZZAMENTO ── rotella ──► gira l'oggetto
+                                       │
+                                       └── clic sinistro su una cella valida ──► GIOCATA
+```
+
+- **Il critico sul battito** si giudica sul clic che gioca o piazza: con la carta
+  già scelta e già orientata basta cliccare a tempo.
+- **Carte non giocabili** (energia che manca, nessun bersaglio): la rotella le
+  sceglie comunque, in grigio, così la posizione di ogni carta resta prevedibile
+  *(proposta)*.
+- **Carte piazzate senza orientamento** (Buco Nero, Tesla Coil, Shock Floor,
+  Pozza di Veleno, Incendio): un solo clic sulla cella, senza piazzamento
+  *(proposta)*.
+- Trascinare le carte, i tasti `1`–`8` e il clic sulla carta funzionano come
+  oggi.
+- **Tecnica.** Scelta, piazzamento e rotazione sono solo input e presentazione:
+  non toccano il gioco. Solo il clic che piazza diventa una giocata, con la
+  direzione data dalla rotella, come fa già oggi il Cannone.
 
 ### 3.4 Che cosa cambia rispetto a oggi
 
@@ -432,6 +493,7 @@ alla volta.
 | rotta a DAG di stanze (Choose_Path) e stanze da 17×11 a 45×31 | una mappa aperta per bioma; le famiglie di stanza (Pilastri, Anello, Corti gemelle, Asimmetrica) diventano layout dei POI |
 | finestra a tempo, `--decision-time`, stordimento a tempo scaduto | via; resta l'orologio dei battiti per nemici e critici |
 | fog, `--vision`, zoom e rotazione della camera | via; camera fissa |
+| rotella: zoom della camera, e mira dell'Inondazione e del Cannone | rotella: sceglie le carte della mano; nel piazzamento gira l'oggetto |
 | reliquia iniziale fra tre, reliquie per la run | reliquie come oggetti dello zaino, portate da casa o trovate |
 | Shop, Rest, Event, Treasure | POI: Officina, Fonte, eventi, Cache |
 | upgrade allo Shop e al Rest | punti potenziamento dall'esperienza |
@@ -538,6 +600,7 @@ creatore.
 | Stile | mondo low poly senza texture al neon; personaggi e oggetti di cartoncino |
 | Salvataggi | tre slot avviabili; in ogni slot un solo salvataggio, aggiornato quasi sempre; gli slot non si copiano, si possono solo cancellare |
 | Mappa dei biomi | una galassia di isolette 3D nello stile del gioco, unite da rotte di luce; mostra solo i biomi già sbloccati, salvo il bioma segreto dopo il finale |
+| Rotella in scontro | sceglie le carte della mano (la prima, poi una a scatto); per le carte da orientare il clic sinistro entra nel piazzamento, dove la rotella gira l'oggetto; un altro clic sinistro piazza, il clic destro torna allo scorrimento |
 
 ### Aperte, con una proposta
 
@@ -545,6 +608,9 @@ creatore.
 |---|---|
 | Quanti biomi e come si collegano | 6 più il segreto, collegati da rotte a rami ([2.7](#27-biomi-e-sblocchi)) |
 | Comandi della galassia | si gira trascinando, senza zoom libero |
+| Rotella in su e ai bordi della mano | in su la carta prima; ai bordi si ricomincia dall'altro capo |
+| Carte piazzate senza orientamento | un solo clic, senza piazzamento |
+| Carte non giocabili e rotella | scelte comunque, in grigio |
 | Geografia fissa o generata a ogni run | fissa, con contenuto variabile ([1.1](#11-il-bioma-come-mappa-aperta)) |
 | Dimensioni della mappa | circa 96×96 celle, da 80×80 a 112×112 |
 | Chiavi per la tana del boss | nessuna: sempre aperta |
@@ -571,7 +637,7 @@ poter entrare nel salvataggio.
 | Fase | Contenuto | Fatta quando |
 |---|---|---|
 | 1 | Combattimento senza timer: via la finestra, critici sul battito, nuova pescata | uno scontro intero si gioca senza conto alla rovescia, con i critici sul battito |
-| 2 | Camera fissa, niente fog né zoom | la stanza di oggi si gioca con la camera nuova, senza nebbia |
+| 2 | Camera fissa, niente fog né zoom; la rotella che sceglie e piazza le carte | la stanza di oggi si gioca con la camera nuova, senza nebbia, e la mano si gioca anche solo con rotella e clic |
 | 3 | Mappa aperta di prova: un bioma grande a chunk, POI, pattuglie, ingaggio, ologramma del bioma | si esplora, si ripulisce un nido e si torna a esplorare senza cambi di schermata |
 | 4 | Mount | si attraversa il bioma in sella; uno scontro la impedisce |
 | 5 | Zaino, deposito, hub minimo, estrazione e morte; i tre slot con il salvataggio continuo | una run porta a casa uno zaino, una morte lo perde; chiudendo il gioco a metà run, o dopo un crash, si riprende dall'ultimo salvataggio |
