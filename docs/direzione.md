@@ -2,7 +2,7 @@
 
 # Direzione del gioco
 
-Documento di direzione, versione 1.4 (22 ottobre 2026). Fissa dove va il gioco in
+Documento di direzione, versione 1.5 (22 ottobre 2026). Fissa dove va il gioco in
 quattro ambiti: **Mappa**, **Progressione**, **Gameplay** e **Design**. Gli altri
 documenti descrivono il gioco di oggi e restano validi finché una fase della
 [roadmap](#6-roadmap) non ne sostituisce le regole.
@@ -60,12 +60,11 @@ bioma e porta a casa ciò che ha raccolto. Se muore perde lo zaino, ma ciò che 
   molto più grande di una stanza ma attraversabile. *(proposta)* Circa 96×96
   celle: 80×80 nei primi biomi, 112×112 negli ultimi. Oggi la stanza più grande
   è di 45×31. A piedi si attraversa in circa un minuto, in sella in 20–25 secondi.
-- **Geografia fissa, contenuto variabile** *(proposta)*. Ogni bioma ha la stessa
-  geografia a ogni run: rilievi, monoliti, ingresso, tana del boss e segreti
-  fissi. Il seed della run cambia i nemici, il bottino e quali POI sono attivi
-  fra quelli possibili. È il mito di Sisifo: il robot risale la stessa collina, e
-  ciò che ricorda (i segreti trovati, la mappa imparata) vale qualcosa.
-  L'alternativa è una geografia generata a ogni run, come le stanze di oggi.
+- **Geografia fissa, contenuto variabile.** Ogni bioma ha la stessa geografia a
+  ogni run: rilievi, monoliti, ingresso, tana del boss e segreti fissi. Il seed
+  della run cambia i nemici, il bottino e quali POI sono attivi fra quelli
+  possibili. È il mito di Sisifo: il robot risale la stessa collina, e ciò che
+  ricorda (i segreti trovati, la mappa imparata) vale qualcosa.
 - **Il bioma è finito.** I POI non si rigenerano e le pattuglie sono in numero
   fisso per run. Senza timer è il contenuto finito a chiudere la run: non si
   può accumulare esperienza all'infinito.
@@ -599,6 +598,7 @@ creatore.
 | Fine del gioco | tutti i biomi vinti; poi il bioma segreto e il true ending |
 | Stile | mondo low poly senza texture al neon; personaggi e oggetti di cartoncino |
 | Salvataggi | tre slot avviabili; in ogni slot un solo salvataggio, aggiornato quasi sempre; gli slot non si copiano, si possono solo cancellare |
+| Geografia dei biomi | fissa a ogni run (rilievi, monoliti, ingresso, tana del boss, segreti); il seed della run cambia nemici, bottino e POI attivi |
 | Mappa dei biomi | una galassia di isolette 3D nello stile del gioco, unite da rotte di luce; mostra solo i biomi già sbloccati, salvo il bioma segreto dopo il finale |
 | Rotella in scontro | sceglie le carte della mano (la prima, poi una a scatto); per le carte da orientare il clic sinistro entra nel piazzamento, dove la rotella gira l'oggetto; un altro clic sinistro piazza, il clic destro torna allo scorrimento |
 
@@ -611,7 +611,6 @@ creatore.
 | Rotella in su e ai bordi della mano | in su la carta prima; ai bordi si ricomincia dall'altro capo |
 | Carte piazzate senza orientamento | un solo clic, senza piazzamento |
 | Carte non giocabili e rotella | scelte comunque, in grigio |
-| Geografia fissa o generata a ogni run | fissa, con contenuto variabile ([1.1](#11-il-bioma-come-mappa-aperta)) |
 | Dimensioni della mappa | circa 96×96 celle, da 80×80 a 112×112 |
 | Chiavi per la tana del boss | nessuna: sempre aperta |
 | Posti dello zaino, reliquie attive | 12 posti, 3 reliquie attive |
@@ -652,8 +651,9 @@ poter entrare nel salvataggio.
   oggetti, 416 eventi per registro, `Room` sotto gli 8 KB. La mappa aperta
   chiede un contenitore del mondo a blocchi, con la simulazione attiva solo
   attorno al robot.
-- **Determinismo.** Resta come oggi: seed della run e stream separati per mappa,
-  incontri, bottino e premi. La grafica non consuma RNG.
+- **Determinismo.** Resta come oggi: seed della run e stream separati per i POI
+  attivi, gli incontri, il bottino e i premi. La geografia di ogni bioma è fissa
+  e non consuma RNG, come la grafica.
 - **Slot.** Tre file versionati, uno per slot, al posto di `odin_pp_profile.json`
   del ring e del profilo dei minigiochi. Si scrivono su un file temporaneo e poi
   si rinominano, come il profilo di oggi: un crash a metà scrittura non rovina
