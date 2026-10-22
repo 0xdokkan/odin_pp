@@ -2,14 +2,14 @@
 
 # Direzione del gioco
 
-Documento di direzione, versione 1.13 (22 ottobre 2026). Fissa dove va il gioco in
+Documento di direzione, versione 1.14 (22 ottobre 2026). Fissa dove va il gioco in
 quattro ambiti: **Mappa**, **Progressione**, **Gameplay** e **Design**. Gli altri
 documenti descrivono il gioco di oggi e restano validi finché una fase della
 [roadmap](#6-roadmap) non ne sostituisce le regole.
 
-Le voci marcate *(proposta)* sono scelte di partenza da confermare o tarare con
-le partite; tutte le altre sono decise. Le decisioni ancora aperte sono raccolte
-in [Decisioni](#5-decisioni).
+Le voci marcate *(per ora)* sono **confermate momentaneamente**: valgono come
+regole quando comincia lo sviluppo, e si possono rivedere con le prove e le
+partite. Tutte le altre sono decise. Il riepilogo è in [Decisioni](#5-decisioni).
 
 ## In breve
 
@@ -62,7 +62,7 @@ bioma e porta a casa ciò che ha raccolto. Se muore perde lo zaino, ma ciò che 
 ### 1.1 Il bioma come mappa aperta
 
 - Ogni bioma è un'unica mappa aperta sulla griglia di oggi (una cella per passo),
-  molto più grande di una stanza ma attraversabile. *(proposta)* Circa 96×96
+  molto più grande di una stanza ma attraversabile. *(per ora)* Circa 96×96
   celle: 80×80 nei primi biomi, 112×112 negli ultimi. Oggi la stanza più grande
   è di 45×31. A piedi si attraversa in circa un minuto, in sella in 20–25 secondi.
 - **Geografia fissa, contenuto variabile.** Ogni bioma ha la stessa geografia a
@@ -84,8 +84,8 @@ bioma e porta a casa ciò che ha raccolto. Se muore perde lo zaino, ma ciò che 
 | Nido | un generatore di nemici | si attiva entrando nel suo centro; le ondate vanno ripulite | una carta fra tre ed esperienza; a volte un oggetto |
 | Cache | bottino | si apre; a volte la custodiscono 1–2 nemici | oggetti, consumabili, reliquie, crediti |
 | Archivio | un terminale | si legge | una **scoperta**: la carta entra nel pool delle run future |
-| Officina *(proposta)* | un mercante | si spendono crediti | carte, rimozione di una carta, consumabili |
-| Fonte *(proposta)* | un punto di ristoro | si usa una volta | cura |
+| Officina *(per ora)* | un mercante | si spendono crediti | carte, rimozione di una carta, consumabili |
+| Fonte *(per ora)* | un punto di ristoro | si usa una volta | cura |
 | Prova | un elite o una sfida | si vince | una reliquia o un oggetto raro, molta esperienza |
 | Tana del boss | il boss del bioma | si vince | l'**estrazione** |
 
@@ -95,7 +95,7 @@ bioma e porta a casa ciò che ha raccolto. Se muore perde lo zaino, ma ciò che 
   - *Risolto*: spento.
 - **Il Nido non chiude dentro.** Le ondate partono quando si entra nel suo
   centro. Uscendo dal suo raggio le ondate si interrompono e il nido resta
-  attivo con i nemici rimasti *(proposta)*.
+  attivo con i nemici rimasti *(per ora)*.
 - **I segreti** non compaiono sull'ologramma finché non sono stati trovati.
   - *Che cosa sono*: cache e archivi nascosti dietro i rilievi o nelle zone
     vuote, un elite dormiente, i frammenti di memoria della storia.
@@ -116,7 +116,7 @@ bioma e porta a casa ciò che ha raccolto. Se muore perde lo zaino, ma ciò che 
 - **Niente fog of war.** Tutto ciò che la camera inquadra è visibile:
   scompaiono la vista locale (`--vision`) e i blocchi di nebbia.
 - **Niente zoom né rotazione.** La camera ha angolo e distanza fissi, con un
-  ampio margine di vista *(proposta: circa 25×15 celle attorno al robot)*, e lo
+  ampio margine di vista *(per ora: circa 25×15 celle attorno al robot)*, e lo
   segue con un leggero ritardo.
 - **La rotella è delle carte.** In uno scontro sceglie le carte della mano e,
   nel piazzamento, gira l'oggetto da piazzare (vedi [Controlli](#33-controlli)).
@@ -128,11 +128,11 @@ bioma e porta a casa ciò che ha raccolto. Se muore perde lo zaino, ma ciò che 
 - Il grosso dei nemici sta nei **POI**; nelle pianure girano **poche pattuglie**
   (2–4 nemici) che si possono affrontare o evitare.
 - **Ingaggio.** Uno scontro comincia in tre casi:
-  - un nemico ti vede entro il suo raggio *(proposta: 6 celle, con linea di vista)*;
+  - un nemico ti vede entro il suo raggio *(per ora: 6 celle, con linea di vista)*;
   - un nemico ti colpisce;
   - attacchi tu.
 - **Fine dello scontro.** Lo scontro finisce quando nessun nemico ingaggiato è
-  vivo o ti insegue più *(proposta: un nemico smette di inseguire a 12 celle
+  vivo o ti insegue più *(per ora: un nemico smette di inseguire a 12 celle
   dalla sua zona)*.
 - **Difficoltà.** Cresce con il bioma e, dentro il bioma, con la distanza
   dall'ingresso: zone esterne e POI lontani hanno più nemici e varianti più forti.
@@ -175,8 +175,8 @@ Tutto questo vale per slot: ogni slot è una partita a sé
 ### 2.3 Le carte
 
 - **Mazzo iniziale.** Ogni run parte dallo stesso mazzo base, uguale in tutti i
-  biomi *(proposta: lo starter di oggi)*.
-- **Pool.** All'inizio del gioco è un sottoinsieme del catalogo *(proposta: le
+  biomi *(per ora: lo starter di oggi)*.
+- **Pool.** All'inizio del gioco è un sottoinsieme del catalogo *(per ora: le
   comuni e alcune non comuni)*. Tutto il resto si scopre.
 - **Ottenere una carta nella run.** Arriva dai premi dei Nidi e delle Prove (una
   fra tre, come oggi), dalle Officine e dagli eventi. Restano le regole di oggi
@@ -184,7 +184,7 @@ Tutto questo vale per slot: ogni slot è una partita a sé
 - **Scoprire una carta.** Si scopre negli Archivi (anche segreti) e con imprese
   speciali. Oggi Titan Grip e Storm Crown si sbloccano vincendo il ring delle
   Tesla; il ring diventa il minigioco della City pop e lo sblocco passa lì
-  *(proposta)*. La carta non entra nel mazzo: entra nel pool delle run
+  *(per ora)*. La carta non entra nel mazzo: entra nel pool delle run
   future, anche se questa run finisce con la morte. L'hub ne tiene l'archivio,
   con Mostra effetto.
 - **Prova meccaniche.** Nel laboratorio tutte le carte restano disponibili,
@@ -194,7 +194,7 @@ Tutto questo vale per slot: ogni slot è una partita a sé
 
 - I nemici lasciano frammenti di esperienza, raccolti dalla calamita del bottino
   di oggi.
-- Ogni livello dà **un punto potenziamento** *(proposta: il livello `n` costa
+- Ogni livello dà **un punto potenziamento** *(per ora: il livello `n` costa
   `4 + 2n` esperienza; da tarare)*.
 - **Un punto alza di un livello una carta del mazzo**, entro il suo limite: dadi
   dal D4 al D20, Lazzo fino a 5, il Cannone che al secondo diventa laser e così
@@ -204,11 +204,11 @@ Tutto questo vale per slot: ogni slot è una partita a sé
   (mazzo), mai durante un combattimento.
 - **A fine run** il livello e i punti non spesi si perdono, comunque finisca.
 - **Niente più upgrade da Shop e Rest.** L'esperienza diventa la sola fonte di
-  potenziamenti *(proposta: un consumabile raro può dare un punto)*.
+  potenziamenti *(per ora: un consumabile raro può dare un punto)*.
 
 ### 2.5 L'inventario: zaino e deposito
 
-- **Lo zaino è una griglia limitata** *(proposta: 8×5 celle)*. Ogni oggetto
+- **Lo zaino è una griglia limitata** *(per ora: 8×5 celle)*. Ogni oggetto
   occupa le celle della sua forma e della sua grandezza, e lo spazio è il limite
   dello zaino: il gioco è far entrare ciò che conta.
 - **Tre posti per le reliquie attive**, fuori dalla griglia. Solo le reliquie
@@ -240,7 +240,7 @@ Tutto questo vale per slot: ogni slot è una partita a sé
            └───┴───┘
   ```
 
-- **Le forme** sono fatte di celle *(proposta)*:
+- **Le forme** sono fatte di celle *(per ora)*:
 
   | Categoria | Che cosa contiene | Forma tipica | Regole |
   |---|---|---|---|
@@ -254,7 +254,7 @@ Tutto questo vale per slot: ogni slot è una partita a sé
   Portarne una rara nella griglia costa spazio; nei posti attivi, invece, ognuna
   ne occupa uno solo.
 
-  | Rarità | Celle *(proposta)* | Forme d'esempio |
+  | Rarità | Celle *(per ora)* | Forme d'esempio |
   |---|---|---|
   | comune | 1–2 | un quadratino, una barretta da due |
   | non comune | 3 | una L corta, una barra da tre |
@@ -263,37 +263,37 @@ Tutto questo vale per slot: ogni slot è una partita a sé
 
 - **Sistemare.** Gli oggetti si spostano trascinandoli. Mentre se ne sposta uno,
   la rotella lo gira di un quarto di giro, come nel piazzamento delle carte
-  *(proposta)*. Un oggetto si posa solo dove tutte le sue celle sono libere.
+  *(per ora)*. Un oggetto si posa solo dove tutte le sue celle sono libere.
 - **Pile.** I consumabili uguali e i crediti si impilano nella stessa cella
-  *(proposta: fino a 5 consumabili, 99 crediti)*.
+  *(per ora: fino a 5 consumabili, 99 crediti)*.
 - **Il sospeso.** Nel menu dello zaino, accanto alla griglia, un oggetto può
   restare momentaneamente sospeso: quello appena raccolto che non trova posto, o
   uno tolto dalla griglia per sistemare gli altri. Così si riordina senza perdere
   niente e senza frustrazione.
-  - *Quanti* *(proposta)*: fino a 3 oggetti, di qualunque forma.
-  - *Chiudendo lo zaino* *(proposta)*: ciò che resta sospeso torna a terra, dove
+  - *Quanti* *(per ora)*: fino a 3 oggetti, di qualunque forma.
+  - *Chiudendo lo zaino* *(per ora)*: ciò che resta sospeso torna a terra, dove
     sta il robot, dopo un avviso.
-  - *Raccogliere* *(proposta)*: la calamita non prende ciò che non entra;
+  - *Raccogliere* *(per ora)*: la calamita non prende ciò che non entra;
     raccogliendolo a mano (`E`), lo zaino si apre con l'oggetto già sospeso.
 - **Zaino pieno.** Ciò che non entra e non si sistema resta a terra, come oggi
   l'arma con la riserva piena. Per fare posto si può sempre lasciare a terra un
   oggetto dello zaino.
-- **In uno scontro** lo zaino si apre, ma il tempo continua *(proposta)*.
+- **In uno scontro** lo zaino si apre, ma il tempo continua *(per ora)*.
 - **Il deposito** dell'hub conserva tutto ciò che è stato estratto, in una
-  griglia più grande, a pagine *(proposta)*. Prima di una run si sistema lo
+  griglia più grande, a pagine *(per ora)*. Prima di una run si sistema lo
   zaino: è la posta in gioco.
-- **Zaini più grandi** *(proposta)*: si trovano nei biomi e, una volta estratti,
+- **Zaini più grandi** *(per ora)*: si trovano nei biomi e, una volta estratti,
   si scelgono nell'hub prima di partire.
 - **Morte**: si perde tutto lo zaino.
 - **Estrazione**: tutto lo zaino va nel deposito, comunque finisca il minigioco.
-- **Una sola regola** *(proposta)*: tutto ciò che si raccoglie nella run va
+- **Una sola regola** *(per ora)*: tutto ciò che si raccoglie nella run va
   nello zaino ed è estraibile; non esistono oggetti validi solo per la run.
 
 ### 2.6 Estrazione e minigioco
 
 - Battuto il boss si apre il portale e il robot entra in uno dei **minigiochi
   del bioma**, un cabinato della memoria del creatore.
-- **Il risultato dà un bonus**, in stelle da 0 a 3 come oggi *(proposta)*:
+- **Il risultato dà un bonus**, in stelle da 0 a 3 come oggi *(per ora)*:
 
   | Stelle | Bonus |
   |---|---|
@@ -314,13 +314,13 @@ Tutto questo vale per slot: ogni slot è una partita a sé
     (vedi [L'hub](#32-lhub))
 
   Andranno riletti in chiave futuristica o da cabinato; ne arriveranno altri.
-  L'assegnazione proposta è nelle [bozze dei biomi](#43-i-biomi-bozze).
+  L'assegnazione, per ora, è nelle [bozze dei biomi](#43-i-biomi-bozze).
 
 ### 2.7 Biomi e sblocchi
 
 - Si parte dalla **Robotica cibernetica**. Vincere una run ne sblocca uno o più,
   secondo rotte fisse. La Robotica cibernetica apre il primo bioma di ciascuno
-  dei tre rami; ogni altro bioma apre il successivo del suo ramo *(proposta:
+  dei tre rami; ogni altro bioma apre il successivo del suo ramo *(per ora:
   rami e ordine sono quelli delle [bozze](#43-i-biomi-bozze))*.
 - Lo **Spazio** è l'ultimo: si apre quando gli altri dieci biomi sono vinti.
 - Il bioma segreto del true ending è a parte (vedi
@@ -356,7 +356,7 @@ normale (vedi sotto).
 
   | Stato | Come si vede |
   |---|---|
-  | nuova | appena formata alla fine della sua rotta; resta segnata finché non la si visita *(proposta)* |
+  | nuova | appena formata alla fine della sua rotta; resta segnata finché non la si visita *(per ora)* |
   | aperta | accesa nella sua tinta, con un faro che pulsa |
   | vinta | in cima un'insegna di cartoncino (il boss battuto) e le stelle del miglior minigioco |
   | nella serie | le isole vinte nella serie in corso sono unite da una catena di luce |
@@ -364,7 +364,7 @@ normale (vedi sotto).
 - **Scegliere un bioma.** Passando sopra un'isola compare il suo cartellino di
   carta: nome, boss, minigiochi, record. Scegliendola, la camera vola fino a lei
   e il cartoncino del robot salta dall'hub lungo la rotta: è l'ingresso nella
-  run. *(proposta: si gira attorno alla galassia trascinando, senza zoom libero)*
+  run. *(per ora: si gira attorno alla galassia trascinando, senza zoom libero)*
 - **L'isola segreta** non si vede prima del finale normale; ci sono solo indizi,
   come una stella che si spegne e si riaccende o un glitch. Dopo il finale
   appare come un'isola spenta ai margini della galassia, ancora chiusa: è la
@@ -397,17 +397,17 @@ lo Spazio si accendono solo quando gli altri dieci biomi sono vinti.
   **ogni** bioma, l'ultimo compreso: con le bozze di oggi, undici vittorie di
   fila.
   - Contano le run vinte di fila.
-  - Una morte azzera la serie *(proposta: anche abbandonare una run)*.
+  - Una morte azzera la serie *(per ora: anche abbandonare una run)*.
   - Vale **dalla primissima run**: chi finisce il gioco senza mai morire apre il
     bioma segreto subito.
-- **L'hub mostra la serie** *(proposta: solo dopo il finale normale, per non
+- **L'hub mostra la serie** *(per ora: solo dopo il finale normale, per non
   svelare il segreto)*.
 - **Il bioma segreto** ha l'ultimo vero boss e porta al **true ending**.
 
 ### 2.9 La mount
 
 - **Uso.** Si evoca e si congeda fuori dagli scontri. È molto più veloce del
-  passo a piedi *(proposta: tre volte)* e non si può usare in combattimento.
+  passo a piedi *(per ora: tre volte)* e non si può usare in combattimento.
 - **Forma.** Cambia in ogni bioma: un veicolo o una creatura del gioco di quel
   bioma (vedi le [bozze](#43-i-biomi-bozze)).
 - **Ingaggio in sella.** Se un nemico ti ingaggia mentre sei in sella puoi
@@ -423,7 +423,7 @@ lo Spazio si accendono solo quando gli altri dieci biomi sono vinti.
 - **Tre slot.** Il gioco ha tre slot di salvataggio indipendenti. Ognuno è una
   partita intera: deposito, scoperte, segreti, biomi sbloccati, serie, record dei
   minigiochi e l'eventuale run in corso. Le impostazioni (video, audio,
-  controlli) sono comuni a tutti gli slot *(proposta)*.
+  controlli) sono comuni a tutti gli slot *(per ora)*.
 - **Ogni slot si può avviare.** Uno slot vuoto inizia una partita nuova; uno slot
   pieno riprende esattamente da dove si era rimasti, nell'hub o a metà run.
 - **Un solo salvataggio per slot, aggiornato quasi sempre.** Non ci sono
@@ -432,10 +432,10 @@ lo Spazio si accendono solo quando gli altri dieci biomi sono vinti.
 
   | Quando | Che cosa si salva |
   |---|---|
-  | fuori dagli scontri | a ogni cambiamento che conta (oggetto raccolto, POI risolto, punto speso, ingresso e uscita da un bioma, ogni modifica nell'hub) e comunque ogni pochi secondi di esplorazione *(proposta: 10 s)* |
-  | in scontro | fra un battito e l'altro, quando il mondo è stabile *(proposta)* |
+  | fuori dagli scontri | a ogni cambiamento che conta (oggetto raccolto, POI risolto, punto speso, ingresso e uscita da un bioma, ogni modifica nell'hub) e comunque ogni pochi secondi di esplorazione *(per ora: 10 s)* |
+  | in scontro | fra un battito e l'altro, quando il mondo è stabile *(per ora)* |
   | sempre | alla chiusura del gioco e quando la finestra perde il focus |
-  | mai | a metà di un cast, di un lancio di dadi o di un minigioco: vale l'ultimo salvataggio stabile, e un minigioco interrotto riparte dall'inizio *(proposta)* |
+  | mai | a metà di un cast, di un lancio di dadi o di un minigioco: vale l'ultimo salvataggio stabile, e un minigioco interrotto riparte dall'inizio *(per ora)* |
 
 - **Dopo un crash** si riprende dall'ultimo salvataggio, perdendo al massimo pochi
   secondi.
@@ -444,12 +444,12 @@ lo Spazio si accendono solo quando gli altri dieci biomi sono vinti.
   zaino perso non si annullano: la serie senza morti e la posta dello zaino
   restano vere.
 - **Cancellare** uno slot chiede una conferma esplicita e non si può annullare
-  *(proposta: due conferme)*.
+  *(per ora: due conferme)*.
 - **Chiudere il gioco non è abbandonare.** La run riprende dove era; abbandonarla
   è una scelta esplicita.
 - **Il menu degli slot** mostra, per ognuno, se è vuoto oppure i biomi vinti, il
   tempo di gioco, la run in corso (e in quale bioma) e la data dell'ultimo
-  salvataggio *(proposta)*.
+  salvataggio *(per ora)*.
 
 ## 3. Gameplay
 
@@ -471,25 +471,25 @@ lo Spazio si accendono solo quando gli altri dieci biomi sono vinti.
   mana. Il giocatore la gestisce: spendere tutto in una carta forte o tenersi
   margine per quelle piccole.
   - *Il costo* di ogni carta dipende dalla sua efficacia: le carte deboli costano
-    poco, le più forti molto. *(proposta: una barra da 100 punti; costi da 10 a
+    poco, le più forti molto. *(per ora: una barra da 100 punti; costi da 10 a
     70, per esempio Strike 15, Cannone 40, Buco Nero 60, Bomb Marley 70; tutte le
     carte vanno ritarate)*
   - *Si ricarica* durante lo scontro, sull'orologio del mondo: si ferma quando il
-    mondo è fermo (cast, dadi, pausa) *(proposta: 8 punti al secondo)*. Si
+    mondo è fermo (cast, dadi, pausa) *(per ora: 8 punti al secondo)*. Si
     ricarica anche con i consumabili.
   - *Una carta si gioca* solo se nella barra c'è tutto il suo costo.
   - *All'inizio di ogni scontro* la barra è piena; fuori dagli scontri non si
-    ricarica né si spende *(proposta)*.
+    ricarica né si spende *(per ora)*.
   - *Gli effetti* che oggi danno energia (carte, reliquie come Swift Soles)
-    riempiono la barra di una quantità di punti *(proposta: 20 punti per
+    riempiono la barra di una quantità di punti *(per ora: 20 punti per
     ogni energia di oggi)*.
   - *L'HUD* mostra la barra blu al posto delle tacche; scegliendo una carta, la
     parte che costerebbe si accende sulla barra.
   - *Un potenziamento* migliora l'effetto della carta, non il suo costo, salvo
-    le carte che lo dicono *(proposta)*.
+    le carte che lo dicono *(per ora)*.
 - **La mano.**
   - All'inizio dello scontro si pescano 5 carte.
-  - Senza finestre la mano si ricarica in un altro modo *(proposta: una carta
+  - Senza finestre la mano si ricarica in un altro modo *(per ora: una carta
     ogni 4 battiti fino al massimo, più il Refocus di oggi)*.
   - Finito lo scontro la mano si mette via e il mazzo si rimescola per il
     prossimo.
@@ -505,7 +505,7 @@ lo Spazio si accendono solo quando gli altri dieci biomi sono vinti.
 | Deposito | gestire gli oggetti estratti e preparare lo zaino |
 | Galassia | la mappa dei biomi: isolette 3D sparse nel vuoto, solo per i biomi già sbloccati, aperti o vinti ([2.7](#27-biomi-e-sblocchi)); da qui si parte |
 | Progressi | statistiche, carte scoperte (con Mostra effetto), segreti, record dei minigiochi, serie |
-| Cabinati *(proposta)* | rigiocare i minigiochi sbloccati per i record, senza premi |
+| Cabinati *(per ora)* | rigiocare i minigiochi sbloccati per i record, senza premi |
 | Prova meccaniche | il laboratorio delle carte di oggi |
 | Casinò | un po' di sano gioco d'azzardo con i crediti del deposito: la slot del ranch, Tre in fuga, roulette e dadi (vedi sotto) |
 
@@ -514,7 +514,7 @@ lo Spazio si accendono solo quando gli altri dieci biomi sono vinti.
 Nell'hub si scommettono i **crediti del deposito**, mai denaro vero: i crediti
 non si comprano. Ogni gioco si salva nello slot di salvataggio come il resto.
 
-- **Puntate** *(proposta)*: da 5 a 50 crediti a giocata.
+- **Puntate** *(per ora)*: da 5 a 50 crediti a giocata.
 - **Il banco** tiene sempre un piccolo vantaggio, dal 2 al 5 % secondo il gioco,
   così il casinò non diventa una miniera di crediti. Le probabilità si
   verificano nei test con milioni di giocate simulate, come oggi i bot dei
@@ -540,12 +540,12 @@ non finisce più a tre monete; non è più un tempismo da premere a ogni scocco.
   a far vedere a che punto si è. L'incasso cresce a ogni moneta, e ogni moneta
   in più pesa più della precedente; ma ogni moneta in più rende anche più
   probabile il BANG, basso all'inizio.
-- **Staccionata mancata** *(proposta)*: il cavallo inciampa e rallenta per un
+- **Staccionata mancata** *(per ora)*: il cavallo inciampa e rallenta per un
   momento, senza perdere nulla; il rischio resta tutto nella pistola.
-- **Comandi** *(proposta)*: `W` per andare avanti, `Spazio` per saltare, `Invio`
+- **Comandi** *(per ora)*: `W` per andare avanti, `Spazio` per saltare, `Invio`
   per incassare.
 
-**I numeri** *(proposta)*. Il BANG parte dal 2 % e cresce di 3 punti a ogni
+**I numeri** *(per ora)*. Il BANG parte dal 2 % e cresce di 3 punti a ogni
 moneta, fino a un massimo del 60 %. L'incasso è calcolato in modo che, a
 qualunque moneta ci si fermi, la puntata renda in media il 98 %: il banco tiene
 il 2 %.
@@ -584,24 +584,24 @@ una Panda 4x4 e una moto futuristica**, tutti di cartoncino nel mondo neon.
   Se cade subito, alla partenza, si perde la puntata.
 - Gli altri due continuano la loro corsa per lo spettacolo: ognuno cade per conto
   suo, e il loro destino non cambia quello del proprio scelto.
-- **I numeri** *(proposta)*: per ciascuno dei tre la probabilità di arrivare
+- **I numeri** *(per ora)*: per ciascuno dei tre la probabilità di arrivare
   almeno a ×M è `0,97 / M` (il banco tiene il 3 %; il 3 % delle volte cade alla
   partenza). Il moltiplicatore raddoppia ogni 6 secondi circa. I tre hanno gli
   stessi rischi e si distinguono solo per come cadono.
 
 ##### Roulette e dadi
 
-- **Roulette** *(proposta)*: europea, un solo zero, ruota di cartoncino su un
+- **Roulette** *(per ora)*: europea, un solo zero, ruota di cartoncino su un
   piatto al neon. Puntate classiche: numero pieno (35 a 1), rosso o nero, pari o
   dispari, basso o alto (1 a 1), dozzine e colonne (2 a 1). Il banco tiene il
   2,7 % con lo zero.
-- **Dadi: duello di d20** *(proposta)*: il robot e il banco tirano un d20 con i
+- **Dadi: duello di d20** *(per ora)*: il robot e il banco tirano un d20 con i
   dadi del gioco; vince il più alto, il pari va al banco. Paga 1 a 1; il banco
   tiene il 5 %.
 
 ### 3.3 Controlli
 
-La tabella è una proposta, tranne la rotella con le carte, che è decisa (vedi
+La tabella vale *(per ora)*, tranne la rotella con le carte, che è decisa (vedi
 sotto).
 
 | Input | Fuori dallo scontro | In scontro |
@@ -612,7 +612,7 @@ sotto).
 | `Z` | zaino | zaino; un consumabile costa tempo |
 | `Tab` | ologramma del bioma | ologramma; il tempo continua |
 | **PERSONAGGIO** | mazzo, punti, reliquie | come oggi, in pausa |
-| rotella | nello zaino, gira l'oggetto che si sta spostando *(proposta)* | sceglie le carte della mano; nel piazzamento gira l'oggetto |
+| rotella | nello zaino, gira l'oggetto che si sta spostando *(per ora)* | sceglie le carte della mano; nel piazzamento gira l'oggetto |
 | clic sinistro | — | gioca la carta scelta sul bersaglio; con una carta da piazzare entra nel piazzamento, poi piazza |
 | clic destro | — | esce dal piazzamento; poi toglie la scelta |
 | trascinare le carte, `1`–`8`, `F` | — | come oggi |
@@ -624,11 +624,11 @@ con il mouse.
 
 1. **Scorrere.** Se nessuna carta è scelta, il primo scatto della rotella
    sceglie la prima carta della mano. Ogni scatto in giù passa alla carta dopo.
-   *(proposta: lo scatto in su torna alla carta prima, e ai bordi della mano la
+   *(per ora: lo scatto in su torna alla carta prima, e ai bordi della mano la
    scelta ricomincia dall'altro capo; se una carta è già scelta con un tasto o
    un clic, la rotella parte da lei)*
 2. **Giocare una carta normale.** Con una carta scelta, il clic sinistro su un
-   bersaglio valido la gioca, come la scelta con i tasti di oggi. *(proposta:
+   bersaglio valido la gioca, come la scelta con i tasti di oggi. *(per ora:
    una carta su di sé si gioca con un clic sinistro in un punto qualsiasi della
    board)*
 3. **Entrare nel piazzamento.** Se la carta scelta è da piazzare e da orientare
@@ -642,7 +642,7 @@ con il mouse.
    La carta resta scelta e la rotella torna a scorrere le carte dopo. Un altro
    clic destro toglie anche la scelta, come oggi.
 6. **Dopo una giocata** la scelta si azzera, e lo scatto successivo riparte dalla
-   prima carta *(proposta)*.
+   prima carta *(per ora)*.
 
 ```text
 NESSUNA CARTA ── rotella ──► CARTA SCELTA ── rotella ──► la carta dopo
@@ -661,10 +661,10 @@ NESSUNA CARTA ── rotella ──► CARTA SCELTA ── rotella ──► la 
   già scelta e già orientata basta cliccare a tempo.
 - **Carte non giocabili** (energia che manca, nessun bersaglio): la rotella le
   sceglie comunque, in grigio, così la posizione di ogni carta resta prevedibile
-  *(proposta)*.
+  *(per ora)*.
 - **Carte piazzate senza orientamento** (Buco Nero, Tesla Coil, Shock Floor,
   Pozza di Veleno, Incendio): un solo clic sulla cella, senza piazzamento
-  *(proposta)*.
+  *(per ora)*.
 - Trascinare le carte, i tasti `1`–`8` e il clic sulla carta funzionano come
   oggi.
 - **Tecnica.** Scelta, piazzamento e rotazione sono solo input e presentazione:
@@ -714,7 +714,7 @@ NESSUNA CARTA ── rotella ──► CARTA SCELTA ── rotella ──► la 
   roccia nera sfaccettata con gli spigoli al neon, stelle di neon, nessuna
   texture; sopra le isole, insegne e cartellini di cartoncino.
 - **Nemici** futuristici, o presi in prestito dai giochi cari al creatore.
-  - *Proposta*: ogni bioma è il ricordo di un gioco (o di un genere) del
+  - *Per ora*: ogni bioma è il ricordo di un gioco (o di un genere) del
     creatore. I suoi nemici, la sua mount e i suoi minigiochi vengono da quel
     gioco, tutti di cartoncino nel mondo neon.
   - I nemici di oggi (Chaser, Archer, Brute, Bomber, Custode, Demolitore)
@@ -740,7 +740,7 @@ Spazio.
 
 **Personaggi** (nomi di lavoro).
 - *Il robot*: protagonista muto. Nell'hub appare com'è; nei biomi gioca con
-  l'avatar del gioco, il Viandante di oggi *(proposta)*.
+  l'avatar del gioco, il Viandante di oggi *(per ora)*.
 - *Il creatore*: assente. Parla attraverso frammenti di memoria, registri e la
   voce dell'hub.
 - *I guardiani*: i boss, che tengono chiuso ogni ricordo.
@@ -774,7 +774,7 @@ creatore.
 
 Undici bozze di bioma, più il bioma segreto, che resta a parte. Nomi, nemici,
 boss, mount e minigiochi nuovi sono di lavoro: tutto ciò che sta in questa
-sezione è *(proposta)*, tranne i temi dei biomi, il bioma da cui si parte (la
+sezione vale *(per ora)*, tranne i temi dei biomi, il bioma da cui si parte (la
 Robotica cibernetica) e quello che si apre per ultimo (lo Spazio).
 
 **Che cosa ha ogni bioma.**
@@ -855,7 +855,7 @@ dal T-Rex, Karaoke, Elicottero, Discesa e Duello a mezzogiorno.
 - **Forme.** Felci e alberi-torre a poche facce, rocce coperte di muschio
   luminoso.
 - **Terreno e corsia.** Erba alta che nasconde i nemici finché non sono vicini:
-  non è fog of war, è una copertura del terreno *(da provare)*. La corsia è una
+  non è fog of war, è una copertura del terreno *(per ora, da provare)*. La corsia è una
   mandria in carica.
 - **Nemici.** Raptor in branco (Chaser), sputatori di veleno (Archer),
   triceratopi che caricano (Brute), pterodattili che lasciano cadere sassi
@@ -954,7 +954,7 @@ dal T-Rex, Karaoke, Elicottero, Discesa e Duello a mezzogiorno.
 - **Forme.** Alberi spogli, steccati, case in rovina, croci, pozzi.
 - **Terreno e corsia.** La palude rallenta. Al posto della corsia c'è il
   **killer**: un elite che segue il robot per la mappa e che si può solo
-  seminare o affrontare a caro prezzo *(da provare)*.
+  seminare o affrontare a caro prezzo *(per ora, da provare)*.
 - **Nemici.** Spiriti che attraversano le coperture (Chaser), cacciatori con il
   fucile (Archer), il bruto con la motosega (Brute), il predicatore con la
   lanterna che appicca il fuoco (Bomber), spaventapasseri (Custode). I nemici
@@ -988,7 +988,7 @@ dal T-Rex, Karaoke, Elicottero, Discesa e Duello a mezzogiorno.
   dieci biomi sono vinti, e vincerlo è il finale normale.
 - **Forme.** Asteroidi poligonali sospesi, piattaforme di stazione, anelli.
 - **Terreno e corsia.** Bassa gravità: una spinta fa volare una casella in più
-  *(da provare)*; pozzi gravitazionali che tirano come il Buco Nero; la corsia è
+  *(per ora, da provare)*; pozzi gravitazionali che tirano come il Buco Nero; la corsia è
   una pioggia di meteore.
 - **Nemici.** Sciami alieni (Chaser), torrette orbitali (Archer), mech (Brute),
   mine spaziali (Bomber), sentinelle (Custode).
@@ -1029,9 +1029,12 @@ dal T-Rex, Karaoke, Elicottero, Discesa e Duello a mezzogiorno.
 | Mappa dei biomi | una galassia di isolette 3D nello stile del gioco, unite da rotte di luce; mostra solo i biomi già sbloccati, salvo il bioma segreto dopo il finale |
 | Rotella in scontro | sceglie le carte della mano (la prima, poi una a scatto); per le carte da orientare il clic sinistro entra nel piazzamento, dove la rotella gira l'oggetto; un altro clic sinistro piazza, il clic destro torna allo scorrimento |
 
-### Aperte, con una proposta
+### Confermate momentaneamente
 
-| Domanda | Proposta |
+Erano le decisioni aperte: ora valgono tutte *(per ora)*. Lo sviluppo parte da
+qui, e ognuna si rivede quando le prove o le partite lo chiedono.
+
+| Tema | Per ora |
 |---|---|
 | Quali bozze entrano nel gioco | tutte e undici, da confermare con le prime prove |
 | Rami della galassia | la discesa, l'ascesa e la paura, tre biomi ciascuno ([4.3](#43-i-biomi-bozze)) |
@@ -1059,13 +1062,21 @@ dal T-Rex, Karaoke, Elicottero, Discesa e Duello a mezzogiorno.
 | Curva dell'esperienza | `4 + 2n` per il livello `n` |
 | Mazzo iniziale e pool iniziale | lo starter di oggi; comuni e alcune non comuni |
 | Abbandonare una run | conta come una morte |
-| Nomi del robot, del creatore, dell'hub e dei biomi | da scegliere |
 | Il protagonista nei biomi | il Viandante come avatar del robot |
 | Minigiochi per bioma e bonus | 1–2 per bioma; bonus a stelle ([2.6](#26-estrazione-e-minigioco)) |
 | Cadenza del salvataggio | a ogni cambiamento che conta e ogni 10 s in esplorazione; in scontro fra un battito e l'altro ([2.10](#210-salvataggi-e-slot)) |
 | Impostazioni | comuni ai tre slot |
 | Dove stanno i file degli slot | nella cartella utente del sistema, non più nella cartella di avvio |
 | Tema gotico | resta un'opzione nascosta finché serve |
+
+### Ancora aperte
+
+Restano aperte solo le scelte per cui non c'è ancora un'idea.
+
+| Tema | Stato |
+|---|---|
+| Nomi del robot, del creatore, dell'hub e dei biomi | da scegliere |
+| Carte di casa delle Montagne innevate | da scegliere |
 
 ## 6. Roadmap
 
