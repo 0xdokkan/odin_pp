@@ -2,7 +2,7 @@
 
 # Direzione del gioco
 
-Documento di direzione, versione 1.10 (22 ottobre 2026). Fissa dove va il gioco in
+Documento di direzione, versione 1.11 (22 ottobre 2026). Fissa dove va il gioco in
 quattro ambiti: **Mappa**, **Progressione**, **Gameplay** e **Design**. Gli altri
 documenti descrivono il gioco di oggi e restano validi finché una fase della
 [roadmap](#6-roadmap) non ne sostituisce le regole.
@@ -181,8 +181,9 @@ Tutto questo vale per slot: ogni slot è una partita a sé
   fra tre, come oggi), dalle Officine e dagli eventi. Restano le regole di oggi
   su mazzo pieno, Skip e rarità.
 - **Scoprire una carta.** Si scopre negli Archivi (anche segreti) e con imprese
-  speciali. Il ring è il primo esempio: oggi Titan Grip e Storm Crown si
-  sbloccano vincendolo. La carta non entra nel mazzo: entra nel pool delle run
+  speciali. Oggi Titan Grip e Storm Crown si sbloccano vincendo il ring delle
+  Tesla; il ring diventa il minigioco della City pop e lo sblocco passa lì
+  *(proposta)*. La carta non entra nel mazzo: entra nel pool delle run
   future, anche se questa run finisce con la morte. L'hub ne tiene l'archivio,
   con Mostra effetto.
 - **Prova meccaniche.** Nel laboratorio tutte le carte restano disponibili,
@@ -494,8 +495,6 @@ lo Spazio si accendono solo quando gli altri dieci biomi sono vinti.
   interagisce con i POI, si usa lo zaino, si spendono i punti e si evoca la
   mount. Le carte che oggi funzionano a stanza liberata (la Canna da Pesca)
   funzioneranno fuori dagli scontri, con un limite da rivedere.
-- **Segreti del combattimento.** Le attività che si aprono durante lo scontro (il
-  ring delle quattro Tesla, 6 RANCH 7) restano segreti del combattimento.
 
 ### 3.2 L'hub
 
@@ -596,12 +595,12 @@ NESSUNA CARTA ── rotella ──► CARTA SCELTA ── rotella ──► la 
 | profilo M8 (vittorie del ring), nessun salvataggio della run | tre slot di salvataggio, ognuno con scoperte, segreti, biomi, deposito, serie, record e la run in corso, salvato di continuo |
 | Victory al boss di fine rotta | estrazione e minigioco a ogni boss di bioma |
 | minigiochi dal menu | minigiochi dei biomi dopo l'estrazione e cabinati nell'hub |
+| attività che si aprono dentro lo scontro: il ring delle quattro Tesla, 6 RANCH 7 con il 6 e il 7 di denari in mano | via; il Ring delle Ombre e 6 RANCH 7 restano solo come minigiochi dei biomi (City pop e far west); il 6 e il 7 di denari restano carte che danno crediti |
 
 **Restano** le altre parti del gioco:
 - il catalogo delle carte, i dadi, gli status e gli intenti dei nemici;
 - QTE, cast e Mostra effetto;
-- la Prova meccaniche, il mondo neon e i cartoncini;
-- le attività in combattimento.
+- la Prova meccaniche, il mondo neon e i cartoncini.
 
 ## 4. Design
 
@@ -928,6 +927,7 @@ I sette minigiochi di oggi trovano tutti un bioma; ne servono cinque nuovi
 | Reliquie attive | tre posti fuori dalla griglia; solo lì le reliquie funzionano; un posto tiene una reliquia di qualunque forma; si cambiano solo fuori dagli scontri; morendo si perdono come il resto dello zaino |
 | Forma delle reliquie | ognuna ha una forma sua, più grande quanto più è rara |
 | Sospeso | nel menu dello zaino un oggetto appena raccolto, o tolto dalla griglia, resta sospeso mentre si sistema |
+| Attività dentro lo scontro | via: niente più ring delle quattro Tesla né 6 RANCH 7 aperti durante uno scontro; restano come minigiochi dei biomi |
 | Mappa dei biomi | una galassia di isolette 3D nello stile del gioco, unite da rotte di luce; mostra solo i biomi già sbloccati, salvo il bioma segreto dopo il finale |
 | Rotella in scontro | sceglie le carte della mano (la prima, poi una a scatto); per le carte da orientare il clic sinistro entra nel piazzamento, dove la rotella gira l'oggetto; un altro clic sinistro piazza, il clic destro torna allo scorrimento |
 
@@ -980,7 +980,7 @@ poter entrare nel salvataggio.
 | 5 | Zaino a griglia, deposito, hub minimo, estrazione e morte; i tre slot con il salvataggio continuo | una run porta a casa uno zaino, una morte lo perde; chiudendo il gioco a metà run, o dopo un crash, si riprende dall'ultimo salvataggio |
 | 6 | Esperienza, livelli e punti; scoperte e pool | si livella nella run; una carta scoperta compare nella run dopo |
 | 7 | La galassia dei biomi, sblocchi, serie e finali | vincendo compaiono la rotta e l'isola nuova, mai prima; la serie si conta e si azzera |
-| 8 | Minigiochi come estrazione e cabinati dell'hub | battere un boss porta al minigioco e al ritorno a casa |
+| 8 | Minigiochi come estrazione e cabinati dell'hub; via le attività dentro lo scontro | battere un boss porta al minigioco e al ritorno a casa; nessuno scontro apre più il ring o 6 RANCH 7 |
 | 9 | I biomi veri, dalle [bozze](#43-i-biomi-bozze); si parte dalla Robotica cibernetica, che è il mondo neon di oggi | ogni bioma ha forme, terreno, corsia, nemici, boss, mount, minigiochi e frammenti suoi |
 
 ### Note tecniche
