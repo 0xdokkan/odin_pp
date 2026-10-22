@@ -2,7 +2,7 @@
 
 # Direzione del gioco
 
-Documento di direzione, versione 1.12 (22 ottobre 2026). Fissa dove va il gioco in
+Documento di direzione, versione 1.13 (22 ottobre 2026). Fissa dove va il gioco in
 quattro ambiti: **Mappa**, **Progressione**, **Gameplay** e **Design**. Gli altri
 documenti descrivono il gioco di oggi e restano validi finché una fase della
 [roadmap](#6-roadmap) non ne sostituisce le regole.
@@ -807,7 +807,7 @@ difficoltà cresce lungo il ramo; lo Spazio è il più duro.
 | Inferno | discesa, 3° | arancio e giallo lava | cerbero | Torre di Cenere |
 | Southern gothic | paura, 3° | bianco spento, verde palude e rosso sangue | cavallo nero | Cripta delle Rune |
 | Isola nel cielo | ascesa, 3° | perla, oro e rosa | grifone | Guglie Sospese |
-| Spazio | l'ultimo: si apre quando gli altri dieci sono vinti | viola e blu elettrico | jetpack | Arena delle Braci |
+| Spazio | l'ultimo: si apre quando gli altri dieci sono vinti | viola e blu elettrico | astronave, cavalcata | Arena delle Braci |
 
 Sei dei sette minigiochi di oggi trovano un bioma; il settimo, 6 RANCH 7,
 diventa la slot del casinò dell'hub. Ne servono sei nuovi: Scie di luce, Fuga
@@ -993,7 +993,8 @@ dal T-Rex, Karaoke, Elicottero, Discesa e Duello a mezzogiorno.
 - **Nemici.** Sciami alieni (Chaser), torrette orbitali (Archer), mech (Brute),
   mine spaziali (Bomber), sentinelle (Custode).
 - **Boss.** La Nave Madre.
-- **Mount.** Un jetpack.
+- **Mount.** Un'astronave, che il robot **cavalca**: non sta dentro, ci sta
+  sopra a cavalcioni, come su un cavallo.
 - **Minigioco.** Arena delle Braci, riletta come sparatutto spaziale.
 - **Carte di casa.** Buco Nero, Cannone laser.
 
