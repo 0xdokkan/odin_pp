@@ -2,7 +2,7 @@
 
 # Direzione del gioco
 
-Documento di direzione, versione 1 (22 ottobre 2026). Fissa dove va il gioco in
+Documento di direzione, versione 1.1 (22 ottobre 2026). Fissa dove va il gioco in
 quattro ambiti: **Mappa**, **Progressione**, **Gameplay** e **Design**. Gli altri
 documenti descrivono il gioco di oggi e restano validi finché una fase della
 [roadmap](#6-roadmap) non ne sostituisce le regole.
@@ -49,6 +49,7 @@ bioma e porta a casa ciò che ha raccolto. Se muore perde lo zaino, ma ciò che 
 | Punti potenziamento | quelli che dà ogni livello della run; si spendono per migliorare le carte del mazzo |
 | Estrazione | l'uscita dal bioma dopo il boss: minigioco e ritorno all'hub con lo zaino |
 | Serie | le run vinte di fila senza morire |
+| Slot | uno dei tre salvataggi: una partita intera, salvata di continuo |
 
 ## 1. Mappa
 
@@ -161,6 +162,9 @@ HUB ── si sceglie il bioma, si prepara lo zaino ──► RUN NEL BIOMA
 | deposito | sempre |
 | carte scoperte, segreti trovati, biomi sbloccati, record dei minigiochi | sempre, anche quando la run fallisce |
 | serie | fino alla prossima morte |
+
+Tutto questo vale per slot: ogni slot è una partita a sé
+([Salvataggi e slot](#210-salvataggi-e-slot)).
 
 ### 2.3 Le carte
 
@@ -285,6 +289,39 @@ HUB ── si sceglie il bioma, si prepara lo zaino ──► RUN NEL BIOMA
   cartoncino sotto la carta del robot, sella, passo, giro come la carta. Il
   Dinosauro resta una carta da combattimento.
 
+### 2.10 Salvataggi e slot
+
+- **Tre slot.** Il gioco ha tre slot di salvataggio indipendenti. Ognuno è una
+  partita intera: deposito, scoperte, segreti, biomi sbloccati, serie, record dei
+  minigiochi e l'eventuale run in corso. Le impostazioni (video, audio,
+  controlli) sono comuni a tutti gli slot *(proposta)*.
+- **Ogni slot si può avviare.** Uno slot vuoto inizia una partita nuova; uno slot
+  pieno riprende esattamente da dove si era rimasti, nell'hub o a metà run.
+- **Un solo salvataggio per slot, aggiornato quasi sempre.** Non ci sono
+  salvataggi manuali né punti di ripristino: lo slot si riscrive di continuo,
+  così un crash non fa perdere il progresso.
+
+  | Quando | Che cosa si salva |
+  |---|---|
+  | fuori dagli scontri | a ogni cambiamento che conta (oggetto raccolto, POI risolto, punto speso, ingresso e uscita da un bioma, ogni modifica nell'hub) e comunque ogni pochi secondi di esplorazione *(proposta: 10 s)* |
+  | in scontro | fra un battito e l'altro, quando il mondo è stabile *(proposta)* |
+  | sempre | alla chiusura del gioco e quando la finestra perde il focus |
+  | mai | a metà di un cast, di un lancio di dadi o di un minigioco: vale l'ultimo salvataggio stabile, e un minigioco interrotto riparte dall'inizio *(proposta)* |
+
+- **Dopo un crash** si riprende dall'ultimo salvataggio, perdendo al massimo pochi
+  secondi.
+- **Gli slot non si copiano.** Il menu degli slot permette solo di avviarli o di
+  cancellarli. Con un solo salvataggio aggiornato di continuo, una morte o uno
+  zaino perso non si annullano: la serie senza morti e la posta dello zaino
+  restano vere.
+- **Cancellare** uno slot chiede una conferma esplicita e non si può annullare
+  *(proposta: due conferme)*.
+- **Chiudere il gioco non è abbandonare.** La run riprende dove era; abbandonarla
+  è una scelta esplicita.
+- **Il menu degli slot** mostra, per ognuno, se è vuoto oppure i biomi vinti, il
+  tempo di gioco, la run in corso (e in quale bioma) e la data dell'ultimo
+  salvataggio *(proposta)*.
+
 ## 3. Gameplay
 
 ### 3.1 Il combattimento senza timer
@@ -348,7 +385,7 @@ HUB ── si sceglie il bioma, si prepara lo zaino ──► RUN NEL BIOMA
 | upgrade allo Shop e al Rest | punti potenziamento dall'esperienza |
 | oro | crediti nello zaino |
 | Mannaia di ferro fra le stanze | equipaggiamento nello zaino |
-| profilo M8 (vittorie del ring) | un profilo unico: scoperte, segreti, biomi, deposito, serie, record |
+| profilo M8 (vittorie del ring), nessun salvataggio della run | tre slot di salvataggio, ognuno con scoperte, segreti, biomi, deposito, serie, record e la run in corso, salvato di continuo |
 | Victory al boss di fine rotta | estrazione e minigioco a ogni boss di bioma |
 | minigiochi dal menu | minigiochi dei biomi dopo l'estrazione e cabinati nell'hub |
 
@@ -444,6 +481,7 @@ creatore.
 | Estrazione | solo battendo il boss; minigioco del bioma per i bonus; lo zaino torna a casa comunque |
 | Fine del gioco | tutti i biomi vinti; poi il bioma segreto e il true ending |
 | Stile | mondo low poly senza texture al neon; personaggi e oggetti di cartoncino |
+| Salvataggi | tre slot avviabili; in ogni slot un solo salvataggio, aggiornato quasi sempre; gli slot non si copiano, si possono solo cancellare |
 
 ### Aperte, con una proposta
 
@@ -462,13 +500,16 @@ creatore.
 | Nomi del robot, del creatore, dell'hub e dei biomi | da scegliere |
 | Il protagonista nei biomi | il Viandante come avatar del robot |
 | Minigiochi per bioma e bonus | 1–2 per bioma; bonus a stelle ([2.6](#26-estrazione-e-minigioco)) |
-| Salvataggio a metà run | serve, perché una run dura 20–30 minuti: si salva all'uscita e si riprende dall'hub |
+| Cadenza del salvataggio | a ogni cambiamento che conta e ogni 10 s in esplorazione; in scontro fra un battito e l'altro ([2.10](#210-salvataggi-e-slot)) |
+| Impostazioni | comuni ai tre slot |
+| Dove stanno i file degli slot | nella cartella utente del sistema, non più nella cartella di avvio |
 | Tema gotico | resta un'opzione nascosta finché serve |
 
 ## 6. Roadmap
 
 Ogni fase si prova prima nella Prova meccaniche, o in un bioma di prova, e passa
-al gioco normale quando è approvata.
+al gioco normale quando è approvata. Dalla fase 3 in poi ogni stato nuovo deve
+poter entrare nel salvataggio.
 
 | Fase | Contenuto | Fatta quando |
 |---|---|---|
@@ -476,7 +517,7 @@ al gioco normale quando è approvata.
 | 2 | Camera fissa, niente fog né zoom | la stanza di oggi si gioca con la camera nuova, senza nebbia |
 | 3 | Mappa aperta di prova: un bioma grande a chunk, POI, pattuglie, ingaggio, ologramma del bioma | si esplora, si ripulisce un nido e si torna a esplorare senza cambi di schermata |
 | 4 | Mount | si attraversa il bioma in sella; uno scontro la impedisce |
-| 5 | Zaino, deposito, hub minimo, estrazione e morte | una run porta a casa uno zaino; una morte lo perde |
+| 5 | Zaino, deposito, hub minimo, estrazione e morte; i tre slot con il salvataggio continuo | una run porta a casa uno zaino, una morte lo perde; chiudendo il gioco a metà run, o dopo un crash, si riprende dall'ultimo salvataggio |
 | 6 | Esperienza, livelli e punti; scoperte e pool | si livella nella run; una carta scoperta compare nella run dopo |
 | 7 | Mappa dei biomi, sblocchi, serie e finali | il grafo si apre vincendo; la serie si conta e si azzera |
 | 8 | Minigiochi come estrazione e cabinati dell'hub | battere un boss porta al minigioco e al ritorno a casa |
@@ -490,9 +531,11 @@ al gioco normale quando è approvata.
   attorno al robot.
 - **Determinismo.** Resta come oggi: seed della run e stream separati per mappa,
   incontri, bottino e premi. La grafica non consuma RNG.
-- **Profilo.** Uno solo, versionato, al posto di `odin_pp_profile.json` del ring
-  e del profilo dei minigiochi. Contiene scoperte, segreti, biomi, deposito,
-  serie e record.
-- **Salvataggio della run in corso**: oggi non esiste.
+- **Slot.** Tre file versionati, uno per slot, al posto di `odin_pp_profile.json`
+  del ring e del profilo dei minigiochi. Si scrivono su un file temporaneo e poi
+  si rinominano, come il profilo di oggi: un crash a metà scrittura non rovina
+  lo slot. Un file invalido resta da parte e il menu lo segnala.
+- **Run in corso.** Oggi non si salva. Il determinismo aiuta: fra un battito e
+  l'altro lo stato del mondo è stabile e si può scrivere per intero.
 - **Prestazioni.** Chunk di disegno e di simulazione; gli smoke del mondo neon
   misurano già il costo per frame.
