@@ -11,6 +11,7 @@ Grid_Object_Kind :: enum {
 	Bomb,
 	Shock_Floor,
 	Tesla_Coil,
+	Cannon, Flood, Black_Hole, Bomb_Marley,
 	Count,
 }
 
@@ -42,6 +43,7 @@ Grid_Object :: struct {
 	device_armed: bool,
 	device_cooldown: i32,
 	device_damage: i32,
+	device_direction: Move_Direction,
 }
 
 Grid_Object_Spawn :: struct {
@@ -93,6 +95,10 @@ GRID_OBJECT_DEFINITIONS :: [int(Grid_Object_Kind.Count)]Grid_Object_Definition{
 	},
 	{kind = .Shock_Floor, name = "Shock Floor"},
 	{kind = .Tesla_Coil, name = "Tesla Coil", max_health = 4, blocks_movement = true, targetable = true, damageable = true},
+	{kind = .Cannon, name = "Cannone", max_health = 8, blocks_movement = true, targetable = true, damageable = true},
+	{kind = .Flood, name = "Inondazione"},
+	{kind = .Black_Hole, name = "Buco Nero"},
+	{kind = .Bomb_Marley, name = "Bomb Marley", max_health = 1, targetable = true, damageable = true},
 }
 
 grid_object_definition :: proc(kind: Grid_Object_Kind) -> (Grid_Object_Definition, bool) {

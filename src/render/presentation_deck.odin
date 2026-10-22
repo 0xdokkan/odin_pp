@@ -28,7 +28,7 @@ apply_presentation_card_played :: proc(deck: ^game.Deck_State, event: game.Game_
 	card := deck.hand[hand_index]
 	definition, definition_found := game.card_definition_by_id(card.definition_id)
 	if !game.validate_card_instance(card) || !presentation_card_matches_event(card, event) ||
-	   !definition_found || definition.cost != event.amount {
+	   !definition_found || (game.expedition_card_energy_cost(card.definition_id) if deck.mana else definition.cost) != event.amount {
 		return false
 	}
 

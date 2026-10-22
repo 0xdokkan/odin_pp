@@ -92,11 +92,11 @@ Game :: struct {
 info :: proc() -> host.Minigame_Info {
 	return host.Minigame_Info{
 		id       = "puzzle",
-		title    = "Sigilli della Cripta",
-		genre    = "Puzzle a turni",
-		tagline  = "Spingi le reliquie sui sigilli runici: quando brillano tutti, la cripta si apre. Sul ghiaccio si scivola fino al primo ostacolo; le grate restano aperte solo finché ogni piastra è premuta.",
+		title    = "Sigilli della Piramide",
+		genre    = "Egitto / Puzzle a turni",
+		tagline  = "Spingi le reliquie sui sigilli runici: quando brillano tutti, la piramide si apre. Sul ghiaccio si scivola fino al primo ostacolo; le grate restano aperte solo finché ogni piastra è premuta.",
 		controls = "Frecce/WASD o croce: muovi e spingi (non si tira). Z annulla, Y ripete, R ricomincia, H suggerimento. Tre stelle entro il par di mosse. Nella sfida ogni mossa consuma la torcia e non ci sono suggerimenti.",
-		accent   = rl.Color{120, 150, 255, 255},
+		accent   = rl.Color{228, 186, 97, 255},
 		create   = create,
 	}
 }

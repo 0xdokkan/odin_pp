@@ -230,12 +230,16 @@ fish_with_rod :: proc(room: ^Room, cell: grid.Position) -> (report: Fishing_Repo
 		record_event(room.recent_events, {kind = .Dice_Rolled, source = PLAYER_ENTITY, target = PLAYER_ENTITY, from_position = origin,
 			to_position = origin, amount = report.roll.total, dice_roll = report.roll, card_id = rod.id, card_definition = .Fishing_Rod,
 			card_upgrade_level = rod.upgrade_level, card_lifetime = rod.lifetime, pulse_count = room.pulse_count+u64(room.fishing.casts)})
-		action := make_action(.Collect, PLAYER_ENTITY, entity_target(PLAYER_ENTITY), .Self)
-		added := add_effect(&action, heal_effect(PLAYER_ENTITY, report.roll.total))
-		assert(added)
-		cure := resolve_action(room, &action)
-		report.healed = cure.healing_done
-		append_event_log(room.recent_events, &cure.events)
+		if room.player.tactical.config.expedition {
+			append(&room.loot, Loot{position=origin,kind=.Healing,amount=report.roll.total,healing_amount=report.roll.total})
+		} else {
+			action := make_action(.Collect, PLAYER_ENTITY, entity_target(PLAYER_ENTITY), .Self)
+			added := add_effect(&action, heal_effect(PLAYER_ENTITY, report.roll.total))
+			assert(added)
+			cure := resolve_action(room, &action)
+			report.healed = cure.healing_done
+			append_event_log(room.recent_events, &cure.events)
+		}
 	}
 	room.fishing.random = random
 	room.fishing.casts += 1

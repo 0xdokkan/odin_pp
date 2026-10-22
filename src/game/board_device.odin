@@ -23,7 +23,7 @@ Board_Device_Network :: struct {
 
 @(private)
 board_device_kind :: proc(kind: Grid_Object_Kind) -> bool {
-	return kind == .Shock_Floor || kind == .Tesla_Coil
+	return kind == .Shock_Floor || kind == .Tesla_Coil || memory_device_kind(kind)
 }
 
 
@@ -49,12 +49,12 @@ board_device_can_deploy :: proc(room: ^Room, kind: Grid_Object_Kind, position: g
 	}
 	if _, occupied := object_index_at(room, position); occupied { return false }
 	if _, trapped := trap_index_at(room, position); trapped { return false }
-	if kind == .Tesla_Coil {
+	if kind == .Tesla_Coil || memory_device_kind(kind) {
 		if room.player.position == position { return false }
 		if _, occupied := enemy_index_at(room, position); occupied { return false }
 		// Never under the Pinball's rolling ball (pinball.odin).
 		if pinball_covers_cell(room, position) { return false }
-		return board_tesla_count(room) < MAX_TESLA_COILS
+		return board_device_count(room, kind) < MAX_TESLA_COILS
 	}
 	return board_device_count(room, .Shock_Floor) < MAX_SHOCK_FLOORS
 }
@@ -77,10 +77,16 @@ deploy_board_device :: proc(room: ^Room, kind: Grid_Object_Kind, position: grid.
 		health = health, max_health = health,
 		device_damage = damage, device_charges = charges, device_target_limit = charges,
 	}
+	if memory_device_kind(kind) {
+		object.device_direction = room.player.tactical.placement_direction
+		object.device_charges = 1 if kind == .Bomb_Marley else 4
+		object.device_cooldown = 3 if kind == .Bomb_Marley || kind == .Cannon else 2
+	}
 	room.next_object_id += 1
 	append(&room.objects, object)
 	record_event(events, {kind = .Object_Spawned, source = PLAYER_ENTITY, target = object_entity(object.id),
-		object_kind = kind, from_position = position, to_position = position, amount = damage, duration = charges})
+		object_kind = kind, from_position = position, to_position = position, amount = damage, duration = charges,
+		area_mask = u16(object.device_direction) if memory_device_kind(kind) else 0})
 	return true
 }
 
@@ -99,6 +105,7 @@ resolve_board_device_card :: proc(room: ^Room, instance: Card_Instance, target: 
 		action.effects[0].charges = roll.total
 	}
 	tactical_critical_scale(room, &action)
+	if memory_device_kind(action.effects[0].object_kind) { action.effects[0].charges = instance.upgrade_level+1 }
 	origin := room.player.position
 	hit := resolve_action(room, &action)
 	if !hit.accepted { return }
@@ -379,6 +386,7 @@ discharge_board_device_network :: proc(room: ^Room, network: ^Board_Device_Netwo
 @(private)
 tick_board_devices :: proc(room: ^Room, pulse: ^Pulse_Report) {
 	if room == nil || pulse == nil || room.phase != .Combat { return }
+	tick_memory_devices(room, pulse)
 	ids: [MAX_SHOCK_FLOORS]u32
 	count := 0
 	for &object in room.objects {

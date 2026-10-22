@@ -206,11 +206,12 @@ finish_combat_pulse :: proc(room: ^Room, pulse: ^Pulse_Report) {
 	if room.phase == .Combat {
 		tick_reaction_bindings(room, pulse)
 	}
+	if room.phase == .Combat { expedition_finish_beat(room, pulse) }
 	pulse.combat_ended = pulse.combat_ended || room.phase == .Loot
 	pulse.player_defeated = pulse.player_defeated || room.phase == .Defeat
 	// M7's world beat is one second. Energy needs its own cadence so a costly
 	// spell does not automatically refund all the energy it just spent.
-	if room.phase == .Combat && (room.pulse_count+1)%3 == 0 {
+	if room.phase == .Combat && !room.player.tactical.config.expedition && (room.pulse_count+1)%3 == 0 {
 		regen := room.player.deck.rules.energy_regen_per_pulse
 		pulse.energy_restored = restore_deck_energy_after_pulse(&room.player.deck)
 		pulse.energy_wasted = max(0, regen-pulse.energy_restored)

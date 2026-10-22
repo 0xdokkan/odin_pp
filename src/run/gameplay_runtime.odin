@@ -12,6 +12,8 @@ Card_Interaction_State :: struct {
 	hovered_card_id:  u32,
 	selected_card_id: u32,
 	dragged_card_id:  u32,
+	placing: bool,
+	placement_direction: game.Move_Direction,
 }
 
 clear_card_interaction :: proc(state: ^Card_Interaction_State) {
@@ -166,6 +168,11 @@ poll_gameplay_command :: proc(
 		return
 	}
 	if run_pressed(controls, .Cancel) || controls.right_pressed {
+		if card_interaction.placing {
+			card_interaction.placing = false
+			renderer.tactical.expedition_placement = false
+			return
+		}
 		clear_card_interaction(card_interaction)
 		return
 	}
@@ -181,6 +188,11 @@ poll_gameplay_command :: proc(
 	if !spatial_interaction_enabled {
 		card_interaction.dragged_card_id = 0
 	}
+	if room.player.tactical.config.expedition && spatial_interaction_enabled && controls.wheel != 0 {
+		expedition_cycle_hand(card_interaction, input_deck, controls.wheel)
+	}
+	renderer.tactical.expedition_placement = card_interaction.placing
+	renderer.tactical.expedition_direction = card_interaction.placement_direction
 
 	card_interaction.hovered_card_id = 0
 	if card_interaction.dragged_card_id == 0 && mouse_inside {
@@ -211,6 +223,11 @@ poll_gameplay_command :: proc(
 			if mouse_inside && render.card_drop_area_contains(renderer, mouse_canvas) &&
 			   renderer.has_hovered_cell {
 				if hand_index, found := game.hand_card_index_by_id(input_deck, dragged_card_id); found {
+					if room.player.tactical.config.expedition && game.card_requires_orientation(input_deck.hand[hand_index].definition_id) {
+						card_interaction.placing = true
+						renderer.tactical.expedition_placement = true
+						return
+					}
 					return targeted_card_command(room, input_deck.hand[hand_index], renderer.hovered_cell)
 				}
 			}
@@ -264,7 +281,18 @@ poll_gameplay_command :: proc(
 			input_deck,
 			card_interaction.selected_card_id,
 		); found {
-			return targeted_card_command(room, input_deck.hand[hand_index], renderer.hovered_cell)
+			card := input_deck.hand[hand_index]
+			if room.player.tactical.config.expedition {
+				if game.card_requires_orientation(card.definition_id) && !card_interaction.placing {
+					card_interaction.placing = true
+					renderer.tactical.expedition_placement = true
+					return
+				}
+				if immediate, ok := immediate_card_command(card); ok { return immediate, true }
+			}
+			command, has_command = targeted_card_command(room, card, renderer.hovered_cell)
+			command.direction = card_interaction.placement_direction
+			return
 		}
 		return
 	}
@@ -402,7 +430,7 @@ execute_gameplay_command :: proc(room: ^game.Room, command: Gameplay_Command) ->
 		if game.tactical_card_claims_beat(room, command.card_id) {
 			room.player.tactical.critical_next = game.tactical_claim_beat(room, command.beat)
 		}
-		play := game.play_card(room, command.card_id, command.target)
+		play := game.play_card(room, command.card_id, command.target, command.direction)
 		room.player.tactical.critical_next = false
 		execution.committed = game.card_play_was_committed(play.result)
 		execution.clears_card_interaction = execution.committed

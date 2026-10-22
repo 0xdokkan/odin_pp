@@ -1,7 +1,12 @@
 #!/bin/sh
 set -eu
 
-# Development startup: avoid the optimizer before each interactive run.
+# Default to quick development builds; --release enables the game optimizer.
 cd -- "$(dirname -- "$0")"
 mkdir -p build
-exec "${ODIN:-odin}" run src -o:none -out:build/odin_pp -- "$@"
+optimization=none
+if [ "${1:-}" = --release ]; then
+    optimization=speed
+    shift
+fi
+exec "${ODIN:-odin}" run src "-o:$optimization" -out:build/odin_pp -- "$@"

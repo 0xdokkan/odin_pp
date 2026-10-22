@@ -200,7 +200,7 @@ draw_tactical_hud :: proc(renderer: ^Renderer, room: ^game.Room, paused, hologra
 	else if lasso { label = "LAZZO" }
 	else if busy || game.tactical_player_busy(room) { label = "AZIONE" }
 	// The pulse continues during casting; cinematic dice and QTE own a full pause.
-	timed := combat
+	timed := combat && !s.config.expedition
 	accent := GOTHIC_RED if timed && s.remaining <= 5 else GOTHIC_BLUE
 	if recovering { accent = HUD_AMBER }
 	if stunned { accent = GOTHIC_RED }
@@ -209,13 +209,15 @@ draw_tactical_hud :: proc(renderer: ^Renderer, room: ^game.Room, paused, hologra
 	hud_frame(bounds, accent)
 	gothic_text_fit(renderer, label, {x+12, y+5, 150, 24}, 18, GOTHIC_PAPER)
 	sub := fmt.ctprintf("PULSE %d", min(s.cycle, max(int)-1)+1)
+	if s.config.expedition { sub = fmt.ctprintf("BATTITO %d", s.encounter_beats+1) }
 	// The window's own seconds wait, shown still, while the shadow's run.
 	if shadow { sub = fmt.ctprintf("FERMO %.1fs", s.remaining) }
 	// The turn the rope is in.
 	if lasso { sub = fmt.ctprintf("GIRO %d", room.lasso.turns+1) }
 	gothic_text_fit(renderer, sub, {x+12, y+26, 90, 14}, 10, GOTHIC_MUTED)
-	if timed {
+	if combat {
 		timer := fmt.ctprintf("%.1fs", s.shadow_remaining if shadow else s.remaining)
+		if s.config.expedition && !shadow { timer = "" }
 		timer_width := gothic_text_width(renderer, timer, 24)
 		// The tick: a lamp fills toward each whole second and flares gold in
 		// the window where moves, bumps and cards turn critical. In the shadow,
@@ -238,6 +240,7 @@ draw_tactical_hud :: proc(renderer: ^Renderer, room: ^game.Room, paused, hologra
 	if stunned { budget = max(f32(1), s.stun_duration) }
 	meter := rl.Rectangle{x+104, y+29, width-116, 7}
 	if shadow { hud_bar(meter, s.shadow_remaining/max(s.shadow_duration, 0.001), HUD_SHADE, int(s.shadow_duration+0.5)) }
+	else if s.config.expedition && combat { hud_bar(meter, f32(s.encounter_beats%game.EXPEDITION_DRAW_BEATS)/f32(game.EXPEDITION_DRAW_BEATS), GOTHIC_BLUE, 4) }
 	else if timed { hud_bar(meter, s.remaining/budget, accent, int(min(budget, 30))) }
 	else { hud_bar(meter, 1, GOTHIC_BLUE if !combat else GOTHIC_STEEL) }
 	// A timed action: a thin gold line drains as it plays out; a shadow's
@@ -251,6 +254,7 @@ draw_tactical_hud :: proc(renderer: ^Renderer, room: ^game.Room, paused, hologra
 	}
 	// One context line, only when it says something the plate does not.
 	status: cstring
+	if s.config.expedition && combat { status = fmt.ctprintf("PESCA FRA %d BATTITI / CRITICO SUL BATTITO", game.EXPEDITION_DRAW_BEATS-s.encounter_beats%game.EXPEDITION_DRAW_BEATS) }
 	if busy { status = "I NEMICI CONTINUANO" }
 	if game.tactical_player_busy(room) { status = fmt.ctprintf("AZIONE %.1fs / I NEMICI CONTINUANO", s.action_remaining) }
 	if game.tactical_is_casting(room) { status = fmt.ctprintf("LANCIO %.1fs / NEMICI SOSPESI", s.cast_remaining) }
@@ -263,9 +267,9 @@ draw_tactical_hud :: proc(renderer: ^Renderer, room: ^game.Room, paused, hologra
 	if lasso && !cinematic { status = lasso_hud_status(room) }
 	if shadow { status = "MONDO FERMO / SOLO PASSI / DIAGONALE SUL BATTITO" }
 	if room.qte.kind != .None { status = "PULSE SOSPESO" }
-	if !combat { status = fishing_hud_status(renderer, room) }
+	if !combat { status = "BOSS / ESTRAI IL TUO ZAINO" if s.config.expedition else fishing_hud_status(renderer, room) }
 	if hologram && combat && room.qte.kind == .None { status = "MAPPA APERTA / IL TEMPO SCORRE" }
-	objective := tactical_hud_objective(renderer, room)
+	objective := "MEMORIA APERTA" if s.config.expedition && !combat else tactical_hud_objective(renderer, room)
 	objective_width := gothic_text_width(renderer, objective, 10)
 	gothic_text(renderer, objective, x+width-12-objective_width, y+bounds.height-17, 10, GOTHIC_BLUE if !combat else GOTHIC_MUTED)
 	if status != nil {

@@ -2,12 +2,19 @@ package render
 
 import "core:c"
 import rl "vendor:raylib"
+import rlgl "vendor:raylib/rlgl"
+import canvas_target "../engine/canvas"
 
-// Geometry gets a 2x render surface; UI and sprite source textures keep their
-// pixel grid. The parent canvas is borrowed, never unloaded by the renderer.
+// Geometry gets a surface with as many pixels as its parent canvas holds (the
+// display's own for the window); UI and sprite source textures keep their
+// pixel grid. The parent canvas is borrowed, never unloaded by the renderer;
+// `follow` tracks a canvas its owner may reallocate (a resized window).
 Tactical_Surface :: struct {
 	target, parent: rl.RenderTexture2D,
+	follow: ^rl.RenderTexture2D,
 	resolve: rl.Shader,
+	post: ^Expedition_Post,
+	hdr_active, hdr_failed: bool,
 	frozen_location, focus_location, aspect_location: c.int,
 }
 
@@ -34,29 +41,50 @@ void main() {
 }
 `
 
-@(private)
-create_tactical_surface :: proc(renderer: ^Renderer, parent: rl.RenderTexture2D) {
-	if parent.id == 0 || renderer.tactical.surface != nil { return }
-	target := rl.LoadRenderTexture(c.int(renderer.canvas_width)*2, c.int(renderer.canvas_height)*2)
-	if !rl.IsRenderTextureValid(target) {
+// At least twice the logical board: a small parent (a fixed stage) keeps
+// the former supersampling; the window's canvas already has display pixels.
+@(private="file")
+tactical_surface_size :: proc(renderer: ^Renderer, parent: rl.RenderTexture2D) -> (c.int, c.int) {
+	return max(parent.texture.width, c.int(renderer.canvas_width)*2), max(parent.texture.height, c.int(renderer.canvas_height)*2)
+}
+
+@(private="file")
+load_tactical_surface_target :: proc(width, height: c.int) -> (rl.RenderTexture2D, bool) {
+	target := rl.LoadRenderTexture(width, height)
+	if !rl.IsRenderTextureValid(target) || !rlgl.FramebufferComplete(target.id) {
 		if target.id != 0 { rl.UnloadRenderTexture(target) }
-		return
+		return {}, false
 	}
 	rl.SetTextureFilter(target.texture, .BILINEAR)
 	rl.SetTextureWrap(target.texture, .CLAMP)
+	return target, true
+}
+
+// Draw the board onto `canvas` from now on, following it when it is reallocated.
+follow_tactical_canvas :: proc(renderer: ^Renderer, canvas: ^rl.RenderTexture2D) {
+	if renderer == nil || renderer.tactical.surface == nil { return }
+	renderer.tactical.surface.follow = canvas
+}
+
+@(private)
+create_tactical_surface :: proc(renderer: ^Renderer, parent: rl.RenderTexture2D) {
+	if parent.id == 0 || renderer.tactical.surface != nil { return }
+	target, ok := load_tactical_surface_target(tactical_surface_size(renderer, parent))
+	if !ok { return }
 	renderer.tactical.surface = new(Tactical_Surface)
 	// The scene replaces the canvas. Gradient/particle blending can reduce a
 	// render target's alpha; resolve it opaque so a map never ghosts the hand
 	// or room that was drawn into the parent canvas earlier in the same frame.
 	resolve := rl.LoadShaderFromMemory(nil, TACTICAL_SURFACE_RESOLVE)
-	renderer.tactical.surface^ = {target, parent, resolve, rl.GetShaderLocation(resolve, "frozen"),
-		rl.GetShaderLocation(resolve, "focus"), rl.GetShaderLocation(resolve, "aspect")}
+	renderer.tactical.surface^ = {target=target,parent=parent,resolve=resolve,frozen_location=rl.GetShaderLocation(resolve,"frozen"),
+		focus_location=rl.GetShaderLocation(resolve,"focus"),aspect_location=rl.GetShaderLocation(resolve,"aspect")}
 }
 
 @(private)
 destroy_tactical_surface :: proc(renderer: ^Renderer) {
 	surface := renderer.tactical.surface
 	if surface == nil { return }
+	destroy_expedition_post(&surface.post)
 	rl.UnloadRenderTexture(surface.target)
 	if surface.resolve.id != 0 { rl.UnloadShader(surface.resolve) }
 	free(surface)
@@ -67,7 +95,28 @@ destroy_tactical_surface :: proc(renderer: ^Renderer) {
 begin_tactical_surface :: proc(renderer: ^Renderer) -> bool {
 	surface := renderer.tactical.surface
 	if surface == nil { return false }
-	rl.BeginTextureMode(surface.target)
+	if surface.follow != nil && surface.follow.id != 0 { surface.parent = surface.follow^ }
+	width, height := tactical_surface_size(renderer, surface.parent)
+	if surface.target.texture.width != width || surface.target.texture.height != height {
+		if next, ok := load_tactical_surface_target(width, height); ok {
+			destroy_expedition_post(&surface.post)
+			surface.hdr_failed=false
+			rl.UnloadRenderTexture(surface.target)
+			surface.target = next
+		}
+	}
+	surface.hdr_active=false
+	if renderer.tactical.expedition && !surface.hdr_failed {
+		if create_expedition_post(surface) {
+			surface.hdr_active=true
+			canvas_target.begin(surface.post.world,renderer.canvas_width,renderer.canvas_height)
+			return true
+		}
+		surface.hdr_failed=true
+		rl.TraceLog(.WARNING,"HDR environment unavailable; using the standard colour surface")
+	}
+	// The board draws in logical units at the surface's full resolution.
+	canvas_target.begin(surface.target, renderer.canvas_width, renderer.canvas_height)
 	return true
 }
 
@@ -78,7 +127,7 @@ end_tactical_surface :: proc(renderer: ^Renderer, active: bool) {
 	rl.EndTextureMode()
 	// Raylib render targets are not a stack. Explicitly restore the borrowed
 	// canvas so later HUD, dice overlays and app.present use the right target.
-	rl.BeginTextureMode(surface.parent)
+	canvas_target.begin(surface.parent, renderer.canvas_width, renderer.canvas_height)
 	rl.ClearBackground(RESIN_BACKGROUND)
 	frozen := renderer.tactical.shadow.frozen
 	rl.SetShaderValue(surface.resolve, surface.frozen_location, &frozen, .FLOAT)
@@ -99,6 +148,15 @@ end_tactical_surface :: proc(renderer: ^Renderer, active: bool) {
 
 @(private)
 draw_tactical_backdrop :: proc(renderer: ^Renderer) {
+	if s:=renderer.tactical.surface;s!=nil && s.hdr_active && s.post!=nil {
+		rl.ClearBackground(rl.BLACK)
+		rl.BeginShaderMode(s.post.backdrop)
+		// Shape atlas UVs cover a tiny white patch; the default white texture
+		// supplies the full 0..1 UV range to this analytic backdrop instead.
+		expedition_fullscreen(renderer,{id=rlgl.GetTextureIdDefault(),width=1,height=1,mipmaps=1,format=.UNCOMPRESSED_R8G8B8A8})
+		rl.EndShaderMode()
+		return
+	}
 	rl.ClearBackground(RESIN_BACKGROUND)
 	rl.DrawRectangleGradientV(0, 0, c.int(renderer.canvas_width), c.int(renderer.canvas_height), {8, 14, 23, 255}, RESIN_BACKGROUND)
 	rl.DrawCircleGradient({renderer.canvas_width*0.51, renderer.canvas_height*0.4}, renderer.canvas_width*0.43,

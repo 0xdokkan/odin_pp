@@ -1,6 +1,7 @@
 package level
 
 import "core:math/rand"
+import "core:sync"
 import grid "../engine/grid"
 
 Tile_Kind :: enum u8 {
@@ -22,7 +23,13 @@ Level :: struct {
 	has_player_spawn: bool,
 	// Generated arena tier; zero also covers parsed maps and legacy rooms.
 	layout_complexity: int,
+	// A lifetime identity avoids stale GPU caches when an allocator reuses a
+	// destroyed map's address. Neither counter participates in gameplay RNG.
+	geometry_id, geometry_revision: u64,
 }
+
+@(private)
+next_geometry_id: u64
 
 Parse_Error :: enum {
 	None,
@@ -97,6 +104,8 @@ create :: proc(width, height: int, initial_tile := Tile{kind = .Void}) -> (resul
 		return {}, false
 	}
 	result.tiles = tiles
+	result.geometry_id = sync.atomic_add(&next_geometry_id, 1)+1
+	result.geometry_revision = 1
 	return result, true
 }
 
@@ -119,7 +128,18 @@ set_tile :: proc(level: ^Level, position: grid.Position, tile: Tile) -> bool {
 	if level == nil {
 		return false
 	}
-	return grid.set(&level.tiles, position, tile)
+	previous, found := grid.get(&level.tiles, position)
+	if !found {return false}
+	if previous == tile {return true}
+	if !grid.set(&level.tiles, position, tile) {return false}
+	mark_geometry_changed(level)
+	return true
+}
+
+// Call after a bulk write into tiles.cells. Ordinary mutations should use
+// set_tile, which also avoids invalidating caches for an unchanged cell.
+mark_geometry_changed :: proc(level: ^Level) {
+	if level != nil {level.geometry_revision += 1}
 }
 
 is_walkable :: proc(kind: Tile_Kind) -> bool {

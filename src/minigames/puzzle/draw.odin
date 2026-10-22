@@ -515,8 +515,8 @@ draw_world :: proc(v: ^View, p: ^Puzzle, params: Draw_Params) {
 	// Decorative depth sits behind the board, never on a playable cell.
 	base := rl.Rectangle{L.origin.x-7*s, L.origin.y-6*s, f32(b.width)*T+14*s, f32(b.height)*T+12*s}
 	rl.DrawRectangleRec({base.x+3*s, base.y+6*s, base.width, base.height}, {3, 7, 13, 205})
-	rl.DrawRectangleRec(base, {16, 27, 41, 255})
-	rl.DrawRectangleLinesEx(base, s, {69, 101, 133, 255})
+	rl.DrawRectangleRec(base, {77, 55, 54, 255})
+	rl.DrawRectangleLinesEx(base, s, {200, 157, 96, 255})
 	for side in 0..<2 {
 		x := base.x+3*s if side == 0 else base.x+base.width-3*s
 		rl.DrawRectangleRec({x-s, base.y+3*s, 2*s, 9*s}, {133, 173, 203, 210})
@@ -541,8 +541,9 @@ draw_world :: proc(v: ^View, p: ^Puzzle, params: Draw_Params) {
 			h := cell_hash(x, y)
 			switch t {
 			case .Floor:
-				frame := 0 if h%7 < 4 else (1 if h%7 < 6 else 2)
-				blit(v.sprites.floor, frame, dest, tint)
+				rl.DrawRectangleRec(dest,ui.with_alpha({99+u8(h%12),77,65,255},k))
+				rl.DrawRectangleLinesEx(dest,s*.5,ui.with_alpha({164,125,81,255},k))
+				if h%9==0 {draw_ankh({pos.x+T*.5,pos.y+T*.5},T*.19,ui.with_alpha({187,142,84,255},k))}
 			case .Ice:
 				blit(v.sprites.ice, int(h%2), dest, tint)
 				// A slow glint sweeps diagonally across the frozen floor.
@@ -640,13 +641,13 @@ draw_wall :: proc(v: ^View, b: ^Board, x, y: int, k, lift: f32, time: f32) {
 			}
 		}
 	}
-	shade := rl.Color{255, 255, 255, 255} if inner else rl.Color{139, 151, 165, 255}
-	tint := ui.with_alpha(shade, k)
 	// The top face rises into the cell above only when nothing playable is
 	// there, so a wall never hides a sigil or a relic standing behind it.
 	raise := H if !walkable(tile_at(b, x, y-1)) else 0
 	top := pos.y - raise
-	blit(v.sprites.wall_top, int(h%2), {pos.x, top, T, T}, tint)
+	rl.DrawRectangleRec({pos.x,top,T,T},ui.with_alpha({154,115,73,255} if inner else {102,78,63,255},k))
+	rl.DrawRectangleLinesEx({pos.x+s,top+s,T-2*s,T-2*s},s,ui.with_alpha({194,148,88,255},k))
+	if h%3==0 {draw_ankh({pos.x+T*.5,top+T*.44},T*.21,ui.with_alpha({46,91,103,255},k))}
 	// Glossy top plate, with dark grout retained between neighbours.
 	rl.DrawRectangleLinesEx({pos.x+s, top+s, T-2*s, T-2*s}, s*0.5, ui.with_alpha({119, 154, 182, 100}, k))
 	rim := ui.with_alpha({149, 181, 208, 255}, k)
@@ -663,7 +664,8 @@ draw_wall :: proc(v: ^View, b: ^Board, x, y: int, k, lift: f32, time: f32) {
 	below := tile_at(b, x, y+1)
 	if below != .Wall {
 		front := rl.Rectangle{pos.x, pos.y + T - H, T, H}
-		blit(v.sprites.wall_front, int((h>>3)%2), front, tint)
+		rl.DrawRectangleRec(front,ui.with_alpha({101,74,56,255},k))
+		rl.DrawLineEx({front.x,front.y},{front.x+T,front.y},s,ui.with_alpha({215,164,94,255},k))
 		if below == .Void {
 			// Outer face: fade into the dark instead of floating.
 			rl.DrawRectangleGradientV(i32(front.x), i32(front.y + front.height), i32(T), i32(H*1.5),
@@ -737,6 +739,11 @@ draw_crate :: proc(v: ^View, b: ^Board, i: int, appear: f32, params: Draw_Params
 		lit = true
 	}
 	blit(v.sprites.crate, 1 if lit else 0, dest, ui.with_alpha(rl.WHITE, appear))
+	// Gilded sarcophagus face retains the original crate silhouette/hit area.
+	face:=rl.Rectangle{dest.x+dest.width*.17,dest.y+dest.height*.18,dest.width*.66,dest.height*.65}
+	rl.DrawRectangleRec(face,ui.with_alpha({195,153,80,255},appear))
+	rl.DrawRectangleLinesEx(face,s*.65,ui.with_alpha({43,91,110,255},appear))
+	draw_ankh({face.x+face.width*.5,face.y+face.height*.4},face.height*.34,ui.with_alpha({60,111,126,255},appear))
 }
 
 @(private)
@@ -941,7 +948,7 @@ draw_hud :: proc(v: ^View, theme: ^ui.Theme, canvas: rl.Rectangle, info: Hud_Inf
 		ui.hud_panel(theme, zone)
 	}
 	left, middle, right := ui.shrink(zones[0], 10), ui.shrink(zones[1], 10), ui.shrink(zones[2], 10)
-	ui.draw_text_fit(theme, fmt.tprintf("CRIPTA %d / %d", info.level_index+1, info.level_count),
+	ui.draw_text_fit(theme, fmt.tprintf("CAMERA %d / %d", info.level_index+1, info.level_count),
 		{left.x, left.y, left.width, 18}, .Small, p.text_dim)
 	ui.draw_text_fit(theme, info.level_name, {left.x, left.y + 22, left.width, 24}, .Body, p.text)
 
@@ -1029,7 +1036,7 @@ draw_title_card :: proc(theme: ^ui.Theme, canvas: rl.Rectangle, index, count: in
 	rl.DrawRectangleGradientH(0, i32(cy - 46), i32(canvas.width*0.5), 92, {4, 3, 8, 0}, {4, 3, 8, u8(225*a)})
 	rl.DrawRectangleGradientH(i32(canvas.width*0.5), i32(cy - 46), i32(canvas.width*0.5), 92, {4, 3, 8, u8(225*a)}, {4, 3, 8, 0})
 	rise := (1 - a) * 8
-	ui.draw_text_centered(theme, fmt.tprintf("Cripta %d di %d", index+1, count), {canvas.width*0.5, cy - 20 + rise}, .Body, ui.with_alpha(p.warning, a))
+	ui.draw_text_centered(theme, fmt.tprintf("Camera %d di %d", index+1, count), {canvas.width*0.5, cy - 20 + rise}, .Body, ui.with_alpha(p.warning, a))
 	ui.draw_text_centered(theme, name, {canvas.width*0.5, cy + 12 + rise}, .Title, ui.with_alpha(p.text, a))
 }
 
@@ -1068,25 +1075,5 @@ vignette_strength :: proc(torch, torch_max: int) -> f32 {
 }
 
 draw_backdrop :: proc(canvas: rl.Rectangle, time: f32) {
-	gfx.draw_vertical_gradient(canvas, {13, 22, 34, 255}, {5, 9, 16, 255})
-	// A vast sigil carved into the dark, turning very slowly behind the crypt.
-	c := [2]f32{canvas.width*0.5, canvas.height*0.5 + 10}
-	for ring in 0..<2 {
-		radius := f32(330 - ring*70)
-		spin := time * (0.03 if ring == 0 else -0.045)
-		rl.DrawRing(c, radius - 2, radius, 0, 360, 96, {64, 112, 158, 34})
-		marks := 36 - ring*12
-		for i in 0..<marks {
-			a := spin + f32(i)*2*math.PI/f32(marks)
-			q := c + {math.cos(a), math.sin(a)} * (radius + 9)
-			size := f32(4 if i%3 == 0 else 2)
-			rl.DrawRectangleRec({q.x - size*0.5, q.y - size*0.5, size, size}, {96, 150, 196, 40})
-		}
-	}
-	// Slow drifting fog bands.
-	for i in 0..<3 {
-		y := canvas.height * (0.25 + 0.25*f32(i)) + math.sin(time*0.2+f32(i)*2)*20
-		rl.DrawRectangleGradientV(0, i32(y - 60), i32(canvas.width), 60, {32, 53, 78, 0}, {32, 53, 78, 26})
-		rl.DrawRectangleGradientV(0, i32(y), i32(canvas.width), 60, {32, 53, 78, 26}, {32, 53, 78, 0})
-	}
+	draw_pyramid_backdrop(canvas,time)
 }

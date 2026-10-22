@@ -33,6 +33,8 @@ show_spawned_presentation_object :: proc(presentation: ^Room_Presentation, event
 		position = presentation_position(event.to_position),
 		health = definition.max_health, max_health = definition.max_health,
 		opacity = 1, visible = true,
+		device_direction = game.Move_Direction(event.area_mask%4),
+		device_target_limit = event.duration,
 	}
 	return true
 }

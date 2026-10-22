@@ -12,7 +12,7 @@ tactical_control_allowed :: proc(room: ^Room, capability: Tactical_Capability, i
 	s := &room.player.tactical
 	defense_free := room.qte.kind == .None
 	world_free := !room.tactical_pulse.pending && defense_free
-	window_free := world_free && s.remaining > 0 && s.cast_remaining <= 0
+	window_free := world_free && (s.config.expedition || s.remaining > 0) && s.cast_remaining <= 0
 	body_free := s.action_remaining <= 0 && !room.lasso.active
 	card_phase := s.phase == .Decision || s.phase == .Stunned
 	switch capability {

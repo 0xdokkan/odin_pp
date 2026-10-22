@@ -10,6 +10,7 @@ Eseguire i comandi dalla radice della repo:
 ```sh
 ./run.sh
 ./run.sh --seed=0xC0FFEE --fast
+./run.sh --release --expedition
 ```
 
 Il launcher usa `odin run src -o:none`, passa gli argomenti al gioco e funziona
@@ -18,6 +19,13 @@ alternativo. Ricompila i sorgenti a ogni avvio, per eseguire sempre le modifiche
 correnti. Il comando senza `-o:none` abilita invece l'ottimizzazione predefinita
 (`minimal`), che su questo progetto può rendere molto lunga l'attesa **prima**
 dell'apertura della finestra.
+
+Per giocare e misurare le prestazioni, aggiungere `--release` come primo
+argomento di `run.sh` o `run.ps1`: attiva `-o:speed` e viene consumato dallo
+script. Gli altri argomenti arrivano al gioco invariati. La compilazione
+richiede più tempo; dopo la prima build si può avviare direttamente
+`./build/odin_pp` (Windows: `.\build\odin_pp.exe`). Le misure FPS vanno
+effettuate su questa build, alla stessa risoluzione e nelle stesse scene.
 
 Comando equivalente, oppure build da riutilizzare senza ricompilare:
 
@@ -46,6 +54,21 @@ dell'utente. Se il file è corrotto o appartiene a una versione futura, la sessi
 usa valori predefiniti e disabilita le scritture per conservare il file originale.
 Smoke, laboratori e report di playtest avviano la run direttamente, come prima.
 Gli smoke e i laboratori non scrivono i profili.
+
+### Campagna dei ricordi
+
+**Gioca** apre tre slot indipendenti. Scegli una memoria, prepara lo zaino
+nel deposito e parti dalla galassia. Un salvataggio con una spedizione
+attiva riprende la posizione e lo stato del bioma. I file della campagna
+sono separati da `profilo.json`; cancellarli richiede due conferme nella UI.
+La [checklist della direzione](direzione-implementazione.md) descrive
+controlli, avanzamento, salvataggi e verifiche della nuova campagna.
+
+`--expedition` avvia una prova senza slot. `--smoke-hub` e
+`--smoke-expedition` catturano schermate senza scrivere profili o memorie.
+`--run` continua ad aprire il vecchio percorso a stanze: i dettagli che
+seguono sulle finestre di combattimento e le ricompense di quel percorso
+non definiscono le regole della spedizione aperta.
 
 ### Prova meccaniche
 
@@ -129,7 +152,8 @@ e i colpi sull'impatto (un dardo che manca suona quando arriva a terra, e chi
 lo schiva quando lo schiva), con piccole variazioni di altezza e volume a ogni
 colpo, e un limitatore sull'uscita tiene puliti i momenti più fitti (un colpo,
 una caduta e un'esplosione insieme); seguono il volume degli effetti e il muto
-delle impostazioni. Nel gioco normale per ora non suonano, e così i film di
+delle impostazioni. Gli effetti suonano anche nella nuova spedizione. Nella modalità a stanze
+precedente restano limitati al laboratorio, come i film di
 [Mostra effetto](presentazione.md#mostra-effetto), che si sentono solo qui. Per rifarli dopo
 aver cambiato una ricetta (`tools/audio/sfx_<famiglia>.py`):
 

@@ -2,6 +2,7 @@ package game
 
 import "core:slice"
 import grid "../engine/grid"
+import level "../level"
 
 MAX_ENEMY_INTENT_PATH_CELLS   :: 8
 MAX_ENEMY_INTENT_THREAT_CELLS :: 16
@@ -33,6 +34,7 @@ Enemy_Intent :: struct {
 	planned_pulse:         u64,
 	protected_ally:        Entity_Ref,
 	windup:                bool,
+	phase_through:         bool,
 	target_object:         u32,
 	push:                  bool,
 	// M7: the seconds Rallentamento added when this intent was planned
@@ -210,6 +212,17 @@ plan_chaser_intent :: proc(
 	if abs(delta_y) > abs(delta_x) {
 		first_step, second_step = second_step, first_step
 	}
+	if room.player.tactical.config.expedition && room.player.tactical.config.expedition_biome==8 && enemy.archetype==.Chaser {
+		for step in ([2]grid.Position{first_step,second_step}) {
+			if step=={} {continue}
+			cover:=add_position(origin,step);landing:=add_position(cover,step)
+			tile,found:=level.tile_at(room.level_data,cover)
+			if !found || tile.kind==.Void || !cell_blocks_movement(room,cover) {continue}
+			if !planned_cell_is_available(room,predicted_positions,enemy_count,ordered_index,landing) {continue}
+			intent.kind=.Move;intent.destination=landing;intent.path[0]=landing;intent.path_count=1;intent.phase_through=true
+			return intent
+		}
+	}
 	origin_index, valid_origin := grid.index_of(&room.level_data.tiles, origin)
 	if !valid_origin || room.enemy_path_distances[origin_index] < 0 {
 		return intent
@@ -356,7 +369,7 @@ validate_enemy_intent_structure :: proc(room: ^Room, intent: ^Enemy_Intent) -> b
 		if intent.path_count != 1 || intent.threatened_cell_count != 0 ||
 		   intent.damage != 0 || intent.destination != intent.path[0] ||
 		   abs(intent.origin.x-intent.destination.x)+
-		   abs(intent.origin.y-intent.destination.y) != 1 {
+		   abs(intent.origin.y-intent.destination.y) != (2 if intent.phase_through && room.player.tactical.config.expedition && room.player.tactical.config.expedition_biome==8 else 1) {
 			return false
 		}
 		// Movable grid objects are runtime blockers, not part of the committed
@@ -654,7 +667,9 @@ record_enemy_attack_miss :: proc(
 // Archers shoot and bombers throw; an object is struck from afar.
 @(private = "file")
 enemy_attack_is_ranged :: proc(enemy: ^Enemy, intent: ^Enemy_Intent) -> bool {
-	return enemy.archetype == .Archer || enemy.archetype == .Bomber || intent.target_object != 0
+	return enemy.archetype == .Archer || enemy.archetype == .Bomber || intent.target_object != 0 ||
+		(enemy.archetype == .Demolitionist && intent.kind == .Attack && intent.threatened_cell_count>0 &&
+		 max(abs(intent.threatened_cells[0].x-intent.origin.x),abs(intent.threatened_cells[0].y-intent.origin.y))>1)
 }
 
 // A confirmed attack and the blow after a charge share the same hit pipeline.
@@ -674,6 +689,14 @@ resolve_enemy_blow :: proc(room: ^Room, enemy: ^Enemy, intent: ^Enemy_Intent, ra
 	mark_attack_events(&report.events, 0, source, PLAYER_ENTITY, enemy.position, intent.threatened_cells[0],
 		intent.threatened_cells[:intent.threatened_cell_count], ranged)
 	merge_action_report(pulse, &report)
+	if room.player.tactical.config.expedition && enemy.archetype==.Archer && report.damage_dealt>0 && room.player.health>0 {
+		biome:=room.player.tactical.config.expedition_biome
+		if biome==2 || biome==7 {
+			status_action:=make_action(.Trigger,source,entity_target(PLAYER_ENTITY),.Opponent)
+			add_effect(&status_action,apply_status_effect(PLAYER_ENTITY,.Poison if biome==2 else .Burn,1,0))
+			status_report:=resolve_action(room,&status_action);merge_action_report(pulse,&status_report)
+		}
+	}
 	resolve_tactical_enemy_push(room, source, intent, &report, pulse)
 	return report.player_defeated || room.phase != .Combat
 }
@@ -831,7 +854,7 @@ resolve_enemy_intents :: proc(room: ^Room, pulse: ^Pulse_Report, only_id: u32 = 
 				continue
 			}
 			action := make_action(.Move, source, cell_target(destination), .Walkable_Cell)
-			added := add_effect(&action, move_effect(source, destination))
+			added := add_effect(&action, move_effect(source, destination, .Teleport if intent.phase_through else .Traverse))
 			assert(added)
 			report := resolve_action(room, &action)
 			assert(report.accepted)

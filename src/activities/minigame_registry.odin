@@ -6,10 +6,10 @@ import fps "../minigames/fps"
 import platform2d "../minigames/platform2d"
 import platform3d "../minigames/platform3d"
 import puzzle "../minigames/puzzle"
+import memoryarcade "../memoryarcade"
 
-// Minigames offered by the menu, in display order. A run opens only the
-// ring, from a square of Tesla coils.
-MINIGAME_COUNT :: 6
+// The six original cabinets followed by the six biome memories.
+MINIGAME_COUNT :: 12
 
 minigame_info :: proc(index: int) -> (host.Minigame_Info, bool) {
 	switch index {
@@ -25,6 +25,8 @@ minigame_info :: proc(index: int) -> (host.Minigame_Info, bool) {
 		return puzzle.info(), true
 	case 5:
 		return ring_minigame_info(), true
+	case 6..<12:
+		return memoryarcade.info(memoryarcade.Kind(index-6)), true
 	}
 	return {}, false
 }
@@ -55,6 +57,8 @@ minigame_capture_scene :: proc(index: int, config: host.Minigame_Config) -> host
 		g := cast(^Ring_Minigame)host.shell_of(&scene).hooks.data
 		g.demo=true
 		return scene
+	case 6..<12:
+		return memoryarcade.create_autoplay(memoryarcade.Kind(index-6),config)
 	}
 	return {}
 }

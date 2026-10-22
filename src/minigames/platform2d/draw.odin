@@ -547,7 +547,7 @@ hash01 :: proc "contextless" (a, b: int) -> f32 {
 @(private)
 draw_backdrop :: proc(v: ^View, w: ^World, canvas: rl.Rectangle) {
 	s := &v.sprites
-	gfx.draw_vertical_gradient(canvas, {7, 11, 18, 255}, {31, 48, 67, 255})
+	gfx.draw_vertical_gradient(canvas, {16, 8, 22, 255}, {71, 27, 29, 255})
 	scroll := v.cam.position.x * ZOOM
 	// Zero when the camera sits on the ground, positive as it climbs.
 	lift := (v.cam.bounds_max.y - 135 - v.cam.position.y) * ZOOM
@@ -555,13 +555,21 @@ draw_backdrop :: proc(v: ^View, w: ^World, canvas: rl.Rectangle) {
 
 	moon := Vec2{canvas.width*0.76 - scroll*0.01, 118 + lift*0.04}
 	rl.BeginBlendMode(.ADDITIVE)
-	soft_glow(s, moon, 190, {68, 130, 187, 110})
-	soft_glow(s, moon, 80, {120, 171, 218, 90})
+	soft_glow(s, moon, 190, {221, 86, 40, 110})
+	soft_glow(s, moon, 80, {246, 155, 71, 90})
 	rl.EndBlendMode()
-	rl.DrawCircleV(moon, 46, {236, 214, 190, 255})
-	rl.DrawCircleV(moon + {-14, -10}, 8, {216, 192, 170, 255})
-	rl.DrawCircleV(moon + {12, 14}, 6, {218, 194, 172, 255})
-	rl.DrawCircleV(moon + {16, -16}, 4, {220, 198, 176, 255})
+	rl.DrawCircleV(moon, 46, {241, 144, 72, 255})
+	rl.DrawCircleV(moon + {-14, -10}, 8, {211, 104, 51, 255})
+	rl.DrawCircleV(moon + {12, 14}, 6, {214, 113, 49, 255})
+	rl.DrawCircleV(moon + {16, -16}, 4, {216, 110, 54, 255})
+	// Hanging basalt chains frame the infernal tower without hiding platforms.
+	for side in 0..<2 {
+		x:=canvas.width*(.08 if side==0 else .92)-scroll*.014
+		for n in -1..<17 {
+			y:=f32(n)*31+math.mod(lift*.06,31)
+			rl.DrawEllipseLines(i32(x),i32(y),7 if n%2==0 else 3,18,{105,64,60,130})
+		}
+	}
 	draw_ash_tower(v, canvas, world_progress(w), lift)
 	// Smoke across the moon.
 	for i in 0..<3 {
@@ -570,11 +578,11 @@ draw_backdrop :: proc(v: ^View, w: ^World, canvas: rl.Rectangle) {
 		rl.DrawEllipse(i32(x), i32(y), 120, 7, {17, 28, 43, 120})
 	}
 
-	draw_spires(canvas, scroll*0.1, 330+lift*0.12, 130, {28, 44, 62, 255}, 1)
-	gfx.draw_hills(canvas.width, canvas.height, 430+lift*0.2, 120, scroll*0.2, {19, 31, 46, 255}, 1.7)
-	draw_spires(canvas, scroll*0.32, 420+lift*0.3, 210, {14, 24, 37, 255}, 2)
-	gfx.draw_hills(canvas.width, canvas.height, 500+lift*0.4, 70, scroll*0.4, {9, 16, 26, 255}, 4.2)
-	rl.DrawRectangleGradientV(0, i32(canvas.height-220), i32(canvas.width), 220, {0, 0, 0, 0}, {44, 85, 116, 65})
+	draw_spires(canvas, scroll*0.1, 330+lift*0.12, 130, {52, 28, 38, 255}, 1)
+	gfx.draw_hills(canvas.width, canvas.height, 430+lift*0.2, 120, scroll*0.2, {36, 20, 32, 255}, 1.7)
+	draw_spires(canvas, scroll*0.32, 420+lift*0.3, 210, {26, 16, 29, 255}, 2)
+	gfx.draw_hills(canvas.width, canvas.height, 500+lift*0.4, 70, scroll*0.4, {18, 13, 22, 255}, 4.2)
+	rl.DrawRectangleGradientV(0, i32(canvas.height-220), i32(canvas.width), 220, {0, 0, 0, 0}, {214, 74, 26, 65})
 }
 
 // Ruined towers with a few lit windows, repeating with the scroll.

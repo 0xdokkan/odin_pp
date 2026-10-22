@@ -25,8 +25,8 @@ Ring_Minigame :: struct {
 }
 
 ring_minigame_info :: proc() -> host.Minigame_Info {
-	return {id="ring", title="Il Ring delle Ombre", genre="Duello 3D",
-		tagline="Sfida il campione. Schiva il colpo, spezza la guardia e chiudi con una presa. Nella run si apre chiudendo i nemici in un quadrato di quattro Tesla.",
+	return {id="ring", title="Il Ring delle Ombre", genre="City pop / Rissa 3D",
+		tagline="Una rissa sopra i vicoli al neon. Sfida il campione, schiva il colpo, spezza la guardia e chiudi con una presa.",
 		controls="WASD / stick: muovi   1 / X: pugno   2 / Y: pesante\n3 / RB: presa   Spazio / A: schiva   Shift / LB: para",
 		accent=render.GOTHIC_BLUE, create=ring_minigame_create}
 }
@@ -121,7 +121,7 @@ ring_minigame_draw :: proc(data: rawptr, frame: ^host.Frame) {
 	}
 	v := free_mode_view(&g.session)
 	v.hosted=true
-	render.draw_m9_fight(r,&g.session.ring,v)
+	render.draw_m9_fight(r,&g.session.ring,v,true)
 }
 
 ring_minigame_score :: proc(data: rawptr) -> (i64,u8) {

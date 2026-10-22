@@ -6,9 +6,27 @@ import rl "vendor:raylib"
 import gfx "../engine/gfx"
 import rlgl "vendor:raylib/rlgl"
 import game "../game"
+import campaign "../campaign"
+import expedition "../expedition"
 import grid "../engine/grid"
 import level "../level"
 import view "../engine/view"
+
+EXPEDITION_BENCHMARK :: #config(EXPEDITION_BENCHMARK,false)
+
+// CPU wall time spent preparing/submitting each section; driver stalls may
+// be included. These are deliberately not labelled as GPU execution times.
+Expedition_Draw_Timing :: struct {
+	prepare_ms,cache_lights_ms,reflection_ms,floor_ms,architecture_resolve_ms:f64,
+	objects_ms,ground_ms,target_details_ms,paper_ms,surface_labels_ms:f64,
+}
+
+@(private)
+expedition_benchmark_elapsed :: proc(stamp:^f64)->f64 {
+	when EXPEDITION_BENCHMARK {
+		now:=rl.GetTime();elapsed:=(now-stamp^)*1000;stamp^=now;return elapsed
+	} else {return 0}
+}
 
 Tactical_View :: struct {
 	art: Gothic_Art,
@@ -16,9 +34,30 @@ Tactical_View :: struct {
 	refocus_enabled: bool,
 	camera: rl.Camera3D,
 	draw_frustum: Tactical_Draw_Frustum,
+	draw_timing: Expedition_Draw_Timing,
 	zoom: f32,
 	visible: [game.MAX_TACTICAL_VISION*game.MAX_TACTICAL_VISION]grid.Position,
 	world_orbit, hologram_orbit: Tactical_Orbit,
+	expedition_placement: bool,
+	expedition: bool,
+	expedition_biome: u8,
+	expedition_mounted: bool,
+	expedition_clock: f32,
+	expedition_material: ^Expedition_Material,
+	expedition_floor: ^Expedition_Floor,
+	expedition_direction: game.Move_Direction,
+	expedition_follow: rl.Vector3,
+	expedition_follow_ready: bool,
+	// Exploration's free walker (expedition_walker.odin): set by the scene
+	// each frame; encounters hand the robot back to its cells.
+	expedition_free, expedition_was_free, expedition_player_drawn: bool,
+	expedition_free_position, expedition_free_velocity: view.Vec2,
+	expedition_player_shown, expedition_player_offset: view.Vec2,
+	expedition_stride, expedition_dt: f32,
+	// Sleeping patrols glide between the cells they step to.
+	expedition_patrols: Expedition_Patrol_Glide,
+	// The sites whose floor plans reach this frame's drawn region.
+	expedition_sites: Expedition_Near_Sites,
 	light_shader: rl.Shader,
 	outline_shader: rl.Shader,
 	outline_mode: Comic_Outline_Mode,
@@ -146,6 +185,8 @@ destroy_tactical_assets :: proc(renderer: ^Renderer) {
 	destroy_renderer_world_playback(renderer)
 	destroy_tactical_translucents(renderer)
 	destroy_tactical_surface(renderer)
+	destroy_expedition_material(renderer)
+	destroy_expedition_floor(renderer)
 	destroy_gothic_art(&renderer.tactical.art)
 	gfx.destroy_flipbook_assets(&renderer.tactical.flipbook)
 	gfx.destroy_attack_props(&renderer.tactical.attack_props)
@@ -207,9 +248,12 @@ Tactical_View_Input :: struct {
 update_tactical_view :: proc(renderer: ^Renderer, room: ^game.Room, mouse: view.Vec2, inside: bool, refresh_only: bool = false,
 	input: Tactical_View_Input = {}) {
 	v := &renderer.tactical
+	v.expedition = room.player.tactical.config.expedition
+	v.expedition_biome = room.player.tactical.config.expedition_biome
 	if !refresh_only { v.pointer_window = input.window_mouse }
 	tactical_hud_pointer(renderer, mouse, inside)
 	v.snapshot^ = renderer_presentation_snapshot(renderer, room)
+	update_expedition_walker_view(renderer, refresh_only)
 	update_tactical_hand_reveal(renderer, &v.snapshot.deck)
 	// Before the vision and the camera: in the shadow they follow the pool;
 	// the Lazzo's foe flies where the room's rope swings it, the Pinball's
@@ -240,7 +284,11 @@ update_tactical_view :: proc(renderer: ^Renderer, room: ^game.Room, mouse: view.
 	}
 	lasso_extend_vision(renderer, room)
 	if !v.world_orbit.initialized { reset_tactical_orbit(&v.world_orbit) }
-	if inside && !refresh_only {
+	if room.player.tactical.config.expedition {
+		reset_tactical_orbit(&v.world_orbit)
+		v.world_orbit.distance = 25
+	}
+	if inside && !refresh_only && !room.player.tactical.config.expedition {
 		update_tactical_orbit_pointer(&v.world_orbit, mouse, point_in_rectangle(mouse, tactical_world_bounds(renderer)),
 			input.orbit_pressed, input.orbit_down, input.wheel)
 	}
@@ -254,6 +302,19 @@ update_tactical_view :: proc(renderer: ^Renderer, room: ^game.Room, mouse: view.
 	footprint_scale := 1.1+f32(max(0, size-5))*0.065
 	aim := TACTICAL_SHOWCASE_AIM if v.showcase else TACTICAL_HAND_AIM
 	target := rl.Vector3{p.x+0.5, 0, p.y+0.5}+forward*(aim*footprint_scale*(1-LASSO_CAMERA_AIM*pull))
+	if room.player.tactical.config.expedition {
+		combat_orbit := v.world_orbit
+		combat_orbit.distance *= footprint_scale*(1+LASSO_CAMERA_BACK*pull)
+		target = expedition_combat_camera_target(renderer, combat_orbit, target)
+		if !v.expedition_follow_ready || rl.Vector3Distance(v.expedition_follow, target) > 8 {
+			v.expedition_follow = target
+			v.expedition_follow_ready = true
+		} else if !refresh_only {
+			// Frame-rate independent: a glide reads the same at any refresh.
+			v.expedition_follow = v.expedition_follow+(target-v.expedition_follow)*(1-math.exp(-10*expedition_frame_dt(renderer)))
+		}
+		target = v.expedition_follow
+	}
 	framed_orbit := v.world_orbit
 	framed_orbit.distance *= footprint_scale*(1+LASSO_CAMERA_BACK*pull)
 	v.zoom = framed_orbit.distance*0.65
@@ -378,11 +439,18 @@ tactical_billboard_geometry :: proc(renderer: ^Renderer, key: Sprite_Key, positi
 @(private)
 tactical_billboard :: proc(renderer: ^Renderer, key: Sprite_Key, position: view.Vec2, opacity: f32,
 	entity: game.Entity_Ref = game.SYSTEM_ENTITY) {
+	if renderer.tactical.expedition && entity == game.PLAYER_ENTITY && key == .Player {
+		draw_expedition_robot(renderer, position, opacity)
+		return
+	}
 	quad := tactical_billboard_geometry(renderer, key, position, true, entity)
 	pose := tactical_feedback_pose(renderer, key, position)
 	// Sunk in its shadow the player's card is dark, paper and print alike.
 	shade, seen := tactical_shadow_tint(renderer, entity)
 	if shade != rl.WHITE { pose.tint = shade }
+	if renderer.tactical.expedition && key >= .Chaser && key <= .Demolitionist && pose.tint == rl.WHITE {
+		pose.tint = expedition_enemy_tint(campaign.Biome(renderer.tactical.expedition_biome))
+	}
 	draw_tactical_billboard_quad(renderer, quad, position, opacity*seen, pose.tint, shade)
 }
 
@@ -480,37 +548,70 @@ update_tactical_body_hover :: proc(renderer: ^Renderer, mouse: view.Vec2) {
 	}
 }
 
-draw_tactical_world :: proc(renderer: ^Renderer, room: ^game.Room, active_card: u32) {
+draw_tactical_world :: proc(renderer: ^Renderer, room: ^game.Room, active_card: u32, expedition_world: ^expedition.World = nil) {
 	v := &renderer.tactical
+	when EXPEDITION_BENCHMARK {v.draw_timing={};stamp:=rl.GetTime()}
 	v.draw_frustum = tactical_draw_frustum(v.camera, renderer.canvas_width, renderer.canvas_height)
 	snapshot := v.snapshot
 	preview: Card_Range_Preview
 	prepare_card_range_preview(renderer, room, active_card, &preview)
 	update_ground_fx(renderer, room)
 	lights: [4]rl.Vector4
+	// The surface draws in logical units at its own resolution.
 	surface := begin_tactical_surface(renderer)
-	if surface { rl.BeginMode2D({zoom = 2}) }
+	min_x, min_y := 0, 0
+	max_x, max_y := room.level_data.tiles.width, room.level_data.tiles.height
+	when EXPEDITION_BENCHMARK {v.draw_timing.prepare_ms=expedition_benchmark_elapsed(&stamp)}
+	if expedition_world != nil {
+		p := room.player.position
+		min_x, min_y = max(0, (p.x/16-2)*16), max(0, (p.y/16-2)*16)
+		max_x, max_y = min(max_x, (p.x/16+3)*16), min(max_y, (p.y/16+3)*16)
+		expedition_gather_sites(renderer, expedition_world, {min_x, min_y}, {max_x, max_y})
+		prepare_expedition_material(renderer,room,expedition_world)
+		collect_expedition_edges(renderer,room,expedition_world)
+		prepare_expedition_lights(renderer,room,expedition_world)
+		when EXPEDITION_BENCHMARK {v.draw_timing.cache_lights_ms=expedition_benchmark_elapsed(&stamp)}
+		prepare_expedition_reflection(renderer,room,expedition_world)
+		when EXPEDITION_BENCHMARK {v.draw_timing.reflection_ms=expedition_benchmark_elapsed(&stamp)}
+	}
 	draw_tactical_backdrop(renderer)
-	if surface { rl.EndMode2D() }
-	lights = prepare_diorama_lights(renderer, room)
+	if expedition_world == nil { lights = prepare_diorama_lights(renderer, room) }
 	rl.BeginMode3D(v.camera)
-	draw_voxel_fog(renderer, room)
-	begin_tactical_lighting(renderer, accents = lights)
-
-	for y in 0..<room.level_data.tiles.height {
-		for x in 0..<room.level_data.tiles.width {
+	if expedition_world == nil {draw_voxel_fog(renderer, room)}
+	floor_drawn:=false
+	if expedition_world!=nil {floor_drawn=draw_expedition_floor(renderer,room,expedition_world)}
+	if !floor_drawn {
+		if expedition_world == nil { begin_tactical_lighting(renderer, accents = lights) }
+		else {begin_expedition_material(renderer,expedition_world,floor=true)}
+		for y in min_y..<max_y {
+		for x in min_x..<max_x {
 			cell := grid.Position{x, y}
 			if !tactical_cell_on_screen(renderer, cell) || !tactical_render_visible(renderer, cell) { continue }
 			tile, _ := level.tile_at(room.level_data, cell)
-			draw_tactical_tile(renderer, room, tile, cell, &preview)
+			if expedition_world != nil { draw_expedition_tile(renderer, room, expedition_world, cell, &preview) }
+			else { draw_tactical_tile(renderer, room, tile, cell, &preview) }
 		}
 	}
+		if expedition_world!=nil {rl.EndShaderMode()}
+	}
+	when EXPEDITION_BENCHMARK {v.draw_timing.floor_ms=expedition_benchmark_elapsed(&stamp)}
+	if expedition_world != nil {
+		// Binds its own ink and reveal programs, layer by layer.
+		draw_expedition_architecture(renderer,room,expedition_world)
+		rl.EndMode3D()
+		resolve_expedition_world(renderer)
+		rl.BeginMode3D(v.camera)
+		// Devices, cover and loot placed by cards keep the board's resin light.
+		begin_tactical_lighting(renderer)
+	}
+	when EXPEDITION_BENCHMARK {v.draw_timing.architecture_resolve_ms=expedition_benchmark_elapsed(&stamp)}
 	for obstacle in room.obstacles {
 		if !tactical_cell_on_screen(renderer, obstacle.position) || !tactical_render_visible(renderer, obstacle.position) { continue }
 		draw_voxel_cover(renderer, obstacle.position)
 	}
 
 	for trap in snapshot.traps[:snapshot.trap_count] {
+		if expedition_world != nil && expedition_world.biome == .Vietnam && expedition.distance(room.player.position, trap.position) > 2 { continue }
 		if !trap.armed || !tactical_cell_on_screen(renderer, trap.position) || !tactical_render_visible(renderer, trap.position) { continue }
 		draw_voxel_trap(renderer, trap)
 	}
@@ -524,36 +625,40 @@ draw_tactical_world :: proc(renderer: ^Renderer, room: ^game.Room, active_card: 
 		draw_tactical_loot(renderer, item)
 	}
 	rl.EndShaderMode()
+	when EXPEDITION_BENCHMARK {v.draw_timing.objects_ms=expedition_benchmark_elapsed(&stamp)}
 	draw_ground_decal(renderer, room)
 	draw_fishing_ripples(renderer)
 	draw_lasso_ring(renderer, room)
-	draw_tactical_ground_shadows(renderer, room)
-	draw_diorama_accents(renderer, room)
+	// Static architecture contact shading is cached in the floor map; paper
+	// only needs a small feathered footprint for each visible actor.
+	if expedition_world == nil { draw_tactical_ground_shadows(renderer, room) }
+	else {draw_expedition_contact_shadows(renderer,room,expedition_world)}
+	if expedition_world == nil { draw_diorama_accents(renderer, room) }
 	draw_tactical_clear_markers(renderer, room)
 	draw_card_range_light(renderer, room, &preview)
 	draw_voxel_threats(renderer, room)
 	draw_intent_ground(renderer, room)
 	draw_m8_device_network(renderer, room)
+	draw_memory_device_ranges(renderer, room, active_card)
 	rl.EndMode3D()
+	when EXPEDITION_BENCHMARK {v.draw_timing.ground_ms=expedition_benchmark_elapsed(&stamp)}
 
-	if tactical_telegraphs_are_visible(renderer, room) {
-		if surface { rl.BeginMode2D({zoom = 2}) }
-		if !renderer_blocks_player_input(renderer) {
-			draw_card_target_details(renderer, room, &preview)
-			draw_fishing_target_range(renderer, room, active_card)
-			draw_arrow_aim(renderer, room)
-		}
-
-		if surface { rl.EndMode2D() }
+	if tactical_telegraphs_are_visible(renderer, room) && !renderer_blocks_player_input(renderer) {
+		draw_card_target_details(renderer, room, &preview)
+		draw_fishing_target_range(renderer, room, active_card)
+		draw_arrow_aim(renderer, room)
 	}
+	when EXPEDITION_BENCHMARK {v.draw_timing.target_details_ms=expedition_benchmark_elapsed(&stamp)}
 	// Ground feedback precedes the sorted walls/sprites. Opaque terrain keeps
 	// its depth while the translucent wall bodies reveal visible actors.
 	rl.BeginMode3D(v.camera)
+	if expedition_world != nil { draw_expedition_props(renderer, room, expedition_world) }
 	draw_tactical_actor_bases(renderer)
 	draw_tactical_feedback(renderer, .Ground)
 	draw_tactical_billboards(renderer, room, lights)
 	draw_tactical_feedback(renderer, .Accent)
 	rl.EndMode3D()
+	when EXPEDITION_BENCHMARK {v.draw_timing.paper_ms=expedition_benchmark_elapsed(&stamp)}
 
 	end_tactical_surface(renderer, surface)
 	// The world stands still: without the resolve shader's grade, a cold veil
@@ -563,6 +668,7 @@ draw_tactical_world :: proc(renderer: ^Renderer, room: ^game.Room, active_card: 
 		rl.DrawRectangleRec({0, 0, renderer.canvas_width, renderer.canvas_height}, color_with_opacity({8, 12, 28, 255}, 0.4*v.shadow.frozen))
 	}
 	draw_tactical_annotations(renderer, room)
+	if expedition_world != nil { draw_expedition_labels(renderer, room, expedition_world) }
 	// Keep the Pinball's targeting warning above enemy health tags.
 	draw_pinball_heavy_labels(renderer, room, active_card)
 	draw_tactical_shadow_overlay(renderer)
@@ -577,4 +683,5 @@ draw_tactical_world :: proc(renderer: ^Renderer, room: ^game.Room, active_card: 
 	// The mechanics lab's paper tokens outlive their cues.
 	draw_living_tokens(renderer)
 	draw_fate_tokens(renderer)
+	when EXPEDITION_BENCHMARK {v.draw_timing.surface_labels_ms=expedition_benchmark_elapsed(&stamp)}
 }

@@ -24,8 +24,8 @@ ZOOM_MAX :: f32(15)
 
 // The tower's diorama palette: obsidian, blue slate, ivory cutouts and gold rewards.
 SKY_TOP :: rl.Color{5, 9, 16, 255}
-SKY_HORIZON :: rl.Color{28, 44, 65, 255}
-ABYSS_MID :: rl.Color{16, 28, 43, 255}
+SKY_HORIZON :: rl.Color{62, 77, 105, 255}
+ABYSS_MID :: rl.Color{31, 45, 68, 255}
 ABYSS_DEEP :: rl.Color{7, 12, 21, 255}
 FOG :: rl.Color{24, 39, 58, 235}
 IVORY :: rl.Color{236, 226, 204, 255}
@@ -709,6 +709,14 @@ draw_sky :: proc(v: ^View, width, height: f32) {
 	gfx.draw_vertical_gradient({0, mid, width, height - mid}, ABYSS_MID, ABYSS_DEEP)
 	if h > 12 {
 		gfx.draw_stars(width, h-10, 70, v.time, -v.cam.yaw*12800)
+	}
+	// The abyss is an ocean of slow clouds beneath the floating archipelago.
+	for layer in 0..<3 {
+		for n in -1..<7 {
+			x:=f32(n)*190+math.mod(v.time*(3+f32(layer)*2)-v.cam.yaw*60,190)
+			y:=h+52+f32(layer)*36+math.sin(f32(n)*2.1)*12
+			rl.DrawEllipse(i32(x),i32(y),145,18+f32(layer)*7,{117,149,174,u8(11+layer*3)})
+		}
 	}
 	// A pale moon low over the spires.
 	if x, ok := bearing_x(v, 0.7, width, height); ok {

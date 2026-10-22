@@ -1,8 +1,8 @@
 package ui
 
-import "core:c"
 import "core:math"
 import rl "vendor:raylib"
+import canvas_target "../canvas"
 
 ROUND_SEGMENTS :: 6
 
@@ -31,7 +31,7 @@ render :: proc(ctx: ^Context) {
 			position := rl.Vector2{math.round(cmd.rect.x), math.round(cmd.rect.y)}
 			rl.DrawTextEx(font, ctext, position, sizes[cmd.size], theme.spacing, cmd.color)
 		case .Scissor_Begin:
-			rl.BeginScissorMode(c.int(cmd.rect.x), c.int(cmd.rect.y), c.int(cmd.rect.width), c.int(cmd.rect.height))
+			canvas_target.begin_scissor(cmd.rect.x, cmd.rect.y, cmd.rect.width, cmd.rect.height)
 		case .Scissor_End:
 			rl.EndScissorMode()
 		case .Star:

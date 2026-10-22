@@ -47,11 +47,11 @@ Game :: struct {
 info :: proc() -> host.Minigame_Info {
 	return host.Minigame_Info{
 		id       = "arena",
-		title    = "Arena delle Braci",
-		genre    = "Arena top-down",
-		tagline  = "Resisti alle ondate di creature di brace. Uccisioni rapide alzano la combo. Stelle: vittoria, mezza vita salva, combo alta.",
+		title    = "Arena delle Braci / Orbita",
+		genre    = "Sparatutto spaziale",
+		tagline  = "L'ultimo ricordo: difendi la stazione dalle ondate aliene. Uccisioni rapide alzano la combo. Stelle: vittoria, mezza vita salva, combo alta.",
 		controls = "WASD / stick sinistro: muovi    Mouse / stick destro: mira\nClic sinistro / RT: spara (tieni premuto)\nSpazio, Shift, clic destro / A: scatto invulnerabile\nEsc: pausa",
-		accent   = rl.Color{232, 120, 48, 255},
+		accent   = rl.Color{90, 220, 235, 255},
 		create   = create,
 	}
 }

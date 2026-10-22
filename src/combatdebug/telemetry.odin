@@ -216,8 +216,8 @@ affordable_card_is_in_hand :: proc(room: ^game.Room, definition_id: game.Card_Id
 		return false
 	}
 	deck := &room.player.deck
-	definition, found := game.card_definition_by_id(definition_id)
-	if !found || deck.energy < definition.cost {
+	_, found := game.card_definition_by_id(definition_id)
+	if !found || deck.energy < game.card_energy_cost(room, definition_id) {
 		return false
 	}
 	for index in 0..<deck.hand_count {
@@ -251,7 +251,7 @@ capture_card_descriptor :: proc(
 		card_id = card.id,
 		card_definition = card.definition_id,
 		card_upgrade_level = card.upgrade_level,
-		card_cost = definition.cost,
+		card_cost = game.card_energy_cost(room, card.definition_id),
 	}
 
 	request, has_request := game.card_target_request_from_target(room, definition, target)

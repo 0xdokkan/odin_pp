@@ -45,6 +45,7 @@ equip_reserved_weapon :: proc(room: ^Room) -> bool {
 player_basic_attack_damage :: proc(player: ^Player) -> i32 {
 	if player == nil { return 0 }
 	damage := player.stats.attack
+	if player.tactical.dinosaur_remaining > 0 { damage += player.tactical.dinosaur_power }
 	if definition, found := weapon_definition(player.equipment.weapon.id); found &&
 	   weapon_slot_valid(player.equipment.weapon) { damage = i32(min(i64(max(i32)), i64(damage)+i64(definition.bonus_damage))) }
 	return damage

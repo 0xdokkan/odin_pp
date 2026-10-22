@@ -45,7 +45,7 @@ prepare_card_range_preview :: proc(renderer: ^Renderer, room: ^game.Room, card_i
 	definition, defined := game.card_definition_by_id(card.definition_id)
 	if !defined { return }
 	preview.active, preview.card = true, card
-	preview.affordable = room.player.deck.energy >= definition.cost
+	preview.affordable = room.player.deck.energy >= game.card_energy_cost(room, card.definition_id)
 	at := room.player.position
 	preview.origin = {at.x-game.MAX_TARGETING_RANGE, at.y-game.MAX_TARGETING_RANGE}
 	if definition.targeting.shape != .None {

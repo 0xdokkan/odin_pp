@@ -745,7 +745,8 @@ apply_effect :: proc(room: ^Room, source: Entity_Ref, effect: Effect, report: ^A
 		})
 	case .Gain_Energy:
 		deck := &room.player.deck
-		restored := min(effect.amount, deck.rules.max_energy-deck.energy)
+		amount := effect.amount*(20 if room.player.tactical.config.expedition else 1)
+		restored := min(amount, deck.rules.max_energy-deck.energy)
 		deck.energy += restored
 		record_report_event(report, {
 			kind = .Energy_Gained,

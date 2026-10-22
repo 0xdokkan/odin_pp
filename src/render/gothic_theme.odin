@@ -157,6 +157,7 @@ gothic_text :: proc(renderer: ^Renderer, text: cstring, x, y: f32, size: int, co
 // How gothic_text_fit sets a text in a width: as it is, its letters closed up,
 // a size smaller, or cut short ("...").
 Gothic_Fit :: enum {Fits, Closed, Smaller, Cut}
+GOTHIC_CPU_TEXT_CLIP :: #config(GOTHIC_CPU_TEXT_CLIP,true)
 
 // The size, letter spacing and words gothic_text_fit draws `text` with in
 // `width`, and how it had to fit them.
@@ -176,9 +177,12 @@ gothic_text_fit_plan :: proc(renderer: ^Renderer, text: cstring, width: f32, siz
 
 gothic_text_fit :: proc(renderer: ^Renderer, text: cstring, bounds: rl.Rectangle, size: int, color: rl.Color) {
 	chosen, spacing, label, _ := gothic_text_fit_plan(renderer, text, bounds.width, size)
-	rl.BeginScissorMode(c.int(bounds.x), c.int(bounds.y), c.int(bounds.width), c.int(bounds.height))
-	gothic_text(renderer, label, bounds.x, bounds.y, chosen, color, spacing)
-	rl.EndScissorMode()
+	font,actual:=gothic_font(renderer,chosen)
+	when GOTHIC_CPU_TEXT_CLIP {
+		draw_gothic_text_clipped(font,label,bounds,actual,spacing,color)
+	} else {
+		draw_gothic_text_scissored(font,label,bounds,actual,spacing,color)
+	}
 }
 @(private)
 gothic_wrapped_text :: proc(renderer: ^Renderer, value: string, x, y, width: f32, color: rl.Color) {

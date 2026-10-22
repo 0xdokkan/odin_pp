@@ -52,6 +52,7 @@ Card_Zone :: enum {
 }
 
 Deck_State :: struct {
+	mana: bool,
 	owned:             [MAX_OWNED_CARDS]Card_Instance,
 	owned_count:       int,
 	draw_pile:         [MAX_COMBAT_CARDS]Card_Instance,

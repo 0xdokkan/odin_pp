@@ -1,8 +1,14 @@
-# Development startup for Windows: same contract as run.sh.
-# Usage: .\run.ps1 [game arguments], e.g. .\run.ps1 --seed=0xC0FFEE --fast
+# Same contract as run.sh: optional --release before the game arguments.
+# Usage: .\run.ps1 --release --expedition
 $ErrorActionPreference = 'Stop'
 Set-Location -LiteralPath $PSScriptRoot
 $odin = if ($env:ODIN) { $env:ODIN } else { 'odin' }
 New-Item -ItemType Directory -Path 'build' -Force | Out-Null
-& $odin run src '-o:none' '-out:build/odin_pp.exe' -- @args
+$optimization = 'none'
+$gameArgs = @($args)
+if ($gameArgs.Count -gt 0 -and $gameArgs[0] -eq '--release') {
+    $optimization = 'speed'
+    $gameArgs = @($gameArgs | Select-Object -Skip 1)
+}
+& $odin run src "-o:$optimization" '-out:build/odin_pp.exe' -- @gameArgs
 exit $LASTEXITCODE

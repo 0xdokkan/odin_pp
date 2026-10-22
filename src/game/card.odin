@@ -70,6 +70,7 @@ Card_Id :: enum {
 	Fishing_Rod,
 	Pinball,
 	First_Person,
+	Cannon, Flood, Black_Hole, Bomb_Marley, Dinosaur,
 	Count,
 }
 
@@ -1069,6 +1070,41 @@ CARD_DEFINITIONS := [Card_Id]Card_Definition{
 			amount_per_upgrade = FIRST_PERSON_SECONDS_PER_UPGRADE}, {}, {}, {}},
 		effect_count = 1,
 	},
+	.Cannon = {
+		upgrade_limit = MAX_CARD_UPGRADE_LEVEL, time_cost = 2, traits = {.Board_Device},
+		id = .Cannon, name = "Cannone", rarity = .Uncommon, reward_weight = 45, shop_base_price = 7, cost = 2,
+		targeting = {rule = .Walkable_Cell, cast_range = {.Chebyshev, 1, 5}, shape = .Single, requires_line_of_sight = true, stops_on_wall = true},
+		effects = {{kind = .Deploy_Device, target = .Player, base_amount = 5, amount_per_upgrade = 1, object_kind = .Cannon}, {}, {}, {}},
+		effect_count = 1,
+	},
+	.Flood = {
+		upgrade_limit = MAX_CARD_UPGRADE_LEVEL, time_cost = 2, traits = {.Board_Device},
+		id = .Flood, name = "Inondazione", rarity = .Uncommon, reward_weight = 45, shop_base_price = 7, cost = 2,
+		targeting = {rule = .Walkable_Cell, cast_range = {.Chebyshev, 1, 5}, shape = .Single, requires_line_of_sight = true, stops_on_wall = true},
+		effects = {{kind = .Deploy_Device, target = .Player, base_amount = 2, amount_per_upgrade = 1, object_kind = .Flood}, {}, {}, {}},
+		effect_count = 1,
+	},
+	.Black_Hole = {
+		upgrade_limit = MAX_CARD_UPGRADE_LEVEL, time_cost = 2, traits = {.Board_Device},
+		id = .Black_Hole, name = "Buco Nero", rarity = .Rare, reward_weight = 45, shop_base_price = 7, cost = 3,
+		targeting = {rule = .Walkable_Cell, cast_range = {.Chebyshev, 1, 5}, shape = .Single, requires_line_of_sight = true, stops_on_wall = true},
+		effects = {{kind = .Deploy_Device, target = .Player, base_amount = 2, amount_per_upgrade = 1, object_kind = .Black_Hole}, {}, {}, {}},
+		effect_count = 1,
+	},
+	.Bomb_Marley = {
+		upgrade_limit = MAX_CARD_UPGRADE_LEVEL, time_cost = 2, traits = {.Board_Device},
+		id = .Bomb_Marley, name = "Bomb Marley", rarity = .Rare, reward_weight = 45, shop_base_price = 7, cost = 3,
+		targeting = {rule = .Walkable_Cell, cast_range = {.Chebyshev, 1, 5}, shape = .Single, requires_line_of_sight = true, stops_on_wall = true},
+		effects = {{kind = .Deploy_Device, target = .Player, base_amount = 12, amount_per_upgrade = 1, object_kind = .Bomb_Marley}, {}, {}, {}},
+		effect_count = 1,
+	},
+	.Dinosaur = {
+		upgrade_limit = MAX_CARD_UPGRADE_LEVEL, time_cost = 2,
+		id = .Dinosaur, name = "Dinosauro", rarity = .Rare, reward_weight = 45, shop_base_price = 7, cost = 2,
+		targeting = {rule = .Self},
+		effects = {{kind = .Apply_Status, target = .Player, base_amount = 5, amount_per_upgrade = 1, status = .Shield, duration = 12}, {}, {}, {}},
+		effect_count = 1,
+	},
 	.Count = {id = .Count},
 }
 
@@ -1679,6 +1715,7 @@ evaluate_validated_card_targeting :: proc(
 			return
 		}
 		evaluation.movement = query_entity_movement(room, effect_target, destination)
+		evaluation.movement = low_gravity_movement(room, PLAYER_ENTITY, evaluation.movement)
 		if evaluation.movement_required && evaluation.movement.error != .None {
 			evaluation.error = card_compile_error_from_movement(evaluation.movement.error)
 			return

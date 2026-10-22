@@ -182,9 +182,10 @@ draw_m9_weapon :: proc(renderer: ^Renderer, state: ^shooter.State) {
 	}
 }
 
-draw_m9_fight :: proc(renderer: ^Renderer, state: ^fight.State, v: M9_View) {
+draw_m9_fight :: proc(renderer: ^Renderer, state: ^fight.State, v: M9_View, city:bool=false) {
 	w,h := renderer.canvas_width,renderer.canvas_height
 	rl.DrawRectangleRec({0,0,w,h},RESIN_BACKGROUND)
+	if city {draw_m9_city_sky(w,h)}
 	extent := m9_world_extent(&state.world)
 	camera := rl.Camera3D{position={9,11,14},target={0,0.4,0},up={0,1,0},fovy=max(extent.x,extent.y)*2.55,projection=.ORTHOGRAPHIC}
 	if v.kind==.Ring {
@@ -206,6 +207,7 @@ draw_m9_fight :: proc(renderer: ^Renderer, state: ^fight.State, v: M9_View) {
 		draw_m9_ring_stage(renderer,&state.world)
 	} else {draw_m9_geometry(renderer,&state.world,v.debug)}
 	if lit {rl.EndShaderMode()}
+	if city {draw_m9_city_rooftop()}
 	if extent.x<6 {
 		draw_m9_ring_ropes(&state.world)
 		if v.debug {for solid in state.world.solids[:state.world.solid_count] {

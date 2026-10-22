@@ -206,6 +206,13 @@ player_bump :: proc(room: ^Room, enemy_index: int, aim: grid.Position, rule: Tar
 		spend_player_charge(room, .Fate, room.recent_events)
 	}
 	if venom { spend_player_charge(room, .Venom_Blade, room.recent_events) }
+	if room.player.tactical.dinosaur_remaining > 0 && room.phase == .Combat && entity_exists(room, ref) {
+		step := grid.Position{sign(enemy.position.x-room.player.position.x), sign(enemy.position.y-room.player.position.y)}
+		charge := make_action(.Trigger, PLAYER_ENTITY, entity_target(ref), .Opponent)
+		add_effect(&charge, move_effect(ref, add_position(enemy.position, step)))
+		pushed := resolve_action(room, &charge)
+		if pushed.accepted { append_event_log(room.recent_events, &pushed.events) }
+	}
 	return true
 }
 

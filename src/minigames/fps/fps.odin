@@ -47,9 +47,9 @@ Game :: struct {
 info :: proc() -> host.Minigame_Info {
 	return host.Minigame_Info{
 		id       = "fps",
-		title    = "Cripta delle Rune",
-		genre    = "FPS 3D",
-		tagline  = "Scendi nella cripta, strappa le rune ai suoi guardiani e fuggi dal portale prima che i morti ti reclamino.",
+		title    = "Cripta delle Rune / La casa",
+		genre    = "Casa infestata / FPS",
+		tagline  = "La casa ricorda chi entra. Attraversa le stanze di legno, strappa le rune ai suoi fantasmi e fuggi prima che il ricordo ti reclami.",
 		controls = "Mouse: guarda   WASD / stick: muoviti   Shift: corri   Spazio: salta\nClick SX / RT: bastone runico   Tab: mappa",
 		accent   = {125, 170, 203, 255},
 		create   = create,

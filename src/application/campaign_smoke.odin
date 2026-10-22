@@ -1,0 +1,347 @@
+package application
+
+import "core:fmt"
+import "core:slice"
+import "core:time"
+import rl "vendor:raylib"
+import artifacts "../devtools/artifacts"
+import campaign "../campaign"
+import campaignui "../campaignui"
+import world "../expedition"
+import run "../run"
+import render "../render"
+import game "../game"
+import grid "../engine/grid"
+import level "../level"
+import host "../engine/host"
+import arcade "../memoryarcade"
+import activities "../activities"
+
+hub_prepare_unsaved_expedition :: proc(h:^Campaign_Hub) {
+	campaign.destroy(&h.progress);campaign.initialize(&h.progress)
+	h.slot=0;h.page=.Galaxy;h.path="";h.smoke_expedition=false
+	_=campaign.begin_run(&h.progress,.Cyber,h.options.seed)
+	// The one-shot startup is separate from the screenshot driver.
+	h.first_frame=true
+}
+
+@(private)
+Hub_Capture :: struct { kind:int, frames:int }
+
+@(private)
+hub_after_present :: proc(data:rawptr,frame:^host.Frame) {
+	h:=cast(^Campaign_Hub)data
+	if !h.smoke {return}
+	h.smoke_frame+=1
+	if h.smoke_frame%35!=0 {return}
+	stage:=h.smoke_frame/35-1
+	names:=[11]string{"galassia","deposito","progressi","record","cabinati","cabinati_pagina2","casino","memorie","galassia_completa","galassia_city","slot"}
+	if stage<len(names) {artifacts.screenshot(fmt.ctprintf("odin_pp_hub_%s.png",names[stage]))}
+	switch stage {
+	case 0:
+		campaign.depot_add(&h.progress,campaign.make_item(.Relic,1,i32(game.Relic_Id.Guard_Sigil)))
+		campaign.grid_add(&h.progress.backpack.grid,campaign.make_item(.Healing,3))
+		h.page=.Storage
+	case 1:
+		campaign.discover_secret(&h.progress,.Cyber,12);campaign.discover_secret(&h.progress,.Cyber,13)
+		campaign.discover_secret(&h.progress,.Cyber,14);campaign.discover_secret(&h.progress,.City,14)
+		h.page=.Progress
+	case 2:
+		for b in campaign.Biome.Cyber..<campaign.Biome.Count {h.progress.won[b]=true;h.progress.unlocked[b]=true}
+		for i in 0..<activities.MINIGAME_COUNT {campaign.record_result(&h.progress,i,i64(1250+i*175),u8(1+i%3),true)}
+		h.progress_tab=1;h.progress_page=1
+	case 3:h.page=.Arcade
+	case 4:h.arcade_page=1
+	case 5:h.page=.Casino
+	case 6:h.page=.Memories;h.progress.normal_ending=true
+	case 7:h.page=.Galaxy
+	case 8:h.selected=.City
+	case 9:
+		h.page=.Slots
+		for &status in h.slot_status {status=.Missing}
+		h.slot_status[0]=.Loaded;h.slot_date[0]=time.to_unix_seconds(time.now());h.slot_wins[0]=11;h.slot_biomes[0]=11;h.slot_time[0]=3600
+	case 10:
+		scene:=arcade.casino_create_demo(.Ranch,h.options.seed);scene.after_present=casino_smoke_after_present;host.push(frame,scene)
+	}
+}
+
+@(private)
+casino_smoke_after_present :: proc(data:rawptr,frame:^host.Frame) {
+	// The hub is frozen under the table, so the host frame supplies a stable
+	// elapsed capture interval. Each demo owns an isolated wallet.
+	if frame.index%60!=0 {return}
+	artifacts.screenshot("odin_pp_hub_casino_table.png")
+	host.quit(frame)
+}
+
+EXPEDITION_BENCHMARK :: #config(EXPEDITION_BENCHMARK,false)
+EXPEDITION_BENCHMARK_LAST :: #config(EXPEDITION_BENCHMARK_LAST,50)
+#assert(EXPEDITION_BENCHMARK_LAST>=0 && EXPEDITION_BENCHMARK_LAST<=50)
+@(private)
+EXPEDITION_BENCHMARK_WARMUP :: 20
+@(private)
+EXPEDITION_BENCHMARK_SAMPLES :: 120
+@(private)
+EXPEDITION_BENCHMARK_WALK_SAMPLES :: 240
+@(private)
+Expedition_Benchmark :: struct {
+	frame_ms,draw_ms:[EXPEDITION_BENCHMARK_WALK_SAMPLES]f64,
+	scene_sum:[5]f64,
+	world_sum:[10]f64,
+	geometry_start,geometry_measured:[2]u64,
+	count,post_count:int,
+	post_sum:render.Expedition_Post_Timing,
+}
+Expedition_Capture :: struct {
+	wrapped:host.Scene,
+	frame,stage,held,measured:int,
+	seconds,draw_ms:f64,
+	benchmark:Expedition_Benchmark,
+}
+@(private)
+EXPEDITION_SMOKE_WALK :: 25
+@(private)
+EXPEDITION_SMOKE_ENGAGE :: 26
+@(private)
+EXPEDITION_SMOKE_CENTER :: 27
+@(private)
+EXPEDITION_SMOKE_WORKSHOP :: EXPEDITION_SMOKE_CENTER+12
+
+@(private)
+expedition_benchmark_geometry :: proc(e:^run.Expedition_Session)->[2]u64 {
+	m:=e.rs.iso_renderer.tactical.expedition_material
+	if m==nil {return {}}
+	return {m.geometry.rebuilds,m.geometry.uploads}
+}
+
+// Frame intervals include real update, submission, presentation and any
+// driver stalls. The post breakdown is CPU submission time, never GPU time.
+// Statistics and captures happen after the final measured sample; the next
+// stage discards its warmup, so neither contaminates the reported interval.
+@(private)
+expedition_benchmark_present :: proc(s:^Expedition_Capture,e:^run.Expedition_Session,frame:^host.Frame)->bool {
+	if s.held<=EXPEDITION_BENCHMARK_WARMUP {
+		if s.held==EXPEDITION_BENCHMARK_WARMUP {s.benchmark.geometry_measured=expedition_benchmark_geometry(e)}
+		return false
+	}
+	b:=&s.benchmark;target:=EXPEDITION_BENCHMARK_SAMPLES
+	if s.stage==EXPEDITION_SMOKE_WALK || s.stage==EXPEDITION_SMOKE_ENGAGE {target=EXPEDITION_BENCHMARK_WALK_SAMPLES}
+	b.frame_ms[b.count]=f64(rl.GetFrameTime())*1000;b.draw_ms[b.count]=s.draw_ms;b.count+=1
+	scene:=e.draw_timing;draw:=e.rs.iso_renderer.tactical.draw_timing
+	for ms,i in ([5]f64{scene.view_ms,scene.world_ms,scene.hud_hand_ms,scene.map_ms,scene.effect_ms}) {b.scene_sum[i]+=ms}
+	for ms,i in ([10]f64{draw.prepare_ms,draw.cache_lights_ms,draw.reflection_ms,draw.floor_ms,draw.architecture_resolve_ms,
+		draw.objects_ms,draw.ground_ms,draw.target_details_ms,draw.paper_ms,draw.surface_labels_ms}) {b.world_sum[i]+=ms}
+	if surface:=e.rs.iso_renderer.tactical.surface;surface!=nil && surface.post!=nil {
+		p:=surface.post.timing
+		b.post_sum.reflection_ms+=p.reflection_ms;b.post_sum.reflection_blur_ms+=p.reflection_blur_ms
+		b.post_sum.bloom_ms+=p.bloom_ms;b.post_sum.resolve_ms+=p.resolve_ms;b.post_count+=1
+	}
+	if b.count<target {return false}
+	ordered:=b.frame_ms;values:=ordered[:b.count];slice.sort(values)
+	total:f64;for ms in values {total+=ms}
+	mean:=total/f64(b.count);median:=(values[(b.count-1)/2]+values[b.count/2])*.5
+	p95:=values[(b.count*95+99)/100-1];maximum:=values[b.count-1]
+	draw_ordered:=b.draw_ms;draw_values:=draw_ordered[:b.count];slice.sort(draw_values)
+	draw_total:f64;for ms in draw_values {draw_total+=ms}
+	draw_mean:=draw_total/f64(b.count);draw_p95:=draw_values[(b.count*95+99)/100-1]
+	post_divisor:=f64(max(b.post_count,1));p:=b.post_sum
+	pixels:=[2]int{}
+	if frame.window!=nil {pixels={int(frame.window.canvas.texture.width),int(frame.window.canvas.texture.height)}}
+	fmt.printf("EXPEDITION BENCHMARK stage=%d biome=%d canvas_px=%dx%d samples=%d warmup=%d mean_ms=%.3f median_ms=%.3f p95_ms=%.3f max_ms=%.3f mean_fps=%.2f\n",
+		s.stage,int(e.world.biome),pixels.x,pixels.y,b.count,EXPEDITION_BENCHMARK_WARMUP,mean,median,p95,maximum,1000/max(mean,.000001))
+	fmt.printf("CPU SUBMISSION stage=%d samples=%d wrapped_draw_mean_ms=%.3f wrapped_draw_p95_ms=%.3f reflection_ms=%.3f reflection_blur_ms=%.3f bloom_ms=%.3f resolve_ms=%.3f (post means; not GPU timings)\n",
+		s.stage,b.post_count,draw_mean,draw_p95,p.reflection_ms/post_divisor,p.reflection_blur_ms/post_divisor,p.bloom_ms/post_divisor,p.resolve_ms/post_divisor)
+	frame_divisor:=f64(b.count)
+	fmt.printf("CPU SCENE stage=%d view_ms=%.3f world_ms=%.3f hud_hand_ms=%.3f map_ms=%.3f effect_ms=%.3f (means; nested scopes, not GPU timings)\n",
+		s.stage,b.scene_sum[0]/frame_divisor,b.scene_sum[1]/frame_divisor,b.scene_sum[2]/frame_divisor,b.scene_sum[3]/frame_divisor,b.scene_sum[4]/frame_divisor)
+	fmt.printf("CPU WORLD stage=%d prepare_ms=%.3f cache_lights_ms=%.3f reflection_ms=%.3f floor_ms=%.3f architecture_resolve_ms=%.3f objects_ms=%.3f ground_ms=%.3f target_details_ms=%.3f paper_ms=%.3f surface_labels_ms=%.3f (means; nested scopes, not GPU timings)\n",
+		s.stage,b.world_sum[0]/frame_divisor,b.world_sum[1]/frame_divisor,b.world_sum[2]/frame_divisor,b.world_sum[3]/frame_divisor,b.world_sum[4]/frame_divisor,
+		b.world_sum[5]/frame_divisor,b.world_sum[6]/frame_divisor,b.world_sum[7]/frame_divisor,b.world_sum[8]/frame_divisor,b.world_sum[9]/frame_divisor)
+	geometry:=expedition_benchmark_geometry(e)
+	fmt.printf("GEOMETRY CACHE stage=%d rebuilds_total=%d uploads_total=%d rebuilds_stage_delta=%d uploads_stage_delta=%d rebuilds_measured_delta=%d uploads_measured_delta=%d counter_reset=%v\n",
+		s.stage,geometry[0],geometry[1],i64(geometry[0])-i64(b.geometry_start[0]),i64(geometry[1])-i64(b.geometry_start[1]),
+		i64(geometry[0])-i64(b.geometry_measured[0]),i64(geometry[1])-i64(b.geometry_measured[1]),
+		geometry[0]<b.geometry_start[0] || geometry[1]<b.geometry_start[1])
+	b^={}
+	return true
+}
+
+// A fresh world of biome `b` for the per-biome captures, mounted.
+@(private)
+expedition_smoke_world :: proc(e:^run.Expedition_Session,b:campaign.Biome) {
+	game.destroy_room(&e.rs.room);level.destroy(&e.rs.level_data)
+	_=world.generate(&e.world,&e.rs.level_data,b,e.rs.run_seed)
+	player,_:=game.create_player({max_health=32,attack=2,defense=1});e.rs.run_state.player=player
+	room,_:=game.create_room(&e.rs.level_data,&e.rs.run_state.player,{room_seed=e.rs.run_seed});e.rs.room=room
+	_=game.configure_expedition_combat(&e.rs.room);game.end_expedition_encounter(&e.rs.room)
+	world.prepare_room(&e.world,&e.rs.room)
+	e.rs.room.player.tactical.config.expedition_biome=u8(b);e.rs.room.player.tactical.config.low_gravity=b==.Space
+	e.world.mounted=true
+	e.rs.iso_renderer.tactical.expedition_follow_ready=false
+	render.clear_event_animations(&e.rs.iso_renderer)
+}
+
+// Eight open cells west of a resting patrol: walking east engages it.
+@(private)
+expedition_smoke_before_patrol :: proc(e:^run.Expedition_Session) {
+	w:=&e.world;room:=&e.rs.room
+	for &group in w.groups[:w.group_count] {
+		if !group.patrol || group.active {continue}
+		for member in group.members[:group.count] {
+			if !member.alive || member.deployed {continue}
+			p:=grid.Position{member.enemy.position.x-8,member.enemy.position.y}
+			clear:=true
+			for x in p.x..<member.enemy.position.x {clear=clear && !game.cell_blocks_movement(room,{x,p.y})}
+			if !clear {continue}
+			room.player.position=p;e.rs.iso_renderer.tactical.expedition_follow_ready=false
+			return
+		}
+	}
+}
+
+// The robot just behind a courtyard wall, for the see-through capture.
+@(private)
+expedition_smoke_behind_wall :: proc(e:^run.Expedition_Session) {
+	w:=&e.world;room:=&e.rs.room
+	for &site in w.sites[:w.site_count] {
+		// The boss lair has the tallest walls, which hide the whole robot.
+		if !site.active || site.kind!=.Boss {continue}
+		lo,hi:=world.site_bounds(&site)
+		for y in lo.y..=hi.y {for x in lo.x..=hi.x {
+			p:=grid.Position{x,y}
+			if game.cell_blocks_movement(room,p) {continue}
+			// The camera looks from +x/+z: a wall row there hides the robot.
+			_,a:=world.site_at(w,{x,y+1});_,b:=world.site_at(w,{x+1,y+1})
+			if !a.wall || !b.wall || a.fixture || b.fixture || a.wall_height<2.5 || b.wall_height<2.5 {continue}
+			room.player.position=p;e.rs.iso_renderer.tactical.expedition_follow_ready=false
+			game.end_expedition_encounter(room);clear(&room.enemies)
+			return
+		}}
+	}
+}
+
+expedition_enable_smoke :: proc(scene:^host.Scene) {
+	when EXPEDITION_BENCHMARK {
+		rl.SetTargetFPS(0);rl.ClearWindowState({.VSYNC_HINT})
+		fmt.printfln("EXPEDITION BENCHMARK: target_fps=0 vsync_hint=%v; no screenshots or GPU readbacks; presented-frame intervals plus CPU submission timings.",rl.IsWindowState({.VSYNC_HINT}))
+	}
+	state:=new(Expedition_Capture);state.wrapped=scene^
+	scene^=host.Scene{name="expedition-smoke",data=state,opaque=true,modal=true,update=expedition_capture_update,draw=expedition_capture_draw,after_present=expedition_capture_present,destroy=proc(data:rawptr){s:=cast(^Expedition_Capture)data;s.wrapped.destroy(s.wrapped.data);free(s)}}
+}
+
+@(private)
+expedition_capture_update :: proc(data:rawptr,frame:^host.Frame) {
+	s:=cast(^Expedition_Capture)data;e:=cast(^run.Expedition_Session)s.wrapped.data
+	when EXPEDITION_BENCHMARK {
+		if s.held==0 {s.benchmark.geometry_start=expedition_benchmark_geometry(e)}
+	}
+	if (s.stage==EXPEDITION_SMOKE_WALK || s.stage==EXPEDITION_SMOKE_ENGAGE) && frame.devices!=nil {
+		// The real scene walks with held keys: free roaming end to end, then
+		// on foot toward the boss until its lair engages the robot.
+		keys:=frame.devices^
+		if s.stage==EXPEDITION_SMOKE_WALK {keys.keys_down[.W]=true;keys.keys_down[.D]=true}
+		else {keys.keys_down[.S]=true;keys.keys_down[.D]=true}
+		walk:=frame^;walk.devices=&keys
+		s.wrapped.update(s.wrapped.data,&walk)
+		when !EXPEDITION_BENCHMARK {
+			if s.held%15==0 {fmt.printfln("walk %d/%d: position %.3f %.3f cell %v phase %v mounted %v dt %.4f",s.stage,s.held,e.roam.position.x,e.roam.position.y,e.rs.room.player.position,e.rs.room.phase,e.world.mounted,frame.dt)}
+		}
+		return
+	}
+	e.rs.frame_input.focused=true;e.rs.frame_time=frame.dt
+	render.set_living_cards(&e.rs.iso_renderer,true)
+	render.update_tactical_atmosphere(&e.rs.iso_renderer,frame.dt)
+	_=render.update_renderer_frame_timeline(&e.rs.iso_renderer,frame.dt)
+	if e.inventory_open {_=campaignui.update_inventory(e.progress,e.rs.room.player,&e.inventory,frame,false,false)}
+}
+@(private)
+expedition_capture_draw :: proc(data:rawptr,frame:^host.Frame) {
+	s:=cast(^Expedition_Capture)data
+	when EXPEDITION_BENCHMARK {
+		started:=rl.GetTime();s.wrapped.draw(s.wrapped.data,frame);s.draw_ms=(rl.GetTime()-started)*1000
+	} else {s.wrapped.draw(s.wrapped.data,frame)}
+}
+@(private)
+expedition_capture_present :: proc(data:rawptr,frame:^host.Frame) {
+	s:=cast(^Expedition_Capture)data;e:=cast(^run.Expedition_Session)s.wrapped.data
+	// Walking stages run the real scene long enough to cross several cells.
+	s.frame+=1;s.held+=1
+	when EXPEDITION_BENCHMARK {
+		if !expedition_benchmark_present(s,e,frame) {return}
+	} else {
+		if s.held>5 {s.measured+=1;s.seconds+=f64(rl.GetFrameTime())}
+		if s.held<(150 if s.stage==EXPEDITION_SMOKE_WALK || s.stage==EXPEDITION_SMOKE_ENGAGE else 35) {return}
+		if s.measured>0 {fmt.printf("RENDER TIMING: stage %d, %d frames, %.2f ms/frame\n",s.stage,s.measured,s.seconds*1000/f64(s.measured))}
+	}
+	s.held=0
+	s.measured=0;s.seconds=0
+	when !EXPEDITION_BENCHMARK {
+		if s.stage==0 || s.stage==4 || s.stage==24 {assert(render.expedition_render_smoke_check(&e.rs.iso_renderer),"Native HDR/bloom/reflection validation failed")}
+		names:=[7]string{"bioma","ologramma","mount","zaino","personaggio","scontro","tana"}
+		if s.stage<7 {artifacts.screenshot(fmt.ctprintf("odin_pp_expedition_%s.png",names[s.stage]))}
+		else if s.stage<19 {artifacts.screenshot(fmt.ctprintf("odin_pp_expedition_bioma_%02d.png",s.stage-7))}
+		else if s.stage<23 {artifacts.screenshot(fmt.ctprintf("odin_pp_expedition_poi_%02d.png",s.stage-19))}
+		else if s.stage==23 {artifacts.screenshot("odin_pp_expedition_ologramma_grande.png")}
+		else if s.stage==24 {artifacts.screenshot("odin_pp_expedition_dietro_muro.png")}
+		else if s.stage==EXPEDITION_SMOKE_WALK {artifacts.screenshot("odin_pp_expedition_camminata.png")}
+		else if s.stage==EXPEDITION_SMOKE_ENGAGE {artifacts.screenshot("odin_pp_expedition_ingaggio.png")}
+		else if s.stage==EXPEDITION_SMOKE_WORKSHOP {artifacts.screenshot("odin_pp_expedition_officina_cyber.png")}
+		else if s.stage>EXPEDITION_SMOKE_WORKSHOP {artifacts.screenshot(fmt.ctprintf("odin_pp_expedition_officina_%02d.png",s.stage-EXPEDITION_SMOKE_WORKSHOP))}
+		else {artifacts.screenshot(fmt.ctprintf("odin_pp_expedition_centro_%02d.png",s.stage-EXPEDITION_SMOKE_CENTER))}
+	}
+	when EXPEDITION_BENCHMARK {
+		if s.stage>=EXPEDITION_BENCHMARK_LAST {host.quit(frame);return}
+	}
+	s.stage+=1
+	switch s.stage {
+	case 1:e.map_open=true
+	case 2:e.map_open=false;e.world.mounted=true
+	case 3:
+		rl.SetWindowSize(1100,760)
+		e.world.mounted=false;e.inventory_open=true
+		campaign.grid_add(&e.progress.backpack.grid,campaign.make_item(.Healing,3))
+		campaign.grid_add(&e.progress.backpack.grid,campaign.make_item(.Credits,45))
+		campaign.grid_add(&e.progress.backpack.grid,campaign.make_item(.Relic,1,i32(game.Relic_Id.Guard_Sigil)))
+	case 4:e.inventory.panel=.Character;e.progress.run.points=3
+	case 5:
+		rl.SetWindowSize(1280,720)
+		e.inventory_open=false;e.rs.room.player.position=world.site_world(&e.world.sites[e.world.groups[0].site],{-4,0})
+		_=world.engage(&e.world,&e.rs.room,0)
+	case 6:
+		game.end_expedition_encounter(&e.rs.room);clear(&e.rs.room.enemies)
+		e.rs.room.player.position=e.rs.room.exit_position;e.world.boss_defeated=true
+	case:
+		if s.stage>=7 && s.stage<19 {
+			expedition_smoke_world(e,campaign.Biome(s.stage-7))
+			e.rs.room.player.position=world.site_world(&e.world.sites[2],{-5,0})
+		} else if s.stage>=EXPEDITION_SMOKE_CENTER && s.stage<EXPEDITION_SMOKE_CENTER+12 {
+			// The framing of the biome reference captures: the map's center, mounted.
+			expedition_smoke_world(e,campaign.Biome(s.stage-EXPEDITION_SMOKE_CENTER))
+			side:=world.size(&e.world);e.rs.room.player.position={side/2,side/2}
+		} else if s.stage>=19 && s.stage<23 {
+			indices:=[4]int{2,0,11,3}
+			e.world.mounted=false
+			e.rs.room.player.position=world.site_world(&e.world.sites[indices[s.stage-19]],{-5,0})
+			e.rs.iso_renderer.tactical.expedition_follow_ready=false
+			e.message_timer=0
+			if s.stage==20 {
+				e.rs.room.player.position=world.site_world(&e.world.sites[0],{-2,0})
+				world.tick(&e.world,&e.rs.room,.1)
+			} else {game.end_expedition_encounter(&e.rs.room);clear(&e.rs.room.enemies)}
+		} else if s.stage==23 {rl.SetWindowSize(1024,768);e.map_open=true}
+		else if s.stage==24 {rl.SetWindowSize(1280,720);e.map_open=false;expedition_smoke_behind_wall(e)}
+		else if s.stage==EXPEDITION_SMOKE_WALK {e.rs.room.player.position=e.rs.room.exit_position;e.rs.room.player.position.x-=8;e.rs.iso_renderer.tactical.expedition_follow_ready=false;e.world.mounted=true}
+		else if s.stage==EXPEDITION_SMOKE_ENGAGE {e.world.mounted=false;expedition_smoke_before_patrol(e)}
+		else if s.stage>=EXPEDITION_SMOKE_WORKSHOP && s.stage<EXPEDITION_SMOKE_WORKSHOP+12 {
+			expedition_smoke_world(e,campaign.Biome(s.stage-EXPEDITION_SMOKE_WORKSHOP));e.world.mounted=false;e.message_timer=0
+			for &site in e.world.sites[:e.world.site_count] {
+				if site.kind!=.Workshop {continue}
+				for local in ([3]grid.Position{{0,2},{1,1},{-5,0}}) {
+					p:=world.site_world(&site,local)
+					if !game.cell_blocks_movement(&e.rs.room,p) {e.rs.room.player.position=p;break}
+				}
+				break
+			}
+		} else if s.stage>=EXPEDITION_SMOKE_WORKSHOP+12 {host.quit(frame)}
+	}
+}

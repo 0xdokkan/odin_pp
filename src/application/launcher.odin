@@ -5,6 +5,7 @@ import devtools "../devtools"
 import run_session "../run"
 
 import "core:fmt"
+import "core:os"
 import "core:strings"
 import "core:time"
 import rl "vendor:raylib"
@@ -25,6 +26,7 @@ Launch_Options :: struct {
 	// --smoke-minigame=<id>: play <id> without the intro, capture
 	// odin_pp_<id>.png after a few seconds and quit.
 	smoke_minigame: string,
+	expedition, smoke_expedition, smoke_hub: bool,
 }
 
 split_launch_arguments :: proc(args: []string) -> (Launch_Options, [dynamic]string) {
@@ -32,6 +34,12 @@ split_launch_arguments :: proc(args: []string) -> (Launch_Options, [dynamic]stri
 	rest := make([dynamic]string, 0, len(args))
 	for arg in args {
 		switch {
+		case arg == "--expedition":
+			launch.expedition = true
+		case arg == "--smoke-expedition":
+			launch.expedition, launch.smoke_expedition = true, true
+		case arg == "--smoke-hub":
+			launch.smoke_hub = true
 		case arg == "--run":
 			launch.run = true
 		case strings.has_prefix(arg, "--minigame="):
@@ -60,19 +68,27 @@ run_launcher :: proc(options: Runtime_Options, launch: Launch_Options) {
 	window.title = "Odin PP"
 	h, ok := host.create(host.Config{
 		window          = window,
-		profile_path    = profile_path() if launch.smoke_minigame == "" && !launch.smoke_menu else "",
+		profile_path    = profile_path() if launch.smoke_minigame == "" && !launch.smoke_menu && !launch.smoke_hub && !launch.smoke_expedition else "",
 		enable_audio    = launch.smoke_minigame == "" && !launch.smoke_menu,
 		letterbox_color = render.LETTERBOX_COLOR,
-		force_focus     = launch.smoke_minigame != "",
+		force_focus     = launch.smoke_minigame != "" || launch.smoke_expedition || launch.smoke_hub,
 	})
 	if !ok {
 		fmt.eprintln("could not open the window")
-		return
+		os.exit(2)
 	}
 	defer host.destroy(h)
 	menu := launcher_create(options)
 	menu.smoke = launch.smoke_menu
 	host.push_scene(h, launcher_scene(menu))
+	if launch.expedition || launch.smoke_hub {
+		scene := campaign_hub_scene(options, launch.smoke_hub, launch.smoke_expedition)
+		if launch.expedition && !launch.smoke_expedition {
+			hub := cast(^Campaign_Hub)scene.data
+			hub_prepare_unsaved_expedition(hub)
+		}
+		host.push_scene(h, scene)
+	}
 	if launch.minigame != "" {
 		index := activities.minigame_index_by_id(launch.minigame)
 		if info, found := activities.minigame_info(index); found {
@@ -101,6 +117,7 @@ Launcher :: struct {
 	focus_set:  bool,
 	smoke:      bool,
 	frames:     int,
+	arcade_page: int,
 }
 
 launcher_create :: proc(options: Runtime_Options) -> ^Launcher {
@@ -175,7 +192,7 @@ minigame_smoke_after_present :: proc(data: rawptr, frame: ^host.Frame) {
 	}
 }
 
-@(private = "file")
+@(private)
 launcher_start_run :: proc(l: ^Launcher, frame: ^host.Frame, mechanics_lab := false) {
 	rs := run_session.roguelike_session_new()
 	rs.options = l.options.gameplay
@@ -223,18 +240,18 @@ launcher_update :: proc(data: rawptr, frame: ^host.Frame) {
 	left := ui.cut_left(&area, 304)
 	ui.cut_left(&area, 24)
 	run := ui.panel(ctx, left)
-	ui.label(ctx, ui.cut_top(&run, 22), "L'ASCESA", .Small, p.focus)
-	ui.label(ctx, ui.cut_top(&run, 48), "La Rotta", .Title, p.text)
+	ui.label(ctx, ui.cut_top(&run, 22), "NELLA MEMORIA", .Small, p.focus)
+	ui.label(ctx, ui.cut_top(&run, 48), "Il Creatore", .Title, p.text)
 	ui.cut_top(&run, 8)
-	ui.paragraph(ctx, ui.cut_top(&run, 76), "Carte, dadi e reliquie.\nSette livelli per raggiungere\nil cuore della torre.", .Body, p.text_dim)
+	ui.paragraph(ctx, ui.cut_top(&run, 76), "Esplora ricordi al neon.\nCombatti sul battito.\nEstrai cio che vuoi salvare.", .Body, p.text_dim)
 	start := ui.cut_bottom(&run, 42)
 	ui.cut_bottom(&run, 8)
 	lab := ui.cut_bottom(&run, 32)
 	ui.cut_bottom(&run, 8)
-	ui.paragraph(ctx, run, "Leggi gli intenti. Colpisci sul\nsecondo: la torre nasconde\nsegreti per chi osa.", .Small, p.text_dim)
-	if ui.button(ctx, start, "Inizia l'ascesa", primary = true) {
+	ui.paragraph(ctx, run, "Le cose si perdono.\nCio che scopri rimane.\nLa collina ti aspetta.", .Small, p.text_dim)
+	if ui.button(ctx, start, "Gioca", primary = true) {
 		audio.play(frame.audio, .Confirm)
-		launcher_start_run(l, frame)
+		host.push(frame, campaign_hub_scene(l.options))
 	}
 	// A sandbox for trying new mechanics: an open arena, endless enemies.
 	if ui.button(ctx, lab, "Prova meccaniche") {
@@ -242,9 +259,9 @@ launcher_update :: proc(data: rawptr, frame: ^host.Frame) {
 		launcher_start_run(l, frame, true)
 	}
 
-	count := activities.MINIGAME_COUNT
+	count := min(6, activities.MINIGAME_COUNT-l.arcade_page*6)
 	heading := ui.cut_top(&area, 28)
-	ui.label(ctx, heading, "LE PROVE DELLA TORRE", .Body, p.text)
+	ui.label(ctx, heading, "I CABINATI", .Body, p.text)
 	ui.label(ctx, heading, "Pratica libera", .Small, p.text_dim, .Right)
 	ui.cut_top(&area, 4)
 	if count == 0 {
@@ -252,7 +269,7 @@ launcher_update :: proc(data: rawptr, frame: ^host.Frame) {
 		ui.label(ctx, ui.shrink(area, 40), "Nessun minigioco registrato.", .Body, p.text_dim, .Center)
 	}
 	for i in 0..<count {
-		info, ok := activities.minigame_info(i)
+		info, ok := activities.minigame_info(i+l.arcade_page*6)
 		if !ok {
 			continue
 		}
@@ -263,6 +280,8 @@ launcher_update :: proc(data: rawptr, frame: ^host.Frame) {
 			host.push(frame, info.create(launcher_minigame_config(l)))
 		}
 	}
+
+	if ui.button(ctx, {360, 435, 220, 26}, "Altri cabinati  >") { l.arcade_page = (l.arcade_page+1)%2 }
 
 	// Bottom bar: settings and quit.
 	quit_rect := ui.cut_right(&bottom, 92)
@@ -338,7 +357,7 @@ launcher_draw :: proc(data: rawptr, frame: ^host.Frame) {
 	gfx.draw_stars(w, h*0.6, 24, l.time*0.4)
 	gfx.draw_vignette(w, h, 0.35)
 	ui.draw_text(frame.theme, "ODIN PP", {32, 24}, .Title, p.text)
-	ui.draw_text(frame.theme, "Ogni stanza, una scelta. Ogni prova, una nuova strada.", {34, 72}, .Body, p.text_dim)
+	ui.draw_text(frame.theme, "Il mondo dimentica. La memoria resta.", {34, 72}, .Body, p.text_dim)
 	rl.DrawRectangleRec({32, 99, w-64, 1}, p.border)
 	ui.draw_text(frame.theme, "Mouse / frecce / pad: scegli    Invio: conferma", {32, h-24}, .Small, p.text_dim, false)
 	ui.draw_text_fit(frame.theme, "F11  Schermo intero", {w-230, h-27, 198, 20}, .Small, p.text_dim, .Right)

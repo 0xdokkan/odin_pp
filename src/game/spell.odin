@@ -272,7 +272,12 @@ resolve_played_card_action :: proc(
 	if instance.definition_id != .Fate_Strike && instance.definition_id != .Chain_Lightning && instance.definition_id != .Storm_Crown {
 		action := compiled^
 		tactical_critical_scale(room, &action)
-		return resolve_action(room, &action)
+		report = resolve_action(room, &action)
+		if report.accepted && instance.definition_id == .Dinosaur {
+			room.player.tactical.dinosaur_remaining = 12+f32(instance.upgrade_level)*2
+			room.player.tactical.dinosaur_power = 2+instance.upgrade_level
+		}
+		return
 	}
 	path := query_spell_path(room, instance, target)
 	if path.error != .None || path.count == 0 { return }

@@ -322,7 +322,7 @@ update_run_board_commands :: proc(rs: ^Roguelike_Session, tactical_input_blocked
 	roguelike_finish_room(rs)
 }
 
-@(private = "file")
+@(private)
 update_run_dice_overlay :: proc(rs: ^Roguelike_Session) {
 	dice_cue, has_dice_cue := render.active_presentation_cue(&rs.iso_renderer.timeline)
 	dice_visible := has_dice_cue && dice_cue.started && dice_cue.kind == .Dice_Rolled

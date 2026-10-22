@@ -95,6 +95,8 @@ destroy_borrowed_renderer :: proc(r: ^Renderer) {
 	destroy_renderer_world_playback(r)
 	destroy_tactical_translucents(r)
 	destroy_tactical_surface(r)
+	destroy_expedition_material(r)
+	destroy_expedition_floor(r)
 	forget_attack_fx(r)
 	if v.living_state != nil {
 		living_tokens_free(v.living_state)

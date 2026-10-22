@@ -32,6 +32,9 @@ plan_demolitionist_intent :: proc(
 	predicted_positions: ^[MAX_ENEMIES_PER_ROOM]grid.Position,
 	enemy_count, ordered_index: int, reserved_bombs: []grid.Position,
 ) -> Enemy_Intent {
+	if room.player.tactical.config.expedition {
+		return plan_expedition_boss(room, enemy, origin, predicted_positions, enemy_count, ordered_index, reserved_bombs)
+	}
 	bomb_stages: u32 = 2 if enemy.boss_phase >= 2 else 1
 	if enemy.boss_cycle < bomb_stages {
 		return plan_tactical_bomber(room, enemy, origin, predicted_positions,

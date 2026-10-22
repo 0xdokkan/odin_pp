@@ -7,6 +7,10 @@ import grid "../engine/grid"
 // with the whole world frozen.
 Tactical_Phase :: enum { Decision, Recovery, Resolving, Stunned, Shadow }
 Tactical_Config :: struct {
+	// The open-biome rules: a continuous world beat, no decision deadline.
+	expedition: bool,
+	low_gravity: bool,
+	expedition_biome: u8,
 	timer_seconds: int,
 	vision_size: int,
 	qte_seconds: f32,
@@ -22,6 +26,8 @@ DEFAULT_TACTICAL_CONFIG :: Tactical_Config{timer_seconds = 20, vision_size = 7, 
 // The game as it is played: actions last their cost, the window shrinks.
 GAME_TACTICAL_CONFIG :: Tactical_Config{timer_seconds = 20, vision_size = 7, qte_seconds = 1.2,
 	timed_actions = true, shrinking_window = true}
+EXPEDITION_TACTICAL_CONFIG :: Tactical_Config{expedition = true, timer_seconds = 20, vision_size = 0,
+	qte_seconds = 1.2, timed_actions = true}
 MAX_TACTICAL_VISION :: 9
 TACTICAL_DODGE_RECOVERY :: 2
 
@@ -47,7 +53,13 @@ Tactical_State :: struct {
 	// World time advances in bounded one-second beats; animations never add time.
 	clock_fraction: f32,
 	queued_beats: int,
+	energy_fraction: f32,
+	encounter_beats: u64,
+	environment_beat: u64,
 	facing: Move_Direction,
+	placement_direction: Move_Direction,
+	dinosaur_remaining: f32,
+	dinosaur_power: i32,
 	dodge_recovery: int,
 	metrics: Tactical_Metrics,
 	// On-beat criticals (tactical_beat.odin): beats crossed by real time in
@@ -109,6 +121,12 @@ configure_tactical :: proc(player: ^Player, config: Tactical_Config) -> bool {
 	if player == nil || !valid_tactical_config(config) { return false }
 	player.tactical = {config = config, budget = config.timer_seconds,
 		remaining = f32(config.timer_seconds), facing = .South}
+	if config.expedition {
+		player.deck.mana = true
+		player.deck.rules.max_energy = EXPEDITION_MAX_ENERGY
+		player.deck.rules.energy_regen_per_pulse = 0
+		if player.deck.combat_active { player.deck.energy = EXPEDITION_MAX_ENERGY }
+	}
 	return true
 }
 
@@ -162,8 +180,10 @@ tactical_reset_room_clock :: proc(s: ^Tactical_State) {
 	s.remaining = f32(s.budget)
 	tactical_reset_window_pressure(s)
 	s.dodge_recovery = 0
+	s.dinosaur_remaining, s.dinosaur_power = 0, 0
 	s.clock_fraction = 0
 	s.queued_beats = 0
+	s.energy_fraction, s.encounter_beats = 0, 0
 	s.cast_remaining, s.cast_duration = 0, 0
 	s.action_remaining, s.action_duration = 0, 0
 	tactical_reset_beats(s)
@@ -206,17 +226,18 @@ tactical_tick :: proc(room: ^Room, dt: f32, available: bool, hologram: bool) -> 
 		s.cast_remaining = max(f32(0), s.cast_remaining-elapsed)
 		if s.cast_remaining < 0.00001 { s.cast_remaining = 0 }
 		charged := min(elapsed, s.remaining)
+		if s.config.expedition { charged = 0 }
 		s.remaining = max(f32(0), s.remaining-charged)
 		if s.remaining < 0.00001 { s.remaining = 0 }
 		s.metrics.decision_seconds += f64(charged)
 		if s.cast_remaining == 0 { tactical_refill(room) }
 		// Remainder belongs to the next controller frame: no world catch-up
 		// after a cinematic or a long frame can surprise the player.
-		return s.cast_remaining == 0 && s.remaining == 0
+		return !s.config.expedition && s.cast_remaining == 0 && s.remaining == 0
 	}
 	// The final charged beat can finish on a zero-delta controller frame. A
 	// deadline already reached must still publish its explicit timeout command.
-	if s.remaining <= 0 {
+	if !s.config.expedition && s.remaining <= 0 {
 		if tactical_between_windows(s) { tactical_finish_recovery(room); return false }
 		return true
 	}
@@ -226,7 +247,7 @@ tactical_tick :: proc(room: ^Room, dt: f32, available: bool, hologram: bool) -> 
 		s.action_remaining = max(f32(0), s.action_remaining-dt)
 		if s.action_remaining < 0.00001 { s.action_remaining = 0 }
 	}
-	elapsed := min(dt, max(f32(0), s.remaining))
+	elapsed := dt if s.config.expedition else min(dt, max(f32(0), s.remaining))
 	before := s.clock_fraction
 	tactical_advance_clock(room, elapsed)
 	tactical_note_beat_time(s, before, elapsed)
@@ -235,7 +256,7 @@ tactical_tick :: proc(room: ^Room, dt: f32, available: bool, hologram: bool) -> 
 	s.metrics.decision_seconds += f64(elapsed)
 	if hologram { s.metrics.hologram_seconds += f64(elapsed) }
 	if tactical_between_windows(s) { tactical_finish_recovery(room); return false }
-	return s.remaining <= 0 && !room.tactical_pulse.pending
+	return !s.config.expedition && s.remaining <= 0 && !room.tactical_pulse.pending
 }
 
 // Each continuation owns one bounded event log. Only elapsed world time queues

@@ -86,17 +86,17 @@ enemy_stats :: proc "contextless" (kind: Enemy_Kind) -> Enemy_Stats {
 enemy_name :: proc "contextless" (kind: Enemy_Kind) -> string {
 	switch kind {
 	case .Chaser:
-		return "Spiritelli di brace"
+		return "Sciame alieno"
 	case .Caster:
-		return "Streghe di cenere"
+		return "Torrette orbitali"
 	case .Charger:
-		return "Bruti d'ossidiana"
+		return "Mech corazzati"
 	case .Splitter:
-		return "Melme ardenti"
+		return "Mine a frammentazione"
 	case .Shard:
-		return "Gocce di magma"
+		return "Microdroni"
 	case .Boss:
-		return "Il Signore delle Braci"
+		return "La Nave Madre"
 	}
 	return ""
 }

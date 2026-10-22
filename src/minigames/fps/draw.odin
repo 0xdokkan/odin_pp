@@ -221,39 +221,10 @@ release_model :: proc(v: ^View) {
 // symmetric under transposition: square blocks with an even bevel.
 @(private)
 make_stone_texture :: proc() -> rl.Texture2D {
-	SIZE :: 32
-	BLOCK :: 16
-	img := rl.GenImageColor(SIZE, SIZE, rl.WHITE)
-	hash :: proc(a, b: int) -> int {
-		h := u32(a*73856093) ~ u32(b*19349663)
-		h = (h ~ (h >> 13)) * 0x5bd1e995
-		return int((h ~ (h >> 15)) & 0xffff)
-	}
-	for y in 0..<SIZE {
-		for x in 0..<SIZE {
-			bx, by := x/BLOCK, y/BLOCK
-			ix, iy := x%BLOCK, y%BLOCK
-			v := 221 + hash(bx+by*7, bx*by+3)%10 - 5 + hash(x, y)%5 - 2
-			edge_lo := min(ix, iy)
-			edge_hi := max(ix, iy)
-			if edge_lo == 0 {
-				v = 98 + hash(x, y)%8
-			} else if edge_lo == 1 {
-				v += 24
-			} else if edge_hi == BLOCK-1 {
-				v -= 38
-			}
-			// Sparse chips and cracks.
-			if hash(x*3+1, y*5+2)%193 == 0 {
-				v -= 25
-			}
-			c := u8(clamp(v, 0, 255))
-			rl.ImageDrawPixel(&img, i32(x), i32(y), {c, c, c, 255})
-		}
-	}
+	// Flat paper colour; the house's boards and mouldings are actual geometry.
+	img := rl.GenImageColor(2, 2, rl.WHITE)
 	tex := rl.LoadTextureFromImage(img)
 	rl.UnloadImage(img)
-	rl.SetTextureFilter(tex, .POINT)
 	return tex
 }
 
@@ -263,22 +234,22 @@ voxel_palette :: proc() -> gfx.Voxel_Palette {
 	set :: proc(p: ^gfx.Voxel_Palette, m: Material, c: rl.Color) {
 		p[u8(m)] = c
 	}
-	set(&p, .Floor, {80, 94, 117, 255})
-	set(&p, .Floor_Cracked, {65, 78, 98, 255})
-	set(&p, .Floor_Room_A, {112, 129, 151, 255})
-	set(&p, .Floor_Room_B, {87, 103, 126, 255})
+	set(&p, .Floor, {98, 77, 68, 255})
+	set(&p, .Floor_Cracked, {74, 60, 58, 255})
+	set(&p, .Floor_Room_A, {119, 91, 76, 255})
+	set(&p, .Floor_Room_B, {103, 81, 72, 255})
 	set(&p, .Ceiling, {35, 45, 62, 255})
-	set(&p, .Slate, {107, 123, 147, 255})
-	set(&p, .Slate_Trim, {55, 72, 96, 255})
+	set(&p, .Slate, {78, 102, 100, 255})
+	set(&p, .Slate_Trim, {64, 48, 48, 255})
 	set(&p, .Moss, {91, 111, 123, 255})
 	set(&p, .Moss_Trim, {45, 63, 76, 255})
-	set(&p, .Brick, {110, 109, 126, 255})
-	set(&p, .Brick_Trim, {55, 56, 75, 255})
+	set(&p, .Brick, {117, 84, 91, 255})
+	set(&p, .Brick_Trim, {70, 49, 56, 255})
 	set(&p, .Obsidian, {65, 78, 104, 255})
 	set(&p, .Obsidian_Trim, {36, 48, 69, 255})
 	set(&p, .Glyph, {105, 158, 192, 255})
 	set(&p, .Pillar, {144, 156, 168, 255})
-	set(&p, .Arch, {190, 185, 165, 255})
+	set(&p, .Arch, {170, 143, 116, 255})
 	return p
 }
 
@@ -1133,30 +1104,38 @@ draw_portal :: proc(g: ^Game, cam: rl.Camera3D) {
 // Flush inlays follow solid faces: decoration never suggests a new platform
 // or a collision volume. Only nearby faces are submitted to the renderer.
 @(private)
-draw_crypt_inlays :: proc(g: ^Game, eye: Vec3) {
-	w,v := &g.world,&g.view
-	gfx.lighting_begin(&v.lighting)
+draw_haunted_house :: proc(g: ^Game, eye: Vec3) {
+	w := &g.world
 	for z in max(0,int(eye.z)-13)..<min(w.side,int(eye.z)+14) {
 		for x in max(0,int(eye.x)-13)..<min(w.side,int(eye.x)+14) {
 			if !walkable_xz(w,x,z) { continue }
+			// Flush floorboards: unchanged walking and projectile volumes.
+			for n in 0..<4 {
+				rl.DrawCube({f32(x)+f32(n)*.25,FLOOR_Y+.006,f32(z)+.5},.012,.008,1,{47,36,41,255})
+			}
 			for direction in ([4][2]int{{1,0},{-1,0},{0,1},{0,-1}}) {
 				if walkable_xz(w,x+direction.x,z+direction.y) { continue }
-				p:=Vec3{f32(x)+0.5+f32(direction.x)*0.492, FLOOR_Y, f32(z)+0.5+f32(direction.y)*0.492}
-				width,depth:=f32(1),f32(0.026)
-				if direction.x!=0 { width,depth=depth,width }
-				rl.DrawCube(p+Vec3{0,0.18,0},width,0.085,depth,{40,56,78,255})
-				rl.DrawCube(p+Vec3{0,2.68,0},width,0.045,depth,{91,123,153,255})
-				if (x*3+z*5)%9!=0 { continue }
-				if direction.x!=0 { depth=0.30 } else { width=0.30 }
-				rl.DrawCube(p+Vec3{0,1.63,0},width,0.90,depth,{17,27,43,255})
-				if direction.x!=0 { depth=0.055;width=0.033 } else { width=0.055;depth=0.033 }
-				rl.DrawCube(p+Vec3{0,1.68,0},width,0.54,depth,{117,182,223,255})
-				if direction.x!=0 { depth=0.19 } else { width=0.19 }
-				rl.DrawCube(p+Vec3{0,1.83,0},width,0.045,depth,{134,187,222,255})
+				p:=Vec3{f32(x)+.5+f32(direction.x)*.487,FLOOR_Y,f32(z)+.5+f32(direction.y)*.487}
+				tangent:=Vec3{-f32(direction.y),0,f32(direction.x)}
+				face :: proc(p,tangent:Vec3,along,high:f32,c:rl.Color) {
+					rl.DrawCube(p,.027 if tangent.x==0 else along,high,along if tangent.x==0 else .027,c)
+				}
+				face(p+{0,.67,0},tangent,1,1.22,{64,48,50,255})
+				for n in 0..<4 {face(p+tangent*(f32(n)*.25-.375)+{0,.65,0},tangent,.022,1.10,{108,83,77,255})}
+				for y in ([3]f32{.13,1.30,2.68}) {face(p+{0,y,0},tangent,1,.065,{150,123,106,255})}
+				if (x*3+z*5)%5!=0 {continue}
+				// Uneven ancestral portraits, mounted flat against existing walls.
+				q:=p-Vec3{f32(direction.x)*.022,0,f32(direction.y)*.022}+{0,2.01,0}
+				face(q,tangent,.68,.94,{183,143,96,255})
+				q-=Vec3{f32(direction.x)*.018,0,f32(direction.y)*.018}
+				face(q,tangent,.56,.82,{26,34,45,255})
+				q-=Vec3{f32(direction.x)*.018,0,f32(direction.y)*.018}
+				face(q+{0,-.13,0},tangent,.34,.34,{67,67,78,255})
+				face(q+{0,.14,0},tangent,.22,.28,{137,147,145,255})
+				for sign in ([2]f32{-1,1}) {face(q+tangent*(sign*.055)+{0,.18,0},tangent,.027,.035,{153,235,214,255})}
 			}
 		}
 	}
-	gfx.lighting_end(&v.lighting)
 }
 
 @(private)
@@ -1191,7 +1170,7 @@ view_draw :: proc(g: ^Game, frame: ^host.Frame) {
 	if v.has_model {
 		rl.DrawModel(v.model, {}, 1, rl.WHITE)
 	}
-	draw_crypt_inlays(g,eye)
+	draw_haunted_house(g,eye)
 	draw_enemy_ground_feedback(g,eye)
 	list := new(Draw_List, context.temp_allocator)
 	collect_sprites(g, list, cam)

@@ -77,7 +77,7 @@ query_tesla_ring :: proc(room: ^Room) -> (ring: Tesla_Ring, ok: bool) {
 
 @(private)
 tesla_ring_allows_query :: proc(room: ^Room) -> bool {
-	return room != nil && room.player != nil && room.phase == .Combat && .Tesla_Ring not_in room.player.floor_secrets
+	return room != nil && room.player != nil && room.phase == .Combat && !room.player.tactical.config.expedition && .Tesla_Ring not_in room.player.floor_secrets
 }
 
 @(private)

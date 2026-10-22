@@ -142,6 +142,8 @@ Loot :: struct {
 	kind:     Loot_Kind,
 	amount:   i32,
 	weapon_id: Weapon_Id,
+	// Expedition fishing stores its d4 healing until the physical food is used.
+	healing_amount: i32,
 }
 
 Enemy_Spawn :: struct {
@@ -297,7 +299,7 @@ base_cell_is_walkable :: proc(room: ^Room, position: grid.Position) -> bool {
 		return false
 	}
 	tile, ok := level.tile_at(room.level_data, position)
-	return ok && level.is_walkable(tile.kind)
+	return ok && level.is_walkable(tile.kind) && expedition_bridge_open(room, position)
 }
 
 obstacle_at :: proc(room: ^Room, position: grid.Position) -> bool {
@@ -619,6 +621,8 @@ loot_is_in_magnet_range :: proc(player_position, loot_position: grid.Position) -
 @(private)
 collect_loot_in_magnet_range :: proc(room: ^Room) -> (collected: int) {
 	assert(room != nil && room.player != nil)
+	// The biome owns physical drops and backpack capacity, including healing.
+	if room.player.tactical.config.expedition { return }
 	if room.phase != .Combat && room.phase != .Loot {
 		return
 	}
@@ -875,7 +879,7 @@ try_move_player :: proc(room: ^Room, direction: Move_Direction) -> Action_Result
 		return .Moved
 	}
 
-	outcome := finish_player_combat_command(room, TACTICAL_MOVE_SECONDS)
+	outcome := finish_player_combat_command(room, expedition_step_seconds(room))
 	switch outcome {
 	case .Player_Defeated:
 		return .Player_Defeated

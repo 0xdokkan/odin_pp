@@ -1,6 +1,7 @@
 package render
 
 import game "../game"
+import world "../expedition"
 import grid "../engine/grid"
 import level "../level"
 import view "../engine/view"
@@ -11,8 +12,9 @@ MAX_PRESENTATION_CUES :: game.MAX_GAME_EVENTS
 MAX_PRESENTATION_LOOT :: game.MAX_ENEMIES_PER_ROOM*3
 MAX_PRESENTATION_TRAPS :: game.MAX_TRAPS_PER_ROOM
 MAX_PRESENTATION_GRID_OBJECTS :: game.MAX_GRID_OBJECTS_PER_ROOM
-// One bit a cell of the largest level: the pools on its floor.
-MAX_PRESENTATION_GROUND_CELLS :: level.MAX_GENERATED_ROOM_DIMENSION*level.MAX_GENERATED_ROOM_DIMENSION
+// One bit per cell of the largest legacy room or expedition. Keep this a
+// value: queued before/after snapshots must own independent pool histories.
+MAX_PRESENTATION_GROUND_CELLS :: max(world.MAX_CELLS, level.MAX_GENERATED_ROOM_DIMENSION*level.MAX_GENERATED_ROOM_DIMENSION)
 
 // Values above one slow every cue while preserving their relative rhythm.
 PRESENTATION_TIME_SCALE           :: f32(1.35)
@@ -150,6 +152,8 @@ Presentation_Grid_Object :: struct {
 	detonation_pulse: u64,
 	fuse_pulses: int,
 	device_armed: bool,
+	device_direction: game.Move_Direction,
+	device_target_limit: i32,
 }
 
 // The pools and fires on the floor as the board shows them (game/ground.odin):
@@ -157,7 +161,7 @@ Presentation_Grid_Object :: struct {
 // the Canna da Pesca's water (game/fishing.odin).
 Presentation_Ground :: struct {
 	width: int,
-	pool: [MAX_PRESENTATION_GROUND_CELLS/64]u64,
+	pool: [(MAX_PRESENTATION_GROUND_CELLS+63)/64]u64,
 	fires: [game.MAX_GROUND_FIRES]game.Ground_Fire,
 	fire_count: int,
 	water: [game.MAX_FISHING_WATERS]grid.Position,
@@ -279,7 +283,7 @@ capture_room_presentation :: proc(room: ^game.Room) -> (result: Room_Presentatio
 			kind = object.kind,
 			detonation_pulse = object.detonation_pulse,
 			fuse_pulses = object.fuse_pulses,
-			device_armed = object.device_armed,
+			device_armed = object.device_armed, device_direction = object.device_direction, device_target_limit = object.device_target_limit,
 			position = presentation_position(object.position),
 			health = object.health,
 			max_health = object.max_health,

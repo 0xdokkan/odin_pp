@@ -3,6 +3,7 @@ package render
 import "core:fmt"
 import "core:math"
 import rl "vendor:raylib"
+import canvas_target "../engine/canvas"
 import rlgl "vendor:raylib/rlgl"
 import game "../game"
 import western "../western"
@@ -264,7 +265,7 @@ draw_western_bubble :: proc(renderer: ^Renderer, room: ^game.Room, s: ^western.S
 		panel := layout.panel
 		rl.DrawRectangleRec({panel.x-3, panel.y-3, panel.width+6, panel.height+6}, WESTERN_INK)
 		rlgl.DrawRenderBatchActive()
-		rl.BeginScissorMode(i32(panel.x), i32(panel.y), i32(math.ceil(panel.width)), i32(math.ceil(panel.height)))
+		canvas_target.begin_scissor(panel.x, panel.y, panel.width, panel.height)
 		rlgl.PushMatrix()
 		rlgl.Translatef(panel.x, panel.y, 0)
 		rlgl.Scalef(layout.scale, layout.scale, 1)

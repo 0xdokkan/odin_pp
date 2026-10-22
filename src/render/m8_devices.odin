@@ -9,6 +9,10 @@ import grid "../engine/grid"
 draw_device_card_icon :: proc(id: game.Card_Id, bounds: rl.Rectangle, color: rl.Color) {
     x, y := bounds.x+bounds.width*0.5, bounds.y+bounds.height*0.5
     s := min(bounds.width/52, bounds.height/44)
+    if game.card_requires_orientation(id) || id == .Black_Hole || id == .Bomb_Marley {
+        draw_memory_card_icon(id, bounds, color)
+        return
+    }
     if id == .Shock_Floor {
         for row in 0..<3 { for col in 0..<3 {
             rl.DrawRectangleRec({x+(f32(col)-1)*13*s-5*s, y+(f32(row)-1)*10*s-4*s, 10*s, 8*s}, color)

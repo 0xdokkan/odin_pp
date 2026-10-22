@@ -565,13 +565,25 @@ draw_tactical_hand :: proc(renderer: ^Renderer, room: ^game.Room,
 	if right-left < 640 { left = (renderer.canvas_width-640)*0.5; right = left+640 }
 	rl.DrawRectangleGradientV(0, c.int(top-14), c.int(renderer.canvas_width), c.int(TACTICAL_HAND_HEIGHT+14), {8, 13, 21, 0}, {8, 13, 21, 245})
 	gothic_text(renderer, fmt.ctprintf("ENERGIA %d/%d", deck.energy, deck.rules.max_energy), left+2, top+3, 14, GOTHIC_PAPER)
-	spacing := min(f32(15), f32(60)/f32(max(i32(1), deck.rules.max_energy)))
-	for energy in 0..<int(deck.rules.max_energy) {
-		gothic_inlay(left+110+f32(energy)*spacing, top+11, min(f32(4),spacing*0.35), GOTHIC_BLUE if energy < int(deck.energy) else GOTHIC_STEEL)
+	if room.player.tactical.config.expedition {
+		bar := rl.Rectangle{left+126, top+7, 118, 10}
+		hud_bar(bar, f32(deck.energy)/f32(deck.rules.max_energy), {55, 150, 255, 255})
+		if index, found := game.hand_card_index_by_id(deck, selected); found {
+			cost := game.card_energy_cost(room, deck.hand[index].definition_id)
+			spent := min(cost, deck.energy)
+			portion := bar.width*f32(spent)/f32(deck.rules.max_energy)
+			rl.DrawRectangleRec({bar.x+bar.width*f32(deck.energy-spent)/f32(deck.rules.max_energy), bar.y, portion, bar.height},
+				rl.Color{144, 220, 255, 255} if cost <= deck.energy else rl.Color{240, 86, 100, 255})
+		}
+	} else {
+		spacing := min(f32(15), f32(60)/f32(max(i32(1), deck.rules.max_energy)))
+		for energy in 0..<int(deck.rules.max_energy) {
+			gothic_inlay(left+110+f32(energy)*spacing, top+11, min(f32(4),spacing*0.35), GOTHIC_BLUE if energy < int(deck.energy) else GOTHIC_STEEL)
+		}
 	}
 	// The Canna da Pesca waiting in Exhaust was never played.
 	gothic_text_fit(renderer, fmt.ctprintf("MAZZO %d / SCARTI %d / ESAURITE %d", deck.draw_count, deck.discard_count, game.deck_exhausted_count(deck)), {right-205, top+5, 205, 17}, 10, GOTHIC_MUTED)
-	hint: cstring = ""
+	hint: cstring = "ROTELLA: CARTA / CLIC: GIOCA" if room.player.tactical.config.expedition else ""
 	if selected != 0 {
 		if index, found := game.hand_card_index_by_id(deck, selected); found {
 			definition, _ := game.card_definition_by_id(deck.hand[index].definition_id)
@@ -592,12 +604,15 @@ draw_tactical_hand :: proc(renderer: ^Renderer, room: ^game.Room,
 			if said := pinball_aim_hint(room, evaluation.error); said != "" { hint = said }
 		}
 	}
+	if renderer.tactical.expedition_placement { hint = "ROTELLA: GIRA / CLIC: PIAZZA / DESTRO: TORNA" }
+	if room.player.tactical.dinosaur_remaining > 0 { hint = fmt.ctprintf("DINOSAURO %.0fs / URTO +%d E SPINTA", room.player.tactical.dinosaur_remaining, room.player.tactical.dinosaur_power) }
 	if recovering { hint = "RECUPERO / PUOI MUOVERTI" }
 	if game.tactical_is_stunned(room) { hint = "STORDITO / SOLO CARTE" }
 	if game.tactical_shadow_active(room) { hint = "OMBRA / SOLO PASSI" }
 	// The pivot holds the rope: only a dodge lets go, when one can be made.
 	if game.tactical_lasso_active(room) && !game.tactical_is_casting(room) { hint = lasso_hand_hint(room) }
-	if right-left > 580 { gothic_text_fit(renderer, hint, {left+180, top+5, right-left-398, 17}, 10, GOTHIC_BLUE) }
+	hint_offset := f32(254) if room.player.tactical.config.expedition else 180
+	if right-left > 580 { gothic_text_fit(renderer, hint, {left+hint_offset, top+5, right-left-hint_offset-218, 17}, 10, GOTHIC_BLUE) }
 	// Left to right, each over the edge of the one before in an overlapping
 	// hand; the raised card last, over them all.
 	raised := tactical_hand_raised_card(deck, hovered, selected, dragged)
@@ -606,6 +621,7 @@ draw_tactical_hand :: proc(renderer: ^Renderer, room: ^game.Room,
 			if (card.id == raised) != (pass == 1) { continue }
 			definition, found := game.card_definition_by_id(card.definition_id)
 			if !found { continue }
+			definition.cost = game.card_energy_cost(room, card.definition_id)
 			bounds := tactical_hand_card_bounds(renderer, index, deck.hand_count)
 			visible := tactical_hand_card_visible_width(renderer, index, deck.hand_count)
 			if card.id == raised { bounds, visible = tactical_hand_raised_card_bounds(renderer, index, deck.hand_count), bounds.width }
@@ -618,6 +634,7 @@ draw_tactical_hand :: proc(renderer: ^Renderer, room: ^game.Room,
 	if index, found := game.hand_card_index_by_id(deck, active); found {
 		card := deck.hand[index]
 		definition, _ := game.card_definition_by_id(card.definition_id)
+		definition.cost = game.card_energy_cost(room, card.definition_id)
 		_, effect := tactical_inspector_effect(renderer, room, hovered, selected, dragged)
 		draw_tactical_card_inspector(renderer, card, definition, selected == active, effect, tactical_inspector_effect_ready(renderer, room))
 		if dragged != 0 { gothic_text(renderer, fmt.ctprintf("%s", definition.name), mouse.x+14, mouse.y-18, 16, GOTHIC_PAPER) }

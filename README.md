@@ -1,12 +1,15 @@
 # Odin PP
 
-Roguelike con deck building, simulazione tattica a griglia, ambienti 3D a blocchi
-e personaggi pixel art. Carte, nemici, terreno e dispositivi condividono un
-mondo deterministico; il renderer ne anima gli eventi senza decidere le regole.
-Il menu offre anche sei minigiochi: platform 2D e 3D, arena, FPS, puzzle e ring.
+Roguelike di esplorazione e deck building: dodici biomi aperti, combattimenti
+continui a battito, uno zaino fisico da estrarre e una galassia di ricordi.
+Il mondo è geometrico e al neon; carte e personaggi sono di cartoncino.
+La campagna offre tre salvataggi, un deposito, dodici cabinati e quattro
+giochi del casinò con i crediti raccolti nelle spedizioni.
 
-Il gioco principale usa un solo runtime tattico 3D. Gli alias `--m7`, `--m8` e
-`--m9` restano compatibili; la modalità classica e la vista `--flat` sono ritirate.
+La nuova campagna parte da **Gioca**. La modalità a stanze precedente
+resta accessibile con `--run`; i suoi manuali storici restano consultabili.
+La [checklist della direzione](docs/direzione-implementazione.md) descrive
+le nuove regole, le verifiche e i limiti attuali.
 
 ## Avvio
 
@@ -16,16 +19,20 @@ nella CI è `dev-2026-10:84bc3fc21`. Dalla radice del progetto:
 ```sh
 ./run.sh
 ./run.sh --seed=0xC0FFEE
-./run.sh --run
+./run.sh --expedition   # prova senza slot
+./run.sh --run          # modalità precedente
+./run.sh --release --expedition  # build ottimizzata per giocare
 ```
 
 Su Windows usare `./run.ps1`. `ODIN` può indicare un compilatore alternativo.
 Gli script ricompilano con `-o:none`, evitando l'attesa dell'ottimizzatore
-prima dell'apertura della finestra. Per una build riutilizzabile:
+prima dell'apertura della finestra. `--release`, come primo argomento,
+usa `-o:speed`: la compilazione richiede più tempo, l'esecuzione è ottimizzata.
+Per una build ottimizzata riutilizzabile:
 
 ```sh
 mkdir -p build
-odin build src -o:none -out:build/odin_pp
+odin build src -o:speed -out:build/odin_pp
 ./build/odin_pp
 ```
 
@@ -36,28 +43,41 @@ per i salvataggi sono nel [manuale di avvio](docs/avvio.md).
 
 ## Giocare
 
-Ogni combattimento offre una finestra temporale per agire. Movimento, attacchi
-e carte consumano tempo; i nemici seguono ritmi propri. Un cast ferma il mondo
-mentre consuma il tempo della carta; le animazioni dei dadi fermano anche
-quel timer. Terminato il combattimento, la stanza si illumina e si attraversa
-liberamente per raccogliere il loot e raggiungere l'uscita.
+Esplora il bioma, trova equipaggiamento e carte, sconfiggi il boss e raggiungi
+il portale. Il minigioco finale assegna un bonus: lo zaino viene estratto
+anche se perdi il minigioco. La morte nella spedizione perde lo zaino e la
+serie, ma conserva scoperte e sblocchi. I salvataggi sono automatici.
+
+In combattimento il mondo avanza senza scadenza decisionale. Cast e dadi
+fermano il mondo; l'energia si ricarica soltanto mentre il mondo avanza.
 
 | Input | Azione principale |
 |---|---|
-| `WASD` | movimento; attacco contro un nemico adiacente |
-| trascina una carta | anteprima e giocata sulla griglia |
-| `1`–`8` | seleziona o gioca una carta |
+| `WASD` | esplorazione libera (`W` verso l'alto dello schermo); in combattimento un passo per cella, attacco contro un nemico adiacente |
+| rotella | seleziona la carta; durante il piazzamento la ruota |
+| clic sinistro | piazza/conferma la carta; le carte semplici si giocano subito |
+| clic destro | annulla il piazzamento |
+| `M` | evoca o lascia la cavalcatura fuori dagli scontri |
+| `E` | interagisce con POI, oggetti e portale |
+| `Z` | zaino; il mondo continua durante gli scontri |
+| `U` | personaggio, mazzo e potenziamenti; mette in pausa |
+| `Tab` | miniatura 3D dell'intero bioma, legenda POI e posizione del robot |
+| `I` / Mostra effetto | anteprima isolata della carta selezionata |
 | `F` | Refocus |
-| `Tab` | ologramma; durante il combattimento il tempo continua |
-| clic sui pulsanti dell'HUD | dispositivi, equipaggiamento e personaggio |
-| `Esc` | annulla o chiude la schermata corrente |
-| `P` | pausa della run |
-| `F10` | ritorna al menu, nelle partite avviate dal launcher |
+| `P` / `Esc` | pausa o chiusura della schermata corrente |
+| `F10` | salva e torna all'hub |
 | `F11` | schermo intero |
 
-L'elenco completo dei controlli, i QTE e le regole del tempo sono in
-[Combattimento](docs/regole/combattimento.md). Le schermate di ricompensa,
-negozio e riposo consentono di aprire **Mostra effetto** per provare una carta.
+Nel deposito prepari gli oggetti da portare. Trascina gli oggetti e ruotali
+con la rotella o `R`; tre slot ospitano le reliquie attive. I punti esperienza
+migliorano singole carte dalla scheda personaggio fuori dagli scontri.
+
+Le mappe nuove misurano 160, 192 o 224 celle per lato. I punti d'interesse
+hanno cortili, ingressi e coperture. Fuori dagli scontri il robot si muove
+liberamente; durante gli scontri il pavimento attorno ai combattenti diventa
+una griglia di piastrelle e il movimento torna a celle. I muri che coprono
+il robot o i nemici si diradano per lasciarli vedere. L'ologramma indica aree approssimative dei POI senza mostrare
+i nemici. Le spedizioni già salvate mantengono la loro geografia originale.
 
 ## Documentazione
 

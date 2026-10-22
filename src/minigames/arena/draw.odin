@@ -707,7 +707,7 @@ bake_level :: proc(v: ^Render, w: ^World) {
 	}
 	salt := int(w.config.seed % 100000)
 	rl.BeginTextureMode(v.level)
-	rl.ClearBackground(INK)
+	rl.ClearBackground({0,0,0,0})
 	v.crack_count = 0
 	for y in 0..<MAP_H {
 		for x in 0..<MAP_W {
@@ -716,7 +716,7 @@ bake_level :: proc(v: ^Render, w: ^World) {
 			}
 		}
 	}
-	bake_circle(player_start())
+	orbital_markings(w)
 	for i in 0..<w.portal_count {
 		p := w.portals[i]
 		rl.DrawRing(p, 15, 17, 0, 360, 28, {71, 108, 145, 255})
@@ -868,6 +868,7 @@ bake_wall :: proc(w: ^World, x, y, salt: int) {
 render_draw :: proc(v: ^Render, w: ^World, frame: ^host.Frame, alpha: f32, playing: bool) {
 	view := Vec2{frame.canvas.width, frame.canvas.height}
 	cam := camera.camera2_to_raylib(v.cam, view)
+	draw_orbital_void(view.x,view.y,v.time)
 	rl.BeginMode2D(cam)
 	if v.level.id != 0 {
 		src := rl.Rectangle{0, 0, WORLD_W, -WORLD_H}
@@ -1119,8 +1120,9 @@ draw_player :: proc(v: ^Render, w: ^World, alpha: f32) {
 draw_staff :: proc(v: ^Render, p: ^Player, pos: Vec2) {
 	hand := pos + Vec2{p.aim.x*3, 2}
 	tip := hand + p.aim*17
-	rl.DrawLineEx(hand, tip, 3, {52, 38, 34, 255})
-	rl.DrawLineEx(hand+{0, -1}, tip+{0, -1}, 1, {150, 110, 74, 255})
+	rl.DrawLineEx(hand, tip, 8, IVORY)
+	rl.DrawLineEx(hand, tip, 5, {49,70,91,255})
+	rl.DrawLineEx(hand+p.aim*4, tip, 2, SOUL_BLUE)
 	glow := GOLD
 	for power in Power {
 		if p.power[power] > 0 {
@@ -1144,8 +1146,6 @@ draw_enemy :: proc(v: ^Render, w: ^World, e: ^Enemy, alpha: f32) {
 	if e.kind == .Charger && (e.state == .Windup || e.state == .Attack) {
 		flip = e.facing.x < 0
 	}
-	frames := sprite_frame_count(id)
-	frame := int(e.age*6+f32(e.id)*0.37) % frames
 	squash := Vec2{1, 1}
 	offset: Vec2
 	switch e.kind {
@@ -1175,7 +1175,7 @@ draw_enemy :: proc(v: ^Render, w: ^World, e: ^Enemy, alpha: f32) {
 		squash *= Vec2{1 + 0.12*k, 1 - 0.1*k}
 	}
 	feet := pos + {0, e.radius} + offset
-	gfx.draw_sprite_cutout_feet(v.sprites[id], v.white[id], frame, feet, scale, flip, rl.WHITE, squash)
+	draw_orbital_enemy(e,feet,scale,squash)
 	overlay := rl.Color{}
 	if e.flash > 0 {
 		// Fades out, so sustained fire still shows the sprite underneath.
@@ -1187,9 +1187,7 @@ draw_enemy :: proc(v: ^Render, w: ^World, e: ^Enemy, alpha: f32) {
 	} else if e.kind == .Boss && e.enraged {
 		overlay = alpha_of({255, 80, 40, 255}, 0.15+0.15*math.sin(v.time*10))
 	}
-	if overlay.a > 0 {
-		gfx.draw_sprite_feet(v.white[id], frame, feet, scale, flip, overlay, squash)
-	}
+	if overlay.a > 0 {rl.DrawCircleLinesV(pos,e.radius+3,overlay)}
 	if e.state == .Stunned {
 		for k in 0..<3 {
 			a := v.time*5 + f32(k)*2.1
@@ -1551,7 +1549,7 @@ draw_banner :: proc(v: ^Render, w: ^World, frame: ^host.Frame) {
 		subtitle = fmt.tprintf("Vita residua +%d", b.value)
 		color = GOLD
 	case .Defeat:
-		title = "Sei caduto tra le braci"
+		title = "Segnale perso nello spazio"
 		color = {255, 90, 90, 255}
 	}
 	if b.kind != .Victory && b.kind != .Defeat {

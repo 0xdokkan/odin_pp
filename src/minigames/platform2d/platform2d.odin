@@ -20,8 +20,8 @@ info :: proc() -> host.Minigame_Info {
 	return host.Minigame_Info{
 		id       = "platform2d",
 		title    = "Torre di Cenere",
-		genre    = "Platform 2D",
-		tagline  = "Risali la torre in fiamme fino al portale. Raccogli le braci: il 60% vale due stelle, il 90% senza ferite tre.",
+		genre    = "Inferno / Platform 2D",
+		tagline  = "Dal fondo dell'Inferno risali la torre d'ossidiana fino al portale. Raccogli le braci: il 60% vale due stelle, il 90% senza ferite tre.",
 		controls = "A/D o frecce: muoviti.  Spazio, W o Z: salta (ripremi in aria per il doppio salto).\nShift o X: scatto.  S: scendi dalle sporgenze.  Pad: stick, A salta, X scatta.\nCadi sui nemici per schiacciarli. Contro un muro puoi scivolare e rimbalzare.",
 		accent   = rl.Color{232, 122, 58, 255},
 		create   = create,

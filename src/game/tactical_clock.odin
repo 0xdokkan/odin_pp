@@ -22,7 +22,7 @@ tactical_reset_window_pressure :: proc(s: ^Tactical_State) {
 // Every card played counts toward the next won second.
 @(private)
 tactical_count_card :: proc(room: ^Room) {
-	if room == nil || room.player == nil || room.phase != .Combat { return }
+	if room == nil || room.player == nil || room.phase != .Combat || room.player.tactical.config.expedition { return }
 	s := &room.player.tactical
 	s.cards_toward_second += 1
 	if s.cards_toward_second >= TACTICAL_CARDS_PER_SECOND {
@@ -84,6 +84,10 @@ tactical_schedule_enemy :: proc(room: ^Room, enemy: ^Enemy) {
 	enemy.intent.slowed = 0
 	if index, slowed := status_index(&enemy.statuses, .Slow); slowed { enemy.intent.slowed = enemy.statuses.items[index].potency }
 	enemy.tactical_cooldown = tactical_enemy_intent_seconds(enemy)
+	if room.player.tactical.config.expedition && enemy.archetype==.Chaser && enemy.intent.kind!=.Recover {
+		if room.player.tactical.config.expedition_biome==4 {enemy.tactical_cooldown+=1}
+		if room.player.tactical.config.expedition_biome==9 {enemy.tactical_cooldown=max(f32(1),enemy.tactical_cooldown-1)}
+	}
 }
 
 @(private)
@@ -116,8 +120,10 @@ tactical_finish_recovery :: proc(room: ^Room) {
 @(private)
 tactical_advance_clock :: proc(room: ^Room, seconds: f32) {
 	s := &room.player.tactical
-	elapsed := min(max(f32(0), seconds), max(f32(0), s.remaining))
-	s.remaining = max(f32(0), s.remaining-elapsed)
+	elapsed := max(f32(0), seconds) if s.config.expedition else min(max(f32(0), seconds), max(f32(0), s.remaining))
+	if !s.config.expedition { s.remaining = max(f32(0), s.remaining-elapsed) }
+	expedition_regenerate_energy(room, elapsed)
+	s.dinosaur_remaining = max(f32(0), s.dinosaur_remaining-elapsed)
 	if s.remaining < 0.00001 { s.remaining = 0 }
 	s.clock_fraction += elapsed
 	// The Pinball's ball rolls on the world's every second, an action's cost
@@ -155,7 +161,7 @@ tactical_spend_action_time :: proc(room: ^Room, seconds: f32) {
 // beat cannot accidentally start another window or carry work into the loot.
 tactical_expire_window :: proc(room: ^Room) -> bool {
 	if room == nil || room.player == nil || room.phase != .Combat || room.tactical_pulse.pending ||
-	   room.qte.kind != .None || room.player.tactical.remaining > 0 { return false }
+	   room.qte.kind != .None || room.player.tactical.config.expedition || room.player.tactical.remaining > 0 { return false }
 	s := &room.player.tactical
 	if s.phase != .Decision || s.queued_beats > 0 || s.cast_remaining > 0 { return false }
 	clear_event_log(room.recent_events)

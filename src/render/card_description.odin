@@ -101,6 +101,11 @@ gothic_card_lines :: proc(card: game.Card_Instance) -> (cstring, cstring) {
 	case .Tesla_Coil: return fmt.ctprintf("%d / DISTANZA DANNI", a), fmt.ctprintf("CAMPO: CONSUMA %d TESLA", game.MAX_TESLA_COILS)
 	case .Titan_Grip: return fmt.ctprintf("%d DANNI / LANCIA %d", a, d.effects[1].movement_distance), fmt.ctprintf("INTERROMPE / STORDISCE %ds", d.effects[2].duration)
 	case .Storm_Crown: return fmt.ctprintf("%d DANNI / %d BERSAGLI", a, game.MAX_SPELL_TARGETS), fmt.ctprintf("LEGGENDARIA / RIMBALZO %d", game.SPELL_BOUNCE_RANGE)
+	case .Cannon: return fmt.ctprintf("%d DANNI / 3 BATTITI", a), "LASER / PERFORA" if u > 0 else "4 COLPI / ORIENTABILE"
+	case .Flood: return fmt.ctprintf("%d DANNI / ONDA", a), "SPINGE / RALLENTA"
+	case .Black_Hole: return fmt.ctprintf("%d DANNI / ATTRAE", a), "RAGGIO 3 / 4 IMPULSI"
+	case .Bomb_Marley: return fmt.ctprintf("%d DANNI / RAGGIO 3", a), "ESPLODE FRA 3 BATTITI"
+	case .Dinosaur: return fmt.ctprintf("CAVALCA %ds / +%d URTO", 12+u*2, 2+u), "SCUDO / URTO SPINGE"
 	case .Count: return "", ""
 	}
 	return "", ""

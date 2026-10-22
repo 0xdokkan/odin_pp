@@ -149,7 +149,7 @@ LEVELS := [?]Level_Def{
 		"#o.o#o....#.#",
 		"#############",
 	}},
-	{name = "Il Cuore della Cripta", rank = 5, par = 115, rows = {
+	{name = "Il Cuore della Piramide", rank = 5, par = 115, rows = {
 		"--######--",
 		"--#..@.#--",
 		"###$##.###",

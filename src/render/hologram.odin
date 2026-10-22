@@ -1,9 +1,9 @@
 package render
 
 import "core:fmt"
-import "core:c"
 import "core:math"
 import rl "vendor:raylib"
+import canvas_target "../engine/canvas"
 import rlgl "vendor:raylib/rlgl"
 import game "../game"
 import grid "../engine/grid"
@@ -144,10 +144,9 @@ draw_hologram_chrome :: proc(renderer: ^Renderer, room: ^game.Room) {
 
 draw_hologram :: proc(renderer: ^Renderer, room: ^game.Room) {
 	rlgl.DrawRenderBatchActive()
+	// The surface draws in logical units at its own resolution.
 	surface := begin_tactical_surface(renderer)
-	if surface { rl.BeginMode2D({zoom = 2}) }
 	draw_tactical_backdrop(renderer)
-	if surface { rl.EndMode2D() }
 	orbit := &renderer.tactical.hologram_orbit
 	if !orbit.initialized { reset_tactical_orbit(orbit) }
 	camera := tactical_hologram_camera(renderer, room.level_data.tiles.width, room.level_data.tiles.height, orbit^)
@@ -162,8 +161,7 @@ draw_hologram :: proc(renderer: ^Renderer, room: ^game.Room) {
 		renderer.tactical.outline_mode = previous_outline
 	}
 	viewport := tactical_map_drag_bounds(renderer)
-	if surface { viewport.x *= 2; viewport.y *= 2; viewport.width *= 2; viewport.height *= 2 }
-	rl.BeginScissorMode(c.int(viewport.x), c.int(viewport.y), c.int(viewport.width), c.int(viewport.height))
+	canvas_target.begin_scissor(viewport.x, viewport.y, viewport.width, viewport.height)
 	rl.BeginMode3D(camera)
 	begin_tactical_lighting(renderer, true)
 	draw_hologram_table(renderer, room)

@@ -34,6 +34,20 @@ Movement_Query :: struct {
 	has_blocker: bool,
 }
 
+// Space adds one cell to displacement, never to a voluntary step or teleport.
+// A blocked extra cell leaves the original legal move intact.
+@(private)
+low_gravity_movement :: proc(room: ^Room, source: Entity_Ref, query: Movement_Query) -> Movement_Query {
+	if room == nil || room.player == nil || query.error != .None || query.mode != .Traverse { return query }
+	config := room.player.tactical.config
+	gravity := config.low_gravity && source != query.mover
+	ice := config.expedition && expedition_terrain(config.expedition_biome, query.destination) == .Ice
+	if !gravity && !ice { return query }
+	step := grid.Position{sign(query.destination.x-query.origin.x), sign(query.destination.y-query.origin.y)}
+	extended := query_entity_movement(room, query.mover, add_position(query.destination, step), query.mode)
+	return extended if extended.error == .None else query
+}
+
 @(private = "file")
 movement_actor_blocks :: proc(
 	room: ^Room,
@@ -267,6 +281,7 @@ apply_movement_effect :: proc(
 		effect.movement_mode,
 	)
 	assert(movement_query_is_clear(&query))
+	query = low_gravity_movement(room, source, query)
 
 	from_position := query.origin
 	for index in 0..<query.count {
@@ -305,6 +320,7 @@ apply_movement_effect :: proc(
 // and the Lazzo's foe falling where it was held (lasso.odin).
 @(private)
 trigger_cell_entry :: proc(room: ^Room, target: Entity_Ref, report: ^Action_Report) {
+	expedition_terrain_entry(room, target, report)
 	trigger_shock_floors_on_entry(room, target, &report.events)
 	trigger_cell_hazard(room, target, report)
 	trigger_ground_on_entry(room, target, report)

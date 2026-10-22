@@ -4,6 +4,7 @@ import "core:c"
 import "core:fmt"
 import "core:math"
 import rl "vendor:raylib"
+import canvas_target "../engine/canvas"
 import rlgl "vendor:raylib/rlgl"
 import game "../game"
 import view "../engine/view"
@@ -109,7 +110,7 @@ draw_sheet_chapel :: proc(renderer: ^Renderer) {
 
 @(private = "file")
 draw_character_stage :: proc(renderer: ^Renderer, stage: rl.Rectangle) {
-	rl.BeginScissorMode(c.int(stage.x), c.int(stage.y), c.int(stage.width), c.int(stage.height))
+	canvas_target.begin_scissor(stage.x, stage.y, stage.width, stage.height)
 	defer rl.EndScissorMode()
 	rl.DrawRectangleGradientV(c.int(stage.x), c.int(stage.y), c.int(stage.width), c.int(stage.height), {6, 11, 19, 255}, {2, 4, 8, 255})
 	camera := rl.Camera3D{position = {0.4, 1.3, 5.3}, target = {0, 0.9, -0.2}, up = {0, 1, 0}, fovy = 33, projection = .PERSPECTIVE}

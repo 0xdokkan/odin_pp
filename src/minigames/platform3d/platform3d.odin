@@ -43,8 +43,8 @@ info :: proc() -> host.Minigame_Info {
 	return host.Minigame_Info{
 		id       = "platform3d",
 		title    = "Guglie Sospese",
-		genre    = "Platform 3D",
-		tagline  = "Isole di pietra sospese sull'abisso. Raccogli i frammenti d'anima, risveglia il portale del santuario e non guardare giù.",
+		genre    = "Isola nel cielo / Platform 3D",
+		tagline  = "Il ricordo sopra le nuvole: isole, cristalli e guglie sospese. Raccogli i frammenti d'anima, risveglia il portale del santuario e non guardare giù.",
 		controls = "WASD: muovi   Spazio: salta, anche in aria   Shift: scatto   Q/E o tasto destro: visuale   Rotella: zoom   Pad: stick sinistro, A salta, X/RB scatto, stick destro visuale",
 		accent   = rl.Color{120, 200, 240, 255},
 		create   = create,

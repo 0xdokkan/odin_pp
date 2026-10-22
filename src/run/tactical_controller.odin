@@ -76,7 +76,7 @@ tactical_controller_input :: proc(controller: ^Tactical_Controller, room: ^game.
 		shift = run_down(controls, .Dodge_Modifier),
 		map_input = {mouse = mouse, inside = inside, toggle = run_pressed(controls, .Map), close = run_pressed(controls, .Cancel),
 			reset = run_pressed(controls, .Recenter), pressed = controls.left_pressed, down = controls.left_down,
-			wheel = controls.wheel},
+			wheel = (0 if room != nil && room.player != nil && room.player.tactical.config.expedition else controls.wheel)},
 		fire = controls.left_down, sensitivity = sensitivity,
 	}
 	if controller.look_captured {

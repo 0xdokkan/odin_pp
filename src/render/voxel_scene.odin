@@ -103,6 +103,10 @@ voxel_object_bounds :: proc(kind: game.Grid_Object_Kind, position: view.Vec2) ->
 	case .Fire: width, height = 0.64, 0.7
 	case .Shock_Floor: width, height = 0.88, 0.12
 	case .Tesla_Coil: width, height = 0.64, 1.18
+	case .Cannon: width, height = 0.85, 0.85
+	case .Flood: width, height = 0.85, 0.35
+	case .Black_Hole: width, height = 0.85, 0.65
+	case .Bomb_Marley: width, height = 0.75, 0.9
 	case .Count:
 	}
 	p := rl.Vector3{position.x+0.5, 0.035, position.y+0.5}
@@ -117,6 +121,7 @@ draw_voxel_object :: proc(renderer: ^Renderer, object: Presentation_Grid_Object)
 	tint := GOTHIC_MUTED
 	switch object.kind {
 	case .Shock_Floor, .Tesla_Coil: draw_m8_device_object(renderer, object)
+	case .Cannon, .Flood, .Black_Hole, .Bomb_Marley: draw_memory_device(renderer, object)
 	case .Ice_Block:
 		tint = {102, 151, 162, 255}
 		draw_resin_cube_v(renderer, p, size, tint)

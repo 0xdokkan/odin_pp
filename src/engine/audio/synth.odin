@@ -168,6 +168,7 @@ Music_Mood :: enum u8 {
 	Action,
 	Tense,
 	Calm,
+	Karaoke,
 }
 
 // One bar per chord; each bar has 8 steps (eighth notes).
@@ -190,6 +191,8 @@ mood_pattern :: proc "contextless" (mood: Music_Mood) -> Mood_Pattern {
 		return {bpm = 120, roots = {0, 1, 0, -1, 0, 1, 3, -1}, minor = true, lead = .Saw}
 	case .Calm:
 		return {bpm = 84, roots = {0, 5, 7, 5, 0, 5, 7, 7}, minor = false, lead = .Sine}
+	case .Karaoke:
+		return {bpm = 112, roots = {0, 5, 4, -3, 0, 5, 7, 7}, minor = false, lead = .Triangle}
 	}
 	return {}
 }

@@ -6,6 +6,9 @@ TACTICAL_BOMB_FUSE :: 3
 TACTICAL_BOMB_DAMAGE :: i32(3)
 TACTICAL_BOMBER_RECOVERY :: i32(2)
 TACTICAL_BOMB_LIMIT :: 1
+// The largest authored arena is 29 cells wide and its leash is 20. A
+// forty-cell margin includes every legal pursuit and its flanking routes.
+EXPEDITION_PATH_RADIUS :: 40
 
 Enemy_Path_Goal :: enum {Melee, Archer, Bomber}
 
@@ -85,46 +88,59 @@ enemy_path_heap_pop :: proc(heap, slots, distances: []int, count: ^int) -> int {
 
 @(private)
 rebuild_tactical_enemy_distances :: proc(room: ^Room, distances: []int, goal: Enemy_Path_Goal) {
-	visited := make([]bool, len(distances))
-	costs := make([]int, len(distances))
-	heap := make([]int, len(distances))
-	slots := make([]int, len(distances))
+	tiles := &room.level_data.tiles
+	minimum:=grid.Position{0,0};maximum:=grid.Position{tiles.width-1,tiles.height-1}
+	if room.player.tactical.config.expedition {
+		p:=room.player.position
+		minimum={max(0,p.x-EXPEDITION_PATH_RADIUS),max(0,p.y-EXPEDITION_PATH_RADIUS)}
+		maximum={min(tiles.width-1,p.x+EXPEDITION_PATH_RADIUS),min(tiles.height-1,p.y+EXPEDITION_PATH_RADIUS)}
+	}
+	width,height:=maximum.x-minimum.x+1,maximum.y-minimum.y+1
+	for &distance in distances {distance= -1}
+	local_distances:=make([]int,width*height)
+	visited := make([]bool, width*height)
+	costs := make([]int, width*height)
+	heap := make([]int, width*height)
+	slots := make([]int, width*height)
+	defer delete(local_distances)
 	defer delete(visited)
 	defer delete(costs)
 	defer delete(heap)
 	defer delete(slots)
 	count := 0
-	tiles := &room.level_data.tiles
-	for &distance, i in distances {
-		cell := grid.Position{i%tiles.width, i/tiles.width}
+	for &distance, i in local_distances {
+		cell := grid.Position{minimum.x+i%width, minimum.y+i/width}
 		distance, slots[i] = -1, -1
 		if cell_blocks_movement(room, cell) { visited[i] = true; continue }
 		costs[i] = 1+enemy_terrain_danger(room, cell)
 		if enemy_position_is_goal(room, cell, goal) {
 			distance = 0
 			heap[count], slots[i] = i, count
-			enemy_path_heap_up(heap, slots, distances, count)
+			enemy_path_heap_up(heap, slots, local_distances, count)
 			count += 1
 		}
 	}
 	for count > 0 {
-		best := enemy_path_heap_pop(heap, slots, distances, &count)
-		score := distances[best]
+		best := enemy_path_heap_pop(heap, slots, local_distances, &count)
+		score := local_distances[best]
 		visited[best] = true
-		cell := grid.Position{best%tiles.width, best/tiles.width}
+		cell := grid.Position{best%width, best/width}
 		for step in ([?]grid.Position{{0, -1}, {1, 0}, {0, 1}, {-1, 0}}) {
-			i, ok := grid.index_of(tiles, add_position(cell, step))
-			if !ok || visited[i] { continue }
+			q:=add_position(cell,step)
+			if q.x<0 || q.y<0 || q.x>=width || q.y>=height {continue}
+			i:=q.y*width+q.x
+			if visited[i] { continue }
 			candidate := score+costs[best]
-			if distances[i] >= 0 && candidate >= distances[i] { continue }
-			distances[i] = candidate
+			if local_distances[i] >= 0 && candidate >= local_distances[i] { continue }
+			local_distances[i] = candidate
 			if slots[i] < 0 {
 				heap[count], slots[i] = i, count
 				count += 1
 			}
-			enemy_path_heap_up(heap, slots, distances, slots[i])
+			enemy_path_heap_up(heap, slots, local_distances, slots[i])
 		}
 	}
+	for distance,i in local_distances {distances[(minimum.y+i/width)*tiles.width+minimum.x+i%width]=distance}
 }
 
 @(private = "file")

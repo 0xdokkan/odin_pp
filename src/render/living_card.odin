@@ -194,9 +194,16 @@ living_travel_lift :: proc(kind: gfx.Living_Travel, u: f32) -> f32 {
 }
 
 // Where the card stands now: on its cell, or partway through its slide; and
-// how far it is off the board (a hop, the Lazzo's rope: lasso.odin).
+// how far it is off the board (a hop, the Lazzo's rope: lasso.odin). The
+// expedition's robot glides while exploring (expedition_walker.odin).
 @(private)
 living_card_position :: proc(renderer: ^Renderer, entity: game.Entity_Ref, key: Sprite_Key, position: view.Vec2) -> (at: view.Vec2, lift: f32) {
+	if entity == game.PLAYER_ENTITY && renderer.tactical.expedition { return expedition_player_position(renderer, key, position) }
+	return living_card_slide_position(renderer, entity, key, position)
+}
+
+@(private)
+living_card_slide_position :: proc(renderer: ^Renderer, entity: game.Entity_Ref, key: Sprite_Key, position: view.Vec2) -> (at: view.Vec2, lift: f32) {
 	at = position
 	lift = tactical_lasso_lift(renderer, entity)
 	if !renderer.tactical.living || renderer.tactical.living_state == nil { return }
@@ -374,7 +381,7 @@ living_observe :: proc(renderer: ^Renderer, state: ^Living_State, room: ^game.Ro
 				slot.cause, slot.shot = .Move, false
 				clip := &sheet.clips[slot.action]
 				// The card goes from wherever it stands now, at the push.
-				here, _ := living_card_position(renderer, actor.entity, flipbook_key(character), from)
+				here, _ := living_card_slide_position(renderer, actor.entity, flipbook_key(character), from)
 				slot.slide_from, slot.slide_to = here, to
 				slot.slide_kind = clip.travel if clip.travel != .None && !pushed else .Dash
 				slot.slide_start = clock+(f64(clip.travel_start)/1000 if clip.travel != .None && !pushed else 0)

@@ -18,7 +18,15 @@ screenshot :: proc(name: cstring) {
 		fmt.eprintln("Cannot create capture directory:", DIRECTORY)
 		return
 	}
-	rl.TakeScreenshot(fmt.ctprintf("%s/%s", DIRECTORY, name))
+	// raylib 6's TakeScreenshot multiplies the already-physical render size
+	// by the Retina scale again. Read the measured framebuffer directly, so
+	// captures retain native pixels without three black overflow quadrants.
+	image:=rl.LoadImageFromScreen()
+	if !rl.IsImageValid(image) {fmt.eprintln("Cannot read screenshot framebuffer");return}
+	defer rl.UnloadImage(image)
+	if !rl.ExportImage(image,fmt.ctprintf("%s/%s",DIRECTORY,name)) {
+		fmt.eprintln("Cannot write screenshot:",name)
+	}
 }
 
 write_report :: proc(name: string, bytes: []u8) -> bool {

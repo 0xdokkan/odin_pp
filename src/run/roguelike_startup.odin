@@ -83,6 +83,8 @@ roguelike_attach :: proc(rs: ^Roguelike_Session, window: ^app.Window) -> Session
 	rs.iso_renderer = render.create(rs.window.config.canvas_width, rs.window.config.canvas_height)
 	rs.iso_renderer.tactical.perspective = rs.options.perspective
 	render.create_tactical_assets(&rs.iso_renderer, rs.window.canvas)
+	// The window reallocates its canvas when the display size changes.
+	render.follow_tactical_canvas(&rs.iso_renderer, &rs.window.canvas)
 	rs.dice_renderer.theme = &rs.iso_renderer
 	sprite_manifest := rs.options.sprite_manifest
 	if len(sprite_manifest) == 0 { sprite_manifest = "assets/sprites.json" }
