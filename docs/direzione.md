@@ -2,7 +2,7 @@
 
 # Direzione del gioco
 
-Documento di direzione, versione 1.14 (22 ottobre 2026). Fissa dove va il gioco in
+Documento di direzione, versione 1.15 (22 ottobre 2026). Fissa dove va il gioco in
 quattro ambiti: **Mappa**, **Progressione**, **Gameplay** e **Design**. Gli altri
 documenti descrivono il gioco di oggi e restano validi finché una fase della
 [roadmap](#6-roadmap) non ne sostituisce le regole.
@@ -998,6 +998,86 @@ dal T-Rex, Karaoke, Elicottero, Discesa e Duello a mezzogiorno.
 - **Minigioco.** Arena delle Braci, riletta come sparatutto spaziale.
 - **Carte di casa.** Buco Nero, Cannone laser.
 
+### 4.4 Level design document (è ancora da implementare)
+
+La struttura della mappa di ogni bioma: dove stanno l'ingresso, i POI, il boss,
+i rilievi e i sentieri. Vale per tutti i biomi; ognuno la riveste con le sue
+forme, il suo terreno e i suoi nemici ([4.3](#43-i-biomi-bozze)).
+
+#### I tre POI ai lati
+
+- **Tre POI maggiori, al centro di tre lati della mappa:** uno a sinistra, uno a
+  destra e uno in alto. Il quarto lato, in basso, è quello da cui entra il
+  robot *(per ora)*.
+- **Uno dei tre è il POI del boss.** Non è fisso: all'inizio di ogni run il boss
+  viene messo a caso in uno dei tre. Se in una run del Far West il boss è sul
+  lato destro, nella run dopo nello stesso bioma può essere a sinistra o in
+  alto.
+- **La scelta viene dal seed della run**, come il resto del contenuto
+  variabile; la geografia attorno ai tre POI resta fissa.
+- **Cambia due regole di oggi:** la tana del boss esce dalla geografia fissa
+  ([1.1](#11-il-bioma-come-mappa-aperta)), e l'ologramma la segna dall'inizio
+  della run, dovunque sia toccata ([1.6](#16-boss-ed-estrazione)).
+- **Ancora da decidere:** che cosa ospitano i due lati senza il boss, e come si
+  riconosce dal mondo quale dei tre è il suo.
+
+#### Level design strutturato da IA
+
+La struttura che l'IA ha applicato ai biomi nello sviluppo di prova (poi
+rimosso dal progetto). Resta qui come riferimento e base di partenza; la regola
+dei tre POI ai lati la sostituisce dove le due non vanno d'accordo (la tana del
+boss fissa a nord).
+
+- **Forma.** Un'isola quadrata dagli angoli arrotondati che finisce nel vuoto,
+  senza muri. Il bordo è irregolare, fra l'86 % e il 100 % del raggio, sempre
+  uguale per lo stesso bioma. Lato: 80 celle nella Robotica cibernetica, 84 nei
+  primi biomi dei rami, 88 nei secondi, 92 nei terzi, 96 nello Spazio, 72 nel
+  bioma segreto.
+- **Ingresso e tana.** L'ingresso è a sud, all'80 % del raggio dal centro; la
+  tana del boss è a nord, al 74 %, in una radura libera di raggio 5 con il
+  portale di estrazione al centro.
+- **Siti.** Quindici in tutto, ciascuno su una radura libera di raggio 3:
+  - *Dodici aperti*, entro il 66 % del raggio, ad almeno 11 celle l'uno
+    dall'altro (la distanza cala di una cella alla volta, fino a 6, se l'isola
+    è troppo piena). Ricevono il tipo secondo la distanza dall'ingresso, dal
+    più vicino: Cache, Nido, Archivio, Fonte, Nido, Cache, Officina, Nido,
+    Archivio, Cache, Nido, Prova.
+  - *Tre segreti* (una Cache, un Archivio, una Prova con l'elite dormiente),
+    entro l'80 % del raggio, fuori dai sentieri, chiusi da un anello di roccia
+    con un solo varco rivolto verso l'esterno dell'isola.
+- **Sentieri.** Linee dritte larghe due celle, dall'ingresso a ogni sito aperto
+  e alla tana; le rocce non le occupano mai.
+- **Rilievi.** Grappoli di roccia sparsi (uno ogni 45 celle nella Robotica, più
+  radi o più fitti negli altri biomi), fatti di brevi cammini casuali e, una
+  volta su sette circa, di monoliti 2×2. Sopra, le forme del bioma:
+  - Deserto del far west: canyon, pareti lunghe 8–18 celle e spesse 2, con
+    pochissime altre rocce;
+  - City pop: isolati di 3–5 celle su una griglia di 7, separati da vicoli;
+  - Antico Egitto: piramidi quadrate di lato 3–6;
+  - Montagne innevate: creste, lunghe catene di roccia;
+  - Giungla preistorica: grappoli fitti; Southern gothic: radi;
+  - Isola nel cielo: canali di vuoto che tagliano l'isola, attraversati dai
+    sentieri come ponti;
+  - Spazio: crateri di vuoto fra gli asteroidi.
+- **Nessuna sacca chiusa.** Ogni cella che dall'ingresso non si raggiunge
+  diventa roccia; un sito rimasto tagliato fuori riceve un passaggio scavato
+  fino all'ingresso.
+- **Terreno.** Macchie del terreno del bioma, sempre le stesse: piastre singole
+  nella Robotica, grandi macchie di erba, palude, risaie e ghiaccio, sabbie
+  mobili più piccole, fiumi di lava nell'Inferno. Mai sull'ingresso, sulla tana
+  e al centro dei siti.
+- **Contenuto dal seed della run.**
+  - Un sito aperto su sette resta vuoto, ma i Nidi attivi sono almeno due.
+  - Metà delle Cache e un Archivio su tre hanno 1–2 guardie.
+  - Ogni Nido manda 2–3 ondate da 2–3 nemici.
+  - Ogni Prova ha un elite (un bruto o un custode resistente 2,2 volte) con una
+    scorta.
+  - Il boss ha due guardie.
+  - Quattro pattuglie da 2–4 nemici camminano nelle pianure, lontano dai siti
+    e dall'ingresso; nel Southern gothic c'è in più il Killer.
+- **Difficoltà.** I nemici sono più forti con il bioma e, dentro il bioma, fino
+  alla metà in più con la distanza dall'ingresso.
+
 ## 5. Decisioni
 
 ### Prese
@@ -1077,6 +1157,7 @@ Restano aperte solo le scelte per cui non c'è ancora un'idea.
 |---|---|
 | Nomi del robot, del creatore, dell'hub e dei biomi | da scegliere |
 | Carte di casa delle Montagne innevate | da scegliere |
+| I due lati senza boss ([4.4](#44-level-design-document-è-ancora-da-implementare)) | che cosa ospitano, e come si riconosce il lato del boss |
 
 ## 6. Roadmap
 
