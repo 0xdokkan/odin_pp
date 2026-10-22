@@ -2,7 +2,7 @@
 
 # Direzione del gioco
 
-Documento di direzione, versione 1.9 (22 ottobre 2026). Fissa dove va il gioco in
+Documento di direzione, versione 1.10 (22 ottobre 2026). Fissa dove va il gioco in
 quattro ambiti: **Mappa**, **Progressione**, **Gameplay** e **Design**. Gli altri
 documenti descrivono il gioco di oggi e restano validi finché una fase della
 [roadmap](#6-roadmap) non ne sostituisce le regole.
@@ -51,6 +51,7 @@ bioma e porta a casa ciò che ha raccolto. Se muore perde lo zaino, ma ciò che 
 | Scoperta | una carta resa ottenibile nelle run future, senza ottenerla subito |
 | Pool | le carte che possono comparire in premi e offerte di una run |
 | Punti potenziamento | quelli che dà ogni livello della run; si spendono per migliorare le carte del mazzo |
+| Energia | la barra blu, come una stamina o un mana, da cui le carte pagano il loro costo |
 | Estrazione | l'uscita dal bioma dopo il boss: minigioco e ritorno all'hub con lo zaino |
 | Serie | le run vinte di fila senza morire |
 | Slot | uno dei tre salvataggi: una partita intera, salvata di continuo |
@@ -461,8 +462,28 @@ lo Spazio si accendono solo quando gli altri dieci biomi sono vinti.
   (diagonale solo sul battito, urto doppio, carte x1,5 e così via). Cambia solo
   il riferimento: non più il secondo del conto alla rovescia ma il battito del
   mondo, che l'HUD mostra.
-- **Il resto non cambia**: le azioni costano tempo, il cast di una carta ferma il
-  mondo, i dadi sono una pausa, l'energia si rigenera di 1 ogni 3 s fino a 3.
+- **Restano**: le azioni costano tempo, il cast di una carta ferma il mondo, i
+  dadi sono una pausa.
+- **L'energia diventa una barra blu**, come una stamina, ma blu perché è un
+  mana. Il giocatore la gestisce: spendere tutto in una carta forte o tenersi
+  margine per quelle piccole.
+  - *Il costo* di ogni carta dipende dalla sua efficacia: le carte deboli costano
+    poco, le più forti molto. *(proposta: una barra da 100 punti; costi da 10 a
+    70, per esempio Strike 15, Cannone 40, Buco Nero 60, Bomb Marley 70; tutte le
+    carte vanno ritarate)*
+  - *Si ricarica* durante lo scontro, sull'orologio del mondo: si ferma quando il
+    mondo è fermo (cast, dadi, pausa) *(proposta: 8 punti al secondo)*. Si
+    ricarica anche con i consumabili.
+  - *Una carta si gioca* solo se nella barra c'è tutto il suo costo.
+  - *All'inizio di ogni scontro* la barra è piena; fuori dagli scontri non si
+    ricarica né si spende *(proposta)*.
+  - *Gli effetti* che oggi danno energia (carte, reliquie come Swift Soles)
+    riempiono la barra di una quantità di punti *(proposta: 20 punti per
+    ogni energia di oggi)*.
+  - *L'HUD* mostra la barra blu al posto delle tacche; scegliendo una carta, la
+    parte che costerebbe si accende sulla barra.
+  - *Un potenziamento* migliora l'effetto della carta, non il suo costo, salvo
+    le carte che lo dicono *(proposta)*.
 - **La mano.**
   - All'inizio dello scontro si pescano 5 carte.
   - Senza finestre la mano si ricarica in un altro modo *(proposta: una carta
@@ -565,6 +586,7 @@ NESSUNA CARTA ── rotella ──► CARTA SCELTA ── rotella ──► la 
 | rotta a DAG di stanze (Choose_Path) e stanze da 17×11 a 45×31 | una mappa aperta per bioma; le famiglie di stanza (Pilastri, Anello, Corti gemelle, Asimmetrica) diventano layout dei POI |
 | finestra a tempo, `--decision-time`, stordimento a tempo scaduto | via; resta l'orologio dei battiti per nemici e critici |
 | fog, `--vision`, zoom e rotazione della camera | via; camera fissa |
+| energia a tacche (3 al massimo, 1 ogni 3 s), carte che costano da 0 a 3 | una barra blu che si ricarica nello scontro e con i consumabili; ogni carta costa in base alla sua efficacia |
 | rotella: zoom della camera, e mira dell'Inondazione e del Cannone | rotella: sceglie le carte della mano; nel piazzamento gira l'oggetto |
 | reliquia iniziale fra tre, reliquie per la run | reliquie come oggetti dello zaino, portate da casa o trovate; ne funzionano tre alla volta, nei posti attivi |
 | Shop, Rest, Event, Treasure | POI: Officina, Fonte, eventi, Cache |
@@ -593,8 +615,8 @@ NESSUNA CARTA ── rotella ──► CARTA SCELTA ── rotella ──► la 
 - **Personaggi e oggetti** restano di **cartoncino**: stampa pixel art con
   inchiostro e bordo di carta, come le carte vive, le bombe di Marley, la palla
   del cannone e i dinosauri.
-- **Carte e HUD** restano come sono: la carta nel vuoto digitale è l'identità
-  visiva.
+- **Carte e HUD** restano come sono, salvo l'energia, che diventa la barra blu:
+  la carta nel vuoto digitale è l'identità visiva.
 - **La galassia dell'hub** usa gli stessi materiali del mondo: isolette di
   roccia nera sfaccettata con gli spigoli al neon, stelle di neon, nessuna
   texture; sopra le isole, insegne e cartellini di cartoncino.
@@ -901,6 +923,7 @@ I sette minigiochi di oggi trovano tutti un bioma; ne servono cinque nuovi
 | Salvataggi | tre slot avviabili; in ogni slot un solo salvataggio, aggiornato quasi sempre; gli slot non si copiano, si possono solo cancellare |
 | Biomi | undici bozze ([4.3](#43-i-biomi-bozze)); si parte dalla Robotica cibernetica; lo Spazio è l'ultimo, si apre quando gli altri dieci sono vinti; il bioma segreto è a parte |
 | Geografia dei biomi | fissa a ogni run (rilievi, monoliti, ingresso, tana del boss, segreti); il seed della run cambia nemici, bottino e POI attivi |
+| Energia | una barra blu, come una stamina o un mana; ogni carta ne costa in base alla sua efficacia; si ricarica durante lo scontro e con i consumabili |
 | Zaino | una griglia limitata: ogni oggetto occupa le celle della sua forma e della sua grandezza |
 | Reliquie attive | tre posti fuori dalla griglia; solo lì le reliquie funzionano; un posto tiene una reliquia di qualunque forma; si cambiano solo fuori dagli scontri; morendo si perdono come il resto dello zaino |
 | Forma delle reliquie | ognuna ha una forma sua, più grande quanto più è rara |
@@ -928,6 +951,9 @@ I sette minigiochi di oggi trovano tutti un bioma; ne servono cinque nuovi
 | Deposito | una griglia più grande, a pagine |
 | Valuta | crediti nello zaino (l'oro di oggi) |
 | Pescata senza finestre | una carta ogni 4 battiti, più Refocus |
+| Scala e ricarica della barra di energia | 100 punti, 8 al secondo del mondo, piena all'inizio di ogni scontro |
+| Costi delle carte | da 10 a 70 secondo l'efficacia; tutto il catalogo da ritarare |
+| Energia e potenziamenti | un potenziamento migliora l'effetto, non il costo |
 | Curva dell'esperienza | `4 + 2n` per il livello `n` |
 | Mazzo iniziale e pool iniziale | lo starter di oggi; comuni e alcune non comuni |
 | Abbandonare una run | conta come una morte |
@@ -947,7 +973,7 @@ poter entrare nel salvataggio.
 
 | Fase | Contenuto | Fatta quando |
 |---|---|---|
-| 1 | Combattimento senza timer: via la finestra, critici sul battito, nuova pescata | uno scontro intero si gioca senza conto alla rovescia, con i critici sul battito |
+| 1 | Combattimento senza timer: via la finestra, critici sul battito, nuova pescata, energia a barra | uno scontro intero si gioca senza conto alla rovescia, con i critici sul battito e le carte pagate dalla barra blu |
 | 2 | Camera fissa, niente fog né zoom; la rotella che sceglie e piazza le carte | la stanza di oggi si gioca con la camera nuova, senza nebbia, e la mano si gioca anche solo con rotella e clic |
 | 3 | Mappa aperta di prova: un bioma grande a chunk, POI, pattuglie, ingaggio, ologramma del bioma | si esplora, si ripulisce un nido e si torna a esplorare senza cambi di schermata |
 | 4 | Mount | si attraversa il bioma in sella; uno scontro la impedisce |
