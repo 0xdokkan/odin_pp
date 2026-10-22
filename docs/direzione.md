@@ -2,7 +2,7 @@
 
 # Direzione del gioco
 
-Documento di direzione, versione 1.7 (22 ottobre 2026). Fissa dove va il gioco in
+Documento di direzione, versione 1.8 (22 ottobre 2026). Fissa dove va il gioco in
 quattro ambiti: **Mappa**, **Progressione**, **Gameplay** e **Design**. Gli altri
 documenti descrivono il gioco di oggi e restano validi finché una fase della
 [roadmap](#6-roadmap) non ne sostituisce le regole.
@@ -45,7 +45,7 @@ bioma e porta a casa ciò che ha raccolto. Se muore perde lo zaino, ma ciò che 
 | POI | punto d'interesse: un luogo della mappa con un contenuto (nemici, bottino, scoperta, servizio) |
 | Segreto | un luogo che l'ologramma non segna finché non lo si trova esplorando |
 | Scontro | lo stato di combattimento: comincia con l'ingaggio, finisce quando nessun nemico insegue più |
-| Zaino | l'inventario della run: una griglia limitata dove ogni oggetto occupa spazio secondo forma e grandezza; morendo si perde tutto, estraendosi va nel deposito |
+| Zaino | l'inventario della run: una griglia limitata dove ogni oggetto occupa spazio secondo forma e grandezza, più tre posti per le reliquie attive; morendo si perde tutto, estraendosi va nel deposito |
 | Deposito | l'inventario permanente dell'hub |
 | Scoperta | una carta resa ottenibile nelle run future, senza ottenerla subito |
 | Pool | le carte che possono comparire in premi e offerte di una run |
@@ -161,7 +161,7 @@ HUB ── si sceglie il bioma, si prepara lo zaino ──► RUN NEL BIOMA
 |---|---|
 | mazzo, carte ottenute e loro potenziamenti | la run |
 | esperienza, livello e punti potenziamento | la run: ogni run riparte dal livello 1 |
-| zaino | la run: morendo si perde **tutto**, anche ciò che era stato portato da casa; estraendosi tutto va nel deposito |
+| zaino | la run: morendo si perde **tutto**, anche ciò che era stato portato da casa e le reliquie attive; estraendosi tutto va nel deposito |
 | deposito | sempre |
 | carte scoperte, segreti trovati, biomi sbloccati, record dei minigiochi | sempre, anche quando la run fallisce |
 | serie | fino alla prossima morte |
@@ -207,8 +207,16 @@ Tutto questo vale per slot: ogni slot è una partita a sé
 - **Lo zaino è una griglia limitata** *(proposta: 8×5 celle)*. Ogni oggetto
   occupa le celle della sua forma e della sua grandezza, e lo spazio è il limite
   dello zaino: il gioco è far entrare ciò che conta.
+- **Tre posti per le reliquie attive**, fuori dalla griglia. Solo le reliquie
+  messe lì funzionano; quelle nella griglia si portano soltanto. Un posto tiene
+  una reliquia di qualunque forma *(proposta)*. Morendo si perdono anche queste;
+  estraendosi vanno nel deposito come il resto dello zaino.
 
   ```text
+  reliquie attive  ┌───┐ ┌───┐ ┌───┐        arma impugnata  ┌───┐
+                   │ r │ │ r │ │   │                        │ a │
+                   └───┘ └───┘ └───┘                        └───┘
+
   ┌───┬───┬───┬───┬───┬───┬───┬───┐
   │ A │ A │ A │ R │ R │ c │ c │   │    A  un'arma lunga, 1×3
   ├───┼───┼───┼───┼───┼───┼───┼───┤    R  una reliquia a L
@@ -228,7 +236,7 @@ Tutto questo vale per slot: ogni slot è una partita a sé
   |---|---|---|---|
   | Consumabili | cura, energia, una carta temporanea, un'esca per le pattuglie | 1×1; i più grossi 1×2 | si usano dallo zaino; in uno scontro costano tempo come un'azione |
   | Equipaggiamento | armi per l'attacco a urto (la Mannaia di ferro di oggi) e altri oggetti attivi | strisce da 1×2 a 1×3 | l'arma impugnata ha un posto suo, fuori dalla griglia; quelle di riserva stanno nella griglia |
-  | Reliquie | passive come quelle di oggi | da 1×1 a forme grandi o strane (quadrate, a L, a T) | funzionano se stanno nello zaino: il loro costo è lo spazio che occupano |
+  | Reliquie | passive come quelle di oggi | da 1×1 a forme grandi o strane (quadrate, a L, a T) | funzionano solo nei tre posti attivi; nella griglia si portano e basta |
   | Crediti | l'oro di oggi | 1×1 | si spendono nelle Officine e nell'hub |
   | Frammenti di memoria | la storia | 1×1 | si portano a casa per leggerli |
 
@@ -240,7 +248,8 @@ Tutto questo vale per slot: ogni slot è una partita a sé
 - **Zaino pieno.** Ciò che non entra resta a terra, come oggi l'arma con la
   riserva piena. Per fare posto si può sempre lasciare a terra un oggetto dello
   zaino.
-- **In uno scontro** lo zaino si apre, ma il tempo continua *(proposta)*.
+- **In uno scontro** lo zaino si apre, ma il tempo continua; le reliquie attive
+  si cambiano solo fuori dagli scontri *(proposta)*.
 - **Il deposito** dell'hub conserva tutto ciò che è stato estratto, in una
   griglia più grande, a pagine *(proposta)*. Prima di una run si sistema lo
   zaino: è la posta in gioco.
@@ -531,7 +540,7 @@ NESSUNA CARTA ── rotella ──► CARTA SCELTA ── rotella ──► la 
 | finestra a tempo, `--decision-time`, stordimento a tempo scaduto | via; resta l'orologio dei battiti per nemici e critici |
 | fog, `--vision`, zoom e rotazione della camera | via; camera fissa |
 | rotella: zoom della camera, e mira dell'Inondazione e del Cannone | rotella: sceglie le carte della mano; nel piazzamento gira l'oggetto |
-| reliquia iniziale fra tre, reliquie per la run | reliquie come oggetti dello zaino, portate da casa o trovate |
+| reliquia iniziale fra tre, reliquie per la run | reliquie come oggetti dello zaino, portate da casa o trovate; ne funzionano tre alla volta, nei posti attivi |
 | Shop, Rest, Event, Treasure | POI: Officina, Fonte, eventi, Cache |
 | upgrade allo Shop e al Rest | punti potenziamento dall'esperienza |
 | oro | crediti nello zaino |
@@ -867,6 +876,7 @@ I sette minigiochi di oggi trovano tutti un bioma; ne servono cinque nuovi
 | Biomi | undici bozze ([4.3](#43-i-biomi-bozze)); si parte dalla Robotica cibernetica; lo Spazio è l'ultimo, si apre quando gli altri dieci sono vinti; il bioma segreto è a parte |
 | Geografia dei biomi | fissa a ogni run (rilievi, monoliti, ingresso, tana del boss, segreti); il seed della run cambia nemici, bottino e POI attivi |
 | Zaino | una griglia limitata: ogni oggetto occupa le celle della sua forma e della sua grandezza |
+| Reliquie attive | tre posti fuori dalla griglia; solo lì le reliquie funzionano; morendo si perdono come il resto dello zaino |
 | Mappa dei biomi | una galassia di isolette 3D nello stile del gioco, unite da rotte di luce; mostra solo i biomi già sbloccati, salvo il bioma segreto dopo il finale |
 | Rotella in scontro | sceglie le carte della mano (la prima, poi una a scatto); per le carte da orientare il clic sinistro entra nel piazzamento, dove la rotella gira l'oggetto; un altro clic sinistro piazza, il clic destro torna allo scorrimento |
 
@@ -885,7 +895,7 @@ I sette minigiochi di oggi trovano tutti un bioma; ne servono cinque nuovi
 | Chiavi per la tana del boss | nessuna: sempre aperta |
 | Misura della griglia dello zaino | 8×5 celle; zaini più grandi da trovare |
 | Forme, pile e rotazione degli oggetti | forme a celle; pile di 5 consumabili e 99 crediti; la rotella gira l'oggetto preso |
-| Reliquie attive | tutte quelle nello zaino: il limite è lo spazio |
+| Cambio delle reliquie attive | solo fuori dagli scontri |
 | Deposito | una griglia più grande, a pagine |
 | Valuta | crediti nello zaino (l'oro di oggi) |
 | Pescata senza finestre | una carta ogni 4 battiti, più Refocus |
