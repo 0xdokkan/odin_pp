@@ -11,8 +11,8 @@ per i comandi disponibili oggi valgono il [README](README.md) e la documentazion
   (mappa aperta per bioma, progressione da extraction, combattimento senza timer,
   design e narrativa del robot nella memoria del creatore), le decisioni prese
   (fra cui i tre slot di salvataggio, aggiornati di continuo e non copiabili, la
-  mappa dei biomi come galassia di isolette 3D e la rotella che sceglie e
-  piazza le carte),
+  mappa dei biomi come galassia di isolette 3D, la rotella che sceglie e
+  piazza le carte e le bozze di undici biomi),
   quelle aperte con una proposta e la roadmap in nove fasi. Il gioco non cambia
   ancora: le regole di oggi restano finché le fasi non le sostituiscono.
 

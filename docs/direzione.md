@@ -2,7 +2,7 @@
 
 # Direzione del gioco
 
-Documento di direzione, versione 1.5 (22 ottobre 2026). Fissa dove va il gioco in
+Documento di direzione, versione 1.6 (22 ottobre 2026). Fissa dove va il gioco in
 quattro ambiti: **Mappa**, **Progressione**, **Gameplay** e **Design**. Gli altri
 documenti descrivono il gioco di oggi e restano validi finché una fase della
 [roadmap](#6-roadmap) non ne sostituisce le regole.
@@ -37,6 +37,8 @@ bioma e porta a casa ciò che ha raccolto. Se muore perde lo zaino, ma ciò che 
 | Termine | Significato |
 |---|---|
 | Bioma | una mappa aperta con il suo boss, i suoi nemici, la sua mount e i suoi minigiochi |
+| Ramo | uno dei tre bracci della galassia (la discesa, l'ascesa, la paura), di tre biomi ciascuno |
+| Corsia | il pericolo di un bioma che scatta su una fila o una colonna, come la Furnace di oggi |
 | Run | una spedizione in un bioma, dall'ingresso all'estrazione o alla morte |
 | Hub | il luogo fra una run e l'altra: deposito, zaino, mappa dei biomi, progressi |
 | Galassia | la mappa dei biomi nell'hub: isolette 3D sparse nel vuoto, una per ogni bioma già sbloccato |
@@ -244,13 +246,17 @@ Tutto questo vale per slot: ogni slot è una partita a sé
   - 6 RANCH 7 (western a tempo)
 
   Andranno riletti in chiave futuristica o da cabinato; ne arriveranno altri.
+  L'assegnazione proposta è nelle [bozze dei biomi](#43-i-biomi-bozze).
 
 ### 2.7 Biomi e sblocchi
 
-- Si parte con un solo bioma sbloccato. Vincere una run ne sblocca uno o più,
-  secondo rotte fisse fra i biomi. *(proposta: 6 biomi più uno segreto, con i
-  nomi di lavoro dello schizzo qui sotto. B1 apre B2 e B3; B2 apre B4; B3 apre
-  B5; B6, l'ultimo, si apre quando tutti gli altri sono vinti)*
+- Si parte dalla **Robotica cibernetica**. Vincere una run ne sblocca uno o più,
+  secondo rotte fisse. La Robotica cibernetica apre il primo bioma di ciascuno
+  dei tre rami; ogni altro bioma apre il successivo del suo ramo *(proposta:
+  rami e ordine sono quelli delle [bozze](#43-i-biomi-bozze))*.
+- Lo **Spazio** è l'ultimo: si apre quando gli altri dieci biomi sono vinti.
+- Il bioma segreto del true ending è a parte (vedi
+  [2.8](#28-il-finale-e-il-true-ending)).
 - Il gioco **finisce** quando ogni bioma è stato vinto almeno una volta: è il
   finale normale.
 
@@ -262,7 +268,7 @@ vuoto, nello stile del gioco.
 **La galassia mostra solo i biomi già sbloccati.** Un bioma che si aprirà più
 avanti non si vede in nessun modo, nemmeno come sagoma: la sua isola non c'è
 finché una vittoria non la apre. All'inizio del gioco ci sono soltanto l'isola
-dell'hub e quella di B1. L'unica eccezione è il bioma segreto dopo il finale
+dell'hub e quella della Robotica cibernetica. L'unica eccezione è il bioma segreto dopo il finale
 normale (vedi sotto).
 
 - **Lo spazio.** È il vuoto nero del mondo neon, con l'alone rosso
@@ -300,16 +306,18 @@ normale (vedi sotto).
 Schizzo della galassia vista dall'alto, solo per orientarsi: nel gioco le isole
 sono sparse anche in altezza. Le rotte di luce sono `~`, `/` e `\`. È la
 galassia a fine gioco, con tutti i biomi vinti; il giocatore la scopre un'isola
-alla volta.
+alla volta. I tre rami sono le braccia della galassia; Cyber è la Robotica
+cibernetica, Cielo l'Isola nel cielo, Gotico il Southern gothic. Le rotte verso
+lo Spazio si accendono solo quando gli altri dieci biomi sono vinti.
 
 ```text
-      .         *                .                 *           .
-                   ( B2 )~~~~~~~~~~~~( B4 )
-          .       /                          \           .
-  ( HUB )~~( B1 )            *                 ( B6 )
-          .       \                          /       .     ( ? )
-                   ( B3 )~~~~~~~~~~~~( B5 )
-      *         .                .         .           *
+       .               *                   .                    *
+                  ( Far West )~~~~~( Egitto )~~~~~~( Inferno )~~
+                /                                               \
+  ( HUB )~( Cyber )~~( City pop )~~~( Montagne )~~~~( Cielo )~~~~~( Spazio )
+                \                                               /
+                  ( Giungla )~~~~~~( Vietnam )~~~~~( Gotico )~~~
+       *               .                   *                    .    ( ? )
 ```
 
 ### 2.8 Il finale e il true ending
@@ -318,7 +326,8 @@ alla volta.
   come un'isola spenta ai margini, con un indizio esplicito della condizione.
   Prima del finale ci sono solo indizi impliciti: glitch e frammenti di memoria.
 - **La condizione** è una **serie senza morti** che comprende una vittoria in
-  **ogni** bioma, l'ultimo compreso.
+  **ogni** bioma, l'ultimo compreso: con le bozze di oggi, undici vittorie di
+  fila.
   - Contano le run vinte di fila.
   - Una morte azzera la serie *(proposta: anche abbandonare una run)*.
   - Vale **dalla primissima run**: chi finisce il gioco senza mai morire apre il
@@ -332,7 +341,7 @@ alla volta.
 - **Uso.** Si evoca e si congeda fuori dagli scontri. È molto più veloce del
   passo a piedi *(proposta: tre volte)* e non si può usare in combattimento.
 - **Forma.** Cambia in ogni bioma: un veicolo o una creatura del gioco di quel
-  bioma.
+  bioma (vedi le [bozze](#43-i-biomi-bozze)).
 - **Ingaggio in sella.** Se un nemico ti ingaggia mentre sei in sella puoi
   provare a seminarlo, perché la mount è più veloce dei nemici base. Se ti
   colpisce vieni disarcionato e comincia lo scontro.
@@ -531,6 +540,7 @@ NESSUNA CARTA ── rotella ──► CARTA SCELTA ── rotella ──► la 
     gioco, tutti di cartoncino nel mondo neon.
   - I nemici di oggi (Chaser, Archer, Brute, Bomber, Custode, Demolitore)
     restano come comportamenti e cambiano veste in ogni bioma.
+  - Le bozze dei biomi sono in [4.3](#43-i-biomi-bozze).
 - **Suono** generato da codice come oggi (`tools/audio`): sintetico per il
   mondo, analogico per i cabinati.
 
@@ -545,7 +555,9 @@ come Sisifo, spinge lo stesso masso sulla stessa collina.
 **Il mondo.** I biomi sono ricordi: pezzi dei videogiochi amati dal creatore,
 svuotati e ridotti a poligoni e neon, abitati da nemici di cartoncino. Il
 cabinato del ranch 6-7, il 6 e il 7 di denari della Scopa e i dungeon gotici di
-oggi ne sono i primi esempi.
+oggi ne sono i primi esempi. Anche i rami hanno un senso: la discesa finisce
+all'Inferno, l'ascesa nel cielo, la paura nell'orrore; oltre tutti c'è lo
+Spazio.
 
 **Personaggi** (nomi di lavoro).
 - *Il robot*: protagonista muto. Nell'hub appare com'è; nei biomi gioca con
@@ -579,6 +591,231 @@ ogni bioma, l'ingresso di ogni boss, il finale e il true ending.
 **Tono.** Fantascienza alta, desolata e malinconica, con l'ironia dei giochi del
 creatore.
 
+### 4.3 I biomi (bozze)
+
+Undici bozze di bioma, più il bioma segreto, che resta a parte. Nomi, nemici,
+boss, mount e minigiochi nuovi sono di lavoro: tutto ciò che sta in questa
+sezione è *(proposta)*, tranne i temi dei biomi, il bioma da cui si parte (la
+Robotica cibernetica) e quello che si apre per ultimo (lo Spazio).
+
+**Che cosa ha ogni bioma.**
+- un'atmosfera, una tinta di neon e un suo linguaggio di forme low poly;
+- un **terreno** con una sua regola e una **corsia**: il pericolo che scatta su
+  una fila o una colonna, come la Furnace di oggi, rivestito dal bioma;
+- i nemici di oggi rivestiti (Chaser, Archer, Brute, Bomber e Custode restano
+  come comportamenti), più uno o due suoi;
+- un boss, una mount e uno o due minigiochi;
+- le sue **carte di casa**: quelle che i suoi archivi fanno scoprire più spesso.
+
+**I rami.** La galassia ha tre rami, le sue braccia, di tre biomi ciascuno. La
+difficoltà cresce lungo il ramo; lo Spazio è il più duro.
+
+| Ramo | 1° | 2° | 3° |
+|---|---|---|---|
+| La discesa | Deserto del far west | Antico Egitto | Inferno |
+| L'ascesa | City pop | Montagne innevate | Isola nel cielo |
+| La paura | Giungla preistorica | Vietnam | Southern gothic |
+
+| Bioma | Posto nella galassia | Neon | Mount | Minigiochi |
+|---|---|---|---|---|
+| Robotica cibernetica | il centro: si parte da qui | rosso cremisi (il mondo neon di oggi) | hoverbike | Scie di luce *(nuovo)* |
+| Deserto del far west | discesa, 1° | ambra e arancio | cavallo | 6 RANCH 7 |
+| Giungla preistorica | paura, 1° | verde acido e giallo | parasaurolofo | Fuga dal T-Rex *(nuovo)* |
+| City pop | ascesa, 1° | magenta e ciano | moto anni '80 | Ring delle Ombre, Karaoke *(nuovo)* |
+| Antico Egitto | discesa, 2° | oro e turchese | cammello | Sigilli della Cripta |
+| Vietnam | paura, 2° | verde oliva e giallo | jeep | Elicottero *(nuovo)* |
+| Montagne innevate | ascesa, 2° | bianco ghiaccio e azzurro | motoslitta | Discesa *(nuovo)* |
+| Inferno | discesa, 3° | arancio e giallo lava | cerbero | Torre di Cenere |
+| Southern gothic | paura, 3° | bianco spento, verde palude e rosso sangue | cavallo nero | Cripta delle Rune |
+| Isola nel cielo | ascesa, 3° | perla, oro e rosa | grifone | Guglie Sospese |
+| Spazio | l'ultimo: si apre quando gli altri dieci sono vinti | viola e blu elettrico | jetpack | Arena delle Braci |
+
+I sette minigiochi di oggi trovano tutti un bioma; ne servono cinque nuovi
+(Scie di luce, Fuga dal T-Rex, Karaoke, Elicottero e Discesa).
+
+#### Robotica cibernetica (si parte da qui)
+
+- **Atmosfera.** Il ricordo più vicino al robot: una città-fabbrica di circuiti,
+  torri di server spente, trincee di cavi, nastri trasportatori fermi. È il
+  mondo neon di oggi.
+- **Forme.** Il pavimento nero lucido con i fili cremisi, monoliti di dati,
+  colonne di server, colline poligonali.
+- **Terreno e corsia.** Piastre elettriche sparse, come la Shock Floor; la corsia
+  è una griglia laser.
+- **Nemici.** I programmi di difesa: droni ragno (Chaser), torrette laser
+  (Archer), presse industriali (Brute), droni kamikaze (Bomber), antivirus con
+  lo scudo (Custode).
+- **Boss.** Il Supervisore, l'IA che il creatore ha messo a guardia del primo
+  ricordo.
+- **Mount.** Una hoverbike al neon.
+- **Minigioco.** Scie di luce *(nuovo)*: moto che lasciano muri di luce dietro
+  di sé; resta in pista chi non ci sbatte.
+- **Carte di casa.** Cannone e Cannone laser, Tesla Coil, Shock Floor.
+
+#### Deserto del far west
+
+- **Atmosfera.** La frontiera del cabinato del ranch 6-7: mesas, canyon, binari,
+  città fantasma, saloon vuoti, polvere.
+- **Forme.** Mesas a gradoni, cactus a poche facce, binari al neon, sagome di
+  case di legno.
+- **Terreno e corsia.** Il deserto aperto, senza coperture fra un canyon e
+  l'altro; la corsia è il treno che passa sui binari.
+- **Nemici.** Banditi (Chaser), pistoleri (Archer), tori meccanici (Brute),
+  bruti con la dinamite (Bomber), sceriffi corazzati (Custode).
+- **Boss.** Il Fuorilegge, sul treno blindato.
+- **Mount.** Il cavallo del cowboy di 6 RANCH 7.
+- **Minigioco.** 6 RANCH 7.
+- **Carte di casa.** Lazzo, il 6 e il 7 di denari.
+
+#### Giungla preistorica
+
+- **Atmosfera.** Vegetazione fitta, felci giganti, paludi, vulcani
+  all'orizzonte, ossa enormi; tanta fauna paurosa che caccia in branco.
+- **Forme.** Felci e alberi-torre a poche facce, rocce coperte di muschio
+  luminoso.
+- **Terreno e corsia.** Erba alta che nasconde i nemici finché non sono vicini:
+  non è fog of war, è una copertura del terreno *(da provare)*. La corsia è una
+  mandria in carica.
+- **Nemici.** Raptor in branco (Chaser), sputatori di veleno (Archer),
+  triceratopi che caricano (Brute), pterodattili che lasciano cadere sassi
+  (Bomber), anchilosauri corazzati (Custode).
+- **Boss.** Il T-Rex alfa.
+- **Mount.** Un parasaurolofo, per non confondersi con i dinosauri della carta
+  Dinosauro.
+- **Minigioco.** Fuga dal T-Rex *(nuovo)*: una corsa a ostacoli, un saluto al
+  dinosauro del browser senza rete.
+- **Carte di casa.** Dinosauro, Pozza di Veleno, Lama Velenosa.
+
+#### City pop
+
+- **Atmosfera.** Una città giapponese degli anni '80, di notte: insegne, sale
+  giochi, karaoke, vicoli bagnati, tetti, le famiglie della malavita alla Yakuza.
+- **Forme.** Palazzi a blocchi come quinte di teatro, insegne al neon,
+  distributori automatici, ponti; il pavimento lucido diventa asfalto bagnato.
+- **Terreno e corsia.** Vicoli stretti fra i palazzi; la corsia è il traffico che
+  passa sulle strade.
+- **Nemici.** Teppisti (Chaser), sicari con la pistola (Archer), lottatori di
+  sumo (Brute), lanciatori di molotov (Bomber), guardie del corpo (Custode).
+- **Boss.** L'Oyabun, il capo della famiglia, sul tetto più alto.
+- **Mount.** Una moto degli anni '80.
+- **Minigiochi.** Ring delle Ombre, la rissa; Karaoke *(nuovo)*: il colpo a tempo
+  diventa canto.
+- **Carte di casa.** Bomb Marley, Pinball, Shove.
+
+#### Antico Egitto
+
+- **Atmosfera.** Dune, piramidi, obelischi, tombe, il fiume, la sfinge, le
+  maledizioni.
+- **Forme.** Piramidi a gradoni, obelischi come monoliti, colonne, ingressi di
+  tombe.
+- **Terreno e corsia.** Sabbie mobili che rallentano; le tombe sono POI
+  sotterranei; la corsia è una tempesta di sabbia.
+- **Nemici.** Mummie lente e resistenti (Chaser), sacerdoti arcieri (Archer),
+  guardiani di pietra (Brute), scarabei esplosivi (Bomber), statue che
+  proteggono (Custode).
+- **Boss.** Il Faraone risorto.
+- **Mount.** Un cammello.
+- **Minigioco.** Sigilli della Cripta, dentro la piramide.
+- **Carte di casa.** Dado del Destino.
+
+#### Vietnam
+
+- **Atmosfera.** Una guerra nella giungla umida: risaie a terrazze, fiumi,
+  villaggi su palafitte, tunnel, elicotteri lontani, trappole. È il gioco di
+  guerra della memoria del creatore: soldati di cartoncino, senza bandiere né
+  fazioni reali.
+- **Forme.** Palme a poche facce, risaie a gradoni, bunker, filo spinato.
+- **Terreno e corsia.** Acqua delle risaie che rallenta, trappole nascoste,
+  tunnel come scorciatoie e segreti; la corsia è un bombardamento.
+- **Nemici.** Soldati (Chaser), cecchini (Archer), mitraglieri (Brute),
+  granatieri (Bomber), ufficiali con lo scudo (Custode).
+- **Boss.** L'elicottero da combattimento, che sorvola l'arena.
+- **Mount.** Una jeep.
+- **Minigioco.** Elicottero *(nuovo)*: uno sparatutto su binari dal portellone.
+- **Carte di casa.** First Person Shooter, Incendio, Firebomb.
+
+#### Montagne innevate
+
+- **Atmosfera.** Silenzio e vento: vette, crepacci, bufere, rifugi abbandonati,
+  una funivia ferma.
+- **Forme.** Picchi sfaccettati, lastre di ghiaccio, i cavi della funivia al neon.
+- **Terreno e corsia.** Ghiaccio su cui si scivola (i blocchi di ghiaccio di
+  oggi), neve alta che rallenta; la corsia è una valanga.
+- **Nemici.** Lupi delle nevi (Chaser), lanciatori di ghiaccio (Archer), yeti
+  (Brute), rotolatori di palle di neve (Bomber), spiriti del ghiaccio (Custode).
+- **Boss.** Il Re della Valanga, uno yeti enorme.
+- **Mount.** Una motoslitta.
+- **Minigioco.** Discesa *(nuovo)*: sci fra gli alberi, con lo yeti alle
+  calcagna.
+- **Carte di casa.** da scegliere.
+
+#### Inferno
+
+- **Atmosfera.** Vulcani, fiumi di lava, ponti di ossidiana, catene; i demoni
+  più forti del gioco. È il fondo del ramo della discesa.
+- **Forme.** Crateri, colonne di basalto esagonali, ossidiana nera lucida,
+  crepe di lava al neon.
+- **Terreno e corsia.** Lava che brucia (Bruciatura) e pavimento che si crepa;
+  la corsia è un'eruzione.
+- **Nemici.** Diavoletti (Chaser), demoni che lanciano fuoco (Archer), demoni
+  corazzati (Brute), anime che esplodono (Bomber), guardiani infernali
+  (Custode): tutti più forti della media.
+- **Boss.** Il Signore dei Demoni.
+- **Mount.** Un cerbero.
+- **Minigioco.** Torre di Cenere.
+- **Carte di casa.** Incendio, Firebomb, Thorn Coat.
+
+#### Southern gothic
+
+- **Atmosfera.** Horror di campagna: nebbia bassa, paludi, campi di granturco,
+  chiese di legno, fienili, spaventapasseri, fantasmi, spiriti e un killer. La
+  nebbia è solo atmosfera: non nasconde il gioco.
+- **Forme.** Alberi spogli, steccati, case in rovina, croci, pozzi.
+- **Terreno e corsia.** La palude rallenta. Al posto della corsia c'è il
+  **killer**: un elite che segue il robot per la mappa e che si può solo
+  seminare o affrontare a caro prezzo *(da provare)*.
+- **Nemici.** Spiriti che attraversano le coperture (Chaser), cacciatori con il
+  fucile (Archer), il bruto con la motosega (Brute), il predicatore con la
+  lanterna che appicca il fuoco (Bomber), spaventapasseri (Custode). I nemici
+  gotici di oggi sono la base naturale di questo bioma.
+- **Boss.** Il Killer mascherato.
+- **Mount.** Un cavallo nero.
+- **Minigioco.** Cripta delle Rune, riletta come una casa infestata.
+- **Carte di casa.** Movimento Ombra, Feretro.
+
+#### Isola nel cielo
+
+- **Atmosfera.** Isole sospese fra le nuvole, cascate che cadono nel vuoto,
+  flora e fauna strane, fatate, spiritiche, angeliche. È la cima del ramo
+  dell'ascesa.
+- **Forme.** La mappa stessa è un arcipelago di isolette unite da ponti di luce;
+  cristalli, archi, piume.
+- **Terreno e corsia.** Ponti di luce che compaiono sul battito e il vuoto ai
+  bordi; la corsia è una raffica di vento che spinge.
+- **Nemici.** Fate veloci (Chaser), spiriti arcieri (Archer), golem di nuvola
+  (Brute), uccelli di fuoco celeste (Bomber), angeli custodi con lo scudo
+  (Custode).
+- **Boss.** Il Serafino.
+- **Mount.** Un grifone.
+- **Minigioco.** Guglie Sospese.
+- **Carte di casa.** Afterimage, Purifying Guard.
+
+#### Spazio (l'ultimo)
+
+- **Atmosfera.** Il ricordo più lontano: stazioni orbitali abbandonate, campi
+  di asteroidi, pianeti all'orizzonte, il vuoto vero. Si apre quando gli altri
+  dieci biomi sono vinti, e vincerlo è il finale normale.
+- **Forme.** Asteroidi poligonali sospesi, piattaforme di stazione, anelli.
+- **Terreno e corsia.** Bassa gravità: una spinta fa volare una casella in più
+  *(da provare)*; pozzi gravitazionali che tirano come il Buco Nero; la corsia è
+  una pioggia di meteore.
+- **Nemici.** Sciami alieni (Chaser), torrette orbitali (Archer), mech (Brute),
+  mine spaziali (Bomber), sentinelle (Custode).
+- **Boss.** La Nave Madre.
+- **Mount.** Un jetpack.
+- **Minigioco.** Arena delle Braci, riletta come sparatutto spaziale.
+- **Carte di casa.** Buco Nero, Cannone laser.
+
 ## 5. Decisioni
 
 ### Prese
@@ -598,6 +835,7 @@ creatore.
 | Fine del gioco | tutti i biomi vinti; poi il bioma segreto e il true ending |
 | Stile | mondo low poly senza texture al neon; personaggi e oggetti di cartoncino |
 | Salvataggi | tre slot avviabili; in ogni slot un solo salvataggio, aggiornato quasi sempre; gli slot non si copiano, si possono solo cancellare |
+| Biomi | undici bozze ([4.3](#43-i-biomi-bozze)); si parte dalla Robotica cibernetica; lo Spazio è l'ultimo, si apre quando gli altri dieci sono vinti; il bioma segreto è a parte |
 | Geografia dei biomi | fissa a ogni run (rilievi, monoliti, ingresso, tana del boss, segreti); il seed della run cambia nemici, bottino e POI attivi |
 | Mappa dei biomi | una galassia di isolette 3D nello stile del gioco, unite da rotte di luce; mostra solo i biomi già sbloccati, salvo il bioma segreto dopo il finale |
 | Rotella in scontro | sceglie le carte della mano (la prima, poi una a scatto); per le carte da orientare il clic sinistro entra nel piazzamento, dove la rotella gira l'oggetto; un altro clic sinistro piazza, il clic destro torna allo scorrimento |
@@ -606,7 +844,9 @@ creatore.
 
 | Domanda | Proposta |
 |---|---|
-| Quanti biomi e come si collegano | 6 più il segreto, collegati da rotte a rami ([2.7](#27-biomi-e-sblocchi)) |
+| Quali bozze entrano nel gioco | tutte e undici, da confermare con le prime prove |
+| Rami della galassia | la discesa, l'ascesa e la paura, tre biomi ciascuno ([4.3](#43-i-biomi-bozze)) |
+| Nemici, boss, mount, minigiochi nuovi dei biomi | quelli delle bozze ([4.3](#43-i-biomi-bozze)) |
 | Comandi della galassia | si gira trascinando, senza zoom libero |
 | Rotella in su e ai bordi della mano | in su la carta prima; ai bordi si ricomincia dall'altro capo |
 | Carte piazzate senza orientamento | un solo clic, senza piazzamento |
@@ -643,7 +883,7 @@ poter entrare nel salvataggio.
 | 6 | Esperienza, livelli e punti; scoperte e pool | si livella nella run; una carta scoperta compare nella run dopo |
 | 7 | La galassia dei biomi, sblocchi, serie e finali | vincendo compaiono la rotta e l'isola nuova, mai prima; la serie si conta e si azzera |
 | 8 | Minigiochi come estrazione e cabinati dell'hub | battere un boss porta al minigioco e al ritorno a casa |
-| 9 | I biomi veri: direzione artistica, nemici, mount e narrativa | ogni bioma ha forma, nemici, mount, minigiochi e frammenti suoi |
+| 9 | I biomi veri, dalle [bozze](#43-i-biomi-bozze); si parte dalla Robotica cibernetica, che è il mondo neon di oggi | ogni bioma ha forme, terreno, corsia, nemici, boss, mount, minigiochi e frammenti suoi |
 
 ### Note tecniche
 
