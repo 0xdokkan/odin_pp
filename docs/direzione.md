@@ -2,7 +2,7 @@
 
 # Direzione del gioco
 
-Documento di direzione, versione 1.11 (22 ottobre 2026). Fissa dove va il gioco in
+Documento di direzione, versione 1.12 (22 ottobre 2026). Fissa dove va il gioco in
 quattro ambiti: **Mappa**, **Progressione**, **Gameplay** e **Design**. Gli altri
 documenti descrivono il gioco di oggi e restano validi finché una fase della
 [roadmap](#6-roadmap) non ne sostituisce le regole.
@@ -47,6 +47,7 @@ bioma e porta a casa ciò che ha raccolto. Se muore perde lo zaino, ma ciò che 
 | Scontro | lo stato di combattimento: comincia con l'ingaggio, finisce quando nessun nemico insegue più |
 | Zaino | l'inventario della run: una griglia limitata dove ogni oggetto occupa spazio secondo forma e grandezza, più tre posti per le reliquie attive; morendo si perde tutto, estraendosi va nel deposito |
 | Deposito | l'inventario permanente dell'hub |
+| Casinò | la zona dell'hub dove si scommettono i crediti del deposito |
 | Sospeso | lo spazio del menu dello zaino dove un oggetto aspetta un posto mentre si sistema la griglia |
 | Scoperta | una carta resa ottenibile nelle run future, senza ottenerla subito |
 | Pool | le carte che possono comparire in premi e offerte di una run |
@@ -309,7 +310,8 @@ Tutto questo vale per slot: ogni slot è una partita a sé
   - Cripta delle Rune (FPS)
   - Sigilli della Cripta (puzzle)
   - Ring delle Ombre (picchiaduro)
-  - 6 RANCH 7 (western a tempo)
+  - 6 RANCH 7 (western a tempo), che diventa la slot del casinò dell'hub
+    (vedi [L'hub](#32-lhub))
 
   Andranno riletti in chiave futuristica o da cabinato; ne arriveranno altri.
   L'assegnazione proposta è nelle [bozze dei biomi](#43-i-biomi-bozze).
@@ -505,6 +507,97 @@ lo Spazio si accendono solo quando gli altri dieci biomi sono vinti.
 | Progressi | statistiche, carte scoperte (con Mostra effetto), segreti, record dei minigiochi, serie |
 | Cabinati *(proposta)* | rigiocare i minigiochi sbloccati per i record, senza premi |
 | Prova meccaniche | il laboratorio delle carte di oggi |
+| Casinò | un po' di sano gioco d'azzardo con i crediti del deposito: la slot del ranch, Tre in fuga, roulette e dadi (vedi sotto) |
+
+#### Il casinò
+
+Nell'hub si scommettono i **crediti del deposito**, mai denaro vero: i crediti
+non si comprano. Ogni gioco si salva nello slot di salvataggio come il resto.
+
+- **Puntate** *(proposta)*: da 5 a 50 crediti a giocata.
+- **Il banco** tiene sempre un piccolo vantaggio, dal 2 al 5 % secondo il gioco,
+  così il casinò non diventa una miniera di crediti. Le probabilità si
+  verificano nei test con milioni di giocate simulate, come oggi i bot dei
+  minigiochi.
+
+##### La slot del ranch
+
+È il minigioco 6 RANCH 7 di oggi, cambiato. Non è più una gara fra due cowboy e
+non finisce più a tre monete; non è più un tempismo da premere a ogni scocco.
+
+- **Come si gioca.** Si punta, e il robot va a cavallo da giù verso su per una
+  pista con le monete. Si pensa solo ad andare avanti e a saltare le
+  staccionate; le monete sulla strada si raccolgono passandoci sopra.
+- **Il cowboy.** Accanto alla pista c'è un cowboy di cartoncino con la pistola
+  già in mano, pronta a sparare. Ogni volta che il robot raccoglie una moneta,
+  il cowboy spara. Dalla pistola esce una bandierina:
+  - **MANCATO**: non succede nulla e si continua;
+  - **BANG**: parte davvero il proiettile, che colpisce il robot. La giocata
+    finisce e si perde tutto ciò che si era guadagnato.
+- **Incassare.** In qualsiasi momento si può smettere e incassare il valore
+  raggiunto.
+- **Monete e incasso sono due numeri diversi.** Le monete raccolte servono solo
+  a far vedere a che punto si è. L'incasso cresce a ogni moneta, e ogni moneta
+  in più pesa più della precedente; ma ogni moneta in più rende anche più
+  probabile il BANG, basso all'inizio.
+- **Staccionata mancata** *(proposta)*: il cavallo inciampa e rallenta per un
+  momento, senza perdere nulla; il rischio resta tutto nella pistola.
+- **Comandi** *(proposta)*: `W` per andare avanti, `Spazio` per saltare, `Invio`
+  per incassare.
+
+**I numeri** *(proposta)*. Il BANG parte dal 2 % e cresce di 3 punti a ogni
+moneta, fino a un massimo del 60 %. L'incasso è calcolato in modo che, a
+qualunque moneta ci si fermi, la puntata renda in media il 98 %: il banco tiene
+il 2 %.
+
+| Moneta | Probabilità di BANG | Si arriva fin qui | Incasso | Con 10 crediti |
+|---|---|---|---|---|
+| 1 | 2 % | 98 % | ×1,00 | 10 |
+| 2 | 5 % | 93 % | ×1,05 | 10 |
+| 3 | 8 % | 86 % | ×1,14 | 11 |
+| 4 | 11 % | 76 % | ×1,29 | 12 |
+| 5 | 14 % | 66 % | ×1,49 | 14 |
+| 6 | 17 % | 54 % | ×1,80 | 18 |
+| 7 | 20 % | 44 % | ×2,25 | 22 |
+| 8 | 23 % | 34 % | ×2,92 | 29 |
+| 9 | 26 % | 25 % | ×3,95 | 39 |
+| 10 | 29 % | 18 % | ×5,56 | 55 |
+| 11 | 32 % | 12 % | ×8,18 | 81 |
+| 12 | 35 % | 8 % | ×12,59 | 125 |
+
+Una moneta di rischio in più moltiplica l'incasso per `1 / (1 − BANG)`: per
+questo, con un BANG basso all'inizio, i primi passi sono piccoli e la crescita
+accelera dopo. Salti grossi già alle prime monete (per esempio 1, 3, 6, 10)
+richiederebbero un BANG alto fin dalla seconda.
+
+##### Tre in fuga
+
+Un crash game alla Aviator: al posto dell'aereo corrono insieme **un dinosauro,
+una Panda 4x4 e una moto futuristica**, tutti di cartoncino nel mondo neon.
+
+- **Si sceglie uno dei tre** e si punta su di lui. Partono tutti e tre insieme e
+  il moltiplicatore sale finché corrono.
+- **Si incassa quando si vuole**, finché il proprio scelto è ancora in corsa: si
+  prende la puntata per il moltiplicatore di quel momento.
+- **Se il proprio scelto cade** (il dinosauro inciampa, la Panda si ribalta, la
+  moto si sfascia in scintille di neon) prima dell'incasso, non si prende nulla.
+  Se cade subito, alla partenza, si perde la puntata.
+- Gli altri due continuano la loro corsa per lo spettacolo: ognuno cade per conto
+  suo, e il loro destino non cambia quello del proprio scelto.
+- **I numeri** *(proposta)*: per ciascuno dei tre la probabilità di arrivare
+  almeno a ×M è `0,97 / M` (il banco tiene il 3 %; il 3 % delle volte cade alla
+  partenza). Il moltiplicatore raddoppia ogni 6 secondi circa. I tre hanno gli
+  stessi rischi e si distinguono solo per come cadono.
+
+##### Roulette e dadi
+
+- **Roulette** *(proposta)*: europea, un solo zero, ruota di cartoncino su un
+  piatto al neon. Puntate classiche: numero pieno (35 a 1), rosso o nero, pari o
+  dispari, basso o alto (1 a 1), dozzine e colonne (2 a 1). Il banco tiene il
+  2,7 % con lo zero.
+- **Dadi: duello di d20** *(proposta)*: il robot e il banco tirano un d20 con i
+  dadi del gioco; vince il più alto, il pari va al banco. Paga 1 a 1; il banco
+  tiene il 5 %.
 
 ### 3.3 Controlli
 
@@ -595,7 +688,8 @@ NESSUNA CARTA ── rotella ──► CARTA SCELTA ── rotella ──► la 
 | profilo M8 (vittorie del ring), nessun salvataggio della run | tre slot di salvataggio, ognuno con scoperte, segreti, biomi, deposito, serie, record e la run in corso, salvato di continuo |
 | Victory al boss di fine rotta | estrazione e minigioco a ogni boss di bioma |
 | minigiochi dal menu | minigiochi dei biomi dopo l'estrazione e cabinati nell'hub |
-| attività che si aprono dentro lo scontro: il ring delle quattro Tesla, 6 RANCH 7 con il 6 e il 7 di denari in mano | via; il Ring delle Ombre e 6 RANCH 7 restano solo come minigiochi dei biomi (City pop e far west); il 6 e il 7 di denari restano carte che danno crediti |
+| attività che si aprono dentro lo scontro: il ring delle quattro Tesla, 6 RANCH 7 con il 6 e il 7 di denari in mano | via; il Ring delle Ombre resta come minigioco della City pop; il 6 e il 7 di denari restano carte che danno crediti |
+| 6 RANCH 7: gara fra due cowboy a chi arriva prima a tre monete | la slot del casinò dell'hub: si cavalca raccogliendo monete finché si vuole, sotto la pistola di un cowboy |
 
 **Restano** le altre parti del gioco:
 - il catalogo delle carte, i dadi, gli status e gli intenti dei nemici;
@@ -704,7 +798,7 @@ difficoltà cresce lungo il ramo; lo Spazio è il più duro.
 | Bioma | Posto nella galassia | Neon | Mount | Minigiochi |
 |---|---|---|---|---|
 | Robotica cibernetica | il centro: si parte da qui | rosso cremisi (il mondo neon di oggi) | hoverbike | Scie di luce *(nuovo)* |
-| Deserto del far west | discesa, 1° | ambra e arancio | cavallo | 6 RANCH 7 |
+| Deserto del far west | discesa, 1° | ambra e arancio | cavallo | Duello a mezzogiorno *(nuovo)* |
 | Giungla preistorica | paura, 1° | verde acido e giallo | parasaurolofo | Fuga dal T-Rex *(nuovo)* |
 | City pop | ascesa, 1° | magenta e ciano | moto anni '80 | Ring delle Ombre, Karaoke *(nuovo)* |
 | Antico Egitto | discesa, 2° | oro e turchese | cammello | Sigilli della Cripta |
@@ -715,8 +809,9 @@ difficoltà cresce lungo il ramo; lo Spazio è il più duro.
 | Isola nel cielo | ascesa, 3° | perla, oro e rosa | grifone | Guglie Sospese |
 | Spazio | l'ultimo: si apre quando gli altri dieci sono vinti | viola e blu elettrico | jetpack | Arena delle Braci |
 
-I sette minigiochi di oggi trovano tutti un bioma; ne servono cinque nuovi
-(Scie di luce, Fuga dal T-Rex, Karaoke, Elicottero e Discesa).
+Sei dei sette minigiochi di oggi trovano un bioma; il settimo, 6 RANCH 7,
+diventa la slot del casinò dell'hub. Ne servono sei nuovi: Scie di luce, Fuga
+dal T-Rex, Karaoke, Elicottero, Discesa e Duello a mezzogiorno.
 
 #### Robotica cibernetica (si parte da qui)
 
@@ -749,7 +844,8 @@ I sette minigiochi di oggi trovano tutti un bioma; ne servono cinque nuovi
   bruti con la dinamite (Bomber), sceriffi corazzati (Custode).
 - **Boss.** Il Fuorilegge, sul treno blindato.
 - **Mount.** Il cavallo del cowboy di 6 RANCH 7.
-- **Minigioco.** 6 RANCH 7.
+- **Minigioco.** Duello a mezzogiorno *(nuovo)*: chi estrae per primo al
+  segnale. 6 RANCH 7 è diventato la slot del casinò dell'hub.
 - **Carte di casa.** Lazzo, il 6 e il 7 di denari.
 
 #### Giungla preistorica
@@ -927,7 +1023,8 @@ I sette minigiochi di oggi trovano tutti un bioma; ne servono cinque nuovi
 | Reliquie attive | tre posti fuori dalla griglia; solo lì le reliquie funzionano; un posto tiene una reliquia di qualunque forma; si cambiano solo fuori dagli scontri; morendo si perdono come il resto dello zaino |
 | Forma delle reliquie | ognuna ha una forma sua, più grande quanto più è rara |
 | Sospeso | nel menu dello zaino un oggetto appena raccolto, o tolto dalla griglia, resta sospeso mentre si sistema |
-| Attività dentro lo scontro | via: niente più ring delle quattro Tesla né 6 RANCH 7 aperti durante uno scontro; restano come minigiochi dei biomi |
+| Attività dentro lo scontro | via: niente più ring delle quattro Tesla né 6 RANCH 7 aperti durante uno scontro; il ring resta come minigioco della City pop |
+| Casinò dell'hub | slot del ranch (6 RANCH 7 riletto: monete raccolte a cavallo sotto la pistola di un cowboy, incasso quando si vuole), Tre in fuga (un crash game con dinosauro, Panda 4x4 e moto futuristica), roulette e dadi, con i crediti del deposito |
 | Mappa dei biomi | una galassia di isolette 3D nello stile del gioco, unite da rotte di luce; mostra solo i biomi già sbloccati, salvo il bioma segreto dopo il finale |
 | Rotella in scontro | sceglie le carte della mano (la prima, poi una a scatto); per le carte da orientare il clic sinistro entra nel piazzamento, dove la rotella gira l'oggetto; un altro clic sinistro piazza, il clic destro torna allo scorrimento |
 
@@ -948,6 +1045,10 @@ I sette minigiochi di oggi trovano tutti un bioma; ne servono cinque nuovi
 | Forme, pile e rotazione degli oggetti | forme a celle; pile di 5 consumabili e 99 crediti; la rotella gira l'oggetto preso |
 | Celle delle reliquie per rarità | comune 1–2, non comune 3, rara 4, leggendaria 5–6 |
 | Sospeso: quanti oggetti, chiusura, raccolta | fino a 3; chiudendo lo zaino tornano a terra dopo un avviso; la calamita non prende ciò che non entra |
+| Puntate del casinò | da 5 a 50 crediti |
+| Curva della slot del ranch | BANG dal 2 %, +3 punti a moneta, fino al 60 %; incasso che restituisce il 98 % a ogni punto d'uscita |
+| Tre in fuga | arrivare a ×M con probabilità 0,97 / M; stessi rischi per i tre; raddoppio ogni 6 s |
+| Roulette e dadi | roulette europea; duello di d20 con il pari al banco |
 | Deposito | una griglia più grande, a pagine |
 | Valuta | crediti nello zaino (l'oro di oggi) |
 | Pescata senza finestre | una carta ogni 4 battiti, più Refocus |
@@ -982,6 +1083,7 @@ poter entrare nel salvataggio.
 | 7 | La galassia dei biomi, sblocchi, serie e finali | vincendo compaiono la rotta e l'isola nuova, mai prima; la serie si conta e si azzera |
 | 8 | Minigiochi come estrazione e cabinati dell'hub; via le attività dentro lo scontro | battere un boss porta al minigioco e al ritorno a casa; nessuno scontro apre più il ring o 6 RANCH 7 |
 | 9 | I biomi veri, dalle [bozze](#43-i-biomi-bozze); si parte dalla Robotica cibernetica, che è il mondo neon di oggi | ogni bioma ha forme, terreno, corsia, nemici, boss, mount, minigiochi e frammenti suoi |
+| 10 | Il casinò dell'hub: la slot del ranch (da 6 RANCH 7), Tre in fuga, roulette e dadi | si scommettono crediti in tutti e quattro; le simulazioni confermano il vantaggio del banco |
 
 ### Note tecniche
 

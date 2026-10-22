@@ -14,8 +14,8 @@ per i comandi disponibili oggi valgono il [README](README.md) e la documentazion
   mappa dei biomi come galassia di isolette 3D, la rotella che sceglie e
   piazza le carte, le bozze di undici biomi e lo zaino a griglia con tre posti
   per le reliquie attive, reliquie più grandi quanto più sono rare, uno spazio
-  sospeso per sistemare e l'energia come barra blu),
-  quelle aperte con una proposta e la roadmap in nove fasi. Il gioco non cambia
+  sospeso per sistemare, l'energia come barra blu e il casinò dell'hub),
+  quelle aperte con una proposta e la roadmap in dieci fasi. Il gioco non cambia
   ancora: le regole di oggi restano finché le fasi non le sostituiscono.
 
 ## 2026-10-21 — Cannone, Buco Nero, Dinosauro e Sanguinamento
