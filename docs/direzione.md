@@ -2,7 +2,7 @@
 
 # Direzione del gioco
 
-Documento di direzione, versione 1.1 (22 ottobre 2026). Fissa dove va il gioco in
+Documento di direzione, versione 1.2 (22 ottobre 2026). Fissa dove va il gioco in
 quattro ambiti: **Mappa**, **Progressione**, **Gameplay** e **Design**. Gli altri
 documenti descrivono il gioco di oggi e restano validi finché una fase della
 [roadmap](#6-roadmap) non ne sostituisce le regole.
@@ -39,6 +39,7 @@ bioma e porta a casa ciò che ha raccolto. Se muore perde lo zaino, ma ciò che 
 | Bioma | una mappa aperta con il suo boss, i suoi nemici, la sua mount e i suoi minigiochi |
 | Run | una spedizione in un bioma, dall'ingresso all'estrazione o alla morte |
 | Hub | il luogo fra una run e l'altra: deposito, zaino, mappa dei biomi, progressi |
+| Galassia | la mappa dei biomi nell'hub: isolette 3D sparse nel vuoto, una per bioma |
 | POI | punto d'interesse: un luogo della mappa con un contenuto (nemici, bottino, scoperta, servizio) |
 | Segreto | un luogo che l'ologramma non segna finché non lo si trova esplorando |
 | Scontro | lo stato di combattimento: comincia con l'ingaggio, finisce quando nessun nemico insegue più |
@@ -246,24 +247,65 @@ Tutto questo vale per slot: ogni slot è una partita a sé
 
 ### 2.7 Biomi e sblocchi
 
-- Si parte con un solo bioma sbloccato. Vincere una run ne sblocca uno o più: la
-  **mappa dei biomi** è un grafo. *(proposta: 6 biomi più uno segreto, con i
-  nomi di lavoro qui sotto; il B6 si apre quando tutti gli altri sono vinti)*
-
-  ```text
-          ┌─► B2 ─┐       ┌─► B4 ─┐
-   B1 ────┤       ├───────┤       ├───► B6, l'ultimo bioma
-          └─► B3 ─┘       └─► B5 ─┘
-                                        ?  il bioma segreto
-  ```
-
+- Si parte con un solo bioma sbloccato. Vincere una run ne sblocca uno o più,
+  secondo rotte fisse fra i biomi. *(proposta: 6 biomi più uno segreto, con i
+  nomi di lavoro dello schizzo qui sotto. B1 apre B2 e B3; B2 apre B4; B3 apre
+  B5; B6, l'ultimo, si apre quando tutti gli altri sono vinti)*
 - Il gioco **finisce** quando ogni bioma è stato vinto almeno una volta: è il
   finale normale.
 
+#### La galassia
+
+Nell'hub la mappa dei biomi è una **galassia**: tante isolette 3D sparse nel
+vuoto, nello stile del gioco.
+
+- **Lo spazio.** È il vuoto nero del mondo neon, con l'alone rosso
+  all'orizzonte, stelle come punti di neon e polvere di poligoni a fil di ferro.
+  Niente texture.
+- **Le isole.** Ogni bioma è un'isoletta che galleggia: una roccia nera
+  sfaccettata con gli spigoli al neon, come le colline del mondo neon. Sopra
+  c'è il bioma in miniatura nella sua tinta, con la sua geografia come la mostra
+  l'ologramma (vedi la geografia fissa in
+  [1.1](#11-il-bioma-come-mappa-aperta)). Le isole stanno a distanze e altezze
+  diverse e ruotano piano su sé stesse.
+- **L'hub** è anch'esso un'isola: quella da cui il robot parte.
+- **Le rotte.** Gli sblocchi sono rotte di luce fra le isole. Vincendo un bioma
+  si accende la rotta, poi l'isola che apre.
+- **Stati di un'isola.**
+
+  | Stato | Come si vede |
+  |---|---|
+  | chiusa | sagoma scura con un contorno spento; si vede anche da lontano |
+  | aperta | accesa nella sua tinta, con un faro che pulsa |
+  | vinta | in cima un'insegna di cartoncino (il boss battuto) e le stelle del miglior minigioco |
+  | nella serie | le isole vinte nella serie in corso sono unite da una catena di luce |
+
+- **Scegliere un bioma.** Passando sopra un'isola compare il suo cartellino di
+  carta: nome, boss, minigiochi, record. Scegliendola, la camera vola fino a lei
+  e il cartoncino del robot salta dall'hub lungo la rotta: è l'ingresso nella
+  run. *(proposta: si gira attorno alla galassia trascinando, senza zoom libero)*
+- **L'isola segreta** non si vede prima del finale normale; ci sono solo indizi,
+  come una stella che si spegne e si riaccende o un glitch. Dopo il finale
+  appare come un'isola spenta ai margini della galassia (vedi
+  [2.8](#28-il-finale-e-il-true-ending)).
+
+Schizzo della galassia vista dall'alto, solo per orientarsi: nel gioco le isole
+sono sparse anche in altezza. Le rotte di luce sono `~`, `/` e `\`.
+
+```text
+      .         *                .                 *           .
+                   ( B2 )~~~~~~~~~~~~( B4 )
+          .       /                          \           .
+  ( HUB )~~( B1 )            *                 ( B6 )
+          .       \                          /       .     ( ? )
+                   ( B3 )~~~~~~~~~~~~( B5 )
+      *         .                .         .           *
+```
+
 ### 2.8 Il finale e il true ending
 
-- **Il bioma segreto si mostra.** Dopo il finale normale, la mappa dei biomi lo
-  mostra come una sagoma spenta, con un indizio esplicito della condizione.
+- **Il bioma segreto si mostra.** Dopo il finale normale, la galassia lo mostra
+  come un'isola spenta ai margini, con un indizio esplicito della condizione.
   Prima del finale ci sono solo indizi impliciti: glitch e frammenti di memoria.
 - **La condizione** è una **serie senza morti** che comprende una vittoria in
   **ogni** bioma, l'ultimo compreso.
@@ -356,7 +398,7 @@ Tutto questo vale per slot: ogni slot è una partita a sé
 | Zona | A che cosa serve |
 |---|---|
 | Deposito | gestire gli oggetti estratti e preparare lo zaino |
-| Mappa dei biomi | una mappa larga con i biomi sbloccati e le sagome di quelli chiusi; da qui si parte |
+| Galassia | la mappa dei biomi: isolette 3D sparse nel vuoto, aperte, chiuse o vinte ([2.7](#27-biomi-e-sblocchi)); da qui si parte |
 | Progressi | statistiche, carte scoperte (con Mostra effetto), segreti, record dei minigiochi, serie |
 | Cabinati *(proposta)* | rigiocare i minigiochi sbloccati per i record, senza premi |
 | Prova meccaniche | il laboratorio delle carte di oggi |
@@ -409,6 +451,9 @@ Tutto questo vale per slot: ogni slot è una partita a sé
   del cannone e i dinosauri.
 - **Carte e HUD** restano come sono: la carta nel vuoto digitale è l'identità
   visiva.
+- **La galassia dell'hub** usa gli stessi materiali del mondo: isolette di
+  roccia nera sfaccettata con gli spigoli al neon, stelle di neon, nessuna
+  texture; sopra le isole, insegne e cartellini di cartoncino.
 - **Nemici** futuristici, o presi in prestito dai giochi cari al creatore.
   - *Proposta*: ogni bioma è il ricordo di un gioco (o di un genere) del
     creatore. I suoi nemici, la sua mount e i suoi minigiochi vengono da quel
@@ -482,12 +527,14 @@ creatore.
 | Fine del gioco | tutti i biomi vinti; poi il bioma segreto e il true ending |
 | Stile | mondo low poly senza texture al neon; personaggi e oggetti di cartoncino |
 | Salvataggi | tre slot avviabili; in ogni slot un solo salvataggio, aggiornato quasi sempre; gli slot non si copiano, si possono solo cancellare |
+| Mappa dei biomi | una galassia di isolette 3D nello stile del gioco, unite da rotte di luce |
 
 ### Aperte, con una proposta
 
 | Domanda | Proposta |
 |---|---|
-| Quanti biomi e come si collegano | 6 più il segreto, un grafo a rami ([2.7](#27-biomi-e-sblocchi)) |
+| Quanti biomi e come si collegano | 6 più il segreto, collegati da rotte a rami ([2.7](#27-biomi-e-sblocchi)) |
+| Comandi della galassia | si gira trascinando, senza zoom libero |
 | Geografia fissa o generata a ogni run | fissa, con contenuto variabile ([1.1](#11-il-bioma-come-mappa-aperta)) |
 | Dimensioni della mappa | circa 96×96 celle, da 80×80 a 112×112 |
 | Chiavi per la tana del boss | nessuna: sempre aperta |
@@ -519,7 +566,7 @@ poter entrare nel salvataggio.
 | 4 | Mount | si attraversa il bioma in sella; uno scontro la impedisce |
 | 5 | Zaino, deposito, hub minimo, estrazione e morte; i tre slot con il salvataggio continuo | una run porta a casa uno zaino, una morte lo perde; chiudendo il gioco a metà run, o dopo un crash, si riprende dall'ultimo salvataggio |
 | 6 | Esperienza, livelli e punti; scoperte e pool | si livella nella run; una carta scoperta compare nella run dopo |
-| 7 | Mappa dei biomi, sblocchi, serie e finali | il grafo si apre vincendo; la serie si conta e si azzera |
+| 7 | La galassia dei biomi, sblocchi, serie e finali | vincendo si accendono rotte e isole; la serie si conta e si azzera |
 | 8 | Minigiochi come estrazione e cabinati dell'hub | battere un boss porta al minigioco e al ritorno a casa |
 | 9 | I biomi veri: direzione artistica, nemici, mount e narrativa | ogni bioma ha forma, nemici, mount, minigiochi e frammenti suoi |
 
