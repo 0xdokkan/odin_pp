@@ -13,7 +13,8 @@ per i comandi disponibili oggi valgono il [README](README.md) e la documentazion
   (fra cui i tre slot di salvataggio, aggiornati di continuo e non copiabili, la
   mappa dei biomi come galassia di isolette 3D, la rotella che sceglie e
   piazza le carte, le bozze di undici biomi e lo zaino a griglia con tre posti
-  per le reliquie attive),
+  per le reliquie attive, reliquie più grandi quanto più sono rare e uno spazio
+  sospeso per sistemare),
   quelle aperte con una proposta e la roadmap in nove fasi. Il gioco non cambia
   ancora: le regole di oggi restano finché le fasi non le sostituiscono.
 
