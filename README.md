@@ -63,6 +63,7 @@ negozio e riposo consentono di aprire **Mostra effetto** per provare una carta.
 
 | Documento | Contenuto |
 |---|---|
+| [Direzione del gioco](docs/direzione.md) | dove va il gioco: mappa aperta per bioma, progressione da extraction, combattimento senza timer, design e narrativa |
 | [Architettura](docs/architettura.md) | package, dipendenze, proprietà delle risorse e contratti |
 | [Engine e minigiochi](docs/engine.md) | host, scene, input, minigiochi e atlanti incorporati |
 | [Combattimento](docs/regole/combattimento.md) | clock, comandi, status, reazioni, movimento e oggetti |

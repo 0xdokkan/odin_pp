@@ -5,6 +5,14 @@ I riferimenti a Classica, `--flat` e ai vecchi smoke descrivono versioni precede
 per i comandi disponibili oggi valgono il [README](README.md) e la documentazione collegata.
 
 
+## 2026-10-22 — Documento di direzione
+
+- [Direzione del gioco](docs/direzione.md): fissa la direzione in quattro ambiti
+  (mappa aperta per bioma, progressione da extraction, combattimento senza timer,
+  design e narrativa del robot nella memoria del creatore), le decisioni prese,
+  quelle aperte con una proposta e la roadmap in nove fasi. Il gioco non cambia
+  ancora: le regole di oggi restano finché le fasi non le sostituiscono.
+
 ## 2026-10-21 — Cannone, Buco Nero, Dinosauro e Sanguinamento
 
 - **Cannone** (non comune, energia 2, 2 s, fino a +2): una torretta su una casella
