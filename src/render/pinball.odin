@@ -715,8 +715,8 @@ pinball_ball_pixels :: proc(band: rl.Color, axis: [3]f32, out: []u8) {
 
 PINBALL_HEAVY :: rl.Color{235, 91, 91, 255}
 
-// While the Pinball is aimed: every foe beside the player it can take marked
-// with a steel reticle, a boss or a miniboss there with a red one (and
+// While the Pinball is aimed: a boss or a miniboss beside the player, which it
+// cannot take, marked with a red reticle (and
 // TROPPO PESANTE, after the cards: draw_pinball_heavy_labels); for the foe under
 // the mouse, the way the strike would send the ball now, up to the first solid
 // thing on it.
@@ -733,9 +733,8 @@ draw_pinball_preview :: proc(renderer: ^Renderer, room: ^game.Room, card: game.C
 			continue
 		}
 		if evaluation.error != .None { continue }
-		hot := renderer.has_hovered_cell && renderer.hovered_cell == enemy.position
-		draw_aim_reticle(renderer, enemy.position, 0.5 if hot else 0.46, 3 if hot else 2, PINBALL_AIM_HOT if hot else PINBALL_AIM_LINE)
-		if hot { draw_pinball_launch_line(renderer, room, enemy.position) }
+		// The foe itself is marked by the general "can be hit" mark (card_hit_mark.odin).
+		if renderer.has_hovered_cell && renderer.hovered_cell == enemy.position { draw_pinball_launch_line(renderer, room, enemy.position) }
 	}
 }
 

@@ -33,6 +33,13 @@ active_targeting_card_id :: proc(state: Card_Interaction_State) -> u32 {
 	return state.selected_card_id
 }
 
+// The card under the mouse in the hand while none is chosen or dragged: its
+// range and the foes it would hit show faintly, to help decide (render.draw_tactical_world).
+hovered_preview_card_id :: proc(state: Card_Interaction_State) -> u32 {
+	if active_targeting_card_id(state) != 0 { return 0 }
+	return state.hovered_card_id
+}
+
 // FERETRO: the player holds Ctrl with arrows to loose; the board then marks
 // the foes they reach (render.draw_arrow_aim).
 arrows_aiming :: proc(room: ^game.Room, controls: Run_Input) -> bool {

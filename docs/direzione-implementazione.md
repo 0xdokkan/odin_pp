@@ -291,7 +291,10 @@ della tana (`dietro_muro`), poi guida la scena vera con i tasti tenuti
 premuti: una corsa in sella (`camminata`) e una camminata verso una
 pattuglia fino all'ingaggio (`ingaggio`), stampando posizione, cella e fase;
 infine i dodici biomi con l'inquadratura delle catture di riferimento
-(`centro_00`–`centro_11`). Dopo un'interruzione dovuta al monitor non
+(`centro_00`–`centro_11`), e quattro scontri con una carta scelta in Neve, Far West,
+Giungla e Spazio (`bersagli_neve`, `bersagli_far_west`, `bersagli_giungla`,
+`bersagli_spazio`: il segno dei nemici colpibili sui quattro biomi; con
+`ODIN_PP_SMOKE_ONLY=hits` partono solo quelli). Dopo un'interruzione dovuta al monitor non
 disponibile, la sessione grafica è tornata accessibile: le nuove catture
 native sono state controllate. La mappa intera, gli indicatori e la legenda risultano leggibili;
 il robot conserva il bordo di carta, la griglia di combattimento è visibile

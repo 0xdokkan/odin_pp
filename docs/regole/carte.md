@@ -14,6 +14,9 @@ non resta nel mazzo. La compilazione valida fase, istanza e definizione,
 riesegue targeting e movimento, espande i destinatari per ID e controlla la
 capacità prima di produrre effetti. Non paga energia e non modifica RNG.
 
+`card_hit_enemies` usa lo stesso piano per dire quali nemici una giocata valida
+colpirebbe davvero (la HUD li segna: [Bersagli in evidenza](../presentazione.md)).
+
 Preview e compilazione condividono `build_card_target_plan`: la preview conta
 i destinatari, il compilatore conserva e consuma il piano locale della stessa
 espansione. L'ordine resta template, oggetti colpiti, nemici per ID. Il conteggio

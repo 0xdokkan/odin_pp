@@ -120,6 +120,9 @@ Tactical_View :: struct {
 	arsenal: Arsenal_View,
 	// INONDAZIONE: the way of its wave while the card is held over the board.
 	flood_aim: Flood_Aim,
+	// "This one can be hit": when each locked foe was first locked, for its ring
+	// (card_hit_mark.odin).
+	hit_marks: Card_Hit_Memory,
 	// FIRST PERSON SHOOTER: the camera in the player's eyes, the AK and its
 	// shots (first_person.odin).
 	first_person: First_Person_View,
@@ -558,13 +561,17 @@ update_tactical_body_hover :: proc(renderer: ^Renderer, mouse: view.Vec2) {
 	}
 }
 
-draw_tactical_world :: proc(renderer: ^Renderer, room: ^game.Room, active_card: u32, expedition_world: ^expedition.World = nil) {
+// `hover_card` is a card only under the mouse in the hand (none chosen): its range
+// and its targets show faintly.
+draw_tactical_world :: proc(renderer: ^Renderer, room: ^game.Room, active_card: u32, expedition_world: ^expedition.World = nil, hover_card: u32 = 0) {
 	v := &renderer.tactical
 	when EXPEDITION_BENCHMARK {v.draw_timing={};stamp:=rl.GetTime()}
 	v.draw_frustum = tactical_draw_frustum(v.camera, renderer.canvas_width, renderer.canvas_height)
 	snapshot := v.snapshot
 	preview: Card_Range_Preview
-	prepare_card_range_preview(renderer, room, active_card, &preview)
+	if active_card != 0 { prepare_card_range_preview(renderer, room, active_card, &preview) } else { prepare_card_range_preview(renderer, room, hover_card, &preview, true) }
+	halo := CARD_HIT_VIOLET
+	if expedition_world != nil { halo = card_hit_halo_color(expedition.metadata(expedition_world.biome).color, true) }
 	update_ground_fx(renderer, room)
 	lights: [4]rl.Vector4
 	// The surface draws in logical units at its own resolution.
@@ -646,6 +653,7 @@ draw_tactical_world :: proc(renderer: ^Renderer, room: ^game.Room, active_card: 
 	if expedition_world == nil { draw_diorama_accents(renderer, room) }
 	draw_tactical_clear_markers(renderer, room)
 	draw_card_range_light(renderer, room, &preview)
+	draw_card_hit_marks(renderer, room, &preview, halo)
 	draw_voxel_threats(renderer, room)
 	draw_intent_ground(renderer, room)
 	draw_marley_floor(renderer, room)
@@ -672,6 +680,7 @@ draw_tactical_world :: proc(renderer: ^Renderer, room: ^game.Room, active_card: 
 	draw_flood_wave(renderer, room)
 	draw_arsenal_sky(renderer, room)
 	draw_tactical_feedback(renderer, .Accent)
+	draw_card_hit_sparks(renderer, room, &preview, halo)
 	rl.EndMode3D()
 	when EXPEDITION_BENCHMARK {v.draw_timing.paper_ms=expedition_benchmark_elapsed(&stamp)}
 

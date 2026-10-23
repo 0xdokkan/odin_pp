@@ -1920,6 +1920,49 @@ build_card_target_plan :: proc(room: ^Room, card: Card_Id, definition: Card_Defi
 	return
 }
 
+// The foes a cast would really affect, for the board's "this one can be hit"
+// mark: the ones the effect plan names (damage, push, status...), the same
+// expansion the play itself compiles, not every foe the line or the area covers
+// (a Dash lists the foes on its line and hits none). Nothing for a cast the
+// evaluation refuses. A card whose foes are only known when it resolves (the
+// random columns of Bomb Marley, the die of the Dinosauro) names none.
+MAX_CARD_HITS :: MAX_ENEMIES_PER_ROOM
+Card_Hit_Set :: struct {
+	ids:   [MAX_CARD_HITS]u32,
+	count: int,
+}
+
+card_hit_set_contains :: proc(set: ^Card_Hit_Set, id: u32) -> bool {
+	for known in set.ids[:set.count] { if known == id { return true } }
+	return false
+}
+
+card_hit_set_add :: proc(set: ^Card_Hit_Set, id: u32) {
+	if set.count < len(set.ids) && !card_hit_set_contains(set, id) {
+		set.ids[set.count] = id
+		set.count += 1
+	}
+}
+
+card_hit_enemies :: proc(room: ^Room, instance: Card_Instance, evaluation: ^Card_Target_Evaluation) -> (hits: Card_Hit_Set) {
+	if room == nil || evaluation == nil || evaluation.error != .None { return }
+	definition, found := card_definition_by_id(instance.definition_id)
+	if !found { return }
+	plan := build_card_target_plan(room, instance.definition_id, definition, &evaluation.query, true)
+	for entry in plan.targets[:min(plan.count, len(plan.targets))] {
+		if entry.entity.kind != .Enemy || enemy_is_out_of_play(room, entry.entity.id) { continue }
+		if _, present := enemy_index_by_id(room, entry.entity.id); present { card_hit_set_add(&hits, entry.entity.id) }
+	}
+	// INONDAZIONE: the wave sweeps every foe in play, wherever it is dropped.
+	for index in 0..<definition.effect_count {
+		if definition.effects[index].kind != .Flood_Wave { continue }
+		for enemy in room.enemies {
+			if !enemy_is_out_of_play(room, enemy.id) && tactical_cell_visible(room, enemy.position) { card_hit_set_add(&hits, enemy.id) }
+		}
+	}
+	return
+}
+
 compile_card_action :: proc(
 	room: ^Room,
 	instance: Card_Instance,

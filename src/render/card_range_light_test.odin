@@ -6,7 +6,7 @@ import game "../game"
 import grid "../engine/grid"
 import level "../level"
 
-@(private = "file")
+@(private)
 card_range_test_room :: proc(t: ^testing.T, data: ^level.Level, player: ^game.Player) -> (room: game.Room) {
 	rows := [?]string{
 		"#############",

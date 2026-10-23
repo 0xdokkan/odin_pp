@@ -230,10 +230,6 @@ draw_flood_preview :: proc(renderer: ^Renderer, room: ^game.Room) {
 		if game.cell_blocks_movement(room, cell) { continue }
 		draw_card_range_cell(renderer, cell, {64, 140, 226, 70}, {160, 214, 250, 150})
 	}
-	for enemy in room.enemies {
-		if game.enemy_is_out_of_play(room, enemy.id) { continue }
-		draw_card_range_cell(renderer, enemy.position, {236, 248, 255, 70}, {236, 248, 255, 255})
-	}
 	// The two walls: where the wave starts (the bar, in cyan) and where it ends
 	// (white), as board-edge segments.
 	start_a, start_b, end_a, end_b: view.Vec2

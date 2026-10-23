@@ -515,7 +515,7 @@ expedition_draw :: proc(data:rawptr,frame:^host.Frame) {
 	}
 	render.update_tactical_view(&rs.iso_renderer,room,rs.mouse_canvas,false,true)
 	when render.EXPEDITION_BENCHMARK {now=rl.GetTime();e.draw_timing.view_ms=(now-stamp)*1000;stamp=now}
-	render.draw_tactical_world(&rs.iso_renderer,room,active_targeting_card_id(rs.card_interaction),&e.world)
+	render.draw_tactical_world(&rs.iso_renderer,room,active_targeting_card_id(rs.card_interaction),&e.world,hovered_preview_card_id(rs.card_interaction))
 	when render.EXPEDITION_BENCHMARK {now=rl.GetTime();e.draw_timing.world_ms=(now-stamp)*1000;stamp=now}
 	render.draw_status(&rs.iso_renderer,room,rs.window.scale_mode)
 	render.draw_tactical_hud(&rs.iso_renderer,room,false,false)

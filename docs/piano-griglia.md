@@ -32,7 +32,7 @@ numero della fase resta quello della sua sezione.
 | Priorità | Fase | Contenuto | Dipende da | Stato | Commit |
 |---|---|---|---|---|---|
 | 0 | 0 | Test affidabili su Windows (proposta di Claude, approvata dall'utente) | — | Fatta | vedi Esito |
-| 1 | 1 | Bersagli in evidenza | — | Da fare | — |
+| 1 | 1 | Bersagli in evidenza | — | Fatta | vedi Esito |
 | 2 | 8 | Hub in 3D: la piazza, il robot che cammina, gli edifici | — | Da fare | — |
 | 3 | 9 | Hub in 3D: dentro il casinò | 8 | Da fare | — |
 | 4 | 10 | Hub in 3D: dentro il deposito | 8 | Da fare | — |
@@ -439,7 +439,60 @@ regole della sezione 1: fammi prima le domande della fase e fermati alla fine.
 
 ### Esito
 
-*(da compilare a fine fase)*
+Fatta il 23 ottobre 2026 sul ramo `piano-griglia`.
+
+**Risposte dell'utente alle domande della fase**
+1. **Colore:** bianco con alone viola elettrico (verde acido nello Spazio).
+2. **Quali nemici:** tutti quelli colpiti con certezza, esclusi gli effetti
+   casuali.
+3. **Lazzo e Pinball:** usano il nuovo segno.
+4. **Passaggio del mouse sulla carta:** sì, più tenue. (Il piano consigliava il
+   contrario; vale la scelta dell'utente.)
+
+**Cosa è stato fatto**
+- **Gioco:** `game.card_hit_enemies` (in `src/game/card.odin`) dice quali nemici
+  una giocata valida colpirebbe davvero, con lo stesso piano degli effetti della
+  giocata. Eccezione calcolata a parte: l'Inondazione segna tutti i nemici in
+  gioco. Cinque test nuovi in `src/game/card_hit_test.odin`.
+- **Renderer:** `src/render/card_hit_mark.odin` disegna il segno nel passaggio
+  della luce del raggio (nucleo quasi bianco che pulsa, contorno d'inchiostro,
+  angoli, alone, anello che si apre una volta) e, dopo gli sprite, un fascio di
+  luce con le scintille. `Card_Range_Preview` ha ora l'elenco dei nemici
+  colpibili e lo stato «tenue».
+- **Cannone e Buco Nero:** i nemici sulla linea e nel 3×3 si segnano con il
+  puntatore sulla casella. Il vecchio segno di Cannone, Inondazione, Lazzo e
+  Pinball sui nemici è stato tolto.
+- **Passaggio del mouse:** `draw_tactical_world` ha un parametro `hover_card`
+  e le due scene lo riempiono con `hovered_preview_card_id`.
+- **Colore per bioma:** l'alone sceglie tra viola e verde acido (funzione
+  `card_hit_halo_color`); un test verifica 40° di tinta di distanza da tutti i
+  colori in ogni bioma.
+- **Verifiche visive:** nuovo atto `mechanics_lab_hit_marks` nello smoke del
+  laboratorio e quattro scontri nello smoke della spedizione (Neve, Far West,
+  Giungla, Spazio).
+- **Documenti:** `docs/presentazione.md`, `docs/regole/carte.md`,
+  `docs/verifica.md`, `docs/direzione-implementazione.md` e `CHANGELOG.md`.
+
+**Verifiche**
+- `.\scripts\check.ps1` completo: 1538 test verdi, con e senza assert, e le
+  due build.
+- Smoke del laboratorio completo: exit 0 in 13 minuti, catture
+  `odin_pp_mechanics_lab_hit_*.png`.
+- Smoke della spedizione completo, con i quattro scontri nuovi:
+  `odin_pp_expedition_bersagli_*.png`.
+
+**Da sapere**
+- L'animazione del segno usa l'orologio degli sprite e non quello del mondo
+  (come previsto dal piano), perché la scelta delle carte avviene proprio quando
+  il mondo è fermo.
+- Le carte che colpiscono più tardi (ordigni posati) o a caso (Bomb Marley, dado
+  del Dinosauro) non segnano nessun nemico.
+- Per lavorare più in fretta ci sono due filtri solo di sviluppo:
+  `ODIN_PP_LAB_ONLY=hit_marks` (laboratorio) e `ODIN_PP_SMOKE_ONLY=hits`
+  (spedizione). La corsa completa resta in sequenza.
+- Il passo «prestazioni» del piano non ha una misura dedicata: il segno fa al
+  massimo una valutazione per casella già fatta dal raggio, più un piccolo
+  calcolo per nemico segnato.
 
 ## 3. Fase 2 — Altezze nel laboratorio
 

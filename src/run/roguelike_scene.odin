@@ -432,14 +432,15 @@ roguelike_draw :: proc(data: rawptr, hf: ^host.Frame) {
 	if !draw_run_screen(rs) {
 		rs.timeline_busy = render.renderer_blocks_player_input(&rs.iso_renderer)
 		active_card_id := active_targeting_card_id(rs.card_interaction)
+		hover_card_id := hovered_preview_card_id(rs.card_interaction)
 		if rs.timeline_busy {
-			active_card_id = 0
+			active_card_id, hover_card_id = 0, 0
 		}
 		// FERETRO's aim shows while a click would loose an arrow.
 		rs.iso_renderer.tactical.arrow_aim = arrows_aiming(&rs.room, rs.frame_input) && !rs.activity_modal && !rs.timeline_busy &&
 			game.tactical_allows_action(&rs.room) && !game.tactical_player_busy(&rs.room)
 		render.update_tactical_view(&rs.iso_renderer, &rs.room, rs.mouse_canvas, false, true)
-		render.draw_tactical_world(&rs.iso_renderer, &rs.room, active_card_id)
+		render.draw_tactical_world(&rs.iso_renderer, &rs.room, active_card_id, nil, hover_card_id)
 		render.draw_status(&rs.iso_renderer, &rs.room, rs.window.scale_mode)
 		render.draw_relic_bar(&rs.iso_renderer, &rs.room, rs.mouse_canvas, rs.mouse_inside,
 			rs.card_interaction.hovered_card_id if rs.card_interaction.hovered_card_id != 0 else rs.card_interaction.selected_card_id)

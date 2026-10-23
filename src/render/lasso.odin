@@ -840,8 +840,7 @@ draw_lasso_projected_ring :: proc(renderer: ^Renderer, room: ^game.Room, centre:
 LASSO_AIM_LINE :: rl.Color{232, 196, 128, 235}
 LASSO_AIM_HOT :: rl.Color{255, 232, 168, 255}
 
-// While the Lazzo is aimed: every foe it can take, bosses included, marked
-// with a hemp reticle; the ring it would spin on (its cells, red with a cross
+// While the Lazzo is aimed: the ring it would spin on (its cells, red with a cross
 // where the foe would smash, orange where it would strike a foe) and, for
 // the foe under the mouse, the cell the
 // spin starts on and its way round.
@@ -877,7 +876,7 @@ draw_lasso_preview :: proc(renderer: ^Renderer, room: ^game.Room, card: game.Car
 		evaluation := game.evaluate_card_targeting(room, card, game.card_target_request_at(definition, enemy.position))
 		if evaluation.error != .None { continue }
 		hot := renderer.has_hovered_cell && hovered_cell == enemy.position
-		draw_aim_reticle(renderer, enemy.position, 0.5 if hot else 0.46, 3 if hot else 2, LASSO_AIM_HOT if hot else LASSO_AIM_LINE)
+		// The foe itself is marked by the general "can be hit" mark (card_hit_mark.odin).
 		if !hot { continue }
 		// Where the spin starts, and its way round (counter-clockwise).
 		state: game.Lasso_State

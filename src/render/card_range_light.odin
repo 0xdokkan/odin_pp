@@ -15,10 +15,46 @@ CARD_RANGE_SIDE :: game.MAX_TARGETING_RANGE*2+1
 @(private)
 Card_Range_Preview :: struct {
 	active, affordable, has_hover: bool,
+	// The card is only under the mouse in the hand, not chosen: its range and its
+	// targets show faintly, and the cell under the mouse is not evaluated.
+	faint: bool,
 	card: game.Card_Instance,
 	origin: grid.Position,
 	cells: [CARD_RANGE_SIDE*CARD_RANGE_SIDE]bool,
 	hover: game.Card_Target_Evaluation,
+	// The foes some valid cast of the card would really affect (card_hit_mark.odin
+	// draws them); `locked` ones are hit by the cast on the cell under the mouse.
+	hits: [game.MAX_CARD_HITS]Card_Hit_Mark,
+	hit_count: int,
+}
+
+@(private)
+Card_Hit_Mark :: struct {
+	id: u32,
+	cell: grid.Position,
+	locked: bool,
+}
+
+// A foe the card can hit, once: found on the board, in sight, in play.
+@(private="file")
+card_range_hit :: proc(renderer: ^Renderer, room: ^game.Room, preview: ^Card_Range_Preview, id: u32, locked: bool) {
+	for i in 0..<preview.hit_count {
+		if preview.hits[i].id == id { preview.hits[i].locked = preview.hits[i].locked || locked; return }
+	}
+	if preview.hit_count >= len(preview.hits) { return }
+	for enemy in room.enemies {
+		if enemy.id != id { continue }
+		if game.enemy_is_out_of_play(room, id) || !tactical_render_visible(renderer, enemy.position) { return }
+		preview.hits[preview.hit_count] = {id = id, cell = enemy.position, locked = locked}
+		preview.hit_count += 1
+		return
+	}
+}
+
+@(private="file")
+card_range_hits :: proc(renderer: ^Renderer, room: ^game.Room, preview: ^Card_Range_Preview, set: game.Card_Hit_Set, locked: bool) {
+	set := set
+	for id in set.ids[:set.count] { card_range_hit(renderer, room, preview, id, locked) }
 }
 
 @(private)
@@ -35,7 +71,7 @@ card_range_include :: proc(preview: ^Card_Range_Preview, cell: grid.Position) {
 }
 
 @(private)
-prepare_card_range_preview :: proc(renderer: ^Renderer, room: ^game.Room, card_id: u32, preview: ^Card_Range_Preview) {
+prepare_card_range_preview :: proc(renderer: ^Renderer, room: ^game.Room, card_id: u32, preview: ^Card_Range_Preview, faint := false) {
 	preview^ = {}
 	if renderer == nil || room == nil || room.player == nil || room.level_data == nil ||
 	   room.phase != .Combat || card_id == 0 || renderer_blocks_player_input(renderer) { return }
@@ -44,7 +80,7 @@ prepare_card_range_preview :: proc(renderer: ^Renderer, room: ^game.Room, card_i
 	card := room.player.deck.hand[index]
 	definition, defined := game.card_definition_by_id(card.definition_id)
 	if !defined { return }
-	preview.active, preview.card = true, card
+	preview.active, preview.card, preview.faint = true, card, faint
 	preview.affordable = room.player.deck.energy >= game.card_energy_cost(room, card.definition_id)
 	at := room.player.position
 	preview.origin = {at.x-game.MAX_TARGETING_RANGE, at.y-game.MAX_TARGETING_RANGE}
@@ -59,6 +95,7 @@ prepare_card_range_preview :: proc(renderer: ^Renderer, room: ^game.Room, card_i
 				// destinations still belong to the cast range. Cell anchors may
 				// deliberately accept static terrain.
 				if evaluation.query.anchor_reachable || evaluation.error == .None { card_range_include(preview, cell) }
+				if evaluation.error == .None { card_range_hits(renderer, room, preview, game.card_hit_enemies(room, card, &evaluation), false) }
 			}
 		}
 	} else {
@@ -66,6 +103,7 @@ prepare_card_range_preview :: proc(renderer: ^Renderer, room: ^game.Room, card_i
 		if (evaluation.query.anchor_reachable || evaluation.error == .None) && tactical_render_visible(renderer, evaluation.query.anchor) {
 			card_range_include(preview, evaluation.query.anchor)
 		}
+		if evaluation.error == .None { card_range_hits(renderer, room, preview, game.card_hit_enemies(room, card, &evaluation), false) }
 	}
 	if card.definition_id == .Toxic_Wave {
 		for enemy in room.enemies {
@@ -74,22 +112,41 @@ prepare_card_range_preview :: proc(renderer: ^Renderer, room: ^game.Room, card_i
 			}
 		}
 	}
-	if !renderer.has_hovered_cell { return }
+	if faint || !renderer.has_hovered_cell { return }
 	// Hidden anchors fail before the game constructs a query: do not draw
 	// that empty query at (0,0). Self cards always anchor on the player.
 	if definition.targeting.shape != .None && (!tactical_render_visible(renderer, renderer.hovered_cell) ||
 	   !game.tactical_cell_visible(room, renderer.hovered_cell)) { return }
 	preview.has_hover = true
 	preview.hover = game.evaluate_card_targeting(room, card, game.card_target_request_at(definition, renderer.hovered_cell))
+	if preview.hover.error != .None { return }
+	// The foes this very cast would hit: the mark closes on them.
+	card_range_hits(renderer, room, preview, game.card_hit_enemies(room, card, &preview.hover), true)
+	anchor := preview.hover.query.anchor
+	aim := renderer.tactical.flood_aim
+	if game.card_is_wheel_aimed(card.definition_id) && aim.active {
+		// CANNONE and CANNONE LASER: the foes on the line it would fire along.
+		line := game.cannon_line(room, anchor, aim.way, card.definition_id == .Laser_Cannon)
+		for id in line.foes[:line.foe_count] { card_range_hit(renderer, room, preview, id, true) }
+	}
+	if card.definition_id == .Devouring_Hole {
+		// BUCO NERO: the foes inside the 3x3 it hurts.
+		radius := int(game.black_hole_radius(card.upgrade_level))
+		for enemy in room.enemies {
+			if abs(enemy.position.x-anchor.x) <= radius && abs(enemy.position.y-anchor.y) <= radius {
+				card_range_hit(renderer, room, preview, enemy.id, true)
+			}
+		}
+	}
 }
 
-@(private="file")
+@(private)
 CARD_LIGHT_REACH :: rl.Color{76, 164, 232, 255}
-@(private="file")
+@(private)
 CARD_LIGHT_EFFECT :: rl.Color{242, 183, 85, 255}
-@(private="file")
+@(private)
 CARD_LIGHT_TARGET :: rl.Color{130, 245, 213, 255}
-@(private="file")
+@(private)
 CARD_LIGHT_INVALID :: rl.Color{242, 91, 100, 255}
 
 // Tint the actual moulded floor, including its bevel. Its resin, engraving
@@ -98,6 +155,7 @@ CARD_LIGHT_INVALID :: rl.Color{242, 91, 100, 255}
 card_range_floor_color :: proc(preview: ^Card_Range_Preview, cell: grid.Position, base: rl.Color) -> rl.Color {
 	if preview == nil || !preview.active { return base }
 	amount := (f32(0.30) if preview.affordable else f32(0.10)) if card_range_contains(preview, cell) else f32(0)
+	if preview.faint { amount *= 0.5 }
 	light := CARD_LIGHT_REACH
 	if preview.has_hover {
 		evaluation := &preview.hover
@@ -132,13 +190,13 @@ CARD_LIGHT_NEIGHBORS :: [Card_Light_Edge]grid.Position{.North = {0,-1}, .East = 
 
 // Vertex alpha provides the falloff: no render target, shader, texture upload,
 // per-cell draw-call flush or light allocation. All these triangles batch.
-@(private="file")
+@(private)
 card_light_vertex :: proc(p: rl.Vector3, color: rl.Color, opacity: f32) {
 	rlgl.Color4ub(color.r, color.g, color.b, u8(clamp(opacity, f32(0), f32(255))))
 	rlgl.Vertex3f(p.x, p.y, p.z)
 }
 
-@(private="file")
+@(private)
 card_light_strip :: proc(a, b: rl.Vector3, inward: rl.Vector3, width: f32, color: rl.Color, alpha: f32) {
 	c, d := b+inward*width, a+inward*width
 	card_light_vertex(a, color, alpha); card_light_vertex(b, color, alpha); card_light_vertex(c, color, 0)
@@ -202,7 +260,7 @@ draw_card_range_light :: proc(renderer: ^Renderer, room: ^game.Room, preview: ^C
 	defer { rlgl.DrawRenderBatchActive(); rlgl.EnableDepthMask() }
 	rlgl.SetTexture(rlgl.GetTextureIdDefault())
 	breath := f32(0.92+0.08*math.sin(renderer.sprite_assets.elapsed*2.4))
-	strength := breath*(f32(1) if preview.affordable else f32(0.36))
+	strength := breath*(f32(1) if preview.affordable else f32(0.36))*(f32(0.5) if preview.faint else f32(1))
 	for lit, i in preview.cells {
 		if !lit { continue }
 		cell := grid.Position{preview.origin.x+i%CARD_RANGE_SIDE, preview.origin.y+i/CARD_RANGE_SIDE}
@@ -244,7 +302,7 @@ draw_card_range_light :: proc(renderer: ^Renderer, room: ^game.Room, preview: ^C
 // The general range/effect light is in 3D, under threats and sprites.
 @(private)
 draw_card_target_details :: proc(renderer: ^Renderer, room: ^game.Room, preview: ^Card_Range_Preview) {
-	if !preview.active { return }
+	if !preview.active || preview.faint { return }
 	card := preview.card
 	if card.definition_id == .Lasso { draw_lasso_preview(renderer, room, card) }
 	if card.definition_id == .Pinball { draw_pinball_preview(renderer, room, card) }

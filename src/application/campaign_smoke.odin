@@ -1,6 +1,7 @@
 package application
 
 import "core:fmt"
+import "core:os"
 import "core:slice"
 import "core:time"
 import rl "vendor:raylib"
@@ -106,6 +107,12 @@ EXPEDITION_SMOKE_ENGAGE :: 26
 EXPEDITION_SMOKE_CENTER :: 27
 @(private)
 EXPEDITION_SMOKE_WORKSHOP :: EXPEDITION_SMOKE_CENTER+12
+// "This one can be hit" over a fight in four biomes of different tints (the last
+// is the one whose own tint is violet, where the halo turns acid green).
+@(private)
+EXPEDITION_SMOKE_HITS :: EXPEDITION_SMOKE_WORKSHOP+12
+@(private)
+EXPEDITION_SMOKE_HIT_BIOMES :: [4]campaign.Biome{.Snow, .West, .Jungle, .Space}
 
 @(private)
 expedition_benchmark_geometry :: proc(e:^run.Expedition_Session)->[2]u64 {
@@ -181,6 +188,50 @@ expedition_smoke_world :: proc(e:^run.Expedition_Session,b:campaign.Biome) {
 	render.clear_event_animations(&e.rs.iso_renderer)
 }
 
+// A fight on the spot: foes on the open cells beside the player, the combat begun
+// and a card chosen that would hit one of them, so the board marks it.
+@(private)
+expedition_smoke_hits :: proc(e:^run.Expedition_Session) {
+	room:=&e.rs.room;player:=room.player
+	// The nearest cell whose four neighbours are all open ground.
+	open_around :: proc(room:^game.Room,p:grid.Position)->bool {
+		if game.cell_blocks_movement(room,p) {return false}
+		for offset in ([4]grid.Position{{1,0},{0,1},{-1,0},{0,-1}}) {if game.cell_blocks_movement(room,game.add_position(p,offset)) {return false}}
+		return true
+	}
+	if !open_around(room,player.position) {
+		found:=false
+		search:for radius in 1..=12 {for dy in -radius..=radius {for dx in -radius..=radius {
+			if max(abs(dx),abs(dy))!=radius {continue}
+			p:=game.add_position(player.position,{dx,dy})
+			if open_around(room,p) {player.position=p;found=true;break search}
+		}}}
+		assert(found,"no open ground near the player for the hit marks")
+		e.rs.iso_renderer.tactical.expedition_follow_ready=false
+	}
+	// Foes join a room already in combat (game.spawn_enemy).
+	assert(game.begin_expedition_encounter(room),"the hit marks' fight did not begin")
+	placed:=0
+	for offset in ([4]grid.Position{{1,0},{0,1},{-1,0},{0,-1}}) {
+		cell:=game.add_position(player.position,offset)
+		if game.cell_blocks_movement(room,cell) {continue}
+		if _,ok:=game.spawn_enemy(room,{position=cell,health=40,attack=1,archetype=.Chaser});ok {placed+=1}
+	}
+	assert(placed>0,"no open cell beside the player for the hit marks")
+	// The first card of the hand some valid cast of which hits a foe.
+	for card in player.deck.hand[:player.deck.hand_count] {
+		definition,found:=game.card_definition_by_id(card.definition_id)
+		if !found || game.card_is_room_tool(card.definition_id) {continue}
+		for dy in -3..=3 {for dx in -3..=3 {
+			cell:=game.add_position(player.position,{dx,dy})
+			evaluation:=game.evaluate_card_targeting(room,card,game.card_target_request_at(definition,cell))
+			hits:=game.card_hit_enemies(room,card,&evaluation)
+			if hits.count>0 {e.rs.card_interaction.selected_card_id=card.id;return}
+		}}
+	}
+	assert(false,"no card of the hand hits a foe")
+}
+
 // Eight open cells west of a resting patrol: walking east engages it.
 @(private)
 expedition_smoke_before_patrol :: proc(e:^run.Expedition_Session) {
@@ -226,6 +277,8 @@ expedition_enable_smoke :: proc(scene:^host.Scene) {
 		fmt.printfln("EXPEDITION BENCHMARK: target_fps=0 vsync_hint=%v; no screenshots or GPU readbacks; presented-frame intervals plus CPU submission timings.",rl.IsWindowState({.VSYNC_HINT}))
 	}
 	state:=new(Expedition_Capture);state.wrapped=scene^
+	// ODIN_PP_SMOKE_ONLY=hits starts at the hit marks' fights, to work on them.
+	if only,_:=os.lookup_env("ODIN_PP_SMOKE_ONLY",context.temp_allocator);only=="hits" {state.stage=EXPEDITION_SMOKE_HITS-1}
 	scene^=host.Scene{name="expedition-smoke",data=state,opaque=true,modal=true,update=expedition_capture_update,draw=expedition_capture_draw,after_present=expedition_capture_present,destroy=proc(data:rawptr){s:=cast(^Expedition_Capture)data;s.wrapped.destroy(s.wrapped.data);free(s)}}
 }
 
@@ -286,7 +339,10 @@ expedition_capture_present :: proc(data:rawptr,frame:^host.Frame) {
 		else if s.stage==EXPEDITION_SMOKE_WALK {artifacts.screenshot("odin_pp_expedition_camminata.png")}
 		else if s.stage==EXPEDITION_SMOKE_ENGAGE {artifacts.screenshot("odin_pp_expedition_ingaggio.png")}
 		else if s.stage==EXPEDITION_SMOKE_WORKSHOP {artifacts.screenshot("odin_pp_expedition_officina_cyber.png")}
-		else if s.stage>EXPEDITION_SMOKE_WORKSHOP {artifacts.screenshot(fmt.ctprintf("odin_pp_expedition_officina_%02d.png",s.stage-EXPEDITION_SMOKE_WORKSHOP))}
+		else if s.stage>=EXPEDITION_SMOKE_HITS && s.stage<EXPEDITION_SMOKE_HITS+4 {
+			names:=[4]string{"neve","far_west","giungla","spazio"}
+			artifacts.screenshot(fmt.ctprintf("odin_pp_expedition_bersagli_%s.png",names[s.stage-EXPEDITION_SMOKE_HITS]))
+		} else if s.stage>EXPEDITION_SMOKE_WORKSHOP {artifacts.screenshot(fmt.ctprintf("odin_pp_expedition_officina_%02d.png",s.stage-EXPEDITION_SMOKE_WORKSHOP))}
 		else {artifacts.screenshot(fmt.ctprintf("odin_pp_expedition_centro_%02d.png",s.stage-EXPEDITION_SMOKE_CENTER))}
 	}
 	when EXPEDITION_BENCHMARK {
@@ -332,7 +388,11 @@ expedition_capture_present :: proc(data:rawptr,frame:^host.Frame) {
 		else if s.stage==24 {rl.SetWindowSize(1280,720);e.map_open=false;expedition_smoke_behind_wall(e)}
 		else if s.stage==EXPEDITION_SMOKE_WALK {e.rs.room.player.position=e.rs.room.exit_position;e.rs.room.player.position.x-=8;e.rs.iso_renderer.tactical.expedition_follow_ready=false;e.world.mounted=true}
 		else if s.stage==EXPEDITION_SMOKE_ENGAGE {e.world.mounted=false;expedition_smoke_before_patrol(e)}
-		else if s.stage>=EXPEDITION_SMOKE_WORKSHOP && s.stage<EXPEDITION_SMOKE_WORKSHOP+12 {
+		else if s.stage>=EXPEDITION_SMOKE_HITS && s.stage<EXPEDITION_SMOKE_HITS+4 {
+			biomes:=EXPEDITION_SMOKE_HIT_BIOMES
+			expedition_smoke_world(e,biomes[s.stage-EXPEDITION_SMOKE_HITS]);e.world.mounted=false;e.message_timer=0
+			expedition_smoke_hits(e)
+		} else if s.stage>=EXPEDITION_SMOKE_WORKSHOP && s.stage<EXPEDITION_SMOKE_WORKSHOP+12 {
 			expedition_smoke_world(e,campaign.Biome(s.stage-EXPEDITION_SMOKE_WORKSHOP));e.world.mounted=false;e.message_timer=0
 			for &site in e.world.sites[:e.world.site_count] {
 				if site.kind!=.Workshop {continue}
@@ -342,6 +402,6 @@ expedition_capture_present :: proc(data:rawptr,frame:^host.Frame) {
 				}
 				break
 			}
-		} else if s.stage>=EXPEDITION_SMOKE_WORKSHOP+12 {host.quit(frame)}
+		} else if s.stage>=EXPEDITION_SMOKE_HITS+4 {host.quit(frame)}
 	}
 }

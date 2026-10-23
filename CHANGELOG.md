@@ -15,6 +15,18 @@ per i comandi disponibili oggi valgono il [README](README.md) e la documentazion
 - Fasi 8–11: l'hub diventa un mondo 3D in cui il robot cammina (piazza,
   casinò, deposito, sala giochi), dai disegni dell'utente in
   `docs/immagini/`.
+- **Fase 1 del piano fatta: bersagli in evidenza.** Mentre si sceglie una carta,
+  ogni nemico che una giocata valida colpirebbe davvero ha la casella accesa (nucleo
+  quasi bianco che pulsa, contorno d'inchiostro, angoli, alone viola elettrico, verde
+  acido nello Spazio), un fascio di luce con scintille che sale dalla sua casella e,
+  col puntatore sulla casella giusta, angoli che si chiudono e un anello che si apre.
+  - Il calcolo è `game.card_hit_enemies`, sul piano degli effetti della giocata: lo
+    Scatto non segna chi sta sulla sua linea; l'Inondazione segna tutti.
+  - Con una carta solo sotto il mouse nella mano, raggio e bersagli compaiono più tenui.
+  - Lazzo, Pinball, Cannone e Inondazione usano questo segno al posto dei loro mirini
+    sui nemici.
+  - Test: 9 nuovi (1538 in tutto). Catture: `odin_pp_mechanics_lab_hit_*.png` e
+    `odin_pp_expedition_bersagli_*.png` (Neve, Far West, Giungla, Spazio).
 - **Fase 0 del piano fatta: test affidabili su Windows.** `check.ps1` completo
   finisce con 1529 test verdi due volte (con e senza assert) e le due build.
   - 14 percorsi `/private/tmp` in 6 test (di 0xdokkan) ora usano la cartella

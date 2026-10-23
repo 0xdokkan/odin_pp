@@ -750,11 +750,6 @@ draw_cannon_preview :: proc(renderer: ^Renderer, room: ^game.Room, card: game.Ca
 		draw_card_range_cell(renderer, probe, {255, 80, 80, 44}, {255, 150, 150, 120})
 		probe = {probe.x+step.x, probe.y+step.y}
 	}
-	for index in 0..<line.foe_count {
-		for enemy in room.enemies {
-			if enemy.id == line.foes[index] { draw_card_range_cell(renderer, enemy.position, {255, 236, 236, 70}, {255, 236, 236, 255}) }
-		}
-	}
 	from := to_raylib(tactical_project(renderer, {f32(cell.x)+0.5, f32(cell.y)+0.5}, 0.6))
 	last := line.last
 	if last == cell { last = {cell.x+step.x, cell.y+step.y} }

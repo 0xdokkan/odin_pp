@@ -21,6 +21,44 @@ maschera locale per frame, usando il targeting condiviso e limitando la ricerca
 al range massimo della carta. Materiale e alone riusano quella maschera;
 il falloff usa alpha ai vertici, senza nuovi shader, texture o render target.
 
+### Bersagli in evidenza
+
+Mentre si sceglie una carta, ogni nemico che una giocata valida colpirebbe
+davvero ha la casella accesa in modo molto visibile: nucleo quasi bianco che
+pulsa, contorno d'inchiostro, quattro angoli che respirano e un alone saturo.
+Un fascio di luce con una colonna di scintille sale dalla casella fino al petto
+del nemico, davanti al suo sprite. Quando il puntatore sta su una casella la cui
+giocata colpirebbe quel nemico, gli angoli si chiudono e un anello si apre una
+volta; gli altri bersagli restano nello stato «colpibile».
+
+- **Colore.** Quattro tinte sono già del raggio (blu, ambra, menta, rosso) e le
+  tinte dei biomi coprono quasi tutta la ruota, quindi nessun colore fisso si
+  legge ovunque. Il segno è quindi bianco con contorno scuro (luminosità e
+  forma), con alone **viola elettrico**, o **verde acido** nello Spazio, dove il
+  viola è la tinta del bioma. Un test tiene l'alone ad almeno 40° di tinta da
+  tutti gli altri colori, in ogni bioma e nel laboratorio.
+- **Quali nemici.** Quelli che il piano degli effetti nomina (danno, spinta,
+  stato): lo Scatto elenca i nemici sulla sua linea ma non ne colpisce nessuno,
+  e quindi non ne segna. Le carte con esito casuale (le colonne di Bomb Marley,
+  il dado del Dinosauro) e quelle che colpiscono più tardi (ordigni posati) non
+  segnano nessuno. Eccezioni calcolate a parte: l'Inondazione segna tutti i
+  nemici in gioco, il Cannone quelli sulla sua linea, il Buco Nero quelli nel
+  suo 3×3 (sotto il puntatore).
+- **Fuori vista.** Nemici fuori gioco, nella nebbia o dietro un muro (per le
+  carte con linea di vista) non sono segnati.
+- **Solo passaggio del mouse.** Con una carta sotto il mouse nella mano ma non
+  scelta, raggio e bersagli compaiono più tenui (metà intensità) e la casella
+  sotto il puntatore non viene valutata.
+- **Lazzo e Pinball.** Usano questo segno: i vecchi mirini sui bersagli validi
+  sono tolti. Restano l'anello e la freccia del Lazzo, la linea del Pinball e il
+  mirino rosso «troppo pesante».
+
+[card_hit_mark.odin](../src/render/card_hit_mark.odin) disegna il segno nel
+passaggio 3D della luce del raggio (cella, angoli, anello) e le scintille dopo
+gli sprite. Il calcolo è in `game.card_hit_enemies`, che usa lo stesso piano
+degli effetti della giocata. L'animazione usa l'orologio degli sprite, non
+quello del mondo, perché è proprio quando il mondo è fermo che si sceglie.
+
 ### Mostra effetto
 
 Ovunque si guardi una carta, **MOSTRA EFFETTO** apre sopra la run una finestra

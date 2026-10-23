@@ -3,6 +3,7 @@ import artifacts "artifacts"
 import run_session "../run"
 
 import "core:fmt"
+import "core:os"
 import app "../engine/app"
 import audio "../engine/audio"
 import gfx "../engine/gfx"
@@ -78,6 +79,10 @@ run_mechanics_lab_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer,
 	buffer: run_session.Buffered_Gameplay_Command
 	sandbox := game.begin_sandbox(7)
 	for _ in 0..<20 { mechanics_lab_smoke_frame(window, renderer, &room, &controller, &cards, &buffer, 1.0/60.0) }
+	// ODIN_PP_LAB_ONLY=hit_marks runs only the hit marks' act, to work on it.
+	if only, _ := os.lookup_env("ODIN_PP_LAB_ONLY", context.temp_allocator); only == "hit_marks" {
+		return mechanics_lab_hit_marks(window, renderer, &room, &controller, &cards, &buffer)
+	}
 	artifacts.screenshot("odin_pp_mechanics_lab.png")
 	if !mechanics_lab_card_words(renderer, &player) { return false }
 	// A square of coils around an arrival offers the ring, every time.
@@ -225,6 +230,7 @@ run_mechanics_lab_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer,
 	if !mechanics_lab_first_person(window, renderer, &room, &data, &controller, &cards, &buffer) { return false }
 	if !mechanics_lab_flood(window, renderer, &room, &controller, &cards, &buffer) { return false }
 	if !mechanics_lab_marley(window, renderer, &room, &controller, &cards, &buffer) { return false }
+	if !mechanics_lab_hit_marks(window, renderer, &room, &controller, &cards, &buffer) { return false }
 	if !mechanics_lab_cannon(window, renderer, &room, &controller, &cards, &buffer) { return false }
 	if !mechanics_lab_black_hole(window, renderer, &room, &controller, &cards, &buffer) { return false }
 	if !mechanics_lab_dinosaur(window, renderer, &room, &controller, &cards, &buffer) { return false }
