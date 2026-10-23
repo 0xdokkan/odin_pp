@@ -31,7 +31,7 @@ numero della fase resta quello della sua sezione.
 
 | Priorità | Fase | Contenuto | Dipende da | Stato | Commit |
 |---|---|---|---|---|---|
-| 0 | 0 | Test affidabili su Windows (proposta di Claude) | — | Proposta: si fa solo se l'utente la conferma | — |
+| 0 | 0 | Test affidabili su Windows (proposta di Claude, approvata dall'utente) | — | Da fare | — |
 | 1 | 1 | Bersagli in evidenza | — | Da fare | — |
 | 2 | 8 | Hub in 3D: la piazza, il robot che cammina, gli edifici | — | Da fare | — |
 | 3 | 9 | Hub in 3D: dentro il casinò | 8 | Da fare | — |
@@ -65,7 +65,7 @@ una fase.
 
 | Priorità | Fase | Perché in questa posizione | Dimensione | Rischio |
 |---|---|---|---|---|
-| 0 | Fase 0: test affidabili su Windows (proposta) | Ogni fase si chiude con la suite completa, che oggi su Windows va in crash a metà e lascia test non eseguiti (sezione 1.5). Sistemarla prima rende ogni verifica successiva più veloce e completa. Si fa solo se l'utente la conferma, perché tocca test scritti da 0xdokkan. | piccola | basso |
+| 0 | Fase 0: test affidabili su Windows (proposta) | Ogni fase si chiude con la suite completa, che oggi su Windows va in crash a metà e lascia test non eseguiti (sezione 1.5). Sistemarla prima rende ogni verifica successiva più veloce e completa. Approvata dall'utente il 23 ottobre 2026; i test scritti da 0xdokkan si correggono qui. | piccola | basso |
 | 1 | Fase 1: bersagli in evidenza | È la prima richiesta dell'utente e migliora subito ogni scontro. Non dipende da niente e non tocca il resto. | piccola | basso |
 | 2 | Fase 8: hub, la piazza | È il cambiamento più visibile, perché ogni partita parte da lì. Disegni e immagini sono pronti, quindi resta poco da decidere. Non tocca combattimento né spedizioni. | grande | medio: cambia cosa succede dopo la scelta della memoria |
 | 3 | Fase 9: hub, il casinò | Completa l'hub finché il lavoro della Fase 8 è fresco, e costruisce il passaggio tra zone che riusano le Fasi 10 e 11. | media | basso |
@@ -2056,8 +2056,7 @@ Ricerche del 23 ottobre 2026, per le parti che il codice non dice.
 
 ### Perché
 
-Non è una richiesta dell'utente: è una proposta di Claude, e si fa solo se
-l'utente la conferma.
+È nata come proposta di Claude, e l'utente l'ha approvata il 23 ottobre 2026.
 
 Ogni fase del piano si chiude con la suite completa dei test. Oggi su Windows
 (sezione 1.5):
@@ -2075,6 +2074,16 @@ confondersi con quelli già noti.
 
 - I test scrivono i loro file nella cartella temporanea del sistema, non più
   in `/private/tmp`.
+  - Sono 14 percorsi in 6 file (situazione del 23 ottobre 2026):
+    `src/application/campaign_hub_test.odin`, `src/campaign/campaign_test.odin`,
+    `src/campaign/save_queue_test.odin`,
+    `src/expedition/snapshot_migration_test.odin`,
+    `src/run/checkpoint_benchmark_test.odin` e
+    `src/run/expedition_flow_test.odin`.
+  - Il compilatore fissato dal progetto ha `os.temp_directory(allocator)`
+    (`core/os/temp_file.odin:97`).
+  - Su macOS il risultato non cambia, perché la cartella temporanea c'è anche
+    lì.
 - Un test che non riesce a salvare si ferma lì invece di proseguire, così un
   fallimento non diventa un crash.
 - Si cerca perché:
@@ -2086,13 +2095,13 @@ confondersi con quelli già noti.
 
 ### Da chiedere prima di iniziare
 
-1. **Fare questa fase.**
-   - (Consigliato) Sì, prima delle altre.
-   - Oppure no.
-2. **Questi test li ha scritti 0xdokkan.**
-   - (Consigliato) Correggerli qui e scriverlo chiaramente nel messaggio di
-     commit.
-   - Oppure lasciarli com'è e avvisare 0xdokkan.
+L'utente ha già risposto il 23 ottobre 2026:
+1. **Fare questa fase:** sì. È approvata nel piano, ma si avvia solo con il
+   suo comando.
+2. **I test scritti da 0xdokkan:** si correggono qui, e il messaggio di commit
+   lo dice chiaramente.
+
+All'avvio Claude chiede soltanto se queste risposte valgono ancora.
 
 ### Fatto quando
 
