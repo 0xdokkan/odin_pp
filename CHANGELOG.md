@@ -15,6 +15,10 @@ per i comandi disponibili oggi valgono il [README](README.md) e la documentazion
 - Fasi 8–11: l'hub diventa un mondo 3D in cui il robot cammina (piazza,
   casinò, deposito, sala giochi), dai disegni dell'utente in
   `docs/immagini/`.
+- Scaletta per priorità, all'inizio del piano. La tabella delle fasi segue
+  questo ordine: Fase 0 (proposta: test affidabili su Windows), bersagli,
+  hub, altezze nel laboratorio, strutture, altezze nelle spedizioni,
+  montagna, caverne, posa da parte del giocatore.
 - Fase 6 precisata: oggetti complessi ed edifici occupano tutte le caselle
   della loro impronta. Gli edifici diventano trasparenti man mano che il robot
   si avvicina, spariscono sulla soglia e, quando il robot è dentro, tornano

@@ -21,30 +21,73 @@ Il piano raccoglie quattro richieste dell'utente, divise in fasi indipendenti:
    disegni dell'utente.
 
 Le fasi si eseguono **una alla volta, solo su comando dell'utente**. Le regole
-per Claude sono nella sezione 1 e vanno lette prima di ogni fase.
+per Claude sono nella sezione 1 e vanno lette prima di ogni fase. L'ordine
+consigliato è nella scaletta, subito dopo la tabella.
 
 ## Stato delle fasi
 
-| Fase | Contenuto | Dipende da | Stato | Commit |
-|---|---|---|---|---|
-| 1 | Bersagli in evidenza | — | Da fare | — |
-| 2 | Altezze nel laboratorio: dati, regole, grafica, puntamento | — | Da fare | — |
-| 3 | Altezze nelle spedizioni: renderer, mappe, salvataggi, prestazioni | 2 | Da fare | — |
-| 4 | La montagna a spirale delle Montagne innevate | 2, 3 | Da fare | — |
-| 5 | Caverne | 2 (3 e 4 per metterle nei biomi) | Da fare | — |
-| 6 | Strutture su più caselle: edifici e oggetti complessi, edifici trasparenti avvicinandosi | — (meglio dopo la 2) | Da fare | — |
-| 7 | Posa delle strutture da parte del giocatore | 6 | Facoltativa: si fa solo se l'utente la conferma | — |
-| 8 | Hub in 3D: la piazza, il robot che cammina, gli edifici | — | Da fare | — |
-| 9 | Hub in 3D: dentro il casinò | 8 | Da fare | — |
-| 10 | Hub in 3D: dentro il deposito | 8 | Da fare | — |
-| 11 | Hub in 3D: dentro la sala giochi | 8 | Da fare | — |
+La tabella è in ordine di priorità, cioè l'ordine della scaletta qui sotto. Il
+numero della fase resta quello della sua sezione.
 
-L'ordine segue la richiesta dell'utente: prima l'HUD, poi la profondità, poi
-le strutture. Le strutture vengono dopo le altezze perché così possono avere
-piani e gradini fin dall'inizio. Le Fasi 8–11 riguardano l'hub e non
-dipendono dalle Fasi 1–7, quindi si possono fare in qualunque momento. Se
-l'utente vuole un altro ordine, basta nominare la fase: le dipendenze sono
-nella tabella.
+| Priorità | Fase | Contenuto | Dipende da | Stato | Commit |
+|---|---|---|---|---|---|
+| 0 | 0 | Test affidabili su Windows (proposta di Claude) | — | Proposta: si fa solo se l'utente la conferma | — |
+| 1 | 1 | Bersagli in evidenza | — | Da fare | — |
+| 2 | 8 | Hub in 3D: la piazza, il robot che cammina, gli edifici | — | Da fare | — |
+| 3 | 9 | Hub in 3D: dentro il casinò | 8 | Da fare | — |
+| 4 | 10 | Hub in 3D: dentro il deposito | 8 | Da fare | — |
+| 5 | 11 | Hub in 3D: dentro la sala giochi | 8 | Da fare | — |
+| 6 | 2 | Altezze nel laboratorio: dati, regole, grafica, puntamento | — | Da fare | — |
+| 7 | 6 | Strutture su più caselle: edifici e oggetti complessi, edifici trasparenti avvicinandosi | — (meglio dopo la 2) | Da fare | — |
+| 8 | 3 | Altezze nelle spedizioni: renderer, mappe, salvataggi, prestazioni | 2 | Da fare | — |
+| 9 | 4 | La montagna a spirale delle Montagne innevate | 2, 3 | Da fare | — |
+| 10 | 5 | Caverne | 2 (3 e 4 per metterle nei biomi) | Da fare | — |
+| 11 | 7 | Posa delle strutture da parte del giocatore | 6 | Facoltativa: si fa solo se l'utente la conferma | — |
+
+## Scaletta: cosa sviluppare prima
+
+Ordine consigliato da Claude il 23 ottobre 2026. È l'ordine della tabella, e
+«Passa alla prossima fase» lo segue. L'utente può sempre cambiarlo nominando
+una fase.
+
+**I criteri:**
+- **Valore subito:** prima ciò che il giocatore sente in ogni partita.
+- **Rischio:** prima i lavori piccoli e sicuri. Le parti che toccano il
+  renderer delle spedizioni e le prestazioni vengono dopo che le regole sono
+  collaudate nel laboratorio.
+- **Dipendenze:** nessuna fase arriva prima di ciò che le serve.
+- **Niente lavoro rifatto:** per esempio le strutture vengono dopo le altezze,
+  così le piante nascono con piani e gradini.
+- **Verifiche affidabili:** ogni fase si chiude con la suite di test, che oggi
+  su Windows si interrompe a metà.
+
+**La scaletta.** Le dimensioni sono relative alle altre fasi del piano.
+
+| Priorità | Fase | Perché in questa posizione | Dimensione | Rischio |
+|---|---|---|---|---|
+| 0 | Fase 0: test affidabili su Windows (proposta) | Ogni fase si chiude con la suite completa, che oggi su Windows va in crash a metà e lascia test non eseguiti (sezione 1.5). Sistemarla prima rende ogni verifica successiva più veloce e completa. Si fa solo se l'utente la conferma, perché tocca test scritti da 0xdokkan. | piccola | basso |
+| 1 | Fase 1: bersagli in evidenza | È la prima richiesta dell'utente e migliora subito ogni scontro. Non dipende da niente e non tocca il resto. | piccola | basso |
+| 2 | Fase 8: hub, la piazza | È il cambiamento più visibile, perché ogni partita parte da lì. Disegni e immagini sono pronti, quindi resta poco da decidere. Non tocca combattimento né spedizioni. | grande | medio: cambia cosa succede dopo la scelta della memoria |
+| 3 | Fase 9: hub, il casinò | Completa l'hub finché il lavoro della Fase 8 è fresco, e costruisce il passaggio tra zone che riusano le Fasi 10 e 11. | media | basso |
+| 4 | Fase 10: hub, il deposito | I tre pannelli (zaino, personaggio, archivio) esistono già: si costruisce la sala attorno. | media | basso |
+| 5 | Fase 11: hub, la sala giochi | Chiude l'hub. Serve prima la risposta sulla disposizione, perché non c'è un disegno. | piccola o media | basso |
+| 6 | Fase 2: altezze nel laboratorio | Sono le fondamenta della profondità: cambiano movimento, vista e IA, ma la grafica nuova resta nel laboratorio. Sblocca le Fasi 3, 4 e 5 e le strutture con piani. | grande | medio |
+| 7 | Fase 6: strutture e trasparenza | Viene dopo le altezze, così le piante nascono con piani e gradini. La sua trasparenza si può poi estendere agli edifici della piazza (domanda 7 della Fase 8). | grande | medio |
+| 8 | Fase 3: altezze nelle spedizioni | È la parte più rischiosa: renderer delle spedizioni, prestazioni e salvataggi. Meglio farla quando regole e grafica sono già collaudate nel laboratorio. | molto grande | alto |
+| 9 | Fase 4: la montagna a spirale | È il traguardo della profondità, e serve la Fase 3. | media | medio: vedere il robot dietro la montagna |
+| 10 | Fase 5: caverne | Le grotte con volta poggiano su altezze e montagna. | media | medio |
+| 11 | Fase 7: posa da parte del giocatore | È facoltativa: si fa solo se l'utente la conferma alla Fase 6. | media | basso |
+
+**Se la priorità è un'altra:**
+- **La montagna prima di tutto:** 1 → 2 → 3 → 4 → 5, poi l'hub e le
+  strutture. Alla montagna si arriva prima, ma passando subito dalla parte più
+  rischiosa, la Fase 3.
+- **Gli edifici trasparenti prima:** 1 → 2 → 6, poi il resto.
+- **Solo l'hub:** le Fasi 8 → 9 → 10 → 11 non dipendono da nient'altro.
+
+**Prima delle fasi grandi** conviene fare un pull di `main` e controllare se
+gli stessi file sono cambiati. Le Fasi 3, 6 e 8–11 toccano il renderer delle
+spedizioni e l'hub, su cui lavora anche 0xdokkan.
 
 ## 1. Comandi per Claude
 
@@ -61,8 +104,10 @@ Passa alla prossima fase di docs/piano-griglia.md
 ```
 
 Ogni fase ha anche il suo comando pronto, alla fine della sua sezione.
-«Prossima fase» significa la prima riga della tabella con stato `Da fare`.
-Una fase `Facoltativa` si esegue solo se l'utente la nomina.
+- **Prossima fase.** La tabella è in ordine di priorità, quindi «prossima
+  fase» significa la prima riga con stato `Da fare`.
+- **Fasi `Proposta` e `Facoltativa`.** Si eseguono solo se l'utente le nomina
+  o le conferma.
 
 ### 1.2 Regole per ogni fase
 
@@ -2006,3 +2051,62 @@ Ricerche del 23 ottobre 2026, per le parti che il codice non dice.
 - **Avvio del gioco.** Le Fasi 8–11 cambiano quello che succede dopo la scelta
   della memoria: vanno ricontrollati i test di `application`, gli smoke
   dell'hub e il ritorno dalle spedizioni.
+
+## 16. Fase 0 — Test affidabili su Windows (proposta di Claude)
+
+### Perché
+
+Non è una richiesta dell'utente: è una proposta di Claude, e si fa solo se
+l'utente la conferma.
+
+Ogni fase del piano si chiude con la suite completa dei test. Oggi su Windows
+(sezione 1.5):
+- dodici test falliscono perché scrivono in `/private/tmp`, un percorso che
+  esiste solo su macOS;
+- dopo `test_running_slot_snapshot_restores_owned_room_pointers` la suite va
+  in crash, e i test successivi non partono;
+- per coprirli bisogna lanciare i pacchetti uno per uno, e `game`,
+  `integration` e `combatdebug`, lanciati da soli, non arrivano in fondo.
+
+Così ogni verifica è più lenta e meno completa, e un errore nuovo potrebbe
+confondersi con quelli già noti.
+
+### Cosa si fa
+
+- I test scrivono i loro file nella cartella temporanea del sistema, non più
+  in `/private/tmp`.
+- Un test che non riesce a salvare si ferma lì invece di proseguire, così un
+  fallimento non diventa un crash.
+- Si cerca perché:
+  - `game` lanciato da solo gira all'infinito;
+  - `integration` e `combatdebug` lanciati da soli si chiudono con exit 127.
+
+  Se la causa è nei test si corregge, altrimenti si documenta.
+- Si aggiorna la sezione 1.5.
+
+### Da chiedere prima di iniziare
+
+1. **Fare questa fase.**
+   - (Consigliato) Sì, prima delle altre.
+   - Oppure no.
+2. **Questi test li ha scritti 0xdokkan.**
+   - (Consigliato) Correggerli qui e scriverlo chiaramente nel messaggio di
+     commit.
+   - Oppure lasciarli com'è e avvisare 0xdokkan.
+
+### Fatto quando
+
+Su Windows `odin test src -all-packages` arriva in fondo senza crash e senza
+fallimenti. Se qualche fallimento resta, dev'essere documentato e motivato.
+
+### Comando
+
+```text
+Esegui la Fase 0 di docs/piano-griglia.md (Test affidabili su Windows). Segui
+le regole della sezione 1: fammi prima le domande della fase e fermati alla
+fine.
+```
+
+### Esito
+
+*(da compilare a fine fase)*
