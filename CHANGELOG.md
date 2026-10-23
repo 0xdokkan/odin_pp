@@ -5,6 +5,17 @@ I riferimenti a Classica, `--flat` e ai vecchi smoke descrivono versioni precede
 per i comandi disponibili oggi valgono il [README](README.md) e la documentazione collegata.
 
 
+## 2026-10-23 — Piano di lavoro della griglia
+
+- Nuovo [piano](docs/piano-griglia.md) in sette fasi, da eseguire una alla
+  volta solo su comando dell'utente: bersagli in evidenza mentre si sceglie una
+  carta, altezze nel laboratorio e nelle spedizioni, montagna a spirale delle
+  Montagne innevate, caverne, strutture su più caselle e, se confermata, la
+  loro posa da parte del giocatore.
+- Per ogni fase: come funziona oggi il codice, il progetto, le domande da fare
+  prima di iniziare, i passi, i test e il comando da dare a Claude. La sezione
+  1 contiene le regole per Claude, compreso lo stop a fine fase.
+
 ## 2026-10-23 — Le carte del laboratorio tornano, solo in Prova meccaniche
 
 - Bomb Marley, Inondazione, Cannone, Cannone Laser, Buco Nero, Dinosauro e il
