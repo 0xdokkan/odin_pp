@@ -28,30 +28,63 @@ MECHANICS_LAB_RULES :: game.Deck_Rules{hand_size = len(MECHANICS_LAB_DECK)-1, ma
 #assert(len(MECHANICS_LAB_DECK)-1 <= game.MAX_HAND_CAPACITY)
 MECHANICS_LAB_DECK_SEED :: u64(0x7E57_1AB)
 
-// The arenas of the lab: the flat one every card is tried in, and the one with
-// heights (a plateau up a stair, a pillar, a spiral hill) to try the heights in
-// (F3 switches between them).
-Mechanics_Lab_Arena :: enum { Flat, Heights }
+// The arenas of the lab: the flat one every card is tried in, the one with heights
+// (a plateau up a stair, a pillar, a spiral hill) to try the heights in, and the
+// one with the catalog of structures (F3 goes from one to the next).
+Mechanics_Lab_Arena :: enum { Flat, Heights, Structures }
+
+// The arena of structures is larger, to hold all of them with room between.
+MECHANICS_LAB_STRUCTURES_WIDTH :: 41
+MECHANICS_LAB_STRUCTURES_HEIGHT :: 29
+
+mechanics_lab_size :: proc(arena: Mechanics_Lab_Arena) -> (width, height: int) {
+	if arena == .Structures { return MECHANICS_LAB_STRUCTURES_WIDTH, MECHANICS_LAB_STRUCTURES_HEIGHT }
+	return MECHANICS_LAB_WIDTH, MECHANICS_LAB_HEIGHT
+}
+
+// The next arena in F3's turn.
+mechanics_lab_next_arena :: proc(arena: Mechanics_Lab_Arena) -> Mechanics_Lab_Arena {
+	return Mechanics_Lab_Arena((int(arena)+1)%len(Mechanics_Lab_Arena))
+}
+
+// What the arena of structures holds: the three buildings, the five complex objects and
+// the pen, and the cottage in each of its four turns (the last one mirrored).
+Lab_Structure :: struct { id: level.Structure_Id, origin: grid.Position, rotation: u8, mirror: bool }
+MECHANICS_LAB_STRUCTURES := [?]Lab_Structure{
+	{.Cottage, {4, 3}, 0, false}, {.Hut, {12, 3}, 0, false}, {.Temple, {28, 3}, 0, false},
+	{.Cart, {4, 11}, 0, false}, {.Fountain, {8, 11}, 0, false}, {.Statue, {12, 11}, 0, false}, {.Machine, {16, 11}, 0, false},
+	{.Ruin, {34, 13}, 0, false}, {.Pen, {28, 17}, 0, false},
+	{.Cottage, {4, 22}, 0, false}, {.Cottage, {10, 22}, 1, false}, {.Cottage, {16, 22}, 2, false}, {.Cottage, {22, 22}, 3, true},
+}
 
 // The open arena: walls only around the edge, the player in the middle and
 // the (unused) exit tucked into a corner.
 mechanics_lab_level :: proc(arena := Mechanics_Lab_Arena.Flat) -> (level.Level, bool) {
-	rows: [MECHANICS_LAB_HEIGHT]string
-	for y in 0..<MECHANICS_LAB_HEIGHT {
+	width, height := mechanics_lab_size(arena)
+	rows: [MECHANICS_LAB_STRUCTURES_HEIGHT]string
+	for y in 0..<height {
 		row := strings.builder_make(context.temp_allocator)
-		for x in 0..<MECHANICS_LAB_WIDTH {
+		for x in 0..<width {
 			switch {
-			case x == 0 || y == 0 || x == MECHANICS_LAB_WIDTH-1 || y == MECHANICS_LAB_HEIGHT-1: strings.write_byte(&row, '#')
-			case x == MECHANICS_LAB_WIDTH/2 && y == MECHANICS_LAB_HEIGHT/2: strings.write_byte(&row, '@')
-			case x == MECHANICS_LAB_WIDTH-2 && y == MECHANICS_LAB_HEIGHT-2: strings.write_byte(&row, '>')
+			case x == 0 || y == 0 || x == width-1 || y == height-1: strings.write_byte(&row, '#')
+			case x == width/2 && y == height/2: strings.write_byte(&row, '@')
+			case x == width-2 && y == height-2: strings.write_byte(&row, '>')
 			case: strings.write_byte(&row, '.')
 			}
 		}
 		rows[y] = strings.to_string(row)
 	}
-	data, error, _ := level.from_ascii(rows[:])
+	data, error, _ := level.from_ascii(rows[:height])
 	if error != .None { return data, false }
 	if arena == .Heights { mechanics_lab_raise(&data) }
+	if arena == .Structures {
+		for placed in MECHANICS_LAB_STRUCTURES {
+			if _, err := level.place_structure(&data, placed.id, placed.origin, placed.rotation, placed.mirror); err != .None {
+				level.destroy(&data)
+				return {}, false
+			}
+		}
+	}
 	return data, true
 }
 
@@ -83,11 +116,16 @@ create_mechanics_lab_room :: proc(data: ^level.Level, player: ^game.Player, conf
 	data^ = arena
 	player.floor_secrets = {}
 	// Three first arrivals, well away from the middle.
+	width, height := mechanics_lab_size(which)
 	spawns := [?]game.Enemy_Spawn{
 		{position = {4, 4}, health = 12, attack = 2, archetype = .Chaser},
 		// In the arena of heights the archer waits up on the plateau.
-		{position = {MECHANICS_LAB_WIDTH-5, 4} if which == .Flat else {MECHANICS_LAB_WIDTH-5, 6}, health = 10, attack = 2, archetype = .Archer},
-		{position = {MECHANICS_LAB_WIDTH/2, MECHANICS_LAB_HEIGHT-4}, health = 18, attack = 3, archetype = .Brute},
+		{position = {width-5, 4} if which == .Flat else {width-5, 6}, health = 10, attack = 2, archetype = .Archer},
+		{position = {width/2, height-4}, health = 18, attack = 3, archetype = .Brute},
+	}
+	// In the arena of structures they wait in the open, away from the buildings.
+	if which == .Structures {
+		spawns[0].position, spawns[1].position, spawns[2].position = {37, 3}, {37, 10}, {20, 26}
 	}
 	room, ok = game.create_room(data, player, {enemies = spawns[:]})
 	if !ok { return }

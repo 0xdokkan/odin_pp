@@ -47,6 +47,10 @@ World :: struct {
 	seed: u64,
 	sites: [MAX_SITES]Site,
 	site_count: int,
+	// The structures standing on the map (structures.odin); empty in a world saved before
+	// there were any, whose tiles are as they were.
+	structures: [MAX_WORLD_STRUCTURES]level.Placed_Structure,
+	structure_count: int,
 	groups: [MAX_GROUPS]Group,
 	group_count: int,
 	drops: [MAX_DROPS]Drop,
@@ -170,6 +174,8 @@ generate :: proc(w: ^World, data: ^level.Level, b: campaign.Biome, seed: u64) ->
 		stamp_site(data,&site)
 		if kind==.Boss { _=level.set_tile(data,p,{.Exit}) }
 	}
+	// The biome's buildings and objects, after the sites and before any inhabitants.
+	place_structures(w,data)
 	// Structural geography is finished before any inhabitants are placed.
 	for site,i in w.sites[:w.site_count] {if site.active && (site.kind==.Trial || site.kind==.Boss || (site.kind==.Cache && i<12)) {add_group(w,data,i,site.position,1 if site.kind==.Boss else 2+rank(b)/2,false,site.kind==.Boss)}}
 	for i in 0..<4 {
@@ -191,14 +197,14 @@ add_group :: proc(w:^World,data:^level.Level,site:int,p:grid.Position,requested_
 		q:=grid.Position{p.x+i%3-1,p.y+i/3-1}
 		if site>=0 && w.sites[site].layout_version==SITE_LAYOUT_VERSION {q=site_spawn_position(&w.sites[site],w.sites[site].wave,i)}
 		// Placement never edits geography: content seeds only choose inhabitants.
-		if tile, present := level.tile_at(data, q); !present || tile.kind == .Wall || tile.kind == .Void {
+		if tile, present := level.tile_at(data, q); !present || tile.kind == .Wall || tile.kind == .Void || tile.kind == .Fence {
 			for radius in 1..=4 {
 				found := false
 				for dy in -radius..=radius {
 					for dx in -radius..=radius {
 						candidate := grid.Position{p.x+dx, p.y+dy}
 						candidate_tile, candidate_present := level.tile_at(data, candidate)
-						if !candidate_present || candidate_tile.kind == .Wall || candidate_tile.kind == .Void || candidate_tile.kind == .Exit { continue }
+						if !candidate_present || candidate_tile.kind == .Wall || candidate_tile.kind == .Void || candidate_tile.kind == .Fence || candidate_tile.kind == .Exit { continue }
 						occupied := false
 						for previous in g.members[:i] { occupied = occupied || previous.enemy.position == candidate }
 						if !occupied { q = candidate; found = true; break }

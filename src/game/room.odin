@@ -313,6 +313,14 @@ base_cell_is_walkable :: proc(room: ^Room, position: grid.Position) -> bool {
 	return ok && level.is_walkable(tile.kind) && expedition_bridge_open(room, position)
 }
 
+// Whether the cell holds a low wall (level.Tile_Kind.Fence): one that stops the step and
+// lets the sight through.
+cell_is_fence :: proc(room: ^Room, position: grid.Position) -> bool {
+	if room == nil || room.level_data == nil { return false }
+	tile, ok := level.tile_at(room.level_data, position)
+	return ok && tile.kind == .Fence
+}
+
 obstacle_at :: proc(room: ^Room, position: grid.Position) -> bool {
 	if room == nil {
 		return false
@@ -374,7 +382,8 @@ cell_blocks_movement :: proc(room: ^Room, position: grid.Position) -> bool {
 }
 
 cell_blocks_line_of_sight :: proc(room: ^Room, position: grid.Position) -> bool {
-	if !base_cell_is_walkable(room, position) || obstacle_at(room, position) {
+	// A fence or low wall stops the step but not the sight.
+	if !base_cell_is_walkable(room, position) && !cell_is_fence(room, position) || obstacle_at(room, position) {
 		return true
 	}
 	object, found := grid_object_at(room, position)

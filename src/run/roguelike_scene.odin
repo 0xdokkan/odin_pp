@@ -246,7 +246,7 @@ update_run_activity_overlay :: proc(rs: ^Roguelike_Session, hf: ^host.Frame) -> 
 		(rs.defeat_hovered == .Restart && rs.frame_input.left_pressed))
 	// F3 in PROVA MECCANICHE: the other arena, started afresh.
 	if rs.options.mechanics_lab && !rs.activity_modal && run_pressed(rs.frame_input, .Lab_Arena) {
-		rs.lab_arena = .Heights if rs.lab_arena == .Flat else .Flat
+		rs.lab_arena = mechanics_lab_next_arena(rs.lab_arena)
 		restart_requested = true
 	}
 	if restart_requested && !roguelike_restart(rs, hf) { return true }

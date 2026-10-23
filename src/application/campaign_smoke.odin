@@ -115,6 +115,14 @@ EXPEDITION_SMOKE_WORKSHOP :: EXPEDITION_SMOKE_CENTER+12
 EXPEDITION_SMOKE_HITS :: EXPEDITION_SMOKE_WORKSHOP+12
 @(private)
 EXPEDITION_SMOKE_HIT_BIOMES :: [4]campaign.Biome{.Snow, .West, .Jungle, .Space}
+// Buildings and objects (level/structure.odin) in the first biome: the robot walks up to a hut
+// (6, 4, 2 and 1 cell from its door, on the threshold, inside, outside again), then the objects.
+@(private)
+EXPEDITION_SMOKE_STRUCTURES :: EXPEDITION_SMOKE_HITS+4
+@(private)
+EXPEDITION_SMOKE_STRUCTURE_STEPS :: 8
+@(private)
+EXPEDITION_SMOKE_STRUCTURE_NAMES :: [EXPEDITION_SMOKE_STRUCTURE_STEPS]string{"6","4","2","1","soglia","dentro","fuori","oggetti"}
 
 @(private)
 expedition_benchmark_geometry :: proc(e:^run.Expedition_Session)->[2]u64 {
@@ -344,6 +352,9 @@ expedition_capture_present :: proc(data:rawptr,frame:^host.Frame) {
 		else if s.stage>=EXPEDITION_SMOKE_HITS && s.stage<EXPEDITION_SMOKE_HITS+4 {
 			names:=[4]string{"neve","far_west","giungla","spazio"}
 			artifacts.screenshot(fmt.ctprintf("odin_pp_expedition_bersagli_%s.png",names[s.stage-EXPEDITION_SMOKE_HITS]))
+		} else if s.stage>=EXPEDITION_SMOKE_STRUCTURES && s.stage<EXPEDITION_SMOKE_STRUCTURES+EXPEDITION_SMOKE_STRUCTURE_STEPS {
+			names:=EXPEDITION_SMOKE_STRUCTURE_NAMES
+			artifacts.screenshot(fmt.ctprintf("odin_pp_expedition_edificio_%s.png",names[s.stage-EXPEDITION_SMOKE_STRUCTURES]))
 		} else if s.stage>EXPEDITION_SMOKE_WORKSHOP {artifacts.screenshot(fmt.ctprintf("odin_pp_expedition_officina_%02d.png",s.stage-EXPEDITION_SMOKE_WORKSHOP))}
 		else {artifacts.screenshot(fmt.ctprintf("odin_pp_expedition_centro_%02d.png",s.stage-EXPEDITION_SMOKE_CENTER))}
 	}
@@ -404,6 +415,54 @@ expedition_capture_present :: proc(data:rawptr,frame:^host.Frame) {
 				}
 				break
 			}
-		} else if s.stage>=EXPEDITION_SMOKE_HITS+4 {host.quit(frame)}
+		} else if s.stage>=EXPEDITION_SMOKE_STRUCTURES && s.stage<EXPEDITION_SMOKE_STRUCTURES+EXPEDITION_SMOKE_STRUCTURE_STEPS {
+			expedition_smoke_structures(e,s.stage-EXPEDITION_SMOKE_STRUCTURES)
+		} else if s.stage>=EXPEDITION_SMOKE_STRUCTURES+EXPEDITION_SMOKE_STRUCTURE_STEPS {host.quit(frame)}
+	}
+}
+
+// One step of the structures' act: where the robot stands and what the building should be doing.
+@(private)
+expedition_smoke_structures :: proc(e:^run.Expedition_Session,step:int) {
+	if step==0 {expedition_smoke_world(e,.Cyber);e.world.mounted=false;e.message_timer=0}
+	data:=e.rs.room.level_data
+	hut:=-1
+	for placed,i in data.structures {if placed.id==.Hut {hut=i;break}}
+	assert(hut>=0,"the first biome has no hut")
+	placed:=data.structures[hut];plan:=&data.structure_plans[hut]
+	door,outward:=grid.Position{},grid.Position{}
+	for y in 0..<plan.height {for x in 0..<plan.width {
+		if level.plan_at(plan,x,y)!=.Door {continue}
+		door={placed.origin.x+x,placed.origin.y+y}
+		for d in ([4]grid.Position{{1,0},{-1,0},{0,1},{0,-1}}) {if level.plan_at(plan,x+d.x,y+d.y)==.Outside {outward=d}}
+	}}
+	at:grid.Position
+	expected:game.Structure_Stage
+	switch step {
+	case 0:at,expected=grid.Position{door.x+outward.x*6,door.y+outward.y*6},.Far
+	case 1:at,expected=grid.Position{door.x+outward.x*4,door.y+outward.y*4},.Approaching
+	case 2:at,expected=grid.Position{door.x+outward.x*2,door.y+outward.y*2},.Approaching
+	case 3:at,expected=grid.Position{door.x+outward.x,door.y+outward.y},.Threshold
+	case 4:at,expected=door,.Threshold
+	case 5:at,expected=grid.Position{door.x-outward.x*2,door.y-outward.y*2},.Inside
+	case 6:at,expected=grid.Position{door.x+outward.x*4,door.y+outward.y*4},.Approaching
+	case:
+		// Round the objects: next to the first one that is not a building.
+		expected=.Far
+		for other,i in data.structures {
+			if level.structure_is_building(other.id) {continue}
+			for d in ([6]grid.Position{{-3,0},{3,0},{0,-3},{0,3},{-4,1},{4,-1}}) {
+				p:=game.add_position(other.origin,d)
+				if !game.cell_blocks_movement(&e.rs.room,p) {at=p;break}
+			}
+			_=i;break
+		}
+	}
+	e.rs.room.player.position=at
+	e.rs.iso_renderer.tactical.expedition_follow_ready=false
+	if step<7 {
+		view:=game.structure_visibility(data,hut,{f32(at.x)+.5,f32(at.y)+.5})
+		assert(view.stage==expected,"the hut is not in the stage the act expects")
+		if view.stage==.Inside {assert(view.opacity==1 && !view.roof,"inside, the walls are whole and the roof hidden")}
 	}
 }

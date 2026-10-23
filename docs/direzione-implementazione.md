@@ -741,6 +741,23 @@ Per ripetere il confronto con il vecchio buffer, compilare con
 iniziali; ometterlo esegue tutte le 51 scene. La build normale pronta da
 avviare è `build/odin_pp`; conserva il limite fps delle impostazioni di gioco.
 
+## Strutture su più caselle (Fase 6 del piano griglia)
+
+- **Livello:** `level.Tile_Kind.Fence` (blocca il passo, non la vista); `src/level/structure.odin`
+  legge le piante, le ruota e le specchia, controlla e posa; il catalogo è in
+  `structure_catalog.odin`. Il livello tiene l'elenco, le piante ruotate e per ogni cella il numero
+  della struttura sopra (`structure_index_at`).
+- **Regole:** nessuna nuova (le caselle sono ordinarie); la vista lascia passare il muretto
+  (`game.cell_blocks_line_of_sight`). `game.structure_visibility` è la funzione pura della trasparenza.
+- **Spedizioni:** `World.structures` (24 al massimo) è salvato con il mondo; il ripristino ricostruisce
+  l'indice dalle caselle salvate; il generatore posa le strutture di Robotica cibernetica dopo i servizi,
+  cercando il posto libero più vicino in un ordine fisso, quindi la stessa geografia a ogni run.
+- **Grafica:** vedi `docs/presentazione.md`.
+- **Limiti:** per ora solo Robotica cibernetica (il bioma di prova scelto dall'utente) ha strutture; le
+  piante non hanno altezze (le cifre `1`…`9` non sono accettate, le spedizioni restano piatte fino alla Fase 3);
+  l'arredo degli edifici è minimo (pavimento, altare del tempietto); nei riflessi del pavimento non compare
+  l'involucro; l'ologramma non mostra i muretti. La posa da parte del giocatore è la Fase 7.
+
 ## Limiti dichiarati
 
 - **Renderer:** i riflessi planari comprendono architettura e neon; carta e

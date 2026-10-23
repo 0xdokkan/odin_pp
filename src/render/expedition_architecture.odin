@@ -242,7 +242,8 @@ collect_expedition_edges :: proc(renderer:^Renderer,room:^game.Room,w:^world.Wor
 	// draw_tactical_world gathers the wider floor/site cache before this pass.
 	for y in max(0,p.y-26)..<min(room.level_data.tiles.height,p.y+27) {
 		for x in max(0,p.x-26)..<min(room.level_data.tiles.width,p.x+27) {
-			cell:=grid.Position{x,y};tile,_:=level.tile_at(room.level_data,cell);if tile.kind!=.Wall {continue}
+			cell:=grid.Position{x,y};tile,_:=level.tile_at(room.level_data,cell);if tile.kind!=.Wall && tile.kind!=.Fence {continue}
+			if draw_expedition_structure_solid(pass,room,w,cell,tile.kind) {continue}
 			site_index,design:=expedition_site_near(renderer,w,cell)
 			if design.fixture && site_index>=0 && w.sites[site_index].active {continue}
 			if design.inside {draw_expedition_site_wall(pass,room,w,&w.sites[site_index],cell,design)}
@@ -266,8 +267,9 @@ draw_expedition_architecture :: proc(renderer:^Renderer,room:^game.Room,w:^world
 		for y in max(0,p.y-26)..<min(room.level_data.tiles.height,p.y+27) {
 			for x in max(0,p.x-26)..<min(room.level_data.tiles.width,p.x+27) {
 				cell:=grid.Position{x,y};tile,_:=level.tile_at(room.level_data,cell)
-				if tile.kind!=.Wall || ((m==nil || !m.reflection_pass) && !tactical_cell_on_screen(renderer,cell)) {continue}
+				if (tile.kind!=.Wall && tile.kind!=.Fence) || ((m==nil || !m.reflection_pass) && !tactical_cell_on_screen(renderer,cell)) {continue}
 				if ink_layer_skips(layer,m,{f32(x)+.5,f32(y)+.5}) {continue}
+				if draw_expedition_structure_solid(pass,room,w,cell,tile.kind) {continue}
 				site_index,design:=expedition_site_near(renderer,w,cell)
 				// Active fixtures own a bespoke prop below; dormant ruins remain visible cover.
 				if design.fixture && site_index>=0 && w.sites[site_index].active {continue}
@@ -279,6 +281,7 @@ draw_expedition_architecture :: proc(renderer:^Renderer,room:^game.Room,w:^world
 		if layer==.Edges {end_expedition_edges(renderer)}
 		else {rlgl.DrawRenderBatchActive();rl.EndShaderMode()}
 	}
+	draw_expedition_structure_envelopes(renderer,room,w)
 }
 
 // One immutable site mesh contains its gates and authored fixture. The same

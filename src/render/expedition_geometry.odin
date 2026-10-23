@@ -75,7 +75,8 @@ expedition_build_chunk :: proc(renderer:^Renderer,room:^game.Room,w:^world.World
 	for y in origin.y..<min(origin.y+EXPEDITION_GEOMETRY_CHUNK,room.level_data.tiles.height) {
 		for x in origin.x..<min(origin.x+EXPEDITION_GEOMETRY_CHUNK,room.level_data.tiles.width) {
 			cell:=grid.Position{x,y};tile,_:=level.tile_at(room.level_data,cell)
-			if tile.kind!=.Wall {continue}
+			if tile.kind!=.Wall && tile.kind!=.Fence {continue}
+			if draw_expedition_structure_solid(pass,room,w,cell,tile.kind) {continue}
 			site_index,design:=expedition_site_near(renderer,w,cell)
 			if design.fixture && site_index>=0 && w.sites[site_index].active {continue}
 			if design.inside {draw_expedition_site_wall(pass,room,w,&w.sites[site_index],cell,design)}
@@ -235,5 +236,6 @@ draw_expedition_cached_architecture :: proc(renderer:^Renderer,room:^game.Room,w
 		if layer==.Edges {end_expedition_edges(renderer)}
 		else {rlgl.DrawRenderBatchActive();rl.EndShaderMode()}
 	}
+	draw_expedition_structure_envelopes(renderer,room,w)
 	return true
 }

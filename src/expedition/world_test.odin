@@ -34,7 +34,7 @@ test_expedition_geography_is_seed_independent_and_all_sites_reachable :: proc(t:
 			for head:=0;head<tail;head+=1 {
 				for offset in ([4]grid.Position{{1,0},{-1,0},{0,1},{0,-1}}) {
 					q:=game.add_position(queue[head],offset);tile,ok:=level.tile_at(&first,q)
-					if !ok || tile.kind==.Void || tile.kind==.Wall {continue}
+					if !ok || !level.is_walkable(tile.kind) {continue}
 					i:=q.y*first.tiles.width+q.x;if seen[i] {continue};seen[i]=true;queue[tail]=q;tail+=1
 				}
 			}
@@ -228,7 +228,7 @@ test_expedition_outdoor_props_never_enclose_open_floor :: proc(t:^testing.T) {
 		for head:=0;head<tail;head+=1 {
 			for offset in ([4]grid.Position{{1,0},{-1,0},{0,1},{0,-1}}) {
 				q:=game.add_position(queue[head],offset);tile,ok:=level.tile_at(&data,q)
-				if !ok || tile.kind==.Void || tile.kind==.Wall {continue}
+				if !ok || !level.is_walkable(tile.kind) {continue}
 				i:=q.y*data.tiles.width+q.x;if seen[i] {continue};seen[i]=true;queue[tail]=q;tail+=1
 			}
 		}
@@ -237,7 +237,7 @@ test_expedition_outdoor_props_never_enclose_open_floor :: proc(t:^testing.T) {
 			p:=grid.Position{i%data.tiles.width,i/data.tiles.width}
 			if _,design:=site_at(&w,p);design.inside {continue}
 			if tile.kind==.Wall {props+=1}
-			if tile.kind!=.Wall && tile.kind!=.Void && !seen[i] {stranded+=1}
+			if tile.kind!=.Wall && tile.kind!=.Fence && tile.kind!=.Void && !seen[i] {stranded+=1}
 		}
 		// The Sky has no props: its archipelago keeps a few unbridged islets
 		// by design, and the site test above covers every site's approach.

@@ -75,10 +75,14 @@ non definiscono le regole della spedizione aperta.
 
 ### Prova meccaniche
 
-**F3** cambia arena: la seconda, «Altezze», ha un altopiano di 4 gradini con una
+**F3** cambia arena, una dopo l'altra: «Altezze» ha un altopiano di 4 gradini con una
 scala di 3, un pilastro di 8 e una collina a spirale (si prova la regola dei
-dirupi, le cadute, la vista e la gittata dall'alto). Con `--smoke-mechanics-lab` e
-`ODIN_PP_LAB_ONLY=heights` gira solo l'atto delle altezze.
+dirupi, le cadute, la vista e la gittata dall'alto); «Strutture» (41×29) ha tutto il
+catalogo: tre edifici, cinque oggetti complessi, un recinto e la casetta nelle quattro
+rotazioni (si prova passo, vista e trasparenza avvicinandosi). Con `--smoke-mechanics-lab` e
+`ODIN_PP_LAB_ONLY=heights` o `structures` gira solo l'atto delle altezze o delle strutture.
+`--smoke-expedition` comprende l'atto «edifici»: il robot si avvicina a una capanna di
+Robotica cibernetica (6, 4, 2 e 1 casella, soglia, dentro, fuori) e agli oggetti.
 
 Il pulsante **Prova meccaniche** del menu (o `--mechanics-lab`) apre una sandbox
 per provare le meccaniche nuove, una alla volta. È un'arena grande 23x17 senza

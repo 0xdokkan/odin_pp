@@ -98,7 +98,9 @@ valid_snapshot :: proc(s:^Snapshot) -> bool {
 	   !game.m8_profile_valid(s.player.m8_profile) || s.player.deck.has_resolving_card || s.tactical_pulse.pending ||
 	   s.tactical_pulse.count<0 || s.tactical_pulse.count>game.MAX_ENEMIES_PER_ROOM ||
 	   s.reactions.count<0 || s.reactions.count>game.MAX_REACTION_BINDINGS_PER_ROOM {return false}
-	for tile in s.tiles[:size*size] {if tile.kind>.Exit {return false}}
+	for tile in s.tiles[:size*size] {if tile.kind>.Fence {return false}}
+	if w.structure_count<0 || w.structure_count>MAX_WORLD_STRUCTURES {return false}
+	for placed in w.structures[:w.structure_count] {if placed.id>=.Count || placed.rotation>=4 || !inside(placed.origin,size) {return false}}
 	for e,i in s.enemies[:s.enemy_count] {
 		if !valid_statuses(e.statuses) || e.intent.path_count<0 || e.intent.path_count>game.MAX_ENEMY_INTENT_PATH_CELLS || e.intent.threatened_cell_count<0 || e.intent.threatened_cell_count>game.MAX_ENEMY_INTENT_THREAT_CELLS || e.id==0 || e.id>=s.next_enemy_id || e.archetype<.Chaser || e.archetype>=.Count || e.health<=0 || e.health>e.max_health || e.attack<=0 || !inside(e.position,size) {return false}
 		for previous in s.enemies[:i] {if e.id==previous.id {return false}}
@@ -129,6 +131,8 @@ restore :: proc(s:^Snapshot,w:^World,data:^level.Level,player:^game.Player,room:
 		if tile.kind==.Player_Spawn {data.player_spawn={i%side,i/side};data.has_player_spawn=true;break}
 	}
 	if !data.has_player_spawn {level.destroy(data);return false}
+	// The structures' records are in the world; their tiles came with the map.
+	if !level.set_structures(data,s.world.structures[:max(0,s.world.structure_count)]) {level.destroy(data);return false}
 	player^=s.player
 	player.health=max(i32(1),player.health) // Allocation also supports a stable defeated snapshot.
 	r,ok:=game.create_room(data,player,{room_seed=s.world.seed})

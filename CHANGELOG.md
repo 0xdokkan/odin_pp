@@ -5,6 +5,18 @@ I riferimenti a Classica, `--flat` e ai vecchi smoke descrivono versioni precede
 per i comandi disponibili oggi valgono il [README](README.md) e la documentazione collegata.
 
 
+## 2026-10-24 — Strutture su più caselle
+
+- **Fase 6 del piano fatta.** Edifici (casetta, capanna, tempietto) e oggetti complessi (carro, fontana,
+  statua, macchinario, rovina, recinto) che occupano tutte le caselle della loro impronta, da piante a
+  caratteri con rotazione e specchio, posati con controlli (fuori mappa, sovrapposizione, porta bloccata,
+  sacche). Nuovo tipo di casella, il muretto, che ferma il passo ma non la vista.
+- Gli edifici diventano trasparenti avvicinandosi (intero da 5 caselle, sparito a una casella da una porta,
+  minimo del 25% accanto a un muro cieco); dentro i muri tornano pieni, il tetto si nasconde e il fuori si
+  scurisce; resta il contorno a terra. Solo grafica: i muri fermano sempre passo e vista.
+- Laboratorio: terza arena (F3) con tutto il catalogo. Spedizioni: Robotica cibernetica ha 14 strutture
+  fisse, salvate con il mondo. Test: 21 nuovi (1609 in tutto).
+
 ## 2026-10-23 — Hub in 3D: dentro la sala giochi
 
 - **Fase 11 del piano fatta: l'hub 3D è completo.** Entrando nella Sala giochi dalla piazza

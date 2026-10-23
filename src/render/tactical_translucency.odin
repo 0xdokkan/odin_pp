@@ -9,7 +9,7 @@ import grid "../engine/grid"
 import view "../engine/view"
 
 Tactical_Alpha_Entry :: struct {
-	kind: enum {Sprite, Wall, Attack, Ground, Lasso, Fishing, Pinball, First_Person, Dino},
+	kind: enum {Sprite, Wall, Roof, Attack, Ground, Lasso, Fishing, Pinball, First_Person, Dino},
 	// An Attack entry: its blow's slot in Attack_Fx_State.
 	attack: i32,
 	// A Ground entry: its flame's cell, or past the cells its splash (ground_fx.odin).
@@ -114,6 +114,8 @@ collect_tactical_translucents :: proc(renderer: ^Renderer, room: ^game.Room = ni
 			}
 		} }
 	}
+	// The envelope of each building that is not whole: its walls and colonnade, and its roof.
+	if room != nil && (room.player == nil || !room.player.tactical.config.expedition) { collect_structure_entries(renderer, room, entries) }
 	forward := rl.Vector3Normalize(v.camera.target-v.camera.position)
 	for &entry in entries^ {
 		// View depth, not radial distance: objects off to the side must not
@@ -140,6 +142,9 @@ draw_tactical_billboards :: proc(renderer: ^Renderer, room: ^game.Room = nil, li
 		if entry.kind == .Wall {
 			if !walls_active { begin_tactical_lighting(renderer, accents = lights); walls_active = true }
 			draw_diorama_wall(renderer, room, {int(entry.position.x), int(entry.position.y)})
+		} else if entry.kind == .Roof {
+			if !walls_active { begin_tactical_lighting(renderer, accents = lights); walls_active = true }
+			draw_structure_roof(renderer, room, int(entry.attack))
 		} else if entry.kind == .Attack {
 			if walls_active { rl.EndShaderMode(); walls_active = false }
 			draw_attack_fx_entry(renderer, entry)

@@ -33,6 +33,9 @@ Tactical_View :: struct {
 	perspective, no_fog: bool,
 	refocus_enabled: bool,
 	camera: rl.Camera3D,
+	// The buildings' see-through state this frame (structure_view.odin).
+	structures: Structure_Views,
+	structure_room_data: ^level.Level,
 	draw_frustum: Tactical_Draw_Frustum,
 	draw_timing: Expedition_Draw_Timing,
 	zoom: f32,
@@ -575,6 +578,7 @@ draw_tactical_world :: proc(renderer: ^Renderer, room: ^game.Room, active_card: 
 	halo := CARD_HIT_VIOLET
 	if expedition_world != nil { halo = card_hit_halo_color(expedition.metadata(expedition_world.biome).color, true) }
 	update_ground_fx(renderer, room)
+	update_structure_views(renderer, room)
 	lights: [4]rl.Vector4
 	// The surface draws in logical units at its own resolution.
 	surface := begin_tactical_surface(renderer)
@@ -652,7 +656,7 @@ draw_tactical_world :: proc(renderer: ^Renderer, room: ^game.Room, active_card: 
 	// only needs a small feathered footprint for each visible actor.
 	if expedition_world == nil { draw_tactical_ground_shadows(renderer, room) }
 	else {draw_expedition_contact_shadows(renderer,room,expedition_world)}
-	if expedition_world == nil { draw_diorama_accents(renderer, room) }
+	if expedition_world == nil { draw_diorama_accents(renderer, room); draw_structure_outlines(renderer, room) }
 	draw_tactical_clear_markers(renderer, room)
 	draw_card_range_light(renderer, room, &preview)
 	draw_card_hit_marks(renderer, room, &preview, halo)

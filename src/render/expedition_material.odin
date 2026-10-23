@@ -23,6 +23,12 @@ Expedition_Material :: struct {
 	tint, floor, cyber, reveal_cyber: c.int,
 	reveal_eye, reveal_forward, reveal_viewport, reveal_points, reveal_count: c.int,
 	grid_amount: f32,
+	// Inside a building the rest of the world is darker: the building's footprint (x0, z0,
+	// x1, z1) and how dark the outside is (structure_expedition.odin).
+	dim_box: rl.Vector4,
+	dim_amount: f32,
+	// The envelope's opacity in the reveal program, per structure drawn.
+	reveal_envelope: c.int,
 	focus_points: [EXPEDITION_GRID_FOCUS]rl.Vector4,
 	focus_point_count: int,
 	// Screen uv, radius in screen heights, view depth beyond which nothing thins.
@@ -85,6 +91,8 @@ uniform vec3 viewForward;
 uniform vec2 viewport;
 uniform vec4 reveal[9];
 uniform int revealCount;
+// A building's envelope: below 1 it is dithered away (1 for everything else).
+uniform float envelope;
 out vec4 finalColor;
 const float BAYER[16]=float[16](0.,8.,2.,10.,12.,4.,14.,6.,3.,11.,1.,9.,15.,7.,13.,5.);
 void main() {
@@ -106,6 +114,10 @@ void main() {
         // The actor's centre is fully clear; only the rim is stippled.
         // Leaving wall pixels there would break the printed paper silhouette.
         if(cut>0. && (BAYER[q.x+q.y*4]+.5)/16.<cut) discard;
+    }
+    if(envelope<.999) {
+        ivec2 e=ivec2(mod(gl_FragCoord.xy,4.));
+        if((BAYER[e.x+e.y*4]+.5)/16.>envelope) discard;
     }
     finalColor=vec4(expedition_body(worldPosition,normal,color.rgb),1.);
 }`
@@ -130,6 +142,8 @@ expedition_material_ready :: proc(renderer:^Renderer)->bool {
 	m.reveal_eye=rl.GetShaderLocation(r,"eye");m.reveal_forward=rl.GetShaderLocation(r,"viewForward")
 	m.reveal_viewport=rl.GetShaderLocation(r,"viewport")
 	m.reveal_points=rl.GetShaderLocation(r,"reveal[0]");m.reveal_count=rl.GetShaderLocation(r,"revealCount")
+	m.reveal_envelope=rl.GetShaderLocation(r,"envelope")
+	whole:=f32(1);rl.SetShaderValue(r,m.reveal_envelope,&whole,.FLOAT)
 	renderer.tactical.expedition_material=m
 	return true
 }
@@ -153,6 +167,7 @@ prepare_expedition_material :: proc(renderer:^Renderer,room:^game.Room,w:^world.
 	m.grid_amount+=(goal-m.grid_amount)*(1-math.exp(-7*dt))
 	if goal==0 && m.grid_amount<.01 {m.grid_amount=0}
 	m.focus_point_count=0;m.reveal_point_count=0
+	update_structure_dim(renderer,m)
 	camera:=v.camera
 	toward:=rl.Vector2{camera.position.x-camera.target.x,camera.position.z-camera.target.z}
 	if l:=rl.Vector2Length(toward);l>.0001 {m.toward_camera=toward/l}

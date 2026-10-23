@@ -38,6 +38,26 @@ del livello, aggiornata quando la geometria cambia, mai da un puntatore al livel
 ([height_view.odin](../src/render/height_view.odin)). Solo il laboratorio ha altezze;
 le spedizioni restano piatte (Fase 3).
 
+### Strutture e trasparenza degli edifici
+
+Ogni edificio è disegnato in tre parti: l'**involucro** (muri, colonnato e tetto), l'**interno**
+(il pavimento, sempre presente) e il **contorno a terra** (una linea al neon lungo l'impronta,
+con una croce sulla porta, sempre presente). Quanto è pieno l'involucro dipende da dove si trova
+il robot, ed è calcolato dalla funzione pura `game.structure_visibility`
+([structure_view.odin](../src/game/structure_view.odin)): intero da 5 caselle in su; sempre più
+trasparente avvicinandosi; sparito a una casella da una porta (e sulla porta); accanto a un muro
+senza porta mai sotto il 25%; dentro, i muri tornano interi, il tetto si nasconde e tutto ciò
+che sta fuori dall'edificio si scurisce, sempre allo stesso modo. Il valore disegnato segue quel
+valore in circa un quinto di secondo, così negli scontri (a caselle) l'edificio non lampeggia. È
+solo grafica: i muri fermano sempre passo e vista. Gli oggetti complessi non cambiano.
+
+Nel laboratorio l'involucro che non è intero va nel passaggio ordinato con gli attori, con i
+colori in trasparenza; nelle spedizioni passa dal programma di rivelazione con un retino
+ordinato per edificio (nessun ordinamento) e i suoi bordi sfumano con lui; la scurita di fuori è
+una moltiplicazione della luce condivisa. Muretti e oggetti sono blocchi cotti come i prop
+([structure_diorama.odin](../src/render/structure_diorama.odin),
+[structure_expedition.odin](../src/render/structure_expedition.odin)).
+
 ### Bersagli in evidenza
 
 Mentre si sceglie una carta, ogni nemico che una giocata valida colpirebbe

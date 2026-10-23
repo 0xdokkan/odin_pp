@@ -11,6 +11,8 @@ Tile_Kind :: enum u8 {
 	Door,
 	Player_Spawn,
 	Exit,
+	// A low wall: it stops the step but not the sight (structure.odin).
+	Fence,
 }
 
 Tile :: struct {
@@ -30,6 +32,12 @@ Level :: struct {
 	// walked, a cliff of two or more is a wall). Empty means flat: every cell is
 	// at 0, which is every map that was not given heights.
 	heights: [dynamic]u8,
+	// The structures standing on the map (structure.odin): each one, its plan turned as
+	// placed, and for every cell the number of the structure over it (0 for none, else
+	// its index plus one). The tiles themselves are ordinary ones.
+	structures:      [dynamic]Placed_Structure,
+	structure_plans: [dynamic]Plan,
+	structure_cells: [dynamic]u8,
 }
 
 // The tallest a cell can be.
@@ -122,6 +130,9 @@ destroy :: proc(level: ^Level) {
 	}
 	grid.destroy(&level.tiles)
 	delete(level.heights)
+	delete(level.structures)
+	delete(level.structure_plans)
+	delete(level.structure_cells)
 	level^ = {}
 }
 
@@ -203,7 +214,7 @@ is_walkable :: proc(kind: Tile_Kind) -> bool {
 	switch kind {
 	case .Floor, .Door, .Player_Spawn, .Exit:
 		return true
-	case .Void, .Wall:
+	case .Void, .Wall, .Fence:
 		return false
 	}
 	return false
@@ -217,6 +228,8 @@ tile_from_symbol :: proc(symbol: u8) -> (Tile, bool) {
 		return Tile{kind = .Floor}, true
 	case '#':
 		return Tile{kind = .Wall}, true
+	case '=':
+		return Tile{kind = .Fence}, true
 	case '+':
 		return Tile{kind = .Door}, true
 	case '@':
@@ -235,6 +248,8 @@ tile_symbol :: proc(kind: Tile_Kind) -> string {
 		return "."
 	case .Wall:
 		return "#"
+	case .Fence:
+		return "="
 	case .Door:
 		return "+"
 	case .Player_Spawn:

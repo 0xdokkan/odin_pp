@@ -781,6 +781,33 @@ danno di caduta in `apply_movement_effect`, che registra un `Hazard_Triggered`
 con il danno. Gli attacchi in mischia fra celle di altezza diversa restano
 possibili.
 
+### Strutture
+
+Edifici e oggetti complessi occupano **tutte** le caselle della loro impronta, come
+caselle ordinarie, e perciò passo, vista, intelligenza dei nemici e anteprime delle
+carte non hanno regole nuove: [structure.odin](../../src/level/structure.odin).
+
+| Casella | Passo | Vista |
+|---|---|---|
+| Muro (`#`) | bloccato | bloccata |
+| Muretto o recinto (`=`, `Tile_Kind.Fence`) | bloccato | libera (`game.cell_is_fence`) |
+| Porta (`+`) | libero | libera |
+| Pavimento (`.`) e punto d'uso (`*`) | libero | libera |
+
+Le piante sono righe di testo (Dungeon Crawl Stone Soup ne è il modello) con rotazione a
+quarti di giro e specchio; il catalogo
+([structure_catalog.odin](../../src/level/structure_catalog.odin)) ha tre edifici
+(casetta 4×3, capanna 5×4, tempietto 7×7 con colonnato e altare), cinque oggetti
+complessi (carro 2×1, fontana 2×2, statua 2×2, macchinario 3×2, rovina a L 3×3) e un
+recinto con cancello. Una posa è rifiutata se la struttura esce dalla mappa o dal
+bordo, non sta su pavimento libero, si sovrappone o tocca un'altra struttura, copre ciò
+che il chiamante vuole libero (servizi, partenza), ha una porta che si apre su una casella
+bloccata o chiude una sacca in una mappa che era tutta raggiungibile
+(`level.place_check`, la stessa funzione che userà la posa da parte del giocatore).
+Le strutture non sono distruttibili. Le spedizioni le salvano in `World.structures`
+(vuoto negli slot vecchi, che restano com'erano); solo Robotica cibernetica ne ha, in
+posti fissi del bioma ([structures.odin](../../src/expedition/structures.odin)).
+
 ## Oggetti, esplosivi e loot
 
 Sorgenti: [grid_object.odin](../../src/game/grid_object.odin),

@@ -13,7 +13,7 @@ EXPEDITION_LIGHT_TILE_SIDE :: 8
 EXPEDITION_LIGHT_TILE_SIZE :: f32(8)
 EXPEDITION_LIGHT_TILE_COUNT :: EXPEDITION_LIGHT_TILE_SIDE*EXPEDITION_LIGHT_TILE_SIDE
 #assert(EXPEDITION_LIGHTS==32 && size_of(c.int)==size_of(u32))
-Expedition_Light_Uniforms :: struct {eye,mirror,count,start,end,color,tiles,tile_origin:c.int}
+Expedition_Light_Uniforms :: struct {eye,mirror,count,start,end,color,tiles,tile_origin,dim_box,dim_amount:c.int}
 Expedition_Lights :: struct {
 	start,end,color:[EXPEDITION_LIGHTS]rl.Vector4,
 	count:c.int,
@@ -70,7 +70,9 @@ uint expedition_light_mask(vec2 p) {
 }
 #endif
 vec3 expedition_linear(vec3 c) { return pow(max(c,vec3(0.)),vec3(2.2)); }
-vec3 expedition_lit(vec3 p,vec3 normal,vec3 srgbBase,float roughness,float metallic) {
+uniform vec4 dimBox;
+uniform float dimAmount;
+vec3 expedition_lit_open(vec3 p,vec3 normal,vec3 srgbBase,float roughness,float metallic) {
     if(lightMirror>.5) {p.y=-p.y;normal.y=-normal.y;}
     vec3 n=normalize(normal);
     vec3 base=expedition_linear(srgbBase);
@@ -112,13 +114,23 @@ vec3 expedition_lit(vec3 p,vec3 normal,vec3 srgbBase,float roughness,float metal
     }
     return result;
 }
+// Inside a building everything outside its footprint is darker (dimBox is x0,z0,x1,z1).
+vec3 expedition_lit(vec3 p,vec3 normal,vec3 srgbBase,float roughness,float metallic) {
+    vec3 lit=expedition_lit_open(p,normal,srgbBase,roughness,metallic);
+    if(dimAmount>0.) {
+        bool within=p.x>=dimBox.x && p.x<=dimBox.z && p.z>=dimBox.y && p.z<=dimBox.w;
+        if(!within) lit*=1.-dimAmount;
+    }
+    return lit;
+}
 `
 
 expedition_light_uniforms :: proc(shader:rl.Shader)->Expedition_Light_Uniforms {
 	return {rl.GetShaderLocation(shader,"lightEye"),rl.GetShaderLocation(shader,"lightMirror"),
 		rl.GetShaderLocation(shader,"lightCount"),rl.GetShaderLocation(shader,"lightStart[0]"),
 		rl.GetShaderLocation(shader,"lightEnd[0]"),rl.GetShaderLocation(shader,"lightColor[0]"),
-		rl.GetShaderLocation(shader,"lightTiles[0]"),rl.GetShaderLocation(shader,"lightTileOrigin")}
+		rl.GetShaderLocation(shader,"lightTiles[0]"),rl.GetShaderLocation(shader,"lightTileOrigin"),
+		rl.GetShaderLocation(shader,"dimBox"),rl.GetShaderLocation(shader,"dimAmount")}
 }
 
 set_expedition_lights :: proc(renderer:^Renderer,shader:rl.Shader,u:Expedition_Light_Uniforms) {
@@ -127,6 +139,7 @@ set_expedition_lights :: proc(renderer:^Renderer,shader:rl.Shader,u:Expedition_L
 	if m.reflection_pass {mirror=1;eye.y=-eye.y}
 	rl.SetShaderValue(shader,u.eye,&eye,.VEC3);rl.SetShaderValue(shader,u.mirror,&mirror,.FLOAT)
 	l:=&m.lights;rl.SetShaderValue(shader,u.count,&l.count,.INT)
+	rl.SetShaderValue(shader,u.dim_box,&m.dim_box,.VEC4);rl.SetShaderValue(shader,u.dim_amount,&m.dim_amount,.FLOAT)
 	when EXPEDITION_TILED_LIGHTS {
 		rl.SetShaderValueV(shader,u.tiles,&l.tiles[0],.INT,EXPEDITION_LIGHT_TILE_COUNT)
 		rl.SetShaderValue(shader,u.tile_origin,&l.tile_origin,.VEC2)

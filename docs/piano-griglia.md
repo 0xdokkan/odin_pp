@@ -38,11 +38,11 @@ numero della fase resta quello della sua sezione.
 | 4 | 10 | Hub in 3D: dentro il deposito | 8 | Fatta | vedi Esito |
 | 5 | 11 | Hub in 3D: dentro la sala giochi | 8 | Fatta | vedi Esito |
 | 6 | 2 | Altezze nel laboratorio: dati, regole, grafica, puntamento | — | Fatta | vedi Esito |
-| 7 | 6 | Strutture su più caselle: edifici e oggetti complessi, edifici trasparenti avvicinandosi | — (meglio dopo la 2) | Da fare | — |
+| 7 | 6 | Strutture su più caselle: edifici e oggetti complessi, edifici trasparenti avvicinandosi | — (meglio dopo la 2) | Fatta | vedi Esito |
 | 8 | 3 | Altezze nelle spedizioni: renderer, mappe, salvataggi, prestazioni | 2 | Da fare | — |
 | 9 | 4 | La montagna a spirale delle Montagne innevate | 2, 3 | Da fare | — |
 | 10 | 5 | Caverne | 2 (3 e 4 per metterle nei biomi) | Da fare | — |
-| 11 | 7 | Posa delle strutture da parte del giocatore | 6 | Facoltativa: si fa solo se l'utente la conferma | — |
+| 11 | 7 | Posa delle strutture da parte del giocatore | 6 | Confermata dall'utente (alla Fase 6): da fare | — |
 
 ## Scaletta: cosa sviluppare prima
 
@@ -1413,7 +1413,28 @@ regole della sezione 1: fammi prima le domande della fase e fermati alla fine.
 
 ### Esito
 
-*(da compilare a fine fase)*
+**Fatta il 2026-10-24.** Strutture su più caselle, nel laboratorio e nelle spedizioni.
+
+- **Risposte dell'utente:** posa (anche il giocatore: la Fase 7 è confermata e resta una fase a
+  sé, che riusa `level.place_check`), catalogo completo (3 edifici, 5 oggetti complessi, recinto),
+  solo Robotica cibernetica, strutture non distruttibili, muretti con un tipo di casella nuovo,
+  interno nella stessa griglia, trasparenza da 5 caselle, minimo del 25% accanto a un muro cieco,
+  fuori sempre scurito allo stesso modo dentro un edificio, contorno a terra sì.
+- **Nucleo (`src/level`):** `Tile_Kind.Fence`; piante a caratteri con errori chiari, rotazione e specchio,
+  controllo di posa (fuori mappa, non libero, sovrapposizione, vicinanza, zone da lasciare libere, porta
+  su casella bloccata, sacche) e posa; catalogo con le nove strutture; elenco e indice delle celle nel livello.
+- **Regole:** il muretto ferma il passo e non la vista; `game.structure_visibility` calcola fase
+  (lontano, in avvicinamento, soglia, dentro) e opacità; è solo grafica.
+- **Laboratorio:** terza arena (F3), «Strutture», 41×29, con tutto il catalogo e la casetta in quattro
+  rotazioni; disegno in tre parti con involucro che sfuma, tetto che si nasconde dentro, contorno a terra e
+  fuori scurito; atto dello smoke `structures` (`ODIN_PP_LAB_ONLY=structures`).
+- **Spedizioni:** il generatore posa 14 strutture in Robotica cibernetica, fisse per bioma, senza coprire
+  servizi, partenza o pattuglie e con ogni porta raggiungibile; salvate in `World.structures`, uno slot
+  vecchio si carica senza; disegno con retino per edificio, bordi che sfumano, tetto, contorno e scurita di
+  fuori; atto «edifici» dello smoke (`--smoke-expedition`).
+- **Test:** 21 nuovi (1609 in tutto, con e senza assert).
+- **Non fatto, dichiarato:** altre biomi (si estendono aggiungendo posti a `structures.odin`), altezze nelle
+  piante (Fase 3), involucro nei riflessi del pavimento, muretti nell'ologramma, arredo degli interni.
 
 ## 8. Fase 7 — Posa delle strutture da parte del giocatore (facoltativa)
 

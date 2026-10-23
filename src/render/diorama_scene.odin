@@ -17,7 +17,9 @@ DIORAMA_CUTAWAY_HEIGHT :: f32(0.5)
 @(private)
 diorama_interior_wall :: proc(room: ^game.Room, cell: grid.Position) -> bool {
 	tile, found := level.tile_at(room.level_data, cell)
-	return found && tile.kind == .Wall &&
+	// The walls of a structure are drawn by it (structure_diorama.odin), not as ghost interior walls.
+	_, in_structure := level.structure_index_at(room.level_data, cell)
+	return found && tile.kind == .Wall && !in_structure &&
 		!level.is_border_position(cell, room.level_data.tiles.width, room.level_data.tiles.height)
 }
 
@@ -116,6 +118,7 @@ draw_diorama_wall_face :: proc(center, normal: rl.Vector3, height: f32, variant:
 // opaque; the upper body is submitted with actors in the sorted alpha pass.
 @(private)
 draw_diorama_wall :: proc(renderer: ^Renderer, room: ^game.Room, cell: grid.Position) {
+	if index, owned := level.structure_index_at(room.level_data, cell); owned { draw_structure_cell(renderer, room, cell, index); return }
 	if renderer.tactical.kit.loaded { draw_diorama_kit_wall(renderer, room, cell); return }
 	p := rl.Vector3{f32(cell.x)+0.5, 0, f32(cell.y)+0.5}
 	n := gothic_hash(cell.x, cell.y)
@@ -148,9 +151,16 @@ draw_diorama_wall :: proc(renderer: ^Renderer, room: ^game.Room, cell: grid.Posi
 	}
 }
 
+// A tile of the board; the cells outside the building the robot is in are drawn darker.
 @(private)
 draw_tactical_tile :: proc(renderer: ^Renderer, room: ^game.Room, tile: level.Tile, cell: grid.Position, preview: ^Card_Range_Preview = nil) {
 	if tile.kind == .Void { return }
+	draw_tactical_tile_body(renderer, room, tile, cell, preview)
+	structure_outside_dim(renderer, room, cell, tile)
+}
+
+@(private = "file")
+draw_tactical_tile_body :: proc(renderer: ^Renderer, room: ^game.Room, tile: level.Tile, cell: grid.Position, preview: ^Card_Range_Preview = nil) {
 	// A raised cell stands on a column down to the board's plane: the dark base
 	// gets as tall as the cell is high, and its exposed sides show the steps.
 	rise := cell_ground(cell)
@@ -165,7 +175,22 @@ draw_tactical_tile :: proc(renderer: ^Renderer, room: ^game.Room, tile: level.Ti
 	if rise > 0 { draw_height_steps(renderer, cell, p, rise) }
 	if tile.kind == .Wall {
 		draw_resin_cube(renderer, p+rl.Vector3{0, 0.10, 0}, 0.98, 0.16, 0.98, DIORAMA_EDGE)
+		if index, owned := level.structure_index_at(room.level_data, cell); owned {
+			// A building's envelope that is not whole waits for the sorted pass.
+			if !structure_envelope_pending(renderer, room.level_data, index) { draw_structure_cell(renderer, room, cell, index) }
+			return
+		}
 		if !diorama_interior_wall(room, cell) || first_person_solid_walls(renderer) { draw_diorama_wall(renderer, room, cell) }
+		return
+	}
+	// A low wall: the plinth, and what its structure puts on it.
+	if tile.kind == .Fence {
+		draw_resin_cube(renderer, p+rl.Vector3{0, 0.07, 0}, 0.96, 0.12, 0.96, DIORAMA_EDGE)
+		if index, owned := level.structure_index_at(room.level_data, cell); owned {
+			if !structure_envelope_pending(renderer, room.level_data, index) { draw_structure_cell(renderer, room, cell, index) }
+		} else {
+			draw_resin_cube(renderer, p+rl.Vector3{0, 0.30, 0}, 0.78, 0.5, 0.78, RESIN_WALL)
+		}
 		return
 	}
 	// Slim inset corner fittings and occasional engraving preserve empty centers.
