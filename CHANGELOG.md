@@ -5,6 +5,16 @@ I riferimenti a Classica, `--flat` e ai vecchi smoke descrivono versioni precede
 per i comandi disponibili oggi valgono il [README](README.md) e la documentazione collegata.
 
 
+## 2026-10-23 — Hub in 3D: dentro il casinò
+
+- **Fase 9 del piano fatta.** Entrando nel Casinò dalla piazza si passa, con una
+  dissolvenza, alla sala: 6 Ranch 7, Tre in fuga, roulette europea e Duello del d20 sono
+  strutture a cui il robot cammina; entrandoci si apre il gioco di prima, con lo stesso
+  portafoglio, e alla fine si è davanti alla struttura. La porta «Piazza» riporta davanti
+  al Casinò. Un'insegna mostra i crediti del deposito; suoni d'ambiente leggeri.
+- Stanze e dissolvenza in `hubworld/zone.odin` (riusabili dal deposito e dalla sala
+  giochi), disegno in `render/hub_casino.odin`. Test: 9 nuovi (1571 in tutto).
+
 ## 2026-10-23 — Hub in 3D: la piazza
 
 - **Fase 8 del piano fatta.** L'hub è una piazza rotonda con sette edifici (Portale dei

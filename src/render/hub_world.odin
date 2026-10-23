@@ -35,35 +35,41 @@ hub_building_color :: proc(b: hubworld.Building) -> rl.Color {
 	return rl.WHITE
 }
 
-@(private="file")
+@(private)
 hub_fade :: proc(color: rl.Color, k: f32) -> rl.Color {
 	return {color.r, color.g, color.b, u8(clamp(f32(color.a)*k, 0, 255))}
 }
 
 // A solid with a neon edge, `opacity` of the way there (the shell fading out).
-@(private="file")
+@(private)
 hub_box :: proc(center, size: rl.Vector3, fill, edge: rl.Color, opacity: f32 = 1) {
 	if opacity <= 0.01 { return }
 	rl.DrawCubeV(center, size, hub_fade(fill, opacity))
 	rl.DrawCubeWiresV(center, size, hub_fade(edge, opacity))
 }
 
-@(private="file")
+@(private)
 hub_prism :: proc(base: rl.Vector3, radius_bottom, radius_top, height: f32, sides: i32, fill, edge: rl.Color, opacity: f32 = 1) {
 	if opacity <= 0.01 { return }
 	rl.DrawCylinder(base, radius_top, radius_bottom, height, sides, hub_fade(fill, opacity))
 	rl.DrawCylinderWires(base, radius_top, radius_bottom, height, sides, hub_fade(edge, opacity))
 }
 
-@(private="file")
-hub_frame_begin :: proc(b: hubworld.Building) {
-	c := hubworld.building_center(b)
+// A frame whose origin is `center` on the floor and whose z looks along `yaw`: each
+// thing is drawn in its own frame, x across, z to its front.
+@(private)
+hub_frame_at :: proc(center: hubworld.Vec2, yaw: f32) {
 	rlgl.PushMatrix()
-	rlgl.Translatef(c.x, 0, c.y)
-	rlgl.Rotatef(hubworld.building_yaw(b)*math.DEG_PER_RAD, 0, 1, 0)
+	rlgl.Translatef(center.x, 0, center.y)
+	rlgl.Rotatef(yaw*math.DEG_PER_RAD, 0, 1, 0)
 }
 
 @(private="file")
+hub_frame_begin :: proc(b: hubworld.Building) {
+	hub_frame_at(hubworld.building_center(b), hubworld.building_yaw(b))
+}
+
+@(private)
 hub_frame_end :: proc() { rlgl.PopMatrix() }
 
 // What stands inside, seen through the fading shell (and what stays when it is gone).
@@ -204,14 +210,19 @@ hub_draw_ground_marks :: proc(b: hubworld.Building, color: rl.Color, hovered: bo
 	rl.DrawCubeWiresV({0, 0.03, 0}, outline, hub_fade(color, 0.95 if hovered else 0.7))
 }
 
-// The paper robot, as in the expeditions (expedition_robot.odin), on the plaza.
+// The paper robot, as in the expeditions (expedition_robot.odin), on the plaza or in a room.
+@(private)
+hub_draw_robot_at :: proc(position: hubworld.Vec2, facing_left, moving: bool, stride, time: f32, camera: rl.Camera3D) {
+	right := rl.Vector3Normalize(rl.Vector3CrossProduct({0, 1, 0}, camera.position-camera.target))
+	action := gfx.Living_Action.Move_Side if moving else gfx.Living_Action.Idle
+	progress := stride*1.8-math.floor(stride*1.8)
+	art := expedition_robot_art(time, action, progress, false)
+	draw_expedition_paper_facing(right, &art, {position.x, 0.035, position.y}, 1.7, facing_left, 1, 1)
+}
+
 @(private="file")
 hub_draw_robot :: proc(w: ^hubworld.World, camera: rl.Camera3D) {
-	right := rl.Vector3Normalize(rl.Vector3CrossProduct({0, 1, 0}, camera.position-camera.target))
-	action := gfx.Living_Action.Move_Side if w.moving else gfx.Living_Action.Idle
-	progress := w.stride*1.8-math.floor(w.stride*1.8)
-	art := expedition_robot_art(w.time, action, progress, false)
-	draw_expedition_paper_facing(right, &art, {w.position.x, 0.035, w.position.y}, 1.7, w.facing_left, 1, 1)
+	hub_draw_robot_at(w.position, w.facing_left, w.moving, w.stride, w.time, camera)
 }
 
 // The plaza, in 3D from `camera`. `hovered` is the building under the pointer.
@@ -247,6 +258,23 @@ draw_hub_world :: proc(w: ^hubworld.World, camera: rl.Camera3D, hovered: Maybe(h
 	}
 }
 
+// A name plate at `at` (its lower middle), in screen space: the name, and under it
+// the subtitle when `expanded`.
+@(private)
+hub_draw_plate :: proc(theme: ^ui.Theme, at: rl.Vector2, name, subtitle: string, color: rl.Color, expanded, hovered: bool) {
+	size := ui.measure(theme, name, .Small)
+	sub := ui.measure(theme, subtitle, .Small)
+	width := max(size.x, sub.x if expanded else 0)+16
+	height := size.y+(sub.y+2 if expanded else 0)+8
+	plate := rl.Rectangle{at.x-width*0.5, at.y-height, width, height}
+	rl.DrawRectangleRec(plate, {13, 16, 25, 225})
+	rl.DrawRectangleLinesEx(plate, 1.5 if !hovered else 2.5, color)
+	ui.draw_text_centered(theme, name, {at.x, plate.y+4+size.y*0.5}, .Small, color)
+	if expanded {
+		ui.draw_text_centered(theme, subtitle, {at.x, plate.y+6+size.y+sub.y*0.5}, .Small, {200, 208, 226, 255})
+	}
+}
+
 // The name plates over the buildings, in screen space (after the 3D): the name of
 // each, and what it holds while the robot is near it or the pointer is on it.
 draw_hub_world_labels :: proc(theme: ^ui.Theme, w: ^hubworld.World, camera: rl.Camera3D, canvas_width, canvas_height: f32,
@@ -260,16 +288,6 @@ draw_hub_world_labels :: proc(theme: ^ui.Theme, w: ^hubworld.World, camera: rl.C
 		is_hovered := false
 		if h, ok := hovered.?; ok && h == b { is_hovered = true }
 		near := hubworld.distance_to_building(b, w.position) < 7
-		size := ui.measure(theme, name, .Small)
-		sub := ui.measure(theme, info.subtitle, .Small)
-		width := max(size.x, sub.x if (near || is_hovered) else 0)+16
-		height := size.y+(sub.y+2 if (near || is_hovered) else 0)+8
-		plate := rl.Rectangle{at.x-width*0.5, at.y-height, width, height}
-		rl.DrawRectangleRec(plate, {13, 16, 25, 225})
-		rl.DrawRectangleLinesEx(plate, 1.5 if !is_hovered else 2.5, color)
-		ui.draw_text_centered(theme, name, {at.x, plate.y+4+size.y*0.5}, .Small, color)
-		if near || is_hovered {
-			ui.draw_text_centered(theme, info.subtitle, {at.x, plate.y+6+size.y+sub.y*0.5}, .Small, {200, 208, 226, 255})
-		}
+		hub_draw_plate(theme, at, name, info.subtitle, color, near || is_hovered, is_hovered)
 	}
 }

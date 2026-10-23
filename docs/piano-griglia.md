@@ -34,7 +34,7 @@ numero della fase resta quello della sua sezione.
 | 0 | 0 | Test affidabili su Windows (proposta di Claude, approvata dall'utente) | — | Fatta | vedi Esito |
 | 1 | 1 | Bersagli in evidenza | — | Fatta | vedi Esito |
 | 2 | 8 | Hub in 3D: la piazza, il robot che cammina, gli edifici | — | Fatta | vedi Esito |
-| 3 | 9 | Hub in 3D: dentro il casinò | 8 | Da fare | — |
+| 3 | 9 | Hub in 3D: dentro il casinò | 8 | Fatta | vedi Esito |
 | 4 | 10 | Hub in 3D: dentro il deposito | 8 | Da fare | — |
 | 5 | 11 | Hub in 3D: dentro la sala giochi | 8 | Da fare | — |
 | 6 | 2 | Altezze nel laboratorio: dati, regole, grafica, puntamento | — | Fatta | vedi Esito |
@@ -1923,7 +1923,28 @@ alla fine.
 
 ### Esito
 
-*(da compilare a fine fase)*
+**Fatta il 2026-10-23.** Entrando nel Casinò dalla piazza lo schermo si oscura e si
+passa alla sala: un ottagono con pareti al neon, il robot al centro, un'insegna in
+fondo con i crediti del deposito.
+
+- **Strutture** (come nel disegno): 6 Ranch 7 in alto a sinistra (saloon con tre rulli
+  che lampeggiano, cavallo e cowboy di cartoncino), Tre in fuga in alto a destra (pista
+  con dinosauro, Panda 4×4 e moto che girano), roulette europea in basso a sinistra (la
+  ruota gira piano, la pallina va al contrario), Duello del d20 in basso a destra (tavolo
+  con due d20 che ruotano) e la porta «Piazza» a destra.
+- **Giochi:** entrando in una struttura si apre il gioco di prima (`arcade.casino_create`,
+  stesso portafoglio e stessi salvataggi). Alla fine il robot è davanti a quella struttura.
+  La vecchia pagina con i quattro pulsanti non c'è più.
+- **Uscita:** la porta «Piazza» dissolve di nuovo e il robot riappare davanti al Casinò.
+- **Passaggio tra zone** (riusabile dalle Fasi 10 e 11): `src/hubworld/zone.odin` ha
+  `Station`, `Room`/`Room_World` (stanza con stazioni, collisioni, porte che si aprono una
+  volta, clic per camminare) e `Fade` (la dissolvenza cambia zona una sola volta al buio).
+  La piazza usa ora le stesse funzioni geometriche delle stanze.
+- **Suoni** (generati da codice, leggeri): brusio, jingle di slot ogni tanto, tic della
+  ruota quando il robot è vicino alla roulette (`Hall_Murmur`, `Hall_Slot`, `Hall_Wheel`).
+- **Test:** 9 nuovi (1571 in tutto, con e senza assert). Lo smoke `--smoke-hub-world`
+  ora entra nel casinò, va a ogni struttura, apre e chiude i quattro giochi, controlla il
+  ritorno davanti alla struttura e quello in piazza (scatti `odin_pp_hub_casino_*.png`).
 
 ## 12. Fase 10 — Hub in 3D: dentro il deposito
 

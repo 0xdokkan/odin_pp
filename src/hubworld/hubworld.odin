@@ -107,37 +107,35 @@ building_yaw :: proc(b: Building) -> f32 {
 	return math.atan2(f.x, f.y)
 }
 
+// The building as a station (zone.odin), whose functions do the geometry for both.
+building_station :: proc(b: Building) -> Station {
+	info := building_info(b)
+	return {info.name, info.subtitle, building_center(b), building_front(b), info.half, info.height}
+}
+
 // A point of the plaza in the building's own frame: how far to its right of its
 // middle, and how far in front of it.
 to_local :: proc(b: Building, p: Vec2) -> Vec2 {
-	d := p-building_center(b)
-	return {dot(d, building_right(b)), dot(d, building_front(b))}
+	return station_to_local(building_station(b), p)
 }
 
 from_local :: proc(b: Building, local: Vec2) -> Vec2 {
-	return building_center(b)+building_right(b)*local.x+building_front(b)*local.y
+	return station_from_local(building_station(b), local)
 }
 
 // The middle of the door's patch, where a click on the building sends the robot.
 door_center :: proc(b: Building) -> Vec2 {
-	info := building_info(b)
-	return from_local(b, {0, info.half.y+DOOR_DEPTH*0.5})
+	return station_door_center(building_station(b))
 }
 
 // Whether `p` is on the building's door (grown by `margin` on every side).
 in_door :: proc(b: Building, p: Vec2, margin: f32 = 0) -> bool {
-	info := building_info(b)
-	l := to_local(b, p)
-	return abs(l.x) <= DOOR_HALF_WIDTH+margin && l.y >= info.half.y-margin && l.y <= info.half.y+DOOR_DEPTH+margin
+	return station_in_door(building_station(b), p, margin)
 }
 
 // How far `p` is from the building's footprint (0 inside it).
 distance_to_building :: proc(b: Building, p: Vec2) -> f32 {
-	info := building_info(b)
-	l := to_local(b, p)
-	dx := max(abs(l.x)-info.half.x, 0)
-	dz := max(abs(l.y)-info.half.y, 0)
-	return math.sqrt(dx*dx+dz*dz)
+	return station_distance(building_station(b), p)
 }
 
 // How solid the building is drawn, from 1 (whole) to 0 (gone), for a robot at `p`:
@@ -191,25 +189,7 @@ building_at :: proc(p: Vec2, margin: f32 = 0.6) -> (b: Building, found: bool) {
 // Where a ray from `origin` going `direction` (x, y up, z) first enters the building's
 // box, as a distance along the ray: what the pointer is on when it is over a wall.
 ray_hits_building :: proc(b: Building, origin, direction: [3]f32) -> (distance: f32, hit: bool) {
-	info := building_info(b)
-	o := to_local(b, {origin.x, origin.z})
-	right, front := building_right(b), building_front(b)
-	d := [3]f32{dot({direction.x, direction.z}, right), direction.y, dot({direction.x, direction.z}, front)}
-	low := [3]f32{-info.half.x, 0, -info.half.y}
-	high := [3]f32{info.half.x, info.height, info.half.y}
-	start := [3]f32{o.x, origin.y, o.y}
-	near, far := f32(0), f32(1e9)
-	for axis in 0..<3 {
-		if abs(d[axis]) < 0.00001 {
-			if start[axis] < low[axis] || start[axis] > high[axis] { return 0, false }
-			continue
-		}
-		t1, t2 := (low[axis]-start[axis])/d[axis], (high[axis]-start[axis])/d[axis]
-		if t1 > t2 { t1, t2 = t2, t1 }
-		near, far = max(near, t1), min(far, t2)
-		if near > far { return 0, false }
-	}
-	return near, true
+	return station_ray_hits(building_station(b), origin, direction)
 }
 
 // Pushes `p` out of the buildings and back inside the plaza.

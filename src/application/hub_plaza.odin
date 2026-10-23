@@ -30,7 +30,7 @@ hub_page_of_building :: proc(b: hubworld.Building) -> Hub_Page {
 	case .Storage:  return .Storage
 	case .Progress: return .Progress
 	case .Arcade:   return .Arcade
-	case .Casino:   return .Casino
+	case .Casino:   return .Casino_Hall
 	case .Memories: return .Memories
 	case .Exit:     return .Slots
 	}
@@ -63,6 +63,10 @@ hub_world_return_to :: proc(h: ^Campaign_Hub, b: hubworld.Building) {
 hub_world_enter :: proc(h: ^Campaign_Hub, b: hubworld.Building, frame: ^host.Frame) {
 	h.plaza_from = b
 	ui.cancel_interaction(frame.ui)
+	if b == .Casino {
+		hub_fade_to(h, .Casino_Hall)
+		return
+	}
 	if b == .Exit {
 		_ = hub_save(h)
 		if hub_flush(h) { h.page = .Slots; hub_scan_slots(h) } else { hub_notice(h, "Salvataggio non riuscito. Riprova prima di cambiare memoria.") }
@@ -87,6 +91,16 @@ hub_world_pick :: proc(frame: ^host.Frame, camera: rl.Camera3D) -> (b: hubworld.
 	return hubworld.building_at({origin.x + direction.x * ground, origin.z + direction.z * ground}, 0.8)
 }
 
+// The way the keys ask the robot to go (screen-aligned: W is away from the camera).
+@(private)
+hub_walk_wish :: proc(frame: ^host.Frame) -> (wish: hubworld.Vec2) {
+	if input.key_down(frame.devices, .W) || input.key_down(frame.devices, .UP) { wish.y -= 1 }
+	if input.key_down(frame.devices, .S) || input.key_down(frame.devices, .DOWN) { wish.y += 1 }
+	if input.key_down(frame.devices, .A) || input.key_down(frame.devices, .LEFT) { wish.x -= 1 }
+	if input.key_down(frame.devices, .D) || input.key_down(frame.devices, .RIGHT) { wish.x += 1 }
+	return
+}
+
 @(private)
 hub_world_update :: proc(h: ^Campaign_Hub, frame: ^host.Frame) {
 	ctx := frame.ui
@@ -98,11 +112,6 @@ hub_world_update :: proc(h: ^Campaign_Hub, frame: ^host.Frame) {
 		if hub_flush(h) { h.page = .Slots; hub_scan_slots(h) }
 		return
 	}
-	wish: hubworld.Vec2
-	if input.key_down(frame.devices, .W) || input.key_down(frame.devices, .UP) { wish.y -= 1 }
-	if input.key_down(frame.devices, .S) || input.key_down(frame.devices, .DOWN) { wish.y += 1 }
-	if input.key_down(frame.devices, .A) || input.key_down(frame.devices, .LEFT) { wish.x -= 1 }
-	if input.key_down(frame.devices, .D) || input.key_down(frame.devices, .RIGHT) { wish.x += 1 }
 	camera := hub_world_camera(h)
 	h.plaza_hover = nil
 	if hovered, found := hub_world_pick(frame, camera); found {
@@ -111,7 +120,7 @@ hub_world_update :: proc(h: ^Campaign_Hub, frame: ^host.Frame) {
 	}
 	// A frame that lasted long (a drag of the window) is not one long step.
 	dt := min(frame.dt, 0.05)
-	entered, did_enter := hubworld.step(&h.plaza, wish, dt)
+	entered, did_enter := hubworld.step(&h.plaza, hub_walk_wish(frame), dt)
 	goal := hub_world_camera_goal(h.plaza.position)
 	h.plaza_camera += (goal - h.plaza_camera) * min(dt * 4, 1)
 	if did_enter { hub_world_enter(h, entered, frame); return }
@@ -131,13 +140,18 @@ hub_world_draw :: proc(h: ^Campaign_Hub, frame: ^host.Frame) {
 // the page it should (the Uscita leaves for the slots), and the robot comes back in
 // front of it. Stills odin_pp_hub_world_*.png.
 @(private = "file")
-HUB_WORLD_SMOKE_ORDER :: [hubworld.BUILDING_COUNT]hubworld.Building{.Casino, .Portal, .Storage, .Progress, .Arcade, .Memories, .Exit}
+HUB_WORLD_SMOKE_ORDER :: [hubworld.BUILDING_COUNT]hubworld.Building{.Portal, .Storage, .Progress, .Arcade, .Memories, .Exit, .Casino}
 
 @(private)
 hub_world_smoke :: proc(h: ^Campaign_Hub, frame: ^host.Frame) {
 	h.smoke_frame += 1
 	if h.smoke_frame == 30 { artifacts.screenshot("odin_pp_hub_world_centro.png") }
 	if h.smoke_frame <= 30 { return }
+	// The casino's hall is the last walk: its own sequence (hub_hall_smoke).
+	if h.smoke_phase >= 10 {
+		if hub_hall_smoke(h) { host.quit(frame) }
+		return
+	}
 	order := HUB_WORLD_SMOKE_ORDER
 	if h.smoke_stage >= len(order) { host.quit(frame); return }
 	b := order[h.smoke_stage]
@@ -155,7 +169,7 @@ hub_world_smoke :: proc(h: ^Campaign_Hub, frame: ^host.Frame) {
 		}
 		if h.page != .World {
 			assert(h.page == hub_page_of_building(b), "the plaza smoke: a door opened the wrong page")
-			h.smoke_phase, h.smoke_wait, h.smoke_shot = 2, 0, false
+			h.smoke_phase, h.smoke_wait, h.smoke_shot = 10 if b == .Casino else 2, 0, false
 		}
 	case 2:
 		// The page is up for a few frames, then the robot comes back in front of the door.
