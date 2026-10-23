@@ -26,7 +26,7 @@ Launch_Options :: struct {
 	// --smoke-minigame=<id>: play <id> without the intro, capture
 	// odin_pp_<id>.png after a few seconds and quit.
 	smoke_minigame: string,
-	expedition, smoke_expedition, smoke_hub: bool,
+	expedition, smoke_expedition, smoke_hub, smoke_hub_world: bool,
 }
 
 split_launch_arguments :: proc(args: []string) -> (Launch_Options, [dynamic]string) {
@@ -40,6 +40,8 @@ split_launch_arguments :: proc(args: []string) -> (Launch_Options, [dynamic]stri
 			launch.expedition, launch.smoke_expedition = true, true
 		case arg == "--smoke-hub":
 			launch.smoke_hub = true
+		case arg == "--smoke-hub-world":
+			launch.smoke_hub_world = true
 		case arg == "--run":
 			launch.run = true
 		case strings.has_prefix(arg, "--minigame="):
@@ -68,10 +70,10 @@ run_launcher :: proc(options: Runtime_Options, launch: Launch_Options) {
 	window.title = "Odin PP"
 	h, ok := host.create(host.Config{
 		window          = window,
-		profile_path    = profile_path() if launch.smoke_minigame == "" && !launch.smoke_menu && !launch.smoke_hub && !launch.smoke_expedition else "",
+		profile_path    = profile_path() if launch.smoke_minigame == "" && !launch.smoke_menu && !launch.smoke_hub && !launch.smoke_hub_world && !launch.smoke_expedition else "",
 		enable_audio    = launch.smoke_minigame == "" && !launch.smoke_menu,
 		letterbox_color = render.LETTERBOX_COLOR,
-		force_focus     = launch.smoke_minigame != "" || launch.smoke_expedition || launch.smoke_hub,
+		force_focus     = launch.smoke_minigame != "" || launch.smoke_expedition || launch.smoke_hub || launch.smoke_hub_world,
 	})
 	if !ok {
 		fmt.eprintln("could not open the window")
@@ -81,8 +83,8 @@ run_launcher :: proc(options: Runtime_Options, launch: Launch_Options) {
 	menu := launcher_create(options)
 	menu.smoke = launch.smoke_menu
 	host.push_scene(h, launcher_scene(menu))
-	if launch.expedition || launch.smoke_hub {
-		scene := campaign_hub_scene(options, launch.smoke_hub, launch.smoke_expedition)
+	if launch.expedition || launch.smoke_hub || launch.smoke_hub_world {
+		scene := campaign_hub_scene(options, launch.smoke_hub, launch.smoke_expedition, launch.smoke_hub_world)
 		if launch.expedition && !launch.smoke_expedition {
 			hub := cast(^Campaign_Hub)scene.data
 			hub_prepare_unsaved_expedition(hub)

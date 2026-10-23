@@ -5,6 +5,17 @@ I riferimenti a Classica, `--flat` e ai vecchi smoke descrivono versioni precede
 per i comandi disponibili oggi valgono il [README](README.md) e la documentazione collegata.
 
 
+## 2026-10-23 — Hub in 3D: la piazza
+
+- **Fase 8 del piano fatta.** L'hub è una piazza rotonda con sette edifici (Portale dei
+  ricordi, Deposito, Progressi, Uscita, Frammenti del creatore, Sala giochi, Casinò): il
+  robot di carta cammina con WASD o frecce, o con un clic su un edificio, e ogni porta
+  apre la pagina di prima. Gli edifici sbiadiscono avvicinandosi e si vede l'interno.
+  Dopo una spedizione il robot riappare davanti al Portale, dopo una pagina davanti
+  al suo edificio; «Torna in piazza» sostituisce la barra dei pulsanti.
+- Regole nel nuovo pacchetto `hubworld` (testate senza finestra), disegno in
+  `render/hub_world.odin`; smoke `--smoke-hub-world`. Test: 11 nuovi (1562 in tutto).
+
 ## 2026-10-23 — Piano di lavoro della griglia
 
 - Nuovo [piano](docs/piano-griglia.md) in undici fasi, da eseguire una alla

@@ -32,6 +32,7 @@ Hub_Capture :: struct { kind:int, frames:int }
 @(private)
 hub_after_present :: proc(data:rawptr,frame:^host.Frame) {
 	h:=cast(^Campaign_Hub)data
+	if h.smoke_world {hub_world_smoke(h,frame);return}
 	if !h.smoke {return}
 	h.smoke_frame+=1
 	if h.smoke_frame%35!=0 {return}

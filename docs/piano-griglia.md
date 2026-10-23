@@ -33,7 +33,7 @@ numero della fase resta quello della sua sezione.
 |---|---|---|---|---|---|
 | 0 | 0 | Test affidabili su Windows (proposta di Claude, approvata dall'utente) | — | Fatta | vedi Esito |
 | 1 | 1 | Bersagli in evidenza | — | Fatta | vedi Esito |
-| 2 | 8 | Hub in 3D: la piazza, il robot che cammina, gli edifici | — | Da fare | — |
+| 2 | 8 | Hub in 3D: la piazza, il robot che cammina, gli edifici | — | Fatta | vedi Esito |
 | 3 | 9 | Hub in 3D: dentro il casinò | 8 | Da fare | — |
 | 4 | 10 | Hub in 3D: dentro il deposito | 8 | Da fare | — |
 | 5 | 11 | Hub in 3D: dentro la sala giochi | 8 | Da fare | — |
@@ -1817,7 +1817,30 @@ regole della sezione 1: fammi prima le domande della fase e fermati alla fine.
 
 ### Esito
 
-*(da compilare a fine fase)*
+**Fatta il 2026-10-23.** L'hub è una piazza in 3D: aprendo una memoria si arriva al
+centro, dove il robot di carta cammina con WASD o le frecce, o con un clic su un
+edificio.
+
+- **Edifici:** sette, come nel disegno. Portale dei ricordi in alto, Deposito, Progressi,
+  Uscita, Frammenti del creatore in basso, Sala giochi, Casinò. Ognuno ha il suo nome,
+  la sua targa e il suo colore. Il robot non li attraversa né esce dalla piazza.
+- **Porte:** una porta si apre una sola volta quando il robot ci cammina dentro, e si
+  riarma solo dopo che il robot si è allontanato. Il Portale apre la galassia, gli altri
+  le loro pagine; l'Uscita salva e torna alla scelta della memoria.
+- **Trasparenza:** un edificio sbiadisce man mano che il robot si avvicina e sparisce
+  davanti alla porta, così si vede l'interno; di lato resta almeno al 25%.
+- **Ritorno:** dopo una spedizione il robot riappare davanti al Portale; dopo una pagina
+  o un gioco, davanti all'edificio da cui è entrato. La barra dei pulsanti di prima è
+  sostituita da «Torna in piazza».
+- **Come è fatto:** regole pure nel pacchetto `src/hubworld` (testate senza finestra),
+  disegno con primitive raylib in `src/render/hub_world.odin`, collegamento alle pagine
+  in `src/application/hub_plaza.odin`. Il robot riusa la figura di carta delle
+  spedizioni (`draw_expedition_paper_facing`).
+- **Test:** 11 nuovi (1562 in tutto, con e senza assert). Smoke nuovo `--smoke-hub-world`
+  (il robot va a ogni porta, verifica la pagina e il ritorno; scatti
+  `odin_pp_hub_world_*.png`). `--smoke-hub` e `--smoke-expedition` invariati e verdi.
+- **Per le fasi 9–11:** gli interni sono ancora le pagine di prima; ogni fase ne
+  sostituirà una.
 
 ## 11. Fase 9 — Hub in 3D: dentro il casinò
 

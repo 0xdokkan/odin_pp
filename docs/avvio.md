@@ -67,7 +67,7 @@ sono separati da `profilo.json`; cancellarli richiede due conferme nella UI.
 La [checklist della direzione](direzione-implementazione.md) descrive
 controlli, avanzamento, salvataggi e verifiche della nuova campagna.
 
-`--expedition` avvia una prova senza slot. `--smoke-hub` e
+`--expedition` avvia una prova senza slot. `--smoke-hub`, `--smoke-hub-world` e
 `--smoke-expedition` catturano schermate senza scrivere profili o memorie.
 `--run` continua ad aprire il vecchio percorso a stanze: i dettagli che
 seguono sulle finestre di combattimento e le ricompense di quel percorso

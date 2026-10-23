@@ -11,13 +11,17 @@ import world "../expedition"
 import arcade "../memoryarcade"
 import activities "../activities"
 import run "../run"
+import hubworld "../hubworld"
 import render "../render"
 import host "../engine/host"
 import input "../engine/input"
 import ui "../engine/ui"
 import gfx "../engine/gfx"
 
-Hub_Page :: enum { Slots, Galaxy, Storage, Progress, Arcade, Casino, Memories }
+// The pages after Slots: the plaza (World) where the robot walks, and, opened from
+// its buildings, the Galaxy (the Portal), Storage (the Deposito), Progress, Arcade (the
+// Sala giochi), Casino and Memories (Frammenti del creatore).
+Hub_Page :: enum { Slots, World, Galaxy, Storage, Progress, Arcade, Casino, Memories }
 Campaign_Save :: struct { expedition:world.Snapshot, casino:arcade.Casino_Transaction, casino_random:u64 }
 Campaign_Hub :: struct {
 	options:Runtime_Options,
@@ -35,6 +39,12 @@ Campaign_Hub :: struct {
 	slot_active:[3]bool,
 	slot_biome:[3]campaign.Biome,
 	selected:campaign.Biome,
+	// The plaza (hubworld): the robot, the building whose page is open (the robot
+	// comes back in front of it), the camera's middle and what the pointer is on.
+	plaza:hubworld.World,
+	plaza_from:hubworld.Building,
+	plaza_camera:[2]f32,
+	plaza_hover:Maybe(hubworld.Building),
 	inventory:campaignui.State,
 	clock,yaw,launch_time,notice_time:f32,
 	revealed_at:f32,
@@ -46,14 +56,17 @@ Campaign_Hub :: struct {
 	notice:string,
 	memory:int,
 	progress_tab,progress_page,arcade_page:int,
-	smoke,smoke_expedition:bool,
-	smoke_frame:int,
+	smoke,smoke_expedition,smoke_world:bool,
+	smoke_frame,smoke_stage,smoke_phase,smoke_wait:int,
+	smoke_shot:bool,
 }
 
-campaign_hub_scene :: proc(options:Runtime_Options,smoke:bool=false,expedition_smoke:bool=false) -> host.Scene {
-	h:=new(Campaign_Hub);h.options=options;h.page=.Slots;h.slot=-1;h.delete_slot=-1;h.first_frame=true;h.window_active=true;h.smoke=smoke;h.smoke_expedition=expedition_smoke
-	if smoke || expedition_smoke {campaign.initialize(&h.progress);h.slot=0;h.page=.Galaxy;h.saved.casino_random=options.seed;campaign.depot_credit(&h.progress,150);h.path=""}
-	else {hub_scan_slots(h)}
+campaign_hub_scene :: proc(options:Runtime_Options,smoke:bool=false,expedition_smoke:bool=false,world_smoke:bool=false) -> host.Scene {
+	h:=new(Campaign_Hub);h.options=options;h.page=.Slots;h.slot=-1;h.delete_slot=-1;h.first_frame=true;h.window_active=true;h.smoke=smoke;h.smoke_expedition=expedition_smoke;h.smoke_world=world_smoke
+	if smoke || expedition_smoke || world_smoke {
+		campaign.initialize(&h.progress);h.slot=0;h.page=.Galaxy;h.saved.casino_random=options.seed;campaign.depot_credit(&h.progress,150);h.path=""
+		if world_smoke {h.page=.World;hubworld.place_at_centre(&h.plaza)}
+	} else {hub_scan_slots(h)}
 	return host.Scene{name="memory-hub",data=h,opaque=true,modal=true,clear_color={5,6,14,255},update=hub_update,draw=hub_draw,resume=hub_resume,destroy=hub_destroy,after_present=hub_after_present}
 }
 
@@ -79,14 +92,14 @@ hub_scan_slots :: proc(h:^Campaign_Hub) {
 hub_save :: proc(data:rawptr) -> bool {
 	h:=cast(^Campaign_Hub)data
 	if h.slot<0 {return true}
-	if h.path=="" {h.save_failed=!(h.smoke || h.smoke_expedition);return !h.save_failed}
+	if h.path=="" {h.save_failed=!(h.smoke || h.smoke_expedition || h.smoke_world);return !h.save_failed}
 	accepted:=campaign.save_queue_enqueue(&h.save_queue,h.path,&h.progress,&h.saved)
 	h.save_failed=!accepted || h.save_queue.failed
 	return accepted && !h.save_failed
 }
 @(private)
 hub_flush :: proc(h:^Campaign_Hub) -> bool {
-	if h.slot>=0 && h.path=="" && !h.smoke && !h.smoke_expedition {h.save_failed=true;return false}
+	if h.slot>=0 && h.path=="" && !h.smoke && !h.smoke_expedition && !h.smoke_world {h.save_failed=true;return false}
 	h.save_failed=!campaign.save_queue_flush(&h.save_queue)
 	if !h.save_failed && h.save_queue.completed_at>0 {h.progress.saved_unix_seconds=h.save_queue.completed_at}
 	return !h.save_failed
@@ -122,7 +135,8 @@ hub_open_slot :: proc(h:^Campaign_Hub,index:int,frame:^host.Frame) {
 		status:=campaign.load_slot_into(h.path,&h.progress,&h.saved)
 		if status!=.Loaded {h.slot_status[index]=status;h.slot=-1;return}
 	}
-	h.page=.Galaxy;h.selected=.Cyber;_=hub_save(h)
+	// A memory opens on the plaza, the robot at its middle.
+	h.page=.World;h.selected=.Cyber;hubworld.place_at_centre(&h.plaza);h.plaza_camera={};_=hub_save(h)
 	if h.progress.run.active {hub_enter_expedition(h,frame)}
 }
 
@@ -152,12 +166,13 @@ hub_reveal_new_routes :: proc(h:^Campaign_Hub) {
 hub_resume :: proc(data:rawptr,frame:^host.Frame,from:string,result:Maybe(host.Result)) {
 	h:=cast(^Campaign_Hub)data;h.launching=false
 	if from=="expedition" {
-		h.page=.Galaxy
+		// Back from the expedition: on the plaza, in front of the Portal it left by.
+		hub_world_return_to(h,.Portal)
 		if r,ok:=result.?;ok {
 			if r.outcome==.Won {hub_notice(h,world.metadata(h.saved.expedition.world.biome).message);hub_reveal_new_routes(h)}
 			else {hub_notice(h,"La memoria si riavvolge. Lo zaino e perduto. Le scoperte restano.")}
-			if r.outcome==.Won && h.saved.expedition.world.biome==.Space && h.progress.normal_ending {h.page=.Memories;h.memory=-1}
-			if r.outcome==.Won && h.saved.expedition.world.biome==.Secret && h.progress.true_ending {h.page=.Memories;h.memory=-2}
+			if r.outcome==.Won && h.saved.expedition.world.biome==.Space && h.progress.normal_ending {h.page=.Memories;h.plaza_from=.Memories;h.memory=-1}
+			if r.outcome==.Won && h.saved.expedition.world.biome==.Secret && h.progress.true_ending {h.page=.Memories;h.plaza_from=.Memories;h.memory=-2}
 		}
 	} else if r,ok:=result.?;ok {campaign.record_result(&h.progress,activities.minigame_index_by_id(from),r.score,r.stars,r.outcome==.Won)}
 	_=hub_save(h)
@@ -186,14 +201,15 @@ hub_update :: proc(data:rawptr,frame:^host.Frame) {
 	// Storage is a modal surface: do not register the covered navigation or
 	// append hub notices over its inventory controls.
 	if h.page==.Storage {hub_storage(h,frame);return}
+	if h.page==.World {hub_world_update(h,frame);return}
 	ctx:=frame.ui;p:=ctx.theme.palette
 	ui.label(ctx,{28,18,650,40},"LA MEMORIA DEL CREATORE",.Title,p.text)
 	ui.label(ctx,{30,61,670,24},"Il mondo dimentica le cose. Tu ricordi la strada.",.Small,p.text_dim)
 	if ui.button(ctx,{798,24,132,32},"Slot / Salva") {_=hub_save(h);if hub_flush(h) {h.page=.Slots;hub_scan_slots(h)};return}
-	titles:=[7]string{"","Galassia","Deposito","Progressi","Cabinati","Casino","Memorie"}
-	for i in 1..<7 {if ui.button(ctx,{30+f32(i-1)*150,95,142,32},titles[i],primary=h.page==Hub_Page(i)) {h.page=Hub_Page(i);ui.cancel_interaction(ctx)}}
+	// The pages are the plaza's buildings: one way back, to the door the robot came by.
+	if ui.button(ctx,{30,95,190,32},"Torna in piazza") {hub_world_return_to(h,h.plaza_from);ui.cancel_interaction(ctx);return}
 	switch h.page {
-	case .Slots:
+	case .Slots,.World:
 	case .Galaxy:hub_galaxy_input(h,frame)
 	case .Storage:hub_storage(h,frame);return
 	case .Progress:hub_progress(h,frame)
@@ -208,7 +224,7 @@ hub_update :: proc(data:rawptr,frame:^host.Frame) {
 @(private)
 hub_storage :: proc(h:^Campaign_Hub,frame:^host.Frame) {
 	out:=campaignui.update_inventory(&h.progress,nil,&h.inventory,frame,false,true)
-	if out.closed {h.page=.Galaxy;ui.cancel_interaction(frame.ui)}
+	if out.closed {hub_world_return_to(h,.Storage);ui.cancel_interaction(frame.ui)}
 	if out.changed {_=hub_save(h)}
 	if out.show_effect {_=hub_open_archive_preview(&h.progress,out.effect_card,frame)}
 	if h.save_failed {h.inventory.notice="Salvataggio non riuscito: riprova prima di uscire.";h.inventory.notice_time=7}
@@ -333,7 +349,7 @@ hub_wallet_commit :: proc(data:rawptr) -> bool {
 	// A wager or paid outcome must reach the atomic file before its animation
 	// proceeds. Finish earlier checkpoints so none can overwrite this commit.
 	_=hub_flush(h)
-	if h.path=="" {h.save_failed=!(h.smoke || h.smoke_expedition);return !h.save_failed}
+	if h.path=="" {h.save_failed=!(h.smoke || h.smoke_expedition || h.smoke_world);return !h.save_failed}
 	h.save_failed=!campaign.save_slot_from(h.path,&h.progress,&h.saved)
 	h.save_queue.failed=h.save_failed
 	if !h.save_failed {h.save_queue.completed_at=h.progress.saved_unix_seconds;h.save_queue.completed_revision=h.progress.revision}
@@ -380,6 +396,7 @@ hub_draw :: proc(data:rawptr,frame:^host.Frame) {
 	gfx.draw_vertical_gradient(frame.canvas,{7,7,18,255},{22,7,23,255})
 	gfx.draw_stars(960,540,100,h.clock*.04)
 	rl.DrawCircleGradient({480,420},480,{100,16,40,55},{0,0,0,0})
+	if h.page==.World && h.progress.initialized {hub_world_draw(h,frame);return}
 	if h.page!=.Galaxy || !h.progress.initialized {return}
 	cam:=hub_camera(h);rl.BeginMode3D(cam)
 	// Only materialized memories exist. No locked silhouette leaks a route.
