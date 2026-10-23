@@ -1228,6 +1228,62 @@ DEPOSITO
                      Archivio delle carte         Piazza
 ```
 
+### Immagini di riferimento in 3D
+
+Claude le ha fatte il 23 ottobre 2026 dai disegni dell'utente, per mostrare
+come dovrà apparire la parte 3D. Sono immagini di concetto: contano le
+posizioni, i nomi, le proporzioni e l'atmosfera, non la grafica finale.
+
+- **Come sono fatte.** Sono render di Blender 3.5 costruiti da codice, nello
+  stile delle spedizioni:
+  - pavimento a piastrelle scure e lucide;
+  - solidi blu notte con spigoli al neon;
+  - puntini luminosi come le piastrelle accese delle mappe;
+  - il font Jersey 10 del gioco.
+- **Il robot** è ricostruito pezzo per pezzo da
+  `src/render/expedition_robot.odin`.
+- **La telecamera** è fissa, inclinata e guarda verso il fondo della zona,
+  come propone la sezione «Come si costruisce».
+
+![La piazza dell'hub in 3D](immagini/hub-3d-piazza.png)
+
+**Piazza (Fase 8).**
+- Il robot arriva sull'anello azzurro al centro.
+- I sette edifici stanno nelle posizioni del disegno, ognuno con la sua
+  insegna e il suo colore. Da Portale dei ricordi in senso orario: Deposito,
+  Progressi, Uscita, Frammenti del creatore, Sala giochi, Casinò.
+- Davanti a ogni porta c'è un rettangolo luminoso: la zona in cui si entra.
+- I puntini azzurri sono le strade dal centro alle porte.
+
+![Il casinò in 3D](immagini/hub-3d-casino.png)
+
+**Casinò (Fase 9).**
+- In alto a sinistra la slot-saloon di 6 Ranch 7, con cowboy e cavallo di
+  cartoncino.
+- In alto a destra la pista di Tre in fuga, con dinosauro, Panda e moto.
+- A destra l'uscita verso la piazza.
+- In basso a sinistra il tavolo della roulette europea.
+- In basso a destra il tavolo con i due d20 del duello.
+- In fondo l'insegna dei crediti del deposito.
+
+![Il deposito in 3D](immagini/hub-3d-deposito.png)
+
+**Deposito (Fase 10).**
+- In alto a sinistra lo zaino di cartoncino, posato sul suo tappeto.
+- In alto a destra il manichino sulla pedana, con un'arma e tre reliquie.
+- In basso l'archivio delle carte, a due facce.
+- A destra l'uscita.
+- A sinistra le casse, che crescono con gli oggetti del deposito.
+
+![La sala giochi in 3D](immagini/hub-3d-sala-giochi.png)
+
+**Sala giochi (Fase 11, proposta).**
+- Dodici posti a semicerchio.
+- In questo esempio cinque cabinati accesi, cioè sbloccati, con il nome
+  sull'insegna e il rettangolo d'ingresso.
+- Gli altri sono pedane vuote, senza indizi sul bioma.
+- L'uscita è in basso, dietro l'arrivo.
+
 ### Nomi proposti
 
 | Nel disegno | Nome | Cosa fa | Perché questo nome |
@@ -1345,12 +1401,20 @@ Righe del 23 ottobre 2026.
   - Insegne al neon con il nome.
   - Lo stile delle spedizioni: solidi blu notte, spigoli al neon, personaggi
     di carta.
+- **Il lato della telecamera.** La telecamera è fissa e guarda verso il fondo
+  della zona, quindi gli oggetti nella metà vicina alla telecamera mostrano il
+  retro.
+  - Vanno disegnati leggibili anche da quel lato: per esempio l'archivio delle
+    carte è a due facce, e il tempio dei Frammenti è aperto tra le colonne.
+  - Le immagini di riferimento lo mostrano.
 - **Salvataggi.** La posizione nella piazza non si salva, perché si riparte
   sempre dal centro. Il formato dei salvataggi non cambia.
 
 ## 10. Fase 8 — Hub in 3D: la piazza
 
 ### Cosa si fa
+
+Riferimento visivo: `immagini/hub-3d-piazza.png` (sezione 9).
 
 - **La piazza** con i sette edifici, disposti come nel disegno.
   - Stanno su un cerchio di circa 14 unità (da regolare), con le porte
@@ -1468,6 +1532,8 @@ regole della sezione 1: fammi prima le domande della fase e fermati alla fine.
 
 ### Cosa si fa
 
+Riferimento visivo: `immagini/hub-3d-casino.png` (sezione 9).
+
 - **Entrare in una zona:** entrando nel Casinò dalla piazza si passa,
   con una dissolvenza, alla sala del casinò.
   - È il primo interno, quindi questa fase costruisce il passaggio generico
@@ -1549,6 +1615,8 @@ alla fine.
 
 ### Cosa si fa
 
+Riferimento visivo: `immagini/hub-3d-deposito.png` (sezione 9).
+
 - **Disposizione** (disegno `immagini/hub-deposito.png`): arrivo al centro;
   - Zaino in alto a sinistra;
   - Personaggio in alto a destra;
@@ -1623,6 +1691,8 @@ alla fine.
 ## 13. Fase 11 — Hub in 3D: dentro la sala giochi
 
 ### Cosa si fa
+
+Riferimento visivo: `immagini/hub-3d-sala-giochi.png` (sezione 9).
 
 Per questa sala l'utente non ha mandato un disegno. Proposta:
 

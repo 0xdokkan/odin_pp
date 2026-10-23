@@ -15,6 +15,9 @@ per i comandi disponibili oggi valgono il [README](README.md) e la documentazion
 - Fasi 8–11: l'hub diventa un mondo 3D in cui il robot cammina (piazza,
   casinò, deposito, sala giochi), dai disegni dell'utente in
   `docs/immagini/`.
+- Quattro immagini di riferimento in 3D dell'hub, `docs/immagini/hub-3d-*.png`:
+  render di concetto fatti da Claude con Blender dai disegni dell'utente, nello
+  stile delle spedizioni, con il robot del gioco e il font Jersey 10.
 - Per ogni fase: come funziona oggi il codice, il progetto, le domande da fare
   prima di iniziare, i passi, i test e il comando da dare a Claude. La sezione
   1 contiene le regole per Claude, compreso lo stop a fine fase.
