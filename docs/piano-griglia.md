@@ -32,7 +32,7 @@ per Claude sono nella sezione 1 e vanno lette prima di ogni fase.
 | 3 | Altezze nelle spedizioni: renderer, mappe, salvataggi, prestazioni | 2 | Da fare | — |
 | 4 | La montagna a spirale delle Montagne innevate | 2, 3 | Da fare | — |
 | 5 | Caverne | 2 (3 e 4 per metterle nei biomi) | Da fare | — |
-| 6 | Strutture su più caselle: edifici e oggetti complessi | — (meglio dopo la 2) | Da fare | — |
+| 6 | Strutture su più caselle: edifici e oggetti complessi, edifici trasparenti avvicinandosi | — (meglio dopo la 2) | Da fare | — |
 | 7 | Posa delle strutture da parte del giocatore | 6 | Facoltativa: si fa solo se l'utente la conferma | — |
 | 8 | Hub in 3D: la piazza, il robot che cammina, gli edifici | — | Da fare | — |
 | 9 | Hub in 3D: dentro il casinò | 8 | Da fare | — |
@@ -977,8 +977,22 @@ sezione 1: fammi prima le domande della fase e fermati alla fine.
 
 ### Cosa chiede l'utente, ed è possibile?
 
-Un modo per posare sulla griglia oggetti o edifici complessi. **Sì.** Il gioco
-ha già edifici su più caselle, i POI delle spedizioni:
+Un modo per posare sulla griglia oggetti o edifici complessi. Due richieste
+precisate in seguito:
+
+- **Più caselle.** Edifici e oggetti complessi possono, e in certi casi
+  devono, occupare più di una casella della griglia.
+- **Trasparenza degli edifici.**
+  - Quando il giocatore è fuori da un edificio e si avvicina, l'edificio
+    diventa sempre più trasparente, e più è vicino più si vede l'interno.
+  - A una casella dall'entrata l'edificio sparisce del tutto, così si vede
+    l'interno.
+  - Allontanandosi riappare, con una trasparenza che dipende dalla distanza.
+  - Quando il giocatore è dentro, la trasparenza sparisce: i muri tornano
+    normali e lo isolano, così vede solo l'interno dell'edificio.
+
+**Sì, si può fare tutto.** Il gioco ha già edifici su più caselle, i POI delle
+spedizioni:
 - `Site` (`src/expedition/world.odin:20-29`) ha un centro e un orientamento
   da 0 a 3;
 - la pianta si calcola casella per casella in `site_cell`
@@ -996,6 +1010,38 @@ Mancano però quattro cose:
 - **un contenitore adatto:** gli oggetti normali della griglia (`Grid_Object`)
   sono al massimo 32 per stanza, e in spedizione tutta la mappa è una stanza
   sola, quindi non vanno bene per gli edifici.
+
+Inoltre oggi nessun edificio si apre o diventa trasparente. Il gioco dirada
+solo i solidi che stanno davanti a un personaggio, con un retino
+(`src/render/expedition_material.odin:80-111`).
+
+### Oggetti ed edifici su più caselle
+
+Ci sono tre tipi di cose da posare:
+
+| Tipo | Caselle | Ci si entra? | Esempi |
+|---|---|---|---|
+| Oggetto semplice | 1 | no | barili, bombe, dispositivi delle carte: restano `Grid_Object` come oggi |
+| Oggetto complesso | più di 1 | no | carro 2×1, fontana 2×2, statua su piedistallo 2×2, macchinario 3×2, albero grande 2×2, rovina a L 3×3 |
+| Edificio | più di 1 | sì, nella stessa griglia | casetta 4×3, capanna 5×4, tempietto 7×7 con cortile, torre 3×3 con scala (se la Fase 2 è fatta) |
+
+- **Forma e misure.** Vengono dalla pianta, e l'impronta può non essere un
+  rettangolo (per esempio a L o a croce). Un oggetto complesso o un edificio
+  occupa sempre **tutte** le caselle della sua impronta: passo, vista, IA,
+  anteprime delle carte e posa di altre cose le considerano tutte.
+- **Regole per casella.** Ogni casella dell'impronta ha le sue regole, scritte
+  nella pianta. Per esempio, nella fontana il bordo ferma il passo ma non la
+  vista; nella statua il piedistallo ferma entrambi.
+- **Colpire un oggetto.** Se un giorno un oggetto complesso sarà colpibile o
+  distruttibile, colpirne una casella qualunque vale come colpire l'oggetto
+  intero.
+- **L'interno degli edifici** è fatto di caselle normali dentro l'impronta:
+  - il pavimento interno (`.`) si percorre;
+  - le porte (`+`) sono i soli passaggi;
+  - dentro si combatte e si cammina come fuori.
+
+  Non serve una mappa separata. Gli interni separati della Fase 5 restano per
+  luoghi grandi.
 
 ### Progetto
 
@@ -1051,17 +1097,83 @@ Mancano però quattro cose:
 - **Salvataggi.** Le caselle sono già salvate con la mappa. L'elenco delle
   strutture è un campo nuovo che vale vuoto nei salvataggi vecchi.
 
+### Trasparenza degli edifici
+
+Vale per ogni edificio, nel laboratorio e nelle spedizioni. Gli oggetti
+complessi non cambiano: per loro resta il retino di oggi quando coprono un
+personaggio.
+
+**Le parti di un edificio.** Ogni edificio è disegnato in tre parti separate,
+come i muri e i soffitti modulari dei giochi tattici citati nella sezione 14:
+- **involucro:** muri esterni e tetto;
+- **interno:** pavimento, arredi, muri interni, personaggi;
+- **contorno a terra:** una linea al neon che segue l'impronta e le porte.
+
+**Come cambia in base a dove si trova il robot:**
+
+| Dove si trova il robot | Involucro | Interno |
+|---|---|---|
+| Lontano: oltre 5 caselle dall'edificio | opaco, come oggi | nascosto dall'involucro |
+| Si avvicina: da 5 caselle a 1 | sempre più trasparente man mano che si avvicina | si vede attraverso l'involucro |
+| Sulla soglia: la casella davanti a un ingresso, o la porta stessa | sparito del tutto; resta solo il contorno a terra | visibile |
+| Dentro: su una casella interna | muri di nuovo opachi e normali; tetto nascosto | visibile; fuori dall'edificio tutto si scurisce |
+| Esce | torna come «sulla soglia», poi riappare piano mentre si allontana | — |
+
+**Regole:**
+- **Distanza.** Si misura in caselle, dalla posizione del robot alla casella
+  più vicina dell'impronta.
+  - In esplorazione il robot si muove in modo continuo, e la trasparenza lo
+    segue in modo continuo.
+  - Negli scontri il robot va a caselle, e la trasparenza cambia con una breve
+    transizione (circa 0,2 s), così l'edificio non lampeggia.
+- **Quanto è trasparente.** Proposta (domande 7 e 8):
+  - piena opacità a 5 caselle o più;
+  - scende in modo morbido avvicinandosi;
+  - arriva a zero solo sulla soglia di un ingresso;
+  - accanto a un muro senza porta resta un minimo, per esempio il 25%, così
+    si capisce ancora dov'è l'edificio.
+- **Dentro.** «I muri tornano normali e isolano la vista»:
+  - i muri sono di nuovo opachi;
+  - il tetto resta nascosto, altrimenti dall'alto la telecamera non vedrebbe
+    nulla;
+  - tutto ciò che sta fuori dall'impronta si scurisce (domanda 9);
+  - l'unica eccezione è il muro tra la telecamera e il robot, che usa il
+    retino che il gioco usa già per ogni muro davanti a un personaggio.
+    Altrimenti il robot sparirebbe dietro il muro sud.
+- **Solo grafica.** La trasparenza non cambia nessuna regola: i muri fermano
+  sempre passo e vista. Un nemico dentro un edificio si vede attraverso
+  l'involucro trasparente, ma le carte con linea di vista continuano a non
+  attraversare i muri.
+- **Edifici indipendenti.** Ogni edificio calcola la propria trasparenza, e si
+  apre solo quello vicino al robot.
+
+**Come si disegna.**
+- **Retino, non trasparenza vera.** Si usa un retino ordinato, come lo shader
+  delle spedizioni che dirada i solidi davanti agli attori: niente ordinamento
+  delle trasparenze e niente costo in più. Più il robot è vicino, più punti
+  del retino si spengono.
+- **Opacità per edificio.** È un numero che cambia a ogni frame, quindi gli
+  involucri non possono stare nei blocchi 8×8 cotti con un aspetto fisso.
+  - Si cuociono con l'id della struttura, e lo shader legge l'opacità da una
+    piccola tabella aggiornata a ogni frame.
+  - In alternativa gli involucri si disegnano a parte: si sceglie misurando.
+- **Nel laboratorio** vale la stessa regola. All'inizio della fase si decide
+  se riusare la trasparenza ordinata di `src/render/tactical_translucency.odin`
+  o il retino.
+- **Una funzione pura in `src/game`** (per esempio `structure_visibility`)
+  calcola stato e opacità dalla posizione del robot e dall'impronta, così si
+  testa senza finestra.
+
 ### Da chiedere prima di iniziare
 
 1. **Chi posa le strutture.**
    - (Consigliato) Per ora solo il generatore delle mappe.
    - Oppure anche il giocatore: quella è la Fase 7.
 2. **Le prime strutture.** Proposta:
-   - casetta 4×3 con porta;
-   - torre 2×2;
-   - recinto;
-   - rovina a L;
-   - tempietto 7×7 con cortile.
+   - edifici: casetta 4×3 con porta, capanna 5×4, tempietto 7×7 con cortile;
+   - oggetti complessi: carro 2×1, fontana 2×2, statua 2×2, macchinario 3×2,
+     rovina a L 3×3;
+   - recinto.
 3. **Dove, dopo il laboratorio.**
    - (Consigliato) Un solo bioma di prova, scelto dall'utente.
    - Oppure tutti.
@@ -1070,9 +1182,24 @@ Mancano però quattro cose:
 5. **Muretti che fermano il passo ma non la vista.**
    - (Consigliato) Sì, con un tipo di casella nuovo.
 6. **Entrare negli edifici.**
-   - (Consigliato) Insieme agli interni separati (opzione B della Fase 5), se
-     l'utente li sceglie.
-   - Altrimenti più avanti.
+   - (Consigliato) Interno nella stessa griglia: si entra camminando dalla
+     porta.
+   - Oppure interni separati (opzione B della Fase 5), solo per i luoghi
+     grandi.
+7. **Da quante caselle comincia la trasparenza.**
+   - (Consigliato) 5 caselle.
+   - Oppure un altro numero.
+8. **Accanto a un muro senza porta.**
+   - (Consigliato) Resta un minimo del 25%.
+   - Oppure sparisce del tutto anche lì.
+9. **Quando il robot è dentro.**
+   - (Consigliato) Il fuori si scurisce, ma meno durante gli scontri, così i
+     nemici fuori restano leggibili.
+   - Oppure si scurisce sempre allo stesso modo.
+   - Oppure non si scurisce.
+10. **Contorno a terra quando l'involucro sparisce.**
+    - (Consigliato) Sì.
+    - Oppure no.
 
 ### Passi
 
@@ -1089,13 +1216,23 @@ Mancano però quattro cose:
 3. Laboratorio: un'arena con strutture di prova, scelta con il tasto della
    Fase 2 (o con uno libero). Si verifica che i nemici le aggirino e che le
    carte con linea di vista le rispettino.
-4. Disegno nel laboratorio e nelle spedizioni.
-5. Generatore delle spedizioni (solo i biomi scelti), con controllo di
+4. Disegno nel laboratorio e nelle spedizioni, con le tre parti separate
+   (involucro, interno, contorno a terra).
+5. Trasparenza:
+   - funzione pura dello stato e dell'opacità, con test;
+   - retino per edificio nei due renderer;
+   - tetto nascosto e fuori scurito quando si è dentro;
+   - transizione morbida negli scontri.
+6. Generatore delle spedizioni (solo i biomi scelti), con controllo di
    sovrapposizione e raggiungibilità, e strutture nell'ologramma.
-6. Salvataggio dell'elenco, con test di andata e ritorno e di uno slot vecchio.
-7. Atto «strutture» dello smoke, con catture in ogni rotazione.
-8. Documenti: `docs/regole/combattimento.md` (ostacoli),
-   `docs/direzione-implementazione.md` e `CHANGELOG.md`.
+7. Salvataggio dell'elenco, con test di andata e ritorno e di uno slot vecchio.
+8. Smoke:
+   - atto «strutture», con catture in ogni rotazione;
+   - atto «edifici»: il robot cammina verso una casetta, con catture a 6, 4,
+     2 e 1 casella, sulla soglia, dentro e di nuovo fuori.
+9. Documenti: `docs/regole/combattimento.md` (ostacoli),
+   `docs/presentazione.md` (trasparenza), `docs/direzione-implementazione.md`
+   e `CHANGELOG.md`.
 
 ### Test
 
@@ -1108,15 +1245,30 @@ Mancano però quattro cose:
   - chiude una sacca.
 - Passo e vista: il muro blocca entrambi, il muretto solo il passo, la porta
   lascia passare.
-- I nemici trovano la strada attorno.
+- I nemici trovano la strada attorno agli oggetti complessi e dentro gli
+  edifici, passando dalle porte.
+- Ogni casella dell'impronta conta: un oggetto 2×2 occupa e blocca quattro
+  caselle, non una.
+- Trasparenza:
+  - l'opacità cala avvicinandosi;
+  - arriva a zero solo sulla soglia o sulla porta;
+  - accanto a un muro senza porta resta il minimo scelto;
+  - dentro, i muri sono di nuovo opachi e il tetto è nascosto;
+  - uscendo, l'involucro riappare con la distanza;
+  - due edifici vicini si aprono in modo indipendente.
+- La trasparenza non cambia vista e passo: con l'involucro trasparente, una
+  carta con linea di vista non colpisce oltre un muro.
 - Salvataggi: andata e ritorno; uno slot vecchio senza strutture si carica.
 - Lo stesso bioma ha la stessa geografia a ogni run.
 
 ### Fatto quando
 
-- Le strutture del catalogo si posano nel laboratorio e nel bioma scelto, in
-  tutte le rotazioni.
+- Le strutture del catalogo, oggetti complessi ed edifici, si posano nel
+  laboratorio e nel bioma scelto, in tutte le rotazioni, occupando tutte le
+  caselle della loro impronta.
 - Funzionano con passo, vista, IA e salvataggi.
+- Avvicinandosi a un edificio lo si vede diventare trasparente; sulla soglia
+  sparisce; dentro i muri isolano la vista; uscendo riappare.
 - Le verifiche della sezione 1.4 sono a posto.
 
 ### Comando
@@ -1463,6 +1615,12 @@ Riferimento visivo: `immagini/hub-3d-piazza.png` (sezione 9).
 6. **Interno del portale.**
    - (Consigliato) La galassia di oggi.
    - Oppure una sala nuova da progettare.
+7. **Trasparenza degli edifici della piazza.** È la regola della Fase 6:
+   avvicinandosi l'edificio si apre e si vede dentro.
+   - (Consigliato) Sì, con un interno semplice dentro ogni edificio:
+     pavimento e sagome di ciò che c'è nella sua zona. Entrando dalla porta si
+     passa comunque alla zona separata.
+   - Oppure no: gli edifici della piazza restano opachi.
 
 ### Passi
 
@@ -1816,6 +1974,19 @@ Ricerche del 23 ottobre 2026, per le parti che il codice non dice.
   [Wayline](https://www.wayline.io/blog/diegetic-interfaces-game-design),
   [devlog di un gioco VR](https://saltboy.itch.io/vr-dev-blog-post/devlog/436746/the-5-design-ideas-3-91022),
   [schemi di HUD](https://cdn.jsdelivr.net/npm/@hegemonart/get-design-done@1.60.4/reference/domains/gaming-patterns.md).
+- **Edifici che si aprono.** Ecco gli spunti:
+  - la trasparenza dei muri si calcola nello shader dalla distanza del
+    personaggio;
+  - le stanze sfumano quando il personaggio entra;
+  - muri e soffitti sono pezzi separati che si possono nascondere (come in
+    Dragon Age);
+  - i tetti spariscono quando si è dentro un edificio (RuneScape).
+
+  [Unity, trasparenza nel raggio](https://discussions.unity.com/t/environment-transparency-in-a-radius/17372),
+  [Unity, muro trasparente](https://discussions.unity.com/t/make-wall-partially-transparent-when-player-is-behind-it/78077),
+  [Godot, muri che sfumano entrando](https://godotengine.org/qa/140216/fading-room-walls-5d-perspective-when-player-enters-the-room),
+  [Unreal, visibilità dei muri](https://forums.unrealengine.com/t/wall-visibility/9079),
+  [RuneScape Classic, tetti](https://classic.runescape.wiki/w/Roof).
 
 ## 15. Rischi che valgono per tutte le fasi
 
