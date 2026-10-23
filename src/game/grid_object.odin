@@ -12,6 +12,9 @@ Grid_Object_Kind :: enum {
 	Shock_Floor,
 	Tesla_Coil,
 	Cannon, Flood, Black_Hole, Bomb_Marley,
+	// What the player sets down for a while (emplacement.odin).
+	Field_Cannon,
+	Devouring_Hole,
 	Count,
 }
 
@@ -44,6 +47,13 @@ Grid_Object :: struct {
 	device_cooldown: i32,
 	device_damage: i32,
 	device_direction: Move_Direction,
+	// An emplacement's (emplacement.odin): the beats left, its damage a beat,
+	// a hole's damage radius, a cannon's way and whether it fires a beam.
+	life: i32,
+	power: i32,
+	radius: i32,
+	facing: Move_Direction,
+	laser: bool,
 }
 
 Grid_Object_Spawn :: struct {
@@ -99,6 +109,9 @@ GRID_OBJECT_DEFINITIONS :: [int(Grid_Object_Kind.Count)]Grid_Object_Definition{
 	{kind = .Flood, name = "Inondazione"},
 	{kind = .Black_Hole, name = "Buco Nero"},
 	{kind = .Bomb_Marley, name = "Bomb Marley", max_health = 1, targetable = true, damageable = true},
+	// Solid on its stand, nothing aims at it; the hole blocks nothing.
+	{kind = .Field_Cannon, name = "Cannon", blocks_movement = true},
+	{kind = .Devouring_Hole, name = "Black Hole"},
 }
 
 grid_object_definition :: proc(kind: Grid_Object_Kind) -> (Grid_Object_Definition, bool) {

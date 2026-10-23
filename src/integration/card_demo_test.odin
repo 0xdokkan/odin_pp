@@ -95,7 +95,7 @@ test_every_card_has_a_demo_that_shows_its_effect :: proc(t: ^testing.T) {
 				testing.expectf(t, mute == 0, "%v +%d take %d: %d frames with no caption", id, upgrade, take, mute)
 				testing.expectf(t, unknown == 0, "%v +%d take %d: %d frames with a caption off the film's table", id, upgrade, take, unknown)
 				missing, shown := run_session.card_demo_shown(demo, renderer)
-				expected, hurt := game.card_demo_expected_events(id)
+				expected, hurt := game.card_demo_expected_events(id, upgrade)
 				testing.expectf(t, shown, "%v +%d take %d: played %v, missing %v of %v, foes hurt %d of %d, pool %v, fire %v, AK hits %d", id, upgrade,
 					take, demo.played, missing, expected, run_session.card_demo_foes_hurt(demo), hurt, demo.pooled, demo.burned, demo.fps_hits)
 				testing.expectf(t, demo.stage == .Done && demo.take_time < run_session.CARD_DEMO_TAKE_LIMIT, "%v +%d: the take ran %.1f s", id, upgrade, demo.take_time)

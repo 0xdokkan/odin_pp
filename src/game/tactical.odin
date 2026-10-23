@@ -199,6 +199,8 @@ tactical_end_combat :: proc(room: ^Room) {
 	// still belong to this room; they are not part of an exclusive takeover.
 	room.lasso = {}
 	room.pinball = {}
+	room.marley = {}
+	room.ride = {}
 	room.first_person.active, room.first_person.trigger = false, false
 }
 
@@ -274,6 +276,11 @@ continue_tactical_pulse :: proc(room: ^Room) -> bool {
 		for &enemy in room.enemies { enemy.tactical_cooldown = max(f32(0), enemy.tactical_cooldown-1) }
 		resolve_due_explosives(room, &pulse)
 		resolve_due_room_modifier(room, &pulse)
+		// BOMB MARLEY: the party's beat (marley.odin).
+		marley_beat(room, &pulse)
+		// CANNONE and BUCO NERO: what the player set down acts; the ride's clock.
+		emplacement_beat(room, &pulse)
+		ride_beat(room, &pulse)
 		ids, count := enemy_ids_in_planning_order(room)
 		for protect_pass in 0..<2 {
 			for id in ids[:count] {
@@ -442,6 +449,8 @@ offer_defense_qte :: proc(room: ^Room, enemy: ^Enemy) -> bool {
 	}
 	// RIFLESSO answers this blow by itself (deflect_enemy_blow): no defence to choose.
 	if player_charges(room, .Deflect) > 0 { return false }
+	// The Stegosauro does the same for every blow while the ride lasts.
+	if ride_deflects(room) { return false }
 	defenses: bit_set[Defense_Mode]
 	if _, found := status_for_entity(room, PLAYER_ENTITY, .Shield); found { defenses += {.Block, .Parry} }
 	if _, found := status_for_entity(room, PLAYER_ENTITY, .Thorns); found && enemy.archetype == .Archer { defenses += {.Deflect} }

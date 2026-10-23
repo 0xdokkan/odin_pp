@@ -812,3 +812,221 @@ rosso. Nel recupero dopo la fine della finestra l'AK spara ancora. Finiti i 20
 secondi, dopo una ventina di battiti del mondo, la vista finisce, la telecamera
 risale con il suo suono e il mouse torna libero. Una copia +5 dura 30 secondi. Il
 riquadro dei secondi e la riga dell'HUD ci stanno interi.
+
+> **Solo in Prova meccaniche, per ora.** Inondazione, Bomb Marley, Cannone,
+> Cannone Laser, Buco Nero e Dinosauro (con il Sanguinamento) qui sotto sono le
+> versioni del laboratorio: hanno il tratto `Lab_Only` e non si offrono, non si
+> comprano, non si scoprono e non entrano in una spedizione. Le carte della
+> campagna con gli stessi nomi sono altre (gli ordigni di `game/memory_devices.odin`).
+
+### Inondazione
+
+`Inondazione` (non comune, energia 2, **2 s** di finestra, fino a tre
+potenziamenti; per ora solo in Prova meccaniche) lancia un'onda che attraversa
+tutta la mappa e sposta ogni nemico. Regole in
+[flood.odin](../../src/game/flood.odin), onda in
+[flood.odin](../../src/render/flood.odin).
+
+**La direzione.** Si trascina la carta (o la si sceglie e poi si clicca) su una
+casella intorno al Viandante, da 1 a 3 celle di Chebyshev (la sua stessa casella
+non vale): l'onda va nel verso dell'asse principale dal Viandante a quella casella,
+una delle quattro direzioni, e in parità lungo la riga (est o ovest). **Con la
+carta in mano la rotella del mouse gira la direzione** di un quarto di giro a
+scatto (in su in senso orario: nord, est, sud, ovest) e la direzione scelta resta
+anche muovendo il mouse, finché la carta non viene giocata o rimessa a posto; la
+rotella intanto non zooma la camera. Giocata dopo la rotella, la carta va su una
+casella che quella direzione indica (la prima delle tre celle in quel verso che il
+gioco accetta), qualunque casella tocchi il mouse. L'onda parte dal muro dietro di
+sé e corre fino al muro davanti, dove finisce: la mappa intera, vista o no.
+
+**L'anteprima.** Con la carta in mano la mappa mostra una freccia grande dal muro da
+cui l'onda parte al muro in cui finisce, lungo la corsia del Viandante (spessa, con
+la punta bianca e le chevron che scorrono), altre frecce più sottili ogni tre
+corsie, una barra ciano sul muro di partenza (`PARTE`) e una bianca su quello di
+arrivo (`FINE`), il pavimento visibile tinto di blu, la corsia del Viandante più
+forte e i nemici che l'onda spingerà cerchiati; sopra il Viandante la scritta
+`ROTELLA: DIREZIONE`.
+
+**L'effetto.** Tutto si risolve in una sola giocata, nell'ordine in cui il fronte
+raggiunge le file dei nemici dalla parte lontana: la testa di una fila si
+sposta per prima, così una fila con spazio davanti si sposta insieme. Prima si
+spengono **tutti i fuochi** (gli Incendi del Viandante e gli oggetti Fuoco della
+stanza), così nessun nemico finisce in una fiamma. Poi ogni nemico a terra viene
+spinto di **1 casella** (+1 per upgrade, +1 sul colpo a tempo; fino a 4) nel
+verso dell'onda, una sola volta, con le regole di spinta del gioco: un muro, una
+copertura, un oggetto che blocca o un corpo (il Viandante compreso) fermano la
+spinta prima, e su ogni casella in cui entra agiscono pozze, trappole e pericoli
+(un nemico può morire così). L'onda non fa danni, non sposta il Viandante né gli
+oggetti, e non tocca il nemico appeso al Lazzo né la palla del Pinball.
+
+**Sul tavolo.** Un muro d'acqua a blocchi semitrasparenti, con la schiuma in cima,
+attraversa la stanza in circa 1,9 secondi del cast, mentre il mondo è fermo: ogni
+nemico parte spinto nel momento in cui il fronte lo raggiunge, e dove passa
+sopra un fuoco sale un po' di vapore. Nella Prova meccaniche suonano la carta,
+l'onda, ogni nemico bagnato e ogni fuoco spento. Il film di Mostra effetto
+mostra tre nemici (uno contro il muro) e due fuochi.
+
+### Bomb Marley
+
+`Bomb Marley` (rara, energia 3, **2 s** di finestra, fino a cinque potenziamenti;
+per ora solo in Prova meccaniche) apre una festa nella stanza: dal soffitto
+scende una sfera da discoteca che illumina alcune caselle, e Bomb Marley lancia
+bombe a ritmo lungo colonne intere. Chi sta su una casella illuminata è salvo.
+Regole in [marley.odin](../../src/game/marley.odin), tavolo in
+[marley.odin](../../src/render/marley.odin).
+
+**Bomb Marley non è un nemico.** Non è un'entità della stanza: non ha casella,
+vita né ID, quindi nessuna carta, colpo, freccia o palla lo raggiunge e nessun
+nemico lo ha come bersaglio. Sta dietro il muro nord e lancia.
+
+**Il ritmo.** La festa dura **35 secondi del mondo** e va a battiti di un
+secondo, quindi il cast, i dadi, una difesa, Movimento Ombra e la pausa la fermano
+come fermano il mondo. Ogni battito:
+
+- le colonne annunciate **due battiti prima** cadono: la bomba attraversa tutta la
+  colonna, sopra muri e coperture, e ogni personaggio (il Viandante e i nemici,
+  boss e miniboss compresi) che non sta su una casella illuminata prende **6
+  danni** (+1 per upgrade; lo Scudo li assorbe; niente scelta di difesa, Deflect non
+  li rimanda); chi sta su una luce è salvo (`SALVO`); un barile nella colonna si
+  accende; nell'ombra di Movimento Ombra il Viandante non li subisce. Ogni nemico
+  ucciso da una bomba aggiunge **5 secondi** alla festa, **90 in tutto** al massimo
+  (anche se l'ha spinto lì il Viandante);
+- il tempo cala di un secondo; alla fine, con il combattimento o con la morte del
+  Viandante, la festa finisce;
+- le **luci** si spostano ogni 5 battiti, e le caselle a cui passeranno al turno
+  dopo si vedono per tutto il tempo (un alone freddo e una cornice sottile con una
+  scintilla che corre, molto più deboli delle luci vere): in anteprima, non
+  salvano nessuno. Sono 4 più dei personaggi in gioco (il Viandante e i nemici)
+  all'inizio, una in meno ogni 5 secondi, mai meno della metà dei personaggi (2 al
+  minimo) e mai più di 32: la stanza è generosa all'inizio e dopo mezzo minuto
+  circa non c'è più posto per tutti. Sono sparse sul pavimento (fra alcune
+  candidate vince la più lontana dalle altre), una è sempre entro 3 caselle dal
+  Viandante, e le nuove cadono di preferenza dove non sta nessuno e mai sulle
+  luci accese;
+- vengono annunciate **nuove colonne**: poche all'inizio (una ogni due secondi), poi
+  una, due e tre al secondo ogni 10 secondi, in proporzione per una stanza più
+  larga di 17 caselle; metà sono la colonna di un personaggio.
+
+Le luci e le colonne nascono dal solo flusso della stanza (`Room.marley_random`),
+mai dall'orologio. Una sola festa alla volta: mentre suona, la carta viene
+rifiutata. Il colpo a tempo aggiunge 5 secondi.
+
+**I nemici.** Una colonna annunciata è una zona di pericolo, come lo scoppio di
+una bomba: i nemici ne escono e non la attraversano se c'è un'altra strada. Un
+nemico fuori dalle luci e non accanto al Viandante muove verso la luce libera più
+vicina entro 3 celle. First Person Shooter si può giocare durante la festa e la vista
+negli occhi mostra le stesse luci e colonne.
+
+**Sul tavolo.** La sfera a specchietti scende in un secondo sopra il Viandante e ruota;
+i fasci colorati (magenta, ciano, oro, verde, arancio) vanno dalla sfera alle caselle
+salve, dove ci sono macchie di luce e un bordo d'oro; puntini di riflesso girano sul
+pavimento. Le luci e le colonne si vedono anche nella nebbia (sopra i blocchi
+della nebbia). Le colonne annunciate sono rosse, più accese e lampeggianti
+all'ultimo battito, con una freccia che scende. La bomba è un cartoncino di carta
+(nero, con una fascia rossa, oro e verde, miccia e scintilla, linea d'inchiostro,
+margine bianco e taglio come gli altri pezzi del tavolo): Bomb Marley la lancia in
+un arco fino alla prima casella della colonna e poi rimbalza lungo tutta la
+colonna, un salto ogni 3 caselle, girando, con un'ombra morbida sul pavimento,
+cartoncini di fumo dietro di sé e un anello di luce dove tocca terra. Rimbalzare
+è solo il suo modo di andare: colpisce chiunque stia in un punto qualunque del suo
+percorso, a terra o in aria (una colonna dà danno a tutta la colonna). Le bombe
+di uno stesso battito volano insieme. Lascia un lampo su ogni casella (verde dove
+si è salvi) e i danni arrivano dopo. Bomb Marley è un cartoncino originale: una bomba con un berretto
+rosso, oro e verde, occhiali scuri e dreadlock di miccia, che balla a tempo sul
+muro nord sopra la colonna che sta per bombardare. L'HUD mostra `MARLEY 23s` fra i
+chip. Nella Prova meccaniche suonano la carta, la sfera, le luci, l'avviso, la
+bomba e il suo scoppio, la salvezza, i secondi guadagnati, la fine e un
+groove reggae a 60 BPM (un battito `a`, uno `b`).
+
+**Mostra effetto.** Il film mostra la carta sopra una stanza di prova con le luci e
+la prima colonna fissate: due nemici in una colonna, uno in una luce e uno no. La
+bomba salva il primo, ferisce il secondo e il film finisce pochi secondi dopo,
+molto prima dei 35 secondi della festa.
+
+
+### Cannone e Cannone Laser
+
+`Cannone` (non comune, energia 2, **2 s** di finestra, fino a 2 potenziamenti) e
+`Cannone Laser` (rara, energia 2, 2 s, fino a 3) mettono sulla mappa una
+torretta d'acciaio su un piedistallo: si trascina la carta su una casella libera
+entro 3 celle e, **con la carta in mano, la rotella del mouse gira la canna** di
+un quarto di giro a scatto (come l'onda dell'Inondazione: la camera non zooma
+e la mappa mostra la freccia della linea di tiro, fino al primo nemico o al
+muro). Senza rotella la direzione è quella dal Viandante alla casella.
+
+- **Cannone.** Ogni secondo del mondo, per **20 s**, spara una palla dritta
+  davanti a sé: il primo nemico sulla linea prende 2 danni (+1 per upgrade);
+  muri, coperture e oggetti che bloccano il passo fermano la palla, e un
+  barile sulla linea la prende e salta. Al termine si sbriciola.
+- **Evoluzione.** Il **secondo upgrade** non aumenta il danno: la carta
+  *diventa* Cannone Laser (stesso posto nel mazzo, livello 0). Il Cannone Laser
+  è `evolution_only`: peso di offerta 0, mai in premi, negozio o armeria.
+- **Cannone Laser.** Un raggio rosso ogni secondo colpisce **tutti** i nemici
+  della linea fino al muro (3 danni, +1 per upgrade, fino a 3 upgrade).
+- Il cannone è solido (blocca il passo come una bobina Tesla), nessuno lo prende
+  di mira, e al massimo due cannoni stanno insieme sulla mappa. Un colpo a tempo
+  fa il danno x1,5.
+- Sopra il cannone c'è `CANNONE 14s`; il suo lampo, il fumo di carta, la palla
+  di cartoncino che vola (con la sua ombra) e il raggio additivo sono in
+  `render/arsenal.odin`; le regole in `game/cannon.odin`.
+
+### Buco Nero
+
+`Buco Nero` (rara, energia 3, **2 s**, fino a 4 potenziamenti) apre un buco su
+una casella libera entro 3 celle per **8 battiti** del mondo. Ogni battito:
+
+- chi sta nell'**area di danno** (3x3, raggio 1 + upgrade/2: 5x5 a +2, 7x7 a +4)
+  prende 4 danni (+1 per upgrade), boss e miniboss compresi;
+- chi sta nell'**area di tiro** (una casella più larga: 5x5 di base) ma fuori
+  dall'area di danno è tirato di **una casella** verso il centro con le normali
+  regole di movimento (un muro, un corpo o un oggetto lo fermano; pozze, trappole
+  e fuochi agiscono sulla casella in cui entra); **boss e miniboss non vengono
+  tirati**;
+- un nemico che muore per il danno del buco viene **inghiottito**: il tavolo lo
+  mostra mentre gira a spirale verso il centro prima di cadere.
+
+Il buco non blocca il passo. L'anteprima della carta mostra le due aree; sul
+tavolo il buco è un disco nero con spirali viola e arancio, una sfera scura
+sospesa, aree evidenziate e un anello che a ogni battito scorre verso il centro;
+sopra c'è `BUCO NERO 5s`. Regole in `game/black_hole.odin`.
+
+### Dinosauro e Sanguinamento
+
+`Dinosauro` (rara, energia 3, **2 s**, fino a 5 potenziamenti) tira **un d4**
+(sempre un d4, a ogni livello) e il lato sceglie il dinosauro che il Viandante
+cavalca per **20 s** (+3 s per upgrade, +3 s sul colpo a tempo). Si cavalca un
+dinosauro alla volta: la carta non si gioca finché dura la cavalcata, e finisce
+con la stanza.
+
+| d4 | Dinosauro | Effetto |
+|---|---|---|
+| 1 | Velociraptor | un passo costa 0,4 s invece di 0,8 s; il colpo d'urto mette 1 Sanguinamento |
+| 2 | Stegosauro | ogni colpo di un nemico sul Viandante gli viene restituito senza spendere cariche e senza richiesta di difesa |
+| 3 | Dilophosaurus | 1 Veleno su ogni nemico che il Viandante ferisce e su ogni nemico che lo ferisce |
+| 4 | Giganotosauro | dopo ogni passo i nemici sulle 4 caselle intorno prendono 6 danni; il suo urto uccide all'istante Chaser, Archer e Bomber, e fa 12 danni a Brute, Custode e Demolitore. **Se l'urto ucciderebbe il nemico, non lo colpisce: cammina sulla sua casella e lo schiaccia** (passo, schiacciamento, caduta del nemico; costa un passo e calpesta anche le caselle intorno); se invece il nemico sopravvive, lo morde come prima |
+
+**Sanguinamento.** Nuovo status dei nemici (il Viandante non lo porta): un
+nemico con N stack prende **+N danni** da qualsiasi danno di qualsiasi fonte,
+una sola volta (senza ricorsione), prima dello scudo. Gli stack non calano mai.
+`Bleed` ha il suo suono (`ui_status_bleed`) e un morso `SANGUE +N` sul tavolo.
+
+Il dinosauro è una pixel art di cartoncino (quattro bestie originali, due
+fotogrammi di camminata) sotto la carta del Viandante, che sta sulla sua sella;
+cammina a tempo con il Viandante e si gira esattamente come la carta del
+Viandante (verso dove va o verso il nemico che colpisce, con lo stesso giro da
+figurina). **Mentre lo cavalca, il Viandante non esegue né passi né colpi: li
+esegue il dinosauro.** Un colpo è uno scatto in avanti verso il nemico a testa
+bassa (si carica indietro, scatta, torna), con il Viandante che lo segue sulla
+sella; il Giganotosauro ha inoltre un colpo di calpestio con onda e polvere. L'HUD mostra `RAPTOR 14s`
+fra i chip. Regole in `game/dinosaur.odin`, disegno in `render/arsenal.odin` e
+`render/dino_art.odin`.
+
+**Prova meccaniche e Mostra effetto.** Nella Prova meccaniche il mazzo ha
+Cannone, Buco Nero e Dinosauro (Pozza di Veleno, Deflect e Feretro non ci sono
+più: i loro atti nello smoke li riprendono in prestito per un momento). Gli atti
+di `--smoke-mechanics-lab` verificano la palla sul primo di due nemici, il
+raggio su entrambi, la caduta del cannone, il nemico inghiottito, quello tirato
+dentro, il boss che resta, la chiusura e i quattro dinosauri con i loro effetti.
+I film di Mostra effetto mostrano a ogni livello la scena giusta: il Cannone
+colpisce il primo nemico e il Laser entrambi, il Buco Nero inghiotte e tira, il
+Dinosauro mostra un dinosauro diverso a ogni livello (livello mod 4 + 1).

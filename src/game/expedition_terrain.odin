@@ -69,7 +69,8 @@ expedition_bridge_open :: proc(room: ^Room, position: grid.Position) -> bool {
 @(private)
 expedition_step_seconds :: proc(room: ^Room) -> f32 {
 	if room == nil || room.player == nil {return TACTICAL_MOVE_SECONDS}
-	seconds := TACTICAL_MOVE_SECONDS
+	// Riding the lab's Velociraptor steps faster (dinosaur.odin).
+	seconds := player_move_seconds(room)
 	if room.player.tactical.dinosaur_remaining > 0 {seconds *= 0.75}
 	if !room.player.tactical.config.expedition {return seconds}
 	ground := expedition_terrain(room.player.tactical.config.expedition_biome, room.player.position)

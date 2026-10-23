@@ -79,18 +79,23 @@ mai: l'ultimo nemico ucciso non ripulisce la stanza, e ogni 4 secondi di gioco
 arriva un nemico casuale (Chaser, Archer, Brute, Bomber o Custode) su una
 casella libera ad almeno 4 celle dal giocatore, fino a 6 insieme; un'arena vuota
 si riempie subito. Gli easter egg si riaprono ogni volta. Il mazzo contiene
-**una copia di Movimento Ombra, una di ogni carta nuova della Fase 2** (Pozza di
-Veleno, Incendio, Deflect, Feretro, Dado del Destino e Lama Velenosa), **una del
-Lazzo e della Canna da Pesca e una del Pinball e di First Person Shooter**:
+**una copia di Bomb Marley e una di Inondazione, una di Cannone, Buco Nero e
+Dinosauro, due carte della Fase 2** (Incendio e Dado del Destino), **una del Lazzo
+e della Canna da Pesca e una del Pinball e di First Person Shooter**
+(Pozza di Veleno, Deflect e Feretro hanno lasciato il posto alle tre nuove; il
+Cannone Laser è ciò che il Cannone diventa al secondo upgrade):
 tutte in mano (energia 12) tranne la Canna, in attesa fra le esaurite perché non
 si pesca mai in mano. Sono dieci carte, più di quante ne tenga mai la mano del
 gioco: restano larghe come in una mano piena di otto e si sovrappongono da un
 lato all'altro dello schermo, ognuna in vista quanto le serve per mostrare tutte
 le sue parole, l'icona, i segni della rarità e il tasto, in qualunque ordine
 stiano; quella sotto il mouse si alza intera sopra le altre, e `9` e `0` giocano
-la nona e la decima (vedi [Movimento Ombra](regole/meccaniche.md#movimento-ombra),
-[Pozza di Veleno e Incendio](regole/meccaniche.md#pozza-di-veleno-e-incendio),
-[Deflect, Feretro, Dado del Destino e Lama Velenosa](regole/meccaniche.md#deflect-feretro-dado-del-destino-e-lama-velenosa),
+la nona e la decima (vedi [Bomb Marley](regole/meccaniche.md#bomb-marley),
+[Inondazione](regole/meccaniche.md#inondazione),
+[Cannone](regole/meccaniche.md#cannone-e-cannone-laser), [Buco Nero](regole/meccaniche.md#buco-nero),
+[Dinosauro](regole/meccaniche.md#dinosauro-e-sanguinamento),
+[Incendio](regole/meccaniche.md#pozza-di-veleno-e-incendio),
+[Dado del Destino](regole/meccaniche.md#deflect-feretro-dado-del-destino-e-lama-velenosa),
 [Lazzo](regole/meccaniche.md#lazzo), [Canna da Pesca](regole/meccaniche.md#canna-da-pesca), [Pinball](regole/meccaniche.md#pinball) e
 [First Person Shooter](regole/meccaniche.md#first-person-shooter)). Niente ricompense, uscita o
 profilo; `F5` ricomincia, `F10` torna al menu. Arena, mazzo e ritmo degli arrivi
@@ -122,8 +127,9 @@ i colpi che si vedono sul tavolo, ognuno con la sua arma di carta
 Fase 2 ([Pozza di Veleno e Incendio](regole/meccaniche.md#pozza-di-veleno-e-incendio) e
 [Deflect, Feretro, Dado del Destino e Lama Velenosa](regole/meccaniche.md#deflect-feretro-dado-del-destino-e-lama-velenosa))
 compaiono fra ricompense e negozio di ogni run tattica, come il [Lazzo](regole/meccaniche.md#lazzo),
-la [Canna da Pesca](regole/meccaniche.md#canna-da-pesca), il [Pinball](regole/meccaniche.md#pinball) e
-[First Person Shooter](regole/meccaniche.md#first-person-shooter).
+la [Canna da Pesca](regole/meccaniche.md#canna-da-pesca), il [Pinball](regole/meccaniche.md#pinball),
+[First Person Shooter](regole/meccaniche.md#first-person-shooter), [Inondazione](regole/meccaniche.md#inondazione) e
+[Bomb Marley](regole/meccaniche.md#bomb-marley).
 La prova resta la sandbox in cui provare le prossime.
 
 **Intenzioni dei nemici (`F6`).** Il simbolo dell'azione sta dentro il cartellino
@@ -175,7 +181,7 @@ misure e un ascolto di tutta la famiglia, senza toccare il gioco.
 | `--smoke-menu` | cattura `odin_pp_menu.png` dopo 30 frame ed esce |
 | `--animation-speed=2` | velocità delle animazioni ordinarie, fra 0.25x e 4x; non accelera cast o dadi M8 |
 | `--fast` | velocità 4x |
-| `--mechanics-lab` | Prova meccaniche: arena aperta senza fine, mazzo delle carte in prova (Movimento Ombra, Pozza di Veleno, Incendio, Deflect, Feretro, Dado del Destino, Lama Velenosa, Lazzo, Pinball, First Person Shooter, Canna da Pesca), nemici che continuano ad arrivare; `F7` libera l'arena per la Canna da Pesca |
+| `--mechanics-lab` | Prova meccaniche: arena aperta senza fine, mazzo delle carte in prova (Bomb Marley, Inondazione, Cannone, Incendio, Buco Nero, Dinosauro, Dado del Destino, Lazzo, Pinball, First Person Shooter, Canna da Pesca), nemici che continuano ad arrivare; `F7` libera l'arena per la Canna da Pesca |
 | `--spell-lab` | arena con Firebomb, Fate Strike, Chain Lightning, Sundering Blow e Guard |
 | `--dice-lab` | arena con Fate Strike, Sundering Blow, Prismatic Barrage, Twin Venom e Guard |
 | `--dice-set-lab` | tavolo 3D del set D4/D6/D8/D10/D%/D12/D20: selezione, lancio e rotazione con il mouse |

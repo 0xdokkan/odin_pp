@@ -14,6 +14,10 @@ Card_Interaction_State :: struct {
 	dragged_card_id:  u32,
 	placing: bool,
 	placement_direction: game.Move_Direction,
+	// INONDAZIONE: the wave's way once the wheel has turned it (else the mouse's
+	// cell gives it).
+	flood_way_set: bool,
+	flood_way: game.Move_Direction,
 }
 
 clear_card_interaction :: proc(state: ^Card_Interaction_State) {
@@ -133,6 +137,8 @@ poll_gameplay_command :: proc(
 	controls: Run_Input = {},
 ) -> (command: Gameplay_Command, has_command: bool) {
 	assert(room != nil && room.player != nil && renderer != nil && card_interaction != nil)
+	// INONDAZIONE's aim is set again below whenever the card is held.
+	render.set_flood_aim(renderer, false, false, .East)
 	// FIRST PERSON SHOOTER: the mouse is the view's and the hand is put away;
 	// only steps and waits are left (first_person_input.odin).
 	if game.tactical_first_person_active(room) {
@@ -194,6 +200,7 @@ poll_gameplay_command :: proc(
 	renderer.tactical.expedition_placement = card_interaction.placing
 	renderer.tactical.expedition_direction = card_interaction.placement_direction
 
+	update_flood_aim(room, renderer, card_interaction, input_deck, controls.wheel)
 	card_interaction.hovered_card_id = 0
 	if card_interaction.dragged_card_id == 0 && mouse_inside {
 		if hand_index, found := render.hand_card_at_point(
@@ -228,7 +235,9 @@ poll_gameplay_command :: proc(
 						renderer.tactical.expedition_placement = true
 						return
 					}
-					return targeted_card_command(room, input_deck.hand[hand_index], renderer.hovered_cell)
+					card := input_deck.hand[hand_index]
+					return targeted_card_command(room, card, flood_anchor(room, card, renderer.hovered_cell, card_interaction^),
+						card_interaction.flood_way, card_interaction.flood_way_set)
 				}
 			}
 		}
@@ -290,7 +299,8 @@ poll_gameplay_command :: proc(
 				}
 				if immediate, ok := immediate_card_command(card); ok { return immediate, true }
 			}
-			command, has_command = targeted_card_command(room, card, renderer.hovered_cell)
+			command, has_command = targeted_card_command(room, card, flood_anchor(room, card, renderer.hovered_cell, card_interaction^),
+				card_interaction.flood_way, card_interaction.flood_way_set)
 			command.direction = card_interaction.placement_direction
 			return
 		}
@@ -430,6 +440,8 @@ execute_gameplay_command :: proc(room: ^game.Room, command: Gameplay_Command) ->
 		if game.tactical_card_claims_beat(room, command.card_id) {
 			room.player.tactical.critical_next = game.tactical_claim_beat(room, command.beat)
 		}
+		// A cannon's way, as the wheel turned it (play_card clears it).
+		room.aim, room.has_aim = command.aim_way, command.has_aim_way
 		play := game.play_card(room, command.card_id, command.target, command.direction)
 		room.player.tactical.critical_next = false
 		execution.committed = game.card_play_was_committed(play.result)

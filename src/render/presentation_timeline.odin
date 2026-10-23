@@ -1,5 +1,6 @@
 package render
 
+import "core:math"
 import game "../game"
 import world "../expedition"
 import grid "../engine/grid"
@@ -60,6 +61,21 @@ PRESENTATION_PINBALL_STRIKE_DURATION :: f32(0.6)*PRESENTATION_TIME_SCALE
 PRESENTATION_PINBALL_BURST_DURATION :: f32(0.32)*PRESENTATION_TIME_SCALE
 // FIRST PERSON SHOOTER: the camera's dive into the player's eyes (first_person.odin).
 PRESENTATION_FIRST_PERSON_DIVE_DURATION :: f32(0.45)*PRESENTATION_TIME_SCALE
+// BOMB MARLEY: the ball coming down (stretched over the cast), a bomb falling
+// across its column, the party's end.
+PRESENTATION_MARLEY_BALL_DURATION :: f32(1.0)*PRESENTATION_TIME_SCALE
+PRESENTATION_MARLEY_BOMB_DURATION :: f32(0.85)*PRESENTATION_TIME_SCALE
+PRESENTATION_MARLEY_END_DURATION :: f32(0.6)*PRESENTATION_TIME_SCALE
+// INONDAZIONE: the wave crossing the board.
+PRESENTATION_FLOOD_DURATION :: f32(1.4)*PRESENTATION_TIME_SCALE
+// CANNONE: a shot's flight, the cannon falling apart; BUCO NERO: a foe spun
+// down the hole, the hole closing; DINOSAURO: mounting, a stomp.
+PRESENTATION_CANNON_FIRE_DURATION :: f32(0.42)*PRESENTATION_TIME_SCALE
+PRESENTATION_CANNON_BREAK_DURATION :: f32(0.7)*PRESENTATION_TIME_SCALE
+PRESENTATION_HOLE_SWALLOW_DURATION :: f32(0.75)*PRESENTATION_TIME_SCALE
+PRESENTATION_HOLE_CLOSE_DURATION :: f32(0.7)*PRESENTATION_TIME_SCALE
+PRESENTATION_RIDE_DURATION :: f32(0.9)*PRESENTATION_TIME_SCALE
+PRESENTATION_STOMP_DURATION :: f32(0.35)*PRESENTATION_TIME_SCALE
 PRESENTATION_MAX_SEQUENCE_DURATION :: f32(12.0)
 PRESENTATION_TIME_EPSILON         :: f32(0.00001)
 
@@ -120,6 +136,31 @@ Presentation_Cue_Kind :: enum {
 	Pinball_Burst,
 	// FIRST PERSON SHOOTER: the dive into the player's eyes (game/first_person.odin).
 	First_Person_Begun,
+	// BOMB MARLEY (game/marley.odin): the ball comes down, the lights, a column
+	// warned, a bomb across it, someone saved, the seconds earned, the end.
+	Marley_Begun,
+	Marley_Lights,
+	Marley_Warned,
+	Marley_Bomb,
+	Marley_Saved,
+	Marley_Bonus,
+	Marley_Ended,
+	// INONDAZIONE (game/flood.odin): the wave's sweep and the steam of a fire put out.
+	Flood_Swept,
+	Fire_Extinguished,
+	// CANNONE and BUCO NERO (game/cannon.odin, black_hole.odin): a shot, a cannon
+	// falling apart, a hole's beat, a foe swallowed, the hole closing.
+	Cannon_Fired,
+	Cannon_Broken,
+	Black_Hole_Tick,
+	Black_Hole_Swallowed,
+	Black_Hole_Closed,
+	// DINOSAURO (game/dinosaur.odin): the ride begins and ends, a stomp; and
+	// Sanguinamento's extra bite.
+	Ride_Begun,
+	Ride_Ended,
+	Dino_Stomp,
+	Bleed_Bite,
 }
 
 Presentation_Actor :: struct {
@@ -154,6 +195,11 @@ Presentation_Grid_Object :: struct {
 	device_armed: bool,
 	device_direction: game.Move_Direction,
 	device_target_limit: i32,
+	// An emplacement's (game/emplacement.odin): its way, its beam, the beats left
+	// and the beats it had, its damage radius.
+	facing: game.Move_Direction,
+	laser: bool,
+	life, max_life, radius: i32,
 }
 
 // The pools and fires on the floor as the board shows them (game/ground.odin):
@@ -192,6 +238,11 @@ Room_Presentation :: struct {
 	loot_count:  int,
 	// Shown from a pool's or a fire's landing (start_presentation_cue).
 	ground:      Presentation_Ground,
+	// BOMB MARLEY's party: its lights, its warned columns and its seconds, as
+	// the cues of the party's events show them.
+	marley:      game.Marley_State,
+	// The dinosaur the player rides, as the cues show it.
+	ride:        game.Ride_State,
 	gold:        i32,
 	pulse_count: u64,
 	valid:       bool,
@@ -284,6 +335,7 @@ capture_room_presentation :: proc(room: ^game.Room) -> (result: Room_Presentatio
 			detonation_pulse = object.detonation_pulse,
 			fuse_pulses = object.fuse_pulses,
 			device_armed = object.device_armed, device_direction = object.device_direction, device_target_limit = object.device_target_limit,
+			facing = object.facing, laser = object.laser, life = object.life, max_life = object.life, radius = object.radius,
 			position = presentation_position(object.position),
 			health = object.health,
 			max_health = object.max_health,
@@ -293,6 +345,8 @@ capture_room_presentation :: proc(room: ^game.Room) -> (result: Room_Presentatio
 	}
 
 	result.dropped += capture_presentation_ground(room, &result.ground)
+	result.marley = room.marley
+	result.ride = room.ride
 	result.loot_count = min(len(room.loot), MAX_PRESENTATION_LOOT)
 	result.dropped += max(0, len(room.loot)-result.loot_count)
 	for index in 0..<result.loot_count {
@@ -549,6 +603,42 @@ presentation_cue_kind :: proc(event: game.Game_Event) -> Presentation_Cue_Kind {
 		return .Pinball_Burst
 	case .First_Person_Begun:
 		return .First_Person_Begun
+	case .Marley_Begun:
+		return .Marley_Begun
+	case .Marley_Lights:
+		return .Marley_Lights
+	case .Marley_Warned:
+		return .Marley_Warned
+	case .Marley_Bomb:
+		return .Marley_Bomb
+	case .Marley_Saved:
+		return .Marley_Saved
+	case .Marley_Bonus:
+		return .Marley_Bonus
+	case .Marley_Ended:
+		return .Marley_Ended
+	case .Flood_Swept:
+		return .Flood_Swept
+	case .Fire_Extinguished:
+		return .Fire_Extinguished
+	case .Cannon_Fired:
+		return .Cannon_Fired
+	case .Cannon_Broken:
+		return .Cannon_Broken
+	case .Black_Hole_Tick:
+		return .Black_Hole_Tick
+	case .Black_Hole_Swallowed:
+		return .Black_Hole_Swallowed
+	case .Black_Hole_Closed:
+		return .Black_Hole_Closed
+	case .Ride_Begun:
+		return .Ride_Begun
+	case .Ride_Ended:
+		return .Ride_Ended
+	case .Dino_Stomp:
+		return .Dino_Stomp
+	case .Bleed_Bite:
+		return .Bleed_Bite
 	}
 	unreachable()
 }
@@ -570,6 +660,8 @@ presentation_cue_duration :: proc(kind: Presentation_Cue_Kind, event: game.Game_
 		if game.event_is_teleport(event) {
 			return PRESENTATION_NOTICE_DURATION
 		}
+		// The wave's pushes last as long as the wave: each starts as it arrives.
+		if event.card_definition == .Flood_Wave { return PRESENTATION_FLOOD_DURATION }
 		if event.target.kind == .Enemy || event.target.kind == .Object {
 			return PRESENTATION_ENEMY_MOVE_DURATION
 		}
@@ -639,6 +731,30 @@ presentation_cue_duration :: proc(kind: Presentation_Cue_Kind, event: game.Game_
 		return PRESENTATION_PINBALL_BURST_DURATION
 	case .First_Person_Begun:
 		return PRESENTATION_FIRST_PERSON_DIVE_DURATION
+	case .Marley_Begun:
+		return PRESENTATION_MARLEY_BALL_DURATION
+	case .Marley_Bomb:
+		return PRESENTATION_MARLEY_BOMB_DURATION
+	case .Marley_Ended:
+		return PRESENTATION_MARLEY_END_DURATION
+	case .Marley_Lights, .Marley_Warned, .Marley_Saved, .Marley_Bonus, .Fire_Extinguished:
+		return PRESENTATION_NOTICE_DURATION
+	case .Flood_Swept:
+		return PRESENTATION_FLOOD_DURATION
+	case .Cannon_Fired:
+		return PRESENTATION_CANNON_FIRE_DURATION
+	case .Cannon_Broken:
+		return PRESENTATION_CANNON_BREAK_DURATION
+	case .Black_Hole_Swallowed:
+		return PRESENTATION_HOLE_SWALLOW_DURATION
+	case .Black_Hole_Closed:
+		return PRESENTATION_HOLE_CLOSE_DURATION
+	case .Ride_Begun, .Ride_Ended:
+		return PRESENTATION_RIDE_DURATION
+	case .Dino_Stomp:
+		return PRESENTATION_STOMP_DURATION
+	case .Black_Hole_Tick, .Bleed_Bite:
+		return PRESENTATION_NOTICE_DURATION
 	}
 	unreachable()
 }
@@ -737,7 +853,10 @@ active_presentation_cue :: proc(timeline: ^Presentation_Timeline) -> (^Presentat
 @(private = "file")
 presentation_cue_can_group :: proc(kind: Presentation_Cue_Kind) -> bool {
 	return kind == .Damage || kind == .Damage_Absorbed || kind == .Status_Removed ||
-	       kind == .Defeat || kind == .Loot_Dropped || kind == .Explosive_Armed
+	       kind == .Defeat || kind == .Loot_Dropped || kind == .Explosive_Armed ||
+	       kind == .Move || kind == .Marley_Bomb || kind == .Flood_Swept || kind == .Fire_Extinguished || kind == .Status_Applied ||
+	       kind == .Black_Hole_Swallowed ||
+	       kind == .Trap_Triggered || kind == .Hazard_Triggered
 }
 
 @(private)
@@ -1037,6 +1156,8 @@ start_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^Presentat
 			}
 		}
 	case .Move:
+		// The wave's pushes wait for its front (update_active_presentation_cue).
+		if event.card_definition == .Flood_Wave { break }
 		// A teleport shows the body on its landing at once, never on the line
 		// between.
 		start := event.to_position if game.event_is_teleport(event) else event.from_position
@@ -1204,6 +1325,40 @@ start_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^Presentat
 		if event.card_definition != .Pinball || event.source.kind != .Enemy || event.amount <= 0 {
 			timeline.update_failures += 1
 		}
+	// BOMB MARLEY: the party as the cue shows it. The lights and the warned
+	// columns follow the party's own events; a bomb's column stays on show
+	// until its cue is over (finish_presentation_cue).
+	case .Marley_Begun, .Marley_Lights, .Marley_Warned, .Marley_Bonus, .Marley_Ended:
+		if event.card_definition != .Marley_Party { timeline.update_failures += 1 }
+		if timeline.final_view.valid { timeline.view.marley = timeline.final_view.marley }
+	case .Marley_Bomb, .Marley_Saved:
+		if event.card_definition != .Marley_Party { timeline.update_failures += 1 }
+	// INONDAZIONE: the player's own wave, and the steam of the fires it puts out.
+	case .Flood_Swept, .Fire_Extinguished:
+		if event.card_definition != .Flood_Wave || event.source != game.PLAYER_ENTITY { timeline.update_failures += 1 }
+		if cue.kind == .Fire_Extinguished {
+			if timeline.final_view.valid { timeline.view.ground = timeline.final_view.ground }
+			// A fire the board burned on goes out with its steam.
+			for &fire in timeline.view.objects[:timeline.view.object_count] {
+				if fire.kind == .Fire && fire.position == presentation_position(event.from_position) { fire.visible, fire.opacity = false, 0 }
+			}
+		}
+	// CANNONE: a cannon of the board fires (its beats left count down).
+	case .Cannon_Fired:
+		if event.object_kind != .Field_Cannon { timeline.update_failures += 1 }
+		if emplacement, found := presentation_grid_object(timeline, event.source); found { emplacement.life = max(i32(0), emplacement.life-1) } else { timeline.update_failures += 1 }
+	case .Cannon_Broken, .Black_Hole_Closed:
+		if _, found := presentation_grid_object(timeline, event.target); !found { timeline.update_failures += 1 }
+	// BUCO NERO: the hole's beat; the foe it will swallow starts to spin.
+	case .Black_Hole_Tick:
+		if emplacement, found := presentation_grid_object(timeline, event.target); found { emplacement.life = event.amount } else { timeline.update_failures += 1 }
+	case .Black_Hole_Swallowed:
+		if !has_actor { timeline.update_failures += 1 }
+	// DINOSAURO: the ride as the cues show it.
+	case .Ride_Begun, .Ride_Ended:
+		if event.source != game.PLAYER_ENTITY || event.card_definition != .Dino_Ride { timeline.update_failures += 1 }
+		if timeline.final_view.valid { timeline.view.ride = timeline.final_view.ride }
+	case .Dino_Stomp, .Bleed_Bite:
 	case .Attack_Missed, .Move_Blocked, .Attack_Deflected,
 	     .Binding_Added, .Binding_Exhausted, .Binding_Expired, .Shadow_Entered, .Shadow_Emerged:
 	// The player's own card, behind his eyes.
@@ -1228,6 +1383,17 @@ update_active_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^P
 		from := presentation_position(cue.event.from_position)
 		to := presentation_position(cue.event.to_position)
 		if game.event_is_teleport(cue.event) { from = to }
+		// INONDAZIONE: a push of the wave starts as its front reaches the foe
+		// and lasts as long as the front takes to cross a cell.
+		if cue.event.card_definition == .Flood_Wave {
+			head, led := flood_group_head(timeline)
+			if !led { break }
+			length := flood_length(head.event)
+			index := flood_progress_index(game.Move_Direction(head.event.duration), cue.event.from_position, length)
+			push := clamp((presentation_cue_progress(cue)-flood_arrival(index, length))/flood_push_share(length), f32(0), f32(1))
+			if push <= 0 { break }
+			progress = tween.smoothstep(push)
+		}
 		position := view.Vec2{from.x+(to.x-from.x)*progress, from.y+(to.y-from.y)*progress}
 		if has_actor {
 			actor.position = position
@@ -1250,13 +1416,32 @@ update_active_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^P
 	     .Explosive_Disarmed, .Explosion, .Room_Hazard_Triggered, .Dice_Rolled, .Spell_Launched, .Spell_Impact,
 	     .Shadow_Entered, .Shadow_Emerged, .Attack_Deflected, .Fate_Rolled, .Lasso_Caught, .Lasso_Struck, .Lasso_Released,
 	     .Fish_Cast, .Fish_Bite, .Fish_Caught, .Pinball_Made, .Pinball_Launched, .Pinball_Bounced, .Pinball_Bumped, .Pinball_Burst,
-	     .First_Person_Begun:
+	     .First_Person_Begun, .Marley_Begun, .Marley_Lights, .Marley_Warned, .Marley_Bomb, .Marley_Saved, .Marley_Bonus,
+	     .Marley_Ended, .Flood_Swept, .Fire_Extinguished, .Cannon_Fired, .Cannon_Broken, .Black_Hole_Tick, .Black_Hole_Closed,
+	     .Ride_Begun, .Ride_Ended, .Dino_Stomp, .Bleed_Bite:
+	// A foe swallowed by the hole spins down it toward the hole's centre.
+	case .Black_Hole_Swallowed:
+		if has_actor {
+			centre := presentation_position(cue.event.to_position)
+			start := presentation_position(cue.event.from_position)
+			linear := presentation_cue_progress(cue)
+			turn := linear*linear*10
+			radius := 1-linear
+			dx, dy := start.x-centre.x, start.y-centre.y
+			actor.position = {centre.x+(dx*math.cos(turn)-dy*math.sin(turn))*radius, centre.y+(dx*math.sin(turn)+dy*math.cos(turn))*radius}
+			actor.opacity = 1-linear*0.85
+		}
 	}
 }
 
 @(private = "file")
 finish_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^Presentation_Cue) {
 	assert(timeline != nil && cue != nil && cue.started)
+	// A cannon that fell apart, a hole that closed: gone with the cue.
+	if cue.kind == .Cannon_Broken || cue.kind == .Black_Hole_Closed {
+		if emplacement, found := presentation_grid_object(timeline, cue.event.target); found { emplacement.visible, emplacement.opacity = false, 0 }
+		return
+	}
 	if cue.kind != .Defeat {
 		return
 	}

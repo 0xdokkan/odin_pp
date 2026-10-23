@@ -72,6 +72,7 @@ draw_voxel_fuse_labels :: proc(renderer: ^Renderer, room: ^game.Room) {
 		label := fmt.ctprintf("MICCIA %ds", remaining)
 		draw_tactical_label(renderer, p, label, "", GOTHIC_RED if remaining <= 1 else GOTHIC_PAPER)
 	}
+	draw_emplacement_labels(renderer, room)
 }
 
 @(private)
@@ -107,6 +108,9 @@ voxel_object_bounds :: proc(kind: game.Grid_Object_Kind, position: view.Vec2) ->
 	case .Flood: width, height = 0.85, 0.35
 	case .Black_Hole: width, height = 0.85, 0.65
 	case .Bomb_Marley: width, height = 0.75, 0.9
+	// CANNONE on its stand; the hole is a dark disc with a sphere in it.
+	case .Field_Cannon: width, height = 0.72, 0.86
+	case .Devouring_Hole: width, height = 0.9, 0.5
 	case .Count:
 	}
 	p := rl.Vector3{position.x+0.5, 0.035, position.y+0.5}
@@ -122,6 +126,9 @@ draw_voxel_object :: proc(renderer: ^Renderer, object: Presentation_Grid_Object)
 	switch object.kind {
 	case .Shock_Floor, .Tesla_Coil: draw_m8_device_object(renderer, object)
 	case .Cannon, .Flood, .Black_Hole, .Bomb_Marley: draw_memory_device(renderer, object)
+	case .Field_Cannon: draw_cannon_object(renderer, object, p)
+	// The hole has its own pass: the floor and the sphere (arsenal.odin).
+	case .Devouring_Hole:
 	case .Ice_Block:
 		tint = {102, 151, 162, 255}
 		draw_resin_cube_v(renderer, p, size, tint)

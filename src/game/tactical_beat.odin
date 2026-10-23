@@ -138,6 +138,16 @@ tactical_critical_scale :: proc(room: ^Room, action: ^Action) {
 		// (and the one every wall puts it back to).
 		case .Draw_Cards, .Create_Card, .Gain_Energy, .Place_Ground, .Lasso, .Pinball:
 			effect.amount += 1
+		// The wave pushes one cell more; the party lasts five seconds longer.
+		case .Flood_Wave:
+			effect.amount += 1
+		// A cannon and a hole hurt more; the ride lasts longer.
+		case .Place_Cannon, .Open_Black_Hole:
+			effect.amount = critical_damage(effect.amount)
+		case .Ride:
+			effect.amount += RIDE_CRITICAL_SECONDS
+		case .Marley:
+			effect.duration += MARLEY_CRITICAL_SECONDS
 		case .Deploy_Device:
 			effect.amount = critical_damage(effect.amount)
 			if effect.object_kind == .Shock_Floor { effect.charges = min(effect.charges+1, TACTICAL_SHOCK_FLOOR_MAX_CHARGES) }
@@ -169,6 +179,8 @@ try_move_player_diagonal :: proc(room: ^Room, offset: grid.Position) -> Action_R
 	if enemy_index, found := enemy_index_at(room, target); found {
 		if !tactical_allows_action(room) { return .Invalid_Phase }
 		clear_event_log(room.recent_events)
+		// The Giganotosauro walks onto a foe his bump would kill.
+		if giga_crushes(room, enemy_index, true) { return giga_crush_step(room, enemy_index, target, .Opponent, true) }
 		// Always critical, loaded like a straight bump (player_charges.odin).
 		if !player_bump(room, enemy_index, target, .Opponent, true) { return .Blocked }
 		outcome := finish_player_combat_command(room)
@@ -191,7 +203,8 @@ try_move_player_diagonal :: proc(room: ^Room, offset: grid.Position) -> Action_R
 	append_event_log(room.recent_events, &report.events)
 	collect_loot_in_magnet_range(room)
 	room.player.tactical.facing = .North if offset.y < 0 else .South
-	outcome := finish_player_combat_command(room, TACTICAL_MOVE_SECONDS)
+	ride_stomp(room)
+	outcome := finish_player_combat_command(room, player_move_seconds(room))
 	switch outcome {
 	case .Player_Defeated: return .Player_Defeated
 	case .Combat_Ended: return .Combat_Ended

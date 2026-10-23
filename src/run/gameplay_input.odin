@@ -46,15 +46,22 @@ Gameplay_Command :: struct {
 	diagonal: grid.Position,
 	// The view a First_Person_Fire shot is fired along.
 	aim: game.First_Person_Aim,
+	// The way the wheel gave a cannon (CANNONE) before it was played.
+	aim_way: game.Move_Direction,
+	has_aim_way: bool,
 }
 
 // Both the native hand and MOSTRA EFFETTO construct the same commands. Their
 // callers own pointer bounds, hand lookup and selection/drag state; only the
 // game decides whether an anchor provides a target.
-targeted_card_command :: proc(room: ^game.Room, card: game.Card_Instance, anchor: grid.Position) -> (Gameplay_Command, bool) {
+targeted_card_command :: proc(room: ^game.Room, card: game.Card_Instance, anchor: grid.Position, way := game.Move_Direction.North,
+                              forced := false) -> (Gameplay_Command, bool) {
 	target, valid := game.card_drop_target(room, card, anchor)
 	if !valid { return {}, false }
-	return {kind = .Play_Card, origin_phase = .Combat, card_id = card.id, target = target}, true
+	// A cannon turned with the wheel keeps its way; without it the game takes the
+	// way from the player to the cell.
+	aimed := forced && game.card_emplacement_kind(card.definition_id) == .Field_Cannon
+	return {kind = .Play_Card, origin_phase = .Combat, card_id = card.id, target = target, aim_way = way if aimed else .North, has_aim_way = aimed}, true
 }
 
 immediate_card_command :: proc(card: game.Card_Instance) -> (Gameplay_Command, bool) {

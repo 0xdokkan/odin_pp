@@ -7,6 +7,30 @@ import "core:os"
 import "core:testing"
 import game "../game"
 
+// The Prova meccaniche's own cards never reach a memory: not at the start, not
+// as a discovery, not in a run's pool.
+@(test)
+test_lab_only_cards_never_enter_the_campaign :: proc(t: ^testing.T) {
+	c: Campaign
+	initialize(&c)
+	defer destroy(&c)
+	lab := 0
+	for id in game.Card_Id.Strike..<game.Card_Id.Count {
+		if !game.card_is_lab_only(id) { continue }
+		lab += 1
+		testing.expect(t, !c.discovered[id] && !discover(&c, id) && !c.discovered[id] && !card_in_pool(&c, id))
+	}
+	testing.expect_value(t, lab, 6)
+	// Every other card still comes to light one at a time, the lab's never.
+	for id in game.Card_Id.Strike..<game.Card_Id.Count {
+		if !game.card_is_lab_only(id) { discover(&c, id) }
+	}
+	testing.expect(t, begin_run(&c, .Cyber, 7))
+	for id in game.Card_Id.Strike..<game.Card_Id.Count {
+		testing.expect_value(t, card_in_pool(&c, id), !game.card_is_lab_only(id))
+	}
+}
+
 @(test)
 test_polyomino_rotations_and_collision :: proc(t: ^testing.T) {
 	grid := make_grid(8, 5)

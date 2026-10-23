@@ -230,6 +230,17 @@ Room :: struct {
 	// own stream for its launches.
 	pinball: Pinball_State,
 	pinball_random: u64,
+	// BOMB MARLEY: the party in the room and its own stream for the lights and
+	// the columns (marley.odin).
+	marley: Marley_State,
+	marley_random: u64,
+	marley_demo: Marley_Demo,
+	// DINOSAURO: the dinosaur the player rides (dinosaur.odin).
+	ride: Ride_State,
+	// The way the player aimed the card he plays (the mouse wheel's, for a
+	// cannon): the controller sets it before the play, the play clears it.
+	aim: Move_Direction,
+	has_aim: bool,
 	// FIRST PERSON SHOOTER: the seconds behind the player's eyes and his AK's
 	// shots (first_person.odin); a new room starts them afresh.
 	first_person: First_Person_State,
@@ -473,6 +484,7 @@ create_room :: proc(level_data: ^level.Level, player: ^Player, content: Room_Con
 	result.modifier = content.modifier
 	result.fishing = begin_room_fishing(player, content)
 	result.pinball_random = pinball_room_stream(player, content)
+	result.marley_random = marley_room_stream(player, content)
 	result.next_enemy_id = 1
 	result.next_trap_id = 1
 	result.next_object_id = 1
@@ -817,6 +829,8 @@ try_move_player :: proc(room: ^Room, direction: Move_Direction) -> Action_Result
 	clear_event_log(room.recent_events)
 	if room.phase == .Combat {
 		if enemy_index, found := enemy_index_at(room, target); found {
+			// The Giganotosauro walks onto a foe his bump would kill.
+			if giga_crushes(room, enemy_index, critical) { return giga_crush_step(room, enemy_index, target, .Adjacent_Opponent, false) }
 			// The bump, loaded with whatever the player's charges add (player_charges.odin).
 			struck := player_bump(room, enemy_index, target, .Adjacent_Opponent, critical)
 			assert(struck)
@@ -879,6 +893,8 @@ try_move_player :: proc(room: ^Room, direction: Move_Direction) -> Action_Result
 		return .Moved
 	}
 
+	// The Giganotosauro's step stomps the foes round where he lands.
+	ride_stomp(room)
 	outcome := finish_player_combat_command(room, expedition_step_seconds(room))
 	switch outcome {
 	case .Player_Defeated:

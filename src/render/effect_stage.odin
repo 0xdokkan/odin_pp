@@ -22,6 +22,19 @@ BORROWED_RENDERER_OWN_HANDLES :: [?]string{
 	"tactical.lasso.rope_texture",
 	"tactical.lasso.ring_texture",
 	"tactical.pinball.texture",
+	"tactical.marley.figure",
+	"tactical.marley.bomb",
+	"tactical.marley.puff",
+	"tactical.arsenal.ball",
+	"tactical.arsenal.puff",
+	"tactical.arsenal.dinos[0]",
+	"tactical.arsenal.dinos[1]",
+	"tactical.arsenal.dinos[2]",
+	"tactical.arsenal.dinos[3]",
+	"tactical.arsenal.dinos[4]",
+	"tactical.arsenal.dinos[5]",
+	"tactical.arsenal.dinos[6]",
+	"tactical.arsenal.dinos[7]",
 	"tactical.first_person.ak_texture",
 	"tactical.first_person.tracer_texture",
 	"tactical.first_person.flash_textures[0]",
@@ -109,6 +122,8 @@ destroy_borrowed_renderer :: proc(r: ^Renderer) {
 	destroy_fishing_view(r)
 	destroy_pinball_view(r)
 	destroy_first_person_view(r)
+	destroy_marley_view(r)
+	destroy_arsenal_view(r)
 	if v.flipbook_state != nil { free(v.flipbook_state); v.flipbook_state = nil }
 	if v.labels != nil { free(v.labels); v.labels = nil }
 	if v.snapshot != nil { free(v.snapshot); v.snapshot = nil }

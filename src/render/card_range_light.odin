@@ -248,8 +248,16 @@ draw_card_target_details :: proc(renderer: ^Renderer, room: ^game.Room, preview:
 	card := preview.card
 	if card.definition_id == .Lasso { draw_lasso_preview(renderer, room, card) }
 	if card.definition_id == .Pinball { draw_pinball_preview(renderer, room, card) }
+	if card.definition_id == .Flood_Wave { draw_flood_preview(renderer, room) }
 	if !preview.has_hover { return }
 	evaluation := &preview.hover
+	// CANNONE and BUCO NERO: the line of fire and the two areas.
+	if game.card_is_wheel_aimed(card.definition_id) {
+		draw_cannon_preview(renderer, room, card, evaluation.query.anchor, evaluation.error == .None && preview.affordable)
+	}
+	if card.definition_id == .Devouring_Hole {
+		draw_black_hole_preview(renderer, room, card, evaluation.query.anchor, evaluation.error == .None && preview.affordable)
+	}
 	if game.card_places_ground(card.definition_id) {
 		draw_ground_preview(renderer, room, card.definition_id, evaluation.query.anchor, evaluation.error == .None && preview.affordable)
 	}

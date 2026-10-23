@@ -22,7 +22,44 @@ enemy_terrain_danger :: proc(room: ^Room, cell: grid.Position) -> int {
 			danger += 40 if object.detonation_pulse <= room.pulse_count+2 else 20
 		}
 	}
+	// BOMB MARLEY: a warned column is a blast zone, unless the cell is lit.
+	if marley_column_is_warned(room, cell.x) && !marley_cell_is_lit(room, cell) {
+		danger += MARLEY_COLUMN_DANGER
+	}
 	return danger
+}
+
+// Foes within this many cells (Manhattan) of a free light make for it.
+MARLEY_SHELTER_REACH :: 3
+MARLEY_COLUMN_DANGER :: 24
+
+// BOMB MARLEY: a foe off the lights, not beside the player, steps toward the
+// nearest free lit cell within MARLEY_SHELTER_REACH: nearest first, then
+// row-major, so the same room plans the same steps.
+@(private)
+tactical_marley_shelter :: proc(room: ^Room, origin: grid.Position,
+	positions: ^[MAX_ENEMIES_PER_ROOM]grid.Position, count, index: int) -> (intent: Enemy_Intent, found: bool) {
+	if !tactical_marley_active(room) || marley_cell_is_lit(room, origin) { return }
+	if abs(origin.x-room.player.position.x)+abs(origin.y-room.player.position.y) <= 1 { return }
+	target: grid.Position
+	best := MARLEY_SHELTER_REACH+1
+	for packed in room.marley.lights[:room.marley.light_count] {
+		light := marley_position(packed)
+		distance := abs(origin.x-light.x)+abs(origin.y-light.y)
+		if distance >= best || !planned_cell_is_available(room, positions, count, index, light) { continue }
+		best, target = distance, light
+	}
+	if best > MARLEY_SHELTER_REACH { return }
+	intent = make_wait_intent(room, origin)
+	for step in ([?]grid.Position{{0, -1}, {1, 0}, {0, 1}, {-1, 0}}) {
+		cell := add_position(origin, step)
+		if !planned_cell_is_available(room, positions, count, index, cell) { continue }
+		distance := abs(cell.x-target.x)+abs(cell.y-target.y)
+		if distance >= best { continue }
+		best, found = distance, true
+		intent.kind, intent.destination, intent.path[0], intent.path_count = .Move, cell, cell, 1
+	}
+	return
 }
 
 @(private)

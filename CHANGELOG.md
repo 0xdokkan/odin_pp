@@ -5,6 +5,85 @@ I riferimenti a Classica, `--flat` e ai vecchi smoke descrivono versioni precede
 per i comandi disponibili oggi valgono il [README](README.md) e la documentazione collegata.
 
 
+## 2026-10-23 — Le carte del laboratorio tornano, solo in Prova meccaniche
+
+- Bomb Marley, Inondazione, Cannone, Cannone Laser, Buco Nero, Dinosauro e il
+  Sanguinamento (le voci del 21 ottobre qui sotto) tornano sopra la campagna dei
+  dodici biomi, **solo nella Prova meccaniche** per ora: non si offrono, non si
+  comprano, non si scoprono nell'archivio e non entrano nel pool di una
+  spedizione (tratto `Lab_Only`, `game.card_is_lab_only`).
+- Le carte con gli stessi nomi della campagna (gli ordigni di Cannone,
+  Inondazione, Buco Nero, Bomb Marley e lo scudo del Dinosauro) restano com'erano.
+  Le nostre hanno nomi interni propri: `Marley_Party`, `Flood_Wave`,
+  `Field_Cannon`, `Laser_Cannon`, `Devouring_Hole`, `Dino_Ride`; gli oggetti posati
+  `Field_Cannon` e `Devouring_Hole`.
+- Il mondo neon non torna: la grafica resta quella di main.
+- Il passo calcolato da main (`expedition_step_seconds`) parte da quello del
+  giocatore, così il Velociraptor cavalcato fa di nuovo passi da 0,4 s.
+
+## 2026-10-21 — Cannone, Buco Nero, Dinosauro e Sanguinamento
+
+- **Cannone** (non comune, energia 2, 2 s, fino a +2): una torretta su una casella
+  libera, girata con la rotella, spara ogni secondo del mondo per 20 s una palla
+  da 2 danni (+1) al primo nemico della linea e poi si sbriciola. Al secondo
+  upgrade **diventa Cannone Laser** (rara, mai offerta): un raggio da 3 danni
+  (+1, fino a 3 upgrade) a tutti i nemici della linea. Massimo due cannoni.
+- **Buco Nero** (rara, energia 3, 2 s, fino a +4): un buco per 8 s del mondo; il
+  3x3 prende 4 danni a battito (+1 per upgrade; l'area cresce con gli upgrade),
+  il 5x5 intorno viene tirato di una casella verso il centro, boss e miniboss
+  esclusi; chi muore viene inghiottito con una spirale.
+- **Dinosauro** (rara, energia 3, 2 s, fino a +5): un d4 sceglie per 20 s (+3 per
+  upgrade) Velociraptor (passi da 0,4 s, urto che sanguina), Stegosauro (ogni
+  colpo ricevuto torna indietro senza cariche), Dilophosaurus (1 Veleno a chi
+  ferisce o è ferito) o Giganotosauro (passi che schiacciano le 4 caselle intorno
+  per 6, urto che uccide Chaser, Archer e Bomber all'istante).
+- Dinosauro, ritocco: il dinosauro si gira come la carta del Viandante (prima poteva
+  tornare indietro dopo il passo); mentre si cavalca i passi e i colpi li fa il
+  dinosauro (scatto in avanti a testa bassa), non il disegno del Viandante; il
+  **Giganotosauro**, se il suo urto ucciderebbe il nemico, ne prende la casella e
+  lo schiaccia invece di colpirlo; se sopravvive lo morde.
+- **Sanguinamento**: nuovo status dei nemici, +N danni da ogni fonte, una volta,
+  gli stack non calano.
+- Catalogo a 50 carte (il Cannone Laser non si offre). Icone, 25 suoni
+  originali, pixel art dei quattro dinosauri, testi, chip `RAPTOR 14s`, film di
+  Mostra effetto a ogni livello e atti della Prova meccaniche.
+- Il mazzo della Prova meccaniche cambia: Pozza di Veleno, Deflect e Feretro
+  lasciano il posto a Cannone, Buco Nero e Dinosauro (restano nel gioco; lo smoke
+  li riprende per i loro atti).
+- Regole in `game/emplacement.odin`, `cannon.odin`, `black_hole.odin`,
+  `dinosaur.odin`; disegno in `render/arsenal.odin` e `render/dino_art.odin`.
+
+## 2026-10-21 — Bomb Marley e Inondazione
+
+- **Inondazione** (non comune, energia 2, 2 s, fino a +3): un'onda attraversa
+  tutta la mappa dal muro dietro la direzione scelta al muro davanti, spegne
+  tutti i fuochi e spinge ogni nemico di una casella (+1 per upgrade, +1 sul
+  colpo a tempo) con le normali regole di spinta; nessun danno. Regole in
+  `game/flood.odin`, onda e vapore in `render/flood.odin`.
+- **Bomb Marley** (rara, energia 3, 2 s, fino a +5): una festa di 35 s del
+  mondo (+5 s per nemico ucciso da una bomba, 90 in tutto) a battiti di un
+  secondo. Una sfera da discoteca illumina caselle che salvano; bombe da 6
+  danni (+1 per upgrade) attraversano colonne intere, annunciate due battiti
+  prima, e non toccano chi sta su una luce. Poche bombe all'inizio, poi sempre
+  di più; le luci calano con il tempo. Bomb Marley non è un'entità della stanza:
+  nessuno lo tocca né lo vede come bersaglio. I nemici evitano le colonne
+  annunciate e cercano le luci vicine. Regole in `game/marley.odin`, tavolo in
+  `render/marley.odin`.
+- Catalogo a 46 carte. Icone, suoni (compreso un groove reggae a 60 BPM),
+  testi, chip dell'HUD, film di Mostra effetto (quello di Bomb Marley finisce
+  alla prima bomba, non dopo l'intera festa) e atti della Prova meccaniche.
+- Bomb Marley, ritocco: bombe di cartoncino che vengono lanciate dalla figura e
+  rimbalzano lungo la colonna (un salto ogni 3 caselle) senza cambiare il danno,
+  che colpisce chiunque sia nella colonna; luci molto più numerose (4 più dei
+  personaggi, una in meno ogni 5 s) e sparse; le caselle del turno dopo si vedono
+  in anteprima per tutto il tempo.
+- Inondazione, ritocco: con la carta in mano la rotella del mouse gira la
+  direzione dell'onda di un quarto di giro a scatto (la camera non zooma) e la
+  mappa mostra una freccia grande dal muro di partenza a quello di arrivo, con
+  barre `PARTE` e `FINE` e frecce più sottili sulle altre corsie.
+- Il mazzo della Prova meccaniche resta di dieci carte più la Canna: Movimento
+  Ombra e Lama Velenosa lasciano il posto alle due nuove (restano nel gioco).
+
 ## 2026-10-20 — Verifica prima della pubblicazione
 
 - Ripristinato `scripts/check.sh --quick`: il registro delle combinazioni

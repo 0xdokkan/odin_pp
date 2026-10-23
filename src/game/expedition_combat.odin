@@ -21,7 +21,9 @@ EXPEDITION_CARD_COSTS := [Card_Id]i32{
 	.Poison_Pool = 30, .Wildfire = 45, .Deflect = 25, .Coffin = 35,
 	.Fate_Dice = 30, .Venom_Blade = 25, .Lasso = 40,
 	.Fishing_Rod = 10, .Pinball = 50, .First_Person = 60,
-	.Cannon = 40, .Flood = 35, .Black_Hole = 60, .Bomb_Marley = 70, .Dinosaur = 45, .Count = 0,
+	.Cannon = 40, .Flood = 35, .Black_Hole = 60, .Bomb_Marley = 70, .Dinosaur = 45,
+	// The Prova meccaniche's own versions (never offered yet): priced like the ones above.
+	.Marley_Party = 70, .Flood_Wave = 35, .Field_Cannon = 40, .Laser_Cannon = 50, .Devouring_Hole = 60, .Dino_Ride = 45, .Count = 0,
 }
 
 expedition_card_energy_cost :: proc(id: Card_Id) -> i32 {

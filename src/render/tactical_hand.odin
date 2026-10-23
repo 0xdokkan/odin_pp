@@ -529,6 +529,12 @@ tactical_card_inspector_rules :: proc(card: game.Card_Instance, definition: game
 	if card.definition_id == .Fishing_Rod { reaction, rule = "SOLO A STANZA LIBERATA", "MAI IN MANO / UNA PER RUN" }
 	if card.definition_id == .Pinball { reaction, rule = "BOSS E MINIBOSS: TROPPO PESANTI", fmt.ctprintf("DOPO %ds SCOPPIA E CADE", int(game.PINBALL_SECONDS)) }
 	if card.definition_id == .First_Person { reaction, rule = "NIENTE CARTE: SOLO L'AK", "WASD SECONDO LA VISTA" }
+	if card.definition_id == .Marley_Party { reaction, rule = "SOLO SULLE CASELLE LUCI", fmt.ctprintf("+%ds A UCCISIONE / MAX %ds", game.MARLEY_KILL_SECONDS, game.MARLEY_MAX_SECONDS) }
+	if card.definition_id == .Flood_Wave { reaction, rule = "UNA CASELLA PER NEMICO", "ROTELLA: GIRA LA FRECCIA" }
+	if card.definition_id == .Field_Cannon { reaction, rule = "ROTELLA: GIRA LA CANNA", "AL 2o UPGRADE: LASER" }
+	if card.definition_id == .Laser_Cannon { reaction, rule = "COLPISCE TUTTA LA LINEA", "NON SI OFFRE: EVOLUZIONE" }
+	if card.definition_id == .Devouring_Hole { reaction, rule = "TIRA IL 5X5, COLPISCE IL 3X3", "BOSS E MINIBOSS: SOLO DANNO" }
+	if card.definition_id == .Dino_Ride { reaction, rule = "1 RAPTOR 2 STEGO 3 DILO 4 GIGA", "UN DINO ALLA VOLTA" }
 	if card.definition_id == .Guard || card.definition_id == .Purifying_Guard { reaction = "QTE: BLOCK / PARRY" }
 	if card.definition_id == .Thorn_Coat { reaction = "QTE: DEVIAZIONE (FRECCE)" }
 	if card.definition_id == .Afterimage { reaction = "IGNORA RECUPERO SCHIVA" }

@@ -202,6 +202,12 @@ upgrade_owned_card :: proc(deck: ^Deck_State, card_id: u32) -> Deck_Mutation_Res
 
 	upgraded := deck.owned[card_index]
 	upgraded.upgrade_level += 1
+	// A card that evolves becomes the next one at its upgrade (the Cannone, at its
+	// second, the Cannone laser, which starts again from its own level 0).
+	if definition, defined := card_definition_by_id(upgraded.definition_id); defined && definition.evolve_level > 0 &&
+	   upgraded.upgrade_level >= definition.evolve_level {
+		upgraded.definition_id, upgraded.upgrade_level = definition.evolves_to, 0
+	}
 	if !validate_card_instance(upgraded) {
 		return .Invalid
 	}

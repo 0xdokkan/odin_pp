@@ -71,14 +71,14 @@ begin_run :: proc(c: ^Campaign, biome: Biome, seed: u64) -> bool {
 	return true
 }
 discover :: proc(c: ^Campaign, card: game.Card_Id) -> bool {
-	if c == nil || card < .Strike || card >= .Count || c.discovered[card] { return false }
+	if c == nil || card < .Strike || card >= .Count || c.discovered[card] || game.card_is_lab_only(card) { return false }
 	c.discovered[card] = true; c.revision += 1
 	// Do not change the current run pool: archive discoveries become available
 	// only on the next expedition, even if the present expedition is lost.
 	return true
 }
 card_in_pool :: proc(c: ^Campaign, card: game.Card_Id) -> bool {
-	if c == nil || card < .Strike || card >= .Count { return false }
+	if c == nil || card < .Strike || card >= .Count || game.card_is_lab_only(card) { return false }
 	return c.run.pool[card] if c.run.active else c.discovered[card]
 }
 discover_secret :: proc(c: ^Campaign, biome: Biome, index: int) -> bool {
@@ -204,7 +204,7 @@ finish_run :: proc(c: ^Campaign, victory: bool, stars: u8 = 0) -> bool {
 		if stars >= 3 {
 			found := false
 			for id in game.Card_Id.Strike..<game.Card_Id.Count {
-				if !c.discovered[id] { discover(c, id); found = true; break }
+				if discover(c, id) { found = true; break }
 			}
 			if !found { depot_add(c, make_item(.Relic, 1, i32(game.Relic_Id.Guard_Sigil))) }
 		}

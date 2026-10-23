@@ -26,7 +26,8 @@ test_catalog_every_allowed_upgrade_changes_an_instantiated_effect :: proc(t: ^te
 				testing.expect(t, before_ok && after_ok)
 				changed = changed || before != after
 			}
-			if card_dice_count(definition.id) > 0 {
+			// The Dinosauro's die stays a d4: its upgrades are its ride's seconds.
+			if card_dice_count(definition.id) > 0 && definition.id != .Dino_Ride {
 				// A dice card's upgrade changes only its die, up to the D20.
 				testing.expect(t, !changed, definition.name)
 				testing.expect_value(t, card_can_upgrade(card), upgrade < MAX_DICE_UPGRADE_LEVEL)

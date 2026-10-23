@@ -172,11 +172,45 @@ each sound starts with the drawing it belongs to:
   wounds a foe (at 0.9; the struck foe's own hurt stays silent: its card
   starts no clip) and `world_ak_ricochet` 0.04 s after one stopped by stone,
   cover or an object (at 0.8).
+- **The disco** (Bomb Marley), on the board: `card_bomb_marley` when the card is
+  played; `world_marley_ball` as the mirror ball falls from above and
+  `world_marley_lights` each time the lit tiles swap; `world_marley_warn` when a
+  column is marked for a throw, `world_marley_bomb` as the bomb flies down it
+  and `world_marley_blast` as it bursts; `world_marley_safe` for each character
+  standing in the light that survives, `world_marley_bonus` when +5 seconds are
+  earned and `world_marley_end` as the ball rises and the party ends. Under it
+  all the reggae plays one beat a second (60 BPM) as the world's own beat:
+  `world_marley_groove_a`, `world_marley_groove_b`, `a`, `b`, ... (one-drop:
+  bass and kick, then rim and offbeat skank).
+- **The flood** (Inondazione): `card_flood` when the card is played;
+  `world_flood_wave` as the wave sweeps from one wall to the other,
+  `world_flood_splash` at each enemy it pushes and `world_flood_steam` at each
+  fire it puts out.
 - **The room**: `ui_beat_tick` on every whole second of an open window,
   `ui_critical` when an action claims the beat, `ui_window_end`, `ui_stun`,
   `ui_defense_prompt`, `pilgrim_parry` on a parry or deflection that lands,
   `world_tesla_ring` when the square opens the Ring, `world_spawn` when an
   enemy arrives, `ui_defeat` after the fall; `amb_crypt_loop` under it all.
+- **The cannons** (Cannone, Cannone laser): `card_cannon` / `card_laser_cannon`
+  when the card is played; `world_cannon_place` as the stand lands on its cell;
+  `world_cannon_fire` at each shot and `world_cannon_hit` at the foe it strikes
+  (a laser's shot plays `world_laser_fire` and, at the foe, `world_cannon_hit`
+  too); `world_cannon_break` when the cannon falls apart.
+- **The black hole** (Buco nero): `card_black_hole` when the card is played;
+  `world_black_hole_open` as the hole opens; `world_black_hole_hum` once a
+  second while it is open (one beat, dry, made to be retriggered on the beat);
+  `world_black_hole_pull` for each foe it drags a cell closer,
+  `world_black_hole_swallow` for each foe it takes and
+  `world_black_hole_close` as it collapses.
+- **The dinosaurs** (Dinosauro): `card_dinosaur` when the card is played (the
+  d4's rattle, then the roar sting); the mount's call at its arrival, one per
+  kind (`world_dino_roar_raptor`, `_stego`, `_dilo`, `_giga`); its steps
+  (`world_dino_step_small` for the raptor and the dilophosaurus, quiet and fast,
+  `world_dino_step_heavy` for the stegosaurus, `world_dino_stomp` for the
+  giant's crushing stomp), `world_dino_bite` at each bite and
+  `world_dino_dismount` as it leaves the rider.
+- **The bleed** (Sanguinamento): `ui_status_bleed` when it is applied and
+  `world_bleed_tick` at the extra damage it deals each tick.
 
 Each play gets a small random pitch (±4%) and volume (±1.5 dB) and is panned
 by its place on the screen, so recipes need not vary. The player's effects
@@ -391,6 +425,34 @@ Same rules as `cards_arms`.
 | world_ak_hit | a round of the AK wounds a foe | 0.25 | -20 | 0.2 | the foe's paper card punched through at 0.0 (a crisp tear 2-6 kHz, 10 ms), a muffled body thud under it (80-250 Hz), a few crinkles to 0.05; short, up to six a second |
 | world_ak_ricochet | a round stops on stone, cover or an object | 0.5 | -21 | 0.3 | a hard chip of stone at 0.0 (a crack, a chunk, grit flying), the round whining away from 0.03 (a thin tone falling 3.2 -> 1.3 kHz with a little wobble, fading by 0.4) |
 
+### Family `marley` — Bomb Marley and Inondazione
+
+Module `sfx_marley.py` (it reuses the `world` family's water, blast and stone
+materials). Mirror-ball sounds are glints (tiny pings on D5-D8 of D Phrygian
+with a tick of noise each) and detuned shimmers; the reggae is in D minor
+seventh at **60 BPM**: a drawbar organ (with a Leslie wobble), a round bass on
+D2, a soft kick, a rim click and a muted guitar-and-organ skank with dub echoes.
+Length is the recipe's (the build's hall adds a tail: the built length is in
+brackets; every sound stays under 3.5 s).
+
+| name | when | length | marks | loud | wet | what |
+|---|---|---|---|---|---|---|
+| card_bomb_marley | Bomb Marley is played | 2.0 (1.9) | 0.0, 0.8, 0.95, 1.1 | -19 | 0.3 (rt60 1.2) | a paper flick, a low fuse spitting while a mirror ball's glints climb D5 -> D8 over a high shimmer, then a reggae organ bubbles twice (0.8, 0.95: short D minor seventh stabs over a round bass) and holds the chord at 1.1 with its Leslie wobble |
+| card_flood | Inondazione is played | 1.4 (1.6) | 0.0, 0.7 | -19 | 0.25 (rt60 0.9) | a paper flick, a surge of water rising (a wide band 200 -> 2.4 kHz over a swelling low rumble, bubbles ringing up through it), cresting and crashing at 0.7 (foam falling 6 -> 1.5 kHz) and draining away in froth and drops |
+| world_marley_ball | the mirror ball falls | 1.75 (2.2) | 0.0, 1.5 | -21 | 0.3 (rt60 1.0) | a shimmer gliding down D7 -> D5 as the ball comes down its chain, tiny metal ticks of the winch slowing from 14 to 3 a second, a soft wind falling, glints scattered over it; at 1.5 the ball hangs: a lightly struck D6 chime |
+| world_marley_warn | a column is warned | 0.25 (0.36) | 0.0, 0.11 | -23 | 0.1 (rt60 0.5) | a short, dry two-tone tick: two woodblock knocks, A5 then D6 (rising) |
+| world_marley_bomb | a bomb is thrown down a column | 0.9 (1.2) | 0.0, 0.62 | -19 | 0.2 (rt60 0.8) | a falling whistle (2.8 kHz -> 700 Hz, swelling, a little air and fuse fizz), then at 0.62 the landing: a dull iron-and-stone thud, a short rattle of grit |
+| world_marley_blast | a bomb bursts | 1.5 (1.45) | 0.004, 0.06 | -13 | 0.35 (rt60 1.1) | a heavy blast (pressure front, falling boom, stone shatter, debris to 1.3) and in it a dub bass drop: a round sine diving from 200 Hz to D2 at 0.06 and ringing on, an octave of sub under it |
+| world_marley_safe | a character in the light survives | 0.45 (0.53) | 0.0, 0.045 | -22 | 0.25 (rt60 0.8) | a bright soft chime: a glockenspiel D6 with A6 a breath later, a few glints |
+| world_marley_lights | the lit tiles swap | 0.65 (0.9) | 0.0, 0.5 | -22 | 0.25 (rt60 0.8) | a sparkle sweep: glints rising D5 -> D8 over a thin band sliding 2.5 -> 10 kHz, a tiny ping at 0.5 |
+| world_marley_bonus | +5 seconds earned | 0.4 (0.4) | 0.0, 0.075 | -21 | 0.15 (rt60 0.6) | a coin-like ding: two bright metal strikes a fifth apart (D6, A6) |
+| world_marley_end | the ball rises, the party ends | 1.3 (1.5) | 0.0, 0.18, 0.95 | -20 | 0.3 (rt60 1.0) | the ball hauled up (a soft up-swish, chain ticks) as a descending sparkle falls over a D minor chord that slows like a stopped record (speed 1 -> 0 from 0.18 to 0.93, darkening, a few crackles), a last low thump at 0.95 |
+| world_marley_groove_a | beat A of the groove (every other second) | 1.0 (1.03) | 0.0, 0.72 | -22 | 0.1 (rt60 0.5) | one beat at 60 BPM: a deep round bass note on D2 with a soft kick under it on the beat, ringing on, and a quiet A2 pickup at 0.72 |
+| world_marley_groove_b | beat B of the groove | 1.0 (1.07) | 0.0, 0.5, 0.73 | -23 | 0.12 (rt60 0.3) | one beat: a dry rim click on the beat, the offbeat skank at 0.5 (a muted guitar chop over an organ chop and the pick's chk), its dub echoes falling away at 0.73 and 0.96; a, b, a, b is one-drop |
+| world_flood_wave | the wave sweeps the room | 2.3 (3.2) | 0.0, 1.25 | -16 | 0.25 (rt60 0.8) | a long swell of filtered noise (pink through a wide band 180 -> 700 -> 260 Hz, a low brown roll, a foam hiss 2.5 -> 5.5 -> 2.5 kHz) breathing slowly, cresting at 1.25, bubbles and drops in its wake |
+| world_flood_splash | the wave hits an enemy | 0.55 (0.77) | 0.0 | -19 | 0.2 (rt60 0.8) | a heavy wet slap (a band falling 6 -> 1.4 kHz, a low whump under it, the soaked card's paper flap), bubbles bursting and a rain of drops |
+| world_flood_steam | a fire is put out | 0.75 (0.94) | 0.0, 0.03 | -21 | 0.2 (rt60 0.8) | water on embers: a wet gulp, a dense sizzle thinning out, then a long turbulent hiss of steam (7 -> 3 kHz) fading with a soft puff |
+
 ### Family `ui` — time, criticals, defence, statuses, rewards
 
 Quiet and clear; they must never mask the action sounds.
@@ -425,6 +487,48 @@ Quiet and clear; they must never mask the action sounds.
 | ui_status_expired | a status wears off | 0.4 | -28 | 0.2 | a soft fading puff |
 | ui_fish_card | a card caught by the Canna da Pesca reaches him (CARTA PESCATA) | 0.9 | -20 | 0.35 | the wet card shaken twice in the air (dull paper flaps at 0.0 and 0.08, drops flung off it), then the find: crystal A5, D6 and A6 rising (0.12, 0.18, 0.25) over a warm D5 and A4, a few sparkles |
 | ui_defeat | the Viandante falls (defeat) | 2.0 | -18 | 0.5 | a low drone sinks, paper crumples, a distant bell |
+
+### Family `arsenal` — the cannons, the black hole, the dinosaurs, the bleed
+
+Module `sfx_arsenal.py` (it reuses the `world` family's iron, stone, blast and
+fuse materials and the `cards_arms` family's paper flick and bone dice). The
+dinosaurs' voices are a glottal source (harmonics of a moving f0, a jitter and a
+growl of 20-70 Hz amplitude modulation) through two sets of formants crossfaded
+as the mouth opens: high and bright for the raptor (900-1700 Hz, formants at 2.2
+and 3.6 kHz), mid for the stegosaurus (120-210 Hz), noise and clicks for the
+dilophosaurus, 85 -> 44 Hz and mostly chest for the giant. The black hole is a
+Shepard spiral (four voices an octave apart that seem to climb, or fall, forever)
+over a D2 sub and a wheeling band of noise; the laser's whine climbs D3 -> D7. No
+voices of people, no words. Length is the recipe's; the built length (the hall's
+tail added) is in brackets and stays inside the 0.1-3.5 s the bank test allows.
+
+| name | when | length | marks | loud | wet | what |
+|---|---|---|---|---|---|---|
+| card_cannon | Cannone is played | 1.3 (1.39) | 0.0, 0.18, 0.32, 0.5 | -19 | 0.25 (rt60 1.0) | a paper flick, the cannon set on its stand: a heavy iron clunk at 0.18 (deep thud, low iron modes, a stone chunk), the barrel seated in its cradle at 0.32 (wood and iron knock), a flint struck at 0.5 and the fuse lit, hissing and spitting to 1.25 |
+| card_laser_cannon | Cannone laser is played | 1.5 (1.73) | 0.0, 0.16, 1.0, 1.05 | -19 | 0.2 (rt60 0.8) | a paper flick, the emitter seated with a steel clank at 0.16, the charge-up from 0.28 (a whine climbing D3 -> D7 with an FM shimmer, the A2 hum swelling, sparks thickening), a bright lock at 1.0 (a click, D6 and A6 chimes) and a held high hum |
+| card_black_hole | Buco nero is played | 1.65 (2.32) | 0.0, 0.5, 0.95, 1.15 | -19 | 0.15 (rt60 0.6) | a paper flick, the void swelling (a D2 sub, a dark rumble) under a spiral of voices rising forever and a band of noise wheeling, everything drawn inward from 0.95 (a suction falling 3 kHz -> 200 Hz) to a deep soft thump at 1.15 and a breath of the void |
+| card_dinosaur | Dinosauro is played | 1.75 (2.07) | 0.0, 0.05, 0.5, 0.68 | -19 | 0.25 (rt60 0.9) | a paper flick, a bone d4 rattled in a cupped hand (four shakes, settling in ticks at 0.5), then a roar sting at 0.68: a deep growl rising into a bellow with a sub of the chest under it |
+| world_cannon_place | the stand lands on its cell | 0.5 (0.63) | 0.0 | -19 | 0.25 (rt60 0.9) | a heavy thud (68 Hz falling), the stand's iron ringing low and short, a stone chunk, a puff of dust |
+| world_cannon_fire | a cannon fires | 1.0 (0.81) | 0.0, 0.3, 0.55 | -18 | 0.3 (rt60 0.9) | a hard pressure front, a falling boom (110 -> 44 Hz), the barrel ringing, a flame's whoof, a puff of smoke; its echo comes back off the walls at 0.3 and again, fainter and darker, at 0.55 |
+| world_cannon_hit | the ball (or a laser's shot) strikes a foe | 0.4 (0.37) | 0.0 | -19 | 0.2 (rt60 0.6) | a dull crack (a hard click and a short wooden snap), a heavy muffled thud under it, the card crumpled for a few grains |
+| world_cannon_break | the cannon falls apart | 1.1 (1.06) | 0.0, 0.12, 0.34, 0.52 | -16 | 0.3 (rt60 0.9) | a sharp crack of overstrained iron, its bands springing off in pings, the barrel tumbling in heavy clanks at 0.12, 0.34 and 0.52 (each lower and softer), the stand crumbling in stone chunks and gravel |
+| world_laser_fire | a laser fires | 0.5 (0.77) | 0.0, 0.1 | -17 | 0.2 (rt60 0.7) | a hard electric crack and a pew falling 5.2 kHz -> 400 Hz in 0.28 s (an FM shimmer on it), a bright beam buzz (the A2 hum with corona and crackle) held to 0.3 |
+| world_black_hole_open | the hole opens | 1.05 (1.72) | 0.0, 0.3, 0.6, 0.85 | -18 | 0.15 (rt60 0.6) | the floor tears (a ripping crackle falling 6 kHz -> 800 Hz), the void swelling (D2 sub, rumble) with a spiral of voices rising round it and a wheeling band of noise, a low settling hum at 0.85 |
+| world_black_hole_hum | each second the hole is open | 1.0 (1.0) | 0.0, 0.5 | -24 | 0.02 (rt60 0.3) | one beat, exactly a second and dry so beats do not smear: a sub-bass D2 falling a little with its second harmonic, a slow rumble and a whoosh of suction (a band 280 -> 1300 -> 320 Hz), swelling from silence to a crest at 0.5 and sinking to silence |
+| world_black_hole_pull | a foe is dragged a cell closer | 0.38 (0.55) | 0.0, 0.22 | -21 | 0.15 (rt60 0.5) | a suction rising (a band 300 -> 2500 Hz), the card scraping on stone, a small low tug at 0.22 |
+| world_black_hole_swallow | a foe is taken | 0.62 (0.77) | 0.0, 0.3 | -19 | 0.2 (rt60 0.6) | an inward whoosh (a band falling 2.4 kHz -> 200 Hz) and at 0.3 a pop (a bubble's plop falling 700 -> 90 Hz) with a soft low thump and a faint ring of the void |
+| world_black_hole_close | the hole collapses | 0.95 (1.22) | 0.0, 0.38, 0.6 | -18 | 0.25 (rt60 0.8) | the spiral falling back down over a sinking sub, everything rushing into a point (a suction band falling 3.5 kHz -> 150 Hz), a sharp pop at 0.6 (a click and a dive 1.1 kHz -> 150 Hz), a thin glassy ping |
+| world_dino_roar_raptor | the raptor arrives / calls | 0.6 (0.87) | 0.0, 0.07 | -17 | 0.2 (rt60 0.6) | a short high screech: f0 900 -> 1700 Hz in 0.1 s then falling to 780, a fast vibrato, bright formants (2.2, 3.6 kHz), a raspy growl, breath |
+| world_dino_roar_stego | the stegosaurus calls | 0.9 (1.19) | 0.0, 0.17 | -17 | 0.22 (rt60 0.7) | a mid grunting bellow: a short grunt at 0.0 (120 -> 150 -> 95 Hz) and a longer bellow at 0.17 (140 -> 210 -> 108 Hz, a slow 24 Hz growl, mouth opening and closing), a chesty body |
+| world_dino_roar_dilo | the dilophosaurus calls | 0.7 (0.9) | 0.0, 0.05, 0.26 | -19 | 0.2 (rt60 0.6) | a hissing chirp-rattle: a hiss (3-9 kHz), a chirp gliding 1.6 -> 3.4 kHz with an FM warble at 0.05, the frill's rattle at 0.26 (26 clicks a second through a 1.4 kHz resonance), a trailing hiss |
+| world_dino_roar_giga | the giant calls | 1.5 (2.28) | 0.0, 0.07, 0.62 | -14 | 0.2 (rt60 0.7) | a huge deep roar: f0 85 -> 125 -> 44 Hz, a 38 -> 24 Hz growl tearing at it, low formants (250, 700, 1.4 kHz), a chest sub and a brown rumble under it, sinking away |
+| world_dino_step_small | a raptor or dilophosaurus steps | 0.2 (0.27) | 0.0, 0.065, 0.1, 0.165 | -26 | 0.05 (rt60 0.3) | a light fast pitter-patter: six dry claw ticks (2.5-5 kHz) in two runs of three over a tiny pad; quiet, it must not tire |
+| world_dino_step_heavy | the stegosaurus steps | 0.5 (0.57) | 0.0 | -19 | 0.25 (rt60 0.8) | a heavy stomp: a deep thud (58 Hz falling), a stone chunk, a drag of claws settling, a puff of dust |
+| world_dino_stomp | the giant's crushing stomp | 0.55 (0.84) | 0.0, 0.05, 0.2 | -20 | 0.1 (rt60 0.25) | a pressure thump, a deep boom (84 -> 36 Hz), the stone shattering under the foot, the ground shaking to 0.4, grit and pebbles falling |
+| world_dino_bite | the dinosaur bites | 0.4 (0.65) | 0.0, 0.03, 0.09 | -17 | 0.2 (rt60 0.6) | the jaws slam shut (a bone-on-bone clack and a wet smack), the bones crunching 0.03-0.2, a low chomp at 0.09 and a short growl in the throat |
+| world_dino_dismount | the dinosaur leaves the rider | 0.65 (0.88) | 0.0, 0.05, 0.15 | -20 | 0.3 (rt60 0.8) | a puff of smoke and paper at 0.0, a soft low thump, and its call fading away (a bellow falling 190 -> 90 Hz, darkening as it goes) |
+| ui_status_bleed | a bleed is applied (Sanguinamento) | 0.3 (0.5) | 0.0, 0.04, 0.18 | -22 | 0.15 (rt60 0.5) | a thin wet slice (a band sliding 7.5 -> 2.5 kHz), a drop of blood plipping at 0.04 and a smaller one at 0.18 with a wet cling |
+| world_bleed_tick | the bleed's extra damage | 0.2 (0.38) | 0.0, 0.02 | -21 | 0.15 (rt60 0.5) | a sharper wet slash (a hard bright cut 2.5-9 kHz sliding down), a squelch of the wound under it at 0.02, two drops falling |
 
 ### Family `ambience` — the room
 

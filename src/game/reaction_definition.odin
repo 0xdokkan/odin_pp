@@ -115,7 +115,7 @@ reaction_effect_template_is_valid :: proc(
 	}
 	switch template.kind {
 	case .Move, .Gain_Energy, .Deploy_Device, .Add_Reaction_Binding, .Draw_Cards, .Discard_Cards, .Create_Card, .Enter_Shadow,
-	     .Place_Ground, .Lasso, .Fish, .Pinball, .First_Person:
+	     .Place_Ground, .Lasso, .Fish, .Pinball, .First_Person, .Marley, .Flood_Wave, .Place_Cannon, .Open_Black_Hole, .Ride:
 		return false
 	case .Remove_Status:
 		return true
@@ -358,13 +358,13 @@ build_reaction_effect :: proc(
 		case .Apply_Status:
 			return apply_status_effect(target, template.status, amount, template.duration), true
 		case .Move, .Gain_Energy, .Deploy_Device, .Remove_Status, .Add_Reaction_Binding,
-		     .Draw_Cards, .Discard_Cards, .Create_Card, .Enter_Shadow, .Place_Ground, .Lasso, .Fish, .Pinball, .First_Person:
+		     .Draw_Cards, .Discard_Cards, .Create_Card, .Enter_Shadow, .Place_Ground, .Lasso, .Fish, .Pinball, .First_Person, .Marley, .Flood_Wave, .Place_Cannon, .Open_Black_Hole, .Ride:
 			unreachable()
 		}
 	case .Remove_Status:
 		return remove_status_effect(target, template.status), true
 	case .Move, .Gain_Energy, .Deploy_Device, .Add_Reaction_Binding, .Draw_Cards, .Discard_Cards, .Create_Card, .Enter_Shadow,
-	     .Place_Ground, .Lasso, .Fish, .Pinball, .First_Person:
+	     .Place_Ground, .Lasso, .Fish, .Pinball, .First_Person, .Marley, .Flood_Wave, .Place_Cannon, .Open_Black_Hole, .Ride:
 		return {}, false
 	}
 	return {}, false

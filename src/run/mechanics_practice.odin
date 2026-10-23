@@ -6,17 +6,18 @@ import level "../level"
 import render "../render"
 
 // PROVA MECCANICHE: a sandbox for trying mechanics one at a time. A large
-// arena with no cover, a deck made only of the cards under test (one
-// Movimento Ombra, one of each card of Phase 2: Pozza di Veleno, Incendio,
-// Deflect, Feretro, Dado del Destino, Lama Velenosa, the Lazzo and the Canna
-// da Pesca of Phase 3, the Pinball and the First Person Shooter of Phase 4)
+// arena with no cover, a deck made only of the cards under test (one of each:
+// Bomb Marley, Inondazione, Cannone, Incendio, Buco Nero, Dinosauro, Dado del
+// Destino, the Lazzo and the Canna da Pesca, the Pinball and the First Person
+// Shooter; the Cannone laser is what the Cannone becomes at its second upgrade;
+// Pozza di Veleno, Deflect and Feretro left it for the three new cards)
 // and enemies that never stop coming (game/sandbox.odin). F7 clears the arena
 // at once for the rod (mechanics_lab_begin_fishing); F5 brings the fight
 // back. It never touches the profile, gives no rewards and has no exit to
 // walk to.
 MECHANICS_LAB_WIDTH :: 23
 MECHANICS_LAB_HEIGHT :: 17
-MECHANICS_LAB_DECK :: [11]game.Card_Id{.Shadow_Step, .Poison_Pool, .Wildfire, .Deflect, .Coffin, .Fate_Dice, .Venom_Blade, .Lasso,
+MECHANICS_LAB_DECK :: [11]game.Card_Id{.Marley_Party, .Flood_Wave, .Field_Cannon, .Wildfire, .Devouring_Hole, .Dino_Ride, .Fate_Dice, .Lasso,
 	.Pinball, .First_Person, .Fishing_Rod}
 // The whole deck in hand, every card under test at once (ten: more than the
 // game's hand ever holds, game.deck_hand_limit, so they overlap there,

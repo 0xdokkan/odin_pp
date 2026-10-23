@@ -123,6 +123,9 @@ del movimento è solo il passo in diagonale.
 | Carta: scudo, cura, oro | x1,5, almeno +1 |
 | Carta: altri status | +1 potenza e +1 durata (Veleno, Bruciatura, Rallentamento e le cariche del Viandante: +1 stack, non hanno durata; Lama Velenosa: il dado più uno) |
 | Carta: pesca, energia, carte create, reazioni | +1 (anche il primo colpo del Lazzo e il valore del Pinball, quello da cui parte e a cui lo riportano i muri) |
+| Inondazione, Bomb Marley | +1 casella di spinta; +5 s di festa |
+| Cannone, Buco Nero | danno x1,5 (almeno +2) a ogni colpo della palla, del raggio o del buco |
+| Dinosauro | +3 s di cavalcata |
 | Carta-dispositivo | danno x1,5 (almeno +2); la Tesla nasce con vita doppia, la Shock Floor con un colpo in più (massimo 21: un 20 del D20 più uno) |
 | First Person Shooter | +2 s dietro gli occhi |
 | Movimento Ombra, Dado del Destino | nessun critico: giocate sul secondo lasciano lo scocco all'azione dopo |
@@ -160,7 +163,7 @@ odin run src -o:none -- --no-fog
 | `--smoke-m7-view` | prova grafica di scena, oggetti 3D, fog, ologramma, QTE e menu |
 | `--smoke-m8-view` | prova 3D di d4, dispositivi, offerta del ring, equipaggiamento, scheda personaggio, tag match e cambio stanza |
 | `--smoke-western` | nuvoletta 6 RANCH 7: apertura automatica, volo delle carte, insegna, porte, corsa a tempo e premio |
-| `--smoke-mechanics-lab` | Prova meccaniche in 3D: mano e testi, status, intenti, colpi, ombra, pozze, incendio, cariche, Lazzo, Pinball, FPS e pesca; replay e screenshot `odin_pp_mechanics_lab_*.png` / `odin_pp_living_*.png` |
+| `--smoke-mechanics-lab` | Prova meccaniche in 3D: mano e testi, status, intenti, colpi, pozze, incendio, cariche, Lazzo, Pinball, FPS, Inondazione, Bomb Marley e pesca; replay e screenshot `odin_pp_mechanics_lab_*.png` / `odin_pp_living_*.png` |
 | `--smoke-effect-window` | Mostra effetto: ingressi da ogni menu, isolamento della run, chiusura senza click-through, testi, film delle carte e tempi dei frame. `-define:EFFECT_SMOKE_CARDS=,Strike,Pinball,` limita le carte filmate. Screenshot `odin_pp_effect_*.png` |
 | `--smoke-m9-view` | arena continua, duello con IA, presa in quattro pose, replay e FPS con ricarica e vittoria |
 
@@ -254,9 +257,10 @@ puntatore la trova nella sua striscia anche mentre si alza
 e la decima, mentre i menu restano su `1`–`8`. Le carte le cui righe lì si
 rimpicciolirebbero o si taglierebbero ne hanno una forma corta (Shock Floor,
 Tesla Coil, Movimento Ombra con `OMBRA 4s` / `MONDO FERMO`, Pozza di Veleno,
-Incendio, Deflect, Feretro, Dado del Destino, Lama Velenosa, Lazzo, Pinball e
-First Person Shooter) e quelle il cui nome lì si taglierebbe un nome corto
-(`Ombra`, `Pozza`, `Dado`, `Lama`, `FPS`; l'ispettore tiene il nome intero), che
+Incendio, Deflect, Feretro, Dado del Destino, Lama Velenosa, Lazzo, Pinball,
+First Person Shooter, Bomb Marley e Inondazione) e quelle il cui nome lì si
+taglierebbe un nome corto (`Ombra`, `Pozza`, `Dado`, `Lama`, `FPS`, `Marley`,
+`Onda`; l'ispettore tiene il nome intero), che
 dicono anche sulle carte più larghe (mani da cinque o sei, negozio, ricompense)
 dove il nome intero, con il suo `+n`, non ci starebbe così com'è alla sua
 misura: First Person Shooter è `FPS` su ogni carta della mano e dei menu,
@@ -330,7 +334,7 @@ dal **costo temporale**, centralizzato in `game/tactical_action_cost.odin`:
 | Refocus | 2 s |
 | Clic su **ATTIVA** o **EQUIPAGGIA** in Combat | 1 s |
 | Supporto, Guard, Afterimage, Battle Focus, Spark, Pozza di Veleno, Deflect, Feretro, Dado del Destino, Lama Velenosa | 1 s |
-| Strike, Arc Bolt, Shove, Dash, Grappling Hook, Venom Needle, Fate Strike, Tesla Coil, Incendio, Lazzo (il lancio; il giro sta sul tempo del mondo), Pinball (il colpo; la corsa sta sul tempo del mondo) | 2 s |
+| Strike, Arc Bolt, Shove, Dash, Grappling Hook, Venom Needle, Fate Strike, Tesla Coil, Incendio, Inondazione, Lazzo (il lancio; il giro sta sul tempo del mondo), Pinball (il colpo; la corsa sta sul tempo del mondo), Bomb Marley (il lancio; la festa sta sul tempo del mondo) | 2 s |
 | Piercing Ray, Cross Slash, Heavy Blow, Sundering Blow, Twin Venom, Shock Floor, Titan Grip | 3 s |
 | Firebomb, Toxic Wave, Caustic Bloom, Chain Lightning, Prismatic Barrage, Storm Crown | 4 s |
 | [Movimento Ombra](meccaniche.md#movimento-ombra) | 0 s: i suoi 4 s reali stanno fuori dalla finestra |
@@ -373,6 +377,12 @@ La schivata base rimane accessibile fuori recupero, senza richiedere carte.
 | Canna da Pesca | 0 | mai in mano: a stanza liberata pesca da un suo slot una casella libera entro 3 celle, che diventa acqua; 95% cibo che cura un d4, 5% una carta nel mazzo; 1 pesca a stanza +1 per upgrade (fino a 6); una sola per run ([Canna da Pesca](meccaniche.md#canna-da-pesca)) |
 | Pinball | 3 | un nemico accanto (non boss né miniboss) diventa una palla d'acciaio che rimbalza per 20 s del mondo a 7 caselle al secondo: i nemici che tocca prendono 2, 3, 4... (+1 per upgrade) e sono spinti di una cella, ogni muro la riporta a 2; poi scoppia e il nemico cade ([Pinball](meccaniche.md#pinball)) |
 | First Person Shooter | 3 | 20 s del mondo (+2 per upgrade) dietro gli occhi del Viandante: un AK di carta da 6 colpi al secondo, 1 danno lungo il mirino, passi secondo la vista, niente carte; 0 s di finestra ([First Person Shooter](meccaniche.md#first-person-shooter)) |
+| Inondazione | 2 | trascinata su una casella intorno al Viandante, un'onda attraversa tutta la mappa nel verso di quel lato: spinge ogni nemico di 1 casella (+1 per upgrade, massimo 3) e spegne tutti i fuochi; nessun danno ([Inondazione](meccaniche.md#inondazione)) |
+| Bomb Marley | 3 | una festa di 35 s del mondo (+5 s per nemico ucciso da una bomba, 90 in tutto): bombe da 6 danni (+1 per upgrade) a ogni battito lungo colonne intere, che non toccano chi sta su una casella illuminata ([Bomb Marley](meccaniche.md#bomb-marley)) |
+| Cannone | 2 | una torretta d'acciaio su una casella libera entro 3 celle, girata con la rotella: ogni secondo del mondo, per 20 s, spara una palla dritta davanti a sé che colpisce il primo nemico della linea (2 danni, +1 per upgrade, massimo 2 colpi di cannone insieme); poi si sbriciola. Al **secondo upgrade diventa Cannone Laser** ([Cannone](meccaniche.md#cannone-e-cannone-laser)) |
+| Cannone Laser | 2 | l'evoluzione del Cannone, non si offre mai: un raggio rosso a ogni secondo colpisce tutti i nemici della linea (3 danni, +1 per upgrade, fino a 3) |
+| Buco Nero | 3 | un buco su una casella libera entro 3 celle per 8 s del mondo: chi sta nel 3x3 prende 4 danni a battito (+1 per upgrade), chi sta nel 5x5 intorno è tirato di una casella verso il centro, tranne boss e miniboss (che prendono solo danno); fino a 4 upgrade, che allargano buco e tiro ([Buco Nero](meccaniche.md#buco-nero)) |
+| Dinosauro | 3 | un d4 sceglie il dinosauro che il Viandante cavalca per 20 s (+3 per upgrade): 1 Velociraptor, 2 Stegosauro, 3 Dilophosaurus, 4 Giganotosauro ([Dinosauro](meccaniche.md#dinosauro-e-sanguinamento)) |
 
 Afterimage mantiene il bypass del recupero della schivata e lo Shield dopo il
 movimento. Calculated Risk, Spark, Firebomb, Caustic Bloom e le formule delle

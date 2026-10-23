@@ -243,6 +243,10 @@ resolve_played_card_action :: proc(
 	if instance.definition_id == .Sundering_Blow {
 		return resolve_sundering_blow(room, instance, target, compiled)
 	}
+	// The Dinosauro rolls its d4 and the face names the dinosaur.
+	if instance.definition_id == .Dino_Ride {
+		return resolve_dinosaur_card(room, instance, target, compiled)
+	}
 	// Lama Velenosa rolls the bumps it loads; the Dado del Destino keeps its die.
 	if instance.definition_id == .Venom_Blade || instance.definition_id == .Fate_Dice {
 		return resolve_loading_card(room, instance, target, compiled)

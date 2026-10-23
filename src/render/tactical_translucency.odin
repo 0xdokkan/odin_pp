@@ -9,7 +9,7 @@ import grid "../engine/grid"
 import view "../engine/view"
 
 Tactical_Alpha_Entry :: struct {
-	kind: enum {Sprite, Wall, Attack, Ground, Lasso, Fishing, Pinball, First_Person},
+	kind: enum {Sprite, Wall, Attack, Ground, Lasso, Fishing, Pinball, First_Person, Dino},
 	// An Attack entry: its blow's slot in Attack_Fx_State.
 	attack: i32,
 	// A Ground entry: its flame's cell, or past the cells its splash (ground_fx.odin).
@@ -103,6 +103,7 @@ collect_tactical_translucents :: proc(renderer: ^Renderer, room: ^game.Room = ni
 	// The Pinball's ball shows on the map's hologram too.
 	collect_pinball_entries(renderer, entries)
 	if room != nil { collect_first_person_entries(renderer, entries) }
+	if room != nil { collect_dino_entries(renderer, entries) }
 	// The hologram intentionally supplies no room: its own miniature walls
 	// remain in the table pass, and it only needs sorted actor billboards.
 	// Behind the player's eyes they are opaque, with the floor.
@@ -119,6 +120,8 @@ collect_tactical_translucents :: proc(renderer: ^Renderer, room: ^game.Room = ni
 		// change order with a nearer object on the same projected sight line.
 		center := rl.Vector3{entry.position.x+0.5, DIORAMA_WALL_HEIGHT*0.5, entry.position.y+0.5}
 		entry.depth = rl.Vector3DotProduct(center-v.camera.position, forward)
+		// The dinosaur is drawn just before the card riding it.
+		if entry.kind == .Dino { entry.depth += 0.01 }
 	}
 	slice.sort_by(entries^[:], proc(a, b: Tactical_Alpha_Entry) -> bool { return a.depth > b.depth })
 	return entries^[:]
@@ -155,6 +158,9 @@ draw_tactical_billboards :: proc(renderer: ^Renderer, room: ^game.Room = nil, li
 		} else if entry.kind == .First_Person {
 			if walls_active { rl.EndShaderMode(); walls_active = false }
 			draw_first_person_entry(renderer, entry)
+		} else if entry.kind == .Dino {
+			if walls_active { rl.EndShaderMode(); walls_active = false }
+			draw_dino_entry(renderer, entry)
 		} else {
 			if walls_active { rl.EndShaderMode(); walls_active = false }
 			tactical_billboard(renderer, entry.key, entry.position, entry.opacity, entry.entity)

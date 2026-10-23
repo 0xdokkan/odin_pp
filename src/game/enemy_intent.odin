@@ -544,6 +544,13 @@ plan_enemy_intents :: proc(room: ^Room) {
 				predicted_positions[ordered_index] = escape.destination
 				continue
 			}
+			// BOMB MARLEY: off the lights, make for one.
+			if shelter, sheltering := tactical_marley_shelter(room, origin, &predicted_positions, enemy_count, ordered_index); sheltering {
+				enemy.intent = shelter
+				tactical_schedule_enemy(room, enemy)
+				predicted_positions[ordered_index] = shelter.destination
+				continue
+			}
 		}
 		intent: Enemy_Intent
 		switch enemy.archetype {

@@ -292,7 +292,7 @@ expedition_discovery :: proc(c:^campaign.Campaign,b:campaign.Biome,seed:u64) -> 
 	case .Count:return {},false
 	}
 	for i in 0..<4 {id:=home[(i+int(seed%4))%4];if !c.discovered[id] {return id,true}}
-	for i in 0..<int(game.Card_Id.Count) {id:=game.Card_Id((i+int(seed%u64(game.Card_Id.Count)))%int(game.Card_Id.Count));if !c.discovered[id] {return id,true}}
+	for i in 0..<int(game.Card_Id.Count) {id:=game.Card_Id((i+int(seed%u64(game.Card_Id.Count)))%int(game.Card_Id.Count));if !c.discovered[id] && !game.card_is_lab_only(id) {return id,true}}
 	return {},false
 }
 
