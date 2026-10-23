@@ -85,7 +85,8 @@ prepare_card_range_preview :: proc(renderer: ^Renderer, room: ^game.Room, card_i
 	at := room.player.position
 	preview.origin = {at.x-game.MAX_TARGETING_RANGE, at.y-game.MAX_TARGETING_RANGE}
 	if definition.targeting.shape != .None {
-		radius := min(definition.targeting.cast_range.maximum, game.MAX_TARGETING_RANGE)
+		// One more than the card's reach: from four steps above it reaches a cell further.
+		radius := min(definition.targeting.cast_range.maximum+1, game.MAX_TARGETING_RANGE)
 		for y in max(0, at.y-radius)..=min(room.level_data.tiles.height-1, at.y+radius) {
 			for x in max(0, at.x-radius)..=min(room.level_data.tiles.width-1, at.x+radius) {
 				cell := grid.Position{x, y}
@@ -212,6 +213,7 @@ draw_card_light_cell :: proc(renderer: ^Renderer, room: ^game.Room, cell: grid.P
 	y := f32(0.034)
 	if tile.kind == .Exit { y = 0.112 }
 	if tile.kind == .Wall { y = 0.186 }
+	y += cell_ground(cell)
 	center := rl.Vector3{f32(cell.x)+0.5, y, f32(cell.y)+0.5}
 	neighbors := CARD_LIGHT_NEIGHBORS
 	points := [4]rl.Vector3{center+{-0.465,0,-0.465}, center+{0.465,0,-0.465}, center+{0.465,0,0.465}, center+{-0.465,0,0.465}}

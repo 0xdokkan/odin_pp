@@ -31,7 +31,8 @@ tactical_dodge_destination :: proc(room: ^Room, direction: Move_Direction) -> (d
 	for distance in 1..=2 {
 		next := grid.Position{origin.x+step.x*distance, origin.y+step.y*distance}
 		query := query_entity_movement(room, PLAYER_ENTITY, next)
-		if !movement_query_is_clear(&query) { break }
+		before := grid.Position{origin.x+step.x*(distance-1), origin.y+step.y*(distance-1)}
+		if !movement_query_is_clear(&query) || step_height_blocked(room, before, next) { break }
 		destination, ok = next, true
 	}
 	return

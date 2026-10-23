@@ -82,6 +82,8 @@ run_mechanics_lab_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer,
 	// ODIN_PP_LAB_ONLY=hit_marks runs only the hit marks' act, to work on it.
 	if only, _ := os.lookup_env("ODIN_PP_LAB_ONLY", context.temp_allocator); only == "hit_marks" {
 		return mechanics_lab_hit_marks(window, renderer, &room, &controller, &cards, &buffer)
+	} else if only == "heights" {
+		return mechanics_lab_heights(window, renderer, &room, &data, &controller, &cards, &buffer)
 	}
 	artifacts.screenshot("odin_pp_mechanics_lab.png")
 	if !mechanics_lab_card_words(renderer, &player) { return false }
@@ -231,6 +233,7 @@ run_mechanics_lab_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer,
 	if !mechanics_lab_flood(window, renderer, &room, &controller, &cards, &buffer) { return false }
 	if !mechanics_lab_marley(window, renderer, &room, &controller, &cards, &buffer) { return false }
 	if !mechanics_lab_hit_marks(window, renderer, &room, &controller, &cards, &buffer) { return false }
+	if !mechanics_lab_heights(window, renderer, &room, &data, &controller, &cards, &buffer) { return false }
 	if !mechanics_lab_cannon(window, renderer, &room, &controller, &cards, &buffer) { return false }
 	if !mechanics_lab_black_hole(window, renderer, &room, &controller, &cards, &buffer) { return false }
 	if !mechanics_lab_dinosaur(window, renderer, &room, &controller, &cards, &buffer) { return false }

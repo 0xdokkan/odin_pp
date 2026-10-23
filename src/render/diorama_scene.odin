@@ -151,14 +151,18 @@ draw_diorama_wall :: proc(renderer: ^Renderer, room: ^game.Room, cell: grid.Posi
 @(private)
 draw_tactical_tile :: proc(renderer: ^Renderer, room: ^game.Room, tile: level.Tile, cell: grid.Position, preview: ^Card_Range_Preview = nil) {
 	if tile.kind == .Void { return }
-	p := rl.Vector3{f32(cell.x)+0.5, 0, f32(cell.y)+0.5}
+	// A raised cell stands on a column down to the board's plane: the dark base
+	// gets as tall as the cell is high, and its exposed sides show the steps.
+	rise := cell_ground(cell)
+	p := rl.Vector3{f32(cell.x)+0.5, rise, f32(cell.y)+0.5}
 	n := gothic_hash(cell.x, cell.y)
 	shade := u8(n%11)
 	floor := rl.Color{43+shade, 52+shade, 65+shade, 255}
 	if renderer.tactical.snapshot.family == .Twin_Courts { floor = {38+shade, 51+shade, 69+shade, 255} }
 	if tile.kind != .Wall { floor = card_range_floor_color(preview, cell, floor) }
-	draw_resin_cube(renderer, p+rl.Vector3{0, -0.155, 0}, 0.99, 0.31, 0.99, RESIN_DARK)
+	draw_resin_cube(renderer, p+rl.Vector3{0, -(rise+0.31)*0.5, 0}, 0.99, rise+0.31, 0.99, RESIN_DARK)
 	draw_resin_cube(renderer, p+rl.Vector3{0, -0.05, 0}, 0.945, 0.135, 0.945, floor)
+	if rise > 0 { draw_height_steps(renderer, cell, p, rise) }
 	if tile.kind == .Wall {
 		draw_resin_cube(renderer, p+rl.Vector3{0, 0.10, 0}, 0.98, 0.16, 0.98, DIORAMA_EDGE)
 		if !diorama_interior_wall(room, cell) || first_person_solid_walls(renderer) { draw_diorama_wall(renderer, room, cell) }

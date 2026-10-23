@@ -75,6 +75,11 @@ non definiscono le regole della spedizione aperta.
 
 ### Prova meccaniche
 
+**F3** cambia arena: la seconda, «Altezze», ha un altopiano di 4 gradini con una
+scala di 3, un pilastro di 8 e una collina a spirale (si prova la regola dei
+dirupi, le cadute, la vista e la gittata dall'alto). Con `--smoke-mechanics-lab` e
+`ODIN_PP_LAB_ONLY=heights` gira solo l'atto delle altezze.
+
 Il pulsante **Prova meccaniche** del menu (o `--mechanics-lab`) apre una sandbox
 per provare le meccaniche nuove, una alla volta. È un'arena grande 23x17 senza
 ostacoli né nebbia, con il giocatore al centro. Il combattimento non finisce

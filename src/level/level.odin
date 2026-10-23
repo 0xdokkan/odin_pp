@@ -26,7 +26,14 @@ Level :: struct {
 	// A lifetime identity avoids stale GPU caches when an allocator reuses a
 	// destroyed map's address. Neither counter participates in gameplay RNG.
 	geometry_id, geometry_revision: u64,
+	// The height of each cell in steps, a unit the rules count in (a step up is
+	// walked, a cliff of two or more is a wall). Empty means flat: every cell is
+	// at 0, which is every map that was not given heights.
+	heights: [dynamic]u8,
 }
+
+// The tallest a cell can be.
+MAX_CELL_HEIGHT :: 255
 
 @(private)
 next_geometry_id: u64
@@ -114,7 +121,57 @@ destroy :: proc(level: ^Level) {
 		return
 	}
 	grid.destroy(&level.tiles)
+	delete(level.heights)
 	level^ = {}
+}
+
+// The height of `position` in steps: 0 on a flat map, off the map or without heights.
+height_at :: proc(level: ^Level, position: grid.Position) -> i32 {
+	if level == nil || len(level.heights) == 0 { return 0 }
+	index, found := grid.index_of(&level.tiles, position)
+	if !found || index >= len(level.heights) { return 0 }
+	return i32(level.heights[index])
+}
+
+has_heights :: proc(level: ^Level) -> bool {
+	return level != nil && len(level.heights) > 0
+}
+
+// Raises or lowers one cell (0..MAX_CELL_HEIGHT). The first non-zero height makes
+// the map's height table; a change alters the geometry like a tile does.
+set_height :: proc(level: ^Level, position: grid.Position, height: i32) -> bool {
+	if level == nil { return false }
+	index, found := grid.index_of(&level.tiles, position)
+	if !found { return false }
+	steps := clamp(height, 0, i32(MAX_CELL_HEIGHT))
+	if len(level.heights) == 0 {
+		if steps == 0 { return true }
+		resize(&level.heights, len(level.tiles.cells))
+	}
+	if i32(level.heights[index]) == steps { return true }
+	level.heights[index] = u8(steps)
+	mark_geometry_changed(level)
+	return true
+}
+
+// Heights from rows of text the size of the map: ' ' or '0' is flat, '1'..'9'
+// that many steps, 'a'..'f' ten to fifteen. Used by the arenas that test heights.
+apply_height_rows :: proc(level: ^Level, rows: []string) -> bool {
+	if level == nil || len(rows) != level.tiles.height { return false }
+	for row in rows { if len(row) != level.tiles.width { return false } }
+	for row, y in rows {
+		for symbol, x in row {
+			steps: i32
+			switch {
+			case symbol >= '0' && symbol <= '9': steps = i32(symbol-'0')
+			case symbol >= 'a' && symbol <= 'f': steps = i32(symbol-'a')+10
+			case symbol == ' ':
+			case: return false
+			}
+			if !set_height(level, {x, y}, steps) { return false }
+		}
+	}
+	return true
 }
 
 tile_at :: proc(level: ^Level, position: grid.Position) -> (Tile, bool) {

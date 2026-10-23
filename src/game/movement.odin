@@ -110,7 +110,7 @@ movement_path_blocker :: proc(
 	}
 	previous := origin
 	for position in path[:path_count] {
-		if cell_blocks_movement(room, position) {
+		if cell_blocks_movement(room, position) || rise_height_blocked(room, previous, position) {
 			return position, true
 		}
 		step_x := position.x-previous.x
@@ -288,6 +288,8 @@ apply_movement_effect :: proc(
 		to_position := query.cells[index]
 		set_entity_position(room, effect.target, to_position)
 		final_step := index == query.count-1
+		// Going down more than a step is a fall (a teleport lands, it does not fall).
+		drop := cell_height(room, from_position)-cell_height(room, to_position)
 		movement_event_index := report.events.count
 		record_report_event(report, {
 			kind = .Moved if final_step else .Movement_Step,
@@ -298,7 +300,8 @@ apply_movement_effect :: proc(
 			area_mask = EVENT_TELEPORT_BIT if effect.movement_mode == .Teleport else 0,
 		})
 		movement_recorded := report.events.count > movement_event_index
-		trigger_cell_entry(room, effect.target, report)
+		if effect.movement_mode != .Teleport { trigger_fall(room, effect.target, drop, report) }
+		if entity_exists(room, effect.target) { trigger_cell_entry(room, effect.target, report) }
 		if effect.target.kind == .Object {
 			ignite_barrel_near_fire(room, effect.target.id, &report.events)
 		}

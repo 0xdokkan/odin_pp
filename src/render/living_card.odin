@@ -206,6 +206,8 @@ living_card_position :: proc(renderer: ^Renderer, entity: game.Entity_Ref, key: 
 living_card_slide_position :: proc(renderer: ^Renderer, entity: game.Entity_Ref, key: Sprite_Key, position: view.Vec2) -> (at: view.Vec2, lift: f32) {
 	at = position
 	lift = tactical_lasso_lift(renderer, entity)
+	// The ground it stands on, climbing a step as the slide crosses it (height_view.odin).
+	defer lift += point_ground(at)
 	// The dinosaur lunge carries its rider with it (arsenal.odin).
 	defer if entity == game.PLAYER_ENTITY { off := tactical_ride_offset(renderer); at.x += off.x; at.y += off.y }
 	if !renderer.tactical.living || renderer.tactical.living_state == nil { return }

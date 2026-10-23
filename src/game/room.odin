@@ -803,6 +803,10 @@ enemy_can_move_to :: proc(room: ^Room, enemy_index: int, position: grid.Position
 	if cell_blocks_movement(room, position) || position == room.player.position {
 		return false
 	}
+	if enemy_index >= 0 && enemy_index < len(room.enemies) {
+		from := room.enemies[enemy_index].position
+		if max(abs(from.x-position.x), abs(from.y-position.y)) == 1 && step_height_blocked(room, from, position) { return false }
+	}
 	_, occupied := enemy_index_at(room, position, enemy_index)
 	return !occupied
 }
@@ -846,7 +850,7 @@ try_move_player :: proc(room: ^Room, direction: Move_Direction) -> Action_Result
 		}
 	}
 
-	if cell_blocks_movement(room, target) {
+	if cell_blocks_movement(room, target) || step_height_blocked(room, room.player.position, target) {
 		// Loot cannot softlock when a movable block was pushed into a corridor.
 		if room.phase == .Loot {
 			if object, found := grid_object_at(room, target); found {

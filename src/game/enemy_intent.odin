@@ -115,6 +115,11 @@ planned_cell_is_available :: proc(
 	   target == room.player.position {
 		return false
 	}
+	// A foe's step does not climb or leave a cliff.
+	if moving_index >= 0 && moving_index < position_count {
+		from := positions[moving_index]
+		if max(abs(from.x-target.x), abs(from.y-target.y)) == 1 && step_height_blocked(room, from, target) { return false }
+	}
 	for index in 0..<position_count {
 		if index != moving_index && positions[index] == target {
 			return false

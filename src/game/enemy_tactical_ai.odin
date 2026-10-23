@@ -165,6 +165,8 @@ rebuild_tactical_enemy_distances :: proc(room: ^Room, distances: []int, goal: En
 		for step in ([?]grid.Position{{0, -1}, {1, 0}, {0, 1}, {-1, 0}}) {
 			q:=add_position(cell,step)
 			if q.x<0 || q.y<0 || q.x>=width || q.y>=height {continue}
+			// A foe walks the way back along this edge: a cliff cuts it.
+			if step_height_blocked(room,{minimum.x+cell.x,minimum.y+cell.y},{minimum.x+q.x,minimum.y+q.y}) {continue}
 			i:=q.y*width+q.x
 			if visited[i] { continue }
 			candidate := score+costs[best]

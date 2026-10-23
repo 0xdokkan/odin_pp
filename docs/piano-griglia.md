@@ -37,7 +37,7 @@ numero della fase resta quello della sua sezione.
 | 3 | 9 | Hub in 3D: dentro il casinò | 8 | Da fare | — |
 | 4 | 10 | Hub in 3D: dentro il deposito | 8 | Da fare | — |
 | 5 | 11 | Hub in 3D: dentro la sala giochi | 8 | Da fare | — |
-| 6 | 2 | Altezze nel laboratorio: dati, regole, grafica, puntamento | — | Da fare | — |
+| 6 | 2 | Altezze nel laboratorio: dati, regole, grafica, puntamento | — | Fatta | vedi Esito |
 | 7 | 6 | Strutture su più caselle: edifici e oggetti complessi, edifici trasparenti avvicinandosi | — (meglio dopo la 2) | Da fare | — |
 | 8 | 3 | Altezze nelle spedizioni: renderer, mappe, salvataggi, prestazioni | 2 | Da fare | — |
 | 9 | 4 | La montagna a spirale delle Montagne innevate | 2, 3 | Da fare | — |
@@ -720,7 +720,57 @@ regole della sezione 1: fammi prima le domande della fase e fermati alla fine.
 
 ### Esito
 
-*(da compilare a fine fase)*
+Fatta il 23 ottobre 2026 sul ramo `piano-griglia`.
+
+**Risposte dell'utente alle domande della fase**
+1. **Altezza di un gradino disegnato:** 0,12.
+2. **Scendere da un dirupo camminando:** no, solo con una spinta.
+3. **Danno di caduta:** dislivello − 1, al massimo 10.
+4. **Bonus d'altura:** +1 gittata dall'alto (4 gradini o più) per le carte a distanza.
+   Nessun bonus di danno.
+5. **First Person Shooter:** la domanda mescolava due scelte e l'utente ha risposto solo
+   sulla gittata. Ho seguito la raccomandazione del piano: il First Person Shooter
+   segue le altezze.
+
+**Cosa è stato fatto**
+- **Dati:** `level.Level` ha una tabella `heights` (vuota = piatto), con `height_at`,
+  `set_height`, `has_heights` e `apply_height_rows` (`src/level/level.odin`). Cambiare
+  un'altezza alza `geometry_revision`.
+- **Regole:** nuovo `src/game/height.odin` con passo, dirupo, caduta, linea di tiro e
+  gittata (vedi `docs/regole/combattimento.md`, sezione «Altezze»). Agganci in
+  `try_move_player`, diagonale, schivata, `movement_path_blocker` e
+  `apply_movement_effect` (caduta), `planned_cell_is_available`, `enemy_can_move_to`,
+  ricerca del percorso dei nemici, `targeting_path_blocker`, `tactical_line_visible` e
+  controllo della gittata. Il First Person Shooter ha occhio, pavimento per cella e
+  facce dei dirupi.
+- **Renderer del laboratorio:** `src/render/height_view.odin` (quota di una cella e di un
+  punto, scelta della casella col mouse, linee dei gradini). Pavimento rialzato,
+  personaggi, piedistalli, ombre, oggetti, anteprima del raggio, segni dei bersagli,
+  intenti e rombi del puntatore alla quota giusta; telecamera che segue il giocatore.
+- **Arena «Altezze»** (F3 nella Prova meccaniche): altopiano di 4 gradini con scala di 3,
+  pilastro di 8 e collina a spirale.
+- **Test:** 13 nuovi (3 in `level`, 8 in `game`, 2 in `render`).
+- **Smoke:** atto `mechanics_lab_heights`, con asserzioni sulla salita, sul dirupo, sulla
+  gittata dall'alto e sulla caduta; catture `odin_pp_mechanics_lab_heights_*.png`.
+
+**Verifiche**
+- `.\scripts\check.ps1` completo: 1551 test verdi, con e senza assert, e le due build.
+- Smoke del laboratorio completo (compreso l'atto nuovo).
+
+**Da sapere**
+- Con altezze a zero (tutto il gioco di prima) il comportamento non cambia: nessun test
+  esistente è stato modificato, a parte il testo del banner della Prova meccaniche
+  («F3 ALTEZZE»).
+- Una prima versione teneva un puntatore globale al livello; mandava in crash un test
+  esistente (il livello veniva distrutto sotto il renderer). Ora il renderer tiene una
+  copia della tabella delle altezze, aggiornata quando la geometria cambia.
+- Lo scatto (Dash) e altri spostamenti volontari fatti con carte possono scendere un
+  dirupo cadendo: la regola «solo con una spinta» vale per camminare. Camminare, schivare
+  e il passo dei nemici non scendono mai un dirupo.
+- Gli attacchi in mischia fra celle di altezza diversa restano possibili.
+- Le spedizioni restano piatte: renderer, mappe e salvataggi sono la Fase 3.
+- Non ho una misura delle prestazioni: nel laboratorio, a terreno piatto, il costo in più è
+  una ricerca nella copia delle altezze vuota.
 
 ## 4. Fase 3 — Altezze nelle spedizioni
 

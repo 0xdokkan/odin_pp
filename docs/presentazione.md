@@ -21,6 +21,23 @@ maschera locale per frame, usando il targeting condiviso e limitando la ricerca
 al range massimo della carta. Materiale e alone riusano quella maschera;
 il falloff usa alpha ai vertici, senza nuovi shader, texture o render target.
 
+### Altezze del tabellone
+
+Una cella con altezza sta sul suo piano rialzato: ogni gradino è alto 0,12 di cella
+(`game.HEIGHT_STEP_DRAWN`). Il pavimento ha una colonna scura fino al piano del
+tabellone e una linea sottile a ogni gradino sui lati che guardano una cella più
+bassa, così un dirupo di dieci gradini si legge come dieci e una scala come
+scalini. Personaggi, piedistalli, ombre, oggetti, anteprima del raggio, segni dei
+bersagli, intenti e rombi del puntatore stanno alla quota della loro cella; mentre
+un personaggio scivola da una cella all'altra sale il gradino in modo morbido
+(`point_ground`, media pesata delle quattro celle intorno al punto). La telecamera
+segue la quota del giocatore. Il puntatore sceglie la prima cella la cui cima sta
+sopra il raggio (`pick_ground_cell`): la cima di un altopiano o la faccia di un
+dirupo, non il pavimento dietro. Le quote vengono da una copia delle altezze
+del livello, aggiornata quando la geometria cambia, mai da un puntatore al livello
+([height_view.odin](../src/render/height_view.odin)). Solo il laboratorio ha altezze;
+le spedizioni restano piatte (Fase 3).
+
 ### Bersagli in evidenza
 
 Mentre si sceglie una carta, ogni nemico che una giocata valida colpirebbe

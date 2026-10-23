@@ -200,7 +200,7 @@ board_device_link_is_clear :: proc(room: ^Room, a, b: grid.Position) -> bool {
 board_device_clear_path :: proc(room: ^Room, origin, target: grid.Position) -> bool {
 	return room != nil && base_cell_is_walkable(room, origin) && base_cell_is_walkable(room, target) &&
 	       !cell_blocks_line_of_sight(room, target) &&
-	       tactical_line_visible(origin, target, tactical_room_opaque, room)
+	       tactical_line_visible(origin, target, tactical_room_opaque, room, tactical_room_height)
 }
 
 @(private = "file")

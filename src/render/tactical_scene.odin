@@ -14,6 +14,12 @@ tactical_snapshot_opaque :: proc(data: rawptr, position: grid.Position) -> bool 
 	return tactical_presentation_opaque(state.renderer, state.room, position)
 }
 
+@(private)
+tactical_snapshot_height :: proc(data: rawptr, position: grid.Position) -> i32 {
+	state := cast(^Tactical_Visibility_Context)data
+	return game.cell_height(state.room, position)
+}
+
 Tactical_Orbit :: struct {
 	yaw, pitch, distance: f32,
 	initialized, dragging: bool,
@@ -95,7 +101,7 @@ draw_tactical_actor_bases :: proc(renderer: ^Renderer) {
 		if !actor.visible || !tactical_render_visible(renderer, cell) || tactical_pinball_holds(renderer, actor.entity) { continue }
 		key := sprite_key_for_enemy(actor.archetype)
 		at, _ := living_card_position(renderer, actor.entity, key, actor.position)
-		p := rl.Vector3{at.x+0.5, 0.048, at.y+0.5}
+		p := rl.Vector3{at.x+0.5, 0.048+point_ground(at), at.y+0.5}
 		draw_tactical_actor_shadow(p)
 		// Up on the Lazzo's rope: its shadow on the floor, and the stand it
 		// carries (lasso.odin).
@@ -117,7 +123,7 @@ draw_tactical_actor_bases :: proc(renderer: ^Renderer) {
 		if tactical_shadow_depth(renderer, game.PLAYER_ENTITY) > 0 { return }
 	}
 	at, _ := living_card_position(renderer, game.PLAYER_ENTITY, .Player, snapshot.player.position)
-	p := rl.Vector3{at.x+0.5, 0.05, at.y+0.5}
+	p := rl.Vector3{at.x+0.5, 0.05+point_ground(at), at.y+0.5}
 	draw_tactical_actor_shadow(p)
 	rl.DrawCylinder(p, 0.32, 0.32, 0.01, 24, GOTHIC_INK)
 	rl.DrawCircle3D(p+rl.Vector3{0, 0.01, 0}, 0.34, {1, 0, 0}, 90, GOTHIC_PAPER)

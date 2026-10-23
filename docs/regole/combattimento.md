@@ -759,6 +759,28 @@ attore e trascina il bersaglio fino alla cella adiacente al player.
 Spostare un nemico non aggiorna il suo intento già committed: il piano stale
 produce miss o blocco, poi viene ripianificato per il pulse successivo.
 
+### Altezze
+
+Ogni cella ha un'altezza in gradini (`level.height_at`, 0 su una mappa piatta, che
+è ogni mappa senza altezze): [height.odin](../../src/game/height.odin). Con altezze
+a zero ovunque il gioco è identico a prima.
+
+| Cosa | Regola |
+|---|---|
+| Passo (giocatore, nemico) | fra caselle vicine al massimo 1 gradino di dislivello, in su o in giù; di più è un **dirupo**, un muro per chi cammina |
+| Diagonale e schivata | stessa regola, cella per cella |
+| Spinta, tirata, scatto (Traverse) | un dislivello in salita di più di 1 gradino è un muro; in discesa è aperto |
+| Caduta | scendendo più di 1 gradino in un passo di uno spostamento forzato: danno = dislivello − 1, al massimo 10 (4 gradini fanno 3). Vale per giocatore e nemici; Teleport non cade |
+| Nemici | la ricerca del percorso, i passi pianificati e l'esecuzione rispettano il dirupo: un nemico non lo scende né lo sale |
+| Linea di tiro e di vista | occhio a 6 gradini sul pavimento, bersaglio a 4: una cella la cui cima sta sopra la retta fra i due nasconde ciò che c'è dietro (`height_hides`); vale per carte, nemici e nebbia |
+| Gittata | +1 casella dalle carte a distanza (gittata massima oltre 1) lanciate da almeno 4 gradini più in alto del bersaglio |
+| First Person Shooter | l'occhio sta sul pavimento della sua cella; il pavimento è quello di ogni cella; una cella con il pavimento sopra il raggio ferma il colpo |
+
+Il passo si controlla in `try_move_player`, nella diagonale e nella schivata; il
+danno di caduta in `apply_movement_effect`, che registra un `Hazard_Triggered`
+con il danno. Gli attacchi in mischia fra celle di altezza diversa restano
+possibili.
+
 ## Oggetti, esplosivi e loot
 
 Sorgenti: [grid_object.odin](../../src/game/grid_object.odin),

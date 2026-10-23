@@ -285,12 +285,14 @@ first_person_trace :: proc(room: ^Room, from: grid.Position, aim: First_Person_A
 	o := first_person_eye(room, from, aim)
 	d := [2]f32{math.cos(aim.yaw), math.sin(aim.yaw)}
 	rise := math.tan(pitch)
-	shot.origin = {o.x, FIRST_PERSON_EYE_HEIGHT, o.y}
+	// The eye stands on its cell's floor, which may be above the board's level.
+	base := f32(cell_height(room, from))*HEIGHT_STEP_DRAWN
+	shot.origin = {o.x, FIRST_PERSON_EYE_HEIGHT+base, o.y}
 	shot.target = SYSTEM_ENTITY
-	at :: proc(o, d: [2]f32, rise, s: f32) -> [3]f32 {
-		return {o.x+d.x*s, FIRST_PERSON_EYE_HEIGHT+rise*s, o.y+d.y*s}
+	at :: proc(o, d: [2]f32, base, rise, s: f32) -> [3]f32 {
+		return {o.x+d.x*s, FIRST_PERSON_EYE_HEIGHT+base+rise*s, o.y+d.y*s}
 	}
-	nearest := first_person_trace_board(room, o, d, rise, &shot)
+	nearest := first_person_trace_board(room, o, d, base, rise, &shot)
 	if room == nil { return }
 	side := max(f32)
 	for enemy in room.enemies {
@@ -301,12 +303,14 @@ first_person_trace :: proc(room: ^Room, from: grid.Position, aim: First_Person_A
 		t := (card.x-o.x)*d.x+(card.y-o.y)*d.y
 		if t <= FIRST_PERSON_EPSILON || t > nearest+FIRST_PERSON_EPSILON { continue }
 		lateral := abs((card.x-o.x)*d.y-(card.y-o.y)*d.x)
-		if lateral > first_person_outline_half_width(enemy.archetype, FIRST_PERSON_EYE_HEIGHT+rise*t-lift) { continue }
+		// The ray's height over the foe's own floor.
+		foe_base := f32(cell_height(room, enemy.position))*HEIGHT_STEP_DRAWN
+		if lateral > first_person_outline_half_width(enemy.archetype, FIRST_PERSON_EYE_HEIGHT+base-foe_base+rise*t-lift) { continue }
 		// Nearer than all before it; two cards as deep, the one the ray
 		// crosses nearer its middle.
 		if shot.hit == .Foe && t >= nearest-FIRST_PERSON_EPSILON && lateral >= side { continue }
 		nearest, side = t, lateral
-		shot.hit, shot.target, shot.cell, shot.point = .Foe, enemy_entity(enemy.id), enemy.position, at(o, d, rise, t)
+		shot.hit, shot.target, shot.cell, shot.point = .Foe, enemy_entity(enemy.id), enemy.position, at(o, d, base, rise, t)
 	}
 	return
 }
@@ -315,12 +319,15 @@ first_person_trace :: proc(room: ^Room, from: grid.Position, aim: First_Person_A
 // stops the shot, written into `shot` (nothing struck: a cell out of sight, or
 // the walk's end), and how far along the board it stops.
 @(private="file")
-first_person_trace_board :: proc(room: ^Room, o, d: [2]f32, rise: f32, shot: ^First_Person_Shot) -> (stop: f32) {
-	at :: proc(o, d: [2]f32, rise, s: f32) -> [3]f32 {
-		return {o.x+d.x*s, FIRST_PERSON_EYE_HEIGHT+rise*s, o.y+d.y*s}
+first_person_trace_board :: proc(room: ^Room, o, d: [2]f32, base, rise: f32, shot: ^First_Person_Shot) -> (stop: f32) {
+	at :: proc(o, d: [2]f32, base, rise, s: f32) -> [3]f32 {
+		return {o.x+d.x*s, FIRST_PERSON_EYE_HEIGHT+base+rise*s, o.y+d.y*s}
 	}
-	floor := max(f32)
-	if rise < -FIRST_PERSON_EPSILON { floor = FIRST_PERSON_EYE_HEIGHT/-rise }
+	// How far along the ray it meets the floor of `cell` (the height of its steps).
+	floor_of :: proc(room: ^Room, cell: grid.Position, base, rise: f32) -> f32 {
+		if rise < -FIRST_PERSON_EPSILON { return (FIRST_PERSON_EYE_HEIGHT+base-f32(cell_height(room, cell))*HEIGHT_STEP_DRAWN)/-rise }
+		return max(f32)
+	}
 	big :: f32(1e30)
 	cell := grid.Position{int(math.floor(o.x)), int(math.floor(o.y))}
 	step := [2]int{1 if d.x > 0 else -1, 1 if d.y > 0 else -1}
@@ -334,9 +341,9 @@ first_person_trace_board :: proc(room: ^Room, o, d: [2]f32, rise: f32, shot: ^Fi
 	if room != nil && room.level_data != nil { limit += room.level_data.tiles.width+room.level_data.tiles.height }
 	for _ in 0..<limit*2 {
 		leave := min(next.x, next.y)
-		if floor <= leave {
-			shot.hit, shot.cell, shot.point = .Floor, cell, at(o, d, rise, floor)
-			shot.point.y = 0
+		if floor := floor_of(room, cell, base, rise); floor <= leave {
+			shot.hit, shot.cell, shot.point = .Floor, cell, at(o, d, base, rise, floor)
+			shot.point.y = f32(cell_height(room, cell))*HEIGHT_STEP_DRAWN
 			return floor
 		}
 		entered := cell
@@ -344,7 +351,7 @@ first_person_trace_board :: proc(room: ^Room, o, d: [2]f32, rise: f32, shot: ^Fi
 			// Through a corner: both cells beside it must be open.
 			side_a, side_b := grid.Position{cell.x+step.x, cell.y}, grid.Position{cell.x, cell.y+step.y}
 			if lasso_cell_is_solid(room, side_a) && lasso_cell_is_solid(room, side_b) {
-				shot.hit, shot.cell, shot.point = .Solid, side_a, at(o, d, rise, next.x)
+				shot.hit, shot.cell, shot.point = .Solid, side_a, at(o, d, base, rise, next.x)
 				return next.x
 			}
 			entered = {cell.x+step.x, cell.y+step.y}
@@ -361,16 +368,21 @@ first_person_trace_board :: proc(room: ^Room, o, d: [2]f32, rise: f32, shot: ^Fi
 			next.y += delta.y
 		}
 		if lasso_cell_is_solid(room, entered) {
-			shot.hit, shot.cell, shot.point = .Solid, entered, at(o, d, rise, s)
+			shot.hit, shot.cell, shot.point = .Solid, entered, at(o, d, base, rise, s)
+			return s
+		}
+		// A cell whose floor is above the ray is a cliff face: it stops the shot.
+		if f32(cell_height(room, entered))*HEIGHT_STEP_DRAWN > FIRST_PERSON_EYE_HEIGHT+base+rise*s+FIRST_PERSON_EPSILON {
+			shot.hit, shot.cell, shot.point = .Solid, entered, at(o, d, base, rise, s)
 			return s
 		}
 		if !tactical_cell_visible(room, entered) {
-			shot.cell, shot.point = entered, at(o, d, rise, s)
+			shot.cell, shot.point = entered, at(o, d, base, rise, s)
 			return s
 		}
 		cell = entered
 	}
-	shot.cell, shot.point = cell, at(o, d, rise, s)
+	shot.cell, shot.point = cell, at(o, d, base, rise, s)
 	return s
 }
 

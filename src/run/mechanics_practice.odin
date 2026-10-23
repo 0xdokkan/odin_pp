@@ -2,6 +2,7 @@ package run
 
 import "core:strings"
 import game "../game"
+import grid "../engine/grid"
 import level "../level"
 import render "../render"
 
@@ -27,9 +28,14 @@ MECHANICS_LAB_RULES :: game.Deck_Rules{hand_size = len(MECHANICS_LAB_DECK)-1, ma
 #assert(len(MECHANICS_LAB_DECK)-1 <= game.MAX_HAND_CAPACITY)
 MECHANICS_LAB_DECK_SEED :: u64(0x7E57_1AB)
 
+// The arenas of the lab: the flat one every card is tried in, and the one with
+// heights (a plateau up a stair, a pillar, a spiral hill) to try the heights in
+// (F3 switches between them).
+Mechanics_Lab_Arena :: enum { Flat, Heights }
+
 // The open arena: walls only around the edge, the player in the middle and
 // the (unused) exit tucked into a corner.
-mechanics_lab_level :: proc() -> (level.Level, bool) {
+mechanics_lab_level :: proc(arena := Mechanics_Lab_Arena.Flat) -> (level.Level, bool) {
 	rows: [MECHANICS_LAB_HEIGHT]string
 	for y in 0..<MECHANICS_LAB_HEIGHT {
 		row := strings.builder_make(context.temp_allocator)
@@ -44,12 +50,29 @@ mechanics_lab_level :: proc() -> (level.Level, bool) {
 		rows[y] = strings.to_string(row)
 	}
 	data, error, _ := level.from_ascii(rows[:])
-	return data, error == .None
+	if error != .None { return data, false }
+	if arena == .Heights { mechanics_lab_raise(&data) }
+	return data, true
+}
+
+// The arena of heights, on the 23x17 board with the player at (11,8):
+// - a plateau of 4 steps at x 15..19, y 5..11, reached by a stair of three
+//   (x 12..14, y 7..9: 1, 2, 3) from the player's side; its other sides are cliffs;
+// - a pillar of 8 steps at (6,4): a wall to anyone who walks;
+// - a spiral hill at x 3..5, y 10..12: a path of one step each round a top of 9,
+//   with a cliff between every two turns of it.
+mechanics_lab_raise :: proc(data: ^level.Level) {
+	for x in 12..=14 { for y in 7..=9 { level.set_height(data, {x, y}, i32(x-11)) } }
+	for x in 15..=19 { for y in 5..=11 { level.set_height(data, {x, y}, 4) } }
+	level.set_height(data, {6, 4}, 8)
+	spiral := [9]grid.Position{{3, 10}, {4, 10}, {5, 10}, {5, 11}, {5, 12}, {4, 12}, {3, 12}, {3, 11}, {4, 11}}
+	for cell, step in spiral { level.set_height(data, cell, i32(step)+1) }
 }
 
 // Replaces `data` with the arena and builds its endless room around `player`.
-create_mechanics_lab_room :: proc(data: ^level.Level, player: ^game.Player, config: game.Tactical_Config) -> (room: game.Room, ok: bool) {
-	arena, built := mechanics_lab_level()
+create_mechanics_lab_room :: proc(data: ^level.Level, player: ^game.Player, config: game.Tactical_Config,
+	which := Mechanics_Lab_Arena.Flat) -> (room: game.Room, ok: bool) {
+	arena, built := mechanics_lab_level(which)
 	if !built { return }
 	game.finish_deck_combat(&player.deck)
 	if !game.initialize_empty_deck(&player.deck, MECHANICS_LAB_RULES, MECHANICS_LAB_DECK_SEED) { level.destroy(&arena); return }
@@ -62,7 +85,8 @@ create_mechanics_lab_room :: proc(data: ^level.Level, player: ^game.Player, conf
 	// Three first arrivals, well away from the middle.
 	spawns := [?]game.Enemy_Spawn{
 		{position = {4, 4}, health = 12, attack = 2, archetype = .Chaser},
-		{position = {MECHANICS_LAB_WIDTH-5, 4}, health = 10, attack = 2, archetype = .Archer},
+		// In the arena of heights the archer waits up on the plateau.
+		{position = {MECHANICS_LAB_WIDTH-5, 4} if which == .Flat else {MECHANICS_LAB_WIDTH-5, 6}, health = 10, attack = 2, archetype = .Archer},
 		{position = {MECHANICS_LAB_WIDTH/2, MECHANICS_LAB_HEIGHT-4}, health = 18, attack = 3, archetype = .Brute},
 	}
 	room, ok = game.create_room(data, player, {enemies = spawns[:]})
@@ -82,7 +106,7 @@ prepare_mechanics_lab :: proc(rs: ^Roguelike_Session) -> bool {
 		game.destroy_room(&rs.room)
 		rs.room_created = false
 	}
-	room, ok := create_mechanics_lab_room(&rs.level_data, &rs.run_state.player, rs.options.tactical)
+	room, ok := create_mechanics_lab_room(&rs.level_data, &rs.run_state.player, rs.options.tactical, rs.lab_arena)
 	if !ok { return false }
 	rs.room = room
 	rs.room_created = true

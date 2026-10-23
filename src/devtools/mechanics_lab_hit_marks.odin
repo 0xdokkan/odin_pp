@@ -17,7 +17,6 @@ import render "../render"
 
 // The board as the act draws it: a chosen card (and the one only under the mouse
 // in the hand), the pointer on `cell`.
-@(private = "file")
 mechanics_lab_capture_hits :: proc(window: ^app.Window, renderer: ^render.Renderer, room: ^game.Room, selected, hovered: u32,
 	cell: grid.Position, name: cstring) {
 	for _ in 0..<3 {
@@ -50,7 +49,6 @@ mechanics_lab_hits_of :: proc(room: ^game.Room, card: game.Card_Instance) -> (al
 	return
 }
 
-@(private = "file")
 mechanics_lab_card_of :: proc(player: ^game.Player, id: game.Card_Id) -> (card: game.Card_Instance, ok: bool) {
 	hand, held := mechanics_lab_hand_card(player, id)
 	if !held { return }

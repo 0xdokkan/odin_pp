@@ -15,6 +15,19 @@ per i comandi disponibili oggi valgono il [README](README.md) e la documentazion
 - Fasi 8–11: l'hub diventa un mondo 3D in cui il robot cammina (piazza,
   casinò, deposito, sala giochi), dai disegni dell'utente in
   `docs/immagini/`.
+- **Fase 2 del piano fatta: altezze nel laboratorio.** Ogni cella può avere un'altezza in
+  gradini (0 ovunque = il gioco di prima).
+  - Regole: il passo fra celle vicine è al massimo di 1 gradino, di più è un dirupo (un muro
+    per chi cammina); le spinte non salgono un dirupo ma lo scendono, cadendo (danno =
+    dislivello − 1, al massimo 10); i nemici non camminano sui dirupi; linea di tiro e di vista
+    seguono il terreno; +1 gittata dalle carte a distanza da 4 o più gradini in alto; il First
+    Person Shooter segue le altezze.
+  - Grafica del laboratorio: pavimento rialzato con le linee dei gradini, personaggi, ombre,
+    anteprime, segni dei bersagli e intenti alla quota giusta, telecamera che segue il giocatore,
+    puntatore che sceglie la cima o la faccia giusta.
+  - Seconda arena della Prova meccaniche (F3): altopiano con scala, pilastro e collina a
+    spirale. Le spedizioni restano piatte (Fase 3).
+  - Test: 13 nuovi (1551 in tutto); atto `mechanics_lab_heights` dello smoke (`ODIN_PP_LAB_ONLY=heights`).
 - **Fase 1 del piano fatta: bersagli in evidenza.** Mentre si sceglie una carta,
   ogni nemico che una giocata valida colpirebbe davvero ha la casella accesa (nucleo
   quasi bianco che pulsa, contorno d'inchiostro, angoli, alone viola elettrico, verde

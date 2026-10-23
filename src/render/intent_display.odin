@@ -200,7 +200,7 @@ draw_intent_ground :: proc(renderer: ^Renderer, room: ^game.Room) {
 @(private = "file")
 draw_intent_cell :: proc(cell: grid.Position, progress: f32, color: rl.Color, alpha: f32) {
 	x, z := f32(cell.x), f32(cell.y)
-	y := f32(0.045)
+	y := f32(0.045)+cell_ground(cell)
 	band := 0.08+0.42*progress
 	c := color_with_opacity(color, clamp(alpha, 0, 1))
 	rl.DrawCubeV({x+0.5, y, z+band*0.5}, {1, 0.01, band}, c)
@@ -215,7 +215,7 @@ draw_intent_cell :: proc(cell: grid.Position, progress: f32, color: rl.Color, al
 @(private = "file")
 draw_intent_cell_outline :: proc(cell: grid.Position, width: f32, color: rl.Color) {
 	x, z := f32(cell.x), f32(cell.y)
-	y := f32(0.05)
+	y := f32(0.05)+cell_ground(cell)
 	rl.DrawCubeV({x+0.5, y, z+width*0.5}, {1, 0.012, width}, color)
 	rl.DrawCubeV({x+0.5, y, z+1-width*0.5}, {1, 0.012, width}, color)
 	rl.DrawCubeV({x+width*0.5, y, z+0.5}, {width, 0.012, 1}, color)
@@ -226,8 +226,8 @@ draw_intent_cell_outline :: proc(cell: grid.Position, width: f32, color: rl.Colo
 // the head filling as the step comes.
 @(private = "file")
 draw_intent_arrow :: proc(from, to: grid.Position, progress: f32, color: rl.Color) {
-	a := rl.Vector3{f32(from.x)+0.5, 0.05, f32(from.y)+0.5}
-	b := rl.Vector3{f32(to.x)+0.5, 0.05, f32(to.y)+0.5}
+	a := rl.Vector3{f32(from.x)+0.5, 0.05+cell_ground(from), f32(from.y)+0.5}
+	b := rl.Vector3{f32(to.x)+0.5, 0.05+cell_ground(to), f32(to.y)+0.5}
 	d := b-a
 	length := rl.Vector3Length(d)
 	if length < 0.01 { return }

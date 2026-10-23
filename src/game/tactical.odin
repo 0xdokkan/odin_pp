@@ -374,10 +374,14 @@ tactical_in_footprint :: proc(size: int, facing: Move_Direction, origin, positio
 
 // Visible endpoints include walls; intermediate blockers and closed corners
 // hide what lies behind them. There is deliberately no explored-cell storage.
+// `height`, when given, is the cell's height in steps: the ground hides what is
+// behind a cell above the line from the eye to the target (height_hides).
 tactical_line_visible :: proc(origin, destination: grid.Position,
-	opaque: proc(rawptr, grid.Position) -> bool, data: rawptr) -> bool {
+	opaque: proc(rawptr, grid.Position) -> bool, data: rawptr,
+	height: proc(rawptr, grid.Position) -> i32 = nil) -> bool {
 	cell := origin
 	dx, dy := abs(destination.x-origin.x), abs(destination.y-origin.y)
+	count, index := max(dx, dy), 0
 	sx := 1 if destination.x > origin.x else -1
 	sy := 1 if destination.y > origin.y else -1
 	error := dx-dy
@@ -389,6 +393,8 @@ tactical_line_visible :: proc(origin, destination: grid.Position,
 		if next.x != cell.x && next.y != cell.y &&
 		   opaque(data, {next.x, cell.y}) && opaque(data, {cell.x, next.y}) { return false }
 		if next != destination && opaque(data, next) { return false }
+		index += 1
+		if height != nil && next != destination && line_hidden_by_height(height, data, origin, destination, next, index, count) { return false }
 		cell = next
 	}
 	return true
@@ -399,6 +405,21 @@ tactical_room_opaque :: proc(data: rawptr, position: grid.Position) -> bool {
 	return cell_blocks_line_of_sight(cast(^Room)data, position)
 }
 
+// The ground's part of a line of sight, the same rule as height_hides but over a
+// callback: the renderer reads its own copy of the heights.
+@(private)
+line_hidden_by_height :: proc(height: proc(rawptr, grid.Position) -> i32, data: rawptr, origin, destination, cell: grid.Position, index, count: int) -> bool {
+	if count <= 1 || index <= 0 || index >= count { return false }
+	eye := height(data, origin)+HEIGHT_EYE_STEPS
+	aim := height(data, destination)+HEIGHT_TARGET_STEPS
+	return int(height(data, cell))*count > int(eye)*count+int(aim-eye)*index
+}
+
+@(private)
+tactical_room_height :: proc(data: rawptr, position: grid.Position) -> i32 {
+	return cell_height(cast(^Room)data, position)
+}
+
 tactical_cell_visible :: proc(room: ^Room, position: grid.Position) -> bool {
 	if room == nil || room.player == nil || room.level_data == nil { return false }
 	if !grid.contains(&room.level_data.tiles, position) { return false }
@@ -406,7 +427,7 @@ tactical_cell_visible :: proc(room: ^Room, position: grid.Position) -> bool {
 	if s.config.vision_size == 0 { return true }
 	origin := tactical_view_origin(room)
 	return tactical_in_footprint(tactical_vision_size(s.config, &room.player.statuses), s.facing, origin, position) &&
-		tactical_line_visible(origin, position, tactical_room_opaque, room)
+		tactical_line_visible(origin, position, tactical_room_opaque, room, tactical_room_height)
 }
 
 tactical_target_visible :: proc(room: ^Room, target: Target) -> bool {

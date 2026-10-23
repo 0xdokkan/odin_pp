@@ -23,6 +23,8 @@ import view "../engine/view"
 Roguelike_Session :: struct {
 	window:                  ^app.Window,
 	options:                 Options,
+	// Which arena the Prova meccaniche is in (F3 switches it, mechanics_practice.odin).
+	lab_arena:               Mechanics_Lab_Arena,
 	actions:                 input.Action_Map(Run_Action),
 	diagnostics:             Run_Diagnostics,
 	frame_input:             Run_Input,
@@ -242,6 +244,11 @@ update_run_activity_overlay :: proc(rs: ^Roguelike_Session, hf: ^host.Frame) -> 
 	restart_requested := !rs.activity_modal && (run_pressed(rs.frame_input, .Restart) ||
 		(rs.run_state.phase == .Defeat && run_pressed(rs.frame_input, .Confirm)) ||
 		(rs.defeat_hovered == .Restart && rs.frame_input.left_pressed))
+	// F3 in PROVA MECCANICHE: the other arena, started afresh.
+	if rs.options.mechanics_lab && !rs.activity_modal && run_pressed(rs.frame_input, .Lab_Arena) {
+		rs.lab_arena = .Heights if rs.lab_arena == .Flat else .Flat
+		restart_requested = true
+	}
 	if restart_requested && !roguelike_restart(rs, hf) { return true }
 
 	return false

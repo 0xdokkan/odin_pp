@@ -128,6 +128,7 @@ draw_card_hit_cell :: proc(room: ^game.Room, mark: Card_Hit_Mark, t, age, scale:
 	y := f32(0.05)
 	if tile.kind == .Exit { y = 0.128 }
 	if tile.kind == .Wall { y = 0.202 }
+	y += cell_ground(mark.cell)
 	locked := age >= 0
 	pulse := 0.5+0.5*math.sin(t*5.2+f32(mark.id)*0.7)
 	center := rl.Vector3{f32(mark.cell.x)+0.5, y, f32(mark.cell.y)+0.5}
@@ -222,7 +223,7 @@ draw_card_hit_sparks :: proc(renderer: ^Renderer, room: ^game.Room, preview: ^Ca
 	rlgl.SetTexture(rlgl.GetTextureIdDefault())
 	for mark in preview.hits[:preview.hit_count] {
 		if !tactical_render_visible(renderer, mark.cell) || !tactical_cell_on_screen(renderer, mark.cell) { continue }
-		base := rl.Vector3{f32(mark.cell.x)+0.5, 0.05, f32(mark.cell.y)+0.5}+toward
+		base := rl.Vector3{f32(mark.cell.x)+0.5, 0.05+cell_ground(mark.cell), f32(mark.cell.y)+0.5}+toward
 		pulse := 0.5+0.5*math.sin(t*5.2+f32(mark.id)*0.7)
 		// The shaft: a halo-coloured sheet fading upwards with a hot white core.
 		rlgl.CheckRenderBatchLimit(c.int(24))

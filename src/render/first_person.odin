@@ -294,7 +294,7 @@ frame_first_person_camera :: proc(renderer: ^Renderer, room: ^game.Room) {
 	if room == nil || room.player == nil || v.snapshot == nil { return }
 	now := renderer.sprite_assets.elapsed
 	p := v.snapshot.player.position
-	f.eye = {p.x+0.5, game.FIRST_PERSON_EYE_HEIGHT, p.y+0.5}
+	f.eye = {p.x+0.5, game.FIRST_PERSON_EYE_HEIGHT+point_ground(p), p.y+0.5}
 	f.eye_cell = {int(math.round(p.x)), int(math.round(p.y))}
 	f.card_count = 0
 	for actor in v.snapshot.enemies[:v.snapshot.enemy_count] {
@@ -339,7 +339,7 @@ frame_first_person_camera :: proc(renderer: ^Renderer, room: ^game.Room) {
 		for actor in v.snapshot.enemies[:v.snapshot.enemy_count] {
 			if f.sight_count == len(f.sight) { break }
 			cell := grid.Position{int(math.round(actor.position.x)), int(math.round(actor.position.y))}
-			f.sight[f.sight_count] = {cell = cell, seen = game.tactical_line_visible(f.eye_cell, cell, tactical_snapshot_opaque, &context_data)}
+			f.sight[f.sight_count] = {cell = cell, seen = game.tactical_line_visible(f.eye_cell, cell, tactical_snapshot_opaque, &context_data, tactical_snapshot_height)}
 			f.sight_count += 1
 		}
 	}

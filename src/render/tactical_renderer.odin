@@ -259,6 +259,7 @@ Tactical_View_Input :: struct {
 update_tactical_view :: proc(renderer: ^Renderer, room: ^game.Room, mouse: view.Vec2, inside: bool, refresh_only: bool = false,
 	input: Tactical_View_Input = {}) {
 	v := &renderer.tactical
+	set_board_level(room.level_data)
 	v.expedition = room.player.tactical.config.expedition
 	v.expedition_biome = room.player.tactical.config.expedition_biome
 	if !refresh_only { v.pointer_window = input.window_mouse }
@@ -290,7 +291,7 @@ update_tactical_view :: proc(renderer: ^Renderer, room: ^game.Room, mouse: view.
 			cell := grid.Position{origin.x+dx, origin.y+dy}
 			if !grid.contains(&room.level_data.tiles, cell) ||
 			   !game.tactical_in_footprint(size, room.player.tactical.facing, origin, cell) ||
-			   !game.tactical_line_visible(origin, cell, tactical_snapshot_opaque, &visibility) { continue }
+			   !game.tactical_line_visible(origin, cell, tactical_snapshot_opaque, &visibility, tactical_snapshot_height) { continue }
 			v.visible[v.visible_count] = cell
 			v.visible_count += 1
 		}
@@ -314,7 +315,8 @@ update_tactical_view :: proc(renderer: ^Renderer, room: ^game.Room, mouse: view.
 	forward := rl.Vector3{math.cos(v.world_orbit.yaw), 0, math.sin(v.world_orbit.yaw)}
 	footprint_scale := 1.1+f32(max(0, size-5))*0.065
 	aim := TACTICAL_SHOWCASE_AIM if v.showcase else TACTICAL_HAND_AIM
-	target := rl.Vector3{p.x+0.5, 0, p.y+0.5}+forward*(aim*footprint_scale*(1-LASSO_CAMERA_AIM*pull))
+	// The camera follows the ground the player stands on, up a stair and down it.
+	target := rl.Vector3{p.x+0.5, point_ground(p), p.y+0.5}+forward*(aim*footprint_scale*(1-LASSO_CAMERA_AIM*pull))
 	if room.player.tactical.config.expedition {
 		combat_orbit := v.world_orbit
 		combat_orbit.distance *= footprint_scale*(1+LASSO_CAMERA_BACK*pull)
@@ -340,11 +342,10 @@ update_tactical_view :: proc(renderer: ^Renderer, room: ^game.Room, mouse: view.
 	renderer.has_hovered_cell = false
 	if !inside || !point_in_rectangle(mouse, tactical_world_bounds(renderer)) || renderer_blocks_player_input(renderer) { return }
 	ray := rl.GetScreenToWorldRayEx(to_raylib(mouse), v.camera, c.int(renderer.canvas_width), c.int(renderer.canvas_height))
-	if abs(ray.direction.y) < 0.0001 { return }
-	t := -ray.position.y/ray.direction.y
-	if t <= 0 { return }
-	point := ray.position+ray.direction*t
-	cell := grid.Position{int(math.floor(point.x)), int(math.floor(point.z))}
+	// The cell the ray reaches first: a plateau's top or a cliff's face, where
+	// there are heights (pick_ground_cell); the plane's cell where there are none.
+	cell, picked := pick_ground_cell(ray.position, ray.direction)
+	if !picked { return }
 
 	if grid.contains(&room.level_data.tiles, cell) && tactical_render_visible(renderer, cell) {
 		renderer.has_hovered_cell = true
@@ -569,6 +570,7 @@ draw_tactical_world :: proc(renderer: ^Renderer, room: ^game.Room, active_card: 
 	v.draw_frustum = tactical_draw_frustum(v.camera, renderer.canvas_width, renderer.canvas_height)
 	snapshot := v.snapshot
 	preview: Card_Range_Preview
+	set_board_level(room.level_data)
 	if active_card != 0 { prepare_card_range_preview(renderer, room, active_card, &preview) } else { prepare_card_range_preview(renderer, room, hover_card, &preview, true) }
 	halo := CARD_HIT_VIOLET
 	if expedition_world != nil { halo = card_hit_halo_color(expedition.metadata(expedition_world.biome).color, true) }

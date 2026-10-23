@@ -192,7 +192,7 @@ try_move_player_diagonal :: proc(room: ^Room, offset: grid.Position) -> Action_R
 		return .Attacked
 	}
 	query := query_entity_movement(room, PLAYER_ENTITY, target)
-	if !movement_query_is_clear(&query) { return .Blocked }
+	if !movement_query_is_clear(&query) || step_height_blocked(room, room.player.position, target) { return .Blocked }
 	clear_event_log(room.recent_events)
 	action := make_action(.Move, PLAYER_ENTITY, cell_target(target), .Walkable_Cell)
 	added := add_effect(&action, move_effect(PLAYER_ENTITY, target))

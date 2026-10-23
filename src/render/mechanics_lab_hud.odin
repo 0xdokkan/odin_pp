@@ -17,7 +17,7 @@ mechanics_lab_banner_detail :: proc(renderer: ^Renderer, room: ^game.Room) -> cs
 		return fmt.ctprintf("ARENA LIBERA  /  PESCA %d/%d  /  F7 DA CAPO  /  F5 RICOMINCIA%s", game.fishing_casts_left(room),
 			game.fishing_casts_allowed(room), menu)
 	}
-	return fmt.ctprintf("NEMICI %d/%d  /  F5 RICOMINCIA  /  F6 INTENTI: %s  /  F7 PESCA%s", len(room.enemies), game.SANDBOX_MAX_ENEMIES,
+	return fmt.ctprintf("NEMICI %d/%d  /  F5 RICOMINCIA  /  F6 INTENTI: %s  /  F7 PESCA  /  F3 ALTEZZE%s", len(room.enemies), game.SANDBOX_MAX_ENEMIES,
 		intent_display_name(renderer.tactical.intent_display), menu)
 }
 

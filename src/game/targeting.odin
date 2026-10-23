@@ -256,6 +256,10 @@ targeting_path_blocker :: proc(
 		   !(allow_blocked_destination && is_destination) {
 			return position, true
 		}
+		// The ground rises and falls: a cell above the line of sight hides what is behind it.
+		if !is_destination && height_hides(room, origin, path[path_count-1], position, index+1, path_count) {
+			return position, true
+		}
 		step_x := position.x-previous.x
 		step_y := position.y-previous.y
 		if step_x != 0 && step_y != 0 {
@@ -479,7 +483,9 @@ evaluate_target_query :: proc(
 		return
 	}
 	result.error = .Anchor_Out_Of_Range
-	if !targeting_range_contains(spec.cast_range, result.origin, result.anchor) {
+	reach := spec.cast_range
+	reach.maximum = height_range_maximum(room, reach.maximum, result.origin, result.anchor)
+	if !targeting_range_contains(reach, result.origin, result.anchor) {
 		return
 	}
 	if spec.shape == .Line && !targeting_line_is_aligned(result.origin, result.anchor) {

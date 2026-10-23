@@ -73,10 +73,10 @@ test_mechanics_lab_f7_clears_the_arena_for_the_rod :: proc(t: ^testing.T) {
 	defer free(renderer)
 	render.set_mechanics_lab(renderer, true, true)
 	testing.expect_value(t, string(render.mechanics_lab_banner_detail(renderer, &room)),
-		"NEMICI 3/6  /  F5 RICOMINCIA  /  F6 INTENTI: HUD + TERRENO  /  F7 PESCA  /  F10 MENU")
+		"NEMICI 3/6  /  F5 RICOMINCIA  /  F6 INTENTI: HUD + TERRENO  /  F7 PESCA  /  F3 ALTEZZE  /  F10 MENU")
 	render.set_mechanics_lab(renderer, true)
 	testing.expect_value(t, string(render.mechanics_lab_banner_detail(renderer, &room)),
-		"NEMICI 3/6  /  F5 RICOMINCIA  /  F6 INTENTI: HUD + TERRENO  /  F7 PESCA")
+		"NEMICI 3/6  /  F5 RICOMINCIA  /  F6 INTENTI: HUD + TERRENO  /  F7 PESCA  /  F3 ALTEZZE")
 	enemies := len(room.enemies)
 	report, cleared := game.sandbox_clear_for_fishing(&room)
 	testing.expect(t, cleared)
