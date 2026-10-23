@@ -7,11 +7,14 @@ per i comandi disponibili oggi valgono il [README](README.md) e la documentazion
 
 ## 2026-10-23 — Piano di lavoro della griglia
 
-- Nuovo [piano](docs/piano-griglia.md) in sette fasi, da eseguire una alla
+- Nuovo [piano](docs/piano-griglia.md) in undici fasi, da eseguire una alla
   volta solo su comando dell'utente: bersagli in evidenza mentre si sceglie una
   carta, altezze nel laboratorio e nelle spedizioni, montagna a spirale delle
   Montagne innevate, caverne, strutture su più caselle e, se confermata, la
   loro posa da parte del giocatore.
+- Fasi 8–11: l'hub diventa un mondo 3D in cui il robot cammina (piazza,
+  casinò, deposito, sala giochi), dai disegni dell'utente in
+  `docs/immagini/`.
 - Per ogni fase: come funziona oggi il codice, il progetto, le domande da fare
   prima di iniziare, i passi, i test e il comando da dare a Claude. La sezione
   1 contiene le regole per Claude, compreso lo stop a fine fase.

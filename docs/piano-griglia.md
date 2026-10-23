@@ -5,7 +5,7 @@ Scritto il 23 ottobre 2026 sul ramo `piano-griglia`, partito da
 Prova meccaniche). Il ramo non contiene i 1000 crediti iniziali, che stanno su
 `crediti-iniziali-casino`.
 
-Il piano raccoglie tre richieste dell'utente, divise in fasi indipendenti:
+Il piano raccoglie quattro richieste dell'utente, divise in fasi indipendenti:
 
 1. **Bersagli in evidenza.** Mentre scegli una carta, la casella del raggio
    con sopra un nemico che la carta colpirebbe si accende in modo diverso, con
@@ -15,6 +15,10 @@ Il piano raccoglie tre richieste dell'utente, divise in fasi indipendenti:
    gradini fino alla cima.
 3. **Strutture su più caselle.** Un modo per posare sulla griglia oggetti ed
    edifici complessi.
+4. **L'hub in 3D.** Dopo la scelta della memoria, l'hub diventa un mondo in
+   cui il robot cammina: una piazza con gli edifici, e dentro casinò, deposito
+   e sala giochi altre zone da percorrere. La richiesta è accompagnata da tre
+   disegni dell'utente.
 
 Le fasi si eseguono **una alla volta, solo su comando dell'utente**. Le regole
 per Claude sono nella sezione 1 e vanno lette prima di ogni fase.
@@ -30,11 +34,17 @@ per Claude sono nella sezione 1 e vanno lette prima di ogni fase.
 | 5 | Caverne | 2 (3 e 4 per metterle nei biomi) | Da fare | — |
 | 6 | Strutture su più caselle: edifici e oggetti complessi | — (meglio dopo la 2) | Da fare | — |
 | 7 | Posa delle strutture da parte del giocatore | 6 | Facoltativa: si fa solo se l'utente la conferma | — |
+| 8 | Hub in 3D: la piazza, il robot che cammina, gli edifici | — | Da fare | — |
+| 9 | Hub in 3D: dentro il casinò | 8 | Da fare | — |
+| 10 | Hub in 3D: dentro il deposito | 8 | Da fare | — |
+| 11 | Hub in 3D: dentro la sala giochi | 8 | Da fare | — |
 
 L'ordine segue la richiesta dell'utente: prima l'HUD, poi la profondità, poi
 le strutture. Le strutture vengono dopo le altezze perché così possono avere
-piani e gradini fin dall'inizio. Se l'utente vuole un altro ordine, basta
-nominare la fase: le dipendenze sono nella tabella.
+piani e gradini fin dall'inizio. Le Fasi 8–11 riguardano l'hub e non
+dipendono dalle Fasi 1–7, quindi si possono fare in qualunque momento. Se
+l'utente vuole un altro ordine, basta nominare la fase: le dipendenze sono
+nella tabella.
 
 ## 1. Comandi per Claude
 
@@ -137,6 +147,8 @@ ODIN="/c/Users/lukeg/OneDrive/Desktop/odin-dev-2026-10/dist/odin.exe"
 Le catture finiscono in `build/captures` (cartella ignorata da git). Lo smoke
 completo del laboratorio dura più di otto minuti: durante il lavoro si
 possono far girare solo gli atti della fase, ma a fine fase va completato.
+Nelle Fasi 8–11 si aggiungono gli smoke dell'hub: `--smoke-hub`,
+`--smoke-expedition` e il nuovo `--smoke-hub-world`.
 
 ### 1.5 Fallimenti già noti (Windows, 23 ottobre 2026)
 
@@ -272,7 +284,7 @@ in `src/game` (per esempio `card_hittable_enemies`), pura e testabile.
 - Quindi qualunque tinta fissa si confonde in almeno un bioma.
 - Le guide sull'accessibilità dicono di non affidare il significato al solo
   colore, ma di usare anche forma, luminosità e movimento (fonti nella
-  sezione 9).
+  sezione 14).
 
 Per questo il segno è fatto di quattro cose insieme:
 1. **Luminosità:** il cuore della casella è bianco caldo, il punto più chiaro
@@ -989,7 +1001,7 @@ Mancano però quattro cose:
 
 - **Pianta disegnata a caratteri,** sul modello delle «vault» di Dungeon Crawl
   Stone Soup: righe di testo con una legenda, più indicazioni su rotazione e
-  specchio (fonti nella sezione 9). Legenda proposta:
+  specchio (fonti nella sezione 14). Legenda proposta:
   - `#` muro pieno: blocca passo e vista;
   - `=` muretto o recinto: blocca il passo, non la vista;
   - `.` pavimento della struttura;
@@ -1155,7 +1167,529 @@ fine.
 
 **Esito:** *(da compilare a fine fase)*
 
-## 9. Fonti consultate online
+## 9. L'hub in 3D: richiesta, disegni e com'è oggi
+
+Questa sezione vale per le Fasi 8–11.
+
+### Cosa chiede l'utente
+
+Dopo la scelta dello slot di salvataggio, l'hub (dove si decide cosa fare e
+dove andare) diventa un vero mondo di gioco in 3D. Il robot del giocatore ci
+cammina dentro e va dove vuole.
+
+- **La piazza.** Il robot appare al centro. Attorno ci sono edifici fisici:
+  - il portale da cui si sceglie il bioma e si parte;
+  - il casinò;
+  - il deposito;
+  - i progressi;
+  - i cabinati;
+  - le memorie;
+  - un'uscita per tornare indietro.
+- **Gli edifici.** Sono tutti edifici veri.
+  - Progressi e memorie aprono la loro pagina.
+  - Tutti gli altri portano in un'altra zona del mondo 3D.
+- **Il casinò.** Ogni gioco ha una sua struttura 3D: entrandoci si apre quel
+  gioco, per esempio la slot di 6 Ranch 7 o il duello di d20.
+- **Il deposito.** C'è uno zaino a terra: salendoci sopra si apre lo zaino del
+  menu. C'è poi un personaggio (il robot stesso o un manichino, a scelta di
+  Claude) che apre il menu del personaggio, più l'archivio e l'uscita.
+- **I nomi** dei disegni non sono definitivi: Claude propone quelli migliori.
+
+### I disegni dell'utente
+
+Dall'alto. In alto nel disegno vuol dire lontano dalla telecamera.
+
+![La piazza dell'hub](immagini/hub-piazza.png)
+
+![Il casinò](immagini/hub-casino.png)
+
+![Il deposito](immagini/hub-deposito.png)
+
+Trascrizione, con i nomi proposti:
+
+```text
+PIAZZA
+                    Portale dei ricordi
+      Casinò                                  Deposito
+
+  Sala giochi             (arrivo)                  Progressi
+
+                                                 Uscita
+                 Frammenti del creatore
+
+CASINÒ
+      6 Ranch 7                         Tre in fuga
+                       (arrivo)                     Piazza
+      Roulette europea                  Duello del d20
+
+DEPOSITO
+      Zaino                             Personaggio
+                       (arrivo)
+                     Archivio delle carte         Piazza
+```
+
+### Nomi proposti
+
+| Nel disegno | Nome | Cosa fa | Perché questo nome |
+|---|---|---|---|
+| portale di gioco | Portale dei ricordi | apre la galassia dei biomi; si parte da lì | il gioco chiama i biomi «ricordi» («Ricordo selezionato») |
+| casino | Casinò | porta nella sala del casinò (Fase 9) | con l'accento |
+| deposito | Deposito | porta nel deposito (Fase 10) | uguale |
+| cabinati | Sala giochi | porta nella sala dei cabinati (Fase 11) | chiaro anche a chi non conosce la parola «cabinato» |
+| progressi | Progressi | apre la pagina dei progressi | uguale |
+| memorie | Frammenti del creatore | apre frammenti e finali | «memorie» sono già gli slot («Tre memorie», «Memoria 01»): due cose con lo stesso nome confonderebbero |
+| uscita | Uscita | salva e torna alla scelta della memoria | uguale |
+| ranch 6 7 | 6 Ranch 7 | apre la slot | il nome del gioco |
+| tre in fuga | Tre in fuga | apre il gioco | uguale |
+| roulette europea | Roulette europea | apre la roulette | uguale |
+| duello di d20 | Duello del d20 | apre il duello | più scorrevole |
+| zaino | Zaino | apre lo zaino | uguale |
+| personaggio | Personaggio | apre la pagina del personaggio | uguale |
+| archivio | Archivio delle carte | apre l'archivio con Mostra effetto | dice cosa contiene |
+| uscita (interni) | Piazza | torna in piazza | dice dove porta |
+
+### Com'è oggi
+
+Righe del 23 ottobre 2026.
+
+- **La scena** è `campaign_hub_scene` (`src/application/campaign_hub.odin:53-58`).
+  - Le pagine sono `Hub_Page` (riga 20): `Slots`, `Galaxy`, `Storage`,
+    `Progress`, `Arcade`, `Casino`, `Memories`, cioè le sezioni dei disegni.
+  - In alto c'è una barra di pulsanti per cambiare pagina (righe 192-194), con
+    «Slot / Salva» per tornare agli slot.
+- **Aprire una memoria** (`hub_open_slot`, righe 110-127) porta alla galassia.
+  Se c'è una spedizione in corso, ci si entra subito.
+- **La galassia** è l'unica parte già in 3D (`hub_galaxy_input`, righe 281-320;
+  `hub_draw`, righe 378-425).
+  - Isole che si fanno orbitare trascinando, e il pulsante «PARTI».
+  - Un'animazione di 1,15 s porta poi alla spedizione; il robot che salta è
+    fatto di cubi.
+  - Le isole si disegnano in `src/application/hub_islands.odin`.
+- **Il deposito** (`hub_storage`, righe 209-215) usa
+  `campaignui.update_inventory`, che ha tre pannelli: `Inventory`,
+  `Character` e `Archive` (`src/campaignui/inventory.odin:13`). Sono lo zaino,
+  il personaggio e l'archivio del disegno.
+- **Il casinò** (righe 343-357) ha quattro pulsanti. Ognuno apre
+  `arcade.casino_create(kind, wallet, seed)` con `host.push`, dove `kind` è
+  `Ranch`, `Escape`, `Roulette` o `Dice` (`src/memoryarcade/casino.odin:9`).
+- **I cabinati** (`hub_arcade`, `src/application/hub_progress.odin:128-142`)
+  elencano i minigiochi sbloccati vincendo i biomi (`hub_unlocked_arcades`,
+  righe 44-52; 12 in tutto). «GIOCA» apre il minigioco con `host.push`.
+- **I progressi** (`hub_progress`, righe 85-126) mostrano statistiche, segreti
+  e record, più due pulsanti: «ARCHIVIO / MOSTRA EFFETTO» e «PROVA
+  MECCANICHE».
+- **Le memorie** (`hub_memories`, `campaign_hub.odin:360-375`) mostrano
+  frammenti e finali.
+- **Al ritorno da una spedizione** (`hub_resume`, righe 152-164) compaiono gli
+  avvisi, e i finali aprono da soli le memorie (righe 159-160).
+- **Gli smoke** `--smoke-hub` e `--smoke-expedition` aprono direttamente la
+  galassia o la spedizione (riga 55).
+- **I test** sono in `src/application/campaign_hub_test.odin`,
+  `hub_preview_test.odin` e `hub_progress_test.odin`.
+
+### Come si costruisce: scelte comuni alle Fasi 8–11
+
+- **La scena resta quella dell'hub.**
+  - Si aggiunge lo stato «a piedi», con la zona corrente: piazza, casinò,
+    deposito o sala giochi.
+  - Le pagine di oggi (progressi, frammenti, deposito, galassia) diventano
+    finestre che si aprono sopra il mondo quando si entra nell'edificio, e si
+    chiudono riportando il robot davanti alla porta.
+  - Casinò e cabinati aprono le loro scene con `host.push` come oggi, e
+    `hub_resume` rimette il robot davanti all'edificio da cui era entrato.
+- **Dati e regole puri** in un pacchetto nuovo (proposta: `src/hubworld`):
+  - le zone e gli edifici, con impronta, porta, nome e azione;
+  - i punti di arrivo;
+  - il movimento con le collisioni;
+  - gli ingressi.
+
+  Senza grafica e senza finestra, così tutto si testa.
+- **Il disegno delle spedizioni non si riusa per intero.**
+  - Sia il disegno completo (`draw_tactical_world`,
+    `src/render/tactical_renderer.odin:561`) sia il movimento libero
+    (`roam_step`, `src/expedition/roam.odin:115`) chiedono una stanza di
+    gioco e un mondo di spedizione, ma l'hub non ha combattimenti, nemici né
+    caselle.
+  - Si riusano i pezzi pubblici: le forme con bordo al neon `ink_solid`,
+    `ink_frustum` e `ink_box` (`src/render/expedition_architecture.odin:54-104`)
+    e il robot di cartoncino `draw_expedition_robot`
+    (`src/render/expedition_robot.odin:74`). Così l'hub ha lo stesso stile
+    delle spedizioni.
+  - Il disegno va in un file nuovo del renderer (proposta:
+    `src/render/hub_world.odin`).
+- **Movimento:** tastiera (WASD, come in esplorazione) e clic su un edificio
+  per andarci da soli. Niente salti e niente mount.
+- **Telecamera:** fissa e inclinata come nelle spedizioni, segue il robot.
+  Guarda verso il portale, così lo schermo ricalca il disegno. Niente
+  rotazione e niente zoom.
+- **Entrare.** Si entra camminando dentro la porta, come chiede l'utente; per
+  gli oggetti del deposito basta salirci sopra.
+  - Una porta si riarma solo dopo che il robot ne è uscito, e dopo ogni
+    chiusura il robot riappare fuori, rivolto verso la piazza. Così niente si
+    riapre per sbaglio.
+  - Avvicinandosi compaiono il nome dell'edificio e una riga che dice cosa fa.
+- **Accesso rapido.** Tab apre l'elenco delle sezioni, per chi non vuole
+  camminare e per gli smoke. Le guide sulle interfacce dentro il mondo
+  consigliano sempre una via alternativa (sezione 14).
+- **Arrivi:**
+  - aprendo una memoria, al centro della piazza;
+  - tornando da una spedizione, davanti al portale;
+  - chiudendo una pagina o un gioco, davanti a quell'edificio.
+- **Da conservare:**
+  - avvisi e messaggi di salvataggio;
+  - i finali che aprono i frammenti;
+  - la spedizione sospesa (oggi «Riprendi la spedizione» nella galassia);
+  - il pulsante della Prova meccaniche nei progressi;
+  - gli smoke che aprono direttamente la galassia.
+- **Grafica:** tutta costruita da codice, senza modelli scaricati.
+  - Insegne al neon con il nome.
+  - Lo stile delle spedizioni: solidi blu notte, spigoli al neon, personaggi
+    di carta.
+- **Salvataggi.** La posizione nella piazza non si salva, perché si riparte
+  sempre dal centro. Il formato dei salvataggi non cambia.
+
+## 10. Fase 8 — Hub in 3D: la piazza
+
+### Cosa si fa
+
+- **La piazza** con i sette edifici, disposti come nel disegno.
+  - Stanno su un cerchio di circa 14 unità (da regolare), con le porte
+    rivolte al centro.
+  - Posizioni sull'orologio: Portale alle 12, Deposito alle 2, Progressi alle
+    3, Uscita tra le 4 e le 5, Frammenti alle 6, Sala giochi alle 9, Casinò tra
+    le 10 e le 11.
+- **Il robot** cammina, la telecamera lo segue.
+- **Gli ingressi:**
+  - Portale dei ricordi: la galassia di oggi, presentata come l'interno del
+    portale, con «Torna in piazza»;
+  - Progressi e Frammenti: le loro pagine, aperte sopra il mondo;
+  - Deposito, Casinò e Sala giochi: per ora aprono le pagine di oggi, finché
+    le Fasi 9–11 non costruiscono i loro interni;
+  - Uscita: salva e torna alla scelta della memoria.
+- **La barra di pulsanti in alto** sparisce; le sezioni restano raggiungibili
+  anche dall'elenco con Tab.
+
+### Aspetto proposto degli edifici
+
+- **Portale dei ricordi:** un anello di luce alto, con la galassia che gira
+  dentro.
+- **Casinò:** facciata con luci da insegna e dadi giganti.
+- **Deposito:** magazzino con serranda e casse.
+- **Progressi:** una torre con un tabellone di stelle e trofei.
+- **Frammenti del creatore:** un piccolo tempio con frammenti sospesi che
+  ruotano.
+- **Sala giochi:** facciata con le sagome dei cabinati nelle vetrine.
+- **Uscita:** un varco che si apre sul vuoto.
+
+### Da chiedere prima di iniziare
+
+1. **Nomi:** quelli della tabella della sezione 9, oppure altri.
+2. **Come si entra.**
+   - (Consigliato) Camminando dentro la porta.
+   - Oppure con un tasto davanti alla porta.
+3. **Clic su un edificio** per andarci da soli.
+   - (Consigliato) Sì.
+   - Oppure solo tastiera.
+4. **Elenco rapido con Tab.**
+   - (Consigliato) Sì.
+   - Oppure no.
+5. **Dove si appare tornando da una spedizione.**
+   - (Consigliato) Davanti al portale.
+   - Oppure al centro.
+6. **Interno del portale.**
+   - (Consigliato) La galassia di oggi.
+   - Oppure una sala nuova da progettare.
+
+### Passi
+
+1. `src/hubworld`, con i test:
+   - zone, edifici e porte;
+   - arrivi;
+   - movimento con collisioni;
+   - ingressi con riarmo.
+2. **Disposizione della piazza.** I test controllano che l'ordine attorno al
+   centro sia quello del disegno e che ogni porta si raggiunga dall'arrivo.
+3. **Disegno** in `src/render/hub_world.odin`: pavimento della piazza,
+   edifici, insegne, robot, telecamera.
+4. **Collegamento in `campaign_hub.odin`:**
+   - stato a piedi e pagine come finestre;
+   - ritorni, arrivi e Uscita;
+   - elenco con Tab;
+   - via la barra di pulsanti.
+5. **Smoke nuovo** `--smoke-hub-world`, con catture di:
+   - arrivo;
+   - ogni edificio con il suo nome;
+   - ogni pagina aperta;
+   - ritorno da una pagina.
+
+   `--smoke-hub` e `--smoke-expedition` devono continuare a funzionare.
+6. **Documenti:** `docs/avvio.md` (hub), `docs/direzione-implementazione.md`,
+   `docs/presentazione.md`, `CHANGELOG.md`.
+
+### Test
+
+- **Ingressi:**
+  - entrando in una porta, la sua azione parte una volta sola;
+  - non riparte finché il robot non esce;
+  - gli oggetti si aprono salendoci sopra.
+- **Arrivi:** al centro aprendo una memoria; davanti al portale dopo una
+  spedizione; davanti all'edificio dopo una pagina o un gioco.
+- **Collisioni:** il robot non attraversa gli edifici.
+- **I flussi di oggi restano:**
+  - spedizione sospesa e finali che aprono i frammenti;
+  - salvataggi continui;
+  - casinò e cabinati con `host.push`;
+  - Prova meccaniche dai progressi.
+- **I test dell'hub esistenti passano.** Fa eccezione quello già rotto su
+  Windows (sezione 1.5).
+
+### Fatto quando
+
+- Aprendo una memoria si arriva al centro della piazza.
+- Si cammina fino a ogni edificio e ognuno apre la sua sezione.
+- Uscendo si torna davanti all'edificio.
+- Dal portale si parte per una spedizione e al ritorno si è davanti al
+  portale.
+- Le verifiche della sezione 1.4 sono a posto, con lo smoke dell'hub al posto
+  di quello del laboratorio.
+
+### Comando
+
+```text
+Esegui la Fase 8 di docs/piano-griglia.md (Hub in 3D: la piazza). Segui le
+regole della sezione 1: fammi prima le domande della fase e fermati alla fine.
+```
+
+### Esito
+
+*(da compilare a fine fase)*
+
+## 11. Fase 9 — Hub in 3D: dentro il casinò
+
+### Cosa si fa
+
+- **Entrare in una zona:** entrando nel Casinò dalla piazza si passa,
+  con una dissolvenza, alla sala del casinò.
+  - È il primo interno, quindi questa fase costruisce il passaggio generico
+    tra zone, che le Fasi 10 e 11 riusano.
+- **Disposizione** (disegno `immagini/hub-casino.png`): arrivo al centro;
+  - 6 Ranch 7 in alto a sinistra;
+  - Tre in fuga in alto a destra;
+  - Piazza (l'uscita) a destra;
+  - Roulette europea in basso a sinistra;
+  - Duello del d20 in basso a destra.
+- **Le strutture dei giochi.** Entrandoci si apre il gioco esattamente come
+  oggi: `arcade.casino_create` con lo stesso portafoglio, a
+  `src/application/campaign_hub.odin:352-355`. Alla fine il robot è davanti a
+  quella struttura.
+- **Un'insegna** mostra i crediti del deposito.
+
+### Aspetto proposto
+
+- **6 Ranch 7:** una slot a forma di saloon, con cavallo e cowboy di
+  cartoncino.
+- **Tre in fuga:** una pista corta con il dinosauro, la Panda 4×4 e la moto
+  futuristica.
+- **Roulette europea:** un tavolo con la ruota che gira piano.
+- **Duello del d20:** un tavolo con due grandi d20.
+- **Piazza:** una porta con l'insegna «Piazza».
+
+### Da chiedere prima di iniziare
+
+1. **Aspetto delle quattro strutture:** quello proposto, oppure indicazioni
+   dell'utente.
+2. **Crediti visibili nella sala.**
+   - (Consigliato) Sì.
+   - Oppure no.
+3. **Suoni d'ambiente generati da codice** (brusio, slot, ruota).
+   - (Consigliato) Sì, leggeri.
+   - Oppure nessuno.
+
+### Passi
+
+1. Passaggio tra zone in `src/hubworld`: arrivo nella zona nuova e ritorno
+   davanti alla porta di partenza. Con test.
+2. Sala del casinò: disposizione e strutture.
+3. Disegno della sala e delle strutture.
+4. Collegamento ai quattro giochi e ritorni.
+5. Catture dello smoke dell'hub:
+   - sala;
+   - ogni struttura con il suo nome;
+   - un gioco aperto;
+   - ritorno in sala;
+   - ritorno in piazza.
+6. Documenti e `CHANGELOG.md`.
+
+### Test
+
+- Ogni struttura apre il gioco giusto, con il portafoglio del deposito.
+- Dopo il gioco si è davanti alla struttura giusta.
+- L'uscita riporta davanti al Casinò in piazza.
+- I test del casinò che esistono già passano.
+
+### Fatto quando
+
+- Dalla piazza si entra nel casinò, si gioca a ognuno dei quattro giochi
+  entrando nelle loro strutture, e si torna in piazza.
+- Le verifiche della sezione 1.4 sono a posto.
+
+### Comando
+
+```text
+Esegui la Fase 9 di docs/piano-griglia.md (Hub in 3D: dentro il casinò).
+Segui le regole della sezione 1: fammi prima le domande della fase e fermati
+alla fine.
+```
+
+### Esito
+
+*(da compilare a fine fase)*
+
+## 12. Fase 10 — Hub in 3D: dentro il deposito
+
+### Cosa si fa
+
+- **Disposizione** (disegno `immagini/hub-deposito.png`): arrivo al centro;
+  - Zaino in alto a sinistra;
+  - Personaggio in alto a destra;
+  - Archivio delle carte in basso al centro;
+  - Piazza (l'uscita) in basso a destra.
+- **Zaino.** È posato a terra su un tappetino. Salendoci sopra si apre il
+  pannello `Inventory` di `campaignui.update_inventory`, come fa oggi
+  `hub_storage` (`src/application/campaign_hub.odin:209-215`).
+- **Personaggio.** La scelta consigliata è un **manichino** su una pedana, che
+  indossa l'equipaggiamento attuale (arma e reliquie) e si aggiorna quando
+  cambia.
+  - È più chiaro di una copia del robot, che sembrerebbe un secondo
+    giocatore.
+  - Salendo sulla pedana si apre il pannello `Character`.
+- **Archivio delle carte.** Uno scaffale con i dorsi delle carte che si
+  accendono. Entrandoci si apre il pannello `Archive`, con Mostra effetto come
+  oggi.
+- **Decorazione:** le casse del deposito, che crescono con il numero di
+  oggetti conservati.
+
+### Da chiedere prima di iniziare
+
+1. **Personaggio.**
+   - (Consigliato) Manichino con l'equipaggiamento.
+   - Oppure una copia del robot.
+2. **Aspetto dell'archivio.**
+   - (Consigliato) Scaffale di carte.
+   - Oppure un terminale.
+3. **Casse che crescono con il deposito.**
+   - (Consigliato) Sì.
+   - Oppure solo decorazione fissa.
+
+### Passi
+
+1. Sala del deposito nel sistema di zone della Fase 9. Se la Fase 9 non è
+   ancora fatta, questa fase costruisce il passaggio tra zone.
+2. Zaino, manichino e archivio, con i loro ingressi.
+3. Disegno, compreso il manichino vestito con l'equipaggiamento vero.
+4. Collegamento ai tre pannelli e ritorni.
+5. Catture dello smoke dell'hub:
+   - sala;
+   - zaino, manichino e archivio;
+   - ogni pannello aperto;
+   - ritorno in piazza.
+6. Documenti e `CHANGELOG.md`.
+
+### Test
+
+- Zaino, manichino e archivio aprono il pannello giusto.
+- Chiudendo il pannello si è vicino all'oggetto, fuori dalla zona d'ingresso.
+- Il manichino mostra l'equipaggiamento vero.
+- I test dell'inventario (`src/campaignui/inventory_test.odin`) passano.
+
+### Fatto quando
+
+- Dalla piazza si entra nel deposito; zaino, manichino e archivio aprono le
+  loro pagine; si torna in piazza.
+- Le verifiche della sezione 1.4 sono a posto.
+
+### Comando
+
+```text
+Esegui la Fase 10 di docs/piano-griglia.md (Hub in 3D: dentro il deposito).
+Segui le regole della sezione 1: fammi prima le domande della fase e fermati
+alla fine.
+```
+
+### Esito
+
+*(da compilare a fine fase)*
+
+## 13. Fase 11 — Hub in 3D: dentro la sala giochi
+
+### Cosa si fa
+
+Per questa sala l'utente non ha mandato un disegno. Proposta:
+
+- **Disposizione.** I cabinati stanno a semicerchio attorno all'arrivo, con
+  la porta verso la piazza alle spalle. Un posto per ognuno dei 12 minigiochi
+  (`activities.MINIGAME_COUNT`).
+- **Cabinati sbloccati.** Sono accesi, con il nome e il record sull'insegna
+  (`hub_record_line`). Entrandoci si gioca come oggi: `info.create` con
+  `host.push` (`src/application/hub_progress.odin:140`).
+- **Cabinati non ancora sbloccati.** Sono posti vuoti o cabinati coperti da un
+  telo senza nome. La direzione del gioco vuole che non si mostrino in anticipo
+  i biomi da scoprire, quindi un cabinato bloccato non dice a quale bioma
+  appartiene.
+- **Aspetto:** ogni cabinato è costruito da codice, con lo schermo nei colori
+  del suo minigioco.
+
+### Da chiedere prima di iniziare
+
+1. **Disposizione.**
+   - (Consigliato) A semicerchio.
+   - Oppure un disegno dell'utente, come per casinò e deposito.
+2. **Cabinati non ancora sbloccati.**
+   - (Consigliato) Posti vuoti.
+   - Oppure cabinati coperti da un telo senza nome.
+3. **Record sull'insegna di ogni cabinato.**
+   - (Consigliato) Sì.
+   - Oppure no.
+
+### Passi
+
+1. Sala giochi nel sistema di zone: posti, cabinati sbloccati, ingressi.
+2. Disegno dei cabinati e delle insegne.
+3. Collegamento ai minigiochi e ritorni: dopo una partita si è davanti al
+   cabinato, e il record si aggiorna.
+4. Catture dello smoke dell'hub:
+   - sala con zero cabinati sbloccati;
+   - sala con alcuni cabinati sbloccati;
+   - un minigioco aperto;
+   - ritorno.
+5. Documenti e `CHANGELOG.md`.
+
+### Test
+
+- I cabinati accesi sono esattamente quelli di `hub_unlocked_arcades`.
+- Ogni cabinato apre il suo minigioco.
+- Il ritorno porta davanti al cabinato giusto.
+- Un bioma non vinto non lascia indizi.
+
+### Fatto quando
+
+- Dalla piazza si entra nella sala giochi, si gioca a ogni cabinato sbloccato
+  e si torna in piazza.
+- Le verifiche della sezione 1.4 sono a posto.
+
+### Comando
+
+```text
+Esegui la Fase 11 di docs/piano-griglia.md (Hub in 3D: dentro la sala giochi).
+Segui le regole della sezione 1: fammi prima le domande della fase e fermati
+alla fine.
+```
+
+### Esito
+
+*(da compilare a fine fase)*
+
+## 14. Fonti consultate online
 
 Ricerche del 23 ottobre 2026, per le parti che il codice non dice.
 
@@ -1201,8 +1735,19 @@ Ricerche del 23 ottobre 2026, per le parti che il codice non dice.
 - **raylib.** Raggio dallo schermo e collisioni, utili per il mouse con le
   altezze:
   [Camera Systems in raylib](https://slicker.me/raylib/camera.html).
+- **Hub in cui si cammina.** In Hades la Casa di Ade è il punto di partenza e
+  di ritorno di ogni run, con luoghi e personaggi da raggiungere a piedi
+  (per esempio lo Specchio della Notte per i potenziamenti):
+  [Gamepressure](https://www.gamepressure.com/hades/house-of/z0ec5c),
+  [Brainbound](https://brainbound.blog/hades-repeated-gameplay-loop-guide).
+- **Interfacce dentro il mondo.** Un menu fatto come mondo 3D costa di più e
+  può diventare frustrante se non è curato, e chi usa informazioni solo nel
+  mondo deve offrire anche un'alternativa:
+  [Wayline](https://www.wayline.io/blog/diegetic-interfaces-game-design),
+  [devlog di un gioco VR](https://saltboy.itch.io/vr-dev-blog-post/devlog/436746/the-5-design-ideas-3-91022),
+  [schemi di HUD](https://cdn.jsdelivr.net/npm/@hegemonart/get-design-done@1.60.4/reference/domains/gaming-patterns.md).
 
-## 10. Rischi che valgono per tutte le fasi
+## 15. Rischi che valgono per tutte le fasi
 
 - **Prestazioni.** I 60 fps costanti non sono ancora garantiti ovunque
   (`docs/direzione-implementazione.md`, «Limiti dichiarati»). Le Fasi 3–6
@@ -1217,3 +1762,6 @@ Ricerche del 23 ottobre 2026, per le parti che il codice non dice.
 - **Test di Windows già rotti** (sezione 1.5).
 - **Documento di direzione.** `docs/direzione.md` non è su questo ramo: sta su
   `carte-bomb-marley-inondazione`.
+- **Avvio del gioco.** Le Fasi 8–11 cambiano quello che succede dopo la scelta
+  della memoria: vanno ricontrollati i test di `application`, gli smoke
+  dell'hub e il ritorno dalle spedizioni.
