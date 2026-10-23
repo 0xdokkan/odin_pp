@@ -5,6 +5,17 @@ I riferimenti a Classica, `--flat` e ai vecchi smoke descrivono versioni precede
 per i comandi disponibili oggi valgono il [README](README.md) e la documentazione collegata.
 
 
+## 2026-10-24 — Rilievi nelle spedizioni
+
+- **Fase 3 del piano fatta.** Tutti i dodici biomi hanno un rilievo a tema: piattaforme, mesa, colline,
+  piazze, dune, terrazze, altopiani con scala, cenge, tumuli, isole a quote diverse, crateri, la grande
+  collina del masso. Funzione pura del bioma, quindi la stessa geografia a ogni run; servizi, partenza e
+  pattuglie restano su terreno piano.
+- In esplorazione il robot (a piedi e in sella), i gruppi che dormono, le pattuglie e l'avvistamento
+  seguono le regole di passo e di vista dei dislivelli; il pavimento ha terrazze, più chiare con la quota e
+  con una riga a ogni gradino; l'ologramma ha ombreggiatura e curve di livello. Gli slot vecchi si caricano
+  piatti. Test: 9 nuovi (1618 in tutto).
+
 ## 2026-10-24 — Strutture su più caselle
 
 - **Fase 6 del piano fatta.** Edifici (casetta, capanna, tempietto) e oggetti complessi (carro, fontana,

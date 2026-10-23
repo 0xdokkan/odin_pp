@@ -81,7 +81,8 @@ dirupi, le cadute, la vista e la gittata dall'alto); «Strutture» (41×29) ha t
 catalogo: tre edifici, cinque oggetti complessi, un recinto e la casetta nelle quattro
 rotazioni (si prova passo, vista e trasparenza avvicinandosi). Con `--smoke-mechanics-lab` e
 `ODIN_PP_LAB_ONLY=heights` o `structures` gira solo l'atto delle altezze o delle strutture.
-`--smoke-expedition` comprende l'atto «edifici»: il robot si avvicina a una capanna di
+`--smoke-expedition` comprende gli atti «rilievi» (il robot nel punto più accidentato di ogni bioma, e
+l'ologramma con le curve di livello in tre biomi), «scontro su due livelli» e «edifici»; quest'ultimo: il robot si avvicina a una capanna di
 Robotica cibernetica (6, 4, 2 e 1 casella, soglia, dentro, fuori) e agli oggetti.
 
 Il pulsante **Prova meccaniche** del menu (o `--mechanics-lab`) apre una sandbox

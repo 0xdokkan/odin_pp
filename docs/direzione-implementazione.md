@@ -758,6 +758,21 @@ avviare è `build/odin_pp`; conserva il limite fps delle impostazioni di gioco.
   l'arredo degli edifici è minimo (pavimento, altare del tempietto); nei riflessi del pavimento non compare
   l'involucro; l'ologramma non mostra i muretti. La posa da parte del giocatore è la Fase 7.
 
+## Rilievi delle spedizioni (Fase 3 del piano griglia)
+
+- **Generatore:** `src/expedition/relief.odin` calcola le altezze come funzione pura del bioma e delle
+  coordinate (cumuli, dune, terrazze, crateri, isole del Cielo, altopiani con scala), in due strati: il
+  liscio, rilassato perché due celle vicine siano al massimo a un gradino, e piano attorno a servizi,
+  partenza e pattuglie; e gli altopiani, con i loro dirupi, solo ben lontano da quel terreno piano.
+  `level.set_height_table` scrive la tabella; `generate` la applica dopo i servizi e prima delle strutture.
+- **Salvataggio:** `Snapshot.heights`, una tabella `[MAX_CELLS]u8` in più; manca nei salvataggi vecchi e
+  vale zero (piatto).
+- **Esplorazione:** `roam_blocked`, `walk`, `move_sleeping_group`, `patrol_move_toward` e `can_see` usano
+  `game.step_height_blocked` e le altezze della linea di vista.
+- **Renderer:** terrazze in `render/expedition_terrain.odin`; `Ink_Pass.lift` alza muri, prop, servizi e
+  strutture alla quota della cella; l'ologramma in `run/expedition_hologram.odin`.
+- **Limiti:** vedi l'Esito della Fase 3 nel piano.
+
 ## Limiti dichiarati
 
 - **Renderer:** i riflessi planari comprendono architettura e neon; carta e

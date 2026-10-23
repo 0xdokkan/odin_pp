@@ -38,6 +38,19 @@ del livello, aggiornata quando la geometria cambia, mai da un puntatore al livel
 ([height_view.odin](../src/render/height_view.odin)). Solo il laboratorio ha altezze;
 le spedizioni restano piatte (Fase 3).
 
+### Rilievi delle spedizioni
+
+Ogni bioma ha un rilievo a tema (colline, dune, terrazze, altopiani, isole, crateri: l'elenco è in
+[relief.odin](../src/expedition/relief.odin)). Il pavimento resta un piano e una texture; una cella più
+alta del piano è una **terrazza** ([expedition_terrain.odin](../src/render/expedition_terrain.odin)): la
+cima sta alla sua quota (ogni gradino è alto 0,12 di cella, `game.HEIGHT_STEP_DRAWN`), disegnata dallo
+stesso programma del pavimento, quindi tessere, terreni e avvisi si leggono anche in alto; la cima è più
+chiara con la quota (un decimo a gradino) e i fianchi, in roccia scura, hanno una riga a ogni gradino, così
+un dirupo si legge come tanti gradini e una scala come una scala. Le terrazze stanno in blocchi di 8×8
+caselle ricostruiti quando la geometria cambia, e si inviano solo quelli in vista. Muri, prop, servizi,
+strutture, luci, personaggi e puntatore stanno alla quota della loro casella. L'ologramma schiarisce con la
+quota, la esagera e traccia una curva di livello a ogni cambio di altezza.
+
 ### Strutture e trasparenza degli edifici
 
 Ogni edificio è disegnato in tre parti: l'**involucro** (muri, colonnato e tetto), l'**interno**

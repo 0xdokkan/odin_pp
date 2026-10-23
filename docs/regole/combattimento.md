@@ -776,6 +776,10 @@ a zero ovunque il gioco è identico a prima.
 | Gittata | +1 casella dalle carte a distanza (gittata massima oltre 1) lanciate da almeno 4 gradini più in alto del bersaglio |
 | First Person Shooter | l'occhio sta sul pavimento della sua cella; il pavimento è quello di ogni cella; una cella con il pavimento sopra il raggio ferma il colpo |
 
+Le spedizioni hanno rilievi in ogni bioma (Fase 3 del piano griglia): in esplorazione il camminatore
+libero (a piedi e in sella), il passo a caselle, i gruppi che dormono e le pattuglie seguono la stessa
+regola di passo, e l'avvistamento usa la linea di vista con le altezze (`expedition.can_see`).
+
 Il passo si controlla in `try_move_player`, nella diagonale e nella schivata; il
 danno di caduta in `apply_movement_effect`, che registra un `Hazard_Triggered`
 con il danno. Gli attacchi in mischia fra celle di altezza diversa restano

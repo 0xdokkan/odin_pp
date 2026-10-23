@@ -39,7 +39,7 @@ numero della fase resta quello della sua sezione.
 | 5 | 11 | Hub in 3D: dentro la sala giochi | 8 | Fatta | vedi Esito |
 | 6 | 2 | Altezze nel laboratorio: dati, regole, grafica, puntamento | — | Fatta | vedi Esito |
 | 7 | 6 | Strutture su più caselle: edifici e oggetti complessi, edifici trasparenti avvicinandosi | — (meglio dopo la 2) | Fatta | vedi Esito |
-| 8 | 3 | Altezze nelle spedizioni: renderer, mappe, salvataggi, prestazioni | 2 | Da fare | — |
+| 8 | 3 | Altezze nelle spedizioni: renderer, mappe, salvataggi, prestazioni | 2 | Fatta | vedi Esito |
 | 9 | 4 | La montagna a spirale delle Montagne innevate | 2, 3 | Da fare | — |
 | 10 | 5 | Caverne | 2 (3 e 4 per metterle nei biomi) | Da fare | — |
 | 11 | 7 | Posa delle strutture da parte del giocatore | 6 | Confermata dall'utente (alla Fase 6): da fare | — |
@@ -890,7 +890,37 @@ regole della sezione 1: fammi prima le domande della fase e fermati alla fine.
 
 ### Esito
 
-*(da compilare a fine fase)*
+**Fatta il 2026-10-24.** Le spedizioni hanno rilievi in tutti i dodici biomi.
+
+- **Risposte dell'utente:** non solo le Montagne innevate: rilievi a tema in ogni bioma (dune nel deserto,
+  isole alte nel cielo, colline piccole nella giungla, e simili per gli altri); il mount sale e scende le
+  scale; l'ologramma con ombreggiatura **e** curve di livello; sui vecchi salvataggi «cancella pure»: non
+  serve alcuna migrazione e non ho cancellato nulla (uno slot vecchio si carica piatto).
+- **Rilievi** (`src/expedition/relief.odin`, funzione pura del bioma e delle coordinate, quindi la stessa
+  geografia a ogni run): Cyber piattaforme rialzate con scala; West mesa con scala e dolci ondulazioni;
+  Jungle molte colline piccole; City piazze rialzate; Egitto lunghe dune; Vietnam colline a terrazze (un
+  gradino ogni due caselle); Neve altopiani con scala e cumuli (e spazio per la spirale della Fase 4);
+  Inferno cenge e guglie di roccia; Gotico tumuli attorno a una collina della cripta; Cielo isole a quote
+  diverse con ponti in pendenza; Spazio crateri con bordo rialzato; Segreto la grande collina del masso.
+  Il terreno liscio non ha mai un dirupo (ogni cella è al massimo un gradino dalle vicine, calcolato per
+  rilassamento); gli altopiani hanno i loro dirupi e una scala a tre caselle di larghezza. I servizi, la
+  partenza e il terreno delle pattuglie restano piani, e una struttura (Fase 6) vuole terreno piano.
+- **Regole:** il camminatore libero, il passo a caselle, i gruppi che dormono, le pattuglie e l'avvistamento
+  seguono le stesse regole degli scontri (un gradino si sale, un dirupo è un muro, una collina nasconde ciò
+  che sta dietro), a piedi e in sella.
+- **Salvataggi:** le altezze entrano nello `Snapshot` come una tabella in più; nei salvataggi vecchi manca e
+  vale zero (piatto, senza errori); il test di migrazione passa.
+- **Disegno:** il pavimento resta un piano; le caselle rialzate sono terrazze (cima più fianchi) in blocchi
+  8×8, con lo stesso programma del pavimento, cime più chiare con la quota e una riga a ogni gradino sui
+  fianchi; muri, prop, servizi, strutture e luci stanno alla quota della loro casella; personaggi,
+  telecamera e puntatore usano le altezze della Fase 2.
+- **Ologramma:** colore più chiaro con la quota, rilievo esagerato, e una curva di livello a ogni cambio di
+  altezza.
+- **Prestazioni** (benchmark degli stage 0–26 dei documenti, stesso schermo e stesso carico): da −0,5% a +7,8% rispetto a prima (media circa +3,5%): Neve +1,7% (l'obiettivo era al massimo il 5%), Cielo +7,8% (l'80% del suo pavimento è rialzato, il caso peggiore); ora il piano del pavimento si disegna solo dove non lo coprono le terrazze
+- **Test:** 9 nuovi (1618 in tutto, con e senza assert).
+- **Non fatto, dichiarato:** i riflessi del pavimento non mostrano le terrazze; il retino davanti ai
+  personaggi usa ancora la quota assoluta 0,1 e può diradare i piedi di un muro su una collina; la
+  spirale della Fase 4 e le caverne della Fase 5 non ci sono.
 
 ## 5. Fase 4 — La montagna a spirale delle Montagne innevate
 

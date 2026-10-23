@@ -66,7 +66,8 @@ patrol_move_toward :: proc(w:^World,room:^game.Room,g:^Group,target:grid.Positio
 			nx,ny:=x+step.x,y+step.y
 			if nx<0 || ny<0 || nx>=PATROL_PATH_SIDE || ny>=PATROL_PATH_SIDE {continue}
 			j:=ny*PATROL_PATH_SIDE+nx
-			if distances[j]>=0 || blocked[j] || game.cell_blocks_movement(room,{origin.x+nx,origin.y+ny}) {continue}
+			if distances[j]>=0 || blocked[j] || game.cell_blocks_movement(room,{origin.x+nx,origin.y+ny}) ||
+			   game.step_height_blocked(room,{origin.x+x,origin.y+y},{origin.x+nx,origin.y+ny}) {continue}
 			distances[j]=distances[i]+1;queue[tail]=u16(j);tail+=1
 		}
 	}
@@ -80,7 +81,7 @@ patrol_move_toward :: proc(w:^World,room:^game.Room,g:^Group,target:grid.Positio
 			q:=game.add_position(p,step);nx,ny:=local.x+step.x,local.y+step.y
 			if nx<0 || ny<0 || nx>=PATROL_PATH_SIDE || ny>=PATROL_PATH_SIDE {continue}
 			d:=distances[ny*PATROL_PATH_SIDE+nx]
-			if d<0 || d>=best || !patrol_cell_free(w,room,q,&member) {continue}
+			if d<0 || d>=best || !patrol_cell_free(w,room,q,&member) || game.step_height_blocked(room,p,q) {continue}
 			best=d;destination=q
 		}
 		member.enemy.position=destination

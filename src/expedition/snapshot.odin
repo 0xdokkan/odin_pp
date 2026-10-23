@@ -15,6 +15,9 @@ Snapshot :: struct {
 	player: game.Player,
 	phase: game.Room_Phase,
 	tiles: [MAX_CELLS]level.Tile,
+	// The height of every cell in steps (all zero: a flat map, which is every save from before the
+	// expeditions had a relief: the key is simply missing there).
+	heights: [MAX_CELLS]u8,
 	obstacles: [MAX_CELLS]game.Obstacle,
 	obstacle_count: int,
 	family: level.Room_Family,
@@ -66,7 +69,7 @@ capture :: proc(w:^World,room:^game.Room,out:^Snapshot) -> bool {
 	out.fishing=room.fishing;out.pinball=room.pinball;out.pinball_random=room.pinball_random;out.lasso=room.lasso;out.first_person=room.first_person;out.reactions=room.reaction_bindings
 	out.family=room.family;out.encounter_kind=room.encounter_kind;out.modifier=room.modifier;out.exit_position=room.exit_position;out.endless=room.endless
 	out.tactical_pulse=room.tactical_pulse;out.obstacle_count=len(room.obstacles)
-	copy(out.tiles[:],room.level_data.tiles.cells[:]);copy(out.obstacles[:],room.obstacles[:])
+	copy(out.tiles[:],room.level_data.tiles.cells[:]);copy(out.heights[:],room.level_data.heights[:]);copy(out.obstacles[:],room.obstacles[:])
 	copy(out.enemies[:],room.enemies[:]);copy(out.traps[:],room.traps[:]);copy(out.objects[:],room.objects[:]);copy(out.loot[:],room.loot[:]);copy(out.ground_pool[:],room.ground.pool)
 	return true
 }
@@ -127,6 +130,7 @@ restore :: proc(s:^Snapshot,w:^World,data:^level.Level,player:^game.Player,room:
 	if !allocated {return false}
 	data^=created
 	copy(data.tiles.cells[:],s.tiles[:side*side])
+	_=level.set_height_table(data,s.heights[:side*side])
 	for tile,i in data.tiles.cells {
 		if tile.kind==.Player_Spawn {data.player_spawn={i%side,i/side};data.has_player_spawn=true;break}
 	}

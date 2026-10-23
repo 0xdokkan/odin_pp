@@ -220,7 +220,7 @@ test_a_structure_that_would_close_a_pocket_is_refused :: proc(t: ^testing.T) {
 	defer destroy(&room)
 	_, err := place_structure(&room, .Hut, {8, 8}, 0, false)
 	testing.expect_value(t, err, Placement_Error.None)
-	reached, total := reachable_walkable(room.tiles.cells[:], 20, 20, {1, 1})
+	reached, total := reachable_walkable(&room, room.tiles.cells[:], 20, 20, {1, 1})
 	testing.expect_value(t, reached, total)
 }
 
@@ -255,4 +255,21 @@ test_the_structures_are_restored_from_a_saved_list :: proc(t: ^testing.T) {
 	// An empty list is the old save: no structures.
 	testing.expect(t, set_structures(&other, nil))
 	testing.expect_value(t, structure_count(&other), 0)
+}
+
+// On a map with heights a structure needs level ground, and a door needs a step the robot can take.
+@(test)
+test_a_structure_needs_level_ground_and_a_door_a_step_to_climb :: proc(t: ^testing.T) {
+	data := open_map(20, 20)
+	defer destroy(&data)
+	_ = set_height(&data, {9, 9}, 2)
+	testing.expect_value(t, place_check(&data, .Cottage, {8, 8}, 0, false), Placement_Error.Not_Flat)
+	// The same cottage on a level plateau of its own is fine, but a cliff in front of its door is not.
+	for y in 8..<14 { for x in 8..<14 { _ = set_height(&data, {x, y}, 3) } }
+	for y in 8..<14 { for x in 8..<14 { if y == 13 { _ = set_height(&data, {x, y}, 0) } } }
+	// The cottage at (8, 10) has its door at (10, 12); below it (10, 13) is at 0, three steps down.
+	testing.expect_value(t, place_check(&data, .Cottage, {8, 10}, 0, false), Placement_Error.Entrance_Blocked)
+	// Lowering that cell to two steps down is still a cliff; one step is a stair.
+	_ = set_height(&data, {10, 13}, 2)
+	testing.expect_value(t, place_check(&data, .Cottage, {8, 10}, 0, false), Placement_Error.None)
 }

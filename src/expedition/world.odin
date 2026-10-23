@@ -174,7 +174,9 @@ generate :: proc(w: ^World, data: ^level.Level, b: campaign.Biome, seed: u64) ->
 		stamp_site(data,&site)
 		if kind==.Boss { _=level.set_tile(data,p,{.Exit}) }
 	}
-	// The biome's buildings and objects, after the sites and before any inhabitants.
+	// The biome's relief, level round the sites; then its buildings and objects, level on it; all before
+	// any inhabitants.
+	apply_relief(w,data)
 	place_structures(w,data)
 	// Structural geography is finished before any inhabitants are placed.
 	for site,i in w.sites[:w.site_count] {if site.active && (site.kind==.Trial || site.kind==.Boss || (site.kind==.Cache && i<12)) {add_group(w,data,i,site.position,1 if site.kind==.Boss else 2+rank(b)/2,false,site.kind==.Boss)}}
@@ -229,9 +231,12 @@ add_group :: proc(w:^World,data:^level.Level,site:int,p:grid.Position,requested_
 
 can_see :: proc(room:^game.Room,a,b:grid.Position) -> bool {
 	if room == nil || room.level_data == nil { return false }
+	// Sight rises and falls with the ground: a hill hides what is behind it (game.height_hides).
 	return game.tactical_line_visible(a, b, proc(data: rawptr, cell: grid.Position) -> bool {
 		return game.cell_blocks_line_of_sight(cast(^game.Room)data, cell)
-	}, room)
+	}, room, proc(data: rawptr, cell: grid.Position) -> i32 {
+		return game.cell_height(cast(^game.Room)data, cell)
+	})
 }
 
 add_drop :: proc(w:^World,p:grid.Position,item:campaign.Item,xp:i32=0,manual_only:bool=false) -> bool {
@@ -346,7 +351,7 @@ move_sleeping_group :: proc(w:^World,g: ^Group, room: ^game.Room, step: grid.Pos
 	for &m in g.members[:g.count] {
 		if !m.alive || m.deployed {continue}
 		p := game.add_position(m.enemy.position, step)
-		if !patrol_cell_free(w,room,p,&m) {continue}
+		if !patrol_cell_free(w,room,p,&m) || game.step_height_blocked(room,m.enemy.position,p) {continue}
 		if step.x != 0 && step.y != 0 && game.cell_blocks_movement(room, {p.x,m.enemy.position.y}) &&
 		   game.cell_blocks_movement(room, {m.enemy.position.x,p.y}) {continue}
 		m.enemy.position = p
@@ -468,7 +473,7 @@ lane_contains :: proc(w:^World,p:grid.Position) -> bool {
 walk :: proc(w:^World,room:^game.Room,offset:grid.Position) -> bool {
 	if room.phase!=.Loot || offset=={} {return false}
 	p:=game.add_position(room.player.position,offset)
-	if !game.base_cell_is_walkable(room,p) || game.cell_blocks_movement(room,p) {return false}
+	if !game.base_cell_is_walkable(room,p) || game.cell_blocks_movement(room,p) || game.step_height_blocked(room,room.player.position,p) {return false}
 	if offset.x!=0 && offset.y!=0 && (game.cell_blocks_movement(room,{p.x,room.player.position.y}) || game.cell_blocks_movement(room,{room.player.position.x,p.y})) {return false}
 	ground:=terrain(w.biome,p)
 	if ground==.Bridge && w.beat%4>=2 {return false}

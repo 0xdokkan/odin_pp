@@ -179,6 +179,7 @@ draw_expedition_structure_envelopes :: proc(renderer: ^Renderer, room: ^game.Roo
 		if opacity <= 0.02 { continue }
 		rlgl.DrawRenderBatchActive()
 		rl.SetShaderValue(m.reveal_shader, m.reveal_envelope, &opacity, .FLOAT)
+		solid.lift = cell_ground(data.structures[index].origin)
 		draw_expedition_envelope_solids(solid, data, index, views.roof[index])
 	}
 	rlgl.DrawRenderBatchActive()
@@ -191,6 +192,7 @@ draw_expedition_structure_envelopes :: proc(renderer: ^Renderer, room: ^game.Roo
 	color := expedition_color(w.biome)
 	for index in near[:count] {
 		opacity := views.opacity[index]
+		edges.lift = cell_ground(data.structures[index].origin)
 		if opacity > 0.05 {
 			faded := ink_edge(color)
 			faded.a = u8(clamp(f32(EXPEDITION_EDGE_ALPHA)*opacity, 1, f32(EXPEDITION_EDGE_ALPHA)))

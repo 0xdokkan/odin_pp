@@ -8,7 +8,7 @@ import level "../level"
 @(private)
 roam_test_room :: proc(t:^testing.T,w:^World,data:^level.Level,p:^game.Player)->game.Room {
 	room:=test_world(t,w,data,p,.Secret)
-	for y in 18..=42 {for x in 18..=42 {_=level.set_tile(data,{x,y},{.Floor})}}
+	for y in 18..=42 {for x in 18..=42 {_=level.set_tile(data,{x,y},{.Floor});_=level.set_height(data,{x,y},0)}}
 	return room
 }
 

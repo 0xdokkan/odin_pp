@@ -207,6 +207,7 @@ Placement_Error :: enum u8 {
 	Too_Many,
 	Out_Of_Map,
 	Not_Free,
+	Not_Flat,
 	Overlap,
 	Too_Close,
 	Keep_Clear,
@@ -223,6 +224,7 @@ placement_error_text :: proc(err: Placement_Error) -> string {
 	case .Too_Many: return "the map holds no more structures"
 	case .Out_Of_Map: return "the structure does not fit inside the map"
 	case .Not_Free: return "the ground under the structure is not free floor"
+	case .Not_Flat: return "the ground under the structure is not level"
 	case .Overlap: return "the structure overlaps another one"
 	case .Too_Close: return "the structure touches another one"
 	case .Keep_Clear: return "the structure stands on something that must stay clear"
@@ -267,9 +269,10 @@ structure_plan_cell :: proc(data: ^Level, index: int, cell: grid.Position) -> Pl
 	return plan_at(&data.structure_plans[index], cell.x-placed.origin.x, cell.y-placed.origin.y)
 }
 
-// Counts the walkable cells of `tiles` and those reached from `from` by 4-neighbour steps.
+// Counts the walkable cells of `tiles` and those reached from `from` by 4-neighbour steps a walker can
+// take: between two cells at most one step of height apart (a cliff is a wall to a walker).
 @(private)
-reachable_walkable :: proc(tiles: []Tile, width, height: int, from: grid.Position) -> (reached, total: int) {
+reachable_walkable :: proc(data: ^Level, tiles: []Tile, width, height: int, from: grid.Position) -> (reached, total: int) {
 	visited := make([]bool, len(tiles), context.temp_allocator)
 	queue := make([dynamic]int, 0, 256, context.temp_allocator)
 	for tile in tiles { if is_walkable(tile.kind) { total += 1 } }
@@ -288,6 +291,7 @@ reachable_walkable :: proc(tiles: []Tile, width, height: int, from: grid.Positio
 			if nx < 0 || ny < 0 || nx >= width || ny >= height { continue }
 			next := ny*width+nx
 			if visited[next] || !is_walkable(tiles[next].kind) { continue }
+			if len(data.heights) == len(tiles) && abs(int(data.heights[next])-int(data.heights[at])) > 1 { continue }
 			visited[next] = true
 			append(&queue, next)
 		}
@@ -338,6 +342,17 @@ place_check :: proc(data: ^Level, id: Structure_Id, origin: grid.Position, rotat
 			if keep_clear != nil && keep_clear(user, cell) { return .Keep_Clear }
 		}
 	}
+	// The ground under the structure is level (a building on a slope would have a wall in the air).
+	if len(data.heights) == len(data.tiles.cells) {
+		level_height := -1
+		for y in 0..<plan.height {
+			for x in 0..<plan.width {
+				if plan_at(&plan, x, y) == .Outside { continue }
+				here := int(data.heights[(origin.y+y)*width+(origin.x+x)])
+				if level_height < 0 { level_height = here } else if here != level_height { return .Not_Flat }
+			}
+		}
+	}
 	// Every door opens onto walkable ground that is not part of this structure.
 	for y in 0..<plan.height {
 		for x in 0..<plan.width {
@@ -347,7 +362,11 @@ place_check :: proc(data: ^Level, id: Structure_Id, origin: grid.Position, rotat
 				if plan_at(&plan, x+step.x, y+step.y) != .Outside { continue }
 				outside := grid.Position{origin.x+x+step.x, origin.y+y+step.y}
 				tile, found := tile_at(data, outside)
-				if found && tile.kind == .Floor { open = true }
+				if found && tile.kind == .Floor {
+					// A step the robot can take from the door.
+					rise := abs(int(height_at(data, outside))-int(height_at(data, {origin.x+x, origin.y+y})))
+					if rise <= 1 { open = true }
+				}
 			}
 			if !open { return .Entrance_Blocked }
 		}
@@ -355,7 +374,7 @@ place_check :: proc(data: ^Level, id: Structure_Id, origin: grid.Position, rotat
 	// No pocket: a map that was whole must stay whole with the structure on it.
 	reference, has_reference := reference_cell(data)
 	if has_reference {
-		before_reached, before_total := reachable_walkable(data.tiles.cells[:], width, height, reference)
+		before_reached, before_total := reachable_walkable(data, data.tiles.cells[:], width, height, reference)
 		if before_reached == before_total {
 			after := make([]Tile, len(data.tiles.cells), context.temp_allocator)
 			copy(after, data.tiles.cells[:])
@@ -365,7 +384,7 @@ place_check :: proc(data: ^Level, id: Structure_Id, origin: grid.Position, rotat
 					if writes { after[(origin.y+y)*width+(origin.x+x)] = tile }
 				}
 			}
-			after_reached, after_total := reachable_walkable(after, width, height, reference)
+			after_reached, after_total := reachable_walkable(data, after, width, height, reference)
 			if after_reached != after_total { return .Pocket }
 		}
 	}

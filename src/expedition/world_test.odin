@@ -34,7 +34,7 @@ test_expedition_geography_is_seed_independent_and_all_sites_reachable :: proc(t:
 			for head:=0;head<tail;head+=1 {
 				for offset in ([4]grid.Position{{1,0},{-1,0},{0,1},{0,-1}}) {
 					q:=game.add_position(queue[head],offset);tile,ok:=level.tile_at(&first,q)
-					if !ok || !level.is_walkable(tile.kind) {continue}
+					if !ok || !level.is_walkable(tile.kind) || abs(int(level.height_at(&first,q))-int(level.height_at(&first,queue[head])))>1 {continue}
 					i:=q.y*first.tiles.width+q.x;if seen[i] {continue};seen[i]=true;queue[tail]=q;tail+=1
 				}
 			}
@@ -228,7 +228,7 @@ test_expedition_outdoor_props_never_enclose_open_floor :: proc(t:^testing.T) {
 		for head:=0;head<tail;head+=1 {
 			for offset in ([4]grid.Position{{1,0},{-1,0},{0,1},{0,-1}}) {
 				q:=game.add_position(queue[head],offset);tile,ok:=level.tile_at(&data,q)
-				if !ok || !level.is_walkable(tile.kind) {continue}
+				if !ok || !level.is_walkable(tile.kind) || abs(int(level.height_at(&data,q))-int(level.height_at(&data,queue[head])))>1 {continue}
 				i:=q.y*data.tiles.width+q.x;if seen[i] {continue};seen[i]=true;queue[tail]=q;tail+=1
 			}
 		}

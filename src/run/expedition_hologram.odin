@@ -16,7 +16,8 @@ import render "../render"
 // locations nor encounter RNG enter this presentation. Row merging preserves
 // every wall, entrance and void cell while avoiding one cube per map tile.
 HOLO_SIDE :: 256
-Hologram_Cell :: struct { ground, wall: u8 }
+// `height`: the cell's steps over the ground, which the map shows as shading and as contour lines.
+Hologram_Cell :: struct { ground, wall, height: u8 }
 Hologram_Geometry :: struct {
 	width, height: int,
 	cells: [HOLO_SIDE*HOLO_SIDE]Hologram_Cell,
@@ -60,7 +61,7 @@ hologram_geometry :: proc(w:^world.World,data:^level.Level,out:^Hologram_Geometr
 			px,py:=x+dx,y+dy;tile:=data.tiles.cells[py*data.tiles.width+px]
 			c:=&out.cells[py*HOLO_SIDE+px];c^={}
 			if tile.kind==.Void {continue}
-			c.ground=ground
+			c.ground=ground;c.height=u8(level.height_at(data,{px,py}))
 			if w.biome==.Inferno && tile.kind==.Door {c.ground=6}
 			// Scattered open-ground props stay low stubs: the courtyards, the
 			// city blocks and the pyramid fields remain the landmarks.
@@ -111,30 +112,56 @@ draw_hologram_geography :: proc(g:^Hologram_Geometry,tint:rl.Color) {
 	w,h:=f32(g.width),f32(g.height)
 	hologram_prism(-1,-1,w+2,h+2,-5,-3,{10,24,39,255})
 	rl.DrawCubeWires({w*.5,-3,h*.5},w+2,.1,h+2,{68,135,165,255})
+	// The relief: a step of height is this tall on the map, more than the board's own so that it reads
+	// from far; higher ground is lighter, and every change of height is a contour line (below).
+	step:=f32(max(g.width,g.height))/160*.45
+	lighten:=proc(c:rl.Color,height:u8)->rl.Color {
+		k:=1+.11*f32(height)
+		return {u8(min(f32(255),f32(c.r)*k)),u8(min(f32(255),f32(c.g)*k)),u8(min(f32(255),f32(c.b)*k)),c.a}
+	}
 	for y in 0..<g.height {
 		for x:=0;x<g.width; {
 			c:=g.cells[y*HOLO_SIDE+x];start:=x;x+=1
-			for x<g.width && g.cells[y*HOLO_SIDE+x].ground==c.ground {x+=1}
-			if c.ground>0 {hologram_prism(f32(start),f32(y),f32(x-start),1,-1.4,0,palette[c.ground])}
+			for x<g.width && g.cells[y*HOLO_SIDE+x].ground==c.ground && g.cells[y*HOLO_SIDE+x].height==c.height {x+=1}
+			if c.ground>0 {hologram_prism(f32(start),f32(y),f32(x-start),1,-1.4,f32(c.height)*step,lighten(palette[c.ground],c.height))}
 		}
 	}
 	for y in 0..<g.height {
 		for x:=0;x<g.width; {
 			c:=g.cells[y*HOLO_SIDE+x];start:=x;x+=1
-			for x<g.width && g.cells[y*HOLO_SIDE+x].wall==c.wall {x+=1}
+			for x<g.width && g.cells[y*HOLO_SIDE+x].wall==c.wall && g.cells[y*HOLO_SIDE+x].height==c.height {x+=1}
 			if c.wall==0 {continue}
 			height:=f32(c.wall)*f32(max(g.width,g.height))/160
-			hologram_prism(f32(start),f32(y),f32(x-start),1,0,height,{80,132,163,255})
+			base:=f32(c.height)*step
+			hologram_prism(f32(start),f32(y),f32(x-start),1,base,base+height,lighten({80,132,163,255},c.height))
 		}
 	}
 	// Keep triangle and line batches contiguous; alternating them per wall
 	// would turn a whole-map overview into thousands of tiny GL draw calls.
 	for y in 0..<g.height {for x:=0;x<g.width; {
 		c:=g.cells[y*HOLO_SIDE+x];start:=x;x+=1
-		for x<g.width && g.cells[y*HOLO_SIDE+x].wall==c.wall {x+=1}
+		for x<g.width && g.cells[y*HOLO_SIDE+x].wall==c.wall && g.cells[y*HOLO_SIDE+x].height==c.height {x+=1}
 		if c.wall==0 {continue}
-		height:=f32(c.wall)*f32(max(g.width,g.height))/160
+		height:=f32(c.wall)*f32(max(g.width,g.height))/160+f32(c.height)*step
 		rl.DrawLine3D({f32(start),height+.03,f32(y)+1},{f32(x),height+.03,f32(y)+1},{148,213,231,190})
+	}}
+	// Contour lines: a line wherever the ground changes height, at the higher side's level.
+	for y in 0..<g.height {for x in 0..<g.width {
+		c:=g.cells[y*HOLO_SIDE+x];if c.ground==0 {continue}
+		if x+1<g.width {
+			next:=g.cells[y*HOLO_SIDE+x+1]
+			if next.ground>0 && next.height!=c.height {
+				top:=f32(max(c.height,next.height))*step+.04
+				rl.DrawLine3D({f32(x+1),top,f32(y)},{f32(x+1),top,f32(y+1)},{176,230,244,150})
+			}
+		}
+		if y+1<g.height {
+			next:=g.cells[(y+1)*HOLO_SIDE+x]
+			if next.ground>0 && next.height!=c.height {
+				top:=f32(max(c.height,next.height))*step+.04
+				rl.DrawLine3D({f32(x),top,f32(y+1)},{f32(x+1),top,f32(y+1)},{176,230,244,150})
+			}
+		}
 	}}
 	for i:=0;i<=max(g.width,g.height);i+=16 {
 		if i<=g.width {rl.DrawLine3D({f32(i),.06,0},{f32(i),.06,h},{74,139,167,38})}

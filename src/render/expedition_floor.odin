@@ -14,6 +14,8 @@ Expedition_Floor :: struct {
 	failed: bool,
 	map_data, map_size, tint, time, beat, lane, lane_warning, biome: c.int,
 	focus, focus_count, grid_amount, surface: c.int,
+	// The terraces of the map's relief, over the plane (expedition_terrain.odin).
+	terrain: Expedition_Terrain_Cache,
 	lights: Expedition_Light_Uniforms,
 	reflection: Expedition_Reflection_Uniforms,
 }
@@ -64,6 +66,16 @@ float floorJoint(vec2 p,vec2 size,float stagger,float width,float aa) {
     return inkLine(min(edge.x,edge.y),width,aa);
 }
 void main() {
+    // The sides of a terrace are dark rock, tinted a little by the biome.
+    if(normal.y<.5) {
+        vec3 rock=mix(vec3(.05,.055,.07),biomeTint*.12,.5);
+        // A fine line at every step of the height, so that a cliff reads as many and a stair as steps.
+        float stepFraction=fract(worldPosition.y/.12);
+        float stepLine=1.-smoothstep(0.,.12,min(stepFraction,1.-stepFraction));
+        rock+=biomeTint*.16*stepLine;
+        finalColor=vec4(expedition_lit(worldPosition,normal,rock,.85,.1),1.);
+        return;
+    }
     vec2 p=worldPosition.xz;
     vec2 footprint=max(fwidth(p),vec2(.0001));
     float aa=max(footprint.x,footprint.y);
@@ -341,6 +353,8 @@ void main() {
             emission+=expedition_linear(vec3(1.,.25,.035))*(.16+hatch*.4)*pulse;
         }
     }
+    // The higher the ground, the lighter: ten percent a step, so that hills and dunes read from above.
+    base*=1.+max(worldPosition.y,0.)*.9;
     vec3 lit=expedition_lit(worldPosition,vec3(0.,1.,0.),base,roughness,.3)*contact;
     lit+=expedition_reflection(worldPosition,vec3(0.,1.,0.),roughness)*reflectionMask*contact;
     finalColor=vec4(lit+emission,1.);
@@ -376,6 +390,7 @@ destroy_expedition_floor :: proc(renderer:^Renderer) {
 	f:=renderer.tactical.expedition_floor
 	if f.texture.id!=0 {rl.UnloadTexture(f.texture)}
 	if f.shader.id!=0 {rl.UnloadShader(f.shader)}
+	destroy_expedition_terrain(&f.terrain)
 	destroy_expedition_floor_data(&f.data);free(f);renderer.tactical.expedition_floor=nil
 }
 
@@ -413,7 +428,8 @@ draw_expedition_floor :: proc(renderer:^Renderer,room:^game.Room,w:^world.World)
 	rl.BeginShaderMode(shader)
 	rl.SetShaderValueTexture(shader,f.map_data,f.texture)
 	set_expedition_reflection(renderer,shader,f.reflection)
-	rl.DrawPlane({dimensions.x*.5,-.01,dimensions.y*.5},dimensions,rl.WHITE)
+	draw_expedition_floor_plane(renderer,room,dimensions)
+	draw_expedition_terrain(renderer,room)
 	rl.EndShaderMode()
 	return true
 }

@@ -165,6 +165,19 @@ set_height :: proc(level: ^Level, position: grid.Position, height: i32) -> bool 
 	return true
 }
 
+// Sets the whole height table at once (one value per cell, in the tiles' order); all zeros is
+// a flat map and leaves the table empty. A change alters the geometry like a tile does.
+set_height_table :: proc(level: ^Level, heights: []u8) -> bool {
+	if level == nil || len(heights) != len(level.tiles.cells) { return false }
+	flat := true
+	for steps in heights { if steps != 0 { flat = false; break } }
+	if flat { clear(&level.heights); mark_geometry_changed(level); return true }
+	resize(&level.heights, len(heights))
+	copy(level.heights[:], heights)
+	mark_geometry_changed(level)
+	return true
+}
+
 // Heights from rows of text the size of the map: ' ' or '0' is flat, '1'..'9'
 // that many steps, 'a'..'f' ten to fifteen. Used by the arenas that test heights.
 apply_height_rows :: proc(level: ^Level, rows: []string) -> bool {

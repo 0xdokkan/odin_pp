@@ -79,7 +79,7 @@ test_structures_leave_sites_spawn_and_exit_alone_and_every_door_is_reachable :: 
 		for offset in ([4]grid.Position{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}) {
 			q := game.add_position(queue[head], offset)
 			tile, ok := level.tile_at(&data, q)
-			if !ok || !level.is_walkable(tile.kind) { continue }
+			if !ok || !level.is_walkable(tile.kind) || abs(int(level.height_at(&data, q))-int(level.height_at(&data, queue[head]))) > 1 { continue }
 			at := q.y*data.tiles.width+q.x
 			if seen[at] { continue }
 			seen[at] = true

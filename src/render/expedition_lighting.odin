@@ -225,12 +225,12 @@ prepare_expedition_lights :: proc(renderer:^Renderer,room:^game.Room,w:^world.Wo
 	s:=renderer.tactical.snapshot;if s==nil {return}
 	if s.player.visible {
 		p,_:=living_card_position(renderer,game.PLAYER_ENTITY,.Player,s.player.position)
-		a:=rl.Vector3{p.x+.5,.65,p.y+.5};expedition_add_light(l,a,a,{.10,.42,.55},3)
+		a:=rl.Vector3{p.x+.5,.65+point_ground(p),p.y+.5};expedition_add_light(l,a,a,{.10,.42,.55},3)
 	}
 	dynamic_start:=int(l.count)
 	for object in s.objects[:s.object_count] {
 		if !object.visible {continue}
-		a:=rl.Vector3{object.position.x+.5,.65,object.position.y+.5};color:rl.Vector3
+		a:=rl.Vector3{object.position.x+.5,.65+point_ground(object.position),object.position.y+.5};color:rl.Vector3
 		#partial switch object.kind {
 		case .Tesla_Coil,.Shock_Floor:color={.2,.8,3.5}
 		case .Fire:color={3.2,.65,.08}

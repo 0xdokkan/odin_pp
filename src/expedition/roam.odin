@@ -44,10 +44,11 @@ roam_sync :: proc(r:^Roam,room:^game.Room) {
 }
 
 // The cell the walker stands in never blocks it: a light bridge may close
-// beneath the robot, and it can still step off.
+// beneath the robot, and it can still step off. A cell more than a step higher or lower than the one
+// it stands in is a cliff, a wall to a walker (game/height.odin), whether on foot or in the saddle.
 @(private)
 roam_blocked :: proc(r:^Roam,room:^game.Room,cell:grid.Position)->bool {
-	return cell!=r.cell && game.cell_blocks_movement(room,cell)
+	return cell!=r.cell && (game.cell_blocks_movement(room,cell) || game.step_height_blocked(room,r.cell,cell))
 }
 
 // Circle against solid cells. A corner shared with a neighbouring solid cell

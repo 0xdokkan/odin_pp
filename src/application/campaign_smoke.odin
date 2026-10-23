@@ -121,6 +121,19 @@ EXPEDITION_SMOKE_HIT_BIOMES :: [4]campaign.Biome{.Snow, .West, .Jungle, .Space}
 EXPEDITION_SMOKE_STRUCTURES :: EXPEDITION_SMOKE_HITS+4
 @(private)
 EXPEDITION_SMOKE_STRUCTURE_STEPS :: 8
+// The relief of every biome (Fase 3): the robot stands where the ground is most uneven.
+@(private)
+EXPEDITION_SMOKE_RELIEF :: EXPEDITION_SMOKE_STRUCTURES+8
+@(private)
+EXPEDITION_SMOKE_RELIEF_COUNT :: 12
+// The map's hologram with the relief (shading and contour lines) in three biomes.
+@(private)
+EXPEDITION_SMOKE_HOLOGRAMS :: EXPEDITION_SMOKE_RELIEF+EXPEDITION_SMOKE_RELIEF_COUNT
+@(private)
+EXPEDITION_SMOKE_HOLOGRAM_BIOMES :: [3]campaign.Biome{.Egypt, .Snow, .Sky}
+// A fight on two levels in the Snow: the robot on a plateau, a foe on the ground below.
+@(private)
+EXPEDITION_SMOKE_TWO_LEVELS :: EXPEDITION_SMOKE_HOLOGRAMS+3
 @(private)
 EXPEDITION_SMOKE_STRUCTURE_NAMES :: [EXPEDITION_SMOKE_STRUCTURE_STEPS]string{"6","4","2","1","soglia","dentro","fuori","oggetti"}
 
@@ -352,6 +365,12 @@ expedition_capture_present :: proc(data:rawptr,frame:^host.Frame) {
 		else if s.stage>=EXPEDITION_SMOKE_HITS && s.stage<EXPEDITION_SMOKE_HITS+4 {
 			names:=[4]string{"neve","far_west","giungla","spazio"}
 			artifacts.screenshot(fmt.ctprintf("odin_pp_expedition_bersagli_%s.png",names[s.stage-EXPEDITION_SMOKE_HITS]))
+		} else if s.stage==EXPEDITION_SMOKE_TWO_LEVELS {
+			artifacts.screenshot("odin_pp_expedition_scontro_livelli.png")
+		} else if s.stage>=EXPEDITION_SMOKE_HOLOGRAMS && s.stage<EXPEDITION_SMOKE_HOLOGRAMS+3 {
+			artifacts.screenshot(fmt.ctprintf("odin_pp_expedition_ologramma_rilievo_%d.png",s.stage-EXPEDITION_SMOKE_HOLOGRAMS))
+		} else if s.stage>=EXPEDITION_SMOKE_RELIEF && s.stage<EXPEDITION_SMOKE_RELIEF+EXPEDITION_SMOKE_RELIEF_COUNT {
+			artifacts.screenshot(fmt.ctprintf("odin_pp_expedition_rilievo_%02d.png",s.stage-EXPEDITION_SMOKE_RELIEF))
 		} else if s.stage>=EXPEDITION_SMOKE_STRUCTURES && s.stage<EXPEDITION_SMOKE_STRUCTURES+EXPEDITION_SMOKE_STRUCTURE_STEPS {
 			names:=EXPEDITION_SMOKE_STRUCTURE_NAMES
 			artifacts.screenshot(fmt.ctprintf("odin_pp_expedition_edificio_%s.png",names[s.stage-EXPEDITION_SMOKE_STRUCTURES]))
@@ -417,8 +436,59 @@ expedition_capture_present :: proc(data:rawptr,frame:^host.Frame) {
 			}
 		} else if s.stage>=EXPEDITION_SMOKE_STRUCTURES && s.stage<EXPEDITION_SMOKE_STRUCTURES+EXPEDITION_SMOKE_STRUCTURE_STEPS {
 			expedition_smoke_structures(e,s.stage-EXPEDITION_SMOKE_STRUCTURES)
-		} else if s.stage>=EXPEDITION_SMOKE_STRUCTURES+EXPEDITION_SMOKE_STRUCTURE_STEPS {host.quit(frame)}
+		} else if s.stage>=EXPEDITION_SMOKE_RELIEF && s.stage<EXPEDITION_SMOKE_RELIEF+EXPEDITION_SMOKE_RELIEF_COUNT {
+			expedition_smoke_relief(e,campaign.Biome(s.stage-EXPEDITION_SMOKE_RELIEF))
+		} else if s.stage>=EXPEDITION_SMOKE_HOLOGRAMS && s.stage<EXPEDITION_SMOKE_HOLOGRAMS+3 {
+			biomes:=EXPEDITION_SMOKE_HOLOGRAM_BIOMES
+			expedition_smoke_world(e,biomes[s.stage-EXPEDITION_SMOKE_HOLOGRAMS]);e.world.mounted=false;e.message_timer=0;e.map_open=true
+		} else if s.stage==EXPEDITION_SMOKE_TWO_LEVELS {e.map_open=false;expedition_smoke_two_levels(e)}
+		else if s.stage>EXPEDITION_SMOKE_TWO_LEVELS {host.quit(frame)}
 	}
+}
+
+// The robot in the biome's most uneven place: the walkable cell whose 7 by 7 neighbourhood spans the most steps,
+// the nearest to the spawn if there are several.
+@(private)
+expedition_smoke_relief :: proc(e:^run.Expedition_Session,biome:campaign.Biome) {
+	expedition_smoke_world(e,biome);e.world.mounted=false;e.message_timer=0
+	data:=e.rs.room.level_data
+	best,best_range,best_distance:=grid.Position{},-1,1<<30
+	for y in 14..<data.tiles.height-14 {for x in 14..<data.tiles.width-14 {
+		cell:=grid.Position{x,y};tile,_:=level.tile_at(data,cell)
+		if !level.is_walkable(tile.kind) || game.cell_blocks_movement(&e.rs.room,cell) {continue}
+		low,high:=i32(1000),i32(-1)
+		for dy in -3..=3 {for dx in -3..=3 {
+			h:=level.height_at(data,{x+dx,y+dy});low=min(low,h);high=max(high,h)
+		}}
+		// The tallest relief first, then the nearer to the middle of the map.
+		spread:=int(high-low)*100+int(high);distance:=world.distance(cell,{data.tiles.width/2,data.tiles.height/2})
+		if spread>best_range || (spread==best_range && distance<best_distance) {best,best_range,best_distance=cell,spread,distance}
+	}}
+	e.rs.room.player.position=best
+	e.rs.iso_renderer.tactical.expedition_follow_ready=false
+}
+
+// A fight on two levels: the robot on a Snow plateau, one foe on the ground three steps or more below.
+@(private)
+expedition_smoke_two_levels :: proc(e:^run.Expedition_Session) {
+	expedition_smoke_world(e,.Snow);e.world.mounted=false;e.message_timer=0
+	data:=e.rs.room.level_data
+	high_cell,low_cell,best:=grid.Position{},grid.Position{},1<<30
+	for y in 14..<data.tiles.height-14 {for x in 14..<data.tiles.width-14 {
+		cell:=grid.Position{x,y}
+		if level.height_at(data,cell)<4 || game.cell_blocks_movement(&e.rs.room,cell) {continue}
+		for dy in -3..=3 {for dx in -3..=3 {
+			other:=grid.Position{x+dx,y+dy}
+			if abs(dx)+abs(dy)<2 || level.height_at(data,other)>1 || game.cell_blocks_movement(&e.rs.room,other) {continue}
+			distance:=world.distance(cell,{data.tiles.width/2,data.tiles.height/2})
+			if distance<best {high_cell,low_cell,best=cell,other,distance}
+		}}
+	}}
+	assert(best<1<<30,"the Snow has no plateau to fight over")
+	e.rs.room.player.position=high_cell
+	if e.rs.room.phase!=.Combat {_=game.begin_expedition_encounter(&e.rs.room)}
+	_,_=game.spawn_enemy(&e.rs.room,{position=low_cell,health=10,attack=2,archetype=.Chaser})
+	e.rs.iso_renderer.tactical.expedition_follow_ready=false
 }
 
 // One step of the structures' act: where the robot stands and what the building should be doing.
