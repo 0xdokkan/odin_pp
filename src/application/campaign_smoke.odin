@@ -54,7 +54,7 @@ hub_after_present :: proc(data:rawptr,frame:^host.Frame) {
 		h.progress_tab=1;h.progress_page=1
 	case 3:h.page=.Arcade
 	case 4:h.arcade_page=1
-	case 5:h.page=.Casino_Hall
+	case 5:hub_room_setup(h,.Casino);h.page=.Room
 	case 6:h.page=.Memories;h.progress.normal_ending=true
 	case 7:h.page=.Galaxy
 	case 8:h.selected=.City

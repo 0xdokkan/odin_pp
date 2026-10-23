@@ -110,7 +110,7 @@ building_yaw :: proc(b: Building) -> f32 {
 // The building as a station (zone.odin), whose functions do the geometry for both.
 building_station :: proc(b: Building) -> Station {
 	info := building_info(b)
-	return {info.name, info.subtitle, building_center(b), building_front(b), info.half, info.height}
+	return {name = info.name, subtitle = info.subtitle, center = building_center(b), front = building_front(b), half = info.half, height = info.height}
 }
 
 // A point of the plaza in the building's own frame: how far to its right of its

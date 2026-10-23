@@ -21,6 +21,8 @@ Station :: struct {
 	// Half its footprint across (x, along `station_right`) and deep (z, along `front`).
 	half:     Vec2,
 	height:   f32,
+	// Only a solid thing to walk round (the depot's crates): no door, nothing to click.
+	decor:    bool,
 }
 
 // To the station's right as seen from in front of it, looking at it.
@@ -139,6 +141,7 @@ room_walk_to :: proc(room: ^Room, w: ^Room_World, i: int) {
 room_station_at :: proc(room: ^Room, p: Vec2, margin: f32 = 0.6) -> (i: int, found: bool) {
 	best := f32(1e9)
 	for k in 0..<room.count {
+		if room.stations[k].decor { continue }
 		d := station_distance(room.stations[k], p)
 		if d <= margin && d < best { i, found, best = k, true, d }
 	}
@@ -189,6 +192,7 @@ room_step :: proc(room: ^Room, w: ^Room_World, wish: Vec2, dt: f32) -> (entered:
 		}
 	}
 	for k in 0..<room.count {
+		if room.stations[k].decor { continue }
 		in_zone := station_in_door(room.stations[k], w.position)
 		if in_zone && w.armed[k] && !did_enter {
 			w.armed[k] = false
@@ -212,7 +216,7 @@ CASINO_ROOM_RADIUS :: f32(15)
 casino_room :: proc() -> Room {
 	room := Room{name = "IL CASINÒ", radius = CASINO_ROOM_RADIUS, count = len(Casino_Station), exit = int(Casino_Station.Plaza)}
 	put :: proc(room: ^Room, which: Casino_Station, name, subtitle: string, center, half: Vec2, height: f32) {
-		room.stations[which] = {name, subtitle, center, normalize({-center.x, -center.y}), half, height}
+		room.stations[which] = {name = name, subtitle = subtitle, center = center, front = normalize({-center.x, -center.y}), half = half, height = height}
 	}
 	put(&room, .Ranch, "6 RANCH 7", "slot del ranch", {-8.5, -8}, {2.4, 1.4}, 3.6)
 	put(&room, .Run, "TRE IN FUGA", "dinosauro, Panda o moto", {8.5, -8}, {3.2, 1.6}, 3.4)

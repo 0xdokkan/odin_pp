@@ -27,10 +27,10 @@ HUB_SLOT_BUTTON :: rl.Rectangle{798, 24, 132, 32}
 hub_page_of_building :: proc(b: hubworld.Building) -> Hub_Page {
 	switch b {
 	case .Portal:   return .Galaxy
-	case .Storage:  return .Storage
+	case .Storage:  return .Room
 	case .Progress: return .Progress
 	case .Arcade:   return .Arcade
-	case .Casino:   return .Casino_Hall
+	case .Casino:   return .Room
 	case .Memories: return .Memories
 	case .Exit:     return .Slots
 	}
@@ -63,8 +63,8 @@ hub_world_return_to :: proc(h: ^Campaign_Hub, b: hubworld.Building) {
 hub_world_enter :: proc(h: ^Campaign_Hub, b: hubworld.Building, frame: ^host.Frame) {
 	h.plaza_from = b
 	ui.cancel_interaction(frame.ui)
-	if b == .Casino {
-		hub_fade_to(h, .Casino_Hall)
+	if b == .Casino || b == .Storage {
+		hub_fade_to(h, .Room, .Casino if b == .Casino else .Depot)
 		return
 	}
 	if b == .Exit {
@@ -140,16 +140,16 @@ hub_world_draw :: proc(h: ^Campaign_Hub, frame: ^host.Frame) {
 // the page it should (the Uscita leaves for the slots), and the robot comes back in
 // front of it. Stills odin_pp_hub_world_*.png.
 @(private = "file")
-HUB_WORLD_SMOKE_ORDER :: [hubworld.BUILDING_COUNT]hubworld.Building{.Portal, .Storage, .Progress, .Arcade, .Memories, .Exit, .Casino}
+HUB_WORLD_SMOKE_ORDER :: [hubworld.BUILDING_COUNT]hubworld.Building{.Portal, .Progress, .Arcade, .Memories, .Exit, .Storage, .Casino}
 
 @(private)
 hub_world_smoke :: proc(h: ^Campaign_Hub, frame: ^host.Frame) {
 	h.smoke_frame += 1
 	if h.smoke_frame == 30 { artifacts.screenshot("odin_pp_hub_world_centro.png") }
 	if h.smoke_frame <= 30 { return }
-	// The casino's hall is the last walk: its own sequence (hub_hall_smoke).
-	if h.smoke_phase >= 10 {
-		if hub_hall_smoke(h) { host.quit(frame) }
+	// The rooms behind the Deposito's and the Casinò's doors have their own sequences.
+	if h.smoke_phase >= HUB_SMOKE_CASINO {
+		if hub_room_smoke(h) { h.smoke_stage, h.smoke_phase = h.smoke_stage+1, 0 }
 		return
 	}
 	order := HUB_WORLD_SMOKE_ORDER
@@ -169,7 +169,7 @@ hub_world_smoke :: proc(h: ^Campaign_Hub, frame: ^host.Frame) {
 		}
 		if h.page != .World {
 			assert(h.page == hub_page_of_building(b), "the plaza smoke: a door opened the wrong page")
-			h.smoke_phase, h.smoke_wait, h.smoke_shot = 10 if b == .Casino else 2, 0, false
+			h.smoke_phase, h.smoke_wait, h.smoke_shot = (HUB_SMOKE_CASINO if b == .Casino else (HUB_SMOKE_DEPOT if b == .Storage else 2)), 0, false
 		}
 	case 2:
 		// The page is up for a few frames, then the robot comes back in front of the door.

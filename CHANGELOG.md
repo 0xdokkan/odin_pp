@@ -5,6 +5,16 @@ I riferimenti a Classica, `--flat` e ai vecchi smoke descrivono versioni precede
 per i comandi disponibili oggi valgono il [README](README.md) e la documentazione collegata.
 
 
+## 2026-10-23 — Hub in 3D: dentro il deposito
+
+- **Fase 10 del piano fatta.** Entrando nel Deposito dalla piazza si passa, con la
+  dissolvenza, alla sua sala: lo zaino su un tappetino, un manichino su una pedana che
+  indossa arma e reliquie vere, un terminale con lo scaffale delle carte scoperte che si
+  accendono, casse che crescono con gli oggetti conservati e la porta «Piazza». Zaino,
+  manichino e archivio aprono i pannelli di prima e al ritorno il robot è davanti a loro.
+- Le sale di casinò e deposito condividono ora codice (`Hub_Room`, `hub_rooms.odin`,
+  `render/hub_room`-helper). Test: 9 nuovi (1580 in tutto).
+
 ## 2026-10-23 — Hub in 3D: dentro il casinò
 
 - **Fase 9 del piano fatta.** Entrando nel Casinò dalla piazza si passa, con una

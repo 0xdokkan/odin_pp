@@ -34,8 +34,9 @@ hub_octagon_vertex_radius :: proc(r: f32) -> f32 {
 	return r/math.cos(f32(math.PI/8))
 }
 
-@(private="file")
-hub_casino_floor :: proc(room: ^hubworld.Room, time: f32) {
+// The floor of a room (shared by the casino's hall and the depot).
+@(private)
+hub_room_floor :: proc(room: ^hubworld.Room, time: f32) {
 	r := room.radius
 	vr := hub_octagon_vertex_radius(r)
 	// Turned an eighth of a turn so a wall (not a corner) faces right, where the way out is.
@@ -64,10 +65,10 @@ hub_casino_floor :: proc(room: ^hubworld.Room, time: f32) {
 	}
 }
 
-// The eight neon walls: the ones at the back are high (the camera looks over the
-// others), and the credits sign hangs on the middle one.
-@(private="file")
-hub_casino_walls :: proc(room: ^hubworld.Room, credits_glow: f32) {
+// The eight neon walls of a room: the ones at the back are high (the camera looks over
+// the others), and a sign (the casino's credits) can hang on the middle one.
+@(private)
+hub_room_walls :: proc(room: ^hubworld.Room, color: rl.Color, sign: bool, sign_glow: f32) {
 	r := room.radius
 	length := 2*r*math.tan(f32(math.PI/8))
 	for i in 0..<8 {
@@ -77,17 +78,18 @@ hub_casino_walls :: proc(room: ^hubworld.Room, credits_glow: f32) {
 		high := direction.y < -0.3
 		height := f32(3.6) if high else 0.9
 		hub_frame_at(direction*r, math.atan2(front.x, front.y))
-		hub_box({0, height*0.5, -0.18}, {length+0.35, height, 0.36}, HUB_SOLID_DARK, HUB_CASINO_WALL)
-		if i == 6 {
+		hub_box({0, height*0.5, -0.18}, {length+0.35, height, 0.36}, HUB_SOLID_DARK, color)
+		if sign && i == 6 {
 			// The sign for the credits, on the back wall's middle.
-			hub_box({0, 2.3, 0.06}, {5.6, 1.1, 0.14}, {26, 20, 8, 255}, hub_fade(HUB_CASINO_SIGN, 0.6+0.4*credits_glow))
+			hub_box({0, 2.3, 0.06}, {5.6, 1.1, 0.14}, {26, 20, 8, 255}, hub_fade(HUB_CASINO_SIGN, 0.6+0.4*sign_glow))
 		}
 		hub_frame_end()
 	}
 }
 
-@(private="file")
-hub_casino_ground_marks :: proc(s: hubworld.Station, color: rl.Color, hovered: bool, time: f32, phase: f32) {
+// The door's patch and the station's outline on the ground: always there.
+@(private)
+hub_room_ground_marks :: proc(s: hubworld.Station, color: rl.Color, hovered: bool, time: f32, phase: f32) {
 	hub_frame_at(s.center, hubworld.station_yaw(s))
 	defer hub_frame_end()
 	glow := 0.55+0.25*math.sin(time*3+phase)+(0.3 if hovered else 0)
@@ -253,7 +255,8 @@ hub_casino_dice :: proc(s: hubworld.Station, color: rl.Color, time: f32) {
 	}
 }
 
-@(private="file")
+// The way out to the plaza: a door in the wall.
+@(private)
 hub_casino_plaza_door :: proc(s: hubworld.Station, color: rl.Color) {
 	hx, h := s.half.x, s.height
 	for sx in ([2]f32{-1, 1}) { hub_box({sx*(hx-0.15), h*0.5, 0}, {0.4, h, 0.6}, HUB_SOLID, color) }
@@ -266,12 +269,12 @@ hub_casino_plaza_door :: proc(s: hubworld.Station, color: rl.Color) {
 draw_hub_casino :: proc(room: ^hubworld.Room, w: ^hubworld.Room_World, camera: rl.Camera3D, hovered: Maybe(int)) {
 	rl.BeginMode3D(camera)
 	defer rl.EndMode3D()
-	hub_casino_floor(room, w.time)
-	hub_casino_walls(room, 0.5+0.5*math.sin(w.time*2.4))
+	hub_room_floor(room, w.time)
+	hub_room_walls(room, HUB_CASINO_WALL, true, 0.5+0.5*math.sin(w.time*2.4))
 	for k in 0..<room.count {
 		is_hovered := false
 		if h, ok := hovered.?; ok && h == k { is_hovered = true }
-		hub_casino_ground_marks(room.stations[k], hub_casino_color(hubworld.Casino_Station(k)), is_hovered, w.time, f32(k))
+		hub_room_ground_marks(room.stations[k], hub_casino_color(hubworld.Casino_Station(k)), is_hovered, w.time, f32(k))
 	}
 	for k in 0..<room.count {
 		s := room.stations[k]

@@ -35,7 +35,7 @@ numero della fase resta quello della sua sezione.
 | 1 | 1 | Bersagli in evidenza | — | Fatta | vedi Esito |
 | 2 | 8 | Hub in 3D: la piazza, il robot che cammina, gli edifici | — | Fatta | vedi Esito |
 | 3 | 9 | Hub in 3D: dentro il casinò | 8 | Fatta | vedi Esito |
-| 4 | 10 | Hub in 3D: dentro il deposito | 8 | Da fare | — |
+| 4 | 10 | Hub in 3D: dentro il deposito | 8 | Fatta | vedi Esito |
 | 5 | 11 | Hub in 3D: dentro la sala giochi | 8 | Da fare | — |
 | 6 | 2 | Altezze nel laboratorio: dati, regole, grafica, puntamento | — | Fatta | vedi Esito |
 | 7 | 6 | Strutture su più caselle: edifici e oggetti complessi, edifici trasparenti avvicinandosi | — (meglio dopo la 2) | Da fare | — |
@@ -2021,7 +2021,35 @@ alla fine.
 
 ### Esito
 
-*(da compilare a fine fase)*
+**Fatta il 2026-10-23.** Entrando nel Deposito dalla piazza lo schermo si oscura e si
+passa alla sua sala, nello stesso modo della sala del casinò: un ottagono con pareti
+blu, il robot al centro.
+
+- **Disposizione** (come nel disegno): zaino in alto a sinistra, personaggio in alto a
+  destra, archivio delle carte in basso al centro, porta «Piazza» in basso a destra.
+- **Zaino:** posato a terra su un tappetino; ci si cammina sopra e si apre il pannello
+  Zaino.
+- **Personaggio** (scelta consigliata): un manichino su una pedana. Indossa
+  l'equipaggiamento vero dello zaino: la lancia Storm Pike o la lama, e le tre reliquie
+  che girano in aria, ognuna del suo colore. Cambia quando cambi l'equipaggiamento.
+  Si apre il pannello Personaggio.
+- **Archivio** (scelta dell'utente: un terminale con uno scaffale di carte che si
+  accendono): lo schermo mostra 60 dorsi, accesi in proporzione alle carte scoperte.
+  Si apre il pannello Archivio, con Mostra effetto come prima.
+- **Casse:** pile di casse accanto alla parete, da 2 a 12 in base agli oggetti nel
+  deposito. Sono solo da aggirare: non hanno porta.
+- **Ritorni:** chiudendo un pannello il robot è davanti all'oggetto da cui è partito, fuori
+  dalla zona d'ingresso. La porta «Piazza» dissolve di nuovo e il robot riappare davanti
+  al Deposito.
+- **Come è fatto:** le sale sono ora generiche (`Hub_Room`, in
+  `src/application/hub_rooms.odin`): casinò e deposito usano la stessa piazza-stanza, la
+  stessa dissolvenza, gli stessi disegni di pavimento e pareti. La Fase 11 aggiunge solo
+  la sua sala. `hubworld` ha `depot_room`, `Gear`, `crate_count` e `shelf_lit`.
+- **Test:** 9 nuovi (1580 in tutto, con e senza assert), compresi quelli che il
+  manichino mostra l'equipaggiamento vero e che ogni oggetto apre il pannello giusto.
+  I test dell'inventario passano. Lo smoke `--smoke-hub-world` ora entra anche nel
+  deposito, va a ogni oggetto, apre e chiude i tre pannelli e torna in piazza (scatti
+  `odin_pp_hub_depot_*.png`).
 
 ## 13. Fase 11 — Hub in 3D: dentro la sala giochi
 
