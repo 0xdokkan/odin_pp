@@ -20,7 +20,7 @@ import ui "../engine/ui"
 // same name. The way out dissolves back to the plaza, in front of the building. Coming
 // back from a game or a panel the robot is in front of its station.
 
-Hub_Room :: enum u8 { Casino, Depot }
+Hub_Room :: enum u8 { Casino, Depot, Arcade }
 
 // Where a dissolve of the hub ends up.
 Hub_Fade_Target :: enum u8 { Room, Plaza }
@@ -39,6 +39,9 @@ hub_room_setup :: proc(h: ^Campaign_Hub, kind: Hub_Room) {
 	switch kind {
 	case .Casino: h.room = hubworld.casino_room()
 	case .Depot: h.room = hubworld.depot_room()
+	case .Arcade:
+		_, unlocked := hub_unlocked_arcades(&h.progress)
+		h.room = hubworld.arcade_room(unlocked)
 	}
 	hubworld.room_place_at_centre(&h.room_world)
 	h.room_camera = {}
@@ -52,6 +55,17 @@ hub_room_building :: proc(kind: Hub_Room) -> hubworld.Building {
 	switch kind {
 	case .Casino: return .Casino
 	case .Depot: return .Storage
+	case .Arcade: return .Arcade
+	}
+	return .Casino
+}
+
+// The room behind a building's door.
+@(private)
+hub_room_of_building :: proc(b: hubworld.Building) -> Hub_Room {
+	#partial switch b {
+	case .Storage: return .Depot
+	case .Arcade: return .Arcade
 	}
 	return .Casino
 }
@@ -161,6 +175,7 @@ hub_room_enter :: proc(h: ^Campaign_Hub, i: int, frame: ^host.Frame) {
 	switch h.room_kind {
 	case .Casino: hub_open_casino_game(h, frame, arcade.Casino_Kind(i))
 	case .Depot: hub_open_depot_panel(h, i)
+	case .Arcade: hub_open_arcade_game(h, frame, i)
 	}
 }
 
@@ -204,8 +219,12 @@ hub_room_update :: proc(h: ^Campaign_Hub, frame: ^host.Frame) {
 		if .Wheel in cues { audio.play(frame.audio, .Hall_Wheel, 0.5) }
 	}
 	if did_enter { hub_room_enter(h, entered, frame); return }
-	hint := "WASD o frecce per muoverti. Clic su una struttura per andarci. La porta a destra torna in piazza." if h.room_kind == .Casino else
-		"WASD o frecce per muoverti. Clic su un oggetto per andarci. La porta in basso a destra torna in piazza."
+	hint := "WASD o frecce per muoverti. Clic su una struttura per andarci. La porta a destra torna in piazza."
+	switch h.room_kind {
+	case .Casino:
+	case .Depot: hint = "WASD o frecce per muoverti. Clic su un oggetto per andarci. La porta in basso a destra torna in piazza."
+	case .Arcade: hint = "WASD o frecce per muoverti. Clic su un cabinato per giocare. La porta in basso torna in piazza."
+	}
 	ui.label(ctx, {33, 508, 880, 24}, hint, .Small, p.text_dim)
 	if h.notice_time > 0 { ui.label(ctx, {32, 483, 890, 28}, h.notice, .Small, p.warning) }
 	if h.save_failed { ui.label(ctx, {32, 460, 890, 22}, "Salvataggio non riuscito. Il progresso resta in memoria; riprova prima di uscire.", .Small, p.warning) }
@@ -221,6 +240,10 @@ hub_room_draw :: proc(h: ^Campaign_Hub, frame: ^host.Frame) {
 	case .Depot:
 		render.draw_hub_depot(&h.room, &h.room_world, camera, h.room_hover, hub_depot_view(&h.progress))
 		render.draw_hub_depot_labels(frame.theme, &h.room, &h.room_world, camera, 960, 540, h.room_hover)
+	case .Arcade:
+		view := hub_arcade_view(&h.progress)
+		render.draw_hub_arcade(&h.room, &h.room_world, camera, h.room_hover, view)
+		render.draw_hub_arcade_labels(frame.theme, &h.room, &h.room_world, camera, 960, 540, h.room_hover, view)
 	}
 }
 
@@ -235,23 +258,26 @@ HALL_SMOKE_STATION_NAMES :: [4]cstring{"odin_pp_hub_casino_ranch.png", "odin_pp_
 DEPOT_SMOKE_STATION_NAMES :: [3]cstring{"odin_pp_hub_depot_zaino.png", "odin_pp_hub_depot_manichino.png", "odin_pp_hub_depot_archivio.png"}
 @(private = "file")
 DEPOT_SMOKE_PANEL_NAMES :: [3]cstring{"odin_pp_hub_depot_pannello_zaino.png", "odin_pp_hub_depot_pannello_personaggio.png", "odin_pp_hub_depot_pannello_archivio.png"}
-@(private = "file")
+@(private)
 hall_smoke_game_name: cstring
 
-@(private = "file")
+@(private)
 hub_hall_smoke_game_present :: proc(data: rawptr, frame: ^host.Frame) {
 	if frame.index%45 != 0 { return }
 	artifacts.screenshot(hall_smoke_game_name)
 	host.pop(frame)
 }
 
-// Phases of the smoke at the plaza's doors: 10 to 14 the casino, 20 to 25 the depot.
+// Phases of the smoke at the plaza's doors: 10 to 14 the casino, 20 to 25 the depot,
+// 30 to 35 the arcade hall.
 HUB_SMOKE_CASINO :: 10
 HUB_SMOKE_DEPOT :: 20
+HUB_SMOKE_ARCADE :: 30
 
 // One frame of a room's part of the smoke. Returns true once the whole walk is done.
 @(private)
 hub_room_smoke :: proc(h: ^Campaign_Hub) -> bool {
+	if h.smoke_phase >= HUB_SMOKE_ARCADE { return hub_arcade_smoke(h) }
 	if h.smoke_phase >= HUB_SMOKE_DEPOT { return hub_depot_smoke(h) }
 	return hub_casino_smoke(h)
 }

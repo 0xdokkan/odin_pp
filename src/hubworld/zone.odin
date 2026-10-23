@@ -8,7 +8,7 @@ import "core:math"
 // window and no drawing. The way between zones is a dissolve (Fade) that switches
 // from one to the other while the screen is dark.
 
-MAX_STATIONS :: 8
+MAX_STATIONS :: 16
 
 // A thing in a room (or a building of the plaza) the robot can walk up to: a box on
 // the floor, turned so its front looks along `front` (a unit vector, plan coordinates

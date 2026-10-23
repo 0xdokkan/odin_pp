@@ -65,8 +65,4 @@ test_hub_progress_reveals_only_known_secrets_and_pages_records :: proc(t:^testin
 		found_ring=found_ring||command.text=="Il Ring delle Ombre"
 	}
 	testing.expect(t,found_score&&found_ring)
-	h.arcade_page=1
-	ui.begin(ctx,{}, {},0);hub_arcade(h,&frame);ui.end(ctx)
-	play_buttons:=0;for command in ctx.commands[:ctx.command_count] {if command.text=="GIOCA" {play_buttons+=1}}
-	testing.expect_value(t,play_buttons,4)
 }

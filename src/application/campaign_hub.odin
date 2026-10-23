@@ -22,7 +22,7 @@ import gfx "../engine/gfx"
 // The pages after Slots: the plaza (World) where the robot walks, and, opened from
 // its buildings, the Galaxy (the Portal), Storage (the Deposito), Progress, Arcade (the
 // Sala giochi), Room (the room of the Casinò or of the Deposito) and Memories (Frammenti del creatore).
-Hub_Page :: enum { Slots, World, Galaxy, Storage, Progress, Arcade, Room, Memories }
+Hub_Page :: enum { Slots, World, Galaxy, Storage, Progress, Room, Memories }
 Campaign_Save :: struct { expedition:world.Snapshot, casino:arcade.Casino_Transaction, casino_random:u64 }
 Campaign_Hub :: struct {
 	options:Runtime_Options,
@@ -70,7 +70,7 @@ Campaign_Hub :: struct {
 	departure_unlocked:[campaign.Biome.Count]bool,
 	notice:string,
 	memory:int,
-	progress_tab,progress_page,arcade_page:int,
+	progress_tab,progress_page:int,
 	smoke,smoke_expedition,smoke_world:bool,
 	smoke_frame,smoke_stage,smoke_phase,smoke_wait,smoke_hall:int,
 	smoke_shot:bool,
@@ -241,7 +241,6 @@ hub_update :: proc(data:rawptr,frame:^host.Frame) {
 	case .Galaxy:hub_galaxy_input(h,frame)
 	case .Storage:hub_storage(h,frame);return
 	case .Progress:hub_progress(h,frame)
-	case .Arcade:hub_arcade(h,frame)
 	case .Memories:hub_memories(h,frame)
 	}
 	if h.notice_time>0 {ui.label(ctx,{32,483,890,28},h.notice,.Small,p.warning)}

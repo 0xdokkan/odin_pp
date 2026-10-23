@@ -82,3 +82,80 @@ test_the_dissolve_leads_into_a_room_and_back_to_the_plaza_in_front_of_its_buildi
 		testing.expect(t,!hubworld.in_door(building,h.plaza.position,hubworld.DOOR_REARM_MARGIN),"in front of the building, outside its door")
 	}
 }
+
+@(test)
+test_the_lit_cabinets_are_exactly_the_unlocked_ones :: proc(t:^testing.T) {
+	c:campaign.Campaign;campaign.initialize(&c);defer campaign.destroy(&c)
+	// Nothing won: no cabinet is lit and every place is covered, with nothing written on it.
+	view:=hub_arcade_view(&c)
+	testing.expect_value(t,view.count,0)
+	room:=hubworld.arcade_room(view.count)
+	for k in 0..<hubworld.ARCADE_SLOTS {
+		testing.expect(t,room.stations[k].decor)
+		testing.expect_value(t,room.stations[k].name,"")
+		testing.expect_value(t,view.title[k],"")
+	}
+	// Win the biomes one by one: the lit ones are always those of hub_unlocked_arcades, in its order.
+	for b in campaign.Biome.Cyber..<campaign.Biome.Count {
+		c.won[b]=true
+		indices,count:=hub_unlocked_arcades(&c)
+		view=hub_arcade_view(&c)
+		room=hubworld.arcade_room(view.count)
+		testing.expect_value(t,view.count,count)
+		for k in 0..<hubworld.ARCADE_SLOTS {
+			testing.expect_value(t,room.stations[k].decor,k>=count)
+			if k<count {
+				testing.expect_value(t,view.game[k],indices[k])
+				testing.expect(t,view.title[k]!="")
+				game,ok:=hub_arcade_game(&c,k)
+				testing.expect(t,ok && game==indices[k],"each cabinet opens its own minigame")
+			} else {
+				_,ok:=hub_arcade_game(&c,k)
+				testing.expect(t,!ok,"a covered cabinet opens nothing")
+			}
+		}
+	}
+}
+
+@(test)
+test_a_biome_not_won_leaves_no_clue_in_the_hall :: proc(t:^testing.T) {
+	c:campaign.Campaign;campaign.initialize(&c);defer campaign.destroy(&c)
+	c.won[campaign.Biome.Cyber]=true
+	view:=hub_arcade_view(&c)
+	entries,n:=hub_biome_arcades(.Cyber)
+	testing.expect_value(t,view.count,n)
+	for k in 0..<view.count {testing.expect_value(t,view.game[k],entries[k])}
+	// The other places say nothing: no name, no record, and no colour in the view.
+	room:=hubworld.arcade_room(view.count)
+	for k in view.count..<hubworld.ARCADE_SLOTS {
+		testing.expect_value(t,view.title[k],"")
+		testing.expect_value(t,view.record[k],"")
+		testing.expect_value(t,view.stars[k],u8(0))
+		testing.expect(t,room.stations[k].decor)
+	}
+}
+
+@(test)
+test_the_record_on_a_cabinet_follows_the_game_just_played_and_the_robot_comes_back_to_it :: proc(t:^testing.T) {
+	h:=new(Campaign_Hub);defer free(h)
+	campaign.initialize(&h.progress);defer campaign.destroy(&h.progress)
+	for &won in h.progress.won {won=true}
+	indices,count:=hub_unlocked_arcades(&h.progress)
+	testing.expect(t,count>1)
+	hub_room_setup(h,.Arcade)
+	for station in 0..<count {
+		view:=hub_arcade_view(&h.progress)
+		testing.expect_value(t,view.record[station],"Nessun record")
+		// The game is played, then the hub resumes: the record is there, the robot in front of the cabinet.
+		campaign.record_result(&h.progress,indices[station],2468,3,true)
+		h.page=.Room;h.in_game=true;h.room_from=station
+		hub_resume(h,nil,"minigame",nil)
+		view=hub_arcade_view(&h.progress)
+		testing.expect_value(t,view.stars[station],u8(3))
+		testing.expect(t,view.record[station]!="Nessun record")
+		testing.expect_value(t,h.room_from,station)
+		s:=h.room.stations[station]
+		testing.expect(t,!hubworld.station_in_door(s,h.room_world.position,hubworld.DOOR_REARM_MARGIN),"outside the door")
+		testing.expect(t,hubworld.station_distance(s,h.room_world.position)>=hubworld.ROBOT_RADIUS)
+	}
+}

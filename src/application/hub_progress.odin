@@ -124,19 +124,3 @@ hub_progress :: proc(h:^Campaign_Hub,frame:^host.Frame) {
 	}
 }
 
-@(private)
-hub_arcade :: proc(h:^Campaign_Hub,frame:^host.Frame) {
-	ctx:=frame.ui;p:=ctx.theme.palette
-	ui.label(ctx,{34,143,890,26},"CABINATI / Record personali, nessun premio e nessun oggetto a rischio",.Small,p.text_dim)
-	indices,count:=hub_unlocked_arcades(&h.progress)
-	hub_page_controls(ctx,{340,439,280,28},&h.arcade_page,count,8)
-	if count==0 {ui.paragraph(ctx,{35,210,750,80},"Vinci una spedizione per conservare il suo cabinato nell'hub.",.Body,p.text_dim)}
-	for i in h.arcade_page*8..<min(count,(h.arcade_page+1)*8) {
-		index:=indices[i];info,_:=activities.minigame_info(index);local:=i%8
-		box:=ui.panel(ctx,{34+f32(local%2)*450,177+f32(local/2)*64,430,58})
-		button:=ui.cut_right(&box,78);ui.cut_right(&box,10)
-		ui.label(ctx,ui.cut_top(&box,20),info.title,.Small,p.text)
-		ui.label(ctx,box,hub_record_line(&h.progress,index),.Small,p.text_dim)
-		if ui.button(ctx,button,"GIOCA",true,false,.Small) {host.push(frame,info.create({seed=h.options.seed~u64(h.clock*1000)}))}
-	}
-}

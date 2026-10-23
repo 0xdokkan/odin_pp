@@ -15,6 +15,7 @@ import game "../game"
 import grid "../engine/grid"
 import level "../level"
 import host "../engine/host"
+import hubworld "../hubworld"
 import arcade "../memoryarcade"
 import activities "../activities"
 
@@ -37,7 +38,7 @@ hub_after_present :: proc(data:rawptr,frame:^host.Frame) {
 	h.smoke_frame+=1
 	if h.smoke_frame%35!=0 {return}
 	stage:=h.smoke_frame/35-1
-	names:=[11]string{"galassia","deposito","progressi","record","cabinati","cabinati_pagina2","casino","memorie","galassia_completa","galassia_city","slot"}
+	names:=[11]string{"galassia","deposito","progressi","record","cabinati","cabinati_vicino","casino","memorie","galassia_completa","galassia_city","slot"}
 	if stage<len(names) {artifacts.screenshot(fmt.ctprintf("odin_pp_hub_%s.png",names[stage]))}
 	switch stage {
 	case 0:
@@ -52,8 +53,8 @@ hub_after_present :: proc(data:rawptr,frame:^host.Frame) {
 		for b in campaign.Biome.Cyber..<campaign.Biome.Count {h.progress.won[b]=true;h.progress.unlocked[b]=true}
 		for i in 0..<activities.MINIGAME_COUNT {campaign.record_result(&h.progress,i,i64(1250+i*175),u8(1+i%3),true)}
 		h.progress_tab=1;h.progress_page=1
-	case 3:h.page=.Arcade
-	case 4:h.arcade_page=1
+	case 3:hub_room_setup(h,.Arcade);h.page=.Room
+	case 4:hubworld.room_place_before(&h.room,&h.room_world,0);h.room_camera={-6,-3}
 	case 5:hub_room_setup(h,.Casino);h.page=.Room
 	case 6:h.page=.Memories;h.progress.normal_ending=true
 	case 7:h.page=.Galaxy

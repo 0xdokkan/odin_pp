@@ -5,6 +5,16 @@ I riferimenti a Classica, `--flat` e ai vecchi smoke descrivono versioni precede
 per i comandi disponibili oggi valgono il [README](README.md) e la documentazione collegata.
 
 
+## 2026-10-23 — Hub in 3D: dentro la sala giochi
+
+- **Fase 11 del piano fatta: l'hub 3D è completo.** Entrando nella Sala giochi dalla piazza
+  si passa, con la dissolvenza, a dodici posti a semicerchio: i cabinati dei biomi vinti
+  sono accesi, con nome, stelle e record, e si gioca entrandoci; gli altri sono coperti da
+  un telo e non dicono a quale bioma appartengono. Dopo una partita il robot è davanti al
+  cabinato e il record è aggiornato. La vecchia pagina «Cabinati» è sostituita dalla sala.
+- Sala in `hubworld/arcade.odin` e `render/hub_arcade.odin`, collegamento in
+  `application/hub_arcade_room.odin`. Test: 8 nuovi (1588 in tutto).
+
 ## 2026-10-23 — Hub in 3D: dentro il deposito
 
 - **Fase 10 del piano fatta.** Entrando nel Deposito dalla piazza si passa, con la

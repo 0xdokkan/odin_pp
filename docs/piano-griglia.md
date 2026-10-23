@@ -36,7 +36,7 @@ numero della fase resta quello della sua sezione.
 | 2 | 8 | Hub in 3D: la piazza, il robot che cammina, gli edifici | — | Fatta | vedi Esito |
 | 3 | 9 | Hub in 3D: dentro il casinò | 8 | Fatta | vedi Esito |
 | 4 | 10 | Hub in 3D: dentro il deposito | 8 | Fatta | vedi Esito |
-| 5 | 11 | Hub in 3D: dentro la sala giochi | 8 | Da fare | — |
+| 5 | 11 | Hub in 3D: dentro la sala giochi | 8 | Fatta | vedi Esito |
 | 6 | 2 | Altezze nel laboratorio: dati, regole, grafica, puntamento | — | Fatta | vedi Esito |
 | 7 | 6 | Strutture su più caselle: edifici e oggetti complessi, edifici trasparenti avvicinandosi | — (meglio dopo la 2) | Da fare | — |
 | 8 | 3 | Altezze nelle spedizioni: renderer, mappe, salvataggi, prestazioni | 2 | Da fare | — |
@@ -2120,7 +2120,29 @@ alla fine.
 
 ### Esito
 
-*(da compilare a fine fase)*
+**Fatta il 2026-10-23.** Entrando nella Sala giochi dalla piazza lo schermo si oscura e si
+passa alla sua sala, come per il casinò e il deposito: un ottagono con pareti verde lime,
+il robot al centro, la porta «Piazza» alle sue spalle.
+
+- **Disposizione** (scelta consigliata, senza disegno): dodici posti a semicerchio davanti
+  all'arrivo, uno per minigioco (`activities.MINIGAME_COUNT`).
+- **Cabinati sbloccati:** sono esattamente quelli di `hub_unlocked_arcades` (gli stessi della
+  pagina Progressi), accesi nei colori del loro gioco, con lo schermo che si muove, il nome
+  sull'insegna, le stelle del record sul cartello in cima e, avvicinandosi o puntandoli, il
+  record (`hub_record_line`). Entrandoci si gioca come prima (`info.create` con `host.push`);
+  finita la partita il record si aggiorna e il robot è davanti a quel cabinato.
+- **Cabinati non ancora sbloccati** (scelta dell'utente: coperti da un telo): un cabinato
+  coperto da un telo grigio, senza nome, senza colore, senza porta e non cliccabile. Non
+  dice a quale bioma appartiene.
+- **Uscita:** la porta «Piazza» dissolve di nuovo e il robot riappare davanti alla Sala giochi.
+- **Pagina vecchia:** la pagina «Cabinati» non c'è più (non era più raggiungibile); i suoi
+  cabinati sono i posti della sala. La stazione generica delle sale passa da 8 a 16 posti.
+- **Test:** 8 nuovi (1588 in tutto, con e senza assert): i cabinati accesi sono
+  esattamente quelli sbloccati, ogni cabinato apre il suo minigioco, il ritorno è davanti
+  al cabinato giusto con il record aggiornato, un bioma non vinto non lascia indizi, le
+  porte dei posti vicini non si sovrappongono. Lo smoke `--smoke-hub-world` ora entra anche
+  qui: sala con zero cabinati, sala con alcuni biomi vinti, il primo e l'ultimo cabinato
+  aperti e chiusi davvero, il ritorno e l'uscita (scatti `odin_pp_hub_arcade_*.png`).
 
 ## 14. Fonti consultate online
 
