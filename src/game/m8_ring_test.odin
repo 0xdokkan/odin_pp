@@ -47,7 +47,9 @@ test_m8_locked_cards_never_leak_into_reward_pool :: proc(t: ^testing.T) {
 		for id in choices { testing.expect(t, id != .Titan_Grip && id != .Storm_Crown) }
 	}
 	profile.ring_wins = 3
-	all: [int(Card_Id.Count)-4]Card_Id // Spark is temporary-only; the Scopa pair and the Cannone laser are never offered.
+	// Spark is temporary-only; the Scopa pair and the Prova meccaniche's six cards
+	// (the Cannone laser among them) are never offered.
+	all: [int(Card_Id.Count)-9]Card_Id
 	random := u64(1)
 	testing.expect(t, generate_weighted_card_choices(&random, &node, all[:], &profile))
 	found_titan, found_crown := false, false

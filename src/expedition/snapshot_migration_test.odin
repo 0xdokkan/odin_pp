@@ -2,6 +2,7 @@ package expedition
 
 import "core:fmt"
 import "core:os"
+import _ "../engine/teststack"
 import "core:strings"
 import "core:testing"
 import campaign "../campaign"
@@ -22,10 +23,19 @@ Legacy_Test_Snapshot :: struct {
 	next_enemy_id, next_trap_id, next_object_id: u32,
 }
 
+// A scratch file in the system's temp directory: the tests must not depend on
+// a macOS-only path such as /private/tmp (they failed on Windows).
+scratch_path :: proc(name: string) -> string {
+	dir, dir_error := os.temp_directory(context.temp_allocator)
+	if dir_error != nil { return name }
+	path, path_error := os.join_path({dir, name}, context.temp_allocator)
+	return path if path_error == nil else name
+}
+
 @(test)
 test_legacy_80_96_112_slots_resume_exact_tiles_and_keep_original_size :: proc(t: ^testing.T) {
 	for biome in ([3]campaign.Biome{.Cyber, .Egypt, .Space}) {
-		path := fmt.tprintf("/private/tmp/odin-pp-legacy-world-%d.json", int(biome)); defer os.remove(path)
+		path := scratch_path(fmt.tprintf("odin-pp-legacy-world-%d.json", int(biome))); defer os.remove(path)
 		old := new(Legacy_Test_Snapshot); defer free(old)
 		side := legacy_map_size(biome)
 		old.valid = true; old.world = {biome, 42, -1, 32, {9, side/2}}

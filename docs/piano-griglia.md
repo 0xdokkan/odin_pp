@@ -31,7 +31,7 @@ numero della fase resta quello della sua sezione.
 
 | Priorità | Fase | Contenuto | Dipende da | Stato | Commit |
 |---|---|---|---|---|---|
-| 0 | 0 | Test affidabili su Windows (proposta di Claude, approvata dall'utente) | — | Da fare | — |
+| 0 | 0 | Test affidabili su Windows (proposta di Claude, approvata dall'utente) | — | Fatta | vedi Esito |
 | 1 | 1 | Bersagli in evidenza | — | Da fare | — |
 | 2 | 8 | Hub in 3D: la piazza, il robot che cammina, gli edifici | — | Da fare | — |
 | 3 | 9 | Hub in 3D: dentro il casinò | 8 | Da fare | — |
@@ -58,14 +58,14 @@ una fase.
 - **Dipendenze:** nessuna fase arriva prima di ciò che le serve.
 - **Niente lavoro rifatto:** per esempio le strutture vengono dopo le altezze,
   così le piante nascono con piani e gradini.
-- **Verifiche affidabili:** ogni fase si chiude con la suite di test, che oggi
-  su Windows si interrompe a metà.
+- **Verifiche affidabili:** ogni fase si chiude con la suite di test, che dopo
+  la Fase 0 su Windows arriva in fondo.
 
 **La scaletta.** Le dimensioni sono relative alle altre fasi del piano.
 
 | Priorità | Fase | Perché in questa posizione | Dimensione | Rischio |
 |---|---|---|---|---|
-| 0 | Fase 0: test affidabili su Windows (proposta) | Ogni fase si chiude con la suite completa, che oggi su Windows va in crash a metà e lascia test non eseguiti (sezione 1.5). Sistemarla prima rende ogni verifica successiva più veloce e completa. Approvata dall'utente il 23 ottobre 2026; i test scritti da 0xdokkan si correggono qui. | piccola | basso |
+| 0 | Fase 0: test affidabili su Windows (fatta il 23 ottobre 2026) | Ogni fase si chiude con la suite completa, che prima su Windows andava in crash a metà e lasciava test non eseguiti. Ora arriva in fondo (sezione 1.5), così ogni verifica successiva è più veloce e completa. | piccola | basso |
 | 1 | Fase 1: bersagli in evidenza | È la prima richiesta dell'utente e migliora subito ogni scontro. Non dipende da niente e non tocca il resto. | piccola | basso |
 | 2 | Fase 8: hub, la piazza | È il cambiamento più visibile, perché ogni partita parte da lì. Disegni e immagini sono pronti, quindi resta poco da decidere. Non tocca combattimento né spedizioni. | grande | medio: cambia cosa succede dopo la scelta della memoria |
 | 3 | Fase 9: hub, il casinò | Completa l'hub finché il lavoro della Fase 8 è fresco, e costruisce il passaggio tra zone che riusano le Fasi 10 e 11. | media | basso |
@@ -195,37 +195,22 @@ possono far girare solo gli atti della fase, ma a fine fase va completato.
 Nelle Fasi 8–11 si aggiungono gli smoke dell'hub: `--smoke-hub`,
 `--smoke-expedition` e il nuovo `--smoke-hub-world`.
 
-### 1.5 Fallimenti già noti (Windows, 23 ottobre 2026)
+### 1.5 Test su Windows (dopo la Fase 0, 23 ottobre 2026)
 
-Sono stati misurati su `main` pulito e non dipendono da questo piano.
+Dopo la Fase 0 la suite completa passa su Windows senza flag speciali:
+`.\scripts\check.ps1` finisce con 1529 test verdi, due volte (con e senza
+assert), più le due build.
 
-- **Dodici test falliscono.** Quasi tutti usano percorsi `/private/tmp` che
-  su Windows non esistono:
-  - `application`: `test_window_focus_loss_flushes_latest_hub_state`;
-  - `campaign`: `test_corrupt_save_is_preserved_and_rejection_leaks_nothing`,
-    i quattro `test_save_queue_*`,
-    `test_save_roundtrip_keeps_campaign_and_live_snapshot`,
-    `test_three_slots_keep_independent_stakes_and_discoveries` e
-    `test_version_one_checksum_survives_new_fields_and_expanded_arrays`;
-  - `expedition`: `test_legacy_80_96_112_slots_resume_exact_tiles_and_keep_original_size`;
-  - `render`: `test_expedition_combat_camera_keeps_near_fighters_above_hand_and_pickable`;
-  - `run`: `test_running_slot_snapshot_restores_owned_room_pointers`.
-- **La suite si interrompe.** Dopo
-  `test_running_slot_snapshot_restores_owned_room_pointers` va in crash
-  (segmentation fault, exit 139), quindi i test successivi non partono.
-  - Il pacchetto `run` si completa escludendo solo quel test, con
-    `-define:ODIN_TEST_NAMES=` e l'elenco degli altri test del pacchetto.
-  - Gli altri pacchetti si possono lanciare uno per uno con
-    `odin test src/<pacchetto>`.
-- **Problemi dei pacchetti lanciati da soli:**
-  - `game` da solo gira all'infinito (succede, per esempio, con
-    `ODIN_TEST_RANDOM_SEED=344123742175708`);
-  - `integration` e `combatdebug` da soli si chiudono con exit 127;
-  - in `expedition`, da solo, fallisce anche
-    `test_inferno_eruption_cracks_floor_after_warning_and_persists_lava`.
-
-  Sono tutti uguali su `main`: questi pacchetti contano solo dentro la suite
-  completa.
+- **Nessun fallimento noto.** I dodici di prima, il crash a metà della suite e
+  i pacchetti che da soli non arrivavano in fondo avevano tre cause, tutte
+  risolte (sezione 16): percorsi `/private/tmp`, stack di Windows troppo
+  piccolo per decodificare lo snapshot e una tolleranza troppo stretta.
+- **Ogni pacchetto si lancia da solo** con `odin test src/<pacchetto>`.
+- **Se un test nuovo decodifica lo snapshot della spedizione** (1,3 MB) in un
+  pacchetto che non importa `src/engine/teststack`, su Windows va in crash.
+  Basta aggiungere `import _ "../engine/teststack"` in un suo file di test.
+- **I test non devono scrivere in `/private/tmp`**, ma nella cartella
+  temporanea del sistema (`os.temp_directory`).
 
 ## 2. Fase 1 — Bersagli in evidenza
 
@@ -2058,55 +2043,63 @@ Ricerche del 23 ottobre 2026, per le parti che il codice non dice.
 
 È nata come proposta di Claude, e l'utente l'ha approvata il 23 ottobre 2026.
 
-Ogni fase del piano si chiude con la suite completa dei test. Oggi su Windows
-(sezione 1.5):
-- dodici test falliscono perché scrivono in `/private/tmp`, un percorso che
+Ogni fase del piano si chiude con la suite completa dei test. Prima della
+Fase 0, su Windows:
+- dodici test fallivano perché scrivevano in `/private/tmp`, un percorso che
   esiste solo su macOS;
-- dopo `test_running_slot_snapshot_restores_owned_room_pointers` la suite va
-  in crash, e i test successivi non partono;
-- per coprirli bisogna lanciare i pacchetti uno per uno, e `game`,
-  `integration` e `combatdebug`, lanciati da soli, non arrivano in fondo.
+- dopo `test_running_slot_snapshot_restores_owned_room_pointers` la suite
+  andava in crash, e i test successivi non partivano;
+- per coprirli bisognava lanciare i pacchetti uno per uno, e `game`,
+  `integration` e `combatdebug`, lanciati da soli, non arrivavano in fondo.
 
-Così ogni verifica è più lenta e meno completa, e un errore nuovo potrebbe
+Così ogni verifica era più lenta e meno completa, e un errore nuovo poteva
 confondersi con quelli già noti.
 
-### Cosa si fa
+### Cosa è stato fatto
 
-- I test scrivono i loro file nella cartella temporanea del sistema, non più
-  in `/private/tmp`.
-  - Sono 14 percorsi in 6 file (situazione del 23 ottobre 2026):
-    `src/application/campaign_hub_test.odin`, `src/campaign/campaign_test.odin`,
-    `src/campaign/save_queue_test.odin`,
-    `src/expedition/snapshot_migration_test.odin`,
-    `src/run/checkpoint_benchmark_test.odin` e
-    `src/run/expedition_flow_test.odin`.
-  - Il compilatore fissato dal progetto ha `os.temp_directory(allocator)`
-    (`core/os/temp_file.odin:97`).
-  - Su macOS il risultato non cambia, perché la cartella temporanea c'è anche
-    lì.
-- Un test che non riesce a salvare si ferma lì invece di proseguire, così un
-  fallimento non diventa un crash.
-- Si cerca perché:
-  - `game` lanciato da solo gira all'infinito;
-  - `integration` e `combatdebug` lanciati da soli si chiudono con exit 127.
+Le risposte dell'utente erano già registrate: la fase si fa, e i test scritti
+da 0xdokkan si correggono qui, scrivendolo nel messaggio di commit.
 
-  Se la causa è nei test si corregge, altrimenti si documenta.
-- Si aggiorna la sezione 1.5.
+1. **Percorsi.** 14 percorsi `/private/tmp` in 6 file di test (`application`,
+   `campaign` due file, `expedition`, `run` due file) ora usano
+   `scratch_path(nome)`, che dà un file nella cartella temporanea del sistema
+   (`os.temp_directory` e `os.join_path`, come già fanno i test di
+   `src/engine/save` e di `integration`). Su macOS il risultato è lo stesso.
+2. **Stack.** Era la causa del crash e del blocco.
+   - `core:encoding/json` del compilatore, per ogni campo di una struct,
+     riserva sullo stack una maschera grande quanto la struct diviso 8
+     (`intrinsics.alloca` dentro un ciclo, che non si libera fino alla fine
+     della funzione). Lo snapshot della spedizione pesa 1,28 MB e ha circa 40
+     campi: servono circa 6 MB di stack, mentre Windows ne dà 1 MB a ogni
+     eseguibile.
+   - Il gioco funziona perché il suo pacchetto principale riserva 16 MiB
+     (`src/windows_stack.odin`). I test dei singoli pacchetti non lo
+     includono.
+   - Nuovo pacchetto `src/engine/teststack`, con lo stesso trucco (un
+     `foreign import` con `@(extra_linker_flags = "/STACK:33554432")` che
+     viaggia con il pacchetto). I test che lo servono lo importano con
+     `import _`: `application`, `expedition`, `run` e `game`.
+3. **Tolleranza della camera.** `test_expedition_combat_camera_keeps_near_fighters_above_hand_and_pickable`
+   ammetteva 0,001 caselle nell'andata e ritorno schermo→mondo, ma su
+   Windows il rumore dei numeri a 32 bit arriva a 0,0025 caselle (un decimo
+   di pixel). Ora è 0,005 e il messaggio d'errore dice la distanza.
+4. **Conteggio delle carte offribili.** `test_m8_locked_cards_never_leak_into_reward_pool`
+   aspettava 4 carte escluse dal pool; con le sei carte solo da laboratorio
+   sono 9. Non si vedeva perché la suite si fermava prima.
+5. **Documenti:** sezione 1.5, `docs/avvio.md`, `docs/engine.md` e
+   `CHANGELOG.md`.
 
 ### Da chiedere prima di iniziare
 
 L'utente ha già risposto il 23 ottobre 2026:
-1. **Fare questa fase:** sì. È approvata nel piano, ma si avvia solo con il
-   suo comando.
+1. **Fare questa fase:** sì.
 2. **I test scritti da 0xdokkan:** si correggono qui, e il messaggio di commit
    lo dice chiaramente.
-
-All'avvio Claude chiede soltanto se queste risposte valgono ancora.
 
 ### Fatto quando
 
 Su Windows `odin test src -all-packages` arriva in fondo senza crash e senza
-fallimenti. Se qualche fallimento resta, dev'essere documentato e motivato.
+fallimenti. Ottenuto.
 
 ### Comando
 
@@ -2118,4 +2111,18 @@ fine.
 
 ### Esito
 
-*(da compilare a fine fase)*
+Fatta il 23 ottobre 2026 sul ramo `piano-griglia`.
+
+- **Risultato:** `.\scripts\check.ps1`, profilo completo, finisce con exit 0
+  in 4 min 32 s: 1529 test verdi con gli assert e 1529 senza, più le due
+  build. I pacchetti `application`, `campaign`, `expedition`, `run`, `game`,
+  `integration`, `combatdebug` e `render` passano anche da soli, senza flag.
+- **Non è stato toccato il codice del gioco**, solo test e il nuovo pacchetto
+  `teststack` (usato dai soli test). Una prima versione cambiava
+  `campaign/persistence.odin`: non serviva e l'ho tolta.
+- **Da sapere:**
+  - le carte solo da laboratorio hanno cambiato il conteggio di un terzo test,
+    non solo dei due già corretti;
+  - il crash dello stack riguardava solo le build senza ottimizzazione dei
+    test, non il gioco con le tue tre memorie salvate;
+  - lo smoke del laboratorio non serve a questa fase e non è stato rifatto.

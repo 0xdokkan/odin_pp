@@ -35,7 +35,10 @@ test_expedition_combat_camera_keeps_near_fighters_above_hand_and_pickable :: pro
 				screen = rl.GetWorldToScreenEx(floor, camera, i32(dimensions.x), i32(dimensions.y))
 				ray := rl.GetScreenToWorldRayEx(screen, camera, i32(dimensions.x), i32(dimensions.y))
 				hit := ray.position-ray.direction*(ray.position.y/ray.direction.y)
-				testing.expect(t, rl.Vector3Distance(hit, floor) < .001)
+				// A screen-to-world round trip in 32-bit floats is off by up to ~0.0025
+				// cells (a tenth of a pixel) on Windows: tighter than the float noise.
+				error := rl.Vector3Distance(hit, floor)
+				testing.expectf(t, error < .005, "viewport %v perspective %v point %v: the floor is picked %.5f cells away", dimensions, perspective, point, error)
 			}
 		}
 	}

@@ -1,11 +1,21 @@
 package run
 
 import "core:os"
+import _ "../engine/teststack"
 import "core:testing"
 import campaign "../campaign"
 import world "../expedition"
 import game "../game"
 import host "../engine/host"
+
+// A scratch file in the system's temp directory: the tests must not depend on
+// a macOS-only path such as /private/tmp (they failed on Windows).
+scratch_path :: proc(name: string) -> string {
+	dir, dir_error := os.temp_directory(context.temp_allocator)
+	if dir_error != nil { return name }
+	path, path_error := os.join_path({dir, name}, context.temp_allocator)
+	return path if path_error == nil else name
+}
 
 @(test)
 test_workshop_purchase_uses_cell_freed_by_payment_and_rolls_back_failure :: proc(t:^testing.T) {
@@ -83,7 +93,7 @@ test_failed_extraction_arcade_still_wins_and_clears_checkpoint :: proc(t: ^testi
 
 @(test)
 test_running_slot_snapshot_restores_owned_room_pointers :: proc(t: ^testing.T) {
-	path := "/private/tmp/odin-pp-expedition-flow-slot.json"
+	path := scratch_path("odin-pp-expedition-flow-slot.json")
 	defer os.remove(path)
 	e := flow_fixture(t); defer flow_destroy(e)
 	campaign.discover(e.progress, .Storm_Crown)

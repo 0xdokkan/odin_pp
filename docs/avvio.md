@@ -40,6 +40,9 @@ Su Windows (PowerShell) gli equivalenti sono `.\run.ps1` e
 funziona anche a mano. Windows riserva al thread principale 1 MiB di stack
 contro gli 8 MiB di macOS: [windows_stack.odin](../src/windows_stack.odin) porta la
 riserva a 16 MiB dal sorgente, senza flag del linker sulla riga di comando.
+I test dei singoli pacchetti non includono quel file: i pacchetti che decodificano
+lo snapshot della spedizione importano [teststack](../src/engine/teststack), che dà
+all'eseguibile di test 32 MiB, e `odin test src/<pacchetto>` funziona a mano.
 
 Dopo modifiche ai sorgenti, ricompilare prima di riutilizzare `./odin_pp`.
 Le build rapide mantengono assert e controlli di sicurezza; non riducono asset

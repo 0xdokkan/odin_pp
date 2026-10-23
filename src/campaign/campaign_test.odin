@@ -9,6 +9,15 @@ import game "../game"
 
 // The Prova meccaniche's own cards never reach a memory: not at the start, not
 // as a discovery, not in a run's pool.
+// A scratch file in the system's temp directory: the tests must not depend on
+// a macOS-only path such as /private/tmp (they failed on Windows).
+scratch_path :: proc(name: string) -> string {
+	dir, dir_error := os.temp_directory(context.temp_allocator)
+	if dir_error != nil { return name }
+	path, path_error := os.join_path({dir, name}, context.temp_allocator)
+	return path if path_error == nil else name
+}
+
 @(test)
 test_lab_only_cards_never_enter_the_campaign :: proc(t: ^testing.T) {
 	c: Campaign
@@ -231,7 +240,7 @@ Test_Snapshot :: struct { position: [2]int, random_state: u64, enemy_hp: [3]i32,
 test_version_one_checksum_survives_new_fields_and_expanded_arrays :: proc(t: ^testing.T) {
 	Legacy :: struct { cells: [2]i32, seed: u64, label: string }
 	Expanded :: struct { width: int, cells: [4]i32, seed: u64, label: string }
-	path := "/private/tmp/odin-pp-version-one-migration.json"; defer os.remove(path)
+	path := scratch_path("odin-pp-version-one-migration.json"); defer os.remove(path)
 	c: Campaign; initialize(&c); defer destroy(&c)
 	depot_credit(&c, 71)
 	old := Saved_State(Legacy){campaign = c, snapshot = {{4, 8}, 0xFEDCBA9876543210, "braces { } and \\\"quotes\\\""}}
@@ -252,7 +261,7 @@ test_version_one_checksum_survives_new_fields_and_expanded_arrays :: proc(t: ^te
 
 @(test)
 test_save_roundtrip_keeps_campaign_and_live_snapshot :: proc(t: ^testing.T) {
-	path := "/private/tmp/odin-pp-campaign-roundtrip.json"
+	path := scratch_path("odin-pp-campaign-roundtrip.json")
 	defer os.remove(path)
 	c: Campaign; initialize(&c); defer destroy(&c)
 	depot_credit(&c, 184); begin_run(&c, .Cyber, 0x1234); add_xp(&c, 20)
@@ -275,7 +284,7 @@ test_save_roundtrip_keeps_campaign_and_live_snapshot :: proc(t: ^testing.T) {
 
 @(test)
 test_corrupt_save_is_preserved_and_rejection_leaks_nothing :: proc(t: ^testing.T) {
-	path := "/private/tmp/odin-pp-campaign-corrupt.json"
+	path := scratch_path("odin-pp-campaign-corrupt.json")
 	defer os.remove(path)
 	c: Campaign; initialize(&c); defer destroy(&c)
 	testing.expect(t, save_slot(path, &c, Test_Snapshot{label = "owned data"}))
@@ -299,7 +308,7 @@ test_corrupt_save_is_preserved_and_rejection_leaks_nothing :: proc(t: ^testing.T
 
 @(test)
 test_three_slots_keep_independent_stakes_and_discoveries :: proc(t: ^testing.T) {
-	paths := [3]string{"/private/tmp/odin-pp-independent-slot1.json", "/private/tmp/odin-pp-independent-slot2.json", "/private/tmp/odin-pp-independent-slot3.json"}
+	paths := [3]string{scratch_path("odin-pp-independent-slot1.json"), scratch_path("odin-pp-independent-slot2.json"), scratch_path("odin-pp-independent-slot3.json")}
 	for path, index in paths {
 		c: Campaign; initialize(&c)
 		depot_credit(&c, i64((index+1)*10))

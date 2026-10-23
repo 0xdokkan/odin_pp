@@ -21,6 +21,7 @@ fisica, layout dell'interfaccia, sintesi audio, salvataggi) non chiamano Raylib.
 | [fx](../src/engine/fx) | particelle a pool fisso 2D/3D, popup, flash e hit stop |
 | [gfx](../src/engine/gfx) | atlanti pixel art incorporati e sprite procedurali, billboard e materiale carta condiviso, shader con sole, luce puntiforme e nebbia, mesh di voxel con facce nascoste rimosse, fondali procedurali |
 | [save](../src/engine/save) | JSON versionato scritto in modo atomico, percorsi per utente |
+| [teststack](../src/engine/teststack) | solo per i test: su Windows porta lo stack dell'eseguibile a 32 MiB, importato con `import _` |
 | [host](../src/engine/host) | finestra, ciclo dei frame, stack di scene, profilo con impostazioni e record, guscio dei minigiochi |
 
 ### Interfaccia e input condivisi

@@ -11,7 +11,7 @@ import world "../expedition"
 @(test)
 test_checkpoint_save_benchmark :: proc(t: ^testing.T) {
 	if #config(CAMPAIGN_SAVE_BENCHMARK, false) {
-		path := "/private/tmp/odin-pp-checkpoint-benchmark.json"
+		path := scratch_path("odin-pp-checkpoint-benchmark.json")
 		defer os.remove(path)
 		e := flow_fixture(t, .Space); defer flow_destroy(e)
 		testing.expect(t, world.capture(&e.world, &e.rs.room, e.checkpoint))
