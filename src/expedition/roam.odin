@@ -124,14 +124,14 @@ roam_step :: proc(w:^World,room:^game.Room,r:^Roam,wish:[2]f32,dt:f32) {
 	elapsed:=min(max(dt,0),f32(.1))
 	r.offset*=math.exp(-12*elapsed)
 	if elapsed<=0 {return}
-	ground:=terrain(w.biome,r.cell)
+	under:=ground(w,r.cell)
 	direction:=wish;length:=math.sqrt(direction.x*direction.x+direction.y*direction.y)
 	if length>1 {direction/=length;length=1}
 	// Brisk on foot, weighty in the saddle, slippery on ice.
 	rate:=f32(4.5) if w.mounted else 16
 	if length<.01 {rate=6 if w.mounted else 22}
-	if ground==.Ice {rate=2.2 if length>=.01 else .7}
-	r.velocity+=(direction*roam_speed(w,ground)-r.velocity)*(1-math.exp(-rate*elapsed))
+	if under==.Ice {rate=2.2 if length>=.01 else .7}
+	r.velocity+=(direction*roam_speed(w,under)-r.velocity)*(1-math.exp(-rate*elapsed))
 	if length<.01 && r.velocity.x*r.velocity.x+r.velocity.y*r.velocity.y<.0004 {r.velocity={}}
 	travel:=r.velocity*elapsed
 	steps:=max(1,int(math.ceil(max(abs(travel.x),abs(travel.y))/ROAM_MAX_STEP)))

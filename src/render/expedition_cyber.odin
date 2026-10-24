@@ -252,7 +252,7 @@ draw_expedition_cyber_fixture :: proc(pass:Ink_Pass,site:^world.Site,boss_defeat
 	yaw:=f32(site.orientation%4)*math.PI/2
 	accent:=ink_scale(CYBER_RED,.45) if site.state==.Resolved else CYBER_RED
 	if site.secret {accent={237,195,91,254}}
-	switch site.kind {
+	#partial switch site.kind {
 	case .Archive,.Memory:
 		cyber_console(pass,base,yaw,site.kind==.Archive,site.secret)
 	case .Workshop:

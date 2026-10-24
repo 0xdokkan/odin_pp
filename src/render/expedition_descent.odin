@@ -272,7 +272,7 @@ descent_anvil :: proc(pass:Ink_Pass,p:rl.Vector3,yaw:f32,hot:bool=false) {
 @(private)
 descent_west_fixture :: proc(pass:Ink_Pass,p:rl.Vector3,site:^world.Site,accent:rl.Color) {
 	yaw:=f32(site.orientation%4)*math.PI/2
-	switch site.kind {
+	#partial switch site.kind {
 	case .Nest:
 		// Powder magazine: barrels behind a small boarded, iron-bound front.
 		descent_barrel(pass,cyber_point(p,{-.23,0,-.10},yaw),.23,1.00)
@@ -332,7 +332,7 @@ descent_egypt_inscription :: proc(pass:Ink_Pass,p:rl.Vector3,yaw:f32,height:f32,
 @(private)
 descent_egypt_fixture :: proc(pass:Ink_Pass,p:rl.Vector3,site:^world.Site,accent:rl.Color) {
 	yaw:=f32(site.orientation%4)*math.PI/2
-	switch site.kind {
+	#partial switch site.kind {
 	case .Nest:
 		// Upright sarcophagus: stepped plinth, broad headdress and carved mask.
 		ink_box(pass,p,{.45,.42},.14,yaw,DESCENT_SAND,DESCENT_SAND_CAP,{})
@@ -375,7 +375,7 @@ descent_egypt_fixture :: proc(pass:Ink_Pass,p:rl.Vector3,site:^world.Site,accent
 @(private)
 descent_inferno_fixture :: proc(pass:Ink_Pass,p:rl.Vector3,site:^world.Site,accent:rl.Color) {
 	yaw:=f32(site.orientation%4)*math.PI/2
-	switch site.kind {
+	#partial switch site.kind {
 	case .Nest:
 		// Furnace mouth and short horns, visibly distinct from a loot chest.
 		cyber_case(pass,p,{.45,.41},1.02,yaw,DESCENT_BASALT,DESCENT_BASALT_CAP)

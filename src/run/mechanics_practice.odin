@@ -31,8 +31,8 @@ MECHANICS_LAB_DECK_SEED :: u64(0x7E57_1AB)
 // The arenas of the lab: the flat one every card is tried in, the one with heights
 // (a plateau up a stair, a pillar, a spiral hill) to try the heights in, the
 // one with the catalog of structures, and the one with the Snow biome's spiral
-// mountain (F3 goes from one to the next).
-Mechanics_Lab_Arena :: enum { Flat, Heights, Structures, Mountain }
+// mountain, and the one with a cave's rooms (F3 goes from one to the next).
+Mechanics_Lab_Arena :: enum { Flat, Heights, Structures, Mountain, Cave }
 
 // The arena of structures is larger, to hold all of them with room between.
 MECHANICS_LAB_STRUCTURES_WIDTH :: 41
@@ -44,7 +44,13 @@ MECHANICS_LAB_MOUNTAIN_WIDTH :: 47
 MECHANICS_LAB_MOUNTAIN_HEIGHT :: 25
 MECHANICS_LAB_MOUNTAIN_CENTER :: grid.Position{35, 12}
 
+// The arena of the cave: its plan (level/cave.odin) with a ring of rock round it.
+MECHANICS_LAB_CAVE_SEED :: u64(2026)
+MECHANICS_LAB_CAVE_WIDTH :: level.CAVE_WIDTH+2
+MECHANICS_LAB_CAVE_HEIGHT :: level.CAVE_HEIGHT+2
+
 mechanics_lab_size :: proc(arena: Mechanics_Lab_Arena) -> (width, height: int) {
+	if arena == .Cave { return MECHANICS_LAB_CAVE_WIDTH, MECHANICS_LAB_CAVE_HEIGHT }
 	if arena == .Structures { return MECHANICS_LAB_STRUCTURES_WIDTH, MECHANICS_LAB_STRUCTURES_HEIGHT }
 	if arena == .Mountain { return MECHANICS_LAB_MOUNTAIN_WIDTH, MECHANICS_LAB_MOUNTAIN_HEIGHT }
 	return MECHANICS_LAB_WIDTH, MECHANICS_LAB_HEIGHT
@@ -70,9 +76,19 @@ MECHANICS_LAB_STRUCTURES := [?]Lab_Structure{
 mechanics_lab_level :: proc(arena := Mechanics_Lab_Arena.Flat) -> (level.Level, bool) {
 	width, height := mechanics_lab_size(arena)
 	rows: [MECHANICS_LAB_STRUCTURES_HEIGHT]string
+	cave := level.cave_plan(MECHANICS_LAB_CAVE_SEED)
 	for y in 0..<height {
 		row := strings.builder_make(context.temp_allocator)
 		for x in 0..<width {
+			if arena == .Cave {
+				switch {
+				case x == 0 || y == 0 || x == width-1 || y == height-1: strings.write_byte(&row, '#')
+				case x == width-2 && y == height-2: strings.write_byte(&row, '>')
+				case x-1 == cave.arrival.x && y-1 == cave.arrival.y: strings.write_byte(&row, '@')
+				case: strings.write_byte(&row, cave.rows[y-1][x-1])
+				}
+				continue
+			}
 			switch {
 			case x == 0 || y == 0 || x == width-1 || y == height-1: strings.write_byte(&row, '#')
 			case x == width/2 && y == height/2: strings.write_byte(&row, '@')
@@ -138,6 +154,12 @@ create_mechanics_lab_room :: proc(data: ^level.Level, player: ^game.Player, conf
 	// In the arena of structures they wait in the open, away from the buildings.
 	if which == .Structures {
 		spawns[0].position, spawns[1].position, spawns[2].position = {37, 3}, {37, 10}, {20, 26}
+	}
+	// In the arena of the cave the foes wait in its rooms, as the plan has them.
+	if which == .Cave {
+		cave := level.cave_plan(MECHANICS_LAB_CAVE_SEED)
+		for g in 0..<min(3, cave.groups) { spawns[g].position = {cave.anchors[g].x+1, cave.anchors[g].y+1} }
+		for g in cave.groups..<3 { spawns[g].position = {cave.secret.x, cave.secret.y+1} if g == 2 else {cave.anchors[0].x+1, cave.anchors[0].y+2} }
 	}
 	// In the arena of the mountain the archer waits at the summit (sturdy enough to survive being pushed off),
 	// the others on the open ground beside it.

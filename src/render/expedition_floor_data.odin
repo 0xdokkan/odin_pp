@@ -33,7 +33,7 @@ Expedition_Floor_Data :: struct {
 
 @(private)
 expedition_floor_site_keys :: proc(w:^world.World)->(keys:[world.MAX_SITES]Expedition_Floor_Site_Key) {
-	for s,i in w.sites[:clamp(w.site_count,0,world.MAX_SITES)] {
+	for s,i in w.sites[:clamp(world.visible_sites(w),0,world.MAX_SITES)] {
 		keys[i]={s.position,s.kind,s.orientation,s.layout_version}
 	}
 	return
@@ -53,21 +53,23 @@ refresh_expedition_floor_data :: proc(cache:^Expedition_Floor_Data,room:^game.Ro
 	if room==nil || room.level_data==nil || w==nil {cache.ready=false;return false}
 	data:=room.level_data;width,height:=data.tiles.width,data.tiles.height
 	if width<=0 || height<=0 || len(data.tiles.cells)!=width*height {cache.ready=false;return false}
-	keys:=expedition_floor_site_keys(w);count:=clamp(w.site_count,0,world.MAX_SITES)
+	keys:=expedition_floor_site_keys(w);count:=clamp(world.visible_sites(w),0,world.MAX_SITES)
+	// In a cave none of the biome's terrain is painted on the floor (biome 255 has none).
+	biome:=u8(w.biome) if w.in_cave==0 else u8(255)
 	if cache.ready && cache.level_data==data && cache.cells==raw_data(data.tiles.cells) &&
 		cache.geometry_id==data.geometry_id && cache.revision==data.geometry_revision &&
-		cache.width==width && cache.height==height && cache.biome==u8(w.biome) &&
+		cache.width==width && cache.height==height && cache.biome==biome &&
 		cache.site_count==count && cache.sites==keys {return false}
 	if len(cache.pixels)!=width*height {
 		delete(cache.pixels);cache.pixels=make([]rl.Color,width*height)
 	}
 	cache.level_data=data;cache.cells=raw_data(data.tiles.cells)
 	cache.geometry_id=data.geometry_id;cache.revision=data.geometry_revision
-	cache.width=width;cache.height=height;cache.biome=u8(w.biome)
+	cache.width=width;cache.height=height;cache.biome=biome
 	cache.sites=keys;cache.site_count=count
 	for tile,i in data.tiles.cells {
-		p:=grid.Position{i%width,i/width};ground:=game.expedition_terrain(u8(w.biome),p)
-		if w.biome==.Inferno && tile.kind==.Door {ground=.Lava}
+		p:=grid.Position{i%width,i/width};ground:=game.expedition_terrain(biome,p)
+		if w.biome==.Inferno && w.in_cave==0 && tile.kind==.Door {ground=.Lava}
 		cache.pixels[i]={u8(tile.kind),u8(ground),0,0}
 	}
 	// Earlier overlapping sites have the same precedence as world.site_at.

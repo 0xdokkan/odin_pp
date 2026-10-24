@@ -51,6 +51,14 @@ caselle ricostruiti quando la geometria cambia, e si inviano solo quelli in vist
 strutture, luci, personaggi e puntatore stanno alla quota della loro casella. L'ologramma schiarisce con la
 quota, la esagera e traccia una curva di livello a ogni cambio di altezza.
 
+### Le caverne
+
+Nella Neve, nel Far West, nell'Egitto e nell'Inferno ci sono da una a tre grotte per mappa: un arco di roccia (sulla montagna
+a spirale, a metà salita) che ricompare identico a ogni run ma dà accesso a una grotta solo in alcune. L'arco è un segreto: appare
+sull'ologramma, con la lettera G, solo dopo averlo scoperto. Con **E** davanti all'arco lo schermo va al nero e si è in una mappa
+a parte ([cave.odin](../src/level/cave.odin)): due o tre stanze in fila con dei nemici, e in fondo una nicchia con un tesoro
+(crediti e una reliquia). Con **E** vicino al punto di arrivo si esce, allo stesso arco.
+
 ### La montagna a spirale
 
 Nelle Montagne innevate (mappe nuove) c'è una montagna tonda con un sentiero largo due caselle che la

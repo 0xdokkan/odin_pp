@@ -8,7 +8,7 @@ import level "../level"
 test_inferno_eruption_cracks_floor_after_warning_and_persists_lava :: proc(t:^testing.T) {
 	w:World;data:level.Level;p:game.Player;room:=test_world(t,&w,&data,&p,.Inferno)
 	defer level.destroy(&data);defer game.destroy_room(&room)
-	w.site_count=0;w.group_count=0;room.phase=.Loot;p.position={45,45}
+	w.site_count=0;w.group_count=0;w.cave_count=0;w.drop_count=0;room.phase=.Loot;p.position={45,45}
 	_=level.set_tile(&data,p.position,{.Floor})
 	_=level.set_tile(&data,{46,45},{.Floor})
 	_=level.set_tile(&data,{45,46},{.Wall})

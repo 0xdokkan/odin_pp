@@ -9,6 +9,8 @@ import level "../level"
 @(test)
 test_authored_sites_have_reachable_wide_entrances_cover_and_safe_spawns :: proc(t:^testing.T) {
 	for kind in Site_Kind {for orientation in u8(0)..<4 {
+		// A cave's arch is a few cells of rock, not a courtyard (cave_test.odin).
+		if kind==.Cave {continue}
 		site:=Site{kind=kind,position={40,40},orientation=orientation,layout_version=SITE_LAYOUT_VERSION}
 		d:=site_layout(kind);minimum,maximum:=site_bounds(&site)
 		testing.expect(t,d.half_extent.x>=10 && d.half_extent.y>=10 && d.half_extent.x<=14 && d.half_extent.y<=14)
@@ -58,6 +60,8 @@ test_authored_geometry_matches_semantics_in_all_biomes_and_preserves_spawn :: pr
 			}}
 		}
 		for &group in w.groups[:w.group_count] {for member in group.members[:group.count] {
+			// A cave's foes stand where its plan is stamped when the cave is entered, not on the open map.
+			if group.cave>0 {continue}
 			tile,present:=level.tile_at(&data,member.enemy.position);testing.expect(t,present && tile.kind!=.Wall && tile.kind!=.Void)
 		}}
 	}

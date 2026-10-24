@@ -222,7 +222,7 @@ draw_expedition_site_wall :: proc(pass:Ink_Pass,room:^game.Room,w:^world.World,s
 // program; every other solid, and every edge, through the plain ink one.
 Ink_Layer :: enum u8 { Solid, Revealed, Edges }
 
-@(private="file")
+@(private)
 ink_layer_skips :: proc(layer:Ink_Layer,m:^Expedition_Material,center:rl.Vector2,half_width:f32=.5)->bool {
 	if m!=nil && m.reflection_pass {return layer==.Revealed}
 	return layer!=.Edges && expedition_occludes(m,center,half_width)!=(layer==.Revealed)
@@ -293,6 +293,7 @@ draw_expedition_architecture :: proc(renderer:^Renderer,room:^game.Room,w:^world
 @(private)
 draw_expedition_site_static :: proc(pass_in:Ink_Pass,w:^world.World,site:^world.Site,layer:Ink_Layer=.Edges,m:^Expedition_Material=nil) {
 	pass:=pass_in;pass.lift=cell_ground(site.position)
+	if site.kind==.Cave {draw_expedition_cave_arch(pass,w,site,layer,m);return}
 	decor:=world.site_decor_anchors(site)
 	for i:=0;i+1<decor.count;i+=2 {
 		a,b:=decor.items[i],decor.items[i+1]
@@ -332,7 +333,7 @@ draw_expedition_site_architecture :: proc(layer:Ink_Layer,renderer:^Renderer,roo
 	m:=renderer.tactical.expedition_material
 	pass:=Ink_Pass{mode=.Edge if layer==.Edges else .Fill,edges=&m.edges if m!=nil else nil}
 	if collect {pass.mode=.Collect}
-	for &site in w.sites[:w.site_count] {
+	for &site in w.sites[:world.visible_sites(w)] {
 		if !site.active || world.distance(site.position,room.player.position)>30 {continue}
 		if !dynamic_only {draw_expedition_site_static(pass,w,&site,layer,m)}
 		draw_expedition_site_dynamic(pass,w,&site)

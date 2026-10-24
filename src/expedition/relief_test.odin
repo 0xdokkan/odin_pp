@@ -66,6 +66,8 @@ test_the_ground_that_matters_is_level_and_every_site_and_the_exit_can_be_walked_
 		// Each site is level inside its bounds.
 		uneven = 0
 		for &site in w.sites[:w.site_count] {
+			// The Snow's cave on the mountain's path is on a slope; the arches on the open ground are level (cave_test.odin).
+			if site.kind == .Cave { continue }
 			low, high := site_bounds(&site)
 			base := level.height_at(&data, site.position)
 			for y in low.y..=high.y {

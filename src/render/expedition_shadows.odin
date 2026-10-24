@@ -39,8 +39,8 @@ draw_expedition_contact_shadows :: proc(renderer:^Renderer,room:^game.Room,w:^wo
 		expedition_paper_shadow(p,.40,.38/(1+max(lift,0)))
 	}
 	for &group,g in w.groups[:w.group_count] {for member,i in group.members[:group.count] {
-		if !member.alive || member.deployed || !tactical_cell_on_screen(renderer,member.enemy.position) {continue}
-		if world.terrain(w.biome,member.enemy.position)==.Grass && world.distance(room.player.position,member.enemy.position)>3 {continue}
+		if !member.alive || member.deployed || !world.in_scope(w,group.cave) || !tactical_cell_on_screen(renderer,member.enemy.position) {continue}
+		if world.ground(w,member.enemy.position)==.Grass && world.distance(room.player.position,member.enemy.position)>3 {continue}
 		expedition_paper_shadow(expedition_patrol_shown(renderer,g,i,member.enemy.position))
 	}}
 }

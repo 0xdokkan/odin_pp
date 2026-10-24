@@ -5,6 +5,16 @@ I riferimenti a Classica, `--flat` e ai vecchi smoke descrivono versioni precede
 per i comandi disponibili oggi valgono il [README](README.md) e la documentazione collegata.
 
 
+## 2026-10-24 — Le caverne
+
+- **Fase 5 del piano fatta.** Nella Neve, nel Far West, nell'Egitto e nell'Inferno ci sono da una a tre grotte per mappa, ognuna
+  un arco-segreto (nascosto sull'ologramma finché non lo si scopre; nella Neve, il primo sul sentiero della montagna, a
+  metà salita). Con E all'arco, dissolvenza al nero ed entri in una mappa a parte: due o tre stanze in fila con dei
+  nemici e in fondo, in una nicchia, crediti e una reliquia; con E vicino all'arrivo esci, allo stesso arco.
+- Tecnicamente l'interno sta sulla stessa griglia (la mappa aperta viene messa da parte e poi riportata identica); un
+  salvataggio preso in grotta si riapre in grotta. Nuova arena «Grotta» nel laboratorio (F3). Test: 11 nuovi (1643
+  in tutto).
+
 ## 2026-10-24 — La montagna a spirale
 
 - **Fase 4 del piano fatta.** Le nuove Montagne innevate hanno una montagna tonda con un sentiero largo due

@@ -14,7 +14,7 @@ MAX_GROUPS :: 32
 MAX_MEMBERS :: 6
 MAX_DROPS :: 128
 
-Site_Kind :: enum u8 { Nest, Cache, Archive, Workshop, Spring, Trial, Boss, Memory, Tunnel }
+Site_Kind :: enum u8 { Nest, Cache, Archive, Workshop, Spring, Trial, Boss, Memory, Tunnel, Cave }
 Site_State :: enum u8 { Unvisited, Discovered, Resolved }
 Terrain :: game.Expedition_Terrain
 Site :: struct {
@@ -35,12 +35,15 @@ Group :: struct {
 	count: int,
 	active, patrol, killer, boss, pursuing: bool,
 	site: int,
+	// Where the group is: 0 on the open map, k+1 in the k-th cave (cave.odin). A group is only alive where the
+	// player is.
+	cave: u8,
 	patrol_step: int,
 	lure_phase: Patrol_Lure_Phase,
 	lure_target: grid.Position,
 	lure_until, lure_wait_until: f32,
 }
-Drop :: struct { position: grid.Position, item: campaign.Item, xp: i32, manual_only: bool }
+Drop :: struct { position: grid.Position, item: campaign.Item, xp: i32, manual_only: bool, cave: u8 }
 World :: struct {
 	biome: campaign.Biome,
 	side_length: int,
@@ -51,6 +54,12 @@ World :: struct {
 	// there were any, whose tiles are as they were.
 	structures: [MAX_WORLD_STRUCTURES]level.Placed_Structure,
 	structure_count: int,
+	// The caves of the map (cave.odin), and where the player is: 0 on the open map, k+1 in the k-th cave. While in
+	// a cave the open map is put away (its tiles are kept by the scene, its groups, drops and sites do nothing).
+	caves: [MAX_CAVES]Cave,
+	cave_count: int,
+	in_cave: int,
+	cave_return: grid.Position,
 	groups: [MAX_GROUPS]Group,
 	group_count: int,
 	drops: [MAX_DROPS]Drop,
@@ -110,6 +119,7 @@ site_name :: proc(k: Site_Kind) -> string {
 	case .Boss:return "TANA DEL BOSS"
 	case .Memory:return "FRAMMENTO"
 	case .Tunnel:return "TUNNEL"
+	case .Cave:return "GROTTA"
 	}
 	return ""
 }
@@ -179,6 +189,7 @@ generate :: proc(w: ^World, data: ^level.Level, b: campaign.Biome, seed: u64) ->
 	apply_relief(w,data)
 	apply_mountain(w,data)
 	place_structures(w,data)
+	place_caves(w,data)
 	// Structural geography is finished before any inhabitants are placed.
 	for site,i in w.sites[:w.site_count] {if site.active && (site.kind==.Trial || site.kind==.Boss || (site.kind==.Cache && i<12)) {add_group(w,data,i,site.position,1 if site.kind==.Boss else 2+rank(b)/2,false,site.kind==.Boss)}}
 	for i in 0..<4 {
@@ -241,13 +252,15 @@ can_see :: proc(room:^game.Room,a,b:grid.Position) -> bool {
 	})
 }
 
-add_drop :: proc(w:^World,p:grid.Position,item:campaign.Item,xp:i32=0,manual_only:bool=false) -> bool {
+// A drop lies where the player is (the open map or a cave), unless `cave` says whose it is (cave.odin).
+add_drop :: proc(w:^World,p:grid.Position,item:campaign.Item,xp:i32=0,manual_only:bool=false,cave:int=-1) -> bool {
 	if w.drop_count>=MAX_DROPS {return false}
-	w.drops[w.drop_count]={p,item,xp,manual_only}; w.drop_count+=1; return true
+	w.drops[w.drop_count]={p,item,xp,manual_only,u8(w.in_cave if cave<0 else cave)}; w.drop_count+=1; return true
 }
 
 nearest_site :: proc(w:^World,p:grid.Position) -> int {
 	best:=-1; d:=4
+	if w.in_cave>0 {return -1}
 	for site,i in w.sites[:w.site_count] { if !site.active || site.state==.Resolved {continue}; next:=distance(p,site.position); if next<d {d=next;best=i} }
 	return best
 }
@@ -256,7 +269,7 @@ nearest_site :: proc(w:^World,p:grid.Position) -> int {
 add_xp_drop :: proc(w:^World,p:grid.Position,xp:i32) {
 	if xp<=0 {return}
 	for &drop in w.drops[:w.drop_count] {
-		if drop.xp>0 && distance(p,drop.position)<=3 {drop.xp+=xp;return}
+		if drop.xp>0 && in_scope(w,drop.cave) && distance(p,drop.position)<=3 {drop.xp+=xp;return}
 	}
 	if add_drop(w,p,{},xp) {return}
 	if w.pending_xp==0 {w.pending_xp_position=p}
@@ -367,8 +380,9 @@ tick :: proc(w:^World,room:^game.Room,dt:f32) {
 	w.clock+=dt; w.patrol_clock+=dt
 	w.beat=u64(w.clock)
 	room.player.tactical.environment_beat=w.beat
-	room.player.tactical.config.expedition_biome=u8(w.biome)
-	room.player.tactical.config.low_gravity=w.biome==.Space
+	// In a cave nothing of the biome's ground or weather reaches the player (biome 255 has none).
+	room.player.tactical.config.expedition_biome=u8(w.biome) if w.in_cave==0 else 255
+	room.player.tactical.config.low_gravity=w.biome==.Space && w.in_cave==0
 	if room.phase==.Loot && w.beat!=previous_beat && w.beat%4==0 {game.expedition_gravity_pulse(room,room.recent_events)}
 	if room.phase==.Loot && w.beat!=previous_beat {game.expedition_exploration_terrain_beat(room)}
 	if room.player.health<=0 {room.phase=.Defeat;return}
@@ -377,7 +391,7 @@ tick :: proc(w:^World,room:^game.Room,dt:f32) {
 	if room.player.health<w.last_health {w.mounted=false}
 	w.last_health=room.player.health
 	for &s,site_index in w.sites[:w.site_count] {
-		if !s.active {continue}
+		if !s.active || w.in_cave>0 {continue}
 		if distance(player,s.position)<=5 && s.state==.Unvisited {s.state=.Discovered}
 		activation:=4 if s.layout_version==0 else site_layout(s.kind).trigger_radius
 		if s.kind==.Nest && s.state!=.Resolved && distance(player,s.position)<=activation {
@@ -397,6 +411,7 @@ tick :: proc(w:^World,room:^game.Room,dt:f32) {
 		}
 	}
 	for &g,i in w.groups[:w.group_count] {
+		if !in_scope(w,g.cave) {continue}
 		if g.active {
 			// A blocked member remains finite and alive. Retry just that member
 			// after a placed object expires; never duplicate deployed actors.
@@ -431,7 +446,7 @@ tick :: proc(w:^World,room:^game.Room,dt:f32) {
 		}
 		for m in g.members[:g.count] {
 			if !m.alive {continue}
-			radius:=3 if terrain(w.biome,m.enemy.position)==.Grass else 6
+			radius:=3 if ground(w,m.enemy.position)==.Grass else 6
 			if g.lure_phase==.Seeking || g.lure_phase==.Waiting {radius=1}
 			if distance(player,m.enemy.position)<=radius && can_see(room,m.enemy.position,player) {
 				if w.mounted { // riders may outrun pursuit; a close hit dismounts
@@ -447,7 +462,8 @@ tick :: proc(w:^World,room:^game.Room,dt:f32) {
 	if w.patrol_clock>=1.4 {w.patrol_clock=0}
 	if room.phase==.Combat && len(room.enemies)==0 {game.end_expedition_encounter(room)}
 	cycle:=w.beat%9
-	if !w.lane_warning && cycle==7 && w.biome!=.Gothic {w.lane_warning=true;w.lane_vertical=(w.beat/9)%2==0;w.lane=player.x if w.lane_vertical else player.y;w.lane_center=player}
+	if w.in_cave>0 {w.lane_warning=false}
+	if w.in_cave==0 && !w.lane_warning && cycle==7 && w.biome!=.Gothic {w.lane_warning=true;w.lane_vertical=(w.beat/9)%2==0;w.lane=player.x if w.lane_vertical else player.y;w.lane_center=player}
 	if w.lane_warning && cycle==0 {
 		w.lane_warning=false
 		if w.biome==.Inferno {
@@ -477,10 +493,10 @@ walk :: proc(w:^World,room:^game.Room,offset:grid.Position) -> bool {
 	p:=game.add_position(room.player.position,offset)
 	if !game.base_cell_is_walkable(room,p) || game.cell_blocks_movement(room,p) || game.step_height_blocked(room,room.player.position,p) {return false}
 	if offset.x!=0 && offset.y!=0 && (game.cell_blocks_movement(room,{p.x,room.player.position.y}) || game.cell_blocks_movement(room,{room.player.position.x,p.y})) {return false}
-	ground:=terrain(w.biome,p)
-	if ground==.Bridge && w.beat%4>=2 {return false}
+	under:=ground(w,p)
+	if under==.Bridge && w.beat%4>=2 {return false}
 	room.player.position=p
-	if ground==.Ice {slide:=game.add_position(p,offset);if game.base_cell_is_walkable(room,slide) && !game.cell_blocks_movement(room,slide) {room.player.position=slide}}
+	if under==.Ice {slide:=game.add_position(p,offset);if game.base_cell_is_walkable(room,slide) && !game.cell_blocks_movement(room,slide) {room.player.position=slide}}
 	before_health:=room.player.health
 	game.expedition_enter_cell(room)
 	if room.player.health<before_health {w.mounted=false}

@@ -53,6 +53,9 @@ site_layout :: proc(kind:Site_Kind)->(d:Site_Layout) {
 		d.half_extent={10,10};d.entrances={{-10,0},{0,10},{0,-10},{}};d.entrance_count=3
 	case .Tunnel:
 		d.half_extent={11,10};d.entrances={{-11,0},{11,0},{},{}};d.entrance_count=2
+	// A cave's arch is a few cells of rock stamped by the cave itself (cave.odin), with no layout of its own.
+	case .Cave:
+		d.half_extent={3,2};d.trigger_radius=4
 	}
 	return
 }
@@ -141,11 +144,17 @@ site_cell :: proc(site:^Site,p:grid.Position)->(cell:Site_Cell) {
 		cell.surface=.Passage;cell.wall_height=2.1
 		cell.wall=(ay==7 && ax<=8) || (ax==8 && ay>=3 && ay<=7) || (ax==3 && ay>=3 && ay<=5)
 		if ax<=2 && ay<=2 {cell.surface=.Platform}
+	case .Cave:
+		// The mouth of the cave: a mass of rock seven wide, stepped up behind, with the doorway cut into its front between two
+		// legs.
+		cell.surface=.Approach
+		cell.wall=(y== -2 && ax<=3) || (y== -1 && ax>=1 && ax<=3) || (y==0 && ax==1)
+		cell.wall_height=2.6 if y== -2 else (2.2 if y== -1 else 1.7)
 	}
 	for entry in d.entrances[:d.entrance_count] {for side in ([2]int{-1,1}) {
 		if q==site_gatepost(site.kind,entry,side) {cell.wall=true;cell.wall_height=2.2}
 	}}
-	if q=={} && site.kind!=.Trial && site.kind!=.Boss && site.kind!=.Tunnel {
+	if q=={} && site.kind!=.Trial && site.kind!=.Boss && site.kind!=.Tunnel && site.kind!=.Cave {
 		cell.fixture,cell.wall=true,true
 		cell.wall_height=1.3 if site.kind==.Archive || site.kind==.Memory else (.7 if site.kind==.Cache || site.kind==.Workshop else 1)
 	}

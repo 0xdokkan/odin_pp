@@ -98,7 +98,7 @@ Expedition_Near_Sites :: struct { items:[world.MAX_SITES]u8, count:int }
 @(private)
 expedition_gather_sites :: proc(renderer:^Renderer,w:^world.World,lo,hi:grid.Position) {
 	near:=&renderer.tactical.expedition_sites;near.count=0
-	for &site,i in w.sites[:w.site_count] {
+	for &site,i in w.sites[:world.visible_sites(w)] {
 		a,b:=world.site_bounds(&site)
 		if b.x<lo.x || b.y<lo.y || a.x>hi.x || a.y>hi.y {continue}
 		near.items[near.count]=u8(i);near.count+=1
@@ -130,6 +130,7 @@ update_expedition_patrol_glide :: proc(renderer:^Renderer,w:^world.World) {
 	if !renderer.tactical.expedition_follow_ready {glide.ready={}}
 	dt:=expedition_frame_dt(renderer)
 	for &group,g in w.groups[:w.group_count] {for member,m in group.members[:group.count] {
+		if !world.in_scope(w,group.cave) {continue}
 		i:=g*world.MAX_MEMBERS+m
 		target:=view.Vec2{f32(member.enemy.position.x),f32(member.enemy.position.y)}
 		if !member.alive || member.deployed || !glide.ready[i] || abs(target.x-glide.to[i].x)+abs(target.y-glide.to[i].y)>2.5 {
@@ -158,12 +159,12 @@ draw_expedition_props :: proc(renderer:^Renderer,room:^game.Room,w:^world.World)
 	update_expedition_patrol_glide(renderer,w)
 
 	for &group,g in w.groups[:w.group_count] {for m,i in group.members[:group.count] {
-		if !m.alive || m.deployed || !tactical_cell_on_screen(renderer,m.enemy.position) {continue}
-		if world.terrain(w.biome,m.enemy.position)==.Grass && world.distance(room.player.position,m.enemy.position)>3 {continue}
+		if !m.alive || m.deployed || !world.in_scope(w,group.cave) || !tactical_cell_on_screen(renderer,m.enemy.position) {continue}
+		if world.ground(w,m.enemy.position)==.Grass && world.distance(room.player.position,m.enemy.position)>3 {continue}
 		tactical_billboard(renderer,sprite_key_for_enemy(m.enemy.archetype),expedition_patrol_shown(renderer,g,i,m.enemy.position),1)
 	}}
 	for drop in w.drops[:w.drop_count] {
-		if !tactical_cell_on_screen(renderer,drop.position) {continue}
+		if !world.in_scope(w,drop.cave) || !tactical_cell_on_screen(renderer,drop.position) {continue}
 		p:=rl.Vector3{f32(drop.position.x)+.5,.25+math.sin(w.clock*3+f32(drop.position.x))*.05,f32(drop.position.y)+.5}
 		_,design:=world.site_at(w,drop.position)
 		if design.fixture {p.y+=design.wall_height}
@@ -190,7 +191,7 @@ draw_expedition_mount :: proc(renderer:^Renderer,w:^world.World,dinosaur:bool=fa
 
 draw_expedition_labels :: proc(renderer:^Renderer,room:^game.Room,w:^world.World) {
 	c:=expedition_color(w.biome)
-	for site in w.sites[:w.site_count] {
+	for site in w.sites[:world.visible_sites(w)] {
 		if !site.active || site.state==.Resolved || world.distance(room.player.position,site.position)>10 {continue}
 		if site.secret && site.state==.Unvisited {continue}
 		label_height:=f32(2.7) if w.biome==.Cyber && site.kind==.Workshop else 1.5

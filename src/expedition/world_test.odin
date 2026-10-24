@@ -24,7 +24,8 @@ test_expedition_geography_is_seed_independent_and_all_sites_reachable :: proc(t:
 		a,b:World; first,second:level.Level
 		testing.expect(t,generate(&a,&first,biome,1));testing.expect(t,generate(&b,&second,biome,9999))
 		testing.expect(t,slice.equal(first.tiles.cells[:],second.tiles.cells[:]))
-		for site,i in a.sites[:a.site_count] {testing.expect_value(t,site.position,b.sites[i].position)}
+		// The caves a run has are the run's (cave_test.odin); every other site is the biome's.
+		for site,i in a.sites[:a.site_count] {if site.kind!=.Cave {testing.expect_value(t,site.position,b.sites[i].position)}}
 		{
 			seen:=make([]bool,len(first.tiles.cells));queue:=make([]grid.Position,len(first.tiles.cells));defer delete(seen);defer delete(queue);tail:=1;queue[0]=first.player_spawn
 			seen[first.player_spawn.y*first.tiles.width+first.player_spawn.x]=true

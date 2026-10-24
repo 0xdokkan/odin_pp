@@ -41,7 +41,7 @@ numero della fase resta quello della sua sezione.
 | 7 | 6 | Strutture su più caselle: edifici e oggetti complessi, edifici trasparenti avvicinandosi | — (meglio dopo la 2) | Fatta | vedi Esito |
 | 8 | 3 | Altezze nelle spedizioni: renderer, mappe, salvataggi, prestazioni | 2 | Fatta | vedi Esito |
 | 9 | 4 | La montagna a spirale delle Montagne innevate | 2, 3 | Fatta | vedi Esito |
-| 10 | 5 | Caverne | 2 (3 e 4 per metterle nei biomi) | Da fare | — |
+| 10 | 5 | Caverne | 2 (3 e 4 per metterle nei biomi) | Fatta | vedi Esito |
 | 11 | 7 | Posa delle strutture da parte del giocatore | 6 | Confermata dall'utente (alla Fase 6): da fare | — |
 
 ## Scaletta: cosa sviluppare prima
@@ -1171,7 +1171,42 @@ sezione 1: fammi prima le domande della fase e fermati alla fine.
 
 ### Esito
 
-*(da compilare a fine fase)*
+**Fatta il 2026-10-24.** Quattro biomi hanno le caverne.
+
+- **Risposte dell'utente:** tipo B (interni separati, non grotte con volta); dentro, un segreto con ricompensa e dei
+  nemici; i biomi Neve, Far West, Egitto e Inferno; da una a tre grotte per mappa, a caso; l'interno è di due o tre
+  stanze in fila; l'ingresso della Neve è a metà della salita della montagna; l'ingresso è nascosto sull'ologramma
+  finché non lo si scopre.
+- **Come è fatto un interno** (`src/level/cave.odin`, funzione pura di un seme): 34×18 caselle, due o tre stanze in
+  fila unite da gallerie larghe due caselle, qualche pilastro, in fondo una nicchia col segreto; il bordo è roccia. Ogni
+  seme dà una grotta connessa (300 semi verificati).
+- **Come funziona il passaggio** (`src/expedition/cave.odin`): un interno **separato dal punto di vista del giocatore, ma sulla
+  stessa griglia**, come il tunnel del Vietnam e senza il costo di più mappe e più salvataggi. Entrando, con una
+  dissolvenza al nero, le caselle e le altezze della mappa aperta vengono messe da parte (`Outer_Map`, tenuta dalla scena e
+  salvata nel checkpoint), la mappa si svuota e vi si stampa la grotta; uscendo, la mappa aperta torna identica
+  (verificato casella per casella). Fuori dalla grotta non si vede nient'altro, perché il resto è vuoto.
+- **Che cosa è di chi:** gruppi, oggetti a terra e siti della mappa aperta non fanno nulla in grotta, e quelli della grotta
+  (marcati col suo numero) non fanno nulla fuori; il terreno e il tempo del bioma non arrivano in grotta (il bioma 255 non ha
+  terreni). L'esperienza e gli oggetti che cadono in grotta restano in grotta. Non si entra né si esce durante uno scontro.
+- **Dentro:** un gruppo di 2–4 nemici in ogni stanza che ne ha uno (non nella prima, se le stanze sono tre) e, nella nicchia in
+  fondo, crediti e una reliquia da raccogliere a mano.
+- **Ingressi:** un sito nuovo, `Site_Kind.Cave`, segreto (sull'ologramma appare solo dopo averlo scoperto: pin «G», voce
+  «GROTTA» in legenda). Una grotta di una run non rende la prossima già scoperta (i segreti ricordati dalla campagna sono
+  quelli della mappa). Le posizioni possibili sono **fisse per bioma** (la geografia resta uguale a ogni run: un blocco di roccia
+  con la porta, sempre presente) e la run sceglie quali hanno una grotta: da una a tre; nella Neve la prima è sul sentiero
+  della montagna, a metà salita, e c'è sempre. Ogni bioma ha tre posti possibili (verificato su 40 semi: una grotta in 10 mappe, due in 12, tre in 18).
+- **Salvataggio:** `Snapshot.outer`, due tabelle di byte in più (zero fuori dalle grotte e nei salvataggi vecchi); un
+  checkpoint preso in grotta si riapre in grotta, e la mappa aperta torna all'uscita.
+- **Disegno:** l'arco (due gambe di roccia, architrave, apertura scura e un arco di luce del colore del bioma); dentro, le
+  pareti sono quelle del bioma. I tasti: **E** all'arco entra, **E** vicino all'inizio della grotta esce; **TAB** (mappa) e **M**
+  (mount) non servono in grotta.
+- **Laboratorio:** arena «Grotta» (quinta di F3, 36×20): la grotta con i suoi nemici, percorsa dall'arrivo al segreto e ritorno
+  passo dopo passo, con una cattura per stanza; la roccia ferma il passo.
+- **Prestazioni** (benchmark degli stage 0–26 dei documenti, stesso schermo e stesso carico): media +2,4 % rispetto alla Fase 3 (10,34 → 10,59 ms, due misure concordi): lo stesso costo della Fase 4, perché le grotte non cambiano il disegno delle mappe aperte
+- **Test:** 11 nuovi (1643 in tutto, con e senza assert).
+- **Non fatto, dichiarato:** la grotta non ha una volta né una luce interna più scura (l'interno è una mappa separata); l'ologramma
+  non mostra l'interno; l'arco sulla montagna
+  è un cancello di roccia sul sentiero (non scava la parete).
 
 ## 7. Fase 6 — Strutture su più caselle: edifici e oggetti complessi
 

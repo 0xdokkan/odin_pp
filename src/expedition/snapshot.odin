@@ -18,6 +18,9 @@ Snapshot :: struct {
 	// The height of every cell in steps (all zero: a flat map, which is every save from before the
 	// expeditions had a relief: the key is simply missing there).
 	heights: [MAX_CELLS]u8,
+	// The open map's tiles and heights, put away while the player is in a cave (world.in_cave>0; zero otherwise, and
+	// in every save from before the caves).
+	outer: Outer_Map,
 	obstacles: [MAX_CELLS]game.Obstacle,
 	obstacle_count: int,
 	family: level.Room_Family,
@@ -53,8 +56,8 @@ stable :: proc(room:^game.Room) -> bool {
 		!game.tactical_is_casting(room) && !room.player.deck.has_resolving_card
 }
 
-capture :: proc(w:^World,room:^game.Room,out:^Snapshot) -> bool {
-	if w==nil || out==nil || !stable(room) || room.level_data==nil || len(room.traps)>len(out.traps) || len(room.obstacles)>len(out.obstacles) || len(room.ground.pool)>MAX_CELLS || len(room.level_data.tiles.cells)>MAX_CELLS || len(room.enemies)>len(out.enemies) || len(room.objects)>len(out.objects) || len(room.loot)>len(out.loot) {return false}
+capture :: proc(w:^World,room:^game.Room,out:^Snapshot,outer:^Outer_Map=nil) -> bool {
+	if w==nil || out==nil || (w.in_cave>0 && outer==nil) || !stable(room) || room.level_data==nil || len(room.traps)>len(out.traps) || len(room.obstacles)>len(out.obstacles) || len(room.ground.pool)>MAX_CELLS || len(room.level_data.tiles.cells)>MAX_CELLS || len(room.enemies)>len(out.enemies) || len(room.objects)>len(out.objects) || len(room.loot)>len(out.loot) {return false}
 	side:=size(w)
 	if side!=legacy_map_size(w.biome) && side!=map_size(w.biome) {return false}
 	if room.level_data.tiles.width!=side || room.level_data.tiles.height!=side || len(room.level_data.tiles.cells)!=side*side || len(room.ground.pool)!=side*side {return false}
@@ -70,6 +73,7 @@ capture :: proc(w:^World,room:^game.Room,out:^Snapshot) -> bool {
 	out.family=room.family;out.encounter_kind=room.encounter_kind;out.modifier=room.modifier;out.exit_position=room.exit_position;out.endless=room.endless
 	out.tactical_pulse=room.tactical_pulse;out.obstacle_count=len(room.obstacles)
 	copy(out.tiles[:],room.level_data.tiles.cells[:]);copy(out.heights[:],room.level_data.heights[:]);copy(out.obstacles[:],room.obstacles[:])
+	if w.in_cave>0 {out.outer=outer^}
 	copy(out.enemies[:],room.enemies[:]);copy(out.traps[:],room.traps[:]);copy(out.objects[:],room.objects[:]);copy(out.loot[:],room.loot[:]);copy(out.ground_pool[:],room.ground.pool)
 	return true
 }
@@ -88,6 +92,7 @@ valid_statuses :: proc(value:game.Status_Set)->bool {
 valid_snapshot :: proc(s:^Snapshot) -> bool {
 	if s==nil || !s.valid || s.phase<.Combat || s.phase>.Defeat || s.obstacle_count<0 || s.obstacle_count>MAX_CELLS || s.world.biome>=.Count || s.enemy_count<0 || s.enemy_count>len(s.enemies) || s.trap_count<0 || s.trap_count>len(s.traps) || s.object_count<0 || s.object_count>len(s.objects) || s.loot_count<0 || s.loot_count>len(s.loot) || s.fire_count<0 || s.fire_count>len(s.fires) {return false}
 	w:=&s.world
+	if w.cave_count<0 || w.cave_count>MAX_CAVES || w.in_cave<0 || w.in_cave>w.cave_count {return false}
 	if w.site_count<0 || w.site_count>MAX_SITES || w.group_count<0 || w.group_count>MAX_GROUPS || w.drop_count<0 || w.drop_count>MAX_DROPS || w.reward_count<0 || w.reward_count>3 || w.reward_site < -1 || w.reward_site>=w.site_count {return false}
 	size:=size(w)
 	if size!=legacy_map_size(w.biome) && size!=map_size(w.biome) {return false}
@@ -102,6 +107,11 @@ valid_snapshot :: proc(s:^Snapshot) -> bool {
 	   s.tactical_pulse.count<0 || s.tactical_pulse.count>game.MAX_ENEMIES_PER_ROOM ||
 	   s.reactions.count<0 || s.reactions.count>game.MAX_REACTION_BINDINGS_PER_ROOM {return false}
 	for tile in s.tiles[:size*size] {if tile.kind>.Fence {return false}}
+	for cave in w.caves[:w.cave_count] {if cave.site<0 || cave.site>=w.site_count || w.sites[cave.site].kind!=.Cave || cave.state>.Looted {return false}}
+	if w.in_cave>0 {
+		for kind in s.outer.kinds[:size*size] {if level.Tile_Kind(kind)>.Fence {return false}}
+		if !inside(w.cave_return,size) {return false}
+	}
 	if w.structure_count<0 || w.structure_count>MAX_WORLD_STRUCTURES {return false}
 	for placed in w.structures[:w.structure_count] {if placed.id>=.Count || placed.rotation>=4 || !inside(placed.origin,size) {return false}}
 	for e,i in s.enemies[:s.enemy_count] {
@@ -113,24 +123,33 @@ valid_snapshot :: proc(s:^Snapshot) -> bool {
 	for loot in s.loot[:s.loot_count] {if loot.kind<.Gold || loot.kind>.Weapon || loot.amount<0 || loot.healing_amount<0 || loot.healing_amount>4 || !inside(loot.position,size) {return false}}
 	for obstacle in s.obstacles[:s.obstacle_count] {if !inside(obstacle.position,size) {return false}}
 	for fire in s.fires[:s.fire_count] {if !inside(fire.center,size) || fire.id==0 || fire.stage<0 || fire.stage>game.GROUND_FIRE_STAGES {return false}}
-	for drop in w.drops[:w.drop_count] {if !inside(drop.position,size) || drop.xp<0 {return false}}
+	for drop in w.drops[:w.drop_count] {if !inside(drop.position,size) || drop.xp<0 || int(drop.cave)>w.cave_count {return false}}
 	if s.player.position.x<0 || s.player.position.y<0 || s.player.position.x>=size || s.player.position.y>=size || s.player.health<0 || s.player.health>s.player.stats.max_health || !game.validate_deck_state(&s.player.deck) {return false}
 	for &g in w.groups[:w.group_count] {
-		if g.count<0 || g.count>MAX_MEMBERS || g.site < -1 || g.site>=w.site_count || !inside(g.anchor,size) || g.lure_phase>.Returning || (g.lure_phase!=.None && (!inside(g.lure_target,size) || g.lure_until<0 || g.lure_wait_until<0)) {return false}
+		if g.count<0 || g.count>MAX_MEMBERS || int(g.cave)>w.cave_count || g.site < -1 || g.site>=w.site_count || !inside(g.anchor,size) || g.lure_phase>.Returning || (g.lure_phase!=.None && (!inside(g.lure_target,size) || g.lure_until<0 || g.lure_wait_until<0)) {return false}
 		for m in g.members[:g.count] {if !valid_statuses(m.enemy.statuses) || !inside(m.enemy.position,size) || m.enemy.archetype<.Chaser || m.enemy.archetype>=.Count || (m.alive && (m.enemy.health<=0 || m.enemy.health>m.enemy.max_health)) {return false}}
 	}
-	for site in w.sites[:w.site_count] {if !inside(site.position,size) || site.wave<0 || site.waves<0 || site.wave>site.waves || site.kind>.Tunnel || site.state>.Resolved || site.group < -1 || site.group>=w.group_count || site.orientation>=4 || site.layout_version>SITE_LAYOUT_VERSION {return false}}
+	for site in w.sites[:w.site_count] {if !inside(site.position,size) || site.wave<0 || site.waves<0 || site.wave>site.waves || site.kind>.Cave || site.state>.Resolved || site.group < -1 || site.group>=w.group_count || site.orientation>=4 || site.layout_version>SITE_LAYOUT_VERSION {return false}}
 	return true
 }
 
-restore :: proc(s:^Snapshot,w:^World,data:^level.Level,player:^game.Player,room:^game.Room) -> bool {
-	if w==nil || data==nil || player==nil || room==nil || !valid_snapshot(s) {return false}
+restore :: proc(s:^Snapshot,w:^World,data:^level.Level,player:^game.Player,room:^game.Room,outer:^Outer_Map=nil) -> bool {
+	if w==nil || data==nil || player==nil || room==nil || !valid_snapshot(s) || (s.world.in_cave>0 && outer==nil) {return false}
 	side:=size(&s.world)
 	created,allocated:=level.create(side,side,{.Void})
 	if !allocated {return false}
 	data^=created
-	copy(data.tiles.cells[:],s.tiles[:side*side])
-	_=level.set_height_table(data,s.heights[:side*side])
+	// The room is made on the open map's tiles (a cave has no exit tile nor the map's spawn, which a room needs); a
+	// checkpoint taken in a cave then puts the cave over it, as entering it does.
+	in_cave:=s.world.in_cave>0
+	if in_cave {
+		outer^=s.outer
+		for kind,i in s.outer.kinds[:side*side] {data.tiles.cells[i]=level.Tile{kind=level.Tile_Kind(kind)}}
+		_=level.set_height_table(data,s.outer.heights[:side*side])
+	} else {
+		copy(data.tiles.cells[:],s.tiles[:side*side])
+		_=level.set_height_table(data,s.heights[:side*side])
+	}
 	for tile,i in data.tiles.cells {
 		if tile.kind==.Player_Spawn {data.player_spawn={i%side,i/side};data.has_player_spawn=true;break}
 	}
@@ -151,5 +170,10 @@ restore :: proc(s:^Snapshot,w:^World,data:^level.Level,player:^game.Player,room:
 	copy(room.ground.pool,s.ground_pool[:]);room.ground.fires=s.fires;room.ground.fire_count=s.fire_count;room.ground.next_fire_id=s.next_fire_id
 	room.fishing=s.fishing;room.pinball=s.pinball;room.pinball_random=s.pinball_random;room.lasso=s.lasso;room.first_person=s.first_person;room.reaction_bindings=s.reactions
 	room.player=player;room.level_data=data
+	if in_cave {
+		kinds:=make([]u8,side*side,context.temp_allocator)
+		for tile,i in s.tiles[:side*side] {kinds[i]=u8(tile.kind)}
+		if !level.set_tile_kinds(data,kinds) || !level.set_height_table(data,s.heights[:side*side]) {return false}
+	}
 	return true
 }

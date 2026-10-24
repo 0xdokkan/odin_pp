@@ -80,9 +80,10 @@ scala di 3, un pilastro di 8 e una collina a spirale (si prova la regola dei
 dirupi, le cadute, la vista e la gittata dall'alto); «Strutture» (41×29) ha tutto il
 catalogo: tre edifici, cinque oggetti complessi, un recinto e la casetta nelle quattro
 rotazioni (si prova passo, vista e trasparenza avvicinandosi). Con `--smoke-mechanics-lab` e
-`ODIN_PP_LAB_ONLY=heights`, `structures` o `mountain` gira solo l'atto delle altezze, delle strutture o della
-montagna a spirale (quest'ultimo dura qualche minuto: sale tutto il sentiero a passi veri).
-`--smoke-expedition` comprende l'atto «montagna» (il robot in otto punti della salita, con le mappe della Neve
+`ODIN_PP_LAB_ONLY=heights`, `structures`, `mountain` o `cave` gira solo l'atto delle altezze, delle strutture, della
+montagna a spirale o della grotta (quest'ultimo dura qualche minuto: sale tutto il sentiero a passi veri).
+`--smoke-expedition` comprende l'atto «grotte» (in Neve, Far West, Egitto e Inferno: l'arco, l'ingresso e la seconda
+stanza della prima grotta, con il giro entra-esci controllato) e l'atto «montagna» (il robot in otto punti della salita, con le mappe della Neve
 controllate: montagna, pattuglia e reliquia), gli atti «rilievi» (il robot nel punto più accidentato di ogni bioma, e
 l'ologramma con le curve di livello in tre biomi), «scontro su due livelli» e «edifici»; quest'ultimo: il robot si avvicina a una capanna di
 Robotica cibernetica (6, 4, 2 e 1 casella, soglia, dentro, fuori) e agli oggetti.

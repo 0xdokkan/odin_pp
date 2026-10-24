@@ -176,8 +176,8 @@ draw_expedition_costumes :: proc(renderer:^Renderer,room:^game.Room,w:^world.Wor
 		draw_expedition_costume(renderer,w.biome,actor.archetype,actor.position,actor.entity,w.clock,actor.opacity)
 	}
 	for &group,g in w.groups[:w.group_count] {for &member,i in group.members[:group.count] {
-		if !member.alive || member.deployed || !tactical_cell_on_screen(renderer,member.enemy.position) {continue}
-		if world.terrain(w.biome,member.enemy.position)==.Grass && world.distance(room.player.position,member.enemy.position)>3 {continue}
+		if !member.alive || member.deployed || !world.in_scope(w,group.cave) || !tactical_cell_on_screen(renderer,member.enemy.position) {continue}
+		if world.ground(w,member.enemy.position)==.Grass && world.distance(room.player.position,member.enemy.position)>3 {continue}
 		if terrain_hides_actor(renderer,{f32(member.enemy.position.x),f32(member.enemy.position.y)}) {continue}
 		draw_expedition_costume(renderer,w.biome,member.enemy.archetype,expedition_patrol_shown(renderer,g,i,member.enemy.position),game.SYSTEM_ENTITY,w.clock)
 	}}

@@ -76,7 +76,7 @@ test_descent_all_site_walls_fit_blocked_cells_with_finite_outward_normals :: pro
 	room:=game.Room{level_data=&data}
 	b:Expedition_Geometry_Builder;defer {delete(b.vertices);delete(b.lines)}
 	pass:=Ink_Pass{mode=.Bake,builder=&b}
-	for biome in ([3]campaign.Biome{.West,.Egypt,.Inferno}) {for kind in world.Site_Kind {for orientation in u8(0)..<4 {
+	for biome in ([3]campaign.Biome{.West,.Egypt,.Inferno}) {for kind in world.Site_Kind {if kind==.Cave {continue};for orientation in u8(0)..<4 {
 		w.biome=biome
 		site:=world.Site{kind=kind,position={32,32},orientation=orientation,active=true,layout_version=world.SITE_LAYOUT_VERSION}
 		for &tile in data.tiles.cells {tile={.Floor}}
@@ -105,7 +105,7 @@ test_descent_fixtures_match_rotated_layout_and_leave_trial_tunnel_walkable :: pr
 	w:=new(world.World);defer free(w)
 	a,b:Expedition_Geometry_Builder;defer {delete(a.vertices);delete(a.lines);delete(b.vertices);delete(b.lines)}
 	pass,again:=Ink_Pass{mode=.Bake,builder=&a},Ink_Pass{mode=.Bake,builder=&b}
-	for biome in ([3]campaign.Biome{.West,.Egypt,.Inferno}) {for kind in world.Site_Kind {for orientation in u8(0)..<4 {
+	for biome in ([3]campaign.Biome{.West,.Egypt,.Inferno}) {for kind in world.Site_Kind {if kind==.Cave {continue};for orientation in u8(0)..<4 {
 		w.biome=biome
 		site:=world.Site{kind=kind,position={32,32},orientation=orientation,active=true,layout_version=world.SITE_LAYOUT_VERSION}
 		clear(&a.vertices);clear(&a.lines);clear(&b.vertices);clear(&b.lines)
@@ -131,7 +131,7 @@ test_descent_gate_clearance_and_collect_match_cached_emissive_geometry :: proc(t
 	w:=new(world.World);defer free(w)
 	b:Expedition_Geometry_Builder;defer {delete(b.vertices);delete(b.lines)}
 	pass:=Ink_Pass{mode=.Bake,builder=&b}
-	for biome in ([3]campaign.Biome{.West,.Egypt,.Inferno}) {for kind in world.Site_Kind {for orientation in u8(0)..<4 {
+	for biome in ([3]campaign.Biome{.West,.Egypt,.Inferno}) {for kind in world.Site_Kind {if kind==.Cave {continue};for orientation in u8(0)..<4 {
 		w.biome=biome
 		site:=world.Site{kind=kind,position={32,32},orientation=orientation,active=true,layout_version=world.SITE_LAYOUT_VERSION}
 		decor:=world.site_decor_anchors(&site)

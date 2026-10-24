@@ -792,6 +792,21 @@ avviare è `build/odin_pp`; conserva il limite fps delle impostazioni di gioco.
 - **Attenzione:** in Odin un `defer` che cambia un risultato con nome non cambia il valore restituito.
 - **Laboratorio:** `Mechanics_Lab_Arena.Mountain`, atto `mechanics_lab_mountain`, `ODIN_PP_LAB_ONLY=mountain`.
 
+## Le caverne (Fase 5 del piano griglia)
+
+- **Piano dell'interno:** `src/level/cave.odin`: `cave_plan(seed)` dà 34×18 caselle con due o tre stanze, l'arrivo, il segreto
+  e i punti dove aspettano i gruppi; `cave_stamp` lo scrive su un `Level`.
+- **Passaggio:** `src/expedition/cave.odin`. `enter_cave` mette da parte caselle e altezze della mappa aperta (`Outer_Map`),
+  la svuota (`level.set_tile_kinds` / `set_height_table`, un solo cambio di geometria) e vi stampa la grotta al centro;
+  `exit_cave` riporta tutto. `World.in_cave` (0 fuori, k+1 nella grotta k), `Group.cave`, `Drop.cave`: `in_scope` decide chi
+  agisce; `visible_sites` dice quanti siti si vedono (nessuno in grotta); `ground` dà il terreno (liscio in grotta, bioma 255).
+- **Posti:** `cave_candidates` sceglie fino a tre posti per bioma con un generatore fisso (stessa geografia a ogni run), la
+  run ne sceglie 1–3 (`place_caves`); la Neve ha sempre la grotta del sentiero della montagna.
+- **Salvataggio:** `Snapshot.outer`; `capture(..., outer)` e `restore(..., outer)`; la scena tiene l'`Outer_Map` mentre si è
+  in grotta (`Expedition_Session.outer`) e la dissolvenza in `expedition_cave_fade`.
+- **Disegno:** `render/expedition_cave.odin` (l'arco); i siti, i gruppi e i drop fuori scope non si disegnano.
+- **Attenzione:** nei biomi con grotte la geografia non dipende dal seme; il test della geografia salta i siti `Cave`.
+
 ## Limiti dichiarati
 
 - **Renderer:** i riflessi planari comprendono architettura e neon; carta e

@@ -50,7 +50,7 @@ expedition_geometry_key :: proc(room:^game.Room,w:^world.World)->(key:Expedition
 	data:=room.level_data
 	key.geometry_id=data.geometry_id;key.revision=data.geometry_revision
 	key.width=data.tiles.width;key.height=data.tiles.height;key.biome=u8(w.biome)
-	key.sites=expedition_floor_site_keys(w);key.site_count=clamp(w.site_count,0,world.MAX_SITES)
+	key.sites=expedition_floor_site_keys(w);key.site_count=clamp(world.visible_sites(w),0,world.MAX_SITES)
 	key.boss_defeated=w.boss_defeated
 	for site,i in w.sites[:key.site_count] {key.active[i]=site.active;key.secret[i]=site.secret;key.states[i]=site.state}
 	return

@@ -67,7 +67,7 @@ test_ascent_site_walls_all_kinds_and_rotations_follow_collision_and_budget :: pr
 	room:=game.Room{level_data=&data}
 	b:Expedition_Geometry_Builder;defer {delete(b.vertices);delete(b.lines)}
 	pass:=Ink_Pass{mode=.Bake,builder=&b};count:=0
-	for kind in world.Site_Kind {for orientation in u8(0)..<4 {
+	for kind in world.Site_Kind {if kind==.Cave {continue};for orientation in u8(0)..<4 {
 		site:=world.Site{kind=kind,position={40,40},orientation=orientation,active=true,layout_version=world.SITE_LAYOUT_VERSION}
 		lo,hi:=world.site_bounds(&site)
 		for y in 20..<61 {for x in 20..<61 {_=level.set_tile(&data,{x,y},{.Floor})}}
@@ -99,7 +99,7 @@ test_ascent_fixtures_all_biomes_kinds_rotations_preserve_walkable_space :: proc(
 	b,again:Expedition_Geometry_Builder
 	defer {delete(b.vertices);delete(b.lines);delete(again.vertices);delete(again.lines)}
 	pass,other:=Ink_Pass{mode=.Bake,builder=&b},Ink_Pass{mode=.Bake,builder=&again}
-	for biome in ASCENT_TEST_BIOMES {for kind in world.Site_Kind {for orientation in u8(0)..<4 {for state in world.Site_State {
+	for biome in ASCENT_TEST_BIOMES {for kind in world.Site_Kind {if kind==.Cave {continue};for orientation in u8(0)..<4 {for state in world.Site_State {
 		w.biome=biome
 		site:=world.Site{kind=kind,state=state,position={32,32},orientation=orientation,active=true,layout_version=world.SITE_LAYOUT_VERSION}
 		clear(&b.vertices);clear(&b.lines);clear(&again.vertices);clear(&again.lines)

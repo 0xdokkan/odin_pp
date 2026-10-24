@@ -178,6 +178,26 @@ set_height_table :: proc(level: ^Level, heights: []u8) -> bool {
 	return true
 }
 
+// Every cell's tile kind, in the tiles' order, into `out` (as many as the map has cells).
+tile_kinds :: proc(level: ^Level, out: []u8) -> bool {
+	if level == nil || len(out) < len(level.tiles.cells) { return false }
+	for tile, i in level.tiles.cells { out[i] = u8(tile.kind) }
+	return true
+}
+
+// Sets every cell's tile kind at once (one per cell, in the tiles' order): a single change of the geometry,
+// where a call of set_tile for each cell would make as many. False if a kind is not one.
+set_tile_kinds :: proc(level: ^Level, kinds: []u8) -> bool {
+	if level == nil || len(kinds) != len(level.tiles.cells) { return false }
+	for kind in kinds { if Tile_Kind(kind) > max(Tile_Kind) { return false } }
+	changed := false
+	for kind, i in kinds {
+		if u8(level.tiles.cells[i].kind) != kind { level.tiles.cells[i].kind = Tile_Kind(kind); changed = true }
+	}
+	if changed { mark_geometry_changed(level) }
+	return true
+}
+
 // Heights from rows of text the size of the map: ' ' or '0' is flat, '1'..'9'
 // that many steps, 'a'..'f' ten to fifteen. Used by the arenas that test heights.
 apply_height_rows :: proc(level: ^Level, rows: []string) -> bool {

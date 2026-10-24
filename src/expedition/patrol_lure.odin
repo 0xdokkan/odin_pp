@@ -15,7 +15,7 @@ lure_patrol :: proc(w:^World,room:^game.Room,target:grid.Position)->bool {
 	if w==nil || room==nil || room.player==nil || !game.base_cell_is_walkable(room,target) || game.cell_blocks_movement(room,target) {return false}
 	best:= -1;nearest:=PATROL_LURE_RANGE+1
 	for &group,i in w.groups[:w.group_count] {
-		if !group.patrol || group.active {continue}
+		if !group.patrol || group.active || !in_scope(w,group.cave) {continue}
 		for member in group.members[:group.count] {
 			if !member.alive || member.deployed {continue}
 			d:=distance(member.enemy.position,target)

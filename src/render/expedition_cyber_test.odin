@@ -123,7 +123,7 @@ test_cyber_site_walls_and_factory_arms_stay_on_actual_blocked_cells :: proc(t:^t
 test_cyber_fixtures_preserve_walkable_centers_and_rotated_boss_opening :: proc(t:^testing.T) {
 	b:Expedition_Geometry_Builder;defer {delete(b.vertices);delete(b.lines)}
 	pass:=Ink_Pass{mode=.Bake,builder=&b}
-	for kind in world.Site_Kind {for orientation in u8(0)..<4 {
+	for kind in world.Site_Kind {if kind==.Cave {continue};for orientation in u8(0)..<4 {
 		site:=world.Site{kind=kind,position={32,32},orientation=orientation,active=true,layout_version=world.SITE_LAYOUT_VERSION}
 		clear(&b.vertices);clear(&b.lines)
 		draw_expedition_cyber_fixture(pass,&site,false)

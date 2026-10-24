@@ -53,6 +53,8 @@ test_the_mountain_is_clear_of_the_sites_and_the_spawn :: proc(t: ^testing.T) {
 	defer level.destroy(&data)
 	zone := mountain_zone()
 	for &site in w.sites[:w.site_count] {
+		// The cave halfway up the mountain is on it, as it should be.
+		if site.kind == .Cave { continue }
 		low, high := site_bounds(&site)
 		testing.expectf(t, low.x > zone[1].x || high.x < zone[0].x || low.y > zone[1].y || high.y < zone[0].y, "the site at %v is on the mountain", site.position)
 	}

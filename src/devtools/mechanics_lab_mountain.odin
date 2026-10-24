@@ -15,10 +15,8 @@ import render "../render"
 // fall costs at most ten), and the robot is seen from eight places on the climb, behind the mountain
 // and before it. Stills odin_pp_mechanics_lab_mountain_*.png.
 
-@(private = "file")
 Mountain_Step :: struct { offset: grid.Position, direction: game.Move_Direction }
 
-@(private = "file")
 MOUNTAIN_LAB_STEPS := [4]Mountain_Step{
 	{{0, -1}, .North}, {{1, 0}, .East}, {{0, 1}, .South}, {{-1, 0}, .West},
 }
@@ -30,7 +28,6 @@ mountain_lab_cell :: proc(offset: grid.Position) -> grid.Position {
 }
 
 // The shortest walk, a step of one height at a time, from `from` to `to` (empty if there is none).
-@(private = "file")
 mountain_lab_route :: proc(room: ^game.Room, from, to: grid.Position) -> [dynamic]game.Move_Direction {
 	width, height := room.level_data.tiles.width, room.level_data.tiles.height
 	came := make([]int, width*height, context.temp_allocator)
@@ -65,7 +62,6 @@ mountain_lab_route :: proc(room: ^game.Room, from, to: grid.Position) -> [dynami
 }
 
 // One step of the player, as the lane makes it (the next call waits for its slide to end).
-@(private = "file")
 mountain_lab_step :: proc(window: ^app.Window, renderer: ^render.Renderer, room: ^game.Room, controller: ^run_session.Tactical_Controller,
 	cards: ^run_session.Card_Interaction_State, buffer: ^run_session.Buffered_Gameplay_Command, direction: game.Move_Direction) -> bool {
 	mechanics_lab_wait_free(window, renderer, room, controller, cards, buffer)

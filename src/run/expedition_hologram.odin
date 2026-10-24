@@ -33,7 +33,7 @@ Hologram_Geometry :: struct {
 	cells: [HOLO_SIDE*HOLO_SIDE]Hologram_Cell,
 }
 Hologram_Area :: struct { visible:bool, center:rl.Vector3, radius:f32 }
-HOLO_CODES :: [world.Site_Kind]string{.Nest="N",.Cache="C",.Archive="A",.Workshop="O",.Spring="F",.Trial="P",.Boss="B",.Memory="M",.Tunnel="T"}
+HOLO_CODES :: [world.Site_Kind]string{.Nest="N",.Cache="C",.Archive="A",.Workshop="O",.Spring="F",.Trial="P",.Boss="B",.Memory="M",.Tunnel="T",.Cave="G"}
 
 @(private)
 hologram_area :: proc(site:^world.Site)->Hologram_Area {
