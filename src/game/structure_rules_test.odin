@@ -85,3 +85,45 @@ test_a_building_stops_the_step_and_the_sight_except_through_its_door :: proc(t: 
 	testing.expect(t, !tactical_line_visible({10, 6}, {10, 9}, blocks, &room), "the wall hides the inside")
 	testing.expect(t, tactical_line_visible({10, 13}, {10, 9}, blocks, &room), "the door shows the inside")
 }
+
+// An enemy's blow breaks the object the player set down in its reach or beside the one who strikes it, once however many of its cells
+// are hit, and never a building; a blow far from it does nothing.
+@(test)
+test_an_enemy_blow_breaks_a_placed_object_in_reach_and_never_a_building :: proc(t: ^testing.T) {
+	rows := make([]string, 16, context.temp_allocator)
+	for y in 0..<16 {
+		row := make([]u8, 30, context.temp_allocator)
+		for x in 0..<30 { row[x] = '#' if x == 0 || y == 0 || x == 29 || y == 15 else '.' }
+		if y == 1 { row[1] = '@' }
+		if y == 14 { row[28] = '>' }
+		rows[y] = string(row)
+	}
+	data: level.Level
+	player: Player
+	room := structure_room(t, &data, &player, rows)
+	defer level.destroy(&data)
+	defer destroy_room(&room)
+	cart, _ := level.place_structure(&data, .Cart, {10, 6}, 0, false)
+	cottage, _ := level.place_structure(&data, .Cottage, {18, 4}, 0, false)
+	testing.expect(t, cart >= 0 && cottage >= 0)
+	data.structures[cart].health = level.structure_max_health(.Cart)
+	cart_origin := data.structures[cart].origin
+	// Far from both: nothing.
+	testing.expect_value(t, strike_structures(&room, {3, 3}, {{4, 3}, {5, 3}}, 5), 0)
+	testing.expect_value(t, data.structures[cart].health, level.structure_max_health(.Cart))
+	// A threatened cell on the cart: it takes the damage once, though two of its cells are threatened.
+	testing.expect_value(t, strike_structures(&room, {7, 7}, {cart_origin, {cart_origin.x+1, cart_origin.y}}, 2), 0)
+	testing.expect_value(t, data.structures[cart].health, level.structure_max_health(.Cart)-2)
+	// Beside the one who strikes, with no cell of the blow on it.
+	testing.expect_value(t, strike_structures(&room, {cart_origin.x-1, cart_origin.y}, {{cart_origin.x-3, cart_origin.y}}, 1), 0)
+	testing.expect_value(t, data.structures[cart].health, level.structure_max_health(.Cart)-3)
+	// The cottage takes nothing, however hard the blow.
+	testing.expect_value(t, strike_structures(&room, {17, 5}, {{18, 5}, {19, 5}}, 50), 0)
+	testing.expect_value(t, level.structure_count(&data), 2)
+	// Enough damage brings the cart down and takes it off the map.
+	testing.expect_value(t, strike_structures(&room, {cart_origin.x-1, cart_origin.y}, {cart_origin}, 50), 1)
+	testing.expect_value(t, level.structure_count(&data), 1)
+	testing.expect_value(t, data.structures[0].id, level.Structure_Id.Cottage)
+	// No damage, no blow.
+	testing.expect_value(t, strike_structures(&room, {17, 5}, {{18, 5}}, 0), 0)
+}

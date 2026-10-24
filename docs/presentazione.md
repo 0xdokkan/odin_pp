@@ -51,6 +51,13 @@ caselle ricostruiti quando la geometria cambia, e si inviano solo quelli in vist
 strutture, luci, personaggi e puntatore stanno alla quota della loro casella. L'ologramma schiarisce con la
 quota, la esagera e traccia una curva di livello a ogni cambio di altezza.
 
+### Posare le strutture
+
+Alcune strutture si portano nello zaino come **kit** (si trovano nelle cache e si comprano nelle officine). Dallo zaino, fuori dagli scontri,
+**POSA** lascia scegliere dove: l'impronta segue il mouse, verde dove ci sta e rossa dove no, la rotella la gira, R la specchia, un clic la
+posa e il tasto destro annulla. Ne puoi posare tre per spedizione e non si smontano; i colpi dei nemici rompono gli oggetti e i recinti
+(non gli edifici).
+
 ### Le caverne
 
 Nella Neve, nel Far West, nell'Egitto e nell'Inferno ci sono da una a tre grotte per mappa: un arco di roccia (sulla montagna

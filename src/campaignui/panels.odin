@@ -129,10 +129,12 @@ item_detail :: proc(c: ^campaign.Campaign, player: ^game.Player, state: ^State, 
 		}
 		return
 	}
-	if state.selected.source == .Backpack && item.kind <= .Upgrade {
-		if ui.button(ctx, primary, "USA", player != nil && can_use, true, .Small) {
+	if state.selected.source == .Backpack && (item.kind <= .Upgrade || item.kind == .Structure_Kit) {
+		if ui.button(ctx, primary, "POSA" if item.kind == .Structure_Kit else "USA", player != nil && can_use, true, .Small) {
 			used := use_selected(c, player, state, in_combat, can_use)
 			out.changed = out.changed || used.changed; out.decoy = used.decoy; out.action_seconds += used.action_seconds
+			out.place_structure, out.structure = used.place_structure, used.structure
+			if used.place_structure { out.closed = true }
 		}
 	} else if state.selected.source == .Pending {
 		if ui.button(ctx, primary, "SISTEMA", can_change, true, .Small) {

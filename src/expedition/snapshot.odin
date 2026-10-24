@@ -60,6 +60,8 @@ capture :: proc(w:^World,room:^game.Room,out:^Snapshot,outer:^Outer_Map=nil) -> 
 	if w==nil || out==nil || (w.in_cave>0 && outer==nil) || !stable(room) || room.level_data==nil || len(room.traps)>len(out.traps) || len(room.obstacles)>len(out.obstacles) || len(room.ground.pool)>MAX_CELLS || len(room.level_data.tiles.cells)>MAX_CELLS || len(room.enemies)>len(out.enemies) || len(room.objects)>len(out.objects) || len(room.loot)>len(out.loot) {return false}
 	side:=size(w)
 	if side!=legacy_map_size(w.biome) && side!=map_size(w.biome) {return false}
+	// Structures the enemies have broken are off the map's list: the world's list is what is saved.
+	sync_structures(w,room.level_data)
 	if room.level_data.tiles.width!=side || room.level_data.tiles.height!=side || len(room.level_data.tiles.cells)!=side*side || len(room.ground.pool)!=side*side {return false}
 	// Zero in place, then copy into the caller's heap snapshot. A large compound
 	// literal here would put the expanded tile and obstacle arrays on the stack.
@@ -171,6 +173,7 @@ restore :: proc(s:^Snapshot,w:^World,data:^level.Level,player:^game.Player,room:
 	room.fishing=s.fishing;room.pinball=s.pinball;room.pinball_random=s.pinball_random;room.lasso=s.lasso;room.first_person=s.first_person;room.reaction_bindings=s.reactions
 	room.player=player;room.level_data=data
 	if in_cave {
+		_=level.set_structures(data,nil)
 		kinds:=make([]u8,side*side,context.temp_allocator)
 		for tile,i in s.tiles[:side*side] {kinds[i]=u8(tile.kind)}
 		if !level.set_tile_kinds(data,kinds) || !level.set_height_table(data,s.heights[:side*side]) {return false}

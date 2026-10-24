@@ -5,6 +5,14 @@ I riferimenti a Classica, `--flat` e ai vecchi smoke descrivono versioni precede
 per i comandi disponibili oggi valgono il [README](README.md) e la documentazione collegata.
 
 
+## 2026-10-24 — Posare le strutture
+
+- **Fase 7 del piano fatta, ultima del piano.** Un kit nello zaino (si trova nelle cache e si compra nelle officine per 25 crediti)
+  permette di posare una struttura sulla mappa: **POSA** dallo zaino, l'impronta segue il mouse (verde dove ci sta, rossa dove no,
+  con il motivo), la rotella la gira, R la specchia, clic posa, tasto destro annulla. Tre per spedizione, non si smontano.
+- Gli oggetti e i recinti posati hanno salute e i colpi dei nemici li rompono (carro 6, fontana 8, statua 10, macchina 8, rovina 8,
+  recinto 6); gli edifici no. Le strutture rotte non tornano al salvataggio. Test: 6 nuovi (1649 in tutto).
+
 ## 2026-10-24 — Le caverne
 
 - **Fase 5 del piano fatta.** Nella Neve, nel Far West, nell'Egitto e nell'Inferno ci sono da una a tre grotte per mappa, ognuna

@@ -61,6 +61,8 @@ Tactical_View :: struct {
 	expedition_patrols: Expedition_Patrol_Glide,
 	// The sites whose floor plans reach this frame's drawn region.
 	expedition_sites: Expedition_Near_Sites,
+	// The structure the player is about to set down (expedition_ghost.odin).
+	structure_ghost: Structure_Ghost,
 	light_shader: rl.Shader,
 	outline_shader: rl.Shader,
 	outline_mode: Comic_Outline_Mode,

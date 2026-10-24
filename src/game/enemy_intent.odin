@@ -690,6 +690,8 @@ enemy_attack_is_ranged :: proc(enemy: ^Enemy, intent: ^Enemy_Intent) -> bool {
 @(private)
 resolve_enemy_blow :: proc(room: ^Room, enemy: ^Enemy, intent: ^Enemy_Intent, ranged: bool, pulse: ^Pulse_Report) -> bool {
 	source := enemy_entity(enemy.id)
+	// The blow breaks what the player has set down within its reach (structure_damage.odin).
+	_ = strike_structures(room, enemy.position, intent.threatened_cells[:intent.threatened_cell_count], intent.damage)
 	if deflect_enemy_blow(room, source, enemy.position, intent, ranged, pulse) {
 		return room.phase != .Combat
 	}

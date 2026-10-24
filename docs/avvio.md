@@ -82,7 +82,8 @@ catalogo: tre edifici, cinque oggetti complessi, un recinto e la casetta nelle q
 rotazioni (si prova passo, vista e trasparenza avvicinandosi). Con `--smoke-mechanics-lab` e
 `ODIN_PP_LAB_ONLY=heights`, `structures`, `mountain` o `cave` gira solo l'atto delle altezze, delle strutture, della
 montagna a spirale o della grotta (quest'ultimo dura qualche minuto: sale tutto il sentiero a passi veri).
-`--smoke-expedition` comprende l'atto «grotte» (in Neve, Far West, Egitto e Inferno: l'arco, l'ingresso e la seconda
+`--smoke-expedition` comprende l'atto «posa» (il fantasma verde e rosso, una statua e una casetta posate, la statua rotta da un colpo
+e la casetta che resta), l'atto «grotte» (in Neve, Far West, Egitto e Inferno: l'arco, l'ingresso e la seconda
 stanza della prima grotta, con il giro entra-esci controllato) e l'atto «montagna» (il robot in otto punti della salita, con le mappe della Neve
 controllate: montagna, pattuglia e reliquia), gli atti «rilievi» (il robot nel punto più accidentato di ogni bioma, e
 l'ologramma con le curve di livello in tre biomi), «scontro su due livelli» e «edifici»; quest'ultimo: il robot si avvicina a una capanna di

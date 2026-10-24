@@ -190,6 +190,9 @@ Placed_Structure :: struct {
 	origin:   grid.Position,
 	rotation: u8,
 	mirror:   bool,
+	// What it can still take before it falls apart, if it can fall apart (what the player set down: the objects and the
+	// pens, structure_max_health); 0 for a building and for all the map's own.
+	health:   i16,
 }
 
 // The plan of a placed structure, turned.
@@ -409,6 +412,50 @@ place_structure :: proc(data: ^Level, id: Structure_Id, origin: grid.Position, r
 	append(&data.structure_plans, plan)
 	index_structure(data, index)
 	return index, .None
+}
+
+// How much a structure the player sets down can take before it falls apart: the objects and the low walls,
+// not the buildings.
+structure_max_health :: proc(id: Structure_Id) -> i16 {
+	switch id {
+	case .Cottage, .Hut, .Temple, .Count: return 0
+	case .Cart: return 6
+	case .Fountain: return 8
+	case .Statue: return 10
+	case .Machine: return 8
+	case .Ruin: return 8
+	case .Pen: return 6
+	}
+	return 0
+}
+
+// Takes structure `index` off the map: its cells go back to open floor and it leaves the list (the later ones move up).
+remove_structure :: proc(data: ^Level, index: int) -> bool {
+	if data == nil || index < 0 || index >= len(data.structures) { return false }
+	placed := data.structures[index]
+	plan := data.structure_plans[index]
+	for y in 0..<plan.height {
+		for x in 0..<plan.width {
+			if plan_at(&plan, x, y) == .Outside { continue }
+			_ = set_tile(data, {placed.origin.x+x, placed.origin.y+y}, {.Floor})
+		}
+	}
+	kept := make([dynamic]Placed_Structure, 0, len(data.structures), context.temp_allocator)
+	for other, i in data.structures { if i != index { append(&kept, other) } }
+	return set_structures(data, kept[:])
+}
+
+// Hurts structure `index` by `amount`. A structure that cannot fall apart (health 0) is not hurt; one that has no health
+// left is taken off the map. Returns whether it fell.
+damage_structure :: proc(data: ^Level, index: int, amount: i32) -> (fell: bool) {
+	if data == nil || index < 0 || index >= len(data.structures) || amount <= 0 || data.structures[index].health <= 0 { return false }
+	remaining := i32(data.structures[index].health)-amount
+	if remaining > 0 {
+		data.structures[index].health = i16(remaining)
+		mark_geometry_changed(data)
+		return false
+	}
+	return remove_structure(data, index)
 }
 
 @(private)

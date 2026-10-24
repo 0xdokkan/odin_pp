@@ -273,3 +273,55 @@ test_a_structure_needs_level_ground_and_a_door_a_step_to_climb :: proc(t: ^testi
 	_ = set_height(&data, {10, 13}, 2)
 	testing.expect_value(t, place_check(&data, .Cottage, {8, 10}, 0, false), Placement_Error.None)
 }
+
+// Only the objects and the pens the player sets down fall apart; they take the damage they are dealt, and when their health is gone
+// their cells are open floor again and they leave the list (the others move up).
+@(test)
+test_an_object_falls_apart_when_hurt_enough_and_a_building_never_does :: proc(t: ^testing.T) {
+	data := open_map(40, 30)
+	defer destroy(&data)
+	testing.expect_value(t, structure_max_health(.Cottage), i16(0))
+	testing.expect_value(t, structure_max_health(.Temple), i16(0))
+	for id in Structure_Id {
+		if id == .Count { continue }
+		definition := structure_definition(id)
+		if definition.kind == .Building { testing.expect_value(t, structure_max_health(id), i16(0)) } else { testing.expect(t, structure_max_health(id) > 0) }
+	}
+	building, _ := place_structure(&data, .Cottage, {4, 4}, 0, false)
+	cart, _ := place_structure(&data, .Cart, {14, 4}, 0, false)
+	pen, _ := place_structure(&data, .Pen, {24, 12}, 0, false)
+	testing.expect(t, building >= 0 && cart >= 0 && pen >= 0)
+	data.structures[cart].health = structure_max_health(.Cart)
+	data.structures[pen].health = structure_max_health(.Pen)
+	// A building and the map's own (health 0) take no harm.
+	testing.expect(t, !damage_structure(&data, building, 99))
+	testing.expect_value(t, structure_count(&data), 3)
+	// The cart takes a few blows before it falls.
+	before := data.geometry_revision
+	testing.expect(t, !damage_structure(&data, cart, 2))
+	testing.expect_value(t, data.structures[cart].health, structure_max_health(.Cart)-2)
+	testing.expect(t, data.geometry_revision != before, "a hurt structure is drawn again")
+	testing.expect(t, !damage_structure(&data, cart, 0) && !damage_structure(&data, cart, -3))
+	cart_cell := data.structures[cart].origin
+	tile, _ := tile_at(&data, cart_cell)
+	solid := !is_walkable(tile.kind)
+	testing.expect(t, damage_structure(&data, cart, 99))
+	testing.expect_value(t, structure_count(&data), 2)
+	if solid {
+		tile, _ = tile_at(&data, cart_cell)
+		testing.expect_value(t, tile.kind, Tile_Kind.Floor)
+	}
+	// Where the cart stood there is no structure now, and the pen moved up to index 1 with its health intact.
+	_, found := structure_index_at(&data, cart_cell)
+	testing.expect(t, !found)
+	index, at_pen := structure_index_at(&data, data.structures[1].origin)
+	testing.expect(t, at_pen && index == 1 && data.structures[1].id == .Pen && data.structures[1].health == structure_max_health(.Pen))
+	// The pen's fences are gone with it.
+	pen_origin := data.structures[1].origin
+	testing.expect(t, damage_structure(&data, 1, 99))
+	for dy in 0..<4 { for dx in 0..<5 {
+		cell, _ := tile_at(&data, {pen_origin.x+dx, pen_origin.y+dy})
+		testing.expect(t, cell.kind == .Floor, "the pen is cleared")
+	}}
+	testing.expect(t, !remove_structure(&data, 9) && !remove_structure(&data, -1))
+}

@@ -54,6 +54,8 @@ World :: struct {
 	// there were any, whose tiles are as they were.
 	structures: [MAX_WORLD_STRUCTURES]level.Placed_Structure,
 	structure_count: int,
+	// How many the player has set down in this expedition (player_structures.odin).
+	placed_by_player: int,
 	// The caves of the map (cave.odin), and where the player is: 0 on the open map, k+1 in the k-th cave. While in
 	// a cave the open map is put away (its tiles are kept by the scene, its groups, drops and sites do nothing).
 	caves: [MAX_CAVES]Cave,

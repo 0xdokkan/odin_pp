@@ -146,6 +146,12 @@ EXPEDITION_SMOKE_CAVES :: EXPEDITION_SMOKE_MOUNTAIN+EXPEDITION_SMOKE_MOUNTAIN_ST
 EXPEDITION_SMOKE_CAVE_BIOMES :: [4]campaign.Biome{.Snow,.West,.Egypt,.Inferno}
 @(private)
 EXPEDITION_SMOKE_CAVE_VIEWS :: 3
+// The structures the player sets down (Fase 7): the footprint where it can go and where it cannot, a statue set down, and a hut next to
+// it with the statue then broken by an enemy's blow (the hut stays).
+@(private)
+EXPEDITION_SMOKE_PLACE :: EXPEDITION_SMOKE_CAVES+4*EXPEDITION_SMOKE_CAVE_VIEWS
+@(private)
+EXPEDITION_SMOKE_PLACE_STEPS :: 4
 @(private)
 EXPEDITION_SMOKE_STRUCTURE_NAMES :: [EXPEDITION_SMOKE_STRUCTURE_STEPS]string{"6","4","2","1","soglia","dentro","fuori","oggetti"}
 
@@ -381,6 +387,9 @@ expedition_capture_present :: proc(data:rawptr,frame:^host.Frame) {
 			artifacts.screenshot("odin_pp_expedition_scontro_livelli.png")
 		} else if s.stage>=EXPEDITION_SMOKE_MOUNTAIN && s.stage<EXPEDITION_SMOKE_MOUNTAIN+EXPEDITION_SMOKE_MOUNTAIN_STEPS {
 			artifacts.screenshot(fmt.ctprintf("odin_pp_expedition_montagna_%d.png",s.stage-EXPEDITION_SMOKE_MOUNTAIN))
+		} else if s.stage>=EXPEDITION_SMOKE_PLACE && s.stage<EXPEDITION_SMOKE_PLACE+EXPEDITION_SMOKE_PLACE_STEPS {
+			names:=[EXPEDITION_SMOKE_PLACE_STEPS]string{"fantasma_verde","fantasma_rosso","posata","rotta"}
+			artifacts.screenshot(fmt.ctprintf("odin_pp_expedition_posa_%s.png",names[s.stage-EXPEDITION_SMOKE_PLACE]))
 		} else if s.stage>=EXPEDITION_SMOKE_CAVES && s.stage<EXPEDITION_SMOKE_CAVES+4*EXPEDITION_SMOKE_CAVE_VIEWS {
 			biomes:=EXPEDITION_SMOKE_CAVE_BIOMES;views:=[EXPEDITION_SMOKE_CAVE_VIEWS]string{"arco","ingresso","stanza"}
 			k:=s.stage-EXPEDITION_SMOKE_CAVES
@@ -462,7 +471,8 @@ expedition_capture_present :: proc(data:rawptr,frame:^host.Frame) {
 		} else if s.stage==EXPEDITION_SMOKE_TWO_LEVELS {e.map_open=false;expedition_smoke_two_levels(e)}
 		else if s.stage>=EXPEDITION_SMOKE_MOUNTAIN && s.stage<EXPEDITION_SMOKE_MOUNTAIN+EXPEDITION_SMOKE_MOUNTAIN_STEPS {expedition_smoke_mountain(e,s.stage-EXPEDITION_SMOKE_MOUNTAIN)}
 		else if s.stage>=EXPEDITION_SMOKE_CAVES && s.stage<EXPEDITION_SMOKE_CAVES+4*EXPEDITION_SMOKE_CAVE_VIEWS {expedition_smoke_cave(e,s.stage-EXPEDITION_SMOKE_CAVES)}
-		else if s.stage>=EXPEDITION_SMOKE_CAVES+4*EXPEDITION_SMOKE_CAVE_VIEWS {host.quit(frame)}
+		else if s.stage>=EXPEDITION_SMOKE_PLACE && s.stage<EXPEDITION_SMOKE_PLACE+EXPEDITION_SMOKE_PLACE_STEPS {expedition_smoke_place(e,s.stage-EXPEDITION_SMOKE_PLACE)}
+		else if s.stage>=EXPEDITION_SMOKE_PLACE+EXPEDITION_SMOKE_PLACE_STEPS {host.quit(frame)}
 	}
 }
 
@@ -546,6 +556,57 @@ expedition_smoke_cave :: proc(e:^run.Expedition_Session,step:int) {
 	}
 	e.rs.iso_renderer.tactical.expedition_follow_ready=false
 	world.roam_sync(&e.roam,room)
+}
+
+// One step of the placing act (Egypt): where the robot stands and a spot a statue can be set down, found by the same check the
+// game makes.
+@(private)
+expedition_smoke_place :: proc(e:^run.Expedition_Session,step:int) {
+	expedition_smoke_world(e,.Egypt);e.world.mounted=false;e.message_timer=0
+	w:=&e.world;room:=&e.rs.room;data:=room.level_data
+	if room.phase!=.Loot {game.end_expedition_encounter(room);room.phase=.Loot}
+	stand,origin,hut:=grid.Position{},grid.Position{},grid.Position{}
+	found:=false
+	search:for y:=14;y<data.tiles.height-14;y+=3 {for x:=14;x<data.tiles.width-14;x+=3 {
+		room.player.position={x,y}
+		tile,_:=level.tile_at(data,room.player.position);if tile.kind!=.Floor {continue}
+		for dx in 3..=6 {
+			candidate:=world.structure_origin_for(.Statue,0,false,{x+dx,y})
+			if result,_:=world.check_player_structure(w,data,room,.Statue,candidate,0,false);result==.Ok {
+				// A hut must also fit two cells further.
+				hut_origin:=world.structure_origin_for(.Hut,0,false,{x+dx+5,y})
+				if hresult,_:=world.check_player_structure(w,data,room,.Hut,hut_origin,0,false);hresult!=.Ok {continue}
+				stand,origin,hut,found={x,y},candidate,hut_origin,true;break search
+			}
+		}
+	}}
+	assert(found,"no place to set a statue down")
+	room.player.position=stand
+	ghost:=render.Structure_Ghost{active=true,ok=true,id=.Statue,origin=origin}
+	switch step {
+	case 0:
+		render.set_structure_ghost(&e.rs.iso_renderer,ghost)
+	case 1:
+		// On the player: red, and the check says why.
+		ghost.origin=world.structure_origin_for(.Statue,0,false,stand);ghost.ok=false
+		result,_:=world.check_player_structure(w,data,room,.Statue,ghost.origin,0,false)
+		assert(result!=.Ok,"a statue on the player is refused")
+		render.set_structure_ghost(&e.rs.iso_renderer,ghost)
+	case 2,3:
+		render.set_structure_ghost(&e.rs.iso_renderer,{})
+		result,_:=world.place_player_structure(w,data,room,.Statue,origin,0,false)
+		assert(result==.Ok,"the statue is set down")
+		hresult,_:=world.place_player_structure(w,data,room,.Hut,hut,0,false)
+		assert(hresult==.Ok,"the hut is set down")
+		if step==3 {
+			// An enemy's blow beside the statue breaks it and leaves the hut.
+			before:=level.structure_count(data)
+			assert(game.strike_structures(room,origin,{origin},99)==1,"the statue falls")
+			assert(level.structure_count(data)==before-1,"only the statue fell")
+			assert(game.strike_structures(room,hut,{hut},99)==0 && level.structure_count(data)==before-1,"the hut stays")
+		}
+	}
+	e.rs.iso_renderer.tactical.expedition_follow_ready=false
 }
 
 // A fight on two levels: the robot on a Snow plateau, one foe on the ground three steps or more below.

@@ -34,7 +34,7 @@ STRUCTURE_SEARCH_RADIUS :: 16
 
 // Whether `cell` must be left clear: round a site (its plan and a margin), round the spawn and round
 // a patrol's anchor.
-@(private = "file")
+@(private)
 structure_keep_clear :: proc(user: rawptr, cell: grid.Position) -> bool {
 	w := cast(^World)user
 	for site in w.sites[:w.site_count] {

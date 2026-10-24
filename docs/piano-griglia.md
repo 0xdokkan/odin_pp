@@ -42,7 +42,7 @@ numero della fase resta quello della sua sezione.
 | 8 | 3 | Altezze nelle spedizioni: renderer, mappe, salvataggi, prestazioni | 2 | Fatta | vedi Esito |
 | 9 | 4 | La montagna a spirale delle Montagne innevate | 2, 3 | Fatta | vedi Esito |
 | 10 | 5 | Caverne | 2 (3 e 4 per metterle nei biomi) | Fatta | vedi Esito |
-| 11 | 7 | Posa delle strutture da parte del giocatore | 6 | Confermata dall'utente (alla Fase 6): da fare | — |
+| 11 | 7 | Posa delle strutture da parte del giocatore | 6 | Fatta | vedi Esito |
 
 ## Scaletta: cosa sviluppare prima
 
@@ -1573,7 +1573,38 @@ le regole della sezione 1: fammi prima le domande della fase e fermati alla
 fine.
 ```
 
-**Esito:** *(da compilare a fine fase)*
+### Esito
+
+**Fatta il 2026-10-24.** Il giocatore posa strutture sulla mappa aperta.
+
+- **Risposte dell'utente:** si posa con un oggetto dello zaino; dura per la spedizione; poche e non si smontano; i nemici
+  possono distruggere solo gli oggetti e i muretti (gli edifici no).
+- **Il kit** (`Item_Kind.Structure_Kit`, `variant` = struttura del catalogo): un oggetto dello zaino, una cella (due per gli
+  edifici), di nome «Casetta», «Carro»... Si trova nelle cache (un ottavo) e si compra nelle officine (25 crediti, il kit
+  della struttura di quell'officina). Dallo zaino, fuori dagli scontri, il pulsante **POSA** chiude lo zaino e avvia la posa.
+- **La posa** (`src/run/expedition_scene.odin`): l'impronta segue il mouse (centrata sulla casella puntata), **verde** dove ci può
+  stare e **rossa** dove no, con il motivo del rifiuto scritto; la **rotella** la gira, **R** la specchia, **clic** la posa (e
+  spende il kit), **tasto destro** o **Esc** annullano; il mondo aspetta mentre si sceglie.
+- **Dove si può** (`expedition.check_player_structure`): fuori dagli scontri, non in grotta, entro 9 caselle dal robot, mai sul
+  robot, su un nemico, un oggetto, una trappola o un oggetto a terra, e con le regole della Fase 6 (`level.place_check`: suolo
+  libero e piano, non tocca un'altra struttura, nessuna tasca, lontano da siti, partenza e pattuglie). Al massimo tre per
+  spedizione (`MAX_PLAYER_STRUCTURES`, `World.placed_by_player`).
+- **Cosa rompono i nemici** (`game/structure_damage.odin`): ogni colpo di un nemico fa il suo danno alle strutture distruttibili
+  che stanno nelle sue caselle minacciate o accanto a chi colpisce, una volta per struttura. Le strutture hanno salute
+  (`Placed_Structure.health`, `level.structure_max_health`: carro 6, fontana 8, statua 10, macchina 8, rovina 8, recinto 6;
+  gli edifici 0 = indistruttibili). Finita la salute, le sue caselle tornano suolo libero (`level.remove_structure`).
+- **Salvataggio:** la lista delle strutture del mondo è quella della mappa (`sync_structures` prima di ogni checkpoint, quindi quelle
+  rotte non tornano); la salute e il numero posato sono nel salvataggio (zero nei salvataggi vecchi). Una grotta mette da parte le
+  strutture con la mappa aperta e le riporta all'uscita.
+- **Disegno:** il fantasma (`render/expedition_ghost.odin`); le strutture posate si disegnano come quelle del bioma (involucro, ritaglio,
+  contorno).
+- **Prestazioni** (benchmark degli stage 0–26 dei documenti, stesso schermo e stesso carico): media +1,1 % rispetto alla Fase 3 (10,34 → 10,45 ms, due misure): nessun costo per le mappe senza strutture posate
+- **Test:** 6 nuovi (1649 in tutto, con e senza assert): salute, rimozione e danno nel livello; il colpo che rompe il carro e non
+  la casetta; la posa con la sua salute, i limiti e i rifiuti con il loro perché; la lista salvata dopo una rottura e dopo una
+  grotta; il kit come oggetto.
+- **Non fatto, dichiarato:** i nemici rompono solo con i loro colpi (non si dirigono apposta contro una struttura che li ferma, e le
+  esplosioni delle bombe non le toccano); le strutture non si smontano né si riprendono; il Cyber ha già le sue della Fase 6
+  (sulla mappa vecchia non cambia nulla); nell'arena del laboratorio non si può posare.
 
 ## 9. L'hub in 3D: richiesta, disegni e com'è oggi
 

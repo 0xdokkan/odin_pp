@@ -807,6 +807,16 @@ avviare è `build/odin_pp`; conserva il limite fps delle impostazioni di gioco.
 - **Disegno:** `render/expedition_cave.odin` (l'arco); i siti, i gruppi e i drop fuori scope non si disegnano.
 - **Attenzione:** nei biomi con grotte la geografia non dipende dal seme; il test della geografia salta i siti `Cave`.
 
+## Strutture posate dal giocatore (Fase 7 del piano griglia)
+
+- **Kit:** `campaign.Item_Kind.Structure_Kit` (variante = `level.Structure_Id`); `campaign.spend_structure_kit` lo spende alla posa;
+  `campaignui` lo usa con **POSA** (`Output.place_structure`, non lo spende).
+- **Regole:** `expedition/player_structures.odin`: `check_player_structure` / `place_player_structure` (limite, portata, nessun attore sopra,
+  poi `level.place_check` con `structure_keep_clear`); `sync_structures` tiene la lista del mondo uguale a quella della mappa.
+- **Salute:** `Placed_Structure.health`, `level.structure_max_health`, `damage_structure`, `remove_structure`; `game.strike_structures`
+  è chiamata da `resolve_enemy_blow`.
+- **Scena:** `expedition_begin_placement` / `expedition_placing_update`; il fantasma è `render.set_structure_ghost` (`expedition_ghost.odin`).
+
 ## Limiti dichiarati
 
 - **Renderer:** i riflessi planari comprendono architettura e neon; carta e

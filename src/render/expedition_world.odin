@@ -175,6 +175,7 @@ draw_expedition_props :: proc(renderer:^Renderer,room:^game.Room,w:^world.World)
 	}
 	draw_expedition_costumes(renderer,room,w)
 	if w.mounted || room.player.tactical.dinosaur_remaining>0 {draw_expedition_mount(renderer,w,room.player.tactical.dinosaur_remaining>0)}
+	draw_structure_ghost(renderer)
 }
 
 @(private)

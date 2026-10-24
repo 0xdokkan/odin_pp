@@ -1,6 +1,7 @@
 package campaign
 
 import game "../game"
+import level "../level"
 
 GRID_MAX_WIDTH :: 12
 GRID_MAX_HEIGHT :: 8
@@ -10,7 +11,8 @@ BACKPACK_HEIGHT :: 5
 ACTIVE_RELICS :: 3
 PENDING_ITEMS :: 3
 
-Item_Kind :: enum u8 { None, Healing, Energy, Temporary_Card, Decoy, Upgrade, Weapon, Relic, Credits, Memory, Backpack }
+// `Structure_Kit` (Fase 7): a structure the player can set down on the open map; its variant is the level.Structure_Id.
+Item_Kind :: enum u8 { None, Healing, Energy, Temporary_Card, Decoy, Upgrade, Weapon, Relic, Credits, Memory, Backpack, Structure_Kit }
 Item :: struct {
 	kind: Item_Kind,
 	variant: i32,
@@ -49,6 +51,20 @@ make_item :: proc(kind: Item_Kind, quantity: i32 = 1, variant: i32 = 0) -> Item 
 	return item
 }
 
+// What a structure's kit is called: "Casetta", "Carro"... as the catalog names it.
+structure_kit_name :: proc(id: level.Structure_Id) -> string {
+	return level.structure_definition(id).name
+}
+
+// Spends one kit of structure `variant` from the backpack's grid (the one the player has just set down). False if there is none.
+spend_structure_kit :: proc(backpack: ^Backpack, variant: i32) -> bool {
+	if backpack == nil { return false }
+	for entry, i in backpack.grid.entries[:backpack.grid.count] {
+		if entry.item.kind == .Structure_Kit && entry.item.variant == variant { _, removed := grid_remove(&backpack.grid, i); return removed }
+	}
+	return false
+}
+
 item_name :: proc(item: Item) -> string {
 	#partial switch item.kind {
 	case .None: return "Vuoto"
@@ -66,6 +82,8 @@ item_name :: proc(item: Item) -> string {
 	case .Credits: return "Crediti"
 	case .Memory: return "Frammento di memoria"
 	case .Backpack: return "Modulo zaino"
+	case .Structure_Kit:
+		if item.variant >= 0 && item.variant < i32(level.Structure_Id.Count) { return structure_kit_name(level.Structure_Id(item.variant)) }
 	}
 	return "Oggetto sconosciuto"
 }
@@ -88,6 +106,11 @@ item_description :: proc(item: Item) -> string {
 	case .Credits: return "Valuta per officine e casino. Estrai per conservarla."
 	case .Memory: return "Una memoria del creatore. Estrai per leggerla nell'hub."
 	case .Backpack: return "Estrai questo modulo per sbloccare uno zaino piu grande."
+	case .Structure_Kit:
+		if item.variant >= 0 && item.variant < i32(level.Structure_Id.Count) && level.structure_max_health(level.Structure_Id(item.variant)) > 0 {
+			return "Usalo fuori dagli scontri per posarla sulla mappa. I colpi dei nemici la rompono."
+		}
+		return "Usalo fuori dagli scontri per posarla sulla mappa. Resta per tutta la spedizione."
 	case .None:
 	}
 	return ""
@@ -100,7 +123,7 @@ stack_limit :: proc(kind: Item_Kind) -> i32 {
 	}
 }
 item_valid :: proc(item: Item) -> bool {
-	if item.kind <= .None || item.kind > .Backpack || item.quantity < 1 ||
+	if item.kind <= .None || item.kind > .Structure_Kit || item.quantity < 1 ||
 	   item.quantity > stack_limit(item.kind) || item.rotation > 3 { return false }
 	#partial switch item.kind {
 	case .Healing: return item.variant >= 0 && item.variant <= 4
@@ -111,6 +134,7 @@ item_valid :: proc(item: Item) -> bool {
 	case .Temporary_Card: return item.variant >= 0 && item.variant < i32(game.Card_Id.Count)
 	case .Memory: return item.variant >= 0 && item.variant < 64
 	case .Backpack: return item.variant >= 0 && item.variant <= GRID_MAX_WIDTH-BACKPACK_WIDTH
+	case .Structure_Kit: return item.variant >= 0 && item.variant < i32(level.Structure_Id.Count)
 	case: return item.variant == 0
 	}
 }
@@ -125,6 +149,11 @@ item_shape :: proc(item: Item) -> (shape: Shape) {
 		shape.count = 3 if item.variant == i32(game.Weapon_Id.Storm_Pike) else 2
 	case .Backpack:
 		shape.cells = {{0, 0}, {1, 0}, {0, 1}, {1, 1}, {}, {}}; shape.count = 4
+	case .Structure_Kit:
+		// A building's kit is two cells; the others' one.
+		if item.variant >= 0 && item.variant < i32(level.Structure_Id.Count) && level.structure_definition(level.Structure_Id(item.variant)).kind == .Building {
+			shape.cells = {{0, 0}, {1, 0}, {}, {}, {}, {}}; shape.count = 2
+		}
 	case .Relic:
 		#partial switch game.Relic_Id(item.variant) {
 		case .Iron_Knuckle: shape.count = 1

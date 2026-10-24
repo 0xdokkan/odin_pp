@@ -229,6 +229,8 @@ enter_cave :: proc(w: ^World, data: ^level.Level, room: ^game.Room, outer: ^Oute
 	plan := level.cave_plan(w.caves[index].seed)
 	origin := cave_origin(w)
 	if !level.cave_stamp(data, origin, &plan) { return false }
+	// The open map's structures are put away with it (their tiles are in the outer map; the world keeps their records).
+	_ = level.set_structures(data, nil)
 	arrival := game.add_position(origin, plan.arrival)
 	_ = level.set_tile(data, arrival, {.Player_Spawn})
 	w.cave_return = room.player.position
@@ -244,6 +246,7 @@ exit_cave :: proc(w: ^World, data: ^level.Level, room: ^game.Room, outer: ^Outer
 	if w == nil || data == nil || room == nil || outer == nil || room.player == nil || w.in_cave <= 0 || room.phase == .Combat { return false }
 	cells := len(data.tiles.cells)
 	if cells > MAX_CELLS || !level.set_tile_kinds(data, outer.kinds[:cells]) || !level.set_height_table(data, outer.heights[:cells]) { return false }
+	_ = level.set_structures(data, w.structures[:w.structure_count])
 	w.in_cave = 0
 	room.player.position = w.cave_return
 	return true
