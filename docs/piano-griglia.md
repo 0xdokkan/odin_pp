@@ -1078,7 +1078,7 @@ regole della sezione 1: fammi prima le domande della fase e fermati alla fine.
 - **Laboratorio:** arena «Montagna» (quarta arena di F3, 47×25): la salita completa in 120 passi, il dirupo che
   ferma la camminata, l'arciere in cima spinto giù (la caduta costa al massimo 10) e otto catture lungo il giro.
 - **Prestazioni** (benchmark degli stage 0–26 dei documenti, stesso schermo e stesso carico): media +2,6 % rispetto alla Fase 3 (10,34 → 10,61 ms, due misure concordi), nel bioma Neve +4 % (11,33 → 11,84); il pavimento ha due programmi e quello che dirada le terrazze alte (un `discard`, che costa il test di profondità anticipato) si usa solo dove una montagna alta è in vista.
-- **Test:** 12 nuovi (1630 in tutto, con e senza assert).
+- **Test:** 14 nuovi (1632 in tutto, con e senza assert).
 - **Non fatto, dichiarato:** nell'arena del laboratorio (grafica a diorama) il robot dietro la montagna non si
   dirada (il retino c'è solo nelle spedizioni); lo scontro sulla montagna usa le regole di dislivello esistenti
   (un colpo spinge giù, la caduta costa al massimo 10) senza regole nuove; le caverne (Fase 5) non ci sono.

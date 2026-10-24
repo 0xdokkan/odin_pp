@@ -15,7 +15,7 @@ per i comandi disponibili oggi valgono il [README](README.md) e la documentazion
   si vede anche dietro la montagna; i nemici dietro la montagna restano nascosti. Corretto un difetto della Fase 3:
   il robot che cammina libero (e ogni figura) non veniva alzato alla quota del terreno (un `defer` su un risultato
   con nome non ha effetto in Odin); l'ologramma raggruppa le altezze oltre 12 a bande; nuova arena «Montagna» nel laboratorio (F3) e atto
-  di smoke. Test: 12 nuovi (1630 in tutto).
+  di smoke. Test: 14 nuovi (1632 in tutto).
 
 ## 2026-10-24 — Rilievi nelle spedizioni
 
