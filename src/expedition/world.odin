@@ -177,6 +177,7 @@ generate :: proc(w: ^World, data: ^level.Level, b: campaign.Biome, seed: u64) ->
 	// The biome's relief, level round the sites; then its buildings and objects, level on it; all before
 	// any inhabitants.
 	apply_relief(w,data)
+	apply_mountain(w,data)
 	place_structures(w,data)
 	// Structural geography is finished before any inhabitants are placed.
 	for site,i in w.sites[:w.site_count] {if site.active && (site.kind==.Trial || site.kind==.Boss || (site.kind==.Cache && i<12)) {add_group(w,data,i,site.position,1 if site.kind==.Boss else 2+rank(b)/2,false,site.kind==.Boss)}}
@@ -184,6 +185,7 @@ generate :: proc(w: ^World, data: ^level.Level, b: campaign.Biome, seed: u64) ->
 		p:=grid.Position{size*(35+i*13)/100,size*(35+(i%2)*28)/100}
 		add_group(w,data,-1,p,2+int(rng.next_u64(&content)%3),true,false)
 	}
+	add_mountain_inhabitants(w,data,&content)
 	if b==.Gothic { add_group(w,data,-1,{size/2,size/2-10},1,false,false); w.groups[w.group_count-1].killer=true; w.groups[w.group_count-1].members[0].enemy.health*=4; w.groups[w.group_count-1].members[0].enemy.max_health*=4 }
 	w.last_position=data.player_spawn
 	return true

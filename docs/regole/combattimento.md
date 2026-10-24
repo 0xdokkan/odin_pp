@@ -780,6 +780,9 @@ Le spedizioni hanno rilievi in ogni bioma (Fase 3 del piano griglia): in esplora
 libero (a piedi e in sella), il passo a caselle, i gruppi che dormono e le pattuglie seguono la stessa
 regola di passo, e l'avvistamento usa la linea di vista con le altezze (`expedition.can_see`).
 
+Nelle Montagne innevate una montagna a spirale (Fase 4) usa queste stesse regole: il sentiero sale di un
+gradino a ogni passo, tra un giro e l'altro c'è un dirupo, e chi cade dalla cima paga al massimo 10.
+
 Il passo si controlla in `try_move_player`, nella diagonale e nella schivata; il
 danno di caduta in `apply_movement_effect`, che registra un `Hazard_Triggered`
 con il danno. Gli attacchi in mischia fra celle di altezza diversa restano

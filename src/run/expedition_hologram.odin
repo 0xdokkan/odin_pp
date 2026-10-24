@@ -16,8 +16,18 @@ import render "../render"
 // locations nor encounter RNG enter this presentation. Row merging preserves
 // every wall, entrance and void cell while avoiding one cube per map tile.
 HOLO_SIDE :: 256
-// `height`: the cell's steps over the ground, which the map shows as shading and as contour lines.
+// `height`: the cell's height band (hologram_band), which the map shows as shading and as contour lines.
 Hologram_Cell :: struct { ground, wall, height: u8 }
+
+// The heights up to HOLO_FLAT_STEPS are shown as they are; above them (the spiral mountain of the Snow is
+// ninety-odd steps) six steps are one band, so that the map's relief stays in proportion and has a few
+// contour lines, not ninety.
+HOLO_FLAT_STEPS :: 12
+HOLO_BAND_STEPS :: 6
+hologram_band :: proc(steps:i32)->u8 {
+	if steps<=HOLO_FLAT_STEPS {return u8(max(steps,0))}
+	return u8(min(i32(255),HOLO_FLAT_STEPS+(steps-HOLO_FLAT_STEPS)/HOLO_BAND_STEPS))
+}
 Hologram_Geometry :: struct {
 	width, height: int,
 	cells: [HOLO_SIDE*HOLO_SIDE]Hologram_Cell,
@@ -61,7 +71,7 @@ hologram_geometry :: proc(w:^world.World,data:^level.Level,out:^Hologram_Geometr
 			px,py:=x+dx,y+dy;tile:=data.tiles.cells[py*data.tiles.width+px]
 			c:=&out.cells[py*HOLO_SIDE+px];c^={}
 			if tile.kind==.Void {continue}
-			c.ground=ground;c.height=u8(level.height_at(data,{px,py}))
+			c.ground=ground;c.height=hologram_band(level.height_at(data,{px,py}))
 			if w.biome==.Inferno && tile.kind==.Door {c.ground=6}
 			// Scattered open-ground props stay low stubs: the courtyards, the
 			// city blocks and the pyramid fields remain the landmarks.
@@ -116,7 +126,7 @@ draw_hologram_geography :: proc(g:^Hologram_Geometry,tint:rl.Color) {
 	// from far; higher ground is lighter, and every change of height is a contour line (below).
 	step:=f32(max(g.width,g.height))/160*.45
 	lighten:=proc(c:rl.Color,height:u8)->rl.Color {
-		k:=1+.11*f32(height)
+		k:=1+.11*f32(min(height,HOLO_FLAT_STEPS))
 		return {u8(min(f32(255),f32(c.r)*k)),u8(min(f32(255),f32(c.g)*k)),u8(min(f32(255),f32(c.b)*k)),c.a}
 	}
 	for y in 0..<g.height {

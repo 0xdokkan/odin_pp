@@ -23,7 +23,12 @@ Expedition_Terrain_Chunk :: struct {
 	ready:    bool,
 	// Every cell of the block is raised (or void): the plane under it is never seen, so it is not drawn.
 	covered:  bool,
+	// The height of the tallest cell in the block, in steps.
+	tallest:  u8,
 }
+
+// From this many steps a terrace is tall enough to hide an actor behind it, and the floor thins it out.
+EXPEDITION_TERRAIN_TALL :: 16
 
 Expedition_Terrain_Cache :: struct {
 	chunks:               []Expedition_Terrain_Chunk,
@@ -59,9 +64,11 @@ build_terrain_chunk :: proc(data: ^level.Level, origin: grid.Position, chunk: ^E
 	}
 	low, high := rl.Vector3{1e9, 1e9, 1e9}, rl.Vector3{-1e9, -1e9, -1e9}
 	chunk.covered = true
+	chunk.tallest = 0
 	for y in origin.y..<min(origin.y+EXPEDITION_TERRAIN_CHUNK, height) {
 		for x in origin.x..<min(origin.x+EXPEDITION_TERRAIN_CHUNK, width) {
 			here := steps_at(data, x, y)
+			chunk.tallest = max(chunk.tallest, u8(min(here, 255)))
 			if data.tiles.cells[y*width+x].kind == .Void { continue }
 			if here == 0 { chunk.covered = false; continue }
 			top := f32(here)*step
@@ -127,6 +134,24 @@ draw_expedition_terrain :: proc(renderer: ^Renderer, room: ^game.Room) {
 			rlgl.End()
 		}
 	}
+}
+
+// Whether a block in the view round the player holds a terrace tall enough to hide an actor.
+@(private)
+expedition_terrain_tall_in_view :: proc(renderer: ^Renderer, room: ^game.Room) -> bool {
+	data := room.level_data
+	if data == nil || !level.has_heights(data) { return false }
+	cache := &renderer.tactical.expedition_floor.terrain
+	prepare_expedition_terrain(cache, data)
+	p := room.player.position
+	low := grid.Position{max(0, p.x-26)/EXPEDITION_TERRAIN_CHUNK, max(0, p.y-26)/EXPEDITION_TERRAIN_CHUNK}
+	high := grid.Position{min(cache.columns-1, (p.x+26)/EXPEDITION_TERRAIN_CHUNK), min(cache.rows-1, (p.y+26)/EXPEDITION_TERRAIN_CHUNK)}
+	for cy in low.y..=high.y {
+		for cx in low.x..=high.x {
+			if cache.chunks[cy*cache.columns+cx].tallest >= EXPEDITION_TERRAIN_TALL { return true }
+		}
+	}
+	return false
 }
 
 // Builds the terraces of every block when the map's geometry is new.

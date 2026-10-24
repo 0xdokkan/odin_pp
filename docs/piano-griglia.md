@@ -40,7 +40,7 @@ numero della fase resta quello della sua sezione.
 | 6 | 2 | Altezze nel laboratorio: dati, regole, grafica, puntamento | — | Fatta | vedi Esito |
 | 7 | 6 | Strutture su più caselle: edifici e oggetti complessi, edifici trasparenti avvicinandosi | — (meglio dopo la 2) | Fatta | vedi Esito |
 | 8 | 3 | Altezze nelle spedizioni: renderer, mappe, salvataggi, prestazioni | 2 | Fatta | vedi Esito |
-| 9 | 4 | La montagna a spirale delle Montagne innevate | 2, 3 | Da fare | — |
+| 9 | 4 | La montagna a spirale delle Montagne innevate | 2, 3 | Fatta | vedi Esito |
 | 10 | 5 | Caverne | 2 (3 e 4 per metterle nei biomi) | Da fare | — |
 | 11 | 7 | Posa delle strutture da parte del giocatore | 6 | Confermata dall'utente (alla Fase 6): da fare | — |
 
@@ -1044,7 +1044,36 @@ regole della sezione 1: fammi prima le domande della fase e fermati alla fine.
 
 ### Esito
 
-*(da compilare a fine fase)*
+**Fatta il 2026-10-24.** Le Montagne innevate hanno la montagna a spirale.
+
+- **Risposte dell'utente:** 3 giri; sentiero largo 2 caselle; in cima una ricompensa; il sentiero ha tratti di
+  ghiaccio; una pattuglia a metà salita; il bordo esterno tutto libero (nessun parapetto).
+- **Forma** (`src/level/mountain.odin`, funzione pura della distanza dal centro): pianta tonda di raggio 9,5
+  caselle; il sentiero fa tre giri larghi due caselle; l'altezza di una casella è la lunghezza del sentiero
+  fino a lei, quindi **a ogni passo si sale di un gradino** (la cima è a 94 gradini, circa 11 caselle di
+  altezza disegnata). Le due caselle affiancate del sentiero hanno la stessa quota; tra un giro e l'altro c'è un
+  dirupo di decine di gradini, un muro per chi cammina: l'unica via per la cima è il sentiero (a piedi occorrono
+  circa 120 passi, 98 con le diagonali). La cima è piana, di una trentina di caselle.
+- **Posto nella mappa** (`src/expedition/mountain.odin`): nelle nuove mappe della Neve (192×192) sta in basso a
+  sinistra, centro (24,172), nell'unico vuoto lasciato dai 16 siti (la fascia centrale, l'ingresso, la partenza e
+  le pattuglie ne sono fuori; un test lo verifica); le mappe vecchie (96×96) non l'hanno. Il rilievo della Fase 3
+  la lascia piana attorno; le mura e i prop che c'erano sono spianati.
+- **Dentro:** una pattuglia di due o tre sul sentiero a metà salita; una reliquia in cima, da raccogliere a mano
+  (le caselle del giro sotto, a un dirupo di distanza, non la prendono da sole).
+- **Terreno** (`game.expedition_terrain`): il sentiero è neve battuta (velocità normale), con due tratti di
+  ghiaccio (uno nel secondo giro, uno nel terzo) che fanno scivolare.
+- **Visibilità del robot:** il pavimento rialzato ora si dirada a retino davanti al robot (e ai nemici) come i
+  muri (`set_expedition_reveal`, shader del pavimento): il robot si vede in ogni punto del giro, verificato con
+  otto catture (`odin_pp_expedition_montagna_0..7.png`). Le cime sono schiarite al massimo di sei gradini.
+- **Ologramma:** le altezze oltre 12 gradini sono raggruppate a bande di sei (`hologram_band`), quindi la
+  montagna è alta una dozzina di unità sulla mappa e ha poche curve di livello.
+- **Laboratorio:** arena «Montagna» (quarta arena di F3, 47×25): la salita completa in 120 passi, il dirupo che
+  ferma la camminata, l'arciere in cima spinto giù (la caduta costa al massimo 10) e otto catture lungo il giro.
+- **Prestazioni** (benchmark degli stage 0–26 dei documenti, stesso schermo e stesso carico): media +2,6 % rispetto alla Fase 3 (10,34 → 10,61 ms, due misure concordi), nel bioma Neve +4 % (11,33 → 11,84); il pavimento ha due programmi e quello che dirada le terrazze alte (un `discard`, che costa il test di profondità anticipato) si usa solo dove una montagna alta è in vista.
+- **Test:** 12 nuovi (1630 in tutto, con e senza assert).
+- **Non fatto, dichiarato:** nell'arena del laboratorio (grafica a diorama) il robot dietro la montagna non si
+  dirada (il retino c'è solo nelle spedizioni); lo scontro sulla montagna usa le regole di dislivello esistenti
+  (un colpo spinge giù, la caduta costa al massimo 10) senza regole nuove; le caverne (Fase 5) non ci sono.
 
 ## 6. Fase 5 — Caverne
 

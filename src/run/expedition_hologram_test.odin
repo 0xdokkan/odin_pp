@@ -46,6 +46,18 @@ test_hologram_preserves_actual_walls_gates_and_void_in_whole_large_maps :: proc(
 	}
 }
 
+// A mountain of ninety steps is a few bands on the map, and the low relief is shown as it is.
+@(test)
+test_hologram_heights_are_shown_as_they_are_and_the_tall_ones_in_bands :: proc(t:^testing.T) {
+	for steps in i32(0)..=HOLO_FLAT_STEPS {testing.expect_value(t,hologram_band(steps),u8(steps))}
+	testing.expect_value(t,hologram_band(-3),u8(0))
+	testing.expect(t,hologram_band(HOLO_FLAT_STEPS+1)==HOLO_FLAT_STEPS)
+	testing.expect(t,hologram_band(HOLO_FLAT_STEPS+HOLO_BAND_STEPS)==HOLO_FLAT_STEPS+1)
+	top:=hologram_band(i32(level.MOUNTAIN_TOP))
+	testing.expect(t,top>HOLO_FLAT_STEPS && top<=HOLO_FLAT_STEPS+16,"the mountain is a few bands")
+	for steps in i32(1)..<i32(level.MOUNTAIN_TOP) {testing.expect(t,hologram_band(steps+1)>=hologram_band(steps))}
+}
+
 @(test)
 test_hologram_site_knowledge_never_reveals_exact_pins_or_hidden_secrets :: proc(t:^testing.T) {
 	for kind in world.Site_Kind {for y in 0..<32 {for x in 0..<32 {

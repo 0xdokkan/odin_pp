@@ -5,6 +5,16 @@ I riferimenti a Classica, `--flat` e ai vecchi smoke descrivono versioni precede
 per i comandi disponibili oggi valgono il [README](README.md) e la documentazione collegata.
 
 
+## 2026-10-24 — La montagna a spirale
+
+- **Fase 4 del piano fatta.** Le nuove Montagne innevate hanno una montagna tonda con un sentiero largo due
+  caselle che la avvolge per tre giri, un gradino a ogni passo fino alla cima (94 gradini); tra i giri c'è un
+  dirupo, quindi non si taglia. Sul sentiero: una pattuglia a metà salita e due tratti di ghiaccio; in cima, una
+  reliquia da raccogliere a mano. Il bordo esterno è libero.
+- Il pavimento rialzato si dirada a retino davanti al robot (e ai nemici), quindi il robot si vede anche dietro la
+  montagna; l'ologramma raggruppa le altezze oltre 12 a bande; nuova arena «Montagna» nel laboratorio (F3) e atto
+  di smoke. Test: 12 nuovi (1630 in tutto).
+
 ## 2026-10-24 — Rilievi nelle spedizioni
 
 - **Fase 3 del piano fatta.** Tutti i dodici biomi hanno un rilievo a tema: piattaforme, mesa, colline,

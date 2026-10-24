@@ -148,6 +148,23 @@ expedition_material_ready :: proc(renderer:^Renderer)->bool {
 	return true
 }
 
+// The camera and the actors the solids thin out for, to a program with the reveal's uniforms (the reveal
+// program of the material, and the floor's, whose terraces are as solid as a wall).
+@(private)
+set_expedition_reveal :: proc(renderer:^Renderer,shader:rl.Shader,eye_at,forward_at,viewport_at,points_at,count_at:c.int) {
+	m:=renderer.tactical.expedition_material
+	camera:=renderer.tactical.camera
+	forward:=rl.Vector3Normalize(camera.target-camera.position)
+	viewport:=rl.Vector2{renderer.canvas_width,renderer.canvas_height}
+	if s:=renderer.tactical.surface;s!=nil {viewport={f32(s.target.texture.width),f32(s.target.texture.height)}}
+	count:=c.int(0)
+	if m!=nil {count=m.reveal_point_count}
+	rl.SetShaderValue(shader,eye_at,&camera.position,.VEC3);rl.SetShaderValue(shader,forward_at,&forward,.VEC3)
+	rl.SetShaderValue(shader,viewport_at,&viewport,.VEC2)
+	rl.SetShaderValue(shader,count_at,&count,.INT)
+	if count>0 {rl.SetShaderValueV(shader,points_at,&m.reveal[0],.VEC4,count)}
+}
+
 @(private)
 destroy_expedition_material :: proc(renderer:^Renderer) {
 	m:=renderer.tactical.expedition_material;if m==nil {return}
@@ -239,15 +256,8 @@ begin_expedition_material :: proc(renderer:^Renderer,w:^world.World,floor:bool=f
 	m:=renderer.tactical.expedition_material;if m==nil {return}
 	cyber:=f32(1) if w.biome==.Cyber && !floor else 0
 	if reveal {
-		camera:=renderer.tactical.camera
-		forward:=rl.Vector3Normalize(camera.target-camera.position)
-		viewport:=rl.Vector2{renderer.canvas_width,renderer.canvas_height}
-		if s:=renderer.tactical.surface;s!=nil {viewport={f32(s.target.texture.width),f32(s.target.texture.height)}}
 		r:=m.reveal_shader
-		rl.SetShaderValue(r,m.reveal_eye,&camera.position,.VEC3);rl.SetShaderValue(r,m.reveal_forward,&forward,.VEC3)
-		rl.SetShaderValue(r,m.reveal_viewport,&viewport,.VEC2)
-		rl.SetShaderValue(r,m.reveal_count,&m.reveal_point_count,.INT)
-		if m.reveal_point_count>0 {rl.SetShaderValueV(r,m.reveal_points,&m.reveal[0],.VEC4,m.reveal_point_count)}
+		set_expedition_reveal(renderer,r,m.reveal_eye,m.reveal_forward,m.reveal_viewport,m.reveal_points,m.reveal_count)
 		set_expedition_lights(renderer,r,m.reveal_light_uniforms)
 		rl.SetShaderValue(r,m.reveal_cyber,&cyber,.FLOAT)
 		rl.BeginShaderMode(r)

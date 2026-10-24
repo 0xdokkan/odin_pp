@@ -30,7 +30,11 @@ expedition_terrain :: proc(b: u8, p: grid.Position) -> Expedition_Terrain {
 	case 2: d,v:=expedition_patch_distance(b,p);if d<=7+v*3 {return .Grass}
 	case 4: d,v:=expedition_patch_distance(b,p);if d<=8+v*4 {return .Sand}
 	case 5: if p.y%19 < 4 { return .Water }
-	case 6: d,v:=expedition_patch_distance(b,p);if d<=6+v*2 {return .Ice};if d<=17+v*3 {return .Snow}
+	case 6:
+		// The spiral mountain's path is packed snow, with two stretches of ice (level/mountain.odin).
+		offset:=grid.Position{p.x-level.MOUNTAIN_CENTER.x,p.y-level.MOUNTAIN_CENTER.y}
+		if abs(offset.x)<=level.MOUNTAIN_HALF && abs(offset.y)<=level.MOUNTAIN_HALF {return .Ice if level.mountain_icy(offset) else .Plain}
+		d,v:=expedition_patch_distance(b,p);if d<=6+v*2 {return .Ice};if d<=17+v*3 {return .Snow}
 	case 7: if (p.x+p.y/2)%23 < 3 { return .Lava }
 	case 8: d,v:=expedition_patch_distance(b,p);if d<=9+v*3 {return .Swamp}
 	case 9: if p.x%24 >= 21 || p.y%24 >= 21 { return .Bridge }

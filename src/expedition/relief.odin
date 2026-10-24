@@ -225,6 +225,7 @@ apply_relief :: proc(w: ^World, data: ^level.Level) {
 		at := grid.Position{size*(35+i*13)/100, size*(35+(i%2)*28)/100}
 		append(&zones, [2]grid.Position{{at.x-6, at.y-6}, {at.x+6, at.y+6}})
 	}
+	if mountain_present(w) { append(&zones, mountain_zone()) }
 	if w.biome == .Gothic { append(&zones, [2]grid.Position{{size/2-5, size/2-15}, {size/2+5, size/2-5}}) }
 	heights := relief_heights(w.biome, data.tiles.cells[:], size, zones[:])
 	_ = level.set_height_table(data, heights)

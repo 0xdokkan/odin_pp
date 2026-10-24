@@ -7,26 +7,34 @@ import game "../game"
 
 // One plane and one exact integer map texture replace thousands of floor
 // boxes. Only map mutations upload texels; all animation stays in uniforms.
-Expedition_Floor :: struct {
-	data: Expedition_Floor_Data,
-	texture: rl.Texture2D,
+// A floor program and where its uniforms are. There are two of one source: the plain one, and one that also thins out
+// the terraces of a tall mountain in front of an actor (a discard, which costs the early depth test, so it is
+// only used where such a mountain is in view).
+Expedition_Floor_Program :: struct {
 	shader: rl.Shader,
-	failed: bool,
 	map_data, map_size, tint, time, beat, lane, lane_warning, biome: c.int,
 	focus, focus_count, grid_amount, surface: c.int,
-	// The terraces of the map's relief, over the plane (expedition_terrain.odin).
-	terrain: Expedition_Terrain_Cache,
+	reveal_eye, reveal_forward, reveal_viewport, reveal_points, reveal_count: c.int,
 	lights: Expedition_Light_Uniforms,
 	reflection: Expedition_Reflection_Uniforms,
 }
 
-EXPEDITION_FLOOR_HEADER :: `#version 330
-in vec3 worldPosition;
+Expedition_Floor :: struct {
+	data: Expedition_Floor_Data,
+	texture: rl.Texture2D,
+	plain, tall: Expedition_Floor_Program,
+	failed: bool,
+	// The terraces of the map's relief, over the plane (expedition_terrain.odin).
+	terrain: Expedition_Terrain_Cache,
+}
+
+EXPEDITION_FLOOR_HEADER_BODY :: `in vec3 worldPosition;
 in vec3 normal;
 in vec2 surfaceUV;
 in vec4 color;
 out vec4 finalColor;
 `
+EXPEDITION_FLOOR_HEADER :: "#version 330\n"+EXPEDITION_FLOOR_HEADER_BODY
 EXPEDITION_FLOOR_BODY :: `
 uniform sampler2D floorMap;
 uniform vec2 mapSize;
@@ -40,6 +48,14 @@ uniform vec4 gridFocus[9];
 uniform int gridFocusCount;
 uniform float gridAmount;
 uniform vec2 floorSurface;
+#ifdef TERRACE_REVEAL
+uniform vec3 eye;
+uniform vec3 viewForward;
+uniform vec2 viewport;
+uniform vec4 reveal[9];
+uniform int revealCount;
+#endif
+const float BAYER[16]=float[16](0.,8.,2.,10.,12.,4.,14.,6.,3.,11.,1.,9.,15.,7.,13.,5.);
 
 ivec4 mapCell(ivec2 p) {
     if(any(lessThan(p,ivec2(0))) || any(greaterThanEqual(p,ivec2(mapSize)))) return ivec4(0);
@@ -66,6 +82,23 @@ float floorJoint(vec2 p,vec2 size,float stagger,float width,float aa) {
     return inkLine(min(edge.x,edge.y),width,aa);
 }
 void main() {
+    // A hill or a mountain between the camera and an actor is dithered away round the actor, as the solids are
+    // (expedition_material.odin): the ground at the board's level is never in the way.
+#ifdef TERRACE_REVEAL
+    if(worldPosition.y>.1) {
+        vec2 uv=gl_FragCoord.xy/viewport;
+        float depth=dot(worldPosition-eye,viewForward);
+        float cut=0.;
+        for(int i=0;i<revealCount;i++) {
+            if(depth>reveal[i].w) continue;
+            vec2 d=(uv-reveal[i].xy)*vec2(viewport.x/viewport.y,1.);
+            d.y*=.78;
+            cut=max(cut,1.-smoothstep(.55,1.,length(d)/reveal[i].z));
+        }
+        ivec2 q=ivec2(mod(gl_FragCoord.xy,4.));
+        if(cut>0. && (BAYER[q.x+q.y*4]+.5)/16.<cut) discard;
+    }
+#endif
     // The sides of a terrace are dark rock, tinted a little by the biome.
     if(normal.y<.5) {
         vec3 rock=mix(vec3(.05,.055,.07),biomeTint*.12,.5);
@@ -353,34 +386,53 @@ void main() {
             emission+=expedition_linear(vec3(1.,.25,.035))*(.16+hatch*.4)*pulse;
         }
     }
-    // The higher the ground, the lighter: ten percent a step, so that hills and dunes read from above.
-    base*=1.+max(worldPosition.y,0.)*.9;
+    // The higher the ground, the lighter: ten percent a step, so that hills and dunes read from above; no more
+    // than six steps' worth, so that a mountain's top is not white.
+    base*=1.+clamp(worldPosition.y,0.,.72)*.9;
     vec3 lit=expedition_lit(worldPosition,vec3(0.,1.,0.),base,roughness,.3)*contact;
     lit+=expedition_reflection(worldPosition,vec3(0.,1.,0.),roughness)*reflectionMask*contact;
     finalColor=vec4(lit+emission,1.);
 }
 `
 EXPEDITION_FLOOR_FRAGMENT :: EXPEDITION_FLOOR_HEADER+EXPEDITION_LIGHT_GLSL+EXPEDITION_REFLECTION_GLSL+EXPEDITION_FLOOR_BODY
+// The same, with the thinning of tall terraces: the define goes in after the version line.
+EXPEDITION_FLOOR_TALL_FRAGMENT :: `#version 330
+#define TERRACE_REVEAL
+`+EXPEDITION_FLOOR_HEADER_BODY+EXPEDITION_LIGHT_GLSL+EXPEDITION_REFLECTION_GLSL+EXPEDITION_FLOOR_BODY
+
+@(private = "file")
+load_expedition_floor_program :: proc(p:^Expedition_Floor_Program,source:cstring)->bool {
+	p.shader=rl.LoadShaderFromMemory(TACTICAL_LIGHT_VERTEX,source)
+	if !rl.IsShaderValid(p.shader) {
+		if p.shader.id!=0 {rl.UnloadShader(p.shader)}
+		p.shader={}
+		return false
+	}
+	shader:=p.shader
+	p.map_data=rl.GetShaderLocation(shader,"floorMap");p.map_size=rl.GetShaderLocation(shader,"mapSize")
+	p.tint=rl.GetShaderLocation(shader,"biomeTint");p.time=rl.GetShaderLocation(shader,"worldClock")
+	p.biome=rl.GetShaderLocation(shader,"floorBiome");p.beat=rl.GetShaderLocation(shader,"worldBeat");p.lane=rl.GetShaderLocation(shader,"warningLane")
+	p.lane_warning=rl.GetShaderLocation(shader,"laneWarning")
+	p.focus=rl.GetShaderLocation(shader,"gridFocus[0]");p.focus_count=rl.GetShaderLocation(shader,"gridFocusCount")
+	p.grid_amount=rl.GetShaderLocation(shader,"gridAmount");p.surface=rl.GetShaderLocation(shader,"floorSurface")
+	p.reveal_eye=rl.GetShaderLocation(shader,"eye");p.reveal_forward=rl.GetShaderLocation(shader,"viewForward")
+	p.reveal_viewport=rl.GetShaderLocation(shader,"viewport")
+	p.reveal_points=rl.GetShaderLocation(shader,"reveal[0]");p.reveal_count=rl.GetShaderLocation(shader,"revealCount")
+	p.lights=expedition_light_uniforms(shader);p.reflection=expedition_reflection_uniforms(shader)
+	return true
+}
 
 @(private)
 expedition_floor_ready :: proc(renderer:^Renderer)->bool {
 	if renderer.tactical.expedition_floor!=nil {return !renderer.tactical.expedition_floor.failed}
 	if !rl.IsWindowReady() {return false}
 	f:=new(Expedition_Floor)
-	f.shader=rl.LoadShaderFromMemory(TACTICAL_LIGHT_VERTEX,EXPEDITION_FLOOR_FRAGMENT)
-	if !rl.IsShaderValid(f.shader) {
-		if f.shader.id!=0 {rl.UnloadShader(f.shader)}
-		f.shader={};f.failed=true;renderer.tactical.expedition_floor=f
+	if !load_expedition_floor_program(&f.plain,EXPEDITION_FLOOR_FRAGMENT) {
+		f.failed=true;renderer.tactical.expedition_floor=f
 		return false
 	}
-	shader:=f.shader
-	f.map_data=rl.GetShaderLocation(shader,"floorMap");f.map_size=rl.GetShaderLocation(shader,"mapSize")
-	f.tint=rl.GetShaderLocation(shader,"biomeTint");f.time=rl.GetShaderLocation(shader,"worldClock")
-	f.biome=rl.GetShaderLocation(shader,"floorBiome");f.beat=rl.GetShaderLocation(shader,"worldBeat");f.lane=rl.GetShaderLocation(shader,"warningLane")
-	f.lane_warning=rl.GetShaderLocation(shader,"laneWarning")
-	f.focus=rl.GetShaderLocation(shader,"gridFocus[0]");f.focus_count=rl.GetShaderLocation(shader,"gridFocusCount")
-	f.grid_amount=rl.GetShaderLocation(shader,"gridAmount");f.surface=rl.GetShaderLocation(shader,"floorSurface")
-	f.lights=expedition_light_uniforms(shader);f.reflection=expedition_reflection_uniforms(shader)
+	// Without the tall program the floor still draws, only without the thinning.
+	if !load_expedition_floor_program(&f.tall,EXPEDITION_FLOOR_TALL_FRAGMENT) {f.tall=f.plain}
 	renderer.tactical.expedition_floor=f
 	return true
 }
@@ -389,7 +441,8 @@ destroy_expedition_floor :: proc(renderer:^Renderer) {
 	if renderer==nil || renderer.tactical.expedition_floor==nil {return}
 	f:=renderer.tactical.expedition_floor
 	if f.texture.id!=0 {rl.UnloadTexture(f.texture)}
-	if f.shader.id!=0 {rl.UnloadShader(f.shader)}
+	if f.plain.shader.id!=0 {rl.UnloadShader(f.plain.shader)}
+	if f.tall.shader.id!=0 && f.tall.shader.id!=f.plain.shader.id {rl.UnloadShader(f.tall.shader)}
 	destroy_expedition_terrain(&f.terrain)
 	destroy_expedition_floor_data(&f.data);free(f);renderer.tactical.expedition_floor=nil
 }
@@ -407,27 +460,30 @@ draw_expedition_floor :: proc(renderer:^Renderer,room:^game.Room,w:^world.World)
 		rl.SetTextureFilter(f.texture,.POINT);rl.SetTextureWrap(f.texture,.CLAMP)
 	} else if changed {rl.UpdateTexture(f.texture,raw_data(f.data.pixels))}
 	if f.texture.id==0 {return false}
-	shader:=f.shader
+	// The program that thins out a tall mountain is used only where one is in view.
+	p:=&f.tall if expedition_terrain_tall_in_view(renderer,room) else &f.plain
+	shader:=p.shader
 	dimensions:=rl.Vector2{f32(f.data.width),f32(f.data.height)}
 	metadata:=world.METADATA;c3:=metadata[w.biome].color;tint:=[3]f32{f32(c3[0])/255,f32(c3[1])/255,f32(c3[2])/255}
 	biome:=c.int(w.biome);beat:=c.int(w.beat%4);warning:=c.int(1) if w.lane_warning else 0
 	lane:=rl.Vector4{f32(w.lane),1 if w.lane_vertical else 0,f32(w.lane_center.x),f32(w.lane_center.y)}
 	finish:=expedition_biome_surface(w.biome);surface:=rl.Vector2{finish.roughness,finish.reflection}
-	rl.SetShaderValue(shader,f.map_size,&dimensions,.VEC2);rl.SetShaderValue(shader,f.tint,&tint,.VEC3)
-	rl.SetShaderValue(shader,f.time,&w.clock,.FLOAT);rl.SetShaderValue(shader,f.beat,&beat,.INT)
-	rl.SetShaderValue(shader,f.biome,&biome,.INT)
-	rl.SetShaderValue(shader,f.lane,&lane,.VEC4);rl.SetShaderValue(shader,f.lane_warning,&warning,.INT)
-	rl.SetShaderValue(shader,f.surface,&surface,.VEC2)
+	rl.SetShaderValue(shader,p.map_size,&dimensions,.VEC2);rl.SetShaderValue(shader,p.tint,&tint,.VEC3)
+	rl.SetShaderValue(shader,p.time,&w.clock,.FLOAT);rl.SetShaderValue(shader,p.beat,&beat,.INT)
+	rl.SetShaderValue(shader,p.biome,&biome,.INT)
+	rl.SetShaderValue(shader,p.lane,&lane,.VEC4);rl.SetShaderValue(shader,p.lane_warning,&warning,.INT)
+	rl.SetShaderValue(shader,p.surface,&surface,.VEC2)
 	count:c.int;amount:f32
 	if m:=renderer.tactical.expedition_material;m!=nil {
 		count=c.int(m.focus_point_count);amount=m.grid_amount
-		if count>0 {rl.SetShaderValueV(shader,f.focus,&m.focus_points[0],.VEC4,count)}
+		if count>0 {rl.SetShaderValueV(shader,p.focus,&m.focus_points[0],.VEC4,count)}
 	}
-	rl.SetShaderValue(shader,f.focus_count,&count,.INT);rl.SetShaderValue(shader,f.grid_amount,&amount,.FLOAT)
-	set_expedition_lights(renderer,shader,f.lights)
+	rl.SetShaderValue(shader,p.focus_count,&count,.INT);rl.SetShaderValue(shader,p.grid_amount,&amount,.FLOAT)
+	set_expedition_reveal(renderer,shader,p.reveal_eye,p.reveal_forward,p.reveal_viewport,p.reveal_points,p.reveal_count)
+	set_expedition_lights(renderer,shader,p.lights)
 	rl.BeginShaderMode(shader)
-	rl.SetShaderValueTexture(shader,f.map_data,f.texture)
-	set_expedition_reflection(renderer,shader,f.reflection)
+	rl.SetShaderValueTexture(shader,p.map_data,f.texture)
+	set_expedition_reflection(renderer,shader,p.reflection)
 	draw_expedition_floor_plane(renderer,room,dimensions)
 	draw_expedition_terrain(renderer,room)
 	rl.EndShaderMode()

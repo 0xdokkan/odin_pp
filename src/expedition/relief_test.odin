@@ -37,7 +37,8 @@ test_every_biome_has_a_relief_of_its_own_and_the_same_at_every_run :: proc(t: ^t
 		fmt.printfln("relief %v: tallest %d steps, %d%% of the cells above ground", biome, tallest, raised)
 		testing.expectf(t, tallest >= 2, "%v: the tallest cell is %d steps", biome, tallest)
 		testing.expectf(t, raised >= 2, "%v: only %d%% of the map is raised", biome, raised)
-		testing.expect(t, tallest <= int(RELIEF_MAX))
+		// The Snow map's spiral mountain (Fase 4) is far taller than any relief.
+		testing.expect(t, tallest <= int(RELIEF_MAX) || (biome == .Snow && tallest == level.MOUNTAIN_TOP))
 	}
 }
 

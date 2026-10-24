@@ -29,16 +29,24 @@ MECHANICS_LAB_RULES :: game.Deck_Rules{hand_size = len(MECHANICS_LAB_DECK)-1, ma
 MECHANICS_LAB_DECK_SEED :: u64(0x7E57_1AB)
 
 // The arenas of the lab: the flat one every card is tried in, the one with heights
-// (a plateau up a stair, a pillar, a spiral hill) to try the heights in, and the
-// one with the catalog of structures (F3 goes from one to the next).
-Mechanics_Lab_Arena :: enum { Flat, Heights, Structures }
+// (a plateau up a stair, a pillar, a spiral hill) to try the heights in, the
+// one with the catalog of structures, and the one with the Snow biome's spiral
+// mountain (F3 goes from one to the next).
+Mechanics_Lab_Arena :: enum { Flat, Heights, Structures, Mountain }
 
 // The arena of structures is larger, to hold all of them with room between.
 MECHANICS_LAB_STRUCTURES_WIDTH :: 41
 MECHANICS_LAB_STRUCTURES_HEIGHT :: 29
 
+// The arena of the mountain holds the whole mountain (level.MOUNTAIN_HALF cells each way from its centre)
+// to the east of the player's place, with a free lane round it.
+MECHANICS_LAB_MOUNTAIN_WIDTH :: 47
+MECHANICS_LAB_MOUNTAIN_HEIGHT :: 25
+MECHANICS_LAB_MOUNTAIN_CENTER :: grid.Position{35, 12}
+
 mechanics_lab_size :: proc(arena: Mechanics_Lab_Arena) -> (width, height: int) {
 	if arena == .Structures { return MECHANICS_LAB_STRUCTURES_WIDTH, MECHANICS_LAB_STRUCTURES_HEIGHT }
+	if arena == .Mountain { return MECHANICS_LAB_MOUNTAIN_WIDTH, MECHANICS_LAB_MOUNTAIN_HEIGHT }
 	return MECHANICS_LAB_WIDTH, MECHANICS_LAB_HEIGHT
 }
 
@@ -77,6 +85,10 @@ mechanics_lab_level :: proc(arena := Mechanics_Lab_Arena.Flat) -> (level.Level, 
 	data, error, _ := level.from_ascii(rows[:height])
 	if error != .None { return data, false }
 	if arena == .Heights { mechanics_lab_raise(&data) }
+	if arena == .Mountain && !level.mountain_stamp(&data, MECHANICS_LAB_MOUNTAIN_CENTER) {
+		level.destroy(&data)
+		return {}, false
+	}
 	if arena == .Structures {
 		for placed in MECHANICS_LAB_STRUCTURES {
 			if _, err := level.place_structure(&data, placed.id, placed.origin, placed.rotation, placed.mirror); err != .None {
@@ -126,6 +138,15 @@ create_mechanics_lab_room :: proc(data: ^level.Level, player: ^game.Player, conf
 	// In the arena of structures they wait in the open, away from the buildings.
 	if which == .Structures {
 		spawns[0].position, spawns[1].position, spawns[2].position = {37, 3}, {37, 10}, {20, 26}
+	}
+	// In the arena of the mountain the archer waits at the summit (sturdy enough to survive being pushed off),
+	// the others on the open ground beside it.
+	if which == .Mountain {
+		summit := level.mountain_summit()
+		spawns[0].position = {4, 4}
+		spawns[1].position = {MECHANICS_LAB_MOUNTAIN_CENTER.x+summit.x+1, MECHANICS_LAB_MOUNTAIN_CENTER.y+summit.y}
+		spawns[1].health = 18
+		spawns[2].position = {width/2, height-3}
 	}
 	room, ok = game.create_room(data, player, {enemies = spawns[:]})
 	if !ok { return }

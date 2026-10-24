@@ -51,6 +51,15 @@ caselle ricostruiti quando la geometria cambia, e si inviano solo quelli in vist
 strutture, luci, personaggi e puntatore stanno alla quota della loro casella. L'ologramma schiarisce con la
 quota, la esagera e traccia una curva di livello a ogni cambio di altezza.
 
+### La montagna a spirale
+
+Nelle Montagne innevate (mappe nuove) c'è una montagna tonda con un sentiero largo due caselle che la
+avvolge per tre giri ([mountain.odin](../src/level/mountain.odin)). Ogni passo sul sentiero sale di un gradino,
+fino alla cima a 94 gradini; tra un giro e l'altro c'è un dirupo, quindi non si taglia. Sul sentiero stanno una
+pattuglia a metà salita e due tratti di ghiaccio; in cima, una reliquia. Il bordo esterno è libero: chi è
+spinto fuori cade fino al terreno (al massimo dieci danni). Quando il robot è dietro la montagna, la roccia si
+dirada a retino attorno a lui.
+
 ### Strutture e trasparenza degli edifici
 
 Ogni edificio è disegnato in tre parti: l'**involucro** (muri, colonnato e tetto), l'**interno**

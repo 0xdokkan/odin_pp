@@ -134,6 +134,11 @@ EXPEDITION_SMOKE_HOLOGRAM_BIOMES :: [3]campaign.Biome{.Egypt, .Snow, .Sky}
 // A fight on two levels in the Snow: the robot on a plateau, a foe on the ground below.
 @(private)
 EXPEDITION_SMOKE_TWO_LEVELS :: EXPEDITION_SMOKE_HOLOGRAMS+3
+// The Snow's spiral mountain (Fase 4): the robot at eight places of the climb, on the path and behind the mountain.
+@(private)
+EXPEDITION_SMOKE_MOUNTAIN :: EXPEDITION_SMOKE_TWO_LEVELS+1
+@(private)
+EXPEDITION_SMOKE_MOUNTAIN_STEPS :: 8
 @(private)
 EXPEDITION_SMOKE_STRUCTURE_NAMES :: [EXPEDITION_SMOKE_STRUCTURE_STEPS]string{"6","4","2","1","soglia","dentro","fuori","oggetti"}
 
@@ -367,6 +372,8 @@ expedition_capture_present :: proc(data:rawptr,frame:^host.Frame) {
 			artifacts.screenshot(fmt.ctprintf("odin_pp_expedition_bersagli_%s.png",names[s.stage-EXPEDITION_SMOKE_HITS]))
 		} else if s.stage==EXPEDITION_SMOKE_TWO_LEVELS {
 			artifacts.screenshot("odin_pp_expedition_scontro_livelli.png")
+		} else if s.stage>=EXPEDITION_SMOKE_MOUNTAIN && s.stage<EXPEDITION_SMOKE_MOUNTAIN+EXPEDITION_SMOKE_MOUNTAIN_STEPS {
+			artifacts.screenshot(fmt.ctprintf("odin_pp_expedition_montagna_%d.png",s.stage-EXPEDITION_SMOKE_MOUNTAIN))
 		} else if s.stage>=EXPEDITION_SMOKE_HOLOGRAMS && s.stage<EXPEDITION_SMOKE_HOLOGRAMS+3 {
 			artifacts.screenshot(fmt.ctprintf("odin_pp_expedition_ologramma_rilievo_%d.png",s.stage-EXPEDITION_SMOKE_HOLOGRAMS))
 		} else if s.stage>=EXPEDITION_SMOKE_RELIEF && s.stage<EXPEDITION_SMOKE_RELIEF+EXPEDITION_SMOKE_RELIEF_COUNT {
@@ -442,7 +449,8 @@ expedition_capture_present :: proc(data:rawptr,frame:^host.Frame) {
 			biomes:=EXPEDITION_SMOKE_HOLOGRAM_BIOMES
 			expedition_smoke_world(e,biomes[s.stage-EXPEDITION_SMOKE_HOLOGRAMS]);e.world.mounted=false;e.message_timer=0;e.map_open=true
 		} else if s.stage==EXPEDITION_SMOKE_TWO_LEVELS {e.map_open=false;expedition_smoke_two_levels(e)}
-		else if s.stage>EXPEDITION_SMOKE_TWO_LEVELS {host.quit(frame)}
+		else if s.stage>=EXPEDITION_SMOKE_MOUNTAIN && s.stage<EXPEDITION_SMOKE_MOUNTAIN+EXPEDITION_SMOKE_MOUNTAIN_STEPS {expedition_smoke_mountain(e,s.stage-EXPEDITION_SMOKE_MOUNTAIN)}
+		else if s.stage>=EXPEDITION_SMOKE_MOUNTAIN+EXPEDITION_SMOKE_MOUNTAIN_STEPS {host.quit(frame)}
 	}
 }
 
@@ -465,6 +473,31 @@ expedition_smoke_relief :: proc(e:^run.Expedition_Session,biome:campaign.Biome) 
 		if spread>best_range || (spread==best_range && distance<best_distance) {best,best_range,best_distance=cell,spread,distance}
 	}}
 	e.rs.room.player.position=best
+	e.rs.iso_renderer.tactical.expedition_follow_ready=false
+}
+
+// One step of the mountain's act: the robot at `step` of eight places of the climb (the first at the foot, the last
+// at the top). The first step also checks the map: the mountain, its patrol, its relic and the walk to the top.
+@(private)
+expedition_smoke_mountain :: proc(e:^run.Expedition_Session,step:int) {
+	if step==0 {
+		expedition_smoke_world(e,.Snow);e.world.mounted=false;e.message_timer=0
+		assert(world.mountain_present(&e.world),"the Snow has no mountain")
+		summit:=world.mountain_cell(level.mountain_summit())
+		assert(int(level.height_at(e.rs.room.level_data,summit))==level.MOUNTAIN_TOP,"the mountain has no summit")
+		found:=false
+		for drop in e.world.drops[:e.world.drop_count] {if drop.position==summit && drop.item.kind==.Relic {found=true}}
+		assert(found,"no relic at the summit")
+		patrol:=false
+		for group in e.world.groups[:e.world.group_count] {
+			if group.patrol && world.distance(group.anchor,world.mountain_cell(level.mountain_midway()))<=1 {patrol=true}
+		}
+		assert(patrol,"no patrol halfway up the mountain")
+	}
+	laps:=f32(step)*f32(level.MOUNTAIN_LAPS)/f32(EXPEDITION_SMOKE_MOUNTAIN_STEPS-1)
+	laps=clamp(laps,0.05,f32(level.MOUNTAIN_LAPS)-0.05)
+	e.rs.room.player.position=world.mountain_cell(level.mountain_path_cell(laps))
+	if step==EXPEDITION_SMOKE_MOUNTAIN_STEPS-1 {e.rs.room.player.position=world.mountain_cell(level.mountain_summit())}
 	e.rs.iso_renderer.tactical.expedition_follow_ready=false
 }
 

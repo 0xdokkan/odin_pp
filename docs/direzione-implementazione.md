@@ -773,6 +773,21 @@ avviare è `build/odin_pp`; conserva il limite fps delle impostazioni di gioco.
   strutture alla quota della cella; l'ologramma in `run/expedition_hologram.odin`.
 - **Limiti:** vedi l'Esito della Fase 3 nel piano.
 
+## La montagna a spirale (Fase 4 del piano griglia)
+
+- **Forma:** `src/level/mountain.odin`: `mountain_height(offset)` e `mountain_icy(offset)` sono funzioni pure della
+  posizione rispetto al centro; una casella appartiene al giro più vicino e ha la quota di quel giro all'angolo
+  suo (lunghezza del sentiero), quindi le caselle affiancate hanno la stessa quota. `mountain_stamp` la scrive
+  su un `Level` (spiana mura e prop del quadrato).
+- **Mappa:** `src/expedition/mountain.odin`: presente solo nella Neve 192×192; `apply_relief` la tratta come una
+  zona piana, `generate` la alza dopo il rilievo e prima delle strutture, e `add_mountain_inhabitants` mette la
+  pattuglia e la reliquia dopo le altre pattuglie (il flusso casuale dei contenuti arriva dopo, quindi le altre
+  mappe non cambiano).
+- **Terreno:** `game.expedition_terrain` (Neve) dà `.Plain` o `.Ice` nel quadrato della montagna.
+- **Disegno:** lo shader del pavimento diradà le terrazze a retino davanti agli attori (uniform come lo shader
+  di rivelazione dei solidi, `set_expedition_reveal`); l'ologramma raggruppa le altezze oltre 12 a bande di sei.
+- **Laboratorio:** `Mechanics_Lab_Arena.Mountain`, atto `mechanics_lab_mountain`, `ODIN_PP_LAB_ONLY=mountain`.
+
 ## Limiti dichiarati
 
 - **Renderer:** i riflessi planari comprendono architettura e neon; carta e
