@@ -47,7 +47,8 @@ update_expedition_walker_view :: proc(renderer:^Renderer,refresh_only:bool) {
 @(private)
 expedition_player_position :: proc(renderer:^Renderer,key:Sprite_Key,position:view.Vec2)->(at:view.Vec2,lift:f32) {
 	v:=&renderer.tactical
-	if v.expedition_free {at,lift=position,tactical_lasso_lift(renderer,game.PLAYER_ENTITY)}
+	// Walking free the robot stands on the ground under it, the hill's or the mountain's (height_view.odin).
+	if v.expedition_free {at,lift=position,tactical_lasso_lift(renderer,game.PLAYER_ENTITY)+point_ground(position)}
 	else {at,lift=living_card_slide_position(renderer,game.PLAYER_ENTITY,key,position)}
 	return at+v.expedition_player_offset,lift
 }

@@ -1,6 +1,7 @@
 package render
 
 import "core:testing"
+import game "../game"
 import grid "../engine/grid"
 import level "../level"
 
@@ -59,4 +60,51 @@ test_the_pointer_picks_the_cell_whose_floor_it_reaches_first :: proc(t: ^testing
 	cell, ok = pick_ground_cell({4.5, 5, 4.5}, {0, -1, 0})
 	testing.expect(t, ok)
 	testing.expect_value(t, cell, grid.Position{4, 4})
+}
+
+// A hill between the camera and an actor hides it; the actor beside the hill, in front of it or on its top is seen.
+@(test)
+test_an_actor_behind_a_hill_is_hidden_from_the_camera :: proc(t: ^testing.T) {
+	data, _ := level.create(20, 30, level.Tile{kind = .Floor})
+	defer level.destroy(&data)
+	defer set_board_level(nil)
+	renderer := new(Renderer)
+	defer free(renderer)
+	// The camera south of the board looking north, high up.
+	renderer.tactical.camera.position = {10, 12, 40}
+	// A flat board hides nobody.
+	set_board_level(&data)
+	testing.expect(t, !terrain_hides_actor(renderer, {10, 5}))
+	// A wall of cells 60 steps (7 cells) high across the middle: the actor behind it is hidden, the one in front is not.
+	for x in 0..<20 { for y in 14..<17 { level.set_height(&data, {x, y}, 60) } }
+	set_board_level(&data)
+	testing.expect(t, terrain_hides_actor(renderer, {10, 5}), "behind the wall")
+	testing.expect(t, !terrain_hides_actor(renderer, {10, 25}), "in front of the wall")
+	// On the wall's top the actor is seen, whether it is at the near or the far edge.
+	testing.expect(t, !terrain_hides_actor(renderer, {10, 15}), "on the wall's top")
+	testing.expect(t, !terrain_hides_actor(renderer, {10, 14}), "at the wall's near edge")
+	// A low step (two steps) in the way does not hide anyone standing far behind it.
+	for x in 0..<20 { for y in 14..<17 { level.set_height(&data, {x, y}, 2) } }
+	set_board_level(&data)
+	testing.expect(t, !terrain_hides_actor(renderer, {10, 5}), "behind a low step")
+}
+
+// A figure stands on the ground under it, whether it steps (a card's slide) or the robot walks free.
+@(test)
+test_a_figure_stands_on_the_ground_whether_it_steps_or_walks_free :: proc(t: ^testing.T) {
+	data, _ := level.create(8, 8, level.Tile{kind = .Floor})
+	defer level.destroy(&data)
+	defer set_board_level(nil)
+	level.set_height(&data, {3, 3}, 50)
+	set_board_level(&data)
+	renderer := new(Renderer)
+	defer free(renderer)
+	step := f32(0.12)
+	_, stepping := living_card_slide_position(renderer, game.PLAYER_ENTITY, .Player, {3, 3})
+	testing.expect(t, abs(stepping-50*step) < 0.0001, "a step lifts the figure to the ground")
+	renderer.tactical.expedition_free = true
+	_, walking := expedition_player_position(renderer, .Player, {3, 3})
+	testing.expect(t, abs(walking-50*step) < 0.0001, "free walking too")
+	_, flat := expedition_player_position(renderer, .Player, {6, 6})
+	testing.expect_value(t, flat, f32(0))
 }

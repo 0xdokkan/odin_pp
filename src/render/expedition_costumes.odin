@@ -172,11 +172,13 @@ draw_expedition_costume :: proc(renderer:^Renderer,b:campaign.Biome,role:game.En
 draw_expedition_costumes :: proc(renderer:^Renderer,room:^game.Room,w:^world.World) {
 	for actor in renderer.tactical.snapshot.enemies[:renderer.tactical.snapshot.enemy_count] {
 		if !actor.visible || actor.health<=0 || game.enemy_is_out_of_play(room,actor.entity.id) || !tactical_cell_on_screen(renderer,{int(actor.position.x),int(actor.position.y)}) {continue}
+		if terrain_hides_actor(renderer,actor.position) {continue}
 		draw_expedition_costume(renderer,w.biome,actor.archetype,actor.position,actor.entity,w.clock,actor.opacity)
 	}
 	for &group,g in w.groups[:w.group_count] {for &member,i in group.members[:group.count] {
 		if !member.alive || member.deployed || !tactical_cell_on_screen(renderer,member.enemy.position) {continue}
 		if world.terrain(w.biome,member.enemy.position)==.Grass && world.distance(room.player.position,member.enemy.position)>3 {continue}
+		if terrain_hides_actor(renderer,{f32(member.enemy.position.x),f32(member.enemy.position.y)}) {continue}
 		draw_expedition_costume(renderer,w.biome,member.enemy.archetype,expedition_patrol_shown(renderer,g,i,member.enemy.position),game.SYSTEM_ENTITY,w.clock)
 	}}
 }

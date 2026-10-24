@@ -58,7 +58,8 @@ avvolge per tre giri ([mountain.odin](../src/level/mountain.odin)). Ogni passo s
 fino alla cima a 94 gradini; tra un giro e l'altro c'è un dirupo, quindi non si taglia. Sul sentiero stanno una
 pattuglia a metà salita e due tratti di ghiaccio; in cima, una reliquia. Il bordo esterno è libero: chi è
 spinto fuori cade fino al terreno (al massimo dieci danni). Quando il robot è dietro la montagna, la roccia si
-dirada a retino attorno a lui.
+apre attorno a lui in una finestra tonda con un sottile bordo luminoso; i nemici dietro la montagna restano
+nascosti.
 
 ### Strutture e trasparenza degli edifici
 

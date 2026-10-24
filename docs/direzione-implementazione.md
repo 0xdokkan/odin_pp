@@ -784,8 +784,12 @@ avviare è `build/odin_pp`; conserva il limite fps delle impostazioni di gioco.
   pattuglia e la reliquia dopo le altre pattuglie (il flusso casuale dei contenuti arriva dopo, quindi le altre
   mappe non cambiano).
 - **Terreno:** `game.expedition_terrain` (Neve) dà `.Plain` o `.Ice` nel quadrato della montagna.
-- **Disegno:** lo shader del pavimento diradà le terrazze a retino davanti agli attori (uniform come lo shader
-  di rivelazione dei solidi, `set_expedition_reveal`); l'ologramma raggruppa le altezze oltre 12 a bande di sei.
+- **Disegno:** il pavimento ha due programmi (`plain` e `tall`): il secondo apre una finestra tonda, con un bordo
+  luminoso, attorno al robot nelle terrazze più alte dei suoi piedi (uniform di `set_expedition_reveal`, solo
+  il primo punto), ed è usato solo dove una terrazza di 16 gradini o più è in vista (un `discard` costa il test di
+  profondità anticipato). I nemici dietro un rilievo non si disegnano (`terrain_hides_actor`). L'ologramma
+  raggruppa le altezze oltre 12 a bande di sei.
+- **Attenzione:** in Odin un `defer` che cambia un risultato con nome non cambia il valore restituito.
 - **Laboratorio:** `Mechanics_Lab_Arena.Mountain`, atto `mechanics_lab_mountain`, `ODIN_PP_LAB_ONLY=mountain`.
 
 ## Limiti dichiarati

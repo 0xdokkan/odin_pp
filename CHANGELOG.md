@@ -11,8 +11,10 @@ per i comandi disponibili oggi valgono il [README](README.md) e la documentazion
   caselle che la avvolge per tre giri, un gradino a ogni passo fino alla cima (94 gradini); tra i giri c'è un
   dirupo, quindi non si taglia. Sul sentiero: una pattuglia a metà salita e due tratti di ghiaccio; in cima, una
   reliquia da raccogliere a mano. Il bordo esterno è libero.
-- Il pavimento rialzato si dirada a retino davanti al robot (e ai nemici), quindi il robot si vede anche dietro la
-  montagna; l'ologramma raggruppa le altezze oltre 12 a bande; nuova arena «Montagna» nel laboratorio (F3) e atto
+- Il pavimento rialzato si apre in una finestra tonda con un sottile bordo luminoso davanti al robot, quindi il robot
+  si vede anche dietro la montagna; i nemici dietro la montagna restano nascosti. Corretto un difetto della Fase 3:
+  il robot che cammina libero (e ogni figura) non veniva alzato alla quota del terreno (un `defer` su un risultato
+  con nome non ha effetto in Odin); l'ologramma raggruppa le altezze oltre 12 a bande; nuova arena «Montagna» nel laboratorio (F3) e atto
   di smoke. Test: 12 nuovi (1630 in tutto).
 
 ## 2026-10-24 — Rilievi nelle spedizioni

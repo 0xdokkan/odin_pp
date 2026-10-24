@@ -36,6 +36,8 @@ Expedition_Material :: struct {
 	// The same actors on the ground (x, z): a cheap screen for the occluders.
 	actors: [EXPEDITION_REVEAL_POINTS]rl.Vector2,
 	reveal_point_count: c.int,
+	// The first reveal point is the robot's (it has one only when the robot is shown).
+	player_reveal: bool,
 	toward_camera: rl.Vector2,
 }
 
@@ -151,14 +153,14 @@ expedition_material_ready :: proc(renderer:^Renderer)->bool {
 // The camera and the actors the solids thin out for, to a program with the reveal's uniforms (the reveal
 // program of the material, and the floor's, whose terraces are as solid as a wall).
 @(private)
-set_expedition_reveal :: proc(renderer:^Renderer,shader:rl.Shader,eye_at,forward_at,viewport_at,points_at,count_at:c.int) {
+set_expedition_reveal :: proc(renderer:^Renderer,shader:rl.Shader,eye_at,forward_at,viewport_at,points_at,count_at:c.int,limit:c.int=EXPEDITION_REVEAL_POINTS) {
 	m:=renderer.tactical.expedition_material
 	camera:=renderer.tactical.camera
 	forward:=rl.Vector3Normalize(camera.target-camera.position)
 	viewport:=rl.Vector2{renderer.canvas_width,renderer.canvas_height}
 	if s:=renderer.tactical.surface;s!=nil {viewport={f32(s.target.texture.width),f32(s.target.texture.height)}}
 	count:=c.int(0)
-	if m!=nil {count=m.reveal_point_count}
+	if m!=nil {count=min(m.reveal_point_count,limit)}
 	rl.SetShaderValue(shader,eye_at,&camera.position,.VEC3);rl.SetShaderValue(shader,forward_at,&forward,.VEC3)
 	rl.SetShaderValue(shader,viewport_at,&viewport,.VEC2)
 	rl.SetShaderValue(shader,count_at,&count,.INT)
@@ -183,7 +185,7 @@ prepare_expedition_material :: proc(renderer:^Renderer,room:^game.Room,w:^world.
 	goal:=f32(1) if room.phase==.Combat else 0
 	m.grid_amount+=(goal-m.grid_amount)*(1-math.exp(-7*dt))
 	if goal==0 && m.grid_amount<.01 {m.grid_amount=0}
-	m.focus_point_count=0;m.reveal_point_count=0
+	m.focus_point_count=0;m.reveal_point_count=0;m.player_reveal=false
 	update_structure_dim(renderer,m)
 	camera:=v.camera
 	toward:=rl.Vector2{camera.position.x-camera.target.x,camera.position.z-camera.target.z}
@@ -192,11 +194,14 @@ prepare_expedition_material :: proc(renderer:^Renderer,room:^game.Room,w:^world.
 	if snapshot.player.visible {
 		at,_:=living_card_position(renderer,game.PLAYER_ENTITY,.Player,snapshot.player.position)
 		m.focus_points[0]={at.x+.5,at.y+.5,4.5,8.5};m.focus_point_count=1
-		expedition_add_reveal(renderer,m,{at.x+.5,.75 if !v.expedition_mounted else .9,at.y+.5},1.05 if !v.expedition_mounted else 1.45)
+		expedition_add_reveal(renderer,m,{at.x+.5,.75+point_ground({at.x,at.y}) if !v.expedition_mounted else .9+point_ground({at.x,at.y}),at.y+.5},1.05 if !v.expedition_mounted else 1.45)
+		m.player_reveal=m.reveal_point_count>0
 	}
 	for actor in snapshot.enemies[:snapshot.enemy_count] {
 		if !actor.visible || actor.health<=0 {continue}
 		at,_:=living_card_position(renderer,actor.entity,sprite_key_for_enemy(actor.archetype),actor.position)
+		// Behind a hill or a mountain: not shown, so no window for it in the solids either.
+		if terrain_hides_actor(renderer,{at.x,at.y}) {continue}
 		if m.focus_point_count<EXPEDITION_GRID_FOCUS {m.focus_points[m.focus_point_count]={at.x+.5,at.y+.5,1.5,3.6};m.focus_point_count+=1}
 		expedition_add_reveal(renderer,m,{at.x+.5,.7,at.y+.5},.85)
 	}

@@ -1062,9 +1062,17 @@ regole della sezione 1: fammi prima le domande della fase e fermati alla fine.
   (le caselle del giro sotto, a un dirupo di distanza, non la prendono da sole).
 - **Terreno** (`game.expedition_terrain`): il sentiero è neve battuta (velocità normale), con due tratti di
   ghiaccio (uno nel secondo giro, uno nel terzo) che fanno scivolare.
-- **Visibilità del robot:** il pavimento rialzato ora si dirada a retino davanti al robot (e ai nemici) come i
-  muri (`set_expedition_reveal`, shader del pavimento): il robot si vede in ogni punto del giro, verificato con
-  otto catture (`odin_pp_expedition_montagna_0..7.png`). Le cime sono schiarite al massimo di sei gradini.
+- **Visibilità del robot:** il pavimento rialzato ha una finestra tonda e netta, con un sottile bordo
+  luminoso, solo attorno al robot (`set_expedition_reveal`, shader del pavimento; niente retino a punti): taglia
+  soltanto ciò che sta sopra i suoi piedi, quindi la cengia su cui sta non si buca mai. Verificato con otto
+  catture (`odin_pp_expedition_montagna_0..7.png`). Le cime sono schiarite al massimo di sei gradini.
+- **Nemici dietro la montagna** (`terrain_hides_actor`, `height_view.odin`): un nemico (di scontro o di pattuglia)
+  si disegna solo se la linea dalla telecamera al suo petto non passa sotto la cima di una casella; altrimenti è
+  nascosto e non ha nemmeno la finestra nei solidi. La finestra è solo del robot.
+- **Correzione di un difetto della Fase 3:** in Odin un `defer` su un risultato con nome non cambia il valore
+  restituito, quindi il `defer lift += point_ground(at)` di `living_card_slide_position` non alzava mai nessuno, e
+  il robot che cammina libero non era alzato per niente: sulla montagna stava a terra, dietro la roccia.
+  Ora la quota si somma esplicitamente (`living_card_slide_position`, `expedition_player_position`); due test.
 - **Ologramma:** le altezze oltre 12 gradini sono raggruppate a bande di sei (`hologram_band`), quindi la
   montagna è alta una dozzina di unità sulla mappa e ha poche curve di livello.
 - **Laboratorio:** arena «Montagna» (quarta arena di F3, 47×25): la salita completa in 120 passi, il dirupo che

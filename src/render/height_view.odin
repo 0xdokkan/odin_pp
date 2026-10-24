@@ -129,3 +129,24 @@ draw_height_steps :: proc(renderer: ^Renderer, cell: grid.Position, p: [3]f32, r
 draw_height_edge :: proc(at, size: [3]f32, color: rl.Color) {
 	rl.DrawCubeV(at, size, color)
 }
+
+// Whether the ground between the camera and an actor standing at `at` (its cell's corner) hides the actor: the
+// line from the camera to the actor's chest passes under the top of a cell on the way. A hill or a mountain in front
+// of an actor hides it; an actor on the same ground, or on a slope that opens to the camera, is seen.
+@(private)
+terrain_hides_actor :: proc(renderer: ^Renderer, at: view.Vec2) -> bool {
+	if !board_has_heights() { return false }
+	target := rl.Vector3{at.x+0.5, point_ground(at)+0.5, at.y+0.5}
+	eye := renderer.tactical.camera.position
+	delta := target-eye
+	length := math.sqrt(delta.x*delta.x+delta.z*delta.z)
+	steps := int(length/0.35)
+	target_cell := grid.Position{int(math.floor(target.x)), int(math.floor(target.z))}
+	for i in 1..<steps {
+		t := f32(i)/f32(steps)
+		cell := grid.Position{int(math.floor(eye.x+delta.x*t)), int(math.floor(eye.z+delta.z*t))}
+		if cell == target_cell { continue }
+		if cell_ground(cell) > eye.y+delta.y*t+0.02 { return true }
+	}
+	return false
+}

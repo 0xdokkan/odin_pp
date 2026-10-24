@@ -14,7 +14,7 @@ Expedition_Floor_Program :: struct {
 	shader: rl.Shader,
 	map_data, map_size, tint, time, beat, lane, lane_warning, biome: c.int,
 	focus, focus_count, grid_amount, surface: c.int,
-	reveal_eye, reveal_forward, reveal_viewport, reveal_points, reveal_count: c.int,
+	reveal_eye, reveal_forward, reveal_viewport, reveal_points, reveal_count, reveal_floor: c.int,
 	lights: Expedition_Light_Uniforms,
 	reflection: Expedition_Reflection_Uniforms,
 }
@@ -54,6 +54,8 @@ uniform vec3 viewForward;
 uniform vec2 viewport;
 uniform vec4 reveal[9];
 uniform int revealCount;
+// The height of the ground the robot stands on: only what is above it can be in its way.
+uniform float revealFloor;
 #endif
 const float BAYER[16]=float[16](0.,8.,2.,10.,12.,4.,14.,6.,3.,11.,1.,9.,15.,7.,13.,5.);
 
@@ -81,24 +83,31 @@ float floorJoint(vec2 p,vec2 size,float stagger,float width,float aa) {
     vec2 edge=min(uv,1.-uv)*size;
     return inkLine(min(edge.x,edge.y),width,aa);
 }
+void floorMain();
 void main() {
-    // A hill or a mountain between the camera and an actor is dithered away round the actor, as the solids are
-    // (expedition_material.odin): the ground at the board's level is never in the way.
+    float rim=0.;
 #ifdef TERRACE_REVEAL
-    if(worldPosition.y>.1) {
+    // A hill or a mountain between the camera and the robot is cut away in a round window round the robot,
+    // with a thin bright edge: no stipple. Only what stands above the robot's feet can be in its way (the ledge it
+    // stands on is never cut), and only the robot has a window: whoever is behind the mountain stays hidden.
+    if(revealCount>0 && worldPosition.y>revealFloor+.05) {
         vec2 uv=gl_FragCoord.xy/viewport;
         float depth=dot(worldPosition-eye,viewForward);
-        float cut=0.;
-        for(int i=0;i<revealCount;i++) {
-            if(depth>reveal[i].w) continue;
-            vec2 d=(uv-reveal[i].xy)*vec2(viewport.x/viewport.y,1.);
+        // Up to half a cell behind the robot's middle too: its paper is as thick as that, and a cliff beside it
+        // would otherwise cut it in two.
+        if(depth<=reveal[0].w+.9) {
+            vec2 d=(uv-reveal[0].xy)*vec2(viewport.x/viewport.y,1.);
             d.y*=.78;
-            cut=max(cut,1.-smoothstep(.55,1.,length(d)/reveal[i].z));
+            float r=length(d)/reveal[0].z;
+            if(r<1.) discard;
+            rim=1.-smoothstep(1.,1.12,r);
         }
-        ivec2 q=ivec2(mod(gl_FragCoord.xy,4.));
-        if(cut>0. && (BAYER[q.x+q.y*4]+.5)/16.<cut) discard;
     }
 #endif
+    floorMain();
+    finalColor.rgb=mix(finalColor.rgb,vec3(.62,.92,1.),rim*.85);
+}
+void floorMain() {
     // The sides of a terrace are dark rock, tinted a little by the biome.
     if(normal.y<.5) {
         vec3 rock=mix(vec3(.05,.055,.07),biomeTint*.12,.5);
@@ -418,6 +427,7 @@ load_expedition_floor_program :: proc(p:^Expedition_Floor_Program,source:cstring
 	p.reveal_eye=rl.GetShaderLocation(shader,"eye");p.reveal_forward=rl.GetShaderLocation(shader,"viewForward")
 	p.reveal_viewport=rl.GetShaderLocation(shader,"viewport")
 	p.reveal_points=rl.GetShaderLocation(shader,"reveal[0]");p.reveal_count=rl.GetShaderLocation(shader,"revealCount")
+	p.reveal_floor=rl.GetShaderLocation(shader,"revealFloor")
 	p.lights=expedition_light_uniforms(shader);p.reflection=expedition_reflection_uniforms(shader)
 	return true
 }
@@ -479,7 +489,9 @@ draw_expedition_floor :: proc(renderer:^Renderer,room:^game.Room,w:^world.World)
 		if count>0 {rl.SetShaderValueV(shader,p.focus,&m.focus_points[0],.VEC4,count)}
 	}
 	rl.SetShaderValue(shader,p.focus_count,&count,.INT);rl.SetShaderValue(shader,p.grid_amount,&amount,.FLOAT)
-	set_expedition_reveal(renderer,shader,p.reveal_eye,p.reveal_forward,p.reveal_viewport,p.reveal_points,p.reveal_count)
+	// Only the robot's window, and only where the robot has one.
+	set_expedition_reveal(renderer,shader,p.reveal_eye,p.reveal_forward,p.reveal_viewport,p.reveal_points,p.reveal_count,1 if (renderer.tactical.expedition_material!=nil && renderer.tactical.expedition_material.player_reveal) else 0)
+	floor_steps:=cell_ground(room.player.position);rl.SetShaderValue(shader,p.reveal_floor,&floor_steps,.FLOAT)
 	set_expedition_lights(renderer,shader,p.lights)
 	rl.BeginShaderMode(shader)
 	rl.SetShaderValueTexture(shader,p.map_data,f.texture)
