@@ -29,6 +29,10 @@ Rispetto alle otto fasi proposte in chat ci sono tre differenze:
 - **L'editor viene prima dei biomi** (Fase 6, poi Fase 7): le interconnessioni
   dei biomi si costruiscono meglio scolpendole a mano.
 
+**Aggiornato lo stesso giorno** dopo lo studio della mappa di Elden Ring,
+chiesto dall'utente: le idee che ne vengono sono nella sezione 2.9 e nelle
+Fasi 3, 5, 7 e 8.
+
 In questo documento «piano» vuol dire sempre un piano della mappa; il
 documento stesso si chiama «questo documento».
 
@@ -50,7 +54,7 @@ La tabella è in ordine di priorità, cioè l'ordine della scaletta qui sotto.
 | 5 | 5 | Piani nelle spedizioni: grotte senza caricamento | 1, 3, 4 | Da fare | — |
 | 6 | 6 | Editor per scolpire i piani | 1, 3 (5 per le mappe dei biomi) | Da fare | — |
 | 7 | 7 | Ponti, gallerie e scorciatoie nei biomi | 5, 6 | Da fare | — |
-| 8 | 8 | Ologramma a piani, prestazioni, grotte vecchie | 5 (meglio dopo la 7) | Da fare | — |
+| 8 | 8 | Ologramma completo, prestazioni, grotte vecchie | 5 (meglio dopo la 7) | Da fare | — |
 
 ## Scaletta: cosa sviluppare prima
 
@@ -81,10 +85,10 @@ documento.
 | 2 | Fase 2: posizioni con il piano | È il prezzo dei piani: lavoro meccanico ma esteso (circa mille posizioni scritte nel codice e ancora di più nei test). Si fa una volta, prima delle regole. | grande | medio: tocca quasi tutti i pacchetti |
 | 3 | Fase 3: piani nel laboratorio, regole | Movimento, vista, aree e IA fra piani, provati in un'arena piccola. | grande | alto |
 | 4 | Fase 4: piani nel laboratorio, grafica | Senza trasparenze, contorni e il mouse giusto i piani non si leggono a schermo. | media | medio |
-| 5 | Fase 5: grotte senza caricamento | Il primo uso vero: le grotte di oggi diventano un piano sotto, senza dissolvenza. Porta i piani nel renderer, nei salvataggi e nell'esplorazione. | molto grande | alto |
+| 5 | Fase 5: grotte senza caricamento | Il primo uso vero: le grotte di oggi diventano un piano sotto, senza dissolvenza. Porta i piani nel renderer, nei salvataggi, nell'esplorazione e nell'ologramma. | molto grande | alto |
 | 6 | Fase 6: editor | Serve a scolpire a mano le mappe dei biomi della Fase 7. È uno strumento: non cambia le regole. | media | basso |
-| 7 | Fase 7: ponti, gallerie e scorciatoie | Qui la profondità diventa disegno dei livelli: la mappa interconnessa che l'utente chiede. | grande | medio |
-| 8 | Fase 8: ologramma, prestazioni, pulizia | Chiude il lavoro: l'ologramma mostra i piani, si misura tutto e si toglie il codice vecchio delle grotte. | media | basso |
+| 7 | Fase 7: ponti, gallerie e scorciatoie | Qui la profondità diventa disegno dei livelli: la mappa interconnessa che l'utente chiede, con altopiani dai pochi accessi, scorciatoie e sotterranei sul modello di Elden Ring (sezione 2.9). | grande | medio |
+| 8 | Fase 8: ologramma, prestazioni, pulizia | Chiude il lavoro: l'ologramma si completa, si misura tutto e si toglie il codice vecchio delle grotte. | media | basso |
 
 **Se la priorità è un'altra:**
 - **Solo l'aspetto, per ora:** 0 → 1, e ci si ferma lì. Il terreno scolpito
@@ -336,6 +340,8 @@ regole normali.
   nascono dalla forma della mappa, senza dati in più.
 - **Scale a pioli**, se l'utente le vuole: collegano due caselle di piani
   diversi anche dove il dislivello è grande.
+- **Ascensori e pozzi** (sezione 2.9): portano al piano sopra o sotto, nella
+  stessa colonna; salirci è un passo.
 - **Spinte e cadute.** Una spinta oltre il bordo di un ponte porta nella
   colonna vicina. Se lì il piano del ponte non c'è, si cade sulla prima casella
   calpestabile sotto, con il danno di caduta di oggi (dislivello − 1, al
@@ -399,6 +405,60 @@ regole normali.
 - **Mappe modellate in Blender** con la griglia ricavata: la geografia
   uscirebbe dal codice, e dodici mappe fino a 224×224 andrebbero modellate
   tutte a mano.
+
+### 2.9 Un riferimento: la mappa di Elden Ring
+
+Il 25 ottobre 2026 l'utente ha chiesto di guardare la conformazione fisica
+della mappa di Elden Ring. Ciò che conta per noi (fonti in fondo alla sezione):
+
+- **Regioni a quote diverse, separate da pareti.** Liurnia è un grande lago in
+  basso, l'Altopiano di Altus sta molto più in alto: l'altopiano si vede, ma ci
+  si sale solo da pochi punti (un grande ascensore da attivare, un sentiero in
+  un burrone con un boss, un passaggio segreto). Il disegno che l'utente ha
+  fatto lo stesso giorno (un livello alto, un'altura, il personaggio in basso)
+  è questa idea in piccolo.
+- **Un mondo sotto il mondo:** fiumi sotterranei e città sepolte, raggiunti da
+  pochi pozzi con lunghi ascensori, da portali e da buchi nel terreno. La mappa
+  del gioco ha un tasto per vedere solo il sotterraneo.
+- **Dungeon fitti dentro il mondo aperto:** castelli verticali con scorciatoie
+  che si aprono dall'altra parte.
+- **Punti di riferimento** visibili da lontano, e quasi tutto ciò che si vede si
+  può raggiungere.
+- **Zone impilate nel DLC** (Shadow of the Erdtree): posti vicini sulla mappa
+  sono separati da salti e pareti, e alcuni segreti stanno sotto la zona, in un
+  burrone. La critica più comune: la mappa del DLC non ha il tasto del
+  sotterraneo, e non si capisce a che livello si è.
+
+**Cosa ne prende questo documento:**
+
+1. **Altopiani con pochi accessi** (Fase 7): ogni altopiano grande ha da 1 a 3
+   accessi, almeno uno nascosto; il resto del bordo è dirupo.
+2. **Ascensori e pozzi** (Fase 3): un collegamento fra piani nella stessa
+   colonna, accanto a rampe e scale a pioli.
+3. **Un sotterraneo grande in alcuni biomi** (Fase 7): non solo grotte dentro le
+   colline, ma zone ampie sotto il suolo, raggiunte da un pozzo.
+4. **Scorciatoie che si aprono dall'altra parte** (Fase 7): una porta, una leva
+   o un ascensore; una volta aperte restano aperte anche nelle run dopo, come i
+   segreti scoperti.
+5. **L'ologramma con il tasto del piano già nella Fase 5**, quando arriva il
+   primo piano sotto, e non solo nella Fase 8.
+6. **Accessi segnati sull'ologramma** una volta scoperti (Fasi 5 e 8), così due
+   posti vicini sulla mappa ma lontani a piedi non confondono.
+
+**Cosa non si copia:** le visuali lunghe. Qui la telecamera è fissa e vicina
+(circa 25×15 caselle), quindi i punti di riferimento lontani li mostra
+l'ologramma.
+
+**Fonti** (consultate il 25 ottobre 2026):
+- [eXputer: la verticalità di Shadow of the Erdtree e la sua mappa](https://exputer.com/features/shadow-of-the-erdtree-verticality-better-map-system/)
+- [GamingBolt: Miyazaki sulla verticalità del DLC](https://gamingbolt.com/elden-ring-shadow-of-the-erdtrees-map-boasts-a-better-sense-of-verticality-miyazaki)
+- [Elden Ring Wiki: Siofra River](https://eldenring.wiki.gg/wiki/Siofra_River)
+- [Elden Ring Wiki (Fandom): Ainsel River](https://eldenring.fandom.com/wiki/Ainsel_River)
+- [Push Square: come arrivare all'Altopiano di Altus](https://www.pushsquare.com/guides/elden-ring-how-to-reach-altus-plateau-using-the-grand-lift-of-dectus-and-dectus-medallions)
+- [Sports Illustrated: recensione di Shadow of the Erdtree](https://videogames.si.com/reviews/elden-ring-sote-review)
+- [Well Played: recensione di Shadow of the Erdtree](https://well-played.com.au/elden-ring-shadow-of-the-erdtree-review)
+- [GameSpot: il mondo aperto di Elden Ring](https://gamespot.com/articles/elden-ring-puts-a-from-software-spin-on-open-worlds/1100-6495648/)
+- [Keen Gamer: il design del mondo aperto di Elden Ring](https://keengamer.com/articles/features/opinion-pieces/why-elden-ring-revolutionizes-open-world-design/)
 
 ## 3. Fase 0 — Misure di partenza (proposta di Claude)
 
@@ -756,6 +816,7 @@ semplice per giocare l'arena.
   con un test.
 - **Regole** della sezione 2.5, in tutti i punti elencati sopra:
   - passo, diagonale, schivata e passo dei nemici;
+  - scale a pioli e ascensori, se scelti;
   - spinte e cadute fra piani, nella pipeline degli spostamenti;
   - vista fra piani in tutti i punti che la usano, compresa la copia del
     renderer;
@@ -771,7 +832,8 @@ semplice per giocare l'arena.
 - **Arena «Piani»** (sesta di F3):
   - una strada con sopra un ponte e due rampe;
   - una collina con dentro una grotta e due imbocchi;
-  - una scala a pioli, se l'utente la vuole;
+  - una scala a pioli e un pozzo con l'ascensore che scende nella grotta, se
+    l'utente li vuole;
   - nemici su tutti i piani.
 
 ### Da chiedere prima di iniziare
@@ -782,9 +844,10 @@ semplice per giocare l'arena.
 2. **Spessore di ponti e volte.**
    - (Consigliato) 2 gradini.
    - Oppure un altro valore.
-3. **Scale a pioli.**
-   - (Consigliato) Sì, nell'arena: collegano piani anche dove non c'è una
-     rampa.
+3. **Scale a pioli e ascensori.**
+   - (Consigliato) Sì, tutti e due nell'arena: collegano piani anche dove non
+     c'è una rampa (l'ascensore è il pozzo di Elden Ring, sezione 2.9).
+   - Oppure solo uno dei due (quale).
    - Oppure no: solo rampe e imbocchi.
 4. **Tiri fra piani.**
    - (Consigliato) Sì, in tutte e due le direzioni, se la linea è libera.
@@ -812,8 +875,8 @@ semplice per giocare l'arena.
 5. IA: campo delle distanze attraverso i piani.
 6. Disegno semplice e mouse.
 7. Arena «Piani» e atto dello smoke (`ODIN_PP_LAB_ONLY=layers`), con
-   catture: salire sul ponte, passarci sotto, entrare in grotta, tiro dal
-   ponte, spinta giù dal ponte.
+   catture: salire sul ponte, passarci sotto, entrare in grotta, scendere con
+   l'ascensore, tiro dal ponte, spinta giù dal ponte.
 8. Documenti: `docs/regole/combattimento.md` (i piani), `docs/avvio.md`
    (l'arena), `CHANGELOG.md`.
 
@@ -826,6 +889,7 @@ semplice per giocare l'arena.
 - Dal ponte si vede e si colpisce la strada; dalla collina non si vede dentro
   la grotta.
 - I nemici trovano la strada per la grotta e per il ponte.
+- Scala e ascensore portano da un piano all'altro, il robot e i nemici.
 - Una colonna con due caselle troppo vicine viene rifiutata.
 - Con un piano solo il comportamento è identico: la suite passa senza toccare
   i test esistenti.
@@ -1016,9 +1080,10 @@ nell'esplorazione e nelle pattuglie.
     con altre tabelle `[MAX_CELLS]`;
   - le posizioni hanno il piano (Fase 2);
   - un salvataggio vecchio senza piani si carica com'era.
-- **Ologramma:** si apre anche in grotta e mostra dove è il robot; l'imbocco
-  resta nascosto finché non lo si scopre. L'ologramma a piani vero è la
-  Fase 8.
+- **Ologramma a piani, già qui** (la lezione del DLC di Elden Ring, sezione
+  2.9): si apre anche in grotta, mostra pieno il piano del robot e ha un tasto
+  per guardare l'altro; gli imbocchi scoperti sono segnati, quelli segreti
+  restano nascosti finché non li si scopre. La Fase 8 lo completa.
 - **Prestazioni:** benchmark sugli stage della Fase 0, prima e dopo.
 
 ### Da chiedere prima di iniziare
@@ -1047,6 +1112,10 @@ nell'esplorazione e nelle pattuglie.
 7. **Obiettivo di prestazioni.**
    - (Consigliato) Al massimo +5% di media rispetto alla fine della Fase 1.
    - Oppure un altro.
+8. **Ologramma.**
+   - (Consigliato) Il piano del robot pieno, un tasto per guardare l'altro,
+     gli imbocchi scoperti segnati.
+   - Oppure cambia piano da solo, quando lo cambia il robot, senza tasto.
 
 ### Passi
 
@@ -1057,7 +1126,7 @@ nell'esplorazione e nelle pattuglie.
 3. Esplorazione, mount, pattuglie e avvistamento fra piani.
 4. Renderer delle spedizioni: texture e superfici per piano, diradamento,
    contorni, luci, ombre.
-5. Ologramma minimo.
+5. Ologramma a piani, con il tasto e gli imbocchi segnati.
 6. Smoke delle grotte rifatto (entrare e uscire camminando) e catture in tutti
    e quattro i biomi, con il pulsante «TEST tutti i biomi».
 7. Benchmark prima e dopo.
@@ -1199,6 +1268,10 @@ con la geografia fissa.
   Inferno (`src/expedition/relief.odin`).
 - **Direzione del gioco:** nell'Antico Egitto le tombe sono «POI
   sotterranei» ([direzione.md](../direzione.md), scheda del bioma).
+- **Segreti ricordati:** la campagna ricorda per ogni bioma fino a 64 segreti
+  scoperti (`Campaign.secrets` e `discover_secret`,
+  `src/campaign/campaign.odin:40`, `:103`). Una scorciatoia aperta si può
+  ricordare allo stesso modo.
 - Dopo la Fase 5 ci sono le grotte a piani in quattro biomi.
 
 ### Progetto
@@ -1223,8 +1296,16 @@ con la geografia fissa.
 - **Interconnessioni:** almeno due strade per arrivare ai luoghi importanti
   (una sopra o sotto); grotte con più imbocchi; scorciatoie che evitano un giro
   lungo.
-- **Sotto il suolo:** dove serve scendere davvero (Egitto, Gotico), il bioma
-  alza tutto il terreno di una base e mette le gallerie sotto.
+- **Altopiani con pochi accessi** (sezione 2.9): ogni altopiano grande ha da 1
+  a 3 accessi, almeno uno nascosto; il resto del bordo è dirupo. L'altopiano si
+  vede da sotto, ma la strada per salirci va trovata.
+- **Scorciatoie che si aprono dall'altra parte:** una porta, una leva o un
+  ascensore che si sblocca solo arrivandoci dal lato giusto. Una volta aperta,
+  la scorciatoia resta aperta anche nelle run dopo, come i segreti scoperti.
+- **Sotterraneo grande** in alcuni biomi (Egitto, Gotico): non solo grotte
+  dentro le colline, ma zone ampie sotto il suolo, raggiunte da un pozzo con
+  l'ascensore, come i fiumi sotterranei di Elden Ring. Per farle, il bioma alza
+  tutto il suo terreno di una base e mette il sotterraneo sotto.
 - **Strumenti:** il generatore per le forme ripetute, l'editor della Fase 6
   per i ritocchi.
 - **Prestazioni:** benchmark per bioma.
@@ -1238,20 +1319,30 @@ con la geografia fissa.
    - (Consigliato) Tre biomi per volta, con le catture da guardare insieme.
    - Oppure tutti insieme.
 3. **Scorciatoie.**
-   - (Consigliato) Fisse, parte della geografia.
-   - Oppure alcune chiuse, che si aprono una volta trovate (una leva, una
-     porta).
+   - (Consigliato) Si aprono dall'altra parte e restano aperte nelle run dopo,
+     come i segreti scoperti.
+   - Oppure si aprono, ma si richiudono a ogni run.
+   - Oppure fisse, sempre aperte.
 4. **Il tunnel del Vietnam.**
    - (Consigliato) Diventa una galleria percorribile.
    - Oppure resta il salto di oggi.
 5. **I ponti del Cielo.**
    - (Consigliato) Diventano ponti veri, con i sentieri sotto.
    - Oppure restano come oggi.
+6. **Accessi agli altopiani.**
+   - (Consigliato) Da 1 a 3 per altopiano, almeno uno nascosto.
+   - Oppure liberi, decisi bioma per bioma.
+7. **Sotterraneo grande.**
+   - (Consigliato) Nell'Egitto e nel Gotico, raggiunto da un pozzo con
+     l'ascensore.
+   - Oppure in altri biomi (quali).
+   - Oppure niente: solo grotte dentro le colline.
 
 ### Passi
 
-1. Biomi a gruppi di tre: piani, imbocchi e scorciatoie, con test di geografia
-   fissa e di raggiungibilità.
+1. Biomi a gruppi di tre: piani, imbocchi, accessi agli altopiani e
+   scorciatoie, con test di geografia fissa, di raggiungibilità e delle
+   scorciatoie ricordate dalla campagna.
 2. Catture di ogni bioma (esplorazione e uno scontro fra piani), con il
    pulsante «TEST tutti i biomi».
 3. Benchmark per bioma.
@@ -1297,8 +1388,9 @@ prestazioni, si toglie il codice delle grotte vecchie.
 
 ### Progetto
 
-- **Ologramma a piani:** il piano del robot pieno, gli altri tenui; un tasto
-  per guardare gli altri piani; le grotte scoperte si vedono anche dentro.
+- **Ologramma a piani completo:** parte da quello della Fase 5 e aggiunge il
+  piano sopra, gli interni delle grotte scoperte e gli accessi degli altopiani
+  già trovati.
 - **Prestazioni:** blocchi del terreno caricati sulla scheda video invece che
   rimandati a ogni fotogramma; misure in tutti i biomi.
 - **Pulizia:** via il codice delle grotte vecchie, se la conversione dei
@@ -1307,9 +1399,9 @@ prestazioni, si toglie il codice delle grotte vecchie.
 ### Da chiedere prima di iniziare
 
 1. **Ologramma.**
-   - (Consigliato) Il piano del robot pieno, gli altri tenui, un tasto per
-     cambiare.
-   - Oppure tutti i piani uguali.
+   - (Consigliato) Come nella Fase 5, più il piano sopra, gli interni delle
+     grotte scoperte e gli accessi trovati.
+   - Oppure tutti i piani insieme, uno sopra l'altro.
 2. **Codice delle grotte vecchie.**
    - (Consigliato) Via, tenendo la conversione dei salvataggi vecchi.
    - Oppure resta.
