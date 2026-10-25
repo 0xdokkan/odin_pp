@@ -1283,10 +1283,30 @@ fermati alla fine.
 - **Smoke delle spedizioni completo.** 103 catture, nessun errore. Non si confrontano al byte: due corse
   della Fase 2 differivano in 67 catture, qui in 81. Ho guardato lo scontro nel Cyber, lo scontro su due
   livelli e la grotta della Neve, e sono come prima.
-- **Benchmark: non fatto.** Alle 22:45 il portatile andava a batteria (47%), e il driver teneva ogni stage
-  a 30 fps fissi (33,3 ms), contro circa 1 ms alla corrente nella Fase 2: quella misura non dice niente.
-  Va rifatto con il portatile alla corrente (comandi nella sezione 1.4), confrontando con le corse della
-  Fase 2.
+- **Benchmark contro la Fase 2.** Due corse alla corrente, sulla RTX 3060, tutti i 103 stage in 22 secondi
+  a corsa: +0,3% di media dei gruppi, il gruppo peggiore +2,4% (gli ologrammi del rilievo, 75–77, come
+  nella Fase 2). È rumore. Le due corse nuove concordano (2,4% di scarto medio fra le mediane, 100 stage su
+  103 entro il 10%).
+  - Una prima prova, alle 22:45, era stata fatta a batteria (47%): il driver teneva ogni stage a 30 fps
+    fissi (33,3 ms), e quella misura non valeva. Questa è stata rifatta quando l'utente ha attaccato il
+    portatile alla corrente.
+
+| Gruppo | Fase 2 (ms) | Fase 3 (ms) | Differenza |
+|---|---:|---:|---:|
+| Viste di base (0–6) | 1,80 | 1,80 | −0,1% |
+| Biomi (7–18) | 1,48 | 1,47 | −0,4% |
+| Luoghi e viste speciali (19–24) | 1,94 | 1,95 | +0,5% |
+| Corsa e ingaggio (25–26) | 1,46 | 1,47 | +0,6% |
+| Centro dei biomi (27–38) | 1,14 | 1,15 | +0,9% |
+| Officine (39–50) | 1,17 | 1,18 | +0,4% |
+| Bersagli (51–54) | 1,20 | 1,22 | +1,8% |
+| Edifici (55–62) | 0,99 | 0,99 | +0,1% |
+| Rilievi (63–74) | 1,09 | 1,09 | −0,3% |
+| Ologrammi del rilievo (75–77) | 4,15 | 4,25 | +2,4% |
+| Scontro su due livelli (78) | 1,11 | 1,09 | −2,0% |
+| Montagna (79–86) | 1,04 | 1,05 | +0,5% |
+| Grotte (87–98) | 0,93 | 0,93 | −0,1% |
+| Posa delle strutture (99–102) | 1,02 | 1,02 | +0,3% |
 
 **Rivisto dalla Fase 2**
 - Le vicine scritte con i nomi nei test (`world_playback_test`, `mechanics_lab_test`,

@@ -19,7 +19,8 @@ per i comandi disponibili oggi valgono il [README](README.md) e la documentazion
 - Nella Prova meccaniche la sesta arena di F3, «Piani»: strada sotto un ponte con due rampe, collina con
   una grotta e due imbocchi, scala sul dirupo, un nemico per piano. Disegno semplice: ciò che copre il robot
   quando è sotto diventa mezzo trasparente. Atto dello smoke `layers` (`ODIN_PP_LAB_ONLY=layers`), sette
-  catture. Test: 19 nuovi (1684 in tutto).
+  catture. Prestazioni: +0,3% di media rispetto alla Fase 2, il gruppo peggiore +2,4% (gli ologrammi):
+  rumore. Test: 19 nuovi (1684 in tutto).
 
 ## 2026-10-25 — Profondità, Fase 2: posizioni con il piano
 
