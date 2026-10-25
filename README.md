@@ -95,6 +95,7 @@ i nemici. Le spedizioni già salvate mantengono la loro geografia originale.
 | [Verifica](docs/verifica.md) | controlli, catture e telemetria |
 | [Sviluppo](docs/sviluppo.md) | convenzioni Odin e metodo di lavoro |
 | [Piano della griglia](docs/piano-griglia.md) | fasi da eseguire una alla volta: bersagli in evidenza, altezze, montagna a spirale, caverne, strutture, hub in 3D |
+| [Piano della profondità](docs/piano-profondita.md) | fasi da eseguire una alla volta: terreno scolpito, mappa a piani, grotte senza caricamento, editor, ponti e gallerie nei biomi |
 | [Cronologia](CHANGELOG.md) | milestone e refactor precedenti; le note storiche non definiscono le regole attuali |
 
 ## Sviluppo

@@ -5,6 +5,17 @@ I riferimenti a Classica, `--flat` e ai vecchi smoke descrivono versioni precede
 per i comandi disponibili oggi valgono il [README](README.md) e la documentazione collegata.
 
 
+## 2026-10-25 — Piano di lavoro della profondità
+
+- Nuovo [documento](docs/piano-profondita.md) in nove fasi (0–8), da eseguire
+  una alla volta solo su comando dell'utente: terreno scolpito (rampe, colline,
+  dirupi di roccia), posizioni con il piano, mappa a piani (sotto, terra,
+  sopra) nel laboratorio, grotte senza caricamento nelle spedizioni, editor per
+  scolpire, ponti, gallerie e scorciatoie nei biomi, ologramma a piani. Il
+  combattimento resta a griglia su ogni piano.
+- La Fase 0 è una proposta di Claude: oggi il benchmark non arriva agli stage
+  di rilievi, montagna e grotte.
+
 ## 2026-10-25 — Test: tutti i biomi sbloccati (temporaneo)
 
 - Nella galassia del Portale, il pulsante **TEST tutti i biomi** (SI/NO) apre tutte e 12 le isole per giocarle, in ogni
