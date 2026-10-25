@@ -24,6 +24,27 @@ test_hub_formation_only_animates_routes_unlocked_by_the_last_expedition :: proc(
 	for shown in h.new_islands {testing.expect(t,!shown)}
 }
 
+// TEMPORARY test mode: the switch forms every hidden island and hides them again.
+@(test)
+test_hub_test_switch_forms_hidden_islands_and_hides_them_again :: proc(t:^testing.T) {
+	h:=new(Campaign_Hub);defer free(h)
+	campaign.initialize(&h.progress);defer campaign.destroy(&h.progress)
+	h.slot=-1;h.progress.unlocked[campaign.Biome.City]=true;h.clock=7
+	hub_toggle_test_biomes(h)
+	testing.expect(t,h.progress.test_all_biomes)
+	testing.expect_value(t,h.revealed_at,f32(7))
+	for b in campaign.Biome.Cyber..<campaign.Biome.Count {testing.expect_value(t,h.new_islands[b],b!=.Cyber&&b!=.City)}
+	h.selected=.Sky
+	hub_toggle_test_biomes(h)
+	testing.expect(t,!h.progress.test_all_biomes)
+	testing.expect_value(t,h.selected,campaign.Biome.Cyber)
+	for shown in h.new_islands {testing.expect(t,!shown)}
+	// No switching while an expedition is out: it keeps the mode it left with.
+	testing.expect(t,campaign.begin_run(&h.progress,.City,1))
+	hub_toggle_test_biomes(h)
+	testing.expect(t,!h.progress.test_all_biomes)
+}
+
 @(test)
 test_hub_records_include_both_city_cabinets_without_secret_duplicates :: proc(t:^testing.T) {
 	c:campaign.Campaign;campaign.initialize(&c);defer campaign.destroy(&c)

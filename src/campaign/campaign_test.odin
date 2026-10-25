@@ -205,6 +205,60 @@ test_repeating_same_biome_does_not_unlock_secret :: proc(t: ^testing.T) {
 	testing.expect_value(t, c.streak, u32(12)); testing.expect(t, !c.unlocked[Biome.Secret])
 }
 
+// TEMPORARY test mode: every biome is playable, the real progress stays as it was.
+@(test)
+test_test_mode_opens_every_biome_without_touching_progress :: proc(t: ^testing.T) {
+	c: Campaign; initialize(&c); defer destroy(&c)
+	testing.expect(t, begin_run(&c, .Cyber, 1)); testing.expect(t, finish_run(&c, true))
+	real_unlocked := c.unlocked
+	testing.expect(t, !biome_open(&c, .Egypt) && !begin_run(&c, .Egypt, 2))
+	testing.expect(t, set_test_all_biomes(&c, true))
+	for b in Biome.Cyber..<Biome.Count { testing.expect(t, biome_open(&c, b)) }
+	testing.expect_value(t, c.unlocked, real_unlocked)
+	// A win in a test biome brings the backpack and the star bonus home, nothing else.
+	testing.expect(t, begin_run(&c, .Egypt, 2))
+	testing.expect(t, c.run.test && !c.visited[Biome.Egypt])
+	testing.expect(t, !set_test_all_biomes(&c, false) && c.test_all_biomes)
+	testing.expect(t, campaign_valid(&c))
+	grid_add(&c.backpack.grid, make_item(.Memory, 1, 4))
+	testing.expect(t, finish_run(&c, true, 1))
+	testing.expect_value(t, c.memory_fragments, u64(1) << 4)
+	testing.expect_value(t, depot_credits(&c), i64(20))
+	testing.expect(t, !c.won[Biome.Egypt] && !c.streak_biomes[Biome.Egypt] && !c.unlocked[Biome.Inferno])
+	testing.expect_value(t, c.streak, u32(1)); testing.expect_value(t, c.total_wins, u32(1))
+	// A death in a test biome loses the backpack but neither the streak nor a death.
+	testing.expect(t, begin_run(&c, .Secret, 3))
+	grid_add(&c.backpack.grid, make_item(.Healing, 2))
+	testing.expect(t, finish_run(&c, false))
+	testing.expect_value(t, c.backpack.grid.count, 0)
+	testing.expect_value(t, c.streak, u32(1)); testing.expect_value(t, c.deaths, u32(0))
+	testing.expect(t, !c.true_ending && !c.normal_ending)
+	// A biome the slot really opened still counts while the test is on.
+	testing.expect(t, begin_run(&c, .West, 4)); testing.expect(t, !c.run.test)
+	testing.expect(t, finish_run(&c, true))
+	testing.expect(t, c.won[Biome.West] && c.unlocked[Biome.Egypt]); testing.expect_value(t, c.streak, u32(2))
+	testing.expect(t, set_test_all_biomes(&c, false))
+	testing.expect(t, !biome_open(&c, .Inferno) && !begin_run(&c, .Inferno, 5))
+	testing.expect(t, campaign_valid(&c))
+}
+
+@(test)
+test_test_expedition_survives_a_save_and_needs_the_test_mode :: proc(t: ^testing.T) {
+	path := scratch_path("odin-pp-campaign-test-mode.json")
+	defer os.remove(path)
+	c: Campaign; initialize(&c); defer destroy(&c)
+	testing.expect(t, set_test_all_biomes(&c, true)); testing.expect(t, begin_run(&c, .Space, 9))
+	testing.expect(t, save_slot(path, &c, Test_Snapshot{label = "prova"}))
+	loaded, world, status := load_slot(path, Test_Snapshot)
+	defer destroy(&loaded); defer delete(world.label)
+	testing.expect_value(t, status, Load_Status.Loaded)
+	testing.expect(t, loaded.test_all_biomes && loaded.run.test && loaded.run.biome == .Space)
+	// The run's test mark must agree with the slot's real routes.
+	loaded.test_all_biomes = false; testing.expect(t, !campaign_valid(&loaded))
+	loaded.test_all_biomes = true; loaded.unlocked[Biome.Space] = true; testing.expect(t, !campaign_valid(&loaded))
+	loaded.run.test = false; testing.expect(t, campaign_valid(&loaded))
+}
+
 @(test)
 test_discovery_pool_next_run_and_xp_upgrades :: proc(t: ^testing.T) {
 	c: Campaign; initialize(&c); defer destroy(&c)

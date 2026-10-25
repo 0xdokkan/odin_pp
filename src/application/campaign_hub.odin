@@ -174,7 +174,7 @@ hub_enter_expedition :: proc(h:^Campaign_Hub,frame:^host.Frame) {
 	}
 	scene,ok:=run.expedition_create(&h.progress,&h.saved.expedition,h.path,frame,hub_save,h,hub_flush_checkpoint)
 	if ok {
-		h.departure_unlocked=h.progress.unlocked
+		h.departure_unlocked=hub_open_biomes(&h.progress)
 		if h.smoke_expedition {expedition_enable_smoke(&scene)}
 		host.push(frame,scene)
 	} else {hub_notice(h,"Impossibile ricostruire la spedizione. Il salvataggio e stato conservato.")}
@@ -183,7 +183,23 @@ hub_enter_expedition :: proc(h:^Campaign_Hub,frame:^host.Frame) {
 @(private)
 hub_reveal_new_routes :: proc(h:^Campaign_Hub) {
 	h.revealed_at=h.clock
-	for opened,i in h.progress.unlocked {h.new_islands[i]=opened&&!h.departure_unlocked[i]}
+	for opened,i in hub_open_biomes(&h.progress) {h.new_islands[i]=opened&&!h.departure_unlocked[i]}
+}
+@(private)
+hub_open_biomes :: proc(c:^campaign.Campaign)->(open:[campaign.Biome.Count]bool) {
+	for b in campaign.Biome.Cyber..<campaign.Biome.Count {open[b]=campaign.biome_open(c,b)}
+	return
+}
+// TEMPORARY test mode: every island forms at once; switching off hides the
+// ones the slot has not really opened.
+@(private)
+hub_toggle_test_biomes :: proc(h:^Campaign_Hub) {
+	before:=hub_open_biomes(&h.progress)
+	if !campaign.set_test_all_biomes(&h.progress,!h.progress.test_all_biomes) {return}
+	h.revealed_at=h.clock
+	for opened,i in hub_open_biomes(&h.progress) {h.new_islands[i]=opened&&!before[i]}
+	if !campaign.biome_open(&h.progress,h.selected) {h.selected=.Cyber}
+	_=hub_save(h)
 }
 
 @(private)
@@ -195,7 +211,9 @@ hub_resume :: proc(data:rawptr,frame:^host.Frame,from:string,result:Maybe(host.R
 		// Back from the expedition: on the plaza, in front of the Portal it left by.
 		hub_world_return_to(h,.Portal)
 		if r,ok:=result.?;ok {
-			if r.outcome==.Won {hub_notice(h,world.metadata(h.saved.expedition.world.biome).message);hub_reveal_new_routes(h)}
+			// A test expedition never opens its own biome, so a closed one means a test.
+			if !h.progress.unlocked[h.saved.expedition.world.biome] {hub_notice(h,"Prova finita: lo zaino e a casa. Il progresso non cambia." if r.outcome==.Won else "Prova finita: lo zaino e perduto. Il progresso non cambia.")}
+			else if r.outcome==.Won {hub_notice(h,world.metadata(h.saved.expedition.world.biome).message);hub_reveal_new_routes(h)}
 			else {hub_notice(h,"La memoria si riavvolge. Lo zaino e perduto. Le scoperte restano.")}
 			if r.outcome==.Won && h.saved.expedition.world.biome==.Space && h.progress.normal_ending {h.page=.Memories;h.plaza_from=.Memories;h.memory=-1}
 			if r.outcome==.Won && h.saved.expedition.world.biome==.Secret && h.progress.true_ending {h.page=.Memories;h.plaza_from=.Memories;h.memory=-2}
@@ -306,7 +324,7 @@ hub_island_position :: proc(b:campaign.Biome) -> rl.Vector3 {
 hub_camera :: proc(h:^Campaign_Hub) -> rl.Camera3D {
 	low,high:=rl.Vector3{-14,0,0},rl.Vector3{-14,0,0}
 	for b in campaign.Biome.Cyber..<campaign.Biome.Count {
-		if !h.progress.unlocked[b] && !(b==.Secret&&h.progress.normal_ending) {continue}
+		if !campaign.biome_open(&h.progress,b) && !(b==.Secret&&h.progress.normal_ending) {continue}
 		p:=hub_island_position(b)
 		low.x=min(low.x,p.x);low.z=min(low.z,p.z);high.x=max(high.x,p.x);high.z=max(high.z,p.z)
 	}
@@ -330,10 +348,12 @@ hub_galaxy_input :: proc(h:^Campaign_Hub,frame:^host.Frame) {
 	if input.mouse_pressed(frame.devices,.LEFT) && frame.mouse.y>140 && frame.mouse.x<680 {h.dragging=true;h.last_mouse=frame.mouse}
 	if h.dragging && input.mouse_down(frame.devices,.LEFT) {h.yaw+=(frame.mouse.x-h.last_mouse.x)*.006;h.last_mouse=frame.mouse}
 	if !input.mouse_down(frame.devices,.LEFT) {h.dragging=false}
+	// TEMPORARY test mode switch, only between expeditions.
+	if ui.button(ctx,{236,95,250,32},"TEST tutti i biomi: SI" if c.test_all_biomes else "TEST tutti i biomi: NO",primary=c.test_all_biomes) {hub_toggle_test_biomes(h);ui.cancel_interaction(ctx)}
 	cam:=hub_camera(h)
 	hovered:=campaign.Biome.Count
 	for b in campaign.Biome.Cyber..<campaign.Biome.Count {
-		if !c.unlocked[b] && !(b==.Secret&&c.normal_ending) {continue}
+		if !campaign.biome_open(c,b) && !(b==.Secret&&c.normal_ending) {continue}
 		at:=rl.GetWorldToScreenEx(hub_island_position(b)+{0,1,0},cam,960,540)
 		bounds:=rl.Rectangle{at.x-28,at.y-21,56,42}
 		if at.x>670 || at.y<140 || at.y>460 {continue}
@@ -346,14 +366,16 @@ hub_galaxy_input :: proc(h:^Campaign_Hub,frame:^host.Frame) {
 	metadata:=world.metadata(h.selected)
 	ui.paragraph(ctx,ui.cut_top(&box,46),fmt.tprintf("Guardiano: %s",metadata.boss),.Small,p.text_dim)
 	ui.label(ctx,ui.cut_top(&box,22),fmt.tprintf("Mount: %s",metadata.mount),.Small,p.text_dim)
-	ui.label(ctx,ui.cut_top(&box,24),"Vinto" if c.won[h.selected] else "Da attraversare",.Small,p.warning)
+	status:="Vinto" if c.won[h.selected] else "Da attraversare"
+	if !c.unlocked[h.selected] && campaign.biome_open(c,h.selected) {status="Solo prova: non conta"}
+	ui.label(ctx,ui.cut_top(&box,24),status,.Small,p.warning)
 	indices,n:=hub_biome_arcades(h.selected)
 	for index in indices[:n] {
 		info,_:=activities.minigame_info(index)
 		ui.label(ctx,ui.cut_top(&box,19),info.title,.Small,p.text)
 		ui.label(ctx,ui.cut_top(&box,19),fmt.tprintf("%d/3 stelle  |  %d pt",c.records[index].best_stars,c.records[index].best_score) if c.records[index].plays>0 else "Nessun record",.Small,p.text_dim)
 	}
-	if c.unlocked[h.selected] {
+	if campaign.biome_open(c,h.selected) {
 		if ui.button(ctx,ui.cut_bottom(&box,40),"PARTI",primary=true) {h.launching=true;h.launch_time=0}
 	} else {ui.paragraph(ctx,ui.cut_bottom(&box,58),"Vinci ogni bioma nella stessa serie, senza morire.",.Small,p.warning)}
 	ui.label(ctx,{33,440,640,28},"Trascina il vuoto per orbitare. Scegli un'isola per partire.",.Small,p.text_dim)
@@ -417,9 +439,9 @@ hub_draw_page :: proc(h:^Campaign_Hub,frame:^host.Frame) {
 	cam:=hub_camera(h);rl.BeginMode3D(cam)
 	// Only materialized memories exist. No locked silhouette leaks a route.
 	for b in campaign.Biome.Cyber..<campaign.Biome.Count {
-		if !h.progress.unlocked[b] && !(b==.Secret&&h.progress.normal_ending) {continue}
+		if !campaign.biome_open(&h.progress,b) && !(b==.Secret&&h.progress.normal_ending) {continue}
 		p:=hub_island_position(b);color:=render.expedition_color(b)
-		if !h.progress.unlocked[b] {color={52,52,68,255}}
+		if !campaign.biome_open(&h.progress,b) {color={52,52,68,255}}
 		parent:=campaign.Biome.Cyber
 		#partial switch b {
 		case .Egypt:parent=.West
@@ -433,7 +455,7 @@ hub_draw_page :: proc(h:^Campaign_Hub,frame:^host.Frame) {
 		}
 		from:=hub_island_position(parent)
 		if b==.Cyber {from={-14,-1,0}}
-		if h.progress.unlocked[b] {rl.DrawLine3D(from,p,color)}
+		if campaign.biome_open(&h.progress,b) {rl.DrawLine3D(from,p,color)}
 		lift:=f32(.07)*math.sin(h.clock*.7+f32(b));p.y+=lift
 		hub_draw_island(h,b,p,frame.theme)
 		if !h.progress.won[b] {rl.DrawLine3D(p+{0,1.5,0},p+{0,4+math.sin(h.clock*2)*.3,0},color)}
@@ -446,7 +468,7 @@ hub_draw_page :: proc(h:^Campaign_Hub,frame:^host.Frame) {
 	rl.DrawCubeV(robot,{.6,.9,.13},{231,218,190,255});rl.DrawCubeV(robot+{0,.65,0},{.8,.55,.15},{199,221,225,255});rl.DrawCubeV(robot+{-.2,.66,.09},{.12,.12,.02},{83,242,238,255});rl.DrawCubeV(robot+{.2,.66,.09},{.12,.12,.02},{83,242,238,255})
 	rl.EndMode3D()
 	for b in campaign.Biome.Cyber..<campaign.Biome.Count {
-		if !h.progress.unlocked[b] && !(b==.Secret&&h.progress.normal_ending) {continue}
+		if !campaign.biome_open(&h.progress,b) && !(b==.Secret&&h.progress.normal_ending) {continue}
 		at:=rl.GetWorldToScreenEx(hub_island_position(b)+{0,4.5 if h.progress.won[b] else 3.7,0},cam,960,540)
 		if at.x>660 || at.y<133 {continue}
 		anchor:=rl.GetWorldToScreenEx(hub_island_position(b)+{0,1,0},cam,960,540)

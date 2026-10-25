@@ -29,6 +29,8 @@ Run_Progress :: struct {
 	points: i32,
 	pool: [game.Card_Id.Count]bool,
 	boss_defeated: bool,
+	// TEMPORARY test mode: the biome was open only through test_all_biomes.
+	test: bool,
 }
 Campaign :: struct {
 	initialized: bool,
@@ -49,6 +51,8 @@ Campaign :: struct {
 	play_seconds: f64,
 	saved_unix_seconds: i64,
 	revision: u64,
+	// TEMPORARY test mode: every biome opens for play without touching unlocked.
+	test_all_biomes: bool,
 }
 
 initialize :: proc(c: ^Campaign) {
@@ -63,11 +67,26 @@ initialize :: proc(c: ^Campaign) {
 	}
 }
 destroy :: proc(c: ^Campaign) { if c != nil { delete(c.depot); c^ = {} } }
+// TEMPORARY test mode (branch biomi-sbloccati): to remove it, delete
+// test_all_biomes, Run_Progress.test and every use of them, then read
+// c.unlocked again where biome_open is called. A slot saved during a test
+// expedition would no longer load, so finish those expeditions first.
+biome_open :: proc(c: ^Campaign, biome: Biome) -> bool {
+	return c != nil && biome < .Count && (c.unlocked[biome] || c.test_all_biomes)
+}
+// The switch waits for the hub: an expedition keeps the mode it left with.
+set_test_all_biomes :: proc(c: ^Campaign, on: bool) -> bool {
+	if c == nil || !c.initialized || c.run.active { return false }
+	c.test_all_biomes = on; c.revision += 1
+	return true
+}
 begin_run :: proc(c: ^Campaign, biome: Biome, seed: u64) -> bool {
-	if c == nil || !c.initialized || c.run.active || biome >= .Count || !c.unlocked[biome] ||
+	if c == nil || !c.initialized || c.run.active || !biome_open(c, biome) ||
 	   c.backpack.pending_count > 0 { return false }
-	c.run = {active = true, biome = biome, seed = seed, level = 1, pool = c.discovered}
-	c.visited[biome] = true; c.revision += 1
+	test := !c.unlocked[biome]
+	c.run = {active = true, biome = biome, seed = seed, level = 1, pool = c.discovered, test = test}
+	if !test { c.visited[biome] = true }
+	c.revision += 1
 	return true
 }
 discover :: proc(c: ^Campaign, card: game.Card_Id) -> bool {
@@ -176,6 +195,15 @@ finish_run :: proc(c: ^Campaign, victory: bool, stars: u8 = 0) -> bool {
 		for item in c.backpack.relics { extract_item(c, item) }
 		extract_item(c, c.backpack.weapon)
 		for item in c.backpack.pending[:c.backpack.pending_count] { extract_item(c, item) }
+	}
+	// A test expedition only moves the backpack: wins, streak, routes,
+	// endings and deaths stay as the real progress left them.
+	if c.run.test {
+		if victory { reward_stars(c, stars) }
+		c.backpack = make_backpack(c.backpack_width); c.run = {}; c.revision += 1
+		return true
+	}
+	if victory {
 		c.streak += 1; c.best_streak = max(c.best_streak, c.streak); c.total_wins += 1
 		c.won[biome] = true; c.streak_biomes[biome] = true
 		#partial switch biome {
@@ -197,22 +225,26 @@ finish_run :: proc(c: ^Campaign, victory: bool, stars: u8 = 0) -> bool {
 		if all_before_space { c.unlocked[Biome.Space] = true }
 		if all_won { c.normal_ending = true }
 		if complete_streak { c.unlocked[Biome.Secret] = true }
-		// Bonus tiers are cumulative; archive discovery is deterministic and
-		// cannot consume an expedition's combat or reward random stream.
-		if stars >= 1 { depot_credit(c, 20) }
-		if stars >= 2 { depot_add(c, make_item(.Healing, 2)) }
-		if stars >= 3 {
-			found := false
-			for id in game.Card_Id.Strike..<game.Card_Id.Count {
-				if discover(c, id) { found = true; break }
-			}
-			if !found { depot_add(c, make_item(.Relic, 1, i32(game.Relic_Id.Guard_Sigil))) }
-		}
+		reward_stars(c, stars)
 	} else {
 		c.streak = 0; c.streak_biomes = {}; c.deaths += 1
 	}
 	c.backpack = make_backpack(c.backpack_width); c.run = {}; c.revision += 1
 	return true
+}
+@(private)
+reward_stars :: proc(c: ^Campaign, stars: u8) {
+	// Bonus tiers are cumulative; archive discovery is deterministic and
+	// cannot consume an expedition's combat or reward random stream.
+	if stars >= 1 { depot_credit(c, 20) }
+	if stars >= 2 { depot_add(c, make_item(.Healing, 2)) }
+	if stars >= 3 {
+		found := false
+		for id in game.Card_Id.Strike..<game.Card_Id.Count {
+			if discover(c, id) { found = true; break }
+		}
+		if !found { depot_add(c, make_item(.Relic, 1, i32(game.Relic_Id.Guard_Sigil))) }
+	}
 }
 record_result :: proc(c: ^Campaign, index: int, score: i64, stars: u8, won: bool) -> bool {
 	if c == nil || index < 0 || index >= ARCADE_RECORDS { return false }
@@ -227,7 +259,7 @@ campaign_valid :: proc(c: ^Campaign) -> bool {
 	if c == nil || !c.initialized || !backpack_valid(&c.backpack) || len(c.depot) == 0 || len(c.depot) > 10000 ||
 	   c.backpack_width < BACKPACK_WIDTH || c.backpack_width > GRID_MAX_WIDTH || !c.unlocked[Biome.Cyber] ||
 	   c.play_seconds < 0 || c.play_seconds > 1e12 || c.streak > c.best_streak || c.streak > c.total_wins { return false }
-	if c.run.active && (c.run.biome >= .Count || !c.unlocked[c.run.biome] || c.run.level < 1 || c.run.level > 1000000 ||
+	if c.run.active && (!biome_open(c, c.run.biome) || c.run.test == c.unlocked[c.run.biome] || c.run.level < 1 || c.run.level > 1000000 ||
 	   c.run.xp < 0 || c.run.xp >= xp_for_level(c.run.level) || c.run.points < 0) { return false }
 	for &page in c.depot { if !grid_valid(&page) { return false } }
 	for record in c.records { if record.best_stars > 3 || record.wins > record.plays { return false } }

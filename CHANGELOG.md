@@ -5,6 +5,17 @@ I riferimenti a Classica, `--flat` e ai vecchi smoke descrivono versioni precede
 per i comandi disponibili oggi valgono il [README](README.md) e la documentazione collegata.
 
 
+## 2026-10-25 — Test: tutti i biomi sbloccati (temporaneo)
+
+- Nella galassia del Portale, il pulsante **TEST tutti i biomi** (SI/NO) apre tutte e 12 le isole per giocarle, in ogni
+  slot; si cambia solo tra una spedizione e l'altra e lo slot se lo ricorda.
+- Il progresso vero non cambia: i biomi sbloccati restano quelli guadagnati e, spento il test, la galassia torna com'era.
+  Una spedizione in un bioma aperto solo dal test ("Solo prova: non conta") non tocca biomi vinti, serie, sblocchi,
+  morti e finali; lo zaino segue le regole normali (torna a casa se vinci, si perde se muori) e le stelle danno il loro
+  premio. I biomi già sbloccati davvero contano come sempre anche a test acceso.
+- Per toglierlo: cercare `test_all_biomes` e `Run_Progress.test` (commento in `src/campaign/campaign.odin`); prima,
+  finire le spedizioni di prova in corso, altrimenti quello slot non si carica più. Test: 3 nuovi.
+
 ## 2026-10-25 — Revisione delle carte
 
 - **Ritirate** (il codice resta, ma niente le dà più): Thorn Coat, Afterimage, Counter Rune, Battle Focus, Spark Forge,
