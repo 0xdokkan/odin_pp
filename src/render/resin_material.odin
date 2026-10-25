@@ -1,6 +1,7 @@
 package render
 
 import "core:c"
+import "core:strings"
 import rl "vendor:raylib"
 import rlgl "vendor:raylib/rlgl"
 
@@ -18,6 +19,47 @@ Resin_Lighting :: struct {
 	mode: Resin_Light_Mode,
 	clear: f32,
 	accents: [4]rl.Vector4,
+	// LAYERS (Fase 4 of docs/piano-profondita.md), on a board with layers only (`layered`, the program of
+	// resin_layer_fragment): under a vault the sky's light falls (`underground` 0..1), and the lantern lights the
+	// heights between `band`'s two ends only (none: the second end not above the first).
+	layered: bool,
+	underground: f32,
+	band: [2]f32,
+}
+
+// The program a board with layers is lit with (Fase 4 of docs/piano-profondita.md): the board's own, with the
+// lantern kept to its layer's heights and the sky's light falling under a vault. A board without layers keeps the
+// board's program as it was, to the bit.
+Resin_Layer_Program :: struct {
+	shader: rl.Shader,
+	lantern, eye, hologram, clear, accents, underground, band: c.int,
+}
+
+// TACTICAL_LIGHT_FRAGMENT with the layers' part written in (empty if the source no longer has its anchors).
+@(private)
+resin_layer_fragment :: proc(allocator := context.temp_allocator) -> string {
+	source := string(TACTICAL_LIGHT_FRAGMENT)
+	Edit :: struct { anchor, text: string }
+	edits := [3]Edit{
+		{"uniform vec4 accentLights[4];\n", "uniform vec4 accentLights[4];\nuniform float underground;\nuniform vec2 lanternBand;\n"},
+		{"    spec += pow(max(dot(n,localHalf),0.0), 80.0)*0.30/(1.0+dot(toLight,toLight)*0.025);\n",
+		 "    // The lantern lights its own layer's heights only, not through a deck or the rock.\n" +
+		 "    bool outOfBand = hologram == 0 && lanternBand.y > lanternBand.x && (worldPosition.y < lanternBand.x || worldPosition.y > lanternBand.y);\n" +
+		 "    if (outOfBand) local = 0.0;\n" +
+		 "    else spec += pow(max(dot(n,localHalf),0.0), 80.0)*0.30/(1.0+dot(toLight,toLight)*0.025);\n"},
+		{"    vec3 lit = base*(ambient+vec3(0.67,0.75,0.90)*sun+local*mix(0.36,0.20,clear))*contact;\n",
+		 "    vec3 lit = base*(ambient+vec3(0.67,0.75,0.90)*sun+local*mix(0.36,0.20,clear))*contact;\n" +
+		 "    // Under a vault the sky's light falls; the lantern stays.\n" +
+		 "    if (hologram == 0 && underground > 0.0) {\n" +
+		 "        float sky = 1.0-0.65*underground;\n" +
+		 "        lit = base*(ambient*sky+vec3(0.67,0.75,0.90)*sun*sky+local*mix(0.36,0.20,clear))*contact;\n" +
+		 "    }\n"},
+	}
+	for edit in edits {
+		if strings.count(source, edit.anchor) != 1 { return "" }
+		source, _ = strings.replace(source, edit.anchor, edit.text, 1, allocator)
+	}
+	return source
 }
 
 // Bind one resin pass. Callers keep their shader-availability guards and pair
@@ -36,6 +78,19 @@ begin_resin_lighting :: proc(renderer: ^Renderer, lighting: Resin_Lighting) {
 	if values.mode != .Model {
 		rl.SetShaderValue(v.light_shader, v.light_clear_location, &values.clear, .FLOAT)
 		rl.SetShaderValueV(v.light_shader, v.light_accents_location, raw_data(values.accents[:]), .VEC4, 4)
+	}
+	// A board with layers has its own program (Resin_Layer_Program); every other pass the board's as it was.
+	if values.layered && values.mode == .Board && v.layer_light.shader.id != 0 {
+		p := &v.layer_light
+		rl.SetShaderValue(p.shader, p.lantern, &values.lantern, .VEC3)
+		rl.SetShaderValue(p.shader, p.eye, &values.eye, .VEC3)
+		rl.SetShaderValue(p.shader, p.hologram, &mode, .INT)
+		rl.SetShaderValue(p.shader, p.clear, &values.clear, .FLOAT)
+		rl.SetShaderValueV(p.shader, p.accents, raw_data(values.accents[:]), .VEC4, 4)
+		rl.SetShaderValue(p.shader, p.underground, &values.underground, .FLOAT)
+		rl.SetShaderValue(p.shader, p.band, &values.band, .VEC2)
+		rl.BeginShaderMode(p.shader)
+		return
 	}
 	rl.BeginShaderMode(v.light_shader)
 }

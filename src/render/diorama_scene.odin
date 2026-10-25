@@ -281,7 +281,7 @@ draw_sloped_tile :: proc(renderer: ^Renderer, cell: grid.Position, surface: leve
 }
 
 // The cells of the other layers in the column of `cell` (a bridge's deck, a cave's floor), as the ground's are
-// drawn; what covers the robot waits for the sorted pass, half transparent (height_view.odin).
+// drawn; what fades over the robot waits for the sorted pass (height_view.odin).
 @(private)
 draw_tactical_layer_tiles :: proc(renderer: ^Renderer, room: ^game.Room, cell: grid.Position, preview: ^Card_Range_Preview = nil) {
 	if !board_heights.layered { return }
@@ -289,19 +289,31 @@ draw_tactical_layer_tiles :: proc(renderer: ^Renderer, room: ^game.Room, cell: g
 		if layer == grid.GROUND_LAYER { continue }
 		at := grid.Position{x = cell.x, y = cell.y, layer = i8(layer)}
 		tile, _ := level.tile_at(room.level_data, at)
-		if !level.kind_has_floor(tile.kind) || cell_covers_robot(at) { continue }
+		if !level.kind_has_floor(tile.kind) || cell_cover_opacity(at) < 1 { continue }
 		draw_tactical_tile(renderer, room, tile, at, preview)
+		draw_layer_dim(at)
 	}
 }
 
-// A cell that covers the robot, half transparent: its column, its floor and an outline.
+// A cell fading over the robot (game.layer_cover_opacity), in the sorted pass: its column and its floor, as see-through
+// as the rule says, in the board's resin light.
 @(private)
-draw_layer_cover :: proc(cell: grid.Position) {
+draw_layer_cover :: proc(renderer: ^Renderer, cell: grid.Position, opacity: f32) {
 	top, base := cell_ground(cell), cell_base(cell)
-	center := rl.Vector3{f32(cell.x)+0.5, (top+base)*0.5, f32(cell.y)+0.5}
-	rl.DrawCube(center, 0.99, top-base, 0.99, {40, 50, 64, 70})
-	rl.DrawCube({center.x, top-0.03, center.z}, 0.945, 0.06, 0.945, {70, 86, 104, 90})
-	rl.DrawCubeWires(center, 0.99, top-base, 0.99, {130, 160, 200, 70})
+	alpha := u8(clamp(opacity, 0, 1)*255)
+	shade := u8(gothic_hash(cell.x, cell.y)%11)
+	draw_resin_cube(renderer, {f32(cell.x)+0.5, (top+base)*0.5, f32(cell.y)+0.5}, 0.99, top-base, 0.99, {RESIN_DARK.r, RESIN_DARK.g, RESIN_DARK.b, alpha})
+	draw_resin_cube(renderer, {f32(cell.x)+0.5, top-0.05, f32(cell.y)+0.5}, 0.945, 0.135, 0.945, {43+shade, 52+shade, 65+shade, alpha})
+}
+
+// A cell darker than the rest (game.layer_cell_dim): the outside of a cave, what is under a bridge. A dark veil over
+// its column, as over the outside of a building (structure_outside_dim).
+@(private)
+draw_layer_dim :: proc(cell: grid.Position) {
+	dim := cell_dim(cell)
+	if dim <= 0 { return }
+	top, base := cell_ground(cell), cell_base(cell)
+	rl.DrawCube({f32(cell.x)+0.5, (top+0.03+base)*0.5, f32(cell.y)+0.5}, 1.0, top+0.03-base, 1.0, {4, 6, 14, u8(dim*255)})
 }
 
 @(private)

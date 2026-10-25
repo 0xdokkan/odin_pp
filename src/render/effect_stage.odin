@@ -85,6 +85,9 @@ borrow_renderer_assets :: proc(r, main: ^Renderer) {
 	v.light_shader = m.light_shader
 	v.light_position_location, v.light_hologram_location, v.light_eye_location = m.light_position_location, m.light_hologram_location, m.light_eye_location
 	v.light_clear_location, v.light_accents_location = m.light_clear_location, m.light_accents_location
+	v.layer_light = m.layer_light
+	v.hidden_shader = m.hidden_shader
+	v.hidden_bounds_location, v.hidden_texel_location, v.hidden_radius_location = m.hidden_bounds_location, m.hidden_texel_location, m.hidden_radius_location
 	v.outline_shader = m.outline_shader
 	v.outline_bounds_location, v.outline_texel_location, v.outline_radius_location = m.outline_bounds_location, m.outline_texel_location, m.outline_radius_location
 	v.block_mesh = m.block_mesh

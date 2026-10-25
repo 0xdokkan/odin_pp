@@ -12,7 +12,9 @@ import render "../render"
 // LAYERS (game/layers.odin, Fase 3 of docs/piano-profondita.md) in the lab's sixth arena (run.Mechanics_Lab_Arena.Layers,
 // F3): the player walks up a ramp onto the bridge, a fire is cast from it onto the road, the foe on the bridge is pushed
 // off it and falls, the player walks under the bridge, into the cave through its mouth and up the ladder on the hill's
-// cliff. Stills odin_pp_mechanics_lab_layers_*.png.
+// cliff. With the Fase 4's view (game/layer_view.odin): a foe hidden under the deck shows its outline to the player on
+// the bridge, the pointer reaches a road's cell through the deck faded over the player, and a foe stands on the bridge
+// over him. Stills odin_pp_mechanics_lab_layers_*.png.
 
 // The shortest walk from `from` to `to` across the layers, a step at a time as the player makes it (game.walk_step: a
 // ramp, a mouth, a ladder), round the foes (empty if there is none).
@@ -51,6 +53,27 @@ layers_lab_route :: proc(room: ^game.Room, from, to: grid.Position) -> [dynamic]
 		cell = before
 	}
 	return route
+}
+
+// Sets a foe down on `cell` (a teleport, as the board shows one), the board then left to show it.
+@(private = "file")
+layers_lab_place :: proc(window: ^app.Window, renderer: ^render.Renderer, room: ^game.Room, controller: ^run_session.Tactical_Controller,
+	cards: ^run_session.Card_Interaction_State, buffer: ^run_session.Buffered_Gameplay_Command, archetype: game.Enemy_Archetype, cell: grid.Position) -> bool {
+	foe := game.Enemy{}
+	for enemy in room.enemies { if enemy.archetype == archetype { foe = enemy } }
+	if foe.id == 0 { fmt.eprintln("mechanics lab: no", archetype, "to set down on", cell); return false }
+	game.clear_event_log(room.recent_events)
+	presentation := render.capture_room_presentation(room)
+	place := game.make_action(.Move, game.PLAYER_ENTITY, game.entity_target(game.enemy_entity(foe.id)), .Entity)
+	if !game.add_effect(&place, game.move_effect(game.enemy_entity(foe.id), cell, .Teleport)) { return false }
+	report := game.resolve_action(room, &place)
+	if !report.accepted { fmt.eprintln("mechanics lab: the", archetype, "was not set down on", cell); return false }
+	game.append_event_log(room.recent_events, &report.events)
+	after := render.capture_room_presentation(room)
+	if !render.begin_renderer_event_timeline(renderer, presentation, room.recent_events, &after) { return false }
+	for _ in 0..<40 { mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0) }
+	placed := mechanics_lab_enemy(room, foe.id)
+	return placed != nil && placed.position == cell
 }
 
 // Walks the player to `to`, the foes held, and takes a still there.
@@ -95,6 +118,11 @@ mechanics_lab_layers :: proc(window: ^app.Window, renderer: ^render.Renderer, ro
 	edge := grid.Position{x = 17, y = 15, layer = 1}
 	if !layers_lab_walk(window, renderer, room, controller, cards, buffer, edge, "odin_pp_mechanics_lab_layers_bridge.png") { return false }
 
+	// The brute under the deck, beside the player's column: the deck hides it, its outline shows; the road under the
+	// player is a little darker (Fase 4).
+	if !layers_lab_place(window, renderer, room, controller, cards, buffer, .Brute, {x = 16, y = 14}) { return false }
+	mechanics_lab_still(window, renderer, room, 0, "odin_pp_mechanics_lab_layers_foe_under.png")
+
 	// A fire cast from the bridge onto the road below: the line goes down past the deck's edge.
 	fire, has_fire := mechanics_lab_card_of(player, .Wildfire)
 	if !has_fire { fmt.eprintln("mechanics lab: no Incendio in hand"); return false }
@@ -130,8 +158,22 @@ mechanics_lab_layers :: proc(window: ^app.Window, renderer: ^render.Renderer, ro
 	for _ in 0..<14 { mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0) }
 	artifacts.screenshot("odin_pp_mechanics_lab_layers_fall.png")
 
-	// Down the east ramp and back along the road, under the bridge: its deck over the player is half seen.
+	// Down the east ramp and back along the road, under the bridge: its deck over the player fades.
 	if !layers_lab_walk(window, renderer, room, controller, cards, buffer, {x = 17, y = 14}, "odin_pp_mechanics_lab_layers_under.png") { return false }
+
+	// The pointer on a road's cell under the deck: it goes through the deck faded over the player (Fase 4).
+	pointed := grid.Position{x = 19, y = 13}
+	render.update_tactical_view(renderer, room, render.tactical_project(renderer, {f32(pointed.x)+0.5, f32(pointed.y)+0.5}, 0.03), true)
+	if !renderer.has_hovered_cell || renderer.hovered_cell != pointed {
+		fmt.eprintln("mechanics lab: the pointer under the deck picked", renderer.hovered_cell, "not", pointed); return false
+	}
+	// Shown with the Incendio aimed there: the cell under the deck is its target.
+	player.deck.energy = player.deck.rules.max_energy
+	mechanics_lab_capture_hits(window, renderer, room, fire.id, 0, pointed, "odin_pp_mechanics_lab_layers_pointer.png")
+
+	// The archer set back on the bridge, over the player: it stands on the faded deck.
+	if !layers_lab_place(window, renderer, room, controller, cards, buffer, .Archer, {x = 18, y = 14, layer = 1}) { return false }
+	mechanics_lab_still(window, renderer, room, 0, "odin_pp_mechanics_lab_layers_foe_over.png")
 	// Into the cave through its west mouth, beside the foe waiting in its room: the hill over it is half seen.
 	if !layers_lab_walk(window, renderer, room, controller, cards, buffer, {x = 37, y = 7, layer = -1}, "odin_pp_mechanics_lab_layers_cave.png") { return false }
 	// Out again, and up the ladder on the hill's west cliff, onto its top.

@@ -5,6 +5,19 @@ I riferimenti a Classica, `--flat` e ai vecchi smoke descrivono versioni precede
 per i comandi disponibili oggi valgono il [README](README.md) e la documentazione collegata.
 
 
+## 2026-10-25 — Profondità, Fase 4: piani nel laboratorio, grafica
+
+- I piani si leggono a schermo, con funzioni pure come quelle degli edifici (`game/layer_view.odin`). Ciò
+  che sta sopra la testa del robot si apre a poco a poco entro 6 caselle. In grotta il fuori si scurisce e
+  la luce del cielo cala; resta la lanterna, che illumina solo il suo piano. Sul ponte ciò che sta sotto si
+  scurisce un poco (scelta dell'utente).
+- Chi è coperto si vede con il contorno del suo colore (`render/layer_outline.odin`). Il mouse attraversa
+  ciò che è diradato e da sotto il ponte punta la strada. La telecamera segue morbida il cambio di piano.
+- Atto dello smoke `layers` con tre catture nuove: nemico sotto il ponte visto dal ponte, mouse su una
+  casella sotto il ponte, nemico sul ponte sopra il robot. Senza piani nulla cambia: un tabellone con i
+  piani usa una variante dello shader della resina, e le altre catture restano identiche al byte.
+  Prestazioni: −0,0% di media rispetto alla Fase 3. Test: 4 nuovi (1688 in tutto).
+
 ## 2026-10-25 — Profondità, Fase 3: piani nel laboratorio, dati e regole
 
 - La mappa può avere caselle sopra la terra (un ponte, piano +1) e sotto (grotte, −1 e −2): `level.Level`

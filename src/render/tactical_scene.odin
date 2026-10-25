@@ -2,9 +2,11 @@ package render
 
 import "core:c"
 import "core:math"
+import "core:strings"
 import rl "vendor:raylib"
 import game "../game"
 import grid "../engine/grid"
+import level "../level"
 import view "../engine/view"
 
 Tactical_Visibility_Context :: struct {renderer: ^Renderer, room: ^game.Room}
@@ -81,14 +83,39 @@ create_tactical_lighting :: proc(renderer: ^Renderer) {
 	v.light_eye_location = rl.GetShaderLocation(v.light_shader, "eye")
 	v.light_clear_location = rl.GetShaderLocation(v.light_shader, "roomClear")
 	v.light_accents_location = rl.GetShaderLocation(v.light_shader, "accentLights[0]")
+	// The program of a board with layers (Resin_Layer_Program).
+	if layered := resin_layer_fragment(); layered != "" {
+		p := &v.layer_light
+		p.shader = rl.LoadShaderFromMemory(TACTICAL_LIGHT_VERTEX, strings.clone_to_cstring(layered, context.temp_allocator))
+		if p.shader.id != 0 {
+			p.lantern = rl.GetShaderLocation(p.shader, "lantern")
+			p.hologram = rl.GetShaderLocation(p.shader, "hologram")
+			p.eye = rl.GetShaderLocation(p.shader, "eye")
+			p.clear = rl.GetShaderLocation(p.shader, "roomClear")
+			p.accents = rl.GetShaderLocation(p.shader, "accentLights[0]")
+			p.underground = rl.GetShaderLocation(p.shader, "underground")
+			p.band = rl.GetShaderLocation(p.shader, "lanternBand")
+		}
+	}
 }
 @(private)
 begin_tactical_lighting :: proc(renderer: ^Renderer, hologram: bool = false, accents: [4]rl.Vector4 = {}) {
 	v := &renderer.tactical
 	p := v.snapshot.player.position
+	lantern := rl.Vector3{p.x+0.5, 2.8, p.y+0.5}
+	underground, band := f32(0), [2]f32{}
+	// On a board with layers the lantern goes with the robot's floor and lights its own layer; under a vault the
+	// sky's light falls (Fase 4 of docs/piano-profondita.md).
+	if !hologram && board_view.layered {
+		ground := entity_point_ground(game.PLAYER_ENTITY, p)
+		lantern.y += ground
+		band = {ground-0.05, ground+f32(level.LAYER_CLEARANCE)*game.HEIGHT_STEP_DRAWN}
+		if board_view.vault { underground = 1 }
+	}
 	begin_resin_lighting(renderer, {
-		eye = v.camera.position, lantern = {p.x+0.5, 2.8, p.y+0.5},
+		eye = v.camera.position, lantern = lantern,
 		mode = .Hologram if hologram else .Board, clear = v.clear_light, accents = accents,
+		layered = !hologram && board_view.layered, underground = underground, band = band,
 	})
 }
 @(private)

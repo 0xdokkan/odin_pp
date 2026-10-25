@@ -102,6 +102,42 @@ una moltiplicazione della luce condivisa. Muretti e oggetti sono blocchi cotti c
 ([structure_diorama.odin](../src/render/structure_diorama.odin),
 [structure_expedition.odin](../src/render/structure_expedition.odin)).
 
+### I piani nel laboratorio
+
+Nell'arena «Piani» della Prova meccaniche (Fasi 3 e 4 del [piano della profondità](piano-profondita.md)) ci
+sono un ponte sopra la strada e una grotta dentro la collina. Come si vedono lo decidono funzioni pure,
+come per gli edifici ([layer_view.odin](../src/game/layer_view.odin)); il renderer disegna solo ciò che
+dicono e non cambia nessuna regola.
+
+- **Diradamento.** Ciò che sta sopra la testa del robot, su un piano più alto del suo, si apre a poco a
+  poco entro 6 caselle: l'impalcato del ponte quando ci passa sotto, la roccia della collina quando è in
+  grotta. Accanto al robot è quasi sparito (15%), e da 6 caselle in là è intero. Le caselle diradate vanno
+  nel passaggio ordinato con gli attori, in resina trasparente
+  ([height_view.odin](../src/render/height_view.odin)).
+- **Scurimento.**
+  - In grotta, sotto la volta, tutto ciò che non sta sul piano del robot si scurisce, come fuori da un
+    edificio.
+  - Sul ponte, ciò che sta sotto il robot si scurisce un poco, per dare profondità (scelta dell'utente).
+- **Luce.**
+  - In grotta la luce del cielo cala, e resta la lanterna del robot.
+  - Con i piani la lanterna segue il pavimento del robot e illumina solo le altezze del suo piano: non
+    passa attraverso l'impalcato o la roccia.
+  - Lo fa una variante dello shader della resina, usata solo su un tabellone con i piani, con due valori
+    in più (`underground` e `lanternBand`): `resin_layer_fragment` in
+    [resin_material.odin](../src/render/resin_material.odin). Senza piani resta lo shader di prima, e le
+    catture restano identiche al byte.
+- **Nascosti.** Chi è coperto da qualcosa disegnato intero si vede attraverso con il contorno del suo
+  colore: chiaro il robot, rosso i nemici, come le loro basi. Ne è un esempio un nemico sotto l'impalcato
+  visto dal ponte, o un nemico in grotta visto da fuori. Il contorno nasce dalla trasparenza della
+  figura, come quello a fumetto, ed è disegnato sopra tutto
+  ([layer_outline.odin](../src/render/layer_outline.odin)).
+- **Mouse.** Il raggio attraversa le colonne e si ferma sul primo pezzo pieno. Salta però ciò che è
+  diradato più della metà: da sotto il ponte si puntano le caselle della strada attraverso l'impalcato.
+- **Telecamera.** Sale e scende in modo morbido quando il robot cambia piano, per esempio su una scala.
+- **Ombre.** Personaggi e ombre stanno sul pavimento del loro piano.
+
+Senza piani tutto questo non si attiva: le altre arene restano come prima.
+
 ### Bersagli in evidenza
 
 Mentre si sceglie una carta, ogni nemico che una giocata valida colpirebbe

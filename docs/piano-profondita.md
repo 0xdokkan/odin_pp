@@ -51,7 +51,7 @@ La tabella è in ordine di priorità, cioè l'ordine della scaletta qui sotto.
 | 1 | 1 | Terreno scolpito: rampe, colline e dirupi di roccia, solo grafica | — (meglio dopo la 0) | Fatta | vedi Esito |
 | 2 | 2 | Posizioni con il piano: il terzo numero, tutto a «terra» | — | Fatta | vedi Esito |
 | 3 | 3 | Piani nel laboratorio: dati e regole | 2 | Fatta | vedi Esito |
-| 4 | 4 | Piani nel laboratorio: trasparenze, contorni, mouse, luce | 3 (1 per l'aspetto) | Da fare | — |
+| 4 | 4 | Piani nel laboratorio: trasparenze, contorni, mouse, luce | 3 (1 per l'aspetto) | Fatta | vedi Esito |
 | 5 | 5 | Piani nelle spedizioni: grotte senza caricamento | 1, 3, 4 | Da fare | — |
 | 6 | 6 | Editor per scolpire i piani | 1, 3 (5 per le mappe dei biomi) | Da fare | — |
 | 7 | 7 | Ponti, gallerie e scorciatoie nei biomi | 5, 6 | Da fare | — |
@@ -381,7 +381,8 @@ ascensori, solo scale a pioli (risposte nell'Esito della Fase 3).
 
 - Ciò che sta sopra la testa del robot, vicino a lui, si dirada come gli
   edifici della Fase 6 del piano della griglia: la roccia sopra la grotta
-  quando è dentro, il ponte quando ci passa sotto.
+  quando è dentro, il ponte quando ci passa sotto. Quando il robot è sul
+  ponte, ciò che sta sotto si scurisce un poco (Fase 4).
 - Dentro una grotta il fuori si scurisce, come fuori da un edificio; sotto
   terra la luce è più scura e restano le luci dei personaggi.
 - Chi è nascosto sotto un ponte o dietro la roccia si vede con un contorno.
@@ -1353,6 +1354,9 @@ Tutto nel laboratorio; le spedizioni lo riusano nella Fase 5.
 - **Cosa si dirada:** una regola pura, come `structure_visibility`. Ciò che
   sta sopra la testa del robot, entro un raggio, si dirada; quando il robot è
   sotto una volta, il fuori si scurisce come fuori da un edificio.
+- **Sotto il ponte, più scuro** (scelta dell'utente nella Fase 4): quando il
+  robot è su un piano sopra la terra, ciò che sta sotto di lui si scurisce un
+  poco, per dare profondità.
 - **Contorni** per i personaggi nascosti sotto un ponte o dietro la roccia, del
   loro colore.
 - **Mouse** sui piani visibili: il raggio salta ciò che è diradato.
@@ -1414,7 +1418,89 @@ alla fine.
 
 ### Esito
 
-Da fare.
+**Fatta il 25 ottobre 2026** sul ramo `piano-profondita`.
+
+**Risposte dell'utente**
+1. **Cosa si dirada:** ciò che sta sopra la testa del robot entro 6 caselle, con un'apertura graduale come
+   gli edifici.
+2. **Personaggi nascosti:** un contorno del loro colore.
+3. **Luce sotto terra:** più scura, con le luci dei personaggi.
+4. **Ciò che sta sotto il robot quando è sul ponte:** un po' più scuro, non il consigliato «normalmente».
+   Il documento è aggiornato (sezione 2.6 e Progetto di questa fase).
+
+**Il codice citato** c'era ancora tutto; in `height_view.odin` le righe si sono spostate con la Fase 3
+(all'inizio di questa fase `terrain_hides_actor` era alla 329).
+
+**Cosa è stato fatto**
+- **Regole pure** (`src/game/layer_view.odin`), come `structure_visibility`:
+  - `layer_cover_opacity`: un pezzo su un piano sopra il robot, con la cima sopra la sua testa, entro 6
+    caselle si apre dal 100% fino al 15% accanto a lui;
+  - `layer_viewer_in_vault` e `layer_cell_dim`: in grotta, sotto la volta, è più scuro tutto ciò che non
+    sta sul suo piano (60%); sul ponte, ciò che sta sotto di lui (25%);
+  - `layer_solid_owner`: a quale pezzo appartiene un'altezza di una colonna (l'impalcato è del ponte, la
+    roccia è della terra);
+  - `layer_figure_hidden`: una figura è nascosta se la linea dalla telecamera al suo petto entra in un pezzo
+    disegnato quasi intero; il pavimento sotto la figura non conta.
+- **Disegno nel laboratorio:**
+  - le caselle diradate vanno nel passaggio ordinato con gli attori, in resina trasparente. Prendono il
+    posto dei riquadri provvisori della Fase 3;
+  - le caselle più scure hanno un velo scuro sulla colonna, come fuori da un edificio;
+  - un tabellone con i piani usa una variante dello shader della resina, con due valori nuovi:
+    `underground`, per cui in grotta la luce del cielo cala al 35%, e `lanternBand`, per cui la lanterna sale
+    con il pavimento del robot e illumina solo le altezze del suo piano (`resin_layer_fragment`,
+    `Resin_Layer_Program`). Senza piani resta lo shader di prima, identico;
+  - i nascosti hanno un contorno del loro colore (chiaro il robot, rosso i nemici), disegnato sopra tutto.
+    Lo fa uno shader nuovo che dilata la trasparenza della figura come il contorno a fumetto, ma tiene solo
+    l'anello e un velo dentro (`src/render/layer_outline.odin`);
+  - il mouse attraversa i pezzi diradati più della metà (`game.LAYER_PICK_THROUGH`);
+  - la telecamera va verso la quota del nuovo piano di un quinto a ogni aggiornamento della vista;
+  - le ombre stavano già sul piano di chi le fa dalla Fase 3.
+- **Atto dello smoke `layers`:** tre catture nuove:
+  - il bruto sotto l'impalcato visto dal robot sul ponte, con il contorno rosso;
+  - il mouse su una casella della strada sotto l'impalcato diradato, mostrata con l'anteprima
+    dell'Incendio. L'atto controlla che il puntatore prenda proprio quella casella;
+  - l'arciere sul ponte sopra il robot.
+
+  La cattura della grotta ora ha la collina che si apre, il fuori più scuro e la lanterna.
+- **Test:** 4 nuovi. 3 in `game` sulle regole pure (diradamento, scurimento, nascosti) e 1 in `render`: il
+  mouse attraversa l'impalcato diradato e si ferma su quello intero.
+
+**Scelte prese durante la fase**
+- **Quando si dirada:** sempre, sopra la testa del robot, anche se non è proprio sotto. Il ponte si apre
+  già quando il robot gli passa accanto sulla strada.
+- **Nascosti:** valgono anche il terreno e i rilievi, nell'arena con i piani. Un nemico dietro una rampa,
+  visto dalla grotta, ha il contorno.
+- **Scurimento e diradamento cambiano di colpo**, al cambio di casella del robot (per lo scurimento) o con
+  il suo punto disegnato (per il diradamento), senza animazione: così lo smoke resta deterministico.
+
+**Verifiche**
+- **Check e test.** Check normale e senza assert, senza avvisi. `.\scripts\check.ps1` completo: 1688 test
+  verdi (1684 più i 4 nuovi), con e senza assert, più le due build.
+- **Atto `layers` dello smoke del laboratorio.** Le dieci catture, guardate:
+  - in grotta: la collina si apre attorno al robot, il fuori è più scuro, resta la lanterna, il nemico nella
+    stanza ha il contorno;
+  - dal ponte: il bruto sotto l'impalcato si vede col contorno rosso, la strada è un poco più scura;
+  - sotto il ponte: l'impalcato si apre sopra il robot e l'arciere ci sta sopra;
+  - il mouse prende la casella della strada (19,13) attraverso l'impalcato. L'atto lo controlla e la
+    mostra con l'anteprima dell'Incendio.
+- **Smoke del laboratorio completo, contro la Fase 3.**
+  - Le 87 catture prima dell'atto dei piani sono identiche al byte. Cambiano le 7 dell'atto dei piani (il
+    disegno nuovo) e le 23 degli atti dopo: l'atto più lungo sposta l'orologio delle animazioni.
+  - Una copia del gioco che salta solo l'atto dei piani rifà tutte le 109 catture della Fase 2, identiche
+    al byte. Senza piani il disegno non è cambiato in niente.
+  - In una prima versione la Fase 4 cambiava lo shader della resina per tutti. Erano 71 catture con al
+    massimo 7 pixel diversi ciascuna, sempre di 1 su 255. Per questo i piani hanno una variante tutta loro
+    e lo shader di prima resta identico.
+- **Smoke delle spedizioni completo.** 103 catture, nessun errore. Come sempre non si confrontano al byte (81
+  diverse dalla Fase 3, come fra due corse uguali). Lo scontro su due livelli è come prima.
+- **Benchmark contro la Fase 3.** Due corse alla corrente, sulla RTX 3060, 22 secondi a corsa. La media dei
+  gruppi è −0,0%. Il gruppo peggiore è lo scontro su due livelli, uno stage solo: +4,3%, cioè 0,05 ms,
+  sotto la soglia del rumore. Le due corse concordano (2,1% di scarto medio fra le mediane, 101 stage su
+  103 entro il 10%).
+
+**Non fatto, per le fasi dopo**
+- Le spedizioni non usano ancora niente di tutto questo: arriva con la Fase 5.
+- La telecamera segue la quota, ma non si avvicina in grotta.
 
 ## 8. Fase 5 — Piani nelle spedizioni: grotte senza caricamento
 

@@ -156,3 +156,27 @@ test_the_pointer_and_the_figures_find_their_layer :: proc(t: ^testing.T) {
 	testing.expect(t, abs(entity_point_ground(on_bridge, {5, 4})-12*step) < 0.0001)
 	testing.expect_value(t, entity_point_ground(on_road, {5, 4}), f32(0))
 }
+
+// The pointer goes through a deck faded over the robot, to the road under it, and stops on the deck when it is
+// whole (Fase 4 of docs/piano-profondita.md).
+@(test)
+test_the_pointer_goes_through_what_fades_over_the_robot :: proc(t: ^testing.T) {
+	data, _ := level.create(10, 10, level.Tile{kind = .Floor})
+	defer level.destroy(&data)
+	defer set_board_level(nil)
+	for y in 0..<10 {
+		bridge := grid.Position{x = 5, y = y, layer = 1}
+		level.set_tile(&data, bridge, {kind = .Floor})
+		level.set_height(&data, bridge, level.LAYER_SPACING)
+	}
+	set_board_level(&data)
+	defer board_view = {}
+	board_view = {layered = true, viewer = {point = {0.5, 0.5}, cell = {x = 0, y = 0}}}
+	cell, ok := pick_ground_cell({5.5, 5, 4.5}, {0, -1, 0})
+	testing.expect(t, ok)
+	testing.expect_value(t, cell, grid.Position{x = 5, y = 4, layer = 1})
+	board_view = {layered = true, viewer = {point = {5.5, 5.5}, cell = {x = 5, y = 5}}}
+	cell, ok = pick_ground_cell({5.5, 5, 4.5}, {0, -1, 0})
+	testing.expect(t, ok)
+	testing.expect_value(t, cell, grid.Position{x = 5, y = 4})
+}

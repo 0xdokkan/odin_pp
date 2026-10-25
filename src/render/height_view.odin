@@ -213,38 +213,44 @@ cell_base :: proc(cell: grid.Position) -> f32 {
 	return base
 }
 
-// HALF SEEN, a first drawing of the layers (Fase 3 of docs/piano-profondita.md; the Fase 4 does the rest): when
-// the robot stands under something (a cave's rock, a bridge's deck), what covers it near it is drawn half
-// transparent, in the sorted pass.
+// THE LAYERS ROUND THE ROBOT (Fase 4 of docs/piano-profondita.md; the rules are game/layer_view.odin): where he
+// stands this frame, for what fades over him, what is darker and who is hidden. Set once a frame with the board.
 @(private)
-Board_Cover :: struct {
-	under:        bool,
-	robot:        grid.Position,
-	robot_height: f32,
+Board_View :: struct {
+	layered: bool,
+	viewer:  game.Layer_Viewer,
+	// Under a vault (in a cave): the outside is darker and the sky's light falls.
+	vault:   bool,
 }
 
 @(private)
-board_cover: Board_Cover
-
-BOARD_COVER_RADIUS :: 5
+board_view: Board_View
 
 @(private)
-set_board_cover :: proc(room: ^game.Room) {
-	board_cover = {}
+set_board_view :: proc(renderer: ^Renderer, room: ^game.Room) {
+	board_view = {}
 	if room == nil || room.player == nil || !board_heights.layered { return }
-	robot := room.player.position
+	// His point as the board shows him (sliding between cells), his cell as the rules have it.
+	p := renderer.tactical.snapshot.player.position if renderer != nil && renderer.tactical.snapshot != nil else view.Vec2{f32(room.player.position.x), f32(room.player.position.y)}
 	m := board_layer_map()
-	column := level.column_of(&m, robot.x, robot.y)
-	under := robot.layer < grid.GROUND_LAYER || level.column_room_top(&column, level.map_height(&m, robot)) < level.COLUMN_FAR
-	board_cover = {under = under, robot = robot, robot_height = cell_ground(robot)}
+	viewer := game.Layer_Viewer{point = {p.x+0.5, p.y+0.5}, cell = room.player.position}
+	board_view = {layered = true, viewer = viewer, vault = game.layer_viewer_in_vault(&m, viewer)}
 }
 
-// Whether `cell` is drawn half transparent: near the robot under cover, on a layer over his and above his head.
+// How whole `cell` is drawn (1 whole: always, on a board without layers).
 @(private)
-cell_covers_robot :: proc(cell: grid.Position) -> bool {
-	c := &board_cover
-	if !c.under || cell.layer <= c.robot.layer || max(abs(cell.x-c.robot.x), abs(cell.y-c.robot.y)) > BOARD_COVER_RADIUS { return false }
-	return cell_ground(cell) > c.robot_height+2*game.HEIGHT_STEP_DRAWN
+cell_cover_opacity :: proc(cell: grid.Position) -> f32 {
+	if !board_view.layered { return 1 }
+	m := board_layer_map()
+	return game.layer_cover_opacity(&m, board_view.viewer, cell)
+}
+
+// How much darker `cell` is drawn (0: not at all, on a board without layers).
+@(private)
+cell_dim :: proc(cell: grid.Position) -> f32 {
+	if !board_view.layered { return 0 }
+	m := board_layer_map()
+	return game.layer_cell_dim(&m, board_view.viewer, cell)
 }
 
 // The cell `entity` stands on this frame, on its layer (found false off a map with layers).
@@ -305,14 +311,9 @@ pick_ground_cell :: proc(origin, direction: [3]f32) -> (cell: grid.Position, ok:
 		probe := grid.Position{x = int(math.floor(x)), y = int(math.floor(z))}
 		if probe.x < 0 || probe.y < 0 || probe.x >= board_heights.width || probe.y >= board_heights.height { continue }
 		if board_column_layered(probe) {
-			column := level.column_of(&layers, probe.x, probe.y)
-			steps := (y-0.02)/game.HEIGHT_STEP_DRAWN
-			for span in column.solids[:column.solid_count] {
-				if f32(span.bottom) > steps || steps >= f32(span.top) { continue }
-				hit := probe
-				for floor, i in column.floors[:column.floor_count] { if column.floor_heights[i] == span.top { hit = floor } }
-				return hit, true
-			}
+			// A piece faded enough over the robot (a bridge's deck, a hill's rock) lets the ray through (Fase 4).
+			owner, inside := game.layer_solid_owner(&layers, probe.x, probe.y, (y-0.02)/game.HEIGHT_STEP_DRAWN)
+			if inside && cell_cover_opacity(owner) > game.LAYER_PICK_THROUGH { return owner, true }
 			continue
 		}
 		if y <= level.surface_height_at(&m, x, z)*game.HEIGHT_STEP_DRAWN+0.02 { return probe, true }

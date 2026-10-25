@@ -115,15 +115,18 @@ collect_tactical_translucents :: proc(renderer: ^Renderer, room: ^game.Room = ni
 			}
 		} }
 	}
-	// What covers the robot under a cave's rock or a bridge's deck (height_view.odin): a cell a layer, its layer in
-	// the entry's `attack`.
-	if room != nil && board_cover.under {
-		c := board_cover.robot
-		for y in c.y-BOARD_COVER_RADIUS..=c.y+BOARD_COVER_RADIUS { for x in c.x-BOARD_COVER_RADIUS..=c.x+BOARD_COVER_RADIUS {
+	// What fades over the robot (game.layer_cover_opacity): a cell a layer, its layer in the entry's `attack`.
+	if room != nil && board_view.layered {
+		c := board_view.viewer.cell
+		reach := int(game.LAYER_FADE_FAR)+1
+		for y in c.y-reach..=c.y+reach { for x in c.x-reach..=c.x+reach {
 			for layer in grid.LOWEST_LAYER..=grid.HIGHEST_LAYER {
 				cell := grid.Position{x = x, y = y, layer = i8(layer)}
-				if !cell_covers_robot(cell) || !level.kind_has_floor(board_tile(cell)) { continue }
-				append(entries, Tactical_Alpha_Entry{kind = .Cover, attack = i32(layer), position = {f32(x), f32(y)}})
+				kind := board_tile(cell)
+				if kind == .Void || layer != grid.GROUND_LAYER && !level.kind_has_floor(kind) { continue }
+				if opacity := cell_cover_opacity(cell); opacity < 1 {
+					append(entries, Tactical_Alpha_Entry{kind = .Cover, attack = i32(layer), position = {f32(x), f32(y)}, opacity = opacity})
+				}
 			}
 		} }
 	}
@@ -180,14 +183,16 @@ draw_tactical_billboards :: proc(renderer: ^Renderer, room: ^game.Room = nil, li
 			if walls_active { rl.EndShaderMode(); walls_active = false }
 			draw_dino_entry(renderer, entry)
 		} else if entry.kind == .Cover {
-			if walls_active { rl.EndShaderMode(); walls_active = false }
-			draw_layer_cover({x = int(entry.position.x), y = int(entry.position.y), layer = i8(entry.attack)})
+			if !walls_active { begin_tactical_lighting(renderer, accents = lights); walls_active = true }
+			draw_layer_cover(renderer, {x = int(entry.position.x), y = int(entry.position.y), layer = i8(entry.attack)}, entry.opacity)
 		} else {
 			if walls_active { rl.EndShaderMode(); walls_active = false }
 			tactical_billboard(renderer, entry.key, entry.position, entry.opacity, entry.entity)
 		}
 	}
 	if walls_active { rl.EndShaderMode() }
+	// Who is hidden under a deck or in the rock shows its outline, over everything (layer_outline.odin).
+	draw_hidden_outlines(renderer, room)
 	// The board pass only: the hologram has no room.
 	draw_living_rings(renderer, room)
 }
