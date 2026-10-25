@@ -14,7 +14,7 @@ per i comandi disponibili oggi valgono il [README](README.md) e la documentazion
 - 3215 posizioni riscritte con l'aiuto del compilatore: 2909 con i nomi, 300 vicine con `grid.offset`.
 - Una posizione pesa 24 byte invece di 16: i limiti del test sul budget dello stack crescono (`Room` 9 KB,
   registri degli eventi 104 KB), le `Renderer` dei test passano sullo heap, i salvataggi crescono del 21%
-  (+50 ms, in background). Test: 4 nuovi (1665 in tutto).
+  (+50 ms, in background). Test: 3 nuovi (1665 in tutto).
 
 ## 2026-10-25 — Profondità, Fase 1: terreno scolpito
 

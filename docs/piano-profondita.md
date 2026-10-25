@@ -978,10 +978,11 @@ fine.
 - **Indici a mano:** `reachable_walkable` (strutture) passa da `grid.cell_index`. Gli altri lavorano su
   finestre locali di interi, giuste finché tutto sta sulla terra, e diventano per piano nella Fase 3.
   `place_check` rifiuta le strutture fuori dalla terra.
-- **Test:** 4 nuovi. Tre in `engine/grid`: una griglia ha un piano solo, `offset` conserva il piano, una
-  posizione salvata senza `layer` torna sulla terra. Uno in `level`: niente strutture fuori dalla terra.
-  Nei test esistenti, oltre alla scrittura delle posizioni, due cambi approvati dall'utente: i limiti
-  del budget dello stack e le `Renderer` sullo heap (32 dichiarazioni in 20 file).
+- **Test:** 3 nuovi, in `engine/grid`: una griglia ha un piano solo, `offset` conserva il piano, una
+  posizione salvata senza `layer` torna sulla terra. In `level` un test esistente ha due controlli in
+  più: la stessa struttura si piazza sulla terra e non su un altro piano. Nei test esistenti, oltre alla
+  scrittura delle posizioni, due cambi approvati dall'utente: i limiti del budget dello stack e le
+  `Renderer` sullo heap (35 in 20 file).
 
 **Costi misurati**
 - Una posizione pesa 24 byte invece di 16. Un evento di gioco passa da 232 a 248 byte, `Room` da 7.768 a
