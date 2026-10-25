@@ -22,8 +22,8 @@ test_input_snapshots_preserve_blocked_state_and_previous_capture :: proc(t: ^tes
 	defer level.destroy(&data)
 	run := game.Run_State{seed = 98765, phase = .In_Room, player = create_gameplay_command_test_player(t)}
 	testing.expect(t, game.configure_tactical(&run.player, game.DEFAULT_TACTICAL_CONFIG))
-	enemies := [?]game.Enemy_Spawn{{position = {2, 1}, health = 8, attack = 1}}
-	objects := [?]game.Grid_Object_Spawn{{kind = .Ice_Block, position = {1, 2}}}
+	enemies := [?]game.Enemy_Spawn{{position = {x = 2, y = 1}, health = 8, attack = 1}}
+	objects := [?]game.Grid_Object_Spawn{{kind = .Ice_Block, position = {x = 1, y = 2}}}
 	room, created := game.create_room(&data, &run.player, {enemies = enemies[:], objects = objects[:]})
 	testing.expect(t, created)
 	defer game.destroy_room(&room)

@@ -69,10 +69,10 @@ flood_group_head :: proc(timeline: ^Presentation_Timeline) -> (head: ^Presentati
 @(private = "file")
 flood_cell :: proc(direction: game.Move_Direction, index, across, length, width, height: int) -> grid.Position {
 	switch direction {
-	case .East: return {index, across}
-	case .West: return {width-1-index, across}
-	case .South: return {across, index}
-	case .North: return {across, height-1-index}
+	case .East: return {x = index, y = across}
+	case .West: return {x = width-1-index, y = across}
+	case .South: return {x = across, y = index}
+	case .North: return {x = across, y = height-1-index}
 	}
 	return {}
 }
@@ -225,8 +225,8 @@ draw_flood_preview :: proc(renderer: ^Renderer, room: ^game.Room) {
 	}
 	// The line through the player, from the wall behind him to the wall in front.
 	start := room.player.position
-	for grid.contains(tiles, {start.x-step.x, start.y-step.y}) { start = {start.x-step.x, start.y-step.y} }
-	for cell := start; grid.contains(tiles, cell); cell = {cell.x+step.x, cell.y+step.y} {
+	for grid.contains(tiles, grid.offset(start, -step.x, -step.y)) { start = grid.offset(start, -step.x, -step.y) }
+	for cell := start; grid.contains(tiles, cell); cell = grid.offset(cell, step.x, step.y) {
 		if game.cell_blocks_movement(room, cell) { continue }
 		draw_card_range_cell(renderer, cell, {64, 140, 226, 70}, {160, 214, 250, 150})
 	}

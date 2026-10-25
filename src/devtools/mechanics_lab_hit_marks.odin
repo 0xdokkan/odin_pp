@@ -41,7 +41,7 @@ mechanics_lab_hits_of :: proc(room: ^game.Room, card: game.Card_Instance) -> (al
 	definition, _ := game.card_definition_by_id(card.definition_id)
 	for y in 0..<room.level_data.tiles.height {
 		for x in 0..<room.level_data.tiles.width {
-			evaluation := game.evaluate_card_targeting(room, card, game.card_target_request_at(definition, {x, y}))
+			evaluation := game.evaluate_card_targeting(room, card, game.card_target_request_at(definition, {x = x, y = y}))
 			hits := game.card_hit_enemies(room, card, &evaluation)
 			for id in hits.ids[:hits.count] { game.card_hit_set_add(&all, id) }
 		}
@@ -65,17 +65,17 @@ mechanics_lab_foe_cell :: proc(room: ^game.Room, id: u32) -> grid.Position {
 mechanics_lab_hit_marks :: proc(window: ^app.Window, renderer: ^render.Renderer, room: ^game.Room, controller: ^run_session.Tactical_Controller,
 	cards: ^run_session.Card_Interaction_State, buffer: ^run_session.Buffered_Gameplay_Command) -> bool {
 	player := room.player
-	center := grid.Position{run_session.MECHANICS_LAB_WIDTH/2, run_session.MECHANICS_LAB_HEIGHT/2}
+	center := grid.Position{x = run_session.MECHANICS_LAB_WIDTH/2, y = run_session.MECHANICS_LAB_HEIGHT/2}
 	spawn :: mechanics_lab_spawn_enemy
 	if !mechanics_lab_party_arena(window, renderer, room, controller, cards, buffer, "the hit marks") { return false }
 	// Foes held about the player: one beside him to the east, one to the south, a
 	// Custodian (a miniboss: no Pinball takes it), one far east on his row, one
 	// far west.
-	east := spawn(room, {center.x+1, center.y}, 60)
-	south := spawn(room, {center.x, center.y+1}, 60)
-	custodian := spawn(room, {center.x+2, center.y-2}, 80, .Custodian)
-	far_east := spawn(room, {center.x+7, center.y}, 60)
-	far_west := spawn(room, {center.x-6, center.y+2}, 60)
+	east := spawn(room, grid.offset(center, 1, 0), 60)
+	south := spawn(room, grid.offset(center, 0, 1), 60)
+	custodian := spawn(room, grid.offset(center, 2, -2), 80, .Custodian)
+	far_east := spawn(room, grid.offset(center, 7, 0), 60)
+	far_west := spawn(room, grid.offset(center, -6, 2), 60)
 	if east == 0 || south == 0 || custodian == 0 || far_east == 0 || far_west == 0 {
 		fmt.eprintln("mechanics lab: no room for the hit marks' foes"); return false
 	}
@@ -113,15 +113,15 @@ mechanics_lab_hit_marks :: proc(window: ^app.Window, renderer: ^render.Renderer,
 	// The Inondazione sweeps every foe in play, wherever it is dropped.
 	wave_hits := mechanics_lab_hits_of(room, wave)
 	if wave_hits.count != len(room.enemies) { fmt.eprintln("mechanics lab: the wave does not mark every foe"); return false }
-	mechanics_lab_capture_hits(window, renderer, room, wave.id, 0, {center.x-2, center.y}, "odin_pp_mechanics_lab_hit_flood.png")
+	mechanics_lab_capture_hits(window, renderer, room, wave.id, 0, grid.offset(center, -2, 0), "odin_pp_mechanics_lab_hit_flood.png")
 
 	// The Cannone aimed east from beside the player: the first foe in its line.
 	render.set_flood_aim(renderer, true, true, .East)
-	mechanics_lab_capture_hits(window, renderer, room, cannon.id, 0, {center.x-1, center.y}, "odin_pp_mechanics_lab_hit_cannon.png")
+	mechanics_lab_capture_hits(window, renderer, room, cannon.id, 0, grid.offset(center, -1, 0), "odin_pp_mechanics_lab_hit_cannon.png")
 	render.set_flood_aim(renderer, false, false, .East)
 
 	// The Buco Nero over the foe to the south: the foes in its 3x3.
-	mechanics_lab_capture_hits(window, renderer, room, hole.id, 0, {center.x, center.y+2}, "odin_pp_mechanics_lab_hit_hole.png")
+	mechanics_lab_capture_hits(window, renderer, room, hole.id, 0, grid.offset(center, 0, 2), "odin_pp_mechanics_lab_hit_hole.png")
 
 	// No card chosen, the Lazzo only under the mouse in the hand: its range and
 	// its foes show faintly, and the pointer on the board changes nothing.

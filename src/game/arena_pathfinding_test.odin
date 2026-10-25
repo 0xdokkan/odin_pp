@@ -12,7 +12,7 @@ reference_tactical_enemy_distances :: proc(room: ^Room, distances: []int, goal: 
 	defer delete(costs)
 	tiles := &room.level_data.tiles
 	for &distance, i in distances {
-		cell := grid.Position{i%tiles.width, i/tiles.width}
+		cell := grid.Position{x = i%tiles.width, y = i/tiles.width}
 		distance = -1
 		if cell_blocks_movement(room, cell) { visited[i] = true; continue }
 		costs[i] = 1+enemy_terrain_danger(room, cell)
@@ -25,8 +25,8 @@ reference_tactical_enemy_distances :: proc(room: ^Room, distances: []int, goal: 
 		}
 		if best < 0 { break }
 		visited[best] = true
-		cell := grid.Position{best%tiles.width, best/tiles.width}
-		for step in ([?]grid.Position{{0, -1}, {1, 0}, {0, 1}, {-1, 0}}) {
+		cell := grid.Position{x = best%tiles.width, y = best/tiles.width}
+		for step in ([?]grid.Position{{x = 0, y = -1}, {x = 1, y = 0}, {x = 0, y = 1}, {x = -1, y = 0}}) {
 			i, ok := grid.index_of(tiles, add_position(cell, step))
 			if !ok || visited[i] { continue }
 			candidate := score+costs[best]

@@ -12,7 +12,7 @@ complex_room_crossing_is_reserved :: proc(width, height: int, position: grid.Pos
 }
 
 write_complex_family_wall :: proc(data: ^Level, x, y: int) {
-	if complex_room_crossing_is_reserved(data.tiles.width, data.tiles.height, {x, y}) { return }
+	if complex_room_crossing_is_reserved(data.tiles.width, data.tiles.height, {x = x, y = y}) { return }
 	write_family_wall(data, x, y)
 }
 
@@ -118,7 +118,7 @@ select_complex_room_anchors :: proc(data: ^Level, config: Room_Generation_Config
 	min_sum, max_sum, min_difference, max_difference := max(int), min(int), max(int), min(int)
 	for y in minimum.y..=maximum.y {
 		for x in minimum.x..=maximum.x {
-			position := grid.Position{x, y}
+			position := grid.Position{x = x, y = y}
 			if !has_full_interior_clearance(position, config.exit_clearance_radius, config.width, config.height) ||
 			   !clearance_is_walkable(data, position, config.exit_clearance_radius) { continue }
 			append(&exits, position)
@@ -132,7 +132,7 @@ select_complex_room_anchors :: proc(data: ^Level, config: Room_Generation_Config
 	closest := max(int)
 	for y in 1+config.spawn_clearance_radius..<config.height-1-config.spawn_clearance_radius {
 		for x in 1+config.spawn_clearance_radius..<config.width-1-config.spawn_clearance_radius {
-			position := grid.Position{x, y}
+			position := grid.Position{x = x, y = y}
 			distance := spawn_center_distance_squared(config, position)
 			if distance > closest || !clearance_is_walkable(data, position, config.spawn_clearance_radius) { continue }
 			farthest := max(max_sum-(x+y), (x+y)-min_sum, max_difference-(x-y), (x-y)-min_difference)

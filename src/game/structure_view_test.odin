@@ -7,11 +7,11 @@ import level "../level"
 open_world :: proc() -> level.Level {
 	data, _ := level.create(60, 60, level.Tile{kind = .Floor})
 	for i in 0..<60 {
-		_ = level.set_tile(&data, {i, 0}, {kind = .Wall}); _ = level.set_tile(&data, {i, 59}, {kind = .Wall})
-		_ = level.set_tile(&data, {0, i}, {kind = .Wall}); _ = level.set_tile(&data, {59, i}, {kind = .Wall})
+		_ = level.set_tile(&data, {x = i, y = 0}, {kind = .Wall}); _ = level.set_tile(&data, {x = i, y = 59}, {kind = .Wall})
+		_ = level.set_tile(&data, {x = 0, y = i}, {kind = .Wall}); _ = level.set_tile(&data, {x = 59, y = i}, {kind = .Wall})
 	}
-	_ = level.set_tile(&data, {1, 1}, {kind = .Player_Spawn})
-	data.player_spawn, data.has_player_spawn = {1, 1}, true
+	_ = level.set_tile(&data, {x = 1, y = 1}, {kind = .Player_Spawn})
+	data.player_spawn, data.has_player_spawn = {x = 1, y = 1}, true
 	return data
 }
 
@@ -23,7 +23,7 @@ open_world :: proc() -> level.Level {
 test_a_building_fades_as_the_robot_walks_to_its_door_and_returns_as_it_leaves :: proc(t: ^testing.T) {
 	data := open_world()
 	defer level.destroy(&data)
-	index, err := level.place_structure(&data, .Hut, {20, 20}, 0, false)
+	index, err := level.place_structure(&data, .Hut, {x = 20, y = 20}, 0, false)
 	testing.expect_value(t, err, level.Placement_Error.None)
 	// Straight down onto the door at x = 22.5, from far below to the door cell.
 	far := structure_visibility(&data, index, {22.5, 40.5})
@@ -65,7 +65,7 @@ test_a_building_fades_as_the_robot_walks_to_its_door_and_returns_as_it_leaves ::
 test_beside_a_wall_without_a_door_the_building_never_goes_below_the_minimum :: proc(t: ^testing.T) {
 	data := open_world()
 	defer level.destroy(&data)
-	index, _ := level.place_structure(&data, .Hut, {20, 20}, 0, false)
+	index, _ := level.place_structure(&data, .Hut, {x = 20, y = 20}, 0, false)
 	// Close to the left wall, and close behind the building (its door faces down).
 	for position in ([4][2]f32{{19.1, 21.5}, {19.5, 20.5}, {22.5, 19.2}, {26.5, 21.5}}) {
 		view := structure_visibility(&data, index, position)
@@ -84,7 +84,7 @@ test_beside_a_wall_without_a_door_the_building_never_goes_below_the_minimum :: p
 test_inside_the_walls_are_whole_the_roof_hidden_and_the_outside_darkened :: proc(t: ^testing.T) {
 	data := open_world()
 	defer level.destroy(&data)
-	index, _ := level.place_structure(&data, .Hut, {20, 20}, 0, false)
+	index, _ := level.place_structure(&data, .Hut, {x = 20, y = 20}, 0, false)
 	for position in ([3][2]f32{{22.5, 21.5}, {21.2, 22.8}, {23.7, 21.1}}) {
 		view := structure_visibility(&data, index, position)
 		testing.expect_value(t, view.stage, Structure_Stage.Inside)
@@ -102,8 +102,8 @@ test_inside_the_walls_are_whole_the_roof_hidden_and_the_outside_darkened :: proc
 test_two_buildings_fade_independently :: proc(t: ^testing.T) {
 	data := open_world()
 	defer level.destroy(&data)
-	first, e1 := level.place_structure(&data, .Hut, {10, 10}, 0, false)
-	second, e2 := level.place_structure(&data, .Cottage, {40, 40}, 0, false)
+	first, e1 := level.place_structure(&data, .Hut, {x = 10, y = 10}, 0, false)
+	second, e2 := level.place_structure(&data, .Cottage, {x = 40, y = 40}, 0, false)
 	testing.expect(t, e1 == .None && e2 == .None)
 	// At the first hut's door (12.5, 14.5).
 	at := [2]f32{12.5, 14.5}
@@ -120,7 +120,7 @@ test_two_buildings_fade_independently :: proc(t: ^testing.T) {
 test_a_temple_fades_like_any_building_and_its_gate_is_the_way_in :: proc(t: ^testing.T) {
 	data := open_world()
 	defer level.destroy(&data)
-	index, err := level.place_structure(&data, .Temple, {20, 20}, 0, false)
+	index, err := level.place_structure(&data, .Temple, {x = 20, y = 20}, 0, false)
 	testing.expect_value(t, err, level.Placement_Error.None)
 	// The gate is at (23, 26); the courtyard is inside.
 	testing.expect_value(t, structure_visibility(&data, index, {23.5, 28.0}).stage, Structure_Stage.Threshold)

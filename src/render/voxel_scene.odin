@@ -41,11 +41,11 @@ draw_voxel_threats :: proc(renderer: ^Renderer, room: ^game.Room) {
 	}
 	for object in renderer.tactical.snapshot.objects[:renderer.tactical.snapshot.object_count] {
 		if !object.visible || object.detonation_pulse == 0 { continue }
-		center := grid.Position{int(object.position.x), int(object.position.y)}
+		center := grid.Position{x = int(object.position.x), y = int(object.position.y)}
 		if !tactical_render_visible(renderer, center) { continue }
 		for y in center.y-1..=center.y+1 { for x in center.x-1..=center.x+1 {
-			if tactical_render_visible(renderer, {x, y}) && game.explosion_contains_cell(room, center, {x, y}) {
-				draw_voxel_marker({x, y}, {220, 115, 49, 255})
+			if tactical_render_visible(renderer, {x = x, y = y}) && game.explosion_contains_cell(room, center, {x = x, y = y}) {
+				draw_voxel_marker({x = x, y = y}, {220, 115, 49, 255})
 			}
 		} }
 	}
@@ -65,7 +65,7 @@ draw_voxel_fuse_labels :: proc(renderer: ^Renderer, room: ^game.Room) {
 		}
 	}
 	for object in snapshot.objects[:snapshot.object_count] {
-		cell := grid.Position{int(object.position.x), int(object.position.y)}
+		cell := grid.Position{x = int(object.position.x), y = int(object.position.y)}
 		if !object.visible || object.detonation_pulse == 0 || !tactical_render_visible(renderer, cell) { continue }
 		remaining := game.explosive_pulses_remaining(object.detonation_pulse, snapshot.pulse_count, object.fuse_pulses)
 		p := tactical_project(renderer, {object.position.x+0.5, object.position.y+0.5}, 0.85)
@@ -204,8 +204,8 @@ draw_voxel_fog :: proc(renderer: ^Renderer, room: ^game.Room) {
 	if renderer.tactical.no_fog { return }
 	for y in 0..<room.level_data.tiles.height {
 		for x in 0..<room.level_data.tiles.width {
-			if !tactical_cell_on_screen(renderer, {x, y}) { continue }
-			if tactical_render_visible(renderer, {x, y}) { continue }
+			if !tactical_cell_on_screen(renderer, {x = x, y = y}) { continue }
+			if tactical_render_visible(renderer, {x = x, y = y}) { continue }
 			p := rl.Vector3{f32(x)+0.5, 0, f32(y)+0.5}
 			rl.DrawCube(p+rl.Vector3{0, -0.15, 0}, 1, 0.3, 1, {7, 10, 16, 255})
 			for layer in 0..<2 {

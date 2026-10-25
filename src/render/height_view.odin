@@ -117,7 +117,7 @@ pick_ground_cell :: proc(origin, direction: [3]f32) -> (cell: grid.Position, ok:
 	if !board_has_heights() {
 		t := -origin.y/direction.y
 		if t <= 0 { return }
-		return {int(math.floor(origin.x+direction.x*t)), int(math.floor(origin.z+direction.z*t))}, true
+		return {x = int(math.floor(origin.x+direction.x*t)), y = int(math.floor(origin.z+direction.z*t))}, true
 	}
 	top := f32(0)
 	for height in board_heights.cells { top = max(top, f32(height)) }
@@ -131,13 +131,13 @@ pick_ground_cell :: proc(origin, direction: [3]f32) -> (cell: grid.Position, ok:
 	m := board_surface_map()
 	for t := start; t <= end+STEP; t += STEP {
 		x, y, z := origin.x+direction.x*t, origin.y+direction.y*t, origin.z+direction.z*t
-		probe := grid.Position{int(math.floor(x)), int(math.floor(z))}
+		probe := grid.Position{x = int(math.floor(x)), y = int(math.floor(z))}
 		if probe.x < 0 || probe.y < 0 || probe.x >= board_heights.width || probe.y >= board_heights.height { continue }
 		if y <= level.surface_height_at(&m, x, z)*game.HEIGHT_STEP_DRAWN+0.02 { return probe, true }
 	}
 	// Nothing above the plane was hit: the ray meets the plane itself.
 	t := end
-	return {int(math.floor(origin.x+direction.x*t)), int(math.floor(origin.z+direction.z*t))}, true
+	return {x = int(math.floor(origin.x+direction.x*t)), y = int(math.floor(origin.z+direction.z*t))}, true
 }
 
 // Whether the ground between the camera and an actor standing at `at` (its cell's corner) hides the actor: the
@@ -151,10 +151,10 @@ terrain_hides_actor :: proc(renderer: ^Renderer, at: view.Vec2) -> bool {
 	delta := target-eye
 	length := math.sqrt(delta.x*delta.x+delta.z*delta.z)
 	steps := int(length/0.35)
-	target_cell := grid.Position{int(math.floor(target.x)), int(math.floor(target.z))}
+	target_cell := grid.Position{x = int(math.floor(target.x)), y = int(math.floor(target.z))}
 	for i in 1..<steps {
 		t := f32(i)/f32(steps)
-		cell := grid.Position{int(math.floor(eye.x+delta.x*t)), int(math.floor(eye.z+delta.z*t))}
+		cell := grid.Position{x = int(math.floor(eye.x+delta.x*t)), y = int(math.floor(eye.z+delta.z*t))}
 		if cell == target_cell { continue }
 		if cell_ground(cell) > eye.y+delta.y*t+0.02 { return true }
 	}

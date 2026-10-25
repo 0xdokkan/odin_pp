@@ -7,7 +7,8 @@ import render "../render"
 
 @(test)
 test_m9_fps_center_resume_click_starts_without_firing :: proc(t: ^testing.T) {
-	renderer := render.Renderer{canvas_width = 960, canvas_height = 540}
+	renderer := new_clone(render.Renderer{canvas_width = 960, canvas_height = 540})
+	defer free(renderer)
 	for tools in ([2]bool{false, true}) {
 		s: activities.Free_Mode_Session
 		activities.begin_free_mode_session(&s, .FPS, true, tools)
@@ -15,7 +16,7 @@ test_m9_fps_center_resume_click_starts_without_firing :: proc(t: ^testing.T) {
 		testing.expect(t, s.paused)
 		// Follow the actual pointer hit test instead of supplying Pause directly.
 		// The visible central prompt previously had no clickable control here.
-		control := render.m9_control_at_point(&renderer, activities.free_mode_view(&s), {480, 240})
+		control := render.m9_control_at_point(renderer, activities.free_mode_view(&s), {480, 240})
 		testing.expect_value(t, control, render.M9_Control.Resume_FPS)
 		activities.step_free_mode_session(&s, f32(engine.FIXED_DT), {focused = true, control = control})
 		testing.expect(t, !s.paused)
@@ -30,7 +31,8 @@ test_m9_fps_center_resume_click_starts_without_firing :: proc(t: ^testing.T) {
 
 @(test)
 test_m9_fps_center_resume_is_inert_outside_active_paused_session :: proc(t: ^testing.T) {
-	renderer := render.Renderer{canvas_width = 960, canvas_height = 540}
+	renderer := new_clone(render.Renderer{canvas_width = 960, canvas_height = 540})
+	defer free(renderer)
 	s: activities.Free_Mode_Session
 	activities.begin_free_mode_session(&s, .FPS, true, true)
 	defer activities.destroy_free_mode_session(&s)
@@ -47,7 +49,7 @@ test_m9_fps_center_resume_is_inert_outside_active_paused_session :: proc(t: ^tes
 		case 5: inactive.captured = true
 		}
 		testing.expect(t, !render.m9_control_enabled(inactive, .Resume_FPS))
-		testing.expect_value(t, render.m9_control_at_point(&renderer, inactive, {480, 240}), render.M9_Control.None)
+		testing.expect_value(t, render.m9_control_at_point(renderer, inactive, {480, 240}), render.M9_Control.None)
 	}
 	// A stale/double delivery cannot toggle a running FPS back into pause.
 	activities.step_free_mode_session(&s, 0, {focused = true, control = .Resume_FPS})

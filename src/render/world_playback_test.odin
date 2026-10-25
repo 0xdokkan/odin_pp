@@ -6,8 +6,8 @@ import view "../engine/view"
 
 @(test)
 test_world_movement_and_foreground_move_animate_without_a_shared_input_lock :: proc(t: ^testing.T) {
-	player := game.Player{position = {1, 2}, health = 10, stats = {max_health = 10}}
-	enemies := [?]game.Enemy{{id = 1, position = {7, 2}, health = 5, max_health = 5}}
+	player := game.Player{position = {x = 1, y = 2}, health = 10, stats = {max_health = 10}}
+	enemies := [?]game.Enemy{{id = 1, position = {x = 7, y = 2}, health = 5, max_health = 5}}
 	room := make_presentation_timeline_test_room(&player, enemies[:], nil)
 	defer game.destroy_room(&room)
 	renderer := new(Renderer)
@@ -15,17 +15,17 @@ test_world_movement_and_foreground_move_animate_without_a_shared_input_lock :: p
 	defer destroy_renderer_world_playback(renderer)
 	before := capture_room_presentation(&room)
 	world_events := game.Event_Log{count = 1}
-	world_events.events[0] = {kind = .Moved, source = game.enemy_entity(1), target = game.enemy_entity(1), from_position = {7, 2}, to_position = {6, 2}}
-	room.enemies[0].position = {6, 2}
+	world_events.events[0] = {kind = .Moved, source = game.enemy_entity(1), target = game.enemy_entity(1), from_position = {x = 7, y = 2}, to_position = {x = 6, y = 2}}
+	room.enemies[0].position = {x = 6, y = 2}
 	after := capture_room_presentation(&room)
 	testing.expect(t, begin_renderer_world_timeline(renderer, before, &world_events, &after))
 	testing.expect(t, renderer_world_is_busy(renderer))
 	testing.expect(t, !renderer_blocks_player_input(renderer))
 	before = after
-	player.position = {2, 2}
+	player.position = {x = 2, y = 2}
 	after = capture_room_presentation(&room)
 	player_events := game.Event_Log{count = 1}
-	player_events.events[0] = {kind = .Moved, source = game.PLAYER_ENTITY, target = game.PLAYER_ENTITY, from_position = {1, 2}, to_position = {2, 2}}
+	player_events.events[0] = {kind = .Moved, source = game.PLAYER_ENTITY, target = game.PLAYER_ENTITY, from_position = {x = 1, y = 2}, to_position = {x = 2, y = 2}}
 	testing.expect(t, begin_renderer_event_timeline(renderer, before, &player_events, &after))
 	update_renderer_event_timeline(renderer, PRESENTATION_PLAYER_MOVE_DURATION/2)
 	snapshot := renderer_presentation_snapshot(renderer, &room)
@@ -44,17 +44,17 @@ test_world_movement_and_foreground_move_animate_without_a_shared_input_lock :: p
 
 @(test)
 test_new_world_damage_cannot_be_undone_by_an_older_player_snapshot :: proc(t: ^testing.T) {
-	player := game.Player{position = {1, 2}, health = 10, stats = {max_health = 10}}
+	player := game.Player{position = {x = 1, y = 2}, health = 10, stats = {max_health = 10}}
 	room := make_presentation_timeline_test_room(&player, nil, nil)
 	defer game.destroy_room(&room)
 	renderer := new(Renderer)
 	defer free(renderer)
 	defer destroy_renderer_world_playback(renderer)
 	before := capture_room_presentation(&room)
-	player.position = {2, 2}
+	player.position = {x = 2, y = 2}
 	after := capture_room_presentation(&room)
 	move := game.Event_Log{count = 1}
-	move.events[0] = {kind = .Moved, source = game.PLAYER_ENTITY, target = game.PLAYER_ENTITY, from_position = {1, 2}, to_position = {2, 2}}
+	move.events[0] = {kind = .Moved, source = game.PLAYER_ENTITY, target = game.PLAYER_ENTITY, from_position = {x = 1, y = 2}, to_position = {x = 2, y = 2}}
 	testing.expect(t, begin_renderer_event_timeline(renderer, before, &move, &after))
 	before = after
 	player.health = 7
@@ -79,7 +79,7 @@ test_world_waypoints_queue_per_actor_but_a_full_encounter_moves_concurrently :: 
 	player := game.Player{health = 10}
 	enemies: [game.MAX_ENEMIES_PER_ROOM]game.Enemy
 	for &enemy, index in enemies {
-		enemy = {id = u32(index+1), position = {7, index}, health = 5, max_health = 5}
+		enemy = {id = u32(index+1), position = {x = 7, y = index}, health = 5, max_health = 5}
 	}
 	room := make_presentation_timeline_test_room(&player, enemies[:], nil)
 	defer game.destroy_room(&room)
@@ -91,7 +91,7 @@ test_world_waypoints_queue_per_actor_but_a_full_encounter_moves_concurrently :: 
 		before := capture_room_presentation(&room)
 		events.count = 0
 		for &enemy in room.enemies {
-			events.events[events.count] = {kind = .Moved, source = game.enemy_entity(enemy.id), target = game.enemy_entity(enemy.id), from_position = enemy.position, to_position = {enemy.position.x-1, enemy.position.y}}
+			events.events[events.count] = {kind = .Moved, source = game.enemy_entity(enemy.id), target = game.enemy_entity(enemy.id), from_position = enemy.position, to_position = {x = enemy.position.x-1, y = enemy.position.y}}
 			events.count += 1
 			enemy.position.x -= 1
 		}
@@ -123,8 +123,8 @@ test_world_waypoints_queue_per_actor_but_a_full_encounter_moves_concurrently :: 
 
 @(test)
 test_world_defeat_cannot_resurrect_an_actor_in_an_older_foreground_snapshot :: proc(t: ^testing.T) {
-	player := game.Player{position = {1, 2}, health = 10}
-	enemies := [?]game.Enemy{{id = 1, position = {7, 2}, health = 5, max_health = 5}}
+	player := game.Player{position = {x = 1, y = 2}, health = 10}
+	enemies := [?]game.Enemy{{id = 1, position = {x = 7, y = 2}, health = 5, max_health = 5}}
 	room := make_presentation_timeline_test_room(&player, enemies[:], nil)
 	defer game.destroy_room(&room)
 	renderer := new(Renderer)
@@ -157,7 +157,7 @@ test_world_defeat_cannot_resurrect_an_actor_in_an_older_foreground_snapshot :: p
 
 @(test)
 test_world_shield_consumption_and_expiry_override_the_older_card_reveal :: proc(t: ^testing.T) {
-	player := game.Player{position = {1, 2}, health = 10}
+	player := game.Player{position = {x = 1, y = 2}, health = 10}
 	room := make_presentation_timeline_test_room(&player, nil, nil)
 	defer game.destroy_room(&room)
 	renderer := new(Renderer)

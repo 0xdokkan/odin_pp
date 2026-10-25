@@ -19,7 +19,7 @@ shadow_view_test_room :: proc(t: ^testing.T, data: ^level.Level, player: ^game.P
 	_, added := game.add_owned_card(&player.deck, .Shadow_Step)
 	testing.expect(t, added)
 	testing.expect(t, game.configure_tactical(player, game.DEFAULT_TACTICAL_CONFIG))
-	enemies := [?]game.Enemy_Spawn{{position = {7, 1}, health = 9, attack = 1}}
+	enemies := [?]game.Enemy_Spawn{{position = {x = 7, y = 1}, health = 9, attack = 1}}
 	built: bool
 	room, built = game.create_room(data, player, {enemies = enemies[:]})
 	testing.expect(t, built)
@@ -111,10 +111,10 @@ test_shadow_pool_follows_the_room_and_the_world_holds :: proc(t: ^testing.T) {
 	}
 	testing.expect(t, s.on_beat && s.beat_ahead)
 	beat := game.tactical_shadow_beat_target(&room)
-	testing.expect_value(t, game.try_shadow_step(&room, .South, {1, 1}, beat), game.Action_Result.Moved)
+	testing.expect_value(t, game.try_shadow_step(&room, .South, {x = 1, y = 1}, beat), game.Action_Result.Moved)
 	shadow_view_test_frame(renderer, &room, 0)
 	testing.expect(t, s.steps == 2 && s.criticals == 1 && s.critical_at == renderer.sprite_assets.elapsed)
-	landing := game.add_position(body, {2, 1})
+	landing := game.add_position(body, {x = 2, y = 1})
 	testing.expect_value(t, player.tactical.shadow_position, landing)
 
 	// The shadow's own beats strike as its clock runs; the world's do not.
@@ -174,7 +174,7 @@ test_shadow_holds_the_world_cues_and_keeps_its_own_pace :: proc(t: ^testing.T) {
 	update_tactical_view(renderer, &room, {}, false)
 	enemy := game.enemy_entity(room.enemies[0].id)
 	walk: game.Event_Log
-	game.record_event(&walk, {kind = .Moved, source = enemy, target = enemy, from_position = {7, 1}, to_position = {6, 1}})
+	game.record_event(&walk, {kind = .Moved, source = enemy, target = enemy, from_position = {x = 7, y = 1}, to_position = {x = 6, y = 1}})
 	testing.expect(t, begin_renderer_world_timeline(renderer, capture_room_presentation(&room), &walk))
 	cue := &renderer.world_playback.cues[0].cue
 	testing.expect(t, update_renderer_frame_timeline(renderer, 0.01) == false)
@@ -256,7 +256,7 @@ test_shadow_holds_the_world_cues_on_the_body :: proc(t: ^testing.T) {
 	body := player.position
 	missed: game.Event_Log
 	game.record_event(&missed, {kind = .Attack_Missed, source = game.enemy_entity(room.enemies[0].id), target = game.PLAYER_ENTITY,
-		from_position = {7, 1}, to_position = body})
+		from_position = {x = 7, y = 1}, to_position = body})
 	testing.expect(t, begin_renderer_world_timeline(renderer, capture_room_presentation(&room), &missed))
 	cue, found := renderer_active_cue_at(renderer, 0)
 	testing.expect(t, found && cue.kind == .Attack_Missed)
@@ -268,7 +268,7 @@ test_shadow_holds_the_world_cues_on_the_body :: proc(t: ^testing.T) {
 	testing.expect(t, !game.tactical_tick(&room, game.TACTICAL_SHADOW_STEP_SECONDS, true, false))
 	update_tactical_view(renderer, &room, {}, false)
 	// The pool is a cell away; the miss is still where the body sank.
-	pool := game.add_position(body, {1, 0})
+	pool := game.add_position(body, {x = 1, y = 0})
 	testing.expect_value(t, snapshot.player.position, presentation_position(pool))
 	testing.expect_value(t, tactical_feedback_position(renderer, game.PLAYER_ENTITY, {}), rl.Vector3{f32(body.x)+0.5, 0.055, f32(body.y)+0.5})
 	center, centered := presentation_event_center(renderer, cue.event)

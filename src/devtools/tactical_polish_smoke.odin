@@ -102,7 +102,7 @@ run_tactical_polish_smoke :: proc(window: ^app.Window, renderer: ^render.Rendere
 	data, err, _ := level.from_ascii(rows[:])
 	if err != .None { return false }
 	defer level.destroy(&data)
-	spawns := [?]game.Enemy_Spawn{{position = {10, 4}, health = 3, attack = 2, archetype = .Archer}}
+	spawns := [?]game.Enemy_Spawn{{position = {x = 10, y = 4}, health = 3, attack = 2, archetype = .Archer}}
 	room, built := game.create_room(&data, &run.player, {enemies = spawns[:]})
 	if !built { return false }
 	defer game.destroy_room(&room)
@@ -112,12 +112,12 @@ run_tactical_polish_smoke :: proc(window: ^app.Window, renderer: ^render.Rendere
 	for _ in 0..<3 { tactical_polish_frame(window, renderer, &room) }
 	if !tactical_polish_check(room.phase == .Combat && !renderer.tactical.no_fog && renderer.tactical.clear_light == 0,
 		"initial combat light or fog is wrong") { return false }
-	if !tactical_polish_check(game.tactical_cell_visible(&room, {1, 4}) && !game.tactical_cell_visible(&room, {10, 4}),
+	if !tactical_polish_check(game.tactical_cell_visible(&room, {x = 1, y = 4}) && !game.tactical_cell_visible(&room, {x = 10, y = 4}),
 		"fixture must start with the archer beyond vision") { return false }
 	if !tactical_polish_command(window, renderer, &room, &cards, {kind = .Move, origin_phase = .Combat, direction = .East}) { return false }
-	if !tactical_polish_check(run.player.position == (game.add_position(data.player_spawn, {1, 0})) && room.pulse_count == 1 &&
-		game.tactical_cell_visible(&room, {10, 4}) && !game.tactical_cell_visible(&room, {1, 4}) &&
-		!render.tactical_render_visible(renderer, {1, 4}), "combat movement or fog without exploration memory failed") { return false }
+	if !tactical_polish_check(run.player.position == (game.add_position(data.player_spawn, {x = 1, y = 0})) && room.pulse_count == 1 &&
+		game.tactical_cell_visible(&room, {x = 10, y = 4}) && !game.tactical_cell_visible(&room, {x = 1, y = 4}) &&
+		!render.tactical_render_visible(renderer, {x = 1, y = 4}), "combat movement or fog without exploration memory failed") { return false }
 	for _ in 0..<3 { tactical_polish_frame(window, renderer, &room) }
 	artifacts.screenshot("odin_pp_m7_polish_combat.png")
 	ray: u32
@@ -125,7 +125,7 @@ run_tactical_polish_smoke :: proc(window: ^app.Window, renderer: ^render.Rendere
 	if !tactical_polish_check(ray != 0, "ranged card missing from fixture hand") { return false }
 	gold_before := run.player.gold
 	if !tactical_polish_command(window, renderer, &room, &cards,
-		{kind = .Play_Card, origin_phase = .Combat, card_id = ray, target = game.cell_target({10, 4})}) { return false }
+		{kind = .Play_Card, origin_phase = .Combat, card_id = ray, target = game.cell_target({x = 10, y = 4})}) { return false }
 	if !tactical_polish_check(room.phase == .Loot && len(room.enemies) == 0 && len(room.loot) == 1 &&
 		room.qte.kind == .None && !room.tactical_pulse.pending && !run.player.deck.combat_active,
 		"ranged kill did not leave a clean loot phase with its distant drop") { return false }
@@ -160,7 +160,7 @@ run_tactical_polish_smoke :: proc(window: ^app.Window, renderer: ^render.Rendere
 	}
 	fresh, _, _ := tactical_polish_lane_frame(window, renderer, &room, &cards, &controller, &buffer, walk, true)
 	if !tactical_polish_check(fresh && tactical_polish_settle(window, renderer, &room, &cards) &&
-		run.player.position == game.add_position(after_first_step, {1, 0}),
+		run.player.position == game.add_position(after_first_step, {x = 1, y = 0}),
 		"a fresh loot move after the step did not act") { return false }
 	loot_moves := 2
 	for room.phase == .Loot && loot_moves < 32 {

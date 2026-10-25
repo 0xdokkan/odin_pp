@@ -18,11 +18,11 @@ test_ground_snapshot_preserves_pools_across_the_largest_expedition :: proc(t: ^t
 	room.ground.pool = make([]i32, SIDE*SIDE)
 	defer delete(room.ground.pool)
 	before := capture_room_presentation(&room)
-	cells := [?]grid.Position{{0, 0}, {31, 73}, {32, 73}, {100, 180}, {223, 223}}
+	cells := [?]grid.Position{{x = 0, y = 0}, {x = 31, y = 73}, {x = 32, y = 73}, {x = 100, y = 180}, {x = 223, y = 223}}
 	for cell in cells { room.ground.pool[cell.y*SIDE+cell.x] = 3 }
-	room.ground.fires[0] = {center = {220, 222}, burn = 2}
+	room.ground.fires[0] = {center = {x = 220, y = 222}, burn = 2}
 	room.ground.fire_count = 1
-	room.fishing.water[0] = {222, 221}
+	room.fishing.water[0] = {x = 222, y = 221}
 	room.fishing.water_count = 1
 	after := capture_room_presentation(&room)
 	testing.expect(t, before.valid && after.valid)
@@ -32,12 +32,12 @@ test_ground_snapshot_preserves_pools_across_the_largest_expedition :: proc(t: ^t
 		testing.expect(t, !presentation_ground_pool(&before.ground, cell))
 		testing.expectf(t, presentation_ground_pool(&after.ground, cell), "pool at %v lost from the expedition snapshot", cell)
 	}
-	for cell in ([?]grid.Position{{30, 73}, {33, 73}, {222, 223}, {223, 222}, {-1, 0}, {224, 0}, {0, 224}}) {
+	for cell in ([?]grid.Position{{x = 30, y = 73}, {x = 33, y = 73}, {x = 222, y = 223}, {x = 223, y = 222}, {x = -1, y = 0}, {x = 224, y = 0}, {x = 0, y = 224}}) {
 		testing.expectf(t, !presentation_ground_pool(&after.ground, cell), "dry or off-map cell %v aliased a pool", cell)
 	}
 	testing.expect_value(t, after.ground.fire_count, 1)
 	testing.expect(t, after.ground.fires[0] == room.ground.fires[0])
-	testing.expect(t, presentation_ground_water(&after.ground, {222, 221}))
+	testing.expect(t, presentation_ground_water(&after.ground, {x = 222, y = 221}))
 	// Mutating the live map and then copying a historical snapshot must not
 	// alter either earlier value held by playback.
 	for &value in room.ground.pool { value = 0 }

@@ -97,7 +97,7 @@ draw_tactical_actor_bases :: proc(renderer: ^Renderer) {
 	// The Pinball's ball has its own shadow, and no stand (pinball.odin).
 	draw_pinball_shadow(renderer)
 	for actor in snapshot.enemies[:snapshot.enemy_count] {
-		cell := grid.Position{int(math.round(actor.position.x)), int(math.round(actor.position.y))}
+		cell := grid.Position{x = int(math.round(actor.position.x)), y = int(math.round(actor.position.y))}
 		if !actor.visible || !tactical_render_visible(renderer, cell) || tactical_pinball_holds(renderer, actor.entity) { continue }
 		key := sprite_key_for_enemy(actor.archetype)
 		at, _ := living_card_position(renderer, actor.entity, key, actor.position)

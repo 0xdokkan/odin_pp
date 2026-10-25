@@ -26,7 +26,7 @@ charges_test_index :: proc(log: ^Event_Log, kind: Game_Event_Kind) -> int {
 
 // A foe of 40 health right north of the player (4, 4).
 charges_test_bump_room :: proc(t: ^testing.T, data: ^level.Level, player: ^Player, archetype: Enemy_Archetype = .Chaser) -> Room {
-	spawns := [?]Enemy_Spawn{{position = {4, 3}, health = 40, attack = 1, archetype = archetype}}
+	spawns := [?]Enemy_Spawn{{position = {x = 4, y = 3}, health = 40, attack = 1, archetype = archetype}}
 	return create_enemy_rework_room(t, data, player, spawns[:])
 }
 
@@ -41,7 +41,7 @@ charges_test_load_fate :: proc(t: ^testing.T, room: ^Room, face, sides: i32) {
 test_charges_stack_on_the_player_alone :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {7, 1}, health = 20, attack = 1}}
+	spawns := [?]Enemy_Spawn{{position = {x = 7, y = 1}, health = 20, attack = 1}}
 	room := create_enemy_rework_room(t, &data, &player, spawns[:])
 	defer level.destroy(&data)
 	defer destroy_room(&room)
@@ -148,7 +148,7 @@ test_deflect_returns_each_kind_of_blow_to_its_attacker :: proc(t: ^testing.T) {
 		data: level.Level
 		player: Player
 		archetype := Enemy_Archetype.Archer if case_index == 0 else .Brute
-		at := grid.Position{5, 4} if case_index == 1 else grid.Position{7, 4}
+		at := grid.Position{x = 5, y = 4} if case_index == 1 else grid.Position{x = 7, y = 4}
 		spawns := [?]Enemy_Spawn{{position = at, health = 30, attack = 3, archetype = archetype}}
 		room := create_enemy_rework_room(t, &data, &player, spawns[:])
 		foe := enemy_entity(room.enemies[0].id)
@@ -167,17 +167,17 @@ test_deflect_returns_each_kind_of_blow_to_its_attacker :: proc(t: ^testing.T) {
 		pulse: Pulse_Report
 		resolve_enemy_intents(&room, &pulse, foe.id)
 		testing.expect_value(t, player.health, i32(100))
-		testing.expect_value(t, player.position, grid.Position{4, 4})
+		testing.expect_value(t, player.position, grid.Position{x = 4, y = 4})
 		testing.expect_value(t, player_charges(&room, .Deflect), i32(0))
 		deflected, found := charges_test_event(&pulse.events, .Attack_Deflected, foe, PLAYER_ENTITY)
 		testing.expectf(t, found && event_is_attack(deflected) && event_is_ranged_attack(deflected) == (case_index == 0), "case %d", case_index)
-		testing.expect_value(t, deflected.to_position, grid.Position{4, 4})
+		testing.expect_value(t, deflected.to_position, grid.Position{x = 4, y = 4})
 		testing.expect_value(t, deflected.amount, expected)
 		back, hit := charges_test_event(&pulse.events, .Damaged, PLAYER_ENTITY, foe)
 		testing.expectf(t, hit && event_is_attack(back) && event_is_reflected(back) && event_is_ranged_attack(back) == (case_index == 0), "case %d", case_index)
 		testing.expect(t, !event_is_reflected(deflected))
 		testing.expect_value(t, back.amount, expected)
-		testing.expect_value(t, back.from_position, grid.Position{4, 4})
+		testing.expect_value(t, back.from_position, grid.Position{x = 4, y = 4})
 		testing.expect_value(t, back.to_position, deflected.from_position)
 		_, wounded := charges_test_event(&pulse.events, .Damaged, foe, PLAYER_ENTITY)
 		testing.expect(t, !wounded)
@@ -200,7 +200,7 @@ test_deflect_returns_each_kind_of_blow_to_its_attacker :: proc(t: ^testing.T) {
 test_deflect_takes_the_defence_prompts_place_and_leaves_the_guard_whole :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {5, 4}, health = 30, attack = 3, archetype = .Brute}}
+	spawns := [?]Enemy_Spawn{{position = {x = 5, y = 4}, health = 30, attack = 3, archetype = .Brute}}
 	room := create_enemy_rework_room(t, &data, &player, spawns[:])
 	defer level.destroy(&data)
 	defer destroy_room(&room)
@@ -236,7 +236,7 @@ test_deflect_takes_the_defence_prompts_place_and_leaves_the_guard_whole :: proc(
 test_deflect_spends_nothing_in_the_shadow_and_can_end_the_fight :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {5, 4}, health = 2, attack = 3, archetype = .Brute}}
+	spawns := [?]Enemy_Spawn{{position = {x = 5, y = 4}, health = 2, attack = 3, archetype = .Brute}}
 	room := create_enemy_rework_room(t, &data, &player, spawns[:])
 	defer level.destroy(&data)
 	defer destroy_room(&room)
@@ -268,12 +268,12 @@ test_deflect_spends_nothing_in_the_shadow_and_can_end_the_fight :: proc(t: ^test
 test_coffin_arrows_fly_to_the_foes_in_the_line_of_fire :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {7, 4}, health = 20, attack = 1}, {position = {4, 1}, health = 20, attack = 1}}
+	spawns := [?]Enemy_Spawn{{position = {x = 7, y = 4}, health = 20, attack = 1}, {position = {x = 4, y = 1}, health = 20, attack = 1}}
 	room := create_enemy_rework_room(t, &data, &player, spawns[:])
 	defer level.destroy(&data)
 	defer destroy_room(&room)
 	near, far := enemy_entity(room.enemies[0].id), enemy_entity(room.enemies[1].id)
-	append(&room.obstacles, Obstacle{position = {4, 2}})
+	append(&room.obstacles, Obstacle{position = {x = 4, y = 2}})
 	// The cover came after the plans: plan again around it.
 	for &enemy in room.enemies { enemy.intent, enemy.tactical_cooldown = {}, 0 }
 	plan_enemy_intents(&room)
@@ -295,7 +295,7 @@ test_coffin_arrows_fly_to_the_foes_in_the_line_of_fire :: proc(t: ^testing.T) {
 	testing.expect_value(t, room.player.tactical.facing, Move_Direction.East)
 	hit, found := charges_test_event(room.recent_events, .Damaged, PLAYER_ENTITY, near)
 	testing.expect(t, found && event_is_ranged_attack(hit) && !event_is_reflected(hit) && hit.amount == COFFIN_ARROW_DAMAGE)
-	testing.expect_value(t, hit.from_position, grid.Position{4, 4})
+	testing.expect_value(t, hit.from_position, grid.Position{x = 4, y = 4})
 	testing.expect_value(t, hit.to_position, at)
 	applied, marked := charges_test_event(room.recent_events, .Status_Applied, PLAYER_ENTITY, near)
 	testing.expect(t, marked)
@@ -327,14 +327,14 @@ test_coffin_arrows_fly_to_the_foes_in_the_line_of_fire :: proc(t: ^testing.T) {
 test_coffin_arrows_need_an_open_window_and_sight :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {7, 5}, health = 20, attack = 1}, {position = {11, 5}, health = 20, attack = 1}}
+	spawns := [?]Enemy_Spawn{{position = {x = 7, y = 5}, health = 20, attack = 1}, {position = {x = 11, y = 5}, health = 20, attack = 1}}
 	room := ground_test_room(t, &data, &player, {enemies = spawns[:]}, vision = 7)
 	defer level.destroy(&data)
 	defer destroy_room(&room)
 	near, hidden := enemy_entity(room.enemies[0].id), enemy_entity(room.enemies[1].id)
 	_, _ = apply_status(&room, PLAYER_ENTITY, .Arrows, 5, 0)
 	testing.expect(t, player_arrow_target_is_valid(&room, near))
-	testing.expect(t, !tactical_cell_visible(&room, {11, 5}) && !player_arrow_target_is_valid(&room, hidden))
+	testing.expect(t, !tactical_cell_visible(&room, {x = 11, y = 5}) && !player_arrow_target_is_valid(&room, hidden))
 	testing.expect_value(t, shoot_player_arrow(&room, hidden), Action_Result.Blocked)
 	for phase in ([2]Tactical_Phase{.Recovery, .Stunned}) {
 		room.player.tactical.phase = phase
@@ -513,7 +513,7 @@ test_fate_dice_card_loads_three_bumps_with_its_level_die :: proc(t: ^testing.T) 
 test_venom_blade_rolls_the_bumps_it_poisons :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {4, 3}, health = 60, attack = 1}, {position = {5, 3}, health = 60, attack = 1}}
+	spawns := [?]Enemy_Spawn{{position = {x = 4, y = 3}, health = 60, attack = 1}, {position = {x = 5, y = 3}, health = 60, attack = 1}}
 	room := create_enemy_rework_room(t, &data, &player, spawns[:])
 	defer level.destroy(&data)
 	defer destroy_room(&room)
@@ -546,9 +546,9 @@ test_venom_blade_rolls_the_bumps_it_poisons :: proc(t: ^testing.T) {
 	testing.expect_value(t, player_charges(&room, .Venom_Blade), i32(0))
 	// A diagonal bump on the tick strikes loaded too.
 	_, _ = apply_status(&room, PLAYER_ENTITY, .Venom_Blade, 1, 0)
-	room.enemies[1].position = {5, 3}
+	room.enemies[1].position = {x = 5, y = 3}
 	east := enemy_entity(room.enemies[1].id)
-	testing.expect_value(t, try_move_player_diagonal(&room, {1, -1}), Action_Result.Attacked)
+	testing.expect_value(t, try_move_player_diagonal(&room, {x = 1, y = -1}), Action_Result.Attacked)
 	applied, poisoned := charges_test_event(room.recent_events, .Status_Applied, PLAYER_ENTITY, east)
 	testing.expect(t, poisoned && applied.status == .Poison && applied.amount >= VENOM_BLADE_POISON)
 	testing.expect_value(t, player_charges(&room, .Venom_Blade), i32(0))

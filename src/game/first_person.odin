@@ -245,7 +245,7 @@ first_person_eye :: proc(room: ^Room, from: grid.Position, aim: First_Person_Aim
 	if !aim.framed { return centre }
 	eye := aim.eye
 	if !(abs(eye.x-centre.x) <= FIRST_PERSON_EYE_SLACK && abs(eye.y-centre.y) <= FIRST_PERSON_EYE_SLACK) { return centre }
-	if lasso_cell_is_solid(room, {int(math.floor(eye.x)), int(math.floor(eye.y))}) { return centre }
+	if lasso_cell_is_solid(room, {x = int(math.floor(eye.x)), y = int(math.floor(eye.y))}) { return centre }
 	return eye
 }
 
@@ -298,7 +298,7 @@ first_person_trace :: proc(room: ^Room, from: grid.Position, aim: First_Person_A
 	for enemy in room.enemies {
 		if enemy_is_out_of_play(room, enemy.id) { continue }
 		card, lift := first_person_card(enemy, aim)
-		shown := grid.Position{int(math.floor(card.x)), int(math.floor(card.y))}
+		shown := grid.Position{x = int(math.floor(card.x)), y = int(math.floor(card.y))}
 		if !tactical_cell_visible(room, enemy.position) && !tactical_cell_visible(room, shown) { continue }
 		t := (card.x-o.x)*d.x+(card.y-o.y)*d.y
 		if t <= FIRST_PERSON_EPSILON || t > nearest+FIRST_PERSON_EPSILON { continue }
@@ -329,7 +329,7 @@ first_person_trace_board :: proc(room: ^Room, o, d: [2]f32, base, rise: f32, sho
 		return max(f32)
 	}
 	big :: f32(1e30)
-	cell := grid.Position{int(math.floor(o.x)), int(math.floor(o.y))}
+	cell := grid.Position{x = int(math.floor(o.x)), y = int(math.floor(o.y))}
 	step := [2]int{1 if d.x > 0 else -1, 1 if d.y > 0 else -1}
 	delta := [2]f32{abs(1/d.x) if abs(d.x) > FIRST_PERSON_EPSILON else big, abs(1/d.y) if abs(d.y) > FIRST_PERSON_EPSILON else big}
 	// To the first edge of the eye's cell on either axis.
@@ -349,12 +349,12 @@ first_person_trace_board :: proc(room: ^Room, o, d: [2]f32, base, rise: f32, sho
 		entered := cell
 		if abs(next.x-next.y) <= FIRST_PERSON_EPSILON {
 			// Through a corner: both cells beside it must be open.
-			side_a, side_b := grid.Position{cell.x+step.x, cell.y}, grid.Position{cell.x, cell.y+step.y}
+			side_a, side_b := grid.offset(cell, step.x, 0), grid.offset(cell, 0, step.y)
 			if lasso_cell_is_solid(room, side_a) && lasso_cell_is_solid(room, side_b) {
 				shot.hit, shot.cell, shot.point = .Solid, side_a, at(o, d, base, rise, next.x)
 				return next.x
 			}
-			entered = {cell.x+step.x, cell.y+step.y}
+			entered = grid.offset(cell, step.x, step.y)
 			s = next.x
 			next.x += delta.x
 			next.y += delta.y

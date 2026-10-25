@@ -13,15 +13,15 @@ find_spot :: proc(w: ^World, data: ^level.Level, room: ^game.Room, id: level.Str
 	seen := 0
 	for y := 12; y < data.tiles.height-12; y += 3 {
 		for x := 12; x < data.tiles.width-12; x += 3 {
-			room.player.position = {x, y}
+			room.player.position = {x = x, y = y}
 			tile, _ := level.tile_at(data, room.player.position)
 			if tile.kind != .Floor { continue }
 			for dy in -5..=5 {
 				for dx in -5..=5 {
-					at := grid.Position{x+dx, y+dy}
+					at := grid.Position{x = x+dx, y = y+dy}
 					candidate := structure_origin_for(id, 0, false, at)
 					if result, _ := check_player_structure(w, data, room, id, candidate, 0, false); result == .Ok {
-						if seen == skip { return {x, y}, candidate, true }
+						if seen == skip { return {x = x, y = y}, candidate, true }
 						seen += 1
 						break
 					}
@@ -82,14 +82,14 @@ test_the_player_structures_have_limits_and_every_refusal_says_why :: proc(t: ^te
 	testing.expect(t, found)
 	room.player.position = stand
 	// Far away.
-	far, _ := check_player_structure(&w, &data, &room, .Cart, {origin.x+PLAYER_STRUCTURE_REACH+6, origin.y}, 0, false)
+	far, _ := check_player_structure(&w, &data, &room, .Cart, grid.offset(origin, PLAYER_STRUCTURE_REACH+6, 0), 0, false)
 	testing.expect_value(t, far, Player_Placement.Too_Far)
 	// On the player.
 	on_player, _ := check_player_structure(&w, &data, &room, .Cart, structure_origin_for(.Cart, 0, false, stand), 0, false)
 	testing.expect(t, on_player == .On_The_Player || on_player == .Not_Allowed, "not on the player")
 	// On a foe.
 	_ = game.begin_expedition_encounter(&room)
-	_, spawned := game.spawn_enemy(&room, {position = {origin.x+1, origin.y}, health = 3, attack = 1, archetype = .Chaser})
+	_, spawned := game.spawn_enemy(&room, {position = grid.offset(origin, 1, 0), health = 3, attack = 1, archetype = .Chaser})
 	testing.expect(t, spawned)
 	in_fight, _ := check_player_structure(&w, &data, &room, .Cart, origin, 0, false)
 	testing.expect_value(t, in_fight, Player_Placement.Not_Exploring)
@@ -97,7 +97,7 @@ test_the_player_structures_have_limits_and_every_refusal_says_why :: proc(t: ^te
 	game.end_expedition_encounter(&room)
 	room.phase = .Loot
 	// On a drop.
-	testing.expect(t, add_drop(&w, {origin.x, origin.y}, campaign.make_item(.Credits, 5)))
+	testing.expect(t, add_drop(&w, {x = origin.x, y = origin.y}, campaign.make_item(.Credits, 5)))
 	occupied, _ := check_player_structure(&w, &data, &room, .Cart, origin, 0, false)
 	testing.expect_value(t, occupied, Player_Placement.Occupied)
 	w.drop_count -= 1
@@ -145,7 +145,7 @@ test_a_broken_structure_is_off_the_saved_list_and_a_cave_keeps_the_rest :: proc(
 	outer := new(Outer_Map)
 	defer free(outer)
 	arch := w.sites[w.caves[0].site].position
-	room.player.position = {arch.x, arch.y+1}
+	room.player.position = grid.offset(arch, 0, 1)
 	testing.expect(t, enter_cave(&w, &data, &room, outer, 0))
 	testing.expect_value(t, level.structure_count(&data), 0)
 	testing.expect_value(t, w.structure_count, count)

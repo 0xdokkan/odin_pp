@@ -123,8 +123,8 @@ ride_stomp :: proc(room: ^Room) {
 	at := room.player.position
 	victims: [4]u32
 	count := 0
-	for step in ([4]grid.Position{{0, -1}, {1, 0}, {0, 1}, {-1, 0}}) {
-		if index, found := enemy_index_at(room, {at.x+step.x, at.y+step.y}); found {
+	for step in ([4]grid.Position{{x = 0, y = -1}, {x = 1, y = 0}, {x = 0, y = 1}, {x = -1, y = 0}}) {
+		if index, found := enemy_index_at(room, grid.offset(at, step.x, step.y)); found {
 			victims[count] = room.enemies[index].id
 			count += 1
 		}
@@ -165,7 +165,7 @@ giga_crushes :: proc(room: ^Room, enemy_index: int, critical: bool) -> bool {
 giga_crush_step :: proc(room: ^Room, enemy_index: int, aim: grid.Position, rule: Target_Rule, diagonal: bool) -> Action_Result {
 	enemy := room.enemies[enemy_index]
 	ref := enemy_entity(enemy.id)
-	offset := grid.Position{aim.x-room.player.position.x, aim.y-room.player.position.y}
+	offset := grid.offset(aim, -room.player.position.x, -room.player.position.y)
 	guard: i32
 	if shield, shielded := status_for_entity(room, ref, .Shield); shielded { guard = shield.potency }
 	blow := enemy.health+guard

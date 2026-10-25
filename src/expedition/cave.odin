@@ -42,7 +42,7 @@ cave_biome :: proc(b: campaign.Biome) -> bool {
 // Where a cave's plan sits on the map: the middle, whatever the cave.
 cave_origin :: proc(w: ^World) -> grid.Position {
 	side := size(w)
-	return {(side-level.CAVE_WIDTH)/2, (side-level.CAVE_HEIGHT)/2}
+	return {x = (side-level.CAVE_WIDTH)/2, y = (side-level.CAVE_HEIGHT)/2}
 }
 
 cave_world_cell :: proc(w: ^World, local: grid.Position) -> grid.Position {
@@ -84,8 +84,8 @@ cave_entrance_free :: proc(w: ^World, data: ^level.Level, p: grid.Position, othe
 	if distance(p, data.player_spawn) < 14 { return false }
 	for y in p.y-4..=p.y+3 {
 		for x in p.x-4..=p.x+4 {
-			tile, ok := level.tile_at(data, {x, y})
-			if !ok || tile.kind == .Void || tile.kind == .Exit || level.height_at(data, {x, y}) != 0 { return false }
+			tile, ok := level.tile_at(data, {x = x, y = y})
+			if !ok || tile.kind == .Void || tile.kind == .Exit || level.height_at(data, {x = x, y = y}) != 0 { return false }
 		}
 	}
 	for &site in w.sites[:w.site_count] {
@@ -94,7 +94,7 @@ cave_entrance_free :: proc(w: ^World, data: ^level.Level, p: grid.Position, othe
 	}
 	for other in others { if distance(other, p) < 24 { return false } }
 	for i in 0..<4 {
-		anchor := grid.Position{side*(35+i*13)/100, side*(35+(i%2)*28)/100}
+		anchor := grid.Position{x = side*(35+i*13)/100, y = side*(35+(i%2)*28)/100}
 		if distance(anchor, p) < 9 { return false }
 	}
 	if mountain_present(w) {
@@ -125,7 +125,7 @@ cave_member :: proc(w: ^World, plan: ^level.Cave_Plan, anchor: grid.Position, lo
 	for radius in 0..=2 {
 		for dy in -radius..=radius {
 			for dx in -radius..=radius {
-				cell := grid.Position{anchor.x+dx, anchor.y+dy}
+				cell := grid.offset(anchor, dx, dy)
 				if level.cave_plan_at(plan, cell.x, cell.y) != '.' { continue }
 				if cell == plan.arrival || cell == plan.secret { continue }
 				occupied := false
@@ -159,7 +159,7 @@ add_cave_content :: proc(w: ^World, index: int) {
 		for i in 0..<plan.foes[g] {
 			member, ok := cave_member(w, &plan, plan.anchors[g], {}, &r, taken[:i])
 			if !ok { continue }
-			taken[i] = {member.enemy.position.x-cave_origin(w).x, member.enemy.position.y-cave_origin(w).y}
+			taken[i] = grid.offset(member.enemy.position, -cave_origin(w).x, -cave_origin(w).y)
 			group.members[group.count] = member
 			group.count += 1
 		}
@@ -170,7 +170,7 @@ add_cave_content :: proc(w: ^World, index: int) {
 	secret := cave_world_cell(w, plan.secret)
 	_ = add_drop(w, secret, campaign.make_item(.Credits, 40+i32(rng.next_u64(&r)%40)), 0, true, index+1)
 	relic := 1+i32(rng.next_u64(&r)%(u64(game.Relic_Id.Count)-1))
-	_ = add_drop(w, game.add_position(secret, {-1, 0}), campaign.make_item(.Relic, 1, relic), 0, true, index+1)
+	_ = add_drop(w, game.add_position(secret, {x = -1, y = 0}), campaign.make_item(.Relic, 1, relic), 0, true, index+1)
 }
 
 // The places on the map where there can be a cave: the same for a biome at every run, like the rest of its geography. The Snow's
@@ -186,7 +186,7 @@ cave_candidates :: proc(w: ^World, data: ^level.Level) -> (places: [MAX_CAVES]gr
 	r := rng.create(0xCA7E0000+u64(w.biome))
 	for _ in 0..<800 {
 		if count >= MAX_CAVES { break }
-		p := grid.Position{14+int(rng.next_u64(&r)%u64(side-28)), 10+int(rng.next_u64(&r)%u64(side-20))}
+		p := grid.Position{x = 14+int(rng.next_u64(&r)%u64(side-28)), y = 10+int(rng.next_u64(&r)%u64(side-20))}
 		if !cave_entrance_free(w, data, p, places[:count]) { continue }
 		stamp_cave_arch(data, p)
 		places[count] = p

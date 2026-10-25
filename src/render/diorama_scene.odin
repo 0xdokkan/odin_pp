@@ -50,7 +50,7 @@ diorama_wall_height :: proc(renderer: ^Renderer, room: ^game.Room, cell: grid.Po
 
 @(private)
 diorama_wall_face :: proc(room: ^game.Room, cell, offset: grid.Position) -> bool {
-	tile, found := level.tile_at(room.level_data, {cell.x+offset.x, cell.y+offset.y})
+	tile, found := level.tile_at(room.level_data, grid.offset(cell, offset.x, offset.y))
 	return found && level.is_walkable(tile.kind)
 }
 
@@ -59,8 +59,8 @@ diorama_lamp :: proc(renderer: ^Renderer, room: ^game.Room, cell: grid.Position)
 	if !tactical_render_visible(renderer, cell) || gothic_hash(cell.x, cell.y)%3 != 0 { return }
 	tile, found := level.tile_at(room.level_data, cell)
 	if !found || tile.kind != .Wall { return }
-	for offset in ([4]grid.Position{{0, 1}, {1, 0}, {0, -1}, {-1, 0}}) {
-		if !tactical_render_visible(renderer, {cell.x+offset.x, cell.y+offset.y}) || !diorama_wall_face(room, cell, offset) { continue }
+	for offset in ([4]grid.Position{{x = 0, y = 1}, {x = 1, y = 0}, {x = 0, y = -1}, {x = -1, y = 0}}) {
+		if !tactical_render_visible(renderer, grid.offset(cell, offset.x, offset.y)) || !diorama_wall_face(room, cell, offset) { continue }
 		return {f32(cell.x)+0.5+f32(offset.x)*0.47, diorama_wall_height(renderer, room, cell)*0.58, f32(cell.y)+0.5+f32(offset.y)*0.47}, true
 	}
 	return
@@ -72,7 +72,7 @@ prepare_diorama_lights :: proc(renderer: ^Renderer, room: ^game.Room) -> (lights
 	distances := [4]f32{1e10, 1e10, 1e10, 1e10}
 	hero := rl.Vector3{v.snapshot.player.position.x+0.5, 0, v.snapshot.player.position.y+0.5}
 	for y in 0..<room.level_data.tiles.height { for x in 0..<room.level_data.tiles.width {
-		position, found := diorama_lamp(renderer, room, {x, y})
+		position, found := diorama_lamp(renderer, room, {x = x, y = y})
 		if !found { continue }
 		distance := rl.Vector3LengthSqr(position-hero)
 		for index in 0..<4 {
@@ -134,12 +134,12 @@ draw_diorama_wall :: proc(renderer: ^Renderer, room: ^game.Room, cell: grid.Posi
 	draw_resin_cube(renderer, p+rl.Vector3{0, h+0.065, 0}, 0.88, 0.11, 0.88, cap)
 	rl.DrawCube(p+rl.Vector3{0, h+0.122, 0}, 0.59, 0.008, 0.59, ink if transparent else rl.Color{38, 52, 72, 255})
 	rl.DrawCube(p+rl.Vector3{0, h+0.129, 0}, 0.065, 0.006, 0.21, edge if transparent else rl.Color{78, 115, 140, 255})
-	for offset in ([4]grid.Position{{0, 1}, {1, 0}, {0, -1}, {-1, 0}}) {
+	for offset in ([4]grid.Position{{x = 0, y = 1}, {x = 1, y = 0}, {x = 0, y = -1}, {x = -1, y = 0}}) {
 		normal := rl.Vector3{f32(offset.x), 0, f32(offset.y)}
 		// Back-face ornament layers would unnecessarily darken the translucent
 		// shell. Keep the camera-facing relief, just as on the opaque surface.
 		if transparent && rl.Vector3DotProduct(normal, renderer.tactical.camera.position-p-normal*0.474) <= 0 { continue }
-		if tactical_render_visible(renderer, {cell.x+offset.x, cell.y+offset.y}) && diorama_wall_face(room, cell, offset) {
+		if tactical_render_visible(renderer, grid.offset(cell, offset.x, offset.y)) && diorama_wall_face(room, cell, offset) {
 			draw_diorama_wall_face(p, normal, h, n, transparent)
 		}
 	}
@@ -301,7 +301,7 @@ draw_diorama_accents :: proc(renderer: ^Renderer, room: ^game.Room) {
 	// The world's clock: the lamps and the dust hold still with it.
 	time := f32(tactical_world_time(renderer))
 	for y in 0..<room.level_data.tiles.height { for x in 0..<room.level_data.tiles.width {
-		cell := grid.Position{x, y}
+		cell := grid.Position{x = x, y = y}
 		if !tactical_cell_on_screen(renderer, cell) || !tactical_render_visible(renderer, cell) { continue }
 		if !diorama_interior_wall(room, cell) {
 			if lamp, found := diorama_lamp(renderer, room, cell); found { draw_diorama_lamp_glow(renderer, lamp, cell) }

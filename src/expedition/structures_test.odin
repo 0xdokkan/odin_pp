@@ -59,7 +59,7 @@ test_structures_leave_sites_spawn_and_exit_alone_and_every_door_is_reachable :: 
 		for y in 0..<plan.height {
 			for x in 0..<plan.width {
 				if level.plan_at(&plan, x, y) == .Outside { continue }
-				cell := grid.Position{placed.origin.x+x, placed.origin.y+y}
+				cell := grid.offset(placed.origin, x, y)
 				testing.expect(t, distance(cell, data.player_spawn) > 8, "not on the spawn")
 				for site in w.sites[:w.site_count] {
 					testing.expect(t, distance(cell, site.position) > 4, "not on a site")
@@ -76,7 +76,7 @@ test_structures_leave_sites_spawn_and_exit_alone_and_every_door_is_reachable :: 
 	queue[0] = data.player_spawn
 	seen[data.player_spawn.y*data.tiles.width+data.player_spawn.x] = true
 	for head := 0; head < tail; head += 1 {
-		for offset in ([4]grid.Position{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}) {
+		for offset in ([4]grid.Position{{x = 1, y = 0}, {x = -1, y = 0}, {x = 0, y = 1}, {x = 0, y = -1}}) {
 			q := game.add_position(queue[head], offset)
 			tile, ok := level.tile_at(&data, q)
 			if !ok || !level.is_walkable(tile.kind) || abs(int(level.height_at(&data, q))-int(level.height_at(&data, queue[head]))) > 1 { continue }
@@ -145,8 +145,8 @@ test_the_structures_are_saved_and_an_old_snapshot_loads_without_any :: proc(t: ^
 	for tile, at in data.tiles.cells { testing.expect_value(t, data3.tiles.cells[at], tile) }
 	// A record outside the map is refused.
 	s.world.structure_count = 1
-	s.world.structures[0] = {id = .Hut, origin = {-4, 5}}
+	s.world.structures[0] = {id = .Hut, origin = {x = -4, y = 5}}
 	testing.expect(t, !valid_snapshot(s))
-	s.world.structures[0] = {id = .Hut, origin = {5, 5}, rotation = 7}
+	s.world.structures[0] = {id = .Hut, origin = {x = 5, y = 5}, rotation = 7}
 	testing.expect(t, !valid_snapshot(s))
 }

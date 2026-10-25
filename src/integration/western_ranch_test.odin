@@ -18,7 +18,7 @@ test_ranch_opens_by_itself_freezes_the_board_and_pays_once :: proc(t: ^testing.T
 		_, added := game.add_owned_card(&player.deck, id)
 		testing.expect(t, added)
 	}
-	spawns := [?]game.Enemy_Spawn{{position = {5, 3}, health = 9, attack = 1}}
+	spawns := [?]game.Enemy_Spawn{{position = {x = 5, y = 3}, health = 9, attack = 1}}
 	room, built := game.create_room(&data, &player, {enemies = spawns[:]})
 	testing.expect(t, built)
 	defer game.destroy_room(&room)
@@ -67,7 +67,7 @@ test_ranch_pauses_without_focus_and_ignores_presses_then :: proc(t: ^testing.T) 
 		_, added := game.add_owned_card(&player.deck, id)
 		testing.expect(t, added)
 	}
-	spawns := [?]game.Enemy_Spawn{{position = {5, 3}, health = 9, attack = 1}}
+	spawns := [?]game.Enemy_Spawn{{position = {x = 5, y = 3}, health = 9, attack = 1}}
 	room, built := game.create_room(&data, &player, {enemies = spawns[:]})
 	testing.expect(t, built)
 	defer game.destroy_room(&room)

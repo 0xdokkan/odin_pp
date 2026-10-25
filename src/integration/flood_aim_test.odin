@@ -29,7 +29,7 @@ test_flood_wheel_turns_the_waves_way_and_the_drop_follows :: proc(t: ^testing.T)
 	cards := run_session.Card_Interaction_State{dragged_card_id = flood}
 	board := render.tactical_world_bounds(renderer)
 	on_board := view.Vec2{board.x+board.width*0.5, board.y+board.height*0.5}
-	east := game.add_position(player.position, {2, 0})
+	east := game.add_position(player.position, {x = 2, y = 0})
 	renderer.has_hovered_cell, renderer.hovered_cell = true, east
 	poll :: proc(room: ^game.Room, renderer: ^render.Renderer, cards: ^run_session.Card_Interaction_State, on_board: view.Vec2,
 		controls: run_session.Run_Input) -> (run_session.Gameplay_Command, bool) {
@@ -50,7 +50,7 @@ test_flood_wheel_turns_the_waves_way_and_the_drop_follows :: proc(t: ^testing.T)
 	aim = renderer.tactical.flood_aim
 	testing.expect(t, aim.forced && aim.way == .North)
 	// The way stays when the mouse moves.
-	renderer.hovered_cell = game.add_position(player.position, {0, 2})
+	renderer.hovered_cell = game.add_position(player.position, {x = 0, y = 2})
 	_, _ = poll(&room, renderer, &cards, on_board, {left_down = true})
 	testing.expect_value(t, renderer.tactical.flood_aim.way, game.Move_Direction.North)
 	// Let go over a cell south: the command names a cell to the north.
@@ -67,7 +67,7 @@ test_flood_wheel_turns_the_waves_way_and_the_drop_follows :: proc(t: ^testing.T)
 
 	// Without the wheel the mouse's cell gives the way, as before.
 	cards = {dragged_card_id = flood}
-	renderer.hovered_cell = game.add_position(player.position, {-2, 0})
+	renderer.hovered_cell = game.add_position(player.position, {x = -2, y = 0})
 	command, played = poll(&room, renderer, &cards, on_board, {left_released = true})
 	testing.expect(t, played)
 	way, ok = game.flood_direction(player.position, command.target.cell)

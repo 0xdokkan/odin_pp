@@ -5,7 +5,7 @@ import level "../level"
 
 // A hand of four holds every owned card, the Scopa pair included.
 western_ranch_test_room :: proc(t: ^testing.T, data: ^level.Level, player: ^Player, pair: bool) -> Room {
-	spawns := [?]Enemy_Spawn{{position = {7, 7}, health = 20, attack = 1}}
+	spawns := [?]Enemy_Spawn{{position = {x = 7, y = 7}, health = 20, attack = 1}}
 	room := create_enemy_rework_room(t, data, player, spawns[:])
 	destroy_room(&room)
 	testing.expect(t, initialize_empty_deck(&player.deck, {hand_size = 4, max_energy = 3, energy_regen_per_pulse = 1}, 77))

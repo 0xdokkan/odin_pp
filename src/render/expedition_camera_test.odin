@@ -114,7 +114,7 @@ test_expedition_combat_smoke_fixture_frames_and_picks_actual_fighters :: proc(t:
 		r.tactical.flipbook.loaded, r.tactical.living_assets.loaded = true, true
 		set_expedition_walker(r, false, {}, {}, 0, 1.0/60)
 		update_tactical_view(r, &room, {}, false)
-		player.position = world.site_world(&w.sites[w.groups[0].site], {-4, 0})
+		player.position = world.site_world(&w.sites[w.groups[0].site], {x = -4, y = 0})
 		testing.expect(t, world.engage(w, &room, 0))
 		testing.expect_value(t, len(room.enemies), 2)
 		for _ in 0..<35 {
@@ -145,7 +145,7 @@ test_expedition_combat_smoke_fixture_frames_and_picks_actual_fighters :: proc(t:
 			testing.expect(t, hit && point_in_rectangle({mouse.x, mouse.y}, bounds))
 			update_tactical_view(r, &room, {mouse.x, mouse.y}, true)
 			testing.expect(t, r.has_hovered_cell)
-			testing.expect_value(t, r.hovered_cell, (grid.Position{int(actor.position.x), int(actor.position.y)}))
+			testing.expect_value(t, r.hovered_cell, (grid.Position{x = int(actor.position.x), y = int(actor.position.y)}))
 		}
 		testing.expect_value(t, nearby, 2)
 		for height in ([2]f32{0, 2.2}) {

@@ -30,7 +30,7 @@ draw_expedition_tile :: proc(renderer:^Renderer,room:^game.Room,w:^world.World,c
 		}
 	}
 	rl.DrawCubeV(base,{1,0.22,1},ink)
-	for d in ([4]grid.Position{{1,0},{-1,0},{0,1},{0,-1}}) {
+	for d in ([4]grid.Position{{x = 1, y = 0},{x = -1, y = 0},{x = 0, y = 1},{x = 0, y = -1}}) {
 		n,ok:=level.tile_at(room.level_data,game.add_position(cell,d))
 		if !ok || n.kind==.Void {a:=base+rl.Vector3{f32(d.x)*.5,.13,f32(d.y)*.5};v:=rl.Vector3{f32(d.y)*.5,0,f32(d.x)*.5};rl.DrawLine3D(a-v,a+v,c)}
 	}
@@ -45,7 +45,7 @@ draw_expedition_tile :: proc(renderer:^Renderer,room:^game.Room,w:^world.World,c
 		for i in 0..<4 {rl.DrawLine3D(corners[i],corners[(i+1)%4],rim)}
 	}
 	if design.inside && design.surface==.Platform {
-		for d in ([4]grid.Position{{1,0},{-1,0},{0,1},{0,-1}}) {
+		for d in ([4]grid.Position{{x = 1, y = 0},{x = -1, y = 0},{x = 0, y = 1},{x = 0, y = -1}}) {
 			_,adjacent:=expedition_site_near(renderer,w,game.add_position(cell,d))
 			if adjacent.surface!=.Platform {
 				at:=base+rl.Vector3{f32(d.x)*.485,.14,f32(d.y)*.485}

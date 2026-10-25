@@ -22,7 +22,7 @@ test_hologram_preserves_actual_walls_gates_and_void_in_whole_large_maps :: proc(
 		}}
 		// The miniature must follow mutations in the current level, rather than
 		// regenerating walls from an authored court or a remembered seed.
-		site:=&w.sites[0];changed:=world.site_world(site,{-11,4})
+		site:=&w.sites[0];changed:=world.site_world(site,{x = -11, y = 4})
 		level.set_tile(&data,changed,{.Floor});hologram_geometry(&w,&data,g)
 		testing.expect_value(t,g.cells[changed.y*HOLO_SIDE+changed.x].wall,u8(0))
 		if #config(EXPEDITION_HOLOGRAM_BENCHMARK,false) && biome==.Secret {
@@ -61,7 +61,7 @@ test_hologram_heights_are_shown_as_they_are_and_the_tall_ones_in_bands :: proc(t
 @(test)
 test_hologram_site_knowledge_never_reveals_exact_pins_or_hidden_secrets :: proc(t:^testing.T) {
 	for kind in world.Site_Kind {for y in 0..<32 {for x in 0..<32 {
-		site:=world.Site{kind=kind,active=true,position={x,y}}
+		site:=world.Site{kind=kind,active=true,position={x = x, y = y}}
 		area:=hologram_area(&site);testing.expect(t,area.visible)
 		dx,dz:=area.center.x-(f32(x)+.5),area.center.z-(f32(y)+.5)
 		testing.expect(t,dx*dx+dz*dz>0 && dx*dx+dz*dz<area.radius*area.radius)

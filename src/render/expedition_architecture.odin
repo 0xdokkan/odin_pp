@@ -188,7 +188,7 @@ draw_expedition_site_wall :: proc(pass:Ink_Pass,room:^game.Room,w:^world.World,s
 		if pass.mode==.Fill {return}
 	}
 	edge:=ink_edge(c)
-	sides:=[4]grid.Position{{1,0},{0,1},{-1,0},{0,-1}}
+	sides:=[4]grid.Position{{x = 1, y = 0},{x = 0, y = 1},{x = -1, y = 0},{x = 0, y = -1}}
 	joined:[4]bool
 	for d,i in sides {joined[i]=expedition_wall_joined(room,site,game.add_position(cell,d),height)}
 	for d,i in sides {
@@ -198,7 +198,7 @@ draw_expedition_site_wall :: proc(pass:Ink_Pass,room:^game.Room,w:^world.World,s
 		ink_line(pass,p+o-t+{0,height,0},p+o+t+{0,height,0},edge)
 		ink_line(pass,p+o-t,p+o+t,ink_edge(c,.55))
 	}
-	for corner in ([4]grid.Position{{1,1},{-1,1},{-1,-1},{1,-1}}) {
+	for corner in ([4]grid.Position{{x = 1, y = 1},{x = -1, y = 1},{x = -1, y = -1},{x = 1, y = -1}}) {
 		x:=joined[0] if corner.x>0 else joined[2]
 		z:=joined[1] if corner.y>0 else joined[3]
 		d:=expedition_wall_joined(room,site,game.add_position(cell,corner),height)
@@ -206,9 +206,9 @@ draw_expedition_site_wall :: proc(pass:Ink_Pass,room:^game.Room,w:^world.World,s
 		// corners and inner folds keep it.
 		if (x!=z && !d) || (x && z && d) {continue}
 		// A fold is shared by up to three cells: the first in row order draws it.
-		vertex:=grid.Position{cell.x+(1 if corner.x>0 else 0),cell.y+(1 if corner.y>0 else 0)}
+		vertex:=grid.offset(cell, (1 if corner.x>0 else 0), (1 if corner.y>0 else 0))
 		owner:=cell
-		for o in ([4]grid.Position{{-1,-1},{0,-1},{-1,0},{0,0}}) {
+		for o in ([4]grid.Position{{x = -1, y = -1},{x = 0, y = -1},{x = -1, y = 0},{x = 0, y = 0}}) {
 			q:=game.add_position(vertex,o)
 			if q==cell || expedition_wall_joined(room,site,q,height) {owner=q;break}
 		}
@@ -244,7 +244,7 @@ collect_expedition_edges :: proc(renderer:^Renderer,room:^game.Room,w:^world.Wor
 	// draw_tactical_world gathers the wider floor/site cache before this pass.
 	for y in max(0,p.y-26)..<min(room.level_data.tiles.height,p.y+27) {
 		for x in max(0,p.x-26)..<min(room.level_data.tiles.width,p.x+27) {
-			cell:=grid.Position{x,y};tile,_:=level.tile_at(room.level_data,cell);if tile.kind!=.Wall && tile.kind!=.Fence {continue}
+			cell:=grid.Position{x = x, y = y};tile,_:=level.tile_at(room.level_data,cell);if tile.kind!=.Wall && tile.kind!=.Fence {continue}
 			ground:=pass;ground.lift=cell_ground(cell)
 			if draw_expedition_structure_solid(ground,room,w,cell,tile.kind) {continue}
 			site_index,design:=expedition_site_near(renderer,w,cell)
@@ -269,7 +269,7 @@ draw_expedition_architecture :: proc(renderer:^Renderer,room:^game.Room,w:^world
 		pass:=Ink_Pass{mode=.Edge if layer==.Edges else .Fill,edges=&m.edges if m!=nil else nil}
 		for y in max(0,p.y-26)..<min(room.level_data.tiles.height,p.y+27) {
 			for x in max(0,p.x-26)..<min(room.level_data.tiles.width,p.x+27) {
-				cell:=grid.Position{x,y};tile,_:=level.tile_at(room.level_data,cell)
+				cell:=grid.Position{x = x, y = y};tile,_:=level.tile_at(room.level_data,cell)
 				if (tile.kind!=.Wall && tile.kind!=.Fence) || ((m==nil || !m.reflection_pass) && !tactical_cell_on_screen(renderer,cell)) {continue}
 				if ink_layer_skips(layer,m,{f32(x)+.5,f32(y)+.5}) {continue}
 				ground:=pass;ground.lift=cell_ground(cell)

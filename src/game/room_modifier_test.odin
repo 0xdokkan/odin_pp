@@ -7,15 +7,15 @@ import level "../level"
 test_furnace_modifier :: proc() -> Room_Modifier {
 	result := Room_Modifier{kind = .Furnace, cell_count = 4,
 		activation_pulse = 2, damage = ROOM_HAZARD_DAMAGE}
-	cells := [?]grid.Position{{2, 1}, {3, 1}, {4, 1}, {5, 1}}
+	cells := [?]grid.Position{{x = 2, y = 1}, {x = 3, y = 1}, {x = 4, y = 1}, {x = 5, y = 1}}
 	copy(result.cells[:], cells[:])
 	return result
 }
 
 make_furnace_test_room :: proc(t: ^testing.T, data: ^level.Level, player: ^Player) -> Room {
-	enemies := [?]Enemy_Spawn{{position = {3, 1}, health = 20, attack = 1}}
+	enemies := [?]Enemy_Spawn{{position = {x = 3, y = 1}, health = 20, attack = 1}}
 	objects := [?]Grid_Object_Spawn{
-		{kind = .Barrel, position = {4, 1}}, {kind = .Ice_Block, position = {5, 1}},
+		{kind = .Barrel, position = {x = 4, y = 1}}, {kind = .Ice_Block, position = {x = 5, y = 1}},
 	}
 	room, ok := create_room(data, player, {enemies = enemies[:], objects = objects[:],
 		modifier = test_furnace_modifier()})
@@ -32,7 +32,7 @@ test_furnace_warns_two_beats_and_hits_actors_and_objects :: proc(t: ^testing.T) 
 	player := create_test_player(t)
 	room := make_furnace_test_room(t, &data, &player)
 	defer destroy_room(&room)
-	player.position = {2, 1}
+	player.position = {x = 2, y = 1}
 	testing.expect(t, room_modifier_warning_active(&room.modifier, room.pulse_count))
 	room.recent_events^ = advance_combat_pulse(&room).events
 	testing.expect_value(t, player.health, i32(10))
@@ -51,7 +51,7 @@ test_furnace_has_two_cooldown_pulses_before_next_warning :: proc(t: ^testing.T) 
 	data := create_enemy_archetype_test_level(t)
 	defer level.destroy(&data)
 	player := create_test_player(t)
-	enemies := [?]Enemy_Spawn{{position = {8, 4}, health = 20, attack = 1}}
+	enemies := [?]Enemy_Spawn{{position = {x = 8, y = 4}, health = 20, attack = 1}}
 	room, ok := create_room(&data, &player, {enemies = enemies[:], modifier = test_furnace_modifier()})
 	testing.expect(t, ok)
 	defer destroy_room(&room)
@@ -81,7 +81,7 @@ test_furnace_simultaneous_final_kill_preserves_player_defeat :: proc(t: ^testing
 	player := create_test_player(t)
 	room := make_furnace_test_room(t, &data, &player)
 	defer destroy_room(&room)
-	player.position = {2, 1}
+	player.position = {x = 2, y = 1}
 	player.health = 1
 	room.enemies[0].health = 1
 	room.modifier.activation_pulse = 1
@@ -120,7 +120,7 @@ test_room_rejects_invalid_furnace_lanes_without_consuming_player_state :: proc(t
 	variants := [5]Room_Modifier{valid, valid, valid, valid, valid}
 	variants[0].cell_count = MAX_ROOM_HAZARD_CELLS+1
 	variants[1].cells[1] = variants[1].cells[0]
-	variants[2].cells[1] = {3, 2}
+	variants[2].cells[1] = {x = 3, y = 2}
 	variants[3].cells[1] = data.player_spawn
 	variants[4].damage = 0
 	before := player

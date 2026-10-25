@@ -5,6 +5,17 @@ I riferimenti a Classica, `--flat` e ai vecchi smoke descrivono versioni precede
 per i comandi disponibili oggi valgono il [README](README.md) e la documentazione collegata.
 
 
+## 2026-10-25 — Profondità, Fase 2: posizioni con il piano
+
+- `grid.Position` ha un terzo campo, `layer`: −2 sotto profondo, −1 sotto, 0 terra, +1 sopra (quattro
+  piani, come ha scelto l'utente). Tutto resta sulla terra, quindi il gioco non cambia. Una `Grid` rifiuta
+  le posizioni di altri piani; `grid.offset` dà la vicina conservando il piano; `grid.cell_index` vale per
+  le tabelle parallele.
+- 3215 posizioni riscritte con l'aiuto del compilatore: 2909 con i nomi, 300 vicine con `grid.offset`.
+- Una posizione pesa 24 byte invece di 16: i limiti del test sul budget dello stack crescono (`Room` 9 KB,
+  registri degli eventi 104 KB), le `Renderer` dei test passano sullo heap, i salvataggi crescono del 21%
+  (+50 ms, in background). Test: 4 nuovi (1665 in tutto).
+
 ## 2026-10-25 — Profondità, Fase 1: terreno scolpito
 
 - Le altezze si disegnano come una **superficie scolpita** ([surface.odin](src/level/surface.odin),

@@ -20,7 +20,7 @@ height_room :: proc(t: ^testing.T, data: ^level.Level, player: ^Player, heights:
 	for symbol, x in heights {
 		steps := i32(symbol-'0')
 		if symbol >= 'a' { steps = i32(symbol-'a')+10 }
-		testing.expect(t, level.set_height(data, {x, 1}, steps))
+		testing.expect(t, level.set_height(data, {x = x, y = 1}, steps))
 	}
 	player^ = create_test_player(t)
 	made: bool
@@ -37,23 +37,23 @@ test_a_cliff_is_a_height_difference_of_more_than_one_step :: proc(t: ^testing.T)
 	defer level.destroy(&data)
 	defer destroy_room(&room)
 	// Neighbours one step apart are walkable, up or down; two or more are a cliff.
-	testing.expect(t, !step_height_blocked(&room, {0, 1}, {1, 1}))
-	testing.expect(t, !step_height_blocked(&room, {1, 1}, {0, 1}))
-	testing.expect(t, !step_height_blocked(&room, {3, 1}, {4, 1}))
-	testing.expect(t, !step_height_blocked(&room, {5, 1}, {6, 1}))
-	testing.expect(t, step_height_blocked(&room, {4, 1}, {5, 1}))
-	testing.expect(t, step_height_blocked(&room, {5, 1}, {4, 1}))
+	testing.expect(t, !step_height_blocked(&room, {x = 0, y = 1}, {x = 1, y = 1}))
+	testing.expect(t, !step_height_blocked(&room, {x = 1, y = 1}, {x = 0, y = 1}))
+	testing.expect(t, !step_height_blocked(&room, {x = 3, y = 1}, {x = 4, y = 1}))
+	testing.expect(t, !step_height_blocked(&room, {x = 5, y = 1}, {x = 6, y = 1}))
+	testing.expect(t, step_height_blocked(&room, {x = 4, y = 1}, {x = 5, y = 1}))
+	testing.expect(t, step_height_blocked(&room, {x = 5, y = 1}, {x = 4, y = 1}))
 	// A force climbs no cliff but goes down a step or a drop.
-	testing.expect(t, rise_height_blocked(&room, {4, 1}, {5, 1}))
-	testing.expect(t, !rise_height_blocked(&room, {5, 1}, {4, 1}))
-	testing.expect(t, !rise_height_blocked(&room, {1, 1}, {2, 1}))
+	testing.expect(t, rise_height_blocked(&room, {x = 4, y = 1}, {x = 5, y = 1}))
+	testing.expect(t, !rise_height_blocked(&room, {x = 5, y = 1}, {x = 4, y = 1}))
+	testing.expect(t, !rise_height_blocked(&room, {x = 1, y = 1}, {x = 2, y = 1}))
 	// A flat map has no cliff anywhere.
 	flat: level.Level
 	flat_player: Player
 	flat_room := height_room(t, &flat, &flat_player, "")
 	defer level.destroy(&flat)
 	defer destroy_room(&flat_room)
-	testing.expect(t, !step_height_blocked(&flat_room, {1, 1}, {2, 1}) && !rise_height_blocked(&flat_room, {1, 1}, {2, 1}))
+	testing.expect(t, !step_height_blocked(&flat_room, {x = 1, y = 1}, {x = 2, y = 1}) && !rise_height_blocked(&flat_room, {x = 1, y = 1}, {x = 2, y = 1}))
 }
 
 @(test)
@@ -79,22 +79,22 @@ test_the_player_walks_a_stair_and_stops_at_a_cliff :: proc(t: ^testing.T) {
 	room.phase = .Loot
 	for x in 2..=3 {
 		testing.expect_value(t, try_move_player(&room, .East), Action_Result.Moved)
-		testing.expect_value(t, room.player.position, grid.Position{x, 1})
+		testing.expect_value(t, room.player.position, grid.Position{x = x, y = 1})
 	}
 	// The cell past the stair is three steps down: a cliff, a wall to a walker.
 	testing.expect_value(t, try_move_player(&room, .East), Action_Result.Blocked)
-	testing.expect_value(t, room.player.position, grid.Position{3, 1})
+	testing.expect_value(t, room.player.position, grid.Position{x = 3, y = 1})
 	// Back down the stair, one step each.
 	testing.expect_value(t, try_move_player(&room, .West), Action_Result.Moved)
 	testing.expect_value(t, try_move_player(&room, .West), Action_Result.Moved)
-	testing.expect_value(t, room.player.position, grid.Position{1, 1})
+	testing.expect_value(t, room.player.position, grid.Position{x = 1, y = 1})
 }
 
 @(test)
 test_a_push_cannot_climb_a_cliff_but_falls_down_one :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {3, 1}, health = 20, attack = 1}}
+	spawns := [?]Enemy_Spawn{{position = {x = 3, y = 1}, health = 20, attack = 1}}
 	// The foe stands at height 6 on a plateau (cells 3..4); west of it the ground
 	// is at 0, east of it at 1: a drop of five one way, a rise of five the other.
 	room := height_room(t, &data, &player, "0006600", spawns[:])
@@ -103,41 +103,41 @@ test_a_push_cannot_climb_a_cliff_but_falls_down_one :: proc(t: ^testing.T) {
 	room.phase = .Combat
 	foe := room.enemies[0]
 	// Down a cliff: allowed, and it falls: six steps cost five.
-	query := query_entity_movement(&room, enemy_entity(foe.id), {2, 1})
+	query := query_entity_movement(&room, enemy_entity(foe.id), {x = 2, y = 1})
 	testing.expect(t, movement_query_is_clear(&query))
 	action := make_action(.Move, PLAYER_ENTITY, entity_target(enemy_entity(foe.id)), .Entity)
-	testing.expect(t, add_effect(&action, move_effect(enemy_entity(foe.id), {2, 1})))
+	testing.expect(t, add_effect(&action, move_effect(enemy_entity(foe.id), {x = 2, y = 1})))
 	report := resolve_action(&room, &action)
 	testing.expect(t, report.accepted)
-	testing.expect_value(t, room.enemies[0].position, grid.Position{2, 1})
+	testing.expect_value(t, room.enemies[0].position, grid.Position{x = 2, y = 1})
 	testing.expect_value(t, room.enemies[0].health, i32(20-5))
 	// Up a cliff: a wall to a force.
-	up := query_entity_movement(&room, enemy_entity(foe.id), {3, 1})
+	up := query_entity_movement(&room, enemy_entity(foe.id), {x = 3, y = 1})
 	testing.expect_value(t, up.error, Movement_Error.Static_Blocker)
-	testing.expect_value(t, up.blocker, grid.Position{3, 1})
+	testing.expect_value(t, up.blocker, grid.Position{x = 3, y = 1})
 }
 
 @(test)
 test_a_foe_does_not_walk_over_a_cliff :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {3, 1}, health = 20, attack = 1}}
+	spawns := [?]Enemy_Spawn{{position = {x = 3, y = 1}, health = 20, attack = 1}}
 	room := height_room(t, &data, &player, "0006600", spawns[:])
 	defer level.destroy(&data)
 	defer destroy_room(&room)
 	room.phase = .Combat
-	testing.expect(t, !enemy_can_move_to(&room, 0, {2, 1}))
-	testing.expect(t, enemy_can_move_to(&room, 0, {4, 1}))
+	testing.expect(t, !enemy_can_move_to(&room, 0, {x = 2, y = 1}))
+	testing.expect(t, enemy_can_move_to(&room, 0, {x = 4, y = 1}))
 	positions: [MAX_ENEMIES_PER_ROOM]grid.Position
-	positions[0] = {3, 1}
-	testing.expect(t, !planned_cell_is_available(&room, &positions, 1, 0, {2, 1}))
-	testing.expect(t, planned_cell_is_available(&room, &positions, 1, 0, {4, 1}))
+	positions[0] = {x = 3, y = 1}
+	testing.expect(t, !planned_cell_is_available(&room, &positions, 1, 0, {x = 2, y = 1}))
+	testing.expect(t, planned_cell_is_available(&room, &positions, 1, 0, {x = 4, y = 1}))
 	// The distances to the player round the cliff: the plateau's cells are cut off
 	// from the corridor, so the foe on it has no way down.
 	distances := make([]int, len(data.tiles.cells))
 	defer delete(distances)
 	rebuild_tactical_enemy_distances(&room, distances, .Melee)
-	index, _ := grid.index_of(&data.tiles, {3, 1})
+	index, _ := grid.index_of(&data.tiles, {x = 3, y = 1})
 	testing.expect_value(t, distances[index], -1)
 }
 
@@ -149,7 +149,7 @@ test_the_ground_hides_what_is_behind_a_ridge :: proc(t: ^testing.T) {
 	room := height_room(t, &data, &player, "0007000")
 	defer level.destroy(&data)
 	defer destroy_room(&room)
-	origin, target, ridge := grid.Position{0, 1}, grid.Position{6, 1}, grid.Position{3, 1}
+	origin, target, ridge := grid.Position{x = 0, y = 1}, grid.Position{x = 6, y = 1}, grid.Position{x = 3, y = 1}
 	testing.expect(t, height_hides(&room, origin, target, ridge, 3, 6))
 	// A ridge at the line's own height does not hide it; flat ground never does.
 	level.set_height(&data, ridge, 5)
@@ -206,7 +206,7 @@ test_a_ranged_card_reaches_one_cell_further_from_four_steps_above :: proc(t: ^te
 }
 
 @(private = "file")
-func_cell :: proc(distance: int) -> grid.Position { return {1+distance, 1} }
+func_cell :: proc(distance: int) -> grid.Position { return {x = 1+distance, y = 1} }
 
 @(test)
 test_the_first_person_shot_is_stopped_by_a_cliff_face_above_its_eye :: proc(t: ^testing.T) {
@@ -220,20 +220,20 @@ test_the_first_person_shot_is_stopped_by_a_cliff_face_above_its_eye :: proc(t: ^
 	// Level ground: the shot flies along the corridor to its end wall.
 	shot := first_person_trace(&room, from, aim)
 	testing.expect_value(t, shot.hit, First_Person_Hit.Solid)
-	testing.expect_value(t, shot.cell, grid.Position{10, 1})
+	testing.expect_value(t, shot.cell, grid.Position{x = 10, y = 1})
 	// A cell two steps up (0.24) is below the eye (1.05): the shot goes over it.
-	level.set_height(&data, {4, 1}, 2)
+	level.set_height(&data, {x = 4, y = 1}, 2)
 	shot = first_person_trace(&room, from, aim)
-	testing.expect_value(t, shot.cell, grid.Position{10, 1})
+	testing.expect_value(t, shot.cell, grid.Position{x = 10, y = 1})
 	// A cell ten steps up (1.2) is above the eye: its face stops the shot.
-	level.set_height(&data, {4, 1}, 10)
+	level.set_height(&data, {x = 4, y = 1}, 10)
 	shot = first_person_trace(&room, from, aim)
 	testing.expect_value(t, shot.hit, First_Person_Hit.Solid)
-	testing.expect_value(t, shot.cell, grid.Position{4, 1})
+	testing.expect_value(t, shot.cell, grid.Position{x = 4, y = 1})
 	// The same cell seen from a floor at its own height: the eye is above it again.
 	level.set_height(&data, from, 10)
 	shot = first_person_trace(&room, from, aim)
-	testing.expect_value(t, shot.cell, grid.Position{10, 1})
+	testing.expect_value(t, shot.cell, grid.Position{x = 10, y = 1})
 	testing.expect(t, abs(shot.origin.y-(FIRST_PERSON_EYE_HEIGHT+1.2)) < 0.001)
 	_ = math.PI
 }

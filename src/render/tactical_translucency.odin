@@ -59,7 +59,7 @@ collect_tactical_translucents :: proc(renderer: ^Renderer, room: ^game.Room = ni
 	living := v.living && v.living_assets.loaded && v.living_state != nil
 	snapshot := v.snapshot
 	for actor in snapshot.enemies[:snapshot.enemy_count] {
-		cell := grid.Position{int(math.round(actor.position.x)), int(math.round(actor.position.y))}
+		cell := grid.Position{x = int(math.round(actor.position.x)), y = int(math.round(actor.position.y))}
 		// The Pinball's ball has taken its foe's card's place (pinball.odin).
 		if actor.visible && tactical_render_visible(renderer, cell) && !tactical_pinball_holds(renderer, actor.entity) {
 			key := sprite_key_for_enemy(actor.archetype)
@@ -79,7 +79,7 @@ collect_tactical_translucents :: proc(renderer: ^Renderer, room: ^game.Room = ni
 	// Living cards removed from the board mid-death finish toppling first.
 	if living {
 		for &actor in v.living_state.actors {
-			cell := grid.Position{int(math.round(actor.position.x)), int(math.round(actor.position.y))}
+			cell := grid.Position{x = int(math.round(actor.position.x)), y = int(math.round(actor.position.y))}
 			if !actor.used || !actor.ghost || !tactical_render_visible(renderer, cell) || tactical_pinball_holds(renderer, actor.entity) { continue }
 			key := flipbook_key(actor.character)
 			append(entries, Tactical_Alpha_Entry{key = key, entity = actor.entity, position = actor.position,
@@ -89,7 +89,7 @@ collect_tactical_translucents :: proc(renderer: ^Renderer, room: ^game.Room = ni
 	// Standees removed from the board mid-death finish toppling first.
 	if v.flipbook_state != nil && v.flipbook.loaded {
 		for &actor in v.flipbook_state.actors {
-			cell := grid.Position{int(math.round(actor.position.x)), int(math.round(actor.position.y))}
+			cell := grid.Position{x = int(math.round(actor.position.x)), y = int(math.round(actor.position.y))}
 			if !actor.used || !actor.ghost || !tactical_render_visible(renderer, cell) || tactical_pinball_holds(renderer, actor.entity) { continue }
 			key := flipbook_key(actor.character)
 			append(entries, Tactical_Alpha_Entry{key = key, entity = actor.entity, position = actor.position,
@@ -109,7 +109,7 @@ collect_tactical_translucents :: proc(renderer: ^Renderer, room: ^game.Room = ni
 	// Behind the player's eyes they are opaque, with the floor.
 	if room != nil && (room.player == nil || !room.player.tactical.config.expedition) && !first_person_solid_walls(renderer) {
 		for y in 0..<room.level_data.tiles.height { for x in 0..<room.level_data.tiles.width {
-			if tactical_cell_on_screen(renderer, {x, y}) && tactical_render_visible(renderer, {x, y}) && diorama_interior_wall(room, {x, y}) {
+			if tactical_cell_on_screen(renderer, {x = x, y = y}) && tactical_render_visible(renderer, {x = x, y = y}) && diorama_interior_wall(room, {x = x, y = y}) {
 				append(entries, Tactical_Alpha_Entry{kind = .Wall, position = {f32(x), f32(y)}})
 			}
 		} }
@@ -141,7 +141,7 @@ draw_tactical_billboards :: proc(renderer: ^Renderer, room: ^game.Room = nil, li
 	for entry in entries {
 		if entry.kind == .Wall {
 			if !walls_active { begin_tactical_lighting(renderer, accents = lights); walls_active = true }
-			draw_diorama_wall(renderer, room, {int(entry.position.x), int(entry.position.y)})
+			draw_diorama_wall(renderer, room, {x = int(entry.position.x), y = int(entry.position.y)})
 		} else if entry.kind == .Roof {
 			if !walls_active { begin_tactical_lighting(renderer, accents = lights); walls_active = true }
 			draw_structure_roof(renderer, room, int(entry.attack))

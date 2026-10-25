@@ -279,8 +279,8 @@ reachable_walkable :: proc(data: ^Level, tiles: []Tile, width, height: int, from
 	visited := make([]bool, len(tiles), context.temp_allocator)
 	queue := make([dynamic]int, 0, 256, context.temp_allocator)
 	for tile in tiles { if is_walkable(tile.kind) { total += 1 } }
-	start := from.y*width+from.x
-	if from.x < 0 || from.y < 0 || from.x >= width || from.y >= height || !is_walkable(tiles[start].kind) { return 0, total }
+	start, inside := grid.cell_index(from, width, height)
+	if !inside || !is_walkable(tiles[start].kind) { return 0, total }
 	visited[start] = true
 	append(&queue, start)
 	head := 0
@@ -307,7 +307,7 @@ reachable_walkable :: proc(data: ^Level, tiles: []Tile, width, height: int, from
 reference_cell :: proc(data: ^Level) -> (cell: grid.Position, found: bool) {
 	if data.has_player_spawn { return data.player_spawn, true }
 	for tile, i in data.tiles.cells {
-		if is_walkable(tile.kind) { return {i%data.tiles.width, i/data.tiles.width}, true }
+		if is_walkable(tile.kind) { return {x = i%data.tiles.width, y = i/data.tiles.width}, true }
 	}
 	return {}, false
 }
@@ -320,7 +320,8 @@ reference_cell :: proc(data: ^Level) -> (cell: grid.Position, found: bool) {
 // shut off any part of a map that was whole.
 place_check :: proc(data: ^Level, id: Structure_Id, origin: grid.Position, rotation: u8, mirror: bool,
 	keep_clear: Keep_Clear_Proc = nil, user: rawptr = nil) -> Placement_Error {
-	if data == nil || len(data.tiles.cells) == 0 { return .Out_Of_Map }
+	// Structures stand on the ground layer only (docs/piano-profondita.md).
+	if data == nil || len(data.tiles.cells) == 0 || origin.layer != grid.GROUND_LAYER { return .Out_Of_Map }
 	definition := structure_definition(id)
 	base, parsed := parse_plan(definition.rows, definition.kind)
 	if parsed != .None { return .Bad_Structure }
@@ -332,7 +333,7 @@ place_check :: proc(data: ^Level, id: Structure_Id, origin: grid.Position, rotat
 	for y in 0..<plan.height {
 		for x in 0..<plan.width {
 			if plan_at(&plan, x, y) == .Outside { continue }
-			cell := grid.Position{origin.x+x, origin.y+y}
+			cell := grid.offset(origin, x, y)
 			// Inside the map and off its border, which is the edge's wall or void.
 			if cell.x < 1 || cell.y < 1 || cell.x >= width-1 || cell.y >= height-1 { return .Out_Of_Map }
 			if _, taken := structure_index_at(data, cell); taken { return .Overlap }
@@ -340,7 +341,7 @@ place_check :: proc(data: ^Level, id: Structure_Id, origin: grid.Position, rotat
 			if tile.kind != .Floor { return .Not_Free }
 			// A one-cell margin round another structure keeps the ways between them open.
 			for dy in -1..=1 { for dx in -1..=1 {
-				if _, near := structure_index_at(data, {cell.x+dx, cell.y+dy}); near { return .Too_Close }
+				if _, near := structure_index_at(data, grid.offset(cell, dx, dy)); near { return .Too_Close }
 			} }
 			if keep_clear != nil && keep_clear(user, cell) { return .Keep_Clear }
 		}
@@ -363,11 +364,11 @@ place_check :: proc(data: ^Level, id: Structure_Id, origin: grid.Position, rotat
 			open := false
 			for step in ([4][2]int{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}) {
 				if plan_at(&plan, x+step.x, y+step.y) != .Outside { continue }
-				outside := grid.Position{origin.x+x+step.x, origin.y+y+step.y}
+				outside := grid.offset(origin, x+step.x, y+step.y)
 				tile, found := tile_at(data, outside)
 				if found && tile.kind == .Floor {
 					// A step the robot can take from the door.
-					rise := abs(int(height_at(data, outside))-int(height_at(data, {origin.x+x, origin.y+y})))
+					rise := abs(int(height_at(data, outside))-int(height_at(data, grid.offset(origin, x, y))))
 					if rise <= 1 { open = true }
 				}
 			}
@@ -404,7 +405,7 @@ place_structure :: proc(data: ^Level, id: Structure_Id, origin: grid.Position, r
 	for y in 0..<plan.height {
 		for x in 0..<plan.width {
 			tile, writes := plan_tile(plan_at(&plan, x, y))
-			if writes { _ = set_tile(data, {origin.x+x, origin.y+y}, tile) }
+			if writes { _ = set_tile(data, grid.offset(origin, x, y), tile) }
 		}
 	}
 	index = len(data.structures)
@@ -437,7 +438,7 @@ remove_structure :: proc(data: ^Level, index: int) -> bool {
 	for y in 0..<plan.height {
 		for x in 0..<plan.width {
 			if plan_at(&plan, x, y) == .Outside { continue }
-			_ = set_tile(data, {placed.origin.x+x, placed.origin.y+y}, {.Floor})
+			_ = set_tile(data, grid.offset(placed.origin, x, y), {.Floor})
 		}
 	}
 	kept := make([dynamic]Placed_Structure, 0, len(data.structures), context.temp_allocator)
@@ -468,7 +469,7 @@ index_structure :: proc(data: ^Level, index: int) {
 	for y in 0..<plan.height {
 		for x in 0..<plan.width {
 			if plan_at(plan, x, y) == .Outside { continue }
-			at, inside := grid.index_of(&data.tiles, {placed.origin.x+x, placed.origin.y+y})
+			at, inside := grid.index_of(&data.tiles, grid.offset(placed.origin, x, y))
 			if inside { data.structure_cells[at] = u8(index+1) }
 		}
 	}

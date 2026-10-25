@@ -13,7 +13,7 @@ test_large_hologram_fits_board_and_sprites_at_every_orbit :: proc(t: ^testing.T)
 	defer free(renderer)
 	renderer.canvas_width, renderer.canvas_height = 960, 540
 	viewport := tactical_map_drag_bounds(renderer)
-	for dimensions in ([4]grid.Position{{17, 11}, {45, 31}, {31, 45}, {63, 17}}) {
+	for dimensions in ([4]grid.Position{{x = 17, y = 11}, {x = 45, y = 31}, {x = 31, y = 45}, {x = 63, y = 17}}) {
 		for pitch in ([3]f32{0.3, 0.68, 1.45}) {
 			for step in 0..<8 {
 				orbit := Tactical_Orbit{yaw = f32(step)*math.PI/4, pitch = pitch, distance = 12.5, initialized = true}
@@ -64,7 +64,7 @@ test_large_arena_culling_keeps_projected_geometry_and_grid_picking :: proc(t: ^t
 				renderer.tactical.draw_frustum = tactical_draw_frustum(camera, 960, 540)
 				accepted := 0
 				for y in 0..<31 { for x in 0..<45 {
-					cell := grid.Position{x, y}
+					cell := grid.Position{x = x, y = y}
 					visible := tactical_cell_on_screen(renderer, cell)
 					if visible { accepted += 1 }
 					if !visible {
@@ -106,7 +106,7 @@ test_large_arena_alpha_buffer_grows_without_truncating_walls_or_actors :: proc(t
 	walls := 0
 	for y in 1..<30 { for x in 1..<44 {
 		if (x+y)%5 != 0 { continue }
-		testing.expect(t, level.set_tile(&data, {x, y}, {kind = .Wall}))
+		testing.expect(t, level.set_tile(&data, {x = x, y = y}, {kind = .Wall}))
 		walls += 1
 	} }
 	room := game.Room{level_data = &data}
@@ -140,13 +140,13 @@ test_large_arena_culling_never_changes_fog_or_clear_room_light :: proc(t: ^testi
 	data, made := level.create(45, 31, {kind = .Floor})
 	testing.expect(t, made)
 	defer level.destroy(&data)
-	data.player_spawn, data.has_player_spawn = {22, 15}, true
+	data.player_spawn, data.has_player_spawn = {x = 22, y = 15}, true
 	testing.expect(t, level.set_tile(&data, data.player_spawn, {kind = .Player_Spawn}))
-	testing.expect(t, level.set_tile(&data, {42, 28}, {kind = .Exit}))
+	testing.expect(t, level.set_tile(&data, {x = 42, y = 28}, {kind = .Exit}))
 	player, player_made := game.create_player({max_health = 20, attack = 2})
 	testing.expect(t, player_made)
 	testing.expect(t, game.configure_tactical(&player, game.DEFAULT_TACTICAL_CONFIG))
-	enemies := [?]game.Enemy_Spawn{{position = {40, 25}, health = 3, attack = 1}}
+	enemies := [?]game.Enemy_Spawn{{position = {x = 40, y = 25}, health = 3, attack = 1}}
 	room, built := game.create_room(&data, &player, {enemies = enemies[:]})
 	testing.expect(t, built)
 	defer game.destroy_room(&room)
@@ -159,7 +159,7 @@ test_large_arena_culling_never_changes_fog_or_clear_room_light :: proc(t: ^testi
 	testing.expect(t, tactical_render_visible(renderer, player.position))
 	testing.expect(t, !tactical_render_visible(renderer, room.exit_position))
 	old_position := player.position
-	player.position = {35, 22}
+	player.position = {x = 35, y = 22}
 	update_tactical_view(renderer, &room, {}, false)
 	testing.expect(t, !tactical_render_visible(renderer, old_position))
 	testing.expect(t, tactical_render_visible(renderer, player.position))
@@ -172,5 +172,5 @@ test_large_arena_culling_never_changes_fog_or_clear_room_light :: proc(t: ^testi
 	testing.expect(t, tactical_render_visible(renderer, room.exit_position))
 	testing.expect(t, tactical_render_visible(renderer, old_position))
 	// Distant terrain remains known in loot even while it is outside the view.
-	testing.expect(t, !tactical_cell_on_screen(renderer, {1, 28}))
+	testing.expect(t, !tactical_cell_on_screen(renderer, {x = 1, y = 28}))
 }

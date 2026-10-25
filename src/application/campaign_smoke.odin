@@ -249,14 +249,14 @@ expedition_smoke_hits :: proc(e:^run.Expedition_Session) {
 	// The nearest cell whose four neighbours are all open ground.
 	open_around :: proc(room:^game.Room,p:grid.Position)->bool {
 		if game.cell_blocks_movement(room,p) {return false}
-		for offset in ([4]grid.Position{{1,0},{0,1},{-1,0},{0,-1}}) {if game.cell_blocks_movement(room,game.add_position(p,offset)) {return false}}
+		for offset in ([4]grid.Position{{x = 1, y = 0},{x = 0, y = 1},{x = -1, y = 0},{x = 0, y = -1}}) {if game.cell_blocks_movement(room,game.add_position(p,offset)) {return false}}
 		return true
 	}
 	if !open_around(room,player.position) {
 		found:=false
 		search:for radius in 1..=12 {for dy in -radius..=radius {for dx in -radius..=radius {
 			if max(abs(dx),abs(dy))!=radius {continue}
-			p:=game.add_position(player.position,{dx,dy})
+			p:=game.add_position(player.position,{x = dx, y = dy})
 			if open_around(room,p) {player.position=p;found=true;break search}
 		}}}
 		assert(found,"no open ground near the player for the hit marks")
@@ -265,7 +265,7 @@ expedition_smoke_hits :: proc(e:^run.Expedition_Session) {
 	// Foes join a room already in combat (game.spawn_enemy).
 	assert(game.begin_expedition_encounter(room),"the hit marks' fight did not begin")
 	placed:=0
-	for offset in ([4]grid.Position{{1,0},{0,1},{-1,0},{0,-1}}) {
+	for offset in ([4]grid.Position{{x = 1, y = 0},{x = 0, y = 1},{x = -1, y = 0},{x = 0, y = -1}}) {
 		cell:=game.add_position(player.position,offset)
 		if game.cell_blocks_movement(room,cell) {continue}
 		if _,ok:=game.spawn_enemy(room,{position=cell,health=40,attack=1,archetype=.Chaser});ok {placed+=1}
@@ -276,7 +276,7 @@ expedition_smoke_hits :: proc(e:^run.Expedition_Session) {
 		definition,found:=game.card_definition_by_id(card.definition_id)
 		if !found || game.card_is_room_tool(card.definition_id) {continue}
 		for dy in -3..=3 {for dx in -3..=3 {
-			cell:=game.add_position(player.position,{dx,dy})
+			cell:=game.add_position(player.position,{x = dx, y = dy})
 			evaluation:=game.evaluate_card_targeting(room,card,game.card_target_request_at(definition,cell))
 			hits:=game.card_hit_enemies(room,card,&evaluation)
 			if hits.count>0 {e.rs.card_interaction.selected_card_id=card.id;return}
@@ -293,9 +293,9 @@ expedition_smoke_before_patrol :: proc(e:^run.Expedition_Session) {
 		if !group.patrol || group.active {continue}
 		for member in group.members[:group.count] {
 			if !member.alive || member.deployed {continue}
-			p:=grid.Position{member.enemy.position.x-8,member.enemy.position.y}
+			p:=grid.offset(member.enemy.position, -8, 0)
 			clear:=true
-			for x in p.x..<member.enemy.position.x {clear=clear && !game.cell_blocks_movement(room,{x,p.y})}
+			for x in p.x..<member.enemy.position.x {clear=clear && !game.cell_blocks_movement(room,{x = x, y = p.y})}
 			if !clear {continue}
 			room.player.position=p;e.rs.iso_renderer.tactical.expedition_follow_ready=false
 			return
@@ -312,10 +312,10 @@ expedition_smoke_behind_wall :: proc(e:^run.Expedition_Session) {
 		if !site.active || site.kind!=.Boss {continue}
 		lo,hi:=world.site_bounds(&site)
 		for y in lo.y..=hi.y {for x in lo.x..=hi.x {
-			p:=grid.Position{x,y}
+			p:=grid.Position{x = x, y = y}
 			if game.cell_blocks_movement(room,p) {continue}
 			// The camera looks from +x/+z: a wall row there hides the robot.
-			_,a:=world.site_at(w,{x,y+1});_,b:=world.site_at(w,{x+1,y+1})
+			_,a:=world.site_at(w,{x = x, y = y+1});_,b:=world.site_at(w,{x = x+1, y = y+1})
 			if !a.wall || !b.wall || a.fixture || b.fixture || a.wall_height<2.5 || b.wall_height<2.5 {continue}
 			room.player.position=p;e.rs.iso_renderer.tactical.expedition_follow_ready=false
 			game.end_expedition_encounter(room);clear(&room.enemies)
@@ -435,7 +435,7 @@ expedition_capture_present :: proc(data:rawptr,frame:^host.Frame) {
 	case 4:e.inventory.panel=.Character;e.progress.run.points=3
 	case 5:
 		rl.SetWindowSize(1280,720)
-		e.inventory_open=false;e.rs.room.player.position=world.site_world(&e.world.sites[e.world.groups[0].site],{-4,0})
+		e.inventory_open=false;e.rs.room.player.position=world.site_world(&e.world.sites[e.world.groups[0].site],{x = -4, y = 0})
 		_=world.engage(&e.world,&e.rs.room,0)
 	case 6:
 		game.end_expedition_encounter(&e.rs.room);clear(&e.rs.room.enemies)
@@ -443,19 +443,19 @@ expedition_capture_present :: proc(data:rawptr,frame:^host.Frame) {
 	case:
 		if s.stage>=7 && s.stage<19 {
 			expedition_smoke_world(e,campaign.Biome(s.stage-7))
-			e.rs.room.player.position=world.site_world(&e.world.sites[2],{-5,0})
+			e.rs.room.player.position=world.site_world(&e.world.sites[2],{x = -5, y = 0})
 		} else if s.stage>=EXPEDITION_SMOKE_CENTER && s.stage<EXPEDITION_SMOKE_CENTER+12 {
 			// The framing of the biome reference captures: the map's center, mounted.
 			expedition_smoke_world(e,campaign.Biome(s.stage-EXPEDITION_SMOKE_CENTER))
-			side:=world.size(&e.world);e.rs.room.player.position={side/2,side/2}
+			side:=world.size(&e.world);e.rs.room.player.position={x = side/2, y = side/2}
 		} else if s.stage>=19 && s.stage<23 {
 			indices:=[4]int{2,0,11,3}
 			e.world.mounted=false
-			e.rs.room.player.position=world.site_world(&e.world.sites[indices[s.stage-19]],{-5,0})
+			e.rs.room.player.position=world.site_world(&e.world.sites[indices[s.stage-19]],{x = -5, y = 0})
 			e.rs.iso_renderer.tactical.expedition_follow_ready=false
 			e.message_timer=0
 			if s.stage==20 {
-				e.rs.room.player.position=world.site_world(&e.world.sites[0],{-2,0})
+				e.rs.room.player.position=world.site_world(&e.world.sites[0],{x = -2, y = 0})
 				world.tick(&e.world,&e.rs.room,.1)
 			} else {game.end_expedition_encounter(&e.rs.room);clear(&e.rs.room.enemies)}
 		} else if s.stage==23 {rl.SetWindowSize(1024,768);e.map_open=true}
@@ -470,7 +470,7 @@ expedition_capture_present :: proc(data:rawptr,frame:^host.Frame) {
 			expedition_smoke_world(e,campaign.Biome(s.stage-EXPEDITION_SMOKE_WORKSHOP));e.world.mounted=false;e.message_timer=0
 			for &site in e.world.sites[:e.world.site_count] {
 				if site.kind!=.Workshop {continue}
-				for local in ([3]grid.Position{{0,2},{1,1},{-5,0}}) {
+				for local in ([3]grid.Position{{x = 0, y = 2},{x = 1, y = 1},{x = -5, y = 0}}) {
 					p:=world.site_world(&site,local)
 					if !game.cell_blocks_movement(&e.rs.room,p) {e.rs.room.player.position=p;break}
 				}
@@ -499,14 +499,14 @@ expedition_smoke_relief :: proc(e:^run.Expedition_Session,biome:campaign.Biome) 
 	data:=e.rs.room.level_data
 	best,best_range,best_distance:=grid.Position{},-1,1<<30
 	for y in 14..<data.tiles.height-14 {for x in 14..<data.tiles.width-14 {
-		cell:=grid.Position{x,y};tile,_:=level.tile_at(data,cell)
+		cell:=grid.Position{x = x, y = y};tile,_:=level.tile_at(data,cell)
 		if !level.is_walkable(tile.kind) || game.cell_blocks_movement(&e.rs.room,cell) {continue}
 		low,high:=i32(1000),i32(-1)
 		for dy in -3..=3 {for dx in -3..=3 {
-			h:=level.height_at(data,{x+dx,y+dy});low=min(low,h);high=max(high,h)
+			h:=level.height_at(data,{x = x+dx, y = y+dy});low=min(low,h);high=max(high,h)
 		}}
 		// The tallest relief first, then the nearer to the middle of the map.
-		spread:=int(high-low)*100+int(high);distance:=world.distance(cell,{data.tiles.width/2,data.tiles.height/2})
+		spread:=int(high-low)*100+int(high);distance:=world.distance(cell,{x = data.tiles.width/2, y = data.tiles.height/2})
 		if spread>best_range || (spread==best_range && distance<best_distance) {best,best_range,best_distance=cell,spread,distance}
 	}}
 	e.rs.room.player.position=best
@@ -549,7 +549,7 @@ expedition_smoke_cave :: proc(e:^run.Expedition_Session,step:int) {
 	assert(w.cave_count>=1,"the biome has no cave")
 	if e.outer==nil {e.outer=new(run.Cave_Outer_Map)}
 	arch:=w.sites[w.caves[0].site].position
-	front:=arch if w.sites[w.caves[0].site].layout_version==0 else grid.Position{arch.x,arch.y+1}
+	front:=arch if w.sites[w.caves[0].site].layout_version==0 else grid.offset(arch, 0, 1)
 	room.player.position=front
 	w.sites[w.caves[0].site].state=.Discovered
 	if view==0 {e.rs.iso_renderer.tactical.expedition_follow_ready=false;return}
@@ -566,7 +566,7 @@ expedition_smoke_cave :: proc(e:^run.Expedition_Session,step:int) {
 	if view==2 {
 		// Beside the foes of the first room that has some.
 		for g in w.groups[:w.group_count] {
-			if int(g.cave)==1 && g.count>0 {room.player.position={g.members[0].enemy.position.x-3,g.members[0].enemy.position.y};break}
+			if int(g.cave)==1 && g.count>0 {room.player.position={x = g.members[0].enemy.position.x-3, y = g.members[0].enemy.position.y};break}
 		}
 	}
 	e.rs.iso_renderer.tactical.expedition_follow_ready=false
@@ -583,15 +583,15 @@ expedition_smoke_place :: proc(e:^run.Expedition_Session,step:int) {
 	stand,origin,hut:=grid.Position{},grid.Position{},grid.Position{}
 	found:=false
 	search:for y:=14;y<data.tiles.height-14;y+=3 {for x:=14;x<data.tiles.width-14;x+=3 {
-		room.player.position={x,y}
+		room.player.position={x = x, y = y}
 		tile,_:=level.tile_at(data,room.player.position);if tile.kind!=.Floor {continue}
 		for dx in 3..=6 {
-			candidate:=world.structure_origin_for(.Statue,0,false,{x+dx,y})
+			candidate:=world.structure_origin_for(.Statue,0,false,{x = x+dx, y = y})
 			if result,_:=world.check_player_structure(w,data,room,.Statue,candidate,0,false);result==.Ok {
 				// A hut must also fit two cells further.
-				hut_origin:=world.structure_origin_for(.Hut,0,false,{x+dx+5,y})
+				hut_origin:=world.structure_origin_for(.Hut,0,false,{x = x+dx+5, y = y})
 				if hresult,_:=world.check_player_structure(w,data,room,.Hut,hut_origin,0,false);hresult!=.Ok {continue}
-				stand,origin,hut,found={x,y},candidate,hut_origin,true;break search
+				stand,origin,hut,found={x = x, y = y},candidate,hut_origin,true;break search
 			}
 		}
 	}}
@@ -631,12 +631,12 @@ expedition_smoke_two_levels :: proc(e:^run.Expedition_Session) {
 	data:=e.rs.room.level_data
 	high_cell,low_cell,best:=grid.Position{},grid.Position{},1<<30
 	for y in 14..<data.tiles.height-14 {for x in 14..<data.tiles.width-14 {
-		cell:=grid.Position{x,y}
+		cell:=grid.Position{x = x, y = y}
 		if level.height_at(data,cell)<4 || game.cell_blocks_movement(&e.rs.room,cell) {continue}
 		for dy in -3..=3 {for dx in -3..=3 {
-			other:=grid.Position{x+dx,y+dy}
+			other:=grid.Position{x = x+dx, y = y+dy}
 			if abs(dx)+abs(dy)<2 || level.height_at(data,other)>1 || game.cell_blocks_movement(&e.rs.room,other) {continue}
-			distance:=world.distance(cell,{data.tiles.width/2,data.tiles.height/2})
+			distance:=world.distance(cell,{x = data.tiles.width/2, y = data.tiles.height/2})
 			if distance<best {high_cell,low_cell,best=cell,other,distance}
 		}}
 	}}
@@ -659,25 +659,25 @@ expedition_smoke_structures :: proc(e:^run.Expedition_Session,step:int) {
 	door,outward:=grid.Position{},grid.Position{}
 	for y in 0..<plan.height {for x in 0..<plan.width {
 		if level.plan_at(plan,x,y)!=.Door {continue}
-		door={placed.origin.x+x,placed.origin.y+y}
-		for d in ([4]grid.Position{{1,0},{-1,0},{0,1},{0,-1}}) {if level.plan_at(plan,x+d.x,y+d.y)==.Outside {outward=d}}
+		door=grid.offset(placed.origin, x, y)
+		for d in ([4]grid.Position{{x = 1, y = 0},{x = -1, y = 0},{x = 0, y = 1},{x = 0, y = -1}}) {if level.plan_at(plan,x+d.x,y+d.y)==.Outside {outward=d}}
 	}}
 	at:grid.Position
 	expected:game.Structure_Stage
 	switch step {
-	case 0:at,expected=grid.Position{door.x+outward.x*6,door.y+outward.y*6},.Far
-	case 1:at,expected=grid.Position{door.x+outward.x*4,door.y+outward.y*4},.Approaching
-	case 2:at,expected=grid.Position{door.x+outward.x*2,door.y+outward.y*2},.Approaching
-	case 3:at,expected=grid.Position{door.x+outward.x,door.y+outward.y},.Threshold
+	case 0:at,expected=grid.offset(door, outward.x*6, outward.y*6),.Far
+	case 1:at,expected=grid.offset(door, outward.x*4, outward.y*4),.Approaching
+	case 2:at,expected=grid.offset(door, outward.x*2, outward.y*2),.Approaching
+	case 3:at,expected=grid.offset(door, outward.x, outward.y),.Threshold
 	case 4:at,expected=door,.Threshold
-	case 5:at,expected=grid.Position{door.x-outward.x*2,door.y-outward.y*2},.Inside
-	case 6:at,expected=grid.Position{door.x+outward.x*4,door.y+outward.y*4},.Approaching
+	case 5:at,expected=grid.offset(door, -outward.x*2, -outward.y*2),.Inside
+	case 6:at,expected=grid.offset(door, outward.x*4, outward.y*4),.Approaching
 	case:
 		// Round the objects: next to the first one that is not a building.
 		expected=.Far
 		for other,i in data.structures {
 			if level.structure_is_building(other.id) {continue}
-			for d in ([6]grid.Position{{-3,0},{3,0},{0,-3},{0,3},{-4,1},{4,-1}}) {
+			for d in ([6]grid.Position{{x = -3, y = 0},{x = 3, y = 0},{x = 0, y = -3},{x = 0, y = 3},{x = -4, y = 1},{x = 4, y = -1}}) {
 				p:=game.add_position(other.origin,d)
 				if !game.cell_blocks_movement(&e.rs.room,p) {at=p;break}
 			}

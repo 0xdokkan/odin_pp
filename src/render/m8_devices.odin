@@ -73,7 +73,7 @@ draw_m8_device_network :: proc(renderer: ^Renderer, room: ^game.Room) {
             if network.field || (network.active_links & (u8(1)<<u8(i))) != 0 { draw_m8_tesla_link(renderer,points[i],points[(i+1)%count],network.ready) }
         }
         for y in 0..<room.level_data.tiles.height { for x in 0..<room.level_data.tiles.width {
-            cell := grid.Position{x,y}
+            cell := grid.Position{x = x, y = y}
             if !tactical_render_visible(renderer, cell) || !game.board_device_network_contains_cell(room, &network, cell) { continue }
             p := rl.Vector3{f32(x)+0.5, 0.065, f32(y)+0.5}
             rl.DrawCubeWires(p, 0.76, 0.014, 0.76, blue)
@@ -89,7 +89,7 @@ draw_m8_device_network :: proc(renderer: ^Renderer, room: ^game.Room) {
         if object.kind != .Shock_Floor || !tactical_render_visible(renderer, object.position) { continue }
         color := rl.Color{88,184,240,95} if object.device_armed else rl.Color{68,113,145,32}
         for dy in -1..=1 { for dx in -1..=1 {
-            cell := grid.Position{object.position.x+dx, object.position.y+dy}
+            cell := grid.offset(object.position, dx, dy)
             if tactical_render_visible(renderer, cell) && game.shock_floor_contains_cell(room, object.position, cell) {
                 rl.DrawCubeWires({f32(cell.x)+0.5, 0.059, f32(cell.y)+0.5}, 0.83, 0.01, 0.83, color)
             }
@@ -107,7 +107,7 @@ draw_m8_tesla_link :: proc(renderer: ^Renderer, a,b: grid.Position, ready: bool)
     color := rl.Color{116,205,250,180} if ready else rl.Color{77,111,141,90}
     for i in 0..<steps {
         p,q := start+delta*(f32(i)/f32(steps)),start+delta*(f32(i+1)/f32(steps))
-        if !tactical_render_visible(renderer,{int(p.x),int(p.z)}) || !tactical_render_visible(renderer,{int(q.x),int(q.z)}) { continue }
+        if !tactical_render_visible(renderer,{x = int(p.x), y = int(p.z)}) || !tactical_render_visible(renderer,{x = int(q.x), y = int(q.z)}) { continue }
         wobble := f32((i+comic_pose_frame(tactical_world_time(renderer)))%3-1)*0.045 if ready else 0
         for height in ([3]f32{0.34,0.73,1.10}) {
             rl.DrawLine3D(p+rl.Vector3{0,height+wobble,0},q+rl.Vector3{0,height-wobble,0},color)

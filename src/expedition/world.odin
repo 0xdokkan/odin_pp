@@ -156,9 +156,9 @@ generate :: proc(w: ^World, data: ^level.Level, b: campaign.Biome, seed: u64) ->
 	w^ = World{biome=b,side_length=map_size(b),seed=seed,loot_random=rng.create(seed~0xD0A5),reward_site=-1}
 	size := map_size(b)
 	created,ok := level.create(size,size,{.Floor}); if !ok { return false }; data^=created
-	data.player_spawn={7,size/2}; data.has_player_spawn=true
+	data.player_spawn={x = 7, y = size/2}; data.has_player_spawn=true
 	for y in 0..<size { for x in 0..<size {
-		p:=grid.Position{x,y}; edge:=x<2 || y<2 || x>=size-2 || y>=size-2
+		p:=grid.Position{x = x, y = y}; edge:=x<2 || y<2 || x>=size-2 || y>=size-2
 		// Fixed islands and clusters, with broad guaranteed connecting axes.
 		cover := outdoor_cover(b,p,size)
 		if b == .City { cover = x%18>=10 && x%18<=14 && y%16>=6 && y%16<=11 }
@@ -174,12 +174,12 @@ generate :: proc(w: ^World, data: ^level.Level, b: campaign.Biome, seed: u64) ->
 	positions := [?][2]int{{22,50},{24,27},{16,73},{42,52},{44,25},{39,79},{63,48},{66,76},{65,20},{86,70},{86,23},{90,50},{17,9},{85,91},{45,9},{59,94}}
 	content:=rng.create(seed~0xA011)
 	for kind,i in kinds {
-		p:=grid.Position{positions[i][0]*size/100,positions[i][1]*size/100}
-		if kind==.Boss { p={size-20,size/2} }
+		p:=grid.Position{x = positions[i][0]*size/100, y = positions[i][1]*size/100}
+		if kind==.Boss { p={x = size-20, y = size/2} }
 		site:=Site{kind=kind,position=p,secret=i>=12,active=true,waves=2+rank(b)/2,group=-1,seed=rng.next_u64(&content),orientation=u8((int(b)+i)%4),layout_version=SITE_LAYOUT_VERSION}
 		if kind==.Boss || kind==.Tunnel {site.orientation=0}
-		half:=site_layout(kind).half_extent;if site.orientation%2==1 {half={half.y,half.x}}
-		p={clamp(p.x,half.x+3,size-half.x-4),clamp(p.y,half.y+3,size-half.y-4)};site.position=p
+		half:=site_layout(kind).half_extent;if site.orientation%2==1 {half={x = half.y, y = half.x}}
+		p={x = clamp(p.x,half.x+3,size-half.x-4), y = clamp(p.y,half.y+3,size-half.y-4)};site.position=p
 		if i==8 || i==10 { site.active=rng.next_u64(&content)%3!=0 }
 		if i==15 { site.active=b==.Vietnam }
 		w.sites[i]=site; w.site_count+=1
@@ -195,11 +195,11 @@ generate :: proc(w: ^World, data: ^level.Level, b: campaign.Biome, seed: u64) ->
 	// Structural geography is finished before any inhabitants are placed.
 	for site,i in w.sites[:w.site_count] {if site.active && (site.kind==.Trial || site.kind==.Boss || (site.kind==.Cache && i<12)) {add_group(w,data,i,site.position,1 if site.kind==.Boss else 2+rank(b)/2,false,site.kind==.Boss)}}
 	for i in 0..<4 {
-		p:=grid.Position{size*(35+i*13)/100,size*(35+(i%2)*28)/100}
+		p:=grid.Position{x = size*(35+i*13)/100, y = size*(35+(i%2)*28)/100}
 		add_group(w,data,-1,p,2+int(rng.next_u64(&content)%3),true,false)
 	}
 	add_mountain_inhabitants(w,data,&content)
-	if b==.Gothic { add_group(w,data,-1,{size/2,size/2-10},1,false,false); w.groups[w.group_count-1].killer=true; w.groups[w.group_count-1].members[0].enemy.health*=4; w.groups[w.group_count-1].members[0].enemy.max_health*=4 }
+	if b==.Gothic { add_group(w,data,-1,{x = size/2, y = size/2-10},1,false,false); w.groups[w.group_count-1].killer=true; w.groups[w.group_count-1].members[0].enemy.health*=4; w.groups[w.group_count-1].members[0].enemy.max_health*=4 }
 	w.last_position=data.player_spawn
 	return true
 }
@@ -211,7 +211,7 @@ add_group :: proc(w:^World,data:^level.Level,site:int,p:grid.Position,requested_
 	g:=&w.groups[w.group_count]; g^={anchor=p,count=count,patrol=patrol,boss=boss,site=site}
 	r:=rng.create(w.seed~u64(w.group_count+1)*0x9E3779B9)
 	for i in 0..<count {
-		q:=grid.Position{p.x+i%3-1,p.y+i/3-1}
+		q:=grid.offset(p, i%3-1, i/3-1)
 		if site>=0 && w.sites[site].layout_version==SITE_LAYOUT_VERSION {q=site_spawn_position(&w.sites[site],w.sites[site].wave,i)}
 		// Placement never edits geography: content seeds only choose inhabitants.
 		if tile, present := level.tile_at(data, q); !present || tile.kind == .Wall || tile.kind == .Void || tile.kind == .Fence {
@@ -219,7 +219,7 @@ add_group :: proc(w:^World,data:^level.Level,site:int,p:grid.Position,requested_
 				found := false
 				for dy in -radius..=radius {
 					for dx in -radius..=radius {
-						candidate := grid.Position{p.x+dx, p.y+dy}
+						candidate := grid.offset(p, dx, dy)
 						candidate_tile, candidate_present := level.tile_at(data, candidate)
 						if !candidate_present || candidate_tile.kind == .Wall || candidate_tile.kind == .Void || candidate_tile.kind == .Fence || candidate_tile.kind == .Exit { continue }
 						occupied := false
@@ -330,7 +330,7 @@ engage :: proc(w:^World,room:^game.Room,index:int) -> bool {
 		if !m.alive || m.deployed {continue}
 		for attempt in 0..<50 {
 			p:=m.enemy.position
-			if attempt>0 {p={g.anchor.x+(attempt-1)%7-3,g.anchor.y+(attempt-1)/7-3}}
+			if attempt>0 {p=grid.offset(g.anchor, (attempt-1)%7-3, (attempt-1)/7-3)}
 			id,ok:=game.spawn_enemy(room,{position=p,health=m.enemy.health,attack=m.enemy.attack,archetype=m.enemy.archetype,drops_healing=m.enemy.drops_healing})
 			if !ok {continue}
 			m.enemy.id=id;m.enemy.position=p;m.deployed=true;deployed+=1
@@ -369,8 +369,8 @@ move_sleeping_group :: proc(w:^World,g: ^Group, room: ^game.Room, step: grid.Pos
 		if !m.alive || m.deployed {continue}
 		p := game.add_position(m.enemy.position, step)
 		if !patrol_cell_free(w,room,p,&m) || game.step_height_blocked(room,m.enemy.position,p) {continue}
-		if step.x != 0 && step.y != 0 && game.cell_blocks_movement(room, {p.x,m.enemy.position.y}) &&
-		   game.cell_blocks_movement(room, {m.enemy.position.x,p.y}) {continue}
+		if step.x != 0 && step.y != 0 && game.cell_blocks_movement(room, {x = p.x, y = m.enemy.position.y}) &&
+		   game.cell_blocks_movement(room, {x = m.enemy.position.x, y = p.y}) {continue}
 		m.enemy.position = p
 	}
 }
@@ -425,7 +425,7 @@ tick :: proc(w:^World,room:^game.Room,dt:f32) {
 					if !m.deployed {continue}
 					for e,j in room.enemies {if e.id==m.enemy.id {m.enemy=e;ordered_remove(&room.enemies,j);break}}
 					m.deployed=false
-					m.enemy.position=site_spawn_position(&w.sites[g.site],max(0,w.sites[g.site].wave-1),member_index) if g.site>=0 && w.sites[g.site].layout_version==SITE_LAYOUT_VERSION else grid.Position{g.anchor.x+member_index%3-1,g.anchor.y+member_index/3-1}
+					m.enemy.position=site_spawn_position(&w.sites[g.site],max(0,w.sites[g.site].wave-1),member_index) if g.site>=0 && w.sites[g.site].layout_version==SITE_LAYOUT_VERSION else grid.offset(g.anchor, member_index%3-1, member_index/3-1)
 				}
 				g.active=false
 			}
@@ -434,17 +434,17 @@ tick :: proc(w:^World,room:^game.Room,dt:f32) {
 		if g.lure_phase!=.None {tick_patrol_lure(w,room,&g,patrol_due)}
 		if distance(player,g.anchor)>18 && !g.killer && g.lure_phase==.None {continue}
 		if g.patrol && patrol_due && !g.pursuing && g.lure_phase==.None {
-			steps := [4]grid.Position{{1,0},{0,1},{-1,0},{0,-1}}
+			steps := [4]grid.Position{{x = 1, y = 0},{x = 0, y = 1},{x = -1, y = 0},{x = 0, y = -1}}
 			move_sleeping_group(w,&g, room, steps[(g.patrol_step/3)%4]);g.patrol_step+=1
 		}
 		if g.pursuing && distance(player,g.anchor)>12 {g.pursuing=false}
 		if g.pursuing && patrol_due {
 			first:=g.members[0].enemy.position
-			move_sleeping_group(w,&g,room,{clamp(player.x-first.x,-1,1),clamp(player.y-first.y,-1,1)})
+			move_sleeping_group(w,&g,room,{x = clamp(player.x-first.x,-1,1), y = clamp(player.y-first.y,-1,1)})
 		}
 		if g.killer && patrol_due {
 			dx,dy:=clamp(player.x-g.anchor.x,-1,1),clamp(player.y-g.anchor.y,-1,1)
-			p:=grid.Position{g.anchor.x+dx,g.anchor.y+dy}; if game.base_cell_is_walkable(room,p) {g.anchor=p;g.members[0].enemy.position=p}
+			p:=grid.offset(g.anchor, dx, dy); if game.base_cell_is_walkable(room,p) {g.anchor=p;g.members[0].enemy.position=p}
 		}
 		for m in g.members[:g.count] {
 			if !m.alive {continue}
@@ -470,17 +470,17 @@ tick :: proc(w:^World,room:^game.Room,dt:f32) {
 		w.lane_warning=false
 		if w.biome==.Inferno {
 			for offset in -12..=12 {
-				p:=grid.Position{w.lane,w.lane_center.y+offset} if w.lane_vertical else grid.Position{w.lane_center.x+offset,w.lane}
+				p:=grid.Position{x = w.lane, y = w.lane_center.y+offset} if w.lane_vertical else grid.Position{x = w.lane_center.x+offset, y = w.lane}
 				protected:=false
 				for site in w.sites[:w.site_count] {if distance(site.position,p)<=2 {protected=true;break}}
 				if !protected {_=game.expedition_fracture_floor(room,p)}
 			}
 		}
 		if lane_contains(w,player) {
-			if w.biome==.Sky {_=game.expedition_wind_push(room,game.PLAYER_ENTITY,{1,0} if w.lane_vertical else {0,1})}
+			if w.biome==.Sky {_=game.expedition_wind_push(room,game.PLAYER_ENTITY,{x = 1, y = 0} if w.lane_vertical else {x = 0, y = 1})}
 			else {room.player.health=max(0,room.player.health-3-i32(rank(w.biome)));w.mounted=false}
 		}
-		if w.biome==.Sky {for enemy in room.enemies {if lane_contains(w,enemy.position) {_=game.expedition_wind_push(room,game.enemy_entity(enemy.id),{1,0} if w.lane_vertical else {0,1})}}}
+		if w.biome==.Sky {for enemy in room.enemies {if lane_contains(w,enemy.position) {_=game.expedition_wind_push(room,game.enemy_entity(enemy.id),{x = 1, y = 0} if w.lane_vertical else {x = 0, y = 1})}}}
 	}
 	if room.player.health<=0 {room.phase=.Defeat}
 }
@@ -494,7 +494,7 @@ walk :: proc(w:^World,room:^game.Room,offset:grid.Position) -> bool {
 	if room.phase!=.Loot || offset=={} {return false}
 	p:=game.add_position(room.player.position,offset)
 	if !game.base_cell_is_walkable(room,p) || game.cell_blocks_movement(room,p) || game.step_height_blocked(room,room.player.position,p) {return false}
-	if offset.x!=0 && offset.y!=0 && (game.cell_blocks_movement(room,{p.x,room.player.position.y}) || game.cell_blocks_movement(room,{room.player.position.x,p.y})) {return false}
+	if offset.x!=0 && offset.y!=0 && (game.cell_blocks_movement(room,{x = p.x, y = room.player.position.y}) || game.cell_blocks_movement(room,{x = room.player.position.x, y = p.y})) {return false}
 	under:=ground(w,p)
 	if under==.Bridge && w.beat%4>=2 {return false}
 	room.player.position=p
@@ -515,7 +515,7 @@ prepare_room :: proc(w:^World,room:^game.Room) {
 	side:=size(w)
 	for y in 12..<side-8 {for x in 14..<side-8 {
 		if (x*17+y*31)%173!=0 || len(room.traps)>=game.MAX_TRAPS_PER_ROOM {continue}
-		p:=grid.Position{x,y};if !game.base_cell_is_walkable(room,p) || distance(p,room.player.position)<8 {continue}
+		p:=grid.Position{x = x, y = y};if !game.base_cell_is_walkable(room,p) || distance(p,room.player.position)<8 {continue}
 		near_site:=false;for &site in w.sites[:w.site_count] {near_site=near_site || distance(p,site.position)<3 || site_cell(&site,p).inside}
 		if near_site {continue}
 		append(&room.traps,game.Trap{id=room.next_trap_id,position=p,damage=4,armed=true});room.next_trap_id+=1
@@ -526,9 +526,9 @@ prepare_room :: proc(w:^World,room:^game.Room) {
 // This also uses the saved dimensions when resuming an older small map.
 tunnel_destination :: proc(w:^World,room:^game.Room)->(position:grid.Position,ok:bool) {
 	if w==nil || room==nil {return}
-	anchor:=grid.Position{size(w)-14,16}
+	anchor:=grid.Position{x = size(w)-14, y = 16}
 	for radius in 0..=8 {for y in -radius..=radius {for x in -radius..=radius {
-		p:=game.add_position(anchor,{x,y});if !game.base_cell_is_walkable(room,p) || game.cell_blocks_movement(room,p) {continue}
+		p:=game.add_position(anchor,{x = x, y = y});if !game.base_cell_is_walkable(room,p) || game.cell_blocks_movement(room,p) {continue}
 		occupied:=false
 		for enemy in room.enemies {occupied=occupied || enemy.position==p}
 		for &group in w.groups[:w.group_count] {for member in group.members[:group.count] {occupied=occupied || (member.alive && member.enemy.position==p)}}

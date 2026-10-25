@@ -68,7 +68,7 @@ test_generated_rooms_preserve_flanking_gates_and_usable_barrels :: proc(t: ^test
 		if blueprint.profile.level_config.family == .Twin_Courts {
 			court_rooms += 1
 			for y in 1..<blueprint.level_data.tiles.height-1 {
-				gate := grid.Position{blueprint.level_data.tiles.width/2, y}
+				gate := grid.Position{x = blueprint.level_data.tiles.width/2, y = y}
 				if !cell_is_walkable(&blueprint.level_data, gate) { continue }
 				testing.expectf(t, all_unblocked_walkable_cells_are_connected(&blueprint.level_data, blockers[:count], gate, true),
 					"second court gate must remain usable seed=%v closed=%v", seed, gate)

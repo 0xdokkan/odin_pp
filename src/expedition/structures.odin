@@ -39,13 +39,13 @@ structure_keep_clear :: proc(user: rawptr, cell: grid.Position) -> bool {
 	w := cast(^World)user
 	for site in w.sites[:w.site_count] {
 		half := site_layout(site.kind).half_extent
-		if site.orientation%2 == 1 { half = {half.y, half.x} }
+		if site.orientation%2 == 1 { half = {x = half.y, y = half.x} }
 		if abs(cell.x-site.position.x) <= half.x+4 && abs(cell.y-site.position.y) <= half.y+4 { return true }
 	}
 	size := w.side_length
-	if distance(cell, {7, size/2}) <= 9 { return true }
+	if distance(cell, {x = 7, y = size/2}) <= 9 { return true }
 	for i in 0..<4 {
-		if distance(cell, {size*(35+i*13)/100, size*(35+(i%2)*28)/100}) <= 7 { return true }
+		if distance(cell, {x = size*(35+i*13)/100, y = size*(35+(i%2)*28)/100}) <= 7 { return true }
 	}
 	return false
 }
@@ -58,13 +58,13 @@ place_structures :: proc(w: ^World, data: ^level.Level) {
 	size := w.side_length
 	for spot in spots {
 		if w.structure_count >= MAX_WORLD_STRUCTURES { break }
-		wanted := grid.Position{spot.x*size/100, spot.y*size/100}
+		wanted := grid.Position{x = spot.x*size/100, y = spot.y*size/100}
 		placed := false
 		for radius in 0..=STRUCTURE_SEARCH_RADIUS {
 			for dy in -radius..=radius {
 				for dx in -radius..=radius {
 					if max(abs(dx), abs(dy)) != radius { continue }
-					at := grid.Position{wanted.x+dx, wanted.y+dy}
+					at := grid.offset(wanted, dx, dy)
 					if _, err := level.place_structure(data, spot.id, at, spot.rotation, spot.mirror, structure_keep_clear, w); err == .None {
 						w.structures[w.structure_count] = data.structures[len(data.structures)-1]
 						w.structure_count += 1

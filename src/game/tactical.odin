@@ -391,7 +391,7 @@ tactical_line_visible :: proc(origin, destination: grid.Position,
 		if twice > -dy { error -= dy; next.x += sx }
 		if twice < dx { error += dx; next.y += sy }
 		if next.x != cell.x && next.y != cell.y &&
-		   opaque(data, {next.x, cell.y}) && opaque(data, {cell.x, next.y}) { return false }
+		   opaque(data, {x = next.x, y = cell.y}) && opaque(data, {x = cell.x, y = next.y}) { return false }
 		if next != destination && opaque(data, next) { return false }
 		index += 1
 		if height != nil && next != destination && line_hidden_by_height(height, data, origin, destination, next, index, count) { return false }

@@ -28,7 +28,7 @@ mechanics_lab_party_arena :: proc(window: ^app.Window, renderer: ^render.Rendere
 	clear(&room.objects)
 	player.tactical.config.shrinking_window = false
 	player.health = player.stats.max_health
-	player.position = {run_session.MECHANICS_LAB_WIDTH/2, run_session.MECHANICS_LAB_HEIGHT/2}
+	player.position = {x = run_session.MECHANICS_LAB_WIDTH/2, y = run_session.MECHANICS_LAB_HEIGHT/2}
 	player.equipment = {}
 	for kind in ([6]game.Status_Kind{.Deflect, .Arrows, .Fate, .Venom_Blade, .Poison, .Burn}) { _, _ = game.remove_status(room, game.PLAYER_ENTITY, kind) }
 	player.tactical.facing = .East
@@ -48,17 +48,17 @@ mechanics_lab_party_arena :: proc(window: ^app.Window, renderer: ^render.Rendere
 mechanics_lab_flood :: proc(window: ^app.Window, renderer: ^render.Renderer, room: ^game.Room, controller: ^run_session.Tactical_Controller,
 	cards: ^run_session.Card_Interaction_State, buffer: ^run_session.Buffered_Gameplay_Command) -> bool {
 	player := room.player
-	center := grid.Position{run_session.MECHANICS_LAB_WIDTH/2, run_session.MECHANICS_LAB_HEIGHT/2}
+	center := grid.Position{x = run_session.MECHANICS_LAB_WIDTH/2, y = run_session.MECHANICS_LAB_HEIGHT/2}
 	spawn :: mechanics_lab_spawn_enemy
 	foe :: mechanics_lab_enemy
 	if !mechanics_lab_party_arena(window, renderer, room, controller, cards, buffer, "the Inondazione") { return false }
-	free_a := grid.Position{center.x-6, center.y-3}
-	free_b := grid.Position{center.x+3, center.y+3}
-	wall := grid.Position{run_session.MECHANICS_LAB_WIDTH-2, center.y-2}
-	beside := grid.Position{center.x-1, center.y}
+	free_a := grid.offset(center, -6, -3)
+	free_b := grid.offset(center, 3, 3)
+	wall := grid.Position{x = run_session.MECHANICS_LAB_WIDTH-2, y = center.y-2}
+	beside := grid.offset(center, -1, 0)
 	ids := [4]u32{spawn(room, free_a, 40), spawn(room, free_b, 40), spawn(room, wall, 40), spawn(room, beside, 40)}
 	for id in ids { if id == 0 { fmt.eprintln("mechanics lab: no room for the Inondazione's foes"); return false } }
-	for cell in ([2]grid.Position{{center.x+5, center.y-1}, {center.x-3, center.y+2}}) {
+	for cell in ([2]grid.Position{grid.offset(center, 5, -1), grid.offset(center, -3, 2)}) {
 		action := game.make_action(.Card, game.PLAYER_ENTITY, game.cell_target(cell), .Walkable_Cell)
 		if !game.add_effect(&action, game.place_ground_effect(cell, .Burn, 1)) || !game.resolve_action(room, &action).accepted {
 			fmt.eprintln("mechanics lab: the fire at", cell, "was refused"); return false
@@ -74,11 +74,11 @@ mechanics_lab_flood :: proc(window: ^app.Window, renderer: ^render.Renderer, roo
 	// The card held over the board: the arrow of its way from the mouse's cell
 	// (east), and the way the wheel turned it to (north).
 	render.set_flood_aim(renderer, true, false, .East)
-	mechanics_lab_capture_aim(window, renderer, room, id, {center.x+2, center.y}, "odin_pp_mechanics_lab_flood_aim_east.png")
+	mechanics_lab_capture_aim(window, renderer, room, id, grid.offset(center, 2, 0), "odin_pp_mechanics_lab_flood_aim_east.png")
 	render.set_flood_aim(renderer, true, true, .North)
-	mechanics_lab_capture_aim(window, renderer, room, id, {center.x+2, center.y}, "odin_pp_mechanics_lab_flood_aim_north.png")
+	mechanics_lab_capture_aim(window, renderer, room, id, grid.offset(center, 2, 0), "odin_pp_mechanics_lab_flood_aim_north.png")
 	render.set_flood_aim(renderer, false, false, .East)
-	if !mechanics_lab_play(window, renderer, room, controller, cards, buffer, .Flood_Wave, game.cell_target({center.x+2, center.y})) {
+	if !mechanics_lab_play(window, renderer, room, controller, cards, buffer, .Flood_Wave, game.cell_target(grid.offset(center, 2, 0))) {
 		fmt.eprintln("mechanics lab: the Inondazione was not played"); return false
 	}
 	frame := 0
@@ -89,7 +89,7 @@ mechanics_lab_flood :: proc(window: ^app.Window, renderer: ^render.Renderer, roo
 	moved_a, moved_b := foe(room, ids[0]), foe(room, ids[1])
 	stayed_wall, stayed_beside := foe(room, ids[2]), foe(room, ids[3])
 	if moved_a == nil || moved_b == nil || stayed_wall == nil || stayed_beside == nil { fmt.eprintln("mechanics lab: a foe fell to the wave"); return false }
-	if moved_a.position != (grid.Position{free_a.x+1, free_a.y}) || moved_b.position != (grid.Position{free_b.x+1, free_b.y}) {
+	if moved_a.position != (grid.offset(free_a, 1, 0)) || moved_b.position != (grid.offset(free_b, 1, 0)) {
 		fmt.eprintln("mechanics lab: the wave pushed the free foes to", moved_a.position, moved_b.position); return false
 	}
 	if stayed_wall.position != wall || stayed_beside.position != beside { fmt.eprintln("mechanics lab: a foe against a blocker moved"); return false }
@@ -115,7 +115,7 @@ mechanics_lab_flood :: proc(window: ^app.Window, renderer: ^render.Renderer, roo
 mechanics_lab_marley :: proc(window: ^app.Window, renderer: ^render.Renderer, room: ^game.Room, controller: ^run_session.Tactical_Controller,
 	cards: ^run_session.Card_Interaction_State, buffer: ^run_session.Buffered_Gameplay_Command) -> bool {
 	player := room.player
-	center := grid.Position{run_session.MECHANICS_LAB_WIDTH/2, run_session.MECHANICS_LAB_HEIGHT/2}
+	center := grid.Position{x = run_session.MECHANICS_LAB_WIDTH/2, y = run_session.MECHANICS_LAB_HEIGHT/2}
 	spawn :: mechanics_lab_spawn_enemy
 	foe :: mechanics_lab_enemy
 	if !mechanics_lab_party_arena(window, renderer, room, controller, cards, buffer, "Bomb Marley") { return false }
@@ -125,11 +125,11 @@ mechanics_lab_marley :: proc(window: ^app.Window, renderer: ^render.Renderer, ro
 	defer { player.stats.max_health = stats_life; player.health = min(player.health, stats_life); room.marley = {} }
 	player.stats.max_health, player.health = 400, 400
 	column := center.x+4
-	lit := grid.Position{column, center.y-3}
-	doomed := grid.Position{column, center.y+2}
-	hurt := grid.Position{column, center.y+5}
+	lit := grid.Position{x = column, y = center.y-3}
+	doomed := grid.Position{x = column, y = center.y+2}
+	hurt := grid.Position{x = column, y = center.y+5}
 	lit_id, doomed_id, hurt_id := spawn(room, lit, 99), spawn(room, doomed, 1), spawn(room, hurt, 99)
-	other_a, other_b := spawn(room, {center.x-6, center.y-2}, 99), spawn(room, {center.x-7, center.y+4}, 99)
+	other_a, other_b := spawn(room, grid.offset(center, -6, -2), 99), spawn(room, grid.offset(center, -7, 4), 99)
 	for id in ([5]u32{lit_id, doomed_id, hurt_id, other_a, other_b}) { if id == 0 { fmt.eprintln("mechanics lab: no room for the party's foes"); return false } }
 	render.clear_event_animations(renderer)
 	for _ in 0..<20 { mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0) }
@@ -140,7 +140,7 @@ mechanics_lab_marley :: proc(window: ^app.Window, renderer: ^render.Renderer, ro
 	// first column, so that the bomb lands where this act wants it; the script
 	// is dropped once it has landed and the party runs on its own.
 	room.marley_demo = {scripted = true, lights = {lit, {}, {}}, light_count = 1,
-		next_lights = {{center.x-5, center.y+1}, {center.x+7, center.y-6}, {}}, next_count = 2, column = column}
+		next_lights = {grid.offset(center, -5, 1), grid.offset(center, 7, -6), {}}, next_count = 2, column = column}
 	if !mechanics_lab_play(window, renderer, room, controller, cards, buffer, .Marley_Party, game.entity_target(game.PLAYER_ENTITY)) {
 		fmt.eprintln("mechanics lab: Bomb Marley was not played"); return false
 	}

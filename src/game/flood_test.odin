@@ -41,11 +41,11 @@ test_flood_card_is_an_uncommon_aimed_wave_with_upgrades :: proc(t: ^testing.T) {
 // along the row.
 @(test)
 test_flood_direction_is_the_main_axis_of_the_aim :: proc(t: ^testing.T) {
-	from := grid.Position{6, 5}
+	from := grid.Position{x = 6, y = 5}
 	cases := [?]struct{aim: grid.Position, direction: Move_Direction, ok: bool}{
-		{{7, 5}, .East, true}, {{5, 5}, .West, true}, {{6, 4}, .North, true}, {{6, 6}, .South, true},
-		{{8, 6}, .East, true}, {{4, 3}, .West, true}, {{7, 8}, .South, true}, {{5, 2}, .North, true},
-		{{7, 4}, .East, true}, {{5, 6}, .West, true}, {{6, 5}, .North, false},
+		{{x = 7, y = 5}, .East, true}, {{x = 5, y = 5}, .West, true}, {{x = 6, y = 4}, .North, true}, {{x = 6, y = 6}, .South, true},
+		{{x = 8, y = 6}, .East, true}, {{x = 4, y = 3}, .West, true}, {{x = 7, y = 8}, .South, true}, {{x = 5, y = 2}, .North, true},
+		{{x = 7, y = 4}, .East, true}, {{x = 5, y = 6}, .West, true}, {{x = 6, y = 5}, .North, false},
 	}
 	for c in cases {
 		direction, ok := flood_direction(from, c.aim)
@@ -60,44 +60,44 @@ test_flood_pushes_every_foe_one_cell_and_stops_at_blockers :: proc(t: ^testing.T
 	data: level.Level
 	player: Player
 	spawns := [?]Enemy_Spawn{
-		{position = {3, 3}, health = 50, attack = 1}, // free: 4, 3
-		{position = {11, 2}, health = 50, attack = 1}, // against the east wall
-		{position = {5, 5}, health = 50, attack = 1}, // against the player (6, 5)
-		{position = {8, 7}, health = 50, attack = 1},
-		{position = {9, 7}, health = 50, attack = 1}, // a file: both move
-		{position = {2, 8}, health = 50, attack = 1},
-		{position = {3, 8}, health = 50, attack = 1}, // a file against another foe at 4,8 ...
-		{position = {4, 8}, health = 50, attack = 1},
-		{position = {5, 8}, health = 50, attack = 1},
-		{position = {6, 8}, health = 50, attack = 1},
-		{position = {7, 8}, health = 50, attack = 1},
-		{position = {8, 8}, health = 50, attack = 1},
-		{position = {9, 8}, health = 50, attack = 1},
-		{position = {10, 8}, health = 50, attack = 1},
-		{position = {11, 8}, health = 50, attack = 1}, // a whole row to the wall: none moves
+		{position = {x = 3, y = 3}, health = 50, attack = 1}, // free: 4, 3
+		{position = {x = 11, y = 2}, health = 50, attack = 1}, // against the east wall
+		{position = {x = 5, y = 5}, health = 50, attack = 1}, // against the player (6, 5)
+		{position = {x = 8, y = 7}, health = 50, attack = 1},
+		{position = {x = 9, y = 7}, health = 50, attack = 1}, // a file: both move
+		{position = {x = 2, y = 8}, health = 50, attack = 1},
+		{position = {x = 3, y = 8}, health = 50, attack = 1}, // a file against another foe at 4,8 ...
+		{position = {x = 4, y = 8}, health = 50, attack = 1},
+		{position = {x = 5, y = 8}, health = 50, attack = 1},
+		{position = {x = 6, y = 8}, health = 50, attack = 1},
+		{position = {x = 7, y = 8}, health = 50, attack = 1},
+		{position = {x = 8, y = 8}, health = 50, attack = 1},
+		{position = {x = 9, y = 8}, health = 50, attack = 1},
+		{position = {x = 10, y = 8}, health = 50, attack = 1},
+		{position = {x = 11, y = 8}, health = 50, attack = 1}, // a whole row to the wall: none moves
 	}
 	room := ground_test_room(t, &data, &player, {enemies = spawns[:]})
 	defer level.destroy(&data)
 	defer destroy_room(&room)
 	health := [len(spawns)]i32{}
 	for enemy, i in room.enemies { health[i] = enemy.health }
-	play := flood_test_play(t, &room, {7, 5})
+	play := flood_test_play(t, &room, {x = 7, y = 5})
 	testing.expect_value(t, play.result, Card_Play_Result.Played)
-	testing.expect_value(t, flood_test_enemy(&room, 0), grid.Position{4, 3})
-	testing.expect_value(t, flood_test_enemy(&room, 1), grid.Position{11, 2})
-	testing.expect_value(t, flood_test_enemy(&room, 2), grid.Position{5, 5})
-	testing.expect_value(t, flood_test_enemy(&room, 3), grid.Position{9, 7})
-	testing.expect_value(t, flood_test_enemy(&room, 4), grid.Position{10, 7})
+	testing.expect_value(t, flood_test_enemy(&room, 0), grid.Position{x = 4, y = 3})
+	testing.expect_value(t, flood_test_enemy(&room, 1), grid.Position{x = 11, y = 2})
+	testing.expect_value(t, flood_test_enemy(&room, 2), grid.Position{x = 5, y = 5})
+	testing.expect_value(t, flood_test_enemy(&room, 3), grid.Position{x = 9, y = 7})
+	testing.expect_value(t, flood_test_enemy(&room, 4), grid.Position{x = 10, y = 7})
 	for i in 5..<len(spawns) { testing.expect_value(t, flood_test_enemy(&room, i), spawns[i].position) }
-	testing.expect_value(t, player.position, grid.Position{6, 5})
+	testing.expect_value(t, player.position, grid.Position{x = 6, y = 5})
 	for enemy, i in room.enemies { testing.expect_value(t, enemy.health, health[i]) }
 	testing.expect_value(t, player.health, i32(100))
 	swept := false
 	for event in room.recent_events.events[:room.recent_events.count] {
 		if event.kind != .Flood_Swept { continue }
 		swept = true
-		testing.expect_value(t, event.from_position, grid.Position{0, 5})
-		testing.expect_value(t, event.to_position, grid.Position{12, 5})
+		testing.expect_value(t, event.from_position, grid.Position{x = 0, y = 5})
+		testing.expect_value(t, event.to_position, grid.Position{x = 12, y = 5})
 		testing.expect_value(t, event.amount, i32(1))
 		testing.expect_value(t, Move_Direction(event.duration), Move_Direction.East)
 	}
@@ -106,16 +106,16 @@ test_flood_pushes_every_foe_one_cell_and_stops_at_blockers :: proc(t: ^testing.T
 
 @(test)
 test_flood_goes_all_four_ways :: proc(t: ^testing.T) {
-	aims := [4]grid.Position{{6, 4}, {7, 5}, {6, 6}, {5, 5}}
-	offsets := [4]grid.Position{{0, -1}, {1, 0}, {0, 1}, {-1, 0}}
+	aims := [4]grid.Position{{x = 6, y = 4}, {x = 7, y = 5}, {x = 6, y = 6}, {x = 5, y = 5}}
+	offsets := [4]grid.Position{{x = 0, y = -1}, {x = 1, y = 0}, {x = 0, y = 1}, {x = -1, y = 0}}
 	for direction in Move_Direction {
 		data: level.Level
 		player: Player
-		spawns := [?]Enemy_Spawn{{position = {3, 3}, health = 50, attack = 1}, {position = {9, 7}, health = 50, attack = 1}}
+		spawns := [?]Enemy_Spawn{{position = {x = 3, y = 3}, health = 50, attack = 1}, {position = {x = 9, y = 7}, health = 50, attack = 1}}
 		room := ground_test_room(t, &data, &player, {enemies = spawns[:]})
 		testing.expect_value(t, flood_test_play(t, &room, aims[int(direction)]).result, Card_Play_Result.Played)
 		for spawn, i in spawns {
-			testing.expect_value(t, room.enemies[i].position, grid.Position{spawn.position.x+offsets[int(direction)].x, spawn.position.y+offsets[int(direction)].y})
+			testing.expect_value(t, room.enemies[i].position, grid.offset(spawn.position, offsets[int(direction)].x, offsets[int(direction)].y))
 		}
 		destroy_room(&room)
 		level.destroy(&data)
@@ -128,20 +128,20 @@ test_flood_goes_all_four_ways :: proc(t: ^testing.T) {
 test_flood_upgrades_and_the_tick_push_further :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {2, 2}, health = 50, attack = 1}, {position = {9, 8}, health = 50, attack = 1}}
+	spawns := [?]Enemy_Spawn{{position = {x = 2, y = 2}, health = 50, attack = 1}, {position = {x = 9, y = 8}, health = 50, attack = 1}}
 	room := ground_test_room(t, &data, &player, {enemies = spawns[:]})
 	defer level.destroy(&data)
 	defer destroy_room(&room)
-	testing.expect_value(t, flood_test_play(t, &room, {7, 5}, 2).result, Card_Play_Result.Played)
-	testing.expect_value(t, flood_test_enemy(&room, 0), grid.Position{5, 2})
+	testing.expect_value(t, flood_test_play(t, &room, {x = 7, y = 5}, 2).result, Card_Play_Result.Played)
+	testing.expect_value(t, flood_test_enemy(&room, 0), grid.Position{x = 5, y = 2})
 	// 9, 8 + 3 would pass the wall at 12: it stops at 11.
-	testing.expect_value(t, flood_test_enemy(&room, 1), grid.Position{11, 8})
+	testing.expect_value(t, flood_test_enemy(&room, 1), grid.Position{x = 11, y = 8})
 	card := ground_test_card(t, &room, .Flood_Wave, 0)
 	room.player.tactical.critical_next = true
-	testing.expect_value(t, play_card(&room, card.id, cell_target({5, 5})).result, Card_Play_Result.Played)
+	testing.expect_value(t, play_card(&room, card.id, cell_target({x = 5, y = 5})).result, Card_Play_Result.Played)
 	// West two cells now: 5, 2 to 3, 2 and 11, 8 to 9, 8.
-	testing.expect_value(t, flood_test_enemy(&room, 0), grid.Position{3, 2})
-	testing.expect_value(t, flood_test_enemy(&room, 1), grid.Position{9, 8})
+	testing.expect_value(t, flood_test_enemy(&room, 0), grid.Position{x = 3, y = 2})
+	testing.expect_value(t, flood_test_enemy(&room, 1), grid.Position{x = 9, y = 8})
 }
 
 // Fires go out before anybody is pushed: no foe lands in one. The player's
@@ -151,25 +151,25 @@ test_flood_upgrades_and_the_tick_push_further :: proc(t: ^testing.T) {
 test_flood_puts_out_every_fire_before_the_push :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {4, 3}, health = 50, attack = 1}}
-	objects := [?]Grid_Object_Spawn{{kind = .Fire, position = {9, 2}}, {kind = .Barrel, position = {9, 7}}, {kind = .Ice_Block, position = {2, 7}}}
+	spawns := [?]Enemy_Spawn{{position = {x = 4, y = 3}, health = 50, attack = 1}}
+	objects := [?]Grid_Object_Spawn{{kind = .Fire, position = {x = 9, y = 2}}, {kind = .Barrel, position = {x = 9, y = 7}}, {kind = .Ice_Block, position = {x = 2, y = 7}}}
 	room := ground_test_room(t, &data, &player, {enemies = spawns[:], objects = objects[:]})
 	defer level.destroy(&data)
 	defer destroy_room(&room)
 	// A fire where the foe will land, and one far from it.
-	testing.expect(t, ground_test_pour(&room, .Burn, {5, 3}, 2).accepted)
-	testing.expect(t, ground_test_pour(&room, .Burn, {8, 8}, 1).accepted)
+	testing.expect(t, ground_test_pour(&room, .Burn, {x = 5, y = 3}, 2).accepted)
+	testing.expect(t, ground_test_pour(&room, .Burn, {x = 8, y = 8}, 1).accepted)
 	testing.expect(t, room.ground.fire_count == 2)
-	testing.expect(t, ground_burn_at(&room, {5, 3}) > 0)
-	play := flood_test_play(t, &room, {7, 5})
+	testing.expect(t, ground_burn_at(&room, {x = 5, y = 3}) > 0)
+	play := flood_test_play(t, &room, {x = 7, y = 5})
 	testing.expect_value(t, play.result, Card_Play_Result.Played)
 	testing.expect_value(t, room.ground.fire_count, 0)
-	testing.expect_value(t, ground_burn_at(&room, {5, 3}), i32(0))
+	testing.expect_value(t, ground_burn_at(&room, {x = 5, y = 3}), i32(0))
 	fires, others := 0, 0
 	for object in room.objects { if object.kind == .Fire { fires += 1 } else { others += 1 } }
 	testing.expect_value(t, fires, 0)
 	testing.expect_value(t, others, 2)
-	testing.expect_value(t, flood_test_enemy(&room, 0), grid.Position{5, 3})
+	testing.expect_value(t, flood_test_enemy(&room, 0), grid.Position{x = 5, y = 3})
 	_, burning := status_for_entity(&room, enemy_entity(room.enemies[0].id), .Burn)
 	testing.expect(t, !burning)
 	steam := 0
@@ -183,13 +183,13 @@ test_flood_puts_out_every_fire_before_the_push :: proc(t: ^testing.T) {
 test_flood_pushed_foes_trigger_the_cell_they_enter :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {3, 3}, health = 50, attack = 1}, {position = {3, 7}, health = 2, attack = 1}}
-	traps := [?]Trap_Spawn{{position = {4, 7}, damage = 5}}
+	spawns := [?]Enemy_Spawn{{position = {x = 3, y = 3}, health = 50, attack = 1}, {position = {x = 3, y = 7}, health = 2, attack = 1}}
+	traps := [?]Trap_Spawn{{position = {x = 4, y = 7}, damage = 5}}
 	room := ground_test_room(t, &data, &player, {enemies = spawns[:], traps = traps[:]})
 	defer level.destroy(&data)
 	defer destroy_room(&room)
-	testing.expect(t, ground_test_pour(&room, .Poison, {4, 3}, 3).accepted)
-	testing.expect_value(t, flood_test_play(t, &room, {7, 5}).result, Card_Play_Result.Played)
+	testing.expect(t, ground_test_pour(&room, .Poison, {x = 4, y = 3}, 3).accepted)
+	testing.expect_value(t, flood_test_play(t, &room, {x = 7, y = 5}).result, Card_Play_Result.Played)
 	testing.expect_value(t, ground_test_potency(&room, enemy_entity(room.enemies[0].id), .Poison), i32(3))
 	// The foe on the trap died of it.
 	testing.expect_value(t, len(room.enemies), 1)
@@ -201,20 +201,20 @@ test_flood_pushed_foes_trigger_the_cell_they_enter :: proc(t: ^testing.T) {
 test_flood_refuses_his_own_cell_and_far_cells :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {3, 3}, health = 50, attack = 1}}
+	spawns := [?]Enemy_Spawn{{position = {x = 3, y = 3}, health = 50, attack = 1}}
 	room := ground_test_room(t, &data, &player, {enemies = spawns[:]})
 	defer level.destroy(&data)
 	defer destroy_room(&room)
 	own := flood_test_play(t, &room, player.position)
 	testing.expect_value(t, own.result, Card_Play_Result.Compile_Failed)
-	far := flood_test_play(t, &room, {10, 5})
+	far := flood_test_play(t, &room, {x = 10, y = 5})
 	testing.expect_value(t, far.result, Card_Play_Result.Compile_Failed)
 	testing.expect_value(t, room.player.deck.energy, room.player.deck.rules.max_energy)
-	testing.expect_value(t, flood_test_enemy(&room, 0), grid.Position{3, 3})
+	testing.expect_value(t, flood_test_enemy(&room, 0), grid.Position{x = 3, y = 3})
 	// A wall cell a step away is still an aim: the wave goes that way.
-	player.position = {1, 5}
-	testing.expect_value(t, flood_test_play(t, &room, {0, 5}).result, Card_Play_Result.Played)
-	testing.expect_value(t, flood_test_enemy(&room, 0), grid.Position{2, 3})
+	player.position = {x = 1, y = 5}
+	testing.expect_value(t, flood_test_play(t, &room, {x = 0, y = 5}).result, Card_Play_Result.Played)
+	testing.expect_value(t, flood_test_enemy(&room, 0), grid.Position{x = 2, y = 3})
 }
 
 // Nobody out of play is moved: the Lazzo's foe and the Pinball's ball stay.
@@ -222,12 +222,12 @@ test_flood_refuses_his_own_cell_and_far_cells :: proc(t: ^testing.T) {
 test_flood_leaves_the_foe_out_of_play :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {3, 3}, health = 50, attack = 1}, {position = {3, 7}, health = 50, attack = 1}}
+	spawns := [?]Enemy_Spawn{{position = {x = 3, y = 3}, health = 50, attack = 1}, {position = {x = 3, y = 7}, health = 50, attack = 1}}
 	room := ground_test_room(t, &data, &player, {enemies = spawns[:]})
 	defer level.destroy(&data)
 	defer destroy_room(&room)
 	room.pinball = {active = true, enemy_id = room.enemies[0].id, cell = room.enemies[0].position}
-	testing.expect_value(t, flood_test_play(t, &room, {7, 5}).result, Card_Play_Result.Played)
-	testing.expect_value(t, flood_test_enemy(&room, 0), grid.Position{3, 3})
-	testing.expect_value(t, flood_test_enemy(&room, 1), grid.Position{4, 7})
+	testing.expect_value(t, flood_test_play(t, &room, {x = 7, y = 5}).result, Card_Play_Result.Played)
+	testing.expect_value(t, flood_test_enemy(&room, 0), grid.Position{x = 3, y = 3})
+	testing.expect_value(t, flood_test_enemy(&room, 1), grid.Position{x = 4, y = 7})
 }

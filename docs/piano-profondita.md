@@ -15,9 +15,10 @@ Il documento raccoglie due richieste dell'utente dello stesso giorno:
    grotte senza caricamento» e salite, «tenendo sempre la griglia per il
    combat».
 
-La risposta discussa in chat è una **mappa a piani**: fino a tre griglie
-sovrapposte (sotto, terra, sopra), ognuna con il suo terreno scolpito, e il
-combattimento sempre a griglia. La sezione 2 descrive il modello; le fasi lo
+La risposta discussa in chat è una **mappa a piani**: fino a quattro griglie
+sovrapposte (due sotto, la terra, una sopra; erano tre, l'utente ne ha scelte
+quattro nella Fase 2), ognuna con il suo terreno scolpito, e il combattimento
+sempre a griglia. La sezione 2 descrive il modello; le fasi lo
 costruiscono un pezzo alla volta.
 
 Rispetto alle otto fasi proposte in chat ci sono tre differenze:
@@ -48,7 +49,7 @@ La tabella è in ordine di priorità, cioè l'ordine della scaletta qui sotto.
 |---|---|---|---|---|---|
 | 0 | 0 | Misure di partenza: il benchmark arriva a rilievi, montagna e grotte (proposta di Claude) | — | Fatta | vedi Esito |
 | 1 | 1 | Terreno scolpito: rampe, colline e dirupi di roccia, solo grafica | — (meglio dopo la 0) | Fatta | vedi Esito |
-| 2 | 2 | Posizioni con il piano: il terzo numero, tutto a «terra» | — | Da fare | — |
+| 2 | 2 | Posizioni con il piano: il terzo numero, tutto a «terra» | — | Fatta | vedi Esito |
 | 3 | 3 | Piani nel laboratorio: dati e regole | 2 | Da fare | — |
 | 4 | 4 | Piani nel laboratorio: trasparenze, contorni, mouse, luce | 3 (1 per l'aspetto) | Da fare | — |
 | 5 | 5 | Piani nelle spedizioni: grotte senza caricamento | 1, 3, 4 | Da fare | — |
@@ -259,9 +260,9 @@ regole normali.
 
 ### 2.1 Le parole del documento
 
-- **Piano:** una delle griglie sovrapposte della mappa: **sotto** (−1, grotte
-  e gallerie), **terra** (0, la mappa di oggi), **sopra** (+1, ponti,
-  passerelle, balconi).
+- **Piano:** una delle griglie sovrapposte della mappa: **sotto profondo**
+  (−2, un sotterraneo più in basso), **sotto** (−1, grotte e gallerie),
+  **terra** (0, la mappa di oggi), **sopra** (+1, ponti, passerelle, balconi).
 - **Colonna:** le caselle con le stesse x e y su tutti i piani.
 - **Gradino:** l'unità di altezza delle regole, come oggi. A schermo è 0,12 di
   cella (`HEIGHT_STEP_DRAWN`, `src/game/height.odin:26`).
@@ -326,8 +327,9 @@ regole normali.
  sotto                                         ( grotta )
 ```
 
-- Tre griglie della stessa misura. La terra è la mappa di oggi; sotto e sopra
-  sono quasi vuote e hanno caselle solo dove servono.
+- Quattro griglie della stessa misura (tre nella prima versione; l'utente ne ha
+  scelte quattro nella Fase 2). La terra è la mappa di oggi; gli altri piani
+  sono quasi vuoti e hanno caselle solo dove servono.
 - Le altezze di tutti i piani si contano dallo stesso zero, in gradini. Il
   piano sotto sta dentro i rilievi: una grotta entra di lato in una collina, a
   livello del terreno attorno. Per scendere davvero sotto il suolo un bioma può
@@ -881,7 +883,8 @@ dopo.
 
 ### Progetto
 
-- `grid.Position` riceve `layer: i8`: −1 sotto, 0 terra, +1 sopra.
+- `grid.Position` riceve `layer: i8`: −2 sotto profondo, −1 sotto, 0 terra,
+  +1 sopra (quattro piani, risposte 1 e 3).
 - **Nessuno scambio silenzioso:** le `grid.Grid` di oggi sono griglie di un
   solo piano, e `contains` e `index_of` rifiutano ogni posizione con
   `layer != 0`. Il codice che non sa ancora dei piani tratta una casella di un
@@ -950,7 +953,60 @@ fine.
 
 ### Esito
 
-Da fare.
+**Fatta il 25 ottobre 2026** sul ramo `piano-profondita`.
+
+**Risposte dell'utente**
+1. **Valori del piano:** −1, 0, +1, con la terra a 0.
+2. **Forma delle posizioni riscritte:** con i nomi, più `grid.offset` per le vicine.
+3. **Quanti piani:** quattro (la mia raccomandazione era tre): −2 sotto profondo, −1 sotto, 0 terra,
+   +1 sopra. Il documento è aggiornato (introduzione, sezioni 2.1 e 2.4, Fasi 3 e 7).
+4. **Domande nate durante la fase:**
+   - il test del budget dello stack falliva: limiti alzati, con un commento (`Room` sotto i 9 KB, registri
+     degli eventi entro 104 KB);
+   - 35 avvisi del compilatore sulle `Renderer` dei test messe sullo stack: spostate sullo heap;
+   - salvataggi più grandi e più lenti (in background): vanno bene così.
+
+**Cosa è stato fatto**
+- **`grid.Position`** ha `layer: i8` (`src/engine/grid/grid.odin`), con `LOWEST_LAYER` (−2),
+  `GROUND_LAYER` (0) e `HIGHEST_LAYER` (+1). `contains`, `index_of`, `get` e `set` di una `Grid` rifiutano
+  gli altri piani; `grid.offset(p, dx, dy)` dà la vicina conservando il piano; `grid.cell_index` vale per
+  le tabelle parallele.
+- **Riscrittura guidata dal compilatore**, con un programma nella scratchpad (non nel repo): 3215
+  posizioni in un solo giro, di cui 2909 nella forma con i nomi, 300 vicine diventate `grid.offset`, 4
+  vicine con i nomi in test senza l'import di `grid` e 2 copie (`{p.x, p.y}`). Una sola correzione a mano:
+  in `relief.odin` la «vicina» era un `Plateau`, non una posizione.
+- **Indici a mano:** `reachable_walkable` (strutture) passa da `grid.cell_index`. Gli altri lavorano su
+  finestre locali di interi, giuste finché tutto sta sulla terra, e diventano per piano nella Fase 3.
+  `place_check` rifiuta le strutture fuori dalla terra.
+- **Test:** 4 nuovi. Tre in `engine/grid`: una griglia ha un piano solo, `offset` conserva il piano, una
+  posizione salvata senza `layer` torna sulla terra. Uno in `level`: niente strutture fuori dalla terra.
+  Nei test esistenti, oltre alla scrittura delle posizioni, due cambi approvati dall'utente: i limiti
+  del budget dello stack e le `Renderer` sullo heap (32 dichiarazioni in 20 file).
+
+**Costi misurati**
+- Una posizione pesa 24 byte invece di 16. Un evento di gioco passa da 232 a 248 byte, `Room` da 7.768 a
+  8.616 e i registri degli eventi da circa 96,6 a 103,3 KB; la `Renderer` pesa 290.560 byte.
+- Lo snapshot della spedizione in memoria passa da 1.427.944 a 1.885.888 byte; il salvataggio da 2,76 a
+  3,33 MB e da 198 a 249 ms di media, in un thread a parte.
+
+**Verifiche**
+- Check normale e senza assert, senza avvisi. `.\scripts\check.ps1` completo: 1665 test verdi, con e
+  senza assert, più le due build.
+- Smoke del laboratorio completo: le 109 catture sono identiche al byte a quelle della Fase 1. A schermo il
+  gioco non cambia.
+- Smoke delle spedizioni completo: 103 catture, nessun errore. Non si confrontano al byte, perché
+  l'animazione segue il tempo vero: due giri della stessa build differiscono in 67 catture. Le ho guardate:
+  lo scontro nel Cyber e la grotta della Neve sono come prima.
+- Benchmark contro la Fase 1: +0,2% di media, gruppo peggiore +2,1% (gli ologrammi): rumore.
+
+**Da rivedere quando arrivano i piani (Fase 3)**
+- Vicine scritte con i nomi perché il file non importa `grid` (restano sulla terra):
+  `src/render/world_playback_test.odin:94`, `src/integration/mechanics_lab_test.odin:105`,
+  `src/run/expedition_flow_test.odin:254` e `:277`.
+- Copia senza piano: `src/expedition/player_structures_test.odin:100`. L'altra copia,
+  `src/expedition/relief.odin:114`, è un `Plateau`: corretta così.
+- Le finestre locali dell'IA (`rebuild_tactical_enemy_distances`) e il campo delle distanze diventano per
+  piano.
 
 ## 6. Fase 3 — Piani nel laboratorio: dati e regole
 
@@ -1004,8 +1060,8 @@ semplice per giocare l'arena.
 
 ### Progetto
 
-- **Dati:** `level.Level` riceve i piani sotto e sopra (tipi e altezze), vuoti
-  finché non servono; la terra resta quella di oggi. `tile_at` e `height_at`
+- **Dati:** `level.Level` riceve i piani sotto (−1 e −2) e sopra (tipi e
+  altezze), vuoti finché non servono; la terra resta quella di oggi. `tile_at` e `height_at`
   scelgono il piano dalla posizione. Cambiare un piano alza
   `geometry_revision`.
 - **Controllo della colonna:** due caselle calpestabili della stessa colonna
@@ -1500,8 +1556,8 @@ con la geografia fissa.
   ascensore che si sblocca solo arrivandoci dal lato giusto. Una volta aperta,
   la scorciatoia resta aperta anche nelle run dopo, come i segreti scoperti.
 - **Sotterraneo grande** in alcuni biomi (Egitto, Gotico): non solo grotte
-  dentro le colline, ma zone ampie sotto il suolo, raggiunte da un pozzo con
-  l'ascensore, come i fiumi sotterranei di Elden Ring. Per farle, il bioma alza
+  dentro le colline, ma zone ampie sotto il suolo, anche sul piano −2,
+  raggiunte da un pozzo con l'ascensore, come i fiumi sotterranei di Elden Ring. Per farle, il bioma alza
   tutto il suo terreno di una base e mette il sotterraneo sotto.
 - **Strumenti:** il generatore per le forme ripetute, l'editor della Fase 6
   per i ritocchi.

@@ -11,8 +11,8 @@ cave_reach :: proc(plan: ^Cave_Plan) -> (seen: [CAVE_HEIGHT][CAVE_WIDTH]bool) {
 	queue[0] = plan.arrival
 	seen[plan.arrival.y][plan.arrival.x] = true
 	for head := 0; head < tail; head += 1 {
-		for offset in ([4]grid.Position{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}) {
-			q := grid.Position{queue[head].x+offset.x, queue[head].y+offset.y}
+		for offset in ([4]grid.Position{{x = 1, y = 0}, {x = -1, y = 0}, {x = 0, y = 1}, {x = 0, y = -1}}) {
+			q := grid.Position{x = queue[head].x+offset.x, y = queue[head].y+offset.y}
 			if cave_plan_at(plan, q.x, q.y) != '.' || seen[q.y][q.x] { continue }
 			seen[q.y][q.x] = true
 			queue[tail] = q
@@ -69,13 +69,13 @@ test_a_cave_is_stamped_whole_and_only_where_asked :: proc(t: ^testing.T) {
 	data, _ := create(60, 40, Tile{kind = .Floor})
 	defer destroy(&data)
 	plan := cave_plan(5)
-	testing.expect(t, cave_stamp(&data, {10, 8}, &plan))
+	testing.expect(t, cave_stamp(&data, {x = 10, y = 8}, &plan))
 	for y in 0..<CAVE_HEIGHT { for x in 0..<CAVE_WIDTH {
-		tile, _ := tile_at(&data, {10+x, 8+y})
+		tile, _ := tile_at(&data, {x = 10+x, y = 8+y})
 		testing.expect_value(t, tile.kind, Tile_Kind.Wall if plan.rows[y][x] == '#' else Tile_Kind.Floor)
 	}}
-	outside, _ := tile_at(&data, {9, 8})
+	outside, _ := tile_at(&data, {x = 9, y = 8})
 	testing.expect_value(t, outside.kind, Tile_Kind.Floor)
-	testing.expect(t, !cave_stamp(&data, {40, 8}, &plan), "it does not fit at the east edge")
-	testing.expect(t, !cave_stamp(&data, {-1, 0}, &plan))
+	testing.expect(t, !cave_stamp(&data, {x = 40, y = 8}, &plan), "it does not fit at the east edge")
+	testing.expect(t, !cave_stamp(&data, {x = -1, y = 0}, &plan))
 }

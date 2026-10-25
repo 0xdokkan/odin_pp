@@ -144,7 +144,7 @@ generate_blueprint_modifier :: proc(blueprint: ^Room_Blueprint) -> Room_Modifier
 		modifier := Room_Modifier{kind = .Furnace,
 			activation_pulse = ROOM_HAZARD_WARNING_PULSES, damage = ROOM_HAZARD_DAMAGE}
 		for offset in 1..=span {
-			cell := grid.Position{offset, line} if rows else grid.Position{line, offset}
+			cell := grid.Position{x = offset, y = line} if rows else grid.Position{x = line, y = offset}
 			if !cell_is_walkable(&blueprint.level_data, cell) ||
 			   position_in_list(blueprint.obstacles[:], cell) ||
 			   cell == blueprint.level_data.player_spawn || cell == blueprint.exit_position ||

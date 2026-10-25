@@ -11,12 +11,12 @@ test_board_device_card_casts_replay_launch_impact_and_spawn_without_failures :: 
 		defer level.destroy(&data)
 		player := spell_presentation_player(t,id)
 		testing.expect(t,game.configure_tactical(&player,game.DEFAULT_TACTICAL_CONFIG))
-		enemies := [?]game.Enemy_Spawn{{position={6,3},health=20,attack=1}}
+		enemies := [?]game.Enemy_Spawn{{position={x = 6, y = 3},health=20,attack=1}}
 		room,created := game.create_room(&data,&player,{enemies=enemies[:]})
 		testing.expect(t,created)
 		defer game.destroy_room(&room)
 		before := capture_room_presentation(&room)
-		played := game.play_card(&room,player.deck.hand[0].id,game.cell_target({3,1}))
+		played := game.play_card(&room,player.deck.hand[0].id,game.cell_target({x = 3, y = 1}))
 		testing.expect(t,game.card_play_was_committed(played.result))
 		after := capture_room_presentation(&room)
 		timeline := new(Presentation_Timeline)
@@ -50,13 +50,13 @@ test_tesla_activation_replays_walls_or_consumes_four_field_models_after_damage :
 		defer level.destroy(&data)
 		player := spell_presentation_player(t,.Tesla_Coil)
 		testing.expect(t,game.configure_tactical(&player,game.DEFAULT_TACTICAL_CONFIG))
-		enemies := [?]game.Enemy_Spawn{{position={4,1},health=20,attack=1}}
+		enemies := [?]game.Enemy_Spawn{{position={x = 4, y = 1},health=20,attack=1}}
 		room,created := game.create_room(&data,&player,{enemies=enemies[:]})
 		testing.expect(t,created)
 		defer game.destroy_room(&room)
 		positions := [4][2]int{{2,1},{6,1},{6,4},{2,4}}
 		for point in positions[:count] {
-			testing.expect(t,game.deploy_board_device(&room,.Tesla_Coil,{point[0],point[1]},8,0,room.recent_events))
+			testing.expect(t,game.deploy_board_device(&room,.Tesla_Coil,{x = point[0], y = point[1]},8,0,room.recent_events))
 		}
 		before := capture_room_presentation(&room)
 		testing.expect(t,game.activate_board_devices(&room))

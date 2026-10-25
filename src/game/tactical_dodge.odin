@@ -29,9 +29,9 @@ tactical_dodge_destination :: proc(room: ^Room, direction: Move_Direction) -> (d
 	origin := room.player.position
 	// A short roll is still possible when only the first cell is free.
 	for distance in 1..=2 {
-		next := grid.Position{origin.x+step.x*distance, origin.y+step.y*distance}
+		next := grid.offset(origin, step.x*distance, step.y*distance)
 		query := query_entity_movement(room, PLAYER_ENTITY, next)
-		before := grid.Position{origin.x+step.x*(distance-1), origin.y+step.y*(distance-1)}
+		before := grid.offset(origin, step.x*(distance-1), step.y*(distance-1))
 		if !movement_query_is_clear(&query) || step_height_blocked(room, before, next) { break }
 		destination, ok = next, true
 	}

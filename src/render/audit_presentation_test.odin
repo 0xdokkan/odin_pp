@@ -11,34 +11,36 @@ test_animation_speed_changes_duration_and_preserves_event_order_and_final_view :
 	events: game.Event_Log
 	game.record_event(&events, {
 		kind = .Moved, target = game.PLAYER_ENTITY,
-		from_position = {1, 1}, to_position = {2, 1},
+		from_position = {x = 1, y = 1}, to_position = {x = 2, y = 1},
 	})
 	game.record_event(&events, {kind = .Damaged, target = game.PLAYER_ENTITY, amount = 2})
-	normal, fast: Renderer
+	normal, fast := new(Renderer), new(Renderer)
+	defer free(normal)
+	defer free(fast)
 	before := capture_room_presentation(&room)
-	testing.expect(t, begin_renderer_event_timeline(&normal, before, &events))
-	testing.expect(t, begin_renderer_event_timeline(&fast, before, &events))
-	testing.expect(t, set_renderer_playback_speed(&fast, 4))
-	testing.expect(t, !set_renderer_playback_speed(&fast, 0))
-	testing.expect(t, !set_renderer_playback_speed(&fast, -1))
-	testing.expect(t, !set_renderer_playback_speed(&fast, 5))
-	testing.expect_value(t, renderer_playback_speed(&fast), f32(4))
+	testing.expect(t, begin_renderer_event_timeline(normal, before, &events))
+	testing.expect(t, begin_renderer_event_timeline(fast, before, &events))
+	testing.expect(t, set_renderer_playback_speed(fast, 4))
+	testing.expect(t, !set_renderer_playback_speed(fast, 0))
+	testing.expect(t, !set_renderer_playback_speed(fast, -1))
+	testing.expect(t, !set_renderer_playback_speed(fast, 5))
+	testing.expect_value(t, renderer_playback_speed(fast), f32(4))
 	step := PRESENTATION_PLAYER_MOVE_DURATION/4
-	update_renderer_event_timeline(&fast, step)
-	update_renderer_event_timeline(&normal, step)
+	update_renderer_event_timeline(fast, step)
+	update_renderer_event_timeline(normal, step)
 	fast_cue, fast_active := active_presentation_cue(&fast.timeline)
 	normal_cue, normal_active := active_presentation_cue(&normal.timeline)
 	testing.expect(t, fast_active && normal_active)
 	testing.expect_value(t, fast_cue.kind, Presentation_Cue_Kind.Damage)
 	testing.expect_value(t, normal_cue.kind, Presentation_Cue_Kind.Move)
 	testing.expect_value(t, fast.timeline.view.player.health, before.player.health)
-	testing.expect(t, update_renderer_event_timeline(&fast, PRESENTATION_DAMAGE_DURATION/4))
-	testing.expect(t, renderer_timeline_is_busy(&normal))
-	testing.expect(t, update_renderer_event_timeline(&normal, 1000))
+	testing.expect(t, update_renderer_event_timeline(fast, PRESENTATION_DAMAGE_DURATION/4))
+	testing.expect(t, renderer_timeline_is_busy(normal))
+	testing.expect(t, update_renderer_event_timeline(normal, 1000))
 	testing.expect_value(t, fast.timeline.view, normal.timeline.view)
 	testing.expect_value(t, fast.timeline.update_failures, 0)
-	clear_event_animations(&fast)
-	testing.expect_value(t, renderer_playback_speed(&fast), f32(4))
+	clear_event_animations(fast)
+	testing.expect_value(t, renderer_playback_speed(fast), f32(4))
 }
 
 @(test)

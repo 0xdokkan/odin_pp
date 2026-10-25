@@ -18,9 +18,9 @@ import level "../level"
 
 CARD_DEMO_WIDTH :: 11
 CARD_DEMO_HEIGHT :: 9
-CARD_DEMO_PLAYER :: grid.Position{5, 4}
+CARD_DEMO_PLAYER :: grid.Position{x = 5, y = 4}
 // The far corner: an exit the room needs (create_room), out of the way.
-CARD_DEMO_EXIT :: grid.Position{1, 1}
+CARD_DEMO_EXIT :: grid.Position{x = 1, y = 1}
 CARD_DEMO_MAX_FOES :: 6
 CARD_DEMO_MAX_OBJECTS :: 4
 CARD_DEMO_MAX_COILS :: 2
@@ -166,7 +166,7 @@ card_demo_add_action :: proc(scene: ^Card_Demo_Scene, action: Card_Demo_Action) 
 // A cell `dx` east and `dy` south of the player (north is -dy).
 @(private)
 card_demo_offset :: proc(dx, dy: int) -> grid.Position {
-	return {CARD_DEMO_PLAYER.x+dx, CARD_DEMO_PLAYER.y+dy}
+	return grid.offset(CARD_DEMO_PLAYER, dx, dy)
 }
 
 // A cell `reach` away by `metric`, as far as can be to the player's right on
@@ -244,12 +244,12 @@ card_demo_default_scene :: proc(given: Card_Definition) -> (scene: Card_Demo_Sce
 			} else {
 				// What it strikes stands inside its area, east and north of the
 				// cell: one over the other on the screen.
-				card_demo_add_foe(&scene, {t.x+1, t.y})
-				card_demo_add_foe(&scene, {t.x, t.y-1})
+				card_demo_add_foe(&scene, grid.offset(t, 1, 0))
+				card_demo_add_foe(&scene, grid.offset(t, 0, -1))
 			}
 		}
 		if objects && spec.shape != .Line {
-			scene.objects[0] = {kind = .Barrel, position = {t.x-1, t.y}}
+			scene.objects[0] = {kind = .Barrel, position = grid.offset(t, -1, 0)}
 			scene.object_count = 1
 		}
 	}
@@ -276,13 +276,13 @@ card_demo_scene :: proc(id: Card_Id, upgrade_level: i32 = 0) -> (scene: Card_Dem
 		scene.faces = {4, 4, 0}
 	// The die's top face carries the bolt on to a second foe, beside the first.
 	case .Fate_Strike:
-		card_demo_add_foe(&scene, {scene.target.x+1, scene.target.y-1})
+		card_demo_add_foe(&scene, grid.offset(scene.target, 1, -1))
 		scene.faces = {CARD_DEMO_TOP, 0, 0}
 		scene.foe_hurt = 2
 	// The bolt leaps on to the two foes next in line.
 	case .Chain_Lightning, .Storm_Crown:
-		card_demo_add_foe(&scene, {scene.target.x+1, scene.target.y-1})
-		card_demo_add_foe(&scene, {scene.target.x+2, scene.target.y-2})
+		card_demo_add_foe(&scene, grid.offset(scene.target, 1, -1))
+		card_demo_add_foe(&scene, grid.offset(scene.target, 2, -2))
 		scene.foe_hurt = 3
 	// Two hits and a miss that guards; a pair that poisons.
 	case .Prismatic_Barrage:
@@ -364,7 +364,7 @@ card_demo_scene :: proc(id: Card_Id, upgrade_level: i32 = 0) -> (scene: Card_Dem
 		scene.foe_hurt = 1
 	// A foe beside the floor: shocked at each beat, as many times as its die.
 	case .Shock_Floor:
-		card_demo_add_foe(&scene, {scene.target.x-1, scene.target.y})
+		card_demo_add_foe(&scene, grid.offset(scene.target, -1, 0))
 		scene.faces = {3, 0, 0}
 		scene.seconds = 4
 		scene.foe_hurt = 1
@@ -453,8 +453,8 @@ card_demo_scene :: proc(id: Card_Id, upgrade_level: i32 = 0) -> (scene: Card_Dem
 		power := BLACK_HOLE_BASE_DAMAGE+upgrade_level
 		radius := int(black_hole_radius(upgrade_level))
 		scene.target = card_demo_offset(2, -1)
-		scene.foes[0] = {at = {scene.target.x+1, scene.target.y}, archetype = .Chaser, health = power*2-1, attack = 1}
-		scene.foes[1] = {at = {scene.target.x-radius-1, scene.target.y}, archetype = .Chaser, health = 40, attack = 1}
+		scene.foes[0] = {at = grid.offset(scene.target, 1, 0), archetype = .Chaser, health = power*2-1, attack = 1}
+		scene.foes[1] = {at = grid.offset(scene.target, -radius-1, 0), archetype = .Chaser, health = 40, attack = 1}
 		scene.foe_count = 2
 		scene.seconds = 5
 		scene.foe_hurt = 1
@@ -656,7 +656,7 @@ create_card_demo_room :: proc(given: Card_Demo_Scene, card: Card_Instance, dice:
 	buffer: [CARD_DEMO_HEIGHT][CARD_DEMO_WIDTH]u8
 	for y in 0..<CARD_DEMO_HEIGHT {
 		for x in 0..<CARD_DEMO_WIDTH {
-			cell := grid.Position{x, y}
+			cell := grid.Position{x = x, y = y}
 			switch {
 			case x == 0 || y == 0 || x == CARD_DEMO_WIDTH-1 || y == CARD_DEMO_HEIGHT-1: buffer[y][x] = '#'
 			case cell == CARD_DEMO_PLAYER: buffer[y][x] = '@'

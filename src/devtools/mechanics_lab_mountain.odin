@@ -18,13 +18,13 @@ import render "../render"
 Mountain_Step :: struct { offset: grid.Position, direction: game.Move_Direction }
 
 MOUNTAIN_LAB_STEPS := [4]Mountain_Step{
-	{{0, -1}, .North}, {{1, 0}, .East}, {{0, 1}, .South}, {{-1, 0}, .West},
+	{{x = 0, y = -1}, .North}, {{x = 1, y = 0}, .East}, {{x = 0, y = 1}, .South}, {{x = -1, y = 0}, .West},
 }
 
 @(private = "file")
 mountain_lab_cell :: proc(offset: grid.Position) -> grid.Position {
 	centre := run_session.MECHANICS_LAB_MOUNTAIN_CENTER
-	return {centre.x+offset.x, centre.y+offset.y}
+	return grid.offset(centre, offset.x, offset.y)
 }
 
 // The shortest walk, a step of one height at a time, from `from` to `to` (empty if there is none).
@@ -39,7 +39,7 @@ mountain_lab_route :: proc(room: ^game.Room, from, to: grid.Position) -> [dynami
 		cell := queue[head]
 		if cell == to { break }
 		for step in MOUNTAIN_LAB_STEPS {
-			next := grid.Position{cell.x+step.offset.x, cell.y+step.offset.y}
+			next := grid.offset(cell, step.offset.x, step.offset.y)
 			if next.x < 0 || next.y < 0 || next.x >= width || next.y >= height { continue }
 			if came[next.y*width+next.x] >= 0 || (next != to && game.cell_blocks_movement(room, next)) || game.step_height_blocked(room, cell, next) { continue }
 			// A foe in the way is not a step: walking into it is a blow.
@@ -52,7 +52,7 @@ mountain_lab_route :: proc(room: ^game.Room, from, to: grid.Position) -> [dynami
 	if came[to.y*width+to.x] < 0 { return route }
 	for cell := to; cell != from; {
 		previous := came[cell.y*width+cell.x]
-		before := grid.Position{previous%width, previous/width}
+		before := grid.Position{x = previous%width, y = previous/width}
 		for step in MOUNTAIN_LAB_STEPS {
 			if before.x+step.offset.x == cell.x && before.y+step.offset.y == cell.y { inject_at(&route, 0, step.direction) }
 		}
@@ -123,7 +123,7 @@ mechanics_lab_mountain :: proc(window: ^app.Window, renderer: ^render.Renderer, 
 		// Halfway up, the next lap's cliff stops the walk.
 		if index >= len(route)/2 && !blocked_checked {
 			for step in MOUNTAIN_LAB_STEPS {
-				next := grid.Position{player.position.x+step.offset.x, player.position.y+step.offset.y}
+				next := grid.offset(player.position, step.offset.x, step.offset.y)
 				if _, occupied := game.enemy_index_at(room, next); occupied { continue }
 				if !game.cell_blocks_movement(room, next) && game.step_height_blocked(room, player.position, next) {
 					mechanics_lab_wait_free(window, renderer, room, controller, cards, buffer)
@@ -147,7 +147,7 @@ mechanics_lab_mountain :: proc(window: ^app.Window, renderer: ^render.Renderer, 
 	archer = mechanics_lab_enemy(room, archer.id)^
 	landing, lowest := grid.Position{}, i32(1<<20)
 	for step in MOUNTAIN_LAB_STEPS {
-		next := grid.Position{archer.position.x+step.offset.x, archer.position.y+step.offset.y}
+		next := grid.offset(archer.position, step.offset.x, step.offset.y)
 		if game.cell_blocks_movement(room, next) || next == player.position { continue }
 		if h := game.cell_height(room, next); h < lowest { landing, lowest = next, h }
 	}

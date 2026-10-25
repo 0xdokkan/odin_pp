@@ -50,8 +50,8 @@ flood_anchor :: proc(room: ^game.Room, card: game.Card_Instance, hovered: grid.P
 	if card.definition_id != .Flood_Wave || !cards.flood_way_set { return hovered }
 	step := game.direction_offset(cards.flood_way)
 	for distance in 1..=3 {
-		cell := grid.Position{room.player.position.x+step.x*distance, room.player.position.y+step.y*distance}
+		cell := grid.offset(room.player.position, step.x*distance, step.y*distance)
 		if _, valid := game.card_drop_target(room, card, cell); valid { return cell }
 	}
-	return {room.player.position.x+step.x, room.player.position.y+step.y}
+	return grid.offset(room.player.position, step.x, step.y)
 }

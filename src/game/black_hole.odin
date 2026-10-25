@@ -47,9 +47,9 @@ black_hole_pull_step :: proc(room: ^Room, id: u32, from, centre: grid.Position) 
 	dx, dy := sign(centre.x-from.x), sign(centre.y-from.y)
 	options: [3]grid.Position
 	count := 0
-	if dx != 0 && dy != 0 { options[count] = {from.x+dx, from.y+dy}; count += 1 }
+	if dx != 0 && dy != 0 { options[count] = grid.offset(from, dx, dy); count += 1 }
 	longer_x := abs(centre.x-from.x) >= abs(centre.y-from.y)
-	first, second := grid.Position{from.x+dx, from.y}, grid.Position{from.x, from.y+dy}
+	first, second := grid.offset(from, dx, 0), grid.offset(from, 0, dy)
 	if longer_x {
 		if dx != 0 { options[count] = first; count += 1 }
 		if dy != 0 { options[count] = second; count += 1 }

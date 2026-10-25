@@ -21,7 +21,7 @@ test_barrage_zero_and_three_successes_replay_one_throw_before_any_effect :: proc
 			}
 		}
 		testing.expect(t, fixture)
-		enemies := [?]game.Enemy_Spawn{{position = {3, 1}, health = 40, attack = 1}}
+		enemies := [?]game.Enemy_Spawn{{position = {x = 3, y = 1}, health = 40, attack = 1}}
 		room, ok := game.create_room(&data, &player, {enemies = enemies[:]})
 		testing.expect(t, ok)
 		room.enemies[0].intent = game.make_wait_intent(&room, room.enemies[0].position)
@@ -72,7 +72,7 @@ test_dice_pool_is_one_cue_and_holds_health_and_position_until_the_hit :: proc(t:
 		roll, valid := game.roll_card_dice(&staged, player.deck.owned[0])
 		if valid && roll.total == game.SUNDERING_PUSH_TOTAL { player.dice = candidate; break }
 	}
-	enemies := [?]game.Enemy_Spawn{{position = {3, 1}, health = 40, attack = 1}}
+	enemies := [?]game.Enemy_Spawn{{position = {x = 3, y = 1}, health = 40, attack = 1}}
 	room, ok := game.create_room(&data, &player, {enemies = enemies[:]})
 	testing.expect(t, ok)
 	defer game.destroy_room(&room)
@@ -98,7 +98,7 @@ test_dice_pool_is_one_cue_and_holds_health_and_position_until_the_hit :: proc(t:
 	testing.expect(t, visible)
 	if visible {
 		testing.expect_value(t, actor.health, i32(40))
-		testing.expect_value(t, actor.position, presentation_position({3, 1}))
+		testing.expect_value(t, actor.position, presentation_position({x = 3, y = 1}))
 	}
 	testing.expect_value(t, room.enemies[0].health, i32(32))
 	testing.expect_value(t, room.enemies[0].position.x, 4)
@@ -125,7 +125,7 @@ test_dice_cue_rolls_the_die_of_its_card_level :: proc(t: ^testing.T) {
 	for _ in 0..<4 {
 		testing.expect_value(t, game.upgrade_owned_card(&player.deck, player.deck.owned[0].id), game.Deck_Mutation_Result.Upgraded)
 	}
-	enemies := [?]game.Enemy_Spawn{{position = {3, 1}, health = 40, attack = 1}}
+	enemies := [?]game.Enemy_Spawn{{position = {x = 3, y = 1}, health = 40, attack = 1}}
 	room, ok := game.create_room(&data, &player, {enemies = enemies[:]})
 	testing.expect(t, ok)
 	defer game.destroy_room(&room)

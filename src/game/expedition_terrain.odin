@@ -32,7 +32,7 @@ expedition_terrain :: proc(b: u8, p: grid.Position) -> Expedition_Terrain {
 	case 5: if p.y%19 < 4 { return .Water }
 	case 6:
 		// The spiral mountain's path is packed snow, with two stretches of ice (level/mountain.odin).
-		offset:=grid.Position{p.x-level.MOUNTAIN_CENTER.x,p.y-level.MOUNTAIN_CENTER.y}
+		offset:=grid.offset(p, -level.MOUNTAIN_CENTER.x, -level.MOUNTAIN_CENTER.y)
 		if abs(offset.x)<=level.MOUNTAIN_HALF && abs(offset.y)<=level.MOUNTAIN_HALF {return .Ice if level.mountain_icy(offset) else .Plain}
 		d,v:=expedition_patch_distance(b,p);if d<=6+v*2 {return .Ice};if d<=17+v*3 {return .Snow}
 	case 7: if (p.x+p.y/2)%23 < 3 { return .Lava }
@@ -135,12 +135,12 @@ expedition_gravity_pulse :: proc(room:^Room,events:^Event_Log) {
 		position,found:=entity_position(room,target);if !found {continue}
 		well:=position;best:=3
 		for y in -2..=2 {for x in -2..=2 {
-			p:=grid.Position{position.x+x,position.y+y};distance:=max(abs(x),abs(y))
+			p:=grid.offset(position, x, y);distance:=max(abs(x),abs(y))
 			if distance>=best || expedition_terrain(10,p)!=.Gravity || !base_cell_is_walkable(room,p) || !shape_cell_has_clear_path(room,position,p) {continue}
 			well,best=p,distance
 		}}
 		if best==0 || best==3 {continue}
-		step:=grid.Position{sign(well.x-position.x),sign(well.y-position.y)}
+		step:=grid.Position{x = sign(well.x-position.x), y = sign(well.y-position.y)}
 		action:=make_action(.Trigger,SYSTEM_ENTITY,entity_target(target),.Entity)
 		add_effect(&action,move_effect(target,add_position(position,step)))
 		report:=resolve_action(room,&action)

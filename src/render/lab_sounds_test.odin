@@ -64,14 +64,15 @@ test_lab_sounds_play_each_event_once_and_on_time :: proc(t: ^testing.T) {
 	lab_sound_queue(&s, .Ui_Energy, 1.01)
 	lab_sound_queue(&s, .Ui_Gold, 1.2)
 	testing.expect_value(t, s.count, 3)
-	renderer: Renderer
+	renderer := new(Renderer)
+	defer free(renderer)
 	renderer.tactical.lab_sounds = &s
 	renderer.sprite_assets.elapsed = 1.1
-	play_lab_sounds(&renderer, nil, 0)
+	play_lab_sounds(renderer, nil, 0)
 	testing.expect_value(t, s.count, 1)
 	testing.expect(t, s.played[.Ui_Gold] == 1 && s.played[.Ui_Energy] == 1)
 	renderer.sprite_assets.elapsed = 1.3
-	play_lab_sounds(&renderer, nil, 0)
+	play_lab_sounds(renderer, nil, 0)
 	testing.expect(t, s.count == 0 && s.played[.Ui_Gold] == 2)
 }
 
@@ -81,16 +82,17 @@ test_lab_sounds_only_in_the_lab :: proc(t: ^testing.T) {
 	player: game.Player
 	room := game.Room{player = &player, phase = .Combat}
 	state: Living_State
-	renderer: Renderer
+	renderer := new(Renderer)
+	defer free(renderer)
 	renderer.tactical.living_state = &state
-	update_lab_sounds(&renderer, &room, 1)
+	update_lab_sounds(renderer, &room, 1)
 	testing.expect(t, renderer.tactical.lab_sounds == nil)
 	renderer.tactical.mechanics_lab = true
 	snapshot: Room_Presentation
 	renderer.tactical.snapshot = &snapshot
-	update_lab_sounds(&renderer, &room, 1)
+	update_lab_sounds(renderer, &room, 1)
 	testing.expect(t, renderer.tactical.lab_sounds != nil)
-	destroy_lab_sounds(&renderer)
+	destroy_lab_sounds(renderer)
 	testing.expect(t, renderer.tactical.lab_sounds == nil)
 }
 
@@ -122,29 +124,30 @@ test_lab_sounds_hear_the_room :: proc(t: ^testing.T) {
 // twice; a coil's discharge zaps once however many links it strikes.
 @(test)
 test_lab_sounds_of_cards_and_devices :: proc(t: ^testing.T) {
-	renderer: Renderer
+	renderer := new(Renderer)
+	defer free(renderer)
 	snapshot: Room_Presentation
 	renderer.tactical.snapshot = &snapshot
 	s: Lab_Sounds
 	impacts := 0
 	played := Presentation_Cue{kind = .Card_Played, started = true,
 		event = {kind = .Card_Played, source = game.PLAYER_ENTITY, card_definition = .Tesla_Coil}}
-	lab_cue_sounds(&renderer, &s, &played, 1, &impacts)
+	lab_cue_sounds(renderer, &s, &played, 1, &impacts)
 	testing.expect(t, s.count == 1 && s.queue[0].sfx == .Card_Tesla_Coil)
 	coil := Presentation_Cue{kind = .Object_Spawned, started = true, event = {kind = .Object_Spawned, object_kind = .Tesla_Coil}}
-	lab_cue_sounds(&renderer, &s, &coil, 1.2, &impacts)
+	lab_cue_sounds(renderer, &s, &coil, 1.2, &impacts)
 	testing.expect_value(t, s.count, 1)
-	lab_cue_sounds(&renderer, &s, &coil, 3, &impacts)
+	lab_cue_sounds(renderer, &s, &coil, 3, &impacts)
 	testing.expect(t, s.count == 2 && s.queue[1].sfx == .World_Tesla_Deploy)
 	zap := Presentation_Cue{kind = .Spell_Impact, started = true, event = {kind = .Spell_Impact, card_definition = .Tesla_Coil}}
-	for _ in 0..<2 { lab_cue_sounds(&renderer, &s, &zap, 1, &impacts) }
+	for _ in 0..<2 { lab_cue_sounds(renderer, &s, &zap, 1, &impacts) }
 	testing.expect_value(t, impacts, 2)
 	boom := Presentation_Cue{kind = .Explosion, started = true, event = {kind = .Explosion, object_kind = .Barrel}}
-	lab_cue_sounds(&renderer, &s, &boom, 1, &impacts)
+	lab_cue_sounds(renderer, &s, &boom, 1, &impacts)
 	testing.expect(t, s.queue[s.count-1].sfx == .World_Barrel_Explosion)
 	// Drawn cards are dealt one after the other.
 	draw := Presentation_Cue{kind = .Card_Drawn, started = true, event = {kind = .Card_Drawn}}
-	for _ in 0..<3 { lab_cue_sounds(&renderer, &s, &draw, 2, &impacts) }
+	for _ in 0..<3 { lab_cue_sounds(renderer, &s, &draw, 2, &impacts) }
 	deals := 0
 	for sound in s.queue[:s.count] { if sound.sfx == .Ui_Card_Draw { deals += 1 } }
 	testing.expect_value(t, deals, 3)
@@ -162,7 +165,7 @@ test_lab_sounds_of_the_charges_wait_for_their_blow :: proc(t: ^testing.T) {
 	foe := game.enemy_entity(1)
 	now := f64(5)
 	renderer.sprite_assets.elapsed = now
-	_, swung := play_attack_swing(renderer, game.PLAYER_ENTITY, foe, .Lantern, {2, 1})
+	_, swung := play_attack_swing(renderer, game.PLAYER_ENTITY, foe, .Lantern, {x = 2, y = 1})
 	landing, pending := attack_fx_landing_in(renderer, foe, now, game.PLAYER_ENTITY)
 	testing.expect(t, swung && pending && landing > 0)
 	s: Lab_Sounds
@@ -171,7 +174,7 @@ test_lab_sounds_of_the_charges_wait_for_their_blow :: proc(t: ^testing.T) {
 	lab_cue_sounds(renderer, &s, &fate, now, &impacts)
 	testing.expect(t, s.count == 1 && s.queue[0].sfx == .Ui_Fate_Die && abs(s.queue[0].at-(now+landing)) < 1e-9)
 	archer := game.enemy_entity(2)
-	_, flight, shot := play_attack_projectile(renderer, archer, game.PLAYER_ENTITY, .Bolt, {2, 2})
+	_, flight, shot := play_attack_projectile(renderer, archer, game.PLAYER_ENTITY, .Bolt, {x = 2, y = 2})
 	testing.expect(t, shot && flight > 0)
 	turned := Presentation_Cue{kind = .Attack_Deflected, started = true, event = {kind = .Attack_Deflected, source = archer, target = game.PLAYER_ENTITY}}
 	lab_cue_sounds(renderer, &s, &turned, now, &impacts)
@@ -211,7 +214,7 @@ test_lab_sounds_hear_a_cue_the_shadow_holds_once :: proc(t: ^testing.T) {
 	sounds := renderer.tactical.lab_sounds
 	world: game.Event_Log
 	game.record_event(&world, {kind = .Attack_Missed, source = game.enemy_entity(room.enemies[0].id), target = game.PLAYER_ENTITY,
-		from_position = {7, 1}, to_position = player.position})
+		from_position = {x = 7, y = 1}, to_position = player.position})
 	game.record_event(&world, {kind = .Energy_Gained, source = game.PLAYER_ENTITY, target = game.PLAYER_ENTITY, amount = 1})
 	testing.expect(t, begin_renderer_world_timeline(renderer, capture_room_presentation(&room), &world))
 	for _ in 0..<2 { frame(renderer, &room, 0.02) }
@@ -309,7 +312,7 @@ test_lab_sounds_follow_the_shadow_never_its_footsteps :: proc(t: ^testing.T) {
 		lab_shadow_test_frame(renderer, &room, 0.05)
 	}
 	beat := game.tactical_shadow_beat_target(&room)
-	testing.expect_value(t, game.try_shadow_step(&room, .South, {1, 1}, beat), game.Action_Result.Moved)
+	testing.expect_value(t, game.try_shadow_step(&room, .South, {x = 1, y = 1}, beat), game.Action_Result.Moved)
 	lab_shadow_test_frame(renderer, &room, 0)
 	testing.expect(t, sounds.played[.Pilgrim_Shadow_Step] == 2 && sounds.played[.Ui_Critical] == 1)
 	for _ in 0..<200 {

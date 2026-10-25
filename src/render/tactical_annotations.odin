@@ -104,7 +104,7 @@ reserve_tactical_actor_label_bounds :: proc(renderer: ^Renderer, actor: ^Present
 @(private)
 tactical_actor_screen_bounds :: proc(renderer: ^Renderer, actor: ^Presentation_Actor) -> (bounds: rl.Rectangle, ok: bool) {
 	if !actor.visible || actor.opacity <= 0 { return }
-	cell := grid.Position{int(math.round(actor.position.x)), int(math.round(actor.position.y))}
+	cell := grid.Position{x = int(math.round(actor.position.x)), y = int(math.round(actor.position.y))}
 	if !tactical_render_visible(renderer, cell) { return }
 	key := Sprite_Key.Player if actor.entity == game.PLAYER_ENTITY else sprite_key_for_enemy(actor.archetype)
 	quad := tactical_billboard_geometry(renderer, key, actor.position)
@@ -158,7 +158,7 @@ draw_tactical_annotations :: proc(renderer: ^Renderer, room: ^game.Room) {
 	// Existing status glyphs retain their ground lane, the paper tags under
 	// them included; text badges avoid it.
 	for &actor in v.snapshot.enemies[:v.snapshot.enemy_count] {
-		cell := grid.Position{int(math.round(actor.position.x)), int(math.round(actor.position.y))}
+		cell := grid.Position{x = int(math.round(actor.position.x)), y = int(math.round(actor.position.y))}
 		// The tags go with the card the Pinball's ball takes the place of.
 		if !actor.visible || actor.statuses.count == 0 || !tactical_overlay_visible(renderer, cell) ||
 		   tactical_pinball_holds(renderer, actor.entity) { continue }

@@ -5,7 +5,7 @@ import grid "../engine/grid"
 import level "../level"
 
 shadow_test_room :: proc(t: ^testing.T, data: ^level.Level, player: ^Player, spawns: []Enemy_Spawn = nil) -> Room {
-	default_spawns := [?]Enemy_Spawn{{position = {7, 4}, health = 100, attack = 3}}
+	default_spawns := [?]Enemy_Spawn{{position = {x = 7, y = 4}, health = 100, attack = 3}}
 	room := create_enemy_rework_room(t, data, player, spawns if spawns != nil else default_spawns[:])
 	return room
 }
@@ -75,15 +75,15 @@ test_shadow_freezes_the_world_window_and_beats_and_resumes_them :: proc(t: ^test
 test_shadow_steps_use_the_step_rules_from_the_shadow_and_never_move_the_body :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {2, 4}, health = 100, attack = 3}}
+	spawns := [?]Enemy_Spawn{{position = {x = 2, y = 4}, health = 100, attack = 3}}
 	room := shadow_test_room(t, &data, &player, spawns[:])
 	defer level.destroy(&data)
 	defer destroy_room(&room)
-	append(&room.obstacles, Obstacle{position = {4, 3}})
+	append(&room.obstacles, Obstacle{position = {x = 4, y = 3}})
 	testing.expect_value(t, shadow_test_play(t, &room).result, Card_Play_Result.Played)
 	body := player.position
 	testing.expect_value(t, try_shadow_step(&room, .West), Action_Result.Moved)
-	testing.expect_value(t, player.tactical.shadow_position, grid.Position{3, 4})
+	testing.expect_value(t, player.tactical.shadow_position, grid.Position{x = 3, y = 4})
 	testing.expect_value(t, player.position, body)
 	testing.expect_value(t, room.recent_events.count, 0)
 	// A step lasts 0.4 s; a press meanwhile is refused, not kept.
@@ -105,16 +105,16 @@ test_shadow_steps_use_the_step_rules_from_the_shadow_and_never_move_the_body :: 
 	beat := tactical_shadow_beat_target(&room)
 	testing.expect_value(t, beat, u32(1))
 	testing.expect_value(t, tactical_beat_target(&room), beat)
-	testing.expect_value(t, try_shadow_step(&room, .South, {1, 1}, beat), Action_Result.Moved)
-	testing.expect_value(t, player.tactical.shadow_position, grid.Position{5, 5})
+	testing.expect_value(t, try_shadow_step(&room, .South, {x = 1, y = 1}, beat), Action_Result.Moved)
+	testing.expect_value(t, player.tactical.shadow_position, grid.Position{x = 5, y = 5})
 	// Each beat rewards one diagonal; off the beat two keys step straight.
 	testing.expect(t, !tactical_tick(&room, TACTICAL_SHADOW_STEP_SECONDS, true, false))
 	testing.expect_value(t, tactical_shadow_beat_target(&room), u32(0))
-	testing.expect_value(t, try_shadow_step(&room, .North, {1, -1}, beat), Action_Result.Moved)
-	testing.expect_value(t, player.tactical.shadow_position, grid.Position{5, 4})
+	testing.expect_value(t, try_shadow_step(&room, .North, {x = 1, y = -1}, beat), Action_Result.Moved)
+	testing.expect_value(t, player.tactical.shadow_position, grid.Position{x = 5, y = 4})
 	testing.expect(t, !tactical_tick(&room, TACTICAL_SHADOW_STEP_SECONDS, true, false))
-	testing.expect_value(t, try_shadow_step(&room, .South, {-1, 1}, 2), Action_Result.Moved)
-	testing.expect_value(t, player.tactical.shadow_position, grid.Position{5, 5})
+	testing.expect_value(t, try_shadow_step(&room, .South, {x = -1, y = 1}, 2), Action_Result.Moved)
+	testing.expect_value(t, player.tactical.shadow_position, grid.Position{x = 5, y = 5})
 	testing.expect_value(t, player.position, body)
 	testing.expect_value(t, player.tactical.shadow_steps, 5)
 }
@@ -159,7 +159,7 @@ test_shadow_makes_every_damage_path_miss_the_player :: proc(t: ^testing.T) {
 test_shadow_rises_with_a_teleport_takes_loot_and_old_telegraphs_miss :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {4, 3}, health = 100, attack = 3}}
+	spawns := [?]Enemy_Spawn{{position = {x = 4, y = 3}, health = 100, attack = 3}}
 	room := shadow_test_room(t, &data, &player, spawns[:])
 	defer level.destroy(&data)
 	defer destroy_room(&room)
@@ -167,7 +167,7 @@ test_shadow_rises_with_a_teleport_takes_loot_and_old_telegraphs_miss :: proc(t: 
 	testing.expect_value(t, shadow_test_play(t, &room).result, Card_Play_Result.Played)
 	// Dropped inside the magnet's reach of the landing only: nothing is
 	// collected while the body waits in its shadow.
-	append(&room.loot, Loot{position = {1, 7}, kind = .Gold, amount = 3})
+	append(&room.loot, Loot{position = {x = 1, y = 7}, kind = .Gold, amount = 3})
 	origin := player.position
 	for direction in ([?]Move_Direction{.South, .South, .West, .West}) {
 		testing.expect_value(t, try_shadow_step(&room, direction), Action_Result.Moved)
@@ -175,7 +175,7 @@ test_shadow_rises_with_a_teleport_takes_loot_and_old_telegraphs_miss :: proc(t: 
 	}
 	gold := player.gold
 	shadow_test_rise(t, &room)
-	testing.expect_value(t, player.position, grid.Position{2, 6})
+	testing.expect_value(t, player.position, grid.Position{x = 2, y = 6})
 	testing.expect_value(t, player.gold, gold+3)
 	moved, emerged := 0, 0
 	for event in room.recent_events.events[:room.recent_events.count] {
@@ -183,7 +183,7 @@ test_shadow_rises_with_a_teleport_takes_loot_and_old_telegraphs_miss :: proc(t: 
 			moved += 1
 			testing.expect(t, event_is_teleport(event))
 			testing.expect_value(t, event.from_position, origin)
-			testing.expect_value(t, event.to_position, grid.Position{2, 6})
+			testing.expect_value(t, event.to_position, grid.Position{x = 2, y = 6})
 		}
 		if event.kind == .Shadow_Emerged { emerged += 1 }
 	}

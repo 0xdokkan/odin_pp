@@ -111,17 +111,17 @@ test_enemy_archetypes_detour_around_a_wall :: proc(t: ^testing.T) {
 	archetypes := [?]Enemy_Archetype{.Chaser, .Archer, .Brute}
 	for archetype in archetypes {
 		player := create_test_player(t)
-		enemies := [?]Enemy_Spawn{{position = {1, 2}, health = 10, attack = 1, archetype = archetype}}
+		enemies := [?]Enemy_Spawn{{position = {x = 1, y = 2}, health = 10, attack = 1, archetype = archetype}}
 		room, ok := create_room(&level_data, &player, {enemies = enemies[:]})
 		testing.expect(t, ok)
 		intent := room.enemies[0].intent
 		testing.expect_value(t, intent.kind, Enemy_Intent_Kind.Move)
-		testing.expect_value(t, intent.destination, grid.Position{1, 1})
+		testing.expect_value(t, intent.destination, grid.Position{x = 1, y = 1})
 		distances := raw_data(room.enemy_path_distances)
 		for _ in 0..<5 {
 			advance_combat_pulse(&room)
 		}
-		testing.expect(t, room.enemies[0].position != grid.Position{1, 2})
+		testing.expect(t, room.enemies[0].position != grid.Position{x = 1, y = 2})
 		testing.expect(t, raw_data(room.enemy_path_distances) == distances)
 		if archetype == .Chaser {
 			testing.expect(t, player.health < player.stats.max_health)
@@ -137,8 +137,8 @@ test_pathfinding_waits_when_disconnected_and_rebuilds_after_object_removal :: pr
 	testing.expect_value(t, err, level.Parse_Error.None)
 	defer level.destroy(&level_data)
 	player := create_test_player(t)
-	enemies := [?]Enemy_Spawn{{position = {4, 1}, health = 10, attack = 1}}
-	objects := [?]Grid_Object_Spawn{{kind = .Ice_Block, position = {3, 1}}}
+	enemies := [?]Enemy_Spawn{{position = {x = 4, y = 1}, health = 10, attack = 1}}
+	objects := [?]Grid_Object_Spawn{{kind = .Ice_Block, position = {x = 3, y = 1}}}
 	room, ok := create_room(&level_data, &player, {enemies = enemies[:], objects = objects[:]})
 	testing.expect(t, ok)
 	defer destroy_room(&room)
@@ -147,8 +147,8 @@ test_pathfinding_waits_when_disconnected_and_rebuilds_after_object_removal :: pr
 	// La rimozione non cambia un intento committed.
 	testing.expect_value(t, room.enemies[0].intent.kind, Enemy_Intent_Kind.Wait)
 	advance_combat_pulse(&room)
-	testing.expect_value(t, room.enemies[0].position, grid.Position{4, 1})
-	testing.expect_value(t, room.enemies[0].intent.destination, grid.Position{3, 1})
+	testing.expect_value(t, room.enemies[0].position, grid.Position{x = 4, y = 1})
+	testing.expect_value(t, room.enemies[0].intent.destination, grid.Position{x = 3, y = 1})
 }
 
 @(test)
@@ -157,9 +157,9 @@ test_resolve_action_does_not_grow_preallocated_loot :: proc(t: ^testing.T) {
 	defer level.destroy(&level_data)
 	player := create_test_player(t)
 	enemies := [?]Enemy_Spawn{
-		{position = {3, 1}, health = 1, attack = 1},
-		{position = {4, 1}, health = 1, attack = 1, drops_healing = true},
-		{position = {5, 1}, health = 1, attack = 1},
+		{position = {x = 3, y = 1}, health = 1, attack = 1},
+		{position = {x = 4, y = 1}, health = 1, attack = 1, drops_healing = true},
+		{position = {x = 5, y = 1}, health = 1, attack = 1},
 	}
 	room, ok := create_room(&level_data, &player, {enemies = enemies[:]})
 	testing.expect(t, ok)

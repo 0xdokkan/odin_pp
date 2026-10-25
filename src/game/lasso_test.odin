@@ -9,14 +9,14 @@ import level "../level"
 // on `at` (its middle unless said) with 100 health, the exit in a far corner.
 // Fogless unless `vision` says otherwise.
 lasso_test_room :: proc(t: ^testing.T, data: ^level.Level, player: ^Player, spawns: []Enemy_Spawn,
-	at := grid.Position{6, 6}, obstacles: []grid.Position = nil, vision := 0, width := 13, height := 13) -> Room {
+	at := grid.Position{x = 6, y = 6}, obstacles: []grid.Position = nil, vision := 0, width := 13, height := 13) -> Room {
 	cells: [32][32]u8
 	rows: [32]string
 	for y in 0..<height {
 		for x in 0..<width { cells[y][x] = '#' if x == 0 || y == 0 || x == width-1 || y == height-1 else '.' }
 	}
-	exit := grid.Position{width-2, height-2}
-	if exit == at { exit = {1, height-2} }
+	exit := grid.Position{x = width-2, y = height-2}
+	if exit == at { exit = {x = 1, y = height-2} }
 	cells[at.y][at.x] = '@'
 	cells[exit.y][exit.x] = '>'
 	for y in 0..<height { rows[y] = string(cells[y][:width]) }
@@ -172,7 +172,7 @@ test_lasso_ring_is_every_cell_the_true_circle_crosses :: proc(t: ^testing.T) {
 	}
 	one, _ := lasso_ring(1)
 	degrees := [8][2]f64{{30, 60}, {60, 120}, {120, 150}, {150, 210}, {210, 240}, {240, 300}, {300, 330}, {330, 390}}
-	cells := [8]grid.Position{{1, 1}, {0, 1}, {-1, 1}, {-1, 0}, {-1, -1}, {0, -1}, {1, -1}, {1, 0}}
+	cells := [8]grid.Position{{x = 1, y = 1}, {x = 0, y = 1}, {x = -1, y = 1}, {x = -1, y = 0}, {x = -1, y = -1}, {x = 0, y = -1}, {x = 1, y = -1}, {x = 1, y = 0}}
 	for arc, index in one[:8] {
 		testing.expect_value(t, arc.cell, cells[index])
 		testing.expect(t, abs(arc.from*180/math.PI-degrees[index][0]) < 1e-6 && abs(arc.to*180/math.PI-degrees[index][1]) < 1e-6)
@@ -182,13 +182,13 @@ test_lasso_ring_is_every_cell_the_true_circle_crosses :: proc(t: ^testing.T) {
 		for arc in arcs { if arc.cell == cell { return true } }
 		return false
 	}
-	testing.expect(t, has(two[:two_count], {1, 1}) && has(two[:two_count], {2, 1}) && !has(two[:two_count], {2, 2}))
+	testing.expect(t, has(two[:two_count], {x = 1, y = 1}) && has(two[:two_count], {x = 2, y = 1}) && !has(two[:two_count], {x = 2, y = 2}))
 	// The integer eight-way snap is the angle's own octant on every ring cell.
 	for radius in i32(1)..=LASSO_MAX_RADIUS {
 		arcs, count := lasso_ring(radius)
 		for arc in arcs[:count] {
 			octant := int(math.round(math.atan2(f64(arc.cell.y), f64(arc.cell.x))/(math.PI/4)))
-			expected := grid.Position{int(math.round(math.cos(f64(octant)*math.PI/4))), int(math.round(math.sin(f64(octant)*math.PI/4)))}
+			expected := grid.Position{x = int(math.round(math.cos(f64(octant)*math.PI/4))), y = int(math.round(math.sin(f64(octant)*math.PI/4)))}
 			testing.expect_value(t, lasso_radial_step({}, arc.cell), expected)
 		}
 	}
@@ -201,14 +201,14 @@ test_lasso_radius_is_the_largest_clear_ring_and_smashes_beside_walls :: proc(t: 
 	room := lasso_test_room(t, &data, &player, nil)
 	defer level.destroy(&data)
 	defer destroy_room(&room)
-	centre := grid.Position{6, 6}
+	centre := grid.Position{x = 6, y = 6}
 	radius, smash := lasso_radius(&room, centre)
 	testing.expect(t, radius == 4 && !smash)
 	// One block east: on the outer ring (four cells away) it takes the ring
 	// inside it; nearer, inside the outer ring, the foe flies over it at 4,
 	// even beside the player.
 	for distance, index in ([4]int{4, 3, 2, 1}) {
-		append(&room.obstacles, Obstacle{position = {centre.x+distance, centre.y}})
+		append(&room.obstacles, Obstacle{position = grid.offset(centre, distance, 0)})
 		radius, smash = lasso_radius(&room, centre)
 		expected := [4]i32{3, 4, 4, 4}
 		testing.expect_value(t, radius, expected[index])
@@ -219,26 +219,26 @@ test_lasso_radius_is_the_largest_clear_ring_and_smashes_beside_walls :: proc(t: 
 	// wall on the fourth cell giving 3. Beside it every ring crosses it: 1,
 	// and a smash; so in a corner.
 	for x, index in ([4]int{2, 3, 4, 5}) {
-		radius, smash = lasso_radius(&room, {x, 6})
+		radius, smash = lasso_radius(&room, {x = x, y = 6})
 		testing.expect_value(t, radius, i32(index+1))
 		testing.expect(t, !smash)
 	}
-	radius, smash = lasso_radius(&room, {1, 6})
+	radius, smash = lasso_radius(&room, {x = 1, y = 6})
 	testing.expect(t, radius == 1 && smash)
-	radius, smash = lasso_radius(&room, {1, 1})
+	radius, smash = lasso_radius(&room, {x = 1, y = 1})
 	testing.expect(t, radius == 1 && smash)
 	// A block inside the circle, off any axis (on the ring of 3 only): the
 	// outer ring is clear, 4.
-	append(&room.obstacles, Obstacle{position = {8, 8}})
+	append(&room.obstacles, Obstacle{position = {x = 8, y = 8}})
 	radius, smash = lasso_radius(&room, centre)
 	testing.expect(t, radius == 4 && !smash)
 	// Blocks on the rings of 4 and 3 (east), and of 2 (west): 1, no smash.
 	clear(&room.obstacles)
-	for cell in ([3]grid.Position{{10, 6}, {9, 6}, {4, 6}}) { append(&room.obstacles, Obstacle{position = cell}) }
+	for cell in ([3]grid.Position{{x = 10, y = 6}, {x = 9, y = 6}, {x = 4, y = 6}}) { append(&room.obstacles, Obstacle{position = cell}) }
 	radius, smash = lasso_radius(&room, centre)
 	testing.expect(t, radius == 1 && !smash)
 	// And one beside the player too: every ring holds one, 1 and a smash.
-	append(&room.obstacles, Obstacle{position = {6, 7}})
+	append(&room.obstacles, Obstacle{position = {x = 6, y = 7}})
 	radius, smash = lasso_radius(&room, centre)
 	testing.expect(t, radius == 1 && smash)
 	clear(&room.obstacles)
@@ -249,14 +249,14 @@ test_lasso_targets_one_visible_foe_in_reach_including_bosses :: proc(t: ^testing
 	data: level.Level
 	player: Player
 	spawns := [?]Enemy_Spawn{
-		{position = {10, 6}, health = 20, attack = 1},
-		{position = {6, 1}, health = 20, attack = 1},
-		{position = {2, 2}, health = 20, attack = 1},
-		{position = {3, 9}, health = 40, attack = 1, archetype = .Custodian},
-		{position = {9, 9}, health = 40, attack = 1, archetype = .Demolitionist},
-		{position = {3, 6}, health = 20, attack = 1},
+		{position = {x = 10, y = 6}, health = 20, attack = 1},
+		{position = {x = 6, y = 1}, health = 20, attack = 1},
+		{position = {x = 2, y = 2}, health = 20, attack = 1},
+		{position = {x = 3, y = 9}, health = 40, attack = 1, archetype = .Custodian},
+		{position = {x = 9, y = 9}, health = 40, attack = 1, archetype = .Demolitionist},
+		{position = {x = 3, y = 6}, health = 20, attack = 1},
 	}
-	cover := [?]grid.Position{{4, 6}}
+	cover := [?]grid.Position{{x = 4, y = 6}}
 	room := lasso_test_room(t, &data, &player, spawns[:], obstacles = cover[:])
 	defer level.destroy(&data)
 	defer destroy_room(&room)
@@ -265,24 +265,24 @@ test_lasso_targets_one_visible_foe_in_reach_including_bosses :: proc(t: ^testing
 	aim :: proc(room: ^Room, card: Card_Instance, definition: Card_Definition, cell: grid.Position) -> Card_Compile_Error {
 		return evaluate_card_targeting(room, card, card_target_request_at(definition, cell)).error
 	}
-	testing.expect_value(t, aim(&room, card, definition, {10, 6}), Card_Compile_Error.None)
-	testing.expect_value(t, aim(&room, card, definition, {6, 1}), Card_Compile_Error.Target_Out_Of_Range)
-	testing.expect_value(t, aim(&room, card, definition, {2, 2}), Card_Compile_Error.None)
-	testing.expect_value(t, aim(&room, card, definition, {3, 6}), Card_Compile_Error.Target_Blocked)
+	testing.expect_value(t, aim(&room, card, definition, {x = 10, y = 6}), Card_Compile_Error.None)
+	testing.expect_value(t, aim(&room, card, definition, {x = 6, y = 1}), Card_Compile_Error.Target_Out_Of_Range)
+	testing.expect_value(t, aim(&room, card, definition, {x = 2, y = 2}), Card_Compile_Error.None)
+	testing.expect_value(t, aim(&room, card, definition, {x = 3, y = 6}), Card_Compile_Error.Target_Blocked)
 	// Boss and miniboss use the same targeting and drop contract as any foe.
-	testing.expect_value(t, aim(&room, card, definition, {3, 9}), Card_Compile_Error.None)
-	testing.expect_value(t, aim(&room, card, definition, {9, 9}), Card_Compile_Error.None)
-	_, takes := card_drop_target(&room, card, {3, 9})
+	testing.expect_value(t, aim(&room, card, definition, {x = 3, y = 9}), Card_Compile_Error.None)
+	testing.expect_value(t, aim(&room, card, definition, {x = 9, y = 9}), Card_Compile_Error.None)
+	_, takes := card_drop_target(&room, card, {x = 3, y = 9})
 	testing.expect(t, takes)
-	testing.expect_value(t, aim(&room, card, definition, {7, 7}), Card_Compile_Error.Invalid_Target)
+	testing.expect_value(t, aim(&room, card, definition, {x = 7, y = 7}), Card_Compile_Error.Invalid_Target)
 	// In the fog (sight 7: three cells round), four cells away is out of sight.
 	player.tactical.config.vision_size = 7
-	testing.expect_value(t, aim(&room, card, definition, {10, 6}), Card_Compile_Error.Invalid_Target)
+	testing.expect_value(t, aim(&room, card, definition, {x = 10, y = 6}), Card_Compile_Error.Invalid_Target)
 	player.tactical.config.vision_size = 0
 	// One rope at a time.
-	play := lasso_test_throw(t, &room, lasso_test_foe(&room, {10, 6}))
+	play := lasso_test_throw(t, &room, lasso_test_foe(&room, {x = 10, y = 6}))
 	testing.expect_value(t, play.result, Card_Play_Result.Played)
-	testing.expect_value(t, lasso_target_error(&room, entity_target(enemy_entity(lasso_test_foe(&room, {2, 2})))), Card_Compile_Error.Target_Blocked)
+	testing.expect_value(t, lasso_target_error(&room, entity_target(enemy_entity(lasso_test_foe(&room, {x = 2, y = 2})))), Card_Compile_Error.Target_Blocked)
 	testing.expect_value(t, lasso_target_error(&room, entity_target(enemy_entity(room.lasso.enemy_id))), Card_Compile_Error.Invalid_Target)
 
 }
@@ -294,7 +294,7 @@ test_lasso_can_catch_spin_and_release_boss_and_miniboss :: proc(t: ^testing.T) {
 	for kind in ([2]Enemy_Archetype{.Custodian, .Demolitionist}) {
 		data: level.Level
 		player: Player
-		spawns := [?]Enemy_Spawn{{position = {9, 6}, health = 60, attack = 1, archetype = kind}}
+		spawns := [?]Enemy_Spawn{{position = {x = 9, y = 6}, health = 60, attack = 1, archetype = kind}}
 		room := lasso_test_room(t, &data, &player, spawns[:])
 		id := room.enemies[0].id
 		testing.expect_value(t, lasso_test_throw(t, &room, id).result, Card_Play_Result.Played)
@@ -314,7 +314,7 @@ test_lasso_can_catch_spin_and_release_boss_and_miniboss :: proc(t: ^testing.T) {
 test_lasso_throw_freezes_like_a_cast_then_spins_on_world_seconds :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {9, 6}, health = 60, attack = 1}}
+	spawns := [?]Enemy_Spawn{{position = {x = 9, y = 6}, health = 60, attack = 1}}
 	room := lasso_test_room(t, &data, &player, spawns[:])
 	defer level.destroy(&data)
 	defer destroy_room(&room)
@@ -330,15 +330,15 @@ test_lasso_throw_freezes_like_a_cast_then_spins_on_world_seconds :: proc(t: ^tes
 		if event.kind != .Lasso_Caught { continue }
 		caught = true
 		testing.expect(t, event.source == PLAYER_ENTITY && event.target == enemy_entity(id))
-		testing.expect(t, event.from_position == grid.Position{9, 6} && event.to_position == grid.Position{10, 6})
+		testing.expect(t, event.from_position == grid.Position{x = 9, y = 6} && event.to_position == grid.Position{x = 10, y = 6})
 		testing.expect(t, event.amount == 4 && event.duration == 1)
 	}
 	testing.expect(t, caught)
 	// Off the floor, onto its ring, its intent dropped: in the air it stands
 	// on no cell.
-	testing.expect_value(t, room.enemies[0].position, grid.Position{10, 6})
+	testing.expect_value(t, room.enemies[0].position, grid.Position{x = 10, y = 6})
 	testing.expect_value(t, room.enemies[0].intent.kind, Enemy_Intent_Kind.None)
-	_, standing := enemy_index_at(&room, {10, 6})
+	_, standing := enemy_index_at(&room, {x = 10, y = 6})
 	testing.expect(t, !standing)
 	testing.expect(t, validate_enemy_intents(&room))
 	testing.expect(t, enemy_is_lassoed(&room, id))
@@ -365,10 +365,10 @@ test_lasso_throw_freezes_like_a_cast_then_spins_on_world_seconds :: proc(t: ^tes
 	spun := lasso_test_spin(t, &room, 1, 1.0/60.0)
 	testing.expect(t, abs(spun-1) < 1e-4)
 	testing.expect_value(t, room.lasso.turns, i32(1))
-	testing.expect_value(t, lasso_arc_cell(&room.lasso, room.lasso.arc), grid.Position{9, 3})
+	testing.expect_value(t, lasso_arc_cell(&room.lasso, room.lasso.arc), grid.Position{x = 9, y = 3})
 	testing.expect(t, abs(lasso_angle(&room.lasso)*180/math.PI-314.545) < 0.05)
 	testing.expect_value(t, lasso_test_health(&room, id), i32(59))
-	testing.expect_value(t, room.enemies[0].position, grid.Position{9, 3})
+	testing.expect_value(t, room.enemies[0].position, grid.Position{x = 9, y = 3})
 	testing.expect(t, validate_enemy_intents(&room))
 }
 
@@ -392,7 +392,7 @@ test_lasso_turns_speed_up_to_eight_a_second :: proc(t: ^testing.T) {
 	for dt in ([3]f64{1.0/60.0, 1.0/30.0, 0.5}) {
 		data: level.Level
 		player: Player
-		spawns := [?]Enemy_Spawn{{position = {9, 6}, health = 60, attack = 1}}
+		spawns := [?]Enemy_Spawn{{position = {x = 9, y = 6}, health = 60, attack = 1}}
 		room := lasso_test_room(t, &data, &player, spawns[:])
 		play := lasso_test_throw(t, &room, room.enemies[0].id)
 		testing.expect_value(t, play.result, Card_Play_Result.Played)
@@ -412,7 +412,7 @@ test_lasso_turns_speed_up_to_eight_a_second :: proc(t: ^testing.T) {
 // The ring of radius 4 round (6, 6), with foes standing on two of its cells.
 lasso_test_bystanders :: proc(t: ^testing.T, data: ^level.Level, player: ^Player, cells: []grid.Position) -> Room {
 	spawns: [8]Enemy_Spawn
-	spawns[0] = {position = {9, 6}, health = 60, attack = 1}
+	spawns[0] = {position = {x = 9, y = 6}, health = 60, attack = 1}
 	for cell, index in cells { spawns[index+1] = {position = cell, health = 30, attack = 1} }
 	room := lasso_test_room(t, data, player, spawns[:len(cells)+1])
 	for cell in cells { lasso_test_hold(&room, lasso_test_foe(&room, cell)) }
@@ -424,10 +424,10 @@ test_lasso_hits_number_up_and_knock_the_struck_away :: proc(t: ^testing.T) {
 	for strong in ([2]bool{false, true}) {
 		data: level.Level
 		player: Player
-		cells := [2]grid.Position{{6, 2}, {2, 7}}
+		cells := [2]grid.Position{{x = 6, y = 2}, {x = 2, y = 7}}
 		room := lasso_test_bystanders(t, &data, &player, cells[:])
-		target := lasso_test_foe(&room, {9, 6})
-		north, west := lasso_test_foe(&room, {6, 2}), lasso_test_foe(&room, {2, 7})
+		target := lasso_test_foe(&room, {x = 9, y = 6})
+		north, west := lasso_test_foe(&room, {x = 6, y = 2}), lasso_test_foe(&room, {x = 2, y = 7})
 		// Upgraded twice and played on the tick, the first hit is a 4.
 		play := lasso_test_throw(t, &room, target, 2 if strong else 0, strong)
 		testing.expect_value(t, play.result, Card_Play_Result.Played)
@@ -442,15 +442,15 @@ test_lasso_hits_number_up_and_knock_the_struck_away :: proc(t: ^testing.T) {
 			// Each the next number, the swung foe striking a foe on its cell.
 			testing.expect(t, struck[0].event.target == enemy_entity(north) && struck[0].event.amount == first)
 			testing.expect(t, struck[1].event.target == enemy_entity(west) && struck[1].event.amount == first+1)
-			testing.expect(t, struck[0].event.source == enemy_entity(target) && struck[0].event.to_position == grid.Position{6, 2})
+			testing.expect(t, struck[0].event.source == enemy_entity(target) && struck[0].event.to_position == grid.Position{x = 6, y = 2})
 			testing.expect(t, abs(struck[0].at-0.207) < 0.005 && abs(struck[1].at-0.468) < 0.005)
 		}
 		// Both foes of a hit take its number; the one struck is knocked away from
 		// the player as far as the wall lets it.
 		testing.expect_value(t, lasso_test_health(&room, north), 30-first)
 		testing.expect_value(t, lasso_test_health(&room, west), 30-first-1)
-		testing.expect_value(t, lasso_test_cell(&room, north), grid.Position{6, 1})
-		testing.expect_value(t, lasso_test_cell(&room, west), grid.Position{1, 7})
+		testing.expect_value(t, lasso_test_cell(&room, north), grid.Position{x = 6, y = 1})
+		testing.expect_value(t, lasso_test_cell(&room, west), grid.Position{x = 1, y = 7})
 		wounded, pushed := 0, false
 		for seen in events {
 			if seen.event.kind == .Damaged && seen.event.source == PLAYER_ENTITY && event_is_lasso(seen.event) && !event_is_lasso_turn(seen.event) { wounded += 1 }
@@ -473,9 +473,9 @@ test_lasso_rope_pushes_without_damage_inside_the_ring_at_any_frame_rate :: proc(
 	for upgrade in ([2]i32{0, 5}) { for dt in ([2]f64{1.0/240.0, 0.4}) {
 		data: level.Level
 		player: Player
-		cells := [?]grid.Position{{6, 4}, {4, 4}, {11, 6}}
+		cells := [?]grid.Position{{x = 6, y = 4}, {x = 4, y = 4}, {x = 11, y = 6}}
 		room := lasso_test_bystanders(t, &data, &player, cells[:])
-		held := lasso_test_foe(&room, {9, 6})
+		held := lasso_test_foe(&room, {x = 9, y = 6})
 		north, diagonal, outside := lasso_test_foe(&room, cells[0]), lasso_test_foe(&room, cells[1]), lasso_test_foe(&room, cells[2])
 		testing.expect_value(t, lasso_test_throw(t, &room, held, upgrade).result, Card_Play_Result.Played)
 		testing.expect_value(t, room.lasso.radius, i32(4))
@@ -492,9 +492,9 @@ test_lasso_rope_pushes_without_damage_inside_the_ring_at_any_frame_rate :: proc(
 		testing.expect_value(t, pushes, 2)
 		testing.expect_value(t, lasso_test_health(&room, held), i32(60))
 		testing.expect_value(t, lasso_test_health(&room, north), i32(30))
-		testing.expect_value(t, lasso_test_cell(&room, north), grid.Position{6, 2})
+		testing.expect_value(t, lasso_test_cell(&room, north), grid.Position{x = 6, y = 2})
 		testing.expect_value(t, lasso_test_health(&room, diagonal), i32(30))
-		testing.expect_value(t, lasso_test_cell(&room, diagonal), grid.Position{3, 3})
+		testing.expect_value(t, lasso_test_cell(&room, diagonal), grid.Position{x = 3, y = 3})
 		testing.expect_value(t, lasso_test_health(&room, outside), i32(30))
 		testing.expect_value(t, lasso_test_cell(&room, outside), cells[2])
 		delete(events)
@@ -510,25 +510,25 @@ test_lasso_interior_sweep_handles_shared_angles_and_blocked_pushes :: proc(t: ^t
 		player: Player
 		// Store the closer foe first: collision order comes from the rope,
 		// not insertion order. Even a blocked sweep never deals direct damage.
-		cells := [?]grid.Position{{6, 5}, {6, 3}}
+		cells := [?]grid.Position{{x = 6, y = 5}, {x = 6, y = 3}}
 		room := lasso_test_bystanders(t, &data, &player, cells[:])
-		held := lasso_test_foe(&room, {9, 6})
+		held := lasso_test_foe(&room, {x = 9, y = 6})
 		near, far := lasso_test_foe(&room, cells[0]), lasso_test_foe(&room, cells[1])
-		if blocked { append(&room.obstacles, Obstacle{position = {6, 4}}) }
+		if blocked { append(&room.obstacles, Obstacle{position = {x = 6, y = 4}}) }
 		testing.expect_value(t, lasso_test_throw(t, &room, held).result, Card_Play_Result.Played)
 		lasso_test_spin(t, &room, 0.8, 1.0/60.0)
 		testing.expect_value(t, room.lasso.hits, i32(2))
 		testing.expect_value(t, lasso_test_health(&room, held), i32(60))
 		testing.expect_value(t, lasso_test_health(&room, far), i32(30))
-		testing.expect_value(t, lasso_test_cell(&room, far), grid.Position{6, 2})
+		testing.expect_value(t, lasso_test_cell(&room, far), grid.Position{x = 6, y = 2})
 		testing.expect_value(t, lasso_test_health(&room, near), i32(30))
-		testing.expect_value(t, lasso_test_cell(&room, near), grid.Position{6, 5} if blocked else grid.Position{6, 3})
+		testing.expect_value(t, lasso_test_cell(&room, near), grid.Position{x = 6, y = 5} if blocked else grid.Position{x = 6, y = 3})
 		if blocked {
 			// A foe left in the disk is eligible again on the following turn.
 			lasso_test_spin(t, &room, 0.5, 1.0/60.0)
 			testing.expect_value(t, room.lasso.hits, i32(4))
 			testing.expect_value(t, lasso_test_health(&room, near), i32(30))
-			testing.expect_value(t, lasso_test_cell(&room, near), grid.Position{6, 5})
+			testing.expect_value(t, lasso_test_cell(&room, near), grid.Position{x = 6, y = 5})
 		}
 		destroy_room(&room)
 		level.destroy(&data)
@@ -540,22 +540,22 @@ test_lasso_interior_push_onto_ring_cannot_deal_damage_in_the_same_sweep :: proc(
 	for dt in ([2]f64{1.0/240.0, 0.4}) {
 		data: level.Level
 		player: Player
-		cells := [?]grid.Position{{8, 5}}
+		cells := [?]grid.Position{{x = 8, y = 5}}
 		room := lasso_test_bystanders(t, &data, &player, cells[:])
-		held, struck := lasso_test_foe(&room, {9, 6}), lasso_test_foe(&room, cells[0])
+		held, struck := lasso_test_foe(&room, {x = 9, y = 6}), lasso_test_foe(&room, cells[0])
 		testing.expect_value(t, lasso_test_throw(t, &room, held).result, Card_Play_Result.Played)
 		// The rope crosses (8,5), pushing it diagonally onto the upcoming
 		// outer arc (9,4). Entering that arc must not turn the push into damage.
 		lasso_test_spin(t, &room, 0.4, dt)
 		testing.expect_value(t, room.lasso.hits, i32(1))
-		testing.expect_value(t, lasso_test_cell(&room, struck), grid.Position{9, 4})
+		testing.expect_value(t, lasso_test_cell(&room, struck), grid.Position{x = 9, y = 4})
 		testing.expect_value(t, lasso_test_health(&room, struck), i32(30))
 		testing.expect_value(t, lasso_test_health(&room, held), i32(60))
 		// It remains a normal ring target on the following rotation.
 		lasso_test_spin(t, &room, 0.65, dt)
 		testing.expect_value(t, room.lasso.hits, i32(2))
 		testing.expect_value(t, lasso_test_health(&room, struck), i32(28))
-		testing.expect_value(t, lasso_test_cell(&room, struck), grid.Position{11, 2})
+		testing.expect_value(t, lasso_test_cell(&room, struck), grid.Position{x = 11, y = 2})
 		destroy_room(&room)
 		level.destroy(&data)
 	}
@@ -568,23 +568,23 @@ test_lasso_knockback_follows_the_push_rules :: proc(t: ^testing.T) {
 	// from a cell a little off the axis, as far as the wall.
 	data: level.Level
 	player: Player
-	cells := [4]grid.Position{{6, 2}, {6, 1}, {2, 7}, {7, 10}}
+	cells := [4]grid.Position{{x = 6, y = 2}, {x = 6, y = 1}, {x = 2, y = 7}, {x = 7, y = 10}}
 	room := lasso_test_bystanders(t, &data, &player, cells[:])
 	defer level.destroy(&data)
 	defer destroy_room(&room)
-	north, behind, west, south := lasso_test_foe(&room, {6, 2}), lasso_test_foe(&room, {6, 1}), lasso_test_foe(&room, {2, 7}), lasso_test_foe(&room, {7, 10})
-	index, _ := ground_index(&room, {1, 7})
+	north, behind, west, south := lasso_test_foe(&room, {x = 6, y = 2}), lasso_test_foe(&room, {x = 6, y = 1}), lasso_test_foe(&room, {x = 2, y = 7}), lasso_test_foe(&room, {x = 7, y = 10})
+	index, _ := ground_index(&room, {x = 1, y = 7})
 	room.ground.pool[index] = 2
-	room.ground.fires[0] = {id = 1, center = {7, 11}, burn = 1}
+	room.ground.fires[0] = {id = 1, center = {x = 7, y = 11}, burn = 1}
 	room.ground.fire_count = 1
 	room.ground.next_fire_id = 1
-	play := lasso_test_throw(t, &room, lasso_test_foe(&room, {9, 6}))
+	play := lasso_test_throw(t, &room, lasso_test_foe(&room, {x = 9, y = 6}))
 	testing.expect_value(t, play.result, Card_Play_Result.Played)
 	lasso_test_spin(t, &room, 0.8, 1.0/240.0)
-	testing.expect_value(t, lasso_test_cell(&room, north), grid.Position{6, 2})
-	testing.expect_value(t, lasso_test_cell(&room, behind), grid.Position{6, 1})
-	testing.expect_value(t, lasso_test_cell(&room, west), grid.Position{1, 7})
-	testing.expect_value(t, lasso_test_cell(&room, south), grid.Position{7, 11})
+	testing.expect_value(t, lasso_test_cell(&room, north), grid.Position{x = 6, y = 2})
+	testing.expect_value(t, lasso_test_cell(&room, behind), grid.Position{x = 6, y = 1})
+	testing.expect_value(t, lasso_test_cell(&room, west), grid.Position{x = 1, y = 7})
+	testing.expect_value(t, lasso_test_cell(&room, south), grid.Position{x = 7, y = 11})
 	poison, poisoned := status_for_entity(&room, enemy_entity(west), .Poison)
 	testing.expect(t, poisoned && poison.potency == 2)
 	burn, burned := status_for_entity(&room, enemy_entity(south), .Burn)
@@ -594,20 +594,20 @@ test_lasso_knockback_follows_the_push_rules :: proc(t: ^testing.T) {
 	// The push never runs past the movement path's limit.
 	long_data: level.Level
 	long_player: Player
-	long_spawns := [?]Enemy_Spawn{{position = {3, 2}, health = 30, attack = 1}}
-	long := lasso_test_room(t, &long_data, &long_player, long_spawns[:], at = {1, 2}, width = 30, height = 5)
+	long_spawns := [?]Enemy_Spawn{{position = {x = 3, y = 2}, health = 30, attack = 1}}
+	long := lasso_test_room(t, &long_data, &long_player, long_spawns[:], at = {x = 1, y = 2}, width = 30, height = 5)
 	defer level.destroy(&long_data)
 	defer destroy_room(&long)
 	lasso_knock_back(&long, long.enemies[0].id, 50)
-	testing.expect_value(t, long.enemies[0].position, grid.Position{3+MAX_MOVEMENT_PATH_CELLS, 2})
+	testing.expect_value(t, long.enemies[0].position, grid.Position{x = 3+MAX_MOVEMENT_PATH_CELLS, y = 2})
 }
 
 @(test)
 test_lasso_smashes_and_bounces_beside_a_wall :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {4, 1}, health = 60, attack = 1}}
-	room := lasso_test_room(t, &data, &player, spawns[:], at = {1, 1})
+	spawns := [?]Enemy_Spawn{{position = {x = 4, y = 1}, health = 60, attack = 1}}
+	room := lasso_test_room(t, &data, &player, spawns[:], at = {x = 1, y = 1})
 	defer level.destroy(&data)
 	defer destroy_room(&room)
 	id := room.enemies[0].id
@@ -615,7 +615,7 @@ test_lasso_smashes_and_bounces_beside_a_wall :: proc(t: ^testing.T) {
 	testing.expect_value(t, play.result, Card_Play_Result.Played)
 	testing.expect(t, room.lasso.radius == 1 && room.lasso.smash)
 	// Pulled onto the one free cell its way lies.
-	testing.expect_value(t, room.enemies[0].position, grid.Position{2, 1})
+	testing.expect_value(t, room.enemies[0].position, grid.Position{x = 2, y = 1})
 	events: [dynamic]Lasso_Test_Event
 	defer delete(events)
 	spun := lasso_test_spin(t, &room, 20, 1.0/240.0, &events)
@@ -632,7 +632,7 @@ test_lasso_smashes_and_bounces_beside_a_wall :: proc(t: ^testing.T) {
 	}
 	// Into the wall north (2, 0), bounced back into the one west (0, 2), and
 	// back: each a hit of the next number, on the swung foe alone.
-	expected := [3]struct{at: f64, cell: grid.Position}{{0.075, {2, 0}}, {0.45, {0, 2}}, {0.825, {2, 0}}}
+	expected := [3]struct{at: f64, cell: grid.Position}{{0.075, {x = 2, y = 0}}, {0.45, {x = 0, y = 2}}, {0.825, {x = 2, y = 0}}}
 	testing.expect(t, len(smashes) == 11)
 	for want, index in expected {
 		if index >= len(smashes) { break }
@@ -652,16 +652,16 @@ test_lasso_holds_its_foe_out_of_the_world :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
 	spawns := [?]Enemy_Spawn{
-		{position = {9, 6}, health = 60, attack = 1},
-		{position = {2, 2}, health = 30, attack = 1, archetype = .Custodian},
-		{position = {11, 7}, health = 30, attack = 1},
+		{position = {x = 9, y = 6}, health = 60, attack = 1},
+		{position = {x = 2, y = 2}, health = 30, attack = 1, archetype = .Custodian},
+		{position = {x = 11, y = 7}, health = 30, attack = 1},
 	}
 	room := lasso_test_room(t, &data, &player, spawns[:])
 	defer level.destroy(&data)
 	defer destroy_room(&room)
-	id := lasso_test_foe(&room, {9, 6})
-	walker := lasso_test_foe(&room, {11, 7})
-	custodian := lasso_test_foe(&room, {2, 2})
+	id := lasso_test_foe(&room, {x = 9, y = 6})
+	walker := lasso_test_foe(&room, {x = 11, y = 7})
+	custodian := lasso_test_foe(&room, {x = 2, y = 2})
 	lasso_test_hold(&room, walker)
 	lasso_test_hold(&room, custodian)
 	_, _ = apply_status(&room, enemy_entity(id), .Poison, 3, 0)
@@ -669,14 +669,14 @@ test_lasso_holds_its_foe_out_of_the_world :: proc(t: ^testing.T) {
 	// Pools on every cell of its ring, a fire beside its first cell.
 	arcs, count := lasso_ring(4)
 	for arc in arcs[:count] {
-		if index, inside := ground_index(&room, add_position({6, 6}, arc.cell)); inside { room.ground.pool[index] = 3 }
+		if index, inside := ground_index(&room, add_position({x = 6, y = 6}, arc.cell)); inside { room.ground.pool[index] = 3 }
 	}
-	room.ground.fires[0] = {id = 1, center = {10, 7}, burn = 4}
+	room.ground.fires[0] = {id = 1, center = {x = 10, y = 7}, burn = 4}
 	room.ground.fire_count, room.ground.next_fire_id = 1, 1
 	play := lasso_test_throw(t, &room, id)
 	testing.expect_value(t, play.result, Card_Play_Result.Played)
 	// Another foe walks into the cell under it.
-	query := query_movement_from(&room, enemy_entity(walker), {11, 6}, {10, 6})
+	query := query_movement_from(&room, enemy_entity(walker), {x = 11, y = 6}, {x = 10, y = 6})
 	testing.expect(t, movement_query_is_clear(&query))
 	// The fire grows over its cell: nothing catches it in the air.
 	pulse: Pulse_Report
@@ -716,27 +716,27 @@ test_lasso_lets_go_when_the_player_moves :: proc(t: ^testing.T) {
 		// was recovering when the rope caught it.
 		data: level.Level
 		player: Player
-		spawns := [?]Enemy_Spawn{{position = {9, 6}, health = 60, attack = 1}}
+		spawns := [?]Enemy_Spawn{{position = {x = 9, y = 6}, health = 60, attack = 1}}
 		room := lasso_test_room(t, &data, &player, spawns[:])
 		defer level.destroy(&data)
 		defer destroy_room(&room)
 		id := room.enemies[0].id
-		index, _ := ground_index(&room, {9, 3})
+		index, _ := ground_index(&room, {x = 9, y = 3})
 		room.ground.pool[index] = 2
 		room.enemies[0].recovery_pulses = 1
 		lasso_test_throw(t, &room, id)
 		lasso_test_spin(t, &room, 1, 1.0/60.0)
-		testing.expect_value(t, room.enemies[0].position, grid.Position{9, 3})
+		testing.expect_value(t, room.enemies[0].position, grid.Position{x = 9, y = 3})
 		testing.expect_value(t, room.enemies[0].recovery_pulses, i32(1))
 		testing.expect(t, try_dodge_player(&room, .West))
 		testing.expect(t, !room.lasso.active)
 		released := false
 		for event in room.recent_events.events[:room.recent_events.count] {
-			if event.kind == .Lasso_Released { released = event.target == enemy_entity(id) && event.to_position == grid.Position{9, 3} }
+			if event.kind == .Lasso_Released { released = event.target == enemy_entity(id) && event.to_position == grid.Position{x = 9, y = 3} }
 		}
 		testing.expect(t, released)
 		foe := &room.enemies[0]
-		testing.expect_value(t, foe.position, grid.Position{9, 3})
+		testing.expect_value(t, foe.position, grid.Position{x = 9, y = 3})
 		// Its fresh intent at once: a step toward the player, its three seconds
 		// counted as any foe's newly planned.
 		testing.expect_value(t, foe.intent.kind, Enemy_Intent_Kind.Move)
@@ -746,7 +746,7 @@ test_lasso_lets_go_when_the_player_moves :: proc(t: ^testing.T) {
 		poison, poisoned := status_for_entity(&room, enemy_entity(id), .Poison)
 		testing.expect(t, poisoned && poison.potency == 2)
 		testing.expect(t, validate_enemy_intents(&room))
-		_, standing := enemy_index_at(&room, {9, 3})
+		_, standing := enemy_index_at(&room, {x = 9, y = 3})
 		testing.expect(t, standing)
 		// It acts when that intent is due, and plans on as any foe.
 		destination := foe.intent.destination
@@ -762,23 +762,23 @@ test_lasso_lets_go_when_the_player_moves :: proc(t: ^testing.T) {
 		// The player dodges onto the cell under it: it falls beside him.
 		data: level.Level
 		player: Player
-		spawns := [?]Enemy_Spawn{{position = {5, 6}, health = 60, attack = 1}}
-		room := lasso_test_room(t, &data, &player, spawns[:], at = {3, 6})
+		spawns := [?]Enemy_Spawn{{position = {x = 5, y = 6}, health = 60, attack = 1}}
+		room := lasso_test_room(t, &data, &player, spawns[:], at = {x = 3, y = 6})
 		defer level.destroy(&data)
 		defer destroy_room(&room)
 		lasso_test_throw(t, &room, room.enemies[0].id)
 		testing.expect_value(t, room.lasso.radius, i32(2))
 		for _ in 0..<240 {
-			if lasso_arc_cell(&room.lasso, room.lasso.arc) == (grid.Position{3, 4}) { break }
+			if lasso_arc_cell(&room.lasso, room.lasso.arc) == (grid.Position{x = 3, y = 4}) { break }
 			lasso_test_spin(t, &room, 1.0/240.0, 1.0/240.0)
 		}
-		testing.expect_value(t, lasso_arc_cell(&room.lasso, room.lasso.arc), grid.Position{3, 4})
+		testing.expect_value(t, lasso_arc_cell(&room.lasso, room.lasso.arc), grid.Position{x = 3, y = 4})
 		testing.expect(t, try_dodge_player(&room, .North))
-		testing.expect_value(t, player.position, grid.Position{3, 4})
+		testing.expect_value(t, player.position, grid.Position{x = 3, y = 4})
 		testing.expect(t, !room.lasso.active)
 		landed := room.enemies[0].position
 		testing.expect(t, landed != player.position && max(abs(landed.x-3), abs(landed.y-4)) == 1)
-		testing.expect_value(t, landed, grid.Position{2, 3})
+		testing.expect_value(t, landed, grid.Position{x = 2, y = 3})
 	}
 	{
 		// A brute's push, in the middle of its beat, lets go too; and so does the
@@ -786,11 +786,11 @@ test_lasso_lets_go_when_the_player_moves :: proc(t: ^testing.T) {
 		// holds a wait of no length, and the beat's end plans it afresh.
 		data: level.Level
 		player: Player
-		spawns := [?]Enemy_Spawn{{position = {9, 6}, health = 60, attack = 1}, {position = {6, 7}, health = 60, attack = 3, archetype = .Brute}}
+		spawns := [?]Enemy_Spawn{{position = {x = 9, y = 6}, health = 60, attack = 1}, {position = {x = 6, y = 7}, health = 60, attack = 3, archetype = .Brute}}
 		room := lasso_test_room(t, &data, &player, spawns[:])
 		defer level.destroy(&data)
 		defer destroy_room(&room)
-		target, brute := lasso_test_foe(&room, {9, 6}), lasso_test_foe(&room, {6, 7})
+		target, brute := lasso_test_foe(&room, {x = 9, y = 6}), lasso_test_foe(&room, {x = 6, y = 7})
 		lasso_test_hold(&room, brute)
 		lasso_test_throw(t, &room, target)
 		lasso_test_spin(t, &room, 0.3, 1.0/60.0)
@@ -812,13 +812,13 @@ test_lasso_lets_go_when_the_player_moves :: proc(t: ^testing.T) {
 			testing.expect(t, validate_enemy_intents(room))
 		}
 		brute_index, _ := enemy_index_by_id(&room, brute)
-		intent := make_attack_intent(&room, {6, 7}, player.position, 3)
+		intent := make_attack_intent(&room, {x = 6, y = 7}, player.position, 3)
 		intent.push = true
 		room.enemies[brute_index].intent = intent
 		room.tactical_pulse.pending, room.tactical_pulse.started = true, true
 		pulse: Pulse_Report
 		resolve_enemy_intents(&room, &pulse, brute)
-		testing.expect_value(t, player.position, grid.Position{6, 5})
+		testing.expect_value(t, player.position, grid.Position{x = 6, y = 5})
 		testing.expect(t, !room.lasso.active)
 		beat_ends(t, &room, target)
 		// Caught again, then let go by the prompt's dodge (offered mid-beat).
@@ -839,7 +839,7 @@ test_lasso_ends_with_its_foe_and_clears_the_room :: proc(t: ^testing.T) {
 	for endless in ([2]bool{false, true}) {
 		data: level.Level
 		player: Player
-		spawns := [?]Enemy_Spawn{{position = {9, 6}, health = 3, attack = 1}}
+		spawns := [?]Enemy_Spawn{{position = {x = 9, y = 6}, health = 3, attack = 1}}
 		room := lasso_test_room(t, &data, &player, spawns[:])
 		room.endless = endless
 		id := room.enemies[0].id
@@ -853,7 +853,7 @@ test_lasso_ends_with_its_foe_and_clears_the_room :: proc(t: ^testing.T) {
 		testing.expect(t, !tactical_player_busy(&room))
 		dropped := false
 		for seen in events {
-			if seen.event.kind == .Loot_Dropped { dropped = true; testing.expect_value(t, seen.event.from_position, grid.Position{10, 6}) }
+			if seen.event.kind == .Loot_Dropped { dropped = true; testing.expect_value(t, seen.event.from_position, grid.Position{x = 10, y = 6}) }
 		}
 		testing.expect(t, dropped)
 		delete(events)
@@ -863,14 +863,14 @@ test_lasso_ends_with_its_foe_and_clears_the_room :: proc(t: ^testing.T) {
 	// The player falls mid-spin: no rope is left out.
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {9, 6}, health = 60, attack = 1}, {position = {2, 2}, health = 60, attack = 1}}
+	spawns := [?]Enemy_Spawn{{position = {x = 9, y = 6}, health = 60, attack = 1}, {position = {x = 2, y = 2}, health = 60, attack = 1}}
 	room := lasso_test_room(t, &data, &player, spawns[:])
 	defer level.destroy(&data)
 	defer destroy_room(&room)
-	lasso_test_throw(t, &room, lasso_test_foe(&room, {9, 6}))
+	lasso_test_throw(t, &room, lasso_test_foe(&room, {x = 9, y = 6}))
 	lasso_test_spin(t, &room, 0.5, 1.0/60.0)
 	player.health = 1
-	blow := make_action(.Attack, enemy_entity(lasso_test_foe(&room, {2, 2})))
+	blow := make_action(.Attack, enemy_entity(lasso_test_foe(&room, {x = 2, y = 2})))
 	testing.expect(t, add_effect(&blow, damage_effect(PLAYER_ENTITY, 50)))
 	testing.expect(t, resolve_action(&room, &blow).accepted)
 	testing.expect_value(t, room.phase, Room_Phase.Defeat)
@@ -888,9 +888,9 @@ test_lasso_spin_never_skips_and_keeps_its_batches :: proc(t: ^testing.T) {
 	for dt, run in ([2]f64{1.0/240.0, 0.5}) {
 		data: level.Level
 		player: Player
-		cells := [3]grid.Position{{6, 2}, {2, 7}, {7, 10}}
+		cells := [3]grid.Position{{x = 6, y = 2}, {x = 2, y = 7}, {x = 7, y = 10}}
 		room := lasso_test_bystanders(t, &data, &player, cells[:])
-		lasso_test_throw(t, &room, lasso_test_foe(&room, {9, 6}), 1)
+		lasso_test_throw(t, &room, lasso_test_foe(&room, {x = 9, y = 6}), 1)
 		events: [dynamic]Lasso_Test_Event
 		lasso_test_spin(t, &room, 30, dt, &events)
 		for seen in events {
@@ -913,7 +913,7 @@ test_lasso_spin_never_skips_and_keeps_its_batches :: proc(t: ^testing.T) {
 	// in batches that never fill their log.
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {9, 6}, health = 5000, attack = 1}}
+	spawns := [?]Enemy_Spawn{{position = {x = 9, y = 6}, health = 5000, attack = 1}}
 	room := lasso_test_room(t, &data, &player, spawns[:])
 	defer level.destroy(&data)
 	defer destroy_room(&room)

@@ -111,7 +111,7 @@ Plateau :: struct { x, y, width, depth: int, height: int, side: int }
 
 @(private = "file")
 plateau_box :: proc(p: Plateau) -> (low, high: grid.Position) {
-	low, high = {p.x, p.y}, {p.x+p.width-1, p.y+p.depth-1}
+	low, high = {x = p.x, y = p.y}, {x = p.x+p.width-1, y = p.y+p.depth-1}
 	run := p.height
 	switch p.side {
 	case 0: low.y -= run          // the stair runs up from the north
@@ -218,15 +218,15 @@ apply_relief :: proc(w: ^World, data: ^level.Level) {
 	zones := make([dynamic][2]grid.Position, context.temp_allocator)
 	for &site in w.sites[:w.site_count] {
 		low, high := site_bounds(&site)
-		append(&zones, [2]grid.Position{{low.x-4, low.y-4}, {high.x+4, high.y+4}})
+		append(&zones, [2]grid.Position{grid.offset(low, -4, -4), grid.offset(high, 4, 4)})
 	}
-	append(&zones, [2]grid.Position{{data.player_spawn.x-8, data.player_spawn.y-8}, {data.player_spawn.x+8, data.player_spawn.y+8}})
+	append(&zones, [2]grid.Position{grid.offset(data.player_spawn, -8, -8), grid.offset(data.player_spawn, 8, 8)})
 	for i in 0..<4 {
-		at := grid.Position{size*(35+i*13)/100, size*(35+(i%2)*28)/100}
-		append(&zones, [2]grid.Position{{at.x-6, at.y-6}, {at.x+6, at.y+6}})
+		at := grid.Position{x = size*(35+i*13)/100, y = size*(35+(i%2)*28)/100}
+		append(&zones, [2]grid.Position{grid.offset(at, -6, -6), grid.offset(at, 6, 6)})
 	}
 	if mountain_present(w) { append(&zones, mountain_zone()) }
-	if w.biome == .Gothic { append(&zones, [2]grid.Position{{size/2-5, size/2-15}, {size/2+5, size/2-5}}) }
+	if w.biome == .Gothic { append(&zones, [2]grid.Position{{x = size/2-5, y = size/2-15}, {x = size/2+5, y = size/2-5}}) }
 	heights := relief_heights(w.biome, data.tiles.cells[:], size, zones[:])
 	_ = level.set_height_table(data, heights)
 }

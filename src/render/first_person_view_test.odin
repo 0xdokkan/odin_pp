@@ -42,7 +42,7 @@ first_person_view_test_room :: proc(t: ^testing.T, data: ^level.Level, player: ^
 	config := game.DEFAULT_TACTICAL_CONFIG
 	config.vision_size = 0
 	testing.expect(t, game.configure_tactical(player, config))
-	enemies := [?]game.Enemy_Spawn{{position = {6, 3}, health = 30, attack = 1}, {position = {9, 6}, health = 30, attack = 1}}
+	enemies := [?]game.Enemy_Spawn{{position = {x = 6, y = 3}, health = 30, attack = 1}, {position = {x = 9, y = 6}, health = 30, attack = 1}}
 	built: bool
 	room, built = game.create_room(data, player, {enemies = enemies[:]})
 	testing.expect(t, built)
@@ -131,7 +131,7 @@ test_first_person_view_dives_into_his_eyes_and_rises_back :: proc(t: ^testing.T)
 	ahead := tactical_project(renderer, {eye.x+math.cos(f.yaw)*3, eye.z+math.sin(f.yaw)*3}, game.FIRST_PERSON_EYE_HEIGHT)
 	testing.expect(t, abs(ahead.x-480) < 0.5 && abs(ahead.y-270) < 0.5)
 	// The edge stands whole behind his eyes.
-	testing.expect_value(t, diorama_wall_height(renderer, &room, {0, 6}), DIORAMA_WALL_HEIGHT)
+	testing.expect_value(t, diorama_wall_height(renderer, &room, {x = 0, y = 6}), DIORAMA_WALL_HEIGHT)
 	// The hand is away under the canvas.
 	testing.expect_value(t, first_person_hand_drop(renderer), TACTICAL_HAND_HEIGHT+24)
 	// No button the pointer cannot reach is drawn as if it could be used.
@@ -205,7 +205,7 @@ test_first_person_overlays_leave_out_what_a_wall_hides :: proc(t: ^testing.T) {
 	defer free(renderer)
 	defer destroy_renderer_world_playback(renderer)
 	shadow_view_test_frame(renderer, &room, 0.02)
-	north, behind := grid.Position{6, 3}, grid.Position{9, 6}
+	north, behind := grid.Position{x = 6, y = 3}, grid.Position{x = 9, y = 6}
 	testing.expect(t, tactical_overlay_visible(renderer, north) && tactical_overlay_visible(renderer, behind))
 	first_person_view_test_play(t, renderer, &room)
 	first_person_view_test_dive(t, renderer, &room)
@@ -305,19 +305,19 @@ test_first_person_sparks_land_on_what_stopped_them :: proc(t: ^testing.T) {
 	room := first_person_view_test_room(t, &data, &player)
 	defer level.destroy(&data)
 	defer game.destroy_room(&room)
-	from := grid.Position{6, 6}
-	append(&room.obstacles, game.Obstacle{position = {6, 8}})
-	append(&room.objects, game.Grid_Object{id = room.next_object_id, kind = .Ice_Block, position = {4, 6}, health = 4, max_health = 4})
+	from := grid.Position{x = 6, y = 6}
+	append(&room.obstacles, game.Obstacle{position = {x = 6, y = 8}})
+	append(&room.objects, game.Grid_Object{id = room.next_object_id, kind = .Ice_Block, position = {x = 4, y = 6}, health = 4, max_health = 4})
 	room.next_object_id += 1
 	near :: proc(a, b: rl.Vector3) -> bool { return rl.Vector3Distance(a, b) < 1e-3 }
 	// South, level: over the cover's top, which stops it.
 	south := game.first_person_trace(&room, from, {yaw = math.PI/2})
-	testing.expect(t, south.hit == .Solid && south.cell == grid.Position{6, 8})
+	testing.expect(t, south.hit == .Solid && south.cell == grid.Position{x = 6, y = 8})
 	testing.expect(t, near(first_person_landing(&room, south), {6.5, FIRST_PERSON_COVER_HEIGHT, 8.5-FIRST_PERSON_COVER_HALF}))
 	// West, level: over the ice block's top; looking down, onto its face.
 	ice := voxel_object_bounds(.Ice_Block, {4, 6})
 	west := game.first_person_trace(&room, from, {yaw = math.PI})
-	testing.expect(t, west.hit == .Solid && west.cell == grid.Position{4, 6})
+	testing.expect(t, west.hit == .Solid && west.cell == grid.Position{x = 4, y = 6})
 	testing.expect(t, near(first_person_landing(&room, west), {ice.max.x, ice.max.y, 6.5}))
 	down := game.first_person_trace(&room, from, {yaw = math.PI, pitch = -0.3})
 	landed := first_person_landing(&room, down)
@@ -325,11 +325,11 @@ test_first_person_sparks_land_on_what_stopped_them :: proc(t: ^testing.T) {
 	testing.expect(t, abs(landed.y-(game.FIRST_PERSON_EYE_HEIGHT-math.tan(f32(0.3))*(6.5-ice.max.x))) < 1e-3)
 	// East, level: the wall stub's face, as the trace has it.
 	east := game.first_person_trace(&room, from, {yaw = 0})
-	testing.expect(t, east.hit == .Solid && east.cell == grid.Position{8, 6})
+	testing.expect(t, east.hit == .Solid && east.cell == grid.Position{x = 8, y = 6})
 	testing.expect(t, near(first_person_landing(&room, east), {east.point.x, east.point.y, east.point.z}))
 	// North, looking up over the foe: the room's edge, at the wall's top.
 	up := game.first_person_trace(&room, from, {yaw = -math.PI/2, pitch = 0.5})
-	testing.expect(t, up.hit == .Solid && up.cell == grid.Position{6, 0} && up.point.y > DIORAMA_WALL_HEIGHT)
+	testing.expect(t, up.hit == .Solid && up.cell == grid.Position{x = 6, y = 0} && up.point.y > DIORAMA_WALL_HEIGHT)
 	testing.expect(t, near(first_person_landing(&room, up), {6.5, DIORAMA_WALL_HEIGHT, 1}))
 	// A foe's and the floor's stay.
 	foe := game.first_person_trace(&room, from, {yaw = -math.PI/2})
@@ -485,10 +485,10 @@ test_first_person_shots_follow_the_glides_the_view_shows :: proc(t: ^testing.T) 
 		shadow_view_test_frame(renderer, &room, 1.0/60.0)
 	}
 	before = capture_room_presentation(&room)
-	action := game.make_action(.Move, foe, game.cell_target({7, 3}), .Walkable_Cell)
-	testing.expect(t, game.add_effect(&action, game.move_effect(foe, {7, 3})))
+	action := game.make_action(.Move, foe, game.cell_target({x = 7, y = 3}), .Walkable_Cell)
+	testing.expect(t, game.add_effect(&action, game.move_effect(foe, {x = 7, y = 3})))
 	report := game.resolve_action(&room, &action)
-	testing.expect(t, report.accepted && room.enemies[0].position == grid.Position{7, 3})
+	testing.expect(t, report.accepted && room.enemies[0].position == grid.Position{x = 7, y = 3})
 	game.clear_event_log(room.recent_events)
 	game.append_event_log(room.recent_events, &report.events)
 	after = capture_room_presentation(&room)

@@ -57,7 +57,7 @@ test_the_ground_that_matters_is_level_and_every_site_and_the_exit_can_be_walked_
 		uneven := 0
 		for dy in -8..=8 {
 			for dx in -8..=8 {
-				cell := grid.Position{data.player_spawn.x+dx, data.player_spawn.y+dy}
+				cell := grid.offset(data.player_spawn, dx, dy)
 				tile, ok := level.tile_at(&data, cell)
 				if ok && tile.kind != .Void && level.height_at(&data, cell) != spawn_height { uneven += 1 }
 			}
@@ -72,8 +72,8 @@ test_the_ground_that_matters_is_level_and_every_site_and_the_exit_can_be_walked_
 			base := level.height_at(&data, site.position)
 			for y in low.y..=high.y {
 				for x in low.x..=high.x {
-					tile, ok := level.tile_at(&data, {x, y})
-					if ok && tile.kind != .Void && level.height_at(&data, {x, y}) != base { uneven += 1 }
+					tile, ok := level.tile_at(&data, {x = x, y = y})
+					if ok && tile.kind != .Void && level.height_at(&data, {x = x, y = y}) != base { uneven += 1 }
 				}
 			}
 		}
@@ -87,8 +87,8 @@ test_the_ground_that_matters_is_level_and_every_site_and_the_exit_can_be_walked_
 		queue[0] = data.player_spawn
 		seen[data.player_spawn.y*data.tiles.width+data.player_spawn.x] = true
 		for head := 0; head < tail; head += 1 {
-			for offset in ([4]grid.Position{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}) {
-				q := grid.Position{queue[head].x+offset.x, queue[head].y+offset.y}
+			for offset in ([4]grid.Position{{x = 1, y = 0}, {x = -1, y = 0}, {x = 0, y = 1}, {x = 0, y = -1}}) {
+				q := grid.Position{x = queue[head].x+offset.x, y = queue[head].y+offset.y}
 				tile, ok := level.tile_at(&data, q)
 				if !ok || !level.is_walkable(tile.kind) { continue }
 				if abs(int(level.height_at(&data, q))-int(level.height_at(&data, queue[head]))) > 1 { continue }
@@ -103,7 +103,7 @@ test_the_ground_that_matters_is_level_and_every_site_and_the_exit_can_be_walked_
 			near := false
 			for dy in -3..=3 {
 				for dx in -3..=3 {
-					p := grid.Position{site.position.x+dx, site.position.y+dy}
+					p := grid.offset(site.position, dx, dy)
 					if p.x >= 0 && p.y >= 0 && p.x < data.tiles.width && p.y < data.tiles.height { near = near || seen[p.y*data.tiles.width+p.x] }
 				}
 			}

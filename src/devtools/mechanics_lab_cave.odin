@@ -54,15 +54,15 @@ mechanics_lab_cave :: proc(window: ^app.Window, renderer: ^render.Renderer, room
 	renderer.tactical.world_orbit.distance = 32
 	for _ in 0..<20 { mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0) }
 	plan := level.cave_plan(run_session.MECHANICS_LAB_CAVE_SEED)
-	arrival := grid.Position{plan.arrival.x+1, plan.arrival.y+1}
-	secret := grid.Position{plan.secret.x+1, plan.secret.y+1}
+	arrival := grid.offset(plan.arrival, 1, 1)
+	secret := grid.offset(plan.secret, 1, 1)
 	if player.position != arrival { fmt.eprintln("mechanics lab: the player is not at the cave's arrival:", player.position, arrival); return false }
 	mechanics_lab_still(window, renderer, room, 0, "odin_pp_mechanics_lab_cave_arrival.png")
 
 	// The rock stops the step: the cell north or south of the arrival's row that is rock, tried from beside it.
 	blocked := false
 	for step in MOUNTAIN_LAB_STEPS {
-		next := grid.Position{player.position.x+step.offset.x, player.position.y+step.offset.y}
+		next := grid.offset(player.position, step.offset.x, step.offset.y)
 		if game.cell_blocks_movement(room, next) {
 			if game.try_move_player(room, step.direction) != .Blocked || player.position != arrival { fmt.eprintln("mechanics lab: the cave's rock did not stop the step"); return false }
 			blocked = true
@@ -72,7 +72,7 @@ mechanics_lab_cave :: proc(window: ^app.Window, renderer: ^render.Renderer, room
 	if !blocked { fmt.eprintln("mechanics lab: no rock beside the arrival"); return false }
 
 	// To the secret and back, with a still in the first room that has foes and at the gallery to the last room.
-	rooms := [2]grid.Position{{plan.anchors[0].x+1, plan.anchors[0].y+1}, {plan.anchors[plan.groups-1].x+1, plan.anchors[plan.groups-1].y+1}}
+	rooms := [2]grid.Position{{x = plan.anchors[0].x+1, y = plan.anchors[0].y+1}, {x = plan.anchors[plan.groups-1].x+1, y = plan.anchors[plan.groups-1].y+1}}
 	names := [2]cstring{"odin_pp_mechanics_lab_cave_first_room.png", "odin_pp_mechanics_lab_cave_last_room.png"}
 	if !cave_lab_walk(window, renderer, room, controller, cards, buffer, secret, "odin_pp_mechanics_lab_cave_secret.png", rooms, names) { return false }
 	if !cave_lab_walk(window, renderer, room, controller, cards, buffer, arrival, "odin_pp_mechanics_lab_cave_back.png", rooms, {"odin_pp_mechanics_lab_cave_back_last.png", "odin_pp_mechanics_lab_cave_back_first.png"}) { return false }

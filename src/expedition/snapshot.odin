@@ -153,7 +153,7 @@ restore :: proc(s:^Snapshot,w:^World,data:^level.Level,player:^game.Player,room:
 		_=level.set_height_table(data,s.heights[:side*side])
 	}
 	for tile,i in data.tiles.cells {
-		if tile.kind==.Player_Spawn {data.player_spawn={i%side,i/side};data.has_player_spawn=true;break}
+		if tile.kind==.Player_Spawn {data.player_spawn={x = i%side, y = i/side};data.has_player_spawn=true;break}
 	}
 	if !data.has_player_spawn {level.destroy(data);return false}
 	// The structures' records are in the world; their tiles came with the map.

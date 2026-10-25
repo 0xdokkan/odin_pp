@@ -71,7 +71,7 @@ test_marley_ramps_up_bombs_and_wears_down_lights :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
 	spawns: [10]Enemy_Spawn
-	for &spawn, index in spawns { spawn = {position = {2+index, 2}, health = 50, attack = 1} }
+	for &spawn, index in spawns { spawn = {position = {x = 2+index, y = 2}, health = 50, attack = 1} }
 	room := ground_test_room(t, &data, &player, {enemies = spawns[:]})
 	defer level.destroy(&data)
 	defer destroy_room(&room)
@@ -96,7 +96,7 @@ test_marley_ramps_up_bombs_and_wears_down_lights :: proc(t: ^testing.T) {
 test_marley_card_starts_the_party_after_its_cast :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {3, 3}, health = 50, attack = 1}, {position = {9, 3}, health = 50, attack = 1}, {position = {9, 7}, health = 50, attack = 1}}
+	spawns := [?]Enemy_Spawn{{position = {x = 3, y = 3}, health = 50, attack = 1}, {position = {x = 9, y = 3}, health = 50, attack = 1}, {position = {x = 9, y = 7}, health = 50, attack = 1}}
 	room := ground_test_room(t, &data, &player, {enemies = spawns[:]})
 	defer level.destroy(&data)
 	defer destroy_room(&room)
@@ -134,7 +134,7 @@ test_marley_card_starts_the_party_after_its_cast :: proc(t: ^testing.T) {
 test_marley_critical_play_adds_five_seconds :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {3, 3}, health = 50, attack = 1}}
+	spawns := [?]Enemy_Spawn{{position = {x = 3, y = 3}, health = 50, attack = 1}}
 	room := ground_test_room(t, &data, &player, {enemies = spawns[:]})
 	defer level.destroy(&data)
 	defer destroy_room(&room)
@@ -151,9 +151,9 @@ test_marley_bomb_hurts_everyone_off_the_lights :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
 	spawns := [?]Enemy_Spawn{
-		{position = {6, 2}, health = 50, attack = 1}, // lit
-		{position = {6, 8}, health = 50, attack = 1}, // not lit
-		{position = {2, 4}, health = 50, attack = 1}, // another column
+		{position = {x = 6, y = 2}, health = 50, attack = 1}, // lit
+		{position = {x = 6, y = 8}, health = 50, attack = 1}, // not lit
+		{position = {x = 2, y = 4}, health = 50, attack = 1}, // another column
 	}
 	room := ground_test_room(t, &data, &player, {enemies = spawns[:]})
 	defer level.destroy(&data)
@@ -172,8 +172,8 @@ test_marley_bomb_hurts_everyone_off_the_lights :: proc(t: ^testing.T) {
 	testing.expect_value(t, room.enemies[2].health, i32(50))
 	for event in pulse.events.events[:pulse.events.count] {
 		if event.kind == .Marley_Bomb {
-			testing.expect_value(t, event.from_position, grid.Position{6, 0})
-			testing.expect_value(t, event.to_position, grid.Position{6, 10})
+			testing.expect_value(t, event.from_position, grid.Position{x = 6, y = 0})
+			testing.expect_value(t, event.to_position, grid.Position{x = 6, y = 10})
 			testing.expect_value(t, event.amount, MARLEY_BASE_DAMAGE)
 		}
 		if event.kind == .Marley_Saved { testing.expect_value(t, event.target, enemy_entity(room.enemies[0].id)) }
@@ -192,7 +192,7 @@ test_marley_bomb_hurts_everyone_off_the_lights :: proc(t: ^testing.T) {
 test_marley_warns_columns_two_beats_ahead :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {3, 3}, health = 50, attack = 1}, {position = {9, 7}, health = 50, attack = 1}}
+	spawns := [?]Enemy_Spawn{{position = {x = 3, y = 3}, health = 50, attack = 1}, {position = {x = 9, y = 7}, health = 50, attack = 1}}
 	room := ground_test_room(t, &data, &player, {enemies = spawns[:]})
 	defer level.destroy(&data)
 	defer destroy_room(&room)
@@ -218,7 +218,7 @@ test_marley_warns_columns_two_beats_ahead :: proc(t: ^testing.T) {
 test_marley_kill_earns_seconds_within_ninety :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {6, 8}, health = 3, attack = 1}, {position = {3, 3}, health = 50, attack = 1}, {position = {9, 2}, health = 50, attack = 1}}
+	spawns := [?]Enemy_Spawn{{position = {x = 6, y = 8}, health = 3, attack = 1}, {position = {x = 3, y = 3}, health = 50, attack = 1}, {position = {x = 9, y = 2}, health = 50, attack = 1}}
 	room := ground_test_room(t, &data, &player, {enemies = spawns[:]})
 	defer level.destroy(&data)
 	defer destroy_room(&room)
@@ -236,7 +236,7 @@ test_marley_kill_earns_seconds_within_ninety :: proc(t: ^testing.T) {
 	testing.expect_value(t, marley_test_count(&pulse.events, .Marley_Bonus), 1)
 
 	// Near the end of the ninety seconds the bonus is cut short.
-	room.enemies[0].position, room.enemies[0].health = {6, 8}, 1
+	room.enemies[0].position, room.enemies[0].health = {x = 6, y = 8}, 1
 	room.enemies[0].max_health = max(room.enemies[0].max_health, 1)
 	m.elapsed, m.remaining = 80, 8
 	m.column_count = 1
@@ -251,7 +251,7 @@ test_marley_kill_earns_seconds_within_ninety :: proc(t: ^testing.T) {
 test_marley_ends_with_its_time_and_with_the_combat :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {3, 3}, health = 50, attack = 1}, {position = {9, 7}, health = 50, attack = 1}}
+	spawns := [?]Enemy_Spawn{{position = {x = 3, y = 3}, health = 50, attack = 1}, {position = {x = 9, y = 7}, health = 50, attack = 1}}
 	room := ground_test_room(t, &data, &player, {enemies = spawns[:]})
 	defer level.destroy(&data)
 	defer destroy_room(&room)
@@ -275,7 +275,7 @@ test_marley_is_deterministic :: proc(t: ^testing.T) {
 	record :: proc(t: ^testing.T, lights: ^[dynamic]grid.Position, columns: ^[dynamic]i32) {
 		data: level.Level
 		player: Player
-		spawns := [?]Enemy_Spawn{{position = {3, 3}, health = 500, attack = 1}, {position = {9, 7}, health = 500, attack = 1}, {position = {6, 2}, health = 500, attack = 1}}
+		spawns := [?]Enemy_Spawn{{position = {x = 3, y = 3}, health = 500, attack = 1}, {position = {x = 9, y = 7}, health = 500, attack = 1}, {position = {x = 6, y = 2}, health = 500, attack = 1}}
 		room := ground_test_room(t, &data, &player, {enemies = spawns[:], room_seed = 77})
 		defer level.destroy(&data)
 		defer destroy_room(&room)
@@ -306,7 +306,7 @@ test_marley_is_deterministic :: proc(t: ^testing.T) {
 test_marley_lights_move_every_five_beats_with_the_next_always_shown :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {3, 3}, health = 500, attack = 1}, {position = {9, 7}, health = 500, attack = 1}, {position = {6, 2}, health = 500, attack = 1}, {position = {2, 8}, health = 500, attack = 1}}
+	spawns := [?]Enemy_Spawn{{position = {x = 3, y = 3}, health = 500, attack = 1}, {position = {x = 9, y = 7}, health = 500, attack = 1}, {position = {x = 6, y = 2}, health = 500, attack = 1}, {position = {x = 2, y = 8}, health = 500, attack = 1}}
 	room := ground_test_room(t, &data, &player, {enemies = spawns[:]})
 	defer level.destroy(&data)
 	defer destroy_room(&room)
@@ -339,7 +339,7 @@ test_marley_lights_move_every_five_beats_with_the_next_always_shown :: proc(t: ^
 test_marley_lights_are_spread_out :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {3, 3}, health = 500, attack = 1}, {position = {9, 7}, health = 500, attack = 1}}
+	spawns := [?]Enemy_Spawn{{position = {x = 3, y = 3}, health = 500, attack = 1}, {position = {x = 9, y = 7}, health = 500, attack = 1}}
 	room := ground_test_room(t, &data, &player, {enemies = spawns[:]})
 	defer level.destroy(&data)
 	defer destroy_room(&room)
@@ -361,7 +361,7 @@ test_marley_lights_are_spread_out :: proc(t: ^testing.T) {
 test_marley_bombs_of_a_beat_share_a_group :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {3, 3}, health = 500, attack = 1}, {position = {9, 7}, health = 500, attack = 1}}
+	spawns := [?]Enemy_Spawn{{position = {x = 3, y = 3}, health = 500, attack = 1}, {position = {x = 9, y = 7}, health = 500, attack = 1}}
 	room := ground_test_room(t, &data, &player, {enemies = spawns[:]})
 	defer level.destroy(&data)
 	defer destroy_room(&room)
@@ -390,8 +390,8 @@ test_marley_bombs_of_a_beat_share_a_group :: proc(t: ^testing.T) {
 test_marley_bombs_catch_barrels_and_spare_the_shadow :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {3, 3}, health = 50, attack = 1}}
-	objects := [?]Grid_Object_Spawn{{kind = .Barrel, position = {6, 8}}, {kind = .Ice_Block, position = {6, 2}}}
+	spawns := [?]Enemy_Spawn{{position = {x = 3, y = 3}, health = 50, attack = 1}}
+	objects := [?]Grid_Object_Spawn{{kind = .Barrel, position = {x = 6, y = 8}}, {kind = .Ice_Block, position = {x = 6, y = 2}}}
 	room := ground_test_room(t, &data, &player, {enemies = spawns[:], objects = objects[:]})
 	defer level.destroy(&data)
 	defer destroy_room(&room)
@@ -414,7 +414,7 @@ test_marley_bombs_catch_barrels_and_spare_the_shadow :: proc(t: ^testing.T) {
 test_marley_enemies_flee_columns_and_make_for_the_lights :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {3, 3}, health = 500, attack = 1}, {position = {10, 8}, health = 500, attack = 1}, {position = {5, 5}, health = 500, attack = 1}}
+	spawns := [?]Enemy_Spawn{{position = {x = 3, y = 3}, health = 500, attack = 1}, {position = {x = 10, y = 8}, health = 500, attack = 1}, {position = {x = 5, y = 5}, health = 500, attack = 1}}
 	room := ground_test_room(t, &data, &player, {enemies = spawns[:]})
 	defer level.destroy(&data)
 	defer destroy_room(&room)
@@ -422,7 +422,7 @@ test_marley_enemies_flee_columns_and_make_for_the_lights :: proc(t: ^testing.T) 
 	m := &room.marley
 	// Foe 0 stands in a warned column; foe 1 has a light two cells off; foe 2
 	// is beside the player (6, 5).
-	marley_set_lights(m, {{8, 8}})
+	marley_set_lights(m, {{x = 8, y = 8}})
 	m.column_count = 1
 	m.columns[0] = {x = 3, beats = 2}
 	for &enemy in room.enemies { enemy.intent, enemy.tactical_cooldown = {}, 0 }
@@ -430,11 +430,11 @@ test_marley_enemies_flee_columns_and_make_for_the_lights :: proc(t: ^testing.T) 
 	testing.expect_value(t, room.enemies[0].intent.kind, Enemy_Intent_Kind.Move)
 	testing.expect(t, room.enemies[0].intent.destination.x != 3)
 	testing.expect_value(t, room.enemies[1].intent.kind, Enemy_Intent_Kind.Move)
-	testing.expect_value(t, room.enemies[1].intent.destination, grid.Position{9, 8})
+	testing.expect_value(t, room.enemies[1].intent.destination, grid.Position{x = 9, y = 8})
 	testing.expect(t, room.enemies[2].intent.kind != .Move || !marley_cell_is_lit(&room, room.enemies[2].intent.destination))
 	// A lit cell in a warned column is safe: no blast zone there.
-	testing.expect_value(t, enemy_terrain_danger(&room, {3, 3}), MARLEY_COLUMN_DANGER)
-	marley_set_lights(m, {{3, 3}})
-	testing.expect_value(t, enemy_terrain_danger(&room, {3, 3}), 0)
-	testing.expect_value(t, enemy_terrain_danger(&room, {3, 4}), MARLEY_COLUMN_DANGER)
+	testing.expect_value(t, enemy_terrain_danger(&room, {x = 3, y = 3}), MARLEY_COLUMN_DANGER)
+	marley_set_lights(m, {{x = 3, y = 3}})
+	testing.expect_value(t, enemy_terrain_danger(&room, {x = 3, y = 3}), 0)
+	testing.expect_value(t, enemy_terrain_danger(&room, {x = 3, y = 4}), MARLEY_COLUMN_DANGER)
 }

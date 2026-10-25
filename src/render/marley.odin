@@ -202,7 +202,7 @@ draw_marley_floor :: proc(renderer: ^Renderer, room: ^game.Room) {
 	if party.active {
 		for column in party.columns[:party.column_count] {
 			for y in 0..<room.level_data.tiles.height {
-				cell := grid.Position{int(column.x), y}
+				cell := grid.Position{x = int(column.x), y = y}
 				if !marley_cell_drawn(renderer, room, cell) { continue }
 				if marley_shown_lit(party, cell) { continue }
 				height := marley_floor_height(renderer, cell)
@@ -260,7 +260,7 @@ draw_marley_floor :: proc(renderer: ^Renderer, room: ^game.Room) {
 			slope := 0.45+f32(seed/628%100)/100*1.05
 			reach := center.y/math.tan(slope)
 			x, z := center.x+math.cos(turn)*reach, center.z+math.sin(turn)*reach
-			cell := grid.Position{int(math.floor(x)), int(math.floor(z))}
+			cell := grid.Position{x = int(math.floor(x)), y = int(math.floor(z))}
 			if !marley_cell_drawn(renderer, room, cell) { continue }
 			height := marley_floor_height(renderer, cell)
 			flash := 0.5+0.5*math.sin(f32(t)*5+f32(glint))
@@ -432,7 +432,7 @@ draw_marley_bomb :: proc(renderer: ^Renderer, room: ^game.Room, cue: ^Presentati
 	rlgl.DisableBackfaceCulling()
 	// A flash on every cell the bomb has crossed, and a ring where it lands.
 	for y in 0..<room.level_data.tiles.height {
-		cell := grid.Position{cue.event.from_position.x, y}
+		cell := grid.Position{x = cue.event.from_position.x, y = y}
 		if !marley_cell_drawn(renderer, room, cell) { continue }
 		floor := marley_floor_height(renderer, cell)
 		crossed := marley_bomb_arrival(origin, x, board, f32(y)+0.5)
@@ -451,7 +451,7 @@ draw_marley_bomb :: proc(renderer: ^Renderer, room: ^game.Room, cue: ^Presentati
 		touched := marley_bomb_arrival(origin, x, board, z)
 		age := (p-touched)*cue.duration
 		if z > board+0.5 || age < 0 || age > 0.35 { continue }
-		cell := grid.Position{cue.event.from_position.x, clamp(int(z), 0, room.level_data.tiles.height-1)}
+		cell := grid.Position{x = cue.event.from_position.x, y = clamp(int(z), 0, room.level_data.tiles.height-1)}
 		floor := marley_floor_height(renderer, cell)
 		ring := 0.2+age*2.6
 		marley_glow(x, floor+0.014, z, ring, {255, 230, 170, 255}, 0.8*(1-age/0.35))
@@ -459,7 +459,7 @@ draw_marley_bomb :: proc(renderer: ^Renderer, room: ^game.Room, cue: ^Presentati
 	rl.EndBlendMode()
 	rlgl.DrawRenderBatchActive()
 	// A soft shadow on the floor under it, smaller the higher it is.
-	floor_cell := grid.Position{cue.event.from_position.x, clamp(int(at.z), 0, room.level_data.tiles.height-1)}
+	floor_cell := grid.Position{x = cue.event.from_position.x, y = clamp(int(at.z), 0, room.level_data.tiles.height-1)}
 	if at.z > 0 && at.z < board {
 		lift := clamp(at.y/(MARLEY_BOUNCE_HEIGHT+0.3), f32(0), f32(1))
 		radius := 0.34*(1-0.45*lift)
@@ -497,9 +497,9 @@ marley_figure_center :: proc(renderer: ^Renderer, room: ^game.Room) -> rl.Vector
 	x := clamp(m.figure_x, 0.6, f32(room.level_data.tiles.width)-0.6)
 	column := int(x)
 	at := rl.Vector3{x, 1.58+size*0.5-0.15+0.3, 0.5}
-	if !tactical_cell_on_screen(renderer, {column, 0}) {
+	if !tactical_cell_on_screen(renderer, {x = column, y = 0}) {
 		for row in 1..<room.level_data.tiles.height {
-			if tactical_cell_on_screen(renderer, {column, row}) {
+			if tactical_cell_on_screen(renderer, {x = column, y = row}) {
 				at = {x, size*0.5+0.1+0.3, f32(row)+0.5}
 				break
 			}

@@ -15,15 +15,15 @@ run_tactical_voxel_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer
 	defer level.destroy(&data)
 	player, ok := game.create_player({max_health = 22, attack = 2, defense = 1})
 	if !ok || !game.configure_tactical(&player, game.DEFAULT_TACTICAL_CONFIG) { return false }
-	enemies := [?]game.Enemy_Spawn{{position = {6, 2}, health = 12, attack = 2, archetype = .Bomber}}
-	objects := [?]game.Grid_Object_Spawn{{kind = .Ice_Block, position = {3, 4}}, {kind = .Barrel, position = {5, 4}},
-		{kind = .Fire, position = {5, 3}}}
-	traps := [?]game.Trap_Spawn{{position = {4, 5}, damage = 2}}
-	covers := [?]grid.Position{{3, 6}}
+	enemies := [?]game.Enemy_Spawn{{position = {x = 6, y = 2}, health = 12, attack = 2, archetype = .Bomber}}
+	objects := [?]game.Grid_Object_Spawn{{kind = .Ice_Block, position = {x = 3, y = 4}}, {kind = .Barrel, position = {x = 5, y = 4}},
+		{kind = .Fire, position = {x = 5, y = 3}}}
+	traps := [?]game.Trap_Spawn{{position = {x = 4, y = 5}, damage = 2}}
+	covers := [?]grid.Position{{x = 3, y = 6}}
 	room, created := game.create_room(&data, &player, {enemies = enemies[:], objects = objects[:], traps = traps[:], obstacles = covers[:]})
 	if !created { return false }
 	defer game.destroy_room(&room)
-	if !game.spawn_bomb(&room, game.enemy_entity(1), {5, 5}, room.recent_events) { return false }
+	if !game.spawn_bomb(&room, game.enemy_entity(1), {x = 5, y = 5}, room.recent_events) { return false }
 	game.plan_enemy_intents(&room)
 	renderer.timeline = {}
 	render.reset_tactical_orbit(&renderer.tactical.world_orbit)

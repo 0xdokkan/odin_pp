@@ -6,26 +6,27 @@ import view "../engine/view"
 
 @(test)
 test_tactical_full_hand_is_readable_clickable_and_separate_from_grid :: proc(t: ^testing.T) {
-	renderer := Renderer{canvas_width = 960, canvas_height = 540}
+	renderer := new_clone(Renderer{canvas_width = 960, canvas_height = 540})
+	defer free(renderer)
 	for count in 1..=game.MAX_HAND_CARDS {
 		deck := game.Deck_State{combat_active = true, hand_count = count}
 		for index in 0..<count { deck.hand[index].id = u32(index+1) }
 		previous_right: f32
 		for index in 0..<count {
-			bounds := hand_card_bounds(&renderer, index, count)
+			bounds := hand_card_bounds(renderer, index, count)
 			testing.expect(t, bounds.x >= previous_right && bounds.x+bounds.width <= renderer.canvas_width)
 			testing.expect(t, bounds.y > renderer.canvas_height-TACTICAL_HAND_HEIGHT && bounds.y+bounds.height <= renderer.canvas_height)
 			previous_right = bounds.x+bounds.width
 			for point in ([?]view.Vec2{{bounds.x+2, bounds.y+2}, {bounds.x+bounds.width-2, bounds.y+bounds.height-2}}) {
-				actual, found := hand_card_at_point(&renderer, &deck, point, deck.hand[index].id)
+				actual, found := hand_card_at_point(renderer, &deck, point, deck.hand[index].id)
 				testing.expect(t, found && actual == index)
-				testing.expect(t, !card_drop_area_contains(&renderer, point))
+				testing.expect(t, !card_drop_area_contains(renderer, point))
 			}
 		}
 	}
-	map_button := tactical_map_button_bounds(&renderer)
-	testing.expect(t, !card_drop_area_contains(&renderer, {map_button.x+10, map_button.y+10}))
-	testing.expect(t, card_drop_area_contains(&renderer, {480, 240}))
+	map_button := tactical_map_button_bounds(renderer)
+	testing.expect(t, !card_drop_area_contains(renderer, {map_button.x+10, map_button.y+10}))
+	testing.expect(t, card_drop_area_contains(renderer, {480, 240}))
 }
 
 // The game's hand never rises nor overlaps. PROVA MECCANICHE's ten cards keep
@@ -37,17 +38,18 @@ test_tactical_full_hand_is_readable_clickable_and_separate_from_grid :: proc(t: 
 // rose.
 @(test)
 test_tactical_hand_of_ten_overlaps_at_a_full_hands_width :: proc(t: ^testing.T) {
-	renderer := Renderer{canvas_width = 960, canvas_height = 540}
+	renderer := new_clone(Renderer{canvas_width = 960, canvas_height = 540})
+	defer free(renderer)
 	full := game.MAX_HAND_CARDS
-	first := tactical_hand_card_bounds(&renderer, 0, full)
-	last := tactical_hand_card_bounds(&renderer, full-1, full)
+	first := tactical_hand_card_bounds(renderer, 0, full)
+	last := tactical_hand_card_bounds(renderer, full-1, full)
 	for count in 1..=full {
 		testing.expect(t, !tactical_hand_overlaps(count))
 		for index in 0..<count {
-			bounds := tactical_hand_card_bounds(&renderer, index, count)
-			testing.expect_value(t, tactical_hand_raised_card_bounds(&renderer, index, count), bounds)
-			testing.expect_value(t, hand_raised_card_bounds(&renderer, index, count), bounds)
-			testing.expect_value(t, tactical_hand_card_visible_width(&renderer, index, count), bounds.width)
+			bounds := tactical_hand_card_bounds(renderer, index, count)
+			testing.expect_value(t, tactical_hand_raised_card_bounds(renderer, index, count), bounds)
+			testing.expect_value(t, hand_raised_card_bounds(renderer, index, count), bounds)
+			testing.expect_value(t, tactical_hand_card_visible_width(renderer, index, count), bounds.width)
 		}
 	}
 	count := game.MAX_HAND_CAPACITY
@@ -55,51 +57,51 @@ test_tactical_hand_of_ten_overlaps_at_a_full_hands_width :: proc(t: ^testing.T) 
 	deck := game.Deck_State{combat_active = true, hand_count = count}
 	for index in 0..<count { deck.hand[index].id = u32(index+1) }
 	for index in 0..<count {
-		bounds := tactical_hand_card_bounds(&renderer, index, count)
-		shown := tactical_hand_card_visible_width(&renderer, index, count)
+		bounds := tactical_hand_card_bounds(renderer, index, count)
+		shown := tactical_hand_card_visible_width(renderer, index, count)
 		testing.expect(t, bounds.width == first.width && bounds.height == first.height && bounds.y == first.y)
 		testing.expect(t, shown >= bounds.width*0.8 && (shown < bounds.width) == (index < count-1))
 		// Resting, the card shows where the next one does not cover it.
-		found_index, found := hand_card_at_point(&renderer, &deck, {bounds.x+shown*0.5, bounds.y+bounds.height*0.5})
+		found_index, found := hand_card_at_point(renderer, &deck, {bounds.x+shown*0.5, bounds.y+bounds.height*0.5})
 		testing.expect(t, found && found_index == index)
 		// Raised, it rises whole over the others, inside the canvas.
-		raised := tactical_hand_raised_card_bounds(&renderer, index, count)
+		raised := tactical_hand_raised_card_bounds(renderer, index, count)
 		testing.expect(t, raised.y == bounds.y-TACTICAL_HAND_RAISE && raised.x == bounds.x && raised.width == bounds.width)
 		testing.expect(t, raised.x >= 0 && raised.x+raised.width <= renderer.canvas_width && raised.y+raised.height <= renderer.canvas_height)
 		for point in ([3]view.Vec2{{raised.x+raised.width-3, raised.y+2}, {bounds.x+bounds.width-3, bounds.y+bounds.height-2},
 			{bounds.x+3, bounds.y+bounds.height-2}}) {
-			found_index, found = hand_card_at_point(&renderer, &deck, point, deck.hand[index].id)
+			found_index, found = hand_card_at_point(renderer, &deck, point, deck.hand[index].id)
 			testing.expect(t, found && found_index == index)
 		}
 	}
-	testing.expect_value(t, tactical_hand_card_bounds(&renderer, 0, count).x, TACTICAL_HAND_OVERLAP_GUTTER)
-	right := tactical_hand_card_bounds(&renderer, count-1, count)
+	testing.expect_value(t, tactical_hand_card_bounds(renderer, 0, count).x, TACTICAL_HAND_OVERLAP_GUTTER)
+	right := tactical_hand_card_bounds(renderer, count-1, count)
 	testing.expect_value(t, right.x+right.width, renderer.canvas_width-TACTICAL_HAND_OVERLAP_GUTTER)
 	testing.expect(t, first.x > TACTICAL_HAND_OVERLAP_GUTTER && last.x+last.width < renderer.canvas_width-TACTICAL_HAND_OVERLAP_GUTTER)
 	// Measured: each card as far on as the ones before it show.
 	renderer.tactical.hand_reveal = {shown = {90, 100, 86, 95, 92, 88, 97, 86, 91, first.width}, count = count}
 	x := TACTICAL_HAND_OVERLAP_GUTTER
 	for index in 0..<count {
-		bounds := tactical_hand_card_bounds(&renderer, index, count)
+		bounds := tactical_hand_card_bounds(renderer, index, count)
 		testing.expect(t, abs(bounds.x-x) < 1e-3 && bounds.width == first.width)
-		testing.expect(t, abs(tactical_hand_card_visible_width(&renderer, index, count)-renderer.tactical.hand_reveal.shown[index]) < 1e-3)
+		testing.expect(t, abs(tactical_hand_card_visible_width(renderer, index, count)-renderer.tactical.hand_reveal.shown[index]) < 1e-3)
 		x += renderer.tactical.hand_reveal.shown[index]
 	}
 	// For another hand than it was measured for: evenly again.
 	renderer.tactical.hand_reveal.count = count-1
-	testing.expect(t, abs(tactical_hand_card_visible_width(&renderer, 0, count)-tactical_hand_card_visible_width(&renderer, 4, count)) < 1e-3)
+	testing.expect(t, abs(tactical_hand_card_visible_width(renderer, 0, count)-tactical_hand_card_visible_width(renderer, 4, count)) < 1e-3)
 	// Measured from the hand (here with no font: every card needs its icon
 	// only), the spare width shared out: the last card where the hand ends;
 	// the game's hand is never measured.
 	for &card in deck.hand[:count] { card.definition_id = .Strike }
-	update_tactical_hand_reveal(&renderer, &deck)
+	update_tactical_hand_reveal(renderer, &deck)
 	testing.expect_value(t, renderer.tactical.hand_reveal.count, count)
 	for shown in renderer.tactical.hand_reveal.shown[:count-1] { testing.expect(t, shown >= TACTICAL_HAND_REVEAL_ICON) }
-	right = tactical_hand_card_bounds(&renderer, count-1, count)
+	right = tactical_hand_card_bounds(renderer, count-1, count)
 	testing.expect(t, abs(right.x+right.width-(renderer.canvas_width-TACTICAL_HAND_OVERLAP_GUTTER)) < 1e-3)
 	eight := deck
 	eight.hand_count = full
-	update_tactical_hand_reveal(&renderer, &eight)
+	update_tactical_hand_reveal(renderer, &eight)
 	testing.expect_value(t, renderer.tactical.hand_reveal.count, 0)
 	// The card that rises: the one under the mouse, the one aimed, the one
 	// chosen; never one in the game's hand.
@@ -131,13 +133,14 @@ test_hand_input_uses_the_visible_deck_and_phase_while_timeline_is_busy :: proc(t
 	game.record_event(&events, {
 		kind = .Moved,
 		target = game.PLAYER_ENTITY,
-		from_position = {1, 1},
-		to_position = {2, 1},
+		from_position = {x = 1, y = 1},
+		to_position = {x = 2, y = 1},
 	})
-	renderer: Renderer
-	testing.expect(t, begin_renderer_event_timeline(&renderer, before, &events))
+	renderer := new(Renderer)
+	defer free(renderer)
+	testing.expect(t, begin_renderer_event_timeline(renderer, before, &events))
 
-	visible_deck, visible_phase := renderer_hand_deck(&renderer, &room)
+	visible_deck, visible_phase := renderer_hand_deck(renderer, &room)
 
 	testing.expect_value(t, visible_phase, game.Room_Phase.Combat)
 	testing.expect_value(t, visible_deck.hand[0].id, u32(11))
@@ -188,23 +191,24 @@ test_m4_card_labels_and_timeline_verbs_cover_new_zone_feedback :: proc(t: ^testi
 
 @(test)
 test_refocus_button_hitbox_stays_in_the_hud_and_out_of_the_card_drop_area :: proc(t: ^testing.T) {
-	renderer := Renderer{canvas_width = 960, canvas_height = 540}
+	renderer := new_clone(Renderer{canvas_width = 960, canvas_height = 540})
+	defer free(renderer)
 	renderer.tactical.refocus_enabled = true
-	bounds := refocus_button_bounds(&renderer)
+	bounds := refocus_button_bounds(renderer)
 	testing.expect(t, bounds.x >= 0 && bounds.x+bounds.width <= renderer.canvas_width)
 	testing.expect(t, bounds.y >= 0 && bounds.y+bounds.height <= TACTICAL_HUD_HEIGHT)
 	center := view.Vec2{bounds.x+bounds.width*0.5, bounds.y+bounds.height*0.5}
-	testing.expect(t, refocus_button_at_point(&renderer, center))
-	testing.expect(t, !refocus_button_at_point(&renderer, {bounds.x-1, center.y}))
-	testing.expect(t, !card_drop_area_contains(&renderer, center))
-	testing.expect(t, refocus_button_is_enabled(&renderer))
+	testing.expect(t, refocus_button_at_point(renderer, center))
+	testing.expect(t, !refocus_button_at_point(renderer, {bounds.x-1, center.y}))
+	testing.expect(t, !card_drop_area_contains(renderer, center))
+	testing.expect(t, refocus_button_is_enabled(renderer))
 
 	renderer.timeline.count = 1
 	renderer.timeline.head = 0
-	testing.expect(t, renderer_timeline_is_busy(&renderer))
-	testing.expect(t, !refocus_button_is_enabled(&renderer))
+	testing.expect(t, renderer_timeline_is_busy(renderer))
+	testing.expect(t, !refocus_button_is_enabled(renderer))
 	marker := view.Vec2{480, 300}
-	testing.expect(t, card_drop_area_contains(&renderer, marker))
+	testing.expect(t, card_drop_area_contains(renderer, marker))
 }
 
 @(test)

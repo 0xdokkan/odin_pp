@@ -242,7 +242,7 @@ step_tactical_controller :: proc(
 				if pressed { command.kind = .Dodge; command.direction = keys[index]; break }
 			}
 		}
-		offsets := [?]grid.Position{{-1, -1}, {1, -1}, {-1, 1}, {1, 1}}
+		offsets := [?]grid.Position{{x = -1, y = -1}, {x = 1, y = -1}, {x = -1, y = 1}, {x = 1, y = 1}}
 		for pressed, index in input.diagonals {
 			if !fps && command.kind == .None && pressed { command.kind = .Begin_Diagonal; command.offset = offsets[index]; break }
 		}

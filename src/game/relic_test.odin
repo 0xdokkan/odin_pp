@@ -58,7 +58,7 @@ test_relic_guard_entry_persists_inventory_resets_usage_and_cannot_repeat :: proc
 	defer level.destroy(&level_data)
 	player := create_test_player(t)
 	testing.expect(t, acquire_relic(&player, .Guard_Sigil))
-	spawns := [?]Enemy_Spawn{{position = {5, 3}, health = 40, attack = 1}}
+	spawns := [?]Enemy_Spawn{{position = {x = 5, y = 3}, health = 40, attack = 1}}
 	room, ok := create_room(&level_data, &player, {enemies = spawns[:]})
 	testing.expect(t, ok)
 	shield, found := status_for_entity(&room, PLAYER_ENTITY, .Shield)
@@ -96,9 +96,9 @@ test_relic_shove_ignores_blocked_push_then_shields_successful_barrel_push :: pro
 	testing.expect(t, acquire_relic(&player, .Iron_Knuckle))
 	definitions := [?]Card_Id{.Shove, .Shove, .Guard}
 	configure_test_deck(t, &player, definitions[:], {hand_size = 3, max_energy = 3, energy_regen_per_pulse = 1})
-	spawns := [?]Enemy_Spawn{{position = {5, 3}, health = 40, attack = 1}}
-	objects := [?]Grid_Object_Spawn{{kind = .Barrel, position = {2, 1}}}
-	obstacles := [?]grid.Position{{3, 1}}
+	spawns := [?]Enemy_Spawn{{position = {x = 5, y = 3}, health = 40, attack = 1}}
+	objects := [?]Grid_Object_Spawn{{kind = .Barrel, position = {x = 2, y = 1}}}
+	obstacles := [?]grid.Position{{x = 3, y = 1}}
 	room, ok := create_room(&level_data, &player, {enemies = spawns[:], objects = objects[:], obstacles = obstacles[:]})
 	testing.expect(t, ok)
 	defer destroy_room(&room)
@@ -106,14 +106,14 @@ test_relic_shove_ignores_blocked_push_then_shields_successful_barrel_push :: pro
 	play := play_card(&room, id, entity_target(object_entity(room.objects[0].id)))
 	testing.expect(t, card_play_was_committed(play.result))
 	testing.expect(t, !player.relics.combat.push_used)
-	testing.expect_value(t, room.objects[0].position, grid.Position{2, 1})
+	testing.expect_value(t, room.objects[0].position, grid.Position{x = 2, y = 1})
 	drain_tactical_test_pulse(t, &room)
 	clear(&room.obstacles)
 	id = force_card_definition_into_hand(t, &player.deck, .Shove)
 	play = play_card(&room, id, entity_target(object_entity(room.objects[0].id)))
 	testing.expect(t, card_play_was_committed(play.result))
 	testing.expect(t, player.relics.combat.push_used)
-	testing.expect_value(t, room.objects[0].position, grid.Position{3, 1})
+	testing.expect_value(t, room.objects[0].position, grid.Position{x = 3, y = 1})
 	testing.expect_value(t, play.action_report.statuses_applied, 1)
 	shield, found := status_for_entity(&room, PLAYER_ENTITY, .Shield)
 	testing.expect(t, found && shield.potency == 1 && shield.remaining_pulses == 2)
@@ -126,21 +126,21 @@ test_relic_push_limit_uses_authoritative_pulse_and_ordinary_movement_events :: p
 	defer level.destroy(&level_data)
 	player := create_test_player(t)
 	testing.expect(t, acquire_relic(&player, .Iron_Knuckle))
-	spawns := [?]Enemy_Spawn{{position = {2, 1}, health = 40, attack = 1}}
+	spawns := [?]Enemy_Spawn{{position = {x = 2, y = 1}, health = 40, attack = 1}}
 	room, ok := create_room(&level_data, &player, {enemies = spawns[:]})
 	testing.expect(t, ok)
 	defer destroy_room(&room)
 	action := make_action(.Ability, PLAYER_ENTITY)
-	testing.expect(t, add_effect(&action, move_effect(enemy_entity(1), {3, 1})))
+	testing.expect(t, add_effect(&action, move_effect(enemy_entity(1), {x = 3, y = 1})))
 	report := resolve_action(&room, &action)
 	testing.expect_value(t, report.statuses_applied, 1)
-	action.effects[0].destination = {4, 1}
+	action.effects[0].destination = {x = 4, y = 1}
 	report = resolve_action(&room, &action)
 	testing.expect_value(t, report.statuses_applied, 0)
 	shield, _ := status_for_entity(&room, PLAYER_ENTITY, .Shield)
 	testing.expect_value(t, shield.potency, i32(1))
 	room.pulse_count += 1
-	action.effects[0].destination = {5, 1}
+	action.effects[0].destination = {x = 5, y = 1}
 	report = resolve_action(&room, &action)
 	testing.expect_value(t, report.statuses_applied, 1)
 	testing.expect_value(t, shield.potency, i32(2))
@@ -155,23 +155,23 @@ test_relic_swift_soles_rejects_bad_target_and_refunds_only_first_movement_card :
 	testing.expect(t, acquire_relic(&player, .Swift_Soles))
 	definitions := [?]Card_Id{.Dash, .Dash, .Guard}
 	configure_test_deck(t, &player, definitions[:], {hand_size = 3, max_energy = 5, energy_regen_per_pulse = 0})
-	spawns := [?]Enemy_Spawn{{position = {5, 3}, health = 40, attack = 1}}
+	spawns := [?]Enemy_Spawn{{position = {x = 5, y = 3}, health = 40, attack = 1}}
 	room, ok := create_room(&level_data, &player, {enemies = spawns[:]})
 	testing.expect(t, ok)
 	defer destroy_room(&room)
 	id := force_card_definition_into_hand(t, &player.deck, .Dash)
 	before := player.relics
-	bad := play_card(&room, id, cell_target({0, 0}))
+	bad := play_card(&room, id, cell_target({x = 0, y = 0}))
 	testing.expect(t, !card_play_was_committed(bad.result))
 	testing.expect_value(t, player.relics, before)
-	play := play_card(&room, id, cell_target({3, 1}))
+	play := play_card(&room, id, cell_target({x = 3, y = 1}))
 	testing.expect_value(t, play.result, Card_Play_Result.Played)
 	testing.expect_value(t, player.deck.energy, i32(5))
 	testing.expect_value(t, relic_test_events(room.recent_events, .Energy_Gained), 1)
 	testing.expect(t, player.relics.combat.movement_used)
 	drain_tactical_test_pulse(t, &room)
 	id = force_card_definition_into_hand(t, &player.deck, .Dash)
-	play = play_card(&room, id, cell_target({1, 1}))
+	play = play_card(&room, id, cell_target({x = 1, y = 1}))
 	testing.expect_value(t, play.result, Card_Play_Result.Played)
 	testing.expect_value(t, player.deck.energy, i32(4))
 	testing.expect_value(t, relic_test_events(room.recent_events, .Energy_Gained), 0)
@@ -185,7 +185,7 @@ test_relic_ash_bookmark_draws_once_after_exhaust_zone_commit :: proc(t: ^testing
 	testing.expect(t, acquire_relic(&player, .Ash_Bookmark))
 	definitions := [?]Card_Id{.Battle_Focus, .Battle_Focus, .Strike, .Guard, .Arc_Bolt, .Dash, .Thorn_Coat, .Shove, .Guard, .Strike}
 	configure_test_deck(t, &player, definitions[:], {hand_size = 3, max_energy = 6, energy_regen_per_pulse = 0})
-	spawns := [?]Enemy_Spawn{{position = {5, 3}, health = 40, attack = 1}}
+	spawns := [?]Enemy_Spawn{{position = {x = 5, y = 3}, health = 40, attack = 1}}
 	room, ok := create_room(&level_data, &player, {enemies = spawns[:]})
 	testing.expect(t, ok)
 	defer destroy_room(&room)
@@ -225,7 +225,7 @@ test_relic_ash_bookmark_refocus_ethereal_grants_card_beyond_normal_refill :: pro
 	testing.expect(t, acquire_relic(&player, .Ash_Bookmark))
 	definitions := [?]Card_Id{.Battle_Focus, .Strike, .Guard, .Arc_Bolt, .Dash, .Thorn_Coat, .Shove, .Guard}
 	configure_test_deck(t, &player, definitions[:], {hand_size = 3, max_energy = 3, energy_regen_per_pulse = 1})
-	spawns := [?]Enemy_Spawn{{position = {5, 3}, health = 40, attack = 1}}
+	spawns := [?]Enemy_Spawn{{position = {x = 5, y = 3}, health = 40, attack = 1}}
 	room, ok := create_room(&level_data, &player, {enemies = spawns[:]})
 	testing.expect(t, ok)
 	defer destroy_room(&room)
@@ -252,13 +252,13 @@ test_relic_movement_death_does_not_refund_energy_or_fire_other_bonuses :: proc(t
 	player.health = 1
 	definitions := [?]Card_Id{.Dash}
 	configure_test_deck(t, &player, definitions[:], {hand_size = 1, max_energy = 3, energy_regen_per_pulse = 1})
-	spawns := [?]Enemy_Spawn{{position = {5, 3}, health = 40, attack = 1}}
-	traps := [?]Trap_Spawn{{position = {2, 1}, damage = 5}}
+	spawns := [?]Enemy_Spawn{{position = {x = 5, y = 3}, health = 40, attack = 1}}
+	traps := [?]Trap_Spawn{{position = {x = 2, y = 1}, damage = 5}}
 	room, ok := create_room(&level_data, &player, {enemies = spawns[:], traps = traps[:]})
 	testing.expect(t, ok)
 	defer destroy_room(&room)
 	id := force_card_definition_into_hand(t, &player.deck, .Dash)
-	play := play_card(&room, id, cell_target({3, 1}))
+	play := play_card(&room, id, cell_target({x = 3, y = 1}))
 	testing.expect_value(t, play.result, Card_Play_Result.Player_Defeated)
 	testing.expect(t, !player.relics.combat.movement_used)
 	testing.expect_value(t, relic_test_events(room.recent_events, .Energy_Gained), 0)
@@ -274,11 +274,11 @@ test_relic_venom_vial_boosts_one_enemy_application_and_preserves_rejection :: pr
 	testing.expect(t, acquire_relic(&player, .Venom_Vial))
 	definitions := [?]Card_Id{.Toxic_Wave}
 	configure_test_deck(t, &player, definitions[:], {hand_size = 1, max_energy = 3, energy_regen_per_pulse = 1})
-	spawns := [?]Enemy_Spawn{{position = {5, 3}, health = 40, attack = 1}, {position = {4, 3}, health = 40, attack = 1}}
+	spawns := [?]Enemy_Spawn{{position = {x = 5, y = 3}, health = 40, attack = 1}, {position = {x = 4, y = 3}, health = 40, attack = 1}}
 	room, ok := create_room(&level_data, &player, {enemies = spawns[:]})
 	testing.expect(t, ok)
 	defer destroy_room(&room)
-	player.position = {3, 2}
+	player.position = {x = 3, y = 2}
 	id := force_card_definition_into_hand(t, &player.deck, .Toxic_Wave)
 	player.deck.energy = 0
 	bad := play_card(&room, id, {})
@@ -304,7 +304,7 @@ test_relic_mending_heals_automatically_after_last_kill_exactly_once :: proc(t: ^
 	player := create_test_player(t)
 	testing.expect(t, acquire_relic(&player, .Mending_Thread))
 	player.health = 5
-	spawns := [?]Enemy_Spawn{{position = {2, 1}, health = 2, attack = 1}}
+	spawns := [?]Enemy_Spawn{{position = {x = 2, y = 1}, health = 2, attack = 1}}
 	room, ok := create_room(&level_data, &player, {enemies = spawns[:]})
 	testing.expect(t, ok)
 	defer destroy_room(&room)
@@ -325,7 +325,7 @@ test_relic_mending_cannot_revive_simultaneous_defeat_or_reward_empty_rooms :: pr
 	player := create_test_player(t)
 	testing.expect(t, acquire_relic(&player, .Mending_Thread))
 	player.health = 2
-	spawns := [?]Enemy_Spawn{{position = {2, 1}, health = 2, attack = 1}}
+	spawns := [?]Enemy_Spawn{{position = {x = 2, y = 1}, health = 2, attack = 1}}
 	room, ok := create_room(&level_data, &player, {enemies = spawns[:]})
 	testing.expect(t, ok)
 	action := make_action(.Trigger, SYSTEM_ENTITY)

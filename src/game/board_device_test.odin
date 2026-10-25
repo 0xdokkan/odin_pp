@@ -8,10 +8,10 @@ board_device_test_room :: proc(t: ^testing.T, data: ^level.Level, player: ^Playe
 	data^ = spell_test_level(t)
 	player^ = spell_test_player(t, .Shock_Floor)
 	spawns := [?]Enemy_Spawn{
-		{position = {3, 2}, health = 30, attack = 1},
-		{position = {4, 2}, health = 30, attack = 1},
-		{position = {4, 3}, health = 30, attack = 1},
-		{position = {9, 3}, health = 30, attack = 1},
+		{position = {x = 3, y = 2}, health = 30, attack = 1},
+		{position = {x = 4, y = 2}, health = 30, attack = 1},
+		{position = {x = 4, y = 3}, health = 30, attack = 1},
+		{position = {x = 9, y = 3}, health = 30, attack = 1},
 	}
 	room, ok := create_room(data, player, {enemies = spawns[:]})
 	testing.expect(t, ok)
@@ -28,14 +28,14 @@ test_m8_floor_targeting_never_rolls_and_committed_deploy_uses_one_d4 :: proc(t: 
 	card := player.deck.hand[0]
 	before := player.dice
 	for _ in 0..<5 {
-		action, err := compile_card_action(&room, card, cell_target({3, 2}))
+		action, err := compile_card_action(&room, card, cell_target({x = 3, y = 2}))
 		testing.expect_value(t, err, Card_Compile_Error.None)
 		testing.expect_value(t, action.effects[0].kind, Effect_Kind.Deploy_Device)
 		testing.expect_value(t, player.dice, before)
 	}
-	action, err := compile_card_action(&room, card, cell_target({3, 2}))
+	action, err := compile_card_action(&room, card, cell_target({x = 3, y = 2}))
 	testing.expect_value(t, err, Card_Compile_Error.None)
-	report := resolve_played_card_action(&room, card, cell_target({3, 2}), &action)
+	report := resolve_played_card_action(&room, card, cell_target({x = 3, y = 2}), &action)
 	testing.expect(t, report.accepted)
 	testing.expect_value(t, player.dice.roll_count, before.roll_count+1)
 	testing.expect_value(t, len(room.objects), 1)
@@ -64,15 +64,15 @@ test_m8_d20_floor_on_the_tick_keeps_every_charge :: proc(t: ^testing.T) {
 		if ok && roll.total == 20 { player.dice, found = candidate, true; break }
 	}
 	testing.expect(t, found)
-	spawns := [?]Enemy_Spawn{{position = {9, 3}, health = 30, attack = 1}}
+	spawns := [?]Enemy_Spawn{{position = {x = 9, y = 3}, health = 30, attack = 1}}
 	room, ok := create_room(&data, &player, {enemies = spawns[:]})
 	testing.expect(t, ok)
 	defer destroy_room(&room)
 	player.tactical.critical_card = true
 	card := player.deck.hand[0]
-	action, err := compile_card_action(&room, card, cell_target({3, 2}))
+	action, err := compile_card_action(&room, card, cell_target({x = 3, y = 2}))
 	testing.expect_value(t, err, Card_Compile_Error.None)
-	report := resolve_played_card_action(&room, card, cell_target({3, 2}), &action)
+	report := resolve_played_card_action(&room, card, cell_target({x = 3, y = 2}), &action)
 	testing.expect(t, report.accepted)
 	testing.expect_value(t, len(room.objects), 1)
 	if len(room.objects) == 1 {
@@ -84,7 +84,7 @@ test_m8_d20_floor_on_the_tick_keeps_every_charge :: proc(t: ^testing.T) {
 		if event.kind == .Dice_Rolled { testing.expect_value(t, event.dice_roll, Dice_Roll{faces = {20, 0, 0}, total = 20, sides = 20, count = 1}) }
 	}
 	log: Event_Log
-	testing.expect(t, !deploy_board_device(&room, .Shock_Floor, {5, 2}, 1, TACTICAL_SHOCK_FLOOR_MAX_CHARGES+1, &log))
+	testing.expect(t, !deploy_board_device(&room, .Shock_Floor, {x = 5, y = 2}, 1, TACTICAL_SHOCK_FLOOR_MAX_CHARGES+1, &log))
 	player.tactical.critical_card = false
 }
 
@@ -96,7 +96,7 @@ test_m8_floor_d4_limits_targets_and_repeated_beats_then_expires :: proc(t: ^test
 	defer level.destroy(&data)
 	defer destroy_room(&room)
 	log: Event_Log
-	testing.expect(t, deploy_board_device(&room, .Shock_Floor, {3, 2}, 1, 2, &log))
+	testing.expect(t, deploy_board_device(&room, .Shock_Floor, {x = 3, y = 2}, 1, 2, &log))
 	testing.expect(t, !board_devices_can_activate(&room))
 	testing.expect(t, !activate_board_devices(&room))
 	for tick in 1..=2 {
@@ -122,9 +122,9 @@ test_m8_passive_floor_waits_indefinitely_and_player_cannot_trigger_or_activate_i
 	defer level.destroy(&data)
 	defer destroy_room(&room)
 	log: Event_Log
-	testing.expect(t, deploy_board_device(&room, .Shock_Floor, {6, 2}, 1, 4, &log))
+	testing.expect(t, deploy_board_device(&room, .Shock_Floor, {x = 6, y = 2}, 1, 4, &log))
 	action := make_action(.Ability, PLAYER_ENTITY)
-	testing.expect(t, add_effect(&action, move_effect(PLAYER_ENTITY, {6, 1})))
+	testing.expect(t, add_effect(&action, move_effect(PLAYER_ENTITY, {x = 6, y = 1})))
 	report := resolve_action(&room, &action)
 	testing.expect(t, report.accepted)
 	testing.expect_value(t, spell_test_event_count(&report.events, .Hazard_Triggered), 0)
@@ -149,9 +149,9 @@ test_m8_passive_floor_trips_from_push_then_finishes_committed_sequence_after_ene
 	defer level.destroy(&data)
 	defer destroy_room(&room)
 	log: Event_Log
-	testing.expect(t, deploy_board_device(&room, .Shock_Floor, {6, 2}, 2, 2, &log))
+	testing.expect(t, deploy_board_device(&room, .Shock_Floor, {x = 6, y = 2}, 2, 2, &log))
 	action := make_action(.Ability, PLAYER_ENTITY)
-	testing.expect(t, add_effect(&action, move_effect(enemy_entity(4), {7, 3})))
+	testing.expect(t, add_effect(&action, move_effect(enemy_entity(4), {x = 7, y = 3})))
 	report := resolve_action(&room, &action)
 	testing.expect(t, report.accepted)
 	testing.expect(t, room.objects[0].device_armed)
@@ -163,7 +163,7 @@ test_m8_passive_floor_trips_from_push_then_finishes_committed_sequence_after_ene
 	testing.expect_value(t, room.objects[0].device_charges, i32(1))
 	testing.expect_value(t, spell_test_event_count(&pulse.events, .Hazard_Triggered), 0)
 	action = make_action(.Ability, PLAYER_ENTITY)
-	testing.expect(t, add_effect(&action, move_effect(enemy_entity(4), {9, 3})))
+	testing.expect(t, add_effect(&action, move_effect(enemy_entity(4), {x = 9, y = 3})))
 	report = resolve_action(&room, &action)
 	testing.expect(t, report.accepted)
 	pulse = {}
@@ -177,16 +177,16 @@ test_m8_passive_floor_trips_from_push_then_finishes_committed_sequence_after_ene
 @(test)
 test_m8_passive_floor_detects_traversed_cells_but_teleport_only_its_landing :: proc(t: ^testing.T) {
 	for fixture in ([?]struct {mode: Movement_Mode, destination: grid.Position, triggered: bool}{
-		{.Traverse, {3, 1}, true}, {.Teleport, {3, 1}, false}, {.Teleport, {6, 1}, true},
+		{.Traverse, {x = 3, y = 1}, true}, {.Teleport, {x = 3, y = 1}, false}, {.Teleport, {x = 6, y = 1}, true},
 	}) {
 		data: level.Level
 		player: Player
 		room := board_device_test_room(t, &data, &player)
 		defer level.destroy(&data)
 		defer destroy_room(&room)
-		room.enemies[3].position = {9, 1}
+		room.enemies[3].position = {x = 9, y = 1}
 		log: Event_Log
-		testing.expect(t, deploy_board_device(&room, .Shock_Floor, {6, 1}, 1, 3, &log))
+		testing.expect(t, deploy_board_device(&room, .Shock_Floor, {x = 6, y = 1}, 1, 3, &log))
 		action := make_action(.Trigger, SYSTEM_ENTITY)
 		testing.expect(t, add_effect(&action, move_effect(enemy_entity(4), fixture.destination, fixture.mode)))
 		report := resolve_action(&room, &action)
@@ -201,12 +201,12 @@ test_m8_passive_floor_detects_traversed_cells_but_teleport_only_its_landing :: p
 test_m8_passive_floor_enemy_clock_triggers_without_player_action_and_respects_cast_freeze :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {7, 4}, health = 30, attack = 1}}
+	spawns := [?]Enemy_Spawn{{position = {x = 7, y = 4}, health = 30, attack = 1}}
 	room := create_enemy_rework_room(t, &data, &player, spawns[:])
 	defer level.destroy(&data)
 	defer destroy_room(&room)
 	log: Event_Log
-	testing.expect(t, deploy_board_device(&room, .Shock_Floor, {5, 4}, 1, 2, &log))
+	testing.expect(t, deploy_board_device(&room, .Shock_Floor, {x = 5, y = 4}, 1, 2, &log))
 	before, position := player.tactical, player.position
 	testing.expect(t, !tactical_tick(&room, 4, false, true))
 	testing.expect_value(t, player.tactical, before)
@@ -234,9 +234,9 @@ test_m8_tesla_activation_never_arms_unoccupied_passive_floors :: proc(t: ^testin
 	defer level.destroy(&data)
 	defer destroy_room(&room)
 	log: Event_Log
-	testing.expect(t, deploy_board_device(&room, .Shock_Floor, {6, 2}, 1, 4, &log))
-	testing.expect(t, deploy_board_device(&room, .Tesla_Coil, {2, 4}, 8, 0, &log))
-	testing.expect(t, deploy_board_device(&room, .Tesla_Coil, {6, 4}, 8, 0, &log))
+	testing.expect(t, deploy_board_device(&room, .Shock_Floor, {x = 6, y = 2}, 1, 4, &log))
+	testing.expect(t, deploy_board_device(&room, .Tesla_Coil, {x = 2, y = 4}, 8, 0, &log))
+	testing.expect(t, deploy_board_device(&room, .Tesla_Coil, {x = 6, y = 4}, 8, 0, &log))
 	before := room.objects[0]
 	testing.expect(t, board_devices_can_activate(&room) && activate_board_devices(&room))
 	testing.expect_value(t, room.objects[0], before)
@@ -251,7 +251,7 @@ test_m8_floor_target_ties_use_id_after_object_and_enemy_reordering :: proc(t: ^t
 	room := board_device_test_room(t, &data, &player)
 	defer level.destroy(&data)
 	defer destroy_room(&room)
-	object := Grid_Object{kind = .Shock_Floor, position = {3, 3}, device_target_limit = 2}
+	object := Grid_Object{kind = .Shock_Floor, position = {x = 3, y = 3}, device_target_limit = 2}
 	first, count := shock_floor_targets(&room, object)
 	room.enemies[0], room.enemies[2] = room.enemies[2], room.enemies[0]
 	second, next_count := shock_floor_targets(&room, object)
@@ -268,26 +268,26 @@ test_m8_tesla_limit_capacity_and_invalid_positions_are_atomic :: proc(t: ^testin
 	defer level.destroy(&data)
 	defer destroy_room(&room)
 	log: Event_Log
-	for cell in ([?]grid.Position{{1, 1}, {3, 2}, {0, 0}, room.exit_position}) {
+	for cell in ([?]grid.Position{{x = 1, y = 1}, {x = 3, y = 2}, {x = 0, y = 0}, room.exit_position}) {
 		id := room.next_object_id
 		testing.expect(t, !deploy_board_device(&room, .Tesla_Coil, cell, 8, 0, &log))
 		testing.expect_value(t, room.next_object_id, id)
 		testing.expect_value(t, len(room.objects), 0)
 	}
 	log.count = MAX_GAME_EVENTS
-	testing.expect(t, !deploy_board_device(&room, .Tesla_Coil, {2, 1}, 8, 0, &log))
+	testing.expect(t, !deploy_board_device(&room, .Tesla_Coil, {x = 2, y = 1}, 8, 0, &log))
 	testing.expect_value(t, len(room.objects), 0)
 	clear_event_log(&log)
-	for cell in ([?]grid.Position{{2, 1}, {6, 1}, {6, 4}, {2, 4}}) {
+	for cell in ([?]grid.Position{{x = 2, y = 1}, {x = 6, y = 1}, {x = 6, y = 4}, {x = 2, y = 4}}) {
 		testing.expect(t, deploy_board_device(&room, .Tesla_Coil, cell, 8, 0, &log))
 	}
 	id := room.next_object_id
-	testing.expect(t, !deploy_board_device(&room, .Tesla_Coil, {8, 1}, 8, 0, &log))
+	testing.expect(t, !deploy_board_device(&room, .Tesla_Coil, {x = 8, y = 1}, 8, 0, &log))
 	testing.expect_value(t, room.next_object_id, id)
 	testing.expect_value(t, board_tesla_count(&room), MAX_TESLA_COILS)
-	testing.expect(t, cell_blocks_movement(&room, {2, 1}))
+	testing.expect(t, cell_blocks_movement(&room, {x = 2, y = 1}))
 	room.next_object_id = max(u32)
-	testing.expect(t, !deploy_board_device(&room, .Shock_Floor, {8, 1}, 1, 3, &log))
+	testing.expect(t, !deploy_board_device(&room, .Shock_Floor, {x = 8, y = 1}, 1, 3, &log))
 }
 
 @(test)
@@ -299,17 +299,17 @@ test_m8_tesla_mega_geometry_damage_and_friendly_fire_consume_all_four :: proc(t:
 	defer destroy_room(&room)
 	player.stats.defense = 0
 	log: Event_Log
-	for cell in ([?]grid.Position{{2, 1}, {6, 1}, {6, 4}, {2, 4}}) {
+	for cell in ([?]grid.Position{{x = 2, y = 1}, {x = 6, y = 1}, {x = 6, y = 4}, {x = 2, y = 4}}) {
 		testing.expect(t, deploy_board_device(&room, .Tesla_Coil, cell, 8, 0, &log))
 	}
 	network := query_board_device_network(&room)
 	testing.expect(t, network.field && network.ready)
 	testing.expect_value(t, network.damage, i32(2))
 	for x in 2..=6 { for y in 1..=4 {
-		testing.expect(t, board_device_network_contains_cell(&room, &network, {x, y}))
+		testing.expect(t, board_device_network_contains_cell(&room, &network, {x = x, y = y}))
 	} }
-	testing.expect(t, !board_device_network_contains_cell(&room, &network, {7, 2}))
-	player.position = {3, 3}
+	testing.expect(t, !board_device_network_contains_cell(&room, &network, {x = 7, y = 2}))
+	player.position = {x = 3, y = 3}
 	testing.expect(t, activate_board_devices(&room))
 	testing.expect_value(t, player.health, i32(8))
 	for i in 0..<3 { testing.expect_value(t, room.enemies[i].health, i32(28)) }
@@ -325,7 +325,7 @@ test_m8_tesla_mega_geometry_damage_and_friendly_fire_consume_all_four :: proc(t:
 
 @(test)
 test_m8_tesla_two_and_three_coils_keep_positions_across_repeated_activations_and_time :: proc(t: ^testing.T) {
-	positions := [?]grid.Position{{2, 1}, {6, 1}, {6, 4}}
+	positions := [?]grid.Position{{x = 2, y = 1}, {x = 6, y = 1}, {x = 6, y = 4}}
 	for count in 2..=3 {
 		data: level.Level
 		player: Player
@@ -364,13 +364,13 @@ test_m8_tesla_mega_removes_only_captured_coils_after_all_hits_and_frees_deployme
 	defer level.destroy(&data)
 	defer destroy_room(&room)
 	log: Event_Log
-	positions := [?]grid.Position{{2, 1}, {6, 4}, {6, 1}, {2, 4}}
+	positions := [?]grid.Position{{x = 2, y = 1}, {x = 6, y = 4}, {x = 6, y = 1}, {x = 2, y = 4}}
 	for position in positions {
 		testing.expect(t, deploy_board_device(&room, .Tesla_Coil, position, 8, 0, &log))
 	}
-	testing.expect(t, deploy_board_device(&room, .Shock_Floor, {8, 1}, 1, 3, &log))
+	testing.expect(t, deploy_board_device(&room, .Shock_Floor, {x = 8, y = 1}, 1, 3, &log))
 	floor := room.objects[4]
-	append(&room.objects, Grid_Object{id = room.next_object_id, kind = .Barrel, position = {8, 4}, health = 1, max_health = 1})
+	append(&room.objects, Grid_Object{id = room.next_object_id, kind = .Barrel, position = {x = 8, y = 4}, health = 1, max_health = 1})
 	room.next_object_id += 1
 	room.objects[0], room.objects[4] = room.objects[4], room.objects[0]
 	network := query_board_device_network(&room)
@@ -410,7 +410,7 @@ test_m8_tesla_four_collinear_coils_remain_lightning_walls_without_mega_consumpti
 	defer destroy_room(&room)
 	log: Event_Log
 	for x in ([4]int{2, 4, 6, 8}) {
-		testing.expect(t, deploy_board_device(&room, .Tesla_Coil, {x, 1}, 8, 0, &log))
+		testing.expect(t, deploy_board_device(&room, .Tesla_Coil, {x = x, y = 1}, 8, 0, &log))
 	}
 	network := query_board_device_network(&room)
 	testing.expect(t, !network.field && network.ready)
@@ -433,11 +433,11 @@ test_m8_tesla_joining_fourth_coil_respects_existing_cooldown_before_consuming_me
 	defer level.destroy(&data)
 	defer destroy_room(&room)
 	log: Event_Log
-	for position in ([3]grid.Position{{2, 1}, {6, 1}, {6, 4}}) {
+	for position in ([3]grid.Position{{x = 2, y = 1}, {x = 6, y = 1}, {x = 6, y = 4}}) {
 		testing.expect(t, deploy_board_device(&room, .Tesla_Coil, position, 8, 0, &log))
 	}
 	testing.expect(t, activate_board_devices(&room))
-	testing.expect(t, deploy_board_device(&room, .Tesla_Coil, {2, 4}, 8, 0, &log))
+	testing.expect(t, deploy_board_device(&room, .Tesla_Coil, {x = 2, y = 4}, 8, 0, &log))
 	network := query_board_device_network(&room)
 	testing.expect(t, network.field && !network.ready)
 	before_events := room.recent_events^
@@ -455,7 +455,7 @@ test_m8_tesla_joining_fourth_coil_respects_existing_cooldown_before_consuming_me
 @(test)
 test_m8_tesla_distance_halving_crossed_hull_and_degenerate_lines :: proc(t: ^testing.T) {
 	for distance in ([?]int{1, 2, 4, 8}) {
-		testing.expect_value(t, board_device_link_damage(8, {0, 0}, {distance, 0}), i32(8/distance))
+		testing.expect_value(t, board_device_link_damage(8, {x = 0, y = 0}, {x = distance, y = 0}), i32(8/distance))
 	}
 	data: level.Level
 	player: Player
@@ -463,17 +463,17 @@ test_m8_tesla_distance_halving_crossed_hull_and_degenerate_lines :: proc(t: ^tes
 	defer level.destroy(&data)
 	defer destroy_room(&room)
 	log: Event_Log
-	for cell in ([?]grid.Position{{2, 1}, {6, 4}, {6, 1}, {2, 4}}) {
+	for cell in ([?]grid.Position{{x = 2, y = 1}, {x = 6, y = 4}, {x = 6, y = 1}, {x = 2, y = 4}}) {
 		testing.expect(t, deploy_board_device(&room, .Tesla_Coil, cell, 8, 0, &log))
 	}
 	network := query_board_device_network(&room)
 	testing.expect(t, network.field)
-	testing.expect(t, board_device_network_contains_cell(&room, &network, {3, 3}))
-	for &object, i in room.objects { object.position = {2+i*2, 1} }
+	testing.expect(t, board_device_network_contains_cell(&room, &network, {x = 3, y = 3}))
+	for &object, i in room.objects { object.position = {x = 2+i*2, y = 1} }
 	network = query_board_device_network(&room)
 	testing.expect(t, !network.field)
-	testing.expect(t, board_device_network_contains_cell(&room, &network, {3, 1}))
-	testing.expect(t, !board_device_network_contains_cell(&room, &network, {3, 2}))
+	testing.expect(t, board_device_network_contains_cell(&room, &network, {x = 3, y = 1}))
+	testing.expect(t, !board_device_network_contains_cell(&room, &network, {x = 3, y = 2}))
 }
 
 @(test)
@@ -484,9 +484,9 @@ test_m8_failed_device_card_preserves_payment_dice_and_board :: proc(t: ^testing.
 	defer level.destroy(&data)
 	defer destroy_room(&room)
 	log: Event_Log
-	testing.expect(t, deploy_board_device(&room, .Shock_Floor, {3, 2}, 1, 2, &log))
+	testing.expect(t, deploy_board_device(&room, .Shock_Floor, {x = 3, y = 2}, 1, 2, &log))
 	before, dice, next_id := player.deck, player.dice, room.next_object_id
-	play := play_card(&room, player.deck.hand[0].id, cell_target({3, 2}))
+	play := play_card(&room, player.deck.hand[0].id, cell_target({x = 3, y = 2}))
 	testing.expect(t, !card_play_was_committed(play.result))
 	testing.expect_value(t, player.deck, before)
 	testing.expect_value(t, player.dice, dice)
@@ -502,12 +502,12 @@ test_m8_tesla_links_spare_player_and_damage_every_enemy_once :: proc(t: ^testing
 	defer level.destroy(&data)
 	defer destroy_room(&room)
 	log: Event_Log
-	testing.expect(t, deploy_board_device(&room, .Tesla_Coil, {2, 2}, 8, 0, &log))
-	testing.expect(t, deploy_board_device(&room, .Tesla_Coil, {6, 2}, 8, 0, &log))
-	player.position = {5, 2}
+	testing.expect(t, deploy_board_device(&room, .Tesla_Coil, {x = 2, y = 2}, 8, 0, &log))
+	testing.expect(t, deploy_board_device(&room, .Tesla_Coil, {x = 6, y = 2}, 8, 0, &log))
+	player.position = {x = 5, y = 2}
 	network := query_board_device_network(&room)
 	testing.expect(t, !network.field && network.ready)
-	testing.expect_value(t, board_device_network_damage_at(&room, &network, {3, 2}), i32(2))
+	testing.expect_value(t, board_device_network_damage_at(&room, &network, {x = 3, y = 2}), i32(2))
 	testing.expect(t, activate_board_devices(&room))
 	testing.expect_value(t, player.health, player.stats.max_health)
 	testing.expect_value(t, room.enemies[0].health, i32(28))
@@ -524,9 +524,9 @@ test_m8_endfight_removes_devices_preserves_room_objects_and_opens_loot_path :: p
 	defer destroy_room(&room)
 	log: Event_Log
 	first_device_id := room.next_object_id
-	testing.expect(t, deploy_board_device(&room, .Tesla_Coil, {2, 1}, 8, 0, &log))
-	testing.expect(t, deploy_board_device(&room, .Shock_Floor, {3, 1}, 1, 4, &log))
-	append(&room.objects, Grid_Object{id = room.next_object_id, kind = .Barrel, position = {5, 1}, health = 1, max_health = 1})
+	testing.expect(t, deploy_board_device(&room, .Tesla_Coil, {x = 2, y = 1}, 8, 0, &log))
+	testing.expect(t, deploy_board_device(&room, .Shock_Floor, {x = 3, y = 1}, 1, 4, &log))
+	append(&room.objects, Grid_Object{id = room.next_object_id, kind = .Barrel, position = {x = 5, y = 1}, health = 1, max_health = 1})
 	room.next_object_id += 1
 	// Storage order must not determine cleanup events: removal compacts the
 	// object slice while the sorted ID snapshot still includes both devices.
@@ -535,7 +535,7 @@ test_m8_endfight_removes_devices_preserves_room_objects_and_opens_loot_path :: p
 	disarm_board_devices_after_combat(&room, &log)
 	testing.expect_value(t, len(room.objects), 1)
 	testing.expect_value(t, room.objects[0].kind, Grid_Object_Kind.Barrel)
-	testing.expect(t, !cell_blocks_movement(&room, {2, 1}))
+	testing.expect(t, !cell_blocks_movement(&room, {x = 2, y = 1}))
 	testing.expect_value(t, spell_test_event_count(&log, .Entity_Defeated), 2)
 	defeated_count := u32(0)
 	for event in log.events[:log.count] {
@@ -555,12 +555,12 @@ test_m8_tesla_blocked_link_rejects_activation_without_mutation :: proc(t: ^testi
 	defer level.destroy(&data)
 	defer destroy_room(&room)
 	log: Event_Log
-	testing.expect(t, deploy_board_device(&room, .Tesla_Coil, {2, 2}, 8, 0, &log))
-	testing.expect(t, deploy_board_device(&room, .Tesla_Coil, {6, 2}, 8, 0, &log))
-	append(&room.obstacles, Obstacle{position = {5, 2}})
+	testing.expect(t, deploy_board_device(&room, .Tesla_Coil, {x = 2, y = 2}, 8, 0, &log))
+	testing.expect(t, deploy_board_device(&room, .Tesla_Coil, {x = 6, y = 2}, 8, 0, &log))
+	append(&room.obstacles, Obstacle{position = {x = 5, y = 2}})
 	network := query_board_device_network(&room)
 	testing.expect(t, !network.ready && network.active_links == 0)
-	testing.expect_value(t, board_device_network_damage_at(&room, &network, {3, 2}), i32(0))
+	testing.expect_value(t, board_device_network_damage_at(&room, &network, {x = 3, y = 2}), i32(0))
 	before_log := room.recent_events^
 	testing.expect(t, !activate_board_devices(&room))
 	testing.expect_value(t, room.recent_events^, before_log)
@@ -578,14 +578,14 @@ test_m8_tesla_field_requires_a_closed_unblocked_perimeter :: proc(t: ^testing.T)
 	defer level.destroy(&data)
 	defer destroy_room(&room)
 	log: Event_Log
-	for cell in ([?]grid.Position{{2, 1}, {6, 1}, {6, 4}, {2, 4}}) {
+	for cell in ([?]grid.Position{{x = 2, y = 1}, {x = 6, y = 1}, {x = 6, y = 4}, {x = 2, y = 4}}) {
 		testing.expect(t, deploy_board_device(&room, .Tesla_Coil, cell, 8, 0, &log))
 	}
-	append(&room.obstacles, Obstacle{position = {4, 1}})
+	append(&room.obstacles, Obstacle{position = {x = 4, y = 1}})
 	network := query_board_device_network(&room)
 	testing.expect(t, !network.field && network.ready)
-	testing.expect(t, !board_device_network_contains_cell(&room, &network, {3, 2}))
-	testing.expect(t, board_device_network_contains_cell(&room, &network, {6, 2}))
+	testing.expect(t, !board_device_network_contains_cell(&room, &network, {x = 3, y = 2}))
+	testing.expect(t, board_device_network_contains_cell(&room, &network, {x = 6, y = 2}))
 	clear(&room.obstacles)
 	network = query_board_device_network(&room)
 	testing.expect(t, network.field)
@@ -601,10 +601,10 @@ test_m8_last_floor_discharge_can_end_fight_while_cleanup_removes_other_devices :
 	kill_enemy(&room, 3)
 	for &enemy in room.enemies { enemy.health = 1 }
 	log: Event_Log
-	testing.expect(t, deploy_board_device(&room, .Shock_Floor, {3, 2}, 1, 3, &log))
+	testing.expect(t, deploy_board_device(&room, .Shock_Floor, {x = 3, y = 2}, 1, 3, &log))
 	room.objects[0].device_charges = 1
-	testing.expect(t, deploy_board_device(&room, .Shock_Floor, {8, 2}, 1, 1, &log))
-	testing.expect(t, deploy_board_device(&room, .Tesla_Coil, {2, 1}, 8, 0, &log))
+	testing.expect(t, deploy_board_device(&room, .Shock_Floor, {x = 8, y = 2}, 1, 1, &log))
+	testing.expect(t, deploy_board_device(&room, .Tesla_Coil, {x = 2, y = 1}, 8, 0, &log))
 	testing.expect(t, !activate_board_devices(&room))
 	pulse: Pulse_Report
 	tick_board_devices(&room, &pulse)
@@ -613,7 +613,7 @@ test_m8_last_floor_discharge_can_end_fight_while_cleanup_removes_other_devices :
 	testing.expect_value(t, len(room.objects), 0)
 	testing.expect_value(t, pulse.enemies_defeated, 3)
 	testing.expect_value(t, pulse.events.dropped_count, 0)
-	testing.expect(t, !cell_blocks_movement(&room, {2, 1}))
+	testing.expect(t, !cell_blocks_movement(&room, {x = 2, y = 1}))
 }
 
 @(test)
@@ -629,17 +629,17 @@ test_m8_network_trace_spans_full_room_and_respects_sealed_diagonal_corners :: pr
 	testing.expect_value(t, err, level.Parse_Error.None)
 	defer level.destroy(&data)
 	player := create_test_player(t)
-	spawns := [?]Enemy_Spawn{{position = {21, 3}, health = 10, attack = 1}}
+	spawns := [?]Enemy_Spawn{{position = {x = 21, y = 3}, health = 10, attack = 1}}
 	room, ok := create_room(&data, &player, {enemies = spawns[:]})
 	testing.expect(t, ok)
 	defer destroy_room(&room)
-	testing.expect(t, board_device_link_is_clear(&room, {2, 2}, {21, 2}))
-	append(&room.obstacles, Obstacle{position = {13, 2}})
-	testing.expect(t, !board_device_link_is_clear(&room, {2, 2}, {21, 2}))
+	testing.expect(t, board_device_link_is_clear(&room, {x = 2, y = 2}, {x = 21, y = 2}))
+	append(&room.obstacles, Obstacle{position = {x = 13, y = 2}})
+	testing.expect(t, !board_device_link_is_clear(&room, {x = 2, y = 2}, {x = 21, y = 2}))
 	clear(&room.obstacles)
-	append(&room.obstacles, Obstacle{position = {3, 1}})
-	append(&room.obstacles, Obstacle{position = {2, 2}})
-	testing.expect(t, !board_device_link_is_clear(&room, {2, 1}, {4, 3}))
+	append(&room.obstacles, Obstacle{position = {x = 3, y = 1}})
+	append(&room.obstacles, Obstacle{position = {x = 2, y = 2}})
+	testing.expect(t, !board_device_link_is_clear(&room, {x = 2, y = 1}, {x = 4, y = 3}))
 }
 
 @(test)
@@ -659,7 +659,7 @@ test_m8_field_lethal_friendly_fire_still_hits_all_32_enemies_once :: proc(t: ^te
 		count := 0
 		for y in 1..=5 { for x in 1..=7 {
 			if (y == 1 && (x == 1 || x == 7)) || (x == 4 && y == 4) { continue }
-			spawns[count] = {position = {x, y}, health = 1 if lethal_enemies else 5, attack = 1}
+			spawns[count] = {position = {x = x, y = y}, health = 1 if lethal_enemies else 5, attack = 1}
 			count += 1
 		} }
 		testing.expect_value(t, count, MAX_ENEMIES_PER_ROOM)
@@ -667,7 +667,7 @@ test_m8_field_lethal_friendly_fire_still_hits_all_32_enemies_once :: proc(t: ^te
 		testing.expect(t, ok)
 		defer destroy_room(&room)
 		log: Event_Log
-		for cell in ([4]grid.Position{{1, 1}, {7, 1}, {7, 7}, {1, 7}}) {
+		for cell in ([4]grid.Position{{x = 1, y = 1}, {x = 7, y = 1}, {x = 7, y = 7}, {x = 1, y = 7}}) {
 			testing.expect(t, deploy_board_device(&room, .Tesla_Coil, cell, 8, 0, &log))
 		}
 		network := query_board_device_network(&room)

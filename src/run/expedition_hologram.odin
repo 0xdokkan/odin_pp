@@ -58,7 +58,7 @@ hologram_geometry :: proc(w:^world.World,data:^level.Level,out:^Hologram_Geometr
 	out.width=min(data.tiles.width,HOLO_SIDE);out.height=min(data.tiles.height,HOLO_SIDE)
 	for y:=0;y<out.height;y+=2 {for x:=0;x<out.width;x+=2 {
 		ground:=u8(1)
-		#partial switch world.terrain(w.biome,{x,y}) {
+		#partial switch world.terrain(w.biome,{x = x, y = y}) {
 		case .Grass:ground=2
 		case .Water,.Swamp:ground=3
 		case .Ice,.Snow:ground=4
@@ -71,7 +71,7 @@ hologram_geometry :: proc(w:^world.World,data:^level.Level,out:^Hologram_Geometr
 			px,py:=x+dx,y+dy;tile:=data.tiles.cells[py*data.tiles.width+px]
 			c:=&out.cells[py*HOLO_SIDE+px];c^={}
 			if tile.kind==.Void {continue}
-			c.ground=ground;c.height=hologram_band(level.height_at(data,{px,py}))
+			c.ground=ground;c.height=hologram_band(level.height_at(data,{x = px, y = py}))
 			if w.biome==.Inferno && tile.kind==.Door {c.ground=6}
 			// Scattered open-ground props stay low stubs: the courtyards, the
 			// city blocks and the pyramid fields remain the landmarks.
@@ -84,7 +84,7 @@ hologram_geometry :: proc(w:^world.World,data:^level.Level,out:^Hologram_Geometr
 		minimum,maximum:=world.site_bounds(&site)
 		for y in max(0,minimum.y)..=min(out.height-1,maximum.y) {for x in max(0,minimum.x)..=min(out.width-1,maximum.x) {
 			c:=&out.cells[y*HOLO_SIDE+x];if c.ground==0 {continue}
-			design:=world.site_cell(&site,{x,y});if !design.inside {continue}
+			design:=world.site_cell(&site,{x = x, y = y});if !design.inside {continue}
 			c.ground=9
 			#partial switch design.surface {
 			case .Platform,.Threshold:c.ground=10

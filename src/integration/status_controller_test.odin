@@ -21,7 +21,7 @@ test_status_burn_and_poison_through_the_controller :: proc(t: ^testing.T) {
 	config := game.DEFAULT_TACTICAL_CONFIG
 	config.timer_seconds = 2
 	testing.expect(t, game.configure_tactical(&player, config))
-	enemies := [?]game.Enemy_Spawn{{position = {7, 4}, health = 1000, attack = 1}}
+	enemies := [?]game.Enemy_Spawn{{position = {x = 7, y = 4}, health = 1000, attack = 1}}
 	room, built := game.create_room(&data, &player, {enemies = enemies[:]})
 	testing.expect(t, built)
 	defer game.destroy_room(&room)

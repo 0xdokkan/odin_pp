@@ -26,7 +26,7 @@ MAX_GROUND_FIRES :: 32
 GROUND_FIRE_STAGES :: i32(4)
 
 // North, east, south, west: Move_Direction's order.
-GROUND_ARM_STEPS :: [Move_Direction]grid.Position{.North = {0, -1}, .East = {1, 0}, .South = {0, 1}, .West = {-1, 0}}
+GROUND_ARM_STEPS :: [Move_Direction]grid.Position{.North = {x = 0, y = -1}, .East = {x = 1, y = 0}, .South = {x = 0, y = 1}, .West = {x = -1, y = 0}}
 
 Ground_Fire :: struct {
 	id: u32,
@@ -146,7 +146,7 @@ ground_pool_fill :: proc(room: ^Room, anchor: grid.Position, cells: ^[dynamic]gr
 	for &value in label { value = -1 }
 	steps := GROUND_ARM_STEPS
 	for start in 0..<count {
-		cell := grid.Position{start%tiles.width, start/tiles.width}
+		cell := grid.Position{x = start%tiles.width, y = start/tiles.width}
 		if label[start] >= 0 || !ground_cell_is_open(room, cell, anchor) { continue }
 		area := i32(len(sizes))
 		append(&sizes, 0)
@@ -158,9 +158,9 @@ ground_pool_fill :: proc(room: ^Room, anchor: grid.Position, cells: ^[dynamic]gr
 			at := queue[head]
 			head += 1
 			sizes[area] += 1
-			here := grid.Position{at%tiles.width, at/tiles.width}
+			here := grid.Position{x = at%tiles.width, y = at/tiles.width}
 			for step in steps {
-				next := grid.Position{here.x+step.x, here.y+step.y}
+				next := grid.offset(here, step.x, step.y)
 				index, ok := grid.index_of(tiles, next)
 				if !ok { continue }
 				if next == anchor || room.ground.pool[index] > 0 { touches[area] = true; continue }
@@ -176,7 +176,7 @@ ground_pool_fill :: proc(room: ^Room, anchor: grid.Position, cells: ^[dynamic]gr
 	for index in 0..<count {
 		area := label[index]
 		if area < 0 || sizes[area] == largest || !touches[area] { continue }
-		append(cells, grid.Position{index%tiles.width, index/tiles.width})
+		append(cells, grid.Position{x = index%tiles.width, y = index/tiles.width})
 	}
 }
 
@@ -189,7 +189,7 @@ ground_fire_reach :: proc(room: ^Room, center: grid.Position) -> (fire: Ground_F
 	for step, direction in steps {
 		for fire.arms[direction] < GROUND_FIRE_STAGES {
 			reach := int(fire.arms[direction])+1
-			if cell_blocks_movement(room, {center.x+step.x*reach, center.y+step.y*reach}) { break }
+			if cell_blocks_movement(room, grid.offset(center, step.x*reach, step.y*reach)) { break }
 			fire.arms[direction] += 1
 		}
 	}
@@ -274,7 +274,7 @@ grow_ground_fires :: proc(room: ^Room, pulse: ^Pulse_Report) {
 		for step, direction in steps {
 			if direction in fire.stopped { continue }
 			reach := int(fire.arms[direction])+1
-			if cell_blocks_movement(room, {fire.center.x+step.x*reach, fire.center.y+step.y*reach}) {
+			if cell_blocks_movement(room, grid.offset(fire.center, step.x*reach, step.y*reach)) {
 				fire.stopped += {direction}
 				continue
 			}

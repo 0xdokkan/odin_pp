@@ -60,9 +60,9 @@ progressive_encounter_required_roles :: proc(blueprint: ^Room_Blueprint) -> (rol
 @(private)
 progressive_encounter_sector_score :: proc(blueprint: ^Room_Blueprint, index: int, position: grid.Position) -> int {
 	if blueprint.profile.encounter_config.target_enemies == 0 { return 0 }
-	sectors := [?]grid.Position{{-1, -1}, {1, 1}, {-1, 1}, {1, -1}, {0, -1}, {0, 1}, {-1, 0}, {1, 0}}
+	sectors := [?]grid.Position{{x = -1, y = -1}, {x = 1, y = 1}, {x = -1, y = 1}, {x = 1, y = -1}, {x = 0, y = -1}, {x = 0, y = 1}, {x = -1, y = 0}, {x = 1, y = 0}}
 	sector := sectors[((index-2)/3)%len(sectors)]
 	width, height := blueprint.level_data.tiles.width, blueprint.level_data.tiles.height
-	anchor := grid.Position{width/2+sector.x*(width/2-4), height/2+sector.y*(height/2-3)}
+	anchor := grid.Position{x = width/2+sector.x*(width/2-4), y = height/2+sector.y*(height/2-3)}
 	return -(abs(position.x-anchor.x)+abs(position.y-anchor.y))*12
 }

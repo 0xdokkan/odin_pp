@@ -46,8 +46,8 @@ test_intent_urgency_flickers_only_at_the_end :: proc(t: ^testing.T) {
 @(test)
 test_intent_traces_flash_the_action_that_landed :: proc(t: ^testing.T) {
 	strike := game.Enemy_Intent{kind = .Attack, planned_pulse = 1, threatened_cell_count = 1}
-	strike.threatened_cells[0] = {5, 5}
-	enemies := [?]game.Enemy{{id = 3, archetype = .Chaser, position = {5, 4}, intent = strike, tactical_cooldown = 0.2}}
+	strike.threatened_cells[0] = {x = 5, y = 5}
+	enemies := [?]game.Enemy{{id = 3, archetype = .Chaser, position = {x = 5, y = 4}, intent = strike, tactical_cooldown = 0.2}}
 	room := make_intent_presentation_test_room(enemies[:])
 	defer game.destroy_room(&room)
 	player: game.Player
@@ -59,12 +59,12 @@ test_intent_traces_flash_the_action_that_landed :: proc(t: ^testing.T) {
 	update_intent_traces(renderer, &room, 1.0)
 	trace := intent_trace(renderer, 3)
 	testing.expect(t, trace.kind == .Strike && trace.flash_kind == .None)
-	room.enemies[0].intent = {kind = .Move, planned_pulse = 2, destination = {6, 4}}
+	room.enemies[0].intent = {kind = .Move, planned_pulse = 2, destination = {x = 6, y = 4}}
 	room.enemies[0].tactical_cooldown = 2
 	update_intent_traces(renderer, &room, 1.1)
 	trace = intent_trace(renderer, 3)
 	testing.expect(t, trace.flash == 1.1 && trace.flash_kind == .Strike && trace.flash_count == 1)
-	testing.expect(t, trace.flash_cells[0] == {5, 5} && trace.kind == .Move)
+	testing.expect(t, trace.flash_cells[0] == {x = 5, y = 5} && trace.kind == .Move)
 	// A plan kept from frame to frame does not flash again.
 	update_intent_traces(renderer, &room, 1.2)
 	testing.expect_value(t, intent_trace(renderer, 3).flash, f64(1.1))
@@ -74,17 +74,17 @@ test_intent_traces_flash_the_action_that_landed :: proc(t: ^testing.T) {
 // attack through an interruption, recovery or takeover by the Lazzo.
 @(test)
 test_compact_intent_tracks_the_current_enemy_state :: proc(t: ^testing.T) {
-	player := game.Player{position = {3, 3}}
+	player := game.Player{position = {x = 3, y = 3}}
 	room := game.Room{player = &player, phase = .Combat}
 	enemy := game.Enemy{id = 7, health = 10, archetype = .Chaser}
 	for icon, kind in ([game.Enemy_Intent_Kind]Intent_Icon{
 		.None = .None, .Wait = .Wait, .Recover = .Recover, .Protect = .Protect,
 		.Charge = .Charge, .Bombard = .Bombard, .Attack = .Strike, .Move = .Move,
 	}) {
-		enemy.intent = {kind = kind, origin = {5, 3}, destination = {4, 3}}
+		enemy.intent = {kind = kind, origin = {x = 5, y = 3}, destination = {x = 4, y = 3}}
 		testing.expect_value(t, tactical_intent_icon(&room, &enemy), icon)
 	}
-	enemy.intent.kind, enemy.intent.destination = .Move, {6, 3}
+	enemy.intent.kind, enemy.intent.destination = .Move, {x = 6, y = 3}
 	testing.expect_value(t, tactical_intent_icon(&room, &enemy), Intent_Icon.Retreat)
 	enemy.intent.kind = .Attack
 	enemy.archetype = .Archer

@@ -42,7 +42,7 @@ MECHANICS_LAB_STRUCTURES_HEIGHT :: 29
 // to the east of the player's place, with a free lane round it.
 MECHANICS_LAB_MOUNTAIN_WIDTH :: 47
 MECHANICS_LAB_MOUNTAIN_HEIGHT :: 25
-MECHANICS_LAB_MOUNTAIN_CENTER :: grid.Position{35, 12}
+MECHANICS_LAB_MOUNTAIN_CENTER :: grid.Position{x = 35, y = 12}
 
 // The arena of the cave: its plan (level/cave.odin) with a ring of rock round it.
 MECHANICS_LAB_CAVE_SEED :: u64(2026)
@@ -65,10 +65,10 @@ mechanics_lab_next_arena :: proc(arena: Mechanics_Lab_Arena) -> Mechanics_Lab_Ar
 // the pen, and the cottage in each of its four turns (the last one mirrored).
 Lab_Structure :: struct { id: level.Structure_Id, origin: grid.Position, rotation: u8, mirror: bool }
 MECHANICS_LAB_STRUCTURES := [?]Lab_Structure{
-	{.Cottage, {4, 3}, 0, false}, {.Hut, {12, 3}, 0, false}, {.Temple, {28, 3}, 0, false},
-	{.Cart, {4, 11}, 0, false}, {.Fountain, {8, 11}, 0, false}, {.Statue, {12, 11}, 0, false}, {.Machine, {16, 11}, 0, false},
-	{.Ruin, {34, 13}, 0, false}, {.Pen, {28, 17}, 0, false},
-	{.Cottage, {4, 22}, 0, false}, {.Cottage, {10, 22}, 1, false}, {.Cottage, {16, 22}, 2, false}, {.Cottage, {22, 22}, 3, true},
+	{.Cottage, {x = 4, y = 3}, 0, false}, {.Hut, {x = 12, y = 3}, 0, false}, {.Temple, {x = 28, y = 3}, 0, false},
+	{.Cart, {x = 4, y = 11}, 0, false}, {.Fountain, {x = 8, y = 11}, 0, false}, {.Statue, {x = 12, y = 11}, 0, false}, {.Machine, {x = 16, y = 11}, 0, false},
+	{.Ruin, {x = 34, y = 13}, 0, false}, {.Pen, {x = 28, y = 17}, 0, false},
+	{.Cottage, {x = 4, y = 22}, 0, false}, {.Cottage, {x = 10, y = 22}, 1, false}, {.Cottage, {x = 16, y = 22}, 2, false}, {.Cottage, {x = 22, y = 22}, 3, true},
 }
 
 // The open arena: walls only around the edge, the player in the middle and
@@ -123,10 +123,10 @@ mechanics_lab_level :: proc(arena := Mechanics_Lab_Arena.Flat) -> (level.Level, 
 // - a spiral hill at x 3..5, y 10..12: a path of one step each round a top of 9,
 //   with a cliff between every two turns of it.
 mechanics_lab_raise :: proc(data: ^level.Level) {
-	for x in 12..=14 { for y in 7..=9 { level.set_height(data, {x, y}, i32(x-11)) } }
-	for x in 15..=19 { for y in 5..=11 { level.set_height(data, {x, y}, 4) } }
-	level.set_height(data, {6, 4}, 8)
-	spiral := [9]grid.Position{{3, 10}, {4, 10}, {5, 10}, {5, 11}, {5, 12}, {4, 12}, {3, 12}, {3, 11}, {4, 11}}
+	for x in 12..=14 { for y in 7..=9 { level.set_height(data, {x = x, y = y}, i32(x-11)) } }
+	for x in 15..=19 { for y in 5..=11 { level.set_height(data, {x = x, y = y}, 4) } }
+	level.set_height(data, {x = 6, y = 4}, 8)
+	spiral := [9]grid.Position{{x = 3, y = 10}, {x = 4, y = 10}, {x = 5, y = 10}, {x = 5, y = 11}, {x = 5, y = 12}, {x = 4, y = 12}, {x = 3, y = 12}, {x = 3, y = 11}, {x = 4, y = 11}}
 	for cell, step in spiral { level.set_height(data, cell, i32(step)+1) }
 }
 
@@ -146,29 +146,29 @@ create_mechanics_lab_room :: proc(data: ^level.Level, player: ^game.Player, conf
 	// Three first arrivals, well away from the middle.
 	width, height := mechanics_lab_size(which)
 	spawns := [?]game.Enemy_Spawn{
-		{position = {4, 4}, health = 12, attack = 2, archetype = .Chaser},
+		{position = {x = 4, y = 4}, health = 12, attack = 2, archetype = .Chaser},
 		// In the arena of heights the archer waits up on the plateau.
-		{position = {width-5, 4} if which == .Flat else {width-5, 6}, health = 10, attack = 2, archetype = .Archer},
-		{position = {width/2, height-4}, health = 18, attack = 3, archetype = .Brute},
+		{position = {x = width-5, y = 4} if which == .Flat else {x = width-5, y = 6}, health = 10, attack = 2, archetype = .Archer},
+		{position = {x = width/2, y = height-4}, health = 18, attack = 3, archetype = .Brute},
 	}
 	// In the arena of structures they wait in the open, away from the buildings.
 	if which == .Structures {
-		spawns[0].position, spawns[1].position, spawns[2].position = {37, 3}, {37, 10}, {20, 26}
+		spawns[0].position, spawns[1].position, spawns[2].position = {x = 37, y = 3}, {x = 37, y = 10}, {x = 20, y = 26}
 	}
 	// In the arena of the cave the foes wait in its rooms, as the plan has them.
 	if which == .Cave {
 		cave := level.cave_plan(MECHANICS_LAB_CAVE_SEED)
-		for g in 0..<min(3, cave.groups) { spawns[g].position = {cave.anchors[g].x+1, cave.anchors[g].y+1} }
-		for g in cave.groups..<3 { spawns[g].position = {cave.secret.x, cave.secret.y+1} if g == 2 else {cave.anchors[0].x+1, cave.anchors[0].y+2} }
+		for g in 0..<min(3, cave.groups) { spawns[g].position = {x = cave.anchors[g].x+1, y = cave.anchors[g].y+1} }
+		for g in cave.groups..<3 { spawns[g].position = grid.offset(cave.secret, 0, 1) if g == 2 else {x = cave.anchors[0].x+1, y = cave.anchors[0].y+2} }
 	}
 	// In the arena of the mountain the archer waits at the summit (sturdy enough to survive being pushed off),
 	// the others on the open ground beside it.
 	if which == .Mountain {
 		summit := level.mountain_summit()
-		spawns[0].position = {4, 4}
-		spawns[1].position = {MECHANICS_LAB_MOUNTAIN_CENTER.x+summit.x+1, MECHANICS_LAB_MOUNTAIN_CENTER.y+summit.y}
+		spawns[0].position = {x = 4, y = 4}
+		spawns[1].position = grid.offset(MECHANICS_LAB_MOUNTAIN_CENTER, summit.x+1, summit.y)
 		spawns[1].health = 18
-		spawns[2].position = {width/2, height-3}
+		spawns[2].position = {x = width/2, y = height-3}
 	}
 	room, ok = game.create_room(data, player, {enemies = spawns[:]})
 	if !ok { return }

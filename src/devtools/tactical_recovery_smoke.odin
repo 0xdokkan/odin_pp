@@ -40,8 +40,8 @@ run_tactical_recovery_smoke :: proc(window: ^app.Window, renderer: ^render.Rende
 		if _, added := game.add_owned_card(&player.deck, id); !added { return false }
 	}
 	spawns := [?]game.Enemy_Spawn{
-		{position = {2, 4}, health = 20, attack = 2},
-		{position = {8, 4}, health = 20, attack = 2, archetype = .Brute},
+		{position = {x = 2, y = 4}, health = 20, attack = 2},
+		{position = {x = 8, y = 4}, health = 20, attack = 2, archetype = .Brute},
 	}
 	room, built := game.create_room(&data, &player, {enemies = spawns[:]})
 	if !built { return false }
@@ -93,7 +93,7 @@ run_tactical_recovery_smoke :: proc(window: ^app.Window, renderer: ^render.Rende
 	}
 	if !tactical_polish_check(player.tactical.phase == .Decision && player.tactical.remaining == 2 &&
 		room.pulse_count == 3 && player.tactical.metrics.forced_pulses == 1 &&
-		player.tactical.metrics.decisions == 0 && player.position == {8, 5} &&
+		player.tactical.metrics.decisions == 0 && player.position == {x = 8, y = 5} &&
 		!room.tactical_pulse.pending && room.qte.kind == .None,
 		"one-second recovery failed to restore the full configured pulse") { return false }
 	if !tactical_polish_check(run_session.commit_gameplay_command(&room, renderer, &cards,

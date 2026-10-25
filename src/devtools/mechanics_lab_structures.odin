@@ -44,34 +44,34 @@ mechanics_lab_structures :: proc(window: ^app.Window, renderer: ^render.Renderer
 	mechanics_lab_still(window, renderer, room, 0, "odin_pp_mechanics_lab_structures_arena.png")
 
 	// The cottage in its four turns, along the bottom of the arena.
-	mechanics_lab_stand(window, renderer, room, controller, cards, buffer, {14, 20}, "odin_pp_mechanics_lab_structures_rotations.png")
+	mechanics_lab_stand(window, renderer, room, controller, cards, buffer, {x = 14, y = 20}, "odin_pp_mechanics_lab_structures_rotations.png")
 	// The objects: the cart, the fountain, the statue and the machine in a row.
-	mechanics_lab_stand(window, renderer, room, controller, cards, buffer, {10, 15}, "odin_pp_mechanics_lab_structures_objects.png")
+	mechanics_lab_stand(window, renderer, room, controller, cards, buffer, {x = 10, y = 15}, "odin_pp_mechanics_lab_structures_objects.png")
 
 	// The hut at (12, 3), door at (14, 6): the robot walks up to it from the south.
 	hut := -1
 	for placed, index in data.structures { if placed.id == .Hut { hut = index } }
 	if hut < 0 { fmt.eprintln("mechanics lab: no hut in the arena"); return false }
 	// Every cell of the hut counts: the walls stop the step, the door lets it through.
-	room.player.position = {13, 7}
+	room.player.position = {x = 13, y = 7}
 	mechanics_lab_wait_free(window, renderer, room, controller, cards, buffer)
-	if game.try_move_player(room, .North) != .Blocked || room.player.position != (grid.Position{13, 7}) {
+	if game.try_move_player(room, .North) != .Blocked || room.player.position != (grid.Position{x = 13, y = 7}) {
 		fmt.eprintln("mechanics lab: the hut's wall did not stop the step"); return false
 	}
-	room.player.position = {14, 7}
+	room.player.position = {x = 14, y = 7}
 	mechanics_lab_wait_free(window, renderer, room, controller, cards, buffer)
-	if game.try_move_player(room, .North) != .Moved || room.player.position != (grid.Position{14, 6}) {
+	if game.try_move_player(room, .North) != .Moved || room.player.position != (grid.Position{x = 14, y = 6}) {
 		fmt.eprintln("mechanics lab: the hut's door did not let the step through"); return false
 	}
 	// The way the opacity goes: whole at six cells, gone on the threshold, whole again inside.
 	stages := [?]struct { at: grid.Position, name: cstring, stage: game.Structure_Stage }{
-		{{14, 13}, "odin_pp_mechanics_lab_structures_hut_6.png", .Far},
-		{{14, 11}, "odin_pp_mechanics_lab_structures_hut_4.png", .Approaching},
-		{{14, 9}, "odin_pp_mechanics_lab_structures_hut_2.png", .Approaching},
-		{{14, 8}, "odin_pp_mechanics_lab_structures_hut_1.png", .Approaching},
-		{{14, 7}, "odin_pp_mechanics_lab_structures_hut_soglia.png", .Threshold},
-		{{14, 4}, "odin_pp_mechanics_lab_structures_hut_dentro.png", .Inside},
-		{{14, 9}, "odin_pp_mechanics_lab_structures_hut_fuori.png", .Approaching},
+		{{x = 14, y = 13}, "odin_pp_mechanics_lab_structures_hut_6.png", .Far},
+		{{x = 14, y = 11}, "odin_pp_mechanics_lab_structures_hut_4.png", .Approaching},
+		{{x = 14, y = 9}, "odin_pp_mechanics_lab_structures_hut_2.png", .Approaching},
+		{{x = 14, y = 8}, "odin_pp_mechanics_lab_structures_hut_1.png", .Approaching},
+		{{x = 14, y = 7}, "odin_pp_mechanics_lab_structures_hut_soglia.png", .Threshold},
+		{{x = 14, y = 4}, "odin_pp_mechanics_lab_structures_hut_dentro.png", .Inside},
+		{{x = 14, y = 9}, "odin_pp_mechanics_lab_structures_hut_fuori.png", .Approaching},
 	}
 	previous := f32(1)
 	for step, i in stages {

@@ -27,7 +27,7 @@ test_mechanics_lab_is_an_open_endless_arena_with_the_cards_under_test :: proc(t:
 	// No cover: every cell inside the border is walkable floor.
 	for y in 1..<run_session.MECHANICS_LAB_HEIGHT-1 {
 		for x in 1..<run_session.MECHANICS_LAB_WIDTH-1 {
-			tile, inside := level.tile_at(&data, {x, y})
+			tile, inside := level.tile_at(&data, {x = x, y = y})
 			testing.expect(t, inside && level.is_walkable(tile.kind))
 		}
 	}
@@ -92,7 +92,7 @@ test_mechanics_lab_f7_clears_the_arena_for_the_rod :: proc(t: ^testing.T) {
 	_, spawned := game.sandbox_tick(&room, &sandbox, 10)
 	testing.expect(t, !spawned)
 	// The rod fishes a cell beside him; the room's one fishing is then spent.
-	water := game.add_position(player.position, {2, 0})
+	water := game.add_position(player.position, {x = 2, y = 0})
 	testing.expect_value(t, game.fish_with_rod(&room, water).result, game.Fishing_Result.Fished)
 	testing.expect_value(t, game.fishing_target_error(&room, water), game.Fishing_Result.Spent)
 	// F7 again: afresh, no water.
@@ -102,7 +102,7 @@ test_mechanics_lab_f7_clears_the_arena_for_the_rod :: proc(t: ^testing.T) {
 	testing.expect_value(t, game.fishing_casts_left(&room), i32(1))
 	// The exit stays shut in the lab: walking onto it keeps the arena, and the
 	// board shows it shut (no portal, no USCITA), where a cleared room's opens.
-	player.position = {room.exit_position.x-1, room.exit_position.y}
+	player.position = {x = room.exit_position.x-1, y = room.exit_position.y}
 	testing.expect_value(t, game.try_move_player(&room, .East), game.Action_Result.Moved)
 	testing.expect_value(t, room.phase, game.Room_Phase.Loot)
 	testing.expect(t, !render.tactical_exit_is_open(&room, room.phase))

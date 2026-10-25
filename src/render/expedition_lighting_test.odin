@@ -129,15 +129,15 @@ test_expedition_ground_fire_light_moves_and_expires_without_ghosts :: proc(t: ^t
 	w := new(world.World); defer free(w)
 	s := r.tactical.snapshot
 	s.ground.fire_count = 2
-	s.ground.fires[0] = {id = 7, center = {3, 4}, stage = 3, burn = 2}
-	s.ground.fires[1] = {id = 8, center = {50, 50}, stage = 1, burn = 1}
+	s.ground.fires[0] = {id = 7, center = {x = 3, y = 4}, stage = 3, burn = 2}
+	s.ground.fires[1] = {id = 8, center = {x = 50, y = 50}, stage = 1, burn = 1}
 	l := &r.tactical.expedition_material.lights
 	prepare_expedition_lights(r, nil, w)
 	testing.expect_value(t, l.count, 1)
 	testing.expect_value(t, lighting_test_at(l, {3.5, .45, 4.5}), 0)
 	testing.expect(t, l.color[0].x > l.color[0].y && l.color[0].y > l.color[0].z)
 	testing.expect_value(t, l.start[0].w, f32(4.5))
-	s.ground.fires[0].center = {6, 2}
+	s.ground.fires[0].center = {x = 6, y = 2}
 	prepare_expedition_lights(r, nil, w)
 	testing.expect_value(t, lighting_test_at(l, {6.5, .45, 2.5}), 0)
 	testing.expect_value(t, lighting_test_at(l, {3.5, .45, 4.5}), -1)
@@ -163,7 +163,7 @@ test_expedition_lights_keep_actual_edge_segments_and_reserve_live_slots :: proc(
 	s.object_count = 20
 	for i in 0..<s.object_count { s.objects[i] = {kind = .Fire, position = {f32(i%8), f32(i/8)+5}, visible = true} }
 	s.ground.fire_count = game.MAX_GROUND_FIRES
-	for &fire, i in s.ground.fires { fire = {id = u32(i+1), center = {i%8, i/8}} }
+	for &fire, i in s.ground.fires { fire = {id = u32(i+1), center = {x = i%8, y = i/8}} }
 	prepare_expedition_lights(r, nil, w)
 	l := &m.lights
 	testing.expect_value(t, l.count, EXPEDITION_LIGHTS)
@@ -198,7 +198,7 @@ test_expedition_dynamic_light_budget_retains_nearest_fire_and_devices :: proc(t:
 	s.object_count = 12
 	for i in 0..<s.object_count { s.objects[i] = {kind = .Tesla_Coil, position = {f32(14-i), 0}, visible = true} }
 	s.ground.fire_count = 3
-	for i in 0..<3 { s.ground.fires[i] = {id = u32(i+1), center = {i, 0}} }
+	for i in 0..<3 { s.ground.fires[i] = {id = u32(i+1), center = {x = i, y = 0}} }
 	prepare_expedition_lights(r, nil, w)
 	l := &m.lights
 	testing.expect_value(t, l.count, EXPEDITION_LIGHTS)
@@ -388,7 +388,7 @@ test_expedition_light_tiles_prepare_after_dynamic_sort_and_clear_stale_bits :: p
 	s.object_count=10
 	for i in 0..<s.object_count {s.objects[i]={kind=.Tesla_Coil,position={f32(10-i),2},visible=true}}
 	s.ground.fire_count=2
-	s.ground.fires[0]={id=1,center={0,0}};s.ground.fires[1]={id=2,center={1,0}}
+	s.ground.fires[0]={id=1,center={x = 0, y = 0}};s.ground.fires[1]={id=2,center={x = 1, y = 0}}
 	prepare_expedition_lights(r,nil,w)
 	testing.expect_value(t,l.count,EXPEDITION_LIGHTS)
 	for i in 0..<int(l.count) {

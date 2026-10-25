@@ -32,30 +32,30 @@ site_layout :: proc(kind:Site_Kind)->(d:Site_Layout) {
 	d.trigger_radius=8;d.encounter_radius=16
 	switch kind {
 	case .Nest:
-		d.half_extent={13,12};d.entrances={{-13,0},{13,0},{-4,-12},{5,12}};d.entrance_count=4
-		d.spawn_lanes={{8,-6},{8,6},{0,-7}};d.spawn_count=3
+		d.half_extent={x = 13, y = 12};d.entrances={{x = -13, y = 0},{x = 13, y = 0},{x = -4, y = -12},{x = 5, y = 12}};d.entrance_count=4
+		d.spawn_lanes={{x = 8, y = -6},{x = 8, y = 6},{x = 0, y = -7}};d.spawn_count=3
 	case .Cache:
-		d.half_extent={11,10};d.entrances={{-11,0},{-5,10},{},{}};d.entrance_count=2
-		d.spawn_lanes={{5,-2},{5,2},{6,0}};d.spawn_count=3
+		d.half_extent={x = 11, y = 10};d.entrances={{x = -11, y = 0},{x = -5, y = 10},{},{}};d.entrance_count=2
+		d.spawn_lanes={{x = 5, y = -2},{x = 5, y = 2},{x = 6, y = 0}};d.spawn_count=3
 	case .Archive:
-		d.half_extent={14,12};d.entrances={{-14,0},{0,12},{5,-12},{}};d.entrance_count=3
+		d.half_extent={x = 14, y = 12};d.entrances={{x = -14, y = 0},{x = 0, y = 12},{x = 5, y = -12},{}};d.entrance_count=3
 	case .Workshop:
-		d.half_extent={12,11};d.entrances={{-12,0},{0,11},{0,-11},{}};d.entrance_count=3
+		d.half_extent={x = 12, y = 11};d.entrances={{x = -12, y = 0},{x = 0, y = 11},{x = 0, y = -11},{}};d.entrance_count=3
 	case .Spring:
-		d.half_extent={12,12};d.entrances={{-12,0},{12,0},{0,-12},{0,12}};d.entrance_count=4
+		d.half_extent={x = 12, y = 12};d.entrances={{x = -12, y = 0},{x = 12, y = 0},{x = 0, y = -12},{x = 0, y = 12}};d.entrance_count=4
 	case .Trial:
-		d.half_extent={14,13};d.entrances={{-14,0},{14,0},{0,-13},{0,13}};d.entrance_count=4
-		d.spawn_lanes={{7,-6},{7,6},{0,-8}};d.spawn_count=3
+		d.half_extent={x = 14, y = 13};d.entrances={{x = -14, y = 0},{x = 14, y = 0},{x = 0, y = -13},{x = 0, y = 13}};d.entrance_count=4
+		d.spawn_lanes={{x = 7, y = -6},{x = 7, y = 6},{x = 0, y = -8}};d.spawn_count=3
 	case .Boss:
-		d.half_extent={14,14};d.entrances={{-14,0},{-6,-14},{6,14},{}};d.entrance_count=3
-		d.spawn_lanes={{4,0},{8,-8},{8,8}};d.spawn_count=3;d.encounter_radius=20
+		d.half_extent={x = 14, y = 14};d.entrances={{x = -14, y = 0},{x = -6, y = -14},{x = 6, y = 14},{}};d.entrance_count=3
+		d.spawn_lanes={{x = 4, y = 0},{x = 8, y = -8},{x = 8, y = 8}};d.spawn_count=3;d.encounter_radius=20
 	case .Memory:
-		d.half_extent={10,10};d.entrances={{-10,0},{0,10},{0,-10},{}};d.entrance_count=3
+		d.half_extent={x = 10, y = 10};d.entrances={{x = -10, y = 0},{x = 0, y = 10},{x = 0, y = -10},{}};d.entrance_count=3
 	case .Tunnel:
-		d.half_extent={11,10};d.entrances={{-11,0},{11,0},{},{}};d.entrance_count=2
+		d.half_extent={x = 11, y = 10};d.entrances={{x = -11, y = 0},{x = 11, y = 0},{},{}};d.entrance_count=2
 	// A cave's arch is a few cells of rock stamped by the cave itself (cave.odin), with no layout of its own.
 	case .Cave:
-		d.half_extent={3,2};d.trigger_radius=4
+		d.half_extent={x = 3, y = 2};d.trigger_radius=4
 	}
 	return
 }
@@ -63,27 +63,27 @@ site_layout :: proc(kind:Site_Kind)->(d:Site_Layout) {
 site_rotate :: proc(p:grid.Position,orientation:u8)->grid.Position {
 	switch orientation%4 {
 	case 0:return p
-	case 1:return {-p.y,p.x}
-	case 2:return {-p.x,-p.y}
-	case 3:return {p.y,-p.x}
+	case 1:return {x = -p.y, y = p.x}
+	case 2:return {x = -p.x, y = -p.y}
+	case 3:return {x = p.y, y = -p.x}
 	}
 	return p
 }
 
-site_local :: proc(site:^Site,p:grid.Position)->grid.Position {return site_rotate({p.x-site.position.x,p.y-site.position.y},(4-site.orientation%4)%4)}
+site_local :: proc(site:^Site,p:grid.Position)->grid.Position {return site_rotate(grid.offset(p, -site.position.x, -site.position.y),(4-site.orientation%4)%4)}
 site_world :: proc(site:^Site,p:grid.Position)->grid.Position {return game.add_position(site.position,site_rotate(p,site.orientation))}
 
 @(private)
 site_gatepost :: proc(kind:Site_Kind,entry:grid.Position,side:int)->grid.Position {
 	spread:=4 if kind==.Boss else 3
-	if abs(entry.x)>abs(entry.y) {return {entry.x-clamp(entry.x,-1,1)*2,entry.y+spread*side}}
-	return {entry.x+spread*side,entry.y-clamp(entry.y,-1,1)*2}
+	if abs(entry.x)>abs(entry.y) {return grid.offset(entry, -clamp(entry.x,-1,1)*2, spread*side)}
+	return grid.offset(entry, spread*side, -clamp(entry.y,-1,1)*2)
 }
 
 site_bounds :: proc(site:^Site)->(minimum,maximum:grid.Position) {
 	d:=site_layout(site.kind);half:=d.half_extent
-	if site.orientation%2==1 {half={half.y,half.x}}
-	return {site.position.x-half.x,site.position.y-half.y},{site.position.x+half.x,site.position.y+half.y}
+	if site.orientation%2==1 {half={x = half.y, y = half.x}}
+	return grid.offset(site.position, -half.x, -half.y),grid.offset(site.position, half.x, half.y)
 }
 
 site_cell :: proc(site:^Site,p:grid.Position)->(cell:Site_Cell) {
@@ -183,7 +183,7 @@ site_decor_anchors :: proc(site:^Site)->(set:Site_Decor_Set) {
 stamp_site :: proc(data:^level.Level,site:^Site) {
 	minimum,maximum:=site_bounds(site)
 	for y in minimum.y..=maximum.y {for x in minimum.x..=maximum.x {
-		p:=grid.Position{x,y};cell:=site_cell(site,p);if !cell.inside {continue}
+		p:=grid.Position{x = x, y = y};cell:=site_cell(site,p);if !cell.inside {continue}
 		_=level.set_tile(data,p,{.Wall if cell.wall else .Floor})
 	}}
 }
@@ -191,8 +191,8 @@ stamp_site :: proc(data:^level.Level,site:^Site) {
 @(private)
 site_spawn_position :: proc(site:^Site,wave,member:int)->grid.Position {
 	d:=site_layout(site.kind)
-	if d.spawn_count==0 {return game.add_position(site.position,{member%3-1,member/3-1})}
+	if d.spawn_count==0 {return game.add_position(site.position,{x = member%3-1, y = member/3-1})}
 	lane:=d.spawn_lanes[wave%d.spawn_count]
 	// Alternating spawn wings leave the ritual center and all exits free.
-	return site_world(site,game.add_position(lane,{member%3-1,member/3-1}))
+	return site_world(site,game.add_position(lane,{x = member%3-1, y = member/3-1}))
 }

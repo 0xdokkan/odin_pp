@@ -17,15 +17,15 @@ test_expedition_floor_cache_all_biomes_preserve_gameplay_tiles_and_terrain :: pr
 		testing.expect(t,refresh_expedition_floor_data(&cache,&room,&w))
 		testing.expect_value(t,cache.width,world.map_size(biome))
 		for tile,i in data.tiles.cells {
-			p:=grid.Position{i%cache.width,i/cache.width}
+			p:=grid.Position{x = i%cache.width, y = i/cache.width}
 			testing.expect_value(t,cache.pixels[i].r&7,u8(tile.kind))
 			testing.expect_value(t,cache.pixels[i].g&15,u8(game.expedition_terrain(u8(biome),p)))
 			// Compare packed adjacency against independent gameplay queries;
 			// in particular a neighbouring Void retains its terrain enum.
 			if tile.kind!=.Void && i%97==0 {
 				walls,boundary:u8
-				for d,direction in ([4]grid.Position{{-1,0},{1,0},{0,-1},{0,1}}) {
-					q:=grid.Position{p.x+d.x,p.y+d.y};adjacent,inside:=level.tile_at(&data,q)
+				for d,direction in ([4]grid.Position{{x = -1, y = 0},{x = 1, y = 0},{x = 0, y = -1},{x = 0, y = 1}}) {
+					q:=grid.offset(p, d.x, d.y);adjacent,inside:=level.tile_at(&data,q)
 					if inside && adjacent.kind==.Wall {walls|=u8(1<<uint(direction))}
 					terrain:=game.expedition_terrain(u8(biome),q) if inside else game.Expedition_Terrain.Plain
 					if terrain!=game.expedition_terrain(u8(biome),p) {boundary|=u8(1<<uint(direction))}
@@ -50,11 +50,11 @@ test_expedition_floor_cache_all_biomes_preserve_gameplay_tiles_and_terrain :: pr
 test_expedition_floor_contact_shadows_follow_actual_walls_and_stable_slabs :: proc(t:^testing.T) {
 	data,ok:=level.create(32,32,{.Floor});testing.expect(t,ok);defer level.destroy(&data)
 	w:=world.World{biome=.Cyber,site_count=1}
-	w.sites[0]={kind=.Archive,position={16,16},layout_version=world.SITE_LAYOUT_VERSION}
+	w.sites[0]={kind=.Archive,position={x = 16, y = 16},layout_version=world.SITE_LAYOUT_VERSION}
 	room:=game.Room{level_data=&data};cache:Expedition_Floor_Data;defer destroy_expedition_floor_data(&cache)
-	_=level.set_tile(&data,{7,8},{.Wall});_=level.set_tile(&data,{8,7},{.Wall})
-	_=level.set_tile(&data,{9,8},{.Door});_=level.set_tile(&data,{8,9},{.Void})
-	_=level.set_tile(&data,{16,16},{.Wall}) // Actual solid terminal fixture.
+	_=level.set_tile(&data,{x = 7, y = 8},{.Wall});_=level.set_tile(&data,{x = 8, y = 7},{.Wall})
+	_=level.set_tile(&data,{x = 9, y = 8},{.Door});_=level.set_tile(&data,{x = 8, y = 9},{.Void})
+	_=level.set_tile(&data,{x = 16, y = 16},{.Wall}) // Actual solid terminal fixture.
 	testing.expect(t,refresh_expedition_floor_data(&cache,&room,&w))
 	testing.expect_value(t,(cache.pixels[8*32+8].r>>3)&15,u8(5))
 	testing.expect_value(t,(cache.pixels[16*32+15].r>>3)&15,u8(2))
@@ -67,7 +67,7 @@ test_expedition_floor_contact_shadows_follow_actual_walls_and_stable_slabs :: pr
 	pixels:=raw_data(cache.pixels);w.seed=991
 	testing.expect(t,!refresh_expedition_floor_data(&cache,&room,&w))
 	testing.expect_value(t,raw_data(cache.pixels),pixels)
-	_=level.set_tile(&data,{7,8},{.Floor});_=level.set_tile(&data,{16,16},{.Floor})
+	_=level.set_tile(&data,{x = 7, y = 8},{.Floor});_=level.set_tile(&data,{x = 16, y = 16},{.Floor})
 	testing.expect(t,refresh_expedition_floor_data(&cache,&room,&w))
 	testing.expect_value(t,(cache.pixels[8*32+8].r>>3)&15,u8(4))
 	// An authored fixture descriptor alone must not cast a collision shadow.
@@ -78,7 +78,7 @@ test_expedition_floor_contact_shadows_follow_actual_walls_and_stable_slabs :: pr
 test_expedition_floor_cache_ignores_animation_but_invalidates_geography :: proc(t:^testing.T) {
 	data,ok:=level.create(40,40,{.Floor});testing.expect(t,ok);defer level.destroy(&data)
 	w:=world.World{biome=.Inferno,site_count=1}
-	w.sites[0]={kind=.Nest,position={20,20},layout_version=world.SITE_LAYOUT_VERSION}
+	w.sites[0]={kind=.Nest,position={x = 20, y = 20},layout_version=world.SITE_LAYOUT_VERSION}
 	room:=game.Room{level_data=&data};cache:Expedition_Floor_Data;defer destroy_expedition_floor_data(&cache)
 	testing.expect(t,refresh_expedition_floor_data(&cache,&room,&w))
 	w.clock=18;w.beat=9;w.lane_warning=true;w.lane=15;w.lane_vertical=true
@@ -86,7 +86,7 @@ test_expedition_floor_cache_ignores_animation_but_invalidates_geography :: proc(
 	room.phase=.Combat
 	testing.expect(t,!refresh_expedition_floor_data(&cache,&room,&w))
 	testing.expect_value(t,cache.rebuilds,u64(1))
-	p:=grid.Position{14,14};testing.expect(t,game.expedition_terrain(7,p)!=.Lava)
+	p:=grid.Position{x = 14, y = 14};testing.expect(t,game.expedition_terrain(7,p)!=.Lava)
 	testing.expect(t,level.set_tile(&data,p,{.Door}))
 	testing.expect(t,refresh_expedition_floor_data(&cache,&room,&w))
 	testing.expect_value(t,cache.pixels[p.y*40+p.x].g&15,u8(game.Expedition_Terrain.Lava))
@@ -105,17 +105,17 @@ test_expedition_floor_cache_ignores_animation_but_invalidates_geography :: proc(
 test_expedition_floor_cache_exact_void_and_platform_boundaries :: proc(t:^testing.T) {
 	data,ok:=level.create(24,24,{.Floor});testing.expect(t,ok);defer level.destroy(&data)
 	w:=world.World{biome=.Sky,site_count=1}
-	w.sites[0]={kind=.Nest,position={12,12},layout_version=world.SITE_LAYOUT_VERSION}
+	w.sites[0]={kind=.Nest,position={x = 12, y = 12},layout_version=world.SITE_LAYOUT_VERSION}
 	room:=game.Room{level_data=&data};cache:Expedition_Floor_Data;defer destroy_expedition_floor_data(&cache)
-	_=level.set_tile(&data,{5,6},{.Void});_=level.set_tile(&data,{7,6},{.Void})
-	_=level.set_tile(&data,{6,5},{.Void});_=level.set_tile(&data,{6,7},{.Void})
+	_=level.set_tile(&data,{x = 5, y = 6},{.Void});_=level.set_tile(&data,{x = 7, y = 6},{.Void})
+	_=level.set_tile(&data,{x = 6, y = 5},{.Void});_=level.set_tile(&data,{x = 6, y = 7},{.Void})
 	testing.expect(t,refresh_expedition_floor_data(&cache,&room,&w))
 	testing.expect_value(t,cache.pixels[6*24+6].a&15,u8(15))
 	testing.expect_value(t,cache.pixels[0].a&15,u8(5))
 	testing.expect_value(t,cache.pixels[12*24+12].a>>4,u8(0))
 	testing.expect_value(t,cache.pixels[9*24+9].a>>4,u8(5))
 	testing.expect_value(t,cache.pixels[15*24+15].a>>4,u8(10))
-	_=level.set_tile(&data,{7,6},{.Floor})
+	_=level.set_tile(&data,{x = 7, y = 6},{.Floor})
 	testing.expect(t,refresh_expedition_floor_data(&cache,&room,&w))
 	testing.expect_value(t,cache.pixels[6*24+6].a&15,u8(13))
 	// A bulk restore has an explicit invalidation hook.
@@ -128,11 +128,11 @@ test_expedition_floor_cache_exact_void_and_platform_boundaries :: proc(t:^testin
 test_expedition_floor_cache_resizes_and_preserves_site_overlap_precedence :: proc(t:^testing.T) {
 	data,ok:=level.create(40,40,{.Floor});testing.expect(t,ok);defer level.destroy(&data)
 	w:=world.World{biome=.Cyber,site_count=2}
-	w.sites[0]={kind=.Spring,position={20,20},layout_version=world.SITE_LAYOUT_VERSION}
-	w.sites[1]={kind=.Nest,position={20,20},layout_version=world.SITE_LAYOUT_VERSION}
+	w.sites[0]={kind=.Spring,position={x = 20, y = 20},layout_version=world.SITE_LAYOUT_VERSION}
+	w.sites[1]={kind=.Nest,position={x = 20, y = 20},layout_version=world.SITE_LAYOUT_VERSION}
 	room:=game.Room{level_data=&data};cache:Expedition_Floor_Data;defer destroy_expedition_floor_data(&cache)
 	testing.expect(t,refresh_expedition_floor_data(&cache,&room,&w))
-	_,expected:=world.site_at(&w,{20,20})
+	_,expected:=world.site_at(&w,{x = 20, y = 20})
 	testing.expect_value(t,cache.pixels[20*40+20].b&15,u8(expected.surface))
 	testing.expect_value(t,expected.surface,world.Site_Surface.Pool)
 	level.destroy(&data)

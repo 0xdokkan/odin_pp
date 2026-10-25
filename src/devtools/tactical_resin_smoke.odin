@@ -49,7 +49,7 @@ run_tactical_resin_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer
 	for card in ([?]game.Card_Id{.Prismatic_Barrage, .Fate_Strike, .Guard, .Shove, .Afterimage}) {
 		if _, added := game.add_owned_card(&run.player.deck, card); !added { return false }
 	}
-	enemies := [?]game.Enemy_Spawn{{position = {7, 4}, health = 100, attack = 1, archetype = .Brute}}
+	enemies := [?]game.Enemy_Spawn{{position = {x = 7, y = 4}, health = 100, attack = 1, archetype = .Brute}}
 	room, ok = game.create_room(&data, &run.player, {enemies = enemies[:]})
 	if !ok { return false }
 	renderer.timeline = {}

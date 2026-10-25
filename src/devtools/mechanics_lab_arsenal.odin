@@ -41,12 +41,12 @@ mechanics_lab_play_cannon :: proc(window: ^app.Window, renderer: ^render.Rendere
 mechanics_lab_cannon :: proc(window: ^app.Window, renderer: ^render.Renderer, room: ^game.Room, controller: ^run_session.Tactical_Controller,
 	cards: ^run_session.Card_Interaction_State, buffer: ^run_session.Buffered_Gameplay_Command) -> bool {
 	player := room.player
-	center := grid.Position{run_session.MECHANICS_LAB_WIDTH/2, run_session.MECHANICS_LAB_HEIGHT/2}
+	center := grid.Position{x = run_session.MECHANICS_LAB_WIDTH/2, y = run_session.MECHANICS_LAB_HEIGHT/2}
 	spawn :: mechanics_lab_spawn_enemy
 	foe :: mechanics_lab_enemy
 	if !mechanics_lab_party_arena(window, renderer, room, controller, cards, buffer, "the Cannone") { return false }
-	cannon_at := grid.Position{center.x+2, center.y}
-	first_id, second_id := spawn(room, {center.x+6, center.y}, 60), spawn(room, {center.x+8, center.y}, 60)
+	cannon_at := grid.offset(center, 2, 0)
+	first_id, second_id := spawn(room, grid.offset(center, 6, 0), 60), spawn(room, grid.offset(center, 8, 0), 60)
 	if first_id == 0 || second_id == 0 { fmt.eprintln("mechanics lab: no room for the cannon's foes"); return false }
 	render.clear_event_animations(renderer)
 	for _ in 0..<20 { mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0) }
@@ -129,14 +129,14 @@ mechanics_lab_cannon :: proc(window: ^app.Window, renderer: ^render.Renderer, ro
 mechanics_lab_black_hole :: proc(window: ^app.Window, renderer: ^render.Renderer, room: ^game.Room, controller: ^run_session.Tactical_Controller,
 	cards: ^run_session.Card_Interaction_State, buffer: ^run_session.Buffered_Gameplay_Command) -> bool {
 	player := room.player
-	center := grid.Position{run_session.MECHANICS_LAB_WIDTH/2, run_session.MECHANICS_LAB_HEIGHT/2}
+	center := grid.Position{x = run_session.MECHANICS_LAB_WIDTH/2, y = run_session.MECHANICS_LAB_HEIGHT/2}
 	spawn :: mechanics_lab_spawn_enemy
 	foe :: mechanics_lab_enemy
 	if !mechanics_lab_party_arena(window, renderer, room, controller, cards, buffer, "the Buco Nero") { return false }
-	hole_at := grid.Position{center.x+3, center.y}
-	inside_id := spawn(room, {hole_at.x+1, hole_at.y}, 2*game.BLACK_HOLE_BASE_DAMAGE-1)
-	far_id := spawn(room, {hole_at.x, hole_at.y-2}, 60)
-	boss_id := spawn(room, {hole_at.x-2, hole_at.y+2}, 90, .Custodian)
+	hole_at := grid.offset(center, 3, 0)
+	inside_id := spawn(room, grid.offset(hole_at, 1, 0), 2*game.BLACK_HOLE_BASE_DAMAGE-1)
+	far_id := spawn(room, grid.offset(hole_at, 0, -2), 60)
+	boss_id := spawn(room, grid.offset(hole_at, -2, 2), 90, .Custodian)
 	if inside_id == 0 || far_id == 0 || boss_id == 0 { fmt.eprintln("mechanics lab: no room for the hole's foes"); return false }
 	render.clear_event_animations(renderer)
 	for _ in 0..<20 { mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0) }
@@ -159,7 +159,7 @@ mechanics_lab_black_hole :: proc(window: ^app.Window, renderer: ^render.Renderer
 	far, boss := foe(room, far_id), foe(room, boss_id)
 	if far == nil || far.health >= 60 { fmt.eprintln("mechanics lab: the far foe was not drawn in and hurt"); return false }
 	if far.position.x != hole_at.x || abs(far.position.y-hole_at.y) > 1 { fmt.eprintln("mechanics lab: the far foe stands at", far.position); return false }
-	if boss == nil || boss.position != (grid.Position{hole_at.x-2, hole_at.y+2}) { fmt.eprintln("mechanics lab: the heavy foe was moved"); return false }
+	if boss == nil || boss.position != (grid.offset(hole_at, -2, 2)) { fmt.eprintln("mechanics lab: the heavy foe was moved"); return false }
 	artifacts.screenshot("odin_pp_mechanics_lab_black_hole_pull.png")
 	// It closes at its eighth beat.
 	for index in 0..<len(room.objects) { if room.objects[index].kind == .Devouring_Hole { room.objects[index].life = 1 } }
@@ -182,7 +182,7 @@ mechanics_lab_black_hole :: proc(window: ^app.Window, renderer: ^render.Renderer
 mechanics_lab_dinosaur :: proc(window: ^app.Window, renderer: ^render.Renderer, room: ^game.Room, controller: ^run_session.Tactical_Controller,
 	cards: ^run_session.Card_Interaction_State, buffer: ^run_session.Buffered_Gameplay_Command) -> bool {
 	player := room.player
-	center := grid.Position{run_session.MECHANICS_LAB_WIDTH/2, run_session.MECHANICS_LAB_HEIGHT/2}
+	center := grid.Position{x = run_session.MECHANICS_LAB_WIDTH/2, y = run_session.MECHANICS_LAB_HEIGHT/2}
 	spawn :: mechanics_lab_spawn_enemy
 	foe :: mechanics_lab_enemy
 	stacks :: proc(room: ^game.Room, id: u32, kind: game.Status_Kind) -> i32 {
@@ -224,7 +224,7 @@ mechanics_lab_dinosaur :: proc(window: ^app.Window, renderer: ^render.Renderer, 
 		mechanics_lab_still(window, renderer, room, 0, fmt.ctprintf("odin_pp_mechanics_lab_dino_%d.png", face))
 		switch kind {
 		case .Raptor:
-			bait := spawn(room, {center.x, center.y-3}, 60)
+			bait := spawn(room, grid.offset(center, 0, -3), 60)
 			if bait == 0 { return false }
 			if !step(window, renderer, room, controller, cards, buffer, .North) || !step(window, renderer, room, controller, cards, buffer, .North) ||
 			   !step(window, renderer, room, controller, cards, buffer, .North) { return false }
@@ -236,7 +236,7 @@ mechanics_lab_dinosaur :: proc(window: ^app.Window, renderer: ^render.Renderer, 
 			for _ in 0..<60 { mechanics_lab_reel_frame(window, renderer, room, controller, cards, buffer, "dino_raptor_bump", 6, &frame) }
 			if stacks(room, bait, .Bleed) != 2 || before-foe(room, bait).health < 2 { fmt.eprintln("mechanics lab: the bleeding did not bite"); return false }
 		case .Stego:
-			archer := spawn(room, {center.x+4, center.y}, 30, .Archer, true)
+			archer := spawn(room, grid.offset(center, 4, 0), 30, .Archer, true)
 			if archer == 0 { return false }
 			hurt := false
 			for _ in 0..<900 {
@@ -247,7 +247,7 @@ mechanics_lab_dinosaur :: proc(window: ^app.Window, renderer: ^render.Renderer, 
 				fmt.eprintln("mechanics lab: the stegosaurus did not turn the bolt back clean"); return false
 			}
 		case .Dilo:
-			bait := spawn(room, {center.x, center.y-2}, 60)
+			bait := spawn(room, grid.offset(center, 0, -2), 60)
 			if bait == 0 { return false }
 			if !step(window, renderer, room, controller, cards, buffer, .North) || !step(window, renderer, room, controller, cards, buffer, .North) { return false }
 			// Poison wears a stack a beat: watched as it lands.
@@ -259,8 +259,8 @@ mechanics_lab_dinosaur :: proc(window: ^app.Window, renderer: ^render.Renderer, 
 			if !poisoned { fmt.eprintln("mechanics lab: the dilophosaurus's bump did not poison"); return false }
 			for _ in 0..<20 { mechanics_lab_reel_frame(window, renderer, room, controller, cards, buffer, "dino_dilo_bump", 6, &frame) }
 		case .Giga:
-			left, right := spawn(room, {center.x-1, center.y-1}, 60), spawn(room, {center.x+1, center.y-1}, 60)
-			victim := spawn(room, {center.x, center.y-3}, 30, .Chaser)
+			left, right := spawn(room, grid.offset(center, -1, -1), 60), spawn(room, grid.offset(center, 1, -1), 60)
+			victim := spawn(room, grid.offset(center, 0, -3), 30, .Chaser)
 			if left == 0 || right == 0 || victim == 0 { return false }
 			if !step(window, renderer, room, controller, cards, buffer, .North) { return false }
 			for _ in 0..<80 { mechanics_lab_reel_frame(window, renderer, room, controller, cards, buffer, "dino_giga_stomp", 6, &frame) }
@@ -271,7 +271,7 @@ mechanics_lab_dinosaur :: proc(window: ^app.Window, renderer: ^render.Renderer, 
 			if !step(window, renderer, room, controller, cards, buffer, .North) || !step(window, renderer, room, controller, cards, buffer, .North) { return false }
 			for _ in 0..<80 { mechanics_lab_reel_frame(window, renderer, room, controller, cards, buffer, "dino_giga_bite", 6, &frame) }
 			// His bump would kill the chaser: he walks onto it and crushes it.
-			if foe(room, victim) != nil || player.position != (grid.Position{center.x, center.y-3}) {
+			if foe(room, victim) != nil || player.position != (grid.offset(center, 0, -3)) {
 				fmt.eprintln("mechanics lab: the giganotosaurus did not crush the chaser under him"); return false
 			}
 			if .Dino_Stomp not_in renderer.shown_events { fmt.eprintln("mechanics lab: no crush was shown"); return false }

@@ -212,7 +212,7 @@ apply_height_rows :: proc(level: ^Level, rows: []string) -> bool {
 			case symbol == ' ':
 			case: return false
 			}
-			if !set_height(level, {x, y}, steps) { return false }
+			if !set_height(level, {x = x, y = y}, steps) { return false }
 		}
 	}
 	return true
@@ -486,7 +486,7 @@ generation_config_is_valid :: proc(config: Room_Generation_Config) -> bool {
 		// With central placement both anchors need their full clearance. The
 		// farthest corners of these regions bound every possible anchor pair.
 		spawn_min := 1+config.spawn_clearance_radius
-		spawn_max := grid.Position{config.width-2-config.spawn_clearance_radius, config.height-2-config.spawn_clearance_radius}
+		spawn_max := grid.Position{x = config.width-2-config.spawn_clearance_radius, y = config.height-2-config.spawn_clearance_radius}
 		exit_min, exit_max := exit_candidate_bounds(config)
 		exit_min.x = max(exit_min.x, 1+config.exit_clearance_radius)
 		exit_min.y = max(exit_min.y, 1+config.exit_clearance_radius)

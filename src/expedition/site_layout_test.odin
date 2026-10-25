@@ -11,27 +11,27 @@ test_authored_sites_have_reachable_wide_entrances_cover_and_safe_spawns :: proc(
 	for kind in Site_Kind {for orientation in u8(0)..<4 {
 		// A cave's arch is a few cells of rock, not a courtyard (cave_test.odin).
 		if kind==.Cave {continue}
-		site:=Site{kind=kind,position={40,40},orientation=orientation,layout_version=SITE_LAYOUT_VERSION}
+		site:=Site{kind=kind,position={x = 40, y = 40},orientation=orientation,layout_version=SITE_LAYOUT_VERSION}
 		d:=site_layout(kind);minimum,maximum:=site_bounds(&site)
 		testing.expect(t,d.half_extent.x>=10 && d.half_extent.y>=10 && d.half_extent.x<=14 && d.half_extent.y<=14)
-		start:=site_world(&site,{-1,0})
+		start:=site_world(&site,{x = -1, y = 0})
 		seen:[81*81]bool;queue:[81*81]grid.Position;head,tail:=0,1;queue[0]=start;seen[start.y*81+start.x]=true
 		for head<tail {
 			p:=queue[head];head+=1
-			for offset in ([4]grid.Position{{0,-1},{1,0},{0,1},{-1,0}}) {
-				q:=grid.Position{p.x+offset.x,p.y+offset.y};c:=site_cell(&site,q)
+			for offset in ([4]grid.Position{{x = 0, y = -1},{x = 1, y = 0},{x = 0, y = 1},{x = -1, y = 0}}) {
+				q:=grid.offset(p, offset.x, offset.y);c:=site_cell(&site,q)
 				if !c.inside || c.wall || seen[q.y*81+q.x] {continue}
 				seen[q.y*81+q.x]=true;queue[tail]=q;tail+=1
 			}
 		}
 		walls:=0;walkable:=0
 		for y in minimum.y..=maximum.y {for x in minimum.x..=maximum.x {
-			c:=site_cell(&site,{x,y});if c.wall {walls+=1}else {walkable+=1;testing.expect(t,seen[y*81+x])}
+			c:=site_cell(&site,{x = x, y = y});if c.wall {walls+=1}else {walkable+=1;testing.expect(t,seen[y*81+x])}
 		}}
 		testing.expect(t,walls>=12 && walls<walkable/2)
 		for entrance in d.entrances[:d.entrance_count] {
 			for shift in -1..=1 {
-				local:=grid.Position{entrance.x,entrance.y+shift} if abs(entrance.x)>abs(entrance.y) else grid.Position{entrance.x+shift,entrance.y}
+				local:=grid.offset(entrance, 0, shift) if abs(entrance.x)>abs(entrance.y) else grid.offset(entrance, shift, 0)
 				p:=site_world(&site,local);testing.expect(t,seen[p.y*81+p.x] && !site_cell(&site,p).wall)
 			}
 		}
@@ -55,7 +55,7 @@ test_authored_geometry_matches_semantics_in_all_biomes_and_preserves_spawn :: pr
 			minimum,maximum:=site_bounds(&site)
 			testing.expect(t,minimum.x>=2 && minimum.y>=2 && maximum.x<size(&w)-2 && maximum.y<size(&w)-2)
 			for y in minimum.y..=maximum.y {for x in minimum.x..=maximum.x {
-				p:=grid.Position{x,y};cell:=site_cell(&site,p);tile,_:=level.tile_at(&data,p)
+				p:=grid.Position{x = x, y = y};cell:=site_cell(&site,p);tile,_:=level.tile_at(&data,p)
 				testing.expect(t,(tile.kind==.Wall)==cell.wall,fmt.tprintf("Biome %v site %v at %v: wall query %v but tile %v",biome,site.kind,p,cell.wall,tile.kind))
 			}}
 		}

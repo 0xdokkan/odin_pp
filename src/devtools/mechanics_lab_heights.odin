@@ -38,8 +38,8 @@ mechanics_lab_heights :: proc(window: ^app.Window, renderer: ^render.Renderer, r
 	for foe in room.enemies { mechanics_lab_hold(room, foe.id) }
 	for _ in 0..<20 { mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0) }
 	start := player.position
-	if game.cell_height(room, start) != 0 || game.cell_height(room, {12, 8}) != 1 || game.cell_height(room, {14, 8}) != 3 ||
-	   game.cell_height(room, {15, 8}) != 4 || game.cell_height(room, {4, 11}) != 9 {
+	if game.cell_height(room, start) != 0 || game.cell_height(room, {x = 12, y = 8}) != 1 || game.cell_height(room, {x = 14, y = 8}) != 3 ||
+	   game.cell_height(room, {x = 15, y = 8}) != 4 || game.cell_height(room, {x = 4, y = 11}) != 9 {
 		fmt.eprintln("mechanics lab: the arena of heights is not the one drawn"); return false
 	}
 	mechanics_lab_still(window, renderer, room, 0, "odin_pp_mechanics_lab_heights_arena.png")
@@ -61,7 +61,7 @@ mechanics_lab_heights :: proc(window: ^app.Window, renderer: ^render.Renderer, r
 		if !mechanics_lab_step(window, renderer, room, controller, cards, buffer, .East) { fmt.eprintln("mechanics lab: the plateau did not hold the player"); return false }
 	}
 	edge := player.position
-	if edge != (grid.Position{19, 8}) { fmt.eprintln("mechanics lab: the player is not at the plateau's edge:", edge); return false }
+	if edge != (grid.Position{x = 19, y = 8}) { fmt.eprintln("mechanics lab: the player is not at the plateau's edge:", edge); return false }
 	mechanics_lab_wait_free(window, renderer, room, controller, cards, buffer)
 	if game.try_move_player(room, .East) != .Blocked || player.position != edge {
 		fmt.eprintln("mechanics lab: the cliff did not stop the walk"); return false
@@ -74,11 +74,11 @@ mechanics_lab_heights :: proc(window: ^app.Window, renderer: ^render.Renderer, r
 	if !has_lasso { fmt.eprintln("mechanics lab: no Lazzo in hand"); return false }
 	definition, _ := game.card_definition_by_id(.Lasso)
 	reach := definition.targeting.cast_range.maximum
-	if game.height_range_maximum(room, reach, edge, {edge.x+reach, edge.y}) != reach+1 {
+	if game.height_range_maximum(room, reach, edge, grid.offset(edge, reach, 0)) != reach+1 {
 		fmt.eprintln("mechanics lab: no bonus in reach from the plateau"); return false
 	}
 	player.deck.energy = player.deck.rules.max_energy
-	mechanics_lab_capture_hits(window, renderer, room, lasso.id, 0, {edge.x+1, edge.y}, "odin_pp_mechanics_lab_heights_reach.png")
+	mechanics_lab_capture_hits(window, renderer, room, lasso.id, 0, grid.offset(edge, 1, 0), "odin_pp_mechanics_lab_heights_reach.png")
 
 	// A foe pushed off the plateau: down the cliff it falls, and the fall hurts
 	// (the drop of four steps costs three). Up the same cliff it cannot be pushed.
@@ -86,7 +86,7 @@ mechanics_lab_heights :: proc(window: ^app.Window, renderer: ^render.Renderer, r
 	for foe in room.enemies { if foe.archetype == .Archer { archer = foe } }
 	if archer.id == 0 || game.cell_height(room, archer.position) != 4 { fmt.eprintln("mechanics lab: the archer is not on the plateau"); return false }
 	before_health := archer.health
-	landing := grid.Position{archer.position.x+2, archer.position.y}
+	landing := grid.offset(archer.position, 2, 0)
 	query := game.query_entity_movement(room, game.enemy_entity(archer.id), landing)
 	if !game.movement_query_is_clear(&query) { fmt.eprintln("mechanics lab: the archer cannot be pushed off the plateau"); return false }
 	presentation := render.capture_room_presentation(room)

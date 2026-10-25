@@ -308,5 +308,5 @@ draw_tactical_shadow_overlay :: proc(renderer: ^Renderer) {
 
 @(private="file")
 shadow_drop_cell :: proc(at: view.Vec2) -> grid.Position {
-	return {int(math.round(at.x)), int(math.round(at.y))}
+	return {x = int(math.round(at.x)), y = int(math.round(at.y))}
 }

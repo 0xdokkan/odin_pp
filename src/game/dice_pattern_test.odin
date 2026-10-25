@@ -106,18 +106,18 @@ test_pattern_cards_are_append_only_upgrades_and_pure_to_preview_at_max_upgrade :
 		testing.expect_value(t, definition.cost, i32(2))
 		data := spell_test_level(t)
 		player := spell_test_player(t, id, int(MAX_DICE_UPGRADE_LEVEL))
-		enemies := [?]Enemy_Spawn{{position = {4, 1}, health = 100, attack = 1}}
+		enemies := [?]Enemy_Spawn{{position = {x = 4, y = 1}, health = 100, attack = 1}}
 		room, ok := create_room(&data, &player, {enemies = enemies[:]})
 		testing.expect(t, ok)
 		before := player
 		for _ in 0..<16 {
 			card := player.deck.hand[0]
-			preview := evaluate_card_targeting(&room, card, {anchor = {4, 1}, has_anchor = true})
+			preview := evaluate_card_targeting(&room, card, {anchor = {x = 4, y = 1}, has_anchor = true})
 			testing.expect_value(t, preview.error, Card_Compile_Error.None)
 			testing.expect(t, !preview.has_movement)
 			path := query_spell_path(&room, card, entity_target(enemy_entity(1)))
 			testing.expect_value(t, path.count, 1)
-			testing.expect_value(t, path.positions[0], grid.Position{4, 1})
+			testing.expect_value(t, path.positions[0], grid.Position{x = 4, y = 1})
 			action, err := compile_card_action(&room, card, entity_target(enemy_entity(1)))
 			testing.expect_value(t, err, Card_Compile_Error.None)
 			testing.expect_value(t, action.effect_count, 2)
@@ -143,7 +143,7 @@ test_barrage_commits_each_success_count_with_shield_first_and_single_economy :: 
 			player.dice = pattern_test_dice_for_faces(t, faces, 3, sides)
 			expected_dice := player.dice
 			expected_roll, _ := roll_dice_pool(&expected_dice, 3, sides)
-			enemies := [?]Enemy_Spawn{{position = {3, 1}, health = 100, attack = 1}}
+			enemies := [?]Enemy_Spawn{{position = {x = 3, y = 1}, health = 100, attack = 1}}
 			room, ok := create_room(&data, &player, {enemies = enemies[:]})
 			testing.expect(t, ok)
 			room.enemies[0].intent = make_wait_intent(&room, room.enemies[0].position)
@@ -193,7 +193,7 @@ test_twin_venom_all_face_pairs_use_highest_die_and_only_doubles_poison :: proc(t
 				player.dice = pattern_test_dice_for_faces(t, {first, second, 0}, 2, sides)
 				expected_dice := player.dice
 				expected_roll, _ := roll_dice_pool(&expected_dice, 2, sides)
-				enemies := [?]Enemy_Spawn{{position = {3, 1}, health = 100, attack = 1}}
+				enemies := [?]Enemy_Spawn{{position = {x = 3, y = 1}, health = 100, attack = 1}}
 				room, ok := create_room(&data, &player, {enemies = enemies[:]})
 				testing.expect(t, ok)
 				room.enemies[0].intent = make_wait_intent(&room, room.enemies[0].position)
@@ -230,7 +230,7 @@ test_pattern_spells_reject_without_mutating_rng_deck_targets_or_relics :: proc(t
 		data := spell_test_level(t)
 		player := spell_test_player(t, id)
 		testing.expect(t, acquire_relic(&player, .Venom_Vial))
-		enemies := [?]Enemy_Spawn{{position = {3, 1}, health = 40, attack = 1}, {position = {5, 1}, health = 40, attack = 1}}
+		enemies := [?]Enemy_Spawn{{position = {x = 3, y = 1}, health = 40, attack = 1}, {position = {x = 5, y = 1}, health = 40, attack = 1}}
 		room, ok := create_room(&data, &player, {enemies = enemies[:]})
 		testing.expect(t, ok)
 		for rejected_case in 0..<7 {
@@ -242,7 +242,7 @@ test_pattern_spells_reject_without_mutating_rng_deck_targets_or_relics :: proc(t
 			case 0: target = entity_target(PLAYER_ENTITY)
 			case 1: target = entity_target(enemy_entity(2))
 			case 2: player.deck.energy = 1
-			case 3: append(&room.obstacles, Obstacle{position = {2, 1}})
+			case 3: append(&room.obstacles, Obstacle{position = {x = 2, y = 1}})
 			case 4: player.dice.roll_count = max(u64)-u64(card_dice_count(id)-1)
 			case 5: player.dice.random_state = 0
 			case 6: target = entity_target(enemy_entity(99))
@@ -268,7 +268,7 @@ test_barrage_aggregates_damage_and_shields_before_thorns_without_false_hits :: p
 		player.health = 10
 		player.stats.defense = 0
 		player.dice = pattern_test_dice_for_faces(t, {4 if successes == 1 else 3, 1, 2}, 3)
-		enemies := [?]Enemy_Spawn{{position = {3, 1}, health = 40, attack = 1}}
+		enemies := [?]Enemy_Spawn{{position = {x = 3, y = 1}, health = 40, attack = 1}}
 		room, ok := create_room(&data, &player, {enemies = enemies[:]})
 		testing.expect(t, ok)
 		room.enemies[0].intent = make_wait_intent(&room, room.enemies[0].position)
@@ -294,7 +294,7 @@ test_pattern_spells_commit_lethal_hits_without_postmortem_poison_or_extra_pulse 
 		testing.expect(t, acquire_relic(&player, .Venom_Vial))
 		faces := [3]i32{4, 4, 4} if id == .Prismatic_Barrage else [3]i32{4, 4, 0}
 		player.dice = pattern_test_dice_for_faces(t, faces, card_dice_count(id))
-		enemies := [?]Enemy_Spawn{{position = {3, 1}, health = 1, attack = 1}}
+		enemies := [?]Enemy_Spawn{{position = {x = 3, y = 1}, health = 1, attack = 1}}
 		room, ok := create_room(&data, &player, {enemies = enemies[:]})
 		testing.expect(t, ok)
 		play := play_card(&room, player.deck.hand[0].id, entity_target(enemy_entity(1)))
@@ -318,7 +318,7 @@ test_pattern_spell_reaction_death_commits_rng_and_stops_further_damage_and_pulse
 		player.health = 1
 		faces := [3]i32{4, 4, 4} if id == .Prismatic_Barrage else [3]i32{4, 4, 0}
 		player.dice = pattern_test_dice_for_faces(t, faces, card_dice_count(id))
-		enemies := [?]Enemy_Spawn{{position = {3, 1}, health = 40, attack = 1}}
+		enemies := [?]Enemy_Spawn{{position = {x = 3, y = 1}, health = 40, attack = 1}}
 		room, ok := create_room(&data, &player, {enemies = enemies[:]})
 		testing.expect(t, ok)
 		applied, _ := apply_status(&room, enemy_entity(1), .Thorns, 4, 3)
@@ -348,8 +348,8 @@ test_twin_venom_pair_uses_existing_poison_relic_once_and_never_bonus_economy :: 
 	player := spell_test_player(t, .Twin_Venom)
 	testing.expect(t, acquire_relic(&player, .Venom_Vial))
 	enemies := [?]Enemy_Spawn{
-		{position = {3, 1}, health = 40, attack = 1},
-		{position = {3, 2}, health = 40, attack = 1},
+		{position = {x = 3, y = 1}, health = 40, attack = 1},
+		{position = {x = 3, y = 2}, health = 40, attack = 1},
 	}
 	room, ok := create_room(&data, &player, {enemies = enemies[:]})
 	testing.expect(t, ok)

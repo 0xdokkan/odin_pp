@@ -22,7 +22,7 @@ strike_structures :: proc(room: ^Room, attacker: grid.Position, cells: []grid.Po
 	}
 	for cell in cells { if reach(data, cell, &hit) { any_hit = true } }
 	for dy in -1..=1 { for dx in -1..=1 {
-		if reach(data, {attacker.x+dx, attacker.y+dy}, &hit) { any_hit = true }
+		if reach(data, grid.offset(attacker, dx, dy), &hit) { any_hit = true }
 	} }
 	if !any_hit { return }
 	// From the last to the first: a structure that falls moves the later ones up.

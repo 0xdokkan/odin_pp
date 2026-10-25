@@ -33,7 +33,7 @@ test_expedition_geography_is_seed_independent_and_all_sites_reachable :: proc(t:
 			for tile in first.tiles.cells {if tile.kind==.Void {voids+=1}}
 			if biome==.Sky {testing.expect(t,voids>1000)}
 			for head:=0;head<tail;head+=1 {
-				for offset in ([4]grid.Position{{1,0},{-1,0},{0,1},{0,-1}}) {
+				for offset in ([4]grid.Position{{x = 1, y = 0},{x = -1, y = 0},{x = 0, y = 1},{x = 0, y = -1}}) {
 					q:=game.add_position(queue[head],offset);tile,ok:=level.tile_at(&first,q)
 					if !ok || !level.is_walkable(tile.kind) || abs(int(level.height_at(&first,q))-int(level.height_at(&first,queue[head])))>1 {continue}
 					i:=q.y*first.tiles.width+q.x;if seen[i] {continue};seen[i]=true;queue[tail]=q;tail+=1
@@ -41,7 +41,7 @@ test_expedition_geography_is_seed_independent_and_all_sites_reachable :: proc(t:
 			}
 			for site in a.sites[:a.site_count] {
 				reachable:=false
-				for dy in -3..=3 {for dx in -3..=3 {p:=grid.Position{site.position.x+dx,site.position.y+dy};if p.x>=0 && p.y>=0 && p.x<first.tiles.width && p.y<first.tiles.height {reachable=reachable || seen[p.y*first.tiles.width+p.x]}}}
+				for dy in -3..=3 {for dx in -3..=3 {p:=grid.offset(site.position, dx, dy);if p.x>=0 && p.y>=0 && p.x<first.tiles.width && p.y<first.tiles.height {reachable=reachable || seen[p.y*first.tiles.width+p.x]}}}
 				testing.expect(t,reachable)
 			}
 			for tile,i in first.tiles.cells {if tile.kind==.Exit {testing.expect(t,seen[i])}}
@@ -54,12 +54,12 @@ test_expedition_geography_is_seed_independent_and_all_sites_reachable :: proc(t:
 test_expedition_leash_preserves_damage_and_finite_groups_never_respawn :: proc(t:^testing.T) {
 	w:World;data:level.Level;p:game.Player;room:=test_world(t,&w,&data,&p)
 	defer level.destroy(&data);defer game.destroy_room(&room)
-	g:=&w.groups[0];p.position={g.anchor.x-4,g.anchor.y}
+	g:=&w.groups[0];p.position=grid.offset(g.anchor, -4, 0)
 	testing.expect(t,engage(&w,&room,0));testing.expect(t,len(room.enemies)>0)
 	room.enemies[0].health-=2;remaining:=room.enemies[0].health
 	p.position=data.player_spawn;tick(&w,&room,0.1)
 	testing.expect(t,!g.active);testing.expect_value(t,g.members[0].enemy.health,remaining)
-	p.position={g.anchor.x-4,g.anchor.y};testing.expect(t,engage(&w,&room,0))
+	p.position=grid.offset(g.anchor, -4, 0);testing.expect(t,engage(&w,&room,0))
 	testing.expect_value(t,room.enemies[0].health,remaining)
 	clear(&room.enemies);xp:=sync(&w,&room)
 	testing.expect(t,xp>0);testing.expect_value(t,sync(&w,&room),i32(0))
@@ -72,12 +72,12 @@ test_expedition_nest_pauses_waves_outside_radius_and_resumes_once :: proc(t:^tes
 	w:World;data:level.Level;p:game.Player;room:=test_world(t,&w,&data,&p)
 	defer level.destroy(&data);defer game.destroy_room(&room)
 	s:=&w.sites[0];testing.expect_value(t,s.kind,Site_Kind.Nest)
-	w.mounted=true;p.position=site_world(s,{-1,0});tick(&w,&room,0.1)
+	w.mounted=true;p.position=site_world(s,{x = -1, y = 0});tick(&w,&room,0.1)
 	testing.expect(t,!w.mounted)
 	testing.expect_value(t,s.wave,1);first_group:=s.group
 	clear(&room.enemies);sync(&w,&room);p.position=data.player_spawn;tick(&w,&room,0.1)
 	testing.expect_value(t,s.wave,1)
-	p.position=site_world(s,{-1,0});tick(&w,&room,0.1)
+	p.position=site_world(s,{x = -1, y = 0});tick(&w,&room,0.1)
 	testing.expect_value(t,s.wave,2);testing.expect(t,s.group!=first_group)
 	count:=w.group_count;tick(&w,&room,0.1);testing.expect_value(t,w.group_count,count)
 	clear(&room.enemies);sync(&w,&room);tick(&w,&room,0.1)
@@ -88,13 +88,13 @@ test_expedition_nest_pauses_waves_outside_radius_and_resumes_once :: proc(t:^tes
 test_authored_final_nest_wave_resumes_after_leash_with_damage_preserved :: proc(t:^testing.T) {
 	w:World;data:level.Level;p:game.Player;room:=test_world(t,&w,&data,&p)
 	defer level.destroy(&data);defer game.destroy_room(&room)
-	s:=&w.sites[0];s.waves=1;p.position=site_world(s,{-1,0})
+	s:=&w.sites[0];s.waves=1;p.position=site_world(s,{x = -1, y = 0})
 	tick(&w,&room,.01);testing.expect_value(t,s.wave,1)
 	g:=&w.groups[s.group];testing.expect(t,g.active && len(room.enemies)>0)
 	room.enemies[0].health-=2;remaining:=room.enemies[0].health;sync(&w,&room)
 	p.position=data.player_spawn;tick(&w,&room,.01)
 	testing.expect(t,!g.active && len(room.enemies)==0 && room.phase==.Loot)
-	p.position=site_world(s,{-1,0});tick(&w,&room,.01)
+	p.position=site_world(s,{x = -1, y = 0});tick(&w,&room,.01)
 	testing.expect(t,g.active && len(room.enemies)>0);testing.expect_value(t,room.enemies[0].health,remaining)
 	testing.expect_value(t,s.wave,1)
 	clear(&room.enemies);sync(&w,&room);tick(&w,&room,.01)
@@ -105,13 +105,13 @@ test_authored_final_nest_wave_resumes_after_leash_with_damage_preserved :: proc(
 test_partial_group_deployment_recovers_when_blocker_clears_without_duplicates :: proc(t:^testing.T) {
 	w:World;data:level.Level;p:game.Player;room:=test_world(t,&w,&data,&p)
 	defer level.destroy(&data);defer game.destroy_room(&room)
-	g:=&w.groups[0];g.site= -1;g.anchor={40,40};g.count=2
-	g.members[0].enemy.position={36,40};g.members[1].enemy.position={40,40};p.position={35,40}
-	for y in 37..=43 {for x in 37..=43 {_=level.set_tile(&data,{x,y},{.Wall})}}
-	_=level.set_tile(&data,{36,40},{.Floor});_=level.set_tile(&data,p.position,{.Floor})
+	g:=&w.groups[0];g.site= -1;g.anchor={x = 40, y = 40};g.count=2
+	g.members[0].enemy.position={x = 36, y = 40};g.members[1].enemy.position={x = 40, y = 40};p.position={x = 35, y = 40}
+	for y in 37..=43 {for x in 37..=43 {_=level.set_tile(&data,{x = x, y = y},{.Wall})}}
+	_=level.set_tile(&data,{x = 36, y = 40},{.Floor});_=level.set_tile(&data,p.position,{.Floor})
 	testing.expect(t,engage(&w,&room,0));testing.expect_value(t,len(room.enemies),1)
 	first_id:=room.enemies[0].id;testing.expect(t,g.members[0].deployed && !g.members[1].deployed && g.members[1].alive)
-	_=level.set_tile(&data,{40,40},{.Floor});testing.expect(t,engage(&w,&room,0))
+	_=level.set_tile(&data,{x = 40, y = 40},{.Floor});testing.expect(t,engage(&w,&room,0))
 	testing.expect_value(t,len(room.enemies),2);testing.expect_value(t,room.enemies[0].id,first_id)
 	testing.expect(t,room.enemies[1].id!=first_id && !engage(&w,&room,0))
 	ordered_remove(&room.enemies,0);sync(&w,&room)
@@ -122,10 +122,10 @@ test_partial_group_deployment_recovers_when_blocker_clears_without_duplicates ::
 test_tunnel_exit_avoids_solid_tiles_and_hidden_traps :: proc(t:^testing.T) {
 	w:World;data:level.Level;p:game.Player;room:=test_world(t,&w,&data,&p,.Vietnam)
 	defer level.destroy(&data);defer game.destroy_room(&room)
-	anchor:=grid.Position{size(&w)-14,16};_=level.set_tile(&data,anchor,{.Wall})
+	anchor:=grid.Position{x = size(&w)-14, y = 16};_=level.set_tile(&data,anchor,{.Wall})
 	for dy in -1..=1 {for dx in -1..=1 {
 		if dx==0 && dy==0 {continue}
-		q:=grid.Position{anchor.x+dx,anchor.y+dy};_=level.set_tile(&data,q,{.Floor})
+		q:=grid.offset(anchor, dx, dy);_=level.set_tile(&data,q,{.Floor})
 		append(&room.traps,game.Trap{id=room.next_trap_id,position=q,damage=4,armed=true});room.next_trap_id+=1
 	}}
 	exit,ok:=tunnel_destination(&w,&room);testing.expect(t,ok && distance(exit,anchor)>=2)
@@ -137,10 +137,10 @@ test_tunnel_exit_avoids_solid_tiles_and_hidden_traps :: proc(t:^testing.T) {
 test_expedition_snapshot_restores_dynamic_terrain_and_exact_room_state :: proc(t:^testing.T) {
 	w:World;data:level.Level;p:game.Player;room:=test_world(t,&w,&data,&p)
 	defer level.destroy(&data);defer game.destroy_room(&room)
-	p.position={w.groups[0].anchor.x-4,w.groups[0].anchor.y};testing.expect(t,engage(&w,&room,0))
+	p.position={x = w.groups[0].anchor.x-4, y = w.groups[0].anchor.y};testing.expect(t,engage(&w,&room,0))
 	room.enemies[0].health-=1;room.enemies[0].boss_cycle=7
 	room.tactical_pulse.deferred_draws=2;p.deck.energy=37;p.tactical.energy_fraction=0.6
-	_=level.set_tile(&data,{8,8},{.Void});append(&room.obstacles,game.Obstacle{{9,9}})
+	_=level.set_tile(&data,{x = 8, y = 8},{.Void});append(&room.obstacles,game.Obstacle{{x = 9, y = 9}})
 	room.ground.pool[42]=3;w.clock=31.25;w.beat=31
 	snapshot:=new(Snapshot);defer free(snapshot)
 	testing.expect(t,capture(&w,&room,snapshot));testing.expect(t,valid_snapshot(snapshot))
@@ -181,9 +181,9 @@ test_expedition_vietnam_traps_trigger_in_exploration_and_persist_disarmed :: pro
 	defer level.destroy(&data);defer game.destroy_room(&room)
 	prepare_room(&w,&room);testing.expect(t,len(room.traps)>0)
 	count:=len(room.traps);prepare_room(&w,&room);testing.expect_value(t,len(room.traps),count)
-	trap:=room.traps[0].position;p.position={trap.x-1,trap.y};_=level.set_tile(&data,p.position,{.Floor})
+	trap:=room.traps[0].position;p.position=grid.offset(trap, -1, 0);_=level.set_tile(&data,p.position,{.Floor})
 	w.mounted=true;before:=p.health
-	testing.expect(t,walk(&w,&room,{1,0}));testing.expect_value(t,p.health,before-4)
+	testing.expect(t,walk(&w,&room,{x = 1, y = 0}));testing.expect_value(t,p.health,before-4)
 	testing.expect(t,!room.traps[0].armed && !w.mounted)
 	snapshot:=new(Snapshot);defer free(snapshot);testing.expect(t,capture(&w,&room,snapshot))
 	testing.expect(t,!snapshot.traps[0].armed)
@@ -193,7 +193,7 @@ test_expedition_vietnam_traps_trigger_in_exploration_and_persist_disarmed :: pro
 test_expedition_full_drop_capacity_preserves_and_restores_pending_xp :: proc(t:^testing.T) {
 	w:World;data:level.Level;p:game.Player;room:=test_world(t,&w,&data,&p)
 	defer level.destroy(&data);defer game.destroy_room(&room)
-	p.position={w.groups[0].anchor.x-4,w.groups[0].anchor.y};testing.expect(t,engage(&w,&room,0))
+	p.position={x = w.groups[0].anchor.x-4, y = w.groups[0].anchor.y};testing.expect(t,engage(&w,&room,0))
 	for _ in 0..<MAX_DROPS {testing.expect(t,add_drop(&w,p.position,campaign.make_item(.Credits,1)))}
 	clear(&room.enemies);earned:=sync(&w,&room)
 	testing.expect(t,earned>0);testing.expect_value(t,w.pending_xp,earned)
@@ -213,9 +213,9 @@ test_expedition_full_drop_capacity_preserves_and_restores_pending_xp :: proc(t:^
 @(test)
 test_expedition_xp_coalesces_nearby_without_stealing_item_drop_slots :: proc(t:^testing.T) {
 	w:=World{biome=.Cyber,reward_site=-1}
-	add_xp_drop(&w,{5,5},2);add_xp_drop(&w,{7,5},3)
+	add_xp_drop(&w,{x = 5, y = 5},2);add_xp_drop(&w,{x = 7, y = 5},3)
 	testing.expect_value(t,w.drop_count,1);testing.expect_value(t,w.drops[0].xp,i32(5))
-	add_xp_drop(&w,{30,30},2);testing.expect_value(t,w.drop_count,2)
+	add_xp_drop(&w,{x = 30, y = 30},2);testing.expect_value(t,w.drop_count,2)
 }
 
 @(test)
@@ -227,7 +227,7 @@ test_expedition_outdoor_props_never_enclose_open_floor :: proc(t:^testing.T) {
 		seen:=make([]bool,len(data.tiles.cells));queue:=make([]grid.Position,len(data.tiles.cells))
 		seen[data.player_spawn.y*data.tiles.width+data.player_spawn.x]=true;queue[0]=data.player_spawn;tail:=1
 		for head:=0;head<tail;head+=1 {
-			for offset in ([4]grid.Position{{1,0},{-1,0},{0,1},{0,-1}}) {
+			for offset in ([4]grid.Position{{x = 1, y = 0},{x = -1, y = 0},{x = 0, y = 1},{x = 0, y = -1}}) {
 				q:=game.add_position(queue[head],offset);tile,ok:=level.tile_at(&data,q)
 				if !ok || !level.is_walkable(tile.kind) || abs(int(level.height_at(&data,q))-int(level.height_at(&data,queue[head])))>1 {continue}
 				i:=q.y*data.tiles.width+q.x;if seen[i] {continue};seen[i]=true;queue[tail]=q;tail+=1
@@ -235,7 +235,7 @@ test_expedition_outdoor_props_never_enclose_open_floor :: proc(t:^testing.T) {
 		}
 		props,stranded:=0,0
 		for tile,i in data.tiles.cells {
-			p:=grid.Position{i%data.tiles.width,i/data.tiles.width}
+			p:=grid.Position{x = i%data.tiles.width, y = i/data.tiles.width}
 			if _,design:=site_at(&w,p);design.inside {continue}
 			if tile.kind==.Wall {props+=1}
 			if tile.kind!=.Wall && tile.kind!=.Fence && tile.kind!=.Void && !seen[i] {stranded+=1}

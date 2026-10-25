@@ -50,7 +50,7 @@ patrol_move_toward :: proc(w:^World,room:^game.Room,g:^Group,target:grid.Positio
 	distances:[PATROL_PATH_SIDE*PATROL_PATH_SIDE]i16
 	for &d in distances {d= -1}
 	queue:[PATROL_PATH_SIDE*PATROL_PATH_SIDE]u16
-	origin:=grid.Position{target.x-PATROL_PATH_RADIUS,target.y-PATROL_PATH_RADIUS}
+	origin:=grid.offset(target, -PATROL_PATH_RADIUS, -PATROL_PATH_RADIUS)
 	blocked:[PATROL_PATH_SIDE*PATROL_PATH_SIDE]bool
 	patrol_mark_occupied(&blocked,origin,room.player.position)
 	for enemy in room.enemies {patrol_mark_occupied(&blocked,origin,enemy.position)}
@@ -59,21 +59,21 @@ patrol_move_toward :: proc(w:^World,room:^game.Room,g:^Group,target:grid.Positio
 	}}
 	center:=PATROL_PATH_RADIUS*PATROL_PATH_SIDE+PATROL_PATH_RADIUS
 	distances[center]=0;queue[0]=u16(center);head,tail:=0,1
-	steps:=[4]grid.Position{{0,-1},{1,0},{0,1},{-1,0}}
+	steps:=[4]grid.Position{{x = 0, y = -1},{x = 1, y = 0},{x = 0, y = 1},{x = -1, y = 0}}
 	for head<tail {
 		i:=int(queue[head]);head+=1;x,y:=i%PATROL_PATH_SIDE,i/PATROL_PATH_SIDE
 		for step in steps {
 			nx,ny:=x+step.x,y+step.y
 			if nx<0 || ny<0 || nx>=PATROL_PATH_SIDE || ny>=PATROL_PATH_SIDE {continue}
 			j:=ny*PATROL_PATH_SIDE+nx
-			if distances[j]>=0 || blocked[j] || game.cell_blocks_movement(room,{origin.x+nx,origin.y+ny}) ||
-			   game.step_height_blocked(room,{origin.x+x,origin.y+y},{origin.x+nx,origin.y+ny}) {continue}
+			if distances[j]>=0 || blocked[j] || game.cell_blocks_movement(room,grid.offset(origin, nx, ny)) ||
+			   game.step_height_blocked(room,grid.offset(origin, x, y),grid.offset(origin, nx, ny)) {continue}
 			distances[j]=distances[i]+1;queue[tail]=u16(j);tail+=1
 		}
 	}
 	for &member in g.members[:g.count] {
 		if !member.alive || member.deployed || distance(member.enemy.position,target)<=stop_distance {continue}
-		p:=member.enemy.position;local:=grid.Position{p.x-origin.x,p.y-origin.y}
+		p:=member.enemy.position;local:=grid.offset(p, -origin.x, -origin.y)
 		if local.x<0 || local.y<0 || local.x>=PATROL_PATH_SIDE || local.y>=PATROL_PATH_SIDE {continue}
 		best:=distances[local.y*PATROL_PATH_SIDE+local.x];destination:=p
 		if best<0 {continue}

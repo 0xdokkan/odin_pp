@@ -330,7 +330,7 @@ draw_lasso_release_badge :: proc(renderer: ^Renderer) {
 	if u < 0 || u >= 1 { return }
 	actor, found := presentation_actor_in_view(renderer.tactical.snapshot, l.enemy)
 	if !found || !actor.visible { return }
-	cell := grid.Position{int(math.round(actor.position.x)), int(math.round(actor.position.y))}
+	cell := grid.Position{x = int(math.round(actor.position.x)), y = int(math.round(actor.position.y))}
 	if !tactical_render_visible(renderer, cell) { return }
 	draw_tactical_feedback_badge(renderer, {label = "MOLLATO", color = LASSO_ROPE_LIGHT, over = l.enemy, fallback = cell}, tactical_feedback_alpha(u))
 }

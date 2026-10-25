@@ -23,7 +23,7 @@ beat_chord_offset :: proc(primary: game.Move_Direction, keys := game.MOVEMENT_KE
 		direction := keys[index]
 		if (direction == .North || direction == .South) == vertical || !run_down(controls, action) { continue }
 		a, b := game.direction_offset(primary), game.direction_offset(direction)
-		return {a.x+b.x, a.y+b.y}, true
+		return grid.offset(a, b.x, b.y), true
 	}
 	return
 }

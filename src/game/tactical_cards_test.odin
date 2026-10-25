@@ -21,26 +21,26 @@ test_tactical_dash_pays_one_shields_before_hazards_and_rejects_blocked_paths :: 
 	for blocked in ([?]bool{false, true}) {
 		data: level.Level
 		player: Player
-		spawns := [?]Enemy_Spawn{{position = {7, 1}, health = 100, attack = 1}}
+		spawns := [?]Enemy_Spawn{{position = {x = 7, y = 1}, health = 100, attack = 1}}
 		room := create_enemy_rework_room(t, &data, &player, spawns[:])
 		card := rework_hand_card(t, &room, .Dash)
-		append(&room.traps, Trap{id = 99, position = {5, 4}, damage = 3, armed = true})
-		if blocked { append(&room.obstacles, Obstacle{position = {5, 4}}) }
+		append(&room.traps, Trap{id = 99, position = {x = 5, y = 4}, damage = 3, armed = true})
+		if blocked { append(&room.obstacles, Obstacle{position = {x = 5, y = 4}}) }
 		before := player.deck
 		before_time := player.tactical.remaining
 		player.tactical.dodge_recovery = 2
-		result := play_card(&room, card.id, cell_target({6, 4}))
+		result := play_card(&room, card.id, cell_target({x = 6, y = 4}))
 		if blocked {
 			testing.expect(t, result.result != .Played)
 			testing.expect_value(t, player.deck, before)
-			testing.expect_value(t, player.position, grid.Position{4, 4})
+			testing.expect_value(t, player.position, grid.Position{x = 4, y = 4})
 			testing.expect_value(t, player.statuses.count, 0)
 			testing.expect(t, !room.tactical_pulse.pending)
 			testing.expect_value(t, player.tactical.remaining, before_time)
 		} else {
 			testing.expect_value(t, result.result, Card_Play_Result.Played)
 			testing.expect_value(t, player.deck.energy, before.energy-1)
-			testing.expect_value(t, player.position, grid.Position{6, 4})
+			testing.expect_value(t, player.position, grid.Position{x = 6, y = 4})
 			testing.expect_value(t, player.health, i32(99))
 			testing.expect_value(t, player.tactical.dodge_recovery, 2)
 			testing.expect_value(t, player.tactical.remaining, before_time)
@@ -64,7 +64,7 @@ test_tactical_dash_pays_one_shields_before_hazards_and_rejects_blocked_paths :: 
 test_tactical_heavy_blow_cancels_attack_and_opens_a_strike_window :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {5, 4}, health = 100, attack = 3}}
+	spawns := [?]Enemy_Spawn{{position = {x = 5, y = 4}, health = 100, attack = 3}}
 	room := create_enemy_rework_room(t, &data, &player, spawns[:])
 	defer level.destroy(&data)
 	defer destroy_room(&room)
@@ -107,12 +107,12 @@ test_tactical_heavy_blow_cancels_attack_and_opens_a_strike_window :: proc(t: ^te
 test_tactical_toxic_wave_is_local_and_respects_occlusion :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {4, 6}, health = 100, attack = 1},
-		{position = {1, 4}, health = 100, attack = 1}, {position = {6, 4}, health = 100, attack = 1}}
+	spawns := [?]Enemy_Spawn{{position = {x = 4, y = 6}, health = 100, attack = 1},
+		{position = {x = 1, y = 4}, health = 100, attack = 1}, {position = {x = 6, y = 4}, health = 100, attack = 1}}
 	room := create_enemy_rework_room(t, &data, &player, spawns[:])
 	defer level.destroy(&data)
 	defer destroy_room(&room)
-	append(&room.obstacles, Obstacle{position = {5, 4}})
+	append(&room.obstacles, Obstacle{position = {x = 5, y = 4}})
 	card := Card_Instance{id = 100, definition_id = .Toxic_Wave}
 	evaluation := evaluate_card_targeting(&room, card, {})
 	testing.expect_value(t, evaluation.error, Card_Compile_Error.None)
@@ -130,7 +130,7 @@ test_tactical_toxic_wave_is_local_and_respects_occlusion :: proc(t: ^testing.T) 
 test_tactical_splash_and_bounces_do_not_reveal_or_hit_hidden_enemies :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {6, 4}, health = 100, attack = 1}, {position = {7, 4}, health = 100, attack = 1}}
+	spawns := [?]Enemy_Spawn{{position = {x = 6, y = 4}, health = 100, attack = 1}, {position = {x = 7, y = 4}, health = 100, attack = 1}}
 	room := create_enemy_rework_room(t, &data, &player, spawns[:])
 	defer level.destroy(&data)
 	defer destroy_room(&room)
@@ -138,11 +138,11 @@ test_tactical_splash_and_bounces_do_not_reveal_or_hit_hidden_enemies :: proc(t: 
 	for id in ([?]Card_Id{.Firebomb, .Caustic_Bloom}) {
 		card := Card_Instance{id = 100, definition_id = id}
 		d, _ := card_definition_by_id(id)
-		query := evaluate_card_targeting(&room, card, card_target_request_at(d, {6, 4}))
+		query := evaluate_card_targeting(&room, card, card_target_request_at(d, {x = 6, y = 4}))
 		testing.expect_value(t, query.error, Card_Compile_Error.None)
 		testing.expect_value(t, query.query.enemy_count, 1)
-		testing.expect(t, !target_cell_set_contains(&query.query.affected, {7, 4}))
-		action, err := compile_card_action(&room, card, cell_target({6, 4}))
+		testing.expect(t, !target_cell_set_contains(&query.query.affected, {x = 7, y = 4}))
+		action, err := compile_card_action(&room, card, cell_target({x = 6, y = 4}))
 		testing.expect_value(t, err, Card_Compile_Error.None)
 		testing.expect_value(t, action.effect_count, 1)
 	}
@@ -159,15 +159,15 @@ test_tactical_splash_and_bounces_do_not_reveal_or_hit_hidden_enemies :: proc(t: 
 test_tactical_shove_relocates_a_bomb_before_arming_its_impact :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {7, 1}, health = 100, attack = 1}}
+	spawns := [?]Enemy_Spawn{{position = {x = 7, y = 1}, health = 100, attack = 1}}
 	room := create_enemy_rework_room(t, &data, &player, spawns[:])
 	defer level.destroy(&data)
 	defer destroy_room(&room)
-	testing.expect(t, spawn_bomb(&room, enemy_entity(1), {5, 4}, room.recent_events))
+	testing.expect(t, spawn_bomb(&room, enemy_entity(1), {x = 5, y = 4}, room.recent_events))
 	card := rework_hand_card(t, &room, .Shove)
 	play := play_card(&room, card.id, entity_target(object_entity(room.objects[0].id)))
 	testing.expect_value(t, play.result, Card_Play_Result.Played)
-	testing.expect_value(t, room.objects[0].position, grid.Position{6, 4})
+	testing.expect_value(t, room.objects[0].position, grid.Position{x = 6, y = 4})
 	testing.expect_value(t, player.health, i32(100))
 	drain_tactical_test_pulse(t, &room)
 	testing.expect_value(t, player.health, i32(100))
@@ -177,22 +177,22 @@ test_tactical_shove_relocates_a_bomb_before_arming_its_impact :: proc(t: ^testin
 test_tactical_survey_extends_current_sight_then_expires_without_memory :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {7, 1}, health = 100, attack = 1}}
+	spawns := [?]Enemy_Spawn{{position = {x = 7, y = 1}, health = 100, attack = 1}}
 	room := create_enemy_rework_room(t, &data, &player, spawns[:])
 	defer level.destroy(&data)
 	defer destroy_room(&room)
 	player.tactical.config.vision_size = 3
-	testing.expect(t, !tactical_cell_visible(&room, {6, 4}))
+	testing.expect(t, !tactical_cell_visible(&room, {x = 6, y = 4}))
 	card := rework_hand_card(t, &room, .Battle_Focus)
 	play := play_card(&room, card.id, entity_target(PLAYER_ENTITY))
 	testing.expect_value(t, play.result, Card_Play_Result.Played)
-	testing.expect(t, tactical_cell_visible(&room, {6, 4}))
-	append(&room.obstacles, Obstacle{position = {5, 4}})
-	testing.expect(t, !tactical_cell_visible(&room, {6, 4}))
+	testing.expect(t, tactical_cell_visible(&room, {x = 6, y = 4}))
+	append(&room.obstacles, Obstacle{position = {x = 5, y = 4}})
+	testing.expect(t, !tactical_cell_visible(&room, {x = 6, y = 4}))
 	clear(&room.obstacles)
 	drain_tactical_test_pulse(t, &room)
 	for _ in 0..<3 { wait_player_turn(&room); drain_tactical_test_pulse(t, &room) }
-	testing.expect(t, !tactical_cell_visible(&room, {6, 4}))
+	testing.expect(t, !tactical_cell_visible(&room, {x = 6, y = 4}))
 	testing.expect_value(t, player.deck.exhaust_count, 1)
 	// The directional 2x2 preset expands to a supported centred footprint, not
 	// an invalid 4x4 label whose actual mask would contain 25 cells.
@@ -202,7 +202,7 @@ test_tactical_survey_extends_current_sight_then_expires_without_memory :: proc(t
 		effective := tactical_vision_size(player.tactical.config, &player.statuses)
 		testing.expect(t, valid_tactical_vision(effective))
 		count := 0
-		for y in 0..<9 { for x in 0..<9 { if tactical_cell_visible(&room, {x, y}) { count += 1 } } }
+		for y in 0..<9 { for x in 0..<9 { if tactical_cell_visible(&room, {x = x, y = y}) { count += 1 } } }
 		// Four closed wall corners remain occluded even under Survey.
 		testing.expect_value(t, count, 77 if effective == 9 else effective*effective)
 	}

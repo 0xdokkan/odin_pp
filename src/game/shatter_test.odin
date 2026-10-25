@@ -28,17 +28,17 @@ test_sunder_card_is_append_only_collectible_and_previews_minimum_damage_without_
 	data := spell_test_level(t)
 	defer level.destroy(&data)
 	player := spell_test_player(t, .Sundering_Blow, 2)
-	enemies := [?]Enemy_Spawn{{position = {3, 1}, health = 40, attack = 1}}
+	enemies := [?]Enemy_Spawn{{position = {x = 3, y = 1}, health = 40, attack = 1}}
 	room, ok := create_room(&data, &player, {enemies = enemies[:]})
 	testing.expect(t, ok)
 	defer destroy_room(&room)
 	before := player
 	card := player.deck.hand[0]
 	for _ in 0..<16 {
-		preview := evaluate_card_targeting(&room, card, {anchor = {3, 1}, has_anchor = true})
+		preview := evaluate_card_targeting(&room, card, {anchor = {x = 3, y = 1}, has_anchor = true})
 		testing.expect_value(t, preview.error, Card_Compile_Error.None)
 		testing.expect(t, preview.has_movement && !preview.movement_required)
-		testing.expect_value(t, preview.movement.destination, grid.Position{4, 1})
+		testing.expect_value(t, preview.movement.destination, grid.Position{x = 4, y = 1})
 		path := query_spell_path(&room, card, entity_target(enemy_entity(1)))
 		testing.expect_value(t, path.count, 1)
 		action, err := compile_card_action(&room, card, entity_target(enemy_entity(1)))
@@ -61,7 +61,7 @@ test_sunder_two_dice_commit_total_damage_and_raw_eight_threshold_without_advanci
 		expected_dice := player.dice
 		expected_roll, expected_ok := roll_dice_pool(&expected_dice, 2, 10)
 		testing.expect(t, expected_ok)
-		enemies := [?]Enemy_Spawn{{position = {3, 1}, health = 40, attack = 1}}
+		enemies := [?]Enemy_Spawn{{position = {x = 3, y = 1}, health = 40, attack = 1}}
 		room, ok := create_room(&data, &player, {enemies = enemies[:]})
 		testing.expect(t, ok)
 		room.enemies[0].intent = make_wait_intent(&room, room.enemies[0].position)
@@ -70,7 +70,7 @@ test_sunder_two_dice_commit_total_damage_and_raw_eight_threshold_without_advanci
 		testing.expect_value(t, player.dice, expected_dice)
 		testing.expect_value(t, player.dice.roll_count, u64(2))
 		testing.expect_value(t, room.enemies[0].health, i32(40)-total)
-		testing.expect_value(t, room.enemies[0].position, grid.Position{4, 1} if total == 8 else grid.Position{3, 1})
+		testing.expect_value(t, room.enemies[0].position, grid.Position{x = 4, y = 1} if total == 8 else grid.Position{x = 3, y = 1})
 		testing.expect_value(t, spell_test_event_count(&play.action_report.events, .Moved), 1 if total == 8 else 0)
 		testing.expect_value(t, spell_test_event_count(room.recent_events, .Dice_Rolled), 1)
 		testing.expect_value(t, spell_test_event_count(room.recent_events, .Card_Played), 1)
@@ -102,14 +102,14 @@ test_sunder_blocked_push_preserves_damage_without_collision_damage :: proc(t: ^t
 		testing.expect_value(t, err, level.Parse_Error.None)
 		player := spell_test_player(t, .Sundering_Blow)
 		player.dice = shatter_test_dice_for_total(t, 8)
-		enemies := [?]Enemy_Spawn{{position = {2, 1}, health = 40, attack = 1}}
-		obstacles := [?]grid.Position{{3, 1}}
+		enemies := [?]Enemy_Spawn{{position = {x = 2, y = 1}, health = 40, attack = 1}}
+		obstacles := [?]grid.Position{{x = 3, y = 1}}
 		content := Room_Content{enemies = enemies[:]}
 		if !wall { content.obstacles = obstacles[:] }
 		room, ok := create_room(&data, &player, content)
 		testing.expect(t, ok)
 		room.enemies[0].intent = make_wait_intent(&room, room.enemies[0].position)
-		preview := evaluate_card_targeting(&room, player.deck.hand[0], {anchor = {2, 1}, has_anchor = true})
+		preview := evaluate_card_targeting(&room, player.deck.hand[0], {anchor = {x = 2, y = 1}, has_anchor = true})
 		testing.expect_value(t, preview.error, Card_Compile_Error.None)
 		testing.expect_value(t, preview.movement.error, Movement_Error.Static_Blocker)
 		play := play_card(&room, player.deck.hand[0].id, entity_target(enemy_entity(1)))
@@ -117,7 +117,7 @@ test_sunder_blocked_push_preserves_damage_without_collision_damage :: proc(t: ^t
 		testing.expect_value(t, play.action_report.damage_dealt, i32(8))
 		testing.expect_value(t, play.action_report.skipped_effects, 1)
 		testing.expect_value(t, room.enemies[0].health, i32(32))
-		testing.expect_value(t, room.enemies[0].position, grid.Position{2, 1})
+		testing.expect_value(t, room.enemies[0].position, grid.Position{x = 2, y = 1})
 		testing.expect_value(t, spell_test_event_count(&play.action_report.events, .Moved), 0)
 		testing.expect_value(t, player.dice.roll_count, u64(2))
 		destroy_room(&room)
@@ -130,7 +130,7 @@ test_sunder_rejected_target_energy_los_and_partial_pool_capacity_roll_back :: pr
 	data := spell_test_level(t)
 	defer level.destroy(&data)
 	player := spell_test_player(t, .Sundering_Blow)
-	enemies := [?]Enemy_Spawn{{position = {3, 1}, health = 40, attack = 1}, {position = {5, 1}, health = 40, attack = 1}}
+	enemies := [?]Enemy_Spawn{{position = {x = 3, y = 1}, health = 40, attack = 1}, {position = {x = 5, y = 1}, health = 40, attack = 1}}
 	room, ok := create_room(&data, &player, {enemies = enemies[:]})
 	testing.expect(t, ok)
 	defer destroy_room(&room)
@@ -143,7 +143,7 @@ test_sunder_rejected_target_energy_los_and_partial_pool_capacity_roll_back :: pr
 		case 0: target = entity_target(PLAYER_ENTITY)
 		case 1: target = entity_target(enemy_entity(2))
 		case 2: player.deck.energy = 1
-		case 3: append(&room.obstacles, Obstacle{position = {2, 1}})
+		case 3: append(&room.obstacles, Obstacle{position = {x = 2, y = 1}})
 		case 4: player.dice.roll_count = max(u64)-1
 		}
 		before := player
@@ -163,7 +163,7 @@ test_sunder_lethal_hit_does_not_move_removed_target_and_commits_both_dice :: pro
 	defer level.destroy(&data)
 	player := spell_test_player(t, .Sundering_Blow)
 	player.dice = shatter_test_dice_for_total(t, 8)
-	enemies := [?]Enemy_Spawn{{position = {3, 1}, health = 1, attack = 1}}
+	enemies := [?]Enemy_Spawn{{position = {x = 3, y = 1}, health = 1, attack = 1}}
 	room, ok := create_room(&data, &player, {enemies = enemies[:]})
 	testing.expect(t, ok)
 	defer destroy_room(&room)
@@ -185,7 +185,7 @@ test_sunder_reaction_death_stops_the_command_without_pulse_or_draw :: proc(t: ^t
 	player := spell_test_player(t, .Sundering_Blow)
 	player.health = 1
 	player.dice = shatter_test_dice_for_total(t, 7)
-	enemies := [?]Enemy_Spawn{{position = {3, 1}, health = 40, attack = 1}}
+	enemies := [?]Enemy_Spawn{{position = {x = 3, y = 1}, health = 40, attack = 1}}
 	room, ok := create_room(&data, &player, {enemies = enemies[:]})
 	testing.expect(t, ok)
 	defer destroy_room(&room)
@@ -208,15 +208,15 @@ test_sunder_successful_push_triggers_existing_hazard_and_iron_knuckle_events :: 
 	player := spell_test_player(t, .Sundering_Blow)
 	player.dice = shatter_test_dice_for_total(t, 8)
 	testing.expect(t, acquire_relic(&player, .Iron_Knuckle))
-	enemies := [?]Enemy_Spawn{{position = {2, 1}, health = 40, attack = 1}}
-	objects := [?]Grid_Object_Spawn{{kind = .Fire, position = {3, 1}}}
+	enemies := [?]Enemy_Spawn{{position = {x = 2, y = 1}, health = 40, attack = 1}}
+	objects := [?]Grid_Object_Spawn{{kind = .Fire, position = {x = 3, y = 1}}}
 	room, ok := create_room(&data, &player, {enemies = enemies[:], objects = objects[:]})
 	testing.expect(t, ok)
 	defer destroy_room(&room)
 	room.enemies[0].intent = make_wait_intent(&room, room.enemies[0].position)
 	play := play_card(&room, player.deck.hand[0].id, entity_target(enemy_entity(1)))
 	testing.expect_value(t, play.result, Card_Play_Result.Played)
-	testing.expect_value(t, room.enemies[0].position, grid.Position{3, 1})
+	testing.expect_value(t, room.enemies[0].position, grid.Position{x = 3, y = 1})
 	testing.expect_value(t, room.enemies[0].health, i32(30))
 	testing.expect_value(t, spell_test_event_count(&play.action_report.events, .Moved), 1)
 	testing.expect_value(t, spell_test_event_count(&play.action_report.events, .Hazard_Triggered), 1)

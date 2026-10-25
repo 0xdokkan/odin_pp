@@ -45,7 +45,7 @@ test_descent_outdoor_is_bounded_static_and_has_sparse_real_emitters :: proc(t:^t
 		w.biome=biome
 		variants:[61]bool
 		for i in 0..<96 {
-			cell:=grid.Position{i*13%61,i*17%59}
+			cell:=grid.Position{x = i*13%61, y = i*17%59}
 			clear(&a.vertices);clear(&a.lines);clear(&b.vertices);clear(&b.lines)
 			handled:=draw_expedition_descent_outdoor(pass,w,cell)
 			w.clock+=19;w.beat+=7;w.seed+=41
@@ -65,7 +65,7 @@ test_descent_outdoor_is_bounded_static_and_has_sparse_real_emitters :: proc(t:^t
 	}
 	// The dispatcher declines other biomes without appending any geometry.
 	w.biome=.Cyber;clear(&a.vertices);clear(&a.lines)
-	handled:=draw_expedition_descent_outdoor(pass,w,{2,2})
+	handled:=draw_expedition_descent_outdoor(pass,w,{x = 2, y = 2})
 	testing.expect(t,!handled && len(a.vertices)==0 && len(a.lines)==0)
 }
 
@@ -78,16 +78,16 @@ test_descent_all_site_walls_fit_blocked_cells_with_finite_outward_normals :: pro
 	pass:=Ink_Pass{mode=.Bake,builder=&b}
 	for biome in ([3]campaign.Biome{.West,.Egypt,.Inferno}) {for kind in world.Site_Kind {if kind==.Cave {continue};for orientation in u8(0)..<4 {
 		w.biome=biome
-		site:=world.Site{kind=kind,position={32,32},orientation=orientation,active=true,layout_version=world.SITE_LAYOUT_VERSION}
+		site:=world.Site{kind=kind,position={x = 32, y = 32},orientation=orientation,active=true,layout_version=world.SITE_LAYOUT_VERSION}
 		for &tile in data.tiles.cells {tile={.Floor}}
 		lo,hi:=world.site_bounds(&site)
 		for y in lo.y..=hi.y {for x in lo.x..=hi.x {
-			cell:=grid.Position{x,y};d:=world.site_cell(&site,cell)
+			cell:=grid.Position{x = x, y = y};d:=world.site_cell(&site,cell)
 			if d.wall {_=level.set_tile(&data,cell,{.Wall})}
 		}}
 		walls,peak:=0,0;valid,inside,handled:=true,true,true
 		for y in lo.y..=hi.y {for x in lo.x..=hi.x {
-			cell:=grid.Position{x,y};d:=world.site_cell(&site,cell)
+			cell:=grid.Position{x = x, y = y};d:=world.site_cell(&site,cell)
 			if !d.wall || d.fixture {continue}
 			clear(&b.vertices);clear(&b.lines)
 			handled=draw_expedition_descent_wall(pass,&room,w,&site,cell,d) && handled
@@ -107,7 +107,7 @@ test_descent_fixtures_match_rotated_layout_and_leave_trial_tunnel_walkable :: pr
 	pass,again:=Ink_Pass{mode=.Bake,builder=&a},Ink_Pass{mode=.Bake,builder=&b}
 	for biome in ([3]campaign.Biome{.West,.Egypt,.Inferno}) {for kind in world.Site_Kind {if kind==.Cave {continue};for orientation in u8(0)..<4 {
 		w.biome=biome
-		site:=world.Site{kind=kind,position={32,32},orientation=orientation,active=true,layout_version=world.SITE_LAYOUT_VERSION}
+		site:=world.Site{kind=kind,position={x = 32, y = 32},orientation=orientation,active=true,layout_version=world.SITE_LAYOUT_VERSION}
 		clear(&a.vertices);clear(&a.lines);clear(&b.vertices);clear(&b.lines)
 		handled:=draw_expedition_descent_fixture(pass,w,&site)
 		w.clock+=21;w.beat+=3;w.seed+=13;site.wave+=1;site.seed+=51
@@ -118,7 +118,7 @@ test_descent_fixtures_match_rotated_layout_and_leave_trial_tunnel_walkable :: pr
 		for v in a.vertices {
 			if kind==.Trial || kind==.Tunnel {inside=inside && v.position.y<=.025 && descent_test_in_cell(v.position,site.position);continue}
 			if kind==.Boss && v.position.y>=3.22 {continue}
-			cell:=grid.Position{int(math.floor(v.position.x)),int(math.floor(v.position.z))}
+			cell:=grid.Position{x = int(math.floor(v.position.x)), y = int(math.floor(v.position.z))}
 			d:=world.site_cell(&site,cell);inside=inside && d.fixture && d.wall && v.position.y>=0
 		}
 		testing.expect(t,inside && len(a.vertices)<1500 && len(a.lines)<24,fmt.tprintf("%v %v rotation%d inside%v vertices%d",biome,kind,orientation,inside,len(a.vertices)))
@@ -133,7 +133,7 @@ test_descent_gate_clearance_and_collect_match_cached_emissive_geometry :: proc(t
 	pass:=Ink_Pass{mode=.Bake,builder=&b}
 	for biome in ([3]campaign.Biome{.West,.Egypt,.Inferno}) {for kind in world.Site_Kind {if kind==.Cave {continue};for orientation in u8(0)..<4 {
 		w.biome=biome
-		site:=world.Site{kind=kind,position={32,32},orientation=orientation,active=true,layout_version=world.SITE_LAYOUT_VERSION}
+		site:=world.Site{kind=kind,position={x = 32, y = 32},orientation=orientation,active=true,layout_version=world.SITE_LAYOUT_VERSION}
 		decor:=world.site_decor_anchors(&site)
 		for i:=0;i+1<decor.count;i+=2 {
 			a,b:=decor.items[i],decor.items[i+1];if a.kind!=.Gatepost || b.kind!=.Gatepost {break}
@@ -165,8 +165,8 @@ test_descent_wall_details_only_occupy_exposed_faces :: proc(t:^testing.T) {
 	w:=new(world.World);defer free(w)
 	data,created:=level.create(65,65,{.Floor});testing.expect(t,created);defer level.destroy(&data)
 	room:=game.Room{level_data=&data}
-	site:=world.Site{kind=.Trial,position={32,32},active=true,layout_version=world.SITE_LAYOUT_VERSION}
-	cell:=grid.Position{43,36};design:=world.site_cell(&site,cell)
+	site:=world.Site{kind=.Trial,position={x = 32, y = 32},active=true,layout_version=world.SITE_LAYOUT_VERSION}
+	cell:=grid.Position{x = 43, y = 36};design:=world.site_cell(&site,cell)
 	b:Expedition_Geometry_Builder;defer {delete(b.vertices);delete(b.lines)}
 	pass:=Ink_Pass{mode=.Bake,builder=&b}
 	for biome in ([3]campaign.Biome{.West,.Egypt,.Inferno}) {
@@ -176,7 +176,7 @@ test_descent_wall_details_only_occupy_exposed_faces :: proc(t:^testing.T) {
 		clear(&b.vertices);clear(&b.lines)
 		handled:=draw_expedition_descent_wall(pass,&room,w,&site,cell,design)
 		exposed:=len(b.vertices)
-		for offset in ([4]grid.Position{{0,1},{0,-1},{1,0},{-1,0}}) {_=level.set_tile(&data,game.add_position(cell,offset),{.Wall})}
+		for offset in ([4]grid.Position{{x = 0, y = 1},{x = 0, y = -1},{x = 1, y = 0},{x = -1, y = 0}}) {_=level.set_tile(&data,game.add_position(cell,offset),{.Wall})}
 		clear(&b.vertices);clear(&b.lines)
 		closed:=draw_expedition_descent_wall(pass,&room,w,&site,cell,design)
 		testing.expect(t,handled && closed && len(b.vertices)<exposed && len(b.lines)==0)

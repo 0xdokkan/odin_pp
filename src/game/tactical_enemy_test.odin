@@ -8,7 +8,7 @@ test_prepared_bomber_does_not_retarget_an_occupied_landing_cell :: proc(t: ^test
 	data := create_enemy_archetype_test_level(t)
 	defer level.destroy(&data)
 	player := create_test_player(t)
-	enemies := [?]Enemy_Spawn{{position = {5, 1}, health = 10, attack = 2, archetype = .Bomber}}
+	enemies := [?]Enemy_Spawn{{position = {x = 5, y = 1}, health = 10, attack = 2, archetype = .Bomber}}
 	room, ok := create_room(&data, &player, {enemies = enemies[:]})
 	testing.expect(t, ok)
 	defer destroy_room(&room)
@@ -29,8 +29,8 @@ test_bomb_survives_its_bomber_while_combat_continues :: proc(t: ^testing.T) {
 	defer level.destroy(&data)
 	player := create_test_player(t)
 	enemies := [?]Enemy_Spawn{
-		{position = {5, 1}, health = 3, attack = 1, archetype = .Bomber},
-		{position = {8, 4}, health = 20, attack = 1},
+		{position = {x = 5, y = 1}, health = 3, attack = 1, archetype = .Bomber},
+		{position = {x = 8, y = 4}, health = 20, attack = 1},
 	}
 	room, ok := create_room(&data, &player, {enemies = enemies[:]})
 	testing.expect(t, ok)

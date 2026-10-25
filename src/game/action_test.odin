@@ -11,8 +11,8 @@ test_move_action_rejects_invalid_cells_and_applies_valid_movement_once :: proc(t
 		accepted: bool,
 	}
 	cases := [?]Case{
-		{destination = {0, 0}, expected_position = {1, 1}, accepted = false},
-		{destination = {1, 2}, expected_position = {1, 2}, accepted = true},
+		{destination = {x = 0, y = 0}, expected_position = {x = 1, y = 1}, accepted = false},
+		{destination = {x = 1, y = 2}, expected_position = {x = 1, y = 2}, accepted = true},
 	}
 	for c in cases {
 		level_data := create_test_level(t)

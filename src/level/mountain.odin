@@ -26,7 +26,7 @@ MOUNTAIN_START  :: f32(MOUNTAIN_OUTER)-f32(MOUNTAIN_PATH)*0.5
 MOUNTAIN_TOP    :: 94
 // Where the mountain stands on a Snow map of the current size (side 192); the path starts to the east of
 // the centre (the angle 0) and winds towards the south.
-MOUNTAIN_CENTER :: grid.Position{24, 172}
+MOUNTAIN_CENTER :: grid.Position{x = 24, y = 172}
 
 // How far along the path a cell is, in laps (0 where it leaves the ground, MOUNTAIN_LAPS at the summit),
 // and whether it is part of the mountain at all. A cell belongs to the lap whose centre line is nearest,
@@ -68,7 +68,7 @@ mountain_icy :: proc(offset: grid.Position) -> bool {
 mountain_path_cell :: proc(laps: f32) -> grid.Position {
 	angle := 2*math.PI*(laps-math.floor(laps))
 	radius := MOUNTAIN_START-laps*f32(MOUNTAIN_PATH)
-	return {int(math.round(radius*math.cos(angle))), int(math.round(radius*math.sin(angle)))}
+	return {x = int(math.round(radius*math.cos(angle))), y = int(math.round(radius*math.sin(angle)))}
 }
 
 // The cell halfway up the climb, on the path, where a patrol waits.
@@ -82,9 +82,9 @@ mountain_summit :: proc() -> grid.Position {
 	best_distance := 1<<30
 	for y in -MOUNTAIN_HALF..=MOUNTAIN_HALF {
 		for x in -MOUNTAIN_HALF..=MOUNTAIN_HALF {
-			if mountain_height({x, y}) != MOUNTAIN_TOP { continue }
+			if mountain_height({x = x, y = y}) != MOUNTAIN_TOP { continue }
 			distance := x*x+y*y
-			if distance < best_distance { best, best_distance = {x, y}, distance }
+			if distance < best_distance { best, best_distance = {x = x, y = y}, distance }
 		}
 	}
 	return best
@@ -99,10 +99,10 @@ mountain_stamp :: proc(data: ^Level, centre: grid.Position) -> bool {
 	   centre.x+MOUNTAIN_HALF >= data.tiles.width || centre.y+MOUNTAIN_HALF >= data.tiles.height { return false }
 	for y in -MOUNTAIN_HALF..=MOUNTAIN_HALF {
 		for x in -MOUNTAIN_HALF..=MOUNTAIN_HALF {
-			cell := grid.Position{centre.x+x, centre.y+y}
+			cell := grid.offset(centre, x, y)
 			tile, _ := tile_at(data, cell)
 			if tile.kind != .Void && tile.kind != .Floor { _ = set_tile(data, cell, {.Floor}) }
-			if !set_height(data, cell, i32(mountain_height({x, y}))) { return false }
+			if !set_height(data, cell, i32(mountain_height({x = x, y = y}))) { return false }
 		}
 	}
 	return true

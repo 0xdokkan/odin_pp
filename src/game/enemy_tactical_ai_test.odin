@@ -9,7 +9,7 @@ test_room_creation_and_reconfiguration_prepare_first_bomb_intent :: proc(t: ^tes
 	data := create_enemy_archetype_test_level(t)
 	defer level.destroy(&data)
 	player := create_test_player(t)
-	spawns := [?]Enemy_Spawn{{position = {5, 1}, health = 20, attack = 2, archetype = .Bomber}}
+	spawns := [?]Enemy_Spawn{{position = {x = 5, y = 1}, health = 20, attack = 2, archetype = .Bomber}}
 	room, ok := create_room(&data, &player, {enemies = spawns[:]})
 	testing.expect(t, ok)
 	defer destroy_room(&room)
@@ -41,8 +41,8 @@ create_enemy_rework_room :: proc(t: ^testing.T, data: ^level.Level, player: ^Pla
 test_m7_bombers_prepare_one_frozen_throw_with_three_pulses_to_escape :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {6, 2}, health = 20, attack = 2, archetype = .Bomber},
-		{position = {2, 2}, health = 20, attack = 2, archetype = .Bomber}}
+	spawns := [?]Enemy_Spawn{{position = {x = 6, y = 2}, health = 20, attack = 2, archetype = .Bomber},
+		{position = {x = 2, y = 2}, health = 20, attack = 2, archetype = .Bomber}}
 	room := create_enemy_rework_room(t, &data, &player, spawns[:])
 	defer level.destroy(&data)
 	defer destroy_room(&room)
@@ -76,7 +76,7 @@ test_m7_bombers_prepare_one_frozen_throw_with_three_pulses_to_escape :: proc(t: 
 test_m7_shoving_a_prepared_bomber_cancels_throw_and_still_grants_recovery :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {6, 2}, health = 20, attack = 2, archetype = .Bomber}}
+	spawns := [?]Enemy_Spawn{{position = {x = 6, y = 2}, health = 20, attack = 2, archetype = .Bomber}}
 	room := create_enemy_rework_room(t, &data, &player, spawns[:])
 	defer level.destroy(&data)
 	defer destroy_room(&room)
@@ -84,7 +84,7 @@ test_m7_shoving_a_prepared_bomber_cancels_throw_and_still_grants_recovery :: pro
 	drain_tactical_test_pulse(t, &room)
 	testing.expect(t, room.enemies[0].bomb_ready)
 	action := make_action(.Trigger, PLAYER_ENTITY, entity_target(enemy_entity(1)), .Opponent)
-	testing.expect(t, add_effect(&action, move_effect(enemy_entity(1), {6, 1})))
+	testing.expect(t, add_effect(&action, move_effect(enemy_entity(1), {x = 6, y = 1})))
 	report := resolve_action(&room, &action)
 	testing.expect(t, report.accepted)
 	wait_player_turn(&room)
@@ -99,7 +99,7 @@ test_m7_enemy_bomb_damage_is_reduced_without_nerfing_player_explosives :: proc(t
 	for hostile in ([?]bool{true, false}) {
 		data: level.Level
 		player: Player
-		spawns := [?]Enemy_Spawn{{position = {7, 1}, health = 100, attack = 1}}
+		spawns := [?]Enemy_Spawn{{position = {x = 7, y = 1}, health = 100, attack = 1}}
 		room := create_enemy_rework_room(t, &data, &player, spawns[:])
 		source := enemy_entity(1) if hostile else PLAYER_ENTITY
 		testing.expect(t, spawn_bomb(&room, source, player.position, room.recent_events))
@@ -119,14 +119,14 @@ test_m7_chaser_routes_around_fire_and_archer_seeks_a_firing_lane :: proc(t: ^tes
 	for archer in ([?]bool{false, true}) {
 		data: level.Level
 		player: Player
-		spawns := [?]Enemy_Spawn{{position = ({6, 3} if archer else {4, 1}), health = 20, attack = 2,
+		spawns := [?]Enemy_Spawn{{position = ({x = 6, y = 3} if archer else {x = 4, y = 1}), health = 20, attack = 2,
 			archetype = (.Archer if archer else .Chaser)}}
-		objects := [?]Grid_Object_Spawn{{kind = .Fire, position = {4, 2}}}
+		objects := [?]Grid_Object_Spawn{{kind = .Fire, position = {x = 4, y = 2}}}
 		room := create_enemy_rework_room(t, &data, &player, spawns[:], objects[:])
 		intent := room.enemies[0].intent
 		testing.expect_value(t, intent.kind, Enemy_Intent_Kind.Move)
-		if archer { testing.expect_value(t, intent.destination, grid.Position{6, 4}) }
-		else { testing.expect(t, intent.destination == (grid.Position{3, 1}) || intent.destination == (grid.Position{5, 1})) }
+		if archer { testing.expect_value(t, intent.destination, grid.Position{x = 6, y = 4}) }
+		else { testing.expect(t, intent.destination == (grid.Position{x = 3, y = 1}) || intent.destination == (grid.Position{x = 5, y = 1})) }
 		testing.expect_value(t, enemy_terrain_danger(&room, intent.destination), 0)
 		destroy_room(&room)
 		level.destroy(&data)
@@ -138,8 +138,8 @@ test_m7_brute_push_uses_hazards_and_a_full_block_prevents_displacement :: proc(t
 	for shielded in ([?]bool{false, true}) {
 		data: level.Level
 		player: Player
-		spawns := [?]Enemy_Spawn{{position = {5, 4}, health = 20, attack = 2, archetype = .Brute}}
-		objects := [?]Grid_Object_Spawn{{kind = .Fire, position = {3, 4}}}
+		spawns := [?]Enemy_Spawn{{position = {x = 5, y = 4}, health = 20, attack = 2, archetype = .Brute}}
+		objects := [?]Grid_Object_Spawn{{kind = .Fire, position = {x = 3, y = 4}}}
 		room := create_enemy_rework_room(t, &data, &player, spawns[:], objects[:])
 		if shielded {
 			_, _ = apply_status(&room, PLAYER_ENTITY, .Shield, 2, 3)
@@ -148,7 +148,7 @@ test_m7_brute_push_uses_hazards_and_a_full_block_prevents_displacement :: proc(t
 		testing.expect(t, room.enemies[0].intent.push)
 		pulse: Pulse_Report
 		resolve_enemy_intents(&room, &pulse)
-		testing.expect_value(t, player.position, grid.Position{4, 4} if shielded else grid.Position{3, 4})
+		testing.expect_value(t, player.position, grid.Position{x = 4, y = 4} if shielded else grid.Position{x = 3, y = 4})
 		testing.expect_value(t, player.health, i32(100) if shielded else i32(96))
 		destroy_room(&room)
 		level.destroy(&data)
@@ -159,7 +159,7 @@ test_m7_brute_push_uses_hazards_and_a_full_block_prevents_displacement :: proc(t
 test_m7_charge_can_be_parried_once_and_retains_recovery :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {7, 4}, health = 20, attack = 2, archetype = .Brute}}
+	spawns := [?]Enemy_Spawn{{position = {x = 7, y = 4}, health = 20, attack = 2, archetype = .Brute}}
 	room := create_enemy_rework_room(t, &data, &player, spawns[:])
 	defer level.destroy(&data)
 	defer destroy_room(&room)
@@ -175,7 +175,7 @@ test_m7_charge_can_be_parried_once_and_retains_recovery :: proc(t: ^testing.T) {
 	testing.expect(t, qte_key(&room, room.qte.keys[0]))
 	drain_tactical_test_pulse(t, &room)
 	testing.expect_value(t, player.health, i32(100))
-	testing.expect_value(t, room.enemies[0].position, grid.Position{7, 4})
+	testing.expect_value(t, room.enemies[0].position, grid.Position{x = 7, y = 4})
 	testing.expect_value(t, room.enemies[0].health, i32(18))
 	testing.expect_value(t, room.enemies[0].intent.kind, Enemy_Intent_Kind.Recover)
 	testing.expect_value(t, room.pulse_count, u64(5))
@@ -186,11 +186,11 @@ test_m7_demolitionist_ignites_a_barrel_but_does_not_retarget_a_moved_barrel :: p
 	for displaced in ([?]bool{false, true}) {
 		data: level.Level
 		player: Player
-		spawns := [?]Enemy_Spawn{{position = {6, 2}, health = 20, attack = 2, archetype = .Demolitionist}}
-		objects := [?]Grid_Object_Spawn{{kind = .Barrel, position = {4, 3}}}
+		spawns := [?]Enemy_Spawn{{position = {x = 6, y = 2}, health = 20, attack = 2, archetype = .Demolitionist}}
+		objects := [?]Grid_Object_Spawn{{kind = .Barrel, position = {x = 4, y = 3}}}
 		room := create_enemy_rework_room(t, &data, &player, spawns[:], objects[:])
 		testing.expect_value(t, room.enemies[0].intent.target_object, room.objects[0].id)
-		if displaced { room.objects[0].position = {3, 3} }
+		if displaced { room.objects[0].position = {x = 3, y = 3} }
 		pulse: Pulse_Report
 		resolve_enemy_intents(&room, &pulse)
 		testing.expect_value(t, room.objects[0].detonation_pulse != 0, !displaced)

@@ -109,7 +109,7 @@ test_fishing_cues_show_the_water_from_the_plop :: proc(t: ^testing.T) {
 		player: game.Player
 		room := fishing_test_room(t, &data, &player)
 		room.fishing.random = fishing_test_stream(card)
-		cell := grid.Position{7, 3}
+		cell := grid.Position{x = 7, y = 3}
 		before := capture_room_presentation(&room)
 		report := game.fish_with_rod(&room, cell)
 		testing.expect(t, report.result == .Fished && report.card == card)
@@ -203,7 +203,7 @@ test_fishing_water_bakes_blue_with_ripples :: proc(t: ^testing.T) {
 	tx := fx.texels
 	fx.cells[3*fx.width+4].layers += {.Water}
 	for y in 0..<fx.height { for x in 0..<fx.width {
-		fx.cells[y*fx.width+x].content = bake_ground_cell(&fx, {x, y})
+		fx.cells[y*fx.width+x].content = bake_ground_cell(&fx, {x = x, y = y})
 	} }
 	water, ripples, paper, venom := 0, 0, 0, 0
 	for gy in 2*tx..<5*tx { for gx in 3*tx..<6*tx {
@@ -227,28 +227,29 @@ test_fishing_water_bakes_blue_with_ripples :: proc(t: ^testing.T) {
 @(test)
 test_fishing_lab_sounds_follow_the_rod :: proc(t: ^testing.T) {
 	snapshot: Room_Presentation
-	renderer: Renderer
+	renderer := new(Renderer)
+	defer free(renderer)
 	renderer.tactical.snapshot = &snapshot
 	s: Lab_Sounds
 	impacts := 0
 	casting := Presentation_Cue{kind = .Fish_Cast, started = true, duration = PRESENTATION_FISH_CAST_DURATION,
 		event = {kind = .Fish_Cast, source = game.PLAYER_ENTITY, card_definition = .Fishing_Rod}}
-	lab_cue_sounds(&renderer, &s, &casting, 1, &impacts)
+	lab_cue_sounds(renderer, &s, &casting, 1, &impacts)
 	testing.expect(t, s.count == 1 && s.queue[0].sfx == .Card_Fishing_Rod && s.queue[0].at == 1)
 	bite := Presentation_Cue{kind = .Fish_Bite, started = true, duration = PRESENTATION_FISH_BITE_DURATION,
 		event = {kind = .Fish_Bite, source = game.PLAYER_ENTITY, card_definition = .Fishing_Rod}}
-	lab_cue_sounds(&renderer, &s, &bite, 2, &impacts)
+	lab_cue_sounds(renderer, &s, &bite, 2, &impacts)
 	testing.expect(t, s.count == 3 && s.queue[1].sfx == .World_Bobber_Plop && s.queue[1].at == 2)
 	testing.expect(t, s.queue[2].sfx == .World_Fish_Bite && abs(s.queue[2].at-(2+f64(PRESENTATION_FISH_BITE_DURATION*FISHING_BITE_AT))) < 1e-6)
 	food := Presentation_Cue{kind = .Fish_Caught, started = true, duration = PRESENTATION_FISH_CATCH_DURATION,
 		event = {kind = .Fish_Caught, source = game.PLAYER_ENTITY, card_definition = .Fishing_Rod}}
-	lab_cue_sounds(&renderer, &s, &food, 4, &impacts)
+	lab_cue_sounds(renderer, &s, &food, 4, &impacts)
 	breaks := 4+f64(PRESENTATION_FISH_CATCH_DURATION*FISHING_REEL*FISHING_REEL_BREAKS)
 	testing.expect(t, s.count == 5 && s.queue[3].sfx == .Pilgrim_Reel && abs(s.queue[3].at+LAB_REEL_SPLASH_SECONDS-breaks) < 1e-6)
 	testing.expect(t, s.queue[4].sfx == .Pilgrim_Catch && abs(s.queue[4].at-(4+f64(PRESENTATION_FISH_CATCH_DURATION*fishing_food_taken()))) < 1e-6)
 	card := Presentation_Cue{kind = .Fish_Caught, started = true, duration = PRESENTATION_FISH_CARD_DURATION,
 		event = {kind = .Fish_Caught, source = game.PLAYER_ENTITY, card_definition = .Poison_Pool}}
-	lab_cue_sounds(&renderer, &s, &card, 8, &impacts)
+	lab_cue_sounds(renderer, &s, &card, 8, &impacts)
 	testing.expect(t, s.count == 7 && s.queue[5].sfx == .Pilgrim_Reel && s.queue[6].sfx == .Ui_Fish_Card)
 	testing.expect(t, abs(s.queue[6].at-(8+f64(PRESENTATION_FISH_CARD_DURATION*FISHING_CARD_LANDS))) < 1e-6)
 	// Food is taken late in its flight, after the reeling.
@@ -275,7 +276,7 @@ test_fishing_lab_board_plays_the_rod_alone :: proc(t: ^testing.T) {
 		update_tactical_view(renderer, &room, {}, false)
 		lab_shadow_test_frame(renderer, &room, 1.0/60.0)
 		before := capture_room_presentation(&room)
-		report := game.fish_with_rod(&room, {7, 3})
+		report := game.fish_with_rod(&room, {x = 7, y = 3})
 		testing.expect(t, report.result == .Fished && report.card == card)
 		after := capture_room_presentation(&room)
 		testing.expect(t, begin_renderer_event_timeline(renderer, before, room.recent_events, &after))

@@ -22,7 +22,7 @@ memory_device_card :: proc(kind: Grid_Object_Kind) -> Card_Id {
 
 memory_device_contains :: proc(room: ^Room, object: Grid_Object, cell: grid.Position) -> bool {
 	if !shape_cell_has_clear_path(room, object.position, cell) { return false }
-	delta := grid.Position{cell.x-object.position.x, cell.y-object.position.y}
+	delta := grid.offset(cell, -object.position.x, -object.position.y)
 	if object.kind == .Black_Hole || object.kind == .Bomb_Marley {
 		return max(abs(delta.x), abs(delta.y)) <= 3
 	}
@@ -80,7 +80,7 @@ tick_memory_devices :: proc(room: ^Room, pulse: ^Pulse_Report) {
 			ei, exists = enemy_index_by_id(room, enemy_id)
 			if !exists { continue }
 			step := direction_offset(object.device_direction)
-			if object.kind == .Black_Hole { step = {sign(object.position.x-position.x), sign(object.position.y-position.y)} }
+			if object.kind == .Black_Hole { step = {x = sign(object.position.x-position.x), y = sign(object.position.y-position.y)} }
 			destination := add_position(position, step)
 			move := make_action(.Trigger, SYSTEM_ENTITY, entity_target(target), .Entity)
 			add_effect(&move, move_effect(target, destination))

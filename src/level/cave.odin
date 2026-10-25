@@ -70,7 +70,7 @@ cave_plan :: proc(seed: u64) -> (plan: Cave_Plan) {
 	for index in 0..<plan.rooms {
 		tall := cave_pick(seed, u64(10+index), 7, 12)
 		top := cave_pick(seed, u64(20+index), 2, CAVE_HEIGHT-2-tall)
-		plan.boxes[index] = {{columns[index][0], top}, {columns[index][1], top+tall-1}}
+		plan.boxes[index] = {{x = columns[index][0], y = top}, {x = columns[index][1], y = top+tall-1}}
 		cave_carve(&plan, plan.boxes[index][0], plan.boxes[index][1])
 		middles[index] = top+tall/2
 	}
@@ -80,9 +80,9 @@ cave_plan :: proc(seed: u64) -> (plan: Cave_Plan) {
 		y0, y1 := middles[index], middles[index+1]
 		// Along the gallery: across from the first room's middle, up or down at the middle column, across again.
 		mid := (x0+x1)/2
-		cave_carve(&plan, {x0, y0}, {mid, y0+1})
-		cave_carve(&plan, {mid, min(y0, y1)}, {mid+1, max(y0, y1)+1})
-		cave_carve(&plan, {mid, y1}, {x1, y1+1})
+		cave_carve(&plan, {x = x0, y = y0}, {x = mid, y = y0+1})
+		cave_carve(&plan, {x = mid, y = min(y0, y1)}, {x = mid+1, y = max(y0, y1)+1})
+		cave_carve(&plan, {x = mid, y = y1}, {x = x1, y = y1+1})
 	}
 	// A few pillars in the rooms, never against a wall nor beside each other, so that no pocket closes.
 	for index in 0..<plan.rooms {
@@ -99,19 +99,19 @@ cave_plan :: proc(seed: u64) -> (plan: Cave_Plan) {
 		}
 	}
 	// The way out: the first cell of the first room on its middle row.
-	plan.arrival = {plan.boxes[0][0].x, middles[0]}
+	plan.arrival = {x = plan.boxes[0][0].x, y = middles[0]}
 	// The secret: a niche cut into the east wall of the last room, two cells tall and three deep, at its middle.
 	last := plan.rooms-1
 	niche_y := middles[last]
-	cave_carve(&plan, {plan.boxes[last][1].x+1, niche_y}, {CAVE_WIDTH-3, niche_y+1})
-	plan.secret = {CAVE_WIDTH-3, niche_y}
+	cave_carve(&plan, {x = plan.boxes[last][1].x+1, y = niche_y}, {x = CAVE_WIDTH-3, y = niche_y+1})
+	plan.secret = {x = CAVE_WIDTH-3, y = niche_y}
 	// The foes: none in the first room when there are three; the others each have a group at their middle.
 	for index in 0..<plan.rooms {
 		if plan.rooms == 3 && index == 0 { continue }
 		box := plan.boxes[index]
 		// In the first room of two the group stands by the gallery, a good way from the arrival.
 		anchor_x := box[1].x-1 if index == 0 else (box[0].x+box[1].x)/2
-		plan.anchors[plan.groups] = {anchor_x, middles[index]}
+		plan.anchors[plan.groups] = {x = anchor_x, y = middles[index]}
 		plan.foes[plan.groups] = 2+int(cave_hash(seed, u64(100+index))%2)+(1 if index == last else 0)
 		plan.groups += 1
 	}
@@ -128,7 +128,7 @@ cave_stamp :: proc(data: ^Level, origin: grid.Position, plan: ^Cave_Plan) -> boo
 	if data == nil || origin.x < 0 || origin.y < 0 || origin.x+CAVE_WIDTH > data.tiles.width || origin.y+CAVE_HEIGHT > data.tiles.height { return false }
 	for y in 0..<CAVE_HEIGHT {
 		for x in 0..<CAVE_WIDTH {
-			cell := grid.Position{origin.x+x, origin.y+y}
+			cell := grid.offset(origin, x, y)
 			_ = set_tile(data, cell, {.Wall if plan.rows[y][x] == '#' else .Floor})
 		}
 	}

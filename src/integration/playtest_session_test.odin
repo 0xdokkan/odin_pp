@@ -21,7 +21,7 @@ test_headless_playtest_finishes_twenty_timed_decisions_and_observes_the_world ::
 		testing.expect(t, game.configure_tactical(&run.player, config))
 		data := create_gameplay_command_test_level(t)
 		defer level.destroy(&data)
-		enemies := [?]game.Enemy_Spawn{{position = {2, 1}, health = 1000, attack = 2}}
+		enemies := [?]game.Enemy_Spawn{{position = {x = 2, y = 1}, health = 1000, attack = 2}}
 		room, built := game.create_room(&data, &run.player, {enemies = enemies[:]})
 		testing.expect(t, built)
 		defer game.destroy_room(&room)

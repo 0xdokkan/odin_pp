@@ -287,13 +287,13 @@ update_tactical_view :: proc(renderer: ^Renderer, room: ^game.Room, mouse: view.
 	// Behind the player's eyes his hand is put away: no refocus.
 	v.refocus_enabled = game.tactical_control_allowed(room, .Board_Action)
 	p := v.snapshot.player.position
-	origin := grid.Position{int(math.round(p.x)), int(math.round(p.y))}
+	origin := grid.Position{x = int(math.round(p.x)), y = int(math.round(p.y))}
 	v.visible_count = 0
 	size := game.tactical_vision_size(room.player.tactical.config, &v.snapshot.player.statuses)
 	visibility := Tactical_Visibility_Context{renderer, room}
 	for dy in -size/2..=size/2 {
 		for dx in -size/2..=size/2 {
-			cell := grid.Position{origin.x+dx, origin.y+dy}
+			cell := grid.offset(origin, dx, dy)
 			if !grid.contains(&room.level_data.tiles, cell) ||
 			   !game.tactical_in_footprint(size, room.player.tactical.facing, origin, cell) ||
 			   !game.tactical_line_visible(origin, cell, tactical_snapshot_opaque, &visibility, tactical_snapshot_height) { continue }
@@ -527,10 +527,10 @@ tactical_cue_visible :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) -> boo
 	snapshot := renderer.tactical.snapshot
 	position := cue.event.to_position
 	if target, ok := tactical_cue_actor_position(renderer, cue.event.target); ok {
-		position = {int(math.round(target.x)), int(math.round(target.y))}
+		position = {x = int(math.round(target.x)), y = int(math.round(target.y))}
 	} else if cue.event.target.kind == .Object {
 		for object in snapshot.objects[:snapshot.object_count] {
-			if object.entity == cue.event.target { position = {int(math.round(object.position.x)), int(math.round(object.position.y))}; break }
+			if object.entity == cue.event.target { position = {x = int(math.round(object.position.x)), y = int(math.round(object.position.y))}; break }
 		}
 	}
 	if !tactical_render_visible(renderer, position) { return false }
@@ -546,7 +546,7 @@ update_tactical_body_hover :: proc(renderer: ^Renderer, mouse: view.Vec2) {
 	ray := rl.GetScreenToWorldRayEx(to_raylib(mouse), v.camera, c.int(renderer.canvas_width), c.int(renderer.canvas_height))
 	closest := f32(1.0e20)
 	for actor in v.snapshot.enemies[:v.snapshot.enemy_count] {
-		cell := grid.Position{int(math.round(actor.position.x)), int(math.round(actor.position.y))}
+		cell := grid.Position{x = int(math.round(actor.position.x)), y = int(math.round(actor.position.y))}
 		// The Pinball's ball is no card under the mouse (pinball.odin).
 		if !actor.visible || !tactical_render_visible(renderer, cell) || tactical_pinball_holds(renderer, actor.entity) { continue }
 		if distance, hit := tactical_billboard_hit(renderer, sprite_key_for_enemy(actor.archetype), actor.position, ray, actor.entity); hit && distance < closest {
@@ -556,7 +556,7 @@ update_tactical_body_hover :: proc(renderer: ^Renderer, mouse: view.Vec2) {
 		}
 	}
 	for object in v.snapshot.objects[:v.snapshot.object_count] {
-		cell := grid.Position{int(math.round(object.position.x)), int(math.round(object.position.y))}
+		cell := grid.Position{x = int(math.round(object.position.x)), y = int(math.round(object.position.y))}
 		if !object.visible || !tactical_render_visible(renderer, cell) { continue }
 		collision := rl.GetRayCollisionBox(ray, voxel_object_bounds(object.kind, object.position))
 		if collision.hit && collision.distance < closest {
@@ -591,7 +591,7 @@ draw_tactical_world :: proc(renderer: ^Renderer, room: ^game.Room, active_card: 
 		p := room.player.position
 		min_x, min_y = max(0, (p.x/16-2)*16), max(0, (p.y/16-2)*16)
 		max_x, max_y = min(max_x, (p.x/16+3)*16), min(max_y, (p.y/16+3)*16)
-		expedition_gather_sites(renderer, expedition_world, {min_x, min_y}, {max_x, max_y})
+		expedition_gather_sites(renderer, expedition_world, {x = min_x, y = min_y}, {x = max_x, y = max_y})
 		prepare_expedition_material(renderer,room,expedition_world)
 		collect_expedition_edges(renderer,room,expedition_world)
 		prepare_expedition_lights(renderer,room,expedition_world)
@@ -610,7 +610,7 @@ draw_tactical_world :: proc(renderer: ^Renderer, room: ^game.Room, active_card: 
 		else {begin_expedition_material(renderer,expedition_world,floor=true)}
 		for y in min_y..<max_y {
 		for x in min_x..<max_x {
-			cell := grid.Position{x, y}
+			cell := grid.Position{x = x, y = y}
 			if !tactical_cell_on_screen(renderer, cell) || !tactical_render_visible(renderer, cell) { continue }
 			tile, _ := level.tile_at(room.level_data, cell)
 			if expedition_world != nil { draw_expedition_tile(renderer, room, expedition_world, cell, &preview) }
@@ -641,7 +641,7 @@ draw_tactical_world :: proc(renderer: ^Renderer, room: ^game.Room, active_card: 
 		draw_voxel_trap(renderer, trap)
 	}
 	for object in snapshot.objects[:snapshot.object_count] {
-		cell := grid.Position{int(math.round(object.position.x)), int(math.round(object.position.y))}
+		cell := grid.Position{x = int(math.round(object.position.x)), y = int(math.round(object.position.y))}
 		if !object.visible || !tactical_cell_on_screen(renderer, cell) || !tactical_render_visible(renderer, cell) { continue }
 		draw_voxel_object(renderer, object)
 	}

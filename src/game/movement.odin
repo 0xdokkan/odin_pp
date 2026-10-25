@@ -43,7 +43,7 @@ low_gravity_movement :: proc(room: ^Room, source: Entity_Ref, query: Movement_Qu
 	gravity := config.low_gravity && source != query.mover
 	ice := config.expedition && expedition_terrain(config.expedition_biome, query.destination) == .Ice
 	if !gravity && !ice { return query }
-	step := grid.Position{sign(query.destination.x-query.origin.x), sign(query.destination.y-query.origin.y)}
+	step := grid.Position{x = sign(query.destination.x-query.origin.x), y = sign(query.destination.y-query.origin.y)}
 	extended := query_entity_movement(room, query.mover, add_position(query.destination, step), query.mode)
 	return extended if extended.error == .None else query
 }

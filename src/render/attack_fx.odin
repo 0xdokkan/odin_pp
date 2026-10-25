@@ -277,7 +277,7 @@ attack_cell_center :: proc(cell: grid.Position, height: f32 = 0) -> rl.Vector3 {
 
 @(private)
 attack_board_cell :: proc(point: rl.Vector3) -> grid.Position {
-	return {int(math.floor(point.x)), int(math.floor(point.z))}
+	return {x = int(math.floor(point.x)), y = int(math.floor(point.z))}
 }
 
 // The cells a blow sweeps, decoded around its aim (game.event_footprint_bit).
@@ -285,7 +285,7 @@ attack_board_cell :: proc(point: rl.Vector3) -> grid.Position {
 attack_swept_cells :: proc(aim: grid.Position, swept: u16) -> (cells: [9]grid.Position, count: int) {
 	for bit in 0..<9 {
 		if swept&(u16(1)<<u32(bit)) == 0 { continue }
-		cells[count] = {aim.x+bit%3-1, aim.y+bit/3-1}
+		cells[count] = grid.offset(aim, bit%3-1, bit/3-1)
 		count += 1
 	}
 	if count == 0 { cells[0], count = aim, 1 }

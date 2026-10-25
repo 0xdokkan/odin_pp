@@ -37,16 +37,16 @@ tile_map_destroy :: proc(m: ^Tile_Map) {
 }
 
 tile_at :: proc(m: ^Tile_Map, x, y: int) -> Tile_Shape {
-	value, ok := grid.get(&m.cells, grid.Position{x, y})
+	value, ok := grid.get(&m.cells, grid.Position{x = x, y = y})
 	return value if ok else m.outside
 }
 
 set_tile :: proc(m: ^Tile_Map, x, y: int, shape: Tile_Shape) -> bool {
-	return grid.set(&m.cells, grid.Position{x, y}, shape)
+	return grid.set(&m.cells, grid.Position{x = x, y = y}, shape)
 }
 
 cell_of :: proc(m: ^Tile_Map, p: Vec2) -> grid.Position {
-	return grid.Position{int(math.floor(p.x / m.tile_size)), int(math.floor(p.y / m.tile_size))}
+	return grid.Position{x = int(math.floor(p.x / m.tile_size)), y = int(math.floor(p.y / m.tile_size))}
 }
 
 cell_rect :: proc(m: ^Tile_Map, x, y: int) -> Rect {

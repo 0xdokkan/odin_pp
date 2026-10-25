@@ -83,13 +83,13 @@ prepare_card_range_preview :: proc(renderer: ^Renderer, room: ^game.Room, card_i
 	preview.active, preview.card, preview.faint = true, card, faint
 	preview.affordable = room.player.deck.energy >= game.card_energy_cost(room, card.definition_id)
 	at := room.player.position
-	preview.origin = {at.x-game.MAX_TARGETING_RANGE, at.y-game.MAX_TARGETING_RANGE}
+	preview.origin = grid.offset(at, -game.MAX_TARGETING_RANGE, -game.MAX_TARGETING_RANGE)
 	if definition.targeting.shape != .None {
 		// One more than the card's reach: from four steps above it reaches a cell further.
 		radius := min(definition.targeting.cast_range.maximum+1, game.MAX_TARGETING_RANGE)
 		for y in max(0, at.y-radius)..=min(room.level_data.tiles.height-1, at.y+radius) {
 			for x in max(0, at.x-radius)..=min(room.level_data.tiles.width-1, at.x+radius) {
-				cell := grid.Position{x, y}
+				cell := grid.Position{x = x, y = y}
 				if !tactical_render_visible(renderer, cell) { continue }
 				evaluation := game.evaluate_card_targeting(room, card, game.card_target_request_at(definition, cell))
 				// Reach is not validity: empty enemy slots and blocked movement
@@ -187,7 +187,7 @@ card_range_floor_color :: proc(preview: ^Card_Range_Preview, cell: grid.Position
 @(private="file")
 Card_Light_Edge :: enum {North, East, South, West}
 @(private="file")
-CARD_LIGHT_NEIGHBORS :: [Card_Light_Edge]grid.Position{.North = {0,-1}, .East = {1,0}, .South = {0,1}, .West = {-1,0}}
+CARD_LIGHT_NEIGHBORS :: [Card_Light_Edge]grid.Position{.North = {x = 0, y = -1}, .East = {x = 1, y = 0}, .South = {x = 0, y = 1}, .West = {x = -1, y = 0}}
 
 // Vertex alpha provides the falloff: no render target, shader, texture upload,
 // per-cell draw-call flush or light allocation. All these triangles batch.
@@ -246,7 +246,7 @@ draw_card_light_cell :: proc(renderer: ^Renderer, room: ^game.Room, cell: grid.P
 card_effect_edges :: proc(renderer: ^Renderer, cells: ^game.Target_Cell_Set, cell: grid.Position) -> bit_set[Card_Light_Edge] {
 	edges: bit_set[Card_Light_Edge]
 	for offset, edge in CARD_LIGHT_NEIGHBORS {
-		next := grid.Position{cell.x+offset.x, cell.y+offset.y}
+		next := grid.offset(cell, offset.x, offset.y)
 		if !tactical_render_visible(renderer, next) || !game.target_cell_set_contains(cells, next) { edges += {edge} }
 	}
 	return edges
@@ -265,10 +265,10 @@ draw_card_range_light :: proc(renderer: ^Renderer, room: ^game.Room, preview: ^C
 	strength := breath*(f32(1) if preview.affordable else f32(0.36))*(f32(0.5) if preview.faint else f32(1))
 	for lit, i in preview.cells {
 		if !lit { continue }
-		cell := grid.Position{preview.origin.x+i%CARD_RANGE_SIDE, preview.origin.y+i/CARD_RANGE_SIDE}
+		cell := grid.offset(preview.origin, i%CARD_RANGE_SIDE, i/CARD_RANGE_SIDE)
 		edges: bit_set[Card_Light_Edge]
 		for offset, edge in CARD_LIGHT_NEIGHBORS {
-			if !card_range_contains(preview, {cell.x+offset.x, cell.y+offset.y}) { edges += {edge} }
+			if !card_range_contains(preview, grid.offset(cell, offset.x, offset.y)) { edges += {edge} }
 		}
 		draw_card_light_cell(renderer, room, cell, CARD_LIGHT_REACH, strength, edges)
 	}

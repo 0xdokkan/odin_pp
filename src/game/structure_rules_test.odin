@@ -32,7 +32,7 @@ test_a_fence_stops_the_step_but_not_the_sight_and_a_wall_stops_both :: proc(t: ^
 	})
 	defer level.destroy(&data)
 	defer destroy_room(&room)
-	fence, wall, floor := grid.Position{4, 1}, grid.Position{4, 2}, grid.Position{3, 1}
+	fence, wall, floor := grid.Position{x = 4, y = 1}, grid.Position{x = 4, y = 2}, grid.Position{x = 3, y = 1}
 	testing.expect(t, !base_cell_is_walkable(&room, fence))
 	testing.expect(t, cell_blocks_movement(&room, fence))
 	testing.expect(t, !cell_blocks_line_of_sight(&room, fence), "the sight passes over a fence")
@@ -40,12 +40,12 @@ test_a_fence_stops_the_step_but_not_the_sight_and_a_wall_stops_both :: proc(t: ^
 	testing.expect(t, !cell_blocks_movement(&room, floor) && !cell_blocks_line_of_sight(&room, floor))
 	// A line of sight through the fence is clear, and through the wall it is not.
 	blocks :: proc(data: rawptr, cell: grid.Position) -> bool { return cell_blocks_line_of_sight(cast(^Room)data, cell) }
-	testing.expect(t, tactical_line_visible({1, 1}, {6, 1}, blocks, &room), "over the fence")
-	testing.expect(t, !tactical_line_visible({1, 2}, {6, 2}, blocks, &room), "through the wall")
+	testing.expect(t, tactical_line_visible({x = 1, y = 1}, {x = 6, y = 1}, blocks, &room), "over the fence")
+	testing.expect(t, !tactical_line_visible({x = 1, y = 2}, {x = 6, y = 2}, blocks, &room), "through the wall")
 	// The player cannot step onto the fence.
-	room.player.position = {3, 1}
+	room.player.position = {x = 3, y = 1}
 	testing.expect_value(t, try_move_player(&room, .East), Action_Result.Blocked)
-	testing.expect_value(t, room.player.position, grid.Position{3, 1})
+	testing.expect_value(t, room.player.position, grid.Position{x = 3, y = 1})
 }
 
 // A building's walls stop the step and the sight, its door lets both pass.
@@ -54,13 +54,13 @@ test_a_building_stops_the_step_and_the_sight_except_through_its_door :: proc(t: 
 	data, _ := level.create(24, 24, level.Tile{kind = .Floor})
 	defer level.destroy(&data)
 	for i in 0..<24 {
-		_ = level.set_tile(&data, {i, 0}, {kind = .Wall}); _ = level.set_tile(&data, {i, 23}, {kind = .Wall})
-		_ = level.set_tile(&data, {0, i}, {kind = .Wall}); _ = level.set_tile(&data, {23, i}, {kind = .Wall})
+		_ = level.set_tile(&data, {x = i, y = 0}, {kind = .Wall}); _ = level.set_tile(&data, {x = i, y = 23}, {kind = .Wall})
+		_ = level.set_tile(&data, {x = 0, y = i}, {kind = .Wall}); _ = level.set_tile(&data, {x = 23, y = i}, {kind = .Wall})
 	}
-	_ = level.set_tile(&data, {1, 1}, {kind = .Player_Spawn})
-	data.player_spawn, data.has_player_spawn = {1, 1}, true
-	_ = level.set_tile(&data, {22, 22}, {kind = .Exit})
-	index, err := level.place_structure(&data, .Hut, {8, 8}, 0, false)
+	_ = level.set_tile(&data, {x = 1, y = 1}, {kind = .Player_Spawn})
+	data.player_spawn, data.has_player_spawn = {x = 1, y = 1}, true
+	_ = level.set_tile(&data, {x = 22, y = 22}, {kind = .Exit})
+	index, err := level.place_structure(&data, .Hut, {x = 8, y = 8}, 0, false)
 	testing.expect_value(t, err, level.Placement_Error.None)
 	player := create_test_player(t)
 	room, made := create_room(&data, &player, {})
@@ -70,7 +70,7 @@ test_a_building_stops_the_step_and_the_sight_except_through_its_door :: proc(t: 
 	plan := data.structure_plans[index]
 	for y in 0..<plan.height {
 		for x in 0..<plan.width {
-			cell := grid.Position{8+x, 8+y}
+			cell := grid.Position{x = 8+x, y = 8+y}
 			switch level.plan_at(&plan, x, y) {
 			case .Wall:
 				testing.expect(t, cell_blocks_movement(&room, cell) && cell_blocks_line_of_sight(&room, cell))
@@ -82,8 +82,8 @@ test_a_building_stops_the_step_and_the_sight_except_through_its_door :: proc(t: 
 	}
 	blocks :: proc(data: rawptr, cell: grid.Position) -> bool { return cell_blocks_line_of_sight(cast(^Room)data, cell) }
 	// From outside to the middle of the room: through the wall it is blocked, through the door it is clear.
-	testing.expect(t, !tactical_line_visible({10, 6}, {10, 9}, blocks, &room), "the wall hides the inside")
-	testing.expect(t, tactical_line_visible({10, 13}, {10, 9}, blocks, &room), "the door shows the inside")
+	testing.expect(t, !tactical_line_visible({x = 10, y = 6}, {x = 10, y = 9}, blocks, &room), "the wall hides the inside")
+	testing.expect(t, tactical_line_visible({x = 10, y = 13}, {x = 10, y = 9}, blocks, &room), "the door shows the inside")
 }
 
 // An enemy's blow breaks the object the player set down in its reach or beside the one who strikes it, once however many of its cells
@@ -103,27 +103,27 @@ test_an_enemy_blow_breaks_a_placed_object_in_reach_and_never_a_building :: proc(
 	room := structure_room(t, &data, &player, rows)
 	defer level.destroy(&data)
 	defer destroy_room(&room)
-	cart, _ := level.place_structure(&data, .Cart, {10, 6}, 0, false)
-	cottage, _ := level.place_structure(&data, .Cottage, {18, 4}, 0, false)
+	cart, _ := level.place_structure(&data, .Cart, {x = 10, y = 6}, 0, false)
+	cottage, _ := level.place_structure(&data, .Cottage, {x = 18, y = 4}, 0, false)
 	testing.expect(t, cart >= 0 && cottage >= 0)
 	data.structures[cart].health = level.structure_max_health(.Cart)
 	cart_origin := data.structures[cart].origin
 	// Far from both: nothing.
-	testing.expect_value(t, strike_structures(&room, {3, 3}, {{4, 3}, {5, 3}}, 5), 0)
+	testing.expect_value(t, strike_structures(&room, {x = 3, y = 3}, {{x = 4, y = 3}, {x = 5, y = 3}}, 5), 0)
 	testing.expect_value(t, data.structures[cart].health, level.structure_max_health(.Cart))
 	// A threatened cell on the cart: it takes the damage once, though two of its cells are threatened.
-	testing.expect_value(t, strike_structures(&room, {7, 7}, {cart_origin, {cart_origin.x+1, cart_origin.y}}, 2), 0)
+	testing.expect_value(t, strike_structures(&room, {x = 7, y = 7}, {cart_origin, grid.offset(cart_origin, 1, 0)}, 2), 0)
 	testing.expect_value(t, data.structures[cart].health, level.structure_max_health(.Cart)-2)
 	// Beside the one who strikes, with no cell of the blow on it.
-	testing.expect_value(t, strike_structures(&room, {cart_origin.x-1, cart_origin.y}, {{cart_origin.x-3, cart_origin.y}}, 1), 0)
+	testing.expect_value(t, strike_structures(&room, grid.offset(cart_origin, -1, 0), {grid.offset(cart_origin, -3, 0)}, 1), 0)
 	testing.expect_value(t, data.structures[cart].health, level.structure_max_health(.Cart)-3)
 	// The cottage takes nothing, however hard the blow.
-	testing.expect_value(t, strike_structures(&room, {17, 5}, {{18, 5}, {19, 5}}, 50), 0)
+	testing.expect_value(t, strike_structures(&room, {x = 17, y = 5}, {{x = 18, y = 5}, {x = 19, y = 5}}, 50), 0)
 	testing.expect_value(t, level.structure_count(&data), 2)
 	// Enough damage brings the cart down and takes it off the map.
-	testing.expect_value(t, strike_structures(&room, {cart_origin.x-1, cart_origin.y}, {cart_origin}, 50), 1)
+	testing.expect_value(t, strike_structures(&room, grid.offset(cart_origin, -1, 0), {cart_origin}, 50), 1)
 	testing.expect_value(t, level.structure_count(&data), 1)
 	testing.expect_value(t, data.structures[0].id, level.Structure_Id.Cottage)
 	// No damage, no blow.
-	testing.expect_value(t, strike_structures(&room, {17, 5}, {{18, 5}}, 0), 0)
+	testing.expect_value(t, strike_structures(&room, {x = 17, y = 5}, {{x = 18, y = 5}}, 0), 0)
 }

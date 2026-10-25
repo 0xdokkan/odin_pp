@@ -46,7 +46,7 @@ Cannon_Line :: struct {
 cannon_line :: proc(room: ^Room, origin: grid.Position, way: Move_Direction, laser: bool) -> (line: Cannon_Line) {
 	step := direction_offset(way)
 	line.last = origin
-	cell := grid.Position{origin.x+step.x, origin.y+step.y}
+	cell := grid.offset(origin, step.x, step.y)
 	for grid.contains(&room.level_data.tiles, cell) {
 		if !base_cell_is_walkable(room, cell) || obstacle_at(room, cell) { break }
 		if index, present := enemy_index_at(room, cell); present {
@@ -64,7 +64,7 @@ cannon_line :: proc(room: ^Room, origin: grid.Position, way: Move_Direction, las
 			} else if definition.blocks_movement { break }
 		}
 		line.last = cell
-		cell = grid.Position{cell.x+step.x, cell.y+step.y}
+		cell = grid.offset(cell, step.x, step.y)
 	}
 	return
 }

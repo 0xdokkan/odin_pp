@@ -286,7 +286,7 @@ draw_cannon_shot :: proc(renderer: ^Renderer, room: ^game.Room, cue: ^Presentati
 	p := presentation_cue_progress(cue)
 	laser := event.duration == 1
 	// Which way it was aimed: along the line from the cannon to its last cell.
-	delta := grid.Position{event.to_position.x-event.from_position.x, event.to_position.y-event.from_position.y}
+	delta := grid.offset(event.to_position, -event.from_position.x, -event.from_position.y)
 	way := game.Move_Direction.East
 	switch {
 	case delta.y < 0: way = .North
@@ -438,7 +438,7 @@ draw_arsenal_floor :: proc(renderer: ^Renderer, room: ^game.Room) {
 	defer { rlgl.DrawRenderBatchActive(); rlgl.EnableBackfaceCulling(); rlgl.EnableDepthMask() }
 	for object in snapshot.objects[:snapshot.object_count] {
 		if object.kind != .Devouring_Hole || !object.visible { continue }
-		cell := grid.Position{int(object.position.x), int(object.position.y)}
+		cell := grid.Position{x = int(object.position.x), y = int(object.position.y)}
 		if !tactical_cell_on_screen(renderer, cell) || !tactical_render_visible(renderer, cell) { continue }
 		open := clamp(f32(t-hole_born(renderer, object.entity))/0.6, f32(0), f32(1))
 		if closing, closed := arsenal_cue_progress(renderer, .Black_Hole_Closed, object.entity); closed { open = min(open, 1-closing) }
@@ -457,7 +457,7 @@ draw_hole_floor :: proc(renderer: ^Renderer, room: ^game.Room, object: Presentat
 	rl.BeginBlendMode(.ALPHA)
 	for dy in -int(r)-1..=int(r)+1 {
 		for dx in -int(r)-1..=int(r)+1 {
-			cell := grid.Position{int(object.position.x)+dx, int(object.position.y)+dy}
+			cell := grid.Position{x = int(object.position.x)+dx, y = int(object.position.y)+dy}
 			if !marley_cell_drawn(renderer, room, cell) { continue }
 			floor := marley_floor_height(renderer, cell)
 			inside := abs(dx) <= int(r) && abs(dy) <= int(r)
@@ -508,7 +508,7 @@ draw_arsenal_sky :: proc(renderer: ^Renderer, room: ^game.Room) {
 	defer { rlgl.DrawRenderBatchActive(); rlgl.EnableDepthMask() }
 	for object in snapshot.objects[:snapshot.object_count] {
 		if object.kind != .Devouring_Hole || !object.visible { continue }
-		cell := grid.Position{int(object.position.x), int(object.position.y)}
+		cell := grid.Position{x = int(object.position.x), y = int(object.position.y)}
 		if !tactical_cell_on_screen(renderer, cell) || !tactical_render_visible(renderer, cell) { continue }
 		open := clamp(f32(t-hole_born(renderer, object.entity))/0.6, f32(0), f32(1))
 		if closing, closed := arsenal_cue_progress(renderer, .Black_Hole_Closed, object.entity); closed { open = min(open, 1-closing) }
@@ -671,8 +671,8 @@ draw_dino_stomp :: proc(renderer: ^Renderer, room: ^game.Room, cue: ^Presentatio
 	}
 	rl.BeginBlendMode(.ADDITIVE)
 	marley_glow(cx, 0.06, cz, 0.4+1.3*p, DINO_AURA[3], 0.85*(1-p))
-	for offset in ([4]grid.Position{{0, -1}, {1, 0}, {0, 1}, {-1, 0}}) {
-		cell := grid.Position{at.x+offset.x, at.y+offset.y}
+	for offset in ([4]grid.Position{{x = 0, y = -1}, {x = 1, y = 0}, {x = 0, y = 1}, {x = -1, y = 0}}) {
+		cell := grid.offset(at, offset.x, offset.y)
 		if !marley_cell_drawn(renderer, room, cell) { continue }
 		marley_square(f32(cell.x)+0.5, 0.058, f32(cell.y)+0.5, 0.46, color_with_opacity(DINO_AURA[3], 0.5*(1-p)))
 	}
@@ -708,7 +708,7 @@ draw_emplacement_labels :: proc(renderer: ^Renderer, room: ^game.Room) {
 	snapshot := renderer.tactical.snapshot
 	for object in snapshot.objects[:snapshot.object_count] {
 		if (object.kind != .Field_Cannon && object.kind != .Devouring_Hole) || !object.visible { continue }
-		cell := grid.Position{int(object.position.x), int(object.position.y)}
+		cell := grid.Position{x = int(object.position.x), y = int(object.position.y)}
 		if !tactical_render_visible(renderer, cell) { continue }
 		name := "BUCO NERO"
 		height := f32(0.8)
@@ -744,15 +744,15 @@ draw_cannon_preview :: proc(renderer: ^Renderer, room: ^game.Room, card: game.Ca
 	line := game.cannon_line(room, cell, way, laser)
 	step := game.direction_offset(way)
 	good := rl.Color{255, 96, 96, 255} if valid else rl.Color{150, 150, 150, 255}
-	probe := grid.Position{cell.x+step.x, cell.y+step.y}
-	beyond := grid.Position{line.last.x+step.x, line.last.y+step.y}
+	probe := grid.offset(cell, step.x, step.y)
+	beyond := grid.offset(line.last, step.x, step.y)
 	for probe != beyond && grid.contains(&room.level_data.tiles, probe) {
 		draw_card_range_cell(renderer, probe, {255, 80, 80, 44}, {255, 150, 150, 120})
-		probe = {probe.x+step.x, probe.y+step.y}
+		probe = grid.offset(probe, step.x, step.y)
 	}
 	from := to_raylib(tactical_project(renderer, {f32(cell.x)+0.5, f32(cell.y)+0.5}, 0.6))
 	last := line.last
-	if last == cell { last = {cell.x+step.x, cell.y+step.y} }
+	if last == cell { last = grid.offset(cell, step.x, step.y) }
 	to := to_raylib(tactical_project(renderer, {f32(last.x)+0.5, f32(last.y)+0.5}, 0.6))
 	along := to-from
 	length := math.sqrt(along.x*along.x+along.y*along.y)
@@ -779,7 +779,7 @@ draw_black_hole_preview :: proc(renderer: ^Renderer, room: ^game.Room, card: gam
 	radius := int(game.black_hole_radius(card.upgrade_level))
 	for dy in -radius-1..=radius+1 {
 		for dx in -radius-1..=radius+1 {
-			spot := grid.Position{cell.x+dx, cell.y+dy}
+			spot := grid.offset(cell, dx, dy)
 			if !grid.contains(&room.level_data.tiles, spot) || game.cell_blocks_movement(room, spot) { continue }
 			inside := abs(dx) <= radius && abs(dy) <= radius
 			if inside && valid {

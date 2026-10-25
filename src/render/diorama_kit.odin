@@ -29,7 +29,7 @@ DIORAMA_PIECE_NAMES := [Diorama_Piece]string{
 
 // Grid +y, +x, -y, -x: the order of the board's neighbour scans.
 @(rodata)
-DIORAMA_SIDES := [4]grid.Position{{0, 1}, {1, 0}, {0, -1}, {-1, 0}}
+DIORAMA_SIDES := [4]grid.Position{{x = 0, y = 1}, {x = 1, y = 0}, {x = 0, y = -1}, {x = -1, y = 0}}
 
 Diorama_Vertex :: struct {
 	position, normal: rl.Vector3,
@@ -168,7 +168,7 @@ diorama_face_piece :: proc(cell: grid.Position, side: int) -> Diorama_Piece {
 diorama_lamp_side :: proc(renderer: ^Renderer, room: ^game.Room, cell: grid.Position) -> int {
 	if _, found := diorama_lamp(renderer, room, cell); !found { return -1 }
 	for offset, side in DIORAMA_SIDES {
-		if tactical_render_visible(renderer, {cell.x+offset.x, cell.y+offset.y}) && diorama_wall_face(room, cell, offset) { return side }
+		if tactical_render_visible(renderer, grid.offset(cell, offset.x, offset.y)) && diorama_wall_face(room, cell, offset) { return side }
 	}
 	return -1
 }
@@ -191,7 +191,7 @@ draw_diorama_kit_wall :: proc(renderer: ^Renderer, room: ^game.Room, cell: grid.
 	exposed: [4]bool
 	to_camera := renderer.tactical.camera.position-origin
 	for offset, side in DIORAMA_SIDES {
-		neighbour := grid.Position{cell.x+offset.x, cell.y+offset.y}
+		neighbour := grid.offset(cell, offset.x, offset.y)
 		exposed[side] = !diorama_neighbour_is_wall(room, neighbour)
 		normal := rl.Vector3{f32(offset.x), 0, f32(offset.y)}
 		// A translucent shell shows only its camera-facing relief: stacked

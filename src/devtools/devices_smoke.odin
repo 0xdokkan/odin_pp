@@ -92,7 +92,7 @@ run_m8_view_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer, dice:
 	for id in ([8]game.Card_Id{.Shock_Floor, .Tesla_Coil, .Tesla_Coil, .Tesla_Coil, .Tesla_Coil, .Strike, .Guard, .Heavy_Blow}) {
 		if _, added := game.add_owned_card(&player.deck, id); !added { return false }
 	}
-	enemies := [?]game.Enemy_Spawn{{position = {4,3},health = 30,attack = 1}, {position = {6,5},health = 30,attack = 1,archetype = .Brute}, {position = {8,4},health = 30,attack = 1,archetype = .Archer}}
+	enemies := [?]game.Enemy_Spawn{{position = {x = 4, y = 3},health = 30,attack = 1}, {position = {x = 6, y = 5},health = 30,attack = 1,archetype = .Brute}, {position = {x = 8, y = 4},health = 30,attack = 1,archetype = .Archer}}
 	room, built := game.create_room(&data, &player, {enemies = enemies[:]})
 	if !built { return false }
 	defer game.destroy_room(&room)
@@ -101,7 +101,7 @@ run_m8_view_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer, dice:
 	controller := run_session.Tactical_Controller{was_focused = true}
 	cards: run_session.Card_Interaction_State
 	buffer: run_session.Buffered_Gameplay_Command
-	positions := [5]grid.Position{{3,2},{7,2},{7,6},{3,6},{4,2}}
+	positions := [5]grid.Position{{x = 3, y = 2},{x = 7, y = 2},{x = 7, y = 6},{x = 3, y = 6},{x = 4, y = 2}}
 	for position, index in positions {
 		id: u32
 		definition: game.Card_Id = .Shock_Floor if index == 4 else .Tesla_Coil

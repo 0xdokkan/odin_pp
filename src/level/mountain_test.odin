@@ -16,7 +16,7 @@ mountain_walk :: proc(diagonals: bool) -> (distances: []int, side: int) {
 	for y in -half..=half {
 		for x in -half..=half {
 			if abs(x) == half || abs(y) == half {
-				append(&queue, grid.Position{x, y})
+				append(&queue, grid.Position{x = x, y = y})
 				distances[(y+half)*side+x+half] = 0
 			}
 		}
@@ -26,7 +26,7 @@ mountain_walk :: proc(diagonals: bool) -> (distances: []int, side: int) {
 		for oy in -1..=1 {
 			for ox in -1..=1 {
 				if (ox == 0 && oy == 0) || (!diagonals && ox != 0 && oy != 0) { continue }
-				next := grid.Position{cell.x+ox, cell.y+oy}
+				next := grid.offset(cell, ox, oy)
 				if abs(next.x) > half || abs(next.y) > half { continue }
 				if abs(mountain_height(next)-mountain_height(cell)) > 1 { continue }
 				at := (next.y+half)*side+next.x+half
@@ -46,7 +46,7 @@ test_the_mountain_stands_in_its_square_and_has_a_flat_summit :: proc(t: ^testing
 	tallest, summit_cells := 0, 0
 	for y in -MOUNTAIN_HALF-2..=MOUNTAIN_HALF+2 {
 		for x in -MOUNTAIN_HALF-2..=MOUNTAIN_HALF+2 {
-			h := mountain_height({x, y})
+			h := mountain_height({x = x, y = y})
 			tallest = max(tallest, h)
 			if h == MOUNTAIN_TOP { summit_cells += 1 }
 			if abs(x) > MOUNTAIN_HALF || abs(y) > MOUNTAIN_HALF { testing.expect_value(t, h, 0) }
@@ -56,7 +56,7 @@ test_the_mountain_stands_in_its_square_and_has_a_flat_summit :: proc(t: ^testing
 	testing.expectf(t, summit_cells >= 9, "the summit has %d cells", summit_cells)
 	summit := mountain_summit()
 	testing.expect_value(t, mountain_height(summit), MOUNTAIN_TOP)
-	testing.expect_value(t, mountain_height({MOUNTAIN_HALF+3, 0}), 0)
+	testing.expect_value(t, mountain_height({x = MOUNTAIN_HALF+3, y = 0}), 0)
 }
 
 // The way up is the path: a walk climbing a step at a time reaches the summit, and it is a long one, three
@@ -83,9 +83,9 @@ test_the_laps_are_divided_by_cliffs_and_the_ground_rises_along_the_path :: proc(
 	cliffs, steps := 0, 0
 	for y in -MOUNTAIN_HALF..=MOUNTAIN_HALF {
 		for x in -MOUNTAIN_HALF..=MOUNTAIN_HALF {
-			here := mountain_height({x, y})
+			here := mountain_height({x = x, y = y})
 			for step in ([2][2]int{{1, 0}, {0, 1}}) {
-				there := mountain_height({x+step.x, y+step.y})
+				there := mountain_height({x = x+step.x, y = y+step.y})
 				if abs(here-there) >= 2 { cliffs += 1 }
 				if abs(here-there) == 1 { steps += 1 }
 			}
@@ -104,7 +104,7 @@ test_most_of_the_mountain_is_walkable_and_the_halfway_cell_is_halfway_up :: proc
 	inside, reached := 0, 0
 	for y in -MOUNTAIN_HALF..=MOUNTAIN_HALF {
 		for x in -MOUNTAIN_HALF..=MOUNTAIN_HALF {
-			if _, in_mountain := mountain_progress({x, y}); !in_mountain || mountain_height({x, y}) == 0 { continue }
+			if _, in_mountain := mountain_progress({x = x, y = y}); !in_mountain || mountain_height({x = x, y = y}) == 0 { continue }
 			inside += 1
 			if distances[(y+half)*side+x+half] >= 0 { reached += 1 }
 		}
@@ -122,10 +122,10 @@ test_the_ice_is_in_two_stretches_on_the_path :: proc(t: ^testing.T) {
 	icy := 0
 	for y in -MOUNTAIN_HALF-2..=MOUNTAIN_HALF+2 {
 		for x in -MOUNTAIN_HALF-2..=MOUNTAIN_HALF+2 {
-			if !mountain_icy({x, y}) { continue }
+			if !mountain_icy({x = x, y = y}) { continue }
 			icy += 1
-			h := mountain_height({x, y})
-			testing.expectf(t, h > 0 && h < MOUNTAIN_TOP, "ice at %v, %d steps high", grid.Position{x, y}, h)
+			h := mountain_height({x = x, y = y})
+			testing.expectf(t, h > 0 && h < MOUNTAIN_TOP, "ice at %v, %d steps high", grid.Position{x = x, y = y}, h)
 		}
 	}
 	testing.expectf(t, icy >= 12 && icy <= 80, "%d icy cells", icy)
@@ -159,5 +159,5 @@ test_the_path_rises_one_step_at_a_time_and_is_level_across :: proc(t: ^testing.T
 
 @(private = "file")
 ring_cell :: proc(radius, angle: f32) -> grid.Position {
-	return {int(math.round(radius*math.cos(angle))), int(math.round(radius*math.sin(angle)))}
+	return {x = int(math.round(radius*math.cos(angle))), y = int(math.round(radius*math.sin(angle)))}
 }

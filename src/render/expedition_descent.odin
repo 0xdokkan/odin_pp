@@ -207,7 +207,7 @@ draw_expedition_descent_wall :: proc(pass:Ink_Pass,room:^game.Room,w:^world.Worl
 			ink_frustum(pass,p+o,.21,.19,.18+f32((h>>u32(i*3))%3)*.10,6,math.PI/6,fill,cap,{})
 		}
 	}
-	for direction in ([4]grid.Position{{0,1},{1,0},{0,-1},{-1,0}}) {
+	for direction in ([4]grid.Position{{x = 0, y = 1},{x = 1, y = 0},{x = 0, y = -1},{x = -1, y = 0}}) {
 		if expedition_wall_joined(room,site,game.add_position(cell,direction),plain_height) {continue}
 		yaw:=math.atan2(f32(-direction.x),f32(direction.y))
 		#partial switch w.biome {

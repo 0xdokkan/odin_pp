@@ -317,7 +317,7 @@ card_demo_cell_under :: proc(demo: ^Card_Demo, renderer: ^render.Renderer, point
 	t := -ray.position.y/ray.direction.y
 	if t <= 0 { return }
 	at := ray.position+ray.direction*t
-	cell = {int(math.floor(at.x)), int(math.floor(at.z))}
+	cell = {x = int(math.floor(at.x)), y = int(math.floor(at.z))}
 	ok = grid.contains(&demo.data.tiles, cell) && render.tactical_render_visible(r, cell)
 	return
 }

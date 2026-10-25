@@ -181,7 +181,7 @@ test_flipbook_card_stands_on_the_floor_and_turns_with_the_walk :: proc(t: ^testi
 	step := [2]int{-1, 0} if right.x > 0 else [2]int{1, 0}
 	renderer.timeline.count = 1
 	renderer.timeline.cues[0] = {kind = .Move, started = true, elapsed = 0.01, duration = 0.24,
-		event = {target = game.PLAYER_ENTITY, from_position = {2, 3}, to_position = {2+step.x, 3+step.y}}}
+		event = {target = game.PLAYER_ENTITY, from_position = {x = 2, y = 3}, to_position = {x = 2+step.x, y = 3+step.y}}}
 	update_flipbook_actors(renderer, nil)
 	player := flipbook_find(renderer, game.PLAYER_ENTITY, .Pilgrim, {2, 3})
 	testing.expect(t, player != nil && player.facing_left && player.base == .Walk)

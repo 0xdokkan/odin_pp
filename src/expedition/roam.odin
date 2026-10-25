@@ -27,7 +27,7 @@ Roam :: struct {
 }
 
 roam_center :: proc(cell:grid.Position)->[2]f32 {return {f32(cell.x)+.5,f32(cell.y)+.5}}
-roam_cell :: proc(p:[2]f32)->grid.Position {return {int(math.floor(p.x)),int(math.floor(p.y))}}
+roam_cell :: proc(p:[2]f32)->grid.Position {return {x = int(math.floor(p.x)), y = int(math.floor(p.y))}}
 
 // Gravity wells, wind, tunnels, encounters and saves move the room's player
 // directly. The walker adopts that cell instead of overriding it.
@@ -60,7 +60,7 @@ roam_resolve :: proc(r:^Roam,room:^game.Room) {
 		pushed:=false
 		base:=roam_cell(r.position)
 		for dy in -1..=1 {for dx in -1..=1 {
-			cell:=grid.Position{base.x+dx,base.y+dy}
+			cell:=grid.offset(base, dx, dy)
 			if !roam_blocked(r,room,cell) {continue}
 			lo:=[2]f32{f32(cell.x),f32(cell.y)};hi:=lo+1
 			closest:=[2]f32{clamp(r.position.x,lo.x,hi.x),clamp(r.position.y,lo.y,hi.y)}
@@ -77,8 +77,8 @@ roam_resolve :: proc(r:^Roam,room:^game.Room) {
 				normal=d/length;depth=ROAM_RADIUS-length
 				if d.x!=0 && d.y!=0 {
 					sx,sy:=int(math.sign(d.x)),int(math.sign(d.y))
-					along_x:=roam_blocked(r,room,{cell.x+sx,cell.y})
-					along_y:=roam_blocked(r,room,{cell.x,cell.y+sy})
+					along_x:=roam_blocked(r,room,grid.offset(cell, sx, 0))
+					along_y:=roam_blocked(r,room,grid.offset(cell, 0, sy))
 					if along_x && along_y {continue}
 					if along_x {normal={0,f32(sy)};depth=ROAM_RADIUS-abs(d.y)}
 					else if along_y {normal={f32(sx),0};depth=ROAM_RADIUS-abs(d.x)}

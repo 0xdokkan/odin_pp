@@ -18,12 +18,12 @@ mountain_present :: proc(w: ^World) -> bool {
 // The square the mountain keeps level and clear, with two cells of margin, for the relief to leave alone.
 mountain_zone :: proc() -> [2]grid.Position {
 	c, h := level.MOUNTAIN_CENTER, level.MOUNTAIN_HALF+2
-	return {{c.x-h, c.y-h}, {c.x+h, c.y+h}}
+	return {grid.offset(c, -h, -h), grid.offset(c, h, h)}
 }
 
 // The map cell at `offset` from the mountain's centre.
 mountain_cell :: proc(offset: grid.Position) -> grid.Position {
-	return {level.MOUNTAIN_CENTER.x+offset.x, level.MOUNTAIN_CENTER.y+offset.y}
+	return grid.offset(level.MOUNTAIN_CENTER, offset.x, offset.y)
 }
 
 // Raises the mountain, after the relief and before the inhabitants.

@@ -77,8 +77,8 @@ test_every_arch_can_be_walked_to_from_the_spawn :: proc(t: ^testing.T) {
 			queue[0] = data.player_spawn
 			seen[data.player_spawn.y*data.tiles.width+data.player_spawn.x] = true
 			for head := 0; head < tail; head += 1 {
-				for offset in ([4]grid.Position{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}) {
-					q := grid.Position{queue[head].x+offset.x, queue[head].y+offset.y}
+				for offset in ([4]grid.Position{{x = 1, y = 0}, {x = -1, y = 0}, {x = 0, y = 1}, {x = 0, y = -1}}) {
+					q := grid.Position{x = queue[head].x+offset.x, y = queue[head].y+offset.y}
 					tile, ok := level.tile_at(&data, q)
 					if !ok || !level.is_walkable(tile.kind) { continue }
 					if abs(int(level.height_at(&data, q))-int(level.height_at(&data, queue[head]))) > 1 { continue }
@@ -95,7 +95,7 @@ test_every_arch_can_be_walked_to_from_the_spawn :: proc(t: ^testing.T) {
 				testing.expectf(t, level.is_walkable(tile.kind), "%v: the arch at %v is not floor", biome, p)
 				// The cell in front of the doorway, or (on the mountain) the path itself.
 				on_mountain := mountain_present(&w) && p == mountain_cell(level.mountain_path_cell(1.75))
-				front := p if on_mountain else grid.Position{p.x, p.y+1}
+				front := p if on_mountain else grid.offset(p, 0, 1)
 				testing.expectf(t, seen[front.y*data.tiles.width+front.x], "%v seed %d: the arch at %v cannot be walked to", biome, seed, p)
 			}
 		}
@@ -129,7 +129,7 @@ test_a_cave_is_entered_and_left_and_the_open_map_comes_back_as_it_was :: proc(t:
 		defer delete(before_tiles)
 		defer delete(before_heights)
 		arch := w.sites[w.caves[0].site].position
-		room.player.position = grid.Position{arch.x, arch.y+1}
+		room.player.position = grid.offset(arch, 0, 1)
 		testing.expect(t, enter_cave(&w, &data, &room, outer, 0))
 		testing.expect_value(t, w.in_cave, 1)
 		arrival, ok := cave_arrival(&w)
@@ -138,10 +138,10 @@ test_a_cave_is_entered_and_left_and_the_open_map_comes_back_as_it_was :: proc(t:
 		origin := cave_origin(&w)
 		for y in 0..<data.tiles.height {
 			for x in 0..<data.tiles.width {
-				tile, _ := level.tile_at(&data, {x, y})
+				tile, _ := level.tile_at(&data, {x = x, y = y})
 				inside := x >= origin.x && y >= origin.y && x < origin.x+level.CAVE_WIDTH && y < origin.y+level.CAVE_HEIGHT
 				if !inside { testing.expect_value(t, tile.kind, level.Tile_Kind.Void); continue }
-				if (grid.Position{x, y}) == arrival { testing.expect_value(t, tile.kind, level.Tile_Kind.Player_Spawn); continue }
+				if (grid.Position{x = x, y = y}) == arrival { testing.expect_value(t, tile.kind, level.Tile_Kind.Player_Spawn); continue }
 				testing.expect_value(t, tile.kind, level.Tile_Kind.Wall if plan.rows[y-origin.y][x-origin.x] == '#' else level.Tile_Kind.Floor)
 			}
 		}
@@ -150,7 +150,7 @@ test_a_cave_is_entered_and_left_and_the_open_map_comes_back_as_it_was :: proc(t:
 		testing.expect(t, !enter_cave(&w, &data, &room, outer, 0))
 		testing.expect(t, exit_cave(&w, &data, &room, outer))
 		testing.expect_value(t, w.in_cave, 0)
-		testing.expect_value(t, room.player.position, grid.Position{arch.x, arch.y+1})
+		testing.expect_value(t, room.player.position, grid.offset(arch, 0, 1))
 		testing.expect(t, slice.equal(before_tiles, data.tiles.cells[:]), "the tiles are as they were")
 		testing.expect(t, slice.equal(before_heights, data.heights[:]) || (len(before_heights) == 0 && len(data.heights) == 0), "the heights are as they were")
 		testing.expect(t, !exit_cave(&w, &data, &room, outer), "out already")
@@ -170,7 +170,7 @@ test_a_fight_stops_the_crossing_and_groups_and_drops_belong_to_where_the_player_
 	outer := new(Outer_Map)
 	defer free(outer)
 	arch := w.sites[w.caves[0].site].position
-	room.player.position = {arch.x, arch.y+1}
+	room.player.position = grid.offset(arch, 0, 1)
 	_ = game.begin_expedition_encounter(&room)
 	testing.expect(t, !enter_cave(&w, &data, &room, outer, 0), "no crossing in a fight")
 	game.end_expedition_encounter(&room)
@@ -205,7 +205,7 @@ test_a_checkpoint_in_a_cave_comes_back_in_the_cave_with_the_open_map_kept :: pro
 	outer := new(Outer_Map)
 	defer free(outer)
 	arch := w.sites[w.caves[0].site].position
-	room.player.position = {arch.x, arch.y+1}
+	room.player.position = grid.offset(arch, 0, 1)
 	open_tiles := slice.clone(data.tiles.cells[:])
 	defer delete(open_tiles)
 	testing.expect(t, enter_cave(&w, &data, &room, outer, 0))
@@ -252,7 +252,7 @@ test_what_drops_in_a_cave_belongs_to_the_cave :: proc(t: ^testing.T) {
 	outer := new(Outer_Map)
 	defer free(outer)
 	arch := w.sites[w.caves[0].site].position
-	room.player.position = {arch.x, arch.y+1}
+	room.player.position = grid.offset(arch, 0, 1)
 	open_drops := w.drop_count
 	testing.expect(t, enter_cave(&w, &data, &room, outer, 0))
 	add_xp_drop(&w, room.player.position, 6)

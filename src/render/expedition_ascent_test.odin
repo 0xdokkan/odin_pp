@@ -45,7 +45,7 @@ test_ascent_outdoor_five_biomes_are_deterministic_bounded_and_economical :: proc
 	defer {delete(b.vertices);delete(b.lines);delete(again.vertices);delete(again.lines)}
 	pass,other:=Ink_Pass{mode=.Bake,builder=&b},Ink_Pass{mode=.Bake,builder=&again}
 	for biome in ASCENT_TEST_BIOMES {for i in 0..<64 {
-		cell:=grid.Position{i*7%61-30,i*13%59-29};w.biome=biome
+		cell:=grid.Position{x = i*7%61-30, y = i*13%59-29};w.biome=biome
 		clear(&b.vertices);clear(&b.lines);clear(&again.vertices);clear(&again.lines)
 		testing.expect(t,draw_expedition_ascent_outdoor(pass,w,cell))
 		w.clock+=23;w.seed+=711
@@ -68,16 +68,16 @@ test_ascent_site_walls_all_kinds_and_rotations_follow_collision_and_budget :: pr
 	b:Expedition_Geometry_Builder;defer {delete(b.vertices);delete(b.lines)}
 	pass:=Ink_Pass{mode=.Bake,builder=&b};count:=0
 	for kind in world.Site_Kind {if kind==.Cave {continue};for orientation in u8(0)..<4 {
-		site:=world.Site{kind=kind,position={40,40},orientation=orientation,active=true,layout_version=world.SITE_LAYOUT_VERSION}
+		site:=world.Site{kind=kind,position={x = 40, y = 40},orientation=orientation,active=true,layout_version=world.SITE_LAYOUT_VERSION}
 		lo,hi:=world.site_bounds(&site)
-		for y in 20..<61 {for x in 20..<61 {_=level.set_tile(&data,{x,y},{.Floor})}}
+		for y in 20..<61 {for x in 20..<61 {_=level.set_tile(&data,{x = x, y = y},{.Floor})}}
 		for y in lo.y..=hi.y {for x in lo.x..=hi.x {
-			p:=grid.Position{x,y};if world.site_cell(&site,p).wall {_=level.set_tile(&data,p,{.Wall})}
+			p:=grid.Position{x = x, y = y};if world.site_cell(&site,p).wall {_=level.set_tile(&data,p,{.Wall})}
 		}}
 		for biome in ASCENT_TEST_BIOMES {
 			w.biome=biome
 			for y in lo.y..=hi.y {for x in lo.x..=hi.x {
-				cell:=grid.Position{x,y};design:=world.site_cell(&site,cell)
+				cell:=grid.Position{x = x, y = y};design:=world.site_cell(&site,cell)
 				if !design.wall || design.fixture {continue}
 				clear(&b.vertices);clear(&b.lines)
 				testing.expect(t,draw_expedition_ascent_wall(pass,&room,w,&site,cell,design))
@@ -101,7 +101,7 @@ test_ascent_fixtures_all_biomes_kinds_rotations_preserve_walkable_space :: proc(
 	pass,other:=Ink_Pass{mode=.Bake,builder=&b},Ink_Pass{mode=.Bake,builder=&again}
 	for biome in ASCENT_TEST_BIOMES {for kind in world.Site_Kind {if kind==.Cave {continue};for orientation in u8(0)..<4 {for state in world.Site_State {
 		w.biome=biome
-		site:=world.Site{kind=kind,state=state,position={32,32},orientation=orientation,active=true,layout_version=world.SITE_LAYOUT_VERSION}
+		site:=world.Site{kind=kind,state=state,position={x = 32, y = 32},orientation=orientation,active=true,layout_version=world.SITE_LAYOUT_VERSION}
 		clear(&b.vertices);clear(&b.lines);clear(&again.vertices);clear(&again.lines)
 		testing.expect(t,draw_expedition_ascent_fixture(pass,w,&site))
 		w.clock+=7;w.seed+=13
@@ -120,7 +120,7 @@ test_ascent_fixtures_all_biomes_kinds_rotations_preserve_walkable_space :: proc(
 ascent_test_fixture_point :: proc(site:^world.Site,p:rl.Vector3)->bool {
 	if site.kind==.Trial || site.kind==.Tunnel {return p.y<=.026 && ascent_test_cell_contains(site.position,p)}
 	if site.kind==.Boss && p.y>=3.24 {return p.y<4.2}
-	cell:=grid.Position{int(math.floor(p.x)),int(math.floor(p.z))}
+	cell:=grid.Position{x = int(math.floor(p.x)), y = int(math.floor(p.z))}
 	d:=world.site_cell(site,cell)
 	return p.y>=0 && d.fixture && d.wall
 }

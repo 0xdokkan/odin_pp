@@ -29,7 +29,7 @@ create_pinball_controller_test_room :: proc(t: ^testing.T, data: ^level.Level, p
 	config.vision_size = 0
 	config.timed_actions = true
 	testing.expect(t, game.configure_tactical(player, config))
-	enemies := [?]game.Enemy_Spawn{{position = {6, 4}, health = 40, attack = 1}}
+	enemies := [?]game.Enemy_Spawn{{position = {x = 6, y = 4}, health = 40, attack = 1}}
 	built: bool
 	room^, built = game.create_room(data, player, {enemies = enemies[:]})
 	return testing.expect(t, built)

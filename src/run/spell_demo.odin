@@ -11,7 +11,7 @@ prepare_spell_lab :: proc(room: ^game.Room, dice_lab: bool = false) -> bool {
 	game.finish_deck_combat(&player.deck)
 	for y in 1..<data.tiles.height-1 {
 		for x in 1..<data.tiles.width-1 {
-			cell: grid.Position = {x, y}
+			cell: grid.Position = {x = x, y = y}
 			tile, _ := level.tile_at(data, cell)
 			if tile.kind == .Wall { level.set_tile(data, cell, {.Floor}) }
 		}
@@ -23,15 +23,15 @@ prepare_spell_lab :: proc(room: ^game.Room, dice_lab: bool = false) -> bool {
 		if _, added := game.add_owned_card(&player.deck, id); !added { return false }
 	}
 	enemies := [?]game.Enemy_Spawn{
-		{position = {5, 3}, health = 12, attack = 2, archetype = .Chaser},
-		{position = {6, 2}, health = 12, attack = 2, archetype = .Chaser},
-		{position = {7, 3}, health = 12, attack = 2, archetype = .Archer},
-		{position = {10, 6}, health = 12, attack = 2, archetype = .Brute},
+		{position = {x = 5, y = 3}, health = 12, attack = 2, archetype = .Chaser},
+		{position = {x = 6, y = 2}, health = 12, attack = 2, archetype = .Chaser},
+		{position = {x = 7, y = 3}, health = 12, attack = 2, archetype = .Archer},
+		{position = {x = 10, y = 6}, health = 12, attack = 2, archetype = .Brute},
 	}
 	created, valid := game.create_room(data, player, {enemies = enemies[:]})
 	if !valid { return false }
 	room^ = created
-	player.position = {3, 3}
+	player.position = {x = 3, y = 3}
 	// Five cards fill the hand; sort only the practice hand for stable shortcuts.
 	for card, index in player.deck.owned[:player.deck.owned_count] { player.deck.hand[index] = card }
 	practice := player.tactical.config

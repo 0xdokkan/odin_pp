@@ -16,7 +16,7 @@ test_the_ground_under_a_point_follows_the_sculpted_surface :: proc(t: ^testing.T
 	set_board_level(&data)
 	// A flat board is at 0 everywhere.
 	testing.expect_value(t, point_ground({2.5, 3.2}), f32(0))
-	level.set_height(&data, {2, 2}, 4)
+	level.set_height(&data, {x = 2, y = 2}, 4)
 	// The view takes the table again when the geometry has changed.
 	set_board_level(&data)
 	step := f32(0.12)
@@ -26,10 +26,10 @@ test_the_ground_under_a_point_follows_the_sculpted_surface :: proc(t: ^testing.T
 	testing.expect(t, abs(point_ground({1.51, 2})-4*step) < 0.0001)
 	testing.expect(t, abs(point_ground({1.49, 2})) < 0.0001)
 	testing.expect_value(t, point_ground({4, 4}), f32(0))
-	testing.expect(t, abs(cell_ground({2, 2})-4*step) < 0.0001)
-	testing.expect_value(t, cell_ground({0, 0}), f32(0))
+	testing.expect(t, abs(cell_ground({x = 2, y = 2})-4*step) < 0.0001)
+	testing.expect_value(t, cell_ground({x = 0, y = 0}), f32(0))
 	// A stair along x, a step a column: a ramp. Halfway between two middles it is halfway up, and it never jumps.
-	for y in 0..<6 { for x in 0..<6 { level.set_height(&data, {x, y}, i32(x)) } }
+	for y in 0..<6 { for x in 0..<6 { level.set_height(&data, {x = x, y = y}, i32(x)) } }
 	set_board_level(&data)
 	testing.expect(t, abs(point_ground({3, 2})-3*step) < 0.0001)
 	testing.expect(t, abs(point_ground({2.5, 2})-2.5*step) < 0.0001)
@@ -53,14 +53,14 @@ test_the_pointer_picks_the_cell_whose_floor_it_reaches_first :: proc(t: ^testing
 	// On a flat board the ray reaches the plane at z=3.5: the cell (4,3).
 	cell, ok := pick_ground_cell(origin, direction)
 	testing.expect(t, ok)
-	testing.expect_value(t, cell, grid.Position{4, 3})
+	testing.expect_value(t, cell, grid.Position{x = 4, y = 3})
 	// With a plateau of six steps (0.72) at (4,4) the ray meets its top at z=4.9
 	// first: the plateau's cell is the one under the pointer, not the ground behind it.
-	level.set_height(&data, {4, 4}, 6)
+	level.set_height(&data, {x = 4, y = 4}, 6)
 	set_board_level(&data)
 	cell, ok = pick_ground_cell(origin, direction)
 	testing.expect(t, ok)
-	testing.expect_value(t, cell, grid.Position{4, 4})
+	testing.expect_value(t, cell, grid.Position{x = 4, y = 4})
 	// A ray going up, or flat, picks nothing.
 	_, ok = pick_ground_cell(origin, {0, 1, -1})
 	testing.expect(t, !ok)
@@ -69,10 +69,10 @@ test_the_pointer_picks_the_cell_whose_floor_it_reaches_first :: proc(t: ^testing
 	// A ray straight down over a cell picks it, raised or not.
 	cell, ok = pick_ground_cell({7.5, 5, 7.5}, {0, -1, 0})
 	testing.expect(t, ok)
-	testing.expect_value(t, cell, grid.Position{7, 7})
+	testing.expect_value(t, cell, grid.Position{x = 7, y = 7})
 	cell, ok = pick_ground_cell({4.5, 5, 4.5}, {0, -1, 0})
 	testing.expect(t, ok)
-	testing.expect_value(t, cell, grid.Position{4, 4})
+	testing.expect_value(t, cell, grid.Position{x = 4, y = 4})
 }
 
 // A hill between the camera and an actor hides it; the actor beside the hill, in front of it or on its top is seen.
@@ -89,7 +89,7 @@ test_an_actor_behind_a_hill_is_hidden_from_the_camera :: proc(t: ^testing.T) {
 	set_board_level(&data)
 	testing.expect(t, !terrain_hides_actor(renderer, {10, 5}))
 	// A wall of cells 60 steps (7 cells) high across the middle: the actor behind it is hidden, the one in front is not.
-	for x in 0..<20 { for y in 14..<17 { level.set_height(&data, {x, y}, 60) } }
+	for x in 0..<20 { for y in 14..<17 { level.set_height(&data, {x = x, y = y}, 60) } }
 	set_board_level(&data)
 	testing.expect(t, terrain_hides_actor(renderer, {10, 5}), "behind the wall")
 	testing.expect(t, !terrain_hides_actor(renderer, {10, 25}), "in front of the wall")
@@ -97,7 +97,7 @@ test_an_actor_behind_a_hill_is_hidden_from_the_camera :: proc(t: ^testing.T) {
 	testing.expect(t, !terrain_hides_actor(renderer, {10, 15}), "on the wall's top")
 	testing.expect(t, !terrain_hides_actor(renderer, {10, 14}), "at the wall's near edge")
 	// A low step (two steps) in the way does not hide anyone standing far behind it.
-	for x in 0..<20 { for y in 14..<17 { level.set_height(&data, {x, y}, 2) } }
+	for x in 0..<20 { for y in 14..<17 { level.set_height(&data, {x = x, y = y}, 2) } }
 	set_board_level(&data)
 	testing.expect(t, !terrain_hides_actor(renderer, {10, 5}), "behind a low step")
 }
@@ -108,7 +108,7 @@ test_a_figure_stands_on_the_ground_whether_it_steps_or_walks_free :: proc(t: ^te
 	data, _ := level.create(8, 8, level.Tile{kind = .Floor})
 	defer level.destroy(&data)
 	defer set_board_level(nil)
-	level.set_height(&data, {3, 3}, 50)
+	level.set_height(&data, {x = 3, y = 3}, 50)
 	set_board_level(&data)
 	renderer := new(Renderer)
 	defer free(renderer)

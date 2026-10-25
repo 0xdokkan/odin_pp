@@ -74,7 +74,7 @@ expedition_build_chunk :: proc(renderer:^Renderer,room:^game.Room,w:^world.World
 	pass:=Ink_Pass{mode=.Bake,builder=builder}
 	for y in origin.y..<min(origin.y+EXPEDITION_GEOMETRY_CHUNK,room.level_data.tiles.height) {
 		for x in origin.x..<min(origin.x+EXPEDITION_GEOMETRY_CHUNK,room.level_data.tiles.width) {
-			cell:=grid.Position{x,y};tile,_:=level.tile_at(room.level_data,cell)
+			cell:=grid.Position{x = x, y = y};tile,_:=level.tile_at(room.level_data,cell)
 			if tile.kind!=.Wall && tile.kind!=.Fence {continue}
 			ground:=pass;ground.lift=cell_ground(cell)
 			if draw_expedition_structure_solid(ground,room,w,cell,tile.kind) {continue}
@@ -128,14 +128,14 @@ prepare_expedition_geometry :: proc(renderer:^Renderer,room:^game.Room,w:^world.
 		cache.chunks=make([]Expedition_Geometry_Chunk,cache.columns*cache.rows);cache.ready=true
 	}
 	p:=room.player.position
-	cache.lo={max(0,p.x-26)/EXPEDITION_GEOMETRY_CHUNK,max(0,p.y-26)/EXPEDITION_GEOMETRY_CHUNK}
-	cache.hi={min(cache.columns-1,(p.x+26)/EXPEDITION_GEOMETRY_CHUNK),min(cache.rows-1,(p.y+26)/EXPEDITION_GEOMETRY_CHUNK)}
+	cache.lo={x = max(0,p.x-26)/EXPEDITION_GEOMETRY_CHUNK, y = max(0,p.y-26)/EXPEDITION_GEOMETRY_CHUNK}
+	cache.hi={x = min(cache.columns-1,(p.x+26)/EXPEDITION_GEOMETRY_CHUNK), y = min(cache.rows-1,(p.y+26)/EXPEDITION_GEOMETRY_CHUNK)}
 	builder:Expedition_Geometry_Builder
 	defer {delete(builder.vertices);delete(builder.lines)}
 	for y in cache.lo.y..=cache.hi.y {for x in cache.lo.x..=cache.hi.x {
 		chunk:=&cache.chunks[y*cache.columns+x];if chunk.ready {continue}
 		clear(&builder.vertices);clear(&builder.lines)
-		origin:=grid.Position{x*EXPEDITION_GEOMETRY_CHUNK,y*EXPEDITION_GEOMETRY_CHUNK}
+		origin:=grid.Position{x = x*EXPEDITION_GEOMETRY_CHUNK, y = y*EXPEDITION_GEOMETRY_CHUNK}
 		expedition_build_chunk(renderer,room,w,origin,&builder)
 		rlgl.DrawRenderBatchActive()
 		if !expedition_upload_chunk(chunk,&builder,origin) {cache.ready=false;cache.failed=true;return false}

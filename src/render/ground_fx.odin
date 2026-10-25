@@ -266,7 +266,7 @@ ground_texel_liquid :: proc(fx: ^Ground_Fx, layer: Ground_Layer, gx, gy: int) ->
 	u, v := gx-cx*t, gy-cy*t
 	value: f32
 	for dy in -1..=1 { for dx in -1..=1 {
-		if layer not_in ground_fx_layers(fx, {cx+dx, cy+dy}) { continue }
+		if layer not_in ground_fx_layers(fx, {x = cx+dx, y = cy+dy}) { continue }
 		value += fx.profile[layer][dx+1][u]*fx.profile[layer][dy+1][v]
 	} }
 	return ground_liquid_cut(layer, value, gx, gy, t)
@@ -288,7 +288,7 @@ bake_ground_cell :: proc(fx: ^Ground_Fx, cell: grid.Position) -> (content: bool)
 	near: [Ground_Layer][5][5]bool
 	any_near: [Ground_Layer]bool
 	for dy in -2..=2 { for dx in -2..=2 {
-		layers := ground_fx_layers(fx, {cell.x+dx, cell.y+dy})
+		layers := ground_fx_layers(fx, grid.offset(cell, dx, dy))
 		for layer in Ground_Layer {
 			if layer not_in layers { continue }
 			near[layer][dy+2][dx+2], any_near[layer] = true, true
@@ -471,9 +471,9 @@ ground_fx_face :: proc(fx: ^Ground_Fx, toward: rl.Vector3, looked_at: grid.Posit
 	if west == fx.camera_west && north == fx.camera_north { return false }
 	fx.camera_west, fx.camera_north = west, north
 	for cell, index in fx.cells {
-		if cell.layers != {} { ground_fx_mark(fx, {index%fx.width, index/fx.width}) }
+		if cell.layers != {} { ground_fx_mark(fx, {x = index%fx.width, y = index/fx.width}) }
 	}
-	fx.seed = {clamp(looked_at.x, 0, max(fx.width-1, 0)), clamp(looked_at.y, 0, max(fx.height-1, 0))}
+	fx.seed = {x = clamp(looked_at.x, 0, max(fx.width-1, 0)), y = clamp(looked_at.y, 0, max(fx.height-1, 0))}
 	return true
 }
 
@@ -482,7 +482,7 @@ ground_fx_face :: proc(fx: ^Ground_Fx, toward: rl.Vector3, looked_at: grid.Posit
 @(private)
 ground_fx_mark :: proc(fx: ^Ground_Fx, cell: grid.Position) {
 	for dy in -2..=2 { for dx in -2..=2 {
-		at := ground_fx_cell(fx, {cell.x+dx, cell.y+dy})
+		at := ground_fx_cell(fx, grid.offset(cell, dx, dy))
 		if at == nil || at.dirty { continue }
 		at.dirty = true
 		fx.pending += 1
@@ -504,7 +504,7 @@ ground_fx_bake :: proc(fx: ^Ground_Fx, budget: int) {
 		if best < 0 { fx.pending = 0; return }
 		cell := &fx.cells[best]
 		cell.dirty, cell.upload = false, true
-		cell.content = bake_ground_cell(fx, {best%fx.width, best/fx.width})
+		cell.content = bake_ground_cell(fx, {x = best%fx.width, y = best/fx.width})
 		fx.pending -= 1
 	}
 }
@@ -527,13 +527,13 @@ update_ground_fx :: proc(renderer: ^Renderer, room: ^game.Room) {
 	fx := v.ground
 	ground_fx_resize(fx, room.level_data.tiles.width, room.level_data.tiles.height)
 	looked_at := v.camera.target
-	ground_fx_face(fx, attack_toward_camera(renderer), {int(math.floor(looked_at.x)), int(math.floor(looked_at.z))})
+	ground_fx_face(fx, attack_toward_camera(renderer), {x = int(math.floor(looked_at.x)), y = int(math.floor(looked_at.z))})
 	world := tactical_world_time(renderer)
 	// The layers and the flames the snapshot shows.
 	wanted, centre, last := fx.wanted, fx.centre, fx.last
 	for index in 0..<len(fx.cells) {
 		wanted[index], centre[index], last[index] = {}, false, false
-		if presentation_ground_pool(shown, {index%fx.width, index/fx.width}) { wanted[index] += {.Pool} }
+		if presentation_ground_pool(shown, {x = index%fx.width, y = index/fx.width}) { wanted[index] += {.Pool} }
 	}
 	for water in shown.water[:clamp(shown.water_count, 0, len(shown.water))] {
 		if at := ground_fx_cell(fx, water); at != nil { wanted[water.y*fx.width+water.x] += {.Water} }
@@ -545,14 +545,14 @@ update_ground_fx :: proc(renderer: ^Renderer, room: ^game.Room) {
 		if at := ground_fx_cell(fx, fire.center); at != nil { centre[fire.center.y*fx.width+fire.center.x] = true }
 		for step, direction in steps {
 			for reach in 1..=int(fire.arms[direction]) {
-				ground_fx_mark_fire(fx, {fire.center.x+step.x*reach, fire.center.y+step.y*reach}, final)
+				ground_fx_mark_fire(fx, grid.offset(fire.center, step.x*reach, step.y*reach), final)
 			}
 		}
 	}
 	changed := false
 	lab := v.mechanics_lab && v.lab_sounds != nil
 	for &cell, index in fx.cells {
-		at := grid.Position{index%fx.width, index/fx.width}
+		at := grid.Position{x = index%fx.width, y = index/fx.width}
 		now_burning := .Char in wanted[index]
 		if now_burning && !cell.fire {
 			cell.lit, cell.quenched = world, 0
@@ -611,7 +611,7 @@ update_ground_fx :: proc(renderer: ^Renderer, room: ^game.Room) {
 	for actor in v.snapshot.enemies[:v.snapshot.enemy_count] {
 		if !actor.visible || actor.health <= 0 || tracked_count == len(tracked) || tactical_lasso_holds(renderer, actor.entity) ||
 		   tactical_pinball_holds(renderer, actor.entity) { continue }
-		cell := grid.Position{int(math.round(actor.position.x)), int(math.round(actor.position.y))}
+		cell := grid.Position{x = int(math.round(actor.position.x)), y = int(math.round(actor.position.y))}
 		tracked[tracked_count] = {entity = actor.entity, cell = cell}
 		tracked_count += 1
 		for before in fx.tracked[:fx.tracked_count] {
@@ -704,7 +704,7 @@ draw_ground_decal :: proc(renderer: ^Renderer, room: ^game.Room) {
 	rlgl.Color4ub(255, 255, 255, 255)
 	for cell, index in fx.cells {
 		if !cell.content { continue }
-		at := grid.Position{index%fx.width, index/fx.width}
+		at := grid.Position{x = index%fx.width, y = index/fx.width}
 		if !tactical_cell_on_screen(renderer, at) || !tactical_render_visible(renderer, at) { continue }
 		x0, z0 := f32(at.x), f32(at.y)
 		u0, v0 := f32(at.x)/f32(fx.width), f32(at.y)/f32(fx.height)
@@ -727,7 +727,7 @@ collect_ground_entries :: proc(renderer: ^Renderer, room: ^game.Room, entries: ^
 	toward := attack_toward_camera(renderer)
 	for cell, index in fx.cells {
 		if !cell.fire && (cell.quenched <= 0 || world-cell.quenched > GROUND_FLAME_OUT_SECONDS) { continue }
-		at := grid.Position{index%fx.width, index/fx.width}
+		at := grid.Position{x = index%fx.width, y = index/fx.width}
 		if !tactical_cell_on_screen(renderer, at) || !tactical_render_visible(renderer, at) || game.cell_blocks_movement(room, at) { continue }
 		// A hair toward the camera: the flame stands in front of a card on its cell.
 		append(entries, Tactical_Alpha_Entry{kind = .Ground, ground = i32(index), position = {f32(at.x)+toward.x*0.12, f32(at.y)+toward.z*0.12}})
@@ -759,7 +759,7 @@ draw_ground_entry :: proc(renderer: ^Renderer, entry: Tactical_Alpha_Entry) {
 @(private = "file")
 draw_ground_flame :: proc(renderer: ^Renderer, fx: ^Ground_Fx, index: int, world: f64) {
 	cell := &fx.cells[index]
-	at := grid.Position{index%fx.width, index/fx.width}
+	at := grid.Position{x = index%fx.width, y = index/fx.width}
 	seed := int(gothic_hash(at.x, at.y)%997)
 	// Up from the pop, down to nothing once out; lower on its last window.
 	scale := f32(1)
@@ -854,7 +854,7 @@ draw_ground_preview :: proc(renderer: ^Renderer, room: ^game.Room, id: game.Card
 	steps := game.GROUND_ARM_STEPS
 	for step, direction in steps {
 		for distance in 1..=int(reach.arms[direction]) {
-			cell := grid.Position{anchor.x+step.x*distance, anchor.y+step.y*distance}
+			cell := grid.offset(anchor, step.x*distance, step.y*distance)
 			draw_card_range_cell(renderer, cell, {196, 76, 34, u8(90-distance*14)}, {244, 157, 104, u8(230-distance*30)})
 		}
 	}

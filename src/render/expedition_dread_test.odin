@@ -44,7 +44,7 @@ test_dread_outdoor_silhouettes_are_bounded_cheap_and_cache_stable :: proc(t:^tes
 	for biome in DREAD_TEST_BIOMES {
 		w.biome=biome;short,tall:=0,0
 		for i in 0..<96 {
-			cell:=grid.Position{i*7%61,i*13%59}
+			cell:=grid.Position{x = i*7%61, y = i*13%59}
 			clear(&b.vertices);clear(&b.lines);clear(&again.vertices);clear(&again.lines)
 			testing.expect(t,draw_expedition_dread_outdoor({mode=.Bake,builder=&b},w,cell))
 			w.clock+=.13;w.seed+=123;w.boss_defeated=!w.boss_defeated
@@ -94,7 +94,7 @@ test_dread_site_walls_follow_real_collision_and_vertex_budget :: proc(t:^testing
 		for &site in w.sites[:w.site_count] {
 			lo,hi:=world.site_bounds(&site)
 			for y in lo.y..=hi.y {for x in lo.x..=hi.x {
-				cell:=grid.Position{x,y};d:=world.site_cell(&site,cell);tile,ok:=level.tile_at(&data,cell)
+				cell:=grid.Position{x = x, y = y};d:=world.site_cell(&site,cell);tile,ok:=level.tile_at(&data,cell)
 				if !ok || tile.kind!=.Wall || !d.inside || (d.fixture && site.active) {continue}
 				clear(&b.vertices);clear(&b.lines)
 				testing.expect(t,draw_expedition_dread_wall({mode=.Bake,builder=&b},&room,w,&site,cell,d))
@@ -122,7 +122,7 @@ test_dread_all_fixtures_keep_rotated_portals_and_walkable_centres_clear :: proc(
 	b:Expedition_Geometry_Builder;defer {delete(b.vertices);delete(b.lines)}
 	for biome in DREAD_TEST_BIOMES {w.biome=biome
 		for kind in world.Site_Kind {if kind==.Cave {continue};for orientation in u8(0)..<4 {
-			site:=world.Site{kind=kind,position={32,32},orientation=orientation,active=true,layout_version=world.SITE_LAYOUT_VERSION}
+			site:=world.Site{kind=kind,position={x = 32, y = 32},orientation=orientation,active=true,layout_version=world.SITE_LAYOUT_VERSION}
 			clear(&b.vertices);clear(&b.lines)
 			testing.expect(t,draw_expedition_dread_fixture({mode=.Bake,builder=&b},w,&site))
 			dread_test_mesh(t,&b)
@@ -133,7 +133,7 @@ test_dread_all_fixtures_keep_rotated_portals_and_walkable_centres_clear :: proc(
 				// Only the overhead boss lintel bridges the walkable opening.
 				// Its rotated support columns must match the actual layout.
 				if kind==.Boss && v.position.y>=3.22 {continue}
-				cell:=grid.Position{int(math.floor(v.position.x)),int(math.floor(v.position.z))}
+				cell:=grid.Position{x = int(math.floor(v.position.x)), y = int(math.floor(v.position.z))}
 				d:=world.site_cell(&site,cell);bounded=bounded && d.fixture && d.wall
 			}
 			testing.expect(t,bounded,"solid fixture geometry belongs to blocked cells in every orientation")
@@ -148,7 +148,7 @@ test_dread_poi_functions_have_distinct_silhouettes_beyond_palette :: proc(t:^tes
 	for biome in DREAD_TEST_BIOMES {w.biome=biome
 		shapes:[world.Site_Kind][]rl.Vector3
 		for kind in world.Site_Kind {if kind==.Cave {continue}
-			site:=world.Site{kind=kind,position={32,32},active=true,layout_version=world.SITE_LAYOUT_VERSION}
+			site:=world.Site{kind=kind,position={x = 32, y = 32},active=true,layout_version=world.SITE_LAYOUT_VERSION}
 			clear(&b.vertices);clear(&b.lines)
 			testing.expect(t,draw_expedition_dread_fixture({mode=.Bake,builder=&b},w,&site))
 			shapes[kind]=make([]rl.Vector3,len(b.vertices))
@@ -190,7 +190,7 @@ test_dread_cached_lines_match_live_light_collection_and_ignore_cosmetic_state ::
 	defer {delete(b.vertices);delete(b.lines);delete(again.vertices);delete(again.lines)}
 	for biome in DREAD_TEST_BIOMES {w.biome=biome
 		for kind in world.Site_Kind {if kind==.Cave {continue};for state in ([2]world.Site_State{.Discovered,.Resolved}) {
-			site:=world.Site{kind=kind,state=state,position={32,32},orientation=1,active=true,secret=state==.Resolved,layout_version=world.SITE_LAYOUT_VERSION}
+			site:=world.Site{kind=kind,state=state,position={x = 32, y = 32},orientation=1,active=true,secret=state==.Resolved,layout_version=world.SITE_LAYOUT_VERSION}
 			clear(&b.vertices);clear(&b.lines);clear(&again.vertices);clear(&again.lines)
 			testing.expect(t,draw_expedition_dread_fixture({mode=.Bake,builder=&b},w,&site))
 			w.clock+=.1;w.seed+=17;w.boss_defeated=!w.boss_defeated;site.wave+=1
@@ -214,11 +214,11 @@ test_dread_dispatch_declines_other_biomes_without_geometry_or_gpu :: proc(t:^tes
 	for biome in campaign.Biome {
 		if biome==.Jungle || biome==.Vietnam || biome==.Gothic {continue}
 		w.biome=biome
-		testing.expect(t,!draw_expedition_dread_outdoor(pass,w,{0,0}))
-		testing.expect(t,!draw_expedition_dread_wall(pass,nil,w,nil,{0,0},{}))
+		testing.expect(t,!draw_expedition_dread_outdoor(pass,w,{x = 0, y = 0}))
+		testing.expect(t,!draw_expedition_dread_wall(pass,nil,w,nil,{x = 0, y = 0},{}))
 		testing.expect(t,!draw_expedition_dread_gate(pass,w,{0,2,0},{3,2,0}))
 		testing.expect(t,!draw_expedition_dread_fixture(pass,w,nil))
 	}
-	testing.expect(t,!draw_expedition_dread_outdoor(pass,nil,{0,0}))
+	testing.expect(t,!draw_expedition_dread_outdoor(pass,nil,{x = 0, y = 0}))
 	testing.expect(t,len(b.vertices)==0 && len(b.lines)==0)
 }

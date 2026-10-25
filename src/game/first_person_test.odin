@@ -116,7 +116,7 @@ test_first_person_card_is_a_rare_tactical_self_card :: proc(t: ^testing.T) {
 test_first_person_begins_on_self_and_locks_the_cards :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {7, 6}, health = 40, attack = 1}, {position = {6, 2}, health = 40, attack = 1}}
+	spawns := [?]Enemy_Spawn{{position = {x = 7, y = 6}, health = 40, attack = 1}, {position = {x = 6, y = 2}, health = 40, attack = 1}}
 	room := first_person_test_room(t, &data, &player, spawns[:])
 	defer level.destroy(&data)
 	defer destroy_room(&room)
@@ -192,7 +192,7 @@ test_first_person_begins_on_self_and_locks_the_cards :: proc(t: ^testing.T) {
 test_first_person_clock_runs_on_the_worlds_seconds :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {6, 2}, health = 40, attack = 1}, {position = {2, 2}, health = 40, attack = 1}}
+	spawns := [?]Enemy_Spawn{{position = {x = 6, y = 2}, health = 40, attack = 1}, {position = {x = 2, y = 2}, health = 40, attack = 1}}
 	room := first_person_test_room(t, &data, &player, spawns[:])
 	defer level.destroy(&data)
 	defer destroy_room(&room)
@@ -261,7 +261,7 @@ test_first_person_fires_six_shots_a_second_at_any_frame_rate :: proc(t: ^testing
 	for dt in ([?]f32{1.0/30, 1.0/50, 1.0/60, 1.0/144, 1.0/165, 0.037}) {
 		data: level.Level
 		player: Player
-		spawns := [?]Enemy_Spawn{{position = {6, 2}, health = 200, attack = 1}}
+		spawns := [?]Enemy_Spawn{{position = {x = 6, y = 2}, health = 200, attack = 1}}
 		room := first_person_test_room(t, &data, &player, spawns[:])
 		lasso_test_hold(&room, room.enemies[0].id)
 		testing.expect(t, tactical_begin_first_person(&room, 20))
@@ -284,7 +284,7 @@ test_first_person_fires_six_shots_a_second_at_any_frame_rate :: proc(t: ^testing
 	}
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {6, 2}, health = 200, attack = 1}}
+	spawns := [?]Enemy_Spawn{{position = {x = 6, y = 2}, health = 200, attack = 1}}
 	room := first_person_test_room(t, &data, &player, spawns[:])
 	defer level.destroy(&data)
 	defer destroy_room(&room)
@@ -325,13 +325,13 @@ test_first_person_hitscan_stops_on_solids_and_takes_the_first_foe :: proc(t: ^te
 	data: level.Level
 	player: Player
 	spawns := [?]Enemy_Spawn{
-		{position = {6, 3}, health = 20, attack = 1, archetype = .Chaser},
-		{position = {6, 2}, health = 20, attack = 1, archetype = .Brute},
-		{position = {9, 6}, health = 20, attack = 1, archetype = .Archer},
-		{position = {3, 9}, health = 20, attack = 1, archetype = .Demolitionist},
+		{position = {x = 6, y = 3}, health = 20, attack = 1, archetype = .Chaser},
+		{position = {x = 6, y = 2}, health = 20, attack = 1, archetype = .Brute},
+		{position = {x = 9, y = 6}, health = 20, attack = 1, archetype = .Archer},
+		{position = {x = 3, y = 9}, health = 20, attack = 1, archetype = .Demolitionist},
 	}
-	cover := [?]grid.Position{{4, 6}}
-	objects := [?]Grid_Object_Spawn{{kind = .Ice_Block, position = {6, 8}}, {kind = .Fire, position = {9, 9}}, {kind = .Barrel, position = {2, 4}}}
+	cover := [?]grid.Position{{x = 4, y = 6}}
+	objects := [?]Grid_Object_Spawn{{kind = .Ice_Block, position = {x = 6, y = 8}}, {kind = .Fire, position = {x = 9, y = 9}}, {kind = .Barrel, position = {x = 2, y = 4}}}
 	room := first_person_test_room(t, &data, &player, spawns[:], cover[:], objects[:])
 	defer level.destroy(&data)
 	defer destroy_room(&room)
@@ -352,26 +352,26 @@ test_first_person_hitscan_stops_on_solids_and_takes_the_first_foe :: proc(t: ^te
 	// East: the archer three cells off.
 	shot = first_person_trace(&room, from, {yaw = 0})
 	testing.expect_value(t, shot.hit, First_Person_Hit.Foe)
-	testing.expect_value(t, shot.cell, grid.Position{9, 6})
+	testing.expect_value(t, shot.cell, grid.Position{x = 9, y = 6})
 	// West: the cover two cells off stops it at its face.
 	shot = first_person_trace(&room, from, {yaw = math.PI})
 	testing.expect_value(t, shot.hit, First_Person_Hit.Solid)
-	testing.expect_value(t, shot.cell, grid.Position{4, 6})
+	testing.expect_value(t, shot.cell, grid.Position{x = 4, y = 6})
 	testing.expect(t, abs(shot.point.x-5) < 0.001)
 	// South: the ice block, a blocking object, two cells off.
 	shot = first_person_trace(&room, from, {yaw = math.PI/2})
 	testing.expect_value(t, shot.hit, First_Person_Hit.Solid)
-	testing.expect_value(t, shot.cell, grid.Position{6, 8})
+	testing.expect_value(t, shot.cell, grid.Position{x = 6, y = 8})
 	// Down: the floor, 1.05/tan(0.5) cells away (the archer is farther).
 	shot = first_person_trace(&room, from, {yaw = 0, pitch = -0.5})
 	testing.expect_value(t, shot.hit, First_Person_Hit.Floor)
-	testing.expect_value(t, shot.cell, grid.Position{8, 6})
+	testing.expect_value(t, shot.cell, grid.Position{x = 8, y = 6})
 	testing.expect(t, abs(shot.point.x-(6.5+FIRST_PERSON_EYE_HEIGHT/math.tan(f32(0.5)))) < 0.001 && shot.point.y == 0)
 	// The exact diagonal south-east goes over the fire (no blocker) to the
 	// room's closed corner, stopped at the first of its two walls.
 	shot = first_person_trace(&room, from, {yaw = math.PI/4})
 	testing.expect_value(t, shot.hit, First_Person_Hit.Solid)
-	testing.expect_value(t, shot.cell, grid.Position{12, 11})
+	testing.expect_value(t, shot.cell, grid.Position{x = 12, y = 11})
 	// South-west, the boss (the Demolitionist) is hit as any foe.
 	shot = first_person_trace(&room, from, {yaw = 3*math.PI/4})
 	testing.expect_value(t, shot.hit, First_Person_Hit.Foe)
@@ -383,18 +383,18 @@ test_first_person_hitscan_stops_on_solids_and_takes_the_first_foe :: proc(t: ^te
 	room.lasso = {}
 	// A barrel and a coil stop it too (from another cell, north to the barrel);
 	// a shock floor does not, the shot goes on to the room's corner.
-	shot = first_person_trace(&room, {2, 6}, FIRST_PERSON_TEST_NORTH)
+	shot = first_person_trace(&room, {x = 2, y = 6}, FIRST_PERSON_TEST_NORTH)
 	testing.expect_value(t, shot.hit, First_Person_Hit.Solid)
-	testing.expect_value(t, shot.cell, grid.Position{2, 4})
+	testing.expect_value(t, shot.cell, grid.Position{x = 2, y = 4})
 	log: Event_Log
-	testing.expect(t, deploy_board_device(&room, .Shock_Floor, {7, 5}, 1, 1, &log))
-	testing.expect(t, deploy_board_device(&room, .Tesla_Coil, {5, 5}, 4, 0, &log))
+	testing.expect(t, deploy_board_device(&room, .Shock_Floor, {x = 7, y = 5}, 1, 1, &log))
+	testing.expect(t, deploy_board_device(&room, .Tesla_Coil, {x = 5, y = 5}, 4, 0, &log))
 	shot = first_person_trace(&room, from, {yaw = -math.PI/4})
 	testing.expect_value(t, shot.hit, First_Person_Hit.Solid)
-	testing.expect_value(t, shot.cell, grid.Position{12, 1})
+	testing.expect_value(t, shot.cell, grid.Position{x = 12, y = 1})
 	shot = first_person_trace(&room, from, {yaw = -3*math.PI/4})
 	testing.expect_value(t, shot.hit, First_Person_Hit.Solid)
-	testing.expect_value(t, shot.cell, grid.Position{5, 5})
+	testing.expect_value(t, shot.cell, grid.Position{x = 5, y = 5})
 	// Out of his sight the shot is lost. With vision 7 the ghoul three cells
 	// north is seen and struck; off the board (the rope's) it leaves the brute
 	// four cells off, out of sight: nothing is struck.
@@ -404,7 +404,7 @@ test_first_person_hitscan_stops_on_solids_and_takes_the_first_foe :: proc(t: ^te
 	room.lasso.active, room.lasso.enemy_id = true, room.enemies[0].id
 	shot = first_person_trace(&room, from, FIRST_PERSON_TEST_NORTH)
 	testing.expect_value(t, shot.hit, First_Person_Hit.None)
-	testing.expect_value(t, shot.cell, grid.Position{6, 2})
+	testing.expect_value(t, shot.cell, grid.Position{x = 6, y = 2})
 	room.lasso = {}
 	shot = first_person_trace(&room, from, {yaw = math.PI/2})
 	testing.expect_value(t, shot.hit, First_Person_Hit.Solid)
@@ -431,7 +431,7 @@ first_person_test_aim_at :: proc(o, card: [2]f32, lateral, height: f32) -> First
 test_first_person_shots_meet_the_whole_card :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {6, 3}, health = 50, attack = 1, archetype = .Chaser}}
+	spawns := [?]Enemy_Spawn{{position = {x = 6, y = 3}, health = 50, attack = 1, archetype = .Chaser}}
 	room := first_person_test_room(t, &data, &player, spawns[:])
 	defer level.destroy(&data)
 	defer destroy_room(&room)
@@ -457,14 +457,14 @@ test_first_person_shots_meet_the_whole_card :: proc(t: ^testing.T) {
 	// From (5, 6) toward the ghoul's left claw the ray never leaves the cells
 	// west of the ghoul's: the card reaches over to it. Cover on (5, 3) stops
 	// the same shot at its near face, before the card's edge behind it.
-	room.player.position = {5, 6}
+	room.player.position = {x = 5, y = 6}
 	claw := First_Person_Aim{yaw = math.atan2(f32(-3), f32(0.3)), pitch = math.atan((0.3-FIRST_PERSON_EYE_HEIGHT)/3)}
 	beside := first_person_trace(&room, room.player.position, claw)
-	testing.expect(t, beside.hit == .Foe && beside.target == enemy_entity(room.enemies[0].id) && beside.cell == grid.Position{6, 3})
+	testing.expect(t, beside.hit == .Foe && beside.target == enemy_entity(room.enemies[0].id) && beside.cell == grid.Position{x = 6, y = 3})
 	testing.expect(t, beside.point.x > 5.7 && beside.point.x < 5.9)
-	append(&room.obstacles, Obstacle{position = {5, 3}})
+	append(&room.obstacles, Obstacle{position = {x = 5, y = 3}})
 	blocked := first_person_trace(&room, room.player.position, claw)
-	testing.expect(t, blocked.hit == .Solid && blocked.cell == grid.Position{5, 3} && abs(blocked.point.z-4) < 1e-3)
+	testing.expect(t, blocked.hit == .Solid && blocked.cell == grid.Position{x = 5, y = 3} && abs(blocked.point.z-4) < 1e-3)
 	// Every card at its widest is wider than the old column (0.34), and stands
 	// as tall as its paper.
 	for archetype in Enemy_Archetype {
@@ -488,8 +488,8 @@ test_first_person_shots_meet_the_whole_card :: proc(t: ^testing.T) {
 test_first_person_shots_leave_the_eye_the_view_shows :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {6, 3}, health = 50, attack = 1, archetype = .Chaser}}
-	cover := [?]grid.Position{{8, 6}}
+	spawns := [?]Enemy_Spawn{{position = {x = 6, y = 3}, health = 50, attack = 1, archetype = .Chaser}}
+	cover := [?]grid.Position{{x = 8, y = 6}}
 	room := first_person_test_room(t, &data, &player, spawns[:], cover[:])
 	defer level.destroy(&data)
 	defer destroy_room(&room)
@@ -498,7 +498,7 @@ test_first_person_shots_leave_the_eye_the_view_shows :: proc(t: ^testing.T) {
 	from := player.position
 	// Gliding east from (6, 6) to (7, 6): the eye already half way, the cell
 	// his; the ray north from the eye still crosses the ghoul's card.
-	room.player.position = {7, 6}
+	room.player.position = {x = 7, y = 6}
 	glide := First_Person_Aim{yaw = -math.PI/2, framed = true, eye = {6.8, 6.5}}
 	shot := first_person_trace(&room, room.player.position, glide)
 	testing.expect(t, shot.hit == .Foe && shot.target == enemy_entity(ghoul))
@@ -515,7 +515,7 @@ test_first_person_shots_leave_the_eye_the_view_shows :: proc(t: ^testing.T) {
 	}
 	room.player.position = from
 	// The ghoul's step east: its cell (7, 3) at once, its card sliding there.
-	room.enemies[0].position = {7, 3}
+	room.enemies[0].position = {x = 7, y = 3}
 	slide := First_Person_Aim{yaw = -math.PI/2, framed = true, eye = {6.5, 6.5}, card_count = 1}
 	slide.cards[0] = {enemy_id = ghoul, at = {6.6, 3.5}}
 	testing.expect_value(t, first_person_trace(&room, from, slide).target, enemy_entity(ghoul))
@@ -542,7 +542,7 @@ test_first_person_shots_leave_the_eye_the_view_shows :: proc(t: ^testing.T) {
 test_first_person_shot_is_the_players_normal_damage :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {6, 3}, health = 1, attack = 1}, {position = {9, 6}, health = 3, attack = 1}}
+	spawns := [?]Enemy_Spawn{{position = {x = 6, y = 3}, health = 1, attack = 1}, {position = {x = 9, y = 6}, health = 3, attack = 1}}
 	room := first_person_test_room(t, &data, &player, spawns[:])
 	defer level.destroy(&data)
 	defer destroy_room(&room)

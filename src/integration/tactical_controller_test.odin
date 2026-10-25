@@ -42,14 +42,14 @@ test_m7_movement_pressed_during_loot_animation_is_dropped :: proc(t: ^testing.T)
 	}
 	testing.expect(t, dropped > 5 && !render.renderer_blocks_player_input(renderer))
 	for _ in 0..<30 { testing.expect(t, !scene_lane_frame(t, &controller, &room, renderer, &cards, &buffer, walk, false, dt)) }
-	testing.expect_value(t, player.position, grid.Position{2, 1})
+	testing.expect_value(t, player.position, grid.Position{x = 2, y = 1})
 	// A press made after the step acts, once.
 	moved := 0
 	for index in 0..<8 {
 		if scene_lane_frame(t, &controller, &room, renderer, &cards, &buffer, walk, index == 0, dt) { moved += 1 }
 	}
 	testing.expect_value(t, moved, 1)
-	testing.expect_value(t, player.position, grid.Position{2, 2})
+	testing.expect_value(t, player.position, grid.Position{x = 2, y = 2})
 }
 
 @(test)
@@ -62,7 +62,7 @@ expect_m7_walk_through_pulse :: proc(t: ^testing.T, during_timeline: bool) {
 	defer level.destroy(&data)
 	player := create_gameplay_command_test_player(t)
 	testing.expect(t, game.configure_tactical(&player, game.DEFAULT_TACTICAL_CONFIG))
-	enemies := [?]game.Enemy_Spawn{{position = {5, 3}, health = 8, attack = 1}}
+	enemies := [?]game.Enemy_Spawn{{position = {x = 5, y = 3}, health = 8, attack = 1}}
 	room, ok := game.create_room(&data, &player, {enemies = enemies[:]})
 	testing.expect(t, ok)
 	defer game.destroy_room(&room)
@@ -94,11 +94,11 @@ expect_m7_walk_through_pulse :: proc(t: ^testing.T, during_timeline: bool) {
 		render.update_renderer_event_timeline(renderer, 100)
 		testing.expect(t, !run_session.step_tactical_controller(&controller, &room, renderer, &cards, &buffer,
 			0, true, {focused = true}))
-		testing.expect_value(t, player.position, grid.Position{2, 1})
+		testing.expect_value(t, player.position, grid.Position{x = 2, y = 1})
 	}
 	testing.expect(t, run_session.commit_gameplay_command(&room, renderer, &cards,
 		{kind = .Move, origin_phase = .Combat, direction = .South}))
-	testing.expect_value(t, player.position, grid.Position{2, 2})
+	testing.expect_value(t, player.position, grid.Position{x = 2, y = 2})
 }
 
 @(test)
@@ -162,13 +162,14 @@ test_map_button_drag_close_and_clock_share_the_native_input_path :: proc(t: ^tes
 	player: game.Player
 	testing.expect(t, game.configure_tactical(&player, game.DEFAULT_TACTICAL_CONFIG))
 	room := game.Room{player = &player, phase = .Combat}
-	renderer := render.Renderer{canvas_width = 960, canvas_height = 540}
+	renderer := new_clone(render.Renderer{canvas_width = 960, canvas_height = 540})
+	defer free(renderer)
 	controller: run_session.Tactical_Controller
 	cards := run_session.Card_Interaction_State{selected_card_id = 42, dragged_card_id = 42}
 	buffer: run_session.Buffered_Gameplay_Command
-	button := render.tactical_map_button_bounds(&renderer)
+	button := render.tactical_map_button_bounds(renderer)
 	click := run_session.Tactical_Map_Input{mouse = {button.x+20, button.y+15}, inside = true, pressed = true, down = true}
-	testing.expect(t, run_session.update_tactical_map_controls(&controller, &room, &renderer, &cards, &buffer, click))
+	testing.expect(t, run_session.update_tactical_map_controls(&controller, &room, renderer, &cards, &buffer, click))
 	testing.expect(t, controller.hologram)
 	testing.expect_value(t, cards, run_session.Card_Interaction_State{})
 	testing.expect_value(t, player.tactical.metrics.hologram_opens, u64(1))
@@ -176,12 +177,12 @@ test_map_button_drag_close_and_clock_share_the_native_input_path :: proc(t: ^tes
 	before := renderer.tactical.hologram_orbit
 	// The opening button cannot start a drag; movement over the table must begin
 	// with its own press. All inputs are routed away from cards while open.
-	_ = run_session.update_tactical_map_controls(&controller, &room, &renderer, &cards, &buffer,
+	_ = run_session.update_tactical_map_controls(&controller, &room, renderer, &cards, &buffer,
 		{mouse = {500, 250}, inside = true, down = true})
 	testing.expect_value(t, renderer.tactical.hologram_orbit.yaw, before.yaw)
-	_ = run_session.update_tactical_map_controls(&controller, &room, &renderer, &cards, &buffer,
+	_ = run_session.update_tactical_map_controls(&controller, &room, renderer, &cards, &buffer,
 		{mouse = {500, 250}, inside = true, pressed = true, down = true})
-	_ = run_session.update_tactical_map_controls(&controller, &room, &renderer, &cards, &buffer,
+	_ = run_session.update_tactical_map_controls(&controller, &room, renderer, &cards, &buffer,
 		{mouse = {570, 280}, inside = true, down = true, wheel = 1})
 	testing.expect(t, renderer.tactical.hologram_orbit.yaw != before.yaw)
 	testing.expect(t, renderer.tactical.hologram_orbit.pitch != before.pitch)
@@ -190,17 +191,17 @@ test_map_button_drag_close_and_clock_share_the_native_input_path :: proc(t: ^tes
 	testing.expect_value(t, player.tactical.remaining, f32(18))
 	testing.expect_value(t, player.tactical.metrics.hologram_seconds, f64(2))
 	testing.expect_value(t, room.pulse_count, u64(0))
-	_ = run_session.update_tactical_map_controls(&controller, &room, &renderer, &cards, &buffer, {reset = true})
+	_ = run_session.update_tactical_map_controls(&controller, &room, renderer, &cards, &buffer, {reset = true})
 	testing.expect_value(t, renderer.tactical.hologram_orbit, before)
-	testing.expect(t, run_session.update_tactical_map_controls(&controller, &room, &renderer, &cards, &buffer, {close = true}))
+	testing.expect(t, run_session.update_tactical_map_controls(&controller, &room, renderer, &cards, &buffer, {close = true}))
 	testing.expect(t, !controller.hologram)
 	testing.expect_value(t, player.tactical.remaining, f32(18))
 	// Closing on the button consumes the click too (no click-through action).
-	testing.expect(t, run_session.update_tactical_map_controls(&controller, &room, &renderer, &cards, &buffer, {toggle = true}))
-	testing.expect(t, run_session.update_tactical_map_controls(&controller, &room, &renderer, &cards, &buffer, click))
+	testing.expect(t, run_session.update_tactical_map_controls(&controller, &room, renderer, &cards, &buffer, {toggle = true}))
+	testing.expect(t, run_session.update_tactical_map_controls(&controller, &room, renderer, &cards, &buffer, click))
 	testing.expect(t, !controller.hologram)
 	room.qte.kind = .Diagonal
-	testing.expect(t, !run_session.update_tactical_map_controls(&controller, &room, &renderer, &cards, &buffer, click))
+	testing.expect(t, !run_session.update_tactical_map_controls(&controller, &room, renderer, &cards, &buffer, click))
 	testing.expect(t, !controller.hologram)
 }
 

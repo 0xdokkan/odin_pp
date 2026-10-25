@@ -74,7 +74,7 @@ flood_fire_cells :: proc(fire: Ground_Fire, cells: ^[dynamic]grid.Position) {
 	append(cells, fire.center)
 	steps := GROUND_ARM_STEPS
 	for step, direction in steps {
-		for reach in 1..=int(fire.arms[direction]) { append(cells, grid.Position{fire.center.x+step.x*reach, fire.center.y+step.y*reach}) }
+		for reach in 1..=int(fire.arms[direction]) { append(cells, grid.offset(fire.center, step.x*reach, step.y*reach)) }
 	}
 }
 
@@ -120,7 +120,7 @@ flood_push_enemy :: proc(room: ^Room, id: u32, direction: Move_Direction, cells:
 	for _ in 0..<cells {
 		position, present := entity_position(room, enemy_entity(id))
 		if !present || room.phase != .Combat { return }
-		to := grid.Position{position.x+step.x, position.y+step.y}
+		to := grid.offset(position, step.x, step.y)
 		query := query_entity_movement(room, enemy_entity(id), to)
 		if !movement_query_is_clear(&query) { return }
 		apply_movement_effect(room, PLAYER_ENTITY, move_effect(enemy_entity(id), to), report)
@@ -140,12 +140,12 @@ begin_flood :: proc(room: ^Room, aim: grid.Position, cells: i32, report: ^Action
 	// From the middle of the wall behind to the middle of the wall in front;
 	// `duration` is the direction (Move_Direction) and `amount` the push.
 	first, last: grid.Position
-	middle := grid.Position{tiles.width/2, tiles.height/2}
+	middle := grid.Position{x = tiles.width/2, y = tiles.height/2}
 	switch direction {
-	case .East: first, last = {0, middle.y}, {tiles.width-1, middle.y}
-	case .West: first, last = {tiles.width-1, middle.y}, {0, middle.y}
-	case .South: first, last = {middle.x, 0}, {middle.x, tiles.height-1}
-	case .North: first, last = {middle.x, tiles.height-1}, {middle.x, 0}
+	case .East: first, last = {x = 0, y = middle.y}, {x = tiles.width-1, y = middle.y}
+	case .West: first, last = {x = tiles.width-1, y = middle.y}, {x = 0, y = middle.y}
+	case .South: first, last = {x = middle.x, y = 0}, {x = middle.x, y = tiles.height-1}
+	case .North: first, last = {x = middle.x, y = tiles.height-1}, {x = middle.x, y = 0}
 	}
 	record_report_event(report, {kind = .Flood_Swept, source = PLAYER_ENTITY, target = SYSTEM_ENTITY, from_position = first,
 		to_position = last, amount = cells, duration = i32(direction), card_definition = .Flood_Wave})

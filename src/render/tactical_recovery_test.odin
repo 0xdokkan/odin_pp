@@ -5,7 +5,7 @@ import game "../game"
 
 @(test)
 test_recovery_step_keeps_enemy_telegraphs_visible_until_actions_resume :: proc(t: ^testing.T) {
-	player := game.Player{position = {1, 2}, health = 10, stats = {max_health = 10}}
+	player := game.Player{position = {x = 1, y = 2}, health = 10, stats = {max_health = 10}}
 	room := make_presentation_timeline_test_room(&player, nil, nil)
 	defer game.destroy_room(&room)
 	testing.expect(t, game.configure_tactical(&player, game.DEFAULT_TACTICAL_CONFIG))
@@ -14,11 +14,11 @@ test_recovery_step_keeps_enemy_telegraphs_visible_until_actions_resume :: proc(t
 	renderer := new(Renderer)
 	defer free(renderer)
 	before := capture_room_presentation(&room)
-	player.position = {2, 2}
+	player.position = {x = 2, y = 2}
 	after := capture_room_presentation(&room)
 	events := game.Event_Log{count = 1}
 	events.events[0] = {kind = .Moved, source = game.PLAYER_ENTITY, target = game.PLAYER_ENTITY,
-		from_position = {1, 2}, to_position = {2, 2}}
+		from_position = {x = 1, y = 2}, to_position = {x = 2, y = 2}}
 	testing.expect(t, begin_renderer_event_timeline(renderer, before, &events, &after))
 	testing.expect(t, renderer_blocks_player_input(renderer))
 	player.tactical.phase = .Decision

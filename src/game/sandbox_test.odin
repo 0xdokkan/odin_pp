@@ -7,13 +7,13 @@ import level "../level"
 test_sandbox_last_kill_keeps_the_combat_and_the_arena_refills :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {7, 7}, health = 5, attack = 1}}
+	spawns := [?]Enemy_Spawn{{position = {x = 7, y = 7}, health = 5, attack = 1}}
 	room := create_enemy_rework_room(t, &data, &player, spawns[:])
 	defer level.destroy(&data)
 	defer destroy_room(&room)
 	room.endless = true
 	log: Event_Log
-	testing.expect(t, deploy_board_device(&room, .Tesla_Coil, {2, 2}, 8, 0, &log))
+	testing.expect(t, deploy_board_device(&room, .Tesla_Coil, {x = 2, y = 2}, 8, 0, &log))
 	hand := player.deck.hand_count
 	action := make_action(.Ability, PLAYER_ENTITY)
 	testing.expect(t, add_effect(&action, damage_effect(enemy_entity(room.enemies[0].id), 50)))
@@ -55,7 +55,7 @@ test_sandbox_last_kill_keeps_the_combat_and_the_arena_refills :: proc(t: ^testin
 test_sandbox_spawns_wait_for_the_board_and_reopen_the_ring :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {7, 7}, health = 5, attack = 1}}
+	spawns := [?]Enemy_Spawn{{position = {x = 7, y = 7}, health = 5, attack = 1}}
 	room := create_enemy_rework_room(t, &data, &player, spawns[:])
 	defer level.destroy(&data)
 	defer destroy_room(&room)

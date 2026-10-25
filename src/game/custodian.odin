@@ -74,7 +74,7 @@ plan_custodian_intent :: proc(
 	}
 	if best_id != 0 && best_distance > 1 {
 		intent := make_wait_intent(room, origin)
-		steps := [?]grid.Position{{0, -1}, {1, 0}, {0, 1}, {-1, 0}}
+		steps := [?]grid.Position{{x = 0, y = -1}, {x = 1, y = 0}, {x = 0, y = 1}, {x = -1, y = 0}}
 		for step in steps {
 			target := add_position(origin, step)
 			distance := abs(target.x-ally_position.x)+abs(target.y-ally_position.y)

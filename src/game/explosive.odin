@@ -143,7 +143,7 @@ resolve_due_explosives :: proc(room: ^Room, pulse: ^Pulse_Report) {
 		// Cell order makes friendly fire independent of unordered enemy/object storage.
 		for y in center.y-1..=center.y+1 {
 			for x in center.x-1..=center.x+1 {
-				cell := grid.Position{x, y}
+				cell := grid.Position{x = x, y = y}
 				if !explosion_contains_cell(room, center, cell) {
 					continue
 				}

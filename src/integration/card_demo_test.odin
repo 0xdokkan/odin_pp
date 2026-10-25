@@ -34,9 +34,10 @@ card_demo_outcome :: proc(demo: ^run_session.Card_Demo, renderer: ^render.Render
 
 // A board's canvas and projection as the game's, with no GPU asset.
 card_demo_test_renderer :: proc() -> ^render.Renderer {
-	main := render.create(960, 540)
+	main := new_clone(render.create(960, 540))
+	defer free(main)
 	main.tactical.perspective = true
-	return render.create_borrowed_renderer(&main, 960, 540, {})
+	return render.create_borrowed_renderer(main, 960, 540, {})
 }
 
 // A caption of the film's own table (CARD_DEMO_WORDS) with its key's cap (a

@@ -34,7 +34,7 @@ player_placement_text :: proc(result: Player_Placement, err: level.Placement_Err
 // The top left cell of a structure's plan when its middle is on `at`.
 structure_origin_for :: proc(id: level.Structure_Id, rotation: u8, mirror: bool, at: grid.Position) -> grid.Position {
 	plan := level.placed_plan({id = id, rotation = rotation%4, mirror = mirror})
-	return {at.x-plan.width/2, at.y-plan.height/2}
+	return grid.offset(at, -plan.width/2, -plan.height/2)
 }
 
 // Whether `cell` is inside the plan of the structure at `origin` (the footprint's cells, with its walls and doors).
@@ -56,7 +56,7 @@ check_player_structure :: proc(w: ^World, data: ^level.Level, room: ^game.Room, 
 	nearest := 1<<20
 	for y in 0..<plan.height { for x in 0..<plan.width {
 		if level.plan_at(&plan, x, y) == .Outside { continue }
-		nearest = min(nearest, distance({origin.x+x, origin.y+y}, room.player.position))
+		nearest = min(nearest, distance(grid.offset(origin, x, y), room.player.position))
 	} }
 	if nearest > PLAYER_STRUCTURE_REACH { return .Too_Far, .None }
 	if footprint_has(&plan, origin, room.player.position) { return .On_The_Player, .None }

@@ -115,7 +115,7 @@ marley_cell :: proc(cell: grid.Position) -> Marley_Cell {
 }
 
 marley_position :: proc(cell: Marley_Cell) -> grid.Position {
-	return {int(cell.x), int(cell.y)}
+	return {x = int(cell.x), y = int(cell.y)}
 }
 
 // The cell of light `index`, and of the next turn's.
@@ -228,7 +228,7 @@ marley_choose_lights :: proc(room: ^Room, count: int, avoid: []Marley_Cell, out:
 	defer delete(taken)
 	for y in 0..<tiles.height {
 		for x in 0..<tiles.width {
-			cell := grid.Position{x, y}
+			cell := grid.Position{x = x, y = y}
 			if !marley_cell_is_floor(room, cell) { continue }
 			skip := false
 			for lit in avoid { if lit == marley_cell(cell) { skip = true; break } }
@@ -313,7 +313,7 @@ begin_marley :: proc(room: ^Room, damage, seconds: i32, report: ^Action_Report) 
 @(private = "file")
 marley_throw_bomb :: proc(room: ^Room, pulse: ^Pulse_Report, x: i32) {
 	record_event(&pulse.events, {kind = .Marley_Bomb, source = SYSTEM_ENTITY, target = SYSTEM_ENTITY,
-		from_position = {int(x), 0}, to_position = {int(x), room.level_data.tiles.height-1}, amount = room.marley.damage,
+		from_position = {x = int(x), y = 0}, to_position = {x = int(x), y = room.level_data.tiles.height-1}, amount = room.marley.damage,
 		card_definition = .Marley_Party, visual_group = MARLEY_BOMB_GROUP})
 }
 
@@ -360,7 +360,7 @@ marley_resolve_column :: proc(room: ^Room, pulse: ^Pulse_Report, x: i32) {
 		m.remaining += gain
 		m.earned += gain
 		record_event(&pulse.events, {kind = .Marley_Bonus, source = SYSTEM_ENTITY, target = SYSTEM_ENTITY,
-			from_position = {int(x), 0}, to_position = {int(x), 0}, amount = gain, duration = m.remaining,
+			from_position = {x = int(x), y = 0}, to_position = {x = int(x), y = 0}, amount = gain, duration = m.remaining,
 			card_definition = .Marley_Party})
 	}
 }
@@ -375,7 +375,7 @@ marley_warn_columns :: proc(room: ^Room, count: int) {
 	for x in 0..<tiles.width {
 		if marley_column_is_warned(room, x) { continue }
 		for y in 0..<tiles.height {
-			if marley_cell_is_floor(room, {x, y}) { append(&candidates, i32(x)); break }
+			if marley_cell_is_floor(room, {x = x, y = y}) { append(&candidates, i32(x)); break }
 		}
 	}
 	// Half of them are a character's column.
@@ -468,7 +468,7 @@ marley_beat :: proc(room: ^Room, pulse: ^Pulse_Report) {
 	}
 	for index in before..<m.column_count {
 		record_event(&pulse.events, {kind = .Marley_Warned, source = SYSTEM_ENTITY, target = SYSTEM_ENTITY,
-			from_position = {int(m.columns[index].x), 0}, to_position = {int(m.columns[index].x), room.level_data.tiles.height-1},
+			from_position = {x = int(m.columns[index].x), y = 0}, to_position = {x = int(m.columns[index].x), y = room.level_data.tiles.height-1},
 			amount = m.columns[index].beats, card_definition = .Marley_Party})
 	}
 }

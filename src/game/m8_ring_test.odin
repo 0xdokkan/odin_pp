@@ -82,10 +82,10 @@ test_m8_storm_crown_preview_and_play_share_three_targets_and_damage :: proc(t: ^
 	defer level.destroy(&data)
 	player := spell_test_player(t, .Storm_Crown, 2)
 	enemies := [?]Enemy_Spawn{
-		{position = {3, 1}, health = 40, attack = 1},
-		{position = {4, 1}, health = 40, attack = 1},
-		{position = {3, 2}, health = 40, attack = 1},
-		{position = {8, 1}, health = 40, attack = 1},
+		{position = {x = 3, y = 1}, health = 40, attack = 1},
+		{position = {x = 4, y = 1}, health = 40, attack = 1},
+		{position = {x = 3, y = 2}, health = 40, attack = 1},
+		{position = {x = 8, y = 1}, health = 40, attack = 1},
 	}
 	room, ok := create_room(&data, &player, {enemies = enemies[:]})
 	testing.expect(t, ok)

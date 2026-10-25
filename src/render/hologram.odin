@@ -19,18 +19,18 @@ draw_hologram_table :: proc(renderer: ^Renderer, room: ^game.Room) {
 	draw_resin_cube(renderer, {w*0.5, -0.095, h*0.5}, w+0.13, 0.035, h+0.13, {27, 57, 77, 255})
 	for y in 0..<room.level_data.tiles.height {
 		for x in 0..<room.level_data.tiles.width {
-			tile, _ := level.tile_at(room.level_data, {x, y})
+			tile, _ := level.tile_at(room.level_data, {x = x, y = y})
 			if tile.kind == .Void { continue }
 			color := rl.Color{13, 25, 39, 255}
 			if (x+y)%2 == 0 { color = {16, 30, 45, 255} }
 			p := rl.Vector3{f32(x)+0.5, -0.025, f32(y)+0.5}
 			draw_resin_cube(renderer, p, 0.97, 0.09, 0.97, color)
 			if tile.kind == .Wall {
-				height := f32(0.055) if level.is_border_position({x, y}, int(w), int(h)) else 0.46
+				height := f32(0.055) if level.is_border_position({x = x, y = y}, int(w), int(h)) else 0.46
 				draw_resin_cube(renderer, {p.x, height*0.5, p.z}, 0.93, height, 0.93, {18, 33, 49, 255})
 				draw_resin_cube(renderer, {p.x, height+0.015, p.z}, 0.88, 0.035, 0.88, {27, 48, 68, 255})
 			}
-			if tile.kind == .Exit { draw_voxel_exit(renderer, {x, y}) }
+			if tile.kind == .Exit { draw_voxel_exit(renderer, {x = x, y = y}) }
 		}
 	}
 	for obstacle in room.obstacles {
@@ -59,7 +59,7 @@ draw_hologram_projection :: proc(renderer: ^Renderer, room: ^game.Room) {
 	rl.DrawCubeWires({w*0.5, -0.064, h*0.5}, w+0.14, 0.026, h+0.14, HOLOGRAM_GLOW)
 	for y in 0..<room.level_data.tiles.height {
 		for x in 0..<room.level_data.tiles.width {
-			tile, _ := level.tile_at(room.level_data, {x, y})
+			tile, _ := level.tile_at(room.level_data, {x = x, y = y})
 			p := rl.Vector3{f32(x)+0.5, 0.029, f32(y)+0.5}
 			if level.is_walkable(tile.kind) {
 				// Narrow emissive rails survive the scene downsample more cleanly
@@ -69,7 +69,7 @@ draw_hologram_projection :: proc(renderer: ^Renderer, room: ^game.Room) {
 					rl.DrawCube(p+rl.Vector3{0, 0, sign*0.475}, 0.972, 0.004, 0.022, {68, 141, 172, 215})
 				}
 			} else if tile.kind == .Wall {
-				border := level.is_border_position({x, y}, int(w), int(h))
+				border := level.is_border_position({x = x, y = y}, int(w), int(h))
 				height := f32(0.091) if border else 0.496
 				rl.DrawCubeWires({p.x, height*0.5, p.z}, 0.935, height, 0.935, {57, 114, 143, 205} if border else HOLOGRAM_GLOW)
 			}
@@ -109,9 +109,9 @@ draw_hologram_projection :: proc(renderer: ^Renderer, room: ^game.Room) {
 	snapshot := renderer.tactical.snapshot
 	for object in snapshot.objects[:snapshot.object_count] {
 		if !object.visible || object.detonation_pulse == 0 { continue }
-		center := grid.Position{int(object.position.x), int(object.position.y)}
+		center := grid.Position{x = int(object.position.x), y = int(object.position.y)}
 		for y in center.y-1..=center.y+1 { for x in center.x-1..=center.x+1 {
-			if game.explosion_contains_cell(room, center, {x, y}) { draw_hologram_threat(room, {x, y}) }
+			if game.explosion_contains_cell(room, center, {x = x, y = y}) { draw_hologram_threat(room, {x = x, y = y}) }
 		} }
 	}
 	rlgl.DrawRenderBatchActive()

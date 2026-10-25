@@ -19,7 +19,7 @@ test_dodge_without_cards_cancels_a_melee_hit_and_starts_recovery :: proc(t: ^tes
 	testing.expect(t, select_defense(&room, .Dodge))
 	testing.expect(t, qte_key(&room, .South))
 	drain_tactical_test_pulse(t, &room)
-	testing.expect_value(t, player.position, grid.Position{1, 2})
+	testing.expect_value(t, player.position, grid.Position{x = 1, y = 2})
 	testing.expect_value(t, player.health, i32(1000))
 	testing.expect_value(t, room.pulse_count, u64(1))
 	testing.expect_value(t, player.tactical.dodge_recovery, TACTICAL_DODGE_RECOVERY)
@@ -32,13 +32,13 @@ test_dodge_without_cards_cancels_a_melee_hit_and_starts_recovery :: proc(t: ^tes
 test_active_dodge_traverses_two_cells_costs_one_second_and_recovers_on_world_beats :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {7, 1}, health = 100, attack = 1}}
-	objects := [?]Grid_Object_Spawn{{kind = .Fire, position = {4, 5}}}
+	spawns := [?]Enemy_Spawn{{position = {x = 7, y = 1}, health = 100, attack = 1}}
+	objects := [?]Grid_Object_Spawn{{kind = .Fire, position = {x = 4, y = 5}}}
 	room := create_enemy_rework_room(t, &data, &player, spawns[:], objects[:])
 	defer level.destroy(&data)
 	defer destroy_room(&room)
 	testing.expect(t, try_dodge_player(&room, .South))
-	testing.expect_value(t, player.position, grid.Position{4, 6})
+	testing.expect_value(t, player.position, grid.Position{x = 4, y = 6})
 	testing.expect_value(t, player.health, i32(98)) // Rolling still traverses floor hazards.
 	testing.expect(t, !try_dodge_player(&room, .North), "cannot dodge twice during one committed pulse")
 	drain_tactical_test_pulse(t, &room)
@@ -62,23 +62,23 @@ test_active_dodge_traverses_two_cells_costs_one_second_and_recovers_on_world_bea
 test_active_dodge_does_not_cross_walls_actors_or_consume_a_blocked_attempt :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {5, 4}, health = 100, attack = 1}}
+	spawns := [?]Enemy_Spawn{{position = {x = 5, y = 4}, health = 100, attack = 1}}
 	room := create_enemy_rework_room(t, &data, &player, spawns[:])
 	defer level.destroy(&data)
 	defer destroy_room(&room)
 	testing.expect(t, !try_dodge_player(&room, .East))
-	testing.expect_value(t, player.position, grid.Position{4, 4})
+	testing.expect_value(t, player.position, grid.Position{x = 4, y = 4})
 	testing.expect_value(t, player.tactical.dodge_recovery, 0)
 	testing.expect(t, !room.tactical_pulse.pending)
-	append(&room.obstacles, Obstacle{position = {2, 4}})
+	append(&room.obstacles, Obstacle{position = {x = 2, y = 4}})
 	destination, ok := tactical_dodge_destination(&room, .West)
 	testing.expect(t, ok)
-	testing.expect_value(t, destination, grid.Position{3, 4})
+	testing.expect_value(t, destination, grid.Position{x = 3, y = 4})
 	player.tactical.phase = .Recovery
 	testing.expect(t, !try_dodge_player(&room, .West))
 	player.tactical.phase = .Decision
 	testing.expect(t, try_dodge_player(&room, .West))
-	testing.expect_value(t, player.position, grid.Position{3, 4})
+	testing.expect_value(t, player.position, grid.Position{x = 3, y = 4})
 	room.phase = .Loot
 	tactical_end_combat(&room)
 	testing.expect_value(t, player.tactical.dodge_recovery, 0)
@@ -97,7 +97,7 @@ test_failed_reactive_dodge_leaves_the_attack_live :: proc(t: ^testing.T) {
 	testing.expect(t, select_defense(&room, .Dodge))
 	testing.expect(t, qte_key(&room, .North), "blocked landing resolves as a failed QTE")
 	drain_tactical_test_pulse(t, &room)
-	testing.expect_value(t, player.position, grid.Position{1, 1})
+	testing.expect_value(t, player.position, grid.Position{x = 1, y = 1})
 	testing.expect(t, player.health < 1000)
 	testing.expect_value(t, player.tactical.metrics.qte_failures, u64(1))
 }

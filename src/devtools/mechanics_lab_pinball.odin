@@ -46,7 +46,7 @@ import render "../render"
 mechanics_lab_pinball :: proc(window: ^app.Window, renderer: ^render.Renderer, room: ^game.Room, controller: ^run_session.Tactical_Controller,
 	cards: ^run_session.Card_Interaction_State, buffer: ^run_session.Buffered_Gameplay_Command) -> bool {
 	player := room.player
-	center := grid.Position{run_session.MECHANICS_LAB_WIDTH/2, run_session.MECHANICS_LAB_HEIGHT/2}
+	center := grid.Position{x = run_session.MECHANICS_LAB_WIDTH/2, y = run_session.MECHANICS_LAB_HEIGHT/2}
 	foe :: mechanics_lab_enemy
 	spawn :: mechanics_lab_spawn_enemy
 	// The aim as the board shows it with the mouse on `cell`.
@@ -68,13 +68,13 @@ mechanics_lab_pinball :: proc(window: ^app.Window, renderer: ^render.Renderer, r
 	for kind in ([6]game.Status_Kind{.Deflect, .Arrows, .Fate, .Venom_Blade, .Poison, .Burn}) { _, _ = game.remove_status(room, game.PLAYER_ENTITY, kind) }
 	player.tactical.facing = .East
 	player.tactical.dodge_recovery = 0
-	target := grid.Position{center.x+1, center.y}
+	target := grid.offset(center, 1, 0)
 	BALL_HEALTH :: i32(30)
 	BUMPER_HEALTH :: i32(99)
 	target_id := spawn(room, target, BALL_HEALTH, .Archer)
-	custodian := grid.Position{center.x-1, center.y+1}
+	custodian := grid.offset(center, -1, 1)
 	custodian_id := spawn(room, custodian, BUMPER_HEALTH, .Custodian)
-	far := grid.Position{center.x+2, center.y-2}
+	far := grid.offset(center, 2, -2)
 	far_id := spawn(room, far, BUMPER_HEALTH, .Brute)
 	if target_id == 0 || custodian_id == 0 || far_id == 0 { fmt.eprintln("mechanics lab: no room for the Pinball's foes"); return false }
 	_, _ = game.apply_status(room, game.enemy_entity(target_id), .Poison, 2, 0)
@@ -93,13 +93,13 @@ mechanics_lab_pinball :: proc(window: ^app.Window, renderer: ^render.Renderer, r
 	room.pinball_random = stream
 	heading, turn := game.pinball_next_launch(room, target)
 	if turn != LAUNCH_TURN { fmt.eprintln("mechanics lab: the Pinball's stream turns its launch", turn, "degrees"); return false }
-	row := [3]grid.Position{{target.x+int(math.round(heading.x*4)), target.y+int(math.round(heading.y*4))}, {center.x+2, center.y+2}, {center.x-1, center.y-4}}
+	row := [3]grid.Position{grid.offset(target, int(math.round(heading.x*4)), int(math.round(heading.y*4))), grid.offset(center, 2, 2), grid.offset(center, -1, -4)}
 	row_ids: [3]u32
 	for cell, index in row {
 		row_ids[index] = spawn(room, cell, BUMPER_HEALTH, .Chaser)
 		if row_ids[index] == 0 { fmt.eprintln("mechanics lab: no room for the Pinball's row on", cell); return false }
 	}
-	for cell in ([4]grid.Position{{4, 4}, {5, 12}, {18, 12}, {17, 3}}) {
+	for cell in ([4]grid.Position{{x = 4, y = 4}, {x = 5, y = 12}, {x = 18, y = 12}, {x = 17, y = 3}}) {
 		_ = spawn(room, cell, BUMPER_HEALTH, .Brute if cell.y > center.y else .Chaser)
 	}
 	render.clear_event_animations(renderer)
@@ -222,7 +222,7 @@ mechanics_lab_pinball :: proc(window: ^app.Window, renderer: ^render.Renderer, r
 			p := game.pinball_position(s)
 			for dy in -1..=1 {
 				for dx in -1..=1 {
-					cell := grid.Position{s.cell.x+dx, s.cell.y+dy}
+					cell := grid.offset(s.cell, dx, dy)
 					if !game.lasso_cell_is_solid(room, cell) { continue }
 					closest := [2]f64{clamp(p.x, f64(cell.x)-0.5, f64(cell.x)+0.5), clamp(p.y, f64(cell.y)-0.5, f64(cell.y)+0.5)}
 					if math.hypot(p.x-closest.x, p.y-closest.y) < game.PINBALL_RADIUS-1e-6 {
@@ -291,8 +291,8 @@ mechanics_lab_pinball :: proc(window: ^app.Window, renderer: ^render.Renderer, r
 				case .Move:
 					// The foe just struck pushed one cell, away from the ball.
 					if event.kind != .Moved || event.target != last_bumped || event.source != game.PLAYER_ENTITY { continue }
-					d := grid.Position{event.to_position.x-event.from_position.x, event.to_position.y-event.from_position.y}
-					away := grid.Position{event.from_position.x-last_ball_cell.x, event.from_position.y-last_ball_cell.y}
+					d := grid.offset(event.to_position, -event.from_position.x, -event.from_position.y)
+					away := grid.offset(event.from_position, -last_ball_cell.x, -last_ball_cell.y)
 					if max(abs(d.x), abs(d.y)) != 1 || d.x*away.x+d.y*away.y <= 0 {
 						fmt.eprintln("mechanics lab: a foe struck from", last_ball_cell, "was pushed from", event.from_position, "to", event.to_position); return false
 					}

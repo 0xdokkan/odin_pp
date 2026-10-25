@@ -266,8 +266,8 @@ draw_expedition_terrain :: proc(renderer: ^Renderer, room: ^game.Room) {
 	cache := &f.terrain
 	prepare_expedition_terrain(cache, data)
 	p := room.player.position
-	low := grid.Position{max(0, p.x-26)/EXPEDITION_TERRAIN_CHUNK, max(0, p.y-26)/EXPEDITION_TERRAIN_CHUNK}
-	high := grid.Position{min(cache.columns-1, (p.x+26)/EXPEDITION_TERRAIN_CHUNK), min(cache.rows-1, (p.y+26)/EXPEDITION_TERRAIN_CHUNK)}
+	low := grid.Position{x = max(0, p.x-26)/EXPEDITION_TERRAIN_CHUNK, y = max(0, p.y-26)/EXPEDITION_TERRAIN_CHUNK}
+	high := grid.Position{x = min(cache.columns-1, (p.x+26)/EXPEDITION_TERRAIN_CHUNK), y = min(cache.rows-1, (p.y+26)/EXPEDITION_TERRAIN_CHUNK)}
 	rlgl.DisableBackfaceCulling()
 	defer rlgl.EnableBackfaceCulling()
 	reflection := false
@@ -298,8 +298,8 @@ expedition_terrain_tall_in_view :: proc(renderer: ^Renderer, room: ^game.Room) -
 	cache := &renderer.tactical.expedition_floor.terrain
 	prepare_expedition_terrain(cache, data)
 	p := room.player.position
-	low := grid.Position{max(0, p.x-26)/EXPEDITION_TERRAIN_CHUNK, max(0, p.y-26)/EXPEDITION_TERRAIN_CHUNK}
-	high := grid.Position{min(cache.columns-1, (p.x+26)/EXPEDITION_TERRAIN_CHUNK), min(cache.rows-1, (p.y+26)/EXPEDITION_TERRAIN_CHUNK)}
+	low := grid.Position{x = max(0, p.x-26)/EXPEDITION_TERRAIN_CHUNK, y = max(0, p.y-26)/EXPEDITION_TERRAIN_CHUNK}
+	high := grid.Position{x = min(cache.columns-1, (p.x+26)/EXPEDITION_TERRAIN_CHUNK), y = min(cache.rows-1, (p.y+26)/EXPEDITION_TERRAIN_CHUNK)}
 	for cy in low.y..=high.y {
 		for cx in low.x..=high.x {
 			if cache.chunks[cy*cache.columns+cx].tallest >= EXPEDITION_TERRAIN_TALL { return true }
@@ -327,7 +327,7 @@ prepare_expedition_terrain :: proc(cache: ^Expedition_Terrain_Cache, data: ^leve
 		defer free(block)
 		for cy in 0..<cache.rows {
 			for cx in 0..<cache.columns {
-				build_terrain_chunk(&m, {cx*EXPEDITION_TERRAIN_CHUNK, cy*EXPEDITION_TERRAIN_CHUNK}, &cache.chunks[cy*cache.columns+cx], cache.raised, &scratch, block)
+				build_terrain_chunk(&m, {x = cx*EXPEDITION_TERRAIN_CHUNK, y = cy*EXPEDITION_TERRAIN_CHUNK}, &cache.chunks[cy*cache.columns+cx], cache.raised, &scratch, block)
 			}
 		}
 		cache.ready = true

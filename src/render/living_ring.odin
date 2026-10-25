@@ -101,7 +101,7 @@ draw_living_rings :: proc(renderer: ^Renderer, room: ^game.Room) {
 	defer { rlgl.DrawRenderBatchActive(); rlgl.EnableDepthTest() }
 	// The enemies' rings are still a trial of the mechanics lab.
 	for actor in snapshot.enemies[:snapshot.enemy_count if v.mechanics_lab && LIVING_ENEMY_RINGS else 0] {
-		cell := grid.Position{int(math.round(actor.position.x)), int(math.round(actor.position.y))}
+		cell := grid.Position{x = int(math.round(actor.position.x)), y = int(math.round(actor.position.y))}
 		if !actor.visible || actor.health <= 0 || !tactical_render_visible(renderer, cell) { continue }
 		index, found := game.enemy_index_by_id(room, actor.entity.id)
 		if !found { continue }

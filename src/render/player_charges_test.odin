@@ -205,8 +205,8 @@ test_fate_tag_keeps_clear_of_the_struck_cards_heart :: proc(t: ^testing.T) {
 // none of the player's; the archer's heart keeps its health until it lands.
 @(test)
 test_deflected_bolt_turns_round_and_is_the_only_bolt :: proc(t: ^testing.T) {
-	player := game.Player{position = {2, 2}, health = 10, stats = {max_health = 10}}
-	enemies := [?]game.Enemy{{id = 1, archetype = .Archer, position = {6, 2}, health = 9, max_health = 9}}
+	player := game.Player{position = {x = 2, y = 2}, health = 10, stats = {max_health = 10}}
+	enemies := [?]game.Enemy{{id = 1, archetype = .Archer, position = {x = 6, y = 2}, health = 9, max_health = 9}}
 	room := make_presentation_timeline_test_room(&player, enemies[:], nil)
 	defer game.destroy_room(&room)
 	snapshot: Room_Presentation
@@ -218,8 +218,8 @@ test_deflected_bolt_turns_round_and_is_the_only_bolt :: proc(t: ^testing.T) {
 	room.enemies[0].health = 6
 	after := capture_room_presentation(&room)
 	events: game.Event_Log
-	game.record_event(&events, charges_test_blow(.Attack_Deflected, archer, game.PLAYER_ENTITY, {6, 2}, {2, 2}, ranged = true))
-	game.record_event(&events, charges_test_blow(.Damaged, game.PLAYER_ENTITY, archer, {2, 2}, {6, 2}, ranged = true, reflected = true))
+	game.record_event(&events, charges_test_blow(.Attack_Deflected, archer, game.PLAYER_ENTITY, {x = 6, y = 2}, {x = 2, y = 2}, ranged = true))
+	game.record_event(&events, charges_test_blow(.Damaged, game.PLAYER_ENTITY, archer, {x = 2, y = 2}, {x = 6, y = 2}, ranged = true, reflected = true))
 	testing.expect(t, begin_renderer_world_timeline(renderer, before, &events, &after))
 	renderer.sprite_assets.elapsed = 5
 	snapshot = renderer_presentation_snapshot(renderer, &room)
@@ -239,7 +239,7 @@ test_deflected_bolt_turns_round_and_is_the_only_bolt :: proc(t: ^testing.T) {
 		if fx.used && fx.answered && !turned {
 			turned = true
 			testing.expect(t, fx.reflected && fx.attacker == game.PLAYER_ENTITY && fx.victim == archer)
-			testing.expect_value(t, fx.aim, grid.Position{6, 2})
+			testing.expect_value(t, fx.aim, grid.Position{x = 6, y = 2})
 		}
 		left, flying := attack_fx_landing_in(renderer, archer, renderer.sprite_assets.elapsed, game.PLAYER_ENTITY)
 		actor, shown := presentation_actor_in_view(&snapshot, archer)
@@ -270,8 +270,8 @@ test_deflected_bolt_turns_round_and_is_the_only_bolt :: proc(t: ^testing.T) {
 // own lantern at the brute.
 @(test)
 test_deflected_swing_is_answered_by_the_players_riposte :: proc(t: ^testing.T) {
-	player := game.Player{position = {2, 2}, health = 10, stats = {max_health = 10}}
-	enemies := [?]game.Enemy{{id = 1, archetype = .Brute, position = {3, 2}, health = 9, max_health = 9}}
+	player := game.Player{position = {x = 2, y = 2}, health = 10, stats = {max_health = 10}}
+	enemies := [?]game.Enemy{{id = 1, archetype = .Brute, position = {x = 3, y = 2}, health = 9, max_health = 9}}
 	room := make_presentation_timeline_test_room(&player, enemies[:], nil)
 	defer game.destroy_room(&room)
 	snapshot: Room_Presentation
@@ -283,8 +283,8 @@ test_deflected_swing_is_answered_by_the_players_riposte :: proc(t: ^testing.T) {
 	room.enemies[0].health = 6
 	after := capture_room_presentation(&room)
 	events: game.Event_Log
-	game.record_event(&events, charges_test_blow(.Attack_Deflected, brute, game.PLAYER_ENTITY, {3, 2}, {2, 2}))
-	game.record_event(&events, charges_test_blow(.Damaged, game.PLAYER_ENTITY, brute, {2, 2}, {3, 2}, reflected = true))
+	game.record_event(&events, charges_test_blow(.Attack_Deflected, brute, game.PLAYER_ENTITY, {x = 3, y = 2}, {x = 2, y = 2}))
+	game.record_event(&events, charges_test_blow(.Damaged, game.PLAYER_ENTITY, brute, {x = 2, y = 2}, {x = 3, y = 2}, reflected = true))
 	testing.expect(t, begin_renderer_world_timeline(renderer, before, &events, &after))
 	renderer.sprite_assets.elapsed = 5
 	snapshot = renderer_presentation_snapshot(renderer, &room)
@@ -297,7 +297,7 @@ test_deflected_swing_is_answered_by_the_players_riposte :: proc(t: ^testing.T) {
 		riposted = true
 		riposte, found := attack_fx_find(renderer, game.PLAYER_ENTITY, .Swing)
 		fx := attack_fx_by_id(renderer, riposte)
-		testing.expect(t, found && fx != nil && fx.victim == brute && fx.aim == grid.Position{3, 2} && fx.damage == 3)
+		testing.expect(t, found && fx != nil && fx.victim == brute && fx.aim == grid.Position{x = 3, y = 2} && fx.damage == 3)
 	}
 	testing.expect(t, riposted)
 	testing.expect_value(t, renderer.tactical.attack_fx.spawned[.Cleaver], 1)
@@ -314,7 +314,7 @@ test_the_players_shot_is_an_arrow :: proc(t: ^testing.T) {
 	defer attack_test_free(renderer)
 	testing.expect_value(t, attack_look(renderer, game.PLAYER_ENTITY, true), Attack_Look.Bolt)
 	testing.expect_value(t, attack_look(renderer, game.PLAYER_ENTITY, false), Attack_Look.Lantern)
-	shot := charges_test_blow(.Damaged, game.PLAYER_ENTITY, game.enemy_entity(1), {2, 2}, {6, 2}, ranged = true, amount = 1)
+	shot := charges_test_blow(.Damaged, game.PLAYER_ENTITY, game.enemy_entity(1), {x = 2, y = 2}, {x = 6, y = 2}, ranged = true, amount = 1)
 	snapshot.valid = true
 	testing.expect(t, abs(world_blow_done(&snapshot, shot)-f32(attack_fx_done_seconds(.Pilgrim, .Bolt, shot))) < 1e-6)
 	// It sounds as a shot, not as a swing.
@@ -326,8 +326,8 @@ test_the_players_shot_is_an_arrow :: proc(t: ^testing.T) {
 // An enemy bolt on the player: his health shows as it lands, not as it is loosed.
 @(test)
 test_hearts_wait_for_the_blow_to_land :: proc(t: ^testing.T) {
-	player := game.Player{position = {2, 2}, health = 10, stats = {max_health = 10}}
-	enemies := [?]game.Enemy{{id = 1, archetype = .Archer, position = {6, 2}, health = 5, max_health = 5}}
+	player := game.Player{position = {x = 2, y = 2}, health = 10, stats = {max_health = 10}}
+	enemies := [?]game.Enemy{{id = 1, archetype = .Archer, position = {x = 6, y = 2}, health = 5, max_health = 5}}
 	room := make_presentation_timeline_test_room(&player, enemies[:], nil)
 	defer game.destroy_room(&room)
 	snapshot: Room_Presentation
@@ -338,7 +338,7 @@ test_hearts_wait_for_the_blow_to_land :: proc(t: ^testing.T) {
 	player.health = 7
 	after := capture_room_presentation(&room)
 	events: game.Event_Log
-	game.record_event(&events, charges_test_blow(.Damaged, game.enemy_entity(1), game.PLAYER_ENTITY, {6, 2}, {2, 2}, ranged = true))
+	game.record_event(&events, charges_test_blow(.Damaged, game.enemy_entity(1), game.PLAYER_ENTITY, {x = 6, y = 2}, {x = 2, y = 2}, ranged = true))
 	testing.expect(t, begin_renderer_world_timeline(renderer, before, &events, &after))
 	renderer.sprite_assets.elapsed = 5
 	// The frame its cue starts, before the bolt is on the board.
@@ -364,8 +364,8 @@ test_fate_cue_validates_its_die_and_shows_it_once :: proc(t: ^testing.T) {
 	testing.expect_value(t, presentation_cue_kind({kind = .Attack_Deflected}), Presentation_Cue_Kind.Attack_Deflected)
 	testing.expect(t, !presentation_cue_is_cinematic(.Fate_Rolled))
 	testing.expect_value(t, presentation_cue_duration(.Fate_Rolled, {}), PRESENTATION_FATE_DURATION)
-	player := game.Player{position = {2, 2}, health = 10, stats = {max_health = 10}}
-	enemies := [?]game.Enemy{{id = 1, archetype = .Chaser, position = {2, 1}, health = 9, max_health = 9}}
+	player := game.Player{position = {x = 2, y = 2}, health = 10, stats = {max_health = 10}}
+	enemies := [?]game.Enemy{{id = 1, archetype = .Chaser, position = {x = 2, y = 1}, health = 9, max_health = 9}}
 	room := make_presentation_timeline_test_room(&player, enemies[:], nil)
 	defer game.destroy_room(&room)
 	foe := game.enemy_entity(1)
@@ -379,9 +379,9 @@ test_fate_cue_validates_its_die_and_shows_it_once :: proc(t: ^testing.T) {
 	after := capture_room_presentation(&room)
 	roll := game.Dice_Roll{faces = {2, 0, 0}, total = 2, sides = 4, count = 1}
 	fate := game.Game_Event{kind = .Fate_Rolled, source = game.PLAYER_ENTITY, target = foe, dice_roll = roll, amount = 2,
-		duration = i32(game.Fate_Outcome.Burn), from_position = {2, 2}, to_position = {2, 1}, card_definition = .Fate_Dice}
+		duration = i32(game.Fate_Outcome.Burn), from_position = {x = 2, y = 2}, to_position = {x = 2, y = 1}, card_definition = .Fate_Dice}
 	events: game.Event_Log
-	game.record_event(&events, charges_test_blow(.Damaged, game.PLAYER_ENTITY, foe, {2, 2}, {2, 1}, amount = 2))
+	game.record_event(&events, charges_test_blow(.Damaged, game.PLAYER_ENTITY, foe, {x = 2, y = 2}, {x = 2, y = 1}, amount = 2))
 	game.record_event(&events, fate)
 	snapshot: Room_Presentation
 	renderer := attack_test_renderer(&snapshot)
@@ -428,7 +428,7 @@ test_every_loaded_bump_shows_its_die_even_on_the_same_face :: proc(t: ^testing.T
 	data := ground_test_level(t)
 	defer level.destroy(&data)
 	player: game.Player
-	cell := grid.Position{data.player_spawn.x, data.player_spawn.y-1}
+	cell := grid.offset(data.player_spawn, 0, -1)
 	enemies := [?]game.Enemy_Spawn{{position = cell, health = 60, attack = 1}}
 	room := charges_test_room(t, &data, &player, enemies[:])
 	defer game.destroy_room(&room)
@@ -491,7 +491,7 @@ test_a_critical_the_die_makes_is_said_by_the_die :: proc(t: ^testing.T) {
 	data := ground_test_level(t)
 	defer level.destroy(&data)
 	player: game.Player
-	cell := grid.Position{data.player_spawn.x, data.player_spawn.y-1}
+	cell := grid.offset(data.player_spawn, 0, -1)
 	enemies := [?]game.Enemy_Spawn{{position = cell, health = 60, attack = 1}}
 	room := charges_test_room(t, &data, &player, enemies[:])
 	defer game.destroy_room(&room)
@@ -530,7 +530,7 @@ test_an_arrows_status_shows_as_it_lands :: proc(t: ^testing.T) {
 	data := ground_test_level(t)
 	defer level.destroy(&data)
 	player: game.Player
-	enemies := [?]game.Enemy_Spawn{{position = {data.player_spawn.x+4, data.player_spawn.y}, health = 20, attack = 1}}
+	enemies := [?]game.Enemy_Spawn{{position = grid.offset(data.player_spawn, 4, 0), health = 20, attack = 1}}
 	room := charges_test_room(t, &data, &player, enemies[:])
 	defer game.destroy_room(&room)
 	_, _ = game.apply_status(&room, game.PLAYER_ENTITY, .Arrows, 3, 0)
@@ -581,7 +581,7 @@ test_riflesso_shows_until_the_blow_reaches_him :: proc(t: ^testing.T) {
 	defer level.destroy(&data)
 	player: game.Player
 	spawn := data.player_spawn
-	enemies := [?]game.Enemy_Spawn{{position = {spawn.x+4, spawn.y}, health = 20, attack = 3, archetype = .Archer}}
+	enemies := [?]game.Enemy_Spawn{{position = grid.offset(spawn, 4, 0), health = 20, attack = 3, archetype = .Archer}}
 	room := charges_test_room(t, &data, &player, enemies[:])
 	defer game.destroy_room(&room)
 	_, _ = game.apply_status(&room, game.PLAYER_ENTITY, .Deflect, 1, 0)
@@ -625,8 +625,8 @@ test_his_blows_spend_their_charges_as_they_land :: proc(t: ^testing.T) {
 	defer level.destroy(&data)
 	player: game.Player
 	spawn := data.player_spawn
-	north := grid.Position{spawn.x, spawn.y-1}
-	enemies := [?]game.Enemy_Spawn{{position = north, health = 20, attack = 1}, {position = {spawn.x+4, spawn.y}, health = 20, attack = 1}}
+	north := grid.offset(spawn, 0, -1)
+	enemies := [?]game.Enemy_Spawn{{position = north, health = 20, attack = 1}, {position = grid.offset(spawn, 4, 0), health = 20, attack = 1}}
 	room := charges_test_room(t, &data, &player, enemies[:])
 	defer game.destroy_room(&room)
 	_, _ = game.apply_status(&room, game.PLAYER_ENTITY, .Venom_Blade, 2, 0)
@@ -673,10 +673,10 @@ test_a_felling_blow_keeps_the_heart_until_it_lands :: proc(t: ^testing.T) {
 	defer level.destroy(&data)
 	player: game.Player
 	spawn := data.player_spawn
-	north := grid.Position{spawn.x, spawn.y-1}
+	north := grid.offset(spawn, 0, -1)
 	// The third keeps the fight going once the other two fall.
-	enemies := [?]game.Enemy_Spawn{{position = north, health = 2, attack = 1}, {position = {spawn.x+4, spawn.y}, health = 1, attack = 1},
-		{position = {1, 5}, health = 20, attack = 1}}
+	enemies := [?]game.Enemy_Spawn{{position = north, health = 2, attack = 1}, {position = grid.offset(spawn, 4, 0), health = 1, attack = 1},
+		{position = {x = 1, y = 5}, health = 20, attack = 1}}
 	room := charges_test_room(t, &data, &player, enemies[:])
 	defer game.destroy_room(&room)
 	_, _ = game.apply_status(&room, game.PLAYER_ENTITY, .Arrows, 3, 0)
@@ -722,10 +722,10 @@ test_riflesso_on_a_guard_says_it_once_and_keeps_parata :: proc(t: ^testing.T) {
 	spawn := data.player_spawn
 	Case :: struct {archetype: game.Enemy_Archetype, at: grid.Position, shield: i32, guard, wound: string, outcome: Attack_Outcome}
 	cases := [?]Case{
-		{.Brute, {spawn.x+1, spawn.y}, 2, "[PARATA 2]", "[RIFLESSO]", .Hit},
-		{.Brute, {spawn.x+1, spawn.y}, 10, "[PARATA 5][RIFLESSO]", "?", .Hit},
-		{.Archer, {spawn.x+4, spawn.y}, 2, "[PARATA 2]", "[RIFLESSO]", .Hit},
-		{.Archer, {spawn.x+4, spawn.y}, 10, "[PARATA 5][RIFLESSO]", "?", .Absorbed},
+		{.Brute, grid.offset(spawn, 1, 0), 2, "[PARATA 2]", "[RIFLESSO]", .Hit},
+		{.Brute, grid.offset(spawn, 1, 0), 10, "[PARATA 5][RIFLESSO]", "?", .Hit},
+		{.Archer, grid.offset(spawn, 4, 0), 2, "[PARATA 2]", "[RIFLESSO]", .Hit},
+		{.Archer, grid.offset(spawn, 4, 0), 10, "[PARATA 5][RIFLESSO]", "?", .Absorbed},
 	}
 	said :: proc(renderer: ^Renderer, kind: Presentation_Cue_Kind) -> (text: string, owners: [2]game.Entity_Ref) {
 		cue := charges_test_world_cue(renderer, kind, game.PLAYER_ENTITY)
@@ -791,7 +791,7 @@ test_destino_chip_names_the_die_its_bumps_roll :: proc(t: ^testing.T) {
 	data := ground_test_level(t)
 	defer level.destroy(&data)
 	player: game.Player
-	enemies := [?]game.Enemy_Spawn{{position = {data.player_spawn.x+4, data.player_spawn.y}, health = 20, attack = 1}}
+	enemies := [?]game.Enemy_Spawn{{position = grid.offset(data.player_spawn, 4, 0), health = 20, attack = 1}}
 	room := charges_test_room(t, &data, &player, enemies[:])
 	defer game.destroy_room(&room)
 	// A Dado del Destino +2 in hand: a d8.

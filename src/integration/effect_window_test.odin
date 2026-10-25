@@ -26,7 +26,7 @@ effect_test_fight :: proc(t: ^testing.T, seed: u64 = 0xC0FFEE) -> ^run_session.R
 	rs.run_created = true
 	testing.expect(t, run_session.configure_demo_tactical_player(&rs.run_state.player, rs.options.tactical))
 	rs.level_data = create_gameplay_command_test_level(t)
-	spawns := [?]game.Enemy_Spawn{{position = {5, 3}, health = 30, attack = 1}}
+	spawns := [?]game.Enemy_Spawn{{position = {x = 5, y = 3}, health = 30, attack = 1}}
 	rs.room, ok = game.create_room(&rs.level_data, &rs.run_state.player, {enemies = spawns[:]})
 	testing.expect(t, ok)
 	rs.room_created = true

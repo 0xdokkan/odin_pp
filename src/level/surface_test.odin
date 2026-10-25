@@ -26,7 +26,7 @@ test_a_flat_map_has_a_flat_surface :: proc(t: ^testing.T) {
 test_a_stair_becomes_a_ramp_without_cracks :: proc(t: ^testing.T) {
 	data, _ := create(6, 4, Tile{kind = .Floor})
 	defer destroy(&data)
-	for y in 0..<4 { for x in 0..<6 { set_height(&data, {x, y}, i32(x)) } }
+	for y in 0..<4 { for x in 0..<6 { set_height(&data, {x = x, y = y}, i32(x)) } }
 	m := surface_map(&data)
 	for x in 0..<5 {
 		a, _ := surface_cell(&m, x, 1)
@@ -57,7 +57,7 @@ test_a_stair_becomes_a_ramp_without_cracks :: proc(t: ^testing.T) {
 test_a_cliff_keeps_its_edge :: proc(t: ^testing.T) {
 	data, _ := create(5, 5, Tile{kind = .Floor})
 	defer destroy(&data)
-	set_height(&data, {2, 2}, 4)
+	set_height(&data, {x = 2, y = 2}, 4)
 	m := surface_map(&data)
 	top, _ := surface_cell(&m, 2, 2)
 	testing.expect(t, surface_flat(top) && top.center == 4)
@@ -90,8 +90,8 @@ test_a_cliff_fades_where_the_ground_goes_round_it :: proc(t: ^testing.T) {
 test_the_void_has_no_surface :: proc(t: ^testing.T) {
 	data, _ := create(4, 3, Tile{kind = .Floor})
 	defer destroy(&data)
-	set_tile(&data, {2, 1}, {kind = .Void})
-	set_height(&data, {1, 1}, 1)
+	set_tile(&data, {x = 2, y = 1}, {kind = .Void})
+	set_height(&data, {x = 1, y = 1}, 1)
 	m := surface_map(&data)
 	_, ok := surface_cell(&m, 2, 1)
 	testing.expect(t, !ok)
@@ -108,11 +108,11 @@ test_the_void_has_no_surface :: proc(t: ^testing.T) {
 test_every_middle_is_at_its_own_height :: proc(t: ^testing.T) {
 	data, _ := create(7, 7, Tile{kind = .Floor})
 	defer destroy(&data)
-	for y in 0..<7 { for x in 0..<7 { set_height(&data, {x, y}, i32((x*7+y*13)%5)) } }
+	for y in 0..<7 { for x in 0..<7 { set_height(&data, {x = x, y = y}, i32((x*7+y*13)%5)) } }
 	m := surface_map(&data)
 	for y in 0..<7 {
 		for x in 0..<7 {
-			testing.expect(t, near(surface_height_at(&m, f32(x)+0.5, f32(y)+0.5), f32(height_at(&data, {x, y}))))
+			testing.expect(t, near(surface_height_at(&m, f32(x)+0.5, f32(y)+0.5), f32(height_at(&data, {x = x, y = y}))))
 		}
 	}
 }

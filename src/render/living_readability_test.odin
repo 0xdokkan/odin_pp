@@ -97,16 +97,16 @@ test_living_heart_glyph_is_a_heart :: proc(t: ^testing.T) {
 // under a still mouse; the flipbook fallback follows the hovered cell.
 @(test)
 test_living_inspector_keeps_its_enemy_while_the_board_moves :: proc(t: ^testing.T) {
-	enemies := [?]game.Enemy{{id = 5, position = {3, 2}, health = 7, max_health = 10}}
+	enemies := [?]game.Enemy{{id = 5, position = {x = 3, y = 2}, health = 7, max_health = 10}}
 	room := make_intent_presentation_test_room(enemies[:])
 	defer game.destroy_room(&room)
 	renderer := new(Renderer)
 	defer free(renderer)
 	renderer.tactical.living, renderer.tactical.no_fog = true, true
-	renderer.hovered_cell, renderer.has_hovered_cell = {3, 2}, true
+	renderer.hovered_cell, renderer.has_hovered_cell = {x = 3, y = 2}, true
 	enemy, found := tactical_inspected_enemy(renderer, &room)
 	testing.expect(t, found && enemy.id == 5)
-	renderer.hovered_cell = {6, 6}
+	renderer.hovered_cell = {x = 6, y = 6}
 	enemy, found = tactical_inspected_enemy(renderer, &room)
 	testing.expect(t, found && enemy.id == 5)
 	renderer.has_hovered_cell = false
@@ -118,10 +118,10 @@ test_living_inspector_keeps_its_enemy_while_the_board_moves :: proc(t: ^testing.
 	testing.expect(t, !found && renderer.tactical.inspected == 0)
 	renderer.tactical.living = false
 	append(&room.enemies, enemies[0])
-	renderer.hovered_cell, renderer.has_hovered_cell = {3, 2}, true
+	renderer.hovered_cell, renderer.has_hovered_cell = {x = 3, y = 2}, true
 	_, found = tactical_inspected_enemy(renderer, &room)
 	testing.expect(t, found)
-	renderer.hovered_cell = {6, 6}
+	renderer.hovered_cell = {x = 6, y = 6}
 	_, found = tactical_inspected_enemy(renderer, &room)
 	testing.expect(t, !found)
 }

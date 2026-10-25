@@ -37,13 +37,13 @@ test_relic_dash_energy_replays_refund_before_pulse_regeneration :: proc(t: ^test
 	data := create_encounter_presentation_test_level(t)
 	defer level.destroy(&data)
 	player := relic_presentation_player(t, .Swift_Soles)
-	enemies := [?]game.Enemy_Spawn{{position = {7, 3}, health = 40, attack = 1}}
+	enemies := [?]game.Enemy_Spawn{{position = {x = 7, y = 3}, health = 40, attack = 1}}
 	room, ok := game.create_room(&data, &player, {enemies = enemies[:]})
 	testing.expect(t, ok)
 	defer game.destroy_room(&room)
 	id := relic_presentation_card(t, &player, .Dash)
 	before := capture_room_presentation(&room)
-	play := game.play_card(&room, id, game.cell_target({3, 1}))
+	play := game.play_card(&room, id, game.cell_target({x = 3, y = 1}))
 	testing.expect_value(t, play.result, game.Card_Play_Result.Played)
 	advance_presentation_test_clock(t, &room, 1)
 	after := capture_room_presentation(&room)
@@ -80,7 +80,7 @@ test_relic_exhaust_bonus_draw_replays_after_exhaust_and_before_pulse :: proc(t: 
 	data := create_encounter_presentation_test_level(t)
 	defer level.destroy(&data)
 	player := relic_presentation_player(t, .Ash_Bookmark)
-	enemies := [?]game.Enemy_Spawn{{position = {7, 3}, health = 40, attack = 1}}
+	enemies := [?]game.Enemy_Spawn{{position = {x = 7, y = 3}, health = 40, attack = 1}}
 	room, ok := game.create_room(&data, &player, {enemies = enemies[:]})
 	testing.expect(t, ok)
 	defer game.destroy_room(&room)
@@ -121,7 +121,7 @@ test_relic_refocus_bonus_draw_replays_after_pulse_and_normal_refill :: proc(t: ^
 	data := create_encounter_presentation_test_level(t)
 	defer level.destroy(&data)
 	player := relic_presentation_player(t, .Ash_Bookmark)
-	enemies := [?]game.Enemy_Spawn{{position = {7, 3}, health = 40, attack = 1}}
+	enemies := [?]game.Enemy_Spawn{{position = {x = 7, y = 3}, health = 40, attack = 1}}
 	room, ok := game.create_room(&data, &player, {enemies = enemies[:]})
 	testing.expect(t, ok)
 	defer game.destroy_room(&room)
@@ -160,7 +160,7 @@ test_relic_mending_terminal_heal_replays_after_enemy_defeat_without_pulse :: pro
 	defer level.destroy(&data)
 	player := relic_presentation_player(t, .Mending_Thread)
 	player.health = 10
-	enemies := [?]game.Enemy_Spawn{{position = {2, 1}, health = 2, attack = 1}}
+	enemies := [?]game.Enemy_Spawn{{position = {x = 2, y = 1}, health = 2, attack = 1}}
 	room, ok := game.create_room(&data, &player, {enemies = enemies[:]})
 	testing.expect(t, ok)
 	defer game.destroy_room(&room)

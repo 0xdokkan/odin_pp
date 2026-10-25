@@ -36,11 +36,11 @@ card_range_test_room :: proc(t: ^testing.T, data: ^level.Level, player: ^game.Pl
 	config.vision_size = 0
 	testing.expect(t, game.configure_tactical(player, config))
 	enemies := [?]game.Enemy_Spawn{
-		{position = {7, 6}, health = 30, attack = 1},
-		{position = {6, 7}, health = 30, attack = 1, archetype = .Custodian},
-		{position = {9, 9}, health = 30, attack = 1},
+		{position = {x = 7, y = 6}, health = 30, attack = 1},
+		{position = {x = 6, y = 7}, health = 30, attack = 1, archetype = .Custodian},
+		{position = {x = 9, y = 9}, health = 30, attack = 1},
 	}
-	obstacles := [?]grid.Position{{8, 6}}
+	obstacles := [?]grid.Position{{x = 8, y = 6}}
 	built: bool
 	room, built = game.create_room(data, player, {enemies = enemies[:], obstacles = obstacles[:]})
 	testing.expect(t, built)
@@ -73,11 +73,11 @@ test_card_range_light_matches_shared_targeting_for_the_catalog :: proc(t: ^testi
 			player.deck.hand[0] = card
 			// A blocked shove, a heavy Pinball target and a normal enemy share
 			// the same stored hover result used to draw path and impact cells.
-			renderer.hovered_cell = {6, 7} if id == .Pinball else {7, 6}
+			renderer.hovered_cell = {x = 6, y = 7} if id == .Pinball else {x = 7, y = 6}
 			renderer.has_hovered_cell = true
 			prepare_card_range_preview(renderer, &room, card.id, &preview)
 			for y in 0..<data.tiles.height { for x in 0..<data.tiles.width {
-				cell := grid.Position{x, y}
+				cell := grid.Position{x = x, y = y}
 				expected := false
 				if definition.targeting.shape != .None || cell == player.position {
 					query := game.evaluate_card_targeting(&room, card, game.card_target_request_at(definition, cell))
@@ -123,28 +123,28 @@ test_card_range_light_resets_with_visibility_selection_and_control :: proc(t: ^t
 	player.deck.hand_count = 1
 	player.deck.hand[0] = {id = 92, definition_id = .Dash}
 	update_tactical_view(renderer, &room, {}, false)
-	renderer.has_hovered_cell, renderer.hovered_cell = true, {5, 6}
+	renderer.has_hovered_cell, renderer.hovered_cell = true, {x = 5, y = 6}
 	prepare_card_range_preview(renderer, &room, 92, &preview)
 	testing.expect(t, preview.active && preview.has_hover)
-	testing.expect(t, card_range_contains(&preview, {5, 6}))
-	testing.expect(t, !card_range_contains(&preview, {-1, 6}))
+	testing.expect(t, card_range_contains(&preview, {x = 5, y = 6}))
+	testing.expect(t, !card_range_contains(&preview, {x = -1, y = 6}))
 
-	player.position = {3, 6}
+	player.position = {x = 3, y = 6}
 	update_tactical_view(renderer, &room, {}, false)
 	// A stale pointer into fog must not reveal a new target or retain the old
 	// room's illumination after the player moves.
-	renderer.has_hovered_cell, renderer.hovered_cell = true, {5, 6}
+	renderer.has_hovered_cell, renderer.hovered_cell = true, {x = 5, y = 6}
 	prepare_card_range_preview(renderer, &room, 92, &preview)
-	testing.expect(t, card_range_contains(&preview, {2, 6}))
-	testing.expect(t, !card_range_contains(&preview, {5, 6}) && !preview.has_hover)
+	testing.expect(t, card_range_contains(&preview, {x = 2, y = 6}))
+	testing.expect(t, !card_range_contains(&preview, {x = 5, y = 6}) && !preview.has_hover)
 
 	player.deck.hand[0] = {id = 93, definition_id = .Guard}
-	renderer.hovered_cell = {2, 6}
+	renderer.hovered_cell = {x = 2, y = 6}
 	prepare_card_range_preview(renderer, &room, 93, &preview)
 	testing.expect(t, preview.active && preview.has_hover)
 	testing.expect_value(t, preview.hover.query.anchor, player.position)
 	testing.expect(t, card_range_contains(&preview, player.position))
-	testing.expect(t, !card_range_contains(&preview, {2, 6}))
+	testing.expect(t, !card_range_contains(&preview, {x = 2, y = 6}))
 	player.deck.energy = 0
 	prepare_card_range_preview(renderer, &room, 93, &preview)
 	testing.expect(t, !preview.affordable && card_range_contains(&preview, player.position))

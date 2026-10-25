@@ -32,7 +32,7 @@ create_first_person_controller_test_room :: proc(t: ^testing.T, data: ^level.Lev
 	config.vision_size = 0
 	config.timed_actions = true
 	testing.expect(t, game.configure_tactical(player, config))
-	enemies := [?]game.Enemy_Spawn{{position = {5, 1}, health = 60, attack = 1}}
+	enemies := [?]game.Enemy_Spawn{{position = {x = 5, y = 1}, health = 60, attack = 1}}
 	built: bool
 	room^, built = game.create_room(data, player, {enemies = enemies[:]})
 	if !testing.expect(t, built) { return false }
@@ -188,7 +188,7 @@ test_first_person_keys_dodge_and_defence_turn_with_the_view :: proc(t: ^testing.
 	dodge := run_session.Tactical_Controller_Input{shift = true}
 	dodge.directions[0] = true
 	first_person_controller_frame(&controller, &room, renderer, &cards, &held, dt, dodge)
-	testing.expect_value(t, player.position, game.add_position(start, {2, 0}))
+	testing.expect_value(t, player.position, game.add_position(start, {x = 2, y = 0}))
 	for _ in 0..<600 {
 		if !render.renderer_blocks_player_input(renderer) && !game.tactical_player_busy(&room) { break }
 		first_person_controller_frame(&controller, &room, renderer, &cards, &held, dt)
@@ -206,7 +206,7 @@ test_first_person_keys_dodge_and_defence_turn_with_the_view :: proc(t: ^testing.
 	land.directions[0] = true
 	first_person_controller_frame(&controller, &room, renderer, &cards, &held, dt, land)
 	testing.expect(t, room.qte.kind == .None)
-	testing.expect_value(t, player.position, game.add_position(from, {1, 0}))
+	testing.expect_value(t, player.position, game.add_position(from, {x = 1, y = 0}))
 	// A key the panel names: its own letter (W is north), whatever the view.
 	room.qte = {kind = .Defense, remaining = 1, enemy_id = foe, defenses = {.Parry}, length = 1, selected = true, mode = .Parry,
 		keys = {.North, .North}}

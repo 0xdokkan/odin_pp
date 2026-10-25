@@ -97,7 +97,7 @@ test_fishing_rod_is_an_uncommon_tactical_room_tool_with_five_upgrades :: proc(t:
 test_fishing_rod_waits_in_exhaust_and_is_never_drawn :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {1, 1}, health = 50, attack = 1}}
+	spawns := [?]Enemy_Spawn{{position = {x = 1, y = 1}, health = 50, attack = 1}}
 	room := fishing_test_room(t, &data, &player, spawns[:])
 	defer level.destroy(&data)
 	defer destroy_room(&room)
@@ -120,7 +120,7 @@ test_fishing_rod_waits_in_exhaust_and_is_never_drawn :: proc(t: ^testing.T) {
 		testing.expect(t, validate_deck_state(deck))
 	}
 	testing.expect(t, card_effect_amount_is_targeted_never(&room, rod))
-	testing.expect_value(t, fish_with_rod(&room, {6, 5}).result, Fishing_Result.Not_Open)
+	testing.expect_value(t, fish_with_rod(&room, {x = 6, y = 5}).result, Fishing_Result.Not_Open)
 	finish_deck_combat(deck)
 	_, still_owned := owned_card_index_by_id(deck, rod.id)
 	testing.expect(t, still_owned && validate_deck_state(deck))
@@ -128,8 +128,8 @@ test_fishing_rod_waits_in_exhaust_and_is_never_drawn :: proc(t: ^testing.T) {
 
 // The rod is never played as a card: its targeting refuses it everywhere.
 card_effect_amount_is_targeted_never :: proc(room: ^Room, rod: Card_Instance) -> bool {
-	evaluation := evaluate_card_targeting(room, rod, {anchor = {6, 5}, has_anchor = true})
-	_, err := compile_card_action(room, rod, cell_target({6, 5}))
+	evaluation := evaluate_card_targeting(room, rod, {anchor = {x = 6, y = 5}, has_anchor = true})
+	_, err := compile_card_action(room, rod, cell_target({x = 6, y = 5}))
 	return evaluation.error == .Invalid_Phase && err == .Invalid_Phase
 }
 
@@ -151,7 +151,7 @@ test_fishing_opens_only_in_a_cleared_tactical_room_with_a_rod :: proc(t: ^testin
 		// The last foe falls: the room is cleared and the rod opens.
 		data: level.Level
 		player: Player
-		spawns := [?]Enemy_Spawn{{position = {5, 6}, health = 1, attack = 1}}
+		spawns := [?]Enemy_Spawn{{position = {x = 5, y = 6}, health = 1, attack = 1}}
 		room := fishing_test_room(t, &data, &player, spawns[:])
 		defer level.destroy(&data)
 		defer destroy_room(&room)
@@ -159,7 +159,7 @@ test_fishing_opens_only_in_a_cleared_tactical_room_with_a_rod :: proc(t: ^testin
 		testing.expect_value(t, try_move_player(&room, .South), Action_Result.Combat_Ended)
 		testing.expect_value(t, room.phase, Room_Phase.Loot)
 		testing.expect(t, fishing_room_open(&room) && !player.deck.combat_active)
-		testing.expect_value(t, fish_with_rod(&room, {4, 5}).result, Fishing_Result.Fished)
+		testing.expect_value(t, fish_with_rod(&room, {x = 4, y = 5}).result, Fishing_Result.Fished)
 	}
 	{
 		// Left through the exit: no more.
@@ -172,7 +172,7 @@ test_fishing_opens_only_in_a_cleared_tactical_room_with_a_rod :: proc(t: ^testin
 		for direction in ([?]Move_Direction{.East, .East, .South}) { testing.expect_value(t, try_move_player(&room, direction), Action_Result.Moved) }
 		testing.expect_value(t, try_move_player(&room, .South), Action_Result.Room_Completed)
 		testing.expect(t, !fishing_room_open(&room))
-		testing.expect_value(t, fish_with_rod(&room, {6, 6}).result, Fishing_Result.Not_Open)
+		testing.expect_value(t, fish_with_rod(&room, {x = 6, y = 6}).result, Fishing_Result.Not_Open)
 	}
 }
 
@@ -184,38 +184,38 @@ test_fishing_targets_free_cells_in_reach_and_sight :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
 	content := Room_Content{
-		traps = []Trap_Spawn{{position = {3, 5}, damage = 1}},
-		obstacles = []grid.Position{{7, 3}},
-		objects = []Grid_Object_Spawn{{kind = .Barrel, position = {4, 7}}},
+		traps = []Trap_Spawn{{position = {x = 3, y = 5}, damage = 1}},
+		obstacles = []grid.Position{{x = 7, y = 3}},
+		objects = []Grid_Object_Spawn{{kind = .Barrel, position = {x = 4, y = 7}}},
 	}
 	room := fishing_test_room(t, &data, &player, rod = 2, content = content)
 	defer level.destroy(&data)
 	defer destroy_room(&room)
-	testing.expect_value(t, fishing_target_error(&room, {8, 5}), Fishing_Result.Fished)
-	testing.expect_value(t, fishing_target_error(&room, {8, 8}), Fishing_Result.Fished)
-	testing.expect_value(t, fishing_target_error(&room, {9, 5}), Fishing_Result.Out_Of_Reach)
-	testing.expect_value(t, fishing_target_error(&room, {5, 1}), Fishing_Result.Out_Of_Reach)
-	testing.expect_value(t, fishing_target_error(&room, {5, 5}), Fishing_Result.Out_Of_Reach)
-	testing.expect_value(t, fishing_target_error(&room, {-1, 5}), Fishing_Result.Out_Of_Reach)
+	testing.expect_value(t, fishing_target_error(&room, {x = 8, y = 5}), Fishing_Result.Fished)
+	testing.expect_value(t, fishing_target_error(&room, {x = 8, y = 8}), Fishing_Result.Fished)
+	testing.expect_value(t, fishing_target_error(&room, {x = 9, y = 5}), Fishing_Result.Out_Of_Reach)
+	testing.expect_value(t, fishing_target_error(&room, {x = 5, y = 1}), Fishing_Result.Out_Of_Reach)
+	testing.expect_value(t, fishing_target_error(&room, {x = 5, y = 5}), Fishing_Result.Out_Of_Reach)
+	testing.expect_value(t, fishing_target_error(&room, {x = -1, y = 5}), Fishing_Result.Out_Of_Reach)
 	// Behind the wall at (5, 3), and the wall itself.
-	testing.expect_value(t, fishing_target_error(&room, {5, 2}), Fishing_Result.Blocked)
-	testing.expect_value(t, fishing_target_error(&room, {5, 3}), Fishing_Result.Blocked)
-	testing.expect_value(t, fishing_target_error(&room, {7, 7}), Fishing_Result.Blocked)
-	testing.expect_value(t, fishing_target_error(&room, {3, 5}), Fishing_Result.Blocked)
-	testing.expect_value(t, fishing_target_error(&room, {7, 3}), Fishing_Result.Blocked)
-	testing.expect_value(t, fishing_target_error(&room, {4, 7}), Fishing_Result.Blocked)
-	append(&room.loot, Loot{position = {6, 6}, kind = .Gold, amount = 1})
-	testing.expect_value(t, fishing_target_error(&room, {6, 6}), Fishing_Result.Blocked)
-	pool, _ := ground_index(&room, {4, 4})
+	testing.expect_value(t, fishing_target_error(&room, {x = 5, y = 2}), Fishing_Result.Blocked)
+	testing.expect_value(t, fishing_target_error(&room, {x = 5, y = 3}), Fishing_Result.Blocked)
+	testing.expect_value(t, fishing_target_error(&room, {x = 7, y = 7}), Fishing_Result.Blocked)
+	testing.expect_value(t, fishing_target_error(&room, {x = 3, y = 5}), Fishing_Result.Blocked)
+	testing.expect_value(t, fishing_target_error(&room, {x = 7, y = 3}), Fishing_Result.Blocked)
+	testing.expect_value(t, fishing_target_error(&room, {x = 4, y = 7}), Fishing_Result.Blocked)
+	append(&room.loot, Loot{position = {x = 6, y = 6}, kind = .Gold, amount = 1})
+	testing.expect_value(t, fishing_target_error(&room, {x = 6, y = 6}), Fishing_Result.Blocked)
+	pool, _ := ground_index(&room, {x = 4, y = 4})
 	room.ground.pool[pool] = 2
-	testing.expect_value(t, fishing_target_error(&room, {4, 4}), Fishing_Result.Blocked)
-	room.ground.fires[0] = {id = 1, center = {6, 4}, burn = 1}
+	testing.expect_value(t, fishing_target_error(&room, {x = 4, y = 4}), Fishing_Result.Blocked)
+	room.ground.fires[0] = {id = 1, center = {x = 6, y = 4}, burn = 1}
 	room.ground.fire_count = 1
-	testing.expect_value(t, fishing_target_error(&room, {6, 4}), Fishing_Result.Blocked)
+	testing.expect_value(t, fishing_target_error(&room, {x = 6, y = 4}), Fishing_Result.Blocked)
 	// Water already there is fished again.
-	testing.expect_value(t, fish_with_rod(&room, {8, 5}).result, Fishing_Result.Fished)
-	testing.expect(t, fishing_cell_is_water(&room, {8, 5}))
-	testing.expect_value(t, fishing_target_error(&room, {8, 5}), Fishing_Result.Fished)
+	testing.expect_value(t, fish_with_rod(&room, {x = 8, y = 5}).result, Fishing_Result.Fished)
+	testing.expect(t, fishing_cell_is_water(&room, {x = 8, y = 5}))
+	testing.expect_value(t, fishing_target_error(&room, {x = 8, y = 5}), Fishing_Result.Fished)
 }
 
 // 1 + the rod's level fishings a room, then no more; the same water fished
@@ -227,7 +227,7 @@ test_fishing_counts_one_plus_the_rods_level_each_room :: proc(t: ^testing.T) {
 		player: Player
 		room := fishing_test_room(t, &data, &player, rod = level_index)
 		testing.expect_value(t, fishing_casts_allowed(&room), 1+level_index)
-		cells := [?]grid.Position{{6, 5}, {4, 5}, {6, 6}, {4, 6}, {5, 7}, {6, 7}}
+		cells := [?]grid.Position{{x = 6, y = 5}, {x = 4, y = 5}, {x = 6, y = 6}, {x = 4, y = 6}, {x = 5, y = 7}, {x = 6, y = 7}}
 		for index in 0..<int(1+level_index) {
 			testing.expect_value(t, fishing_casts_left(&room), 1+level_index-i32(index))
 			report := fish_with_rod(&room, cells[index])
@@ -245,8 +245,8 @@ test_fishing_counts_one_plus_the_rods_level_each_room :: proc(t: ^testing.T) {
 	player: Player
 	room := fishing_test_room(t, &data, &player, rod = 1)
 	defer level.destroy(&data)
-	testing.expect(t, fish_with_rod(&room, {6, 5}).new_water)
-	again := fish_with_rod(&room, {6, 5})
+	testing.expect(t, fish_with_rod(&room, {x = 6, y = 5}).new_water)
+	again := fish_with_rod(&room, {x = 6, y = 5})
 	testing.expect(t, again.result == .Fished && !again.new_water)
 	testing.expect_value(t, room.fishing.water_count, 1)
 	testing.expect_value(t, fishing_casts_left(&room), i32(0))
@@ -268,7 +268,7 @@ test_fishing_food_heals_a_d4_shown_as_a_roll :: proc(t: ^testing.T) {
 		room := fishing_test_room(t, &data, &player, rod = rod)
 		room.fishing.random = fishing_test_stream(false)
 		dice_before := player.dice
-		report := fish_with_rod(&room, {7, 5})
+		report := fish_with_rod(&room, {x = 7, y = 5})
 		testing.expect_value(t, report.result, Fishing_Result.Fished)
 		testing.expect(t, !report.card)
 		testing.expect(t, report.roll.count == 1 && report.roll.sides == FISHING_HEAL_SIDES)
@@ -280,9 +280,9 @@ test_fishing_food_heals_a_d4_shown_as_a_roll :: proc(t: ^testing.T) {
 		testing.expect_value(t, len(events), 5)
 		kinds := [5]Game_Event_Kind{.Fish_Cast, .Fish_Bite, .Fish_Caught, .Dice_Rolled, .Healed}
 		for kind, index in kinds { testing.expect_value(t, events[index].kind, kind) }
-		testing.expect(t, events[0].from_position == player.position && events[0].to_position == {7, 5})
+		testing.expect(t, events[0].from_position == player.position && events[0].to_position == {x = 7, y = 5})
 		testing.expect(t, events[0].card_definition == .Fishing_Rod && events[0].duration == 1 && events[0].amount == rod)
-		testing.expect(t, events[1].from_position == {7, 5} && events[1].to_position == {7, 5})
+		testing.expect(t, events[1].from_position == {x = 7, y = 5} && events[1].to_position == {x = 7, y = 5})
 		testing.expect(t, events[2].card_definition == .Fishing_Rod && events[2].duration == i32(report.food))
 		testing.expect(t, events[3].dice_roll == report.roll && events[3].amount == report.roll.total && events[3].card_definition == .Fishing_Rod)
 		testing.expect_value(t, player.tactical.facing, Move_Direction.East)
@@ -297,7 +297,7 @@ test_fishing_food_heals_a_d4_shown_as_a_roll :: proc(t: ^testing.T) {
 	defer destroy_room(&room)
 	player.health = player.stats.max_health
 	room.fishing.random = fishing_test_stream(false)
-	report := fish_with_rod(&room, {5, 7})
+	report := fish_with_rod(&room, {x = 5, y = 7})
 	testing.expect(t, report.result == .Fished && !report.card && report.healed == 0)
 	testing.expect_value(t, player.health, player.stats.max_health)
 	testing.expect_value(t, room.recent_events.count, 4)
@@ -323,7 +323,7 @@ test_fishing_catches_cards_one_in_twenty_never_the_rod :: proc(t: ^testing.T) {
 		trial.player = &trial_player
 		trial.fishing = {random = seed}
 		owned := trial_player.deck.owned_count
-		report := fish_with_rod(&trial, {6, 5})
+		report := fish_with_rod(&trial, {x = 6, y = 5})
 		testing.expect_value(t, report.result, Fishing_Result.Fished)
 		if report.card {
 			cards += 1
@@ -350,7 +350,7 @@ test_fishing_catches_cards_one_in_twenty_never_the_rod :: proc(t: ^testing.T) {
 	first.recent_events, second.recent_events = &first_events, &second_events
 	first.player, second.player = &first_player, &second_player
 	first.fishing.random, second.fishing.random = card_stream, card_stream
-	a, b := fish_with_rod(&first, {6, 5}), fish_with_rod(&second, {6, 5})
+	a, b := fish_with_rod(&first, {x = 6, y = 5}), fish_with_rod(&second, {x = 6, y = 5})
 	testing.expect(t, a.card && b.card && a.added == b.added)
 	// A full deck: food.
 	full_player := player
@@ -360,7 +360,7 @@ test_fishing_catches_cards_one_in_twenty_never_the_rod :: proc(t: ^testing.T) {
 	full.recent_events = &full_events
 	full.player = &full_player
 	full.fishing.random = card_stream
-	report := fish_with_rod(&full, {6, 5})
+	report := fish_with_rod(&full, {x = 6, y = 5})
 	testing.expect(t, report.result == .Fished && !report.card && report.roll.count == 1)
 	testing.expect_value(t, full_player.deck.owned_count, MAX_OWNED_CARDS)
 }

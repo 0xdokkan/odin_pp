@@ -64,10 +64,10 @@ test_spell_query_and_compile_are_pure_with_stable_distinct_nearest_targets :: pr
 	defer level.destroy(&data)
 	player := spell_test_player(t, .Chain_Lightning)
 	enemies := [?]Enemy_Spawn{
-		{position = {3, 1}, health = 40, attack = 1},
-		{position = {4, 1}, health = 40, attack = 1},
-		{position = {3, 2}, health = 40, attack = 1},
-		{position = {8, 1}, health = 40, attack = 1},
+		{position = {x = 3, y = 1}, health = 40, attack = 1},
+		{position = {x = 4, y = 1}, health = 40, attack = 1},
+		{position = {x = 3, y = 2}, health = 40, attack = 1},
+		{position = {x = 8, y = 1}, health = 40, attack = 1},
 	}
 	room, ok := create_room(&data, &player, {enemies = enemies[:]})
 	testing.expect(t, ok)
@@ -103,12 +103,12 @@ test_spell_bounces_obey_range_los_and_diagonal_corner_blockers :: proc(t: ^testi
 	defer level.destroy(&data)
 	player := spell_test_player(t, .Chain_Lightning)
 	enemies := [?]Enemy_Spawn{
-		{position = {3, 1}, health = 40, attack = 1},
-		{position = {5, 1}, health = 40, attack = 1},
-		{position = {3, 4}, health = 40, attack = 1},
-		{position = {7, 4}, health = 40, attack = 1},
+		{position = {x = 3, y = 1}, health = 40, attack = 1},
+		{position = {x = 5, y = 1}, health = 40, attack = 1},
+		{position = {x = 3, y = 4}, health = 40, attack = 1},
+		{position = {x = 7, y = 4}, health = 40, attack = 1},
 	}
-	obstacles := [?]grid.Position{{4, 1}}
+	obstacles := [?]grid.Position{{x = 4, y = 1}}
 	room, ok := create_room(&data, &player, {enemies = enemies[:], obstacles = obstacles[:]})
 	testing.expect(t, ok)
 	defer destroy_room(&room)
@@ -118,9 +118,9 @@ test_spell_bounces_obey_range_los_and_diagonal_corner_blockers :: proc(t: ^testi
 	testing.expect_value(t, path.targets[1], enemy_entity(3))
 	far := query_spell_path(&room, instance, entity_target(enemy_entity(4)))
 	testing.expect_value(t, far.error, Card_Compile_Error.Target_Out_Of_Range)
-	room.enemies[1].position = {4, 2}
-	room.enemies[2].position = {9, 4}
-	append(&room.obstacles, Obstacle{position = {3, 2}})
+	room.enemies[1].position = {x = 4, y = 2}
+	room.enemies[2].position = {x = 9, y = 4}
+	append(&room.obstacles, Obstacle{position = {x = 3, y = 2}})
 	path = query_spell_path(&room, instance, entity_target(enemy_entity(1)))
 	testing.expect_value(t, path.count, 1)
 }
@@ -130,7 +130,7 @@ test_fate_rejections_preserve_dice_deck_and_health_including_action_rollback :: 
 	data := spell_test_level(t)
 	defer level.destroy(&data)
 	player := spell_test_player(t, .Fate_Strike)
-	enemies := [?]Enemy_Spawn{{position = {3, 1}, health = 40, attack = 1}, {position = {9, 1}, health = 40, attack = 1}}
+	enemies := [?]Enemy_Spawn{{position = {x = 3, y = 1}, health = 40, attack = 1}, {position = {x = 9, y = 1}, health = 40, attack = 1}}
 	room, ok := create_room(&data, &player, {enemies = enemies[:]})
 	testing.expect(t, ok)
 	defer destroy_room(&room)
@@ -143,7 +143,7 @@ test_fate_rejections_preserve_dice_deck_and_health_including_action_rollback :: 
 		case 0: target = entity_target(PLAYER_ENTITY)
 		case 1: target = entity_target(enemy_entity(2))
 		case 2: player.deck.energy = 0
-		case 3: append(&room.obstacles, Obstacle{position = {2, 1}})
+		case 3: append(&room.obstacles, Obstacle{position = {x = 2, y = 1}})
 		case 4: player.dice.roll_count = max(u64)
 		}
 		before := player
@@ -169,7 +169,7 @@ test_fate_every_face_of_every_die_uses_one_roll_and_only_the_top_face_bounces ::
 			expected_dice := player.dice
 			_, expected_ok := roll_die(&expected_dice, sides)
 			testing.expect(t, expected_ok)
-			enemies := [?]Enemy_Spawn{{position = {3, 1}, health = 100, attack = 1}, {position = {4, 1}, health = 100, attack = 1}}
+			enemies := [?]Enemy_Spawn{{position = {x = 3, y = 1}, health = 100, attack = 1}, {position = {x = 4, y = 1}, health = 100, attack = 1}}
 			room, ok := create_room(&data, &player, {enemies = enemies[:]})
 			testing.expect(t, ok)
 			card := player.deck.hand[0]
@@ -205,7 +205,7 @@ test_chain_settles_each_hit_and_reaction_in_order_with_one_card_economy :: proc(
 	data := spell_test_level(t)
 	defer level.destroy(&data)
 	player := spell_test_player(t, .Chain_Lightning, 2)
-	enemies := [?]Enemy_Spawn{{position = {3, 1}, health = 40, attack = 1}, {position = {4, 1}, health = 40, attack = 1}, {position = {5, 1}, health = 40, attack = 1}}
+	enemies := [?]Enemy_Spawn{{position = {x = 3, y = 1}, health = 40, attack = 1}, {position = {x = 4, y = 1}, health = 40, attack = 1}, {position = {x = 5, y = 1}, health = 40, attack = 1}}
 	room, ok := create_room(&data, &player, {enemies = enemies[:]})
 	testing.expect(t, ok)
 	defer destroy_room(&room)
@@ -219,7 +219,7 @@ test_chain_settles_each_hit_and_reaction_in_order_with_one_card_economy :: proc(
 	testing.expect_value(t, play.action_report.reactions_triggered, 3)
 	testing.expect_value(t, play.action_report.events.count, 10)
 	testing.expect_value(t, play.action_report.events.events[0].kind, Game_Event_Kind.Spell_Launched)
-	from := grid.Position{1, 1}
+	from := grid.Position{x = 1, y = 1}
 	for index in 0..<3 {
 		impact := play.action_report.events.events[1+index*3]
 		damage := play.action_report.events.events[2+index*3]
@@ -249,7 +249,7 @@ test_spell_bounces_stop_immediately_after_player_dies_to_first_hit_reaction :: p
 		player.health = 1
 		// The D4's top face: Fate would bounce if the player survived.
 		player.dice = spell_test_dice_for_face(t, 4, 4)
-		enemies := [?]Enemy_Spawn{{position = {3, 1}, health = 40, attack = 1}, {position = {4, 1}, health = 40, attack = 1}}
+		enemies := [?]Enemy_Spawn{{position = {x = 3, y = 1}, health = 40, attack = 1}, {position = {x = 4, y = 1}, health = 40, attack = 1}}
 		room, ok := create_room(&data, &player, {enemies = enemies[:]})
 		testing.expect(t, ok)
 		applied, _ := apply_status(&room, enemy_entity(1), .Thorns, 5, 3)
@@ -271,7 +271,7 @@ test_firebomb_announces_one_area_impact_groups_only_direct_effects_then_reaction
 	data := spell_test_level(t)
 	defer level.destroy(&data)
 	player := spell_test_player(t, .Firebomb)
-	enemies := [?]Enemy_Spawn{{position = {3, 1}, health = 40, attack = 1}, {position = {4, 1}, health = 40, attack = 1}}
+	enemies := [?]Enemy_Spawn{{position = {x = 3, y = 1}, health = 40, attack = 1}, {position = {x = 4, y = 1}, health = 40, attack = 1}}
 	room, ok := create_room(&data, &player, {enemies = enemies[:]})
 	testing.expect(t, ok)
 	defer destroy_room(&room)
@@ -280,14 +280,14 @@ test_firebomb_announces_one_area_impact_groups_only_direct_effects_then_reaction
 		testing.expect(t, applied)
 	}
 	dice_before := player.dice
-	play := play_card(&room, player.deck.hand[0].id, cell_target({3, 1}))
+	play := play_card(&room, player.deck.hand[0].id, cell_target({x = 3, y = 1}))
 	testing.expect_value(t, play.result, Card_Play_Result.Played)
 	testing.expect_value(t, play.action_report.events.count, 6)
 	for event, index in play.action_report.events.events[:play.action_report.events.count] {
 		if index < 2 {
 			testing.expect_value(t, event.visual_group, u32(0))
-			testing.expect_value(t, event.from_position, grid.Position{1, 1})
-			testing.expect_value(t, event.to_position, grid.Position{3, 1})
+			testing.expect_value(t, event.from_position, grid.Position{x = 1, y = 1})
+			testing.expect_value(t, event.to_position, grid.Position{x = 3, y = 1})
 		} else if index < 4 {
 			testing.expect_value(t, event.kind, Game_Event_Kind.Damaged)
 			testing.expect_value(t, event.visual_group, u32(1))

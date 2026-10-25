@@ -51,7 +51,7 @@ tactical_marley_shelter :: proc(room: ^Room, origin: grid.Position,
 	}
 	if best > MARLEY_SHELTER_REACH { return }
 	intent = make_wait_intent(room, origin)
-	for step in ([?]grid.Position{{0, -1}, {1, 0}, {0, 1}, {-1, 0}}) {
+	for step in ([?]grid.Position{{x = 0, y = -1}, {x = 1, y = 0}, {x = 0, y = 1}, {x = -1, y = 0}}) {
 		cell := add_position(origin, step)
 		if !planned_cell_is_available(room, positions, count, index, cell) { continue }
 		distance := abs(cell.x-target.x)+abs(cell.y-target.y)
@@ -126,11 +126,11 @@ enemy_path_heap_pop :: proc(heap, slots, distances: []int, count: ^int) -> int {
 @(private)
 rebuild_tactical_enemy_distances :: proc(room: ^Room, distances: []int, goal: Enemy_Path_Goal) {
 	tiles := &room.level_data.tiles
-	minimum:=grid.Position{0,0};maximum:=grid.Position{tiles.width-1,tiles.height-1}
+	minimum:=grid.Position{x = 0, y = 0};maximum:=grid.Position{x = tiles.width-1, y = tiles.height-1}
 	if room.player.tactical.config.expedition {
 		p:=room.player.position
-		minimum={max(0,p.x-EXPEDITION_PATH_RADIUS),max(0,p.y-EXPEDITION_PATH_RADIUS)}
-		maximum={min(tiles.width-1,p.x+EXPEDITION_PATH_RADIUS),min(tiles.height-1,p.y+EXPEDITION_PATH_RADIUS)}
+		minimum={x = max(0,p.x-EXPEDITION_PATH_RADIUS), y = max(0,p.y-EXPEDITION_PATH_RADIUS)}
+		maximum={x = min(tiles.width-1,p.x+EXPEDITION_PATH_RADIUS), y = min(tiles.height-1,p.y+EXPEDITION_PATH_RADIUS)}
 	}
 	width,height:=maximum.x-minimum.x+1,maximum.y-minimum.y+1
 	for &distance in distances {distance= -1}
@@ -146,7 +146,7 @@ rebuild_tactical_enemy_distances :: proc(room: ^Room, distances: []int, goal: En
 	defer delete(slots)
 	count := 0
 	for &distance, i in local_distances {
-		cell := grid.Position{minimum.x+i%width, minimum.y+i/width}
+		cell := grid.offset(minimum, i%width, i/width)
 		distance, slots[i] = -1, -1
 		if cell_blocks_movement(room, cell) { visited[i] = true; continue }
 		costs[i] = 1+enemy_terrain_danger(room, cell)
@@ -161,12 +161,12 @@ rebuild_tactical_enemy_distances :: proc(room: ^Room, distances: []int, goal: En
 		best := enemy_path_heap_pop(heap, slots, local_distances, &count)
 		score := local_distances[best]
 		visited[best] = true
-		cell := grid.Position{best%width, best/width}
-		for step in ([?]grid.Position{{0, -1}, {1, 0}, {0, 1}, {-1, 0}}) {
+		cell := grid.Position{x = best%width, y = best/width}
+		for step in ([?]grid.Position{{x = 0, y = -1}, {x = 1, y = 0}, {x = 0, y = 1}, {x = -1, y = 0}}) {
 			q:=add_position(cell,step)
 			if q.x<0 || q.y<0 || q.x>=width || q.y>=height {continue}
 			// A foe walks the way back along this edge: a cliff cuts it.
-			if step_height_blocked(room,{minimum.x+cell.x,minimum.y+cell.y},{minimum.x+q.x,minimum.y+q.y}) {continue}
+			if step_height_blocked(room,grid.offset(minimum, cell.x, cell.y),grid.offset(minimum, q.x, q.y)) {continue}
 			i:=q.y*width+q.x
 			if visited[i] { continue }
 			candidate := score+costs[best]
@@ -192,7 +192,7 @@ tactical_ranged_move :: proc(room: ^Room, enemy: ^Enemy, origin: grid.Position,
 	if !valid || distances[start] < 0 { return plan_chaser_intent(room, enemy, origin, positions, count, index) }
 	intent := make_wait_intent(room, origin)
 	best := distances[start]
-	for step in ([?]grid.Position{{0, -1}, {1, 0}, {0, 1}, {-1, 0}}) {
+	for step in ([?]grid.Position{{x = 0, y = -1}, {x = 1, y = 0}, {x = 0, y = 1}, {x = -1, y = 0}}) {
 		cell := add_position(origin, step)
 		if !planned_cell_is_available(room, positions, count, index, cell) { continue }
 		i, _ := grid.index_of(&room.level_data.tiles, cell)
@@ -227,7 +227,7 @@ tactical_enemy_escape :: proc(room: ^Room, origin: grid.Position,
 	best := enemy_terrain_danger(room, origin)
 	if best == 0 { return }
 	intent = make_wait_intent(room, origin)
-	for step in ([?]grid.Position{{0, -1}, {1, 0}, {0, 1}, {-1, 0}}) {
+	for step in ([?]grid.Position{{x = 0, y = -1}, {x = 1, y = 0}, {x = 0, y = 1}, {x = -1, y = 0}}) {
 		cell := add_position(origin, step)
 		if !planned_cell_is_available(room, positions, count, index, cell) { continue }
 		danger := enemy_terrain_danger(room, cell)
@@ -244,7 +244,7 @@ make_tactical_bomb_intent :: proc(room: ^Room, origin, anchor: grid.Position, wi
 	intent.kind, intent.destination, intent.windup = .Bombard, anchor, windup
 	intent.damage = TACTICAL_BOMB_DAMAGE
 	for y in anchor.y-1..=anchor.y+1 { for x in anchor.x-1..=anchor.x+1 {
-		cell := grid.Position{x, y}
+		cell := grid.Position{x = x, y = y}
 		if explosion_contains_cell(room, anchor, cell) {
 			intent.threatened_cells[intent.threatened_cell_count] = cell
 			intent.threatened_cell_count += 1

@@ -32,7 +32,7 @@ draw_structure_ghost :: proc(renderer: ^Renderer) {
 		for x in 0..<plan.width {
 			cell := level.plan_at(&plan, x, y)
 			if cell == .Outside { continue }
-			at := grid.Position{ghost.origin.x+x, ghost.origin.y+y}
+			at := grid.offset(ghost.origin, x, y)
 			base := cell_ground(at)+0.07
 			centre := rl.Vector3{f32(at.x)+0.5, base, f32(at.y)+0.5}
 			rl.DrawCubeV(centre, {0.94, 0.03, 0.94}, fill)

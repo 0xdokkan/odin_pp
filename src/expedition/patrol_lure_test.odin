@@ -10,11 +10,11 @@ test_patrol_lure_routes_around_cover_waits_then_returns_and_survives_save :: pro
 	w:World;data:level.Level;p:game.Player;room:=test_world(t,&w,&data,&p)
 	defer level.destroy(&data);defer game.destroy_room(&room)
 	w.site_count=0;w.group_count=3;room.phase=.Loot
-	for y in 8..=35 {for x in 10..=45 {_=level.set_tile(&data,{x,y},{.Floor})}}
-	w.groups[0]={anchor={31,18},patrol=true,count=1,site= -1}
-	w.groups[1]={anchor={24,18},patrol=true,count=1,site= -1,members={0={enemy={position={24,18},health=5,max_health=5,attack=2,archetype=.Chaser},alive=true}}}
-	w.groups[2]={anchor={27,11},count=1,site= -1,members={0={enemy={position={27,11},health=5,max_health=5,attack=2,archetype=.Chaser},alive=true}}}
-	for y in 12..=24 {_=level.set_tile(&data,{28,y},{.Wall})}
+	for y in 8..=35 {for x in 10..=45 {_=level.set_tile(&data,{x = x, y = y},{.Floor})}}
+	w.groups[0]={anchor={x = 31, y = 18},patrol=true,count=1,site= -1}
+	w.groups[1]={anchor={x = 24, y = 18},patrol=true,count=1,site= -1,members={0={enemy={position={x = 24, y = 18},health=5,max_health=5,attack=2,archetype=.Chaser},alive=true}}}
+	w.groups[2]={anchor={x = 27, y = 11},count=1,site= -1,members={0={enemy={position={x = 27, y = 11},health=5,max_health=5,attack=2,archetype=.Chaser},alive=true}}}
+	for y in 12..=24 {_=level.set_tile(&data,{x = 28, y = y},{.Wall})}
 	goal:=level_position(32,18);testing.expect(t,lure_patrol(&w,&room,goal))
 	g:=&w.groups[1];home:=g.anchor;testing.expect_value(t,g.lure_phase,Patrol_Lure_Phase.Seeking)
 	testing.expect_value(t,w.groups[0].lure_phase,Patrol_Lure_Phase.None)
@@ -41,12 +41,12 @@ test_patrol_lure_expires_when_enclosed_and_cannot_select_active_or_distant_group
 	w:World;data:level.Level;p:game.Player;room:=test_world(t,&w,&data,&p)
 	defer level.destroy(&data);defer game.destroy_room(&room)
 	w.site_count=0;w.group_count=1;room.phase=.Loot
-	g:=&w.groups[0];g^={anchor={30,30},patrol=true,count=1,site= -1,members={0={enemy={position={30,30},health=5,max_health=5,attack=2,archetype=.Chaser},alive=true}}}
-	_=level.set_tile(&data,{35,30},{.Floor})
-	g.active=true;testing.expect(t,!lure_patrol(&w,&room,{35,30}));g.active=false
-	testing.expect(t,!lure_patrol(&w,&room,{100,100}))
-	for y in 29..=31 {for x in 29..=31 {_=level.set_tile(&data,{x,y},{.Wall})}}
-	_=level.set_tile(&data,{30,30},{.Floor});testing.expect(t,lure_patrol(&w,&room,{35,30}))
+	g:=&w.groups[0];g^={anchor={x = 30, y = 30},patrol=true,count=1,site= -1,members={0={enemy={position={x = 30, y = 30},health=5,max_health=5,attack=2,archetype=.Chaser},alive=true}}}
+	_=level.set_tile(&data,{x = 35, y = 30},{.Floor})
+	g.active=true;testing.expect(t,!lure_patrol(&w,&room,{x = 35, y = 30}));g.active=false
+	testing.expect(t,!lure_patrol(&w,&room,{x = 100, y = 100}))
+	for y in 29..=31 {for x in 29..=31 {_=level.set_tile(&data,{x = x, y = y},{.Wall})}}
+	_=level.set_tile(&data,{x = 30, y = 30},{.Floor});testing.expect(t,lure_patrol(&w,&room,{x = 35, y = 30}))
 	w.clock=g.lure_until+.01;tick(&w,&room,.01)
 	testing.expect_value(t,g.lure_phase,Patrol_Lure_Phase.None);testing.expect_value(t,g.members[0].enemy.position,level_position(30,30))
 }
@@ -55,10 +55,10 @@ test_patrol_lure_expires_when_enclosed_and_cannot_select_active_or_distant_group
 test_lured_patrol_engagement_uses_arrival_area_instead_of_old_leash :: proc(t:^testing.T) {
 	w:World;data:level.Level;p:game.Player;room:=test_world(t,&w,&data,&p)
 	defer level.destroy(&data);defer game.destroy_room(&room)
-	w.site_count=0;w.group_count=1;room.phase=.Loot;p.position={42,25}
-	for y in 15..=35 {for x in 15..=65 {_=level.set_tile(&data,{x,y},{.Floor})}}
-	g:=&w.groups[0];g^={anchor={20,25},patrol=true,count=1,site= -1,members={0={enemy={position={20,25},health=5,max_health=5,attack=2,archetype=.Chaser},alive=true}}}
-	original:=g.anchor;testing.expect(t,lure_patrol(&w,&room,{40,25}))
+	w.site_count=0;w.group_count=1;room.phase=.Loot;p.position={x = 42, y = 25}
+	for y in 15..=35 {for x in 15..=65 {_=level.set_tile(&data,{x = x, y = y},{.Floor})}}
+	g:=&w.groups[0];g^={anchor={x = 20, y = 25},patrol=true,count=1,site= -1,members={0={enemy={position={x = 20, y = 25},health=5,max_health=5,attack=2,archetype=.Chaser},alive=true}}}
+	original:=g.anchor;testing.expect(t,lure_patrol(&w,&room,{x = 40, y = 25}))
 	for _ in 0..<25 {tick(&w,&room,1.4);if g.lure_phase==.Waiting {break}}
 	testing.expect_value(t,g.lure_phase,Patrol_Lure_Phase.Waiting)
 	testing.expect(t,distance(p.position,original)>12)
@@ -71,4 +71,4 @@ test_lured_patrol_engagement_uses_arrival_area_instead_of_old_leash :: proc(t:^t
 }
 
 @(private)
-level_position :: proc(x,y:int)->grid.Position {return {x,y}}
+level_position :: proc(x,y:int)->grid.Position {return {x = x, y = y}}

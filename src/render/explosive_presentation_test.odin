@@ -12,7 +12,7 @@ test_bomb_spawn_arm_and_explosion_replay_without_reading_future_state :: proc(t:
 	defer level.destroy(&data)
 	player, player_ok := game.create_player({max_health = 20, attack = 2})
 	testing.expect(t, player_ok)
-	enemies := [?]game.Enemy_Spawn{{position = {5, 1}, health = 8, attack = 1, archetype = .Bomber}}
+	enemies := [?]game.Enemy_Spawn{{position = {x = 5, y = 1}, health = 8, attack = 1, archetype = .Bomber}}
 	room, ok := game.create_room(&data, &player, {enemies = enemies[:]})
 	testing.expect(t, ok)
 	defer game.destroy_room(&room)
@@ -54,7 +54,7 @@ test_bomb_spawn_reuses_hidden_slot_at_full_presentation_capacity :: proc(t: ^tes
 		object = {entity = game.object_entity(u32(index+1)), kind = .Ice_Block, visible = true, opacity = 1}
 	}
 	presentation.objects[7].visible = false
-	event := game.Game_Event{kind = .Object_Spawned, object_kind = .Bomb, target = game.object_entity(99), to_position = {4, 3}}
+	event := game.Game_Event{kind = .Object_Spawned, object_kind = .Bomb, target = game.object_entity(99), to_position = {x = 4, y = 3}}
 	testing.expect(t, show_spawned_presentation_object(&presentation, event))
 	testing.expect_value(t, presentation.object_count, MAX_PRESENTATION_GRID_OBJECTS)
 	testing.expect_value(t, presentation.objects[7].entity, event.target)

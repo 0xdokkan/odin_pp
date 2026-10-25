@@ -29,7 +29,7 @@ family_interior_wall_components :: proc(data: ^Level) -> (components, count: int
 			current := queue[head]
 			head += 1
 			for direction in CARDINAL_OFFSETS {
-				next := grid.Position{current.x+direction.x, current.y+direction.y}
+				next := grid.offset(current, direction.x, direction.y)
 				if is_border_position(next, data.tiles.width, data.tiles.height) { continue }
 				next_index, found := grid.index_of(&data.tiles, next)
 				if !found || visited[next_index] || data.tiles.cells[next_index].kind != .Wall { continue }
@@ -67,7 +67,7 @@ test_tactical_families_keep_distinct_shapes_and_safe_anchors :: proc(t: ^testing
 					testing.expect_value(t, walls, config.height-4)
 					gates := 0
 					for y in 1..<config.height-1 {
-						tile, _ := tile_at(&data, {config.width/2, y})
+						tile, _ := tile_at(&data, {x = config.width/2, y = y})
 						if is_walkable(tile.kind) { gates += 1 }
 					}
 					testing.expect_value(t, gates, 2)

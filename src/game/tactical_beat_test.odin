@@ -43,7 +43,7 @@ test_tactical_beats_are_struck_only_by_real_time_and_reward_once :: proc(t: ^tes
 test_tactical_critical_steps_bumps_and_diagonals :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {4, 3}, health = 100, attack = 1}, {position = {7, 7}, health = 100, attack = 1}}
+	spawns := [?]Enemy_Spawn{{position = {x = 4, y = 3}, health = 100, attack = 1}, {position = {x = 7, y = 7}, health = 100, attack = 1}}
 	room := create_enemy_rework_room(t, &data, &player, spawns[:])
 	defer level.destroy(&data)
 	defer destroy_room(&room)
@@ -62,9 +62,9 @@ test_tactical_critical_steps_bumps_and_diagonals :: proc(t: ^testing.T) {
 	testing.expect(t, !player.tactical.critical_next)
 	drain_tactical_test_pulse(t, &room, false)
 	// Two keys on the tick step diagonally; a single axis is not a diagonal.
-	testing.expect_value(t, try_move_player_diagonal(&room, {1, 0}), Action_Result.Blocked)
+	testing.expect_value(t, try_move_player_diagonal(&room, {x = 1, y = 0}), Action_Result.Blocked)
 	before := player.position
-	testing.expect_value(t, try_move_player_diagonal(&room, {1, 1}), Action_Result.Moved)
+	testing.expect_value(t, try_move_player_diagonal(&room, {x = 1, y = 1}), Action_Result.Moved)
 	testing.expect_value(t, player.position.x, before.x+1)
 	testing.expect_value(t, player.position.y, before.y+1)
 }
@@ -73,7 +73,7 @@ test_tactical_critical_steps_bumps_and_diagonals :: proc(t: ^testing.T) {
 test_tactical_critical_cards_strengthen_every_effect_kind :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {7, 7}, health = 100, attack = 1}}
+	spawns := [?]Enemy_Spawn{{position = {x = 7, y = 7}, health = 100, attack = 1}}
 	room := create_enemy_rework_room(t, &data, &player, spawns[:])
 	defer level.destroy(&data)
 	defer destroy_room(&room)
@@ -96,7 +96,7 @@ test_tactical_critical_cards_strengthen_every_effect_kind :: proc(t: ^testing.T)
 	testing.expect_value(t, action.effects[3].amount, i32(9))
 	// A coil deployed on the tick is built with twice the health.
 	events: Event_Log
-	testing.expect(t, deploy_board_device(&room, .Tesla_Coil, {2, 2}, 8, 0, &events))
+	testing.expect(t, deploy_board_device(&room, .Tesla_Coil, {x = 2, y = 2}, 8, 0, &events))
 	coil := room.objects[len(room.objects)-1]
 	definition, _ := grid_object_definition(.Tesla_Coil)
 	testing.expect_value(t, coil.health, definition.max_health*2)

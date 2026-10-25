@@ -75,42 +75,42 @@ test_the_cannon_evolves_into_the_laser_at_its_second_upgrade :: proc(t: ^testing
 test_cannon_is_set_on_a_free_cell_aimed_and_blocks_the_way :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {10, 5}, health = 50, attack = 1}}
+	spawns := [?]Enemy_Spawn{{position = {x = 10, y = 5}, health = 50, attack = 1}}
 	room := ground_test_room(t, &data, &player, {enemies = spawns[:]})
 	defer level.destroy(&data)
 	defer destroy_room(&room)
 	// East of the player: its way is east (from the player to its cell).
-	play := arsenal_test_play(t, &room, .Field_Cannon, cell_target({7, 5}))
+	play := arsenal_test_play(t, &room, .Field_Cannon, cell_target({x = 7, y = 5}))
 	testing.expect_value(t, play.result, Card_Play_Result.Played)
 	testing.expect_value(t, play.energy_before-play.energy_after, i32(2))
 	testing.expect_value(t, len(room.objects), 1)
 	cannon := room.objects[0]
-	testing.expect(t, cannon.kind == .Field_Cannon && cannon.position == grid.Position{7, 5} && cannon.facing == .East)
+	testing.expect(t, cannon.kind == .Field_Cannon && cannon.position == grid.Position{x = 7, y = 5} && cannon.facing == .East)
 	testing.expect_value(t, cannon.life, CANNON_SECONDS)
 	testing.expect_value(t, cannon.power, CANNON_BASE_DAMAGE)
-	testing.expect(t, !cannon.laser && cell_blocks_movement(&room, {7, 5}))
+	testing.expect(t, !cannon.laser && cell_blocks_movement(&room, {x = 7, y = 5}))
 	// The wheel's way wins over the cell's, for one play.
 	room.aim, room.has_aim = .North, true
-	arsenal_test_play(t, &room, .Field_Cannon, cell_target({6, 7}))
+	arsenal_test_play(t, &room, .Field_Cannon, cell_target({x = 6, y = 7}))
 	testing.expect_value(t, len(room.objects), 2)
 	testing.expect_value(t, room.objects[1].facing, Move_Direction.North)
 	testing.expect(t, !room.has_aim)
 	// A third is refused, and so is an occupied cell.
-	third := arsenal_test_play(t, &room, .Field_Cannon, cell_target({5, 7}))
+	third := arsenal_test_play(t, &room, .Field_Cannon, cell_target({x = 5, y = 7}))
 	testing.expect_value(t, third.result, Card_Play_Result.Compile_Failed)
 	testing.expect_value(t, third.compile_error, Card_Compile_Error.Target_Blocked)
-	testing.expect_value(t, arsenal_test_play(t, &room, .Field_Cannon, cell_target({10, 5})).result, Card_Play_Result.Compile_Failed)
+	testing.expect_value(t, arsenal_test_play(t, &room, .Field_Cannon, cell_target({x = 10, y = 5})).result, Card_Play_Result.Compile_Failed)
 }
 
 @(test)
 test_cannon_fires_each_beat_at_the_first_foe_and_falls_apart :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {9, 5}, health = 100, attack = 1}, {position = {11, 5}, health = 100, attack = 1}}
+	spawns := [?]Enemy_Spawn{{position = {x = 9, y = 5}, health = 100, attack = 1}, {position = {x = 11, y = 5}, health = 100, attack = 1}}
 	room := ground_test_room(t, &data, &player, {enemies = spawns[:]})
 	defer level.destroy(&data)
 	defer destroy_room(&room)
-	testing.expect_value(t, arsenal_test_play(t, &room, .Field_Cannon, cell_target({7, 5}), 1).result, Card_Play_Result.Played)
+	testing.expect_value(t, arsenal_test_play(t, &room, .Field_Cannon, cell_target({x = 7, y = 5}), 1).result, Card_Play_Result.Played)
 	for beat in 1..=int(CANNON_SECONDS) {
 		pulse := arsenal_test_beat(&room)
 		testing.expect_value(t, arsenal_test_count(&pulse.events, .Cannon_Fired), 1)
@@ -129,19 +129,19 @@ test_cannon_fires_each_beat_at_the_first_foe_and_falls_apart :: proc(t: ^testing
 test_cannon_ball_stops_at_walls_and_covers_and_fires_at_nothing :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {10, 2}, health = 100, attack = 1}}
-	obstacles := [?]grid.Position{{9, 5}}
+	spawns := [?]Enemy_Spawn{{position = {x = 10, y = 2}, health = 100, attack = 1}}
+	obstacles := [?]grid.Position{{x = 9, y = 5}}
 	room := ground_test_room(t, &data, &player, {enemies = spawns[:], obstacles = obstacles[:]})
 	defer level.destroy(&data)
 	defer destroy_room(&room)
 	// East along the row 5: a cover at 9 stops it; the foe is on another row.
 	room.aim, room.has_aim = .East, true
-	testing.expect_value(t, arsenal_test_play(t, &room, .Field_Cannon, cell_target({7, 5})).result, Card_Play_Result.Played)
+	testing.expect_value(t, arsenal_test_play(t, &room, .Field_Cannon, cell_target({x = 7, y = 5})).result, Card_Play_Result.Played)
 	pulse := arsenal_test_beat(&room)
 	testing.expect_value(t, arsenal_test_count(&pulse.events, .Cannon_Fired), 1)
 	for event in pulse.events.events[:pulse.events.count] {
 		if event.kind == .Cannon_Fired {
-			testing.expect_value(t, event.to_position, grid.Position{8, 5})
+			testing.expect_value(t, event.to_position, grid.Position{x = 8, y = 5})
 			testing.expect_value(t, event.target, SYSTEM_ENTITY)
 		}
 	}
@@ -152,13 +152,13 @@ test_cannon_ball_stops_at_walls_and_covers_and_fires_at_nothing :: proc(t: ^test
 test_laser_hits_every_foe_on_its_line_and_barrels :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {8, 5}, health = 100, attack = 1}, {position = {10, 5}, health = 100, attack = 1}, {position = {10, 2}, health = 100, attack = 1}}
-	objects := [?]Grid_Object_Spawn{{kind = .Barrel, position = {9, 5}}}
+	spawns := [?]Enemy_Spawn{{position = {x = 8, y = 5}, health = 100, attack = 1}, {position = {x = 10, y = 5}, health = 100, attack = 1}, {position = {x = 10, y = 2}, health = 100, attack = 1}}
+	objects := [?]Grid_Object_Spawn{{kind = .Barrel, position = {x = 9, y = 5}}}
 	room := ground_test_room(t, &data, &player, {enemies = spawns[:], objects = objects[:]})
 	defer level.destroy(&data)
 	defer destroy_room(&room)
 	room.aim, room.has_aim = .East, true
-	testing.expect_value(t, arsenal_test_play(t, &room, .Laser_Cannon, cell_target({7, 5}), 1).result, Card_Play_Result.Played)
+	testing.expect_value(t, arsenal_test_play(t, &room, .Laser_Cannon, cell_target({x = 7, y = 5}), 1).result, Card_Play_Result.Played)
 	testing.expect(t, room.objects[len(room.objects)-1].laser)
 	pulse := arsenal_test_beat(&room)
 	damage := LASER_BASE_DAMAGE+1
@@ -176,31 +176,31 @@ test_black_hole_pulls_the_foes_of_its_5x5_and_hurts_those_in_its_3x3 :: proc(t: 
 	data: level.Level
 	player: Player
 	spawns := [?]Enemy_Spawn{
-		{position = {9, 5}, health = 100, attack = 1}, // two cells from the centre (7, 5): pulled
-		{position = {7, 6}, health = 100, attack = 1}, // inside: hurt
-		{position = {7, 2}, health = 100, attack = 1}, // outside: untouched
-		{position = {5, 7}, health = 100, attack = 1, archetype = .Demolitionist}, // a boss: not pulled
+		{position = {x = 9, y = 5}, health = 100, attack = 1}, // two cells from the centre (7, 5): pulled
+		{position = {x = 7, y = 6}, health = 100, attack = 1}, // inside: hurt
+		{position = {x = 7, y = 2}, health = 100, attack = 1}, // outside: untouched
+		{position = {x = 5, y = 7}, health = 100, attack = 1, archetype = .Demolitionist}, // a boss: not pulled
 	}
 	room := ground_test_room(t, &data, &player, {enemies = spawns[:]})
 	defer level.destroy(&data)
 	defer destroy_room(&room)
-	play := arsenal_test_play(t, &room, .Devouring_Hole, cell_target({7, 5}))
+	play := arsenal_test_play(t, &room, .Devouring_Hole, cell_target({x = 7, y = 5}))
 	testing.expect_value(t, play.result, Card_Play_Result.Played)
 	testing.expect_value(t, play.energy_before-play.energy_after, i32(3))
 	testing.expect_value(t, len(room.objects), 1)
 	hole := room.objects[0]
 	testing.expect(t, hole.kind == .Devouring_Hole && hole.radius == 1 && hole.life == BLACK_HOLE_SECONDS && hole.power == BLACK_HOLE_BASE_DAMAGE)
 	// The hole blocks nothing.
-	testing.expect(t, !cell_blocks_movement(&room, {7, 5}))
+	testing.expect(t, !cell_blocks_movement(&room, {x = 7, y = 5}))
 	arsenal_test_beat(&room)
 	// The far foe came a cell: (8, 5), then in the 3x3 it is hurt next beat.
-	testing.expect_value(t, room.enemies[0].position, grid.Position{8, 5})
+	testing.expect_value(t, room.enemies[0].position, grid.Position{x = 8, y = 5})
 	testing.expect_value(t, room.enemies[0].health, 100-BLACK_HOLE_BASE_DAMAGE)
 	testing.expect_value(t, room.enemies[1].health, 100-BLACK_HOLE_BASE_DAMAGE)
 	testing.expect_value(t, room.enemies[2].health, i32(100))
-	testing.expect_value(t, room.enemies[2].position, grid.Position{7, 2})
+	testing.expect_value(t, room.enemies[2].position, grid.Position{x = 7, y = 2})
 	// The boss at (5, 7) is two off the centre: damage area is radius 1, so only pulled if not boss.
-	testing.expect_value(t, room.enemies[3].position, grid.Position{5, 7})
+	testing.expect_value(t, room.enemies[3].position, grid.Position{x = 5, y = 7})
 	testing.expect_value(t, room.enemies[3].health, i32(100))
 	// Eight beats, then it closes.
 	for _ in 0..<BLACK_HOLE_SECONDS-1 { arsenal_test_beat(&room) }
@@ -211,14 +211,14 @@ test_black_hole_pulls_the_foes_of_its_5x5_and_hurts_those_in_its_3x3 :: proc(t: 
 test_black_hole_swallows_a_foe_it_kills_and_widens_with_upgrades :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {7, 6}, health = 3, attack = 1}, {position = {7, 3}, health = 100, attack = 1}, {position = {7, 8}, health = 100, attack = 1}}
+	spawns := [?]Enemy_Spawn{{position = {x = 7, y = 6}, health = 3, attack = 1}, {position = {x = 7, y = 3}, health = 100, attack = 1}, {position = {x = 7, y = 8}, health = 100, attack = 1}}
 	room := ground_test_room(t, &data, &player, {enemies = spawns[:]})
 	defer level.destroy(&data)
 	defer destroy_room(&room)
 	testing.expect_value(t, black_hole_radius(0), i32(1))
 	testing.expect_value(t, black_hole_radius(2), i32(2))
 	testing.expect_value(t, black_hole_radius(4), i32(3))
-	testing.expect_value(t, arsenal_test_play(t, &room, .Devouring_Hole, cell_target({7, 5}), 2).result, Card_Play_Result.Played)
+	testing.expect_value(t, arsenal_test_play(t, &room, .Devouring_Hole, cell_target({x = 7, y = 5}), 2).result, Card_Play_Result.Played)
 	hole := room.objects[0]
 	testing.expect_value(t, hole.radius, i32(2))
 	testing.expect_value(t, hole.power, BLACK_HOLE_BASE_DAMAGE+2)
@@ -226,15 +226,15 @@ test_black_hole_swallows_a_foe_it_kills_and_widens_with_upgrades :: proc(t: ^tes
 	// The weak foe in the 5x5 damage area dies, swallowed first.
 	swallowed, fell := -1, -1
 	for event, index in pulse.events.events[:pulse.events.count] {
-		if event.kind == .Black_Hole_Swallowed { swallowed = index; testing.expect_value(t, event.to_position, grid.Position{7, 5}) }
+		if event.kind == .Black_Hole_Swallowed { swallowed = index; testing.expect_value(t, event.to_position, grid.Position{x = 7, y = 5}) }
 		if event.kind == .Entity_Defeated && fell < 0 { fell = index }
 	}
 	testing.expect(t, swallowed >= 0 && fell > swallowed)
 	testing.expect_value(t, len(room.enemies), 2)
 	// (7, 3) is inside the 5x5 now (two cells north): hurt; (7, 8) is three off: pulled.
 	// The far one, drawn in to (7, 7), is hurt there in the same beat.
-	near, near_found := enemy_index_at(&room, {7, 3})
-	pulled, pulled_found := enemy_index_at(&room, {7, 7})
+	near, near_found := enemy_index_at(&room, {x = 7, y = 3})
+	pulled, pulled_found := enemy_index_at(&room, {x = 7, y = 7})
 	testing.expect(t, near_found && pulled_found)
 	if near_found && pulled_found {
 		testing.expect_value(t, room.enemies[near].health, 100-(BLACK_HOLE_BASE_DAMAGE+2))
@@ -246,22 +246,22 @@ test_black_hole_swallows_a_foe_it_kills_and_widens_with_upgrades :: proc(t: ^tes
 test_black_hole_pull_stops_at_blockers :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {9, 5}, health = 100, attack = 1}, {position = {8, 5}, health = 100, attack = 1}}
-	obstacles := [?]grid.Position{{9, 4}, {8, 4}, {8, 6}, {9, 6}}
+	spawns := [?]Enemy_Spawn{{position = {x = 9, y = 5}, health = 100, attack = 1}, {position = {x = 8, y = 5}, health = 100, attack = 1}}
+	obstacles := [?]grid.Position{{x = 9, y = 4}, {x = 8, y = 4}, {x = 8, y = 6}, {x = 9, y = 6}}
 	room := ground_test_room(t, &data, &player, {enemies = spawns[:], obstacles = obstacles[:]})
 	defer level.destroy(&data)
 	defer destroy_room(&room)
-	testing.expect_value(t, arsenal_test_play(t, &room, .Devouring_Hole, cell_target({7, 5})).result, Card_Play_Result.Played)
+	testing.expect_value(t, arsenal_test_play(t, &room, .Devouring_Hole, cell_target({x = 7, y = 5})).result, Card_Play_Result.Played)
 	arsenal_test_beat(&room)
 	// The near foe is inside already; the far one is stopped behind it.
-	testing.expect_value(t, room.enemies[0].position, grid.Position{9, 5})
+	testing.expect_value(t, room.enemies[0].position, grid.Position{x = 9, y = 5})
 }
 
 @(test)
 test_bleed_adds_its_stacks_to_every_damage_once :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {7, 5}, health = 50, attack = 1}}
+	spawns := [?]Enemy_Spawn{{position = {x = 7, y = 5}, health = 50, attack = 1}}
 	room := ground_test_room(t, &data, &player, {enemies = spawns[:]})
 	defer level.destroy(&data)
 	defer destroy_room(&room)
@@ -305,7 +305,7 @@ test_dinosaur_rolls_a_d4_and_the_face_names_the_ride :: proc(t: ^testing.T) {
 	for face in i32(1)..=4 {
 		data: level.Level
 		player: Player
-		spawns := [?]Enemy_Spawn{{position = {9, 5}, health = 50, attack = 1}}
+		spawns := [?]Enemy_Spawn{{position = {x = 9, y = 5}, health = 50, attack = 1}}
 		room := ground_test_room(t, &data, &player, {enemies = spawns[:]})
 		play := arsenal_test_ride(t, &room, face, 2)
 		testing.expect_value(t, play.result, Card_Play_Result.Played)
@@ -336,7 +336,7 @@ test_dinosaur_rolls_a_d4_and_the_face_names_the_ride :: proc(t: ^testing.T) {
 test_velociraptor_halves_the_step_and_leaves_bleeding :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {6, 4}, health = 50, attack = 1}}
+	spawns := [?]Enemy_Spawn{{position = {x = 6, y = 4}, health = 50, attack = 1}}
 	room := ground_test_room(t, &data, &player, {enemies = spawns[:]})
 	defer level.destroy(&data)
 	defer destroy_room(&room)
@@ -348,12 +348,12 @@ test_velociraptor_halves_the_step_and_leaves_bleeding :: proc(t: ^testing.T) {
 	foe := enemy_entity(room.enemies[0].id)
 	room.player.tactical.phase, room.player.tactical.remaining, room.player.tactical.cast_remaining, room.player.tactical.action_remaining = .Decision, 20, 0, 0
 	room.tactical_pulse = {}
-	testing.expect(t, player_bump(&room, 0, {6, 4}, .Adjacent_Opponent, false))
+	testing.expect(t, player_bump(&room, 0, {x = 6, y = 4}, .Adjacent_Opponent, false))
 	testing.expect_value(t, ground_test_potency(&room, foe, .Bleed), i32(1))
 	testing.expect_value(t, room.enemies[0].health, 50-player_basic_attack_damage(room.player))
 	// The next blow bleeds: its damage and the stack.
 	before := room.enemies[0].health
-	testing.expect(t, player_bump(&room, 0, {6, 4}, .Adjacent_Opponent, false))
+	testing.expect(t, player_bump(&room, 0, {x = 6, y = 4}, .Adjacent_Opponent, false))
 	testing.expect_value(t, room.enemies[0].health, before-player_basic_attack_damage(room.player)-1)
 	testing.expect_value(t, ground_test_potency(&room, foe, .Bleed), i32(2))
 }
@@ -362,7 +362,7 @@ test_velociraptor_halves_the_step_and_leaves_bleeding :: proc(t: ^testing.T) {
 test_stegosaurus_turns_every_blow_back_without_spending_anything :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {5, 4}, health = 30, attack = 3, archetype = .Brute}}
+	spawns := [?]Enemy_Spawn{{position = {x = 5, y = 4}, health = 30, attack = 3, archetype = .Brute}}
 	room := create_enemy_rework_room(t, &data, &player, spawns[:])
 	defer level.destroy(&data)
 	defer destroy_room(&room)
@@ -388,7 +388,7 @@ test_stegosaurus_turns_every_blow_back_without_spending_anything :: proc(t: ^tes
 test_dilophosaurus_poisons_the_foe_it_hurts_and_the_foe_that_hurts_it :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {6, 4}, health = 50, attack = 1}, {position = {9, 5}, health = 50, attack = 1}}
+	spawns := [?]Enemy_Spawn{{position = {x = 6, y = 4}, health = 50, attack = 1}, {position = {x = 9, y = 5}, health = 50, attack = 1}}
 	room := ground_test_room(t, &data, &player, {enemies = spawns[:]})
 	defer level.destroy(&data)
 	defer destroy_room(&room)
@@ -396,7 +396,7 @@ test_dilophosaurus_poisons_the_foe_it_hurts_and_the_foe_that_hurts_it :: proc(t:
 	first, second := enemy_entity(room.enemies[0].id), enemy_entity(room.enemies[1].id)
 	room.player.tactical.phase, room.player.tactical.remaining, room.player.tactical.cast_remaining, room.player.tactical.action_remaining = .Decision, 20, 0, 0
 	room.tactical_pulse = {}
-	testing.expect(t, player_bump(&room, 0, {6, 4}, .Adjacent_Opponent, false))
+	testing.expect(t, player_bump(&room, 0, {x = 6, y = 4}, .Adjacent_Opponent, false))
 	testing.expect_value(t, ground_test_potency(&room, first, .Poison), i32(1))
 	// A card's damage poisons too.
 	card := make_action(.Card, PLAYER_ENTITY, entity_target(second), .Opponent)
@@ -420,9 +420,9 @@ test_giganotosaurus_stomps_on_each_step_and_bites_small_foes_dead :: proc(t: ^te
 	data: level.Level
 	player: Player
 	spawns := [?]Enemy_Spawn{
-		{position = {7, 4}, health = 40, attack = 1}, // beside where he lands (6, 5)? (7, 5 is east of it)
-		{position = {2, 2}, health = 40, attack = 1, archetype = .Archer},
-		{position = {10, 8}, health = 60, attack = 1, archetype = .Brute},
+		{position = {x = 7, y = 4}, health = 40, attack = 1}, // beside where he lands (6, 5)? (7, 5 is east of it)
+		{position = {x = 2, y = 2}, health = 40, attack = 1, archetype = .Archer},
+		{position = {x = 10, y = 8}, health = 60, attack = 1, archetype = .Brute},
 	}
 	room := ground_test_room(t, &data, &player, {enemies = spawns[:]})
 	defer level.destroy(&data)
@@ -432,24 +432,24 @@ test_giganotosaurus_stomps_on_each_step_and_bites_small_foes_dead :: proc(t: ^te
 	room.tactical_pulse = {}
 	// A step north puts him on (6, 4): the foe at (7, 4) is beside him: stomped.
 	testing.expect_value(t, try_move_player(&room, .North), Action_Result.Moved)
-	testing.expect_value(t, player.position, grid.Position{6, 4})
+	testing.expect_value(t, player.position, grid.Position{x = 6, y = 4})
 	testing.expect_value(t, arsenal_test_count(room.recent_events, .Dino_Stomp), 1)
 	testing.expect_value(t, room.enemies[0].health, 40-GIGA_STOMP_DAMAGE)
 	// The step costs the usual time.
 	testing.expect_value(t, player_move_seconds(&room), TACTICAL_MOVE_SECONDS)
 	// His bite: a small foe falls at once, a brute takes 12.
-	room.enemies[1].position, room.enemies[2].position = {5, 4}, {6, 3}
+	room.enemies[1].position, room.enemies[2].position = {x = 5, y = 4}, {x = 6, y = 3}
 	room.player.tactical.phase, room.player.tactical.remaining, room.player.tactical.cast_remaining, room.player.tactical.action_remaining = .Decision, 20, 0, 0
 	room.tactical_pulse = {}
 	archer_id := room.enemies[1].id
-	testing.expect(t, player_bump(&room, 1, {5, 4}, .Adjacent_Opponent, false))
+	testing.expect(t, player_bump(&room, 1, {x = 5, y = 4}, .Adjacent_Opponent, false))
 	_, archer_alive := enemy_index_by_id(&room, archer_id)
 	testing.expect(t, !archer_alive)
 	brute_index := 1
 	testing.expect_value(t, room.enemies[brute_index].archetype, Enemy_Archetype.Brute)
 	room.player.tactical.phase, room.player.tactical.remaining, room.player.tactical.cast_remaining, room.player.tactical.action_remaining = .Decision, 20, 0, 0
 	room.tactical_pulse = {}
-	testing.expect(t, player_bump(&room, brute_index, {6, 3}, .Adjacent_Opponent, false))
+	testing.expect(t, player_bump(&room, brute_index, {x = 6, y = 3}, .Adjacent_Opponent, false))
 	testing.expect_value(t, room.enemies[brute_index].health, 60-GIGA_BITE_DAMAGE)
 }
 
@@ -457,7 +457,7 @@ test_giganotosaurus_stomps_on_each_step_and_bites_small_foes_dead :: proc(t: ^te
 test_the_ride_and_the_emplacements_go_with_the_combat :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {10, 5}, health = 50, attack = 1}}
+	spawns := [?]Enemy_Spawn{{position = {x = 10, y = 5}, health = 50, attack = 1}}
 	room := ground_test_room(t, &data, &player, {enemies = spawns[:]})
 	defer level.destroy(&data)
 	defer destroy_room(&room)
@@ -466,7 +466,7 @@ test_the_ride_and_the_emplacements_go_with_the_combat :: proc(t: ^testing.T) {
 	tactical_end_combat(&room)
 	testing.expect(t, !room.ride.active && !tactical_ride_active(&room))
 	// An emplacement is only set down in a fight.
-	testing.expect(t, !emplacement_can_place(&room, .Field_Cannon, {7, 5}))
+	testing.expect(t, !emplacement_can_place(&room, .Field_Cannon, {x = 7, y = 5}))
 }
 
 // A foe his bump would kill is not struck: the Giganotosauro walks onto its cell
@@ -477,9 +477,9 @@ test_giganotosaurus_crushes_the_foe_his_bump_would_kill_and_bites_the_rest :: pr
 	data: level.Level
 	player: Player
 	spawns := [?]Enemy_Spawn{
-		{position = {6, 4}, health = 40, attack = 1},                       // a chaser: always dies to his bump
-		{position = {8, 5}, health = 12, attack = 1, archetype = .Brute},   // a brute with the bite's 12 left: crushed
-		{position = {3, 5}, health = 60, attack = 1, archetype = .Brute},   // a brute that survives the bite
+		{position = {x = 6, y = 4}, health = 40, attack = 1},                       // a chaser: always dies to his bump
+		{position = {x = 8, y = 5}, health = 12, attack = 1, archetype = .Brute},   // a brute with the bite's 12 left: crushed
+		{position = {x = 3, y = 5}, health = 60, attack = 1, archetype = .Brute},   // a brute that survives the bite
 	}
 	room := ground_test_room(t, &data, &player, {enemies = spawns[:]})
 	defer level.destroy(&data)
@@ -492,7 +492,7 @@ test_giganotosaurus_crushes_the_foe_his_bump_would_kill_and_bites_the_rest :: pr
 	free_window(&room)
 	chaser := room.enemies[0].id
 	testing.expect_value(t, try_move_player(&room, .North), Action_Result.Moved)
-	testing.expect_value(t, player.position, grid.Position{6, 4})
+	testing.expect_value(t, player.position, grid.Position{x = 6, y = 4})
 	_, chaser_alive := enemy_index_by_id(&room, chaser)
 	testing.expect(t, !chaser_alive)
 	moved, crushed, fell := -1, -1, -1
@@ -505,22 +505,22 @@ test_giganotosaurus_crushes_the_foe_his_bump_would_kill_and_bites_the_rest :: pr
 	}
 	testing.expect(t, moved >= 0 && crushed > moved && fell > crushed)
 	// A brute with 12 left is crushed too (from (6, 5): east, then its cell).
-	player.position = {7, 5}
+	player.position = {x = 7, y = 5}
 	free_window(&room)
-	brute_at, _ := enemy_index_at(&room, {8, 5})
+	brute_at, _ := enemy_index_at(&room, {x = 8, y = 5})
 	brute := room.enemies[brute_at].id
 	testing.expect_value(t, try_move_player(&room, .East), Action_Result.Moved)
-	testing.expect_value(t, player.position, grid.Position{8, 5})
+	testing.expect_value(t, player.position, grid.Position{x = 8, y = 5})
 	_, brute_alive := enemy_index_by_id(&room, brute)
 	testing.expect(t, !brute_alive)
 	// One with 60 takes the bite and stays: a bump.
-	player.position = {4, 5}
+	player.position = {x = 4, y = 5}
 	free_window(&room)
-	big_at, _ := enemy_index_at(&room, {3, 5})
+	big_at, _ := enemy_index_at(&room, {x = 3, y = 5})
 	big := room.enemies[big_at].id
 	testing.expect_value(t, try_move_player(&room, .West), Action_Result.Attacked)
 	index, still := enemy_index_by_id(&room, big)
 	testing.expect(t, still)
-	testing.expect_value(t, player.position, grid.Position{4, 5})
+	testing.expect_value(t, player.position, grid.Position{x = 4, y = 5})
 	testing.expect_value(t, room.enemies[index].health, 60-GIGA_BITE_DAMAGE)
 }

@@ -36,7 +36,7 @@ first_cell :: proc(data: ^level.Level, index: int) -> grid.Position {
 	plan := &data.structure_plans[index]
 	for y in 0..<plan.height {
 		for x in 0..<plan.width {
-			if level.plan_at(plan, x, y) != .Outside { return {placed.origin.x+x, placed.origin.y+y} }
+			if level.plan_at(plan, x, y) != .Outside { return grid.offset(placed.origin, x, y) }
 		}
 	}
 	return placed.origin
@@ -147,7 +147,7 @@ draw_structure_outlines :: proc(renderer: ^Renderer, room: ^game.Room) {
 			for x in 0..<plan.width {
 				cell := level.plan_at(plan, x, y)
 				if cell == .Outside { continue }
-				if !tactical_cell_on_screen(renderer, {placed.origin.x+x, placed.origin.y+y}) { continue }
+				if !tactical_cell_on_screen(renderer, grid.offset(placed.origin, x, y)) { continue }
 				x0, z0 := f32(placed.origin.x+x), f32(placed.origin.y+y)
 				if cell == .Door { rl.DrawCube({x0+0.5, 0.025, z0+0.5}, 0.9, 0.02, 0.9, {98, 192, 229, 90}) }
 				// A side facing outside the footprint is a side of the outline.
@@ -191,7 +191,7 @@ collect_structure_entries :: proc(renderer: ^Renderer, room: ^game.Room, entries
 				for x in 0..<plan.width {
 					cell := level.plan_at(plan, x, y)
 					if cell != .Wall && cell != .Fence { continue }
-					position := grid.Position{placed.origin.x+x, placed.origin.y+y}
+					position := grid.offset(placed.origin, x, y)
 					if tactical_cell_on_screen(renderer, position) && tactical_render_visible(renderer, position) {
 						append(entries, Tactical_Alpha_Entry{kind = .Wall, position = {f32(position.x), f32(position.y)}})
 					}

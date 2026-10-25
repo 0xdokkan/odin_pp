@@ -93,9 +93,10 @@ test_character_sheet_deck_lines_group_by_card_and_level_and_page :: proc(t: ^tes
 		testing.expect(t, added)
 	}
 	room := game.Room{player = &player, level_data = &data}
-	renderer := Renderer{canvas_width = 960, canvas_height = 540}
+	renderer := new_clone(Renderer{canvas_width = 960, canvas_height = 540})
+	defer free(renderer)
 
-	layout := character_sheet_deck_layout(&renderer, &room, 0)
+	layout := character_sheet_deck_layout(renderer, &room, 0)
 	testing.expect_value(t, layout.row_count, 7)
 	expected := [?]struct{id: game.Card_Id, level: i32, count: int}{{.Strike, 0, 2}, {.Guard, 0, 2}, {.Strike, 1, 1}, {.Pinball, 2, 1},
 		{.Lasso, 0, 1}, {.Deflect, 0, 1}, {.Coffin, 1, 1}}
@@ -105,14 +106,14 @@ test_character_sheet_deck_lines_group_by_card_and_level_and_page :: proc(t: ^tes
 	}
 	testing.expect_value(t, character_sheet_deck_row_text(layout.rows[3]), cstring("1x Pinball +2"))
 	testing.expect(t, layout.pages > 1 && layout.per_page >= 3)
-	last := character_sheet_deck_layout(&renderer, &room, 99)
+	last := character_sheet_deck_layout(renderer, &room, 99)
 	testing.expect_value(t, last.page, last.pages-1)
 	first, count := character_sheet_deck_page_rows(&last)
 	testing.expect(t, first+count == last.row_count && count > 0)
 	s := layout.section
 	testing.expect(t, effect_entry_inside(layout.button, 960, 540) && layout.button.x >= s.x && layout.button.x+layout.button.width <= s.x+s.width)
 	testing.expect(t, layout.button.x > s.x+90, "clear of the section's title")
-	testing.expect(t, !rectangles_overlap(layout.button, m8_modal_control_bounds(&renderer, .Close_Character)))
+	testing.expect(t, !rectangles_overlap(layout.button, m8_modal_control_bounds(renderer, .Close_Character)))
 	for slot in 0..<layout.per_page {
 		row := character_sheet_deck_row_bounds(&layout, slot)
 		testing.expect(t, row.y >= layout.button.y+layout.button.height && row.y+row.height <= layout.previous.y)
@@ -121,7 +122,7 @@ test_character_sheet_deck_lines_group_by_card_and_level_and_page :: proc(t: ^tes
 		testing.expect(t, hit && found == slot)
 	}
 	testing.expect(t, !rectangles_overlap(layout.previous, layout.next))
-	relics := character_sheet_frame(&renderer).relics
+	relics := character_sheet_frame(renderer).relics
 	testing.expect(t, !rectangles_overlap(relics, s) && relics.width > 200 && s.width > 200)
 	// One page: no pager, every line shown.
 	small := game.Room{player = &player, level_data = &data}
@@ -129,7 +130,7 @@ test_character_sheet_deck_lines_group_by_card_and_level_and_page :: proc(t: ^tes
 	testing.expect(t, game.initialize_empty_deck(&player.deck, game.DEFAULT_DECK_RULES, 7))
 	_, added := game.add_owned_card(&player.deck, .Strike)
 	testing.expect(t, added)
-	one := character_sheet_deck_layout(&renderer, &small, 3)
+	one := character_sheet_deck_layout(renderer, &small, 3)
 	testing.expect(t, one.row_count == 1 && one.pages == 1 && one.page == 0)
 }
 
@@ -151,7 +152,7 @@ test_inspector_effect_follows_the_inspector :: proc(t: ^testing.T) {
 		_, added := game.add_owned_card(&player.deck, id)
 		testing.expect(t, added)
 	}
-	spawns := [?]game.Enemy_Spawn{{position = {5, 3}, health = 30, attack = 1}}
+	spawns := [?]game.Enemy_Spawn{{position = {x = 5, y = 3}, health = 30, attack = 1}}
 	room, built := game.create_room(&data, &player, {enemies = spawns[:]})
 	testing.expect(t, built)
 	defer game.destroy_room(&room)

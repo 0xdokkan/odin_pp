@@ -233,7 +233,7 @@ plan_chaser_intent :: proc(
 		return intent
 	}
 	best_distance := room.enemy_path_distances[origin_index]
-	steps := [?]grid.Position{first_step, second_step, {0, -1}, {1, 0}, {0, 1}, {-1, 0}}
+	steps := [?]grid.Position{first_step, second_step, {x = 0, y = -1}, {x = 1, y = 0}, {x = 0, y = 1}, {x = -1, y = 0}}
 	for step in steps {
 		if step.x == 0 && step.y == 0 {
 			continue
@@ -411,7 +411,7 @@ validate_enemy_intent_structure :: proc(room: ^Room, intent: ^Enemy_Intent) -> b
 		}
 		for y in intent.destination.y-1..=intent.destination.y+1 {
 			for x in intent.destination.x-1..=intent.destination.x+1 {
-				cell := grid.Position{x, y}
+				cell := grid.Position{x = x, y = y}
 				if explosion_contains_cell(room, intent.destination, cell) !=
 				   enemy_intent_cell_is_threatened(intent, cell) {
 					return false
@@ -603,7 +603,7 @@ plan_enemy_intents :: proc(room: ^Room) {
 			if aligned {
 				center := intent.threatened_cells[0]
 				for sign in ([?]int{-1, 1}) {
-					cell := grid.Position{center.x+step.y*sign, center.y+step.x*sign}
+					cell := grid.offset(center, step.y*sign, step.x*sign)
 					if grid.contains(&room.level_data.tiles, cell) && shape_cell_has_clear_path(room, origin, cell) {
 						intent.threatened_cells[intent.threatened_cell_count] = cell
 						intent.threatened_cell_count += 1

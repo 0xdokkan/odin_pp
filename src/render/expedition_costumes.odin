@@ -171,7 +171,7 @@ draw_expedition_costume :: proc(renderer:^Renderer,b:campaign.Biome,role:game.En
 @(private)
 draw_expedition_costumes :: proc(renderer:^Renderer,room:^game.Room,w:^world.World) {
 	for actor in renderer.tactical.snapshot.enemies[:renderer.tactical.snapshot.enemy_count] {
-		if !actor.visible || actor.health<=0 || game.enemy_is_out_of_play(room,actor.entity.id) || !tactical_cell_on_screen(renderer,{int(actor.position.x),int(actor.position.y)}) {continue}
+		if !actor.visible || actor.health<=0 || game.enemy_is_out_of_play(room,actor.entity.id) || !tactical_cell_on_screen(renderer,{x = int(actor.position.x), y = int(actor.position.y)}) {continue}
 		if terrain_hides_actor(renderer,actor.position) {continue}
 		draw_expedition_costume(renderer,w.biome,actor.archetype,actor.position,actor.entity,w.clock,actor.opacity)
 	}

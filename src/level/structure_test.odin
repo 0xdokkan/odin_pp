@@ -7,10 +7,10 @@ import grid "../engine/grid"
 @(private = "file")
 open_map :: proc(width, height: int) -> Level {
 	data, _ := create(width, height, Tile{kind = .Floor})
-	for x in 0..<width { _ = set_tile(&data, {x, 0}, {kind = .Wall}); _ = set_tile(&data, {x, height-1}, {kind = .Wall}) }
-	for y in 0..<height { _ = set_tile(&data, {0, y}, {kind = .Wall}); _ = set_tile(&data, {width-1, y}, {kind = .Wall}) }
-	_ = set_tile(&data, {1, 1}, {kind = .Player_Spawn})
-	data.player_spawn, data.has_player_spawn = {1, 1}, true
+	for x in 0..<width { _ = set_tile(&data, {x = x, y = 0}, {kind = .Wall}); _ = set_tile(&data, {x = x, y = height-1}, {kind = .Wall}) }
+	for y in 0..<height { _ = set_tile(&data, {x = 0, y = y}, {kind = .Wall}); _ = set_tile(&data, {x = width-1, y = y}, {kind = .Wall}) }
+	_ = set_tile(&data, {x = 1, y = 1}, {kind = .Player_Spawn})
+	data.player_spawn, data.has_player_spawn = {x = 1, y = 1}, true
 	return data
 }
 
@@ -114,7 +114,7 @@ test_a_structure_writes_its_whole_footprint_in_every_turn :: proc(t: ^testing.T)
 		for rotation in u8(0)..<4 {
 			data := open_map(24, 24)
 			defer destroy(&data)
-			index, err := place_structure(&data, id, {8, 8}, rotation, false)
+			index, err := place_structure(&data, id, {x = 8, y = 8}, rotation, false)
 			testing.expectf(t, err == .None, "%v turned %d: %s", id, rotation, placement_error_text(err))
 			if err != .None { continue }
 			plan := data.structure_plans[index]
@@ -123,17 +123,17 @@ test_a_structure_writes_its_whole_footprint_in_every_turn :: proc(t: ^testing.T)
 				for x in 0..<24 {
 					inside := x >= 8 && y >= 8 && x < 8+plan.width && y < 8+plan.height
 					cell := plan_at(&plan, x-8, y-8) if inside else Plan_Cell.Outside
-					tile, _ := tile_at(&data, {x, y})
+					tile, _ := tile_at(&data, {x = x, y = y})
 					if cell == .Outside {
 						if !(x == 0 || y == 0 || x == 23 || y == 23 || (x == 1 && y == 1)) { testing.expect_value(t, tile.kind, Tile_Kind.Floor) }
-						_, owned := structure_index_at(&data, {x, y})
+						_, owned := structure_index_at(&data, {x = x, y = y})
 						testing.expect(t, !owned, "outside the footprint belongs to nobody")
 						continue
 					}
 					covered += 1
 					expected, _ := plan_tile(cell)
 					testing.expect_value(t, tile.kind, expected.kind)
-					owner, owned := structure_index_at(&data, {x, y})
+					owner, owned := structure_index_at(&data, {x = x, y = y})
 					testing.expect(t, owned && owner == index)
 				}
 			}
@@ -149,16 +149,16 @@ test_a_structure_writes_its_whole_footprint_in_every_turn :: proc(t: ^testing.T)
 test_every_cell_of_a_complex_object_counts :: proc(t: ^testing.T) {
 	data := open_map(16, 16)
 	defer destroy(&data)
-	_, err := place_structure(&data, .Statue, {5, 5}, 0, false)
+	_, err := place_structure(&data, .Statue, {x = 5, y = 5}, 0, false)
 	testing.expect_value(t, err, Placement_Error.None)
-	for cell in ([4]grid.Position{{5, 5}, {6, 5}, {5, 6}, {6, 6}}) {
+	for cell in ([4]grid.Position{{x = 5, y = 5}, {x = 6, y = 5}, {x = 5, y = 6}, {x = 6, y = 6}}) {
 		tile, _ := tile_at(&data, cell)
 		testing.expect_value(t, tile.kind, Tile_Kind.Wall)
 		testing.expect(t, !is_walkable(tile.kind))
 	}
-	_, err = place_structure(&data, .Cart, {9, 9}, 0, false)
+	_, err = place_structure(&data, .Cart, {x = 9, y = 9}, 0, false)
 	testing.expect_value(t, err, Placement_Error.None)
-	for cell in ([2]grid.Position{{9, 9}, {10, 9}}) {
+	for cell in ([2]grid.Position{{x = 9, y = 9}, {x = 10, y = 9}}) {
 		tile, _ := tile_at(&data, cell)
 		testing.expect_value(t, tile.kind, Tile_Kind.Fence)
 		testing.expect(t, !is_walkable(tile.kind))
@@ -170,24 +170,27 @@ test_placement_is_refused_outside_the_map_over_something_or_next_to_another :: p
 	data := open_map(20, 20)
 	defer destroy(&data)
 	// Off the map, and on the border.
-	testing.expect_value(t, place_check(&data, .Hut, {17, 5}, 0, false), Placement_Error.Out_Of_Map)
-	testing.expect_value(t, place_check(&data, .Hut, {-2, 5}, 0, false), Placement_Error.Out_Of_Map)
-	testing.expect_value(t, place_check(&data, .Hut, {0, 5}, 0, false), Placement_Error.Out_Of_Map)
+	testing.expect_value(t, place_check(&data, .Hut, {x = 17, y = 5}, 0, false), Placement_Error.Out_Of_Map)
+	testing.expect_value(t, place_check(&data, .Hut, {x = -2, y = 5}, 0, false), Placement_Error.Out_Of_Map)
+	testing.expect_value(t, place_check(&data, .Hut, {x = 0, y = 5}, 0, false), Placement_Error.Out_Of_Map)
+	// On another layer than the ground (docs/piano-profondita.md), where a structure fits on the ground.
+	testing.expect_value(t, place_check(&data, .Statue, {x = 5, y = 5}, 0, false), Placement_Error.None)
+	testing.expect_value(t, place_check(&data, .Statue, {x = 5, y = 5, layer = -1}, 0, false), Placement_Error.Out_Of_Map)
 	// Over the spawn, and over a wall.
-	testing.expect_value(t, place_check(&data, .Cottage, {1, 1}, 0, false), Placement_Error.Not_Free)
-	_ = set_tile(&data, {12, 12}, {kind = .Wall})
-	testing.expect_value(t, place_check(&data, .Statue, {11, 11}, 0, false), Placement_Error.Not_Free)
+	testing.expect_value(t, place_check(&data, .Cottage, {x = 1, y = 1}, 0, false), Placement_Error.Not_Free)
+	_ = set_tile(&data, {x = 12, y = 12}, {kind = .Wall})
+	testing.expect_value(t, place_check(&data, .Statue, {x = 11, y = 11}, 0, false), Placement_Error.Not_Free)
 	// Over another structure, and touching one.
-	_, err := place_structure(&data, .Machine, {4, 8}, 0, false)
+	_, err := place_structure(&data, .Machine, {x = 4, y = 8}, 0, false)
 	testing.expect_value(t, err, Placement_Error.None)
-	testing.expect_value(t, place_check(&data, .Statue, {5, 8}, 0, false), Placement_Error.Overlap)
-	testing.expect_value(t, place_check(&data, .Statue, {7, 8}, 0, false), Placement_Error.Too_Close)
-	testing.expect_value(t, place_check(&data, .Statue, {8, 8}, 0, false), Placement_Error.None)
+	testing.expect_value(t, place_check(&data, .Statue, {x = 5, y = 8}, 0, false), Placement_Error.Overlap)
+	testing.expect_value(t, place_check(&data, .Statue, {x = 7, y = 8}, 0, false), Placement_Error.Too_Close)
+	testing.expect_value(t, place_check(&data, .Statue, {x = 8, y = 8}, 0, false), Placement_Error.None)
 	// What the caller says must stay clear.
 	clear_at_seven :: proc(user: rawptr, cell: grid.Position) -> bool { return cell.x == 14 }
-	testing.expect_value(t, place_check(&data, .Statue, {13, 3}, 0, false, clear_at_seven), Placement_Error.Keep_Clear)
+	testing.expect_value(t, place_check(&data, .Statue, {x = 13, y = 3}, 0, false, clear_at_seven), Placement_Error.Keep_Clear)
 	// A turn or a mirror the definition does not allow.
-	testing.expect_value(t, place_check(&data, .Fountain, {3, 15}, 0, true), Placement_Error.Mirror_Not_Allowed)
+	testing.expect_value(t, place_check(&data, .Fountain, {x = 3, y = 15}, 0, true), Placement_Error.Mirror_Not_Allowed)
 	// A refused placement changes nothing.
 	testing.expect_value(t, structure_count(&data), 1)
 }
@@ -198,10 +201,10 @@ test_a_door_that_opens_onto_a_blocked_cell_is_refused :: proc(t: ^testing.T) {
 	data := open_map(20, 20)
 	defer destroy(&data)
 	// The cottage's door is at its bottom, at (x+2, y+2) = (10, 13); the cell below it is a wall.
-	_ = set_tile(&data, {10, 14}, {kind = .Wall})
-	testing.expect_value(t, place_check(&data, .Cottage, {8, 11}, 0, false), Placement_Error.Entrance_Blocked)
+	_ = set_tile(&data, {x = 10, y = 14}, {kind = .Wall})
+	testing.expect_value(t, place_check(&data, .Cottage, {x = 8, y = 11}, 0, false), Placement_Error.Entrance_Blocked)
 	// Turned so that its door faces another way, it can stand there.
-	testing.expect_value(t, place_check(&data, .Cottage, {8, 11}, 2, false), Placement_Error.None)
+	testing.expect_value(t, place_check(&data, .Cottage, {x = 8, y = 11}, 2, false), Placement_Error.None)
 }
 
 // A structure that would shut a part of a whole map off is refused.
@@ -210,17 +213,17 @@ test_a_structure_that_would_close_a_pocket_is_refused :: proc(t: ^testing.T) {
 	// A corridor two cells high; the spawn is at its left.
 	data := open_map(12, 4)
 	defer destroy(&data)
-	testing.expect_value(t, place_check(&data, .Fountain, {5, 1}, 0, false), Placement_Error.Pocket)
+	testing.expect_value(t, place_check(&data, .Fountain, {x = 5, y = 1}, 0, false), Placement_Error.Pocket)
 	// A statue on one side of a three-wide corridor leaves the way open.
 	wide := open_map(12, 5)
 	defer destroy(&wide)
-	testing.expect_value(t, place_check(&wide, .Statue, {5, 1}, 0, false), Placement_Error.None)
+	testing.expect_value(t, place_check(&wide, .Statue, {x = 5, y = 1}, 0, false), Placement_Error.None)
 	// A building with a door seals nothing: its inside is reached through the door.
 	room := open_map(20, 20)
 	defer destroy(&room)
-	_, err := place_structure(&room, .Hut, {8, 8}, 0, false)
+	_, err := place_structure(&room, .Hut, {x = 8, y = 8}, 0, false)
 	testing.expect_value(t, err, Placement_Error.None)
-	reached, total := reachable_walkable(&room, room.tiles.cells[:], 20, 20, {1, 1})
+	reached, total := reachable_walkable(&room, room.tiles.cells[:], 20, 20, {x = 1, y = 1})
 	testing.expect_value(t, reached, total)
 }
 
@@ -228,8 +231,8 @@ test_a_structure_that_would_close_a_pocket_is_refused :: proc(t: ^testing.T) {
 test_the_structures_are_restored_from_a_saved_list :: proc(t: ^testing.T) {
 	data := open_map(30, 30)
 	defer destroy(&data)
-	_, _ = place_structure(&data, .Temple, {10, 10}, 1, true)
-	_, _ = place_structure(&data, .Cart, {20, 20}, 3, false)
+	_, _ = place_structure(&data, .Temple, {x = 10, y = 10}, 1, true)
+	_, _ = place_structure(&data, .Cart, {x = 20, y = 20}, 3, false)
 	saved := make([dynamic]Placed_Structure)
 	defer delete(saved)
 	append(&saved, ..data.structures[:])
@@ -241,16 +244,16 @@ test_the_structures_are_restored_from_a_saved_list :: proc(t: ^testing.T) {
 	for cell, i in data.structure_cells { testing.expect_value(t, other.structure_cells[i], cell) }
 	for y in 0..<30 {
 		for x in 0..<30 {
-			first, inside_first := structure_index_at(&data, {x, y})
-			second, inside_second := structure_index_at(&other, {x, y})
+			first, inside_first := structure_index_at(&data, {x = x, y = y})
+			second, inside_second := structure_index_at(&other, {x = x, y = y})
 			testing.expect(t, first == second && inside_first == inside_second)
-			testing.expect_value(t, structure_plan_cell(&other, 0, {x, y}), structure_plan_cell(&data, 0, {x, y}))
+			testing.expect_value(t, structure_plan_cell(&other, 0, {x = x, y = y}), structure_plan_cell(&data, 0, {x = x, y = y}))
 		}
 	}
 	// A record that does not fit is refused.
-	bad := [1]Placed_Structure{{id = .Hut, origin = {28, 28}}}
+	bad := [1]Placed_Structure{{id = .Hut, origin = {x = 28, y = 28}}}
 	testing.expect(t, !set_structures(&other, bad[:]))
-	bad_turn := [1]Placed_Structure{{id = .Hut, origin = {5, 5}, rotation = 9}}
+	bad_turn := [1]Placed_Structure{{id = .Hut, origin = {x = 5, y = 5}, rotation = 9}}
 	testing.expect(t, !set_structures(&other, bad_turn[:]))
 	// An empty list is the old save: no structures.
 	testing.expect(t, set_structures(&other, nil))
@@ -262,16 +265,16 @@ test_the_structures_are_restored_from_a_saved_list :: proc(t: ^testing.T) {
 test_a_structure_needs_level_ground_and_a_door_a_step_to_climb :: proc(t: ^testing.T) {
 	data := open_map(20, 20)
 	defer destroy(&data)
-	_ = set_height(&data, {9, 9}, 2)
-	testing.expect_value(t, place_check(&data, .Cottage, {8, 8}, 0, false), Placement_Error.Not_Flat)
+	_ = set_height(&data, {x = 9, y = 9}, 2)
+	testing.expect_value(t, place_check(&data, .Cottage, {x = 8, y = 8}, 0, false), Placement_Error.Not_Flat)
 	// The same cottage on a level plateau of its own is fine, but a cliff in front of its door is not.
-	for y in 8..<14 { for x in 8..<14 { _ = set_height(&data, {x, y}, 3) } }
-	for y in 8..<14 { for x in 8..<14 { if y == 13 { _ = set_height(&data, {x, y}, 0) } } }
+	for y in 8..<14 { for x in 8..<14 { _ = set_height(&data, {x = x, y = y}, 3) } }
+	for y in 8..<14 { for x in 8..<14 { if y == 13 { _ = set_height(&data, {x = x, y = y}, 0) } } }
 	// The cottage at (8, 10) has its door at (10, 12); below it (10, 13) is at 0, three steps down.
-	testing.expect_value(t, place_check(&data, .Cottage, {8, 10}, 0, false), Placement_Error.Entrance_Blocked)
+	testing.expect_value(t, place_check(&data, .Cottage, {x = 8, y = 10}, 0, false), Placement_Error.Entrance_Blocked)
 	// Lowering that cell to two steps down is still a cliff; one step is a stair.
-	_ = set_height(&data, {10, 13}, 2)
-	testing.expect_value(t, place_check(&data, .Cottage, {8, 10}, 0, false), Placement_Error.None)
+	_ = set_height(&data, {x = 10, y = 13}, 2)
+	testing.expect_value(t, place_check(&data, .Cottage, {x = 8, y = 10}, 0, false), Placement_Error.None)
 }
 
 // Only the objects and the pens the player sets down fall apart; they take the damage they are dealt, and when their health is gone
@@ -287,9 +290,9 @@ test_an_object_falls_apart_when_hurt_enough_and_a_building_never_does :: proc(t:
 		definition := structure_definition(id)
 		if definition.kind == .Building { testing.expect_value(t, structure_max_health(id), i16(0)) } else { testing.expect(t, structure_max_health(id) > 0) }
 	}
-	building, _ := place_structure(&data, .Cottage, {4, 4}, 0, false)
-	cart, _ := place_structure(&data, .Cart, {14, 4}, 0, false)
-	pen, _ := place_structure(&data, .Pen, {24, 12}, 0, false)
+	building, _ := place_structure(&data, .Cottage, {x = 4, y = 4}, 0, false)
+	cart, _ := place_structure(&data, .Cart, {x = 14, y = 4}, 0, false)
+	pen, _ := place_structure(&data, .Pen, {x = 24, y = 12}, 0, false)
 	testing.expect(t, building >= 0 && cart >= 0 && pen >= 0)
 	data.structures[cart].health = structure_max_health(.Cart)
 	data.structures[pen].health = structure_max_health(.Pen)
@@ -320,7 +323,7 @@ test_an_object_falls_apart_when_hurt_enough_and_a_building_never_does :: proc(t:
 	pen_origin := data.structures[1].origin
 	testing.expect(t, damage_structure(&data, 1, 99))
 	for dy in 0..<4 { for dx in 0..<5 {
-		cell, _ := tile_at(&data, {pen_origin.x+dx, pen_origin.y+dy})
+		cell, _ := tile_at(&data, grid.offset(pen_origin, dx, dy))
 		testing.expect(t, cell.kind == .Floor, "the pen is cleared")
 	}}
 	testing.expect(t, !remove_structure(&data, 9) && !remove_structure(&data, -1))

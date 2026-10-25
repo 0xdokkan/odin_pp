@@ -499,7 +499,7 @@ test_local_wave_supports_nine_enemies_without_truncation :: proc(t: ^testing.T) 
 	testing.expect(t, ok)
 	defer destroy_room(&room)
 
-	player.position = {3, 2}
+	player.position = {x = 3, y = 2}
 	action, err := compile_card_action(&room, {id = 9, definition_id = .Toxic_Wave}, {})
 	testing.expect_value(t, err, Card_Compile_Error.None)
 	testing.expect_value(t, action.effect_count, len(enemy_spawns))
@@ -529,9 +529,9 @@ test_area_card_compilation_preserves_shape_and_stable_enemy_order :: proc(t: ^te
 		expected_ids: [3]u32,
 		target_count: int,
 	}{
-		{.Piercing_Ray, {5, 1}, {{4, 1}, {5, 3}, {2, 1}, {}}, 3, {1, 3, 0}, 2},
-		{.Cross_Slash, {2, 2}, {{2, 3}, {5, 3}, {2, 1}, {1, 2}}, 4, {1, 3, 4}, 3},
-		{.Firebomb, {4, 2}, {{5, 3}, {2, 3}, {3, 1}, {4, 3}}, 4, {1, 3, 4}, 3},
+		{.Piercing_Ray, {x = 5, y = 1}, {{x = 4, y = 1}, {x = 5, y = 3}, {x = 2, y = 1}, {}}, 3, {1, 3, 0}, 2},
+		{.Cross_Slash, {x = 2, y = 2}, {{x = 2, y = 3}, {x = 5, y = 3}, {x = 2, y = 1}, {x = 1, y = 2}}, 4, {1, 3, 4}, 3},
+		{.Firebomb, {x = 4, y = 2}, {{x = 5, y = 3}, {x = 2, y = 3}, {x = 3, y = 1}, {x = 4, y = 3}}, 4, {1, 3, 4}, 3},
 	}
 	for fixture in cases {
 		level_data := create_test_level(t)

@@ -41,7 +41,7 @@ test_route_drops_commands_while_busy_and_passes_them_when_free :: proc(t: ^testi
 	defer level.destroy(&data)
 	player := create_gameplay_command_test_player(t)
 	testing.expect(t, game.configure_tactical(&player, game.DEFAULT_TACTICAL_CONFIG))
-	enemies := [?]game.Enemy_Spawn{{position = {5, 3}, health = 20, attack = 1}}
+	enemies := [?]game.Enemy_Spawn{{position = {x = 5, y = 3}, health = 20, attack = 1}}
 	room, built := game.create_room(&data, &player, {enemies = enemies[:]})
 	testing.expect(t, built)
 	defer game.destroy_room(&room)
@@ -106,7 +106,7 @@ test_walk_input_reopens_at_point_eight_seconds_before_the_world_beat :: proc(t: 
 	defer level.destroy(&data)
 	player := create_gameplay_command_test_player(t)
 	testing.expect(t, game.configure_tactical(&player, game.GAME_TACTICAL_CONFIG))
-	enemies := [?]game.Enemy_Spawn{{position = {5, 3}, health = 20, attack = 1}}
+	enemies := [?]game.Enemy_Spawn{{position = {x = 5, y = 3}, health = 20, attack = 1}}
 	room, built := game.create_room(&data, &player, {enemies = enemies[:]})
 	testing.expect(t, built)
 	defer game.destroy_room(&room)
@@ -124,7 +124,7 @@ test_walk_input_reopens_at_point_eight_seconds_before_the_world_beat :: proc(t: 
 	}
 	testing.expect_value(t, player.position, first)
 	testing.expect(t, scene_lane_frame(t, &controller, &room, renderer, &cards, &held, east, true, 0.1))
-	testing.expect_value(t, player.position, game.add_position(first, {1, 0}))
+	testing.expect_value(t, player.position, game.add_position(first, {x = 1, y = 0}))
 	testing.expect_value(t, player.tactical.metrics.decisions, u64(2))
 	testing.expect_value(t, room.pulse_count, u64(0))
 	testing.expect(t, abs(player.tactical.remaining-19.2) < 0.001)
@@ -141,7 +141,7 @@ test_presses_during_the_players_own_action_are_dropped_not_chained :: proc(t: ^t
 	config := game.DEFAULT_TACTICAL_CONFIG
 	config.timed_actions = true
 	testing.expect(t, game.configure_tactical(&player, config))
-	enemies := [?]game.Enemy_Spawn{{position = {5, 3}, health = 20, attack = 1}}
+	enemies := [?]game.Enemy_Spawn{{position = {x = 5, y = 3}, health = 20, attack = 1}}
 	room, built := game.create_room(&data, &player, {enemies = enemies[:]})
 	testing.expect(t, built)
 	defer game.destroy_room(&room)
@@ -155,7 +155,7 @@ test_presses_during_the_players_own_action_are_dropped_not_chained :: proc(t: ^t
 	dt := f32(1.0/60.0)
 	testing.expect(t, scene_lane_frame(t, &controller, &room, renderer, &cards, &held, east, true, dt))
 	first := player.position
-	testing.expect_value(t, first, game.add_position(data.player_spawn, {1, 0}))
+	testing.expect_value(t, first, game.add_position(data.player_spawn, {x = 1, y = 0}))
 	testing.expect(t, render.renderer_blocks_player_input(renderer) && game.tactical_player_busy(&room))
 	// A press on every frame of the step's animation and of its timed second
 	// is dropped (the frame on which the second runs out is already free).
@@ -178,7 +178,7 @@ test_presses_during_the_players_own_action_are_dropped_not_chained :: proc(t: ^t
 		if scene_lane_frame(t, &controller, &room, renderer, &cards, &held, east, index == 0, dt) { moved += 1 }
 	}
 	testing.expect_value(t, moved, 1)
-	testing.expect_value(t, player.position, game.add_position(first, {1, 0}))
+	testing.expect_value(t, player.position, game.add_position(first, {x = 1, y = 0}))
 }
 
 
@@ -193,7 +193,7 @@ test_a_dodge_still_cuts_the_players_own_timed_action_short :: proc(t: ^testing.T
 	config := game.DEFAULT_TACTICAL_CONFIG
 	config.timed_actions = true
 	testing.expect(t, game.configure_tactical(&player, config))
-	enemies := [?]game.Enemy_Spawn{{position = {5, 3}, health = 20, attack = 1}}
+	enemies := [?]game.Enemy_Spawn{{position = {x = 5, y = 3}, health = 20, attack = 1}}
 	room, built := game.create_room(&data, &player, {enemies = enemies[:]})
 	testing.expect(t, built)
 	defer game.destroy_room(&room)
@@ -212,7 +212,7 @@ test_a_dodge_still_cuts_the_players_own_timed_action_short :: proc(t: ^testing.T
 	testing.expect(t, !run_session.step_tactical_controller(&controller, &room, renderer, &cards, &held, 0.25, true, {focused = true}))
 	testing.expect(t, game.tactical_player_busy(&room) && player.tactical.action_remaining < game.TACTICAL_DODGE_SECONDS)
 	testing.expect(t, run_session.step_tactical_controller(&controller, &room, renderer, &cards, &held, 0, true, dodge))
-	testing.expect_value(t, player.position, game.add_position(step, {0, 2}))
+	testing.expect_value(t, player.position, game.add_position(step, {x = 0, y = 2}))
 	testing.expect_value(t, player.tactical.action_remaining, game.TACTICAL_DODGE_SECONDS)
 	testing.expect(t, !held.chord.active)
 }

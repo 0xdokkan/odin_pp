@@ -39,7 +39,7 @@ run_western_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer, dice:
 		if _, added := game.add_owned_card(&player.deck, id); !added { return false }
 	}
 	player.health = 9
-	enemies := [?]game.Enemy_Spawn{{position = {3, 2}, health = 30, attack = 1}, {position = {7, 6}, health = 30, attack = 1, archetype = .Brute}}
+	enemies := [?]game.Enemy_Spawn{{position = {x = 3, y = 2}, health = 30, attack = 1}, {position = {x = 7, y = 6}, health = 30, attack = 1, archetype = .Brute}}
 	room, built := game.create_room(&data, &player, {enemies = enemies[:]})
 	if !built { return false }
 	defer game.destroy_room(&room)

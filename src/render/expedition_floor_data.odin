@@ -68,7 +68,7 @@ refresh_expedition_floor_data :: proc(cache:^Expedition_Floor_Data,room:^game.Ro
 	cache.width=width;cache.height=height;cache.biome=biome
 	cache.sites=keys;cache.site_count=count
 	for tile,i in data.tiles.cells {
-		p:=grid.Position{i%width,i/width};ground:=game.expedition_terrain(biome,p)
+		p:=grid.Position{x = i%width, y = i/width};ground:=game.expedition_terrain(biome,p)
 		if w.biome==.Inferno && w.in_cave==0 && tile.kind==.Door {ground=.Lava}
 		cache.pixels[i]={u8(tile.kind),u8(ground),0,0}
 	}
@@ -77,12 +77,12 @@ refresh_expedition_floor_data :: proc(cache:^Expedition_Floor_Data,room:^game.Ro
 		site:=&w.sites[i];minimum,maximum:=world.site_bounds(site)
 		for y in max(0,minimum.y)..=min(height-1,maximum.y) {
 			for x in max(0,minimum.x)..=min(width-1,maximum.x) {
-				design:=world.site_cell(site,{x,y})
+				design:=world.site_cell(site,{x = x, y = y})
 				if design.inside {cache.pixels[y*width+x].b=u8(design.surface)}
 			}
 		}
 	}
-	offsets:=[4]grid.Position{{-1,0},{1,0},{0,-1},{0,1}}
+	offsets:=[4]grid.Position{{x = -1, y = 0},{x = 1, y = 0},{x = 0, y = -1},{x = 0, y = 1}}
 	for y in 0..<height {for x in 0..<width {
 		pixel:=&cache.pixels[y*width+x]
 		if pixel.r&7==u8(level.Tile_Kind.Void) {continue}
@@ -95,7 +95,7 @@ refresh_expedition_floor_data :: proc(cache:^Expedition_Floor_Data,room:^game.Ro
 			if pixel.b&15==u8(world.Site_Surface.Platform) &&
 				(outside || adjacent.b&15!=u8(world.Site_Surface.Platform)) {pixel.a|=u8(16<<uint(i))}
 		}
-		pixel.b|=expedition_floor_slab_variant({x,y})<<4
+		pixel.b|=expedition_floor_slab_variant({x = x, y = y})<<4
 	}}
 	cache.ready=true;cache.rebuilds+=1
 	return true

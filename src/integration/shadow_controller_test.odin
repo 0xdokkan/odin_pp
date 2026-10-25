@@ -14,7 +14,7 @@ test_m7_shadow_holds_its_clock_for_the_card_walks_on_moves_and_rises_by_command 
 	player := create_gameplay_command_test_player(t)
 	configure_single_card_test_deck(t, &player, .Shadow_Step)
 	testing.expect(t, game.configure_tactical(&player, game.DEFAULT_TACTICAL_CONFIG))
-	enemies := [?]game.Enemy_Spawn{{position = {5, 3}, health = 8, attack = 1}}
+	enemies := [?]game.Enemy_Spawn{{position = {x = 5, y = 3}, health = 8, attack = 1}}
 	room, ok := game.create_room(&data, &player, {enemies = enemies[:]})
 	testing.expect(t, ok)
 	defer game.destroy_room(&room)
@@ -40,7 +40,7 @@ test_m7_shadow_holds_its_clock_for_the_card_walks_on_moves_and_rises_by_command 
 	body := player.position
 	testing.expect(t, run_session.commit_gameplay_command(&room, renderer, &cards, {kind = .Move, origin_phase = .Combat, direction = .East}))
 	testing.expect_value(t, player.position, body)
-	testing.expect_value(t, player.tactical.shadow_position, grid.Position{2, 1})
+	testing.expect_value(t, player.tactical.shadow_position, grid.Position{x = 2, y = 1})
 	testing.expect(t, !render.renderer_blocks_player_input(renderer))
 	testing.expect(t, game.tactical_player_busy(&room))
 	for _ in 0..<40 {
@@ -48,7 +48,7 @@ test_m7_shadow_holds_its_clock_for_the_card_walks_on_moves_and_rises_by_command 
 		run_session.step_tactical_controller(&controller, &room, renderer, &cards, &buffer, 0.25, true, {focused = true})
 	}
 	testing.expect(t, !game.tactical_shadow_active(&room))
-	testing.expect_value(t, player.position, grid.Position{2, 1})
+	testing.expect_value(t, player.position, grid.Position{x = 2, y = 1})
 	testing.expect_value(t, player.tactical.remaining, window)
 	testing.expect_value(t, room.pulse_count, u64(0))
 	testing.expect(t, render.renderer_blocks_player_input(renderer), "the rise keeps its presentation")
@@ -69,7 +69,7 @@ test_m7_shadow_lane_drops_presses_during_a_step_and_keeps_the_tick_chord :: proc
 	config := game.DEFAULT_TACTICAL_CONFIG
 	config.timed_actions = true
 	testing.expect(t, game.configure_tactical(&player, config))
-	enemies := [?]game.Enemy_Spawn{{position = {5, 3}, health = 8, attack = 1}}
+	enemies := [?]game.Enemy_Spawn{{position = {x = 5, y = 3}, health = 8, attack = 1}}
 	room, built := game.create_room(&data, &player, {enemies = enemies[:]})
 	testing.expect(t, built)
 	defer game.destroy_room(&room)
@@ -96,7 +96,7 @@ test_m7_shadow_lane_drops_presses_during_a_step_and_keeps_the_tick_chord :: proc
 	testing.expect(t, player.tactical.shadow_remaining > game.TACTICAL_SHADOW_SECONDS-2*dt)
 	body := player.position
 	testing.expect(t, scene_lane_frame(t, &controller, &room, renderer, &cards, &held, east, true, dt))
-	stepped := game.add_position(body, {1, 0})
+	stepped := game.add_position(body, {x = 1, y = 0})
 	testing.expect_value(t, player.tactical.shadow_position, stepped)
 	// The step's own lockout drops presses too (the frame on which it runs
 	// out is already free).
@@ -119,14 +119,14 @@ test_m7_shadow_lane_drops_presses_during_a_step_and_keeps_the_tick_chord :: proc
 	waited := 0
 	for !scene_lane_frame(t, &controller, &room, renderer, &cards, &held, south, false, dt) && waited < 30 { waited += 1 }
 	testing.expect(t, waited > 0 && f32(waited)*dt < run_session.BEAT_CHORD_SECONDS+dt)
-	testing.expect_value(t, player.tactical.shadow_position, game.add_position(stepped, {0, 1}))
+	testing.expect_value(t, player.tactical.shadow_position, game.add_position(stepped, {x = 0, y = 1}))
 	testing.expect(t, 1 not_in player.tactical.shadow_beats_spent)
 	for _ in 0..<600 {
 		if !game.tactical_shadow_active(&room) { break }
 		testing.expect(t, !scene_lane_frame(t, &controller, &room, renderer, &cards, &held, east, false, dt))
 	}
 	testing.expect(t, !game.tactical_shadow_active(&room))
-	testing.expect_value(t, player.position, game.add_position(stepped, {0, 1}))
+	testing.expect_value(t, player.position, game.add_position(stepped, {x = 0, y = 1}))
 	testing.expect_value(t, player.tactical.remaining, window)
 	testing.expect_value(t, room.pulse_count, u64(0))
 }
@@ -140,7 +140,7 @@ test_m7_shadow_card_on_the_tick_does_not_claim_the_beat :: proc(t: ^testing.T) {
 	player := create_gameplay_command_test_player(t)
 	configure_single_card_test_deck(t, &player, .Shadow_Step)
 	testing.expect(t, game.configure_tactical(&player, game.DEFAULT_TACTICAL_CONFIG))
-	enemies := [?]game.Enemy_Spawn{{position = {5, 3}, health = 8, attack = 1}}
+	enemies := [?]game.Enemy_Spawn{{position = {x = 5, y = 3}, health = 8, attack = 1}}
 	room, ok := game.create_room(&data, &player, {enemies = enemies[:]})
 	testing.expect(t, ok)
 	defer game.destroy_room(&room)

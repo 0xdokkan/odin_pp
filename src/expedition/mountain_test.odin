@@ -26,9 +26,9 @@ test_the_snow_map_has_the_spiral_mountain_at_a_fixed_place :: proc(t: ^testing.T
 		wrong := 0
 		for y in -level.MOUNTAIN_HALF..=level.MOUNTAIN_HALF {
 			for x in -level.MOUNTAIN_HALF..=level.MOUNTAIN_HALF {
-				cell := mountain_cell({x, y})
+				cell := mountain_cell({x = x, y = y})
 				tile, _ := level.tile_at(&data, cell)
-				if int(level.height_at(&data, cell)) != level.mountain_height({x, y}) || tile.kind != .Floor { wrong += 1 }
+				if int(level.height_at(&data, cell)) != level.mountain_height({x = x, y = y}) || tile.kind != .Floor { wrong += 1 }
 			}
 		}
 		testing.expectf(t, wrong == 0, "%d cells of the mountain are not as it is", wrong)
@@ -80,8 +80,8 @@ test_the_summit_is_walked_to_from_the_spawn :: proc(t: ^testing.T) {
 	queue[0] = data.player_spawn
 	seen[data.player_spawn.y*data.tiles.width+data.player_spawn.x] = true
 	for head := 0; head < tail; head += 1 {
-		for offset in ([4]grid.Position{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}) {
-			q := grid.Position{queue[head].x+offset.x, queue[head].y+offset.y}
+		for offset in ([4]grid.Position{{x = 1, y = 0}, {x = -1, y = 0}, {x = 0, y = 1}, {x = 0, y = -1}}) {
+			q := grid.Position{x = queue[head].x+offset.x, y = queue[head].y+offset.y}
 			tile, ok := level.tile_at(&data, q)
 			if !ok || !level.is_walkable(tile.kind) { continue }
 			if abs(int(level.height_at(&data, q))-int(level.height_at(&data, queue[head]))) > 1 { continue }
@@ -138,10 +138,10 @@ test_the_path_is_packed_snow_with_two_icy_stretches :: proc(t: ^testing.T) {
 	icy, plain := 0, 0
 	for y in -level.MOUNTAIN_HALF..=level.MOUNTAIN_HALF {
 		for x in -level.MOUNTAIN_HALF..=level.MOUNTAIN_HALF {
-			ground := game.expedition_terrain(u8(campaign.Biome.Snow), mountain_cell({x, y}))
+			ground := game.expedition_terrain(u8(campaign.Biome.Snow), mountain_cell({x = x, y = y}))
 			testing.expect(t, ground == .Ice || ground == .Plain)
 			if ground == .Ice { icy += 1 } else { plain += 1 }
-			testing.expect_value(t, ground == .Ice, level.mountain_icy({x, y}))
+			testing.expect_value(t, ground == .Ice, level.mountain_icy({x = x, y = y}))
 		}
 	}
 	testing.expect(t, icy >= 12 && plain > icy)
@@ -149,7 +149,7 @@ test_the_path_is_packed_snow_with_two_icy_stretches :: proc(t: ^testing.T) {
 	sand := 0
 	for y in -level.MOUNTAIN_HALF..=level.MOUNTAIN_HALF {
 		for x in -level.MOUNTAIN_HALF..=level.MOUNTAIN_HALF {
-			if game.expedition_terrain(u8(campaign.Biome.Egypt), mountain_cell({x, y})) == .Sand { sand += 1 }
+			if game.expedition_terrain(u8(campaign.Biome.Egypt), mountain_cell({x = x, y = y})) == .Sand { sand += 1 }
 		}
 	}
 	testing.expect(t, sand > 0, "Egypt keeps its sand there")

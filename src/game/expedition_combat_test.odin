@@ -112,15 +112,15 @@ test_memory_cannon_orientation_and_laser_upgrade_hit_the_expected_lane :: proc(t
 	defer level.destroy(&data)
 	defer destroy_room(&room)
 	testing.expect(t, configure_expedition_combat(&room))
-	room.enemies[0].position = {7, 3}
+	room.enemies[0].position = {x = 7, y = 3}
 	room.enemies[0].tactical_cooldown = 1000
 	player.tactical.placement_direction = .East
-	testing.expect(t, deploy_board_device(&room, .Cannon, {4, 3}, 5, 2, room.recent_events))
+	testing.expect(t, deploy_board_device(&room, .Cannon, {x = 4, y = 3}, 5, 2, room.recent_events))
 	if len(room.objects) == 0 { return }
 	object := room.objects[len(room.objects)-1]
 	testing.expect_value(t, object.device_direction, Move_Direction.East)
-	testing.expect(t, memory_device_contains(&room, object, {7, 3}))
-	testing.expect(t, !memory_device_contains(&room, object, {4, 6}))
+	testing.expect(t, memory_device_contains(&room, object, {x = 7, y = 3}))
+	testing.expect(t, !memory_device_contains(&room, object, {x = 4, y = 6}))
 	before := room.enemies[0].health
 	for _ in 0..<3 {
 		tactical_tick(&room, 1, true, false)
@@ -136,31 +136,31 @@ test_expedition_gravity_ice_and_bridge_movement_use_real_collision :: proc(t:^te
 	defer level.destroy(&data);defer destroy_room(&room)
 	configure_expedition_combat(&room)
 	player.tactical.config.low_gravity=true
-	room.enemies[0].position={5,3}
+	room.enemies[0].position={x = 5, y = 3}
 	ref:=enemy_entity(room.enemies[0].id)
 	action:=make_action(.Trigger,PLAYER_ENTITY,entity_target(ref),.Entity)
-	add_effect(&action,move_effect(ref,{6,3}))
+	add_effect(&action,move_effect(ref,{x = 6, y = 3}))
 	hit:=resolve_action(&room,&action);testing.expect(t,hit.accepted)
 	testing.expect_value(t,room.enemies[0].position,level_position(7,3))
 	// A blocked extra cell preserves the original one-cell push.
-	room.enemies[0].position={5,3};_=level.set_tile(&data,{7,3},{.Wall})
+	room.enemies[0].position={x = 5, y = 3};_=level.set_tile(&data,{x = 7, y = 3},{.Wall})
 	hit=resolve_action(&room,&action);testing.expect(t,hit.accepted)
 	testing.expect_value(t,room.enemies[0].position,level_position(6,3))
 	player.tactical.config.low_gravity=false;player.tactical.config.expedition_biome=6
-	player.position={1,2};_=level.set_tile(&data,{2,2},{.Floor});_=level.set_tile(&data,{3,2},{.Floor})
+	player.position={x = 1, y = 2};_=level.set_tile(&data,{x = 2, y = 2},{.Floor});_=level.set_tile(&data,{x = 3, y = 2},{.Floor})
 	// (2,2) is a stable ice cell in the Snow biome.
-	testing.expect_value(t,expedition_terrain(6,{2,2}),Expedition_Terrain.Ice)
-	action=make_action(.Move,PLAYER_ENTITY,cell_target({2,2}),.Walkable_Cell)
-	add_effect(&action,move_effect(PLAYER_ENTITY,{2,2}))
+	testing.expect_value(t,expedition_terrain(6,{x = 2, y = 2}),Expedition_Terrain.Ice)
+	action=make_action(.Move,PLAYER_ENTITY,cell_target({x = 2, y = 2}),.Walkable_Cell)
+	add_effect(&action,move_effect(PLAYER_ENTITY,{x = 2, y = 2}))
 	hit=resolve_action(&room,&action);testing.expect(t,hit.accepted)
 	testing.expect_value(t,player.position,level_position(3,2))
 	player.tactical.config.expedition_biome=9;player.tactical.environment_beat=0
-	testing.expect(t,expedition_bridge_open(&room,{21,10}))
-	player.tactical.environment_beat=2;testing.expect(t,!expedition_bridge_open(&room,{21,10}))
+	testing.expect(t,expedition_bridge_open(&room,{x = 21, y = 10}))
+	player.tactical.environment_beat=2;testing.expect(t,!expedition_bridge_open(&room,{x = 21, y = 10}))
 }
 
 @(private)
-level_position :: proc(x,y:int)->grid.Position {return {x,y}}
+level_position :: proc(x,y:int)->grid.Position {return {x = x, y = y}}
 
 @(test)
 test_expedition_dinosaur_boost_ends_only_on_world_time :: proc(t:^testing.T) {
@@ -180,7 +180,7 @@ test_expedition_dinosaur_boost_ends_only_on_world_time :: proc(t:^testing.T) {
 test_expedition_boss_patterns_are_distinct_and_fully_telegraphed :: proc(t:^testing.T) {
 	data:level.Level;player:Player;room:=tactical_clock_test_room(t,&data,&player,.Demolitionist)
 	defer level.destroy(&data);defer destroy_room(&room)
-	configure_expedition_combat(&room);player.position={4,4};room.enemies[0].position={7,4}
+	configure_expedition_combat(&room);player.position={x = 4, y = 4};room.enemies[0].position={x = 7, y = 4}
 	enemy:=&room.enemies[0];positions:[MAX_ENEMIES_PER_ROOM]grid.Position;positions[0]=enemy.position
 	cyber:=plan_expedition_boss(&room,enemy,enemy.position,&positions,1,0,nil)
 	testing.expect_value(t,cyber.kind,Enemy_Intent_Kind.Attack);testing.expect(t,cyber.windup && cyber.threatened_cell_count>4)
@@ -198,8 +198,8 @@ test_expedition_gravity_wells_pull_with_collision_and_do_not_affect_other_biomes
 	data:level.Level;player:Player;room:=tactical_clock_test_room(t,&data,&player)
 	defer level.destroy(&data);defer destroy_room(&room)
 	configure_expedition_combat(&room)
-	player.position={5,4};player.tactical.config.expedition_biome=10;player.tactical.config.low_gravity=true
-	_=level.set_tile(&data,{5,5},{.Floor});_=level.set_tile(&data,{5,6},{.Floor})
+	player.position={x = 5, y = 4};player.tactical.config.expedition_biome=10;player.tactical.config.low_gravity=true
+	_=level.set_tile(&data,{x = 5, y = 5},{.Floor});_=level.set_tile(&data,{x = 5, y = 6},{.Floor})
 	origin:=player.position
 	expedition_gravity_pulse(&room,room.recent_events)
 	testing.expect(t,player.position!=origin)
@@ -213,9 +213,9 @@ test_memory_wave_pull_and_timed_bomb_resolve_and_expire :: proc(t:^testing.T) {
 	for kind in ([3]Grid_Object_Kind{.Flood,.Black_Hole,.Bomb_Marley}) {
 		data:level.Level;player:Player;room:=tactical_clock_test_room(t,&data,&player)
 		configure_expedition_combat(&room)
-		room.enemies[0].position={6,3};player.tactical.placement_direction=.East;player.tactical.config.expedition_biome=1
+		room.enemies[0].position={x = 6, y = 3};player.tactical.placement_direction=.East;player.tactical.config.expedition_biome=1
 		damage:i32=12 if kind==.Bomb_Marley else 2
-		testing.expect(t,deploy_board_device(&room,kind,{4,3},damage,1,room.recent_events))
+		testing.expect(t,deploy_board_device(&room,kind,{x = 4, y = 3},damage,1,room.recent_events))
 		pulse:Pulse_Report
 		for _ in 0..<(3 if kind==.Bomb_Marley else 2) {tick_memory_devices(&room,&pulse)}
 		testing.expect_value(t,room.enemies[0].health,i32(100)-damage)
@@ -232,9 +232,9 @@ test_memory_wave_pull_and_timed_bomb_resolve_and_expire :: proc(t:^testing.T) {
 test_expedition_gothic_chaser_phases_through_cover_to_clear_landing :: proc(t:^testing.T) {
 	data:level.Level;player:Player;room:=tactical_clock_test_room(t,&data,&player)
 	defer level.destroy(&data);defer destroy_room(&room)
-	configure_expedition_combat(&room);player.tactical.config.expedition_biome=8;player.position={4,4}
-	room.enemies[0].position={7,4};room.enemies[0].intent={}
-	_=level.set_tile(&data,{6,4},{.Wall});_=level.set_tile(&data,{5,4},{.Floor})
+	configure_expedition_combat(&room);player.tactical.config.expedition_biome=8;player.position={x = 4, y = 4}
+	room.enemies[0].position={x = 7, y = 4};room.enemies[0].intent={}
+	_=level.set_tile(&data,{x = 6, y = 4},{.Wall});_=level.set_tile(&data,{x = 5, y = 4},{.Floor})
 	plan_enemy_intents(&room)
 	testing.expect(t,room.enemies[0].intent.phase_through)
 	testing.expect_value(t,room.enemies[0].intent.destination,level_position(5,4))
@@ -265,11 +265,11 @@ test_expedition_wind_checks_occupancy_walls_and_records_real_move :: proc(t:^tes
 	data:level.Level;player:Player;room:=tactical_clock_test_room(t,&data,&player)
 	defer level.destroy(&data);defer destroy_room(&room)
 	configure_expedition_combat(&room);player.tactical.config.expedition_biome=9
-	player.position={4,4};room.enemies[0].position={5,4}
-	testing.expect(t,!expedition_wind_push(&room,PLAYER_ENTITY,{1,0}));testing.expect_value(t,player.position,level_position(4,4))
-	room.enemies[0].position={7,4};_=level.set_tile(&data,{5,4},{.Wall})
-	testing.expect(t,!expedition_wind_push(&room,PLAYER_ENTITY,{1,0}));testing.expect_value(t,player.position,level_position(4,4))
-	_=level.set_tile(&data,{5,4},{.Floor});testing.expect(t,expedition_wind_push(&room,PLAYER_ENTITY,{1,0}))
+	player.position={x = 4, y = 4};room.enemies[0].position={x = 5, y = 4}
+	testing.expect(t,!expedition_wind_push(&room,PLAYER_ENTITY,{x = 1, y = 0}));testing.expect_value(t,player.position,level_position(4,4))
+	room.enemies[0].position={x = 7, y = 4};_=level.set_tile(&data,{x = 5, y = 4},{.Wall})
+	testing.expect(t,!expedition_wind_push(&room,PLAYER_ENTITY,{x = 1, y = 0}));testing.expect_value(t,player.position,level_position(4,4))
+	_=level.set_tile(&data,{x = 5, y = 4},{.Floor});testing.expect(t,expedition_wind_push(&room,PLAYER_ENTITY,{x = 1, y = 0}))
 	testing.expect_value(t,player.position,level_position(5,4))
 	room.enemies[0].archetype=.Chaser;room.enemies[0].intent=make_wait_intent(&room,room.enemies[0].position)
 	tactical_schedule_enemy(&room,&room.enemies[0]);testing.expect_value(t,room.enemies[0].tactical_cooldown,f32(2))
@@ -279,15 +279,15 @@ test_expedition_wind_checks_occupancy_walls_and_records_real_move :: proc(t:^tes
 @(test)
 test_expedition_large_map_paths_keep_flanking_routes_with_bounded_search :: proc(t:^testing.T) {
 	data,created:=level.create(224,224,{.Floor});testing.expect(t,created);defer level.destroy(&data)
-	data.player_spawn={112,112};data.has_player_spawn=true;_=level.set_tile(&data,{112,112},{.Player_Spawn});_=level.set_tile(&data,{204,112},{.Exit})
+	data.player_spawn={x = 112, y = 112};data.has_player_spawn=true;_=level.set_tile(&data,{x = 112, y = 112},{.Player_Spawn});_=level.set_tile(&data,{x = 204, y = 112},{.Exit})
 	player:=create_test_player(t);room,ok:=create_room(&data,&player,{});testing.expect(t,ok);defer destroy_room(&room)
 	configure_expedition_combat(&room)
-	for y in 100..=124 {_=level.set_tile(&data,{118,y},{.Wall})}
+	for y in 100..=124 {_=level.set_tile(&data,{x = 118, y = y},{.Wall})}
 	rebuild_tactical_enemy_distances(&room,room.enemy_path_distances,.Melee)
 	near:=room.enemy_path_distances[112*224+124];testing.expect(t,near>12 && near<50)
 	testing.expect_value(t,room.enemy_path_distances[112*224+170],-1)
 	// Moving the active encounter updates the bounded window on the next plan.
-	player.position={180,112};rebuild_tactical_enemy_distances(&room,room.enemy_path_distances,.Melee)
+	player.position={x = 180, y = 112};rebuild_tactical_enemy_distances(&room,room.enemy_path_distances,.Melee)
 	testing.expect_value(t,room.enemy_path_distances[112*224+170],10)
 	testing.expect_value(t,room.enemy_path_distances[112*224+112],-1)
 }

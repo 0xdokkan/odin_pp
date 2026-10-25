@@ -16,13 +16,13 @@ test_expedition_architecture_key_ignores_animation_camera_and_combat :: proc(t:^
 	data,ok:=level.create(32,32,{.Floor});testing.expect(t,ok);defer level.destroy(&data)
 	w:=new(world.World);defer free(w)
 	w.biome=.Cyber;w.site_count=1
-	w.sites[0]={position={16,16},kind=.Archive,layout_version=world.SITE_LAYOUT_VERSION,active=true}
-	p:=game.Player{position={5,5}};room:=game.Room{level_data=&data,player=&p}
+	w.sites[0]={position={x = 16, y = 16},kind=.Archive,layout_version=world.SITE_LAYOUT_VERSION,active=true}
+	p:=game.Player{position={x = 5, y = 5}};room:=game.Room{level_data=&data,player=&p}
 	r:=new(Renderer);defer free(r)
 	key:=expedition_geometry_key(&room,w)
 	for i in 0..<120 {
 		w.clock=f32(i)*.25;w.beat=u64(i);w.seed=u64(i);w.lane_warning=i%2==0
-		w.sites[0].wave=i%3;p.position={i%16,i%23}
+		w.sites[0].wave=i%3;p.position={x = i%16, y = i%23}
 		room.phase=.Combat if i%2==0 else .Loot
 		r.canvas_width=960+f32(i);r.canvas_height=540
 		r.tactical.camera.position={f32(i),12,25};r.tactical.camera.target={f32(i),0,5}
@@ -35,10 +35,10 @@ test_expedition_architecture_key_invalidates_geometry_site_activation_and_layout
 	data,ok:=level.create(32,32,{.Floor});testing.expect(t,ok);defer level.destroy(&data)
 	w:=new(world.World);defer free(w)
 	w.biome=.Cyber;w.site_count=1
-	w.sites[0]={position={16,16},kind=.Archive,layout_version=world.SITE_LAYOUT_VERSION}
+	w.sites[0]={position={x = 16, y = 16},kind=.Archive,layout_version=world.SITE_LAYOUT_VERSION}
 	room:=game.Room{level_data=&data}
 	previous:=expedition_geometry_key(&room,w)
-	_=level.set_tile(&data,{3,3},{.Wall})
+	_=level.set_tile(&data,{x = 3, y = 3},{.Wall})
 	next:=expedition_geometry_key(&room,w);testing.expect(t,next!=previous);previous=next
 	for change in 0..<9 {
 		switch change {
@@ -67,9 +67,9 @@ test_expedition_chunk_bakes_only_its_walls_without_gpu_and_stays_deterministic :
 	w:=new(world.World);defer free(w);w.biome=.City
 	r:=new(Renderer);defer free(r)
 	room:=game.Room{level_data=&data}
-	for p in ([4]grid.Position{{0,0},{7,7},{8,8},{9,9}}) {_=level.set_tile(&data,p,{.Wall})}
+	for p in ([4]grid.Position{{x = 0, y = 0},{x = 7, y = 7},{x = 8, y = 8},{x = 9, y = 9}}) {_=level.set_tile(&data,p,{.Wall})}
 	builder:Expedition_Geometry_Builder;defer {delete(builder.vertices);delete(builder.lines)}
-	expedition_build_chunk(r,&room,w,{0,0},&builder)
+	expedition_build_chunk(r,&room,w,{x = 0, y = 0},&builder)
 	testing.expect(t,len(builder.vertices)>0 && len(builder.vertices)<=1800)
 	testing.expect(t,len(builder.lines)>0 && len(builder.lines)<=32)
 	for v in builder.vertices {
@@ -81,12 +81,12 @@ test_expedition_chunk_bakes_only_its_walls_without_gpu_and_stays_deterministic :
 	lines:=make([]Expedition_Baked_Line,len(builder.lines));defer delete(lines);copy(lines,builder.lines[:])
 	w.clock=123;w.seed=456;r.tactical.camera.position={100,50,40}
 	clear(&builder.vertices);clear(&builder.lines)
-	expedition_build_chunk(r,&room,w,{0,0},&builder)
+	expedition_build_chunk(r,&room,w,{x = 0, y = 0},&builder)
 	testing.expect_value(t,len(builder.vertices),len(vertices));testing.expect_value(t,len(builder.lines),len(lines))
 	for v,i in builder.vertices {testing.expect_value(t,v,vertices[i])}
 	for line,i in builder.lines {testing.expect_value(t,line,lines[i])}
 	clear(&builder.vertices);clear(&builder.lines)
-	expedition_build_chunk(r,&room,w,{8,8},&builder)
+	expedition_build_chunk(r,&room,w,{x = 8, y = 8},&builder)
 	testing.expect(t,len(builder.vertices)>0 && len(builder.vertices)<=1800)
 	for v in builder.vertices {testing.expect(t,v.position.x>=8 && v.position.x<10 && v.position.z>=8 && v.position.z<10)}
 }
@@ -95,15 +95,15 @@ test_expedition_chunk_bakes_only_its_walls_without_gpu_and_stays_deterministic :
 test_expedition_chunk_excludes_active_fixture_and_restores_dormant_cover :: proc(t:^testing.T) {
 	data,ok:=level.create(32,32,{.Floor});testing.expect(t,ok);defer level.destroy(&data)
 	w:=new(world.World);defer free(w);w.biome=.City;w.site_count=1
-	w.sites[0]={kind=.Archive,position={16,16},layout_version=world.SITE_LAYOUT_VERSION,active=true}
-	_=level.set_tile(&data,{16,16},{.Wall})
-	r:=new(Renderer);defer free(r);expedition_gather_sites(r,w,{0,0},{31,31})
+	w.sites[0]={kind=.Archive,position={x = 16, y = 16},layout_version=world.SITE_LAYOUT_VERSION,active=true}
+	_=level.set_tile(&data,{x = 16, y = 16},{.Wall})
+	r:=new(Renderer);defer free(r);expedition_gather_sites(r,w,{x = 0, y = 0},{x = 31, y = 31})
 	room:=game.Room{level_data=&data}
 	builder:Expedition_Geometry_Builder;defer {delete(builder.vertices);delete(builder.lines)}
-	expedition_build_chunk(r,&room,w,{16,16},&builder)
+	expedition_build_chunk(r,&room,w,{x = 16, y = 16},&builder)
 	testing.expect_value(t,len(builder.vertices),0);testing.expect_value(t,len(builder.lines),0)
 	w.sites[0].active=false
-	expedition_build_chunk(r,&room,w,{16,16},&builder)
+	expedition_build_chunk(r,&room,w,{x = 16, y = 16},&builder)
 	testing.expect(t,len(builder.vertices)>0 && len(builder.vertices)<=600)
 	testing.expect(t,len(builder.lines)>0 && len(builder.lines)<=16)
 	for v in builder.vertices {
@@ -112,7 +112,7 @@ test_expedition_chunk_excludes_active_fixture_and_restores_dormant_cover :: proc
 		testing.expect(t,abs(rl.Vector3LengthSqr(v.normal)-1)<.00001)
 	}
 	clear(&builder.vertices);clear(&builder.lines);w.sites[0].active=true
-	expedition_build_chunk(r,&room,w,{16,16},&builder)
+	expedition_build_chunk(r,&room,w,{x = 16, y = 16},&builder)
 	testing.expect_value(t,len(builder.vertices),0)
 }
 
@@ -170,7 +170,7 @@ test_expedition_all_biomes_static_site_bake_is_complete_bounded_and_clock_indepe
 	defer {delete(a.vertices);delete(a.lines);delete(b.vertices);delete(b.lines)}
 	for biome in campaign.Biome.Cyber..<campaign.Biome.Count {for kind in world.Site_Kind {for orientation in u8(0)..<4 {
 		w.biome=biome;w.boss_defeated=true
-		site:=world.Site{position={32,32},kind=kind,orientation=orientation,active=true,layout_version=world.SITE_LAYOUT_VERSION}
+		site:=world.Site{position={x = 32, y = 32},kind=kind,orientation=orientation,active=true,layout_version=world.SITE_LAYOUT_VERSION}
 		clear(&a.vertices);clear(&a.lines);clear(&b.vertices);clear(&b.lines)
 		draw_expedition_site_static({mode=.Bake,builder=&a},w,&site)
 		// A defeated boss must not accidentally bake the rotating exit ring.

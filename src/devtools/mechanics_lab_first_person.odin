@@ -42,7 +42,7 @@ import render "../render"
 mechanics_lab_first_person :: proc(window: ^app.Window, renderer: ^render.Renderer, room: ^game.Room, data: ^level.Level,
 	controller: ^run_session.Tactical_Controller, cards: ^run_session.Card_Interaction_State, buffer: ^run_session.Buffered_Gameplay_Command) -> bool {
 	player := room.player
-	center := grid.Position{run_session.MECHANICS_LAB_WIDTH/2, run_session.MECHANICS_LAB_HEIGHT/2}
+	center := grid.Position{x = run_session.MECHANICS_LAB_WIDTH/2, y = run_session.MECHANICS_LAB_HEIGHT/2}
 	fp := &renderer.tactical.first_person
 	foe :: mechanics_lab_enemy
 	spawn :: mechanics_lab_spawn_enemy
@@ -95,11 +95,11 @@ mechanics_lab_first_person :: proc(window: ^app.Window, renderer: ^render.Render
 	player.equipment = {}
 	for kind in ([6]game.Status_Kind{.Deflect, .Arrows, .Fate, .Venom_Blade, .Poison, .Burn}) { _, _ = game.remove_status(room, game.PLAYER_ENTITY, kind) }
 	player.tactical.dodge_recovery, player.tactical.facing = 0, .North
-	ghoul_id := spawn(room, {center.x, center.y-3}, 40)
-	ice := grid.Position{center.x-2, center.y}
+	ghoul_id := spawn(room, grid.offset(center, 0, -3), 40)
+	ice := grid.offset(center, -2, 0)
 	append(&room.objects, game.Grid_Object{id = room.next_object_id, kind = .Ice_Block, position = ice, health = 4, max_health = 4})
 	room.next_object_id += 1
-	hidden_id := spawn(room, {center.x-4, center.y}, 30, .Archer)
+	hidden_id := spawn(room, grid.offset(center, -4, 0), 30, .Archer)
 	if ghoul_id == 0 || hidden_id == 0 { fmt.eprintln("mechanics lab: no room for the first person's foes"); return false }
 	render.clear_event_animations(renderer)
 	for _ in 0..<12 { frame(window, renderer, room, controller, cards, buffer) }
@@ -229,7 +229,7 @@ mechanics_lab_first_person :: proc(window: ^app.Window, renderer: ^render.Render
 	// The tracer's flight to the wall, eight cells off, and the stone chips
 	// its spark throws off.
 	for _ in 0..<16 { frame(window, renderer, room, controller, cards, buffer) }
-	edge := grid.Position{player.position.x, run_session.MECHANICS_LAB_HEIGHT-1}
+	edge := grid.Position{x = player.position.x, y = run_session.MECHANICS_LAB_HEIGHT-1}
 	tile, inside := level.tile_at(data, edge)
 	_, object := game.grid_object_at(room, edge)
 	if room.first_person.shots != shots+1 || stone.hit != .Solid || stone.cell != edge || !inside || level.is_walkable(tile.kind) || object ||
@@ -243,7 +243,7 @@ mechanics_lab_first_person :: proc(window: ^app.Window, renderer: ^render.Render
 	keys := render.first_person_keys(renderer)
 	if keys != ([4]game.Move_Direction{.East, .South, .West, .North}) { fmt.eprintln("mechanics lab: the keys facing east are", keys); return false }
 	shot = 0
-	ways := [4]grid.Position{{1, 0}, {0, 1}, {-1, 0}, {0, -1}}
+	ways := [4]grid.Position{{x = 1, y = 0}, {x = 0, y = 1}, {x = -1, y = 0}, {x = 0, y = -1}}
 	for way, index in ways {
 		free_board(window, renderer, room, controller, cards, buffer)
 		from := player.position
@@ -264,7 +264,7 @@ mechanics_lab_first_person :: proc(window: ^app.Window, renderer: ^render.Render
 		}
 	}
 	// W into a foe is a bump.
-	bumped_id := spawn(room, {center.x+1, center.y}, 30)
+	bumped_id := spawn(room, grid.offset(center, 1, 0), 30)
 	free_board(window, renderer, room, controller, cards, buffer)
 	if bumped_id == 0 || !run_session.commit_gameplay_command(room, renderer, cards, {kind = .Move, origin_phase = .Combat, direction = keys[0]}) ||
 	   player.position != center || foe(room, bumped_id).health != 30-player.stats.attack {
@@ -277,7 +277,7 @@ mechanics_lab_first_person :: proc(window: ^app.Window, renderer: ^render.Render
 	dodge := run_session.Tactical_Controller_Input{shift = true}
 	dodge.directions[1] = true
 	frame(window, renderer, room, controller, cards, buffer, input = dodge)
-	if player.position != (grid.Position{center.x, center.y+2}) {
+	if player.position != (grid.offset(center, 0, 2)) {
 		fmt.eprintln("mechanics lab: Shift and D facing east dodged to", player.position); return false
 	}
 	for _ in 0..<40 { frame(window, renderer, room, controller, cards, buffer) }
@@ -287,7 +287,7 @@ mechanics_lab_first_person :: proc(window: ^app.Window, renderer: ^render.Render
 	_ = mechanics_lab_clear_arena(room)
 	player.tactical.dodge_recovery = 0
 	fp.yaw, fp.pitch = 0, 0
-	attacker_id := spawn(room, {player.position.x+1, player.position.y}, 60, free = true)
+	attacker_id := spawn(room, grid.offset(player.position, 1, 0), 60, free = true)
 	if attacker_id == 0 { fmt.eprintln("mechanics lab: no room for the free ghoul"); return false }
 	prompted := false
 	for _ in 0..<600 {
@@ -308,7 +308,7 @@ mechanics_lab_first_person :: proc(window: ^app.Window, renderer: ^render.Render
 	land := run_session.Tactical_Controller_Input{}
 	land.directions[3] = true
 	frame(window, renderer, room, controller, cards, buffer, input = land)
-	if room.qte.kind != .None || player.position != (grid.Position{from.x, from.y-1}) {
+	if room.qte.kind != .None || player.position != (grid.offset(from, 0, -1)) {
 		fmt.eprintln("mechanics lab: E then A facing east dodged to", player.position, "from", from); return false
 	}
 	// A blow let through: the edges flash red.

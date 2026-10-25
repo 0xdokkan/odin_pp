@@ -383,7 +383,7 @@ pinball_step :: proc(room: ^Room) {
 	foe: u32
 	for dy in -1..=1 {
 		for dx in -1..=1 {
-			cell := grid.Position{s.cell.x+dx, s.cell.y+dy}
+			cell := grid.offset(s.cell, dx, dy)
 			if !lasso_cell_is_solid(room, cell) { continue }
 			if t, n, hit := pinball_square_contact(s.origin, s.heading, s.run, cell); hit && t < best {
 				next, best, normal, wall = .Solid, t, n, cell
@@ -467,9 +467,9 @@ pinball_eight_way :: proc(from, to, fallback: Pinball_Vec) -> grid.Position {
 	sx := 1 if d.x > 0 else (-1 if d.x < 0 else 0)
 	sy := 1 if d.y > 0 else (-1 if d.y < 0 else 0)
 	ax, ay := abs(d.x), abs(d.y)
-	if ay <= ax*0.414 { return {sx, 0} }
-	if ax <= ay*0.414 { return {0, sy} }
-	return {sx, sy}
+	if ay <= ax*0.414 { return {x = sx, y = 0} }
+	if ax <= ay*0.414 { return {x = 0, y = sy} }
+	return {x = sx, y = sy}
 }
 
 // The ball touches the foe `id`: it takes the value, the player's damage; then

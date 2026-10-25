@@ -31,19 +31,19 @@ test_the_hit_marks_follow_the_foes_a_cast_would_really_hit :: proc(t: ^testing.T
 	prepare_card_range_preview(renderer, &room, 11, &preview)
 	testing.expect_value(t, preview.hit_count, 2)
 	for mark in preview.hits[:preview.hit_count] {
-		testing.expect(t, mark.cell == {7, 6} || mark.cell == {6, 7}, fmt.tprintf("marked %v", mark.cell))
+		testing.expect(t, mark.cell == {x = 7, y = 6} || mark.cell == {x = 6, y = 7}, fmt.tprintf("marked %v", mark.cell))
 		testing.expect(t, !mark.locked)
 	}
 	// With the mouse on one of them the cast closes on it: only it locks.
-	renderer.has_hovered_cell, renderer.hovered_cell = true, {7, 6}
+	renderer.has_hovered_cell, renderer.hovered_cell = true, {x = 7, y = 6}
 	prepare_card_range_preview(renderer, &room, 11, &preview)
 	locked := 0
 	for mark in preview.hits[:preview.hit_count] {
-		if mark.locked { locked += 1; testing.expect_value(t, mark.cell, grid.Position{7, 6}) }
+		if mark.locked { locked += 1; testing.expect_value(t, mark.cell, grid.Position{x = 7, y = 6}) }
 	}
 	testing.expect_value(t, locked, 1)
 	// The mouse on an empty cell locks no one.
-	renderer.hovered_cell = {3, 3}
+	renderer.hovered_cell = {x = 3, y = 3}
 	prepare_card_range_preview(renderer, &room, 11, &preview)
 	for mark in preview.hits[:preview.hit_count] { testing.expect(t, !mark.locked) }
 	// A Dash lists the foes on its line and hits none: nothing is marked.
@@ -66,13 +66,13 @@ test_a_card_only_under_the_mouse_shows_faintly_without_evaluating_the_pointer ::
 	preview: Card_Range_Preview
 	player.deck.hand_count = 1
 	player.deck.hand[0] = {id = 13, definition_id = .Strike, lifetime = .Permanent}
-	renderer.has_hovered_cell, renderer.hovered_cell = true, {7, 6}
+	renderer.has_hovered_cell, renderer.hovered_cell = true, {x = 7, y = 6}
 	prepare_card_range_preview(renderer, &room, 13, &preview, true)
 	testing.expect(t, preview.active && preview.faint)
 	testing.expect(t, !preview.has_hover)
 	testing.expect_value(t, preview.hit_count, 2)
 	for mark in preview.hits[:preview.hit_count] { testing.expect(t, !mark.locked) }
-	testing.expect(t, card_range_contains(&preview, {7, 6}))
+	testing.expect(t, card_range_contains(&preview, {x = 7, y = 6}))
 	// A chosen card is never faint, and no card at all is no preview.
 	prepare_card_range_preview(renderer, &room, 13, &preview)
 	testing.expect(t, preview.active && !preview.faint && preview.has_hover)

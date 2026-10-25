@@ -34,7 +34,7 @@ test_cyber_outdoor_modules_are_deterministic_bounded_and_selectively_lit :: proc
 	other:=Ink_Pass{mode=.Bake,builder=&again}
 	rocks,servers:=0,0
 	for i in 0..<96 {
-		cell:=grid.Position{i*7%61,i*13%59}
+		cell:=grid.Position{x = i*7%61, y = i*13%59}
 		clear(&b.vertices);clear(&b.lines);clear(&again.vertices);clear(&again.lines)
 		draw_expedition_cyber_outdoor(pass,cell)
 		draw_expedition_cyber_outdoor(other,cell)
@@ -103,7 +103,7 @@ test_cyber_site_walls_and_factory_arms_stay_on_actual_blocked_cells :: proc(t:^t
 	for &site in w.sites[:w.site_count] {
 		lo,hi:=world.site_bounds(&site)
 		for y in lo.y..=hi.y {for x in lo.x..=hi.x {
-			cell:=grid.Position{x,y};d:=world.site_cell(&site,cell);tile,ok:=level.tile_at(&data,cell)
+			cell:=grid.Position{x = x, y = y};d:=world.site_cell(&site,cell);tile,ok:=level.tile_at(&data,cell)
 			if !ok || tile.kind!=.Wall || !d.inside || (d.fixture && site.active) {continue}
 			clear(&b.vertices);clear(&b.lines)
 			draw_expedition_cyber_wall(pass,&room,&site,cell,d)
@@ -124,7 +124,7 @@ test_cyber_fixtures_preserve_walkable_centers_and_rotated_boss_opening :: proc(t
 	b:Expedition_Geometry_Builder;defer {delete(b.vertices);delete(b.lines)}
 	pass:=Ink_Pass{mode=.Bake,builder=&b}
 	for kind in world.Site_Kind {if kind==.Cave {continue};for orientation in u8(0)..<4 {
-		site:=world.Site{kind=kind,position={32,32},orientation=orientation,active=true,layout_version=world.SITE_LAYOUT_VERSION}
+		site:=world.Site{kind=kind,position={x = 32, y = 32},orientation=orientation,active=true,layout_version=world.SITE_LAYOUT_VERSION}
 		clear(&b.vertices);clear(&b.lines)
 		draw_expedition_cyber_fixture(pass,&site,false)
 		cyber_test_mesh(t,&b)
@@ -134,7 +134,7 @@ test_cyber_fixtures_preserve_walkable_centers_and_rotated_boss_opening :: proc(t
 			// The boss lintel is overhead; all geometry within actor height
 			// must still occupy one of the two real rotated portal supports.
 			if kind==.Boss && v.position.y>=3.22 {continue}
-			cell:=grid.Position{int(math.floor(v.position.x)),int(math.floor(v.position.z))}
+			cell:=grid.Position{x = int(math.floor(v.position.x)), y = int(math.floor(v.position.z))}
 			d:=world.site_cell(&site,cell)
 			testing.expect(t,d.fixture && d.wall)
 		}

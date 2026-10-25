@@ -6,7 +6,7 @@ import level "../level"
 
 tactical_clock_test_room :: proc(t: ^testing.T, data: ^level.Level, player: ^Player,
 	archetype: Enemy_Archetype = .Chaser) -> Room {
-	spawns := [?]Enemy_Spawn{{position = {7, 4}, health = 100, attack = 3, archetype = archetype}}
+	spawns := [?]Enemy_Spawn{{position = {x = 7, y = 4}, health = 100, attack = 3, archetype = archetype}}
 	return create_enemy_rework_room(t, data, player, spawns[:])
 }
 
@@ -154,7 +154,7 @@ test_tactical_clock_stagger_cancels_a_slow_enemy_before_status_expiry :: proc(t:
 test_tactical_clock_heavy_card_leaves_exposure_after_its_own_cost :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {5, 4}, health = 100, attack = 3}}
+	spawns := [?]Enemy_Spawn{{position = {x = 5, y = 4}, health = 100, attack = 3}}
 	room := create_enemy_rework_room(t, &data, &player, spawns[:])
 	defer level.destroy(&data)
 	defer destroy_room(&room)
@@ -180,11 +180,11 @@ test_tactical_clock_rejected_input_does_not_charge_or_reset_time :: proc(t: ^tes
 	room := tactical_clock_test_room(t, &data, &player)
 	defer level.destroy(&data)
 	defer destroy_room(&room)
-	player.position = {1, 1}
+	player.position = {x = 1, y = 1}
 	testing.expect(t, !tactical_tick(&room, 0.5, true, false))
 	before := player.tactical
 	testing.expect_value(t, try_move_player(&room, .North), Action_Result.Blocked)
-	testing.expect_value(t, player.position, grid.Position{1, 1})
+	testing.expect_value(t, player.position, grid.Position{x = 1, y = 1})
 	testing.expect_value(t, player.tactical, before)
 	testing.expect(t, !tactical_tick(&room, 10, false, true))
 	testing.expect_value(t, player.tactical, before)
@@ -226,7 +226,7 @@ test_tactical_clock_walks_do_not_retarget_a_committed_archer_shot :: proc(t: ^te
 	tactical_tick(&room, 4-2*TACTICAL_MOVE_SECONDS, true, false)
 	drain_tactical_test_pulse(t, &room)
 	testing.expect(t, room.enemies[0].aim_ready)
-	testing.expect_value(t, room.enemies[0].aim_anchor, grid.Position{4, 4})
+	testing.expect_value(t, room.enemies[0].aim_anchor, grid.Position{x = 4, y = 4})
 	tactical_tick(&room, 1, true, false)
 	drain_tactical_test_pulse(t, &room)
 	testing.expect_value(t, player.health, i32(100))

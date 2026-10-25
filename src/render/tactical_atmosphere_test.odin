@@ -15,7 +15,7 @@ test_clear_room_light_follows_presentation_then_resets_in_next_combat :: proc(t:
 	config := game.DEFAULT_TACTICAL_CONFIG
 	config.vision_size = 3
 	testing.expect(t, game.configure_tactical(&player, config))
-	enemies := [?]game.Enemy_Spawn{{position = {7, 3}, health = 1, attack = 1}}
+	enemies := [?]game.Enemy_Spawn{{position = {x = 7, y = 3}, health = 1, attack = 1}}
 	room, built := game.create_room(&data, &player, {enemies = enemies[:]})
 	testing.expect(t, built)
 	defer game.destroy_room(&room)

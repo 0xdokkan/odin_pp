@@ -38,18 +38,18 @@ test_legacy_80_96_112_slots_resume_exact_tiles_and_keep_original_size :: proc(t:
 		path := scratch_path(fmt.tprintf("odin-pp-legacy-world-%d.json", int(biome))); defer os.remove(path)
 		old := new(Legacy_Test_Snapshot); defer free(old)
 		side := legacy_map_size(biome)
-		old.valid = true; old.world = {biome, 42, -1, 32, {9, side/2}}
-		old.phase = .Loot; old.exit_position = {side-8, side/2}
+		old.valid = true; old.world = {biome, 42, -1, 32, {x = 9, y = side/2}}
+		old.phase = .Loot; old.exit_position = {x = side-8, y = side/2}
 		old.next_enemy_id = 1; old.next_trap_id = 1; old.next_object_id = 1
 		created: bool
 		old.player, created = game.create_player({max_health = 32, attack = 2, defense = 1})
 		testing.expect(t, created && game.configure_tactical(&old.player, game.EXPEDITION_TACTICAL_CONFIG))
-		old.player.position = {9, side/2}
+		old.player.position = {x = 9, y = side/2}
 		for &tile in old.tiles[:side*side] { tile.kind = .Floor }
 		old.tiles[(side/2)*side+7].kind = .Player_Spawn
 		old.tiles[(side/2)*side+side-8].kind = .Exit
 		old.tiles[8*side+8].kind = .Wall
-		old.obstacles[0] = {{8, 8}}; old.obstacle_count = 1
+		old.obstacles[0] = {{x = 8, y = 8}}; old.obstacle_count = 1
 		old.ground_pool[(side-3)*side+side-4] = 3
 		c: campaign.Campaign; campaign.initialize(&c); defer campaign.destroy(&c)
 		c.unlocked[biome] = true; testing.expect(t, campaign.begin_run(&c, biome, 42))

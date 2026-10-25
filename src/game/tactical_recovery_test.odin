@@ -26,7 +26,7 @@ test_tactical_recovery_walks_are_free_but_attacks_and_cards_are_unavailable :: p
 	testing.expect_value(t, wait_player_turn(&room), Action_Result.Invalid_Phase)
 	testing.expect_value(t, use_player_ability(&room, .Guard), Action_Result.Invalid_Phase)
 	testing.expect(t, !try_dodge_player(&room, .South))
-	testing.expect(t, !begin_diagonal_qte(&room, {1, 1}))
+	testing.expect(t, !begin_diagonal_qte(&room, {x = 1, y = 1}))
 	testing.expect_value(t, room.recent_events^, log)
 	testing.expect_value(t, room.enemies[0].health, health)
 	testing.expect_value(t, player.deck, deck)
@@ -36,7 +36,7 @@ test_tactical_recovery_walks_are_free_but_attacks_and_cards_are_unavailable :: p
 		testing.expect_value(t, room.pulse_count, u64(0))
 		testing.expect(t, !room.tactical_pulse.pending)
 	}
-	testing.expect_value(t, player.position, grid.Position{1, 1})
+	testing.expect_value(t, player.position, grid.Position{x = 1, y = 1})
 }
 
 @(test)
@@ -156,8 +156,8 @@ test_tactical_recovery_defense_qte_suspends_time_then_resumes_same_window :: pro
 test_tactical_recovery_walk_still_resolves_lethal_floor_hazards :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {7, 1}, health = 100, attack = 1}}
-	objects := [?]Grid_Object_Spawn{{kind = .Fire, position = {4, 5}}}
+	spawns := [?]Enemy_Spawn{{position = {x = 7, y = 1}, health = 100, attack = 1}}
+	objects := [?]Grid_Object_Spawn{{kind = .Fire, position = {x = 4, y = 5}}}
 	room := create_enemy_rework_room(t, &data, &player, spawns[:], objects[:])
 	defer level.destroy(&data)
 	defer destroy_room(&room)
