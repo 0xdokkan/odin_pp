@@ -46,6 +46,7 @@ run_roguelike_directly :: proc(rs: ^run_session.Roguelike_Session, options: devt
 		profile_path    = profile_path() if run_session.roguelike_profile_enabled(rs) else "",
 		enable_audio    = options.smoke_mode_count == 0,
 		letterbox_color = render.LETTERBOX_COLOR,
+		keep_running    = options.smoke_mode_count > 0,
 	})
 	if !ok {
 		run_session.roguelike_destroy(rs)

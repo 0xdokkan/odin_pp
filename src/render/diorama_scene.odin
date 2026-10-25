@@ -170,9 +170,16 @@ draw_tactical_tile_body :: proc(renderer: ^Renderer, room: ^game.Room, tile: lev
 	floor := rl.Color{43+shade, 52+shade, 65+shade, 255}
 	if renderer.tactical.snapshot.family == .Twin_Courts { floor = {38+shade, 51+shade, 69+shade, 255} }
 	if tile.kind != .Wall { floor = card_range_floor_color(preview, cell, floor) }
-	draw_resin_cube(renderer, p+rl.Vector3{0, -(rise+0.31)*0.5, 0}, 0.99, rise+0.31, 0.99, RESIN_DARK)
-	draw_resin_cube(renderer, p+rl.Vector3{0, -0.05, 0}, 0.945, 0.135, 0.945, floor)
-	if rise > 0 { draw_height_steps(renderer, cell, p, rise) }
+	// On a ramp or a hill the tile follows the sculpted surface (level/surface.odin); a level tile is the block it
+	// always was.
+	surface, sculpted := cell_surface(cell)
+	sloped := sculpted && !level.surface_flat(surface)
+	if sloped {
+		draw_sloped_tile(renderer, cell, surface, floor)
+	} else {
+		draw_resin_cube(renderer, p+rl.Vector3{0, -(rise+0.31)*0.5, 0}, 0.99, rise+0.31, 0.99, RESIN_DARK)
+		draw_resin_cube(renderer, p+rl.Vector3{0, -0.05, 0}, 0.945, 0.135, 0.945, floor)
+	}
 	if tile.kind == .Wall {
 		draw_resin_cube(renderer, p+rl.Vector3{0, 0.10, 0}, 0.98, 0.16, 0.98, DIORAMA_EDGE)
 		if index, owned := level.structure_index_at(room.level_data, cell); owned {
@@ -193,7 +200,12 @@ draw_tactical_tile_body :: proc(renderer: ^Renderer, room: ^game.Room, tile: lev
 		}
 		return
 	}
-	// Slim inset corner fittings and occasional engraving preserve empty centers.
+	// Slim inset corner fittings and occasional engraving preserve empty centers. A sloped tile is plain: they would
+	// sink into its high side.
+	if sloped {
+		if tile.kind == .Exit { draw_voxel_exit(renderer, cell) }
+		return
+	}
 	for sign in ([2]f32{-1, 1}) {
 		rl.DrawCube(p+rl.Vector3{sign*0.35, 0.02, sign*0.40}, 0.17, 0.006, 0.018, {28, 40, 57, 255})
 		rl.DrawCube(p+rl.Vector3{sign*0.40, 0.02, sign*0.35}, 0.018, 0.006, 0.17, {28, 40, 57, 255})
@@ -215,6 +227,55 @@ draw_tactical_tile_body :: proc(renderer: ^Renderer, room: ^game.Room, tile: lev
 		rl.DrawCubeWires(p+rl.Vector3{0, 0.105, 0}, 0.70, 0.01, 0.70, DIORAMA_EDGE)
 		draw_voxel_exit(renderer, cell)
 	}
+}
+
+// A tile on a ramp or a hill: its top follows the sculpted surface (four triangles round the middle, with smoothed
+// light), its sides go down to a little under its lowest corner, and the dark column under it stops there.
+@(private = "file")
+draw_sloped_tile :: proc(renderer: ^Renderer, cell: grid.Position, surface: level.Surface_Cell, color: rl.Color) {
+	step := game.HEIGHT_STEP_DRAWN
+	// The tile is inset like the level block (0.945 of a cell) and its top lifted like the block's top.
+	INSET :: f32(0.0275)
+	LIFT :: f32(0.0175)
+	places := [4][2]f32{{INSET, INSET}, {1-INSET, INSET}, {1-INSET, 1-INSET}, {INSET, 1-INSET}}
+	corners: [4]rl.Vector3
+	lowest := surface.center
+	for place, i in places {
+		height := level.surface_cell_height_at(surface, place.x, place.y)
+		corners[i] = {f32(cell.x)+place.x, height*step+LIFT, f32(cell.y)+place.y}
+		lowest = min(lowest, surface.corners[i])
+	}
+	middle := rl.Vector3{f32(cell.x)+0.5, surface.center*step+LIFT, f32(cell.y)+0.5}
+	floor := lowest*step
+	draw_resin_cube(renderer, {middle.x, (floor-0.31)*0.5, middle.z}, 0.99, floor+0.31, 0.99, RESIN_DARK)
+	bottom := floor-0.1175
+	faces: [4]rl.Vector3
+	for i in 0..<4 { faces[i] = rl.Vector3Normalize(rl.Vector3CrossProduct(corners[(i+1)%4]-middle, corners[i]-middle)) }
+	rlgl.SetTexture(rlgl.GetTextureIdDefault())
+	rlgl.Begin(rlgl.TRIANGLES)
+	rlgl.Color4ub(color.r, color.g, color.b, color.a)
+	vertex :: proc(p, n: rl.Vector3, cell: grid.Position) {
+		rlgl.Normal3f(n.x, n.y, n.z)
+		rlgl.TexCoord2f(p.x-f32(cell.x), p.z-f32(cell.y))
+		rlgl.Vertex3f(p.x, p.y, p.z)
+	}
+	up := rl.Vector3Normalize(faces[0]+faces[1]+faces[2]+faces[3])
+	for i in 0..<4 {
+		a, b := i, (i+1)%4
+		vertex(middle, up, cell)
+		vertex(corners[b], rl.Vector3Normalize(faces[b]+faces[a]), cell)
+		vertex(corners[a], rl.Vector3Normalize(faces[a]+faces[(a+3)%4]), cell)
+	}
+	// The sides, each turned out from the tile.
+	sides := [4]rl.Vector3{{0, 0, -1}, {1, 0, 0}, {0, 0, 1}, {-1, 0, 0}}
+	for i in 0..<4 {
+		a, b := corners[i], corners[(i+1)%4]
+		low_a, low_b := rl.Vector3{a.x, bottom, a.z}, rl.Vector3{b.x, bottom, b.z}
+		quad := [6]rl.Vector3{a, low_a, low_b, a, low_b, b}
+		if rl.Vector3DotProduct(rl.Vector3CrossProduct(low_a-a, low_b-a), sides[i]) < 0 { quad = {a, low_b, low_a, a, b, low_b} }
+		for p in quad { vertex(p, sides[i], cell) }
+	}
+	rlgl.End()
 }
 
 @(private)

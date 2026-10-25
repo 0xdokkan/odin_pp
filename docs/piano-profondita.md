@@ -47,7 +47,7 @@ La tabella è in ordine di priorità, cioè l'ordine della scaletta qui sotto.
 | Priorità | Fase | Contenuto | Dipende da | Stato | Commit |
 |---|---|---|---|---|---|
 | 0 | 0 | Misure di partenza: il benchmark arriva a rilievi, montagna e grotte (proposta di Claude) | — | Fatta | vedi Esito |
-| 1 | 1 | Terreno scolpito: rampe, colline e dirupi di roccia, solo grafica | — (meglio dopo la 0) | Da fare | — |
+| 1 | 1 | Terreno scolpito: rampe, colline e dirupi di roccia, solo grafica | — (meglio dopo la 0) | Fatta | vedi Esito |
 | 2 | 2 | Posizioni con il piano: il terzo numero, tutto a «terra» | — | Da fare | — |
 | 3 | 3 | Piani nel laboratorio: dati e regole | 2 | Da fare | — |
 | 4 | 4 | Piani nel laboratorio: trasparenze, contorni, mouse, luce | 3 (1 per l'aspetto) | Da fare | — |
@@ -303,8 +303,8 @@ regole normali.
     una collina a gradoni diventa una collina;
   - dove c'è un dirupo l'angolo non si unisce: resta lo spigolo, e sotto c'è
     una parete di roccia;
-  - quattro triangoli per casella attorno al centro, a facce piatte: lo stile
-    low-poly al neon del gioco.
+  - quattro triangoli per casella attorno al centro; la luce è morbida sulle
+    salite e sfaccettata sulle pareti di roccia (risposte della Fase 1).
 - **Il centro resta alla sua altezza**, perché le regole contano l'altezza
   della casella e gli scontri si fanno al centro delle caselle: ciò che si vede
   coincide con ciò che conta.
@@ -601,11 +601,12 @@ regole della sezione 1: fammi prima le domande della fase e fermati alla fine.
   errori: il primo dopo 13 atti su 18 (fino alla montagna; mancano grotta,
   cannone, buco nero, dinosauro e pesca), il secondo già nel primo atto. In
   tutti e due i casi il processo era vivo ma non scriveva più, mentre l'utente
-  usava altre finestre. Causa probabile: senza il fuoco della finestra il host
-  mette in pausa le scene, e `force_focus` vale per gli smoke delle spedizioni,
-  dell'hub e dei minigiochi, non per quello del laboratorio
-  (`src/application/launcher.odin:76`, `src/engine/host/host.odin:159`).
-  L'utente ha chiesto di fare comunque il commit. Di questa fase, il
+  usava altre finestre. La causa, verificata all'inizio della Fase 1, è la
+  finestra ridotta a icona: senza il flag `WINDOW_ALWAYS_RUN` raylib aspetta un
+  evento e smette di disegnare. Prova: 15 secondi da ridotta a icona, log
+  fermo; rimessa a posto, lo smoke riparte e finisce. (Prima avevo indicato il
+  fuoco della finestra: era sbagliato.) L'utente ha chiesto di fare comunque il
+  commit. Di questa fase, il
   laboratorio vede solo il cambio di scheda video, e gli atti arrivati in fondo
   sulla RTX non hanno dato errori. La correzione è il primo passo della Fase 1.
 
@@ -675,9 +676,15 @@ solo grafica: le regole non cambiano. Lo scolpire a mano arriva con l'editor
 - **Spedizioni:** i blocchi 8×8 si costruiscono con la superficie. La mesh
   serve solo vicino a un cambio di quota: le zone piatte restano sul piano di
   oggi, quindi un bioma piatto non costa nulla in più.
+- **Salite smussate** (risposta 2): le normali si mediano fra i triangoli
+  vicini della stessa superficie, così rampe e colline hanno una luce morbida.
 - **Dirupi:** pareti di roccia sfaccettate, con qualche irregolarità sotto lo
-  spigolo, mai sopra, dove si cammina.
-- **Bordo al neon** in cima ai dirupi, se l'utente lo vuole.
+  spigolo, mai sopra, dove si cammina; senza le righe dei gradini
+  (risposta 5).
+- **Bordo al neon** in cima ai dirupi, tenue, del colore del bioma
+  (risposta 4).
+- **Prestazioni:** al massimo +10% di media sui gruppi della Fase 0
+  (risposta 6).
 - **Personaggi, mouse e ombre** sulla superficie nuova: `point_ground` legge i
   triangoli, il mouse li colpisce, le ombre a contatto seguono il terreno.
 - **Le regole non cambiano:** `src/game/height.odin` non si tocca.
@@ -709,9 +716,9 @@ solo grafica: le regole non cambiano. Lo scolpire a mano arriva con l'editor
 
 ### Passi
 
-0. Lo smoke del laboratorio non deve fermarsi quando la finestra perde il
-   fuoco: `force_focus` anche per `--smoke-mechanics-lab` (esito della Fase 0).
-   Poi lo smoke completo, come base delle catture di questa fase.
+0. Gli smoke non devono fermarsi quando la loro finestra è ridotta a icona: il
+   host accende `WINDOW_ALWAYS_RUN` per gli smoke (esito della Fase 0). Poi lo
+   smoke completo del laboratorio, come base delle catture di questa fase.
 1. Funzione pura della superficie (centro, angoli, spigoli dei dirupi), con
    test.
 2. Laboratorio: caselle disegnate con la superficie; personaggi, mouse e ombre
@@ -754,7 +761,81 @@ regole della sezione 1: fammi prima le domande della fase e fermati alla fine.
 
 ### Esito
 
-Da fare.
+**Fatta il 25 ottobre 2026** sul ramo `piano-profondita`.
+
+**Risposte dell'utente**
+1. **Dove:** laboratorio e spedizioni insieme.
+2. **Salite:** facce smussate (la mia raccomandazione era facce piatte).
+3. **Pareti dei dirupi:** roccia sfaccettata.
+4. **Bordo al neon in cima ai dirupi:** sì, tenue.
+5. **Righe dei gradini sui fianchi:** via (la mia raccomandazione era tenerle).
+6. **Obiettivo di prestazioni:** più largo, fino a +10% di media.
+
+**Cosa è stato fatto**
+- **Passo 0, smoke che non si fermano:** `host.Config.keep_running` accende `WINDOW_ALWAYS_RUN` per tutti
+  gli smoke (`src/engine/host/host.odin`, `src/application/launcher.odin`,
+  `src/application/application_start.odin`). Prova: ridotto a icona per 15 secondi, lo smoke continua e
+  finisce; prima si fermava. Il gioco normale si mette ancora in pausa quando è ridotto a icona.
+- **Superficie:** `src/level/surface.odin`, funzione pura: `surface_cell` (centro e angoli),
+  `surface_height_at`, `surface_linked`, `surface_top`. Un angolo è la media delle caselle attorno che la
+  casella raggiunge per lati collegati (al massimo un gradino: `SURFACE_LINK_STEPS`, uguale a
+  `game.HEIGHT_MAX_STEP`, e un test lo controlla). Dove il terreno gira attorno alla fine di un dirupo, lo
+  spigolo sfuma.
+- **Spedizioni** (`src/render/expedition_terrain.odin`, riscritto): quattro triangoli per casella con le
+  normali mediate fra i triangoli della stessa superficie (due triangoli per le caselle in piano senza
+  dirupi); pareti di roccia in otto facce, con il mezzo spinto un poco nella roccia; il bordo al neon viene
+  dall'alfa dei vertici; il piano si disegna solo dove il rilievo non copre (`raised`). Nello shader del
+  pavimento (`src/render/expedition_floor.odin`) tolte le righe dei gradini, la luce usa la normale vera e
+  lo spigolo dei dirupi brilla del colore del bioma.
+- **Laboratorio** (`src/render/diorama_scene.odin`): le caselle in pendenza sono piastrelle inclinate
+  (`draw_sloped_tile`); quelle in piano restano i blocchi di prima; tolte le righe dei gradini.
+- **Personaggi e segni:** `point_ground` legge la superficie; `rim_ground` tiene piedistalli e ombre a
+  contatto sul punto più alto sotto il loro bordo (le ombre ora stanno sul terreno anche in alto, prima
+  finivano sotto); `cell_overlay_ground` alza anteprime, segni dei bersagli, intenti e marcatori sulla cima
+  della casella; il rombo del puntatore 2D segue gli angoli; il puntatore 3D colpisce la superficie.
+- **Test:** 7 nuovi (6 in `level`, 1 in `game`). In `render` il test di `point_ground` è stato riscritto:
+  descriveva la media delle quattro caselle attorno, che non c'è più.
+
+**Verifiche**
+- Check normale e senza assert. `.\scripts\check.ps1` completo: 1662 test verdi, con e senza assert,
+  più le due build.
+- Smoke del laboratorio completo, prima e dopo: 110 catture ciascuno, nessun errore. 89 catture sono
+  identiche al byte; cambiano solo le 20 delle arene «Altezze» e «Montagna» (rampa di piastrelle, sentiero
+  in pendenza, pareti pulite).
+- Smoke delle spedizioni completo: 103 catture, nessun errore. Guardate Egitto (dune morbide), Vietnam
+  (colline), Neve (montagna e scontro su due livelli), Cyber (altopiano con il bordo rosso) e Cielo (ponti
+  in rampa).
+- Benchmark, due giri prima (Fase 0) e due dopo, sulla RTX 3060 alla corrente; medie dei due giri:
+
+| Gruppo di stage | Fase 0 (ms) | Fase 1 (ms) | Differenza |
+|---|---:|---:|---:|
+| Viste di base (0–6) | 1,73 | 1,78 | +2,9% |
+| Biomi (7–18) | 1,44 | 1,50 | +4,3% |
+| Luoghi e viste speciali (19–24) | 1,87 | 1,92 | +2,7% |
+| Corsa e ingaggio (25–26) | 1,43 | 1,46 | +2,4% |
+| Centro dei biomi (27–38) | 1,12 | 1,14 | +2,2% |
+| Officine (39–50) | 1,14 | 1,18 | +3,2% |
+| Bersagli (51–54) | 1,18 | 1,20 | +1,8% |
+| Edifici (55–62) | 0,96 | 0,99 | +3,5% |
+| Rilievi (63–74) | 1,07 | 1,09 | +2,4% |
+| Ologrammi del rilievo (75–77) | 4,04 | 4,07 | +0,7% |
+| Scontro su due livelli (78) | 1,10 | 1,11 | +0,7% |
+| Montagna (79–86) | 1,01 | 1,05 | +3,6% |
+| Grotte (87–98) | 0,92 | 0,93 | +1,0% |
+| Posa delle strutture (99–102) | 0,99 | 1,01 | +2,6% |
+
+  In media +2,4%, il gruppo peggiore +4,3%: dentro l'obiettivo (+10%). I due giri nuovi concordano (2,3%
+  di differenza media, 101 stage su 103 entro il 10%).
+
+**Da sapere**
+- I segni a terra stanno sulla cima della casella: su una rampa galleggiano un poco sul lato basso (al
+  massimo circa un decimo di casella) invece di sparire sul lato alto.
+- Sulle caselle in pendenza del laboratorio mancano le piccole incisioni decorative: affonderebbero nel
+  lato alto.
+- Un personaggio spinto giù da un dirupo dovrebbe scendere di colpo sullo spigolo, perché prima scivolava
+  lungo una rampa invisibile. È atteso, ma non l'ho guardato in movimento: le catture sono ferme.
+- Dalla sezione 12: tolto `covered`; il rilassamento sulle diagonali passa alla Fase 3 e la sfera di
+  taglio alla Fase 5.
 
 ## 5. Fase 2 — Posizioni con il piano
 
@@ -1564,11 +1645,11 @@ fase indicata, prima di correggerle.
 |---|---|---|
 | La carica del bruto controlla l'altezza solo della prima casella: se le caselle dopo salgono di due gradini, l'assert che la mossa sia accettata potrebbe fallire. | `src/game/enemy_intent.odin`, verso la riga 900 | 3 |
 | La diagonale con QTE, la schivata di difesa e il passo d'ombra usano solo la regola della salita: camminando potrebbero scendere un dirupo. | `src/game/tactical.odin`, `src/game/tactical_shadow.odin` | 3 |
-| Il rilassamento dei rilievi limita solo le quattro vicine dritte: due vicine in diagonale possono stare a due gradini e bloccare una diagonale dove la strada dritta va bene. | `relax`, `src/expedition/relief.odin:329` | 1 |
+| Il rilassamento dei rilievi limita solo le quattro vicine dritte: due vicine in diagonale possono stare a due gradini e bloccare una diagonale dove la strada dritta va bene. | `relax`, `src/expedition/relief.odin:329` | 3 (spostata dalla 1: riguarda il passo, non la grafica; a schermo la superficie è liscia anche lì) |
 | I bordi degli edifici diradati non sfumano: l'alfa sembra perdersi nel disegno dei bordi. | `src/render/expedition_edges.odin` | 4 |
 | Nell'ologramma delle stanze i personaggi potrebbero galleggiare sulle mappe con altezze. | `src/render/hologram.odin` | 8 |
-| Il campo `covered` dei blocchi del terreno non è letto da nessuno. | `src/render/expedition_terrain.odin` | 1 |
-| La sfera di taglio per casella sta a quota fissa 0,65: il piano della griglia voleva allargarla, ma non è stato fatto. | `src/render/tactical_framing.odin` | 1 |
+| Il campo `covered` dei blocchi del terreno non era letto da nessuno: tolto. | `src/render/expedition_terrain.odin` | 1 (fatta) |
+| La sfera di taglio per casella sta a quota fissa 0,65: il piano della griglia voleva allargarla, ma non è stato fatto. | `tactical_cell_on_screen`, `src/render/tactical_framing.odin` | 5 (spostata dalla 1: con i piani il taglio va rivisto comunque) |
 | Entrando in grotta, trappole, oggetti, pozze, fuochi e ostacoli della stanza non vengono messi da parte. | `enter_cave`, `src/expedition/cave.odin:221` | 5 (sparisce con le grotte a piani) |
 | Il benchmark non arrivava a rilievi, montagna e grotte: risolto. | `src/application/campaign_smoke.odin` | 0 (fatta) |
 | Il gioco disegnava con la scheda Intel integrata anche dove c'è una scheda dedicata: risolto. | `src/windows_gpu.odin` | 0 (fatta) |

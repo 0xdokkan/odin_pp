@@ -6,13 +6,19 @@ import game "../game"
 import grid "../engine/grid"
 import level "../level"
 
-// THE RELIEF OF THE EXPEDITIONS' FLOOR (Fase 3 of docs/piano-griglia.md). The floor is one plane at
-// the board's level and one texture of the map (expedition_floor.odin); a cell with a height is a
-// terrace on it: its top at its height in steps (game.HEIGHT_STEP_DRAWN of a cell each), drawn by the
-// same floor program so the tiles, the terrains and the warnings read on the heights too, and its
-// sides, down to the neighbour that is lower, in dark rock. The terraces are kept as vertices in
-// blocks of 8 by 8 cells, rebuilt when the map's geometry changes, and only the blocks in view are
-// submitted. Cells at the board's level stay on the plane as before, so a flat biome costs nothing.
+// THE RELIEF OF THE EXPEDITIONS' FLOOR (Fase 3 of docs/piano-griglia.md, sculpted in Fase 1 of
+// docs/piano-profondita.md). The floor is one plane at the board's level and one texture of the map
+// (expedition_floor.odin); the relief is the sculpted surface over it (level/surface.odin), drawn by the same floor
+// program so the tiles, the terrains and the warnings read on it too:
+//
+// - a raised or sloping cell is four triangles round its middle, with the light smoothed across the ramps and hills
+//   (a level cell without a cliff on its sides is two);
+// - where a neighbour is a cliff lower, a wall of faceted rock goes down to it (to the plane at the map's edge or
+//   over the void), and the top of the cliff glows faintly in the biome's colour: the alpha of the top's vertices
+//   tells the floor program how near such an edge a point is (0 on it).
+//
+// The surface is kept as vertices in blocks of 8 by 8 cells, rebuilt when the map's geometry changes, and only the
+// blocks in view are submitted. Cells level at the board's height stay on the plane, so a flat biome costs nothing.
 
 EXPEDITION_TERRAIN_CHUNK :: 8
 
@@ -21,8 +27,6 @@ Expedition_Terrain_Chunk :: struct {
 	center:   rl.Vector3,
 	radius:   f32,
 	ready:    bool,
-	// Every cell of the block is raised (or void): the plane under it is never seen, so it is not drawn.
-	covered:  bool,
 	// The height of the tallest cell in the block, in steps.
 	tallest:  u8,
 }
@@ -32,6 +36,8 @@ EXPEDITION_TERRAIN_TALL :: 16
 
 Expedition_Terrain_Cache :: struct {
 	chunks:               []Expedition_Terrain_Chunk,
+	// For every cell, whether the relief draws over it: the plane under it is never seen.
+	raised:               []bool,
 	geometry_id, revision: u64,
 	columns, rows:        int,
 	ready:                bool,
@@ -42,57 +48,205 @@ Expedition_Terrain_Cache :: struct {
 destroy_expedition_terrain :: proc(cache: ^Expedition_Terrain_Cache) {
 	for &chunk in cache.chunks { delete(chunk.vertices) }
 	delete(cache.chunks)
+	delete(cache.raised)
 	cache^ = {}
 }
 
+// The corners' places in a cell, from its north-west corner: 0 north-west, 1 north-east, 2 south-east, 3 south-west.
 @(private = "file")
-terrace_quad :: proc(vertices: ^[dynamic]Expedition_Baked_Vertex, a, b, c, d: rl.Vector3, normal: rl.Vector3) {
-	color := rl.Color{255, 255, 255, 255}
-	for p in ([6]rl.Vector3{a, b, c, a, c, d}) { append(vertices, Expedition_Baked_Vertex{p, normal, color}) }
+TERRAIN_CORNERS :: [4][2]f32{{0, 0}, {1, 0}, {1, 1}, {0, 1}}
+// The neighbour across each side: 0 north (corners 0, 1), 1 east (1, 2), 2 south (2, 3), 3 west (3, 0).
+@(private = "file")
+TERRAIN_SIDES :: [4][2]int{{0, -1}, {1, 0}, {0, 1}, {-1, 0}}
+
+// The surfaces of a block's cells and of the ring of cells round it, which the smoothed light and the walls read.
+@(private = "file")
+TERRAIN_SPAN :: EXPEDITION_TERRAIN_CHUNK+2
+
+@(private = "file")
+Terrain_Block :: struct {
+	cells:   [TERRAIN_SPAN*TERRAIN_SPAN]level.Surface_Cell,
+	ground:  [TERRAIN_SPAN*TERRAIN_SPAN]bool,
+	// Each cell's four triangles' normals: north, east, south and west.
+	normals: [TERRAIN_SPAN*TERRAIN_SPAN][4]rl.Vector3,
+	origin:  grid.Position,
 }
 
-// The terraces of the cells in one block: a top at each raised cell, and a side wherever a neighbour
-// is lower (down to that neighbour, or to the plane at the edge of the map).
 @(private = "file")
-build_terrain_chunk :: proc(data: ^level.Level, origin: grid.Position, chunk: ^Expedition_Terrain_Chunk) {
-	vertices := make([dynamic]Expedition_Baked_Vertex, 0, 512, context.temp_allocator)
-	step := game.HEIGHT_STEP_DRAWN
-	width, height := data.tiles.width, data.tiles.height
-	steps_at :: proc(data: ^level.Level, x, y: int) -> int {
-		if x < 0 || y < 0 || x >= data.tiles.width || y >= data.tiles.height { return 0 }
-		return int(level.height_at(data, {x, y}))
+terrain_point :: proc(x, y: int, corner: int, steps: f32) -> rl.Vector3 {
+	places := TERRAIN_CORNERS
+	return {f32(x)+places[corner].x, steps*game.HEIGHT_STEP_DRAWN, f32(y)+places[corner].y}
+}
+
+@(private = "file")
+terrain_slot :: proc(block: ^Terrain_Block, x, y: int) -> (slot: int, ok: bool) {
+	lx, ly := x-block.origin.x+1, y-block.origin.y+1
+	if lx < 0 || ly < 0 || lx >= TERRAIN_SPAN || ly >= TERRAIN_SPAN { return }
+	return ly*TERRAIN_SPAN+lx, true
+}
+
+@(private = "file")
+terrain_face_normal :: proc(a, b, c: rl.Vector3) -> rl.Vector3 {
+	return rl.Vector3Normalize(rl.Vector3CrossProduct(b-a, c-a))
+}
+
+// The smoothed normal at corner `corner` of the cell at (x, y): the triangles that touch the corner, in the cell and
+// in the cells round the corner whose surface meets it there (the same ramp, never the other side of a cliff).
+@(private = "file")
+terrain_corner_normal :: proc(block: ^Terrain_Block, x, y, corner: int) -> rl.Vector3 {
+	offsets := [4][2]int{{0, 0}, {1, 0}, {1, 1}, {0, 1}}
+	point := [2]int{x, y}+offsets[corner]
+	own, _ := terrain_slot(block, x, y)
+	height := block.cells[own].corners[corner]
+	sum: rl.Vector3
+	// The cells round the point: north-west, north-east, south-east and south-west of it; the point is their
+	// corner (b+2)%4, which the cell's triangles (b+1)%4 and (b+2)%4 touch.
+	round := [4][2]int{point+{-1, -1}, point+{0, -1}, point, point+{-1, 0}}
+	for cell, b in round {
+		slot, inside := terrain_slot(block, cell.x, cell.y)
+		if !inside || !block.ground[slot] { continue }
+		at := (b+2)%4
+		if abs(block.cells[slot].corners[at]-height) > 0.0001 { continue }
+		sum += block.normals[slot][(at+3)%4]+block.normals[slot][at]
 	}
-	low, high := rl.Vector3{1e9, 1e9, 1e9}, rl.Vector3{-1e9, -1e9, -1e9}
-	chunk.covered = true
-	chunk.tallest = 0
-	for y in origin.y..<min(origin.y+EXPEDITION_TERRAIN_CHUNK, height) {
-		for x in origin.x..<min(origin.x+EXPEDITION_TERRAIN_CHUNK, width) {
-			here := steps_at(data, x, y)
-			chunk.tallest = max(chunk.tallest, u8(min(here, 255)))
-			if data.tiles.cells[y*width+x].kind == .Void { continue }
-			if here == 0 { chunk.covered = false; continue }
-			top := f32(here)*step
-			x0, z0 := f32(x), f32(y)
-			terrace_quad(&vertices, {x0, top, z0}, {x0, top, z0+1}, {x0+1, top, z0+1}, {x0+1, top, z0}, {0, 1, 0})
-			for side in ([4][2]int{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}) {
-				below := steps_at(data, x+side.x, y+side.y)
-				if below >= here { continue }
-				foot := f32(below)*step
-				// The side's two ends along the shared edge.
-				a := rl.Vector3{x0+0.5+f32(side.x)*0.5-f32(side.y)*0.5, 0, z0+0.5+f32(side.y)*0.5-f32(side.x)*0.5}
-				b := rl.Vector3{x0+0.5+f32(side.x)*0.5+f32(side.y)*0.5, 0, z0+0.5+f32(side.y)*0.5+f32(side.x)*0.5}
-				normal := rl.Vector3{f32(side.x), 0, f32(side.y)}
-				terrace_quad(&vertices, {a.x, foot, a.z}, {b.x, foot, b.z}, {b.x, top, b.z}, {a.x, top, a.z}, normal)
+	return rl.Vector3Normalize(sum)
+}
+
+@(private = "file")
+terrain_vertex :: proc(vertices: ^[dynamic]Expedition_Baked_Vertex, p, normal: rl.Vector3, edge: u8 = 255) {
+	append(vertices, Expedition_Baked_Vertex{p, normal, {255, 255, 255, edge}})
+}
+
+// A triangle of rock, lit flat: its own normal, turned to face `outward`.
+@(private = "file")
+terrain_rock :: proc(vertices: ^[dynamic]Expedition_Baked_Vertex, a, b, c, outward: rl.Vector3) {
+	normal := terrain_face_normal(a, b, c)
+	if rl.Vector3DotProduct(normal, outward) < 0 { normal = -normal }
+	for p in ([3]rl.Vector3{a, b, c}) { terrain_vertex(vertices, p, normal) }
+}
+
+@(private = "file")
+terrain_hash :: proc(x, y, salt: int) -> f32 {
+	h := u32(x)*0x8DA6B343+u32(y)*0xD8163841+u32(salt)*0xCB1AB31F
+	h ~= h >> 13
+	h *= 0x5BD1E995
+	h ~= h >> 15
+	return f32(h & 0xFFFF)/65535
+}
+
+// The wall of rock on side `side` of the cell at (x, y), from its top edge down to the neighbour's edge (`low`, one
+// height per end). Only the parts where this cell is the higher are drawn; the neighbour draws the rest. The middle
+// of the wall is pushed a little into the rock, so it breaks into facets; the top edge, where one walks, stays exact.
+@(private = "file")
+terrain_wall :: proc(vertices: ^[dynamic]Expedition_Baked_Vertex, x, y, side: int, top, low: [2]f32) -> bool {
+	sides := TERRAIN_SIDES
+	a, b := side, (side+1)%4
+	bottom := [2]f32{min(low[0], top[0]), min(low[1], top[1])}
+	drop := max(top[0]-bottom[0], top[1]-bottom[1])
+	if drop*game.HEIGHT_STEP_DRAWN < 0.005 { return false }
+	outward := rl.Vector3{f32(sides[side].x), 0, f32(sides[side].y)}
+	top_a, top_b := terrain_point(x, y, a, top[0]), terrain_point(x, y, b, top[1])
+	low_a, low_b := terrain_point(x, y, a, bottom[0]), terrain_point(x, y, b, bottom[1])
+	mid_a, mid_b := (top_a+low_a)*0.5, (top_b+low_b)*0.5
+	top_m, low_m := (top_a+top_b)*0.5, (low_a+low_b)*0.5
+	// The push grows with the wall's height, so a low wall's facets stay steep (rock, never ground).
+	tall := ((top[0]-bottom[0])+(top[1]-bottom[1]))*0.5*game.HEIGHT_STEP_DRAWN
+	push := min(f32(0.06), tall*0.3)*(0.4+0.6*terrain_hash(x, y, side))
+	mid_m := (top_m+low_m)*0.5-outward*push
+	terrain_rock(vertices, top_a, top_m, mid_m, outward)
+	terrain_rock(vertices, top_a, mid_m, mid_a, outward)
+	terrain_rock(vertices, top_m, top_b, mid_b, outward)
+	terrain_rock(vertices, top_m, mid_b, mid_m, outward)
+	terrain_rock(vertices, mid_a, mid_m, low_m, outward)
+	terrain_rock(vertices, mid_a, low_m, low_a, outward)
+	terrain_rock(vertices, mid_m, mid_b, low_b, outward)
+	terrain_rock(vertices, mid_m, low_b, low_m, outward)
+	return true
+}
+
+// The relief of the cells in one block: each raised or sloping cell's top, and the walls of rock on its sides that
+// look down on a cliff, the map's edge or the void. `vertices` and `block` are scratch space the caller reuses.
+@(private = "file")
+build_terrain_chunk :: proc(m: ^level.Surface_Map, origin: grid.Position, chunk: ^Expedition_Terrain_Chunk, raised: []bool,
+	vertices: ^[dynamic]Expedition_Baked_Vertex, block: ^Terrain_Block) {
+	clear(vertices)
+	block^ = {}
+	block.origin = origin
+	for ly in 0..<TERRAIN_SPAN {
+		for lx in 0..<TERRAIN_SPAN {
+			x, y := origin.x+lx-1, origin.y+ly-1
+			slot := ly*TERRAIN_SPAN+lx
+			block.cells[slot], block.ground[slot] = level.surface_cell(m, x, y)
+			if !block.ground[slot] { continue }
+			cell := block.cells[slot]
+			middle := rl.Vector3{f32(x)+0.5, cell.center*game.HEIGHT_STEP_DRAWN, f32(y)+0.5}
+			for side in 0..<4 {
+				a, b := side, (side+1)%4
+				block.normals[slot][side] = terrain_face_normal(middle, terrain_point(x, y, b, cell.corners[b]), terrain_point(x, y, a, cell.corners[a]))
 			}
-			low = {min(low.x, x0), 0, min(low.z, z0)}
-			high = {max(high.x, x0+1), max(high.y, top), max(high.z, z0+1)}
+		}
+	}
+	sides := TERRAIN_SIDES
+	low, high := rl.Vector3{1e9, 1e9, 1e9}, rl.Vector3{-1e9, -1e9, -1e9}
+	chunk.tallest = 0
+	for y in origin.y..<min(origin.y+EXPEDITION_TERRAIN_CHUNK, m.height) {
+		for x in origin.x..<min(origin.x+EXPEDITION_TERRAIN_CHUNK, m.width) {
+			slot, _ := terrain_slot(block, x, y)
+			chunk.tallest = max(chunk.tallest, u8(min(level.surface_steps(m, x, y), 255)))
+			if !block.ground[slot] { continue }
+			cell := block.cells[slot]
+			if level.surface_flat(cell) && cell.center == 0 { continue }
+			start := len(vertices^)
+			// The walls first: which sides have one decides where the top glows.
+			cliff: [4]bool
+			for side in 0..<4 {
+				next := [2]int{x+sides[side].x, y+sides[side].y}
+				if level.surface_linked(m, {x, y}, next) { continue }
+				a, b := side, (side+1)%4
+				// The neighbour's corners on the shared edge, or the plane where it has no ground.
+				across := [2]f32{}
+				ground := level.surface_ground(m, next.x, next.y)
+				if ground {
+					neighbour, _ := terrain_slot(block, next.x, next.y)
+					// The neighbour's corners at the same two points: across a north or south side corner c is 3-c,
+					// across an east or west side (5-c)%4.
+					facing_a, facing_b := 3-a, 3-b
+					if side%2 == 1 { facing_a, facing_b = (5-a)%4, (5-b)%4 }
+					across = {block.cells[neighbour].corners[facing_a], block.cells[neighbour].corners[facing_b]}
+				}
+				walled := terrain_wall(vertices, x, y, side, {cell.corners[a], cell.corners[b]}, across)
+				cliff[side] = walled && ground
+			}
+			// The top: two triangles for a level cell with no cliff to glow on, else four round the middle.
+			normals: [4]rl.Vector3
+			for corner in 0..<4 { normals[corner] = terrain_corner_normal(block, x, y, corner) }
+			points: [4]rl.Vector3
+			for corner in 0..<4 { points[corner] = terrain_point(x, y, corner, cell.corners[corner]) }
+			if level.surface_flat(cell) && !cliff[0] && !cliff[1] && !cliff[2] && !cliff[3] {
+				for corner in ([6]int{0, 2, 1, 0, 3, 2}) { terrain_vertex(vertices, points[corner], normals[corner]) }
+			} else {
+				middle := rl.Vector3{f32(x)+0.5, cell.center*game.HEIGHT_STEP_DRAWN, f32(y)+0.5}
+				up := rl.Vector3Normalize(block.normals[slot][0]+block.normals[slot][1]+block.normals[slot][2]+block.normals[slot][3])
+				for side in 0..<4 {
+					a, b := side, (side+1)%4
+					edge := u8(0) if cliff[side] else 255
+					terrain_vertex(vertices, middle, up)
+					terrain_vertex(vertices, points[b], normals[b], edge)
+					terrain_vertex(vertices, points[a], normals[a], edge)
+				}
+			}
+			raised[y*m.width+x] = true
+			for v in vertices^[start:] {
+				low = {min(low.x, v.position.x), min(low.y, v.position.y), min(low.z, v.position.z)}
+				high = {max(high.x, v.position.x), max(high.y, v.position.y), max(high.z, v.position.z)}
+			}
 		}
 	}
 	delete(chunk.vertices)
 	chunk.vertices = nil
-	if len(vertices) > 0 {
-		chunk.vertices = make([]Expedition_Baked_Vertex, len(vertices))
-		copy(chunk.vertices, vertices[:])
+	if len(vertices^) > 0 {
+		chunk.vertices = make([]Expedition_Baked_Vertex, len(vertices^))
+		copy(chunk.vertices, vertices^[:])
 		chunk.center = (low+high)*0.5
 		chunk.radius = rl.Vector3Distance(low, high)*0.5+0.1
 	} else {
@@ -102,8 +256,8 @@ build_terrain_chunk :: proc(data: ^level.Level, origin: grid.Position, chunk: ^E
 	chunk.ready = true
 }
 
-// Submits the terraces in view, with the floor program already bound. The caller has set its
-// uniforms; the vertices carry no colour of their own.
+// Submits the relief in view, with the floor program already bound. The caller has set its uniforms; the vertices
+// carry no colour of their own, only how near a cliff's edge they are.
 @(private)
 draw_expedition_terrain :: proc(renderer: ^Renderer, room: ^game.Room) {
 	data := room.level_data
@@ -154,7 +308,7 @@ expedition_terrain_tall_in_view :: proc(renderer: ^Renderer, room: ^game.Room) -
 	return false
 }
 
-// Builds the terraces of every block when the map's geometry is new.
+// Builds the relief of every block when the map's geometry is new.
 @(private = "file")
 prepare_expedition_terrain :: proc(cache: ^Expedition_Terrain_Cache, data: ^level.Level) {
 	if !cache.ready || cache.geometry_id != data.geometry_id || cache.revision != data.geometry_revision {
@@ -164,8 +318,17 @@ prepare_expedition_terrain :: proc(cache: ^Expedition_Terrain_Cache, data: ^leve
 		cache.columns = (data.tiles.width+EXPEDITION_TERRAIN_CHUNK-1)/EXPEDITION_TERRAIN_CHUNK
 		cache.rows = (data.tiles.height+EXPEDITION_TERRAIN_CHUNK-1)/EXPEDITION_TERRAIN_CHUNK
 		cache.chunks = make([]Expedition_Terrain_Chunk, cache.columns*cache.rows)
+		cache.raised = make([]bool, data.tiles.width*data.tiles.height)
+		m := level.surface_map(data)
+		// One scratch buffer and block for all the blocks, so a big map does not pile up temporary memory.
+		scratch := make([dynamic]Expedition_Baked_Vertex, 0, 4096)
+		defer delete(scratch)
+		block := new(Terrain_Block)
+		defer free(block)
 		for cy in 0..<cache.rows {
-			for cx in 0..<cache.columns { build_terrain_chunk(data, {cx*EXPEDITION_TERRAIN_CHUNK, cy*EXPEDITION_TERRAIN_CHUNK}, &cache.chunks[cy*cache.columns+cx]) }
+			for cx in 0..<cache.columns {
+				build_terrain_chunk(&m, {cx*EXPEDITION_TERRAIN_CHUNK, cy*EXPEDITION_TERRAIN_CHUNK}, &cache.chunks[cy*cache.columns+cx], cache.raised, &scratch, block)
+			}
 		}
 		cache.ready = true
 	}
@@ -173,7 +336,7 @@ prepare_expedition_terrain :: proc(cache: ^Expedition_Terrain_Cache, data: ^leve
 
 // The plane of the floor: one quad for a flat map. For a map with relief, only where it is seen: a few big
 // quads beyond the cells near the player, and in that window one quad if little of it is raised, else a
-// quad for every run of cells at the board's level along a row (the terraces over the rest would hide
+// quad for every run of cells at the board's level along a row (the relief over the rest would hide
 // the plane there, and the floor program is dear to run twice).
 @(private)
 draw_expedition_floor_plane :: proc(renderer: ^Renderer, room: ^game.Room, dimensions: rl.Vector2) {
@@ -182,6 +345,8 @@ draw_expedition_floor_plane :: proc(renderer: ^Renderer, room: ^game.Room, dimen
 		rl.DrawPlane({dimensions.x*.5, -.01, dimensions.y*.5}, dimensions, rl.WHITE)
 		return
 	}
+	cache := &renderer.tactical.expedition_floor.terrain
+	prepare_expedition_terrain(cache, data)
 	width, depth := data.tiles.width, data.tiles.height
 	p := room.player.position
 	x0, x1 := max(0, p.x-27), min(width, p.x+28)
@@ -196,7 +361,7 @@ draw_expedition_floor_plane :: proc(renderer: ^Renderer, room: ^game.Room, dimen
 	quad(0, z0, x0, z1-z0)
 	quad(x1, z0, width-x1, z1-z0)
 	raised := 0
-	for row in z0..<z1 { for column in x0..<x1 { if data.heights[row*width+column] != 0 { raised += 1 } } }
+	for row in z0..<z1 { for column in x0..<x1 { if cache.raised[row*width+column] { raised += 1 } } }
 	if raised*100 < (x1-x0)*(z1-z0)*8 {
 		quad(x0, z0, x1-x0, z1-z0)
 		return
@@ -204,9 +369,9 @@ draw_expedition_floor_plane :: proc(renderer: ^Renderer, room: ^game.Room, dimen
 	for row in z0..<z1 {
 		column := x0
 		for column < x1 {
-			if data.heights[row*width+column] != 0 { column += 1; continue }
+			if cache.raised[row*width+column] { column += 1; continue }
 			start := column
-			for column < x1 && data.heights[row*width+column] == 0 { column += 1 }
+			for column < x1 && !cache.raised[row*width+column] { column += 1 }
 			quad(start, row, column-start, 1)
 		}
 	}

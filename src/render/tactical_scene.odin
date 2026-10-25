@@ -101,8 +101,9 @@ draw_tactical_actor_bases :: proc(renderer: ^Renderer) {
 		if !actor.visible || !tactical_render_visible(renderer, cell) || tactical_pinball_holds(renderer, actor.entity) { continue }
 		key := sprite_key_for_enemy(actor.archetype)
 		at, _ := living_card_position(renderer, actor.entity, key, actor.position)
-		p := rl.Vector3{at.x+0.5, 0.048+point_ground(at), at.y+0.5}
-		draw_tactical_actor_shadow(p)
+		ground := rim_ground(at, 0.32)
+		p := rl.Vector3{at.x+0.5, 0.048+ground, at.y+0.5}
+		draw_tactical_actor_shadow(p, ground)
 		// Up on the Lazzo's rope: its shadow on the floor, and the stand it
 		// carries (lasso.odin).
 		if tactical_lasso_holds(renderer, actor.entity) {
@@ -123,19 +124,21 @@ draw_tactical_actor_bases :: proc(renderer: ^Renderer) {
 		if tactical_shadow_depth(renderer, game.PLAYER_ENTITY) > 0 { return }
 	}
 	at, _ := living_card_position(renderer, game.PLAYER_ENTITY, .Player, snapshot.player.position)
-	p := rl.Vector3{at.x+0.5, 0.05+point_ground(at), at.y+0.5}
-	draw_tactical_actor_shadow(p)
+	ground := rim_ground(at, 0.34)
+	p := rl.Vector3{at.x+0.5, 0.05+ground, at.y+0.5}
+	draw_tactical_actor_shadow(p, ground)
 	rl.DrawCylinder(p, 0.32, 0.32, 0.01, 24, GOTHIC_INK)
 	rl.DrawCircle3D(p+rl.Vector3{0, 0.01, 0}, 0.34, {1, 0, 0}, 90, GOTHIC_PAPER)
 	if renderer.tactical.flipbook.loaded { draw_flipbook_stand(renderer, .Player, snapshot.player.position, GOTHIC_PAPER, game.PLAYER_ENTITY) }
 }
 
 @(private = "file")
-draw_tactical_actor_shadow :: proc(position: rl.Vector3) {
+draw_tactical_actor_shadow :: proc(position: rl.Vector3, ground: f32) {
 	// Nested low-opacity discs give the sprite a soft contact edge, contained
 	// within its tile and independent of animation duration or gameplay state.
+	// They lie on the ground the stand stands on.
 	for layer in 0..<4 {
 		radius := f32(0.44)-f32(layer)*0.045
-		rl.DrawCylinder({position.x, 0.024+f32(layer)*0.001, position.z}, radius, radius, 0.001, 24, {1, 5, 12, u8(7+layer*4)})
+		rl.DrawCylinder({position.x, ground+0.024+f32(layer)*0.001, position.z}, radius, radius, 0.001, 24, {1, 5, 12, u8(7+layer*4)})
 	}
 }

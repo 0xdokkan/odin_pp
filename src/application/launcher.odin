@@ -74,6 +74,7 @@ run_launcher :: proc(options: Runtime_Options, launch: Launch_Options) {
 		enable_audio    = launch.smoke_minigame == "" && !launch.smoke_menu,
 		letterbox_color = render.LETTERBOX_COLOR,
 		force_focus     = launch.smoke_minigame != "" || launch.smoke_expedition || launch.smoke_hub || launch.smoke_hub_world,
+		keep_running    = launch.smoke_minigame != "" || launch.smoke_menu || launch.smoke_expedition || launch.smoke_hub || launch.smoke_hub_world,
 	})
 	if !ok {
 		fmt.eprintln("could not open the window")

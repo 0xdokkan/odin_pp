@@ -5,8 +5,11 @@ import game "../game"
 import grid "../engine/grid"
 import level "../level"
 
+// The ground under a point is the sculpted surface (level/surface.odin): exactly a cell's height in its middle, a
+// ramp between cells a step apart, and an edge where they are a cliff apart. (Before Fase 1 of
+// docs/piano-profondita.md it blended the four cells round the point, cliffs too.)
 @(test)
-test_the_ground_under_a_point_blends_the_cells_round_it :: proc(t: ^testing.T) {
+test_the_ground_under_a_point_follows_the_sculpted_surface :: proc(t: ^testing.T) {
 	data, _ := level.create(6, 6, level.Tile{kind = .Floor})
 	defer level.destroy(&data)
 	defer set_board_level(nil)
@@ -17,15 +20,25 @@ test_the_ground_under_a_point_blends_the_cells_round_it :: proc(t: ^testing.T) {
 	// The view takes the table again when the geometry has changed.
 	set_board_level(&data)
 	step := f32(0.12)
-	// On the cell's own coordinates: exactly its height; halfway to a flat cell: half.
+	// A cliff of four steps all round: on the cell's own coordinates and up to its edge, its height; past the edge,
+	// the flat ground.
 	testing.expect(t, abs(point_ground({2, 2})-4*step) < 0.0001)
-	testing.expect(t, abs(point_ground({1.5, 2})-2*step) < 0.0001)
-	testing.expect(t, abs(point_ground({2, 2.5})-2*step) < 0.0001)
-	testing.expect(t, abs(point_ground({1.5, 1.5})-step) < 0.0001)
-	// Off the raised cell's four neighbours it is flat again.
+	testing.expect(t, abs(point_ground({1.51, 2})-4*step) < 0.0001)
+	testing.expect(t, abs(point_ground({1.49, 2})) < 0.0001)
 	testing.expect_value(t, point_ground({4, 4}), f32(0))
 	testing.expect(t, abs(cell_ground({2, 2})-4*step) < 0.0001)
 	testing.expect_value(t, cell_ground({0, 0}), f32(0))
+	// A stair along x, a step a column: a ramp. Halfway between two middles it is halfway up, and it never jumps.
+	for y in 0..<6 { for x in 0..<6 { level.set_height(&data, {x, y}, i32(x)) } }
+	set_board_level(&data)
+	testing.expect(t, abs(point_ground({3, 2})-3*step) < 0.0001)
+	testing.expect(t, abs(point_ground({2.5, 2})-2.5*step) < 0.0001)
+	last := point_ground({0, 2})
+	for i in 1..=50 {
+		here := point_ground({f32(i)*0.1, 2})
+		testing.expect(t, here >= last-0.0001 && here-last < step*0.25)
+		last = here
+	}
 }
 
 @(test)

@@ -237,3 +237,10 @@ test_the_first_person_shot_is_stopped_by_a_cliff_face_above_its_eye :: proc(t: ^
 	testing.expect(t, abs(shot.origin.y-(FIRST_PERSON_EYE_HEIGHT+1.2)) < 0.001)
 	_ = math.PI
 }
+
+// The sculpted surface (level/surface.odin) links two cells side by side exactly where a walker can step between
+// them, so a ramp drawn is a ramp walked and a cliff drawn stops the step.
+@(test)
+test_the_surface_links_the_cells_a_walker_steps_between :: proc(t: ^testing.T) {
+	testing.expect_value(t, level.SURFACE_LINK_STEPS, int(HEIGHT_MAX_STEP))
+}

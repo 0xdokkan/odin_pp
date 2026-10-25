@@ -108,14 +108,10 @@ void main() {
     finalColor.rgb=mix(finalColor.rgb,vec3(.62,.92,1.),rim*.85);
 }
 void floorMain() {
-    // The sides of a terrace are dark rock, tinted a little by the biome.
+    // The walls of a cliff are dark rock, tinted a little by the biome, lit facet by facet.
     if(normal.y<.5) {
         vec3 rock=mix(vec3(.05,.055,.07),biomeTint*.12,.5);
-        // A fine line at every step of the height, so that a cliff reads as many and a stair as steps.
-        float stepFraction=fract(worldPosition.y/.12);
-        float stepLine=1.-smoothstep(0.,.12,min(stepFraction,1.-stepFraction));
-        rock+=biomeTint*.16*stepLine;
-        finalColor=vec4(expedition_lit(worldPosition,normal,rock,.85,.1),1.);
+        finalColor=vec4(expedition_lit(worldPosition,normalize(normal),rock,.85,.1),1.);
         return;
     }
     vec2 p=worldPosition.xz;
@@ -398,8 +394,14 @@ void floorMain() {
     // The higher the ground, the lighter: ten percent a step, so that hills and dunes read from above; no more
     // than six steps' worth, so that a mountain's top is not white.
     base*=1.+clamp(worldPosition.y,0.,.72)*.9;
-    vec3 lit=expedition_lit(worldPosition,vec3(0.,1.,0.),base,roughness,.3)*contact;
-    lit+=expedition_reflection(worldPosition,vec3(0.,1.,0.),roughness)*reflectionMask*contact;
+    // The sculpted ground's own normal, smoothed across ramps and hills: a slope turned to the light is lighter.
+    vec3 n=normalize(normal);
+    vec3 lit=expedition_lit(worldPosition,n,base,roughness,.3)*contact;
+    lit+=expedition_reflection(worldPosition,n,roughness)*reflectionMask*contact;
+    // The top edge of a cliff glows faintly in the biome's colour: the relief's vertices carry in their alpha how
+    // near such an edge a point is (0 on it, 1 away from it; the plane is always 1).
+    float cliff=1.-smoothstep(0.,.08,color.a);
+    emission+=expedition_linear(biomeTint)*cliff*.45;
     finalColor=vec4(lit+emission,1.);
 }
 `
@@ -491,7 +493,8 @@ draw_expedition_floor :: proc(renderer:^Renderer,room:^game.Room,w:^world.World)
 	rl.SetShaderValue(shader,p.focus_count,&count,.INT);rl.SetShaderValue(shader,p.grid_amount,&amount,.FLOAT)
 	// Only the robot's window, and only where the robot has one.
 	set_expedition_reveal(renderer,shader,p.reveal_eye,p.reveal_forward,p.reveal_viewport,p.reveal_points,p.reveal_count,1 if (renderer.tactical.expedition_material!=nil && renderer.tactical.expedition_material.player_reveal) else 0)
-	floor_steps:=cell_ground(room.player.position);rl.SetShaderValue(shader,p.reveal_floor,&floor_steps,.FLOAT)
+	// The top of the robot's own cell: a slope it stands on is never cut.
+	floor_steps:=cell_overlay_ground(room.player.position);rl.SetShaderValue(shader,p.reveal_floor,&floor_steps,.FLOAT)
 	set_expedition_lights(renderer,shader,p.lights)
 	rl.BeginShaderMode(shader)
 	rl.SetShaderValueTexture(shader,p.map_data,f.texture)

@@ -24,32 +24,38 @@ il falloff usa alpha ai vertici, senza nuovi shader, texture o render target.
 ### Altezze del tabellone
 
 Una cella con altezza sta sul suo piano rialzato: ogni gradino è alto 0,12 di cella
-(`game.HEIGHT_STEP_DRAWN`). Il pavimento ha una colonna scura fino al piano del
-tabellone e una linea sottile a ogni gradino sui lati che guardano una cella più
-bassa, così un dirupo di dieci gradini si legge come dieci e una scala come
-scalini. Personaggi, piedistalli, ombre, oggetti, anteprima del raggio, segni dei
-bersagli, intenti e rombi del puntatore stanno alla quota della loro cella; mentre
-un personaggio scivola da una cella all'altra sale il gradino in modo morbido
-(`point_ground`, media pesata delle quattro celle intorno al punto). La telecamera
-segue la quota del giocatore. Il puntatore sceglie la prima cella la cui cima sta
-sopra il raggio (`pick_ground_cell`): la cima di un altopiano o la faccia di un
-dirupo, non il pavimento dietro. Le quote vengono da una copia delle altezze
-del livello, aggiornata quando la geometria cambia, mai da un puntatore al livello
-([height_view.odin](../src/render/height_view.odin)). Solo il laboratorio ha altezze;
-le spedizioni restano piatte (Fase 3).
+(`game.HEIGHT_STEP_DRAWN`). Dalla Fase 1 del [piano della profondità](piano-profondita.md)
+il terreno è **scolpito** ([surface.odin](../src/level/surface.odin)): il centro di ogni
+casella sta alla sua quota, e ogni angolo è la media delle caselle attorno che stanno a un
+gradino al massimo. Una scala diventa una rampa e una collina a gradoni una collina, mentre
+un dirupo tiene lo spigolo. Nel laboratorio una casella in pendenza è una piastrella
+inclinata che segue la superficie, con la colonna scura sotto; una casella in piano è il
+blocco di sempre. I fianchi non hanno più le righe dei gradini (scelta dell'utente).
+Personaggi, oggetti e telecamera stanno sulla superficie (`point_ground`: il triangolo
+della superficie sotto il punto); piedistalli e ombre sul punto più alto sotto il loro
+bordo (`rim_ground`); anteprima del raggio, segni dei bersagli, intenti e rombi del
+puntatore sulla cima della loro cella (`cell_overlay_ground`), così una rampa non li
+copre. Il puntatore sceglie la prima cella la cui superficie sta sopra il raggio
+(`pick_ground_cell`): la cima di un altopiano o la faccia di un dirupo, non il pavimento
+dietro. Le quote vengono da una copia delle altezze e delle tessere del livello,
+aggiornata quando la geometria cambia, mai da un puntatore al livello
+([height_view.odin](../src/render/height_view.odin)).
 
 ### Rilievi delle spedizioni
 
 Ogni bioma ha un rilievo a tema (colline, dune, terrazze, altopiani, isole, crateri: l'elenco è in
-[relief.odin](../src/expedition/relief.odin)). Il pavimento resta un piano e una texture; una cella più
-alta del piano è una **terrazza** ([expedition_terrain.odin](../src/render/expedition_terrain.odin)): la
-cima sta alla sua quota (ogni gradino è alto 0,12 di cella, `game.HEIGHT_STEP_DRAWN`), disegnata dallo
-stesso programma del pavimento, quindi tessere, terreni e avvisi si leggono anche in alto; la cima è più
-chiara con la quota (un decimo a gradino) e i fianchi, in roccia scura, hanno una riga a ogni gradino, così
-un dirupo si legge come tanti gradini e una scala come una scala. Le terrazze stanno in blocchi di 8×8
-caselle ricostruiti quando la geometria cambia, e si inviano solo quelli in vista. Muri, prop, servizi,
-strutture, luci, personaggi e puntatore stanno alla quota della loro casella. L'ologramma schiarisce con la
-quota, la esagera e traccia una curva di livello a ogni cambio di altezza.
+[relief.odin](../src/expedition/relief.odin)). Il pavimento resta un piano e una texture; il rilievo è
+la **superficie scolpita** sopra il piano ([expedition_terrain.odin](../src/render/expedition_terrain.odin)):
+una casella rialzata o in pendenza è fatta di quattro triangoli attorno al suo centro (due, se è in piano
+e senza dirupi), disegnati dallo stesso programma del pavimento, quindi tessere, terreni e avvisi si
+leggono anche sulle rampe. La luce è morbida sulle salite (normali mediate fra i triangoli della stessa
+superficie) e la cima schiarisce con la quota (un decimo a gradino). Dove una vicina è un dirupo più in
+basso scende una parete di roccia sfaccettata, senza righe dei gradini, e lo spigolo in cima brilla appena
+del colore del bioma (l'alfa dei vertici dice al programma quanto un punto è vicino allo spigolo). Il
+rilievo sta in blocchi di 8×8 caselle ricostruiti quando la geometria cambia, e si inviano solo quelli in
+vista. Muri, prop, servizi, strutture e luci stanno alla quota della loro casella; personaggi, ombre e
+puntatore sulla superficie. L'ologramma schiarisce con la quota, la esagera e traccia una curva di livello
+a ogni cambio di altezza.
 
 ### Posare le strutture
 

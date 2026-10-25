@@ -10,16 +10,20 @@ import view "../engine/view"
 
 // HEIGHTS ON THE BOARD (game/height.odin). The board is drawn on a flat plane;
 // a cell with a height is lifted by its steps (game.HEIGHT_STEP_DRAWN of a cell
-// each), and whatever stands or is drawn on it with it.
+// each), and whatever stands or is drawn on it with it. The ground between the
+// cells' middles is the sculpted surface (level/surface.odin): ramps where the
+// cells are a step apart, an edge where they are a cliff apart.
 //
 // Most of what is drawn on the ground does not take the renderer (a marker, an
 // intent cell), so the heights the board shows are kept here, set once a frame by
 // update_tactical_view and draw_tactical_world: one renderer draws at a time. It is
-// a copy of the level's table, refreshed when the level's geometry changes, and
+// a copy of the level's tables, refreshed when the level's geometry changes, and
 // never a pointer to the level: a level destroyed under it cannot be read.
 @(private)
 Board_Heights :: struct {
 	cells: [dynamic]u8,
+	// The tiles too, which the surface reads: a Void cell has no ground.
+	tiles: [dynamic]level.Tile,
 	width, height: int,
 	id, revision: u64,
 }
@@ -33,16 +37,43 @@ set_board_level :: proc(data: ^level.Level) {
 	b := &board_heights
 	if data == nil || !level.has_heights(data) {
 		if len(b.cells) > 0 { clear(&b.cells) }
+		if len(b.tiles) > 0 { clear(&b.tiles) }
 		b.id, b.revision, b.width, b.height = 0, 0, 0, 0
 		return
 	}
 	if b.id == data.geometry_id && b.revision == data.geometry_revision && len(b.cells) == len(data.heights) { return }
 	// Kept off the test runner's per-test allocator: it outlives any one test.
 	if b.cells.allocator.procedure == nil { b.cells = make([dynamic]u8, runtime.heap_allocator()) }
+	if b.tiles.allocator.procedure == nil { b.tiles = make([dynamic]level.Tile, runtime.heap_allocator()) }
 	clear(&b.cells)
 	append(&b.cells, ..data.heights[:])
+	clear(&b.tiles)
+	append(&b.tiles, ..data.tiles.cells[:])
 	b.width, b.height = data.tiles.width, data.tiles.height
 	b.id, b.revision = data.geometry_id, data.geometry_revision
+}
+
+// The board's tables as the surface reads them.
+@(private)
+board_surface_map :: proc() -> level.Surface_Map {
+	b := &board_heights
+	return {heights = b.cells[:], tiles = b.tiles[:], width = b.width, height = b.height}
+}
+
+// The sculpted surface of `cell`, in steps; `ok` is false off the board, on a Void cell or on a flat board.
+@(private)
+cell_surface :: proc(cell: grid.Position) -> (surface: level.Surface_Cell, ok: bool) {
+	if !board_has_heights() { return }
+	m := board_surface_map()
+	return level.surface_cell(&m, cell.x, cell.y)
+}
+
+// How high something laid flat on `cell` goes so the ground does not cover it: the top of the cell's surface.
+@(private)
+cell_overlay_ground :: proc(cell: grid.Position) -> f32 {
+	surface, ok := cell_surface(cell)
+	if !ok { return cell_ground(cell) }
+	return level.surface_top(surface)*game.HEIGHT_STEP_DRAWN
 }
 
 @(private)
@@ -59,16 +90,22 @@ cell_ground :: proc(cell: grid.Position) -> f32 {
 }
 
 // The floor's height under a point in cell coordinates (a cell's centre is its
-// own coordinates plus a half): the four cells round it blended, so a figure
-// sliding from a cell to the next climbs the step smoothly instead of jumping.
+// own coordinates plus a half): the sculpted surface there, so a figure walks up
+// a ramp as it is drawn, and stands at its cell's own height in the middle.
 @(private)
 point_ground :: proc(at: view.Vec2) -> f32 {
 	if !board_has_heights() { return 0 }
-	x0, y0 := int(math.floor(at.x)), int(math.floor(at.y))
-	tx, ty := at.x-f32(x0), at.y-f32(y0)
-	a, b := cell_ground({x0, y0}), cell_ground({x0+1, y0})
-	c, d := cell_ground({x0, y0+1}), cell_ground({x0+1, y0+1})
-	return (a*(1-tx)+b*tx)*(1-ty)+(c*(1-tx)+d*tx)*ty
+	m := board_surface_map()
+	return level.surface_height_at(&m, at.x+0.5, at.y+0.5)*game.HEIGHT_STEP_DRAWN
+}
+
+// The highest ground under a disc of `radius` round `at` (its middle and four points of its rim): a stand or a
+// shadow laid flat there is never covered by a slope.
+@(private)
+rim_ground :: proc(at: view.Vec2, radius: f32) -> f32 {
+	ground := point_ground(at)
+	for offset in ([4]view.Vec2{{radius, 0}, {-radius, 0}, {0, radius}, {0, -radius}}) { ground = max(ground, point_ground(at+offset)) }
+	return ground
 }
 
 // The cell under the ray the pointer casts: the first one whose floor is above
@@ -91,43 +128,16 @@ pick_ground_cell :: proc(origin, direction: [3]f32) -> (cell: grid.Position, ok:
 	if end <= 0 { return }
 	start = max(start, 0)
 	STEP :: f32(0.04)
+	m := board_surface_map()
 	for t := start; t <= end+STEP; t += STEP {
 		x, y, z := origin.x+direction.x*t, origin.y+direction.y*t, origin.z+direction.z*t
 		probe := grid.Position{int(math.floor(x)), int(math.floor(z))}
 		if probe.x < 0 || probe.y < 0 || probe.x >= board_heights.width || probe.y >= board_heights.height { continue }
-		if y <= cell_ground(probe)+0.02 { return probe, true }
+		if y <= level.surface_height_at(&m, x, z)*game.HEIGHT_STEP_DRAWN+0.02 { return probe, true }
 	}
 	// Nothing above the plane was hit: the ray meets the plane itself.
 	t := end
 	return {int(math.floor(origin.x+direction.x*t)), int(math.floor(origin.z+direction.z*t))}, true
-}
-
-// The steps of a cliff or a stair drawn on the sides of a raised cell that face
-// a lower one: a thin edge line at every step of the drop, so a wall of ten
-// steps reads as ten and a stair as a stair.
-@(private)
-draw_height_steps :: proc(renderer: ^Renderer, cell: grid.Position, p: [3]f32, rise: f32) {
-	sides := [4]grid.Position{{0, -1}, {1, 0}, {0, 1}, {-1, 0}}
-	for side in sides {
-		next := grid.Position{cell.x+side.x, cell.y+side.y}
-		if next.x < 0 || next.y < 0 || next.x >= board_heights.width || next.y >= board_heights.height { continue }
-		drop := rise-cell_ground(next)
-		if drop <= 0.001 { continue }
-		count := int(drop/game.HEIGHT_STEP_DRAWN+0.5)
-		normal := [3]f32{f32(side.x), 0, f32(side.y)}
-		across := [3]f32{0.97 if side.x == 0 else 0.012, 0.012, 0.97 if side.y == 0 else 0.012}
-		for step in 1..=count {
-			y := -f32(step)*game.HEIGHT_STEP_DRAWN
-			// The top edge a little darker than the lines below it.
-			shade := u8(95-min(step, 9)*4)
-			draw_height_edge({p.x+normal.x*0.496, p.y+y, p.z+normal.z*0.496}, across, {shade-20, shade, shade+30, 255})
-		}
-	}
-}
-
-@(private = "file")
-draw_height_edge :: proc(at, size: [3]f32, color: rl.Color) {
-	rl.DrawCubeV(at, size, color)
 }
 
 // Whether the ground between the camera and an actor standing at `at` (its cell's corner) hides the actor: the

@@ -782,7 +782,9 @@ avviare è `build/odin_pp`; conserva il limite fps delle impostazioni di gioco.
   vale zero (piatto).
 - **Esplorazione:** `roam_blocked`, `walk`, `move_sleeping_group`, `patrol_move_toward` e `can_see` usano
   `game.step_height_blocked` e le altezze della linea di vista.
-- **Renderer:** terrazze in `render/expedition_terrain.odin`; `Ink_Pass.lift` alza muri, prop, servizi e
+- **Renderer:** dalla Fase 1 del piano della profondità il rilievo è la superficie scolpita
+  (`level/surface.odin`) in `render/expedition_terrain.odin`: rampe, pareti di roccia sfaccettate e un bordo
+  al neon tenue in cima ai dirupi (prima erano terrazze). `Ink_Pass.lift` alza muri, prop, servizi e
   strutture alla quota della cella; l'ologramma in `run/expedition_hologram.odin`.
 - **Limiti:** vedi l'Esito della Fase 3 nel piano.
 

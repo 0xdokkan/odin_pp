@@ -9,7 +9,7 @@ import view "../engine/view"
 
 @(private = "file")
 draw_voxel_marker :: proc(cell: grid.Position, color: rl.Color) {
-	p := rl.Vector3{f32(cell.x)+0.5, 0.043+cell_ground(cell), f32(cell.y)+0.5}
+	p := rl.Vector3{f32(cell.x)+0.5, 0.043+cell_overlay_ground(cell), f32(cell.y)+0.5}
 	rl.DrawPlane(p, {0.87, 0.87}, {color.r, color.g, color.b, 45})
 	rl.DrawCubeWires(p, 0.87, 0.005, 0.87, color)
 }

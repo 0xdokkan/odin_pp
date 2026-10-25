@@ -5,6 +5,20 @@ I riferimenti a Classica, `--flat` e ai vecchi smoke descrivono versioni precede
 per i comandi disponibili oggi valgono il [README](README.md) e la documentazione collegata.
 
 
+## 2026-10-25 — Profondità, Fase 1: terreno scolpito
+
+- Le altezze si disegnano come una **superficie scolpita** ([surface.odin](src/level/surface.odin),
+  funzione pura): il centro di ogni casella alla sua quota, ogni angolo la media delle vicine a un gradino
+  al massimo. Le scale diventano rampe e le colline a gradoni colline; i dirupi tengono lo spigolo, con
+  pareti di roccia sfaccettate e un bordo al neon tenue del colore del bioma. Luce morbida sulle salite;
+  via le righe dei gradini.
+- Spedizioni: il rilievo in blocchi 8×8 è riscritto sulla superficie. Laboratorio: le caselle in pendenza
+  sono piastrelle inclinate. Personaggi, piedistalli, ombre e puntatore stanno sulla superficie; anteprime
+  e segni sulla cima della casella. Le regole non cambiano.
+- Gli smoke non si fermano più quando la loro finestra è ridotta a icona (`keep_running` del host).
+- Prestazioni: +2,4% di media rispetto alla Fase 0, il gruppo peggiore +4,3%. Test: 7 nuovi (1662 in
+  tutto).
+
 ## 2026-10-25 — Profondità, Fase 0: misure di partenza
 
 - Il benchmark delle spedizioni misura tutto il percorso dello smoke (stage
@@ -20,7 +34,7 @@ per i comandi disponibili oggi valgono il [README](README.md) e la documentazion
   nell'esito della Fase 0 e nell'appendice A di
   [piano-profondita.md](docs/piano-profondita.md). Test: 1 nuovo (1655 in tutto).
 - Lo smoke del laboratorio non è arrivato in fondo: si ferma quando la sua
-  finestra perde il fuoco. La correzione apre la Fase 1.
+  finestra è ridotta a icona. La correzione apre la Fase 1.
 
 ## 2026-10-25 — Piano di lavoro della profondità
 
