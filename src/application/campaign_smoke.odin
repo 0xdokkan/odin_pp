@@ -78,8 +78,15 @@ casino_smoke_after_present :: proc(data:rawptr,frame:^host.Frame) {
 }
 
 EXPEDITION_BENCHMARK :: #config(EXPEDITION_BENCHMARK,false)
-EXPEDITION_BENCHMARK_LAST :: #config(EXPEDITION_BENCHMARK_LAST,50)
-#assert(EXPEDITION_BENCHMARK_LAST>=0 && EXPEDITION_BENCHMARK_LAST<=50)
+// The stages measured, first and last: the whole smoke path by default. The stages before the first still set their
+// scene up, unmeasured, so a measured stage starts as it does in a full run (Fase 0 of docs/piano-profondita.md).
+EXPEDITION_BENCHMARK_FIRST :: #config(EXPEDITION_BENCHMARK_FIRST,0)
+EXPEDITION_BENCHMARK_LAST :: #config(EXPEDITION_BENCHMARK_LAST,EXPEDITION_SMOKE_LAST)
+#assert(EXPEDITION_BENCHMARK_FIRST>=0 && EXPEDITION_BENCHMARK_FIRST<=EXPEDITION_BENCHMARK_LAST && EXPEDITION_BENCHMARK_LAST<=EXPEDITION_SMOKE_LAST)
+// Every scene draws into a canvas of this many pixels, whatever the window and the display's scaling, so measures
+// taken on different screens compare. Zero by zero follows the window, as before.
+EXPEDITION_BENCHMARK_CANVAS_WIDTH :: #config(EXPEDITION_BENCHMARK_CANVAS_WIDTH,1920)
+EXPEDITION_BENCHMARK_CANVAS_HEIGHT :: #config(EXPEDITION_BENCHMARK_CANVAS_HEIGHT,1080)
 @(private)
 EXPEDITION_BENCHMARK_WARMUP :: 20
 @(private)
@@ -152,6 +159,9 @@ EXPEDITION_SMOKE_CAVE_VIEWS :: 3
 EXPEDITION_SMOKE_PLACE :: EXPEDITION_SMOKE_CAVES+4*EXPEDITION_SMOKE_CAVE_VIEWS
 @(private)
 EXPEDITION_SMOKE_PLACE_STEPS :: 4
+// The last stage of the path; the smoke quits after it.
+@(private)
+EXPEDITION_SMOKE_LAST :: EXPEDITION_SMOKE_PLACE+EXPEDITION_SMOKE_PLACE_STEPS-1
 @(private)
 EXPEDITION_SMOKE_STRUCTURE_NAMES :: [EXPEDITION_SMOKE_STRUCTURE_STEPS]string{"6","4","2","1","soglia","dentro","fuori","oggetti"}
 
@@ -168,6 +178,8 @@ expedition_benchmark_geometry :: proc(e:^run.Expedition_Session)->[2]u64 {
 // stage discards its warmup, so neither contaminates the reported interval.
 @(private)
 expedition_benchmark_present :: proc(s:^Expedition_Capture,e:^run.Expedition_Session,frame:^host.Frame)->bool {
+	// A stage before the first measured one sets its scene up, is drawn and moves on.
+	if s.stage<EXPEDITION_BENCHMARK_FIRST {return s.held>=2}
 	if s.held<=EXPEDITION_BENCHMARK_WARMUP {
 		if s.held==EXPEDITION_BENCHMARK_WARMUP {s.benchmark.geometry_measured=expedition_benchmark_geometry(e)}
 		return false
@@ -315,7 +327,8 @@ expedition_smoke_behind_wall :: proc(e:^run.Expedition_Session) {
 expedition_enable_smoke :: proc(scene:^host.Scene) {
 	when EXPEDITION_BENCHMARK {
 		rl.SetTargetFPS(0);rl.ClearWindowState({.VSYNC_HINT})
-		fmt.printfln("EXPEDITION BENCHMARK: target_fps=0 vsync_hint=%v; no screenshots or GPU readbacks; presented-frame intervals plus CPU submission timings.",rl.IsWindowState({.VSYNC_HINT}))
+		fmt.printfln("EXPEDITION BENCHMARK: target_fps=0 vsync_hint=%v; stages %d..%d; canvas %dx%d (0x0 follows the window); no screenshots or GPU readbacks; presented-frame intervals plus CPU submission timings.",
+			rl.IsWindowState({.VSYNC_HINT}),EXPEDITION_BENCHMARK_FIRST,EXPEDITION_BENCHMARK_LAST,EXPEDITION_BENCHMARK_CANVAS_WIDTH,EXPEDITION_BENCHMARK_CANVAS_HEIGHT)
 	}
 	state:=new(Expedition_Capture);state.wrapped=scene^
 	// ODIN_PP_SMOKE_ONLY=hits starts at the hit marks' fights, to work on them.
@@ -361,6 +374,8 @@ expedition_capture_present :: proc(data:rawptr,frame:^host.Frame) {
 	// Walking stages run the real scene long enough to cross several cells.
 	s.frame+=1;s.held+=1
 	when EXPEDITION_BENCHMARK {
+		// Set in the first stage's warmup; the host's next viewport refresh reallocates the canvas.
+		if frame.window!=nil {frame.window.fixed_canvas_size={EXPEDITION_BENCHMARK_CANVAS_WIDTH,EXPEDITION_BENCHMARK_CANVAS_HEIGHT}}
 		if !expedition_benchmark_present(s,e,frame) {return}
 	} else {
 		if s.held>5 {s.measured+=1;s.seconds+=f64(rl.GetFrameTime())}

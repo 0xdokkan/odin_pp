@@ -36,6 +36,21 @@ test_canvas_resizes_for_monitor_dpi_and_integer_mode_without_changing_layout :: 
 }
 
 @(test)
+test_fixed_canvas_ignores_window_and_display_scaling :: proc(t:^testing.T) {
+	viewport,_:=view.calculate_viewport(1100,760,960,540,.Fit)
+	for factor in 1..=2 {
+		size,ok:=canvas_target_size({1920,1080},viewport,{1100,760},{1100*factor,760*factor},{960,540})
+		testing.expect(t,ok)
+		testing.expect_value(t,size,[2]int{1920,1080})
+	}
+	// Without a fixed size the canvas follows the display, as before.
+	native,ok:=canvas_target_size({},viewport,{1100,760},{2200,1520},{960,540})
+	expected,_:=canvas_pixel_size(viewport,{1100,760},{2200,1520},{960,540})
+	testing.expect(t,ok)
+	testing.expect_value(t,native,expected)
+}
+
+@(test)
 test_stretch_canvas_preserves_3d_projection_aspect_and_native_coverage :: proc(t:^testing.T) {
 	viewport,_:=view.calculate_viewport(1200,800,960,540,.Stretch)
 	size,valid:=canvas_pixel_size(viewport,{1200,800},{2400,1600},{960,540})

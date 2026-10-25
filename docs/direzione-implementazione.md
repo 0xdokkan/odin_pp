@@ -568,16 +568,28 @@ odin build src -o:speed -define:EXPEDITION_BENCHMARK=true -out:build/odin_pp-ben
 rg '^(EXPEDITION BENCHMARK|CPU SUBMISSION|CPU SCENE|CPU WORLD|GEOMETRY CACHE)' build/expedition-benchmark.log
 ```
 
-Il percorso corrente comprende gli stage 0–50 (i log della revisione Cyber
-precedente terminano allo stage 39). Scarta i primi 20 frame di ogni scena,
+Il percorso comprende tutti gli stage dello smoke, 0–102 (fino al 25 ottobre
+2026 si fermava al 50; i log della revisione Cyber precedente terminano allo
+stage 39). Scarta i primi 20 frame di ogni scena,
 ne misura 120, oppure 240 per corsa e ingaggio, e termina automaticamente.
 Le scene ferme conservano uno stato di gioco prestabilito e aggiornano
 presentazione e animazioni; soltanto corsa e ingaggio, stage 25 e 26,
 eseguono l'aggiornamento completo della scena con input di movimento. La
 misura dello scontro fermo descrive quindi il disegno di quella situazione,
 non tutti i costi di una battaglia giocata.
-Per un controllo breve aggiungere `-define:EXPEDITION_BENCHMARK_LAST=7` alla
-compilazione. Il benchmark disabilita il limite fps e la richiesta di VSYNC;
+Per misurare solo una parte si scelgono primo e ultimo stage in compilazione,
+per esempio `-define:EXPEDITION_BENCHMARK_FIRST=63 -define:EXPEDITION_BENCHMARK_LAST=98`
+(rilievi, ologrammi, montagna e grotte); `-define:EXPEDITION_BENCHMARK_LAST=7`
+basta per un controllo breve. Gli stage prima del primo preparano comunque la
+loro scena, senza misurarla, così ogni stage misurato parte come in un giro
+intero. Ogni scena si disegna su un canvas fisso di 1920×1080 pixel, qualunque
+siano la finestra e il ridimensionamento dello schermo
+(`EXPEDITION_BENCHMARK_CANVAS_WIDTH` e `_HEIGHT`; 0 e 0 seguono la finestra,
+come prima): il log lo riporta in `canvas_px`. Sui portatili con due schede
+video la riga `Renderer:` del log dice quale scheda ha disegnato.
+Le misure di partenza del 25 ottobre 2026, su Windows con una RTX 3060, sono
+nella Fase 0 e nell'appendice A di [piano-profondita.md](piano-profondita.md).
+Il benchmark disabilita il limite fps e la richiesta di VSYNC;
 esclude screenshot e letture dei buffer GPU. Il compositore e il driver
 possono comunque influenzare la presentazione. La prova visiva e HDR resta
 un'esecuzione separata di `--smoke-expedition` compilata senza il flag.
@@ -591,8 +603,9 @@ odin build src -o:speed -define:EXPEDITION_BENCHMARK=true -define:EXPEDITION_TIL
 
 Confrontare gli stessi stage e `canvas_px`, sullo stesso monitor e con lo
 stesso carico di sistema; ripetere alternando l'ordine delle due build. Lo
-smoke ridimensiona alcune schermate, quindi le medie di scene con tele
-diverse non misurano lo stesso lavoro.
+smoke ridimensiona alcune schermate: con il canvas fisso i pixel disegnati
+restano gli stessi, mentre con il canvas che segue la finestra le medie di
+scene con tele diverse non misurano lo stesso lavoro.
 
 `EXPEDITION BENCHMARK` riporta gli intervalli fra frame presentati, inclusi
 aggiornamento, invio, presentazione e attese del driver. `CPU SUBMISSION`,

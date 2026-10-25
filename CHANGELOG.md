@@ -5,6 +5,23 @@ I riferimenti a Classica, `--flat` e ai vecchi smoke descrivono versioni precede
 per i comandi disponibili oggi valgono il [README](README.md) e la documentazione collegata.
 
 
+## 2026-10-25 — Profondità, Fase 0: misure di partenza
+
+- Il benchmark delle spedizioni misura tutto il percorso dello smoke (stage
+  0–102, prima al massimo 0–50), oppure un intervallo scelto in compilazione
+  con `EXPEDITION_BENCHMARK_FIRST` e `EXPEDITION_BENCHMARK_LAST`. Ogni scena si
+  disegna su un canvas fisso di 1920×1080 pixel (`fixed_canvas_size` della
+  finestra), così le misure non dipendono dallo schermo.
+- Sui portatili con due schede video il gioco chiede la scheda dedicata
+  ([windows_gpu.odin](src/windows_gpu.odin)). Sul PC di sviluppo disegnava con
+  la Intel UHD accanto a una RTX 3060; con la RTX gli stessi stage sono circa
+  quattro volte più rapidi.
+- Misure di partenza (due giri concordi, quasi tutte le scene intorno a 1 ms)
+  nell'esito della Fase 0 e nell'appendice A di
+  [piano-profondita.md](docs/piano-profondita.md). Test: 1 nuovo (1655 in tutto).
+- Lo smoke del laboratorio non è arrivato in fondo: si ferma quando la sua
+  finestra perde il fuoco. La correzione apre la Fase 1.
+
 ## 2026-10-25 — Piano di lavoro della profondità
 
 - Nuovo [documento](docs/piano-profondita.md) in nove fasi (0–8), da eseguire

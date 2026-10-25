@@ -28,6 +28,10 @@ Window :: struct {
 	// the currently bound offscreen target rather than the window framebuffer.
 	screen_size, framebuffer_size: [2]int,
 	requested_canvas_size: [2]int,
+	// A canvas of exactly this many pixels, whatever the window and the display
+	// (zero follows them); refresh_viewport applies a change. The expedition
+	// benchmark fixes it, so every scene it measures draws the same pixels.
+	fixed_canvas_size: [2]int,
 	canvas_degraded: bool,
 	// rlgl retains this pointer, so it must not point into the Window returned
 	// by value from open(). The buffers outlive every offscreen render pass.
@@ -107,6 +111,13 @@ canvas_pixel_size :: proc(viewport:view.Viewport,screen,framebuffer,logical:[2]i
 	return {max(1,int(math.round(f64(logical.x)*scale))),max(1,int(math.round(f64(logical.y)*scale)))},true
 }
 
+// The canvas the window draws into: the fixed size when one is set, otherwise
+// the display's own pixels.
+canvas_target_size :: proc(fixed:[2]int,viewport:view.Viewport,screen,framebuffer,logical:[2]int)->(size:[2]int,ok:bool) {
+	if fixed.x>0 && fixed.y>0 {return fixed,true}
+	return canvas_pixel_size(viewport,screen,framebuffer,logical)
+}
+
 @(private)
 load_canvas :: proc(size:[2]int)->(target:rl.RenderTexture2D,ok:bool) {
 	target=rl.LoadRenderTexture(c.int(size.x),c.int(size.y))
@@ -123,7 +134,7 @@ load_canvas :: proc(size:[2]int)->(target:rl.RenderTexture2D,ok:bool) {
 // instead of allocating and logging the same failure every rendered frame.
 @(private)
 ensure_canvas :: proc(window: ^Window) {
-	size,valid:=canvas_pixel_size(window.viewport,window.screen_size,window.framebuffer_size,{window.config.canvas_width,window.config.canvas_height})
+	size,valid:=canvas_target_size(window.fixed_canvas_size,window.viewport,window.screen_size,window.framebuffer_size,{window.config.canvas_width,window.config.canvas_height})
 	if !valid {return}
 	if window.canvas.id!=0 && window.requested_canvas_size==size {return}
 	window.requested_canvas_size=size

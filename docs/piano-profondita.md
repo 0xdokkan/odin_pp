@@ -46,7 +46,7 @@ La tabella è in ordine di priorità, cioè l'ordine della scaletta qui sotto.
 
 | Priorità | Fase | Contenuto | Dipende da | Stato | Commit |
 |---|---|---|---|---|---|
-| 0 | 0 | Misure di partenza: il benchmark arriva a rilievi, montagna e grotte (proposta di Claude) | — | Proposta | — |
+| 0 | 0 | Misure di partenza: il benchmark arriva a rilievi, montagna e grotte (proposta di Claude) | — | Fatta | vedi Esito |
 | 1 | 1 | Terreno scolpito: rampe, colline e dirupi di roccia, solo grafica | — (meglio dopo la 0) | Da fare | — |
 | 2 | 2 | Posizioni con il piano: il terzo numero, tutto a «terra» | — | Da fare | — |
 | 3 | 3 | Piani nel laboratorio: dati e regole | 2 | Da fare | — |
@@ -217,9 +217,16 @@ ODIN="/c/Users/lukeg/OneDrive/Desktop/odin-dev-2026-10/dist/odin.exe"
   montagna 79, grotte dall'87.
 - **Benchmark:**
   `"$ODIN" build src -o:speed -define:EXPEDITION_BENCHMARK=true -out:"$S/bench.exe"`,
-  poi `"$S/bench.exe" --smoke-expedition` (`docs/direzione-implementazione.md`,
-  «Ripetere il benchmark e leggere il profiler»). Dopo la Fase 0 arriva anche
-  agli stage di rilievi, montagna e grotte.
+  poi `"$S/bench.exe" --smoke-expedition > "$S/bench_a.log" 2>&1`
+  (`docs/direzione-implementazione.md`, «Ripetere il benchmark e leggere il
+  profiler»).
+  - Dalla Fase 0 misura tutti gli stage, 0–102, in circa 22 secondi, su un
+    canvas fisso di 1920×1080. Per una parte sola:
+    `-define:EXPEDITION_BENCHMARK_FIRST=63 -define:EXPEDITION_BENCHMARK_LAST=98`.
+  - Si misura due volte, sulla RTX 3060 (la riga `Renderer:` del log lo
+    conferma), con il portatile alla corrente, e si confrontano le medie dei
+    gruppi con quelle della Fase 0 (appendice A). Sul singolo stage, una
+    differenza sotto il 10% è rumore.
 - **Catture:** in `build/captures` (cartella ignorata da git). Gira un solo
   smoke alla volta.
 - **Avviso di fine fase** (PowerShell, senza toccare il volume del sistema):
@@ -480,10 +487,15 @@ l'ologramma.
 
 1. Il benchmark accetta un intervallo di stage, primo e ultimo, fino alle
    grotte.
-2. Misura di partenza sul PC dell'utente, ripetuta due volte (le due misure
-   devono concordare): media, mediana e p95 per stage, scritte nell'esito.
-3. Documenti: `docs/direzione-implementazione.md` (come ripetere il
-   benchmark) e `CHANGELOG.md`.
+2. Ogni scena del benchmark si disegna su un canvas fisso di 1920×1080 pixel
+   (risposta alla domanda 2).
+3. Il gioco chiede la scheda video dedicata sui portatili con due schede
+   (domanda nata durante la fase, vedi l'esito).
+4. Misura di partenza sul PC dell'utente, ripetuta due volte (le due misure
+   devono concordare): media, mediana e p95 per stage, scritte nell'esito e
+   nell'appendice A.
+5. Documenti: `docs/direzione-implementazione.md` (come ripetere il
+   benchmark), `docs/avvio.md` (la scheda video) e `CHANGELOG.md`.
 
 ### Da chiedere prima di iniziare
 
@@ -511,7 +523,107 @@ regole della sezione 1: fammi prima le domande della fase e fermati alla fine.
 
 ### Esito
 
-Da fare.
+**Fatta il 25 ottobre 2026** sul ramo `piano-profondita`.
+
+**Risposte dell'utente**
+1. **Fare questa fase:** sì, con il comando della fase.
+2. **Grandezza delle misure:** 1920×1080 pixel fissi in tutte le schermate. La
+   mia raccomandazione era la finestra dello smoke. La domanda era stata
+   riformulata, perché la grandezza la decide lo smoke, non lo schermo.
+3. **Quando misurare:** subito.
+4. **Scheda video**, domanda nata durante la fase: la RTX 3060. Il gioco
+   disegnava con la Intel UHD integrata (`Renderer: Intel(R) UHD Graphics` nel
+   log). L'utente ha scelto di far chiedere al gioco la scheda dedicata, sapendo
+   che cambia il gioco per tutti.
+
+**Cosa è stato fatto**
+- **Intervallo di stage** (`src/application/campaign_smoke.odin`):
+  `EXPEDITION_BENCHMARK_FIRST` e `EXPEDITION_BENCHMARK_LAST`, per default tutto
+  il percorso, 0–102 (prima al massimo 0–50). Gli stage prima del primo
+  preparano la loro scena per due fotogrammi, senza misurarla. Un intervallo
+  sbagliato non compila.
+- **Canvas fisso:** `Window.fixed_canvas_size` e la funzione pura
+  `canvas_target_size` (`src/engine/app/window.odin`). Il benchmark lo mette a
+  1920×1080 (`EXPEDITION_BENCHMARK_CANVAS_WIDTH` e `_HEIGHT`; 0 e 0 seguono la
+  finestra). Nel gioco normale il campo resta a zero e non cambia niente.
+- **Scheda video dedicata:** `src/windows_gpu.odin` esporta
+  `NvOptimusEnablement` e `AmdPowerXpressRequestHighPerformance`, il modo
+  documentato dai driver NVIDIA e AMD. Vale per tutto il gioco su Windows; dove
+  c'è una scheda sola non cambia niente.
+- **Documenti:** `docs/direzione-implementazione.md` (come ripetere il
+  benchmark), `docs/avvio.md` (la scheda video), `CHANGELOG.md`, la sezione 1.4
+  e l'appendice A di questo documento.
+- **Test:** 1 nuovo, `test_fixed_canvas_ignores_window_and_display_scaling`
+  in `src/engine/app`.
+
+**Misure di partenza**
+- **Macchina:** portatile HP con Intel Core i7-11800H, NVIDIA GeForce RTX 3060
+  Laptop GPU (driver 32.0.15.9282) e Intel UHD Graphics, 15,6 GB di RAM,
+  schermo 1920×1080 a 144 Hz, alla corrente, piano energetico consigliato da
+  HP.
+- **Come:** build `-o:speed`, 103 stage, canvas 1920×1080 in tutti, due giri
+  (A e B) da 22 secondi ciascuno. Il log conferma
+  `Renderer: NVIDIA GeForce RTX 3060 Laptop GPU`.
+- **Concordanza:** le mediane dei due giri differiscono in media del 2,2%: 91
+  stage su 103 entro il 5%, 99 entro il 10%, il peggiore del 14%. Le medie dei
+  gruppi differiscono di meno del 2%, tranne lo scontro su due livelli (5%).
+
+| Gruppo di stage | Media A (ms) | Media B (ms) | Mediana A | Mediana B | p95 peggiore |
+|---|---:|---:|---:|---:|---:|
+| Viste di base (0–6) | 1,73 | 1,73 | 1,60 | 1,60 | 3,67 |
+| Biomi (7–18) | 1,44 | 1,44 | 1,38 | 1,36 | 2,42 |
+| Luoghi e viste speciali (19–24) | 1,86 | 1,88 | 1,85 | 1,87 | 4,02 |
+| Corsa e ingaggio (25–26) | 1,43 | 1,43 | 1,42 | 1,42 | 1,60 |
+| Centro dei biomi (27–38) | 1,11 | 1,12 | 1,08 | 1,09 | 1,69 |
+| Officine (39–50) | 1,14 | 1,15 | 1,11 | 1,12 | 1,64 |
+| Bersagli (51–54) | 1,17 | 1,19 | 1,14 | 1,16 | 1,57 |
+| Edifici (55–62) | 0,97 | 0,95 | 0,95 | 0,93 | 1,41 |
+| Rilievi (63–74) | 1,06 | 1,08 | 1,03 | 1,04 | 1,46 |
+| Ologrammi del rilievo (75–77) | 4,02 | 4,06 | 4,00 | 4,03 | 4,74 |
+| Scontro su due livelli (78) | 1,07 | 1,14 | 1,01 | 1,06 | 1,65 |
+| Montagna (79–86) | 1,01 | 1,01 | 0,93 | 0,95 | 1,55 |
+| Grotte (87–98) | 0,91 | 0,93 | 0,88 | 0,90 | 1,34 |
+| Posa delle strutture (99–102) | 0,99 | 0,99 | 0,93 | 0,93 | 1,42 |
+
+- **Stage per stage:** appendice A.
+- **Prima e dopo la scheda dedicata** (stessa build `-o:none`, stage 96–98,
+  grotta dell'Inferno): con la Intel UHD 9,6, 5,7 e 5,7 ms; con la RTX 3060
+  2,5, 1,2 e 1,2 ms. Circa quattro volte più rapido.
+
+**Verifiche**
+- Check normale e senza assert. `.\scripts\check.ps1` completo: 1655 test
+  verdi, con e senza assert, più le due build.
+- Prova breve del benchmark (stage 96–98) per l'intervallo e il canvas fisso.
+- Smoke delle spedizioni completo sulla RTX 3060: 103 catture, nessun errore.
+  Guardate quelle del bioma iniziale, della montagna, della grotta dell'Egitto
+  e dell'ologramma della Neve: si vedono come prima.
+- **Smoke del laboratorio: non completato.** Due giri si sono fermati senza
+  errori: il primo dopo 13 atti su 18 (fino alla montagna; mancano grotta,
+  cannone, buco nero, dinosauro e pesca), il secondo già nel primo atto. In
+  tutti e due i casi il processo era vivo ma non scriveva più, mentre l'utente
+  usava altre finestre. Causa probabile: senza il fuoco della finestra il host
+  mette in pausa le scene, e `force_focus` vale per gli smoke delle spedizioni,
+  dell'hub e dei minigiochi, non per quello del laboratorio
+  (`src/application/launcher.odin:76`, `src/engine/host/host.odin:159`).
+  L'utente ha chiesto di fare comunque il commit. Di questa fase, il
+  laboratorio vede solo il cambio di scheda video, e gli atti arrivati in fondo
+  sulla RTX non hanno dato errori. La correzione è il primo passo della Fase 1.
+
+**Da sapere**
+- A circa 1 ms per fotogramma (quasi 1000 fps) si misura vicino al costo fisso
+  di presentazione: sul singolo stage, una differenza sotto il 10% è rumore. Le
+  fasi dopo confrontano le medie dei gruppi, sulla stessa macchina, sulla RTX e
+  alla corrente.
+- Le scene più care sono quelle con l'ologramma aperto (stage 1, 23 e 75–77, da
+  3,3 a 4,4 ms): l'ologramma della spedizione ricostruisce la geometria a ogni
+  fotogramma. Va tenuto d'occhio nella Fase 5, quando diventa a piani.
+- Con il canvas fisso lo smoke cambia ancora la grandezza della finestra in
+  alcune schermate: cambia solo come il canvas si scala a schermo, non i pixel
+  disegnati.
+- I numeri dei documenti precedenti (Apple M1, canvas diversi, stage 0–26) non
+  si confrontano con questi.
+- Il primo smoke del laboratorio si è fermato da fuori dopo l'atto della
+  montagna, senza errori; è stato rifatto intero.
 
 ## 4. Fase 1 — Terreno scolpito
 
@@ -589,13 +701,17 @@ solo grafica: le regole non cambiano. Lo scolpire a mano arriva con l'editor
 5. **Righe dei gradini sui fianchi.**
    - (Consigliato) Restano: aiutano a contare i gradini.
    - Oppure via.
-6. **Obiettivo di prestazioni.**
-   - (Consigliato) Al massimo +5% di media sugli stage della Fase 0, nessuno
-     stage oltre +10%.
+6. **Obiettivo di prestazioni.** Il singolo stage oscilla fino al 10% tra due
+   giri (esito della Fase 0), quindi si confrontano le medie dei gruppi.
+   - (Consigliato) Al massimo +5% di media su tutti i gruppi della Fase 0,
+     nessun gruppo oltre +10%.
    - Oppure un altro.
 
 ### Passi
 
+0. Lo smoke del laboratorio non deve fermarsi quando la finestra perde il
+   fuoco: `force_focus` anche per `--smoke-mechanics-lab` (esito della Fase 0).
+   Poi lo smoke completo, come base delle catture di questa fase.
 1. Funzione pura della superficie (centro, angoli, spigoli dei dirupi), con
    test.
 2. Laboratorio: caselle disegnate con la superficie; personaggi, mouse e ombre
@@ -1454,7 +1570,8 @@ fase indicata, prima di correggerle.
 | Il campo `covered` dei blocchi del terreno non è letto da nessuno. | `src/render/expedition_terrain.odin` | 1 |
 | La sfera di taglio per casella sta a quota fissa 0,65: il piano della griglia voleva allargarla, ma non è stato fatto. | `src/render/tactical_framing.odin` | 1 |
 | Entrando in grotta, trappole, oggetti, pozze, fuochi e ostacoli della stanza non vengono messi da parte. | `enter_cave`, `src/expedition/cave.odin:221` | 5 (sparisce con le grotte a piani) |
-| Il benchmark non arriva a rilievi, montagna e grotte. | `src/application/campaign_smoke.odin:81-82` | 0 |
+| Il benchmark non arrivava a rilievi, montagna e grotte: risolto. | `src/application/campaign_smoke.odin` | 0 (fatta) |
+| Il gioco disegnava con la scheda Intel integrata anche dove c'è una scheda dedicata: risolto. | `src/windows_gpu.odin` | 0 (fatta) |
 
 ## 13. Rischi che valgono per tutte le fasi
 
@@ -1476,3 +1593,116 @@ fase indicata, prima di correggerle.
 - **È il cambiamento più grande fatto finora.** Ogni fase lascia il gioco
   funzionante, e la regola «tutto a terra = gioco di oggi» (sezione 2.7) è la
   rete di sicurezza.
+
+## Appendice A — Misure di partenza, stage per stage
+
+Fase 0, 25 ottobre 2026: build `-o:speed`, canvas 1920×1080, NVIDIA GeForce RTX
+3060 Laptop GPU, portatile alla corrente. Millisecondi per frame presentato
+(non tempi GPU), due giri A e B da 120 campioni per stage (240 per corsa e
+ingaggio). La macchina e il modo di leggerle sono nell'esito della Fase 0.
+
+| Stage | Scena | Media A | Media B | Mediana A | Mediana B | p95 A | p95 B |
+|---:|---|---:|---:|---:|---:|---:|---:|
+| 0 | bioma | 1,46 | 1,30 | 1,16 | 1,12 | 2,26 | 2,03 |
+| 1 | ologramma | 3,29 | 3,37 | 3,27 | 3,33 | 3,61 | 3,67 |
+| 2 | mount | 1,29 | 1,33 | 1,10 | 1,10 | 1,96 | 2,01 |
+| 3 | zaino | 1,44 | 1,45 | 1,48 | 1,48 | 1,80 | 1,86 |
+| 4 | personaggio | 1,39 | 1,40 | 1,21 | 1,21 | 1,98 | 2,02 |
+| 5 | scontro | 1,75 | 1,73 | 1,75 | 1,73 | 1,97 | 1,91 |
+| 6 | tana | 1,53 | 1,53 | 1,24 | 1,23 | 2,23 | 2,22 |
+| 7 | bioma, Cyber | 1,68 | 1,68 | 1,37 | 1,42 | 2,35 | 2,33 |
+| 8 | bioma, Far West | 1,59 | 1,62 | 1,41 | 1,21 | 2,41 | 2,42 |
+| 9 | bioma, Giungla | 1,42 | 1,42 | 1,42 | 1,42 | 1,48 | 1,48 |
+| 10 | bioma, City pop | 1,44 | 1,42 | 1,42 | 1,41 | 1,51 | 1,50 |
+| 11 | bioma, Egitto | 1,43 | 1,43 | 1,43 | 1,44 | 1,48 | 1,47 |
+| 12 | bioma, Vietnam | 1,19 | 1,17 | 1,08 | 1,08 | 1,72 | 1,73 |
+| 13 | bioma, Neve | 1,35 | 1,35 | 1,36 | 1,36 | 1,42 | 1,42 |
+| 14 | bioma, Inferno | 1,48 | 1,46 | 1,48 | 1,46 | 1,54 | 1,53 |
+| 15 | bioma, Gotico | 1,27 | 1,26 | 1,15 | 1,12 | 1,79 | 1,82 |
+| 16 | bioma, Cielo | 1,54 | 1,53 | 1,54 | 1,53 | 1,60 | 1,59 |
+| 17 | bioma, Spazio | 1,50 | 1,50 | 1,49 | 1,48 | 1,56 | 1,61 |
+| 18 | bioma, Segreto | 1,42 | 1,42 | 1,43 | 1,42 | 1,48 | 1,50 |
+| 19 | luogo 0 | 1,45 | 1,46 | 1,45 | 1,46 | 1,50 | 1,51 |
+| 20 | luogo 1 | 1,66 | 1,68 | 1,65 | 1,66 | 1,78 | 1,88 |
+| 21 | luogo 2 | 1,43 | 1,44 | 1,43 | 1,43 | 1,48 | 1,48 |
+| 22 | luogo 3 | 1,35 | 1,35 | 1,34 | 1,34 | 1,49 | 1,45 |
+| 23 | ologramma grande | 3,73 | 3,83 | 3,72 | 3,80 | 3,94 | 4,02 |
+| 24 | dietro un muro | 1,52 | 1,52 | 1,53 | 1,53 | 1,59 | 1,58 |
+| 25 | camminata | 1,46 | 1,47 | 1,46 | 1,47 | 1,56 | 1,60 |
+| 26 | ingaggio | 1,39 | 1,39 | 1,38 | 1,37 | 1,52 | 1,55 |
+| 27 | centro, Cyber | 1,08 | 1,05 | 1,05 | 1,01 | 1,29 | 1,23 |
+| 28 | centro, Far West | 1,00 | 1,00 | 0,98 | 0,96 | 1,17 | 1,24 |
+| 29 | centro, Giungla | 0,96 | 0,98 | 0,93 | 0,96 | 1,19 | 1,26 |
+| 30 | centro, City pop | 1,08 | 1,11 | 1,07 | 1,09 | 1,20 | 1,21 |
+| 31 | centro, Egitto | 0,97 | 1,00 | 0,96 | 0,97 | 1,11 | 1,22 |
+| 32 | centro, Vietnam | 1,01 | 1,05 | 0,89 | 0,98 | 1,49 | 1,50 |
+| 33 | centro, Neve | 1,03 | 1,09 | 1,01 | 1,08 | 1,18 | 1,31 |
+| 34 | centro, Inferno | 1,19 | 1,20 | 1,18 | 1,20 | 1,28 | 1,30 |
+| 35 | centro, Gotico | 1,16 | 1,14 | 1,08 | 1,09 | 1,69 | 1,43 |
+| 36 | centro, Cielo | 1,26 | 1,24 | 1,21 | 1,21 | 1,52 | 1,48 |
+| 37 | centro, Spazio | 1,25 | 1,26 | 1,22 | 1,24 | 1,48 | 1,45 |
+| 38 | centro, Segreto | 1,33 | 1,34 | 1,32 | 1,31 | 1,47 | 1,54 |
+| 39 | officina, Cyber | 1,15 | 1,17 | 1,13 | 1,16 | 1,35 | 1,45 |
+| 40 | officina, Far West | 1,09 | 1,09 | 1,09 | 1,08 | 1,18 | 1,13 |
+| 41 | officina, Giungla | 1,22 | 1,20 | 1,21 | 1,20 | 1,31 | 1,31 |
+| 42 | officina, City pop | 1,31 | 1,33 | 1,31 | 1,31 | 1,49 | 1,52 |
+| 43 | officina, Egitto | 1,09 | 1,10 | 1,08 | 1,09 | 1,19 | 1,23 |
+| 44 | officina, Vietnam | 1,09 | 1,13 | 0,99 | 1,08 | 1,64 | 1,59 |
+| 45 | officina, Neve | 1,25 | 1,26 | 1,24 | 1,25 | 1,35 | 1,37 |
+| 46 | officina, Inferno | 1,18 | 1,17 | 1,11 | 1,05 | 1,54 | 1,58 |
+| 47 | officina, Gotico | 1,04 | 1,05 | 0,98 | 0,98 | 1,48 | 1,49 |
+| 48 | officina, Cielo | 1,07 | 1,07 | 1,01 | 1,02 | 1,51 | 1,41 |
+| 49 | officina, Spazio | 1,18 | 1,18 | 1,18 | 1,17 | 1,23 | 1,26 |
+| 50 | officina, Segreto | 1,01 | 1,02 | 1,00 | 1,01 | 1,10 | 1,08 |
+| 51 | bersagli, Neve | 1,22 | 1,17 | 1,18 | 1,17 | 1,48 | 1,27 |
+| 52 | bersagli, Far West | 1,14 | 1,22 | 1,11 | 1,17 | 1,27 | 1,57 |
+| 53 | bersagli, Giungla | 1,14 | 1,17 | 1,10 | 1,13 | 1,25 | 1,38 |
+| 54 | bersagli, Spazio | 1,18 | 1,19 | 1,17 | 1,18 | 1,27 | 1,31 |
+| 55 | edificio, 6 | 0,93 | 0,96 | 0,93 | 0,92 | 1,07 | 1,27 |
+| 56 | edificio, 4 | 0,95 | 0,94 | 0,94 | 0,95 | 1,05 | 1,06 |
+| 57 | edificio, 2 | 0,96 | 0,94 | 0,94 | 0,95 | 1,11 | 1,05 |
+| 58 | edificio, 1 | 0,97 | 0,93 | 0,96 | 0,93 | 1,18 | 1,04 |
+| 59 | edificio, soglia | 0,96 | 0,92 | 0,96 | 0,92 | 1,16 | 1,02 |
+| 60 | edificio, dentro | 0,99 | 0,95 | 0,99 | 0,93 | 1,23 | 1,07 |
+| 61 | edificio, fuori | 0,99 | 0,94 | 0,98 | 0,96 | 1,24 | 1,09 |
+| 62 | edificio, oggetti | 0,98 | 1,00 | 0,93 | 0,88 | 1,36 | 1,41 |
+| 63 | rilievo, Cyber | 0,89 | 0,97 | 0,88 | 0,95 | 0,99 | 1,24 |
+| 64 | rilievo, Far West | 1,02 | 1,03 | 1,02 | 1,02 | 1,10 | 1,14 |
+| 65 | rilievo, Giungla | 0,97 | 0,98 | 0,89 | 0,89 | 1,38 | 1,32 |
+| 66 | rilievo, City pop | 0,93 | 0,92 | 0,89 | 0,91 | 1,20 | 1,12 |
+| 67 | rilievo, Egitto | 0,99 | 0,99 | 0,93 | 0,91 | 1,33 | 1,38 |
+| 68 | rilievo, Vietnam | 1,11 | 1,13 | 1,10 | 1,12 | 1,28 | 1,41 |
+| 69 | rilievo, Neve | 0,95 | 0,97 | 0,93 | 0,95 | 1,18 | 1,23 |
+| 70 | rilievo, Inferno | 1,17 | 1,18 | 1,17 | 1,18 | 1,25 | 1,26 |
+| 71 | rilievo, Gotico | 0,98 | 1,01 | 0,94 | 0,93 | 1,42 | 1,46 |
+| 72 | rilievo, Cielo | 1,13 | 1,14 | 1,10 | 1,12 | 1,31 | 1,34 |
+| 73 | rilievo, Spazio | 1,25 | 1,26 | 1,23 | 1,24 | 1,43 | 1,44 |
+| 74 | rilievo, Segreto | 1,30 | 1,32 | 1,29 | 1,31 | 1,41 | 1,45 |
+| 75 | ologramma rilievo, Egitto | 4,29 | 4,42 | 4,28 | 4,40 | 4,55 | 4,68 |
+| 76 | ologramma rilievo, Neve | 4,34 | 4,35 | 4,32 | 4,29 | 4,63 | 4,74 |
+| 77 | ologramma rilievo, Cielo | 3,41 | 3,42 | 3,40 | 3,41 | 3,60 | 3,58 |
+| 78 | scontro su due livelli | 1,07 | 1,14 | 1,01 | 1,06 | 1,65 | 1,63 |
+| 79 | montagna 0 | 1,06 | 1,05 | 0,88 | 0,97 | 1,55 | 1,45 |
+| 80 | montagna 1 | 1,06 | 1,06 | 0,92 | 0,95 | 1,52 | 1,45 |
+| 81 | montagna 2 | 0,96 | 0,99 | 0,94 | 0,97 | 1,14 | 1,18 |
+| 82 | montagna 3 | 1,01 | 1,01 | 0,94 | 0,92 | 1,40 | 1,49 |
+| 83 | montagna 4 | 0,95 | 0,98 | 0,93 | 0,95 | 1,10 | 1,12 |
+| 84 | montagna 5 | 1,00 | 0,99 | 0,94 | 0,95 | 1,43 | 1,41 |
+| 85 | montagna 6 | 1,02 | 1,02 | 0,94 | 0,95 | 1,40 | 1,45 |
+| 86 | montagna 7 | 1,00 | 1,02 | 0,92 | 0,93 | 1,43 | 1,44 |
+| 87 | grotta, Neve, arco | 0,95 | 0,98 | 0,93 | 0,96 | 1,19 | 1,20 |
+| 88 | grotta, Neve, ingresso | 0,85 | 0,87 | 0,83 | 0,86 | 0,94 | 0,97 |
+| 89 | grotta, Neve, stanza | 0,86 | 0,85 | 0,85 | 0,84 | 0,92 | 0,96 |
+| 90 | grotta, Far West, arco | 0,99 | 0,98 | 0,90 | 0,87 | 1,32 | 1,34 |
+| 91 | grotta, Far West, ingresso | 0,71 | 0,79 | 0,68 | 0,75 | 0,89 | 1,08 |
+| 92 | grotta, Far West, stanza | 0,72 | 0,79 | 0,68 | 0,73 | 1,03 | 1,05 |
+| 93 | grotta, Egitto, arco | 0,97 | 0,97 | 0,95 | 0,94 | 1,22 | 1,23 |
+| 94 | grotta, Egitto, ingresso | 0,85 | 0,88 | 0,84 | 0,84 | 0,93 | 1,15 |
+| 95 | grotta, Egitto, stanza | 0,86 | 0,86 | 0,84 | 0,84 | 0,95 | 0,96 |
+| 96 | grotta, Inferno, arco | 1,19 | 1,19 | 1,18 | 1,20 | 1,25 | 1,25 |
+| 97 | grotta, Inferno, ingresso | 0,95 | 0,99 | 0,93 | 0,97 | 1,17 | 1,26 |
+| 98 | grotta, Inferno, stanza | 0,97 | 0,99 | 0,96 | 0,97 | 1,26 | 1,22 |
+| 99 | posa, fantasma verde | 0,99 | 0,98 | 0,93 | 0,92 | 1,39 | 1,39 |
+| 100 | posa, fantasma rosso | 0,97 | 0,98 | 0,91 | 0,93 | 1,39 | 1,40 |
+| 101 | posa, posata | 0,98 | 1,00 | 0,93 | 0,93 | 1,39 | 1,42 |
+| 102 | posa, rotta | 1,01 | 1,01 | 0,96 | 0,95 | 1,38 | 1,41 |

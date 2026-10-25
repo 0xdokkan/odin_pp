@@ -43,6 +43,9 @@ riserva a 16 MiB dal sorgente, senza flag del linker sulla riga di comando.
 I test dei singoli pacchetti non includono quel file: i pacchetti che decodificano
 lo snapshot della spedizione importano [teststack](../src/engine/teststack), che dà
 all'eseguibile di test 32 MiB, e `odin test src/<pacchetto>` funziona a mano.
+Sui portatili con due schede video, Windows dà a un programma sconosciuto quella
+integrata: [windows_gpu.odin](../src/windows_gpu.odin) chiede quella dedicata (NVIDIA
+Optimus e AMD PowerXpress). La riga `Renderer:` all'avvio dice quale scheda disegna.
 
 Dopo modifiche ai sorgenti, ricompilare prima di riutilizzare `./odin_pp`.
 Le build rapide mantengono assert e controlli di sicurezza; non riducono asset
