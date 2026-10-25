@@ -31,8 +31,8 @@ MECHANICS_LAB_DECK_SEED :: u64(0x7E57_1AB)
 // The arenas of the lab: the flat one every card is tried in, the one with heights
 // (a plateau up a stair, a pillar, a spiral hill) to try the heights in, the
 // one with the catalog of structures, and the one with the Snow biome's spiral
-// mountain, and the one with a cave's rooms (F3 goes from one to the next).
-Mechanics_Lab_Arena :: enum { Flat, Heights, Structures, Mountain, Cave }
+// mountain, the one with a cave's rooms, and the one with layers (F3 goes from one to the next).
+Mechanics_Lab_Arena :: enum { Flat, Heights, Structures, Mountain, Cave, Layers }
 
 // The arena of structures is larger, to hold all of them with room between.
 MECHANICS_LAB_STRUCTURES_WIDTH :: 41
@@ -49,7 +49,14 @@ MECHANICS_LAB_CAVE_SEED :: u64(2026)
 MECHANICS_LAB_CAVE_WIDTH :: level.CAVE_WIDTH+2
 MECHANICS_LAB_CAVE_HEIGHT :: level.CAVE_HEIGHT+2
 
+// The arena of the layers (Fase 3 of docs/piano-profondita.md): a road under a bridge and its ramps, a hill with a
+// cave through it, a ladder up the hill's cliff (mechanics_lab_layers).
+MECHANICS_LAB_LAYERS_WIDTH :: 46
+MECHANICS_LAB_LAYERS_HEIGHT :: 29
+MECHANICS_LAB_LAYERS_START :: grid.Position{x = 8, y = 22}
+
 mechanics_lab_size :: proc(arena: Mechanics_Lab_Arena) -> (width, height: int) {
+	if arena == .Layers { return MECHANICS_LAB_LAYERS_WIDTH, MECHANICS_LAB_LAYERS_HEIGHT }
 	if arena == .Cave { return MECHANICS_LAB_CAVE_WIDTH, MECHANICS_LAB_CAVE_HEIGHT }
 	if arena == .Structures { return MECHANICS_LAB_STRUCTURES_WIDTH, MECHANICS_LAB_STRUCTURES_HEIGHT }
 	if arena == .Mountain { return MECHANICS_LAB_MOUNTAIN_WIDTH, MECHANICS_LAB_MOUNTAIN_HEIGHT }
@@ -77,6 +84,8 @@ mechanics_lab_level :: proc(arena := Mechanics_Lab_Arena.Flat) -> (level.Level, 
 	width, height := mechanics_lab_size(arena)
 	rows: [MECHANICS_LAB_STRUCTURES_HEIGHT]string
 	cave := level.cave_plan(MECHANICS_LAB_CAVE_SEED)
+	start := grid.Position{x = width/2, y = height/2}
+	if arena == .Layers { start = MECHANICS_LAB_LAYERS_START }
 	for y in 0..<height {
 		row := strings.builder_make(context.temp_allocator)
 		for x in 0..<width {
@@ -91,7 +100,7 @@ mechanics_lab_level :: proc(arena := Mechanics_Lab_Arena.Flat) -> (level.Level, 
 			}
 			switch {
 			case x == 0 || y == 0 || x == width-1 || y == height-1: strings.write_byte(&row, '#')
-			case x == width/2 && y == height/2: strings.write_byte(&row, '@')
+			case x == start.x && y == start.y: strings.write_byte(&row, '@')
 			case x == width-2 && y == height-2: strings.write_byte(&row, '>')
 			case: strings.write_byte(&row, '.')
 			}
@@ -101,6 +110,10 @@ mechanics_lab_level :: proc(arena := Mechanics_Lab_Arena.Flat) -> (level.Level, 
 	data, error, _ := level.from_ascii(rows[:height])
 	if error != .None { return data, false }
 	if arena == .Heights { mechanics_lab_raise(&data) }
+	if arena == .Layers && !mechanics_lab_layers(&data) {
+		level.destroy(&data)
+		return {}, false
+	}
 	if arena == .Mountain && !level.mountain_stamp(&data, MECHANICS_LAB_MOUNTAIN_CENTER) {
 		level.destroy(&data)
 		return {}, false
@@ -128,6 +141,29 @@ mechanics_lab_raise :: proc(data: ^level.Level) {
 	level.set_height(data, {x = 6, y = 4}, 8)
 	spiral := [9]grid.Position{{x = 3, y = 10}, {x = 4, y = 10}, {x = 5, y = 10}, {x = 5, y = 11}, {x = 5, y = 12}, {x = 4, y = 12}, {x = 3, y = 12}, {x = 3, y = 11}, {x = 4, y = 11}}
 	for cell, step in spiral { level.set_height(data, cell, i32(step)+1) }
+}
+
+// The arena of the layers, on the 46x29 board with the player at (8,22):
+// - a road (x 16..18) goes under a bridge on layer +1, 12 steps up, that crosses it along y 13..15 from x 14 to
+//   20; two ramps of eleven steps lead onto it, up from x 3 to 13 and down from x 21 to 31;
+// - a hill of 14 steps (x 35..43, y 3..11) has a cave on layer -1 through it, at 0, along y = 7, with a room of
+//   3x3 in its middle (x 38..40, y 6..8): its mouths open at (34,7) and (44,7);
+// - a ladder climbs the hill's west cliff, from (34,4) to (35,4).
+mechanics_lab_layers :: proc(data: ^level.Level) -> bool {
+	for y in 13..=15 {
+		for x in 3..=13 { if !level.set_height(data, {x = x, y = y}, i32(x-2)) { return false } }
+		for x in 21..=31 { if !level.set_height(data, {x = x, y = y}, i32(32-x)) { return false } }
+		for x in 14..=20 {
+			bridge := grid.Position{x = x, y = y, layer = 1}
+			if !level.set_tile(data, bridge, {kind = .Floor}) || !level.set_height(data, bridge, level.LAYER_SPACING) { return false }
+		}
+	}
+	for y in 3..=11 { for x in 35..=43 { if !level.set_height(data, {x = x, y = y}, 14) { return false } } }
+	for x in 35..=43 { if !level.set_tile(data, {x = x, y = 7, layer = -1}, {kind = .Floor}) { return false } }
+	for y in 6..=8 { for x in 38..=40 { if !level.set_tile(data, {x = x, y = y, layer = -1}, {kind = .Floor}) { return false } } }
+	if !level.add_ladder(data, {x = 34, y = 4}, {x = 35, y = 4}) { return false }
+	error, _ := level.check_layers(data)
+	return error == .None
 }
 
 // Replaces `data` with the arena and builds its endless room around `player`.
@@ -169,6 +205,14 @@ create_mechanics_lab_room :: proc(data: ^level.Level, player: ^game.Player, conf
 		spawns[1].position = grid.offset(MECHANICS_LAB_MOUNTAIN_CENTER, summit.x+1, summit.y)
 		spawns[1].health = 18
 		spawns[2].position = {x = width/2, y = height-3}
+	}
+	// In the arena of the layers a foe on each: in the cave's room, on the bridge's south edge (sturdy enough
+	// to survive a fall off it), on the road south of the bridge.
+	if which == .Layers {
+		spawns[0].position = {x = 39, y = 7, layer = -1}
+		spawns[1].position = {x = 19, y = 15, layer = 1}
+		spawns[1].health = 18
+		spawns[2].position = {x = 17, y = 19}
 	}
 	room, ok = game.create_room(data, player, {enemies = spawns[:]})
 	if !ok { return }

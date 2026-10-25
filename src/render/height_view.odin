@@ -24,6 +24,10 @@ Board_Heights :: struct {
 	cells: [dynamic]u8,
 	// The tiles too, which the surface reads: a Void cell has no ground.
 	tiles: [dynamic]level.Tile,
+	// The other layers' tables (level/layers.odin), by level.layer_slot: empty where the map has none.
+	plane_cells: [level.LAYER_COUNT][dynamic]u8,
+	plane_tiles: [level.LAYER_COUNT][dynamic]level.Tile,
+	layered: bool,
 	width, height: int,
 	id, revision: u64,
 }
@@ -31,17 +35,33 @@ Board_Heights :: struct {
 @(private)
 board_heights: Board_Heights
 
+// Where each actor of the room stands this frame (the room's own cells, on their layers): on a map with layers
+// a figure is drawn on its own layer's floor (entity_point_ground).
+@(private)
+Board_Actor :: struct {
+	entity: game.Entity_Ref,
+	cell:   grid.Position,
+}
+
+@(private)
+board_actors: [dynamic]Board_Actor
+
 // The level whose heights the next drawing uses (nil: flat).
 @(private)
 set_board_level :: proc(data: ^level.Level) {
 	b := &board_heights
-	if data == nil || !level.has_heights(data) {
+	layered := data != nil && level.has_layers(data)
+	if data == nil || !level.has_heights(data) && !layered {
 		if len(b.cells) > 0 { clear(&b.cells) }
 		if len(b.tiles) > 0 { clear(&b.tiles) }
-		b.id, b.revision, b.width, b.height = 0, 0, 0, 0
+		for slot in 0..<level.LAYER_COUNT {
+			if len(b.plane_cells[slot]) > 0 { clear(&b.plane_cells[slot]) }
+			if len(b.plane_tiles[slot]) > 0 { clear(&b.plane_tiles[slot]) }
+		}
+		b.id, b.revision, b.width, b.height, b.layered = 0, 0, 0, 0, false
 		return
 	}
-	if b.id == data.geometry_id && b.revision == data.geometry_revision && len(b.cells) == len(data.heights) { return }
+	if b.id == data.geometry_id && b.revision == data.geometry_revision && len(b.cells) == len(data.heights) && b.layered == layered { return }
 	// Kept off the test runner's per-test allocator: it outlives any one test.
 	if b.cells.allocator.procedure == nil { b.cells = make([dynamic]u8, runtime.heap_allocator()) }
 	if b.tiles.allocator.procedure == nil { b.tiles = make([dynamic]level.Tile, runtime.heap_allocator()) }
@@ -49,22 +69,77 @@ set_board_level :: proc(data: ^level.Level) {
 	append(&b.cells, ..data.heights[:])
 	clear(&b.tiles)
 	append(&b.tiles, ..data.tiles.cells[:])
+	for slot in 0..<level.LAYER_COUNT {
+		if b.plane_cells[slot].allocator.procedure == nil { b.plane_cells[slot] = make([dynamic]u8, runtime.heap_allocator()) }
+		if b.plane_tiles[slot].allocator.procedure == nil { b.plane_tiles[slot] = make([dynamic]level.Tile, runtime.heap_allocator()) }
+		clear(&b.plane_cells[slot])
+		clear(&b.plane_tiles[slot])
+		plane := &data.planes[slot]
+		if !layered || len(plane.tiles) == 0 { continue }
+		append(&b.plane_tiles[slot], ..plane.tiles[:])
+		append(&b.plane_cells[slot], ..plane.heights[:])
+	}
+	b.layered = layered
 	b.width, b.height = data.tiles.width, data.tiles.height
 	b.id, b.revision = data.geometry_id, data.geometry_revision
 }
 
-// The board's tables as the surface reads them.
+// Where the room's actors stand this frame, on a map with layers (nothing to keep without).
 @(private)
-board_surface_map :: proc() -> level.Surface_Map {
-	b := &board_heights
-	return {heights = b.cells[:], tiles = b.tiles[:], width = b.width, height = b.height}
+set_board_actors :: proc(room: ^game.Room) {
+	if board_actors.allocator.procedure == nil { board_actors = make([dynamic]Board_Actor, runtime.heap_allocator()) }
+	clear(&board_actors)
+	if room == nil || room.player == nil || !board_heights.layered { return }
+	append(&board_actors, Board_Actor{game.PLAYER_ENTITY, room.player.position})
+	for enemy in room.enemies { append(&board_actors, Board_Actor{game.enemy_entity(enemy.id), enemy.position}) }
+	for object in room.objects { append(&board_actors, Board_Actor{game.object_entity(object.id), object.position}) }
 }
 
-// The sculpted surface of `cell`, in steps; `ok` is false off the board, on a Void cell or on a flat board.
+// The board's tables as the surface reads them: the ground's, or `layer`'s.
+@(private)
+board_surface_map :: proc(layer := i8(grid.GROUND_LAYER)) -> level.Surface_Map {
+	b := &board_heights
+	if layer == grid.GROUND_LAYER || !level.layer_in_range(layer) {
+		return {heights = b.cells[:], tiles = b.tiles[:], width = b.width, height = b.height}
+	}
+	slot := level.layer_slot(layer)
+	return {heights = b.plane_cells[slot][:], tiles = b.plane_tiles[slot][:], width = b.width, height = b.height}
+}
+
+// The board's tables as the rules of the layers read them (level/layer_sight.odin).
+@(private)
+board_layer_map :: proc() -> (m: level.Layer_Map) {
+	b := &board_heights
+	m.width, m.height = b.width, b.height
+	for slot in 0..<level.LAYER_COUNT {
+		if slot == level.layer_slot(grid.GROUND_LAYER) {
+			m.tiles[slot], m.heights[slot] = b.tiles[:], b.cells[:]
+		} else {
+			m.tiles[slot], m.heights[slot] = b.plane_tiles[slot][:], b.plane_cells[slot][:]
+		}
+	}
+	return
+}
+
+// Whether a layer other than the ground has a floor in the column of `cell`.
+@(private)
+board_column_layered :: proc(cell: grid.Position) -> bool {
+	b := &board_heights
+	if !b.layered || cell.x < 0 || cell.y < 0 || cell.x >= b.width || cell.y >= b.height { return false }
+	index := cell.y*b.width+cell.x
+	for slot in 0..<level.LAYER_COUNT {
+		tiles := b.plane_tiles[slot]
+		if index < len(tiles) && level.kind_has_floor(tiles[index].kind) { return true }
+	}
+	return false
+}
+
+// The sculpted surface of `cell` on its layer, in steps; `ok` is false off the board, on a Void cell or on a flat board.
 @(private)
 cell_surface :: proc(cell: grid.Position) -> (surface: level.Surface_Cell, ok: bool) {
-	if !board_has_heights() { return }
-	m := board_surface_map()
+	if cell.layer == grid.GROUND_LAYER && !board_has_heights() { return }
+	if cell.layer != grid.GROUND_LAYER && !board_heights.layered { return }
+	m := board_surface_map(cell.layer)
 	return level.surface_cell(&m, cell.x, cell.y)
 }
 
@@ -81,12 +156,18 @@ board_has_heights :: proc() -> bool {
 	return len(board_heights.cells) > 0
 }
 
-// How high `cell`'s floor stands over the board's plane.
+// How high `cell`'s floor stands over the board's plane, on its layer.
 @(private)
 cell_ground :: proc(cell: grid.Position) -> f32 {
 	b := &board_heights
-	if len(b.cells) == 0 || cell.x < 0 || cell.y < 0 || cell.x >= b.width || cell.y >= b.height { return 0 }
-	return f32(b.cells[cell.y*b.width+cell.x])*game.HEIGHT_STEP_DRAWN
+	if cell.x < 0 || cell.y < 0 || cell.x >= b.width || cell.y >= b.height { return 0 }
+	cells := b.cells[:]
+	if cell.layer != grid.GROUND_LAYER {
+		if !b.layered || !level.layer_in_range(cell.layer) { return 0 }
+		cells = b.plane_cells[level.layer_slot(cell.layer)][:]
+	}
+	index := cell.y*b.width+cell.x
+	return f32(cells[index])*game.HEIGHT_STEP_DRAWN if index < len(cells) else 0
 }
 
 // The floor's height under a point in cell coordinates (a cell's centre is its
@@ -100,12 +181,97 @@ point_ground :: proc(at: view.Vec2) -> f32 {
 }
 
 // The highest ground under a disc of `radius` round `at` (its middle and four points of its rim): a stand or a
-// shadow laid flat there is never covered by a slope.
+// shadow laid flat there is never covered by a slope. With `entity`, the floor of its own layer.
 @(private)
-rim_ground :: proc(at: view.Vec2, radius: f32) -> f32 {
-	ground := point_ground(at)
-	for offset in ([4]view.Vec2{{radius, 0}, {-radius, 0}, {0, radius}, {0, -radius}}) { ground = max(ground, point_ground(at+offset)) }
+rim_ground :: proc(at: view.Vec2, radius: f32, entity := game.Entity_Ref{}) -> f32 {
+	ground := entity_point_ground(entity, at)
+	for offset in ([4]view.Vec2{{radius, 0}, {-radius, 0}, {0, radius}, {0, -radius}}) { ground = max(ground, entity_point_ground(entity, at+offset)) }
 	return ground
+}
+
+// The kind of `cell`'s tile in the board's copy, on its layer.
+@(private)
+board_tile :: proc(cell: grid.Position) -> level.Tile_Kind {
+	m := board_layer_map()
+	return level.map_tile(&m, cell)
+}
+
+// Where the dark column under `cell`'s floor starts, over the board's plane: under the board, or at the top of
+// the room over the floor under it (the cave the ground's column stands over); a bridge's floor is a deck
+// LAYER_THICKNESS steps thick.
+@(private)
+cell_base :: proc(cell: grid.Position) -> f32 {
+	BOARD_BASE :: f32(-0.31)
+	if !board_heights.layered { return BOARD_BASE }
+	step := game.HEIGHT_STEP_DRAWN
+	if cell.layer > grid.GROUND_LAYER { return cell_ground(cell)-f32(level.LAYER_THICKNESS)*step }
+	base := BOARD_BASE
+	for layer in grid.LOWEST_LAYER..<int(cell.layer) {
+		under := grid.Position{x = cell.x, y = cell.y, layer = i8(layer)}
+		if level.kind_has_floor(board_tile(under)) { base = max(base, cell_ground(under)+f32(level.LAYER_CLEARANCE)*step) }
+	}
+	return base
+}
+
+// HALF SEEN, a first drawing of the layers (Fase 3 of docs/piano-profondita.md; the Fase 4 does the rest): when
+// the robot stands under something (a cave's rock, a bridge's deck), what covers it near it is drawn half
+// transparent, in the sorted pass.
+@(private)
+Board_Cover :: struct {
+	under:        bool,
+	robot:        grid.Position,
+	robot_height: f32,
+}
+
+@(private)
+board_cover: Board_Cover
+
+BOARD_COVER_RADIUS :: 5
+
+@(private)
+set_board_cover :: proc(room: ^game.Room) {
+	board_cover = {}
+	if room == nil || room.player == nil || !board_heights.layered { return }
+	robot := room.player.position
+	m := board_layer_map()
+	column := level.column_of(&m, robot.x, robot.y)
+	under := robot.layer < grid.GROUND_LAYER || level.column_room_top(&column, level.map_height(&m, robot)) < level.COLUMN_FAR
+	board_cover = {under = under, robot = robot, robot_height = cell_ground(robot)}
+}
+
+// Whether `cell` is drawn half transparent: near the robot under cover, on a layer over his and above his head.
+@(private)
+cell_covers_robot :: proc(cell: grid.Position) -> bool {
+	c := &board_cover
+	if !c.under || cell.layer <= c.robot.layer || max(abs(cell.x-c.robot.x), abs(cell.y-c.robot.y)) > BOARD_COVER_RADIUS { return false }
+	return cell_ground(cell) > c.robot_height+2*game.HEIGHT_STEP_DRAWN
+}
+
+// The cell `entity` stands on this frame, on its layer (found false off a map with layers).
+@(private)
+board_actor_cell :: proc(entity: game.Entity_Ref) -> (cell: grid.Position, found: bool) {
+	for actor in board_actors { if actor.entity == entity { return actor.cell, true } }
+	return
+}
+
+// The floor under a point that `entity` stands on: on a map with layers, of the layers that have a floor
+// under the point, the one nearest in height to the cell the actor stands on (so a figure crossing a mouth or
+// a bridge's head goes from one floor to the other without a drop); else the ground's (point_ground).
+@(private)
+entity_point_ground :: proc(entity: game.Entity_Ref, at: view.Vec2) -> f32 {
+	if !board_heights.layered || entity == {} { return point_ground(at) }
+	standing, found := board_actor_cell(entity)
+	if !found { return point_ground(at) }
+	target := cell_ground(standing)
+	best, best_distance := point_ground(at), max(f32)
+	x, y := int(math.floor(at.x+0.5)), int(math.floor(at.y+0.5))
+	for layer in grid.LOWEST_LAYER..=grid.HIGHEST_LAYER {
+		m := board_surface_map(i8(layer))
+		if !level.surface_ground(&m, x, y) { continue }
+		height := level.surface_height_at(&m, at.x+0.5, at.y+0.5)*game.HEIGHT_STEP_DRAWN
+		if distance := abs(height-target); distance < best_distance { best, best_distance = height, distance }
+	}
+	return best
 }
 
 // The cell under the ray the pointer casts: the first one whose floor is above
@@ -114,14 +280,19 @@ rim_ground :: proc(at: view.Vec2, radius: f32) -> f32 {
 @(private)
 pick_ground_cell :: proc(origin, direction: [3]f32) -> (cell: grid.Position, ok: bool) {
 	if direction.y > -0.0001 { return }
-	if !board_has_heights() {
+	if !board_has_heights() && !board_heights.layered {
 		t := -origin.y/direction.y
 		if t <= 0 { return }
 		return {x = int(math.floor(origin.x+direction.x*t)), y = int(math.floor(origin.z+direction.z*t))}, true
 	}
 	top := f32(0)
 	for height in board_heights.cells { top = max(top, f32(height)) }
+	for cells in board_heights.plane_cells { for height in cells { top = max(top, f32(height)) } }
 	top = top*game.HEIGHT_STEP_DRAWN+0.1
+	// Where another layer has a floor, the column's solids (level.column_of): the ray stops in the first one it
+	// enters, on the floor that stands on it (a bridge's deck, a cave's floor through its mouth, the hill's top).
+	layers: level.Layer_Map
+	if board_heights.layered { layers = board_layer_map() }
 	// From the height of the tallest cell down to the plane, in small steps.
 	start := (top-origin.y)/direction.y
 	end := -origin.y/direction.y
@@ -133,6 +304,17 @@ pick_ground_cell :: proc(origin, direction: [3]f32) -> (cell: grid.Position, ok:
 		x, y, z := origin.x+direction.x*t, origin.y+direction.y*t, origin.z+direction.z*t
 		probe := grid.Position{x = int(math.floor(x)), y = int(math.floor(z))}
 		if probe.x < 0 || probe.y < 0 || probe.x >= board_heights.width || probe.y >= board_heights.height { continue }
+		if board_column_layered(probe) {
+			column := level.column_of(&layers, probe.x, probe.y)
+			steps := (y-0.02)/game.HEIGHT_STEP_DRAWN
+			for span in column.solids[:column.solid_count] {
+				if f32(span.bottom) > steps || steps >= f32(span.top) { continue }
+				hit := probe
+				for floor, i in column.floors[:column.floor_count] { if column.floor_heights[i] == span.top { hit = floor } }
+				return hit, true
+			}
+			continue
+		}
 		if y <= level.surface_height_at(&m, x, z)*game.HEIGHT_STEP_DRAWN+0.02 { return probe, true }
 	}
 	// Nothing above the plane was hit: the ray meets the plane itself.

@@ -788,6 +788,39 @@ danno di caduta in `apply_movement_effect`, che registra un `Hazard_Triggered`
 con il danno. Gli attacchi in mischia fra celle di altezza diversa restano
 possibili.
 
+### Piani
+
+Una mappa può avere caselle anche sopra la terra (un ponte, piano +1) e sotto (una grotta, piani −1 e −2):
+[layers.odin](../../src/level/layers.odin) per i dati, [layers.odin](../../src/game/layers.odin) per le
+regole (Fase 3 di [piano-profondita.md](../piano-profondita.md)). Ogni casella calpestabile di ogni piano è
+una casella della griglia, e la posizione ha il suo piano (`grid.Position.layer`). Senza piani, cioè con
+tutto a terra, il gioco è identico a prima.
+
+**La colonna.** Le caselle con le stesse x e y su tutti i piani. Due pavimenti della stessa colonna distano
+almeno 12 gradini, e il piano più alto sta più in alto: sopra ogni pavimento ci sono 10 gradini liberi (la
+luce), e l'impalcato di un ponte o la roccia sopra una grotta sono spessi 2. Una mappa che non lo rispetta è
+rifiutata (`level.check_layers`). Così in una colonna vicina c'è al massimo un pavimento a un gradino o due
+da qualsiasi altezza, e un passo non deve mai scegliere il piano.
+
+| Cosa | Regola |
+|---|---|
+| Passo | nella colonna vicina, sul pavimento a un gradino al massimo, su qualsiasi piano: una rampa porta sul ponte, l'imbocco in grotta (`game.layer_step`) |
+| Scala a pioli | collega due caselle di colonne vicine anche sopra un dirupo; si sale e si scende premendo la direzione verso la scala, robot e nemici (`level.Ladder`, movimento `Climb`) |
+| Spinta, tirata, scatto | entrano nel pavimento la cui luce raggiungono: oltre il bordo aperto di un ponte si cade sul piano sotto, con il danno di caduta di sempre |
+| Vista e tiri | in tutte e due le direzioni: dal ponte si vede e si colpisce la strada, e dalla strada il ponte; la linea non deve toccare l'impalcato o la roccia sopra una grotta, in nessun punto della casella (`level.layer_line_blocker`) |
+| Gittata | si misura su x e y; il +1 da 4 gradini più in alto vale anche fra piani |
+| Aree | in ogni colonna, la casella del piano dell'ancora; dove quel piano non c'è, il pavimento più vicino in altezza entro 2 gradini: l'area esce da un imbocco, mentre ponti e volte la fermano (`game.area_cell`); vale anche per esplosioni, fuochi e scariche |
+| Mischia | sullo stesso piano come sempre, anche sopra un dirupo; fra piani diversi solo a un gradino al massimo, cioè agli imbocchi |
+| Chi sta dove | un personaggio per casella: due possono stare sulla stessa x,y su piani diversi |
+| Nemici | il campo delle distanze attraversa i piani con la regola del passo e le scale |
+| Carte speciali | Inondazione, Buco Nero, Bomb Marley, Lazzo, Pinball, Cannone, dispositivi e First Person Shooter agiscono sul piano di chi le gioca come sempre, e sugli altri piani solo su ciò che vede (`game.effect_reaches`); la palla del Pinball rotola sul suo piano |
+| Pozze e fuochi | stanno sul loro piano; una pozza chiude le aree anche attraverso un imbocco |
+
+Nella Prova meccaniche l'arena «Piani» (sesta di F3) li mette alla prova: una strada sotto un ponte con
+due rampe, una collina con una grotta e due imbocchi, una scala sul dirupo della collina, un nemico per
+piano. Il disegno è ancora semplice: ciò che copre il robot quando è sotto (la roccia sopra la grotta,
+l'impalcato del ponte) diventa mezzo trasparente; il resto arriva con la Fase 4.
+
 ### Strutture
 
 Edifici e oggetti complessi occupano **tutte** le caselle della loro impronta, come

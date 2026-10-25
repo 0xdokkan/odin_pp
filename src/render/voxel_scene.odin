@@ -95,7 +95,7 @@ tactical_intent_label :: proc(intent: game.Enemy_Intent) -> cstring {
 
 // All environmental props have volume. The same extents drive their ray pick.
 @(private)
-voxel_object_bounds :: proc(kind: game.Grid_Object_Kind, position: view.Vec2) -> rl.BoundingBox {
+voxel_object_bounds :: proc(kind: game.Grid_Object_Kind, position: view.Vec2, entity := game.Entity_Ref{}) -> rl.BoundingBox {
 	width, height := f32(0.68), f32(0.72)
 	switch kind {
 	case .Ice_Block: width, height = 0.82, 0.94
@@ -113,13 +113,13 @@ voxel_object_bounds :: proc(kind: game.Grid_Object_Kind, position: view.Vec2) ->
 	case .Devouring_Hole: width, height = 0.9, 0.5
 	case .Count:
 	}
-	p := rl.Vector3{position.x+0.5, 0.035+point_ground(position), position.y+0.5}
+	p := rl.Vector3{position.x+0.5, 0.035+entity_point_ground(entity, position), position.y+0.5}
 	return {p-rl.Vector3{width/2, 0, width/2}, p+rl.Vector3{width/2, height, width/2}}
 }
 
 @(private)
 draw_voxel_object :: proc(renderer: ^Renderer, object: Presentation_Grid_Object) {
-	bounds := voxel_object_bounds(object.kind, object.position)
+	bounds := voxel_object_bounds(object.kind, object.position, object.entity)
 	p := (bounds.min+bounds.max)*0.5
 	size := bounds.max-bounds.min
 	tint := GOTHIC_MUTED

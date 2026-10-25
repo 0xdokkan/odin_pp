@@ -121,3 +121,38 @@ test_a_figure_stands_on_the_ground_whether_it_steps_or_walks_free :: proc(t: ^te
 	_, flat := expedition_player_position(renderer, .Player, {6, 6})
 	testing.expect_value(t, flat, f32(0))
 }
+
+// With layers the pointer goes through the columns: straight down over a bridge it picks the deck and beside it
+// the road; a ray low under the deck reaches the road beyond it. A figure on the bridge stands on the deck and
+// one under it on the road, in the same column (Fase 3 of docs/piano-profondita.md).
+@(test)
+test_the_pointer_and_the_figures_find_their_layer :: proc(t: ^testing.T) {
+	data, _ := level.create(10, 10, level.Tile{kind = .Floor})
+	defer level.destroy(&data)
+	defer set_board_level(nil)
+	for y in 0..<10 {
+		bridge := grid.Position{x = 5, y = y, layer = 1}
+		level.set_tile(&data, bridge, {kind = .Floor})
+		level.set_height(&data, bridge, level.LAYER_SPACING)
+	}
+	set_board_level(&data)
+	step := f32(0.12)
+	cell, ok := pick_ground_cell({5.5, 5, 4.5}, {0, -1, 0})
+	testing.expect(t, ok)
+	testing.expect_value(t, cell, grid.Position{x = 5, y = 4, layer = 1})
+	cell, ok = pick_ground_cell({3.5, 5, 4.5}, {0, -1, 0})
+	testing.expect(t, ok)
+	testing.expect_value(t, cell, grid.Position{x = 3, y = 4})
+	cell, ok = pick_ground_cell({2, 0.6, 4.5}, {1, -0.08, 0})
+	testing.expect(t, ok)
+	testing.expect_value(t, cell, grid.Position{x = 9, y = 4})
+	// The deck is drawn from its underside up, two steps thick.
+	testing.expect(t, abs(cell_ground({x = 5, y = 4, layer = 1})-12*step) < 0.0001)
+	testing.expect(t, abs(cell_base({x = 5, y = 4, layer = 1})-10*step) < 0.0001)
+	set_board_actors(nil)
+	defer clear(&board_actors)
+	on_bridge, on_road := game.enemy_entity(1), game.enemy_entity(2)
+	append(&board_actors, Board_Actor{on_bridge, {x = 5, y = 4, layer = 1}}, Board_Actor{on_road, {x = 5, y = 4}})
+	testing.expect(t, abs(entity_point_ground(on_bridge, {5, 4})-12*step) < 0.0001)
+	testing.expect_value(t, entity_point_ground(on_road, {5, 4}), f32(0))
+}

@@ -164,6 +164,8 @@ draw_tactical_tile_body :: proc(renderer: ^Renderer, room: ^game.Room, tile: lev
 	// A raised cell stands on a column down to the board's plane: the dark base
 	// gets as tall as the cell is high, and its exposed sides show the steps.
 	rise := cell_ground(cell)
+	// Under the board, or over a cave's room, or a bridge's deck (height_view.odin).
+	base := cell_base(cell)
 	p := rl.Vector3{f32(cell.x)+0.5, rise, f32(cell.y)+0.5}
 	n := gothic_hash(cell.x, cell.y)
 	shade := u8(n%11)
@@ -175,9 +177,9 @@ draw_tactical_tile_body :: proc(renderer: ^Renderer, room: ^game.Room, tile: lev
 	surface, sculpted := cell_surface(cell)
 	sloped := sculpted && !level.surface_flat(surface)
 	if sloped {
-		draw_sloped_tile(renderer, cell, surface, floor)
+		draw_sloped_tile(renderer, cell, surface, floor, base)
 	} else {
-		draw_resin_cube(renderer, p+rl.Vector3{0, -(rise+0.31)*0.5, 0}, 0.99, rise+0.31, 0.99, RESIN_DARK)
+		draw_resin_cube(renderer, p+rl.Vector3{0, (base-rise)*0.5, 0}, 0.99, rise-base, 0.99, RESIN_DARK)
 		draw_resin_cube(renderer, p+rl.Vector3{0, -0.05, 0}, 0.945, 0.135, 0.945, floor)
 	}
 	if tile.kind == .Wall {
@@ -232,7 +234,7 @@ draw_tactical_tile_body :: proc(renderer: ^Renderer, room: ^game.Room, tile: lev
 // A tile on a ramp or a hill: its top follows the sculpted surface (four triangles round the middle, with smoothed
 // light), its sides go down to a little under its lowest corner, and the dark column under it stops there.
 @(private = "file")
-draw_sloped_tile :: proc(renderer: ^Renderer, cell: grid.Position, surface: level.Surface_Cell, color: rl.Color) {
+draw_sloped_tile :: proc(renderer: ^Renderer, cell: grid.Position, surface: level.Surface_Cell, color: rl.Color, base := f32(-0.31)) {
 	step := game.HEIGHT_STEP_DRAWN
 	// The tile is inset like the level block (0.945 of a cell) and its top lifted like the block's top.
 	INSET :: f32(0.0275)
@@ -247,7 +249,7 @@ draw_sloped_tile :: proc(renderer: ^Renderer, cell: grid.Position, surface: leve
 	}
 	middle := rl.Vector3{f32(cell.x)+0.5, surface.center*step+LIFT, f32(cell.y)+0.5}
 	floor := lowest*step
-	draw_resin_cube(renderer, {middle.x, (floor-0.31)*0.5, middle.z}, 0.99, floor+0.31, 0.99, RESIN_DARK)
+	draw_resin_cube(renderer, {middle.x, (floor+base)*0.5, middle.z}, 0.99, floor-base, 0.99, RESIN_DARK)
 	bottom := floor-0.1175
 	faces: [4]rl.Vector3
 	for i in 0..<4 { faces[i] = rl.Vector3Normalize(rl.Vector3CrossProduct(corners[(i+1)%4]-middle, corners[i]-middle)) }
@@ -276,6 +278,30 @@ draw_sloped_tile :: proc(renderer: ^Renderer, cell: grid.Position, surface: leve
 		for p in quad { vertex(p, sides[i], cell) }
 	}
 	rlgl.End()
+}
+
+// The cells of the other layers in the column of `cell` (a bridge's deck, a cave's floor), as the ground's are
+// drawn; what covers the robot waits for the sorted pass, half transparent (height_view.odin).
+@(private)
+draw_tactical_layer_tiles :: proc(renderer: ^Renderer, room: ^game.Room, cell: grid.Position, preview: ^Card_Range_Preview = nil) {
+	if !board_heights.layered { return }
+	for layer in grid.LOWEST_LAYER..=grid.HIGHEST_LAYER {
+		if layer == grid.GROUND_LAYER { continue }
+		at := grid.Position{x = cell.x, y = cell.y, layer = i8(layer)}
+		tile, _ := level.tile_at(room.level_data, at)
+		if !level.kind_has_floor(tile.kind) || cell_covers_robot(at) { continue }
+		draw_tactical_tile(renderer, room, tile, at, preview)
+	}
+}
+
+// A cell that covers the robot, half transparent: its column, its floor and an outline.
+@(private)
+draw_layer_cover :: proc(cell: grid.Position) {
+	top, base := cell_ground(cell), cell_base(cell)
+	center := rl.Vector3{f32(cell.x)+0.5, (top+base)*0.5, f32(cell.y)+0.5}
+	rl.DrawCube(center, 0.99, top-base, 0.99, {40, 50, 64, 70})
+	rl.DrawCube({center.x, top-0.03, center.z}, 0.945, 0.06, 0.945, {70, 86, 104, 90})
+	rl.DrawCubeWires(center, 0.99, top-base, 0.99, {130, 160, 200, 70})
 }
 
 @(private)

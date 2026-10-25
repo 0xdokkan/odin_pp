@@ -50,7 +50,7 @@ La tabella è in ordine di priorità, cioè l'ordine della scaletta qui sotto.
 | 0 | 0 | Misure di partenza: il benchmark arriva a rilievi, montagna e grotte (proposta di Claude) | — | Fatta | vedi Esito |
 | 1 | 1 | Terreno scolpito: rampe, colline e dirupi di roccia, solo grafica | — (meglio dopo la 0) | Fatta | vedi Esito |
 | 2 | 2 | Posizioni con il piano: il terzo numero, tutto a «terra» | — | Fatta | vedi Esito |
-| 3 | 3 | Piani nel laboratorio: dati e regole | 2 | Da fare | — |
+| 3 | 3 | Piani nel laboratorio: dati e regole | 2 | Fatta | vedi Esito |
 | 4 | 4 | Piani nel laboratorio: trasparenze, contorni, mouse, luce | 3 (1 per l'aspetto) | Da fare | — |
 | 5 | 5 | Piani nelle spedizioni: grotte senza caricamento | 1, 3, 4 | Da fare | — |
 | 6 | 6 | Editor per scolpire i piani | 1, 3 (5 per le mappe dei biomi) | Da fare | — |
@@ -208,8 +208,8 @@ ODIN="/c/Users/lukeg/OneDrive/Desktop/odin-dev-2026-10/dist/odin.exe"
   del compilatore, poi `.\scripts\check.ps1`: test con e senza assert, più le
   due build.
 - **Un solo atto del laboratorio:** `ODIN_PP_LAB_ONLY=<atto>` (oggi
-  `hit_marks`, `heights`, `structures`, `mountain`, `cave`:
-  `src/devtools/mechanics_lab.odin:82-93`). Ogni fase che aggiunge un atto lo
+  `hit_marks`, `heights`, `structures`, `mountain`, `cave`, `layers`:
+  `src/devtools/mechanics_lab.odin:82-95`). Ogni fase che aggiunge un atto lo
   aggiunge anche qui. A fine fase lo smoke del laboratorio va completato:
   dura più di otto minuti.
 - **Spedizioni da un punto:** `ODIN_PP_SMOKE_ONLY=hits` parte dagli scontri
@@ -335,7 +335,7 @@ regole normali.
   livello del terreno attorno. Per scendere davvero sotto il suolo un bioma può
   alzare tutto il suo terreno di una base (Fase 7).
 - **Colonna valida:** due caselle calpestabili della stessa colonna, su piani
-  diversi, distano almeno luce + spessore (proposta: 10 + 2 gradini). Così
+  diversi, distano almeno luce + spessore (10 + 2 gradini, scelti nella Fase 3). Così
   sopra ogni personaggio c'è spazio, e in una colonna vicina c'è al massimo una
   casella calpestabile a un gradino di distanza.
 - **Ogni casella calpestabile di ogni piano è una casella della griglia:** il
@@ -343,14 +343,19 @@ regole normali.
 
 ### 2.5 Regole fra piani (proposte, da confermare nella Fase 3)
 
+Nella Fase 3 l'utente le ha confermate tutte, con una differenza: niente
+ascensori, solo scale a pioli (risposte nell'Esito della Fase 3).
+
 - **Passo.** Si passa nella colonna vicina se lì c'è una casella calpestabile
   a un gradino al massimo, su qualsiasi piano. Per la regola della colonna ce
   n'è al massimo una, quindi il passo non sceglie mai il piano. Gli imbocchi
   nascono dalla forma della mappa, senza dati in più.
-- **Scale a pioli**, se l'utente le vuole: collegano due caselle di piani
-  diversi anche dove il dislivello è grande.
+- **Scale a pioli** (scelte nella Fase 3): collegano due caselle di colonne
+  vicine anche dove il dislivello è grande; si usano premendo la direzione
+  verso la scala.
 - **Ascensori e pozzi** (sezione 2.9): portano al piano sopra o sotto, nella
-  stessa colonna; salirci è un passo.
+  stessa colonna; salirci è un passo. Nella Fase 3 l'utente non li ha voluti:
+  se servono, si decidono nella Fase 7.
 - **Spinte e cadute.** Una spinta oltre il bordo di un ponte porta nella
   colonna vicina. Se lì il piano del ponte non c'è, si cade sulla prima casella
   calpestabile sotto, con il danno di caduta di oggi (dislivello − 1, al
@@ -442,8 +447,9 @@ della mappa di Elden Ring. Ciò che conta per noi (fonti in fondo alla sezione):
 
 1. **Altopiani con pochi accessi** (Fase 7): ogni altopiano grande ha da 1 a 3
    accessi, almeno uno nascosto; il resto del bordo è dirupo.
-2. **Ascensori e pozzi** (Fase 3): un collegamento fra piani nella stessa
-   colonna, accanto a rampe e scale a pioli.
+2. **Ascensori e pozzi** (proposti per la Fase 3): un collegamento fra piani
+   nella stessa colonna, accanto a rampe e scale a pioli. Nella Fase 3 l'utente
+   ha scelto solo le scale: gli ascensori restano un'idea per la Fase 7.
 3. **Un sotterraneo grande in alcuni biomi** (Fase 7): non solo grotte dentro le
    colline, ma zone ampie sotto il suolo, raggiunte da un pozzo.
 4. **Scorciatoie che si aprono dall'altra parte** (Fase 7): una porta, una leva
@@ -1070,7 +1076,7 @@ semplice per giocare l'arena.
   con un test.
 - **Regole** della sezione 2.5, in tutti i punti elencati sopra:
   - passo, diagonale, schivata e passo dei nemici;
-  - scale a pioli e ascensori, se scelti;
+  - scale a pioli (l'utente non vuole gli ascensori);
   - spinte e cadute fra piani, nella pipeline degli spostamenti;
   - vista fra piani in tutti i punti che la usano, compresa la copia del
     renderer;
@@ -1086,8 +1092,7 @@ semplice per giocare l'arena.
 - **Arena «Piani»** (sesta di F3):
   - una strada con sopra un ponte e due rampe;
   - una collina con dentro una grotta e due imbocchi;
-  - una scala a pioli e un pozzo con l'ascensore che scende nella grotta, se
-    l'utente li vuole;
+  - una scala a pioli sul dirupo della collina;
   - nemici su tutti i piani.
 
 ### Da chiedere prima di iniziare
@@ -1129,8 +1134,8 @@ semplice per giocare l'arena.
 5. IA: campo delle distanze attraverso i piani.
 6. Disegno semplice e mouse.
 7. Arena «Piani» e atto dello smoke (`ODIN_PP_LAB_ONLY=layers`), con
-   catture: salire sul ponte, passarci sotto, entrare in grotta, scendere con
-   l'ascensore, tiro dal ponte, spinta giù dal ponte.
+   catture: salire sul ponte, passarci sotto, entrare in grotta, salire con
+   la scala, tiro dal ponte, spinta giù dal ponte.
 8. Documenti: `docs/regole/combattimento.md` (i piani), `docs/avvio.md`
    (l'arena), `CHANGELOG.md`.
 
@@ -1143,7 +1148,7 @@ semplice per giocare l'arena.
 - Dal ponte si vede e si colpisce la strada; dalla collina non si vede dentro
   la grotta.
 - I nemici trovano la strada per la grotta e per il ponte.
-- Scala e ascensore portano da un piano all'altro, il robot e i nemici.
+- La scala porta da un piano all'altro, il robot e i nemici.
 - Una colonna con due caselle troppo vicine viene rifiutata.
 - Con un piano solo il comportamento è identico: la suite passa senza toccare
   i test esistenti.
@@ -1165,7 +1170,135 @@ fermati alla fine.
 
 ### Esito
 
-Da fare.
+**Fatta il 25 ottobre 2026** sul ramo `piano-profondita`.
+
+**Risposte dell'utente**
+1. **Luce e spessore:** 10 + 2 gradini.
+2. **Scale a pioli e ascensori:** solo le scale a pioli. Il documento è aggiornato (sezioni 2.4, 2.5
+   e 2.9, Fasi 3 e 7): gli ascensori, se servono, si decidono nella Fase 7.
+3. **Tiri fra piani:** in tutte e due le direzioni.
+4. **Aree fra piani:** il piano dell'ancora; dove manca, la casella più vicina in altezza entro 2
+   gradini.
+5. **Bordo dei ponti:** aperto, con il danno di caduta di oggi.
+6. **Mischia:** fra piani diversi solo agli imbocchi; sullo stesso piano come oggi.
+7. **Carte che agiscono su tutta la mappa o con una forma propria:** sul piano di chi gioca come oggi,
+   sugli altri solo su ciò che vede.
+8. **Sotto profondo nell'arena:** no, bastano i test.
+
+**Cosa è stato fatto**
+- **Dati** (`src/level/layers.odin`):
+  - `Level.planes`: un piano per livello, grande come la terra e vuoto finché non ha una casella;
+  - `Level.ladders`: le scale a pioli;
+  - `tile_at`, `height_at`, `set_tile` e `set_height` scelgono il piano dalla posizione; ogni cambio alza
+    `geometry_revision`;
+  - `layer_contains`, `has_layers` e `column_walkable_near`;
+  - `check_layers` controlla la colonna (12 gradini, piani in ordine) e le scale (colonne vicine).
+- **Colonne e vista** (`src/level/layer_sight.odin`):
+  - `Layer_Map` legge i piani di un livello o della copia del renderer;
+  - `Column` dà i pavimenti e le parti solide di una colonna: la terra, la roccia sopra una grotta,
+    l'impalcato di un ponte;
+  - `layer_line_blocker` è la vista attraverso i piani. Al centro della casella la linea segue la regola
+    della terra di sempre; impalcati e rocce non li tocca in nessun punto della casella, estremi compresi;
+  - `column_landing` dice dove atterra uno spostamento.
+- **Regole** (`src/game/layers.odin`):
+  - passo e scale: `layer_step`;
+  - mischia: `bump_cell` e `melee_layers_meet`;
+  - aree: `area_cell`;
+  - vista e carte speciali: `room_line_blocker` ed `effect_reaches`;
+  - tabelle della stanza per piano (distanze dei nemici, pozze): `room_table_index`.
+- **Dove entrano le regole:**
+  - passo, diagonale e schivata;
+  - la pipeline degli spostamenti: ogni casella del percorso atterra sul suo piano. Il movimento nuovo
+    `Climb` sale o scende una scala, senza caduta;
+  - i nemici:
+    - passi pianificati ed esecuzione, anche sulle scale;
+    - mischia e carica del bruto;
+    - campo delle distanze su tutti i piani. Senza piani né scale il calcolo resta quello di prima;
+  - la vista: tiri, nebbia del gioco e copia del renderer, rete dei dispositivi, avvistamento delle
+    spedizioni. Il ciclo di `tactical_line_visible` ora si ferma alla colonna d'arrivo: verso un altro piano
+    non sarebbe finito mai;
+  - le aree:
+    - le forme delle carte (croce e quadrato; la linea segue la vista);
+    - esplosioni, fuochi, scariche e onda tossica;
+  - i confini: le convalide dei bersagli `Cell` e delle intenzioni dei nemici accettano gli altri piani.
+- **Carte speciali**, controllate una per una:
+  - Inondazione e Buco Nero seguono la regola scelta;
+  - Bomb Marley: la festa ha il suo piano;
+  - Lazzo: anello sul piano del robot, atterraggio sul piano del nemico;
+  - Pinball: la palla rotola sul suo piano;
+  - First Person Shooter: il colpo attraversa le colonne;
+  - Cannone: il raggio resta sul suo piano;
+  - dispositivi: vedono dal loro punto;
+  - Dinosauro: passa dalla pipeline.
+- **Disegno semplice** (renderer del laboratorio):
+  - la vista copia anche i piani;
+  - personaggi, ombre, oggetti e telecamera stanno sul pavimento del loro piano;
+  - le caselle dei piani si disegnano come quelle della terra: il ponte come impalcato, la grotta scavata
+    nella collina;
+  - quando il robot è sotto, ciò che lo copre entro 5 caselle è mezzo trasparente;
+  - il mouse attraversa le colonne e prende la prima superficie, anche sotto il ponte o dentro la grotta
+    dall'imbocco.
+- **Arena «Piani»** (sesta di F3, 46×29, `run/mechanics_practice.odin`) e **atto dello smoke** `layers`
+  (`src/devtools/mechanics_lab_layers.odin`), con sette catture:
+  - l'arena;
+  - il robot sul ponte;
+  - un Incendio lanciato dal ponte sulla strada;
+  - la spinta dal ponte, con caduta di 10;
+  - il robot sotto il ponte;
+  - il robot in grotta;
+  - il robot in cima alla scala.
+- **Test:** 19 nuovi:
+  - 9 in `level`: dati, colonna, scale, solidi, vista, atterraggio;
+  - 8 in `game`: passo sul ponte e in galleria, scala, due personaggi nella stessa colonna, spinta giù dal
+    ponte, vista, aree, nemici;
+  - 1 in `render`: il mouse e i personaggi sui piani;
+  - 1 in `integration`: l'arena.
+
+**Scelte prese durante la fase**
+- **Carte piazzate** (Buco Nero, Cannone, dispositivi): «chi gioca» è il punto da cui l'effetto agisce,
+  cioè il loro piano e la loro vista.
+- **Pinball e Cannone** restano sul loro piano: la palla e il raggio non cambiano piano.
+- **La regola sullo stesso piano non cambia.** Inondazione, Bomb Marley e Lazzo raggiungono anche chi non
+  si vede, come oggi.
+- **Mouse:** prende la superficie più vicina lungo il raggio. Saltare ciò che è diradato spetta alla Fase 4.
+- **Pozze:** chiudono le aree anche attraverso un imbocco. I fuochi stanno sul loro piano.
+
+**Verifiche**
+- **Check e test.** Check normale e senza assert, senza avvisi. `.\scripts\check.ps1` completo: 1684 test
+  verdi (1665 più i 19 nuovi), con e senza assert, più le due build.
+- **Atto `layers` dello smoke del laboratorio.** Le sette catture, guardate una per una:
+  - il robot sul ponte;
+  - l'anteprima dell'Incendio dal ponte sulla strada;
+  - la caduta di 10;
+  - sotto il ponte, con l'impalcato mezzo trasparente;
+  - in grotta, con la collina mezza trasparente;
+  - in cima alla scala.
+- **Smoke del laboratorio completo.**
+  - 86 catture sono identiche al byte a quelle della Fase 2, e 8 sono nuove.
+  - Le 23 catture degli atti che vengono dopo quello dei piani cambiano perché quell'atto arriva prima: in
+    due minuti l'orologio delle animazioni va avanti. Una copia del gioco che salta solo l'atto dei piani le
+    rifà identiche al byte.
+  - In quella copia due catture delle strutture differiscono di 6 e di 22 pixel. Nella corsa vera erano
+    identiche: è rumore del disegno.
+- **Smoke delle spedizioni completo.** 103 catture, nessun errore. Non si confrontano al byte: due corse
+  della Fase 2 differivano in 67 catture, qui in 81. Ho guardato lo scontro nel Cyber, lo scontro su due
+  livelli e la grotta della Neve, e sono come prima.
+- **Benchmark: non fatto.** Alle 22:45 il portatile andava a batteria (47%), e il driver teneva ogni stage
+  a 30 fps fissi (33,3 ms), contro circa 1 ms alla corrente nella Fase 2: quella misura non dice niente.
+  Va rifatto con il portatile alla corrente (comandi nella sezione 1.4), confrontando con le corse della
+  Fase 2.
+
+**Rivisto dalla Fase 2**
+- Le vicine scritte con i nomi nei test (`world_playback_test`, `mechanics_lab_test`,
+  `expedition_flow_test`) e la copia in `player_structures_test` restano sulla terra: sono giuste così.
+- Le finestre locali dell'IA e il campo delle distanze ora vanno per piano.
+
+**Non fatto, per la Fase 4**
+- I personaggi nascosti (un nemico in grotta visto dalla collina) non hanno contorno; la sua etichetta si
+  vede.
+- Il mouse non salta ciò che è diradato.
+- Non c'è la luce sotto terra.
+- Il passaggio fra due piani si disegna con un piccolo scatto di altezza.
 
 ## 7. Fase 4 — Piani nel laboratorio: grafica
 
@@ -1530,7 +1663,9 @@ con la geografia fissa.
 
 ### Progetto
 
-**Proposta di temi**, da confermare bioma per bioma:
+**Proposta di temi**, da confermare bioma per bioma. Nella Fase 3 l'utente ha
+scelto solo le scale a pioli: dove qui sotto si parla di ascensori, questa fase
+chiede prima se costruirli o usare scale e rampe.
 
 | Bioma | Sotto | Sopra |
 |---|---|---|

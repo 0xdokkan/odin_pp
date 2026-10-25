@@ -5,6 +5,22 @@ I riferimenti a Classica, `--flat` e ai vecchi smoke descrivono versioni precede
 per i comandi disponibili oggi valgono il [README](README.md) e la documentazione collegata.
 
 
+## 2026-10-25 — Profondità, Fase 3: piani nel laboratorio, dati e regole
+
+- La mappa può avere caselle sopra la terra (un ponte, piano +1) e sotto (grotte, −1 e −2): `level.Level`
+  ha i suoi piani, vuoti finché non servono, e le scale a pioli. Due pavimenti della stessa colonna distano
+  almeno 12 gradini (10 di luce e 2 di spessore, come ha scelto l'utente); una mappa che non lo rispetta è
+  rifiutata.
+- Le regole passano da un piano all'altro: passo (rampe e imbocchi), scale (solo scale, niente ascensori),
+  spinte e cadute oltre il bordo aperto di un ponte, vista e tiri nelle due direzioni, aree che seguono un
+  imbocco e si fermano a ponti e volte, mischia fra piani solo agli imbocchi, campo delle distanze dei
+  nemici. Le carte speciali agiscono sul piano di chi le gioca come prima e sugli altri piani solo su ciò che
+  vede. Senza piani tutto è come prima.
+- Nella Prova meccaniche la sesta arena di F3, «Piani»: strada sotto un ponte con due rampe, collina con
+  una grotta e due imbocchi, scala sul dirupo, un nemico per piano. Disegno semplice: ciò che copre il robot
+  quando è sotto diventa mezzo trasparente. Atto dello smoke `layers` (`ODIN_PP_LAB_ONLY=layers`), sette
+  catture. Test: 19 nuovi (1684 in tutto).
+
 ## 2026-10-25 — Profondità, Fase 2: posizioni con il piano
 
 - `grid.Position` ha un terzo campo, `layer`: −2 sotto profondo, −1 sotto, 0 terra, +1 sopra (quattro

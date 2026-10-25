@@ -2,6 +2,7 @@ package game
 
 import "core:slice"
 import grid "../engine/grid"
+import level "../level"
 
 MAX_TESLA_COILS :: 4
 MAX_SHOCK_FLOORS :: 4
@@ -198,9 +199,10 @@ board_device_link_is_clear :: proc(room: ^Room, a, b: grid.Position) -> bool {
 // card targeting's fixed path buffer. This uses the same corner occlusion rule.
 @(private = "file")
 board_device_clear_path :: proc(room: ^Room, origin, target: grid.Position) -> bool {
+	m: level.Layer_Map
 	return room != nil && base_cell_is_walkable(room, origin) && base_cell_is_walkable(room, target) &&
 	       !cell_blocks_line_of_sight(room, target) &&
-	       tactical_line_visible(origin, target, tactical_room_opaque, room, tactical_room_height)
+	       tactical_line_visible(origin, target, tactical_room_opaque, room, tactical_room_height, room_line_layers(room, &m))
 }
 
 @(private = "file")
@@ -275,7 +277,7 @@ board_device_network_contains_cell :: proc(room: ^Room, network: ^Board_Device_N
 
 shock_floor_contains_cell :: proc(room: ^Room, center, cell: grid.Position) -> bool {
 	return room != nil && max(abs(center.x-cell.x), abs(center.y-cell.y)) <= 1 &&
-	       base_cell_is_walkable(room, cell) && !obstacle_at(room, cell)
+	       base_cell_is_walkable(room, cell) && !obstacle_at(room, cell) && area_takes(room, center, cell)
 }
 
 arm_shock_floor :: proc(object: ^Grid_Object, enemy: Entity_Ref, events: ^Event_Log) {

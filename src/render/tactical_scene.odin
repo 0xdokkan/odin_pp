@@ -101,7 +101,7 @@ draw_tactical_actor_bases :: proc(renderer: ^Renderer) {
 		if !actor.visible || !tactical_render_visible(renderer, cell) || tactical_pinball_holds(renderer, actor.entity) { continue }
 		key := sprite_key_for_enemy(actor.archetype)
 		at, _ := living_card_position(renderer, actor.entity, key, actor.position)
-		ground := rim_ground(at, 0.32)
+		ground := rim_ground(at, 0.32, actor.entity)
 		p := rl.Vector3{at.x+0.5, 0.048+ground, at.y+0.5}
 		draw_tactical_actor_shadow(p, ground)
 		// Up on the Lazzo's rope: its shadow on the floor, and the stand it
@@ -124,7 +124,7 @@ draw_tactical_actor_bases :: proc(renderer: ^Renderer) {
 		if tactical_shadow_depth(renderer, game.PLAYER_ENTITY) > 0 { return }
 	}
 	at, _ := living_card_position(renderer, game.PLAYER_ENTITY, .Player, snapshot.player.position)
-	ground := rim_ground(at, 0.34)
+	ground := rim_ground(at, 0.34, game.PLAYER_ENTITY)
 	p := rl.Vector3{at.x+0.5, 0.05+ground, at.y+0.5}
 	draw_tactical_actor_shadow(p, ground)
 	rl.DrawCylinder(p, 0.32, 0.32, 0.01, 24, GOTHIC_INK)

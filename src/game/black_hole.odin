@@ -85,6 +85,8 @@ black_hole_beat :: proc(room: ^Room, pulse: ^Pulse_Report) {
 			enemy := room.enemies[enemy_index]
 			distance := black_hole_distance(hole.position, enemy.position)
 			if distance <= hole.radius || distance > hole.radius+1 || enemy_is_boss(enemy.archetype) { continue }
+			// With layers, the foes on the hole's layer and those in its sight (layers.odin).
+			if !effect_reaches(room, hole.position, enemy.position) { continue }
 			to, ok := black_hole_pull_step(room, id, enemy.position, hole.position)
 			if !ok { continue }
 			report: Action_Report
@@ -106,7 +108,7 @@ black_hole_beat :: proc(room: ^Room, pulse: ^Pulse_Report) {
 			enemy_index, present := enemy_index_by_id(room, id)
 			if !present { continue }
 			enemy := room.enemies[enemy_index]
-			if black_hole_distance(hole.position, enemy.position) > hole.radius { continue }
+			if black_hole_distance(hole.position, enemy.position) > hole.radius || !effect_reaches(room, hole.position, enemy.position) { continue }
 			struck[struck_count] = id
 			struck_count += 1
 			guard: i32

@@ -1,6 +1,7 @@
 package game
 
 import grid "../engine/grid"
+import level "../level"
 
 // One simultaneous area discharge can hit every enemy plus the player.
 // Multi-template area cards still validate their expansion against this bound.
@@ -341,7 +342,7 @@ target_is_valid :: proc(room: ^Room, target: Target) -> bool {
 	case .Entity:
 		return entity_exists(room, target.entity)
 	case .Cell:
-		return room.level_data != nil && grid.contains(&room.level_data.tiles, target.cell)
+		return room.level_data != nil && level.layer_contains(room.level_data, target.cell)
 	}
 	return false
 }
@@ -420,7 +421,8 @@ target_matches_rule :: proc(room: ^Room, source: Entity_Ref, target: Target, rul
 		source_position, source_found := entity_position(room, source)
 		target_position, target_found := entity_position(room, target.entity)
 		return source_found && target_found &&
-		       abs(source_position.x-target_position.x)+abs(source_position.y-target_position.y) == 1
+		       abs(source_position.x-target_position.x)+abs(source_position.y-target_position.y) == 1 &&
+		       melee_layers_meet(room, source_position, target_position)
 	case .Cell:
 		return target.kind == .Cell
 	case .Walkable_Cell:

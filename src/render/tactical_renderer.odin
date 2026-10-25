@@ -265,6 +265,7 @@ update_tactical_view :: proc(renderer: ^Renderer, room: ^game.Room, mouse: view.
 	input: Tactical_View_Input = {}) {
 	v := &renderer.tactical
 	set_board_level(room.level_data)
+	set_board_actors(room)
 	v.expedition = room.player.tactical.config.expedition
 	v.expedition_biome = room.player.tactical.config.expedition_biome
 	if !refresh_only { v.pointer_window = input.window_mouse }
@@ -291,14 +292,23 @@ update_tactical_view :: proc(renderer: ^Renderer, room: ^game.Room, mouse: view.
 	v.visible_count = 0
 	size := game.tactical_vision_size(room.player.tactical.config, &v.snapshot.player.statuses)
 	visibility := Tactical_Visibility_Context{renderer, room}
+	// With layers, the sight goes from the player's own layer to every floor of each column (game/layers.odin).
+	m: level.Layer_Map
+	layers := game.room_line_layers(room, &m)
+	if layers != nil { origin.layer = room.player.position.layer }
 	for dy in -size/2..=size/2 {
 		for dx in -size/2..=size/2 {
-			cell := grid.offset(origin, dx, dy)
-			if !grid.contains(&room.level_data.tiles, cell) ||
-			   !game.tactical_in_footprint(size, room.player.tactical.facing, origin, cell) ||
-			   !game.tactical_line_visible(origin, cell, tactical_snapshot_opaque, &visibility, tactical_snapshot_height) { continue }
-			v.visible[v.visible_count] = cell
-			v.visible_count += 1
+			column := grid.Position{x = origin.x+dx, y = origin.y+dy}
+			if !grid.contains(&room.level_data.tiles, column) || !game.tactical_in_footprint(size, room.player.tactical.facing, origin, column) { continue }
+			for layer in grid.LOWEST_LAYER..=grid.HIGHEST_LAYER {
+				cell := column
+				cell.layer = i8(layer)
+				if layer != grid.GROUND_LAYER && (layers == nil || !level.kind_has_floor(level.map_tile(layers, cell))) { continue }
+				if !game.tactical_line_visible(origin, cell, tactical_snapshot_opaque, &visibility, tactical_snapshot_height, layers) ||
+				   v.visible_count >= len(v.visible) { continue }
+				v.visible[v.visible_count] = cell
+				v.visible_count += 1
+			}
 		}
 	}
 	lasso_extend_vision(renderer, room)
@@ -321,7 +331,7 @@ update_tactical_view :: proc(renderer: ^Renderer, room: ^game.Room, mouse: view.
 	footprint_scale := 1.1+f32(max(0, size-5))*0.065
 	aim := TACTICAL_SHOWCASE_AIM if v.showcase else TACTICAL_HAND_AIM
 	// The camera follows the ground the player stands on, up a stair and down it.
-	target := rl.Vector3{p.x+0.5, point_ground(p), p.y+0.5}+forward*(aim*footprint_scale*(1-LASSO_CAMERA_AIM*pull))
+	target := rl.Vector3{p.x+0.5, entity_point_ground(game.PLAYER_ENTITY, p), p.y+0.5}+forward*(aim*footprint_scale*(1-LASSO_CAMERA_AIM*pull))
 	if room.player.tactical.config.expedition {
 		combat_orbit := v.world_orbit
 		combat_orbit.distance *= footprint_scale*(1+LASSO_CAMERA_BACK*pull)
@@ -352,7 +362,7 @@ update_tactical_view :: proc(renderer: ^Renderer, room: ^game.Room, mouse: view.
 	cell, picked := pick_ground_cell(ray.position, ray.direction)
 	if !picked { return }
 
-	if grid.contains(&room.level_data.tiles, cell) && tactical_render_visible(renderer, cell) {
+	if level.layer_contains(room.level_data, cell) && tactical_render_visible(renderer, cell) {
 		renderer.has_hovered_cell = true
 		renderer.hovered_cell = cell
 	}
@@ -551,6 +561,8 @@ update_tactical_body_hover :: proc(renderer: ^Renderer, mouse: view.Vec2) {
 		if !actor.visible || !tactical_render_visible(renderer, cell) || tactical_pinball_holds(renderer, actor.entity) { continue }
 		if distance, hit := tactical_billboard_hit(renderer, sprite_key_for_enemy(actor.archetype), actor.position, ray, actor.entity); hit && distance < closest {
 			closest = distance
+			// On a map with layers, the cell on the actor's own layer.
+			if standing, found := board_actor_cell(actor.entity); found { cell = standing }
 			renderer.hovered_cell = cell
 			renderer.has_hovered_cell = true
 		}
@@ -558,9 +570,10 @@ update_tactical_body_hover :: proc(renderer: ^Renderer, mouse: view.Vec2) {
 	for object in v.snapshot.objects[:v.snapshot.object_count] {
 		cell := grid.Position{x = int(math.round(object.position.x)), y = int(math.round(object.position.y))}
 		if !object.visible || !tactical_render_visible(renderer, cell) { continue }
-		collision := rl.GetRayCollisionBox(ray, voxel_object_bounds(object.kind, object.position))
+		collision := rl.GetRayCollisionBox(ray, voxel_object_bounds(object.kind, object.position, object.entity))
 		if collision.hit && collision.distance < closest {
 			closest = collision.distance
+			if standing, found := board_actor_cell(object.entity); found { cell = standing }
 			renderer.hovered_cell = cell
 			renderer.has_hovered_cell = true
 		}
@@ -576,6 +589,8 @@ draw_tactical_world :: proc(renderer: ^Renderer, room: ^game.Room, active_card: 
 	snapshot := v.snapshot
 	preview: Card_Range_Preview
 	set_board_level(room.level_data)
+	set_board_actors(room)
+	set_board_cover(room)
 	if active_card != 0 { prepare_card_range_preview(renderer, room, active_card, &preview) } else { prepare_card_range_preview(renderer, room, hover_card, &preview, true) }
 	halo := CARD_HIT_VIOLET
 	if expedition_world != nil { halo = card_hit_halo_color(expedition.metadata(expedition_world.biome).color, true) }
@@ -614,7 +629,11 @@ draw_tactical_world :: proc(renderer: ^Renderer, room: ^game.Room, active_card: 
 			if !tactical_cell_on_screen(renderer, cell) || !tactical_render_visible(renderer, cell) { continue }
 			tile, _ := level.tile_at(room.level_data, cell)
 			if expedition_world != nil { draw_expedition_tile(renderer, room, expedition_world, cell, &preview) }
-			else { draw_tactical_tile(renderer, room, tile, cell, &preview) }
+			else {
+				// What covers the robot waits for the sorted pass, half transparent (height_view.odin).
+				if !cell_covers_robot(cell) { draw_tactical_tile(renderer, room, tile, cell, &preview) }
+				draw_tactical_layer_tiles(renderer, room, cell, &preview)
+			}
 		}
 	}
 		if expedition_world!=nil {rl.EndShaderMode()}

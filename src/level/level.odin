@@ -38,6 +38,9 @@ Level :: struct {
 	structures:      [dynamic]Placed_Structure,
 	structure_plans: [dynamic]Plan,
 	structure_cells: [dynamic]u8,
+	// The layers other than the ground (layers.odin), by layer_slot: the ground's slot stays empty.
+	planes:  [LAYER_COUNT]Layer_Plane,
+	ladders: [dynamic]Ladder,
 }
 
 // The tallest a cell can be.
@@ -133,12 +136,15 @@ destroy :: proc(level: ^Level) {
 	delete(level.structures)
 	delete(level.structure_plans)
 	delete(level.structure_cells)
+	destroy_layers(level)
 	level^ = {}
 }
 
-// The height of `position` in steps: 0 on a flat map, off the map or without heights.
+// The height of `position` in steps, on its layer: 0 on a flat map, off the map or without heights.
 height_at :: proc(level: ^Level, position: grid.Position) -> i32 {
-	if level == nil || len(level.heights) == 0 { return 0 }
+	if level == nil { return 0 }
+	if position.layer != grid.GROUND_LAYER { return plane_height(level, position) }
+	if len(level.heights) == 0 { return 0 }
 	index, found := grid.index_of(&level.tiles, position)
 	if !found || index >= len(level.heights) { return 0 }
 	return i32(level.heights[index])
@@ -152,9 +158,10 @@ has_heights :: proc(level: ^Level) -> bool {
 // the map's height table; a change alters the geometry like a tile does.
 set_height :: proc(level: ^Level, position: grid.Position, height: i32) -> bool {
 	if level == nil { return false }
+	steps := clamp(height, 0, i32(MAX_CELL_HEIGHT))
+	if position.layer != grid.GROUND_LAYER { return set_plane_height(level, position, steps) }
 	index, found := grid.index_of(&level.tiles, position)
 	if !found { return false }
-	steps := clamp(height, 0, i32(MAX_CELL_HEIGHT))
 	if len(level.heights) == 0 {
 		if steps == 0 { return true }
 		resize(&level.heights, len(level.tiles.cells))
@@ -218,10 +225,12 @@ apply_height_rows :: proc(level: ^Level, rows: []string) -> bool {
 	return true
 }
 
+// The tile of `position` on its layer: a cell of another layer that holds nothing is Void.
 tile_at :: proc(level: ^Level, position: grid.Position) -> (Tile, bool) {
 	if level == nil {
 		return {}, false
 	}
+	if position.layer != grid.GROUND_LAYER { return plane_tile(level, position) }
 	return grid.get(&level.tiles, position)
 }
 
@@ -229,6 +238,7 @@ set_tile :: proc(level: ^Level, position: grid.Position, tile: Tile) -> bool {
 	if level == nil {
 		return false
 	}
+	if position.layer != grid.GROUND_LAYER { return set_plane_tile(level, position, tile) }
 	previous, found := grid.get(&level.tiles, position)
 	if !found {return false}
 	if previous == tile {return true}

@@ -252,7 +252,7 @@ attack_struck_point :: proc(renderer: ^Renderer, entity: game.Entity_Ref, bolt :
 	if snapshot := renderer.tactical.snapshot; entity.kind == .Object && snapshot != nil {
 		for object in snapshot.objects[:snapshot.object_count] {
 			if object.entity != entity { continue }
-			box := voxel_object_bounds(object.kind, object.position)
+			box := voxel_object_bounds(object.kind, object.position, object.entity)
 			centre := (box.min+box.max)*0.5
 			// Out of the square along the camera's way, and a hair beyond.
 			out := (box.max.x-box.min.x)*0.5/max(abs(toward.x), abs(toward.z), 0.0001)+0.05

@@ -1,6 +1,7 @@
 package game
 
 import grid "../engine/grid"
+import level "../level"
 
 // CANNONE and CANNONE LASER. The card sets a cannon on its raised stand on a
 // free cell and aims it (the mouse wheel turns it, as the Inondazione's wave;
@@ -47,7 +48,7 @@ cannon_line :: proc(room: ^Room, origin: grid.Position, way: Move_Direction, las
 	step := direction_offset(way)
 	line.last = origin
 	cell := grid.offset(origin, step.x, step.y)
-	for grid.contains(&room.level_data.tiles, cell) {
+	for level.layer_contains(room.level_data, cell) {
 		if !base_cell_is_walkable(room, cell) || obstacle_at(room, cell) { break }
 		if index, present := enemy_index_at(room, cell); present {
 			line.foes[line.foe_count] = room.enemies[index].id

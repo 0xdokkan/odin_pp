@@ -1,6 +1,7 @@
 package game
 
 import grid "../engine/grid"
+import level "../level"
 
 MAX_TARGETING_RANGE       :: 12
 MAX_TARGETING_RADIUS      :: 4
@@ -208,7 +209,7 @@ trace_targeting_line :: proc(
 	origin, target: grid.Position,
 	path: ^[MAX_TARGETING_PATH_CELLS]grid.Position,
 ) -> (count: int, ok: bool) {
-	if path == nil || origin == target {
+	if path == nil || origin.x == target.x && origin.y == target.y {
 		return
 	}
 	x, y := origin.x, origin.y
@@ -231,7 +232,8 @@ trace_targeting_line :: proc(
 		if count >= MAX_TARGETING_PATH_CELLS {
 			return count, false
 		}
-		path[count] = {x = x, y = y}
+		// The cells between keep the origin's layer until a rule puts them on theirs; the last is the target.
+		path[count] = target if x == target.x && y == target.y else {x = x, y = y, layer = origin.layer}
 		count += 1
 	}
 	return count, true
@@ -247,6 +249,10 @@ targeting_path_blocker :: proc(
 ) -> (blocker: grid.Position, found: bool) {
 	if room == nil || path == nil || path_count < 0 || path_count > MAX_TARGETING_PATH_CELLS {
 		return {}, true
+	}
+	// Through the layers the line has a rule of its own (layers.odin); the path ends on the target.
+	if path_count > 0 && room_has_layers(room) {
+		return room_line_blocker(room, origin, path[path_count-1], !allow_blocked_destination)
 	}
 	previous := origin
 	for index in 0..<path_count {
@@ -339,7 +345,7 @@ targeting_target_at_anchor :: proc(
 
 @(private = "file")
 append_shape_cell :: proc(room: ^Room, set: ^Target_Cell_Set, position: grid.Position) -> bool {
-	if room == nil || room.level_data == nil || !grid.contains(&room.level_data.tiles, position) ||
+	if room == nil || room.level_data == nil || !level.layer_contains(room.level_data, position) ||
 	   targeting_static_blocker_at(room, position) {
 		return true
 	}
@@ -397,7 +403,9 @@ build_target_shape :: proc(
 				if offset_x != 0 && offset_y != 0 {
 					continue
 			}
-				position := grid.Position{x = result.anchor.x+offset_x, y = result.anchor.y+offset_y}
+				// The area's cell in this column, on whichever layer (layers.odin).
+				position, taken := area_cell(room, result.anchor, result.anchor.x+offset_x, result.anchor.y+offset_y)
+				if !taken { continue }
 				if spec.stops_on_wall && !shape_cell_has_clear_path(room, result.anchor, position) {
 					continue
 				}
@@ -410,7 +418,8 @@ build_target_shape :: proc(
 	case .Square:
 		for offset_y in -spec.radius..=spec.radius {
 			for offset_x in -spec.radius..=spec.radius {
-				position := grid.Position{x = result.anchor.x+offset_x, y = result.anchor.y+offset_y}
+				position, taken := area_cell(room, result.anchor, result.anchor.x+offset_x, result.anchor.y+offset_y)
+				if !taken { continue }
 				if !append_shape_cell(room, &result.affected, position) {
 					return false
 				}
@@ -479,7 +488,7 @@ evaluate_target_query :: proc(
 	}
 	result.anchor = request.anchor
 	result.error = .Anchor_Out_Of_Bounds
-	if !grid.contains(&room.level_data.tiles, result.anchor) {
+	if !level.layer_contains(room.level_data, result.anchor) {
 		return
 	}
 	result.error = .Anchor_Out_Of_Range
@@ -492,12 +501,19 @@ evaluate_target_query :: proc(
 		result.error = .Shape_Not_Aligned
 		return
 	}
-	if result.origin != result.anchor {
+	if result.origin.x != result.anchor.x || result.origin.y != result.anchor.y {
 		traced := false
 		result.path_count, traced = trace_targeting_line(result.origin, result.anchor, &result.path)
 		if !traced || result.path_count <= 0 {
 			result.error = .Capacity_Exceeded
 			return
+		}
+		// With layers, every cell of the line is the floor it passes over (a line from a bridge down to the road).
+		if room_has_layers(room) {
+			m := level.layer_map(room.level_data)
+			for &cell, index in result.path[:result.path_count] {
+				cell = level.layer_line_cell(&m, result.origin, result.anchor, HEIGHT_EYE_STEPS, HEIGHT_TARGET_STEPS, cell, index+1, result.path_count)
+			}
 		}
 	}
 	if spec.requires_line_of_sight || spec.stops_on_wall {
@@ -510,13 +526,12 @@ evaluate_target_query :: proc(
 				)
 			}
 		}
-		if blocker, blocked := targeting_path_blocker(
-			room,
-			result.origin,
-			&result.path,
-			result.path_count,
-			allow_blocked_destination,
-		); blocked {
+		blocker, blocked := targeting_path_blocker(room, result.origin, &result.path, result.path_count, allow_blocked_destination)
+		// Straight up or down a column (a bridge over a road) the line has no path, but its rule still holds.
+		if result.path_count == 0 && result.origin != result.anchor {
+			blocker, blocked = room_line_blocker(room, result.origin, result.anchor, !allow_blocked_destination)
+		}
+		if blocked {
 			result.error = .Line_Of_Sight_Blocked
 			result.blocker = blocker
 			result.has_blocker = true

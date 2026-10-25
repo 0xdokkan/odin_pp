@@ -85,13 +85,22 @@ flood_fire_cells :: proc(fire: Ground_Fire, cells: ^[dynamic]grid.Position) {
 flood_put_out_fires :: proc(room: ^Room, report: ^Action_Report) -> (out: int) {
 	steam: [dynamic]grid.Position
 	defer delete(steam)
-	for fire in room.ground.fires[:room.ground.fire_count] { flood_fire_cells(fire, &steam) }
-	out += room.ground.fire_count
-	for &fire in room.ground.fires { fire = {} }
-	room.ground.fire_count = 0
+	// With layers, the fires on the player's layer and those he sees (layers.odin).
+	kept := 0
+	for fire in room.ground.fires[:room.ground.fire_count] {
+		if !effect_reaches(room, room.player.position, fire.center) {
+			room.ground.fires[kept] = fire
+			kept += 1
+			continue
+		}
+		flood_fire_cells(fire, &steam)
+		out += 1
+	}
+	for &fire in room.ground.fires[kept:] { fire = {} }
+	room.ground.fire_count = kept
 	// The board's own fires: objects that burn where they lie.
 	for index := len(room.objects)-1; index >= 0; index -= 1 {
-		if room.objects[index].kind != .Fire { continue }
+		if room.objects[index].kind != .Fire || !effect_reaches(room, room.player.position, room.objects[index].position) { continue }
 		append(&steam, room.objects[index].position)
 		remove_grid_object(room, index)
 		out += 1
@@ -158,6 +167,8 @@ begin_flood :: proc(room: ^Room, aim: grid.Position, cells: i32, report: ^Action
 	count := 0
 	for enemy in room.enemies {
 		if enemy_is_out_of_play(room, enemy.id) || count >= MAX_ENEMIES_PER_ROOM { continue }
+		// With layers, the foes on the player's layer and those he sees (layers.odin).
+		if !effect_reaches(room, room.player.position, enemy.position) { continue }
 		ids[count], rank[count] = enemy.id, flood_progress(room, direction, enemy.position)
 		count += 1
 	}

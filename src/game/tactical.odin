@@ -1,6 +1,7 @@
 package game
 
 import grid "../engine/grid"
+import level "../level"
 
 // Recovery leaves only walking; Stunned (an exhausted window) only cards;
 // Shadow (Movimento Ombra, tactical_shadow.odin) only the shadow's own steps,
@@ -376,25 +377,31 @@ tactical_in_footprint :: proc(size: int, facing: Move_Direction, origin, positio
 // hide what lies behind them. There is deliberately no explored-cell storage.
 // `height`, when given, is the cell's height in steps: the ground hides what is
 // behind a cell above the line from the eye to the target (height_hides).
+// With `layers` (a map that has them), the line is the one through the layers (level.layer_line_blocker).
 tactical_line_visible :: proc(origin, destination: grid.Position,
 	opaque: proc(rawptr, grid.Position) -> bool, data: rawptr,
-	height: proc(rawptr, grid.Position) -> i32 = nil) -> bool {
+	height: proc(rawptr, grid.Position) -> i32 = nil, layers: ^level.Layer_Map = nil) -> bool {
+	if layers != nil {
+		_, blocked := level.layer_line_blocker(layers, origin, destination, HEIGHT_EYE_STEPS, HEIGHT_TARGET_STEPS, opaque, data)
+		return !blocked
+	}
 	cell := origin
 	dx, dy := abs(destination.x-origin.x), abs(destination.y-origin.y)
 	count, index := max(dx, dy), 0
 	sx := 1 if destination.x > origin.x else -1
 	sy := 1 if destination.y > origin.y else -1
 	error := dx-dy
-	for cell != destination {
+	for cell.x != destination.x || cell.y != destination.y {
 		next := cell
 		twice := 2*error
 		if twice > -dy { error -= dy; next.x += sx }
 		if twice < dx { error += dx; next.y += sy }
 		if next.x != cell.x && next.y != cell.y &&
 		   opaque(data, {x = next.x, y = cell.y}) && opaque(data, {x = cell.x, y = next.y}) { return false }
-		if next != destination && opaque(data, next) { return false }
+		last := next.x == destination.x && next.y == destination.y
+		if !last && opaque(data, next) { return false }
 		index += 1
-		if height != nil && next != destination && line_hidden_by_height(height, data, origin, destination, next, index, count) { return false }
+		if height != nil && !last && line_hidden_by_height(height, data, origin, destination, next, index, count) { return false }
 		cell = next
 	}
 	return true
@@ -422,12 +429,13 @@ tactical_room_height :: proc(data: rawptr, position: grid.Position) -> i32 {
 
 tactical_cell_visible :: proc(room: ^Room, position: grid.Position) -> bool {
 	if room == nil || room.player == nil || room.level_data == nil { return false }
-	if !grid.contains(&room.level_data.tiles, position) { return false }
+	if !level.layer_contains(room.level_data, position) { return false }
 	s := &room.player.tactical
 	if s.config.vision_size == 0 { return true }
 	origin := tactical_view_origin(room)
+	m: level.Layer_Map
 	return tactical_in_footprint(tactical_vision_size(s.config, &room.player.statuses), s.facing, origin, position) &&
-		tactical_line_visible(origin, position, tactical_room_opaque, room, tactical_room_height)
+		tactical_line_visible(origin, position, tactical_room_opaque, room, tactical_room_height, room_line_layers(room, &m))
 }
 
 tactical_target_visible :: proc(room: ^Room, target: Target) -> bool {

@@ -175,14 +175,15 @@ mark_critical_events :: proc(log: ^Event_Log) {
 try_move_player_diagonal :: proc(room: ^Room, offset: grid.Position) -> Action_Result {
 	if room == nil || room.player == nil || room.phase != .Combat || !tactical_allows_movement(room) { return .Invalid_Phase }
 	if abs(offset.x) != 1 || abs(offset.y) != 1 { return .Blocked }
-	target := add_position(room.player.position, offset)
-	if enemy_index, found := enemy_index_at(room, target); found {
+	target, _ := layer_step(room, room.player.position, offset)
+	foe_cell := bump_cell(room, room.player.position, offset)
+	if enemy_index, found := enemy_index_at(room, foe_cell); found {
 		if !tactical_allows_action(room) { return .Invalid_Phase }
 		clear_event_log(room.recent_events)
 		// The Giganotosauro walks onto a foe his bump would kill.
-		if giga_crushes(room, enemy_index, true) { return giga_crush_step(room, enemy_index, target, .Opponent, true) }
+		if giga_crushes(room, enemy_index, true) { return giga_crush_step(room, enemy_index, foe_cell, .Opponent, true) }
 		// Always critical, loaded like a straight bump (player_charges.odin).
-		if !player_bump(room, enemy_index, target, .Opponent, true) { return .Blocked }
+		if !player_bump(room, enemy_index, foe_cell, .Opponent, true) { return .Blocked }
 		outcome := finish_player_combat_command(room)
 		switch outcome {
 		case .Player_Defeated: return .Player_Defeated

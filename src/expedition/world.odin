@@ -246,12 +246,14 @@ add_group :: proc(w:^World,data:^level.Level,site:int,p:grid.Position,requested_
 
 can_see :: proc(room:^game.Room,a,b:grid.Position) -> bool {
 	if room == nil || room.level_data == nil { return false }
-	// Sight rises and falls with the ground: a hill hides what is behind it (game.height_hides).
+	// Sight rises and falls with the ground: a hill hides what is behind it (game.height_hides); with layers, the
+	// line goes through them (game/layers.odin).
+	m: level.Layer_Map
 	return game.tactical_line_visible(a, b, proc(data: rawptr, cell: grid.Position) -> bool {
 		return game.cell_blocks_line_of_sight(cast(^game.Room)data, cell)
 	}, room, proc(data: rawptr, cell: grid.Position) -> i32 {
 		return game.cell_height(cast(^game.Room)data, cell)
-	})
+	}, game.room_line_layers(room, &m))
 }
 
 // A drop lies where the player is (the open map or a cave), unless `cave` says whose it is (cave.odin).

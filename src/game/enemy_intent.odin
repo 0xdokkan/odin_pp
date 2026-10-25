@@ -118,7 +118,7 @@ planned_cell_is_available :: proc(
 	// A foe's step does not climb or leave a cliff.
 	if moving_index >= 0 && moving_index < position_count {
 		from := positions[moving_index]
-		if max(abs(from.x-target.x), abs(from.y-target.y)) == 1 && step_height_blocked(room, from, target) { return false }
+		if max(abs(from.x-target.x), abs(from.y-target.y)) == 1 && !is_ladder_move(room, from, target) && step_height_blocked(room, from, target) { return false }
 	}
 	for index in 0..<position_count {
 		if index != moving_index && positions[index] == target {
@@ -205,7 +205,7 @@ plan_chaser_intent :: proc(
 	assert(room != nil && room.player != nil && enemy != nil && predicted_positions != nil)
 	delta_x := room.player.position.x-origin.x
 	delta_y := room.player.position.y-origin.y
-	if abs(delta_x)+abs(delta_y) == 1 {
+	if abs(delta_x)+abs(delta_y) == 1 && melee_layers_meet(room, origin, room.player.position) {
 		return make_attack_intent(room, origin, room.player.position, enemy.attack)
 	}
 
@@ -228,8 +228,8 @@ plan_chaser_intent :: proc(
 			return intent
 		}
 	}
-	origin_index, valid_origin := grid.index_of(&room.level_data.tiles, origin)
-	if !valid_origin || room.enemy_path_distances[origin_index] < 0 {
+	origin_index, valid_origin := room_table_index(room, origin)
+	if !valid_origin || origin_index >= len(room.enemy_path_distances) || room.enemy_path_distances[origin_index] < 0 {
 		return intent
 	}
 	best_distance := room.enemy_path_distances[origin_index]
@@ -238,7 +238,8 @@ plan_chaser_intent :: proc(
 		if step.x == 0 && step.y == 0 {
 			continue
 		}
-		target := add_position(origin, step)
+		// The cell the step lands on, on whichever layer, up or down a ladder too (layers.odin).
+		target := walk_step(room, origin, step)
 		if !planned_cell_is_available(
 			room,
 			predicted_positions,
@@ -248,7 +249,8 @@ plan_chaser_intent :: proc(
 		) {
 			continue
 		}
-		index, _ := grid.index_of(&room.level_data.tiles, target)
+		index, inside := room_table_index(room, target)
+		if !inside || index >= len(room.enemy_path_distances) { continue }
 		distance := room.enemy_path_distances[index]
 		if distance >= 0 { distance += enemy_terrain_danger(room, target) }
 		if distance < 0 || distance >= best_distance {
@@ -304,7 +306,7 @@ plan_brute_intent :: proc(
 	assert(room != nil && room.player != nil && enemy != nil && predicted_positions != nil)
 	player_position := room.player.position
 	step, distance, aligned := orthogonal_step_and_distance(origin, player_position)
-	if distance == 1 {
+	if distance == 1 && melee_layers_meet(room, origin, player_position) {
 		return make_attack_intent(room, origin, player_position, enemy.attack)
 	}
 	if aligned && distance >= BRUTE_MIN_CHARGE_RANGE &&
@@ -312,11 +314,11 @@ plan_brute_intent :: proc(
 	   has_clear_orthogonal_line(room, origin, player_position) {
 		intent := make_wait_intent(room, origin)
 		intent.kind = .Charge
-		for offset in 1..<distance {
-			intent.path[intent.path_count] = {
-				x = origin.x+step.x*offset,
-				y = origin.y+step.y*offset,
-			}
+		// The charge runs on the floors its steps land on (layers.odin), as the movement it makes: up no ladder.
+		previous := origin
+		for _ in 1..<distance {
+			previous, _ = layer_step(room, previous, step)
+			intent.path[intent.path_count] = previous
 			intent.path_count += 1
 		}
 		if intent.path_count <= MAX_ENEMY_INTENT_PATH_CELLS &&
@@ -388,7 +390,7 @@ validate_enemy_intent_structure :: proc(room: ^Room, intent: ^Enemy_Intent) -> b
 			return false
 		}
 		for position, index in intent.threatened_cells[:intent.threatened_cell_count] {
-			if !grid.contains(&room.level_data.tiles, position) {
+			if !level.layer_contains(room.level_data, position) {
 				return false
 			}
 			for previous_index in 0..<index {
@@ -446,7 +448,7 @@ validate_enemy_intent_structure :: proc(room: ^Room, intent: ^Enemy_Intent) -> b
 			previous = position
 		}
 		for position, index in intent.threatened_cells[:intent.threatened_cell_count] {
-			if !grid.contains(&room.level_data.tiles, position) {
+			if !level.layer_contains(room.level_data, position) {
 				return false
 			}
 			for previous_index in 0..<index {
@@ -604,7 +606,7 @@ plan_enemy_intents :: proc(room: ^Room) {
 				center := intent.threatened_cells[0]
 				for sign in ([?]int{-1, 1}) {
 					cell := grid.offset(center, step.y*sign, step.x*sign)
-					if grid.contains(&room.level_data.tiles, cell) && shape_cell_has_clear_path(room, origin, cell) {
+					if level.layer_contains(room.level_data, cell) && area_takes(room, center, cell) && shape_cell_has_clear_path(room, origin, cell) {
 						intent.threatened_cells[intent.threatened_cell_count] = cell
 						intent.threatened_cell_count += 1
 					}
@@ -868,7 +870,8 @@ resolve_enemy_intents :: proc(room: ^Room, pulse: ^Pulse_Report, only_id: u32 = 
 				continue
 			}
 			action := make_action(.Move, source, cell_target(destination), .Walkable_Cell)
-			added := add_effect(&action, move_effect(source, destination, .Teleport if intent.phase_through else .Traverse))
+			mode := Movement_Mode.Climb if is_ladder_move(room, intent.origin, destination) else .Teleport if intent.phase_through else .Traverse
+			added := add_effect(&action, move_effect(source, destination, mode))
 			assert(added)
 			report := resolve_action(room, &action)
 			assert(report.accepted)

@@ -6,10 +6,11 @@ import rl "vendor:raylib"
 import rlgl "vendor:raylib/rlgl"
 import game "../game"
 import grid "../engine/grid"
+import level "../level"
 import view "../engine/view"
 
 Tactical_Alpha_Entry :: struct {
-	kind: enum {Sprite, Wall, Roof, Attack, Ground, Lasso, Fishing, Pinball, First_Person, Dino},
+	kind: enum {Sprite, Wall, Roof, Attack, Ground, Lasso, Fishing, Pinball, First_Person, Dino, Cover},
 	// An Attack entry: its blow's slot in Attack_Fx_State.
 	attack: i32,
 	// A Ground entry: its flame's cell, or past the cells its splash (ground_fx.odin).
@@ -114,6 +115,18 @@ collect_tactical_translucents :: proc(renderer: ^Renderer, room: ^game.Room = ni
 			}
 		} }
 	}
+	// What covers the robot under a cave's rock or a bridge's deck (height_view.odin): a cell a layer, its layer in
+	// the entry's `attack`.
+	if room != nil && board_cover.under {
+		c := board_cover.robot
+		for y in c.y-BOARD_COVER_RADIUS..=c.y+BOARD_COVER_RADIUS { for x in c.x-BOARD_COVER_RADIUS..=c.x+BOARD_COVER_RADIUS {
+			for layer in grid.LOWEST_LAYER..=grid.HIGHEST_LAYER {
+				cell := grid.Position{x = x, y = y, layer = i8(layer)}
+				if !cell_covers_robot(cell) || !level.kind_has_floor(board_tile(cell)) { continue }
+				append(entries, Tactical_Alpha_Entry{kind = .Cover, attack = i32(layer), position = {f32(x), f32(y)}})
+			}
+		} }
+	}
 	// The envelope of each building that is not whole: its walls and colonnade, and its roof.
 	if room != nil && (room.player == nil || !room.player.tactical.config.expedition) { collect_structure_entries(renderer, room, entries) }
 	forward := rl.Vector3Normalize(v.camera.target-v.camera.position)
@@ -166,6 +179,9 @@ draw_tactical_billboards :: proc(renderer: ^Renderer, room: ^game.Room = nil, li
 		} else if entry.kind == .Dino {
 			if walls_active { rl.EndShaderMode(); walls_active = false }
 			draw_dino_entry(renderer, entry)
+		} else if entry.kind == .Cover {
+			if walls_active { rl.EndShaderMode(); walls_active = false }
+			draw_layer_cover({x = int(entry.position.x), y = int(entry.position.y), layer = i8(entry.attack)})
 		} else {
 			if walls_active { rl.EndShaderMode(); walls_active = false }
 			tactical_billboard(renderer, entry.key, entry.position, entry.opacity, entry.entity)

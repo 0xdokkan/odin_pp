@@ -149,7 +149,8 @@ pinball_next_launch :: proc(room: ^Room, cell: grid.Position) -> (heading: Pinba
 // down there while it does (board_device_can_deploy).
 @(private)
 pinball_covers_cell :: proc(room: ^Room, cell: grid.Position) -> bool {
-	if !tactical_pinball_active(room) { return false }
+	// The ball rolls on its own layer (layers.odin).
+	if !tactical_pinball_active(room) || cell.layer != room.pinball.cell.layer { return false }
 	p := pinball_position(&room.pinball)
 	closest := Pinball_Vec{clamp(p.x, f64(cell.x)-0.5, f64(cell.x)+0.5), clamp(p.y, f64(cell.y)-0.5, f64(cell.y)+0.5)}
 	return pinball_length(p-closest) < PINBALL_RADIUS
@@ -342,7 +343,8 @@ pinball_touching :: proc(s: ^Pinball_State, id: u32) -> bool {
 // A foe on the floor the ball meets: not the ball, not the Lazzo's foe.
 @(private = "file")
 pinball_bumper :: proc(room: ^Room, enemy: Enemy) -> bool {
-	return enemy.id != room.pinball.enemy_id && !enemy_is_out_of_play(room, enemy.id)
+	// It rolls on its own layer and meets only who stands there (layers.odin).
+	return enemy.id != room.pinball.enemy_id && !enemy_is_out_of_play(room, enemy.id) && enemy.position.layer == room.pinball.cell.layer
 }
 
 @(private = "file")

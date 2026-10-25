@@ -207,7 +207,7 @@ living_card_position :: proc(renderer: ^Renderer, entity: game.Entity_Ref, key: 
 @(private)
 living_card_slide_position :: proc(renderer: ^Renderer, entity: game.Entity_Ref, key: Sprite_Key, position: view.Vec2) -> (at: view.Vec2, lift: f32) {
 	at, lift = living_card_slide(renderer, entity, key, position)
-	lift += point_ground(at)
+	lift += entity_point_ground(entity, at)
 	return
 }
 

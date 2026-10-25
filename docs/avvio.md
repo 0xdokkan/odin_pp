@@ -82,9 +82,12 @@ non definiscono le regole della spedizione aperta.
 scala di 3, un pilastro di 8 e una collina a spirale (si prova la regola dei
 dirupi, le cadute, la vista e la gittata dall'alto); «Strutture» (41×29) ha tutto il
 catalogo: tre edifici, cinque oggetti complessi, un recinto e la casetta nelle quattro
-rotazioni (si prova passo, vista e trasparenza avvicinandosi). Con `--smoke-mechanics-lab` e
-`ODIN_PP_LAB_ONLY=heights`, `structures`, `mountain` o `cave` gira solo l'atto delle altezze, delle strutture, della
-montagna a spirale o della grotta (quest'ultimo dura qualche minuto: sale tutto il sentiero a passi veri).
+rotazioni (si prova passo, vista e trasparenza avvicinandosi); «Piani» (46×29) ha una strada sotto un
+ponte con due rampe, una collina con una grotta e due imbocchi, una scala a pioli sul dirupo della collina e
+un nemico su ogni piano (si provano passo, scale, vista, aree e cadute fra piani: docs/regole/combattimento.md,
+«Piani»). Con `--smoke-mechanics-lab` e `ODIN_PP_LAB_ONLY=heights`, `structures`, `mountain`, `cave` o `layers`
+gira solo l'atto delle altezze, delle strutture, della montagna a spirale, della grotta o dei piani (la
+montagna dura qualche minuto: sale tutto il sentiero a passi veri).
 `--smoke-expedition` comprende l'atto «posa» (il fantasma verde e rosso, una statua e una casetta posate, la statua rotta da un colpo
 e la casetta che resta), l'atto «grotte» (in Neve, Far West, Egitto e Inferno: l'arco, l'ingresso e la seconda
 stanza della prima grotta, con il giro entra-esci controllato) e l'atto «montagna» (il robot in otto punti della salita, con le mappe della Neve

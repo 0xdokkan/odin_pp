@@ -62,7 +62,8 @@ place_ground_effect :: proc(cell: grid.Position, kind: Status_Kind, amount: i32)
 @(private)
 ground_index :: proc(room: ^Room, cell: grid.Position) -> (index: int, ok: bool) {
 	if room == nil || room.level_data == nil { return }
-	index, ok = grid.index_of(&room.level_data.tiles, cell)
+	// On whichever layer: the pools of every layer are kept (layers.odin).
+	index, ok = room_table_index(room, cell)
 	return index, ok && index < len(room.ground.pool)
 }
 
@@ -74,6 +75,8 @@ ground_pool_at :: proc(room: ^Room, cell: grid.Position) -> i32 {
 
 ground_fire_covers :: proc(fire: Ground_Fire, cell: grid.Position) -> bool {
 	if cell == fire.center { return true }
+	// A fire burns on its own layer (its arms grow there: layers.odin).
+	if cell.layer != fire.center.layer { return false }
 	steps := GROUND_ARM_STEPS
 	for step, direction in steps {
 		dx, dy := cell.x-fire.center.x, cell.y-fire.center.y
@@ -133,8 +136,8 @@ ground_pool_fill :: proc(room: ^Room, anchor: grid.Position, cells: ^[dynamic]gr
 	if room == nil || room.level_data == nil || cells == nil { return }
 	if _, inside := ground_index(room, anchor); !inside { return }
 	append(cells, anchor)
-	tiles := &room.level_data.tiles
-	count := len(tiles.cells)
+	// Every layer's floor, when the map has layers (layers.odin), the ground's first as in the pools' table.
+	count := len(room.ground.pool)
 	label := make([]i32, count)
 	defer delete(label)
 	queue := make([]int, count)
@@ -146,7 +149,7 @@ ground_pool_fill :: proc(room: ^Room, anchor: grid.Position, cells: ^[dynamic]gr
 	for &value in label { value = -1 }
 	steps := GROUND_ARM_STEPS
 	for start in 0..<count {
-		cell := grid.Position{x = start%tiles.width, y = start/tiles.width}
+		cell := room_table_cell(room, start)
 		if label[start] >= 0 || !ground_cell_is_open(room, cell, anchor) { continue }
 		area := i32(len(sizes))
 		append(&sizes, 0)
@@ -158,16 +161,23 @@ ground_pool_fill :: proc(room: ^Room, anchor: grid.Position, cells: ^[dynamic]gr
 			at := queue[head]
 			head += 1
 			sizes[area] += 1
-			here := grid.Position{x = at%tiles.width, y = at/tiles.width}
+			here := room_table_cell(room, at)
 			for step in steps {
-				next := grid.offset(here, step.x, step.y)
-				index, ok := grid.index_of(tiles, next)
-				if !ok { continue }
-				if next == anchor || room.ground.pool[index] > 0 { touches[area] = true; continue }
-				if label[index] >= 0 || !ground_cell_is_open(room, next, anchor) { continue }
-				label[index] = area
-				queue[tail] = index
-				tail += 1
+				// The neighbour on this layer, as ever, and the one a step away on another (a cave's mouth).
+				neighbours := [2]grid.Position{grid.offset(here, step.x, step.y), {}}
+				reached := 1
+				if landing, _ := layer_step(room, here, step); landing.layer != here.layer && !step_height_blocked(room, here, landing) {
+					neighbours[1], reached = landing, 2
+				}
+				for next in neighbours[:reached] {
+					index, ok := ground_index(room, next)
+					if !ok { continue }
+					if next == anchor || room.ground.pool[index] > 0 { touches[area] = true; continue }
+					if label[index] >= 0 || !ground_cell_is_open(room, next, anchor) { continue }
+					label[index] = area
+					queue[tail] = index
+					tail += 1
+				}
 			}
 		}
 	}
@@ -176,7 +186,7 @@ ground_pool_fill :: proc(room: ^Room, anchor: grid.Position, cells: ^[dynamic]gr
 	for index in 0..<count {
 		area := label[index]
 		if area < 0 || sizes[area] == largest || !touches[area] { continue }
-		append(cells, grid.Position{x = index%tiles.width, y = index/tiles.width})
+		append(cells, room_table_cell(room, index))
 	}
 }
 

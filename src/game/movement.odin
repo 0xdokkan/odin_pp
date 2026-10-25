@@ -1,12 +1,15 @@
 package game
 
 import grid "../engine/grid"
+import level "../level"
 
 MAX_MOVEMENT_PATH_CELLS :: MAX_TARGETING_PATH_CELLS
 
 Movement_Mode :: enum {
 	Traverse,
 	Teleport,
+	// Up or down a ladder (layers.odin): from one end to the other, with no fall.
+	Climb,
 }
 
 Movement_Error :: enum {
@@ -116,8 +119,8 @@ movement_path_blocker :: proc(
 		step_x := position.x-previous.x
 		step_y := position.y-previous.y
 		if step_x != 0 && step_y != 0 {
-			side_x := grid.Position{x = previous.x+step_x, y = previous.y}
-			side_y := grid.Position{x = previous.x, y = previous.y+step_y}
+			side_x, _ := layer_step(room, previous, {x = step_x})
+			side_y, _ := layer_step(room, previous, {y = step_y})
 			if cell_blocks_movement(room, side_x) && cell_blocks_movement(room, side_y) {
 				return side_x, true
 			}
@@ -179,11 +182,13 @@ query_movement_from :: proc(
 	}
 	query.origin = origin
 	query.error = .Same_Position
-	if origin == destination {
+	// A traverse goes to a column (its layer is where the path lands); a teleport or a climb to a cell.
+	column := grid.Position{x = destination.x, y = destination.y, layer = origin.layer}
+	if origin == (column if mode == .Traverse else destination) {
 		return
 	}
 	query.error = .Destination_Out_Of_Bounds
-	if !grid.contains(&room.level_data.tiles, destination) {
+	if !level.layer_contains(room.level_data, column if mode == .Traverse else destination) {
 		return
 	}
 
@@ -199,7 +204,14 @@ query_movement_from :: proc(
 			query.error = .Path_Too_Long
 			return
 		}
-	case .Teleport:
+		// Every cell of the path on the floor it lands on from the one before (layers.odin).
+		previous := origin
+		for &cell in query.cells[:query.count] {
+			cell, _ = layer_step(room, previous, {x = cell.x-previous.x, y = cell.y-previous.y})
+			previous = cell
+		}
+		query.destination = previous
+	case .Teleport, .Climb:
 		query.cells[0] = destination
 		query.count = 1
 	}
@@ -300,7 +312,7 @@ apply_movement_effect :: proc(
 			area_mask = EVENT_TELEPORT_BIT if effect.movement_mode == .Teleport else 0,
 		})
 		movement_recorded := report.events.count > movement_event_index
-		if effect.movement_mode != .Teleport { trigger_fall(room, effect.target, drop, report) }
+		if effect.movement_mode == .Traverse { trigger_fall(room, effect.target, drop, report) }
 		if entity_exists(room, effect.target) { trigger_cell_entry(room, effect.target, report) }
 		if effect.target.kind == .Object {
 			ignite_barrel_near_fire(room, effect.target.id, &report.events)

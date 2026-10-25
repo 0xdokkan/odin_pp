@@ -99,6 +99,9 @@ Marley_State :: struct {
 	has_next: bool,
 	columns: [MAX_MARLEY_COLUMNS]Marley_Column,
 	column_count: int,
+	// The layer the party is on: its player's as it began (layers.odin). Its lights are cells of it; its
+	// bombs strike there, and on the other layers only what the player sees.
+	layer: i8,
 }
 
 @(private)
@@ -118,13 +121,17 @@ marley_position :: proc(cell: Marley_Cell) -> grid.Position {
 	return {x = int(cell.x), y = int(cell.y)}
 }
 
-// The cell of light `index`, and of the next turn's.
+// The cell of light `index`, and of the next turn's, on the party's layer.
 marley_light :: proc(m: ^Marley_State, index: int) -> grid.Position {
-	return marley_position(m.lights[index])
+	cell := marley_position(m.lights[index])
+	cell.layer = m.layer
+	return cell
 }
 
 marley_next_light :: proc(m: ^Marley_State, index: int) -> grid.Position {
-	return marley_position(m.next_lights[index])
+	cell := marley_position(m.next_lights[index])
+	cell.layer = m.layer
+	return cell
 }
 
 // Sets the lit cells (tests, the film's script).
@@ -151,7 +158,7 @@ marley_room_stream :: proc(player: ^Player, content: Room_Content) -> u64 {
 
 // Whether a cell is lit now: whoever stands on it is safe.
 marley_cell_is_lit :: proc(room: ^Room, cell: grid.Position) -> bool {
-	if !tactical_marley_active(room) { return false }
+	if !tactical_marley_active(room) || cell.layer != room.marley.layer { return false }
 	cell_packed := marley_cell(cell)
 	for light in room.marley.lights[:room.marley.light_count] { if light == cell_packed { return true } }
 	return false
@@ -228,7 +235,7 @@ marley_choose_lights :: proc(room: ^Room, count: int, avoid: []Marley_Cell, out:
 	defer delete(taken)
 	for y in 0..<tiles.height {
 		for x in 0..<tiles.width {
-			cell := grid.Position{x = x, y = y}
+			cell := grid.Position{x = x, y = y, layer = room.marley.layer}
 			if !marley_cell_is_floor(room, cell) { continue }
 			skip := false
 			for lit in avoid { if lit == marley_cell(cell) { skip = true; break } }
@@ -289,7 +296,7 @@ marley_choose_lights :: proc(room: ^Room, count: int, avoid: []Marley_Cell, out:
 @(private)
 begin_marley :: proc(room: ^Room, damage, seconds: i32, report: ^Action_Report) -> bool {
 	if report == nil || damage <= 0 || seconds <= 0 || !marley_can_begin(room) { return false }
-	room.marley = {active = true, remaining = min(seconds, MARLEY_MAX_SECONDS), damage = damage}
+	room.marley = {active = true, remaining = min(seconds, MARLEY_MAX_SECONDS), damage = damage, layer = room.player.position.layer}
 	m := &room.marley
 	if room.marley_demo.scripted {
 		marley_set_lights(m, room.marley_demo.lights[:room.marley_demo.light_count])
@@ -317,13 +324,19 @@ marley_throw_bomb :: proc(room: ^Room, pulse: ^Pulse_Report, x: i32) {
 		card_definition = .Marley_Party, visual_group = MARLEY_BOMB_GROUP})
 }
 
+// Whether a bomb of the party reaches `cell`: on the party's layer, or on another that the player sees.
+@(private = "file")
+marley_strikes :: proc(room: ^Room, cell: grid.Position) -> bool {
+	return cell.layer == room.marley.layer || effect_reaches(room, room.player.position, cell)
+}
+
 // Wherever along its column the bomb is, whoever stands in it is struck: it is
 // no matter whether it bounces over him or rolls under.
 @(private = "file")
 marley_resolve_column :: proc(room: ^Room, pulse: ^Pulse_Report, x: i32) {
 	damage := room.marley.damage
 	action := make_action(.Trigger, SYSTEM_ENTITY)
-	if room.player.position.x == int(x) {
+	if room.player.position.x == int(x) && room.player.position.layer == room.marley.layer {
 		if marley_cell_is_lit(room, room.player.position) {
 			record_event(&pulse.events, {kind = .Marley_Saved, source = SYSTEM_ENTITY, target = PLAYER_ENTITY,
 				from_position = room.player.position, to_position = room.player.position, card_definition = .Marley_Party})
@@ -333,7 +346,7 @@ marley_resolve_column :: proc(room: ^Room, pulse: ^Pulse_Report, x: i32) {
 		}
 	}
 	for enemy in room.enemies {
-		if enemy.position.x != int(x) || enemy_is_out_of_play(room, enemy.id) { continue }
+		if enemy.position.x != int(x) || enemy_is_out_of_play(room, enemy.id) || !marley_strikes(room, enemy.position) { continue }
 		if marley_cell_is_lit(room, enemy.position) {
 			record_event(&pulse.events, {kind = .Marley_Saved, source = SYSTEM_ENTITY, target = enemy_entity(enemy.id),
 				from_position = enemy.position, to_position = enemy.position, card_definition = .Marley_Party})
@@ -343,7 +356,7 @@ marley_resolve_column :: proc(room: ^Room, pulse: ^Pulse_Report, x: i32) {
 		assert(added)
 	}
 	for object in room.objects {
-		if object.position.x != int(x) { continue }
+		if object.position.x != int(x) || !marley_strikes(room, object.position) { continue }
 		definition, found := grid_object_definition(object.kind)
 		if !found || !definition.explosive { continue }
 		effect := damage_effect(object_entity(object.id), damage)

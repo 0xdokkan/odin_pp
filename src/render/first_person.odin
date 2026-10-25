@@ -294,7 +294,7 @@ frame_first_person_camera :: proc(renderer: ^Renderer, room: ^game.Room) {
 	if room == nil || room.player == nil || v.snapshot == nil { return }
 	now := renderer.sprite_assets.elapsed
 	p := v.snapshot.player.position
-	f.eye = {p.x+0.5, game.FIRST_PERSON_EYE_HEIGHT+point_ground(p), p.y+0.5}
+	f.eye = {p.x+0.5, game.FIRST_PERSON_EYE_HEIGHT+entity_point_ground(game.PLAYER_ENTITY, p), p.y+0.5}
 	f.eye_cell = {x = int(math.round(p.x)), y = int(math.round(p.y))}
 	f.card_count = 0
 	for actor in v.snapshot.enemies[:v.snapshot.enemy_count] {

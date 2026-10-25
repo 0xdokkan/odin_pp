@@ -42,10 +42,11 @@ explosive_pulses_remaining :: proc(deadline, pulse: u64, fuse: int = EXPLOSIVE_F
 	return int(min(deadline-pulse, u64(max(1, fuse)))) if deadline > pulse else 0
 }
 
-// Walls and fixed obstacles are excluded; cover objects can be destroyed by the blast.
+// Walls and fixed obstacles are excluded; cover objects can be destroyed by the blast. With layers, the
+// blast takes one cell a column, as an area does (layers.odin).
 explosion_contains_cell :: proc(room: ^Room, center, cell: grid.Position) -> bool {
 	return grid_distance(center, cell) <= 1 && base_cell_is_walkable(room, cell) &&
-	       !obstacle_at(room, cell)
+	       !obstacle_at(room, cell) && area_takes(room, center, cell)
 }
 
 @(private)

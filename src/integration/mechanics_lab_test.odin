@@ -5,6 +5,7 @@ import application "../application"
 
 import "core:testing"
 import game "../game"
+import grid "../engine/grid"
 import level "../level"
 import render "../render"
 
@@ -51,6 +52,32 @@ test_mechanics_lab_is_an_open_endless_arena_with_the_cards_under_test :: proc(t:
 	testing.expect_value(t, player.deck.exhaust_pile[0].definition_id, game.Card_Id.Fishing_Rod)
 	for card in player.deck.hand[:player.deck.hand_count] { testing.expect(t, card.definition_id != .Fishing_Rod) }
 
+}
+
+// The arena of the layers (Fase 3 of docs/piano-profondita.md): its bridge, cave and ladder keep the column's rule,
+// a foe waits on each of three layers, and a step goes up the ramp onto the bridge, into the cave's mouth and up the
+// ladder. F3 comes to it after the cave's arena.
+@(test)
+test_mechanics_lab_has_an_arena_of_layers :: proc(t: ^testing.T) {
+	data: level.Level
+	defer level.destroy(&data)
+	player, created := game.create_player(run_session.DEMO_PLAYER_STATS)
+	testing.expect(t, created)
+	room, built := run_session.create_mechanics_lab_room(&data, &player, game.DEFAULT_TACTICAL_CONFIG, .Layers)
+	testing.expect(t, built)
+	defer game.destroy_room(&room)
+	testing.expect(t, level.has_layers(&data))
+	error, _ := level.check_layers(&data)
+	testing.expect_value(t, error, level.Layer_Error.None)
+	testing.expect_value(t, player.position, run_session.MECHANICS_LAB_LAYERS_START)
+	on: [3]bool
+	for foe in room.enemies { on[int(foe.position.layer)+1] = true }
+	testing.expect(t, on[0] && on[1] && on[2])
+	testing.expect_value(t, game.walk_step(&room, {x = 13, y = 14}, {x = 1}), grid.Position{x = 14, y = 14, layer = 1})
+	testing.expect_value(t, game.walk_step(&room, {x = 34, y = 7}, {x = 1}), grid.Position{x = 35, y = 7, layer = -1})
+	testing.expect_value(t, game.walk_step(&room, {x = 34, y = 4}, {x = 1}), grid.Position{x = 35, y = 4})
+	testing.expect_value(t, run_session.mechanics_lab_next_arena(.Cave), run_session.Mechanics_Lab_Arena.Layers)
+	testing.expect_value(t, run_session.mechanics_lab_next_arena(.Layers), run_session.Mechanics_Lab_Arena.Flat)
 }
 
 // F7 clears the arena as a room's last fall clears it: the fight ends, the

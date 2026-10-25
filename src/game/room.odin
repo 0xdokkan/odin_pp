@@ -279,8 +279,9 @@ direction_offset :: proc(direction: Move_Direction) -> grid.Position {
 	return {}
 }
 
+// `a` moved by the offset `b`, on `a`'s layer.
 add_position :: proc(a, b: grid.Position) -> grid.Position {
-	return {x = a.x+b.x, y = a.y+b.y}
+	return {x = a.x+b.x, y = a.y+b.y, layer = a.layer}
 }
 
 @(private)
@@ -510,8 +511,8 @@ create_room :: proc(level_data: ^level.Level, player: ^Player, content: Room_Con
 		}
 	}
 	result.loot = make([dynamic]Loot, 0, loot_capacity)
-	result.enemy_path_distances = make([]int, len(level_data.tiles.cells))
-	result.ground.pool = make([]i32, len(level_data.tiles.cells))
+	result.enemy_path_distances = make([]int, room_table_cells(level_data))
+	result.ground.pool = make([]i32, room_table_cells(level_data))
 	spawn_position := level_data.player_spawn
 
 	for position in content.obstacles {
@@ -814,7 +815,7 @@ enemy_can_move_to :: proc(room: ^Room, enemy_index: int, position: grid.Position
 	}
 	if enemy_index >= 0 && enemy_index < len(room.enemies) {
 		from := room.enemies[enemy_index].position
-		if max(abs(from.x-position.x), abs(from.y-position.y)) == 1 && step_height_blocked(room, from, position) { return false }
+		if max(abs(from.x-position.x), abs(from.y-position.y)) == 1 && !is_ladder_move(room, from, position) && step_height_blocked(room, from, position) { return false }
 	}
 	_, occupied := enemy_index_at(room, position, enemy_index)
 	return !occupied
@@ -833,19 +834,22 @@ try_move_player :: proc(room: ^Room, direction: Move_Direction) -> Action_Result
 		return .Invalid_Phase
 	}
 	critical := tactical_take_critical(room)
-	target := add_position(room.player.position, direction_offset(direction))
+	step := direction_offset(direction)
+	// The cell the step lands on, on whichever layer (a ladder's other end too), and the one a bump strikes.
+	target, ladder := layer_step(room, room.player.position, step, true)
+	foe_cell := bump_cell(room, room.player.position, step)
 	// Walking remains available during recovery, but walking into an enemy is
 	// an attack and must pass the offensive gate before mutating the event log.
 	if room.phase == .Combat && !tactical_allows_action(room) {
-		if _, found := enemy_index_at(room, target); found { return .Invalid_Phase }
+		if _, found := enemy_index_at(room, foe_cell); found { return .Invalid_Phase }
 	}
 	clear_event_log(room.recent_events)
 	if room.phase == .Combat {
-		if enemy_index, found := enemy_index_at(room, target); found {
+		if enemy_index, found := enemy_index_at(room, foe_cell); found {
 			// The Giganotosauro walks onto a foe his bump would kill.
-			if giga_crushes(room, enemy_index, critical) { return giga_crush_step(room, enemy_index, target, .Adjacent_Opponent, false) }
+			if giga_crushes(room, enemy_index, critical) { return giga_crush_step(room, enemy_index, foe_cell, .Adjacent_Opponent, false) }
 			// The bump, loaded with whatever the player's charges add (player_charges.odin).
-			struck := player_bump(room, enemy_index, target, .Adjacent_Opponent, critical)
+			struck := player_bump(room, enemy_index, foe_cell, .Adjacent_Opponent, critical)
 			assert(struck)
 			outcome := finish_player_combat_command(room)
 			switch outcome {
@@ -859,7 +863,10 @@ try_move_player :: proc(room: ^Room, direction: Move_Direction) -> Action_Result
 		}
 	}
 
-	if cell_blocks_movement(room, target) || step_height_blocked(room, room.player.position, target) {
+	if ladder {
+		climb := query_entity_movement(room, PLAYER_ENTITY, target, .Climb)
+		if !movement_query_is_clear(&climb) { return .Blocked }
+	} else if cell_blocks_movement(room, target) || step_height_blocked(room, room.player.position, target) {
 		// Loot cannot softlock when a movable block was pushed into a corridor.
 		if room.phase == .Loot {
 			if object, found := grid_object_at(room, target); found {
@@ -885,7 +892,7 @@ try_move_player :: proc(room: ^Room, direction: Move_Direction) -> Action_Result
 	// A straight step is one cell, on the tick or not: the tick's step is the
 	// diagonal (try_move_player_diagonal).
 	action := make_action(.Move, PLAYER_ENTITY, cell_target(target), .Walkable_Cell)
-	added := add_effect(&action, move_effect(PLAYER_ENTITY, target))
+	added := add_effect(&action, move_effect(PLAYER_ENTITY, target, .Climb if ladder else .Traverse))
 	assert(added)
 	report := resolve_action(room, &action)
 	if !report.accepted {
