@@ -358,11 +358,12 @@ test_shadow_card_is_offered_by_rewards_shops_and_armory :: proc(t: ^testing.T) {
 	node := Run_Node{kind = .Shop, depth = 9}
 	testing.expect(t, card_offer_weight(definition, &node) > 0)
 	profile := M8_Profile{ring_wins = 3}
-	// Spark is temporary-only; the Scopa pair and the Prova meccaniche's six
-	// cards (the Cannone laser among them) are never offered.
-	all: [int(Card_Id.Count)-9]Card_Id
+	// Spark is temporary-only; the Scopa pair, the Prova meccaniche's six cards (the Cannone laser among them), the
+	// retired cards and those only an upgrade makes are never offered: the whole pool, counted.
+	storage: [int(Card_Id.Count)]Card_Id
+	all := storage[:offerable_card_count(&node, &profile)]
 	random := u64(1)
-	testing.expect(t, generate_weighted_card_choices(&random, &node, all[:], &profile))
+	testing.expect(t, generate_weighted_card_choices(&random, &node, all, &profile))
 	offered := false
 	for id in all { offered = offered || id == .Shadow_Step }
 	testing.expect(t, offered)

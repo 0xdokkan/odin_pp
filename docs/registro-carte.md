@@ -1,0 +1,85 @@
+[← Odin PP](../README.md)
+
+# Registro delle carte
+
+Qui si segna ogni carta tolta dal gioco o cambiata, con quello che faceva, così da poterla confrontare o rimettere in
+futuro. Le voci più recenti stanno in cima. Per ritrovare il commit di una voce:
+`git log --all --grep "<titolo del commit>"`.
+
+## 2026-10-25 — Revisione delle carte
+
+Commit **«Carte: ritirate otto carte, cinque diventano potenziamenti»** sul ramo `revisione-carte` (partito da
+`piano-griglia`).
+
+### Come si toglie una carta, e come si rimette
+
+- **Ritirata** vuol dire: nella sua definizione in [card.odin](../src/game/card.odin) c'è `traits = {.Retired}`. Il codice
+  della carta resta tutto (regole, disegno, suoni, test), ma niente la dà: né il mazzo iniziale, né le ricompense, né i
+  negozi, né le officine, né gli archivi dei biomi, né il ring. L'archivio dell'hub non la conta e non la mostra.
+  Per **rimetterla** basta togliere quella riga (e, se si vuole, rimetterla dove stava: mazzo iniziale, ring, archivi;
+  sotto è scritto dove stava ciascuna).
+- **Diventata potenziamento** vuol dire: la carta base ha `evolves_to = .<carta>, evolve_level = CARD_EVOLVE_LEVEL`
+  (`CARD_EVOLVE_LEVEL = 2`, in card.odin), e la carta che ne nasce ha `evolution_only = true` e `reward_weight = 0`. Al
+  **secondo potenziamento** la carta base diventa l'altra, che riparte dal suo livello 0 e si potenzia per conto suo.
+  Per **rimettere** la carta da sola: togliere le due righe dalla carta base, togliere `evolution_only = true` e ridarle il
+  `reward_weight` scritto sotto.
+- Le carte ritirate o diventate potenziamento **restano nei salvataggi**: se un mazzo di una spedizione in corso ne ha una,
+  la si gioca fino alla fine di quella spedizione. Nelle scoperte della campagna restano segnate, solo nascoste.
+
+### Carte ritirate (8)
+
+| Carta | Nel codice | Rarità | Energia | Effetto (com'era) | Peso nelle offerte | Prima comparsa | Dove stava |
+|---|---|---|---:|---|---:|---|---|
+| Thorn Coat | `Thorn_Coat` | non comune | 25 | su di te: 2 spine per 3 s; abilita la deviazione (contro gli arcieri) | 85 | 15/07, `37487b6` | mazzo iniziale |
+| Afterimage | `Afterimage` | non comune | 25 | su di te: schiva senza recupero; 1 scudo se ti muovi, per 4 s | 85 | 15/07, `37487b6` | mazzo iniziale |
+| Counter Rune | `Counter_Rune` | rara | 25 | su di te: contrattacco 3; 2 cariche, retain | 65 | 15/07, `37487b6` | — |
+| Battle Focus | `Battle_Focus` | rara | 15 | su di te: pesca 2; esplora, vista per 3 s fino a 9 celle; exhaust/ethereal | 65 | 16/07, `bc29683` | run tattica (`--run`), al posto di Toxic Wave |
+| Spark Forge | `Spark_Forge` | non comune | 15 | su di te: crea 2 Spark temporanee a energia 0 | 75 | 16/07, `bc29683` | — |
+| Spark | `Spark` | comune (temporanea) | 10 | raggio 1-2: 2 danni | 0 (temporanea) | 16/07, `bc29683` | nasceva solo da Spark Forge e Volatile Study |
+| Volatile Study | `Volatile_Study` | rara | 20 | su di te: crea 1 Spark, pesca 2; exhaust | 60 | 17/07, `c3ec4b8` | — |
+| Titan Grip | `Titan_Grip` | rara | 45 | raggio 1: 3 danni, lancia di 2; interrompe e stordisce 1 s | 65 | 09/10, `8f2b6ae` | premio del primo ring vinto; archivio del bioma Segreto |
+
+### Carte diventate potenziamenti (5)
+
+Ognuna si ottiene ora solo potenziando due volte la carta base; da sola non è più offerta, venduta né scoperta.
+
+| Carta base | Diventa (al 2° potenziamento) | Rarità | Energia | Effetto della carta che ne nasce | Peso che aveva | Prima comparsa | Dove stava |
+|---|---|---|---:|---|---:|---|---|
+| Guard | **Purifying Guard** (`Purifying_Guard`) | non comune | 25 | su di te: 3 scudo per 2 s; rimuove il veleno | 80 | 17/07, `c3ec4b8` | archivio della Neve |
+| Strike | **Cross Slash** (`Cross_Slash`) | non comune | 25 | raggio 1-3: 3 danni a croce; solo celle visibili | 90 | 15/07, `37487b6` | — |
+| Arc Bolt | **Chain Lightning** (`Chain_Lightning`) | rara | 40 | raggio 1-4: 3 danni a nemico; salta fino a 3 visibili | 65 | 08/09, `5d7e91d` | archivio dello Spazio |
+| Fate Strike | **Prismatic Barrage** (`Prismatic_Barrage`) | non comune | 50 | raggio 1-3: 3d4, ogni 4+ fa 3 danni; con 1-3, 1 scudo per dado | 75 | 08/09, `5d7e91d` | archivi dell'Egitto e dello Spazio |
+| Venom Needle | **Twin Venom** (`Twin_Venom`) | non comune | 30 | raggio 1-3: max(2d4) + 1 danni; con una coppia, 2 veleno | 75 | 08/09, `5d7e91d` | — |
+
+Fate Strike, che sale di dado a ogni potenziamento, ora arriva al d6 (livello 1) e al secondo potenziamento diventa
+Prismatic Barrage, che riparte dal d4 e sale fino al d20 come prima.
+
+### Cambiamenti che ne seguono
+
+- **Mazzo iniziale** ([deck.odin](../src/game/deck.odin)): da 10 a **8 carte**. Thorn Coat e Afterimage sono uscite senza
+  sostituti: Strike, Arc Bolt, Piercing Ray, Shove, Firebomb, Guard, Toxic Wave, Dash.
+- **Run tattica** `--run` ([tactical_setup.odin](../src/run/tactical_setup.odin)): Toxic Wave non è più sostituita da Battle
+  Focus; restano gli altri cambi (Fate Strike al posto di Arc Bolt, Heavy Blow al posto di Piercing Ray) e le cinque
+  carte aggiunte: 13 carte invece di 15.
+- **Ring** ([m8_ring.odin](../src/game/m8_ring.odin)): il primo ring vinto dà **Grappling Hook** invece di Titan Grip (la
+  presa del ring passa all'uncino: rara, raggio 2-4, 1 danno e trascina il nemico accanto). Come prima Titan Grip, nelle
+  run tattiche Grappling Hook non è offerto prima del primo ring vinto; nelle spedizioni non cambia nulla. Storm Crown resta
+  al terzo ring.
+- **Archivi dei biomi** (scoperte, [expedition_scene.odin](../src/run/expedition_scene.odin)): Neve, Purifying Guard →
+  Sundering Blow; Egitto, Prismatic Barrage → Feretro; Spazio, Prismatic Barrage e Chain Lightning → Tesla Coil e Storm
+  Crown; Segreto, Titan Grip → Grappling Hook.
+- **Collezione**: una nuova funzione, `game.card_in_collection`, dice quali carte si scoprono, entrano nel pool di una
+  spedizione e si contano nell'archivio e nell'hub («N / M carte scoperte»): non quelle del laboratorio, non le ritirate,
+  non quelle che nascono da un potenziamento, non le temporanee.
+- **Interfaccia**: nel pannello PERSONAGGIO una carta che cambia dice «Potenziamento X / 2: diventa <carta>»; nei negozi e
+  nei riposi della run tattica l'anteprima del potenziamento che la cambia è «-> <carta>».
+- **Restano com'erano**: i tasti di prova `C`/`V` con `--debug-abilities` (sono abilità di prova, non carte); le arene di
+  prova `--spell-lab`, `--dice-lab` e gli smoke tattici, che usano alcune di queste carte per provarne le regole.
+
+### Verifica
+
+1651 test, con e senza assert (`scripts/check.ps1`). Due test nuovi
+([card_evolution_test.odin](../src/game/card_evolution_test.odin)): le cinque carte cambiano al secondo potenziamento e poi
+si potenziano per conto loro; le ritirate restano valide nel codice ma nessuna offerta, mazzo iniziale o collezione le
+contiene. Gli altri test che contavano su queste carte sono stati aggiornati (mazzo di 8 carte, premio del ring, pool
+delle offerte contato invece che scritto a mano, Fate Strike che cambia).

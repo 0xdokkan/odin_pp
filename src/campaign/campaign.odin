@@ -58,8 +58,8 @@ initialize :: proc(c: ^Campaign) {
 	append(&c.depot, make_grid(GRID_MAX_WIDTH, GRID_MAX_HEIGHT))
 	for id in game.Card_Id.Strike..<game.Card_Id.Count {
 		definition, _ := game.card_definition_by_id(id)
-		c.discovered[id] = definition.rarity == .Common ||
-			id == .Dash || id == .Shove || id == .Guard || id == .Lasso || id == .Fishing_Rod
+		c.discovered[id] = game.card_in_collection(id) && (definition.rarity == .Common ||
+			id == .Dash || id == .Shove || id == .Guard || id == .Lasso || id == .Fishing_Rod)
 	}
 }
 destroy :: proc(c: ^Campaign) { if c != nil { delete(c.depot); c^ = {} } }
@@ -71,14 +71,14 @@ begin_run :: proc(c: ^Campaign, biome: Biome, seed: u64) -> bool {
 	return true
 }
 discover :: proc(c: ^Campaign, card: game.Card_Id) -> bool {
-	if c == nil || card < .Strike || card >= .Count || c.discovered[card] || game.card_is_lab_only(card) { return false }
+	if c == nil || card < .Strike || card >= .Count || c.discovered[card] || !game.card_in_collection(card) { return false }
 	c.discovered[card] = true; c.revision += 1
 	// Do not change the current run pool: archive discoveries become available
 	// only on the next expedition, even if the present expedition is lost.
 	return true
 }
 card_in_pool :: proc(c: ^Campaign, card: game.Card_Id) -> bool {
-	if c == nil || card < .Strike || card >= .Count || game.card_is_lab_only(card) { return false }
+	if c == nil || card < .Strike || card >= .Count || !game.card_in_collection(card) { return false }
 	return c.run.pool[card] if c.run.active else c.discovered[card]
 }
 discover_secret :: proc(c: ^Campaign, biome: Biome, index: int) -> bool {

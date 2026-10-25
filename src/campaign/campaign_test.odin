@@ -30,13 +30,17 @@ test_lab_only_cards_never_enter_the_campaign :: proc(t: ^testing.T) {
 		testing.expect(t, !c.discovered[id] && !discover(&c, id) && !c.discovered[id] && !card_in_pool(&c, id))
 	}
 	testing.expect_value(t, lab, 6)
-	// Every other card still comes to light one at a time, the lab's never.
+	// Every card of the collection still comes to light one at a time; the lab's, the retired ones and those only an
+	// upgrade makes never do (docs/registro-carte.md).
 	for id in game.Card_Id.Strike..<game.Card_Id.Count {
-		if !game.card_is_lab_only(id) { discover(&c, id) }
+		if !game.card_in_collection(id) { testing.expect(t, !c.discovered[id] && !discover(&c, id)) } else { discover(&c, id) }
 	}
 	testing.expect(t, begin_run(&c, .Cyber, 7))
 	for id in game.Card_Id.Strike..<game.Card_Id.Count {
-		testing.expect_value(t, card_in_pool(&c, id), !game.card_is_lab_only(id))
+		testing.expect_value(t, card_in_pool(&c, id), game.card_in_collection(id))
+	}
+	for id in ([?]game.Card_Id{.Thorn_Coat, .Afterimage, .Titan_Grip, .Cross_Slash, .Purifying_Guard, .Twin_Venom}) {
+		testing.expect(t, !card_in_pool(&c, id))
 	}
 }
 

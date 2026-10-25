@@ -168,10 +168,15 @@ test_card_economy_metadata_is_valid_and_covers_every_rarity :: proc(t: ^testing.
 	}
 	// These additions must remain ordinary rewards, irrespective of tuning.
 	node := Run_Node{kind = .Combat, depth = 0}
-	for id in ([7]Card_Id{.Heavy_Blow, .Venom_Needle, .Caustic_Bloom, .Purifying_Guard, .Volatile_Study, .Fate_Strike, .Chain_Lightning}) {
+	for id in ([4]Card_Id{.Heavy_Blow, .Venom_Needle, .Caustic_Bloom, .Fate_Strike}) {
 		definition, found := card_definition_by_id(id)
 		testing.expect(t, found && !definition.temporary_only)
 		testing.expect(t, card_offer_weight(definition, &node) > 0)
+	}
+	// The retired cards and those only an upgrade makes are never offered (docs/registro-carte.md).
+	for id in ([?]Card_Id{.Purifying_Guard, .Volatile_Study, .Chain_Lightning, .Cross_Slash, .Thorn_Coat, .Titan_Grip}) {
+		definition, _ := card_definition_by_id(id)
+		testing.expect_value(t, card_offer_weight(definition, &node), u64(0))
 	}
 
 	definition, found := card_definition_by_id(.Strike)

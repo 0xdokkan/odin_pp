@@ -4,6 +4,9 @@ import grid "../engine/grid"
 
 MAX_CARD_DEFINITION_EFFECTS :: 4
 MAX_CARD_UPGRADE_LEVEL :: 10
+// The upgrade at which a card that evolves becomes the next one (docs/registro-carte.md): Guard, Strike, Arc Bolt, Fate
+// Strike and Venom Needle at their second.
+CARD_EVOLVE_LEVEL :: i32(2)
 
 Card_Rarity :: enum {
 	Common,
@@ -83,7 +86,9 @@ Card_Id :: enum {
 
 // Static card traits live with the definition; rules, previews and menus query
 // these through the existing predicates instead of maintaining card lists.
-Card_Trait :: enum { Scopa, Room_Tool, Player_Charge, Board_Device, Ground, Emplacement, Lab_Only }
+// `Retired`: a card taken out of the game (docs/registro-carte.md). Its code stays, so that it can come back by taking the
+// trait off, but nothing deals, offers, sells or discovers it.
+Card_Trait :: enum { Scopa, Room_Tool, Player_Charge, Board_Device, Ground, Emplacement, Lab_Only, Retired }
 
 @(private = "file")
 card_has_trait :: proc(id: Card_Id, trait: Card_Trait) -> bool {
@@ -102,6 +107,15 @@ card_is_emplacement :: proc(id: Card_Id) -> bool { return card_has_trait(id, .Em
 // Only in the Prova meccaniche for now (Bomb Marley, Inondazione, the cannons, Buco
 // Nero, Dinosauro): never offered, sold or discovered anywhere else.
 card_is_lab_only :: proc(id: Card_Id) -> bool { return card_has_trait(id, .Lab_Only) }
+// Taken out of the game (docs/registro-carte.md): kept in the code, never dealt, offered, sold or discovered.
+card_is_retired :: proc(id: Card_Id) -> bool { return card_has_trait(id, .Retired) }
+// A card of the collection: one the campaign can discover, the run's pool can hold and the archive counts. Not a card of
+// the lab, not a retired one, not one that only an upgrade makes, not a temporary one.
+card_in_collection :: proc(id: Card_Id) -> bool {
+	if id < .Strike || id >= .Count || card_is_lab_only(id) || card_is_retired(id) { return false }
+	definition := CARD_DEFINITIONS[id]
+	return !definition.evolution_only && !definition.temporary_only
+}
 // The kind of object an emplacement card sets down.
 card_emplacement_kind :: proc(id: Card_Id) -> Grid_Object_Kind {
 	return .Devouring_Hole if id == .Devouring_Hole else .Field_Cannon
@@ -212,6 +226,8 @@ Card_Instance :: struct {
 @(private, rodata)
 CARD_DEFINITIONS := [Card_Id]Card_Definition{
 	.Strike = {
+		// At its second upgrade it becomes Cross Slash, which starts again from its own level 0 (docs/registro-carte.md).
+		evolves_to = .Cross_Slash, evolve_level = CARD_EVOLVE_LEVEL,
 		upgrade_limit = MAX_CARD_UPGRADE_LEVEL, time_cost = 2,
 		id = .Strike,
 		name = "Strike",
@@ -238,6 +254,8 @@ CARD_DEFINITIONS := [Card_Id]Card_Definition{
 		effect_count = 1,
 	},
 	.Arc_Bolt = {
+		// At its second upgrade it becomes Chain Lightning, which starts again from its own level 0 (docs/registro-carte.md).
+		evolves_to = .Chain_Lightning, evolve_level = CARD_EVOLVE_LEVEL,
 		upgrade_limit = MAX_CARD_UPGRADE_LEVEL, time_cost = 2,
 		id = .Arc_Bolt,
 		name = "Arc Bolt",
@@ -294,11 +312,13 @@ CARD_DEFINITIONS := [Card_Id]Card_Definition{
 		effect_count = 1,
 	},
 	.Cross_Slash = {
+		// Only an upgrade of Strike makes it now (docs/registro-carte.md): never offered, sold or discovered.
+		evolution_only = true,
 		upgrade_limit = MAX_CARD_UPGRADE_LEVEL, time_cost = 3,
 		id = .Cross_Slash,
 		name = "Cross Slash",
 		rarity = .Uncommon,
-		reward_weight = 90,
+		reward_weight = 0,
 		shop_base_price = 5,
 		cost = 2,
 		targeting = {
@@ -353,6 +373,8 @@ CARD_DEFINITIONS := [Card_Id]Card_Definition{
 		effect_count = 1,
 	},
 	.Guard = {
+		// At its second upgrade it becomes Purifying Guard, which starts again from its own level 0 (docs/registro-carte.md).
+		evolves_to = .Purifying_Guard, evolve_level = CARD_EVOLVE_LEVEL,
 		upgrade_limit = MAX_CARD_UPGRADE_LEVEL, time_cost = 1,
 		id = .Guard,
 		name = "Guard",
@@ -400,6 +422,8 @@ CARD_DEFINITIONS := [Card_Id]Card_Definition{
 		effect_count = 1,
 	},
 	.Thorn_Coat = {
+		// RITIRATA (docs/registro-carte.md): kept so it can come back, but nothing deals it.
+		traits = {.Retired},
 		upgrade_limit = MAX_CARD_UPGRADE_LEVEL, time_cost = 1,
 		id = .Thorn_Coat,
 		name = "Thorn Coat",
@@ -424,6 +448,8 @@ CARD_DEFINITIONS := [Card_Id]Card_Definition{
 		effect_count = 1,
 	},
 	.Afterimage = {
+		// RITIRATA (docs/registro-carte.md): kept so it can come back, but nothing deals it.
+		traits = {.Retired},
 		upgrade_limit = MAX_CARD_UPGRADE_LEVEL, time_cost = 1,
 		id = .Afterimage,
 		name = "Afterimage",
@@ -448,6 +474,8 @@ CARD_DEFINITIONS := [Card_Id]Card_Definition{
 		effect_count = 1,
 	},
 	.Counter_Rune = {
+		// RITIRATA (docs/registro-carte.md): kept so it can come back, but nothing deals it.
+		traits = {.Retired},
 		upgrade_limit = MAX_CARD_UPGRADE_LEVEL, time_cost = 1,
 		id = .Counter_Rune,
 		name = "Counter Rune",
@@ -474,6 +502,8 @@ CARD_DEFINITIONS := [Card_Id]Card_Definition{
 		effect_count = 1,
 	},
 	.Battle_Focus = {
+		// RITIRATA (docs/registro-carte.md): kept so it can come back, but nothing deals it.
+		traits = {.Retired},
 		upgrade_limit = MAX_CARD_UPGRADE_LEVEL, time_cost = 1,
 		id = .Battle_Focus,
 		name = "Battle Focus",
@@ -522,6 +552,8 @@ CARD_DEFINITIONS := [Card_Id]Card_Definition{
 			effect_count = 2,
 	},
 	.Spark_Forge = {
+		// RITIRATA (docs/registro-carte.md): kept so it can come back, but nothing deals it.
+		traits = {.Retired},
 		upgrade_limit = MAX_CARD_UPGRADE_LEVEL, time_cost = 1,
 		id = .Spark_Forge,
 		name = "Spark Forge",
@@ -545,6 +577,8 @@ CARD_DEFINITIONS := [Card_Id]Card_Definition{
 		effect_count = 1,
 	},
 	.Spark = {
+		// RITIRATA (docs/registro-carte.md): kept so it can come back, but nothing deals it.
+		traits = {.Retired},
 		upgrade_limit = MAX_CARD_UPGRADE_LEVEL, time_cost = 1,
 		id = .Spark,
 		name = "Spark",
@@ -687,6 +721,8 @@ CARD_DEFINITIONS := [Card_Id]Card_Definition{
 		effect_count = 2,
 	},
 	.Venom_Needle = {
+		// At its second upgrade it becomes Twin Venom, which starts again from its own level 0 (docs/registro-carte.md).
+		evolves_to = .Twin_Venom, evolve_level = CARD_EVOLVE_LEVEL,
 		upgrade_limit = MAX_CARD_UPGRADE_LEVEL, time_cost = 2,
 		id = .Venom_Needle,
 		name = "Venom Needle",
@@ -750,11 +786,13 @@ CARD_DEFINITIONS := [Card_Id]Card_Definition{
 		effect_count = 1,
 	},
 	.Purifying_Guard = {
+		// Only an upgrade of Guard makes it now (docs/registro-carte.md): never offered, sold or discovered.
+		evolution_only = true,
 		upgrade_limit = MAX_CARD_UPGRADE_LEVEL, time_cost = 1,
 		id = .Purifying_Guard,
 		name = "Purifying Guard",
 		rarity = .Uncommon,
-		reward_weight = 80,
+		reward_weight = 0,
 		shop_base_price = 5,
 		cost = 1,
 		targeting = {rule = .Self},
@@ -778,6 +816,8 @@ CARD_DEFINITIONS := [Card_Id]Card_Definition{
 		effect_count = 2,
 	},
 	.Volatile_Study = {
+		// RITIRATA (docs/registro-carte.md): kept so it can come back, but nothing deals it.
+		traits = {.Retired},
 		upgrade_limit = MAX_CARD_UPGRADE_LEVEL, time_cost = 1,
 		id = .Volatile_Study,
 		name = "Volatile Study",
@@ -808,6 +848,8 @@ CARD_DEFINITIONS := [Card_Id]Card_Definition{
 		effect_count = 2,
 	},
 	.Fate_Strike = {
+		// At its second upgrade it becomes Prismatic Barrage, which starts again from its own level 0 (docs/registro-carte.md).
+		evolves_to = .Prismatic_Barrage, evolve_level = CARD_EVOLVE_LEVEL,
 		upgrade_limit = MAX_DICE_UPGRADE_LEVEL, time_cost = 2,
 		dice_count = 1,
 		id = .Fate_Strike,
@@ -827,11 +869,13 @@ CARD_DEFINITIONS := [Card_Id]Card_Definition{
 		effect_count = 1,
 	},
 	.Chain_Lightning = {
+		// Only an upgrade of Arc Bolt makes it now (docs/registro-carte.md): never offered, sold or discovered.
+		evolution_only = true,
 		upgrade_limit = MAX_CARD_UPGRADE_LEVEL, time_cost = 4,
 		id = .Chain_Lightning,
 		name = "Chain Lightning",
 		rarity = .Rare,
-		reward_weight = 65,
+		reward_weight = 0,
 		shop_base_price = 8,
 		cost = 2,
 		targeting = {
@@ -868,12 +912,14 @@ CARD_DEFINITIONS := [Card_Id]Card_Definition{
 		effect_count = 2,
 	},
 	.Prismatic_Barrage = {
+		// Only an upgrade of Fate Strike makes it now (docs/registro-carte.md): never offered, sold or discovered.
+		evolution_only = true,
 		upgrade_limit = MAX_DICE_UPGRADE_LEVEL, time_cost = 4,
 		dice_count = 3,
 		id = .Prismatic_Barrage,
 		name = "Prismatic Barrage",
 		rarity = .Uncommon,
-		reward_weight = 75,
+		reward_weight = 0,
 		shop_base_price = 6,
 		cost = 2,
 		targeting = {
@@ -891,12 +937,14 @@ CARD_DEFINITIONS := [Card_Id]Card_Definition{
 		effect_count = 2,
 	},
 	.Twin_Venom = {
+		// Only an upgrade of Venom Needle makes it now (docs/registro-carte.md): never offered, sold or discovered.
+		evolution_only = true,
 		upgrade_limit = MAX_DICE_UPGRADE_LEVEL, time_cost = 3,
 		dice_count = 2,
 		id = .Twin_Venom,
 		name = "Twin Venom",
 		rarity = .Uncommon,
-		reward_weight = 75,
+		reward_weight = 0,
 		shop_base_price = 6,
 		cost = 2,
 		targeting = {
@@ -932,6 +980,8 @@ CARD_DEFINITIONS := [Card_Id]Card_Definition{
 		effect_count = 1,
 	},
 	.Titan_Grip = {
+		// RITIRATA (docs/registro-carte.md): kept so it can come back, but nothing deals it.
+		traits = {.Retired},
 		upgrade_limit = MAX_CARD_UPGRADE_LEVEL, time_cost = 3,
 		id = .Titan_Grip, name = "Titan Grip", rarity = .Rare,
 		reward_weight = 65, shop_base_price = 9, cost = 2,

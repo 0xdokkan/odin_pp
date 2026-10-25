@@ -5,6 +5,15 @@ I riferimenti a Classica, `--flat` e ai vecchi smoke descrivono versioni precede
 per i comandi disponibili oggi valgono il [README](README.md) e la documentazione collegata.
 
 
+## 2026-10-25 — Revisione delle carte
+
+- **Ritirate** (il codice resta, ma niente le dà più): Thorn Coat, Afterimage, Counter Rune, Battle Focus, Spark Forge,
+  Spark, Volatile Study, Titan Grip.
+- **Diventate potenziamenti** (al secondo potenziamento della carta base, poi ripartono dal livello 0): Guard → Purifying
+  Guard, Strike → Cross Slash, Arc Bolt → Chain Lightning, Fate Strike → Prismatic Barrage, Venom Needle → Twin Venom.
+- Mazzo iniziale da 8 carte; il primo ring dà Grappling Hook; archivi dei biomi aggiornati. Tutto, con l'effetto di ogni
+  carta e il modo di rimetterla, in [docs/registro-carte.md](docs/registro-carte.md).
+
 ## 2026-10-24 — Posare le strutture
 
 - **Fase 7 del piano fatta, ultima del piano.** Un kit nello zaino (si trova nelle cache e si compra nelle officine per 25 crediti)

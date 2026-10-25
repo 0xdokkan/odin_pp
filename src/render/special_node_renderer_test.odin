@@ -226,6 +226,8 @@ test_rest_hit_test_exposes_selection_actions_and_page_controls :: proc(t: ^testi
 	run := create_special_node_render_test_run(t, .Rest)
 	defer game.destroy_run(&run)
 	deck := &run.player.deck
+	// Ten cards, two pages: the starter deck alone is one page of eight (docs/registro-carte.md).
+	for _ in 0..<2 { _, added := game.add_owned_card(deck, .Strike); testing.expect(t, added) }
 	selected_card_id := deck.owned[0].id
 
 	primary := special_node_action_bounds(960, 540, 0, 3)

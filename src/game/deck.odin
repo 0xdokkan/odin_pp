@@ -250,8 +250,7 @@ initialize_starter_deck :: proc(deck: ^Deck_State, seed: u64 = DEFAULT_DECK_SEED
 		.Firebomb,
 		.Guard,
 		.Toxic_Wave,
-		.Thorn_Coat,
-		.Afterimage,
+		// Thorn Coat and Afterimage were here until they were retired (docs/registro-carte.md): eight cards now.
 		.Dash,
 	}
 	for definition_id in starter_cards {

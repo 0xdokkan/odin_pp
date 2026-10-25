@@ -397,9 +397,10 @@ test_one_rod_a_run_leaves_it_out_of_every_offer :: proc(t: ^testing.T) {
 	testing.expect_value(t, card_offer_weight(definition, &node, nil, card_offer_exclusions(&deck)), u64(0))
 	// Every other card is still offered: the whole tactical pool, but the rod.
 	profile := M8_Profile{ring_wins = 3}
-	all: [int(Card_Id.Count)-10]Card_Id
+	storage: [int(Card_Id.Count)]Card_Id
+	all := storage[:offerable_card_count(&node, &profile, {.Fishing_Rod})]
 	random := u64(1)
-	testing.expect(t, generate_weighted_card_choices(&random, &node, all[:], &profile, {.Fishing_Rod}))
+	testing.expect(t, generate_weighted_card_choices(&random, &node, all, &profile, {.Fishing_Rod}))
 	for id in all { testing.expect(t, id != .Fishing_Rod) }
 	// Rewards and the shop, over runs whose deck holds the rod or not.
 	offered, offered_with_rod := 0, 0

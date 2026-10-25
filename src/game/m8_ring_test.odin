@@ -13,9 +13,9 @@ test_m8_ring_unlock_milestones_grant_once_and_filter_all_card_offers :: proc(t: 
 	testing.expect(t, ok)
 	defer destroy_room(&room)
 	node := Run_Node{kind = .Elite, depth = 3}
-	titan, _ := card_definition_by_id(.Titan_Grip)
+	hook, _ := card_definition_by_id(.Grappling_Hook)
 	crown, _ := card_definition_by_id(.Storm_Crown)
-	testing.expect_value(t, card_offer_weight(titan, &node, &player.m8_profile), u64(0))
+	testing.expect_value(t, card_offer_weight(hook, &node, &player.m8_profile), u64(0))
 	testing.expect_value(t, card_offer_weight(crown, &node, &player.m8_profile), u64(0))
 	for wins in 1..=4 {
 		owned_before := player.deck.owned_count
@@ -25,12 +25,12 @@ test_m8_ring_unlock_milestones_grant_once_and_filter_all_card_offers :: proc(t: 
 		if wins == 1 || wins == 3 {
 			testing.expect(t, reward.has_unlock && reward.card_added)
 			testing.expect_value(t, player.deck.owned_count, owned_before+1)
-			testing.expect_value(t, reward.unlocked, Card_Id.Titan_Grip if wins == 1 else Card_Id.Storm_Crown)
+			testing.expect_value(t, reward.unlocked, Card_Id.Grappling_Hook if wins == 1 else Card_Id.Storm_Crown)
 		} else {
 			testing.expect(t, !reward.has_unlock && !reward.card_added)
 			testing.expect_value(t, player.deck.owned_count, owned_before)
 		}
-		testing.expect(t, card_offer_weight(titan, &node, &player.m8_profile) > 0)
+		testing.expect(t, card_offer_weight(hook, &node, &player.m8_profile) > 0)
 		testing.expect_value(t, card_offer_weight(crown, &node, &player.m8_profile) > 0, wins >= 3)
 	}
 	testing.expect(t, !m8_profile_valid({M8_MAX_RING_WINS+1}))
@@ -44,17 +44,18 @@ test_m8_locked_cards_never_leak_into_reward_pool :: proc(t: ^testing.T) {
 		random := seed
 		choices: [3]Card_Id
 		testing.expect(t, generate_weighted_card_choices(&random, &node, choices[:], &profile))
-		for id in choices { testing.expect(t, id != .Titan_Grip && id != .Storm_Crown) }
+		for id in choices { testing.expect(t, id != .Grappling_Hook && id != .Storm_Crown) }
 	}
 	profile.ring_wins = 3
-	// Spark is temporary-only; the Scopa pair and the Prova meccaniche's six cards
-	// (the Cannone laser among them) are never offered.
-	all: [int(Card_Id.Count)-9]Card_Id
+	// The whole pool, counted (Spark, the Scopa pair, the lab's cards, the retired ones and those only an upgrade makes
+	// are never offered): the two prizes of the ring are in it.
+	storage: [int(Card_Id.Count)]Card_Id
+	all := storage[:offerable_card_count(&node, &profile)]
 	random := u64(1)
-	testing.expect(t, generate_weighted_card_choices(&random, &node, all[:], &profile))
-	found_titan, found_crown := false, false
-	for id in all { found_titan = found_titan || id == .Titan_Grip; found_crown = found_crown || id == .Storm_Crown }
-	testing.expect(t, found_titan && found_crown)
+	testing.expect(t, generate_weighted_card_choices(&random, &node, all, &profile))
+	found_hook, found_crown := false, false
+	for id in all { found_hook = found_hook || id == .Grappling_Hook; found_crown = found_crown || id == .Storm_Crown }
+	testing.expect(t, found_hook && found_crown)
 }
 
 @(test)
@@ -71,7 +72,7 @@ test_m8_unlock_survives_full_deck_and_remains_available_in_offers :: proc(t: ^te
 	}
 	reward := record_ring_win(&room)
 	testing.expect(t, reward.settled && reward.has_unlock && !reward.card_added)
-	testing.expect(t, m8_card_unlocked(.Titan_Grip, &player.m8_profile))
+	testing.expect(t, m8_card_unlocked(.Grappling_Hook, &player.m8_profile))
 	testing.expect_value(t, player.deck.owned_count, MAX_OWNED_CARDS)
 }
 

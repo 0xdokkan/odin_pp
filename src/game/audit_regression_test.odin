@@ -49,7 +49,8 @@ test_dice_card_upgrade_services_stop_at_the_d20 :: proc(t: ^testing.T) {
 	defer destroy_run(&shop)
 	rest := create_special_node_test_run(t, .Rest)
 	defer destroy_run(&rest)
-	for definition in ([5]Card_Id{.Fate_Strike, .Shock_Floor, .Sundering_Blow, .Twin_Venom, .Prismatic_Barrage}) {
+	// Fate Strike is not here: at its second upgrade it becomes Prismatic Barrage (card_evolution_test.odin).
+	for definition in ([4]Card_Id{.Shock_Floor, .Sundering_Blow, .Twin_Venom, .Prismatic_Barrage}) {
 		deck: Deck_State
 		testing.expect(t, initialize_empty_deck(&deck))
 		card, added := add_owned_card(&deck, definition)

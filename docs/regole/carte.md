@@ -2,6 +2,10 @@
 
 ## Carte e ciclo del mazzo
 
+> **Revisione del 2026-10-25:** otto carte sono ritirate e cinque si ottengono ora solo come potenziamento di un'altra
+> (Purifying Guard da Guard, Cross Slash da Strike, Chain Lightning da Arc Bolt, Prismatic Barrage da Fate Strike, Twin
+> Venom da Venom Needle). Cosa è cambiato e come rimetterle: [registro delle carte](../registro-carte.md).
+
 Sorgenti: [card.odin](../../src/game/card.odin), [card_play.odin](../../src/game/card_play.odin),
 [deck.odin](../../src/game/deck.odin) e [refocus.odin](../../src/game/refocus.odin).
 
@@ -44,13 +48,12 @@ scalano automaticamente.
 | energia | massimo 3, recupero 1 ogni tre beat del mondo |
 | ID | unico `next_card_id` monotono, senza riciclo |
 
-Lo starter deck ha dieci carte: Strike, Arc Bolt, Piercing Ray, Shove,
-Firebomb, Guard, Toxic Wave, Thorn Coat, Afterimage e Dash.
+Lo starter deck ha otto carte: Strike, Arc Bolt, Piercing Ray, Shove,
+Firebomb, Guard, Toxic Wave e Dash (Thorn Coat e Afterimage sono state ritirate: [registro](../registro-carte.md)).
 La run tattica ([tactical_setup.odin](../../src/run/tactical_setup.odin)) sostituisce Arc
-Bolt con **Fate Strike**, Piercing Ray con **Heavy Blow** e Toxic Wave con
-**Battle Focus**, per provare subito dadi, interruzione e ricognizione, e
-aggiunge una Shock Floor, una Tesla Coil, il 6 e il 7 di denari e un
-**Movimento Ombra**: quindici carte. La mano è mescolata, senza pesca garantita.
+Bolt con **Fate Strike** e Piercing Ray con **Heavy Blow**, per provare subito dadi e
+interruzione, e aggiunge una Shock Floor, una Tesla Coil, il 6 e il 7 di denari e un
+**Movimento Ombra**: tredici carte. La mano è mescolata, senza pesca garantita.
 `begin_deck_combat` copia owned nel draw, imposta `combat_card_id_floor`,
 mescola e pesca cinque carte. Un attrezzo da fine stanza, la
 [Canna da Pesca](meccaniche.md#canna-da-pesca), va invece subito fra le esaurite, da cui
@@ -153,6 +156,9 @@ difesa, Shield e reazioni:
 | Sundering Blow | Uncommon | nemico allineato, Manhattan 1–2 | `2D`; somma dei dadi almeno 8: spinta di una cella |
 | Prismatic Barrage | Uncommon | nemico, Manhattan 1–3 | `3D`: ogni 4+ vale 3 danni; ogni dado sotto il 4 dà 1 Shield per due pulse |
 | Twin Venom | Uncommon | nemico, Manhattan 1–3 | `1 + max(2D)`; una coppia applica 2 Veleno al sopravvissuto |
+
+Chain Lightning, Prismatic Barrage e Twin Venom nascono ora solo dal secondo potenziamento di Arc Bolt, Fate Strike
+(che quindi arriva al d6 e poi diventa Prismatic Barrage) e Venom Needle: [registro](../registro-carte.md).
 
 Due carte della Fase 2 tirano un dado della stessa scala, in tattica:
 `Dado del Destino` (energia 2) non tira niente quando la si gioca, ma ogni suo

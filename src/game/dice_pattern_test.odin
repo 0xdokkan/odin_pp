@@ -93,14 +93,15 @@ test_dice_patterns_count_all_successes_pairs_and_reject_invalid_inputs :: proc(t
 }
 
 @(test)
-test_pattern_cards_are_append_only_collectible_and_pure_to_preview_at_max_upgrade :: proc(t: ^testing.T) {
+test_pattern_cards_are_append_only_upgrades_and_pure_to_preview_at_max_upgrade :: proc(t: ^testing.T) {
 	testing.expect_value(t, int(Card_Id.Prismatic_Barrage), int(Card_Id.Sundering_Blow)+1)
 	testing.expect_value(t, int(Card_Id.Twin_Venom), int(Card_Id.Prismatic_Barrage)+1)
 	testing.expect_value(t, int(Card_Id.Shock_Floor), int(Card_Id.Twin_Venom)+1)
 	for id in ([2]Card_Id{.Prismatic_Barrage, .Twin_Venom}) {
 		definition, found := card_definition_by_id(id)
 		testing.expect(t, found && validate_card_definition(&definition))
-		testing.expect(t, !definition.temporary_only && definition.reward_weight > 0 && definition.shop_base_price > 0)
+		// Only an upgrade makes them now (Fate Strike, Venom Needle: docs/registro-carte.md).
+		testing.expect(t, !definition.temporary_only && definition.evolution_only && definition.reward_weight == 0 && definition.shop_base_price > 0)
 		testing.expect_value(t, definition.rarity, Card_Rarity.Uncommon)
 		testing.expect_value(t, definition.cost, i32(2))
 		data := spell_test_level(t)

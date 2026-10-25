@@ -157,7 +157,7 @@ hub_depot_view :: proc(c: ^campaign.Campaign) -> (view: hubworld.Depot_View) {
 	}
 	for page in c.depot { view.stored += page.count }
 	for id in game.Card_Id.Strike..<game.Card_Id.Count {
-		if game.card_is_lab_only(id) { continue }
+		if !game.card_in_collection(id) { continue }
 		view.total += 1
 		if c.discovered[id] { view.discovered += 1 }
 	}

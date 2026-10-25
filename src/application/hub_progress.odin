@@ -87,8 +87,10 @@ hub_progress :: proc(h:^Campaign_Hub,frame:^host.Frame) {
 	left:=ui.panel(ctx,{30,146,300,324})
 	ui.label(ctx,ui.cut_top(&left,30),"LA TUA MEMORIA",.Large,p.text)
 	ui.label(ctx,ui.cut_top(&left,26),fmt.tprintf("%d estrazioni / %d morti",c.total_wins,c.deaths),.Body,p.text_dim)
-	count:=0;for found in c.discovered {if found {count+=1}}
-	ui.label(ctx,ui.cut_top(&left,26),fmt.tprintf("%d / %d carte scoperte",count,int(game.Card_Id.Count)),.Body,p.focus)
+	// The collection only: not the lab's cards, the retired ones or those only an upgrade makes (docs/registro-carte.md).
+	count,total:=0,0
+	for id in game.Card_Id.Strike..<game.Card_Id.Count {if game.card_in_collection(id) {total+=1;if c.discovered[id] {count+=1}}}
+	ui.label(ctx,ui.cut_top(&left,26),fmt.tprintf("%d / %d carte scoperte",count,total),.Body,p.focus)
 	won:=0;for b in campaign.Biome.Cyber..<campaign.Biome.Secret {if c.won[b] {won+=1}}
 	ui.label(ctx,ui.cut_top(&left,25),fmt.tprintf("%d / 11 biomi vinti",won),.Small,p.text_dim)
 	minutes:=int(c.play_seconds)/60

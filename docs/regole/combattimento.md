@@ -352,19 +352,19 @@ La schivata base rimane accessibile fuori recupero, senza richiedere carte.
 |---|---:|---|
 | Strike | 1 | 3 danni; **+2** contro un nemico in recupero o stordito |
 | Arc Bolt | 1 | 2 danni, tiro economico |
-| Piercing Ray / Cross Slash | 2 | 3 danni in linea / a croce, nelle celle visibili |
+| Piercing Ray / Cross Slash | 2 | 3 danni in linea / a croce, nelle celle visibili; Cross Slash ora nasce solo dal secondo potenziamento di Strike ([registro](../registro-carte.md)) |
 | Guard | 1 | 4 Shield per 2 secondi; abilita Block e Parry |
-| Thorn Coat | 1 | 2 Thorns per 3 secondi; abilita la deviazione (QTE `L`) contro gli arcieri |
-| Counter Rune | 1 | contrattacco 3, 2 cariche, 4 secondi; Retain |
-| Battle Focus | 1 | pesca fino a 2 carte; Survey per 3 secondi: lato della vista +2 (da 2×2 passa a 5×5), massimo 9; Exhaust / Ethereal |
-| Spark Forge | 1 | crea fino a 2 Spark temporanee a costo 0 |
+| Thorn Coat | 1 | 2 Thorns per 3 secondi; abilita la deviazione (QTE `L`) contro gli arcieri — **ritirata** ([registro](../registro-carte.md)) |
+| Counter Rune | 1 | contrattacco 3, 2 cariche, 4 secondi; Retain — **ritirata** ([registro](../registro-carte.md)) |
+| Battle Focus | 1 | pesca fino a 2 carte; Survey per 3 secondi: lato della vista +2 (da 2×2 passa a 5×5), massimo 9; Exhaust / Ethereal — **ritirata** ([registro](../registro-carte.md)) |
+| Spark Forge | 1 | crea fino a 2 Spark temporanee a costo 0 — **ritirata** ([registro](../registro-carte.md)) |
 | Dash | 1 | 2 Shield **prima** di muovere, durata 2 secondi; movimento fino a 4 celle, senza usare il recupero della schivata |
 | Shove | 1 | prima spinge di 1 cella, poi infligge 1 danno; allontana bombe e interrompe intenti tramite spostamento |
 | Grappling Hook | 1 | 1 danno e trascina adiacente, raggio 2–4; interrompe gli intenti spostando il nemico |
 | Heavy Blow | 2 | 4 danni e Stagger: salta l’azione annunciata e apre almeno 1 secondo di recupero dopo il pagamento del costo temporale |
 | Venom Needle | 1 | 1 danno + 2 Veleno (danno a ogni azione del bersaglio, poi uno stack in meno) |
-| Purifying Guard | 1 | 3 Shield per 2 secondi e rimuove il Veleno |
-| Volatile Study | 2 | crea 1 Spark, pesca fino a 2 carte; Exhaust |
+| Purifying Guard | 1 | 3 Shield per 2 secondi e rimuove il Veleno; ora nasce solo dal secondo potenziamento di Guard ([registro](../registro-carte.md)) |
+| Volatile Study | 2 | crea 1 Spark, pesca fino a 2 carte; Exhaust — **ritirata** ([registro](../registro-carte.md)) |
 | Toxic Wave | 2 | 1 Veleno ai nemici visibili entro raggio Chebyshev 2 (5×5) |
 | Movimento Ombra | 3 | 4 secondi reali nell'ombra: mondo e finestra fermi, intangibile, solo passi dell'ombra da 0,4 s (diagonale sui suoi battiti); risale sull'ultima casella dell'ombra. 0 s di finestra, giocabile anche da storditi |
 | Pozza di Veleno | 1 | una pozza su una cella libera fino alla fine della stanza: 2 Veleno (+1 per upgrade) a un nemico per ogni sua cella in cui entra; le aree che chiude si riempiono ([Pozza di Veleno e Incendio](meccaniche.md#pozza-di-veleno-e-incendio)) |

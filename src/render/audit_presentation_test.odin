@@ -46,8 +46,15 @@ test_upgrade_preview_uses_effect_values_and_rest_disables_no_op_upgrade :: proc(
 	testing.expect_value(t, string(card_upgrade_preview({id = 1, definition_id = .Strike})), "DAMAGE 3 -> 4")
 	testing.expect_value(t, string(card_upgrade_preview({id = 1, definition_id = .Volatile_Study, upgrade_level = 2})), "DRAW 4 -> 5")
 	testing.expect_value(t, string(card_upgrade_preview({id = 1, definition_id = .Dash})), "NO UPGRADE AVAILABLE")
+	// The upgrade that makes another card names it (docs/registro-carte.md).
+	testing.expect_value(t, string(card_upgrade_preview({id = 1, definition_id = .Strike, upgrade_level = 1})), "-> Cross Slash")
+	testing.expect_value(t, string(card_upgrade_preview({id = 1, definition_id = .Guard, upgrade_level = 1})), "-> Purifying Guard")
+	testing.expect_value(t, string(card_upgrade_preview({id = 1, definition_id = .Arc_Bolt, upgrade_level = 1})), "-> Chain Lightning")
+	testing.expect_value(t, string(card_upgrade_preview({id = 1, definition_id = .Fate_Strike, upgrade_level = 1})), "-> Prismatic Barrage")
+	testing.expect_value(t, string(card_upgrade_preview({id = 1, definition_id = .Venom_Needle, upgrade_level = 1})), "-> Twin Venom")
+	testing.expect_value(t, string(card_upgrade_preview({id = 1, definition_id = .Fate_Strike})), "d4 -> d6")
 	// A dice card's upgrade shows only its next die, up to the D20.
-	for id in ([5]game.Card_Id{.Fate_Strike, .Shock_Floor, .Sundering_Blow, .Twin_Venom, .Prismatic_Barrage}) {
+	for id in ([4]game.Card_Id{.Shock_Floor, .Sundering_Blow, .Twin_Venom, .Prismatic_Barrage}) {
 		testing.expect_value(t, string(card_upgrade_preview({id = 1, definition_id = id})), "d4 -> d6")
 		testing.expect_value(t, string(card_upgrade_preview({id = 1, definition_id = id, upgrade_level = 4})), "d12 -> d20")
 		testing.expect_value(t, string(card_upgrade_preview({id = 1, definition_id = id, upgrade_level = game.MAX_DICE_UPGRADE_LEVEL})), "MAX UPGRADE")

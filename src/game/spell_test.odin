@@ -159,7 +159,8 @@ test_fate_rejections_preserve_dice_deck_and_health_including_action_rollback :: 
 
 @(test)
 test_fate_every_face_of_every_die_uses_one_roll_and_only_the_top_face_bounces :: proc(t: ^testing.T) {
-	for upgrade in i32(0)..=MAX_DICE_UPGRADE_LEVEL {
+	// The dice Fate Strike can have: at its second upgrade it becomes Prismatic Barrage (docs/registro-carte.md).
+	for upgrade in i32(0)..<CARD_EVOLVE_LEVEL {
 		sides := card_die_sides(.Fate_Strike, upgrade)
 		for desired in i32(1)..=sides {
 			data := spell_test_level(t)

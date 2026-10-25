@@ -18,7 +18,8 @@ m8_profile_valid :: proc(profile: M8_Profile) -> bool {
 m8_card_unlocked :: proc(id: Card_Id, profile: ^M8_Profile = nil) -> bool {
 	wins := u32(0)
 	if profile != nil && m8_profile_valid(profile^) { wins = profile.ring_wins }
-	if id == .Titan_Grip { return wins >= 1 }
+	// The first ring's prize (it was the Titan Grip, retired: docs/registro-carte.md).
+	if id == .Grappling_Hook { return wins >= 1 }
 	if id == .Storm_Crown { return wins >= 3 }
 	return true
 }
@@ -30,7 +31,7 @@ record_ring_win :: proc(room: ^Room) -> (result: Ring_Reward) {
 	result.settled, result.won = true, true
 	profile := &room.player.m8_profile
 	profile.ring_wins = min(profile.ring_wins+1, M8_MAX_RING_WINS)
-	if profile.ring_wins == 1 { result.has_unlock = true; result.unlocked = .Titan_Grip }
+	if profile.ring_wins == 1 { result.has_unlock = true; result.unlocked = .Grappling_Hook }
 	if profile.ring_wins == 3 { result.has_unlock = true; result.unlocked = .Storm_Crown }
 	if result.has_unlock {
 		_, result.card_added = add_owned_card(&room.player.deck, result.unlocked)

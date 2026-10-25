@@ -315,18 +315,18 @@ expedition_discovery :: proc(c:^campaign.Campaign,b:campaign.Biome,seed:u64) -> 
 	case .West:home={.Lasso,.Sei_Denari,.Sette_Denari,.Coffin}
 	case .Jungle:home={.Dinosaur,.Poison_Pool,.Venom_Blade,.Caustic_Bloom}
 	case .City:home={.Bomb_Marley,.Pinball,.Shove,.Storm_Crown}
-	case .Egypt:home={.Fate_Dice,.Fate_Strike,.Calculated_Risk,.Prismatic_Barrage}
+	case .Egypt:home={.Fate_Dice,.Fate_Strike,.Calculated_Risk,.Coffin}
 	case .Vietnam:home={.First_Person,.Wildfire,.Firebomb,.Cannon}
-	case .Snow:home={.Deflect,.Guard,.Dash,.Purifying_Guard}
+	case .Snow:home={.Deflect,.Guard,.Dash,.Sundering_Blow}
 	case .Inferno:home={.Wildfire,.Firebomb,.Thorn_Coat,.Bomb_Marley}
 	case .Gothic:home={.Shadow_Step,.Coffin,.Lasso,.Counter_Rune}
 	case .Sky:home={.Afterimage,.Purifying_Guard,.Dash,.Grappling_Hook}
-	case .Space:home={.Black_Hole,.Cannon,.Prismatic_Barrage,.Chain_Lightning}
-	case .Secret:home={.Black_Hole,.Titan_Grip,.Storm_Crown,.Fate_Dice}
+	case .Space:home={.Black_Hole,.Cannon,.Tesla_Coil,.Storm_Crown}
+	case .Secret:home={.Black_Hole,.Grappling_Hook,.Storm_Crown,.Fate_Dice}
 	case .Count:return {},false
 	}
 	for i in 0..<4 {id:=home[(i+int(seed%4))%4];if !c.discovered[id] {return id,true}}
-	for i in 0..<int(game.Card_Id.Count) {id:=game.Card_Id((i+int(seed%u64(game.Card_Id.Count)))%int(game.Card_Id.Count));if !c.discovered[id] && !game.card_is_lab_only(id) {return id,true}}
+	for i in 0..<int(game.Card_Id.Count) {id:=game.Card_Id((i+int(seed%u64(game.Card_Id.Count)))%int(game.Card_Id.Count));if !c.discovered[id] && game.card_in_collection(id) {return id,true}}
 	return {},false
 }
 
