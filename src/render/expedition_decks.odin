@@ -56,7 +56,7 @@ deck_post :: proc(vertices: ^[dynamic]Expedition_Baked_Vertex, x, z, half, top, 
 // The decks of the layer over the ground in one block.
 @(private = "file")
 build_deck_chunk :: proc(m: ^level.Layer_Map, origin: grid.Position, trestles: bool, chunk: ^Expedition_Terrain_Chunk,
-	vertices: ^[dynamic]Expedition_Baked_Vertex) {
+	vertices: ^[dynamic]Expedition_Baked_Vertex, base: i32) {
 	clear(vertices)
 	step := game.HEIGHT_STEP_DRAWN
 	up, down := rl.Vector3{0, 1, 0}, rl.Vector3{0, -1, 0}
@@ -69,7 +69,8 @@ build_deck_chunk :: proc(m: ^level.Layer_Map, origin: grid.Position, trestles: b
 				cell := grid.Position{x = x, y = y, layer = i8(layer)}
 				if !level.kind_has_floor(level.map_tile(m, cell)) { continue }
 				floor := level.map_height(m, cell)
-				top, bottom := f32(floor)*step+0.004, f32(floor-level.LAYER_THICKNESS)*step
+				// Drawn from the map's base (board_drawn's rule).
+				top, bottom := f32(floor-base)*step+0.004, f32(floor-base-level.LAYER_THICKNESS)*step
 				open: [4]bool
 				for side, i in sides { open[i] = deck_open(m, x+side.x, y+side.y, floor) }
 				// Along x when a side across x (north or south) is open; on its edge when a side across its way is.
@@ -101,7 +102,7 @@ build_deck_chunk :: proc(m: ^level.Layer_Map, origin: grid.Position, trestles: b
 				deck_frame(vertices, {{f32(x), bottom, f32(y)}, {f32(x+1), bottom, f32(y)}, {f32(x+1), bottom, f32(y+1)}, {f32(x), bottom, f32(y+1)}}, down)
 				// A trestle's posts under the bridge's edges, every third column along it, down to the ground.
 				if trestles && edge && (x if along_x else y)%3 == 0 {
-					ground := f32(level.map_height(m, {x = x, y = y}))*step
+					ground := f32(level.map_height(m, {x = x, y = y})-base)*step
 					for side, i in sides {
 						if !open[i] || (along_x && i%2 == 1) || (!along_x && i%2 == 0) { continue }
 						deck_post(vertices, f32(x)+0.5+f32(side.x)*0.32, f32(y)+0.5+f32(side.y)*0.32, 0.07, bottom, ground)
@@ -151,7 +152,7 @@ prepare_expedition_decks :: proc(cache: ^Expedition_Under_Cache, data: ^level.Le
 	defer delete(scratch)
 	for cy in 0..<cache.rows {
 		for cx in 0..<cache.columns {
-			build_deck_chunk(&m, {x = cx*EXPEDITION_TERRAIN_CHUNK, y = cy*EXPEDITION_TERRAIN_CHUNK}, trestles, &cache.chunks[cy*cache.columns+cx], &scratch)
+			build_deck_chunk(&m, {x = cx*EXPEDITION_TERRAIN_CHUNK, y = cy*EXPEDITION_TERRAIN_CHUNK}, trestles, &cache.chunks[cy*cache.columns+cx], &scratch, data.base)
 		}
 	}
 }

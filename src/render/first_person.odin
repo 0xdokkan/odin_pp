@@ -370,7 +370,8 @@ FIRST_PERSON_COVER_HEIGHT :: f32(0.49)
 // the cell, whatever stands there: game/first_person.odin).
 @(private)
 first_person_landing :: proc(room: ^game.Room, shot: game.First_Person_Shot) -> rl.Vector3 {
-	point := rl.Vector3{shot.point.x, shot.point.y, shot.point.z}
+	// The rules' heights count from 0, the drawing's from the map's base (board_drawn).
+	point := rl.Vector3{shot.point.x, shot.point.y-board_base_drawn(), shot.point.z}
 	if shot.hit != .Solid || room == nil { return point }
 	box := first_person_solid_box(room, shot.cell)
 	origin := rl.Vector3{shot.origin.x, shot.origin.y, shot.origin.z}

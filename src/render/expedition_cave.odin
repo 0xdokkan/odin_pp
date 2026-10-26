@@ -22,7 +22,7 @@ draw_expedition_cave_arch :: proc(pass: Ink_Pass, w: ^world.World, site: ^world.
 	centre := rl.Vector2{f32(place.mouth.x)+.5+d.x*.5, f32(place.mouth.y)+.5+d.y*.5}
 	if ink_layer_skips(layer, m, centre, 2) { return }
 	// Just in front of the rock's face, across it.
-	base := rl.Vector3{centre.x-d.x*.02, f32(place.floor)*game.HEIGHT_STEP_DRAWN, centre.y-d.y*.02}
+	base := rl.Vector3{centre.x-d.x*.02, board_drawn(f32(place.floor)), centre.y-d.y*.02}
 	across := rl.Vector3{-d.y, 0, d.x}
 	color := ink_edge(expedition_color(w.biome), 1)
 	if site.state == .Resolved { color = ink_scale(color, .5) }

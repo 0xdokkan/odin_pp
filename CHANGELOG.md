@@ -5,6 +5,35 @@ I riferimenti a Classica, `--flat` e ai vecchi smoke descrivono versioni precede
 per i comandi disponibili oggi valgono il [README](README.md) e la documentazione collegata.
 
 
+## 2026-10-26 — Profondità, Fase 7 (in corso): City pop, Egitto e Vietnam, con i sotterranei
+
+- **Terreno alzato di una base** (scelta dell'utente): City pop, Egitto e Vietnam sono alzati tutti di 14 gradini, così
+  sotto c'è posto per reti vere sul piano −2. La superficie è identica e si vede come prima: il disegno toglie la base.
+- **Le reti sotterranee:**
+  - City pop: la metropolitana, tre stazioni unite da gallerie, con le scale dalla strada alle due stazioni in fondo e
+    l'ascensore in quella di mezzo; il cancello fra la stazione di mezzo e quella a sud-est si apre da sud-est;
+  - Egitto: la necropoli, con la grande sala (scala che scende dalla sabbia), una tomba col segreto e la sala sotto la
+    piramide, raggiunta dal pozzo con l'ascensore che scende dalla sua cima; il cancello si apre dalla grande sala;
+  - Vietnam: la galleria vera, dal tunnel di oggi fino a dove il tunnel portava, con sei camere e quattro botole; il
+    salto con E non c'è più.
+  - Le scale sono buche con una rampa di 13 gradini; le gallerie girano attorno a muri e decorazioni; nelle sale ci sono
+    nemici del bioma e un segreto.
+- **I complessi:** in City pop tetti e cavalcavia fra tre palazzi (scala antincendio, ascensore, cancello sul
+  cavalcavia); in Egitto due piramidi a gradoni con le terrazze e una scala che gira; in Vietnam due colline sulle rive
+  di un fiume e un ponte di bambù sopra l'acqua, con cancello e ascensore.
+- **Disegno:** le buche delle scale hanno le loro pareti; sotto terra la finestra attorno al robot è più larga e la
+  superficie più scura; cavalcavia e ponti di bambù hanno il loro materiale.
+- **La telecamera dopo un salto:** sui piani prendeva la quota nuova un po' alla volta anche quando saltava (una mappa
+  nuova, il robot messo altrove), partendo da quella di prima. Ora la prende subito: cambiano le catture degli smoke
+  fatte dopo un salto di piano, con la stessa scena e il robot al centro.
+- Smoke delle spedizioni: 18 catture dei complessi nuovi e 9 delle reti, dagli stage 122 e 140
+  (`ODIN_PP_SMOKE_ONLY=complessi`, `ODIN_PP_SMOKE_ONLY=reti`).
+- Test nuovi: le reti nei biomi alzati, segreto e nemici raggiungibili, la galleria del Vietnam dal tunnel all'arrivo,
+  la base nel salvataggio, la telecamera che salta di piano; le prove con i nemici liberi ora girano nei sei complessi
+  (1729 in tutto).
+- Prestazioni (RTX 3060, alla corrente): media +2,0%, dentro il rumore; costano 0,1-0,15 ms in più solo le viste dove la
+  rete passa sotto, al centro di City pop e dell'Egitto.
+
 ## 2026-10-26 — Profondità, Fase 7 (in corso): i complessi di Robotica, Far West e Giungla
 
 - **Complessi a tema, alti 14** (scelta dell'utente all'inizio del primo gruppo di biomi): la regola dei piani vuole 12

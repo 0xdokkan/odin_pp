@@ -248,7 +248,7 @@ tile_vertices :: proc(renderer: ^Renderer, position: grid.Position) -> Tile_Vert
 	// On the cell's own floor: a raised cell's diamond rides up with it, each corner at the sculpted surface's.
 	e := cell_ground(position)
 	corners := [4]f32{e, e, e, e}
-	if surface, ok := cell_surface(position); ok { for corner, i in surface.corners { corners[i] = corner*game.HEIGHT_STEP_DRAWN } }
+	if surface, ok := cell_surface(position); ok { for corner, i in surface.corners { corners[i] = board_drawn(corner) } }
 	return {top = tactical_project(renderer, {x, y}, corners[0]), right = tactical_project(renderer, {x+1, y}, corners[1]),
 		bottom = tactical_project(renderer, {x+1, y+1}, corners[2]), left = tactical_project(renderer, {x, y+1}, corners[3])}
 }

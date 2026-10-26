@@ -34,6 +34,8 @@ Board_Heights :: struct {
 	layered_columns: [dynamic]bool,
 	width, height: int,
 	id, revision: u64,
+	// The map's base (level.Level.base): the height drawn at the board's plane.
+	base: i32,
 }
 
 @(private)
@@ -78,10 +80,11 @@ set_board_level :: proc(data: ^level.Level) {
 			if len(b.plane_cells[slot]) > 0 { clear(&b.plane_cells[slot]) }
 			if len(b.plane_tiles[slot]) > 0 { clear(&b.plane_tiles[slot]) }
 		}
-		b.id, b.revision, b.width, b.height, b.layered, b.top = 0, 0, 0, 0, false, 0
+		b.id, b.revision, b.width, b.height, b.layered, b.top, b.base = 0, 0, 0, 0, false, 0, 0
 		return
 	}
-	if b.id == data.geometry_id && b.revision == data.geometry_revision && len(b.cells) == len(data.heights) && b.layered == layered { return }
+	if b.id == data.geometry_id && b.revision == data.geometry_revision && len(b.cells) == len(data.heights) && b.layered == layered && b.base == data.base { return }
+	b.base = data.base
 	// Kept off the test runner's per-test allocator: it outlives any one test.
 	if b.cells.allocator.procedure == nil { b.cells = make([dynamic]u8, runtime.heap_allocator()) }
 	if b.tiles.allocator.procedure == nil { b.tiles = make([dynamic]level.Tile, runtime.heap_allocator()) }
@@ -191,12 +194,25 @@ cell_surface :: proc(cell: grid.Position) -> (surface: level.Surface_Cell, ok: b
 cell_overlay_ground :: proc(cell: grid.Position) -> f32 {
 	surface, ok := cell_surface(cell)
 	if !ok { return cell_ground(cell) }
-	return level.surface_top(surface)*game.HEIGHT_STEP_DRAWN
+	return board_drawn(level.surface_top(surface))
 }
 
 @(private)
 board_has_heights :: proc() -> bool {
 	return len(board_heights.cells) > 0
+}
+
+// A height in steps as it is drawn over the board's plane: the map's base (level.Level.base) is at the plane, so a map
+// raised by a base for the layers under it looks as it would without, and those layers go under the plane.
+@(private)
+board_drawn :: proc(steps: f32) -> f32 {
+	return (steps-f32(board_heights.base))*game.HEIGHT_STEP_DRAWN
+}
+
+// How far under the board's plane the height 0 is drawn: the map's base.
+@(private)
+board_base_drawn :: proc() -> f32 {
+	return f32(board_heights.base)*game.HEIGHT_STEP_DRAWN
 }
 
 // How high `cell`'s floor stands over the board's plane, on its layer.
@@ -210,7 +226,7 @@ cell_ground :: proc(cell: grid.Position) -> f32 {
 		cells = b.plane_cells[level.layer_slot(cell.layer)][:]
 	}
 	index := cell.y*b.width+cell.x
-	return f32(cells[index])*game.HEIGHT_STEP_DRAWN if index < len(cells) else 0
+	return board_drawn(f32(cells[index])) if index < len(cells) else board_drawn(0)
 }
 
 // The floor's height under a point in cell coordinates (a cell's centre is its
@@ -220,7 +236,7 @@ cell_ground :: proc(cell: grid.Position) -> f32 {
 point_ground :: proc(at: view.Vec2) -> f32 {
 	if !board_has_heights() { return 0 }
 	m := board_surface_map()
-	return level.surface_height_at(&m, at.x+0.5, at.y+0.5)*game.HEIGHT_STEP_DRAWN
+	return board_drawn(level.surface_height_at(&m, at.x+0.5, at.y+0.5))
 }
 
 // The highest ground under a disc of `radius` round `at` (its middle and four points of its rim): a stand or a
@@ -321,7 +337,7 @@ entity_point_ground :: proc(entity: game.Entity_Ref, at: view.Vec2) -> f32 {
 	for layer in grid.LOWEST_LAYER..=grid.HIGHEST_LAYER {
 		m := board_surface_map(i8(layer))
 		if !level.surface_ground(&m, x, y) { continue }
-		height := level.surface_height_at(&m, at.x+0.5, at.y+0.5)*game.HEIGHT_STEP_DRAWN
+		height := board_drawn(level.surface_height_at(&m, at.x+0.5, at.y+0.5))
 		if distance := abs(height-target); distance < best_distance { best, best_distance = height, distance }
 	}
 	return best
@@ -338,14 +354,15 @@ pick_ground_cell :: proc(origin, direction: [3]f32) -> (cell: grid.Position, ok:
 		if t <= 0 { return }
 		return {x = int(math.floor(origin.x+direction.x*t)), y = int(math.floor(origin.z+direction.z*t))}, true
 	}
-	top := f32(board_heights.top)*game.HEIGHT_STEP_DRAWN+0.1
+	top := board_drawn(f32(board_heights.top))+0.1
 	// Where another layer has a floor, the column's solids (level.column_of): the ray stops in the first one it
 	// enters, on the floor that stands on it (a bridge's deck, a cave's floor through its mouth, the hill's top).
 	layers: level.Layer_Map
 	if board_heights.layered { layers = board_layer_map() }
-	// From the height of the tallest cell down to the plane, in small steps.
+	// From the height of the tallest cell down to the plane, in small steps; under it too on a map raised by a base,
+	// whose lowest layers are drawn there.
 	start := (top-origin.y)/direction.y
-	end := -origin.y/direction.y
+	end := (min(board_drawn(0), 0)-origin.y)/direction.y
 	if end <= 0 { return }
 	start = max(start, 0)
 	STEP :: f32(0.04)
@@ -356,11 +373,11 @@ pick_ground_cell :: proc(origin, direction: [3]f32) -> (cell: grid.Position, ok:
 		if probe.x < 0 || probe.y < 0 || probe.x >= board_heights.width || probe.y >= board_heights.height { continue }
 		if board_column_layered(probe) {
 			// A piece faded enough over the robot (a bridge's deck, a hill's rock) lets the ray through (Fase 4).
-			owner, inside := game.layer_solid_owner(&layers, probe.x, probe.y, (y-0.02)/game.HEIGHT_STEP_DRAWN)
+			owner, inside := game.layer_solid_owner(&layers, probe.x, probe.y, (y-0.02+board_base_drawn())/game.HEIGHT_STEP_DRAWN)
 			if inside && cell_cover_opacity(owner) > game.LAYER_PICK_THROUGH { return owner, true }
 			continue
 		}
-		if y <= level.surface_height_at(&m, x, z)*game.HEIGHT_STEP_DRAWN+0.02 { return probe, true }
+		if y <= board_drawn(level.surface_height_at(&m, x, z))+0.02 { return probe, true }
 	}
 	// Nothing above the plane was hit: the ray meets the plane itself.
 	t := end
@@ -380,9 +397,10 @@ terrain_hides_actor :: proc(renderer: ^Renderer, at: view.Vec2, entity := NO_FIG
 	// The rule of the layers where they matter: the robot or the actor off the ground; else the ground's, which is cheaper.
 	if board_view.layered && (standing.layer != grid.GROUND_LAYER || board_view.viewer.cell.layer != grid.GROUND_LAYER) {
 		m := board_layer_map()
+		// The rules' heights count from 0, the drawing's from the map's base.
 		eye := renderer.tactical.camera.position
-		target := [3]f32{at.x+0.5, entity_point_ground(entity, at)+0.5, at.y+0.5}
-		return game.layer_figure_hidden(&m, board_view.viewer, {eye.x, eye.y, eye.z}, target, standing)
+		target := [3]f32{at.x+0.5, entity_point_ground(entity, at)+0.5+board_base_drawn(), at.y+0.5}
+		return game.layer_figure_hidden(&m, board_view.viewer, {eye.x, eye.y+board_base_drawn(), eye.z}, target, standing)
 	}
 	target := rl.Vector3{at.x+0.5, point_ground(at)+0.5, at.y+0.5}
 	eye := renderer.tactical.camera.position

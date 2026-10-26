@@ -119,21 +119,6 @@ test_partial_group_deployment_recovers_when_blocker_clears_without_duplicates ::
 }
 
 @(test)
-test_tunnel_exit_avoids_solid_tiles_and_hidden_traps :: proc(t:^testing.T) {
-	w:World;data:level.Level;p:game.Player;room:=test_world(t,&w,&data,&p,.Vietnam)
-	defer level.destroy(&data);defer game.destroy_room(&room)
-	anchor:=grid.Position{x = size(&w)-14, y = 16};_=level.set_tile(&data,anchor,{.Wall})
-	for dy in -1..=1 {for dx in -1..=1 {
-		if dx==0 && dy==0 {continue}
-		q:=grid.offset(anchor, dx, dy);_=level.set_tile(&data,q,{.Floor})
-		append(&room.traps,game.Trap{id=room.next_trap_id,position=q,damage=4,armed=true});room.next_trap_id+=1
-	}}
-	exit,ok:=tunnel_destination(&w,&room);testing.expect(t,ok && distance(exit,anchor)>=2)
-	testing.expect(t,!game.cell_blocks_movement(&room,exit))
-	for trap in room.traps {testing.expect(t,exit!=trap.position)}
-}
-
-@(test)
 test_expedition_snapshot_restores_dynamic_terrain_and_exact_room_state :: proc(t:^testing.T) {
 	w:World;data:level.Level;p:game.Player;room:=test_world(t,&w,&data,&p)
 	defer level.destroy(&data);defer game.destroy_room(&room)

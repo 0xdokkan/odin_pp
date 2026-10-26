@@ -91,7 +91,8 @@ draw_hidden_outlines :: proc(renderer: ^Renderer, room: ^game.Room) {
 	v := &renderer.tactical
 	snapshot := v.snapshot
 	m := board_layer_map()
-	eye := [3]f32{v.camera.position.x, v.camera.position.y, v.camera.position.z}
+	// The rules' heights count from 0, the drawing's from the map's base (board_drawn).
+	eye := [3]f32{v.camera.position.x, v.camera.position.y+board_base_drawn(), v.camera.position.z}
 	rlgl.DrawRenderBatchActive()
 	rlgl.DisableDepthTest()
 	defer { rlgl.DrawRenderBatchActive(); rlgl.EnableDepthTest() }
@@ -99,7 +100,7 @@ draw_hidden_outlines :: proc(renderer: ^Renderer, room: ^game.Room) {
 		cell, found := board_actor_cell(entity)
 		if !found { return }
 		at, lift := living_card_position(renderer, entity, key, position)
-		if !game.layer_figure_hidden(m, board_view.viewer, eye, {at.x+0.5, lift+0.5, at.y+0.5}, cell) { return }
+		if !game.layer_figure_hidden(m, board_view.viewer, eye, {at.x+0.5, lift+0.5+board_base_drawn(), at.y+0.5}, cell) { return }
 		draw_figure_outline(renderer, tactical_billboard_geometry(renderer, key, position, true, entity), color)
 	}
 	for actor in snapshot.enemies[:snapshot.enemy_count] {

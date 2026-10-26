@@ -65,6 +65,8 @@ World :: struct {
 	// The complexes of the map (complex.odin): blocks, bridges and tunnels at places fixed by the biome.
 	complexes: [MAX_COMPLEXES]Complex,
 	complex_count: int,
+	// The height the biome's ground was raised by (biome_base, level.Level.base): 0 in a world saved before.
+	base: i32,
 	// The map's lifts and gates (level/layers.odin), kept for the saves: a gate's cell on the map says if it is open.
 	lifts: [MAX_WORLD_LIFTS]level.Lift,
 	lift_count: int,
@@ -167,7 +169,7 @@ biome_map_edits: [campaign.Biome]level.Map_Edits
 // The biome's map and its world. With `retouched`, its retouches over its geography (biome_map_edits).
 generate :: proc(w: ^World, data: ^level.Level, b: campaign.Biome, seed: u64, retouched := true) -> bool {
 	if b >= .Count { return false }
-	w^ = World{biome=b,side_length=map_size(b),seed=seed,loot_random=rng.create(seed~0xD0A5),reward_site=-1}
+	w^ = World{biome=b,side_length=map_size(b),seed=seed,loot_random=rng.create(seed~0xD0A5),reward_site=-1,base=biome_base(b)}
 	size := map_size(b)
 	created,ok := level.create(size,size,{.Floor}); if !ok { return false }; data^=created
 	data.player_spawn={x = 7, y = size/2}; data.has_player_spawn=true
@@ -210,6 +212,8 @@ generate :: proc(w: ^World, data: ^level.Level, b: campaign.Biome, seed: u64, re
 	place_structures(w,data)
 	place_caves(w,data)
 	place_complexes(w,data)
+	// The network under the ground of a raised biome, after the complexes (network.odin).
+	place_network(w,data)
 	// The retouches over the whole geography; then the caves' foes and secrets, on the floors the map has now. Retouches
 	// that do not go on it (an old file's, of another size, or one painted by hand that breaks the layers' rule) are
 	// left out: the map as the code makes it.
@@ -227,8 +231,9 @@ generate :: proc(w: ^World, data: ^level.Level, b: campaign.Biome, seed: u64, re
 	}
 	add_mountain_inhabitants(w,data,&content)
 	if b==.Gothic { add_group(w,data,-1,{x = size/2, y = size/2-10},1,false,false); w.groups[w.group_count-1].killer=true; w.groups[w.group_count-1].members[0].enemy.health*=4; w.groups[w.group_count-1].members[0].enemy.max_health*=4 }
-	// The complexes' secrets and guards last: the sites' groups keep their places in the list.
+	// The complexes' and the network's secrets and guards last: the sites' groups keep their places in the list.
 	fill_complexes(w,data)
+	fill_network(w,data)
 	keep_lifts_and_gates(w,data)
 	w.last_position=data.player_spawn
 	return true
@@ -294,8 +299,9 @@ add_drop :: proc(w:^World,p:grid.Position,item:campaign.Item,xp:i32=0,manual_onl
 
 nearest_site :: proc(w:^World,p:grid.Position) -> int {
 	best:=-1; d:=4
-	// A cave's mouth has nothing to do: one walks in.
-	for site,i in w.sites[:w.site_count] { if !site.active || site.state==.Resolved || site.kind==.Cave || site.position.layer!=p.layer {continue}; next:=distance(p,site.position); if next<d {d=next;best=i} }
+	// A cave's mouth has nothing to do: one walks in; nor has the Vietnam's tunnel, whose gallery one walks down into
+	// (network.odin).
+	for site,i in w.sites[:w.site_count] { if !site.active || site.state==.Resolved || site.kind==.Cave || site.kind==.Tunnel || site.position.layer!=p.layer {continue}; next:=distance(p,site.position); if next<d {d=next;best=i} }
 	return best
 }
 
@@ -574,18 +580,3 @@ prepare_room :: proc(w:^World,room:^game.Room) {
 	}}
 }
 
-// A shortcut never emerges inside a wall, an actor or a hidden pressure plate.
-// This also uses the saved dimensions when resuming an older small map.
-tunnel_destination :: proc(w:^World,room:^game.Room)->(position:grid.Position,ok:bool) {
-	if w==nil || room==nil {return}
-	anchor:=grid.Position{x = size(w)-14, y = 16}
-	for radius in 0..=8 {for y in -radius..=radius {for x in -radius..=radius {
-		p:=game.add_position(anchor,{x = x, y = y});if !game.base_cell_is_walkable(room,p) || game.cell_blocks_movement(room,p) {continue}
-		occupied:=false
-		for enemy in room.enemies {occupied=occupied || enemy.position==p}
-		for &group in w.groups[:w.group_count] {for member in group.members[:group.count] {occupied=occupied || (member.alive && member.enemy.position==p)}}
-		for trap in room.traps {occupied=occupied || (trap.armed && trap.position==p)}
-		if !occupied {return p,true}
-	}}}
-	return
-}

@@ -29,6 +29,9 @@ Expedition_Terrain_Chunk :: struct {
 	ready:    bool,
 	// The height of the tallest cell in the block, in steps.
 	tallest:  u8,
+	// Whether a cell's ground in the block dips under the map's base (a stair's pit down to a network): the plane must
+	// not cover it.
+	sunk:     bool,
 }
 
 // From this many steps a terrace is tall enough to hide an actor behind it, and the floor thins it out: a cave's massif,
@@ -71,12 +74,14 @@ Terrain_Block :: struct {
 	// Each cell's four triangles' normals: north, east, south and west.
 	normals: [TERRAIN_SPAN*TERRAIN_SPAN][4]rl.Vector3,
 	origin:  grid.Position,
+	// The map's base (level.Level.base): the height drawn at the board's plane.
+	base:    f32,
 }
 
 @(private = "file")
-terrain_point :: proc(x, y: int, corner: int, steps: f32) -> rl.Vector3 {
+terrain_point :: proc(x, y: int, corner: int, steps, base: f32) -> rl.Vector3 {
 	places := TERRAIN_CORNERS
-	return {f32(x)+places[corner].x, steps*game.HEIGHT_STEP_DRAWN, f32(y)+places[corner].y}
+	return {f32(x)+places[corner].x, (steps-base)*game.HEIGHT_STEP_DRAWN, f32(y)+places[corner].y}
 }
 
 @(private = "file")
@@ -139,15 +144,15 @@ terrain_hash :: proc(x, y, salt: int) -> f32 {
 // height per end). Only the parts where this cell is the higher are drawn; the neighbour draws the rest. The middle
 // of the wall is pushed a little into the rock, so it breaks into facets; the top edge, where one walks, stays exact.
 @(private = "file")
-terrain_wall :: proc(vertices: ^[dynamic]Expedition_Baked_Vertex, x, y, side: int, top, low: [2]f32) -> bool {
+terrain_wall :: proc(vertices: ^[dynamic]Expedition_Baked_Vertex, x, y, side: int, top, low: [2]f32, base: f32) -> bool {
 	sides := TERRAIN_SIDES
 	a, b := side, (side+1)%4
 	bottom := [2]f32{min(low[0], top[0]), min(low[1], top[1])}
 	drop := max(top[0]-bottom[0], top[1]-bottom[1])
 	if drop*game.HEIGHT_STEP_DRAWN < 0.005 { return false }
 	outward := rl.Vector3{f32(sides[side].x), 0, f32(sides[side].y)}
-	top_a, top_b := terrain_point(x, y, a, top[0]), terrain_point(x, y, b, top[1])
-	low_a, low_b := terrain_point(x, y, a, bottom[0]), terrain_point(x, y, b, bottom[1])
+	top_a, top_b := terrain_point(x, y, a, top[0], base), terrain_point(x, y, b, top[1], base)
+	low_a, low_b := terrain_point(x, y, a, bottom[0], base), terrain_point(x, y, b, bottom[1], base)
 	mid_a, mid_b := (top_a+low_a)*0.5, (top_b+low_b)*0.5
 	top_m, low_m := (top_a+top_b)*0.5, (low_a+low_b)*0.5
 	// The push grows with the wall's height, so a low wall's facets stay steep (rock, never ground).
@@ -186,10 +191,10 @@ terrain_opening :: proc(layers: ^level.Layer_Map, x, y: int, next: [2]int) -> (b
 
 @(private = "file")
 build_terrain_chunk :: proc(m: ^level.Surface_Map, origin: grid.Position, chunk: ^Expedition_Terrain_Chunk, raised: []bool,
-	vertices: ^[dynamic]Expedition_Baked_Vertex, block: ^Terrain_Block, layers: ^level.Layer_Map = nil) {
+	vertices: ^[dynamic]Expedition_Baked_Vertex, block: ^Terrain_Block, layers: ^level.Layer_Map = nil, base: i32 = 0) {
 	clear(vertices)
 	block^ = {}
-	block.origin = origin
+	block.origin, block.base = origin, f32(base)
 	for ly in 0..<TERRAIN_SPAN {
 		for lx in 0..<TERRAIN_SPAN {
 			x, y := origin.x+lx-1, origin.y+ly-1
@@ -197,23 +202,33 @@ build_terrain_chunk :: proc(m: ^level.Surface_Map, origin: grid.Position, chunk:
 			block.cells[slot], block.ground[slot] = level.surface_cell(m, x, y)
 			if !block.ground[slot] { continue }
 			cell := block.cells[slot]
-			middle := rl.Vector3{f32(x)+0.5, cell.center*game.HEIGHT_STEP_DRAWN, f32(y)+0.5}
+			middle := rl.Vector3{f32(x)+0.5, (cell.center-block.base)*game.HEIGHT_STEP_DRAWN, f32(y)+0.5}
 			for side in 0..<4 {
 				a, b := side, (side+1)%4
-				block.normals[slot][side] = terrain_face_normal(middle, terrain_point(x, y, b, cell.corners[b]), terrain_point(x, y, a, cell.corners[a]))
+				block.normals[slot][side] = terrain_face_normal(middle, terrain_point(x, y, b, cell.corners[b], block.base), terrain_point(x, y, a, cell.corners[a], block.base))
 			}
 		}
 	}
 	sides := TERRAIN_SIDES
 	low, high := rl.Vector3{1e9, 1e9, 1e9}, rl.Vector3{-1e9, -1e9, -1e9}
-	chunk.tallest = 0
+	chunk.tallest, chunk.sunk = 0, false
+	// Whether a ground cell dips under the base (a pit): the cells round it are drawn, for their walls down into it.
+	dips :: proc(block: ^Terrain_Block, x, y: int) -> bool {
+		slot, inside := terrain_slot(block, x, y)
+		if !inside || !block.ground[slot] { return false }
+		for corner in block.cells[slot].corners { if corner < block.base { return true } }
+		return block.cells[slot].center < block.base
+	}
 	for y in origin.y..<min(origin.y+EXPEDITION_TERRAIN_CHUNK, m.height) {
 		for x in origin.x..<min(origin.x+EXPEDITION_TERRAIN_CHUNK, m.width) {
 			slot, _ := terrain_slot(block, x, y)
-			chunk.tallest = max(chunk.tallest, u8(min(level.surface_steps(m, x, y), 255)))
+			// Over the map's base: the level ground of a raised map stays on the plane, and is no terrace.
+			chunk.tallest = max(chunk.tallest, u8(clamp(level.surface_steps(m, x, y)-int(block.base), 0, 255)))
 			if !block.ground[slot] { continue }
 			cell := block.cells[slot]
-			if level.surface_flat(cell) && cell.center == 0 { continue }
+			if dips(block, x, y) { chunk.sunk = true }
+			beside_pit := dips(block, x-1, y) || dips(block, x+1, y) || dips(block, x, y-1) || dips(block, x, y+1)
+			if level.surface_flat(cell) && cell.center == block.base && !beside_pit { continue }
 			start := len(vertices^)
 			// The walls first: which sides have one decides where the top glows.
 			cliff: [4]bool
@@ -234,18 +249,18 @@ build_terrain_chunk :: proc(m: ^level.Surface_Map, origin: grid.Position, chunk:
 				}
 				// Over a cave's mouth the wall opens down to the room's top (expedition_layers.odin draws the room).
 				if bottom, open := terrain_opening(layers, x, y, next); open { across = {max(across[0], bottom), max(across[1], bottom)} }
-				walled := terrain_wall(vertices, x, y, side, {cell.corners[a], cell.corners[b]}, across)
+				walled := terrain_wall(vertices, x, y, side, {cell.corners[a], cell.corners[b]}, across, block.base)
 				cliff[side] = walled && ground
 			}
 			// The top: two triangles for a level cell with no cliff to glow on, else four round the middle.
 			normals: [4]rl.Vector3
 			for corner in 0..<4 { normals[corner] = terrain_corner_normal(block, x, y, corner) }
 			points: [4]rl.Vector3
-			for corner in 0..<4 { points[corner] = terrain_point(x, y, corner, cell.corners[corner]) }
+			for corner in 0..<4 { points[corner] = terrain_point(x, y, corner, cell.corners[corner], block.base) }
 			if level.surface_flat(cell) && !cliff[0] && !cliff[1] && !cliff[2] && !cliff[3] {
 				for corner in ([6]int{0, 2, 1, 0, 3, 2}) { terrain_vertex(vertices, points[corner], normals[corner]) }
 			} else {
-				middle := rl.Vector3{f32(x)+0.5, cell.center*game.HEIGHT_STEP_DRAWN, f32(y)+0.5}
+				middle := rl.Vector3{f32(x)+0.5, (cell.center-block.base)*game.HEIGHT_STEP_DRAWN, f32(y)+0.5}
 				up := rl.Vector3Normalize(block.normals[slot][0]+block.normals[slot][1]+block.normals[slot][2]+block.normals[slot][3])
 				for side in 0..<4 {
 					a, b := side, (side+1)%4
@@ -351,7 +366,7 @@ prepare_expedition_terrain :: proc(cache: ^Expedition_Terrain_Cache, data: ^leve
 		defer free(block)
 		for cy in 0..<cache.rows {
 			for cx in 0..<cache.columns {
-				build_terrain_chunk(&m, {x = cx*EXPEDITION_TERRAIN_CHUNK, y = cy*EXPEDITION_TERRAIN_CHUNK}, &cache.chunks[cy*cache.columns+cx], cache.raised, &scratch, block, &layers if layered else nil)
+				build_terrain_chunk(&m, {x = cx*EXPEDITION_TERRAIN_CHUNK, y = cy*EXPEDITION_TERRAIN_CHUNK}, &cache.chunks[cy*cache.columns+cx], cache.raised, &scratch, block, &layers if layered else nil, data.base)
 			}
 		}
 		cache.ready = true
@@ -386,7 +401,12 @@ draw_expedition_floor_plane :: proc(renderer: ^Renderer, room: ^game.Room, dimen
 	quad(x1, z0, width-x1, z1-z0)
 	raised := 0
 	for row in z0..<z1 { for column in x0..<x1 { if cache.raised[row*width+column] { raised += 1 } } }
-	if raised*100 < (x1-x0)*(z1-z0)*8 {
+	// A pit under the plane in the window: the plane leaves it open (and every other cell the relief draws).
+	sunk := false
+	for cy in z0/EXPEDITION_TERRAIN_CHUNK..=(z1-1)/EXPEDITION_TERRAIN_CHUNK {
+		for cx in x0/EXPEDITION_TERRAIN_CHUNK..=(x1-1)/EXPEDITION_TERRAIN_CHUNK { sunk = sunk || cache.chunks[cy*cache.columns+cx].sunk }
+	}
+	if raised*100 < (x1-x0)*(z1-z0)*8 && !sunk {
 		quad(x0, z0, x1-x0, z1-z0)
 		return
 	}

@@ -31,6 +31,18 @@ import level "../level"
 
 RELIEF_MAX :: u8(12)
 
+// THE RAISED BIOMES (Fase 7 of docs/piano-profondita.md, the user's choice for its second group): City pop, Egitto and
+// Vietnam have all their ground raised by a base, so that there is room under it for their networks on the deep layer
+// (network.odin); the surface is the same, and drawn as before (level.Level.base).
+EXPEDITION_RAISED_BASE :: level.LAYER_SPACING+2
+
+biome_base :: proc(b: campaign.Biome) -> i32 {
+	#partial switch b {
+	case .City, .Egypt, .Vietnam: return EXPEDITION_RAISED_BASE
+	}
+	return 0
+}
+
 @(private = "file")
 Relief :: struct {
 	size:      int,
@@ -235,7 +247,10 @@ apply_relief :: proc(w: ^World, data: ^level.Level) {
 	for c in w.complexes[:w.complex_count] { append(&zones, complex_level_zone(c)) }
 	if w.biome == .Gothic { append(&zones, [2]grid.Position{{x = size/2-5, y = size/2-15}, {x = size/2+5, y = size/2-5}}) }
 	heights := relief_heights(w.biome, data.tiles.cells[:], size, zones[:])
+	// The biome's base under all of it.
+	for &steps in heights { steps += u8(w.base) }
 	_ = level.set_height_table(data, heights)
+	data.base = w.base
 }
 
 // Heights, one per cell in the tiles' order, for biome `b` on `tiles` (size by size). `zones` are the

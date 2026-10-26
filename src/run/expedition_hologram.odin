@@ -56,7 +56,7 @@ hologram_camera :: proc(width,height:int)->rl.Camera3D {
 
 // The map shows the robot's layer, and changes with him (the user's choice in Fase 5 of docs/piano-profondita.md): on
 // the open ground the ground; in a cave, the rock of its massif taken away and its rooms shown, at their floor's height,
-// the other caves still shut in their rock.
+// the other caves still shut in their rock. Heights count from the map's base (level.Level.base), as the board draws them.
 @(private)
 hologram_geometry :: proc(w:^world.World,data:^level.Level,out:^Hologram_Geometry) {
 	out.width=min(data.tiles.width,HOLO_SIDE);out.height=min(data.tiles.height,HOLO_SIDE)
@@ -75,7 +75,7 @@ hologram_geometry :: proc(w:^world.World,data:^level.Level,out:^Hologram_Geometr
 			px,py:=x+dx,y+dy;tile:=data.tiles.cells[py*data.tiles.width+px]
 			c:=&out.cells[py*HOLO_SIDE+px];c^={}
 			if tile.kind==.Void {continue}
-			c.ground=ground;c.height=hologram_band(level.height_at(data,{x = px, y = py}))
+			c.ground=ground;c.height=hologram_band(level.height_at(data,{x = px, y = py})-data.base)
 			if w.biome==.Inferno && tile.kind==.Door {c.ground=6}
 			// Scattered open-ground props stay low stubs: the courtyards, the
 			// city blocks and the pyramid fields remain the landmarks.
@@ -105,9 +105,9 @@ hologram_geometry :: proc(w:^world.World,data:^level.Level,out:^Hologram_Geometr
 		for y in max(0,place.origin.y-1)..=min(out.height-1,place.origin.y+place.height) {for x in max(0,place.origin.x-1)..=min(out.width-1,place.origin.x+place.width) {
 			c:=&out.cells[y*HOLO_SIDE+x]
 			room:=grid.Position{x = x, y = y, layer = world.CAVE_LAYER}
-			if tile,_:=level.tile_at(data,room);tile.kind==.Floor {c^={ground=15,height=hologram_band(level.height_at(data,room))};continue}
+			if tile,_:=level.tile_at(data,room);tile.kind==.Floor {c^={ground=15,height=hologram_band(level.height_at(data,room)-data.base)};continue}
 			// The mountain's core keeps its path round the room.
-			if !place.mountain {c^={ground=16,height=hologram_band(place.floor),wall=4}}
+			if !place.mountain {c^={ground=16,height=hologram_band(place.floor-data.base),wall=4}}
 		}}
 	}
 }

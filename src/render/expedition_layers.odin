@@ -56,8 +56,8 @@ set_expedition_board_actors :: proc(w: ^world.World) {
 	}
 }
 
-// The cave the robot is in, if any, or the tunnel under a complex's block: outside it everything is darker, and the
-// robot's lamp lights it.
+// The cave the robot is in, if any, the tunnel under a complex's block, or, anywhere else under rock, the network of a
+// raised biome round him (expedition/network.odin): outside it everything is darker, and the robot's lamp lights it.
 @(private)
 set_expedition_cave_view :: proc(renderer: ^Renderer, room: ^game.Room, w: ^world.World) {
 	v := &renderer.tactical
@@ -69,7 +69,14 @@ set_expedition_cave_view :: proc(renderer: ^Renderer, room: ^game.Room, w: ^worl
 		return
 	}
 	index := world.cave_at(w, room.player.position)
-	if index <= 0 { return }
+	if index <= 0 {
+		// The box is the few cells round him: everything else, over him and round him, is darker.
+		if p := room.player.position; p.layer < grid.GROUND_LAYER && board_view.vault {
+			v.expedition_in_cave = true
+			v.expedition_cave_box = {f32(p.x-2), f32(p.y-2), f32(p.x+3), f32(p.y+3)}
+		}
+		return
+	}
 	place := w.caves[index-1].place
 	v.expedition_in_cave = true
 	v.expedition_cave_box = {f32(place.origin.x-1), f32(place.origin.y-1), f32(place.origin.x+place.width+1), f32(place.origin.y+place.height+1)}
@@ -148,9 +155,10 @@ under_near_floors :: proc(m: ^level.Layer_Map, layer: i8, near: []i32) {
 // The rooms of the layers under the ground in one block: floors, walls and the cut of the rock round them.
 @(private = "file")
 build_under_chunk :: proc(m: ^level.Layer_Map, near: [][]i32, origin: grid.Position, chunk: ^Expedition_Terrain_Chunk,
-	vertices: ^[dynamic]Expedition_Baked_Vertex) {
+	vertices: ^[dynamic]Expedition_Baked_Vertex, base: i32) {
 	clear(vertices)
-	step := game.HEIGHT_STEP_DRAWN
+	// Heights are drawn from the map's base (board_drawn's rule).
+	drawn :: proc(steps, base: i32) -> f32 { return f32(steps-base)*game.HEIGHT_STEP_DRAWN }
 	up := rl.Vector3{0, 1, 0}
 	for layer in grid.LOWEST_LAYER..<grid.GROUND_LAYER {
 		slot := level.layer_slot(i8(layer))
@@ -168,7 +176,7 @@ build_under_chunk :: proc(m: ^level.Layer_Map, near: [][]i32, origin: grid.Posit
 					points: [4]rl.Vector3
 					colors: [4]rl.Color
 					for corner, i in corners {
-						points[i] = {f32(x+corner.x), f32(floor)*step+0.004, f32(y+corner.y)}
+						points[i] = {f32(x+corner.x), drawn(floor, base)+0.004, f32(y+corner.y)}
 						sx, sy := x+corner.x*2-1, y+corner.y*2-1
 						rock := int(solid(m, sx, y, cell.layer))+int(solid(m, x, sy, cell.layer))+int(solid(m, sx, sy, cell.layer))
 						colors[i] = {255, u8(255-rock*40), 255, 255}
@@ -180,7 +188,7 @@ build_under_chunk :: proc(m: ^level.Layer_Map, near: [][]i32, origin: grid.Posit
 						nx, ny := x+side.x, y+side.y
 						if !solid(m, nx, ny, cell.layer) { continue }
 						if _, open := level.column_landing(m, nx, ny, floor, game.HEIGHT_MAX_STEP); open { continue }
-						under_wall(vertices, x, y, i, f32(floor)*step, f32(floor+level.LAYER_CLEARANCE)*step)
+						under_wall(vertices, x, y, i, drawn(floor, base), drawn(floor+level.LAYER_CLEARANCE, base))
 					}
 					continue
 				}
@@ -189,7 +197,7 @@ build_under_chunk :: proc(m: ^level.Layer_Map, near: [][]i32, origin: grid.Posit
 				if reach < 0 { continue }
 				ground := grid.Position{x = x, y = y}
 				if !level.kind_has_floor(level.map_tile(m, ground)) || level.map_height(m, ground) < reach+level.LAYER_SPACING { continue }
-				top := f32(reach+level.LAYER_CLEARANCE)*step
+				top := drawn(reach+level.LAYER_CLEARANCE, base)
 				// Kept inside the rock's sides, whose facets go into it a little (expedition_terrain.odin).
 				inset :: proc(m: ^level.Layer_Map, x, y: int, reach: i32, layer: i8) -> f32 {
 					next := grid.Position{x = x, y = y}
@@ -242,7 +250,7 @@ prepare_expedition_under :: proc(cache: ^Expedition_Under_Cache, data: ^level.Le
 	defer delete(scratch)
 	for cy in 0..<cache.rows {
 		for cx in 0..<cache.columns {
-			build_under_chunk(&m, near[:], {x = cx*EXPEDITION_TERRAIN_CHUNK, y = cy*EXPEDITION_TERRAIN_CHUNK}, &cache.chunks[cy*cache.columns+cx], &scratch)
+			build_under_chunk(&m, near[:], {x = cx*EXPEDITION_TERRAIN_CHUNK, y = cy*EXPEDITION_TERRAIN_CHUNK}, &cache.chunks[cy*cache.columns+cx], &scratch, data.base)
 		}
 	}
 }

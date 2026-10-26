@@ -197,7 +197,16 @@ prepare_expedition_material :: proc(renderer:^Renderer,room:^game.Room,w:^world.
 		at,_:=living_card_position(renderer,game.PLAYER_ENTITY,.Player,snapshot.player.position)
 		m.focus_points[0]={at.x+.5,at.y+.5,4.5,8.5};m.focus_point_count=1
 		ground:=entity_point_ground(game.PLAYER_ENTITY,{at.x,at.y})
-		expedition_add_reveal(renderer,m,{at.x+.5,.75+ground if !v.expedition_mounted else .9+ground,at.y+.5},1.05 if !v.expedition_mounted else 1.45)
+		// Under the board's plane (a raised biome's network, expedition/network.odin) the window is wider, through the
+		// ground and the buildings over him; down a stair's pit, on the ground, there is none: nothing is over him there,
+		// and under the pit there is nothing to show.
+		radius:=f32(1.05) if !v.expedition_mounted else 1.45
+		cell,standing:=board_actor_cell(game.PLAYER_ENTITY)
+		sunk:=ground < -.05
+		if sunk && board_view.vault {radius=3.2}
+		if !(sunk && standing && cell.layer==grid.GROUND_LAYER) {
+			expedition_add_reveal(renderer,m,{at.x+.5,.75+ground if !v.expedition_mounted else .9+ground,at.y+.5},radius)
+		}
 		m.player_reveal=m.reveal_point_count>0
 	}
 	for actor in snapshot.enemies[:snapshot.enemy_count] {

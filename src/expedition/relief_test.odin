@@ -8,13 +8,14 @@ import game "../game"
 import grid "../engine/grid"
 import level "../level"
 
-// What a biome's relief looks like in numbers: the tallest cell and the share of cells above ground.
+// What a biome's relief looks like in numbers: the tallest cell and the share of cells above ground, counted from the
+// map's base (a raised biome's, relief.odin).
 @(private = "file")
 relief_numbers :: proc(data: ^level.Level) -> (tallest: int, raised_percent: int) {
 	raised := 0
 	for steps in data.heights {
-		tallest = max(tallest, int(steps))
-		if steps > 0 { raised += 1 }
+		tallest = max(tallest, int(steps)-int(data.base))
+		if i32(steps) > data.base { raised += 1 }
 	}
 	if len(data.heights) > 0 { raised_percent = raised*100/len(data.heights) }
 	return
@@ -109,8 +110,8 @@ test_the_ground_that_matters_is_level_and_every_site_and_the_exit_can_be_walked_
 }
 
 // The smooth ground has no cliff of its own: neighbouring cells are at most a step apart, but at the edge
-// of a plateau (a cliff of the plateaus' own) in the biomes that have them, of a cave's massif (cave.odin) and of a
-// complex's blocks and ramps (complex.odin).
+// of a plateau (a cliff of the plateaus' own) in the biomes that have them, of a cave's massif (cave.odin), of a
+// complex's blocks and ramps (complex.odin) and of a stair's pit down to a network, under the base (network.odin).
 @(test)
 test_the_smooth_biomes_have_no_cliffs_at_all :: proc(t: ^testing.T) {
 	for biome in ([?]campaign.Biome{.Jungle, .Egypt, .Vietnam, .Gothic, .Sky, .Space, .Secret}) {
@@ -123,10 +124,10 @@ test_the_smooth_biomes_have_no_cliffs_at_all :: proc(t: ^testing.T) {
 		for y in 0..<data.tiles.height {
 			for x in 0..<width {
 				here := data.tiles.cells[y*width+x].kind
-				if here == .Void || cave_rock(&w, {x = x, y = y}) || complex_rock(&w, {x = x, y = y}) { continue }
+				if here == .Void || cave_rock(&w, {x = x, y = y}) || complex_rock(&w, {x = x, y = y}) || i32(data.heights[y*width+x]) < data.base { continue }
 				for step in ([2][2]int{{1, 0}, {0, 1}}) {
 					nx, ny := x+step.x, y+step.y
-					if nx >= width || ny >= data.tiles.height || data.tiles.cells[ny*width+nx].kind == .Void || cave_rock(&w, {x = nx, y = ny}) || complex_rock(&w, {x = nx, y = ny}) { continue }
+					if nx >= width || ny >= data.tiles.height || data.tiles.cells[ny*width+nx].kind == .Void || cave_rock(&w, {x = nx, y = ny}) || complex_rock(&w, {x = nx, y = ny}) || i32(data.heights[ny*width+nx]) < data.base { continue }
 					if abs(int(data.heights[ny*width+nx])-int(data.heights[y*width+x])) > 1 { cliffs += 1 }
 				}
 			}

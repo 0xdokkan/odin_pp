@@ -15,7 +15,7 @@ import run_session "../run"
 // breaks the foes' beat across the layers and the lifts (a foe off a lift with no intent once stopped the game).
 @(test)
 test_the_complexes_live_a_minute_of_play_with_their_guards_free :: proc(t: ^testing.T) {
-	for biome in ([3]campaign.Biome{.Cyber, .West, .Jungle}) {
+	for biome in ([6]campaign.Biome{.Cyber, .West, .Jungle, .City, .Egypt, .Vietnam}) {
 		w: world.World
 		data: level.Level
 		testing.expect(t, world.generate(&w, &data, biome, 21))
@@ -28,7 +28,13 @@ test_the_complexes_live_a_minute_of_play_with_their_guards_free :: proc(t: ^test
 		room.phase = .Loot
 		player.tactical.config.expedition_biome = u8(biome)
 		testing.expect(t, w.complex_count > 0)
-		player.position = world.complex_bridge_middle(w.complexes[0])
+		// On the complex's bridge; on the top with its secret where it has none (the Egitto's pyramids).
+		c := w.complexes[0]
+		player.position = world.complex_bridge_middle(c)
+		if player.position == c.origin {
+			layout := world.complex_layout(c.kind)
+			for row, y in layout.rows { for x in 0..<len(row) { if row[x] == '$' { player.position = world.complex_cell(c, {x = x, y = y}) } } }
+		}
 		guards := -1
 		for group, i in w.groups[:w.group_count] {
 			if index, _ := world.complex_at(&w, group.anchor); index > 0 { guards = i }
@@ -84,7 +90,7 @@ complex_beside :: proc(room: ^game.Room, cell: grid.Position) -> grid.Position {
 // up out of play and fights on; nothing breaks the foes' beat.
 @(test)
 test_a_foe_rides_a_complexs_lift_up_after_the_robot :: proc(t: ^testing.T) {
-	for biome in ([3]campaign.Biome{.Cyber, .West, .Jungle}) {
+	for biome in ([6]campaign.Biome{.Cyber, .West, .Jungle, .City, .Egypt, .Vietnam}) {
 		w: world.World
 		data: level.Level
 		testing.expect(t, world.generate(&w, &data, biome, 33))

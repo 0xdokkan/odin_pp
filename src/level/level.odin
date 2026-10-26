@@ -45,6 +45,10 @@ Level :: struct {
 	lifts:   [dynamic]Lift,
 	// The shortcuts' gates (layers.odin): shut, a gate's cell is a Fence; open, a Floor.
 	gates:   [dynamic]Gate,
+	// The height of the map's level ground, in steps: 0, or a base the map's ground was raised by so that there is room
+	// under it for the layers below (Fase 7 of docs/piano-profondita.md). It is drawn at the board's plane: the rules count
+	// heights from 0 as ever, only the drawing takes the base off.
+	base:    i32,
 }
 
 // The tallest a cell can be.

@@ -873,8 +873,40 @@ avviare è `build/odin_pp`; conserva il limite fps delle impostazioni di gioco.
   (`draw_board_lifts`, luce di resina); il recinto di un cancello non ha il muretto d'inchiostro. In un condotto vale la vista
   della grotta (`complex_tunnel_block`): fuori più scuro, la lampada del robot. I nemici che dormono sotto terra non si
   disegnano dove la roccia li nasconde.
-- **Smoke:** gli stage dal 104 (`ODIN_PP_SMOKE_ONLY=complessi`), sei per bioma: panorama, sotto il ponte, sul ponte, al
-  cancello, in ascensore, uno scontro fra il ponte e il terreno.
+  - City pop, `Rooftops`: tre palazzi con i tetti uniti da cavalcavia; scala antincendio sul primo, ascensore sul terzo, il
+    cancello sul cavalcavia del primo si apre dal tetto di mezzo (segreto e guardie).
+  - Egitto, `Pyramids`: due piramidi a gradoni (terrazze a 4, 8 e 12 gradini, cima a 14) con una scala che gira; la
+    prima ha il pozzo `D` fino alla necropoli, la seconda segreto e guardie in cima.
+  - Vietnam, `Bamboo_Bridges`: due colline sulle rive di un fiume e un ponte di bambù sopra l'acqua
+    (`Complex_Layout.over_water`: il ponte sopra l'acqua, blocchi e rampe all'asciutto).
+- **Smoke:** gli stage dal 104 (`ODIN_PP_SMOKE_ONLY=complessi`), sei per bioma (Robotica, Far West, Giungla, City pop,
+  Egitto, Vietnam): panorama, sotto il ponte (in Egitto una terrazza), sul ponte (la cima), al cancello, in ascensore, uno
+  scontro fra i piani.
+
+## Il terreno alzato e le reti sotterranee (Fase 7 del piano profondità, secondo gruppo)
+
+- **La base** (`level.Level.base`, `World.base`, `expedition.biome_base`): City pop, Egitto e Vietnam hanno tutto il
+  terreno alzato di `EXPEDITION_RAISED_BASE` (14) gradini in `apply_relief` (scelta dell'utente). Le regole contano le
+  quote da 0 come sempre; il disegno toglie la base (`board_drawn`, `board_base_drawn` in `render/height_view.odin`; il
+  rilievo, le stanze sotterranee, i ponti, l'arco delle grotte, la prima persona e l'ologramma fanno lo stesso), così la
+  superficie si vede come prima e i piani sotto vanno sotto il piano del tavolo. Il salvataggio tiene la base nel mondo
+  (un salvataggio di prima ha 0, e il suo terreno non è alzato).
+- **Le reti** (`src/expedition/network.odin`): sul piano −2 (`NETWORK_LAYER`) alla quota 0, sale (`Network_Hall`, a posti
+  fissi in centesimi della mappa) unite da vie che girano attorno a muri e buche (`network_way`, una ricerca in ampiezza;
+  sotto un muro la colonna è roccia piena, `level.column_of`). Metro di City pop (tre stazioni), necropoli dell'Egitto (la
+  sala sotto il pozzo della piramide, la grande sala, la tomba), gallerie del Vietnam (dal tunnel di oggi al suo arrivo,
+  sei camere). Scale: buche con una rampa da 1 a 13 gradini (`network_stair`), la più vicina alla sala che ha una via;
+  un ascensore per bioma (`network_lift`, o il pozzo `D` della piramide); un cancello sulla via indicata
+  (`Network_Plan.gate_way`), con la leva verso la sala dopo. Guardie e segreto in `fill_network`.
+- **Il tunnel del Vietnam:** il salto con E non c'è più (`tunnel_destination` tolto); `nearest_site` non offre il tunnel,
+  come le grotte: si scende dalle scale accanto.
+- **Disegno:** le caselle accanto a una buca hanno il loro muro anche se piane alla base, e il piano non copre le buche
+  (`Expedition_Terrain_Chunk.sunk`). Sotto il piano, sotto roccia, la finestra attorno al robot è più larga (taglia anche
+  gli edifici sopra) e la superficie è più scura (la scatola della «grotta» è di poche caselle attorno a lui); in una buca
+  la finestra non c'è (sotto la buca non c'è niente da mostrare). Ponti di City pop (lastre e riga tratteggiata) e del
+  Vietnam (bambù) in `deckMain`.
+- **Smoke:** gli stage dal 140 (`ODIN_PP_SMOKE_ONLY=reti`), tre per bioma: a metà di una scala, in una sala vicino ai
+  nemici, sull'ascensore a metà discesa.
 
 ## Strutture posate dal giocatore (Fase 7 del piano griglia)
 

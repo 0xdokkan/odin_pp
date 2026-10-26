@@ -281,13 +281,10 @@ expedition_interact :: proc(e:^Expedition_Session,frame:^host.Frame) {
 	case .Memory:
 		if !world.add_drop(w,s.position,campaign.make_item(.Memory,1,i32(w.biome))) {expedition_message(e,"Raccogli un oggetto a terra prima di recuperare il frammento.");return}
 		s.state=.Resolved;expedition_collect(e,true);expedition_message(e,"Frammento recuperato. Estrai per ascoltarlo nell'hub.")
-	case .Cave:
-		// One walks in through the mouth (world.nearest_site never offers it).
+	case .Cave,.Tunnel:
+		// One walks in through the mouth, or down the gallery's stair beside the tunnel (expedition/network.odin):
+		// world.nearest_site never offers them.
 		return
-	case .Tunnel:
-		position,safe:=world.tunnel_destination(w,room)
-		if !safe {expedition_message(e,"L'uscita del tunnel e ostruita. Riprova piu tardi.");return}
-		room.player.position=position;s.state=.Resolved;expedition_message(e,"Il tunnel riemerge oltre le risaie.")
 	}
 	c.revision+=1
 }

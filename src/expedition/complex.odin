@@ -15,7 +15,8 @@ import rng "../engine/rng"
 // Like the caves, a complex is part of the biome's geography: its place and its layout come from the biome alone,
 // chosen before the relief, which keeps the ground round it level (relief.odin). Every run finds its gate shut
 // (level.Gate); the run decides only who guards it. Robotica cibernetica has a data node, the Far West a train's bridge
-// between two mesas, the Giungla preistorica giant trees by a hill of bones.
+// between two mesas, the Giungla preistorica giant trees by a hill of bones; in the second group City pop has rooftops
+// joined by overpasses, the Egitto two stepped pyramids over its necropolis, the Vietnam bamboo bridges over a river.
 //
 // A layout is one string a row of cells, x eastward and y southward:
 //   .     open ground, at the complex's floor (the level ground round it)
@@ -26,6 +27,7 @@ import rng "../engine/rng"
 //   t &   a tunnel on the layer under the ground, at the floor, under a block; & where its guards stand
 //   S     a shaft: a tunnel's cell with a lift up to the block's top over it
 //   L     a lift up a block's side: its foot on the open ground, its landing on the deck's layer at the top
+//   D     a block's cell with a shaft from its top down to the network under the ground (network.odin)
 // Its gates are listed apart, each on the layer of its cell's mark (a tunnel's, a deck's or a block's top).
 
 COMPLEX_TOP :: level.LAYER_SPACING+2
@@ -38,7 +40,7 @@ COMPLEX_TUNNEL :: i8(-1)
 MAX_WORLD_LIFTS :: game.MAX_ROOM_LIFTS
 MAX_WORLD_GATES :: 8
 
-Complex_Kind :: enum u8 { None, Data_Node, Train_Bridge, Giant_Trees }
+Complex_Kind :: enum u8 { None, Data_Node, Train_Bridge, Giant_Trees, Rooftops, Pyramids, Bamboo_Bridges }
 
 Complex :: struct {
 	kind:   Complex_Kind,
@@ -53,10 +55,12 @@ Complex_Gate :: struct {
 }
 
 Complex_Layout :: struct {
-	rows:    []string,
-	gates:   []Complex_Gate,
+	rows:       []string,
+	gates:      []Complex_Gate,
 	// How the blocks' tops look (render/expedition_floor_data.odin).
-	surface: Site_Surface,
+	surface:    Site_Surface,
+	// Its bridges go over the biome's water, its blocks and ramps stand on dry ground (the Vietnam's rivers).
+	over_water: bool,
 }
 
 // Robotica cibernetica: two data platforms over a road, a walkway between them. Up the east one by its ramp; the west
@@ -111,11 +115,84 @@ GIANT_TREES_ROWS := [?]string{
 @(private = "file")
 GIANT_TREES_GATES := [?]Complex_Gate{{cell = {x = 36, y = 5}, lever = {x = 35, y = 5}}}
 
+// City pop: three buildings, their rooftops joined by overpasses. The middle one has the secret and its guards; up the
+// west one by its fire escape, up the east one by its lift; the overpass from the west one has a gate opened from the
+// middle rooftop: once opened, the fire escape is a second way to it.
+@(private = "file")
+ROOFTOPS_ROWS := [?]string{
+	".............#######.....#######.....#######.",
+	".............#######.....##$####.....#######.",
+	".............#######.....#######=====#######.",
+	"abcdefghijklm#######=====#######=====#######L",
+	"abcdefghijklm#######.....###@###.....#######.",
+	".............#######.....#######.....#######.",
+	".............#######.....#######.....#######.",
+}
+@(private = "file")
+ROOFTOPS_GATES := [?]Complex_Gate{{cell = {x = 23, y = 3}, lever = {x = 24, y = 3}}}
+
+// Antico Egitto: two stepped pyramids, terraces at 4, 8 and 12 steps round a top at 14, up a stair that winds round
+// them. The west one has the shaft down to the necropolis under the desert (network.odin), the east one the secret
+// and its guards at its top.
+@(private = "file")
+PYRAMIDS_ROWS := [?]string{
+	"ddddddddddddddd....ddddddddddddddd",
+	"ddddddddddddddd....ddddddddddddddd",
+	"ddhhhhhhhhhhhdd....ddhhhhhhhhhhhdd",
+	"ddhhhhhhhhhhhdd....ddhhhhhhhhhhhdd",
+	"ddhhlllllllhhdd....ddhhlllllllhhdd",
+	"ddhhlllmlllhhdd....ddhhlllmlllhhdd",
+	"ddhhll###llhhdd....ddhhll@##llhhdd",
+	"ddhhll#D#llhhdd....ddhhll#$#llhhdd",
+	"ddhhll###llkhdd....ddhhll###llkhdd",
+	"ddhhllllllljhdd....ddhhllllllljhdd",
+	"ddhhlllllllihdd....ddhhlllllllihdd",
+	"ddhhhhhhhhhhhdd....ddhhhhhhhhhhhdd",
+	"ddhhhhhhhhhhhdd....ddhhhhhhhhhhhdd",
+	"ddddddddefgdddd....ddddddddefgdddd",
+	"ddddddddddddddd....ddddddddddddddd",
+	".......c..................c.......",
+	".......b..................b.......",
+	".......a..................a.......",
+}
+
+// Vietnam: two terraced hills on the two banks of a river, a bamboo bridge between them over the water. The north one has
+// the secret, up its slope from the west; the south one has the guards and a lift; the bridge's gate opens from the
+// north: once opened, the lift and the bridge are the way to the secret.
+@(private = "file")
+BAMBOO_BRIDGES_ROWS := [?]string{
+	".............#########.",
+	".............#########.",
+	"abcdefghijklm##$######.",
+	"abcdefghijklm#########.",
+	"abcdefghijklm#########.",
+	".............#########.",
+	".............#########.",
+	".................=.....",
+	".................=.....",
+	".................=.....",
+	".................=.....",
+	".................=.....",
+	".................=.....",
+	".............#########.",
+	".............#########.",
+	".............#########.",
+	".............####@####L",
+	".............#########.",
+	".............#########.",
+	".............#########.",
+}
+@(private = "file")
+BAMBOO_BRIDGES_GATES := [?]Complex_Gate{{cell = {x = 17, y = 12}, lever = {x = 17, y = 11}}}
+
 complex_layout :: proc(kind: Complex_Kind) -> Complex_Layout {
 	switch kind {
 	case .Data_Node: return {rows = DATA_NODE_ROWS[:], gates = DATA_NODE_GATES[:], surface = .Platform}
 	case .Train_Bridge: return {rows = TRAIN_BRIDGE_ROWS[:], gates = TRAIN_BRIDGE_GATES[:]}
 	case .Giant_Trees: return {rows = GIANT_TREES_ROWS[:], gates = GIANT_TREES_GATES[:]}
+	case .Rooftops: return {rows = ROOFTOPS_ROWS[:], gates = ROOFTOPS_GATES[:], surface = .Platform}
+	case .Pyramids: return {rows = PYRAMIDS_ROWS[:]}
+	case .Bamboo_Bridges: return {rows = BAMBOO_BRIDGES_ROWS[:], gates = BAMBOO_BRIDGES_GATES[:], over_water = true}
 	case .None:
 	}
 	return {}
@@ -127,6 +204,9 @@ complex_kinds :: proc(b: campaign.Biome) -> (kinds: [MAX_COMPLEXES]Complex_Kind)
 	case .Cyber: kinds[0] = .Data_Node
 	case .West: kinds[0] = .Train_Bridge
 	case .Jungle: kinds[0] = .Giant_Trees
+	case .City: kinds[0] = .Rooftops
+	case .Egypt: kinds[0] = .Pyramids
+	case .Vietnam: kinds[0] = .Bamboo_Bridges
 	}
 	return
 }
@@ -148,7 +228,7 @@ complex_mark :: proc(layout: Complex_Layout, x, y: int) -> u8 {
 
 complex_mark_block :: proc(mark: u8) -> bool {
 	switch mark {
-	case '#', '$', '@', 't', '&', 'S': return true
+	case '#', '$', '@', 't', '&', 'S', 'D': return true
 	}
 	return false
 }
@@ -262,7 +342,8 @@ complex_level_zone :: proc(c: Complex) -> [2]grid.Position {
 // the central band, the patrols' ground, the mountain, the caves' massifs and the other complexes, on cells of the map
 // that are floor or props (the relief and the props come after, and it clears them), on safe ground.
 @(private = "file")
-complex_free :: proc(w: ^World, data: ^level.Level, origin: grid.Position, width, height: int, others: []Complex) -> bool {
+complex_free :: proc(w: ^World, data: ^level.Level, origin: grid.Position, layout: Complex_Layout, others: []Complex) -> bool {
+	width, height := complex_size(layout)
 	side := size(w)
 	low, high := complex_bounds(origin, width, height, COMPLEX_MARGIN)
 	overlaps :: proc(low, high, other_low, other_high: grid.Position) -> bool {
@@ -300,10 +381,22 @@ complex_free :: proc(w: ^World, data: ^level.Level, origin: grid.Position, width
 			tile, found := level.tile_at(data, p)
 			if !found || tile.kind != .Floor && tile.kind != .Wall { return false }
 			if _, owned := level.structure_index_at(data, p); owned { return false }
+			mark := complex_mark(layout, x-origin.x, y-origin.y)
 			#partial switch terrain(w.biome, p) {
-			case .Water, .Lava, .Bridge, .Gravity: return false
+			case .Lava, .Bridge, .Gravity: return false
+			case .Water: if !layout.over_water || complex_mark_block(mark) || complex_mark_ramp(mark) > 0 { return false }
 			}
 		}
+	}
+	// A bridge over water goes over a river: three of its cells over the water at least.
+	if layout.over_water {
+		wet := 0
+		for y in 0..<height {
+			for x in 0..<width {
+				if complex_mark_deck(complex_mark(layout, x, y)) && terrain(w.biome, grid.offset(origin, x, y)) == .Water { wet += 1 }
+			}
+		}
+		if wet < 3 { return false }
 	}
 	return true
 }
@@ -316,11 +409,12 @@ plan_complexes :: proc(w: ^World, data: ^level.Level) {
 	r := rng.create(0xC0A1E000+u64(w.biome))
 	for kind in complex_kinds(w.biome) {
 		if kind == .None || w.complex_count >= MAX_COMPLEXES { break }
-		width, height := complex_size(complex_layout(kind))
+		layout := complex_layout(kind)
+		width, height := complex_size(layout)
 		if side-width-24 <= 0 || side-height-16 <= 0 { continue }
 		for _ in 0..<6000 {
 			origin := grid.Position{x = 16+int(rng.next_u64(&r)%u64(side-width-24)), y = 8+int(rng.next_u64(&r)%u64(side-height-16))}
-			if !complex_free(w, data, origin, width, height, w.complexes[:w.complex_count]) { continue }
+			if !complex_free(w, data, origin, layout, w.complexes[:w.complex_count]) { continue }
 			w.complexes[w.complex_count] = {kind = kind, origin = origin}
 			w.complex_count += 1
 			break
@@ -346,6 +440,13 @@ build_complex :: proc(data: ^level.Level, c: Complex) {
 			mark := layout.rows[y][x]
 			ground := grid.offset(c.origin, x, y)
 			if complex_mark_block(mark) { _ = level.set_height(data, ground, top) }
+			// The shaft down to the network: its bottom is the network's floor (network.odin makes the hall round it).
+			if mark == 'D' {
+				deep := grid.Position{x = ground.x, y = ground.y, layer = NETWORK_LAYER}
+				_ = level.set_tile(data, deep, {kind = .Floor})
+				_ = level.set_height(data, deep, NETWORK_FLOOR)
+				_ = level.add_lift(data, deep, ground, 1)
+			}
 			if steps := complex_mark_ramp(mark); steps > 0 { _ = level.set_height(data, ground, c.floor+steps) }
 			if complex_mark_tunnel(mark) {
 				cell := grid.Position{x = ground.x, y = ground.y, layer = COMPLEX_TUNNEL}

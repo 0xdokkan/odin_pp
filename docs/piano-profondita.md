@@ -216,11 +216,13 @@ ODIN="/c/Users/lukeg/OneDrive/Desktop/odin-dev-2026-10/dist/odin.exe"
   le catture di prima restano confrontabili al byte.
 - **Spedizioni da un punto:** `ODIN_PP_SMOKE_ONLY=hits` parte dagli scontri
   dei segni dei colpi, `ODIN_PP_SMOKE_ONLY=caves` dalle grotte,
-  `ODIN_PP_SMOKE_ONLY=complessi` dai complessi della Fase 7
+  `ODIN_PP_SMOKE_ONLY=complessi` dai complessi della Fase 7,
+  `ODIN_PP_SMOKE_ONLY=reti` dalle reti sotterranee
   (`src/application/campaign_smoke.odin`, `expedition_enable_smoke`). Gli
   stage che contano qui: rilievi dal 63, ologrammi dal 75, due livelli 78,
   montagna 79, grotte dall'87, ologramma in grotta 103 (dalla Fase 5),
-  complessi dal 104, sei per bioma (dalla Fase 7).
+  complessi dal 104, sei per bioma, reti dal 140, tre per bioma (dalla
+  Fase 7).
 - **Benchmark:**
   `"$ODIN" build src -o:speed -define:EXPEDITION_BENCHMARK=true -out:"$S/bench.exe"`,
   poi `"$S/bench.exe" --smoke-expedition > "$S/bench_a.log" 2>&1`
@@ -2047,7 +2049,28 @@ Con le risposte dell'utente nella Fase 7:
   gradini fra due pavimenti della stessa colonna, e gli altopiani di oggi ne hanno 3 o 4. Così ogni bioma riceve 1
   o 2 complessi a posti fissi, come i massicci delle grotte: blocchi alti 14 gradini con ponti o passerelle sopra
   (piano +1), gallerie sotto (piano −1), scorciatoie con cancello e accessi (rampe, ascensori). Il resto del bioma
-  resta com'è.
+  resta com'è;
+- **secondo gruppo (City pop, Egitto, Vietnam), risposte all'inizio del gruppo:**
+  - **terreno alzato di una base:** i tre biomi si alzano tutti di 14 gradini; la superficie resta identica e si
+    disegna come oggi (il disegno toglie la base). Sotto c'è posto per reti vere sul piano −2, alla quota 0: la
+    metropolitana sotto le strade, il sotterraneo grande sotto il deserto, le gallerie del Vietnam. Il piano −1 resta
+    per le grotte e le gallerie dei complessi, alla quota della base;
+  - **la galleria del Vietnam** va dal tunnel di oggi, a sud, fino al punto d'arrivo del teletrasporto, in alto a
+    destra, con qualche botola laterale; il salto con E sparisce;
+  - **accessi:** scale che scendono dalla strada o dalla sabbia (una rampa in una buca) e, in un punto per bioma, il
+    pozzo con l'ascensore.
+- **terzo gruppo (Neve, Inferno, Gotico), risposte date alla fine del secondo** (l'utente ha chiesto le domande prima,
+  per fare il terzo gruppo subito dopo il secondo, senza fermarsi):
+  - **Neve, il crepaccio scavato:** la Neve si alza di una base come i biomi del secondo gruppo, e la superficie si vede
+    uguale. Il crepaccio è una spaccatura profonda 14 nella neve: il ponte di corda lo attraversa alla quota del terreno
+    (piano +1) e il fondo è la strada lunga, con scale, ascensore, guardie e segreto;
+  - **Inferno, sopra un fiume di lava:** il terreno resta com'è. Un complesso alto 14 a cavallo di uno dei fiumi di lava
+    di oggi: due rupi, il ponte di ossa sopra la lava (piano +1) e dentro le rupi le caverne di lava (piano −1), con
+    cancello e ascensore. Sul ponte si passa senza toccare la lava;
+  - **Gotico, cripta e catacombe:** il terreno si alza di una base come l'Egitto. Sul piano −2 la cripta grande sotto la
+    collina e le catacombe che la uniscono al cimitero, con scale nelle tombe aperte e il pozzo con l'ascensore. Sopra,
+    il ballatoio di una casa in rovina, con la scorciatoia;
+  - **il killer del Gotico non scende:** resta in superficie, e sotto terra lo si semina.
 
 **Temi:**
 
@@ -2262,10 +2285,57 @@ In corso.
       Giungla (il punto più irregolare ora è il complesso); camminata e ingaggio cambiano a ogni giro; le altre
       differenze sono sotto l'1%, attorno al robot (animazione). 18 catture nuove dei complessi;
     - smoke dell'editor: 12 catture, nessun errore;
-    - **benchmark non valido:** il portatile era a batteria. La RTX 3060 (due giri «prima», uno «dopo») resta
-      bloccata a 30 fotogrammi al secondo, 33,33 ms in ogni stage, prima e dopo; altri due giri «dopo» sono finiti
-      sulla grafica Intel. I tempi di CPU del disegno stanno nel rumore fra un giro e l'altro. Da rifare alla
-      corrente.
+    - benchmark: il primo giro, a batteria, non valeva (la RTX 3060 bloccata a 30 fotogrammi al secondo, poi la
+      grafica Intel). Rifatto alla corrente, su richiesta dell'utente, due giri prima e due dopo alternati: media dei
+      gruppi +0,4%, peggiore +2,8% (lo scontro su due livelli, uno stage solo: rumore). Gli stage dei complessi
+      costano 1,11 ms di media, come le grotte (1,12 ms).
+- **Passo 2, secondo gruppo di biomi: City pop, Egitto, Vietnam** (26 ottobre 2026): fatto. L'utente ha dato prima le
+  risposte del terzo gruppo, per farlo subito dopo: le catture dei due gruppi si guardano insieme alla fine del terzo.
+  - **Domande all'inizio del gruppo** (risposte nel «Progetto»): metropolitana, sotterraneo grande e gallerie sono reti
+    lunghe, e sotto il terreno alto 0 non c'è posto. L'utente ha scelto di **alzare il terreno dei tre biomi di una
+    base**, la galleria del Vietnam **fino all'arrivo del tunnel di oggi** e gli accessi con **scale e un ascensore**.
+  - **La base** (`level.Level.base`, `World.base`): le regole contano le quote da 0 come prima; il disegno toglie la base
+    dappertutto (`board_drawn`), così la superficie dei tre biomi si vede uguale. Verificato con lo smoke: le catture di
+    City pop, Egitto e Vietnam sono uguali a prima, salvo l'animazione del robot (meno dello 0,02% dei pixel).
+  - **Le reti** (`src/expedition/network.odin`) sul piano −2 alla quota 0: la metro di City pop (tre stazioni), la
+    necropoli dell'Egitto (grande sala, tomba, sala sotto la piramide), le gallerie del Vietnam (dal tunnel di oggi
+    all'arrivo, sei camere, quattro botole). Un ascensore per bioma (in Egitto il pozzo dalla cima della piramide), un
+    cancello che si apre da una parte sola, nemici e segreto.
+  - **I complessi:** tetti e cavalcavia (City pop), piramidi a gradoni (Egitto), ponte di bambù sul fiume (Vietnam).
+  - **Scelte prese durante il lavoro:**
+    - le reti stanno sul piano −2, non −1: così passano anche sotto le grotte e le gallerie dei complessi, che sono
+      sul −1 alla quota della base;
+    - una rete non passa mai sotto un muro o una decorazione: per la regola delle colonne (`level.column_of`) sotto un
+      muro c'è roccia piena, e il robot lì non risultava «sotto una volta» (niente dissolvenza, niente finestra).
+      Le vie girano attorno con una ricerca in ampiezza; le sale tengono solo le caselle collegate al centro;
+    - le scale si cercano attorno alla sala e si collegano con la stessa via: le stazioni stanno spesso dentro un
+      luogo, con il muro di cinta, e una scala dritta non ne usciva. La stazione a sud-est della metro è in un incrocio
+      libero (74%, 59%);
+    - nelle buche delle scale la finestra attorno al robot non c'è: tagliava la rampa e sotto si vedeva il vuoto nero;
+      sotto terra invece è più larga, per tagliare anche gli edifici e i luoghi sopra;
+    - il tunnel del Vietnam non si usa più con E (come l'imbocco di una grotta): si scende dalle scale accanto;
+    - **la telecamera dopo un salto** (`update_tactical_view`): sui piani la quota della telecamera va verso quella del
+      robot un po' alla volta, e lo faceva anche quando la telecamera salta (una mappa nuova, il robot messo altrove),
+      partendo dalla quota di prima. Ora in un salto prende subito la quota del robot, come già la posizione. L'ha
+      mostrato lo smoke: con il Vietnam a piani, una cattura della Neve usciva inquadrata con la quota dello stage prima.
+  - **Test:** i rilievi contano le quote dalla base. Nuovi: le reti nei tre biomi, segreto e nemici raggiungibili, la
+    galleria del Vietnam dal tunnel all'arrivo, la base nel salvataggio, la telecamera che salta di piano; le prove con i
+    nemici liberi girano nei sei complessi. Via il test del salto con E.
+  - **Verifiche:**
+    - check con e senza assert; `.\scripts\check.ps1` completo: 1729 test verdi (5 nuovi, uno tolto), più le due build;
+    - smoke del laboratorio: le 129 catture identiche al byte a quelle del primo gruppo;
+    - smoke delle spedizioni: 149 catture, nessun errore. City pop, Egitto e Vietnam si vedono come prima (meno dello
+      0,02% dei pixel diversi, l'animazione del robot); 18 catture nuove dei complessi e 9 delle reti. Con la telecamera
+      corretta cambiano le catture fatte dopo un salto di piano (montagna, imbocchi delle grotte, panorami dei complessi,
+      quattro rilievi, il ponte del Far West): stessa scena, con il robot al centro;
+    - smoke dell'editor: 12 catture, nessun errore;
+    - benchmark sulla RTX 3060, alla corrente, tre giri per parte: lo stesso eseguibile al giro dopo esce più lento del
+      3-5% (si scalda), quindi conta il confronto in ordine bilanciato (vecchio, nuovo, nuovo, vecchio). Media dei gruppi
+      +2,0%, dentro il rumore. Costano davvero di più solo i centri di City pop (+13,5%, 0,15 ms) e dell'Egitto (+10,2%,
+      0,11 ms), con la stessa immagine: lì la rete passa sotto la vista, e i blocchi sotterranei attorno al robot si
+      mandano alla scheda a ogni fotogramma, come il terreno (la Fase 8 li carica una volta sola). In Vietnam, con le
+      gallerie lontane dal centro, non cambia niente. Gli stage dei complessi costano 1,23 ms di media, quelli delle reti
+      1,21 ms, le grotte 1,14 ms.
 
 ### Cosa si fa
 

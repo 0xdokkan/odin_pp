@@ -10,7 +10,7 @@ import grid "../engine/grid"
 import level "../level"
 
 @(private = "file")
-COMPLEX_BIOMES :: [3]campaign.Biome{.Cyber, .West, .Jungle}
+COMPLEX_BIOMES :: [6]campaign.Biome{.Cyber, .West, .Jungle, .City, .Egypt, .Vietnam}
 
 // The walkable cells of the map no walk from the spawn reaches, on any layer (level.layer_reach: ramps, mouths, decks,
 // lifts), the gates shut: none but a massif's top, rock over a cave.

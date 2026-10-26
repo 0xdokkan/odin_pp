@@ -180,7 +180,8 @@ void caveMain() {
 // A complex's decks (expedition_decks.odin): the biome's bridge, its top in its own material, its frame (the edges, the
 // underside, the trestles: the vertices' red at 0) darker. The vertices' green says the way it runs (along x at 1), their
 // blue whether the cell is in its middle (1) or on its edge, their alpha how near an open side a point is (0 on it), where
-// the biome's railing runs: the data walkway's neon, the train bridge's beam, the vine bridge's vines.
+// the biome's railing runs: the data walkway's neon, the train bridge's beam, the vine bridge's vines, the overpass's
+// kerb, the bamboo bridge's rope.
 void deckMain() {
     vec3 n=normalize(normal);
     vec2 p=worldPosition.xz;
@@ -209,6 +210,23 @@ void deckMain() {
             metallic=mix(metallic,.7,rail);roughness=mix(roughness,.3,rail);
         }
         base=mix(base,vec3(.30,.19,.10),rim);
+    } else if(floorBiome==3) {
+        // City pop's overpass: concrete slabs across it, a dashed line along its middle, a pale kerb on its open sides.
+        float slab=floorJoint(p,vec2(2.,1.),0.,.010,aa);
+        base=mix(vec3(.105,.108,.118),vec3(.125,.128,.138),abs(fract(q.x*.21)-.5)*2.);
+        base*=1.-slab*.25;
+        float dash=step(.5,fract(q.x*.5))*(1.-smoothstep(.04,.04+aa,abs(fract(q.y)-.5)));
+        if(color.b>.5 || color.g>.5) base=mix(base,vec3(.42,.38,.20),dash*.8);
+        base=mix(base,vec3(.30,.30,.32),rim);
+        roughness=.6;
+    } else if(floorBiome==5) {
+        // The Vietnam's bamboo bridge: poles along it, bound across every half cell, a rope on its open sides.
+        float pole=abs(fract(q.y*5.)-.5)*2.;
+        float bind=1.-smoothstep(.05,.05+aa,abs(fract(q.x*2.)-.5));
+        base=mix(vec3(.20,.17,.07),vec3(.36,.31,.13),smoothstep(.2,.9,pole));
+        base=mix(base,vec3(.12,.09,.05),bind*.7);
+        base=mix(base,vec3(.30,.25,.15),rim);
+        roughness=.7;
     } else if(floorBiome==2) {
         // The vine bridge: planks across it with gaps between, lashed with green vines along its open sides.
         float plank=1.-smoothstep(.40,.40+aa,abs(fract(q.x*2.6)-.5));

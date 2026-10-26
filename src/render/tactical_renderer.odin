@@ -350,7 +350,9 @@ update_tactical_view :: proc(renderer: ^Renderer, room: ^game.Room, mouse: view.
 	// to a new layer's floor, up a ladder or down off a bridge (Fase 4 of docs/piano-profondita.md).
 	ground := entity_point_ground(game.PLAYER_ENTITY, p)
 	if board_view.layered {
-		if v.camera_ground_set { ground = v.camera_ground+(ground-v.camera_ground)*TACTICAL_LAYER_CAMERA_EASE }
+		// A jump of an expedition's camera (a new map, a robot set down elsewhere) takes the floor's height at once.
+		snap := room.player.tactical.config.expedition && !v.expedition_follow_ready
+		if v.camera_ground_set && !snap { ground = v.camera_ground+(ground-v.camera_ground)*TACTICAL_LAYER_CAMERA_EASE }
 		v.camera_ground, v.camera_ground_set = ground, true
 	} else { v.camera_ground_set = false }
 	target := rl.Vector3{p.x+0.5, ground, p.y+0.5}+forward*(aim*footprint_scale*(1-LASSO_CAMERA_AIM*pull))

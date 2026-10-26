@@ -158,7 +158,7 @@ valid_snapshot :: proc(s:^Snapshot) -> bool {
 	}
 	for pool in s.layer_pools[:s.layer_pool_count] {if int(pool[0])<size*size || int(pool[0])>=size*size*level.LAYER_COUNT || pool[1]<0 {return false}}
 	for cave in w.caves[:w.cave_count] {if cave.site<0 || cave.site>=w.site_count || w.sites[cave.site].kind!=.Cave || cave.state>.Looted {return false}}
-	if w.complex_count<0 || w.complex_count>MAX_COMPLEXES || w.lift_count<0 || w.lift_count>MAX_WORLD_LIFTS || w.gate_count<0 || w.gate_count>MAX_WORLD_GATES {return false}
+	if w.complex_count<0 || w.complex_count>MAX_COMPLEXES || w.lift_count<0 || w.lift_count>MAX_WORLD_LIFTS || w.gate_count<0 || w.gate_count>MAX_WORLD_GATES || w.base<0 || w.base>level.LAYER_SPACING*4 {return false}
 	for c in w.complexes[:w.complex_count] {if c.kind==.None || c.kind>max(Complex_Kind) || !inside(c.origin,size) {return false}}
 	for lift in w.lifts[:w.lift_count] {if !inside(lift.ends[0],size) || !inside(lift.ends[1],size) || lift.rest>1 {return false}}
 	for gate in w.gates[:w.gate_count] {if !inside(gate.cell,size) || !inside(gate.lever,size) {return false}}
@@ -191,6 +191,8 @@ restore :: proc(s:^Snapshot,w:^World,data:^level.Level,player:^game.Player,room:
 	created,allocated:=level.create(side,side,{.Void})
 	if !allocated {return false}
 	data^=created
+	// The base the world's ground was raised by (0 in a save from before there was one, whose ground is not raised).
+	data.base=s.world.base
 	copy(data.tiles.cells[:],s.tiles[:side*side])
 	_=level.set_height_table(data,s.heights[:side*side])
 	// The other layers before the room, whose tables are made for them; a map that breaks their rule is not one.
