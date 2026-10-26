@@ -163,13 +163,13 @@ EXPEDITION_SMOKE_PLACE_STEPS :: 4
 // The hologram in a cave (Fase 5 of docs/piano-profondita.md): in the Snow's mountain room, its room in place of the rock.
 @(private)
 EXPEDITION_SMOKE_CAVE_MAP :: EXPEDITION_SMOKE_PLACE+EXPEDITION_SMOKE_PLACE_STEPS
-// The complexes (Fase 7 of docs/piano-profondita.md) of the first two groups of biomes: the whole complex from its foot,
-// under its bridge (a pyramid's terrace), on it (a pyramid's top), by its gate, on its lift halfway down, and a fight
-// between its layers.
+// The complexes (Fase 7 of docs/piano-profondita.md) of the first three groups of biomes: the whole complex from its foot,
+// under its bridge (a pyramid's terrace, the crevasse's bottom), on it (a pyramid's top), by its gate, on its lift halfway
+// down, and a fight between its layers.
 @(private)
 EXPEDITION_SMOKE_COMPLEXES :: EXPEDITION_SMOKE_CAVE_MAP+1
 @(private)
-EXPEDITION_SMOKE_COMPLEX_BIOMES :: [6]campaign.Biome{.Cyber,.West,.Jungle,.City,.Egypt,.Vietnam}
+EXPEDITION_SMOKE_COMPLEX_BIOMES :: [9]campaign.Biome{.Cyber,.West,.Jungle,.City,.Egypt,.Vietnam,.Snow,.Inferno,.Gothic}
 @(private)
 EXPEDITION_SMOKE_COMPLEX_VIEWS :: 6
 // The networks under the ground of the raised biomes (expedition/network.odin): on a stair's pit, in a hall with its foes,
@@ -177,7 +177,7 @@ EXPEDITION_SMOKE_COMPLEX_VIEWS :: 6
 @(private)
 EXPEDITION_SMOKE_NETWORKS :: EXPEDITION_SMOKE_COMPLEXES+len(EXPEDITION_SMOKE_COMPLEX_BIOMES)*EXPEDITION_SMOKE_COMPLEX_VIEWS
 @(private)
-EXPEDITION_SMOKE_NETWORK_BIOMES :: [3]campaign.Biome{.City,.Egypt,.Vietnam}
+EXPEDITION_SMOKE_NETWORK_BIOMES :: [4]campaign.Biome{.City,.Egypt,.Vietnam,.Gothic}
 @(private)
 EXPEDITION_SMOKE_NETWORK_VIEWS :: 3
 // The last stage of the path; the smoke quits after it.
@@ -559,7 +559,8 @@ expedition_smoke_mountain :: proc(e:^run.Expedition_Session,step:int) {
 		expedition_smoke_world(e,.Snow);e.world.mounted=false;e.message_timer=0
 		assert(world.mountain_present(&e.world),"the Snow has no mountain")
 		summit:=world.mountain_cell(level.mountain_summit())
-		assert(int(level.height_at(e.rs.room.level_data,summit))==level.MOUNTAIN_TOP,"the mountain has no summit")
+		// Over the biome's base (the Neve is raised for its crevasse).
+		assert(int(level.height_at(e.rs.room.level_data,summit))==int(e.rs.room.level_data.base)+level.MOUNTAIN_TOP,"the mountain has no summit")
 		found:=false
 		for drop in e.world.drops[:e.world.drop_count] {if drop.position==summit && drop.item.kind==.Relic {found=true}}
 		assert(found,"no relic at the summit")
@@ -827,7 +828,8 @@ expedition_smoke_place :: proc(e:^run.Expedition_Session,step:int) {
 	e.rs.iso_renderer.tactical.expedition_follow_ready=false
 }
 
-// A fight on two levels: the robot on a Snow plateau, one foe on the ground three steps or more below.
+// A fight on two levels: the robot on a Snow plateau, one foe on the ground three steps or more below (the heights from
+// the map's base: the Neve is raised for its crevasse, whose bottom is no ground for this fight).
 @(private)
 expedition_smoke_two_levels :: proc(e:^run.Expedition_Session) {
 	expedition_smoke_world(e,.Snow);e.world.mounted=false;e.message_timer=0
@@ -835,10 +837,11 @@ expedition_smoke_two_levels :: proc(e:^run.Expedition_Session) {
 	high_cell,low_cell,best:=grid.Position{},grid.Position{},1<<30
 	for y in 14..<data.tiles.height-14 {for x in 14..<data.tiles.width-14 {
 		cell:=grid.Position{x = x, y = y}
-		if level.height_at(data,cell)<4 || game.cell_blocks_movement(&e.rs.room,cell) {continue}
+		if level.height_at(data,cell)-data.base<4 || game.cell_blocks_movement(&e.rs.room,cell) {continue}
 		for dy in -3..=3 {for dx in -3..=3 {
 			other:=grid.Position{x = x+dx, y = y+dy}
-			if abs(dx)+abs(dy)<2 || level.height_at(data,other)>1 || game.cell_blocks_movement(&e.rs.room,other) {continue}
+			ground:=level.height_at(data,other)-data.base
+			if abs(dx)+abs(dy)<2 || ground<0 || ground>1 || game.cell_blocks_movement(&e.rs.room,other) {continue}
 			distance:=world.distance(cell,{x = data.tiles.width/2, y = data.tiles.height/2})
 			if distance<best {high_cell,low_cell,best=cell,other,distance}
 		}}

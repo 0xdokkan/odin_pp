@@ -181,7 +181,7 @@ void caveMain() {
 // underside, the trestles: the vertices' red at 0) darker. The vertices' green says the way it runs (along x at 1), their
 // blue whether the cell is in its middle (1) or on its edge, their alpha how near an open side a point is (0 on it), where
 // the biome's railing runs: the data walkway's neon, the train bridge's beam, the vine bridge's vines, the overpass's
-// kerb, the bamboo bridge's rope.
+// kerb, the bamboo bridge's rope, the rope bridge's ropes, the bones' ends, the gallery's balustrade.
 void deckMain() {
     vec3 n=normalize(normal);
     vec2 p=worldPosition.xz;
@@ -189,6 +189,9 @@ void deckMain() {
     float aa=max(footprint.x,footprint.y);
     if(normal.y<.5 || color.r<.5) {
         vec3 frame=floorBiome==1?vec3(.165,.105,.062):(floorBiome==2?vec3(.105,.082,.048):vec3(.062,.070,.088));
+        if(floorBiome==6) frame=vec3(.16,.13,.10);
+        if(floorBiome==7) frame=vec3(.40,.35,.28);
+        if(floorBiome==8) frame=vec3(.08,.065,.05);
         if(normal.y<-.5) frame*=.6;
         finalColor=vec4(expedition_lit(worldPosition,n,frame,.8,floorBiome==0?.35:.04),1.);
         return;
@@ -235,6 +238,31 @@ void deckMain() {
         float vine=rim*(.6+.4*sin(q.x*9.));
         base=mix(base,vec3(.09,.20,.05),clamp(vine,0.,1.));
         roughness=.85;
+    } else if(floorBiome==6) {
+        // The Neve's rope bridge: planks across it with dark gaps, frost on some, ropes along its open sides.
+        float plank=1.-smoothstep(.36,.36+aa,abs(fract(q.x*3.)-.5));
+        float grain=abs(fract(q.y*5.+q.x*.5)-.5)*2.;
+        base=mix(vec3(.025,.030,.040),mix(vec3(.30,.25,.20),vec3(.38,.33,.27),grain),plank);
+        float frost=smoothstep(.55,.95,hash21(floor(q*vec2(3.,2.))));
+        base=mix(base,vec3(.80,.86,.92),frost*.35*plank);
+        base=mix(base,vec3(.42,.36,.26),rim);
+        roughness=.85;
+    } else if(floorBiome==7) {
+        // The Inferno's bridge of bones: pale ribs across it on a spine along its middle, embers glowing between them.
+        float rib=1.-smoothstep(.28,.28+aa,abs(fract(q.x*2.5)-.5));
+        float spine=1.-smoothstep(.10,.10+aa,abs(fract(q.y)-.5));
+        float bone=max(rib,spine*.8);
+        base=mix(vec3(.05,.02,.015),vec3(.44,.39,.31),bone);
+        emission+=expedition_linear(vec3(1.,.32,.08))*(1.-bone)*.45;
+        base=mix(base,vec3(.52,.46,.36),rim);
+        roughness=.6;
+    } else if(floorBiome==8) {
+        // The Gotico's gallery: weathered boards along it with dark seams, a pale balustrade on its open sides.
+        float board=1.-smoothstep(.42,.42+aa,abs(fract(q.y*4.)-.5));
+        float grain=abs(fract(q.x*1.7+q.y*.3)-.5)*2.;
+        base=mix(vec3(.03,.025,.02),mix(vec3(.15,.13,.11),vec3(.20,.18,.15),grain),board);
+        base=mix(base,vec3(.52,.50,.44),rim);
+        roughness=.9;
     } else {
         // The data walkway: steel grating in a fine grid between solid plates, a neon rim along its open sides.
         float grate=max(inkLine(fract(q.x*4.)-.5,.03,aa*4.),inkLine(fract(q.y*4.)-.5,.03,aa*4.));
@@ -251,6 +279,9 @@ void floorMain() {
     // The walls of a cliff are dark rock, tinted a little by the biome, lit facet by facet.
     if(normal.y<.5) {
         vec3 rock=mix(vec3(.05,.055,.07),biomeTint*.12,.5);
+        // Under the board's plane, in a pit dug under a raised map's base, the biome's rock is lighter at the rim and
+        // darker toward the bottom, so that the pit reads as a hollow and not as a slot of black.
+        if(worldPosition.y<-.02) rock=mix(mix(vec3(.15,.16,.18),biomeTint*.42,.45),rock,smoothstep(0.,1.7,-worldPosition.y)*.75);
         finalColor=vec4(expedition_lit(worldPosition,normalize(normal),rock,.85,.1),1.);
         return;
     }
@@ -544,8 +575,10 @@ void floorMain() {
         }
     }
     // The higher the ground, the lighter: ten percent a step, so that hills and dunes read from above; no more
-    // than six steps' worth, so that a mountain's top is not white.
+    // than six steps' worth, so that a mountain's top is not white. Under the board's plane, in a pit dug under a raised
+    // map's base (a stair's, a crevasse), the darker the deeper.
     base*=1.+clamp(worldPosition.y,0.,.72)*.9;
+    base*=1.-smoothstep(0.,1.7,-worldPosition.y)*.45;
     // The sculpted ground's own normal, smoothed across ramps and hills: a slope turned to the light is lighter.
     vec3 n=normalize(normal);
     vec3 lit=expedition_lit(worldPosition,n,base,roughness,.3)*contact;

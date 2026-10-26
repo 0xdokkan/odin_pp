@@ -879,14 +879,25 @@ avviare è `build/odin_pp`; conserva il limite fps delle impostazioni di gioco.
     prima ha il pozzo `D` fino alla necropoli, la seconda segreto e guardie in cima.
   - Vietnam, `Bamboo_Bridges`: due colline sulle rive di un fiume e un ponte di bambù sopra l'acqua
     (`Complex_Layout.over_water`: il ponte sopra l'acqua, blocchi e rampe all'asciutto).
+  - Montagne innevate, `Crevasse`: un crepaccio **scavato** (`Complex_Layout.dug`, nella Neve alzata di una base): il fondo
+    `COMPLEX_TOP` gradini sotto la neve (`_`), una scala che scende dall'ovest, il ponte di corda sul piano +1 alla quota
+    della neve, guardie e segreto sul fondo; l'ascensore scende dalla neve in una nicchia, il cancello della nicchia si apre
+    dal fondo. In un complesso scavato `complex_levels` dà fondo e neve, `complex_mark_pit` le caselle scavate.
+  - Inferno, `Bone_Bridge`: due rupi ai lati di un fiume di lava e il ponte di ossa fra le cime (`over_lava`: il ponte sopra
+    la lava, rupi e scala all'asciutto). La scala gira una volta, perché i fiumi tornano ogni 23 colonne. Nella rupe est la
+    caverna di lava con le guardie, il cancello all'imbocco (leva dentro) e il pozzo fino alla cima. L'eruzione non rompe la
+    roccia dei complessi.
+  - Southern gothic, `Ruined_House`: un fienile e una casa in rovina, il ballatoio fra i tetti; scala esterna sul fienile,
+    segreto e guardie sul tetto della casa, ascensore sul fianco della casa con il cancello in cima (leva sul tetto).
 - **Smoke:** gli stage dal 104 (`ODIN_PP_SMOKE_ONLY=complessi`), sei per bioma (Robotica, Far West, Giungla, City pop,
-  Egitto, Vietnam): panorama, sotto il ponte (in Egitto una terrazza), sul ponte (la cima), al cancello, in ascensore, uno
-  scontro fra i piani.
+  Egitto, Vietnam, Neve, Inferno, Gotico, fino al 157): panorama, sotto il ponte (in Egitto una terrazza, nella Neve il fondo
+  del crepaccio), sul ponte (la cima), al cancello, in ascensore, uno scontro fra i piani.
 
-## Il terreno alzato e le reti sotterranee (Fase 7 del piano profondità, secondo gruppo)
+## Il terreno alzato e le reti sotterranee (Fase 7 del piano profondità, secondo e terzo gruppo)
 
-- **La base** (`level.Level.base`, `World.base`, `expedition.biome_base`): City pop, Egitto e Vietnam hanno tutto il
-  terreno alzato di `EXPEDITION_RAISED_BASE` (14) gradini in `apply_relief` (scelta dell'utente). Le regole contano le
+- **La base** (`level.Level.base`, `World.base`, `expedition.biome_base`): City pop, Egitto, Vietnam, Neve e Gotico hanno
+  tutto il terreno alzato di `EXPEDITION_RAISED_BASE` (14) gradini in `apply_relief` (scelta dell'utente). La montagna della
+  Neve sta sopra la base (`level.mountain_stamp` aggiunge `Level.base`), e così la stanza della sua grotta. Le regole contano le
   quote da 0 come sempre; il disegno toglie la base (`board_drawn`, `board_base_drawn` in `render/height_view.odin`; il
   rilievo, le stanze sotterranee, i ponti, l'arco delle grotte, la prima persona e l'ologramma fanno lo stesso), così la
   superficie si vede come prima e i piani sotto vanno sotto il piano del tavolo. Il salvataggio tiene la base nel mondo
@@ -895,18 +906,23 @@ avviare è `build/odin_pp`; conserva il limite fps delle impostazioni di gioco.
   fissi in centesimi della mappa) unite da vie che girano attorno a muri e buche (`network_way`, una ricerca in ampiezza;
   sotto un muro la colonna è roccia piena, `level.column_of`). Metro di City pop (tre stazioni), necropoli dell'Egitto (la
   sala sotto il pozzo della piramide, la grande sala, la tomba), gallerie del Vietnam (dal tunnel di oggi al suo arrivo,
-  sei camere). Scale: buche con una rampa da 1 a 13 gradini (`network_stair`), la più vicina alla sala che ha una via;
+  sei camere), cripta e catacombe del Gotico (il pozzo con l'ascensore, la cripta sotto la collina, due tombe aperte con
+  le scale). La Neve è alzata per il crepaccio e non ha rete. Scale: buche con una rampa da 1 a 13 gradini (`network_stair`), la più vicina alla sala che ha una via;
   un ascensore per bioma (`network_lift`, o il pozzo `D` della piramide); un cancello sulla via indicata
   (`Network_Plan.gate_way`), con la leva verso la sala dopo. Guardie e segreto in `fill_network`.
 - **Il tunnel del Vietnam:** il salto con E non c'è più (`tunnel_destination` tolto); `nearest_site` non offre il tunnel,
   come le grotte: si scende dalle scale accanto.
+- **Il killer del Gotico** non scende sotto terra (scelta dell'utente): mentre il robot è sotto, aspetta in superficie e non
+  lo vede; uno scontro con lui finisce quando il robot scende (`tick`, come il guinzaglio).
 - **Disegno:** le caselle accanto a una buca hanno il loro muro anche se piane alla base, e il piano non copre le buche
   (`Expedition_Terrain_Chunk.sunk`). Sotto il piano, sotto roccia, la finestra attorno al robot è più larga (taglia anche
   gli edifici sopra) e la superficie è più scura (la scatola della «grotta» è di poche caselle attorno a lui); in una buca
-  la finestra non c'è (sotto la buca non c'è niente da mostrare). Ponti di City pop (lastre e riga tratteggiata) e del
-  Vietnam (bambù) in `deckMain`.
-- **Smoke:** gli stage dal 140 (`ODIN_PP_SMOKE_ONLY=reti`), tre per bioma: a metà di una scala, in una sala vicino ai
-  nemici, sull'ascensore a metà discesa.
+  la finestra non c'è (sotto la buca non c'è niente da mostrare). Sotto il piano le pareti di una buca hanno la roccia
+  del bioma, più chiara al bordo e più scura verso il fondo, e il fondo è più scuro quanto è più giù. Ponti di City pop
+  (lastre e riga tratteggiata), del Vietnam (bambù), della Neve (assi e corde), dell'Inferno (ossa e braci) e del Gotico
+  (assi del ballatoio, balaustra) in `deckMain`.
+- **Smoke:** gli stage dal 158 (`ODIN_PP_SMOKE_ONLY=reti`), tre per bioma (City pop, Egitto, Vietnam, Gotico): a metà di
+  una scala, in una sala vicino ai nemici, sull'ascensore a metà discesa.
 
 ## Strutture posate dal giocatore (Fase 7 del piano griglia)
 

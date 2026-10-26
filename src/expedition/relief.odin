@@ -33,12 +33,13 @@ RELIEF_MAX :: u8(12)
 
 // THE RAISED BIOMES (Fase 7 of docs/piano-profondita.md, the user's choice for its second group): City pop, Egitto and
 // Vietnam have all their ground raised by a base, so that there is room under it for their networks on the deep layer
-// (network.odin); the surface is the same, and drawn as before (level.Level.base).
+// (network.odin); the surface is the same, and drawn as before (level.Level.base). In the third group the Neve too, for
+// the crevasse dug in its snow (complex.odin), and the Gotico, for its crypt and catacombs (network.odin).
 EXPEDITION_RAISED_BASE :: level.LAYER_SPACING+2
 
 biome_base :: proc(b: campaign.Biome) -> i32 {
 	#partial switch b {
-	case .City, .Egypt, .Vietnam: return EXPEDITION_RAISED_BASE
+	case .City, .Egypt, .Vietnam, .Snow, .Gothic: return EXPEDITION_RAISED_BASE
 	}
 	return 0
 }

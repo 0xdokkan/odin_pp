@@ -10,12 +10,15 @@ import level "../level"
 import render "../render"
 import run_session "../run"
 
-// Each complex of the first group of biomes (Fase 7 of docs/piano-profondita.md) lives a minute of play as an expedition
+@(private = "file")
+COMPLEX_PLAY_BIOMES :: [9]campaign.Biome{.Cyber, .West, .Jungle, .City, .Egypt, .Vietnam, .Snow, .Inferno, .Gothic}
+
+// Each biome's complex (Fase 7 of docs/piano-profondita.md) lives a minute of play as an expedition
 // has it: the robot still on the complex's bridge, its guards woken and free, the controller and the world ticking. Nothing
 // breaks the foes' beat across the layers and the lifts (a foe off a lift with no intent once stopped the game).
 @(test)
 test_the_complexes_live_a_minute_of_play_with_their_guards_free :: proc(t: ^testing.T) {
-	for biome in ([6]campaign.Biome{.Cyber, .West, .Jungle, .City, .Egypt, .Vietnam}) {
+	for biome in COMPLEX_PLAY_BIOMES {
 		w: world.World
 		data: level.Level
 		testing.expect(t, world.generate(&w, &data, biome, 21))
@@ -90,7 +93,7 @@ complex_beside :: proc(room: ^game.Room, cell: grid.Position) -> grid.Position {
 // up out of play and fights on; nothing breaks the foes' beat.
 @(test)
 test_a_foe_rides_a_complexs_lift_up_after_the_robot :: proc(t: ^testing.T) {
-	for biome in ([6]campaign.Biome{.Cyber, .West, .Jungle, .City, .Egypt, .Vietnam}) {
+	for biome in COMPLEX_PLAY_BIOMES {
 		w: world.World
 		data: level.Level
 		testing.expect(t, world.generate(&w, &data, biome, 33))

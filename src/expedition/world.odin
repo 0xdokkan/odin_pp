@@ -464,7 +464,9 @@ tick :: proc(w:^World,room:^game.Room,dt:f32) {
 			_=engage(w,room,i)
 			leash:=20 if g.killer else 12
 			if g.site>=0 && w.sites[g.site].layout_version==SITE_LAYOUT_VERSION {leash=site_layout(w.sites[g.site].kind).encounter_radius}
-			if distance(player,g.anchor)>leash {
+			// Under the ground the robot shakes the Gotico's killer off: he does not go down after him (the user's choice in
+			// Fase 7 of docs/piano-profondita.md).
+			if distance(player,g.anchor)>leash || g.killer && player.layer<grid.GROUND_LAYER {
 				for &m,member_index in g.members[:g.count] {
 					if !m.deployed {continue}
 					for e,j in room.enemies {if e.id==m.enemy.id {m.enemy=e;ordered_remove(&room.enemies,j);break}}
@@ -477,6 +479,8 @@ tick :: proc(w:^World,room:^game.Room,dt:f32) {
 		}
 		if g.lure_phase!=.None {tick_patrol_lure(w,room,&g,patrol_due)}
 		if distance(player,g.anchor)>18 && !g.killer && g.lure_phase==.None {continue}
+		// The killer waits on the open ground while the robot is under it.
+		if g.killer && player.layer<grid.GROUND_LAYER {continue}
 		if g.patrol && patrol_due && !g.pursuing && g.lure_phase==.None {
 			steps := [4]grid.Position{{x = 1, y = 0},{x = 0, y = 1},{x = -1, y = 0},{x = 0, y = -1}}
 			move_sleeping_group(w,&g, room, steps[(g.patrol_step/3)%4]);g.patrol_step+=1
@@ -488,7 +492,7 @@ tick :: proc(w:^World,room:^game.Room,dt:f32) {
 		}
 		if g.killer && patrol_due {
 			dx,dy:=clamp(player.x-g.anchor.x,-1,1),clamp(player.y-g.anchor.y,-1,1)
-			p,_:=game.layer_step(room,g.anchor,{x = dx, y = dy}); if game.base_cell_is_walkable(room,p) {g.anchor=p;g.members[0].enemy.position=p}
+			p,_:=game.layer_step(room,g.anchor,{x = dx, y = dy}); if p.layer>=grid.GROUND_LAYER && game.base_cell_is_walkable(room,p) {g.anchor=p;g.members[0].enemy.position=p}
 		}
 		for m in g.members[:g.count] {
 			if !m.alive {continue}
@@ -515,8 +519,8 @@ tick :: proc(w:^World,room:^game.Room,dt:f32) {
 		if w.biome==.Inferno {
 			for offset in -12..=12 {
 				p:=grid.Position{x = w.lane, y = w.lane_center.y+offset} if w.lane_vertical else grid.Position{x = w.lane_center.x+offset, y = w.lane}
-				// The sites' ground stays whole, and the rock over a cave.
-				protected:=cave_rock(w,p)
+				// The sites' ground stays whole, and the rock over a cave, and a complex's.
+				protected:=cave_rock(w,p) || complex_rock(w,p)
 				for site in w.sites[:w.site_count] {if distance(site.position,p)<=2 {protected=true;break}}
 				if !protected {_=game.expedition_fracture_floor(room,p)}
 			}

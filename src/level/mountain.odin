@@ -91,8 +91,8 @@ mountain_summit :: proc() -> grid.Position {
 }
 
 // Raises the mountain on `data`, centred at `centre`: every cell of its square is levelled to the
-// mountain's height there, and a wall or a prop on it is cleared (the mountain is built on open ground).
-// False if the square does not fit in the map.
+// mountain's height there, over the map's base (Level.base), and a wall or a prop on it is cleared (the
+// mountain is built on open ground). False if the square does not fit in the map.
 mountain_stamp :: proc(data: ^Level, centre: grid.Position) -> bool {
 	if data == nil { return false }
 	if centre.x-MOUNTAIN_HALF < 0 || centre.y-MOUNTAIN_HALF < 0 ||
@@ -102,7 +102,7 @@ mountain_stamp :: proc(data: ^Level, centre: grid.Position) -> bool {
 			cell := grid.offset(centre, x, y)
 			tile, _ := tile_at(data, cell)
 			if tile.kind != .Void && tile.kind != .Floor { _ = set_tile(data, cell, {.Floor}) }
-			if !set_height(data, cell, i32(mountain_height({x = x, y = y}))) { return false }
+			if !set_height(data, cell, data.base+i32(mountain_height({x = x, y = y}))) { return false }
 		}
 	}
 	return true

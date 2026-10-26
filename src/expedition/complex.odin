@@ -16,7 +16,9 @@ import rng "../engine/rng"
 // chosen before the relief, which keeps the ground round it level (relief.odin). Every run finds its gate shut
 // (level.Gate); the run decides only who guards it. Robotica cibernetica has a data node, the Far West a train's bridge
 // between two mesas, the Giungla preistorica giant trees by a hill of bones; in the second group City pop has rooftops
-// joined by overpasses, the Egitto two stepped pyramids over its necropolis, the Vietnam bamboo bridges over a river.
+// joined by overpasses, the Egitto two stepped pyramids over its necropolis, the Vietnam bamboo bridges over a river; in
+// the third the Neve a crevasse dug in its snow with a rope bridge over it, the Inferno a bridge of bones over a stream of
+// lava between two cliffs, the Gotico a ruined house and its barn joined by a gallery (the ballatoio).
 //
 // A layout is one string a row of cells, x eastward and y southward:
 //   .     open ground, at the complex's floor (the level ground round it)
@@ -29,6 +31,14 @@ import rng "../engine/rng"
 //   L     a lift up a block's side: its foot on the open ground, its landing on the deck's layer at the top
 //   D     a block's cell with a shaft from its top down to the network under the ground (network.odin)
 // Its gates are listed apart, each on the layer of its cell's mark (a tunnel's, a deck's or a block's top).
+//
+// A DUG layout (the Neve's crevasse, in a biome raised by a base: relief.odin) goes down instead of up: its floor is the
+// open ground's, and what it digs is COMPLEX_TOP steps under it:
+//   _     the bottom, COMPLEX_TOP steps under the floor
+//   $ @   the bottom's cell with the secret, where its guards stand
+//   a..m  a ramp down, 1 to 13 steps over the bottom
+//   =     a deck on the layer over the ground, at the floor, over the bottom
+//   L     a lift up from the bottom: its foot there, its landing on the deck's layer at the floor
 
 COMPLEX_TOP :: level.LAYER_SPACING+2
 MAX_COMPLEXES :: 2
@@ -40,7 +50,7 @@ COMPLEX_TUNNEL :: i8(-1)
 MAX_WORLD_LIFTS :: game.MAX_ROOM_LIFTS
 MAX_WORLD_GATES :: 8
 
-Complex_Kind :: enum u8 { None, Data_Node, Train_Bridge, Giant_Trees, Rooftops, Pyramids, Bamboo_Bridges }
+Complex_Kind :: enum u8 { None, Data_Node, Train_Bridge, Giant_Trees, Rooftops, Pyramids, Bamboo_Bridges, Crevasse, Bone_Bridge, Ruined_House }
 
 Complex :: struct {
 	kind:   Complex_Kind,
@@ -59,8 +69,12 @@ Complex_Layout :: struct {
 	gates:      []Complex_Gate,
 	// How the blocks' tops look (render/expedition_floor_data.odin).
 	surface:    Site_Surface,
-	// Its bridges go over the biome's water, its blocks and ramps stand on dry ground (the Vietnam's rivers).
+	// Its bridges go over the biome's water, its blocks and ramps stand on dry ground (the Vietnam's rivers); or over its
+	// lava (the Inferno's streams).
 	over_water: bool,
+	over_lava:  bool,
+	// It is dug into the ground instead of raised over it (the marks of a dug layout, above).
+	dug:        bool,
 }
 
 // Robotica cibernetica: two data platforms over a road, a walkway between them. Up the east one by its ramp; the west
@@ -185,6 +199,53 @@ BAMBOO_BRIDGES_ROWS := [?]string{
 @(private = "file")
 BAMBOO_BRIDGES_GATES := [?]Complex_Gate{{cell = {x = 17, y = 12}, lever = {x = 17, y = 11}}}
 
+// Montagne innevate: a crevasse dug COMPLEX_TOP deep in the snow (a dug layout), a rope bridge over it at the snow's
+// height. Its bottom is the long way: down a stair at its west end, past its guards to the secret at its east end. There a
+// lift comes down from the snow into a niche, whose gate opens from the crevasse: once opened, the way down from the snow.
+@(private = "file")
+CREVASSE_ROWS := [?]string{
+	"...............................",
+	"mlkjihgfedcba____=_______$__...",
+	"mlkjihgfedcba____=__________L..",
+	"mlkjihgfedcba____=____@_____...",
+	"mlkjihgfedcba____=__________...",
+	"...............................",
+}
+@(private = "file")
+CREVASSE_GATES := [?]Complex_Gate{{cell = {x = 27, y = 2}, lever = {x = 26, y = 2}}}
+
+// Inferno: two cliffs on the two sides of a stream of lava, a bridge of bones between their tops over it. Up the west one
+// by a stair that turns once (the streams come every 23 columns: a straight one would reach the next); the east one has
+// the secret and its guards, and inside it a cavern of lava, with foes, whose mouth on the far side is shut by a gate
+// opened from inside, with a shaft up to the top: once opened, the way up from the ground.
+@(private = "file")
+BONE_BRIDGE_ROWS := [?]string{
+	"ghijklm#######.........#########.",
+	"fedcba.#######.........##$######.",
+	".......#######=========#########.",
+	".......#######=========####@####.",
+	".......#######=========##ttttt##.",
+	".......#######.........##S&ttttt.",
+	".......#######.........#########.",
+}
+@(private = "file")
+BONE_BRIDGE_GATES := [?]Complex_Gate{{cell = {x = 31, y = 5}, lever = {x = 30, y = 5}}}
+
+// Southern gothic: a barn and a ruined house, the gallery between them (the ballatoio) at their roofs. Up the barn by its
+// outer stair; the house has the secret and its guards on its roof, and a lift up its far side whose landing a gate shuts,
+// opened from the roof: once opened, the way up from below.
+@(private = "file")
+RUINED_HOUSE_ROWS := [?]string{
+	".............#######...........#########.",
+	".............#######...........##$######.",
+	"abcdefghijklm#######===========#########.",
+	"abcdefghijklm#######===========#########L",
+	".............#######...........####@####.",
+	".............#######...........#########.",
+}
+@(private = "file")
+RUINED_HOUSE_GATES := [?]Complex_Gate{{cell = {x = 39, y = 3}, lever = {x = 38, y = 3}}}
+
 complex_layout :: proc(kind: Complex_Kind) -> Complex_Layout {
 	switch kind {
 	case .Data_Node: return {rows = DATA_NODE_ROWS[:], gates = DATA_NODE_GATES[:], surface = .Platform}
@@ -193,6 +254,9 @@ complex_layout :: proc(kind: Complex_Kind) -> Complex_Layout {
 	case .Rooftops: return {rows = ROOFTOPS_ROWS[:], gates = ROOFTOPS_GATES[:], surface = .Platform}
 	case .Pyramids: return {rows = PYRAMIDS_ROWS[:]}
 	case .Bamboo_Bridges: return {rows = BAMBOO_BRIDGES_ROWS[:], gates = BAMBOO_BRIDGES_GATES[:], over_water = true}
+	case .Crevasse: return {rows = CREVASSE_ROWS[:], gates = CREVASSE_GATES[:], dug = true}
+	case .Bone_Bridge: return {rows = BONE_BRIDGE_ROWS[:], gates = BONE_BRIDGE_GATES[:], over_lava = true}
+	case .Ruined_House: return {rows = RUINED_HOUSE_ROWS[:], gates = RUINED_HOUSE_GATES[:], surface = .Ruin}
 	case .None:
 	}
 	return {}
@@ -207,6 +271,9 @@ complex_kinds :: proc(b: campaign.Biome) -> (kinds: [MAX_COMPLEXES]Complex_Kind)
 	case .City: kinds[0] = .Rooftops
 	case .Egypt: kinds[0] = .Pyramids
 	case .Vietnam: kinds[0] = .Bamboo_Bridges
+	case .Snow: kinds[0] = .Crevasse
+	case .Inferno: kinds[0] = .Bone_Bridge
+	case .Gothic: kinds[0] = .Ruined_House
 	}
 	return
 }
@@ -241,10 +308,25 @@ complex_mark_deck :: proc(mark: u8) -> bool {
 	return mark == '=' || mark == 'L'
 }
 
-// How many steps over the floor a ramp's mark stands (0: no ramp).
+// In a dug layout: the marks of the cells dug down to its bottom (its own, its secret's and guards', those under its decks
+// and the foot of its lift).
+complex_mark_pit :: proc(mark: u8) -> bool {
+	switch mark {
+	case '_', '$', '@', '=', 'L': return true
+	}
+	return false
+}
+
+// How many steps over the floor a ramp's mark stands (0: no ramp); in a dug layout, over its bottom.
 complex_mark_ramp :: proc(mark: u8) -> i32 {
 	if mark >= 'a' && mark <= 'm' { return i32(mark-'a')+1 }
 	return 0
+}
+
+// The heights of a complex's two levels: its floor and its blocks' top, or, dug, its bottom and its floor.
+complex_levels :: proc(c: Complex) -> (low, high: i32) {
+	if complex_layout(c.kind).dug { return c.floor-COMPLEX_TOP, c.floor }
+	return c.floor, c.floor+COMPLEX_TOP
 }
 
 // The map's cell of the complex's layout cell `local`, on the layer its mark says: a tunnel's under the ground, a
@@ -287,9 +369,12 @@ complex_at :: proc(w: ^World, p: grid.Position) -> (index: int, mark: u8) {
 	return 0, '.'
 }
 
-// Whether the ground at column `p` is a complex's block or ramp: ground the relief does not make, with cliffs of its own.
+// Whether the ground at column `p` is a complex's block or ramp, or what a dug one digs: ground the relief does not make,
+// with cliffs of its own.
 complex_rock :: proc(w: ^World, p: grid.Position) -> bool {
-	_, mark := complex_at(w, p)
+	index, mark := complex_at(w, p)
+	if index == 0 { return false }
+	if complex_layout(w.complexes[index-1].kind).dug { return complex_mark_pit(mark) || complex_mark_ramp(mark) > 0 }
 	return complex_mark_block(mark) || complex_mark_ramp(mark) > 0
 }
 
@@ -383,17 +468,19 @@ complex_free :: proc(w: ^World, data: ^level.Level, origin: grid.Position, layou
 			if _, owned := level.structure_index_at(data, p); owned { return false }
 			mark := complex_mark(layout, x-origin.x, y-origin.y)
 			#partial switch terrain(w.biome, p) {
-			case .Lava, .Bridge, .Gravity: return false
+			case .Bridge, .Gravity: return false
 			case .Water: if !layout.over_water || complex_mark_block(mark) || complex_mark_ramp(mark) > 0 { return false }
+			case .Lava: if !layout.over_lava || complex_mark_block(mark) || complex_mark_ramp(mark) > 0 { return false }
 			}
 		}
 	}
-	// A bridge over water goes over a river: three of its cells over the water at least.
-	if layout.over_water {
+	// A bridge over water goes over a river, one over lava over a stream: three of its cells over it at least.
+	if layout.over_water || layout.over_lava {
+		under := game.Expedition_Terrain.Water if layout.over_water else .Lava
 		wet := 0
 		for y in 0..<height {
 			for x in 0..<width {
-				if complex_mark_deck(complex_mark(layout, x, y)) && terrain(w.biome, grid.offset(origin, x, y)) == .Water { wet += 1 }
+				if complex_mark_deck(complex_mark(layout, x, y)) && terrain(w.biome, grid.offset(origin, x, y)) == under { wet += 1 }
 			}
 		}
 		if wet < 3 { return false }
@@ -412,6 +499,8 @@ plan_complexes :: proc(w: ^World, data: ^level.Level) {
 		layout := complex_layout(kind)
 		width, height := complex_size(layout)
 		if side-width-24 <= 0 || side-height-16 <= 0 { continue }
+		// A dug one needs the ground raised by a base as deep as it digs.
+		if layout.dug && w.base < COMPLEX_TOP { continue }
 		for _ in 0..<6000 {
 			origin := grid.Position{x = 16+int(rng.next_u64(&r)%u64(side-width-24)), y = 8+int(rng.next_u64(&r)%u64(side-height-16))}
 			if !complex_free(w, data, origin, layout, w.complexes[:w.complex_count]) { continue }
@@ -422,8 +511,8 @@ plan_complexes :: proc(w: ^World, data: ^level.Level) {
 	}
 }
 
-// Raises a complex on the level ground the relief left round it: its blocks and ramps, its decks and tunnels, its lifts
-// and its gates, shut; the props round it cleared.
+// Raises a complex on the level ground the relief left round it, or digs it into it: its blocks or its bottom, its ramps,
+// its decks and tunnels, its lifts and its gates, shut; the props round it cleared.
 @(private = "file")
 build_complex :: proc(data: ^level.Level, c: Complex) {
 	layout := complex_layout(c.kind)
@@ -434,12 +523,14 @@ build_complex :: proc(data: ^level.Level, c: Complex) {
 			if tile, found := level.tile_at(data, {x = x, y = y}); found && tile.kind == .Wall { _ = level.set_tile(data, {x = x, y = y}, {kind = .Floor}) }
 		}
 	}
-	top := c.floor+COMPLEX_TOP
+	bottom, top := complex_levels(c)
 	for y in 0..<height {
 		for x in 0..<width {
 			mark := layout.rows[y][x]
 			ground := grid.offset(c.origin, x, y)
-			if complex_mark_block(mark) { _ = level.set_height(data, ground, top) }
+			if layout.dug {
+				if complex_mark_pit(mark) { _ = level.set_height(data, ground, bottom) }
+			} else if complex_mark_block(mark) { _ = level.set_height(data, ground, top) }
 			// The shaft down to the network: its bottom is the network's floor (network.odin makes the hall round it).
 			if mark == 'D' {
 				deep := grid.Position{x = ground.x, y = ground.y, layer = NETWORK_LAYER}
@@ -447,7 +538,7 @@ build_complex :: proc(data: ^level.Level, c: Complex) {
 				_ = level.set_height(data, deep, NETWORK_FLOOR)
 				_ = level.add_lift(data, deep, ground, 1)
 			}
-			if steps := complex_mark_ramp(mark); steps > 0 { _ = level.set_height(data, ground, c.floor+steps) }
+			if steps := complex_mark_ramp(mark); steps > 0 { _ = level.set_height(data, ground, bottom+steps) }
 			if complex_mark_tunnel(mark) {
 				cell := grid.Position{x = ground.x, y = ground.y, layer = COMPLEX_TUNNEL}
 				_ = level.set_tile(data, cell, {kind = .Floor})

@@ -11,7 +11,8 @@ snow_world :: proc(t: ^testing.T, w: ^World, data: ^level.Level, seed: u64) {
 	testing.expect(t, generate(w, data, .Snow, seed))
 }
 
-// The new Snow map has the spiral mountain at its fixed place, the same at every run; no other biome does.
+// The new Snow map has the spiral mountain at its fixed place, over the biome's base, the same at every run; no other
+// biome does.
 @(test)
 test_the_snow_map_has_the_spiral_mountain_at_a_fixed_place :: proc(t: ^testing.T) {
 	for seed in ([?]u64{1, 77, 123456789}) {
@@ -21,14 +22,14 @@ test_the_snow_map_has_the_spiral_mountain_at_a_fixed_place :: proc(t: ^testing.T
 		defer level.destroy(&data)
 		testing.expect(t, mountain_present(&w))
 		summit := mountain_cell(level.mountain_summit())
-		testing.expect_value(t, int(level.height_at(&data, summit)), level.MOUNTAIN_TOP)
-		// The mountain's square is exactly the pure function's, over open ground.
+		testing.expect_value(t, int(level.height_at(&data, summit)), int(data.base)+level.MOUNTAIN_TOP)
+		// The mountain's square is exactly the pure function's over the base, on open ground.
 		wrong := 0
 		for y in -level.MOUNTAIN_HALF..=level.MOUNTAIN_HALF {
 			for x in -level.MOUNTAIN_HALF..=level.MOUNTAIN_HALF {
 				cell := mountain_cell({x = x, y = y})
 				tile, _ := level.tile_at(&data, cell)
-				if int(level.height_at(&data, cell)) != level.mountain_height({x = x, y = y}) || tile.kind != .Floor { wrong += 1 }
+				if int(level.height_at(&data, cell)) != int(data.base)+level.mountain_height({x = x, y = y}) || tile.kind != .Floor { wrong += 1 }
 			}
 		}
 		testing.expectf(t, wrong == 0, "%d cells of the mountain are not as it is", wrong)

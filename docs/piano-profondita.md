@@ -221,8 +221,9 @@ ODIN="/c/Users/lukeg/OneDrive/Desktop/odin-dev-2026-10/dist/odin.exe"
   (`src/application/campaign_smoke.odin`, `expedition_enable_smoke`). Gli
   stage che contano qui: rilievi dal 63, ologrammi dal 75, due livelli 78,
   montagna 79, grotte dall'87, ologramma in grotta 103 (dalla Fase 5),
-  complessi dal 104, sei per bioma, reti dal 140, tre per bioma (dalla
-  Fase 7).
+  complessi dal 104, sei per bioma (nove biomi dal terzo gruppo, fino al
+  157), reti dal 158, tre per bioma (City pop, Egitto, Vietnam, Gotico:
+  fino al 169) (dalla Fase 7). Nel secondo gruppo le reti partivano dal 140.
 - **Benchmark:**
   `"$ODIN" build src -o:speed -define:EXPEDITION_BENCHMARK=true -out:"$S/bench.exe"`,
   poi `"$S/bench.exe" --smoke-expedition > "$S/bench_a.log" 2>&1`
@@ -2336,6 +2337,52 @@ In corso.
       mandano alla scheda a ogni fotogramma, come il terreno (la Fase 8 li carica una volta sola). In Vietnam, con le
       gallerie lontane dal centro, non cambia niente. Gli stage dei complessi costano 1,23 ms di media, quelli delle reti
       1,21 ms, le grotte 1,14 ms.
+- **Passo 2, terzo gruppo di biomi: Neve, Inferno, Gotico** (26 ottobre 2026): fatto subito dopo il secondo, con le
+  risposte date prima (vedi «Progetto»); fermo per guardare con l'utente le catture del secondo e del terzo gruppo prima
+  del quarto.
+  - **Neve, il crepaccio** (`Crevasse`, il primo complesso **scavato**, `Complex_Layout.dug`): la Neve si alza di una base,
+    con la montagna e la stanza della sua grotta (`level.mountain_stamp` aggiunge la base). Il crepaccio è largo 4 e
+    profondo 14: una scala scende dall'ovest, il ponte di corda lo attraversa sul piano +1 alla quota della neve, sul fondo
+    ci sono guardie e segreto, e all'est l'ascensore scende dalla neve in una nicchia.
+  - **Inferno, il ponte di ossa** (`Bone_Bridge`, `over_lava`): due rupi ai lati di uno dei fiumi di lava di oggi, il ponte
+    sopra la lava fra le cime, nella rupe est la caverna di lava con le guardie, il cancello all'imbocco e il pozzo.
+  - **Gotico, cripta e catacombe:** il Gotico si alza di una base. La rete sul piano −2: il pozzo con l'ascensore, la
+    cripta sotto la collina (guardie e segreto), una catacomba con le guardie e una tomba aperta, ciascuna con la sua
+    scala. Il cancello sta fra il pozzo e la cripta e si apre dalla cripta. Sopra, il fienile e la casa in rovina
+    (`Ruined_House`) con il ballatoio fra i tetti.
+  - **Il killer non scende:** mentre il robot è sotto terra il killer aspetta in superficie e non lo vede; uno scontro con
+    lui finisce quando il robot scende.
+  - **Scelte prese durante il lavoro:**
+    - un cancello e la sua leva stanno sullo stesso piano (`level.add_gate`): nel crepaccio il cancello non può stare sul
+      pianerottolo dell'ascensore, così chiude la nicchia in fondo e si apre dal crepaccio. La strada lunga (scala, guardie,
+      segreto) apre la scorciatoia;
+    - i fiumi di lava dell'Inferno tornano ogni 23 colonne: una scala dritta di 13 caselle più la rupe ne avrebbe toccato un
+      altro, così la scala dell'Inferno gira una volta;
+    - l'eruzione dell'Inferno non rompe la roccia dei complessi (come quella sopra le grotte);
+    - le buche sotto la base (scale e crepaccio) erano una fessura nera: le loro pareti ora hanno la roccia del bioma, più
+      chiara al bordo e più scura in basso, e il fondo si scurisce con la profondità. Cambiano anche le scale del secondo
+      gruppo e, nei biomi alzati, il bordo della mappa (la parete della base, prima nera); la superficie e il resto delle
+      mappe restano come prima.
+  - **Test:** i complessi e le prove con i nemici liberi girano in nove biomi; la rete nei quattro biomi che ne hanno una
+    (la Neve è alzata e non ne ha); la montagna conta le quote dalla base. Nuovi: il crepaccio scavato, il ponte sopra la
+    lava, il killer che non scende.
+  - **Verifiche:**
+    - check con e senza assert; `.\scripts\check.ps1` completo: 1732 test verdi (3 nuovi), più le due build;
+    - smoke del laboratorio: le 129 catture identiche al byte a quelle del secondo gruppo;
+    - smoke delle spedizioni: 170 catture, nessun errore. Neve e Gotico alzati si vedono come prima (meno dello 0,2% dei
+      pixel diversi, l'animazione); cambiano le pareti delle buche e del bordo dei biomi alzati (fino all'1,9%) e il
+      rilievo del Gotico, che ora inquadra la scala di una tomba aperta (il punto più irregolare della mappa). 18 catture
+      nuove dei complessi e 3 della rete del Gotico;
+    - lo smoke ha trovato due stage che contavano le quote della Neve da 0, la cima della montagna e lo scontro su due
+      livelli: ora le contano dalla base, e lo scontro inquadra lo stesso altopiano di prima;
+    - in un giro dei soli complessi la cattura dello scontro del Gotico ha preso una spedizione nuova di Robotica; nei due
+      giri dopo non è successo;
+    - smoke dell'editor: 12 catture, nessun errore;
+    - benchmark sulla RTX 3060, alla corrente, in ordine bilanciato (secondo gruppo, terzo, terzo, secondo): media dei
+      gruppi −2,4%, nessun peggioramento. Il gruppo peggiore, «Biomi» (+5,1%), viene da pochi stage che variano del
+      10-15% fra un giro e l'altro anche con l'eseguibile del secondo gruppo (lo stage dell'Inferno fa 1,52 o 1,75 ms).
+      Gli stage nuovi costano come gli altri: i complessi di Neve, Inferno e Gotico 1,12 ms di media, la rete del Gotico
+      1,18 ms.
 
 ### Cosa si fa
 

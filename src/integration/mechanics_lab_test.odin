@@ -120,6 +120,7 @@ test_mechanics_lab_lifts_live_a_minute_of_play :: proc(t: ^testing.T) {
 	defer game.destroy_room(&room)
 	renderer := new(render.Renderer)
 	defer free(renderer)
+	defer render.destroy_renderer_world_playback(renderer)
 	controller := run_session.Tactical_Controller{was_focused = true}
 	cards: run_session.Card_Interaction_State
 	buffer: run_session.Buffered_Gameplay_Command

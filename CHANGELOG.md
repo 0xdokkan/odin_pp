@@ -5,6 +5,30 @@ I riferimenti a Classica, `--flat` e ai vecchi smoke descrivono versioni precede
 per i comandi disponibili oggi valgono il [README](README.md) e la documentazione collegata.
 
 
+## 2026-10-26 — Profondità, Fase 7 (in corso): Neve, Inferno e Gotico
+
+- **Neve, il crepaccio scavato** (scelta dell'utente): la Neve si alza di una base, come City pop, Egitto e Vietnam, e si
+  vede come prima (montagna e grotta della montagna comprese). Nella neve c'è un crepaccio profondo 14: una scala scende
+  dall'ovest, il ponte di corda lo attraversa alla quota della neve, sul fondo guardie e segreto, e un ascensore scende
+  dalla neve in una nicchia il cui cancello si apre dal fondo.
+- **Inferno, il ponte di ossa:** due rupi ai lati di un fiume di lava, il ponte sopra la lava fra le cime. Nella rupe est
+  c'è la caverna di lava con le guardie, chiusa da un cancello che si apre da dentro, con il pozzo fino alla cima. Si sale
+  a piedi da una scala che gira. L'eruzione non rompe più la roccia dei complessi.
+- **Gotico, cripta e catacombe:** il Gotico si alza di una base. Sotto ci sono il pozzo con l'ascensore, la cripta sotto la
+  collina (guardie e segreto) e le catacombe fino al cimitero, con scale da due tombe aperte. Il cancello fra il pozzo e la
+  cripta si apre dalla cripta. Sopra, il fienile e la casa in rovina con il ballatoio fra i tetti.
+- **Il killer del Gotico non scende sotto terra:** lì lo si semina; uno scontro con lui finisce quando il robot scende.
+- **Disegno:** le pareti delle buche sotto la base (scale e crepaccio) hanno la roccia del bioma, più chiara al bordo, e il
+  fondo si scurisce con la profondità: prima erano una fessura nera. Ponti di corda, di ossa e il ballatoio hanno il loro
+  materiale.
+- Smoke delle spedizioni: 18 catture nuove dei complessi e 3 della rete del Gotico; i complessi vanno dallo stage 104 al
+  157, le reti dal 158. La cima della montagna e lo scontro su due livelli contano le quote della Neve dalla base.
+- Test nuovi: il crepaccio scavato, il ponte sopra la lava, il killer che non scende; complessi e prove con i nemici liberi
+  in nove biomi (1732 in tutto). Il test dell'arena degli ascensori non perde più la memoria della registrazione del
+  renderer.
+- Verifiche: smoke del laboratorio identico al byte (129 catture), smoke delle spedizioni (170 catture) e dell'editor senza
+  errori; benchmark alla corrente in ordine bilanciato: media −2,4%, i complessi nuovi 1,12 ms, la rete del Gotico 1,18 ms.
+
 ## 2026-10-26 — Profondità, Fase 7 (in corso): City pop, Egitto e Vietnam, con i sotterranei
 
 - **Terreno alzato di una base** (scelta dell'utente): City pop, Egitto e Vietnam sono alzati tutti di 14 gradini, così

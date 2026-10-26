@@ -11,7 +11,8 @@ import rng "../engine/rng"
 // height NETWORK_FLOOR: halls joined by ways. City pop has its metro, three stations under its streets; the Egitto its
 // necropolis, a great hall and a tomb under the desert, with a hall under the west pyramid's shaft (complex.odin); the
 // Vietnam its galleries, from today's tunnel in the south to where the tunnel came out in the north-east, with chambers
-// on the way (the user's choices).
+// on the way; in the third group the Gotico its crypt under the hill and the catacombs to the graveyard (the user's
+// choices). The Neve is raised too, for its crevasse, and has none.
 //
 // One goes down by stairs, a ramp in a pit from the ground to a step over the network, and at one place by a lift's
 // shaft; a gate on a way opens from one side only, the network's shortcut. Its halls hold the biome's foes and a secret.
@@ -76,11 +77,23 @@ GALLERY_HALLS := [?]Network_Hall{
 	{at = {92, 10}, half = {2, 2}, stair = 2, secret = true},
 }
 
+// The Gotico's crypt and catacombs: the crypt under the hill (relief.odin), with the secret and its guards; the catacombs
+// from it to the graveyard, with stairs down from two open graves; a well's shaft with the lift, whose way to the crypt
+// has the gate, opened from the crypt: once opened, the well is the short way down to it.
+@(private = "file")
+CATACOMB_HALLS := [?]Network_Hall{
+	{at = {48, 80}, half = {3, 2}, lift = true},
+	{at = {66, 57}, half = {6, 4}, guards = true, secret = true},
+	{at = {30, 72}, half = {3, 3}, stair = 1, guards = true},
+	{at = {22, 30}, half = {3, 2}, stair = 1},
+}
+
 network_plan :: proc(b: campaign.Biome) -> Network_Plan {
 	#partial switch b {
 	case .City: return {halls = METRO_HALLS[:], way = 3, gate_way = 1}
 	case .Egypt: return {halls = NECROPOLIS_HALLS[:], way = 3, gate_way = 0}
 	case .Vietnam: return {halls = GALLERY_HALLS[:], way = 2, gate_way = 3}
+	case .Gothic: return {halls = CATACOMB_HALLS[:], way = 2, gate_way = 0}
 	}
 	return {gate_way = -1}
 }

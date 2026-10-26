@@ -247,7 +247,8 @@ cave_places :: proc(w: ^World, data: ^level.Level) -> (places: [MAX_CAVES]Cave_P
 				high = {x = max(high.x, cell.x), y = max(high.y, cell.y)}
 			}
 			at := mountain_cell(arrival)
-			places[count] = {origin = mountain_cell(low), width = high.x-low.x+1, height = high.y-low.y+1, floor = floor, mountain = true,
+			// The mountain stands on the biome's base (level.mountain_stamp).
+			places[count] = {origin = mountain_cell(low), width = high.x-low.x+1, height = high.y-low.y+1, floor = w.base+floor, mountain = true,
 				mouth = mountain_cell(mouth), arrival = {x = at.x, y = at.y, layer = CAVE_LAYER}}
 			count += 1
 		}
@@ -282,9 +283,9 @@ dig_cave :: proc(data: ^level.Level, place: Cave_Place) {
 	}
 	if place.mountain {
 		room: [CAVE_MOUNTAIN_ROOM_MAX]grid.Position
-		cells, _, _, floor, ok := mountain_cave_room(&room)
+		cells, _, _, _, ok := mountain_cave_room(&room)
 		if !ok { return }
-		for offset in room[:cells] { cell := mountain_cell(offset); cave_floor(data, cell.x, cell.y, floor) }
+		for offset in room[:cells] { cell := mountain_cell(offset); cave_floor(data, cell.x, cell.y, place.floor) }
 		return
 	}
 	clear_prop :: proc(data: ^level.Level, p: grid.Position) {

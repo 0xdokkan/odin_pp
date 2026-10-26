@@ -8,11 +8,11 @@ import grid "../engine/grid"
 import level "../level"
 
 @(private = "file")
-RAISED_BIOMES :: [3]campaign.Biome{.City, .Egypt, .Vietnam}
+RAISED_BIOMES :: [4]campaign.Biome{.City, .Egypt, .Vietnam, .Gothic}
 
-// City pop, the Egitto and the Vietnam are raised by a base, and have a network on the deep layer under it: halls at the
-// network's floor, a stair down (a pit under the base), the shaft of a lift and a gate on it. The other biomes are not
-// raised and have nothing on the deep layer.
+// City pop, the Egitto, the Vietnam and the Gotico are raised by a base, and have a network on the deep layer under it:
+// halls at the network's floor, a stair down (a pit under the base), the shaft of a lift and a gate on it. The Neve is
+// raised for its crevasse (complex.odin) and has none; the other biomes are not raised and have nothing on the deep layer.
 @(test)
 test_the_raised_biomes_have_a_network_under_their_ground :: proc(t: ^testing.T) {
 	for biome in campaign.Biome {
@@ -30,6 +30,10 @@ test_the_raised_biomes_have_a_network_under_their_ground :: proc(t: ^testing.T) 
 		}
 		testing.expect_value(t, w.base, EXPEDITION_RAISED_BASE)
 		testing.expect_value(t, data.base, EXPEDITION_RAISED_BASE)
+		if len(network_plan(biome).halls) == 0 {
+			testing.expectf(t, floors == 0, "%v: %d cells on the deep layer, and no network", biome, floors)
+			continue
+		}
 		testing.expectf(t, floors >= 60, "%v: a network of %d cells", biome, floors)
 		pits := 0
 		for steps, at in data.heights {
@@ -133,4 +137,54 @@ test_a_save_keeps_the_base_of_a_raised_biome :: proc(t: ^testing.T) {
 	testing.expect_value(t, w2.base, EXPEDITION_RAISED_BASE)
 	testing.expect(t, slice.equal(data.heights[:], data2.heights[:]))
 	testing.expect(t, slice.equal(data2.lifts[:], data.lifts[:]) && slice.equal(data2.gates[:], data.gates[:]))
+}
+
+// Under the ground the robot shakes off the Gotico's killer (the user's choice in Fase 7): while the robot is down in the
+// catacombs the killer waits on the open ground, and comes again once the robot is up; a fight with him breaks off when
+// the robot goes down.
+@(test)
+test_the_gothics_killer_does_not_follow_the_robot_under_the_ground :: proc(t: ^testing.T) {
+	w: World
+	data: level.Level
+	p: game.Player
+	room := test_world(t, &w, &data, &p, .Gothic)
+	defer level.destroy(&data)
+	defer game.destroy_room(&room)
+	game.end_expedition_encounter(&room)
+	clear(&room.enemies)
+	room.phase = .Loot
+	// Nobody else to wake.
+	killer := -1
+	for &g, i in w.groups[:w.group_count] {
+		if g.killer { killer = i } else { g.count = 0 }
+	}
+	for &site in w.sites[:w.site_count] { site.active = false }
+	if !testing.expect(t, killer >= 0) { return }
+	g := &w.groups[killer]
+	// A cell of the catacombs far from him, with another beside it.
+	deep, found := grid.Position{}, false
+	for y in 0..<data.tiles.height {
+		for x in 0..<data.tiles.width {
+			cell := grid.Position{x = x, y = y, layer = NETWORK_LAYER}
+			tile, _ := level.tile_at(&data, cell)
+			beside, _ := level.tile_at(&data, grid.offset(cell, 1, 0))
+			if tile.kind == .Floor && beside.kind == .Floor && distance(cell, g.anchor) > 24 { deep, found = cell, true }
+		}
+	}
+	if !testing.expect(t, found) { return }
+	before := g.anchor
+	p.position = deep
+	for _ in 0..<20 { tick(&w, &room, 0.2) }
+	testing.expect_value(t, g.anchor, before)
+	// Up on the open ground over it, he comes.
+	p.position = {x = deep.x, y = deep.y}
+	for _ in 0..<20 { tick(&w, &room, 0.2) }
+	testing.expect(t, g.anchor != before && g.anchor.layer == grid.GROUND_LAYER, "the killer does not come")
+	// A fight with him beside the robot, then the robot down under him: it breaks off.
+	g.anchor = {x = deep.x+1, y = deep.y}
+	g.members[0].enemy.position = g.anchor
+	testing.expect(t, engage(&w, &room, killer) && g.active, "no fight with the killer")
+	p.position = deep
+	for _ in 0..<5 { tick(&w, &room, 0.2) }
+	testing.expect(t, !g.active && len(room.enemies) == 0, "the fight goes on under the ground")
 }

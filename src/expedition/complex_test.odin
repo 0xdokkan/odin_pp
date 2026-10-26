@@ -10,7 +10,7 @@ import grid "../engine/grid"
 import level "../level"
 
 @(private = "file")
-COMPLEX_BIOMES :: [6]campaign.Biome{.Cyber, .West, .Jungle, .City, .Egypt, .Vietnam}
+COMPLEX_BIOMES :: [9]campaign.Biome{.Cyber, .West, .Jungle, .City, .Egypt, .Vietnam, .Snow, .Inferno, .Gothic}
 
 // The walkable cells of the map no walk from the spawn reaches, on any layer (level.layer_reach: ramps, mouths, decks,
 // lifts), the gates shut: none but a massif's top, rock over a cave.
@@ -182,4 +182,64 @@ test_the_walker_calls_rides_and_opens_on_a_complex :: proc(t: ^testing.T) {
 	roam_walk(&w, &room, &r, {1, 0}, 0.5)
 	_, open, _ = level.gate_at(&data, gate.cell)
 	testing.expect(t, open, "the gate opens to a push from its lever")
+}
+
+// The Neve is raised by a base, and its crevasse is dug into it: the bottom COMPLEX_TOP steps under the open ground round
+// it, the stair a step a cell from the bottom up to a step under the snow, the rope bridge on the layer over the ground
+// at the snow's height, and the lift from the bottom up to a landing at the snow's height.
+@(test)
+test_the_snows_crevasse_is_dug_into_its_raised_ground :: proc(t: ^testing.T) {
+	w: World
+	data: level.Level
+	testing.expect(t, generate(&w, &data, .Snow, 4))
+	defer level.destroy(&data)
+	testing.expect_value(t, w.base, EXPEDITION_RAISED_BASE)
+	if !testing.expect(t, w.complex_count == 1 && w.complexes[0].kind == .Crevasse) { return }
+	c := w.complexes[0]
+	bottom, top := complex_levels(c)
+	testing.expect(t, top == c.floor && bottom == c.floor-COMPLEX_TOP && bottom >= 0)
+	layout := complex_layout(c.kind)
+	width, height := complex_size(layout)
+	for y in 0..<height {
+		for x in 0..<width {
+			mark := layout.rows[y][x]
+			ground := grid.offset(c.origin, x, y)
+			want := c.floor
+			if complex_mark_pit(mark) { want = bottom } else if steps := complex_mark_ramp(mark); steps > 0 { want = bottom+steps }
+			got := level.height_at(&data, ground)
+			testing.expectf(t, got == want, "the crevasse's %c at %v is %d steps, not %d", mark, ground, got, want)
+			if mark == '=' { testing.expect_value(t, level.height_at(&data, complex_cell(c, {x = x, y = y})), c.floor) }
+		}
+	}
+	if !testing.expect_value(t, len(data.lifts), 1) { return }
+	testing.expect_value(t, level.height_at(&data, data.lifts[0].ends[0]), bottom)
+	testing.expect_value(t, level.height_at(&data, data.lifts[0].ends[1]), c.floor)
+}
+
+// The Inferno's bridge of bones goes over one of its streams of lava, on the layer over the ground, where there is no lava;
+// its cliffs and its stair stand on dry ground.
+@(test)
+test_the_infernos_bridge_of_bones_goes_over_a_stream_of_lava :: proc(t: ^testing.T) {
+	w: World
+	data: level.Level
+	testing.expect(t, generate(&w, &data, .Inferno, 6))
+	defer level.destroy(&data)
+	if !testing.expect(t, w.complex_count == 1 && w.complexes[0].kind == .Bone_Bridge) { return }
+	c := w.complexes[0]
+	layout := complex_layout(c.kind)
+	width, height := complex_size(layout)
+	over := 0
+	for y in 0..<height {
+		for x in 0..<width {
+			mark := layout.rows[y][x]
+			ground := grid.offset(c.origin, x, y)
+			lava := terrain(.Inferno, ground) == .Lava
+			if complex_mark_deck(mark) {
+				if lava { over += 1 }
+				testing.expect_value(t, terrain(.Inferno, complex_cell(c, {x = x, y = y})), Terrain.Plain)
+			}
+			if complex_mark_block(mark) || complex_mark_ramp(mark) > 0 { testing.expectf(t, !lava, "the complex's %c at %v is on lava", mark, ground) }
+		}
+	}
+	testing.expectf(t, over >= 3, "%d cells of the bridge over the lava", over)
 }
