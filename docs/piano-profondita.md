@@ -2207,6 +2207,14 @@ In corso.
       grotte delle spedizioni (il robot ora sta nella stanza). In più la telecamera segue la sua altezza vera.
     - Due test nuovi nel disegno (il robot sul ponte, il robot a metà viaggio) e una cattura in più nell'atto
       `lift` (l'arrivo in cima); 1719 test verdi.
+    - Smoke completi rifatti dopo la correzione:
+      - laboratorio: 118 catture identiche al byte, 10 cambiate e 1 nuova. Le cambiate sono quelle col robot
+        fuori dal piano di terra: il ponte e la grotta dell'atto dei piani, e l'atto degli ascensori. Nella grotta
+        il robot ora sta accanto al nemico, invece di fluttuare all'altezza della collina;
+      - spedizioni: 104 catture, nessun errore. Cambiano le grotte, col robot nella stanza invece che sopra il
+        massiccio; le altre differenze sono l'animazione.
+    - Benchmark sulla RTX 3060, alla corrente: −0,3% rispetto al passo precedente, +0,5% rispetto alla Fase 5
+      (rumore).
 
 ## 11. Fase 8 — Ologramma a piani, prestazioni e grotte vecchie
 
