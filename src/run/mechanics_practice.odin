@@ -1,5 +1,6 @@
 package run
 
+import "core:fmt"
 import "core:strings"
 import game "../game"
 import grid "../engine/grid"
@@ -78,9 +79,13 @@ MECHANICS_LAB_STRUCTURES := [?]Lab_Structure{
 	{.Cottage, {x = 4, y = 22}, 0, false}, {.Cottage, {x = 10, y = 22}, 1, false}, {.Cottage, {x = 16, y = 22}, 2, false}, {.Cottage, {x = 22, y = 22}, 3, true},
 }
 
+// The arenas' retouches (Fase 6 of docs/piano-profondita.md): what the map editor saved for each, loaded at the start
+// (mapeditor.load_all) and put over the arena the code makes. None: the arena as the code makes it.
+mechanics_lab_edits: [Mechanics_Lab_Arena]level.Map_Edits
+
 // The open arena: walls only around the edge, the player in the middle and
-// the (unused) exit tucked into a corner.
-mechanics_lab_level :: proc(arena := Mechanics_Lab_Arena.Flat) -> (level.Level, bool) {
+// the (unused) exit tucked into a corner. With `retouched`, its retouches over it (mechanics_lab_edits).
+mechanics_lab_level :: proc(arena := Mechanics_Lab_Arena.Flat, retouched := true) -> (level.Level, bool) {
 	width, height := mechanics_lab_size(arena)
 	rows: [MECHANICS_LAB_STRUCTURES_HEIGHT]string
 	cave := level.cave_plan(MECHANICS_LAB_CAVE_SEED)
@@ -125,6 +130,13 @@ mechanics_lab_level :: proc(arena := Mechanics_Lab_Arena.Flat) -> (level.Level, 
 				return {}, false
 			}
 		}
+	}
+	// Retouches that do not go on it (an old file's, of another size, or one painted by hand that breaks the layers'
+	// rule) are left out: the arena as the code makes it.
+	if retouched && level.map_edits_any(&mechanics_lab_edits[arena]) && !level.map_edits_apply_checked(&data, &mechanics_lab_edits[arena]) {
+		fmt.eprintfln("mappe: the retouches of the %v arena do not go on it: left out", arena)
+		level.destroy(&data)
+		return mechanics_lab_level(arena, retouched = false)
 	}
 	return data, true
 }

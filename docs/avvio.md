@@ -197,6 +197,71 @@ audio di Blender) e la tabella generata
 `--only <famiglia> --preview <cartella> --no-write` produce invece spettrogrammi,
 misure e un ascolto di tutta la famiglia, senza toccare il gioco.
 
+### Editor delle mappe
+
+`--editor-mappe` apre l'editor per scolpire a mano le mappe (Fase 6 di
+[piano-profondita.md](piano-profondita.md)): le sei arene della Prova meccaniche e le mappe dei dodici biomi,
+come le fa il codice e con i ritocchi già salvati. **Tab** passa alla mappa seguente (**Maiusc+Tab** alla
+precedente). Il pannello in alto dice la mappa, il piano, il pennello e la sua grandezza, se ci sono modifiche non
+salvate e quanti errori ha la mappa; in basso c'è il promemoria dei tasti.
+
+- **Telecamera:** il tasto destro trascinato, o **Q** ed **E**, la fanno ruotare; la rotella avvicina e
+  allontana; **WASD** la sposta.
+- **Piano attivo:** **PagSu** e **PagGiù** passano fra sotto profondo, sotto, terra e sopra. Il piano attivo e
+  quelli sotto si vedono pieni, quelli sopra trasparenti.
+- **Pennelli** (tasti **1**–**9**), con il tasto sinistro; tenuto premuto, il pennello ripassa:
+  1. **Alza** e 2. **Abbassa**: un gradino a passata;
+  3. **Leviga**: ogni casella prende la media con le sue vicine;
+  4. **Appiattisci**: tutto all'altezza della casella da cui si parte;
+  5. **Dipingi**: il tipo di casella, che **T** cambia (pavimento, roccia, vuoto, recinto). Sui piani sopra e
+     sotto la terra il pavimento crea il piano e il vuoto lo toglie;
+  6. **Rampa**: un clic per capo, e le caselle fra i due salgono in pendenza;
+  7. **Copia**: si trascina un rettangolo; 8. **Incolla**: un clic mette giù il pezzo, con l'angolo in alto a
+     sinistra sotto il mouse;
+  9. **Rumore**: ogni casella un gradino su, giù o com'è, sempre uguale per la stessa passata.
+
+  **[** e **]** (o **-** e **=**) cambiano la grandezza, da 0 (una casella) a 12.
+- **Cosa resta del codice:** i pennelli non toccano le caselle degli edifici. Partenza, uscita e porte si
+  possono alzare e abbassare, ma un pennello non le toglie e non ne fa di nuove: una partenza incollata diventa
+  pavimento.
+- **Ctrl+Z** annulla un'intera passata, **Ctrl+Y** (o **Ctrl+Maiusc+Z**) la rifà.
+- **Ctrl+S** salva, ma prima controlla la mappa:
+  - le colonne dei piani: almeno 12 gradini fra due pavimenti, e ogni scala fra due pavimenti vicini;
+  - la partenza, che deve essere calpestabile;
+  - nei biomi, anche: la partenza e i luoghi in piano, e dalla partenza si raggiungono ogni luogo, l'interno di
+    ogni grotta e l'uscita.
+
+  Gli errori sono segnati in rosso, con un'asta che si vede da lontano. **G** porta la telecamera all'errore
+  seguente. Una mappa con errori non si salva. Le mappe come le fa il codice non ne hanno.
+- **F5** ricarica la mappa dai file, **Esc** chiude. Con modifiche non salvate, Tab, F5 ed Esc vanno premuti
+  due volte.
+
+**I file.** I ritocchi stanno in `assets/mappe/laboratorio/<arena>/` (`piana`, `altezze`, `strutture`,
+`montagna`, `grotta`, `piani`) e in `assets/mappe/biomi/<bioma>/`: il nome del bioma nel codice, in minuscolo
+(`cyber`, `west`, `jungle`, `city`, `egypt`, `vietnam`, `snow`, `inferno`, `gothic`, `sky`, `space`, `secret`).
+Ogni piano ritoccato ha due immagini grandi quanto la mappa, una casella un pixel; i piani si chiamano
+`sotto_profondo`, `sotto`, `terra` e `sopra`:
+- `<piano>_altezze.png`: le altezze in grigio, un livello di grigio a gradino;
+- `<piano>_tipi.png`: i tipi a colori.
+
+Un pixel trasparente è una casella come la fa il codice. Le immagini si possono dipingere anche con un altro
+programma: ogni colore vale il tipo del colore più vicino (sotto). I colori di partenza, uscita e porte non
+contano, e un'immagine di un'altra grandezza resta fuori. Se i file di una mappa rompono la regola dei piani, il
+gioco li lascia fuori tutti, con un avviso, e usa la mappa del codice; l'editor invece li apre, con gli errori in
+rosso, per correggerli.
+
+| Tipo | Colore (R, G, B) |
+|---|---|
+| vuoto | 0, 0, 0 |
+| pavimento | 200, 200, 200 |
+| roccia | 120, 72, 40 |
+| recinto | 230, 190, 40 |
+
+Il gioco legge i file all'avvio. La Prova meccaniche li mette sulla sua arena; le spedizioni li mettono sulla
+mappa del bioma dopo la geografia (rilievi, montagna, strutture, grotte) e prima di nemici e segreti. Fanno parte
+del bioma, non della run: la mappa resta la stessa a ogni partita. `--smoke-editor-mappe` fa lo smoke
+dell'editor: scrive solo in `build/editor_smoke/mappe` e lascia le catture in `build/captures/odin_pp_editor_*.png`.
+
 | Opzione | Uso |
 |---|---|
 | `--run` | salta il menu ed entra subito nella run |
@@ -211,6 +276,8 @@ misure e un ascolto di tutta la famiglia, senza toccare il gioco.
 | `--engine-lab` / `--arena-lab` | arena libera con collisioni, dummy e strumenti M9 |
 | `--ring-lab` | ring 1v1 di pratica con strumenti M9; non assegna sblocchi |
 | `--fps-lab` | prova FPS con strumenti M9 e due livelli selezionabili |
+| `--editor-mappe` | editor delle mappe: scolpisce arene e biomi e ne salva i ritocchi in `assets/mappe` (vedi «Editor delle mappe») |
+| `--smoke-editor-mappe` | smoke dell'editor: scolpisce, salva in `build/editor_smoke/mappe`, riapre e cattura `odin_pp_editor_*.png` |
 | `--sprites=/percorso/sprites.json` | manifest grafico alternativo |
 | `--debug-abilities` | abilita gli shortcut di debug `C` e `V` |
 | `--playtest-report` | registra una sessione interattiva |

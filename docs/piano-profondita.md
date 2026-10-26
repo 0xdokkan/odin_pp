@@ -53,7 +53,7 @@ La tabella è in ordine di priorità, cioè l'ordine della scaletta qui sotto.
 | 3 | 3 | Piani nel laboratorio: dati e regole | 2 | Fatta | vedi Esito |
 | 4 | 4 | Piani nel laboratorio: trasparenze, contorni, mouse, luce | 3 (1 per l'aspetto) | Fatta | vedi Esito |
 | 5 | 5 | Piani nelle spedizioni: grotte senza caricamento | 1, 3, 4 | Fatta | vedi Esito |
-| 6 | 6 | Editor per scolpire i piani | 1, 3 (5 per le mappe dei biomi) | Da fare | — |
+| 6 | 6 | Editor per scolpire i piani | 1, 3 (5 per le mappe dei biomi) | Fatta | vedi Esito |
 | 7 | 7 | Ponti, gallerie e scorciatoie nei biomi | 5, 6 | Da fare | — |
 | 8 | 8 | Ologramma completo, prestazioni, grotte vecchie | 5 (meglio dopo la 7) | Da fare | — |
 
@@ -202,6 +202,7 @@ ODIN="/c/Users/lukeg/OneDrive/Desktop/odin-dev-2026-10/dist/odin.exe"
 "$ODIN" build src -o:none -out:"$S/odin_pp.exe"
 "$S/odin_pp.exe" --smoke-mechanics-lab
 "$S/odin_pp.exe" --smoke-expedition
+"$S/odin_pp.exe" --smoke-editor-mappe
 ```
 
 - **Suite completa in un colpo** (PowerShell): `$env:ODIN` con il percorso
@@ -229,6 +230,10 @@ ODIN="/c/Users/lukeg/OneDrive/Desktop/odin-dev-2026-10/dist/odin.exe"
     conferma), con il portatile alla corrente, e si confrontano le medie dei
     gruppi con quelle della Fase 0 (appendice A). Sul singolo stage, una
     differenza sotto il 10% è rumore.
+- **Editor delle mappe** (dalla Fase 6): `--smoke-editor-mappe` scolpisce,
+  salva e riapre in pochi secondi, con otto catture `odin_pp_editor_*.png`;
+  scrive solo in `build/editor_smoke/mappe`. Va ripetuto quando una fase tocca
+  i pennelli, i ritocchi o la geografia dei biomi.
 - **Catture:** in `build/captures` (cartella ignorata da git). Gira un solo
   smoke alla volta.
 - **Avviso di fine fase** (PowerShell, senza toccare il volume del sistema):
@@ -1814,22 +1819,34 @@ e per ritoccare le mappe dei biomi, che la Fase 7 userà.
 
 ### Progetto
 
-- **Editor nella Prova meccaniche:**
-  - piano attivo (sotto, terra, sopra);
+Con le risposte dell'utente nella Fase 6: un programma a parte, i ritocchi in
+PNG, niente angoli scolpiti uno per uno, i pennelli del progetto più rampa,
+copia e incolla e rumore.
+
+- **Editor, un programma a parte** (scelta dell'utente, non il consigliato):
+  - si apre con `odin_pp --editor-mappe` e sceglie fra le arene della Prova
+    meccaniche e le mappe dei biomi;
+  - piano attivo: i quattro piani (sotto profondo, sotto, terra, sopra);
   - pennelli: alza e abbassa di un gradino, leviga, appiattisci, dipingi il
-    tipo di casella (pavimento, roccia, vuoto, recinto);
-  - grandezza del pennello, annulla e ripeti, salva;
+    tipo di casella (pavimento, roccia, vuoto, recinto); in più, scelta
+    dell'utente, la rampa fra due punti, copia e incolla, il rumore;
+  - si scolpiscono le caselle; gli angoli si ricavano come oggi (sezione 2.3);
+  - grandezza del pennello, annulla e ripeti, salva, ricarica;
   - una telecamera che ruota e fa zoom, solo nell'editor: le spedizioni
     restano a telecamera fissa.
-- **Mappe dei biomi:** l'editor apre la mappa generata di un bioma e salva i
-  ritocchi in un file del bioma, in `assets/mappe/`. `generate` li applica
-  dopo rilievi e montagna; luoghi, strutture e abitanti vengono dopo, come
-  oggi. Il file fa parte del bioma, non della run: la geografia resta fissa.
+- **Ritocchi:** PNG in `assets/mappe/`, due per piano: le altezze in grigio e
+  i tipi a colori, trasparenti dove la mappa è come la genera il codice. Sono
+  anche il formato per dipingere fuori dal gioco: l'editor li ricarica.
+- **Mappe dei biomi:** l'editor apre la mappa generata di un bioma e ne salva
+  i ritocchi. `generate` li applica dopo la geografia (rilievi, montagna,
+  strutture, massicci e grotte) e prima di nemici e segreti delle grotte e
+  degli altri abitanti. Il file fa parte del bioma, non della run: la
+  geografia resta fissa.
+- **Arene:** la Prova meccaniche applica i ritocchi della sua arena, se ci
+  sono.
 - **Controlli al salvataggio:** ogni luogo raggiungibile, colonne valide, zone
-  dei luoghi e partenza in piano. Gli errori si vedono in rosso.
-- **Fuori dal gioco:** i ritocchi si possono esportare e reimportare come
-  immagini (altezze in grigio, tipi a colori), per dipingerli con qualunque
-  programma.
+  dei luoghi e partenza in piano. Gli errori si vedono in rosso e il
+  salvataggio aspetta che siano a posto.
 
 ### Da chiedere prima di iniziare
 
@@ -1850,12 +1867,14 @@ e per ritoccare le mappe dei biomi, che la Fase 7 userà.
 
 ### Passi
 
-1. Pennelli e piano attivo nel laboratorio, con test delle funzioni pure.
-2. Annulla, ripeti e salvataggio delle arene.
-3. Mappe dei biomi: apertura, ritocchi, file, applicazione in `generate`.
+1. Pennelli e piano attivo, annulla e ripeti, con test delle funzioni pure.
+2. File dei ritocchi: PNG per piano, scrittura e lettura, con test di andata
+   e ritorno.
+3. Applicazione dei ritocchi: arene della Prova meccaniche e `generate`.
 4. Controlli al salvataggio.
-5. Esporta e importa come immagini.
-6. Atto dello smoke: una collina alzata, levigata e salvata, poi riaperta.
+5. Programma `--editor-mappe`: vista, telecamera, pennelli, interfaccia.
+6. Smoke dell'editor (`--smoke-editor-mappe`): una collina alzata, levigata,
+   salvata in una cartella di prova e riaperta, con le catture.
 7. Documenti: `docs/avvio.md` (come si usa l'editor), `CHANGELOG.md`.
 
 ### Fatto quando
@@ -1873,7 +1892,90 @@ regole della sezione 1: fammi prima le domande della fase e fermati alla fine.
 
 ### Esito
 
-Da fare.
+**Fatta il 26 ottobre 2026** sul ramo `piano-profondita`.
+
+**Risposte dell'utente**
+1. **Dove:** un programma a parte, `--editor-mappe` (non il consigliato).
+2. **Formato:** PNG per piano: le altezze in grigio e i tipi a colori, trasparenti dove la mappa resta del
+   codice.
+3. **Angoli:** no, si scolpiscono solo le caselle e gli angoli si ricavano.
+4. **Pennelli:** quelli del progetto e anche gli altri proposti: rampa fra due punti, copia e incolla, rumore.
+
+**Il codice citato** c'era ancora tutto.
+
+**Cosa è stato fatto**
+- **Pennelli** (`src/level/sculpt.odin`): funzioni pure sulle caselle e sulle altezze di un piano.
+  - Alza e abbassa; leviga (la media con le vicine, dalle altezze di prima della passata); appiattisci;
+    dipingi; rampa; copia e incolla; rumore (un gradino su, giù o niente, da un hash fisso di casella e
+    passata).
+  - Ogni passata tiene, per ogni casella, com'era prima e com'è dopo: si annulla e si rifà intera
+    (`Sculpt_History`). Una passata che non cambia niente non resta.
+- **Ritocchi** (`src/level/map_edits.odin`): la differenza fra la mappa scolpita e quella del codice, casella per
+  casella e piano per piano (tipo, altezza o entrambi). `map_edits_apply` li mette sulla mappa del codice; rifiuta
+  quelli di un'altra grandezza o con un tipo che non esiste.
+- **File** (`src/mapeditor/files.odin`): due PNG per piano ritoccato, in `assets/mappe/laboratorio/<arena>/` e
+  `assets/mappe/biomi/<bioma>/`. Il gioco li legge all'avvio (`load_all`), in ogni modo; senza file non cambia
+  niente.
+- **Applicazione:**
+  - la Prova meccaniche mette i ritocchi della sua arena su `mechanics_lab_level`;
+  - `generate` li mette sulla mappa del bioma dopo rilievi, montagna, strutture e grotte, e prima degli abitanti.
+    Per questo il contenuto delle grotte (nemici e segreto) ora si mette dopo (`fill_caves`), e solo su caselle
+    che hanno ancora un pavimento;
+  - un file dipinto a mano che rompe la regola dei piani resta fuori intero, con un avviso
+    (`map_edits_apply_checked`); l'editor invece lo apre, per mostrarne gli errori;
+  - una spedizione salvata tiene la sua mappa: i ritocchi nuovi valgono dalla spedizione dopo.
+- **Controlli** (`src/mapeditor/checks.odin`):
+  - in ogni mappa: le colonne dei piani (`level.check_layers`) e la partenza calpestabile;
+  - nei biomi, anche: la partenza in piano (±8 caselle) e i luoghi in piano nella loro cornice. Dalla partenza si
+    devono raggiungere i luoghi (entro 3 caselle), l'interno di ogni grotta e l'uscita (`level.layer_reach`: una
+    visita che passa da un piano all'altro con le regole del passo);
+  - le 18 mappe come le fa il codice li passano tutti.
+- **Editor** (`src/mapeditor/`): una scena dell'host sopra il menu.
+  - La telecamera ruota, si avvicina e si sposta.
+  - La mappa è disegnata a blocchi di 16×16 caselle per piano, con la luce del gioco: la superficie scolpita a
+    colori per tipo e piano, la roccia in blocchi, i dirupi. Un blocco si ricostruisce quando un pennello lo
+    cambia; i piani sopra quello attivo sono trasparenti.
+  - Il mouse sceglie la casella seguendo il raggio fino alla superficie del piano attivo.
+- **Smoke** `--smoke-editor-mappe`, otto catture (`odin_pp_editor_*.png`):
+  - l'arena piana; la collina alzata, levigata, salvata e riaperta uguale;
+  - rampa, rumore, un pezzo copiato e incollato e un muro dipinto;
+  - le grotte dell'Egitto sul piano «sotto»;
+  - la partenza murata, con 23 errori e il salvataggio rifiutato;
+  - **G** sul primo errore; poi l'annulla, e gli errori spariscono.
+
+  Scrive solo in `build/editor_smoke/mappe`.
+
+**Scelte prese durante la fase**
+- **Partenza, uscita e porte restano del codice,** come gli edifici: un pennello ne cambia l'altezza, ma non le
+  toglie e non ne fa di nuove, e i ritocchi fanno lo stesso. Il motivo: nella prima cattura dei pennelli c'era una
+  seconda partenza, incollata con la collina.
+- **Errori da trovare:** su una mappa grande gli errori lontani non si vedevano. Ora hanno un'asta rossa sopra la
+  casella, e **G** porta la telecamera all'errore seguente, sul suo piano.
+- **Modifiche non salvate:** Tab, F5 ed Esc vanno premuti due volte, entro i 6 secondi dell'avviso.
+- **File dipinti fuori dall'editor:** il gioco controlla almeno la regola dei piani e, se è rotta, usa la mappa
+  del codice; gli altri controlli (luoghi raggiungibili, zone in piano) sono solo dell'editor.
+- **La mappa di base di un bioma** si fa con il seme 1. La geografia non dipende dal seme (lo dicono i test),
+  quindi i ritocchi valgono per ogni run.
+
+**Verifiche**
+- `odin check src -vet -strict-style`, con e senza assert: puliti.
+- `.\scripts\check.ps1` completo: **1707 test verdi** con e senza assert (erano 1692), più le due build. I test
+  nuovi sono 15: 9 nel livello (pennelli, annulla, ritocchi, visita fra i piani, caselle del codice) e 6
+  nell'editor (file andata e ritorno, ritocchi nel laboratorio e nei biomi, controlli, mappe aperte, mouse, mappe
+  del codice senza errori).
+- **Smoke del laboratorio** completo: le 120 catture sono identiche al byte a quelle della Fase 5.
+- **Smoke delle spedizioni** completo: 104 catture, nessun errore.
+  - Al byte ne restano uguali 26; le altre cambiano di 3–31 pixel attorno al robot, che si anima in tempo reale
+    (misurate tre coppie).
+  - Per provarlo, una sonda ha generato i 12 biomi con 3 semi, una volta con il codice della Fase 5 e una con
+    questo: la mappa (tipi, altezze, piani) e il mondo (luoghi, strutture, grotte, gruppi, nemici, bottino) sono
+    identici.
+- **Smoke dell'editor:** otto catture, guardate una per una.
+- **Benchmark:** non serve, perché il disegno del gioco non è cambiato (nessun file in `src/render`).
+
+**Non fatto, per le fasi dopo**
+- Nessuna mappa è ancora ritoccata: `assets/mappe` non c'è. La Fase 7 userà l'editor per i biomi.
+- Scale a pioli, edifici e luoghi non si mettono con i pennelli: restano del codice.
 
 ## 10. Fase 7 — Ponti, gallerie e scorciatoie nei biomi
 

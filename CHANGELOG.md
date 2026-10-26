@@ -5,6 +5,26 @@ I riferimenti a Classica, `--flat` e ai vecchi smoke descrivono versioni precede
 per i comandi disponibili oggi valgono il [README](README.md) e la documentazione collegata.
 
 
+## 2026-10-26 — Profondità, Fase 6: editor per scolpire
+
+- `--editor-mappe` apre un programma a parte per scolpire a mano le sei arene della Prova meccaniche e le mappe dei
+  dodici biomi, piano per piano, con telecamera libera. I pennelli: alza, abbassa, leviga, appiattisci, dipingi
+  (pavimento, roccia, vuoto, recinto) e, scelta dell'utente, rampa, copia e incolla, rumore. Si scolpiscono le
+  caselle, e gli angoli si ricavano come prima. C'è l'annulla e ripeti per passate intere.
+- Pennelli e ritocchi lasciano al codice gli edifici, la partenza, l'uscita e le porte.
+- I ritocchi si salvano come PNG in `assets/mappe` (per piano: altezze in grigio, tipi a colori, trasparente dove la
+  mappa resta del codice). Il gioco li applica all'avvio alle arene e alle mappe dei biomi, dopo la geografia e prima
+  degli abitanti; la mappa resta la stessa a ogni partita. File dipinti a mano che rompono la regola dei piani restano
+  fuori.
+- Prima di salvare, l'editor controlla:
+  - le colonne dei piani e la partenza;
+  - nei biomi, anche i luoghi in piano e se dalla partenza si arriva a luoghi, grotte e uscita.
+
+  Gli errori sono segnati in rosso e **G** li mostra uno per uno; con errori la mappa non si salva.
+- `--smoke-editor-mappe` scolpisce, salva, riapre e prova i pennelli, le grotte e gli errori, con 8 catture. Test: 15
+  nuovi (1707 in tutto). Senza file in `assets/mappe` il gioco non cambia: le catture del laboratorio sono identiche
+  al byte a quelle della Fase 5, e mappe e mondi dei biomi sono gli stessi.
+
 ## 2026-10-26 — Profondità, Fase 5: grotte senza caricamento
 
 - Le grotte delle spedizioni sono il piano sotto la terra: stanze sotto un massiccio di roccia, a cui si arriva

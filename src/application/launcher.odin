@@ -15,6 +15,7 @@ import host "../engine/host"
 import rng "../engine/rng"
 import save "../engine/save"
 import ui "../engine/ui"
+import mapeditor "../mapeditor"
 import render "../render"
 
 // Options consumed before the roguelike parser sees the command line.
@@ -27,6 +28,8 @@ Launch_Options :: struct {
 	// odin_pp_<id>.png after a few seconds and quit.
 	smoke_minigame: string,
 	expedition, smoke_expedition, smoke_hub, smoke_hub_world: bool,
+	// --editor-mappe: the map editor (Fase 6 of docs/piano-profondita.md); --smoke-editor-mappe: its smoke act.
+	map_editor, smoke_map_editor: bool,
 }
 
 split_launch_arguments :: proc(args: []string) -> (Launch_Options, [dynamic]string) {
@@ -42,6 +45,10 @@ split_launch_arguments :: proc(args: []string) -> (Launch_Options, [dynamic]stri
 			launch.smoke_hub = true
 		case arg == "--smoke-hub-world":
 			launch.smoke_hub_world = true
+		case arg == "--editor-mappe":
+			launch.map_editor = true
+		case arg == "--smoke-editor-mappe":
+			launch.map_editor, launch.smoke_map_editor = true, true
 		case arg == "--run":
 			launch.run = true
 		case strings.has_prefix(arg, "--minigame="):
@@ -67,14 +74,14 @@ run_launcher :: proc(options: Runtime_Options, launch: Launch_Options) {
 	rs_config.options = options.gameplay
 	window := run_session.roguelike_window_config(rs_config)
 	run_session.roguelike_destroy(rs_config)
-	window.title = "Odin PP"
+	window.title = "Odin PP - editor delle mappe" if launch.map_editor else "Odin PP"
 	h, ok := host.create(host.Config{
 		window          = window,
-		profile_path    = profile_path() if launch.smoke_minigame == "" && !launch.smoke_menu && !launch.smoke_hub && !launch.smoke_hub_world && !launch.smoke_expedition else "",
-		enable_audio    = launch.smoke_minigame == "" && !launch.smoke_menu,
+		profile_path    = profile_path() if launch.smoke_minigame == "" && !launch.smoke_menu && !launch.smoke_hub && !launch.smoke_hub_world && !launch.smoke_expedition && !launch.smoke_map_editor else "",
+		enable_audio    = launch.smoke_minigame == "" && !launch.smoke_menu && !launch.smoke_map_editor,
 		letterbox_color = render.LETTERBOX_COLOR,
-		force_focus     = launch.smoke_minigame != "" || launch.smoke_expedition || launch.smoke_hub || launch.smoke_hub_world,
-		keep_running    = launch.smoke_minigame != "" || launch.smoke_menu || launch.smoke_expedition || launch.smoke_hub || launch.smoke_hub_world,
+		force_focus     = launch.smoke_minigame != "" || launch.smoke_expedition || launch.smoke_hub || launch.smoke_hub_world || launch.smoke_map_editor,
+		keep_running    = launch.smoke_minigame != "" || launch.smoke_menu || launch.smoke_expedition || launch.smoke_hub || launch.smoke_hub_world || launch.smoke_map_editor,
 	})
 	if !ok {
 		fmt.eprintln("could not open the window")
@@ -84,6 +91,8 @@ run_launcher :: proc(options: Runtime_Options, launch: Launch_Options) {
 	menu := launcher_create(options)
 	menu.smoke = launch.smoke_menu
 	host.push_scene(h, launcher_scene(menu))
+	// The map editor, a program of its own over the menu: Esc closes the program.
+	if launch.map_editor { host.push_scene(h, mapeditor.editor_scene(launch.smoke_map_editor)) }
 	if launch.expedition || launch.smoke_hub || launch.smoke_hub_world {
 		scene := campaign_hub_scene(options, launch.smoke_hub, launch.smoke_expedition, launch.smoke_hub_world)
 		if launch.expedition && !launch.smoke_expedition {

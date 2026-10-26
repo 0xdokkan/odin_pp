@@ -2,6 +2,7 @@
 // the tactical room; sleeping groups never spend a beat or consume combat RNG.
 package expedition
 
+import "core:fmt"
 import campaign "../campaign"
 import game "../game"
 import grid "../engine/grid"
@@ -150,7 +151,13 @@ outdoor_cover :: proc(b:campaign.Biome,p:grid.Position,size:int)->bool {
 	return p.x%3==int((h>>8)%3) && p.y%3==int((h>>16)%3)
 }
 
-generate :: proc(w: ^World, data: ^level.Level, b: campaign.Biome, seed: u64) -> bool {
+// The biomes' retouches (Fase 6 of docs/piano-profondita.md): what the map editor saved for each biome's map, loaded
+// at the start (mapeditor.load_all) and put over the geography the code makes, before any inhabitant. None: the map as
+// the code makes it.
+biome_map_edits: [campaign.Biome]level.Map_Edits
+
+// The biome's map and its world. With `retouched`, its retouches over its geography (biome_map_edits).
+generate :: proc(w: ^World, data: ^level.Level, b: campaign.Biome, seed: u64, retouched := true) -> bool {
 	if b >= .Count { return false }
 	w^ = World{biome=b,side_length=map_size(b),seed=seed,loot_random=rng.create(seed~0xD0A5),reward_site=-1}
 	size := map_size(b)
@@ -193,6 +200,15 @@ generate :: proc(w: ^World, data: ^level.Level, b: campaign.Biome, seed: u64) ->
 	apply_mountain(w,data)
 	place_structures(w,data)
 	place_caves(w,data)
+	// The retouches over the whole geography; then the caves' foes and secrets, on the floors the map has now. Retouches
+	// that do not go on it (an old file's, of another size, or one painted by hand that breaks the layers' rule) are
+	// left out: the map as the code makes it.
+	if retouched && level.map_edits_any(&biome_map_edits[b]) && !level.map_edits_apply_checked(data,&biome_map_edits[b]) {
+		fmt.eprintfln("mappe: the retouches of the %v map do not go on it: left out", b)
+		level.destroy(data)
+		return generate(w,data,b,seed,false)
+	}
+	fill_caves(w,data)
 	// Structural geography is finished before any inhabitants are placed.
 	for site,i in w.sites[:w.site_count] {if site.active && (site.kind==.Trial || site.kind==.Boss || (site.kind==.Cache && i<12)) {add_group(w,data,i,site.position,1 if site.kind==.Boss else 2+rank(b)/2,false,site.kind==.Boss)}}
 	for i in 0..<4 {

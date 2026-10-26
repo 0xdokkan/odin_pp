@@ -322,14 +322,23 @@ cave_member :: proc(w: ^World, position: grid.Position, r: ^rng.Rng) -> Member {
 	return {enemy = {position = position, health = hp, max_health = hp, attack = attack, archetype = kind}, alive = true}
 }
 
-// The nearest floor cell of a plan to `anchor`, not its arrival nor its secret nor one of `taken`.
+// Whether the cell of cave `index` at `local` in its box is a floor of the map now (a retouch may have filled it).
 @(private = "file")
-plan_free_cell :: proc(plan: ^level.Cave_Plan, anchor: grid.Position, taken: []grid.Position) -> (cell: grid.Position, ok: bool) {
+cave_floor_at :: proc(w: ^World, data: ^level.Level, index: int, local: grid.Position) -> bool {
+	tile, _ := level.tile_at(data, cave_world_cell(w, index, local))
+	return tile.kind == .Floor
+}
+
+// The nearest floor cell of a plan to `anchor` that the map has as a floor, not its arrival nor its secret nor one of
+// `taken`.
+@(private = "file")
+plan_free_cell :: proc(w: ^World, data: ^level.Level, index: int, plan: ^level.Cave_Plan, anchor: grid.Position, taken: []grid.Position) -> (cell: grid.Position, ok: bool) {
 	for radius in 0..=2 {
 		for dy in -radius..=radius {
 			for dx in -radius..=radius {
 				cell = grid.offset(anchor, dx, dy)
 				if level.cave_plan_at(plan, cell.x, cell.y) != '.' || cell == plan.arrival || cell == plan.secret { continue }
+				if !cave_floor_at(w, data, index, cell) { continue }
 				occupied := false
 				for other in taken { occupied = occupied || other == cell }
 				if !occupied { return cell, true }
@@ -347,10 +356,27 @@ add_cave_secret :: proc(w: ^World, index: int, at, beside: grid.Position, r: ^rn
 	_ = add_drop(w, beside, campaign.make_item(.Relic, 1, relic), 0, true, index+1)
 }
 
-// The cave's inhabitants and treasure, made once with the map: a group in each room of the plan that has one, and the
-// secret in its niche; in the mountain's room a pair of foes, and the secret at its far end.
+// The floor of cave `index` nearest to `want` (the cell itself when it is one), within its box: where its secret goes
+// when a retouch filled the plan's place for it.
 @(private = "file")
-add_cave_content :: proc(w: ^World, index: int) {
+cave_nearest_floor :: proc(w: ^World, data: ^level.Level, index: int, want: grid.Position) -> (cell: grid.Position, ok: bool) {
+	for radius in 0..=4 {
+		for dy in -radius..=radius {
+			for dx in -radius..=radius {
+				if max(abs(dx), abs(dy)) != radius { continue }
+				cell = grid.offset(want, dx, dy)
+				if tile, _ := level.tile_at(data, cell); tile.kind == .Floor && cave_at(w, cell) == index+1 { return cell, true }
+			}
+		}
+	}
+	return
+}
+
+// The cave's inhabitants and treasure, made once with the map: a group in each room of the plan that has one, and the
+// secret in its niche; in the mountain's room a pair of foes, and the secret at its far end. Only on cells the map has
+// as floors (after the retouches).
+@(private = "file")
+add_cave_content :: proc(w: ^World, data: ^level.Level, index: int) {
 	cave := &w.caves[index]
 	r := rng.create(cave.seed~0xBEEF)
 	if cave.place.mountain {
@@ -367,13 +393,17 @@ add_cave_content :: proc(w: ^World, index: int) {
 			if far < 0 || distance(cell, arrival) > distance(room[far], arrival) { second, far = far, i }
 			else if second < 0 || distance(cell, arrival) > distance(room[second], arrival) { second = i }
 		}
-		add_cave_secret(w, index, on_layer(room[far]), on_layer(room[second]), &r)
+		if secret, found := cave_nearest_floor(w, data, index, on_layer(room[far])); found {
+			beside, near := cave_nearest_floor(w, data, index, on_layer(room[second]))
+			add_cave_secret(w, index, secret, beside if near else secret, &r)
+		}
 		if w.group_count >= MAX_GROUPS { return }
 		group := &w.groups[w.group_count]
 		group^ = Group{anchor = on_layer(room[cells/2]), site = -1, cave = u8(index+1)}
 		for cell, i in room[:cells] {
 			if group.count >= 2 { break }
 			if i == far || i == second || distance(cell, arrival) < 2 { continue }
+			if tile, _ := level.tile_at(data, on_layer(cell)); tile.kind != .Floor { continue }
 			group.members[group.count] = cave_member(w, on_layer(cell), &r)
 			group.count += 1
 		}
@@ -387,7 +417,7 @@ add_cave_content :: proc(w: ^World, index: int) {
 		group^ = Group{anchor = cave_world_cell(w, index, plan.anchors[g]), site = -1, cave = u8(index+1)}
 		taken: [level.CAVE_MAX_ROOMS*4+4]grid.Position
 		for i in 0..<plan.foes[g] {
-			cell, ok := plan_free_cell(&plan, plan.anchors[g], taken[:i])
+			cell, ok := plan_free_cell(w, data, index, &plan, plan.anchors[g], taken[:i])
 			if !ok { continue }
 			taken[i] = cell
 			group.members[group.count] = cave_member(w, cave_world_cell(w, index, cell), &r)
@@ -395,8 +425,10 @@ add_cave_content :: proc(w: ^World, index: int) {
 		}
 		if group.count > 0 { w.group_count += 1 }
 	}
-	secret := cave_world_cell(w, index, plan.secret)
-	add_cave_secret(w, index, secret, grid.offset(secret, -1, 0), &r)
+	if secret, found := cave_nearest_floor(w, data, index, cave_world_cell(w, index, plan.secret)); found {
+		beside, near := cave_nearest_floor(w, data, index, grid.offset(secret, -1, 0))
+		add_cave_secret(w, index, secret, beside if near else secret, &r)
+	}
 }
 
 // The places of the map's caves, before the relief, which keeps their ground level (relief.odin): the world's caves,
@@ -438,8 +470,13 @@ place_caves :: proc(w: ^World, data: ^level.Level) {
 		w.sites[w.site_count] = Site{kind = .Cave, position = cave.place.mouth, secret = true, active = true, group = -1, seed = seed}
 		cave.site, cave.seed, cave.inhabited = w.site_count, seed~0x6A09E667, chosen[i]
 		w.site_count += 1
-		if chosen[i] { add_cave_content(w, i) }
 	}
+}
+
+// The foes and the secret of the caves the run gave them, on the map as it is after the retouches (generate).
+@(private)
+fill_caves :: proc(w: ^World, data: ^level.Level) {
+	for cave, i in w.caves[:w.cave_count] { if cave.inhabited { add_cave_content(w, data, i) } }
 }
 
 // How many of the sites there are to draw and to ask: all of them.
