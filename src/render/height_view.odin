@@ -50,6 +50,12 @@ Board_Actor :: struct {
 @(private)
 board_actors: [dynamic]Board_Actor
 
+// What stands on a point no figure stands on: its floor is the ground's (entity_point_ground). Not the zero
+// Entity_Ref, which is the player (game.PLAYER_ENTITY): taken for "none", it drew the player on the ground's floor on
+// every layer, under a bridge he stood on, over a cave he was in.
+@(private)
+NO_FIGURE :: game.SYSTEM_ENTITY
+
 // The figures riding a lift's platform this frame, and the platform's height (lift_view.odin): each is drawn on it.
 @(private)
 Board_Lift_Rider :: struct {
@@ -220,7 +226,7 @@ point_ground :: proc(at: view.Vec2) -> f32 {
 // The highest ground under a disc of `radius` round `at` (its middle and four points of its rim): a stand or a
 // shadow laid flat there is never covered by a slope. With `entity`, the floor of its own layer.
 @(private)
-rim_ground :: proc(at: view.Vec2, radius: f32, entity := game.Entity_Ref{}) -> f32 {
+rim_ground :: proc(at: view.Vec2, radius: f32, entity := NO_FIGURE) -> f32 {
 	ground := entity_point_ground(entity, at)
 	for offset in ([4]view.Vec2{{radius, 0}, {-radius, 0}, {0, radius}, {0, -radius}}) { ground = max(ground, entity_point_ground(entity, at+offset)) }
 	return ground
@@ -302,7 +308,7 @@ board_actor_cell :: proc(entity: game.Entity_Ref) -> (cell: grid.Position, found
 // a bridge's head goes from one floor to the other without a drop); else the ground's (point_ground).
 @(private)
 entity_point_ground :: proc(entity: game.Entity_Ref, at: view.Vec2) -> f32 {
-	if !board_heights.layered || entity == {} { return point_ground(at) }
+	if !board_heights.layered || entity == NO_FIGURE { return point_ground(at) }
 	// On a lift's platform, on its way (lift_view.odin).
 	for rider in board_lift_riders { if rider.entity == entity { return rider.ground } }
 	standing, found := board_actor_cell(entity)
@@ -367,7 +373,7 @@ pick_ground_cell :: proc(origin, direction: [3]f32) -> (cell: grid.Position, ok:
 // (`entity` says where it stands) the line goes through them: the rock over a cave hides what is in it, but where it
 // fades over the robot (game.layer_figure_hidden).
 @(private)
-terrain_hides_actor :: proc(renderer: ^Renderer, at: view.Vec2, entity := game.Entity_Ref{}) -> bool {
+terrain_hides_actor :: proc(renderer: ^Renderer, at: view.Vec2, entity := NO_FIGURE) -> bool {
 	if !board_has_heights() { return false }
 	standing, found := board_actor_cell(entity)
 	if !found { standing = {x = int(math.floor(at.x+0.5)), y = int(math.floor(at.y+0.5))} }

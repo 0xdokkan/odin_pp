@@ -12,7 +12,7 @@ import view "../engine/view"
 // It lies on the sculpted ground, over the highest point under its rim, so a
 // slope never covers it.
 @(private)
-expedition_paper_shadow :: proc(at:view.Vec2,radius:f32=.37,opacity:f32=.38,entity:=game.Entity_Ref{}) {
+expedition_paper_shadow :: proc(at:view.Vec2,radius:f32=.37,opacity:f32=.38,entity:=NO_FIGURE) {
 	center:=rl.Vector3{at.x+.5,rim_ground(at,radius,entity)+.024,at.y+.5}
 	_=rlgl.CheckRenderBatchLimit(48)
 	rlgl.Begin(rlgl.TRIANGLES)

@@ -95,7 +95,7 @@ tactical_intent_label :: proc(intent: game.Enemy_Intent) -> cstring {
 
 // All environmental props have volume. The same extents drive their ray pick.
 @(private)
-voxel_object_bounds :: proc(kind: game.Grid_Object_Kind, position: view.Vec2, entity := game.Entity_Ref{}) -> rl.BoundingBox {
+voxel_object_bounds :: proc(kind: game.Grid_Object_Kind, position: view.Vec2, entity := NO_FIGURE) -> rl.BoundingBox {
 	width, height := f32(0.68), f32(0.72)
 	switch kind {
 	case .Ice_Block: width, height = 0.82, 0.94

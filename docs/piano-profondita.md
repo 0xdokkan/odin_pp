@@ -2196,6 +2196,17 @@ In corso.
       ferma sulla stessa asserzione.
     - Sonda mirata, sei semi: il robot prende i due ascensori e apre il cancello mentre i nemici, liberi, usano
       gli stessi ascensori. Nessun errore.
+  - **Seconda prova dell'utente: il robot non saliva con la piattaforma.** La figura restava a terra durante e
+    dopo il viaggio, e nel sotterraneo restava disegnata sopra il terreno mentre il corpo era sotto.
+    - La causa è un difetto che c'era dalla Fase 3: `entity_point_ground` prendeva `Entity_Ref{}` per «nessuna
+      figura», ma `{}` è il robot (`game.PLAYER_ENTITY`). Così il robot veniva disegnato sempre all'altezza del
+      terreno di terra: sotto il ponte su cui stava, e sopra il massiccio quando era in una grotta.
+    - Ora «nessuna figura» è `NO_FIGURE` (il riferimento di sistema), e il robot è disegnato sul suo piano e,
+      in ascensore, sulla piattaforma.
+    - Cambiano le catture con il robot fuori dal piano di terra: il ponte e la grotta dell'atto dei piani, le
+      grotte delle spedizioni (il robot ora sta nella stanza). In più la telecamera segue la sua altezza vera.
+    - Due test nuovi nel disegno (il robot sul ponte, il robot a metà viaggio) e una cattura in più nell'atto
+      `lift` (l'arrivo in cima); 1719 test verdi.
 
 ## 11. Fase 8 — Ologramma a piani, prestazioni e grotte vecchie
 

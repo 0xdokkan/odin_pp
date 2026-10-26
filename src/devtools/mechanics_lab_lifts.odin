@@ -108,6 +108,8 @@ mechanics_lab_lifts :: proc(window: ^app.Window, renderer: ^render.Renderer, roo
 	artifacts.screenshot("odin_pp_mechanics_lab_lift_chiamata.png")
 	if !lift_lab_wait_platform(window, renderer, room, controller, cards, buffer, 0) { return false }
 	if !lift_lab_ride(window, renderer, room, controller, cards, buffer, .East, 0, {x = 11, y = 10, layer = 1}, "odin_pp_mechanics_lab_lift_salita.png") { return false }
+	// Up there, on its landing: drawn at the top, where the player stands.
+	mechanics_lab_still(window, renderer, room, 0, "odin_pp_mechanics_lab_lift_arrivo.png")
 	// Off its landing, a step onto the plateau's edge.
 	if !lift_lab_walk(window, renderer, room, controller, cards, buffer, {x = 12, y = 10}) { return false }
 	if game.cell_height(room, player.position) != 14 { fmt.eprintln("mechanics lab: the lift did not reach the plateau's top"); return false }

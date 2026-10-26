@@ -13,8 +13,14 @@ per i comandi disponibili oggi valgono il [README](README.md) e la documentazion
   - anche i nemici la chiamano, la aspettano e ci salgono.
 - **Cancelli delle scorciatoie:** sbarre che si aprono solo con un passo dal lato della leva e restano aperte fino
   alla fine della spedizione.
-- Tutto si prova nella nuova arena «Ascensori» (settima di F3) e nell'atto `lift` dello smoke, che gira per ultimo:
-  le catture di prima restano le stesse. Test nuovi per dati, regole e nemici.
+- Tutto si prova nella nuova arena «Ascensori» (settima di F3) e nell'atto `lift` dello smoke, che gira per ultimo.
+  Test nuovi per dati, regole e nemici, e uno che fa vivere l'arena un minuto con i nemici liberi.
+- Corretti dopo le prove dell'utente:
+  - un crash quando un nemico scendeva dall'ascensore;
+  - le piattaforme ferme dopo F7.
+- **Il robot si disegna sul suo piano.** Prima veniva disegnato sempre all'altezza del terreno di terra: sotto il
+  ponte su cui stava, sopra il massiccio quando era in una grotta, e a terra mentre l'ascensore saliva. Il difetto
+  c'era dalla Fase 3.
 
 ## 2026-10-26 — Profondità, Fase 6: editor per scolpire
 
