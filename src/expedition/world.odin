@@ -56,12 +56,11 @@ World :: struct {
 	structure_count: int,
 	// How many the player has set down in this expedition (player_structures.odin).
 	placed_by_player: int,
-	// The caves of the map (cave.odin), and where the player is: 0 on the open map, k+1 in the k-th cave. While in
-	// a cave the open map is put away (its tiles are kept by the scene, its groups, drops and sites do nothing).
+	// The caves of the map (cave.odin), on the layer under the ground, and where the player is: 0 on the open map,
+	// k+1 in the k-th cave (from where he stands, every tick).
 	caves: [MAX_CAVES]Cave,
 	cave_count: int,
 	in_cave: int,
-	cave_return: grid.Position,
 	groups: [MAX_GROUPS]Group,
 	group_count: int,
 	drops: [MAX_DROPS]Drop,
@@ -188,6 +187,8 @@ generate :: proc(w: ^World, data: ^level.Level, b: campaign.Biome, seed: u64) ->
 	}
 	// The biome's relief, level round the sites; then its buildings and objects, level on it; all before
 	// any inhabitants.
+	// The caves' places first: the relief keeps the ground round each massif level (cave.odin).
+	plan_caves(w,data)
 	apply_relief(w,data)
 	apply_mountain(w,data)
 	place_structures(w,data)
@@ -256,16 +257,16 @@ can_see :: proc(room:^game.Room,a,b:grid.Position) -> bool {
 	}, game.room_line_layers(room, &m))
 }
 
-// A drop lies where the player is (the open map or a cave), unless `cave` says whose it is (cave.odin).
-add_drop :: proc(w:^World,p:grid.Position,item:campaign.Item,xp:i32=0,manual_only:bool=false,cave:int=-1) -> bool {
+// A drop lies at `p`; `cave` marks a cave's secret with the cave's number (cave.odin), 0 anything else.
+add_drop :: proc(w:^World,p:grid.Position,item:campaign.Item,xp:i32=0,manual_only:bool=false,cave:int=0) -> bool {
 	if w.drop_count>=MAX_DROPS {return false}
-	w.drops[w.drop_count]={p,item,xp,manual_only,u8(w.in_cave if cave<0 else cave)}; w.drop_count+=1; return true
+	w.drops[w.drop_count]={p,item,xp,manual_only,u8(cave)}; w.drop_count+=1; return true
 }
 
 nearest_site :: proc(w:^World,p:grid.Position) -> int {
 	best:=-1; d:=4
-	if w.in_cave>0 {return -1}
-	for site,i in w.sites[:w.site_count] { if !site.active || site.state==.Resolved {continue}; next:=distance(p,site.position); if next<d {d=next;best=i} }
+	// A cave's mouth has nothing to do: one walks in.
+	for site,i in w.sites[:w.site_count] { if !site.active || site.state==.Resolved || site.kind==.Cave || site.position.layer!=p.layer {continue}; next:=distance(p,site.position); if next<d {d=next;best=i} }
 	return best
 }
 
@@ -369,10 +370,15 @@ move_sleeping_group :: proc(w:^World,g: ^Group, room: ^game.Room, step: grid.Pos
 	if step == {} {return}
 	for &m in g.members[:g.count] {
 		if !m.alive || m.deployed {continue}
-		p := game.add_position(m.enemy.position, step)
-		if !patrol_cell_free(w,room,p,&m) || game.step_height_blocked(room,m.enemy.position,p) {continue}
-		if step.x != 0 && step.y != 0 && game.cell_blocks_movement(room, {x = p.x, y = m.enemy.position.y}) &&
-		   game.cell_blocks_movement(room, {x = m.enemy.position.x, y = p.y}) {continue}
+		// A step across the layers as a walker makes it (a cave's mouth), ladders aside.
+		from := m.enemy.position
+		p, _ := game.layer_step(room, from, step)
+		if !patrol_cell_free(w,room,p,&m) || game.step_height_blocked(room,from,p) {continue}
+		if step.x != 0 && step.y != 0 {
+			across, _ := game.layer_step(room, from, {x = step.x, y = 0})
+			along, _ := game.layer_step(room, from, {x = 0, y = step.y})
+			if game.cell_blocks_movement(room, across) && game.cell_blocks_movement(room, along) {continue}
+		}
 		m.enemy.position = p
 	}
 }
@@ -384,21 +390,22 @@ tick :: proc(w:^World,room:^game.Room,dt:f32) {
 	w.clock+=dt; w.patrol_clock+=dt
 	w.beat=u64(w.clock)
 	room.player.tactical.environment_beat=w.beat
-	// In a cave nothing of the biome's ground or weather reaches the player (biome 255 has none).
-	room.player.tactical.config.expedition_biome=u8(w.biome) if w.in_cave==0 else 255
-	room.player.tactical.config.low_gravity=w.biome==.Space && w.in_cave==0
+	// Under the rock nothing of the biome's ground reaches anyone (game.expedition_terrain).
+	room.player.tactical.config.expedition_biome=u8(w.biome)
+	room.player.tactical.config.low_gravity=w.biome==.Space
 	if room.phase==.Loot && w.beat!=previous_beat && w.beat%4==0 {game.expedition_gravity_pulse(room,room.recent_events)}
 	if room.phase==.Loot && w.beat!=previous_beat {game.expedition_exploration_terrain_beat(room)}
 	if room.player.health<=0 {room.phase=.Defeat;return}
 	patrol_due := w.patrol_clock >= 1.4
 	player:=room.player.position
+	update_caves(w,player)
 	if room.player.health<w.last_health {w.mounted=false}
 	w.last_health=room.player.health
 	for &s,site_index in w.sites[:w.site_count] {
-		if !s.active || w.in_cave>0 {continue}
+		if !s.active {continue}
 		if distance(player,s.position)<=5 && s.state==.Unvisited {s.state=.Discovered}
 		activation:=4 if s.layout_version==0 else site_layout(s.kind).trigger_radius
-		if s.kind==.Nest && s.state!=.Resolved && distance(player,s.position)<=activation {
+		if s.kind==.Nest && s.state!=.Resolved && player.layer==s.position.layer && distance(player,s.position)<=activation {
 			if !s.triggered && distance(player,s.position)<=2 {s.triggered=true}
 			if s.triggered && s.wave<s.waves {
 				alive:=false
@@ -446,7 +453,7 @@ tick :: proc(w:^World,room:^game.Room,dt:f32) {
 		}
 		if g.killer && patrol_due {
 			dx,dy:=clamp(player.x-g.anchor.x,-1,1),clamp(player.y-g.anchor.y,-1,1)
-			p:=grid.offset(g.anchor, dx, dy); if game.base_cell_is_walkable(room,p) {g.anchor=p;g.members[0].enemy.position=p}
+			p,_:=game.layer_step(room,g.anchor,{x = dx, y = dy}); if game.base_cell_is_walkable(room,p) {g.anchor=p;g.members[0].enemy.position=p}
 		}
 		for m in g.members[:g.count] {
 			if !m.alive {continue}
@@ -473,7 +480,8 @@ tick :: proc(w:^World,room:^game.Room,dt:f32) {
 		if w.biome==.Inferno {
 			for offset in -12..=12 {
 				p:=grid.Position{x = w.lane, y = w.lane_center.y+offset} if w.lane_vertical else grid.Position{x = w.lane_center.x+offset, y = w.lane}
-				protected:=false
+				// The sites' ground stays whole, and the rock over a cave.
+				protected:=cave_rock(w,p)
 				for site in w.sites[:w.site_count] {if distance(site.position,p)<=2 {protected=true;break}}
 				if !protected {_=game.expedition_fracture_floor(room,p)}
 			}
@@ -487,20 +495,28 @@ tick :: proc(w:^World,room:^game.Room,dt:f32) {
 	if room.player.health<=0 {room.phase=.Defeat}
 }
 
+// The lane is on the open ground: it does not reach under the rock.
 lane_contains :: proc(w:^World,p:grid.Position) -> bool {
-	return (p.x if w.lane_vertical else p.y)==w.lane &&
+	return p.layer==grid.GROUND_LAYER && (p.x if w.lane_vertical else p.y)==w.lane &&
 		abs((p.y-w.lane_center.y) if w.lane_vertical else (p.x-w.lane_center.x))<=12
 }
 
 walk :: proc(w:^World,room:^game.Room,offset:grid.Position) -> bool {
 	if room.phase!=.Loot || offset=={} {return false}
-	p:=game.add_position(room.player.position,offset)
-	if !game.base_cell_is_walkable(room,p) || game.cell_blocks_movement(room,p) || game.step_height_blocked(room,room.player.position,p) {return false}
-	if offset.x!=0 && offset.y!=0 && (game.cell_blocks_movement(room,{x = p.x, y = room.player.position.y}) || game.cell_blocks_movement(room,{x = room.player.position.x, y = p.y})) {return false}
+	// A step across the layers as the walker makes it: into a cave's mouth, up a ladder.
+	from:=room.player.position
+	p:=game.walk_step(room,from,offset)
+	ladder:=game.is_ladder_move(room,from,p)
+	if !game.base_cell_is_walkable(room,p) || game.cell_blocks_movement(room,p) || !ladder && game.step_height_blocked(room,from,p) {return false}
+	if offset.x!=0 && offset.y!=0 {
+		across,_:=game.layer_step(room,from,{x = offset.x, y = 0})
+		along,_:=game.layer_step(room,from,{x = 0, y = offset.y})
+		if game.cell_blocks_movement(room,across) || game.cell_blocks_movement(room,along) {return false}
+	}
 	under:=ground(w,p)
 	if under==.Bridge && w.beat%4>=2 {return false}
 	room.player.position=p
-	if under==.Ice {slide:=game.add_position(p,offset);if game.base_cell_is_walkable(room,slide) && !game.cell_blocks_movement(room,slide) {room.player.position=slide}}
+	if under==.Ice {slide:=game.walk_step(room,p,offset);if game.base_cell_is_walkable(room,slide) && !game.cell_blocks_movement(room,slide) {room.player.position=slide}}
 	before_health:=room.player.health
 	game.expedition_enter_cell(room)
 	if room.player.health<before_health {w.mounted=false}

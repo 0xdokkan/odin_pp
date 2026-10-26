@@ -166,9 +166,26 @@ terrain_wall :: proc(vertices: ^[dynamic]Expedition_Baked_Vertex, x, y, side: in
 
 // The relief of the cells in one block: each raised or sloping cell's top, and the walls of rock on its sides that
 // look down on a cliff, the map's edge or the void. `vertices` and `block` are scratch space the caller reuses.
+// A cave's mouth in the side of its rock (Fase 5 of docs/piano-profondita.md): where the column (x, y) holds a floor
+// under the ground and a step from it toward `next` lands on a floor (the open ground in front of the mouth), the wall
+// facing `next` opens over that floor up to the room's top; the height it starts at then, in steps.
+@(private)
+terrain_opening :: proc(layers: ^level.Layer_Map, x, y: int, next: [2]int) -> (bottom: f32, open: bool) {
+	if layers == nil { return }
+	for layer in grid.LOWEST_LAYER..<grid.GROUND_LAYER {
+		cell := grid.Position{x = x, y = y, layer = i8(layer)}
+		if !level.kind_has_floor(level.map_tile(layers, cell)) { continue }
+		floor := level.map_height(layers, cell)
+		if _, lands := level.column_landing(layers, next.x, next.y, floor, game.HEIGHT_MAX_STEP); lands {
+			return f32(floor+level.LAYER_CLEARANCE), true
+		}
+	}
+	return
+}
+
 @(private = "file")
 build_terrain_chunk :: proc(m: ^level.Surface_Map, origin: grid.Position, chunk: ^Expedition_Terrain_Chunk, raised: []bool,
-	vertices: ^[dynamic]Expedition_Baked_Vertex, block: ^Terrain_Block) {
+	vertices: ^[dynamic]Expedition_Baked_Vertex, block: ^Terrain_Block, layers: ^level.Layer_Map = nil) {
 	clear(vertices)
 	block^ = {}
 	block.origin = origin
@@ -214,6 +231,8 @@ build_terrain_chunk :: proc(m: ^level.Surface_Map, origin: grid.Position, chunk:
 					if side%2 == 1 { facing_a, facing_b = (5-a)%4, (5-b)%4 }
 					across = {block.cells[neighbour].corners[facing_a], block.cells[neighbour].corners[facing_b]}
 				}
+				// Over a cave's mouth the wall opens down to the room's top (expedition_layers.odin draws the room).
+				if bottom, open := terrain_opening(layers, x, y, next); open { across = {max(across[0], bottom), max(across[1], bottom)} }
 				walled := terrain_wall(vertices, x, y, side, {cell.corners[a], cell.corners[b]}, across)
 				cliff[side] = walled && ground
 			}
@@ -320,6 +339,10 @@ prepare_expedition_terrain :: proc(cache: ^Expedition_Terrain_Cache, data: ^leve
 		cache.chunks = make([]Expedition_Terrain_Chunk, cache.columns*cache.rows)
 		cache.raised = make([]bool, data.tiles.width*data.tiles.height)
 		m := level.surface_map(data)
+		// The layers, for the caves' mouths in the rock's sides.
+		layers: level.Layer_Map
+		layered := level.has_layers(data)
+		if layered { layers = level.layer_map(data) }
 		// One scratch buffer and block for all the blocks, so a big map does not pile up temporary memory.
 		scratch := make([dynamic]Expedition_Baked_Vertex, 0, 4096)
 		defer delete(scratch)
@@ -327,7 +350,7 @@ prepare_expedition_terrain :: proc(cache: ^Expedition_Terrain_Cache, data: ^leve
 		defer free(block)
 		for cy in 0..<cache.rows {
 			for cx in 0..<cache.columns {
-				build_terrain_chunk(&m, {x = cx*EXPEDITION_TERRAIN_CHUNK, y = cy*EXPEDITION_TERRAIN_CHUNK}, &cache.chunks[cy*cache.columns+cx], cache.raised, &scratch, block)
+				build_terrain_chunk(&m, {x = cx*EXPEDITION_TERRAIN_CHUNK, y = cy*EXPEDITION_TERRAIN_CHUNK}, &cache.chunks[cy*cache.columns+cx], cache.raised, &scratch, block, &layers if layered else nil)
 			}
 		}
 		cache.ready = true

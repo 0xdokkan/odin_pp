@@ -10,15 +10,21 @@ import grid "../engine/grid"
 //   #....#####........#######.....####      the arrival is at the west end, the secret in a niche at the east end;
 //   #....................................   the foes wait in the rooms between.
 //
-// The plan is drawn on a CAVE_WIDTH by CAVE_HEIGHT board; its border is rock.
+// The plan is drawn on a CAVE_WIDTH by CAVE_HEIGHT board, or a smaller one (cave_plan_sized: the Far West's caves, Fase 5 of
+// docs/piano-profondita.md); its border is rock.
 
 CAVE_WIDTH  :: 34
 CAVE_HEIGHT :: 18
 CAVE_MAX_ROOMS :: 3
+// The smallest board: two rooms.
+CAVE_MIN_WIDTH  :: 22
+CAVE_MIN_HEIGHT :: 12
 
 Cave_Plan :: struct {
 	// '#' rock, '.' floor.
 	rows:    [CAVE_HEIGHT][CAVE_WIDTH]u8,
+	// The board it is drawn on; the rest of rows is rock.
+	width, height: int,
 	rooms:   int,
 	// Each room's cells, minimum and maximum corner (inclusive).
 	boxes:   [CAVE_MAX_ROOMS][2]grid.Position,
@@ -49,15 +55,23 @@ cave_carve :: proc(plan: ^Cave_Plan, low, high: grid.Position) {
 	for y in low.y..=high.y { for x in low.x..=high.x { plan.rows[y][x] = '.' } }
 }
 
-cave_plan :: proc(seed: u64) -> (plan: Cave_Plan) {
+cave_plan :: proc(seed: u64) -> Cave_Plan {
+	return cave_plan_sized(seed, CAVE_WIDTH, CAVE_HEIGHT)
+}
+
+// A plan on a board of `width` by `height` (between the smallest and CAVE_WIDTH by CAVE_HEIGHT): three rooms only on the
+// whole board.
+cave_plan_sized :: proc(seed: u64, board_width, board_height: int) -> (plan: Cave_Plan) {
+	width, height := clamp(board_width, CAVE_MIN_WIDTH, CAVE_WIDTH), clamp(board_height, CAVE_MIN_HEIGHT, CAVE_HEIGHT)
+	plan.width, plan.height = width, height
 	for y in 0..<CAVE_HEIGHT { for x in 0..<CAVE_WIDTH { plan.rows[y][x] = '#' } }
-	plan.rooms = 2+int(cave_hash(seed, 1)%2)
+	plan.rooms = 2+int(cave_hash(seed, 1)%2) if width == CAVE_WIDTH else 2
 	// The rooms' columns: [x0, x1] each, with a gallery of three or four cells between one and the next.
 	columns: [CAVE_MAX_ROOMS][2]int
 	if plan.rooms == 2 {
-		first := cave_pick(seed, 2, 10, 13)
+		first := cave_pick(seed, 2, 10, 13) if width == CAVE_WIDTH else cave_pick(seed, 2, width/2-6, width/2-4)
 		columns[0] = {2, first}
-		columns[1] = {first+5, CAVE_WIDTH-6}
+		columns[1] = {first+5, width-6}
 	} else {
 		first := cave_pick(seed, 2, 6, 7)
 		second := cave_pick(seed, 3, 7, 8)
@@ -68,8 +82,8 @@ cave_plan :: proc(seed: u64) -> (plan: Cave_Plan) {
 	// Each room's rows: between 7 and 12 tall, somewhere in the board; the galleries run along the shared middle.
 	middles: [CAVE_MAX_ROOMS]int
 	for index in 0..<plan.rooms {
-		tall := cave_pick(seed, u64(10+index), 7, 12)
-		top := cave_pick(seed, u64(20+index), 2, CAVE_HEIGHT-2-tall)
+		tall := cave_pick(seed, u64(10+index), 7, min(12, height-4))
+		top := cave_pick(seed, u64(20+index), 2, height-2-tall)
 		plan.boxes[index] = {{x = columns[index][0], y = top}, {x = columns[index][1], y = top+tall-1}}
 		cave_carve(&plan, plan.boxes[index][0], plan.boxes[index][1])
 		middles[index] = top+tall/2
@@ -103,8 +117,8 @@ cave_plan :: proc(seed: u64) -> (plan: Cave_Plan) {
 	// The secret: a niche cut into the east wall of the last room, two cells tall and three deep, at its middle.
 	last := plan.rooms-1
 	niche_y := middles[last]
-	cave_carve(&plan, {x = plan.boxes[last][1].x+1, y = niche_y}, {x = CAVE_WIDTH-3, y = niche_y+1})
-	plan.secret = {x = CAVE_WIDTH-3, y = niche_y}
+	cave_carve(&plan, {x = plan.boxes[last][1].x+1, y = niche_y}, {x = width-3, y = niche_y+1})
+	plan.secret = {x = width-3, y = niche_y}
 	// The foes: none in the first room when there are three; the others each have a group at their middle.
 	for index in 0..<plan.rooms {
 		if plan.rooms == 3 && index == 0 { continue }
@@ -119,7 +133,7 @@ cave_plan :: proc(seed: u64) -> (plan: Cave_Plan) {
 }
 
 cave_plan_at :: proc(plan: ^Cave_Plan, x, y: int) -> u8 {
-	if x < 0 || y < 0 || x >= CAVE_WIDTH || y >= CAVE_HEIGHT { return '#' }
+	if x < 0 || y < 0 || x >= plan.width || y >= plan.height { return '#' }
 	return plan.rows[y][x]
 }
 

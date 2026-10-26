@@ -6,30 +6,53 @@ import grid "../engine/grid"
 import level "../level"
 import rng "../engine/rng"
 
-// THE CAVES (Fase 5 of docs/piano-griglia.md). An arch on the open map leads, with a fade, into a small map of its own
-// (level/cave.odin): two or three rooms in a row, foes in them, a secret with its reward at the far end. The way out is
-// the arch again. Four biomes have them: the Snow (one in the spiral mountain, halfway up, and up to two more on the
-// map), the Far West, the Egypt and the Inferno (one to three each).
+// THE CAVES (Fase 5 of docs/piano-profondita.md; they came with Fase 5 of docs/piano-griglia.md). A cave is the layer
+// under a massif of rock (level/layers.odin): its rooms are cells of CAVE_LAYER at the height of the ground round the
+// massif, and the player walks in through its mouth, with no fade and no other map. Four biomes have them: the Snow
+// (one room in the spiral mountain's core, its mouth on the path near halfway up, and more on the open map), the Far
+// West, the Egypt and the Inferno.
 //
-// The cave is drawn on the very same grid, in the middle of it: on going in, the open map's tiles and heights are put away
-// (in an Outer_Map the scene keeps, and saves with the checkpoint), the cave's plan is stamped over a blank map, and
-// the player stands at its arrival; on going out, the open map comes back as it was. What belongs to the open map
-// (its sites, groups and drops) does nothing in the meantime, and what belongs to the cave (its groups and drops,
-// marked with its number) does nothing outside.
+// Every place has its massif and its cave at every run, the same geography: the places and the plans come from the
+// biome alone, chosen before the relief, which keeps the ground round each massif level (relief.odin). The run picks
+// which of them hold foes and a secret, between one and three, the mountain's always; the others are empty. Each cave
+// has a site, at its mouth, which the map marks once found.
+//
+//   ####################################      the massif: the plan of level/cave.odin under rock, with a ring of rock
+//   #....#####........#######.....#####       round it; a tunnel goes from its first room out through the ring to the
+// @=....................................#     mouth (@) on the open ground, in front of the west side.
 
 MAX_CAVES :: 3
+CAVE_LAYER :: i8(-1)
+// The massif's height over the ground round it at its edge: the cave's room and the rock over it, and two steps more.
+// Inside the edge it rises a step a cell, up to CAVE_MASSIF_RISE more.
+CAVE_MASSIF_HEIGHT :: level.LAYER_SPACING+2
+CAVE_MASSIF_RISE :: 4
+// The fewest cells of the mountain's room, and the most.
+CAVE_MOUNTAIN_ROOM_MIN :: 12
+CAVE_MOUNTAIN_ROOM_MAX :: 96
 
 Cave_State :: enum u8 { Unvisited, Visited, Looted }
 Cave :: struct {
-	// The arch on the open map: its site.
-	site:  int,
-	seed:  u64,
-	state: Cave_State,
+	site:      int,
+	// The run's: what its foes and its secret are.
+	seed:      u64,
+	state:     Cave_State,
+	// Whether the run gave it foes and a secret.
+	inhabited: bool,
+	// Where it is: the same for the biome at every run.
+	place:     Cave_Place,
 }
 
-// The open map while the player is in a cave: every cell's tile kind and height.
-Outer_Map :: struct {
-	kinds, heights: [MAX_CELLS]u8,
+// A place for a cave: its box on the map (its cells are on CAVE_LAYER; a ring of rock goes round it: the plan's board,
+// or the mountain's room's), the seed of its plan (level/cave.odin; the mountain's room has none), the height of its
+// floor, the open ground in front of its mouth, and its first cell inside.
+Cave_Place :: struct {
+	origin:         grid.Position,
+	width, height:  int,
+	plan_seed:      u64,
+	floor:          i32,
+	mountain:       bool,
+	mouth, arrival: grid.Position,
 }
 
 cave_biome :: proc(b: campaign.Biome) -> bool {
@@ -39,233 +62,413 @@ cave_biome :: proc(b: campaign.Biome) -> bool {
 	return false
 }
 
-// Where a cave's plan sits on the map: the middle, whatever the cave.
-cave_origin :: proc(w: ^World) -> grid.Position {
-	side := size(w)
-	return {x = (side-level.CAVE_WIDTH)/2, y = (side-level.CAVE_HEIGHT)/2}
+// The cell of cave `index` at `local` in its box, on its layer.
+cave_world_cell :: proc(w: ^World, index: int, local: grid.Position) -> grid.Position {
+	origin := w.caves[index].place.origin
+	return {x = origin.x+local.x, y = origin.y+local.y, layer = CAVE_LAYER}
 }
 
-cave_world_cell :: proc(w: ^World, local: grid.Position) -> grid.Position {
-	return game.add_position(cave_origin(w), local)
-}
-
-// Whether something marked `tag` (a group's, a drop's) is where the player is.
+// Whether something marked `tag` (a group's, a drop's: the cave it was made in, or 0) is on the map with the player:
+// always, now that the caves are a layer of the map and not a map of their own.
 in_scope :: proc(w: ^World, tag: u8) -> bool {
-	return w != nil && int(tag) == w.in_cave
+	return w != nil
 }
 
-// The ground of a cell: the biome's, but in a cave nothing of the open map's terrain is under the player's feet.
+// The ground of a cell: the biome's, but nothing of the open map's terrain is under the rock.
 ground :: proc(w: ^World, p: grid.Position) -> Terrain {
-	if w.in_cave > 0 { return .Plain }
+	if p.layer != grid.GROUND_LAYER { return .Plain }
 	return terrain(w.biome, p)
 }
 
-// The cave the arch at site `site` leads to (-1 if it is not one).
+// The cave whose mouth is site `site` (-1 if it is not one).
 cave_of_site :: proc(w: ^World, site: int) -> int {
 	for cave, i in w.caves[:w.cave_count] { if cave.site == site { return i } }
 	return -1
 }
 
-// The open map's arch, as a site's layout draws it (site_layout.odin): a block of rock three cells wide with the doorway
-// between its legs, and the ground in front of it cleared.
-@(private = "file")
-stamp_cave_arch :: proc(data: ^level.Level, p: grid.Position) {
-	site := Site{kind = .Cave, position = p, layout_version = SITE_LAYOUT_VERSION}
-	stamp_site(data, &site)
+// The cave that holds `p`, its rock's ring included: its index plus one, 0 for none (the open map).
+cave_at :: proc(w: ^World, p: grid.Position) -> int {
+	if w == nil || p.layer != CAVE_LAYER { return 0 }
+	for cave, i in w.caves[:w.cave_count] {
+		box := cave.place
+		if p.x >= box.origin.x-1 && p.y >= box.origin.y-1 && p.x <= box.origin.x+box.width && p.y <= box.origin.y+box.height { return i+1 }
+	}
+	return 0
 }
 
-// A free place for an arch: open ground at the map's own level, clear of the sites, the spawn, the patrols' ground, the
-// central band, the mountain and the other arches.
-@(private = "file")
-cave_entrance_free :: proc(w: ^World, data: ^level.Level, p: grid.Position, others: []grid.Position) -> bool {
-	side := size(w)
-	if p.x < 14 || p.y < 8 || p.x >= side-8 || p.y >= side-8 { return false }
-	if abs(p.y-side/2) <= 5 { return false }
-	if distance(p, data.player_spawn) < 14 { return false }
-	for y in p.y-4..=p.y+3 {
-		for x in p.x-4..=p.x+4 {
-			tile, ok := level.tile_at(data, {x = x, y = y})
-			if !ok || tile.kind == .Void || tile.kind == .Exit || level.height_at(data, {x = x, y = y}) != 0 { return false }
-		}
+// Whether the ground cell at `p`'s column is the rock of a massif on the open map, its ring included (the mountain's cells
+// are the mountain's): a top no one walks on, over a cave.
+cave_rock :: proc(w: ^World, p: grid.Position) -> bool {
+	if w == nil { return false }
+	for cave in w.caves[:w.cave_count] {
+		box := cave.place
+		if box.mountain { continue }
+		if p.x >= box.origin.x-1 && p.y >= box.origin.y-1 && p.x <= box.origin.x+box.width && p.y <= box.origin.y+box.height { return true }
 	}
-	for &site in w.sites[:w.site_count] {
-		low, high := site_bounds(&site)
-		if p.x+5 >= low.x && p.x-5 <= high.x && p.y+4 >= low.y && p.y-4 <= high.y { return false }
-	}
-	for other in others { if distance(other, p) < 24 { return false } }
-	for i in 0..<4 {
-		anchor := grid.Position{x = side*(35+i*13)/100, y = side*(35+(i%2)*28)/100}
-		if distance(anchor, p) < 9 { return false }
-	}
-	if mountain_present(w) {
-		zone := mountain_zone()
-		if p.x+5 >= zone[0].x && p.x-5 <= zone[1].x && p.y+4 >= zone[0].y && p.y-4 <= zone[1].y { return false }
-	}
-	return true
+	return false
 }
 
 @(private = "file")
-add_cave :: proc(w: ^World, p: grid.Position, r: ^rng.Rng) -> int {
-	if w.cave_count >= MAX_CAVES || w.site_count >= MAX_SITES { return -1 }
-	seed := rng.next_u64(r)
-	// The mountain's has no rock of its own: the path is what it stands on (layout 0, like the sites that have none).
-	layout := SITE_LAYOUT_VERSION if !(mountain_present(w) && w.cave_count == 0) else u8(0)
-	w.sites[w.site_count] = Site{kind = .Cave, position = p, secret = true, active = true, group = -1, seed = seed, layout_version = layout}
-	w.caves[w.cave_count] = Cave{site = w.site_count, seed = seed~0x6A09E667}
-	w.site_count += 1
-	w.cave_count += 1
-	add_cave_content(w, w.cave_count-1)
-	return w.cave_count-1
-}
+CAVE_STEPS :: [4]grid.Position{{x = 0, y = -1}, {x = 1, y = 0}, {x = 0, y = 1}, {x = -1, y = 0}}
 
-// A foe of the cave's own: stronger than the open map's at its rank.
+// The mountain's room (the Snow's), as offsets from the mountain's centre: going down the path from near halfway up,
+// the first cell of the path beside rock deep enough for a room, and the cells, 4-neighbours of one another, whose
+// ground stands LAYER_SPACING steps over that path cell or more. The room's floor is at that cell's height; the path
+// cell is its mouth, the first cell of the room its arrival.
 @(private = "file")
-cave_member :: proc(w: ^World, plan: ^level.Cave_Plan, anchor: grid.Position, local: grid.Position, r: ^rng.Rng, taken: []grid.Position) -> (Member, bool) {
-	// The nearest free floor cell of the plan to the anchor.
-	for radius in 0..=2 {
-		for dy in -radius..=radius {
-			for dx in -radius..=radius {
-				cell := grid.offset(anchor, dx, dy)
-				if level.cave_plan_at(plan, cell.x, cell.y) != '.' { continue }
-				if cell == plan.arrival || cell == plan.secret { continue }
-				occupied := false
-				for other in taken { occupied = occupied || other == cell }
-				if occupied { continue }
-				kind := game.Enemy_Archetype(rng.next_u64(r)%5)
-				hp := i32(7+rank(w.biome)*2)
-				if kind == .Brute || kind == .Custodian { hp += 3 }
-				attack := 2+i32(rank(w.biome))
-				if w.biome == .Inferno { hp += 3; attack += 1 }
-				if w.biome == .Egypt && kind == .Chaser { hp += 5 }
-				member := Member{enemy = {position = cave_world_cell(w, cell), health = hp, max_health = hp, attack = attack, archetype = kind}, alive = true}
-				return member, true
+mountain_cave_room :: proc(room: ^[CAVE_MOUNTAIN_ROOM_MAX]grid.Position) -> (count: int, mouth, arrival: grid.Position, floor: i32, ok: bool) {
+	deep :: proc(offset: grid.Position, floor: i32) -> bool {
+		_, inside := level.mountain_progress(offset)
+		return inside && i32(level.mountain_height(offset)) >= floor+level.LAYER_SPACING
+	}
+	for step in 0..<50 {
+		path := level.mountain_path_cell(1.75-f32(step)*0.02)
+		floor = i32(level.mountain_height(path))
+		for direction in CAVE_STEPS {
+			start := grid.offset(path, direction.x, direction.y)
+			if !deep(start, floor) { continue }
+			room[0] = start
+			count = 1
+			for head := 0; head < count; head += 1 {
+				for next_step in CAVE_STEPS {
+					next := grid.offset(room[head], next_step.x, next_step.y)
+					if count >= CAVE_MOUNTAIN_ROOM_MAX || !deep(next, floor) { continue }
+					seen := false
+					for cell in room[:count] { if cell == next { seen = true; break } }
+					if !seen { room[count] = next; count += 1 }
+				}
 			}
+			if count >= CAVE_MOUNTAIN_ROOM_MIN { return count, path, start, floor, true }
 		}
-	}
-	return {}, false
-}
-
-// The cave's inhabitants and treasure, made once with the map: a group in each room that has one, and the secret.
-@(private = "file")
-add_cave_content :: proc(w: ^World, index: int) {
-	cave := &w.caves[index]
-	plan := level.cave_plan(cave.seed)
-	r := rng.create(cave.seed~0xBEEF)
-	for g in 0..<plan.groups {
-		if w.group_count >= MAX_GROUPS { break }
-		group := &w.groups[w.group_count]
-		group^ = Group{anchor = cave_world_cell(w, plan.anchors[g]), site = -1, cave = u8(index+1)}
-		taken: [level.CAVE_MAX_ROOMS*4+4]grid.Position
-		for i in 0..<plan.foes[g] {
-			member, ok := cave_member(w, &plan, plan.anchors[g], {}, &r, taken[:i])
-			if !ok { continue }
-			taken[i] = grid.offset(member.enemy.position, -cave_origin(w).x, -cave_origin(w).y)
-			group.members[group.count] = member
-			group.count += 1
-		}
-		if group.count == 0 { continue }
-		w.group_count += 1
-	}
-	// The secret: credits and a relic, to be taken by hand.
-	secret := cave_world_cell(w, plan.secret)
-	_ = add_drop(w, secret, campaign.make_item(.Credits, 40+i32(rng.next_u64(&r)%40)), 0, true, index+1)
-	relic := 1+i32(rng.next_u64(&r)%(u64(game.Relic_Id.Count)-1))
-	_ = add_drop(w, game.add_position(secret, {x = -1, y = 0}), campaign.make_item(.Relic, 1, relic), 0, true, index+1)
-}
-
-// The places on the map where there can be a cave: the same for a biome at every run, like the rest of its geography. The Snow's
-// first is on the spiral mountain's path, halfway up; the others are open ground, each with its arch's rock stamped (a
-// rock formation with a doorway-shaped niche, which is all it is where the run has no cave).
-@(private = "file")
-cave_candidates :: proc(w: ^World, data: ^level.Level) -> (places: [MAX_CAVES]grid.Position, count: int) {
-	if mountain_present(w) {
-		places[count] = mountain_cell(level.mountain_path_cell(1.75))
-		count += 1
-	}
-	side := size(w)
-	r := rng.create(0xCA7E0000+u64(w.biome))
-	for _ in 0..<800 {
-		if count >= MAX_CAVES { break }
-		p := grid.Position{x = 14+int(rng.next_u64(&r)%u64(side-28)), y = 10+int(rng.next_u64(&r)%u64(side-20))}
-		if !cave_entrance_free(w, data, p, places[:count]) { continue }
-		stamp_cave_arch(data, p)
-		places[count] = p
-		count += 1
 	}
 	return
 }
 
-// The map's caves: between one and three in all (the Snow's mountain always has its own), picked from the places there can
-// be one, as the run's seed decides.
+// The board of a cave's plan in the biome: today's, but smaller in the Far West, whose map has no room for it (the
+// user's choice in Fase 5).
+cave_board :: proc(b: campaign.Biome) -> (width, height: int) {
+	if b == .West { return 24, 14 }
+	return level.CAVE_WIDTH, level.CAVE_HEIGHT
+}
+
+// The cells round a massif at `origin` over a board of `width` by `height`: its own (the plan and the ring of rock round
+// it), with `margin` more on every side; and the apron of open ground in front of its mouth.
+@(private = "file")
+massif_bounds :: proc(origin: grid.Position, width, height, margin: int) -> (low, high: grid.Position) {
+	return grid.offset(origin, -1-margin, -1-margin), grid.offset(origin, width+margin, height+margin)
+}
+
+// The mouth's site's ground (site_layout's .Cave): clear of props, level and safe.
+@(private = "file")
+massif_apron :: proc(mouth: grid.Position) -> (low, high: grid.Position) {
+	return grid.offset(mouth, -3, -2), grid.offset(mouth, 0, 2)
+}
+
+// The ground the relief keeps level round a place on the open map (relief.odin): the massif with two cells all round,
+// and the apron in front of its mouth.
+@(private)
+cave_level_zones :: proc(place: Cave_Place) -> (zones: [2][2]grid.Position) {
+	low, high := massif_bounds(place.origin, place.width, place.height, 2)
+	apron_low, apron_high := massif_apron(place.mouth)
+	return {{low, high}, {grid.offset(apron_low, -1, -1), grid.offset(apron_high, 0, 1)}}
+}
+
+// Whether a massif over a board of `width` by `height` at `origin`, with its mouth at `mouth`, stands on open ground, the
+// ground in front of its mouth too: a cell clear all round of the sites, the structures, the spawn, the central band,
+// the patrols' anchors, the mountain and the other massifs, and its mouth on safe ground. Scattered props (Wall cells on
+// open ground) are no matter, nor the ground's hazards under the rock: the rock covers them. The heights do not matter
+// either: the relief comes after, and keeps it all level.
+@(private = "file")
+massif_free :: proc(w: ^World, data: ^level.Level, origin, mouth: grid.Position, width, height: int, others: []Cave_Place) -> bool {
+	side := size(w)
+	low, high := massif_bounds(origin, width, height, 1)
+	apron_low, apron_high := massif_apron(mouth)
+	low = {x = min(low.x, apron_low.x), y = min(low.y, apron_low.y)}
+	high = {x = max(high.x, apron_high.x), y = max(high.y, apron_high.y)}
+	overlaps :: proc(low, high, other_low, other_high: grid.Position) -> bool {
+		return high.x >= other_low.x && low.x <= other_high.x && high.y >= other_low.y && low.y <= other_high.y
+	}
+	// The west strip and the central band are the map's own ways across.
+	if low.x < 14 || low.y < 5 || high.x >= side-6 || high.y >= side-6 { return false }
+	if overlaps(low, high, {x = 0, y = side/2-5}, {x = side, y = side/2+5}) { return false }
+	if mountain_present(w) {
+		zone := mountain_zone()
+		if overlaps(low, high, zone[0], zone[1]) { return false }
+	}
+	for other in others {
+		if other.mountain { continue }
+		other_low, other_high := massif_bounds(other.origin, other.width, other.height, 4)
+		if overlaps(low, high, other_low, other_high) { return false }
+	}
+	for &site in w.sites[:w.site_count] {
+		site_low, site_high := site_bounds(&site)
+		if overlaps(low, high, site_low, site_high) { return false }
+	}
+	for i in 0..<4 {
+		anchor := grid.Position{x = side*(35+i*13)/100, y = side*(35+(i%2)*28)/100}
+		if overlaps(low, high, grid.offset(anchor, -4, -4), grid.offset(anchor, 4, 4)) { return false }
+	}
+	if data.has_player_spawn && overlaps(low, high, grid.offset(data.player_spawn, -12, -12), grid.offset(data.player_spawn, 12, 12)) { return false }
+	for y in low.y..=high.y {
+		for x in low.x..=high.x {
+			p := grid.Position{x = x, y = y}
+			tile, found := level.tile_at(data, p)
+			if !found || tile.kind != .Floor && tile.kind != .Wall { return false }
+			if _, owned := level.structure_index_at(data, p); owned { return false }
+		}
+	}
+	// The way in is safe ground: no lava, water, bridge or well in front of the mouth.
+	for y in apron_low.y..=apron_high.y {
+		for x in apron_low.x..=apron_high.x {
+			#partial switch terrain(w.biome, {x = x, y = y}) {
+			case .Water, .Lava, .Bridge, .Gravity: return false
+			}
+		}
+	}
+	return true
+}
+
+// The seed of the plan of the biome's `index`-th cave place: fixed, like the rest of its geography.
+@(private = "file")
+cave_plan_seed :: proc(w: ^World, index: int) -> u64 {
+	return 0xCA7E5EED+u64(w.biome)*64+u64(index)
+}
+
+// The places of the biome's caves: the mountain's room first in the Snow, then massifs on the open map, as many as fit,
+// up to MAX_CAVES. A pure function of the biome and of the map made so far.
+@(private = "file")
+cave_places :: proc(w: ^World, data: ^level.Level) -> (places: [MAX_CAVES]Cave_Place, count: int) {
+	if mountain_present(w) {
+		room: [CAVE_MOUNTAIN_ROOM_MAX]grid.Position
+		if cells, mouth, arrival, floor, ok := mountain_cave_room(&room); ok {
+			low, high := room[0], room[0]
+			for cell in room[:cells] {
+				low = {x = min(low.x, cell.x), y = min(low.y, cell.y)}
+				high = {x = max(high.x, cell.x), y = max(high.y, cell.y)}
+			}
+			at := mountain_cell(arrival)
+			places[count] = {origin = mountain_cell(low), width = high.x-low.x+1, height = high.y-low.y+1, floor = floor, mountain = true,
+				mouth = mountain_cell(mouth), arrival = {x = at.x, y = at.y, layer = CAVE_LAYER}}
+			count += 1
+		}
+	}
+	side := size(w)
+	width, height := cave_board(w.biome)
+	r := rng.create(0xCA7E0000+u64(w.biome))
+	plan := level.cave_plan_sized(cave_plan_seed(w, count), width, height)
+	for _ in 0..<6000 {
+		if count >= MAX_CAVES { break }
+		origin := grid.Position{x = 16+int(rng.next_u64(&r)%u64(side-width-24)), y = 8+int(rng.next_u64(&r)%u64(side-height-16))}
+		mouth := grid.Position{x = origin.x-2, y = origin.y+plan.arrival.y}
+		if !massif_free(w, data, origin, mouth, width, height, places[:count]) { continue }
+		places[count] = {origin = origin, width = width, height = height, plan_seed = cave_plan_seed(w, count), mouth = mouth,
+			arrival = {x = origin.x+plan.arrival.x, y = origin.y+plan.arrival.y, layer = CAVE_LAYER}}
+		count += 1
+		plan = level.cave_plan_sized(cave_plan_seed(w, count), width, height)
+	}
+	return
+}
+
+// Raises a place's massif and digs its cave under it: on the open map the plan's rooms on CAVE_LAYER at the height of
+// the level ground round it (place.floor), under rock that rises from CAVE_MASSIF_HEIGHT over it at its edge, and the
+// tunnel from the first room out through the ring to the mouth, with the props round it and in front of the mouth
+// cleared; in the mountain its room.
+@(private = "file")
+dig_cave :: proc(data: ^level.Level, place: Cave_Place) {
+	cave_floor :: proc(data: ^level.Level, x, y: int, height: i32) {
+		cell := grid.Position{x = x, y = y, layer = CAVE_LAYER}
+		_ = level.set_tile(data, cell, {kind = .Floor})
+		_ = level.set_height(data, cell, height)
+	}
+	if place.mountain {
+		room: [CAVE_MOUNTAIN_ROOM_MAX]grid.Position
+		cells, _, _, floor, ok := mountain_cave_room(&room)
+		if !ok { return }
+		for offset in room[:cells] { cell := mountain_cell(offset); cave_floor(data, cell.x, cell.y, floor) }
+		return
+	}
+	clear_prop :: proc(data: ^level.Level, p: grid.Position) {
+		if tile, found := level.tile_at(data, p); found && tile.kind == .Wall { _ = level.set_tile(data, p, {kind = .Floor}) }
+	}
+	low, high := massif_bounds(place.origin, place.width, place.height, 1)
+	apron_low, apron_high := massif_apron(place.mouth)
+	for y in low.y..=high.y { for x in low.x..=high.x { clear_prop(data, {x = x, y = y}) } }
+	for y in apron_low.y..=apron_high.y { for x in apron_low.x..=apron_high.x { clear_prop(data, {x = x, y = y}) } }
+	rock_low, rock_high := massif_bounds(place.origin, place.width, place.height, 0)
+	for y in rock_low.y..=rock_high.y {
+		for x in rock_low.x..=rock_high.x {
+			edge := min(x-rock_low.x, y-rock_low.y, rock_high.x-x, rock_high.y-y)
+			_ = level.set_height(data, {x = x, y = y}, place.floor+CAVE_MASSIF_HEIGHT+i32(min(edge, CAVE_MASSIF_RISE)))
+		}
+	}
+	plan := level.cave_plan_sized(place.plan_seed, place.width, place.height)
+	for y in 0..<place.height {
+		for x in 0..<place.width {
+			if level.cave_plan_at(&plan, x, y) == '.' { cave_floor(data, place.origin.x+x, place.origin.y+y, place.floor) }
+		}
+	}
+	for x in -1..<plan.arrival.x { cave_floor(data, place.origin.x+x, place.mouth.y, place.floor) }
+}
+
+// A foe of the cave's own: stronger than the open map's at its rank.
+@(private = "file")
+cave_member :: proc(w: ^World, position: grid.Position, r: ^rng.Rng) -> Member {
+	kind := game.Enemy_Archetype(rng.next_u64(r)%5)
+	hp := i32(7+rank(w.biome)*2)
+	if kind == .Brute || kind == .Custodian { hp += 3 }
+	attack := 2+i32(rank(w.biome))
+	if w.biome == .Inferno { hp += 3; attack += 1 }
+	if w.biome == .Egypt && kind == .Chaser { hp += 5 }
+	return {enemy = {position = position, health = hp, max_health = hp, attack = attack, archetype = kind}, alive = true}
+}
+
+// The nearest floor cell of a plan to `anchor`, not its arrival nor its secret nor one of `taken`.
+@(private = "file")
+plan_free_cell :: proc(plan: ^level.Cave_Plan, anchor: grid.Position, taken: []grid.Position) -> (cell: grid.Position, ok: bool) {
+	for radius in 0..=2 {
+		for dy in -radius..=radius {
+			for dx in -radius..=radius {
+				cell = grid.offset(anchor, dx, dy)
+				if level.cave_plan_at(plan, cell.x, cell.y) != '.' || cell == plan.arrival || cell == plan.secret { continue }
+				occupied := false
+				for other in taken { occupied = occupied || other == cell }
+				if !occupied { return cell, true }
+			}
+		}
+	}
+	return
+}
+
+// The secret: credits and a relic, to be taken by hand.
+@(private = "file")
+add_cave_secret :: proc(w: ^World, index: int, at, beside: grid.Position, r: ^rng.Rng) {
+	_ = add_drop(w, at, campaign.make_item(.Credits, 40+i32(rng.next_u64(r)%40)), 0, true, index+1)
+	relic := 1+i32(rng.next_u64(r)%(u64(game.Relic_Id.Count)-1))
+	_ = add_drop(w, beside, campaign.make_item(.Relic, 1, relic), 0, true, index+1)
+}
+
+// The cave's inhabitants and treasure, made once with the map: a group in each room of the plan that has one, and the
+// secret in its niche; in the mountain's room a pair of foes, and the secret at its far end.
+@(private = "file")
+add_cave_content :: proc(w: ^World, index: int) {
+	cave := &w.caves[index]
+	r := rng.create(cave.seed~0xBEEF)
+	if cave.place.mountain {
+		room: [CAVE_MOUNTAIN_ROOM_MAX]grid.Position
+		cells, _, arrival, _, ok := mountain_cave_room(&room)
+		if !ok { return }
+		on_layer :: proc(offset: grid.Position) -> grid.Position {
+			cell := mountain_cell(offset)
+			return {x = cell.x, y = cell.y, layer = CAVE_LAYER}
+		}
+		// The two cells farthest from the arrival hold the secret.
+		far, second := -1, -1
+		for cell, i in room[:cells] {
+			if far < 0 || distance(cell, arrival) > distance(room[far], arrival) { second, far = far, i }
+			else if second < 0 || distance(cell, arrival) > distance(room[second], arrival) { second = i }
+		}
+		add_cave_secret(w, index, on_layer(room[far]), on_layer(room[second]), &r)
+		if w.group_count >= MAX_GROUPS { return }
+		group := &w.groups[w.group_count]
+		group^ = Group{anchor = on_layer(room[cells/2]), site = -1, cave = u8(index+1)}
+		for cell, i in room[:cells] {
+			if group.count >= 2 { break }
+			if i == far || i == second || distance(cell, arrival) < 2 { continue }
+			group.members[group.count] = cave_member(w, on_layer(cell), &r)
+			group.count += 1
+		}
+		if group.count > 0 { w.group_count += 1 }
+		return
+	}
+	plan := level.cave_plan_sized(cave.place.plan_seed, cave.place.width, cave.place.height)
+	for g in 0..<plan.groups {
+		if w.group_count >= MAX_GROUPS { break }
+		group := &w.groups[w.group_count]
+		group^ = Group{anchor = cave_world_cell(w, index, plan.anchors[g]), site = -1, cave = u8(index+1)}
+		taken: [level.CAVE_MAX_ROOMS*4+4]grid.Position
+		for i in 0..<plan.foes[g] {
+			cell, ok := plan_free_cell(&plan, plan.anchors[g], taken[:i])
+			if !ok { continue }
+			taken[i] = cell
+			group.members[group.count] = cave_member(w, cave_world_cell(w, index, cell), &r)
+			group.count += 1
+		}
+		if group.count > 0 { w.group_count += 1 }
+	}
+	secret := cave_world_cell(w, index, plan.secret)
+	add_cave_secret(w, index, secret, grid.offset(secret, -1, 0), &r)
+}
+
+// The places of the map's caves, before the relief, which keeps their ground level (relief.odin): the world's caves,
+// with nothing else yet.
+@(private)
+plan_caves :: proc(w: ^World, data: ^level.Level) {
+	if !cave_biome(w.biome) { return }
+	places, count := cave_places(w, data)
+	for place in places[:count] {
+		if w.site_count+w.cave_count >= MAX_SITES { break }
+		w.caves[w.cave_count] = Cave{site = -1, place = place}
+		w.cave_count += 1
+	}
+}
+
+// The map's caves, after the relief: every place gets its massif, its cave and the site at its mouth; between one and
+// three of them (the Snow's mountain's always) hold foes and a secret, as the run's seed decides.
 @(private)
 place_caves :: proc(w: ^World, data: ^level.Level) {
-	if !cave_biome(w.biome) { return }
-	places, count := cave_candidates(w, data)
+	count := w.cave_count
 	if count == 0 { return }
 	r := rng.create(w.seed~0xCA7E5)
 	total := min(count, 1+int(rng.next_u64(&r)%3))
 	chosen: [MAX_CAVES]bool
 	picked := 0
-	if mountain_present(w) { chosen[0] = true; picked = 1 }
+	if w.caves[0].place.mountain { chosen[0] = true; picked = 1 }
 	for picked < total {
 		i := int(rng.next_u64(&r)%u64(count))
 		if chosen[i] { continue }
 		chosen[i] = true
 		picked += 1
 	}
-	for i in 0..<count { if chosen[i] { _ = add_cave(w, places[i], &r) } }
+	for &cave, i in w.caves[:count] {
+		// On the open map the cave is at the height of the level ground round it.
+		if !cave.place.mountain { cave.place.floor = level.height_at(data, cave.place.mouth) }
+		cave.place.arrival.layer = CAVE_LAYER
+		dig_cave(data, cave.place)
+		seed := rng.next_u64(&r)
+		w.sites[w.site_count] = Site{kind = .Cave, position = cave.place.mouth, secret = true, active = true, group = -1, seed = seed}
+		cave.site, cave.seed, cave.inhabited = w.site_count, seed~0x6A09E667, chosen[i]
+		w.site_count += 1
+		if chosen[i] { add_cave_content(w, i) }
+	}
 }
 
-// Goes into cave `index` from where the player stands: puts the open map away in `outer`, stamps the cave, and stands the
-// player at its arrival. False (and nothing changed) if the player cannot now: in a fight, or already in a cave.
-enter_cave :: proc(w: ^World, data: ^level.Level, room: ^game.Room, outer: ^Outer_Map, index: int) -> bool {
-	if w == nil || data == nil || room == nil || outer == nil || room.player == nil || index < 0 || index >= w.cave_count || w.in_cave != 0 || room.phase == .Combat { return false }
-	cells := len(data.tiles.cells)
-	if cells > MAX_CELLS || !level.tile_kinds(data, outer.kinds[:cells]) { return false }
-	for i in 0..<cells { outer.heights[i] = 0 }
-	if level.has_heights(data) { copy(outer.heights[:cells], data.heights[:]) }
-	blank := make([]u8, cells, context.temp_allocator)
-	if !level.set_tile_kinds(data, blank) || !level.set_height_table(data, blank) { return false }
-	plan := level.cave_plan(w.caves[index].seed)
-	origin := cave_origin(w)
-	if !level.cave_stamp(data, origin, &plan) { return false }
-	// The open map's structures are put away with it (their tiles are in the outer map; the world keeps their records).
-	_ = level.set_structures(data, nil)
-	arrival := game.add_position(origin, plan.arrival)
-	_ = level.set_tile(data, arrival, {.Player_Spawn})
-	w.cave_return = room.player.position
-	w.in_cave = index+1
-	w.mounted = false
-	if w.caves[index].state == .Unvisited { w.caves[index].state = .Visited }
-	room.player.position = arrival
-	return true
-}
-
-// Comes out of the cave the player is in, at the arch it went in by, and brings the open map back as it was.
-exit_cave :: proc(w: ^World, data: ^level.Level, room: ^game.Room, outer: ^Outer_Map) -> bool {
-	if w == nil || data == nil || room == nil || outer == nil || room.player == nil || w.in_cave <= 0 || room.phase == .Combat { return false }
-	cells := len(data.tiles.cells)
-	if cells > MAX_CELLS || !level.set_tile_kinds(data, outer.kinds[:cells]) || !level.set_height_table(data, outer.heights[:cells]) { return false }
-	_ = level.set_structures(data, w.structures[:w.structure_count])
-	w.in_cave = 0
-	room.player.position = w.cave_return
-	return true
-}
-
-// How many of the sites there are to draw and to ask: all of them on the open map, none in a cave.
+// How many of the sites there are to draw and to ask: all of them.
 visible_sites :: proc(w: ^World) -> int {
-	return 0 if w.in_cave > 0 else w.site_count
+	return w.site_count
 }
 
-// The cell the player stands on coming into the cave the player is in, and goes out from.
+// The first cell inside the cave the player is in.
 cave_arrival :: proc(w: ^World) -> (cell: grid.Position, ok: bool) {
 	if w == nil || w.in_cave <= 0 || w.in_cave > w.cave_count { return }
-	plan := level.cave_plan(w.caves[w.in_cave-1].seed)
-	return cave_world_cell(w, plan.arrival), true
+	return w.caves[w.in_cave-1].place.arrival, true
 }
 
-// A cave's secret is taken once its drops are gone.
+// A cave's secret is taken once its drops are gone (an empty cave has none to take).
 cave_looted :: proc(w: ^World, index: int) -> bool {
 	for drop in w.drops[:w.drop_count] { if int(drop.cave) == index+1 { return false } }
 	return true
+}
+
+// Where the player is among the caves (in_cave), and what each cave and its mouth's site have seen of him. Called
+// every tick.
+@(private)
+update_caves :: proc(w: ^World, player: grid.Position) {
+	w.in_cave = cave_at(w, player)
+	for &cave, i in w.caves[:w.cave_count] {
+		if w.in_cave == i+1 && cave.state == .Unvisited { cave.state = .Visited }
+		if cave.inhabited && cave.state == .Visited && cave_looted(w, i) {
+			cave.state = .Looted
+			w.sites[cave.site].state = .Resolved
+		}
+	}
 }

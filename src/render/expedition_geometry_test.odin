@@ -177,6 +177,11 @@ test_expedition_all_biomes_static_site_bake_is_complete_bounded_and_clock_indepe
 		w.clock+=.13;w.beat+=11;w.seed+=31;site.wave+=1;site.seed+=23
 		draw_expedition_site_static({mode=.Bake,builder=&b},w,&site)
 		identical:=slice.equal(a.vertices[:],b.vertices[:]) && slice.equal(a.lines[:],b.lines[:])
+		// A cave's mouth is the opening the relief leaves in its massif (expedition_terrain.odin): only its arch of light.
+		if kind==.Cave {
+			testing.expectf(t,identical && len(a.vertices)==0 && len(a.lines)>0,"%v Cave rotation%d: vertices%d lines%d",biome,orientation,len(a.vertices),len(a.lines))
+			continue
+		}
 		valid:=len(a.vertices)>0 && len(a.vertices)%3==0 && len(a.vertices)<=6000 && len(a.lines)<=128
 		lo,hi:=world.site_bounds(&site);minimum_height:=max(f32)
 		for v in a.vertices {

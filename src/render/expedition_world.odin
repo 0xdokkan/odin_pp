@@ -130,7 +130,6 @@ update_expedition_patrol_glide :: proc(renderer:^Renderer,w:^world.World) {
 	if !renderer.tactical.expedition_follow_ready {glide.ready={}}
 	dt:=expedition_frame_dt(renderer)
 	for &group,g in w.groups[:w.group_count] {for member,m in group.members[:group.count] {
-		if !world.in_scope(w,group.cave) {continue}
 		i:=g*world.MAX_MEMBERS+m
 		target:=view.Vec2{f32(member.enemy.position.x),f32(member.enemy.position.y)}
 		if !member.alive || member.deployed || !glide.ready[i] || abs(target.x-glide.to[i].x)+abs(target.y-glide.to[i].y)>2.5 {
@@ -159,13 +158,14 @@ draw_expedition_props :: proc(renderer:^Renderer,room:^game.Room,w:^world.World)
 	update_expedition_patrol_glide(renderer,w)
 
 	for &group,g in w.groups[:w.group_count] {for m,i in group.members[:group.count] {
-		if !m.alive || m.deployed || !world.in_scope(w,group.cave) || !tactical_cell_on_screen(renderer,m.enemy.position) {continue}
+		if !m.alive || m.deployed || !tactical_cell_on_screen(renderer,m.enemy.position) {continue}
 		if world.ground(w,m.enemy.position)==.Grass && world.distance(room.player.position,m.enemy.position)>3 {continue}
-		tactical_billboard(renderer,sprite_key_for_enemy(m.enemy.archetype),expedition_patrol_shown(renderer,g,i,m.enemy.position),1)
+		tactical_billboard(renderer,sprite_key_for_enemy(m.enemy.archetype),expedition_patrol_shown(renderer,g,i,m.enemy.position),1,expedition_member_entity(g,i))
 	}}
 	for drop in w.drops[:w.drop_count] {
-		if !world.in_scope(w,drop.cave) || !tactical_cell_on_screen(renderer,drop.position) {continue}
-		p:=rl.Vector3{f32(drop.position.x)+.5,.25+math.sin(w.clock*3+f32(drop.position.x))*.05,f32(drop.position.y)+.5}
+		if !tactical_cell_on_screen(renderer,drop.position) {continue}
+		// On the floor of its own layer: a cave's under the rock, a hill's top.
+		p:=rl.Vector3{f32(drop.position.x)+.5,.25+cell_overlay_ground(drop.position)+math.sin(w.clock*3+f32(drop.position.x))*.05,f32(drop.position.y)+.5}
 		_,design:=world.site_at(w,drop.position)
 		if design.fixture {p.y+=design.wall_height}
 		color:=rl.Color{102,219,255,255} if drop.xp>0 else rl.Color{246,204,111,255}
@@ -196,13 +196,15 @@ draw_expedition_labels :: proc(renderer:^Renderer,room:^game.Room,w:^world.World
 		if !site.active || site.state==.Resolved || world.distance(room.player.position,site.position)>10 {continue}
 		if site.secret && site.state==.Unvisited {continue}
 		label_height:=f32(2.7) if w.biome==.Cyber && site.kind==.Workshop else 1.5
-		p:=tactical_project(renderer,{f32(site.position.x)+.5,f32(site.position.y)+.5},label_height)
-		draw_tactical_label(renderer,p,fmt.ctprintf("%s",world.site_name(site.kind)),"E  INTERAGISCI" if room.phase==.Loot && !w.mounted && world.distance(room.player.position,site.position)<=3 else "",c)
+		p:=tactical_project(renderer,{f32(site.position.x)+.5,f32(site.position.y)+.5},label_height+cell_ground(site.position))
+		// In the saddle too; a cave's mouth is walked through, with nothing to use.
+		hint:=site.kind!=.Cave && room.phase==.Loot && world.distance(room.player.position,site.position)<=3
+		draw_tactical_label(renderer,p,fmt.ctprintf("%s",world.site_name(site.kind)),"E  INTERAGISCI" if hint else "",c)
 	}
 	names:=world.metadata(w.biome).enemies
 	for enemy in room.enemies {
 		if !tactical_cell_on_screen(renderer,enemy.position) {continue}
-		p:=tactical_project(renderer,{f32(enemy.position.x)+.5,f32(enemy.position.y)+.5},2)
+		p:=tactical_project(renderer,{f32(enemy.position.x)+.5,f32(enemy.position.y)+.5},2+cell_ground(enemy.position))
 		draw_tactical_label(renderer,p,fmt.ctprintf("%s",names[int(enemy.archetype)]),"",c)
 	}
 }

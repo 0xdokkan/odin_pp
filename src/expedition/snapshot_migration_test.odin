@@ -32,8 +32,10 @@ scratch_path :: proc(name: string) -> string {
 	return path if path_error == nil else name
 }
 
+// A save from before the caves were a layer of the map (Fase 5 of docs/piano-profondita.md) is refused without harm: the
+// campaign's own progress loads, the expedition's checkpoint does not (the user deletes the old saves; none is converted).
 @(test)
-test_legacy_80_96_112_slots_resume_exact_tiles_and_keep_original_size :: proc(t: ^testing.T) {
+test_a_save_from_before_the_layers_is_refused_without_harm :: proc(t: ^testing.T) {
 	for biome in ([3]campaign.Biome{.Cyber, .Egypt, .Space}) {
 		path := scratch_path(fmt.tprintf("odin-pp-legacy-world-%d.json", int(biome))); defer os.remove(path)
 		old := new(Legacy_Test_Snapshot); defer free(old)
@@ -48,9 +50,6 @@ test_legacy_80_96_112_slots_resume_exact_tiles_and_keep_original_size :: proc(t:
 		for &tile in old.tiles[:side*side] { tile.kind = .Floor }
 		old.tiles[(side/2)*side+7].kind = .Player_Spawn
 		old.tiles[(side/2)*side+side-8].kind = .Exit
-		old.tiles[8*side+8].kind = .Wall
-		old.obstacles[0] = {{x = 8, y = 8}}; old.obstacle_count = 1
-		old.ground_pool[(side-3)*side+side-4] = 3
 		c: campaign.Campaign; campaign.initialize(&c); defer campaign.destroy(&c)
 		c.unlocked[biome] = true; testing.expect(t, campaign.begin_run(&c, biome, 42))
 		campaign.discover(&c, .Storm_Crown); campaign.depot_credit(&c, 31)
@@ -61,27 +60,10 @@ test_legacy_80_96_112_slots_resume_exact_tiles_and_keep_original_size :: proc(t:
 		loaded: campaign.Campaign; defer campaign.destroy(&loaded)
 		snapshot := new(Snapshot); defer free(snapshot)
 		testing.expect_value(t, campaign.load_slot_into(path, &loaded, snapshot), campaign.Load_Status.Loaded)
-		testing.expect(t, valid_snapshot(snapshot))
-		w: World; data: level.Level; player: game.Player; room: game.Room
-		if !testing.expect(t, restore(snapshot, &w, &data, &player, &room)) { continue }
-		defer level.destroy(&data); defer game.destroy_room(&room)
-		testing.expect_value(t, data.tiles.width, side); testing.expect_value(t, size(&w), side)
-		testing.expect_value(t, map_size(biome), side*2)
-		testing.expect_value(t, data.tiles.cells[8*side+8].kind, level.Tile_Kind.Wall)
-		testing.expect_value(t, room.ground.pool[(side-3)*side+side-4], i32(3))
-		testing.expect_value(t, player.position, old.player.position)
-		testing.expect(t, room.player == &player && room.level_data == &data)
 		testing.expect(t, loaded.discovered[game.Card_Id.Storm_Crown]); testing.expect_value(t, campaign.depot_credits(&loaded), i64(31))
-		// Migrated v2 checkpoints retain this run's old size. Only a new run
-		// uses the larger geography, even after several subsequent saves.
-		testing.expect(t, capture(&w, &room, snapshot))
-		testing.expect_value(t, snapshot.width, side); testing.expect_value(t, snapshot.height, side)
-		testing.expect(t, campaign.save_slot_from(path, &loaded, snapshot))
-		reloaded: campaign.Campaign; defer campaign.destroy(&reloaded)
-		testing.expect_value(t, campaign.load_slot_into(path, &reloaded, snapshot), campaign.Load_Status.Loaded)
-		testing.expect_value(t, snapshot.width, side); testing.expect_value(t, snapshot.world.side_length, side)
-		testing.expect(t, valid_snapshot(snapshot))
-		snapshot.width += 1; testing.expect(t, !valid_snapshot(snapshot)); snapshot.width -= 1
-		snapshot.world.side_length = 225; testing.expect(t, !valid_snapshot(snapshot))
+		testing.expect(t, !valid_snapshot(snapshot))
+		w: World; data: level.Level; player: game.Player; room: game.Room
+		testing.expect(t, !restore(snapshot, &w, &data, &player, &room))
+		testing.expect(t, len(data.tiles.cells) == 0, "nothing is made of it")
 	}
 }

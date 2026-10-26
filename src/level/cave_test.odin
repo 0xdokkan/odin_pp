@@ -79,3 +79,27 @@ test_a_cave_is_stamped_whole_and_only_where_asked :: proc(t: ^testing.T) {
 	testing.expect(t, !cave_stamp(&data, {x = 40, y = 8}, &plan), "it does not fit at the east edge")
 	testing.expect(t, !cave_stamp(&data, {x = -1, y = 0}, &plan))
 }
+
+// The Far West's smaller board (Fase 5 of docs/piano-profondita.md): two rooms, rock all round and past the board, every
+// floor walked to from the arrival, the secret at the far end. The whole board is the plan of before, to the cell.
+@(test)
+test_a_smaller_board_has_two_rooms_joined_from_the_arrival_to_the_secret :: proc(t: ^testing.T) {
+	for seed in u64(0)..<200 {
+		plan := cave_plan_sized(seed*7919+13, 24, 14)
+		testing.expect(t, plan.width == 24 && plan.height == 14 && plan.rooms == 2)
+		seen := cave_reach(&plan)
+		for y in 0..<CAVE_HEIGHT {
+			for x in 0..<CAVE_WIDTH {
+				border := x == 0 || y == 0 || x >= 23 || y >= 13
+				if border { testing.expectf(t, cave_plan_at(&plan, x, y) == '#', "seed %d: floor at %d %d past the board", seed, x, y) }
+				if plan.rows[y][x] == '.' { testing.expectf(t, !border && seen[y][x], "seed %d: the floor at %d %d is apart", seed, x, y) }
+			}
+		}
+		testing.expect(t, plan.arrival.x == 2 && plan.secret.x == 21 && seen[plan.secret.y][plan.secret.x])
+		for g in 0..<plan.groups { testing.expect(t, cave_plan_at(&plan, plan.anchors[g].x, plan.anchors[g].y) == '.') }
+	}
+	for seed in u64(0)..<50 {
+		whole, sized := cave_plan(seed), cave_plan_sized(seed, CAVE_WIDTH, CAVE_HEIGHT)
+		testing.expect(t, whole.rows == sized.rows && whole.arrival == sized.arrival && whole.secret == sized.secret && whole.anchors == sized.anchors)
+	}
+}

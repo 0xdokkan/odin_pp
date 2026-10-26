@@ -9,7 +9,7 @@ import level "../level"
 // Exact packed integer texels (one texture fetch per floor fragment):
 // R: tile in bits 0..2, neighbouring solid walls in bits 3..6.
 // G: terrain in bits 0..3, terrain-patch boundaries in bits 4..7.
-// B: authored surface in bits 0..3, stable slab variation in bits 4..7.
+// B: authored surface in bits 0..3 (EXPEDITION_FLOOR_ROCK: a cave's massif), stable slab variation in bits 4..7.
 // A: void boundaries in bits 0..3, platform boundaries in bits 4..7.
 // Boundary directions are west, east, north, south. Dynamic state stays
 // in uniforms; all adjacency is computed only after a geometry change.
@@ -39,6 +39,10 @@ expedition_floor_site_keys :: proc(w:^world.World)->(keys:[world.MAX_SITES]Exped
 	return
 }
 
+// The surface code of a cave's massif's top (expedition/cave.odin): bare rock, past every site surface.
+EXPEDITION_FLOOR_ROCK :: u8(15)
+#assert(int(max(world.Site_Surface))<int(EXPEDITION_FLOOR_ROCK))
+
 @(private)
 expedition_floor_slab_variant :: proc(p:grid.Position)->u8 {
 	h:=u32(p.x/4+1499)*0x9e3779b9 ~ u32(p.y/4+617)*0x85ebca6b
@@ -54,8 +58,7 @@ refresh_expedition_floor_data :: proc(cache:^Expedition_Floor_Data,room:^game.Ro
 	data:=room.level_data;width,height:=data.tiles.width,data.tiles.height
 	if width<=0 || height<=0 || len(data.tiles.cells)!=width*height {cache.ready=false;return false}
 	keys:=expedition_floor_site_keys(w);count:=clamp(world.visible_sites(w),0,world.MAX_SITES)
-	// In a cave none of the biome's terrain is painted on the floor (biome 255 has none).
-	biome:=u8(w.biome) if w.in_cave==0 else u8(255)
+	biome:=u8(w.biome)
 	if cache.ready && cache.level_data==data && cache.cells==raw_data(data.tiles.cells) &&
 		cache.geometry_id==data.geometry_id && cache.revision==data.geometry_revision &&
 		cache.width==width && cache.height==height && cache.biome==biome &&
@@ -69,8 +72,11 @@ refresh_expedition_floor_data :: proc(cache:^Expedition_Floor_Data,room:^game.Ro
 	cache.sites=keys;cache.site_count=count
 	for tile,i in data.tiles.cells {
 		p:=grid.Position{x = i%width, y = i/width};ground:=game.expedition_terrain(biome,p)
-		if w.biome==.Inferno && w.in_cave==0 && tile.kind==.Door {ground=.Lava}
-		cache.pixels[i]={u8(tile.kind),u8(ground),0,0}
+		if w.biome==.Inferno && tile.kind==.Door {ground=.Lava}
+		// A massif's top is bare rock: none of the ground's terrain over a cave (expedition/cave.odin).
+		surface:=u8(0)
+		if world.cave_rock(w,p) {ground=.Plain;surface=EXPEDITION_FLOOR_ROCK}
+		cache.pixels[i]={u8(tile.kind),u8(ground),surface,0}
 	}
 	// Earlier overlapping sites have the same precedence as world.site_at.
 	for i:=count-1;i>=0;i-=1 {

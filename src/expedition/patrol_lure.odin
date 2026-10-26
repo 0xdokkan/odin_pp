@@ -2,6 +2,7 @@ package expedition
 
 import grid "../engine/grid"
 import game "../game"
+import level "../level"
 
 PATROL_LURE_RANGE :: 24
 PATROL_LURE_SECONDS :: f32(40)
@@ -37,50 +38,68 @@ patrol_cell_free :: proc(w:^World,room:^game.Room,p:grid.Position,self:^Member)-
 	return true
 }
 
+// The window of the patrol's distance field round its target: a cell's place in it, on its layer (one layer only
+// on a map without others), and the cell at a place.
 @(private)
-patrol_mark_occupied :: proc(blocked:^[PATROL_PATH_SIDE*PATROL_PATH_SIDE]bool,origin,p:grid.Position) {
-	x,y:=p.x-origin.x,p.y-origin.y
-	if x>=0 && y>=0 && x<PATROL_PATH_SIDE && y<PATROL_PATH_SIDE {blocked[y*PATROL_PATH_SIDE+x]=true}
+Patrol_Window :: struct { origin:grid.Position, layers:int }
+
+@(private)
+patrol_window_index :: proc(window:Patrol_Window,p:grid.Position)->(index:int,ok:bool) {
+	x,y:=p.x-window.origin.x,p.y-window.origin.y
+	layer:=int(p.layer)-grid.LOWEST_LAYER if window.layers>1 else 0
+	if x<0 || y<0 || x>=PATROL_PATH_SIDE || y>=PATROL_PATH_SIDE || layer<0 || layer>=window.layers {return}
+	return (layer*PATROL_PATH_SIDE+y)*PATROL_PATH_SIDE+x,true
+}
+
+@(private)
+patrol_window_cell :: proc(window:Patrol_Window,index:int)->grid.Position {
+	at:=index%(PATROL_PATH_SIDE*PATROL_PATH_SIDE)
+	layer:=i8(index/(PATROL_PATH_SIDE*PATROL_PATH_SIDE)+grid.LOWEST_LAYER) if window.layers>1 else grid.GROUND_LAYER
+	return {x = window.origin.x+at%PATROL_PATH_SIDE, y = window.origin.y+at/PATROL_PATH_SIDE, layer = layer}
 }
 
 @(private)
 patrol_move_toward :: proc(w:^World,room:^game.Room,g:^Group,target:grid.Position,stop_distance:int) {
-	// One small, allocation-free distance field serves the entire patrol.
-	// Static blockers shape the route; actors are checked at the final step.
-	distances:[PATROL_PATH_SIDE*PATROL_PATH_SIDE]i16
+	// One small distance field serves the entire patrol, across the layers as a walker steps (a cave's mouth:
+	// game.layer_step). Static blockers shape the route; actors are checked at the final step.
+	window:=Patrol_Window{origin = grid.offset(target, -PATROL_PATH_RADIUS, -PATROL_PATH_RADIUS), layers = level.LAYER_COUNT if game.room_has_layers(room) else 1}
+	cells:=PATROL_PATH_SIDE*PATROL_PATH_SIDE*window.layers
+	distances:=make([]i16,cells,context.temp_allocator)
+	queue:=make([]i32,cells,context.temp_allocator)
+	blocked:=make([]bool,cells,context.temp_allocator)
 	for &d in distances {d= -1}
-	queue:[PATROL_PATH_SIDE*PATROL_PATH_SIDE]u16
-	origin:=grid.offset(target, -PATROL_PATH_RADIUS, -PATROL_PATH_RADIUS)
-	blocked:[PATROL_PATH_SIDE*PATROL_PATH_SIDE]bool
-	patrol_mark_occupied(&blocked,origin,room.player.position)
-	for enemy in room.enemies {patrol_mark_occupied(&blocked,origin,enemy.position)}
+	mark :: proc(blocked:[]bool,window:Patrol_Window,p:grid.Position) {if i,ok:=patrol_window_index(window,p);ok {blocked[i]=true}}
+	mark(blocked,window,room.player.position)
+	for enemy in room.enemies {mark(blocked,window,enemy.position)}
 	for &other in w.groups[:w.group_count] {if &other==g {continue};for member in other.members[:other.count] {
-		if member.alive && !member.deployed {patrol_mark_occupied(&blocked,origin,member.enemy.position)}
+		if member.alive && !member.deployed {mark(blocked,window,member.enemy.position)}
 	}}
-	center:=PATROL_PATH_RADIUS*PATROL_PATH_SIDE+PATROL_PATH_RADIUS
-	distances[center]=0;queue[0]=u16(center);head,tail:=0,1
+	start,inside:=patrol_window_index(window,target)
+	if !inside {return}
+	distances[start]=0;queue[0]=i32(start);head,tail:=0,1
 	steps:=[4]grid.Position{{x = 0, y = -1},{x = 1, y = 0},{x = 0, y = 1},{x = -1, y = 0}}
 	for head<tail {
-		i:=int(queue[head]);head+=1;x,y:=i%PATROL_PATH_SIDE,i/PATROL_PATH_SIDE
+		i:=int(queue[head]);head+=1
+		cell:=patrol_window_cell(window,i)
 		for step in steps {
-			nx,ny:=x+step.x,y+step.y
-			if nx<0 || ny<0 || nx>=PATROL_PATH_SIDE || ny>=PATROL_PATH_SIDE {continue}
-			j:=ny*PATROL_PATH_SIDE+nx
-			if distances[j]>=0 || blocked[j] || game.cell_blocks_movement(room,grid.offset(origin, nx, ny)) ||
-			   game.step_height_blocked(room,grid.offset(origin, x, y),grid.offset(origin, nx, ny)) {continue}
-			distances[j]=distances[i]+1;queue[tail]=u16(j);tail+=1
+			next,_:=game.layer_step(room,cell,step)
+			j,ok:=patrol_window_index(window,next)
+			if !ok || distances[j]>=0 || blocked[j] || game.cell_blocks_movement(room,next) || game.step_height_blocked(room,cell,next) {continue}
+			distances[j]=distances[i]+1;queue[tail]=i32(j);tail+=1
 		}
 	}
 	for &member in g.members[:g.count] {
 		if !member.alive || member.deployed || distance(member.enemy.position,target)<=stop_distance {continue}
-		p:=member.enemy.position;local:=grid.offset(p, -origin.x, -origin.y)
-		if local.x<0 || local.y<0 || local.x>=PATROL_PATH_SIDE || local.y>=PATROL_PATH_SIDE {continue}
-		best:=distances[local.y*PATROL_PATH_SIDE+local.x];destination:=p
+		p:=member.enemy.position
+		here,ok:=patrol_window_index(window,p)
+		if !ok {continue}
+		best:=distances[here];destination:=p
 		if best<0 {continue}
 		for step in steps {
-			q:=game.add_position(p,step);nx,ny:=local.x+step.x,local.y+step.y
-			if nx<0 || ny<0 || nx>=PATROL_PATH_SIDE || ny>=PATROL_PATH_SIDE {continue}
-			d:=distances[ny*PATROL_PATH_SIDE+nx]
+			q,_:=game.layer_step(room,p,step)
+			j,in_window:=patrol_window_index(window,q)
+			if !in_window {continue}
+			d:=distances[j]
 			if d<0 || d>=best || !patrol_cell_free(w,room,q,&member) || game.step_height_blocked(room,p,q) {continue}
 			best=d;destination=q
 		}

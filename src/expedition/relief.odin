@@ -226,6 +226,11 @@ apply_relief :: proc(w: ^World, data: ^level.Level) {
 		append(&zones, [2]grid.Position{grid.offset(at, -6, -6), grid.offset(at, 6, 6)})
 	}
 	if mountain_present(w) { append(&zones, mountain_zone()) }
+	// Round each cave's massif on the open map, and in front of its mouth (cave.odin).
+	for cave in w.caves[:w.cave_count] {
+		if cave.place.mountain { continue }
+		for zone in cave_level_zones(cave.place) { append(&zones, zone) }
+	}
 	if w.biome == .Gothic { append(&zones, [2]grid.Position{{x = size/2-5, y = size/2-15}, {x = size/2+5, y = size/2-5}}) }
 	heights := relief_heights(w.biome, data.tiles.cells[:], size, zones[:])
 	_ = level.set_height_table(data, heights)

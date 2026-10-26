@@ -5,6 +5,19 @@ I riferimenti a Classica, `--flat` e ai vecchi smoke descrivono versioni precede
 per i comandi disponibili oggi valgono il [README](README.md) e la documentazione collegata.
 
 
+## 2026-10-26 — Profondità, Fase 5: grotte senza caricamento
+
+- Le grotte delle spedizioni sono il piano sotto la terra: stanze sotto un massiccio di roccia, a cui si arriva
+  camminando dall'imbocco, senza dissolvenza e senza cambiare mappa. Ogni bioma con grotte (Neve, Far West, Egitto,
+  Inferno) ha i suoi posti fissi, sempre con massiccio e grotta; la run sceglie quali 1–3 hanno nemici e segreto. Nella
+  Neve la grotta della montagna è una stanza nel nucleo, con l'imbocco sul sentiero. Nel Far West, dove la mappa non ha
+  spazio, le grotte sono di 24×14 con due stanze (scelta dell'utente durante la fase).
+- In grotta: la roccia sopra il robot si dirada con un retino, il fuori si scurisce, la luce del cielo cala e la lampada
+  del robot illumina le stanze. Si entra anche in sella; un evento che sveglia nemici fa scendere il robot. Le pattuglie
+  entrano, e si combatte anche a cavallo dell'imbocco. L'ologramma segue il piano del robot e segna gli imbocchi trovati.
+- Salvataggi: i piani sono salvati come lista di caselle; quelli di prima della fase sono rifiutati senza danni.
+- Via `Outer_Map`, `enter_cave`, `exit_cave`, la dissolvenza e il bioma 255.
+
 ## 2026-10-25 — Profondità, Fase 4: piani nel laboratorio, grafica
 
 - I piani si leggono a schermo, con funzioni pure come quelle degli edifici (`game/layer_view.odin`). Ciò

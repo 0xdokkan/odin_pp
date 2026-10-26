@@ -146,7 +146,8 @@ EXPEDITION_SMOKE_TWO_LEVELS :: EXPEDITION_SMOKE_HOLOGRAMS+3
 EXPEDITION_SMOKE_MOUNTAIN :: EXPEDITION_SMOKE_TWO_LEVELS+1
 @(private)
 EXPEDITION_SMOKE_MOUNTAIN_STEPS :: 8
-// The caves (Fase 5), in the four biomes that have them: the arch, the first room, the second room.
+// The caves (Fase 5 of docs/piano-griglia.md, walked into since Fase 5 of docs/piano-profondita.md), in the four biomes that
+// have them: the mouth, just inside, beside the foes in a room.
 @(private)
 EXPEDITION_SMOKE_CAVES :: EXPEDITION_SMOKE_MOUNTAIN+EXPEDITION_SMOKE_MOUNTAIN_STEPS
 @(private)
@@ -159,9 +160,12 @@ EXPEDITION_SMOKE_CAVE_VIEWS :: 3
 EXPEDITION_SMOKE_PLACE :: EXPEDITION_SMOKE_CAVES+4*EXPEDITION_SMOKE_CAVE_VIEWS
 @(private)
 EXPEDITION_SMOKE_PLACE_STEPS :: 4
+// The hologram in a cave (Fase 5 of docs/piano-profondita.md): in the Snow's mountain room, its room in place of the rock.
+@(private)
+EXPEDITION_SMOKE_CAVE_MAP :: EXPEDITION_SMOKE_PLACE+EXPEDITION_SMOKE_PLACE_STEPS
 // The last stage of the path; the smoke quits after it.
 @(private)
-EXPEDITION_SMOKE_LAST :: EXPEDITION_SMOKE_PLACE+EXPEDITION_SMOKE_PLACE_STEPS-1
+EXPEDITION_SMOKE_LAST :: EXPEDITION_SMOKE_CAVE_MAP
 @(private)
 EXPEDITION_SMOKE_STRUCTURE_NAMES :: [EXPEDITION_SMOKE_STRUCTURE_STEPS]string{"6","4","2","1","soglia","dentro","fuori","oggetti"}
 
@@ -331,8 +335,9 @@ expedition_enable_smoke :: proc(scene:^host.Scene) {
 			rl.IsWindowState({.VSYNC_HINT}),EXPEDITION_BENCHMARK_FIRST,EXPEDITION_BENCHMARK_LAST,EXPEDITION_BENCHMARK_CANVAS_WIDTH,EXPEDITION_BENCHMARK_CANVAS_HEIGHT)
 	}
 	state:=new(Expedition_Capture);state.wrapped=scene^
-	// ODIN_PP_SMOKE_ONLY=hits starts at the hit marks' fights, to work on them.
+	// ODIN_PP_SMOKE_ONLY=hits starts at the hit marks' fights, =caves at the caves' act, to work on them.
 	if only,_:=os.lookup_env("ODIN_PP_SMOKE_ONLY",context.temp_allocator);only=="hits" {state.stage=EXPEDITION_SMOKE_HITS-1}
+	else if only=="caves" {state.stage=EXPEDITION_SMOKE_CAVES-1}
 	scene^=host.Scene{name="expedition-smoke",data=state,opaque=true,modal=true,update=expedition_capture_update,draw=expedition_capture_draw,after_present=expedition_capture_present,destroy=proc(data:rawptr){s:=cast(^Expedition_Capture)data;s.wrapped.destroy(s.wrapped.data);free(s)}}
 }
 
@@ -402,11 +407,13 @@ expedition_capture_present :: proc(data:rawptr,frame:^host.Frame) {
 			artifacts.screenshot("odin_pp_expedition_scontro_livelli.png")
 		} else if s.stage>=EXPEDITION_SMOKE_MOUNTAIN && s.stage<EXPEDITION_SMOKE_MOUNTAIN+EXPEDITION_SMOKE_MOUNTAIN_STEPS {
 			artifacts.screenshot(fmt.ctprintf("odin_pp_expedition_montagna_%d.png",s.stage-EXPEDITION_SMOKE_MOUNTAIN))
+		} else if s.stage==EXPEDITION_SMOKE_CAVE_MAP {
+			artifacts.screenshot("odin_pp_expedition_grotta_ologramma.png")
 		} else if s.stage>=EXPEDITION_SMOKE_PLACE && s.stage<EXPEDITION_SMOKE_PLACE+EXPEDITION_SMOKE_PLACE_STEPS {
 			names:=[EXPEDITION_SMOKE_PLACE_STEPS]string{"fantasma_verde","fantasma_rosso","posata","rotta"}
 			artifacts.screenshot(fmt.ctprintf("odin_pp_expedition_posa_%s.png",names[s.stage-EXPEDITION_SMOKE_PLACE]))
 		} else if s.stage>=EXPEDITION_SMOKE_CAVES && s.stage<EXPEDITION_SMOKE_CAVES+4*EXPEDITION_SMOKE_CAVE_VIEWS {
-			biomes:=EXPEDITION_SMOKE_CAVE_BIOMES;views:=[EXPEDITION_SMOKE_CAVE_VIEWS]string{"arco","ingresso","stanza"}
+			biomes:=EXPEDITION_SMOKE_CAVE_BIOMES;views:=[EXPEDITION_SMOKE_CAVE_VIEWS]string{"imbocco","ingresso","stanza"}
 			k:=s.stage-EXPEDITION_SMOKE_CAVES
 			artifacts.screenshot(fmt.ctprintf("odin_pp_expedition_grotta_%v_%s.png",biomes[k/EXPEDITION_SMOKE_CAVE_VIEWS],views[k%EXPEDITION_SMOKE_CAVE_VIEWS]))
 		} else if s.stage>=EXPEDITION_SMOKE_HOLOGRAMS && s.stage<EXPEDITION_SMOKE_HOLOGRAMS+3 {
@@ -487,7 +494,8 @@ expedition_capture_present :: proc(data:rawptr,frame:^host.Frame) {
 		else if s.stage>=EXPEDITION_SMOKE_MOUNTAIN && s.stage<EXPEDITION_SMOKE_MOUNTAIN+EXPEDITION_SMOKE_MOUNTAIN_STEPS {expedition_smoke_mountain(e,s.stage-EXPEDITION_SMOKE_MOUNTAIN)}
 		else if s.stage>=EXPEDITION_SMOKE_CAVES && s.stage<EXPEDITION_SMOKE_CAVES+4*EXPEDITION_SMOKE_CAVE_VIEWS {expedition_smoke_cave(e,s.stage-EXPEDITION_SMOKE_CAVES)}
 		else if s.stage>=EXPEDITION_SMOKE_PLACE && s.stage<EXPEDITION_SMOKE_PLACE+EXPEDITION_SMOKE_PLACE_STEPS {expedition_smoke_place(e,s.stage-EXPEDITION_SMOKE_PLACE)}
-		else if s.stage>=EXPEDITION_SMOKE_PLACE+EXPEDITION_SMOKE_PLACE_STEPS {host.quit(frame)}
+		else if s.stage==EXPEDITION_SMOKE_CAVE_MAP {expedition_smoke_cave(e,2);e.world.in_cave=world.cave_at(&e.world,e.rs.room.player.position);e.map_open=true}
+		else if s.stage>EXPEDITION_SMOKE_CAVE_MAP {host.quit(frame)}
 	}
 }
 
@@ -538,36 +546,57 @@ expedition_smoke_mountain :: proc(e:^run.Expedition_Session,step:int) {
 	e.rs.iso_renderer.tactical.expedition_follow_ready=false
 }
 
-// One step of the caves' act: the biome's first cave seen from its arch, from just inside, and from its second room. The first
-// view also checks the crossing: in and out leaves the open map as it was, and the foes and the secret are where the plan says.
+// Walks the robot a step at a time from where it stands to `to`, along a straight way (a cave's tunnel), as exploring does.
+@(private)
+expedition_smoke_walk_to :: proc(e:^run.Expedition_Session,to:grid.Position) {
+	room:=&e.rs.room
+	for step:=0;room.player.position!=to;step+=1 {
+		assert(step<16,"the walk through the mouth is too long")
+		p:=room.player.position
+		offset:=grid.Position{x = clamp(to.x-p.x,-1,1)}
+		if offset.x==0 {offset.y=clamp(to.y-p.y,-1,1)}
+		assert(world.walk(&e.world,room,offset),"a step through the mouth was refused")
+	}
+}
+
+// One step of the caves' act: the biome's first cave with foes, its mouth seen from the open ground, from just inside and beside
+// its foes. The second view also checks the walk: in through the mouth, out again and in once more, the map unchanged.
 @(private)
 expedition_smoke_cave :: proc(e:^run.Expedition_Session,step:int) {
 	biomes:=EXPEDITION_SMOKE_CAVE_BIOMES
 	biome:=biomes[step/EXPEDITION_SMOKE_CAVE_VIEWS];view:=step%EXPEDITION_SMOKE_CAVE_VIEWS
 	expedition_smoke_world(e,biome);e.world.mounted=false;e.message_timer=0
 	w:=&e.world;room:=&e.rs.room;data:=room.level_data
-	assert(w.cave_count>=1,"the biome has no cave")
-	if e.outer==nil {e.outer=new(run.Cave_Outer_Map)}
-	arch:=w.sites[w.caves[0].site].position
-	front:=arch if w.sites[w.caves[0].site].layout_version==0 else grid.offset(arch, 0, 1)
-	room.player.position=front
-	w.sites[w.caves[0].site].state=.Discovered
-	if view==0 {e.rs.iso_renderer.tactical.expedition_follow_ready=false;return}
+	index:=-1
+	for cave,i in w.caves[:w.cave_count] {if cave.inhabited {index=i;break}}
+	assert(index>=0,"the biome has no cave with foes")
+	place:=w.caves[index].place
+	room.player.position=place.mouth
+	w.sites[w.caves[index].site].state=.Discovered
+	// The act shows the cave: the open map's foes are gone, and nothing is fought on the way in.
+	for &g in w.groups[:w.group_count] {if g.cave==0 {for &member in g.members[:g.count] {member.alive=false}}}
+	if room.phase!=.Loot {game.end_expedition_encounter(room);clear(&room.enemies);room.phase=.Loot}
 	if view==1 {
 		before:=slice.clone(data.tiles.cells[:]);defer delete(before)
-		assert(world.enter_cave(w,data,room,e.outer,0),"cannot enter the cave")
-		assert(world.exit_cave(w,data,room,e.outer),"cannot leave the cave")
-		assert(slice.equal(before,data.tiles.cells[:]),"the open map did not come back")
-		room.player.position=front
+		expedition_smoke_walk_to(e,place.arrival)
+		assert(world.cave_at(w,room.player.position)==index+1,"not in the cave")
+		expedition_smoke_walk_to(e,place.mouth)
+		assert(world.cave_at(w,room.player.position)==0 && room.player.position.layer==grid.GROUND_LAYER,"not out of the cave")
+		assert(slice.equal(before,data.tiles.cells[:]),"the map changed")
+		expedition_smoke_walk_to(e,place.arrival)
 	}
-	assert(world.enter_cave(w,data,room,e.outer,0),"cannot enter the cave")
-	arrival,_:=world.cave_arrival(w)
-	assert(room.player.position==arrival,"not at the arrival")
 	if view==2 {
-		// Beside the foes of the first room that has some.
+		// Three cells from a foe of the cave, on its floor.
 		for g in w.groups[:w.group_count] {
-			if int(g.cave)==1 && g.count>0 {room.player.position={x = g.members[0].enemy.position.x-3, y = g.members[0].enemy.position.y};break}
+			if int(g.cave)!=index+1 || g.count==0 {continue}
+			foe:=g.members[0].enemy.position
+			for offset in ([4]grid.Position{{x = -3, y = 0},{x = 3, y = 0},{x = 0, y = 3},{x = 0, y = -3}}) {
+				cell:=grid.offset(foe,offset.x,offset.y)
+				if tile,_:=level.tile_at(data,cell);tile.kind==.Floor {room.player.position=cell;break}
+			}
+			break
 		}
+		assert(room.player.position.layer==world.CAVE_LAYER,"not beside the cave's foes")
 	}
 	e.rs.iso_renderer.tactical.expedition_follow_ready=false
 	world.roam_sync(&e.roam,room)

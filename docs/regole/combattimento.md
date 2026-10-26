@@ -818,8 +818,14 @@ da qualsiasi altezza, e un passo non deve mai scegliere il piano.
 
 Nella Prova meccaniche l'arena «Piani» (sesta di F3) li mette alla prova: una strada sotto un ponte con
 due rampe, una collina con una grotta e due imbocchi, una scala sul dirupo della collina, un nemico per
-piano. Il disegno è ancora semplice: ciò che copre il robot quando è sotto (la roccia sopra la grotta,
-l'impalcato del ponte) diventa mezzo trasparente; il resto arriva con la Fase 4.
+piano. Ciò che sta sopra la testa del robot entro 6 caselle si apre a poco a poco, chi è coperto mostra il
+contorno, in grotta il fuori è più scuro (Fase 4).
+
+**Nelle spedizioni** (Fase 5 di [piano-profondita.md](../piano-profondita.md)) le grotte sono il piano −1
+sotto un massiccio di roccia: ci si entra camminando dall'imbocco, con le regole qui sopra. In sella si entra
+come altrove; un evento che sveglia nemici fa scendere il robot. Si combatte anche a cavallo dell'imbocco, e le
+pattuglie entrano in grotta come ovunque. Sotto la roccia non c'è il terreno del bioma (né lava né neve), e la
+corsia delle catastrofi non arriva; la roccia nasconde chi sta sotto a chi sta sopra, e viceversa.
 
 ### Strutture
 

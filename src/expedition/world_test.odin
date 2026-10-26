@@ -237,6 +237,8 @@ test_expedition_outdoor_props_never_enclose_open_floor :: proc(t:^testing.T) {
 		for tile,i in data.tiles.cells {
 			p:=grid.Position{x = i%data.tiles.width, y = i/data.tiles.width}
 			if _,design:=site_at(&w,p);design.inside {continue}
+			// A massif's top is rock over a cave: no one walks there (cave.odin).
+			if cave_rock(&w,p) {continue}
 			if tile.kind==.Wall {props+=1}
 			if tile.kind!=.Wall && tile.kind!=.Fence && tile.kind!=.Void && !seen[i] {stranded+=1}
 		}

@@ -29,6 +29,10 @@ update_structure_dim :: proc(renderer: ^Renderer, m: ^Expedition_Material) {
 	}
 	if target > 0 {
 		if room := renderer.tactical.structure_room_data; room != nil { m.dim_box = structure_footprint_box(room, views.inside) }
+	} else if renderer.tactical.expedition_in_cave {
+		// In a cave, as in a building: everything outside it is darker (Fase 4's rule, game.layer_cell_dim).
+		target = game.LAYER_OUTSIDE_DIM
+		m.dim_box = renderer.tactical.expedition_cave_box
 	}
 	dt := expedition_frame_dt(renderer)
 	m.dim_amount += (target-m.dim_amount)*(1-math.exp(-6*dt))

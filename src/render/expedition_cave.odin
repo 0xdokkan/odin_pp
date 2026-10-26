@@ -3,37 +3,38 @@ package render
 import "core:math"
 import rl "vendor:raylib"
 import world "../expedition"
+import game "../game"
+import grid "../engine/grid"
+import level "../level"
 
-// THE CAVE'S ARCH on the open map (expedition/cave.odin): in the mass of rock the tiles carry, over the doorway between its two
-// legs, a lintel and a round arch of light in the biome's colour, and a dark opening behind it. On the spiral mountain, where
-// the path is the floor and there is no rock of its own, the legs are drawn too, as a gate across the path.
-
-CAVE_ROCK     :: rl.Color{50, 55, 66, 255}
-CAVE_ROCK_CAP :: rl.Color{88, 96, 112, 255}
-CAVE_DARK     :: rl.Color{5, 7, 11, 255}
+// THE MOUTH OF A CAVE (expedition/cave.odin): the opening the relief leaves in the side of the massif, or of the spiral
+// mountain's core, over the cave's floor (expedition_terrain.odin, expedition_layers.odin), framed by an arch of light
+// in the biome's colour, dimmer once the cave's secret is taken.
 
 @(private)
 draw_expedition_cave_arch :: proc(pass: Ink_Pass, w: ^world.World, site: ^world.Site, layer: Ink_Layer, m: ^Expedition_Material) {
-	centre := rl.Vector2{f32(site.position.x)+.5, f32(site.position.y)+.5}
-	if ink_layer_skips(layer, m, centre, 3.4) { return }
-	base := rl.Vector3{centre.x, 0, centre.y}
-	// The legs, where the tiles have none.
-	if site.layout_version != world.SITE_LAYOUT_VERSION {
-		for side in ([2]f32{-1, 1}) { ink_box(pass, base+{side*1, 0, 0}, {.46, .46}, 1.7, 0, CAVE_ROCK, CAVE_ROCK_CAP, {}) }
-	}
-	// The lintel across both legs, and the dark opening between them, set back a little from the front.
-	ink_box(pass, base+{0, 1.7, 0}, {1.48, .46}, .3, 0, CAVE_ROCK, CAVE_ROCK_CAP, {})
-	ink_box(pass, base+{0, 0, -1.4}, {.46, .04}, 1.7, 0, CAVE_DARK, CAVE_DARK, {})
-	// The arch of light on the front face of the legs.
+	// A site with no cave of the world's (a world made by hand) has the open map's mouth: the cave to its east.
+	place := world.Cave_Place{mouth = site.position, arrival = grid.offset(site.position, 1, 0)}
+	for cave in w.caves[:w.cave_count] { if cave.place.mouth == site.position { place = cave.place } }
+	// The step from the mouth into the cave: the tunnel's first cell on the open map (east), the room in the mountain.
+	inside := place.arrival if place.mountain else grid.offset(place.mouth, 1, 0)
+	d := rl.Vector2{f32(clamp(inside.x-place.mouth.x, -1, 1)), f32(clamp(inside.y-place.mouth.y, -1, 1))}
+	centre := rl.Vector2{f32(place.mouth.x)+.5+d.x*.5, f32(place.mouth.y)+.5+d.y*.5}
+	if ink_layer_skips(layer, m, centre, 2) { return }
+	// Just in front of the rock's face, across it.
+	base := rl.Vector3{centre.x-d.x*.02, f32(place.floor)*game.HEIGHT_STEP_DRAWN, centre.y-d.y*.02}
+	across := rl.Vector3{-d.y, 0, d.x}
 	color := ink_edge(expedition_color(w.biome), 1)
 	if site.state == .Resolved { color = ink_scale(color, .5) }
+	half := f32(.46)
+	spring := f32(level.LAYER_CLEARANCE)*game.HEIGHT_STEP_DRAWN-half
 	segments := 14
 	for i in 0..<segments {
 		a, z := f32(i)*math.PI/f32(segments), f32(i+1)*math.PI/f32(segments)
-		from := base+{math.cos(a)*.52, 1.28+math.sin(a)*.52-.48, .46}
-		to := base+{math.cos(z)*.52, 1.28+math.sin(z)*.52-.48, .46}
+		from := base+across*(math.cos(a)*half)+{0, spring+math.sin(a)*half*.9, 0}
+		to := base+across*(math.cos(z)*half)+{0, spring+math.sin(z)*half*.9, 0}
 		ink_line(pass, from, to, color)
 	}
-	ink_line(pass, base+{-.52, 0.04, .46}, base+{-.52, .8, .46}, color)
-	ink_line(pass, base+{.52, 0.04, .46}, base+{.52, .8, .46}, color)
+	ink_line(pass, base+across*half+{0, .04, 0}, base+across*half+{0, spring, 0}, color)
+	ink_line(pass, base-across*half+{0, .04, 0}, base-across*half+{0, spring, 0}, color)
 }

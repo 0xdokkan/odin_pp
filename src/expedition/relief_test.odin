@@ -37,8 +37,10 @@ test_every_biome_has_a_relief_of_its_own_and_the_same_at_every_run :: proc(t: ^t
 		fmt.printfln("relief %v: tallest %d steps, %d%% of the cells above ground", biome, tallest, raised)
 		testing.expectf(t, tallest >= 2, "%v: the tallest cell is %d steps", biome, tallest)
 		testing.expectf(t, raised >= 2, "%v: only %d%% of the map is raised", biome, raised)
-		// The Snow map's spiral mountain (Fase 4) is far taller than any relief.
-		testing.expect(t, tallest <= int(RELIEF_MAX) || (biome == .Snow && tallest == level.MOUNTAIN_TOP))
+		// The Snow map's spiral mountain (Fase 4) is far taller than any relief; a cave's massif stands over the level
+		// ground round it (cave.odin).
+		massif := int(RELIEF_MAX)+int(CAVE_MASSIF_HEIGHT)+CAVE_MASSIF_RISE
+		testing.expect(t, tallest <= int(RELIEF_MAX) || (biome == .Snow && tallest == level.MOUNTAIN_TOP) || (cave_biome(biome) && tallest <= massif))
 	}
 }
 
@@ -112,17 +114,17 @@ test_the_ground_that_matters_is_level_and_every_site_and_the_exit_can_be_walked_
 		for tile, at in data.tiles.cells {
 			if tile.kind == .Exit { testing.expectf(t, seen[at], "%v: the exit cannot be walked to", biome) }
 		}
-		// Nothing walkable is left out by a cliff.
+		// Nothing walkable is left out by a cliff, but a massif's top, rock over a cave (cave.odin).
 		stranded := 0
 		for tile, at in data.tiles.cells {
-			if level.is_walkable(tile.kind) && !seen[at] { stranded += 1 }
+			if level.is_walkable(tile.kind) && !seen[at] && !cave_rock(&w, {x = at%data.tiles.width, y = at/data.tiles.width}) { stranded += 1 }
 		}
 		if biome != .Sky { testing.expectf(t, stranded == 0, "%v: %d walkable cells cannot be reached by walking", biome, stranded) }
 	}
 }
 
 // The smooth ground has no cliff of its own: neighbouring cells are at most a step apart, but at the edge
-// of a plateau (a cliff of the plateaus' own) in the biomes that have them.
+// of a plateau (a cliff of the plateaus' own) in the biomes that have them, and of a cave's massif (cave.odin).
 @(test)
 test_the_smooth_biomes_have_no_cliffs_at_all :: proc(t: ^testing.T) {
 	for biome in ([?]campaign.Biome{.Jungle, .Egypt, .Vietnam, .Gothic, .Sky, .Space, .Secret}) {
@@ -135,10 +137,10 @@ test_the_smooth_biomes_have_no_cliffs_at_all :: proc(t: ^testing.T) {
 		for y in 0..<data.tiles.height {
 			for x in 0..<width {
 				here := data.tiles.cells[y*width+x].kind
-				if here == .Void { continue }
+				if here == .Void || cave_rock(&w, {x = x, y = y}) { continue }
 				for step in ([2][2]int{{1, 0}, {0, 1}}) {
 					nx, ny := x+step.x, y+step.y
-					if nx >= width || ny >= data.tiles.height || data.tiles.cells[ny*width+nx].kind == .Void { continue }
+					if nx >= width || ny >= data.tiles.height || data.tiles.cells[ny*width+nx].kind == .Void || cave_rock(&w, {x = nx, y = ny}) { continue }
 					if abs(int(data.heights[ny*width+nx])-int(data.heights[y*width+x])) > 1 { cliffs += 1 }
 				}
 			}
@@ -160,10 +162,10 @@ test_the_biomes_with_plateaus_have_cliffs_and_a_stair_up_each :: proc(t: ^testin
 	}
 }
 
-// The relief is saved with the world: restoring a snapshot brings the heights back, and a snapshot
-// without any (a save from before the relief) restores flat, its tiles as they were.
+// The relief is saved with the world: restoring a snapshot brings the heights back. A save from before the caves
+// were a layer (Fase 5 of docs/piano-profondita.md), the relief's own included, is refused: none is converted.
 @(test)
-test_the_relief_is_saved_and_an_old_snapshot_loads_flat :: proc(t: ^testing.T) {
+test_the_relief_is_saved_and_an_old_snapshot_is_refused :: proc(t: ^testing.T) {
 	w: World
 	data: level.Level
 	p: game.Player
@@ -183,15 +185,15 @@ test_the_relief_is_saved_and_an_old_snapshot_loads_flat :: proc(t: ^testing.T) {
 	defer level.destroy(&data2)
 	defer game.destroy_room(&room2)
 	testing.expect(t, slice.equal(data.heights[:], data2.heights[:]), "the same relief")
-	// An old snapshot has no heights: the map is flat, and nothing else changed.
-	s.heights = {}
+	// An old snapshot has none of the layers' version: it is not restored.
+	s.layers_version = 0
 	w3: World
 	data3: level.Level
 	p3: game.Player
 	room3: game.Room
-	testing.expect(t, restore(s, &w3, &data3, &p3, &room3))
-	defer level.destroy(&data3)
-	defer game.destroy_room(&room3)
-	testing.expect(t, !level.has_heights(&data3), "flat")
-	for tile, at in data.tiles.cells { testing.expect_value(t, data3.tiles.cells[at], tile) }
+	testing.expect(t, !restore(s, &w3, &data3, &p3, &room3))
+	// Nor one whose heights put the caves' rock too close over them.
+	s.layers_version = SNAPSHOT_LAYERS
+	s.heights = {}
+	testing.expect(t, !restore(s, &w3, &data3, &p3, &room3))
 }

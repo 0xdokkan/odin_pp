@@ -24,6 +24,8 @@ expedition_patch_distance :: proc(b:u8,p:grid.Position)->(best,variation:int) {
 // Biome IDs are serialized values shared with campaign.Biome. Exploration,
 // combat, previews and presentation all query this same fixed geography.
 expedition_terrain :: proc(b: u8, p: grid.Position) -> Expedition_Terrain {
+	// The biome's ground is the open map's: a cave under the rock has none (Fase 5 of docs/piano-profondita.md).
+	if p.layer != grid.GROUND_LAYER { return .Plain }
 	n := (p.x*13+p.y*7+int(b)*19)%37
 	switch b {
 	case 0: if n < 2 { return .Electric }

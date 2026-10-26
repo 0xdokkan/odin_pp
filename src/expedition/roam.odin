@@ -43,6 +43,17 @@ roam_sync :: proc(r:^Roam,room:^game.Room) {
 	r.position=target;r.velocity={};r.cell=cell;r.ready=true
 }
 
+// The cell of column (x, y) the walker meets there: its own, or where steps across the layers from its cell land
+// (game.layer_step: a cave's mouth, a bridge's ramp), a column at a time toward it. Without layers, the ground's.
+@(private)
+roam_layer_cell :: proc(r:^Roam,room:^game.Room,x,y:int)->grid.Position {
+	cell:=r.cell
+	for cell.x!=x || cell.y!=y {
+		cell,_=game.layer_step(room,cell,{x = clamp(x-cell.x,-1,1), y = clamp(y-cell.y,-1,1)})
+	}
+	return cell
+}
+
 // The cell the walker stands in never blocks it: a light bridge may close
 // beneath the robot, and it can still step off. A cell more than a step higher or lower than the one
 // it stands in is a cliff, a wall to a walker (game/height.odin), whether on foot or in the saddle.
@@ -60,7 +71,7 @@ roam_resolve :: proc(r:^Roam,room:^game.Room) {
 		pushed:=false
 		base:=roam_cell(r.position)
 		for dy in -1..=1 {for dx in -1..=1 {
-			cell:=grid.offset(base, dx, dy)
+			cell:=roam_layer_cell(r,room,base.x+dx,base.y+dy)
 			if !roam_blocked(r,room,cell) {continue}
 			lo:=[2]f32{f32(cell.x),f32(cell.y)};hi:=lo+1
 			closest:=[2]f32{clamp(r.position.x,lo.x,hi.x),clamp(r.position.y,lo.y,hi.y)}
@@ -77,8 +88,8 @@ roam_resolve :: proc(r:^Roam,room:^game.Room) {
 				normal=d/length;depth=ROAM_RADIUS-length
 				if d.x!=0 && d.y!=0 {
 					sx,sy:=int(math.sign(d.x)),int(math.sign(d.y))
-					along_x:=roam_blocked(r,room,grid.offset(cell, sx, 0))
-					along_y:=roam_blocked(r,room,grid.offset(cell, 0, sy))
+					along_x:=roam_blocked(r,room,roam_layer_cell(r,room,cell.x+sx,cell.y))
+					along_y:=roam_blocked(r,room,roam_layer_cell(r,room,cell.x,cell.y+sy))
 					if along_x && along_y {continue}
 					if along_x {normal={0,f32(sy)};depth=ROAM_RADIUS-abs(d.y)}
 					else if along_y {normal={f32(sx),0};depth=ROAM_RADIUS-abs(d.x)}
@@ -139,7 +150,8 @@ roam_step :: proc(w:^World,room:^game.Room,r:^Roam,wish:[2]f32,dt:f32) {
 	for _ in 0..<steps {
 		r.position+=travel/f32(steps)
 		roam_resolve(r,room)
-		cell:=roam_cell(r.position)
+		column:=roam_cell(r.position)
+		cell:=roam_layer_cell(r,room,column.x,column.y)
 		if cell!=r.cell && !roam_enter(w,room,r,cell) {return}
 	}
 	moved:=r.position-start

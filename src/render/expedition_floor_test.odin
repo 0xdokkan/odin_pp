@@ -16,10 +16,14 @@ test_expedition_floor_cache_all_biomes_preserve_gameplay_tiles_and_terrain :: pr
 		room:=game.Room{level_data=&data};cache:Expedition_Floor_Data
 		testing.expect(t,refresh_expedition_floor_data(&cache,&room,&w))
 		testing.expect_value(t,cache.width,world.map_size(biome))
+		// A cave's massif is bare rock: none of the ground's terrain over it (expedition/cave.odin).
+		ground :: proc(w:^world.World,biome:campaign.Biome,p:grid.Position)->game.Expedition_Terrain {
+			return .Plain if world.cave_rock(w,p) else game.expedition_terrain(u8(biome),p)
+		}
 		for tile,i in data.tiles.cells {
 			p:=grid.Position{x = i%cache.width, y = i/cache.width}
 			testing.expect_value(t,cache.pixels[i].r&7,u8(tile.kind))
-			testing.expect_value(t,cache.pixels[i].g&15,u8(game.expedition_terrain(u8(biome),p)))
+			testing.expect_value(t,cache.pixels[i].g&15,u8(ground(&w,biome,p)))
 			// Compare packed adjacency against independent gameplay queries;
 			// in particular a neighbouring Void retains its terrain enum.
 			if tile.kind!=.Void && i%97==0 {
@@ -27,8 +31,8 @@ test_expedition_floor_cache_all_biomes_preserve_gameplay_tiles_and_terrain :: pr
 				for d,direction in ([4]grid.Position{{x = -1, y = 0},{x = 1, y = 0},{x = 0, y = -1},{x = 0, y = 1}}) {
 					q:=grid.offset(p, d.x, d.y);adjacent,inside:=level.tile_at(&data,q)
 					if inside && adjacent.kind==.Wall {walls|=u8(1<<uint(direction))}
-					terrain:=game.expedition_terrain(u8(biome),q) if inside else game.Expedition_Terrain.Plain
-					if terrain!=game.expedition_terrain(u8(biome),p) {boundary|=u8(1<<uint(direction))}
+					terrain:=ground(&w,biome,q) if inside else game.Expedition_Terrain.Plain
+					if terrain!=ground(&w,biome,p) {boundary|=u8(1<<uint(direction))}
 				}
 				testing.expect_value(t,(cache.pixels[i].r>>3)&15,walls)
 				testing.expect_value(t,cache.pixels[i].g>>4,boundary)
@@ -38,7 +42,8 @@ test_expedition_floor_cache_all_biomes_preserve_gameplay_tiles_and_terrain :: pr
 			minimum,maximum:=world.site_bounds(&site)
 			for p in ([3]grid.Position{minimum,site.position,maximum}) {
 				_,design:=world.site_at(&w,p)
-				testing.expect_value(t,cache.pixels[p.y*cache.width+p.x].b&15,u8(design.surface))
+				surface:=EXPEDITION_FLOOR_ROCK if world.cave_rock(&w,p) else u8(design.surface)
+				testing.expect_value(t,cache.pixels[p.y*cache.width+p.x].b&15,surface)
 			}
 		}
 		testing.expect(t,!refresh_expedition_floor_data(&cache,&room,&w))

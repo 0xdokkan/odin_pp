@@ -49,7 +49,8 @@ check_player_structure :: proc(w: ^World, data: ^level.Level, room: ^game.Room, 
 	rotation: u8, mirror: bool) -> (result: Player_Placement, err: level.Placement_Error) {
 	if w == nil || data == nil || room == nil || room.player == nil || id >= .Count { return .Not_Allowed, .Bad_Structure }
 	if room.phase != .Loot { return .Not_Exploring, .None }
-	if w.in_cave > 0 { return .In_Cave, .None }
+	// Only on the open ground: not under the rock of a cave.
+	if room.player.position.layer != grid.GROUND_LAYER { return .In_Cave, .None }
 	if w.placed_by_player >= MAX_PLAYER_STRUCTURES { return .No_More, .None }
 	plan := level.placed_plan({id = id, origin = origin, rotation = rotation%4, mirror = mirror})
 	if plan.width == 0 { return .Not_Allowed, .Bad_Structure }
@@ -88,7 +89,7 @@ place_player_structure :: proc(w: ^World, data: ^level.Level, room: ^game.Room, 
 
 // The world's list of structures is the level's: after one is set down, and before a checkpoint (the enemies break some).
 sync_structures :: proc(w: ^World, data: ^level.Level) {
-	if w == nil || data == nil || w.in_cave > 0 { return }
+	if w == nil || data == nil { return }
 	w.structure_count = min(len(data.structures), MAX_WORLD_STRUCTURES)
 	for i in 0..<w.structure_count { w.structures[i] = data.structures[i] }
 }

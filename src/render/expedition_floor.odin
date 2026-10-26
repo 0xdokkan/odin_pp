@@ -2,8 +2,10 @@ package render
 
 import "core:c"
 import rl "vendor:raylib"
+import rlgl "vendor:raylib/rlgl"
 import world "../expedition"
 import game "../game"
+import level "../level"
 
 // One plane and one exact integer map texture replace thousands of floor
 // boxes. Only map mutations upload texels; all animation stays in uniforms.
@@ -15,6 +17,8 @@ Expedition_Floor_Program :: struct {
 	map_data, map_size, tint, time, beat, lane, lane_warning, biome: c.int,
 	focus, focus_count, grid_amount, surface: c.int,
 	reveal_eye, reveal_forward, reveal_viewport, reveal_points, reveal_count, reveal_floor: c.int,
+	// The pass (0 the ground, 1 the rooms under it: expedition_layers.odin) and the fade over the robot in a cave.
+	layer, cover: c.int,
 	lights: Expedition_Light_Uniforms,
 	reflection: Expedition_Reflection_Uniforms,
 }
@@ -26,6 +30,8 @@ Expedition_Floor :: struct {
 	failed: bool,
 	// The terraces of the map's relief, over the plane (expedition_terrain.odin).
 	terrain: Expedition_Terrain_Cache,
+	// The caves' rooms under the ground (expedition_layers.odin).
+	under: Expedition_Under_Cache,
 }
 
 EXPEDITION_FLOOR_HEADER_BODY :: `in vec3 worldPosition;
@@ -48,6 +54,8 @@ uniform vec4 gridFocus[9];
 uniform int gridFocusCount;
 uniform float gridAmount;
 uniform vec2 floorSurface;
+// 0: the ground and its relief; 1: the rooms under it (expedition_layers.odin).
+uniform int floorLayer;
 #ifdef TERRACE_REVEAL
 uniform vec3 eye;
 uniform vec3 viewForward;
@@ -56,6 +64,8 @@ uniform vec4 reveal[9];
 uniform int revealCount;
 // The height of the ground the robot stands on: only what is above it can be in its way.
 uniform float revealFloor;
+// In a cave: the robot's point (x, z), the height of his eyes (y), and whether the ground over him fades (w).
+uniform vec4 coverPoint;
 #endif
 const float BAYER[16]=float[16](0.,8.,2.,10.,12.,4.,14.,6.,3.,11.,1.,9.,15.,7.,13.,5.);
 
@@ -84,8 +94,10 @@ float floorJoint(vec2 p,vec2 size,float stagger,float width,float aa) {
     return inkLine(min(edge.x,edge.y),width,aa);
 }
 void floorMain();
+void caveMain();
 void main() {
     float rim=0.;
+    float cover=1.;
 #ifdef TERRACE_REVEAL
     // A hill or a mountain between the camera and the robot is cut away in a round window round the robot,
     // with a thin bright edge: no stipple. Only what stands above the robot's feet can be in its way (the ledge it
@@ -103,9 +115,62 @@ void main() {
             rim=1.-smoothstep(1.,1.12,r);
         }
     }
+    // In a cave the ground over the robot's eyes opens round him (Fase 4's rule, game/layer_view.odin): within six
+    // cells, down to fifteen percent beside him, as a stipple; what is left of it is darker.
+    if(floorLayer==0 && coverPoint.w>0. && worldPosition.y>coverPoint.y) {
+        float far=max(length(worldPosition.xz-coverPoint.xz)-.5,0.);
+        if(far<6.) {
+            float k=clamp((6.-far)/5.,0.,1.);
+            cover=1.-.85*k*k*(3.-2.*k);
+            ivec2 f=ivec2(gl_FragCoord.xy)&3;
+            if(cover<=(BAYER[f.y*4+f.x]+.5)/16.) discard;
+        }
+    }
 #endif
-    floorMain();
+    if(floorLayer==1) caveMain(); else floorMain();
     finalColor.rgb=mix(finalColor.rgb,vec3(.62,.92,1.),rim*.85);
+    finalColor.rgb*=mix(.35,1.,cover);
+#ifdef TERRACE_REVEAL
+    // In a cave the ground is off the robot's layer: darker all of it, outside the cave as over it (dimBox, Fase 4).
+    if(floorLayer==0 && coverPoint.w>0. && worldPosition.x>=dimBox.x && worldPosition.x<=dimBox.z && worldPosition.z>=dimBox.y && worldPosition.z<=dimBox.w) finalColor.rgb*=1.-dimAmount;
+#endif
+}
+// A cave's rooms (expedition_layers.odin): dark worn slabs of the biome's stone, darker by the rock round them (the
+// vertices' green); the walls and the cut of the rock (the vertices' red at 0) dark rock, lit facet by facet. The lamps
+// do the rest (expedition_lighting.odin).
+void caveMain() {
+    vec3 n=normalize(normal);
+    if(normal.y<.5 || color.r<.5) {
+        vec3 rock=mix(vec3(.115,.118,.132),biomeTint*.20,.30);
+        if(color.r<.5) rock*=.66;
+        finalColor=vec4(expedition_lit(worldPosition,n,rock,.9,.05),1.);
+        return;
+    }
+    vec2 p=worldPosition.xz;
+    vec2 footprint=max(fwidth(p),vec2(.0001));
+    float aa=max(footprint.x,footprint.y);
+    ivec2 cell=ivec2(floor(p));
+    vec2 uv=fract(p),q=uv-.5;
+    float joint=floorJoint(p,vec2(1.3,.9),.65,.012,aa);
+    float slab=hash21(vec2(cell)*.37+vec2(floor(p.y/.9)));
+    vec3 base=mix(vec3(.150,.145,.158),vec3(.198,.190,.205),slab);
+    base=mix(base,biomeTint*.24,.22);
+    base*=(1.-joint*.30)*mix(.55,1.,color.g);
+    vec3 emission=vec3(0.);
+    if(gridAmount>0.) {
+        float focus=0.;
+        for(int i=0;i<gridFocusCount;i++) {
+            float d=length(vec2(cell)+.5-gridFocus[i].xy);
+            focus=max(focus,1.-smoothstep(gridFocus[i].z,gridFocus[i].w,d));
+        }
+        focus*=gridAmount;
+        float edge=max(abs(q.x),abs(q.y));
+        float inset=1.-smoothstep(.44,.45+aa,edge);
+        float line=inkLine(edge-.45,.008,aa);
+        base=mix(base,base*1.28+biomeTint*.012,focus*inset);
+        emission+=expedition_linear(biomeTint)*line*focus*.22;
+    }
+    finalColor=vec4(expedition_lit(worldPosition,n,base,.72,.05)+emission,1.);
 }
 void floorMain() {
     // The walls of a cliff are dark rock, tinted a little by the biome, lit facet by facet.
@@ -299,6 +364,18 @@ void floorMain() {
             }
         }
     }
+    if(site==15) {
+        // A cave's massif (expedition_floor_data.odin): bare rock, faintly of the biome, split by long cracks.
+        float slab=float(tile.b>>4)/15.;
+        // Few thin cracks, broken where a slow wave runs under them: no net of lines from afar.
+        float crack=inkLine(fract(p.x*.13+p.y*.07+sin(p.y*.29+p.x*.11)*.45)-.5,.005,aa)*step(.35,fract(p.y*.09+p.x*.05));
+        float seam=inkLine(fract(p.y*.11-p.x*.05+sin(p.x*.23)*.4)-.5,.004,aa)*step(.5,fract(p.x*.07-p.y*.03));
+        float grain=mix(.5,hash21(floor(p*3.)),clamp(1.-aa*4.,0.,1.));
+        base=mix(vec3(.112,.110,.118),vec3(.128,.125,.134),slab*.6+grain*.4);
+        base=mix(base,biomeTint*.30,.20);
+        base*=1.-max(crack,seam)*.24;
+        roughness=.88;reflectionMask=.06;contact=1.;
+    }
     emission+=expedition_linear(biomeTint)*borderMask(tile.a&15,uv,.026,aa)*1.25;
     emission+=expedition_linear(biomeTint)*borderMask(tile.a>>4,uv,.018,aa)*.44;
     if(kind!=2) {
@@ -430,6 +507,7 @@ load_expedition_floor_program :: proc(p:^Expedition_Floor_Program,source:cstring
 	p.reveal_viewport=rl.GetShaderLocation(shader,"viewport")
 	p.reveal_points=rl.GetShaderLocation(shader,"reveal[0]");p.reveal_count=rl.GetShaderLocation(shader,"revealCount")
 	p.reveal_floor=rl.GetShaderLocation(shader,"revealFloor")
+	p.layer=rl.GetShaderLocation(shader,"floorLayer");p.cover=rl.GetShaderLocation(shader,"coverPoint")
 	p.lights=expedition_light_uniforms(shader);p.reflection=expedition_reflection_uniforms(shader)
 	return true
 }
@@ -456,6 +534,7 @@ destroy_expedition_floor :: proc(renderer:^Renderer) {
 	if f.plain.shader.id!=0 {rl.UnloadShader(f.plain.shader)}
 	if f.tall.shader.id!=0 && f.tall.shader.id!=f.plain.shader.id {rl.UnloadShader(f.tall.shader)}
 	destroy_expedition_terrain(&f.terrain)
+	destroy_expedition_under(&f.under)
 	destroy_expedition_floor_data(&f.data);free(f);renderer.tactical.expedition_floor=nil
 }
 
@@ -472,8 +551,8 @@ draw_expedition_floor :: proc(renderer:^Renderer,room:^game.Room,w:^world.World)
 		rl.SetTextureFilter(f.texture,.POINT);rl.SetTextureWrap(f.texture,.CLAMP)
 	} else if changed {rl.UpdateTexture(f.texture,raw_data(f.data.pixels))}
 	if f.texture.id==0 {return false}
-	// The program that thins out a tall mountain is used only where one is in view.
-	p:=&f.tall if expedition_terrain_tall_in_view(renderer,room) else &f.plain
+	// The program that thins out a tall mountain is used only where one is in view, or round the robot in a cave.
+	p:=&f.tall if board_view.vault || expedition_terrain_tall_in_view(renderer,room) else &f.plain
 	shader:=p.shader
 	dimensions:=rl.Vector2{f32(f.data.width),f32(f.data.height)}
 	metadata:=world.METADATA;c3:=metadata[w.biome].color;tint:=[3]f32{f32(c3[0])/255,f32(c3[1])/255,f32(c3[2])/255}
@@ -495,12 +574,33 @@ draw_expedition_floor :: proc(renderer:^Renderer,room:^game.Room,w:^world.World)
 	set_expedition_reveal(renderer,shader,p.reveal_eye,p.reveal_forward,p.reveal_viewport,p.reveal_points,p.reveal_count,1 if (renderer.tactical.expedition_material!=nil && renderer.tactical.expedition_material.player_reveal) else 0)
 	// The top of the robot's own cell: a slope it stands on is never cut.
 	floor_steps:=cell_overlay_ground(room.player.position);rl.SetShaderValue(shader,p.reveal_floor,&floor_steps,.FLOAT)
+	// In a cave the ground over the robot's eyes fades round him (Fase 4's rule).
+	cover:=rl.Vector4{}
+	if board_view.vault {
+		viewer:=board_view.viewer
+		cover={viewer.point.x,cell_ground(viewer.cell)+f32(game.HEIGHT_EYE_STEPS)*game.HEIGHT_STEP_DRAWN,viewer.point.y,1}
+	}
+	rl.SetShaderValue(shader,p.cover,&cover,.VEC4)
+	ground_pass,under_pass:=c.int(0),c.int(1)
+	open_sky,under_rock:=f32(0),f32(.65)
+	rl.SetShaderValue(shader,p.layer,&ground_pass,.INT)
+	rl.SetShaderValue(shader,p.lights.sky_shade,&open_sky,.FLOAT)
 	set_expedition_lights(renderer,shader,p.lights)
 	rl.BeginShaderMode(shader)
 	rl.SetShaderValueTexture(shader,p.map_data,f.texture)
 	set_expedition_reflection(renderer,shader,p.reflection)
 	draw_expedition_floor_plane(renderer,room,dimensions)
 	draw_expedition_terrain(renderer,room)
+	// The caves' rooms under the ground, the same program in their own pass.
+	if level.has_layers(room.level_data) {
+		rlgl.DrawRenderBatchActive()
+		rl.SetShaderValue(shader,p.layer,&under_pass,.INT)
+		rl.SetShaderValue(shader,p.lights.sky_shade,&under_rock,.FLOAT)
+		draw_expedition_under(renderer,room)
+		rlgl.DrawRenderBatchActive()
+		rl.SetShaderValue(shader,p.layer,&ground_pass,.INT)
+		rl.SetShaderValue(shader,p.lights.sky_shade,&open_sky,.FLOAT)
+	}
 	rl.EndShaderMode()
 	return true
 }

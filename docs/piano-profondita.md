@@ -52,7 +52,7 @@ La tabella è in ordine di priorità, cioè l'ordine della scaletta qui sotto.
 | 2 | 2 | Posizioni con il piano: il terzo numero, tutto a «terra» | — | Fatta | vedi Esito |
 | 3 | 3 | Piani nel laboratorio: dati e regole | 2 | Fatta | vedi Esito |
 | 4 | 4 | Piani nel laboratorio: trasparenze, contorni, mouse, luce | 3 (1 per l'aspetto) | Fatta | vedi Esito |
-| 5 | 5 | Piani nelle spedizioni: grotte senza caricamento | 1, 3, 4 | Da fare | — |
+| 5 | 5 | Piani nelle spedizioni: grotte senza caricamento | 1, 3, 4 | Fatta | vedi Esito |
 | 6 | 6 | Editor per scolpire i piani | 1, 3 (5 per le mappe dei biomi) | Da fare | — |
 | 7 | 7 | Ponti, gallerie e scorciatoie nei biomi | 5, 6 | Da fare | — |
 | 8 | 8 | Ologramma completo, prestazioni, grotte vecchie | 5 (meglio dopo la 7) | Da fare | — |
@@ -213,9 +213,10 @@ ODIN="/c/Users/lukeg/OneDrive/Desktop/odin-dev-2026-10/dist/odin.exe"
   aggiunge anche qui. A fine fase lo smoke del laboratorio va completato:
   dura più di otto minuti.
 - **Spedizioni da un punto:** `ODIN_PP_SMOKE_ONLY=hits` parte dagli scontri
-  dei segni dei colpi (`src/application/campaign_smoke.odin:321-322`). Gli
+  dei segni dei colpi, `ODIN_PP_SMOKE_ONLY=caves` dalle grotte
+  (`src/application/campaign_smoke.odin`, `expedition_enable_smoke`). Gli
   stage che contano qui: rilievi dal 63, ologrammi dal 75, due livelli 78,
-  montagna 79, grotte dall'87.
+  montagna 79, grotte dall'87, ologramma in grotta 103 (dalla Fase 5).
 - **Benchmark:**
   `"$ODIN" build src -o:speed -define:EXPEDITION_BENCHMARK=true -out:"$S/bench.exe"`,
   poi `"$S/bench.exe" --smoke-expedition > "$S/bench_a.log" 2>&1`
@@ -456,8 +457,9 @@ della mappa di Elden Ring. Ciò che conta per noi (fonti in fondo alla sezione):
 4. **Scorciatoie che si aprono dall'altra parte** (Fase 7): una porta, una leva
    o un ascensore; una volta aperte restano aperte anche nelle run dopo, come i
    segreti scoperti.
-5. **L'ologramma con il tasto del piano già nella Fase 5**, quando arriva il
-   primo piano sotto, e non solo nella Fase 8.
+5. **L'ologramma a piani già nella Fase 5**, quando arriva il primo piano
+   sotto, e non solo nella Fase 8. Nella Fase 5 l'utente ha scelto che cambi
+   piano da solo, con il robot, senza tasto.
 6. **Accessi segnati sull'ologramma** una volta scoperti (Fasi 5 e 8), così due
    posti vicini sulla mappa ma lontani a piedi non confondono.
 
@@ -1553,11 +1555,22 @@ nell'esplorazione e nelle pattuglie.
 
 ### Progetto
 
-- **Generatore:** a ogni posto di grotta un massiccio di roccia sulla terra, e
-  dentro, sul piano sotto, la grotta di oggi (`cave_plan`) a livello del
-  terreno attorno. L'arco diventa l'imbocco. Nella Neve la grotta entra nella
-  montagna dal sentiero; se il nucleo della montagna è troppo piccolo per
-  34×18, la grotta della Neve è più piccola (si misura all'inizio della fase).
+- **Generatore** (risposte dell'utente nella Fase 5):
+  - la grotta di oggi (`cave_plan`, 34×18) sta dentro un massiccio di roccia
+    sulla terra, sul piano sotto, a livello del terreno attorno, e l'arco
+    diventa l'imbocco;
+  - i posti sono nuovi, dove il massiccio ha spazio: misurato all'inizio della
+    fase, quello di una grotta di oggi entra libero solo in 2 dei 12 posti di
+    allora. Gli archi si spostano;
+  - nel Far West una grotta di oggi non entra da nessuna parte (la mappa è
+    160×160 e i 16 luoghi la riempiono): lì le grotte sono di 24×14, con due
+    stanze (scelta dell'utente durante la fase); negli altri tre biomi restano
+    di 34×18;
+  - ogni posto ha sempre il suo massiccio con la grotta (geografia fissa); la
+    run sceglie quali grotte hanno nemici e segreto, le altre restano vuote;
+  - nella Neve la grotta della montagna è una stanza sola nel nucleo, con il
+    segreto, e l'imbocco resta sul sentiero a metà salita: a 68 gradini il
+    nucleo con 12 gradini di roccia sopra è di circa 8×8 caselle.
 - **In grotta:** gruppi e oggetti della grotta stanno semplicemente sul piano
   sotto, e la mappa fuori resta com'è. Spariscono `Outer_Map`, la dissolvenza
   e il bioma 255.
@@ -1566,18 +1579,24 @@ nell'esplorazione e nelle pattuglie.
   retino del programma «reveal»; contorni; luci e ombre per piano. Le regole
   pure della Fase 4 si riusano.
 - **Esplorazione, mount, pattuglie e avvistamento** con le regole fra piani.
+- **Mount** (scelta dell'utente): si entra in grotta in sella, come negli altri
+  posti. Se in sella si fa partire un evento che fa apparire nemici, il robot
+  scende da solo.
 - **Salvataggi:**
   - i piani sotto e sopra si salvano come una lista delle sole caselle che
     esistono (indice, tipo, altezza): quei piani sono quasi vuoti, quindi lo
     snapshot cresce poco e lo stack della decodifica non aumenta come farebbe
     con altre tabelle `[MAX_CELLS]`;
   - le posizioni hanno il piano (Fase 2);
-  - un salvataggio vecchio senza piani si carica com'era.
+  - i salvataggi di prima di questa fase non servono, perché l'utente li
+    cancella: vengono rifiutati senza danni, senza conversione.
 - **Ologramma a piani, già qui** (la lezione del DLC di Elden Ring, sezione
-  2.9): si apre anche in grotta, mostra pieno il piano del robot e ha un tasto
-  per guardare l'altro; gli imbocchi scoperti sono segnati, quelli segreti
-  restano nascosti finché non li si scopre. La Fase 8 lo completa.
-- **Prestazioni:** benchmark sugli stage della Fase 0, prima e dopo.
+  2.9): si apre anche in grotta e mostra il piano del robot, cambiando piano da
+  solo quando lo cambia lui (scelta dell'utente, senza tasto); gli imbocchi
+  scoperti sono segnati, quelli segreti restano nascosti finché non li si
+  scopre. La Fase 8 lo completa.
+- **Prestazioni:** benchmark sugli stage della Fase 0, prima e dopo. La qualità
+  viene prima (scelta dell'utente): fino a +10% se serve a un disegno migliore.
 
 ### Da chiedere prima di iniziare
 
@@ -1614,12 +1633,13 @@ nell'esplorazione e nelle pattuglie.
 
 1. Generatore: massicci e grotte sul piano sotto, con i test di geografia
    fissa e di raggiungibilità estesi ai piani.
-2. Salvataggi: piani come liste, posizioni con il piano, conversione dei
-   salvataggi presi in grotta, con test di andata e ritorno.
+2. Salvataggi: piani come liste, posizioni con il piano, rifiuto senza danni
+   dei salvataggi di prima, con test di andata e ritorno.
 3. Esplorazione, mount, pattuglie e avvistamento fra piani.
 4. Renderer delle spedizioni: texture e superfici per piano, diradamento,
    contorni, luci, ombre.
-5. Ologramma a piani, con il tasto e gli imbocchi segnati.
+5. Ologramma a piani, che segue il piano del robot da solo, con gli imbocchi
+   scoperti segnati.
 6. Smoke delle grotte rifatto (entrare e uscire camminando) e catture in tutti
    e quattro i biomi, con il pulsante «TEST tutti i biomi».
 7. Benchmark prima e dopo.
@@ -1632,15 +1652,16 @@ nell'esplorazione e nelle pattuglie.
   grotta si raggiunge camminando.
 - Si entra e si esce dalla grotta camminando; il mount si comporta come deciso
   alla domanda 6.
-- Un checkpoint preso in grotta si riapre in grotta; un salvataggio vecchio
-  preso in grotta si apre come deciso alla domanda 3.
+- Un checkpoint preso in grotta si riapre in grotta; un salvataggio di prima
+  di questa fase viene rifiutato senza danni.
 - Le pattuglie seguono le regole scelte.
 
 ### Fatto quando
 
 - In ognuno dei quattro biomi si entra in grotta camminando, senza nero, e se
   ne esce dallo stesso imbocco.
-- Salvataggi nuovi e vecchi si caricano.
+- I salvataggi nuovi si caricano; quelli di prima vengono rifiutati senza
+  danni.
 - Le prestazioni rispettano l'obiettivo.
 - Le verifiche della sezione 1.4 sono a posto.
 
@@ -1654,7 +1675,121 @@ della fase e fermati alla fine.
 
 ### Esito
 
-Da fare.
+**Fatta il 26 ottobre 2026** sul ramo `piano-profondita`.
+
+**Risposte dell'utente**
+1. **Quali grotte:** tutti e quattro i biomi. Ogni posto ha sempre il suo massiccio con la grotta (geografia
+   fissa); la run sceglie quali hanno nemici e segreto, le altre restano vuote.
+2. **Grandezza:** le grotte di oggi (34×18), in posti nuovi dove c'è spazio; gli archi si spostano. Durante
+   la fase è venuto fuori che nel Far West una grotta di 34×18 non entra da nessuna parte (la mappa è
+   160×160 e i 16 luoghi la riempiono): l'utente ha scelto grotte di 24×14 con due stanze, solo lì.
+3. **La grotta della montagna:** una stanza sola nel nucleo, con il segreto; l'imbocco resta sul sentiero.
+4. **Salvataggi di prima della fase:** non servono, l'utente li cancella: rifiutati senza danni, senza
+   conversione.
+5. **Scontri sull'imbocco:** sì, entrare è camminare.
+6. **Pattuglie:** entrano in grotta come ovunque.
+7. **Mount:** si entra in sella, in grotta e negli altri posti; un evento che fa apparire nemici, fatto
+   partire in sella, fa scendere il robot.
+8. **Prestazioni:** la qualità prima di tutto, fino a +10% se serve a un disegno migliore.
+9. **Ologramma:** cambia piano da solo con il robot, senza tasto (non il consigliato); gli imbocchi
+   scoperti sono segnati, quelli segreti restano nascosti finché non li si trova.
+
+**Il codice citato** c'era ancora tutto; le righe della scena si erano spostate di poco.
+
+**Cosa è stato fatto**
+- **Generatore** (`src/expedition/cave.odin`):
+  - i posti sono fissi per bioma e si scelgono prima dei rilievi (`plan_caves`), che tengono piano il
+    terreno attorno a ogni massiccio come attorno ai luoghi. Il massiccio è alto 14 gradini al bordo e sale
+    di un gradino a casella fino a 18; le stanze stanno sul piano −1 alla quota del terreno; un tunnel va
+    dalla prima stanza all'imbocco, sul lato ovest. Gli oggetti sparsi finiscono sotto la roccia; davanti
+    all'imbocco il terreno è sgombro e sicuro (niente lava);
+  - con il seme 42: tre posti per bioma. Nella Neve la stanza della montagna ha 45 caselle a 67 gradini,
+    con l'imbocco sul sentiero, più due massicci sul terreno aperto; nel Far West tre grotte di 24×14;
+    in Egitto e nell'Inferno tre di 34×18;
+  - ogni grotta ha un sito all'imbocco, anche quelle vuote; le abitate hanno i loro nemici e il segreto
+    sul piano −1.
+- **Mondo:** `in_cave` si ricava a ogni tick dalla posizione (`cave_at`), che segna anche le grotte visitate
+  e saccheggiate. Sotto la roccia non c'è il terreno del bioma (`game.expedition_terrain`) e non arriva la
+  corsia; la corsia dell'Inferno non spacca i massicci. Passo, esplorazione libera, pattuglie in sonno e
+  campo delle distanze dei richiami passano dai piani con la regola del passo.
+- **Salvataggi:** i piani fuori dalla terra sono una lista di caselle e di pozze; `layers_version` dice
+  che il salvataggio è di questa fase. Uno di prima è rifiutato senza danni: lo slot risulta «stato non
+  valido» e i progressi della campagna restano.
+- **Scena:** niente dissolvenza, `Outer_Map`, `enter_cave`, `exit_cave` né bioma 255. In grotta si aprono
+  l'ologramma e la mount; si interagisce anche in sella.
+- **Disegno:**
+  - le stanze sotto la terra sono un passaggio del programma del pavimento (`render/expedition_layers.odin`):
+    pavimenti di lastre scure, pareti di roccia sfaccettate e il taglio della roccia alla quota del soffitto,
+    così la roccia diradata si apre su stanze scavate; la parete del massiccio si apre sopra l'imbocco;
+  - in grotta la terra sopra gli occhi del robot si dirada con un retino rotondo entro 6 caselle (la regola
+    della Fase 4), e ciò che ne resta si scurisce; tutta la terra si scurisce del 60%; nelle stanze la luce
+    del cielo cala al 35%; la lampada del robot è più forte e calda, e i nemici svegli hanno una luce rossa;
+  - la cima dei massicci è roccia nuda con poche crepe; l'arco di luce del bioma incornicia l'imbocco;
+  - i nemici che dormono, gli oggetti a terra, le etichette e i fuochi stanno sul pavimento del loro piano.
+- **Ologramma:** in grotta toglie la roccia del suo massiccio e mostra le stanze; le altre grotte restano
+  chiuse. Gli imbocchi trovati hanno un segno nel loro punto.
+- **Smoke:** gli stage delle grotte (87–98) entrano, escono e rientrano camminando nei quattro biomi, e
+  controllano che la mappa non cambi; `ODIN_PP_SMOKE_ONLY=caves` parte da lì; lo stage nuovo 103 fotografa
+  l'ologramma nella grotta della montagna (in fondo, per non cambiare il numero degli altri).
+
+**Scelte prese durante la fase**
+- **Posti prima dei rilievi:** con i rilievi di oggi un'area piana di 42×24 non c'era quasi mai; ora sono i
+  rilievi a spianare il terreno attorno ai massicci.
+- **Margini più stretti:** il massiccio può stare a una casella dalla cornice di un luogo, a 4 dai punti
+  delle pattuglie e a 12 dalla partenza. Con i margini di prima le grotte entravano in due biomi su quattro.
+- **Lava sotto la roccia:** nell'Inferno le strisce di lava passano sotto i massicci; conta solo che davanti
+  all'imbocco il terreno sia sicuro.
+- **Retino continuo:** l'apertura sopra il robot si calcola per frammento, non per casella, così è rotonda e
+  senza scalini; i coperchi traslucidi del laboratorio non si usano nelle spedizioni.
+- **Disegno in base all'altezza vera:** oggetti a terra, etichette e fuochi ora stanno sulla quota della loro
+  casella anche sulle colline, dove prima restavano a quota zero.
+
+**Verifiche**
+- `odin check src -vet -strict-style`, con e senza assert: puliti.
+- `.\scripts\check.ps1` completo: **1692 test verdi** con e senza assert (erano 1688), più le due build.
+  - I test delle grotte sono riscritti per il modello nuovo: 8 al posto dei 7 di prima. Ce n'è uno nuovo nel
+    livello (la tavola piccola del Far West) e due nel disegno (stanze, imbocco aperto, figure sul loro piano).
+  - Sono adattati i test che non sapevano dei massicci (rilievi, raggiungibilità, oggetti sparsi, pavimento,
+    archi dei luoghi, strutture). Quelli dei salvataggi vecchi ora controllano il rifiuto.
+- **Smoke del laboratorio** completo: le 120 catture sono identiche al byte a quelle della Fase 4.
+- **Smoke delle spedizioni** completo: 104 catture (le 103 di prima più l'ologramma in grotta), nessun errore.
+  Nelle quattro grotte si entra, si esce e si rientra camminando, e la mappa non cambia. Guardate le catture:
+  l'imbocco con l'arco di luce, le stanze attraverso la roccia diradata, i nemici, l'ologramma.
+- **Benchmark** sulla RTX 3060, alla corrente, due misure concordi (1,9% di scarto medio): media dei gruppi
+  **+6,1%** rispetto alla Fase 4, dentro il +10% concesso.
+
+  | Gruppo | Fase 4 (ms) | Fase 5 (ms) | Differenza |
+  |---|---:|---:|---:|
+  | Viste di base (0–6) | 1,81 | 1,84 | +1,6% |
+  | Biomi (7–18) | 1,49 | 1,50 | +0,5% |
+  | Luoghi e viste speciali (19–24) | 1,95 | 1,93 | −0,8% |
+  | Corsa e ingaggio (25–26) | 1,46 | 1,47 | +0,2% |
+  | Centro dei biomi (27–38) | 1,14 | 1,17 | +2,5% |
+  | Officine (39–50) | 1,18 | 1,20 | +2,1% |
+  | Bersagli (51–54) | 1,20 | 1,29 | +7,5% |
+  | Edifici (55–62) | 0,99 | 1,01 | +1,9% |
+  | Rilievi (63–74) | 1,10 | 1,11 | +0,8% |
+  | Ologrammi del rilievo (75–77) | 4,10 | 4,16 | +1,5% |
+  | Scontro su due livelli (78) | 1,14 | 1,56 | +37,5% |
+  | Montagna (79–86) | 1,05 | 1,10 | +4,2% |
+  | Grotte (87–98) | 0,93 | 1,11 | +19,5% |
+  | Posa delle strutture (99–102) | 1,01 | 1,07 | +6,2% |
+
+  - **Grotte, +19,5%:** prima erano una mappa piccola e piatta; ora sono la mappa intera, con massiccio,
+    stanze, retino e luci.
+  - **Scontro su due livelli, +37,5%:** la Neve ha cambiato geografia e lo stage inquadra un altro posto, con
+    un massiccio e un luogo grande in vista. Una prova di controllo con lo stesso codice ma senza grotte dà
+    1,12 ms contro 1,13 della Fase 4: il codice nuovo, da solo, non costa niente. Il resto è la mappa a piani
+    e la scena diversa; i costi fissi dei piani sono già ridotti (tabella delle colonne con piani, strato sotto
+    solo vicino al robot fuori dalle grotte).
+  - **Stage nuovo 103** (ologramma in grotta): 4,57 ms, come gli altri ologrammi.
+
+**Non fatto, per le fasi dopo**
+- Gli interni delle grotte già visitate nell'ologramma, il piano sopra e gli accessi: Fase 8.
+- Restano nel codice l'arco di roccia dei luoghi (`site_cell`, caso `.Cave`) e `level.cave_stamp`, che nessun
+  gioco usa più: da togliere nella Fase 8. Anche il codice delle mappe piccole di prima (80, 96, 112) non
+  serve più, perché quei salvataggi sono rifiutati.
+- Ponti, gallerie e scorciatoie: Fase 7.
 
 ## 9. Fase 6 — Editor per scolpire
 
@@ -1878,8 +2013,11 @@ prestazioni, si toglie il codice delle grotte vecchie.
 - **Blocchi del terreno:** i vertici passano ogni fotogramma in modalità
   immediata (`src/render/expedition_terrain.odin:128-134`); con tre piani
   conviene caricarli una volta sola sulla scheda video.
-- **Grotte vecchie:** dopo la Fase 5 `Outer_Map`, `enter_cave` ed `exit_cave`
-  servono solo a convertire i salvataggi vecchi.
+- **Grotte vecchie:** nella Fase 5 l'utente ha scelto di rifiutare i
+  salvataggi vecchi senza convertirli, quindi `Outer_Map`, `enter_cave`,
+  `exit_cave` e la dissolvenza spariscono già lì. Restano da guardare gli
+  avanzi: l'arco di roccia dei luoghi (`site_cell`, caso `.Cave`) e
+  `cave_stamp`, se nessuno li usa più.
 
 ### Progetto
 

@@ -807,20 +807,39 @@ avviare è `build/odin_pp`; conserva il limite fps delle impostazioni di gioco.
 - **Attenzione:** in Odin un `defer` che cambia un risultato con nome non cambia il valore restituito.
 - **Laboratorio:** `Mechanics_Lab_Arena.Mountain`, atto `mechanics_lab_mountain`, `ODIN_PP_LAB_ONLY=mountain`.
 
-## Le caverne (Fase 5 del piano griglia)
+## Le caverne (Fase 5 del piano griglia, piano sotto dalla Fase 5 del piano profondità)
 
 - **Piano dell'interno:** `src/level/cave.odin`: `cave_plan(seed)` dà 34×18 caselle con due o tre stanze, l'arrivo, il segreto
-  e i punti dove aspettano i gruppi; `cave_stamp` lo scrive su un `Level`.
-- **Passaggio:** `src/expedition/cave.odin`. `enter_cave` mette da parte caselle e altezze della mappa aperta (`Outer_Map`),
-  la svuota (`level.set_tile_kinds` / `set_height_table`, un solo cambio di geometria) e vi stampa la grotta al centro;
-  `exit_cave` riporta tutto. `World.in_cave` (0 fuori, k+1 nella grotta k), `Group.cave`, `Drop.cave`: `in_scope` decide chi
-  agisce; `visible_sites` dice quanti siti si vedono (nessuno in grotta); `ground` dà il terreno (liscio in grotta, bioma 255).
-- **Posti:** `cave_candidates` sceglie fino a tre posti per bioma con un generatore fisso (stessa geografia a ogni run), la
-  run ne sceglie 1–3 (`place_caves`); la Neve ha sempre la grotta del sentiero della montagna.
-- **Salvataggio:** `Snapshot.outer`; `capture(..., outer)` e `restore(..., outer)`; la scena tiene l'`Outer_Map` mentre si è
-  in grotta (`Expedition_Session.outer`) e la dissolvenza in `expedition_cave_fade`.
-- **Disegno:** `render/expedition_cave.odin` (l'arco); i siti, i gruppi e i drop fuori scope non si disegnano.
-- **Attenzione:** nei biomi con grotte la geografia non dipende dal seme; il test della geografia salta i siti `Cave`.
+  e i punti dove aspettano i gruppi; `cave_plan_sized` una tavola più piccola, con due stanze (il Far West: 24×14,
+  `expedition.cave_board`).
+- **La grotta è un piano della mappa** (`src/expedition/cave.odin`): le stanze sono caselle del piano −1 (`CAVE_LAYER`) alla
+  quota del terreno attorno, sotto un massiccio di roccia alto 14 gradini al bordo e fino a 18 dentro; un tunnel porta dalla
+  prima stanza, attraverso l'anello di roccia, all'imbocco sul terreno aperto a ovest. Nella Neve la grotta della montagna
+  è una stanza sola nel nucleo, con l'imbocco sul sentiero vicino a metà salita (`mountain_cave_room`). Niente dissolvenza e
+  niente cambio di mappa: ci si entra camminando (`game.layer_step`), anche in sella e durante uno scontro.
+- **Posti:** fissi per bioma (`cave_places`, generatore fisso), scelti prima dei rilievi (`plan_caves`), che tengono piano il
+  terreno attorno a ogni massiccio (`cave_level_zones` in `apply_relief`); poi `place_caves` scava le grotte e mette un sito
+  `Cave` all'imbocco per ognuna. La run sceglie quali 1–3 hanno nemici e segreto (`Cave.inhabited`); la montagna sempre.
+- **Dove sta il giocatore:** `World.in_cave` (0 fuori, k+1 nella grotta k) si ricava a ogni `tick` dalla posizione
+  (`cave_at`, `update_caves`), che segna anche le grotte visitate e saccheggiate. `cave_rock` dice se una casella della
+  terra è roccia di un massiccio (la corsia dell'Inferno non la spacca; il disegno la fa di roccia nuda). Sotto la roccia il
+  terreno del bioma non c'è (`game.expedition_terrain` dà `.Plain` fuori dalla terra). `in_scope` e `visible_sites` restano
+  per compatibilità e dicono sempre «tutti».
+- **Salvataggio:** i piani fuori dalla terra sono una lista di caselle (`Snapshot.layer_cells`, 29 bit ciascuna) e di pozze
+  (`layer_pools`); `layers_version` vale `SNAPSHOT_LAYERS`: un salvataggio di prima non ce l'ha ed è rifiutato senza
+  conversione (scelta dell'utente); il campo segna `Invalid_State` nello slot.
+- **Esplorazione e pattuglie:** `roam_layer_cell` e `walk` passano dai piani come il passo; `patrol_move_toward` ha il campo
+  delle distanze su tutti i piani (finestra di 65×65 per piano, in memoria temporanea).
+- **Disegno:** `render/expedition_layers.odin` disegna le stanze con il programma del pavimento (`floorLayer` 1): pavimenti,
+  pareti di roccia sfaccettate, il taglio della roccia alla quota del soffitto; `expedition_terrain.odin` apre la parete
+  del massiccio sopra l'imbocco (`terrain_opening`). In grotta il programma «tall» dirada con un retino la terra sopra gli
+  occhi del robot entro 6 caselle (`coverPoint`, la regola della Fase 4), la scurisce tutta (`dimBox`) e toglie al cielo il
+  65% della luce delle stanze (`skyShade`); la lampada del robot è più forte e i nemici svegli hanno una luce. I nemici che
+  dormono hanno un'entità loro (`expedition_member_entity`) per stare sul pavimento del loro piano. L'arco di luce
+  sull'imbocco è `render/expedition_cave.odin`. L'ologramma, in grotta, toglie la roccia del suo massiccio e mostra le stanze,
+  e segna gli imbocchi scoperti.
+- **Smoke:** gli stage dall'87 entrano ed escono camminando nei quattro biomi (`ODIN_PP_SMOKE_ONLY=caves`); lo stage 103
+  fotografa l'ologramma nella grotta della montagna.
 
 ## Strutture posate dal giocatore (Fase 7 del piano griglia)
 

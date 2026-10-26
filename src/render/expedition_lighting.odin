@@ -13,7 +13,7 @@ EXPEDITION_LIGHT_TILE_SIDE :: 8
 EXPEDITION_LIGHT_TILE_SIZE :: f32(8)
 EXPEDITION_LIGHT_TILE_COUNT :: EXPEDITION_LIGHT_TILE_SIDE*EXPEDITION_LIGHT_TILE_SIDE
 #assert(EXPEDITION_LIGHTS==32 && size_of(c.int)==size_of(u32))
-Expedition_Light_Uniforms :: struct {eye,mirror,count,start,end,color,tiles,tile_origin,dim_box,dim_amount:c.int}
+Expedition_Light_Uniforms :: struct {eye,mirror,count,start,end,color,tiles,tile_origin,dim_box,dim_amount,sky_shade:c.int}
 Expedition_Lights :: struct {
 	start,end,color:[EXPEDITION_LIGHTS]rl.Vector4,
 	count:c.int,
@@ -72,12 +72,15 @@ uint expedition_light_mask(vec2 p) {
 vec3 expedition_linear(vec3 c) { return pow(max(c,vec3(0.)),vec3(2.2)); }
 uniform vec4 dimBox;
 uniform float dimAmount;
+// How much of the sky's light the rock takes away (Fase 4's rule: under it the sky's light falls, the lamps stay): 0 in
+// the open, which every program has unless it sets it (the floor program's caves' pass does).
+uniform float skyShade;
 vec3 expedition_lit_open(vec3 p,vec3 normal,vec3 srgbBase,float roughness,float metallic) {
     if(lightMirror>.5) {p.y=-p.y;normal.y=-normal.y;}
     vec3 n=normalize(normal);
     vec3 base=expedition_linear(srgbBase);
     vec3 key=normalize(vec3(-.45,1.,.3));
-    vec3 result=base*(.65+max(dot(n,key),0.)*1.65);
+    vec3 result=base*(.65+max(dot(n,key),0.)*1.65)*(1.-skyShade);
 #if EXPEDITION_TILED_LIGHTS
     uint candidates=expedition_light_mask(p.xz);
     if(candidates==0u) return result;
@@ -130,7 +133,7 @@ expedition_light_uniforms :: proc(shader:rl.Shader)->Expedition_Light_Uniforms {
 		rl.GetShaderLocation(shader,"lightCount"),rl.GetShaderLocation(shader,"lightStart[0]"),
 		rl.GetShaderLocation(shader,"lightEnd[0]"),rl.GetShaderLocation(shader,"lightColor[0]"),
 		rl.GetShaderLocation(shader,"lightTiles[0]"),rl.GetShaderLocation(shader,"lightTileOrigin"),
-		rl.GetShaderLocation(shader,"dimBox"),rl.GetShaderLocation(shader,"dimAmount")}
+		rl.GetShaderLocation(shader,"dimBox"),rl.GetShaderLocation(shader,"dimAmount"),rl.GetShaderLocation(shader,"skyShade")}
 }
 
 set_expedition_lights :: proc(renderer:^Renderer,shader:rl.Shader,u:Expedition_Light_Uniforms) {
@@ -225,12 +228,24 @@ prepare_expedition_lights :: proc(renderer:^Renderer,room:^game.Room,w:^world.Wo
 	s:=renderer.tactical.snapshot;if s==nil {return}
 	if s.player.visible {
 		p,_:=living_card_position(renderer,game.PLAYER_ENTITY,.Player,s.player.position)
-		a:=rl.Vector3{p.x+.5,.65+point_ground(p),p.y+.5};expedition_add_light(l,a,a,{.10,.42,.55},3)
+		a:=rl.Vector3{p.x+.5,.65+entity_point_ground(game.PLAYER_ENTITY,p),p.y+.5}
+		// In a cave the robot's lamp is the light there is (Fase 4: darker, with the characters' lights).
+		if renderer.tactical.expedition_in_cave {expedition_add_light(l,a,a,{1.9,1.62,1.15},5.5)}
+		else {expedition_add_light(l,a,a,{.10,.42,.55},3)}
 	}
 	dynamic_start:=int(l.count)
+	// In a cave the foes awake carry a faint light of their own.
+	if renderer.tactical.expedition_in_cave {
+		for actor in s.enemies[:s.enemy_count] {
+			if !actor.visible || actor.health<=0 {continue}
+			p,_:=living_card_position(renderer,actor.entity,sprite_key_for_enemy(actor.archetype),actor.position)
+			a:=rl.Vector3{p.x+.5,.6+entity_point_ground(actor.entity,p),p.y+.5}
+			expedition_add_near_light(l,dynamic_start,focus,a,{.55,.16,.10},2.6)
+		}
+	}
 	for object in s.objects[:s.object_count] {
 		if !object.visible {continue}
-		a:=rl.Vector3{object.position.x+.5,.65+point_ground(object.position),object.position.y+.5};color:rl.Vector3
+		a:=rl.Vector3{object.position.x+.5,.65+entity_point_ground(object.entity,object.position),object.position.y+.5};color:rl.Vector3
 		#partial switch object.kind {
 		case .Tesla_Coil,.Shock_Floor:color={.2,.8,3.5}
 		case .Fire:color={3.2,.65,.08}
@@ -242,7 +257,7 @@ prepare_expedition_lights :: proc(renderer:^Renderer,room:^game.Room,w:^world.Wo
 		}
 	}
 	for fire in s.ground.fires[:s.ground.fire_count] {
-		a:=rl.Vector3{f32(fire.center.x)+.5,.45,f32(fire.center.y)+.5}
+		a:=rl.Vector3{f32(fire.center.x)+.5,.45+cell_ground(fire.center),f32(fire.center.y)+.5}
 		if rl.Vector3DistanceSqr(a,focus)<18*18 {expedition_add_near_light(l,dynamic_start,focus,a,{3.5,.7,.06},4.5)}
 	}
 }

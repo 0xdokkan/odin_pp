@@ -101,13 +101,12 @@ test_the_player_structures_have_limits_and_every_refusal_says_why :: proc(t: ^te
 	occupied, _ := check_player_structure(&w, &data, &room, .Cart, origin, 0, false)
 	testing.expect_value(t, occupied, Player_Placement.Occupied)
 	w.drop_count -= 1
-	// In a cave.
-	outer := new(Outer_Map)
-	defer free(outer)
-	w.in_cave = 1
+	// In a cave, under the rock.
+	standing := room.player.position
+	room.player.position = w.caves[0].place.arrival
 	in_cave, _ := check_player_structure(&w, &data, &room, .Cart, origin, 0, false)
 	testing.expect_value(t, in_cave, Player_Placement.In_Cave)
-	w.in_cave = 0
+	room.player.position = standing
 	// A text for every refusal; only the allowed one is silent.
 	for result in Player_Placement {
 		text := player_placement_text(result, .Not_Free)
@@ -125,10 +124,10 @@ test_the_player_structures_have_limits_and_every_refusal_says_why :: proc(t: ^te
 	testing.expect_value(t, again, Player_Placement.Not_Allowed)
 }
 
-// The enemies break an object and the world's list follows: the checkpoint has what is on the map; and going into a cave and out again keeps
-// the structures.
+// The enemies break an object and the world's list follows: the checkpoint has what is on the map; and going into a cave leaves the
+// structures standing (the cave is a layer of the same map).
 @(test)
-test_a_broken_structure_is_off_the_saved_list_and_a_cave_keeps_the_rest :: proc(t: ^testing.T) {
+test_a_broken_structure_is_off_the_saved_list_and_a_cave_leaves_the_rest_standing :: proc(t: ^testing.T) {
 	w: World
 	data: level.Level
 	p: game.Player
@@ -141,16 +140,13 @@ test_a_broken_structure_is_off_the_saved_list_and_a_cave_keeps_the_rest :: proc(
 	result, _ := place_player_structure(&w, &data, &room, .Cart, origin, 0, false)
 	testing.expect_value(t, result, Player_Placement.Ok)
 	count := w.structure_count
-	// A cave takes the structures off the map and brings them back.
-	outer := new(Outer_Map)
-	defer free(outer)
-	arch := w.sites[w.caves[0].site].position
-	room.player.position = grid.offset(arch, 0, 1)
-	testing.expect(t, enter_cave(&w, &data, &room, outer, 0))
-	testing.expect_value(t, level.structure_count(&data), 0)
-	testing.expect_value(t, w.structure_count, count)
-	testing.expect(t, exit_cave(&w, &data, &room, outer))
+	// In a cave the structures stay where they are, on the map and on the list.
+	room.player.position = w.caves[0].place.arrival
+	tick(&w, &room, 0.1)
+	testing.expect_value(t, w.in_cave, 1)
 	testing.expect_value(t, level.structure_count(&data), count)
+	testing.expect_value(t, w.structure_count, count)
+	room.player.position = stand
 	// The enemies break it: the next checkpoint does not have it.
 	cart := count-1
 	cart_cell := data.structures[cart].origin

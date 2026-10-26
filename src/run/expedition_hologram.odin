@@ -10,6 +10,7 @@ import world "../expedition"
 import host "../engine/host"
 import ui "../engine/ui"
 import level "../level"
+import grid "../engine/grid"
 import render "../render"
 
 // The miniature reads only terrain and public site knowledge. Neither enemy
@@ -53,6 +54,9 @@ hologram_camera :: proc(width,height:int)->rl.Camera3D {
 	return {position=center+{s*.82,s*.78,s*.82},target=center,up={0,1,0},fovy=fovy,projection=.ORTHOGRAPHIC}
 }
 
+// The map shows the robot's layer, and changes with him (the user's choice in Fase 5 of docs/piano-profondita.md): on
+// the open ground the ground; in a cave, the rock of its massif taken away and its rooms shown, at their floor's height,
+// the other caves still shut in their rock.
 @(private)
 hologram_geometry :: proc(w:^world.World,data:^level.Level,out:^Hologram_Geometry) {
 	out.width=min(data.tiles.width,HOLO_SIDE);out.height=min(data.tiles.height,HOLO_SIDE)
@@ -96,6 +100,16 @@ hologram_geometry :: proc(w:^world.World,data:^level.Level,out:^Hologram_Geometr
 			if c.wall>0 {c.wall=u8(clamp(design.wall_height*3.2,3,12))}
 		}}
 	}
+	if w.in_cave>0 && w.in_cave<=w.cave_count {
+		place:=w.caves[w.in_cave-1].place
+		for y in max(0,place.origin.y-1)..=min(out.height-1,place.origin.y+place.height) {for x in max(0,place.origin.x-1)..=min(out.width-1,place.origin.x+place.width) {
+			c:=&out.cells[y*HOLO_SIDE+x]
+			room:=grid.Position{x = x, y = y, layer = world.CAVE_LAYER}
+			if tile,_:=level.tile_at(data,room);tile.kind==.Floor {c^={ground=15,height=hologram_band(level.height_at(data,room))};continue}
+			// The mountain's core keeps its path round the room.
+			if !place.mountain {c^={ground=16,height=hologram_band(place.floor),wall=4}}
+		}}
+	}
 }
 
 @(private)
@@ -118,7 +132,8 @@ hologram_prism :: proc(x,z,width,depth,bottom,top:f32,c:rl.Color) {
 
 @(private)
 draw_hologram_geography :: proc(g:^Hologram_Geometry,tint:rl.Color) {
-	palette:=[15]rl.Color{{},{27,56,78,255},{36,77,90,255},{21,48,82,255},{61,103,128,255},{60,75,88,255},{84,75,104,255},{70,103,126,255},{65,63,105,255},{43,79,105,255},{76,127,149,255},{42,91,106,255},{50,83,112,255},{43,70,94,255},{62,101,125,255}}
+	// The last two: a cave's floor, and the rock round it (hologram_geometry).
+	palette:=[17]rl.Color{{},{27,56,78,255},{36,77,90,255},{21,48,82,255},{61,103,128,255},{60,75,88,255},{84,75,104,255},{70,103,126,255},{65,63,105,255},{43,79,105,255},{76,127,149,255},{42,91,106,255},{50,83,112,255},{43,70,94,255},{62,101,125,255},{104,150,163,255},{16,30,46,255}}
 	w,h:=f32(g.width),f32(g.height)
 	hologram_prism(-1,-1,w+2,h+2,-5,-3,{10,24,39,255})
 	rl.DrawCubeWires({w*.5,-3,h*.5},w+2,.1,h+2,{68,135,165,255})
@@ -236,7 +251,7 @@ draw_expedition_hologram :: proc(e:^Expedition_Session,frame:^host.Frame) {
 	ui.draw_text(frame.theme,campaign.biome_name(w.biome),{28,55},.Body,accent)
 	ui.draw_text(frame.theme,"TAB / ESC  chiudi",{769,29},.Small,{180,204,220,255})
 	rl.DrawLineEx({26,82},{934,82},1,{61,106,133,230})
-	ui.draw_text(frame.theme,"RILIEVO COMPLETO  /  AREE DI RICERCA",{28,94},.Small,{115,173,196,255})
+	ui.draw_text(frame.theme,"GROTTA: LE STANZE SOTTO LA ROCCIA  /  AREE DI RICERCA" if w.in_cave>0 else "RILIEVO COMPLETO  /  AREE DI RICERCA",{28,94},.Small,{115,173,196,255})
 	geometry:Hologram_Geometry;hologram_geometry(w,&e.rs.level_data,&geometry)
 	camera:=hologram_camera(geometry.width,geometry.height)
 	canvas_target.begin_scissor(18,110,658,365)
@@ -247,8 +262,17 @@ draw_expedition_hologram :: proc(e:^Expedition_Session,frame:^host.Frame) {
 		area:=hologram_area(&site);if area.visible {draw_hologram_search_area(area,hologram_signal_color(&site),w.clock)}
 	}
 	rlgl.DrawRenderBatchActive();rlgl.EnableDepthMask()
-	p:=e.rs.room.player.position;hero:=rl.Vector3{f32(p.x)+.5,.5,f32(p.y)+.5}
 	scale:=f32(max(geometry.width,geometry.height))/160;beam:=11*scale
+	step:=scale*.45
+	// The caves' mouths found are the map's own: each is marked where it is, with its site's signal.
+	for cave in w.caves[:w.cave_count] {
+		site:=&w.sites[cave.site];if site.state==.Unvisited {continue}
+		mouth:=cave.place.mouth;color:=hologram_signal_color(site)
+		base:=rl.Vector3{f32(mouth.x)+.5,f32(hologram_band(cave.place.floor))*step+.1,f32(mouth.y)+.5}
+		rl.DrawCircle3D(base,1.4*scale,{1,0,0},90,color)
+		rl.DrawLine3D(base,base+{0,4*scale,0},color)
+	}
+	p:=e.rs.room.player.position;hero:=rl.Vector3{f32(p.x)+.5,f32(hologram_band(level.height_at(&e.rs.level_data,p)))*step+.5,f32(p.y)+.5}
 	rl.DrawCylinder(hero,scale,2*scale,2.5*scale,6,{255,244,207,255})
 	rl.DrawLine3D(hero,hero+{0,beam,0},{255,244,207,255})
 	rl.DrawSphereEx(hero+{0,beam,0},scale,4,6,{255,244,207,255})

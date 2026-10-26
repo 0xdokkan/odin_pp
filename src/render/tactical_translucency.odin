@@ -115,8 +115,9 @@ collect_tactical_translucents :: proc(renderer: ^Renderer, room: ^game.Room = ni
 			}
 		} }
 	}
-	// What fades over the robot (game.layer_cover_opacity): a cell a layer, its layer in the entry's `attack`.
-	if room != nil && board_view.layered {
+	// What fades over the robot (game.layer_cover_opacity): a cell a layer, its layer in the entry's `attack`. In an
+	// expedition the floor program fades it (expedition_floor.odin).
+	if room != nil && board_view.layered && (room.player == nil || !room.player.tactical.config.expedition) {
 		c := board_view.viewer.cell
 		reach := int(game.LAYER_FADE_FAR)+1
 		for y in c.y-reach..=c.y+reach { for x in c.x-reach..=c.x+reach {

@@ -28,6 +28,10 @@ Board_Heights :: struct {
 	plane_cells: [level.LAYER_COUNT][dynamic]u8,
 	plane_tiles: [level.LAYER_COUNT][dynamic]level.Tile,
 	layered: bool,
+	// The highest floor of any layer, in steps (pick_ground_cell starts its ray there).
+	top: u8,
+	// For every column, whether a layer other than the ground has a floor in it (board_column_layered).
+	layered_columns: [dynamic]bool,
 	width, height: int,
 	id, revision: u64,
 }
@@ -58,7 +62,7 @@ set_board_level :: proc(data: ^level.Level) {
 			if len(b.plane_cells[slot]) > 0 { clear(&b.plane_cells[slot]) }
 			if len(b.plane_tiles[slot]) > 0 { clear(&b.plane_tiles[slot]) }
 		}
-		b.id, b.revision, b.width, b.height, b.layered = 0, 0, 0, 0, false
+		b.id, b.revision, b.width, b.height, b.layered, b.top = 0, 0, 0, 0, false, 0
 		return
 	}
 	if b.id == data.geometry_id && b.revision == data.geometry_revision && len(b.cells) == len(data.heights) && b.layered == layered { return }
@@ -80,6 +84,17 @@ set_board_level :: proc(data: ^level.Level) {
 		append(&b.plane_cells[slot], ..plane.heights[:])
 	}
 	b.layered = layered
+	b.top = 0
+	for height in b.cells { b.top = max(b.top, height) }
+	for cells in b.plane_cells { for height in cells { b.top = max(b.top, height) } }
+	if b.layered_columns.allocator.procedure == nil { b.layered_columns = make([dynamic]bool, runtime.heap_allocator()) }
+	clear(&b.layered_columns)
+	if layered {
+		resize(&b.layered_columns, len(data.tiles.cells))
+		for tiles in b.plane_tiles {
+			for tile, index in tiles { if level.kind_has_floor(tile.kind) { b.layered_columns[index] = true } }
+		}
+	}
 	b.width, b.height = data.tiles.width, data.tiles.height
 	b.id, b.revision = data.geometry_id, data.geometry_revision
 }
@@ -93,6 +108,14 @@ set_board_actors :: proc(room: ^game.Room) {
 	append(&board_actors, Board_Actor{game.PLAYER_ENTITY, room.player.position})
 	for enemy in room.enemies { append(&board_actors, Board_Actor{game.enemy_entity(enemy.id), enemy.position}) }
 	for object in room.objects { append(&board_actors, Board_Actor{game.object_entity(object.id), object.position}) }
+}
+
+// One more figure standing on `cell` this frame (an expedition's sleeping foe: expedition_member_entity), after the
+// room's own: drawn on its layer's floor too.
+@(private)
+add_board_actor :: proc(entity: game.Entity_Ref, cell: grid.Position) {
+	if !board_heights.layered || board_actors.allocator.procedure == nil { return }
+	append(&board_actors, Board_Actor{entity, cell})
 }
 
 // The board's tables as the surface reads them: the ground's, or `layer`'s.
@@ -127,11 +150,7 @@ board_column_layered :: proc(cell: grid.Position) -> bool {
 	b := &board_heights
 	if !b.layered || cell.x < 0 || cell.y < 0 || cell.x >= b.width || cell.y >= b.height { return false }
 	index := cell.y*b.width+cell.x
-	for slot in 0..<level.LAYER_COUNT {
-		tiles := b.plane_tiles[slot]
-		if index < len(tiles) && level.kind_has_floor(tiles[index].kind) { return true }
-	}
-	return false
+	return index < len(b.layered_columns) && b.layered_columns[index]
 }
 
 // The sculpted surface of `cell` on its layer, in steps; `ok` is false off the board, on a Void cell or on a flat board.
@@ -268,9 +287,11 @@ entity_point_ground :: proc(entity: game.Entity_Ref, at: view.Vec2) -> f32 {
 	if !board_heights.layered || entity == {} { return point_ground(at) }
 	standing, found := board_actor_cell(entity)
 	if !found { return point_ground(at) }
+	x, y := int(math.floor(at.x+0.5)), int(math.floor(at.y+0.5))
+	// Where no column round has a floor off the ground, the ground's is the only one.
+	if standing.layer == grid.GROUND_LAYER && !board_column_layered(standing) && !board_column_layered({x = x, y = y}) { return point_ground(at) }
 	target := cell_ground(standing)
 	best, best_distance := point_ground(at), max(f32)
-	x, y := int(math.floor(at.x+0.5)), int(math.floor(at.y+0.5))
 	for layer in grid.LOWEST_LAYER..=grid.HIGHEST_LAYER {
 		m := board_surface_map(i8(layer))
 		if !level.surface_ground(&m, x, y) { continue }
@@ -291,10 +312,7 @@ pick_ground_cell :: proc(origin, direction: [3]f32) -> (cell: grid.Position, ok:
 		if t <= 0 { return }
 		return {x = int(math.floor(origin.x+direction.x*t)), y = int(math.floor(origin.z+direction.z*t))}, true
 	}
-	top := f32(0)
-	for height in board_heights.cells { top = max(top, f32(height)) }
-	for cells in board_heights.plane_cells { for height in cells { top = max(top, f32(height)) } }
-	top = top*game.HEIGHT_STEP_DRAWN+0.1
+	top := f32(board_heights.top)*game.HEIGHT_STEP_DRAWN+0.1
 	// Where another layer has a floor, the column's solids (level.column_of): the ray stops in the first one it
 	// enters, on the floor that stands on it (a bridge's deck, a cave's floor through its mouth, the hill's top).
 	layers: level.Layer_Map
@@ -325,10 +343,21 @@ pick_ground_cell :: proc(origin, direction: [3]f32) -> (cell: grid.Position, ok:
 
 // Whether the ground between the camera and an actor standing at `at` (its cell's corner) hides the actor: the
 // line from the camera to the actor's chest passes under the top of a cell on the way. A hill or a mountain in front
-// of an actor hides it; an actor on the same ground, or on a slope that opens to the camera, is seen.
+// of an actor hides it; an actor on the same ground, or on a slope that opens to the camera, is seen. With layers
+// (`entity` says where it stands) the line goes through them: the rock over a cave hides what is in it, but where it
+// fades over the robot (game.layer_figure_hidden).
 @(private)
-terrain_hides_actor :: proc(renderer: ^Renderer, at: view.Vec2) -> bool {
+terrain_hides_actor :: proc(renderer: ^Renderer, at: view.Vec2, entity := game.Entity_Ref{}) -> bool {
 	if !board_has_heights() { return false }
+	standing, found := board_actor_cell(entity)
+	if !found { standing = {x = int(math.floor(at.x+0.5)), y = int(math.floor(at.y+0.5))} }
+	// The rule of the layers where they matter: the robot or the actor off the ground; else the ground's, which is cheaper.
+	if board_view.layered && (standing.layer != grid.GROUND_LAYER || board_view.viewer.cell.layer != grid.GROUND_LAYER) {
+		m := board_layer_map()
+		eye := renderer.tactical.camera.position
+		target := [3]f32{at.x+0.5, entity_point_ground(entity, at)+0.5, at.y+0.5}
+		return game.layer_figure_hidden(&m, board_view.viewer, {eye.x, eye.y, eye.z}, target, standing)
+	}
 	target := rl.Vector3{at.x+0.5, point_ground(at)+0.5, at.y+0.5}
 	eye := renderer.tactical.camera.position
 	delta := target-eye

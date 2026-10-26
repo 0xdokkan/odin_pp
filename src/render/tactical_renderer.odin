@@ -61,6 +61,9 @@ Tactical_View :: struct {
 	expedition_patrols: Expedition_Patrol_Glide,
 	// The sites whose floor plans reach this frame's drawn region.
 	expedition_sites: Expedition_Near_Sites,
+	// The cave the robot is in (expedition/cave.odin), its box (x0, z0, x1, z1): outside it everything is darker.
+	expedition_cave_box: rl.Vector4,
+	expedition_in_cave: bool,
 	// The structure the player is about to set down (expedition_ghost.odin).
 	structure_ghost: Structure_Ghost,
 	light_shader: rl.Shader,
@@ -609,6 +612,7 @@ draw_tactical_world :: proc(renderer: ^Renderer, room: ^game.Room, active_card: 
 	preview: Card_Range_Preview
 	set_board_level(room.level_data)
 	set_board_actors(room)
+	if expedition_world != nil { set_expedition_board_actors(expedition_world) }
 	set_board_view(renderer, room)
 	if active_card != 0 { prepare_card_range_preview(renderer, room, active_card, &preview) } else { prepare_card_range_preview(renderer, room, hover_card, &preview, true) }
 	halo := CARD_HIT_VIOLET

@@ -186,6 +186,8 @@ prepare_expedition_material :: proc(renderer:^Renderer,room:^game.Room,w:^world.
 	m.grid_amount+=(goal-m.grid_amount)*(1-math.exp(-7*dt))
 	if goal==0 && m.grid_amount<.01 {m.grid_amount=0}
 	m.focus_point_count=0;m.reveal_point_count=0;m.player_reveal=false
+	// The cave the robot is in, for the dimming outside it and its lamp (expedition_layers.odin).
+	set_expedition_cave_view(renderer,room,w)
 	update_structure_dim(renderer,m)
 	camera:=v.camera
 	toward:=rl.Vector2{camera.position.x-camera.target.x,camera.position.z-camera.target.z}
@@ -194,16 +196,17 @@ prepare_expedition_material :: proc(renderer:^Renderer,room:^game.Room,w:^world.
 	if snapshot.player.visible {
 		at,_:=living_card_position(renderer,game.PLAYER_ENTITY,.Player,snapshot.player.position)
 		m.focus_points[0]={at.x+.5,at.y+.5,4.5,8.5};m.focus_point_count=1
-		expedition_add_reveal(renderer,m,{at.x+.5,.75+point_ground({at.x,at.y}) if !v.expedition_mounted else .9+point_ground({at.x,at.y}),at.y+.5},1.05 if !v.expedition_mounted else 1.45)
+		ground:=entity_point_ground(game.PLAYER_ENTITY,{at.x,at.y})
+		expedition_add_reveal(renderer,m,{at.x+.5,.75+ground if !v.expedition_mounted else .9+ground,at.y+.5},1.05 if !v.expedition_mounted else 1.45)
 		m.player_reveal=m.reveal_point_count>0
 	}
 	for actor in snapshot.enemies[:snapshot.enemy_count] {
 		if !actor.visible || actor.health<=0 {continue}
 		at,_:=living_card_position(renderer,actor.entity,sprite_key_for_enemy(actor.archetype),actor.position)
 		// Behind a hill or a mountain: not shown, so no window for it in the solids either.
-		if terrain_hides_actor(renderer,{at.x,at.y}) {continue}
+		if terrain_hides_actor(renderer,{at.x,at.y},actor.entity) {continue}
 		if m.focus_point_count<EXPEDITION_GRID_FOCUS {m.focus_points[m.focus_point_count]={at.x+.5,at.y+.5,1.5,3.6};m.focus_point_count+=1}
-		expedition_add_reveal(renderer,m,{at.x+.5,.7,at.y+.5},.85)
+		expedition_add_reveal(renderer,m,{at.x+.5,.7+entity_point_ground(actor.entity,{at.x,at.y}),at.y+.5},.85)
 	}
 }
 

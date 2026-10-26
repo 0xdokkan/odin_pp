@@ -10,10 +10,25 @@ import level "../level"
 @(private = "file")
 CAVE_BIOMES :: [4]campaign.Biome{.Snow, .West, .Egypt, .Inferno}
 
-// The cave biomes have between one and three caves at every run, each at an arch that is a secret site; the Snow's first is on the
-// spiral mountain's path; the others have none.
+@(private = "file")
+cave_world :: proc(t: ^testing.T, w: ^World, data: ^level.Level, p: ^game.Player, biome: campaign.Biome) -> game.Room {
+	room := test_world(t, w, data, p, biome)
+	game.end_expedition_encounter(&room)
+	room.phase = .Loot
+	return room
+}
+
+// The last of the biome's caves: one on the open map (the Snow's first is the mountain's), its tunnel running east from the mouth.
+@(private = "file")
+open_map_cave :: proc(w: ^World) -> int {
+	return w.cave_count-1
+}
+
+// Every place of a cave biome has its massif and its cave at every run; between one and three of them hold foes and a secret,
+// the Snow's mountain's always; the other biomes have none. Each cave's mouth is a secret site on the open ground, its arrival a
+// floor under the rock, and the map keeps the rule of the layers' columns.
 @(test)
-test_the_four_biomes_have_one_to_three_caves_and_the_others_none :: proc(t: ^testing.T) {
+test_every_cave_place_has_its_cave_and_one_to_three_are_inhabited :: proc(t: ^testing.T) {
 	for biome in campaign.Biome {
 		if biome == .Count { continue }
 		for seed in ([?]u64{1, 7, 99, 12345, 777777}) {
@@ -22,30 +37,50 @@ test_the_four_biomes_have_one_to_three_caves_and_the_others_none :: proc(t: ^tes
 			testing.expect(t, generate(&w, &data, biome, seed))
 			defer level.destroy(&data)
 			if !cave_biome(biome) {
-				testing.expectf(t, w.cave_count == 0, "%v has %d caves", biome, w.cave_count)
+				testing.expectf(t, w.cave_count == 0 && !level.has_layers(&data), "%v has %d caves", biome, w.cave_count)
 				continue
 			}
-			testing.expectf(t, w.cave_count >= 1 && w.cave_count <= 3, "%v seed %d has %d caves", biome, seed, w.cave_count)
+			testing.expectf(t, w.cave_count >= 2, "%v has only %d places for a cave", biome, w.cave_count)
+			error, bad := level.check_layers(&data)
+			testing.expectf(t, error == .None, "%v: the layers break their rule at %v", biome, bad)
+			inhabited := 0
 			for cave, i in w.caves[:w.cave_count] {
 				site := w.sites[cave.site]
 				testing.expect(t, site.kind == .Cave && site.secret && site.active && site.state == .Unvisited)
+				testing.expect_value(t, site.position, cave.place.mouth)
 				testing.expect_value(t, cave_of_site(&w, cave.site), i)
-				// Each has its foes (marked with its number) and its secret.
+				mouth, _ := level.tile_at(&data, cave.place.mouth)
+				arrival, _ := level.tile_at(&data, cave.place.arrival)
+				testing.expect(t, level.is_walkable(mouth.kind) && arrival.kind == .Floor && cave.place.arrival.layer == CAVE_LAYER)
+				testing.expect_value(t, cave_at(&w, cave.place.arrival), i+1)
+				testing.expect_value(t, cave_at(&w, cave.place.mouth), 0)
 				groups, drops := 0, 0
-				for group in w.groups[:w.group_count] { if int(group.cave) == i+1 { groups += 1; testing.expect(t, group.count >= 2 && !group.patrol) } }
-				for drop in w.drops[:w.drop_count] { if int(drop.cave) == i+1 { drops += 1; testing.expect(t, drop.manual_only) } }
-				testing.expectf(t, groups >= 1 && groups <= 3 && drops == 2, "%v cave %d has %d groups and %d drops", biome, i, groups, drops)
+				for &group in w.groups[:w.group_count] {
+					if int(group.cave) != i+1 { continue }
+					groups += 1
+					testing.expect(t, group.count >= 2 && !group.patrol)
+					for member in group.members[:group.count] { testing.expect_value(t, member.enemy.position.layer, CAVE_LAYER) }
+				}
+				for drop in w.drops[:w.drop_count] {
+					if int(drop.cave) != i+1 { continue }
+					drops += 1
+					testing.expect(t, drop.manual_only && drop.position.layer == CAVE_LAYER)
+				}
+				if cave.inhabited {
+					inhabited += 1
+					testing.expectf(t, groups >= 1 && groups <= 3 && drops == 2, "%v cave %d has %d groups and %d drops", biome, i, groups, drops)
+				} else {
+					testing.expectf(t, groups == 0 && drops == 0, "%v: the empty cave %d has %d groups and %d drops", biome, i, groups, drops)
+				}
 			}
-			// What is not a cave's is the open map's.
-			for group in w.groups[:w.group_count] { if group.cave == 0 { testing.expect(t, group.count >= 1) } }
-			if biome == .Snow {
-				testing.expect_value(t, w.sites[w.caves[0].site].position, mountain_cell(level.mountain_path_cell(1.75)))
-			}
+			testing.expect(t, inhabited >= 1 && inhabited <= 3)
+			if biome == .Snow { testing.expect(t, w.caves[0].place.mountain && w.caves[0].inhabited) }
 		}
 	}
 }
 
-// The geography is the biome's, not the run's: the tiles do not depend on the seed, only which of the places has a cave does.
+// The geography is the biome's, not the run's: the ground, the layers under it and the caves' places do not depend on the seed,
+// only which of the caves hold foes does.
 @(test)
 test_the_geography_of_a_cave_biome_is_the_same_whatever_the_seed :: proc(t: ^testing.T) {
 	for biome in CAVE_BIOMES {
@@ -57,63 +92,19 @@ test_the_geography_of_a_cave_biome_is_the_same_whatever_the_seed :: proc(t: ^tes
 		defer level.destroy(&second)
 		testing.expect(t, slice.equal(first.tiles.cells[:], second.tiles.cells[:]), "the tiles are the same")
 		testing.expect(t, slice.equal(first.heights[:], second.heights[:]), "the heights are the same")
-	}
-}
-
-// The arch of every cave can be walked to from the spawn, one step of height at a time, and the doorway's cell is floor.
-@(test)
-test_every_arch_can_be_walked_to_from_the_spawn :: proc(t: ^testing.T) {
-	for biome in CAVE_BIOMES {
-		for seed in ([?]u64{2, 31, 4444}) {
-			w: World
-			data: level.Level
-			testing.expect(t, generate(&w, &data, biome, seed))
-			defer level.destroy(&data)
-			seen := make([]bool, len(data.tiles.cells))
-			queue := make([]grid.Position, len(data.tiles.cells))
-			defer delete(seen)
-			defer delete(queue)
-			tail := 1
-			queue[0] = data.player_spawn
-			seen[data.player_spawn.y*data.tiles.width+data.player_spawn.x] = true
-			for head := 0; head < tail; head += 1 {
-				for offset in ([4]grid.Position{{x = 1, y = 0}, {x = -1, y = 0}, {x = 0, y = 1}, {x = 0, y = -1}}) {
-					q := grid.Position{x = queue[head].x+offset.x, y = queue[head].y+offset.y}
-					tile, ok := level.tile_at(&data, q)
-					if !ok || !level.is_walkable(tile.kind) { continue }
-					if abs(int(level.height_at(&data, q))-int(level.height_at(&data, queue[head]))) > 1 { continue }
-					at := q.y*data.tiles.width+q.x
-					if seen[at] { continue }
-					seen[at] = true
-					queue[tail] = q
-					tail += 1
-				}
-			}
-			for cave in w.caves[:w.cave_count] {
-				p := w.sites[cave.site].position
-				tile, _ := level.tile_at(&data, p)
-				testing.expectf(t, level.is_walkable(tile.kind), "%v: the arch at %v is not floor", biome, p)
-				// The cell in front of the doorway, or (on the mountain) the path itself.
-				on_mountain := mountain_present(&w) && p == mountain_cell(level.mountain_path_cell(1.75))
-				front := p if on_mountain else grid.offset(p, 0, 1)
-				testing.expectf(t, seen[front.y*data.tiles.width+front.x], "%v seed %d: the arch at %v cannot be walked to", biome, seed, p)
-			}
+		for slot in 0..<level.LAYER_COUNT {
+			same := slice.equal(first.planes[slot].tiles[:], second.planes[slot].tiles[:]) && slice.equal(first.planes[slot].heights[:], second.planes[slot].heights[:])
+			testing.expectf(t, same, "%v: the layer in slot %d is not the same", biome, slot)
 		}
+		testing.expect_value(t, a.cave_count, b.cave_count)
+		for i in 0..<min(a.cave_count, b.cave_count) { testing.expect_value(t, a.caves[i].place, b.caves[i].place) }
 	}
 }
 
-@(private = "file")
-cave_world :: proc(t: ^testing.T, w: ^World, data: ^level.Level, p: ^game.Player, biome: campaign.Biome) -> game.Room {
-	room := test_world(t, w, data, p, biome)
-	game.end_expedition_encounter(&room)
-	room.phase = .Loot
-	return room
-}
-
-// Going into a cave puts the open map away and stamps the cave; coming out brings it back, every tile and height, and the player
-// stands at the arch again.
+// From the spawn the player walks to every cave's mouth and through it to every floor of the cave, a step at a time as the rules
+// of the layers have it (game.walk_step): its rooms are one, and joined to the open map.
 @(test)
-test_a_cave_is_entered_and_left_and_the_open_map_comes_back_as_it_was :: proc(t: ^testing.T) {
+test_every_cave_can_be_walked_into_from_the_spawn :: proc(t: ^testing.T) {
 	for biome in CAVE_BIOMES {
 		w: World
 		data: level.Level
@@ -121,146 +112,208 @@ test_a_cave_is_entered_and_left_and_the_open_map_comes_back_as_it_was :: proc(t:
 		room := cave_world(t, &w, &data, &p, biome)
 		defer level.destroy(&data)
 		defer game.destroy_room(&room)
-		testing.expect(t, w.cave_count >= 1)
-		outer := new(Outer_Map)
-		defer free(outer)
-		before_tiles := slice.clone(data.tiles.cells[:])
-		before_heights := slice.clone(data.heights[:])
-		defer delete(before_tiles)
-		defer delete(before_heights)
-		arch := w.sites[w.caves[0].site].position
-		room.player.position = grid.offset(arch, 0, 1)
-		testing.expect(t, enter_cave(&w, &data, &room, outer, 0))
-		testing.expect_value(t, w.in_cave, 1)
-		arrival, ok := cave_arrival(&w)
-		testing.expect(t, ok && room.player.position == arrival)
-		plan := level.cave_plan(w.caves[0].seed)
-		origin := cave_origin(&w)
-		for y in 0..<data.tiles.height {
-			for x in 0..<data.tiles.width {
-				tile, _ := level.tile_at(&data, {x = x, y = y})
-				inside := x >= origin.x && y >= origin.y && x < origin.x+level.CAVE_WIDTH && y < origin.y+level.CAVE_HEIGHT
-				if !inside { testing.expect_value(t, tile.kind, level.Tile_Kind.Void); continue }
-				if (grid.Position{x = x, y = y}) == arrival { testing.expect_value(t, tile.kind, level.Tile_Kind.Player_Spawn); continue }
-				testing.expect_value(t, tile.kind, level.Tile_Kind.Wall if plan.rows[y-origin.y][x-origin.x] == '#' else level.Tile_Kind.Floor)
+		seen := make([]bool, game.room_table_cells(&data))
+		queue := make([dynamic]grid.Position)
+		defer delete(seen)
+		defer delete(queue)
+		start, _ := game.room_table_index(&room, data.player_spawn)
+		seen[start] = true
+		append(&queue, data.player_spawn)
+		for head := 0; head < len(queue); head += 1 {
+			for step in ([4]grid.Position{{x = 1, y = 0}, {x = -1, y = 0}, {x = 0, y = 1}, {x = 0, y = -1}}) {
+				next := game.walk_step(&room, queue[head], step)
+				index, inside := game.room_table_index(&room, next)
+				if !inside || seen[index] || !game.base_cell_is_walkable(&room, next) || game.step_height_blocked(&room, queue[head], next) { continue }
+				seen[index] = true
+				append(&queue, next)
 			}
 		}
-		testing.expect(t, !level.has_heights(&data), "a cave is flat")
-		// Not twice.
-		testing.expect(t, !enter_cave(&w, &data, &room, outer, 0))
-		testing.expect(t, exit_cave(&w, &data, &room, outer))
-		testing.expect_value(t, w.in_cave, 0)
-		testing.expect_value(t, room.player.position, grid.offset(arch, 0, 1))
-		testing.expect(t, slice.equal(before_tiles, data.tiles.cells[:]), "the tiles are as they were")
-		testing.expect(t, slice.equal(before_heights, data.heights[:]) || (len(before_heights) == 0 && len(data.heights) == 0), "the heights are as they were")
-		testing.expect(t, !exit_cave(&w, &data, &room, outer), "out already")
+		for cave, i in w.caves[:w.cave_count] {
+			mouth, _ := game.room_table_index(&room, cave.place.mouth)
+			testing.expectf(t, seen[mouth], "%v: the mouth of cave %d at %v cannot be walked to", biome, i, cave.place.mouth)
+			floors := 0
+			for y in cave.place.origin.y-1..=cave.place.origin.y+cave.place.height {
+				for x in cave.place.origin.x-1..=cave.place.origin.x+cave.place.width {
+					cell := grid.Position{x = x, y = y, layer = CAVE_LAYER}
+					tile, _ := level.tile_at(&data, cell)
+					if tile.kind != .Floor { continue }
+					floors += 1
+					index, _ := game.room_table_index(&room, cell)
+					testing.expectf(t, seen[index], "%v: the floor of cave %d at %v cannot be walked to", biome, i, cell)
+				}
+			}
+			testing.expectf(t, floors >= CAVE_MOUNTAIN_ROOM_MIN, "%v: cave %d has %d floors", biome, i, floors)
+		}
 	}
 }
 
-// A fight stops the crossing, and a cave's groups and drops are only where the player is: the open map's groups sleep in the
-// cave, and its sites do nothing.
+// One walks into a cave through its mouth and out again, in the saddle too: nothing of the map changes, only where the player is
+// (world.in_cave); under the rock nothing of the biome's ground is under him.
 @(test)
-test_a_fight_stops_the_crossing_and_groups_and_drops_belong_to_where_the_player_is :: proc(t: ^testing.T) {
+test_the_player_walks_into_a_cave_and_out_and_nothing_else_changes :: proc(t: ^testing.T) {
+	for biome in CAVE_BIOMES {
+		w: World
+		data: level.Level
+		p: game.Player
+		room := cave_world(t, &w, &data, &p, biome)
+		defer level.destroy(&data)
+		defer game.destroy_room(&room)
+		// Nobody to wake on the way.
+		w.group_count = 0
+		before_tiles := slice.clone(data.tiles.cells[:])
+		before_heights := slice.clone(data.heights[:])
+		before_cave := slice.clone(data.planes[level.layer_slot(CAVE_LAYER)].tiles[:])
+		defer delete(before_tiles)
+		defer delete(before_heights)
+		defer delete(before_cave)
+		index := open_map_cave(&w)
+		place := w.caves[index].place
+		room.player.position = place.mouth
+		w.mounted = true
+		tick(&w, &room, 0.1)
+		testing.expect_value(t, w.in_cave, 0)
+		for step := 0; room.player.position != place.arrival && step < 8; step += 1 {
+			if !testing.expectf(t, walk(&w, &room, {x = 1, y = 0}), "%v: the walk in stopped at %v", biome, room.player.position) { break }
+		}
+		testing.expect_value(t, room.player.position, place.arrival)
+		tick(&w, &room, 0.1)
+		testing.expect_value(t, w.in_cave, index+1)
+		testing.expect(t, w.mounted, "in the saddle in the cave too")
+		testing.expect_value(t, w.caves[index].state, Cave_State.Visited)
+		testing.expect_value(t, ground(&w, room.player.position), Terrain.Plain)
+		testing.expect_value(t, game.expedition_terrain(u8(biome), room.player.position), game.Expedition_Terrain.Plain)
+		testing.expect_value(t, room.player.tactical.config.expedition_biome, u8(biome))
+		for step := 0; room.player.position.layer != grid.GROUND_LAYER && step < 8; step += 1 {
+			if !testing.expect(t, walk(&w, &room, {x = -1, y = 0})) { break }
+		}
+		tick(&w, &room, 0.1)
+		testing.expect_value(t, w.in_cave, 0)
+		testing.expect(t, slice.equal(before_tiles, data.tiles.cells[:]) && slice.equal(before_heights, data.heights[:]), "the ground is as it was")
+		testing.expect(t, slice.equal(before_cave, data.planes[level.layer_slot(CAVE_LAYER)].tiles[:]), "the cave is as it was")
+	}
+}
+
+// A cave's foes sleep under the rock while the player stands over them on the massif: the rock hides him. Inside, on their
+// layer, they wake as anywhere, and the saddle is left for the fight.
+@(test)
+test_the_rock_hides_the_player_from_the_foes_under_it :: proc(t: ^testing.T) {
 	w: World
 	data: level.Level
 	p: game.Player
 	room := cave_world(t, &w, &data, &p, .Egypt)
 	defer level.destroy(&data)
 	defer game.destroy_room(&room)
-	outer := new(Outer_Map)
-	defer free(outer)
-	arch := w.sites[w.caves[0].site].position
-	room.player.position = grid.offset(arch, 0, 1)
-	_ = game.begin_expedition_encounter(&room)
-	testing.expect(t, !enter_cave(&w, &data, &room, outer, 0), "no crossing in a fight")
-	game.end_expedition_encounter(&room)
-	room.phase = .Loot
-	testing.expect(t, enter_cave(&w, &data, &room, outer, 0))
-	testing.expect(t, in_scope(&w, 1) && !in_scope(&w, 0) && !in_scope(&w, 2))
-	testing.expect_value(t, nearest_site(&w, room.player.position), -1)
-	// A tick in the cave next to its first group never wakes a group of the open map.
-	cave_group := -1
-	for group, i in w.groups[:w.group_count] { if group.cave == 1 && cave_group < 0 { cave_group = i } }
-	testing.expect(t, cave_group >= 0)
-	room.player.position = w.groups[cave_group].members[0].enemy.position
-	room.player.position.x -= 1
-	for _ in 0..<20 { tick(&w, &room, 0.1) }
-	for group, i in w.groups[:w.group_count] {
-		if group.cave == 0 { testing.expectf(t, !group.active, "group %d of the open map woke up in the cave", i) }
+	group := -1
+	for g, i in w.groups[:w.group_count] { if g.cave > 0 && !w.caves[g.cave-1].place.mountain { group = i; break } }
+	if !testing.expect(t, group >= 0) { return }
+	foe := w.groups[group].members[0].enemy.position
+	room.player.position = {x = foe.x, y = foe.y}
+	for _ in 0..<10 { tick(&w, &room, 0.2) }
+	testing.expect(t, !w.groups[group].active && room.phase == .Loot, "seen through the rock")
+	// Inside, two cells away on the same floor.
+	for offset in ([4]grid.Position{{x = -2, y = 0}, {x = 2, y = 0}, {x = 0, y = -2}, {x = 0, y = 2}}) {
+		cell := grid.offset(foe, offset.x, offset.y)
+		if tile, _ := level.tile_at(&data, cell); tile.kind == .Floor { room.player.position = cell; break }
 	}
-	// And the biome's ground is gone: nothing slows or burns in a cave.
-	testing.expect_value(t, ground(&w, room.player.position), Terrain.Plain)
-	testing.expect_value(t, room.player.tactical.config.expedition_biome, u8(255))
+	testing.expect_value(t, room.player.position.layer, CAVE_LAYER)
+	w.mounted = true
+	for _ in 0..<10 { tick(&w, &room, 0.2); if room.phase == .Combat { break } }
+	testing.expect(t, room.phase == .Combat && w.groups[group].active, "not woken in the cave")
+	testing.expect(t, !w.mounted, "the fight sets the robot down")
 }
 
-// A checkpoint taken in a cave restores in it: the cave's tiles, the open map put away, the groups, the place of the return.
+// A checkpoint taken in a cave comes back in it: the layers, the pools on them, where the player stands. A save from before the
+// layers is refused, and so is a cell of a layer off the map.
 @(test)
-test_a_checkpoint_in_a_cave_comes_back_in_the_cave_with_the_open_map_kept :: proc(t: ^testing.T) {
+test_a_checkpoint_in_a_cave_comes_back_in_the_cave :: proc(t: ^testing.T) {
 	w: World
 	data: level.Level
 	p: game.Player
 	room := cave_world(t, &w, &data, &p, .Inferno)
 	defer level.destroy(&data)
 	defer game.destroy_room(&room)
-	outer := new(Outer_Map)
-	defer free(outer)
-	arch := w.sites[w.caves[0].site].position
-	room.player.position = grid.offset(arch, 0, 1)
-	open_tiles := slice.clone(data.tiles.cells[:])
-	defer delete(open_tiles)
-	testing.expect(t, enter_cave(&w, &data, &room, outer, 0))
+	arrival := w.caves[0].place.arrival
+	room.player.position = arrival
+	tick(&w, &room, 0.1)
+	testing.expect_value(t, w.in_cave, 1)
+	pool, _ := game.room_table_index(&room, grid.offset(arrival, 1, 0))
+	room.ground.pool[pool] = 3
 	s := new(Snapshot)
 	defer free(s)
-	testing.expect(t, capture(&w, &room, s, outer))
+	testing.expect(t, capture(&w, &room, s))
 	testing.expect(t, valid_snapshot(s))
-	// A snapshot in a cave without the map put away is not one.
-	bad := new(Snapshot)
-	defer free(bad)
-	testing.expect(t, !capture(&w, &room, bad, nil))
+	testing.expect(t, s.layer_cell_count > 0 && s.layer_pool_count == 1)
 	w2: World
 	data2: level.Level
 	p2: game.Player
 	room2: game.Room
-	outer2 := new(Outer_Map)
-	defer free(outer2)
-	testing.expect(t, restore(s, &w2, &data2, &p2, &room2, outer2))
+	if !testing.expect(t, restore(s, &w2, &data2, &p2, &room2)) { return }
 	defer level.destroy(&data2)
 	defer game.destroy_room(&room2)
+	testing.expect_value(t, room2.player.position, arrival)
 	testing.expect_value(t, w2.in_cave, 1)
-	testing.expect_value(t, w2.cave_return, w.cave_return)
-	testing.expect(t, slice.equal(data.tiles.cells[:], data2.tiles.cells[:]), "the cave's tiles")
-	testing.expect(t, slice.equal(outer.kinds[:], outer2.kinds[:]) && slice.equal(outer.heights[:], outer2.heights[:]), "the open map put away")
-	// Leaving from the restored game gives the open map of before, and the spawn tile is where it was.
-	testing.expect(t, exit_cave(&w2, &data2, &room2, outer2))
-	testing.expect(t, slice.equal(open_tiles, data2.tiles.cells[:]), "the open map comes back")
-	testing.expect_value(t, data2.player_spawn, data.player_spawn)
-	// A checkpoint of a cave with a cave number out of range is not one.
-	s.world.in_cave = s.world.cave_count+1
-	testing.expect(t, !valid_snapshot(s))
+	testing.expect_value(t, w2.caves[0], w.caves[0])
+	testing.expect(t, slice.equal(data.tiles.cells[:], data2.tiles.cells[:]) && slice.equal(data.heights[:], data2.heights[:]), "the ground")
+	for slot in 0..<level.LAYER_COUNT {
+		same := slice.equal(data.planes[slot].tiles[:], data2.planes[slot].tiles[:]) && slice.equal(data.planes[slot].heights[:], data2.planes[slot].heights[:])
+		testing.expectf(t, same, "the layer in slot %d", slot)
+	}
+	testing.expect(t, slice.equal(room.ground.pool, room2.ground.pool), "the pools")
+	s.layers_version = 0
+	testing.expect(t, !valid_snapshot(s), "a save from before the layers")
+	s.layers_version = SNAPSHOT_LAYERS
+	s.layer_cells[0] = layer_cell_pack(size(&w)*size(&w), 0, .Floor, 0)
+	testing.expect(t, !valid_snapshot(s), "a cell off the map")
 }
 
-// What drops in a cave stays in it: its experience and the items left there are the cave's, and leaving takes the player to the
-// open map's own.
+// What drops in a cave lies where it fell, like anywhere; the cave's secret is its two drops, and once they are taken the cave is
+// looted and its mouth's site resolved.
 @(test)
-test_what_drops_in_a_cave_belongs_to_the_cave :: proc(t: ^testing.T) {
+test_a_cave_is_looted_once_its_secret_is_taken :: proc(t: ^testing.T) {
 	w: World
 	data: level.Level
 	p: game.Player
 	room := cave_world(t, &w, &data, &p, .West)
 	defer level.destroy(&data)
 	defer game.destroy_room(&room)
-	outer := new(Outer_Map)
-	defer free(outer)
-	arch := w.sites[w.caves[0].site].position
-	room.player.position = grid.offset(arch, 0, 1)
-	open_drops := w.drop_count
-	testing.expect(t, enter_cave(&w, &data, &room, outer, 0))
+	w.group_count = 0
+	index := -1
+	for cave, i in w.caves[:w.cave_count] { if cave.inhabited { index = i; break } }
+	if !testing.expect(t, index >= 0) { return }
+	room.player.position = w.caves[index].place.arrival
+	tick(&w, &room, 0.1)
+	testing.expect_value(t, w.caves[index].state, Cave_State.Visited)
 	add_xp_drop(&w, room.player.position, 6)
-	testing.expect(t, add_drop(&w, room.player.position, campaign.make_item(.Healing)))
-	testing.expect_value(t, w.drop_count, open_drops+2)
-	for drop in w.drops[open_drops:w.drop_count] { testing.expect_value(t, drop.cave, u8(1)) }
-	testing.expect(t, exit_cave(&w, &data, &room, outer))
-	for drop in w.drops[open_drops:w.drop_count] { testing.expect(t, !in_scope(&w, drop.cave)) }
-	// A cave's secret is its two drops, gone once they are taken.
-	testing.expect(t, !cave_looted(&w, 0))
+	testing.expect_value(t, w.drops[w.drop_count-1].cave, u8(0))
+	testing.expect_value(t, w.drops[w.drop_count-1].position, room.player.position)
+	testing.expect(t, !cave_looted(&w, index))
+	for i := 0; i < w.drop_count; {
+		if int(w.drops[i].cave) == index+1 { w.drop_count -= 1; w.drops[i] = w.drops[w.drop_count] } else { i += 1 }
+	}
+	tick(&w, &room, 0.1)
+	testing.expect_value(t, w.caves[index].state, Cave_State.Looted)
+	testing.expect_value(t, w.sites[w.caves[index].site].state, Site_State.Resolved)
+}
+
+// A patrol lured into a cave walks in through its mouth, as anywhere.
+@(test)
+test_a_lured_patrol_walks_into_a_cave :: proc(t: ^testing.T) {
+	w: World
+	data: level.Level
+	p: game.Player
+	room := cave_world(t, &w, &data, &p, .Egypt)
+	defer level.destroy(&data)
+	defer game.destroy_room(&room)
+	place := w.caves[open_map_cave(&w)].place
+	start := grid.offset(place.mouth, -3, 0)
+	w.group_count = 1
+	w.groups[0] = {anchor = start, patrol = true, count = 1, site = -1, members = {0 = {enemy = {position = start, health = 5, max_health = 5, attack = 2, archetype = .Chaser}, alive = true}}}
+	room.player.position = data.player_spawn
+	testing.expect(t, lure_patrol(&w, &room, place.arrival))
+	inside := false
+	for _ in 0..<40 {
+		tick(&w, &room, 1.4)
+		if w.groups[0].members[0].enemy.position.layer == CAVE_LAYER { inside = true; break }
+	}
+	testing.expect(t, inside, "the patrol stayed outside")
 }
