@@ -132,8 +132,25 @@ lift_tick :: proc(room: ^Room, dt: f32) {
 		if !platform.moving { continue }
 		platform.remaining = max(0, platform.remaining-dt)
 		if platform.remaining > 0 { continue }
+		rider, had_rider := platform.rider, platform.has_rider
 		platform.moving, platform.has_rider, platform.rider = false, false, {}
+		if had_rider && rider.kind == .Enemy { lift_foe_arrives(room, rider.id) }
 	}
+}
+
+// A foe off the shaft, back in play: it gets an intent again, as one the Lazzo lets go (lasso.odin): a wait while the
+// foes' beat is under way, else a plan of them all.
+@(private = "file")
+lift_foe_arrives :: proc(room: ^Room, id: u32) {
+	at, found := enemy_index_by_id(room, id)
+	if !found || room.phase != .Combat { return }
+	enemy := &room.enemies[at]
+	if room.tactical_pulse.pending && room.tactical_pulse.started {
+		enemy.intent, enemy.tactical_cooldown = make_wait_intent(room, enemy.position), 0
+		return
+	}
+	enemy.intent, enemy.tactical_cooldown = {}, 0
+	plan_enemy_intents(room)
 }
 
 // How far platform `index` is along its journey: 0 at the end it left, 1 at the end it goes to (resting: 1).

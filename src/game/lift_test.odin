@@ -128,8 +128,11 @@ test_a_foe_takes_the_lift_and_calls_it :: proc(t: ^testing.T) {
 	testing.expect(t, !found, "nothing reaches it in the shaft")
 	ride_out(&room, 1)
 	testing.expect(t, !enemy_is_out_of_play(&room, room.enemies[0].id))
-	// Back in the hall with the platform up: it calls it down.
+	// Back in play with an intent: one off the shaft with none breaks the foes' beat (validate_enemy_intents).
+	testing.expect(t, room.enemies[0].intent.kind != .None && validate_enemy_intents(&room), "the foe off the shaft has no intent")
+	// Back in the hall with the platform up (set there, its plan from the top forgotten): it calls it down.
 	room.enemies[0].position = {x = 5, y = 3, layer = -1}
+	room.enemies[0].intent, room.enemies[0].tactical_cooldown = {}, 0
 	testing.expect(t, lift_landing_shut(&room, bottom))
 	plan_enemy_intents(&room)
 	testing.expect(t, room.lifts.platforms[1].moving && room.lifts.platforms[1].at == 1, "the foe calls the platform down")

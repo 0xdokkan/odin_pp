@@ -2186,6 +2186,16 @@ In corso.
   - **Correzione prima della prova dell'utente:** fuori dal combattimento (l'arena liberata con F7, una spedizione
     esplorata) le piattaforme non andavano avanti, e chi ci era salito restava fermo. Ora vanno con il tempo del
     fotogramma (`step_tactical_controller`), con un test d'integrazione; 1716 test verdi.
+  - **Crash trovato dall'utente nell'arena «Ascensori»** (con i nemici liberi, prima ancora di usare un
+    ascensore): il nemico della sala arrivava in cima al pozzo senza intenzione, e il turno dei nemici dopo si
+    fermava su un'asserzione (`validate_enemy_intent_structure`). Ora all'arrivo il nemico ripianifica, come
+    quello che il Lazzo lascia andare. Lo smoke non lo vedeva perché teneva fermi i nemici.
+    - Riprodotto con una sonda senza finestra: l'arena come nel gioco, con il controller tattico, i nemici liberi
+      e gli arrivi.
+    - Test d'integrazione nuovo: un minuto di partita nell'arena, con i nemici liberi. Senza la correzione si
+      ferma sulla stessa asserzione.
+    - Sonda mirata, sei semi: il robot prende i due ascensori e apre il cancello mentre i nemici, liberi, usano
+      gli stessi ascensori. Nessun errore.
 
 ## 11. Fase 8 — Ologramma a piani, prestazioni e grotte vecchie
 

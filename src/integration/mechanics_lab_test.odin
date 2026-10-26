@@ -106,6 +106,43 @@ test_mechanics_lab_has_an_arena_of_lifts :: proc(t: ^testing.T) {
 	testing.expect_value(t, run_session.mechanics_lab_next_arena(.Lifts), run_session.Mechanics_Lab_Arena.Flat)
 }
 
+// The arena of the lifts lives a minute of play as the game has it: the foes free, the lab's arrivals, the player
+// still. Nothing breaks the foes' beat (a foe off a lift with no intent once stopped the game), and the foe in the hall
+// comes out of it, up the shaft.
+@(test)
+test_mechanics_lab_lifts_live_a_minute_of_play :: proc(t: ^testing.T) {
+	data: level.Level
+	defer level.destroy(&data)
+	player, created := game.create_player(run_session.DEMO_PLAYER_STATS)
+	testing.expect(t, created)
+	room, built := run_session.create_mechanics_lab_room(&data, &player, game.DEFAULT_TACTICAL_CONFIG, .Lifts)
+	testing.expect(t, built)
+	defer game.destroy_room(&room)
+	renderer := new(render.Renderer)
+	defer free(renderer)
+	controller := run_session.Tactical_Controller{was_focused = true}
+	cards: run_session.Card_Interaction_State
+	buffer: run_session.Buffered_Gameplay_Command
+	sandbox := game.begin_sandbox(7)
+	hall_foe: u32
+	for foe in room.enemies { if foe.position.layer == -1 { hall_foe = foe.id } }
+	testing.expect(t, hall_foe != 0)
+	out_of_the_hall := false
+	for frame in 0..<60*60 {
+		_, _ = game.sandbox_tick(&room, &sandbox, 1.0/60)
+		_ = run_session.step_tactical_controller(&controller, &room, renderer, &cards, &buffer, 1.0/60, true, {focused = true})
+		if room.phase != .Combat { break }
+		// Between the foes' beats (during one, those already resolved wait with none).
+		if frame%30 == 0 && !room.tactical_pulse.pending && !game.validate_enemy_intents(&room) { testing.expect(t, false, "the foes' intents broke"); break }
+		if index, found := game.enemy_index_by_id(&room, hall_foe); found && room.enemies[index].position.layer == grid.GROUND_LAYER &&
+		   !game.enemy_is_out_of_play(&room, hall_foe) {
+			out_of_the_hall = true
+		}
+	}
+	testing.expect_value(t, room.phase, game.Room_Phase.Combat)
+	testing.expect(t, out_of_the_hall, "the foe in the hall did not come out of it up the shaft")
+}
+
 // With the arena of the lifts cleared by F7, out of the fight, the platforms still go, on the controller's frames: a
 // call brings the platform, a ride ends at the top, and nobody is left on a platform that never stops.
 @(test)
