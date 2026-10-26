@@ -257,7 +257,9 @@ view_pick :: proc(data: ^level.Level, layer: i8, camera: rl.Camera3D, mouse: [2]
 		x, y := int(math.floor(p.x)), int(math.floor(p.z))
 		if x < 0 || y < 0 || x >= data.tiles.width || y >= data.tiles.height { continue }
 		if level.surface_ground(&m, x, y) {
-			if p.y <= level.surface_height_at(&m, p.x, p.z)*step+0.01 { return {x = x, y = y, layer = layer}, true }
+			// A Wall's block and a Fence are drawn over their ground: the ray stops on their top.
+			lift := kind_lift(m.tiles[y*m.width+x].kind)
+			if p.y <= (level.surface_height_at(&m, p.x, p.z)+lift)*step+0.01 { return {x = x, y = y, layer = layer}, true }
 		} else if p.y <= plane+0.01 {
 			return {x = x, y = y, layer = layer}, true
 		}

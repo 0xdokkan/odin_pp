@@ -231,9 +231,10 @@ ODIN="/c/Users/lukeg/OneDrive/Desktop/odin-dev-2026-10/dist/odin.exe"
     gruppi con quelle della Fase 0 (appendice A). Sul singolo stage, una
     differenza sotto il 10% è rumore.
 - **Editor delle mappe** (dalla Fase 6): `--smoke-editor-mappe` scolpisce,
-  salva e riapre in pochi secondi, con otto catture `odin_pp_editor_*.png`;
-  scrive solo in `build/editor_smoke/mappe`. Va ripetuto quando una fase tocca
-  i pennelli, i ritocchi o la geografia dei biomi.
+  salva e riapre in pochi secondi, poi usa l'editor con mouse e tasti
+  simulati, con dodici catture `odin_pp_editor_*.png`; scrive solo in
+  `build/editor_smoke/mappe`. Va ripetuto quando una fase tocca i pennelli, i
+  ritocchi o la geografia dei biomi.
 - **Catture:** in `build/captures` (cartella ignorata da git). Gira un solo
   smoke alla volta.
 - **Avviso di fine fase** (PowerShell, senza toccare il volume del sistema):
@@ -1972,6 +1973,27 @@ regole della sezione 1: fammi prima le domande della fase e fermati alla fine.
     identici.
 - **Smoke dell'editor:** otto catture, guardate una per una.
 - **Benchmark:** non serve, perché il disegno del gioco non è cambiato (nessun file in `src/render`).
+
+**Prova dell'editor, dopo la chiusura** (chiesta dall'utente, commit a parte)
+- In questa sessione Claude non ha il controllo del desktop («computer use»), quindi non può cliccare nella finestra.
+  Lo smoke ha una seconda parte (`src/mapeditor/smoke_input.odin`): l'editor usato con mouse e tasti simulati, un
+  fotogramma alla volta, attraverso lo stesso codice dell'input vero (`editor_input`).
+  - Sono 64 azioni: un pennello scelto con il suo tasto, un clic, il tasto tenuto e un trascinamento; annulla e
+    ripeti; T che fa il giro dei tipi; copia trascinando e incolla; rampa, rumore, leviga e appiattisci; la
+    telecamera girata, avvicinata e spostata; i piani; Ctrl+S; Tab con modifiche non salvate (avviso, poi cambio),
+    ritorno, F5, G ed Esc due volte.
+  - Quattro catture in più: il cursore del pennello, il rettangolo della copia, l'anteprima dell'incolla e l'arena
+    salvata.
+- **Prova completa:** i due PNG salvati dall'editor, messi per un momento in `assets/mappe`, sono stati letti dal gioco
+  all'avvio. Nella prima cattura della Prova meccaniche il Viandante sta sulla collina scolpita. Poi la cartella è
+  stata tolta.
+- **Difetti trovati e corretti:**
+  - il mouse non si fermava sulla cima dei blocchi di roccia: ora la scelta della casella conta l'altezza disegnata
+    di roccia e recinti;
+  - aprendo un'altra mappa restava il messaggio di quella di prima (per esempio un errore dell'Egitto sull'arena):
+    ora si cancella;
+  - nello smoke, i fotogrammi senza un punto scelto prendevano il mouse vero: ora il mouse simulato resta fuori dalla
+    finestra, così lo smoke è uguale chiunque sia al computer.
 
 **Non fatto, per le fasi dopo**
 - Nessuna mappa è ancora ritoccata: `assets/mappe` non c'è. La Fase 7 userà l'editor per i biomi.

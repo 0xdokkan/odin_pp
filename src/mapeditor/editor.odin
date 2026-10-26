@@ -100,6 +100,8 @@ editor_close_map :: proc(e: ^Editor) {
 // Opens map `index` (target_at): as the code makes it, with the retouches the root has for it.
 editor_open :: proc(e: ^Editor, index: int) -> bool {
 	editor_close_map(e)
+	// The last map's message and warning are not about this one.
+	e.message_timer, e.discard_armed = 0, false
 	e.target_index = index
 	e.target = target_at(index)
 	base, made := target_base(e.target, e.world)
@@ -270,7 +272,13 @@ editor_update :: proc(data: rawptr, frame: ^host.Frame) {
 	// The second press that throws the changes away counts while its warning is on screen.
 	if e.message_timer <= 0 { e.discard_armed = false }
 	if e.smoke != nil { editor_smoke_update(e, frame); return }
-	if !frame.focused { return }
+	if frame.focused { editor_input(e, frame) }
+}
+
+// What the keys and the mouse of `frame` do: the camera, the keys of EDITOR_HELP and the brush. The smoke gives it
+// frames of its own, with a user's keys and mouse (smoke.odin).
+@(private)
+editor_input :: proc(e: ^Editor, frame: ^host.Frame) {
 	devices := frame.devices
 	ctrl := input.key_down(devices, .LEFT_CONTROL) || input.key_down(devices, .RIGHT_CONTROL)
 	shift := input.key_down(devices, .LEFT_SHIFT) || input.key_down(devices, .RIGHT_SHIFT)

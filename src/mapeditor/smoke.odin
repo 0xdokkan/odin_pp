@@ -2,6 +2,7 @@ package mapeditor
 
 import "core:fmt"
 import "core:slice"
+import rl "vendor:raylib"
 import artifacts "../devtools/artifacts"
 import campaign "../campaign"
 import grid "../engine/grid"
@@ -12,8 +13,9 @@ import run "../run"
 // THE EDITOR'S SMOKE (`--smoke-editor-mappe`): the editor driven step by step, a capture at each one
 // (odin_pp_editor_*.png). The flat arena: a hill raised, smoothed, saved and opened again, the same; the brushes the
 // user added (a ramp, the noise, a piece copied and pasted, a painted wall); a biome's caves on their layer; a start
-// walled in, its errors in red and the save refused, the camera on the first error (G), then undone. It writes only
-// under EDITOR_SMOKE_ROOT, which git leaves out, never in assets/mappe.
+// walled in, its errors in red and the save refused, the camera on the first error (G), then undone. Then the editor
+// used through its keys and mouse, as a user would (smoke_input.odin), with four captures more
+// (odin_pp_editor_mouse*.png). It writes only under EDITOR_SMOKE_ROOT, which git leaves out, never in assets/mappe.
 
 EDITOR_SMOKE_ROOT :: "build/editor_smoke/mappe"
 EDITOR_SMOKE_NAMES :: [?]cstring{
@@ -26,9 +28,18 @@ EDITOR_SMOKE_FRAMES :: 20
 Editor_Smoke :: struct {
 	step, frames: int,
 	ready:        bool,
+	// The second part (smoke_input.odin): its action, the frames an action has been held, what it measured before,
+	// and the capture its frame asks for.
+	action, held:                                      int,
+	paint:                                             int,
+	base, ramp_high, ramp_low, saved_block, saved_ramp: i32,
+	lost:                                              i32,
+	yaw, distance:                                     f32,
+	focus:                                             rl.Vector3,
+	capture:                                           cstring,
 }
 
-@(private = "file")
+@(private)
 smoke_check :: proc(ok: bool, what: string) {
 	if !ok { fmt.eprintln("editor smoke:", what); panic("editor smoke failed") }
 }
@@ -113,24 +124,32 @@ smoke_step :: proc(e: ^Editor, step: int) {
 editor_smoke_update :: proc(e: ^Editor, frame: ^host.Frame) {
 	s := e.smoke
 	names := EDITOR_SMOKE_NAMES
-	if s.step >= len(names) {
+	if s.step < len(names) {
+		if !s.ready {
+			smoke_step(e, s.step)
+			s.ready, s.frames = true, 0
+		}
+		return
+	}
+	if s.action == 0 {
 		// The last step undone: the walled start's errors go.
 		editor_undo(e)
 		smoke_check(len(e.report.errors) == 0, "the undone wall leaves errors")
-		host.quit(frame)
-		return
 	}
-	if !s.ready {
-		smoke_step(e, s.step)
-		s.ready, s.frames = true, 0
-	}
+	// The second part: the editor through its keys and mouse, until its second Esc quits.
+	smoke_input(e, frame)
 }
 
 @(private)
 editor_smoke_present :: proc(data: rawptr, frame: ^host.Frame) {
 	e := cast(^Editor)data
 	s := e.smoke
-	if s == nil || !s.ready { return }
+	if s == nil { return }
+	if s.capture != nil {
+		artifacts.screenshot(s.capture)
+		s.capture = nil
+	}
+	if !s.ready { return }
 	s.frames += 1
 	if s.frames < EDITOR_SMOKE_FRAMES { return }
 	names := EDITOR_SMOKE_NAMES

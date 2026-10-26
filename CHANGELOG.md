@@ -21,9 +21,11 @@ per i comandi disponibili oggi valgono il [README](README.md) e la documentazion
   - nei biomi, anche i luoghi in piano e se dalla partenza si arriva a luoghi, grotte e uscita.
 
   Gli errori sono segnati in rosso e **G** li mostra uno per uno; con errori la mappa non si salva.
-- `--smoke-editor-mappe` scolpisce, salva, riapre e prova i pennelli, le grotte e gli errori, con 8 catture. Test: 15
-  nuovi (1707 in tutto). Senza file in `assets/mappe` il gioco non cambia: le catture del laboratorio sono identiche
-  al byte a quelle della Fase 5, e mappe e mondi dei biomi sono gli stessi.
+- `--smoke-editor-mappe` scolpisce, salva, riapre e prova i pennelli, le grotte e gli errori, poi usa l'editor con mouse
+  e tasti simulati (64 azioni), con 12 catture. La prova ha corretto la scelta della casella sulla roccia e i messaggi
+  rimasti dalla mappa di prima.
+- Test: 15 nuovi (1707 in tutto). Senza file in `assets/mappe` il gioco non cambia: le catture del laboratorio sono
+  identiche al byte a quelle della Fase 5, e mappe e mondi dei biomi sono gli stessi.
 
 ## 2026-10-26 — Profondità, Fase 5: grotte senza caricamento
 
