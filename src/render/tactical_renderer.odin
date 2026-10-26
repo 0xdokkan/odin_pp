@@ -662,6 +662,8 @@ draw_tactical_world :: proc(renderer: ^Renderer, room: ^game.Room, active_card: 
 			}
 		}
 	}
+		// The lifts' shafts and platforms, in the board's resin light (lift_view.odin).
+		if expedition_world == nil { draw_board_lifts(renderer, room) }
 		if expedition_world!=nil {rl.EndShaderMode()}
 	}
 	when EXPEDITION_BENCHMARK {v.draw_timing.floor_ms=expedition_benchmark_elapsed(&stamp)}

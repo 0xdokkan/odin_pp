@@ -17,9 +17,10 @@ import render "../render"
 // over him. Stills odin_pp_mechanics_lab_layers_*.png.
 
 // The shortest walk from `from` to `to` across the layers, a step at a time as the player makes it (game.walk_step: a
-// ramp, a mouth, a ladder), round the foes (empty if there is none).
-@(private = "file")
-layers_lab_route :: proc(room: ^game.Room, from, to: grid.Position) -> [dynamic]game.Move_Direction {
+// ramp, a mouth, a ladder), round the foes (empty if there is none); with `avoid_lifts`, round the lifts' landings too
+// (a step onto one is a call or a ride: mechanics_lab_lifts.odin).
+@(private)
+layers_lab_route :: proc(room: ^game.Room, from, to: grid.Position, avoid_lifts := false) -> [dynamic]game.Move_Direction {
 	cells := game.room_table_cells(room.level_data)
 	came := make([]int, cells, context.temp_allocator)
 	for i in 0..<cells { came[i] = -1 }
@@ -37,6 +38,9 @@ layers_lab_route :: proc(room: ^game.Room, from, to: grid.Position) -> [dynamic]
 			if !game.is_ladder_move(room, cell, next) && game.step_height_blocked(room, cell, next) { continue }
 			// A foe in the way is not a step: walking into it is a blow.
 			if _, occupied := game.enemy_index_at(room, next); occupied { continue }
+			if avoid_lifts && next != to {
+				if _, _, landing := level.lift_at(room.level_data, next); landing { continue }
+			}
 			came[index], _ = game.room_table_index(room, cell)
 			append(&queue, next)
 		}

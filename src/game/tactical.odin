@@ -254,8 +254,9 @@ tactical_tick :: proc(room: ^Room, dt: f32, available: bool, hologram: bool) -> 
 	before := s.clock_fraction
 	tactical_advance_clock(room, elapsed)
 	tactical_note_beat_time(s, before, elapsed)
-	// The Lazzo spins on the same seconds; the controller spins them out.
+	// The Lazzo spins on the same seconds; the controller spins them out. The lifts' platforms go on them too.
 	tactical_lasso_tick(room, elapsed)
+	lift_tick(room, elapsed)
 	s.metrics.decision_seconds += f64(elapsed)
 	if hologram { s.metrics.hologram_seconds += f64(elapsed) }
 	if tactical_between_windows(s) { tactical_finish_recovery(room); return false }

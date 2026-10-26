@@ -54,7 +54,7 @@ La tabella è in ordine di priorità, cioè l'ordine della scaletta qui sotto.
 | 4 | 4 | Piani nel laboratorio: trasparenze, contorni, mouse, luce | 3 (1 per l'aspetto) | Fatta | vedi Esito |
 | 5 | 5 | Piani nelle spedizioni: grotte senza caricamento | 1, 3, 4 | Fatta | vedi Esito |
 | 6 | 6 | Editor per scolpire i piani | 1, 3 (5 per le mappe dei biomi) | Fatta | vedi Esito |
-| 7 | 7 | Ponti, gallerie e scorciatoie nei biomi | 5, 6 | Da fare | — |
+| 7 | 7 | Ponti, gallerie e scorciatoie nei biomi | 5, 6 | In corso | — |
 | 8 | 8 | Ologramma completo, prestazioni, grotte vecchie | 5 (meglio dopo la 7) | Da fare | — |
 
 ## Scaletta: cosa sviluppare prima
@@ -209,10 +209,11 @@ ODIN="/c/Users/lukeg/OneDrive/Desktop/odin-dev-2026-10/dist/odin.exe"
   del compilatore, poi `.\scripts\check.ps1`: test con e senza assert, più le
   due build.
 - **Un solo atto del laboratorio:** `ODIN_PP_LAB_ONLY=<atto>` (oggi
-  `hit_marks`, `heights`, `structures`, `mountain`, `cave`, `layers`:
-  `src/devtools/mechanics_lab.odin:82-95`). Ogni fase che aggiunge un atto lo
+  `hit_marks`, `heights`, `structures`, `mountain`, `cave`, `layers`, `lift`:
+  `src/devtools/mechanics_lab.odin:82-97`). Ogni fase che aggiunge un atto lo
   aggiunge anche qui. A fine fase lo smoke del laboratorio va completato:
-  dura più di otto minuti.
+  dura circa venti minuti. L'atto `lift` (dalla Fase 7) gira per ultimo, così
+  le catture di prima restano confrontabili al byte.
 - **Spedizioni da un punto:** `ODIN_PP_SMOKE_ONLY=hits` parte dagli scontri
   dei segni dei colpi, `ODIN_PP_SMOKE_ONLY=caves` dalle grotte
   (`src/application/campaign_smoke.odin`, `expedition_enable_smoke`). Gli
@@ -2028,9 +2029,20 @@ con la geografia fissa.
 
 ### Progetto
 
-**Proposta di temi**, da confermare bioma per bioma. Nella Fase 3 l'utente ha
-scelto solo le scale a pioli: dove qui sotto si parla di ascensori, questa fase
-chiede prima se costruirli o usare scale e rampe.
+Con le risposte dell'utente nella Fase 7:
+- i temi della tabella;
+- tre biomi per volta, con uno stop dopo ogni gruppo per guardare insieme le
+  catture;
+- scorciatoie che si aprono dal lato giusto e si richiudono a ogni run (non il
+  consigliato);
+- **anche ascensori, da chiamare e aspettare** (non il consigliato: nella Fase 3
+  c'erano solo le scale a pioli);
+- il tunnel del Vietnam diventa una galleria percorribile;
+- i ponti del Cielo restano come oggi (non il consigliato);
+- accessi agli altopiani liberi, bioma per bioma (non il consigliato);
+- il sotterraneo grande in Egitto e nel Gotico, con un pozzo.
+
+**Temi:**
 
 | Bioma | Sotto | Sopra |
 |---|---|---|
@@ -2043,19 +2055,39 @@ chiede prima se costruirli o usare scale e rampe.
 | Montagne innevate | la grotta dentro la montagna | ponte di corda sul crepaccio |
 | Inferno | caverne di lava | ponti di ossa sopra la lava |
 | Southern gothic | cripta sotto la collina | ballatoio della casa |
-| Isola nel cielo | — | i ponti fra le isole diventano ponti veri, con sotto i sentieri delle isole basse |
+| Isola nel cielo | — | — (i ponti fra le isole restano come oggi, scelta dell'utente) |
 | Spazio | gallerie nei crateri | passerelle della stazione |
 | La memoria del creatore | dentro la collina del masso | — |
 
 - **Interconnessioni:** almeno due strade per arrivare ai luoghi importanti
   (una sopra o sotto); grotte con più imbocchi; scorciatoie che evitano un giro
   lungo.
-- **Altopiani con pochi accessi** (sezione 2.9): ogni altopiano grande ha da 1
-  a 3 accessi, almeno uno nascosto; il resto del bordo è dirupo. L'altopiano si
-  vede da sotto, ma la strada per salirci va trovata.
-- **Scorciatoie che si aprono dall'altra parte:** una porta, una leva o un
-  ascensore che si sblocca solo arrivandoci dal lato giusto. Una volta aperta,
-  la scorciatoia resta aperta anche nelle run dopo, come i segreti scoperti.
+- **Accessi agli altopiani:** decisi bioma per bioma, senza una regola fissa
+  (scelta dell'utente). L'idea della sezione 2.9 (pochi accessi, uno nascosto)
+  resta disponibile dove serve.
+- **Scorciatoie che si aprono dall'altra parte:** un cancello a sbarre (si vede
+  attraverso, non si passa) che si apre solo con un passo contro le sbarre dalla
+  parte della leva; dall'altra parte resta chiuso. Una volta aperto resta aperto
+  fino alla fine della spedizione; ogni run lo trova chiuso (scelta
+  dell'utente). Nella mappa è un recinto finché è chiuso, un pavimento quando è
+  aperto.
+- **Ascensore** (meccanica nuova, prima nella Prova meccaniche):
+  - unisce due pavimenti della stessa colonna su due piani: un pozzo verso una
+    sala sotto, o un dirupo, con in cima un pianerottolo sul piano sopra, a un
+    passo dal bordo. Così la piattaforma va sempre su e giù in verticale;
+  - la piattaforma sta a uno dei due capi. Chi prova a salire sul pianerottolo
+    vuoto la **chiama** e la **aspetta**: viaggia a 8 gradini al secondo, 1,5
+    secondi per piano;
+  - ci si sale con un passo, e parte da sola: chi c'è sopra arriva all'altro
+    capo dopo lo stesso viaggio e ne scende con un passo;
+  - tutto con i passi, senza tasti nuovi: in combattimento E è già della
+    diagonale e della schivata;
+  - la usano anche i nemici, con le stesse regole: la chiamano, la aspettano,
+    ci salgono;
+  - in combattimento il viaggio dura il suo tempo come ogni altra azione;
+    durante il viaggio chi c'è sopra non agisce e non si colpisce (è nel
+    pozzo). È uno stato nuovo: chi sale una scala, oggi, fa un passo e basta;
+  - una sola piattaforma per pozzo, con al massimo una figura sopra.
 - **Sotterraneo grande** in alcuni biomi (Egitto, Gotico): non solo grotte
   dentro le colline, ma zone ampie sotto il suolo, anche sul piano −2,
   raggiunte da un pozzo con l'ascensore, come i fiumi sotterranei di Elden Ring. Per farle, il bioma alza
@@ -2094,11 +2126,22 @@ chiede prima se costruirli o usare scale e rampe.
 
 ### Passi
 
-1. Biomi a gruppi di tre: piani, imbocchi, accessi agli altopiani e
-   scorciatoie, con test di geografia fissa, di raggiungibilità e delle
-   scorciatoie ricordate dalla campagna.
-2. Catture di ogni bioma (esplorazione e uno scontro fra piani), con il
-   pulsante «TEST tutti i biomi».
+1. **Ascensore nella Prova meccaniche:**
+   - dati nel livello e regole nel gioco: chiamata, attesa, viaggio, nemici,
+     combattimento;
+   - disegno: pozzo, piattaforma, cavi;
+   - un'arena o un tratto dell'arena «Piani», l'atto `lift` dello smoke e i
+     test.
+2. **Biomi a gruppi di tre**, nell'ordine dei biomi:
+   - piani, imbocchi, accessi agli altopiani e scorciatoie, con test di
+     geografia fissa, di raggiungibilità e delle scorciatoie che si richiudono
+     a ogni run;
+   - catture di ogni bioma (esplorazione e uno scontro fra piani), con il
+     pulsante «TEST tutti i biomi»;
+   - **stop dopo ogni gruppo** per guardare le catture con l'utente.
+
+   I gruppi: Robotica, Far West, Giungla; City pop, Egitto, Vietnam; Neve,
+   Inferno, Gotico; Cielo, Spazio, Memoria.
 3. Benchmark per bioma.
 4. Documenti: `docs/direzione-implementazione.md` (biomi), `CHANGELOG.md`.
 
@@ -2118,7 +2161,28 @@ e fermati alla fine.
 
 ### Esito
 
-Da fare.
+In corso.
+
+**Avanzamento**
+- **Passo 1, ascensore e cancello nella Prova meccaniche** (26 ottobre 2026): fatto, e fermo per guardare le
+  catture con l'utente prima dei biomi.
+  - Dati (`level.Lift`, `level.Gate`), regole (`src/game/lift.odin`), disegno (`src/render/lift_view.odin`),
+    arena «Ascensori», atto `lift` con otto catture, test.
+  - **Scelte prese:**
+    - tutto con i passi, perché in combattimento E è già della diagonale e della schivata;
+    - ogni ascensore va su e giù nella sua colonna: in cima al dirupo un pianerottolo sul piano sopra, così la
+      piattaforma sale in verticale e chi c'è sopra non cambia colonna;
+    - chi viaggia è fuori gioco, come il nemico del Lazzo: il codice non aveva uno stato «in salita» per le scale;
+    - il cancello chiuso è un recinto (si vede attraverso), aperto un pavimento: a ogni run la mappa nuova lo ha
+      chiuso, e il salvataggio della spedizione lo tiene com'è.
+  - **Per i biomi:** ascensori e cancelli non sono ancora nei salvataggi delle spedizioni, né nel loro disegno.
+    Servono quando arrivano in un bioma (Egitto e Gotico per i pozzi).
+  - **Verifiche:**
+    - check con e senza assert; `.\scripts\check.ps1` completo: 1715 test verdi (8 nuovi), più le due build;
+    - smoke del laboratorio: le 120 catture di prima identiche al byte, più le 8 dell'atto `lift`;
+    - smoke delle spedizioni (104 catture, nessun errore) e dell'editor (12 catture);
+    - benchmark sulla RTX 3060, alla corrente: media dei gruppi +0,8% rispetto alla Fase 5, il peggiore +2,2%
+      (rumore).
 
 ## 11. Fase 8 — Ologramma a piani, prestazioni e grotte vecchie
 

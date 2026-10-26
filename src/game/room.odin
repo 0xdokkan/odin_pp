@@ -244,6 +244,8 @@ Room :: struct {
 	// FIRST PERSON SHOOTER: the seconds behind the player's eyes and his AK's
 	// shots (first_person.odin); a new room starts them afresh.
 	first_person: First_Person_State,
+	// The platforms of the map's lifts (lift.odin).
+	lifts: Lift_State,
 }
 
 Move_Direction :: enum {
@@ -371,7 +373,8 @@ grid_object_at :: proc(room: ^Room, position: grid.Position) -> (^Grid_Object, b
 }
 
 cell_blocks_movement :: proc(room: ^Room, position: grid.Position) -> bool {
-	if !base_cell_is_walkable(room, position) || obstacle_at(room, position) {
+	// A lift's landing its platform is away from is no floor to step on (lift.odin); one sees down the shaft.
+	if !base_cell_is_walkable(room, position) || obstacle_at(room, position) || lift_landing_shut(room, position) {
 		return true
 	}
 	object, found := grid_object_at(room, position)
@@ -415,11 +418,13 @@ trap_index_at :: proc(room: ^Room, position: grid.Position) -> (int, bool) {
 	return 0, false
 }
 
-// A foe out of the world: the one the Lazzo holds in the air (lasso.odin) and
-// the Pinball's ball (pinball.odin). It acts in nothing and nothing on the
-// floor, no card and no arrow reaches it.
+// A foe out of the world: the one the Lazzo holds in the air (lasso.odin), the
+// Pinball's ball (pinball.odin) and one riding a lift in its shaft (lift.odin).
+// It acts in nothing and nothing on the floor, no card and no arrow reaches it.
 enemy_is_out_of_play :: proc(room: ^Room, id: u32) -> bool {
-	return enemy_is_lassoed(room, id) || enemy_is_pinball(room, id)
+	if enemy_is_lassoed(room, id) || enemy_is_pinball(room, id) { return true }
+	_, riding := lift_riding(room, enemy_entity(id))
+	return riding
 }
 
 // Who stands on `position`. A foe out of play stands on no cell (others walk
@@ -495,6 +500,7 @@ create_room :: proc(level_data: ^level.Level, player: ^Player, content: Room_Con
 	result.fishing = begin_room_fishing(player, content)
 	result.pinball_random = pinball_room_stream(player, content)
 	result.marley_random = marley_room_stream(player, content)
+	lifts_reset(&result)
 	result.next_enemy_id = 1
 	result.next_trap_id = 1
 	result.next_object_id = 1
@@ -833,6 +839,8 @@ try_move_player :: proc(room: ^Room, direction: Move_Direction) -> Action_Result
 	if room == nil || room.player == nil || (room.phase != .Combat && room.phase != .Loot) {
 		return .Invalid_Phase
 	}
+	// One riding a lift's platform is in its shaft until it stops (lift.odin).
+	if lift_player_riding(room) { return .Blocked }
 	critical := tactical_take_critical(room)
 	step := direction_offset(direction)
 	// The cell the step lands on, on whichever layer (a ladder's other end too), and the one a bump strikes.
@@ -861,6 +869,19 @@ try_move_player :: proc(room: ^Room, direction: Move_Direction) -> Action_Result
 			}
 			return .Attacked
 		}
+	}
+
+	// LIFTS AND GATES (lift.odin): a step toward a landing its platform is away from calls the platform, and takes no
+	// time; a step into a shut gate from its lever opens it, an action.
+	if lift_call(room, target) { return .Blocked }
+	if gate_opens(room, room.player.position, target) {
+		if room.phase != .Combat { return .Used_Ability }
+		switch finish_player_combat_command(room) {
+		case .Player_Defeated: return .Player_Defeated
+		case .Combat_Ended: return .Combat_Ended
+		case .Combat_Continues:
+		}
+		return .Used_Ability
 	}
 
 	if ladder {

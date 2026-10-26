@@ -77,7 +77,33 @@ test_mechanics_lab_has_an_arena_of_layers :: proc(t: ^testing.T) {
 	testing.expect_value(t, game.walk_step(&room, {x = 34, y = 7}, {x = 1}), grid.Position{x = 35, y = 7, layer = -1})
 	testing.expect_value(t, game.walk_step(&room, {x = 34, y = 4}, {x = 1}), grid.Position{x = 35, y = 4})
 	testing.expect_value(t, run_session.mechanics_lab_next_arena(.Cave), run_session.Mechanics_Lab_Arena.Layers)
-	testing.expect_value(t, run_session.mechanics_lab_next_arena(.Layers), run_session.Mechanics_Lab_Arena.Flat)
+	testing.expect_value(t, run_session.mechanics_lab_next_arena(.Layers), run_session.Mechanics_Lab_Arena.Lifts)
+}
+
+// The seventh arena (Fase 7 of docs/piano-profondita.md): a lift up the plateau's cliff and one down its shaft, their
+// platforms where the arena has them, the gate shut, a foe in the hall under the plateau; after it F3 comes back to the
+// flat arena.
+@(test)
+test_mechanics_lab_has_an_arena_of_lifts :: proc(t: ^testing.T) {
+	data: level.Level
+	defer level.destroy(&data)
+	player, created := game.create_player(run_session.DEMO_PLAYER_STATS)
+	testing.expect(t, created)
+	room, built := run_session.create_mechanics_lab_room(&data, &player, game.DEFAULT_TACTICAL_CONFIG, .Lifts)
+	testing.expect(t, built)
+	defer game.destroy_room(&room)
+	error, _ := level.check_layers(&data)
+	testing.expect_value(t, error, level.Layer_Error.None)
+	testing.expect_value(t, player.position, run_session.MECHANICS_LAB_LIFTS_START)
+	testing.expect(t, len(data.lifts) == 2 && room.lifts.count == 2 && len(data.gates) == 1)
+	testing.expect(t, game.lift_landing_shut(&room, {x = 11, y = 10}), "the cliff's platform waits at the top")
+	testing.expect(t, game.lift_landing_shut(&room, {x = 18, y = 5}), "the shaft's platform waits at the bottom")
+	_, open, _ := level.gate_at(&data, {x = 24, y = 7, layer = -1})
+	testing.expect(t, !open)
+	in_hall := false
+	for foe in room.enemies { in_hall = in_hall || foe.position.layer == -1 }
+	testing.expect(t, in_hall)
+	testing.expect_value(t, run_session.mechanics_lab_next_arena(.Lifts), run_session.Mechanics_Lab_Arena.Flat)
 }
 
 // F7 clears the arena as a room's last fall clears it: the fight ends, the

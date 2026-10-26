@@ -6,6 +6,8 @@ package game
 Tactical_Capability :: enum { Action, Movement, Cards, Board_Action, Shadow, First_Person }
 
 tactical_control_allowed :: proc(room: ^Room, capability: Tactical_Capability, ignore_busy := false) -> bool {
+	// One riding a lift's platform does nothing until it stops, not even a dodge (lift.odin).
+	if lift_player_riding(room) { return false }
 	if room == nil || room.player == nil || room.phase != .Combat {
 		return capability == .Action || capability == .Movement || capability == .Cards
 	}

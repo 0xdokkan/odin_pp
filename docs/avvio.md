@@ -85,9 +85,12 @@ catalogo: tre edifici, cinque oggetti complessi, un recinto e la casetta nelle q
 rotazioni (si prova passo, vista e trasparenza avvicinandosi); «Piani» (46×29) ha una strada sotto un
 ponte con due rampe, una collina con una grotta e due imbocchi, una scala a pioli sul dirupo della collina e
 un nemico su ogni piano (si provano passo, scale, vista, aree e cadute fra piani: docs/regole/combattimento.md,
-«Piani»). Con `--smoke-mechanics-lab` e `ODIN_PP_LAB_ONLY=heights`, `structures`, `mountain`, `cave` o `layers`
-gira solo l'atto delle altezze, delle strutture, della montagna a spirale, della grotta o dei piani (la
-montagna dura qualche minuto: sale tutto il sentiero a passi veri).
+«Piani»); «Ascensori» (32×20) ha un altopiano di 14 gradini con un ascensore sul dirupo, una sala sotto raggiunta
+da un pozzo con l'ascensore e un cancello che si apre solo da dentro. L'ascensore si usa con i passi: un passo verso
+il pianerottolo vuoto chiama la piattaforma, un passo sulla piattaforma la fa partire; il cancello si apre con un
+passo contro le sbarre dal lato della leva. Con `--smoke-mechanics-lab` e `ODIN_PP_LAB_ONLY=heights`, `structures`,
+`mountain`, `cave`, `layers` o `lift` gira solo l'atto delle altezze, delle strutture, della montagna a spirale,
+della grotta, dei piani o degli ascensori (la montagna dura qualche minuto: sale tutto il sentiero a passi veri).
 `--smoke-expedition` comprende l'atto «posa» (il fantasma verde e rosso, una statua e una casetta posate, la statua rotta da un colpo
 e la casetta che resta), l'atto «grotte» (in Neve, Far West, Egitto e Inferno: l'arco, l'ingresso e la seconda
 stanza della prima grotta, con il giro entra-esci controllato) e l'atto «montagna» (il robot in otto punti della salita, con le mappe della Neve

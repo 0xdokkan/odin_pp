@@ -50,6 +50,16 @@ Board_Actor :: struct {
 @(private)
 board_actors: [dynamic]Board_Actor
 
+// The figures riding a lift's platform this frame, and the platform's height (lift_view.odin): each is drawn on it.
+@(private)
+Board_Lift_Rider :: struct {
+	entity: game.Entity_Ref,
+	ground: f32,
+}
+
+@(private)
+board_lift_riders: [dynamic]Board_Lift_Rider
+
 // The level whose heights the next drawing uses (nil: flat).
 @(private)
 set_board_level :: proc(data: ^level.Level) {
@@ -104,7 +114,15 @@ set_board_level :: proc(data: ^level.Level) {
 set_board_actors :: proc(room: ^game.Room) {
 	if board_actors.allocator.procedure == nil { board_actors = make([dynamic]Board_Actor, runtime.heap_allocator()) }
 	clear(&board_actors)
+	if board_lift_riders.allocator.procedure == nil { board_lift_riders = make([dynamic]Board_Lift_Rider, runtime.heap_allocator()) }
+	clear(&board_lift_riders)
 	if room == nil || room.player == nil || !board_heights.layered { return }
+	for i in 0..<room.lifts.count {
+		platform := room.lifts.platforms[i]
+		if !platform.moving || !platform.has_rider { continue }
+		ground, _ := lift_platform_ground(room, i)
+		append(&board_lift_riders, Board_Lift_Rider{platform.rider, ground})
+	}
 	append(&board_actors, Board_Actor{game.PLAYER_ENTITY, room.player.position})
 	for enemy in room.enemies { append(&board_actors, Board_Actor{game.enemy_entity(enemy.id), enemy.position}) }
 	for object in room.objects { append(&board_actors, Board_Actor{game.object_entity(object.id), object.position}) }
@@ -285,6 +303,8 @@ board_actor_cell :: proc(entity: game.Entity_Ref) -> (cell: grid.Position, found
 @(private)
 entity_point_ground :: proc(entity: game.Entity_Ref, at: view.Vec2) -> f32 {
 	if !board_heights.layered || entity == {} { return point_ground(at) }
+	// On a lift's platform, on its way (lift_view.odin).
+	for rider in board_lift_riders { if rider.entity == entity { return rider.ground } }
 	standing, found := board_actor_cell(entity)
 	if !found { return point_ground(at) }
 	x, y := int(math.floor(at.x+0.5)), int(math.floor(at.y+0.5))

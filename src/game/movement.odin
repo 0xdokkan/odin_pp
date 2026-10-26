@@ -259,7 +259,7 @@ movement_query_is_clear :: proc(query: ^Movement_Query) -> bool {
 	       query.count <= MAX_MOVEMENT_PATH_CELLS && !query.has_blocker
 }
 
-@(private = "file")
+@(private)
 set_entity_position :: proc(room: ^Room, entity: Entity_Ref, position: grid.Position) {
 	assert(room != nil && room.player != nil)
 	switch entity.kind {
@@ -324,6 +324,10 @@ apply_movement_effect :: proc(
 			return
 		}
 		from_position = to_position
+	}
+	// A step onto a lift's platform starts it (lift.odin); a push or a teleport onto it does not.
+	if effect.movement_mode == .Traverse || effect.movement_mode == .Climb {
+		_ = lift_board(room, effect.target, effect.destination)
 	}
 	// LAZZO: whatever moves the player (a dodge, a push, a teleport) lets the
 	// rope go (lasso.odin).

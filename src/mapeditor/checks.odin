@@ -39,7 +39,13 @@ check_add :: proc(report: ^Check_Report, cell: grid.Position, text: string) {
 check_map :: proc(data: ^level.Level, w: ^world.World, report: ^Check_Report) {
 	check_report_clear(report)
 	if error, bad := level.check_layers(data); error != .None {
-		text := "Due pavimenti della colonna distano meno di 12 gradini" if error == .Column_Too_Close else "Una scala non unisce due pavimenti vicini"
+		text: string
+		switch error {
+		case .None:
+		case .Column_Too_Close: text = "Due pavimenti della colonna distano meno di 12 gradini"
+		case .Ladder_Invalid: text = "Una scala non unisce due pavimenti vicini"
+		case .Lift_Invalid: text = "Un ascensore non unisce due pianerottoli giusti"
+		}
 		check_add(report, bad, text)
 	}
 	if !data.has_player_spawn {

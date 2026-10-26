@@ -33,7 +33,7 @@ MECHANICS_LAB_DECK_SEED :: u64(0x7E57_1AB)
 // (a plateau up a stair, a pillar, a spiral hill) to try the heights in, the
 // one with the catalog of structures, and the one with the Snow biome's spiral
 // mountain, the one with a cave's rooms, and the one with layers (F3 goes from one to the next).
-Mechanics_Lab_Arena :: enum { Flat, Heights, Structures, Mountain, Cave, Layers }
+Mechanics_Lab_Arena :: enum { Flat, Heights, Structures, Mountain, Cave, Layers, Lifts }
 
 // The arena of structures is larger, to hold all of them with room between.
 MECHANICS_LAB_STRUCTURES_WIDTH :: 41
@@ -55,9 +55,15 @@ MECHANICS_LAB_CAVE_HEIGHT :: level.CAVE_HEIGHT+2
 MECHANICS_LAB_LAYERS_WIDTH :: 46
 MECHANICS_LAB_LAYERS_HEIGHT :: 29
 MECHANICS_LAB_LAYERS_START :: grid.Position{x = 8, y = 22}
+// The arena of the lifts (Fase 7 of docs/piano-profondita.md): a plateau with a lift up its cliff, a hall under it
+// down a shaft, a gate across the hall's way out that opens from inside (mechanics_lab_lifts).
+MECHANICS_LAB_LIFTS_WIDTH :: 32
+MECHANICS_LAB_LIFTS_HEIGHT :: 20
+MECHANICS_LAB_LIFTS_START :: grid.Position{x = 4, y = 15}
 
 mechanics_lab_size :: proc(arena: Mechanics_Lab_Arena) -> (width, height: int) {
 	if arena == .Layers { return MECHANICS_LAB_LAYERS_WIDTH, MECHANICS_LAB_LAYERS_HEIGHT }
+	if arena == .Lifts { return MECHANICS_LAB_LIFTS_WIDTH, MECHANICS_LAB_LIFTS_HEIGHT }
 	if arena == .Cave { return MECHANICS_LAB_CAVE_WIDTH, MECHANICS_LAB_CAVE_HEIGHT }
 	if arena == .Structures { return MECHANICS_LAB_STRUCTURES_WIDTH, MECHANICS_LAB_STRUCTURES_HEIGHT }
 	if arena == .Mountain { return MECHANICS_LAB_MOUNTAIN_WIDTH, MECHANICS_LAB_MOUNTAIN_HEIGHT }
@@ -91,6 +97,7 @@ mechanics_lab_level :: proc(arena := Mechanics_Lab_Arena.Flat, retouched := true
 	cave := level.cave_plan(MECHANICS_LAB_CAVE_SEED)
 	start := grid.Position{x = width/2, y = height/2}
 	if arena == .Layers { start = MECHANICS_LAB_LAYERS_START }
+	if arena == .Lifts { start = MECHANICS_LAB_LIFTS_START }
 	for y in 0..<height {
 		row := strings.builder_make(context.temp_allocator)
 		for x in 0..<width {
@@ -116,6 +123,10 @@ mechanics_lab_level :: proc(arena := Mechanics_Lab_Arena.Flat, retouched := true
 	if error != .None { return data, false }
 	if arena == .Heights { mechanics_lab_raise(&data) }
 	if arena == .Layers && !mechanics_lab_layers(&data) {
+		level.destroy(&data)
+		return {}, false
+	}
+	if arena == .Lifts && !mechanics_lab_lifts(&data) {
 		level.destroy(&data)
 		return {}, false
 	}
@@ -178,6 +189,26 @@ mechanics_lab_layers :: proc(data: ^level.Level) -> bool {
 	return error == .None
 }
 
+// The arena of the lifts, on the 32x20 board with the player at (4,15):
+// - a plateau of 14 steps (x 12..25, y 2..12) with a lift up its west cliff, from (11,10) to a landing over it on
+//   layer +1, a step from the top, its platform waiting at the top;
+// - a hall on layer -1 under it, at 0 (x 16..21, y 5..9), down a shaft from (18,5) on the top, its platform waiting
+//   at the bottom;
+// - a tunnel from the hall east along y = 7 (x 22..25) to the open ground at (26,7), with a gate across it at
+//   (24,7) that opens from the hall's side, from (23,7).
+mechanics_lab_lifts :: proc(data: ^level.Level) -> bool {
+	for y in 2..=12 { for x in 12..=25 { if !level.set_height(data, {x = x, y = y}, 14) { return false } } }
+	for y in 5..=9 { for x in 16..=21 { if !level.set_tile(data, {x = x, y = y, layer = -1}, {kind = .Floor}) { return false } } }
+	for x in 22..=25 { if !level.set_tile(data, {x = x, y = 7, layer = -1}, {kind = .Floor}) { return false } }
+	cliff_top := grid.Position{x = 11, y = 10, layer = 1}
+	if !level.set_tile(data, cliff_top, {kind = .Floor}) || !level.set_height(data, cliff_top, 14) { return false }
+	if !level.add_lift(data, {x = 11, y = 10}, cliff_top, 1) { return false }
+	if !level.add_lift(data, {x = 18, y = 5}, {x = 18, y = 5, layer = -1}, 1) { return false }
+	if !level.add_gate(data, {x = 24, y = 7, layer = -1}, {x = 23, y = 7, layer = -1}) { return false }
+	error, _ := level.check_layers(data)
+	return error == .None
+}
+
 // Replaces `data` with the arena and builds its endless room around `player`.
 create_mechanics_lab_room :: proc(data: ^level.Level, player: ^game.Player, config: game.Tactical_Config,
 	which := Mechanics_Lab_Arena.Flat) -> (room: game.Room, ok: bool) {
@@ -217,6 +248,12 @@ create_mechanics_lab_room :: proc(data: ^level.Level, player: ^game.Player, conf
 		spawns[1].position = grid.offset(MECHANICS_LAB_MOUNTAIN_CENTER, summit.x+1, summit.y)
 		spawns[1].health = 18
 		spawns[2].position = {x = width/2, y = height-3}
+	}
+	// In the arena of the lifts: one in the hall under the plateau, one on its top, one on the open ground.
+	if which == .Lifts {
+		spawns[0].position = {x = 19, y = 7, layer = -1}
+		spawns[1].position = {x = 22, y = 4}
+		spawns[2].position = {x = 6, y = 6}
 	}
 	// In the arena of the layers a foe on each: in the cave's room, on the bridge's south edge (sturdy enough
 	// to survive a fall off it), on the road south of the bridge.

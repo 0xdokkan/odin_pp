@@ -806,6 +806,8 @@ da qualsiasi altezza, e un passo non deve mai scegliere il piano.
 |---|---|
 | Passo | nella colonna vicina, sul pavimento a un gradino al massimo, su qualsiasi piano: una rampa porta sul ponte, l'imbocco in grotta (`game.layer_step`) |
 | Scala a pioli | collega due caselle di colonne vicine anche sopra un dirupo; si sale e si scende premendo la direzione verso la scala, robot e nemici (`level.Ladder`, movimento `Climb`) |
+| Ascensore | unisce due piani della stessa colonna: un pozzo verso una sala sotto, o un dirupo con in cima un pianerottolo sul piano sopra. Un passo verso il pianerottolo da cui la piattaforma è lontana la chiama (senza spendere tempo); arriva a 8 gradini al secondo. Un passo sulla piattaforma ferma la fa partire: chi c'è sopra arriva all'altro capo e intanto non agisce e non si colpisce (il robot come in Movimento Ombra, un nemico come se fosse fuori gioco). Un pianerottolo senza piattaforma non si calpesta. Anche i nemici la chiamano, la aspettano e ci salgono (`level.Lift`, [lift.odin](../../src/game/lift.odin)) |
+| Cancello | le sbarre di una scorciatoia: non si passa, ma si vede attraverso (è un recinto). Si apre con un passo contro le sbarre dalla casella della leva, che costa il tempo di un colpo; dall'altra parte resta chiuso. Aperto, resta aperto fino alla fine della spedizione; ogni run lo trova chiuso (`level.Gate`) |
 | Spinta, tirata, scatto | entrano nel pavimento la cui luce raggiungono: oltre il bordo aperto di un ponte si cade sul piano sotto, con il danno di caduta di sempre |
 | Vista e tiri | in tutte e due le direzioni: dal ponte si vede e si colpisce la strada, e dalla strada il ponte; la linea non deve toccare l'impalcato o la roccia sopra una grotta, in nessun punto della casella (`level.layer_line_blocker`) |
 | Gittata | si misura su x e y; il +1 da 4 gradini più in alto vale anche fra piani |
@@ -820,6 +822,10 @@ Nella Prova meccaniche l'arena «Piani» (sesta di F3) li mette alla prova: una 
 due rampe, una collina con una grotta e due imbocchi, una scala sul dirupo della collina, un nemico per
 piano. Ciò che sta sopra la testa del robot entro 6 caselle si apre a poco a poco, chi è coperto mostra il
 contorno, in grotta il fuori è più scuro (Fase 4).
+
+L'arena «Ascensori» (settima di F3, Fase 7) prova ascensori e cancelli: un altopiano di 14 gradini con un
+ascensore sul dirupo, una sala sotto raggiunta da un pozzo con l'ascensore, e un cancello nella galleria che esce
+dalla sala, che si apre solo da dentro.
 
 **Nelle spedizioni** (Fase 5 di [piano-profondita.md](../piano-profondita.md)) le grotte sono il piano −1
 sotto un massiccio di roccia: ci si entra camminando dall'imbocco, con le regole qui sopra. In sella si entra

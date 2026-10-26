@@ -240,6 +240,13 @@ plan_chaser_intent :: proc(
 		}
 		// The cell the step lands on, on whichever layer, up or down a ladder too (layers.odin).
 		target := walk_step(room, origin, step)
+		// A lift's landing its platform is away from, on the way: the foe calls it, and waits (lift.odin).
+		if lift_landing_shut(room, target) {
+			if at, inside := room_table_index(room, target); inside && at < len(room.enemy_path_distances) {
+				if way := room.enemy_path_distances[at]; way >= 0 && way < best_distance { _ = lift_call(room, target) }
+			}
+			continue
+		}
 		if !planned_cell_is_available(
 			room,
 			predicted_positions,

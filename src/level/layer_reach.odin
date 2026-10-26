@@ -4,8 +4,8 @@ import grid "../engine/grid"
 
 // WHERE A WALKER GETS (for the map editor's checks, Fase 6 of docs/piano-profondita.md): from `start`, a step at a time
 // as the rules of the layers have it (game.layer_step): into the neighbour column, onto its floor a step up at most or
-// any drop down that its room lets him through; that is a walk only a step up or down at most. And the ladders, both
-// ways. One flag a cell of every layer, at layer_reach_index.
+// any drop down that its room lets him through; that is a walk only a step up or down at most. And the ladders and the
+// lifts, both ways. One flag a cell of every layer, at layer_reach_index.
 layer_reach :: proc(data: ^Level, start: grid.Position, allocator := context.allocator) -> []bool {
 	seen := make([]bool, len(data.tiles.cells)*LAYER_COUNT, allocator)
 	if !layer_contains(data, start) { return seen }
@@ -17,6 +17,13 @@ layer_reach :: proc(data: ^Level, start: grid.Position, allocator := context.all
 	steps := [4]grid.Position{{x = 1, y = 0}, {x = -1, y = 0}, {x = 0, y = 1}, {x = 0, y = -1}}
 	for head := 0; head < len(queue); head += 1 {
 		from := queue[head]
+		if lift, end, found := lift_at(data, from); found {
+			other := data.lifts[lift].ends[1-end]
+			if at := layer_reach_index(data, other); !seen[at] {
+				seen[at] = true
+				append(&queue, other)
+			}
+		}
 		height := height_at(data, from)
 		for step in steps {
 			next := grid.offset(from, step.x, step.y)

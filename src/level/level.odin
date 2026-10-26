@@ -41,6 +41,10 @@ Level :: struct {
 	// The layers other than the ground (layers.odin), by layer_slot: the ground's slot stays empty.
 	planes:  [LAYER_COUNT]Layer_Plane,
 	ladders: [dynamic]Ladder,
+	// The lifts' shafts (layers.odin); where each platform is, the game keeps.
+	lifts:   [dynamic]Lift,
+	// The shortcuts' gates (layers.odin): shut, a gate's cell is a Fence; open, a Floor.
+	gates:   [dynamic]Gate,
 }
 
 // The tallest a cell can be.

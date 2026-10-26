@@ -26,7 +26,8 @@ tactical_shadow_active :: proc(room: ^Room) -> bool {
 
 // No damage of any kind reaches the player while he is in his shadow.
 tactical_player_intangible :: proc(room: ^Room) -> bool {
-	return tactical_shadow_active(room)
+	// In Movimento Ombra, and in a lift's shaft (lift.odin).
+	return tactical_shadow_active(room) || lift_player_riding(room)
 }
 
 // A shadow step's own short lockout: a press during it is dropped.

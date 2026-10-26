@@ -92,6 +92,8 @@ run_mechanics_lab_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer,
 		return mechanics_lab_cave(window, renderer, &room, &data, &controller, &cards, &buffer)
 	} else if only == "layers" {
 		return mechanics_lab_layers(window, renderer, &room, &data, &controller, &cards, &buffer)
+	} else if only == "lift" {
+		return mechanics_lab_lifts(window, renderer, &room, &data, &controller, &cards, &buffer)
 	}
 	artifacts.screenshot("odin_pp_mechanics_lab.png")
 	if !mechanics_lab_card_words(renderer, &player) { return false }
@@ -250,6 +252,8 @@ run_mechanics_lab_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer,
 	if !mechanics_lab_black_hole(window, renderer, &room, &controller, &cards, &buffer) { return false }
 	if !mechanics_lab_dinosaur(window, renderer, &room, &controller, &cards, &buffer) { return false }
 	if !mechanics_lab_fishing(window, renderer, dice, &room, &controller, &cards, &buffer) { return false }
+	// Last, so that every act before it is the same as before it came (Fase 7).
+	if !mechanics_lab_lifts(window, renderer, &room, &data, &controller, &cards, &buffer) { return false }
 	return mechanics_lab_sounds_heard(renderer)
 }
 

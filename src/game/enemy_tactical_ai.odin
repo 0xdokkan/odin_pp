@@ -171,7 +171,8 @@ rebuild_tactical_enemy_distances :: proc(room: ^Room, distances: []int, goal: En
 	for &distance, i in local_distances {
 		cell := path_window_cell(minimum, width, area, i)
 		distance, slots[i] = -1, -1
-		if cell_blocks_movement(room, cell) { visited[i] = true; continue }
+		// A lift's landing stays on the way, its platform here or not: the foes call it (lift.odin).
+		if cell_blocks_movement(room, cell) && !lift_landing_shut(room, cell) { visited[i] = true; continue }
 		costs[i] = 1+enemy_terrain_danger(room, cell)
 		if enemy_position_is_goal(room, cell, goal) {
 			distance = 0
@@ -198,6 +199,21 @@ rebuild_tactical_enemy_distances :: proc(room: ^Room, distances: []int, goal: En
 			i:=path_window_index(minimum, width, area, q)
 			if i < 0 || i >= cells || visited[i] { continue }
 			candidate := score+costs[best]
+			if local_distances[i] >= 0 && candidate >= local_distances[i] { continue }
+			local_distances[i] = candidate
+			if slots[i] < 0 {
+				heap[count], slots[i] = i, count
+				count += 1
+			}
+			enemy_path_heap_up(heap, slots, local_distances, slots[i])
+		}
+		// A lift's shaft: from one landing to the other, at its journey's cost (lift.odin).
+		if lift, end, landing := room_lift_at(room, cell); landing {
+			q := room.level_data.lifts[lift].ends[1-end]
+			if q.x<minimum.x || q.y<minimum.y || q.x>maximum.x || q.y>maximum.y { continue }
+			i := path_window_index(minimum, width, area, q)
+			if i < 0 || i >= cells || visited[i] { continue }
+			candidate := score+lift_path_cost(room, lift)
 			if local_distances[i] >= 0 && candidate >= local_distances[i] { continue }
 			local_distances[i] = candidate
 			if slots[i] < 0 {

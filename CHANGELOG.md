@@ -5,6 +5,17 @@ I riferimenti a Classica, `--flat` e ai vecchi smoke descrivono versioni precede
 per i comandi disponibili oggi valgono il [README](README.md) e la documentazione collegata.
 
 
+## 2026-10-26 — Profondità, Fase 7 (in corso): ascensori e cancelli nella Prova meccaniche
+
+- **Ascensori da chiamare e aspettare** (scelta dell'utente):
+  - un passo verso il pianerottolo vuoto chiama la piattaforma, che arriva a 8 gradini al secondo;
+  - un passo sulla piattaforma la fa partire, e chi c'è sopra arriva all'altro capo senza agire né essere colpito;
+  - anche i nemici la chiamano, la aspettano e ci salgono.
+- **Cancelli delle scorciatoie:** sbarre che si aprono solo con un passo dal lato della leva e restano aperte fino
+  alla fine della spedizione.
+- Tutto si prova nella nuova arena «Ascensori» (settima di F3) e nell'atto `lift` dello smoke, che gira per ultimo:
+  le catture di prima restano le stesse. Test nuovi per dati, regole e nemici.
+
 ## 2026-10-26 — Profondità, Fase 6: editor per scolpire
 
 - `--editor-mappe` apre un programma a parte per scolpire a mano le sei arene della Prova meccaniche e le mappe dei

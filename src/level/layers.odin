@@ -29,6 +29,24 @@ Ladder :: struct {
 	low, high: grid.Position,
 }
 
+// A lift (Fase 7 of docs/piano-profondita.md): a platform that goes up and down a shaft between two landings, walkable
+// cells of one column on two layers: down into a cave's hall, or up a cliff to a landing on the layer over its foot,
+// one step from the top. The map has the shaft; where the platform is, and who rides it, is the game's (it moves in
+// play).
+Lift :: struct {
+	ends: [2]grid.Position,
+	// The end where the platform waits when the map is made.
+	rest: u8,
+}
+
+// A shortcut's gate (Fase 7 of docs/piano-profondita.md): bars across a passage, which one sees through but does not
+// pass, until someone on `lever` (the cell beside it on its side) opens it. Shut, its cell is a Fence; open, a Floor.
+// The map is made with every gate shut, so every run finds them shut; an expedition saved keeps them as they are
+// (their cells' kinds).
+Gate :: struct {
+	cell, lever: grid.Position,
+}
+
 // Where a layer's plane is kept in Level.planes (the ground's slot stays empty: its cells are Level.tiles).
 layer_slot :: proc(layer: i8) -> int {
 	return int(layer)-grid.LOWEST_LAYER
@@ -109,6 +127,8 @@ destroy_layers :: proc(level: ^Level) {
 		delete(plane.heights)
 	}
 	delete(level.ladders)
+	delete(level.lifts)
+	delete(level.gates)
 }
 
 // Adds a ladder between two walkable cells of neighbour columns (check_layers checks it again).
@@ -125,6 +145,52 @@ ladder_end :: proc(level: ^Level, from, step: grid.Position) -> (end: grid.Posit
 	for ladder in level.ladders {
 		if ladder.low == from && ladder.high.x == from.x+step.x && ladder.high.y == from.y+step.y { return ladder.high, true }
 		if ladder.high == from && ladder.low.x == from.x+step.x && ladder.low.y == from.y+step.y { return ladder.low, true }
+	}
+	return
+}
+
+// Adds a lift between two landings of one column on two layers, its platform waiting at end `rest` (0: `a`, 1: `b`);
+// check_layers checks them again.
+add_lift :: proc(level: ^Level, a, b: grid.Position, rest := 0) -> bool {
+	if !layer_contains(level, a) || !layer_contains(level, b) || a.x != b.x || a.y != b.y || a.layer == b.layer || rest < 0 || rest > 1 { return false }
+	append(&level.lifts, Lift{ends = {a, b}, rest = u8(rest)})
+	mark_geometry_changed(level)
+	return true
+}
+
+// Adds a gate, shut, on `cell`, opened from `lever` beside it (a walkable cell of the same layer).
+add_gate :: proc(level: ^Level, cell, lever: grid.Position) -> bool {
+	if !layer_contains(level, cell) || !layer_contains(level, lever) || cell.layer != lever.layer || abs(cell.x-lever.x)+abs(cell.y-lever.y) != 1 { return false }
+	if tile, _ := tile_at(level, lever); !is_walkable(tile.kind) { return false }
+	if !set_tile(level, cell, {kind = .Fence}) { return false }
+	append(&level.gates, Gate{cell = cell, lever = lever})
+	return true
+}
+
+// The gate on `cell` (none: `found` false), and whether it is open.
+gate_at :: proc(level: ^Level, cell: grid.Position) -> (index: int, open, found: bool) {
+	if level == nil { return }
+	for gate, i in level.gates {
+		if gate.cell != cell { continue }
+		tile, _ := tile_at(level, cell)
+		return i, tile.kind != .Fence, true
+	}
+	return
+}
+
+// Opens gate `index`: its bars go and its cell is a floor. False if it was open already.
+open_gate :: proc(level: ^Level, index: int) -> bool {
+	if level == nil || index < 0 || index >= len(level.gates) { return false }
+	cell := level.gates[index].cell
+	if tile, _ := tile_at(level, cell); tile.kind != .Fence { return false }
+	return set_tile(level, cell, {kind = .Floor})
+}
+
+// The lift with a landing on `cell`, and which of its two ends that is (none: `found` false).
+lift_at :: proc(level: ^Level, cell: grid.Position) -> (index, end: int, found: bool) {
+	if level == nil { return }
+	for lift, i in level.lifts {
+		for landing, k in lift.ends { if landing == cell { return i, k, true } }
 	}
 	return
 }
@@ -149,12 +215,15 @@ Layer_Error :: enum {
 	Column_Too_Close,
 	// A ladder's ends are not walkable cells of neighbour columns.
 	Ladder_Invalid,
+	// A lift's landings are not walkable cells of one column on two layers, or a cell is the landing of two lifts.
+	Lift_Invalid,
 }
 
 // Whether the map's layers keep the column's rule (two floors of a column LAYER_SPACING apart at least,
-// in the layers' order) and its ladders join walkable cells of neighbour columns; `bad` is a cell at fault.
+// in the layers' order), its ladders join walkable cells of neighbour columns and its lifts are whole (Lift);
+// `bad` is a cell at fault.
 check_layers :: proc(level: ^Level) -> (error: Layer_Error, bad: grid.Position) {
-	if level == nil || !has_layers(level) && len(level.ladders) == 0 { return }
+	if level == nil || !has_layers(level) && len(level.ladders) == 0 && len(level.lifts) == 0 { return }
 	for y in 0..<level.tiles.height {
 		for x in 0..<level.tiles.width {
 			below_height: i32
@@ -175,6 +244,15 @@ check_layers :: proc(level: ^Level) -> (error: Layer_Error, bad: grid.Position) 
 			if !ok || !is_walkable(tile.kind) { return .Ladder_Invalid, end }
 		}
 		if abs(ladder.low.x-ladder.high.x)+abs(ladder.low.y-ladder.high.y) != 1 { return .Ladder_Invalid, ladder.low }
+	}
+	for lift, i in level.lifts {
+		for landing in lift.ends {
+			tile, ok := tile_at(level, landing)
+			if !ok || !is_walkable(tile.kind) { return .Lift_Invalid, landing }
+			if other, _, _ := lift_at(level, landing); other != i { return .Lift_Invalid, landing }
+		}
+		a, b := lift.ends[0], lift.ends[1]
+		if a.x != b.x || a.y != b.y || a.layer == b.layer { return .Lift_Invalid, a }
 	}
 	return
 }
