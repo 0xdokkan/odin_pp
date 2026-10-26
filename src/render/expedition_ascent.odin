@@ -104,9 +104,35 @@ ascent_cube :: proc(pass:Ink_Pass,p:rl.Vector3,half,height,yaw:f32,m:Ascent_Mate
 	ascent_mark(pass,p,{-half*.55,height*.54,half+.01},{half*.55,height*.54,half+.01},yaw,m.accent)
 }
 
+// The boulder on top of its hill (expedition/complex.odin, the Memoria's mark 'O'): Sisyphus' stone as the mount remembers
+// it, grey and faceted, gold in its seams; a little higher than a cell, and wider in its middle than at its foot.
+@(private)
+draw_expedition_boulder :: proc(pass:Ink_Pass,cell:grid.Position) {
+	p:=rl.Vector3{f32(cell.x)+.5,0,f32(cell.y)+.5}
+	// As dark as the biome's own stone (Ascent_Material): its light makes it grey, a pale one burns to white.
+	stone,cap:=rl.Color{46,44,54,255},rl.Color{68,65,74,255}
+	gold:=ink_edge({243,203,115,255},.8)
+	RINGS :: [4][2]f32{{.30,0},{.50,.36},{.42,.74},{.17,1.02}}
+	rings:[4][6]rl.Vector3
+	for ring,k in RINGS {
+		for i in 0..<6 {
+			angle:=.35+f32(i)*math.TAU/6+f32(k)*.27
+			r:=ring[0]*(.9+.08*f32((i*7+k*3)%3))
+			rings[k][i]=p+{math.cos(angle)*r,ring[1],math.sin(angle)*r}
+		}
+	}
+	ink_solid(pass,rings[0][:],rings[1][:],stone,stone,{},shade=.14)
+	ink_solid(pass,rings[1][:],rings[2][:],stone,stone,{},shade=.14)
+	ink_solid(pass,rings[2][:],rings[3][:],cap,cap,{},shade=.12)
+	// The seams: round its widest ring, and two up over it.
+	for i in 0..<6 {ink_line(pass,rings[1][i],rings[1][(i+1)%6],gold)}
+	for i in ([2]int{0,3}) {ink_line(pass,rings[1][i],rings[2][i],gold);ink_line(pass,rings[2][i],rings[3][i],gold)}
+}
+
 @(private)
 draw_expedition_ascent_outdoor :: proc(pass:Ink_Pass,w:^world.World,cell:grid.Position)->bool {
 	m,ok:=ascent_material(w.biome);if !ok {return false}
+	if index,mark:=world.complex_at(w,cell);index>0 && mark=='O' {draw_expedition_boulder(pass,cell);return true}
 	p:=rl.Vector3{f32(cell.x)+.5,0,f32(cell.y)+.5};h:=expedition_cell_hash(cell,u32(w.biome)+157)
 	phase:=f32(h%17)*.23
 	#partial switch w.biome {

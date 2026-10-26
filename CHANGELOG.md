@@ -5,6 +5,34 @@ I riferimenti a Classica, `--flat` e ai vecchi smoke descrivono versioni precede
 per i comandi disponibili oggi valgono il [README](README.md) e la documentazione collegata.
 
 
+## 2026-10-27 — Profondità, Fase 7 (in corso): Cielo, Spazio e Memoria
+
+- **Cielo, un'isola sospesa** (scelta dell'utente): su un'isola libera galleggia un'isola più piccola di marmo, 14 gradini
+  sopra, con guardie e segreto. Ci si sale da una scalinata che gira attorno a un pilastro; l'ascensore, una colonna di
+  luce, ha il cancello sul pianerottolo, che si apre dall'isola. Sotto ci si passa all'ombra; i ponti fra le isole restano
+  come prima.
+- **Spazio, gallerie fra i crateri:** lo Spazio si alza di una base e si vede come prima. Tre crateri profondi 14: uno con
+  la scala, uno con guardie e segreto sul fondo, uno con l'ascensore. Le gallerie sul piano −2 li uniscono uscendo dalle
+  loro pareti; il cancello fra il cratere del segreto e quello dell'ascensore si apre dalla parte del segreto. In superficie
+  la stazione: tre moduli uniti da passerelle, rampa, ascensore con il cancello in cima, segreto e guardie sul modulo di
+  mezzo. I pozzi di gravità restano dove sono, anche sopra i moduli.
+- **Memoria, la collina del masso:** la grande collina in mezzo alla mappa era tagliata dal terreno in piano della Fonte e
+  della Prova (restava una cresta alta 7) e non c'è più. Al suo posto, in un punto libero, una collina vera alta 14 con il
+  masso in cima: un sentiero sale da sud a una terrazza, la gira e sale sul fianco est fino in cima; da lì un pozzo con
+  l'ascensore scende nella sala della memoria, dentro la collina, con guardie e segreto. Il passaggio della sala esce ai
+  piedi dello sperone sud, con un cancello che si apre da dentro.
+- Segni nuovi nelle mappe dei complessi: segreto e guardie su un ponte (`+`, `*`), segreto in galleria (`?`), il masso
+  (`O`). Fino a quattro complessi per bioma; un cratere si cerca il posto vicino a quello prima.
+- **Tutti i dodici biomi hanno i loro piani:** il lavoro della Fase 7 è fatto; per chiuderla restano due verifiche alla
+  corrente (sotto). Nel documento torna il titolo della Fase 8, perso con il primo gruppo.
+- Smoke delle spedizioni: 18 catture nuove dei complessi e 3 delle gallerie dello Spazio (191 in tutto); i complessi vanno
+  dallo stage 104 al 175, le reti dal 176 al 190.
+- Test nuovi: l'isola sospesa, le gallerie fra i crateri, la collina con la sala; complessi e prove con i nemici liberi in
+  dodici biomi (1735 in tutto).
+- Verifiche: check completo con e senza assert, smoke delle spedizioni (191 catture) e dell'editor senza errori. Lo smoke
+  del laboratorio si è fermato al limite di tempo a 86 catture su 129 (83 identiche al byte, tre delle strutture con pochi
+  pixel diversi) e il benchmark non è fatto: il portatile era a batteria, al 4%. Tutti e due vanno rifatti alla corrente.
+
 ## 2026-10-26 — Profondità, Fase 7 (in corso): Neve, Inferno e Gotico
 
 - **Neve, il crepaccio scavato** (scelta dell'utente): la Neve si alza di una base, come City pop, Egitto e Vietnam, e si

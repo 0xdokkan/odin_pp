@@ -37,12 +37,20 @@ test_every_biome_has_a_relief_of_its_own_and_the_same_at_every_run :: proc(t: ^t
 		tallest, raised := relief_numbers(&first)
 		fmt.printfln("relief %v: tallest %d steps, %d%% of the cells above ground", biome, tallest, raised)
 		testing.expectf(t, tallest >= 2, "%v: the tallest cell is %d steps", biome, tallest)
-		testing.expectf(t, raised >= 2, "%v: only %d%% of the map is raised", biome, raised)
+		// The Memoria's relief is its boulder's hill (a complex, Fase 7) and a few low mounds: its middle's great hill, which
+		// the sites' level ground had cut to a ridge, is gone.
+		testing.expectf(t, raised >= 2 || biome == .Secret && raised >= 1, "%v: only %d%% of the map is raised", biome, raised)
 		// The Snow map's spiral mountain (Fase 4) is far taller than any relief; a cave's massif stands over the level
-		// ground round it (cave.odin); a complex's blocks over the level ground round them (complex.odin).
+		// ground round it (cave.odin); a complex's blocks over the level ground round them (complex.odin), which in the Cielo
+		// is an island's.
 		massif := int(RELIEF_MAX)+int(CAVE_MASSIF_HEIGHT)+CAVE_MASSIF_RISE
-		testing.expect(t, tallest <= int(RELIEF_MAX) || (biome == .Snow && tallest == level.MOUNTAIN_TOP) || (cave_biome(biome) && tallest <= massif) ||
-			(complex_biome(biome) && tallest <= int(COMPLEX_TOP)))
+		complex_top := 0
+		for c in a.complexes[:a.complex_count] {
+			_, top := complex_levels(c)
+			complex_top = max(complex_top, int(top-first.base))
+		}
+		testing.expectf(t, tallest <= int(RELIEF_MAX) || (biome == .Snow && tallest == level.MOUNTAIN_TOP) || (cave_biome(biome) && tallest <= massif) ||
+			(complex_biome(biome) && tallest <= complex_top), "%v: the tallest cell is %d steps", biome, tallest)
 	}
 }
 

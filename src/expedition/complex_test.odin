@@ -10,10 +10,11 @@ import grid "../engine/grid"
 import level "../level"
 
 @(private = "file")
-COMPLEX_BIOMES :: [9]campaign.Biome{.Cyber, .West, .Jungle, .City, .Egypt, .Vietnam, .Snow, .Inferno, .Gothic}
+COMPLEX_BIOMES :: [12]campaign.Biome{.Cyber, .West, .Jungle, .City, .Egypt, .Vietnam, .Snow, .Inferno, .Gothic, .Sky, .Space, .Secret}
 
 // The walkable cells of the map no walk from the spawn reaches, on any layer (level.layer_reach: ramps, mouths, decks,
-// lifts), the gates shut: none but a massif's top, rock over a cave.
+// lifts), the gates shut: none but a massif's top, rock over a cave, and the Cielo's few islets with no bridge to them
+// (relief_test.odin), out of its complex.
 @(private = "file")
 complex_stranded :: proc(w: ^World, data: ^level.Level) -> (stranded: int, first: grid.Position) {
 	seen := level.layer_reach(data, data.player_spawn, context.temp_allocator)
@@ -23,6 +24,7 @@ complex_stranded :: proc(w: ^World, data: ^level.Level) -> (stranded: int, first
 				p := grid.Position{x = x, y = y, layer = i8(layer)}
 				tile, _ := level.tile_at(data, p)
 				if !level.is_walkable(tile.kind) || seen[level.layer_reach_index(data, p)] || cave_rock(w, p) { continue }
+				if index, _ := complex_at(w, p); w.biome == .Sky && index == 0 { continue }
 				if stranded == 0 { first = p }
 				stranded += 1
 			}
@@ -31,8 +33,8 @@ complex_stranded :: proc(w: ^World, data: ^level.Level) -> (stranded: int, first
 	return
 }
 
-// Robotica cibernetica, the Far West and the Giungla have their complexes, at the same places and the same at every run,
-// on every layer, with the same lifts and gates; the map keeps the layers' rule. The other biomes have none.
+// The biomes with complexes (all twelve, after the fourth group of Fase 7) have them at the same places and the same at
+// every run, on every layer, with the same lifts and gates; the map keeps the layers' rule. A biome without would have none.
 @(test)
 test_the_complexes_are_the_biomes_own_and_the_same_at_every_run :: proc(t: ^testing.T) {
 	for biome in campaign.Biome {
@@ -67,7 +69,7 @@ test_the_complexes_are_the_biomes_own_and_the_same_at_every_run :: proc(t: ^test
 }
 
 // With every gate shut, a walk from the spawn reaches every walkable cell of every layer: a shortcut is only a shortcut.
-// It reaches the secret, and both sides of each gate: the lever's, and the other.
+// It reaches every complex's secret, and both sides of each gate: the lever's, and the other.
 @(test)
 test_everything_on_a_complex_can_be_walked_to_with_its_gates_shut :: proc(t: ^testing.T) {
 	for biome in COMPLEX_BIOMES {
@@ -86,14 +88,18 @@ test_everything_on_a_complex_can_be_walked_to_with_its_gates_shut :: proc(t: ^te
 			landing, found := level.column_walkable_near(&data, beyond.x, beyond.y, level.height_at(&data, gate.cell), 1)
 			testing.expectf(t, found && seen[level.layer_reach_index(&data, landing)], "%v: the far side of the gate at %v cannot be walked to", biome, gate.cell)
 		}
-		secrets := 0
+		// Two drops (credits and a relic) for each complex with a secret.
+		secrets, want := 0, 0
+		for c in w.complexes[:w.complex_count] {
+			for row in complex_layout(c.kind).rows { for mark in transmute([]u8)row { if complex_mark_secret(mark) { want += 2 } } }
+		}
 		for drop in w.drops[:w.drop_count] {
 			if drop.cave != 0 || !drop.manual_only { continue }
 			if index, _ := complex_at(&w, drop.position); index == 0 { continue }
 			secrets += 1
 			testing.expectf(t, seen[level.layer_reach_index(&data, drop.position)], "%v: the secret at %v cannot be walked to", biome, drop.position)
 		}
-		testing.expectf(t, secrets == 2, "%v: %d drops of a complex's secret", biome, secrets)
+		testing.expectf(t, secrets == want && want >= 2, "%v: %d drops of a complex's secret, %d wanted", biome, secrets, want)
 	}
 }
 
@@ -242,4 +248,155 @@ test_the_infernos_bridge_of_bones_goes_over_a_stream_of_lava :: proc(t: ^testing
 		}
 	}
 	testing.expectf(t, over >= 3, "%d cells of the bridge over the lava", over)
+}
+
+// The Cielo's floating island hangs over one of its islands (the user's choice in Fase 7): on the layer over the ground,
+// COMPLEX_TOP over the island's ground, which stays walkable under it, in its shade; nothing of it reaches the sky between
+// the islands or a bridge, which stay as they are. Its secret and its guards are on it.
+@(test)
+test_the_skys_island_floats_over_one_of_its_islands :: proc(t: ^testing.T) {
+	w: World
+	data: level.Level
+	testing.expect(t, generate(&w, &data, .Sky, 8))
+	defer level.destroy(&data)
+	if !testing.expect(t, w.complex_count == 1 && w.complexes[0].kind == .Floating_Island) { return }
+	c := w.complexes[0]
+	testing.expectf(t, c.floor >= 2 && c.floor <= 4, "the island's ground is %d steps high", c.floor)
+	layout := complex_layout(c.kind)
+	width, height := complex_size(layout)
+	decks := 0
+	for y in -COMPLEX_MARGIN..<height+COMPLEX_MARGIN {
+		for x in -COMPLEX_MARGIN..<width+COMPLEX_MARGIN {
+			ground := grid.offset(c.origin, x, y)
+			tile, _ := level.tile_at(&data, ground)
+			testing.expectf(t, tile.kind != .Void && terrain(.Sky, ground) != .Bridge, "the complex reaches the sky or a bridge at %v", ground)
+			if !complex_mark_deck(complex_mark(layout, x, y)) { continue }
+			decks += 1
+			deck := complex_cell(c, {x = x, y = y})
+			over, _ := level.tile_at(&data, deck)
+			testing.expect(t, level.is_walkable(over.kind) || over.kind == .Fence)
+			testing.expect_value(t, level.height_at(&data, deck), c.floor+COMPLEX_TOP)
+			// Under it the island, walkable at its own height.
+			testing.expectf(t, level.is_walkable(tile.kind) && level.height_at(&data, ground) == c.floor, "no island under the deck at %v", ground)
+		}
+	}
+	testing.expectf(t, decks >= 40, "an island of %d cells", decks)
+	on_it := 0
+	for drop in w.drops[:w.drop_count] { if drop.position.layer == COMPLEX_DECK { on_it += 1 } }
+	guards := false
+	for g in w.groups[:w.group_count] { guards = guards || g.count > 0 && g.members[0].enemy.position.layer == COMPLEX_DECK }
+	testing.expectf(t, on_it == 2 && guards, "%d drops of the secret on the island, guards on it %v", on_it, guards)
+}
+
+// The cells a walk reaches from `start` under the base alone (the craters' bottoms and stairs, the galleries): a step to
+// a neighbour column's walkable cell on any layer, a step from the height one is at.
+@(private = "file")
+reach_under_the_base :: proc(data: ^level.Level, start: grid.Position) -> []bool {
+	seen := make([]bool, level.LAYER_COUNT*len(data.tiles.cells), context.temp_allocator)
+	queue := make([dynamic]grid.Position, context.temp_allocator)
+	seen[level.layer_reach_index(data, start)] = true
+	append(&queue, start)
+	for head := 0; head < len(queue); head += 1 {
+		at := queue[head]
+		for step in ([4]grid.Position{{x = 1}, {x = -1}, {y = 1}, {y = -1}}) {
+			next, found := level.column_walkable_near(data, at.x+step.x, at.y+step.y, level.height_at(data, at), 1)
+			if !found || level.height_at(data, next) >= data.base || seen[level.layer_reach_index(data, next)] { continue }
+			seen[level.layer_reach_index(data, next)] = true
+			append(&queue, next)
+		}
+	}
+	return seen
+}
+
+// The Spazio is raised by a base for its three deep craters (the user's choice in Fase 7): each dug COMPLEX_TOP under its
+// ground, open to the sky; its galleries on the deep layer come out of their walls. Under the ground alone a walk goes
+// from the crater with the stair to the one with the secret, and on to the one with the lift only through the gate, which
+// opens from the secret's side.
+@(test)
+test_the_spaces_galleries_join_its_deep_craters :: proc(t: ^testing.T) {
+	w: World
+	data: level.Level
+	testing.expect(t, generate(&w, &data, .Space, 12))
+	defer level.destroy(&data)
+	testing.expect_value(t, w.base, EXPEDITION_RAISED_BASE)
+	kinds := [3]Complex_Kind{.Crater_Lift, .Crater_Hall, .Crater_Stair}
+	bottoms: [3]grid.Position
+	for kind, i in kinds {
+		c, found := network_crater(&w, kind)
+		if !testing.expectf(t, found, "the Spazio has no %v", kind) { return }
+		bottom, top := complex_levels(c)
+		testing.expect(t, bottom == 0 && top == w.base)
+		layout := complex_layout(kind)
+		width, height := complex_size(layout)
+		for y in 0..<height {
+			for x in 0..<width {
+				if layout.rows[y][x] != '_' { continue }
+				bottoms[i] = grid.offset(c.origin, x, y)
+				testing.expect_value(t, level.height_at(&data, bottoms[i]), bottom)
+			}
+		}
+	}
+	gate := -1
+	for g, i in data.gates { if g.cell.layer == NETWORK_LAYER { gate = i } }
+	if !testing.expect(t, gate >= 0, "no gate on the galleries") { return }
+	seen := reach_under_the_base(&data, bottoms[2])
+	testing.expect(t, seen[level.layer_reach_index(&data, bottoms[1])], "the galleries do not join the stair's crater to the secret's")
+	testing.expect(t, !seen[level.layer_reach_index(&data, bottoms[0])], "the lift's crater is reached past the shut gate")
+	testing.expect(t, seen[level.layer_reach_index(&data, data.gates[gate].lever)], "the gate's lever is not on the secret's side")
+	testing.expect(t, level.open_gate(&data, gate))
+	seen = reach_under_the_base(&data, bottoms[2])
+	testing.expect(t, seen[level.layer_reach_index(&data, bottoms[0])], "the galleries do not join the secret's crater to the lift's")
+	// The lift goes from the bottom of its crater up to its ground.
+	crater, found := network_crater(&w, .Crater_Lift)
+	testing.expect(t, found)
+	up := false
+	for lift in data.lifts {
+		if index, _ := complex_at(&w, lift.ends[0]); index > 0 && w.complexes[index-1] == crater {
+			up = level.height_at(&data, lift.ends[0]) == 0 && level.height_at(&data, lift.ends[1]) == w.base
+		}
+	}
+	testing.expect(t, up, "no lift up from the crater's bottom to the ground")
+}
+
+// The Memoria's boulder's hill (the user's choice in Fase 7, in place of the ridge in the middle that the sites' level ground
+// had cut): its top COMPLEX_TOP over the ground, with the boulder on it as a wall; inside it, on the layer under the ground,
+// the memory's hall with the secret and its guards, its shaft's lift up to the top. Its passage's gate opens from inside
+// only. In the middle of the map the relief is low again.
+@(test)
+test_the_memorias_hill_holds_the_hall_of_its_memory :: proc(t: ^testing.T) {
+	w: World
+	data: level.Level
+	p: game.Player
+	room := test_world(t, &w, &data, &p, .Secret)
+	defer level.destroy(&data)
+	defer game.destroy_room(&room)
+	game.end_expedition_encounter(&room)
+	clear(&room.enemies)
+	room.phase = .Loot
+	if !testing.expect(t, w.complex_count == 1 && w.complexes[0].kind == .Boulder_Hill) { return }
+	c := w.complexes[0]
+	boulder, found := complex_boulder(c)
+	tile, _ := level.tile_at(&data, boulder)
+	testing.expect(t, found && tile.kind == .Wall && level.height_at(&data, boulder) == c.floor+COMPLEX_TOP, "no boulder on the top")
+	in_hall := 0
+	for drop in w.drops[:w.drop_count] { if drop.position.layer == COMPLEX_TUNNEL { in_hall += 1 } }
+	guards := false
+	for g in w.groups[:w.group_count] { guards = guards || g.count > 0 && g.members[0].enemy.position.layer == COMPLEX_TUNNEL }
+	testing.expectf(t, in_hall == 2 && guards, "%d drops of the secret in the hall, guards in it %v", in_hall, guards)
+	if !testing.expect_value(t, len(data.lifts), 1) { return }
+	shaft := data.lifts[0]
+	testing.expect(t, shaft.ends[0].layer == COMPLEX_TUNNEL && level.height_at(&data, shaft.ends[1]) == c.floor+COMPLEX_TOP, "no shaft from the hall up to the top")
+	if !testing.expect_value(t, len(data.gates), 1) { return }
+	gate := data.gates[0]
+	outside := grid.Position{x = 2*gate.cell.x-gate.lever.x, y = 2*gate.cell.y-gate.lever.y}
+	testing.expect(t, !game.gate_opens(&room, outside, gate.cell), "the gate opens from the ground")
+	testing.expect(t, game.gate_opens(&room, gate.lever, gate.cell), "the gate does not open from inside")
+	side := data.tiles.width
+	tallest := i32(0)
+	for y in side/2-12..=side/2+12 {
+		for x in side/2-12..=side/2+12 {
+			if index, _ := complex_at(&w, {x = x, y = y}); index == 0 { tallest = max(tallest, level.height_at(&data, {x = x, y = y})) }
+		}
+	}
+	testing.expectf(t, tallest <= 2, "the middle of the map is %d steps high", tallest)
 }

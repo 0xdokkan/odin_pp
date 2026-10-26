@@ -18,22 +18,27 @@ import rng "../engine/rng"
 // between two mesas, the Giungla preistorica giant trees by a hill of bones; in the second group City pop has rooftops
 // joined by overpasses, the Egitto two stepped pyramids over its necropolis, the Vietnam bamboo bridges over a river; in
 // the third the Neve a crevasse dug in its snow with a rope bridge over it, the Inferno a bridge of bones over a stream of
-// lava between two cliffs, the Gotico a ruined house and its barn joined by a gallery (the ballatoio).
+// lava between two cliffs, the Gotico a ruined house and its barn joined by a gallery (the ballatoio); in the fourth the
+// Cielo a smaller island floating over one of its islands, the Spazio a station of modules joined by walkways and three
+// deep craters, whose galleries join them (network.odin), the Memoria the boulder's hill, with the memory's hall inside it.
 //
 // A layout is one string a row of cells, x eastward and y southward:
 //   .     open ground, at the complex's floor (the level ground round it)
 //   #     a block: rock COMPLEX_TOP steps over the floor, walked on at its top
 //   $ @   a block's cell with the complex's secret on it, where its guards stand
+//   O     a block's cell with the boulder on it (the Memoria's): a wall at the top
 //   =     a deck on the layer over the ground, at the blocks' top, over open ground
+//   + *   a deck's cell with the complex's secret on it, where its guards stand
 //   a..m  a ramp up a block, 1 to 13 steps over the floor
 //   t &   a tunnel on the layer under the ground, at the floor, under a block; & where its guards stand
+//   ?     a tunnel's cell with the complex's secret on it
 //   S     a shaft: a tunnel's cell with a lift up to the block's top over it
 //   L     a lift up a block's side: its foot on the open ground, its landing on the deck's layer at the top
 //   D     a block's cell with a shaft from its top down to the network under the ground (network.odin)
 // Its gates are listed apart, each on the layer of its cell's mark (a tunnel's, a deck's or a block's top).
 //
-// A DUG layout (the Neve's crevasse, in a biome raised by a base: relief.odin) goes down instead of up: its floor is the
-// open ground's, and what it digs is COMPLEX_TOP steps under it:
+// A DUG layout (the Neve's crevasse and the Spazio's craters, in a biome raised by a base: relief.odin) goes down instead
+// of up: its floor is the open ground's, and what it digs is COMPLEX_TOP steps under it:
 //   _     the bottom, COMPLEX_TOP steps under the floor
 //   $ @   the bottom's cell with the secret, where its guards stand
 //   a..m  a ramp down, 1 to 13 steps over the bottom
@@ -41,7 +46,7 @@ import rng "../engine/rng"
 //   L     a lift up from the bottom: its foot there, its landing on the deck's layer at the floor
 
 COMPLEX_TOP :: level.LAYER_SPACING+2
-MAX_COMPLEXES :: 2
+MAX_COMPLEXES :: 4
 // The ground left level and clear of props round a complex's layout.
 COMPLEX_MARGIN :: 3
 COMPLEX_DECK :: i8(1)
@@ -50,7 +55,7 @@ COMPLEX_TUNNEL :: i8(-1)
 MAX_WORLD_LIFTS :: game.MAX_ROOM_LIFTS
 MAX_WORLD_GATES :: 8
 
-Complex_Kind :: enum u8 { None, Data_Node, Train_Bridge, Giant_Trees, Rooftops, Pyramids, Bamboo_Bridges, Crevasse, Bone_Bridge, Ruined_House }
+Complex_Kind :: enum u8 { None, Data_Node, Train_Bridge, Giant_Trees, Rooftops, Pyramids, Bamboo_Bridges, Crevasse, Bone_Bridge, Ruined_House, Floating_Island, Station, Crater_Lift, Crater_Hall, Crater_Stair, Boulder_Hill }
 
 Complex :: struct {
 	kind:   Complex_Kind,
@@ -75,6 +80,8 @@ Complex_Layout :: struct {
 	over_lava:  bool,
 	// It is dug into the ground instead of raised over it (the marks of a dug layout, above).
 	dug:        bool,
+	// Its place is looked for near the complex before it first (the Spazio's craters, which its galleries join).
+	near:       bool,
 }
 
 // Robotica cibernetica: two data platforms over a road, a walkway between them. Up the east one by its ramp; the west
@@ -246,6 +253,120 @@ RUINED_HOUSE_ROWS := [?]string{
 @(private = "file")
 RUINED_HOUSE_GATES := [?]Complex_Gate{{cell = {x = 39, y = 3}, lever = {x = 38, y = 3}}}
 
+// Isola nel cielo: a smaller island floating over one of the islands, on the deck's layer, with the secret and its
+// guards; under it the island, in its shade. Up a marble stair round a pillar at its west side; the lift at its east
+// side, a column of light, has its landing shut by a gate opened from the island: once opened, the way up from below.
+// The bridges between the islands stay as they are (the user's choice).
+@(private = "file")
+FLOATING_ISLAND_ROWS := [?]string{
+	"...=======.",
+	"...====+==.",
+	"...=======L",
+	"klm=======.",
+	"j##===*===.",
+	"i##=======.",
+	"hgfedcba...",
+}
+@(private = "file")
+FLOATING_ISLAND_GATES := [?]Complex_Gate{{cell = {x = 9, y = 2}, lever = {x = 8, y = 2}}}
+
+// Spazio: a station of three modules, walkways between their tops. Up the west one by its ramp; the hub has the secret and
+// its guards; the north one has a lift up its far side whose landing a gate shuts, opened from its top: once opened, the
+// way up from below.
+@(private = "file")
+STATION_ROWS := [?]string{
+	".........................#######.",
+	".........................#######.",
+	".........................#######L",
+	".........................#######.",
+	".........................#######.",
+	"...........................===...",
+	"...........................===...",
+	"...........................===...",
+	".............#######.....#######.",
+	".............#######.....###$###.",
+	"abcdefghijklm#######=====#######.",
+	"abcdefghijklm#######=====#######.",
+	"abcdefghijklm#######=====###@###.",
+	".............#######.....#######.",
+	".............#######.....#######.",
+}
+@(private = "file")
+STATION_GATES := [?]Complex_Gate{{cell = {x = 31, y = 2}, lever = {x = 30, y = 2}}}
+
+// Spazio: three deep craters dug in its raised ground, which its galleries join under it (network.odin). The first has a
+// lift up from its bottom, the second its guards and the secret, the third a stair down from the west and guards.
+@(private = "file")
+CRATER_LIFT_ROWS := [?]string{
+	"....___....",
+	".._______..",
+	"._________.",
+	"._________.",
+	"___________",
+	"__________L",
+	"___________",
+	"._________.",
+	"._________.",
+	".._______..",
+	"....___....",
+}
+@(private = "file")
+CRATER_HALL_ROWS := [?]string{
+	"....___....",
+	".._______..",
+	"._________.",
+	"._________.",
+	"_____@_____",
+	"___________",
+	"_____$_____",
+	"._________.",
+	"._________.",
+	".._______..",
+	"....___....",
+}
+@(private = "file")
+CRATER_STAIR_ROWS := [?]string{
+	".................___....",
+	"..............._______..",
+	".............._________.",
+	".............._________.",
+	"mlkjihgfedcba___________",
+	"mlkjihgfedcba_____@_____",
+	"mlkjihgfedcba___________",
+	".............._________.",
+	".............._________.",
+	"..............._______..",
+	".................___....",
+}
+
+// La memoria del creatore: the boulder's hill, its top COMPLEX_TOP over the ground with the boulder on it, a terrace half
+// way up round its west and north sides. The path winds up it: a stair from the south to the terrace, round the hill on
+// it, a stair up its east side to the top. From the top a shaft with a lift goes down to the memory's hall inside the hill,
+// with the secret and its guards; its passage comes out at the foot of the hill's south spur, shut by a gate opened from
+// inside: once opened, the way in from the ground.
+@(private = "file")
+BOULDER_HILL_ROWS := [?]string{
+	"ggggggggggggg",
+	"ggggggggggggg",
+	"gg#########hh",
+	"gg####O####ii",
+	"gg##t?ttt##jj",
+	"gg##ttt&t##kk",
+	"gg##ttStt##ll",
+	"gg####t####mm",
+	"gg####t####..",
+	"ggggg#t#.....",
+	"ggggg#t#.....",
+	"..ff.#t#.....",
+	"..ee.#t#.....",
+	"..dd.........",
+	"..cc.........",
+	"..bb.........",
+	"..aa.........",
+}
+@(private = "file")
+BOULDER_HILL_GATES := [?]Complex_Gate{{cell = {x = 6, y = 12}, lever = {x = 6, y = 11}}}
+
 complex_layout :: proc(kind: Complex_Kind) -> Complex_Layout {
 	switch kind {
 	case .Data_Node: return {rows = DATA_NODE_ROWS[:], gates = DATA_NODE_GATES[:], surface = .Platform}
@@ -257,6 +378,12 @@ complex_layout :: proc(kind: Complex_Kind) -> Complex_Layout {
 	case .Crevasse: return {rows = CREVASSE_ROWS[:], gates = CREVASSE_GATES[:], dug = true}
 	case .Bone_Bridge: return {rows = BONE_BRIDGE_ROWS[:], gates = BONE_BRIDGE_GATES[:], over_lava = true}
 	case .Ruined_House: return {rows = RUINED_HOUSE_ROWS[:], gates = RUINED_HOUSE_GATES[:], surface = .Ruin}
+	case .Floating_Island: return {rows = FLOATING_ISLAND_ROWS[:], gates = FLOATING_ISLAND_GATES[:], surface = .Platform}
+	case .Station: return {rows = STATION_ROWS[:], gates = STATION_GATES[:], surface = .Platform}
+	case .Crater_Lift: return {rows = CRATER_LIFT_ROWS[:], dug = true}
+	case .Crater_Hall: return {rows = CRATER_HALL_ROWS[:], dug = true, near = true}
+	case .Crater_Stair: return {rows = CRATER_STAIR_ROWS[:], dug = true, near = true}
+	case .Boulder_Hill: return {rows = BOULDER_HILL_ROWS[:], gates = BOULDER_HILL_GATES[:], surface = .Platform}
 	case .None:
 	}
 	return {}
@@ -274,6 +401,9 @@ complex_kinds :: proc(b: campaign.Biome) -> (kinds: [MAX_COMPLEXES]Complex_Kind)
 	case .Snow: kinds[0] = .Crevasse
 	case .Inferno: kinds[0] = .Bone_Bridge
 	case .Gothic: kinds[0] = .Ruined_House
+	case .Sky: kinds[0] = .Floating_Island
+	case .Space: kinds = {.Station, .Crater_Lift, .Crater_Hall, .Crater_Stair}
+	case .Secret: kinds[0] = .Boulder_Hill
 	}
 	return
 }
@@ -295,17 +425,22 @@ complex_mark :: proc(layout: Complex_Layout, x, y: int) -> u8 {
 
 complex_mark_block :: proc(mark: u8) -> bool {
 	switch mark {
-	case '#', '$', '@', 't', '&', 'S', 'D': return true
+	case '#', '$', '@', 'O', 't', '&', '?', 'S', 'D': return true
 	}
 	return false
 }
 
 complex_mark_tunnel :: proc(mark: u8) -> bool {
-	return mark == 't' || mark == '&' || mark == 'S'
+	return mark == 't' || mark == '&' || mark == '?' || mark == 'S'
 }
 
 complex_mark_deck :: proc(mark: u8) -> bool {
-	return mark == '=' || mark == 'L'
+	return mark == '=' || mark == '+' || mark == '*' || mark == 'L'
+}
+
+// The marks of the cell with the complex's secret on it: a block's top or a dug bottom, a deck, a tunnel.
+complex_mark_secret :: proc(mark: u8) -> bool {
+	return mark == '$' || mark == '+' || mark == '?'
 }
 
 // In a dug layout: the marks of the cells dug down to its bottom (its own, its secret's and guards', those under its decks
@@ -387,11 +522,11 @@ complex_tunnel_block :: proc(w: ^World, p: grid.Position) -> (low, high: grid.Po
 	c := w.complexes[index-1]
 	layout := complex_layout(c.kind)
 	width, height := complex_size(layout)
-	seen: [64*16]bool
-	queue: [64*16]grid.Position
-	if width > 64 || height > 16 { return }
+	seen: [48*24]bool
+	queue: [48*24]grid.Position
+	if width > 48 || height > 24 { return }
 	start := grid.Position{x = p.x-c.origin.x, y = p.y-c.origin.y}
-	queue[0], seen[start.y*64+start.x] = start, true
+	queue[0], seen[start.y*48+start.x] = start, true
 	low, high = start, start
 	count := 1
 	for head := 0; head < count; head += 1 {
@@ -399,9 +534,9 @@ complex_tunnel_block :: proc(w: ^World, p: grid.Position) -> (low, high: grid.Po
 		low, high = {x = min(low.x, at.x), y = min(low.y, at.y)}, {x = max(high.x, at.x), y = max(high.y, at.y)}
 		for step in ([4]grid.Position{{x = 1}, {x = -1}, {y = 1}, {y = -1}}) {
 			next := grid.offset(at, step.x, step.y)
-			if next.x < 0 || next.y < 0 || next.x >= width || next.y >= height || seen[next.y*64+next.x] { continue }
+			if next.x < 0 || next.y < 0 || next.x >= width || next.y >= height || seen[next.y*48+next.x] { continue }
 			if !complex_mark_block(complex_mark(layout, next.x, next.y)) { continue }
-			seen[next.y*64+next.x] = true
+			seen[next.y*48+next.x] = true
 			queue[count] = next
 			count += 1
 		}
@@ -467,8 +602,9 @@ complex_free :: proc(w: ^World, data: ^level.Level, origin: grid.Position, layou
 			if !found || tile.kind != .Floor && tile.kind != .Wall { return false }
 			if _, owned := level.structure_index_at(data, p); owned { return false }
 			mark := complex_mark(layout, x-origin.x, y-origin.y)
+			// The Spazio's gravity wells stay where they are, on its open ground and on its blocks' tops.
 			#partial switch terrain(w.biome, p) {
-			case .Bridge, .Gravity: return false
+			case .Bridge: return false
 			case .Water: if !layout.over_water || complex_mark_block(mark) || complex_mark_ramp(mark) > 0 { return false }
 			case .Lava: if !layout.over_lava || complex_mark_block(mark) || complex_mark_ramp(mark) > 0 { return false }
 			}
@@ -501,8 +637,13 @@ plan_complexes :: proc(w: ^World, data: ^level.Level) {
 		if side-width-24 <= 0 || side-height-16 <= 0 { continue }
 		// A dug one needs the ground raised by a base as deep as it digs.
 		if layout.dug && w.base < COMPLEX_TOP { continue }
-		for _ in 0..<6000 {
+		// Near the one before it first, COMPLEX_NEAR cells round it at most; then anywhere.
+		previous := w.complexes[w.complex_count-1].origin if layout.near && w.complex_count > 0 else grid.Position{}
+		for attempt in 0..<9000 {
 			origin := grid.Position{x = 16+int(rng.next_u64(&r)%u64(side-width-24)), y = 8+int(rng.next_u64(&r)%u64(side-height-16))}
+			if layout.near && w.complex_count > 0 && attempt < 3000 {
+				origin = {x = previous.x-COMPLEX_NEAR+int(rng.next_u64(&r)%u64(2*COMPLEX_NEAR+1)), y = previous.y-COMPLEX_NEAR+int(rng.next_u64(&r)%u64(2*COMPLEX_NEAR+1))}
+			}
 			if !complex_free(w, data, origin, layout, w.complexes[:w.complex_count]) { continue }
 			w.complexes[w.complex_count] = {kind = kind, origin = origin}
 			w.complex_count += 1
@@ -510,6 +651,9 @@ plan_complexes :: proc(w: ^World, data: ^level.Level) {
 		}
 	}
 }
+
+// How far from the complex before it a complex placed near it may be (Complex_Layout.near).
+COMPLEX_NEAR :: 64
 
 // Raises a complex on the level ground the relief left round it, or digs it into it: its blocks or its bottom, its ramps,
 // its decks and tunnels, its lifts and its gates, shut; the props round it cleared.
@@ -531,6 +675,8 @@ build_complex :: proc(data: ^level.Level, c: Complex) {
 			if layout.dug {
 				if complex_mark_pit(mark) { _ = level.set_height(data, ground, bottom) }
 			} else if complex_mark_block(mark) { _ = level.set_height(data, ground, top) }
+			// The boulder stands on its cell of the top, as a wall (render/expedition_ascent.odin draws it).
+			if mark == 'O' { _ = level.set_tile(data, ground, {kind = .Wall}) }
 			// The shaft down to the network: its bottom is the network's floor (network.odin makes the hall round it).
 			if mark == 'D' {
 				deep := grid.Position{x = ground.x, y = ground.y, layer = NETWORK_LAYER}
@@ -581,6 +727,13 @@ complex_marked :: proc(c: Complex, mark: u8, cells: []grid.Position) -> (count: 
 	return
 }
 
+// The cell of the boulder on the complex's top (its mark 'O'), and whether it has one.
+complex_boulder :: proc(c: Complex) -> (cell: grid.Position, ok: bool) {
+	cells: [1]grid.Position
+	if complex_marked(c, 'O', cells[:]) == 1 { return cells[0], true }
+	return
+}
+
 // The complexes' secrets and guards, on the map as it is after the retouches (generate): credits and a relic on the
 // secret's cell and beside it, taken by hand; a group of the biome's foes where its guards stand.
 @(private)
@@ -588,7 +741,11 @@ fill_complexes :: proc(w: ^World, data: ^level.Level) {
 	for c, i in w.complexes[:w.complex_count] {
 		r := rng.create(w.seed~0xC0A1E5~u64(i+1)*0x9E3779B9)
 		cells: [1]grid.Position
-		if complex_marked(c, '$', cells[:]) == 1 {
+		found := false
+		for mark in ([3]u8{'$', '+', '?'}) {
+			if !found && complex_marked(c, mark, cells[:]) == 1 { found = true }
+		}
+		if found {
 			secret := cells[0]
 			beside := secret
 			for step in ([4]grid.Position{{x = -1}, {x = 1}, {y = -1}, {y = 1}}) {
@@ -601,7 +758,7 @@ fill_complexes :: proc(w: ^World, data: ^level.Level) {
 				_ = add_drop(w, beside, campaign.make_item(.Relic, 1, relic), 0, true)
 			}
 		}
-		for mark in ([2]u8{'@', '&'}) {
+		for mark in ([3]u8{'@', '&', '*'}) {
 			if complex_marked(c, mark, cells[:]) == 1 { add_group(w, data, -1, cells[0], 2+rank(w.biome)/2, false, false) }
 		}
 	}

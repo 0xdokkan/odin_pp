@@ -54,7 +54,7 @@ La tabella è in ordine di priorità, cioè l'ordine della scaletta qui sotto.
 | 4 | 4 | Piani nel laboratorio: trasparenze, contorni, mouse, luce | 3 (1 per l'aspetto) | Fatta | vedi Esito |
 | 5 | 5 | Piani nelle spedizioni: grotte senza caricamento | 1, 3, 4 | Fatta | vedi Esito |
 | 6 | 6 | Editor per scolpire i piani | 1, 3 (5 per le mappe dei biomi) | Fatta | vedi Esito |
-| 7 | 7 | Ponti, gallerie e scorciatoie nei biomi | 5, 6 | In corso | — |
+| 7 | 7 | Ponti, gallerie e scorciatoie nei biomi | 5, 6 | In corso (restano verifiche) | vedi Esito |
 | 8 | 8 | Ologramma completo, prestazioni, grotte vecchie | 5 (meglio dopo la 7) | Da fare | — |
 
 ## Scaletta: cosa sviluppare prima
@@ -221,9 +221,10 @@ ODIN="/c/Users/lukeg/OneDrive/Desktop/odin-dev-2026-10/dist/odin.exe"
   (`src/application/campaign_smoke.odin`, `expedition_enable_smoke`). Gli
   stage che contano qui: rilievi dal 63, ologrammi dal 75, due livelli 78,
   montagna 79, grotte dall'87, ologramma in grotta 103 (dalla Fase 5),
-  complessi dal 104, sei per bioma (nove biomi dal terzo gruppo, fino al
-  157), reti dal 158, tre per bioma (City pop, Egitto, Vietnam, Gotico:
-  fino al 169) (dalla Fase 7). Nel secondo gruppo le reti partivano dal 140.
+  complessi dal 104, sei per bioma (tutti i dodici biomi dal quarto gruppo,
+  fino al 175), reti dal 176, tre per bioma (City pop, Egitto, Vietnam,
+  Gotico, Spazio: fino al 190) (dalla Fase 7). Nel secondo gruppo le reti
+  partivano dal 140, nel terzo dal 158.
 - **Benchmark:**
   `"$ODIN" build src -o:speed -define:EXPEDITION_BENCHMARK=true -out:"$S/bench.exe"`,
   poi `"$S/bench.exe" --smoke-expedition > "$S/bench_a.log" 2>&1`
@@ -2072,6 +2073,20 @@ Con le risposte dell'utente nella Fase 7:
     collina e le catacombe che la uniscono al cimitero, con scale nelle tombe aperte e il pozzo con l'ascensore. Sopra,
     il ballatoio di una casa in rovina, con la scorciatoia;
   - **il killer del Gotico non scende:** resta in superficie, e sotto terra lo si semina.
+- **quarto gruppo (Cielo, Spazio, Memoria), risposte date alla fine del terzo**, tutte le consigliate:
+  - **Cielo, un'isola sospesa:** i ponti fra le isole restano come oggi. Su un'isola libera galleggia un'isola più piccola,
+    14 gradini sopra (piano +1): ci si sale da una scalinata di marmo attorno a un pilastro (la strada lunga), sopra ci sono
+    guardie e segreto, e la scorciatoia è l'ascensore, una colonna di luce, con il cancello che si apre da sopra. Sotto
+    l'isola sospesa ci si passa all'ombra;
+  - **Spazio, gallerie fra i crateri:** lo Spazio si alza di una base, e la superficie si vede uguale. Le gallerie sul piano
+    −2 uniscono i crateri: si scende da una scala in un cratere e si risale in un altro, con un ascensore, un cancello che
+    si apre da una parte sola, guardie e segreto. In superficie la stazione: moduli alti 14 uniti da passerelle (piano +1),
+    con ascensore e cancello;
+  - **Memoria, una collina nuova:** la collina del masso di oggi è tagliata dal terreno in piano di due luoghi (la Fonte e la
+    Prova), e resta una cresta alta 7. Al suo posto, in un punto libero, una collina vera alta 14, come complesso: un
+    sentiero sale girando fino al masso in cima (la strada lunga); dalla cima un pozzo con l'ascensore scende nella sala
+    della memoria dentro la collina, con guardie e segreto; l'imbocco della sala ha un cancello che si apre da dentro (la
+    scorciatoia da terra).
 
 **Temi:**
 
@@ -2086,9 +2101,9 @@ Con le risposte dell'utente nella Fase 7:
 | Montagne innevate | la grotta dentro la montagna | ponte di corda sul crepaccio |
 | Inferno | caverne di lava | ponti di ossa sopra la lava |
 | Southern gothic | cripta sotto la collina | ballatoio della casa |
-| Isola nel cielo | — | — (i ponti fra le isole restano come oggi, scelta dell'utente) |
-| Spazio | gallerie nei crateri | passerelle della stazione |
-| La memoria del creatore | dentro la collina del masso | — |
+| Isola nel cielo | — | un'isola sospesa sopra un'isola (i ponti fra le isole restano come oggi, scelta dell'utente) |
+| Spazio | gallerie fra i crateri | passerelle della stazione |
+| La memoria del creatore | dentro la collina del masso (una collina nuova) | — |
 
 - **Interconnessioni:** almeno due strade per arrivare ai luoghi importanti
   (una sopra o sotto); grotte con più imbocchi; scorciatoie che evitano un giro
@@ -2192,7 +2207,9 @@ e fermati alla fine.
 
 ### Esito
 
-In corso.
+Il lavoro è fatto il 27 ottobre 2026: il passo del laboratorio (ascensore e cancello) e i quattro gruppi di biomi. Tutti i
+dodici biomi hanno i loro piani, raggiungibili e uguali a ogni run. Per chiudere la fase restano, alla corrente, lo smoke
+del laboratorio intero e il benchmark di tutta la fase (vedi il quarto gruppo).
 
 **Avanzamento**
 - **Passo 1, ascensore e cancello nella Prova meccaniche** (26 ottobre 2026): fatto, e fermo per guardare le
@@ -2383,6 +2400,55 @@ In corso.
       10-15% fra un giro e l'altro anche con l'eseguibile del secondo gruppo (lo stage dell'Inferno fa 1,52 o 1,75 ms).
       Gli stage nuovi costano come gli altri: i complessi di Neve, Inferno e Gotico 1,12 ms di media, la rete del Gotico
       1,18 ms.
+- **Passo 2, quarto gruppo di biomi: Cielo, Spazio, Memoria** (26-27 ottobre 2026): fatto con le risposte date alla fine
+  del terzo (vedi «Progetto»). Con lui la fase è finita.
+  - **Cielo, l'isola sospesa** (`Floating_Island`): su un'isola libera, un'isola di marmo di 7×6 caselle sul piano +1, 14
+    gradini sopra il suolo dell'isola; guardie e segreto sopra (segni nuovi `+` e `*`: segreto e guardie su un ponte), la
+    scalinata attorno a un pilastro a ovest, l'ascensore a est con il cancello sul pianerottolo, che si apre dall'isola.
+    L'isola sotto resta camminabile; nessuna casella del complesso tocca il vuoto o un ponte.
+  - **Spazio, gallerie fra i crateri:** lo Spazio si alza di una base. La stazione (`Station`): tre moduli, due passerelle,
+    rampa, segreto e guardie sul modulo di mezzo, ascensore con il cancello in cima. Tre crateri **scavati** profondi 14
+    (`Crater_Lift`, `Crater_Hall`, `Crater_Stair`): l'ascensore dal fondo, guardie e segreto sul fondo, la scala da ovest e
+    le guardie. Le gallerie (`Network_Hall.crater`) partono dalla casella sotto il terreno accanto al fondo di un cratere,
+    la più vicina al cratere dopo (`network_crater_mouth`), e la parete lì si apre; il cancello sta sulla galleria fra il
+    cratere dell'ascensore e quello del segreto, con la leva dalla parte del segreto.
+  - **Memoria, la collina del masso** (`Boulder_Hill`, 13×17): cima a 14 con il masso (segno `O`, un muro disegnato come la
+    pietra di Sisifo), una terrazza a 7 su tre lati, il sentiero che sale da sud, gira sulla terrazza e sale sul fianco
+    est; il pozzo `S` dalla cima alla sala (segno nuovo `?`: segreto in galleria), le guardie, il passaggio con il cancello
+    che si apre da dentro. La grande collina in mezzo alla mappa non c'è più (`relief.odin`).
+  - **Scelte prese durante il lavoro:**
+    - **i crateri sono buche scavate**, non crateri larghi: una scala di 13 gradini dentro la conca di un cratere vuole un
+      cratere largo una trentina di caselle, e una sonda ha mostrato che fra i luoghi di una mappa di 224 non ce n'è posto.
+      Così ogni cratere è una buca tonda di 11 caselle scavata nella base, come il crepaccio della Neve;
+    - **fino a quattro complessi per bioma** (`MAX_COMPLEXES` da 2 a 4): la stazione e i tre crateri. Un cratere cerca il
+      posto prima entro 64 caselle da quello prima (`Complex_Layout.near`), così le gallerie restano corte;
+    - **i pozzi di gravità restano anche sui complessi**: prima un complesso non poteva stare su una casella di gravità, e
+      nello Spazio, dove sono l'8% delle caselle in una griglia fitta, non c'era posto;
+    - il masso era chiaro come la pietra della cavalcatura, e sotto la lampada del robot diventava una palla bianca: ora è
+      scuro come la pietra del bioma;
+    - lo smoke cerca i nemici e l'ascensore delle reti «sotto la base», non sul piano −2: nello Spazio stanno sul fondo dei
+      crateri. Nei biomi di prima è lo stesso.
+  - **Test:** i complessi e le prove con i nemici liberi girano in dodici biomi, le reti in cinque. Nuovi: l'isola sospesa
+    sopra la sua isola, le gallerie fra i crateri (sotto la base si va dalla scala al segreto, all'ascensore solo con il
+    cancello aperto), la collina con la sala e il masso. Il test dei rilievi accetta l'1% di caselle alzate nella Memoria
+    (la sua collina ora è un complesso) e misura la cima di un complesso dal suo suolo (l'isola del Cielo sta a quota 3);
+    il test dei complessi non conta gli isolotti del Cielo senza ponte, che c'erano già.
+  - **Verifiche:**
+    - check con e senza assert; `.\scripts\check.ps1` completo: 1735 test verdi (3 nuovi), più le due build;
+    - smoke del laboratorio **da finire**: girava insieme a `check.ps1` e allo smoke delle spedizioni, e si è fermato al
+      limite di 40 minuti con 86 catture su 129. Di queste 83 sono identiche al byte a quelle del terzo gruppo; tre
+      dell'atto delle strutture hanno pochi pixel diversi (nessuna casella dell'immagine ridotta cambia), la stessa variante
+      già uscita nel primo gruppo. Va rifatto da solo, alla corrente;
+    - smoke delle spedizioni: 191 catture, nessun errore. Cambiano davvero i rilievi di Cielo, Spazio e Memoria (ora
+      inquadrano l'isola, un cratere, la collina), il centro della Memoria e la Fonte accanto (senza la cresta); lo Spazio
+      alzato si vede come prima (meno dello 0,2% dei pixel diversi); le altre differenze sono l'animazione. 18 catture
+      nuove dei complessi e 3 delle gallerie;
+    - smoke dell'editor: 12 catture, nessun errore;
+    - benchmark **da fare**: alla fine del lavoro il portatile era a batteria, al 4%, e a batteria la RTX 3060 è bloccata
+      a 30 fotogrammi al secondo (il benchmark non vale, come nel primo gruppo). Alla corrente: il quarto gruppo contro il
+      terzo, in ordine bilanciato, e tutta la Fase 7 contro l'eseguibile di prima dei gruppi di biomi, sugli stage comuni.
+
+## 11. Fase 8 — Ologramma a piani, prestazioni e grotte vecchie
 
 ### Cosa si fa
 

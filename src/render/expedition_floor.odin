@@ -181,7 +181,8 @@ void caveMain() {
 // underside, the trestles: the vertices' red at 0) darker. The vertices' green says the way it runs (along x at 1), their
 // blue whether the cell is in its middle (1) or on its edge, their alpha how near an open side a point is (0 on it), where
 // the biome's railing runs: the data walkway's neon, the train bridge's beam, the vine bridge's vines, the overpass's
-// kerb, the bamboo bridge's rope, the rope bridge's ropes, the bones' ends, the gallery's balustrade.
+// kerb, the bamboo bridge's rope, the rope bridge's ropes, the bones' ends, the gallery's balustrade, the floating island's
+// gold fillet; the station's walkways are the data walkway's, in the Spazio's neon.
 void deckMain() {
     vec3 n=normalize(normal);
     vec2 p=worldPosition.xz;
@@ -192,6 +193,7 @@ void deckMain() {
         if(floorBiome==6) frame=vec3(.16,.13,.10);
         if(floorBiome==7) frame=vec3(.40,.35,.28);
         if(floorBiome==8) frame=vec3(.08,.065,.05);
+        if(floorBiome==9) frame=vec3(.30,.31,.34);
         if(normal.y<-.5) frame*=.6;
         finalColor=vec4(expedition_lit(worldPosition,n,frame,.8,floorBiome==0?.35:.04),1.);
         return;
@@ -263,6 +265,16 @@ void deckMain() {
         base=mix(vec3(.03,.025,.02),mix(vec3(.15,.13,.11),vec3(.20,.18,.15),grain),board);
         base=mix(base,vec3(.52,.50,.44),rim);
         roughness=.9;
+    } else if(floorBiome==9) {
+        // The Cielo's floating island: pearl marble slabs with sparse veins, as its islands, and a gold fillet along its
+        // open sides.
+        float joint=floorJoint(p,vec2(2.,2.),0.,.009,aa);
+        float vein=inkLine(fract(p.x*.16+p.y*.09+abs(fract(p.y*.11)-.5)*.22)-.5,.004,aa*.3);
+        base=mix(vec3(.236,.246,.262),vec3(.123,.144,.173),vein*.14);
+        base*=1.-joint*.16;
+        base=mix(base,vec3(.42,.33,.16),rim);
+        emission+=expedition_linear(vec3(.95,.74,.36))*rim*.22;
+        roughness=mix(.34,.30,rim);metallic=mix(.04,.55,rim);
     } else {
         // The data walkway: steel grating in a fine grid between solid plates, a neon rim along its open sides.
         float grate=max(inkLine(fract(q.x*4.)-.5,.03,aa*4.),inkLine(fract(q.y*4.)-.5,.03,aa*4.));

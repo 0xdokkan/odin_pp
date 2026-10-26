@@ -12,7 +12,9 @@ import rng "../engine/rng"
 // necropolis, a great hall and a tomb under the desert, with a hall under the west pyramid's shaft (complex.odin); the
 // Vietnam its galleries, from today's tunnel in the south to where the tunnel came out in the north-east, with chambers
 // on the way; in the third group the Gotico its crypt under the hill and the catacombs to the graveyard (the user's
-// choices). The Neve is raised too, for its crevasse, and has none.
+// choices). The Neve is raised too, for its crevasse, and has none. In the fourth the Spazio has its galleries between
+// three deep craters (complex.odin): there the halls are the craters' bottoms, open to the sky, and the ways come out of
+// their walls.
 //
 // One goes down by stairs, a ramp in a pit from the ground to a step over the network, and at one place by a lift's
 // shaft; a gate on a way opens from one side only, the network's shortcut. Its halls hold the biome's foes and a secret.
@@ -31,6 +33,9 @@ Network_Hall :: struct {
 	// shaft down to the network (its mark 'D').
 	at:     [2]int,
 	shaft:  bool,
+	// Or the pit of the biome's complex of this kind (the Spazio's craters): the hall is its bottom, its ways come out of
+	// its wall, and its stair, lift, foes and secret are the complex's.
+	crater: Complex_Kind,
 	// How far it reaches from its middle, on each side.
 	half:   [2]int,
 	// The width of a stair down to it (0: none); whether the lift's shaft is in it, its foes, the secret.
@@ -88,20 +93,49 @@ CATACOMB_HALLS := [?]Network_Hall{
 	{at = {22, 30}, half = {3, 2}, stair = 1},
 }
 
+// The Spazio's galleries between its craters: from the one with the lift to the one with the secret, a way whose gate opens
+// from the secret's crater; on to the one with the stair. Down the stair, along the galleries to the secret, the gate
+// opened, up by the lift: once opened, the lift is the short way down to it.
+@(private = "file")
+CRATER_HALLS := [?]Network_Hall{
+	{crater = .Crater_Lift},
+	{crater = .Crater_Hall},
+	{crater = .Crater_Stair},
+}
+
 network_plan :: proc(b: campaign.Biome) -> Network_Plan {
 	#partial switch b {
 	case .City: return {halls = METRO_HALLS[:], way = 3, gate_way = 1}
 	case .Egypt: return {halls = NECROPOLIS_HALLS[:], way = 3, gate_way = 0}
 	case .Vietnam: return {halls = GALLERY_HALLS[:], way = 2, gate_way = 3}
 	case .Gothic: return {halls = CATACOMB_HALLS[:], way = 2, gate_way = 0}
+	case .Space: return {halls = CRATER_HALLS[:], way = 2, gate_way = 0}
 	}
 	return {gate_way = -1}
 }
 
-// The middle of the plan's hall `index` on the map, on the network's layer.
+// The world's complex of kind `kind`, if it has one.
+network_crater :: proc(w: ^World, kind: Complex_Kind) -> (c: Complex, ok: bool) {
+	for other in w.complexes[:w.complex_count] { if other.kind == kind { return other, true } }
+	return
+}
+
+// The middle of the plan's hall `index` on the map, on the network's layer; a crater's, on its bottom.
 network_hall_centre :: proc(w: ^World, plan: Network_Plan, index: int) -> grid.Position {
 	hall := plan.halls[index]
 	side := size(w)
+	if hall.crater != .None {
+		c, ok := network_crater(w, hall.crater)
+		if !ok { return {} }
+		layout := complex_layout(c.kind)
+		width, height := complex_size(layout)
+		sum, count := grid.Position{}, 0
+		for y in 0..<height {
+			for x in 0..<width { if complex_mark_pit(layout.rows[y][x]) { sum, count = {x = sum.x+x, y = sum.y+y}, count+1 } }
+		}
+		if count == 0 { return c.origin }
+		return {x = c.origin.x+sum.x/count, y = c.origin.y+sum.y/count}
+	}
 	if hall.shaft {
 		for c in w.complexes[:w.complex_count] {
 			layout := complex_layout(c.kind)
@@ -332,6 +366,39 @@ network_lift :: proc(w: ^World, data: ^level.Level, centre: grid.Position, half:
 	return false
 }
 
+// Where a way comes out of a crater's wall (a hall with `crater`): the cell beside its bottom, under the ground round it,
+// nearest `toward`; on the network's layer, at the bottom's height, so that one walks from it onto the bottom.
+@(private = "file")
+network_crater_mouth :: proc(w: ^World, data: ^level.Level, kind: Complex_Kind, toward: grid.Position) -> (mouth: grid.Position, ok: bool) {
+	c, found := network_crater(w, kind)
+	if !found { return }
+	layout := complex_layout(c.kind)
+	width, height := complex_size(layout)
+	best := max(int)
+	for y in 0..<height {
+		for x in 0..<width {
+			if !complex_mark_pit(layout.rows[y][x]) { continue }
+			for step in ([4]grid.Position{{x = 1}, {x = -1}, {y = 1}, {y = -1}}) {
+				if complex_mark_pit(complex_mark(layout, x+step.x, y+step.y)) || complex_mark_ramp(complex_mark(layout, x+step.x, y+step.y)) > 0 { continue }
+				q := grid.Position{x = c.origin.x+x+step.x, y = c.origin.y+y+step.y, layer = NETWORK_LAYER}
+				if !network_room_under(data, q.x, q.y) { continue }
+				d := (q.x-toward.x)*(q.x-toward.x)+(q.y-toward.y)*(q.y-toward.y)
+				if d < best { best, mouth, ok = d, q, true }
+			}
+		}
+	}
+	return
+}
+
+// The cell a way from hall `index` toward hall `other` starts at: the room under the ground nearest a hall's middle, or a
+// crater's mouth.
+@(private = "file")
+network_way_end :: proc(w: ^World, data: ^level.Level, plan: Network_Plan, centres: []grid.Position, index, other: int) -> (end: grid.Position, ok: bool) {
+	if plan.halls[index].crater != .None { return network_crater_mouth(w, data, plan.halls[index].crater, centres[other]) }
+	end = network_nearest(data, centres[index], 6)
+	return end, network_room_under(data, end.x, end.y)
+}
+
 // The network's gate on a way (`path`, from one hall to the next): at the cell nearest its middle where it goes straight,
 // the way narrowed to that cell there; its lever the next cell, on the next hall's side.
 @(private = "file")
@@ -364,8 +431,10 @@ place_network :: proc(w: ^World, data: ^level.Level) {
 	centres: [8]grid.Position
 	count := min(len(plan.halls), len(centres))
 	for i in 0..<count { centres[i] = network_hall_centre(w, plan, i) }
-	// Each hall: the cells of its box that may hold it and join its middle (a wall over the box leaves no pocket apart).
+	// Each hall: the cells of its box that may hold it and join its middle (a wall over the box leaves no pocket apart). A
+	// crater's is its bottom, dug already.
 	for i in 0..<count {
+		if plan.halls[i].crater != .None { continue }
 		half := plan.halls[i].half
 		anchor := network_nearest(data, centres[i], 6)
 		if !network_room_under(data, anchor.x, anchor.y) { continue }
@@ -390,8 +459,9 @@ place_network :: proc(w: ^World, data: ^level.Level) {
 	}
 	path := make([dynamic]grid.Position, context.temp_allocator)
 	for i in 0..<count-1 {
-		from, to := network_nearest(data, centres[i], 6), network_nearest(data, centres[i+1], 6)
-		if !network_way(data, from, to, plan.way, &path) { continue }
+		from, from_ok := network_way_end(w, data, plan, centres[:count], i, i+1)
+		to, to_ok := network_way_end(w, data, plan, centres[:count], i+1, i)
+		if !from_ok || !to_ok || !network_way(data, from, to, plan.way, &path) { continue }
 		if i == plan.gate_way { network_gate(data, path[:], plan.way) }
 	}
 	for hall, i in plan.halls[:count] {
@@ -408,6 +478,8 @@ fill_network :: proc(w: ^World, data: ^level.Level) {
 	if len(plan.halls) == 0 || w.base < NETWORK_FLOOR+level.LAYER_SPACING { return }
 	r := rng.create(w.seed~0x5E7_0071)
 	for hall, i in plan.halls {
+		// A crater's foes and secret are its complex's (fill_complexes).
+		if hall.crater != .None { continue }
 		centre := network_nearest(data, network_hall_centre(w, plan, i), 6)
 		if tile, _ := level.tile_at(data, centre); tile.kind != .Floor { continue }
 		if hall.secret {

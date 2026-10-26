@@ -163,21 +163,21 @@ EXPEDITION_SMOKE_PLACE_STEPS :: 4
 // The hologram in a cave (Fase 5 of docs/piano-profondita.md): in the Snow's mountain room, its room in place of the rock.
 @(private)
 EXPEDITION_SMOKE_CAVE_MAP :: EXPEDITION_SMOKE_PLACE+EXPEDITION_SMOKE_PLACE_STEPS
-// The complexes (Fase 7 of docs/piano-profondita.md) of the first three groups of biomes: the whole complex from its foot,
-// under its bridge (a pyramid's terrace, the crevasse's bottom), on it (a pyramid's top), by its gate, on its lift halfway
-// down, and a fight between its layers.
+// The complexes (Fase 7 of docs/piano-profondita.md) of the four groups of biomes, each biome's first: the whole complex from
+// its foot, under its bridge (a pyramid's terrace, the crevasse's bottom, the boulder's hall), on it (a pyramid's top, the
+// boulder's), by its gate, on its lift halfway down, and a fight between its layers.
 @(private)
 EXPEDITION_SMOKE_COMPLEXES :: EXPEDITION_SMOKE_CAVE_MAP+1
 @(private)
-EXPEDITION_SMOKE_COMPLEX_BIOMES :: [9]campaign.Biome{.Cyber,.West,.Jungle,.City,.Egypt,.Vietnam,.Snow,.Inferno,.Gothic}
+EXPEDITION_SMOKE_COMPLEX_BIOMES :: [12]campaign.Biome{.Cyber,.West,.Jungle,.City,.Egypt,.Vietnam,.Snow,.Inferno,.Gothic,.Sky,.Space,.Secret}
 @(private)
 EXPEDITION_SMOKE_COMPLEX_VIEWS :: 6
-// The networks under the ground of the raised biomes (expedition/network.odin): on a stair's pit, in a hall with its foes,
-// on the lift's shaft halfway down.
+// The networks under the ground of the raised biomes (expedition/network.odin): on a stair's pit, in a hall with its foes
+// (the Spazio's: a crater's bottom), on the lift's shaft halfway down.
 @(private)
 EXPEDITION_SMOKE_NETWORKS :: EXPEDITION_SMOKE_COMPLEXES+len(EXPEDITION_SMOKE_COMPLEX_BIOMES)*EXPEDITION_SMOKE_COMPLEX_VIEWS
 @(private)
-EXPEDITION_SMOKE_NETWORK_BIOMES :: [4]campaign.Biome{.City,.Egypt,.Vietnam,.Gothic}
+EXPEDITION_SMOKE_NETWORK_BIOMES :: [5]campaign.Biome{.City,.Egypt,.Vietnam,.Gothic,.Space}
 @(private)
 EXPEDITION_SMOKE_NETWORK_VIEWS :: 3
 // The last stage of the path; the smoke quits after it.
@@ -661,15 +661,17 @@ expedition_smoke_complex :: proc(e:^run.Expedition_Session,step:int) {
 	c:=w.complexes[0]
 	layout:=world.complex_layout(c.kind);width,height:=world.complex_size(layout)
 	deck:=world.complex_bridge_middle(c)
-	// A complex with no bridge (the Egitto's pyramids): its secret's top for the bridge, its first terrace for under it.
+	// A complex with no bridge (the Egitto's pyramids, the boulder's hill): its secret's top, or its shaft's, for the bridge;
+	// its first terrace for under it, or the hall inside it with the secret.
 	terrace:=grid.Position{x = deck.x, y = deck.y}
 	if deck==c.origin {
 		deck,terrace={x = c.origin.x+width/2, y = c.origin.y},{x = c.origin.x+width/2, y = c.origin.y}
 		found_top,found_terrace:=false,false
 		for y in 0..<height {for x in 0..<width {
 			mark:=layout.rows[y][x]
-			if mark=='$' && !found_top {deck=world.complex_cell(c,{x = x, y = y});found_top=true}
+			if (mark=='$' || mark=='S') && !found_top {deck={x = c.origin.x+x, y = c.origin.y+y};found_top=true}
 			if mark=='h' && !found_terrace {terrace=world.complex_cell(c,{x = x, y = y});found_terrace=true}
+			if mark=='?' {terrace=world.complex_cell(c,{x = x, y = y});found_terrace=true}
 		}}
 	}
 	if room.phase!=.Loot {game.end_expedition_encounter(room);clear(&room.enemies);room.phase=.Loot}
@@ -750,10 +752,10 @@ expedition_smoke_network :: proc(e:^run.Expedition_Session,step:int) {
 		assert(found,"no stair down to the network")
 		room.player.position=best
 	case 1:
-		// Three cells from a foe asleep in the network, on its floor.
+		// Three cells from a foe asleep in the network (under the base: in a hall, or at a crater's bottom), on its floor.
 		placed:=false
 		for g in w.groups[:w.group_count] {
-			if g.count==0 || g.members[0].enemy.position.layer!=world.NETWORK_LAYER {continue}
+			if g.count==0 || level.height_at(data,g.members[0].enemy.position)>=data.base {continue}
 			foe:=g.members[0].enemy.position
 			for offset in ([4]grid.Position{{x = -3},{x = 3},{y = 3},{y = -3}}) {
 				cell:=grid.offset(foe,offset.x,offset.y)
@@ -763,9 +765,10 @@ expedition_smoke_network :: proc(e:^run.Expedition_Session,step:int) {
 		}
 		assert(placed,"no foe in the network")
 	case 2:
-		// The lift down to the network, its platform up top: the robot on it halfway down.
+		// The lift down to the network (its foot under the base: in a hall, or at a crater's bottom), its platform up top: the
+		// robot on it halfway down.
 		index:=-1
-		for lift,i in data.lifts {if lift.ends[0].layer==world.NETWORK_LAYER {index=i}}
+		for lift,i in data.lifts {if level.height_at(data,lift.ends[0])<data.base {index=i}}
 		assert(index>=0,"no lift down to the network")
 		lift:=data.lifts[index]
 		room.player.position=lift.ends[1]

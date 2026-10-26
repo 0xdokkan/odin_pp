@@ -22,7 +22,7 @@ import level "../level"
 //   Gothic    graveyard mounds round a crypt hill
 //   Sky       islands at their own heights, with sloping bridges between
 //   Space     craters, with a raised rim
-//   Secret    one great hill, the boulder's
+//   Secret    a few low mounds (the boulder's hill is a complex: complex.odin)
 //
 // The ground is made in two layers. The smooth one (hills, dunes, swells) never has a cliff: it is
 // relaxed so that neighbouring cells are at most one step apart, and flat round everything that must
@@ -34,12 +34,13 @@ RELIEF_MAX :: u8(12)
 // THE RAISED BIOMES (Fase 7 of docs/piano-profondita.md, the user's choice for its second group): City pop, Egitto and
 // Vietnam have all their ground raised by a base, so that there is room under it for their networks on the deep layer
 // (network.odin); the surface is the same, and drawn as before (level.Level.base). In the third group the Neve too, for
-// the crevasse dug in its snow (complex.odin), and the Gotico, for its crypt and catacombs (network.odin).
+// the crevasse dug in its snow (complex.odin), and the Gotico, for its crypt and catacombs (network.odin); in the fourth
+// the Spazio, for its deep craters and the galleries between them.
 EXPEDITION_RAISED_BASE :: level.LAYER_SPACING+2
 
 biome_base :: proc(b: campaign.Biome) -> i32 {
 	#partial switch b {
-	case .City, .Egypt, .Vietnam, .Snow, .Gothic: return EXPEDITION_RAISED_BASE
+	case .City, .Egypt, .Vietnam, .Snow, .Gothic, .Space: return EXPEDITION_RAISED_BASE
 	}
 	return 0
 }
@@ -204,7 +205,8 @@ paint_smooth :: proc(r: ^Relief, b: campaign.Biome) {
 	case .Space:
 		scatter(r, 36, 80, 19, proc(r: ^Relief, x, y: int, h: u32) { paint_rim(r, x, y, 6+f32(h%4), 3, 1.2) })
 	case .Secret:
-		paint_cone(r, n/2, n/2, 10, 3, 1, 1)
+		// The great hill in the middle the sites' level ground had cut down to a ridge: the boulder's hill is now a
+		// complex of its own (complex.odin, Fase 7 of docs/piano-profondita.md).
 		scatter(r, 30, 40, 20, proc(r: ^Relief, x, y: int, h: u32) { paint_cone(r, x, y, 2, 2, 1, 1) })
 	case .Count:
 	}

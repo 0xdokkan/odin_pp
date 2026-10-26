@@ -11,7 +11,7 @@ import render "../render"
 import run_session "../run"
 
 @(private = "file")
-COMPLEX_PLAY_BIOMES :: [9]campaign.Biome{.Cyber, .West, .Jungle, .City, .Egypt, .Vietnam, .Snow, .Inferno, .Gothic}
+COMPLEX_PLAY_BIOMES :: [12]campaign.Biome{.Cyber, .West, .Jungle, .City, .Egypt, .Vietnam, .Snow, .Inferno, .Gothic, .Sky, .Space, .Secret}
 
 // Each biome's complex (Fase 7 of docs/piano-profondita.md) lives a minute of play as an expedition
 // has it: the robot still on the complex's bridge, its guards woken and free, the controller and the world ticking. Nothing
@@ -31,16 +31,18 @@ test_the_complexes_live_a_minute_of_play_with_their_guards_free :: proc(t: ^test
 		room.phase = .Loot
 		player.tactical.config.expedition_biome = u8(biome)
 		testing.expect(t, w.complex_count > 0)
-		// On the complex's bridge; on the top with its secret where it has none (the Egitto's pyramids).
+		// On the complex's bridge; where it has none, on the top with its secret (the Egitto's pyramids) or its shaft's (the
+		// boulder's hill, its guards in the hall under it).
 		c := w.complexes[0]
 		player.position = world.complex_bridge_middle(c)
 		if player.position == c.origin {
 			layout := world.complex_layout(c.kind)
-			for row, y in layout.rows { for x in 0..<len(row) { if row[x] == '$' { player.position = world.complex_cell(c, {x = x, y = y}) } } }
+			for row, y in layout.rows { for x in 0..<len(row) { if row[x] == '$' || row[x] == 'S' { player.position = grid.offset(c.origin, x, y) } } }
 		}
+		// The guards of that complex (the Spazio has more than one).
 		guards := -1
 		for group, i in w.groups[:w.group_count] {
-			if index, _ := world.complex_at(&w, group.anchor); index > 0 { guards = i }
+			if index, _ := world.complex_at(&w, group.anchor); index == 1 { guards = i }
 		}
 		testing.expectf(t, guards >= 0, "%v: no guards on the complex", biome)
 		testing.expectf(t, world.engage(&w, &room, guards), "%v: the guards did not wake", biome)

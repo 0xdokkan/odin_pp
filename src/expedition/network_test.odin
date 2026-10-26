@@ -8,11 +8,12 @@ import grid "../engine/grid"
 import level "../level"
 
 @(private = "file")
-RAISED_BIOMES :: [4]campaign.Biome{.City, .Egypt, .Vietnam, .Gothic}
+RAISED_BIOMES :: [5]campaign.Biome{.City, .Egypt, .Vietnam, .Gothic, .Space}
 
-// City pop, the Egitto, the Vietnam and the Gotico are raised by a base, and have a network on the deep layer under it:
-// halls at the network's floor, a stair down (a pit under the base), the shaft of a lift and a gate on it. The Neve is
-// raised for its crevasse (complex.odin) and has none; the other biomes are not raised and have nothing on the deep layer.
+// City pop, the Egitto, the Vietnam, the Gotico and the Spazio are raised by a base, and have a network on the deep layer
+// under it: halls at the network's floor (the Spazio's: its craters' bottoms), a stair down (a pit under the base), a lift
+// down under the base and a gate on the network. The Neve is raised for its crevasse (complex.odin) and has none; the other
+// biomes are not raised and have nothing on the deep layer.
 @(test)
 test_the_raised_biomes_have_a_network_under_their_ground :: proc(t: ^testing.T) {
 	for biome in campaign.Biome {
@@ -41,7 +42,7 @@ test_the_raised_biomes_have_a_network_under_their_ground :: proc(t: ^testing.T) 
 		}
 		testing.expectf(t, pits >= NETWORK_STAIR_STEPS, "%v: %d cells of pits", biome, pits)
 		deep_lift, deep_gate := false, false
-		for lift in data.lifts { deep_lift = deep_lift || lift.ends[0].layer == NETWORK_LAYER }
+		for lift in data.lifts { deep_lift = deep_lift || level.height_at(&data, lift.ends[0]) < data.base }
 		for gate in data.gates { deep_gate = deep_gate || gate.cell.layer == NETWORK_LAYER }
 		testing.expectf(t, deep_lift && deep_gate, "%v: a lift down to the network %v, a gate on it %v", biome, deep_lift, deep_gate)
 		error, bad := level.check_layers(&data)
@@ -49,7 +50,8 @@ test_the_raised_biomes_have_a_network_under_their_ground :: proc(t: ^testing.T) 
 	}
 }
 
-// The network's secret is reached from the spawn, with every gate shut, and so is every one of its halls' foes.
+// The network's secret is reached from the spawn, with every gate shut, and so is every one of its halls' foes: under the
+// base (in a hall on the deep layer, or at a crater's bottom).
 @(test)
 test_the_networks_secret_and_foes_can_be_walked_to :: proc(t: ^testing.T) {
 	for biome in RAISED_BIOMES {
@@ -60,13 +62,13 @@ test_the_networks_secret_and_foes_can_be_walked_to :: proc(t: ^testing.T) {
 		seen := level.layer_reach(&data, data.player_spawn, context.temp_allocator)
 		secrets, foes := 0, 0
 		for drop in w.drops[:w.drop_count] {
-			if drop.position.layer != NETWORK_LAYER { continue }
+			if level.height_at(&data, drop.position) >= data.base { continue }
 			secrets += 1
 			testing.expectf(t, seen[level.layer_reach_index(&data, drop.position)], "%v: the secret at %v cannot be walked to", biome, drop.position)
 		}
 		for &group in w.groups[:w.group_count] {
 			for member in group.members[:group.count] {
-				if member.enemy.position.layer != NETWORK_LAYER { continue }
+				if level.height_at(&data, member.enemy.position) >= data.base { continue }
 				foes += 1
 				testing.expectf(t, seen[level.layer_reach_index(&data, member.enemy.position)], "%v: a foe at %v cannot be walked to", biome, member.enemy.position)
 			}
