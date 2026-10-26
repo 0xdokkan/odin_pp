@@ -17,7 +17,8 @@ Expedition_Floor_Program :: struct {
 	map_data, map_size, tint, time, beat, lane, lane_warning, biome: c.int,
 	focus, focus_count, grid_amount, surface: c.int,
 	reveal_eye, reveal_forward, reveal_viewport, reveal_points, reveal_count, reveal_floor: c.int,
-	// The pass (0 the ground, 1 the rooms under it: expedition_layers.odin) and the fade over the robot in a cave.
+	// The pass (0 the ground, 1 the rooms under it: expedition_layers.odin, 2 the decks over it: expedition_decks.odin) and
+	// the fade over the robot.
 	layer, cover: c.int,
 	lights: Expedition_Light_Uniforms,
 	reflection: Expedition_Reflection_Uniforms,
@@ -32,6 +33,8 @@ Expedition_Floor :: struct {
 	terrain: Expedition_Terrain_Cache,
 	// The caves' rooms under the ground (expedition_layers.odin).
 	under: Expedition_Under_Cache,
+	// The complexes' decks over it (expedition_decks.odin).
+	decks: Expedition_Under_Cache,
 }
 
 EXPEDITION_FLOOR_HEADER_BODY :: `in vec3 worldPosition;
@@ -54,7 +57,7 @@ uniform vec4 gridFocus[9];
 uniform int gridFocusCount;
 uniform float gridAmount;
 uniform vec2 floorSurface;
-// 0: the ground and its relief; 1: the rooms under it (expedition_layers.odin).
+// 0: the ground and its relief; 1: the rooms under it (expedition_layers.odin); 2: the decks over it (expedition_decks.odin).
 uniform int floorLayer;
 #ifdef TERRACE_REVEAL
 uniform vec3 eye;
@@ -64,7 +67,8 @@ uniform vec4 reveal[9];
 uniform int revealCount;
 // The height of the ground the robot stands on: only what is above it can be in its way.
 uniform float revealFloor;
-// In a cave: the robot's point (x, z), the height of his eyes (y), and whether the ground over him fades (w).
+// The robot's point (x, z), the height of his eyes (y), and whether what is over them fades (w): the ground in a cave,
+// the decks always.
 uniform vec4 coverPoint;
 #endif
 const float BAYER[16]=float[16](0.,8.,2.,10.,12.,4.,14.,6.,3.,11.,1.,9.,15.,7.,13.,5.);
@@ -95,6 +99,7 @@ float floorJoint(vec2 p,vec2 size,float stagger,float width,float aa) {
 }
 void floorMain();
 void caveMain();
+void deckMain();
 void main() {
     float rim=0.;
     float cover=1.;
@@ -115,9 +120,9 @@ void main() {
             rim=1.-smoothstep(1.,1.12,r);
         }
     }
-    // In a cave the ground over the robot's eyes opens round him (Fase 4's rule, game/layer_view.odin): within six
-    // cells, down to fifteen percent beside him, as a stipple; what is left of it is darker.
-    if(floorLayer==0 && coverPoint.w>0. && worldPosition.y>coverPoint.y) {
+    // In a cave the ground over the robot's eyes opens round him (Fase 4's rule, game/layer_view.odin), and so does a deck
+    // over them: within six cells, down to fifteen percent beside him, as a stipple; what is left of it is darker.
+    if(floorLayer!=1 && coverPoint.w>0. && worldPosition.y>coverPoint.y) {
         float far=max(length(worldPosition.xz-coverPoint.xz)-.5,0.);
         if(far<6.) {
             float k=clamp((6.-far)/5.,0.,1.);
@@ -127,7 +132,7 @@ void main() {
         }
     }
 #endif
-    if(floorLayer==1) caveMain(); else floorMain();
+    if(floorLayer==1) caveMain(); else if(floorLayer==2) deckMain(); else floorMain();
     finalColor.rgb=mix(finalColor.rgb,vec3(.62,.92,1.),rim*.85);
     finalColor.rgb*=mix(.35,1.,cover);
 #ifdef TERRACE_REVEAL
@@ -171,6 +176,58 @@ void caveMain() {
         emission+=expedition_linear(biomeTint)*line*focus*.22;
     }
     finalColor=vec4(expedition_lit(worldPosition,n,base,.72,.05)+emission,1.);
+}
+// A complex's decks (expedition_decks.odin): the biome's bridge, its top in its own material, its frame (the edges, the
+// underside, the trestles: the vertices' red at 0) darker. The vertices' green says the way it runs (along x at 1), their
+// blue whether the cell is in its middle (1) or on its edge, their alpha how near an open side a point is (0 on it), where
+// the biome's railing runs: the data walkway's neon, the train bridge's beam, the vine bridge's vines.
+void deckMain() {
+    vec3 n=normalize(normal);
+    vec2 p=worldPosition.xz;
+    vec2 footprint=max(fwidth(p),vec2(.0001));
+    float aa=max(footprint.x,footprint.y);
+    if(normal.y<.5 || color.r<.5) {
+        vec3 frame=floorBiome==1?vec3(.165,.105,.062):(floorBiome==2?vec3(.105,.082,.048):vec3(.062,.070,.088));
+        if(normal.y<-.5) frame*=.6;
+        finalColor=vec4(expedition_lit(worldPosition,n,frame,.8,floorBiome==0?.35:.04),1.);
+        return;
+    }
+    // Along the bridge (q.x) and across it (q.y).
+    vec2 q=color.g>.5?p:p.yx;
+    float rim=1.-smoothstep(.04,.14,color.a);
+    vec3 base,emission=vec3(0.);
+    float roughness=.75,metallic=.04;
+    if(floorBiome==1) {
+        // The train's bridge: sleepers of dark wood across it on gravel, and in its middle two iron rails along it.
+        float sleeper=1.-smoothstep(.30,.30+aa,abs(fract(q.x*2.)-.5));
+        float grain=abs(fract(q.y*3.1+q.x*.4)-.5)*2.;
+        base=mix(vec3(.105,.092,.080),mix(vec3(.205,.128,.070),vec3(.245,.160,.090),grain),sleeper);
+        if(color.b>.5) {
+            float across=fract(q.y);
+            float rail=max(inkLine(across-.28,.022,aa),inkLine(across-.72,.022,aa));
+            base=mix(base,vec3(.30,.30,.32),rail);
+            metallic=mix(metallic,.7,rail);roughness=mix(roughness,.3,rail);
+        }
+        base=mix(base,vec3(.30,.19,.10),rim);
+    } else if(floorBiome==2) {
+        // The vine bridge: planks across it with gaps between, lashed with green vines along its open sides.
+        float plank=1.-smoothstep(.40,.40+aa,abs(fract(q.x*2.6)-.5));
+        float grain=abs(fract(q.y*4.+q.x*.3)-.5)*2.;
+        base=mix(vec3(.030,.034,.022),mix(vec3(.150,.105,.058),vec3(.185,.135,.075),grain),plank);
+        float vine=rim*(.6+.4*sin(q.x*9.));
+        base=mix(base,vec3(.09,.20,.05),clamp(vine,0.,1.));
+        roughness=.85;
+    } else {
+        // The data walkway: steel grating in a fine grid between solid plates, a neon rim along its open sides.
+        float grate=max(inkLine(fract(q.x*4.)-.5,.03,aa*4.),inkLine(fract(q.y*4.)-.5,.03,aa*4.));
+        float plate=1.-smoothstep(.08,.08+aa,abs(fract(q.x*.5)-.5)-.38);
+        base=mix(vec3(.105,.115,.134),vec3(.045,.050,.062),grate*(1.-plate));
+        metallic=.55;roughness=.42;
+        emission+=expedition_linear(biomeTint)*rim*1.6;
+    }
+    // Lighter the higher it stands, as the ground (floorMain).
+    base*=1.+clamp(worldPosition.y,0.,.72)*.9;
+    finalColor=vec4(expedition_lit(worldPosition,n,base,roughness,metallic)+emission,1.);
 }
 void floorMain() {
     // The walls of a cliff are dark rock, tinted a little by the biome, lit facet by facet.
@@ -535,6 +592,7 @@ destroy_expedition_floor :: proc(renderer:^Renderer) {
 	if f.tall.shader.id!=0 && f.tall.shader.id!=f.plain.shader.id {rl.UnloadShader(f.tall.shader)}
 	destroy_expedition_terrain(&f.terrain)
 	destroy_expedition_under(&f.under)
+	destroy_expedition_under(&f.decks)
 	destroy_expedition_floor_data(&f.data);free(f);renderer.tactical.expedition_floor=nil
 }
 
@@ -551,8 +609,9 @@ draw_expedition_floor :: proc(renderer:^Renderer,room:^game.Room,w:^world.World)
 		rl.SetTextureFilter(f.texture,.POINT);rl.SetTextureWrap(f.texture,.CLAMP)
 	} else if changed {rl.UpdateTexture(f.texture,raw_data(f.data.pixels))}
 	if f.texture.id==0 {return false}
-	// The program that thins out a tall mountain is used only where one is in view, or round the robot in a cave.
-	p:=&f.tall if board_view.vault || expedition_terrain_tall_in_view(renderer,room) else &f.plain
+	// The program that thins out a tall mountain is used only where one is in view, or round the robot in a cave, or where
+	// a deck is in view (its fade over the robot is that program's).
+	p:=&f.tall if board_view.vault || expedition_terrain_tall_in_view(renderer,room) || expedition_decks_in_view(renderer,room,w) else &f.plain
 	shader:=p.shader
 	dimensions:=rl.Vector2{f32(f.data.width),f32(f.data.height)}
 	metadata:=world.METADATA;c3:=metadata[w.biome].color;tint:=[3]f32{f32(c3[0])/255,f32(c3[1])/255,f32(c3[2])/255}
@@ -581,7 +640,7 @@ draw_expedition_floor :: proc(renderer:^Renderer,room:^game.Room,w:^world.World)
 		cover={viewer.point.x,cell_ground(viewer.cell)+f32(game.HEIGHT_EYE_STEPS)*game.HEIGHT_STEP_DRAWN,viewer.point.y,1}
 	}
 	rl.SetShaderValue(shader,p.cover,&cover,.VEC4)
-	ground_pass,under_pass:=c.int(0),c.int(1)
+	ground_pass,under_pass,deck_pass:=c.int(0),c.int(1),c.int(2)
 	open_sky,under_rock:=f32(0),f32(.65)
 	rl.SetShaderValue(shader,p.layer,&ground_pass,.INT)
 	rl.SetShaderValue(shader,p.lights.sky_shade,&open_sky,.FLOAT)
@@ -600,6 +659,18 @@ draw_expedition_floor :: proc(renderer:^Renderer,room:^game.Room,w:^world.World)
 		rlgl.DrawRenderBatchActive()
 		rl.SetShaderValue(shader,p.layer,&ground_pass,.INT)
 		rl.SetShaderValue(shader,p.lights.sky_shade,&open_sky,.FLOAT)
+	}
+	// The complexes' decks over it, the same program in their own pass: one over the robot's eyes fades round him.
+	if expedition_has_decks(room.level_data) {
+		rlgl.DrawRenderBatchActive()
+		viewer:=board_view.viewer
+		over:=rl.Vector4{viewer.point.x,cell_ground(viewer.cell)+f32(game.HEIGHT_EYE_STEPS)*game.HEIGHT_STEP_DRAWN,viewer.point.y,1}
+		rl.SetShaderValue(shader,p.cover,&over,.VEC4)
+		rl.SetShaderValue(shader,p.layer,&deck_pass,.INT)
+		draw_expedition_decks(renderer,room,w)
+		rlgl.DrawRenderBatchActive()
+		rl.SetShaderValue(shader,p.layer,&ground_pass,.INT)
+		rl.SetShaderValue(shader,p.cover,&cover,.VEC4)
 	}
 	rl.EndShaderMode()
 	return true

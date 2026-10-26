@@ -31,8 +31,9 @@ Expedition_Terrain_Chunk :: struct {
 	tallest:  u8,
 }
 
-// From this many steps a terrace is tall enough to hide an actor behind it, and the floor thins it out.
-EXPEDITION_TERRAIN_TALL :: 16
+// From this many steps a terrace is tall enough to hide an actor behind it, and the floor thins it out: a cave's massif,
+// a complex's block (expedition/complex.odin).
+EXPEDITION_TERRAIN_TALL :: 14
 
 Expedition_Terrain_Cache :: struct {
 	chunks:               []Expedition_Terrain_Chunk,

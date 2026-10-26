@@ -62,6 +62,14 @@ World :: struct {
 	caves: [MAX_CAVES]Cave,
 	cave_count: int,
 	in_cave: int,
+	// The complexes of the map (complex.odin): blocks, bridges and tunnels at places fixed by the biome.
+	complexes: [MAX_COMPLEXES]Complex,
+	complex_count: int,
+	// The map's lifts and gates (level/layers.odin), kept for the saves: a gate's cell on the map says if it is open.
+	lifts: [MAX_WORLD_LIFTS]level.Lift,
+	lift_count: int,
+	gates: [MAX_WORLD_GATES]level.Gate,
+	gate_count: int,
 	groups: [MAX_GROUPS]Group,
 	group_count: int,
 	drops: [MAX_DROPS]Drop,
@@ -194,12 +202,14 @@ generate :: proc(w: ^World, data: ^level.Level, b: campaign.Biome, seed: u64, re
 	}
 	// The biome's relief, level round the sites; then its buildings and objects, level on it; all before
 	// any inhabitants.
-	// The caves' places first: the relief keeps the ground round each massif level (cave.odin).
+	// The caves' places first, and the complexes': the relief keeps the ground round each level (cave.odin, complex.odin).
 	plan_caves(w,data)
+	plan_complexes(w,data)
 	apply_relief(w,data)
 	apply_mountain(w,data)
 	place_structures(w,data)
 	place_caves(w,data)
+	place_complexes(w,data)
 	// The retouches over the whole geography; then the caves' foes and secrets, on the floors the map has now. Retouches
 	// that do not go on it (an old file's, of another size, or one painted by hand that breaks the layers' rule) are
 	// left out: the map as the code makes it.
@@ -217,6 +227,9 @@ generate :: proc(w: ^World, data: ^level.Level, b: campaign.Biome, seed: u64, re
 	}
 	add_mountain_inhabitants(w,data,&content)
 	if b==.Gothic { add_group(w,data,-1,{x = size/2, y = size/2-10},1,false,false); w.groups[w.group_count-1].killer=true; w.groups[w.group_count-1].members[0].enemy.health*=4; w.groups[w.group_count-1].members[0].enemy.max_health*=4 }
+	// The complexes' secrets and guards last: the sites' groups keep their places in the list.
+	fill_complexes(w,data)
+	keep_lifts_and_gates(w,data)
 	w.last_position=data.player_spawn
 	return true
 }
@@ -518,10 +531,13 @@ lane_contains :: proc(w:^World,p:grid.Position) -> bool {
 }
 
 walk :: proc(w:^World,room:^game.Room,offset:grid.Position) -> bool {
-	if room.phase!=.Loot || offset=={} {return false}
+	if room.phase!=.Loot || offset=={} || game.lift_player_riding(room) {return false}
 	// A step across the layers as the walker makes it: into a cave's mouth, up a ladder.
 	from:=room.player.position
 	p:=game.walk_step(room,from,offset)
+	// Toward a lift's landing its platform is away from, it calls the platform; into a gate's bars from its lever, it
+	// opens the gate (game/lift.odin): no step either way.
+	if game.lift_call(room,p) || game.gate_opens(room,from,p) {return false}
 	ladder:=game.is_ladder_move(room,from,p)
 	if !game.base_cell_is_walkable(room,p) || game.cell_blocks_movement(room,p) || !ladder && game.step_height_blocked(room,from,p) {return false}
 	if offset.x!=0 && offset.y!=0 {
@@ -532,6 +548,8 @@ walk :: proc(w:^World,room:^game.Room,offset:grid.Position) -> bool {
 	under:=ground(w,p)
 	if under==.Bridge && w.beat%4>=2 {return false}
 	room.player.position=p
+	// Onto a platform: it rides it to the other end.
+	if game.lift_board(room,game.PLAYER_ENTITY,p) {return true}
 	if under==.Ice {slide:=game.walk_step(room,p,offset);if game.base_cell_is_walkable(room,slide) && !game.cell_blocks_movement(room,slide) {room.player.position=slide}}
 	before_health:=room.player.health
 	game.expedition_enter_cell(room)

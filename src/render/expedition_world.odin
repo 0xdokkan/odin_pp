@@ -160,6 +160,9 @@ draw_expedition_props :: proc(renderer:^Renderer,room:^game.Room,w:^world.World)
 	for &group,g in w.groups[:w.group_count] {for m,i in group.members[:group.count] {
 		if !m.alive || m.deployed || !tactical_cell_on_screen(renderer,m.enemy.position) {continue}
 		if world.ground(w,m.enemy.position)==.Grass && world.distance(room.player.position,m.enemy.position)>3 {continue}
+		// Under the ground the rock over it hides it, but where it fades round the robot (a complex's tunnel's is thin enough
+		// for a figure's head to come through it).
+		if m.enemy.position.layer<grid.GROUND_LAYER && terrain_hides_actor(renderer,expedition_patrol_shown(renderer,g,i,m.enemy.position),expedition_member_entity(g,i)) {continue}
 		tactical_billboard(renderer,sprite_key_for_enemy(m.enemy.archetype),expedition_patrol_shown(renderer,g,i,m.enemy.position),1,expedition_member_entity(g,i))
 	}}
 	for drop in w.drops[:w.drop_count] {

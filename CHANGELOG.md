@@ -5,6 +5,30 @@ I riferimenti a Classica, `--flat` e ai vecchi smoke descrivono versioni precede
 per i comandi disponibili oggi valgono il [README](README.md) e la documentazione collegata.
 
 
+## 2026-10-26 — Profondità, Fase 7 (in corso): i complessi di Robotica, Far West e Giungla
+
+- **Complessi a tema, alti 14** (scelta dell'utente all'inizio del primo gruppo di biomi): la regola dei piani vuole 12
+  gradini fra due pavimenti della stessa colonna, e gli altopiani di oggi ne hanno 3 o 4. Ogni bioma del gruppo ha ora
+  un complesso a un posto fisso, uguale a ogni run; il resto della mappa resta com'era.
+  - **Robotica cibernetica:** due piattaforme dati unite da una passerella. Sotto la piattaforma col segreto c'è un
+    condotto: il cancello all'imbocco si apre da dentro, e un pozzo con l'ascensore sale fino in cima.
+  - **Far West:** il ponte del treno fra due mese, con binari e cavalletti. Sulla mesa col segreto, l'ascensore lungo il
+    fianco ha in cima un cancello che si apre dalla mesa. La miniera resta la grotta di prima.
+  - **Giungla preistorica:** la collina delle ossa con la caverna sotto, aperta ai due lati, con le guardie dentro; due
+    alberi giganti uniti da ponti di liane. Il cancello sul secondo ponte si apre dal primo albero, dove c'è il segreto;
+    il secondo albero ha l'ascensore.
+  - In ogni complesso si sale anche a piedi (rampa o pendio) e il luogo importante ha due strade: quella lunga e la
+    scorciatoia, che si apre solo dall'altra parte e si richiude a ogni run.
+- **Ascensori e cancelli nelle spedizioni:** si chiamano e si aprono spingendo contro la casella, anche camminando liberi;
+  i nemici li usano come nel laboratorio. Il salvataggio tiene i cancelli aperti e dove riposano le piattaforme; mentre
+  una piattaforma porta qualcuno non si salva (resta il salvataggio di prima).
+- **Disegno:** i ponti e le passerelle hanno un passaggio loro, con il materiale del bioma; sopra gli occhi del robot si
+  diradano come la roccia sopra una grotta. Nei condotti vale la vista della grotta (fuori più scuro, la lampada).
+- Smoke delle spedizioni: 18 catture nuove dei complessi, dallo stage 104 (`ODIN_PP_SMOKE_ONLY=complessi`).
+- Test nuovi: complessi fissi a ogni run, tutto raggiungibile con i cancelli chiusi, salvataggio, ascensore e cancello
+  camminando, un minuto di scontro con le guardie libere, un nemico libero che sale in ascensore dietro al robot. I test
+  di raggiungibilità dei biomi ora contano anche i piani, i ponti e gli ascensori.
+
 ## 2026-10-26 — Profondità, Fase 7 (in corso): ascensori e cancelli nella Prova meccaniche
 
 - **Ascensori da chiamare e aspettare** (scelta dell'utente):

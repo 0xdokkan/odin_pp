@@ -38,9 +38,10 @@ test_every_biome_has_a_relief_of_its_own_and_the_same_at_every_run :: proc(t: ^t
 		testing.expectf(t, tallest >= 2, "%v: the tallest cell is %d steps", biome, tallest)
 		testing.expectf(t, raised >= 2, "%v: only %d%% of the map is raised", biome, raised)
 		// The Snow map's spiral mountain (Fase 4) is far taller than any relief; a cave's massif stands over the level
-		// ground round it (cave.odin).
+		// ground round it (cave.odin); a complex's blocks over the level ground round them (complex.odin).
 		massif := int(RELIEF_MAX)+int(CAVE_MASSIF_HEIGHT)+CAVE_MASSIF_RISE
-		testing.expect(t, tallest <= int(RELIEF_MAX) || (biome == .Snow && tallest == level.MOUNTAIN_TOP) || (cave_biome(biome) && tallest <= massif))
+		testing.expect(t, tallest <= int(RELIEF_MAX) || (biome == .Snow && tallest == level.MOUNTAIN_TOP) || (cave_biome(biome) && tallest <= massif) ||
+			(complex_biome(biome) && tallest <= int(COMPLEX_TOP)))
 	}
 }
 
@@ -80,51 +81,36 @@ test_the_ground_that_matters_is_level_and_every_site_and_the_exit_can_be_walked_
 			}
 		}
 		testing.expectf(t, uneven == 0, "%v: %d cells of the sites are not level", biome, uneven)
-		// Walk from the spawn a step at a time.
-		seen := make([]bool, len(data.tiles.cells))
-		queue := make([]grid.Position, len(data.tiles.cells))
+		// Walk from the spawn a step at a time, across the layers too: up a complex's ramp, over its bridges, up its lifts
+		// (complex.odin). The ground's cells first in the flags.
+		seen := level.layer_reach(&data, data.player_spawn)
 		defer delete(seen)
-		defer delete(queue)
-		tail := 1
-		queue[0] = data.player_spawn
-		seen[data.player_spawn.y*data.tiles.width+data.player_spawn.x] = true
-		for head := 0; head < tail; head += 1 {
-			for offset in ([4]grid.Position{{x = 1, y = 0}, {x = -1, y = 0}, {x = 0, y = 1}, {x = 0, y = -1}}) {
-				q := grid.Position{x = queue[head].x+offset.x, y = queue[head].y+offset.y}
-				tile, ok := level.tile_at(&data, q)
-				if !ok || !level.is_walkable(tile.kind) { continue }
-				if abs(int(level.height_at(&data, q))-int(level.height_at(&data, queue[head]))) > 1 { continue }
-				at := q.y*data.tiles.width+q.x
-				if seen[at] { continue }
-				seen[at] = true
-				queue[tail] = q
-				tail += 1
-			}
-		}
+		ground := level.layer_slot(grid.GROUND_LAYER)*len(data.tiles.cells)
 		for site in w.sites[:w.site_count] {
 			near := false
 			for dy in -3..=3 {
 				for dx in -3..=3 {
 					p := grid.offset(site.position, dx, dy)
-					if p.x >= 0 && p.y >= 0 && p.x < data.tiles.width && p.y < data.tiles.height { near = near || seen[p.y*data.tiles.width+p.x] }
+					if p.x >= 0 && p.y >= 0 && p.x < data.tiles.width && p.y < data.tiles.height { near = near || seen[ground+p.y*data.tiles.width+p.x] }
 				}
 			}
 			testing.expectf(t, near, "%v: the site at %v cannot be walked to", biome, site.position)
 		}
 		for tile, at in data.tiles.cells {
-			if tile.kind == .Exit { testing.expectf(t, seen[at], "%v: the exit cannot be walked to", biome) }
+			if tile.kind == .Exit { testing.expectf(t, seen[ground+at], "%v: the exit cannot be walked to", biome) }
 		}
 		// Nothing walkable is left out by a cliff, but a massif's top, rock over a cave (cave.odin).
 		stranded := 0
 		for tile, at in data.tiles.cells {
-			if level.is_walkable(tile.kind) && !seen[at] && !cave_rock(&w, {x = at%data.tiles.width, y = at/data.tiles.width}) { stranded += 1 }
+			if level.is_walkable(tile.kind) && !seen[ground+at] && !cave_rock(&w, {x = at%data.tiles.width, y = at/data.tiles.width}) { stranded += 1 }
 		}
 		if biome != .Sky { testing.expectf(t, stranded == 0, "%v: %d walkable cells cannot be reached by walking", biome, stranded) }
 	}
 }
 
 // The smooth ground has no cliff of its own: neighbouring cells are at most a step apart, but at the edge
-// of a plateau (a cliff of the plateaus' own) in the biomes that have them, and of a cave's massif (cave.odin).
+// of a plateau (a cliff of the plateaus' own) in the biomes that have them, of a cave's massif (cave.odin) and of a
+// complex's blocks and ramps (complex.odin).
 @(test)
 test_the_smooth_biomes_have_no_cliffs_at_all :: proc(t: ^testing.T) {
 	for biome in ([?]campaign.Biome{.Jungle, .Egypt, .Vietnam, .Gothic, .Sky, .Space, .Secret}) {
@@ -137,10 +123,10 @@ test_the_smooth_biomes_have_no_cliffs_at_all :: proc(t: ^testing.T) {
 		for y in 0..<data.tiles.height {
 			for x in 0..<width {
 				here := data.tiles.cells[y*width+x].kind
-				if here == .Void || cave_rock(&w, {x = x, y = y}) { continue }
+				if here == .Void || cave_rock(&w, {x = x, y = y}) || complex_rock(&w, {x = x, y = y}) { continue }
 				for step in ([2][2]int{{1, 0}, {0, 1}}) {
 					nx, ny := x+step.x, y+step.y
-					if nx >= width || ny >= data.tiles.height || data.tiles.cells[ny*width+nx].kind == .Void || cave_rock(&w, {x = nx, y = ny}) { continue }
+					if nx >= width || ny >= data.tiles.height || data.tiles.cells[ny*width+nx].kind == .Void || cave_rock(&w, {x = nx, y = ny}) || complex_rock(&w, {x = nx, y = ny}) { continue }
 					if abs(int(data.heights[ny*width+nx])-int(data.heights[y*width+x])) > 1 { cliffs += 1 }
 				}
 			}

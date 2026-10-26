@@ -56,12 +56,18 @@ set_expedition_board_actors :: proc(w: ^world.World) {
 	}
 }
 
-// The cave the robot is in, if any: outside it everything is darker, and the robot's lamp lights it.
+// The cave the robot is in, if any, or the tunnel under a complex's block: outside it everything is darker, and the
+// robot's lamp lights it.
 @(private)
 set_expedition_cave_view :: proc(renderer: ^Renderer, room: ^game.Room, w: ^world.World) {
 	v := &renderer.tactical
 	v.expedition_in_cave = false
 	if room == nil || room.player == nil || w == nil { return }
+	if low, high, under := world.complex_tunnel_block(w, room.player.position); under {
+		v.expedition_in_cave = true
+		v.expedition_cave_box = {f32(low.x), f32(low.y), f32(high.x+1), f32(high.y+1)}
+		return
+	}
 	index := world.cave_at(w, room.player.position)
 	if index <= 0 { return }
 	place := w.caves[index-1].place

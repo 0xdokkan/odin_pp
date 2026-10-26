@@ -231,6 +231,8 @@ apply_relief :: proc(w: ^World, data: ^level.Level) {
 		if cave.place.mountain { continue }
 		for zone in cave_level_zones(cave.place) { append(&zones, zone) }
 	}
+	// Round each complex (complex.odin).
+	for c in w.complexes[:w.complex_count] { append(&zones, complex_level_zone(c)) }
 	if w.biome == .Gothic { append(&zones, [2]grid.Position{{x = size/2-5, y = size/2-15}, {x = size/2+5, y = size/2-5}}) }
 	heights := relief_heights(w.biome, data.tiles.cells[:], size, zones[:])
 	_ = level.set_height_table(data, heights)

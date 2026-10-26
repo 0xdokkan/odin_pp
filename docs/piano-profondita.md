@@ -215,10 +215,12 @@ ODIN="/c/Users/lukeg/OneDrive/Desktop/odin-dev-2026-10/dist/odin.exe"
   dura circa venti minuti. L'atto `lift` (dalla Fase 7) gira per ultimo, così
   le catture di prima restano confrontabili al byte.
 - **Spedizioni da un punto:** `ODIN_PP_SMOKE_ONLY=hits` parte dagli scontri
-  dei segni dei colpi, `ODIN_PP_SMOKE_ONLY=caves` dalle grotte
+  dei segni dei colpi, `ODIN_PP_SMOKE_ONLY=caves` dalle grotte,
+  `ODIN_PP_SMOKE_ONLY=complessi` dai complessi della Fase 7
   (`src/application/campaign_smoke.odin`, `expedition_enable_smoke`). Gli
   stage che contano qui: rilievi dal 63, ologrammi dal 75, due livelli 78,
-  montagna 79, grotte dall'87, ologramma in grotta 103 (dalla Fase 5).
+  montagna 79, grotte dall'87, ologramma in grotta 103 (dalla Fase 5),
+  complessi dal 104, sei per bioma (dalla Fase 7).
 - **Benchmark:**
   `"$ODIN" build src -o:speed -define:EXPEDITION_BENCHMARK=true -out:"$S/bench.exe"`,
   poi `"$S/bench.exe" --smoke-expedition > "$S/bench_a.log" 2>&1`
@@ -2040,7 +2042,12 @@ Con le risposte dell'utente nella Fase 7:
 - il tunnel del Vietnam diventa una galleria percorribile;
 - i ponti del Cielo restano come oggi (non il consigliato);
 - accessi agli altopiani liberi, bioma per bioma (non il consigliato);
-- il sotterraneo grande in Egitto e nel Gotico, con un pozzo.
+- il sotterraneo grande in Egitto e nel Gotico, con un pozzo;
+- **complessi a tema, alti 14** (risposta all'inizio del primo gruppo di biomi): la regola dei piani vuole 12
+  gradini fra due pavimenti della stessa colonna, e gli altopiani di oggi ne hanno 3 o 4. Così ogni bioma riceve 1
+  o 2 complessi a posti fissi, come i massicci delle grotte: blocchi alti 14 gradini con ponti o passerelle sopra
+  (piano +1), gallerie sotto (piano −1), scorciatoie con cancello e accessi (rampe, ascensori). Il resto del bioma
+  resta com'è.
 
 **Temi:**
 
@@ -2215,8 +2222,50 @@ In corso.
         massiccio; le altre differenze sono l'animazione.
     - Benchmark sulla RTX 3060, alla corrente: −0,3% rispetto al passo precedente, +0,5% rispetto alla Fase 5
       (rumore).
-
-## 11. Fase 8 — Ologramma a piani, prestazioni e grotte vecchie
+- **Passo 2, primo gruppo di biomi: Robotica cibernetica, Far West, Giungla preistorica** (26 ottobre 2026): fatto, e
+  fermo per guardare le catture con l'utente prima del secondo gruppo.
+  - **Domanda nuova all'inizio del gruppo.** La regola dei piani vuole 12 gradini fra due pavimenti della stessa
+    colonna, e gli altopiani di oggi ne hanno 3 o 4. L'utente ha scelto i **complessi a tema, alti 14** (vedi
+    «Progetto»): il resto dei biomi resta com'è.
+  - **I complessi** (`src/expedition/complex.odin`, una mappa ASCII per tipo, a un posto fisso per bioma):
+    - Robotica: due piattaforme dati con una passerella; sotto quella col segreto un condotto, con il cancello
+      all'imbocco (leva dentro) e un pozzo con l'ascensore fino in cima. Si sale a piedi dalla rampa dell'altra.
+    - Far West: il ponte del treno fra due mese; la mesa col segreto ha un ascensore lungo il fianco, con un cancello
+      in cima aperto dalla mesa. Si sale a piedi dal sentiero dell'altra. La miniera resta la grotta di prima.
+    - Giungla: la collina delle ossa con la caverna sotto (due imbocchi, le guardie dentro), due alberi giganti con
+      ponti di liane; il cancello sul secondo ponte si apre dal primo albero (il segreto), il secondo ha l'ascensore.
+    - In ogni complesso il luogo importante ha due strade: quella lunga, a piedi, e la scorciatoia, che si apre solo
+      dall'altra parte e si richiude a ogni run. Le guardie sono un gruppo del bioma.
+  - **Scelte prese:**
+    - i posti si cercano come quelli delle grotte, prima dei rilievi. Le zone dei siti coprono quasi tutta la mappa:
+      il complesso non tocca la pianta di un sito (prima chiedevo 4 caselle in più, e non c'era posto), e quello del
+      Far West è largo 38 per stare fra le grotte;
+    - ascensori e cancelli nel salvataggio stanno nel mondo; le piattaforme ferme nello snapshot; mentre una
+      piattaforma porta qualcuno non si salva;
+    - i ponti hanno un passaggio di disegno loro (`render/expedition_decks.odin`), con il programma «tall» quando
+      sono in vista, per diradarli sopra gli occhi del robot; `EXPEDITION_TERRAIN_TALL` passa da 16 a 14 gradini;
+    - i nemici che dormono sotto terra non si disegnano dove la roccia li nasconde: la testa di quelli nella caverna
+      della Giungla spuntava dalla collina, alta solo 14.
+  - **Test:** i test di raggiungibilità dei biomi ora usano `level.layer_reach` (piani, ponti, ascensori); il Far West,
+    Robotica e Giungla hanno piani anche senza grotte; due test contavano i drop dal primo, e Robotica ha ora il
+    segreto del complesso.
+    - Nuovi: complessi fissi a ogni run, tutto raggiungibile con i cancelli chiusi (e i due lati di ogni cancello),
+      salvataggio di cancello e piattaforma, ascensore e cancello camminando liberi; nel pacchetto integration un
+      minuto di scontro con le guardie libere in ogni complesso e un nemico libero che chiama l'ascensore e sale dietro
+      al robot.
+  - **Verifiche:**
+    - check con e senza assert; `.\scripts\check.ps1` completo: 1725 test verdi (6 nuovi), più le due build;
+    - smoke del laboratorio: 128 catture identiche al byte e una con 22 pixel diversi di poco
+      (`structures_hut_6`, una variante già uscita in un giro di prima). L'atto delle strutture da solo dà catture
+      identiche al byte con il codice di prima e con quello nuovo: dipende dallo stato del giro, non dal codice;
+    - smoke delle spedizioni: 122 catture, nessun errore. Cambiano davvero i tre rilievi di Robotica, Far West e
+      Giungla (il punto più irregolare ora è il complesso); camminata e ingaggio cambiano a ogni giro; le altre
+      differenze sono sotto l'1%, attorno al robot (animazione). 18 catture nuove dei complessi;
+    - smoke dell'editor: 12 catture, nessun errore;
+    - **benchmark non valido:** il portatile era a batteria. La RTX 3060 (due giri «prima», uno «dopo») resta
+      bloccata a 30 fotogrammi al secondo, 33,33 ms in ogni stage, prima e dopo; altri due giri «dopo» sono finiti
+      sulla grafica Intel. I tempi di CPU del disegno stanno nel rumore fra un giro e l'altro. Da rifare alla
+      corrente.
 
 ### Cosa si fa
 

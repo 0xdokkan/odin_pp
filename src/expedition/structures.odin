@@ -44,6 +44,11 @@ structure_keep_clear :: proc(user: rawptr, cell: grid.Position) -> bool {
 	}
 	size := w.side_length
 	if distance(cell, {x = 7, y = size/2}) <= 9 { return true }
+	// A complex and the level ground round it (complex.odin).
+	for c in w.complexes[:w.complex_count] {
+		zone := complex_level_zone(c)
+		if cell.x >= zone[0].x-2 && cell.y >= zone[0].y-2 && cell.x <= zone[1].x+2 && cell.y <= zone[1].y+2 { return true }
+	}
 	for i in 0..<4 {
 		if distance(cell, {x = size*(35+i*13)/100, y = size*(35+(i%2)*28)/100}) <= 7 { return true }
 	}

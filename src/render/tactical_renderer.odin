@@ -673,8 +673,9 @@ draw_tactical_world :: proc(renderer: ^Renderer, room: ^game.Room, active_card: 
 		rl.EndMode3D()
 		resolve_expedition_world(renderer)
 		rl.BeginMode3D(v.camera)
-		// Devices, cover and loot placed by cards keep the board's resin light.
+		// Devices, cover and loot placed by cards keep the board's resin light; so do a complex's lifts and gates.
 		begin_tactical_lighting(renderer)
+		draw_board_lifts(renderer, room)
 	}
 	when EXPEDITION_BENCHMARK {v.draw_timing.architecture_resolve_ms=expedition_benchmark_elapsed(&stamp)}
 	for obstacle in room.obstacles {

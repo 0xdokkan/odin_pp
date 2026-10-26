@@ -194,7 +194,8 @@ test_expedition_full_drop_capacity_preserves_and_restores_pending_xp :: proc(t:^
 	w:World;data:level.Level;p:game.Player;room:=test_world(t,&w,&data,&p)
 	defer level.destroy(&data);defer game.destroy_room(&room)
 	p.position={x = w.groups[0].anchor.x-4, y = w.groups[0].anchor.y};testing.expect(t,engage(&w,&room,0))
-	for _ in 0..<MAX_DROPS {testing.expect(t,add_drop(&w,p.position,campaign.make_item(.Credits,1)))}
+	// The map's own drops first (a complex's secret, complex.odin), then as many as there is room for.
+	for _ in w.drop_count..<MAX_DROPS {testing.expect(t,add_drop(&w,p.position,campaign.make_item(.Credits,1)))}
 	clear(&room.enemies);earned:=sync(&w,&room)
 	testing.expect(t,earned>0);testing.expect_value(t,w.pending_xp,earned)
 	testing.expect_value(t,w.drop_count,MAX_DROPS);testing.expect_value(t,sync(&w,&room),i32(0))
@@ -224,15 +225,8 @@ test_expedition_outdoor_props_never_enclose_open_floor :: proc(t:^testing.T) {
 		if biome==.Count {continue}
 		w:World;data:level.Level
 		testing.expect(t,generate(&w,&data,biome,7))
-		seen:=make([]bool,len(data.tiles.cells));queue:=make([]grid.Position,len(data.tiles.cells))
-		seen[data.player_spawn.y*data.tiles.width+data.player_spawn.x]=true;queue[0]=data.player_spawn;tail:=1
-		for head:=0;head<tail;head+=1 {
-			for offset in ([4]grid.Position{{x = 1, y = 0},{x = -1, y = 0},{x = 0, y = 1},{x = 0, y = -1}}) {
-				q:=game.add_position(queue[head],offset);tile,ok:=level.tile_at(&data,q)
-				if !ok || !level.is_walkable(tile.kind) || abs(int(level.height_at(&data,q))-int(level.height_at(&data,queue[head])))>1 {continue}
-				i:=q.y*data.tiles.width+q.x;if seen[i] {continue};seen[i]=true;queue[tail]=q;tail+=1
-			}
-		}
+		// A walk a step at a time, across the layers too: up a complex's ramp, over its bridges, up its lifts (complex.odin).
+		seen:=level.layer_reach(&data,data.player_spawn)
 		props,stranded:=0,0
 		for tile,i in data.tiles.cells {
 			p:=grid.Position{x = i%data.tiles.width, y = i/data.tiles.width}
@@ -240,7 +234,7 @@ test_expedition_outdoor_props_never_enclose_open_floor :: proc(t:^testing.T) {
 			// A massif's top is rock over a cave: no one walks there (cave.odin).
 			if cave_rock(&w,p) {continue}
 			if tile.kind==.Wall {props+=1}
-			if tile.kind!=.Wall && tile.kind!=.Fence && tile.kind!=.Void && !seen[i] {stranded+=1}
+			if tile.kind!=.Wall && tile.kind!=.Fence && tile.kind!=.Void && !seen[level.layer_reach_index(&data,p)] {stranded+=1}
 		}
 		// The Sky has no props: its archipelago keeps a few unbridged islets
 		// by design, and the site test above covers every site's approach.
@@ -248,6 +242,6 @@ test_expedition_outdoor_props_never_enclose_open_floor :: proc(t:^testing.T) {
 			testing.expectf(t,stranded==0,"%v: %d open cells cannot be reached",biome,stranded)
 			testing.expectf(t,props>200,"%v: only %d outdoor props",biome,props)
 		}
-		delete(seen);delete(queue);level.destroy(&data)
+		delete(seen);level.destroy(&data)
 	}
 }

@@ -145,13 +145,15 @@ test_gold_over_99_and_full_ground_never_disappear :: proc(t: ^testing.T) {
 test_deliberately_dropped_item_waits_for_manual_pickup :: proc(t: ^testing.T) {
 	e := flow_fixture(t); defer flow_destroy(e)
 	position := e.rs.room.player.position
+	// The map's own drops (a complex's secret, expedition/complex.odin) lie elsewhere.
+	before := e.world.drop_count
 	testing.expect(t, world.add_drop(&e.world, position, campaign.make_item(.Healing), manual_only = true))
 	expedition_collect(e)
 	testing.expect_value(t, e.progress.backpack.grid.count, 0)
-	testing.expect_value(t, e.world.drop_count, 1)
+	testing.expect_value(t, e.world.drop_count, before+1)
 	expedition_collect(e, true)
 	testing.expect_value(t, e.progress.backpack.grid.count, 1)
-	testing.expect_value(t, e.world.drop_count, 0)
+	testing.expect_value(t, e.world.drop_count, before)
 }
 
 @(test)

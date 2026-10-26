@@ -57,6 +57,8 @@ draw_expedition_structure_solid :: proc(pass: Ink_Pass, room: ^game.Room, w: ^wo
 	p := rl.Vector3{f32(cell.x)+0.5, 0, f32(cell.y)+0.5}
 	if !owned {
 		if kind != .Fence { return false }
+		// A shortcut's gate has its own bars (lift_view.odin).
+		if _, _, gate := level.gate_at(data, cell); gate { return true }
 		ink_box(pass, p, {0.44, 0.44}, STRUCTURE_FENCE_HEIGHT, 0, EXPEDITION_INK, EXPEDITION_INK_TOP, ink_edge(c))
 		return true
 	}

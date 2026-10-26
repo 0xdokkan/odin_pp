@@ -102,6 +102,13 @@ lift_riding :: proc(room: ^Room, who: Entity_Ref) -> (index: int, riding: bool) 
 	return
 }
 
+// Whether a platform is on its way with someone on it.
+lifts_carrying :: proc(room: ^Room) -> bool {
+	if room == nil { return false }
+	for platform in room.lifts.platforms[:room.lifts.count] { if platform.moving && platform.has_rider { return true } }
+	return false
+}
+
 lift_player_riding :: proc(room: ^Room) -> bool {
 	if room == nil || room.player == nil { return false }
 	_, riding := lift_riding(room, PLAYER_ENTITY)

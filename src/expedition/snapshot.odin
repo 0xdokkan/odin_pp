@@ -59,6 +59,9 @@ Snapshot :: struct {
 	lasso:game.Lasso_State,
 	first_person:game.First_Person_State,
 	reactions:game.Reaction_Binding_Set,
+	// Where the lifts' platforms rest (game/lift.odin): a save is never made with one carrying someone (stable), and one
+	// going empty is saved at its end. A save from before has none, and its map no lifts.
+	lifts:game.Lift_State,
 }
 
 // A cell of a layer other than the ground, in 29 bits: its index on the map (16), its layer's slot (2), its tile's
@@ -75,7 +78,7 @@ layer_cell_unpack :: proc(cell:u32)->(index,slot:int,kind:level.Tile_Kind,height
 
 stable :: proc(room:^game.Room) -> bool {
 	return room!=nil && room.player!=nil && !room.tactical_pulse.pending && room.qte.kind==.None &&
-		!game.tactical_is_casting(room) && !room.player.deck.has_resolving_card
+		!game.tactical_is_casting(room) && !room.player.deck.has_resolving_card && !game.lifts_carrying(room)
 }
 
 capture :: proc(w:^World,room:^game.Room,out:^Snapshot) -> bool {
@@ -94,6 +97,8 @@ capture :: proc(w:^World,room:^game.Room,out:^Snapshot) -> bool {
 	out.next_enemy_id=room.next_enemy_id;out.next_trap_id=room.next_trap_id;out.next_object_id=room.next_object_id;out.pulse_count=room.pulse_count
 	out.fires=room.ground.fires;out.fire_count=room.ground.fire_count;out.next_fire_id=room.ground.next_fire_id
 	out.fishing=room.fishing;out.pinball=room.pinball;out.pinball_random=room.pinball_random;out.lasso=room.lasso;out.first_person=room.first_person;out.reactions=room.reaction_bindings
+	out.lifts=room.lifts
+	for &platform in out.lifts.platforms[:out.lifts.count] {platform={at=platform.at}}
 	out.family=room.family;out.encounter_kind=room.encounter_kind;out.modifier=room.modifier;out.exit_position=room.exit_position;out.endless=room.endless
 	out.tactical_pulse=room.tactical_pulse;out.obstacle_count=len(room.obstacles)
 	copy(out.tiles[:],room.level_data.tiles.cells[:]);copy(out.heights[:],room.level_data.heights[:]);copy(out.obstacles[:],room.obstacles[:])
@@ -153,6 +158,12 @@ valid_snapshot :: proc(s:^Snapshot) -> bool {
 	}
 	for pool in s.layer_pools[:s.layer_pool_count] {if int(pool[0])<size*size || int(pool[0])>=size*size*level.LAYER_COUNT || pool[1]<0 {return false}}
 	for cave in w.caves[:w.cave_count] {if cave.site<0 || cave.site>=w.site_count || w.sites[cave.site].kind!=.Cave || cave.state>.Looted {return false}}
+	if w.complex_count<0 || w.complex_count>MAX_COMPLEXES || w.lift_count<0 || w.lift_count>MAX_WORLD_LIFTS || w.gate_count<0 || w.gate_count>MAX_WORLD_GATES {return false}
+	for c in w.complexes[:w.complex_count] {if c.kind==.None || c.kind>max(Complex_Kind) || !inside(c.origin,size) {return false}}
+	for lift in w.lifts[:w.lift_count] {if !inside(lift.ends[0],size) || !inside(lift.ends[1],size) || lift.rest>1 {return false}}
+	for gate in w.gates[:w.gate_count] {if !inside(gate.cell,size) || !inside(gate.lever,size) {return false}}
+	if s.lifts.count!=w.lift_count {return false}
+	for platform in s.lifts.platforms[:s.lifts.count] {if platform.at>1 || platform.moving || platform.has_rider {return false}}
 	if w.structure_count<0 || w.structure_count>MAX_WORLD_STRUCTURES {return false}
 	for placed in w.structures[:w.structure_count] {if placed.id>=.Count || placed.rotation>=4 || !inside(placed.origin,size) {return false}}
 	for e,i in s.enemies[:s.enemy_count] {
@@ -188,6 +199,9 @@ restore :: proc(s:^Snapshot,w:^World,data:^level.Level,player:^game.Player,room:
 		cell:=grid.Position{x = index%side, y = index/side, layer = i8(slot+grid.LOWEST_LAYER)}
 		if !level.set_tile(data,cell,{kind=kind}) || !level.set_height(data,cell,i32(height)) {level.destroy(data);return false}
 	}
+	// The lifts and the gates, as the map had them; a gate's cell says if it is open (level.add_gate would shut it).
+	for lift in s.world.lifts[:s.world.lift_count] {if !level.add_lift(data,lift.ends[0],lift.ends[1],int(lift.rest)) {level.destroy(data);return false}}
+	append(&data.gates,..s.world.gates[:s.world.gate_count])
 	if error,_:=level.check_layers(data);error!=.None {level.destroy(data);return false}
 	for tile,i in data.tiles.cells {
 		if tile.kind==.Player_Spawn {data.player_spawn={x = i%side, y = i/side};data.has_player_spawn=true;break}
@@ -210,6 +224,7 @@ restore :: proc(s:^Snapshot,w:^World,data:^level.Level,player:^game.Player,room:
 	for pool in s.layer_pools[:s.layer_pool_count] {if int(pool[0])<len(room.ground.pool) {room.ground.pool[pool[0]]=pool[1]}}
 	room.ground.fires=s.fires;room.ground.fire_count=s.fire_count;room.ground.next_fire_id=s.next_fire_id
 	room.fishing=s.fishing;room.pinball=s.pinball;room.pinball_random=s.pinball_random;room.lasso=s.lasso;room.first_person=s.first_person;room.reaction_bindings=s.reactions
+	if s.lifts.count==room.lifts.count {room.lifts=s.lifts}
 	room.player=player;room.level_data=data
 	return true
 }

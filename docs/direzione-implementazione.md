@@ -841,6 +841,41 @@ avviare è `build/odin_pp`; conserva il limite fps delle impostazioni di gioco.
 - **Smoke:** gli stage dall'87 entrano ed escono camminando nei quattro biomi (`ODIN_PP_SMOKE_ONLY=caves`); lo stage 103
   fotografa l'ologramma nella grotta della montagna.
 
+## I complessi (Fase 7 del piano profondità)
+
+- **Cosa sono** (`src/expedition/complex.odin`): luoghi su più piani, a posti fissi per bioma come i massicci. La regola dei
+  piani vuole 12 gradini fra due pavimenti della stessa colonna, così un complesso alza blocchi di roccia di
+  `COMPLEX_TOP` (14) gradini sul terreno piano attorno, camminabili in cima, con ponti sul piano +1, gallerie sul piano −1,
+  rampe, ascensori e un cancello di scorciatoia (scelta dell'utente: «complessi a tema, alti 14»).
+- **Disegno del complesso:** una mappa ASCII per tipo (`Complex_Layout.rows`): `.` terreno, `#` blocco, `$` segreto, `@`/`&`
+  guardie, `=` ponte, `a..m` rampa (1–13 gradini), `t` galleria, `S` pozzo con ascensore fino alla cima, `L` ascensore
+  lungo il fianco (piede a terra, pianerottolo sul piano +1). I cancelli sono a parte (`Complex_Layout.gates`), sul piano
+  del loro segno.
+  - Robotica cibernetica, `Data_Node`: due piattaforme dati e una passerella; sotto la piattaforma ovest un condotto con il
+    cancello all'imbocco (leva dentro) e un pozzo fino alla cima.
+  - Far West, `Train_Bridge`: due mese e il ponte del treno (binari, cavalletti); l'ascensore della mesa est ha il cancello
+    sul bordo in cima (leva sulla mesa). La miniera resta la grotta di prima.
+  - Giungla preistorica, `Giant_Trees`: la collina delle ossa con la caverna sotto (due imbocchi, guardie dentro), due alberi
+    giganti con ponti di liane; il cancello sul secondo ponte, l'ascensore sul secondo albero.
+- **Posti:** `plan_complexes` (generatore fisso per bioma, prima dei rilievi) li mette lontano da siti, partenza, corsia
+  centrale, ancore delle pattuglie, montagna e massicci; `apply_relief` tiene piano il terreno attorno
+  (`complex_level_zone`); `structure_keep_clear` tiene lontane le strutture; `place_complexes` costruisce, dopo i rilievi;
+  `fill_complexes` mette segreto e guardie alla fine di `generate` (i gruppi dei siti restano ai loro indici).
+- **Ascensori e cancelli nel mondo:** `World.lifts`/`World.gates` li copiano per il salvataggio; `restore` li rimette prima di
+  `check_layers` (i cancelli senza `add_gate`, che li richiuderebbe). `Snapshot.lifts` tiene dove riposano le piattaforme;
+  `stable` non salva mentre una piattaforma porta qualcuno.
+- **Esplorazione:** `roam_press` chiama la piattaforma o apre il cancello quando il robot spinge contro la faccia della
+  casella; `roam_enter` lo fa salire sulla piattaforma; durante il viaggio non si cammina. `walk` fa lo stesso a passi.
+- **Disegno:** `render/expedition_decks.odin` disegna i ponti nel programma del pavimento (`floorLayer` 2, `deckMain`): piano,
+  bordi, sotto e cavalletti del Far West; i vertici dicono il verso, il bordo aperto e la fila di mezzo. Il programma «tall»
+  si usa anche quando un ponte è in vista: sopra gli occhi del robot il ponte si dirada col retino. Da `EXPEDITION_TERRAIN_TALL`
+  14 il rilievo di un complesso apre la finestra attorno al robot. Ascensori e cancelli sono quelli del laboratorio
+  (`draw_board_lifts`, luce di resina); il recinto di un cancello non ha il muretto d'inchiostro. In un condotto vale la vista
+  della grotta (`complex_tunnel_block`): fuori più scuro, la lampada del robot. I nemici che dormono sotto terra non si
+  disegnano dove la roccia li nasconde.
+- **Smoke:** gli stage dal 104 (`ODIN_PP_SMOKE_ONLY=complessi`), sei per bioma: panorama, sotto il ponte, sul ponte, al
+  cancello, in ascensore, uno scontro fra il ponte e il terreno.
+
 ## Strutture posate dal giocatore (Fase 7 del piano griglia)
 
 - **Kit:** `campaign.Item_Kind.Structure_Kit` (variante = `level.Structure_Id`); `campaign.spend_structure_kit` lo spende alla posa;

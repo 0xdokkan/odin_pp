@@ -104,16 +104,35 @@ roam_resolve :: proc(r:^Roam,room:^game.Room) {
 	}
 }
 
-// Entering a cell uses the exact trap and hazard pipeline of a grid step.
+// Entering a cell uses the exact trap and hazard pipeline of a grid step. A lift's landing with its platform there takes
+// the walker to its other end (game/lift.odin): it adopts the cell it rides to.
 @(private)
 roam_enter :: proc(w:^World,room:^game.Room,r:^Roam,cell:grid.Position)->bool {
 	r.cell=cell;room.player.position=cell
+	if game.lift_board(room,game.PLAYER_ENTITY,cell) {r.velocity={};roam_sync(r,room);return false}
 	before:=room.player.health
 	game.expedition_enter_cell(room)
 	if room.player.health<before {w.mounted=false}
 	if room.player.health<=0 {room.phase=.Defeat;r.velocity={};return false}
 	if room.player.position!=cell || room.phase!=.Loot {r.velocity={};roam_sync(r,room);return false}
 	return true
+}
+
+// The walker pressing on the face of the cell toward `direction` (the wish, of length one at most), along each axis it
+// presses: against a lift's landing its platform is away from it calls the platform, against a gate's bars from the
+// gate's lever it opens the gate (game/lift.odin), as a step does.
+@(private)
+roam_press :: proc(room:^game.Room,r:^Roam,direction:[2]f32) {
+	center:=roam_center(r.cell)
+	for axis in 0..<2 {
+		if abs(direction[axis])<.5 {continue}
+		sign:=1 if direction[axis]>0 else -1
+		// Only once it touches the face.
+		if (r.position[axis]-center[axis])*f32(sign)<.5-ROAM_RADIUS-.02 {continue}
+		step:=grid.Position{x = sign} if axis==0 else grid.Position{y = sign}
+		next:=roam_layer_cell(r,room,r.cell.x+step.x,r.cell.y+step.y)
+		if !game.lift_call(room,next) {_=game.gate_opens(room,r.cell,next)}
+	}
 }
 
 roam_speed :: proc(w:^World,ground:Terrain)->f32 {
@@ -135,6 +154,8 @@ roam_step :: proc(w:^World,room:^game.Room,r:^Roam,wish:[2]f32,dt:f32) {
 	elapsed:=min(max(dt,0),f32(.1))
 	r.offset*=math.exp(-12*elapsed)
 	if elapsed<=0 {return}
+	// On a lift's platform the walker goes nowhere until it stops.
+	if game.lift_player_riding(room) {r.velocity={};return}
 	under:=ground(w,r.cell)
 	direction:=wish;length:=math.sqrt(direction.x*direction.x+direction.y*direction.y)
 	if length>1 {direction/=length;length=1}
@@ -156,4 +177,5 @@ roam_step :: proc(w:^World,room:^game.Room,r:^Roam,wish:[2]f32,dt:f32) {
 	}
 	moved:=r.position-start
 	r.stride+=math.sqrt(moved.x*moved.x+moved.y*moved.y)
+	if length>=.5 {roam_press(room,r,direction)}
 }

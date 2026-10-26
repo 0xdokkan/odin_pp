@@ -75,7 +75,9 @@ refresh_expedition_floor_data :: proc(cache:^Expedition_Floor_Data,room:^game.Ro
 		if w.biome==.Inferno && tile.kind==.Door {ground=.Lava}
 		// A massif's top is bare rock: none of the ground's terrain over a cave (expedition/cave.odin).
 		surface:=u8(0)
+		// A complex's block has the top of its biome's (expedition/complex.odin): the data platforms' are platforms.
 		if world.cave_rock(w,p) {ground=.Plain;surface=EXPEDITION_FLOOR_ROCK}
+		else if index,mark:=world.complex_at(w,p);index>0 && world.complex_mark_block(mark) {surface=u8(world.complex_layout(w.complexes[index-1].kind).surface)}
 		cache.pixels[i]={u8(tile.kind),u8(ground),surface,0}
 	}
 	// Earlier overlapping sites have the same precedence as world.site_at.

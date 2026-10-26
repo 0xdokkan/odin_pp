@@ -25,7 +25,7 @@ open_map_cave :: proc(w: ^World) -> int {
 }
 
 // Every place of a cave biome has its massif and its cave at every run; between one and three of them hold foes and a secret,
-// the Snow's mountain's always; the other biomes have none. Each cave's mouth is a secret site on the open ground, its arrival a
+// the Snow's mountain's always; the other biomes have none (and no layers but a complex's, complex.odin). Each cave's mouth is a secret site on the open ground, its arrival a
 // floor under the rock, and the map keeps the rule of the layers' columns.
 @(test)
 test_every_cave_place_has_its_cave_and_one_to_three_are_inhabited :: proc(t: ^testing.T) {
@@ -37,7 +37,7 @@ test_every_cave_place_has_its_cave_and_one_to_three_are_inhabited :: proc(t: ^te
 			testing.expect(t, generate(&w, &data, biome, seed))
 			defer level.destroy(&data)
 			if !cave_biome(biome) {
-				testing.expectf(t, w.cave_count == 0 && !level.has_layers(&data), "%v has %d caves", biome, w.cave_count)
+				testing.expectf(t, w.cave_count == 0 && (!level.has_layers(&data) || complex_biome(biome)), "%v has %d caves", biome, w.cave_count)
 				continue
 			}
 			testing.expectf(t, w.cave_count >= 2, "%v has only %d places for a cave", biome, w.cave_count)
