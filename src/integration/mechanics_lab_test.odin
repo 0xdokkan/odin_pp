@@ -106,6 +106,40 @@ test_mechanics_lab_has_an_arena_of_lifts :: proc(t: ^testing.T) {
 	testing.expect_value(t, run_session.mechanics_lab_next_arena(.Lifts), run_session.Mechanics_Lab_Arena.Flat)
 }
 
+// With the arena of the lifts cleared by F7, out of the fight, the platforms still go, on the controller's frames: a
+// call brings the platform, a ride ends at the top, and nobody is left on a platform that never stops.
+@(test)
+test_mechanics_lab_lifts_go_on_out_of_the_fight :: proc(t: ^testing.T) {
+	data: level.Level
+	defer level.destroy(&data)
+	player, created := game.create_player(run_session.DEMO_PLAYER_STATS)
+	testing.expect(t, created)
+	room, built := run_session.create_mechanics_lab_room(&data, &player, game.DEFAULT_TACTICAL_CONFIG, .Lifts)
+	testing.expect(t, built)
+	defer game.destroy_room(&room)
+	_, cleared := game.sandbox_clear_for_fishing(&room)
+	testing.expect(t, cleared && room.phase == .Loot)
+	renderer := new(render.Renderer)
+	defer free(renderer)
+	controller := run_session.Tactical_Controller{was_focused = true}
+	cards: run_session.Card_Interaction_State
+	buffer: run_session.Buffered_Gameplay_Command
+	two_seconds :: proc(controller: ^run_session.Tactical_Controller, room: ^game.Room, renderer: ^render.Renderer,
+		cards: ^run_session.Card_Interaction_State, buffer: ^run_session.Buffered_Gameplay_Command) {
+		for _ in 0..<120 { _ = run_session.step_tactical_controller(controller, room, renderer, cards, buffer, 1.0/60, true, {focused = true}) }
+	}
+	player.position = {x = 10, y = 10}
+	testing.expect_value(t, game.try_move_player(&room, .East), game.Action_Result.Blocked)
+	testing.expect(t, room.lifts.platforms[0].moving, "the step called the platform")
+	two_seconds(&controller, &room, renderer, &cards, &buffer)
+	testing.expect(t, !room.lifts.platforms[0].moving && room.lifts.platforms[0].at == 0, "the platform came down")
+	testing.expect_value(t, game.try_move_player(&room, .East), game.Action_Result.Moved)
+	testing.expect(t, game.lift_player_riding(&room))
+	two_seconds(&controller, &room, renderer, &cards, &buffer)
+	testing.expect(t, !game.lift_player_riding(&room), "the ride ended")
+	testing.expect_value(t, player.position, grid.Position{x = 11, y = 10, layer = 1})
+}
+
 // F7 clears the arena as a room's last fall clears it: the fight ends, the
 // deck is put away, nobody arrives any more and the exit stays shut; the rod
 // fishes there, and F7 again starts its fishing afresh.

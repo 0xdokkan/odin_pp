@@ -2183,6 +2183,9 @@ In corso.
     - smoke delle spedizioni (104 catture, nessun errore) e dell'editor (12 catture);
     - benchmark sulla RTX 3060, alla corrente: media dei gruppi +0,8% rispetto alla Fase 5, il peggiore +2,2%
       (rumore).
+  - **Correzione prima della prova dell'utente:** fuori dal combattimento (l'arena liberata con F7, una spedizione
+    esplorata) le piattaforme non andavano avanti, e chi ci era salito restava fermo. Ora vanno con il tempo del
+    fotogramma (`step_tactical_controller`), con un test d'integrazione; 1716 test verdi.
 
 ## 11. Fase 8 — Ologramma a piani, prestazioni e grotte vecchie
 
