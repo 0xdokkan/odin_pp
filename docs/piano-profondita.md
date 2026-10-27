@@ -2611,8 +2611,11 @@ fresca, dal 6 a macchina calda, e si confrontano dentro ogni regime, sugli stage
 - Smoke del laboratorio, da solo, alla corrente: le 129 catture identiche al byte a quelle della Fase 7, più le due
   nuove dell'ologramma della stanza.
 
-**Notato e non toccato:** `--smoke-m7-view` fallisce alla fine («M7 polish flow: combat movement or fog without
-exploration memory failed»), già alla fine della Fase 7; non è nelle verifiche di questo piano.
+**Notato e corretto dopo la fase:** `--smoke-m7-view` falliva alla fine («M7 polish flow: combat movement or fog without
+exploration memory failed») da `d4057ed` (20 ottobre), che ha portato il costo di un passo in combattimento
+(`TACTICAL_MOVE_SECONDS`) da 1 secondo a 0,8: il mondo batte un impulso a ogni secondo intero, e lo smoke si aspettava
+ancora un impulso dopo un passo. Ora controlla che il passo spenda il suo costo sull'orologio del mondo; lo smoke passa e
+produce 52 catture.
 
 ## 12. Cose notate durante lo studio (da verificare)
 

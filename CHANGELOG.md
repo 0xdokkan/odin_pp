@@ -5,6 +5,14 @@ I riferimenti a Classica, `--flat` e ai vecchi smoke descrivono versioni precede
 per i comandi disponibili oggi valgono il [README](README.md) e la documentazione collegata.
 
 
+## 2026-10-27 — Smoke `--smoke-m7-view` di nuovo a posto
+
+- Lo smoke si fermava alla parte «polish» dal 20 ottobre (`d4057ed`): quel refactor ha portato un passo in combattimento
+  da 1 secondo a 0,8 (`TACTICAL_MOVE_SECONDS`), e il mondo batte un impulso a ogni secondo intero, quindi dopo un solo
+  passo l'impulso non è ancora arrivato. Lo smoke ora controlla che il passo spenda il suo costo sull'orologio del mondo
+  (impulsi più la frazione che resta), invece di aspettarsi un impulso.
+- Verifiche: `--smoke-m7-view` esce con 0 e produce 52 catture (prima si fermava a 23); check completo con e senza assert.
+
 ## 2026-10-27 — Profondità, Fase 8 fatta: ologramma a piani, prestazioni, grotte vecchie
 
 - **Ologramma a piani impilati** (scelta dell'utente): `Tab` apre una pila di lastre, una per piano (ponti sopra, terra,

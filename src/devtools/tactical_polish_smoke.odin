@@ -115,7 +115,10 @@ run_tactical_polish_smoke :: proc(window: ^app.Window, renderer: ^render.Rendere
 	if !tactical_polish_check(game.tactical_cell_visible(&room, {x = 1, y = 4}) && !game.tactical_cell_visible(&room, {x = 10, y = 4}),
 		"fixture must start with the archer beyond vision") { return false }
 	if !tactical_polish_command(window, renderer, &room, &cards, {kind = .Move, origin_phase = .Combat, direction = .East}) { return false }
-	if !tactical_polish_check(run.player.position == (game.add_position(data.player_spawn, {x = 1, y = 0})) && room.pulse_count == 1 &&
+	// The step spends its cost on the world's clock (TACTICAL_MOVE_SECONDS): each whole second is a pulse, the rest waits
+	// in the clock's fraction. A step of less than a second leaves the pulse to come.
+	spent := f32(room.pulse_count)+run.player.tactical.clock_fraction
+	if !tactical_polish_check(run.player.position == (game.add_position(data.player_spawn, {x = 1, y = 0})) && abs(spent-game.TACTICAL_MOVE_SECONDS) < 0.001 &&
 		game.tactical_cell_visible(&room, {x = 10, y = 4}) && !game.tactical_cell_visible(&room, {x = 1, y = 4}) &&
 		!render.tactical_render_visible(renderer, {x = 1, y = 4}), "combat movement or fog without exploration memory failed") { return false }
 	for _ in 0..<3 { tactical_polish_frame(window, renderer, &room) }
