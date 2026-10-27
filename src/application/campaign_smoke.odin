@@ -180,9 +180,15 @@ EXPEDITION_SMOKE_NETWORKS :: EXPEDITION_SMOKE_COMPLEXES+len(EXPEDITION_SMOKE_COM
 EXPEDITION_SMOKE_NETWORK_BIOMES :: [5]campaign.Biome{.City,.Egypt,.Vietnam,.Gothic,.Space}
 @(private)
 EXPEDITION_SMOKE_NETWORK_VIEWS :: 3
+// The stacked map (Fase 8 of docs/piano-profondita.md): City pop's on its ground, on the plate over it and on the deep
+// one, chosen as W and S choose them; the Memoria's from the hall inside the boulder's hill, which it opens on.
+@(private)
+EXPEDITION_SMOKE_PLATES :: EXPEDITION_SMOKE_NETWORKS+len(EXPEDITION_SMOKE_NETWORK_BIOMES)*EXPEDITION_SMOKE_NETWORK_VIEWS
+@(private)
+EXPEDITION_SMOKE_PLATE_NAMES :: [4]string{"citta_terra","citta_sopra","citta_profondo","memoria_sala"}
 // The last stage of the path; the smoke quits after it.
 @(private)
-EXPEDITION_SMOKE_LAST :: EXPEDITION_SMOKE_NETWORKS+len(EXPEDITION_SMOKE_NETWORK_BIOMES)*EXPEDITION_SMOKE_NETWORK_VIEWS-1
+EXPEDITION_SMOKE_LAST :: EXPEDITION_SMOKE_PLATES+len(EXPEDITION_SMOKE_PLATE_NAMES)-1
 @(private)
 EXPEDITION_SMOKE_STRUCTURE_NAMES :: [EXPEDITION_SMOKE_STRUCTURE_STEPS]string{"6","4","2","1","soglia","dentro","fuori","oggetti"}
 
@@ -352,12 +358,13 @@ expedition_enable_smoke :: proc(scene:^host.Scene) {
 			rl.IsWindowState({.VSYNC_HINT}),EXPEDITION_BENCHMARK_FIRST,EXPEDITION_BENCHMARK_LAST,EXPEDITION_BENCHMARK_CANVAS_WIDTH,EXPEDITION_BENCHMARK_CANVAS_HEIGHT)
 	}
 	state:=new(Expedition_Capture);state.wrapped=scene^
-	// ODIN_PP_SMOKE_ONLY=hits starts at the hit marks' fights, =caves at the caves' act, =complessi at the complexes', to
-	// work on them.
+	// ODIN_PP_SMOKE_ONLY=hits starts at the hit marks' fights, =caves at the caves' act, =complessi at the complexes', =reti
+	// at the networks', =piani at the stacked map's, to work on them.
 	if only,_:=os.lookup_env("ODIN_PP_SMOKE_ONLY",context.temp_allocator);only=="hits" {state.stage=EXPEDITION_SMOKE_HITS-1}
 	else if only=="caves" {state.stage=EXPEDITION_SMOKE_CAVES-1}
 	else if only=="complessi" {state.stage=EXPEDITION_SMOKE_COMPLEXES-1}
 	else if only=="reti" {state.stage=EXPEDITION_SMOKE_NETWORKS-1}
+	else if only=="piani" {state.stage=EXPEDITION_SMOKE_PLATES-1}
 	scene^=host.Scene{name="expedition-smoke",data=state,opaque=true,modal=true,update=expedition_capture_update,draw=expedition_capture_draw,after_present=expedition_capture_present,destroy=proc(data:rawptr){s:=cast(^Expedition_Capture)data;s.wrapped.destroy(s.wrapped.data);free(s)}}
 }
 
@@ -429,7 +436,10 @@ expedition_capture_present :: proc(data:rawptr,frame:^host.Frame) {
 			artifacts.screenshot(fmt.ctprintf("odin_pp_expedition_montagna_%d.png",s.stage-EXPEDITION_SMOKE_MOUNTAIN))
 		} else if s.stage==EXPEDITION_SMOKE_CAVE_MAP {
 			artifacts.screenshot("odin_pp_expedition_grotta_ologramma.png")
-		} else if s.stage>=EXPEDITION_SMOKE_NETWORKS && s.stage<=EXPEDITION_SMOKE_LAST {
+		} else if s.stage>=EXPEDITION_SMOKE_PLATES && s.stage<=EXPEDITION_SMOKE_LAST {
+			names:=EXPEDITION_SMOKE_PLATE_NAMES
+			artifacts.screenshot(fmt.ctprintf("odin_pp_expedition_ologramma_piani_%s.png",names[s.stage-EXPEDITION_SMOKE_PLATES]))
+		} else if s.stage>=EXPEDITION_SMOKE_NETWORKS && s.stage<EXPEDITION_SMOKE_PLATES {
 			biomes:=EXPEDITION_SMOKE_NETWORK_BIOMES;views:=[EXPEDITION_SMOKE_NETWORK_VIEWS]string{"scale","sala","ascensore"}
 			k:=s.stage-EXPEDITION_SMOKE_NETWORKS
 			artifacts.screenshot(fmt.ctprintf("odin_pp_expedition_rete_%v_%s.png",biomes[k/EXPEDITION_SMOKE_NETWORK_VIEWS],views[k%EXPEDITION_SMOKE_NETWORK_VIEWS]))
@@ -459,7 +469,7 @@ expedition_capture_present :: proc(data:rawptr,frame:^host.Frame) {
 	}
 	s.stage+=1
 	switch s.stage {
-	case 1:e.map_open=true
+	case 1:e.map_open=true;e.map_layer=e.rs.room.player.position.layer
 	case 2:e.map_open=false;e.world.mounted=true
 	case 3:
 		rl.SetWindowSize(1100,760)
@@ -493,7 +503,7 @@ expedition_capture_present :: proc(data:rawptr,frame:^host.Frame) {
 				e.rs.room.player.position=world.site_world(&e.world.sites[0],{x = -2, y = 0})
 				world.tick(&e.world,&e.rs.room,.1)
 			} else {game.end_expedition_encounter(&e.rs.room);clear(&e.rs.room.enemies)}
-		} else if s.stage==23 {rl.SetWindowSize(1024,768);e.map_open=true}
+		} else if s.stage==23 {rl.SetWindowSize(1024,768);e.map_open=true;e.map_layer=e.rs.room.player.position.layer}
 		else if s.stage==24 {rl.SetWindowSize(1280,720);e.map_open=false;expedition_smoke_behind_wall(e)}
 		else if s.stage==EXPEDITION_SMOKE_WALK {e.rs.room.player.position=e.rs.room.exit_position;e.rs.room.player.position.x-=8;e.rs.iso_renderer.tactical.expedition_follow_ready=false;e.world.mounted=true}
 		else if s.stage==EXPEDITION_SMOKE_ENGAGE {e.world.mounted=false;expedition_smoke_before_patrol(e)}
@@ -517,14 +527,15 @@ expedition_capture_present :: proc(data:rawptr,frame:^host.Frame) {
 			expedition_smoke_relief(e,campaign.Biome(s.stage-EXPEDITION_SMOKE_RELIEF))
 		} else if s.stage>=EXPEDITION_SMOKE_HOLOGRAMS && s.stage<EXPEDITION_SMOKE_HOLOGRAMS+3 {
 			biomes:=EXPEDITION_SMOKE_HOLOGRAM_BIOMES
-			expedition_smoke_world(e,biomes[s.stage-EXPEDITION_SMOKE_HOLOGRAMS]);e.world.mounted=false;e.message_timer=0;e.map_open=true
+			expedition_smoke_world(e,biomes[s.stage-EXPEDITION_SMOKE_HOLOGRAMS]);e.world.mounted=false;e.message_timer=0;e.map_open=true;e.map_layer=e.rs.room.player.position.layer
 		} else if s.stage==EXPEDITION_SMOKE_TWO_LEVELS {e.map_open=false;expedition_smoke_two_levels(e)}
 		else if s.stage>=EXPEDITION_SMOKE_MOUNTAIN && s.stage<EXPEDITION_SMOKE_MOUNTAIN+EXPEDITION_SMOKE_MOUNTAIN_STEPS {expedition_smoke_mountain(e,s.stage-EXPEDITION_SMOKE_MOUNTAIN)}
 		else if s.stage>=EXPEDITION_SMOKE_CAVES && s.stage<EXPEDITION_SMOKE_CAVES+4*EXPEDITION_SMOKE_CAVE_VIEWS {expedition_smoke_cave(e,s.stage-EXPEDITION_SMOKE_CAVES)}
 		else if s.stage>=EXPEDITION_SMOKE_PLACE && s.stage<EXPEDITION_SMOKE_PLACE+EXPEDITION_SMOKE_PLACE_STEPS {expedition_smoke_place(e,s.stage-EXPEDITION_SMOKE_PLACE)}
-		else if s.stage==EXPEDITION_SMOKE_CAVE_MAP {expedition_smoke_cave(e,2);e.world.in_cave=world.cave_at(&e.world,e.rs.room.player.position);e.map_open=true}
+		else if s.stage==EXPEDITION_SMOKE_CAVE_MAP {expedition_smoke_cave(e,2);e.world.in_cave=world.cave_at(&e.world,e.rs.room.player.position);e.map_open=true;e.map_layer=e.rs.room.player.position.layer}
 		else if s.stage>=EXPEDITION_SMOKE_COMPLEXES && s.stage<EXPEDITION_SMOKE_NETWORKS {e.map_open=false;expedition_smoke_complex(e,s.stage-EXPEDITION_SMOKE_COMPLEXES)}
-		else if s.stage>=EXPEDITION_SMOKE_NETWORKS && s.stage<=EXPEDITION_SMOKE_LAST {expedition_smoke_network(e,s.stage-EXPEDITION_SMOKE_NETWORKS)}
+		else if s.stage>=EXPEDITION_SMOKE_NETWORKS && s.stage<EXPEDITION_SMOKE_PLATES {expedition_smoke_network(e,s.stage-EXPEDITION_SMOKE_NETWORKS)}
+		else if s.stage>=EXPEDITION_SMOKE_PLATES && s.stage<=EXPEDITION_SMOKE_LAST {expedition_smoke_plates(e,s.stage-EXPEDITION_SMOKE_PLATES)}
 		else if s.stage>EXPEDITION_SMOKE_LAST {host.quit(frame)}
 	}
 }
@@ -776,6 +787,31 @@ expedition_smoke_network :: proc(e:^run.Expedition_Session,step:int) {
 		game.lift_tick(room,game.lift_journey_seconds(room,index)*0.5)
 		assert(game.lift_player_riding(room),"the robot is not on its way down")
 	}
+	e.rs.iso_renderer.tactical.expedition_follow_ready=false
+	world.roam_sync(&e.roam,room)
+}
+
+// One step of the stacked map's act (Fase 8 of docs/piano-profondita.md): City pop's map opened on the ground, then on the
+// plate over it and on the one under it, chosen as W and S choose them (run.hologram_next_plate), its rooftops and its first
+// station visited; the Memoria's opened from the hall inside the boulder's hill, which it opens on.
+@(private)
+expedition_smoke_plates :: proc(e:^run.Expedition_Session,step:int) {
+	expedition_smoke_world(e,.Secret if step==3 else .City);e.world.mounted=false;e.message_timer=0
+	w:=&e.world;room:=&e.rs.room
+	if room.phase!=.Loot {game.end_expedition_encounter(room);clear(&room.enemies);room.phase=.Loot}
+	if w.complex_count>0 {w.complexes[0].visited=true}
+	w.network_visited[0]=true
+	if step==3 {
+		// Beside the secret of the hall.
+		c:=w.complexes[0];layout:=world.complex_layout(c.kind);width,height:=world.complex_size(layout)
+		for y in 0..<height {for x in 0..<width {if layout.rows[y][x]=='?' {room.player.position=world.complex_cell(c,{x = x+1, y = y})}}}
+		assert(room.player.position.layer==world.COMPLEX_TUNNEL,"the robot is not in the boulder's hall")
+	}
+	e.map_open=true;e.map_layer=room.player.position.layer
+	if step==1 {e.map_layer=run.hologram_next_plate(&e.rs.level_data,e.map_layer,1)}
+	if step==2 {e.map_layer=run.hologram_next_plate(&e.rs.level_data,e.map_layer,-1)}
+	assert(step!=1 || e.map_layer==grid.HIGHEST_LAYER,"City pop's map has no plate over its ground")
+	assert(step!=2 || e.map_layer==world.NETWORK_LAYER,"City pop's map has no deep plate")
 	e.rs.iso_renderer.tactical.expedition_follow_ready=false
 	world.roam_sync(&e.roam,room)
 }

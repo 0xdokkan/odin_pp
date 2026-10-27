@@ -126,6 +126,8 @@ mechanics_lab_layers :: proc(window: ^app.Window, renderer: ^render.Renderer, ro
 	// player is a little darker (Fase 4).
 	if !layers_lab_place(window, renderer, room, controller, cards, buffer, .Brute, {x = 16, y = 14}) { return false }
 	mechanics_lab_still(window, renderer, room, 0, "odin_pp_mechanics_lab_layers_foe_under.png")
+	// The room's hologram: the player on the bridge's deck, the brute on the road under it.
+	mechanics_lab_hologram_still(window, renderer, room, "odin_pp_mechanics_lab_layers_mappa.png")
 
 	// A fire cast from the bridge onto the road below: the line goes down past the deck's edge.
 	fire, has_fire := mechanics_lab_card_of(player, .Wildfire)

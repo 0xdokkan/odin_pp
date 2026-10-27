@@ -65,6 +65,9 @@ World :: struct {
 	// The complexes of the map (complex.odin): blocks, bridges and tunnels at places fixed by the biome.
 	complexes: [MAX_COMPLEXES]Complex,
 	complex_count: int,
+	// The halls of the network under the ground (network.odin) the robot has been in, in the plan's order: the stacked
+	// map marks them (Fase 8).
+	network_visited: [MAX_NETWORK_HALLS]bool,
 	// The height the biome's ground was raised by (biome_base, level.Level.base): 0 in a world saved before.
 	base: i32,
 	// The map's lifts and gates (level/layers.odin), kept for the saves: a gate's cell on the map says if it is open.
@@ -434,6 +437,7 @@ tick :: proc(w:^World,room:^game.Room,dt:f32) {
 	patrol_due := w.patrol_clock >= 1.4
 	player:=room.player.position
 	update_caves(w,player)
+	update_visits(w,player)
 	if room.player.health<w.last_health {w.mounted=false}
 	w.last_health=room.player.health
 	for &s,site_index in w.sites[:w.site_count] {

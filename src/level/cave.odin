@@ -2,9 +2,10 @@ package level
 
 import grid "../engine/grid"
 
-// THE CAVES (Fase 5 of docs/piano-griglia.md): a small map of its own, two or three rooms in a row joined by
-// narrow galleries, entered through an arch on the open map and left through the same arch. A pure function of a
-// seed, so a cave is the same every time it is entered (what changes in it is kept by the expedition).
+// THE CAVES (Fase 5 of docs/piano-griglia.md): two or three rooms in a row joined by narrow galleries. Since Fase 5 of
+// docs/piano-profondita.md the plan is dug under a massif of the open map, on the layer under the ground
+// (expedition/cave.odin), entered on foot through its mouth: the separate cave map of before is gone. A pure function of
+// a seed, so a cave is the same every time it is entered (what changes in it is kept by the expedition).
 //
 //   ##################################
 //   #....#####........#######.....####      the arrival is at the west end, the secret in a niche at the east end;
@@ -135,16 +136,4 @@ cave_plan_sized :: proc(seed: u64, board_width, board_height: int) -> (plan: Cav
 cave_plan_at :: proc(plan: ^Cave_Plan, x, y: int) -> u8 {
 	if x < 0 || y < 0 || x >= plan.width || y >= plan.height { return '#' }
 	return plan.rows[y][x]
-}
-
-// Writes the plan onto `data` with its top left corner at `origin`: floor and rock, flat. False if it does not fit.
-cave_stamp :: proc(data: ^Level, origin: grid.Position, plan: ^Cave_Plan) -> bool {
-	if data == nil || origin.x < 0 || origin.y < 0 || origin.x+CAVE_WIDTH > data.tiles.width || origin.y+CAVE_HEIGHT > data.tiles.height { return false }
-	for y in 0..<CAVE_HEIGHT {
-		for x in 0..<CAVE_WIDTH {
-			cell := grid.offset(origin, x, y)
-			_ = set_tile(data, cell, {.Wall if plan.rows[y][x] == '#' else .Floor})
-		}
-	}
-	return true
 }

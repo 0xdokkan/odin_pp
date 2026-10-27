@@ -11,6 +11,29 @@ import level "../level"
 
 HOLOGRAM_EDGE :: rl.Color{58, 108, 140, 255}
 HOLOGRAM_GLOW :: rl.Color{113, 207, 230, 255}
+HOLOGRAM_DECK :: rl.Color{24, 45, 64, 255}
+
+// THE ROOM'S RELIEF (Fase 8 of docs/piano-profondita.md): every cell of the table stands as high as its floor on the
+// board (cell_ground), and the decks over the ground (a bridge, a walkway) are slabs at their height, so that the
+// figures, drawn where they stand, stand on them. A flat room is drawn as before.
+
+// The decks over the ground: each cell with a floor on a layer over it, and its height on the board.
+@(private = "file")
+Hologram_Deck :: struct { cell: grid.Position, kind: level.Tile_Kind, ground: f32 }
+
+@(private = "file")
+hologram_decks :: proc(room: ^game.Room) -> [dynamic]Hologram_Deck {
+	decks := make([dynamic]Hologram_Deck, context.temp_allocator)
+	width := room.level_data.tiles.width
+	for layer in grid.GROUND_LAYER+1..=grid.HIGHEST_LAYER {
+		for tile, index in room.level_data.planes[level.layer_slot(i8(layer))].tiles {
+			if !level.kind_has_floor(tile.kind) { continue }
+			cell := grid.Position{x = index%width, y = index/width, layer = i8(layer)}
+			append(&decks, Hologram_Deck{cell, tile.kind, cell_ground(cell)})
+		}
+	}
+	return decks
+}
 
 @(private = "file")
 draw_hologram_table :: proc(renderer: ^Renderer, room: ^game.Room) {
@@ -23,18 +46,27 @@ draw_hologram_table :: proc(renderer: ^Renderer, room: ^game.Room) {
 			if tile.kind == .Void { continue }
 			color := rl.Color{13, 25, 39, 255}
 			if (x+y)%2 == 0 { color = {16, 30, 45, 255} }
+			// A raised cell is a column from the table up to its floor.
+			ground := cell_ground({x = x, y = y})
 			p := rl.Vector3{f32(x)+0.5, -0.025, f32(y)+0.5}
-			draw_resin_cube(renderer, p, 0.97, 0.09, 0.97, color)
+			draw_resin_cube(renderer, p+rl.Vector3{0, ground*0.5, 0}, 0.97, 0.09+ground, 0.97, color)
 			if tile.kind == .Wall {
 				height := f32(0.055) if level.is_border_position({x = x, y = y}, int(w), int(h)) else 0.46
-				draw_resin_cube(renderer, {p.x, height*0.5, p.z}, 0.93, height, 0.93, {18, 33, 49, 255})
-				draw_resin_cube(renderer, {p.x, height+0.015, p.z}, 0.88, 0.035, 0.88, {27, 48, 68, 255})
+				draw_resin_cube(renderer, {p.x, ground+height*0.5, p.z}, 0.93, height, 0.93, {18, 33, 49, 255})
+				draw_resin_cube(renderer, {p.x, ground+height+0.015, p.z}, 0.88, 0.035, 0.88, {27, 48, 68, 255})
 			}
-			if tile.kind == .Exit { draw_voxel_exit(renderer, {x = x, y = y}) }
+			if tile.kind == .Exit {
+				if ground != 0 { rlgl.PushMatrix(); rlgl.Translatef(0, ground, 0) }
+				draw_voxel_exit(renderer, {x = x, y = y})
+				if ground != 0 { rlgl.PopMatrix() }
+			}
 		}
 	}
+	for deck in hologram_decks(room) {
+		draw_resin_cube(renderer, {f32(deck.cell.x)+0.5, deck.ground-0.025, f32(deck.cell.y)+0.5}, 0.97, 0.09, 0.97, HOLOGRAM_DECK)
+	}
 	for obstacle in room.obstacles {
-		p := rl.Vector3{f32(obstacle.position.x)+0.5, 0.17, f32(obstacle.position.y)+0.5}
+		p := rl.Vector3{f32(obstacle.position.x)+0.5, 0.17+cell_ground(obstacle.position), f32(obstacle.position.y)+0.5}
 		draw_resin_cube(renderer, p, 0.67, 0.34, 0.67, {26, 48, 68, 255})
 		draw_resin_cube(renderer, p+rl.Vector3{0, 0.18, 0}, 0.7, 0.06, 0.7, {39, 66, 86, 255})
 	}
@@ -48,9 +80,19 @@ draw_hologram_table :: proc(renderer: ^Renderer, room: ^game.Room) {
 draw_hologram_threat :: proc(room: ^game.Room, cell: grid.Position) {
 	tile, found := level.tile_at(room.level_data, cell)
 	if !found || !level.is_walkable(tile.kind) { return }
-	p := rl.Vector3{f32(cell.x)+0.5, 0.044, f32(cell.y)+0.5}
+	p := rl.Vector3{f32(cell.x)+0.5, 0.044+cell_ground(cell), f32(cell.y)+0.5}
 	rl.DrawPlane(p, {0.88, 0.88}, {210, 48, 72, 42})
 	rl.DrawCubeWires(p, 0.88, 0.006, 0.88, {221, 74, 89, 225})
+}
+
+// Narrow emissive rails survive the scene downsample more cleanly than hairline
+// wireframes, without lighting the entire cell.
+@(private = "file")
+hologram_rails :: proc(p: rl.Vector3) {
+	for sign in ([2]f32{-1, 1}) {
+		rl.DrawCube(p+rl.Vector3{sign*0.475, 0, 0}, 0.022, 0.004, 0.972, {68, 141, 172, 215})
+		rl.DrawCube(p+rl.Vector3{0, 0, sign*0.475}, 0.972, 0.004, 0.022, {68, 141, 172, 215})
+	}
 }
 
 @(private = "file")
@@ -60,29 +102,28 @@ draw_hologram_projection :: proc(renderer: ^Renderer, room: ^game.Room) {
 	for y in 0..<room.level_data.tiles.height {
 		for x in 0..<room.level_data.tiles.width {
 			tile, _ := level.tile_at(room.level_data, {x = x, y = y})
-			p := rl.Vector3{f32(x)+0.5, 0.029, f32(y)+0.5}
+			ground := cell_ground({x = x, y = y})
+			p := rl.Vector3{f32(x)+0.5, 0.029+ground, f32(y)+0.5}
 			if level.is_walkable(tile.kind) {
-				// Narrow emissive rails survive the scene downsample more cleanly
-				// than hairline wireframes, without lighting the entire cell.
-				for sign in ([2]f32{-1, 1}) {
-					rl.DrawCube(p+rl.Vector3{sign*0.475, 0, 0}, 0.022, 0.004, 0.972, {68, 141, 172, 215})
-					rl.DrawCube(p+rl.Vector3{0, 0, sign*0.475}, 0.972, 0.004, 0.022, {68, 141, 172, 215})
-				}
+				hologram_rails(p)
 			} else if tile.kind == .Wall {
 				border := level.is_border_position({x = x, y = y}, int(w), int(h))
 				height := f32(0.091) if border else 0.496
-				rl.DrawCubeWires({p.x, height*0.5, p.z}, 0.935, height, 0.935, {57, 114, 143, 205} if border else HOLOGRAM_GLOW)
+				rl.DrawCubeWires({p.x, ground+height*0.5, p.z}, 0.935, height, 0.935, {57, 114, 143, 205} if border else HOLOGRAM_GLOW)
 			}
 			if tile.kind == .Exit {
 				for sign in ([2]f32{-1, 1}) {
-					rl.DrawLine3D({p.x+sign*0.34, 0.06, p.z-0.16}, {p.x+sign*0.34, 0.91, p.z-0.16}, HOLOGRAM_GLOW)
-					rl.DrawLine3D({p.x+sign*0.34, 0.91, p.z-0.16}, {p.x, 1.29, p.z-0.16}, HOLOGRAM_GLOW)
+					rl.DrawLine3D({p.x+sign*0.34, ground+0.06, p.z-0.16}, {p.x+sign*0.34, ground+0.91, p.z-0.16}, HOLOGRAM_GLOW)
+					rl.DrawLine3D({p.x+sign*0.34, ground+0.91, p.z-0.16}, {p.x, ground+1.29, p.z-0.16}, HOLOGRAM_GLOW)
 				}
 			}
 		}
 	}
+	for deck in hologram_decks(room) {
+		if level.is_walkable(deck.kind) { hologram_rails({f32(deck.cell.x)+0.5, 0.029+deck.ground, f32(deck.cell.y)+0.5}) }
+	}
 	for obstacle in room.obstacles {
-		rl.DrawCubeWires({f32(obstacle.position.x)+0.5, 0.20, f32(obstacle.position.y)+0.5}, 0.71, 0.42, 0.71, HOLOGRAM_GLOW)
+		rl.DrawCubeWires({f32(obstacle.position.x)+0.5, 0.20+cell_ground(obstacle.position), f32(obstacle.position.y)+0.5}, 0.71, 0.42, 0.71, HOLOGRAM_GLOW)
 	}
 	for x in 0..=room.level_data.tiles.width {
 		if x%2 != 0 { continue }
@@ -96,7 +137,14 @@ draw_hologram_projection :: proc(renderer: ^Renderer, room: ^game.Room) {
 	scan := f32(math.mod(renderer.sprite_assets.elapsed*0.65, f64(max(f32(1), h-2))))+1
 	rlgl.DrawRenderBatchActive()
 	rlgl.DisableDepthMask()
-	rl.DrawCube({w*0.5, 0.033, scan}, w-2, 0.002, 0.055, {100, 202, 230, 90})
+	if !board_has_heights() { rl.DrawCube({w*0.5, 0.033, scan}, w-2, 0.002, 0.055, {100, 202, 230, 90}) }
+	else {
+		// Over the relief the scan climbs each cell it crosses.
+		row := int(scan)
+		for x in 1..<room.level_data.tiles.width-1 {
+			rl.DrawCube({f32(x)+0.5, 0.033+cell_ground({x = x, y = row}), scan}, 1, 0.002, 0.055, {100, 202, 230, 90})
+		}
+	}
 	if tactical_telegraphs_are_visible(renderer, room) {
 		for &enemy in room.enemies {
 			if game.enemy_is_staggered(room, &enemy) { continue }
@@ -144,6 +192,12 @@ draw_hologram_chrome :: proc(renderer: ^Renderer, room: ^game.Room) {
 
 draw_hologram :: proc(renderer: ^Renderer, room: ^game.Room) {
 	rlgl.DrawRenderBatchActive()
+	// The board's heights, who stands where and what covers whom, as the world's
+	// drawing has them, even on a frame the world is not drawn: the table and the
+	// figures agree.
+	set_board_level(room.level_data)
+	set_board_actors(room)
+	set_board_view(renderer, room)
 	// The surface draws in logical units at its own resolution.
 	surface := begin_tactical_surface(renderer)
 	draw_tactical_backdrop(renderer)
@@ -168,6 +222,8 @@ draw_hologram :: proc(renderer: ^Renderer, room: ^game.Room) {
 	rl.EndShaderMode()
 	draw_hologram_projection(renderer, room)
 	draw_tactical_billboards(renderer)
+	// Who is under a deck or in the rock shows its outline, as on the board (layer_outline.odin).
+	draw_hidden_outlines(renderer, room)
 	rl.EndMode3D()
 	rl.EndScissorMode()
 	end_tactical_surface(renderer, surface)

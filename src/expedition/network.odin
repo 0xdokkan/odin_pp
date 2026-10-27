@@ -22,6 +22,8 @@ import rng "../engine/rng"
 
 NETWORK_LAYER :: i8(grid.LOWEST_LAYER)
 NETWORK_FLOOR :: i32(0)
+// The most halls a network has (World.network_visited).
+MAX_NETWORK_HALLS :: 8
 // The cells of a stair's ramp: from a step under the base down to a step over the network.
 NETWORK_STAIR_STEPS :: 13
 // The longest way from a hall's side to its lift's shaft; how far from a hall's middle its stair's foot may be.
@@ -428,7 +430,7 @@ network_gate :: proc(data: ^level.Level, path: []grid.Position, width: int) {
 place_network :: proc(w: ^World, data: ^level.Level) {
 	plan := network_plan(w.biome)
 	if len(plan.halls) == 0 || w.base < NETWORK_FLOOR+level.LAYER_SPACING { return }
-	centres: [8]grid.Position
+	centres: [MAX_NETWORK_HALLS]grid.Position
 	count := min(len(plan.halls), len(centres))
 	for i in 0..<count { centres[i] = network_hall_centre(w, plan, i) }
 	// Each hall: the cells of its box that may hold it and join its middle (a wall over the box leaves no pocket apart). A
@@ -467,6 +469,25 @@ place_network :: proc(w: ^World, data: ^level.Level) {
 	for hall, i in plan.halls[:count] {
 		if hall.stair > 0 { _ = network_stair(w, data, centres[i], hall.half, hall.stair) }
 		if hall.lift { _ = network_lift(w, data, centres[i], hall.half) }
+	}
+}
+
+// What the robot has been on, every tick (the stacked map marks it, Fase 8 of docs/piano-profondita.md): the complex it
+// stands in, on any layer, and the network's hall it is in (a crater's: its complex).
+@(private)
+update_visits :: proc(w: ^World, player: grid.Position) {
+	if index, _ := complex_at(w, player); index > 0 { w.complexes[index-1].visited = true }
+	plan := network_plan(w.biome)
+	if len(plan.halls) == 0 || w.base < NETWORK_FLOOR+level.LAYER_SPACING { return }
+	for hall, i in plan.halls[:min(len(plan.halls), MAX_NETWORK_HALLS)] {
+		if w.network_visited[i] { continue }
+		if hall.crater != .None {
+			c, found := network_crater(w, hall.crater)
+			w.network_visited[i] = found && c.visited
+			continue
+		}
+		centre := network_hall_centre(w, plan, i)
+		w.network_visited[i] = player.layer == NETWORK_LAYER && abs(player.x-centre.x) <= hall.half.x && abs(player.y-centre.y) <= hall.half.y
 	}
 }
 

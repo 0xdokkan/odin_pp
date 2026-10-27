@@ -55,6 +55,8 @@ mechanics_lab_heights :: proc(window: ^app.Window, renderer: ^render.Renderer, r
 		fmt.eprintln("mechanics lab: the player did not reach the plateau"); return false
 	}
 	mechanics_lab_still(window, renderer, room, 0, "odin_pp_mechanics_lab_heights_plateau.png")
+	// The room's hologram from up there: the robot stands on the plateau there too.
+	mechanics_lab_hologram_still(window, renderer, room, "odin_pp_mechanics_lab_heights_mappa.png")
 
 	// Across the plateau to its edge, where the cliff stops the walk.
 	for _ in 0..<4 {

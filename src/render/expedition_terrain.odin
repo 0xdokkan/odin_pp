@@ -1,5 +1,6 @@
 package render
 
+import "core:c"
 import rl "vendor:raylib"
 import rlgl "vendor:raylib/rlgl"
 import game "../game"
@@ -32,6 +33,10 @@ Expedition_Terrain_Chunk :: struct {
 	// Whether a cell's ground in the block dips under the map's base (a stair's pit down to a network): the plane must
 	// not cover it.
 	sunk:     bool,
+	// Its vertices on the video card (draw_terrain_chunk), once drawn; whether the upload failed (then they are sent one by
+	// one, as before Fase 8).
+	mesh:     rl.Mesh,
+	upload_failed: bool,
 }
 
 // From this many steps a terrace is tall enough to hide an actor behind it, and the floor thins it out: a cave's massif,
@@ -48,9 +53,62 @@ Expedition_Terrain_Cache :: struct {
 	rebuilds:             u64,
 }
 
+// THE BLOCKS ON THE VIDEO CARD (Fase 8 of docs/piano-profondita.md): a block of the relief or of the decks is uploaded
+// once, the first time it is drawn after it is built, and drawn from there with the floor program bound, instead of being
+// sent vertex by vertex every frame. Drawing a mesh binds only its material's textures, so the floor's map of cells, which
+// the program reads, goes with every draw (Expedition_Floor.bound). The rooms under the ground are still sent vertex by
+// vertex: drawn from the card, the window round the robot in a complex's hall came out other than before, and they are few
+// and only round the robot.
+@(private)
+release_terrain_mesh :: proc(chunk: ^Expedition_Terrain_Chunk) {
+	if chunk.mesh.vaoId != 0 || chunk.mesh.vboId != nil { rl.UnloadMesh(chunk.mesh) }
+	chunk.mesh, chunk.upload_failed = {}, false
+}
+
+@(private = "file")
+upload_terrain_chunk :: proc(chunk: ^Expedition_Terrain_Chunk) -> bool {
+	n := len(chunk.vertices)
+	mesh := &chunk.mesh
+	mesh.vertexCount, mesh.triangleCount = c.int(n), c.int(n/3)
+	mesh.vertices = cast([^]f32)rl.MemAlloc(c.uint(n*3*size_of(f32)))
+	mesh.normals = cast([^]f32)rl.MemAlloc(c.uint(n*3*size_of(f32)))
+	mesh.colors = cast([^]u8)rl.MemAlloc(c.uint(n*4))
+	if mesh.vertices == nil || mesh.normals == nil || mesh.colors == nil { rl.UnloadMesh(mesh^); mesh^ = {}; return false }
+	for v, i in chunk.vertices {
+		for axis in 0..<3 { mesh.vertices[i*3+axis], mesh.normals[i*3+axis] = v.position[axis], v.normal[axis] }
+		mesh.colors[i*4], mesh.colors[i*4+1], mesh.colors[i*4+2], mesh.colors[i*4+3] = v.color.r, v.color.g, v.color.b, v.color.a
+	}
+	rl.UploadMesh(mesh, false)
+	if mesh.vboId == nil || mesh.vboId[0] == 0 { rl.UnloadMesh(mesh^); mesh^ = {}; return false }
+	return true
+}
+
+// Draws a block with the floor program bound (Expedition_Floor.bound): from the video card (`on_card`), else, or if its
+// upload failed, vertex by vertex.
+@(private)
+draw_terrain_chunk :: proc(f: ^Expedition_Floor, chunk: ^Expedition_Terrain_Chunk, on_card := true) {
+	if len(chunk.vertices) == 0 { return }
+	if on_card && f.bound != nil && chunk.mesh.vaoId == 0 && !chunk.upload_failed && !upload_terrain_chunk(chunk) { chunk.upload_failed = true }
+	if on_card && f.bound != nil && chunk.mesh.vaoId != 0 {
+		maps: [12]rl.MaterialMap
+		maps[rl.MaterialMapIndex.ALBEDO].color = rl.WHITE
+		maps[rl.MaterialMapIndex.METALNESS].texture = f.texture
+		rl.DrawMesh(chunk.mesh, {shader = f.bound.shader, maps = raw_data(maps[:])}, rl.Matrix(1))
+		return
+	}
+	_ = rlgl.CheckRenderBatchLimit(i32(len(chunk.vertices)))
+	rlgl.Begin(rlgl.TRIANGLES)
+	for v in chunk.vertices {
+		rlgl.Color4ub(v.color.r, v.color.g, v.color.b, v.color.a)
+		rlgl.Normal3f(v.normal.x, v.normal.y, v.normal.z)
+		rlgl.Vertex3f(v.position.x, v.position.y, v.position.z)
+	}
+	rlgl.End()
+}
+
 @(private)
 destroy_expedition_terrain :: proc(cache: ^Expedition_Terrain_Cache) {
-	for &chunk in cache.chunks { delete(chunk.vertices) }
+	for &chunk in cache.chunks { release_terrain_mesh(&chunk); delete(chunk.vertices) }
 	delete(cache.chunks)
 	delete(cache.raised)
 	cache^ = {}
@@ -277,6 +335,7 @@ build_terrain_chunk :: proc(m: ^level.Surface_Map, origin: grid.Position, chunk:
 			}
 		}
 	}
+	release_terrain_mesh(chunk)
 	delete(chunk.vertices)
 	chunk.vertices = nil
 	if len(vertices^) > 0 {
@@ -303,8 +362,11 @@ draw_expedition_terrain :: proc(renderer: ^Renderer, room: ^game.Room) {
 	p := room.player.position
 	low := grid.Position{x = max(0, p.x-26)/EXPEDITION_TERRAIN_CHUNK, y = max(0, p.y-26)/EXPEDITION_TERRAIN_CHUNK}
 	high := grid.Position{x = min(cache.columns-1, (p.x+26)/EXPEDITION_TERRAIN_CHUNK), y = min(cache.rows-1, (p.y+26)/EXPEDITION_TERRAIN_CHUNK)}
-	rlgl.DisableBackfaceCulling()
-	defer rlgl.EnableBackfaceCulling()
+	// What is still in the batch (the plane) first, with its own textures.
+	rlgl.DrawRenderBatchActive()
+	// Faces turned away from the camera are culled, as the relief has always been seen: sent vertex by vertex, it almost
+	// always reached the card after culling was back on, and from the card a face turned away showed dark over a ramp
+	// of the Snow's mountain (Fase 8).
 	reflection := false
 	if m := renderer.tactical.expedition_material; m != nil { reflection = m.reflection_pass }
 	for cy in low.y..=high.y {
@@ -313,14 +375,7 @@ draw_expedition_terrain :: proc(renderer: ^Renderer, room: ^game.Room) {
 			if len(chunk.vertices) == 0 { continue }
 			chunk_for_view := Expedition_Geometry_Chunk{center = chunk.center, radius = chunk.radius}
 			if !expedition_chunk_visible(&renderer.tactical.draw_frustum, &chunk_for_view, reflection) { continue }
-			_ = rlgl.CheckRenderBatchLimit(i32(len(chunk.vertices)))
-			rlgl.Begin(rlgl.TRIANGLES)
-			for v in chunk.vertices {
-				rlgl.Color4ub(v.color.r, v.color.g, v.color.b, v.color.a)
-				rlgl.Normal3f(v.normal.x, v.normal.y, v.normal.z)
-				rlgl.Vertex3f(v.position.x, v.position.y, v.position.z)
-			}
-			rlgl.End()
+			draw_terrain_chunk(f, chunk)
 		}
 	}
 }

@@ -30,7 +30,7 @@ Expedition_Under_Cache :: struct {
 
 @(private)
 destroy_expedition_under :: proc(cache: ^Expedition_Under_Cache) {
-	for &chunk in cache.chunks { delete(chunk.vertices) }
+	for &chunk in cache.chunks { release_terrain_mesh(&chunk); delete(chunk.vertices) }
 	delete(cache.chunks)
 	cache^ = {}
 }
@@ -212,6 +212,7 @@ build_under_chunk :: proc(m: ^level.Layer_Map, near: [][]i32, origin: grid.Posit
 			}
 		}
 	}
+	release_terrain_mesh(chunk)
 	delete(chunk.vertices)
 	chunk.vertices = nil
 	chunk.ready = true
@@ -277,14 +278,7 @@ draw_expedition_under :: proc(renderer: ^Renderer, room: ^game.Room) {
 			if len(chunk.vertices) == 0 { continue }
 			view := Expedition_Geometry_Chunk{center = chunk.center, radius = chunk.radius}
 			if !expedition_chunk_visible(&renderer.tactical.draw_frustum, &view, false) { continue }
-			_ = rlgl.CheckRenderBatchLimit(i32(len(chunk.vertices)))
-			rlgl.Begin(rlgl.TRIANGLES)
-			for v in chunk.vertices {
-				rlgl.Color4ub(v.color.r, v.color.g, v.color.b, v.color.a)
-				rlgl.Normal3f(v.normal.x, v.normal.y, v.normal.z)
-				rlgl.Vertex3f(v.position.x, v.position.y, v.position.z)
-			}
-			rlgl.End()
+			draw_terrain_chunk(f, chunk, on_card = false)
 		}
 	}
 }

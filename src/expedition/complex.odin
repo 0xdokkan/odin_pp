@@ -58,11 +58,13 @@ MAX_WORLD_GATES :: 8
 Complex_Kind :: enum u8 { None, Data_Node, Train_Bridge, Giant_Trees, Rooftops, Pyramids, Bamboo_Bridges, Crevasse, Bone_Bridge, Ruined_House, Floating_Island, Station, Crater_Lift, Crater_Hall, Crater_Stair, Boulder_Hill }
 
 Complex :: struct {
-	kind:   Complex_Kind,
+	kind:    Complex_Kind,
 	// The cell of its layout's first row and column.
-	origin: grid.Position,
+	origin:  grid.Position,
 	// The height of the level ground round it, and of its tunnels' floors (the relief's).
-	floor:  i32,
+	floor:   i32,
+	// Whether the robot has been on it, on any layer, in this run (the stacked map marks it then: Fase 8).
+	visited: bool,
 }
 
 Complex_Gate :: struct {

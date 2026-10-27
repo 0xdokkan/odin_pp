@@ -5,6 +5,33 @@ I riferimenti a Classica, `--flat` e ai vecchi smoke descrivono versioni precede
 per i comandi disponibili oggi valgono il [README](README.md) e la documentazione collegata.
 
 
+## 2026-10-27 — Profondità, Fase 8 fatta: ologramma a piani, prestazioni, grotte vecchie
+
+- **Ologramma a piani impilati** (scelta dell'utente): `Tab` apre una pila di lastre, una per piano (ponti sopra, terra,
+  grotte e gallerie sotto, reti in fondo). Quella del robot è piena, le altre sono sagome tenui; `W`/`S` (o le frecce)
+  cambiano il piano mostrato. La struttura si vede tutta; complessi e sale delle reti sono segnati solo dopo che il robot
+  ci è stato, come gli imbocchi delle grotte.
+- **L'ologramma resta sulla scheda video:** le lastre si costruiscono una volta per mappa, i triangoli stanno sulla scheda,
+  e si rifà tutto solo quando cambiano la mappa o il piano mostrato. Con la mappa aperta il gioco è più del doppio più
+  veloce (da 4,0-5,2 ms a 1,6-1,9 ms a fotogramma), più veloce anche della Fase 0, con la stessa immagine al byte.
+- **Blocchi del rilievo e dei ponti sulla scheda video**, caricati una volta invece che a ogni fotogramma: la CPU lavora
+  la metà per il pavimento. Si disegnano con il culling delle facce posteriori, come di fatto succedeva prima nel batch di
+  rlgl: senza, una faccia girata copriva di scuro una rampa della montagna della Neve.
+- **La mappa olografica delle stanze ha il rilievo:** il tavolo era piatto e le figure, alla loro quota, sembravano su
+  un'altra casella. Ora le caselle sono colonne alla loro altezza, i ponti lastre, e chi è coperto ha il contorno come in
+  gioco. Le stanze piatte non cambiano.
+- **Via `level.cave_stamp`** e il suo test, l'ultimo avanzo delle grotte vecchie.
+- Smoke: stage 191-194 per i piani dell'ologramma (`ODIN_PP_SMOKE_ONLY=piani`); nel laboratorio due catture nuove
+  dell'ologramma della stanza, dall'altopiano e dal ponte.
+- Test nuovi: le lastre dei piani, le visite di complessi e sale, la cache dell'ologramma che si rifà solo quando serve
+  (1737 in tutto).
+- **Benchmark finale contro la Fase 0** (16 giri alternati alla corrente, a macchina fresca e calda): media dei gruppi
+  +4,9% e +9,3%, dentro il +10% dell'obiettivo (alla fine della Fase 7 era +9,4% e +16,7%). Senza le viste della mappa il
+  gioco resta più lento del 9,7% e 13,1%: è il terreno nuovo in vista (rocce, massicci, complessi), che la scheda video
+  disegna in più. Provate e scartate due idee che non danno niente senza perdere qualità.
+- Verifiche: check completo con e senza assert (1737 test), smoke delle spedizioni (195 catture) e dell'editor (12)
+  senza errori; smoke del laboratorio da solo, alla corrente: 129 catture identiche al byte, più le 2 nuove.
+
 ## 2026-10-27 — Profondità, Fase 7 fatta: Cielo, Spazio e Memoria
 
 - **Cielo, un'isola sospesa** (scelta dell'utente): su un'isola libera galleggia un'isola più piccola di marmo, 14 gradini

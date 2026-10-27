@@ -14,7 +14,8 @@ verifica delle funzionalità.
 - Nel bioma: `WASD` cammina liberamente rispetto allo schermo (`W` verso
   l'alto), `M` evoca la mount, `E` interagisce, `Z` apre lo zaino, `Tab`
   apre l'ologramma e `U` apre il personaggio. In combattimento `WASD` torna
-  a muovere di una cella lungo gli assi della griglia.
+  a muovere di una cella lungo gli assi della griglia. Con l'ologramma
+  aperto `W`/`S` (o le frecce su e giù) cambiano il piano mostrato.
 - In combattimento la rotella sceglie la carta. Le carte direzionali usano
   un clic per entrare nel piazzamento, la rotella per ruotare, un secondo
   clic per confermare; il clic destro torna alla selezione.
@@ -33,7 +34,7 @@ verifica delle funzionalità.
 | Mondo aperto | Nuove mappe da 160, 192 o 224 celle per lato, geografia fissa per bioma; seed separato per i contenuti, gruppi di nemici finiti e simulazione locale. Le spedizioni salvate con la versione precedente conservano le loro dimensioni. |
 | POI | Nove planimetrie da 21–29 celle: ingressi multipli, cortili, passaggi di aggiramento, coperture e ali di spawn. Pavimento e geometria usano le stesse celle delle collisioni. Nidi a ondate che si fermano uscendo dal raggio, cache, archivi, officine, fonti, prove, tane del boss, frammenti e tunnel; stati non visitato/scoperto/risolto. |
 | Incontri | Ingaggio a distanza con linea di vista, pattuglie, guinzaglio e rientro all'esplorazione. I gruppi conservano danni e morti quando vengono rimossi dalla simulazione attiva. |
-| Ologramma e segreti | Miniatura 3D dell'intero terreno con rilievi e cortili; aree approssimative dei POI, legenda per tipo e stato, posizione precisa del robot. Non mostra le posizioni dei nemici. Anche i POI scoperti restano aree indicative, secondo la richiesta successiva al documento. I segreti compaiono soltanto dopo il ritrovamento. |
+| Ologramma e segreti | Miniatura 3D dell'intero terreno con rilievi e cortili; aree approssimative dei POI, legenda per tipo e stato, posizione precisa del robot. Non mostra le posizioni dei nemici. Anche i POI scoperti restano aree indicative, secondo la richiesta successiva al documento. I segreti compaiono soltanto dopo il ritrovamento. Dalla Fase 8 del piano profondità è una pila di lastre, una per piano (ponti sopra, terra, grotte e gallerie sotto, reti in fondo): quella mostrata è piena, le altre solo sagome; `W`/`S` cambiano piano. La struttura si vede tutta, i complessi e le sale delle reti sono segnati solo dopo che il robot ci è stato. |
 | Mount | Forma del bioma, movimento accelerato fuori dagli scontri, discesa all'ingaggio o quando un pericolo la impone. |
 | Zaino | Griglia iniziale 8×5, forme a celle e rotazioni, pile da 5 consumabili e 99 crediti, 3 reliquie attive, arma impugnata e 3 oggetti sospesi. |
 | Deposito | Griglie da 12×8 su pagine aggiunte secondo necessità, trasferimenti reali, scelta della capacità dello zaino; crediti come oggetti impilati. |
@@ -944,6 +945,43 @@ avviare è `build/odin_pp`; conserva il limite fps delle impostazioni di gioco.
   (assi del ballatoio, balaustra) e del Cielo (marmo, filetto d'oro) in `deckMain`.
 - **Smoke:** gli stage dal 176 (`ODIN_PP_SMOKE_ONLY=reti`), tre per bioma (City pop, Egitto, Vietnam, Gotico, Spazio): a
   metà di una scala, vicino ai nemici sotto la base (in una sala, o sul fondo di un cratere), sull'ascensore a metà discesa.
+
+## L'ologramma a piani e i blocchi sulla scheda video (Fase 8 del piano profondità)
+
+- **La pila di lastre** (`src/run/expedition_hologram.odin`, scelta dell'utente): ogni piano della mappa che ha una casella
+  (`hologram_plates`) è una lastra, nell'ordine dei piani, a `HOLO_PLATE_GAP` del lato della mappa l'una dall'altra. La
+  lastra mostrata (`Expedition_Session.map_layer`) è quella del robot quando la mappa si apre; `W`/`S` e le frecce passano
+  alla lastra sopra o sotto che ha caselle (`hologram_next_plate`). La lastra mostrata è piena (prismi, muri, curve di
+  livello; una lastra di poche caselle ha un alone attorno, `sparse`), le altre solo le cime delle loro caselle, tenui
+  (`draw_hologram_ghost`). La terra conta le quote dalla base (le buche sotto la base vanno sotto lo zero); le altre lastre
+  dal loro pavimento più basso (`hologram_plate`). Il robot è segnato sulla sua lastra, qualunque sia quella mostrata.
+- **Cosa si vede:** tutta la struttura; dei punti d'interesse, solo quelli dove il robot è stato. Sulla terra le aree dei
+  luoghi come prima, gli imbocchi delle grotte trovati e i complessi visitati; sulla lastra profonda le sale delle reti
+  visitate. Le visite stanno nel mondo, per la run: `Complex.visited` e `World.network_visited` (`update_visits`, a ogni
+  tick).
+- **Blocchi sulla scheda video** (`render/expedition_terrain.odin`, `draw_terrain_chunk`): i blocchi del rilievo e dei
+  ponti si caricano una volta, al primo disegno dopo che sono costruiti, e da lì si disegnano dalla scheda con il programma
+  del pavimento (`Expedition_Floor.bound`; la mappa delle caselle va come seconda mappa del materiale), invece di passare
+  vertice per vertice a ogni fotogramma. Si disegnano con il culling delle facce posteriori: prima lo si spegneva, ma nel
+  batch di rlgl i vertici arrivavano alla scheda quasi sempre dopo che era tornato acceso, e l'aspetto è quello. Le stanze
+  sotto terra restano come prima: dalla scheda la finestra attorno al robot nella sala di un complesso usciva diversa
+  (probabilmente per lo stesso motivo), e sono poche e solo vicino al robot.
+- **L'ologramma tenuto fra un fotogramma e l'altro** (`Hologram_Cache`, nella sessione della spedizione): le lastre si
+  costruiscono una volta per mappa (`hologram_prepare`), e i loro triangoli (la lastra mostrata piena, le cime tenui delle
+  altre) vanno sulla scheda video una volta per lastra mostrata, uno per lastra, disegnati con lo shader di base di raylib.
+  A ogni fotogramma restano solo le cose piccole o che si muovono: la base e le cornici, le linee (muri, curve di livello,
+  griglia: una mesh non sa disegnare linee, si mandano dalla lista tenuta), le aree, i segni e il robot. Si ricostruisce
+  quando cambia la geometria della mappa (`geometry_revision`), il mondo (seme o bioma) o la lastra mostrata; si libera
+  quando si chiude la spedizione (`hologram_release`). Le catture dei piani sono identiche al byte a quelle di prima.
+- **L'ologramma delle stanze** (`src/render/hologram.odin`): il tavolo segue il rilievo della stanza (ogni casella è una
+  colonna fino alla sua quota, `cell_ground`; muri, uscite, binari, minacce e scansione stanno sopra), i ponti sopra la
+  terra sono lastre alla loro quota, e chi è sotto un ponte o nella roccia ha il contorno, come in gioco
+  (`draw_hidden_outlines`). Prima il tavolo era piatto e le figure, disegnate alla loro quota, sembravano su un'altra
+  casella. Le quote, le figure e i coperti si prendono dalla stanza anche se il mondo non è stato disegnato. Una stanza
+  piatta si vede come prima, al byte.
+- **Smoke:** gli stage dal 191 (`ODIN_PP_SMOKE_ONLY=piani`): l'ologramma di City pop sulla terra, sopra e nel profondo, e
+  quello della Memoria dalla sala della collina. Nel laboratorio, l'ologramma della stanza dall'altopiano
+  (`odin_pp_mechanics_lab_heights_mappa.png`) e dal ponte (`odin_pp_mechanics_lab_layers_mappa.png`).
 
 ## Strutture posate dal giocatore (Fase 7 del piano griglia)
 

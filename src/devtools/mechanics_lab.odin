@@ -1683,6 +1683,20 @@ mechanics_lab_still :: proc(window: ^app.Window, renderer: ^render.Renderer, roo
 	artifacts.screenshot(name)
 }
 
+// A still frame of the room's hologram (render.draw_hologram, the map the robot
+// opens in a room), saved as `name`.
+mechanics_lab_hologram_still :: proc(window: ^app.Window, renderer: ^render.Renderer, room: ^game.Room, name: cstring) {
+	for _ in 0..<3 {
+		render.update_renderer_frame_timeline(renderer, 0)
+		render.update_tactical_view(renderer, room, {}, false, true)
+		app.begin_canvas(window, render.RESIN_BACKGROUND)
+		render.draw_hologram(renderer, room)
+		render.draw_tactical_hud(renderer, room, false, true)
+		app.present(window, render.LETTERBOX_COLOR)
+	}
+	artifacts.screenshot(name)
+}
+
 // A still frame with the mouse on `foe`, so its inspector stands beside the
 // board, saved as `name`.
 mechanics_lab_inspect_still :: proc(window: ^app.Window, renderer: ^render.Renderer, room: ^game.Room, foe: game.Entity_Ref, name: cstring) {

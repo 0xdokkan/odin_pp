@@ -141,6 +141,52 @@ test_a_save_keeps_the_base_of_a_raised_biome :: proc(t: ^testing.T) {
 	testing.expect(t, slice.equal(data2.lifts[:], data.lifts[:]) && slice.equal(data2.gates[:], data.gates[:]))
 }
 
+// The stacked map marks only what the robot has been to (Fase 8): a complex once it stands on it, a network's hall once it
+// is in it, a crater's hall once it is in the crater. Nothing from the spawn.
+@(test)
+test_the_world_remembers_the_complexes_and_halls_the_robot_has_been_to :: proc(t: ^testing.T) {
+	for biome in ([2]campaign.Biome{.City, .Space}) {
+		w: World
+		data: level.Level
+		p: game.Player
+		room := test_world(t, &w, &data, &p, biome)
+		defer level.destroy(&data)
+		defer game.destroy_room(&room)
+		game.end_expedition_encounter(&room)
+		clear(&room.enemies)
+		room.phase = .Loot
+		for &g in w.groups[:w.group_count] { g.count = 0 }
+		for &site in w.sites[:w.site_count] { site.active = false }
+		tick(&w, &room, 0.1)
+		testing.expectf(t, !w.complexes[0].visited && !w.network_visited[0], "%v: something is visited from the spawn", biome)
+		p.position = complex_bridge_middle(w.complexes[0])
+		tick(&w, &room, 0.1)
+		testing.expectf(t, w.complexes[0].visited, "%v: the complex is not visited from its bridge", biome)
+		// Into the network's first hall (the Spazio's: its first crater, a complex too).
+		plan := network_plan(biome)
+		hall := plan.halls[0]
+		if hall.crater != .None {
+			_, found := network_crater(&w, hall.crater)
+			testing.expect(t, found)
+			p.position = network_hall_centre(&w, plan, 0)
+			testing.expect(t, level.height_at(&data, p.position) == 0, "the crater's middle is not its bottom")
+		} else {
+			centre := network_hall_centre(&w, plan, 0)
+			search: for dy in -hall.half.y..=hall.half.y {
+				for dx in -hall.half.x..=hall.half.x {
+					cell := grid.offset(centre, dx, dy)
+					if tile, _ := level.tile_at(&data, cell); tile.kind == .Floor { p.position = cell; break search }
+				}
+			}
+			testing.expect(t, p.position.layer == NETWORK_LAYER)
+		}
+		testing.expect(t, !w.network_visited[0])
+		tick(&w, &room, 0.1)
+		testing.expectf(t, w.network_visited[0], "%v: the first hall is not visited from inside it", biome)
+		testing.expect(t, !w.network_visited[1], "the next hall is visited too")
+	}
+}
+
 // Under the ground the robot shakes off the Gotico's killer (the user's choice in Fase 7): while the robot is down in the
 // catacombs the killer waits on the open ground, and comes again once the robot is up; a fight with him breaks off when
 // the robot goes down.

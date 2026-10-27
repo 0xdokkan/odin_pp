@@ -1,7 +1,6 @@
 package render
 
 import rl "vendor:raylib"
-import rlgl "vendor:raylib/rlgl"
 import world "../expedition"
 import game "../game"
 import grid "../engine/grid"
@@ -111,6 +110,7 @@ build_deck_chunk :: proc(m: ^level.Layer_Map, origin: grid.Position, trestles: b
 			}
 		}
 	}
+	release_terrain_mesh(chunk)
 	delete(chunk.vertices)
 	chunk.vertices = nil
 	chunk.ready = true
@@ -187,22 +187,14 @@ draw_expedition_decks :: proc(renderer: ^Renderer, room: ^game.Room, w: ^world.W
 	high := grid.Position{x = min(cache.columns-1, (p.x+26)/EXPEDITION_TERRAIN_CHUNK), y = min(cache.rows-1, (p.y+26)/EXPEDITION_TERRAIN_CHUNK)}
 	reflection := false
 	if m := renderer.tactical.expedition_material; m != nil { reflection = m.reflection_pass }
-	rlgl.DisableBackfaceCulling()
-	defer rlgl.EnableBackfaceCulling()
+	// Faces turned away from the camera are culled, as for the relief (draw_expedition_terrain).
 	for cy in low.y..=high.y {
 		for cx in low.x..=high.x {
 			chunk := &cache.chunks[cy*cache.columns+cx]
 			if len(chunk.vertices) == 0 { continue }
 			view := Expedition_Geometry_Chunk{center = chunk.center, radius = chunk.radius}
 			if !expedition_chunk_visible(&renderer.tactical.draw_frustum, &view, reflection) { continue }
-			_ = rlgl.CheckRenderBatchLimit(i32(len(chunk.vertices)))
-			rlgl.Begin(rlgl.TRIANGLES)
-			for v in chunk.vertices {
-				rlgl.Color4ub(v.color.r, v.color.g, v.color.b, v.color.a)
-				rlgl.Normal3f(v.normal.x, v.normal.y, v.normal.z)
-				rlgl.Vertex3f(v.position.x, v.position.y, v.position.z)
-			}
-			rlgl.End()
+			draw_terrain_chunk(f, chunk)
 		}
 	}
 }

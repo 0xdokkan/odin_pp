@@ -64,22 +64,6 @@ test_a_cave_is_the_same_every_time_and_differs_between_seeds :: proc(t: ^testing
 	testing.expect(t, different >= 15, "the caves vary")
 }
 
-@(test)
-test_a_cave_is_stamped_whole_and_only_where_asked :: proc(t: ^testing.T) {
-	data, _ := create(60, 40, Tile{kind = .Floor})
-	defer destroy(&data)
-	plan := cave_plan(5)
-	testing.expect(t, cave_stamp(&data, {x = 10, y = 8}, &plan))
-	for y in 0..<CAVE_HEIGHT { for x in 0..<CAVE_WIDTH {
-		tile, _ := tile_at(&data, {x = 10+x, y = 8+y})
-		testing.expect_value(t, tile.kind, Tile_Kind.Wall if plan.rows[y][x] == '#' else Tile_Kind.Floor)
-	}}
-	outside, _ := tile_at(&data, {x = 9, y = 8})
-	testing.expect_value(t, outside.kind, Tile_Kind.Floor)
-	testing.expect(t, !cave_stamp(&data, {x = 40, y = 8}, &plan), "it does not fit at the east edge")
-	testing.expect(t, !cave_stamp(&data, {x = -1, y = 0}, &plan))
-}
-
 // The Far West's smaller board (Fase 5 of docs/piano-profondita.md): two rooms, rock all round and past the board, every
 // floor walked to from the arrival, the secret at the far end. The whole board is the plan of before, to the cell.
 @(test)

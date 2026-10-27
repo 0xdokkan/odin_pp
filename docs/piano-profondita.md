@@ -55,7 +55,7 @@ La tabella è in ordine di priorità, cioè l'ordine della scaletta qui sotto.
 | 5 | 5 | Piani nelle spedizioni: grotte senza caricamento | 1, 3, 4 | Fatta | vedi Esito |
 | 6 | 6 | Editor per scolpire i piani | 1, 3 (5 per le mappe dei biomi) | Fatta | vedi Esito |
 | 7 | 7 | Ponti, gallerie e scorciatoie nei biomi | 5, 6 | Fatta | vedi Esito |
-| 8 | 8 | Ologramma completo, prestazioni, grotte vecchie | 5 (meglio dopo la 7) | Da fare | — |
+| 8 | 8 | Ologramma completo, prestazioni, grotte vecchie | 5 (meglio dopo la 7) | Fatta | vedi Esito |
 
 ## Scaletta: cosa sviluppare prima
 
@@ -224,7 +224,8 @@ ODIN="/c/Users/lukeg/OneDrive/Desktop/odin-dev-2026-10/dist/odin.exe"
   complessi dal 104, sei per bioma (tutti i dodici biomi dal quarto gruppo,
   fino al 175), reti dal 176, tre per bioma (City pop, Egitto, Vietnam,
   Gotico, Spazio: fino al 190) (dalla Fase 7). Nel secondo gruppo le reti
-  partivano dal 140, nel terzo dal 158.
+  partivano dal 140, nel terzo dal 158. L'ologramma a piani dal 191 al 194
+  (`ODIN_PP_SMOKE_ONLY=piani`, dalla Fase 8).
 - **Benchmark:**
   `"$ODIN" build src -o:speed -define:EXPEDITION_BENCHMARK=true -out:"$S/bench.exe"`,
   poi `"$S/bench.exe" --smoke-expedition > "$S/bench_a.log" 2>&1`
@@ -2486,6 +2487,18 @@ prestazioni, si toglie il codice delle grotte vecchie.
 
 ### Progetto
 
+Con le risposte dell'utente nella Fase 8 (27 ottobre 2026):
+- **ologramma a piani impilati** (non il consigliato): tutti i piani insieme, uno sopra l'altro; uno solo è davvero
+  visibile ed esplorabile, quello dove sta il robot, e mentre la mappa è aperta un tasto cambia il piano mostrato;
+- **sotto terra si vede tutta la struttura** (grotte, gallerie dei complessi, reti, ponti), ma i punti d'interesse e
+  quello che c'è oltre la struttura non si vedono finché il robot non li ha visitati;
+- **prestazioni al massimo:** l'utente vuole sempre la qualità e le prestazioni massime. L'obiettivo è il gioco più veloce
+  possibile senza perdere qualità, e almeno dentro il +10% rispetto alla Fase 0, misurato anche a macchina calda (vedi il
+  benchmark della Fase 7);
+- **via `level.cave_stamp`** e il suo test (consigliato): è l'ultimo avanzo delle grotte vecchie (`Outer_Map`,
+  `enter_cave` ed `exit_cave` sono andati nella Fase 5); i salvataggi di prima restano rifiutati.
+
+Il progetto scritto prima delle Fasi 5-7:
 - **Ologramma a piani completo:** parte da quello della Fase 5 e aggiunge il
   piano sopra, gli interni delle grotte scoperte e gli accessi degli altopiani
   già trovati.
@@ -2534,7 +2547,72 @@ fase e fermati alla fine.
 
 ### Esito
 
-Da fare.
+Fatta il 27 ottobre 2026 sul ramo `piano-profondita`: l'ologramma a piani, le prestazioni misurate contro la Fase 0 e
+migliorate dove si poteva senza perdere qualità, l'ultimo avanzo delle grotte vecchie tolto. Il piano della profondità è
+finito.
+
+**Cosa è stato fatto**
+- **Ologramma a piani impilati** (`src/run/expedition_hologram.odin`, scelta dell'utente):
+  - una lastra per ogni piano che ha caselle, nell'ordine dei piani; si apre su quella del robot, l'unica piena, e `W`/`S`
+    (o le frecce) passano alla lastra sopra o sotto; le altre sono solo sagome tenui;
+  - si vede tutta la struttura; complessi e sale delle reti sono segnati solo dopo che il robot ci è stato
+    (`Complex.visited`, `World.network_visited`, `update_visits`), come gli imbocchi delle grotte trovati;
+  - il robot è segnato sulla sua lastra, qualunque sia quella mostrata.
+- **Ologramma tenuto fra un fotogramma e l'altro** (`Hologram_Cache`): le lastre si costruiscono una volta per mappa e i
+  loro triangoli stanno sulla scheda video; a ogni fotogramma si mandano solo le linee, le cornici, le aree e i segni. Si
+  ricostruisce quando cambiano la mappa, il mondo o la lastra mostrata. Le catture dei piani sono identiche al byte a quelle
+  di prima.
+- **Blocchi del rilievo e dei ponti sulla scheda video**, caricati una volta (`draw_terrain_chunk`), con il culling delle
+  facce posteriori. Il codice di prima lo spegneva, ma i vertici restavano nel batch di rlgl e arrivavano alla scheda quasi
+  sempre dopo che il culling era tornato acceso: l'aspetto approvato era quello con il culling. Dalla scheda, con il
+  culling davvero spento, una faccia girata copriva di scuro una rampa della montagna della Neve (trovato confrontando le
+  catture con la Fase 7). Con il culling il costo non cambia (due giri adiacenti a macchina calda: media dei gruppi
+  +0,0%). Le stanze sotto terra restano vertice per vertice: dalla scheda la finestra attorno al robot nella sala della
+  Memoria usciva diversa, probabilmente per lo stesso motivo (non verificato); sono poche e solo vicino al robot.
+- **Ologramma delle stanze** (sezione 12): il difetto c'era. Il tavolo era piatto e le figure, disegnate alla loro quota,
+  sembravano su un'altra casella (nell'arena delle altezze il robot sull'altopiano a 4 gradini). Ora il tavolo segue il
+  rilievo, i ponti sono lastre alla loro quota, e chi è sotto un ponte o nella roccia ha il contorno, come in gioco. Le
+  stanze piatte restano identiche al byte (23 catture di `--smoke-m7-view` e 14 di `--smoke-arenas-view`).
+- **Pulizia:** via `level.cave_stamp` e il suo test. L'arco dei luoghi «grotta» (`site_cell`, caso `.Cave`) resta: è il
+  piazzale davanti all'imbocco, ancora usato.
+
+**Prestazioni** (RTX 3060, alla corrente, 16 giri alternati di quattro eseguibili: Fase 0, fine della Fase 7, Fase 8
+senza la cache dell'ologramma, Fase 8 finale; 20 secondi di pausa fra un giro e l'altro). I giri 1-5 sono a macchina
+fresca, dal 6 a macchina calda, e si confrontano dentro ogni regime, sugli stage 0-102 che ogni eseguibile ha.
+- **Contro la Fase 0, media delle differenze dei gruppi** (la misura della Fase 7): fine della Fase 7 +9,4% a macchina
+  fresca e +16,7% a calda; **Fase 8 finale +4,9% e +9,3%**, dentro il +10% dell'obiettivo. Sulla media di tutti gli stage:
+  −0,7% e +3,2%.
+- **Le viste con la mappa aperta** (stage 1, 23, 75-77) passano da 4,0-5,2 ms a fotogramma alla fine della Fase 7 a
+  1,6-1,9 ms, quella in grotta (103) da 5,0 a 1,4 ms: più del doppio più veloci, e più veloci anche della Fase 0 (3,7-4,6
+  ms). Il lavoro della CPU per la mappa scende da 2,5-3,8 ms a 0,47-0,63 ms; le lastre nuove (stage 191-194), senza e con
+  la cache, da 2,5-3,7 ms a 1,4-1,7 ms.
+- **Senza le cinque viste della mappa** il gioco resta più lento della Fase 0: +9,7% a macchina fresca e +13,1% a calda
+  (un fotogramma da 1,16 ms diventa 1,27 ms). Bioma per bioma, a macchina calda: Far West +26%, Egitto +24%, City pop +22%,
+  Neve e Giungla +16%, Spazio e Gotico +14%, Memoria +11%, Vietnam +9%, Inferno +6%, Robotica +5%, Cielo +4%.
+- **Dove va quel tempo:** misurato con i contatori di tempo della scheda video (query `TIMESTAMP` di OpenGL, in una copia di
+  prova, letti con quattro fotogrammi di ritardo), le passate del mondo vanno da 0,770 a 0,852 ms: il terreno +0,059 ms
+  (il rilievo in vista: massicci, complessi, pareti di roccia), figure e oggetti +0,012, il resto poco. Il fotogramma è
+  limitato dalla scheda video: i blocchi sulla scheda tolgono metà del lavoro della CPU per il pavimento, ma il fotogramma
+  non si accorcia. È il costo del contenuto nuovo delle Fasi 1-7, non uno spreco.
+- **Provate e scartate**, perché non danno niente senza perdere qualità:
+  - il programma del pavimento senza la finestra del robot (quello con il `discard`, che toglie alla scheda il test di
+    profondità anticipato) usato solo dove serve: anche togliendolo del tutto fuori dalle grotte si guadagnano 0,012 ms,
+    circa l'1%; dividerlo blocco per blocco non vale il rischio;
+  - il culling delle facce posteriori del rilievo come risparmio: nessun guadagno misurabile (è acceso comunque, per
+    l'aspetto: vedi sopra).
+
+**Verifiche**
+- `check.ps1`: 1737 test con e senza assert (uno tolto, tre nuovi) e le due build, a posto.
+- Smoke delle spedizioni: 195 catture, nessun errore. Contro la Fase 7 cambiano davvero solo gli ologrammi (le lastre; in
+  grotta la stanza nel nucleo della montagna è una colonna sulla lastra «sotto», perché sta molto più in alto delle
+  altre) e ci sono le quattro catture nuove dei piani; le altre differenze sono l'animazione, come fra due giri della
+  Fase 7. Il confronto ha trovato la rampa scura della montagna (vedi sopra), corretta prima di chiudere.
+- Smoke dell'editor: 12 catture, nessun errore.
+- Smoke del laboratorio, da solo, alla corrente: le 129 catture identiche al byte a quelle della Fase 7, più le due
+  nuove dell'ologramma della stanza.
+
+**Notato e non toccato:** `--smoke-m7-view` fallisce alla fine («M7 polish flow: combat movement or fog without
+exploration memory failed»), già alla fine della Fase 7; non è nelle verifiche di questo piano.
 
 ## 12. Cose notate durante lo studio (da verificare)
 
@@ -2548,7 +2626,7 @@ fase indicata, prima di correggerle.
 | La diagonale con QTE, la schivata di difesa e il passo d'ombra usano solo la regola della salita: camminando potrebbero scendere un dirupo. | `src/game/tactical.odin`, `src/game/tactical_shadow.odin` | 3 |
 | Il rilassamento dei rilievi limita solo le quattro vicine dritte: due vicine in diagonale possono stare a due gradini e bloccare una diagonale dove la strada dritta va bene. | `relax`, `src/expedition/relief.odin:329` | 3 (spostata dalla 1: riguarda il passo, non la grafica; a schermo la superficie è liscia anche lì) |
 | I bordi degli edifici diradati non sfumano: l'alfa sembra perdersi nel disegno dei bordi. | `src/render/expedition_edges.odin` | 4 |
-| Nell'ologramma delle stanze i personaggi potrebbero galleggiare sulle mappe con altezze. | `src/render/hologram.odin` | 8 |
+| Nell'ologramma delle stanze i personaggi potrebbero galleggiare sulle mappe con altezze: vero (il tavolo era piatto, le figure alla loro quota, quindi su un'altra casella), corretto. | `src/render/hologram.odin` | 8 (fatta) |
 | Il campo `covered` dei blocchi del terreno non era letto da nessuno: tolto. | `src/render/expedition_terrain.odin` | 1 (fatta) |
 | La sfera di taglio per casella sta a quota fissa 0,65: il piano della griglia voleva allargarla, ma non è stato fatto. | `tactical_cell_on_screen`, `src/render/tactical_framing.odin` | 5 (spostata dalla 1: con i piani il taglio va rivisto comunque) |
 | Entrando in grotta, trappole, oggetti, pozze, fuochi e ostacoli della stanza non vengono messi da parte. | `enter_cave`, `src/expedition/cave.odin:221` | 5 (sparisce con le grotte a piani) |

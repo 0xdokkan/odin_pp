@@ -35,6 +35,9 @@ Expedition_Floor :: struct {
 	under: Expedition_Under_Cache,
 	// The complexes' decks over it (expedition_decks.odin).
 	decks: Expedition_Under_Cache,
+	// The program bound while the floor draws (nil out of it): the blocks on the video card draw with it
+	// (expedition_terrain.odin, draw_terrain_chunk).
+	bound: ^Expedition_Floor_Program,
 }
 
 EXPEDITION_FLOOR_HEADER_BODY :: `in vec3 worldPosition;
@@ -629,6 +632,8 @@ load_expedition_floor_program :: proc(p:^Expedition_Floor_Program,source:cstring
 	p.reveal_floor=rl.GetShaderLocation(shader,"revealFloor")
 	p.layer=rl.GetShaderLocation(shader,"floorLayer");p.cover=rl.GetShaderLocation(shader,"coverPoint")
 	p.lights=expedition_light_uniforms(shader);p.reflection=expedition_reflection_uniforms(shader)
+	// A block drawn from the video card binds the floor's map as its material's second map (draw_terrain_chunk).
+	p.shader.locs[rl.ShaderLocationIndex.MAP_METALNESS]=p.map_data
 	return true
 }
 
@@ -709,6 +714,8 @@ draw_expedition_floor :: proc(renderer:^Renderer,room:^game.Room,w:^world.World)
 	rl.SetShaderValue(shader,p.lights.sky_shade,&open_sky,.FLOAT)
 	set_expedition_lights(renderer,shader,p.lights)
 	rl.BeginShaderMode(shader)
+	f.bound=p
+	defer f.bound=nil
 	rl.SetShaderValueTexture(shader,p.map_data,f.texture)
 	set_expedition_reflection(renderer,shader,p.reflection)
 	draw_expedition_floor_plane(renderer,room,dimensions)

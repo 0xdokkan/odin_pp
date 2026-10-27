@@ -37,6 +37,10 @@ Expedition_Session :: struct {
 	save_data:rawptr,
 	inventory:campaignui.State,
 	inventory_open,character_open,map_open,paused,abandon_confirm:bool,
+	// The plate the stacked map shows (expedition_hologram.odin): the robot's layer when it opens; W and S change it.
+	map_layer:i8,
+	// The map's plates and what of them is on the video card, kept between frames (expedition_hologram.odin).
+	hologram:Hologram_Cache,
 	site:int,
 	// A structure kit being set down (Fase 7): which, how it is turned, where the mouse puts it and whether it can go there.
 	placing,place_cached:bool,
@@ -135,7 +139,7 @@ expedition_save :: proc(e:^Expedition_Session,durable:bool=false) -> bool {
 @(private)
 expedition_suspend :: proc(data:rawptr) {e:=cast(^Expedition_Session)data;_=expedition_save(e,true);roguelike_suspend_input(e.rs)}
 @(private)
-expedition_destroy :: proc(data:rawptr) {e:=cast(^Expedition_Session)data;_=expedition_save(e,true);roguelike_destroy(e.rs);delete(e.path);delete(e.message);free(e)}
+expedition_destroy :: proc(data:rawptr) {e:=cast(^Expedition_Session)data;_=expedition_save(e,true);hologram_release(&e.hologram);roguelike_destroy(e.rs);delete(e.path);delete(e.message);free(e)}
 @(private)
 expedition_draw_window :: proc(data:rawptr,frame:^host.Frame) {e:=cast(^Expedition_Session)data;roguelike_draw_window(e.rs,frame)}
 
@@ -348,13 +352,18 @@ expedition_update :: proc(data:rawptr,frame:^host.Frame) {
 	if e.placing && !e.inventory_open {expedition_placing_update(e,frame);return}
 	if !e.inventory_open && !e.map_open && e.site<0 && w.reward_count==0 && rs.frame_input.left_pressed {
 		layout:=render.tactical_hud_layout(&rs.iso_renderer)
-		if rl.CheckCollisionPointRec(frame.mouse,layout.map_button) {e.map_open=true;rs.frame_input.left_pressed=false}
+		if rl.CheckCollisionPointRec(frame.mouse,layout.map_button) {e.map_open=true;e.map_layer=room.player.position.layer;rs.frame_input.left_pressed=false}
 		else if render.m8_control_at_point(&rs.iso_renderer,room,rs.mouse_canvas)==.Character {e.inventory_open=true;e.inventory.panel=.Character;rs.frame_input.left_pressed=false}
 	}
 	if input.key_pressed(frame.devices,.Z) && !e.inventory_open {e.inventory_open=true;e.inventory.panel=.Inventory}
 	if input.key_pressed(frame.devices,.U) && !e.inventory_open {e.inventory_open=true;e.inventory.panel=.Character}
-	if input.key_pressed(frame.devices,.TAB) && !e.inventory_open {e.map_open=!e.map_open;clear_card_interaction(&rs.card_interaction)}
+	if input.key_pressed(frame.devices,.TAB) && !e.inventory_open {e.map_open=!e.map_open;e.map_layer=room.player.position.layer;clear_card_interaction(&rs.card_interaction)}
 	if e.map_open && input.key_pressed(frame.devices,.ESCAPE) {e.map_open=false}
+	// The stacked map: W and the up arrow show the plate over, S and the down arrow the one under (the robot stays still).
+	if e.map_open {
+		if input.key_pressed(frame.devices,.W) || input.key_pressed(frame.devices,.UP) {e.map_layer=hologram_next_plate(&rs.level_data,e.map_layer,1)}
+		if input.key_pressed(frame.devices,.S) || input.key_pressed(frame.devices,.DOWN) {e.map_layer=hologram_next_plate(&rs.level_data,e.map_layer,-1)}
+	}
 	if input.key_pressed(frame.devices,.M) && room.phase==.Loot && !e.inventory_open {w.mounted=!w.mounted;expedition_message(e,world.metadata(w.biome).mount if w.mounted else "A piedi")}
 	if !e.inventory_open && !e.map_open && e.site<0 && w.reward_count==0 && render.tactical_inspector_effect_ready(&rs.iso_renderer,room) {
 		cards:=&rs.card_interaction

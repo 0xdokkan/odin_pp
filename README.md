@@ -61,7 +61,7 @@ fermano il mondo; l'energia si ricarica soltanto mentre il mondo avanza.
 | `E` | interagisce con POI, oggetti e portale |
 | `Z` | zaino; il mondo continua durante gli scontri |
 | `U` | personaggio, mazzo e potenziamenti; mette in pausa |
-| `Tab` | miniatura 3D dell'intero bioma, legenda POI e posizione del robot |
+| `Tab` | miniatura 3D dell'intero bioma a piani, legenda POI e posizione del robot; `W`/`S` cambiano il piano mostrato |
 | `I` / Mostra effetto | anteprima isolata della carta selezionata |
 | `F` | Refocus |
 | `P` / `Esc` | pausa o chiusura della schermata corrente |

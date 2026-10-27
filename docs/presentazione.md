@@ -41,6 +41,12 @@ dietro. Le quote vengono da una copia delle altezze e delle tessere del livello,
 aggiornata quando la geometria cambia, mai da un puntatore al livello
 ([height_view.odin](../src/render/height_view.odin)).
 
+Dalla Fase 8 anche la **mappa olografica delle stanze** (`Tab` nello scontro) ha il rilievo:
+ogni casella del tavolo è una colonna fino alla sua quota, i ponti sono lastre alla loro, e
+chi sta sotto un ponte o nella roccia si vede con il contorno, come in gioco
+([hologram.odin](../src/render/hologram.odin)). Prima il tavolo era piatto e le figure,
+disegnate alla loro quota, sembravano su un'altra casella. Le stanze piatte si vedono come prima.
+
 ### Rilievi delle spedizioni
 
 Ogni bioma ha un rilievo a tema (colline, dune, terrazze, altopiani, isole, crateri: l'elenco è in
@@ -66,11 +72,30 @@ posa e il tasto destro annulla. Ne puoi posare tre per spedizione e non si smont
 
 ### Le caverne
 
-Nella Neve, nel Far West, nell'Egitto e nell'Inferno ci sono da una a tre grotte per mappa: un arco di roccia (sulla montagna
-a spirale, a metà salita) che ricompare identico a ogni run ma dà accesso a una grotta solo in alcune. L'arco è un segreto: appare
-sull'ologramma, con la lettera G, solo dopo averlo scoperto. Con **E** davanti all'arco lo schermo va al nero e si è in una mappa
-a parte ([cave.odin](../src/level/cave.odin)): due o tre stanze in fila con dei nemici, e in fondo una nicchia con un tesoro
-(crediti e una reliquia). Con **E** vicino al punto di arrivo si esce, allo stesso arco.
+Nella Neve, nel Far West, nell'Egitto e nell'Inferno ci sono da una a tre grotte per mappa, sotto un massiccio di roccia
+(nella Neve anche dentro la montagna a spirale, a metà salita). Dalla Fase 5 del [piano della profondità](piano-profondita.md)
+una grotta è il piano sotto la terra della stessa mappa ([cave.odin](../src/expedition/cave.odin)): ci si entra camminando
+dall'imbocco, senza schermo nero né caricamento, anche in sella o durante uno scontro. Dentro ci sono due o tre stanze in fila
+con dei nemici e in fondo una nicchia con un tesoro (crediti e una reliquia); la roccia sopra la testa del robot si dirada e la
+luce cala. I posti sono uguali a ogni run, ma solo alcune grotte sono abitate. L'imbocco è un segreto: appare sull'ologramma,
+con la lettera G, solo dopo averlo scoperto.
+
+### Ponti, gallerie, complessi e reti
+
+Dalla Fase 7 del piano della profondità ogni bioma ha i suoi piani: **complessi** a tema alti 14 gradini (piattaforme dati,
+mese e ponte del treno, alberi giganti, isola sospesa, collina del masso e altri), con rampe, ponti sopra, gallerie sotto,
+ascensori, guardie e un segreto; e, in City pop, Egitto, Vietnam, Gotico e Spazio, **reti sotterranee** sul piano più basso
+che uniscono sale e scale lontane. Un **cancello** fa da scorciatoia: si apre solo dalla parte giusta, poi resta aperto
+([complex.odin](../src/expedition/complex.odin), [network.odin](../src/expedition/network.odin)).
+
+### L'ologramma a piani
+
+Dalla Fase 8 la miniatura delle spedizioni (`Tab`) è una **pila di lastre**, una per piano: i ponti sopra, la terra, le
+grotte e le gallerie sotto, le reti in fondo (scelta dell'utente). Si apre sul piano del robot, l'unico mostrato pieno;
+le altre lastre sono solo sagome tenui, e `W`/`S` (o le frecce) cambiano il piano mostrato. La struttura si vede tutta, ma
+complessi e sale delle reti sono segnati solo dopo che il robot ci è stato, come gli imbocchi delle grotte. La miniatura si
+costruisce una volta per mappa e sta sulla scheda video finché la mappa non cambia
+([expedition_hologram.odin](../src/run/expedition_hologram.odin)).
 
 ### La montagna a spirale
 
