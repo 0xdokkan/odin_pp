@@ -5,6 +5,29 @@ I riferimenti a Classica, `--flat` e ai vecchi smoke descrivono versioni precede
 per i comandi disponibili oggi valgono il [README](README.md) e la documentazione collegata.
 
 
+## 2026-10-27 — Profondità: le cinque voci aperte della sezione 12, verificate e corrette
+
+Tutte e cinque erano vere (la sesta, sulle grotte, non esiste più con le grotte a piani).
+- **Carica del bruto:** controllava l'altezza solo del primo passo. Con un dirupo più avanti sul percorso pianificava la
+  carica e, eseguendola, il gioco si fermava su un assert. Ora ogni passo deve essere percorribile; anche quando la carica
+  parte, un dirupo comparso sulla strada la ferma invece di far fallire la mossa.
+- **Diagonale con QTE, schivata di difesa, passo d'ombra:** seguivano solo la regola della salita e scendevano un dirupo che
+  a piedi non si scende. Ora seguono la regola del passo, in salita e in discesa.
+- **Rilievi in diagonale:** il rilassamento limitava solo le quattro vicine dritte, e 883 angoli (406 nell'Inferno, 304 nello
+  Spazio) fermavano un passo in diagonale dove il giro dritto si camminava e la superficie disegnata è liscia. Ora limita
+  anche le diagonali: cambia meno dell'1,3% del terreno, di un gradino; restano 140 angoli, nelle scale e nei sentieri
+  disegnati.
+- **Bordi degli edifici che svaniscono:** l'alfa calcolata si perdeva nel disegno dei bordi, che restavano pieni sopra un
+  edificio ormai trasparente. Ora sfumano con lui; tutti gli altri bordi restano identici.
+- **Sfera di taglio per casella:** stava a quota fissa 0,65, e sul terreno alto (il fianco della montagna della Neve)
+  caselle sullo schermo venivano scartate: personaggi, ombre e muri potevano sparire ai bordi. Ora sta sul terreno della
+  casella.
+- Test nuovi: la carica lungo un dirupo, la diagonale/schivata/ombra davanti a un dirupo, il taglio sul terreno alto; il
+  test dei biomi lisci controlla anche le diagonali.
+- Verifiche: check completo con e senza assert (1740 test); smoke delle spedizioni (195 catture, nessun errore: cambiano
+  gli edifici che svaniscono e il rilievo di Inferno e Spazio, il resto è animazione) e dell'editor (12); smoke del
+  laboratorio da solo, alla corrente, prima e dopo: tutte le 2232 catture identiche al byte.
+
 ## 2026-10-27 — Smoke `--smoke-m7-view` di nuovo a posto
 
 - Lo smoke si fermava alla parte «polish» dal 20 ottobre (`d4057ed`): quel refactor ha portato un passo in combattimento

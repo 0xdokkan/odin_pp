@@ -776,7 +776,7 @@ avviare è `build/odin_pp`; conserva il limite fps delle impostazioni di gioco.
 
 - **Generatore:** `src/expedition/relief.odin` calcola le altezze come funzione pura del bioma e delle
   coordinate (cumuli, dune, terrazze, crateri, isole del Cielo, altopiani con scala), in due strati: il
-  liscio, rilassato perché due celle vicine siano al massimo a un gradino, e piano attorno a servizi,
+  liscio, rilassato perché due celle vicine, anche in diagonale, siano al massimo a un gradino, e piano attorno a servizi,
   partenza e pattuglie; e gli altopiani, con i loro dirupi, solo ben lontano da quel terreno piano.
   `level.set_height_table` scrive la tabella; `generate` la applica dopo i servizi e prima delle strutture.
 - **Salvataggio:** `Snapshot.heights`, una tabella `[MAX_CELLS]u8` in più; manca nei salvataggi vecchi e

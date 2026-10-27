@@ -347,9 +347,11 @@ relief_heights :: proc(b: campaign.Biome, tiles: []level.Tile, size: int, zones:
 }
 
 // Makes the smooth layer one step at most from cell to cell, keeping the fixed cells as they are: a cell
-// is never higher than a neighbour plus one. Only ever lowering, it settles on the highest ground that
-// has no cliff (the fixed cells are the lowest points, so none of them has to rise). In the Sky, where
-// the fixed cells are at different heights, a cell below its neighbours' reach is raised too.
+// is never higher than a neighbour plus one, a diagonal one too (two steps across a diagonal stopped a
+// walker where the straight way round was single steps and the surface drawn is smooth: section 12 of
+// docs/piano-profondita.md). Only ever lowering, it settles on the highest ground that has no cliff (the
+// fixed cells are the lowest points, so none of them has to rise). In the Sky, where the fixed cells are
+// at different heights, a cell below its neighbours' reach is raised too.
 @(private = "file")
 relax :: proc(r: ^Relief, both_ways: bool) {
 	n := r.size
@@ -361,7 +363,7 @@ relax :: proc(r: ^Relief, both_ways: bool) {
 			if r.fixed[at] || r.tiles[at].kind == .Void { continue }
 			x, y := at%n, at/n
 			ceiling, floor := int(RELIEF_MAX), 0
-			for step in ([4][2]int{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}) {
+			for step in ([8][2]int{{1, 0}, {-1, 0}, {0, 1}, {0, -1}, {1, 1}, {-1, 1}, {1, -1}, {-1, -1}}) {
 				nx, ny := x+step.x, y+step.y
 				if nx < 0 || ny < 0 || nx >= n || ny >= n || r.tiles[ny*n+nx].kind == .Void { continue }
 				ceiling = min(ceiling, int(r.smooth[ny*n+nx])+1)

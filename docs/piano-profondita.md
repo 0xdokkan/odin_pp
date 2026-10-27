@@ -2625,14 +2625,14 @@ fase indicata, prima di correggerle.
 
 | Cosa | Dove | Fase |
 |---|---|---|
-| La carica del bruto controlla l'altezza solo della prima casella: se le caselle dopo salgono di due gradini, l'assert che la mossa sia accettata potrebbe fallire. | `src/game/enemy_intent.odin`, verso la riga 900 | 3 |
-| La diagonale con QTE, la schivata di difesa e il passo d'ombra usano solo la regola della salita: camminando potrebbero scendere un dirupo. | `src/game/tactical.odin`, `src/game/tactical_shadow.odin` | 3 |
-| Il rilassamento dei rilievi limita solo le quattro vicine dritte: due vicine in diagonale possono stare a due gradini e bloccare una diagonale dove la strada dritta va bene. | `relax`, `src/expedition/relief.odin:329` | 3 (spostata dalla 1: riguarda il passo, non la grafica; a schermo la superficie è liscia anche lì) |
-| I bordi degli edifici diradati non sfumano: l'alfa sembra perdersi nel disegno dei bordi. | `src/render/expedition_edges.odin` | 4 |
+| La carica del bruto controllava l'altezza solo della prima casella: vero, e con un dirupo più avanti il gioco si fermava su un assert. Ora ogni passo deve essere percorribile, anche quando la carica parte. | `src/game/enemy_intent.odin`, verso la riga 900 | dopo la 8 (fatta) |
+| La diagonale con QTE, la schivata di difesa e il passo d'ombra usavano solo la regola della salita: vero, scendevano un dirupo. Ora seguono la regola del passo. | `src/game/tactical.odin`, `src/game/tactical_shadow.odin` | dopo la 8 (fatta) |
+| Il rilassamento dei rilievi limitava solo le quattro vicine dritte: vero, 883 angoli in diagonale bloccavano il passo dove il giro dritto si camminava (406 nell'Inferno, 304 nello Spazio). Ora limita anche le diagonali; restano 140 angoli, nelle scale e nei sentieri disegnati (complessi, montagna, reti). | `relax`, `src/expedition/relief.odin:329` | dopo la 8 (fatta) |
+| I bordi degli edifici diradati non sfumavano: vero, l'alfa calcolata si perdeva nel nastro e nello shader dei bordi. Ora sfumano con l'edificio; gli altri bordi restano pieni. | `src/render/expedition_edges.odin` | dopo la 8 (fatta) |
 | Nell'ologramma delle stanze i personaggi potrebbero galleggiare sulle mappe con altezze: vero (il tavolo era piatto, le figure alla loro quota, quindi su un'altra casella), corretto. | `src/render/hologram.odin` | 8 (fatta) |
 | Il campo `covered` dei blocchi del terreno non era letto da nessuno: tolto. | `src/render/expedition_terrain.odin` | 1 (fatta) |
-| La sfera di taglio per casella sta a quota fissa 0,65: il piano della griglia voleva allargarla, ma non è stato fatto. | `tactical_cell_on_screen`, `src/render/tactical_framing.odin` | 5 (spostata dalla 1: con i piani il taglio va rivisto comunque) |
-| Entrando in grotta, trappole, oggetti, pozze, fuochi e ostacoli della stanza non vengono messi da parte. | `enter_cave`, `src/expedition/cave.odin:221` | 5 (sparisce con le grotte a piani) |
+| La sfera di taglio per casella stava a quota fissa 0,65: vero, sul terreno alto (il fianco della montagna) caselle sullo schermo venivano scartate. Ora sta sul terreno della casella. | `tactical_cell_on_screen`, `src/render/tactical_framing.odin` | dopo la 8 (fatta) |
+| Entrando in grotta, trappole, oggetti, pozze, fuochi e ostacoli della stanza non venivano messi da parte: non c'è più, con le grotte a piani non si entra in un'altra mappa (Fase 5). | `enter_cave`, `src/expedition/cave.odin:221` | 5 (sparita) |
 | Il benchmark non arrivava a rilievi, montagna e grotte: risolto. | `src/application/campaign_smoke.odin` | 0 (fatta) |
 | Il gioco disegnava con la scheda Intel integrata anche dove c'è una scheda dedicata: risolto. | `src/windows_gpu.odin` | 0 (fatta) |
 

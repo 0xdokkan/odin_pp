@@ -457,7 +457,8 @@ begin_diagonal_qte :: proc(room: ^Room, offset: grid.Position) -> bool {
 	   abs(offset.x) != 1 || abs(offset.y) != 1 { return false }
 	destination := add_position(room.player.position, offset)
 	query := query_entity_movement(room, PLAYER_ENTITY, destination)
-	if query.error != .None { return false }
+	// A walk: a cliff stops it either way, as it stops a step (the movement's rule stops a rise only).
+	if query.error != .None || step_height_blocked(room, room.player.position, destination) { return false }
 	clear_event_log(room.recent_events)
 	room.qte = {kind = .Diagonal, remaining = room.player.tactical.config.qte_seconds,
 		destination = destination, length = 2, selected = true,
@@ -512,6 +513,8 @@ resolve_qte :: proc(room: ^Room, requested_success: bool, dodge_direction: Move_
 	// One report for the dodge's bite and the pulse a terminal answer ends.
 	pulse: Pulse_Report
 	if q.kind == .Diagonal {
+		// A cliff risen under the step since the QTE began stops it like a wall.
+		if success && step_height_blocked(room, room.player.position, q.destination) { success = false }
 		if success {
 			action := make_action(.Move, PLAYER_ENTITY, cell_target(q.destination), .Walkable_Cell)
 			added := add_effect(&action, move_effect(PLAYER_ENTITY, q.destination))
@@ -545,12 +548,17 @@ resolve_qte :: proc(room: ^Room, requested_success: bool, dodge_direction: Move_
 				append_event_log(room.recent_events, &report.events)
 			case .Dodge:
 				destination := add_position(room.player.position, direction_offset(dodge_direction))
-				action := make_action(.Move, PLAYER_ENTITY, cell_target(destination), .Walkable_Cell)
-				added := add_effect(&action, move_effect(PLAYER_ENTITY, destination))
-				assert(added)
-				report := resolve_action(room, &action)
-				success = report.accepted
-				append_event_log(room.recent_events, &report.events)
+				// A walk: a cliff that way stops the dodge as a wall does.
+				if step_height_blocked(room, room.player.position, destination) {
+					success = false
+				} else {
+					action := make_action(.Move, PLAYER_ENTITY, cell_target(destination), .Walkable_Cell)
+					added := add_effect(&action, move_effect(PLAYER_ENTITY, destination))
+					assert(added)
+					report := resolve_action(room, &action)
+					success = report.accepted
+					append_event_log(room.recent_events, &report.events)
+				}
 				if success {
 					start_tactical_dodge_recovery(room)
 					room.player.tactical.facing = dodge_direction

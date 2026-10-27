@@ -321,14 +321,19 @@ plan_brute_intent :: proc(
 	   has_clear_orthogonal_line(room, origin, player_position) {
 		intent := make_wait_intent(room, origin)
 		intent.kind = .Charge
-		// The charge runs on the floors its steps land on (layers.odin), as the movement it makes: up no ladder.
+		// The charge runs on the floors its steps land on (layers.odin), as the movement it makes: up no ladder. A cliff
+		// anywhere on its way stops it as it stops a walk; only the first step was looked at, and the charge then ran into
+		// the cliff (section 12 of docs/piano-profondita.md).
 		previous := origin
+		walkable := true
 		for _ in 1..<distance {
-			previous, _ = layer_step(room, previous, step)
+			next, _ := layer_step(room, previous, step)
+			if step_height_blocked(room, previous, next) { walkable = false; break }
+			previous = next
 			intent.path[intent.path_count] = previous
 			intent.path_count += 1
 		}
-		if intent.path_count <= MAX_ENEMY_INTENT_PATH_CELLS &&
+		if walkable && intent.path_count <= MAX_ENEMY_INTENT_PATH_CELLS &&
 		   planned_path_is_available(
 			room,
 			predicted_positions,
@@ -645,11 +650,14 @@ enemy_charge_path_is_clear :: proc(
 	   room.enemies[enemy_index].position != intent.origin {
 		return false
 	}
+	previous := intent.origin
 	for index in 0..<intent.path_count {
 		position := intent.path[index]
-		if cell_blocks_movement(room, position) || position == room.player.position {
+		// A cliff risen on the way since the plan stops it too, rather than a move the rules refuse.
+		if cell_blocks_movement(room, position) || position == room.player.position || step_height_blocked(room, previous, position) {
 			return false
 		}
+		previous = position
 		if _, occupied := enemy_index_at(room, position, enemy_index); occupied {
 			return false
 		}

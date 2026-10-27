@@ -200,9 +200,9 @@ draw_expedition_structure_envelopes :: proc(renderer: ^Renderer, room: ^game.Roo
 		opacity := views.opacity[index]
 		edges.lift = cell_ground(data.structures[index].origin)
 		if opacity > 0.05 {
-			faded := ink_edge(color)
-			faded.a = u8(clamp(f32(EXPEDITION_EDGE_ALPHA)*opacity, 1, f32(EXPEDITION_EDGE_ALPHA)))
-			draw_expedition_envelope_edges(edges, data, index, faded, views.roof[index])
+			edges.faded = 1-opacity
+			draw_expedition_envelope_edges(edges, data, index, ink_edge(color), views.roof[index])
+			edges.faded = 0
 		}
 		draw_expedition_structure_outline(edges, data, index, ink_edge(color, 0.9))
 	}

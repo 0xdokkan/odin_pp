@@ -117,9 +117,11 @@ test_the_ground_that_matters_is_level_and_every_site_and_the_exit_can_be_walked_
 	}
 }
 
-// The smooth ground has no cliff of its own: neighbouring cells are at most a step apart, but at the edge
-// of a plateau (a cliff of the plateaus' own) in the biomes that have them, of a cave's massif (cave.odin), of a
-// complex's blocks and ramps (complex.odin) and of a stair's pit down to a network, under the base (network.odin).
+// The smooth ground has no cliff of its own: neighbouring cells are at most a step apart, the diagonal ones too (two
+// steps across a diagonal stopped a walker where the straight way round was single steps: section 12 of
+// docs/piano-profondita.md), but at the edge of a plateau (a cliff of the plateaus' own) in the biomes that have them,
+// of a cave's massif (cave.odin), of a complex's blocks and ramps (complex.odin) and of a stair's pit down to a
+// network, under the base (network.odin).
 @(test)
 test_the_smooth_biomes_have_no_cliffs_at_all :: proc(t: ^testing.T) {
 	for biome in ([?]campaign.Biome{.Jungle, .Egypt, .Vietnam, .Gothic, .Sky, .Space, .Secret}) {
@@ -133,9 +135,9 @@ test_the_smooth_biomes_have_no_cliffs_at_all :: proc(t: ^testing.T) {
 			for x in 0..<width {
 				here := data.tiles.cells[y*width+x].kind
 				if here == .Void || cave_rock(&w, {x = x, y = y}) || complex_rock(&w, {x = x, y = y}) || i32(data.heights[y*width+x]) < data.base { continue }
-				for step in ([2][2]int{{1, 0}, {0, 1}}) {
+				for step in ([4][2]int{{1, 0}, {0, 1}, {1, 1}, {-1, 1}}) {
 					nx, ny := x+step.x, y+step.y
-					if nx >= width || ny >= data.tiles.height || data.tiles.cells[ny*width+nx].kind == .Void || cave_rock(&w, {x = nx, y = ny}) || complex_rock(&w, {x = nx, y = ny}) || i32(data.heights[ny*width+nx]) < data.base { continue }
+					if nx < 0 || nx >= width || ny >= data.tiles.height || data.tiles.cells[ny*width+nx].kind == .Void || cave_rock(&w, {x = nx, y = ny}) || complex_rock(&w, {x = nx, y = ny}) || i32(data.heights[ny*width+nx]) < data.base { continue }
 					if abs(int(data.heights[ny*width+nx])-int(data.heights[y*width+x])) > 1 { cliffs += 1 }
 				}
 			}

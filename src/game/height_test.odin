@@ -244,3 +244,67 @@ test_the_first_person_shot_is_stopped_by_a_cliff_face_above_its_eye :: proc(t: ^
 test_the_surface_links_the_cells_a_walker_steps_between :: proc(t: ^testing.T) {
 	testing.expect_value(t, level.SURFACE_LINK_STEPS, int(HEIGHT_MAX_STEP))
 }
+
+// Section 12 of docs/piano-profondita.md: the brute's charge looked at the height of its first step only. A cliff
+// further along its way (two steps up at its second cell) stops it as it stops a walk; a step of one does not.
+@(test)
+test_a_brute_charges_only_along_steps_it_can_walk :: proc(t: ^testing.T) {
+	for heights, case_index in ([2]string{"0002000000", "0001000000"}) {
+		data: level.Level
+		player: Player
+		spawns := [?]Enemy_Spawn{{position = {x = 5, y = 1}, health = 20, attack = 2, archetype = .Brute}}
+		room := height_room(t, &data, &player, heights, spawns[:])
+		cliff := case_index == 0
+		intent := room.enemies[0].intent
+		testing.expectf(t, (intent.kind == .Charge) == !cliff, "case %d: %v", case_index, intent.kind)
+		if !cliff { testing.expect_value(t, intent.path_count, 3) }
+		pulse: Pulse_Report
+		resolve_enemy_intents(&room, &pulse, room.enemies[0].id)
+		// Over the cliff he never stands: he is still east of it, or (a step of one) next to the player.
+		testing.expectf(t, room.enemies[0].position.x > 3 if cliff else room.enemies[0].position.x == 2,
+			"case %d: the brute at %v", case_index, room.enemies[0].position)
+		destroy_room(&room)
+		level.destroy(&data)
+	}
+}
+
+// Section 12 of docs/piano-profondita.md: the diagonal with its QTE, the defense's dodge and the shadow's step looked
+// at the rise only (the movement's rule, a push's), so they took the player down a cliff that a step does not go down.
+// They are walks: a cliff stops them either way, a step of one does not.
+@(test)
+test_the_diagonal_the_dodge_and_the_shadow_walk_no_cliff :: proc(t: ^testing.T) {
+	for steps in ([2]i32{2, 1}) {
+		cliff := steps > 1
+		{
+			data: level.Level
+			player: Player
+			room := tactical_test_room(t, &data, &player)
+			testing.expect(t, level.set_height(&data, player.position, steps))
+			testing.expectf(t, begin_diagonal_qte(&room, {x = 1, y = 1}) == !cliff, "diagonal, %d steps", steps)
+			destroy_room(&room)
+			level.destroy(&data)
+		}
+		{
+			data: level.Level
+			player: Player
+			room := tactical_test_room(t, &data, &player, true)
+			testing.expect(t, level.set_height(&data, player.position, steps))
+			room.qte = {kind = .Defense, selected = true, mode = .Dodge, enemy_id = room.enemies[0].id, defenses = {.Dodge}, remaining = 1}
+			resolve_qte(&room, true, .South)
+			testing.expectf(t, player.position == (cliff ? grid.Position{x = 1, y = 1} : grid.Position{x = 1, y = 2}),
+				"dodge, %d steps: %v", steps, player.position)
+			destroy_room(&room)
+			level.destroy(&data)
+		}
+		{
+			data: level.Level
+			player: Player
+			room := shadow_test_room(t, &data, &player)
+			testing.expect_value(t, shadow_test_play(t, &room).result, Card_Play_Result.Played)
+			testing.expect(t, level.set_height(&data, player.tactical.shadow_position, steps))
+			testing.expectf(t, try_shadow_step(&room, .West) == (Action_Result.Blocked if cliff else Action_Result.Moved), "shadow, %d steps", steps)
+			destroy_room(&room)
+			level.destroy(&data)
+		}
+	}
+}

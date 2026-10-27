@@ -14,7 +14,9 @@ import level "../level"
 // of driver-dependent GL lines and retain their shape over a revealed actor.
 Ink_Mode :: enum u8 { Fill, Edge, Collect, Bake }
 // `lift` raises everything the pass draws (the height of the ground it stands on).
-Ink_Pass :: struct { mode:Ink_Mode, edges:^Expedition_Edges, builder:^Expedition_Geometry_Builder, lift:f32 }
+// `faded`: how far the pass's edges have faded away (0 drawn whole, 1 gone), a building's as it dithers away
+// (structure_expedition.odin).
+Ink_Pass :: struct { mode:Ink_Mode, edges:^Expedition_Edges, builder:^Expedition_Geometry_Builder, lift:f32, faded:f32 }
 
 EXPEDITION_INK :: rl.Color{22,26,38,255}
 EXPEDITION_INK_TOP :: rl.Color{18,21,31,255}
@@ -110,7 +112,7 @@ ink_line :: proc(pass:Ink_Pass,from,to:rl.Vector3,color:rl.Color) {
 	a,b:=from+rl.Vector3{0,pass.lift,0},to+rl.Vector3{0,pass.lift,0}
 	if pass.mode==.Bake {append(&pass.builder.lines,Expedition_Baked_Line{a,b,color});return}
 	if pass.mode==.Collect {expedition_collect_edge(pass.edges,a,b,color);return}
-	draw_expedition_ribbon(pass.edges,a,b,color)
+	draw_expedition_ribbon(pass.edges,a,b,color,pass.faded)
 }
 
 @(private)
