@@ -54,7 +54,7 @@ La tabella è in ordine di priorità, cioè l'ordine della scaletta qui sotto.
 | 4 | 4 | Piani nel laboratorio: trasparenze, contorni, mouse, luce | 3 (1 per l'aspetto) | Fatta | vedi Esito |
 | 5 | 5 | Piani nelle spedizioni: grotte senza caricamento | 1, 3, 4 | Fatta | vedi Esito |
 | 6 | 6 | Editor per scolpire i piani | 1, 3 (5 per le mappe dei biomi) | Fatta | vedi Esito |
-| 7 | 7 | Ponti, gallerie e scorciatoie nei biomi | 5, 6 | In corso (restano verifiche) | vedi Esito |
+| 7 | 7 | Ponti, gallerie e scorciatoie nei biomi | 5, 6 | Fatta | vedi Esito |
 | 8 | 8 | Ologramma completo, prestazioni, grotte vecchie | 5 (meglio dopo la 7) | Da fare | — |
 
 ## Scaletta: cosa sviluppare prima
@@ -2207,9 +2207,10 @@ e fermati alla fine.
 
 ### Esito
 
-Il lavoro è fatto il 27 ottobre 2026: il passo del laboratorio (ascensore e cancello) e i quattro gruppi di biomi. Tutti i
-dodici biomi hanno i loro piani, raggiungibili e uguali a ogni run. Per chiudere la fase restano, alla corrente, lo smoke
-del laboratorio intero e il benchmark di tutta la fase (vedi il quarto gruppo).
+Fatta il 27 ottobre 2026: il passo del laboratorio (ascensore e cancello) e i quattro gruppi di biomi. Tutti i dodici biomi
+hanno i loro piani, raggiungibili e uguali a ogni run. Il benchmark di tutta la fase è nel quarto gruppo: a macchina fresca
+la fase non costa niente (−0,3%), a macchina calda costa +7,9% di media, con alcune viste fino a +18%; la Fase 8 ha già il
+passo per riprenderlo (i blocchi del terreno caricati sulla scheda video).
 
 **Avanzamento**
 - **Passo 1, ascensore e cancello nella Prova meccaniche** (26 ottobre 2026): fatto, e fermo per guardare le
@@ -2435,18 +2436,30 @@ del laboratorio intero e il benchmark di tutta la fase (vedi il quarto gruppo).
     il test dei complessi non conta gli isolotti del Cielo senza ponte, che c'erano già.
   - **Verifiche:**
     - check con e senza assert; `.\scripts\check.ps1` completo: 1735 test verdi (3 nuovi), più le due build;
-    - smoke del laboratorio **da finire**: girava insieme a `check.ps1` e allo smoke delle spedizioni, e si è fermato al
-      limite di 40 minuti con 86 catture su 129. Di queste 83 sono identiche al byte a quelle del terzo gruppo; tre
-      dell'atto delle strutture hanno pochi pixel diversi (nessuna casella dell'immagine ridotta cambia), la stessa variante
-      già uscita nel primo gruppo. Va rifatto da solo, alla corrente;
+    - smoke del laboratorio: il primo giro, insieme a `check.ps1` e allo smoke delle spedizioni, si è fermato al limite di 40
+      minuti a 86 catture su 129 (tre delle strutture con pochi pixel diversi). Rifatto da solo, alla corrente: le 129
+      catture identiche al byte a quelle del terzo gruppo, strutture comprese (la variante dipendeva dal giro);
     - smoke delle spedizioni: 191 catture, nessun errore. Cambiano davvero i rilievi di Cielo, Spazio e Memoria (ora
       inquadrano l'isola, un cratere, la collina), il centro della Memoria e la Fonte accanto (senza la cresta); lo Spazio
       alzato si vede come prima (meno dello 0,2% dei pixel diversi); le altre differenze sono l'animazione. 18 catture
       nuove dei complessi e 3 delle gallerie;
     - smoke dell'editor: 12 catture, nessun errore;
-    - benchmark **da fare**: alla fine del lavoro il portatile era a batteria, al 4%, e a batteria la RTX 3060 è bloccata
-      a 30 fotogrammi al secondo (il benchmark non vale, come nel primo gruppo). Alla corrente: il quarto gruppo contro il
-      terzo, in ordine bilanciato, e tutta la Fase 7 contro l'eseguibile di prima dei gruppi di biomi, sugli stage comuni.
+    - benchmark sulla RTX 3060, alla corrente (alla fine del lavoro il portatile era a batteria al 4%: rifatto dopo, con
+      il portatile attaccato). Il primo giro di otto, con la batteria che si caricava dall'8% al 53%, non vale: lo stesso
+      eseguibile cambiava fino al 13% fra un giro e l'altro. Rifatto con dodici giri alternati (prima dei gruppi di biomi,
+      quarto gruppo, terzo gruppo, poi all'incontrario, due volte), 20 secondi di pausa fra un giro e l'altro. I giri si
+      dividono in due regimi: i primi quattro a macchina fresca, tutti e tre gli eseguibili sulla stessa media (1,40 ms);
+      dal quinto in poi a macchina calda, tutti più lenti. Confrontati dentro ogni regime:
+      - **quarto gruppo contro terzo:** −1,3% a macchina fresca, −0,3% a macchina calda (peggior gruppo +4,2%, lo scontro
+        su due livelli, uno stage solo). Il quarto gruppo non costa niente; i complessi nuovi costano come gli altri (Cielo
+        1,23 ms, Spazio 1,23 ms, Memoria 1,26 ms di media), le gallerie dello Spazio 1,20 ms;
+      - **tutta la Fase 7** (l'eseguibile di prima dei gruppi di biomi contro il quarto gruppo, stage 0-103): −0,3% a
+        macchina fresca; a macchina calda **+7,9%** di media, i gruppi peggiori i bersagli (+18,3%), lo scontro su due
+        livelli (+15,9%), le officine (+12,3%), gli ologrammi del rilievo (+11,8%) e i centri dei biomi (+11,5%). Il costo
+        c'è anche in viste senza complessi, e viene dai primi tre gruppi (fra il terzo e il quarto non cambia): lavoro in più
+        per la scheda video, che a macchina fresca resta nascosto e si vede quando la scheda è al limite. La media resta
+        sotto il +10% dell'obiettivo della Fase 5; la Fase 8 ha già il passo per riprenderlo (i blocchi del terreno, e
+        quelli sotto terra delle reti, caricati sulla scheda una volta sola invece che a ogni fotogramma).
 
 ## 11. Fase 8 — Ologramma a piani, prestazioni e grotte vecchie
 

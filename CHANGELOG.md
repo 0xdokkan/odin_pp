@@ -5,7 +5,7 @@ I riferimenti a Classica, `--flat` e ai vecchi smoke descrivono versioni precede
 per i comandi disponibili oggi valgono il [README](README.md) e la documentazione collegata.
 
 
-## 2026-10-27 — Profondità, Fase 7 (in corso): Cielo, Spazio e Memoria
+## 2026-10-27 — Profondità, Fase 7 fatta: Cielo, Spazio e Memoria
 
 - **Cielo, un'isola sospesa** (scelta dell'utente): su un'isola libera galleggia un'isola più piccola di marmo, 14 gradini
   sopra, con guardie e segreto. Ci si sale da una scalinata che gira attorno a un pilastro; l'ascensore, una colonna di
@@ -23,15 +23,17 @@ per i comandi disponibili oggi valgono il [README](README.md) e la documentazion
   piedi dello sperone sud, con un cancello che si apre da dentro.
 - Segni nuovi nelle mappe dei complessi: segreto e guardie su un ponte (`+`, `*`), segreto in galleria (`?`), il masso
   (`O`). Fino a quattro complessi per bioma; un cratere si cerca il posto vicino a quello prima.
-- **Tutti i dodici biomi hanno i loro piani:** il lavoro della Fase 7 è fatto; per chiuderla restano due verifiche alla
-  corrente (sotto). Nel documento torna il titolo della Fase 8, perso con il primo gruppo.
+- **Tutti i dodici biomi hanno i loro piani:** la Fase 7 del piano della profondità è fatta. Nel documento torna il titolo
+  della Fase 8, perso con il primo gruppo.
 - Smoke delle spedizioni: 18 catture nuove dei complessi e 3 delle gallerie dello Spazio (191 in tutto); i complessi vanno
   dallo stage 104 al 175, le reti dal 176 al 190.
 - Test nuovi: l'isola sospesa, le gallerie fra i crateri, la collina con la sala; complessi e prove con i nemici liberi in
   dodici biomi (1735 in tutto).
-- Verifiche: check completo con e senza assert, smoke delle spedizioni (191 catture) e dell'editor senza errori. Lo smoke
-  del laboratorio si è fermato al limite di tempo a 86 catture su 129 (83 identiche al byte, tre delle strutture con pochi
-  pixel diversi) e il benchmark non è fatto: il portatile era a batteria, al 4%. Tutti e due vanno rifatti alla corrente.
+- Verifiche: check completo con e senza assert, smoke delle spedizioni (191 catture) e dell'editor senza errori; smoke del
+  laboratorio rifatto da solo, alla corrente: 129 catture identiche al byte.
+- Benchmark alla corrente, dodici giri alternati, confrontati a macchina fresca e a macchina calda: il quarto gruppo contro
+  il terzo −1,3% e −0,3%; tutta la Fase 7 −0,3% a macchina fresca e +7,9% di media a macchina calda (fino a +18% nei
+  bersagli), dentro il +10% dell'obiettivo. La Fase 8 ha il passo per riprenderlo: i blocchi del terreno sulla scheda video.
 
 ## 2026-10-26 — Profondità, Fase 7 (in corso): Neve, Inferno e Gotico
 
