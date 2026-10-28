@@ -152,6 +152,8 @@ First_Person_AK :: struct {
 // reads no raw union.
 First_Person_Arms :: struct #raw_union {
 	using ak: First_Person_AK,
+	// FIRST PERSON BRAWLER's body (first_person_fists.odin).
+	fists: First_Person_Fists,
 }
 
 First_Person_State :: struct {
@@ -226,6 +228,7 @@ tactical_begin_first_person :: proc(room: ^Room, seconds: f32, weapon := First_P
 	if fp.weapon != weapon { fp.arms = {} }
 	fp.active, fp.weapon, fp.remaining, fp.duration = true, weapon, seconds, seconds
 	if weapon == .AK { fp.cooldown, fp.trigger = 0, false }
+	if weapon == .Fists { first_person_fists_begin(room) }
 	return true
 }
 

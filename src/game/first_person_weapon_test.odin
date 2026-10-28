@@ -72,9 +72,10 @@ test_first_person_weapons_share_their_bytes :: proc(t: ^testing.T) {
 	testing.expect(t, tactical_begin_first_person(&room, 2))
 	testing.expect(t, room.first_person.trail == trail)
 	tactical_first_person_tick(&room, 5)
-	// Another weapon starts clear, with the room's counts.
-	testing.expect(t, tactical_begin_first_person(&room, 3, .Fists))
-	testing.expect(t, room.first_person.weapon == .Fists && room.first_person.remaining == 3)
+	// Another weapon starts clear, with the room's counts (the sword: the fists
+	// set their body in place as they are taken up, first_person_fists_begin).
+	testing.expect(t, tactical_begin_first_person(&room, 3, .Sword))
+	testing.expect(t, room.first_person.weapon == .Sword && room.first_person.remaining == 3)
 	testing.expect(t, room.first_person.shots == shots && room.first_person.hits == hits)
 	testing.expect(t, first_person_test_same(room.first_person.arms, First_Person_Arms{}))
 	// It has no trigger: the button touches nothing and nothing is ever due.

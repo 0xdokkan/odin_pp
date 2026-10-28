@@ -765,11 +765,11 @@ pugno della sua mano ([Siliconera](https://www.siliconera.com/?p=294178)).
   l'arena «Prima persona» attraversata in 4 s); un passo a griglia fa 1
   casella ogni 0,8 s, cioè 1,25 al secondo. Si parte e ci si ferma in un
   decimo di secondo (accelerazione e attrito, come Cripta delle Rune).
-- **Il corpo è un cerchio di 0,3 caselle.** Non entra nei solidi
-  (`lasso_cell_is_solid`) né nei nemici (un cerchio di 0,4 al centro della loro
-  casella); scivola lungo i muri (`resolve_circle_tiles`,
-  `src/engine/physics/kinematic2d.odin:121`, risolve già un cerchio contro le
-  caselle).
+- **Il corpo è un cerchio di 0,3 caselle.** Non entra dove un passo non
+  potrebbe, né nella casella di un nemico (fatto: come un muro, Fase 2 passo
+  1); scivola lungo i muri, con la stessa idea di `resolve_circle_tiles`
+  (`src/engine/physics/kinematic2d.odin:121`) ma sulle regole della stanza
+  (`src/game/first_person_fists.odin`).
 - **Le regole del passo valgono ancora:** si entra in una casella vicina solo
   se un passo normale potrebbe (un gradino al massimo, stesso piano o un
   imbocco); niente diagonali fra due solidi; **camminando mai giù da un
@@ -1972,6 +1972,76 @@ fatta prima su sua richiesta).**
   millesimo di secondo d'entrata, niente clic.
 - **Approvata:** «ok così è perfetta!!! bravissimo!!!». Il riferimento
   scaricato e i file di misura sono cancellati dalla scratchpad.
+
+**Ricerche del passo 1:**
+- Movimento a terra alla Quake: accelerazione verso dove si vuole andare e
+  attrito con una «velocità di stop»; valori classici `sv_accelerate` 10,
+  `sv_friction` 4, `sv_stopspeed` 100
+  ([QdQ, la console di Quake](https://quake.speeddemosarchive.com/quake/qdq/articles/console.html),
+  [`pmove.c` di Quake 2](https://q2pb.sourceforge.net/quake2_html/5799.html)).
+  Lezione trovata provando: l'accelerazione deve valere almeno il doppio
+  dell'attrito, altrimenti l'attrito tiene il corpo sotto la sua velocità.
+- Cerchio contro griglia: ogni casella solida spinge fuori il cerchio dal suo
+  punto più vicino al centro, e lo scivolare lungo i muri viene da sé
+  ([matematica delle collisioni](https://abratabia.com/game-math/collision-math.php),
+  [Phaser, cerchio contro caselle](https://unpkg.com/phaser@2.4.3/docs/src_physics_ninja_Circle.js.html)).
+- Salto da altezza e tempo: gravità = 2·altezza/tempo², velocità iniziale =
+  2·altezza/tempo («Building a Better Jump», GDC 2016,
+  [GDC Vault](https://gdcvault.com/play/1023148/Math-for-Game-Programmers-Building)).
+
+**Passo 1 — movimento libero nelle regole: fatto.**
+- `src/game/first_person_fists.odin`: il corpo dei pugni, un cerchio di raggio
+  0,3 caselle, con posizione e velocità continue e l'altezza dei piedi in
+  gradini. Sta nei 648 byte delle armi (`First_Person_Arms`): `Room` non cresce.
+  Si prende al centro della casella quando inizia la vista con i pugni.
+- `first_person_fists_move(room, input, dt)`: direzione voluta, salto, scatto,
+  sguardo (per lo scatto da fermi). Le regole avanzano a passi fissi di 1/240 s,
+  con il resto del fotogramma conservato: gli stessi secondi danno lo stesso
+  corpo a 30, 60 e 144 fotogrammi al secondo.
+- Numeri: 5 caselle al secondo (metà sui terreni lenti delle spedizioni);
+  accelerazione 20 e attrito 10 con velocità di stop 2,5, cioè piena velocità
+  in 0,07 s e fermo in meno di 0,2 s; in aria sterza come a terra, senza attrito.
+- Salto: 4,5 gradini in 0,25 s, mezzo secondo in aria. Sale su un dislivello
+  fino a 4 gradini; una copertura bassa si passa già da metà della sua altezza
+  (2 gradini, le gambe raccolte), perché un salto da fermi contro di essa deve
+  arrivare oltre; atterrando sopra una copertura si scivola oltre, o indietro se
+  oltre è chiuso. Dal bordo di un dirupo si scende solo saltando, con la caduta
+  di oggi (`fall_damage`).
+- Scatto: 2 caselle in 0,18 s in qualsiasi direzione (fermi: dove si guarda),
+  poi 1,2 s di ricarica. Il doppio tocco che lo chiede è del controller (passo 5).
+- Casella del Viandante: quella sotto il centro del corpo. Quando il centro
+  passa in un'altra casella, è un passo vero (`resolve_action` con il suo
+  `Moved`: trappole, terreni, cadute, piattaforme), ma **senza tempo e senza
+  Veleno** (`finish_player_combat_command(room, 0, false)`). Salire con un salto
+  su un dislivello o passare sopra una copertura usa il movimento `Teleport`
+  (controlla solo dove si atterra).
+- Il cerchio non entra dove un passo non potrebbe: muri, coperture, oggetti,
+  caselle dei nemici (come un muro), pianerottoli senza piattaforma, dirupi;
+  ci scivola lungo. Spingere contro un pianerottolo vuoto chiama la piattaforma,
+  contro un cancello dalla parte della leva lo apre; sulla piattaforma il corpo
+  resta fermo al centro della sua casella finché non arriva.
+- Scoperta: le pozze di Veleno e i fuochi a terra mordono **solo i nemici**
+  (`trigger_ground_on_entry`), anche a piedi; per il Viandante valgono
+  trappole, pericoli, terreni e cadute.
+- Lasciati ai passi dopo: in aria i colpi a terra non prendono (passo 4, che
+  dovrà anche rimandare gli effetti delle caselle all'atterraggio); i colpi che
+  prendono appena il corpo tocca la casella rossa (passo 4); il salvataggio del
+  corpo (passo 4); le scale a pioli (oggi il corpo non le sale); il doppio
+  tocco e i tasti (passo 5).
+- Test nuovi in `src/game/first_person_fists_test.odin` (9): libero a qualsiasi
+  angolo e senza tempo; uguale a ogni frequenza di fotogrammi; scivola lungo i
+  muri; salta una copertura senza mai fermarcisi sopra; gradini, dislivelli e
+  dirupi con il salto; la casella di un nemico ferma il corpo; lo scatto e la
+  sua ricarica; ogni casella un `Moved` con la sua trappola; chiamare e prendere
+  un ascensore.
+- Un test della Fase 1 (`test_first_person_weapons_share_their_bytes`) prendeva
+  i pugni per vedere un'arma nuova partire con i byte vuoti: ora i pugni mettono
+  subito il corpo al centro della casella, quindi lo stesso controllo usa la
+  spada, che non ha ancora regole.
+- **Verifiche:** check con e senza assert puliti; `check.ps1` completo: **1760
+  test verdi** con e senza assert (i 1751 della Fase 1 più i 9 nuovi), più le
+  due build (414 s). Il movimento non è ancora collegato ai tasti né al
+  disegno: si prova a mano dal passo 5.
 - Nel gioco entra nella Fase 3: i suoni del laboratorio oggi sono mono, quindi
   per la musica serve un canale stereo suo.
 
