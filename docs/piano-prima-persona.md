@@ -1938,8 +1938,9 @@ fatta prima su sua richiesta).**
 - **Misure della prova 2:** 120 battiti; note più forti Re, La e Mi♭ (misurate
   con una finestra lunga: quella corta divide il Re grave fra Do e Fa); la
   cucitura del giro vale quanto l'inizio delle altre battute; ogni attacco ha un
-  millesimo di secondo d'entrata, niente clic. In attesa dell'ascolto
-  dell'utente.
+  millesimo di secondo d'entrata, niente clic.
+- **Approvata:** «ok così è perfetta!!! bravissimo!!!». Il riferimento
+  scaricato e i file di misura sono cancellati dalla scratchpad.
 - Nel gioco entra nella Fase 3: i suoni del laboratorio oggi sono mono, quindi
   per la musica serve un canale stereo suo.
 
