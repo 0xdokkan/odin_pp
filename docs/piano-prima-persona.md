@@ -54,7 +54,7 @@ La tabella è in ordine di priorità, cioè l'ordine della scaletta qui sotto.
 |---|---|---|---|---|---|
 | 0 | 0 | Decisioni comuni e misure di partenza (proposta di Claude) | — | Fatta | vedi Esito |
 | 1 | 1 | Base comune della prima persona; l'AK resta identico | 0 | Fatta | vedi Esito |
-| 2 | 2 | Pugni: regole e prototipo giocabile nel laboratorio | 1 | Da fare | — |
+| 2 | 2 | Pugni: regole e prototipo giocabile nel laboratorio | 1 | In corso | vedi Esito |
 | 3 | 3 | Pugni: guantoni, segni critici, colpi a schermo, suoni | 2 | Da fare | — |
 | 4 | 4 | Spada: swing col mouse, parata, rampino; prototipo | 1 | Da fare | — |
 | 5 | 5 | Spada: lama, scie, scintille, suoni | 4 | Da fare | — |
@@ -895,6 +895,9 @@ Pugni al secondo, con i tempi della tabella:
 - **Suoni:** la campanella del ring all'entrata; un soffio diverso per ogni
   pugno; il tonfo del cuoio sulla carta; per il critico uno schiocco e un
   «ding»; un ticchettio quando compare un segno.
+- **Musica** (chiesta dall'utente il 28 ottobre 2026, Esito della Fase 2): un
+  giro di 32 s fatto da codice, `tools/audio/music_brawler.py`, sul modello di
+  «Fast fight / battle music» (CC0) adattato al ring; suona solo con i pugni.
 
 ## 6. Carta 2 — Spada: First Person Fencer
 
@@ -1839,7 +1842,72 @@ alla fine di ogni passo.
 
 ### Esito
 
-_Da scrivere alla fine della fase._
+**Stato: in corso** (domande iniziate il 28 ottobre 2026).
+
+**Risposte dell'utente finora (28 ottobre 2026):**
+1. **Movimento:** «deve avere movimento libero, non deve essere costretto al
+   movimento su griglia quando usa i pugni». Il corpo scivola in ogni
+   direzione e si ferma dove si vuole; le caselle restano solo dietro le
+   quinte, per le regole che le conoscono (pozze, fuochi, trappole, colpi).
+2. **Velocità:** «in 4s ma ricorda che vale solo per la carta pugni!!!», cioè
+   l'arena «Prima persona» (21 quadrati) attraversata in 4 secondi:
+   **5 caselle al secondo**, solo con i pugni.
+3. **Scatto:** «si c'è uno scatto ma va tenuto conto che il movimento non è
+   legato alla griglia con i pugni», poi «Spinta libera (Consigliato)»: uno
+   slancio lungo 2 caselle in 0,18 s nella direzione in cui ci si muove
+   (fermi: in avanti), a qualsiasi angolo; ci si ferma dove si arriva; un muro
+   lo ferma e ci si scivola lungo; poi 1,2 s di ricarica.
+4. **Terreni lenti delle spedizioni:** «Metà velocità (Consigliato)».
+5. **Piani e ascensori:** «Anche ascensori» (non la mia raccomandazione): con i
+   pugni si possono chiamare e prendere anche gli ascensori.
+6. **Gradini e dirupi:** «come a piedi ma aggiungi la feature del salto durante
+   l'utilizzo della carta pugni». Un gradino alla volta, il bordo di un dirupo
+   ferma; in più **un salto**. Le sue domande (tasto, altezza, colpi in aria,
+   discesa dai dirupi) sono ancora aperte.
+7. **Colpi dei nemici:** «Se lo tocchi appena» (non la mia raccomandazione): un
+   colpo sulla casella rossa prende il Viandante se **anche solo un pezzo** del
+   suo corpo la tocca.
+8. **Ancora da chiedere:** le domande sul salto, poi difesa, mira dei critici,
+   il critico, danni e tempi, se un pugno è un'azione del Viandante.
+
+**La musica (chiesta dall'utente durante le domande; è materia della Fase 3,
+fatta prima su sua richiesta).**
+- Prima richiesta: una colonna sonora frenetica stile Doom, un po' meno
+  oscura, con licenza CC0. Poi: «cambio di genere», qualcosa da incontro di
+  boxe, con l'esempio di «La Cheyenne» di El de las R's (secondo una pagina di
+  testi un corrido del regionale messicano). In quel genere non si trova
+  musica davvero CC0.
+- Scelta dell'utente: «prendi questa come riferimento: Fast fight / battle
+  music. e prova a creare da codice una soundtrack abbastanza simile e fedele
+  magari adattata leggermente di più al contesto ed al gioco». Il riferimento
+  è [Fast fight / battle music](https://opengameart.org/content/fast-fight-battle-music)
+  di Ville Nousiainen (CC0), scaricato con il permesso dell'utente nella
+  scratchpad, solo per misurarlo, e da cancellare alla fine.
+- Altre risposte: **giro di 32 s** senza stacco; suona **solo con i pugni**:
+  parte con la discesa negli occhi e sfuma in mezzo secondo nella risalita,
+  l'ambiente della sala si abbassa, i colpi restano sopra la musica; per ora
+  solo nel laboratorio, come tutti i suoni.
+- **Misure del riferimento:** 26,6 s, 155 battiti al minuto, cassa su ogni
+  movimento che scende di tono, basso pulsante a sedicesimi su un pedale di Do
+  che sui controtempi salta al Fa (4 battute) e al Sol (4 battute), un riff di
+  quattro note ribattute più una salita cromatica di tre (La-Si♭-Si,
+  Do-Do♯-Re), forma A-B-A-B; quasi tutta l'energia sui bassi (85%), molto
+  compresso.
+- **La traccia nostra** (`tools/audio/music_brawler.py`, da codice, numpy):
+  150 battiti al minuto, così 20 battute fanno 32,0 s esatti; Do maggiore,
+  mai minore (meno cupa); la stessa forma (cassa che scende di tono, basso
+  pulsante che la cassa «pompa», riff di note ribattute e salita cromatica,
+  con note sue) e in più, per il ring: battimani su 2 e 4, fiati a colpi sul
+  ritmo 3-3-2, il colpo di guantone «jab, jab, cross» alla fine di ogni
+  quattro battute, la campanella del ring due volte all'inizio delle ultime
+  quattro battute (un nuovo round), poi un rullo e una salita di rumore che
+  riportano alla prima battuta. Nessuna voce. Stereo, 44,1 kHz.
+- **Misurata come il riferimento:** 150 battiti al minuto, Do maggiore, il
+  «centro» del suono fra 300 e 780 Hz (il riferimento sta intorno a 400);
+  la cucitura del giro vale quanto l'inizio di qualsiasi altra battuta (niente
+  scatto). In attesa dell'ascolto dell'utente.
+- Nel gioco entra nella Fase 3: i suoni del laboratorio oggi sono mono, quindi
+  per la musica serve un canale stereo suo.
 
 ## 12. Fase 3 — Pugni: guantoni, segni critici, colpi a schermo, suoni
 
