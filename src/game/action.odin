@@ -520,7 +520,8 @@ effect_is_valid :: proc(room: ^Room, effect: Effect) -> bool {
 		return effect.target == PLAYER_ENTITY && effect.amount > 0 && room.phase == .Combat &&
 		       can_create_temporary_card(&room.player.deck, effect.card_definition)
 	case .First_Person:
-		return effect.target == PLAYER_ENTITY && effect.amount > 0 && tactical_can_begin_first_person(room)
+		weapon, known := first_person_effect_weapon(effect.charges)
+		return effect.target == PLAYER_ENTITY && effect.amount > 0 && known && tactical_can_begin_first_person(room, weapon)
 	case .Marley:
 		return effect.target == PLAYER_ENTITY && effect.amount > 0 && effect.duration > 0 && marley_can_begin(room)
 	case .Flood_Wave:
@@ -896,12 +897,13 @@ apply_effect :: proc(room: ^Room, source: Entity_Ref, effect: Effect, report: ^A
 		mounted := begin_ride(room, Dino_Kind(effect.charges-1), effect.amount, report)
 		assert(mounted)
 	case .First_Person:
-		began := tactical_begin_first_person(room, f32(effect.amount))
+		weapon, _ := first_person_effect_weapon(effect.charges)
+		began := tactical_begin_first_person(room, f32(effect.amount), weapon)
 		assert(began)
 		at := room.player.position
 		record_report_event(report, {
 			kind = .First_Person_Begun, source = source, target = PLAYER_ENTITY,
-			from_position = at, to_position = at, duration = effect.amount, card_definition = .First_Person,
+			from_position = at, to_position = at, duration = effect.amount, card_definition = FIRST_PERSON_WEAPONS[weapon].card,
 		})
 	}
 	report.applied_effects += 1

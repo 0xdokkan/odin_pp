@@ -57,7 +57,8 @@ Snapshot :: struct {
 	pinball:game.Pinball_State,
 	pinball_random:u64,
 	lasso:game.Lasso_State,
-	first_person:game.First_Person_State,
+	// The view behind the player's eyes, each weapon's own under its key (game.First_Person_Save).
+	first_person:game.First_Person_Save,
 	reactions:game.Reaction_Binding_Set,
 	// Where the lifts' platforms rest (game/lift.odin): a save is never made with one carrying someone (stable), and one
 	// going empty is saved at its end. A save from before has none, and its map no lifts.
@@ -96,7 +97,7 @@ capture :: proc(w:^World,room:^game.Room,out:^Snapshot) -> bool {
 	out.enemy_count=len(room.enemies);out.trap_count=len(room.traps);out.object_count=len(room.objects);out.loot_count=len(room.loot)
 	out.next_enemy_id=room.next_enemy_id;out.next_trap_id=room.next_trap_id;out.next_object_id=room.next_object_id;out.pulse_count=room.pulse_count
 	out.fires=room.ground.fires;out.fire_count=room.ground.fire_count;out.next_fire_id=room.ground.next_fire_id
-	out.fishing=room.fishing;out.pinball=room.pinball;out.pinball_random=room.pinball_random;out.lasso=room.lasso;out.first_person=room.first_person;out.reactions=room.reaction_bindings
+	out.fishing=room.fishing;out.pinball=room.pinball;out.pinball_random=room.pinball_random;out.lasso=room.lasso;out.first_person=game.first_person_save(room.first_person);out.reactions=room.reaction_bindings
 	out.lifts=room.lifts
 	for &platform in out.lifts.platforms[:out.lifts.count] {platform={at=platform.at}}
 	out.family=room.family;out.encounter_kind=room.encounter_kind;out.modifier=room.modifier;out.exit_position=room.exit_position;out.endless=room.endless
@@ -164,6 +165,7 @@ valid_snapshot :: proc(s:^Snapshot) -> bool {
 	for gate in w.gates[:w.gate_count] {if !inside(gate.cell,size) || !inside(gate.lever,size) {return false}}
 	if s.lifts.count!=w.lift_count {return false}
 	for platform in s.lifts.platforms[:s.lifts.count] {if platform.at>1 || platform.moving || platform.has_rider {return false}}
+	if _,known:=game.first_person_load(s.first_person);!known {return false}
 	if w.structure_count<0 || w.structure_count>MAX_WORLD_STRUCTURES {return false}
 	for placed in w.structures[:w.structure_count] {if placed.id>=.Count || placed.rotation>=4 || !inside(placed.origin,size) {return false}}
 	for e,i in s.enemies[:s.enemy_count] {
@@ -225,7 +227,7 @@ restore :: proc(s:^Snapshot,w:^World,data:^level.Level,player:^game.Player,room:
 	copy(room.ground.pool,s.ground_pool[:side*side])
 	for pool in s.layer_pools[:s.layer_pool_count] {if int(pool[0])<len(room.ground.pool) {room.ground.pool[pool[0]]=pool[1]}}
 	room.ground.fires=s.fires;room.ground.fire_count=s.fire_count;room.ground.next_fire_id=s.next_fire_id
-	room.fishing=s.fishing;room.pinball=s.pinball;room.pinball_random=s.pinball_random;room.lasso=s.lasso;room.first_person=s.first_person;room.reaction_bindings=s.reactions
+	room.fishing=s.fishing;room.pinball=s.pinball;room.pinball_random=s.pinball_random;room.lasso=s.lasso;room.first_person,_=game.first_person_load(s.first_person);room.reaction_bindings=s.reactions
 	if s.lifts.count==room.lifts.count {room.lifts=s.lifts}
 	room.player=player;room.level_data=data
 	return true

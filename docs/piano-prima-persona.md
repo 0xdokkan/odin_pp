@@ -1549,6 +1549,36 @@ fermati alla fine di ogni passo.
   confronta dopo ogni modifica; servono per rifare il codice senza cambiare cosa
   fa ([Wikipedia](https://en.wikipedia.org/wiki/Characterization_test)).
 
+**Passo 1 — l'arma nelle regole: fatto.**
+- `First_Person_Weapon :: enum u8 {AK, Fists, Sword, Bow}` e la tabella
+  `FIRST_PERSON_WEAPONS` (`src/game/first_person.odin`): per ora la carta che
+  la vista nomina (`First_Person_Begun`) e se l'arma si prende in groppa al
+  Dinosauro (solo l'AK, risposta 3). Le armi senza carta nominano quella
+  dell'AK finché le loro carte non nascono (Fasi 2, 4, 6).
+- Lo stato: in comune `active`, `weapon`, `remaining`, `duration`, `shots`,
+  `hits`; i dati dell'AK (`cooldown`, `trigger`, `trail`) in
+  `First_Person_AK`, dentro `First_Person_Arms :: struct #raw_union`, con
+  `using`, così il codice dell'AK li chiama per nome come prima. Prendere
+  un'arma diversa da quella in memoria azzera i suoi byte; riprendere la stessa
+  li tiene (le scie dell'AK). Grilletto, raffica e fine della stanza toccano i
+  dati dell'AK solo se in mano c'è l'AK.
+- **Misure:** `Room` 8952 byte come nella Fase 0, stato della vista 672, e
+  **648 byte per i dati di ogni arma**, che le armi nuove dividono a turno.
+- L'effetto `.First_Person` porta l'arma in `charges` (0 = AK, quindi la carta
+  dell'AK e i suoi effetti non cambiano); un'arma sconosciuta rende l'effetto e
+  la carta non validi. `tactical_begin_first_person` e
+  `tactical_can_begin_first_person` hanno l'arma come parametro, con l'AK per
+  difetto: i test dell'AK non cambiano.
+- Il salvataggio: `First_Person_Save` con `first_person_save` e
+  `first_person_load`; lo snapshot rifiuta un'arma sconosciuta.
+- Test nuovi in `src/game/first_person_weapon_test.odin` (4): l'arma
+  nell'effetto e nello stato, i byte divisi, solo l'AK in groppa, il salvataggio
+  in JSON (anche uno di prima, senza la chiave `weapon`). I 27 test dell'AK sono
+  quelli di prima, senza modifiche.
+- **Verifiche:** check con e senza assert puliti; `check.ps1` completo: **1744
+  test verdi** con e senza assert (i 1740 della Fase 0 più i 4 nuovi), più le
+  due build (859 s).
+
 ## 11. Fase 2 — Pugni: regole e prototipo giocabile
 
 ### Obiettivo

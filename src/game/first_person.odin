@@ -111,23 +111,106 @@ First_Person_Shot :: struct {
 	damage: i32,
 }
 
-First_Person_State :: struct {
-	active: bool,
-	// World seconds left of `duration`.
-	remaining, duration: f32,
+// The weapon in hand behind the player's eyes. Each is a card of its own; they
+// share the view: its dive and rise, its seconds, its pause, its ban on cards
+// and its save (docs/piano-prima-persona.md, sezione 4.1). The first is the AK,
+// as every save from before the others is.
+First_Person_Weapon :: enum u8 {AK, Fists, Sword, Bow}
+
+// What the rules ask of a weapon.
+First_Person_Weapon_Rules :: struct {
+	// The card whose view it is (First_Person_Begun names it).
+	card: Card_Id,
+	// Whether it may be taken up on a dinosaur's back (dinosaur.odin).
+	while_riding: bool,
+}
+
+// The weapons whose cards are still to come name the AK's until then (Fasi 2,
+// 4 and 6 of docs/piano-prima-persona.md); none of them is taken up riding (the
+// user's choice).
+@(rodata)
+FIRST_PERSON_WEAPONS := [First_Person_Weapon]First_Person_Weapon_Rules{
+	.AK = {card = .First_Person, while_riding = true},
+	.Fists = {card = .First_Person},
+	.Sword = {card = .First_Person},
+	.Bow = {card = .First_Person},
+}
+
+// The AK's own.
+First_Person_AK :: struct {
 	// Seconds until the trigger may fire again (below zero: a shot overdue).
 	cooldown: f32,
 	// The left button held, as the controller read it this frame.
 	trigger: bool,
-	// Shots fired in the room so far and those that struck a foe; the last
-	// FIRST_PERSON_TRAIL of them by number.
+	// The last FIRST_PERSON_TRAIL shots by number (First_Person_State.shots).
+	trail: [FIRST_PERSON_TRAIL]First_Person_Shot,
+}
+
+// What only the weapon in hand keeps. One view is open at a time, so they
+// share their bytes (Room keeps under 9 KB, event_test): taking up another
+// weapon clears them. A save keeps them through First_Person_Save, as JSON
+// reads no raw union.
+First_Person_Arms :: struct #raw_union {
+	using ak: First_Person_AK,
+}
+
+First_Person_State :: struct {
+	active: bool,
+	weapon: First_Person_Weapon,
+	// World seconds left of `duration`.
+	remaining, duration: f32,
+	// Shots fired in the room so far and those that struck a foe, whatever
+	// was in hand between them.
+	shots, hits: i32,
+	using arms: First_Person_Arms,
+}
+
+// The view as a save keeps it (expedition/snapshot.odin). JSON reads no raw
+// union, so here each weapon's own have keys of their own; the AK's keep the
+// names they had before the other weapons, and a save without `weapon` is the
+// AK's.
+First_Person_Save :: struct {
+	active: bool,
+	weapon: First_Person_Weapon,
+	remaining, duration: f32,
+	cooldown: f32,
+	trigger: bool,
 	shots, hits: i32,
 	trail: [FIRST_PERSON_TRAIL]First_Person_Shot,
 }
 
+first_person_save :: proc(state: First_Person_State) -> (save: First_Person_Save) {
+	save.active, save.weapon, save.remaining, save.duration = state.active, state.weapon, state.remaining, state.duration
+	save.shots, save.hits = state.shots, state.hits
+	switch state.weapon {
+	case .AK: save.cooldown, save.trigger, save.trail = state.cooldown, state.trigger, state.trail
+	// Nothing of their own yet.
+	case .Fists, .Sword, .Bow:
+	}
+	return
+}
+
+// Refuses a weapon the game does not know.
+first_person_load :: proc(save: First_Person_Save) -> (state: First_Person_State, ok: bool) {
+	if _, known := first_person_effect_weapon(i32(save.weapon)); !known { return }
+	state.active, state.weapon, state.remaining, state.duration = save.active, save.weapon, save.remaining, save.duration
+	state.shots, state.hits = save.shots, save.hits
+	switch save.weapon {
+	case .AK: state.cooldown, state.trigger, state.trail = save.cooldown, save.trigger, save.trail
+	case .Fists, .Sword, .Bow:
+	}
+	return state, true
+}
+
 @(private)
-first_person_effect :: proc(seconds: i32) -> Effect {
-	return {kind = .First_Person, target = PLAYER_ENTITY, amount = seconds}
+first_person_effect :: proc(seconds: i32, weapon := First_Person_Weapon.AK) -> Effect {
+	return {kind = .First_Person, target = PLAYER_ENTITY, amount = seconds, charges = i32(weapon)}
+}
+
+// The weapon an effect of .First_Person takes up (its charges), if one.
+first_person_effect_weapon :: proc(charges: i32) -> (weapon: First_Person_Weapon, ok: bool) {
+	if charges < 0 || charges > i32(max(First_Person_Weapon)) { return }
+	return First_Person_Weapon(charges), true
 }
 
 tactical_first_person_active :: proc(room: ^Room) -> bool {
@@ -135,12 +218,14 @@ tactical_first_person_active :: proc(room: ^Room) -> bool {
 }
 
 // The shots and hits of the room go on counting: the board numbers its
-// tracers by them.
-tactical_begin_first_person :: proc(room: ^Room, seconds: f32) -> bool {
-	if !(seconds > 0) || !tactical_can_begin_first_person(room) { return false }
+// tracers by them. The weapon kept what it had when it is the one taken up
+// again (the AK's trail, for the board's tracers); another one starts clear.
+tactical_begin_first_person :: proc(room: ^Room, seconds: f32, weapon := First_Person_Weapon.AK) -> bool {
+	if !(seconds > 0) || !tactical_can_begin_first_person(room, weapon) { return false }
 	fp := &room.first_person
-	fp.active, fp.remaining, fp.duration = true, seconds, seconds
-	fp.cooldown, fp.trigger = 0, false
+	if fp.weapon != weapon { fp.arms = {} }
+	fp.active, fp.weapon, fp.remaining, fp.duration = true, weapon, seconds, seconds
+	if weapon == .AK { fp.cooldown, fp.trigger = 0, false }
 	return true
 }
 
@@ -152,25 +237,29 @@ tactical_first_person_tick :: proc(room: ^Room, seconds: f32) {
 	fp := &room.first_person
 	fp.remaining = max(f32(0), fp.remaining-seconds)
 	if fp.remaining < FIRST_PERSON_EPSILON { fp.remaining = 0 }
-	fp.cooldown = max(fp.cooldown-seconds, -FIRST_PERSON_MAX_CARRY if fp.trigger else 0)
-	if fp.remaining <= 0 { fp.active, fp.trigger, fp.cooldown = false, false, 0 }
+	if fp.weapon == .AK { fp.cooldown = max(fp.cooldown-seconds, -FIRST_PERSON_MAX_CARRY if fp.trigger else 0) }
+	if fp.remaining <= 0 {
+		fp.active = false
+		if fp.weapon == .AK { fp.trigger, fp.cooldown = false, 0 }
+	}
 }
 
 // The left button as the controller reads it this frame. Let go, nothing is
 // banked: the next press fires at once, or as soon as the last shot allows.
+// Only the AK has a trigger.
 first_person_set_trigger :: proc(room: ^Room, held: bool) {
-	if room == nil { return }
+	if room == nil || room.first_person.weapon != .AK { return }
 	fp := &room.first_person
 	fp.trigger = held && tactical_first_person_active(room)
 	if !fp.trigger { fp.cooldown = max(fp.cooldown, 0) }
 }
 
-// A shot is due: the trigger held and its time come, the world's clock free
-// (no beat resolving, no defence prompt, no cast).
+// A shot is due: the AK in hand, its trigger held and its time come, the
+// world's clock free (no beat resolving, no defence prompt, no cast).
 first_person_fire_due :: proc(room: ^Room) -> bool {
 	if !tactical_first_person_active(room) { return false }
 	fp := &room.first_person
-	return fp.trigger && fp.remaining > 0 && fp.cooldown <= FIRST_PERSON_EPSILON && !room.tactical_pulse.pending &&
+	return fp.weapon == .AK && fp.trigger && fp.remaining > 0 && fp.cooldown <= FIRST_PERSON_EPSILON && !room.tactical_pulse.pending &&
 	       room.qte.kind == .None && room.player.tactical.cast_remaining <= 0
 }
 

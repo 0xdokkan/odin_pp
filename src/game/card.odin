@@ -1391,9 +1391,10 @@ card_effect_template_is_valid :: proc(
 		}
 		reaction, found := reaction_definition_by_id(template.reaction)
 		return found && validate_reaction_definition(&reaction) && card_amount_template_is_valid(template)
-	// The player's own seconds behind his eyes.
+	// The player's own seconds behind his eyes, with a weapon (its charges).
 	case .First_Person:
-		return template.target == .Player && definition.targeting.rule == .Self && card_amount_template_is_valid(template)
+		_, known := first_person_effect_weapon(template.charges)
+		return known && template.target == .Player && definition.targeting.rule == .Self && card_amount_template_is_valid(template)
 	// The party's bombs and seconds.
 	case .Marley:
 		return template.target == .Player && definition.targeting.rule == .Self && template.duration > 0 &&
@@ -1593,7 +1594,9 @@ instantiate_card_effect :: proc(
 	case .Move, .Gain_Energy:
 			return {}, false
 	case .First_Person:
-		return first_person_effect(card_effect_amount(template, instance.upgrade_level)), true
+		weapon, known := first_person_effect_weapon(template.charges)
+		if !known { return {}, false }
+		return first_person_effect(card_effect_amount(template, instance.upgrade_level), weapon), true
 	case .Marley:
 		return marley_effect(card_effect_amount(template, instance.upgrade_level), template.duration), true
 	case .Flood_Wave:

@@ -202,7 +202,8 @@ tactical_end_combat :: proc(room: ^Room) {
 	room.pinball = {}
 	room.marley = {}
 	room.ride = {}
-	room.first_person.active, room.first_person.trigger = false, false
+	room.first_person.active = false
+	if room.first_person.weapon == .AK { room.first_person.trigger = false }
 }
 
 @(private = "file")

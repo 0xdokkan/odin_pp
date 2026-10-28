@@ -56,9 +56,11 @@ tactical_can_begin_shadow :: proc(room: ^Room) -> bool {
 	return tactical_control_allowed(room, .Shadow)
 }
 
+// The AK is taken up on a dinosaur's back too; the other weapons are not
+// (FIRST_PERSON_WEAPONS).
 @(private)
-tactical_can_begin_first_person :: proc(room: ^Room) -> bool {
-	return tactical_control_allowed(room, .First_Person)
+tactical_can_begin_first_person :: proc(room: ^Room, weapon := First_Person_Weapon.AK) -> bool {
+	return tactical_control_allowed(room, .First_Person) && (FIRST_PERSON_WEAPONS[weapon].while_riding || !tactical_ride_active(room))
 }
 
 Tactical_Clock_Mode :: enum { Paused, Shadow, Cast, World }
