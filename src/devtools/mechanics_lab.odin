@@ -94,6 +94,9 @@ run_mechanics_lab_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer,
 		return mechanics_lab_layers(window, renderer, &room, &data, &controller, &cards, &buffer)
 	} else if only == "lift" {
 		return mechanics_lab_lifts(window, renderer, &room, &data, &controller, &cards, &buffer)
+	} else if only == "fps" {
+		// The First Person Shooter's act alone (docs/piano-prima-persona.md, Fase 0).
+		return mechanics_lab_first_person(window, renderer, &room, &data, &controller, &cards, &buffer)
 	}
 	artifacts.screenshot("odin_pp_mechanics_lab.png")
 	if !mechanics_lab_card_words(renderer, &player) { return false }
