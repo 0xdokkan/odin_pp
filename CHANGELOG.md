@@ -5,6 +5,19 @@ I riferimenti a Classica, `--flat` e ai vecchi smoke descrivono versioni precede
 per i comandi disponibili oggi valgono il [README](README.md) e la documentazione collegata.
 
 
+## 2026-10-28 — Piano di lavoro delle carte in prima persona
+
+- Nuovo [documento](docs/piano-prima-persona.md) in nove fasi (0–8), da eseguire
+  una alla volta solo su comando dell'utente, con uno stop alla fine di ogni passo
+  e una ricerca su internet quando servono tecnica o riferimenti ad altri giochi.
+- Tre carte nuove che portano la vista in prima persona sul modello di First Person
+  Shooter (l'AK): pugni con movimento libero, jab, cross, ganci e punti critici a
+  tempo sui nemici; spada guidata dal mouse, con parata e rampino; arco a carica con
+  frecce che rimbalzano sui muri, zone critiche e un effetto per ogni stato negativo
+  del gioco. Nomi, numeri e formule sono proposte da confermare fase per fase.
+- La Fase 0 è una proposta di Claude: decisioni comuni (nomi, numeri, arena di
+  prova) e misure dell'AK di oggi.
+
 ## 2026-10-27 — Profondità: le cinque voci aperte della sezione 12, verificate e corrette
 
 Tutte e cinque erano vere (la sesta, sulle grotte, non esiste più con le grotte a piani).
