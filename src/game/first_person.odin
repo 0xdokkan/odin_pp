@@ -179,6 +179,8 @@ First_Person_Save :: struct {
 	trigger: bool,
 	shots, hits: i32,
 	trail: [FIRST_PERSON_TRAIL]First_Person_Shot,
+	// The fists' body, punches and marks (first_person_fists.odin).
+	fists: First_Person_Fists,
 }
 
 first_person_save :: proc(state: First_Person_State) -> (save: First_Person_Save) {
@@ -186,8 +188,9 @@ first_person_save :: proc(state: First_Person_State) -> (save: First_Person_Save
 	save.shots, save.hits = state.shots, state.hits
 	switch state.weapon {
 	case .AK: save.cooldown, save.trigger, save.trail = state.cooldown, state.trigger, state.trail
+	case .Fists: save.fists = state.fists
 	// Nothing of their own yet.
-	case .Fists, .Sword, .Bow:
+	case .Sword, .Bow:
 	}
 	return
 }
@@ -199,7 +202,8 @@ first_person_load :: proc(save: First_Person_Save) -> (state: First_Person_State
 	state.shots, state.hits = save.shots, save.hits
 	switch save.weapon {
 	case .AK: state.cooldown, state.trigger, state.trail = save.cooldown, save.trigger, save.trail
-	case .Fists, .Sword, .Bow:
+	case .Fists: state.fists = save.fists
+	case .Sword, .Bow:
 	}
 	return state, true
 }
@@ -244,6 +248,8 @@ tactical_first_person_tick :: proc(room: ^Room, seconds: f32) {
 	if fp.remaining <= 0 {
 		fp.active = false
 		if fp.weapon == .AK { fp.trigger, fp.cooldown = false, 0 }
+		// Out of the air at once onto the cell under him (the user's choice).
+		if fp.weapon == .Fists { fp.fists.airborne, fp.fists.rise_speed, fp.fists.feet = false, 0, f32(cell_height(room, room.player.position)) }
 	}
 }
 

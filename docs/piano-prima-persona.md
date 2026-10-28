@@ -2140,6 +2140,55 @@ scelte consigliate):
   test verdi** con e senza assert (i 1766 del passo 2 più i 4 nuovi), più le
   due build (449 s). I segni non si vedono ancora: il loro disegno semplice è
   del passo 5.
+
+**Domande prima del passo 4** (risposta dell'utente: «Sì, passo 4», cioè le
+scelte consigliate):
+- Un colpo ad area che copre più caselle toccate dal corpo prende **una volta
+  sola**.
+- Saltando conta **solo la casella dove si atterra**: saltare sopra una
+  trappola la evita.
+- Se la carta finisce in aria si **scende subito dritto** nella casella sotto.
+
+**Passo 4 — nemici e difesa: fatto.**
+- Colpi (`enemy_blow_reaches_player`, al posto del controllo «la sua casella
+  è minacciata» nell'attacco e nella carica dei nemici): con i pugni un colpo
+  prende se il cerchio del corpo **tocca** una delle caselle minacciate, una
+  volta sola; in aria i colpi a terra passano sotto, quelli da lontano (frecce,
+  bombe: `ranged`) prendono. Con l'AK la regola resta quella di prima.
+- Niente scelta di difesa con i pugni (`offer_defense_qte`).
+- In aria il corpo passa da una casella all'altra **senza i loro effetti**
+  (`fists_fly`: la sua casella cambia, con il suo `Moved`); all'atterraggio la
+  casella sotto di lui fa quello che farebbe un passo (trappola, terreno,
+  piattaforma che parte), salvo che sia quella da cui ha saltato (un salto sul
+  posto non rifà scattare la trappola). Una caduta si paga **passando il bordo**,
+  contata dal pavimento più alto lasciato dall'inizio del salto: aspettare la
+  fine della carta in aria non la evita.
+- La carta che finisce in aria lo mette subito sulla casella sotto di lui (lo
+  scivolare al centro in 0,15 s è del disegno, passo 5).
+- Salvataggio: `First_Person_Save` ha il corpo dei pugni intero (`fists`),
+  posizione, salto, scatto, pugno, segni e il loro flusso; un salvataggio di
+  prima non ha la chiave e vale come prima.
+- **Un minuto di gioco senza finestra con i nemici liberi**
+  (`test_mechanics_lab_fists_live_a_minute_of_play`): nell'arena «Prima
+  persona», con gli arrivi del laboratorio, il corpo gira in cerchio saltando,
+  scattando e tirando pugni due secondi su quattro, e resta fermo negli altri
+  due. I nemici non perdono il battito, il corpo non sta mai in una casella dove
+  un passo non entra, i pugni arrivano, da fermo i colpi lo prendono.
+- **Da sapere per il bilanciamento:** in una prima versione del minuto il corpo
+  correva sempre, e in 60 secondi **nessun colpo** lo ha preso: a 5 caselle al
+  secondo esce dalle caselle rosse prima di ogni battito, e i pugni abbattono
+  chi si avvicina. Da fermo, invece, ha preso 13 danni in 30 secondi. La
+  schivata correndo è molto forte: si guarda provando la carta (passo 5).
+- Test nuovi: in `src/game/first_person_fists_foes_test.odin` (6) il colpo
+  sulla casella toccata e non toccata, in aria e con l'AK; la freccia in aria;
+  niente scelta di difesa con i pugni e sì con l'AK; la trappola sorvolata,
+  presa a piedi e non rifatta da un salto sul posto; la carta finita in aria;
+  il salvataggio in JSON. In `src/integration/mechanics_lab_first_person_arena_test.odin`
+  il minuto di gioco.
+- **Verifiche:** check con e senza assert puliti; `check.ps1` completo: **1777
+  test verdi** con e senza assert (i 1770 del passo 3 più i 7 nuovi), più le
+  due build (539 s). L'atto `fps` da solo dà ancora **114 catture identiche al
+  byte** alla Fase 0: la nuova regola dei colpi non tocca l'AK.
 - Nel gioco entra nella Fase 3: i suoni del laboratorio oggi sono mono, quindi
   per la musica serve un canale stereo suo.
 

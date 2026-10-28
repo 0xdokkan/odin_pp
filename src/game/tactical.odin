@@ -471,6 +471,9 @@ begin_diagonal_qte :: proc(room: ^Room, offset: grid.Position) -> bool {
 offer_defense_qte :: proc(room: ^Room, enemy: ^Enemy) -> bool {
 	// A stunned player cannot defend: only cards are left.
 	if tactical_is_stunned(room) { return false }
+	// With the fists he defends by moving: no choice stops the world (Fase 2 of
+	// docs/piano-prima-persona.md).
+	if first_person_fists_active(room) { return false }
 	intent := &enemy.intent
 	if enemy_is_staggered(room, enemy) || intent.windup || (intent.kind != .Attack && intent.kind != .Charge) || intent.target_object != 0 || enemy.position != intent.origin ||
 	   !enemy_intent_cell_is_threatened(intent, room.player.position) ||

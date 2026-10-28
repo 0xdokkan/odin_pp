@@ -1,6 +1,7 @@
 package integration
 
 import run_session "../run"
+import "core:math"
 import "core:testing"
 import game "../game"
 import grid "../engine/grid"
@@ -107,4 +108,59 @@ test_mechanics_lab_first_person_lives_a_minute_of_play :: proc(t: ^testing.T) {
 	testing.expect_value(t, room.phase, game.Room_Phase.Combat)
 	for weapon in game.First_Person_Weapon { testing.expectf(t, taken[weapon], "%v was never taken up", weapon) }
 	testing.expect(t, ak_shots > 0, "the AK never fired")
+}
+
+// The fists live a minute of play in the first person arena, the foes free and
+// arriving: the body circles the room two seconds out of four, jumps, dashes and
+// punches as it goes, the foes' blows on the cells it touches (Fase 2, passo 4 of docs/piano-prima-persona.md).
+// Nothing breaks the foes' beat, the body never stands in a cell a step could not
+// enter, punches land, blows reach him, and the fight goes on.
+@(test)
+test_mechanics_lab_fists_live_a_minute_of_play :: proc(t: ^testing.T) {
+	data: level.Level
+	defer level.destroy(&data)
+	player, created := game.create_player(run_session.DEMO_PLAYER_STATS)
+	testing.expect(t, created)
+	room, built := run_session.create_mechanics_lab_room(&data, &player, game.DEFAULT_TACTICAL_CONFIG, .First_Person)
+	testing.expect(t, built)
+	defer game.destroy_room(&room)
+	player.stats.max_health, player.health = 999, 999
+	renderer := new(render.Renderer)
+	defer free(renderer)
+	defer render.destroy_renderer_world_playback(renderer)
+	controller := run_session.Tactical_Controller{was_focused = true}
+	cards: run_session.Card_Interaction_State
+	buffer: run_session.Buffered_Gameplay_Command
+	sandbox := game.begin_sandbox(7)
+	views, hits := 0, i32(0)
+	punches := [4]game.First_Person_Punch{.Jab, .Cross, .Left_Hook, .Right_Hook}
+	for frame in 0..<60*60 {
+		if !game.tactical_first_person_active(&room) && game.tactical_begin_first_person(&room, 12, .Fists) { views += 1 }
+		// Round and round, looking where it goes and punching, two seconds out of
+		// four; the others standing idle (on the run he steps out of the red cells
+		// before the beat and fells who comes near; standing, he is hit).
+		angle := f32(frame)*0.013
+		way := [2]f32{math.cos(angle), math.sin(angle)}
+		running := (frame/120)%2 == 0
+		input := game.First_Person_Fists_Input{look = way, aim = {yaw = angle}}
+		if running {
+			input.wish, input.jump, input.dash = way, frame%90 == 45, frame%150 == 75
+			if frame%20 == 0 { input.punch = punches[(frame/20)%4] }
+		}
+		if game.first_person_fists_active(&room) {
+			before := room.first_person.hits
+			_ = game.first_person_fists_move(&room, input, 1.0/60)
+			hits += room.first_person.hits-before
+			tile, inside := level.tile_at(&data, room.player.position)
+			testing.expect(t, inside && level.is_walkable(tile.kind) && !game.obstacle_at(&room, room.player.position), "the body stands in a cell no step enters")
+		}
+		_, _ = game.sandbox_tick(&room, &sandbox, 1.0/60)
+		_ = run_session.step_tactical_controller(&controller, &room, renderer, &cards, &buffer, 1.0/60, true, {focused = true})
+		if room.phase != .Combat { break }
+		if frame%30 == 0 && !room.tactical_pulse.pending && !game.validate_enemy_intents(&room) { testing.expect(t, false, "the foes' intents broke"); break }
+	}
+	testing.expect_value(t, room.phase, game.Room_Phase.Combat)
+	testing.expect(t, views >= 4, "the fists were not taken up again")
+	testing.expect(t, hits > 0, "no punch landed in a minute")
+	testing.expect(t, player.health < 999, "no blow reached him in a minute")
 }

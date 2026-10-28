@@ -855,7 +855,7 @@ resolve_enemy_intents :: proc(room: ^Room, pulse: ^Pulse_Report, only_id: u32 = 
 				continue
 			}
 			if enemy.position != intent.origin ||
-			   !enemy_intent_cell_is_threatened(&intent, room.player.position) ||
+			   !enemy_blow_reaches_player(room, &intent, ranged) ||
 			   (enemy.archetype == .Archer &&
 			    !has_clear_orthogonal_line(room, enemy.position, room.player.position)) {
 				record_enemy_attack_miss(
@@ -928,7 +928,7 @@ resolve_enemy_intents :: proc(room: ^Room, pulse: ^Pulse_Report, only_id: u32 = 
 				continue
 			}
 			moved_enemy := &room.enemies[moved_enemy_index]
-			if !enemy_intent_cell_is_threatened(&intent, room.player.position) {
+			if !enemy_blow_reaches_player(room, &intent, false) {
 				record_enemy_attack_miss(
 					pulse,
 					source,

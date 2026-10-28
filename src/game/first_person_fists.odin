@@ -64,6 +64,9 @@ First_Person_Fists :: struct {
 	body, velocity: [2]f32,
 	feet, rise_speed: f32,
 	airborne: bool,
+	// In the air: the cell he left and the highest floor since (a fall counts from it).
+	takeoff: grid.Position,
+	fall_base: f32,
 	// The dash: its way, its seconds left, the seconds before the next.
 	dash_way: [2]f32,
 	dash_left, dash_recharge: f32,
@@ -114,7 +117,7 @@ first_person_fists_move :: proc(room: ^Room, input: First_Person_Fists_Input, dt
 	clear_event_log(room.recent_events)
 	f := &room.first_person.fists
 	if input.jump && !f.airborne && !lift_player_riding(room) {
-		f.airborne, f.rise_speed = true, FISTS_JUMP_SPEED
+		f.airborne, f.rise_speed, f.takeoff, f.fall_base = true, FISTS_JUMP_SPEED, room.player.position, f.feet
 	}
 	if input.dash && f.dash_left <= 0 && f.dash_recharge <= 0 && !lift_player_riding(room) {
 		way := fists_unit(input.wish)
@@ -178,10 +181,77 @@ fists_step :: proc(room: ^Room, wish: [2]f32) -> (entered, ended: bool) {
 	ground := f32(cell_height(room, room.player.position))
 	if f.airborne && f.feet <= ground {
 		f.feet, f.rise_speed, f.airborne = ground, 0, false
-		entered = fists_land_off_cover(room) || entered
+		// Past a cover he walks onto the cell beyond (its step brings its own);
+		// elsewhere the cell he lands on does what a step into it would.
+		if !fists_land_off_cover(room) { fists_touch_down(room) }
+		entered = true
 	}
 	if !f.airborne { f.feet = ground }
 	return
+}
+
+// Into a cell in the air: his cell changes, nothing there acts on him yet (he
+// flies over a trap); a drop of more than a step from the highest floor he has
+// left is a fall, paid as he passes its edge.
+@(private = "file")
+fists_fly :: proc(room: ^Room, cell: grid.Position) -> bool {
+	f := &room.first_person.fists
+	from := room.player.position
+	set_entity_position(room, PLAYER_ENTITY, cell)
+	record_event(room.recent_events, {kind = .Moved, source = PLAYER_ENTITY, target = PLAYER_ENTITY, from_position = from, to_position = cell})
+	ground := f32(cell_height(room, cell))
+	f.fall_base = max(f.fall_base, ground)
+	if drop := i32(math.round(f.fall_base-ground)); drop > HEIGHT_FALL_FREE {
+		report: Action_Report
+		trigger_fall(room, PLAYER_ENTITY, drop, &report)
+		append_event_log(room.recent_events, &report.events)
+		f.fall_base = ground
+	}
+	collect_loot_in_magnet_range(room)
+	return true
+}
+
+// Landing: the cell under him acts as a step into it would (a trap, the terrain,
+// a lift's platform starting), unless it is the one he jumped from.
+@(private = "file")
+fists_touch_down :: proc(room: ^Room) {
+	f := &room.first_person.fists
+	if room.player.position == f.takeoff { return }
+	report: Action_Report
+	trigger_cell_entry(room, PLAYER_ENTITY, &report)
+	append_event_log(room.recent_events, &report.events)
+	_ = lift_board(room, PLAYER_ENTITY, room.player.position)
+}
+
+// A step of the body's centre into a cell: walked on the ground, flown in the air.
+@(private = "file")
+fists_go :: proc(room: ^Room, cell: grid.Position, mode: Movement_Mode) -> bool {
+	if room.first_person.fists.airborne { return fists_fly(room, cell) }
+	return fists_enter(room, cell, mode)
+}
+
+// Whether the body touches the cell (on his own layer): its circle over any of it.
+first_person_fists_touches :: proc(room: ^Room, cell: grid.Position) -> bool {
+	if !first_person_fists_active(room) || cell.layer != room.player.position.layer { return false }
+	b := room.first_person.fists.body
+	closest := [2]f32{clamp(b.x, f32(cell.x), f32(cell.x)+1), clamp(b.y, f32(cell.y), f32(cell.y)+1)}
+	d := b-closest
+	return d.x*d.x+d.y*d.y < FISTS_RADIUS*FISTS_RADIUS
+}
+
+// Whether a foe's blow on its intent's cells reaches the player. Behind his eyes
+// with the fists (the user's choices, Fase 2): it does when his body touches any
+// of them, once however many; in the air a blow on the ground passes under him,
+// one from afar (ranged: an arrow, a bomb) does not. Otherwise as ever: his cell
+// among them.
+enemy_blow_reaches_player :: proc(room: ^Room, intent: ^Enemy_Intent, ranged: bool) -> bool {
+	if !first_person_fists_active(room) { return enemy_intent_cell_is_threatened(intent, room.player.position) }
+	if room.first_person.fists.airborne && !ranged { return false }
+	for index in 0..<intent.threatened_cell_count {
+		cell := intent.threatened_cells[index]
+		if cell == room.player.position || first_person_fists_touches(room, cell) { return true }
+	}
+	return false
 }
 
 // Landing with the centre over a low cover: past it if the cell beyond is open,
@@ -289,7 +359,7 @@ fists_cross :: proc(room: ^Room) -> (entered: bool) {
 			// A leap over a cover: only once the centre is past it, onto the cell beyond.
 			if abs(dx) < 2 && abs(dy) < 2 { return }
 			beyond, beyond_open, _ := fists_neighbour(room, cell, step, f.feet, f.airborne)
-			if !beyond_open || !fists_enter(room, beyond, .Teleport) { return }
+			if !beyond_open || !fists_go(room, beyond, .Teleport) { return }
 			entered = true
 			continue
 		}
@@ -298,7 +368,7 @@ fists_cross :: proc(room: ^Room) -> (entered: bool) {
 			if step.x != 0 && step.y != 0 {
 				side := grid.Position{x = step.x} if abs(f.body.x-(f32(from.x)+0.5)) >= abs(f.body.y-(f32(from.y)+0.5)) else grid.Position{y = step.y}
 				side_cell, side_open, _ := fists_neighbour(room, from, side, f.feet, f.airborne)
-				if side_open && fists_enter(room, side_cell, fists_mode(room, from, side_cell)) {
+				if side_open && fists_go(room, side_cell, fists_mode(room, from, side_cell)) {
 					entered = true
 					continue
 				}
@@ -308,7 +378,7 @@ fists_cross :: proc(room: ^Room) -> (entered: bool) {
 			_ = lift_call(room, cell) || gate_opens(room, from, cell)
 			return
 		}
-		if !fists_enter(room, cell, fists_mode(room, from, cell)) { return }
+		if !fists_go(room, cell, fists_mode(room, from, cell)) { return }
 		entered = true
 		if room.phase != .Combat { return }
 	}
