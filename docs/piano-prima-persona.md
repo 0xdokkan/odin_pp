@@ -10,17 +10,17 @@ parola nell'appendice A): **tre carte nuove che portano la vista in prima
 persona**, sul modello della carta che c'è già.
 
 - **«La carta FPS con la K»** è **First Person Shooter**: «la K» è il suo **AK**
-  di carta (la richiesta è stata dettata a voce). È il riferimento di tutte e
-  tre le carte (sezione 2).
-- **Carta 1, pugni** (nome di lavoro «Pugno a Pugno»): guantoni o tirapugni,
+  di carta (la richiesta è stata dettata a voce; l'utente l'ha confermato nella
+  Fase 0). È il riferimento di tutte e tre le carte (sezione 2).
+- **Carta 1, pugni: First Person Brawler.** Guantoni o tirapugni,
   movimento **libero** e veloce, i quattro pugni del pugilato (jab, cross,
   gancio sinistro, gancio destro) con i due tasti del mouse, e **punti critici**
   che compaiono a tempo su una parte del corpo dei nemici (sezione 5).
-- **Carta 2, spada** (nome di lavoro «Duello»): a griglia ma più veloce; la lama
+- **Carta 2, spada: First Person Fencer.** A griglia ma più veloce; la lama
   **segue il mouse** e il danno dipende da come la si muove; il tasto destro
   para colpi e proiettili, `Ctrl` lancia un rampino che tira a sé il nemico
   (sezione 6).
-- **Carta 3, arco** (nome di lavoro «Arco Rimbalzo»): a griglia; si tende con il
+- **Carta 3, arco: First Person Archer.** A griglia; si tende con il
   tasto destro e si mira con il mouse. La freccia **rimbalza sui muri**: più è
   carica più rimbalzi fa, più rimbalzi fa più è veloce, più è veloce più danno
   fa. Ci sono **zone critiche** sui muri, e ogni freccia ha un **effetto
@@ -33,8 +33,9 @@ approfondimento. Quando serve sapere come si fa una cosa, o guardare come la fa
 un altro gioco, **si cerca su internet**. Sono regole dell'utente e valgono per
 tutto il piano (sezione 1).
 
-Nomi, numeri e formule di questo documento sono **proposte**: ogni fase li
-chiede all'utente prima di usarli.
+Nomi delle carte, numeri comuni, arena di prova, stile e modo di lavorare sono
+decisi nella Fase 0 (sezione 9, «Esito»). Il resto (numeri delle singole carte,
+formule) sono **proposte**: ogni fase le chiede all'utente prima di usarle.
 
 Parole del documento:
 - **Fase:** una sezione numerata del piano (Fase 0 … Fase 8).
@@ -51,7 +52,7 @@ La tabella è in ordine di priorità, cioè l'ordine della scaletta qui sotto.
 
 | Priorità | Fase | Contenuto | Dipende da | Stato | Commit |
 |---|---|---|---|---|---|
-| 0 | 0 | Decisioni comuni e misure di partenza (proposta di Claude) | — | Proposta | — |
+| 0 | 0 | Decisioni comuni e misure di partenza (proposta di Claude) | — | In corso | vedi Esito |
 | 1 | 1 | Base comune della prima persona; l'AK resta identico | 0 | Da fare | — |
 | 2 | 2 | Pugni: regole e prototipo giocabile nel laboratorio | 1 | Da fare | — |
 | 3 | 3 | Pugni: guantoni, segni critici, colpi a schermo, suoni | 2 | Da fare | — |
@@ -72,8 +73,9 @@ una fase.
   uscita dalla vista, mouse catturato, secondi, HUD, niente carte. Si fa una
   volta (Fase 1) e l'AK non deve cambiare di un pixel.
 - **L'ordine della richiesta.** Pugni, spada, arco, come li ha elencati
-  l'utente. I pugni sono anche il rischio più grande (il movimento libero esce
-  dalla griglia): farli per primi scopre presto i problemi.
+  l'utente, confermato nella Fase 0. I pugni sono anche il rischio più
+  grande (il movimento libero esce dalla griglia): farli per primi scopre
+  presto i problemi.
 - **Prima le regole, poi l'aspetto.** Ogni carta ha una fase di regole con un
   prototipo **giocabile** nel laboratorio, con disegni semplici, così l'utente
   la prova presto; la grafica e i suoni finali vengono nella fase dopo.
@@ -184,8 +186,9 @@ Vai avanti con il prossimo passo
      (quello nel PATH è troppo vecchio);
    - dopo ogni modifica piccola: `odin check src -vet -strict-style` e i test
      del pacchetto toccato.
-6. **Commit.** Un commit sul ramo a ogni passo che cambia il codice (se la
-   Fase 0 lo conferma), con un messaggio in italiano che finisce con la riga
+6. **Commit.** Un commit sul ramo alla fine di ogni passo che cambia qualcosa
+   nel repo, codice o documenti (scelta della Fase 0), con un messaggio in
+   italiano che finisce con la riga
    `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`. Niente push.
 7. **Verifica di fine fase.** È l'ultimo passo di ogni fase; i comandi sono
    nella sezione 1.4. Servono:
@@ -199,7 +202,11 @@ Vai avanti con il prossimo passo
 8. **Chiusura della fase.**
    - Aggiorna `CHANGELOG.md`, i documenti che la fase nomina, la tabella (stato
      `Fatta`, commit) e la voce «Esito» della fase.
-   - Suona l'avviso forte sul PC dell'utente (sezione 1.4).
+   - **Avviso sonoro: spento** per scelta dell'utente (Fase 0, 28 ottobre
+     2026: «questa volta niente squilli, fra poco dormo, quando mi sveglio ti
+     dirò di abilitarli»). Nessun suono, né a fine fase né a fine passo, finché
+     l'utente non chiede di riaccenderlo (sezione 1.4). Dove i passi delle fasi
+     dicono «avviso», vale questa regola.
    - Scrivi il resoconto con il modello della sezione 1.3 e chiudi con la
      domanda sulla fase successiva. Poi **fermati**.
 9. **Se qualcosa si blocca** (una decisione che manca, test che non passano,
@@ -279,15 +286,15 @@ ODIN="/c/Users/lukeg/OneDrive/Desktop/odin-dev-2026-10/dist/odin.exe"
   più piano al giro dopo perché si scalda.
 - **Catture:** in `build/captures` (cartella ignorata da git). Gira un solo
   smoke alla volta.
-- **Avviso** (PowerShell, senza toccare il volume del sistema). A fine fase,
-  tre squilli:
+- **Avviso** (PowerShell, senza toccare il volume del sistema). **Oggi è
+  spento** (Fase 0, risposta 9): si usa solo dopo che l'utente ha chiesto di
+  riaccenderlo. Da allora, se non dice altro, la proposta della Fase 0: tre
+  squilli a fine fase, uno solo (`1..1` al posto di `1..3`) a ogni stop di
+  passo.
 
 ```powershell
 $p = New-Object System.Media.SoundPlayer "$env:WINDIR\Media\Alarm01.wav"; 1..3 | ForEach-Object { $p.PlaySync() }
 ```
-
-  A ogni stop di passo, se la Fase 0 lo conferma, uno squillo solo
-  (`1..1` al posto di `1..3`).
 
 ### 1.5 Come si cerca su internet
 
@@ -576,7 +583,8 @@ Precedenti utili:
 - **La mano del laboratorio è piena.** Il mazzo di prova ha 11 carte, 10 in
   mano (la Canna da Pesca aspetta fuori); la mano tiene al massimo 10 carte
   (`MAX_HAND_CAPACITY`, `src/game/deck.odin:11`). Tre carte in più non ci
-  stanno: domanda 5 della Fase 0.
+  stanno. La Fase 0 ha scelto un'**arena nuova, «Prima persona»**, con il suo
+  mazzo: l'AK e le tre carte nuove (Fase 1). Il mazzo di oggi non cambia.
 - **`Room` sotto i 9 KB:** un test lo controlla (`src/game/event_test.odin:126`).
   Lo stato delle armi nuove deve essere piccolo; la Fase 0 misura quanto spazio
   resta.
@@ -604,10 +612,11 @@ La proposta: **una sola meccanica «vista»**, quella dell'AK, con un'**arma**.
   (come `ride_effect` per il Dinosauro, `dinosaur.odin:52`).
 - **Una vista alla volta**, come oggi: non si entra in una vista da dentro
   un'altra.
-- Una **tabella per arma** dice: parola del riquadro (`FPS`, `PUGNI`, `SPADA`,
-  `ARCO`), riga di stato dell'HUD, modo di muoversi (passi girati con la
-  vista, movimento libero, passi con la vista fissa sulla griglia), durata di
-  un passo, tasti, disegno in mano, suoni di entrata e uscita.
+- Una **tabella per arma** dice: parola del riquadro (`FPS` per l'AK; per le
+  carte nuove la decide la Fase 3, sezione 4.3), riga di stato dell'HUD, modo
+  di muoversi (passi girati con la vista, movimento libero, passi con la vista
+  fissa sulla griglia), durata di un passo, tasti, disegno in mano, suoni di
+  entrata e uscita.
 - Il tavolo (`render/first_person.odin`) tiene discesa, risalita, mirino,
   riquadro e ferite in comune, e chiama il disegno dell'arma.
 - **L'AK resta identico:** stesse regole, stessi test, stesse catture al byte.
@@ -633,9 +642,20 @@ rampino della spada, così ogni tasto ha un solo significato in tutte le carte;
 con il movimento libero `Shift` non serve alla schivata, che passa a `Spazio`.
 Se l'utente preferisce `Ctrl`, si cambia una riga della tabella dei tasti.
 
-### 4.3 Numeri comuni (proposta)
+### 4.3 Nomi e numeri comuni (decisi nella Fase 0)
 
-Come l'AK, da confermare nella Fase 0:
+**Nomi** (risposta 2: inglesi, sul modello di First Person Shooter):
+- **First Person Brawler**: i pugni;
+- **First Person Fencer**: la spada;
+- **First Person Archer**: l'arco.
+
+Nel codice (proposta): `Card_Id.First_Person_Brawler`, `.First_Person_Fencer`
+e `.First_Person_Archer`; armi `First_Person_Weapon.Fists`, `.Sword` e `.Bow`.
+Sulle carte strette e nel riquadro dei secondi l'AK usa la sigla `FPS`: per le
+tre nuove la sigla o la parola si decide nella Fase 3 (domanda 3 di quella
+fase) e vale per tutte e tre.
+
+**Numeri** (risposta 4: come l'AK):
 - rare, **3 di energia**, **nessun secondo di finestra**, giocate su di sé;
 - **20 secondi del mondo**, +2 per potenziamento fino al livello 5 (30 s), +2
   se giocate sul secondo;
@@ -644,13 +664,26 @@ Come l'AK, da confermare nella Fase 0:
 - niente carte, Refocus, frecce di Feretro, abilità, ombra e mappa mentre
   durano; il mondo va avanti.
 
-### 4.4 Stile artistico comune (proposta)
+### 4.4 Stile artistico comune (deciso nella Fase 0, da approfondire nella Fase 3)
 
-- **Carta ritagliata in pixel art**, come i cartoncini e l'AK: contorno
-  d'inchiostro, bordo di carta avorio, il taglio della carta un pixel in basso a
-  destra, pixel interi sullo schermo (come `FIRST_PERSON_AK_SCALE`).
-- **Colori del tema gotico** (`GOTHIC_RED`, `GOTHIC_PAPER`, `GOTHIC_STEEL`…) e
-  quelli degli stati (`HUD_VENOM`, `HUD_EMBER`, `HUD_FROST`…).
+La risposta dell'utente (Fase 0, domanda 6): «direi sempre pixer art di carta
+ma con uno stile ciberentico per l'art nello specifico, ma approfondiamo bene
+insieme dopo nella fase di grafica (fase 3)».
+
+- **La base: carta ritagliata in pixel art**, come i cartoncini e l'AK:
+  contorno d'inchiostro, bordo di carta, il taglio della carta un pixel in
+  basso a destra, pixel interi sullo schermo (come `FIRST_PERSON_AK_SCALE`).
+- **Lo stile: cibernetico**, per i disegni delle armi e delle mani. I dettagli
+  (colori, materiali, luci, quanto spinto) si decidono **insieme all'utente
+  nella Fase 3**, con ricerche su riferimenti di pixel art cibernetica e
+  anteprime da confrontare; le Fasi 5 e 7 seguono quello che si decide lì.
+- **Punti di partenza nel gioco:** il bioma Cyber
+  (`src/render/expedition_cyber.odin`: corpi industriali scuri, metallo,
+  accenti rossi, schermi azzurri, luce solo da fessure e spie) e i neon delle
+  armi del laboratorio (`CANNON_NEON`, `src/render/arsenal.odin`). Gli stati
+  tengono i loro colori (`HUD_VENOM`, `HUD_EMBER`, `HUD_FROST`…).
+- **Mani a schermo: sì** (Fase 0, domanda 7): guantoni, una mano sulla spada,
+  due mani sull'arco, di carta come il resto.
 - **Disegnati da codice**: uno script Python in `tools/art`, come
   `build_card_icons.py` (pixel art dipinta da codice, PNG scritto senza
   librerie esterne, opzione `--check` per verificare che il PNG sia quello
@@ -662,7 +695,7 @@ Come l'AK, da confermare nella Fase 0:
 - **Suoni da codice** in `tools/audio` (`SOUND_SPEC.md`, `build_sfx.py`), come
   quelli dell'AK.
 
-## 5. Carta 1 — Pugni («Pugno a Pugno», nome di lavoro)
+## 5. Carta 1 — Pugni: First Person Brawler
 
 ### 5.1 In breve
 
@@ -810,6 +843,10 @@ Pugni al secondo, con i tempi della tabella:
 
 ### 5.8 Stile artistico e suoni (proposta)
 
+> Prime idee scritte prima della Fase 0, ancora in stile gotico. La Fase 3 le
+> rifà in **stile cibernetico** insieme all'utente (sezione 4.4): restano
+> valide le pose, le animazioni, i segni critici e i suoni, non i materiali.
+
 - **Guantoni rossi di carta**, con il polsino bianco e i lacci, contorno
   d'inchiostro e bordo avorio, uno in basso a sinistra e uno in basso a destra;
   in guardia si muovono un poco con i passi. In alternativa **tirapugni
@@ -832,7 +869,7 @@ Pugni al secondo, con i tempi della tabella:
   pugno; il tonfo del cuoio sulla carta; per il critico uno schiocco e un
   «ding»; un ticchettio quando compare un segno.
 
-## 6. Carta 2 — Spada («Duello», nome di lavoro)
+## 6. Carta 2 — Spada: First Person Fencer
 
 ### 6.1 In breve
 
@@ -977,6 +1014,9 @@ d'oro), così il giocatore impara la formula guardando.
 
 ### 6.7 Stile artistico e suoni (proposta)
 
+> Prime idee scritte prima della Fase 0, ancora in stile gotico. La Fase 5 le
+> rifà nello **stile cibernetico** deciso nella Fase 3 (sezione 4.4).
+
 - **Spada da lato gotica**: lama d'acciaio con la scanalatura, guardia e pomo
   d'oro, impugnatura di cuoio, stretta da una mano con il guanto, in carta
   ritagliata. La stampa ruota attorno all'elsa per seguire la punta.
@@ -988,7 +1028,7 @@ d'oro), così il giocatore impara la formula guardando.
   parata; un suono pieno e chiaro per la parata perfetta; la catena che
   sferraglia e lo strappo.
 
-## 7. Carta 3 — Arco («Arco Rimbalzo», nome di lavoro)
+## 7. Carta 3 — Arco: First Person Archer
 
 ### 7.1 In breve
 
@@ -1103,6 +1143,9 @@ rimbalzi.
   danno ([Zelda Wiki](https://zeldawiki.wiki/wiki/Ice_Arrow)).
 
 ### 7.8 Stile artistico e suoni (proposta)
+
+> Prime idee scritte prima della Fase 0, ancora in stile gotico. La Fase 7 le
+> rifà nello **stile cibernetico** deciso nella Fase 3 (sezione 4.4).
 
 - **Arco ricurvo** di legno scuro con le punte d'oro e la corda avorio, tenuto
   dalla mano sinistra; la mano destra tira la corda verso la guancia. Tendendo,
@@ -1223,7 +1266,8 @@ K» della richiesta è l'AK.
 
 ### Passi
 
-1. Domande e risposte; documento aggiornato. **Stop.**
+1. Domande e risposte; documento aggiornato. **Stop.** — *Fatto il 28 ottobre
+   2026 (vedi Esito).*
 2. `ODIN_PP_LAB_ONLY=fps` e catture dell'atto dell'AK come riferimento. **Stop.**
 3. Misure: `size_of(Room)` e spazio sotto i 9 KB; tempo di un fotogramma in
    prima persona con l'AK, due giri alla corrente. **Stop.**
@@ -1251,15 +1295,46 @@ fermati alla fine di ogni passo.
 
 ### Esito
 
-_Da scrivere alla fine della fase._
+**In corso dal 28 ottobre 2026** sul ramo `piano-prima-persona`.
+
+**Risposte dell'utente** (raccolte dalla sessione principale; fra virgolette le
+parole dell'utente)
+1. **Fare questa fase:** «Sì (Consigliato)».
+2. **Nomi delle carte:** «Inglesi»: **First Person Brawler** (pugni), **First
+   Person Fencer** (spada), **First Person Archer** (arco). La mia
+   raccomandazione erano i nomi italiani.
+3. **Ordine delle carte:** «Pugni, spada, arco (Consigliato)».
+4. **Numeri comuni:** «Come l'AK (Consigliato)».
+5. **Dove si provano:** «Arena nuova (Consigliato)»: l'arena «Prima persona»
+   con il suo mazzo, l'AK e le tre carte nuove.
+6. **Stile della grafica:** «direi sempre pixer art di carta ma con uno stile
+   ciberentico per l'art nello specifico, ma approfondiamo bene insieme dopo
+   nella fase di grafica (fase 3)». Cioè pixel art di carta in stile
+   cibernetico; i dettagli si decidono insieme nella Fase 3 (sezione 4.4). La
+   mia raccomandazione erano i colori del tema gotico.
+7. **Mani a schermo:** «Sì (Consigliato)».
+8. **Commit dentro le fasi:** «A ogni passo (Consigliato)».
+9. **Avviso sonoro:** «questa volta niente squilli, fra poco dormo, quando mi
+   sveglio ti dirò di abilitarli». L'avviso resta spento finché l'utente non
+   chiede di riaccenderlo (sezioni 1.2 e 1.4).
+
+In più l'utente ha confermato il riferimento: «Sì, è quella». La carta FPS
+«con la K» è First Person Shooter, con il suo AK.
+
+**Passo 1 (domande e risposte)**, fatto il 28 ottobre 2026: le risposte sono
+nel documento. Nomi inglesi nell'introduzione e nelle sezioni 4.3, 5, 6 e 7;
+stile nella sezione 4.4, nelle sezioni 5.8, 6.7 e 7.8 e nelle domande delle
+Fasi 3, 5 e 7; arena di prova nelle sezioni 3.7 e 10; commit a ogni passo e
+avviso spento nella sezione 1. Nessun suono. Solo documento: niente codice,
+niente prove da fare.
 
 ## 10. Fase 1 — Base comune della prima persona
 
 ### Obiettivo
 
 Il codice dell'AK diventa la base per quattro armi (sezione 4.1), senza
-cambiare niente dell'AK. Nasce l'arena di prova delle carte in prima persona
-(se scelta nella Fase 0).
+cambiare niente dell'AK. Nasce l'arena di prova delle carte in prima persona,
+«Prima persona», con il suo mazzo (scelta della Fase 0).
 
 ### Come funziona oggi
 
@@ -1278,7 +1353,7 @@ salvataggio in `src/expedition/snapshot.odin`.
 - **Tasti:** un instradamento per arma in `first_person_input.odin` (tasti
   della sezione 4.2), con le regole di cattura dell'AK per tutte.
 - **Salvataggio:** l'arma entra nello snapshot; la versione sale.
-- **Arena «Prima persona»** (se scelta): una sala con pilastri, nicchie e muri
+- **Arena «Prima persona»** (scelta della Fase 0): una sala con pilastri, nicchie e muri
   a più angoli per i tiri di sponda, coperture basse, un corridoio di 5 caselle
   per il rampino, un balestriere su un rialzo per le parate, un bruto per i
   colpi pesanti. Il suo mazzo: AK e, man mano che nascono, le carte nuove.
@@ -1288,7 +1363,7 @@ salvataggio in `src/expedition/snapshot.odin`.
 1. **Come si costruisce la base.**
    - (Consigliato) Una vista sola con l'arma dentro (sezione 4.1).
    - Oppure quattro meccaniche separate che copiano il codice comune.
-2. **L'arena «Prima persona»** (se scelta nella Fase 0).
+2. **La forma dell'arena «Prima persona».**
    - (Consigliato) Quella del progetto qui sopra.
    - Oppure un'altra forma (l'utente la descrive).
 3. **Le carte durante il Dinosauro.**
@@ -1326,7 +1401,7 @@ salvataggio in `src/expedition/snapshot.odin`.
 
 - L'AK è lo stesso di prima; la base accetta un'arma nuova con una riga di
   tabella e il suo disegno.
-- L'arena di prova esiste (se scelta) e le verifiche della sezione 1.4 sono a
+- L'arena di prova esiste e le verifiche della sezione 1.4 sono a
   posto.
 
 ### Comando
@@ -1413,7 +1488,8 @@ Sezione 5: movimento libero (5.3), pugni (5.4), punti critici (5.5), formula
    della carta al centro della casella, salvataggio; un minuto di gioco senza
    finestra con i nemici liberi. **Stop.**
 5. Prototipo nel laboratorio: carta `Lab_Only`, mazzo dell'arena, disegni
-   semplici, riquadro `PUGNI 20s` e riga di stato. L'utente la prova. **Stop.**
+   semplici, riquadro dei secondi (con una parola provvisoria fino alla Fase
+   3) e riga di stato. L'utente la prova. **Stop.**
 6. Verifica di fine fase; voce in `docs/registro-carte.md`; commit; avviso.
    **Stop.**
 
@@ -1453,28 +1529,47 @@ _Da scrivere alla fine della fase._
 ### Obiettivo
 
 L'aspetto finale della carta dei pugni (sezione 5.8): guantoni da codice,
-pugni animati, segni critici, impatti, icona, parole della carta, suoni.
+pugni animati, segni critici, impatti, icona, parole della carta, suoni. E
+prima di tutto lo **stile cibernetico** delle tre carte, deciso insieme
+all'utente (risposta 6 della Fase 0, sezione 4.4): le Fasi 5 e 7 lo seguono.
 
 ### Da chiedere prima di iniziare
 
-1. **Guantoni o tirapugni.**
-   - (Consigliato) Guantoni rossi da pugile, di carta.
-   - Oppure tirapugni d'ottone su mani fasciate.
-2. **Segni critici.**
+1. **Lo stile cibernetico.** L'utente vuole approfondirlo insieme in questa
+   fase. Prima di chiedere, Claude cerca riferimenti e prepara due o tre
+   proposte con anteprime dipinte da script: palette, materiali (metallo,
+   carbonio, circuiti stampati sulla carta), luci (neon, spie, fessure),
+   quanto spinto. La base resta la pixel art di carta ritagliata.
+   - (Consigliato) Quella fra le proposte che parte dal bioma Cyber del gioco
+     (corpi scuri, metallo, accenti rossi e azzurri, luce solo da fessure e
+     spie), così le armi stanno bene con il resto.
+   - Oppure un'altra delle proposte, o una descritta dall'utente.
+2. **Guantoni o tirapugni**, nello stile della domanda 1.
+   - (Consigliato) Guantoni da pugile.
+   - Oppure tirapugni su mani fasciate o bioniche.
+3. **Sigla delle carte e parola del riquadro dei secondi**, per tutte e tre
+   (sezione 4.3). L'AK usa `FPS`.
+   - (Consigliato) Le sigle `FPB`, `FPF` e `FPA`, come `FPS`.
+   - Oppure la seconda parola del nome: `BRAWLER`, `FENCER`, `ARCHER`.
+   - Oppure parole italiane: `PUGNI`, `SPADA`, `ARCO`.
+4. **Segni critici.**
    - (Consigliato) Anello di carta del colore del pugno, con la freccia della
      sua traiettoria.
    - Oppure solo il colore.
    - Oppure una lettera (J, C, G).
-3. **Il fermo all'impatto (hitstop).**
+5. **Il fermo all'impatto (hitstop).**
    - (Consigliato) Si ferma solo il disegno, per 0,08 s; le regole no.
    - Oppure si ferma tutto il mondo per 0,08 s.
    - Oppure niente fermo.
-4. **Campanella del ring all'entrata.**
+6. **Campanella del ring all'entrata.**
    - (Consigliato) Sì.
    - Oppure no.
 
 ### Ricerche da fare
 
+- Pixel art cibernetica e cyberpunk: palette, materiali, luci al neon e spie,
+  e come restano leggibili su carta ritagliata e sul tavolo di oggi; il bioma
+  Cyber del gioco (`src/render/expedition_cyber.odin`) come punto di partenza.
 - Hitstop e scossa della vista (Sakurai, Eiserloh, sezione 18) applicati a un
   pugno in prima persona.
 - Animazione procedurale di un'arma in prima persona: oscillazione, passi,
@@ -1483,14 +1578,17 @@ pugni animati, segni critici, impatti, icona, parole della carta, suoni.
 
 ### Passi
 
-1. Guantoni dipinti da script in `tools/art` (con `--check`), anteprime
-   mostrate all'utente. **Stop.**
-2. Pugni animati, strisce di velocità, hitstop, scossa. **Stop.**
-3. Segni critici sui cartoncini, stella d'oro del critico. **Stop.**
-4. Icona (cella 33 dell'atlante), parole della carta e dell'ispettore, HUD.
-   **Stop.**
-5. Suoni da codice, collegati al laboratorio. **Stop.**
-6. Verifica di fine fase (tempo di un fotogramma contro la Fase 0), documenti
+1. Stile cibernetico, insieme all'utente: ricerche, due o tre proposte con
+   anteprime dipinte da script, scelta dell'utente (vale anche per le Fasi 5 e
+   7). **Stop.**
+2. Guantoni dipinti da script in `tools/art` (con `--check`) nello stile
+   scelto, anteprime mostrate all'utente. **Stop.**
+3. Pugni animati, strisce di velocità, hitstop, scossa. **Stop.**
+4. Segni critici sui cartoncini, stella d'oro del critico. **Stop.**
+5. Icona (cella 33 dell'atlante), sigla e parole della carta e
+   dell'ispettore, HUD. **Stop.**
+6. Suoni da codice, collegati al laboratorio. **Stop.**
+7. Verifica di fine fase (tempo di un fotogramma contro la Fase 0), documenti
    (`docs/regole/meccaniche.md`, `docs/avvio.md`, `docs/registro-carte.md`),
    commit, avviso. **Stop.**
 
@@ -1638,8 +1736,8 @@ schermo esattamente al battito, per leggere il momento della parata.
 
 ### Da chiedere prima di iniziare
 
-1. **Che spada.**
-   - (Consigliato) Spada da lato gotica: acciaio, guardia d'oro, cuoio.
+1. **Che spada**, nello stile cibernetico deciso nella Fase 3.
+   - (Consigliato) Una spada a una mano, a lama dritta.
    - Oppure una katana.
    - Oppure uno spadone a due mani.
 2. **La scia.**
@@ -1819,15 +1917,17 @@ nell'HUD, l'icona, i suoni.
 
 ### Da chiedere prima di iniziare
 
-1. **Che arco.**
-   - (Consigliato) Arco ricurvo di legno scuro con le punte d'oro.
+1. **Che arco**, nello stile cibernetico deciso nella Fase 3.
+   - (Consigliato) Un arco ricurvo: compatto, si legge bene in prima persona.
    - Oppure un arco lungo.
+   - Oppure un arco compound, con le carrucole.
 2. **Dove sta la faretra nell'HUD.**
    - (Consigliato) In basso a sinistra, accanto ai secondi.
    - Oppure attorno al mirino.
-3. **Le zone critiche.**
-   - (Consigliato) Un bersaglio di carta dipinto sul muro che pulsa.
-   - Oppure una runa luminosa.
+3. **Le zone critiche**, nello stile della Fase 3.
+   - (Consigliato) Un bersaglio di carta dipinto sul muro, con una spia che
+     pulsa.
+   - Oppure un pannello luminoso.
 4. **I rimbalzi a orecchio.**
    - (Consigliato) Un «ping» una nota più alto a ogni rimbalzo.
    - Oppure un suono sempre uguale.
