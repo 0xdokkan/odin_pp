@@ -17,6 +17,12 @@ Tactical_Controller :: struct {
 	look_captured: bool,
 	look_settle: int,
 	fire_latched, right_latched: bool,
+	// FIRST PERSON BRAWLER (first_person_input.odin): the buttons as last held
+	// (a punch is a press), the controller's own seconds and when each movement
+	// key was last pressed (two presses of one key close together dash).
+	fists_left, fists_right: bool,
+	fists_clock: f64,
+	fists_taps: [4]f64,
 }
 
 M7_INPUT_TRACE :: #config(M7_INPUT_TRACE, false)
@@ -33,6 +39,9 @@ Tactical_Controller_Input :: struct {
 	look: [2]f32,
 	fire, fire_right, ctrl: bool,
 	sensitivity: f32,
+	// FIRST PERSON BRAWLER: the movement keys held (W, D, S, A) and Space pressed.
+	walk: [4]bool,
+	jump: bool,
 }
 
 // The decision clock and QTE deadline are independent of presentation speed.
@@ -87,7 +96,11 @@ tactical_controller_input :: proc(controller: ^Tactical_Controller, room: ^game.
 		delta := controls.mouse_motion
 		input.look = {clamp(delta.x, -FIRST_PERSON_LOOK_CLAMP, FIRST_PERSON_LOOK_CLAMP), clamp(delta.y, -FIRST_PERSON_LOOK_CLAMP, FIRST_PERSON_LOOK_CLAMP)}
 	}
-	for action, index in RUN_WALK_ACTIONS { input.directions[index] = run_pressed(controls, action) }
+	for action, index in RUN_WALK_ACTIONS {
+		input.directions[index] = run_pressed(controls, action)
+		input.walk[index] = run_down(controls, action)
+	}
+	input.jump = run_pressed(controls, .Wait)
 	for action, index in RUN_DIAGONAL_ACTIONS { input.diagonals[index] = run_pressed(controls, action) }
 	// Block, parry, deflect, dodge. The dodge sits by WASD, which then picks
 	// its landing; the diagonal keys are not read during a defence.
@@ -218,7 +231,9 @@ step_tactical_controller :: proc(
 	drain_pinball_roll_commands(room, renderer, cards, playtest)
 	// FIRST PERSON SHOOTER: the buttons to the weapon in hand (the AK's
 	// trigger), then the shots due, as world commands too.
-	route_first_person_buttons(room, first_person_buttons(controller, renderer, room, input))
+	buttons := first_person_buttons(controller, renderer, room, input)
+	route_first_person_buttons(room, buttons)
+	drive_first_person_fists(controller, room, renderer, cards, input, buttons, simulation_dt, playtest)
 	drain_first_person_fire(room, renderer, cards, playtest)
 	// Expiration is checked after all paid beats, including the last second.
 	if game.tactical_tick(room, 0, true, controller.hologram) {
@@ -244,7 +259,8 @@ step_tactical_controller :: proc(
 		// diagonal keys are off.
 		fps := game.tactical_first_person_active(room)
 		keys := render.first_person_keys(renderer)
-		if input.shift {
+		// With the fists Shift is the hooks', and a double tap dashes.
+		if input.shift && !game.first_person_fists_active(room) {
 			for pressed, index in input.directions {
 				if pressed { command.kind = .Dodge; command.direction = keys[index]; break }
 			}

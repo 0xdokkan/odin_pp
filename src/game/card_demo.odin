@@ -81,6 +81,9 @@ Card_Demo_Action_Kind :: enum u8 {
 	// FIRST PERSON SHOOTER: the view turned to the scene's foe `foe`, then the
 	// trigger held `seconds`.
 	Fire,
+	// FIRST PERSON BRAWLER: the view turned to the scene's foe `foe`, W held up to
+	// it, then a jab.
+	Punch,
 	// ATTIVA: the Tesla network discharges (its button on the board's bar).
 	Activate,
 	// A wait (Space).
@@ -398,6 +401,23 @@ card_demo_scene :: proc(id: Card_Id, upgrade_level: i32 = 0) -> (scene: Card_Dem
 		}
 		for burst in 0..<bursts {
 			card_demo_add_action(&scene, {kind = .Fire, after = 0.3+f32(burst)*CARD_DEMO_BURST_EVERY, foe = burst%3, seconds = CARD_DEMO_BURST_SECONDS})
+		}
+		scene.foe_hurt = 3
+	// FIRST PERSON BRAWLER: played by a second click, then the same three foes as
+	// the AK's, one after the other: the view turned on it, a run up to it, a jab;
+	// a punch every few seconds for as long as the view lasts, each foe as hardy
+	// as the jabs it takes.
+	case .First_Person_Brawler:
+		seconds := f32(FIRST_PERSON_SECONDS)
+		for template in definition.effects[:definition.effect_count] {
+			if template.kind == .First_Person { seconds = f32(card_effect_amount(template, clamp(upgrade_level, 0, FIRST_PERSON_MAX_UPGRADE_LEVEL))) }
+		}
+		punches := clamp(int((seconds-CARD_DEMO_BURST_TAIL)/CARD_DEMO_BURST_EVERY)+1, 3, CARD_DEMO_MAX_ACTIONS)
+		for at, foe in ([3]grid.Position{card_demo_offset(0, -3), card_demo_offset(-2, -2), card_demo_offset(2, -2)}) {
+			card_demo_add_foe(&scene, at, health = FISTS_PUNCHES[.Jab].damage*i32((punches-foe+2)/3))
+		}
+		for punch in 0..<punches {
+			card_demo_add_action(&scene, {kind = .Punch, after = 0.3+f32(punch)*CARD_DEMO_BURST_EVERY, foe = punch%3})
 		}
 		scene.foe_hurt = 3
 	// CANNA DA PESCA: a cleared room, the rod's slot, the water at his right,

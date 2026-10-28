@@ -166,6 +166,9 @@ First_Person_View :: struct {
 	// The weapon in hand: the room's while the view is on, kept through the
 	// rise back (FIRST_PERSON_LOOKS).
 	weapon: game.First_Person_Weapon,
+	// The fists' body as last seen and its lift off his floor (first_person_fists.odin).
+	fists_body: [2]f32,
+	fists_lift: f32,
 	// The eye and its cell, as this frame's camera puts them, and the foes'
 	// cards where this frame shows them: what a shot sees (first_person_aim).
 	eye: rl.Vector3,
@@ -224,6 +227,7 @@ update_tactical_first_person :: proc(renderer: ^Renderer, room: ^game.Room) {
 	now := renderer.sprite_assets.elapsed
 	active := game.tactical_first_person_active(room)
 	if active { f.weapon = room.first_person.weapon }
+	follow_first_person_fists(renderer, room)
 	if active != f.engaged {
 		if active {
 			// The eyes look the way he faces, or along the grid way nearest the
@@ -303,6 +307,8 @@ frame_first_person_camera :: proc(renderer: ^Renderer, room: ^game.Room) {
 	now := renderer.sprite_assets.elapsed
 	p := v.snapshot.player.position
 	f.eye = {p.x+0.5, game.FIRST_PERSON_EYE_HEIGHT+entity_point_ground(game.PLAYER_ENTITY, p), p.y+0.5}
+	// With the fists the eye rides the free body (first_person_fists.odin).
+	if eye, fists := first_person_fists_eye(renderer, room, p); fists { f.eye = eye }
 	f.eye_cell = {x = int(math.round(p.x)), y = int(math.round(p.y))}
 	f.card_count = 0
 	for actor in v.snapshot.enemies[:v.snapshot.enemy_count] {
@@ -330,7 +336,8 @@ frame_first_person_camera :: proc(renderer: ^Renderer, room: ^game.Room) {
 			position += (right*math.sin(t*53.1)+up*math.sin(t*41.7+1.3))*(FIRST_PERSON_SHAKE*trauma*trauma)
 		}
 		fovy := orbit.fovy if orbit.projection == .PERSPECTIVE else f32(40)
-		v.camera = {position = position, target = position+look, up = {0, 1, 0}, fovy = fovy+(FIRST_PERSON_FOV-fovy)*s,
+		fov := FIRST_PERSON_FISTS_FOV if f.weapon == .Fists else FIRST_PERSON_FOV
+		v.camera = {position = position, target = position+look, up = {0, 1, 0}, fovy = fovy+(fov-fovy)*s,
 			projection = .PERSPECTIVE}
 	}
 	for &tracer in f.tracers {
@@ -775,6 +782,9 @@ draw_first_person_overlay :: proc(renderer: ^Renderer, room: ^game.Room) {
 	if first_person_amount(renderer) <= FIRST_PERSON_AK_FROM { return }
 	switch FIRST_PERSON_LOOKS[f.weapon].hand {
 	case .AK: draw_first_person_ak(renderer, now)
+	case .Fists:
+		draw_first_person_marks(renderer, room, now)
+		draw_first_person_gloves(renderer, room, now)
 	case .Empty:
 	}
 	// The crosshair: four paper ticks in ink round a dot, warm over a foe; a
@@ -852,6 +862,8 @@ first_person_countdown_text :: proc(left: f32, weapon := game.First_Person_Weapo
 FIRST_PERSON_HUD_STATUS :: cstring("MIRA COL MOUSE / CLIC: SPARA / WASD: PASSI")
 // A weapon whose rules are still to come: only the look and the steps work.
 FIRST_PERSON_HUD_STATUS_BARE :: cstring("MIRA COL MOUSE / WASD: PASSI")
+// The fists: free moves, the four punches, the jump (the dash is a double tap).
+FIRST_PERSON_HUD_STATUS_FISTS :: cstring("WASD LIBERO / CLIC: PUGNI / SPAZIO: SALTO")
 
 // --------------------------------------------------------------------------
 // Each weapon's look (game.FIRST_PERSON_WEAPONS has its rules).
@@ -859,7 +871,7 @@ FIRST_PERSON_HUD_STATUS_BARE :: cstring("MIRA COL MOUSE / WASD: PASSI")
 // What is in hand: the AK's print, or nothing (the crosshair and the plate
 // alone, as Doom's fist leaves the ammo box blank) until a weapon's own
 // drawing comes (docs/piano-prima-persona.md, Fasi 3, 5 e 7).
-First_Person_Hand :: enum u8 {Empty, AK}
+First_Person_Hand :: enum u8 {Empty, AK, Fists}
 
 First_Person_Look :: struct {
 	// The countdown's tag (the new ones provisional, as wide as the AK's,
@@ -872,7 +884,7 @@ First_Person_Look :: struct {
 @(rodata)
 FIRST_PERSON_LOOKS := [game.First_Person_Weapon]First_Person_Look{
 	.AK = {tag = "FPS", status = FIRST_PERSON_HUD_STATUS, hand = .AK},
-	.Fists = {tag = "FPB", status = FIRST_PERSON_HUD_STATUS_BARE},
+	.Fists = {tag = "FPB", status = FIRST_PERSON_HUD_STATUS_FISTS, hand = .Fists},
 	.Sword = {tag = "FPF", status = FIRST_PERSON_HUD_STATUS_BARE},
 	.Bow = {tag = "FPA", status = FIRST_PERSON_HUD_STATUS_BARE},
 }

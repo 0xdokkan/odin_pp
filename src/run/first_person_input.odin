@@ -1,5 +1,6 @@
 package run
 
+import "core:math"
 import rl "vendor:raylib"
 import combatdebug "../combatdebug"
 import game "../game"
@@ -30,6 +31,8 @@ FIRST_PERSON_LOOK_CLAMP :: f32(300)
 FIRST_PERSON_LOOK_SETTLE_FRAMES :: 2
 // Shots committed at most in a frame (a frame's seconds carry one more at most).
 FIRST_PERSON_FIRE_BATCHES :: 3
+// FIRST PERSON BRAWLER: two presses of one movement key within this dash (the user's choice).
+FIRST_PERSON_DOUBLE_TAP_SECONDS :: f64(0.25)
 
 // P pauses; behind the player's eyes Esc too, so the mouse can be freed.
 first_person_pause_pressed :: proc(room: ^game.Room, controls: Run_Input) -> bool {
@@ -87,13 +90,55 @@ first_person_buttons :: proc(controller: ^Tactical_Controller, renderer: ^render
 }
 
 // The buttons to the weapon in hand (docs/piano-prima-persona.md, sezione 4.2):
-// the AK's trigger is the left button, whatever else is held; the fists', the
-// sword's and the bow's wait for their phases (2, 4 and 6) and do nothing yet.
+// the AK's trigger is the left button, whatever else is held; the fists' are
+// presses (drive_first_person_fists); the sword's and the bow's wait for their
+// phases (4 and 6) and do nothing yet.
 route_first_person_buttons :: proc(room: ^game.Room, buttons: First_Person_Buttons) {
 	switch room.first_person.weapon {
 	case .AK: game.first_person_set_trigger(room, buttons.left)
 	case .Fists, .Sword, .Bow:
 	}
+}
+
+// The way the movement keys held move the body, turned with the view (W
+// forward, D right, S back, A left; `yaw` on the board), and the way each key
+// alone points.
+first_person_fists_ways :: proc(walk: [4]bool, yaw: f32) -> (wish: [2]f32, keys: [4][2]f32) {
+	forward := [2]f32{math.cos(yaw), math.sin(yaw)}
+	right := [2]f32{-forward.y, forward.x}
+	keys = {forward, right, -forward, -right}
+	for held, index in walk { if held { wish += keys[index] } }
+	if length := math.sqrt(wish.x*wish.x+wish.y*wish.y); length > 1 { wish /= length }
+	return
+}
+
+// FIRST PERSON BRAWLER's frame (game/first_person_fists.odin): the movement keys
+// turned with the view, Space a jump, a movement key pressed twice within
+// FIRST_PERSON_DOUBLE_TAP_SECONDS a dash its way, a button pressed a punch (with
+// Shift a hook), along the view; committed as a world command of the frame's
+// `seconds`. Nothing while the mouse is not the view's or the camera dives.
+drive_first_person_fists :: proc(controller: ^Tactical_Controller, room: ^game.Room, renderer: ^render.Renderer,
+	cards: ^Card_Interaction_State, input: Tactical_Controller_Input, buttons: First_Person_Buttons, seconds: f32,
+	playtest: ^combatdebug.Playtest_Session) {
+	controller.fists_clock += f64(max(f32(0), seconds))
+	left, right := buttons.left && !controller.fists_left, buttons.right && !controller.fists_right
+	controller.fists_left, controller.fists_right = buttons.left, buttons.right
+	if !game.first_person_fists_active(room) || !controller.look_captured || render.first_person_diving(renderer) { return }
+	yaw := renderer.tactical.first_person.yaw
+	wish, keys := first_person_fists_ways(input.walk, yaw)
+	fists := game.First_Person_Fists_Input{wish = wish, jump = input.jump, look = keys[0],
+		punch = game.first_person_punch_for(left, right, buttons.shift), aim = render.first_person_aim(renderer)}
+	for pressed, index in input.directions {
+		if !pressed { continue }
+		if controller.fists_clock-controller.fists_taps[index] <= FIRST_PERSON_DOUBLE_TAP_SECONDS {
+			fists.dash, fists.look = true, keys[index]
+			controller.fists_taps[index] = -1e9
+		} else {
+			controller.fists_taps[index] = controller.fists_clock
+		}
+	}
+	command := Gameplay_Command{kind = .First_Person_Fists, origin_phase = .Combat, fists = fists, seconds = seconds}
+	_ = commit_gameplay_command(room, renderer, cards, command, playtest)
 }
 
 // The shots due, each a world command along the view's aim; never into a full

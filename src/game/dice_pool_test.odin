@@ -113,7 +113,7 @@ test_dice_cards_climb_the_ladder_from_d4_to_d20 :: proc(t: ^testing.T) {
 		top := MAX_DICE_UPGRADE_LEVEL if dice else (LASSO_MAX_UPGRADE_LEVEL if id == .Lasso else MAX_CARD_UPGRADE_LEVEL)
 		if id == .Fishing_Rod { top = FISHING_ROD_MAX_UPGRADE_LEVEL }
 		if id == .Pinball { top = PINBALL_MAX_UPGRADE_LEVEL }
-		if id == .First_Person { top = FIRST_PERSON_MAX_UPGRADE_LEVEL }
+		if id == .First_Person || id == .First_Person_Brawler { top = FIRST_PERSON_MAX_UPGRADE_LEVEL }
 		if id == .Marley_Party { top = MARLEY_MAX_UPGRADE_LEVEL }
 		if id == .Flood_Wave { top = FLOOD_MAX_UPGRADE_LEVEL }
 		if id == .Field_Cannon { top = CANNON_MAX_UPGRADE_LEVEL }

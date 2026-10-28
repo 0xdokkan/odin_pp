@@ -37,9 +37,9 @@ MECHANICS_LAB_DECK_SEED :: u64(0x7E57_1AB)
 // shoot off, low covers, a corridor of five cells, an archer up on a rise and a brute, with its own deck.
 Mechanics_Lab_Arena :: enum { Flat, First_Person, Heights, Structures, Mountain, Cave, Layers, Lifts }
 
-// The first person arena's deck: First Person Shooter, the cards of the other weapons as they come (Fasi 2, 4 e 6),
-// and the Canna da Pesca for a cleared arena, as in the others.
-MECHANICS_LAB_FIRST_PERSON_DECK :: [2]game.Card_Id{.First_Person, .Fishing_Rod}
+// The first person arena's deck: First Person Shooter, the cards of the other weapons as they come (First Person
+// Brawler, Fase 2; the sword's and the bow's, Fasi 4 e 6), and the Canna da Pesca for a cleared arena, as in the others.
+MECHANICS_LAB_FIRST_PERSON_DECK :: [3]game.Card_Id{.First_Person, .First_Person_Brawler, .Fishing_Rod}
 
 // The first person arena, on the 23x17 board with the player at (11,8):
 // - a wall along y = 1 with two niches in it, at (4,1) and (18,1);

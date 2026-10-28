@@ -11,9 +11,9 @@ test_tactical_card_catalog_has_bounded_nonzero_time_costs :: proc(t: ^testing.T)
 		cost := tactical_card_time_cost(id)
 		// Movimento Ombra stands outside the window: its four seconds freeze
 		// the world instead of spending it. The Canna da Pesca fishes a
-		// cleared room, which has no window. The First Person Shooter's
-		// seconds run with the world's.
-		if id == .Shadow_Step || id == .Fishing_Rod || id == .First_Person { testing.expect_value(t, cost, f32(0)); continue }
+		// cleared room, which has no window. The First Person Shooter's and
+		// First Person Brawler's seconds run with the world's.
+		if id == .Shadow_Step || id == .Fishing_Rod || card_is_first_person(id) { testing.expect_value(t, cost, f32(0)); continue }
 		testing.expect(t, cost >= 1 && cost <= 4, definition.name)
 	}
 	testing.expect_value(t, tactical_card_time_cost(.Count), f32(0))

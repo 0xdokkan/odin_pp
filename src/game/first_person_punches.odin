@@ -119,20 +119,35 @@ fists_land :: proc(room: ^Room, punch: First_Person_Punch, aim: First_Person_Aim
 	return true
 }
 
-// The foe `punch` reaches along `aim` from the body: the AK's hitscan from the
-// body's centre, level, met within the punch's reach; a hook tries again turned
-// toward its side, up to FISTS_HOOK_DEGREES, and takes the first it meets.
+// The eye the fists' hitscans leave from: the view's own when it framed one near
+// the body (the board's eye stands a little behind it, render/first_person_fists.odin),
+// else the body's centre; and the aim along it.
+fists_aim :: proc(room: ^Room, aim: First_Person_Aim) -> First_Person_Aim {
+	look := aim
+	body := room.first_person.fists.body
+	d := aim.eye-body
+	if !aim.framed || d.x*d.x+d.y*d.y > FISTS_EYE_SLACK*FISTS_EYE_SLACK { look.eye = body }
+	look.framed = true
+	return look
+}
+FISTS_EYE_SLACK :: f32(0.6)
+
+// The foe `punch` reaches along `aim`: the AK's hitscan from the view's eye
+// (fists_aim), level, met within the punch's reach of the body's centre; a hook
+// tries again turned toward its side, up to FISTS_HOOK_DEGREES, and takes the
+// first it meets.
 first_person_punch_target :: proc(room: ^Room, punch: First_Person_Punch, aim: First_Person_Aim) -> (target: Entity_Ref, found: bool) {
 	if !first_person_fists_active(room) || punch == .None { return }
 	rules := FISTS_PUNCHES[punch]
-	look := aim
-	look.framed, look.eye, look.pitch = true, room.first_person.fists.body, 0
+	look := fists_aim(room, aim)
+	look.pitch = 0
+	body := room.first_person.fists.body
 	rays := FISTS_HOOK_RAYS if rules.side != 0 else 0
 	for ray in 0..=rays {
 		look.yaw = aim.yaw+f32(rules.side)*f32(ray)*(FISTS_HOOK_DEGREES*math.PI/180)/f32(max(rays, 1))
 		shot := first_person_trace(room, room.player.position, look)
 		if shot.hit != .Foe { continue }
-		dx, dz := shot.point.x-shot.origin.x, shot.point.z-shot.origin.z
+		dx, dz := shot.point.x-body.x, shot.point.z-body.y
 		if math.sqrt(dx*dx+dz*dz) <= rules.reach { return shot.target, true }
 	}
 	return

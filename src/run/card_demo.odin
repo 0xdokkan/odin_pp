@@ -412,12 +412,25 @@ card_demo_input :: proc(demo: ^Card_Demo, renderer: ^render.Renderer, dt: f32) -
 	input.focused, input.sensitivity = true, 1
 	if !demo.acting || demo.next_action >= demo.scene.action_count { return }
 	action := demo.scene.actions[demo.next_action]
-	if action.kind != .Fire { return }
+	if action.kind != .Fire && action.kind != .Punch { return }
 	if demo.firing > 0 { input.fire = true; return }
 	turn := card_demo_turn_left(demo, renderer, action.foe)
 	step := clamp(turn, -CARD_DEMO_TURN_RATE*dt, CARD_DEMO_TURN_RATE*dt)
 	input.look.x = clamp(step/FIRST_PERSON_MOUSE_SENSITIVITY, -FIRST_PERSON_LOOK_CLAMP, FIRST_PERSON_LOOK_CLAMP)
+	// The fists run up to it, W held, once the view is on it.
+	if action.kind == .Punch && abs(turn) < 0.35 && card_demo_reach(demo, action.foe) > CARD_DEMO_PUNCH_REACH { input.walk[0] = true }
 	return
+}
+
+// FIRST PERSON BRAWLER: how far the fists' body is from the scene's foe `foe`
+// (0 once it has fallen), and how near a jab is thrown from.
+CARD_DEMO_PUNCH_REACH :: f32(1.0)
+card_demo_reach :: proc(demo: ^Card_Demo, foe: int) -> f32 {
+	enemy, found := card_demo_foe(demo, foe)
+	if !found || !game.first_person_fists_active(&demo.room) { return 0 }
+	b := demo.room.first_person.fists.body
+	d := [2]f32{f32(enemy.position.x)+0.5-b.x, f32(enemy.position.y)+0.5-b.y}
+	return math.sqrt(d.x*d.x+d.y*d.y)
 }
 
 // The scene's next action, once its time has come and the board lets it,
@@ -436,7 +449,7 @@ card_demo_act :: proc(demo: ^Card_Demo, renderer: ^render.Renderer, dt: f32) {
 		switch {
 		case game.tactical_shadow_active(room):
 			if render.renderer_blocks_player_input(r) || game.tactical_shadow_step_busy(room) { return }
-		case action.kind == .Fire:
+		case action.kind == .Fire || action.kind == .Punch:
 			if game.tactical_first_person_active(room) && render.first_person_diving(r) { return }
 		case:
 			if !card_demo_board_free(demo, r) { return }
@@ -489,6 +502,22 @@ card_demo_act :: proc(demo: ^Card_Demo, renderer: ^render.Renderer, dt: f32) {
 		}
 		if abs(card_demo_turn_left(demo, r, action.foe)) <= CARD_DEMO_TURN_DONE || demo.action_time >= CARD_DEMO_TURN_SECONDS {
 			demo.firing = action.seconds
+		}
+	case .Punch:
+		// Behind his eyes with the fists: the view turned on the foe and a run up
+		// to it (card_demo_input), then the button pressed for the jab and held
+		// as it lands; a foe already down takes none.
+		if _, standing := card_demo_foe(demo, action.foe); !standing || !game.first_person_fists_active(room) { done = true; break }
+		if demo.firing > 0 {
+			demo.firing -= dt
+			done = demo.firing <= 0
+			break
+		}
+		close := card_demo_reach(demo, action.foe) <= CARD_DEMO_PUNCH_REACH
+		if close && (abs(card_demo_turn_left(demo, r, action.foe)) <= CARD_DEMO_TURN_DONE || demo.action_time >= CARD_DEMO_TURN_SECONDS*2) {
+			demo.firing = game.FISTS_PUNCHES[.Jab].recover
+		} else if demo.action_time >= CARD_DEMO_TURN_SECONDS*3 {
+			done = true
 		}
 	}
 	if done {
@@ -611,7 +640,7 @@ CARD_DEMO_NO_FILM_WORDS :: cstring("NESSUNA PROVA PER QUESTA CARTA")
 // holds each one on its plate, with its key's cap.
 Card_Demo_Words :: enum u8 {
 	Double_Click, Drag_To_Player, Drag_To_Foe, Drag_To_Cell, Drag_To_Foe_In_Line, Drag_In_Line, Drag_Rod,
-	Step, Bump, Shadow_Step, Wait, Shoot, Activate, Fire, Turn, Effect, No_Film,
+	Step, Bump, Shadow_Step, Wait, Shoot, Activate, Fire, Turn, Effect, No_Film, Run_Up, Punch,
 }
 
 @(rodata)
@@ -633,13 +662,15 @@ CARD_DEMO_WORDS := [Card_Demo_Words]cstring{
 	.Turn = "MUOVI IL MOUSE: GIRI LA VISTA",
 	.Effect = CARD_DEMO_EFFECT_WORDS,
 	.No_Film = CARD_DEMO_NO_FILM_WORDS,
+	.Run_Up = "TIENI PREMUTO W: CORRI DAL NEMICO",
+	.Punch = "CLIC: UN JAB",
 }
 
 // The key each caption's cap shows (nil: the mouse alone). A step's is the
 // one of its way (CARD_DEMO_STEP_KEYS), each a letter, one cap as wide.
 @(rodata)
 CARD_DEMO_WORDS_KEY := #partial [Card_Demo_Words]cstring{
-	.Step = "W", .Bump = "W", .Shadow_Step = "W", .Wait = "SPAZIO", .Shoot = "CTRL",
+	.Step = "W", .Bump = "W", .Shadow_Step = "W", .Wait = "SPAZIO", .Shoot = "CTRL", .Run_Up = "W",
 }
 
 // The step keys, in game.MOVEMENT_KEY_DIRECTIONS's order.
@@ -669,6 +700,11 @@ card_demo_action_words :: proc(demo: ^Card_Demo, index: int) -> (key, text: cstr
 	case .Fire:
 		words = .Fire
 		if demo.acting && index == demo.next_action && demo.firing <= 0 { words = .Turn }
+	case .Punch:
+		words = .Punch
+		if demo.acting && index == demo.next_action && demo.firing <= 0 {
+			words = .Run_Up if card_demo_reach(demo, action.foe) > CARD_DEMO_PUNCH_REACH else .Turn
+		}
 	}
 	return CARD_DEMO_WORDS_KEY[words], CARD_DEMO_WORDS[words]
 }

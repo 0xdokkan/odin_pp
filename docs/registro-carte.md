@@ -6,6 +6,21 @@ Qui si segna ogni carta tolta dal gioco o cambiata, con quello che faceva, così
 futuro. Le voci più recenti stanno in cima. Per ritrovare il commit di una voce:
 `git log --all --grep "<titolo del commit>"`.
 
+## 2026-10-28 — Carta nuova: First Person Brawler (solo laboratorio)
+
+Commit **«Prima persona, Fase 2, passo 5: First Person Brawler nel laboratorio»** sul ramo `piano-prima-persona`
+([piano](piano-prima-persona.md), Fase 2).
+
+| Carta | Nel codice | Rarità | Energia | Effetto | Peso nelle offerte | Dove sta |
+|---|---|---|---:|---|---:|---|
+| First Person Brawler | `First_Person_Brawler` | rara | 3 | su di te, 0 s di finestra: la vista in prima persona con i pugni per 20 s del mondo (+2 a potenziamento, fino a 30 a +5): movimento libero a 5 caselle al secondo, salto, scatto con il doppio tocco, jab 3, cross 4, ganci 6, segni critici (triplo; il gancio critico stordisce 1 s) | 60 (ma `Lab_Only`: mai offerta) | solo nell'arena «Prima persona» del laboratorio, nel suo mazzo |
+
+- È la seconda arma della vista di First Person Shooter (`First_Person_Weapon.Fists`, l'arma nei `charges` del suo
+  effetto `.First_Person`); niente carte mentre dura, non si gioca in groppa al Dinosauro.
+- Icona e sigla (`FPB`) **provvisorie**: un guantone rosso disegnato da codice nella cella 33 dell'atlante
+  (`tools/art/build_card_icons.py`), e un suono provvisorio suo (`card_first_person_brawler`: i guantoni battuti e la
+  campanella del ring); quelli definitivi sono della Fase 3, in stile cibernetico.
+
 ## 2026-10-25 — Revisione delle carte
 
 Commit **«Carte: ritirate otto carte, cinque diventano potenziamenti»** sul ramo `revisione-carte` (partito da

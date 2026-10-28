@@ -131,7 +131,7 @@ First_Person_Weapon_Rules :: struct {
 @(rodata)
 FIRST_PERSON_WEAPONS := [First_Person_Weapon]First_Person_Weapon_Rules{
 	.AK = {card = .First_Person, while_riding = true},
-	.Fists = {card = .First_Person},
+	.Fists = {card = .First_Person_Brawler},
 	.Sword = {card = .First_Person},
 	.Bow = {card = .First_Person},
 }
@@ -217,6 +217,12 @@ first_person_effect :: proc(seconds: i32, weapon := First_Person_Weapon.AK) -> E
 first_person_effect_weapon :: proc(charges: i32) -> (weapon: First_Person_Weapon, ok: bool) {
 	if charges < 0 || charges > i32(max(First_Person_Weapon)) { return }
 	return First_Person_Weapon(charges), true
+}
+
+// Whether a card is one of the views behind his eyes (the cards of FIRST_PERSON_WEAPONS).
+card_is_first_person :: proc(id: Card_Id) -> bool {
+	for rules in FIRST_PERSON_WEAPONS { if rules.card == id { return true } }
+	return false
 }
 
 tactical_first_person_active :: proc(room: ^Room) -> bool {

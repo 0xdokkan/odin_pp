@@ -115,6 +115,9 @@ CARD_VISUALS := [game.Card_Id]Card_Visual{
 		fill = {44, 50, 60, 245}, outline = {196, 206, 220, 255}},
 	.First_Person = {icon = 26, short_name = "FPS", accent = .Red, sound = LAB_FIRST_PERSON_CARD, narrow_name = "FPS",
 		fill = {40, 46, 38, 245}, outline = {176, 186, 132, 255}},
+	// The provisional tag, glove and sound until Fase 3 (docs/piano-prima-persona.md).
+	.First_Person_Brawler = {icon = 33, short_name = "FPB", accent = .Red, sound = .Card_First_Person_Brawler, narrow_name = "FPB",
+		fill = {64, 30, 30, 245}, outline = {232, 120, 112, 255}},
 	.Cannon = {icon = 4, short_name = "CANNONE", accent = .Electric, sound = .World_Barrel_Explosion,
 		fill = {27, 56, 72, 245}, outline = {105, 215, 255, 255}},
 	.Flood = {icon = 4, short_name = "ONDA", accent = .Blue, sound = .World_Pool_Splash,

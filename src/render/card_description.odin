@@ -82,6 +82,10 @@ gothic_card_lines :: proc(card: game.Card_Instance) -> (cstring, cstring) {
 	// FIRST PERSON SHOOTER (game/first_person.odin): its seconds, and the AK.
 	case .First_Person:
 		return fmt.ctprintf("PRIMA PERSONA %ds", a), fmt.ctprintf("AK: %d COLPI/s, %d DANNO", game.FIRST_PERSON_SHOTS_PER_SECOND, game.FIRST_PERSON_SHOT_DAMAGE)
+	// FIRST PERSON BRAWLER (game/first_person_fists.odin): its seconds, the fists' damage and the critical.
+	case .First_Person_Brawler:
+		return fmt.ctprintf("PRIMA PERSONA %ds", a), fmt.ctprintf("PUGNI %d/%d/%d, CRITICO x%d", game.FISTS_PUNCHES[.Jab].damage,
+			game.FISTS_PUNCHES[.Cross].damage, game.FISTS_PUNCHES[.Left_Hook].damage, game.FISTS_CRITICAL_FACTOR)
 	// BOMB MARLEY (game/marley.odin): the bombs' damage and the party's seconds;
 	// INONDAZIONE (game/flood.odin): the push, and the fires.
 	case .Marley_Party: return fmt.ctprintf("BOMBE DA %d DANNI", a), fmt.ctprintf("%ds / LUCI = SALVI", d.effects[0].duration)
@@ -159,6 +163,7 @@ gothic_card_narrow_lines :: proc(card: game.Card_Instance) -> (first, second: cs
 	case .Fishing_Rod:
 		return fmt.ctprintf("%d PESCA" if a == 1 else "%d PESCHE", a), fmt.ctprintf("CIBO %s O CARTA", die_label(game.FISHING_HEAL_SIDES)), true
 	case .First_Person: return fmt.ctprintf("FPS %ds", a), fmt.ctprintf("AK: %d COLPI/s", game.FIRST_PERSON_SHOTS_PER_SECOND), true
+	case .First_Person_Brawler: return fmt.ctprintf("FPB %ds", a), fmt.ctprintf("PUGNI, CRITICI x%d", game.FISTS_CRITICAL_FACTOR), true
 	case .Marley_Party: return fmt.ctprintf("BOMBE %d", a), "LUCI: SALVI", true
 	case .Flood_Wave: return fmt.ctprintf("SPINTA %d", a), "NO FUOCHI", true
 	case .Field_Cannon: return fmt.ctprintf("PALLA %d", a), fmt.ctprintf("%ds", game.CANNON_SECONDS), true

@@ -1267,3 +1267,32 @@ def card_first_person(seed):
         (0.19, home, 0.8),
     ])
     return _out(x, 0.08)
+
+
+@sound("card_first_person_brawler", loudness=LOUD, wet=WET, marks=(0.0, 0.05, 0.14, 0.22))
+def card_first_person_brawler(seed):
+    """First Person Brawler (provisional until its Fase 3, docs/piano-prima-persona.md):
+    the gloves as the card leaves his hand: knocked together twice, at 0.05 and
+    0.14 (a leather slap over a low thud, the second the harder), then the ring's
+    bell struck once at 0.22 (a bright metal ding, its ring fading), as the
+    camera dives."""
+    dur = 0.9
+
+    def slap(s, hard):
+        t = time_axis(0.12)
+        thud = _thump(0.12, s, f0=150, f1=85, drop=0.012, tau=0.03 + 0.015 * hard, lp=1400, noise=0.6, ntau=0.01)
+        leather = _norm(bandpass(white(0.12, s + 1), 1000, 1.3)) * np.exp(-t / 0.012)
+        return _ramp(_norm(thud + (0.7 + 0.3 * hard) * leather), 0.0005)
+
+    t = time_axis(0.7)
+    bell = fm(1180, 1180 * 1.41, 3.0 * np.exp(-t / 0.2), 0.7) * np.exp(-t / 0.35)
+    bell = bell + 0.4 * fm(2950, 2950 * 1.73, 1.5 * np.exp(-t / 0.12), 0.7) * np.exp(-t / 0.2)
+    strike = _norm(highpass(white(0.006, seed + 3), 3000)) * 0.5
+    bell[:len(strike)] += strike
+    x = place(dur, [
+        (0.0, _flick(seed), FLICK),
+        (0.05, slap(seed + 10, 0.0), 0.5),
+        (0.14, slap(seed + 20, 1.0), 0.7),
+        (0.22, _ramp(_norm(bell), 0.001), 0.55),
+    ])
+    return _out(x, 0.08)

@@ -33,7 +33,8 @@ test_first_person_input_reads_the_right_button_and_ctrl :: proc(t: ^testing.T) {
 // For every weapon: both buttons already down as the view takes the mouse
 // count for nothing until each is let go; then each counts on its own, with
 // Shift and Ctrl; never while the camera dives. Only the AK's left button is a
-// trigger: the others fire nothing in a second of both buttons held.
+// trigger: in a second of both buttons held the fists throw the one punch of
+// that press (Fase 2), the weapons still to come nothing.
 @(test)
 test_first_person_buttons_latch_and_route_for_every_weapon :: proc(t: ^testing.T) {
 	for weapon in game.First_Person_Weapon {
@@ -72,9 +73,9 @@ test_first_person_buttons_latch_and_route_for_every_weapon :: proc(t: ^testing.T
 		renderer.tactical.first_person.amount = 0.5
 		testing.expect_value(t, run_session.first_person_buttons(&controller, renderer, &room, keyed), run_session.First_Person_Buttons{})
 		renderer.tactical.first_person.amount = 1
-		// A second of both buttons: the AK's six shots, nobody else's.
+		// A second of both buttons: the AK's six shots, the fists' one punch, nobody else's.
 		for _ in 0..<60 { first_person_controller_frame(&controller, &room, renderer, &cards, &held, dt, both) }
-		testing.expect_value(t, room.first_person.shots, i32(6) if weapon == .AK else 0)
+		testing.expect_value(t, room.first_person.shots, i32(6) if weapon == .AK else (1 if weapon == .Fists else 0))
 		testing.expect_value(t, room.first_person.trigger, weapon == .AK)
 	}
 }

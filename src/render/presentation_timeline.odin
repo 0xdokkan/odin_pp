@@ -1363,7 +1363,7 @@ start_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^Presentat
 	     .Binding_Added, .Binding_Exhausted, .Binding_Expired, .Shadow_Entered, .Shadow_Emerged:
 	// The player's own card, behind his eyes.
 	case .First_Person_Begun:
-		if event.source != game.PLAYER_ENTITY || event.card_definition != .First_Person || !has_actor {
+		if event.source != game.PLAYER_ENTITY || !game.card_is_first_person(event.card_definition) || !has_actor {
 			timeline.update_failures += 1
 		}
 	}

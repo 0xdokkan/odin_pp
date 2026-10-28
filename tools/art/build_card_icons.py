@@ -67,6 +67,13 @@ of a ninth), painted the same way with a few more palette letters:
     cell 32  Dinosauro: a cheerful green cartoon dinosaur head with an orange
              crest, a bone d4 showing a 4 beside it.
 
+Fase 2 of docs/piano-prima-persona.md adds one more, provisional until the
+cybernetic style of its Fase 3:
+
+    cell 33  First Person Brawler: a red boxing glove thrown up and to the
+             right, its thumb along its side, an ivory cuff laced at the wrist,
+             three strokes of speed behind it.
+
 Options:
     --check        exit 1 if the atlas is not what this script would write
     --preview DIR  also write each added cell on a dark ground,
@@ -706,6 +713,43 @@ DINOSAUR = (
 
 
 ICONS.update({29: CANNON, 30: LASER_CANNON, 31: BLACK_HOLE, 32: DINOSAUR})
+
+# Fase 2 of docs/piano-prima-persona.md: First Person Brawler, a red boxing glove
+# thrown up and to the right (its knuckles lit, its shade along the bottom), the
+# thumb along its left side, an ivory cuff laced at the wrist, speed strokes behind.
+BRAWLER = (
+    "............................",
+    "..............KKKKKK........",
+    "............KKRRRRRRKK......",
+    "...........KRRRUURRRRRK.....",
+    "..........KRRUUURRRRRRRK....",
+    "..HHH.....KRRUURRRRRRRRRK...",
+    ".........KRRRRRRRRRRRRRRK...",
+    ".HHHH....KRRRRRRRRRRRRRRRK..",
+    "........KKRRRRRRRRRRRRRRRK..",
+    "..HHH..KRRKRRRRRRRRRRRRRRK..",
+    "......KRRRRKRRRRRRRRRRRRAK..",
+    "......KRUURRKRRRRRRRRRRRAK..",
+    "......KRURRRKRRRRRRRRRRAAK..",
+    "......KRRRRRKRRRRRRRRRRAK...",
+    ".......KRRRRKRRRRRRRRRAAK...",
+    "........KRRRRKRRRRRRRAAK....",
+    ".........KKRRRRRRRRAAAK.....",
+    "..........KKKRRRRAAAKK......",
+    ".........KIIKKKKKKKKiK......",
+    "........KIIIIkIkIkIiiK......",
+    ".......KIIIIkIkIkIIiiK......",
+    "......KIIIIIIIIIIIiiK.......",
+    ".....KIIIIIIIIIIIiiiK.......",
+    ".....KiIIIIIIIIIiiiK........",
+    "......KiiiiiiiiiiiK.........",
+    ".......KKKKKKKKKKK..........",
+    "............................",
+    "............................",
+)
+assert all(len(row) == 28 for row in BRAWLER) and len(BRAWLER) == 28
+
+ICONS.update({33: BRAWLER})
 
 
 def chunk(kind, body):

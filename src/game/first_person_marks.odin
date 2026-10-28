@@ -128,15 +128,14 @@ first_person_lit_mark :: proc(room: ^Room, enemy_id: u32) -> ^First_Person_Mark 
 	return nil
 }
 
-// Where the crosshair is on `enemy`'s card along `aim` from the body: its zone
+// Where the crosshair is on `enemy`'s card along `aim` from the view's eye: its zone
 // across the card and whether on its head; not `on` when the view's ray meets
 // something else first, or nothing.
 first_person_crosshair_zone :: proc(room: ^Room, enemy_id: u32, aim: First_Person_Aim) -> (zone: i8, high, on: bool) {
 	if !first_person_fists_active(room) { return }
 	index, found := enemy_index_by_id(room, enemy_id)
 	if !found { return }
-	look := aim
-	look.framed, look.eye = true, room.first_person.fists.body
+	look := fists_aim(room, aim)
 	shot := first_person_trace(room, room.player.position, look)
 	if shot.hit != .Foe || shot.target != enemy_entity(enemy_id) { return }
 	enemy := room.enemies[index]

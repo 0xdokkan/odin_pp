@@ -150,6 +150,8 @@ poll_gameplay_command :: proc(
 	// only steps and waits are left (first_person_input.odin).
 	if game.tactical_first_person_active(room) {
 		clear_card_interaction(card_interaction)
+		// With the fists the movement keys move the body (first_person_input.odin).
+		if room.first_person.weapon == .Fists { return {}, false }
 		pressed: [4]bool
 		for action, index in RUN_WALK_ACTIONS { pressed[index] = run_pressed(controls, action) }
 		return first_person_lane_command(pressed, run_down(controls, .Dodge_Modifier), run_pressed(controls, .Wait),
@@ -356,7 +358,7 @@ capture_gameplay_command_telemetry :: proc(
 		resolved_kind = .Wait
 	// An arrow is neither a step nor a bump nor a card, and the rod's cast is
 	// no card either; nor is a shot of the AK.
-	case .Ability, .Shoot, .Fish, .First_Person_Fire:
+	case .Ability, .Shoot, .Fish, .First_Person_Fire, .First_Person_Fists:
 		resolved_kind = .Ability
 	case .Play_Card:
 		resolved_kind = .Play_Card
@@ -469,6 +471,10 @@ execute_gameplay_command :: proc(room: ^game.Room, command: Gameplay_Command) ->
 		execution.clears_card_interaction = execution.committed
 	case .First_Person_Fire:
 		_, execution.committed = game.first_person_fire(room, command.aim)
+	case .First_Person_Fists:
+		// A frame in which nothing stepped or struck has nothing to show.
+		result := game.first_person_fists_move(room, command.fists, command.seconds)
+		execution.committed = result != .Invalid_Phase && result != .None
 	}
 	game.tactical_end_combat(room)
 	return
@@ -518,7 +524,7 @@ commit_gameplay_command :: proc(
 	if room == nil || renderer == nil || card_interaction == nil { return false }
 	world_command := (command.kind == .Continue_Pulse || command.kind == .Timeout || command.kind == .Lasso_Spin || command.kind == .Pinball_Roll ||
 		 command.kind == .Defense || ((command.kind == .QTE_Key || command.kind == .QTE_Fail) && room.qte.kind == .Defense) ||
-		 command.kind == .First_Person_Fire)
+		 command.kind == .First_Person_Fire || command.kind == .First_Person_Fists)
 	if world_command {
 		// Reserve a whole event log before mutating gameplay: no committed beat
 		// can lose its presentation when the bounded world bank is full.

@@ -79,7 +79,7 @@ non definiscono le regole della spedizione aperta.
 ### Prova meccaniche
 
 **F3** cambia arena, una dopo l'altra: subito dopo la Piana, «Prima persona» (23×17) è l'arena delle carte in prima
-persona, con il suo mazzo (First Person Shooter e la Canna da Pesca): un muro con due nicchie, quattro pilastri, due muri
+persona, con il suo mazzo (First Person Shooter, First Person Brawler e la Canna da Pesca): un muro con due nicchie, quattro pilastri, due muri
 di sbieco per i tiri di sponda, tre coperture basse, un corridoio di 5 caselle, un balestriere su un rialzo di 2
 gradini e un bruto (docs/piano-prima-persona.md, Fase 1); «Altezze» ha un altopiano di 4 gradini con una
 scala di 3, un pilastro di 8 e una collina a spirale (si prova la regola dei

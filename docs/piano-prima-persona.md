@@ -2189,6 +2189,82 @@ scelte consigliate):
   test verdi** con e senza assert (i 1770 del passo 3 più i 7 nuovi), più le
   due build (539 s). L'atto `fps` da solo dà ancora **114 catture identiche al
   byte** alla Fase 0: la nuova regola dei colpi non tocca l'AK.
+
+**Domande prima del passo 5** (risposta dell'utente: «Sì, passo 5», cioè le
+scelte consigliate): icona provvisoria di un guantone disegnato da codice; due
+guantoni rossi di carta in mano; segni con il colore e la forma della
+traiettoria del pugno; doppio tocco entro 0,25 s.
+
+**Passo 5 — prototipo nel laboratorio: fatto.**
+- **La carta** `Card_Id.First_Person_Brawler` (`src/game/card.odin`), «First
+  Person Brawler»: rara, 3 di energia, 0 s di finestra, su di sé, 20 s (+2 a
+  potenziamento, 30 a +5), tratto `Lab_Only`; il suo effetto è `.First_Person`
+  con i pugni nei `charges`. `FIRST_PERSON_WEAPONS[.Fists].card` ora la nomina,
+  e la discesa della vista la riconosce (`card_is_first_person`). Parole della
+  carta: «PRIMA PERSONA 20s / PUGNI 3/4/6, CRITICO x3» (stretta: «FPB 20s /
+  PUGNI, CRITICI x3»); nell'ispettore «NIENTE CARTE: SOLO I PUGNI / WASD LIBERO
+  / SPAZIO SALTA». Icona provvisoria: un guantone rosso nella cella 33
+  dell'atlante (`tools/art/build_card_icons.py`). Un suono suo, provvisorio
+  (il gioco ne vuole uno diverso per ogni carta): i guantoni battuti due volte
+  e la campanella del ring (`card_first_person_brawler`, in
+  `tools/audio/sfx_cards_arms.py`); rifatti tutti i suoni, gli altri 197 sono
+  identici al byte. Scritta in `docs/registro-carte.md`.
+- **Il mazzo** dell'arena «Prima persona»: First Person Shooter, First Person
+  Brawler e la Canna da Pesca.
+- **I tasti** (`src/run/first_person_input.odin`): un comando del mondo nuovo,
+  `First_Person_Fists`, a ogni fotogramma, con i secondi del fotogramma;
+  `W A S D` tenuti muovono il corpo girati con la vista (`first_person_fists_ways`),
+  `Spazio` salta, un tasto di movimento premuto due volte entro 0,25 s scatta
+  nella sua direzione, il clic sinistro (o destro) premuto tira un jab (o un
+  cross), con `Shift` un gancio; un pugno per pressione. Con i pugni la corsia
+  del tavolo non fa passi e `Shift` con un tasto non schiva. Niente prima che la
+  vista abbia il mouse né durante la discesa.
+- **Il disegno** (`src/render/first_person_fists.odin`): l'occhio segue il corpo
+  libero, **0,35 caselle dietro** di lui (mai dentro un muro), con una vista più
+  larga (80° invece dei 70° dell'AK); a fine carta torna al centro della casella
+  in 0,15 s. Le regole mirano dallo stesso occhio, così mirino e colpi
+  coincidono, ma la portata si misura dal corpo. Due guantoni rossi di carta in
+  basso, che oscillano correndo; jab e cross vanno dritti verso il mirino, i
+  ganci arrivano ad arco dal loro lato. Un segno acceso è un anello del colore
+  del suo pugno (gancio sinistro arancio, jab azzurro, cross giallo, gancio
+  destro magenta) con dentro la sua traiettoria (freccia dritta o arco),
+  lampeggiante nell'ultimo terzo di secondo. Riga di stato: «WASD LIBERO / CLIC:
+  PUGNI / SPAZIO: SALTO»; riquadro `FPB`.
+- **Prima versione corretta guardando le catture:** con l'occhio al centro del
+  corpo e la vista a 70°, a distanza di pugno il cartoncino riempiva lo
+  schermo e i segni del busto finivano quasi fuori dall'inclinazione massima;
+  la riga di stato più lunga veniva rimpicciolita fino a non leggersi.
+- **L'atto `prima_persona`** ora gioca First Person Brawler dalla mano: carta e
+  ispettore (`odin_pp_mechanics_lab_card_First_Person_Brawler.png`), i guantoni
+  e le parole (`_pugni.png`), `W` tenuto lo porta libero fino al bruto (messo
+  sulla sua riga), un jab e un gancio con i loro danni (`_pugni_jab.png`,
+  `_pugni_gancio.png`), un segno acceso sul bruto (`_pugni_segno.png`) e il cross
+  con il mirino sopra, critico (12). Spada e arco restano presi con il comando
+  di prova. **Catture guardate.**
+- **MOSTRA EFFETTO** (la dimostrazione dell'ispettore, che il gioco chiede per
+  ogni carta): una scena sua, con gli stessi tre nemici di quella dell'AK; il
+  Viandante si gira verso ciascuno, corre fino a lui con `W` («TIENI PREMUTO
+  W: CORRI DAL NEMICO») e tira un jab («CLIC: UN JAB»), un pugno ogni tre
+  secondi per tutta la durata, finché cadono.
+- Test aggiornati perché elencano le carte una per una: le carte solo del
+  laboratorio ora sono 7, la Brawler si potenzia fino a +5 come l'AK e, come
+  l'AK, non costa tempo della finestra. I test della prima persona scritti
+  quando i pugni non tiravano ancora ora li contano (un pugno per pressione);
+  il minuto di gioco dei pugni passa per i tasti del controller, e finisce con
+  venti secondi da fermo: correndo e colpendo nessun nemico fa in tempo a
+  colpirlo, da fermo sì.
+- Test nuovi: la carta (`first_person_brawler_card_test.odin`), i tasti e il
+  controller (`first_person_fists_controller_test.odin`: movimento girato con
+  la vista, salto, doppio tocco veloce e lento, niente schivata né passi della
+  corsia, jab, gancio e cross), l'occhio e i guantoni
+  (`first_person_fists_view_test.odin`). Aggiornati i test che conoscevano la
+  mano vuota dei pugni o il mazzo di una carta sola.
+- **Verifiche:** check con e senza assert puliti; `check.ps1` completo: **1782
+  test verdi** con e senza assert (i 1777 del passo 4 più i 5 nuovi), più le
+  due build (549 s). L'atto `fps` dà ancora **114 catture identiche al byte**
+  alla Fase 0; l'atto `prima_persona` dà le stesse 10 catture in due giri.
+- **Da provare a mano dall'utente** (`--mechanics-lab`, poi `F3` fino
+  all'arena «Prima persona»): è il passo in cui la carta si prova davvero.
 - Nel gioco entra nella Fase 3: i suoni del laboratorio oggi sono mono, quindi
   per la musica serve un canale stereo suo.
 

@@ -5,7 +5,8 @@ import game "../game"
 import level "../level"
 
 // Each weapon's look (docs/piano-prima-persona.md, Fase 1): the AK's as ever,
-// the others a tag as wide as its, the bare line, an empty hand.
+// the fists' (Fase 2) their own line and gloves; the others still to come a tag
+// as wide as its, the bare line, an empty hand.
 
 @(test)
 test_first_person_each_weapon_has_its_look :: proc(t: ^testing.T) {
@@ -17,6 +18,10 @@ test_first_person_each_weapon_has_its_look :: proc(t: ^testing.T) {
 		testing.expect_value(t, look.tag, tags[weapon])
 		testing.expect_value(t, len(look.tag), len("FPS"))
 		if weapon == .AK { continue }
+		if weapon == .Fists {
+			testing.expect(t, look.status == FIRST_PERSON_HUD_STATUS_FISTS && look.hand == .Fists)
+			continue
+		}
 		testing.expect(t, look.status == FIRST_PERSON_HUD_STATUS_BARE && look.hand == .Empty)
 	}
 	testing.expect_value(t, string(first_person_countdown_text(20, .Fists)), "FPB 20s")
@@ -51,7 +56,7 @@ test_first_person_board_follows_the_weapon :: proc(t: ^testing.T) {
 	}
 	testing.expect(t, f.engaged && f.amount == 1)
 	testing.expect_value(t, first_person_shown_weapon(renderer), game.First_Person_Weapon.Fists)
-	testing.expect(t, first_person_hud_status(renderer) == FIRST_PERSON_HUD_STATUS_BARE)
+	testing.expect(t, first_person_hud_status(renderer) == FIRST_PERSON_HUD_STATUS_FISTS)
 	// The room counts a blow of its own: the board takes it as no shot.
 	room.first_person.shots += 1
 	shadow_view_test_frame(renderer, &room, 0.02)

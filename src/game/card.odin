@@ -81,6 +81,8 @@ Card_Id :: enum {
 	Laser_Cannon,
 	Devouring_Hole,
 	Dino_Ride,
+	// FIRST PERSON BRAWLER: the fists behind his eyes (first_person_fists.odin), lab only.
+	First_Person_Brawler,
 	Count,
 }
 
@@ -1142,6 +1144,19 @@ CARD_DEFINITIONS := [Card_Id]Card_Definition{
 		targeting = {rule = .Self},
 		effects = {{kind = .First_Person, target = .Player, base_amount = FIRST_PERSON_SECONDS,
 			amount_per_upgrade = FIRST_PERSON_SECONDS_PER_UPGRADE}, {}, {}, {}},
+		effect_count = 1,
+	},
+	.First_Person_Brawler = {
+		upgrade_limit = FIRST_PERSON_MAX_UPGRADE_LEVEL, time_cost = 0, traits = {.Lab_Only},
+		// FIRST PERSON BRAWLER (docs/piano-prima-persona.md, Fase 2): his own eyes and
+		// his fists for twenty seconds of the world's, as First Person Shooter's AK:
+		// moving free, jab, cross and hooks, critical marks (first_person_fists.odin).
+		// The effect's charges name the weapon.
+		id = .First_Person_Brawler, name = "First Person Brawler", rarity = .Rare,
+		reward_weight = 60, shop_base_price = 8, cost = 3,
+		targeting = {rule = .Self},
+		effects = {{kind = .First_Person, target = .Player, base_amount = FIRST_PERSON_SECONDS,
+			amount_per_upgrade = FIRST_PERSON_SECONDS_PER_UPGRADE, charges = i32(First_Person_Weapon.Fists)}, {}, {}, {}},
 		effect_count = 1,
 	},
 	.Cannon = {
