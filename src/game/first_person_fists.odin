@@ -27,6 +27,7 @@ import grid "../engine/grid"
 // - A double tap dashes: a free push of FISTS_DASH_CELLS cells in FISTS_DASH_SECONDS
 //   at any angle, stopped by what stops him, then FISTS_DASH_RECHARGE seconds.
 // - On a lift's platform he rides it, the body held at its cell.
+// - The punches step on the same clock (first_person_punches.odin).
 // - Every rule steps at FISTS_STEP seconds whatever the frame: the same seconds give
 //   the same body at 30, 60 or 144 frames a second.
 
@@ -67,14 +68,22 @@ First_Person_Fists :: struct {
 	dash_left, dash_recharge: f32,
 	// Frame seconds not stepped yet (under FISTS_STEP).
 	carry: f32,
+	// The punch out (none: the fists are ready), its seconds so far and whether
+	// it has landed; the press kept for its end (first_person_punches.odin).
+	punch, queued: First_Person_Punch,
+	punch_clock: f32,
+	punch_landed: bool,
 }
 
 // What the controller asks of the body this frame: the wished way (east, south;
-// length up to 1), a jump, a dash and its way when he is not moving (his look).
+// length up to 1), a jump, a dash and its way when he is not moving (his look),
+// the punch pressed (first_person_punch_for) and the view it is thrown along.
 First_Person_Fists_Input :: struct {
 	wish: [2]f32,
 	jump, dash: bool,
 	look: [2]f32,
+	punch: First_Person_Punch,
+	aim: First_Person_Aim,
 }
 
 // Taking the fists up: the body at the centre of his cell, on its floor, still.
@@ -89,9 +98,10 @@ first_person_fists_active :: proc(room: ^Room) -> bool {
 	return tactical_first_person_active(room) && room.first_person.weapon == .Fists
 }
 
-// The body this frame (dt seconds): the jump and the dash it asks, its glide and
-// its fall, and the steps its centre takes into the next cells, as world moves of
-// no time. Their events are the room's recent ones.
+// The body this frame (dt seconds): the jump, the dash and the punch it asks, its
+// glide and its fall, the steps its centre takes into the next cells, as world
+// moves of no time, and the punches landing. Their events are the room's recent
+// ones.
 first_person_fists_move :: proc(room: ^Room, input: First_Person_Fists_Input, dt: f32) -> (result: Action_Result) {
 	if !first_person_fists_active(room) { return .Invalid_Phase }
 	clear_event_log(room.recent_events)
@@ -104,12 +114,18 @@ first_person_fists_move :: proc(room: ^Room, input: First_Person_Fists_Input, dt
 		if way == {} { way = fists_unit(input.look) }
 		if way != {} { f.dash_way, f.dash_left, f.dash_recharge = way, FISTS_DASH_SECONDS, FISTS_DASH_RECHARGE }
 	}
+	fists_press(room, input.punch)
 	f.carry += clamp(dt, 0, FISTS_MAX_FRAME)
 	stepped := false
 	for f.carry >= FISTS_STEP {
 		f.carry -= FISTS_STEP
 		entered, ended := fists_step(room, input.wish)
-		stepped = stepped || entered
+		struck := false
+		if !ended {
+			struck = fists_punch_step(room, input.aim, FISTS_STEP)
+			ended = room.phase != .Combat || !first_person_fists_active(room)
+		}
+		stepped = stepped || entered || struck
 		if ended { break }
 	}
 	if !stepped { return .None }
@@ -197,6 +213,8 @@ fists_accelerate :: proc(room: ^Room, f: ^First_Person_Fists, wish: [2]f32, h: f
 	if way == {} { return }
 	amount := min(f32(1), math.sqrt(wish.x*wish.x+wish.y*wish.y))
 	top := FISTS_SPEED*amount*(FISTS_SLOW_FACTOR if fists_slow_ground(room) else 1)
+	// A punch out holds him back to half his speed.
+	if f.punch != .None { top *= FISTS_PUNCH_SPEED_FACTOR }
 	current := f.velocity.x*way.x+f.velocity.y*way.y
 	add := top-current
 	if add <= 0 { return }

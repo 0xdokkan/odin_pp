@@ -2042,6 +2042,53 @@ fatta prima su sua richiesta).**
   test verdi** con e senza assert (i 1751 della Fase 1 più i 9 nuovi), più le
   due build (414 s). Il movimento non è ancora collegato ai tasti né al
   disegno: si prova a mano dal passo 5.
+
+**Domande prima del passo 2** (risposta dell'utente: «Sì, passo 2», cioè le
+scelte consigliate):
+- Mentre un pugno è fuori ci si muove liberi, **a metà velocità**.
+- **Un pugno per clic**; un clic durante un pugno aspetta se arriva negli
+  ultimi 0,15 s, prima si perde.
+- Pugni **anche in aria**, **non durante lo scatto**.
+- Un pugno **a vuoto** non fa danno e non costa altro che il suo tempo.
+
+**Ricerche del passo 2:**
+- Nei pugili misurati con il motion capture i ganci arrivano più forte ma ci
+  mettono più tempo di jab e cross ([Piorkowski e altri, 2011](https://clok.uclan.ac.uk/3757));
+  il jab è spesso il più veloce ([Kimm e Thiel, 2015](https://pub.h-brs.de/frontdoor/index/index/year/2015/docId/1685)).
+  È l'ordine della tabella: jab 0,12 s, cross 0,16 s, ganci 0,20 s.
+- L'attesa dei clic è il «buffer» dei picchiaduro, la memoria breve dei tasti
+  che lascia uscire le combinazioni; di solito da 3 a 10 fotogrammi
+  ([wiki DGMI](https://dgmiwiki.wpi.edu/mechanic/input_buffer),
+  [Dustloop](https://dustloop.com/w/Buffer)). I nostri 0,15 s sono 9
+  fotogrammi a 60 al secondo.
+
+**Passo 2 — pugni: fatto.**
+- `src/game/first_person_punches.odin`: quattro pugni (`First_Person_Punch`),
+  dalla tabella `FISTS_PUNCHES` (tempi del piano, danni scelti dall'utente:
+  jab 3, cross 4, ganci 6). Tasti: sinistro jab, destro cross, con `Shift` i
+  ganci (`first_person_punch_for`).
+- Un pugno alla volta, sullo stesso orologio fisso del corpo (1/240 s):
+  arriva dopo il suo tempo, poi il prossimo parte dopo il suo «prossimo pugno
+  dopo». Un clic negli ultimi 0,15 s aspetta e parte appena il pugno finisce.
+- Chi lo prende: la mira a raggio dell'AK (`first_person_trace`), partendo dal
+  centro del corpo, in piano, entro la portata (1,4 caselle i dritti, 1,1 i
+  ganci). Un gancio, se davanti non c'è nessuno, prova girandosi verso il suo
+  lato fino a 25° e prende il primo che trova. I muri fermano la mira come per
+  l'AK.
+- Il colpo è un attacco del Viandante come gli altri (Scudo, reazioni, bottino,
+  fine dello scontro), con il suo segno negli eventi (`FISTS_VISUAL_GROUP`) per
+  il disegno dei passi dopo. Non è un'azione: niente tempo, niente Veleno.
+  Contati in `shots` (tirati) e `hits` (arrivati), come i colpi dell'AK.
+- Test nuovi in `src/game/first_person_punches_test.odin` (6): tasti e
+  tabella; ogni pugno arriva nel suo tempo con il suo danno e il suo segno;
+  portata, pugno a vuoto e gancio di lato; attesa del clic, clic troppo presto
+  e stessi colpi a 30, 60 e 144 fotogrammi al secondo; metà velocità e niente
+  pugni durante lo scatto; il colpo che uccide l'ultimo nemico chiude lo scontro
+  e la vista.
+- **Verifiche:** check con e senza assert puliti; `check.ps1` completo: **1766
+  test verdi** con e senza assert (i 1760 del passo 1 più i 6 nuovi), più le
+  due build (430 s). Come il movimento, i pugni non sono ancora collegati ai
+  tasti né disegnati: si provano a mano dal passo 5.
 - Nel gioco entra nella Fase 3: i suoni del laboratorio oggi sono mono, quindi
   per la musica serve un canale stereo suo.
 
