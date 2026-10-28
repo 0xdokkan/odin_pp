@@ -89,8 +89,10 @@ un nemico su ogni piano (si provano passo, scale, vista, aree e cadute fra piani
 da un pozzo con l'ascensore e un cancello che si apre solo da dentro. L'ascensore si usa con i passi: un passo verso
 il pianerottolo vuoto chiama la piattaforma, un passo sulla piattaforma la fa partire; il cancello si apre con un
 passo contro le sbarre dal lato della leva. Con `--smoke-mechanics-lab` e `ODIN_PP_LAB_ONLY=heights`, `structures`,
-`mountain`, `cave`, `layers` o `lift` gira solo l'atto delle altezze, delle strutture, della montagna a spirale,
-della grotta, dei piani o degli ascensori (la montagna dura qualche minuto: sale tutto il sentiero a passi veri).
+`mountain`, `cave`, `layers`, `lift` o `fps` gira solo l'atto delle altezze, delle strutture, della montagna a spirale,
+della grotta, dei piani, degli ascensori o di First Person Shooter (la montagna dura qualche minuto: sale tutto il sentiero a passi veri).
+Con `ODIN_PP_LAB_ONLY=fps` e `ODIN_PP_LAB_TIMING=1` l'atto di First Person Shooter si ferma dopo la discesa negli occhi e misura
+600 fotogrammi con l'AK che spara, senza limite di fotogrammi né vsync (riga `FIRST PERSON TIMING`; meglio con una build `-o:speed`).
 `--smoke-expedition` comprende l'atto «posa» (il fantasma verde e rosso, una statua e una casetta posate, la statua rotta da un colpo
 e la casetta che resta), l'atto «grotte» (in Neve, Far West, Egitto e Inferno: l'arco, l'ingresso e la seconda
 stanza della prima grotta, con il giro entra-esci controllato) e l'atto «montagna» (il robot in otto punti della salita, con le mappe della Neve

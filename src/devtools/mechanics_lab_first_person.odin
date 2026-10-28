@@ -4,6 +4,8 @@ import run_session "../run"
 
 import "core:fmt"
 import "core:math"
+import "core:os"
+import "core:slice"
 import rl "vendor:raylib"
 import app "../engine/app"
 import game "../game"
@@ -165,6 +167,11 @@ mechanics_lab_first_person :: proc(window: ^app.Window, renderer: ^render.Render
 		fmt.eprintln("mechanics lab: the hand did not slide away behind his eyes:", render.first_person_hand_drop(renderer)); return false
 	}
 	mechanics_lab_still(window, renderer, room, 0, "odin_pp_mechanics_lab_fps.png")
+	// ODIN_PP_LAB_TIMING=1 measures the view here instead of going on
+	// (docs/piano-prima-persona.md, Fase 0).
+	if timing, _ := os.lookup_env("ODIN_PP_LAB_TIMING", context.temp_allocator); timing == "1" {
+		return mechanics_lab_first_person_timing(window, renderer, room, controller, cards, buffer)
+	}
 	// A second of the trigger held at sixty frames: six shots into the ghoul.
 	fp.yaw, fp.pitch = -math.PI/2, 0
 	poisoned, _ := game.apply_status(room, game.PLAYER_ENTITY, .Poison, 2, 0)
@@ -414,5 +421,42 @@ mechanics_lab_first_person :: proc(window: ^app.Window, renderer: ^render.Render
 		"%v, %v, %v, %v and %v sounded\n", dived, beats,
 		render.LAB_FIRST_PERSON_ENTER, render.LAB_FIRST_PERSON_SHOT, render.LAB_FIRST_PERSON_HIT, render.LAB_FIRST_PERSON_RICOCHET,
 		render.LAB_FIRST_PERSON_EXIT)
+	return true
+}
+
+MECHANICS_LAB_TIMING_WARMUP :: 60
+MECHANICS_LAB_TIMING_SAMPLES :: 600
+
+// The time of a frame behind his eyes, the AK firing north at the ghoul: the
+// whole smoke frame (controller, view, board, HUD, presentation), with no frame
+// limit and no vsync, as the expedition benchmark measures. The world takes
+// sixty frames a second whatever the real time, so every run sees the same room.
+@(private = "file")
+mechanics_lab_first_person_timing :: proc(window: ^app.Window, renderer: ^render.Renderer, room: ^game.Room,
+	controller: ^run_session.Tactical_Controller, cards: ^run_session.Card_Interaction_State, buffer: ^run_session.Buffered_Gameplay_Command) -> bool {
+	rl.SetTargetFPS(0)
+	rl.ClearWindowState({.VSYNC_HINT})
+	fp := &renderer.tactical.first_person
+	fp.yaw, fp.pitch = -math.PI/2, 0
+	samples: [MECHANICS_LAB_TIMING_SAMPLES]f64
+	last := rl.GetTime()
+	for index in 0..<MECHANICS_LAB_TIMING_WARMUP+MECHANICS_LAB_TIMING_SAMPLES {
+		mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0, true, nil, {focused = true, fire = true})
+		now := rl.GetTime()
+		if index >= MECHANICS_LAB_TIMING_WARMUP { samples[index-MECHANICS_LAB_TIMING_WARMUP] = (now-last)*1000 }
+		last = now
+		if !game.tactical_first_person_active(room) { fmt.eprintln("mechanics lab timing: the view ended at frame", index); return false }
+	}
+	values := samples[:]
+	slice.sort(values)
+	total: f64
+	for ms in values { total += ms }
+	count := len(values)
+	mean := total/f64(count)
+	median := (values[(count-1)/2]+values[count/2])*0.5
+	p95 := values[(count*95+99)/100-1]
+	fmt.printf("FIRST PERSON TIMING canvas_px=%dx%d samples=%d warmup=%d mean_ms=%.3f median_ms=%.3f p95_ms=%.3f max_ms=%.3f mean_fps=%.2f vsync_hint=%v\n",
+		window.canvas.texture.width, window.canvas.texture.height, count, MECHANICS_LAB_TIMING_WARMUP, mean, median, p95, values[count-1],
+		1000/max(mean, 0.000001), rl.IsWindowState({.VSYNC_HINT}))
 	return true
 }
