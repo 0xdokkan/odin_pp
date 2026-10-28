@@ -9,7 +9,7 @@ import grid "../engine/grid"
 import level "../level"
 import render "../render"
 
-// THE SPIRAL MOUNTAIN (level/mountain.odin) in the lab's fourth arena (run.Mechanics_Lab_Arena.Mountain, F3):
+// THE SPIRAL MOUNTAIN (level/mountain.odin) in the lab's fifth arena (run.Mechanics_Lab_Arena.Mountain, F3):
 // the player walks the whole path from the ground to the summit a step at a time, a cliff between two laps
 // stops the walk, the archer waiting at the top is pushed off and falls the whole mountain's height (the
 // fall costs at most ten), and the robot is seen from eight places on the climb, behind the mountain

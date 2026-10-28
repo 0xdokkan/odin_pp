@@ -8,7 +8,7 @@ import grid "../engine/grid"
 import level "../level"
 import render "../render"
 
-// STRUCTURES (level/structure.odin, render/structure_diorama.odin) in the lab's third arena
+// STRUCTURES (level/structure.odin, render/structure_diorama.odin) in the lab's fourth arena
 // (run.Mechanics_Lab_Arena.Structures, F3): the catalog of buildings and objects on the
 // board, the cottage in its four turns, a hut the robot walks up to (stills at 6, 4, 2 and
 // 1 cell, on the threshold, inside and outside again), the walls that stop the step and

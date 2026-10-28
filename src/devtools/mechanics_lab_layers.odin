@@ -9,7 +9,7 @@ import grid "../engine/grid"
 import level "../level"
 import render "../render"
 
-// LAYERS (game/layers.odin, Fase 3 of docs/piano-profondita.md) in the lab's sixth arena (run.Mechanics_Lab_Arena.Layers,
+// LAYERS (game/layers.odin, Fase 3 of docs/piano-profondita.md) in the lab's seventh arena (run.Mechanics_Lab_Arena.Layers,
 // F3): the player walks up a ramp onto the bridge, a fire is cast from it onto the road, the foe on the bridge is pushed
 // off it and falls, the player walks under the bridge, into the cave through its mouth and up the ladder on the hill's
 // cliff. With the Fase 4's view (game/layer_view.odin): a foe hidden under the deck shows its outline to the player on

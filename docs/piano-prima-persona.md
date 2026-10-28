@@ -53,7 +53,7 @@ La tabella è in ordine di priorità, cioè l'ordine della scaletta qui sotto.
 | Priorità | Fase | Contenuto | Dipende da | Stato | Commit |
 |---|---|---|---|---|---|
 | 0 | 0 | Decisioni comuni e misure di partenza (proposta di Claude) | — | Fatta | vedi Esito |
-| 1 | 1 | Base comune della prima persona; l'AK resta identico | 0 | In corso | vedi Esito |
+| 1 | 1 | Base comune della prima persona; l'AK resta identico | 0 | Fatta | vedi Esito |
 | 2 | 2 | Pugni: regole e prototipo giocabile nel laboratorio | 1 | Da fare | — |
 | 3 | 3 | Pugni: guantoni, segni critici, colpi a schermo, suoni | 2 | Da fare | — |
 | 4 | 4 | Spada: swing col mouse, parata, rampino; prototipo | 1 | Da fare | — |
@@ -1513,7 +1513,7 @@ fermati alla fine di ogni passo.
 
 ### Esito
 
-**Stato: in corso** (iniziata il 28 ottobre 2026).
+**Stato: fatta** (iniziata e chiusa il 28 ottobre 2026).
 
 **Risposte dell'utente (28 ottobre 2026):**
 1. **Base: una vista sola**, con le parti comuni scritte una volta. L'utente ha
@@ -1676,6 +1676,62 @@ Le domande dei passi 4 e 5, fatte tutte insieme, e le risposte:
    niente smoke completo né misure del tempo; si confrontano l'atto `fps`,
    quello delle strutture e quello nuovo, più gli atti che il giro nuovo di
    `F3` tocca, ognuno da solo.
+
+**Passo 4 — arena «Prima persona», mazzo e atto: fatto.**
+- `Mechanics_Lab_Arena.First_Person` subito dopo `Flat` (risposta 3): `F3` va
+  Piana → Prima persona → Altezze → … → Ascensori → Piana. L'editor delle mappe
+  la ritocca come le altre (cartella `prima_persona`).
+- L'arena (`src/run/mechanics_practice.odin`, 23×17, il giocatore in (11,8)):
+  un muro lungo y = 1 con due nicchie, in (4,1) e (18,1); quattro pilastri,
+  in (6,4), (16,4), (6,11) e (16,11); due muri di sbieco di tre caselle, da
+  (4,6) a (2,8) e da (18,6) a (20,8), per i tiri di sponda; tre coperture basse,
+  in (8,9), (14,9) e (11,12); un corridoio di 5 caselle, (2..6,14), chiuso a
+  ovest e aperto a est, per il rampino; un rialzo di 2 gradini (x 9..13, y 2..3)
+  con un gradino in (11,4). Il balestriere aspetta sul rialzo in (11,2), il bruto
+  in (17,9), un inseguitore in (4,10).
+- Il mazzo (risposta 1): First Person Shooter in mano e la Canna da Pesca che
+  aspetta negli Esausti; il mazzo delle altre arene non cambia.
+- L'atto `prima_persona` (`src/devtools/mechanics_lab_prima_persona.odin`,
+  `ODIN_PP_LAB_ONLY=prima_persona`) gira per ultimo nello smoke, dopo `lift`.
+  Fa sei catture: l'arena dall'alto; l'AK verso il balestriere; un secondo di
+  grilletto (6 colpi); lo sguardo verso il muro di sbieco a est; poi pugni,
+  spada e arco presi con un comando di prova (risposta 2), ognuno con la sua
+  sigla, la riga ridotta e la mano vuota, e i due bottoni tenuti per un secondo
+  senza nessun colpo. **Catture guardate**: la mano vuota e le sigle `FPB`,
+  `FPF` e `FPA` stanno nel riquadro come `FPS`. Due giri danno le stesse 6
+  catture al byte (13 s).
+- **Un minuto di gioco senza finestra** con i nemici liberi
+  (`test_mechanics_lab_first_person_lives_a_minute_of_play`): arrivi del
+  laboratorio, la vista presa con le quattro armi a turno, il grilletto tenuto
+  a secondi alterni. I nemici non perdono mai il loro battito, ogni arma viene
+  presa, solo l'AK spara e lo scontro va avanti.
+- Test nuovi in `src/integration/mechanics_lab_first_person_arena_test.odin`
+  (2): l'arena come disegnata, con il suo mazzo e il giro di `F3`, e il minuto
+  di gioco. Il test degli ascensori dice ancora che dopo di loro si torna alla
+  Piana; nei commenti l'ordine delle arene è aggiornato.
+
+**Passo 5 — verifica di fine fase: fatta**, con gli atti da soli (risposta 4,
+niente smoke completo e niente misure del tempo).
+- Ogni atto delle arene da solo, con il codice di prima dell'arena (commit
+  `3fb45b2`) e con quello nuovo: `fps` (114 catture), `structures` (10),
+  `heights` (7), `mountain` (14), `cave` (6), `layers` (11) e `lift` (9),
+  tutti **identici al byte**. L'arena nuova in mezzo al giro non cambia le
+  altre, perché ogni atto costruisce la sua arena per nome.
+- L'atto `fps` è anche **identico al byte alle 114 impronte della Fase 0**.
+- L'atto delle strutture da solo: 9 catture su 10 sempre uguali alla Fase 0.
+  `structures_hut_6` cambia ogni tanto da un giro all'altro, qualunque sia il
+  codice: in quattro giri, due con il codice della Fase 0 (`90e11bc`) e due con
+  quello nuovo, è uguale alla Fase 0; in un giro precedente era diversa allo
+  stesso modo con il codice vecchio e con quello nuovo. Era già nota (Fase 0,
+  passo 4).
+- Check con e senza assert puliti; `check.ps1` completo: **1751 test verdi** con
+  e senza assert (i 1749 del passo 3 più i 2 nuovi), più le due build (443 s).
+  I 27 test dell'AK sono quelli della Fase 0, senza modifiche.
+- **Non fatti** (risposta 4): lo smoke completo, cioè il confronto con le 2232
+  impronte della Fase 0, e la misura del tempo di un fotogramma con l'AK.
+  Restano da fare quando l'utente vuole, per esempio all'inizio della Fase 2.
+- Nessuna carta è cambiata, quindi `docs/registro-carte.md` non cambia.
+  Nessun suono, come chiesto.
 
 ## 11. Fase 2 — Pugni: regole e prototipo giocabile
 

@@ -80,7 +80,7 @@ test_mechanics_lab_has_an_arena_of_layers :: proc(t: ^testing.T) {
 	testing.expect_value(t, run_session.mechanics_lab_next_arena(.Layers), run_session.Mechanics_Lab_Arena.Lifts)
 }
 
-// The seventh arena (Fase 7 of docs/piano-profondita.md): a lift up the plateau's cliff and one down its shaft, their
+// The eighth arena (Fase 7 of docs/piano-profondita.md): a lift up the plateau's cliff and one down its shaft, their
 // platforms where the arena has them, the gate shut, a foe in the hall under the plateau; after it F3 comes back to the
 // flat arena.
 @(test)

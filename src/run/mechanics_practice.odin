@@ -32,8 +32,39 @@ MECHANICS_LAB_DECK_SEED :: u64(0x7E57_1AB)
 // The arenas of the lab: the flat one every card is tried in, the one with heights
 // (a plateau up a stair, a pillar, a spiral hill) to try the heights in, the
 // one with the catalog of structures, and the one with the Snow biome's spiral
-// mountain, the one with a cave's rooms, and the one with layers (F3 goes from one to the next).
-Mechanics_Lab_Arena :: enum { Flat, Heights, Structures, Mountain, Cave, Layers, Lifts }
+// mountain, the one with a cave's rooms, and the one with layers (F3 goes from one to the next). Right after the
+// flat one, the first person cards' (docs/piano-prima-persona.md, Fase 1): pillars, niches and slanted walls to
+// shoot off, low covers, a corridor of five cells, an archer up on a rise and a brute, with its own deck.
+Mechanics_Lab_Arena :: enum { Flat, First_Person, Heights, Structures, Mountain, Cave, Layers, Lifts }
+
+// The first person arena's deck: First Person Shooter, the cards of the other weapons as they come (Fasi 2, 4 e 6),
+// and the Canna da Pesca for a cleared arena, as in the others.
+MECHANICS_LAB_FIRST_PERSON_DECK :: [2]game.Card_Id{.First_Person, .Fishing_Rod}
+
+// The first person arena, on the 23x17 board with the player at (11,8):
+// - a wall along y = 1 with two niches in it, at (4,1) and (18,1);
+// - four pillars, at (6,4), (16,4), (6,11) and (16,11), and a slanted wall in each side, three cells on a
+//   diagonal: (4,6) to (2,8) and (18,6) to (20,8), for shots off a wall at more than one angle;
+// - low covers (MECHANICS_LAB_FIRST_PERSON_COVERS);
+// - a corridor of five cells, (2..6,14), shut at its west end and open to the east, for a grapple;
+// - a rise of 2 steps at x 9..13, y 2..3, a step of 1 up to it at (11,4), where the archer waits.
+MECHANICS_LAB_FIRST_PERSON_COVERS :: [3]grid.Position{{x = 8, y = 9}, {x = 14, y = 9}, {x = 11, y = 12}}
+MECHANICS_LAB_FIRST_PERSON_ARCHER :: grid.Position{x = 11, y = 2}
+MECHANICS_LAB_FIRST_PERSON_BRUTE :: grid.Position{x = 17, y = 9}
+
+mechanics_lab_first_person :: proc(data: ^level.Level) -> bool {
+	walls: [dynamic]grid.Position
+	walls.allocator = context.temp_allocator
+	for x in 1..=21 { if x != 4 && x != 18 { append(&walls, grid.Position{x = x, y = 1}) } }
+	append(&walls, grid.Position{x = 6, y = 4}, grid.Position{x = 16, y = 4}, grid.Position{x = 6, y = 11}, grid.Position{x = 16, y = 11})
+	append(&walls, grid.Position{x = 4, y = 6}, grid.Position{x = 3, y = 7}, grid.Position{x = 2, y = 8})
+	append(&walls, grid.Position{x = 18, y = 6}, grid.Position{x = 19, y = 7}, grid.Position{x = 20, y = 8})
+	for x in 1..=6 { append(&walls, grid.Position{x = x, y = 13}, grid.Position{x = x, y = 15}) }
+	append(&walls, grid.Position{x = 1, y = 14})
+	for cell in walls { if !level.set_tile(data, cell, {kind = .Wall}) { return false } }
+	for y in 2..=3 { for x in 9..=13 { if !level.set_height(data, {x = x, y = y}, 2) { return false } } }
+	return level.set_height(data, {x = 11, y = 4}, 1)
+}
 
 // The arena of structures is larger, to hold all of them with room between.
 MECHANICS_LAB_STRUCTURES_WIDTH :: 41
@@ -122,6 +153,10 @@ mechanics_lab_level :: proc(arena := Mechanics_Lab_Arena.Flat, retouched := true
 	data, error, _ := level.from_ascii(rows[:height])
 	if error != .None { return data, false }
 	if arena == .Heights { mechanics_lab_raise(&data) }
+	if arena == .First_Person && !mechanics_lab_first_person(&data) {
+		level.destroy(&data)
+		return {}, false
+	}
 	if arena == .Layers && !mechanics_lab_layers(&data) {
 		level.destroy(&data)
 		return {}, false
@@ -215,8 +250,12 @@ create_mechanics_lab_room :: proc(data: ^level.Level, player: ^game.Player, conf
 	arena, built := mechanics_lab_level(which)
 	if !built { return }
 	game.finish_deck_combat(&player.deck)
-	if !game.initialize_empty_deck(&player.deck, MECHANICS_LAB_RULES, MECHANICS_LAB_DECK_SEED) { level.destroy(&arena); return }
-	for id in MECHANICS_LAB_DECK {
+	// The first person arena has its own deck, all of it in hand too (but for the Canna da Pesca).
+	lab_deck, first_person_deck := MECHANICS_LAB_DECK, MECHANICS_LAB_FIRST_PERSON_DECK
+	deck, rules := lab_deck[:], MECHANICS_LAB_RULES
+	if which == .First_Person { deck, rules.hand_size = first_person_deck[:], len(first_person_deck)-1 }
+	if !game.initialize_empty_deck(&player.deck, rules, MECHANICS_LAB_DECK_SEED) { level.destroy(&arena); return }
+	for id in deck {
 		if _, added := game.add_owned_card(&player.deck, id); !added { level.destroy(&arena); return }
 	}
 	level.destroy(data)
@@ -229,6 +268,10 @@ create_mechanics_lab_room :: proc(data: ^level.Level, player: ^game.Player, conf
 		// In the arena of heights the archer waits up on the plateau.
 		{position = {x = width-5, y = 4} if which == .Flat else {x = width-5, y = 6}, health = 10, attack = 2, archetype = .Archer},
 		{position = {x = width/2, y = height-4}, health = 18, attack = 3, archetype = .Brute},
+	}
+	// In the first person arena the archer waits up on the rise, the brute beside the east cover.
+	if which == .First_Person {
+		spawns[0].position, spawns[1].position, spawns[2].position = {x = 4, y = 10}, MECHANICS_LAB_FIRST_PERSON_ARCHER, MECHANICS_LAB_FIRST_PERSON_BRUTE
 	}
 	// In the arena of structures they wait in the open, away from the buildings.
 	if which == .Structures {
@@ -263,7 +306,8 @@ create_mechanics_lab_room :: proc(data: ^level.Level, player: ^game.Player, conf
 		spawns[1].health = 18
 		spawns[2].position = {x = 17, y = 19}
 	}
-	room, ok = game.create_room(data, player, {enemies = spawns[:]})
+	covers := MECHANICS_LAB_FIRST_PERSON_COVERS
+	room, ok = game.create_room(data, player, {enemies = spawns[:], obstacles = covers[:] if which == .First_Person else nil})
 	if !ok { return }
 	room.endless = true
 	// No fog: every arrival is in plain sight. Each action lasts its cost in

@@ -78,7 +78,10 @@ non definiscono le regole della spedizione aperta.
 
 ### Prova meccaniche
 
-**F3** cambia arena, una dopo l'altra: «Altezze» ha un altopiano di 4 gradini con una
+**F3** cambia arena, una dopo l'altra: subito dopo la Piana, «Prima persona» (23×17) è l'arena delle carte in prima
+persona, con il suo mazzo (First Person Shooter e la Canna da Pesca): un muro con due nicchie, quattro pilastri, due muri
+di sbieco per i tiri di sponda, tre coperture basse, un corridoio di 5 caselle, un balestriere su un rialzo di 2
+gradini e un bruto (docs/piano-prima-persona.md, Fase 1); «Altezze» ha un altopiano di 4 gradini con una
 scala di 3, un pilastro di 8 e una collina a spirale (si prova la regola dei
 dirupi, le cadute, la vista e la gittata dall'alto); «Strutture» (41×29) ha tutto il
 catalogo: tre edifici, cinque oggetti complessi, un recinto e la casetta nelle quattro
@@ -89,8 +92,10 @@ un nemico su ogni piano (si provano passo, scale, vista, aree e cadute fra piani
 da un pozzo con l'ascensore e un cancello che si apre solo da dentro. L'ascensore si usa con i passi: un passo verso
 il pianerottolo vuoto chiama la piattaforma, un passo sulla piattaforma la fa partire; il cancello si apre con un
 passo contro le sbarre dal lato della leva. Con `--smoke-mechanics-lab` e `ODIN_PP_LAB_ONLY=heights`, `structures`,
-`mountain`, `cave`, `layers`, `lift` o `fps` gira solo l'atto delle altezze, delle strutture, della montagna a spirale,
-della grotta, dei piani, degli ascensori o di First Person Shooter (la montagna dura qualche minuto: sale tutto il sentiero a passi veri).
+`mountain`, `cave`, `layers`, `lift`, `fps` o `prima_persona` gira solo l'atto delle altezze, delle strutture, della montagna a spirale,
+della grotta, dei piani, degli ascensori, di First Person Shooter o dell'arena «Prima persona» (la montagna dura qualche minuto:
+sale tutto il sentiero a passi veri). L'atto `prima_persona` gira per ultimo nello smoke completo; prende anche pugni, spada e
+arco, che non hanno ancora la loro carta, per guardarne la sigla e la mano vuota.
 Con `ODIN_PP_LAB_ONLY=fps` e `ODIN_PP_LAB_TIMING=1` l'atto di First Person Shooter si ferma dopo la discesa negli occhi e misura
 600 fotogrammi con l'AK che spara, senza limite di fotogrammi né vsync (riga `FIRST PERSON TIMING`; meglio con una build `-o:speed`).
 `--smoke-expedition` comprende l'atto «posa» (il fantasma verde e rosso, una statua e una casetta posate, la statua rotta da un colpo

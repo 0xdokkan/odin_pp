@@ -5,6 +5,19 @@ I riferimenti a Classica, `--flat` e ai vecchi smoke descrivono versioni precede
 per i comandi disponibili oggi valgono il [README](README.md) e la documentazione collegata.
 
 
+## 2026-10-28 — Prima persona, Fase 1: base comune della prima persona
+
+- **Un'arma per vista:** la vista di First Person Shooter ora sa quale arma c'è in mano (AK, pugni, spada, arco). I dati
+  di ogni arma stanno nello stesso spazio (`Room` resta di 8952 byte, 648 byte per arma); il salvataggio ha una copia sua
+  in JSON, e i salvataggi di prima si leggono come AK. Le carte nuove non si giocano in groppa al Dinosauro.
+- **Tavolo e HUD per arma:** sigla del riquadro (`FPS` per l'AK, provvisorie `FPB`, `FPF`, `FPA`), riga di stato e cosa
+  c'è in mano; le armi senza disegno mostrano la mano vuota.
+- **Tasti per arma:** il controller legge anche il clic destro tenuto e `Ctrl`, con le regole dell'AK per tutte le armi
+  (cattura del mouse, clic di prima bloccato, pausa); per ora solo l'AK spara.
+- **Arena «Prima persona»** subito dopo la Piana nel giro di `F3`, con il suo mazzo (First Person Shooter e Canna da
+  Pesca), e atto `prima_persona` dello smoke (`ODIN_PP_LAB_ONLY=prima_persona`), per ultimo.
+- L'AK è identico: le 114 catture dell'atto `fps` sono uguali al byte a quelle della Fase 0.
+
 ## 2026-10-28 — Prima persona, Fase 0 fatta: decisioni comuni e misure dell'AK
 
 - Le risposte dell'utente sono nel [piano](docs/piano-prima-persona.md): nomi inglesi (First Person Brawler, First Person

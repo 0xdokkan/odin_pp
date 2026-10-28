@@ -9,7 +9,7 @@ import grid "../engine/grid"
 import level "../level"
 import render "../render"
 
-// HEIGHTS (game/height.odin, render/height_view.odin) in the lab's second arena
+// HEIGHTS (game/height.odin, render/height_view.odin) in the lab's third arena
 // (run.Mechanics_Lab_Arena.Heights, F3): the player climbs the stair of three
 // to the plateau, is stopped by its cliff, a foe is pushed off it and falls, and
 // the Lazzo is held from up there. Stills odin_pp_mechanics_lab_heights_*.png.

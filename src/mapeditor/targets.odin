@@ -19,7 +19,7 @@ Target :: struct {
 }
 
 // The arenas' folders' names, in their order.
-ARENA_NAMES :: [run.Mechanics_Lab_Arena]string{.Flat = "piana", .Heights = "altezze", .Structures = "strutture", .Mountain = "montagna", .Cave = "grotta", .Layers = "piani", .Lifts = "ascensori"}
+ARENA_NAMES :: [run.Mechanics_Lab_Arena]string{.Flat = "piana", .First_Person = "prima_persona", .Heights = "altezze", .Structures = "strutture", .Mountain = "montagna", .Cave = "grotta", .Layers = "piani", .Lifts = "ascensori"}
 
 // Every map the editor opens: the arenas first, then the biomes.
 target_count :: proc() -> int {

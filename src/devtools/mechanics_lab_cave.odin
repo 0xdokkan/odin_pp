@@ -8,7 +8,7 @@ import grid "../engine/grid"
 import level "../level"
 import render "../render"
 
-// A CAVE (level/cave.odin) in the lab's fifth arena (run.Mechanics_Lab_Arena.Cave, F3): the plan's rooms and galleries with its
+// A CAVE (level/cave.odin) in the lab's sixth arena (run.Mechanics_Lab_Arena.Cave, F3): the plan's rooms and galleries with its
 // foes in them, walked from the arrival to the secret at the far end and back, a step at a time (the foes held), with a still in
 // each room. Stills odin_pp_mechanics_lab_cave_*.png.
 
