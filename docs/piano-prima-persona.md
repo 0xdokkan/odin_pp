@@ -896,8 +896,10 @@ Pugni al secondo, con i tempi della tabella:
   pugno; il tonfo del cuoio sulla carta; per il critico uno schiocco e un
   «ding»; un ticchettio quando compare un segno.
 - **Musica** (chiesta dall'utente il 28 ottobre 2026, Esito della Fase 2): un
-  giro di 32 s fatto da codice, `tools/audio/music_brawler.py`, sul modello di
-  «Fast fight / battle music» (CC0) adattato al ring; suona solo con i pugni.
+  giro di 32 s fatto da codice, `tools/audio/music_brawler.py`: ritmo di
+  guantoni, tamburi da guerra, Re frigio, campanella e folla dell'arena (la
+  prova 2); suona solo con i pugni. La prova 1, sul modello di «Fast fight /
+  battle music» (CC0), resta da parte in `tools/audio/music_battle_riserva.py`.
 
 ## 6. Carta 2 — Spada: First Person Fencer
 
@@ -1905,7 +1907,39 @@ fatta prima su sua richiesta).**
 - **Misurata come il riferimento:** 150 battiti al minuto, Do maggiore, il
   «centro» del suono fra 300 e 780 Hz (il riferimento sta intorno a 400);
   la cucitura del giro vale quanto l'inizio di qualsiasi altra battuta (niente
-  scatto). In attesa dell'ascolto dell'utente.
+  scatto).
+- **Ascolto della prova 1:** «la canzone non va bene per il contesto, però
+  vorrei che la tenessi, perché la riciclerò per qualcos'altro in futuro». La
+  prova 1 è ora `tools/audio/music_battle_riserva.py`, identica al byte, con
+  una copia da ascoltare in `assets/audio/music/battle_riserva.ogg` (stereo,
+  812 KB, nessun codice la carica).
+- **Nuova richiesta:** «un po' più cruenta, più da stile battle, quindi più
+  ritmica, più severa […] è un gioco dove la gente si mena […] il mood è quello
+  del pugilato […] un'atmosfera da ring».
+- **La prova 2** (`tools/audio/music_brawler.py`), tutta ritmo:
+  - 120 battiti al minuto, 16 battute da 2 s, ancora 32,0 s esatti;
+  - la scala del gioco, il **Re frigio** (Re, Mi♭, Fa, Sol, La, Si♭, Do),
+    severa;
+  - il ritmo lo fanno i **guantoni**: jab, cross, ganci e colpi al corpo, ognuno
+    con il suo peso, accordati su Re (i pesanti) e La (i leggeri), con colpi
+    fantasma fra i battiti; una raffica di pugni nell'ultima battuta;
+  - cassa distorta con il passo sincopato di un pugile (non su ogni
+    movimento), tamburi da guerra bassi con le discese Re-La-Sol-Fa-Mi♭ alla
+    fine dei blocchi, rullante su 2 e 4;
+  - basso distorto e archi bassi a colpi secchi in ostinato, fiati duri sugli
+    accenti, con il Mi♭ sul Re (il morso della scala) a fine blocco;
+  - il ring: la **campanella** apre il round all'inizio del giro (cioè quando la
+    carta parte), una **folla** fatta di rumore filtrato (nessuna voce, nessuna
+    parola) che respira e si alza dopo i colpi pesanti, il riverbero di una
+    grande arena;
+  - blocchi: campanella, guantoni e basso; poi rullante, piatti e fiati; poi
+    tutto, con i tamburi a ottavi; poi due battute di soli guantoni, tamburi e
+    folla, la raffica, il rullo e la salita verso la campanella.
+- **Misure della prova 2:** 120 battiti; note più forti Re, La e Mi♭ (misurate
+  con una finestra lunga: quella corta divide il Re grave fra Do e Fa); la
+  cucitura del giro vale quanto l'inizio delle altre battute; ogni attacco ha un
+  millesimo di secondo d'entrata, niente clic. In attesa dell'ascolto
+  dell'utente.
 - Nel gioco entra nella Fase 3: i suoni del laboratorio oggi sono mono, quindi
   per la musica serve un canale stereo suo.
 
