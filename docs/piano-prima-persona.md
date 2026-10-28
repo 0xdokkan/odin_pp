@@ -52,7 +52,7 @@ La tabella è in ordine di priorità, cioè l'ordine della scaletta qui sotto.
 
 | Priorità | Fase | Contenuto | Dipende da | Stato | Commit |
 |---|---|---|---|---|---|
-| 0 | 0 | Decisioni comuni e misure di partenza (proposta di Claude) | — | In corso | vedi Esito |
+| 0 | 0 | Decisioni comuni e misure di partenza (proposta di Claude) | — | Fatta | vedi Esito |
 | 1 | 1 | Base comune della prima persona; l'AK resta identico | 0 | Da fare | — |
 | 2 | 2 | Pugni: regole e prototipo giocabile nel laboratorio | 1 | Da fare | — |
 | 3 | 3 | Pugni: guantoni, segni critici, colpi a schermo, suoni | 2 | Da fare | — |
@@ -272,20 +272,32 @@ ODIN="/c/Users/lukeg/OneDrive/Desktop/odin-dev-2026-10/dist/odin.exe"
   `pugni` (Fasi 2-3), `spada` (Fasi 4-5), `arco` (Fasi 6-7). Gli atti nuovi
   girano **per ultimi**, così le catture di prima restano confrontabili al
   byte (lezione dell'atto `lift`). A fine fase lo smoke del laboratorio va
-  completato: circa venti minuti, da solo, alla corrente.
+  completato: circa mezz'ora (1821 s nella Fase 0), da solo, alla corrente.
+  L'atto `fps` da solo dura 42 s e le sue 114 catture si ripetono identiche
+  al byte: sono il riferimento della Fase 1 (le catture dello stesso atto nel
+  giro completo sono diverse, perché lì parte dopo tutti gli altri atti).
 - **Un minuto di gioco senza finestra** con i nemici liberi: un test
   d'integrazione come `test_mechanics_lab_lifts_live_a_minute_of_play`, che fa
   girare il controller e `game.sandbox_tick` con un `render.Renderer` vuoto.
   Lo smoke tiene fermi i nemici, quindi da solo non basta (lezione degli
   ascensori, che con i nemici liberi facevano cadere il gioco su un assert).
 - **Tempo di un fotogramma in prima persona** (dalla Fase 0): build con
-  `-o:speed`, l'atto da misurare, tela fissa di 1920×1080, vsync spento,
-  media e 95° percentile su 600 fotogrammi. Si misura con il portatile alla
+  `-o:speed`, poi `ODIN_PP_LAB_ONLY=fps ODIN_PP_LAB_TIMING=1` e
+  `--smoke-mechanics-lab`, dalla cartella della build. L'atto si ferma dopo la
+  discesa negli occhi e misura 600 fotogrammi (dopo 60 di riscaldamento) con
+  l'AK che spara, senza limite di fotogrammi e senza vsync, sulla tela dello
+  smoke (1600×900); la riga `FIRST PERSON TIMING` dà media, mediana, 95°
+  percentile e massimo. Ogni arma nuova aggiunge la sua misura allo stesso
+  modo. Si misura con il portatile alla
   corrente, sulla RTX 3060 (la riga `Renderer:` del log lo conferma), in
   ordine alternato (vecchio, nuovo, nuovo, vecchio): lo stesso eseguibile va
   più piano al giro dopo perché si scalda.
-- **Catture:** in `build/captures` (cartella ignorata da git). Gira un solo
-  smoke alla volta.
+- **Catture:** in `build/captures` sotto la cartella da cui parte il gioco
+  (ignorata da git). Gli smoke partono da una cartella della scratchpad con la
+  build e una copia di `assets` (20 MB), così 2,8 GB di catture non finiscono
+  in OneDrive; delle catture di riferimento si tengono solo le impronte
+  SHA-256 (scelta della Fase 0) e le immagini si cancellano dopo averle
+  guardate. Gira un solo smoke alla volta.
 - **Avviso** (PowerShell, senza toccare il volume del sistema). **Oggi è
   spento** (Fase 0, risposta 9): si usa solo dopo che l'utente ha chiesto di
   riaccenderlo. Da allora, se non dice altro, la proposta della Fase 0: tre
@@ -606,8 +618,14 @@ La proposta: **una sola meccanica «vista»**, quella dell'AK, con un'**arma**.
 
 - Nelle regole: `First_Person_Weapon :: enum u8 {AK, Fists, Sword, Bow}` dentro
   `First_Person_State`; `tactical_begin_first_person` riceve l'arma. Ogni arma
-  ha i suoi pochi dati (il grilletto dell'AK, i pugni, lo swing, la corda),
-  piccoli per stare nei 9 KB di `Room`.
+  ha i suoi pochi dati (il grilletto dell'AK, i pugni, lo swing, la corda).
+  **Lo spazio è pochissimo** (misura della Fase 0): `Room` pesa 8952 byte e il
+  test ne permette 9216, quindi restano **264 byte**; lo stato della vista ne
+  pesa 672, quasi tutti per gli ultimi 8 colpi dell'AK. Una vista sola è attiva
+  alla volta, quindi i dati delle armi stanno **nello stesso posto** (un'unione:
+  ogni arma usa lo spazio dei colpi dell'AK quando è lei a essere in mano), e
+  `Room` non cresce. Se non basta, si chiede all'utente prima di alzare il
+  limite (domanda 4 della Fase 1).
 - La carta usa sempre l'effetto `.First_Person`, con l'arma in `charges`
   (come `ride_effect` per il Dinosauro, `dinosaur.odin:52`).
 - **Una vista alla volta**, come oggi: non si entra in una vista da dentro
@@ -1269,9 +1287,11 @@ K» della richiesta è l'AK.
 1. Domande e risposte; documento aggiornato. **Stop.** — *Fatto il 28 ottobre
    2026 (vedi Esito).*
 2. `ODIN_PP_LAB_ONLY=fps` e catture dell'atto dell'AK come riferimento. **Stop.**
+   — *Fatto (vedi Esito).*
 3. Misure: `size_of(Room)` e spazio sotto i 9 KB; tempo di un fotogramma in
-   prima persona con l'AK, due giri alla corrente. **Stop.**
-4. Esito, tabella, `CHANGELOG.md`, commit, avviso. **Stop.**
+   prima persona con l'AK, due giri alla corrente. **Stop.** — *Fatto (vedi Esito).*
+4. Esito, tabella, `CHANGELOG.md`, commit, avviso. **Stop.** — *Fatto (vedi
+   Esito).*
 
 ### Prove
 
@@ -1295,7 +1315,9 @@ fermati alla fine di ogni passo.
 
 ### Esito
 
-**In corso dal 28 ottobre 2026** sul ramo `piano-prima-persona`.
+**Fatta il 28 ottobre 2026** sul ramo `piano-prima-persona`. Su richiesta
+dell'utente i passi 2, 3 e 4 sono stati fatti di fila, senza stop in mezzo
+(«completassi tutti i passi … poi fermati»).
 
 **Risposte dell'utente** (raccolte dalla sessione principale; fra virgolette le
 parole dell'utente)
@@ -1327,6 +1349,62 @@ stile nella sezione 4.4, nelle sezioni 5.8, 6.7 e 7.8 e nelle domande delle
 Fasi 3, 5 e 7; arena di prova nelle sezioni 3.7 e 10; commit a ogni passo e
 avviso spento nella sezione 1. Nessun suono. Solo documento: niente codice,
 niente prove da fare.
+
+**Domande nate prima dei passi 2-4** (risposte dell'utente)
+- «Fase 1» nella richiesta voleva dire questa fase: «si intendo fase 0».
+- Catture di riferimento: «Solo impronte (Consigliato)», cioè impronte SHA-256
+  e immagini cancellate dopo averle guardate.
+- Dove lavorare: «fai semplicemente un nuovo ramo sullo stesso git». La
+  cartella `odin_pp` è passata al ramo `piano-prima-persona`.
+
+**Passo 2 (atto dell'AK da solo)**, commit `0cd4ffd`.
+- `ODIN_PP_LAB_ONLY=fps` (`src/devtools/mechanics_lab.odin`) fa girare solo
+  l'atto di First Person Shooter: 42 secondi, uscita 0, 114 catture.
+- Due giri danno le stesse 114 catture al byte: sono il riferimento della Fase
+  1. Nel giro completo le catture dello stesso atto sono diverse (lì l'atto
+  parte dopo tutti gli altri, con un altro stato del mondo), quindi i due
+  riferimenti restano separati.
+- Catture guardate: la discesa negli occhi, l'AK, il ghoul con il mirino, il
+  riquadro `FPS 20s`, il colpo fermato dal blocco di ghiaccio, la scelta di
+  difesa. Tutto come descritto nella sezione 2.
+
+**Passo 3 (misure)**, commit `02bf8c6`.
+- **`Room` pesa 8952 byte**: il test ne permette 9216, quindi **restano 264
+  byte**. Lo stato della vista ne pesa 672, il Pinball 272, il Lazzo 1744.
+  Tre armi nuove con i loro dati non ci stanno: la sezione 4.1 ora mette i dati
+  delle armi nello stesso posto dei colpi dell'AK, e la Fase 1 ha una domanda in
+  più (la 4).
+- **Tempo di un fotogramma in prima persona con l'AK**: nuova misura
+  `ODIN_PP_LAB_TIMING=1` (sezione 1.4, `docs/avvio.md`), build `-o:speed`, sulla
+  tela dello smoke, 1600×900 (non 1920×1080 come scritto prima: la sezione 1.4
+  è corretta), RTX 3060, portatile alla corrente (carica al 100%).
+
+| Giro | Media | Mediana | 95° percentile | Massimo | Fotogrammi al secondo |
+|---|---:|---:|---:|---:|---:|
+| 1 | 2,397 ms | 2,360 ms | 2,622 ms | 4,221 ms | 417 |
+| 2 | 2,443 ms | 2,417 ms | 2,698 ms | 3,014 ms | 409 |
+
+  In parole semplici: un fotogramma in prima persona con l'AK che spara costa
+  circa 2,4 millesimi di secondo, cioè più di 400 fotogrammi al secondo. I due
+  giri differiscono del 2% (rumore normale). Ogni arma nuova si confronta con
+  questi numeri.
+
+**Passo 4 (verifica e chiusura)**
+- Check normale e senza assert, suite completa (`scripts/check.ps1`): **1740
+  test verdi**, più le due build.
+- Smoke completo del laboratorio, prima (build di `d3d7ab4`, 1821 s) e dopo i
+  passi 2 e 3 (1193 s), dalla scratchpad: uscita 0 tutte e due, 2232 catture.
+  **2229 identiche al byte.** Le altre 3 sono dell'atto delle strutture
+  (`structures_hut_6`, `structures_hut_dentro`, `structures_objects`): cambiano
+  da un giro completo all'altro con lo stato lasciato dagli atti di prima (era
+  già noto per `structures_hut_6`). Con l'atto delle strutture da solo la build
+  vecchia e quella nuova danno le stesse 10 catture al byte, quindi non vengono
+  da questa fase. Nei confronti della Fase 1 quelle tre catture si controllano
+  così, con l'atto da solo.
+- Le impronte (giro completo e atto `fps` da solo) sono nella cartella delle
+  note delle sessioni (`impronte-fase0-*.txt`). Se mancano, si rifanno dal
+  commit `02bf8c6`: build `-o:none` e smoke, mezz'ora.
+- Nessun suono, come chiesto.
 
 ## 10. Fase 1 — Base comune della prima persona
 
@@ -1370,9 +1448,17 @@ salvataggio in `src/expedition/snapshot.odin`.
    - (Consigliato) Le tre carte nuove non si giocano mentre si cavalca; l'AK
      resta com'è oggi.
    - Oppure si giocano anche cavalcando.
+4. **Lo spazio in `Room`** (nato dalla misura della Fase 0: restano 264 byte).
+   - (Consigliato) I dati delle armi nello stesso posto dei colpi dell'AK (sezione
+     4.1): `Room` non cresce e il limite di 9 KB resta.
+   - Oppure alzare il limite del test (`src/game/event_test.odin:126`): `Room`
+     si copia in alcuni punti, quindi pesa un poco di più su stack e
+     salvataggi.
 
 ### Ricerche da fare
 
+- Le unioni di Odin (`union`, `#raw_union`) per dati diversi nello stesso posto,
+  e cosa cambia per i salvataggi dello snapshot.
 - Come i giochi in prima persona organizzano più armi con una sola vista:
   tabelle di dati per arma, stato comune e stato proprio (per esempio il codice
   delle armi di Quake e di Doom, pubblicato da id Software).
@@ -1383,7 +1469,8 @@ salvataggio in `src/expedition/snapshot.odin`.
 
 1. L'arma nelle regole (stato, effetto, inizio), l'AK identico, test verdi.
    **Stop.**
-2. Tavolo e HUD per arma; le catture dell'atto `fps` identiche al byte. **Stop.**
+2. Tavolo e HUD per arma; le catture dell'atto `fps` identiche al byte alle
+   impronte della Fase 0. **Stop.**
 3. Tasti per arma, con i loro test (cattura, clic trattenuto, pausa). **Stop.**
 4. Arena «Prima persona» e suo mazzo; atto `prima_persona` (per ultimo nello
    smoke); un minuto di gioco senza finestra con i nemici liberi. **Stop.**
@@ -1392,8 +1479,10 @@ salvataggio in `src/expedition/snapshot.odin`.
 ### Prove
 
 - I 27 test dell'AK passano senza modifiche.
-- Lo smoke completo del laboratorio identico al byte; l'atto nuovo ha le sue
-  catture, guardate.
+- L'atto `fps` da solo identico al byte alle 114 impronte della Fase 0; lo
+  smoke completo identico al byte alle 2232 impronte della Fase 0 (salvo le
+  catture dell'arena nuova, in coda); l'atto nuovo ha le sue catture,
+  guardate.
 - `size_of(Room)` sotto i 9 KB; lo snapshot salva e rilegge l'arma.
 - Tempo di un fotogramma con l'AK uguale alla Fase 0 (entro il rumore).
 

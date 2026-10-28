@@ -5,6 +5,21 @@ I riferimenti a Classica, `--flat` e ai vecchi smoke descrivono versioni precede
 per i comandi disponibili oggi valgono il [README](README.md) e la documentazione collegata.
 
 
+## 2026-10-28 — Prima persona, Fase 0 fatta: decisioni comuni e misure dell'AK
+
+- Le risposte dell'utente sono nel [piano](docs/piano-prima-persona.md): nomi inglesi (First Person Brawler, First Person
+  Fencer, First Person Archer), ordine pugni, spada, arco, numeri come l'AK, un'arena nuova «Prima persona» con il suo
+  mazzo, pixel art di carta in stile cibernetico da decidere insieme nella Fase 3, mani a schermo, un commit a ogni
+  passo, avviso sonoro spento finché l'utente non lo riaccende.
+- `ODIN_PP_LAB_ONLY=fps` fa girare solo l'atto di First Person Shooter (42 s, 114 catture identiche al byte in due giri).
+- `ODIN_PP_LAB_TIMING=1` con quell'atto misura 600 fotogrammi in prima persona: con l'AK che spara, 2,40 e 2,44 ms di
+  media (circa 410 fotogrammi al secondo) sulla RTX 3060, alla corrente.
+- `Room` pesa 8952 byte su 9216 permessi: restano 264 byte, quindi i dati delle armi nuove andranno nello stesso posto dei
+  colpi dell'AK.
+- Verifiche: check completo con e senza assert (1740 test); smoke completo del laboratorio prima e dopo, 2229 catture su
+  2232 identiche al byte; le altre tre (atto delle strutture) cambiano già da un giro all'altro e sono identiche con
+  l'atto da solo.
+
 ## 2026-10-28 — Piano di lavoro delle carte in prima persona
 
 - Nuovo [documento](docs/piano-prima-persona.md) in nove fasi (0–8), da eseguire
