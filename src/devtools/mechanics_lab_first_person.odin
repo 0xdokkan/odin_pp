@@ -382,14 +382,17 @@ mechanics_lab_first_person :: proc(window: ^app.Window, renderer: ^render.Render
 	mechanics_lab_still(window, renderer, room, 0, "odin_pp_mechanics_lab_fps_upgraded.png")
 	// The HUD's words hold: the countdown in its plate, the line beside the
 	// plate's objective (a full room's too).
+	// Every weapon's words, not only the AK's.
 	countdown := render.first_person_countdown_bounds(renderer)
-	if _, _, _, fit := render.gothic_text_fit_plan(renderer, render.first_person_countdown_text(30), countdown.width-24, 18); fit != .Fits {
-		fmt.eprintln("mechanics lab: the countdown does not hold in its plate:", fit); return false
-	}
-	for objective in ([2]cstring{render.tactical_hud_objective(renderer, room), render.tactical_hud_foes_objective(game.MAX_ENEMIES_PER_ROOM)}) {
-		room_width := render.tactical_hud_status_room(renderer, objective)
-		if _, _, _, fit := render.gothic_text_fit_plan(renderer, render.FIRST_PERSON_HUD_STATUS, room_width, 10); fit != .Fits {
-			fmt.eprintln("mechanics lab: the HUD's line behind his eyes does not hold in", room_width, "px:", fit); return false
+	for weapon in game.First_Person_Weapon {
+		if _, _, _, fit := render.gothic_text_fit_plan(renderer, render.first_person_countdown_text(30, weapon), countdown.width-24, 18); fit != .Fits {
+			fmt.eprintln("mechanics lab: the countdown does not hold in its plate:", weapon, fit); return false
+		}
+		for objective in ([2]cstring{render.tactical_hud_objective(renderer, room), render.tactical_hud_foes_objective(game.MAX_ENEMIES_PER_ROOM)}) {
+			room_width := render.tactical_hud_status_room(renderer, objective)
+			if _, _, _, fit := render.gothic_text_fit_plan(renderer, render.FIRST_PERSON_LOOKS[weapon].status, room_width, 10); fit != .Fits {
+				fmt.eprintln("mechanics lab: the HUD's line behind his eyes does not hold in", room_width, "px:", weapon, fit); return false
+			}
 		}
 	}
 	for _ in 0..<120 {

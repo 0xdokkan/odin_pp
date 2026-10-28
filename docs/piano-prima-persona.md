@@ -679,7 +679,8 @@ Nel codice (proposta): `Card_Id.First_Person_Brawler`, `.First_Person_Fencer`
 e `.First_Person_Archer`; armi `First_Person_Weapon.Fists`, `.Sword` e `.Bow`.
 Sulle carte strette e nel riquadro dei secondi l'AK usa la sigla `FPS`: per le
 tre nuove la sigla o la parola si decide nella Fase 3 (domanda 3 di quella
-fase) e vale per tutte e tre.
+fase) e vale per tutte e tre. Fino ad allora il riquadro usa le sigle
+provvisorie `FPB`, `FPF` e `FPA` (Fase 1, passo 2).
 
 **Numeri** (risposta 4: come l'AK):
 - rare, **3 di energia**, **nessun secondo di finestra**, giocate su di sé;
@@ -1579,6 +1580,43 @@ fermati alla fine di ogni passo.
   test verdi** con e senza assert (i 1740 della Fase 0 più i 4 nuovi), più le
   due build (859 s).
 
+**Domande prima del passo 2** (risposte dell'utente: «Sì, passo 2», cioè le
+scelte consigliate):
+- Scritta del riquadro dei secondi per le carte nuove: **sigle provvisorie
+  `FPB`, `FPF` e `FPA`**, larghe come `FPS`, finché la Fase 3 non decide quella
+  definitiva.
+- Cosa si vede in mano con un'arma ancora senza disegno: **mano vuota**, solo
+  mirino e riquadro, finché la sua fase non la disegna (Fasi 3, 5 e 7).
+
+**Ricerca del passo 2:** in Doom i pugni non hanno munizioni (`am_noammo` nella
+riga di `weaponinfo`) e il riquadro delle munizioni resta vuoto: è il modello
+della mano vuota ([giro del codice di Doom](https://bookdown.org/robertness/doom_tour/10_5_item_definitions.html)).
+
+**Passo 2 — tavolo e HUD per arma: fatto.**
+- La tabella `FIRST_PERSON_LOOKS` (`src/render/first_person.odin`) dice per ogni
+  arma la sigla del riquadro, la riga di stato e cosa c'è in mano
+  (`First_Person_Hand`: l'AK o niente). L'AK ha `FPS`, la riga di sempre e la
+  sua stampa; le altre hanno la sigla provvisoria, la riga
+  `MIRA COL MOUSE / WASD: PASSI` (dice solo quello che già funziona: le loro
+  regole arrivano con le loro fasi) e la mano vuota.
+- Il tavolo tiene l'arma della stanza mentre la vista è accesa e la conserva
+  durante la risalita. Il disegno in mano passa da una scelta per arma; l'AK
+  usa le stesse chiamate di prima, spostate in `draw_first_person_ak`.
+- Solo l'AK lancia traccianti: con un'altra arma i suoi byte non sono colpi,
+  quindi il tavolo non li legge come tali.
+- Il laboratorio controlla che sigla e riga di ogni arma stiano nel loro posto
+  (prima lo faceva solo per l'AK).
+- Test nuovi in `src/render/first_person_weapon_view_test.odin` (2): l'aspetto
+  di ogni arma, e il tavolo che segue l'arma (anche nella risalita) senza
+  traccianti per i pugni. I test dell'AK sono quelli di prima.
+- **Catture:** l'atto `fps` da solo dà **114 catture identiche al byte** alle
+  impronte della Fase 0 (40 s, uscita 0).
+- **Verifiche:** check con e senza assert puliti; `check.ps1` completo: **1746
+  test verdi** con e senza assert (i 1744 del passo 1 più i 2 nuovi), più le
+  due build (376 s).
+- **Non verificato a occhio:** la mano vuota e le sigle nuove a schermo. Nessun
+  atto le mostra ancora; le mostrerà l'atto `prima_persona` (passo 4).
+
 ## 11. Fase 2 — Pugni: regole e prototipo giocabile
 
 ### Obiettivo
@@ -2272,7 +2310,8 @@ aggiungono qui le loro.
   `#raw_union` (campi sovrapposti come in C) e `union` con etichetta.
 - [Doom, `d_items.h`](https://github.com/id-Software/DOOM/blob/master/linuxdoom-1.10/d_items.h)
   e [giro del codice di Doom](https://bookdown.org/robertness/doom_tour/10_5_item_definitions.html):
-  una riga di tabella per arma, un solo codice delle armi.
+  una riga di tabella per arma, un solo codice delle armi; i pugni senza
+  munizioni (`am_noammo`) lasciano vuoto il riquadro, modello della mano vuota.
 - [Guide di QuakeC](https://www.insideqc.com/qctut/qctut-52.shtml): `W_Attack`
   e `W_SetCurrentAmmo` scelgono per arma (guide di appassionati).
 - [Wikipedia, test di caratterizzazione](https://en.wikipedia.org/wiki/Characterization_test):

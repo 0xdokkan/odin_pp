@@ -31,7 +31,9 @@ import view "../engine/view"
 // sparks there: a red star on a foe, a gold one and chips off stone, dust off
 // the floor. When the room's seconds are over (or the fight is) the camera
 // rises back the way it came. The board follows the room; nothing here holds
-// the player's input.
+// the player's input. The countdown's tag, the HUD's line and what is in hand
+// are the weapon's (FIRST_PERSON_LOOKS): the AK's as above, the others' an
+// empty hand until their own drawing comes; only the AK's shots fly.
 
 // The rise back to the board's view (and a dive the card's cue does not pace).
 FIRST_PERSON_VIEW_SECONDS :: f64(0.6)
@@ -161,6 +163,9 @@ First_Person_View :: struct {
 	engaged, paced: bool,
 	changed: f64,
 	amount, from: f32,
+	// The weapon in hand: the room's while the view is on, kept through the
+	// rise back (FIRST_PERSON_LOOKS).
+	weapon: game.First_Person_Weapon,
 	// The eye and its cell, as this frame's camera puts them, and the foes'
 	// cards where this frame shows them: what a shot sees (first_person_aim).
 	eye: rl.Vector3,
@@ -218,6 +223,7 @@ update_tactical_first_person :: proc(renderer: ^Renderer, room: ^game.Room) {
 	if room == nil || room.player == nil || v.snapshot == nil { return }
 	now := renderer.sprite_assets.elapsed
 	active := game.tactical_first_person_active(room)
+	if active { f.weapon = room.first_person.weapon }
 	if active != f.engaged {
 		if active {
 			// The eyes look the way he faces, or along the grid way nearest the
@@ -247,7 +253,9 @@ update_tactical_first_person :: proc(renderer: ^Renderer, room: ^game.Room) {
 	} else {
 		f.amount = f.from*(1-ramp)
 	}
-	// The room's new shots: their tracers, the kick, the hit's mark.
+	// The room's new shots: their tracers, the kick, the hit's mark. Only the
+	// AK keeps a trail; another weapon's bytes are its own.
+	if f.weapon != .AK { f.seen_shots = room.first_person.shots }
 	trail := &room.first_person.trail
 	for f.seen_shots < room.first_person.shots {
 		f.seen_shots += 1
@@ -765,20 +773,9 @@ draw_first_person_overlay :: proc(renderer: ^Renderer, room: ^game.Room) {
 		}
 	}
 	if first_person_amount(renderer) <= FIRST_PERSON_AK_FROM { return }
-	ak := first_person_ak_texture(f)
-	if ak.id != 0 {
-		at := first_person_ak_origin(renderer, now)
-		scale := first_person_ak_scale(renderer)
-		weapon_size := FIRST_PERSON_AK_SIZE*scale
-		rl.DrawTexturePro(ak, {0, 0, f32(ak.width), f32(ak.height)}, {at.x, at.y, weapon_size.x, weapon_size.y}, {}, 0, rl.WHITE)
-		if t := now-f.kick_at; f.kick_at > 0 && t >= 0 && t < FIRST_PERSON_FLASH_SECONDS {
-			flash := first_person_flash_texture(f, int(f.flash)%2)
-			if flash.id != 0 {
-				muzzle := first_person_muzzle(renderer, now)
-				size := rl.Vector2{f32(flash.width), f32(flash.height)}*scale
-				rl.DrawTextureEx(flash, {math.round(muzzle.x-size.x*0.5), math.round(muzzle.y-size.y*0.5)}, 0, scale, rl.WHITE)
-			}
-		}
+	switch FIRST_PERSON_LOOKS[f.weapon].hand {
+	case .AK: draw_first_person_ak(renderer, now)
+	case .Empty:
 	}
 	// The crosshair: four paper ticks in ink round a dot, warm over a foe; a
 	// hit marks it with four corners a moment.
@@ -790,8 +787,28 @@ draw_first_person_overlay :: proc(renderer: ^Renderer, room: ^game.Room) {
 	duration := max(room.first_person.duration, 0.001)
 	accent := GOTHIC_RED if left <= 3 else FIRST_PERSON_OLIVE
 	hud_frame(bounds, accent)
-	gothic_text_fit(renderer, first_person_countdown_text(left), {bounds.x+12, bounds.y+4, bounds.width-24, 24}, 18, GOTHIC_PAPER)
+	gothic_text_fit(renderer, first_person_countdown_text(left, f.weapon), {bounds.x+12, bounds.y+4, bounds.width-24, 24}, 18, GOTHIC_PAPER)
 	hud_bar({bounds.x+12, bounds.y+bounds.height-12, bounds.width-24, 6}, left/duration, accent, int(min(duration, 30)))
+}
+
+// The AK at the bottom right, its flash at the muzzle a moment after a shot.
+@(private = "file")
+draw_first_person_ak :: proc(renderer: ^Renderer, now: f64) {
+	f := &renderer.tactical.first_person
+	ak := first_person_ak_texture(f)
+	if ak.id == 0 { return }
+	at := first_person_ak_origin(renderer, now)
+	scale := first_person_ak_scale(renderer)
+	weapon_size := FIRST_PERSON_AK_SIZE*scale
+	rl.DrawTexturePro(ak, {0, 0, f32(ak.width), f32(ak.height)}, {at.x, at.y, weapon_size.x, weapon_size.y}, {}, 0, rl.WHITE)
+	if t := now-f.kick_at; f.kick_at > 0 && t >= 0 && t < FIRST_PERSON_FLASH_SECONDS {
+		flash := first_person_flash_texture(f, int(f.flash)%2)
+		if flash.id != 0 {
+			muzzle := first_person_muzzle(renderer, now)
+			size := rl.Vector2{f32(flash.width), f32(flash.height)}*scale
+			rl.DrawTextureEx(flash, {math.round(muzzle.x-size.x*0.5), math.round(muzzle.y-size.y*0.5)}, 0, scale, rl.WHITE)
+		}
+	}
 }
 
 @(private = "file")
@@ -826,10 +843,48 @@ first_person_countdown_bounds :: proc(renderer: ^Renderer) -> rl.Rectangle {
 	return {16, renderer.canvas_height-62, 176, 46}
 }
 
-// "FPS 12s": the whole seconds left, counted up.
-first_person_countdown_text :: proc(left: f32) -> cstring {
-	return fmt.ctprintf("FPS %ds", int(math.ceil(max(f32(0), left)-0.0001)))
+// "FPS 12s": the weapon's tag and the whole seconds left, counted up.
+first_person_countdown_text :: proc(left: f32, weapon := game.First_Person_Weapon.AK) -> cstring {
+	return fmt.ctprintf("%s %ds", FIRST_PERSON_LOOKS[weapon].tag, int(math.ceil(max(f32(0), left)-0.0001)))
 }
 
 // The HUD's line behind his eyes: how the AK and the steps are worked.
 FIRST_PERSON_HUD_STATUS :: cstring("MIRA COL MOUSE / CLIC: SPARA / WASD: PASSI")
+// A weapon whose rules are still to come: only the look and the steps work.
+FIRST_PERSON_HUD_STATUS_BARE :: cstring("MIRA COL MOUSE / WASD: PASSI")
+
+// --------------------------------------------------------------------------
+// Each weapon's look (game.FIRST_PERSON_WEAPONS has its rules).
+
+// What is in hand: the AK's print, or nothing (the crosshair and the plate
+// alone, as Doom's fist leaves the ammo box blank) until a weapon's own
+// drawing comes (docs/piano-prima-persona.md, Fasi 3, 5 e 7).
+First_Person_Hand :: enum u8 {Empty, AK}
+
+First_Person_Look :: struct {
+	// The countdown's tag (the new ones provisional, as wide as the AK's,
+	// until Fase 3 names them), the HUD's line, the print in hand.
+	tag: string,
+	status: cstring,
+	hand: First_Person_Hand,
+}
+
+@(rodata)
+FIRST_PERSON_LOOKS := [game.First_Person_Weapon]First_Person_Look{
+	.AK = {tag = "FPS", status = FIRST_PERSON_HUD_STATUS, hand = .AK},
+	.Fists = {tag = "FPB", status = FIRST_PERSON_HUD_STATUS_BARE},
+	.Sword = {tag = "FPF", status = FIRST_PERSON_HUD_STATUS_BARE},
+	.Bow = {tag = "FPA", status = FIRST_PERSON_HUD_STATUS_BARE},
+}
+
+// The weapon the board shows: the room's while the view is on, the last one
+// through the rise back.
+first_person_shown_weapon :: proc(renderer: ^Renderer) -> game.First_Person_Weapon {
+	if renderer == nil { return .AK }
+	return renderer.tactical.first_person.weapon
+}
+
+// The HUD's line for the weapon in hand.
+first_person_hud_status :: proc(renderer: ^Renderer) -> cstring {
+	return FIRST_PERSON_LOOKS[first_person_shown_weapon(renderer)].status
+}

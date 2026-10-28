@@ -272,8 +272,8 @@ draw_tactical_hud :: proc(renderer: ^Renderer, room: ^game.Room, paused, hologra
 	if cinematic { status = "TEMPO SOSPESO" }
 	if recovering { status = "MUOVITI / CARTE IN RECUPERO" }
 	if stunned { status = "SOLO CARTE" }
-	// Behind the player's eyes, how the AK and the steps are worked.
-	if fps && !cinematic { status = FIRST_PERSON_HUD_STATUS }
+	// Behind the player's eyes, how the weapon in hand and the steps are worked.
+	if fps && !cinematic { status = first_person_hud_status(renderer) }
 	// The rope holds through a window's end and a stun: the pivot stays put.
 	if lasso && !cinematic { status = lasso_hud_status(room) }
 	if shadow { status = "MONDO FERMO / SOLO PASSI / DIAGONALE SUL BATTITO" }
