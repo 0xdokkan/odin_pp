@@ -12,10 +12,11 @@ Tactical_Controller :: struct {
 	// FIRST PERSON SHOOTER (first_person_input.odin): the mouse is the view's
 	// (raylib's cursor hidden and held: update_tactical_controller follows
 	// this), the frames left before its moves turn the view, and a press made
-	// before the view took the mouse, which fires nothing until it is let go.
+	// before the view took the mouse, which fires nothing until it is let go
+	// (the left button's, the right one's).
 	look_captured: bool,
 	look_settle: int,
-	fire_latched: bool,
+	fire_latched, right_latched: bool,
 }
 
 M7_INPUT_TRACE :: #config(M7_INPUT_TRACE, false)
@@ -27,10 +28,10 @@ Tactical_Controller_Input :: struct {
 	defenses: [4]bool,
 	map_input: Tactical_Map_Input,
 	// FIRST PERSON SHOOTER: the mouse's move this frame in pixels (only while
-	// the view has the mouse), the left button held, and the profile's mouse
-	// sensitivity (0: as it comes).
+	// the view has the mouse), the left and right buttons and Ctrl held, and
+	// the profile's mouse sensitivity (0: as it comes).
 	look: [2]f32,
-	fire: bool,
+	fire, fire_right, ctrl: bool,
 	sensitivity: f32,
 }
 
@@ -77,7 +78,10 @@ tactical_controller_input :: proc(controller: ^Tactical_Controller, room: ^game.
 		map_input = {mouse = mouse, inside = inside, toggle = run_pressed(controls, .Map), close = run_pressed(controls, .Cancel),
 			reset = run_pressed(controls, .Recenter), pressed = controls.left_pressed, down = controls.left_down,
 			wheel = (0 if room != nil && room.player != nil && room.player.tactical.config.expedition else controls.wheel)},
-		fire = controls.left_down, sensitivity = sensitivity,
+		// Ctrl is Feretro's arrow aim on the board; behind the eyes, where no
+		// arrow is drawn, a weapon's own key (first_person_input.odin).
+		fire = controls.left_down, fire_right = controls.right_down, ctrl = run_down(controls, .Arrow_Aim),
+		sensitivity = sensitivity,
 	}
 	if controller.look_captured {
 		delta := controls.mouse_motion
@@ -212,9 +216,9 @@ step_tactical_controller :: proc(
 	// then the PINBALL's ball rolls them out.
 	drain_lasso_spin_commands(room, renderer, cards, playtest)
 	drain_pinball_roll_commands(room, renderer, cards, playtest)
-	// FIRST PERSON SHOOTER: the trigger as the button holds it, then the shots
-	// due, as world commands too.
-	game.first_person_set_trigger(room, first_person_trigger(controller, renderer, room, input))
+	// FIRST PERSON SHOOTER: the buttons to the weapon in hand (the AK's
+	// trigger), then the shots due, as world commands too.
+	route_first_person_buttons(room, first_person_buttons(controller, renderer, room, input))
 	drain_first_person_fire(room, renderer, cards, playtest)
 	// Expiration is checked after all paid beats, including the last second.
 	if game.tactical_tick(room, 0, true, controller.hologram) {

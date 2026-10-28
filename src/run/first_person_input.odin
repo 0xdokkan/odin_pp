@@ -18,7 +18,10 @@ import render "../render"
 // modal over the board and when the view ends. The scene's lane is left with
 // steps and waits, W, A, S and D turned with the view; the hand, its keys, the
 // map, the arrows and the HUD's buttons are off (the pointer never reaches
-// them: roguelike_scene.odin).
+// them: roguelike_scene.odin). The capture, the latched presses and the pause
+// are every weapon's; the buttons go to the weapon in hand
+// (route_first_person_buttons), and every weapon steps as the AK does until
+// its own phase gives it its own moves.
 
 // Radians the view turns for a pixel of the mouse, before the profile's
 // sensitivity; a frame's move counts up to this many pixels.
@@ -48,7 +51,7 @@ first_person_follow_capture :: proc(controller: ^Tactical_Controller, room: ^gam
 	if want == controller.look_captured { return }
 	controller.look_captured = want
 	controller.look_settle = FIRST_PERSON_LOOK_SETTLE_FRAMES
-	controller.fire_latched = true
+	controller.fire_latched, controller.right_latched = true, true
 	if !want { game.first_person_set_trigger(room, false) }
 }
 
@@ -64,13 +67,33 @@ turn_first_person_look :: proc(controller: ^Tactical_Controller, renderer: ^rend
 	render.turn_first_person_view(renderer, input.look.x*sensitivity, -input.look.y*sensitivity)
 }
 
-// The AK's trigger this frame: the button held with the mouse the view's, once
-// any press from before has been let go and the dive is over.
-first_person_trigger :: proc(controller: ^Tactical_Controller, renderer: ^render.Renderer, room: ^game.Room,
-	input: Tactical_Controller_Input) -> bool {
+// The view's buttons this frame, read once for every weapon (as Half-Life's
+// ItemPostFrame reads them before its weapon's attacks): each mouse button
+// held with the mouse the view's, once any press of it from before has been
+// let go and the dive is over; Shift and Ctrl as they are held then.
+First_Person_Buttons :: struct {
+	left, right, shift, ctrl: bool,
+}
+
+first_person_buttons :: proc(controller: ^Tactical_Controller, renderer: ^render.Renderer, room: ^game.Room,
+	input: Tactical_Controller_Input) -> (buttons: First_Person_Buttons) {
 	if !input.fire { controller.fire_latched = false }
-	return game.tactical_first_person_active(room) && controller.look_captured && input.fire && !controller.fire_latched &&
-	       !render.first_person_diving(renderer)
+	if !input.fire_right { controller.right_latched = false }
+	if !game.tactical_first_person_active(room) || !controller.look_captured || render.first_person_diving(renderer) { return }
+	buttons.left = input.fire && !controller.fire_latched
+	buttons.right = input.fire_right && !controller.right_latched
+	buttons.shift, buttons.ctrl = input.shift, input.ctrl
+	return
+}
+
+// The buttons to the weapon in hand (docs/piano-prima-persona.md, sezione 4.2):
+// the AK's trigger is the left button, whatever else is held; the fists', the
+// sword's and the bow's wait for their phases (2, 4 and 6) and do nothing yet.
+route_first_person_buttons :: proc(room: ^game.Room, buttons: First_Person_Buttons) {
+	switch room.first_person.weapon {
+	case .AK: game.first_person_set_trigger(room, buttons.left)
+	case .Fists, .Sword, .Bow:
+	}
 }
 
 // The shots due, each a world command along the view's aim; never into a full
@@ -110,7 +133,7 @@ release_first_person_mouse :: proc(controller: ^Tactical_Controller, room: ^game
 	if controller.look_captured {
 		controller.look_captured = false
 		controller.look_settle = FIRST_PERSON_LOOK_SETTLE_FRAMES
-		controller.fire_latched = true
+		controller.fire_latched, controller.right_latched = true, true
 	}
 	game.first_person_set_trigger(room, false)
 	sync_first_person_cursor(controller)

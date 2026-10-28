@@ -1617,6 +1617,66 @@ della mano vuota ([giro del codice di Doom](https://bookdown.org/robertness/doom
 - **Non verificato a occhio:** la mano vuota e le sigle nuove a schermo. Nessun
   atto le mostra ancora; le mostrerà l'atto `prima_persona` (passo 4).
 
+**Domande prima del passo 3** (risposte dell'utente: «Sì, passo 3», cioè le
+scelte consigliate):
+- I clic di pugni, spada e arco **non fanno niente** finché la fase dell'arma
+  non li collega; mouse, passi e pausa come con l'AK.
+- **Clic destro, `Shift` e `Ctrl` letti già ora**, con la regola dell'AK (un
+  clic premuto prima che la vista prenda il mouse non conta), ognuno con il suo
+  test.
+- Le armi nuove **si muovono a passi come l'AK** finché la loro fase non porta
+  il loro movimento.
+
+**Ricerca del passo 3:** in Half-Life `ItemPostFrame`, comune a tutte le armi,
+legge i tasti a ogni fotogramma e chiama l'attacco primario o secondario
+dell'arma in mano, ognuno con la sua attesa
+([Valve, modi di fuoco](https://developer.valvesoftware.com/wiki/Adding_Firing_Modes_to_your_weapons),
+[Valve, attacchi ritardati](https://developer.valvesoftware.com/wiki/Delayed_Attacks),
+[AlliedModders, `CBasePlayerWeapon`](https://wiki.alliedmods.net/CBasePlayerWeapon_(CS))).
+È il modello di `first_person_buttons` più `route_first_person_buttons`.
+
+**Passo 3 — tasti per arma: fatto.**
+- Il controller ora legge anche il clic destro tenuto (`Run_Input.right_down`,
+  `Tactical_Controller_Input.fire_right`) e `Ctrl` (`ctrl`). `Ctrl` è il tasto
+  della mira delle frecce di Feretro sul tavolo; nella vista, dove le frecce non
+  si usano, diventa il tasto dell'arma.
+- `first_person_buttons` (`src/run/first_person_input.odin`) legge i tasti una
+  volta per tutte le armi, con le regole dell'AK: niente prima che la vista
+  abbia il mouse, né durante la discesa; un clic premuto da prima non conta
+  finché non si lascia, per ogni bottone (`fire_latched`, `right_latched`).
+  Pausa, fuoco perso e fine della vista bloccano tutti e due i bottoni.
+- `route_first_person_buttons` passa i tasti all'arma in mano: per l'AK il
+  sinistro è il grilletto, come prima; per pugni, spada e arco per ora niente
+  (Fasi 2, 4 e 6). I passi restano quelli dell'AK per tutte.
+- Test nuovi in `src/integration/first_person_weapon_controller_test.odin` (3):
+  clic destro e `Ctrl` dall'ingresso del gioco; per ogni arma i clic bloccati e
+  sbloccati uno per uno, la discesa, solo l'AK che spara; per ogni arma la
+  pausa con i due bottoni tenuti. I test dell'AK sono quelli di prima.
+- **Catture:** l'atto `fps` da solo dà ancora **114 catture identiche al byte**
+  alle impronte della Fase 0 (41 s, uscita 0).
+- **Verifiche:** check con e senza assert puliti; `check.ps1` completo: **1749
+  test verdi** con e senza assert (i 1746 del passo 2 più i 3 nuovi), più le
+  due build (377 s).
+
+**Il resto della fase senza fermate.** Durante il passo 3 l'utente ha scritto:
+«non hai domande, fai pure l'intera fase. Non ti fermare al prossimo passo
+appena hai finito questo», e poi: «se non hai domande, se le hai fammele pure».
+Le domande dei passi 4 e 5, fatte tutte insieme, e le risposte:
+1. **Mazzo dell'arena:** «AK e Canna (Consigliato)», cioè First Person Shooter
+   e la Canna da Pesca, come nelle altre arene, così `F7` e la pesca funzionano
+   anche qui. Le carte nuove entrano quando nascono.
+2. **Pugni, spada e arco prima delle loro carte:** «Solo nell'atto
+   (Consigliato)»: l'atto `prima_persona` le prende con un comando di prova e ne
+   fa le catture; nel gioco non c'è niente di nuovo finché non arrivano le
+   carte.
+3. **Posto nel giro di `F3`:** «Prima di tutte» (non la mia raccomandazione):
+   subito dopo la Piana, quindi Piana → Prima persona → Altezze → … Cambia il
+   giro delle altre arene e i loro test.
+4. **Verifica di fine fase:** «Solo gli atti» (non la mia raccomandazione):
+   niente smoke completo né misure del tempo; si confrontano l'atto `fps`,
+   quello delle strutture e quello nuovo, più gli atti che il giro nuovo di
+   `F3` tocca, ognuno da solo.
+
 ## 11. Fase 2 — Pugni: regole e prototipo giocabile
 
 ### Obiettivo
@@ -2314,6 +2374,11 @@ aggiungono qui le loro.
   munizioni (`am_noammo`) lasciano vuoto il riquadro, modello della mano vuota.
 - [Guide di QuakeC](https://www.insideqc.com/qctut/qctut-52.shtml): `W_Attack`
   e `W_SetCurrentAmmo` scelgono per arma (guide di appassionati).
+- [Valve, modi di fuoco](https://developer.valvesoftware.com/wiki/Adding_Firing_Modes_to_your_weapons),
+  [Valve, attacchi ritardati](https://developer.valvesoftware.com/wiki/Delayed_Attacks)
+  e [AlliedModders, `CBasePlayerWeapon`](https://wiki.alliedmods.net/CBasePlayerWeapon_(CS)):
+  in Half-Life `ItemPostFrame` legge i tasti per tutte le armi e chiama
+  l'attacco primario o secondario di quella in mano.
 - [Wikipedia, test di caratterizzazione](https://en.wikipedia.org/wiki/Characterization_test):
   il «golden master» per rifare il codice senza cambiarne l'uscita.
 
