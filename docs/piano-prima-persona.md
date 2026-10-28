@@ -659,7 +659,8 @@ La proposta: **una sola meccanica «vista»**, quella dell'AK, con un'**arma**.
 | `W A S D` | passi girati con la vista | movimento libero | passi più veloci | passi girati con la vista |
 | `Q` / `E` | tacciono | tacciono | girano la vista di 90° | tacciono |
 | `Shift` + direzione | schivata | — | schivata | schivata |
-| `Spazio` | aspetta | scatto | aspetta | aspetta |
+| `Spazio` | aspetta | salto | aspetta | aspetta |
+| Doppio tocco di una direzione | — | scatto | — | — |
 | `P` / `Esc` | pausa e mouse libero | come l'AK | come l'AK | come l'AK |
 
 **Ganci con `Shift` (scelta di Claude: l'utente l'ha lasciata a noi).** Il
@@ -741,8 +742,9 @@ un critico molto più forte.
   destra).
 - **`Shift` + clic sinistro: gancio sinistro. `Shift` + clic destro: gancio
   destro.**
-- **`Spazio`: scatto** (proposta): due caselle in un lampo nella direzione in
-  cui ci si muove.
+- **`Spazio`: salto** (scelta dell'utente, Fase 2).
+- **Doppio tocco di una direzione (`W W`, `A A`…): scatto**, una spinta libera
+  lunga 2 caselle nella direzione in cui ci si muove (scelta dell'utente).
 - **`P` / `Esc`:** pausa, come l'AK.
 
 Nel pugilato i pugni hanno un numero: 1 jab, 2 cross, 3 gancio sinistro, 4
@@ -756,8 +758,12 @@ pugno della sua mano ([Siliconera](https://www.siliconera.com/?p=294178)).
 
 ### 5.3 Movimento libero (proposta)
 
-- **Velocità 3,5 caselle al secondo**: quasi tre volte un passo a griglia
-  (1 casella ogni 0,8 s = 1,25 al secondo). Si parte e ci si ferma in un
+- **Movimento davvero libero** (l'utente: «non deve essere costretto al
+  movimento su griglia quando usa i pugni»): il corpo scivola in ogni
+  direzione e si ferma dove si vuole; le caselle restano solo dietro le quinte.
+- **Velocità 5 caselle al secondo, solo con i pugni** (scelta dell'utente:
+  l'arena «Prima persona» attraversata in 4 s); un passo a griglia fa 1
+  casella ogni 0,8 s, cioè 1,25 al secondo. Si parte e ci si ferma in un
   decimo di secondo (accelerazione e attrito, come Cripta delle Rune).
 - **Il corpo è un cerchio di 0,3 caselle.** Non entra nei solidi
   (`lasso_cell_is_solid`) né nei nemici (un cerchio di 0,4 al centro della loro
@@ -766,17 +772,30 @@ pugno della sua mano ([Siliconera](https://www.siliconera.com/?p=294178)).
   caselle).
 - **Le regole del passo valgono ancora:** si entra in una casella vicina solo
   se un passo normale potrebbe (un gradino al massimo, stesso piano o un
-  imbocco); niente diagonali fra due solidi; **mai giù da un dirupo**, perché
-  chi cammina non cade per scelta.
+  imbocco); niente diagonali fra due solidi; **camminando mai giù da un
+  dirupo**, perché chi cammina non cade per scelta.
+- **Salto** (scelta dell'utente, Fase 2): `Spazio`, mezzo secondo in aria,
+  circa 4 gradini in alto; scavalca le coperture basse e sale di colpo su un
+  dislivello fino a 4 gradini. **In aria** i colpi a terra (zampate, onde,
+  pozze, trappole) passano sotto, frecce e proiettili prendono ancora.
+  **Saltando si scende da un dirupo**, con il danno delle cadute di oggi oltre
+  1 gradino (fino a 10).
+- **Scatto:** doppio tocco di una direzione; una spinta libera lunga 2
+  caselle in 0,18 s a qualsiasi angolo (fermi: in avanti), ci si ferma dove si
+  arriva, un muro la ferma e ci si scivola lungo; poi 1,2 s di ricarica.
+- **Ascensori** (scelta dell'utente, non la mia raccomandazione): con i pugni
+  si chiamano e si prendono come a piedi.
 - **La casella del Viandante** (`room.player.position`) è quella sotto il
   centro del corpo. Cambia quando il centro passa il bordo: conta come entrare
   nella casella (pozze, fuochi, trappole, lava agiscono), ma **non costa
   tempo**.
 - **Terreni lenti** delle spedizioni (sabbia, acqua, neve, palude): metà
   velocità, come oggi raddoppiano il passo.
-- **I nemici mirano alla casella**: i colpi si risolvono ai battiti sulla
-  casella dove il Viandante è in quel momento. **Uscire in tempo dalle caselle
-  minacciate è la schivata.**
+- **I nemici mirano alla casella**: i colpi si risolvono ai battiti sulle
+  caselle rosse, e prendono il Viandante **se anche solo un pezzo del suo corpo
+  le tocca** (scelta dell'utente, più severa del solo centro). **Uscire del
+  tutto e in tempo dalle caselle minacciate, saltare o scattare è la
+  schivata.**
 - **Alla fine della carta** il corpo scivola al centro della sua casella in
   0,15 s e la telecamera risale.
 
@@ -788,19 +807,22 @@ escono pulite.
 
 | Pugno | Tasti | Portata dall'occhio | Arriva dopo | Prossimo pugno dopo | Danno | Critico |
 |---|---|---|---|---|---:|---:|
-| Jab | clic sinistro | 1,4 caselle | 0,12 s | 0,30 s | 2 | 6 |
-| Cross | clic destro | 1,4 caselle | 0,16 s | 0,40 s | 3 | 9 |
-| Gancio sinistro | `Shift` + clic sinistro | 1,1 caselle, anche un po' a sinistra | 0,20 s | 0,50 s | 4 | 12 |
-| Gancio destro | `Shift` + clic destro | 1,1 caselle, anche un po' a destra | 0,20 s | 0,50 s | 4 | 12 |
+| Jab | clic sinistro | 1,4 caselle | 0,12 s | 0,30 s | 3 | 9 |
+| Cross | clic destro | 1,4 caselle | 0,16 s | 0,40 s | 4 | 12 |
+| Gancio sinistro | `Shift` + clic sinistro | 1,1 caselle, anche un po' a sinistra | 0,20 s | 0,50 s | 6 | 18 |
+| Gancio destro | `Shift` + clic destro | 1,1 caselle, anche un po' a destra | 0,20 s | 0,50 s | 6 | 18 |
+
+I danni sono quelli «più forti» scelti dall'utente (la proposta +50%: era 2,
+3, 4); i tempi sono quelli proposti. Si ritoccano provando (passo 5).
 
 - **Chi prende il pugno:** al momento dell'arrivo, il primo cartoncino lungo il
   mirino entro la portata (il colpo dell'AK accorciato). I ganci prendono anche
   un nemico fino a 25° di lato, dalla loro parte: sono buoni contro chi
   scivola via.
 - **Danno a confronto:** l'AK fa 1 danno a colpo, 6 al secondo, da lontano. I
-  pugni fanno **di più a colpo** (2-4), circa 7 al secondo a pugni normali, ma
+  pugni fanno **di più a colpo** (3-6), circa 10 al secondo a pugni normali, ma
   bisogna stare a un passo dal nemico. I critici alzano molto il conto.
-- **Proposta:** un pugno, come un colpo dell'AK, non è un'azione del
+- **Scelta dell'utente:** un pugno, come un colpo dell'AK, non è un'azione del
   Viandante (niente tempo di finestra, il Veleno non morde).
 
 ### 5.5 I punti critici
@@ -830,20 +852,19 @@ su una parte del corpo del nemico.
   ([Fortnite Wiki](https://fortnite.fandom.com/wiki/Pickaxe_(Weapon))).
 - **Il colpo critico:** il pugno giusto che prende il nemico mentre il segno è
   acceso fa **il triplo del danno**. Il segno sparisce con una stella d'oro.
-  Proposta in più: il **gancio critico stordisce** 1 s (`Stagger`), cioè
-  interrompe l'attacco che il nemico stava caricando.
+  In più il **gancio critico stordisce** 1 s (`Stagger`), cioè interrompe
+  l'attacco che il nemico stava caricando (scelta dell'utente).
 - **Il pugno sbagliato** fa il danno normale e il segno resta.
-- **Mira:** proposta più semplice, basta il mirino sul nemico e il pugno
-  giusto; l'alternativa è chiedere anche il mirino sopra il segno (Fase 2,
-  domanda 4).
+- **Mira** (scelta dell'utente, non la mia raccomandazione): serve il pugno
+  giusto **e il mirino sopra il segno**, non basta il mirino sul nemico.
 - I tempi dei segni sono secondi del mondo e la zona viene dal flusso casuale
   della stanza: i test li ripetono uguali.
 
 ### 5.6 Formula del danno (proposta, numeri da confermare)
 
 ```text
-danno = danno_del_pugno                    (jab 2, cross 3, ganci 4)
-se il segno acceso chiede proprio quel pugno:
+danno = danno_del_pugno                    (jab 3, cross 4, ganci 6)
+se il segno acceso chiede proprio quel pugno e il mirino è sopra il segno:
     danno = danno × 3                      (critico)
 poi le regole normali: Sanguinamento, Scudo, reazioni.
 ```
@@ -852,21 +873,21 @@ Pugni al secondo, con i tempi della tabella:
 
 | Ritmo | Danno al secondo |
 |---|---:|
-| solo jab | 2 / 0,30 = 6,7 |
-| jab, cross, jab, cross… | 5 / 0,70 = 7,1 |
-| ganci alternati | 4 / 0,50 = 8,0 (portata più corta) |
-| jab, cross, con un critico ogni 3 pugni | circa 11 |
+| solo jab | 3 / 0,30 = 10 |
+| jab, cross, jab, cross… | 7 / 0,70 = 10 |
+| ganci alternati | 6 / 0,50 = 12 (portata più corta) |
+| jab, cross, con un critico ogni 3 pugni | circa 16 |
 
 ### 5.7 Difesa, finestra e altro (da decidere nella Fase 2)
 
 - **La scelta di difesa** si apre per un colpo che sta per arrivare e ferma il
-  mondo: con il movimento libero la proposta è **spegnerla** durante i pugni.
-  Ci si difende spostandosi fuori dalle caselle rosse, o con lo scatto.
+  mondo: con i pugni è **spenta** (scelta dell'utente). Ci si difende uscendo
+  dalle caselle rosse, saltando o scattando.
 - **Il Dinosauro:** proposta, la carta non si gioca mentre si cavalca (la
   velocità del Velociraptor e i passi del Giganotosauro non vanno d'accordo
   con il movimento libero).
-- **Piani e ascensori:** da un piano all'altro solo dagli imbocchi, come a
-  piedi; niente ascensori durante la carta.
+- **Piani e ascensori:** da un piano all'altro dagli imbocchi, come a piedi, e
+  anche con gli ascensori (scelta dell'utente).
 
 ### 5.8 Stile artistico e suoni (proposta)
 
@@ -1864,13 +1885,23 @@ alla fine di ogni passo.
    pugni si possono chiamare e prendere anche gli ascensori.
 6. **Gradini e dirupi:** «come a piedi ma aggiungi la feature del salto durante
    l'utilizzo della carta pugni». Un gradino alla volta, il bordo di un dirupo
-   ferma; in più **un salto**. Le sue domande (tasto, altezza, colpi in aria,
-   discesa dai dirupi) sono ancora aperte.
+   ferma; in più **un salto**.
 7. **Colpi dei nemici:** «Se lo tocchi appena» (non la mia raccomandazione): un
    colpo sulla casella rossa prende il Viandante se **anche solo un pezzo** del
    suo corpo la tocca.
-8. **Ancora da chiedere:** le domande sul salto, poi difesa, mira dei critici,
-   il critico, danni e tempi, se un pugno è un'azione del Viandante.
+8. **Tasti:** «Spazio salta, doppio tocco scatta» (non la mia raccomandazione,
+   che era `Ctrl` per lo scatto): lo scatto parte toccando due volte di fila
+   una direzione.
+9. **Salto:** «Salto medio (Consigliato)», mezzo secondo in aria, circa 4
+   gradini; in aria «Solo quelli dall'alto (Consigliato)»: i colpi a terra
+   passano sotto, frecce e proiettili prendono; dal dirupo «Sì, con le cadute
+   (Consigliato)».
+10. **Difesa:** «Niente scelta (Consigliato)».
+11. **Mira dei critici:** «Anche mirare al segno» (non la mia raccomandazione).
+12. **Il critico:** «Triplo + stordisce (Consigliato)».
+13. **Un pugno è un'azione?** «No, come l'AK (Consigliato)».
+14. **Danni:** «Più forti» (non la mia raccomandazione): jab 3, cross 4, ganci
+    6, critici al triplo; i tempi restano quelli della tabella.
 
 **La musica (chiesta dall'utente durante le domande; è materia della Fase 3,
 fatta prima su sua richiesta).**
