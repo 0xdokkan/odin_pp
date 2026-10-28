@@ -53,7 +53,7 @@ La tabella è in ordine di priorità, cioè l'ordine della scaletta qui sotto.
 | Priorità | Fase | Contenuto | Dipende da | Stato | Commit |
 |---|---|---|---|---|---|
 | 0 | 0 | Decisioni comuni e misure di partenza (proposta di Claude) | — | Fatta | vedi Esito |
-| 1 | 1 | Base comune della prima persona; l'AK resta identico | 0 | Da fare | — |
+| 1 | 1 | Base comune della prima persona; l'AK resta identico | 0 | In corso | vedi Esito |
 | 2 | 2 | Pugni: regole e prototipo giocabile nel laboratorio | 1 | Da fare | — |
 | 3 | 3 | Pugni: guantoni, segni critici, colpi a schermo, suoni | 2 | Da fare | — |
 | 4 | 4 | Spada: swing col mouse, parata, rampino; prototipo | 1 | Da fare | — |
@@ -624,8 +624,16 @@ La proposta: **una sola meccanica «vista»**, quella dell'AK, con un'**arma**.
   pesa 672, quasi tutti per gli ultimi 8 colpi dell'AK. Una vista sola è attiva
   alla volta, quindi i dati delle armi stanno **nello stesso posto** (un'unione:
   ogni arma usa lo spazio dei colpi dell'AK quando è lei a essere in mano), e
-  `Room` non cresce. Se non basta, si chiede all'utente prima di alzare il
-  limite (domanda 4 della Fase 1).
+  `Room` non cresce (scelta della Fase 1, domanda 4).
+- **Il salvataggio ha una copia sua** (ricerca della Fase 1). La spedizione si
+  salva in JSON (`campaign/persistence.odin`, `core:encoding/json`), che
+  rifiuta i `#raw_union` (`UNSUPPORTED_TYPE`) e con un `union` di struct
+  rilegge la prima variante che si lascia leggere, quindi spesso quella
+  sbagliata (le chiavi sconosciute si saltano). Per questo lo snapshot tiene
+  `First_Person_Save`: i campi dell'AK con le chiavi di oggi, più l'arma e un
+  campo per arma; due procedure, con i loro test, convertono da `Room` e verso
+  `Room`. Un salvataggio di prima non ha la chiave dell'arma, che vale quindi
+  l'AK (il primo valore): si legge com'è, senza alzare la versione.
 - La carta usa sempre l'effetto `.First_Person`, con l'arma in `charges`
   (come `ride_effect` per il Dinosauro, `dinosaur.odin:52`).
 - **Una vista alla volta**, come oggi: non si entra in una vista da dentro
@@ -1430,7 +1438,8 @@ salvataggio in `src/expedition/snapshot.odin`.
   disegno in mano chiamato per arma; per l'AK le stesse chiamate di oggi.
 - **Tasti:** un instradamento per arma in `first_person_input.odin` (tasti
   della sezione 4.2), con le regole di cattura dell'AK per tutte.
-- **Salvataggio:** l'arma entra nello snapshot; la versione sale.
+- **Salvataggio:** l'arma entra nello snapshot con `First_Person_Save` (sezione
+  4.1); la versione non sale, perché senza la chiave dell'arma vale l'AK.
 - **Arena «Prima persona»** (scelta della Fase 0): una sala con pilastri, nicchie e muri
   a più angoli per i tiri di sponda, coperture basse, un corridoio di 5 caselle
   per il rampino, un balestriere su un rialzo per le parate, un bruto per i
@@ -1503,7 +1512,42 @@ fermati alla fine di ogni passo.
 
 ### Esito
 
-_Da scrivere alla fine della fase._
+**Stato: in corso** (iniziata il 28 ottobre 2026).
+
+**Risposte dell'utente (28 ottobre 2026):**
+1. **Base: una vista sola**, con le parti comuni scritte una volta. L'utente ha
+   chiesto due volte di spiegare meglio e ha precisato: «in ogni caso voglio che
+   siano 4 carte separate da utilizzare». Le carte restano quattro e separate:
+   ognuna ha i suoi numeri, regole, disegni, suoni e tasti. In comune ci sono
+   solo discesa, risalita, pausa, secondi, divieto delle carte e salvataggio; una
+   carta si può rendere diversa anche lì con una colonna della tabella delle
+   armi.
+2. **Arena «Prima persona»: quella del progetto** qui sopra.
+3. **Dinosauro:** le tre carte nuove non si giocano mentre si cavalca; l'AK
+   resta com'è.
+4. **Spazio in `Room`:** dati delle armi sovrapposti (`#raw_union`), `Room` non
+   cresce; il salvataggio ha la sua copia `First_Person_Save` (sezione 4.1).
+
+**Ricerche prima della fase:**
+- Odin: un `#raw_union` mette tutti i campi allo stesso indirizzo, come
+  l'`union` del C; `union` è un'unione con etichetta, nulla se non è
+  `#no_nil` ([panoramica di Odin](https://odin-lang.org/docs/overview/),
+  [forum di Odin](https://forum.odin-lang.org/t/union-and-struct-raw-union/756)).
+- Il JSON di Odin (letto nel compilatore che usiamo, `core/encoding/json`):
+  `unmarshal` rifiuta i `#raw_union`; un `union` si scrive senza etichetta e si
+  rilegge provando le varianti in ordine; le chiavi sconosciute si saltano.
+  Ne nasce `First_Person_Save` (sezione 4.1).
+- Doom: `weaponinfo_t` in `d_items.h` è una riga per arma (munizioni e stati
+  per alzarla, abbassarla, tenerla pronta, attaccare, la fiammata) dentro un
+  solo codice delle armi ([sorgente di id Software](https://github.com/id-Software/DOOM/blob/master/linuxdoom-1.10/d_items.h),
+  [giro del codice di Doom](https://bookdown.org/robertness/doom_tour/10_5_item_definitions.html)).
+  Quake fa lo stesso con `W_Attack` e `W_SetCurrentAmmo`, che scelgono per
+  `self.weapon` ([guide di QuakeC](https://www.insideqc.com/qctut/qctut-52.shtml),
+  da confermare sul sorgente). È il modello della tabella delle armi.
+- Le catture uguali al byte sono un «golden master» (test di
+  caratterizzazione, Michael Feathers): si registra l'uscita di oggi e si
+  confronta dopo ogni modifica; servono per rifare il codice senza cambiare cosa
+  fa ([Wikipedia](https://en.wikipedia.org/wiki/Characterization_test)).
 
 ## 11. Fase 2 — Pugni: regole e prototipo giocabile
 
@@ -2191,6 +2235,18 @@ aggiungono qui le loro.
   il fermo che dà peso al colpo, meglio fra 0,1 e 0,2 s.
 - [Game Developer su Eiserloh, GDC 2016](https://gamedeveloper.com/programming/video-sprucing-up-cameras-with-math):
   la scossa della telecamera con il «trauma».
+
+**Base comune (Fase 1)**
+- [Panoramica di Odin](https://odin-lang.org/docs/overview/) e
+  [forum di Odin](https://forum.odin-lang.org/t/union-and-struct-raw-union/756):
+  `#raw_union` (campi sovrapposti come in C) e `union` con etichetta.
+- [Doom, `d_items.h`](https://github.com/id-Software/DOOM/blob/master/linuxdoom-1.10/d_items.h)
+  e [giro del codice di Doom](https://bookdown.org/robertness/doom_tour/10_5_item_definitions.html):
+  una riga di tabella per arma, un solo codice delle armi.
+- [Guide di QuakeC](https://www.insideqc.com/qctut/qctut-52.shtml): `W_Attack`
+  e `W_SetCurrentAmmo` scelgono per arma (guide di appassionati).
+- [Wikipedia, test di caratterizzazione](https://en.wikipedia.org/wiki/Characterization_test):
+  il «golden master» per rifare il codice senza cambiarne l'uscita.
 
 ## 19. Rischi e strade scartate
 
