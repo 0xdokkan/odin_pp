@@ -343,8 +343,9 @@ first_person_eye :: proc(room: ^Room, from: grid.Position, aim: First_Person_Aim
 
 // Where the card of `enemy` stands for a shot of `aim`: where the view showed
 // it, when that is near its cell, else on its cell's centre; and how far it
-// is lifted off its stand.
-@(private = "file")
+// is lifted off its stand. The fists' marks find their zones on it too
+// (first_person_marks.odin).
+@(private)
 first_person_card :: proc(enemy: Enemy, aim: First_Person_Aim) -> (at: [2]f32, lift: f32) {
 	at = {f32(enemy.position.x)+0.5, f32(enemy.position.y)+0.5}
 	if !aim.framed { return }

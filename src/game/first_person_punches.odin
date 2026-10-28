@@ -95,16 +95,24 @@ fists_punch_step :: proc(room: ^Room, aim: First_Person_Aim, h: f32) -> (struck:
 }
 
 // The punch lands: the foe it reaches takes its damage from him, as any blow of
-// his (a Shield first, its reactions, a kill's loot).
+// his (a Shield first, its reactions, a kill's loot); the right punch on its lit
+// mark, the crosshair over it, three times its damage, and a hook's staggers it
+// (first_person_marks.odin).
 @(private = "file")
 fists_land :: proc(room: ^Room, punch: First_Person_Punch, aim: First_Person_Aim) -> bool {
 	target, found := first_person_punch_target(room, punch, aim)
 	if !found { return false }
+	critical := first_person_punch_critical(room, punch, target.id, aim)
+	damage := FISTS_PUNCHES[punch].damage*(FISTS_CRITICAL_FACTOR if critical else 1)
 	action := make_action(.Attack, PLAYER_ENTITY, entity_target(target), .Opponent)
 	action.visual_group = FISTS_VISUAL_GROUP
-	if !add_effect(&action, damage_effect(target, FISTS_PUNCHES[punch].damage)) { return false }
+	if !add_effect(&action, damage_effect(target, damage)) { return false }
+	if critical && FISTS_PUNCHES[punch].side != 0 {
+		if !add_effect(&action, apply_status_effect(target, .Stagger, 1, FISTS_STAGGER_BEATS)) { return false }
+	}
 	report := resolve_action(room, &action)
 	if !report.accepted { return false }
+	if critical { fists_mark_struck(room, target.id) }
 	room.first_person.hits += 1
 	append_event_log(room.recent_events, &report.events)
 	collect_loot_in_magnet_range(room)

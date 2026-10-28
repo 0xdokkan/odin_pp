@@ -27,7 +27,8 @@ import grid "../engine/grid"
 // - A double tap dashes: a free push of FISTS_DASH_CELLS cells in FISTS_DASH_SECONDS
 //   at any angle, stopped by what stops him, then FISTS_DASH_RECHARGE seconds.
 // - On a lift's platform he rides it, the body held at its cell.
-// - The punches step on the same clock (first_person_punches.odin).
+// - The punches and their critical marks step on the same clock
+//   (first_person_punches.odin, first_person_marks.odin).
 // - Every rule steps at FISTS_STEP seconds whatever the frame: the same seconds give
 //   the same body at 30, 60 or 144 frames a second.
 
@@ -73,6 +74,11 @@ First_Person_Fists :: struct {
 	punch, queued: First_Person_Punch,
 	punch_clock: f32,
 	punch_landed: bool,
+	// The critical marks on the nearest foes, their stream, the criticals landed
+	// (first_person_marks.odin).
+	marks: [FISTS_MARKS]First_Person_Mark,
+	random: u64,
+	crits: i32,
 }
 
 // What the controller asks of the body this frame: the wished way (east, south;
@@ -91,6 +97,7 @@ first_person_fists_begin :: proc(room: ^Room) {
 	if room == nil || room.player == nil { return }
 	p := room.player.position
 	room.first_person.fists = {body = {f32(p.x)+0.5, f32(p.y)+0.5}, feet = f32(cell_height(room, p))}
+	fists_marks_begin(room)
 }
 
 // The fists in hand, the view on.
@@ -122,6 +129,7 @@ first_person_fists_move :: proc(room: ^Room, input: First_Person_Fists_Input, dt
 		entered, ended := fists_step(room, input.wish)
 		struck := false
 		if !ended {
+			fists_marks_step(room, FISTS_STEP)
 			struck = fists_punch_step(room, input.aim, FISTS_STEP)
 			ended = room.phase != .Combat || !first_person_fists_active(room)
 		}

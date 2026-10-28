@@ -17,12 +17,20 @@ punch_room :: proc(t: ^testing.T, data: ^level.Level, player: ^Player, health :=
 	return room
 }
 
+// The critical marks kept dark: these tests weigh the punches alone
+// (first_person_marks_test.odin weighs the criticals).
+@(private = "file")
+punch_dark :: proc(room: ^Room) {
+	for &mark in room.first_person.fists.marks { mark.lit, mark.wait = 0, 1000 }
+}
+
 // Frames of `dt` for `seconds`: the punch pressed on the first, at `yaw`.
 @(private = "file")
 punch_run :: proc(room: ^Room, seconds: f32, punch := First_Person_Punch.None, yaw := f32(0), wish := [2]f32{}, dt := f32(1.0/60)) {
 	input := First_Person_Fists_Input{wish = wish, punch = punch, aim = {yaw = yaw}}
 	for _ in 0..<int(math.round(seconds/dt)) {
 		_ = first_person_fists_move(room, input, dt)
+		punch_dark(room)
 		input.punch = .None
 	}
 }
@@ -68,6 +76,7 @@ test_punches_land_on_time_with_their_damage :: proc(t: ^testing.T) {
 		marked := false
 		for _ in 0..<int(math.round(0.03/FISTS_STEP)) {
 			_ = first_person_fists_move(&room, {aim = {yaw = 0}}, FISTS_STEP)
+			punch_dark(&room)
 			for event in room.recent_events.events[:room.recent_events.count] { marked = marked || event_is_first_person_punch(event) }
 		}
 		testing.expectf(t, health-foe.health == rules.damage, "%v: %d", punch, health-foe.health)
@@ -125,6 +134,7 @@ test_punches_wait_and_keep_time_at_any_frame_rate :: proc(t: ^testing.T) {
 			if press(1.0/20, frame, dt) && dt != 1.0/30 { input.punch = .Cross }
 			if press(1.0/6, frame, dt) { input.punch = .Cross }
 			_ = first_person_fists_move(&room, input, dt)
+			punch_dark(&room)
 			elapsed += dt
 			if frame+1 == int(math.round((1.0/3)/dt)) { lost_at_third = health-foe.health }
 			if frame+1 == int(math.round(0.5/dt)) { lost_at_half = health-foe.health }

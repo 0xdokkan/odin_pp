@@ -2089,6 +2089,57 @@ scelte consigliate):
   test verdi** con e senza assert (i 1760 del passo 1 più i 6 nuovi), più le
   due build (430 s). Come il movimento, i pugni non sono ancora collegati ai
   tasti né disegnati: si provano a mano dal passo 5.
+
+**Domande prima del passo 3** (risposta dell'utente: «Sì, passo 3», cioè le
+scelte consigliate):
+- Segni sui nemici a 3 caselle o meno e in vista, al massimo 4, sui più
+  vicini.
+- Il punto da mirare è **tutta la zona**: un quarto della larghezza del
+  cartoncino, metà altezza (testa o busto).
+- Un segno compare dopo una pausa a caso fra 0,6 e 1,4 s e resta 1,2 s; dopo
+  un critico il prossimo arriva in 0,3 s in un'altra zona.
+- Lo stordimento del gancio critico vale **sempre**, anche sul bruto.
+
+**Ricerche del passo 3:**
+- Il punto debole del piccone di Fortnite: un segno che fa danno doppio e si
+  sposta dopo ogni colpo andato a segno, per fare catena
+  ([Fortnite Wiki](https://fortnite.fandom.com/wiki/Pickaxe_(Weapon)),
+  [Game8](https://game8.co/games/Fortnite/archives/492048)).
+- **Da sapere:** un meccanismo simile è coperto da un brevetto di Epic,
+  «System and method for object weakpoint generation»
+  ([US 9,744,461](https://www.patentarcade.com/video-game-patent/US9744461/system-and-method-for-object-weakpoint-generation)),
+  che parla di punti deboli su oggetti colpiti per raccogliere materiali. Il
+  nostro segno è diverso (sui nemici, a tempo, il pugno giusto e il mirino
+  sopra), ma l'utente è avvisato: non è un parere legale.
+
+**Passo 3 — punti critici: fatto.**
+- `src/game/first_person_marks.odin`: quattro posti per i segni
+  (`First_Person_Mark`) nel corpo dei pugni, sui nemici in vista entro 3,5
+  caselle dal centro del corpo (3 caselle più mezza), i più vicini; un nemico
+  che esce dalla portata libera il posto per il prossimo più vicino.
+- Ogni segno: pausa a caso fra 0,6 e 1,4 s, poi acceso 1,2 s su una zona a caso
+  (quattro in larghezza, testa o busto). Le zone e le pause vengono da un flusso
+  casuale della vista (`First_Person_Fists.random`), preso dal flusso della
+  stanza quando si prendono i pugni: gli stessi giri danno gli stessi segni.
+- La zona del mirino si calcola sul cartoncino come lo vede il Viandante
+  (`first_person_crosshair_zone`): la mira a raggio dell'AK dal corpo, con
+  l'inclinazione della vista; la larghezza è quella del contorno del cartoncino
+  a quell'altezza, la testa è la metà alta.
+- Critico (`first_person_punch_critical`): il segno acceso chiede quel pugno e
+  il mirino sta sopra la sua zona, all'altezza giusta, quando il pugno arriva.
+  Il danno è triplo (jab 9, cross 12, ganci 18); un gancio critico aggiunge
+  `Stagger` per un battito (1 s), che interrompe il colpo caricato. Il segno si
+  spegne e il prossimo si accende dopo 0,3 s in un'altra zona. Contati in
+  `crits`.
+- Test nuovi in `src/game/first_person_marks_test.odin` (4): i segni sui
+  quattro più vicini e il posto liberato; i tempi e la ripetibilità; le quattro
+  zone e testa o busto sotto il mirino; critici, catena e stordimento, e i
+  colpi che non sono critici (pugno sbagliato, mirino accanto, testa invece del
+  busto). I test dei pugni tengono spenti i segni, per pesare solo i pugni.
+- **Verifiche:** check con e senza assert puliti; `check.ps1` completo: **1770
+  test verdi** con e senza assert (i 1766 del passo 2 più i 4 nuovi), più le
+  due build (449 s). I segni non si vedono ancora: il loro disegno semplice è
+  del passo 5.
 - Nel gioco entra nella Fase 3: i suoni del laboratorio oggi sono mono, quindi
   per la musica serve un canale stereo suo.
 
