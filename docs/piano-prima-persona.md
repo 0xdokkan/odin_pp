@@ -136,15 +136,17 @@ Vai avanti con il prossimo passo
    preparare e non affidare ad altri (sessioni nuove, agenti in background,
    workflow) nessun'altra fase. Vale anche se la memoria dice di concatenare le
    fasi: per questo documento l'utente vuole fermarsi.
-2. **Uno stop a ogni passo** (regola dell'utente: «a ogni passo tu ti
-   interrompa e mi chiedi di andare avanti facendomi sempre delle domande di
-   approfondimento se servono»).
-   - Fai **un passo solo** della lista «Passi», poi fermati.
-   - Scrivi il messaggio di fine passo (sezione 1.3): cosa hai fatto, cosa hai
-     cercato, cosa hai verificato, e le **domande di approfondimento** per il
-     passo dopo, con la raccomandazione come prima opzione.
-   - Chiudi chiedendo se andare avanti. Poi il turno finisce: il passo dopo
-     parte solo con il sì dell'utente.
+2. **Domande a ogni passo, nessuno stop per andare avanti** (regola
+   dell'utente del 2026-10-29, che sostituisce lo stop a ogni passo: «se devi
+   farmi domande a ogni passo, fammele pure, però non ti fermare a chiedermi se
+   vuoi andare al passo successivo ... vai in automatico fino a fine fase»).
+   - Prima di un passo che ha bisogno di scelte, fai le sue **domande di
+     approfondimento** (la raccomandazione come prima opzione); con le risposte
+     vai avanti da solo, passo dopo passo, fino alla fine della fase,
+     chiedendo di nuovo solo quando un passo dopo ha bisogno di risposte nuove.
+   - Un commit a ogni passo, come prima.
+   - Ti fermi e scrivi il messaggio di fine fase (sezione 1.3) solo alla fine
+     della fase; la fase dopo parte con il comando dell'utente.
    - Se una risposta cambia il progetto, aggiorna prima questo documento.
 3. **Ricerca su internet, sempre** (regola dell'utente: «se servono
    informazioni su come si sviluppa a livello tecnico, o usando i riferimenti a
