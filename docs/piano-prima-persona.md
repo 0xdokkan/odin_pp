@@ -57,7 +57,7 @@ La tabella è in ordine di priorità, cioè l'ordine della scaletta qui sotto.
 | 2 | 2 | Pugni: regole e prototipo giocabile nel laboratorio | 1 | Fatta | vedi Esito |
 | 3 | 3 | Pugni: guantoni, segni critici, colpi a schermo, suoni | 2 | Fatta | vedi Esito |
 | 4 | 4 | Spada: swing col mouse, parata, rampino; prototipo | 1 | Fatta | vedi Esito |
-| 5 | 5 | Spada: lama, scie, scintille, suoni | 4 | Da fare | — |
+| 5 | 5 | Spada: lama, scie, scintille, suoni | 4 | Fatta | vedi Esito |
 | 6 | 6 | Arco: carica, rimbalzi, zone critiche, frecce; prototipo | 1 | Da fare | — |
 | 7 | 7 | Arco: arco, frecce in volo, faretra nell'HUD, suoni | 6 | Da fare | — |
 | 8 | 8 | Tutte insieme: equilibrio, prestazioni, documenti | 3, 5, 7 | Da fare | — |
@@ -3032,6 +3032,110 @@ controllo completo, atti da soli e tempo di un fotogramma contro l'AK
 5. **Suoni:** acciaio e Neon (consigliato).
 6. **Musica della spada:** **una musica nuova** da codice (non la mia
    raccomandazione, che era la traccia tenuta da parte).
+
+**Fatta (2026-10-29, nella notte, senza fermarsi come chiesto).** Un commit a
+passo sul ramo `piano-prima-persona`:
+
+1. **Lo zweihänder Neon** (`fa5cfe1`, `render/first_person_zweihander.odin`).
+   Uno spadone a due mani fatto da codice come modello 3D e disegnato sulla tela
+   a pixel dei guantoni, con il loro inchiostro e la loro carta. Ricerca: lo
+   zweihänder vero ha i ganci di parata (Parierhaken) dove finisce il ricasso,
+   un ricasso fasciato per impugnarlo più in alto, una guardia fino a 35 cm e
+   un'impugnatura di almeno 25 cm
+   ([Wikipedia](https://en.wikipedia.org/wiki/Zweih%C3%A4nder)). Qui: lama
+   d'acciaio a sezione di rombo (facce piatte, due toni per lato) con i fili di
+   luce ciano e la scanalatura al neon; ganci di parata con le luci; ricasso
+   fasciato con due anelli magenta; guardia larga con il cuore magenta, le punte
+   piegate e le luci ciano; impugnatura lunga con gli anelli; pomo pesante con
+   la fascia ciano; i due guantoni Neon sull'impugnatura, il destro sotto la
+   guardia e il sinistro più in basso, i polsi piegati verso le spalle. La lama
+   sta sulla linea delle regole dall'elsa alla punta: la guardia a un quarto
+   della linea, la punta disegnata **esattamente** sul punto del mouse (test), e
+   in mezzo la lama 3D, che si inclina dentro la vista quando la punta va verso
+   l'elsa. La faccia piatta guarda l'occhio.
+2. **La scia a tempo** (`4485797`). È la fascia spazzata dalla metà esterna
+   della lama negli ultimi 0,11 s. Conta il tempo, non i fotogrammi: è lunga
+   uguale a 30 e a 240 fotogrammi al secondo (test). È lisciata lungo una curva
+   Catmull-Rom, così uno swing veloce a pochi fotogrammi non lascia buchi.
+   Ricerca: è la soluzione che i forum di sviluppo consigliano per le scie delle
+   armi bianche ([GameDev.net](https://gamedev.net/forums/topic/552258-trail-implement/),
+   [Panda3D CMotionTrail](https://docs.panda3d.org/1.10/cpp/reference/panda3d.direct.CMotionTrail)).
+   Va a bande, dalla testa chiara alla coda scura, sempre più sottile verso la
+   coda; il colore viene dalla qualità, magenta se il colpo è roteante.
+3. **Parate e colpi al battito** (`dfaf9dc`). Nella vista della spada il colpo
+   di un nemico sul Viandante arriva a schermo **esattamente al suo battito**,
+   cioè quando la regola guarda la guardia (`foresee_first_person_blows`,
+   `render/attack_fx.odin`):
+   - il conto alla rovescia dell'intento è noto, quindi l'arma (o il dardo) e
+     l'attacco del cartoncino partono prima quanto basta;
+   - quando il battito risolve il colpo, i suoi segnali lo trovano già sul
+     tabellone e non ne mostrano un secondo;
+   - un colpo che non arriverà (intento cambiato, nemico stordito o fuori
+     gioco) viene ritirato se manca più di 0,12 s;
+   - nelle altre viste nulla cambia (atto `fps` 114 su 114).
+
+   Parata normale: poche scintille arancioni smorte. Parata perfetta: la lama
+   bianca per un istante, una raffica di scintille bianche e d'oro e un anello
+   che si apre. Ricerca: in Sekiro la deviazione si riconosce dalla parata
+   normale proprio così, scintille più vive, un contorno circolare e un suono
+   che risuona
+   ([Steam, discussione dei giocatori](https://steamcommunity.com/app/814380/discussions/0/1652169858542412174)).
+4. **Catena e uncino del rampino** (`8f81d28`). Un uncino magenta a tre punte
+   vola dalla guardia al petto del nemico in 0,12 s, con la catena allentata
+   (anelli d'acciaio e lampi ciano). Poi resta agganciato al petto mentre il
+   nemico viene tirato, o mentre la vista è tirata verso un boss, con la catena
+   tesa.
+5. **Icona, parole e HUD** (`3d257d8`):
+   - la cella 34 è lo zweihänder Neon in diagonale;
+   - la carta dice «SPADONE: TAGLIA E PARA» («SPADONE, PARATA» nella versione
+     stretta);
+   - al taglio, accanto al petto, compare il cartellino col tipo e il danno
+     («FENDENTE 9»), del colore della qualità, con sotto le parole del bonus;
+   - con la guardia alzata compaiono quattro angoli attorno al mirino: ciano,
+     d'oro nel quarto di secondo della parata perfetta, e si stringono alla
+     parata.
+6. **Suoni e musica** (`7710e20`):
+   - **Suoni da codice**, acciaio e Neon (`tools/audio/sfx_fencer.py`):
+     - lo zweihänder sguainato all'entrata;
+     - il fruscio dello swing, più acuto quanto più parte veloce (il centro del
+       rumore segue la velocità, come nel modello di
+       [Selfridge, Moffat e Reiss 2017](https://qmro.qmul.ac.uk/xmlui/handle/123456789/25915));
+     - il taglio, pesante per un fendente o un colpo da 6 in su;
+     - il clangore smorto della parata e l'anello chiaro della perfetta;
+     - la catena che parte e lo strappo quando l'uncino aggancia.
+   - **La musica nuova** (`tools/audio/music_fencer.py`, `fencer.ogg`): un loop
+     di 40 s senza giunture, a 96 battiti al minuto.
+     - È in re minore, con la progressione epica re minore, si bemolle, fa, do.
+     - Strumenti: un coro senza parole, tamburi da guerra, incudini accordate su
+       re, un arpeggio Neon e un sub basso.
+     - Nel terzo blocco entra un corno eroico.
+     - Alla fine resta poco, poi una rullata e una salita riportano allo
+       sguainare in cima.
+     - Il laboratorio sceglie la traccia della vista (`Lab_Music`), con la
+       dissolvenza fra una e l'altra.
+7. **Verifica di fine fase:**
+   - Controllo completo verde.
+   - Tutti i test verdi (1806).
+   - Atto `fps`: **114 su 114** uguale alla Fase 0.
+   - Atto `prima_persona` uguale in due giri; ha due catture nuove,
+     `_spada_parata_perfetta` e `_spada_rampino_tirato`.
+   - **Tempo di un fotogramma** nella stessa arena (`-o:speed`, 600 fotogrammi,
+     due giri):
+     - spada 3,26 ms;
+     - AK 3,12 ms;
+     - pugni 3,08 ms.
+
+     Con lo zweihänder 3D il fotogramma costa circa il 5% in più dell'AK, cioè
+     circa 0,15 millesimi di secondo, e restiamo sopra i 300 fotogrammi al
+     secondo.
+- **Da sentire e guardare dall'utente:** i suoni e la musica (fatti senza
+  poterli ascoltare: controllati solo con gli spettrogrammi), e lo spadone in
+  movimento.
+- **Trovato strada facendo, non della spada:** i due test sulle altezze
+  (`height_view_test.odin`) a volte falliscono quando i test girano su 8 fili,
+  perché molti test del disegno cambiano la stessa variabile globale del
+  terreno (`board_heights`). Da soli passano sempre. È un difetto vecchio dei
+  test, non corretto stanotte.
 
 
 ## 15. Fase 6 — Arco: carica, rimbalzi, zone critiche, frecce; prototipo

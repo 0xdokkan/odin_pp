@@ -96,7 +96,8 @@ passo contro le sbarre dal lato della leva. Con `--smoke-mechanics-lab` e `ODIN_
 della grotta, dei piani, degli ascensori, di First Person Shooter o dell'arena «Prima persona» (la montagna dura qualche minuto:
 sale tutto il sentiero a passi veri). L'atto `prima_persona` gira per ultimo nello smoke completo: l'AK, poi First Person
 Brawler (i guantoni Neon, un jab, un gancio, il jab che colpisce, un segno, il cross critico con la stella d'oro), poi
-First Person Fencer (la lama, un tondo sul bruto, la parata, il rampino); prende anche l'arco, che non ha ancora la sua
+First Person Fencer (lo zweihänder, un tondo sul bruto, la parata, il rampino e la catena tesa, il colpo roteante, la
+parata perfetta); prende anche l'arco, che non ha ancora la sua
 carta, per guardarne la sigla e la mano vuota.
 Con `ODIN_PP_LAB_ONLY=fps` e `ODIN_PP_LAB_TIMING=1` l'atto di First Person Shooter si ferma dopo la discesa negli occhi e misura
 600 fotogrammi con l'AK che spara, senza limite di fotogrammi né vsync (riga `FIRST PERSON TIMING`; meglio con una build `-o:speed`).

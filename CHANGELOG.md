@@ -5,6 +5,16 @@ I riferimenti a Classica, `--flat` e ai vecchi smoke descrivono versioni precede
 per i comandi disponibili oggi valgono il [README](README.md) e la documentazione collegata.
 
 
+## 2026-10-29 — Prima persona, Fase 5 fatta: aspetto e suoni della spada
+
+- **First Person Fencer** ha il suo zweihänder Neon (la scelta dell'utente: uno spadone a due mani cibernetico e
+  maestoso), un modello 3D in pixel di cartoncino tenuto con i due guantoni, la punta sempre sul punto del mouse.
+- Scia a tempo (uguale a ogni frame rate, senza buchi), cartellino del colpo («FENDENTE 9»), angoli della guardia,
+  scintille della parata e lampo con anello della parata perfetta, catena e uncino del rampino.
+- Nella vista della spada i colpi nemici arrivano a schermo esattamente al battito, per leggere il momento della parata.
+- Icona definitiva, parole della carta, suoni da codice (acciaio e Neon) e una musica nuova della spada nel laboratorio.
+- L'AK resta identico (114 catture su 114 uguali alla Fase 0); la spada costa circa il 5% in più dell'AK per fotogramma.
+
 ## 2026-10-29 — Prima persona, Fase 4 fatta: la spada, regole e prototipo
 
 - **First Person Fencer** (solo nel laboratorio, arena «Prima persona»): la spada in prima persona, a griglia con passi

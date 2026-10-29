@@ -887,9 +887,16 @@ balestriere. Le bombe non si parano. **`Ctrl` è il rampino**: il primo nemico i
 linea fra 2 e 4 caselle viene tirato davanti e resta stordito; ricarica 3 s; un
 boss o un miniboss resta fermo e tira il Viandante accanto a sé.
 
-**Come si vede** (prototipo, l'aspetto finale è della Fase 5): una lama Neon in
-pixel di cartoncino, e dietro lo swing un nastro colorato da quanto è buono il
-colpo (grigio, bianco, oro).
+**Come si vede** (Fase 5): uno **zweihänder** Neon, lo spadone a due mani, in
+pixel di cartoncino, tenuto con tutti e due i guantoni; la punta è sempre dove
+la mette il mouse. Dietro lo swing la scia degli ultimi 0,11 s, colorata da
+quanto è buono il colpo (grigio, bianco, oro). Al taglio, accanto al nemico, il
+tipo e il danno («FENDENTE 9»). Con la guardia alzata quattro angoli attorno al
+mirino, d'oro nel quarto di secondo in cui una parata sarebbe perfetta; nella
+vista della spada i colpi nemici arrivano a schermo esattamente al battito,
+quando la regola guarda la guardia. La parata fa poche scintille smorte, la
+parata perfetta lampeggia la lama di bianco con scintille d'oro e un anello. Il
+rampino lancia un uncino con la catena.
 
 ### Inondazione
 

@@ -21,6 +21,10 @@ Commit **«Prima persona, Fase 4, passo 6: First Person Fencer nel laboratorio»
   girando con `Q`/`E` nel verso della lama; striscia di sangue, lampo, fermo della lama e scossa al colpo.
 - **Terza prova:** durata da 20 a **35 s** (pochi colpi senza i passi liberi né la distanza); il colpo roteante si vede
   (scia magenta dal giro, parole `COLPO ROTEANTE x1,5` accanto al nemico).
+- **Fase 5 (aspetto e suoni):** la spada è uno zweihänder Neon (la scelta dell'utente); icona definitiva (cella 34, lo
+  spadone in diagonale); la carta dice «SPADONE: TAGLIA E PARA» (stretta «SPADONE, PARATA»); cartellino del colpo
+  («FENDENTE 9»), angoli della guardia attorno al mirino, scintille e lampo delle parate, catena del rampino; suoni suoi
+  e una musica sua nel laboratorio. Le regole non cambiano.
 - Icona (cella 34) e suono (`card_first_person_fencer`) **provvisori**: quelli definitivi sono della Fase 5, nello stile Neon.
 
 ## 2026-10-29 — First Person Brawler: critico senza mira, guantoni 3D
