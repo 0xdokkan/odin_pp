@@ -23,6 +23,11 @@ Tactical_Controller :: struct {
 	fists_left, fists_right: bool,
 	fists_clock: f64,
 	fists_taps: [4]f64,
+	// FIRST PERSON FENCER (first_person_input.odin): the mouse's move this frame
+	// for the blade (none while it settles), and Ctrl as last held (the grapple
+	// is a press).
+	sword_mouse: [2]f32,
+	sword_ctrl: bool,
 }
 
 M7_INPUT_TRACE :: #config(M7_INPUT_TRACE, false)
@@ -234,6 +239,7 @@ step_tactical_controller :: proc(
 	buttons := first_person_buttons(controller, renderer, room, input)
 	route_first_person_buttons(room, buttons)
 	drive_first_person_fists(controller, room, renderer, cards, input, buttons, simulation_dt, playtest)
+	drive_first_person_sword(controller, room, renderer, cards, input, buttons, simulation_dt, playtest)
 	drain_first_person_fire(room, renderer, cards, playtest)
 	// Expiration is checked after all paid beats, including the last second.
 	if game.tactical_tick(room, 0, true, controller.hologram) {

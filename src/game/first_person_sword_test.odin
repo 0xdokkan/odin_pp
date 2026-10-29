@@ -171,6 +171,10 @@ test_sword_turns_and_steps :: proc(t: ^testing.T) {
 	testing.expect_value(t, room.first_person.sword.facing, Move_Direction.North)
 	testing.expect_value(t, room.player.tactical.facing, Move_Direction.North)
 	testing.expect_value(t, player_move_seconds(&room), SWORD_MOVE_SECONDS)
+	// A real step: its 0.3 s.
+	room.player.tactical.config.timed_actions = true
+	testing.expect(t, try_move_player(&room, .South) == .Moved)
+	testing.expectf(t, abs(room.player.tactical.action_remaining-SWORD_MOVE_SECONDS) < 1e-4, "the step takes %v s", room.player.tactical.action_remaining)
 	room.first_person.weapon = .AK
 	testing.expect_value(t, player_move_seconds(&room), TACTICAL_MOVE_SECONDS)
 }

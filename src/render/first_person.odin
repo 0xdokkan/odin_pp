@@ -218,6 +218,8 @@ First_Person_View :: struct {
 	flash_textures: [2]rl.Texture2D,
 	// The fists' gloves (first_person_gloves.odin).
 	gloves: First_Person_Glove_Kit,
+	// The sword as last seen (first_person_sword.odin).
+	sword: First_Person_Sword_View,
 	// What the board has shown so far (the lab's sounds, the smoke and tests).
 	shots, hits, ricochets, enters, exits: int,
 }
@@ -256,6 +258,7 @@ update_tactical_first_person :: proc(renderer: ^Renderer, room: ^game.Room) {
 	active := game.tactical_first_person_active(room)
 	if active { f.weapon = room.first_person.weapon }
 	follow_first_person_fists(renderer, room)
+	follow_first_person_sword(renderer, room)
 	if active != f.engaged {
 		if active {
 			// The eyes look the way he faces, or along the grid way nearest the
@@ -371,7 +374,7 @@ frame_first_person_camera :: proc(renderer: ^Renderer, room: ^game.Room) {
 			position += (right*math.sin(t*53.1)+up*math.sin(t*41.7+1.3))*(FIRST_PERSON_SHAKE*trauma*trauma)
 		}
 		fovy := orbit.fovy if orbit.projection == .PERSPECTIVE else f32(40)
-		fov := FIRST_PERSON_FISTS_FOV if f.weapon == .Fists else FIRST_PERSON_FOV
+		fov := FIRST_PERSON_FISTS_FOV if f.weapon == .Fists else (game.SWORD_FOV if f.weapon == .Sword else FIRST_PERSON_FOV)
 		v.camera = {position = position, target = position+look, up = {0, 1, 0}, fovy = fovy+(fov-fovy)*s,
 			projection = .PERSPECTIVE}
 	}

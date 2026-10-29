@@ -58,12 +58,18 @@ first_person_follow_capture :: proc(controller: ^Tactical_Controller, room: ^gam
 	if !want { game.first_person_set_trigger(room, false) }
 }
 
-// The mouse turns the view: right turns it right, up looks up.
+// The mouse turns the view: right turns it right, up looks up. With the sword
+// it is the blade's (drive_first_person_sword): the view turns with Q and E.
 turn_first_person_look :: proc(controller: ^Tactical_Controller, renderer: ^render.Renderer, room: ^game.Room,
 	input: Tactical_Controller_Input) {
+	controller.sword_mouse = {}
 	if !controller.look_captured || !game.tactical_first_person_active(room) { return }
 	if controller.look_settle > 0 {
 		controller.look_settle -= 1
+		return
+	}
+	if game.first_person_sword_active(room) {
+		controller.sword_mouse = input.look
 		return
 	}
 	sensitivity := FIRST_PERSON_MOUSE_SENSITIVITY*(input.sensitivity if input.sensitivity > 0 else 1)
@@ -91,8 +97,8 @@ first_person_buttons :: proc(controller: ^Tactical_Controller, renderer: ^render
 
 // The buttons to the weapon in hand (docs/piano-prima-persona.md, sezione 4.2):
 // the AK's trigger is the left button, whatever else is held; the fists' are
-// presses (drive_first_person_fists); the sword's and the bow's wait for their
-// phases (4 and 6) and do nothing yet.
+// presses (drive_first_person_fists), the sword's held (drive_first_person_sword);
+// the bow's wait for its phase (6) and do nothing yet.
 route_first_person_buttons :: proc(room: ^game.Room, buttons: First_Person_Buttons) {
 	switch room.first_person.weapon {
 	case .AK: game.first_person_set_trigger(room, buttons.left)
@@ -138,6 +144,27 @@ drive_first_person_fists :: proc(controller: ^Tactical_Controller, room: ^game.R
 		}
 	}
 	command := Gameplay_Command{kind = .First_Person_Fists, origin_phase = .Combat, fists = fists, seconds = seconds}
+	_ = commit_gameplay_command(room, renderer, cards, command, playtest)
+}
+
+// FIRST PERSON FENCER's frame (game/first_person_sword.odin): the mouse's move
+// for the blade, the left button held to cut, the right to parry, Ctrl pressed
+// the grapple, Q and E pressed a quarter turn (the diagonal keys, off behind
+// the eyes); committed as a world command of the frame's `seconds`. The steps
+// stay the lane's, as with the AK. Nothing while the mouse is not the view's
+// or the camera dives.
+drive_first_person_sword :: proc(controller: ^Tactical_Controller, room: ^game.Room, renderer: ^render.Renderer,
+	cards: ^Card_Interaction_State, input: Tactical_Controller_Input, buttons: First_Person_Buttons, seconds: f32,
+	playtest: ^combatdebug.Playtest_Session) {
+	grapple := buttons.ctrl && !controller.sword_ctrl
+	controller.sword_ctrl = buttons.ctrl
+	if !game.first_person_sword_active(room) || !controller.look_captured || render.first_person_diving(renderer) { return }
+	turn := i8(0)
+	if input.diagonals[0] { turn = -1 }
+	if input.diagonals[1] { turn = 1 }
+	sword := game.First_Person_Sword_Input{mouse = controller.sword_mouse, sensitivity = input.sensitivity, cut = buttons.left,
+		guard = buttons.right, grapple = grapple, turn = turn, aim = render.first_person_aim(renderer)}
+	command := Gameplay_Command{kind = .First_Person_Sword, origin_phase = .Combat, sword = sword, seconds = seconds}
 	_ = commit_gameplay_command(room, renderer, cards, command, playtest)
 }
 

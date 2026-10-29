@@ -32,6 +32,7 @@ Gameplay_Command_Kind :: enum {
 	// FIRST PERSON BRAWLER: the frame's `seconds` of the fists' body and punches
 	// along `fists` (a world command too; game/first_person_fists.odin).
 	First_Person_Fists,
+	First_Person_Sword,
 }
 
 Gameplay_Command :: struct {
@@ -51,6 +52,8 @@ Gameplay_Command :: struct {
 	aim: game.First_Person_Aim,
 	// What a First_Person_Fists frame asks of the body, and its seconds.
 	fists: game.First_Person_Fists_Input,
+	// What a First_Person_Sword frame asks of the blade.
+	sword: game.First_Person_Sword_Input,
 	seconds: f32,
 	// The way the wheel gave a cannon (CANNONE) before it was played.
 	aim_way: game.Move_Direction,
@@ -105,7 +108,7 @@ gameplay_command_is_valid :: proc(command: Gameplay_Command) -> bool {
 	// The rod fishes a room cleared, and nothing else.
 	case .Fish:
 		return command.origin_phase == .Loot && command.target.kind == .Cell
-	case .First_Person_Fire, .First_Person_Fists:
+	case .First_Person_Fire, .First_Person_Fists, .First_Person_Sword:
 		return command.origin_phase == .Combat
 	}
 	unreachable()
