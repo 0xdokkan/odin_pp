@@ -823,7 +823,7 @@ draw_first_person_overlay :: proc(renderer: ^Renderer, room: ^game.Room) {
 	bounds := first_person_countdown_bounds(renderer)
 	left := room.first_person.remaining
 	duration := max(room.first_person.duration, 0.001)
-	accent := GOTHIC_RED if left <= 3 else FIRST_PERSON_OLIVE
+	accent := GOTHIC_RED if left <= 3 else FIRST_PERSON_LOOKS[f.weapon].accent
 	hud_frame(bounds, accent)
 	gothic_text_fit(renderer, first_person_countdown_text(left, f.weapon), {bounds.x+12, bounds.y+4, bounds.width-24, 24}, 18, GOTHIC_PAPER)
 	hud_bar({bounds.x+12, bounds.y+bounds.height-12, bounds.width-24, 6}, left/duration, accent, int(min(duration, 30)))
@@ -902,19 +902,24 @@ FIRST_PERSON_HUD_STATUS_FISTS :: cstring("WASD LIBERO / CLIC: PUGNI / SPAZIO: SA
 First_Person_Hand :: enum u8 {Empty, AK, Fists}
 
 First_Person_Look :: struct {
-	// The countdown's tag (the new ones provisional, as wide as the AK's,
-	// until Fase 3 names them), the HUD's line, the print in hand.
+	// The countdown's tag (FPS, FPB, FPF, FPA: the user's choice in Fase 3),
+	// the HUD's line, the print in hand, the countdown plate's colour (red in
+	// its last three seconds, for every weapon).
 	tag: string,
 	status: cstring,
 	hand: First_Person_Hand,
+	accent: rl.Color,
 }
+
+// The fists' plate: the magenta of the neon gloves.
+FIRST_PERSON_NEON_MAGENTA :: rl.Color{255, 64, 206, 255}
 
 @(rodata)
 FIRST_PERSON_LOOKS := [game.First_Person_Weapon]First_Person_Look{
-	.AK = {tag = "FPS", status = FIRST_PERSON_HUD_STATUS, hand = .AK},
-	.Fists = {tag = "FPB", status = FIRST_PERSON_HUD_STATUS_FISTS, hand = .Fists},
-	.Sword = {tag = "FPF", status = FIRST_PERSON_HUD_STATUS_BARE},
-	.Bow = {tag = "FPA", status = FIRST_PERSON_HUD_STATUS_BARE},
+	.AK = {tag = "FPS", status = FIRST_PERSON_HUD_STATUS, hand = .AK, accent = FIRST_PERSON_OLIVE},
+	.Fists = {tag = "FPB", status = FIRST_PERSON_HUD_STATUS_FISTS, hand = .Fists, accent = FIRST_PERSON_NEON_MAGENTA},
+	.Sword = {tag = "FPF", status = FIRST_PERSON_HUD_STATUS_BARE, accent = FIRST_PERSON_OLIVE},
+	.Bow = {tag = "FPA", status = FIRST_PERSON_HUD_STATUS_BARE, accent = FIRST_PERSON_OLIVE},
 }
 
 // The weapon the board shows: the room's while the view is on, the last one

@@ -67,12 +67,12 @@ of a ninth), painted the same way with a few more palette letters:
     cell 32  Dinosauro: a cheerful green cartoon dinosaur head with an orange
              crest, a bone d4 showing a 4 beside it.
 
-Fase 2 of docs/piano-prima-persona.md adds one more, provisional until the
-cybernetic style of its Fase 3:
+docs/piano-prima-persona.md adds one more, in the Neon style of its Fase 3:
 
-    cell 33  First Person Brawler: a red boxing glove thrown up and to the
-             right, its thumb along its side, an ivory cuff laced at the wrist,
-             three strokes of speed behind it.
+    cell 33  First Person Brawler: a violet boxing glove thrown up and to the
+             right with a cyan rim of light, its thumb along its side, a dark
+             cuff under a magenta band, laced in magenta, three strokes of
+             speed behind it.
 
 Options:
     --check        exit 1 if the atlas is not what this script would write
@@ -714,35 +714,37 @@ DINOSAUR = (
 
 ICONS.update({29: CANNON, 30: LASER_CANNON, 31: BLACK_HOLE, 32: DINOSAUR})
 
-# Fase 2 of docs/piano-prima-persona.md: First Person Brawler, a red boxing glove
-# thrown up and to the right (its knuckles lit, its shade along the bottom), the
-# thumb along its left side, an ivory cuff laced at the wrist, speed strokes behind.
+# docs/piano-prima-persona.md, Fase 3 (the Neon style the user chose): First
+# Person Brawler, a violet boxing glove thrown up and to the right (its knuckles
+# lit, its shade along the bottom, a cyan rim of light down its right), the
+# thumb along its left side, a dark cuff under a magenta band, laced in magenta,
+# magenta and cyan speed strokes behind.
 BRAWLER = (
     "............................",
     "..............KKKKKK........",
-    "............KKRRRRRRKK......",
-    "...........KRRRUURRRRRK.....",
-    "..........KRRUUURRRRRRRK....",
-    "..HHH.....KRRUURRRRRRRRRK...",
-    ".........KRRRRRRRRRRRRRRK...",
-    ".HHHH....KRRRRRRRRRRRRRRRK..",
-    "........KKRRRRRRRRRRRRRRRK..",
-    "..HHH..KRRKRRRRRRRRRRRRRRK..",
-    "......KRRRRKRRRRRRRRRRRRAK..",
-    "......KRUURRKRRRRRRRRRRRAK..",
-    "......KRURRRKRRRRRRRRRRAAK..",
-    "......KRRRRRKRRRRRRRRRRAK...",
-    ".......KRRRRKRRRRRRRRRAAK...",
-    "........KRRRRKRRRRRRRAAK....",
-    ".........KKRRRRRRRRAAAK.....",
-    "..........KKKRRRRAAAKK......",
-    ".........KIIKKKKKKKKiK......",
-    "........KIIIIkIkIkIiiK......",
-    ".......KIIIIkIkIkIIiiK......",
-    "......KIIIIIIIIIIIiiK.......",
-    ".....KIIIIIIIIIIIiiiK.......",
-    ".....KiIIIIIIIIIiiiK........",
-    "......KiiiiiiiiiiiK.........",
+    "............KKVVVVVXKK......",
+    "...........KVVVvvVVVVXK.....",
+    "..........KVVvvvVVVVVVXK....",
+    "..PPP.....KVVvvVVVVVVVVXK...",
+    ".........KVVVVVVVVVVVVVXK...",
+    ".XXXX....KVVVVVVVVVVVVVVXK..",
+    "........KKVVVVVVVVVVVVVVXK..",
+    "..PPP..KVVKVVVVVVVVVVVVVXK..",
+    "......KVVVVKVVVVVVVVVVVVXK..",
+    "......KVvvVVKVVVVVVVVVVVXK..",
+    "......KVvVVVKVVVVVVVVVVSXK..",
+    "......KVVVVVKVVVVVVVVVVXK...",
+    ".......KVVVVKVVVVVVVVVSXK...",
+    "........KVVVVKVVVVVVVSXK....",
+    ".........KKVVVVVVVVSSXK.....",
+    "..........KKKVVVVSSXKK......",
+    ".........KPPKKKKKKKKPK......",
+    "........KVVVVPVPVPVSSK......",
+    ".......KVVVVPVPVPVVSSK......",
+    "......KVVVVVVVVVVVSSK.......",
+    ".....KVVVVVVVVVVVSSSK.......",
+    ".....KSVVVVVVVVVSSSK........",
+    "......KSSSSSSSSSSSK.........",
     ".......KKKKKKKKKKK..........",
     "............................",
     "............................",

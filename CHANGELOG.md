@@ -16,6 +16,7 @@ per i comandi disponibili oggi valgono il [README](README.md) e la documentazion
 - **Strisce di velocità** su ogni pugno: raggi magenta e ciano intorno alle nocche, scie lungo la curva dei ganci.
 - **Segni critici** in pixel art di cartoncino (anello neon con la freccia o l'arco, inchiostro e bordo di carta) e
   **stella d'oro** del critico che scoppia, gira e svanisce in mezzo secondo, con le scintille.
+- **Icona Neon** della carta, tasti dei pugni nell'ispettore, riquadro dei secondi magenta.
 - L'AK resta identico (114 catture su 114 uguali alla Fase 0).
 
 ## 2026-10-29 — Prima persona, Fase 2: critico senza mira e guantoni 3D

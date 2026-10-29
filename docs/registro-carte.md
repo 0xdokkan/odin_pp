@@ -17,6 +17,8 @@ Commit **«Prima persona, Fase 2: critico senza mira e guantoni 3D»** sul ramo
 - **Aspetto:** i guantoni rossi di carta ai lati diventano guantoni in guardia al centro in basso: un modello 3D disegnato
   come pixel art di cartoncino (tinte piene, inchiostro, bordo di carta e spessore). Prima neri e oro; poi (Fase 3, scelta
   dell'utente) **Neon**: carbonio viola scuro, fasce e tubi magenta, bordo di luce ciano.
+- **Icona e ispettore** (Fase 3): icona del guantone ridipinta Neon; nell'ispettore «SX JAB / DX CROSS / SHIFT GANCI» al
+  posto di «NIENTE CARTE: SOLO I PUGNI»; riquadro dei secondi magenta.
 - Danni, tempi, rarità, energia e durata non cambiano.
 
 ## 2026-10-28 — Carta nuova: First Person Brawler (solo laboratorio)

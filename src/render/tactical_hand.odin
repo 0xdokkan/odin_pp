@@ -529,7 +529,8 @@ tactical_card_inspector_rules :: proc(card: game.Card_Instance, definition: game
 	if card.definition_id == .Fishing_Rod { reaction, rule = "SOLO A STANZA LIBERATA", "MAI IN MANO / UNA PER RUN" }
 	if card.definition_id == .Pinball { reaction, rule = "BOSS E MINIBOSS: TROPPO PESANTI", fmt.ctprintf("DOPO %ds SCOPPIA E CADE", int(game.PINBALL_SECONDS)) }
 	if card.definition_id == .First_Person { reaction, rule = "NIENTE CARTE: SOLO L'AK", "WASD SECONDO LA VISTA" }
-	if card.definition_id == .First_Person_Brawler { reaction, rule = "NIENTE CARTE: SOLO I PUGNI", "WASD LIBERO / SPAZIO SALTA" }
+	// The fists' keys (Fase 3, the user's choice: the punches' keys too).
+	if card.definition_id == .First_Person_Brawler { reaction, rule = "SX JAB / DX CROSS / SHIFT GANCI", "WASD LIBERO / SPAZIO SALTA" }
 	if card.definition_id == .Marley_Party { reaction, rule = "SOLO SULLE CASELLE LUCI", fmt.ctprintf("+%ds A UCCISIONE / MAX %ds", game.MARLEY_KILL_SECONDS, game.MARLEY_MAX_SECONDS) }
 	if card.definition_id == .Flood_Wave { reaction, rule = "UNA CASELLA PER NEMICO", "ROTELLA: GIRA LA FRECCIA" }
 	if card.definition_id == .Field_Cannon { reaction, rule = "ROTELLA: GIRA LA CANNA", "AL 2o UPGRADE: LASER" }

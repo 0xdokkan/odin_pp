@@ -2572,6 +2572,30 @@ lanciato in alto come ora (consigliato); riquadro dei secondi **magenta neon**,
 rosso negli ultimi 3 s (consigliato); nell'ispettore **più comandi**, cioè anche i
 tasti dei pugni (non la mia raccomandazione, che era una riga sui segni).
 
+**Passo 5 — icona, sigla, parole, HUD: fatto** (2026-10-29).
+- **Icona** (cella 33 dell'atlante, `tools/art/build_card_icons.py`, `--check`
+  pulito): il guantone di prima ridipinto Neon: viola con la luce sulle nocche,
+  un bordo di luce ciano lungo il lato destro, il polsino scuro sotto una fascia
+  magenta con i lacci magenta, tre strisce magenta e ciano dietro.
+- **Sigla** `FPB` (già quella della carta e del riquadro); per spada e arco
+  restano `FPF` e `FPA`.
+- **Ispettore:** «SX JAB / DX CROSS / SHIFT GANCI» e «WASD LIBERO / SPAZIO
+  SALTA» (le righe rosse sono due: «niente carte» lascia il posto ai tasti dei
+  pugni). Le parole della carta restano «PRIMA PERSONA 20s / PUGNI 3/4/6,
+  CRITICO x3».
+- **Riquadro dei secondi:** ogni arma ha il suo colore (`First_Person_Look.accent`):
+  l'AK, la spada e l'arco il verde oliva di sempre, i pugni il **magenta** dei
+  guantoni; rosso per tutte negli ultimi 3 s.
+- Catture guardate: carta e ispettore, riquadro magenta. L'atto `fps` resta
+  **114 su 114** uguale alla Fase 0.
+
+**Domande per il passo 6** (risposte dell'utente): pugni **guantoni veri e
+neon** (fruscio, tonfo di cuoio più pesante dal jab ai ganci, un piccolo ronzio
+elettrico; consigliato); critico **tonfo forte e campanello** (consigliato);
+musica **dopo la campanella, in dissolvenza** di mezzo secondo, un po' più bassa
+degli effetti (consigliato); al segno che si accende **un tic leggero**, diverso
+per ogni pugno (non la mia raccomandazione, che era nessun suono).
+
 ## 13. Fase 4 — Spada: swing col mouse, parata, rampino; prototipo
 
 ### Obiettivo
