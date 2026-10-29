@@ -66,8 +66,10 @@ FIRST_PERSON_GLOVE_HOOK := [2]First_Person_Glove_Pose{
 	{at = {-0.04, -0.045, -0.52}, pitch = 0.10, yaw = 1.25, roll = -1.30},
 }
 
-// What a part is made of: each its own tones (FIRST_PERSON_GLOVE_FRAGMENT).
-First_Person_Glove_Stuff :: enum i32 {Carbon, Neon, Wrap}
+// What a part is made of: each its own tones (FIRST_PERSON_GLOVE_FRAGMENT);
+// the sword's steel and cyan light (first_person_zweihander.odin), and white
+// (a perfect parry's flash).
+First_Person_Glove_Stuff :: enum i32 {Carbon, Neon, Wrap, Steel, Cyan, White}
 
 // One glove's shapes in its own frame (X right, Y the back of the hand, -Z the
 // knuckles), for the left hand: the right mirrors X. A sphere or a cylinder
@@ -98,9 +100,12 @@ FIRST_PERSON_GLOVE_PARTS := [?]First_Person_Glove_Part{
 // The gloves' GPU handles: a sphere and a cylinder of radius and height 1, the
 // model's tones, the small canvas it draws on (`low`) and the card cut from it
 // (`paper`, by `paper_shader`). Made the first time the gloves are drawn, freed
-// with the view. `ready`: `paper` holds this frame's gloves.
+// with the view. `ready`: `paper` holds this frame's gloves. The sword's own
+// shapes the first time it is drawn: a cube, its blade and the blade's ink
+// shell (first_person_zweihander.odin).
 First_Person_Glove_Kit :: struct {
 	sphere, cylinder: rl.Mesh,
+	cube, blade, blade_ink: rl.Mesh,
 	shader, paper_shader: rl.Shader,
 	stuff_location, ink_location, texel_location, part_location: i32,
 	low, paper: rl.RenderTexture2D,
@@ -142,8 +147,11 @@ const vec3 CARBON[4] = vec3[](vec3(10, 8, 24), vec3(24, 18, 48), vec3(44, 34, 84
 const vec3 MAGENTA = vec3(255, 64, 206);
 const vec3 MAGENTA_DIM = vec3(150, 22, 120);
 const vec3 CYAN = vec3(60, 240, 255);
+const vec3 CYAN_DIM = vec3(18, 128, 168);
+const vec3 STEEL[4] = vec3[](vec3(52, 62, 88), vec3(118, 134, 166), vec3(192, 206, 228), vec3(250, 252, 255));
 void main() {
     if (ink > 0.5) { finalColor = vec4(13.0, 20.0, 30.0, 255.0)/255.0; return; }
+    if (stuff > 4.5) { finalColor = vec4(1.0); return; }
     vec3 n = normalize(fragNormal);
     vec3 v = normalize(-fragPos);
     vec3 key = normalize(vec3(-0.45, 0.80, 0.45));
@@ -154,7 +162,12 @@ void main() {
     vec3 l = fragLocal;
     int p = int(part+0.5);
     vec3 c;
-    if (stuff > 1.5) { c = CARBON[gloss > 0.55 ? 3 : tone]*0.8; }
+    if (stuff > 3.5) { c = tone == 0 ? CYAN_DIM : CYAN; }
+    else if (stuff > 2.5) {
+        c = STEEL[gloss > 0.5 ? 3 : tone];
+        if (rim > 0.74) { c = CYAN; }
+    }
+    else if (stuff > 1.5) { c = CARBON[gloss > 0.55 ? 3 : tone]*0.8; }
     else if (stuff > 0.5) { c = tone == 0 ? MAGENTA_DIM : MAGENTA; }
     else {
         c = CARBON[gloss > 0.55 ? 3 : tone];
@@ -204,7 +217,7 @@ void main() {
 }
 `
 
-@(private = "file")
+@(private)
 first_person_glove_kit :: proc(f: ^First_Person_View) -> ^First_Person_Glove_Kit {
 	kit := &f.gloves
 	if kit.shader.id != 0 || kit.failed { return kit }
@@ -230,6 +243,9 @@ first_person_glove_kit :: proc(f: ^First_Person_View) -> ^First_Person_Glove_Kit
 destroy_first_person_glove_kit :: proc(kit: ^First_Person_Glove_Kit) {
 	if kit.sphere.vaoId != 0 { rl.UnloadMesh(kit.sphere) }
 	if kit.cylinder.vaoId != 0 { rl.UnloadMesh(kit.cylinder) }
+	if kit.cube.vaoId != 0 { rl.UnloadMesh(kit.cube) }
+	if kit.blade.vaoId != 0 { rl.UnloadMesh(kit.blade) }
+	if kit.blade_ink.vaoId != 0 { rl.UnloadMesh(kit.blade_ink) }
 	if kit.shader.id != 0 { rl.UnloadShader(kit.shader) }
 	if kit.paper_shader.id != 0 { rl.UnloadShader(kit.paper_shader) }
 	if kit.low.id != 0 { rl.UnloadRenderTexture(kit.low) }
@@ -306,7 +322,7 @@ first_person_glove_frame :: proc(pose: First_Person_Glove_Pose) -> rl.Matrix {
 }
 
 // A part's matrix in the glove's frame, `grow` metres fuller on every side (the ink's shell).
-@(private = "file")
+@(private)
 first_person_glove_part_frame :: proc(part: First_Person_Glove_Part, left: bool, grow: f32) -> rl.Matrix {
 	at := part.at
 	if !left { at.x = -at.x }
@@ -363,7 +379,7 @@ draw_first_person_glove_models :: proc(renderer: ^Renderer, kit: ^First_Person_G
 }
 
 // The gloves' camera (at the origin, looking down -Z).
-@(private = "file")
+@(private)
 first_person_glove_camera :: proc() -> rl.Camera3D {
 	return {position = {0, 0, 0}, target = {0, 0, -1}, up = {0, 1, 0}, fovy = FIRST_PERSON_GLOVE_FOV, projection = .PERSPECTIVE}
 }
@@ -457,6 +473,7 @@ prepare_first_person_gloves :: proc(renderer: ^Renderer) {
 	// The marks first, on the board behind the gloves, the star over them; the cut gives them ink and paper too.
 	if FIRST_PERSON_LOOKS[f.weapon].hand == .Sword {
 		draw_first_person_sword_pixel(renderer, w, h, ready)
+		draw_first_person_zweihander(renderer, kit, ready)
 	} else {
 		draw_first_person_marks_pixel(renderer, w, h)
 		draw_first_person_glove_models(renderer, kit, ready)

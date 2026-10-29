@@ -58,6 +58,9 @@ First_Person_Sword_View :: struct {
 	cut_tip: [2]f32,
 	// The sprite clock at the last frame followed (the turn's pace).
 	seen_at: f64,
+	// When the last parry was, and whether it was perfect.
+	parry_at: f64,
+	parry_perfect: bool,
 }
 
 @(private)
@@ -70,6 +73,7 @@ follow_first_person_sword :: proc(renderer: ^Renderer, room: ^game.Room) {
 	if !game.first_person_sword_active(room) { return }
 	s := &room.first_person.sword
 	if s.strikes != v.strikes { v.cut_at, v.cut_tip = now, s.tip }
+	if s.parries != v.parries { v.parry_at, v.parry_perfect = now, s.perfect_parries != v.perfect_parries }
 	if v.swinging && !s.swing.active { v.ended_at = now }
 	if !v.swinging && s.swing.active { v.trail_count = 0 }
 	v.tip, v.speed, v.swinging, v.start, v.length, v.last = s.tip, s.speed, s.swing.active, s.swing.start, s.swing.length, s.last
@@ -107,6 +111,12 @@ first_person_sword_shown_tip :: proc(v: ^First_Person_Sword_View, now: f64) -> [
 	if since < FIRST_PERSON_SWORD_STOP { return v.cut_tip }
 	u := f32((since-FIRST_PERSON_SWORD_STOP)/FIRST_PERSON_SWORD_STOP)
 	return v.cut_tip+(v.tip-v.cut_tip)*u
+}
+
+// A perfect parry flashes the blade white for FIRST_PERSON_SWORD_PARRY_FLASH.
+FIRST_PERSON_SWORD_PARRY_FLASH :: f64(0.08)
+first_person_sword_parry_flash :: proc(v: ^First_Person_Sword_View, now: f64) -> bool {
+	return v.parry_perfect && v.parry_at > 0 && now >= v.parry_at && now-v.parry_at < FIRST_PERSON_SWORD_PARRY_FLASH
 }
 
 // The blood of the last cut, `since` seconds on: how long its streak is (a
@@ -168,7 +178,6 @@ draw_first_person_sword_pixel :: proc(renderer: ^Renderer, w, h: i32, ready: f32
 	at :: proc(p: [2]f32, w, h: i32, lift: f32) -> rl.Vector2 {
 		return {f32(w)*0.5+p.x*f32(h), f32(h)*0.5-(p.y-lift)*f32(h)}
 	}
-	hilt := game.SWORD_HILT
 	// The last cut's blood across the chest it cut, under the blade.
 	if v.cut_at > 0 && v.last.enemy_id != 0 {
 		streak, flown := first_person_sword_blood(now-v.cut_at)
@@ -212,19 +221,5 @@ draw_first_person_sword_pixel :: proc(renderer: ^Renderer, w, h: i32, ready: f32
 			rl.DrawLineEx(at(v.trail[k], w, h, lift), at(v.trail[k+1], w, h, lift), thick, color)
 		}
 	}
-	// The blade: a cyan Neon strip with a white core, narrowing to the point.
-	base, point := at(hilt, w, h, lift), at(first_person_sword_shown_tip(v, now), w, h, lift)
-	way := point-base
-	length := math.sqrt(way.x*way.x+way.y*way.y)
-	if length < 1 { return }
-	side := rl.Vector2{-way.y, way.x}/length
-	width := f32(h)*0.018
-	rl.DrawTriangle(base+side*width, point, base-side*width, {60, 240, 255, 255})
-	rl.DrawTriangle(base-side*width, point, base+side*width, {60, 240, 255, 255})
-	rl.DrawTriangle(base+side*width*0.4, point, base-side*width*0.4, {214, 252, 255, 255})
-	rl.DrawTriangle(base-side*width*0.4, point, base+side*width*0.4, {214, 252, 255, 255})
-	// The guard across it near the hilt, magenta, and the grip below.
-	guard := base+way*0.12
-	rl.DrawLineEx(guard+side*width*3, guard-side*width*3, width*1.2, {255, 64, 206, 255})
-	rl.DrawLineEx(base, base-way/length*width*4, width*1.6, {44, 34, 84, 255})
+	// The blade itself is the zweihänder's model, over all this (first_person_zweihander.odin).
 }
