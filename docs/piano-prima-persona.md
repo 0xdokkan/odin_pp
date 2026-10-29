@@ -2500,6 +2500,12 @@ Verifiche: `check.ps1` completo, **1782 test verdi** con e senza assert;
 atto `fps` **114 su 114** uguale alla Fase 0; atto `prima_persona` uguale in
 due giri.
 
+**Domande per il passo 3** (risposte dell'utente): strisce di velocità **su
+ogni pugno** (non la mia raccomandazione, che era solo cross e ganci); scossa
+**piccola, più forte al critico** (consigliato), mai a vuoto; il nemico colpito
+fa **solo il lampo** bianco del cartoncino (non la mia raccomandazione, che era
+lampo e spinta). Il fermo del solo disegno per 0,08 s era già deciso.
+
 ## 13. Fase 4 — Spada: swing col mouse, parata, rampino; prototipo
 
 ### Obiettivo
