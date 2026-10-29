@@ -5,6 +5,12 @@ I riferimenti a Classica, `--flat` e ai vecchi smoke descrivono versioni precede
 per i comandi disponibili oggi valgono il [README](README.md) e la documentazione collegata.
 
 
+## 2026-10-29 — Prima persona, Fase 8 fatta: il piano è chiuso
+
+- Le quattro armi in prima persona sono provate, bilanciate con l'utente e documentate; restano nel laboratorio
+  (`Lab_Only`). Controllo completo verde (1822 test), smoke completo del laboratorio verde, l'AK identico alla Fase 0
+  (114 catture su 114).
+
 ## 2026-10-29 — Prima persona: spada più forte, arpa sui rimbalzi, frecce che finiscono il volo
 
 - First Person Fencer: il taglio pieno fa 9 invece di 6 (nel bot 3,1 danni al secondo invece di 2,2).

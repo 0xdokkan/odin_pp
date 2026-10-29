@@ -60,7 +60,7 @@ La tabella è in ordine di priorità, cioè l'ordine della scaletta qui sotto.
 | 5 | 5 | Spada: lama, scie, scintille, suoni | 4 | Fatta | vedi Esito |
 | 6 | 6 | Arco: carica, rimbalzi, zone critiche, frecce; prototipo | 1 | Fatta | vedi Esito |
 | 7 | 7 | Arco: arco, frecce in volo, faretra nell'HUD, suoni | 6 | Fatta | vedi Esito |
-| 8 | 8 | Tutte insieme: equilibrio, prestazioni, documenti | 3, 5, 7 | Parte automatica fatta; resta la prova dell'utente | vedi Esito |
+| 8 | 8 | Tutte insieme: equilibrio, prestazioni, documenti | 3, 5, 7 | Fatta | vedi Esito |
 
 ## Scaletta: cosa sviluppare prima
 
@@ -3534,8 +3534,9 @@ controllo completo, atti da soli e tempo di un fotogramma contro l'AK
    può saltare si salta e si chiede dopo; ciò che blocca ferma il lavoro.
 4. **Push:** nessuno (consigliato).
 
-**Parte automatica fatta (2026-10-29, nella notte).** Il passo 2 (la prova
-dell'utente e i numeri ritoccati insieme) aspetta l'utente.
+**Fatta (2026-10-29).** La parte automatica nella notte, il passo 2 (la prova
+dell'utente e i numeri ritoccati insieme) il giorno dopo, con l'utente; i punti
+qui sotto in ordine.
 - **Passo 1, il bot** (`integration/first_person_balance_test.odin`): ogni arma
   gioca un minuto nell'arena «Prima persona», con gli stessi nemici liberi che
   arrivano (lo stesso seme), la vista ripresa appena finisce, e i tasti del
@@ -3641,13 +3642,47 @@ dell'utente e i numeri ritoccati insieme) aspetta l'utente.
   dopo 2,5 m; tengono la stessa grandezza sullo schermo tra 1 e 7,5 m; crescono
   di un ottavo a rimbalzo, fino a metà in più, come il danno. Una cattura nuova
   nell'atto (`_arco_volo`).
-- **Passo 5, la verifica:**
+- **Passo 5, la verifica (nella notte):**
   - controllo completo verde, 1817 test nei due giri (con e senza i controlli
     interni);
   - smoke completo del laboratorio verde: 1178 s, 2256 catture (le 2232 della
     Fase 0 più quelle nuove delle tre carte);
   - un minuto di gioco per ogni arma nei test;
   - atto `fps` 114 su 114 uguale alla Fase 0.
+- **Le ultime scelte dell'utente (2026-10-29), per chiudere la fase:**
+  - **la spada:** il taglio pieno da 6 a 9 (`SWORD_BASE_DAMAGE`): nel bot passa
+    da 2,2 a 3,1 danni al secondo; giocata bene (petto, fendenti) supera l'AK;
+  - **i suoni e le musiche** di spada e arco vanno bene; in più, a ogni
+    rimbalzo una **corda d'arpa pizzicata** (`world_bow_pluck`, Karplus-Strong
+    da codice, la3), una nota più alta ogni volta sulla pentatonica di la
+    minore (la tonalità della musica dell'arco), il ping una quinta sopra;
+  - **le frecce finiscono il volo** quando la vista finisce, e colpiscono (si
+    vedono anche dall'alto, alla loro grandezza da vicino); la tensione in
+    corso si annulla senza tirare e le zone spariscono;
+  - i pugni restano più forti (14,3 al secondo): all'utente va bene;
+  - il ramo resta `piano-prima-persona`, senza push e senza unirlo a `main`.
+- **Il banco finale** (nemici duri, un minuto per arma):
+
+  | Arma | Danni al secondo |
+  |---|---:|
+  | Pugni | 14,3 |
+  | Arco teso | 8,0 |
+  | AK | 4,6 |
+  | Spada | 3,1 |
+  | Arco a raffica | 2,9 |
+
+  L'arco teso sale da 7,0 a 8,0 e la raffica da 2,5 a 2,9 perché ora le frecce
+  passano sopra le coperture; la raffica resta sotto l'AK.
+- **La verifica di fine fase (2026-10-29 sera):**
+  - controllo completo verde, 1822 test nei due giri;
+  - smoke completo del laboratorio verde: 1478 s (il PC aveva il gioco aperto),
+    2258 catture;
+  - atto `fps` da solo **114 su 114** uguale alla Fase 0, con la build senza
+    ottimizzazioni (`-o:none`, come il riferimento); con `-o:speed` 47 su 114:
+    i calcoli in virgola mobile ottimizzati cambiano qualche pixel, non il
+    gioco;
+  - prestazioni: con il gioco aperto sul PC l'AK misura 3,21 ms e l'arco 3,35
+    (lo stesso rapporto di prima, circa il 4% in più dell'AK).
 
 
 ## 18. Fonti
