@@ -162,11 +162,11 @@ mechanics_lab_prima_persona :: proc(window: ^app.Window, renderer: ^render.Rende
 			fmt.eprintln("mechanics lab: the", blow.punch, "took", lost, "from the brute"); return false
 		}
 	}
-	// A mark lit on the brute's card for the cross; the cross with the crosshair over it, a critical.
+	// A mark lit on the brute's card for the cross; the cross on the brute, wherever the crosshair is on it, a critical.
 	lit := false
 	for &mark in room.first_person.fists.marks {
 		if mark.enemy_id != brute { continue }
-		mark.zone, mark.high, mark.lit, mark.wait = 2, true, 1.2, 0
+		mark.zone, mark.lit, mark.wait = 2, 1.2, 0
 		lit = true
 	}
 	if !lit { fmt.eprintln("mechanics lab: no mark watches the brute"); return false }

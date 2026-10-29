@@ -192,6 +192,8 @@ First_Person_View :: struct {
 	// The painted prints.
 	ak_texture, tracer_texture: rl.Texture2D,
 	flash_textures: [2]rl.Texture2D,
+	// The fists' gloves (first_person_gloves.odin).
+	gloves: First_Person_Glove_Kit,
 	// What the board has shown so far (the lab's sounds, the smoke and tests).
 	shots, hits, ricochets, enters, exits: int,
 }
@@ -200,7 +202,7 @@ First_Person_View :: struct {
 // counts stay.
 @(private)
 first_person_view_reset :: proc(f: ^First_Person_View) {
-	f^ = {ak_texture = f.ak_texture, tracer_texture = f.tracer_texture, flash_textures = f.flash_textures,
+	f^ = {ak_texture = f.ak_texture, tracer_texture = f.tracer_texture, flash_textures = f.flash_textures, gloves = f.gloves,
 		shots = f.shots, hits = f.hits, ricochets = f.ricochets, enters = f.enters, exits = f.exits}
 }
 
@@ -210,6 +212,7 @@ destroy_first_person_view :: proc(renderer: ^Renderer) {
 	if f.ak_texture.id != 0 { rl.UnloadTexture(f.ak_texture) }
 	if f.tracer_texture.id != 0 { rl.UnloadTexture(f.tracer_texture) }
 	for texture in f.flash_textures { if texture.id != 0 { rl.UnloadTexture(texture) } }
+	destroy_first_person_glove_kit(&f.gloves)
 	f^ = {}
 }
 

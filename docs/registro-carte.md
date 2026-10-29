@@ -6,6 +6,17 @@ Qui si segna ogni carta tolta dal gioco o cambiata, con quello che faceva, così
 futuro. Le voci più recenti stanno in cima. Per ritrovare il commit di una voce:
 `git log --all --grep "<titolo del commit>"`.
 
+## 2026-10-29 — First Person Brawler: critico senza mira, guantoni 3D
+
+Commit **«Prima persona, Fase 2: critico senza mira e guantoni 3D»** sul ramo
+`piano-prima-persona` ([piano](piano-prima-persona.md), Fase 2, dopo la prova).
+
+- **Prima:** il critico voleva il pugno chiesto dal segno **e** il mirino sopra il segno (testa o corpo compresi).
+- **Ora:** basta il pugno chiesto dal segno che prende quel nemico, dovunque. Il segno sta sul petto, dalla parte del suo
+  pugno, solo come aiuto.
+- **Aspetto:** i guantoni rossi di carta ai lati diventano guantoni 3D neri e oro, in guardia al centro in basso.
+- Danni, tempi, rarità, energia e durata non cambiano.
+
 ## 2026-10-28 — Carta nuova: First Person Brawler (solo laboratorio)
 
 Commit **«Prima persona, Fase 2, passo 5: First Person Brawler nel laboratorio»** sul ramo `piano-prima-persona`

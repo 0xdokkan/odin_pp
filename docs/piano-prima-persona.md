@@ -855,8 +855,10 @@ su una parte del corpo del nemico.
   In più il **gancio critico stordisce** 1 s (`Stagger`), cioè interrompe
   l'attacco che il nemico stava caricando (scelta dell'utente).
 - **Il pugno sbagliato** fa il danno normale e il segno resta.
-- **Mira** (scelta dell'utente, non la mia raccomandazione): serve il pugno
-  giusto **e il mirino sopra il segno**, non basta il mirino sul nemico.
+- **Mira:** basta il **pugno giusto che prende il nemico**, dovunque il
+  mirino sia sul nemico; il segno sul suo lato è solo un aiuto. (Prima scelta
+  dell'utente: anche il mirino sopra il segno; cambiata dall'utente il
+  2026-10-29, dopo la prova.)
 - I tempi dei segni sono secondi del mondo e la zona viene dal flusso casuale
   della stanza: i test li ripetono uguali.
 
@@ -864,7 +866,7 @@ su una parte del corpo del nemico.
 
 ```text
 danno = danno_del_pugno                    (jab 3, cross 4, ganci 6)
-se il segno acceso chiede proprio quel pugno e il mirino è sopra il segno:
+se il segno acceso chiede proprio quel pugno (dovunque prenda il nemico):
     danno = danno × 3                      (critico)
 poi le regole normali: Sanguinamento, Scudo, reazioni.
 ```
@@ -2267,6 +2269,51 @@ traiettoria del pugno; doppio tocco entro 0,25 s.
   all'arena «Prima persona»): è il passo in cui la carta si prova davvero.
 - Nel gioco entra nella Fase 3: i suoni del laboratorio oggi sono mono, quindi
   per la musica serve un canale stereo suo.
+
+**Dopo la prova dell'utente (2026-10-29): due cambi.** L'utente ha provato la
+carta e ha chiesto: guantoni più attaccati al corpo, al centro, in 3D, come le
+mani vere di una persona; e il critico **senza mira**: basta il pugno che il
+segno chiede. Domande e risposte: guantoni come **modello 3D vero**
+(consigliato), **guardia da pugile** (consigliato), segno **sul nemico, al suo
+lato** (consigliato), colori **neri e oro** (non la mia raccomandazione, che era
+rosso con il polsino bianco). Riferimenti cercati: la guardia classica tiene il
+braccio avanti un poco disteso e quello dietro sul mento, sotto gli occhi, per
+vederci ([Classic Guard](https://en.wikipedia.org/wiki/Classic_Guards_(boxing_style)));
+i giochi di boxe in prima persona tengono i guantoni davanti al viso senza
+coprirlo ([Knockout League](https://www.vrfitnessinsider.com/knockout-league-20-tips-tricks-get-golden-gloves-more/));
+le armi in prima persona si disegnano dopo il mondo, con la profondità pulita,
+così non entrano nei muri ([viewmodel](https://garry.net/posts/unity-viewmodels)).
+- **Critico senza mira** (`src/game/first_person_marks.odin`): il pugno che il
+  segno acceso chiede, se prende quel nemico, fa il triplo dovunque prenda; il
+  segno non ha più testa e corpo (sta sul petto, dalla parte del suo pugno). Il
+  pugno che non prende il nemico non fa nulla, nemmeno quello giusto.
+- **Guantoni 3D** (`src/render/first_person_gloves.odin`): fatti da codice con
+  sfere e cilindri (il guantone, il rotolo delle nocche, il pollice, il
+  polsino con due fasce d'oro, una striscia d'oro sul dorso, l'avambraccio
+  fasciato che esce dal bordo), pelle nera lucida e oro che riflette, il
+  contorno a inchiostro del gioco (il guscio di ogni pezzo, un poco più grande,
+  visto da dentro). Una telecamera loro, a 55°, sopra il tavolo: il tavolo ha
+  già la profondità pulita prima dell'HUD, quindi non entrano mai nei muri.
+  Una luce loro: una calda dall'alto a sinistra, una fredda da sotto a destra,
+  il riflesso della pelle e un bordo d'oro. **In guardia:** in basso al centro,
+  il sinistro un poco più avanti e più in alto, il destro al mento, nocche in
+  su e girate verso l'interno, i polsini tagliati dal bordo; il mirino resta
+  libero. Jab e cross vanno dritti al mirino girando il palmo in giù; i ganci
+  passano larghi dal loro lato e arrivano oltre il centro con il braccio piano;
+  l'altra mano si stringe al mento; correndo oscillano, da fermi respirano.
+- **Corretto guardando le catture:** la prima prova era troppo grande e girata
+  in fuori, con un solco fra nocche e dorso; nel jab si vedeva il fondo piatto
+  del polsino (sembrava un martello): ora c'è l'avambraccio fasciato.
+- **Test:** il test della mira sul segno è tolto (non c'è più); quello dei
+  critici ora prova il pugno giusto dovunque sul nemico, i pugni sbagliati e il
+  pugno che manca il nemico; uno nuovo prova la guardia dei guantoni 3D, il jab
+  al mirino e il gancio largo.
+- **Verifiche:** `check.ps1` completo: **1782 test verdi** con e senza assert
+  (uno tolto, uno nuovo), più le due build. L'atto `fps` dà ancora **114
+  catture identiche al byte** alla Fase 0; l'atto `prima_persona` dà le stesse
+  10 catture in due giri. Catture dei guantoni guardate. (Gli atti si fanno
+  girare dalla cartella dell'eseguibile, a PC libero: dalla cartella del
+  progetto, o con altri test che girano insieme, le catture cambiano.)
 
 ## 12. Fase 3 — Pugni: guantoni, segni critici, colpi a schermo, suoni
 

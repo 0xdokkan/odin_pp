@@ -96,13 +96,12 @@ fists_punch_step :: proc(room: ^Room, aim: First_Person_Aim, h: f32) -> (struck:
 
 // The punch lands: the foe it reaches takes its damage from him, as any blow of
 // his (a Shield first, its reactions, a kill's loot); the right punch on its lit
-// mark, the crosshair over it, three times its damage, and a hook's staggers it
-// (first_person_marks.odin).
+// mark three times its damage, and a hook's staggers it (first_person_marks.odin).
 @(private = "file")
 fists_land :: proc(room: ^Room, punch: First_Person_Punch, aim: First_Person_Aim) -> bool {
 	target, found := first_person_punch_target(room, punch, aim)
 	if !found { return false }
-	critical := first_person_punch_critical(room, punch, target.id, aim)
+	critical := first_person_punch_critical(room, punch, target.id)
 	damage := FISTS_PUNCHES[punch].damage*(FISTS_CRITICAL_FACTOR if critical else 1)
 	action := make_action(.Attack, PLAYER_ENTITY, entity_target(target), .Opponent)
 	action.visual_group = FISTS_VISUAL_GROUP

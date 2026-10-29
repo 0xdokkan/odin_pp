@@ -5,6 +5,16 @@ I riferimenti a Classica, `--flat` e ai vecchi smoke descrivono versioni precede
 per i comandi disponibili oggi valgono il [README](README.md) e la documentazione collegata.
 
 
+## 2026-10-29 — Prima persona, Fase 2: critico senza mira e guantoni 3D
+
+- **First Person Brawler** (solo nel laboratorio), dopo la prova dell'utente:
+  - **critico senza mira:** basta il pugno che il segno acceso chiede, se prende quel nemico, dovunque prenda; il segno
+    sta sul petto, dalla parte del suo pugno, solo come aiuto;
+  - **guantoni 3D** fatti da codice: pelle nera e oro, contorno a inchiostro, una telecamera e una luce loro;
+  - **in guardia da pugile** in basso al centro, con l'avambraccio fasciato; jab e cross dritti al mirino, i ganci larghi
+    dal loro lato.
+- L'AK è identico: le 114 catture dell'atto `fps` sono uguali al byte a quelle della Fase 0.
+
 ## 2026-10-28 — Prima persona, Fase 1: base comune della prima persona
 
 - **Un'arma per vista:** la vista di First Person Shooter ora sa quale arma c'è in mano (AK, pugni, spada, arco). I dati

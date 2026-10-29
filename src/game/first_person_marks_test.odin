@@ -25,12 +25,12 @@ marks_run :: proc(room: ^Room, seconds: f32, punch := First_Person_Punch.None, y
 	}
 }
 
-// The mark watching `id`, set lit on `zone`, on the head or not.
+// The mark watching `id`, set lit on `zone`.
 @(private = "file")
-marks_light :: proc(t: ^testing.T, room: ^Room, id: u32, zone: i8, high: bool) {
+marks_light :: proc(t: ^testing.T, room: ^Room, id: u32, zone: i8) {
 	for &mark in room.first_person.fists.marks {
 		if mark.enemy_id != id { continue }
-		mark.zone, mark.high, mark.lit, mark.wait, mark.chained = zone, high, 1, 0, false
+		mark.zone, mark.lit, mark.wait, mark.chained = zone, 1, 0, false
 		return
 	}
 	testing.expect(t, false, "no mark watches the foe")
@@ -74,7 +74,7 @@ test_marks_watch_the_nearest_foes_in_reach :: proc(t: ^testing.T) {
 // room gives the same marks.
 @(test)
 test_marks_light_on_their_time_and_repeat :: proc(t: ^testing.T) {
-	Light :: struct { at: f32, zone: i8, high: bool }
+	Light :: struct { at: f32, zone: i8 }
 	runs: [2][4]Light
 	for run in 0..<2 {
 		data: level.Level
@@ -90,7 +90,7 @@ test_marks_light_on_their_time_and_repeat :: proc(t: ^testing.T) {
 			if mark.lit > 0 && lit_since < 0 {
 				wait := now-dark_since
 				testing.expectf(t, wait >= FISTS_MARK_WAIT_MIN-0.01 && wait <= FISTS_MARK_WAIT_MAX+0.01, "lit after %v s", wait)
-				if count < 4 { runs[run][count] = {at = now, zone = mark.zone, high = mark.high} }
+				if count < 4 { runs[run][count] = {at = now, zone = mark.zone} }
 				count += 1
 				lit_since = now
 			} else if mark.lit <= 0 && lit_since >= 0 {
@@ -105,33 +105,10 @@ test_marks_light_on_their_time_and_repeat :: proc(t: ^testing.T) {
 	testing.expect(t, runs[0] == runs[1], "the same room gave other marks")
 }
 
-// The zones across the card as he sees it, from the crosshair: its left side,
-// left of its middle, right of it, its right side; head or body with the view's pitch.
-@(test)
-test_marks_zones_under_the_crosshair :: proc(t: ^testing.T) {
-	data: level.Level
-	player: Player
-	spawns := [?]Enemy_Spawn{{position = {x = 8, y = 6}, health = 60, attack = 1}}
-	room := marks_room(t, &data, &player, spawns[:])
-	defer level.destroy(&data)
-	defer destroy_room(&room)
-	marks_run(&room, 0.8, wish = {1, 0})
-	marks_run(&room, 0.3)
-	id := room.enemies[0].id
-	for yaw, zone in ([4]f32{-0.55, -0.2, 0.2, 0.55}) {
-		got, high, on := first_person_crosshair_zone(&room, id, {yaw = yaw})
-		testing.expectf(t, on && got == i8(zone) && high, "yaw %v: zone %v high %v on %v", yaw, got, high, on)
-	}
-	_, high, on := first_person_crosshair_zone(&room, id, {yaw = -0.2, pitch = -0.45})
-	testing.expect(t, on && !high, "looking down is not the body")
-	_, _, on = first_person_crosshair_zone(&room, id, {yaw = 1.2})
-	testing.expect(t, !on, "looking away is on the card")
-}
-
-// The right punch on the lit mark with the crosshair over it: three times its
+// The punch the lit mark asks, landing on its foe wherever the crosshair is on
+// it (no aiming at the mark, the user's choice of 2026-10-29): three times its
 // damage, the mark out, the next lit in 0.3 s elsewhere; a critical hook
-// staggers. The wrong punch, the crosshair beside the mark, or the head for the
-// body: the punch's own damage, the mark still lit.
+// staggers. Another punch: its own damage, the mark still lit.
 @(test)
 test_marks_make_criticals :: proc(t: ^testing.T) {
 	data: level.Level
@@ -144,34 +121,39 @@ test_marks_make_criticals :: proc(t: ^testing.T) {
 	marks_run(&room, 0.3)
 	foe := &room.enemies[0]
 	id := foe.id
-	blow :: proc(t: ^testing.T, room: ^Room, punch: First_Person_Punch, yaw, pitch: f32, zone: i8, high: bool) -> i32 {
-		marks_light(t, room, room.enemies[0].id, zone, high)
+	blow :: proc(t: ^testing.T, room: ^Room, punch: First_Person_Punch, yaw, pitch: f32, zone: i8) -> i32 {
+		marks_light(t, room, room.enemies[0].id, zone)
 		health := room.enemies[0].health
 		marks_run(room, FISTS_PUNCHES[punch].land+FISTS_STEP, punch, yaw, pitch)
 		lost := health-room.enemies[0].health
 		marks_run(room, FISTS_PUNCHES[punch].recover)
 		return lost
 	}
-	// The wrong punch, the crosshair beside, the head for the body: no critical.
-	testing.expect_value(t, blow(t, &room, .Cross, -0.2, 0, 1, true), FISTS_PUNCHES[.Cross].damage)
-	testing.expect_value(t, blow(t, &room, .Jab, 0.2, 0, 1, true), FISTS_PUNCHES[.Jab].damage)
-	testing.expect_value(t, blow(t, &room, .Jab, -0.2, 0, 1, false), FISTS_PUNCHES[.Jab].damage)
-	testing.expect_value(t, room.first_person.fists.crits, i32(0))
-	// The jab on its mark: a critical, the mark out and chained.
-	marks_light(t, &room, id, 1, true)
+	// Another punch than the mark's: no critical, the mark still lit.
+	testing.expect_value(t, blow(t, &room, .Cross, -0.2, 0, 1), FISTS_PUNCHES[.Cross].damage)
+	testing.expect_value(t, blow(t, &room, .Jab, 0.2, 0, 2), FISTS_PUNCHES[.Jab].damage)
+	testing.expect_value(t, blow(t, &room, .Right_Hook, 0, 0, 0), FISTS_PUNCHES[.Right_Hook].damage)
+	testing.expect(t, room.first_person.fists.crits == 0 && first_person_lit_mark(&room, id) != nil)
+	// The jab on the jab's mark, the crosshair on the card's other side: a critical, the mark out and chained.
+	marks_light(t, &room, id, 1)
 	health := foe.health
-	marks_run(&room, FISTS_PUNCHES[.Jab].land+FISTS_STEP, .Jab, -0.2)
+	marks_run(&room, FISTS_PUNCHES[.Jab].land+FISTS_STEP, .Jab, 0.2)
 	testing.expect_value(t, health-foe.health, FISTS_PUNCHES[.Jab].damage*FISTS_CRITICAL_FACTOR)
 	testing.expect(t, room.first_person.fists.crits == 1 && first_person_lit_mark(&room, id) == nil)
 	marks_run(&room, FISTS_MARK_CHAIN+0.01)
 	next := first_person_lit_mark(&room, id)
 	testing.expect(t, next != nil && next.zone != 1, "the chain's next mark")
 	marks_run(&room, FISTS_PUNCHES[.Jab].recover)
-	// The body's mark looking down.
-	testing.expect_value(t, blow(t, &room, .Jab, -0.2, -0.45, 1, false), FISTS_PUNCHES[.Jab].damage*FISTS_CRITICAL_FACTOR)
-	// The left hook on its mark: a critical that staggers.
-	testing.expect_value(t, blow(t, &room, .Left_Hook, -0.55, 0, 0, true), FISTS_PUNCHES[.Left_Hook].damage*FISTS_CRITICAL_FACTOR)
+	// The cross looking down at its legs: a critical all the same.
+	testing.expect_value(t, blow(t, &room, .Cross, 0, -0.45, 2), FISTS_PUNCHES[.Cross].damage*FISTS_CRITICAL_FACTOR)
+	// The left hook from the card's middle: a critical that staggers.
+	testing.expect_value(t, blow(t, &room, .Left_Hook, 0, 0, 0), FISTS_PUNCHES[.Left_Hook].damage*FISTS_CRITICAL_FACTOR)
 	_, staggered := status_for_entity(&room, enemy_entity(id), .Stagger)
 	testing.expect(t, staggered, "the critical hook did not stagger")
 	testing.expect_value(t, room.first_person.fists.crits, i32(3))
+	// A punch that misses the foe: nothing, even the mark's own.
+	marks_light(t, &room, id, 1)
+	health = foe.health
+	marks_run(&room, FISTS_PUNCHES[.Jab].land+FISTS_STEP, .Jab, 1.4)
+	testing.expect(t, foe.health == health && first_person_lit_mark(&room, id) != nil, "a jab past the foe struck its mark")
 }

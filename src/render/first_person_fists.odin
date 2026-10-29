@@ -8,13 +8,11 @@ import game "../game"
 // FIRST PERSON BRAWLER behind his eyes (game/first_person_fists.odin), the
 // prototype's simple look until its art in Fase 3 (docs/piano-prima-persona.md):
 // the eye rides the free body, not his cell's glide, and slides back to his
-// cell's centre in FIRST_PERSON_FISTS_SETTLE seconds as the view ends; two red
-// paper gloves wait low at either side, rocking as he runs, and each punch
-// throws its own: the jab the left straight at the crosshair, the cross the
-// right, the hooks round from their side on an arc; a lit critical mark is a
-// ring of its punch's colour on its zone of the foe's card, with the punch's own
-// path in it (straight for the jab and the cross, an arc for the hooks): colour
-// and shape both, read without telling colours apart.
+// cell's centre in FIRST_PERSON_FISTS_SETTLE seconds as the view ends; the
+// gloves are first_person_gloves.odin's; a lit critical mark is a ring of its
+// punch's colour on its side of the foe's card at its chest, with the punch's
+// own path in it (straight for the jab and the cross, an arc for the hooks):
+// colour and shape both, read without telling colours apart.
 
 FIRST_PERSON_FISTS_SETTLE :: f64(0.15)
 // The eye a little behind the body (a foe at a punch's reach stays whole in
@@ -22,12 +20,6 @@ FIRST_PERSON_FISTS_SETTLE :: f64(0.15)
 // and a wider view than the AK's.
 FIRST_PERSON_FISTS_EYE_BACK :: f32(0.35)
 FIRST_PERSON_FISTS_FOV :: f32(80)
-// The gloves' size and place, as parts of the canvas's height and width.
-FIRST_PERSON_GLOVE_SIZE :: f32(0.16)
-FIRST_PERSON_GLOVE_RED :: rl.Color{190, 38, 40, 255}
-FIRST_PERSON_GLOVE_SHADE :: rl.Color{122, 22, 28, 255}
-FIRST_PERSON_GLOVE_LIGHT :: rl.Color{240, 120, 110, 255}
-FIRST_PERSON_GLOVE_CUFF :: rl.Color{236, 226, 200, 255}
 // The marks' colours by zone: the left hook, the jab, the cross, the right hook.
 @(rodata)
 FIRST_PERSON_MARK_COLORS := [4]rl.Color{{255, 150, 40, 255}, {80, 220, 255, 255}, {255, 222, 70, 255}, {238, 92, 222, 255}}
@@ -82,65 +74,9 @@ first_person_glove_reach :: proc(punch: game.First_Person_Punch, clock: f32) -> 
 	return 1-tween.smoothstep(clamp((clock-rules.land)/back, 0, 1))
 }
 
-// The two gloves: each waits at its side; the punch out throws its own.
-@(private)
-draw_first_person_gloves :: proc(renderer: ^Renderer, room: ^game.Room, now: f64) {
-	if room == nil { return }
-	fists := &room.first_person.fists
-	w, h := renderer.canvas_width, renderer.canvas_height
-	ready := tween.smoothstep(clamp((first_person_amount(renderer)-FIRST_PERSON_AK_FROM)/(1-FIRST_PERSON_AK_FROM), 0, 1))
-	speed := math.sqrt(fists.velocity.x*fists.velocity.x+fists.velocity.y*fists.velocity.y)
-	bob := f32(math.sin(now*11))*h*0.012*clamp(speed/game.FISTS_SPEED, 0, 1)
-	size := h*FIRST_PERSON_GLOVE_SIZE
-	for side in 0..<2 {
-		left := side == 0
-		rest := rl.Vector2{w*(0.24 if left else 0.76), h*0.9+(1-ready)*h*0.4+(bob if left else -bob)}
-		at, scale := rest, f32(1)
-		punch := fists.punch
-		mine := (punch == .Jab || punch == .Left_Hook) if left else (punch == .Cross || punch == .Right_Hook)
-		if mine {
-			u := first_person_glove_reach(punch, fists.punch_clock)
-			target := rl.Vector2{w*(0.46 if left else 0.54), h*0.56}
-			if punch == .Left_Hook || punch == .Right_Hook {
-				// Round from its side: a curve through a point out wide of it.
-				wide := rl.Vector2{w*(0.12 if left else 0.88), h*0.5}
-				a := rest+(wide-rest)*u
-				b := wide+(target-wide)*u
-				at = a+(b-a)*u
-			} else {
-				at = rest+(target-rest)*u
-			}
-			scale = 1-0.4*u
-		}
-		draw_first_person_glove(at, size*scale, left)
-	}
-}
-
-// One paper glove: an ink cut round it, the red mitt with its thumb inward, a
-// light on its knuckles and a shade under them, the ivory cuff below.
-@(private = "file")
-draw_first_person_glove :: proc(at: rl.Vector2, size: f32, left: bool) {
-	ink := LIVING_TOKEN_INK
-	outline := max(f32(2), size*0.05)
-	inward := f32(1) if left else -1
-	mitt := rl.Rectangle{at.x-size*0.42, at.y-size*0.55, size*0.84, size*0.78}
-	thumb := rl.Vector2{at.x+inward*size*0.4, at.y-size*0.05}
-	cuff := rl.Rectangle{at.x-size*0.34, at.y+size*0.18, size*0.68, size*0.32}
-	// The ink and the paper's edge round all of it, then the colours.
-	rl.DrawRectangleRounded({cuff.x-outline, cuff.y-outline, cuff.width+outline*2, cuff.height+outline*2}, 0.3, 6, ink)
-	rl.DrawRectangleRounded({mitt.x-outline, mitt.y-outline, mitt.width+outline*2, mitt.height+outline*2}, 0.55, 10, ink)
-	rl.DrawCircleV(thumb, size*0.2+outline, ink)
-	rl.DrawRectangleRounded(cuff, 0.3, 6, FIRST_PERSON_GLOVE_CUFF)
-	rl.DrawRectangleRec({cuff.x+cuff.width*0.2, cuff.y+cuff.height*0.35, cuff.width*0.6, max(f32(1), size*0.03)}, {190, 178, 152, 255})
-	rl.DrawRectangleRounded(mitt, 0.55, 10, FIRST_PERSON_GLOVE_RED)
-	rl.DrawRectangleRounded({mitt.x, mitt.y+mitt.height*0.62, mitt.width, mitt.height*0.38}, 0.5, 8, FIRST_PERSON_GLOVE_SHADE)
-	rl.DrawCircleV(thumb, size*0.2, FIRST_PERSON_GLOVE_RED)
-	rl.DrawCircleV({mitt.x+mitt.width*(0.35 if left else 0.65), mitt.y+mitt.height*0.25}, size*0.1, FIRST_PERSON_GLOVE_LIGHT)
-}
-
-// The lit marks on the foes' cards: a ring of the punch's colour on its zone (as
-// the rules cut the card: first_person_crosshair_zone), the punch's path inside;
-// blinking in its last third of a second.
+// The lit marks on the foes' cards: a ring of the punch's colour on its zone
+// across the card, the punch's path inside; blinking in its last third of a
+// second. Only a help: the punch it asks is a critical anywhere on the foe.
 @(private)
 draw_first_person_marks :: proc(renderer: ^Renderer, room: ^game.Room, now: f64) {
 	if !game.first_person_fists_active(room) { return }
@@ -161,7 +97,7 @@ draw_first_person_marks :: proc(renderer: ^Renderer, room: ^game.Room, now: f64)
 			if card.enemy_id == enemy.id { at, lift = card.at, card.lift; break }
 		}
 		top := game.first_person_outline_top(enemy.archetype)
-		height := top*(0.72 if mark.high else 0.3)
+		height := top*FIRST_PERSON_MARK_HEIGHT
 		half := game.first_person_outline_half_width(enemy.archetype, height)
 		offset := across[clamp(int(mark.zone), 0, 3)]*half
 		ground := entity_point_ground(game.enemy_entity(enemy.id), {at.x-0.5, at.y-0.5})

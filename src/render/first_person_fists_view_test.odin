@@ -61,3 +61,40 @@ test_first_person_glove_goes_out_and_back :: proc(t: ^testing.T) {
 	}
 	testing.expect_value(t, first_person_glove_reach(.None, 0.1), f32(0))
 }
+
+// The 3D gloves' guard (first_person_gloves.odin): both up in the middle of the
+// view's bottom, below the crosshair and clear of it, the left (the lead)
+// farther out than the right; the jab takes the left out to the crosshair, the
+// right staying at the chin; a hook swings out wide of its side and lands past
+// the middle.
+@(test)
+test_first_person_gloves_guard_and_punches :: proc(t: ^testing.T) {
+	// Where a glove's centre shows across and up the view (-1..1), 16:9.
+	shown :: proc(at: [3]f32) -> [2]f32 {
+		tan := f32(math.tan(f64(FIRST_PERSON_GLOVE_FOV)*math.PI/360))
+		return {at.x/(-at.z*tan*16.0/9.0), at.y/(-at.z*tan)}
+	}
+	left := first_person_glove_pose(0, .None, 0, 1, 0, 0)
+	right := first_person_glove_pose(1, .None, 0, 1, 0, 0)
+	for pose in ([2]First_Person_Glove_Pose{left, right}) {
+		p := shown(pose.at)
+		testing.expectf(t, abs(p.x) > 0.12 && abs(p.x) < 0.45, "a glove at %v across, not beside the middle", p.x)
+		testing.expectf(t, p.y < -0.35 && p.y > -0.9, "a glove at %v up, not low in the view", p.y)
+	}
+	testing.expect(t, shown(left.at).x < 0 && shown(right.at).x > 0, "the gloves on the wrong sides")
+	testing.expect(t, left.at.z < right.at.z, "the lead is not the left")
+	// The jab landed: the left at the crosshair, farther out; the right still at the chin.
+	land := game.FISTS_PUNCHES[.Jab].land
+	jab := first_person_glove_pose(0, .Jab, land, 1, 0, 0)
+	testing.expect(t, abs(shown(jab.at).x) < 0.12 && jab.at.z < left.at.z-0.15, "the jab did not go out to the crosshair")
+	held := first_person_glove_pose(1, .Jab, land, 1, 0, 0)
+	testing.expect(t, abs(held.at.x-right.at.x) < 0.02 && held.at.z > right.at.z, "the right left the chin")
+	// The left hook: out wide of the left on its way, then past the middle.
+	hook := game.FISTS_PUNCHES[.Left_Hook].land
+	out := first_person_glove_pose(0, .Left_Hook, hook*0.5, 1, 0, 0)
+	landed := first_person_glove_pose(0, .Left_Hook, hook, 1, 0, 0)
+	testing.expect(t, out.at.x < left.at.x-0.05, "the hook did not swing out wide")
+	testing.expect(t, landed.at.x > 0 && abs(landed.yaw) > 1, "the hook did not land past the middle, the knuckles in")
+	// Coming in, the guard rises from under the view.
+	testing.expect(t, first_person_glove_pose(0, .None, 0, 0, 0, 0).at.y < left.at.y-0.2)
+}

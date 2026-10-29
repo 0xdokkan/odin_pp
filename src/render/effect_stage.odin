@@ -39,6 +39,9 @@ BORROWED_RENDERER_OWN_HANDLES :: [?]string{
 	"tactical.first_person.tracer_texture",
 	"tactical.first_person.flash_textures[0]",
 	"tactical.first_person.flash_textures[1]",
+	"tactical.first_person.gloves.sphere",
+	"tactical.first_person.gloves.cylinder",
+	"tactical.first_person.gloves.shader",
 }
 
 // A renderer for a board of `canvas_width` by `canvas_height` drawn into
