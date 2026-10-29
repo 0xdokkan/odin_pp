@@ -5,6 +5,15 @@ I riferimenti a Classica, `--flat` e ai vecchi smoke descrivono versioni precede
 per i comandi disponibili oggi valgono il [README](README.md) e la documentazione collegata.
 
 
+## 2026-10-29 — Prima persona, Fase 7 fatta: aspetto e suoni dell'arco
+
+- **First Person Archer** ha il suo arco compound Neon con le carrucole (la scelta dell'utente), un modello 3D in pixel
+  di cartoncino tenuto con i due guantoni; la corda arretra con la carica, la freccia punta sempre il mirino.
+- Frecce in volo con la scia del colore del loro stato, scintille a ogni rimbalzo, zone critiche come bersagli di carta
+  con la luce che pulsa, faretra attorno al mirino.
+- Suoni da codice (un ping più alto a ogni rimbalzo, la corda pizzicata, un accento per ogni stato) e una musica nuova
+  dell'arco nel laboratorio. L'AK resta identico (114 su 114).
+
 ## 2026-10-29 — Prima persona, Fase 6 fatta: l'arco, regole e prototipo
 
 - **First Person Archer** (solo nel laboratorio, arena «Prima persona»): l'arco in prima persona per 30 s, a griglia.

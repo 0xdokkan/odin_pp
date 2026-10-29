@@ -59,7 +59,7 @@ La tabella è in ordine di priorità, cioè l'ordine della scaletta qui sotto.
 | 4 | 4 | Spada: swing col mouse, parata, rampino; prototipo | 1 | Fatta | vedi Esito |
 | 5 | 5 | Spada: lama, scie, scintille, suoni | 4 | Fatta | vedi Esito |
 | 6 | 6 | Arco: carica, rimbalzi, zone critiche, frecce; prototipo | 1 | Fatta | vedi Esito |
-| 7 | 7 | Arco: arco, frecce in volo, faretra nell'HUD, suoni | 6 | Da fare | — |
+| 7 | 7 | Arco: arco, frecce in volo, faretra nell'HUD, suoni | 6 | Fatta | vedi Esito |
 | 8 | 8 | Tutte insieme: equilibrio, prestazioni, documenti | 3, 5, 7 | Da fare | — |
 
 ## Scaletta: cosa sviluppare prima
@@ -3399,6 +3399,68 @@ controllo completo, atti da soli e tempo di un fotogramma contro l'AK
 3. **Zone critiche:** bersaglio di carta con una spia che pulsa (consigliato).
 4. **Rimbalzi a orecchio:** una nota più alta a ogni rimbalzo (consigliato).
 5. **Musica dell'arco:** una nuova da codice (consigliato).
+
+**Fatta (2026-10-29, nella notte).** Nel commit `bbc3396`:
+- **L'arco compound** (`render/first_person_compound.odin`): un modello 3D fatto
+  da codice, disegnato sulla tela a pixel dei guantoni come lo zweihänder.
+  - Ha un corpo di carbonio con la luce magenta e l'impugnatura fasciata, e
+    flettenti corti che tornano verso l'occhio.
+  - Ha due carrucole ciano con il mozzo bianco, la corda e un cavo d'acciaio,
+    il mirino con il pin ciano e lo stabilizzatore con la punta magenta.
+  - La freccia incoccata ha la punta del colore del suo stato; i due guantoni
+    Neon tengono l'impugnatura e la corda.
+  - La corda arretra verso l'occhio con la carica (test: ogni livello più
+    indietro). L'arco è inclinato come lo tiene un arciere, e la freccia punta
+    sempre il mirino (test).
+- **Le frecce in volo:** asta d'acciaio, impennaggio ciano, punta e scia del
+  colore dello stato; la scia è più lunga e accesa quanto più la freccia va
+  veloce. A ogni rimbalzo ci sono scintille bianche e ciano; su una zona
+  critica sono d'oro, con un anello che si apre.
+- **Le zone critiche:** un bersaglio di carta sul muro, con un bordo
+  d'inchiostro, cerchi rossi e avorio, e una luce d'oro al centro che pulsa con
+  un alone.
+- **La faretra attorno al mirino:** il segno della freccia incoccata
+  (goccia, fiamma, fiocco di neve, stelline, goccia di sangue, 7 per 7 pixel)
+  alla sinistra dell'anello, quello della prossima più piccolo sotto, e il nome
+  dell'incoccata sotto l'anello.
+- **L'icona** (cella 35) è il compound già dalla Fase 6: resta quella.
+- **Suoni da codice** (`tools/audio/sfx_bow.py`):
+  - la carica, con lo scatto delle carrucole sopra lo scricchiolio, e lo scatto
+    quando l'arco è pieno;
+  - lo scocco: la corda che vibra (Karplus-Strong), il colpo dei flettenti e il
+    fischio della freccia;
+  - a ogni rimbalzo un ping, **una nota più alta ogni volta** sulla scala
+    maggiore, fino alla sesta;
+  - due campane sulla zona critica;
+  - il colpo sul cartoncino e un accento per ogni stato (bolle, fiammata,
+    cristallo, campanellini, strappo).
+- **La musica nuova dell'arco** (`tools/audio/music_archer.py`, `archer.ogg`):
+  - un loop di 37 s a 104 battiti al minuto, in la minore (la minore, fa, do,
+    mi);
+  - la corda pizzicata come ostinato, i tic delle carrucole, i tamburi e un coro
+    senza parole;
+  - le frecce che passano da un lato all'altro;
+  - nel terzo blocco un fischio-flauto che fa la melodia, e dei ping che salgono
+    come una freccia che rimbalza;
+  - alla fine una salita riporta alla cima.
+- **Verifica:**
+  - controllo completo verde;
+  - tutti i test verdi;
+  - atto `fps` **114 su 114** uguale alla Fase 0;
+  - atto `prima_persona` uguale in due giri, con una cattura nuova
+    (`_arco_zona`).
+- **Tempo di un fotogramma:**
+- Con il primo compound l'arco costava 3,39 ms contro i 2,99 dell'AK, il 13%
+    in più. Misurando un pezzo alla volta: le zone critiche 0,14 ms, l'arco 3D
+    0,22, l'HUD 0,04, la guida 0,02.
+  - Due correzioni (`550313f`): i bersagli disegnati come ventagli di
+    triangoli piatti, e i sedici pezzi fissi del compound cotti in un solo
+    modello (due disegni invece di trentadue, la stessa immagine al byte).
+  - Dopo: arco circa 3,25 ms, AK 3,00, spada 3,24, pugni 3,10. L'arco costa
+    come la spada, circa l'8% in più dell'AK, cioè un quarto di millesimo di
+    secondo, e restiamo sopra i 300 fotogrammi al secondo.
+- **Da sentire e guardare dall'utente:** i suoni e la musica (controllati solo
+  negli spettrogrammi), l'arco in movimento.
 
 
 ## 17. Fase 8 — Tutte insieme: equilibrio, prestazioni, documenti

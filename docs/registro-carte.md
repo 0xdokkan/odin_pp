@@ -20,7 +20,10 @@ Commit **«Prima persona, Fase 6, passi 1-5: l'arco, regole e prototipo»** sul 
   dell'utente); vola e colpisce anche fuori vista; frecce infinite.
 - Icona (cella 35): l'arco compound Neon di lato, la scelta dell'utente per la Fase 7. Suono della carta
   (`card_first_person_archer`): le carrucole che girano, la corda che vibra (Karplus-Strong), il fischio.
-- Aspetto **provvisorio** nella vista (un arco semplice sulla tela a pixel): quello definitivo è della Fase 7.
+- **Fase 7 (aspetto e suoni):** l'arco è un compound Neon in 3D con le carrucole (la scelta dell'utente), frecce con la
+  scia del loro colore, scintille ai rimbalzi, zone critiche come bersagli di carta con la luce che pulsa, la faretra
+  attorno al mirino; suoni suoi (un ping più alto a ogni rimbalzo) e una musica sua nel laboratorio. Le regole non
+  cambiano.
 
 ## 2026-10-29 — Carta nuova: First Person Fencer (solo laboratorio)
 
