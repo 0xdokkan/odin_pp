@@ -2452,6 +2452,30 @@ fine di ogni passo.
 7. **Come mostrare le proposte:** tre proposte in gioco (consigliato): tre
    stili applicati ai guantoni veri nel laboratorio, stessa scena, tre catture.
 
+**Passo 1 — proposte dello stile cibernetico: pronte, in attesa della scelta.**
+Riferimenti cercati: la pixel art cyberpunk vive di corpi scuri e pochi colori
+accesi (rosa neon, ciano, azzurri profondi), con potenziamenti del corpo ben
+visibili ([Slynyrd, Pixelblog 42](https://www.slynyrd.com/blog/2023/1/30/pixelblog-42-cyberpunk-pixel-art),
+[Paleto vol. 02](https://paleto.itch.io/paleto-vol02)); guanti in pixel art dal
+cuoio al metallo ([icone cyberpunk](https://free-game-assets.itch.io/the-cyberpunk-gloves-and-cloaks-pixel-icon-set));
+il bioma Cyber del gioco (`src/render/expedition_cyber.odin`): corpi scuri,
+metallo, luce solo da fessure rosse e spie azzurre. Tre proposte sullo stesso
+modello dei guantoni (`First_Person_Glove_Style` in
+`src/render/first_person_gloves.odin`; i dettagli sono disegnati sulla forma di
+ogni pezzo, quelli accesi a tinta piena):
+1. **Cyber del gioco:** metallo scuro a tre tinte come i moduli del bioma,
+   fasce e striscia diventano fessure di luce rossa, una cucitura rossa sulle
+   nocche, una spia azzurra (schermo) sopra il polsino.
+2. **Neon:** carbonio blu notte, fasce e striscia magenta al neon, un bordo di
+   luce ciano lungo il contorno.
+3. **Circuiti d'oro:** il nero e oro di adesso, con piste di circuito stampate
+   in oro sul dorso e sulle nocche (con le loro piazzole) e una spia azzurra
+   sul polsino.
+
+L'atto `prima_persona` cattura la stessa guardia in ogni stile
+(`_stile_cyber.png`, `_stile_neon.png`, `_stile_circuiti.png`); lo stile di oggi
+resta quello di partenza ed è identico al pixel a prima.
+
 ## 13. Fase 4 — Spada: swing col mouse, parata, rampino; prototipo
 
 ### Obiettivo
