@@ -13,7 +13,7 @@ Commit **«Prima persona, Fase 6, passi 1-5: l'arco, regole e prototipo»** sul 
 
 | Carta | Nel codice | Rarità | Energia | Effetto | Peso nelle offerte | Dove sta |
 |---|---|---|---:|---|---:|---|
-| First Person Archer | `First_Person_Archer` | rara | 3 | su di sé, 0 s di finestra: la vista in prima persona con l'arco per 30 s del mondo (+2 a potenziamento, fino a 40 a +5): a griglia come l'AK; destro tenuto tende (piena in 1,6 s), rilasciato tira, sinistro abbassa; da 0 a 4 rimbalzi sui muri secondo la carica, ognuno ×1,25 di velocità; danno 2 × velocità / 12, fino al 50% in più con i rimbalzi (da 2 a 15); cinque frecce a caso (veleno, fuoco, ghiaccio, stordente, dentata) con i loro stati; tre zone critiche sui muri (×1,6 e un rimbalzo gratis) | 60 (ma `Lab_Only`: mai offerta) | solo nell'arena «Prima persona» del laboratorio, nel suo mazzo |
+| First Person Archer | `First_Person_Archer` | rara | 3 | su di sé, 0 s di finestra: la vista in prima persona con l'arco per 30 s del mondo (+2 a potenziamento, fino a 40 a +5): a griglia come l'AK; destro tenuto tende (piena in 1,6 s), rilasciato tira, sinistro abbassa; da 1 a 4 rimbalzi sui muri secondo la carica, ognuno ×1,25 di velocità; danno 2,5 × partenza/12 × impatto/12, fino al 50% in più con i rimbalzi (da 4 a 14 dritto, fino a 44); tiro veloce (sotto 0,4 s) che cade a parabola, 1 danno, nessuno stato; 0,15 s per incoccare; cinque frecce a caso (veleno, fuoco, ghiaccio, stordente, dentata) con i loro stati; tre zone critiche sui muri (×1,6 e un rimbalzo gratis) | 60 (ma `Lab_Only`: mai offerta) | solo nell'arena «Prima persona» del laboratorio, nel suo mazzo |
 
 - È la quarta arma della vista di First Person Shooter (`First_Person_Weapon.Bow`); non si gioca in groppa al Dinosauro.
 - La freccia che torna sul Viandante rimbalza su di lui senza ferirlo, e conta come un rimbalzo gratis (la scelta
@@ -24,6 +24,12 @@ Commit **«Prima persona, Fase 6, passi 1-5: l'arco, regole e prototipo»** sul 
   scia del loro colore, scintille ai rimbalzi, zone critiche come bersagli di carta con la luce che pulsa, la faretra
   attorno al mirino; suoni suoi (un ping più alto a ogni rimbalzo) e una musica sua nel laboratorio. Le regole non
   cambiano.
+- **2026-10-29, danni ribilanciati** (l'utente: a raffica faceva più danni dell'AK): il tiro rilasciato prima del primo
+  livello è un **tiro veloce** che cade a parabola (tocca terra tra 2 e 4 caselle mirando dritto, manca un nemico a 3
+  caselle circa una volta su tre), fa 1 danno e non dà stati; dopo ogni freccia la prossima si incocca in 0,15 s. Le
+  frecce tese fanno di più: 2,5 × partenza/12 × impatto/12 (da 4 a 14 su un tiro dritto, prima da 2 a 5). Il bot, con
+  nemici che non muoiono: AK 4,6 danni al secondo, arco teso 7,0, arco a raffica 2,5 (prima 474, per gli stati
+  accumulati).
 - **2026-10-29, frecce più grandi** (l'utente le trovava troppo piccole): ogni freccia in volo parte dalla punta della
   freccia incoccata sull'arco e raggiunge la sua linea vera dopo 2,5 m, così si vede di lato e non solo da dietro;
   tiene la stessa grandezza sullo schermo da 1 a 7,5 m (tre volte lo spessore vero a 3 m); a ogni rimbalzo diventa un

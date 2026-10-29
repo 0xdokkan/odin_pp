@@ -79,7 +79,7 @@ test_bow_draw_levels_and_release :: proc(t: ^testing.T) {
 	testing.expect_value(t, s.loosed, i32(1))
 	a := bow_last_arrow(&room)
 	if !testing.expect(t, a != nil) { return }
-	testing.expect(t, a.kind == nocked && a.full && i32(a.bounces_left) == BOW_LEVELS && a.speed == 28)
+	testing.expect(t, a.kind == nocked && a.draw == .Full && i32(a.bounces_left) == BOW_LEVELS && a.speed == 28)
 	testing.expect(t, s.queue[0] == next && !s.drawing && s.charge == 0)
 	// Lowered: the arrow kept, nothing loosed, no draw again until let go.
 	nocked = s.queue[0]
@@ -95,6 +95,102 @@ test_bow_draw_levels_and_release :: proc(t: ^testing.T) {
 	testing.expect(t, s.drawing)
 }
 
+// The nock (the user's choice, 2026-10-29): after an arrow the next draw waits
+// BOW_NOCK_SECONDS; held through it, the draw starts as it is nocked.
+@(test)
+test_bow_nock_time :: proc(t: ^testing.T) {
+	data: level.Level
+	player: Player
+	room := bow_room(t, &data, &player)
+	defer level.destroy(&data)
+	defer destroy_room(&room)
+	s := &room.first_person.bow
+	bow_shoot(&room, 0.5)
+	testing.expect_value(t, s.loosed, i32(1))
+	testing.expect(t, abs(s.nock-BOW_NOCK_SECONDS) < 1e-5)
+	_ = bow_frame(&room, 0.1, true)
+	testing.expect(t, !s.drawing, "drawn before the next arrow was nocked")
+	_ = bow_frame(&room, 0, false)
+	testing.expect_value(t, s.loosed, i32(1))
+	_ = bow_frame(&room, 0.06, true)
+	testing.expect(t, s.drawing, "held through the nock, the draw did not start")
+	// Clicking as fast as the frames go: no more than one arrow a nock.
+	for &arrow in s.arrows { arrow.state = .None }
+	loosed := s.loosed
+	for frame in 0..<120 { _ = bow_frame(&room, 1.0/60, frame%2 == 0) }
+	testing.expectf(t, f32(s.loosed-loosed) <= 2/BOW_NOCK_SECONDS+1, "%d arrows in two seconds", s.loosed-loosed)
+}
+
+// The quick shot (the user's choice, 2026-10-29): let go below the first level
+// it falls in an arc, takes 1, shows no guide; aimed level it misses a foe
+// three cells off about one time in three (only by falling short), aimed
+// higher it carries further; its fall is the same at any frame rate.
+@(test)
+test_bow_quick_shot_falls_and_misses :: proc(t: ^testing.T) {
+	testing.expect(t, bow_quick(0) && bow_quick(0.24) && !bow_quick(0.25))
+	data: level.Level
+	player: Player
+	spawns := [?]Enemy_Spawn{{position = {x = 9, y = 6}, health = 999, attack = 1}}
+	room := bow_room(t, &data, &player, spawns[:])
+	defer level.destroy(&data)
+	defer destroy_room(&room)
+	s := &room.first_person.bow
+	path: [8]Bow_Path_Point
+	testing.expect_value(t, bow_guide(&room, {}, 0.1, path[:]), 0)
+	foe := &room.enemies[0]
+	SHOTS :: 300
+	for shot in 0..<SHOTS {
+		for &arrow in s.arrows { arrow.state = .None }
+		s.nock = 0
+		// The view kept on (it lasts 30 s), the foe whole and without the arrows' statuses.
+		room.first_person.remaining = 30
+		foe.health, foe.statuses = 999, {}
+		bow_shoot(&room, 0)
+		a := bow_last_arrow(&room)
+		if a == nil { testing.expectf(t, false, "shot %d: none loosed (%d loosed, active %v, phase %v, nock %f)", shot, s.loosed, first_person_bow_active(&room), room.phase, s.nock); return }
+		testing.expect(t, a.draw == .Quick && a.speed >= BOW_QUICK_SPEED[0]-1e-4 && a.speed <= BOW_QUICK_SPEED[1]+1e-4)
+		for _ in 0..<60 { _ = bow_frame(&room, 1.0/60) }
+		// It never gets past the foe: it strikes him or falls short.
+		testing.expectf(t, a.state == .None || (a.state == .Stuck && abs(a.at.y) < 1e-3 && a.at.x < 9.2), "%v at %v", a.state, a.at)
+	}
+	testing.expectf(t, s.hits > SHOTS/2 && s.hits < SHOTS*4/5, "%d of %d struck (about two in three wanted)", s.hits, SHOTS)
+	testing.expect_value(t, s.last.damage, BOW_QUICK_DAMAGE)
+	// Aimed higher it carries further: every one strikes him.
+	hits := s.hits
+	for _ in 0..<30 {
+		for &arrow in s.arrows { arrow.state = .None }
+		s.nock = 0
+		room.first_person.remaining = 30
+		foe.health, foe.statuses = 999, {}
+		bow_shoot(&room, 0, pitch = 0.2)
+		for _ in 0..<60 { _ = bow_frame(&room, 1.0/60) }
+	}
+	testing.expectf(t, s.hits-hits >= 24, "aimed higher %d of 30 struck", s.hits-hits)
+	// The same fall at any frame rate.
+	ends: [3][3]f32
+	for hz, index in ([3]f32{30, 120, 240}) {
+		other_data: level.Level
+		other_player: Player
+		other := bow_room(t, &other_data, &other_player)
+		bow_shoot(&other, 0, pitch = 0.3, hz = hz)
+		a := bow_last_arrow(&other)
+		if a != nil {
+			a.speed = 7
+			for _ in 0..<int(math.round(hz*0.4)) { _ = bow_frame(&other, 1/hz) }
+			ends[index] = a.at
+		} else { testing.fail(t) }
+		level.destroy(&other_data)
+		destroy_room(&other)
+	}
+	for end in ends[1:] {
+		d := end-ends[0]
+		testing.expectf(t, d.x*d.x+d.y*d.y+d.z*d.z < 1e-4, "the same fall: %v and %v", ends[0], end)
+	}
+	// Where an arc of its speed and fall would have it.
+	want := FIRST_PERSON_EYE_HEIGHT+7*math.sin(f32(0.3))*0.4-0.5*BOW_QUICK_GRAVITY*0.4*0.4
+	testing.expectf(t, abs(ends[0].y-want) < 0.05, "at %f high, not on its arc's %f", ends[0].y, want)
+}
+
 // The flight (passo 2): a quick shot into the east wall sticks on its face,
 // never past it; drawn, it bounces back off it; down, it sticks in the floor.
 @(test)
@@ -105,9 +201,11 @@ test_bow_arrows_stick_and_bounce_off_walls :: proc(t: ^testing.T) {
 	defer level.destroy(&data)
 	defer destroy_room(&room)
 	s := &room.first_person.bow
-	bow_shoot(&room, 0)
+	// Drawn to the first level, its bounce taken away: it sticks.
+	bow_shoot(&room, 0.3*BOW_DRAW_SECONDS)
 	a := bow_last_arrow(&room)
 	if !testing.expect(t, a != nil) { return }
+	a.bounces_left = 0
 	for _ in 0..<60 {
 		_ = bow_frame(&room, 1.0/60)
 		testing.expect(t, a.state == .Stuck || a.at.x <= 12+1e-4)
@@ -116,6 +214,7 @@ test_bow_arrows_stick_and_bounce_off_walls :: proc(t: ^testing.T) {
 	testing.expect_value(t, s.stuck, i32(1))
 	// Drawn a quarter: one bounce, back west, faster.
 	a.state = .None
+	s.nock = 0
 	bow_shoot(&room, 0.45*BOW_DRAW_SECONDS)
 	a = bow_last_arrow(&room)
 	testing.expect_value(t, a.bounces_left, i16(1))
@@ -123,6 +222,7 @@ test_bow_arrows_stick_and_bounce_off_walls :: proc(t: ^testing.T) {
 	testing.expect(t, s.bounces >= 1 && a.way.x < 0)
 	// Pitched down: into the floor.
 	for &arrow in s.arrows { arrow.state = .None }
+	s.nock = 0
 	bow_shoot(&room, 0, pitch = -0.5)
 	a = bow_last_arrow(&room)
 	for _ in 0..<30 { _ = bow_frame(&room, 1.0/60) }
@@ -183,17 +283,28 @@ test_bow_corner_and_the_player_bounce :: proc(t: ^testing.T) {
 	testing.expect(t, a.speed > bow_launch_speed(0.55)*BOW_BOUNCE_FACTOR*BOW_BOUNCE_FACTOR-1e-3)
 }
 
-// The blow (passo 3): the plan's table of speeds, up to half again for the
-// bounces; the first foe met takes it and the arrow's status, more of it at a
-// full draw.
+// The blow (passo 3; the user's choice of 2026-10-29): a straight shot as its
+// speed squared, from 4 at the first level to 14 full, each faster bounce and
+// up to half again for the bounces; drawn, it deals more a second than the
+// AK's six a second at every level, the draw and the nock counted; the first
+// foe met takes it and the arrow's status, more of it at a full draw.
 @(test)
 test_bow_damage_and_statuses :: proc(t: ^testing.T) {
-	testing.expect_value(t, bow_damage(12, 0), i32(2))
-	testing.expect_value(t, bow_damage(28, 0), i32(5))
-	testing.expect_value(t, bow_damage(35, 1), i32(7))
-	testing.expect_value(t, bow_damage(60, 4), i32(15))
-	testing.expect_value(t, bow_damage(60, 9), i32(15))
-	testing.expect_value(t, bow_damage(200, 0), i32(10))
+	testing.expect_value(t, bow_damage(16, 16, 0), i32(4))
+	testing.expect_value(t, bow_damage(20, 20, 0), i32(7))
+	testing.expect_value(t, bow_damage(24, 24, 0), i32(10))
+	testing.expect_value(t, bow_damage(28, 28, 0), i32(14))
+	testing.expect_value(t, bow_damage(28, 35, 1), i32(19))
+	testing.expect_value(t, bow_damage(28, 60, 4), i32(44))
+	testing.expect_value(t, bow_damage(28, 60, 9), i32(44))
+	testing.expect_value(t, bow_damage(200, 200, 0), i32(63))
+	ak := f32(FIRST_PERSON_SHOTS_PER_SECOND*FIRST_PERSON_SHOT_DAMAGE)
+	for step in 0..=15 {
+		charge := 0.25+0.05*f32(step)
+		v := bow_launch_speed(charge)
+		seconds := charge*BOW_DRAW_SECONDS+BOW_NOCK_SECONDS+1.0/60
+		testing.expectf(t, f32(bow_damage(v, v, 0))/seconds > ak, "drawn %f: %f a second, the AK %f", charge, f32(bow_damage(v, v, 0))/seconds, ak)
+	}
 	for kind in Bow_Arrow_Kind {
 		data: level.Level
 		player: Player
@@ -204,13 +315,13 @@ test_bow_damage_and_statuses :: proc(t: ^testing.T) {
 		bow_shoot(&room, BOW_DRAW_SECONDS+0.1)
 		for _ in 0..<30 { _ = bow_frame(&room, 1.0/60) }
 		foe := &room.enemies[0]
-		testing.expectf(t, s.hits == 1 && foe.health == 60-bow_damage(28, 0), "%v: hits %v, health %v", kind, s.hits, foe.health)
+		testing.expectf(t, s.hits == 1 && foe.health == 60-bow_damage(28, 28, 0), "%v: hits %v, health %v", kind, s.hits, foe.health)
 		index, found := status_index(&foe.statuses, BOW_ARROW_STATUS[kind])
 		testing.expectf(t, found, "%v: no %v", kind, BOW_ARROW_STATUS[kind])
 		if found && kind != .Stun {
 			testing.expectf(t, foe.statuses.items[index].potency == BOW_ARROW_STACKS[kind][1], "%v: %v stacks", kind, foe.statuses.items[index].potency)
 		}
-		testing.expect(t, s.last.enemy_id == foe.id && s.last.damage == 5)
+		testing.expect(t, s.last.enemy_id == foe.id && s.last.damage == 14)
 		level.destroy(&data)
 		destroy_room(&room)
 	}
@@ -235,14 +346,17 @@ test_bow_critical_zones :: proc(t: ^testing.T) {
 		testing.expect(t, !lasso_cell_is_solid(&room, open))
 		for other in s.zones[:i] { testing.expect(t, other.cell != zone.cell || other.face != zone.face) }
 	}
-	// One on the east wall, straight ahead: a quick shot bounces back off it.
+	// One on the east wall, straight ahead: an arrow with no bounce left bounces back off it.
 	s.zones[0] = {cell = {12, 6}, face = u8(Move_Direction.West), floor = 0}
-	bow_shoot(&room, 0)
+	bow_shoot(&room, 0.3*BOW_DRAW_SECONDS)
 	a := bow_last_arrow(&room)
 	if !testing.expect(t, a != nil) { return }
-	for _ in 0..<40 { _ = bow_frame(&room, 1.0/60) }
+	a.bounces_left = 0
+	launch := a.speed
+	// Faster than a quick shot: caught on its way back, before the player.
+	for _ in 0..<28 { _ = bow_frame(&room, 1.0/60) }
 	testing.expect(t, s.zone_bounces == 1 && a.bounced >= 1 && a.way.x < 0)
-	testing.expect(t, a.speed >= 12*BOW_ZONE_FACTOR-1e-3)
+	testing.expect(t, a.speed >= launch*BOW_ZONE_FACTOR-1e-3)
 	testing.expect(t, s.zones[0].move_in > 0)
 	// The arrow taken away (back off the player it would strike the zone again).
 	a.state = .None

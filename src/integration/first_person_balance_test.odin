@@ -19,9 +19,13 @@ import render "../render"
 // - the sword: Q or E toward the nearest foe, a step up to it, the blade swept
 //   back and forth across it with the button held, the guard up as a blow on
 //   him is due;
-// - the bow: the view on the nearest foe, drawn a second and let go.
+// - the bow: the view on the nearest foe, drawn a second and let go; and
+//   spammed (2026-10-29), a click every other frame: quick shots only.
 // It counts the damage dealt (every foe's health lost, a fallen one's last)
 // and taken, a second of the view; the numbers go to the plan's Esito.
+
+@(private = "file")
+BALANCE_TOUGH :: i32(9999)
 
 @(private = "file")
 Balance_Result :: struct {
@@ -30,7 +34,7 @@ Balance_Result :: struct {
 }
 
 @(private = "file")
-balance_run :: proc(t: ^testing.T, weapon: game.First_Person_Weapon) -> (result: Balance_Result) {
+balance_run :: proc(t: ^testing.T, weapon: game.First_Person_Weapon, spam := false) -> (result: Balance_Result) {
 	data: level.Level
 	defer level.destroy(&data)
 	player, created := game.create_player(run_session.DEMO_PLAYER_STATS)
@@ -95,7 +99,7 @@ balance_run :: proc(t: ^testing.T, weapon: game.First_Person_Weapon) -> (result:
 				}
 			case .Bow:
 				view.yaw = yaw
-				input.fire_right = frame%70 < 62
+				input.fire_right = frame%2 == 0 if spam else frame%70 < 62
 			}
 		}
 		_, _ = game.sandbox_tick(&room, &sandbox, 1.0/60)
@@ -108,10 +112,14 @@ balance_run :: proc(t: ^testing.T, weapon: game.First_Person_Weapon) -> (result:
 			if now < seen[k].health { result.dealt += seen[k].health-now }
 			seen[k].health = now
 		}
-		for foe in room.enemies {
+		// Each foe made tough as it comes, so that no weapon runs out of them (the
+		// first bench, 2026-10-29, ran out at about 210: the AK, the fists and
+		// the spammed bow all dealt what the arena had).
+		for &foe in room.enemies {
 			known := false
 			for k in 0..<seen_count { known = known || seen[k].id == foe.id }
 			if !known && seen_count < len(seen) {
+				foe.health = BALANCE_TOUGH
 				seen[seen_count] = {id = foe.id, health = foe.health}
 				seen_count += 1
 			}
@@ -133,4 +141,8 @@ test_first_person_weapons_side_by_side :: proc(t: ^testing.T) {
 			names[weapon], r.dealt, r.taken, r.seconds, dps, taken)
 		testing.expectf(t, r.dealt > 0, "%s dealt nothing in a minute", names[weapon])
 	}
+	r := balance_run(t, .Bow, spam = true)
+	log.infof("BALANCE arco a raffica: %d dealt, %d taken in %.1f s of the view: %.2f a second dealt, %.2f taken",
+		r.dealt, r.taken, r.seconds, f32(r.dealt)/max(r.seconds, 1), f32(r.taken)/max(r.seconds, 1))
+	testing.expect(t, r.dealt > 0, "the spammed bow dealt nothing in a minute")
 }

@@ -3585,6 +3585,32 @@ dell'utente e i numeri ritoccati insieme) aspetta l'utente.
   nuove; il `README.md` ha la riga del piano aggiornata; `CHANGELOG.md`.
 - **Le carte restano `Lab_Only`** (la scelta dell'utente): nessuna offerta,
   nessun negozio, nessuna spedizione.
+- **Dalla prova dell'utente (2026-10-29), i danni dell'arco:** a raffica faceva
+  più danni dell'AK. Le scelte dell'utente: il tiro senza carica fa 1 danno e
+  può mancare, cadendo a parabola come se non avesse portata (un nemico a 3
+  caselle lo manca circa una volta su tre); 0,15 s per incoccare la freccia
+  dopo; tendendo si fanno più danni dell'AK al secondo, contando il tempo per
+  tendere, e a raffica meno. Fatto così:
+  - il tiro veloce (sotto il primo livello, 0,4 s) parte tra 5,2 e 9,8 caselle
+    al secondo, a caso dal flusso della stanza, e cade di 14 caselle al secondo
+    ogni secondo: mirando dritto tocca terra tra 2 e 4 caselle. Fa 1 danno e
+    **non dà stati** (la mia scelta, che l'utente mi ha lasciato: con gli stati,
+    a raffica faceva 40 danni al secondo);
+  - una freccia tesa fa 2,5 × (partenza / 12) × (impatto / 12), più i
+    rimbalzi: da 4 al primo livello a 14 piena su un tiro dritto (prima da 2 a
+    5). Contando la carica e l'incocco, da 7 a 8 danni al secondo a ogni
+    livello (test), più dell'AK che ne fa al massimo 6.
+  - **Il banco del bot ora rende i nemici duri** (9999 di vita): il primo
+    finiva i nemici dell'arena a circa 210 danni, quindi AK, pugni e arco a
+    raffica sembravano uguali. Con nemici duri, in un minuto:
+
+    | Arma | Danni al secondo |
+    |---|---:|
+    | Pugni | 14,3 (all'utente va bene così) |
+    | Arco teso | 7,0 (prima 4,4) |
+    | AK | 4,6 |
+    | Arco a raffica | 2,5 (prima 474, per gli stati accumulati) |
+    | Spada | 2,2 |
 - **Dalla prova dell'utente (2026-10-29), le frecce più grandi:** l'utente le
   trovava troppo piccole e non capiva come si formavano. Il motivo: partivano
   dall'occhio, quindi si vedevano solo da dietro (un triangolo ciano). Ora

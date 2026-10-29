@@ -15,6 +15,16 @@ import rng "../engine/rng"
 // the last one full): the bounces the arrow may make (0 to 4). The longer draw
 // the user chose reaches a harder shot than a short one would: the arrow leaves
 // at BOW_SPEED_MIN + BOW_SPEED_DRAW * charge cells a second (12 to 28).
+// After each arrow the next takes BOW_NOCK_SECONDS to nock: no draw before it.
+//
+// THE QUICK SHOT (the user's choice, 2026-10-29: spamming dealt more than the
+// AK). Let go below the first level, the arrow has no reach: it leaves slow,
+// at a speed drawn from the room's stream between BOW_QUICK_SPEED's two, and
+// falls in an arc (BOW_QUICK_GRAVITY), so that aimed level it lands from two
+// to four cells off and misses a foe three cells away one time in three;
+// aimed higher it carries further. It takes BOW_QUICK_DAMAGE whatever its
+// speed and gives no status: spammed, it deals less a second than the AK.
+// Only a quick shot falls; the guide shows only drawn ones.
 //
 // THE FLIGHT. The arrow is a point flying straight along the aim, on the
 // world's seconds, stepped from one contact to the next (a cell's edge, the
@@ -37,9 +47,13 @@ import rng "../engine/rng"
 // seconds after it is used, and all of them every BOW_ZONE_MOVE_EVERY.
 //
 // THE BLOW. The first foe the arrow meets (its card, a body of BOW_FOE_RADIUS
-// round its cell's centre as high as its outline) takes 2 * speed / 12 at the
-// speed it struck at, up to BOW_BOUNCE_BONUS_MAX more for its bounces (an
-// eighth a bounce, the user's choice), and the arrow's status. The arrows come
+// round its cell's centre as high as its outline) takes, from a drawn arrow,
+// BOW_POWER * launch / 12 * speed / 12 (the speed it left at and the one it
+// struck at: a straight shot as its speed squared, the user's choice of
+// 2026-10-29, so that drawn it deals more a second than the AK, the draw
+// counted: from 4 at the first level to 14 full, about 7 to 8 a second), up
+// to BOW_BOUNCE_BONUS_MAX more for its bounces (an eighth a bounce, the
+// user's choice), and the arrow's status. The arrows come
 // from the room's own stream, one of five (sezione 8), the nocked one and the
 // next shown; a full draw gives more stacks.
 
@@ -53,6 +67,14 @@ BOW_BOUNCE_FACTOR :: f32(1.25)
 BOW_ZONE_FACTOR :: f32(1.6)
 BOW_BOUNCE_BONUS :: f32(0.125)
 BOW_BOUNCE_BONUS_MAX :: f32(0.5)
+BOW_POWER :: f32(2.5)
+BOW_NOCK_SECONDS :: f32(0.15)
+// The quick shot: its damage, its speeds (cells a second, the lowest and the
+// highest), its fall (cells a second each second) on its own clock's steps.
+BOW_QUICK_DAMAGE :: i32(1)
+BOW_QUICK_SPEED :: [2]f32{5.2, 9.8}
+BOW_QUICK_GRAVITY :: f32(14)
+BOW_FALL_STEP :: f32(1)/f32(240)
 // Arrows on the board at once (flying or stuck), and how long they last.
 BOW_ARROWS :: 8
 BOW_FLIGHT_SECONDS :: f32(4)
@@ -84,12 +106,13 @@ BOW_ARROW_STATUS := [Bow_Arrow_Kind]Status_Kind{.Poison = .Poison, .Burn = .Burn
 BOW_ARROW_STACKS := [Bow_Arrow_Kind][2]i32{.Poison = {2, 3}, .Burn = {1, 2}, .Ice = {2, 3}, .Stun = {1, 2}, .Barbed = {1, 2}}
 
 Bow_Arrow_State :: enum u8 {None, Flying, Stuck}
+// How far it was drawn: below the first level (it falls), drawn, or full (more stacks).
+Bow_Draw :: enum u8 {Quick, Drawn, Full}
 
 Bow_Arrow :: struct {
 	kind: Bow_Arrow_Kind,
 	state: Bow_Arrow_State,
-	// Loosed at a full draw (more stacks).
-	full: bool,
+	draw: Bow_Draw,
 	// Once it has left the player: only then does it bounce off him.
 	clear: bool,
 	// Where it is and where it goes (world units: x east, y up, z south, the
@@ -100,8 +123,8 @@ Bow_Arrow :: struct {
 	speed: f32,
 	// Bounces it may still make, and those made (walls, zones and the player).
 	bounces_left, bounced: i16,
-	// Seconds flying, or stuck.
-	age: f32,
+	// Seconds flying, or stuck; the speed it left at (its blow's base).
+	age, launch: f32,
 }
 
 // A target on the face of the wall `cell` toward the open cell its `face` way,
@@ -136,9 +159,10 @@ Bow_Hit :: struct {
 }
 
 First_Person_Bow :: struct {
-	// The right button held, the bow drawn so far (0..1), and lowered while held.
+	// The right button held, the bow drawn so far (0..1), and lowered while held;
+	// seconds until the next arrow is nocked.
 	drawing, lowered: bool,
-	charge: f32,
+	charge, nock: f32,
 	// The nocked arrow and the next.
 	queue: [2]Bow_Arrow_Kind,
 	arrows: [BOW_ARROWS]Bow_Arrow,
@@ -177,10 +201,10 @@ bow_launch_speed :: proc(charge: f32) -> f32 {
 	return BOW_SPEED_MIN+BOW_SPEED_DRAW*clamp(charge, 0, 1)
 }
 
-// What an arrow at `speed` takes, after `bounced` bounces.
-bow_damage :: proc(speed: f32, bounced: i16) -> i32 {
+// What a drawn arrow loosed at `launch` takes striking at `speed`, after `bounced` bounces.
+bow_damage :: proc(launch, speed: f32, bounced: i16) -> i32 {
 	bonus := min(BOW_BOUNCE_BONUS*f32(max(bounced, 0)), BOW_BOUNCE_BONUS_MAX)
-	return max(1, i32(math.round(2*min(speed, BOW_SPEED_MAX)/12*(1+bonus))))
+	return max(1, i32(math.round(BOW_POWER*min(launch, BOW_SPEED_MAX)/12*min(speed, BOW_SPEED_MAX)/12*(1+bonus))))
 }
 
 // The room's own stream for the arrows and zones: from its seed and the run's
@@ -401,11 +425,24 @@ bow_fly :: proc(room: ^Room, a: ^Bow_Arrow, seconds: f32, live: bool, path: []Bo
 			break
 		}
 		span := min(left, BOW_FLIGHT_SECONDS-a.age)
+		// A quick shot falls on its own clock's steps (its age), the same however the seconds come.
+		tick := f32(-1)
+		if a.draw == .Quick {
+			tick = (math.floor(a.age/BOW_FALL_STEP+BOW_EPSILON)+1)*BOW_FALL_STEP
+			span = min(span, tick-a.age)
+		}
 		event, t, cross, foe := bow_next(room, a, a.speed*span)
 		a.at += a.way*t
 		spent := t/a.speed
 		left -= spent
 		a.age += spent
+		if tick > 0 && event == .None && a.age >= tick-BOW_EPSILON {
+			a.age = tick
+			v := a.way*a.speed
+			v.y -= BOW_QUICK_GRAVITY*BOW_FALL_STEP
+			a.speed = math.sqrt(v.x*v.x+v.y*v.y+v.z*v.z)
+			a.way = v/a.speed
+		}
 		if !a.clear {
 			p := room.player.position
 			dx, dz := a.at.x-(f32(p.x)+0.5), a.at.z-(f32(p.y)+0.5)
@@ -497,13 +534,15 @@ bow_strike :: proc(room: ^Room, a: Bow_Arrow, index: int) {
 	s := &room.first_person.bow
 	enemy := room.enemies[index]
 	target := enemy_entity(enemy.id)
-	damage := bow_damage(a.speed, a.bounced)
-	stacks := BOW_ARROW_STACKS[a.kind][1 if a.full else 0]
+	damage := BOW_QUICK_DAMAGE if a.draw == .Quick else bow_damage(a.launch, a.speed, a.bounced)
+	stacks := BOW_ARROW_STACKS[a.kind][1 if a.draw == .Full else 0]
 	status := BOW_ARROW_STATUS[a.kind]
 	action := make_action(.Attack, PLAYER_ENTITY, entity_target(target), .Opponent)
 	action.visual_group = BOW_VISUAL_GROUP
 	if !add_effect(&action, damage_effect(target, damage)) { return }
-	if status == .Stagger { _ = add_effect(&action, apply_status_effect(target, .Stagger, 1, stacks)) }
+	// A quick shot gives no status (spammed, it would outdo the AK many times over).
+	if a.draw == .Quick {}
+	else if status == .Stagger { _ = add_effect(&action, apply_status_effect(target, .Stagger, 1, stacks)) }
 	else { _ = add_effect(&action, apply_status_effect(target, status, stacks, 0)) }
 	report := resolve_action(room, &action)
 	if !report.accepted { return }
@@ -513,23 +552,32 @@ bow_strike :: proc(room: ^Room, a: Bow_Arrow, index: int) {
 	s.last = {enemy_id = enemy.id, kind = a.kind, damage = damage, bounced = a.bounced, speed = a.speed, point = a.at}
 }
 
-// The arrow a draw of `charge` looses along `aim` from his eye.
+// Whether a draw of `charge` looses a quick shot (below the first level).
+bow_quick :: proc(charge: f32) -> bool {
+	return charge < 1/f32(BOW_LEVELS)
+}
+
+// The arrow a draw of `charge` looses along `aim` from his eye; a quick shot
+// at `quick` of the way between BOW_QUICK_SPEED's two (0..1).
 @(private = "file")
-bow_arrow :: proc(room: ^Room, aim: First_Person_Aim, charge: f32, kind: Bow_Arrow_Kind) -> Bow_Arrow {
+bow_arrow :: proc(room: ^Room, aim: First_Person_Aim, charge: f32, kind: Bow_Arrow_Kind, quick := f32(0.5)) -> Bow_Arrow {
 	eye := first_person_eye(room, room.player.position, aim)
 	base := f32(cell_height(room, room.player.position))*HEIGHT_STEP_DRAWN
 	pitch := clamp(aim.pitch, -FIRST_PERSON_PITCH_LIMIT, FIRST_PERSON_PITCH_LIMIT)
 	way := [3]f32{math.cos(pitch)*math.cos(aim.yaw), math.sin(pitch), math.cos(pitch)*math.sin(aim.yaw)}
 	cell := [2]i32{i32(math.floor(eye.x)), i32(math.floor(eye.y))}
-	return {kind = kind, state = .Flying, full = charge >= 1, at = {eye.x, FIRST_PERSON_EYE_HEIGHT+base, eye.y}, way = way,
-		cell = cell, speed = bow_launch_speed(charge), bounces_left = bow_level(charge)}
+	draw := Bow_Draw.Full if charge >= 1 else (Bow_Draw.Quick if bow_quick(charge) else Bow_Draw.Drawn)
+	speed := bow_launch_speed(charge)
+	if draw == .Quick { speed = BOW_QUICK_SPEED[0]+(BOW_QUICK_SPEED[1]-BOW_QUICK_SPEED[0])*clamp(quick, 0, 1) }
+	return {kind = kind, state = .Flying, draw = draw, at = {eye.x, FIRST_PERSON_EYE_HEIGHT+base, eye.y}, way = way,
+		cell = cell, speed = speed, launch = speed, bounces_left = bow_level(charge)}
 }
 
 // The path an arrow drawn to `charge` would fly along `aim` until its
 // `bounces`-th bounce (the guide: the user's choice, to the second), a foe,
 // or its stop; its points into `path`, the eye first.
 bow_guide :: proc(room: ^Room, aim: First_Person_Aim, charge: f32, path: []Bow_Path_Point, bounces := i32(2)) -> int {
-	if !first_person_bow_active(room) || len(path) == 0 { return 0 }
+	if !first_person_bow_active(room) || len(path) == 0 || bow_quick(charge) { return 0 }
 	a := bow_arrow(room, aim, charge, room.first_person.bow.queue[0])
 	count := 1
 	path[0] = {at = a.at}
@@ -549,7 +597,8 @@ first_person_bow_move :: proc(room: ^Room, input: First_Person_Bow_Input) -> (re
 	s.pending = 0
 	acted := false
 	if !input.draw { s.lowered = false }
-	if input.draw && !s.lowered {
+	s.nock = max(s.nock-seconds, 0)
+	if input.draw && !s.lowered && (s.drawing || s.nock <= 0) {
 		if s.drawing { s.charge = min(f32(1), s.charge+seconds/BOW_DRAW_SECONDS) }
 		s.drawing = true
 		if input.lower {
@@ -564,8 +613,14 @@ first_person_bow_move :: proc(room: ^Room, input: First_Person_Bow_Input) -> (re
 			for arrow, index in s.arrows { if arrow.state == .Stuck && arrow.age > oldest { slot, oldest = index, arrow.age } }
 		}
 		if slot >= 0 {
-			s.arrows[slot] = bow_arrow(room, input.aim, s.charge, s.queue[0])
+			quick := f32(0.5)
+			if bow_quick(s.charge) {
+				if room.bow_random == 0 { room.bow_random = BOW_SEED_SALT }
+				quick = f32(rng.below_state(&room.bow_random, 1 << 20))/f32(1 << 20)
+			}
+			s.arrows[slot] = bow_arrow(room, input.aim, s.charge, s.queue[0], quick)
 			s.queue = {s.queue[1], bow_next_kind(room)}
+			s.nock = BOW_NOCK_SECONDS
 			s.loosed += 1
 			room.first_person.shots += 1
 			acted = true

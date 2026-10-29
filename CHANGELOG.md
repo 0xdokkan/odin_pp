@@ -5,6 +5,14 @@ I riferimenti a Classica, `--flat` e ai vecchi smoke descrivono versioni precede
 per i comandi disponibili oggi valgono il [README](README.md) e la documentazione collegata.
 
 
+## 2026-10-29 — Prima persona: danni dell'arco ribilanciati
+
+- First Person Archer: il tiro senza carica (sotto 0,4 s) cade a parabola e può mancare il bersaglio, fa 1 danno e non
+  dà stati; 0,15 s per incoccare la freccia dopo. Le frecce tese fanno di più (da 4 a 14 su un tiro dritto): contando
+  la carica superano l'AK al secondo, a raffica restano sotto.
+- Il banco del bot rende i nemici duri, così nessuna arma li finisce: AK 4,6 danni al secondo, arco teso 7,0, arco a
+  raffica 2,5, pugni 14,3, spada 2,2.
+
 ## 2026-10-29 — Prima persona: frecce dell'arco più grandi
 
 - Le frecce in volo di First Person Archer partono dalla punta della freccia incoccata (non più dall'occhio, da dove si
