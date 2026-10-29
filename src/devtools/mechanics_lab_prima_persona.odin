@@ -65,13 +65,15 @@ mechanics_lab_prima_persona :: proc(window: ^app.Window, renderer: ^render.Rende
 	controller^ = {was_focused = true}
 	for foe in room.enemies { mechanics_lab_hold(room, foe.id) }
 	for _ in 0..<20 { mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0) }
-	card, brawler, fencer := u32(0), u32(0), u32(0)
+	card, brawler, fencer, archer := u32(0), u32(0), u32(0), u32(0)
 	for held in player.deck.hand[:player.deck.hand_count] {
 		if held.definition_id == .First_Person { card = held.id }
 		if held.definition_id == .First_Person_Brawler { brawler = held.id }
 		if held.definition_id == .First_Person_Fencer { fencer = held.id }
+		if held.definition_id == .First_Person_Archer { archer = held.id }
 	}
-	if len(room.obstacles) != len(run_session.MECHANICS_LAB_FIRST_PERSON_COVERS) || player.deck.hand_count != 3 || card == 0 || brawler == 0 || fencer == 0 {
+	if len(room.obstacles) != len(run_session.MECHANICS_LAB_FIRST_PERSON_COVERS) || player.deck.hand_count != 4 || card == 0 || brawler == 0 ||
+	   fencer == 0 || archer == 0 {
 		fmt.eprintln("mechanics lab: the first person arena is not the one drawn, or its deck is not its own"); return false
 	}
 	mechanics_lab_still(window, renderer, room, 0, "odin_pp_mechanics_lab_prima_persona.png")
@@ -345,24 +347,89 @@ mechanics_lab_prima_persona :: proc(window: ^app.Window, renderer: ^render.Rende
 	if sword.perfect_parries != 1 { fmt.eprintln("mechanics lab: no perfect parry (", sword.parries, "parries)"); return false }
 	if !leave(window, renderer, room, controller, cards, buffer) { fmt.eprintln("mechanics lab: the sword's view did not end"); return false }
 
-	// The weapon still to come: the lab takes it up; its tag, the bare line, an empty hand, no shot.
-	names := [game.First_Person_Weapon]string{.AK = "ak", .Fists = "pugni", .Sword = "spada", .Bow = "arco"}
-	for weapon in game.First_Person_Weapon {
-		if weapon != .Bow { continue }
-		if !game.tactical_begin_first_person(room, 20, weapon) { fmt.eprintln("mechanics lab: the", weapon, "was not taken up"); return false }
-		if !settle(window, renderer, room, controller, cards, buffer, true) { fmt.eprintln("mechanics lab: no dive with the", weapon); return false }
-		shots = room.first_person.shots
-		for _ in 0..<60 { frame(window, renderer, room, controller, cards, buffer, fire = true) }
-		if room.first_person.shots != shots || room.first_person.trigger || render.first_person_shown_weapon(renderer) != weapon ||
-		   render.first_person_hud_status(renderer) != render.FIRST_PERSON_HUD_STATUS_BARE ||
-		   string(render.first_person_countdown_text(20, weapon)) != fmt.tprintf("%s 20s", render.FIRST_PERSON_LOOKS[weapon].tag) {
-			fmt.eprintln("mechanics lab: the", weapon, "is not shown as its own, or it fired"); return false
+	// FIRST PERSON ARCHER from the hand (Fase 6): its words; behind his eyes the
+	// bow, the brute three cells east; drawn a second with the right button (its
+	// ring filling, the guide's dots), let go: the arrow into the brute. Then a
+	// bank shot: the angle whose guide reaches the brute after one bounce
+	// (searched round the compass), drawn to one bounce and let go.
+	archer_definition, _ := game.card_definition_by_id(.First_Person_Archer)
+	for upgrade in i32(0)..=game.FIRST_PERSON_MAX_UPGRADE_LEVEL {
+		if misfit := render.tactical_card_text_misfit(renderer, {id = 1, definition_id = .First_Person_Archer, upgrade_level = upgrade},
+			archer_definition, width); misfit != "" {
+			fmt.eprintf("mechanics lab: First Person Archer +%d on a %.0f px card: %s\n", upgrade, width, misfit); return false
 		}
-		fp.yaw, fp.pitch = -math.PI/2, 0.12
-		for _ in 0..<3 { frame(window, renderer, room, controller, cards, buffer) }
-		artifacts.screenshot(fmt.ctprintf("odin_pp_mechanics_lab_prima_persona_%s.png", names[weapon]))
-		if !leave(window, renderer, room, controller, cards, buffer) { fmt.eprintln("mechanics lab: the", weapon, "view did not end"); return false }
 	}
+	mechanics_lab_still(window, renderer, room, archer, "odin_pp_mechanics_lab_card_First_Person_Archer.png")
+	if index, found := game.enemy_index_by_id(room, brute); found { brute_index = index }
+	brute_enemy = &room.enemies[brute_index]
+	brute_enemy.position = game.add_position(room.player.position, {x = 3})
+	brute_enemy.health = 60
+	mechanics_lab_hold(room, brute)
+	room.player.tactical.facing = .East
+	render.clear_event_animations(renderer)
+	for _ in 0..<600 {
+		if game.tactical_allows_cards(room) && !render.renderer_blocks_player_input(renderer) && !game.tactical_player_busy(room) { break }
+		frame(window, renderer, room, controller, cards, buffer)
+	}
+	player.deck.energy = player.deck.rules.max_energy
+	if !run_session.commit_gameplay_command(room, renderer, cards, {kind = .Play_Card, origin_phase = .Combat, card_id = archer,
+		target = game.entity_target(game.PLAYER_ENTITY)}) || room.first_person.weapon != .Bow {
+		fmt.eprintln("mechanics lab: the arena's First Person Archer was not played"); return false
+	}
+	if !settle(window, renderer, room, controller, cards, buffer, true) { fmt.eprintln("mechanics lab: no dive with the bow"); return false }
+	for _ in 0..<12 { frame(window, renderer, room, controller, cards, buffer) }
+	if render.first_person_hud_status(renderer) != render.FIRST_PERSON_HUD_STATUS_BOW || string(render.first_person_countdown_text(20, .Bow)) != "FPA 20s" {
+		fmt.eprintln("mechanics lab: the bow's words are not shown"); return false
+	}
+	artifacts.screenshot("odin_pp_mechanics_lab_prima_persona_arco.png")
+	// ODIN_PP_LAB_TIMING=bow measures the bow's view here (Fase 6).
+	if timing, _ := os.lookup_env("ODIN_PP_LAB_TIMING", context.temp_allocator); timing == "bow" {
+		return mechanics_lab_first_person_timing(window, renderer, room, controller, cards, buffer, .Bow)
+	}
+	bow := &room.first_person.bow
+	fp.yaw, fp.pitch = 0, 0
+	for _ in 0..<60 { drive(window, renderer, room, controller, cards, buffer, {fire_right = true}) }
+	artifacts.screenshot("odin_pp_mechanics_lab_prima_persona_arco_teso.png")
+	health = brute_enemy.health
+	for _ in 0..<40 { drive(window, renderer, room, controller, cards, buffer, {}) }
+	if bow.loosed != 1 || bow.hits != 1 || brute_enemy.health >= health {
+		fmt.eprintln("mechanics lab: the bow's arrow did not strike the brute (loosed", bow.loosed, "hits", bow.hits, ")"); return false
+	}
+	straight := bow.last
+	// The bank shot: the brute two cells south and three east, the angle whose
+	// guide reaches it after one bounce.
+	brute_enemy.position = game.add_position(room.player.position, {x = 3, y = 2})
+	mechanics_lab_hold(room, brute)
+	for _ in 0..<6 { frame(window, renderer, room, controller, cards, buffer) }
+	bank, banked := f32(0), false
+	charge := f32(0.3)
+	for step in 0..<720 {
+		yaw := f32(step)*math.PI/360
+		path: [6]game.Bow_Path_Point
+		count := game.bow_guide(room, {yaw = yaw, framed = false}, charge, path[:], 2)
+		if count != 3 || !path[1].bounce || path[2].bounce { continue }
+		end := path[2].at
+		dx, dz := end.x-(f32(brute_enemy.position.x)+0.5), end.z-(f32(brute_enemy.position.y)+0.5)
+		if dx*dx+dz*dz < 0.5*0.5 { bank, banked = yaw, true; break }
+	}
+	if !banked { fmt.eprintln("mechanics lab: no bank shot onto the brute was found"); return false }
+	fp.yaw, fp.pitch = bank, 0
+	held := int(math.ceil(charge*game.BOW_DRAW_SECONDS*60))+2
+	for _ in 0..<held { drive(window, renderer, room, controller, cards, buffer, {fire_right = true}) }
+	health = brute_enemy.health
+	caught := false
+	for _ in 0..<60 {
+		drive(window, renderer, room, controller, cards, buffer, {})
+		if !caught && bow.bounces > 0 {
+			artifacts.screenshot("odin_pp_mechanics_lab_prima_persona_arco_sponda.png")
+			caught = true
+		}
+	}
+	if bow.loosed != 2 || bow.hits != 2 || bow.last.bounced != 1 || brute_enemy.health >= health {
+		fmt.eprintln("mechanics lab: the bank shot did not strike the brute (hits", bow.hits, "bounced", bow.last.bounced, ")"); return false
+	}
+	banked_hit := bow.last
+	if !leave(window, renderer, room, controller, cards, buffer) { fmt.eprintln("mechanics lab: the bow's view did not end"); return false }
 
 	// The fight back, as F5 brings it, for whatever comes after.
 	game.destroy_room(room)
@@ -375,6 +442,7 @@ mechanics_lab_prima_persona :: proc(window: ^app.Window, renderer: ^render.Rende
 	for _ in 0..<12 { mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0) }
 	fmt.eprintf("mechanics lab first person arena: %d shots of the AK in a second; the fists ran up to the brute, a jab, a hook " +
 		"and a critical cross on its mark; the sword cut the brute (%v for %d), parried its blow, pulled it in, spun " +
-		"into it (%d) and parried it perfectly; %v shown with an empty hand and fired nothing\n", ak_shots, cut.kind, cut.damage, spin.damage, game.First_Person_Weapon.Bow)
+		"into it (%d) and parried it perfectly; the bow struck the brute straight (%d) and off a wall (%d)\n", ak_shots, cut.kind, cut.damage,
+		spin.damage, straight.damage, banked_hit.damage)
 	return true
 }

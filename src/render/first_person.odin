@@ -220,6 +220,8 @@ First_Person_View :: struct {
 	gloves: First_Person_Glove_Kit,
 	// The sword as last seen (first_person_sword.odin).
 	sword: First_Person_Sword_View,
+	// The bow as last seen (first_person_bow.odin).
+	bow: First_Person_Bow_View,
 	// What the board has shown so far (the lab's sounds, the smoke and tests).
 	shots, hits, ricochets, enters, exits: int,
 }
@@ -259,6 +261,7 @@ update_tactical_first_person :: proc(renderer: ^Renderer, room: ^game.Room) {
 	if active { f.weapon = room.first_person.weapon }
 	follow_first_person_fists(renderer, room)
 	follow_first_person_sword(renderer, room)
+	follow_first_person_bow(renderer, room)
 	if active != f.engaged {
 		if active {
 			// The eyes look the way he faces, or along the grid way nearest the
@@ -710,6 +713,7 @@ collect_first_person_entries :: proc(renderer: ^Renderer, entries: ^[dynamic]Tac
 				position = {tracer.to.x-0.5, tracer.to.z-0.5}})
 		}
 	}
+	collect_first_person_bow_entries(renderer, entries)
 }
 
 @(private = "file")
@@ -723,10 +727,15 @@ draw_first_person_entry :: proc(renderer: ^Renderer, entry: Tactical_Alpha_Entry
 	f := &renderer.tactical.first_person
 	now := renderer.sprite_assets.elapsed
 	index := int(entry.first_person)
-	if index < 0 || index >= 2*len(f.tracers) { return }
+	if index < 0 || index >= 2*len(f.tracers)+game.BOW_ARROWS+game.BOW_ZONES { return }
 	rlgl.DrawRenderBatchActive()
 	rlgl.DisableBackfaceCulling()
 	defer { rlgl.DrawRenderBatchActive(); rlgl.EnableBackfaceCulling() }
+	// The bow's arrows and zones past the tracers and their sparks.
+	if index >= 2*len(f.tracers) {
+		draw_first_person_bow_entry(renderer, index-2*len(f.tracers))
+		return
+	}
 	if index < len(f.tracers) {
 		tracer := &f.tracers[index]
 		draw_first_person_tracer(renderer, first_person_tracer_point(tracer, now-tracer.born), tracer.to-tracer.from)
@@ -832,6 +841,10 @@ draw_first_person_overlay :: proc(renderer: ^Renderer, room: ^game.Room) {
 		draw_first_person_gloves(renderer, room, now)
 		draw_first_person_sword_guard(renderer)
 		draw_first_person_sword_words(renderer)
+	// The bow on the same canvas, its ring and guide over the view (first_person_bow.odin).
+	case .Bow:
+		draw_first_person_gloves(renderer, room, now)
+		draw_first_person_bow_hud(renderer)
 	case .Empty:
 	}
 	// The crosshair: four paper ticks in ink round a dot, warm over a foe; a
@@ -913,6 +926,8 @@ FIRST_PERSON_HUD_STATUS_BARE :: cstring("MIRA COL MOUSE / WASD: PASSI")
 FIRST_PERSON_HUD_STATUS_FISTS :: cstring("WASD LIBERO / CLIC: PUGNI / SPAZIO: SALTO")
 // The sword: the blade, the guard, the turns (the cut and the grapple are in the inspector).
 FIRST_PERSON_HUD_STATUS_SWORD :: cstring("MOUSE: LAMA / DESTRO: PARA / Q E: GIRA")
+// The bow: the draw and the release, the lowering, the steps.
+FIRST_PERSON_HUD_STATUS_BOW :: cstring("DESTRO: TENDI E TIRA / SX: ABBASSA / WASD")
 
 // --------------------------------------------------------------------------
 // Each weapon's look (game.FIRST_PERSON_WEAPONS has its rules).
@@ -920,7 +935,7 @@ FIRST_PERSON_HUD_STATUS_SWORD :: cstring("MOUSE: LAMA / DESTRO: PARA / Q E: GIRA
 // What is in hand: the AK's print, or nothing (the crosshair and the plate
 // alone, as Doom's fist leaves the ammo box blank) until a weapon's own
 // drawing comes (docs/piano-prima-persona.md, Fasi 3, 5 e 7).
-First_Person_Hand :: enum u8 {Empty, AK, Fists, Sword}
+First_Person_Hand :: enum u8 {Empty, AK, Fists, Sword, Bow}
 
 First_Person_Look :: struct {
 	// The countdown's tag (FPS, FPB, FPF, FPA: the user's choice in Fase 3),
@@ -940,7 +955,7 @@ FIRST_PERSON_LOOKS := [game.First_Person_Weapon]First_Person_Look{
 	.AK = {tag = "FPS", status = FIRST_PERSON_HUD_STATUS, hand = .AK, accent = FIRST_PERSON_OLIVE},
 	.Fists = {tag = "FPB", status = FIRST_PERSON_HUD_STATUS_FISTS, hand = .Fists, accent = FIRST_PERSON_NEON_MAGENTA},
 	.Sword = {tag = "FPF", status = FIRST_PERSON_HUD_STATUS_SWORD, hand = .Sword, accent = FIRST_PERSON_NEON_MAGENTA},
-	.Bow = {tag = "FPA", status = FIRST_PERSON_HUD_STATUS_BARE, accent = FIRST_PERSON_OLIVE},
+	.Bow = {tag = "FPA", status = FIRST_PERSON_HUD_STATUS_BOW, hand = .Bow, accent = FIRST_PERSON_BOW_TEAL},
 }
 
 // The weapon the board shows: the room's while the view is on, the last one

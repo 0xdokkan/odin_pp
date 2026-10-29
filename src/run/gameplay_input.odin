@@ -33,6 +33,9 @@ Gameplay_Command_Kind :: enum {
 	// along `fists` (a world command too; game/first_person_fists.odin).
 	First_Person_Fists,
 	First_Person_Sword,
+	// FIRST PERSON ARCHER: the frame's draw and arrows along `bow` (a world
+	// command too; game/first_person_bow.odin).
+	First_Person_Bow,
 }
 
 Gameplay_Command :: struct {
@@ -54,6 +57,8 @@ Gameplay_Command :: struct {
 	fists: game.First_Person_Fists_Input,
 	// What a First_Person_Sword frame asks of the blade.
 	sword: game.First_Person_Sword_Input,
+	// What a First_Person_Bow frame asks of the bow.
+	bow: game.First_Person_Bow_Input,
 	seconds: f32,
 	// The way the wheel gave a cannon (CANNONE) before it was played.
 	aim_way: game.Move_Direction,
@@ -108,7 +113,7 @@ gameplay_command_is_valid :: proc(command: Gameplay_Command) -> bool {
 	// The rod fishes a room cleared, and nothing else.
 	case .Fish:
 		return command.origin_phase == .Loot && command.target.kind == .Cell
-	case .First_Person_Fire, .First_Person_Fists, .First_Person_Sword:
+	case .First_Person_Fire, .First_Person_Fists, .First_Person_Sword, .First_Person_Bow:
 		return command.origin_phase == .Combat
 	}
 	unreachable()

@@ -78,6 +78,8 @@ docs/piano-prima-persona.md adds one more, in the Neon style of its Fase 3:
              parrying hooks and a dark ricasso, a broad magenta cross guard lit
              cyan at its ends, a long violet grip ringed in magenta, a magenta
              pommel with a cyan core.
+    cell 35  First Person Archer (its Fase 6): the Neon compound bow side on,
+             two cyan cams, the string drawn to an arrow with a magenta head.
 
 Options:
     --check        exit 1 if the atlas is not what this script would write
@@ -797,6 +799,46 @@ FENCER = (
 assert all(len(row) == 28 for row in FENCER) and len(FENCER) == 28
 
 ICONS.update({34: FENCER})
+
+# docs/piano-prima-persona.md, Fase 6: First Person Archer, the compound bow the
+# user chose for its look (Fase 7), side on: its carbon riser in violet with a
+# magenta neon stripe and a dark grip, the short limbs back to two cyan cams
+# with white hubs, the cables across, the ivory string drawn to the nock and an
+# arrow on it (cyan fletching, a steel shaft, a magenta head past the riser).
+# Painted by tools: thick strokes and wheels rasterised, outlined on four sides.
+ARCHER = (
+    "............................",
+    "........KKK.................",
+    ".......KXXXKK...............",
+    "......KXXyXSSKKKKK..........",
+    "......KXXyXSSSSSVVK.........",
+    ".......KXXXKSSSSVVVK........",
+    "......KkkKiKKKKSVVVK........",
+    "......KkKKiK...KVPVK........",
+    "......KkKKiK...KVPVK........",
+    "......KkK.KiK..KVVPK........",
+    ".....KkkK.KiK..KVVPK........",
+    ".....KkK...KiK.KVVPK........",
+    ".....KkK...KiK.KVSSSK.KK....",
+    ".....KXXKKKKiKKKKSSSKKPPKKK.",
+    "....KkXXXXHHHHHHHHHHHHPPPPPK",
+    ".....KXXKKKKKiKKVSSSKKPPKKK.",
+    ".....KkK.....KiKVVPK..KK....",
+    ".....KkK.....KiKVVPK........",
+    "......KkK....KiKVVPK........",
+    "......KkK.....KiVPVK........",
+    "......KkK.....KiVPVK........",
+    "......KkKKK.KKKSVVVK........",
+    ".......KXXXKSSSSVVVK........",
+    "......KXXyXSSSSSVVK.........",
+    "......KXXyXSSKKKKK..........",
+    ".......KXXXKK...............",
+    "........KKK.................",
+    "............................",
+)
+assert all(len(row) == 28 for row in ARCHER) and len(ARCHER) == 28
+
+ICONS.update({35: ARCHER})
 
 
 def chunk(kind, body):

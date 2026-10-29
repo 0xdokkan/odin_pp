@@ -35,6 +35,8 @@ CARD_DEMO_BURST_EVERY :: f32(3)
 CARD_DEMO_BURST_SECONDS :: f32(1.3)
 CARD_DEMO_BURST_DAMAGE :: i32(6)
 CARD_DEMO_BURST_TAIL :: f32(2.7)
+// FIRST PERSON ARCHER: how long the film draws the bow (a quarter and more: one bounce).
+CARD_DEMO_DRAW_SECONDS :: f32(0.6)
 CARD_DEMO_DECK_SEED :: u64(0xDE30_C4BD)
 CARD_DEMO_ROOM_SEED :: u64(0xDE30_500D)
 // The take's player: the game's own pilgrim, his life a little short where a
@@ -87,6 +89,9 @@ Card_Demo_Action_Kind :: enum u8 {
 	// FIRST PERSON FENCER: the view turned to the scene's foe `foe` with Q or E,
 	// a step up to it, then a cut across it.
 	Cut,
+	// FIRST PERSON ARCHER: the view turned to the scene's foe `foe`, the bow
+	// drawn `seconds`, then let go.
+	Loose,
 	// ATTIVA: the Tesla network discharges (its button on the board's bar).
 	Activate,
 	// A wait (Space).
@@ -439,6 +444,24 @@ card_demo_scene :: proc(id: Card_Id, upgrade_level: i32 = 0) -> (scene: Card_Dem
 		}
 		for cut in 0..<cuts {
 			card_demo_add_action(&scene, {kind = .Cut, after = 0.3+f32(cut)*CARD_DEMO_BURST_EVERY, foe = cut%3})
+		}
+		scene.foe_hurt = 3
+	// FIRST PERSON ARCHER: played by a second click, then three foes three cells
+	// off him, one after the other: the view turned on it, the bow drawn a
+	// moment and let go; a shot every few seconds as the AK's bursts.
+	case .First_Person_Archer:
+		seconds := f32(ARCHER_SECONDS)
+		for template in definition.effects[:definition.effect_count] {
+			if template.kind == .First_Person { seconds = f32(card_effect_amount(template, clamp(upgrade_level, 0, FIRST_PERSON_MAX_UPGRADE_LEVEL))) }
+		}
+		// As many shots as the AK's twenty seconds take (the film ends the longer view after them).
+		seconds = min(seconds, f32(FIRST_PERSON_SECONDS))
+		shots := clamp(int((seconds-CARD_DEMO_BURST_TAIL)/CARD_DEMO_BURST_EVERY)+1, 3, CARD_DEMO_MAX_ACTIONS)
+		for at, foe in ([3]grid.Position{card_demo_offset(0, -3), card_demo_offset(-3, 0), card_demo_offset(3, 0)}) {
+			card_demo_add_foe(&scene, at, health = 4*i32((shots-foe+2)/3))
+		}
+		for shot in 0..<shots {
+			card_demo_add_action(&scene, {kind = .Loose, after = 0.3+f32(shot)*CARD_DEMO_BURST_EVERY, foe = shot%3, seconds = CARD_DEMO_DRAW_SECONDS})
 		}
 		scene.foe_hurt = 3
 	// CANNA DA PESCA: a cleared room, the rod's slot, the water at his right,

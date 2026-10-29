@@ -444,9 +444,10 @@ mechanics_lab_first_person_timing :: proc(window: ^app.Window, renderer: ^render
 	fp := &renderer.tactical.first_person
 	// The AK fires north; the fists (Fase 3) face the brute east, a punch every
 	// quarter of a second (jab, cross, hooks in turn), W held half the time; the
-	// sword (Fase 4) swings back and forth, the button held half the time.
+	// sword (Fase 4) swings back and forth, the button held half the time; the
+	// bow (Fase 6) faces the brute east, drawn a second and let go, again and again.
 	if weapon == .AK { fp.yaw, fp.pitch = -math.PI/2, 0 }
-	if weapon == .Fists { fp.yaw, fp.pitch = 0, 0 }
+	if weapon == .Fists || weapon == .Bow { fp.yaw, fp.pitch = 0, 0 }
 	samples: [MECHANICS_LAB_TIMING_SAMPLES]f64
 	last := rl.GetTime()
 	for index in 0..<MECHANICS_LAB_TIMING_WARMUP+MECHANICS_LAB_TIMING_SAMPLES {
@@ -454,6 +455,7 @@ mechanics_lab_first_person_timing :: proc(window: ^app.Window, renderer: ^render
 		if weapon == .Sword {
 			input = {focused = true, look = {(40 if (index/30)%2 == 0 else -40), 0}, fire = (index/120)%2 == 0}
 		}
+		if weapon == .Bow { input = {focused = true, fire_right = index%75 < 60} }
 		if weapon == .Fists {
 			press := index%15 == 0
 			input = {focused = true, fire = press && (index/15)%2 == 0, fire_right = press && (index/15)%2 == 1, shift = (index/30)%2 == 1}

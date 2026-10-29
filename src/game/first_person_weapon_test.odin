@@ -72,20 +72,22 @@ test_first_person_weapons_share_their_bytes :: proc(t: ^testing.T) {
 	testing.expect(t, tactical_begin_first_person(&room, 2))
 	testing.expect(t, room.first_person.trail == trail)
 	tactical_first_person_tick(&room, 5)
-	// Another weapon starts clear, with the room's counts (the bow: the fists
-	// and the sword set their own in place as they are taken up,
-	// first_person_fists_begin, first_person_sword_begin).
+	// Another weapon starts clear, with the room's counts: the bow with its
+	// own put in place as it is taken up (first_person_bow_begin: its arrows to
+	// come and its zones), as the fists and the sword do theirs.
 	testing.expect(t, tactical_begin_first_person(&room, 3, .Bow))
 	testing.expect(t, room.first_person.weapon == .Bow && room.first_person.remaining == 3)
 	testing.expect(t, room.first_person.shots == shots && room.first_person.hits == hits)
-	testing.expect(t, first_person_test_same(room.first_person.arms, First_Person_Arms{}))
+	fresh := room.first_person.bow
+	testing.expect(t, fresh.loosed == 0 && !fresh.drawing && fresh.pending == 0)
+	for arrow in fresh.arrows { testing.expect(t, arrow.state == .None) }
 	// It has no trigger: the button touches nothing and nothing is ever due.
 	first_person_set_trigger(&room, true)
 	testing.expect(t, !room.first_person.trigger && !first_person_fire_due(&room))
 	_, fired := first_person_fire(&room, FIRST_PERSON_TEST_NORTH)
 	testing.expect(t, !fired && room.first_person.shots == shots)
 	tactical_first_person_tick(&room, 1)
-	testing.expect(t, first_person_test_same(room.first_person.arms, First_Person_Arms{}))
+	testing.expect(t, room.first_person.bow.loosed == 0 && room.first_person.bow.pending > 0)
 	// The end of the fight leaves its bytes alone.
 	room.first_person.trail[0].number = 7
 	room.phase = .Loot

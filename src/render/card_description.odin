@@ -89,6 +89,9 @@ gothic_card_lines :: proc(card: game.Card_Instance) -> (cstring, cstring) {
 	// FIRST PERSON FENCER (game/first_person_sword.odin): its seconds, the cut's best and the guard.
 	case .First_Person_Fencer:
 		return fmt.ctprintf("PRIMA PERSONA %ds", a), "SPADONE: TAGLIA E PARA"
+	// FIRST PERSON ARCHER (game/first_person_bow.odin): its seconds and the bounces of a full draw.
+	case .First_Person_Archer:
+		return fmt.ctprintf("PRIMA PERSONA %ds", a), fmt.ctprintf("ARCO: FINO A %d RIMBALZI", game.BOW_LEVELS)
 	// BOMB MARLEY (game/marley.odin): the bombs' damage and the party's seconds;
 	// INONDAZIONE (game/flood.odin): the push, and the fires.
 	case .Marley_Party: return fmt.ctprintf("BOMBE DA %d DANNI", a), fmt.ctprintf("%ds / LUCI = SALVI", d.effects[0].duration)
@@ -168,6 +171,7 @@ gothic_card_narrow_lines :: proc(card: game.Card_Instance) -> (first, second: cs
 	case .First_Person: return fmt.ctprintf("FPS %ds", a), fmt.ctprintf("AK: %d COLPI/s", game.FIRST_PERSON_SHOTS_PER_SECOND), true
 	case .First_Person_Brawler: return fmt.ctprintf("FPB %ds", a), fmt.ctprintf("PUGNI, CRITICI x%d", game.FISTS_CRITICAL_FACTOR), true
 	case .First_Person_Fencer: return fmt.ctprintf("FPF %ds", a), "SPADONE, PARATA", true
+	case .First_Person_Archer: return fmt.ctprintf("FPA %ds", a), "ARCO, RIMBALZI", true
 	case .Marley_Party: return fmt.ctprintf("BOMBE %d", a), "LUCI: SALVI", true
 	case .Flood_Wave: return fmt.ctprintf("SPINTA %d", a), "NO FUOCHI", true
 	case .Field_Cannon: return fmt.ctprintf("PALLA %d", a), fmt.ctprintf("%ds", game.CANNON_SECONDS), true

@@ -26,7 +26,7 @@ test_first_person_each_weapon_has_its_look :: proc(t: ^testing.T) {
 			testing.expect(t, look.status == FIRST_PERSON_HUD_STATUS_SWORD && look.hand == .Sword)
 			continue
 		}
-		testing.expect(t, look.status == FIRST_PERSON_HUD_STATUS_BARE && look.hand == .Empty)
+		testing.expect(t, look.status == FIRST_PERSON_HUD_STATUS_BOW && look.hand == .Bow)
 	}
 	testing.expect_value(t, string(first_person_countdown_text(20, .Fists)), "FPB 20s")
 	testing.expect_value(t, string(first_person_countdown_text(13.2, .Sword)), "FPF 14s")

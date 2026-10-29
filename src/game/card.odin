@@ -85,6 +85,8 @@ Card_Id :: enum {
 	First_Person_Brawler,
 	// FIRST PERSON FENCER: the sword behind his eyes (first_person_sword.odin), lab only.
 	First_Person_Fencer,
+	// FIRST PERSON ARCHER: the bow behind his eyes (first_person_bow.odin), lab only.
+	First_Person_Archer,
 	Count,
 }
 
@@ -1171,6 +1173,19 @@ CARD_DEFINITIONS := [Card_Id]Card_Definition{
 		targeting = {rule = .Self},
 		effects = {{kind = .First_Person, target = .Player, base_amount = FENCER_SECONDS,
 			amount_per_upgrade = FIRST_PERSON_SECONDS_PER_UPGRADE, charges = i32(First_Person_Weapon.Sword)}, {}, {}, {}},
+		effect_count = 1,
+	},
+	.First_Person_Archer = {
+		upgrade_limit = FIRST_PERSON_MAX_UPGRADE_LEVEL, time_cost = 0, traits = {.Lab_Only},
+		// FIRST PERSON ARCHER (docs/piano-prima-persona.md, Fase 6): his own eyes and a
+		// bow for thirty seconds of the world's (ARCHER_SECONDS), +2 an upgrade: drawn
+		// with the right button, its arrows bouncing off the walls faster each time
+		// (first_person_bow.odin).
+		id = .First_Person_Archer, name = "First Person Archer", rarity = .Rare,
+		reward_weight = 60, shop_base_price = 8, cost = 3,
+		targeting = {rule = .Self},
+		effects = {{kind = .First_Person, target = .Player, base_amount = ARCHER_SECONDS,
+			amount_per_upgrade = FIRST_PERSON_SECONDS_PER_UPGRADE, charges = i32(First_Person_Weapon.Bow)}, {}, {}, {}},
 		effect_count = 1,
 	},
 	.Cannon = {

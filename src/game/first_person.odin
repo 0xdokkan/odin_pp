@@ -133,7 +133,7 @@ FIRST_PERSON_WEAPONS := [First_Person_Weapon]First_Person_Weapon_Rules{
 	.AK = {card = .First_Person, while_riding = true},
 	.Fists = {card = .First_Person_Brawler},
 	.Sword = {card = .First_Person_Fencer},
-	.Bow = {card = .First_Person},
+	.Bow = {card = .First_Person_Archer},
 }
 
 // The AK's own.
@@ -156,6 +156,8 @@ First_Person_Arms :: struct #raw_union {
 	fists: First_Person_Fists,
 	// FIRST PERSON FENCER's blade, guard and grapple (first_person_sword.odin).
 	sword: First_Person_Sword,
+	// FIRST PERSON ARCHER's draw, arrows and zones (first_person_bow.odin).
+	bow: First_Person_Bow,
 }
 
 First_Person_State :: struct {
@@ -185,6 +187,8 @@ First_Person_Save :: struct {
 	fists: First_Person_Fists,
 	// The sword's blade, guard and grapple (first_person_sword.odin).
 	sword: First_Person_Sword,
+	// The bow's draw, arrows and zones (first_person_bow.odin).
+	bow: First_Person_Bow,
 }
 
 first_person_save :: proc(state: First_Person_State) -> (save: First_Person_Save) {
@@ -194,8 +198,7 @@ first_person_save :: proc(state: First_Person_State) -> (save: First_Person_Save
 	case .AK: save.cooldown, save.trigger, save.trail = state.cooldown, state.trigger, state.trail
 	case .Fists: save.fists = state.fists
 	case .Sword: save.sword = state.sword
-	// Nothing of its own yet.
-	case .Bow:
+	case .Bow: save.bow = state.bow
 	}
 	return
 }
@@ -209,7 +212,7 @@ first_person_load :: proc(save: First_Person_Save) -> (state: First_Person_State
 	case .AK: state.cooldown, state.trigger, state.trail = save.cooldown, save.trigger, save.trail
 	case .Fists: state.fists = save.fists
 	case .Sword: state.sword = save.sword
-	case .Bow:
+	case .Bow: state.bow = save.bow
 	}
 	return state, true
 }
@@ -246,6 +249,7 @@ tactical_begin_first_person :: proc(room: ^Room, seconds: f32, weapon := First_P
 	if weapon == .AK { fp.cooldown, fp.trigger = 0, false }
 	if weapon == .Fists { first_person_fists_begin(room) }
 	if weapon == .Sword { first_person_sword_begin(room) }
+	if weapon == .Bow { first_person_bow_begin(room) }
 	return true
 }
 
@@ -259,6 +263,7 @@ tactical_first_person_tick :: proc(room: ^Room, seconds: f32) {
 	if fp.remaining < FIRST_PERSON_EPSILON { fp.remaining = 0 }
 	if fp.weapon == .AK { fp.cooldown = max(fp.cooldown-seconds, -FIRST_PERSON_MAX_CARRY if fp.trigger else 0) }
 	if fp.weapon == .Sword { first_person_sword_tick(room, seconds) }
+	if fp.weapon == .Bow { first_person_bow_tick(room, seconds) }
 	if fp.remaining <= 0 {
 		fp.active = false
 		if fp.weapon == .AK { fp.trigger, fp.cooldown = false, 0 }

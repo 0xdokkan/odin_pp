@@ -119,6 +119,9 @@ CARD_VISUALS := [game.Card_Id]Card_Visual{
 	.First_Person_Brawler = {icon = 33, short_name = "FPB", accent = .Red, sound = .Card_First_Person_Brawler, narrow_name = "FPB",
 		fill = {64, 30, 30, 245}, outline = {232, 120, 112, 255}},
 	// The provisional blade and sound until Fase 5 (docs/piano-prima-persona.md).
+	// The compound bow (Fase 6, the user's choice for Fase 7) and its string's twang.
+	.First_Person_Archer = {icon = 35, short_name = "FPA", accent = .Red, sound = .Card_First_Person_Archer, narrow_name = "FPA",
+		fill = {20, 46, 44, 245}, outline = {80, 230, 196, 255}},
 	.First_Person_Fencer = {icon = 34, short_name = "FPF", accent = .Red, sound = .Card_First_Person_Fencer, narrow_name = "FPF",
 		fill = {34, 26, 58, 245}, outline = {150, 120, 230, 255}},
 	.Cannon = {icon = 4, short_name = "CANNONE", accent = .Electric, sound = .World_Barrel_Explosion,

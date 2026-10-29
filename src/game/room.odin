@@ -234,6 +234,8 @@ Room :: struct {
 	// the columns (marley.odin).
 	marley: Marley_State,
 	marley_random: u64,
+	// FIRST PERSON ARCHER: the room's own stream for its arrows and zones (first_person_bow.odin).
+	bow_random: u64,
 	marley_demo: Marley_Demo,
 	// DINOSAURO: the dinosaur the player rides (dinosaur.odin).
 	ride: Ride_State,
@@ -500,6 +502,7 @@ create_room :: proc(level_data: ^level.Level, player: ^Player, content: Room_Con
 	result.fishing = begin_room_fishing(player, content)
 	result.pinball_random = pinball_room_stream(player, content)
 	result.marley_random = marley_room_stream(player, content)
+	result.bow_random = bow_room_stream(player, content)
 	lifts_reset(&result)
 	result.next_enemy_id = 1
 	result.next_trap_id = 1

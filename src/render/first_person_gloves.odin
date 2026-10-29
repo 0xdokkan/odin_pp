@@ -340,7 +340,7 @@ first_person_gloves_shown :: proc(renderer: ^Renderer) -> (ready: f32, shown: bo
 	f := &renderer.tactical.first_person
 	hand := FIRST_PERSON_LOOKS[f.weapon].hand
 	// The sword's blade draws on the same small canvas (first_person_sword.odin).
-	if f.amount <= 0 || (hand != .Fists && hand != .Sword) { return }
+	if f.amount <= 0 || (hand != .Fists && hand != .Sword && hand != .Bow) { return }
 	amount := first_person_amount(renderer)
 	if amount <= FIRST_PERSON_AK_FROM { return }
 	return tween.smoothstep(clamp((amount-FIRST_PERSON_AK_FROM)/(1-FIRST_PERSON_AK_FROM), 0, 1)), true
@@ -471,7 +471,9 @@ prepare_first_person_gloves :: proc(renderer: ^Renderer) {
 	rl.BeginTextureMode(kit.low)
 	rl.ClearBackground(rl.BLANK)
 	// The marks first, on the board behind the gloves, the star over them; the cut gives them ink and paper too.
-	if FIRST_PERSON_LOOKS[f.weapon].hand == .Sword {
+	if FIRST_PERSON_LOOKS[f.weapon].hand == .Bow {
+		draw_first_person_bow_pixel(renderer, w, h, ready)
+	} else if FIRST_PERSON_LOOKS[f.weapon].hand == .Sword {
 		draw_first_person_sword_pixel(renderer, w, h, ready)
 		draw_first_person_zweihander(renderer, kit, ready)
 		draw_first_person_sword_sparks(renderer, w, h, ready)

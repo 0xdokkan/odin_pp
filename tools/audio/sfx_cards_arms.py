@@ -1313,3 +1313,27 @@ def card_first_person_fencer(seed):
         (0.30, _ramp(_norm(ring), 0.0008), 0.5),
     ])
     return _out(x, 0.08)
+
+
+@sound("card_first_person_archer", loudness=LOUD, wet=WET, marks=(0.0, 0.08, 0.42))
+def card_first_person_archer(seed):
+    """First Person Archer (docs/piano-prima-persona.md, Fase 6): the compound
+    bow taken up as the card leaves his hand: its cams turning as the string is
+    drawn from 0.08 s (a soft ratchet of clicks over a rising creak), then let
+    go at 0.42 s: the string's twang (a plucked string, Karplus-Strong) and the
+    arrow's short whistle off."""
+    dur = 1.1
+    t = time_axis(0.32)
+    creak = sweep_bandpass(white(0.32, seed + 1), 500, 1400, 6.0) * np.clip(t / 0.05, 0, 1) * (0.4 + 0.6 * t / 0.32)
+    clicks = grains(0.32, [0.02 + 0.05 * k for k in range(6)], 0.004, seed + 2, band=(2500, 6000))
+    twang = karplus(165, 0.6, damping=0.994, brightness=0.6, seed=seed + 3)
+    t3 = time_axis(0.22)
+    whistle = sweep_bandpass(white(0.22, seed + 4), 3800, 2200, 8.0) * np.exp(-t3 / 0.07)
+    x = place(dur, [
+        (0.0, _flick(seed), FLICK),
+        (0.08, _norm(creak), 0.35),
+        (0.08, _norm(clicks), 0.25),
+        (0.42, _ramp(_norm(twang), 0.0005), 0.6),
+        (0.44, _norm(whistle), 0.25),
+    ])
+    return _out(x, 0.08)

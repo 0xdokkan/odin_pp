@@ -39,7 +39,7 @@ Mechanics_Lab_Arena :: enum { Flat, First_Person, Heights, Structures, Mountain,
 
 // The first person arena's deck: First Person Shooter, the cards of the other weapons as they come (First Person
 // Brawler, Fase 2; the sword's and the bow's, Fasi 4 e 6), and the Canna da Pesca for a cleared arena, as in the others.
-MECHANICS_LAB_FIRST_PERSON_DECK :: [4]game.Card_Id{.First_Person, .First_Person_Brawler, .First_Person_Fencer, .Fishing_Rod}
+MECHANICS_LAB_FIRST_PERSON_DECK :: [5]game.Card_Id{.First_Person, .First_Person_Brawler, .First_Person_Fencer, .First_Person_Archer, .Fishing_Rod}
 
 // The first person arena, on the 23x17 board with the player at (11,8):
 // - a wall along y = 1 with two niches in it, at (4,1) and (18,1);

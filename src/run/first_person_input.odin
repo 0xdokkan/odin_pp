@@ -97,8 +97,8 @@ first_person_buttons :: proc(controller: ^Tactical_Controller, renderer: ^render
 
 // The buttons to the weapon in hand (docs/piano-prima-persona.md, sezione 4.2):
 // the AK's trigger is the left button, whatever else is held; the fists' are
-// presses (drive_first_person_fists), the sword's held (drive_first_person_sword);
-// the bow's wait for its phase (6) and do nothing yet.
+// presses (drive_first_person_fists), the sword's held (drive_first_person_sword),
+// the bow's too (drive_first_person_bow).
 route_first_person_buttons :: proc(room: ^game.Room, buttons: First_Person_Buttons) {
 	switch room.first_person.weapon {
 	case .AK: game.first_person_set_trigger(room, buttons.left)
@@ -165,6 +165,22 @@ drive_first_person_sword :: proc(controller: ^Tactical_Controller, room: ^game.R
 	sword := game.First_Person_Sword_Input{mouse = controller.sword_mouse, sensitivity = input.sensitivity, cut = buttons.left,
 		guard = buttons.right, grapple = grapple, turn = turn, aim = render.first_person_aim(renderer)}
 	command := Gameplay_Command{kind = .First_Person_Sword, origin_phase = .Combat, sword = sword, seconds = seconds}
+	_ = commit_gameplay_command(room, renderer, cards, command, playtest)
+}
+
+// FIRST PERSON ARCHER's frame (game/first_person_bow.odin): the right button
+// held draws the bow, let go it looses; the left pressed while drawing lowers
+// it; along the view's aim; committed as a world command, which flies the
+// world's seconds waiting (the draw's and the arrows'). The steps stay the
+// lane's, as with the AK. Nothing while the mouse is not the view's or the
+// camera dives.
+drive_first_person_bow :: proc(controller: ^Tactical_Controller, room: ^game.Room, renderer: ^render.Renderer,
+	cards: ^Card_Interaction_State, buttons: First_Person_Buttons, playtest: ^combatdebug.Playtest_Session) {
+	lower := buttons.left && !controller.bow_left
+	controller.bow_left = buttons.left
+	if !game.first_person_bow_active(room) || !controller.look_captured || render.first_person_diving(renderer) { return }
+	bow := game.First_Person_Bow_Input{draw = buttons.right, lower = lower, aim = render.first_person_aim(renderer)}
+	command := Gameplay_Command{kind = .First_Person_Bow, origin_phase = .Combat, bow = bow}
 	_ = commit_gameplay_command(room, renderer, cards, command, playtest)
 }
 
