@@ -1326,7 +1326,7 @@ def card_first_person_archer(seed):
     t = time_axis(0.32)
     creak = sweep_bandpass(white(0.32, seed + 1), 500, 1400, 6.0) * np.clip(t / 0.05, 0, 1) * (0.4 + 0.6 * t / 0.32)
     clicks = grains(0.32, [0.02 + 0.05 * k for k in range(6)], 0.004, seed + 2, band=(2500, 6000))
-    twang = karplus(165, 0.6, damping=0.994, brightness=0.6, seed=seed + 3)
+    twang = fade(karplus(165, 0.6, damping=0.994, brightness=0.6, seed=seed + 3), 0.0, 0.2)
     t3 = time_axis(0.22)
     whistle = sweep_bandpass(white(0.22, seed + 4), 3800, 2200, 8.0) * np.exp(-t3 / 0.07)
     x = place(dur, [

@@ -67,9 +67,10 @@ FIRST_PERSON_GLOVE_HOOK := [2]First_Person_Glove_Pose{
 }
 
 // What a part is made of: each its own tones (FIRST_PERSON_GLOVE_FRAGMENT);
-// the sword's steel and cyan light (first_person_zweihander.odin), and white
-// (a perfect parry's flash).
-First_Person_Glove_Stuff :: enum i32 {Carbon, Neon, Wrap, Steel, Cyan, White}
+// the sword's steel and cyan light (first_person_zweihander.odin), white
+// (a perfect parry's flash), and a colour of its own (`tint`: the bow's arrow
+// heads, first_person_compound.odin).
+First_Person_Glove_Stuff :: enum i32 {Carbon, Neon, Wrap, Steel, Cyan, White, Tint}
 
 // One glove's shapes in its own frame (X right, Y the back of the hand, -Z the
 // knuckles), for the left hand: the right mirrors X. A sphere or a cylinder
@@ -107,7 +108,7 @@ First_Person_Glove_Kit :: struct {
 	sphere, cylinder: rl.Mesh,
 	cube, blade, blade_ink: rl.Mesh,
 	shader, paper_shader: rl.Shader,
-	stuff_location, ink_location, texel_location, part_location: i32,
+	stuff_location, ink_location, texel_location, part_location, tint_location: i32,
 	low, paper: rl.RenderTexture2D,
 	ready, failed: bool,
 }
@@ -142,6 +143,7 @@ in vec3 fragLocal;
 uniform float stuff;
 uniform float ink;
 uniform float part;
+uniform vec3 tint;
 out vec4 finalColor;
 const vec3 CARBON[4] = vec3[](vec3(10, 8, 24), vec3(24, 18, 48), vec3(44, 34, 84), vec3(126, 112, 210));
 const vec3 MAGENTA = vec3(255, 64, 206);
@@ -151,6 +153,11 @@ const vec3 CYAN_DIM = vec3(18, 128, 168);
 const vec3 STEEL[4] = vec3[](vec3(52, 62, 88), vec3(118, 134, 166), vec3(192, 206, 228), vec3(250, 252, 255));
 void main() {
     if (ink > 0.5) { finalColor = vec4(13.0, 20.0, 30.0, 255.0)/255.0; return; }
+    if (stuff > 5.5) {
+        float lit = dot(normalize(fragNormal), normalize(vec3(-0.45, 0.80, 0.45)))*0.5+0.5;
+        finalColor = vec4(tint*(lit < 0.5 ? 0.6 : 1.0), 1.0);
+        return;
+    }
     if (stuff > 4.5) { finalColor = vec4(1.0); return; }
     vec3 n = normalize(fragNormal);
     vec3 v = normalize(-fragPos);
@@ -234,6 +241,7 @@ first_person_glove_kit :: proc(f: ^First_Person_View) -> ^First_Person_Glove_Kit
 	kit.ink_location = rl.GetShaderLocation(shader, "ink")
 	kit.texel_location = rl.GetShaderLocation(paper, "texel")
 	kit.part_location = rl.GetShaderLocation(shader, "part")
+	kit.tint_location = rl.GetShaderLocation(shader, "tint")
 	kit.sphere = rl.GenMeshSphere(1, 24, 32)
 	kit.cylinder = rl.GenMeshCylinder(1, 1, 32)
 	return kit
@@ -472,7 +480,7 @@ prepare_first_person_gloves :: proc(renderer: ^Renderer) {
 	rl.ClearBackground(rl.BLANK)
 	// The marks first, on the board behind the gloves, the star over them; the cut gives them ink and paper too.
 	if FIRST_PERSON_LOOKS[f.weapon].hand == .Bow {
-		draw_first_person_bow_pixel(renderer, w, h, ready)
+		draw_first_person_compound(renderer, kit, ready)
 	} else if FIRST_PERSON_LOOKS[f.weapon].hand == .Sword {
 		draw_first_person_sword_pixel(renderer, w, h, ready)
 		draw_first_person_zweihander(renderer, kit, ready)

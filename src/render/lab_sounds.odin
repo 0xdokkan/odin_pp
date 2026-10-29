@@ -82,6 +82,26 @@ LAB_SWORD_CHAIN_THROW :: audio.Lab_Sfx.World_Sword_Chain_Throw
 LAB_SWORD_CHAIN_YANK :: audio.Lab_Sfx.World_Sword_Chain_Yank
 // A cut this strong or more sounds heavy.
 LAB_SWORD_HEAVY_DAMAGE :: i32(6)
+// FIRST PERSON ARCHER (first_person_bow.odin): the draw as it begins, its
+// let-off when full, the release; each bounce a ping a note higher than the
+// last of the same arrow (up the major scale: it flies faster each time), a
+// zone's bells; an arrow into a foe and its status's accent.
+LAB_BOW_DRAW :: audio.Lab_Sfx.Pilgrim_Bow_Draw
+LAB_BOW_FULL :: audio.Lab_Sfx.Ui_Bow_Full
+LAB_BOW_RELEASE :: audio.Lab_Sfx.Pilgrim_Bow_Release
+LAB_BOW_BOUNCE :: audio.Lab_Sfx.World_Bow_Bounce
+LAB_BOW_ZONE :: audio.Lab_Sfx.World_Bow_Zone
+LAB_BOW_HIT :: audio.Lab_Sfx.World_Bow_Hit
+@(rodata)
+LAB_BOW_ACCENT := [game.Bow_Arrow_Kind]audio.Lab_Sfx{.Poison = .World_Bow_Poison, .Burn = .World_Bow_Burn, .Ice = .World_Bow_Ice,
+	.Stun = .World_Bow_Stun, .Barbed = .World_Bow_Barbed}
+@(rodata)
+LAB_BOW_BOUNCE_PITCH := [6]f32{1, 1.122, 1.26, 1.335, 1.498, 1.682}
+
+// The ping of an arrow's `order`-th bounce: a note higher each time, up to the sixth.
+lab_bow_bounce_pitch :: proc(order: i16) -> f32 {
+	return LAB_BOW_BOUNCE_PITCH[clamp(int(order)-1, 0, len(LAB_BOW_BOUNCE_PITCH)-1)]
+}
 
 // A swing's air at `speed` (screen heights a second as it starts): the
 // centre of the blade's noise follows its speed.
@@ -140,6 +160,9 @@ Lab_Sounds :: struct {
 	fists_thrown, fists_landed, fists_marks_lit: int,
 	// FIRST PERSON FENCER as last heard: swings, cuts, parries, grapples.
 	sword_swings, sword_strikes, sword_parries, sword_grapples: i32,
+	// FIRST PERSON ARCHER as last heard: the draw (and whether full), arrows loosed, bounces, zones, hits.
+	bow_drawing, bow_full: bool,
+	bow_loosed, bow_bounces, bow_zone_bounces, bow_hits: i32,
 	// What the lab has played so far (smoke and tests).
 	played: [audio.Lab_Sfx]int,
 }
@@ -158,7 +181,9 @@ lab_sounds_reset :: proc(renderer: ^Renderer) {
 		pinball_strikes = renderer.tactical.pinball.strikes,
 		first_person_shots = fp.shots, first_person_hits = fp.hits, first_person_ricochets = fp.ricochets,
 		first_person_exits = fp.exits, fists_thrown = fp.fists_thrown, fists_landed = fp.fists_landed, fists_marks_lit = fp.fists_marks_lit,
-		sword_swings = fp.sword.swings, sword_strikes = fp.sword.strikes, sword_parries = fp.sword.parries, sword_grapples = fp.sword.grapples}
+		sword_swings = fp.sword.swings, sword_strikes = fp.sword.strikes, sword_parries = fp.sword.parries, sword_grapples = fp.sword.grapples,
+		bow_drawing = fp.bow.drawing, bow_full = fp.bow.charge >= 1, bow_loosed = fp.bow.loosed, bow_bounces = fp.bow.bounces,
+		bow_zone_bounces = fp.bow.zone_bounces, bow_hits = fp.bow.hits}
 }
 
 // The bong's pitch for a foe struck at `value`, the card's being `base`.
@@ -660,6 +685,31 @@ update_lab_sounds :: proc(renderer: ^Renderer, room: ^game.Room, now: f64) {
 		s.sword_grapples = sw.grapples
 		lab_sound_queue(s, LAB_SWORD_CHAIN_THROW, now, 0.8)
 		lab_sound_queue(s, LAB_SWORD_CHAIN_YANK, now+FIRST_PERSON_SWORD_HOOK_FLIGHT, 1, lab_sound_pan(renderer, sw.grappled))
+	}
+	// FIRST PERSON ARCHER: the draw beginning and full, the release, the
+	// bounces up the scale, a zone's bells, an arrow into a foe and its accent.
+	bw := &fp.bow
+	if bw.drawing && !s.bow_drawing { lab_sound_queue(s, LAB_BOW_DRAW, now, 0.7) }
+	full := bw.drawing && bw.charge >= 1
+	if full && !s.bow_full { lab_sound_queue(s, LAB_BOW_FULL, now, 0.6) }
+	s.bow_drawing, s.bow_full = bw.drawing, full
+	if bw.loosed != s.bow_loosed {
+		s.bow_loosed = bw.loosed
+		lab_sound_queue(s, LAB_BOW_RELEASE, now, 0.9)
+	}
+	if bw.bounces != s.bow_bounces {
+		s.bow_bounces = bw.bounces
+		lab_sound_queue(s, LAB_BOW_BOUNCE, now, 0.8, 0, lab_bow_bounce_pitch(bw.bounce_order))
+	}
+	if bw.zone_bounces != s.bow_zone_bounces {
+		s.bow_zone_bounces = bw.zone_bounces
+		lab_sound_queue(s, LAB_BOW_ZONE, now, 0.9)
+	}
+	if bw.hits != s.bow_hits {
+		s.bow_hits = bw.hits
+		pan := lab_sound_pan(renderer, game.enemy_entity(bw.last.enemy_id))
+		lab_sound_queue(s, LAB_BOW_HIT, now, 1, pan)
+		lab_sound_queue(s, LAB_BOW_ACCENT[bw.last.kind], now+0.03, 0.7, pan)
 	}
 	// The cues now showing, each once; the cards first, so what they put on
 	// the board knows they already sounded. What was heard is kept on the

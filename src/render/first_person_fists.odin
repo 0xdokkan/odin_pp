@@ -114,8 +114,8 @@ follow_first_person_fists :: proc(renderer: ^Renderer, room: ^game.Room) {
 
 // The fists' music (tools/audio/music_brawler.py, the user's pick) plays once
 // the gloves are up and the ring's bell has rung, the sword's
-// (tools/audio/music_fencer.py, a new one, the user's choice) once it is
-// drawn: FIRST_PERSON_MUSIC_AFTER seconds into the view, in the mechanics lab.
+// (tools/audio/music_fencer.py) once it is drawn, the bow's
+// (tools/audio/music_archer.py) once it is up (new ones, the user's choice): FIRST_PERSON_MUSIC_AFTER seconds into the view, in the mechanics lab.
 FIRST_PERSON_MUSIC_AFTER :: f64(0.9)
 first_person_music_track :: proc(renderer: ^Renderer) -> audio.Lab_Music {
 	if renderer == nil || !renderer.tactical.mechanics_lab { return .None }
@@ -124,6 +124,7 @@ first_person_music_track :: proc(renderer: ^Renderer) -> audio.Lab_Music {
 	#partial switch f.weapon {
 	case .Fists: return .Brawler
 	case .Sword: return .Fencer
+	case .Bow: return .Archer
 	}
 	return .None
 }

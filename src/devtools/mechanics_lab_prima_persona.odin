@@ -429,6 +429,16 @@ mechanics_lab_prima_persona :: proc(window: ^app.Window, renderer: ^render.Rende
 		fmt.eprintln("mechanics lab: the bank shot did not strike the brute (hits", bow.hits, "bounced", bow.last.bounced, ")"); return false
 	}
 	banked_hit := bow.last
+	// A critical zone looked at (Fase 7): its paper target on the wall, its light pulsing.
+	if bow.zone_count > 0 {
+		zone := bow.zones[0]
+		open := game.direction_offset(game.Move_Direction(zone.face))
+		face := [2]f32{f32(zone.cell.x)+0.5+f32(open.x)*0.5, f32(zone.cell.y)+0.5+f32(open.y)*0.5}
+		p := room.player.position
+		fp.yaw, fp.pitch = math.atan2(face.y-(f32(p.y)+0.5), face.x-(f32(p.x)+0.5)), 0
+		for _ in 0..<6 { drive(window, renderer, room, controller, cards, buffer, {}) }
+		artifacts.screenshot("odin_pp_mechanics_lab_prima_persona_arco_zona.png")
+	}
 	if !leave(window, renderer, room, controller, cards, buffer) { fmt.eprintln("mechanics lab: the bow's view did not end"); return false }
 
 	// The fight back, as F5 brings it, for whatever comes after.

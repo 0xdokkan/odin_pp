@@ -311,3 +311,68 @@ test_first_person_sword_lab_sounds :: proc(t: ^testing.T) {
 	for _ in 0..<60 { frame(renderer, &room, 0.02) }
 	testing.expect_value(t, first_person_music_track(renderer), audio.Lab_Music.Fencer)
 }
+
+// The lab hears the bow (Fase 7): the draw as it begins and its let-off when
+// full, the release, a bounce's ping a note higher at each bounce of an arrow,
+// a zone's bells, an arrow into a foe and its status's accent; its own music.
+@(test)
+test_first_person_bow_lab_sounds :: proc(t: ^testing.T) {
+	data: level.Level
+	player: game.Player
+	room := first_person_view_test_room(t, &data, &player)
+	defer level.destroy(&data)
+	defer game.destroy_room(&room)
+	snapshot: Room_Presentation
+	renderer := shadow_view_test_renderer(&data, &snapshot)
+	defer free(renderer)
+	defer destroy_renderer_world_playback(renderer)
+	renderer.tactical.mechanics_lab = true
+	renderer.tactical.living_state = new(Living_State)
+	defer free(renderer.tactical.living_state)
+	defer destroy_lab_sounds(renderer)
+	frame :: proc(renderer: ^Renderer, room: ^game.Room, dt: f32) {
+		shadow_view_test_frame(renderer, room, dt)
+		update_lab_sounds(renderer, room, renderer.sprite_assets.elapsed)
+		play_lab_sounds(renderer, nil, 0)
+	}
+	frame(renderer, &room, 0.01)
+	sounds := renderer.tactical.lab_sounds
+	if !testing.expect(t, sounds != nil) { return }
+	testing.expect(t, game.tactical_begin_first_person(&room, 20, .Bow))
+	f := &renderer.tactical.first_person
+	for _ in 0..<60 {
+		frame(renderer, &room, 0.02)
+		if f.amount >= 1 { break }
+	}
+	s := &room.first_person.bow
+	before := sounds.played
+	s.drawing, s.charge = true, 0.4
+	frame(renderer, &room, 0.02)
+	frame(renderer, &room, 0.02)
+	testing.expect_value(t, sounds.played[LAB_BOW_DRAW]-before[LAB_BOW_DRAW], 1)
+	s.charge = 1
+	frame(renderer, &room, 0.02)
+	testing.expect_value(t, sounds.played[LAB_BOW_FULL]-before[LAB_BOW_FULL], 1)
+	s.drawing, s.charge, s.loosed = false, 0, s.loosed+1
+	frame(renderer, &room, 0.02)
+	testing.expect_value(t, sounds.played[LAB_BOW_RELEASE]-before[LAB_BOW_RELEASE], 1)
+	s.bounces += 1
+	frame(renderer, &room, 0.02)
+	// The bank holds back the same sound again at once: the next bounce a little later.
+	for _ in 0..<10 { frame(renderer, &room, 0.02) }
+	s.bounces += 1
+	s.zone_bounces += 1
+	frame(renderer, &room, 0.02)
+	testing.expect_value(t, sounds.played[LAB_BOW_BOUNCE]-before[LAB_BOW_BOUNCE], 2)
+	testing.expect_value(t, sounds.played[LAB_BOW_ZONE]-before[LAB_BOW_ZONE], 1)
+	testing.expect(t, lab_bow_bounce_pitch(1) < lab_bow_bounce_pitch(2) && lab_bow_bounce_pitch(2) < lab_bow_bounce_pitch(4) &&
+		lab_bow_bounce_pitch(40) == lab_bow_bounce_pitch(6))
+	s.hits += 1
+	s.last.kind = .Ice
+	frame(renderer, &room, 0.02)
+	testing.expect_value(t, sounds.played[LAB_BOW_HIT]-before[LAB_BOW_HIT], 1)
+	for _ in 0..<3 { frame(renderer, &room, 0.02) }
+	testing.expect_value(t, sounds.played[LAB_BOW_ACCENT[.Ice]]-before[LAB_BOW_ACCENT[.Ice]], 1)
+	for _ in 0..<60 { frame(renderer, &room, 0.02) }
+	testing.expect_value(t, first_person_music_track(renderer), audio.Lab_Music.Archer)
+}
