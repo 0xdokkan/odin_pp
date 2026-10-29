@@ -303,6 +303,26 @@ mechanics_lab_prima_persona :: proc(window: ^app.Window, renderer: ^render.Rende
 	if sword.facing != .West || sword.grapples != 1 || brute_enemy.position != game.add_position(room.player.position, {x = -1}) {
 		fmt.eprintln("mechanics lab: the grapple did not pull the brute (facing", sword.facing, "grapples", sword.grapples, ")"); return false
 	}
+	// A spinning cut (after the user's try): the brute on his right; the blade
+	// swept right past the middle, then E turns him the way it sweeps: the cut
+	// spins into the brute, its words beside it.
+	brute_enemy.position = game.add_position(room.player.position, {y = -1})
+	mechanics_lab_hold(room, brute)
+	for _ in 0..<6 { frame(window, renderer, room, controller, cards, buffer) }
+	from = sword.tip
+	spin_from, spin_to := [2]f32{-0.7, 0.05}, [2]f32{0.35, 0.05}
+	for k in 1..=20 { drive(window, renderer, room, controller, cards, buffer, toward(sword, from+(spin_from-from)*(f32(k)/20), false)) }
+	cuts := sword.strikes
+	for k in 1..=10 { drive(window, renderer, room, controller, cards, buffer, toward(sword, spin_from+(spin_to-spin_from)*(f32(k)/10), true)) }
+	spun := toward(sword, spin_to+[2]f32{0.05, 0}, true)
+	spun.diagonals[1] = true
+	drive(window, renderer, room, controller, cards, buffer, spun)
+	for _ in 0..<5 { drive(window, renderer, room, controller, cards, buffer, toward(sword, spin_to+[2]f32{0.05, 0}, true)) }
+	artifacts.screenshot("odin_pp_mechanics_lab_prima_persona_spada_roteante.png")
+	if sword.facing != .North || sword.strikes != cuts+1 || !sword.last.spin {
+		fmt.eprintln("mechanics lab: no spinning cut (facing", sword.facing, "cuts", sword.strikes-cuts, "last", sword.last, ")"); return false
+	}
+	spin := sword.last
 	if !leave(window, renderer, room, controller, cards, buffer) { fmt.eprintln("mechanics lab: the sword's view did not end"); return false }
 
 	// The weapon still to come: the lab takes it up; its tag, the bare line, an empty hand, no shot.
@@ -334,7 +354,7 @@ mechanics_lab_prima_persona :: proc(window: ^app.Window, renderer: ^render.Rende
 	controller^ = {was_focused = true}
 	for _ in 0..<12 { mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0) }
 	fmt.eprintf("mechanics lab first person arena: %d shots of the AK in a second; the fists ran up to the brute, a jab, a hook " +
-		"and a critical cross on its mark; the sword cut the brute (%v for %d), parried its blow and pulled it in; %v shown with an " +
-		"empty hand and fired nothing\n", ak_shots, cut.kind, cut.damage, game.First_Person_Weapon.Bow)
+		"and a critical cross on its mark; the sword cut the brute (%v for %d), parried its blow, pulled it in and spun " +
+		"into it (%d); %v shown with an empty hand and fired nothing\n", ak_shots, cut.kind, cut.damage, spin.damage, game.First_Person_Weapon.Bow)
 	return true
 }

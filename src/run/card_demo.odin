@@ -684,6 +684,11 @@ card_demo_advance :: proc(demo: ^Card_Demo, renderer: ^render.Renderer, frame_dt
 		   (game.tactical_first_person_active(room) || game.tactical_shadow_active(room)) { demo.free_time = 0 }
 		step_tactical_controller(&demo.controller, room, r, &demo.cards, &demo.buffer, dt, true, card_demo_input(demo, r, dt))
 		card_demo_act(demo, r, dt)
+		// FIRST PERSON FENCER's view outlasts the film (35 s and more): its cuts
+		// shown, it ends half a second on.
+		if game.first_person_sword_active(room) && demo.next_action >= demo.scene.action_count && !demo.acting {
+			room.first_person.remaining = min(room.first_person.remaining, 0.5)
+		}
 		// The ground has no event: the take samples it, and the AK's hits.
 		for value in room.ground.pool { if value > 0 { demo.pooled = true } }
 		for fire in room.ground.fires[:room.ground.fire_count] { if fire.stage >= 2 { demo.burned = true } }

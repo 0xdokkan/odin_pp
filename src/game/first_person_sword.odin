@@ -33,6 +33,10 @@ import grid "../engine/grid"
 // The point moves on its own clock of SWORD_STEP seconds (the frame's mouse
 // spread over it), so the same gesture strikes the same at any frame rate.
 
+// The card's seconds (the user's choice after trying it: the AK's twenty were
+// too few, with neither the fists' free moves nor the AK's reach).
+FENCER_SECONDS :: i32(35)
+
 SWORD_STEP :: f32(1.0/240)
 SWORD_MAX_FRAME :: f32(0.25)
 // A step on the grid with the sword (the user's choice: 0.3 s).

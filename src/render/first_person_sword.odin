@@ -14,7 +14,10 @@ import game "../game"
 // point's last positions, coloured by how good the cut would be (grey, white,
 // gold), flaring the colour of the cut it made. A cut shows at once (the
 // user's ask after trying it): a streak of blood across the chest it cut, the
-// way the blade went, longer the harder it was, drops flying off it; the
+// way the blade went, longer the harder it was, drops flying off it; what made
+// it stronger in words beside it (a spinning cut, a lunge, a perfect cut:
+// first_person_sword_words), the trail magenta from the moment a turn spins
+// the swing; the
 // struck foe's print white a moment, the blade held still FIRST_PERSON_SWORD_STOP
 // at the cut, the look jolted as a punch's (twice for a perfect cut).
 
@@ -26,6 +29,11 @@ FIRST_PERSON_SWORD_TRAIL_FADE :: f64(0.18)
 FIRST_PERSON_SWORD_STOP :: f64(0.06)
 FIRST_PERSON_SWORD_BLOOD :: f64(0.5)
 FIRST_PERSON_SWORD_BLOOD_DROPS :: 7
+// The cut's words: how long they show and how far they rise (screen heights).
+FIRST_PERSON_SWORD_WORDS :: f64(0.8)
+FIRST_PERSON_SWORD_WORDS_RISE :: f32(0.08)
+// The trail of a spinning swing (Q or E turned the way it sweeps).
+FIRST_PERSON_SWORD_SPIN_COLOR :: rl.Color{255, 64, 206, 255}
 
 // What the board keeps of the sword each frame its view is on.
 First_Person_Sword_View :: struct {
@@ -36,6 +44,8 @@ First_Person_Sword_View :: struct {
 	swinging: bool,
 	start: [2]f32,
 	length: f32,
+	// A spinning swing (its trail magenta), a lunging one.
+	spin, lunge: bool,
 	// The last cut and the counts of cuts, parries and grapples seen.
 	last: game.Sword_Strike,
 	strikes, parries, perfect_parries, grapples: i32,
@@ -63,6 +73,7 @@ follow_first_person_sword :: proc(renderer: ^Renderer, room: ^game.Room) {
 	if v.swinging && !s.swing.active { v.ended_at = now }
 	if !v.swinging && s.swing.active { v.trail_count = 0 }
 	v.tip, v.speed, v.swinging, v.start, v.length, v.last = s.tip, s.speed, s.swing.active, s.swing.start, s.swing.length, s.last
+	v.spin, v.lunge = s.swing.spin, s.swing.lunge
 	v.strikes, v.parries, v.perfect_parries, v.grapples = s.strikes, s.parries, s.perfect_parries, s.grapples
 	if v.swinging {
 		if v.trail_count == FIRST_PERSON_SWORD_TRAIL {
@@ -106,6 +117,37 @@ first_person_sword_blood :: proc(since: f64) -> (streak, flown: f32) {
 	t := f32(since/FIRST_PERSON_SWORD_BLOOD)
 	streak = clamp(f32(since/0.05), 0, 1)*(1-t*t)
 	return streak, t
+}
+
+// The words of what made `strike` stronger (nil: nothing did).
+first_person_sword_words :: proc(strike: game.Sword_Strike) -> cstring {
+	switch {
+	case strike.spin && strike.lunge: return "ROTEANTE x1,5 + AFFONDO"
+	case strike.spin: return "COLPO ROTEANTE x1,5"
+	case strike.lunge: return "AFFONDO x1,25"
+	case strike.perfect: return "TAGLIO PERFETTO"
+	}
+	return nil
+}
+
+// The last cut's words over the view, by the chest it cut, rising and fading
+// in FIRST_PERSON_SWORD_WORDS (the HUD, over the gloves' canvas).
+@(private)
+draw_first_person_sword_words :: proc(renderer: ^Renderer) {
+	v := &renderer.tactical.first_person.sword
+	since := renderer.sprite_assets.elapsed-v.cut_at
+	words := first_person_sword_words(v.last)
+	if words == nil || v.cut_at <= 0 || since < 0 || since >= FIRST_PERSON_SWORD_WORDS { return }
+	u := f32(since/FIRST_PERSON_SWORD_WORDS)
+	w, h := renderer.canvas_width, renderer.canvas_height
+	at := [2]f32{w*0.5+v.last.chest.x*h, h*0.5-(v.last.chest.y+0.12+FIRST_PERSON_SWORD_WORDS_RISE*u)*h}
+	size := 20
+	width := gothic_text_width(renderer, words, size)
+	x := clamp(at.x-width*0.5, 8, w-width-8)
+	alpha := 1-max(0, u-0.6)/0.4
+	color := (rl.Color{255, 214, 80, 255} if !v.last.spin else rl.Color{255, 96, 214, 255})
+	gothic_text(renderer, words, x+2, at.y+2, size, color_with_opacity(LIVING_TOKEN_INK, alpha))
+	gothic_text(renderer, words, x, at.y, size, color_with_opacity(color, alpha))
 }
 
 // The trail's colour for a quality: grey, white, gold.
@@ -160,6 +202,8 @@ draw_first_person_sword_pixel :: proc(renderer: ^Renderer, w, h: i32, ready: f32
 	trail := v.swinging || now-v.ended_at < FIRST_PERSON_SWORD_TRAIL_FADE
 	if trail && v.trail_count >= 2 {
 		color := first_person_sword_trail_color(first_person_sword_quality(v))
+		// A spinning swing shows it from the turn on.
+		if v.spin && v.swinging { color = FIRST_PERSON_SWORD_SPIN_COLOR }
 		if now-v.cut_at < FIRST_PERSON_SWORD_TRAIL_FADE {
 			color = first_person_sword_trail_color(1 if v.last.perfect else (0.5 if v.last.damage >= 3 else 0))
 		}

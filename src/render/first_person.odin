@@ -828,7 +828,9 @@ draw_first_person_overlay :: proc(renderer: ^Renderer, room: ^game.Room) {
 		draw_first_person_marks(renderer, room, now)
 		draw_first_person_gloves(renderer, room, now)
 	// The blade is cut on the gloves' small canvas (first_person_sword.odin).
-	case .Sword: draw_first_person_gloves(renderer, room, now)
+	case .Sword:
+		draw_first_person_gloves(renderer, room, now)
+		draw_first_person_sword_words(renderer)
 	case .Empty:
 	}
 	// The crosshair: four paper ticks in ink round a dot, warm over a foe; a

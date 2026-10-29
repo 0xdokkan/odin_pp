@@ -1164,12 +1164,12 @@ CARD_DEFINITIONS := [Card_Id]Card_Definition{
 	.First_Person_Fencer = {
 		upgrade_limit = FIRST_PERSON_MAX_UPGRADE_LEVEL, time_cost = 0, traits = {.Lab_Only},
 		// FIRST PERSON FENCER (docs/piano-prima-persona.md, Fase 4): his own eyes and
-		// a sword for twenty seconds of the world's, as First Person Shooter's AK:
+		// a sword for thirty-five seconds of the world's (FENCER_SECONDS), +2 an upgrade:
 		// the blade moved by the mouse, the guard, the grapple (first_person_sword.odin).
 		id = .First_Person_Fencer, name = "First Person Fencer", rarity = .Rare,
 		reward_weight = 60, shop_base_price = 8, cost = 3,
 		targeting = {rule = .Self},
-		effects = {{kind = .First_Person, target = .Player, base_amount = FIRST_PERSON_SECONDS,
+		effects = {{kind = .First_Person, target = .Player, base_amount = FENCER_SECONDS,
 			amount_per_upgrade = FIRST_PERSON_SECONDS_PER_UPGRADE, charges = i32(First_Person_Weapon.Sword)}, {}, {}, {}},
 		effect_count = 1,
 	},

@@ -2935,6 +2935,20 @@ lato alla vita, al petto, sotto e sopra le spalle, all'andata e al ritorno,
 taglia sempre. Il taglio dell'atto `prima_persona` sul bruto ora prende prima la
 spalla vicina: meno corsa, 2 di danno invece di 4.
 
+**Terza prova dell'utente: il colpo roteante non si capiva, la carta era corta.**
+L'utente non capiva se il colpo roteante c'era, e voleva la carta da 35 o 40
+secondi: con la spada si fanno pochi colpi, senza il movimento libero dei pugni
+né la distanza dell'AK. Scelti **35 s** (`FENCER_SECONDS`, +2 a potenziamento).
+Il colpo roteante ora si vede: dal momento in cui `Q`/`E` gira nel verso della
+lama la scia diventa **magenta**, e accanto al nemico colpito salgono le parole
+di cosa ha reso il colpo più forte (`COLPO ROTEANTE x1,5`, `AFFONDO x1,25`,
+`ROTEANTE x1,5 + AFFONDO`, `TAGLIO PERFETTO`), che salgono e svaniscono in
+0,8 s. La dimostrazione della carta taglia al massimo per i secondi dell'AK e
+finisce mezzo secondo dopo l'ultima mossa (35 s di vista vuota erano troppi).
+L'atto `prima_persona` ora fa anche un colpo roteante sul bruto
+(`_spada_roteante.png`). Verifiche: tutti i test verdi (1801); atto `fps` 114 su
+114 uguale alla Fase 0; atto `prima_persona` uguale in due giri.
+
 
 ## 14. Fase 5 — Spada: lama, scie, scintille, suoni
 
@@ -3003,7 +3017,22 @@ alla fine di ogni passo.
 
 ### Esito
 
-_Da scrivere alla fine della fase._
+**Risposte dell'utente (2026-10-29)**. Chieste il 2026-10-29 sera, tutte insieme, con quelle delle Fasi 5-8, prima che
+l'utente andasse a dormire: «andassi avanti in automatico, senza fermarti»;
+una questione non chiara che si può saltare si salta e si chiede alla fine; una
+che blocca il lavoro lo ferma. Nessun push. Verifica di fine fase per tutte:
+controllo completo, atti da soli e tempo di un fotogramma contro l'AK
+(consigliato).
+1. **Che spada:** «zweihänder versione cibernetica e maestosa» (risposta
+   scritta dall'utente; le opzioni erano spada a una mano, katana, spadone): uno
+   spadone a due mani, Neon, maestoso.
+2. **La scia:** colorata dalla qualità (consigliato), magenta se roteante.
+3. **Il numero del danno:** cartellino col tipo di colpo e il danno (consigliato).
+4. **I colpi in arrivo:** arrivano a schermo al battito (consigliato).
+5. **Suoni:** acciaio e Neon (consigliato).
+6. **Musica della spada:** **una musica nuova** da codice (non la mia
+   raccomandazione, che era la traccia tenuta da parte).
+
 
 ## 15. Fase 6 — Arco: carica, rimbalzi, zone critiche, frecce; prototipo
 
@@ -3114,7 +3143,32 @@ alla fine di ogni passo.
 
 ### Esito
 
-_Da scrivere alla fine della fase._
+**Risposte dell'utente (2026-10-29)**. Chieste il 2026-10-29 sera, tutte insieme, con quelle delle Fasi 5-8, prima che
+l'utente andasse a dormire: «andassi avanti in automatico, senza fermarti»;
+una questione non chiara che si può saltare si salta e si chiede alla fine; una
+che blocca il lavoro lo ferma. Nessun push. Verifica di fine fase per tutte:
+controllo completo, atti da soli e tempo di un fotogramma contro l'AK
+(consigliato).
+- **Movimento:** a griglia come l'AK (consigliato); la vista col mouse.
+- **Durata della carta:** 30 s (consigliato).
+1. **Come si scocca:** destro tenuto tende, rilasciato scocca (consigliato).
+2. **Carica piena:** **1,6 s**, e caricando di più si fa anche più danno
+   massimo delle altre scelte (risposta scritta dall'utente).
+3. **Rimbalzi:** **0, 1, 2, 3, 4** (risposta scritta: cinque livelli di carica).
+4. **Velocità e danno:** il calcolo del piano, ma con il danno **fino al 50% in
+   più**, anche in base ai rimbalzi (risposta scritta dall'utente).
+5. **Zone critiche:** tre per stanza (consigliato).
+6. **HUD:** la freccia incoccata e la prossima (consigliato).
+7. **Cambiare la freccia:** no (consigliato).
+8. **La freccia che torna:** **il Viandante conta come un rimbalzo in più**,
+   senza ferirsi con la sua freccia (risposta scritta dall'utente).
+9. **Fuori vista:** vola e colpisce (consigliato).
+10. **Frecce:** infinite (consigliato).
+11. **Passi mentre si tende:** sì, resta teso (consigliato).
+12. **Stack degli stati:** quelli della tabella (consigliato).
+13. **Ghiaccio:** Rallentamento (consigliato).
+14. **Guida:** **fino al secondo rimbalzo** (non la mia raccomandazione).
+
 
 ## 16. Fase 7 — Arco: arco, frecce in volo, faretra nell'HUD, suoni
 
@@ -3184,7 +3238,18 @@ fine di ogni passo.
 
 ### Esito
 
-_Da scrivere alla fine della fase._
+**Risposte dell'utente (2026-10-29)**. Chieste il 2026-10-29 sera, tutte insieme, con quelle delle Fasi 5-8, prima che
+l'utente andasse a dormire: «andassi avanti in automatico, senza fermarti»;
+una questione non chiara che si può saltare si salta e si chiede alla fine; una
+che blocca il lavoro lo ferma. Nessun push. Verifica di fine fase per tutte:
+controllo completo, atti da soli e tempo di un fotogramma contro l'AK
+(consigliato).
+1. **Che arco:** **compound con le carrucole** (non la mia raccomandazione).
+2. **Faretra nell'HUD:** **attorno al mirino** (non la mia raccomandazione).
+3. **Zone critiche:** bersaglio di carta con una spia che pulsa (consigliato).
+4. **Rimbalzi a orecchio:** una nota più alta a ogni rimbalzo (consigliato).
+5. **Musica dell'arco:** una nuova da codice (consigliato).
+
 
 ## 17. Fase 8 — Tutte insieme: equilibrio, prestazioni, documenti
 
@@ -3243,7 +3308,20 @@ di ogni passo.
 
 ### Esito
 
-_Da scrivere alla fine della fase._
+**Risposte dell'utente (2026-10-29)**. Chieste il 2026-10-29 sera, tutte insieme, con quelle delle Fasi 5-8, prima che
+l'utente andasse a dormire: «andassi avanti in automatico, senza fermarti»;
+una questione non chiara che si può saltare si salta e si chiede alla fine; una
+che blocca il lavoro lo ferma. Nessun push. Verifica di fine fase per tutte:
+controllo completo, atti da soli e tempo di un fotogramma contro l'AK
+(consigliato).
+1. **Equilibrio:** uno scenario fisso per carta giocato da un bot, poi la prova
+   dell'utente (consigliato): il bot si fa da soli, la prova e i ritocchi
+   insieme dopo.
+2. **Nel gioco normale:** non ancora, restano `Lab_Only` (consigliato).
+3. **Fin dove stanotte:** fino alla fine; quello che chiede la sua presenza e si
+   può saltare si salta e si chiede dopo; ciò che blocca ferma il lavoro.
+4. **Push:** nessuno (consigliato).
+
 
 ## 18. Fonti
 

@@ -856,7 +856,7 @@ all'entrata, poi la musica dei pugni.
 
 `First Person Fencer` (rara, energia 3, **0 s** di finestra; **solo nel
 laboratorio**, arena «Prima persona») è la terza arma della vista: la **spada**,
-per 20 secondi del mondo (+2 a potenziamento). Piano e scelte in
+per 35 secondi del mondo (+2 a potenziamento). Piano e scelte in
 [piano-prima-persona.md](../piano-prima-persona.md), Fase 4; regole in
 [first_person_sword.odin](../../src/game/first_person_sword.odin), disegno in
 [first_person_sword.odin](../../src/render/first_person_sword.odin).
@@ -875,7 +875,8 @@ c'è attesa fra un taglio e l'altro: ogni passaggio sul petto taglia, anche al
 ritorno, purché la punta abbia fatto almeno un quinto di schermo dall'ultimo
 taglio (un tremolio non fa nulla). Un passo fatto durante lo swing è un
 **affondo** (×1,25); girare con `Q`/`E` nel verso della lama durante lo swing è
-un **colpo roteante** (×1,5). Il colpo si vede: una striscia di sangue sul petto
+un **colpo roteante** (×1,5): la scia diventa magenta dal giro, e accanto al
+nemico salgono le parole del bonus (`COLPO ROTEANTE x1,5`, `AFFONDO x1,25`). Il colpo si vede: una striscia di sangue sul petto
 con le gocce, il lampo bianco del nemico, la lama ferma un istante, la vista che
 sobbalza.
 

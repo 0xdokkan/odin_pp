@@ -427,10 +427,12 @@ card_demo_scene :: proc(id: Card_Id, upgrade_level: i32 = 0) -> (scene: Card_Dem
 	// cell's sides, one after the other: the view turned on it, a step up, a cut
 	// across; a cut every few seconds for as long as the view lasts.
 	case .First_Person_Fencer:
-		seconds := f32(FIRST_PERSON_SECONDS)
+		seconds := f32(FENCER_SECONDS)
 		for template in definition.effects[:definition.effect_count] {
 			if template.kind == .First_Person { seconds = f32(card_effect_amount(template, clamp(upgrade_level, 0, FIRST_PERSON_MAX_UPGRADE_LEVEL))) }
 		}
+		// As many cuts as the AK's twenty seconds take (the film ends the longer view after them).
+		seconds = min(seconds, f32(FIRST_PERSON_SECONDS))
 		cuts := clamp(int((seconds-CARD_DEMO_BURST_TAIL)/CARD_DEMO_BURST_EVERY)+1, 3, CARD_DEMO_MAX_ACTIONS)
 		for at, foe in ([3]grid.Position{card_demo_offset(0, -2), card_demo_offset(-2, 0), card_demo_offset(2, 0)}) {
 			card_demo_add_foe(&scene, at, health = 3*i32((cuts-foe+2)/3))

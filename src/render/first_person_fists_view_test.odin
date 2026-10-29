@@ -231,3 +231,14 @@ test_first_person_sword_cut_feedback :: proc(t: ^testing.T) {
 	streak, flown = first_person_sword_blood(FIRST_PERSON_SWORD_BLOOD)
 	testing.expect(t, streak == 0 && flown == 1)
 }
+
+// The words of what made a cut stronger (the user could not tell a spinning
+// cut from another): spin, lunge, perfect; none for a plain cut.
+@(test)
+test_first_person_sword_words :: proc(t: ^testing.T) {
+	testing.expect(t, first_person_sword_words({}) == nil)
+	testing.expect_value(t, string(first_person_sword_words({spin = true})), "COLPO ROTEANTE x1,5")
+	testing.expect_value(t, string(first_person_sword_words({lunge = true})), "AFFONDO x1,25")
+	testing.expect_value(t, string(first_person_sword_words({perfect = true})), "TAGLIO PERFETTO")
+	testing.expect_value(t, string(first_person_sword_words({spin = true, lunge = true})), "ROTEANTE x1,5 + AFFONDO")
+}

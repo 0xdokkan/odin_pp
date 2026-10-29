@@ -13,12 +13,14 @@ Commit **«Prima persona, Fase 4, passo 6: First Person Fencer nel laboratorio»
 
 | Carta | Nel codice | Rarità | Energia | Effetto | Peso nelle offerte | Dove sta |
 |---|---|---|---:|---|---:|---|
-| First Person Fencer | `First_Person_Fencer` | rara | 3 | su di sé, 0 s di finestra: la vista in prima persona con la spada per 20 s del mondo (+2 a potenziamento, fino a 30 a +5): a griglia con passi di 0,3 s, `Q`/`E` di 90°, la lama mossa dal mouse (danno da velocità, ampiezza, linea, punto della lama e direzione: fino a 11), parata senza limite con il destro (perfetta entro 0,25 s), rampino con `Ctrl` | 60 (ma `Lab_Only`: mai offerta) | solo nell'arena «Prima persona» del laboratorio, nel suo mazzo |
+| First Person Fencer | `First_Person_Fencer` | rara | 3 | su di sé, 0 s di finestra: la vista in prima persona con la spada per 35 s del mondo (+2 a potenziamento, fino a 45 a +5; erano 20, alzati dopo la prova dell'utente): a griglia con passi di 0,3 s, `Q`/`E` di 90°, la lama mossa dal mouse (danno da velocità, ampiezza, linea, punto della lama e direzione: fino a 11), parata senza limite con il destro (perfetta entro 0,25 s), rampino con `Ctrl` | 60 (ma `Lab_Only`: mai offerta) | solo nell'arena «Prima persona» del laboratorio, nel suo mazzo |
 
 - È la terza arma della vista di First Person Shooter (`First_Person_Weapon.Sword`); non si gioca in groppa al Dinosauro.
 - **Dopo la prova dell'utente:** niente più attesa fra un taglio e l'altro (ogni passaggio sul petto taglia, anche al
   ritorno, dopo almeno un quinto di schermo di strada); affondo ×1,25 con un passo durante lo swing; colpo roteante ×1,5
   girando con `Q`/`E` nel verso della lama; striscia di sangue, lampo, fermo della lama e scossa al colpo.
+- **Terza prova:** durata da 20 a **35 s** (pochi colpi senza i passi liberi né la distanza); il colpo roteante si vede
+  (scia magenta dal giro, parole `COLPO ROTEANTE x1,5` accanto al nemico).
 - Icona (cella 34) e suono (`card_first_person_fencer`) **provvisori**: quelli definitivi sono della Fase 5, nello stile Neon.
 
 ## 2026-10-29 — First Person Brawler: critico senza mira, guantoni 3D

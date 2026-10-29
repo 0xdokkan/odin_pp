@@ -20,6 +20,8 @@ per i comandi disponibili oggi valgono il [README](README.md) e la documentazion
   lampo bianco, fermo della lama e scossa.
 - **Tagli di lato:** il bersaglio della lama è il corpo (vita, petto, testa e spalle) e non più un punto solo sul petto:
   i tagli orizzontali appena sotto il petto andavano a vuoto nove volte su dieci.
+- **Colpo roteante visibile e carta di 35 s:** la scia diventa magenta dal giro con `Q`/`E`, e accanto al nemico salgono
+  le parole del bonus (`COLPO ROTEANTE x1,5`, `AFFONDO x1,25`, `TAGLIO PERFETTO`); la carta dura 35 s invece di 20.
 - L'AK resta identico (114 catture su 114 uguali alla Fase 0).
 
 ## 2026-10-29 — Prima persona, Fase 3 fatta: aspetto e suoni dei pugni
