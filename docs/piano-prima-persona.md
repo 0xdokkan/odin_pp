@@ -56,7 +56,7 @@ La tabella è in ordine di priorità, cioè l'ordine della scaletta qui sotto.
 | 1 | 1 | Base comune della prima persona; l'AK resta identico | 0 | Fatta | vedi Esito |
 | 2 | 2 | Pugni: regole e prototipo giocabile nel laboratorio | 1 | Fatta | vedi Esito |
 | 3 | 3 | Pugni: guantoni, segni critici, colpi a schermo, suoni | 2 | Fatta | vedi Esito |
-| 4 | 4 | Spada: swing col mouse, parata, rampino; prototipo | 1 | In corso | vedi Esito |
+| 4 | 4 | Spada: swing col mouse, parata, rampino; prototipo | 1 | Fatta | vedi Esito |
 | 5 | 5 | Spada: lama, scie, scintille, suoni | 4 | Da fare | — |
 | 6 | 6 | Arco: carica, rimbalzi, zone critiche, frecce; prototipo | 1 | Da fare | — |
 | 7 | 7 | Arco: arco, frecce in volo, faretra nell'HUD, suoni | 6 | Da fare | — |
@@ -2868,6 +2868,27 @@ riga **«MOUSE: LAMA / DESTRO: PARA / Q E: GIRA»**.
   (come i pugni), per la dimostrazione e i conti.
 - Test aggiornati perché elencano le carte: carte del laboratorio 8, la mano
   dell'arena di tre carte, l'aspetto di ogni arma, le icone.
+
+**Passo 7 — verifica di fine fase: fatta** (2026-10-29).
+- **Un minuto di gioco** senza finestra, con i nemici liberi, attraverso i tasti
+  del controller (test `test_mechanics_lab_sword_lives_a_minute_of_play`): la
+  lama avanti e indietro, il sinistro tenuto metà del tempo, la guardia ogni
+  tanto, `Q`/`E`, il rampino, un passo ogni tanto: tagli a segno, colpi che
+  arrivano, intenti dei nemici sempre validi, la stanza ancora in combattimento.
+- **Tempo di un fotogramma** (build `-o:speed`, 600 fotogrammi senza limite né
+  vsync, tela 1600 × 900, nell'arena «Prima persona», tre giri alternati; misura
+  nuova `ODIN_PP_LAB_TIMING=sword`): **AK 2,99-3,08 ms** di media, **spada
+  3,00-3,08 ms**, pugni 3,05-3,15 ms. La spada costa come l'AK (circa 330
+  fotogrammi al secondo); nel 5% peggiore 3,30-3,43 ms contro 3,28-3,32.
+- **Atti da soli**, dalla cartella dell'eseguibile, a PC libero: `fps` **114 su
+  114** uguale alla Fase 0; `prima_persona` 16 catture, uguali in due giri;
+  `structures` 10 su 10 (una volta `hut_6` è uscita diversa: la cattura che
+  cambia da sé, poi 10 su 10 in tre giri).
+- `check.ps1` completo: **1796 test verdi** con e senza assert, più le due
+  build. Documenti: `docs/regole/meccaniche.md` (una sezione per First Person
+  Fencer), `docs/avvio.md`, `docs/registro-carte.md`, CHANGELOG. **Fase 4 fatta.**
+- Da provare a mano dall'utente: la sensazione del mouse e i numeri della
+  formula (il piano li dava «da ritoccare provando»).
 
 
 ## 14. Fase 5 — Spada: lama, scie, scintille, suoni

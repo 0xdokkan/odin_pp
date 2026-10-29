@@ -167,3 +167,63 @@ test_mechanics_lab_fists_live_a_minute_of_play :: proc(t: ^testing.T) {
 	testing.expect(t, hits > 0, "no punch landed in a minute")
 	testing.expect(t, player.health < 999, "no blow reached him in a minute")
 }
+
+// The sword lives a minute of play in the first person arena, the foes free and
+// arriving, through the controller's keys (Fase 4, passo 7 of
+// docs/piano-prima-persona.md): the mouse swings the blade back and forth, the
+// left button held two seconds out of four, the guard up now and then, Q or E
+// every few seconds, the grapple, a step forward now and then. Nothing breaks
+// the foes' beat, cuts land, blows reach him and are parried, and the fight
+// goes on.
+@(test)
+test_mechanics_lab_sword_lives_a_minute_of_play :: proc(t: ^testing.T) {
+	data: level.Level
+	defer level.destroy(&data)
+	player, created := game.create_player(run_session.DEMO_PLAYER_STATS)
+	testing.expect(t, created)
+	room, built := run_session.create_mechanics_lab_room(&data, &player, game.DEFAULT_TACTICAL_CONFIG, .First_Person)
+	testing.expect(t, built)
+	defer game.destroy_room(&room)
+	player.stats.max_health, player.health = 999, 999
+	renderer := new(render.Renderer)
+	defer free(renderer)
+	defer render.destroy_renderer_world_playback(renderer)
+	controller := run_session.Tactical_Controller{was_focused = true}
+	cards: run_session.Card_Interaction_State
+	buffer: run_session.Buffered_Gameplay_Command
+	sandbox := game.begin_sandbox(7)
+	views, cuts := 0, i32(0)
+	s := &room.first_person.sword
+	for frame in 0..<60*60 {
+		if !game.tactical_first_person_active(&room) && game.tactical_begin_first_person(&room, 12, .Sword) { views += 1 }
+		// The board's view looks the way the rules face (render follows it).
+		view := &renderer.tactical.first_person
+		view.engaged, view.amount, view.yaw = true, 1, game.first_person_yaw(s.facing)
+		input := run_session.Tactical_Controller_Input{focused = true}
+		// Back and forth across the screen, a sweep every half second.
+		sweep := (frame/30)%2 == 0
+		input.look = {(40 if sweep else -40), f32(((frame/7)%3)-1)*6}
+		input.fire = (frame/120)%2 == 0
+		input.fire_right = !input.fire && (frame/45)%3 == 0
+		input.ctrl = frame%300 == 150
+		if frame%240 == 200 { input.diagonals[0] = true }
+		if frame%240 == 80 { input.diagonals[1] = true }
+		before := room.first_person.hits
+		_, _ = game.sandbox_tick(&room, &sandbox, 1.0/60)
+		_ = run_session.step_tactical_controller(&controller, &room, renderer, &cards, &buffer, 1.0/60, true, input)
+		if game.first_person_sword_active(&room) && frame%90 == 0 && !game.tactical_player_busy(&room) && room.qte.kind == .None {
+			_ = run_session.commit_gameplay_command(&room, renderer, &cards, {kind = .Move, origin_phase = .Combat, direction = s.facing})
+		}
+		cuts += room.first_person.hits-before
+		if game.first_person_sword_active(&room) {
+			tile, inside := level.tile_at(&data, room.player.position)
+			testing.expect(t, inside && level.is_walkable(tile.kind) && !game.obstacle_at(&room, room.player.position), "he stands in a cell no step enters")
+		}
+		if room.phase != .Combat { break }
+		if frame%30 == 0 && !room.tactical_pulse.pending && !game.validate_enemy_intents(&room) { testing.expect(t, false, "the foes' intents broke"); break }
+	}
+	testing.expect_value(t, room.phase, game.Room_Phase.Combat)
+	testing.expect(t, views >= 4, "the sword was not taken up again")
+	testing.expectf(t, cuts > 0, "no cut landed in a minute (%d swings)", s.swings)
+	testing.expect(t, player.health < 999, "no blow reached him in a minute")
+}

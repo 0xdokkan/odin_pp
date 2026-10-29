@@ -852,6 +852,38 @@ nemico; il critico fa scoppiare una stella d'oro. **Suoni** da codice: aria,
 tonfo di cuoio per pugno, ding del critico, tic dei segni, campanella del ring
 all'entrata, poi la musica dei pugni.
 
+### First Person Fencer
+
+`First Person Fencer` (rara, energia 3, **0 s** di finestra; **solo nel
+laboratorio**, arena «Prima persona») è la terza arma della vista: la **spada**,
+per 20 secondi del mondo (+2 a potenziamento). Piano e scelte in
+[piano-prima-persona.md](../piano-prima-persona.md), Fase 4; regole in
+[first_person_sword.odin](../../src/game/first_person_sword.odin), disegno in
+[first_person_sword.odin](../../src/render/first_person_sword.odin).
+
+**Il movimento** resta a griglia, con passi di 0,3 s; `Q` ed `E` girano la
+vista di un quarto, `Shift` con una direzione schiva. **Il mouse muove la
+lama**, non la vista: la punta corre sullo schermo dentro un'ellisse,
+dall'impugnatura in basso. Con il sinistro tenuto, uno swing parte quando la
+punta va veloce, e il colpo arriva quando la lama **passa sopra il petto** di un
+nemico nella casella davanti (o, con un colpo di lato, anche nelle due diagonali
+davanti). Il danno, fino a 11, viene da come si muove: veloce, ampio (partire da
+un lato e tagliare attraverso), dritto (agitare il mouse dimezza), preso a tre
+quarti della lama, e dalla direzione: **fendente** dall'alto più forte, **tondo**
+di lato che prende due nemici, **montante** dal basso che spinge indietro. Un
+nemico a swing; per colpire ancora la lama deve rallentare e ripartire.
+
+**Il destro tenuto para** i colpi e i dardi dalle tre direzioni davanti, senza
+limite; premuto appena prima del colpo (entro 0,25 s) è una **parata perfetta**:
+chi colpisce da vicino resta stordito e prende 2 danni, il dardo torna al
+balestriere. Le bombe non si parano. **`Ctrl` è il rampino**: il primo nemico in
+linea fra 2 e 4 caselle viene tirato davanti e resta stordito; ricarica 3 s; un
+boss o un miniboss resta fermo e tira il Viandante accanto a sé.
+
+**Come si vede** (prototipo, l'aspetto finale è della Fase 5): una lama Neon in
+pixel di cartoncino, e dietro lo swing un nastro colorato da quanto è buono il
+colpo (grigio, bianco, oro).
+
 ### Inondazione
 
 `Inondazione` (non comune, energia 2, **2 s** di finestra, fino a tre

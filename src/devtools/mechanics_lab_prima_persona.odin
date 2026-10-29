@@ -142,7 +142,7 @@ mechanics_lab_prima_persona :: proc(window: ^app.Window, renderer: ^render.Rende
 	// ODIN_PP_LAB_TIMING=1 measures the fists' view here instead of going on
 	// (Fase 3, against the AK's of Fase 0).
 	if timing, _ := os.lookup_env("ODIN_PP_LAB_TIMING", context.temp_allocator); timing == "1" {
-		return mechanics_lab_first_person_timing(window, renderer, room, controller, cards, buffer, true)
+		return mechanics_lab_first_person_timing(window, renderer, room, controller, cards, buffer, .Fists)
 	}
 	// W held: free up to the brute.
 	run := run_session.Tactical_Controller_Input{}
@@ -243,6 +243,10 @@ mechanics_lab_prima_persona :: proc(window: ^app.Window, renderer: ^render.Rende
 		fmt.eprintln("mechanics lab: the sword's words are not shown"); return false
 	}
 	artifacts.screenshot("odin_pp_mechanics_lab_prima_persona_spada.png")
+	// ODIN_PP_LAB_TIMING=sword measures the sword's view here (Fase 4).
+	if timing, _ := os.lookup_env("ODIN_PP_LAB_TIMING", context.temp_allocator); timing == "sword" {
+		return mechanics_lab_first_person_timing(window, renderer, room, controller, cards, buffer, .Sword)
+	}
 	sword := &room.first_person.sword
 	// The mouse that takes the point to `want` this frame, the left button held or not.
 	toward :: proc(sword: ^game.First_Person_Sword, want: [2]f32, cut: bool) -> run_session.Tactical_Controller_Input {

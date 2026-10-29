@@ -438,18 +438,23 @@ MECHANICS_LAB_TIMING_SAMPLES :: 600
 @(private)
 mechanics_lab_first_person_timing :: proc(window: ^app.Window, renderer: ^render.Renderer, room: ^game.Room,
 	controller: ^run_session.Tactical_Controller, cards: ^run_session.Card_Interaction_State, buffer: ^run_session.Buffered_Gameplay_Command,
-	fists := false) -> bool {
+	weapon := game.First_Person_Weapon.AK) -> bool {
 	rl.SetTargetFPS(0)
 	rl.ClearWindowState({.VSYNC_HINT})
 	fp := &renderer.tactical.first_person
 	// The AK fires north; the fists (Fase 3) face the brute east, a punch every
-	// quarter of a second (jab, cross, hooks in turn), W held half the time.
-	fp.yaw, fp.pitch = (0 if fists else -math.PI/2), 0
+	// quarter of a second (jab, cross, hooks in turn), W held half the time; the
+	// sword (Fase 4) swings back and forth, the button held half the time.
+	if weapon == .AK { fp.yaw, fp.pitch = -math.PI/2, 0 }
+	if weapon == .Fists { fp.yaw, fp.pitch = 0, 0 }
 	samples: [MECHANICS_LAB_TIMING_SAMPLES]f64
 	last := rl.GetTime()
 	for index in 0..<MECHANICS_LAB_TIMING_WARMUP+MECHANICS_LAB_TIMING_SAMPLES {
 		input := run_session.Tactical_Controller_Input{focused = true, fire = true}
-		if fists {
+		if weapon == .Sword {
+			input = {focused = true, look = {(40 if (index/30)%2 == 0 else -40), 0}, fire = (index/120)%2 == 0}
+		}
+		if weapon == .Fists {
 			press := index%15 == 0
 			input = {focused = true, fire = press && (index/15)%2 == 0, fire_right = press && (index/15)%2 == 1, shift = (index/30)%2 == 1}
 			input.walk[0] = (index/60)%2 == 0

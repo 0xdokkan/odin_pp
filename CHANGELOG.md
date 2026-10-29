@@ -5,6 +5,18 @@ I riferimenti a Classica, `--flat` e ai vecchi smoke descrivono versioni precede
 per i comandi disponibili oggi valgono il [README](README.md) e la documentazione collegata.
 
 
+## 2026-10-29 — Prima persona, Fase 4 fatta: la spada, regole e prototipo
+
+- **First Person Fencer** (solo nel laboratorio, arena «Prima persona»): la spada in prima persona, a griglia con passi
+  di 0,3 s e `Q`/`E` per girare. Il mouse muove la lama: il danno viene da velocità, ampiezza, linea pulita, punto della
+  lama e direzione (fendente, tondo, montante), fino a 11. Parata senza limite con il destro, perfetta entro 0,25 s
+  (stordisce, il dardo torna); rampino con `Ctrl`.
+- Il colpo arriva quando la lama passa sopra il petto del nemico: a una casella il cartoncino riempie lo schermo, e la
+  regola «la lama tocca il cartoncino» avrebbe fatto colpire subito ogni swing.
+- Prototipo: lama Neon in pixel di cartoncino, nastro della scia colorato dalla qualità, icona e suono provvisori, la
+  sua dimostrazione; un minuto di gioco nei test; misura `ODIN_PP_LAB_TIMING=sword` (la spada costa come l'AK).
+- L'AK resta identico (114 catture su 114 uguali alla Fase 0).
+
 ## 2026-10-29 — Prima persona, Fase 3 fatta: aspetto e suoni dei pugni
 
 - Tre proposte di stile cibernetico sui guantoni veri (Cyber del gioco, Neon, Circuiti d'oro); l'utente sceglie il

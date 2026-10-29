@@ -79,7 +79,7 @@ non definiscono le regole della spedizione aperta.
 ### Prova meccaniche
 
 **F3** cambia arena, una dopo l'altra: subito dopo la Piana, «Prima persona» (23×17) è l'arena delle carte in prima
-persona, con il suo mazzo (First Person Shooter, First Person Brawler e la Canna da Pesca): un muro con due nicchie, quattro pilastri, due muri
+persona, con il suo mazzo (First Person Shooter, First Person Brawler, First Person Fencer e la Canna da Pesca): un muro con due nicchie, quattro pilastri, due muri
 di sbieco per i tiri di sponda, tre coperture basse, un corridoio di 5 caselle, un balestriere su un rialzo di 2
 gradini e un bruto (docs/piano-prima-persona.md, Fase 1); «Altezze» ha un altopiano di 4 gradini con una
 scala di 3, un pilastro di 8 e una collina a spirale (si prova la regola dei
@@ -95,12 +95,14 @@ passo contro le sbarre dal lato della leva. Con `--smoke-mechanics-lab` e `ODIN_
 `mountain`, `cave`, `layers`, `lift`, `fps` o `prima_persona` gira solo l'atto delle altezze, delle strutture, della montagna a spirale,
 della grotta, dei piani, degli ascensori, di First Person Shooter o dell'arena «Prima persona» (la montagna dura qualche minuto:
 sale tutto il sentiero a passi veri). L'atto `prima_persona` gira per ultimo nello smoke completo: l'AK, poi First Person
-Brawler (i guantoni Neon, un jab, un gancio, il jab che colpisce, un segno, il cross critico con la stella d'oro); prende
-anche spada e arco, che non hanno ancora la loro carta, per guardarne la sigla e la mano vuota.
+Brawler (i guantoni Neon, un jab, un gancio, il jab che colpisce, un segno, il cross critico con la stella d'oro), poi
+First Person Fencer (la lama, un tondo sul bruto, la parata, il rampino); prende anche l'arco, che non ha ancora la sua
+carta, per guardarne la sigla e la mano vuota.
 Con `ODIN_PP_LAB_ONLY=fps` e `ODIN_PP_LAB_TIMING=1` l'atto di First Person Shooter si ferma dopo la discesa negli occhi e misura
 600 fotogrammi con l'AK che spara, senza limite di fotogrammi né vsync (riga `FIRST PERSON TIMING`; meglio con una build `-o:speed`).
 Con `ODIN_PP_LAB_ONLY=prima_persona` la stessa misura la fa `ODIN_PP_LAB_TIMING=1` con i pugni (un pugno ogni quarto di
-secondo, `W` tenuto metà del tempo) e `ODIN_PP_LAB_TIMING=ak` con l'AK, nella stessa arena.
+secondo, `W` tenuto metà del tempo), `ODIN_PP_LAB_TIMING=sword` con la spada (la lama avanti e indietro) e
+`ODIN_PP_LAB_TIMING=ak` con l'AK, nella stessa arena.
 `--smoke-expedition` comprende l'atto «posa» (il fantasma verde e rosso, una statua e una casetta posate, la statua rotta da un colpo
 e la casetta che resta), l'atto «grotte» (in Neve, Far West, Egitto e Inferno: l'arco, l'ingresso e la seconda
 stanza della prima grotta, con il giro entra-esci controllato) e l'atto «montagna» (il robot in otto punti della salita, con le mappe della Neve
