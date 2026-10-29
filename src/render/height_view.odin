@@ -19,6 +19,11 @@ import view "../engine/view"
 // update_tactical_view and draw_tactical_world: one renderer draws at a time. It is
 // a copy of the level's tables, refreshed when the level's geometry changes, and
 // never a pointer to the level: a level destroyed under it cannot be read.
+//
+// The board's state (board_heights, board_actors, board_lift_riders, board_view) is
+// the drawing thread's own (thread_local): the game draws on one thread, so it is
+// the same as a global there; the tests run on several threads at once, and a
+// global board was set and cleared by one test while another read it.
 @(private)
 Board_Heights :: struct {
 	cells: [dynamic]u8,
@@ -38,7 +43,7 @@ Board_Heights :: struct {
 	base: i32,
 }
 
-@(private)
+@(private, thread_local)
 board_heights: Board_Heights
 
 // Where each actor of the room stands this frame (the room's own cells, on their layers): on a map with layers
@@ -49,7 +54,7 @@ Board_Actor :: struct {
 	cell:   grid.Position,
 }
 
-@(private)
+@(private, thread_local)
 board_actors: [dynamic]Board_Actor
 
 // What stands on a point no figure stands on: its floor is the ground's (entity_point_ground). Not the zero
@@ -65,7 +70,7 @@ Board_Lift_Rider :: struct {
 	ground: f32,
 }
 
-@(private)
+@(private, thread_local)
 board_lift_riders: [dynamic]Board_Lift_Rider
 
 // The level whose heights the next drawing uses (nil: flat).
@@ -282,7 +287,7 @@ Board_View :: struct {
 	vault:   bool,
 }
 
-@(private)
+@(private, thread_local)
 board_view: Board_View
 
 @(private)
