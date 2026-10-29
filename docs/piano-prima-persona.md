@@ -2541,6 +2541,11 @@ Eiserloh sulle telecamere ([GDC](https://www.gamedeveloper.com/programming/video
   (uno nuovo); atto `fps` **114 su 114** uguale alla Fase 0; atto
   `prima_persona` (11 catture) uguale in due giri. Catture guardate.
 
+**Domande per il passo 4** (risposte dell'utente, tutte le consigliate): anelli
+e frecce **accesi come il neon, con inchiostro e bordo di carta**; stella d'oro
+che **esplode e svanisce** in mezzo secondo con qualche scintilla; **colori di
+ora** (gancio sinistro arancio, jab azzurro, cross giallo, gancio destro magenta).
+
 ## 13. Fase 4 — Spada: swing col mouse, parata, rampino; prototipo
 
 ### Obiettivo
