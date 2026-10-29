@@ -44,6 +44,8 @@ BORROWED_RENDERER_OWN_HANDLES :: [?]string{
 	"tactical.first_person.gloves.cube",
 	"tactical.first_person.gloves.blade",
 	"tactical.first_person.gloves.blade_ink",
+	"tactical.first_person.gloves.compound",
+	"tactical.first_person.gloves.compound_ink",
 	"tactical.first_person.gloves.shader",
 	"tactical.first_person.gloves.paper_shader",
 	"tactical.first_person.gloves.low",

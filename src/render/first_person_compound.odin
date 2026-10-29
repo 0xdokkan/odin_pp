@@ -1,5 +1,6 @@
 package render
 
+import "core:c"
 import "core:math"
 import rl "vendor:raylib"
 import rlgl "vendor:raylib/rlgl"
@@ -94,6 +95,11 @@ first_person_compound_rod :: proc(a, b: rl.Vector3, thick: f32) -> rl.Matrix {
 	return frame*rl.MatrixScale(thick, length, thick)
 }
 
+// Where the string holds the arrow's nock at `charge` (in the bow's frame): back toward the eye as it is drawn.
+first_person_compound_nock :: proc(charge: f32) -> rl.Vector3 {
+	return {0.012, 0, FIRST_PERSON_COMPOUND_BRACE+FIRST_PERSON_COMPOUND_DRAW*clamp(charge, 0, 1)}
+}
+
 // The bow's frame in the gloves' camera, `lift` metres down as it comes in.
 first_person_compound_matrix :: proc(lift: f32) -> rl.Matrix {
 	grip := FIRST_PERSON_COMPOUND_GRIP-{0, lift, 0}
@@ -131,6 +137,53 @@ first_person_compound_part_frame :: proc(part: First_Person_Compound_Part, grow:
 	return place*rl.MatrixScale(part.size.x+grow, part.size.y+grow, part.size.z+grow)
 }
 
+// The bow's fixed pieces baked into one mesh in its frame (`grow` metres fuller
+// on every side: the ink's shell), each vertex's stuff in its colour's red, so
+// that they draw at once (first_person_compound_kit). raylib frees it: its
+// arrays come from raylib's allocator.
+@(private = "file")
+first_person_compound_bake :: proc(kit: ^First_Person_Glove_Kit, grow: f32) -> rl.Mesh {
+	total := 0
+	shapes := [First_Person_Compound_Shape]rl.Mesh{.Sphere = kit.sphere, .Cylinder = kit.cylinder, .Cube = kit.cube}
+	count :: proc(m: rl.Mesh) -> int { return int(m.triangleCount)*3 }
+	for part in FIRST_PERSON_COMPOUND_PARTS { total += count(shapes[part.shape]) }
+	mesh: rl.Mesh
+	mesh.vertexCount, mesh.triangleCount = c.int(total), c.int(total/3)
+	mesh.vertices = cast([^]f32)rl.MemAlloc(c.uint(total*3*size_of(f32)))
+	mesh.normals = cast([^]f32)rl.MemAlloc(c.uint(total*3*size_of(f32)))
+	mesh.colors = cast([^]u8)rl.MemAlloc(c.uint(total*4))
+	at := 0
+	for part in FIRST_PERSON_COMPOUND_PARTS {
+		source := shapes[part.shape]
+		m := first_person_compound_part_frame(part, grow)
+		n := rl.MatrixTranspose(rl.MatrixInvert(m))
+		for k in 0..<count(source) {
+			index := int(source.indices[k]) if source.indices != nil else k
+			p := m*[4]f32{source.vertices[index*3], source.vertices[index*3+1], source.vertices[index*3+2], 1}
+			q := n*[4]f32{source.normals[index*3], source.normals[index*3+1], source.normals[index*3+2], 0}
+			normal := rl.Vector3Normalize(q.xyz)
+			mesh.vertices[at*3], mesh.vertices[at*3+1], mesh.vertices[at*3+2] = p.x, p.y, p.z
+			mesh.normals[at*3], mesh.normals[at*3+1], mesh.normals[at*3+2] = normal.x, normal.y, normal.z
+			mesh.colors[at*4], mesh.colors[at*4+1], mesh.colors[at*4+2], mesh.colors[at*4+3] = u8(part.stuff), 0, 0, 255
+			at += 1
+		}
+	}
+	rl.UploadMesh(&mesh, false)
+	return mesh
+}
+
+// The bow's shapes, the first time it is drawn.
+@(private = "file")
+first_person_compound_kit :: proc(kit: ^First_Person_Glove_Kit) -> bool {
+	if kit.shader.id == 0 { return false }
+	if kit.cube.vaoId == 0 { kit.cube = rl.GenMeshCube(1, 1, 1) }
+	if kit.compound.vaoId == 0 {
+		kit.compound = first_person_compound_bake(kit, 0)
+		kit.compound_ink = first_person_compound_bake(kit, FIRST_PERSON_GLOVE_INK)
+	}
+	return kit.compound.vaoId != 0 && kit.compound_ink.vaoId != 0
+}
+
 // A glove in the bow's frame at `at` with its forearm back along `back` and
 // its fist's way through it along `along`, mirrored for the right.
 @(private = "file")
@@ -153,12 +206,11 @@ first_person_compound_glove :: proc(bow: rl.Matrix, at, along, back: rl.Vector3,
 // small canvas bound now.
 @(private)
 draw_first_person_compound :: proc(renderer: ^Renderer, kit: ^First_Person_Glove_Kit, ready: f32) {
-	if kit.shader.id == 0 { return }
-	if kit.cube.vaoId == 0 { kit.cube = rl.GenMeshCube(1, 1, 1) }
+	if !first_person_compound_kit(kit) { return }
 	v := &renderer.tactical.first_person.bow
 	bow := first_person_compound_matrix((1-ready)*0.32)
 	charge := clamp(v.charge, 0, 1) if v.drawing else 0
-	nock := rl.Vector3{0.012, 0.0, FIRST_PERSON_COMPOUND_BRACE+FIRST_PERSON_COMPOUND_DRAW*charge}
+	nock := first_person_compound_nock(charge)
 	cam_back := FIRST_PERSON_COMPOUND_CAM.y+FIRST_PERSON_COMPOUND_CAM_RADIUS
 	top := rl.Vector3{0, FIRST_PERSON_COMPOUND_CAM.x, cam_back}
 	bottom := rl.Vector3{0, -FIRST_PERSON_COMPOUND_CAM.x, cam_back}
@@ -185,12 +237,10 @@ draw_first_person_compound :: proc(renderer: ^Renderer, kit: ^First_Person_Glove
 		rl.SetShaderValue(kit.shader, rl.ShaderLocationIndex(kit.ink_location), &ink, .FLOAT)
 		rl.SetShaderValue(kit.shader, rl.ShaderLocationIndex(kit.part_location), &none, .FLOAT)
 		grow := FIRST_PERSON_GLOVE_INK if pass == 0 else 0
-		for part in FIRST_PERSON_COMPOUND_PARTS {
-			mesh := kit.cube
-			if part.shape == .Sphere { mesh = kit.sphere }
-			if part.shape == .Cylinder { mesh = kit.cylinder }
-			put(kit, material, mesh, part.stuff, bow*first_person_compound_part_frame(part, grow))
-		}
+		// The fixed pieces at once, each vertex with its own stuff (a stuff below zero).
+		baked := f32(-1)
+		rl.SetShaderValue(kit.shader, rl.ShaderLocationIndex(kit.stuff_location), &baked, .FLOAT)
+		rl.DrawMesh(kit.compound_ink if pass == 0 else kit.compound, material, bow)
 		// The string from the cams to the nock, and a cable across.
 		put(kit, material, kit.cube, .Steel, bow*first_person_compound_rod(top, nock, 0.004+grow*2))
 		put(kit, material, kit.cube, .Steel, bow*first_person_compound_rod(nock, bottom, 0.004+grow*2))

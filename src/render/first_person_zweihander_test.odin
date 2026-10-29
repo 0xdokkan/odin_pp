@@ -102,3 +102,27 @@ test_first_person_sword_hook_flies_then_holds :: proc(t: ^testing.T) {
 	_, _, shown = first_person_sword_hook(-0.01, guard, from, at)
 	testing.expect(t, !shown)
 }
+
+// FIRST PERSON ARCHER's compound bow (first_person_compound.odin): its arrow
+// points at the crosshair's place far ahead, its string comes back toward the
+// eye as it is drawn (each level further), the arrow's head is its kind's colour.
+@(test)
+test_first_person_compound_aims_and_draws :: proc(t: ^testing.T) {
+	m := first_person_compound_matrix(0)
+	back := rl.Vector3{m[0, 2], m[1, 2], m[2, 2]}
+	grip := rl.Vector3{m[0, 3], m[1, 3], m[2, 3]}
+	want := rl.Vector3Normalize(rl.Vector3{0, 0, -FIRST_PERSON_COMPOUND_AIM}-grip)
+	testing.expect(t, rl.Vector3DotProduct(rl.Vector3Normalize(-back), want) > 0.999)
+	last := f32(-1)
+	for level in 0..=4 {
+		z := first_person_compound_nock(f32(level)/4).z
+		testing.expect(t, z > last)
+		last = z
+	}
+	testing.expect(t, first_person_compound_nock(2).z == first_person_compound_nock(1).z)
+	for kind in game.Bow_Arrow_Kind {
+		for other in game.Bow_Arrow_Kind {
+			if kind != other { testing.expect(t, FIRST_PERSON_BOW_COLORS[kind] != FIRST_PERSON_BOW_COLORS[other]) }
+		}
+	}
+}

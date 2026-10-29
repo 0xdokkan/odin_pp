@@ -138,8 +138,24 @@ draw_first_person_bow_entry :: proc(renderer: ^Renderer, index: int) {
 	defer rlgl.EnableBackfaceCulling()
 	// A paper target in ink, its rings, the light in its middle pulsing, a glow
 	// round it: filled discs standing out of the face, each a hair nearer the room.
+	// One flat fan of triangles each (no sides, no caps: a tenth of a cylinder's work).
 	disc :: proc(centre, n: rl.Vector3, off, radius: f32, color: rl.Color) {
-		rl.DrawCylinderEx(centre+n*off, centre+n*(off+0.003), radius, radius, 24, color)
+		SIDES :: 20
+		side := rl.Vector3{-n.z, 0, n.x}
+		up := rl.Vector3{0, 1, 0}
+		c := centre+n*off
+		rlgl.Begin(rlgl.TRIANGLES)
+		rlgl.Color4ub(color.r, color.g, color.b, color.a)
+		for k in 0..<SIDES {
+			a0 := f32(k)*math.TAU/SIDES
+			a1 := f32(k+1)*math.TAU/SIDES
+			p0 := c+(side*math.cos(a0)+up*math.sin(a0))*radius
+			p1 := c+(side*math.cos(a1)+up*math.sin(a1))*radius
+			rlgl.Vertex3f(c.x, c.y, c.z)
+			rlgl.Vertex3f(p0.x, p0.y, p0.z)
+			rlgl.Vertex3f(p1.x, p1.y, p1.z)
+		}
+		rlgl.End()
 	}
 	disc(centre, n, 0.000, 0.30+0.04*pulse, color_with_opacity({255, 214, 80, 255}, 0.25*pulse))
 	disc(centre, n, 0.002, 0.27, LIVING_TOKEN_INK)

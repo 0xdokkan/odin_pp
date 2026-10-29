@@ -107,6 +107,9 @@ FIRST_PERSON_GLOVE_PARTS := [?]First_Person_Glove_Part{
 First_Person_Glove_Kit :: struct {
 	sphere, cylinder: rl.Mesh,
 	cube, blade, blade_ink: rl.Mesh,
+	// The compound bow's fixed pieces baked into one mesh and its ink shell
+	// (first_person_compound.odin): each vertex's stuff in its colour's red.
+	compound, compound_ink: rl.Mesh,
 	shader, paper_shader: rl.Shader,
 	stuff_location, ink_location, texel_location, part_location, tint_location: i32,
 	low, paper: rl.RenderTexture2D,
@@ -116,14 +119,17 @@ First_Person_Glove_Kit :: struct {
 FIRST_PERSON_GLOVE_VERTEX :: `#version 330
 in vec3 vertexPosition;
 in vec3 vertexNormal;
+in vec4 vertexColor;
 uniform mat4 mvp;
 uniform mat4 matModel;
 uniform mat4 matNormal;
 out vec3 fragPos;
 out vec3 fragNormal;
 out vec3 fragLocal;
+out float fragStuff;
 void main() {
     fragLocal = vertexPosition;
+    fragStuff = vertexColor.r*255.0;
     fragPos = vec3(matModel*vec4(vertexPosition, 1.0));
     fragNormal = mat3(matNormal)*vertexNormal;
     gl_Position = mvp*vec4(vertexPosition, 1.0);
@@ -135,11 +141,14 @@ void main() {
 // of cyan light along its edge; the neon bands and tubes are lit, flat (only
 // their shaded side a darker magenta). `ink` draws the board's ink (the
 // outline's shell). `part` names the piece (FIRST_PERSON_GLOVE_PARTS' order);
-// the tubes sit on the piece's own unit shape (`fragLocal`).
+// the tubes sit on the piece's own unit shape (`fragLocal`). A `stuff` below
+// zero takes each vertex's own (a baked mesh's, its colour's red).
+
 FIRST_PERSON_GLOVE_FRAGMENT :: `#version 330
 in vec3 fragPos;
 in vec3 fragNormal;
 in vec3 fragLocal;
+in float fragStuff;
 uniform float stuff;
 uniform float ink;
 uniform float part;
@@ -153,12 +162,13 @@ const vec3 CYAN_DIM = vec3(18, 128, 168);
 const vec3 STEEL[4] = vec3[](vec3(52, 62, 88), vec3(118, 134, 166), vec3(192, 206, 228), vec3(250, 252, 255));
 void main() {
     if (ink > 0.5) { finalColor = vec4(13.0, 20.0, 30.0, 255.0)/255.0; return; }
-    if (stuff > 5.5) {
+    float st = stuff < -0.5 ? floor(fragStuff+0.5) : stuff;
+    if (st > 5.5) {
         float lit = dot(normalize(fragNormal), normalize(vec3(-0.45, 0.80, 0.45)))*0.5+0.5;
         finalColor = vec4(tint*(lit < 0.5 ? 0.6 : 1.0), 1.0);
         return;
     }
-    if (stuff > 4.5) { finalColor = vec4(1.0); return; }
+    if (st > 4.5) { finalColor = vec4(1.0); return; }
     vec3 n = normalize(fragNormal);
     vec3 v = normalize(-fragPos);
     vec3 key = normalize(vec3(-0.45, 0.80, 0.45));
@@ -169,13 +179,13 @@ void main() {
     vec3 l = fragLocal;
     int p = int(part+0.5);
     vec3 c;
-    if (stuff > 3.5) { c = tone == 0 ? CYAN_DIM : CYAN; }
-    else if (stuff > 2.5) {
+    if (st > 3.5) { c = tone == 0 ? CYAN_DIM : CYAN; }
+    else if (st > 2.5) {
         c = STEEL[gloss > 0.5 ? 3 : tone];
         if (rim > 0.74) { c = CYAN; }
     }
-    else if (stuff > 1.5) { c = CARBON[gloss > 0.55 ? 3 : tone]*0.8; }
-    else if (stuff > 0.5) { c = tone == 0 ? MAGENTA_DIM : MAGENTA; }
+    else if (st > 1.5) { c = CARBON[gloss > 0.55 ? 3 : tone]*0.8; }
+    else if (st > 0.5) { c = tone == 0 ? MAGENTA_DIM : MAGENTA; }
     else {
         c = CARBON[gloss > 0.55 ? 3 : tone];
         if (rim > 0.68) { c = CYAN; }
@@ -254,6 +264,8 @@ destroy_first_person_glove_kit :: proc(kit: ^First_Person_Glove_Kit) {
 	if kit.cube.vaoId != 0 { rl.UnloadMesh(kit.cube) }
 	if kit.blade.vaoId != 0 { rl.UnloadMesh(kit.blade) }
 	if kit.blade_ink.vaoId != 0 { rl.UnloadMesh(kit.blade_ink) }
+	if kit.compound.vaoId != 0 { rl.UnloadMesh(kit.compound) }
+	if kit.compound_ink.vaoId != 0 { rl.UnloadMesh(kit.compound_ink) }
 	if kit.shader.id != 0 { rl.UnloadShader(kit.shader) }
 	if kit.paper_shader.id != 0 { rl.UnloadShader(kit.paper_shader) }
 	if kit.low.id != 0 { rl.UnloadRenderTexture(kit.low) }
