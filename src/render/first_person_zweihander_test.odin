@@ -82,3 +82,23 @@ test_first_person_sword_trail_at_every_frame_rate :: proc(t: ^testing.T) {
 	points: [8]First_Person_Sword_Trail_Point
 	testing.expect(t, first_person_sword_trail_points(&v, 1.5, v.tip, points[:]) == 0)
 }
+
+// The grapple's hook (first_person_sword.odin): it leaves the guard, reaches
+// the foe's chest as its flight ends, the chain slack; then it holds his chest
+// where his card is drawn, the chain drawn taut, and is gone at the end.
+@(test)
+test_first_person_sword_hook_flies_then_holds :: proc(t: ^testing.T) {
+	guard, from, at := [2]f32{0.3, -0.4}, [2]f32{-0.2, 0.1}, [2]f32{-0.05, 0.0}
+	hook, sag, shown := first_person_sword_hook(0, guard, from, at)
+	testing.expect(t, shown && hook == guard && sag > 0)
+	hook, _, _ = first_person_sword_hook(FIRST_PERSON_SWORD_HOOK_FLIGHT*0.5, guard, from, at)
+	testing.expect(t, hook != guard && hook != from)
+	hook, _, _ = first_person_sword_hook(FIRST_PERSON_SWORD_HOOK_FLIGHT, guard, from, at)
+	testing.expect(t, hook == at)
+	hook, sag, shown = first_person_sword_hook(FIRST_PERSON_SWORD_GRAPPLE*0.9, guard, from, at)
+	testing.expect(t, shown && hook == at && sag == 0)
+	_, _, shown = first_person_sword_hook(FIRST_PERSON_SWORD_GRAPPLE, guard, from, at)
+	testing.expect(t, !shown)
+	_, _, shown = first_person_sword_hook(-0.01, guard, from, at)
+	testing.expect(t, !shown)
+}

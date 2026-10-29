@@ -300,6 +300,9 @@ mechanics_lab_prima_persona :: proc(window: ^app.Window, renderer: ^render.Rende
 	drive(window, renderer, room, controller, cards, buffer, {ctrl = true})
 	for _ in 0..<6 { frame(window, renderer, room, controller, cards, buffer) }
 	artifacts.screenshot("odin_pp_mechanics_lab_prima_persona_spada_rampino.png")
+	// Caught: the chain taut as the brute is hauled in (Fase 5).
+	for _ in 0..<8 { frame(window, renderer, room, controller, cards, buffer) }
+	artifacts.screenshot("odin_pp_mechanics_lab_prima_persona_spada_rampino_tirato.png")
 	if sword.facing != .West || sword.grapples != 1 || brute_enemy.position != game.add_position(room.player.position, {x = -1}) {
 		fmt.eprintln("mechanics lab: the grapple did not pull the brute (facing", sword.facing, "grapples", sword.grapples, ")"); return false
 	}

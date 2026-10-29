@@ -149,6 +149,8 @@ First_Person_Sword :: struct {
 	// Counted for the board, the lab's sounds and the tests.
 	swings, strikes, parries, perfect_parries, grapples: i32,
 	last: Sword_Strike,
+	// The foe the last grapple caught (the board draws its chain to him).
+	grappled: Entity_Ref,
 }
 
 // What the controller asks of the sword this frame.
@@ -480,6 +482,7 @@ sword_grapple :: proc(room: ^Room) -> bool {
 	}
 	s.grapple_recharge = SWORD_GRAPPLE_RECHARGE
 	s.grapples += 1
+	s.grappled = target
 	return true
 }
 

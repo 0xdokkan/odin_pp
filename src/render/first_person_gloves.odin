@@ -475,6 +475,7 @@ prepare_first_person_gloves :: proc(renderer: ^Renderer) {
 		draw_first_person_sword_pixel(renderer, w, h, ready)
 		draw_first_person_zweihander(renderer, kit, ready)
 		draw_first_person_sword_sparks(renderer, w, h, ready)
+		draw_first_person_sword_chain(renderer, w, h, ready)
 	} else {
 		draw_first_person_marks_pixel(renderer, w, h)
 		draw_first_person_glove_models(renderer, kit, ready)

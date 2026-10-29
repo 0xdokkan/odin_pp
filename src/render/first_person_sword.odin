@@ -77,6 +77,11 @@ First_Person_Sword_View :: struct {
 	// When the last parry was, and whether it was perfect.
 	parry_at: f64,
 	parry_perfect: bool,
+	// When the last grapple was thrown, the foe it caught and where his chest
+	// was then (the world's).
+	grapple_at: f64,
+	grappled: game.Entity_Ref,
+	grapple_from: rl.Vector3,
 }
 
 @(private)
@@ -90,6 +95,10 @@ follow_first_person_sword :: proc(renderer: ^Renderer, room: ^game.Room) {
 	s := &room.first_person.sword
 	if s.strikes != v.strikes { v.cut_at, v.cut_tip = now, s.tip }
 	if s.parries != v.parries { v.parry_at, v.parry_perfect = now, s.perfect_parries != v.perfect_parries }
+	if s.grapples != v.grapples {
+		v.grapple_at, v.grappled = now, s.grappled
+		if feet, height, ok := attack_card(renderer, s.grappled); ok { v.grapple_from = feet+{0, height*FIRST_PERSON_MARK_HEIGHT, 0} }
+	}
 	if v.swinging && !s.swing.active { v.ended_at = now }
 	if !v.swinging && s.swing.active { v.trail_count = 0 }
 	v.tip, v.speed, v.swinging, v.start, v.length, v.last = s.tip, s.speed, s.swing.active, s.swing.start, s.swing.length, s.last
@@ -242,6 +251,91 @@ draw_first_person_sword_sparks :: proc(renderer: ^Renderer, w, h: i32, ready: f3
 		r := (0.03+0.14*u/0.7)*f32(h)
 		rl.DrawRing(px(at, w, h), r-1.5, r, 0, 360, 40, rl.Color{255, 250, 220, 255})
 	}
+}
+
+// The grapple's chain over FIRST_PERSON_SWORD_GRAPPLE: the hook flies from
+// the guard to the foe's chest in FIRST_PERSON_SWORD_HOOK_FLIGHT, the chain
+// slack behind it; caught, it holds his chest wherever his card is drawn as
+// he is hauled in (or the view as it is hauled to a boss), the chain taut.
+FIRST_PERSON_SWORD_GRAPPLE :: f64(0.4)
+FIRST_PERSON_SWORD_HOOK_FLIGHT :: f64(0.12)
+// A link's length (screen heights) and the slack chain's sag.
+FIRST_PERSON_SWORD_LINK :: f32(0.02)
+FIRST_PERSON_SWORD_SAG :: f32(0.06)
+
+// Where the hook is `since` seconds after the throw (screen heights), from
+// `guard` to the chest where it was thrown (`from`) and where it is drawn now
+// (`at`), and how far the chain sags (screen heights); `shown` false before
+// the throw and after it.
+first_person_sword_hook :: proc(since: f64, guard, from, at: [2]f32) -> (hook: [2]f32, sag: f32, shown: bool) {
+	if since < 0 || since >= FIRST_PERSON_SWORD_GRAPPLE { return }
+	if since < FIRST_PERSON_SWORD_HOOK_FLIGHT {
+		u := f32(since/FIRST_PERSON_SWORD_HOOK_FLIGHT)
+		return guard+(from-guard)*(1-(1-u)*(1-u)), FIRST_PERSON_SWORD_SAG*(1-u*0.5), true
+	}
+	u := f32((since-FIRST_PERSON_SWORD_HOOK_FLIGHT)/(FIRST_PERSON_SWORD_GRAPPLE-FIRST_PERSON_SWORD_HOOK_FLIGHT))
+	return at, FIRST_PERSON_SWORD_SAG*0.5*max(0, 1-u*3), true
+}
+
+// A point of the world on the screen as the board's camera shows it (heights
+// from the middle, up), if in front of it.
+@(private = "file")
+first_person_sword_on_screen :: proc(renderer: ^Renderer, point: rl.Vector3) -> (at: [2]f32, ok: bool) {
+	camera := renderer.tactical.camera
+	forward := rl.Vector3Normalize(camera.target-camera.position)
+	if rl.Vector3DotProduct(point-camera.position, forward) <= 0.05 { return }
+	w, h := renderer.canvas_width, renderer.canvas_height
+	screen := rl.GetWorldToScreenEx(point, camera, i32(w), i32(h))
+	return {(screen.x-w*0.5)/h, (h*0.5-screen.y)/h}, true
+}
+
+// The grapple's chain and hook on the gloves' small canvas (`w` by `h`), over
+// the sword.
+@(private)
+draw_first_person_sword_chain :: proc(renderer: ^Renderer, w, h: i32, ready: f32) {
+	v := &renderer.tactical.first_person.sword
+	now := renderer.sprite_assets.elapsed
+	since := now-v.grapple_at
+	if v.grapple_at <= 0 || since < 0 || since >= FIRST_PERSON_SWORD_GRAPPLE { return }
+	from, seen := first_person_sword_on_screen(renderer, v.grapple_from)
+	if !seen { return }
+	at := from
+	if feet, height, ok := attack_card(renderer, v.grappled); ok {
+		if drawn, in_front := first_person_sword_on_screen(renderer, feet+{0, height*FIRST_PERSON_MARK_HEIGHT, 0}); in_front { at = drawn }
+	}
+	tip := first_person_sword_shown_tip(v, now)
+	hilt := game.SWORD_HILT
+	guard := hilt+(tip-hilt)*FIRST_PERSON_ZWEIHANDER_ALONG-{0, (1-ready)*0.6}
+	hook, sag, shown := first_person_sword_hook(since, guard, from, at)
+	if !shown { return }
+	px :: proc(p: [2]f32, w, h: i32) -> rl.Vector2 {
+		return {math.round(f32(w)*0.5+p.x*f32(h)), math.round(f32(h)*0.5-p.y*f32(h))}
+	}
+	way := hook-guard
+	length := math.sqrt(way.x*way.x+way.y*way.y)
+	if length < 0.01 { return }
+	links := max(int(length/FIRST_PERSON_SWORD_LINK), 2)
+	steel := rl.Color{150, 160, 185, 255}
+	for k in 0..<links {
+		u := (f32(k)+0.5)/f32(links)
+		// The sag is deepest in the middle.
+		p := guard+way*u-{0, sag*4*u*(1-u)}
+		size := f32(2) if k%2 == 0 else 1
+		color := rl.Color{60, 240, 255, 255} if k%3 == 1 else steel
+		c := px(p, w, h)
+		rl.DrawRectangleV({c.x-size*0.5, c.y-size*0.5}, {size+1, size+1}, color)
+	}
+	// The hook: a magenta claw of three prongs opening the way it flew, its eye cyan.
+	dir := way/length
+	side := [2]f32{-dir.y, dir.x}
+	end := px(hook, w, h)
+	for prong in ([3]f32{-1, 0, 1}) {
+		out := dir*0.025+side*prong*0.018
+		back := dir*0.012-side*prong*0.012
+		rl.DrawLineEx(end, px(hook+out, w, h), 2, {255, 64, 206, 255})
+		rl.DrawLineEx(px(hook+out, w, h), px(hook+out-back, w, h), 2, {255, 64, 206, 255})
+	}
+	rl.DrawRectangleV({end.x-1, end.y-1}, {3, 3}, {60, 240, 255, 255})
 }
 
 // The blood of the last cut, `since` seconds on: how long its streak is (a
