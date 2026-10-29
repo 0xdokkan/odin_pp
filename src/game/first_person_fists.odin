@@ -82,6 +82,8 @@ First_Person_Fists :: struct {
 	marks: [FISTS_MARKS]First_Person_Mark,
 	random: u64,
 	crits: i32,
+	// The last foe a punch landed on (the board flashes its card).
+	struck: u32,
 }
 
 // What the controller asks of the body this frame: the wished way (east, south;

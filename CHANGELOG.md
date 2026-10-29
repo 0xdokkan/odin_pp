@@ -11,6 +11,9 @@ per i comandi disponibili oggi valgono il [README](README.md) e la documentazion
   **Neon**, che vale anche per spada e arco.
 - I guantoni di First Person Brawler sono Neon: carbonio blu notte, fasce e striscia magenta accese, bordo di luce ciano,
   e più tubi al neon (nocche, dorso, polsino, fasce). Le altre versioni sono tolte.
+- **Impatto dei pugni:** il pugno che colpisce ferma i guantoni per 0,08 s (solo il disegno, le regole vanno avanti),
+  scuote un poco la vista (il doppio al critico) e fa diventare bianco per un istante il disegno del nemico colpito.
+- **Strisce di velocità** su ogni pugno: raggi magenta e ciano intorno alle nocche, scie lungo la curva dei ganci.
 - L'AK resta identico (114 catture su 114 uguali alla Fase 0).
 
 ## 2026-10-29 — Prima persona, Fase 2: critico senza mira e guantoni 3D

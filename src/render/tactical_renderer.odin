@@ -505,6 +505,8 @@ tactical_billboard :: proc(renderer: ^Renderer, key: Sprite_Key, position: view.
 		pose.tint = expedition_enemy_tint(campaign.Biome(renderer.tactical.expedition_biome))
 	}
 	draw_tactical_billboard_quad(renderer, quad, position, opacity*seen, pose.tint, shade)
+	// FIRST PERSON BRAWLER: the struck foe's print flashes white (first_person_fists.odin).
+	if flash := first_person_struck_flash(renderer, entity); flash > 0 { draw_first_person_struck_flash(quad, flash*opacity*seen) }
 }
 
 @(private)

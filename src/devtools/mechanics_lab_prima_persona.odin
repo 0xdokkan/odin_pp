@@ -157,7 +157,16 @@ mechanics_lab_prima_persona :: proc(window: ^app.Window, renderer: ^render.Rende
 			dark(room)
 			if index == 4 { artifacts.screenshot(blow.name) }
 		}
-		for _ in 0..<40 { frame(window, renderer, room, controller, cards, buffer); dark(room) }
+		// The jab landing: the stop, the gloves held and the brute's print white (Fase 3).
+		struck := false
+		for _ in 0..<40 {
+			frame(window, renderer, room, controller, cards, buffer)
+			dark(room)
+			hit := fp.fists_hit_at > 0 && render.first_person_struck_flash(renderer, game.enemy_entity(brute)) >= 1
+			if blow.punch == .Jab && hit && !struck { artifacts.screenshot("odin_pp_mechanics_lab_prima_persona_pugni_colpo.png") }
+			struck = struck || hit
+		}
+		if !struck { fmt.eprintln("mechanics lab: the", blow.punch, "landed with no flash on the brute"); return false }
 		if lost := health-room.enemies[brute_index].health; lost != game.FISTS_PUNCHES[blow.punch].damage {
 			fmt.eprintln("mechanics lab: the", blow.punch, "took", lost, "from the brute"); return false
 		}

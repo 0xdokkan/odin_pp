@@ -113,6 +113,7 @@ fists_land :: proc(room: ^Room, punch: First_Person_Punch, aim: First_Person_Aim
 	if !report.accepted { return false }
 	if critical { fists_mark_struck(room, target.id) }
 	room.first_person.hits += 1
+	room.first_person.fists.struck = target.id
 	append_event_log(room.recent_events, &report.events)
 	collect_loot_in_magnet_range(room)
 	return true

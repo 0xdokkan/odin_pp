@@ -85,6 +85,8 @@ test_punches_land_on_time_with_their_damage :: proc(t: ^testing.T) {
 		punch_run(&room, rules.recover, dt = FISTS_STEP)
 	}
 	testing.expect(t, room.first_person.shots == 3 && room.first_person.hits == 3)
+	// The board knows whom the last one struck (its card flashes).
+	testing.expect_value(t, room.first_person.fists.struck, foe.id)
 	testing.expect(t, room.player.tactical.action_remaining == 0 && room.player.tactical.metrics.decisions == decisions, "a punch took time")
 }
 

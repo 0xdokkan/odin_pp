@@ -333,7 +333,7 @@ first_person_gloves_shown :: proc(renderer: ^Renderer) -> (ready: f32, shown: bo
 draw_first_person_glove_models :: proc(renderer: ^Renderer, kit: ^First_Person_Glove_Kit, ready: f32) {
 	f := &renderer.tactical.first_person
 	now := renderer.sprite_assets.elapsed
-	camera := rl.Camera3D{position = {0, 0, 0}, target = {0, 0, -1}, up = {0, 1, 0}, fovy = FIRST_PERSON_GLOVE_FOV, projection = .PERSPECTIVE}
+	camera := first_person_glove_camera()
 	maps: [12]rl.MaterialMap
 	material := rl.Material{shader = kit.shader, maps = raw_data(maps[:])}
 	rl.BeginMode3D(camera)
@@ -360,6 +360,83 @@ draw_first_person_glove_models :: proc(renderer: ^Renderer, kit: ^First_Person_G
 	rl.EndMode3D()
 }
 
+// The gloves' camera (at the origin, looking down -Z).
+@(private = "file")
+first_person_glove_camera :: proc() -> rl.Camera3D {
+	return {position = {0, 0, 0}, target = {0, 0, -1}, up = {0, 1, 0}, fovy = FIRST_PERSON_GLOVE_FOV, projection = .PERSPECTIVE}
+}
+
+// Speed lines of a punch on its way out (every punch, the user's choice), as a
+// comic draws them, on the small canvas `w` by `h` (stored upside down, as
+// `paper` is read): the glove's front flies at the crosshair, so short rays of
+// magenta and cyan burst round it, away from its arm, longer the faster it
+// goes; a hook also trails three lines along the curve it swept in the last
+// FIRST_PERSON_GLOVE_STREAK_STEPS steps of FIRST_PERSON_GLOVE_STREAK_SECONDS.
+FIRST_PERSON_GLOVE_STREAK_STEPS :: 5
+FIRST_PERSON_GLOVE_STREAK_SECONDS :: f32(0.025)
+FIRST_PERSON_GLOVE_RAYS :: 9
+@(private = "file")
+draw_first_person_glove_streaks :: proc(renderer: ^Renderer, w, h: c.int, ready: f32) {
+	f := &renderer.tactical.first_person
+	punch := f.fists_punch
+	if punch == .None || f.fists_clock > game.FISTS_PUNCHES[punch].land+0.01 { return }
+	u := first_person_glove_reach(punch, f.fists_clock)
+	if u < 0.12 { return }
+	side := 0 if punch == .Jab || punch == .Left_Hook else 1
+	now := renderer.sprite_assets.elapsed
+	camera := first_person_glove_camera()
+	// On the canvas: the glove's front (its knuckles) and its cuff.
+	shown :: proc(camera: rl.Camera3D, point: rl.Vector3, w, h: c.int) -> rl.Vector2 {
+		screen := rl.GetWorldToScreenEx(point, camera, w, h)
+		return {screen.x, f32(h)-screen.y}
+	}
+	ends :: proc(pose: First_Person_Glove_Pose) -> (front, cuff: rl.Vector3) {
+		frame := first_person_glove_frame(pose)
+		front4 := frame*[4]f32{0, 0.004, -0.09, 1}
+		cuff4 := frame*[4]f32{0, -0.004, 0.10, 1}
+		return front4.xyz, cuff4.xyz
+	}
+	pose := first_person_glove_pose(side, punch, f.fists_clock, ready, f.fists_run, now)
+	front3, cuff3 := ends(pose)
+	front, cuff := shown(camera, front3, w, h), shown(camera, cuff3, w, h)
+	// The glove's half width on the canvas at its front's depth.
+	half := 0.058*FIRST_PERSON_GLOVE_SCALE/(max(-front3.z, 0.05)*math.tan(FIRST_PERSON_GLOVE_FOV*math.PI/360))*f32(h)*0.5
+	colors := [2]rl.Color{{255, 64, 206, 255}, {60, 240, 255, 255}}
+	// Faster early on: the reach climbs steepest in the middle of its way out.
+	speed := clamp(1-abs(u-0.5)*1.4, 0.3, 1)
+	arm := cuff-front
+	arm_angle := math.atan2(arm.y, arm.x)
+	for k in 0..<FIRST_PERSON_GLOVE_RAYS {
+		angle := arm_angle+math.PI*0.35+f32(k)*(math.PI*1.3)/f32(FIRST_PERSON_GLOVE_RAYS-1)
+		way := rl.Vector2{math.cos(angle), math.sin(angle)}
+		inner := half*(1.15+0.12*f32(k%2))
+		outer := inner+half*(0.5+0.3*f32((k*7)%3))*speed
+		a, b := front+way*inner, front+way*outer
+		// Two pixels thick, so a ray reads at a glance.
+		rl.DrawLineEx({math.round(a.x), math.round(a.y)}, {math.round(b.x), math.round(b.y)}, 2, colors[k%2])
+	}
+	if punch != .Left_Hook && punch != .Right_Hook { return }
+	points: [FIRST_PERSON_GLOVE_STREAK_STEPS]rl.Vector2
+	for &point, k in points {
+		clock := max(0, f.fists_clock-f32(k)*FIRST_PERSON_GLOVE_STREAK_SECONDS)
+		earlier, _ := ends(first_person_glove_pose(side, punch, clock, ready, f.fists_run, now))
+		point = shown(camera, earlier, w, h)
+	}
+	for lane in 0..<3 {
+		offset := f32(lane-1)*half*0.7
+		for k in 0..<FIRST_PERSON_GLOVE_STREAK_STEPS-1 {
+			// The outer lanes a step shorter, so the lines taper.
+			if lane != 1 && k == FIRST_PERSON_GLOVE_STREAK_STEPS-2 { continue }
+			a, b := points[k], points[k+1]
+			way := b-a
+			length := math.sqrt(way.x*way.x+way.y*way.y)
+			if length < 0.5 { continue }
+			across := rl.Vector2{-way.y, way.x}/length*offset
+			rl.DrawLineV({math.round(a.x+across.x), math.round(a.y+across.y)}, {math.round(b.x+across.x), math.round(b.y+across.y)}, colors[lane%2])
+		}
+	}
+}
+
 // Between the board and the HUD, no target bound (end_tactical_surface): the
 // model on the small canvas, then the card cut from it.
 @(private)
@@ -379,6 +456,8 @@ prepare_first_person_gloves :: proc(renderer: ^Renderer) {
 	rl.EndTextureMode()
 	rl.BeginTextureMode(kit.paper)
 	rl.ClearBackground(rl.BLANK)
+	// The speed lines first: the card's gloves and paper cover them where they lie.
+	draw_first_person_glove_streaks(renderer, w, h, ready)
 	texel := [2]f32{1/f32(w), 1/f32(h)}
 	rl.SetShaderValue(kit.paper_shader, rl.ShaderLocationIndex(kit.texel_location), &texel, .VEC2)
 	rl.BeginShaderMode(kit.paper_shader)

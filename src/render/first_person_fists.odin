@@ -2,6 +2,7 @@ package render
 
 import "core:math"
 import rl "vendor:raylib"
+import rlgl "vendor:raylib/rlgl"
 import tween "../engine/tween"
 import game "../game"
 
@@ -15,6 +16,17 @@ import game "../game"
 // colour and shape both, read without telling colours apart.
 
 FIRST_PERSON_FISTS_SETTLE :: f64(0.15)
+// A landed punch (the user's choices, Fase 3): the drawing stops FISTS_HITSTOP
+// seconds (the gloves hold, the struck card white), then the gloves catch up
+// with the rules in FISTS_HITSTOP_CATCH; the rules never stop. The look jolts
+// FIRST_PERSON_PUNCH_JOLT radians at most, twice that on a critical, fading in
+// FIRST_PERSON_PUNCH_JOLT_SECONDS; a miss does nothing. The struck card's
+// print goes white for the stop and fades in FIRST_PERSON_STRUCK_FADE.
+FIRST_PERSON_HITSTOP :: f32(0.08)
+FIRST_PERSON_HITSTOP_CATCH :: f32(0.12)
+FIRST_PERSON_PUNCH_JOLT :: f32(0.008)
+FIRST_PERSON_PUNCH_JOLT_SECONDS :: f32(0.16)
+FIRST_PERSON_STRUCK_FADE :: f32(0.06)
 // The eye a little behind the body (a foe at a punch's reach stays whole in
 // view, its body's marks within the pitch's limit), never into a solid cell;
 // and a wider view than the AK's.
@@ -62,8 +74,65 @@ follow_first_person_fists :: proc(renderer: ^Renderer, room: ^game.Room) {
 	fists := &room.first_person.fists
 	f.fists_body = fists.body
 	f.fists_lift = (fists.feet-f32(game.cell_height(room, room.player.position)))*game.HEIGHT_STEP_DRAWN
-	f.fists_punch, f.fists_clock = fists.punch, fists.punch_clock
+	now := renderer.sprite_assets.elapsed
+	// A punch landed since the last frame (the view's counts start over with
+	// each view, and the first frame of one only takes them).
+	hits := room.first_person.hits
+	if f.engaged && hits > f.fists_hits_seen && f.fists_hits_seen >= 0 {
+		f.fists_hit_at, f.fists_hit_crit, f.fists_struck = now, fists.crits > f.fists_crits_seen, fists.struck
+	}
+	f.fists_hits_seen, f.fists_crits_seen = hits, fists.crits
+	since := f32(now-f.fists_hit_at) if f.fists_hit_at > 0 else max(f32)
+	f.fists_punch, f.fists_clock = fists.punch, first_person_glove_display_clock(fists.punch_clock, since)
 	f.fists_run = clamp(math.sqrt(fists.velocity.x*fists.velocity.x+fists.velocity.y*fists.velocity.y)/game.FISTS_SPEED, 0, 1)
+}
+
+// The clock the gloves are drawn at, `since` seconds after the last landed
+// punch: held for the stop, then catching up with the rules' `clock`.
+first_person_glove_display_clock :: proc(clock, since: f32) -> f32 {
+	if since < 0 || since >= FIRST_PERSON_HITSTOP+FIRST_PERSON_HITSTOP_CATCH { return clock }
+	lag := since if since < FIRST_PERSON_HITSTOP else FIRST_PERSON_HITSTOP*(1-(since-FIRST_PERSON_HITSTOP)/FIRST_PERSON_HITSTOP_CATCH)
+	return max(0, clock-lag)
+}
+
+// How far the look is jolted `since` seconds after a landed punch (radians at most).
+first_person_punch_shake :: proc(since: f32, critical: bool) -> f32 {
+	if since < 0 || since >= FIRST_PERSON_PUNCH_JOLT_SECONDS { return 0 }
+	fade := 1-since/FIRST_PERSON_PUNCH_JOLT_SECONDS
+	return FIRST_PERSON_PUNCH_JOLT*(2 if critical else 1)*fade*fade
+}
+
+// How white the struck foe's print is now (0..1).
+first_person_struck_flash :: proc(renderer: ^Renderer, entity: game.Entity_Ref) -> f32 {
+	f := &renderer.tactical.first_person
+	if f.weapon != .Fists || f.amount <= 0 || f.fists_hit_at <= 0 || entity != game.enemy_entity(f.fists_struck) { return 0 }
+	since := f32(renderer.sprite_assets.elapsed-f.fists_hit_at)
+	if since < 0 { return 0 }
+	if since < FIRST_PERSON_HITSTOP { return 1 }
+	return clamp(1-(since-FIRST_PERSON_HITSTOP)/FIRST_PERSON_STRUCK_FADE, 0, 1)
+}
+
+// The struck print over itself, added three times: its colours go white, its
+// ink stays dark.
+@(private)
+draw_first_person_struck_flash :: proc(quad: Tactical_Billboard, flash: f32) {
+	if quad.texture.id == 0 || flash <= 0 { return }
+	uv := [4]rl.Vector2{{0, 0}, {0, 1}, {1, 1}, {1, 0}}
+	if quad.mirror { uv = {{1, 0}, {1, 1}, {0, 1}, {0, 0}} }
+	rl.BeginBlendMode(.ADDITIVE)
+	for _ in 0..<3 {
+		rlgl.SetTexture(quad.texture.id)
+		rlgl.Begin(rlgl.QUADS)
+		rlgl.Color4ub(255, 255, 255, u8(clamp(flash, 0, 1)*255))
+		for point, index in quad.points {
+			rlgl.TexCoord2f((quad.source.x+uv[index].x*quad.source.width)/f32(quad.texture.width),
+				(quad.source.y+uv[index].y*quad.source.height)/f32(quad.texture.height))
+			rlgl.Vertex3f(point.x, point.y, point.z)
+		}
+		rlgl.End()
+	}
+	rlgl.SetTexture(0)
+	rl.EndBlendMode()
 }
 
 // How far out a glove is, 0 at rest .. 1 landed: out over the punch's `land`

@@ -2506,6 +2506,41 @@ ogni pugno** (non la mia raccomandazione, che era solo cross e ganci); scossa
 fa **solo il lampo** bianco del cartoncino (non la mia raccomandazione, che era
 lampo e spinta). Il fermo del solo disegno per 0,08 s era già deciso.
 
+**Passo 3 — pugni animati, impatto e strisce: fatto** (2026-10-29).
+Riferimenti: Sakurai spiega il fermo all'impatto (hitstop) come il modo di dare
+peso al colpo, e avverte che fermarsi a ogni colpo rallenta il gioco quando i
+colpi sono tanti ([Source Gaming](https://sourcegaming.info/2015/11/11/thoughts-on-hitstop-sakurais-famitsu-column-vol-490-1/));
+uno studio sui giochi d'azione 3D trova il fermo migliore fra 0,1 e 0,2 s
+([IEICE](https://ken.ieice.org/ken/paper/20230315OCSt/eng/)), ma con tanti pugni
+al secondo resta 0,08 s; la scossa della vista viene dal discorso di Squirrel
+Eiserloh sulle telecamere ([GDC](https://www.gamedeveloper.com/programming/video-sprucing-up-cameras-with-math)).
+- **Fermo del solo disegno** (`src/render/first_person_fists.odin`): quando un
+  pugno prende un nemico, i guantoni restano fermi 0,08 s, poi in 0,12 s
+  riprendono il passo delle regole, che non si fermano mai.
+- **Scossa:** la vista ruota un poco (al massimo 0,008 radianti, circa mezzo
+  grado; il doppio al critico) e si calma in 0,16 s; un pugno a vuoto non
+  scuote.
+- **Lampo:** il disegno del nemico colpito diventa bianco per il fermo (la sua
+  stampa ridisegnata sopra di sé tre volte, in somma di colori: i colori vanno
+  al bianco, l'inchiostro resta scuro), poi sfuma in 0,06 s. Le regole ora
+  ricordano solo **chi** ha preso l'ultimo pugno (`First_Person_Fists.struck`).
+- **Strisce di velocità su ogni pugno**, sulla tela piccola dei guantoni: il
+  guantone va verso il mirino, cioè dentro lo schermo, quindi le strisce lungo
+  la sua strada finirebbero dietro il braccio; come nei fumetti, intorno alle
+  nocche si aprono raggi corti magenta e ciano, lontano dal braccio e più lunghi
+  quando il pugno è più veloce; i ganci lasciano anche tre scie lungo la curva.
+  Prima prova: strisce lungo la strada, nascoste dal braccio nel jab; poi raggi
+  di un pixel, troppo sottili: ora sono di due.
+- L'atto `prima_persona` cattura anche il jab che prende il bruto
+  (`_pugni_colpo.png`: guantone fermo, bruto bianco) e controlla che ogni pugno
+  andato a segno faccia il lampo.
+- Test nuovi: il fermo e la ripresa dei guantoni, la scossa (doppia al
+  critico, si calma), il lampo solo sul nemico colpito e solo con i pugni; il
+  test dei pugni controlla chi è stato colpito.
+- **Verifiche:** `check.ps1` completo, **1783 test verdi** con e senza assert
+  (uno nuovo); atto `fps` **114 su 114** uguale alla Fase 0; atto
+  `prima_persona` (11 catture) uguale in due giri. Catture guardate.
+
 ## 13. Fase 4 — Spada: swing col mouse, parata, rampino; prototipo
 
 ### Obiettivo

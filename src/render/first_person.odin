@@ -173,6 +173,12 @@ First_Person_View :: struct {
 	// (first_person_gloves.odin draws the gloves from them).
 	fists_punch: game.First_Person_Punch,
 	fists_clock, fists_run: f32,
+	// The fists' landed punches and criticals seen so far; the last landed one:
+	// when (sprite clock), whether a critical, on whom (first_person_fists.odin).
+	fists_hits_seen, fists_crits_seen: i32,
+	fists_hit_at: f64,
+	fists_hit_crit: bool,
+	fists_struck: u32,
 	// The eye and its cell, as this frame's camera puts them, and the foes'
 	// cards where this frame shows them: what a shot sees (first_person_aim).
 	eye: rl.Vector3,
@@ -335,6 +341,13 @@ frame_first_person_camera :: proc(renderer: ^Renderer, room: ^game.Room) {
 		pitch := pitch0+(f.pitch-pitch0)*s
 		look := rl.Vector3{math.cos(yaw)*math.cos(pitch), math.sin(pitch), math.sin(yaw)*math.cos(pitch)}
 		position := orbit.position+(f.eye-orbit.position)*s
+		// A landed punch jolts the look a moment (first_person_fists.odin).
+		if f.weapon == .Fists && f.fists_hit_at > 0 {
+			jolt := first_person_punch_shake(f32(now-f.fists_hit_at), f.fists_hit_crit)*s
+			yaw += jolt*f32(math.sin(now*61.3))
+			pitch += jolt*f32(math.sin(now*47.9+0.7))
+			look = {math.cos(yaw)*math.cos(pitch), math.sin(pitch), math.sin(yaw)*math.cos(pitch)}
+		}
 		// A wound shakes the eye a moment.
 		if trauma := first_person_trauma(f, now); trauma > 0 {
 			right := rl.Vector3Normalize(rl.Vector3CrossProduct(look, {0, 1, 0}))

@@ -98,3 +98,35 @@ test_first_person_gloves_guard_and_punches :: proc(t: ^testing.T) {
 	// Coming in, the guard rises from under the view.
 	testing.expect(t, first_person_glove_pose(0, .None, 0, 0, 0, 0).at.y < left.at.y-0.2)
 }
+
+// A landed punch (Fase 3): the gloves hold for the stop, then catch up with the
+// rules; the look jolts, twice as hard on a critical, and settles; only the
+// struck foe's print goes white, for the stop, then fades.
+@(test)
+test_first_person_punch_impact :: proc(t: ^testing.T) {
+	testing.expect_value(t, first_person_glove_display_clock(0.2, 0.03), f32(0.2)-0.03)
+	testing.expect_value(t, first_person_glove_display_clock(0.2, FIRST_PERSON_HITSTOP), f32(0.2)-FIRST_PERSON_HITSTOP)
+	caught := first_person_glove_display_clock(0.3, FIRST_PERSON_HITSTOP+FIRST_PERSON_HITSTOP_CATCH*0.5)
+	testing.expect(t, caught > 0.3-FIRST_PERSON_HITSTOP && caught < 0.3, "the gloves did not catch up")
+	testing.expect_value(t, first_person_glove_display_clock(0.3, 1), f32(0.3))
+	testing.expect_value(t, first_person_glove_display_clock(0.01, 0.05), f32(0))
+	testing.expect_value(t, first_person_punch_shake(0, false), FIRST_PERSON_PUNCH_JOLT)
+	testing.expect_value(t, first_person_punch_shake(0, true), FIRST_PERSON_PUNCH_JOLT*2)
+	testing.expect(t, first_person_punch_shake(0.08, true) < first_person_punch_shake(0.02, true), "the jolt does not settle")
+	testing.expect_value(t, first_person_punch_shake(FIRST_PERSON_PUNCH_JOLT_SECONDS, true), f32(0))
+	renderer := new(Renderer)
+	defer free(renderer)
+	f := &renderer.tactical.first_person
+	f.weapon, f.amount, f.fists_struck, f.fists_hit_at = .Fists, 1, 7, 10
+	renderer.sprite_assets.elapsed = 10.05
+	testing.expect_value(t, first_person_struck_flash(renderer, game.enemy_entity(7)), f32(1))
+	testing.expect_value(t, first_person_struck_flash(renderer, game.enemy_entity(8)), f32(0))
+	renderer.sprite_assets.elapsed = 10+f64(FIRST_PERSON_HITSTOP+FIRST_PERSON_STRUCK_FADE*0.5)
+	flash := first_person_struck_flash(renderer, game.enemy_entity(7))
+	testing.expect(t, flash > 0.4 && flash < 0.6, "the flash does not fade")
+	renderer.sprite_assets.elapsed = 11
+	testing.expect_value(t, first_person_struck_flash(renderer, game.enemy_entity(7)), f32(0))
+	f.weapon = .AK
+	renderer.sprite_assets.elapsed = 10.05
+	testing.expect_value(t, first_person_struck_flash(renderer, game.enemy_entity(7)), f32(0))
+}
