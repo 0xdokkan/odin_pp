@@ -18,6 +18,8 @@ per i comandi disponibili oggi valgono il [README](README.md) e la documentazion
 - **Dopo la prova:** niente più attesa fra un taglio e l'altro (minimo un quinto di schermo di strada, anche al ritorno),
   affondo con un passo durante lo swing, colpo roteante girando con `Q`/`E`; al colpo striscia di sangue con le gocce,
   lampo bianco, fermo della lama e scossa.
+- **Tagli di lato:** il bersaglio della lama è il corpo (vita, petto, testa e spalle) e non più un punto solo sul petto:
+  i tagli orizzontali appena sotto il petto andavano a vuoto nove volte su dieci.
 - L'AK resta identico (114 catture su 114 uguali alla Fase 0).
 
 ## 2026-10-29 — Prima persona, Fase 3 fatta: aspetto e suoni dei pugni

@@ -13,11 +13,12 @@ import grid "../engine/grid"
 // faster than SWORD_SWING_START heights a second, and the damage comes from how
 // it moved (sword_strike_damage: speed, breadth, a clean line, where on the
 // blade it cuts, which way). The blade cuts a foe when it sweeps across his
-// chest as the view shows it (the marks' point on his card): a foe a cell away
-// fills the screen's middle, so the blade lying over his card is no cut, its
-// passing through him is, where along the blade it passes saying `u`. Only a
+// body as the view shows it (his spine from the waist to the head, and across
+// his shoulders: SWORD_BODY_POINTS): a foe a cell away fills the screen's
+// middle, so the blade lying over his card is no cut, its passing through him
+// is, where along the blade it passes saying `u`. Only a
 // foe in the cell in front of him, or the two diagonals in front too for a
-// sideways cut, and in sight (the AK's trace to his chest). No pause between
+// sideways cut, and in sight (the AK's trace to him). No pause between
 // cuts (the user's choice after trying it): every pass across a chest cuts,
 // back and forth, once the point has gone SWORD_MIN_CUT since the swing began
 // or since its last cut, and its breadth counts from there, so a twitch does
@@ -259,51 +260,69 @@ sword_reaches :: proc(room: ^Room, facing: Move_Direction, kind: Sword_Kind, cel
 	return cell == add_position(add_position(p, d), side) || cell == add_position(add_position(p, d), {x = -side.x, y = -side.y})
 }
 
-// Where `enemy`'s chest is on the screen (heights) as the view along `facing`
-// shows it from `aim`'s eye (his card where the board drew it, as for a shot).
-sword_chest_on_screen :: proc(room: ^Room, aim: First_Person_Aim, facing: Move_Direction, enemy: Enemy) -> (at: [2]f32, ok: bool) {
+// Where a point of `enemy`'s card is on the screen (heights) as the view along
+// `facing` shows it from `aim`'s eye (his card where the board drew it, as for
+// a shot): `height` up his outline (a part of its top), `across` to his card's
+// right (a part of its half width there).
+sword_body_on_screen :: proc(room: ^Room, aim: First_Person_Aim, facing: Move_Direction, enemy: Enemy, height: f32, across := f32(0)) -> (at: [2]f32, ok: bool) {
 	eye := first_person_eye(room, room.player.position, aim)
 	card, lift := first_person_card(enemy, aim)
 	yaw := first_person_yaw(facing)
 	forward := [2]f32{math.cos(yaw), math.sin(yaw)}
 	right := [2]f32{-forward.y, forward.x}
-	rel := card-eye
+	top := first_person_outline_top(enemy.archetype)
+	rel := card+right*(across*first_person_outline_half_width(enemy.archetype, top*height))-eye
 	ahead := rel.x*forward.x+rel.y*forward.y
 	if ahead <= 0.05 { return }
 	side := rel.x*right.x+rel.y*right.y
 	eye_y := FIRST_PERSON_EYE_HEIGHT+f32(cell_height(room, room.player.position))*HEIGHT_STEP_DRAWN
-	chest := f32(cell_height(room, enemy.position))*HEIGHT_STEP_DRAWN+lift+first_person_outline_top(enemy.archetype)*SWORD_CHEST_HEIGHT
+	point := f32(cell_height(room, enemy.position))*HEIGHT_STEP_DRAWN+lift+top*height
 	half := f32(math.tan(f64(SWORD_FOV)*math.PI/360))*2
-	return {side/ahead/half, (chest-eye_y)/ahead/half}, true
+	return {side/ahead/half, (point-eye_y)/ahead/half}, true
 }
 
+// Where `enemy`'s chest is on the screen (heights): the marks' point on his card.
+sword_chest_on_screen :: proc(room: ^Room, aim: First_Person_Aim, facing: Move_Direction, enemy: Enemy) -> (at: [2]f32, ok: bool) {
+	return sword_body_on_screen(room, aim, facing, enemy, SWORD_CHEST_HEIGHT)
+}
+
+// The points of a foe's body the blade can cut through, as a part of his
+// outline's top and of its half width: his chest first, then his spine from
+// the waist to the head and across his shoulders (the user found a sideways
+// cut a little under the chest went by him: one point was too thin a mark).
+@(rodata)
+SWORD_BODY_POINTS := [?][2]f32{{SWORD_CHEST_HEIGHT, 0}, {0.45, 0}, {0.75, 0}, {0.3, 0}, {0.88, 0},
+	{SWORD_CHEST_HEIGHT, -0.5}, {SWORD_CHEST_HEIGHT, 0.5}}
+
 // The foe the blade cuts as it moves from `before` to `at` (the point on the
-// screen), if one: a foe in reach and in sight whose chest the blade has swept
-// across, where along the blade, and where his chest is.
+// screen), if one: a foe in reach and in sight a point of whose body
+// (SWORD_BODY_POINTS) the blade has swept across, where along the blade, and
+// where that point is.
 @(private = "file")
 sword_contact :: proc(room: ^Room, aim: First_Person_Aim, before, at: [2]f32, kind: Sword_Kind) -> (target: Entity_Ref, u: f32, chest: [2]f32, found: bool) {
 	s := &room.first_person.sword
 	hilt := SWORD_HILT
 	cross :: proc(a, b: [2]f32) -> f32 { return a.x*b.y-a.y*b.x }
+	blade := at-hilt
+	reach := blade.x*blade.x+blade.y*blade.y
+	if reach <= 0 { return }
 	for enemy in room.enemies {
 		if enemy_is_out_of_play(room, enemy.id) || !sword_reaches(room, s.facing, kind, enemy.position) { continue }
 		struck := false
 		for id in s.swing.struck[:s.swing.struck_count] { struck = struck || id == enemy.id }
 		if struck { continue }
-		seen: bool
-		chest, seen = sword_chest_on_screen(room, aim, s.facing, enemy)
-		if !seen { continue }
-		was, now := cross(before-hilt, chest-hilt), cross(at-hilt, chest-hilt)
-		if (was > 0) == (now > 0) && now != 0 { continue }
-		blade := at-hilt
-		reach := blade.x*blade.x+blade.y*blade.y
-		if reach <= 0 { continue }
-		along := ((chest.x-hilt.x)*blade.x+(chest.y-hilt.y)*blade.y)/reach
-		if along < 0 || along > 1+SWORD_POINT_SLACK { continue }
-		// In sight: the view's trace to his chest meets him first.
-		shot := first_person_trace(room, room.player.position, sword_aim_through(aim, s.facing, chest))
-		if shot.hit != .Foe || shot.target != enemy_entity(enemy.id) { continue }
-		return enemy_entity(enemy.id), min(along, 1), chest, true
+		for body in SWORD_BODY_POINTS {
+			point, seen := sword_body_on_screen(room, aim, s.facing, enemy, body[0], body[1])
+			if !seen { continue }
+			was, now := cross(before-hilt, point-hilt), cross(at-hilt, point-hilt)
+			if (was > 0) == (now > 0) && now != 0 { continue }
+			along := ((point.x-hilt.x)*blade.x+(point.y-hilt.y)*blade.y)/reach
+			if along < 0 || along > 1+SWORD_POINT_SLACK { continue }
+			// In sight: the view's trace to that point meets him first.
+			shot := first_person_trace(room, room.player.position, sword_aim_through(aim, s.facing, point))
+			if shot.hit != .Foe || shot.target != enemy_entity(enemy.id) { continue }
+			return enemy_entity(enemy.id), min(along, 1), point, true
+		}
 	}
 	return
 }

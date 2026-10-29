@@ -367,3 +367,28 @@ test_sword_lunge_and_spin :: proc(t: ^testing.T) {
 	testing.expect(t, s.facing == .South, "E did not turn him")
 	testing.expectf(t, s.last.spin && spin_health-foe.health > plain, "the spin cut %d, a plain one %d (last %v)", spin_health-foe.health, plain, s.last)
 }
+
+// A sideways cut low across the foe (under his chest, at his waist) or high
+// (at his shoulders) cuts him too: the blade cuts his body, not one point (the
+// user found nine sideways cuts in ten going by).
+@(test)
+test_sword_sideways_cuts_at_any_height :: proc(t: ^testing.T) {
+	for height in ([4]f32{0.35, 0.5, 0.7, 0.85}) {
+		data: level.Level
+		player: Player
+		spawns := [?]Enemy_Spawn{{position = {x = 7, y = 6}, health = 200, attack = 1}}
+		room := sword_room(t, &data, &player, spawns[:])
+		foe := &room.enemies[0]
+		point, _ := sword_body_on_screen(&room, {}, .East, foe^, height)
+		// The point's height on the screen, crossing him left to right and back.
+		y := SWORD_HILT.y+(point.y-SWORD_HILT.y)/0.8
+		health := foe.health
+		sword_gesture(&room, {-0.8, y}, {0.6, y}, 0.25, 60)
+		testing.expectf(t, foe.health < health, "a sideways cut at %v of his height (tip at %v) went by", height, y)
+		health = foe.health
+		sword_gesture(&room, {0.6, y}, {-0.8, y}, 0.25, 60)
+		testing.expectf(t, foe.health < health, "the cut back at %v of his height went by", height)
+		destroy_room(&room)
+		level.destroy(&data)
+	}
+}

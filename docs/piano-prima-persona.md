@@ -2923,6 +2923,18 @@ una **striscia di sangue con le gocce** (consigliato).
   fermo); atto `fps` **114 su 114** uguale alla Fase 0; atto `prima_persona`
   uguale in due giri.
 
+**Seconda prova dell'utente: i tagli di lato andavano a vuoto.** I fendenti
+tagliavano, i tagli orizzontali mancavano il nemico nove volte su dieci. Non era
+un tempo di ricarica ma la regola del contatto: il bersaglio era **un punto solo**,
+il petto. Un taglio verticale ci passa quasi sempre sopra; uno orizzontale, con
+la punta appena sotto il petto, passava sotto il punto e non toccava il nemico.
+Ora il bersaglio è **il corpo** (`SWORD_BODY_POINTS`): il petto, la colonna
+dalla vita alla testa e le spalle; la lama taglia il primo di questi punti che
+attraversa, e `u` (il punto della lama) è dove lo attraversa. Test: un taglio di
+lato alla vita, al petto, sotto e sopra le spalle, all'andata e al ritorno,
+taglia sempre. Il taglio dell'atto `prima_persona` sul bruto ora prende prima la
+spalla vicina: meno corsa, 2 di danno invece di 4.
+
 
 ## 14. Fase 5 — Spada: lama, scie, scintille, suoni
 

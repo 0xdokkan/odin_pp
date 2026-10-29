@@ -865,7 +865,7 @@ per 20 secondi del mondo (+2 a potenziamento). Piano e scelte in
 vista di un quarto, `Shift` con una direzione schiva. **Il mouse muove la
 lama**, non la vista: la punta corre sullo schermo dentro un'ellisse,
 dall'impugnatura in basso. Con il sinistro tenuto, uno swing parte quando la
-punta va veloce, e il colpo arriva quando la lama **passa sopra il petto** di un
+punta va veloce, e il colpo arriva quando la lama **passa sopra il corpo** (dalla vita alla testa, o sulle spalle) di un
 nemico nella casella davanti (o, con un colpo di lato, anche nelle due diagonali
 davanti). Il danno, fino a 11, viene da come si muove: veloce, ampio (partire da
 un lato e tagliare attraverso), dritto (agitare il mouse dimezza), preso a tre
