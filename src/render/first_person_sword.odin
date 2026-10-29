@@ -63,9 +63,9 @@ First_Person_Sword_View :: struct {
 	length: f32,
 	// A spinning swing (its trail magenta), a lunging one.
 	spin, lunge: bool,
-	// The last cut and the counts of cuts, parries and grapples seen.
+	// The last cut and the counts of swings, cuts, parries and grapples seen.
 	last: game.Sword_Strike,
-	strikes, parries, perfect_parries, grapples: i32,
+	swings, strikes, parries, perfect_parries, grapples: i32,
 	// The point's last places while swinging (newest last), when the
 	// swing ended and when the last cut landed (sprite clock).
 	trail: [FIRST_PERSON_SWORD_TRAIL]First_Person_Sword_Sample,
@@ -108,7 +108,7 @@ follow_first_person_sword :: proc(renderer: ^Renderer, room: ^game.Room) {
 	v.tip, v.speed, v.swinging, v.start, v.length, v.last = s.tip, s.speed, s.swing.active, s.swing.start, s.swing.length, s.last
 	v.spin, v.lunge = s.swing.spin, s.swing.lunge
 	v.guard, v.guard_age = s.guard, s.guard_age
-	v.strikes, v.parries, v.perfect_parries, v.grapples = s.strikes, s.parries, s.perfect_parries, s.grapples
+	v.swings, v.strikes, v.parries, v.perfect_parries, v.grapples = s.swings, s.strikes, s.parries, s.perfect_parries, s.grapples
 	first_person_sword_keep_trail(v, now)
 	// The view turns toward the rules' facing, a quarter in FIRST_PERSON_SWORD_TURN, level.
 	if !f.engaged { return }

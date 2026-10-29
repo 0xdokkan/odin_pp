@@ -68,6 +68,26 @@ LAB_FISTS_HIT := [game.First_Person_Punch]audio.Lab_Sfx{.None = .World_Fists_Hit
 LAB_FISTS_WHOOSH_PITCH := [game.First_Person_Punch]f32{.None = 1, .Jab = 1.15, .Cross = 1, .Left_Hook = 0.85, .Right_Hook = 0.85}
 @(rodata)
 LAB_FISTS_MARK_PITCH := [4]f32{0.85, 1, 1.12, 1.26}
+// FIRST PERSON FENCER (first_person_sword.odin): the zweihänder drawn at the
+// dive, a swing's air (higher the faster it starts), a cut (heavy for a
+// fendente or a strong one), a parry's clang or a perfect one's ring, the
+// grapple's chain out and its yank as the hook catches.
+LAB_SWORD_DRAW :: audio.Lab_Sfx.Pilgrim_Sword_Draw
+LAB_SWORD_WHOOSH :: audio.Lab_Sfx.Pilgrim_Sword_Whoosh
+LAB_SWORD_CUT :: audio.Lab_Sfx.World_Sword_Cut
+LAB_SWORD_CUT_HEAVY :: audio.Lab_Sfx.World_Sword_Cut_Heavy
+LAB_SWORD_PARRY :: audio.Lab_Sfx.World_Sword_Parry
+LAB_SWORD_PARRY_PERFECT :: audio.Lab_Sfx.World_Sword_Parry_Perfect
+LAB_SWORD_CHAIN_THROW :: audio.Lab_Sfx.World_Sword_Chain_Throw
+LAB_SWORD_CHAIN_YANK :: audio.Lab_Sfx.World_Sword_Chain_Yank
+// A cut this strong or more sounds heavy.
+LAB_SWORD_HEAVY_DAMAGE :: i32(6)
+
+// A swing's air at `speed` (screen heights a second as it starts): the
+// centre of the blade's noise follows its speed.
+lab_sword_whoosh_pitch :: proc(speed: f32) -> f32 {
+	return clamp(0.8+0.12*speed, 0.8, 1.35)
+}
 
 Lab_Sound :: struct {
 	sfx: audio.Lab_Sfx,
@@ -118,6 +138,8 @@ Lab_Sounds :: struct {
 	first_person_shots, first_person_hits, first_person_ricochets, first_person_exits: int,
 	// FIRST PERSON BRAWLER as last heard: punches thrown, landed, marks lit.
 	fists_thrown, fists_landed, fists_marks_lit: int,
+	// FIRST PERSON FENCER as last heard: swings, cuts, parries, grapples.
+	sword_swings, sword_strikes, sword_parries, sword_grapples: i32,
 	// What the lab has played so far (smoke and tests).
 	played: [audio.Lab_Sfx]int,
 }
@@ -135,7 +157,8 @@ lab_sounds_reset :: proc(renderer: ^Renderer) {
 	renderer.tactical.lab_sounds^ = {played = played, lasso_whirrs = lasso.whirrs, lasso_releases = lasso.releases,
 		pinball_strikes = renderer.tactical.pinball.strikes,
 		first_person_shots = fp.shots, first_person_hits = fp.hits, first_person_ricochets = fp.ricochets,
-		first_person_exits = fp.exits, fists_thrown = fp.fists_thrown, fists_landed = fp.fists_landed, fists_marks_lit = fp.fists_marks_lit}
+		first_person_exits = fp.exits, fists_thrown = fp.fists_thrown, fists_landed = fp.fists_landed, fists_marks_lit = fp.fists_marks_lit,
+		sword_swings = fp.sword.swings, sword_strikes = fp.sword.strikes, sword_parries = fp.sword.parries, sword_grapples = fp.sword.grapples}
 }
 
 // The bong's pitch for a foe struck at `value`, the card's being `base`.
@@ -433,6 +456,8 @@ lab_cue_sounds :: proc(renderer: ^Renderer, s: ^Lab_Sounds, cue: ^Presentation_C
 		lab_sound_queue(s, LAB_FIRST_PERSON_ENTER, now)
 		// The fists' ring: its bell as the gloves come up.
 		if renderer.tactical.first_person.weapon == .Fists { lab_sound_queue(s, LAB_FISTS_BELL, now+0.1) }
+		// The sword drawn as it comes up.
+		if renderer.tactical.first_person.weapon == .Sword { lab_sound_queue(s, LAB_SWORD_DRAW, now+0.1) }
 	// BOMB MARLEY (marley.odin): the ball coming down, the lights turning, a
 	// column warned, the bomb's whistle and its blast at the far end, a
 	// character saved, the seconds earned, the end; and a groove on the
@@ -614,6 +639,27 @@ update_lab_sounds :: proc(renderer: ^Renderer, room: ^game.Room, now: f64) {
 	if fp.fists_marks_lit != s.fists_marks_lit {
 		s.fists_marks_lit = fp.fists_marks_lit
 		lab_sound_queue(s, LAB_FISTS_MARK, now, 0.5, 0, LAB_FISTS_MARK_PITCH[clamp(int(fp.fists_lit_zone), 0, 3)])
+	}
+	// FIRST PERSON FENCER: a swing's air as it starts, a cut on the struck
+	// foe's side, a parry, the chain out and its yank as the hook catches.
+	sw := &fp.sword
+	if sw.swings != s.sword_swings {
+		s.sword_swings = sw.swings
+		lab_sound_queue(s, LAB_SWORD_WHOOSH, now, 0.75, 0, lab_sword_whoosh_pitch(sw.speed))
+	}
+	if sw.strikes != s.sword_strikes {
+		s.sword_strikes = sw.strikes
+		heavy := sw.last.kind == .Fendente || sw.last.damage >= LAB_SWORD_HEAVY_DAMAGE
+		lab_sound_queue(s, LAB_SWORD_CUT_HEAVY if heavy else LAB_SWORD_CUT, now, 1, lab_sound_pan(renderer, game.enemy_entity(sw.last.enemy_id)))
+	}
+	if sw.parries != s.sword_parries {
+		s.sword_parries = sw.parries
+		lab_sound_queue(s, LAB_SWORD_PARRY_PERFECT if sw.parry_perfect else LAB_SWORD_PARRY, now, 1)
+	}
+	if sw.grapples != s.sword_grapples {
+		s.sword_grapples = sw.grapples
+		lab_sound_queue(s, LAB_SWORD_CHAIN_THROW, now, 0.8)
+		lab_sound_queue(s, LAB_SWORD_CHAIN_YANK, now+FIRST_PERSON_SWORD_HOOK_FLIGHT, 1, lab_sound_pan(renderer, sw.grappled))
 	}
 	// The cues now showing, each once; the cards first, so what they put on
 	// the board knows they already sounded. What was heard is kept on the

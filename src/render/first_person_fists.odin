@@ -3,6 +3,7 @@ package render
 import "core:math"
 import rl "vendor:raylib"
 import rlgl "vendor:raylib/rlgl"
+import audio "../engine/audio"
 import tween "../engine/tween"
 import game "../game"
 
@@ -112,13 +113,23 @@ follow_first_person_fists :: proc(renderer: ^Renderer, room: ^game.Room) {
 }
 
 // The fists' music (tools/audio/music_brawler.py, the user's pick) plays once
-// the gloves are up and the ring's bell has rung: FIRST_PERSON_MUSIC_AFTER
-// seconds into the view, with the fists, in the mechanics lab.
+// the gloves are up and the ring's bell has rung, the sword's
+// (tools/audio/music_fencer.py, a new one, the user's choice) once it is
+// drawn: FIRST_PERSON_MUSIC_AFTER seconds into the view, in the mechanics lab.
 FIRST_PERSON_MUSIC_AFTER :: f64(0.9)
-first_person_music_wanted :: proc(renderer: ^Renderer) -> bool {
-	if renderer == nil || !renderer.tactical.mechanics_lab { return false }
+first_person_music_track :: proc(renderer: ^Renderer) -> audio.Lab_Music {
+	if renderer == nil || !renderer.tactical.mechanics_lab { return .None }
 	f := &renderer.tactical.first_person
-	return f.weapon == .Fists && f.engaged && f.amount >= 1 && renderer.sprite_assets.elapsed-f.changed >= FIRST_PERSON_MUSIC_AFTER
+	if !f.engaged || f.amount < 1 || renderer.sprite_assets.elapsed-f.changed < FIRST_PERSON_MUSIC_AFTER { return .None }
+	#partial switch f.weapon {
+	case .Fists: return .Brawler
+	case .Sword: return .Fencer
+	}
+	return .None
+}
+
+first_person_music_wanted :: proc(renderer: ^Renderer) -> bool {
+	return first_person_music_track(renderer) != .None
 }
 
 // The clock the gloves are drawn at, `since` seconds after the last landed

@@ -132,8 +132,8 @@ roguelike_lab_sounds :: proc(rs: ^Roguelike_Session, hf: ^host.Frame) {
 	}
 	render.play_lab_sounds(&rs.iso_renderer, &rs.lab_bank, bank.sfx_volume)
 	audio.lab_ambience(&rs.lab_bank, rs.run_state.phase == .In_Room, .Amb_Crypt_Loop, bank.sfx_volume)
-	// FIRST PERSON BRAWLER's music, after the ring's bell (render.first_person_music_wanted).
-	audio.lab_music(&rs.lab_bank, render.first_person_music_wanted(&rs.iso_renderer), bank.sfx_volume, hf.dt)
+	// The first person cards' music: the fists' after the ring's bell, the sword's once drawn (render.first_person_music_track).
+	audio.lab_music(&rs.lab_bank, render.first_person_music_track(&rs.iso_renderer), bank.sfx_volume, hf.dt)
 }
 
 roguelike_suspend :: proc(data: rawptr) {

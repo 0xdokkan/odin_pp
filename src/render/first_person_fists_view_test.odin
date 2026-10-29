@@ -2,6 +2,7 @@ package render
 
 import "core:math"
 import "core:testing"
+import audio "../engine/audio"
 import game "../game"
 import level "../level"
 
@@ -247,4 +248,66 @@ test_first_person_sword_words :: proc(t: ^testing.T) {
 	testing.expect_value(t, string(first_person_sword_tag({kind = .Montante, damage = 2})), "MONTANTE 2")
 	testing.expect_value(t, first_person_sword_cut_quality({perfect = true}), f32(1))
 	testing.expect(t, first_person_sword_cut_quality({speed = 0.5, breadth = 0.5, line = 1}) == 0.25)
+}
+
+// The lab hears the sword (Fase 5): drawn at the dive, a swing's air higher the
+// faster it starts, a cut (heavy for a fendente), a parry's clang or a perfect
+// one's ring, the chain out and its yank; its own music once drawn.
+@(test)
+test_first_person_sword_lab_sounds :: proc(t: ^testing.T) {
+	data: level.Level
+	player: game.Player
+	room := first_person_view_test_room(t, &data, &player)
+	defer level.destroy(&data)
+	defer game.destroy_room(&room)
+	snapshot: Room_Presentation
+	renderer := shadow_view_test_renderer(&data, &snapshot)
+	defer free(renderer)
+	defer destroy_renderer_world_playback(renderer)
+	renderer.tactical.mechanics_lab = true
+	renderer.tactical.living_state = new(Living_State)
+	defer free(renderer.tactical.living_state)
+	defer destroy_lab_sounds(renderer)
+	frame :: proc(renderer: ^Renderer, room: ^game.Room, dt: f32) {
+		shadow_view_test_frame(renderer, room, dt)
+		update_lab_sounds(renderer, room, renderer.sprite_assets.elapsed)
+		play_lab_sounds(renderer, nil, 0)
+	}
+	frame(renderer, &room, 0.01)
+	sounds := renderer.tactical.lab_sounds
+	if !testing.expect(t, sounds != nil) { return }
+	testing.expect(t, game.tactical_begin_first_person(&room, 20, .Sword))
+	f := &renderer.tactical.first_person
+	for _ in 0..<60 {
+		frame(renderer, &room, 0.02)
+		if f.amount >= 1 { break }
+	}
+	testing.expect(t, f.engaged && f.amount >= 1)
+	s := &room.first_person.sword
+	before := sounds.played
+	s.swings += 1
+	frame(renderer, &room, 0.02)
+	testing.expect_value(t, sounds.played[LAB_SWORD_WHOOSH]-before[LAB_SWORD_WHOOSH], 1)
+	testing.expect(t, lab_sword_whoosh_pitch(4) > lab_sword_whoosh_pitch(1) && lab_sword_whoosh_pitch(100) <= 1.35)
+	s.strikes += 1
+	s.last = {kind = .Tondo, damage = 2}
+	frame(renderer, &room, 0.02)
+	testing.expect_value(t, sounds.played[LAB_SWORD_CUT]-before[LAB_SWORD_CUT], 1)
+	s.strikes += 1
+	s.last = {kind = .Fendente, damage = 3}
+	frame(renderer, &room, 0.02)
+	testing.expect_value(t, sounds.played[LAB_SWORD_CUT_HEAVY]-before[LAB_SWORD_CUT_HEAVY], 1)
+	s.parries += 1
+	frame(renderer, &room, 0.02)
+	testing.expect_value(t, sounds.played[LAB_SWORD_PARRY]-before[LAB_SWORD_PARRY], 1)
+	s.parries += 1
+	s.perfect_parries += 1
+	frame(renderer, &room, 0.02)
+	testing.expect_value(t, sounds.played[LAB_SWORD_PARRY_PERFECT]-before[LAB_SWORD_PARRY_PERFECT], 1)
+	s.grapples += 1
+	for _ in 0..<12 { frame(renderer, &room, 0.02) }
+	testing.expect_value(t, sounds.played[LAB_SWORD_CHAIN_THROW]-before[LAB_SWORD_CHAIN_THROW], 1)
+	testing.expect_value(t, sounds.played[LAB_SWORD_CHAIN_YANK]-before[LAB_SWORD_CHAIN_YANK], 1)
+	for _ in 0..<60 { frame(renderer, &room, 0.02) }
+	testing.expect_value(t, first_person_music_track(renderer), audio.Lab_Music.Fencer)
 }
