@@ -452,12 +452,16 @@ prepare_first_person_gloves :: proc(renderer: ^Renderer) {
 	if !first_person_glove_canvases(kit, w, h) { return }
 	rl.BeginTextureMode(kit.low)
 	rl.ClearBackground(rl.BLANK)
+	// The marks first, on the board behind the gloves, the star over them; the cut gives them ink and paper too.
+	draw_first_person_marks_pixel(renderer, w, h)
 	draw_first_person_glove_models(renderer, kit, ready)
+	draw_first_person_marks_pixel(renderer, w, h, star = true)
 	rl.EndTextureMode()
 	rl.BeginTextureMode(kit.paper)
 	rl.ClearBackground(rl.BLANK)
-	// The speed lines first: the card's gloves and paper cover them where they lie.
+	// The speed lines and the star's sparks first: the card's gloves and paper cover them where they lie.
 	draw_first_person_glove_streaks(renderer, w, h, ready)
+	draw_first_person_star_sparks(renderer, w, h)
 	texel := [2]f32{1/f32(w), 1/f32(h)}
 	rl.SetShaderValue(kit.paper_shader, rl.ShaderLocationIndex(kit.texel_location), &texel, .VEC2)
 	rl.BeginShaderMode(kit.paper_shader)

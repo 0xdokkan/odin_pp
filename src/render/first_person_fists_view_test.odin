@@ -130,3 +130,19 @@ test_first_person_punch_impact :: proc(t: ^testing.T) {
 	renderer.sprite_assets.elapsed = 10.05
 	testing.expect_value(t, first_person_struck_flash(renderer, game.enemy_entity(7)), f32(0))
 }
+
+// The critical's gold star (Fase 3): it bursts past its size, settles, then
+// shrinks away in half a second, turning; its sparks fly out and are gone.
+@(test)
+test_first_person_critical_star :: proc(t: ^testing.T) {
+	scale, _, sparks := first_person_star(0)
+	testing.expect(t, scale == 0 && sparks == 0)
+	burst, _, _ := first_person_star(0.12)
+	testing.expect(t, burst > 1.2, "the star does not burst")
+	held, turn, _ := first_person_star(0.25)
+	testing.expect(t, held == 1 && turn > 0)
+	late, _, flown := first_person_star(0.45)
+	testing.expect(t, late > 0 && late < 0.5 && flown == 1)
+	gone, _, _ := first_person_star(FIRST_PERSON_STAR_SECONDS)
+	testing.expect_value(t, gone, f32(0))
+}

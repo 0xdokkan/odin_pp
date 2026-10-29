@@ -2548,6 +2548,30 @@ e frecce **accesi come il neon, con inchiostro e bordo di carta**; stella d'oro
 che **esplode e svanisce** in mezzo secondo con qualche scintilla; **colori di
 ora** (gancio sinistro arancio, jab azzurro, cross giallo, gancio destro magenta).
 
+**Passo 4 — segni critici e stella d'oro: fatto** (2026-10-29). Dall'utente,
+il 2026-10-29: niente più stop per andare al passo dopo (sezione 1, regola 2).
+- I segni accesi ora si disegnano sulla **tela piccola dei guantoni**, prima dei
+  guantoni: anello del colore del pugno con un centro più chiaro (acceso come i
+  tubi), dentro la freccia per jab e cross o l'arco per i ganci; il taglio della
+  tela dà loro l'inchiostro e il bordo di carta, come ai guantoni, e un guantone
+  davanti li copre. Lampeggiano nell'ultimo terzo di secondo, come prima. Il
+  punto di ogni segno si calcola una volta per fotogramma, dopo la telecamera
+  (`frame_first_person_marks`); senza la tela piccola restano gli anelli di
+  prima, direttamente sulla vista.
+- **Stella d'oro del critico:** una stella a cinque punte, oro con il centro
+  chiaro, dove era il segno, sopra i guantoni (così l'impatto si vede sul
+  pugno): cresce oltre la sua grandezza in 0,12 s, si assesta, resta, poi si
+  rimpicciolisce fino a sparire a 0,5 s, girando; sette scintille oro e bianche
+  volano fuori e spariscono in 0,4 s.
+- L'atto `prima_persona` cattura la stella sul cross critico
+  (`_pugni_critico.png`) e controlla che ci sia.
+- Test nuovo: i tempi della stella (scoppia, si assesta, sparisce).
+
+**Domande per il passo 5** (risposte dell'utente): icona **guantone Neon**
+lanciato in alto come ora (consigliato); riquadro dei secondi **magenta neon**,
+rosso negli ultimi 3 s (consigliato); nell'ispettore **più comandi**, cioè anche i
+tasti dei pugni (non la mia raccomandazione, che era una riga sui segni).
+
 ## 13. Fase 4 — Spada: swing col mouse, parata, rampino; prototipo
 
 ### Obiettivo

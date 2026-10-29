@@ -184,7 +184,17 @@ mechanics_lab_prima_persona :: proc(window: ^app.Window, renderer: ^render.Rende
 	health := room.enemies[brute_index].health
 	cross := run_session.Tactical_Controller_Input{fire_right = true}
 	for _ in 0..<4 { drive(window, renderer, room, controller, cards, buffer, cross) }
-	for _ in 0..<40 { frame(window, renderer, room, controller, cards, buffer) }
+	// The critical's gold star, caught as it bursts (Fase 3).
+	starred := false
+	for _ in 0..<40 {
+		frame(window, renderer, room, controller, cards, buffer)
+		since := renderer.sprite_assets.elapsed-fp.fists_star_at
+		if !starred && fp.fists_star_at > 0 && fp.fists_star.shown && since >= 0.1 {
+			artifacts.screenshot("odin_pp_mechanics_lab_prima_persona_pugni_critico.png")
+			starred = true
+		}
+	}
+	if !starred { fmt.eprintln("mechanics lab: the critical cross burst no gold star"); return false }
 	if lost := health-room.enemies[brute_index].health; lost != game.FISTS_PUNCHES[.Cross].damage*game.FISTS_CRITICAL_FACTOR ||
 	   room.first_person.fists.crits != 1 {
 		fmt.eprintln("mechanics lab: the cross on its mark took", lost, "and made", room.first_person.fists.crits, "criticals"); return false

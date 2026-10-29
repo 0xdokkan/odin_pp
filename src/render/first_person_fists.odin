@@ -80,6 +80,12 @@ follow_first_person_fists :: proc(renderer: ^Renderer, room: ^game.Room) {
 	hits := room.first_person.hits
 	if f.engaged && hits > f.fists_hits_seen && f.fists_hits_seen >= 0 {
 		f.fists_hit_at, f.fists_hit_crit, f.fists_struck = now, fists.crits > f.fists_crits_seen, fists.struck
+		// A critical: the gold star bursts where its mark was (the struck mark
+		// keeps its zone until the next lights).
+		if f.fists_hit_crit {
+			f.fists_star_at, f.fists_star_enemy, f.fists_star_zone = now, fists.struck, 1
+			for mark in fists.marks { if mark.enemy_id == fists.struck { f.fists_star_zone = mark.zone } }
+		}
 	}
 	f.fists_hits_seen, f.fists_crits_seen = hits, fists.crits
 	since := f32(now-f.fists_hit_at) if f.fists_hit_at > 0 else max(f32)
@@ -145,37 +151,177 @@ first_person_glove_reach :: proc(punch: game.First_Person_Punch, clock: f32) -> 
 	return 1-tween.smoothstep(clamp((clock-rules.land)/back, 0, 1))
 }
 
-// The lit marks on the foes' cards: a ring of the punch's colour on its zone
-// across the card, the punch's path inside; blinking in its last third of a
-// second. Only a help: the punch it asks is a critical anywhere on the foe.
+// A mark (or the star) where the board shows it this frame: the world point on
+// its zone of the foe's card at its chest, its zone, how long it stays lit.
+First_Person_Mark_Point :: struct {
+	point: rl.Vector3,
+	zone: i8,
+	lit: f32,
+	shown: bool,
+}
+
+// The world point of `zone` across `enemy_id`'s card at its chest (as the rules
+// cut the card), where this frame's camera sees it.
+@(private = "file")
+first_person_mark_world :: proc(renderer: ^Renderer, room: ^game.Room, enemy_id: u32, zone: i8) -> (point: rl.Vector3, ok: bool) {
+	f := &renderer.tactical.first_person
+	index, found := game.enemy_index_by_id(room, enemy_id)
+	if !found { return }
+	enemy := room.enemies[index]
+	at := [2]f32{f32(enemy.position.x)+0.5, f32(enemy.position.y)+0.5}
+	lift := f32(0)
+	for card in f.cards[:f.card_count] {
+		if card.enemy_id == enemy.id { at, lift = card.at, card.lift; break }
+	}
+	right := rl.Vector3{-math.sin(f.yaw), 0, math.cos(f.yaw)}
+	across := [4]f32{-0.75, -0.25, 0.25, 0.75}
+	top := game.first_person_outline_top(enemy.archetype)
+	height := top*FIRST_PERSON_MARK_HEIGHT
+	half := game.first_person_outline_half_width(enemy.archetype, height)
+	offset := across[clamp(int(zone), 0, 3)]*half
+	ground := entity_point_ground(game.enemy_entity(enemy.id), {at.x-0.5, at.y-0.5})
+	point = {at.x+right.x*offset, ground+lift+height, at.y+right.z*offset}
+	camera := renderer.tactical.camera
+	look := rl.Vector3Normalize(camera.target-camera.position)
+	return point, rl.Vector3DotProduct(point-camera.position, look) > 0.05
+}
+
+// After this frame's camera (frame_first_person_camera): where the lit marks
+// and the star are.
+@(private)
+frame_first_person_marks :: proc(renderer: ^Renderer, room: ^game.Room) {
+	f := &renderer.tactical.first_person
+	f.fists_marks, f.fists_star = {}, {}
+	if !game.first_person_fists_active(room) { return }
+	for mark, slot in room.first_person.fists.marks {
+		if mark.enemy_id == 0 || mark.lit <= 0 { continue }
+		point, ok := first_person_mark_world(renderer, room, mark.enemy_id, mark.zone)
+		f.fists_marks[slot] = {point = point, zone = mark.zone, lit = mark.lit, shown = ok}
+	}
+	if since := f32(renderer.sprite_assets.elapsed-f.fists_star_at); f.fists_star_at > 0 && since >= 0 && since < FIRST_PERSON_STAR_SECONDS {
+		point, ok := first_person_mark_world(renderer, room, f.fists_star_enemy, f.fists_star_zone)
+		f.fists_star = {point = point, zone = f.fists_star_zone, shown = ok}
+	}
+}
+
+// The gold star of a critical, `since` seconds after it (FIRST_PERSON_STAR_SECONDS
+// in all): its size as a part of its full one (it bursts, holds, shrinks away),
+// its turn, how far its sparks have flown (0..1, gone at 1).
+FIRST_PERSON_STAR_SECONDS :: f32(0.5)
+first_person_star :: proc(since: f32) -> (scale, turn, sparks: f32) {
+	if since < 0 || since >= FIRST_PERSON_STAR_SECONDS { return 0, 0, 1 }
+	if since < 0.12 {
+		u := since/0.12
+		scale = 1.25*(1-(1-u)*(1-u))
+	} else if since < 0.18 {
+		scale = 1.25-0.25*(since-0.12)/0.06
+	} else if since < 0.34 {
+		scale = 1
+	} else {
+		scale = 1-(since-0.34)/(FIRST_PERSON_STAR_SECONDS-0.34)
+	}
+	return scale, since*1.4, clamp(since/0.4, 0, 1)
+}
+
+// The lit marks on the small canvas of the gloves (`w` by `h`, the board's
+// camera), before the gloves: neon rings of the punch's colour with a bright
+// core and the punch's path inside (an arrow up for the jab and the cross, an
+// arc for the hooks), blinking in their last third of a second; or (`star`,
+// after the gloves, so the impact shows over the fist) the critical's star.
+// The canvas' cut gives them the ink and the paper's band.
+@(private)
+draw_first_person_marks_pixel :: proc(renderer: ^Renderer, w, h: i32, star := false) {
+	f := &renderer.tactical.first_person
+	now := renderer.sprite_assets.elapsed
+	camera := renderer.tactical.camera
+	for mark in f.fists_marks {
+		if star || !mark.shown { continue }
+		if mark.lit < 0.33 && math.mod(now*8, 2) < 1 { continue }
+		screen := rl.GetWorldToScreenEx(mark.point, camera, w, h)
+		distance := max(f32(0.4), rl.Vector3Distance(mark.point, camera.position))
+		radius := math.round(clamp(f32(h)*0.035/distance, 5, 11))
+		draw_first_person_mark_pixel({math.round(screen.x), math.round(screen.y)}, radius, mark.zone)
+	}
+	if star && f.fists_star.shown {
+		scale, turn, _ := first_person_star(f32(now-f.fists_star_at))
+		screen := rl.GetWorldToScreenEx(f.fists_star.point, camera, w, h)
+		distance := max(f32(0.4), rl.Vector3Distance(f.fists_star.point, camera.position))
+		radius := clamp(f32(h)*0.06/distance, 8, 18)*scale
+		if radius >= 2 { draw_first_person_star_pixel({math.round(screen.x), math.round(screen.y)}, radius, turn) }
+	}
+}
+
+// The star's sparks, on the card already cut (`paper`, stored upside down):
+// gold and white specks flying out of it.
+@(private)
+draw_first_person_star_sparks :: proc(renderer: ^Renderer, w, h: i32) {
+	f := &renderer.tactical.first_person
+	if !f.fists_star.shown { return }
+	_, turn, flown := first_person_star(f32(renderer.sprite_assets.elapsed-f.fists_star_at))
+	if flown >= 1 { return }
+	camera := renderer.tactical.camera
+	screen := rl.GetWorldToScreenEx(f.fists_star.point, camera, w, h)
+	distance := max(f32(0.4), rl.Vector3Distance(f.fists_star.point, camera.position))
+	reach := clamp(f32(h)*0.06/distance, 8, 18)*(0.8+2.0*flown)
+	for k in 0..<7 {
+		angle := turn*0.5+f32(k)*(2*math.PI/7)
+		at := rl.Vector2{screen.x+math.cos(angle)*reach, f32(h)-(screen.y+math.sin(angle)*reach)}
+		size := f32(2) if flown < 0.6 else 1
+		rl.DrawRectangleV({math.round(at.x), math.round(at.y)}, {size, size}, (rl.Color{255, 246, 196, 255} if k%2 == 0 else rl.Color{255, 196, 48, 255}))
+	}
+}
+
+@(private = "file")
+draw_first_person_mark_pixel :: proc(at: rl.Vector2, radius: f32, zone: i8) {
+	color := FIRST_PERSON_MARK_COLORS[clamp(int(zone), 0, 3)]
+	core := rl.Color{u8((int(color.r)+255)/2), u8((int(color.g)+255)/2), u8((int(color.b)+255)/2), 255}
+	rl.DrawRing(at, radius-2, radius, 0, 360, 28, color)
+	rl.DrawRing(at, radius-1.5, radius-0.5, 0, 360, 28, core)
+	inner := radius-3
+	switch zone {
+	case 1, 2:
+		tail, tip := rl.Vector2{at.x, at.y+inner*0.75}, rl.Vector2{at.x, at.y-inner*0.6}
+		rl.DrawLineEx(tail, tip, 1, core)
+		rl.DrawTriangle(tip+{0, -2}, tip+{-2, 1}, tip+{2, 1}, color)
+	case 0, 3:
+		from := f32(200) if zone == 0 else -20
+		to := f32(300) if zone == 0 else -120
+		rl.DrawRing(at, inner*0.55-0.5, inner*0.55+0.5, min(from, to), max(from, to), 12, core)
+		end := to*math.PI/180
+		tip := at+rl.Vector2{math.cos(end), math.sin(end)}*(inner*0.55)
+		rl.DrawRectangleV({math.round(tip.x)-1, math.round(tip.y)-1}, {2, 2}, color)
+	}
+}
+
+// A five-pointed gold star of `radius` pixels turned `turn` radians, its
+// light core a smaller star.
+@(private = "file")
+draw_first_person_star_pixel :: proc(at: rl.Vector2, radius, turn: f32) {
+	star :: proc(at: rl.Vector2, radius, turn: f32, color: rl.Color) {
+		points: [10]rl.Vector2
+		for &point, k in points {
+			r := radius if k%2 == 0 else radius*0.45
+			angle := turn-math.PI/2+f32(k)*math.PI/5
+			point = at+rl.Vector2{math.cos(angle), math.sin(angle)}*r
+		}
+		for k in 0..<10 { rl.DrawTriangle(at, points[(k+1)%10], points[k], color) }
+	}
+	star(at, radius, turn, {255, 196, 48, 255})
+	star(at, radius*0.55, turn, {255, 240, 170, 255})
+}
+
+// Without the gloves' small canvas (no board surface): the marks straight on
+// the view, as cached by frame_first_person_marks.
 @(private)
 draw_first_person_marks :: proc(renderer: ^Renderer, room: ^game.Room, now: f64) {
-	if !game.first_person_fists_active(room) { return }
 	f := &renderer.tactical.first_person
+	if f.gloves.ready || !game.first_person_fists_active(room) { return }
 	camera := renderer.tactical.camera
-	right := rl.Vector3{-math.sin(f.yaw), 0, math.cos(f.yaw)}
-	look := rl.Vector3Normalize(camera.target-camera.position)
-	across := [4]f32{-0.75, -0.25, 0.25, 0.75}
-	for mark in room.first_person.fists.marks {
-		if mark.enemy_id == 0 || mark.lit <= 0 { continue }
+	for mark in f.fists_marks {
+		if !mark.shown { continue }
 		if mark.lit < 0.33 && math.mod(now*8, 2) < 1 { continue }
-		index, found := game.enemy_index_by_id(room, mark.enemy_id)
-		if !found { continue }
-		enemy := room.enemies[index]
-		at := [2]f32{f32(enemy.position.x)+0.5, f32(enemy.position.y)+0.5}
-		lift := f32(0)
-		for card in f.cards[:f.card_count] {
-			if card.enemy_id == enemy.id { at, lift = card.at, card.lift; break }
-		}
-		top := game.first_person_outline_top(enemy.archetype)
-		height := top*FIRST_PERSON_MARK_HEIGHT
-		half := game.first_person_outline_half_width(enemy.archetype, height)
-		offset := across[clamp(int(mark.zone), 0, 3)]*half
-		ground := entity_point_ground(game.enemy_entity(enemy.id), {at.x-0.5, at.y-0.5})
-		point := rl.Vector3{at.x+right.x*offset, ground+lift+height, at.y+right.z*offset}
-		if rl.Vector3DotProduct(point-camera.position, look) <= 0.05 { continue }
-		screen := rl.GetWorldToScreenEx(point, camera, i32(renderer.canvas_width), i32(renderer.canvas_height))
-		distance := max(f32(0.4), rl.Vector3Distance(point, camera.position))
+		screen := rl.GetWorldToScreenEx(mark.point, camera, i32(renderer.canvas_width), i32(renderer.canvas_height))
+		distance := max(f32(0.4), rl.Vector3Distance(mark.point, camera.position))
 		radius := clamp(renderer.canvas_height*0.035/distance, 7, 30)
 		draw_first_person_mark(screen, radius, mark.zone)
 	}

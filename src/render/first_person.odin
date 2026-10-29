@@ -179,6 +179,13 @@ First_Person_View :: struct {
 	fists_hit_at: f64,
 	fists_hit_crit: bool,
 	fists_struck: u32,
+	// The lit marks where this frame's camera shows them, and the last
+	// critical's gold star: since when, on whom, on which zone, where now.
+	fists_marks: [game.FISTS_MARKS]First_Person_Mark_Point,
+	fists_star_at: f64,
+	fists_star_enemy: u32,
+	fists_star_zone: i8,
+	fists_star: First_Person_Mark_Point,
 	// The eye and its cell, as this frame's camera puts them, and the foes'
 	// cards where this frame shows them: what a shot sees (first_person_aim).
 	eye: rl.Vector3,
@@ -380,6 +387,7 @@ frame_first_person_camera :: proc(renderer: ^Renderer, room: ^game.Room) {
 	}
 	f.aimed = .None
 	if f.engaged { f.aimed = game.first_person_trace(room, room.player.position, first_person_aim(renderer)).hit }
+	frame_first_person_marks(renderer, room)
 }
 
 // The way the eyes look as the dive starts: the way the player faces when it
