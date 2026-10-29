@@ -24,6 +24,9 @@ Commit **«Prima persona, Fase 6, passi 1-5: l'arco, regole e prototipo»** sul 
   scia del loro colore, scintille ai rimbalzi, zone critiche come bersagli di carta con la luce che pulsa, la faretra
   attorno al mirino; suoni suoi (un ping più alto a ogni rimbalzo) e una musica sua nel laboratorio. Le regole non
   cambiano.
+- **2026-10-29, corda al viso** (all'utente la mano che tendeva non convinceva; scelta fra tre pose in foto): tendendo,
+  la corda arriva al viso come nel tiro vero e la mano esce dallo schermo in basso vicino alla guancia; l'arco resta
+  inclinato di lato al mirino; a riposo sta più basso e si alza quando si tende.
 - **2026-10-29, niente muri invisibili** (l'utente: tirando sopra un muretto la freccia rimbalzava): muretti, coperture
   e oggetti fermano la freccia solo fin dove sono disegnati (muretto 0,55, copertura 0,49, ogni oggetto la sua altezza);
   sopra ci passa, cadendoci sopra si pianta sul loro piano. Le zone critiche stanno solo sui muri alti.

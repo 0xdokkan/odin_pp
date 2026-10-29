@@ -51,6 +51,8 @@ FIRST_PERSON_BOW_ARROW_CLEAR :: f32(0.4)
 // the eye where the rules loose it, and joins its true line CONVERGE metres
 // on: from the eye it would only ever be seen end on.
 FIRST_PERSON_BOW_ARROW_CONVERGE :: f32(2.5)
+// How fast the bow rises to its aim as it is drawn, and falls back after (a second's share).
+FIRST_PERSON_BOW_RAISE_RATE :: f32(14)
 
 // How much bigger than at NEAR metres an arrow at `tip` draws, seen from `eye`.
 first_person_bow_arrow_size :: proc(eye, tip: rl.Vector3, bounced: i16) -> f32 {
@@ -63,7 +65,8 @@ first_person_bow_arrow_size :: proc(eye, tip: rl.Vector3, bounced: i16) -> f32 {
 // world seen through `camera`: on its pixel's ray, as far as it is in the
 // gloves' camera.
 first_person_bow_launch_point :: proc(camera: rl.Camera3D, aspect: f32) -> rl.Vector3 {
-	head := first_person_compound_nock(0)+rl.Vector3{0, 0, -FIRST_PERSON_COMPOUND_ARROW}
+	// Loosed from a full draw, the bow raised.
+	head := first_person_compound_head(1)
 	p := first_person_compound_matrix(0)*[4]f32{head.x, head.y, head.z, 1}
 	depth := max(-p.z, 0.1)
 	glove := math.tan(FIRST_PERSON_GLOVE_FOV*math.RAD_PER_DEG*0.5)
@@ -105,6 +108,10 @@ First_Person_Bow_View :: struct {
 	bounce_zone: bool,
 	bounce_time: f64,
 	bounce_order: i16,
+	// The bow raised to its aim (0..1, first_person_compound.odin): toward 1 while
+	// drawn, back down after; when it was last eased (sprite clock).
+	raise: f32,
+	raise_at: f64,
 }
 
 @(private)
@@ -121,6 +128,10 @@ follow_first_person_bow :: proc(renderer: ^Renderer, room: ^game.Room) {
 			if arrow.state != .None && d.x*d.x+d.y*d.y+d.z*d.z < 0.01 { v.bounce_order = max(arrow.bounced, 1) }
 		}
 	}
+	now := renderer.sprite_assets.elapsed
+	step := f32(clamp(now-v.raise_at, 0, 0.1))
+	v.raise_at = now
+	v.raise += ((1 if s.drawing else 0)-v.raise)*min(1, step*FIRST_PERSON_BOW_RAISE_RATE)
 	v.drawing, v.charge, v.queue, v.arrows, v.zones = s.drawing, s.charge, s.queue, s.arrows, s.zones
 	v.zone_count = int(s.zone_count)
 	v.loosed, v.hits, v.bounces, v.zone_bounces, v.last = s.loosed, s.hits, s.bounces, s.zone_bounces, s.last

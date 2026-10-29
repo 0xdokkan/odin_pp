@@ -934,7 +934,10 @@ secondo rimbalzo.
 **Come si vede** (Fase 7): un arco **compound** Neon con le carrucole, tenuto con
 i due guantoni, la corda che arretra con la carica. Sta a destra del mirino,
 vicino al braccio destro (la scelta dell'utente, 2026-10-29): la mano destra
-tiene l'arco, la sinistra tira la corda. Le frecce volano con la scia
+tiene l'arco, la sinistra tira la corda. Tendendo, la corda arriva al viso come
+nel tiro vero: la freccia corre dal mirino verso l'angolo in basso e la mano
+esce dallo schermo vicino alla guancia; a riposo l'arco sta più basso e più
+inclinato, e si alza appena si comincia a tendere. Le frecce volano con la scia
 del colore del loro stato, più lunga quanto più vanno veloci, e a ogni rimbalzo
 fanno scintille (d'oro sulle zone). Le zone critiche sono bersagli di carta con
 una luce che pulsa. La freccia incoccata e la prossima stanno nella faretra

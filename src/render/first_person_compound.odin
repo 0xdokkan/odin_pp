@@ -22,23 +22,40 @@ import rlgl "vendor:raylib/rlgl"
 // mirrors all of it across the view: the bow right of the crosshair, near
 // where the right arm is, in the right glove, the left one on the string.
 
-// Where the grip is in the gloves' camera (metres), the bow's cant (radians),
-// how far ahead its arrow aims at the crosshair, and its size.
-FIRST_PERSON_COMPOUND_GRIP :: rl.Vector3{-0.19, -0.07, -0.62}
-// The whole bow's size against its pieces' metres (it never covers the HUD's corners).
-FIRST_PERSON_COMPOUND_SCALE :: f32(0.6)
-FIRST_PERSON_COMPOUND_CANT :: f32(-0.55)
+// How the bow is held (2026-10-29, the user: the hand drawing it did not feel
+// right): `anchor` where a full draw brings the nock (the gloves' camera,
+// metres; the real anchor is under the aiming eye, at the mouth's corner or
+// the cheek), the riser on the arrow's line from it to the crosshair's place
+// far ahead; the cant (radians) round that line, the size against the
+// pieces' metres; the string's travel from BRACE and the arrow's length (the
+// bow's units); lowered `rest_drop` metres and canted `rest_cant` more while
+// not drawn, raised as it is drawn.
+First_Person_Compound_Pose :: struct {
+	anchor: rl.Vector3,
+	cant, scale, draw, arrow, rest_drop, rest_cant: f32,
+}
+// The user's choice of three (2026-10-29): to the face, the bow canted beside
+// the crosshair; drawn, the hand goes out of sight low by the cheek. (The
+// first one, Fase 7, drew the string by the bow, far from the face: anchor
+// {-0.196, -0.072, -0.38}, draw 0.24, arrow 0.62; the other, the bow nearly
+// upright: anchor {-0.17, -0.10, -0.10}, cant -0.2.)
+FIRST_PERSON_COMPOUND_POSE :: First_Person_Compound_Pose{
+	anchor = {-0.14, -0.13, -0.10}, cant = -0.55, scale = 0.6, draw = 0.67, arrow = 0.95, rest_drop = 0.04, rest_cant = -0.25,
+}
 // Turned round its riser so the eye sees its side three quarters on (its limbs' and cams' profile).
 FIRST_PERSON_COMPOUND_TURN :: f32(0)
 FIRST_PERSON_COMPOUND_AIM :: f32(8)
 FIRST_PERSON_COMPOUND_GLOVE :: f32(0.5)
-// The string at rest and fully drawn, back from the riser (metres, toward the eye).
+// The string at rest, back from the riser (the bow's units, toward the eye).
 FIRST_PERSON_COMPOUND_BRACE :: f32(0.16)
-FIRST_PERSON_COMPOUND_DRAW :: f32(0.24)
-// The cams' place (up, back) and radius; the arrow's length.
+// The cams' place (up, back) and radius.
 FIRST_PERSON_COMPOUND_CAM :: [2]f32{0.33, 0.14}
 FIRST_PERSON_COMPOUND_CAM_RADIUS :: f32(0.042)
-FIRST_PERSON_COMPOUND_ARROW :: f32(0.62)
+
+// The pose the bow is held in.
+first_person_compound_pose :: proc() -> First_Person_Compound_Pose {
+	return FIRST_PERSON_COMPOUND_POSE
+}
 // Held on the right: everything mirrored across the view.
 FIRST_PERSON_COMPOUND_RIGHT :: true
 
@@ -101,18 +118,29 @@ first_person_compound_rod :: proc(a, b: rl.Vector3, thick: f32) -> rl.Matrix {
 
 // Where the string holds the arrow's nock at `charge` (in the bow's frame): back toward the eye as it is drawn.
 first_person_compound_nock :: proc(charge: f32) -> rl.Vector3 {
-	return {0.012, 0, FIRST_PERSON_COMPOUND_BRACE+FIRST_PERSON_COMPOUND_DRAW*clamp(charge, 0, 1)}
+	return {0.012, 0, FIRST_PERSON_COMPOUND_BRACE+first_person_compound_pose().draw*clamp(charge, 0, 1)}
 }
 
-// The bow's frame in the gloves' camera, `lift` metres down as it comes in.
-first_person_compound_matrix :: proc(lift: f32) -> rl.Matrix {
-	grip := FIRST_PERSON_COMPOUND_GRIP-{0, lift, 0}
-	forward := rl.Vector3Normalize(rl.Vector3{0, 0, -FIRST_PERSON_COMPOUND_AIM}-grip)
+// The arrow's head on the string at `charge` (in the bow's frame).
+first_person_compound_head :: proc(charge: f32) -> rl.Vector3 {
+	return first_person_compound_nock(charge)+{0, 0, -first_person_compound_pose().arrow}
+}
+
+// The bow's frame in the gloves' camera, `lift` metres down as it comes in,
+// `raise` (0..1) from its rest to its aim.
+first_person_compound_matrix :: proc(lift: f32, raise := f32(1)) -> rl.Matrix {
+	pose := first_person_compound_pose()
+	r := clamp(raise, 0, 1)
+	anchor := pose.anchor-{0, lift+pose.rest_drop*(1-r), 0}
+	forward := rl.Vector3Normalize(rl.Vector3{0, 0, -FIRST_PERSON_COMPOUND_AIM}-anchor)
+	// The riser on the arrow's line, a full draw ahead of the anchor.
+	grip := anchor+forward*(FIRST_PERSON_COMPOUND_BRACE+pose.draw)*pose.scale
 	back := -forward
 	up := rl.Vector3Normalize(rl.Vector3{0, 1, 0}-back*rl.Vector3DotProduct({0, 1, 0}, back))
 	right := rl.Vector3CrossProduct(up, back)
 	// The cant: up turned round the arrow's line.
-	c, s := math.cos(FIRST_PERSON_COMPOUND_CANT), math.sin(FIRST_PERSON_COMPOUND_CANT)
+	cant := pose.cant+pose.rest_cant*(1-r)
+	c, s := math.cos(cant), math.sin(cant)
 	up, right = up*c+right*s, right*c-up*s
 	// Three quarters on: the bow turned round its riser, its arrow kept on the crosshair's line.
 	ct, st := math.cos(FIRST_PERSON_COMPOUND_TURN), math.sin(FIRST_PERSON_COMPOUND_TURN)
@@ -123,7 +151,7 @@ first_person_compound_matrix :: proc(lift: f32) -> rl.Matrix {
 		right.z, up.z, back.z, grip.z,
 		0, 0, 0, 1,
 	}
-	k := FIRST_PERSON_COMPOUND_SCALE
+	k := pose.scale
 	when FIRST_PERSON_COMPOUND_RIGHT { return rl.MatrixScale(-1, 1, 1)*frame*rl.MatrixScale(k, k, k) }
 	return frame*rl.MatrixScale(k, k, k)
 }
@@ -213,7 +241,7 @@ first_person_compound_glove :: proc(bow: rl.Matrix, at, along, back: rl.Vector3,
 draw_first_person_compound :: proc(renderer: ^Renderer, kit: ^First_Person_Glove_Kit, ready: f32) {
 	if !first_person_compound_kit(kit) { return }
 	v := &renderer.tactical.first_person.bow
-	bow := first_person_compound_matrix((1-ready)*0.32)
+	bow := first_person_compound_matrix((1-ready)*0.32, v.raise)
 	charge := clamp(v.charge, 0, 1) if v.drawing else 0
 	nock := first_person_compound_nock(charge)
 	cam_back := FIRST_PERSON_COMPOUND_CAM.y+FIRST_PERSON_COMPOUND_CAM_RADIUS
@@ -221,7 +249,7 @@ draw_first_person_compound :: proc(renderer: ^Renderer, kit: ^First_Person_Glove
 	bottom := rl.Vector3{0, -FIRST_PERSON_COMPOUND_CAM.x, cam_back}
 	// The arrow from the string forward along the riser's side.
 	tail := nock
-	head := nock+rl.Vector3{0, 0, -FIRST_PERSON_COMPOUND_ARROW}
+	head := first_person_compound_head(charge)
 	tint := FIRST_PERSON_BOW_COLORS[v.queue[0]]
 	tint_value := [3]f32{f32(tint.r)/255, f32(tint.g)/255, f32(tint.b)/255}
 	camera := first_person_glove_camera()

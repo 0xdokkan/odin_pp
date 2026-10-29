@@ -154,7 +154,7 @@ test_first_person_bow_arrow_size :: proc(t: ^testing.T) {
 	side := (start.z > eye.z) if FIRST_PERSON_COMPOUND_RIGHT else (start.z < eye.z)
 	testing.expectf(t, start.x > eye.x+0.2 && start.y < eye.y && side, "it leaves from %v", start)
 	// Its pixel is the nocked arrow head's: the same place on screen in both cameras.
-	head := first_person_compound_nock(0)+rl.Vector3{0, 0, -FIRST_PERSON_COMPOUND_ARROW}
+	head := first_person_compound_head(1)
 	p := first_person_compound_matrix(0)*[4]f32{head.x, head.y, head.z, 1}
 	glove := math.tan(FIRST_PERSON_GLOVE_FOV*math.RAD_PER_DEG*0.5)
 	main := math.tan(FIRST_PERSON_FOV*math.RAD_PER_DEG*0.5)

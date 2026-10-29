@@ -5,6 +5,11 @@ I riferimenti a Classica, `--flat` e ai vecchi smoke descrivono versioni precede
 per i comandi disponibili oggi valgono il [README](README.md) e la documentazione collegata.
 
 
+## 2026-10-29 — Prima persona: la corda dell'arco al viso
+
+- First Person Archer: tendendo, la corda arriva al viso come nel tiro vero e la mano esce dallo schermo vicino alla
+  guancia; a riposo l'arco sta più basso e si alza quando si tende (la posa scelta dall'utente fra tre).
+
 ## 2026-10-29 — Prima persona: frecce sopra i muretti
 
 - Le frecce di First Person Archer passano sopra muretti, coperture e oggetti bassi: li urtano solo fin dove sono

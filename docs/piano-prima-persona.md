@@ -3585,6 +3585,16 @@ dell'utente e i numeri ritoccati insieme) aspetta l'utente.
   nuove; il `README.md` ha la riga del piano aggiornata; `CHANGELOG.md`.
 - **Le carte restano `Lab_Only`** (la scelta dell'utente): nessuna offerta,
   nessun negozio, nessuna spedizione.
+- **Dalla prova dell'utente (2026-10-29), la posa dell'arco:** all'utente non
+  convinceva la mano che tendeva la corda, senza saper dire bene perché. Nel
+  tiro vero la mano porta la corda al viso (angolo della bocca, zigomo o
+  mento) e la freccia finisce sotto l'occhio che mira; da noi la corda si
+  fermava vicino all'arco. Ho fotografato tre pose (com'era, al viso con
+  l'arco inclinato, al viso con l'arco quasi dritto) e l'utente ha scelto
+  **al viso, inclinato**: l'arco ha ora un punto d'ancoraggio (dove arriva la
+  cocca a carica piena) e sta sulla linea da lì al mirino; tendendo la corda
+  corre 0,67 (prima 0,24) e la mano esce in basso vicino alla guancia; a
+  riposo l'arco scende di 4 cm e si inclina di più, e si alza tendendo.
 - **Dalla prova dell'utente (2026-10-29), il muro invisibile:** tirando sopra
   un muretto la freccia rimbalzava, come contro un pezzo di muro invisibile.
   La causa: per le frecce ogni casella che ferma il passo era un muro intero.
