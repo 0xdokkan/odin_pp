@@ -56,7 +56,7 @@ La tabella è in ordine di priorità, cioè l'ordine della scaletta qui sotto.
 | 1 | 1 | Base comune della prima persona; l'AK resta identico | 0 | Fatta | vedi Esito |
 | 2 | 2 | Pugni: regole e prototipo giocabile nel laboratorio | 1 | Fatta | vedi Esito |
 | 3 | 3 | Pugni: guantoni, segni critici, colpi a schermo, suoni | 2 | Fatta | vedi Esito |
-| 4 | 4 | Spada: swing col mouse, parata, rampino; prototipo | 1 | Da fare | — |
+| 4 | 4 | Spada: swing col mouse, parata, rampino; prototipo | 1 | In corso | vedi Esito |
 | 5 | 5 | Spada: lama, scie, scintille, suoni | 4 | Da fare | — |
 | 6 | 6 | Arco: carica, rimbalzi, zone critiche, frecce; prototipo | 1 | Da fare | — |
 | 7 | 7 | Arco: arco, frecce in volo, faretra nell'HUD, suoni | 6 | Da fare | — |
@@ -2758,7 +2758,38 @@ alla fine di ogni passo.
 
 ### Esito
 
-_Da scrivere alla fine della fase._
+**Risposte dell'utente (2026-10-29)**, chieste tutte prima di iniziare (più una
+nuova, perché con i pugni l'utente aveva voluto il movimento libero):
+0. **Movimento:** a griglia con passi veloci (consigliato).
+1. **Vista:** `Q` ed `E` di 90° (consigliato), il mouse è tutto della lama.
+2. **Passo:** **0,3 s** (risposta scritta dall'utente; le opzioni erano 0,4, 0,5
+   e 0,6 s).
+3. **Formula:** quella della sezione 6.4 (consigliato), da ritoccare provando.
+4. **Tipi di colpo:** fendente più forte, tondo su due nemici, montante che
+   spinge (consigliato).
+5. **Portata:** la casella davanti, il tondo anche le due diagonali davanti
+   (consigliato).
+6. **Parata perfetta:** entro **0,25 s** prima del colpo (consigliato).
+7. **Guardia:** **nessun limite** (non la mia raccomandazione, che era 3 parate
+   con la ricarica): tenendo il destro si para sempre.
+8. **Parata perfetta:** da vicino l'attaccante stordito 1 s e 2 danni, il dardo
+   torna al balestriere (consigliato).
+9. **Scelta di difesa:** spenta durante la spada (consigliato).
+10. **Rampino:** 2-4 caselle, nella casella davanti, stordito 1 s, ricarica 3 s,
+    i pesanti tirano a sé il Viandante (consigliato).
+11. **La lama durante la parata:** solo per bellezza (consigliato).
+
+Riferimenti cercati prima delle domande: con il cursore disabilitato GLFW può
+dare il movimento grezzo del mouse, senza l'accelerazione di Windows, se lo si
+chiede (`GLFW_RAW_MOUSE_MOTION`, spento di base;
+[GLFW](https://fuchsia.googlesource.com/third_party/glfw/+/1155c83013d0f8b86d5a56193708dc00d6c53553%5E%21/),
+[forum GLFW](https://discourse.glfw.org/t/showing-and-hiding-a-cursor-at-runtime/1752));
+il filtro 1€ si regola partendo da `beta` 0 e taglio minimo 1 Hz, poi alzando
+`beta` finché i gesti veloci non hanno ritardo
+([1€ filter](https://cristal.univ-lille.fr/~casiez/1euro)); la deviazione di
+Sekiro è stimata dai giocatori intorno a 0,2 s, diversa da colpo a colpo
+([Steam](https://steamcommunity.com/app/814380/discussions/0/1745645926459743476)).
+
 
 ## 14. Fase 5 — Spada: lama, scie, scintille, suoni
 
