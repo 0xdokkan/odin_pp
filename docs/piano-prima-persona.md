@@ -2596,6 +2596,40 @@ musica **dopo la campanella, in dissolvenza** di mezzo secondo, un po' più bass
 degli effetti (consigliato); al segno che si accende **un tic leggero**, diverso
 per ogni pugno (non la mia raccomandazione, che era nessun suono).
 
+**Passo 6 — suoni da codice: fatto** (2026-10-29). Tutti fatti da codice come il
+resto (`tools/audio`, niente registrazioni).
+- **Suoni nuovi** (`tools/audio/sfx_brawler.py`): `pilgrim_fists_whoosh` (l'aria
+  strappata dal guantone: una banda di rumore che sale da 500 Hz a 2,6 kHz; il
+  laboratorio la suona più alta per il jab, più bassa per i ganci);
+  `world_fists_hit_jab`, `_cross`, `_hook` (un tonfo di cuoio sempre più pesante
+  e lungo, lo schiocco del cuoio, un piccolo crepitio elettrico per il Neon);
+  `world_fists_crit` (il colpo del gancio con sopra un «ding» luminoso che suona
+  mezzo secondo, come la stella, e un luccichio); `ui_fists_mark` (un tic chiaro
+  di 30 ms, suonato all'altezza del suo pugno: dal gancio sinistro, il più basso,
+  al gancio destro, il più alto); `world_ring_bell` (la campanella del ring,
+  due colpi, il secondo che suona più di un secondo). Prima prova dei colpi
+  troppo acuta (il centro del suono fra 4 e 6 kHz): schiocco più basso e
+  crepitio più leggero, ora fra 1,6 e 3,3 kHz (il colpo dell'AK è a 1,3).
+- **La carta** ora suona solo i guantoni battuti con un crepitio Neon: la
+  campanella è passata alla discesa nella vista, così non suona due volte.
+  Rifatti tutti i suoni, gli altri 198 sono identici al byte.
+- **La musica** approvata nella Fase 2 (`music_brawler.py`) è ora nel gioco:
+  `assets/audio/music/brawler.ogg`, stereo, codificata da
+  `tools/audio/encode_music.py` (il canale dei suoni del laboratorio è mono, la
+  musica ha un flusso suo, `audio.lab_music`). Parte 0,9 s dopo l'entrata con
+  i pugni, cioè dopo la campanella, salendo in mezzo secondo dall'inizio del
+  giro; a fine carta scende in mezzo secondo e si ferma; tre quarti del volume
+  degli effetti; si ferma anche quando il gioco perde il fuoco. Solo nel
+  laboratorio.
+- **Collegati** (`src/render/lab_sounds.odin`): la campanella con la discesa
+  dei pugni, l'aria a ogni pugno tirato, il colpo del suo pugno (o il ding del
+  critico) quando prende, dalla parte del nemico colpito, il tic quando un
+  segno si accende.
+- Test nuovo: i suoni dei pugni (aria, colpo, critico al posto del colpo, un
+  tic per segno, la musica solo dopo la campanella e solo nel laboratorio).
+- **Verifiche:** `check.ps1` completo, **1785 test verdi** con e senza assert;
+  atto `fps` **114 su 114** uguale alla Fase 0; atto `prima_persona` pulito.
+
 ## 13. Fase 4 — Spada: swing col mouse, parata, rampino; prototipo
 
 ### Obiettivo

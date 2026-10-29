@@ -146,3 +146,70 @@ test_first_person_critical_star :: proc(t: ^testing.T) {
 	gone, _, _ := first_person_star(FIRST_PERSON_STAR_SECONDS)
 	testing.expect_value(t, gone, f32(0))
 }
+
+// The lab hears the fists (Fase 3): a punch's air as it leaves, its blow by
+// punch or the critical's ding as it lands, a mark's tick as it lights; the
+// music only once the gloves are up and the bell has rung, in the lab.
+@(test)
+test_first_person_fists_lab_sounds :: proc(t: ^testing.T) {
+	data: level.Level
+	player: game.Player
+	room := first_person_view_test_room(t, &data, &player)
+	defer level.destroy(&data)
+	defer game.destroy_room(&room)
+	snapshot: Room_Presentation
+	renderer := shadow_view_test_renderer(&data, &snapshot)
+	defer free(renderer)
+	defer destroy_renderer_world_playback(renderer)
+	renderer.tactical.mechanics_lab = true
+	renderer.tactical.living_state = new(Living_State)
+	defer free(renderer.tactical.living_state)
+	defer destroy_lab_sounds(renderer)
+	frame :: proc(renderer: ^Renderer, room: ^game.Room, dt: f32) {
+		shadow_view_test_frame(renderer, room, dt)
+		update_lab_sounds(renderer, room, renderer.sprite_assets.elapsed)
+		play_lab_sounds(renderer, nil, 0)
+	}
+	frame(renderer, &room, 0.01)
+	sounds := renderer.tactical.lab_sounds
+	if !testing.expect(t, sounds != nil) { return }
+	testing.expect(t, game.tactical_begin_first_person(&room, 20, .Fists))
+	f := &renderer.tactical.first_person
+	for _ in 0..<60 {
+		frame(renderer, &room, 0.02)
+		if f.amount >= 1 { break }
+	}
+	testing.expect(t, f.engaged && f.amount >= 1)
+	testing.expect(t, !first_person_music_wanted(renderer), "the music before the bell")
+	// A jab thrown: its air; landed: its blow; a hook landed as a critical: the ding.
+	before := sounds.played
+	room.first_person.shots += 1
+	room.first_person.fists.punch = .Jab
+	frame(renderer, &room, 0.02)
+	testing.expect_value(t, sounds.played[LAB_FISTS_WHOOSH]-before[LAB_FISTS_WHOOSH], 1)
+	room.first_person.hits += 1
+	frame(renderer, &room, 0.02)
+	testing.expect_value(t, sounds.played[LAB_FISTS_HIT[.Jab]]-before[LAB_FISTS_HIT[.Jab]], 1)
+	room.first_person.fists.punch = .Left_Hook
+	room.first_person.hits += 1
+	room.first_person.fists.crits += 1
+	frame(renderer, &room, 0.02)
+	testing.expect_value(t, sounds.played[LAB_FISTS_CRIT]-before[LAB_FISTS_CRIT], 1)
+	testing.expect_value(t, sounds.played[LAB_FISTS_HIT[.Left_Hook]]-before[LAB_FISTS_HIT[.Left_Hook]], 0)
+	// A mark lighting: one tick, not one a frame.
+	ticks := sounds.played[LAB_FISTS_MARK]
+	for &mark in room.first_person.fists.marks {
+		if mark.enemy_id != 0 { mark.lit, mark.wait, mark.zone = 1, 0, 2; break }
+	}
+	lit := false
+	for mark in room.first_person.fists.marks { lit = lit || (mark.enemy_id != 0 && mark.lit > 0) }
+	if lit {
+		for _ in 0..<3 { frame(renderer, &room, 0.01) }
+		testing.expect_value(t, sounds.played[LAB_FISTS_MARK]-ticks, 1)
+	}
+	// The bell rung: the music, in the lab only.
+	for _ in 0..<60 { frame(renderer, &room, 0.02) }
+	testing.expect(t, first_person_music_wanted(renderer), "no music once the gloves are up")
+	renderer.tactical.mechanics_lab = false
+	testing.expect(t, !first_person_music_wanted(renderer), "music outside the lab")
+}

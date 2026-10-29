@@ -53,6 +53,21 @@ LAB_FIRST_PERSON_HIT :: audio.Lab_Sfx.World_Ak_Hit
 LAB_FIRST_PERSON_RICOCHET :: audio.Lab_Sfx.World_Ak_Ricochet
 LAB_FIRST_PERSON_ENTER :: audio.Lab_Sfx.Pilgrim_Fps_Dive
 LAB_FIRST_PERSON_EXIT :: audio.Lab_Sfx.Pilgrim_Fps_Rise
+// FIRST PERSON BRAWLER (first_person_fists.odin): the ring's bell at the dive,
+// a punch's air (higher for a jab, lower for a hook), its blow by punch, a
+// critical's ding, a mark's tick at its punch's pitch (left hook, jab, cross,
+// right hook: low to high).
+LAB_FISTS_BELL :: audio.Lab_Sfx.World_Ring_Bell
+LAB_FISTS_WHOOSH :: audio.Lab_Sfx.Pilgrim_Fists_Whoosh
+LAB_FISTS_CRIT :: audio.Lab_Sfx.World_Fists_Crit
+LAB_FISTS_MARK :: audio.Lab_Sfx.Ui_Fists_Mark
+@(rodata)
+LAB_FISTS_HIT := [game.First_Person_Punch]audio.Lab_Sfx{.None = .World_Fists_Hit_Jab, .Jab = .World_Fists_Hit_Jab,
+	.Cross = .World_Fists_Hit_Cross, .Left_Hook = .World_Fists_Hit_Hook, .Right_Hook = .World_Fists_Hit_Hook}
+@(rodata)
+LAB_FISTS_WHOOSH_PITCH := [game.First_Person_Punch]f32{.None = 1, .Jab = 1.15, .Cross = 1, .Left_Hook = 0.85, .Right_Hook = 0.85}
+@(rodata)
+LAB_FISTS_MARK_PITCH := [4]f32{0.85, 1, 1.12, 1.26}
 
 Lab_Sound :: struct {
 	sfx: audio.Lab_Sfx,
@@ -101,6 +116,8 @@ Lab_Sounds :: struct {
 	// FIRST PERSON SHOOTER as last heard (first_person.odin): its shots, hits
 	// and shots on stone, and its rises (a dive is its card's cue).
 	first_person_shots, first_person_hits, first_person_ricochets, first_person_exits: int,
+	// FIRST PERSON BRAWLER as last heard: punches thrown, landed, marks lit.
+	fists_thrown, fists_landed, fists_marks_lit: int,
 	// What the lab has played so far (smoke and tests).
 	played: [audio.Lab_Sfx]int,
 }
@@ -118,7 +135,7 @@ lab_sounds_reset :: proc(renderer: ^Renderer) {
 	renderer.tactical.lab_sounds^ = {played = played, lasso_whirrs = lasso.whirrs, lasso_releases = lasso.releases,
 		pinball_strikes = renderer.tactical.pinball.strikes,
 		first_person_shots = fp.shots, first_person_hits = fp.hits, first_person_ricochets = fp.ricochets,
-		first_person_exits = fp.exits}
+		first_person_exits = fp.exits, fists_thrown = fp.fists_thrown, fists_landed = fp.fists_landed, fists_marks_lit = fp.fists_marks_lit}
 }
 
 // The bong's pitch for a foe struck at `value`, the card's being `base`.
@@ -414,6 +431,8 @@ lab_cue_sounds :: proc(renderer: ^Renderer, s: ^Lab_Sounds, cue: ^Presentation_C
 	// eyes as the card's own cue paces it.
 	case .First_Person_Begun:
 		lab_sound_queue(s, LAB_FIRST_PERSON_ENTER, now)
+		// The fists' ring: its bell as the gloves come up.
+		if renderer.tactical.first_person.weapon == .Fists { lab_sound_queue(s, LAB_FISTS_BELL, now+0.1) }
 	// BOMB MARLEY (marley.odin): the ball coming down, the lights turning, a
 	// column warned, the bomb's whistle and its blast at the far end, a
 	// character saved, the seconds earned, the end; and a groove on the
@@ -580,6 +599,21 @@ update_lab_sounds :: proc(renderer: ^Renderer, room: ^game.Room, now: f64) {
 	if fp.ricochets != s.first_person_ricochets {
 		s.first_person_ricochets = fp.ricochets
 		lab_sound_queue(s, LAB_FIRST_PERSON_RICOCHET, now+0.04, 0.8)
+	}
+	// FIRST PERSON BRAWLER: a punch's air as it leaves, its blow (or the
+	// critical's ding) as it lands on the struck foe's side, a mark's tick.
+	if fp.fists_thrown != s.fists_thrown {
+		s.fists_thrown = fp.fists_thrown
+		lab_sound_queue(s, LAB_FISTS_WHOOSH, now, 0.7, 0, LAB_FISTS_WHOOSH_PITCH[fp.fists_thrown_punch])
+	}
+	if fp.fists_landed != s.fists_landed {
+		s.fists_landed = fp.fists_landed
+		pan := lab_sound_pan(renderer, game.enemy_entity(fp.fists_struck))
+		lab_sound_queue(s, LAB_FISTS_CRIT if fp.fists_hit_crit else LAB_FISTS_HIT[fp.fists_landed_punch], now, 1, pan)
+	}
+	if fp.fists_marks_lit != s.fists_marks_lit {
+		s.fists_marks_lit = fp.fists_marks_lit
+		lab_sound_queue(s, LAB_FISTS_MARK, now, 0.5, 0, LAB_FISTS_MARK_PITCH[clamp(int(fp.fists_lit_zone), 0, 3)])
 	}
 	// The cues now showing, each once; the cards first, so what they put on
 	// the board knows they already sounded. What was heard is kept on the

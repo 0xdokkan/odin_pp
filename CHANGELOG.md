@@ -17,6 +17,9 @@ per i comandi disponibili oggi valgono il [README](README.md) e la documentazion
 - **Segni critici** in pixel art di cartoncino (anello neon con la freccia o l'arco, inchiostro e bordo di carta) e
   **stella d'oro** del critico che scoppia, gira e svanisce in mezzo secondo, con le scintille.
 - **Icona Neon** della carta, tasti dei pugni nell'ispettore, riquadro dei secondi magenta.
+- **Suoni dei pugni** fatti da codice: aria, tonfo di cuoio per pugno con un crepitio Neon, ding del critico, tic dei
+  segni, campanella del ring all'entrata; **la musica dei pugni** (stereo, 32 s in giro) dopo la campanella, in
+  dissolvenza.
 - L'AK resta identico (114 catture su 114 uguali alla Fase 0).
 
 ## 2026-10-29 — Prima persona, Fase 2: critico senza mira e guantoni 3D

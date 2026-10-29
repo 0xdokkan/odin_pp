@@ -78,8 +78,26 @@ follow_first_person_fists :: proc(renderer: ^Renderer, room: ^game.Room) {
 	// A punch landed since the last frame (the view's counts start over with
 	// each view, and the first frame of one only takes them).
 	hits := room.first_person.hits
+	// A punch thrown (the view's shots count the punches), and the marks
+	// lighting now, for the lab's sounds.
+	if f.engaged && room.first_person.shots > f.fists_shots_seen {
+		f.fists_thrown += 1
+		f.fists_thrown_punch = fists.punch
+	}
+	f.fists_shots_seen = room.first_person.shots
+	for mark, slot in fists.marks {
+		lit := mark.enemy_id != 0 && mark.lit > 0
+		if f.engaged && lit && !f.fists_was_lit[slot] {
+			f.fists_marks_lit += 1
+			f.fists_lit_zone = mark.zone
+		}
+		f.fists_was_lit[slot] = lit
+	}
 	if f.engaged && hits > f.fists_hits_seen && f.fists_hits_seen >= 0 {
+		f.fists_landed += 1
+		f.fists_landed_punch = fists.punch
 		f.fists_hit_at, f.fists_hit_crit, f.fists_struck = now, fists.crits > f.fists_crits_seen, fists.struck
+		if f.fists_hit_crit { f.fists_crit_count += 1 }
 		// A critical: the gold star bursts where its mark was (the struck mark
 		// keeps its zone until the next lights).
 		if f.fists_hit_crit {
@@ -91,6 +109,16 @@ follow_first_person_fists :: proc(renderer: ^Renderer, room: ^game.Room) {
 	since := f32(now-f.fists_hit_at) if f.fists_hit_at > 0 else max(f32)
 	f.fists_punch, f.fists_clock = fists.punch, first_person_glove_display_clock(fists.punch_clock, since)
 	f.fists_run = clamp(math.sqrt(fists.velocity.x*fists.velocity.x+fists.velocity.y*fists.velocity.y)/game.FISTS_SPEED, 0, 1)
+}
+
+// The fists' music (tools/audio/music_brawler.py, the user's pick) plays once
+// the gloves are up and the ring's bell has rung: FIRST_PERSON_MUSIC_AFTER
+// seconds into the view, with the fists, in the mechanics lab.
+FIRST_PERSON_MUSIC_AFTER :: f64(0.9)
+first_person_music_wanted :: proc(renderer: ^Renderer) -> bool {
+	if renderer == nil || !renderer.tactical.mechanics_lab { return false }
+	f := &renderer.tactical.first_person
+	return f.weapon == .Fists && f.engaged && f.amount >= 1 && renderer.sprite_assets.elapsed-f.changed >= FIRST_PERSON_MUSIC_AFTER
 }
 
 // The clock the gloves are drawn at, `since` seconds after the last landed

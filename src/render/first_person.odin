@@ -186,6 +186,13 @@ First_Person_View :: struct {
 	fists_star_enemy: u32,
 	fists_star_zone: i8,
 	fists_star: First_Person_Mark_Point,
+	// For the lab's sounds: the punches thrown and landed, the criticals and
+	// the marks lit so far, with the last of each (first_person_fists.odin).
+	fists_thrown, fists_landed, fists_crit_count, fists_marks_lit: int,
+	fists_thrown_punch, fists_landed_punch: game.First_Person_Punch,
+	fists_lit_zone: i8,
+	fists_shots_seen: i32,
+	fists_was_lit: [game.FISTS_MARKS]bool,
 	// The eye and its cell, as this frame's camera puts them, and the foes'
 	// cards where this frame shows them: what a shot sees (first_person_aim).
 	eye: rl.Vector3,
@@ -220,7 +227,8 @@ First_Person_View :: struct {
 @(private)
 first_person_view_reset :: proc(f: ^First_Person_View) {
 	f^ = {ak_texture = f.ak_texture, tracer_texture = f.tracer_texture, flash_textures = f.flash_textures, gloves = f.gloves,
-		shots = f.shots, hits = f.hits, ricochets = f.ricochets, enters = f.enters, exits = f.exits}
+		shots = f.shots, hits = f.hits, ricochets = f.ricochets, enters = f.enters, exits = f.exits,
+		fists_thrown = f.fists_thrown, fists_landed = f.fists_landed, fists_crit_count = f.fists_crit_count, fists_marks_lit = f.fists_marks_lit}
 }
 
 @(private)

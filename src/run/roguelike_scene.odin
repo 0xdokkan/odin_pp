@@ -115,8 +115,9 @@ roguelike_suspend_input :: proc(rs: ^Roguelike_Session) {
 	rs.iso_renderer.tactical.hologram_orbit.dragging = false
 	// The view behind the player's eyes gives the mouse back.
 	if rs.attached { release_first_person_mouse(&rs.tactical_controller, &rs.room) }
-	// The room's ambience waits for the scene to come back.
+	// The room's ambience waits for the scene to come back; the fists' music stops.
 	audio.lab_ambience(&rs.lab_bank, false)
+	audio.lab_music_stop(&rs.lab_bank)
 }
 
 // The mechanics lab's sounds: what the board pass queued, and the room's
@@ -126,10 +127,13 @@ roguelike_lab_sounds :: proc(rs: ^Roguelike_Session, hf: ^host.Frame) {
 	if bank == nil || !bank.ready || bank.muted || !audio.lab_bank_load(&rs.lab_bank) {
 		render.play_lab_sounds(&rs.iso_renderer, nil, 0)
 		audio.lab_ambience(&rs.lab_bank, false)
+		audio.lab_music_stop(&rs.lab_bank)
 		return
 	}
 	render.play_lab_sounds(&rs.iso_renderer, &rs.lab_bank, bank.sfx_volume)
 	audio.lab_ambience(&rs.lab_bank, rs.run_state.phase == .In_Room, .Amb_Crypt_Loop, bank.sfx_volume)
+	// FIRST PERSON BRAWLER's music, after the ring's bell (render.first_person_music_wanted).
+	audio.lab_music(&rs.lab_bank, render.first_person_music_wanted(&rs.iso_renderer), bank.sfx_volume, hf.dt)
 }
 
 roguelike_suspend :: proc(data: rawptr) {

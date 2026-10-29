@@ -19,6 +19,8 @@ Commit **«Prima persona, Fase 2: critico senza mira e guantoni 3D»** sul ramo
   dell'utente) **Neon**: carbonio viola scuro, fasce e tubi magenta, bordo di luce ciano.
 - **Icona e ispettore** (Fase 3): icona del guantone ridipinta Neon; nell'ispettore «SX JAB / DX CROSS / SHIFT GANCI» al
   posto di «NIENTE CARTE: SOLO I PUGNI»; riquadro dei secondi magenta.
+- **Suono** (Fase 3): `card_first_person_brawler` non ha più la campanella (ora suona alla discesa nella vista): solo i
+  guantoni battuti con un crepitio Neon.
 - Danni, tempi, rarità, energia e durata non cambiano.
 
 ## 2026-10-28 — Carta nuova: First Person Brawler (solo laboratorio)

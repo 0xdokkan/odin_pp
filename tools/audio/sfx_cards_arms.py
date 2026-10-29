@@ -1269,14 +1269,13 @@ def card_first_person(seed):
     return _out(x, 0.08)
 
 
-@sound("card_first_person_brawler", loudness=LOUD, wet=WET, marks=(0.0, 0.05, 0.14, 0.22))
+@sound("card_first_person_brawler", loudness=LOUD, wet=WET, marks=(0.0, 0.05, 0.14))
 def card_first_person_brawler(seed):
-    """First Person Brawler (provisional until its Fase 3, docs/piano-prima-persona.md):
-    the gloves as the card leaves his hand: knocked together twice, at 0.05 and
-    0.14 (a leather slap over a low thud, the second the harder), then the ring's
-    bell struck once at 0.22 (a bright metal ding, its ring fading), as the
-    camera dives."""
-    dur = 0.9
+    """First Person Brawler (docs/piano-prima-persona.md, Fase 3): the gloves as
+    the card leaves his hand: knocked together twice, at 0.05 and 0.14 (a
+    leather slap over a low thud, the second the harder), a crackle of neon on
+    the second; the ring's bell is the dive's (world_ring_bell, sfx_brawler.py)."""
+    dur = 0.5
 
     def slap(s, hard):
         t = time_axis(0.12)
@@ -1284,15 +1283,13 @@ def card_first_person_brawler(seed):
         leather = _norm(bandpass(white(0.12, s + 1), 1000, 1.3)) * np.exp(-t / 0.012)
         return _ramp(_norm(thud + (0.7 + 0.3 * hard) * leather), 0.0005)
 
-    t = time_axis(0.7)
-    bell = fm(1180, 1180 * 1.41, 3.0 * np.exp(-t / 0.2), 0.7) * np.exp(-t / 0.35)
-    bell = bell + 0.4 * fm(2950, 2950 * 1.73, 1.5 * np.exp(-t / 0.12), 0.7) * np.exp(-t / 0.2)
-    strike = _norm(highpass(white(0.006, seed + 3), 3000)) * 0.5
-    bell[:len(strike)] += strike
+    t = time_axis(0.06)
+    crackle = square(2200 + 260 * np.sin(2 * np.pi * 37 * t), 0.06) * 0.5 + _norm(white(0.06, seed + 3)) * 0.6
+    crackle = _norm(highpass(crackle, 1800, 2)) * np.exp(-t / 0.02)
     x = place(dur, [
         (0.0, _flick(seed), FLICK),
         (0.05, slap(seed + 10, 0.0), 0.5),
         (0.14, slap(seed + 20, 1.0), 0.7),
-        (0.22, _ramp(_norm(bell), 0.001), 0.55),
+        (0.145, crackle, 0.12),
     ])
     return _out(x, 0.08)
