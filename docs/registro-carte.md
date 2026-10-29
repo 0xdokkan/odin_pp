@@ -24,6 +24,10 @@ Commit **«Prima persona, Fase 6, passi 1-5: l'arco, regole e prototipo»** sul 
   scia del loro colore, scintille ai rimbalzi, zone critiche come bersagli di carta con la luce che pulsa, la faretra
   attorno al mirino; suoni suoi (un ping più alto a ogni rimbalzo) e una musica sua nel laboratorio. Le regole non
   cambiano.
+- **2026-10-29, frecce più grandi** (l'utente le trovava troppo piccole): ogni freccia in volo parte dalla punta della
+  freccia incoccata sull'arco e raggiunge la sua linea vera dopo 2,5 m, così si vede di lato e non solo da dietro;
+  tiene la stessa grandezza sullo schermo da 1 a 7,5 m (tre volte lo spessore vero a 3 m); a ogni rimbalzo diventa un
+  ottavo più grande, fino a metà in più, come il danno. Solo l'aspetto: i cerchi delle regole non cambiano.
 
 ## 2026-10-29 — Carta nuova: First Person Fencer (solo laboratorio)
 

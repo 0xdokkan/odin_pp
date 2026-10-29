@@ -126,3 +126,36 @@ test_first_person_compound_aims_and_draws :: proc(t: ^testing.T) {
 		}
 	}
 }
+
+// An arrow in flight keeps one size on screen from a metre to NEAR*FAR metres
+// (its size grows as its distance), no smaller than a true arrow up close, no
+// bigger past it; it grows an eighth a bounce up to half again, the same as
+// its damage. It leaves from where the bow shows its nocked arrow's head.
+@(test)
+test_first_person_bow_arrow_size :: proc(t: ^testing.T) {
+	eye := rl.Vector3{0, 1, 0}
+	for d in ([?]f32{1, 2, 3, 5, 7.5}) {
+		size := first_person_bow_arrow_size(eye, eye+{d, 0, 0}, 0)
+		testing.expectf(t, abs(size/d-1/FIRST_PERSON_BOW_ARROW_NEAR) < 1e-5, "at %f m its size %f is not its distance's", d, size)
+	}
+	closest := first_person_bow_arrow_size(eye, eye+{0.5, 0, 0}, 0)
+	testing.expect(t, abs(closest-1/FIRST_PERSON_BOW_ARROW_THICK) < 1e-5, "up close it is thinner than a true arrow")
+	farthest := first_person_bow_arrow_size(eye, eye+{40, 0, 0}, 0)
+	testing.expect(t, abs(farthest-FIRST_PERSON_BOW_ARROW_FAR) < 1e-5, "it grows without end")
+	for bounced in i16(0)..=6 {
+		size := first_person_bow_arrow_size(eye, eye+{3, 0, 0}, bounced)
+		want := 1+min(0.125*f32(bounced), 0.5)
+		testing.expectf(t, abs(size-want) < 1e-5, "%d bounces: %f, not %f", bounced, size, want)
+	}
+	// The launch point: ahead of the eye, low and to the left, where the bow is.
+	camera := rl.Camera3D{position = eye, target = eye+{1, 0, 0}, up = {0, 1, 0}, fovy = FIRST_PERSON_FOV, projection = .PERSPECTIVE}
+	start := first_person_bow_launch_point(camera, 16.0/9)
+	testing.expectf(t, start.x > eye.x+0.2 && start.y < eye.y && start.z < eye.z, "it leaves from %v", start)
+	// Its pixel is the nocked arrow head's: the same place on screen in both cameras.
+	head := first_person_compound_nock(0)+rl.Vector3{0, 0, -FIRST_PERSON_COMPOUND_ARROW}
+	p := first_person_compound_matrix(0)*[4]f32{head.x, head.y, head.z, 1}
+	glove := math.tan(FIRST_PERSON_GLOVE_FOV*math.RAD_PER_DEG*0.5)
+	main := math.tan(FIRST_PERSON_FOV*math.RAD_PER_DEG*0.5)
+	q := start-eye
+	testing.expect(t, abs((q.z/q.x)/main-(p.x/-p.z)/glove) < 1e-4 && abs((q.y/q.x)/main-(p.y/-p.z)/glove) < 1e-4)
+}

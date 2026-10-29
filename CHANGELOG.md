@@ -5,6 +5,12 @@ I riferimenti a Classica, `--flat` e ai vecchi smoke descrivono versioni precede
 per i comandi disponibili oggi valgono il [README](README.md) e la documentazione collegata.
 
 
+## 2026-10-29 — Prima persona: frecce dell'arco più grandi
+
+- Le frecce in volo di First Person Archer partono dalla punta della freccia incoccata (non più dall'occhio, da dove si
+  vedevano solo da dietro), tengono la stessa grandezza sullo schermo tra 1 e 7,5 m e crescono di un ottavo a ogni
+  rimbalzo, fino a metà in più, come il danno. Le regole non cambiano.
+
 ## 2026-10-29 — Prima persona, Fase 8 (parte automatica): le quattro armi a confronto
 
 - Un bot gioca ogni arma un minuto nella stessa arena: AK 3,54 danni al secondo, pugni 3,44, arco 2,47, spada 0,98 (la

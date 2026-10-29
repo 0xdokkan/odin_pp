@@ -3585,6 +3585,13 @@ dell'utente e i numeri ritoccati insieme) aspetta l'utente.
   nuove; il `README.md` ha la riga del piano aggiornata; `CHANGELOG.md`.
 - **Le carte restano `Lab_Only`** (la scelta dell'utente): nessuna offerta,
   nessun negozio, nessuna spedizione.
+- **Dalla prova dell'utente (2026-10-29), le frecce più grandi:** l'utente le
+  trovava troppo piccole e non capiva come si formavano. Il motivo: partivano
+  dall'occhio, quindi si vedevano solo da dietro (un triangolo ciano). Ora
+  partono dalla punta della freccia incoccata e raggiungono la linea del mirino
+  dopo 2,5 m; tengono la stessa grandezza sullo schermo tra 1 e 7,5 m; crescono
+  di un ottavo a rimbalzo, fino a metà in più, come il danno. Una cattura nuova
+  nell'atto (`_arco_volo`).
 - **Passo 5, la verifica:**
   - controllo completo verde, 1817 test nei due giri (con e senza i controlli
     interni);

@@ -391,7 +391,11 @@ mechanics_lab_prima_persona :: proc(window: ^app.Window, renderer: ^render.Rende
 	for _ in 0..<60 { drive(window, renderer, room, controller, cards, buffer, {fire_right = true}) }
 	artifacts.screenshot("odin_pp_mechanics_lab_prima_persona_arco_teso.png")
 	health = brute_enemy.health
-	for _ in 0..<40 { drive(window, renderer, room, controller, cards, buffer, {}) }
+	for k in 0..<40 {
+		drive(window, renderer, room, controller, cards, buffer, {})
+		// The arrow on its way, as big as it draws (2026-10-29).
+		if k == 2 { artifacts.screenshot("odin_pp_mechanics_lab_prima_persona_arco_volo.png") }
+	}
 	if bow.loosed != 1 || bow.hits != 1 || brute_enemy.health >= health {
 		fmt.eprintln("mechanics lab: the bow's arrow did not strike the brute (loosed", bow.loosed, "hits", bow.hits, ")"); return false
 	}

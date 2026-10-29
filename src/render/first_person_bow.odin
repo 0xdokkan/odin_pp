@@ -35,6 +35,45 @@ FIRST_PERSON_BOW_RING :: f32(26)
 FIRST_PERSON_BOW_TEAL :: rl.Color{80, 230, 196, 255}
 // A bounce's sparks: how long they fly.
 FIRST_PERSON_BOW_SPARKS :: f64(0.28)
+// An arrow in flight's size (2026-10-29: the user found them too small). It
+// keeps one size on screen from NEAR/THICK to NEAR*FAR metres from the eye
+// (a true arrow's at a metre: three times its thickness and half again its
+// length, 0.9 m, at NEAR), smaller on screen only nearer or farther; each
+// bounce makes it an eighth bigger, up to half again, the same as the damage
+// it gains (game.BOW_BOUNCE_BONUS). It draws nothing within CLEAR metres of
+// the eye. Only the look: the rules' circles do not change.
+FIRST_PERSON_BOW_ARROW_THICK :: f32(3)
+FIRST_PERSON_BOW_ARROW_LONG :: f32(0.9)
+FIRST_PERSON_BOW_ARROW_NEAR :: f32(3)
+FIRST_PERSON_BOW_ARROW_FAR :: f32(2.5)
+FIRST_PERSON_BOW_ARROW_CLEAR :: f32(0.4)
+// It leaves from the nocked arrow's head (where the bow shows it), not from
+// the eye where the rules loose it, and joins its true line CONVERGE metres
+// on: from the eye it would only ever be seen end on.
+FIRST_PERSON_BOW_ARROW_CONVERGE :: f32(2.5)
+
+// How much bigger than at NEAR metres an arrow at `tip` draws, seen from `eye`.
+first_person_bow_arrow_size :: proc(eye, tip: rl.Vector3, bounced: i16) -> f32 {
+	away := clamp(rl.Vector3Length(tip-eye)/FIRST_PERSON_BOW_ARROW_NEAR, 1/FIRST_PERSON_BOW_ARROW_THICK, FIRST_PERSON_BOW_ARROW_FAR)
+	bounces := 1+min(game.BOW_BOUNCE_BONUS*f32(max(bounced, 0)), game.BOW_BOUNCE_BONUS_MAX)
+	return away*bounces
+}
+
+// Where the nocked arrow's head shows (first_person_compound.odin), in the
+// world seen through `camera`: on its pixel's ray, as far as it is in the
+// gloves' camera.
+first_person_bow_launch_point :: proc(camera: rl.Camera3D, aspect: f32) -> rl.Vector3 {
+	head := first_person_compound_nock(0)+rl.Vector3{0, 0, -FIRST_PERSON_COMPOUND_ARROW}
+	p := first_person_compound_matrix(0)*[4]f32{head.x, head.y, head.z, 1}
+	depth := max(-p.z, 0.1)
+	glove := math.tan(FIRST_PERSON_GLOVE_FOV*math.RAD_PER_DEG*0.5)
+	x, y := p.x/depth/(glove*aspect), p.y/depth/glove
+	forward := rl.Vector3Normalize(camera.target-camera.position)
+	right := rl.Vector3Normalize(rl.Vector3CrossProduct(forward, camera.up))
+	up := rl.Vector3CrossProduct(right, forward)
+	main := math.tan(camera.fovy*math.RAD_PER_DEG*0.5)
+	return camera.position+(forward+right*(x*main*aspect)+up*(y*main))*depth
+}
 
 // Each arrow's mark in the quiver, 7 by 7 ('#' its colour, 'w' white, '.' none):
 // a drop of venom, a flame, a snowflake, stars, a drop of blood.
@@ -117,16 +156,37 @@ draw_first_person_bow_entry :: proc(renderer: ^Renderer, index: int) {
 		tip := rl.Vector3{arrow.at.x, arrow.at.y, arrow.at.z}
 		way := rl.Vector3{arrow.way.x, arrow.way.y, arrow.way.z}
 		color := FIRST_PERSON_BOW_COLORS[arrow.kind]
-		tail := tip-way*0.6
+		camera := renderer.tactical.camera
+		eye := camera.position
+		// Before its first bounce, on its way from the bow's arrow to its true line.
+		if gone := arrow.age*arrow.speed; arrow.state == .Flying && arrow.bounced == 0 && gone < FIRST_PERSON_BOW_ARROW_CONVERGE {
+			start := first_person_bow_launch_point(camera, f32(renderer.canvas_width)/max(f32(renderer.canvas_height), 1))
+			end := tip+way*(FIRST_PERSON_BOW_ARROW_CONVERGE-gone)
+			tip = start+(end-start)*(gone/FIRST_PERSON_BOW_ARROW_CONVERGE)
+			way = rl.Vector3Normalize(end-start)
+		}
+		size := first_person_bow_arrow_size(eye, tip, arrow.bounced)
+		// Not right on the eye, and the tail cut short before it, when it flies away
+		// from him: a thick shaft seen end on would cover the view.
+		gap := rl.Vector3Length(tip-eye)
+		if gap < FIRST_PERSON_BOW_ARROW_CLEAR+0.2 { return }
+		room := gap-FIRST_PERSON_BOW_ARROW_CLEAR if rl.Vector3DotProduct(way, tip-eye) > 0 else max(f32)
+		thick := FIRST_PERSON_BOW_ARROW_THICK*size
+		full := FIRST_PERSON_BOW_ARROW_LONG*size
+		long := min(full, room)
+		head := min(full*0.14, long)
+		tail := tip-way*long
 		// The streak first, behind it: its colour, longer and brighter the faster it flies.
 		if arrow.state == .Flying {
-			streak := min(arrow.speed*0.035, 2.0)
+			streak := min(min(arrow.speed*0.035, 2.0)*size, room-long)
 			heat := clamp((arrow.speed-12)/48, 0, 1)
-			rl.DrawCylinderEx(tail-way*streak, tail, 0.002, 0.014+0.012*heat, 4, color_with_opacity(color, 0.45+0.4*heat))
+			if streak > 0.01 {
+				rl.DrawCylinderEx(tail-way*streak, tail, 0.002*thick, (0.014+0.012*heat)*thick, 6, color_with_opacity(color, 0.45+0.4*heat))
+			}
 		}
-		rl.DrawCylinderEx(tail, tip-way*0.08, 0.012, 0.012, 4, {214, 222, 232, 255})
-		rl.DrawCylinderEx(tip-way*0.08, tip, 0.03, 0.002, 4, color)
-		rl.DrawCylinderEx(tail, tail+way*0.1, 0.028, 0.028, 3, {60, 240, 255, 255})
+		rl.DrawCylinderEx(tail, tip-way*head, 0.012*thick, 0.012*thick, 8, {214, 222, 232, 255})
+		rl.DrawCylinderEx(tip-way*head, tip, 0.03*thick, 0.002*thick, 8, color)
+		rl.DrawCylinderEx(tail, tail+way*min(full*0.17, long), 0.022*thick, 0.022*thick, 3, {60, 240, 255, 255})
 		return
 	}
 	zone := f.bow.zones[index-game.BOW_ARROWS]

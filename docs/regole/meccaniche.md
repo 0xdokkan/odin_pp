@@ -928,6 +928,13 @@ fanno scintille (d'oro sulle zone). Le zone critiche sono bersagli di carta con
 una luce che pulsa. La freccia incoccata e la prossima stanno nella faretra
 attorno al mirino. A ogni rimbalzo un ping, una nota più alta ogni volta.
 
+**La grandezza delle frecce** (2026-10-29): una freccia parte dalla punta di
+quella incoccata sull'arco, in basso a sinistra, e raggiunge la linea del mirino
+dopo 2,5 m; da lì vola sulla sua strada vera. Tra 1 e 7,5 m dall'occhio ha
+sempre la stessa grandezza sullo schermo (più lontana, più grande nel mondo), e
+a ogni rimbalzo cresce di un ottavo, fino a metà in più: lo stesso aumento del
+suo danno. Le regole (dove colpisce, quanto è grande per colpire) non cambiano.
+
 ### Inondazione
 
 `Inondazione` (non comune, energia 2, **2 s** di finestra, fino a tre
