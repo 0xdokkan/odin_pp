@@ -87,7 +87,7 @@ i nemici. Le spedizioni già salvate mantengono la loro geografia originale.
 | [Engine e minigiochi](docs/engine.md) | host, scene, input, minigiochi e atlanti incorporati |
 | [Combattimento](docs/regole/combattimento.md) | clock, comandi, status, reazioni, movimento e oggetti |
 | [Carte e dadi](docs/regole/carte.md) | catalogo, mazzo, targeting, spell e RNG |
-| [Meccaniche delle carte](docs/regole/meccaniche.md) | ombra, terreno, cariche, lazzo, pesca, Pinball, FPS, Inondazione, Bomb Marley, Cannone, Buco Nero e Dinosauro |
+| [Meccaniche delle carte](docs/regole/meccaniche.md) | ombra, terreno, cariche, lazzo, pesca, Pinball, la prima persona (AK, pugni, spada, arco), Inondazione, Bomb Marley, Cannone, Buco Nero e Dinosauro |
 | [Dispositivi e attività](docs/regole/dispositivi.md) | Tesla, trappole, equipaggiamento, ring e sblocchi |
 | [Nemici e progressione](docs/regole/progressione.md) | incontri, stanze, rotta, economia e reliquie |
 | [Presentazione](docs/presentazione.md) | film delle carte, timeline, HUD, sprite e animazioni |
@@ -96,7 +96,7 @@ i nemici. Le spedizioni già salvate mantengono la loro geografia originale.
 | [Sviluppo](docs/sviluppo.md) | convenzioni Odin e metodo di lavoro |
 | [Piano della griglia](docs/piano-griglia.md) | fasi da eseguire una alla volta: bersagli in evidenza, altezze, montagna a spirale, caverne, strutture, hub in 3D |
 | [Piano della profondità](docs/piano-profondita.md) | fasi da eseguire una alla volta: terreno scolpito, mappa a piani, grotte senza caricamento, editor, ponti e gallerie nei biomi |
-| [Piano della prima persona](docs/piano-prima-persona.md) | fasi da eseguire una alla volta, con uno stop a ogni passo: tre carte in prima persona sul modello dell'AK (pugni, spada, arco) |
+| [Piano della prima persona](docs/piano-prima-persona.md) | tre carte in prima persona sul modello dell'AK, nel laboratorio: First Person Brawler (pugni), Fencer (zweihänder), Archer (arco compound); fasi 0-7 fatte, la 8 aspetta la prova dell'utente |
 | [Cronologia](CHANGELOG.md) | milestone e refactor precedenti; le note storiche non definiscono le regole attuali |
 
 ## Sviluppo

@@ -60,7 +60,7 @@ La tabella è in ordine di priorità, cioè l'ordine della scaletta qui sotto.
 | 5 | 5 | Spada: lama, scie, scintille, suoni | 4 | Fatta | vedi Esito |
 | 6 | 6 | Arco: carica, rimbalzi, zone critiche, frecce; prototipo | 1 | Fatta | vedi Esito |
 | 7 | 7 | Arco: arco, frecce in volo, faretra nell'HUD, suoni | 6 | Fatta | vedi Esito |
-| 8 | 8 | Tutte insieme: equilibrio, prestazioni, documenti | 3, 5, 7 | Da fare | — |
+| 8 | 8 | Tutte insieme: equilibrio, prestazioni, documenti | 3, 5, 7 | Parte automatica fatta; resta la prova dell'utente | vedi Esito |
 
 ## Scaletta: cosa sviluppare prima
 
@@ -3533,6 +3533,58 @@ controllo completo, atti da soli e tempo di un fotogramma contro l'AK
 3. **Fin dove stanotte:** fino alla fine; quello che chiede la sua presenza e si
    può saltare si salta e si chiede dopo; ciò che blocca ferma il lavoro.
 4. **Push:** nessuno (consigliato).
+
+**Parte automatica fatta (2026-10-29, nella notte).** Il passo 2 (la prova
+dell'utente e i numeri ritoccati insieme) aspetta l'utente.
+- **Passo 1, il bot** (`integration/first_person_balance_test.odin`): ogni arma
+  gioca un minuto nell'arena «Prima persona», con gli stessi nemici liberi che
+  arrivano (lo stesso seme), la vista ripresa appena finisce, e i tasti del
+  controller come un giocatore onesto:
+  - l'AK guarda il nemico più vicino e tiene il grilletto;
+  - i pugni gli corrono incontro e tirano un pugno ogni terzo di secondo;
+  - la spada si gira con `Q`/`E`, fa un passo verso il nemico e spazza la lama
+    avanti e indietro, con la guardia alzata quando un colpo sta per arrivare;
+  - l'arco guarda il nemico più vicino, tende un secondo e lascia.
+
+  | Arma | Danno fatto in un minuto | Al secondo | Danno preso |
+  |---|---:|---:|---:|
+  | AK | 212 | 3,54 | 0 |
+  | Pugni | 206 | 3,44 | 0 |
+  | Arco | 148 | 2,47 | 4 |
+  | Spada | 59 | 0,98 | 7 |
+
+  A parole:
+  - l'AK e i pugni fanno quasi lo stesso danno, circa 3 e mezzo al secondo;
+  - l'arco ne fa circa due terzi, con tiri dritti a carica media (il bot non
+    tira di sponda né cerca le zone critiche, che sono il suo punto forte);
+  - la spada ne fa poco più di un quarto. Ma il bot la gioca in modo rozzo
+    (spazza alla cieca, non mira il petto né sceglie fendenti), quindi il
+    numero dice soprattutto che la spada chiede abilità.
+  - Da decidere con l'utente dopo la sua prova: se alzare il danno della spada
+    o la sua velocità di passo. Non ho cambiato nessun numero da solo.
+- **Passo 3, le prestazioni** (`-o:speed`, 600 fotogrammi, la stessa arena):
+- **La scena della Fase 0** (l'atto `fps`, l'AK che spara): 2,44 e 2,47 ms
+    contro i 2,40 e 2,44 di allora. È la stessa cosa: circa l'1% in più, cioè
+    tre centesimi di millesimo, dentro il rumore normale fra un giro e l'altro.
+  - **L'arena «Prima persona»**, con le quattro armi nella stessa scena (due
+    giri, media):
+
+    | Arma | Media | 95° percentile | Contro l'AK |
+    |---|---:|---:|---:|
+    | AK | 3,00 ms | 3,32 ms | — |
+    | Pugni | 3,08 ms | 3,91 ms | +3% |
+    | Spada | 3,22 ms | 3,52 ms | +7% |
+    | Arco | 3,28 ms | 3,54 ms | +9% |
+
+    In parole semplici: tutte e quattro stanno sopra i 300 fotogrammi al secondo;
+    la più pesante, l'arco, costa poco più di un quarto di millesimo di secondo
+    in più dell'AK.
+- **Passo 4, i documenti:** `docs/regole/meccaniche.md` ha una sezione per ogni
+  carta (First Person Shooter, Brawler, Fencer, Archer); `docs/avvio.md` ha il
+  mazzo dell'arena, l'atto e le misure; `docs/registro-carte.md` ha le carte
+  nuove; il `README.md` ha la riga del piano aggiornata; `CHANGELOG.md`.
+- **Le carte restano `Lab_Only`** (la scelta dell'utente): nessuna offerta,
+  nessun negozio, nessuna spedizione.
 
 
 ## 18. Fonti

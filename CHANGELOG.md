@@ -5,6 +5,13 @@ I riferimenti a Classica, `--flat` e ai vecchi smoke descrivono versioni precede
 per i comandi disponibili oggi valgono il [README](README.md) e la documentazione collegata.
 
 
+## 2026-10-29 — Prima persona, Fase 8 (parte automatica): le quattro armi a confronto
+
+- Un bot gioca ogni arma un minuto nella stessa arena: AK 3,54 danni al secondo, pugni 3,44, arco 2,47, spada 0,98 (la
+  spada chiede abilità che il bot non ha). Nessun numero cambiato: si decide con l'utente dopo la sua prova.
+- Prestazioni delle quattro armi misurate nella stessa arena; documenti completati. Le carte restano solo nel
+  laboratorio.
+
 ## 2026-10-29 — Prima persona, Fase 7 fatta: aspetto e suoni dell'arco
 
 - **First Person Archer** ha il suo arco compound Neon con le carrucole (la scelta dell'utente), un modello 3D in pixel
