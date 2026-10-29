@@ -3585,6 +3585,13 @@ dell'utente e i numeri ritoccati insieme) aspetta l'utente.
   nuove; il `README.md` ha la riga del piano aggiornata; `CHANGELOG.md`.
 - **Le carte restano `Lab_Only`** (la scelta dell'utente): nessuna offerta,
   nessun negozio, nessuna spedizione.
+- **Passo 5, la verifica:**
+  - controllo completo verde, 1817 test nei due giri (con e senza i controlli
+    interni);
+  - smoke completo del laboratorio verde: 1178 s, 2256 catture (le 2232 della
+    Fase 0 più quelle nuove delle tre carte);
+  - un minuto di gioco per ogni arma nei test;
+  - atto `fps` 114 su 114 uguale alla Fase 0.
 
 
 ## 18. Fonti
