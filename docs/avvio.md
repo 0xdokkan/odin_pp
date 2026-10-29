@@ -97,7 +97,7 @@ passo contro le sbarre dal lato della leva. Con `--smoke-mechanics-lab` e `ODIN_
 della grotta, dei piani, degli ascensori, di First Person Shooter o dell'arena «Prima persona» (la montagna dura qualche minuto:
 sale tutto il sentiero a passi veri). L'atto `prima_persona` gira per ultimo nello smoke completo: l'AK, poi First Person
 Brawler (i guantoni Neon, un jab, un gancio, il jab che colpisce, un segno, il cross critico con la stella d'oro), poi
-First Person Fencer (lo zweihänder, un tondo sul bruto, la parata, il rampino e la catena tesa, il colpo roteante, la
+First Person Fencer (lo zweihänder, un tondo sul bruto, il bruto che si illumina di rosso e di viola, la parata, il rampino e la catena tesa, il colpo roteante, la
 parata perfetta), poi First Person Archer (l'arco compound teso con l'anello della carica, un tiro dritto sul bruto, un
 tiro di sponda trovato con la guida, una zona critica sul muro, una freccia tirata mentre la vista finisce che vola
 ancora vista dall'alto).

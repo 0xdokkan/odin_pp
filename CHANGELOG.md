@@ -5,6 +5,13 @@ I riferimenti a Classica, `--flat` e ai vecchi smoke descrivono versioni precede
 per i comandi disponibili oggi valgono il [README](README.md) e la documentazione collegata.
 
 
+## 2026-10-29 — I nemici si illuminano mentre agiscono
+
+- In tutte le viste la carta di un nemico diventa rossa quando prepara un colpo, una freccia o una carica, viola per lo
+  scudo del Custode o una bomba. La luce cresce col conto alla rovescia, pulsa sempre più veloce ed è al massimo negli
+  ultimi 0,25 s, la finestra della parata perfetta. Nata dalla spada in prima persona, dove non si vedeva quando un
+  nemico stava per colpire.
+
 ## 2026-10-29 — Prima persona, Fase 8 fatta: il piano è chiuso
 
 - Le quattro armi in prima persona sono provate, bilanciate con l'utente e documentate; restano nel laboratorio

@@ -279,6 +279,26 @@ mechanics_lab_prima_persona :: proc(window: ^app.Window, renderer: ^render.Rende
 		fmt.eprintln("mechanics lab: the cut across the brute made", sword.strikes, "cuts, the brute at", room.enemies[brute_index].health); return false
 	}
 	cut := sword.last
+	// The brute glowing as it acts (render/foe_glow.odin, 2026-10-29): red with
+	// its blow halfway, brightest as it comes; purple with a shield's intent
+	// (the colour only: a brute never shields). Held again after.
+	{
+		glowing := &room.enemies[brute_index]
+		shots := [3]struct{kind: game.Enemy_Intent_Kind, left: f32, name: cstring}{
+			{.Attack, 2.5, "odin_pp_mechanics_lab_prima_persona_spada_luce.png"},
+			{.Attack, 0.2, "odin_pp_mechanics_lab_prima_persona_spada_luce_colpo.png"},
+			{.Protect, 1.5, "odin_pp_mechanics_lab_prima_persona_spada_luce_viola.png"},
+		}
+		for shot in shots {
+			glowing.intent = game.make_attack_intent(room, glowing.position, room.player.position, 5)
+			glowing.intent.kind = shot.kind
+			glowing.tactical_cooldown = shot.left+3.0/60+room.player.tactical.clock_fraction
+			for _ in 0..<3 { drive(window, renderer, room, controller, cards, buffer, {}) }
+			artifacts.screenshot(shot.name)
+		}
+		mechanics_lab_hold(room, brute)
+		for _ in 0..<12 { drive(window, renderer, room, controller, cards, buffer, {}) }
+	}
 	// The guard up: the brute's blow parried.
 	for _ in 0..<20 { drive(window, renderer, room, controller, cards, buffer, {fire_right = true}) }
 	brute_enemy := &room.enemies[brute_index]

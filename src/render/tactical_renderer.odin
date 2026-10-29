@@ -141,6 +141,8 @@ Tactical_View :: struct {
 	// FIRST PERSON SHOOTER: the camera in the player's eyes, the AK and its
 	// shots (first_person.odin).
 	first_person: First_Person_View,
+	// The foes' glows as they act (foe_glow.odin).
+	foe_glow: Foe_Glow_View,
 	// PROVA MECCANICHE's overlapping hand: how much of each card shows
 	// (tactical_hand.odin).
 	hand_reveal: Tactical_Hand_Reveal,
@@ -299,6 +301,7 @@ update_tactical_view :: proc(renderer: ^Renderer, room: ^game.Room, mouse: view.
 	update_tactical_arsenal(renderer, room)
 	update_tactical_fishing(renderer)
 	update_tactical_first_person(renderer, room)
+	update_foe_glows(renderer, room)
 	v.no_fog = room.player.tactical.config.vision_size == 0 || tactical_room_is_clear(v.snapshot.phase)
 	if !tactical_room_is_clear(v.snapshot.phase) { v.clear_light = 0 }
 	// Behind the player's eyes his hand is put away: no refocus.
@@ -504,7 +507,14 @@ tactical_billboard :: proc(renderer: ^Renderer, key: Sprite_Key, position: view.
 	if renderer.tactical.expedition && key >= .Chaser && key <= .Demolitionist && pose.tint == rl.WHITE {
 		pose.tint = expedition_enemy_tint(campaign.Biome(renderer.tactical.expedition_biome))
 	}
+	// A foe acting glows, its whole card, paper and print (foe_glow.odin).
+	glow, lit := foe_glow(renderer, entity)
+	if lit > 0 {
+		pose.tint = foe_glow_mix(pose.tint, glow, lit*0.6)
+		shade = foe_glow_mix(shade, glow, lit*0.5)
+	}
 	draw_tactical_billboard_quad(renderer, quad, position, opacity*seen, pose.tint, shade)
+	if lit > 0 { draw_billboard_print_light(quad, glow, lit*0.55*opacity*seen, 1) }
 	// FIRST PERSON BRAWLER: the struck foe's print flashes white (first_person_fists.odin).
 	if flash := first_person_struck_flash(renderer, entity); flash > 0 { draw_first_person_struck_flash(quad, flash*opacity*seen) }
 }

@@ -319,6 +319,12 @@ Mira, preparazione, lancio, recupero, fendente, carica e protezione hanno
 piccoli pittogrammi distinti nel cartellino della vita e colori sul terreno. L’hover su un nemico
 visibile ne scrive l'intento con i secondi rimasti (`MUOVE / 2.8s`), il ruolo e
 come rispondere.
+**I nemici si illuminano mentre agiscono** (2026-10-29, in tutte le viste, anche
+in prima persona): tutta la carta diventa **rossa** per un colpo, una freccia o
+una carica, **viola** per lo scudo del Custode o una bomba. La luce cresce col
+conto alla rovescia dell'intento, pulsa sempre più veloce, e negli ultimi 0,25 s
+(la finestra della parata perfetta della spada) è al massimo e ferma; finito
+l'intento si spegne in 0,15 s ([foe_glow.odin](../../src/render/foe_glow.odin)).
 Lo stordimento nasconde le minacce dell’intento interrotto, ma non disinnesca
 esplosivi già presenti. Questi valori sono un primo bilanciamento da provare durante le run,
 anche mentre il player si muove durante il recupero.

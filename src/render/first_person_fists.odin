@@ -167,14 +167,21 @@ first_person_struck_flash :: proc(renderer: ^Renderer, entity: game.Entity_Ref) 
 // ink stays dark.
 @(private)
 draw_first_person_struck_flash :: proc(quad: Tactical_Billboard, flash: f32) {
-	if quad.texture.id == 0 || flash <= 0 { return }
+	draw_billboard_print_light(quad, rl.WHITE, flash, 3)
+}
+
+// `color` added over a card's print (its own pixels' shape), `passes` times
+// at `amount`: the struck flash, a foe's glow (foe_glow.odin).
+@(private)
+draw_billboard_print_light :: proc(quad: Tactical_Billboard, color: rl.Color, amount: f32, passes: int) {
+	if quad.texture.id == 0 || amount <= 0 { return }
 	uv := [4]rl.Vector2{{0, 0}, {0, 1}, {1, 1}, {1, 0}}
 	if quad.mirror { uv = {{1, 0}, {1, 1}, {0, 1}, {0, 0}} }
 	rl.BeginBlendMode(.ADDITIVE)
-	for _ in 0..<3 {
+	for _ in 0..<passes {
 		rlgl.SetTexture(quad.texture.id)
 		rlgl.Begin(rlgl.QUADS)
-		rlgl.Color4ub(255, 255, 255, u8(clamp(flash, 0, 1)*255))
+		rlgl.Color4ub(color.r, color.g, color.b, u8(clamp(amount, 0, 1)*255))
 		for point, index in quad.points {
 			rlgl.TexCoord2f((quad.source.x+uv[index].x*quad.source.width)/f32(quad.texture.width),
 				(quad.source.y+uv[index].y*quad.source.height)/f32(quad.texture.height))
