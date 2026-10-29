@@ -6,6 +6,22 @@ Qui si segna ogni carta tolta dal gioco o cambiata, con quello che faceva, così
 futuro. Le voci più recenti stanno in cima. Per ritrovare il commit di una voce:
 `git log --all --grep "<titolo del commit>"`.
 
+## 2026-10-29 — Carta nuova: First Person Archer (solo laboratorio)
+
+Commit **«Prima persona, Fase 6, passi 1-5: l'arco, regole e prototipo»** sul ramo `piano-prima-persona`
+([piano](piano-prima-persona.md), Fase 6).
+
+| Carta | Nel codice | Rarità | Energia | Effetto | Peso nelle offerte | Dove sta |
+|---|---|---|---:|---|---:|---|
+| First Person Archer | `First_Person_Archer` | rara | 3 | su di sé, 0 s di finestra: la vista in prima persona con l'arco per 30 s del mondo (+2 a potenziamento, fino a 40 a +5): a griglia come l'AK; destro tenuto tende (piena in 1,6 s), rilasciato tira, sinistro abbassa; da 0 a 4 rimbalzi sui muri secondo la carica, ognuno ×1,25 di velocità; danno 2 × velocità / 12, fino al 50% in più con i rimbalzi (da 2 a 15); cinque frecce a caso (veleno, fuoco, ghiaccio, stordente, dentata) con i loro stati; tre zone critiche sui muri (×1,6 e un rimbalzo gratis) | 60 (ma `Lab_Only`: mai offerta) | solo nell'arena «Prima persona» del laboratorio, nel suo mazzo |
+
+- È la quarta arma della vista di First Person Shooter (`First_Person_Weapon.Bow`); non si gioca in groppa al Dinosauro.
+- La freccia che torna sul Viandante rimbalza su di lui senza ferirlo, e conta come un rimbalzo gratis (la scelta
+  dell'utente); vola e colpisce anche fuori vista; frecce infinite.
+- Icona (cella 35): l'arco compound Neon di lato, la scelta dell'utente per la Fase 7. Suono della carta
+  (`card_first_person_archer`): le carrucole che girano, la corda che vibra (Karplus-Strong), il fischio.
+- Aspetto **provvisorio** nella vista (un arco semplice sulla tela a pixel): quello definitivo è della Fase 7.
+
 ## 2026-10-29 — Carta nuova: First Person Fencer (solo laboratorio)
 
 Commit **«Prima persona, Fase 4, passo 6: First Person Fencer nel laboratorio»** sul ramo `piano-prima-persona`

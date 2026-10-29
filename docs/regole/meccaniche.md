@@ -898,6 +898,29 @@ quando la regola guarda la guardia. La parata fa poche scintille smorte, la
 parata perfetta lampeggia la lama di bianco con scintille d'oro e un anello. Il
 rampino lancia un uncino con la catena.
 
+### First Person Archer
+
+`First Person Archer` (rara, energia 3, **0 s** di finestra; **solo nel
+laboratorio**, arena «Prima persona») è la quarta arma della vista: l'**arco**,
+per 30 secondi del mondo (+2 a potenziamento). Piano e scelte in
+[piano-prima-persona.md](../piano-prima-persona.md), Fase 6; regole in
+[first_person_bow.odin](../../src/game/first_person_bow.odin).
+
+Si cammina a griglia come con l'AK e si mira col mouse. **Il destro tenuto
+tende l'arco**, pieno in 1,6 s; **rilasciato tira**; il sinistro mentre si
+tende abbassa l'arco senza tirare. Più si tende, più la freccia va veloce (da 12
+a 28 caselle al secondo) e più rimbalzi può fare sui muri: da 0 a 4. **A ogni
+rimbalzo va più veloce** (×1,25), e il danno segue la velocità: 2 × velocità /
+12, più un ottavo a rimbalzo fino alla metà (da 2 a 15). Senza rimbalzi rimasti
+si pianta nel muro; il pavimento la ferma sempre; vola e colpisce anche fuori
+vista. Se torna sul Viandante rimbalza su di lui senza ferirlo, gratis. Ogni
+freccia ha uno stato a caso (Velenosa: Veleno 2, Incendiaria: Bruciatura 1, Di
+ghiaccio: Rallentamento 2, Stordente: Stordito 1, Dentata: Sanguinamento 1; uno
+di più a carica piena); l'HUD mostra quella incoccata e la prossima. Sui muri ci
+sono **tre zone critiche**: un rimbalzo lì è ×1,6 e non costa; si spostano 2 s
+dopo l'uso e ogni 12 s. Tendendo, una guida a puntini mostra la strada fino al
+secondo rimbalzo.
+
 ### Inondazione
 
 `Inondazione` (non comune, energia 2, **2 s** di finestra, fino a tre

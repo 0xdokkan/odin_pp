@@ -58,7 +58,7 @@ La tabella è in ordine di priorità, cioè l'ordine della scaletta qui sotto.
 | 3 | 3 | Pugni: guantoni, segni critici, colpi a schermo, suoni | 2 | Fatta | vedi Esito |
 | 4 | 4 | Spada: swing col mouse, parata, rampino; prototipo | 1 | Fatta | vedi Esito |
 | 5 | 5 | Spada: lama, scie, scintille, suoni | 4 | Fatta | vedi Esito |
-| 6 | 6 | Arco: carica, rimbalzi, zone critiche, frecce; prototipo | 1 | Da fare | — |
+| 6 | 6 | Arco: carica, rimbalzi, zone critiche, frecce; prototipo | 1 | Fatta | vedi Esito |
 | 7 | 7 | Arco: arco, frecce in volo, faretra nell'HUD, suoni | 6 | Da fare | — |
 | 8 | 8 | Tutte insieme: equilibrio, prestazioni, documenti | 3, 5, 7 | Da fare | — |
 
@@ -3272,6 +3272,52 @@ controllo completo, atti da soli e tempo di un fotogramma contro l'AK
 12. **Stack degli stati:** quelli della tabella (consigliato).
 13. **Ghiaccio:** Rallentamento (consigliato).
 14. **Guida:** **fino al secondo rimbalzo** (non la mia raccomandazione).
+
+**Fatta (2026-10-29, nella notte).** Le regole in un file solo
+(`game/first_person_bow.odin`), quindi i passi 1-4 sono in un commit insieme al
+prototipo del passo 5 (`7b1498d`).
+- **Come ho letto le risposte scritte:**
+  - **Carica di 1,6 s con più danno massimo:** la velocità di partenza è
+    12 + 16 × carica (da 12 a 28 caselle al secondo, invece di 12 + 12): un tiro
+    teso diretto fa 5 invece di 4.
+  - **Rimbalzi 0, 1, 2, 3, 4:** cinque livelli a ogni quarto di carica, l'ultimo a
+    carica piena.
+  - **Fino al 50% in più dai rimbalzi:** un ottavo in più a rimbalzo, al
+    massimo la metà (dal quarto rimbalzo). Tiro al volo diretto 2; teso diretto 5;
+    teso con un rimbalzo 7; teso con quattro rimbalzi e velocità al massimo 15.
+  - **La freccia che torna:** il Viandante è come un muro (la normale dal suo
+    centro al punto colpito), il rimbalzo fa accelerare e conta per il danno, ma
+    non costa nessuno dei rimbalzi rimasti, e lui non prende danno.
+  - **Zona critica:** ×1,6 e il rimbalzo non costa (anche senza rimbalzi
+    rimasti la freccia rimbalza lì).
+- **Ricerca:** il volo segue il Pinball, da un contatto al successivo (la
+  cella dopo, il pavimento, un nemico, il Viandante), con il passo fisso
+  della ripetibilità ([Fiedler](https://gafferongames.com/post/fix_your_timestep/));
+  il rimbalzo è la riflessione d − 2 (d·n) n; in un angolo cambiano tutte e due
+  le componenti. Il danno legato alla velocità e il limite di rimbalzi tengono
+  a bada quello che rese troppo forte la freccia di Hanzo in Overwatch
+  ([Upcomer](https://upcomer.com/new-patch-notes-for-overwatch-include-the-return-of-ricochet-arrows/)).
+- **Prove:** tiro che si pianta sul muro senza attraversarlo; rimbalzo; tiro
+  nel pavimento; volo uguale a 30, 144 e 240 fotogrammi al secondo a 60 caselle
+  al secondo senza mai uscire dalla stanza; angolo a 45° che torna indietro e
+  rimbalza sul Viandante senza ferirlo; la tabella del danno; ogni freccia col
+  suo stato e i suoi stack; le zone (dove nascono, l'accelerazione, lo
+  spostamento dopo 2 s e ogni 12); la guida fino al secondo rimbalzo; un
+  minuto di gioco con i nemici liberi; la dimostrazione della carta a ogni
+  frame rate.
+- **Prototipo:** un arco semplice sulla tela a pixel, la corda che arretra con la
+  carica, le frecce colorate dal loro stato in volo e piantate, i bersagli sulle
+  zone critiche, l'anello della carica con le quattro tacche e il numero dei
+  rimbalzi, la guida a puntini, la freccia incoccata e la prossima sotto il
+  mirino. L'atto `prima_persona` gioca la carta, tira dritto sul bruto e poi di
+  sponda (cerca da solo l'angolo con la guida): catture `_arco`, `_arco_teso`,
+  `_arco_sponda`.
+- **Verifica:** tutti i test verdi (1814); atto `fps` **114 su 114** uguale
+  alla Fase 0; atto `prima_persona` uguale in due giri. **Tempo di un
+  fotogramma** (`-o:speed`, due giri): arco 3,11 ms con più frecce in volo, AK
+  3,08 ms: circa l'1% in più, cioè 0,03 millesimi di secondo.
+- **Da provare a mano dall'utente:** la sensazione della carica e dei tiri di
+  sponda, i numeri del danno.
 
 
 ## 16. Fase 7 — Arco: arco, frecce in volo, faretra nell'HUD, suoni

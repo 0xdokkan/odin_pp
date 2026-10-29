@@ -97,13 +97,14 @@ della grotta, dei piani, degli ascensori, di First Person Shooter o dell'arena �
 sale tutto il sentiero a passi veri). L'atto `prima_persona` gira per ultimo nello smoke completo: l'AK, poi First Person
 Brawler (i guantoni Neon, un jab, un gancio, il jab che colpisce, un segno, il cross critico con la stella d'oro), poi
 First Person Fencer (lo zweihänder, un tondo sul bruto, la parata, il rampino e la catena tesa, il colpo roteante, la
-parata perfetta); prende anche l'arco, che non ha ancora la sua
-carta, per guardarne la sigla e la mano vuota.
+parata perfetta), poi First Person Archer (l'arco teso con l'anello della carica, un tiro dritto sul bruto, un tiro
+di sponda trovato con la guida).
 Con `ODIN_PP_LAB_ONLY=fps` e `ODIN_PP_LAB_TIMING=1` l'atto di First Person Shooter si ferma dopo la discesa negli occhi e misura
 600 fotogrammi con l'AK che spara, senza limite di fotogrammi né vsync (riga `FIRST PERSON TIMING`; meglio con una build `-o:speed`).
 Con `ODIN_PP_LAB_ONLY=prima_persona` la stessa misura la fa `ODIN_PP_LAB_TIMING=1` con i pugni (un pugno ogni quarto di
 secondo, `W` tenuto metà del tempo), `ODIN_PP_LAB_TIMING=sword` con la spada (la lama avanti e indietro) e
-`ODIN_PP_LAB_TIMING=ak` con l'AK, nella stessa arena.
+`ODIN_PP_LAB_TIMING=bow` con l'arco (teso un secondo e lasciato, di continuo) e `ODIN_PP_LAB_TIMING=ak` con l'AK,
+nella stessa arena.
 `--smoke-expedition` comprende l'atto «posa» (il fantasma verde e rosso, una statua e una casetta posate, la statua rotta da un colpo
 e la casetta che resta), l'atto «grotte» (in Neve, Far West, Egitto e Inferno: l'arco, l'ingresso e la seconda
 stanza della prima grotta, con il giro entra-esci controllato) e l'atto «montagna» (il robot in otto punti della salita, con le mappe della Neve

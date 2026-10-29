@@ -5,6 +5,17 @@ I riferimenti a Classica, `--flat` e ai vecchi smoke descrivono versioni precede
 per i comandi disponibili oggi valgono il [README](README.md) e la documentazione collegata.
 
 
+## 2026-10-29 — Prima persona, Fase 6 fatta: l'arco, regole e prototipo
+
+- **First Person Archer** (solo nel laboratorio, arena «Prima persona»): l'arco in prima persona per 30 s, a griglia.
+  Destro tenuto tende (pieno in 1,6 s), rilasciato tira, sinistro abbassa.
+- Le frecce rimbalzano sui muri (da 0 a 4 rimbalzi secondo la carica), sempre più veloci; il danno segue la velocità,
+  fino al 50% in più con i rimbalzi. Il volo è calcolato da un contatto al successivo: nessun muro attraversato,
+  uguale a ogni frame rate. La freccia che torna rimbalza sul Viandante senza ferirlo.
+- Cinque frecce a caso (veleno, fuoco, ghiaccio, stordente, dentata), tre zone critiche sui muri, la guida fino al
+  secondo rimbalzo.
+- Prototipo visibile, icona (l'arco compound), suono della carta e dimostrazione; l'AK resta identico (114 su 114).
+
 ## 2026-10-29 — Prima persona, Fase 5 fatta: aspetto e suoni della spada
 
 - **First Person Fencer** ha il suo zweihänder Neon (la scelta dell'utente: uno spadone a due mani cibernetico e
