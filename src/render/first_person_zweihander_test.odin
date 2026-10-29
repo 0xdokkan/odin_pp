@@ -35,3 +35,50 @@ test_first_person_zweihander_follows_the_point :: proc(t: ^testing.T) {
 	high, _ := first_person_zweihander_place({0, 0}, 0)
 	testing.expect(t, project(low).y < project(high).y)
 }
+
+// The sword's trail (first_person_sword.odin) is its seconds long whatever the
+// frame rate: a fast swing round a circle at 30, 60, 144 and 240 frames a
+// second leaves a line from exactly its seconds ago to the point, as long at
+// each, with no step between its points longer than the finest one.
+@(test)
+test_first_person_sword_trail_at_every_frame_rate :: proc(t: ^testing.T) {
+	rates := [4]f64{30, 60, 144, 240}
+	spans: [4]f32
+	for fps, index in rates {
+		v: First_Person_Sword_View
+		v.swinging = true
+		now := f64(1)
+		for _ in 0..<int(0.3*fps) {
+			now += 1/fps
+			// A turn in 0.6 s.
+			a := now*math.TAU/0.6
+			v.tip = {0.45*f32(math.cos(a)), 0.4*f32(math.sin(a))}
+			first_person_sword_keep_trail(&v, now)
+		}
+		points: [FIRST_PERSON_SWORD_TRAIL*FIRST_PERSON_SWORD_TRAIL_CUTS]First_Person_Sword_Trail_Point
+		count := first_person_sword_trail_points(&v, now, v.tip, points[:])
+		if !testing.expectf(t, count >= 2, "%v fps: no trail", fps) { continue }
+		testing.expectf(t, abs(points[0].age-1) < 1e-3, "%v fps: the tail is %v of the seconds old", fps, points[0].age)
+		testing.expect(t, points[count-1].age == 0 && points[count-1].tip == v.tip)
+		longest := f32(0)
+		for k in 0..<count-1 {
+			d := points[k+1].tip-points[k].tip
+			gap := math.sqrt(d.x*d.x+d.y*d.y)
+			longest = max(longest, gap)
+			spans[index] += gap
+		}
+		testing.expectf(t, longest <= FIRST_PERSON_SWORD_TRAIL_STEP*1.3, "%v fps: a gap of %v", fps, longest)
+	}
+	for span, index in spans {
+		testing.expectf(t, abs(span-spans[3]) < spans[3]*0.05, "%v fps: the trail %v long, %v at 240", rates[index], span, spans[3])
+	}
+	// Once the swing is over its places age away.
+	v: First_Person_Sword_View
+	v.swinging = true
+	first_person_sword_keep_trail(&v, 1)
+	first_person_sword_keep_trail(&v, 1.01)
+	v.swinging = false
+	first_person_sword_keep_trail(&v, 1.5)
+	points: [8]First_Person_Sword_Trail_Point
+	testing.expect(t, first_person_sword_trail_points(&v, 1.5, v.tip, points[:]) == 0)
+}
