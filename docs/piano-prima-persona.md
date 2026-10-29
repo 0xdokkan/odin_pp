@@ -3585,6 +3585,11 @@ dell'utente e i numeri ritoccati insieme) aspetta l'utente.
   nuove; il `README.md` ha la riga del piano aggiornata; `CHANGELOG.md`.
 - **Le carte restano `Lab_Only`** (la scelta dell'utente): nessuna offerta,
   nessun negozio, nessuna spedizione.
+- **Dalla prova dell'utente (2026-10-29), l'arco a destra:** l'utente lo voleva
+  a destra, vicino a dove sarebbe il braccio destro. L'arco, la freccia
+  incoccata e i due guantoni sono specchiati da sinistra a destra
+  (`FIRST_PERSON_COMPOUND_RIGHT`): la destra tiene l'arco, la sinistra la corda;
+  le frecce in volo partono da lì.
 - **Dalla prova dell'utente (2026-10-29), i danni dell'arco:** a raffica faceva
   più danni dell'AK. Le scelte dell'utente: il tiro senza carica fa 1 danno e
   può mancare, cadendo a parabola come se non avesse portata (un nemico a 3

@@ -5,6 +5,11 @@ I riferimenti a Classica, `--flat` e ai vecchi smoke descrivono versioni precede
 per i comandi disponibili oggi valgono il [README](README.md) e la documentazione collegata.
 
 
+## 2026-10-29 — Prima persona: l'arco a destra
+
+- L'arco di First Person Archer sta a destra del mirino, vicino al braccio destro, tenuto con la mano destra (la scelta
+  dell'utente); le frecce in volo partono da lì.
+
 ## 2026-10-29 — Prima persona: danni dell'arco ribilanciati
 
 - First Person Archer: il tiro senza carica (sotto 0,4 s) cade a parabola e può mancare il bersaglio, fa 1 danno e non

@@ -18,7 +18,9 @@ import rlgl "vendor:raylib/rlgl"
 // the bow is drawn the string comes back toward the eye with the right hand,
 // and the cams turn. The bow stands left of the crosshair, turned so that its
 // arrow points at the crosshair's place far ahead, canted a little the way an
-// archer holds it.
+// archer holds it. FIRST_PERSON_COMPOUND_RIGHT (the user's choice, 2026-10-29)
+// mirrors all of it across the view: the bow right of the crosshair, near
+// where the right arm is, in the right glove, the left one on the string.
 
 // Where the grip is in the gloves' camera (metres), the bow's cant (radians),
 // how far ahead its arrow aims at the crosshair, and its size.
@@ -37,6 +39,8 @@ FIRST_PERSON_COMPOUND_DRAW :: f32(0.24)
 FIRST_PERSON_COMPOUND_CAM :: [2]f32{0.33, 0.14}
 FIRST_PERSON_COMPOUND_CAM_RADIUS :: f32(0.042)
 FIRST_PERSON_COMPOUND_ARROW :: f32(0.62)
+// Held on the right: everything mirrored across the view.
+FIRST_PERSON_COMPOUND_RIGHT :: true
 
 First_Person_Compound_Shape :: enum u8 {Sphere, Cylinder, Cube}
 
@@ -120,6 +124,7 @@ first_person_compound_matrix :: proc(lift: f32) -> rl.Matrix {
 		0, 0, 0, 1,
 	}
 	k := FIRST_PERSON_COMPOUND_SCALE
+	when FIRST_PERSON_COMPOUND_RIGHT { return rl.MatrixScale(-1, 1, 1)*frame*rl.MatrixScale(k, k, k) }
 	return frame*rl.MatrixScale(k, k, k)
 }
 
@@ -231,9 +236,12 @@ draw_first_person_compound :: proc(renderer: ^Renderer, kit: ^First_Person_Glove
 		rl.SetShaderValue(kit.shader, rl.ShaderLocationIndex(kit.stuff_location), &value, .FLOAT)
 		rl.DrawMesh(mesh, material, at)
 	}
+	// Mirrored, the faces turn the other way round.
+	ink_face, face := rlgl.CullMode.FRONT, rlgl.CullMode.BACK
+	when FIRST_PERSON_COMPOUND_RIGHT { ink_face, face = .BACK, .FRONT }
 	for pass in 0..<2 {
 		ink := f32(1 if pass == 0 else 0)
-		rlgl.SetCullFace(.FRONT if pass == 0 else .BACK)
+		rlgl.SetCullFace(ink_face if pass == 0 else face)
 		rl.SetShaderValue(kit.shader, rl.ShaderLocationIndex(kit.ink_location), &ink, .FLOAT)
 		rl.SetShaderValue(kit.shader, rl.ShaderLocationIndex(kit.part_location), &none, .FLOAT)
 		grow := FIRST_PERSON_GLOVE_INK if pass == 0 else 0
@@ -250,7 +258,8 @@ draw_first_person_compound :: proc(renderer: ^Renderer, kit: ^First_Person_Glove
 		put(kit, material, kit.cube, .Cyan, bow*first_person_compound_rod(tail+{0, 0, -0.02}, tail+{0, 0, -0.09}, 0.02+grow*2))
 		put(kit, material, kit.cube, .Tint, bow*first_person_compound_rod(head+{0, 0, 0.035}, head, 0.022+grow*2))
 		// The gloves: the left round the grip, its forearm back to the left
-		// shoulder; the right on the string, back to the right.
+		// shoulder; the right on the string, back to the right (mirrored when
+		// held on the right: the right round the grip).
 		gloves := [2]rl.Matrix{
 			first_person_compound_glove(bow, {-0.004, 0.0, 0.03}, {0, 1, 0}, {-0.30, -0.25, 1}, true),
 			first_person_compound_glove(bow, nock+{0.03, -0.01, 0.02}, {0, 1, 0}, {0.6, -0.35, 1}, false),

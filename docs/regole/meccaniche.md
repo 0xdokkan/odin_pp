@@ -930,7 +930,9 @@ dopo l'uso e ogni 12 s. Tendendo, una guida a puntini mostra la strada fino al
 secondo rimbalzo.
 
 **Come si vede** (Fase 7): un arco **compound** Neon con le carrucole, tenuto con
-i due guantoni, la corda che arretra con la carica. Le frecce volano con la scia
+i due guantoni, la corda che arretra con la carica. Sta a destra del mirino,
+vicino al braccio destro (la scelta dell'utente, 2026-10-29): la mano destra
+tiene l'arco, la sinistra tira la corda. Le frecce volano con la scia
 del colore del loro stato, più lunga quanto più vanno veloci, e a ogni rimbalzo
 fanno scintille (d'oro sulle zone). Le zone critiche sono bersagli di carta con
 una luce che pulsa. La freccia incoccata e la prossima stanno nella faretra

@@ -24,6 +24,8 @@ Commit **«Prima persona, Fase 6, passi 1-5: l'arco, regole e prototipo»** sul 
   scia del loro colore, scintille ai rimbalzi, zone critiche come bersagli di carta con la luce che pulsa, la faretra
   attorno al mirino; suoni suoi (un ping più alto a ogni rimbalzo) e una musica sua nel laboratorio. Le regole non
   cambiano.
+- **2026-10-29, arco a destra** (la scelta dell'utente): l'arco nella vista sta a destra del mirino, vicino al braccio
+  destro, tenuto con la mano destra; la sinistra tira la corda. È tutto lo stesso arco, specchiato.
 - **2026-10-29, danni ribilanciati** (l'utente: a raffica faceva più danni dell'AK): il tiro rilasciato prima del primo
   livello è un **tiro veloce** che cade a parabola (tocca terra tra 2 e 4 caselle mirando dritto, manca un nemico a 3
   caselle circa una volta su tre), fa 1 danno e non dà stati; dopo ogni freccia la prossima si incocca in 0,15 s. Le
