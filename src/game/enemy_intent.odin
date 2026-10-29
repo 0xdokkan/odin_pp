@@ -694,7 +694,7 @@ record_enemy_attack_miss :: proc(
 }
 
 // Archers shoot and bombers throw; an object is struck from afar.
-@(private = "file")
+@(private)
 enemy_attack_is_ranged :: proc(enemy: ^Enemy, intent: ^Enemy_Intent) -> bool {
 	return enemy.archetype == .Archer || enemy.archetype == .Bomber || intent.target_object != 0 ||
 		(enemy.archetype == .Demolitionist && intent.kind == .Attack && intent.threatened_cell_count>0 &&

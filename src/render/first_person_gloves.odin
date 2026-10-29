@@ -474,6 +474,7 @@ prepare_first_person_gloves :: proc(renderer: ^Renderer) {
 	if FIRST_PERSON_LOOKS[f.weapon].hand == .Sword {
 		draw_first_person_sword_pixel(renderer, w, h, ready)
 		draw_first_person_zweihander(renderer, kit, ready)
+		draw_first_person_sword_sparks(renderer, w, h, ready)
 	} else {
 		draw_first_person_marks_pixel(renderer, w, h)
 		draw_first_person_glove_models(renderer, kit, ready)

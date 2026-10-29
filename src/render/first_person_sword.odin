@@ -202,6 +202,48 @@ first_person_sword_parry_flash :: proc(v: ^First_Person_Sword_View, now: f64) ->
 	return v.parry_perfect && v.parry_at > 0 && now >= v.parry_at && now-v.parry_at < FIRST_PERSON_SWORD_PARRY_FLASH
 }
 
+// A parry's sparks off the blade, over FIRST_PERSON_SWORD_SPARKS (as Sekiro
+// tells a deflection from a block, by its sparks: brighter, more, a ring round
+// them): a plain one a few dull orange sparks, a perfect one a burst of white
+// and gold and a ring opening round it.
+FIRST_PERSON_SWORD_SPARKS :: f64(0.3)
+// Where along the blade, from its guard, a blow is caught.
+FIRST_PERSON_SWORD_CAUGHT :: f32(0.62)
+@(private)
+draw_first_person_sword_sparks :: proc(renderer: ^Renderer, w, h: i32, ready: f32) {
+	v := &renderer.tactical.first_person.sword
+	now := renderer.sprite_assets.elapsed
+	since := now-v.parry_at
+	if v.parry_at <= 0 || since < 0 || since >= FIRST_PERSON_SWORD_SPARKS { return }
+	u := f32(since/FIRST_PERSON_SWORD_SPARKS)
+	tip := first_person_sword_shown_tip(v, now)
+	hilt := game.SWORD_HILT
+	guard := hilt+(tip-hilt)*FIRST_PERSON_ZWEIHANDER_ALONG
+	at := guard+(tip-guard)*FIRST_PERSON_SWORD_CAUGHT-{0, (1-ready)*0.6}
+	px :: proc(p: [2]f32, w, h: i32) -> rl.Vector2 {
+		return {math.round(f32(w)*0.5+p.x*f32(h)), math.round(f32(h)*0.5-p.y*f32(h))}
+	}
+	perfect := v.parry_perfect
+	count := 16 if perfect else 8
+	reach := f32(0.18 if perfect else 0.11)
+	flown := 1-(1-u)*(1-u)
+	for k in 0..<count {
+		angle := f32(k)/f32(count)*math.TAU+f32((k*37)%11)*0.05
+		speed := 0.6+0.4*f32((k*5)%7)/6
+		out := [2]f32{math.cos(angle), math.sin(angle)}*reach*speed*flown
+		// They fall as they fly.
+		out.y -= 0.1*u*u
+		color := rl.Color{226, 148, 70, 255}
+		if perfect { color = rl.Color{255, 250, 220, 255} if k%2 == 0 else rl.Color{255, 206, 72, 255} }
+		if u > 0.6 { color = first_person_sword_shade(color, {13, 20, 30, 255}, 0.4) }
+		rl.DrawLineEx(px(at+out*0.5, w, h), px(at+out, w, h), 2, color)
+	}
+	if perfect && u < 0.7 {
+		r := (0.03+0.14*u/0.7)*f32(h)
+		rl.DrawRing(px(at, w, h), r-1.5, r, 0, 360, 40, rl.Color{255, 250, 220, 255})
+	}
+}
+
 // The blood of the last cut, `since` seconds on: how long its streak is (a
 // part of its full length: it opens in 0.05 s, then thins away), how far its
 // drops have flown (0..1).

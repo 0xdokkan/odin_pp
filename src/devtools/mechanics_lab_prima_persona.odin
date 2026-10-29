@@ -323,6 +323,23 @@ mechanics_lab_prima_persona :: proc(window: ^app.Window, renderer: ^render.Rende
 		fmt.eprintln("mechanics lab: no spinning cut (facing", sword.facing, "cuts", sword.strikes-cuts, "last", sword.last, ")"); return false
 	}
 	spin := sword.last
+	// A perfect parry (Fase 5): the guard let go, then raised just as the
+	// brute's blow comes: the blade flashes white, sparks and a ring.
+	// The brute back in front (the spin may have thrown it a cell), held.
+	if index, found := game.enemy_index_by_id(room, brute); found { brute_index = index }
+	brute_enemy = &room.enemies[brute_index]
+	brute_enemy.position = game.add_position(room.player.position, {y = -1})
+	mechanics_lab_hold(room, brute)
+	for _ in 0..<4 { drive(window, renderer, room, controller, cards, buffer, {}) }
+	drive(window, renderer, room, controller, cards, buffer, {fire_right = true})
+	brute_enemy.intent = game.make_attack_intent(room, brute_enemy.position, room.player.position, 5)
+	pulse = {}
+	game.resolve_enemy_intents(room, &pulse, brute)
+	// Its blow spent, it is held again before the world's next beat comes.
+	mechanics_lab_hold(room, brute)
+	for _ in 0..<3 { drive(window, renderer, room, controller, cards, buffer, {fire_right = true}) }
+	artifacts.screenshot("odin_pp_mechanics_lab_prima_persona_spada_parata_perfetta.png")
+	if sword.perfect_parries != 1 { fmt.eprintln("mechanics lab: no perfect parry (", sword.parries, "parries)"); return false }
 	if !leave(window, renderer, room, controller, cards, buffer) { fmt.eprintln("mechanics lab: the sword's view did not end"); return false }
 
 	// The weapon still to come: the lab takes it up; its tag, the bare line, an empty hand, no shot.
@@ -354,7 +371,7 @@ mechanics_lab_prima_persona :: proc(window: ^app.Window, renderer: ^render.Rende
 	controller^ = {was_focused = true}
 	for _ in 0..<12 { mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0) }
 	fmt.eprintf("mechanics lab first person arena: %d shots of the AK in a second; the fists ran up to the brute, a jab, a hook " +
-		"and a critical cross on its mark; the sword cut the brute (%v for %d), parried its blow, pulled it in and spun " +
-		"into it (%d); %v shown with an empty hand and fired nothing\n", ak_shots, cut.kind, cut.damage, spin.damage, game.First_Person_Weapon.Bow)
+		"and a critical cross on its mark; the sword cut the brute (%v for %d), parried its blow, pulled it in, spun " +
+		"into it (%d) and parried it perfectly; %v shown with an empty hand and fired nothing\n", ak_shots, cut.kind, cut.damage, spin.damage, game.First_Person_Weapon.Bow)
 	return true
 }

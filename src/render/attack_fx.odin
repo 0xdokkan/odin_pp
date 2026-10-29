@@ -57,6 +57,11 @@ Attack_Fx :: struct {
 	// What the blow takes from its victim's health, shown as it lands
 	// (hold_unlanded_blows).
 	damage: i32,
+	// FIRST PERSON FENCER: begun before its beat to land on it
+	// (foresee_first_person_blows), for the intent planned at `foresee_pulse`;
+	// its cues find it when the beat has resolved it.
+	foreseen: bool,
+	foresee_pulse: u64,
 	id: u32,
 	kind: Attack_Fx_Kind,
 	look: Attack_Look,
@@ -660,6 +665,91 @@ attack_fx_of_cue :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) -> ^Attack
 	return nil
 }
 
+// FIRST PERSON FENCER: in the sword's view a blow at the player lands on
+// screen on its beat, when the rules decide it (sword_parry_blow reads the
+// guard then), not a little after as everywhere else: its attacker's
+// countdown is known, so its weapon (or its bolt) and its card's attack clip
+// start early enough to arrive then. Its cues, once the beat has resolved it,
+// find it already on the board (observe_attack_cues) and show no second one.
+// A blow that will not come after all (the intent changed, its attacker gone
+// or staggered, the player out of its cells) is taken back while it is still
+// more than FIRST_PERSON_FORESEE_KEEP from landing; closer, it plays out.
+FIRST_PERSON_FORESEE_KEEP :: f64(0.12)
+@(private)
+foresee_first_person_blows :: proc(renderer: ^Renderer, room: ^game.Room) {
+	v := &renderer.tactical
+	if !v.living || v.snapshot == nil || room == nil { return }
+	state := &v.attack_fx
+	now := renderer.sprite_assets.elapsed
+	active := game.first_person_sword_active(room)
+	coming :: proc(room: ^game.Room, attacker: game.Entity_Ref, pulse: u64) -> (enemy: ^game.Enemy, aim: grid.Position, swept: u16, ranged, ok: bool) {
+		for &e in room.enemies {
+			if game.enemy_entity(e.id) != attacker || (pulse != 0 && e.intent.planned_pulse != pulse) { continue }
+			aim, swept, ranged, ok = game.sword_coming_blow(room, &e)
+			return &e, aim, swept, ranged, ok
+		}
+		return
+	}
+	for &fx in state.items {
+		if !fx.used || !fx.foreseen || fx.batch != 0 || living_clock_at(renderer, fx.attacker, now) > fx.landing-FIRST_PERSON_FORESEE_KEEP { continue }
+		if _, _, _, _, still := coming(room, fx.attacker, fx.foresee_pulse); active && still { continue }
+		if character, _, known := attack_character(renderer, fx.attacker); known {
+			if slot := living_find(renderer, fx.attacker, character); slot != nil && slot.blow == fx.id {
+				living_start(slot, .Idle, living_clock(renderer, fx.attacker))
+				slot.blow = 0
+			}
+		}
+		fx = {}
+	}
+	if !active { return }
+	for &e in room.enemies {
+		attacker := game.enemy_entity(e.id)
+		enemy, aim, swept, ranged, ok := coming(room, attacker, 0)
+		if !ok { continue }
+		known := false
+		for fx in state.items { known = known || (fx.used && fx.foreseen && fx.attacker == attacker && fx.foresee_pulse == enemy.intent.planned_pulse) }
+		if known { continue }
+		look := attack_look(renderer, attacker, ranged)
+		character, _, found := attack_character(renderer, attacker)
+		if look == .None || !found { continue }
+		left := f64(game.tactical_enemy_seconds(room, enemy))
+		impact := attack_fx_impact_seconds(character)
+		id: u32
+		if attack_fx_kind(look, ranged) == .Projectile {
+			cells := f32(max(abs(aim.x-enemy.position.x), abs(aim.y-enemy.position.y)))
+			flight := attack_flight_seconds(look, cells)
+			if left > impact+flight { continue }
+			id, _, _ = play_attack_projectile(renderer, attacker, game.PLAYER_ENTITY, look, aim, .Hit, max(0, left-flight))
+		} else {
+			if left > impact { continue }
+			id, _ = play_attack_swing(renderer, attacker, game.PLAYER_ENTITY, look, aim, swept, .Hit, left)
+		}
+		fx := attack_fx_by_id(renderer, id)
+		if fx == nil { continue }
+		// Exactly on the beat, whatever the bolt's flight came to.
+		shift := fx.start+left-fx.landing
+		fx.contact += shift
+		fx.landing += shift
+		fx.swept, fx.slot = swept, -1
+		fx.foreseen, fx.foresee_pulse = true, enemy.intent.planned_pulse
+		// Its card strikes with it: the attack clip's hit drawing on the contact.
+		if slot := living_find(renderer, attacker, character); slot != nil {
+			living_start(slot, .Attack, fx.contact-impact)
+			slot.blow, slot.shot = fx.id, ranged
+		}
+	}
+}
+
+// The blow begun before its beat that `cue` shows, not yet found by a cue.
+@(private = "file")
+attack_fx_foreseen :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) -> ^Attack_Fx {
+	if !attack_cue_is_blow(cue) || attack_cue_returns_bolt(cue) { return nil }
+	for &fx in renderer.tactical.attack_fx.items {
+		if fx.used && fx.foreseen && fx.batch == 0 && fx.attacker == cue.event.source && fx.victim == cue.event.target { return &fx }
+	}
+	return nil
+}
+
 // Once per frame, before the cards read their cues: a prop for every blow
 // that has started showing, one per blow however many of its cues show.
 @(private)
@@ -705,6 +795,15 @@ observe_attack_cues :: proc(renderer: ^Renderer) {
 		if seen { continue }
 		state.seen[state.seen_next] = key
 		state.seen_next = (state.seen_next+1)%len(state.seen)
+		// FIRST PERSON FENCER: already on the board, begun before its beat.
+		if fx := attack_fx_foreseen(renderer, cue); fx != nil {
+			fx.batch, fx.aim, fx.swept = key.batch, key.aim, key.swept
+			fx.outcome, fx.critical = outcome, game.event_is_critical(cue.event)
+			fx.deflect = cue.kind == .Attack_Deflected
+			if cue.kind == .Damage { fx.damage = cue.event.amount }
+			if index, carried := game.status_index(&v.snapshot.player.statuses, .Deflect); carried && fx.deflect { fx.slot = i32(index) }
+			continue
+		}
 		ranged := game.event_is_ranged_attack(cue.event)
 		look := attack_look(renderer, key.attacker, ranged)
 		id: u32

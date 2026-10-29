@@ -579,6 +579,29 @@ sword_parry_blow :: proc(room: ^Room, enemy: ^Enemy, intent: ^Enemy_Intent, rang
 	return true
 }
 
+// The blow `enemy`'s intent will strike the player with at its beat, as its
+// cues will mark it (resolve_enemy_blow): its aim, the cells it sweeps round
+// the aim (footprint bits) and whether it flies; none from a bomber, from one
+// out of play or staggered, or aimed elsewhere. FIRST PERSON FENCER's board
+// times it to land on screen on its beat (render/attack_fx.odin).
+sword_coming_blow :: proc(room: ^Room, enemy: ^Enemy) -> (aim: grid.Position, swept: u16, ranged, coming: bool) {
+	if room == nil || room.player == nil || enemy == nil { return }
+	intent := &enemy.intent
+	if intent.kind != .Attack || intent.threatened_cell_count == 0 || intent.target_object != 0 || enemy.archetype == .Bomber ||
+	   enemy_is_out_of_play(room, enemy.id) { return }
+	if _, staggered := status_index(&enemy.statuses, .Stagger); staggered { return }
+	cells := intent.threatened_cells[:intent.threatened_cell_count]
+	hit := false
+	for cell in cells { hit = hit || cell == room.player.position }
+	if !hit { return }
+	aim = cells[0]
+	swept, _ = event_footprint_bit(aim, aim)
+	for cell in cells {
+		if bit, ok := event_footprint_bit(aim, cell); ok { swept |= bit }
+	}
+	return aim, swept, enemy_attack_is_ranged(enemy, intent), true
+}
+
 // The sword's own wounds.
 event_is_first_person_cut :: proc(event: Game_Event) -> bool {
 	return event.visual_group == SWORD_VISUAL_GROUP

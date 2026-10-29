@@ -54,7 +54,11 @@ collect_tactical_translucents :: proc(renderer: ^Renderer, room: ^game.Room = ni
 	// reuses them as they are. The blows first: a struck card's reaction
 	// waits for its own. The ground was followed once this frame already, as
 	// the board began (draw_tactical_world).
-	if room != nil { observe_attack_cues(renderer) }
+	if room != nil {
+		// FIRST PERSON FENCER's blows begun before their beat, then the cues.
+		foresee_first_person_blows(renderer, room)
+		observe_attack_cues(renderer)
+	}
 	if room != nil { update_flipbook_actors(renderer, room) }
 	if room != nil && v.living { update_living_actors(renderer, room) }
 	living := v.living && v.living_assets.loaded && v.living_state != nil
