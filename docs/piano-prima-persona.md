@@ -2476,6 +2476,14 @@ L'atto `prima_persona` cattura la stessa guardia in ogni stile
 (`_stile_cyber.png`, `_stile_neon.png`, `_stile_circuiti.png`); lo stile di oggi
 resta quello di partenza ed è identico al pixel a prima.
 
+**Scelta dell'utente (2026-10-29):** «mi piace la terza foto, quella con i
+guantoni viola», cioè la proposta **2, Neon** (non la mia raccomandazione, che
+era la 1, Cyber del gioco). Vale anche per spada e arco (Fasi 5 e 7).
+Domande per il passo 2: le altre tre versioni **si tolgono** dal codice
+(consigliato; restano nella cronologia di git); il Neon **con più linee al
+neon** (non la mia raccomandazione, che era tenerlo com'è nella foto): sottili
+linee magenta sul dorso e sul polsino, come tubi al neon.
+
 ## 13. Fase 4 — Spada: swing col mouse, parata, rampino; prototipo
 
 ### Obiettivo
