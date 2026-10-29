@@ -2484,6 +2484,22 @@ Domande per il passo 2: le altre tre versioni **si tolgono** dal codice
 neon** (non la mia raccomandazione, che era tenerlo com'è nella foto): sottili
 linee magenta sul dorso e sul polsino, come tubi al neon.
 
+**Passo 2 — il Neon sui guantoni: fatto** (2026-10-29). Le altre tre versioni
+sono tolte (`First_Person_Glove_Style` non c'è più; la luce dei guantoni ha solo
+il Neon). I materiali ora sono carbonio, neon e fasce
+(`First_Person_Glove_Stuff`): carbonio blu notte a tre tinte con il punto di
+lucido e il bordo di luce ciano; fasce del polsino e striscia del dorso magenta
+accese (il lato in ombra un magenta più scuro); fasce dell'avambraccio in
+carbonio più scuro. **Più linee al neon**, disegnate sulla forma di ogni pezzo:
+la cucitura sulle nocche, due tubi lungo il dorso, un anello intorno al polsino
+e una riga lungo la sua cima, anelli sulle fasce vicino al polsino. Catture
+guardate: guardia, jab e gancio. Il passo 2 del piano parlava di guantoni
+dipinti da script in `tools/art`: non servono, perché i guantoni sono il modello
+da codice della Fase 2 («così è perfetto»).
+Verifiche: `check.ps1` completo, **1782 test verdi** con e senza assert;
+atto `fps` **114 su 114** uguale alla Fase 0; atto `prima_persona` uguale in
+due giri.
+
 ## 13. Fase 4 — Spada: swing col mouse, parata, rampino; prototipo
 
 ### Obiettivo

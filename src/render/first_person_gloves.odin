@@ -7,9 +7,10 @@ import rlgl "vendor:raylib/rlgl"
 import tween "../engine/tween"
 import game "../game"
 
-// FIRST PERSON BRAWLER's gloves (the user's choices of 2026-10-29): two gloves
-// of black leather with gold bands, made from code as a 3D model but drawn as
-// paper pixel art, held up in a boxer's guard at the bottom middle of the view
+// FIRST PERSON BRAWLER's gloves (the user's choices of 2026-10-29): two neon
+// gloves (Fase 3's style, the user's pick of three: blue-black carbon, magenta
+// bands and neon tubes, a cyan rim of light), made from code as a 3D model but
+// drawn as paper pixel art, held up in a boxer's guard at the bottom middle of the view
 // as a person's own hands sit: the left (the lead) a little forward and higher,
 // the right at the chin, both knuckles up and turned in, their cuffs cut by the
 // bottom edge, the crosshair left clear. The model draws with a camera of its
@@ -66,15 +67,7 @@ FIRST_PERSON_GLOVE_HOOK := [2]First_Person_Glove_Pose{
 }
 
 // What a part is made of: each its own tones (FIRST_PERSON_GLOVE_FRAGMENT).
-First_Person_Glove_Stuff :: enum i32 {Leather, Gold, Wrap}
-
-// The cybernetic proposals of Fase 3, passo 1 (docs/piano-prima-persona.md),
-// on the same model: the black leather and gold the user liked; the game's
-// Cyber biome (dark metal, light only from red seams and a blue indicator);
-// neon (blue-black carbon, magenta bands, a cyan rim); gold circuits printed on
-// the black leather, with a blue indicator. The lab's act shows each.
-First_Person_Glove_Style :: enum i32 {Leather_Gold, Cyber, Neon, Circuits}
-first_person_glove_style := First_Person_Glove_Style.Leather_Gold
+First_Person_Glove_Stuff :: enum i32 {Carbon, Neon, Wrap}
 
 // One glove's shapes in its own frame (X right, Y the back of the hand, -Z the
 // knuckles), for the left hand: the right mirrors X. A sphere or a cylinder
@@ -92,14 +85,14 @@ FIRST_PERSON_GLOVE_PARTS := [?]First_Person_Glove_Part{
 	{at = {0, 0.004, -0.046}, size = {0.056, 0.049, 0.046}},
 	// The thumb along the inner side, toward the palm.
 	{at = {0.046, -0.004, -0.018}, size = {0.023, 0.028, 0.050}},
-	// The cuff and its two gold bands.
+	// The cuff and its two neon bands.
 	{cylinder = true, at = {0, -0.004, 0.050}, size = {0.050, 0.110, 0.045}},
-	{cylinder = true, stuff = .Gold, at = {0, -0.004, 0.046}, size = {0.0535, 0.018, 0.0485}},
-	{cylinder = true, stuff = .Gold, at = {0, -0.004, 0.128}, size = {0.0525, 0.012, 0.0475}},
+	{cylinder = true, stuff = .Neon, at = {0, -0.004, 0.046}, size = {0.0535, 0.018, 0.0485}},
+	{cylinder = true, stuff = .Neon, at = {0, -0.004, 0.128}, size = {0.0525, 0.012, 0.0475}},
 	// The wrapped forearm out of the cuff, on past the view's edge (never its end).
 	{cylinder = true, stuff = .Wrap, at = {0, -0.004, 0.100}, size = {0.036, 0.420, 0.033}},
-	// The gold stripe down the back of the hand.
-	{stuff = .Gold, at = {0, 0.050, -0.014}, size = {0.013, 0.0060, 0.050}},
+	// The neon stripe down the back of the hand.
+	{stuff = .Neon, at = {0, 0.050, -0.014}, size = {0.013, 0.0060, 0.050}},
 }
 
 // The gloves' GPU handles: a sphere and a cylinder of radius and height 1, the
@@ -109,7 +102,7 @@ FIRST_PERSON_GLOVE_PARTS := [?]First_Person_Glove_Part{
 First_Person_Glove_Kit :: struct {
 	sphere, cylinder: rl.Mesh,
 	shader, paper_shader: rl.Shader,
-	stuff_location, ink_location, texel_location, style_location, part_location: i32,
+	stuff_location, ink_location, texel_location, part_location: i32,
 	low, paper: rl.RenderTexture2D,
 	ready, failed: bool,
 }
@@ -131,37 +124,24 @@ void main() {
 }
 `
 
-// A pixel artist's shading: a warm key light from the upper left makes three
-// flat tones of each stuff (shade, base, light), a sharp gloss one more spot,
-// a rim of warm light the leather's edge toward the arena; the gold takes its
-// tone from the sky it mirrors. `ink` draws the board's ink (the outline's shell).
-// `style` picks a proposal's tones and printed details (First_Person_Glove_Style),
-// `part` names the piece (FIRST_PERSON_GLOVE_PARTS' order); the details sit on
-// the piece's own unit shape (`fragLocal`), the lit ones flat, unshaded.
+// A pixel artist's shading: a key light from the upper left makes three flat
+// tones of the carbon (shade, base, light), a sharp gloss one more spot, a rim
+// of cyan light along its edge; the neon bands and tubes are lit, flat (only
+// their shaded side a darker magenta). `ink` draws the board's ink (the
+// outline's shell). `part` names the piece (FIRST_PERSON_GLOVE_PARTS' order);
+// the tubes sit on the piece's own unit shape (`fragLocal`).
 FIRST_PERSON_GLOVE_FRAGMENT :: `#version 330
 in vec3 fragPos;
 in vec3 fragNormal;
 in vec3 fragLocal;
 uniform float stuff;
 uniform float ink;
-uniform float style;
 uniform float part;
 out vec4 finalColor;
-const vec3 LEATHER[4] = vec3[](vec3(12, 10, 17), vec3(28, 25, 37), vec3(52, 47, 66), vec3(142, 132, 160));
-const vec3 GOLD[4] = vec3[](vec3(124, 70, 24), vec3(208, 142, 42), vec3(246, 200, 88), vec3(255, 244, 196));
-const vec3 WRAP[4] = vec3[](vec3(30, 28, 38), vec3(56, 52, 66), vec3(86, 82, 100), vec3(120, 116, 136));
-const vec3 RIM = vec3(150, 104, 44);
-const vec3 METAL[4] = vec3[](vec3(8, 9, 12), vec3(22, 23, 27), vec3(45, 47, 52), vec3(104, 108, 118));
-const vec3 CAP[4] = vec3[](vec3(10, 11, 14), vec3(31, 33, 38), vec3(52, 55, 62), vec3(90, 94, 104));
 const vec3 CARBON[4] = vec3[](vec3(10, 8, 24), vec3(24, 18, 48), vec3(44, 34, 84), vec3(126, 112, 210));
-const vec3 RED_LIT = vec3(242, 22, 30);
-const vec3 RED_DIM = vec3(150, 14, 22);
-const vec3 SCREEN = vec3(42, 167, 216);
-const vec3 SCREEN_LIT = vec3(150, 230, 255);
 const vec3 MAGENTA = vec3(255, 64, 206);
 const vec3 MAGENTA_DIM = vec3(150, 22, 120);
 const vec3 CYAN = vec3(60, 240, 255);
-vec3 lit(int tone, float gloss, vec3 tones[4]) { return tones[gloss > 0.55 ? 3 : tone]; }
 void main() {
     if (ink > 0.5) { finalColor = vec4(13.0, 20.0, 30.0, 255.0)/255.0; return; }
     vec3 n = normalize(fragNormal);
@@ -173,48 +153,22 @@ void main() {
     int tone = wrap < 0.50 ? 0 : (wrap < 0.82 ? 1 : 2);
     vec3 l = fragLocal;
     int p = int(part+0.5);
-    int s = int(style+0.5);
-    float sky = reflect(-v, n).y*0.5+0.5;
-    float t = wrap*0.55+sky*0.45;
-    int metal = gloss > 0.5 ? 3 : (t < 0.40 ? 0 : (t < 0.70 ? 1 : 2));
     vec3 c;
-    if (s == 1) {
-        // The Cyber biome: dark metal and caps; the bands and the stripe red
-        // seams of light, a red seam across the knuckles, a blue indicator on
-        // the cuff's top.
-        if (stuff > 1.5) { c = lit(tone, gloss, CAP); }
-        else if (stuff > 0.5) { c = tone == 0 ? RED_DIM : RED_LIT; }
-        else { c = lit(tone, gloss, METAL); }
-        if (p == 1 && abs(l.y-0.30) < 0.10 && l.z < 0.25) { c = RED_LIT; }
-        if (p == 3 && l.z < -0.80 && l.y > 0.30 && l.y < 0.62) { c = abs(l.x) < 0.25 ? SCREEN_LIT : SCREEN; }
-    } else if (s == 2) {
-        // Neon: blue-black carbon, magenta bands and stripe, a cyan rim of light.
-        if (stuff > 1.5) { c = lit(tone, gloss, CARBON)*0.8; }
-        else if (stuff > 0.5) { c = tone == 0 ? MAGENTA_DIM : MAGENTA; }
-        else {
-            c = lit(tone, gloss, CARBON);
-            if (rim > 0.68) { c = CYAN; }
-        }
-        if (p == 1 && abs(l.y-0.30) < 0.08 && l.z < 0.25) { c = MAGENTA; }
-    } else {
-        if (stuff > 1.5) { c = WRAP[gloss > 0.6 ? 3 : tone]; }
-        else if (stuff > 0.5) { c = GOLD[metal]; }
-        else {
-            c = lit(tone, gloss, LEATHER);
-            if (tone < 2 && rim > 0.78) { c = RIM; }
-        }
-        if (s == 3) {
-            // Gold circuits printed on the back of the hand and the knuckles,
-            // with their pads, and a blue indicator on the cuff's top.
-            bool back = (p == 0 || p == 1) && l.y > 0.30;
-            float across = abs(fract(l.x*2.2+0.5)-0.5);
-            float along = abs(fract(l.z*1.8+0.25)-0.5);
-            bool trace = back && ((across < 0.06 && l.z > -0.75) || (along < 0.05 && abs(l.x) < 0.62));
-            bool pad = back && across < 0.13 && along < 0.13;
-            if (trace || pad) { c = GOLD[pad ? 2 : (tone == 0 ? 0 : 1)]; }
-            if (p == 3 && l.z < -0.80 && l.y > 0.38 && l.y < 0.58 && abs(l.x) < 0.30) { c = SCREEN_LIT; }
-        }
+    if (stuff > 1.5) { c = CARBON[gloss > 0.55 ? 3 : tone]*0.8; }
+    else if (stuff > 0.5) { c = tone == 0 ? MAGENTA_DIM : MAGENTA; }
+    else {
+        c = CARBON[gloss > 0.55 ? 3 : tone];
+        if (rim > 0.68) { c = CYAN; }
     }
+    // The neon tubes: a seam across the knuckles, two along the back of the
+    // hand, a ring round the cuff and one along its top, rings round the wraps
+    // near the cuff.
+    bool tube = p == 1 && abs(l.y-0.30) < 0.08 && l.z < 0.25;
+    tube = tube || (p == 0 && l.y > 0.25 && abs(abs(l.x)-0.42) < 0.06 && l.z > -0.70 && l.z < 0.75);
+    tube = tube || (p == 3 && abs(l.y-0.55) < 0.05);
+    tube = tube || (p == 3 && l.z < -0.75 && abs(l.x) < 0.07 && l.y > 0.15 && l.y < 0.95);
+    tube = tube || (p == 6 && l.y < 0.5 && abs(fract(l.y*6.0)-0.5) < 0.035);
+    if (tube) { c = MAGENTA; }
     finalColor = vec4(c/255.0, 1.0);
 }
 `
@@ -266,7 +220,6 @@ first_person_glove_kit :: proc(f: ^First_Person_View) -> ^First_Person_Glove_Kit
 	kit.stuff_location = rl.GetShaderLocation(shader, "stuff")
 	kit.ink_location = rl.GetShaderLocation(shader, "ink")
 	kit.texel_location = rl.GetShaderLocation(paper, "texel")
-	kit.style_location = rl.GetShaderLocation(shader, "style")
 	kit.part_location = rl.GetShaderLocation(shader, "part")
 	kit.sphere = rl.GenMeshSphere(1, 24, 32)
 	kit.cylinder = rl.GenMeshCylinder(1, 1, 32)
@@ -383,8 +336,6 @@ draw_first_person_glove_models :: proc(renderer: ^Renderer, kit: ^First_Person_G
 	camera := rl.Camera3D{position = {0, 0, 0}, target = {0, 0, -1}, up = {0, 1, 0}, fovy = FIRST_PERSON_GLOVE_FOV, projection = .PERSPECTIVE}
 	maps: [12]rl.MaterialMap
 	material := rl.Material{shader = kit.shader, maps = raw_data(maps[:])}
-	style := f32(first_person_glove_style)
-	rl.SetShaderValue(kit.shader, rl.ShaderLocationIndex(kit.style_location), &style, .FLOAT)
 	rl.BeginMode3D(camera)
 	rlgl.EnableBackfaceCulling()
 	for side in 0..<2 {

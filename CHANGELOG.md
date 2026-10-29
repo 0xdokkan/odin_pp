@@ -5,6 +5,14 @@ I riferimenti a Classica, `--flat` e ai vecchi smoke descrivono versioni precede
 per i comandi disponibili oggi valgono il [README](README.md) e la documentazione collegata.
 
 
+## 2026-10-29 — Prima persona, Fase 3: stile Neon dei guantoni
+
+- Tre proposte di stile cibernetico sui guantoni veri (Cyber del gioco, Neon, Circuiti d'oro); l'utente sceglie il
+  **Neon**, che vale anche per spada e arco.
+- I guantoni di First Person Brawler sono Neon: carbonio blu notte, fasce e striscia magenta accese, bordo di luce ciano,
+  e più tubi al neon (nocche, dorso, polsino, fasce). Le altre versioni sono tolte.
+- L'AK resta identico (114 catture su 114 uguali alla Fase 0).
+
 ## 2026-10-29 — Prima persona, Fase 2: critico senza mira e guantoni 3D
 
 - **First Person Brawler** (solo nel laboratorio), dopo la prova dell'utente:

@@ -133,19 +133,6 @@ mechanics_lab_prima_persona :: proc(window: ^app.Window, renderer: ^render.Rende
 		fmt.eprintln("mechanics lab: the fists' words are not shown"); return false
 	}
 	artifacts.screenshot("odin_pp_mechanics_lab_prima_persona_pugni.png")
-	// The cybernetic proposals (Fase 3, passo 1): the same guard in each style.
-	styles := [3]struct{style: render.First_Person_Glove_Style, name: cstring}{
-		{.Cyber, "odin_pp_mechanics_lab_prima_persona_stile_cyber.png"},
-		{.Neon, "odin_pp_mechanics_lab_prima_persona_stile_neon.png"},
-		{.Circuits, "odin_pp_mechanics_lab_prima_persona_stile_circuiti.png"},
-	}
-	for proposal in styles {
-		render.first_person_glove_style = proposal.style
-		frame(window, renderer, room, controller, cards, buffer)
-		artifacts.screenshot(proposal.name)
-	}
-	render.first_person_glove_style = .Leather_Gold
-	frame(window, renderer, room, controller, cards, buffer)
 	// W held: free up to the brute.
 	run := run_session.Tactical_Controller_Input{}
 	run.walk[0] = true
