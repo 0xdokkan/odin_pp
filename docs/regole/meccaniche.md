@@ -819,6 +819,39 @@ riquadro dei secondi e la riga dell'HUD ci stanno interi.
 > comprano, non si scoprono e non entrano in una spedizione. Le carte della
 > campagna con gli stessi nomi sono altre (gli ordigni di `game/memory_devices.odin`).
 
+### First Person Brawler
+
+`First Person Brawler` (rara, energia 3, **0 s** di finestra; **solo nel
+laboratorio**, arena «Prima persona») è la seconda arma della vista di First
+Person Shooter: i **pugni**, per 20 secondi del mondo (+2 a potenziamento).
+Piano e scelte in [piano-prima-persona.md](../piano-prima-persona.md), Fasi 2 e
+3; regole in [first_person_fists.odin](../../src/game/first_person_fists.odin),
+[first_person_punches.odin](../../src/game/first_person_punches.odin) e
+[first_person_marks.odin](../../src/game/first_person_marks.odin); disegno in
+[first_person_fists.odin](../../src/render/first_person_fists.odin) e
+[first_person_gloves.odin](../../src/render/first_person_gloves.odin).
+
+**Il movimento è libero**, non a caselle: `W A S D` muovono il corpo (un
+cerchio) a 5 caselle al secondo girati con la vista; `Spazio` salta (scavalca le
+coperture basse, sale fino a 4 gradini); due tocchi veloci di una direzione
+scattano di 2 caselle. Passare il bordo di una casella è un passo vero, senza
+tempo. **I pugni:** clic sinistro jab (3), destro cross (4), con `Shift` i ganci
+(6), uno per pressione; mentre un pugno è fuori va a metà velocità. **I segni
+critici** si accendono sui nemici vicini, del colore del pugno che chiedono
+(gancio sinistro arancio, jab azzurro, cross giallo, gancio destro magenta): quel
+pugno, se prende il nemico, fa **il triplo** dovunque prenda, e il gancio critico
+lo stordisce. Correndo i colpi dei nemici prendono solo se toccano il corpo; in
+aria solo i tiri.
+
+**Come si vede.** Due guantoni **Neon** (carbonio viola, fasce e tubi magenta,
+bordo di luce ciano), un modello 3D da codice disegnato come pixel art di
+cartoncino, in guardia da pugile in basso al centro; jab e cross dritti al
+mirino, i ganci larghi dal loro lato, raggi e scie di velocità. Il pugno che
+colpisce ferma il disegno per 0,08 s, scuote la vista e fa diventare bianco il
+nemico; il critico fa scoppiare una stella d'oro. **Suoni** da codice: aria,
+tonfo di cuoio per pugno, ding del critico, tic dei segni, campanella del ring
+all'entrata, poi la musica dei pugni.
+
 ### Inondazione
 
 `Inondazione` (non comune, energia 2, **2 s** di finestra, fino a tre

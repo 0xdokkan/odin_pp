@@ -434,17 +434,27 @@ MECHANICS_LAB_TIMING_SAMPLES :: 600
 // whole smoke frame (controller, view, board, HUD, presentation), with no frame
 // limit and no vsync, as the expedition benchmark measures. The world takes
 // sixty frames a second whatever the real time, so every run sees the same room.
-@(private = "file")
+// The first person arena's act (mechanics_lab_prima_persona.odin) measures the fists with it.
+@(private)
 mechanics_lab_first_person_timing :: proc(window: ^app.Window, renderer: ^render.Renderer, room: ^game.Room,
-	controller: ^run_session.Tactical_Controller, cards: ^run_session.Card_Interaction_State, buffer: ^run_session.Buffered_Gameplay_Command) -> bool {
+	controller: ^run_session.Tactical_Controller, cards: ^run_session.Card_Interaction_State, buffer: ^run_session.Buffered_Gameplay_Command,
+	fists := false) -> bool {
 	rl.SetTargetFPS(0)
 	rl.ClearWindowState({.VSYNC_HINT})
 	fp := &renderer.tactical.first_person
-	fp.yaw, fp.pitch = -math.PI/2, 0
+	// The AK fires north; the fists (Fase 3) face the brute east, a punch every
+	// quarter of a second (jab, cross, hooks in turn), W held half the time.
+	fp.yaw, fp.pitch = (0 if fists else -math.PI/2), 0
 	samples: [MECHANICS_LAB_TIMING_SAMPLES]f64
 	last := rl.GetTime()
 	for index in 0..<MECHANICS_LAB_TIMING_WARMUP+MECHANICS_LAB_TIMING_SAMPLES {
-		mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0, true, nil, {focused = true, fire = true})
+		input := run_session.Tactical_Controller_Input{focused = true, fire = true}
+		if fists {
+			press := index%15 == 0
+			input = {focused = true, fire = press && (index/15)%2 == 0, fire_right = press && (index/15)%2 == 1, shift = (index/30)%2 == 1}
+			input.walk[0] = (index/60)%2 == 0
+		}
+		mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0, true, nil, input)
 		now := rl.GetTime()
 		if index >= MECHANICS_LAB_TIMING_WARMUP { samples[index-MECHANICS_LAB_TIMING_WARMUP] = (now-last)*1000 }
 		last = now

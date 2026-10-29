@@ -5,7 +5,7 @@ I riferimenti a Classica, `--flat` e ai vecchi smoke descrivono versioni precede
 per i comandi disponibili oggi valgono il [README](README.md) e la documentazione collegata.
 
 
-## 2026-10-29 — Prima persona, Fase 3: stile Neon dei guantoni
+## 2026-10-29 — Prima persona, Fase 3 fatta: aspetto e suoni dei pugni
 
 - Tre proposte di stile cibernetico sui guantoni veri (Cyber del gioco, Neon, Circuiti d'oro); l'utente sceglie il
   **Neon**, che vale anche per spada e arco.
@@ -20,6 +20,8 @@ per i comandi disponibili oggi valgono il [README](README.md) e la documentazion
 - **Suoni dei pugni** fatti da codice: aria, tonfo di cuoio per pugno con un crepitio Neon, ding del critico, tic dei
   segni, campanella del ring all'entrata; **la musica dei pugni** (stereo, 32 s in giro) dopo la campanella, in
   dissolvenza.
+- **Misura nuova** `ODIN_PP_LAB_TIMING=1` (pugni) e `=ak` (AK) nell'atto `prima_persona`: nella stessa arena i pugni
+  costano come l'AK (4,3 ms di media a fotogramma con la build `-o:speed`).
 - L'AK resta identico (114 catture su 114 uguali alla Fase 0).
 
 ## 2026-10-29 — Prima persona, Fase 2: critico senza mira e guantoni 3D

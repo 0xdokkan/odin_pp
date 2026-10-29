@@ -4,6 +4,7 @@ import run_session "../run"
 
 import "core:fmt"
 import "core:math"
+import "core:os"
 import app "../engine/app"
 import game "../game"
 import level "../level"
@@ -88,6 +89,10 @@ mechanics_lab_prima_persona :: proc(window: ^app.Window, renderer: ^render.Rende
 	fp.yaw, fp.pitch = -math.PI/2, 0.12
 	for _ in 0..<3 { frame(window, renderer, room, controller, cards, buffer) }
 	artifacts.screenshot("odin_pp_mechanics_lab_prima_persona_ak.png")
+	// ODIN_PP_LAB_TIMING=ak measures the AK here, in the same arena as the fists (Fase 3).
+	if timing, _ := os.lookup_env("ODIN_PP_LAB_TIMING", context.temp_allocator); timing == "ak" {
+		return mechanics_lab_first_person_timing(window, renderer, room, controller, cards, buffer)
+	}
 	shots := room.first_person.shots
 	for _ in 0..<60 { frame(window, renderer, room, controller, cards, buffer, fire = true) }
 	for _ in 0..<20 { frame(window, renderer, room, controller, cards, buffer) }
@@ -133,6 +138,11 @@ mechanics_lab_prima_persona :: proc(window: ^app.Window, renderer: ^render.Rende
 		fmt.eprintln("mechanics lab: the fists' words are not shown"); return false
 	}
 	artifacts.screenshot("odin_pp_mechanics_lab_prima_persona_pugni.png")
+	// ODIN_PP_LAB_TIMING=1 measures the fists' view here instead of going on
+	// (Fase 3, against the AK's of Fase 0).
+	if timing, _ := os.lookup_env("ODIN_PP_LAB_TIMING", context.temp_allocator); timing == "1" {
+		return mechanics_lab_first_person_timing(window, renderer, room, controller, cards, buffer, true)
+	}
 	// W held: free up to the brute.
 	run := run_session.Tactical_Controller_Input{}
 	run.walk[0] = true

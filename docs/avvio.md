@@ -94,10 +94,13 @@ il pianerottolo vuoto chiama la piattaforma, un passo sulla piattaforma la fa pa
 passo contro le sbarre dal lato della leva. Con `--smoke-mechanics-lab` e `ODIN_PP_LAB_ONLY=heights`, `structures`,
 `mountain`, `cave`, `layers`, `lift`, `fps` o `prima_persona` gira solo l'atto delle altezze, delle strutture, della montagna a spirale,
 della grotta, dei piani, degli ascensori, di First Person Shooter o dell'arena «Prima persona» (la montagna dura qualche minuto:
-sale tutto il sentiero a passi veri). L'atto `prima_persona` gira per ultimo nello smoke completo; prende anche pugni, spada e
-arco, che non hanno ancora la loro carta, per guardarne la sigla e la mano vuota.
+sale tutto il sentiero a passi veri). L'atto `prima_persona` gira per ultimo nello smoke completo: l'AK, poi First Person
+Brawler (i guantoni Neon, un jab, un gancio, il jab che colpisce, un segno, il cross critico con la stella d'oro); prende
+anche spada e arco, che non hanno ancora la loro carta, per guardarne la sigla e la mano vuota.
 Con `ODIN_PP_LAB_ONLY=fps` e `ODIN_PP_LAB_TIMING=1` l'atto di First Person Shooter si ferma dopo la discesa negli occhi e misura
 600 fotogrammi con l'AK che spara, senza limite di fotogrammi né vsync (riga `FIRST PERSON TIMING`; meglio con una build `-o:speed`).
+Con `ODIN_PP_LAB_ONLY=prima_persona` la stessa misura la fa `ODIN_PP_LAB_TIMING=1` con i pugni (un pugno ogni quarto di
+secondo, `W` tenuto metà del tempo) e `ODIN_PP_LAB_TIMING=ak` con l'AK, nella stessa arena.
 `--smoke-expedition` comprende l'atto «posa» (il fantasma verde e rosso, una statua e una casetta posate, la statua rotta da un colpo
 e la casetta che resta), l'atto «grotte» (in Neve, Far West, Egitto e Inferno: l'arco, l'ingresso e la seconda
 stanza della prima grotta, con il giro entra-esci controllato) e l'atto «montagna» (il robot in otto punti della salita, con le mappe della Neve

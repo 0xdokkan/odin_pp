@@ -55,7 +55,7 @@ La tabella è in ordine di priorità, cioè l'ordine della scaletta qui sotto.
 | 0 | 0 | Decisioni comuni e misure di partenza (proposta di Claude) | — | Fatta | vedi Esito |
 | 1 | 1 | Base comune della prima persona; l'AK resta identico | 0 | Fatta | vedi Esito |
 | 2 | 2 | Pugni: regole e prototipo giocabile nel laboratorio | 1 | Fatta | vedi Esito |
-| 3 | 3 | Pugni: guantoni, segni critici, colpi a schermo, suoni | 2 | In corso | vedi Esito |
+| 3 | 3 | Pugni: guantoni, segni critici, colpi a schermo, suoni | 2 | Fatta | vedi Esito |
 | 4 | 4 | Spada: swing col mouse, parata, rampino; prototipo | 1 | Da fare | — |
 | 5 | 5 | Spada: lama, scie, scintille, suoni | 4 | Da fare | — |
 | 6 | 6 | Arco: carica, rimbalzi, zone critiche, frecce; prototipo | 1 | Da fare | — |
@@ -2629,6 +2629,26 @@ resto (`tools/audio`, niente registrazioni).
   tic per segno, la musica solo dopo la campanella e solo nel laboratorio).
 - **Verifiche:** `check.ps1` completo, **1785 test verdi** con e senza assert;
   atto `fps` **114 su 114** uguale alla Fase 0; atto `prima_persona` pulito.
+
+**Passo 7 — verifica di fine fase: fatta** (2026-10-29).
+- **Tempo di un fotogramma** (build `-o:speed`, 600 fotogrammi senza limite né
+  vsync, tela 1600 × 900; misura nuova `ODIN_PP_LAB_TIMING=1` con i pugni e
+  `=ak` con l'AK, nell'arena «Prima persona»). Il PC oggi è più lento della
+  Fase 0: l'atto `fps` da solo, che allora faceva 2,40-2,44 ms, oggi fa
+  2,6-3,8 ms a seconda del giro. Il confronto giusto è nella stessa arena e
+  nello stesso momento, alternando le prove (tre giri): **AK 4,25-4,39 ms**
+  di media, **pugni 4,31-4,38 ms**, cioè costano uguale (circa 230 fotogrammi
+  al secondo); nei fotogrammi più lenti (il 5% peggiore) i pugni arrivano a
+  5,9-6,1 ms contro 5,4-5,6 dell'AK, circa un decimo in più.
+- **Atti da soli**, dalla cartella dell'eseguibile, a PC libero: `fps` **114
+  su 114** uguale alla Fase 0; `prima_persona` 12 catture, uguali in due giri;
+  `structures` 10 su 10 in cinque giri di fila. Una volta `structures_hut_6`
+  è uscita diversa per tre giri: è la cattura che cambia da sé, già vista nella
+  Fase 0, e lo fa anche la build di fine Fase 2 (9 su 10 e poi 10 su 10).
+- `check.ps1` completo: **1785 test verdi** con e senza assert, più le due
+  build. Documenti: `docs/regole/meccaniche.md` (una
+  sezione per First Person Brawler), `docs/avvio.md` (l'atto e le misure),
+  `docs/registro-carte.md`, CHANGELOG. **Fase 3 fatta.**
 
 ## 13. Fase 4 — Spada: swing col mouse, parata, rampino; prototipo
 
