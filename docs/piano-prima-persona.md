@@ -54,8 +54,8 @@ La tabella è in ordine di priorità, cioè l'ordine della scaletta qui sotto.
 |---|---|---|---|---|---|
 | 0 | 0 | Decisioni comuni e misure di partenza (proposta di Claude) | — | Fatta | vedi Esito |
 | 1 | 1 | Base comune della prima persona; l'AK resta identico | 0 | Fatta | vedi Esito |
-| 2 | 2 | Pugni: regole e prototipo giocabile nel laboratorio | 1 | In corso | vedi Esito |
-| 3 | 3 | Pugni: guantoni, segni critici, colpi a schermo, suoni | 2 | Da fare | — |
+| 2 | 2 | Pugni: regole e prototipo giocabile nel laboratorio | 1 | Fatta | vedi Esito |
+| 3 | 3 | Pugni: guantoni, segni critici, colpi a schermo, suoni | 2 | In corso | vedi Esito |
 | 4 | 4 | Spada: swing col mouse, parata, rampino; prototipo | 1 | Da fare | — |
 | 5 | 5 | Spada: lama, scie, scintille, suoni | 4 | Da fare | — |
 | 6 | 6 | Arco: carica, rimbalzi, zone critiche, frecce; prototipo | 1 | Da fare | — |
@@ -2326,6 +2326,17 @@ così non entrano nei muri ([viewmodel](https://garry.net/posts/unity-viewmodels
   Verifiche: `check.ps1` completo, **1782 test verdi** con e senza assert;
   atto `fps` ancora **identico al byte** alla Fase 0 (114 su 114); atto
   `prima_persona` uguale in due giri. Catture guardate.
+- L'utente: «Così è perfetto, passa alla prossima fase».
+
+**Passo 6 — verifica di fine fase: fatta** (2026-10-29). Scelta dell'utente:
+«Solo gli atti», come nella Fase 1 (niente giro completo né misura del tempo
+di un fotogramma; la misura resta nel passo 7 della Fase 3). `check.ps1`
+completo sul codice del commit dei guantoni in pixel: **1782 test verdi** con e
+senza assert, più le due build (`Room` sotto i 9 KB fa parte dei test). Gli
+atti da soli, dalla cartella dell'eseguibile: `fps` **114 catture su 114**
+uguali alla Fase 0, `structures` **10 su 10**, `prima_persona` 10 catture,
+uguali in due giri. Voce della carta in `docs/registro-carte.md`. **Fase 2
+fatta.**
 - **Verifiche:** `check.ps1` completo: **1782 test verdi** con e senza assert
   (uno tolto, uno nuovo), più le due build. L'atto `fps` dà ancora **114
   catture identiche al byte** alla Fase 0; l'atto `prima_persona` dà le stesse
@@ -2424,7 +2435,22 @@ fine di ogni passo.
 
 ### Esito
 
-_Da scrivere alla fine della fase._
+**Risposte dell'utente (2026-10-29)**, chieste tutte prima di iniziare:
+1. **Stile cibernetico:** «Proposte cyber anche qui» (non la mia
+   raccomandazione, che era tenere lo stile dei guantoni per tutte): le
+   proposte valgono anche per i guantoni, che possono cambiare.
+2. **Guantoni o tirapugni:** già deciso nella Fase 2: guantoni da pugile,
+   neri e oro, modello 3D da codice disegnato come pixel art di cartoncino
+   («così è perfetto»). Il passo 2 quindi non dipinge guantoni da script: porta
+   lo stile scelto sul modello che c'è.
+3. **Sigla:** `FPB`, `FPF`, `FPA` (consigliato).
+4. **Segni critici:** anello e freccia (consigliato), rifatti in pixel art di
+   cartoncino, con la stella d'oro al critico.
+5. **Impatto:** si ferma solo il disegno per 0,08 s, con una piccola scossa
+   della vista (consigliato); le regole no.
+6. **Campanella del ring all'entrata:** sì (consigliato), poi la musica.
+7. **Come mostrare le proposte:** tre proposte in gioco (consigliato): tre
+   stili applicati ai guantoni veri nel laboratorio, stessa scena, tre catture.
 
 ## 13. Fase 4 — Spada: swing col mouse, parata, rampino; prototipo
 

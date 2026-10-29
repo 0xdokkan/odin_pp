@@ -16,6 +16,7 @@ per i comandi disponibili oggi valgono il [README](README.md) e la documentazion
   - **in guardia da pugile** in basso al centro, con l'avambraccio fasciato; jab e cross dritti al mirino, i ganci larghi
     dal loro lato.
 - L'AK è identico: le 114 catture dell'atto `fps` sono uguali al byte a quelle della Fase 0.
+- **Fase 2 fatta:** 1782 test verdi; gli atti `fps` (114 su 114), `structures` (10 su 10) e `prima_persona` puliti.
 
 ## 2026-10-28 — Prima persona, Fase 1: base comune della prima persona
 
