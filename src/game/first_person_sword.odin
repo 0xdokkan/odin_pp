@@ -17,7 +17,13 @@ import grid "../engine/grid"
 // fills the screen's middle, so the blade lying over his card is no cut, its
 // passing through him is, where along the blade it passes saying `u`. Only a
 // foe in the cell in front of him, or the two diagonals in front too for a
-// sideways cut, and in sight (the AK's trace to his chest); a foe once a swing.
+// sideways cut, and in sight (the AK's trace to his chest). No pause between
+// cuts (the user's choice after trying it): every pass across a chest cuts,
+// back and forth, once the point has gone SWORD_MIN_CUT since the swing began
+// or since its last cut, and its breadth counts from there, so a twitch does
+// nothing and a short stroke little. A step taken mid-swing lunges into the cut
+// (SWORD_LUNGE_FACTOR); a quarter turn with Q or E the way the blade sweeps is a
+// spinning cut (SWORD_SPIN_LENGTH more of breadth, SWORD_SPIN_FACTOR more).
 // The right
 // button held parries the blows from in front (no limit, the user's choice); a
 // press within SWORD_PERFECT_PARRY seconds before the blow is a perfect parry:
@@ -58,6 +64,15 @@ SWORD_LENGTH_FULL :: f32(0.8)
 SWORD_PERFECT_FACTOR :: f32(1.5)
 SWORD_FENDENTE_FACTOR :: f32(1.25)
 SWORD_TONDO_SECOND_FACTOR :: f32(0.8)
+// The point's way (heights) a cut needs since the swing began or since its last cut.
+SWORD_MIN_CUT :: f32(0.2)
+// A step mid-swing; a quarter turn the way the blade sweeps (its way counted as
+// this much more, the damage this much more).
+SWORD_LUNGE_FACTOR :: f32(1.25)
+SWORD_SPIN_LENGTH :: f32(0.8)
+SWORD_SPIN_FACTOR :: f32(1.5)
+// Below this way across a reversal the stroke goes on; above it, a new stroke starts.
+SWORD_REVERSE_COSINE :: f32(-0.3)
 // A foe's chest on his card, as a part of its outline's top (the marks' height,
 // render); how far past its point the blade still cuts (its point's own width).
 SWORD_CHEST_HEIGHT :: f32(0.6)
@@ -86,23 +101,31 @@ Sword_Filter :: struct {
 
 Sword_Swing :: struct {
 	active: bool,
-	// Where it started, the way the point has gone so far, and how long it has been slow.
+	// The stroke on now: where it started (the swing's start, its last cut or
+	// its last reversal), the way the point has gone since, and how long it has
+	// been slow.
 	start: [2]f32,
 	length, slow: f32,
-	// The foes it struck (a tondo takes two).
+	// The foes this stroke struck (a tondo takes two).
 	struck: [2]u32,
 	struck_count: u8,
-	// A cut ended it: the next starts only once the point has slowed down.
-	spent: bool,
+	// A step taken mid-swing (a lunge), a quarter turn the way it sweeps (a
+	// spin), and the way the point went last step (for the reversals).
+	lunge, spin: bool,
+	heading: [2]f32,
+	// The cell he stood on as the stroke went.
+	cell: grid.Position,
 }
 
-// A cut, its factors and what it did (the board colours its trail by them).
+// A cut, its factors and what it did (the board colours its trail by them,
+// and draws its blood across the chest it cut, `chest`, the way it went, `along`).
 Sword_Strike :: struct {
 	enemy_id: u32,
 	kind: Sword_Kind,
 	damage: i32,
 	speed, breadth, line, point, way: f32,
-	perfect: bool,
+	perfect, lunge, spin: bool,
+	chest, along: [2]f32,
 }
 
 First_Person_Sword :: struct {
@@ -187,15 +210,17 @@ sword_kind :: proc(start, at: [2]f32) -> Sword_Kind {
 }
 
 // The formula (sezione 6.4) for a cut at `speed` (heights a second) after a
-// swing of `length` from `start` to `at`, `u` along the blade, the `second`
-// foe of a tondo or not.
-sword_strike_damage :: proc(speed, length: f32, start, at: [2]f32, u: f32, second := false) -> (strike: Sword_Strike) {
+// stroke of `length` from `start` to `at`, `u` along the blade, the `second`
+// foe of a tondo or not, a `lunge` or a `spin` (whose breadth may pass 1).
+sword_strike_damage :: proc(speed, length: f32, start, at: [2]f32, u: f32, second := false, lunge := false, spin := false) -> (strike: Sword_Strike) {
 	strike.kind = sword_kind(start, at)
 	strike.speed = clamp((speed-SWORD_SWING_START)/(SWORD_SPEED_FULL-SWORD_SWING_START), 0, 1)
 	strike.breadth = clamp(length/SWORD_LENGTH_FULL, 0.25, 1)
 	d := at-start
 	chord := math.sqrt(d.x*d.x+d.y*d.y)
-	c := chord/length if length > 0 else 1
+	// A spin's turn is breadth, not a crooked line: the line counts the mouse's way alone.
+	drawn := length-SWORD_SPIN_LENGTH if spin else length
+	c := chord/drawn if drawn > 0 else 1
 	strike.line = clamp(0.5+(c-0.4)/(0.9-0.4)*0.5, 0.5, 1)
 	strike.point = clamp(1-1.6*abs(u-0.75), 0.4, 1)
 	switch strike.kind {
@@ -206,6 +231,9 @@ sword_strike_damage :: proc(speed, length: f32, start, at: [2]f32, u: f32, secon
 	damage := SWORD_BASE_DAMAGE*strike.speed*strike.breadth*strike.line*strike.point*strike.way
 	strike.perfect = strike.speed >= 0.9 && strike.breadth >= 1 && strike.line >= 0.9 && strike.point >= 0.9
 	if strike.perfect { damage *= SWORD_PERFECT_FACTOR }
+	strike.lunge, strike.spin = lunge, spin
+	if lunge { damage *= SWORD_LUNGE_FACTOR }
+	if spin { damage *= SWORD_SPIN_FACTOR }
 	strike.damage = max(i32(1), i32(math.round(damage)))
 	return
 }
@@ -251,9 +279,9 @@ sword_chest_on_screen :: proc(room: ^Room, aim: First_Person_Aim, facing: Move_D
 
 // The foe the blade cuts as it moves from `before` to `at` (the point on the
 // screen), if one: a foe in reach and in sight whose chest the blade has swept
-// across, and where along the blade.
+// across, where along the blade, and where his chest is.
 @(private = "file")
-sword_contact :: proc(room: ^Room, aim: First_Person_Aim, before, at: [2]f32, kind: Sword_Kind) -> (target: Entity_Ref, u: f32, found: bool) {
+sword_contact :: proc(room: ^Room, aim: First_Person_Aim, before, at: [2]f32, kind: Sword_Kind) -> (target: Entity_Ref, u: f32, chest: [2]f32, found: bool) {
 	s := &room.first_person.sword
 	hilt := SWORD_HILT
 	cross :: proc(a, b: [2]f32) -> f32 { return a.x*b.y-a.y*b.x }
@@ -262,7 +290,8 @@ sword_contact :: proc(room: ^Room, aim: First_Person_Aim, before, at: [2]f32, ki
 		struck := false
 		for id in s.swing.struck[:s.swing.struck_count] { struck = struck || id == enemy.id }
 		if struck { continue }
-		chest, seen := sword_chest_on_screen(room, aim, s.facing, enemy)
+		seen: bool
+		chest, seen = sword_chest_on_screen(room, aim, s.facing, enemy)
 		if !seen { continue }
 		was, now := cross(before-hilt, chest-hilt), cross(at-hilt, chest-hilt)
 		if (was > 0) == (now > 0) && now != 0 { continue }
@@ -274,7 +303,7 @@ sword_contact :: proc(room: ^Room, aim: First_Person_Aim, before, at: [2]f32, ki
 		// In sight: the view's trace to his chest meets him first.
 		shot := first_person_trace(room, room.player.position, sword_aim_through(aim, s.facing, chest))
 		if shot.hit != .Foe || shot.target != enemy_entity(enemy.id) { continue }
-		return enemy_entity(enemy.id), min(along, 1), true
+		return enemy_entity(enemy.id), min(along, 1), chest, true
 	}
 	return
 }
@@ -304,30 +333,49 @@ sword_cut :: proc(room: ^Room, target: Entity_Ref, strike: Sword_Strike) -> bool
 	return true
 }
 
-// One SWORD_STEP of the point at `at`: the filter, the swing starting and
-// ending, a cut. Whether it struck.
+// A new stroke of the swing on from `at`: its way counts afresh.
 @(private = "file")
-sword_step :: proc(room: ^Room, input: First_Person_Sword_Input, at: [2]f32) -> (struck: bool) {
+sword_restroke :: proc(w: ^Sword_Swing, at: [2]f32) {
+	w.start, w.length, w.slow, w.struck_count, w.lunge, w.spin = at, 0, 0, 0, false, false
+}
+
+// One SWORD_STEP of the point at `at` (`from`: where the blade sweeps from,
+// the last step's point but for a spin): the filter, the swing starting and
+// ending, its strokes, a cut. Whether it struck.
+@(private = "file")
+sword_step :: proc(room: ^Room, input: First_Person_Sword_Input, at: [2]f32, from_spin := false) -> (struck: bool) {
 	s := &room.first_person.sword
 	h := SWORD_STEP
 	moved := at-s.followed
+	before := s.followed
 	s.followed = at
 	s.speed = sword_filter_step(&s.filter, at, h)
 	w := &s.swing
 	if !w.active {
-		if w.spent && s.speed < SWORD_SWING_STOP { w.spent = false }
-		if !w.spent && input.cut && !input.guard && s.speed > SWORD_SWING_START {
-			w^ = {active = true, start = at}
+		if input.cut && !input.guard && s.speed > SWORD_SWING_START {
+			w^ = {active = true, start = at, cell = room.player.position}
 			s.swings += 1
 			// The view's counts: a swing is a blow thrown, a cut one that struck.
 			room.first_person.shots += 1
 		}
 		return
 	}
-	w.length += math.sqrt(moved.x*moved.x+moved.y*moved.y)
 	if !input.cut || input.guard {
 		w.active = false
 		return
+	}
+	step := math.sqrt(moved.x*moved.x+moved.y*moved.y)
+	if step > 0 {
+		heading := moved/step
+		// The point turned back: a new stroke from here (the return cuts too).
+		if w.heading.x*heading.x+w.heading.y*heading.y < SWORD_REVERSE_COSINE && w.length > 0.02 { sword_restroke(w, before) }
+		w.heading = heading
+	}
+	w.length += step
+	// A step taken mid-swing: a lunge.
+	if room.player.position != w.cell {
+		w.cell = room.player.position
+		w.lunge = true
 	}
 	if s.speed < SWORD_SWING_STOP {
 		w.slow += h
@@ -335,24 +383,23 @@ sword_step :: proc(room: ^Room, input: First_Person_Sword_Input, at: [2]f32) -> 
 	} else {
 		w.slow = 0
 	}
+	if w.length < SWORD_MIN_CUT || s.speed < SWORD_SWING_START { return }
 	kind := sword_kind(w.start, at)
-	if kind == .None || s.speed < SWORD_SWING_START { return }
-	target, u, found := sword_contact(room, input.aim, at-moved, at, kind)
+	if kind == .None { return }
+	if from_spin { before = at-{math.sign(w.heading.x)*2, 0} }
+	target, u, chest, found := sword_contact(room, input.aim, before, at, kind)
 	if !found { return }
-	strike := sword_strike_damage(s.speed, w.length, w.start, at, u, w.struck_count > 0)
-	strike.enemy_id = target.id
+	strike := sword_strike_damage(s.speed, w.length, w.start, at, u, w.struck_count > 0, w.lunge, w.spin)
+	strike.enemy_id, strike.chest, strike.along = target.id, chest, at-w.start
 	if !sword_cut(room, target, strike) { return }
 	s.strikes += 1
 	room.first_person.hits += 1
 	s.last = strike
 	w.struck[w.struck_count] = target.id
 	w.struck_count += 1
-	// One foe a swing, two for a tondo; then the blade springs back a little.
-	if kind != .Tondo || w.struck_count >= 2 {
-		w.active, w.spent = false, true
-		s.tip = sword_clamp_tip(at-(at-w.start)*0.1)
-		s.followed = s.tip
-	}
+	// The stroke ends with its cut (a tondo may take a second foe first): the
+	// next counts its way from here, with no pause.
+	if kind != .Tondo || w.struck_count >= 2 { sword_restroke(w, at) }
 	return true
 }
 
@@ -421,11 +468,19 @@ first_person_sword_move :: proc(room: ^Room, input: First_Person_Sword_Input, dt
 	clear_event_log(room.recent_events)
 	s := &room.first_person.sword
 	acted := false
+	spin := false
 	if input.turn != 0 {
 		turn := 1 if input.turn > 0 else 3
 		s.facing = Move_Direction((int(s.facing)+turn)%4)
 		room.player.tactical.facing = s.facing
 		acted = true
+		// Turning the way the blade sweeps mid-swing: a spinning cut, the turn's
+		// arc counted into the stroke, the blade swept across the new front.
+		w := &s.swing
+		if w.active && w.heading.x != 0 && (w.heading.x > 0) == (input.turn > 0) {
+			w.length += SWORD_SPIN_LENGTH
+			w.spin, spin = true, true
+		}
 	}
 	if input.guard && !s.guard { s.guard_age = 0 }
 	s.guard = input.guard
@@ -440,9 +495,7 @@ first_person_sword_move :: proc(room: ^Room, input: First_Person_Sword_Input, dt
 	struck := false
 	for k in 1..=steps {
 		if !first_person_sword_active(room) { break }
-		if sword_step(room, input, from+(to-from)*(f32(k)/f32(steps))) { struck = true }
-		// A cut springs the point back: the rest of the frame follows from there.
-		if struck { from, to = s.followed, s.tip }
+		if sword_step(room, input, from+(to-from)*(f32(k)/f32(steps)), spin && k == 1) { struck = true }
 		if room.phase != .Combat { break }
 	}
 	if !acted && !struck { return .None }

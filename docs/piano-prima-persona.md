@@ -2890,6 +2890,39 @@ riga **«MOUSE: LAMA / DESTRO: PARA / Q E: GIRA»**.
 - Da provare a mano dall'utente: la sensazione del mouse e i numeri della
   formula (il piano li dava «da ritoccare provando»).
 
+**Dopo la prova dell'utente (2026-10-29): il taglio senza pausa.** L'utente:
+«non ho molto il feeling di stare effettivamente tagliando»: dopo un colpo la
+lama doveva rallentare prima del successivo, e sembrava un tempo di ricarica.
+Chiesto di toglierlo ma di non permettere di uccidere agitando il mouse di poco,
+e più segni visivi del colpo, «tipo una striscia di sangue». Domande e risposte:
+minimo **un quinto di schermo** di strada per tagliare (consigliato); il colpo
+di ritorno conta **se è abbastanza lungo**, e in più due idee dell'utente: se
+stai già tagliando mentre ti avvicini e il nemico entra in portata, il colpo è
+più forte (**affondo**); se durante lo swing giri la vista nel verso in cui va
+la lama, conta come uno swing molto più grande (**colpo roteante**); il segno è
+una **striscia di sangue con le gocce** (consigliato).
+- **Regole** (`first_person_sword.odin`): niente più attesa dopo un taglio.
+  Ogni passaggio della lama sul petto è un taglio, anche al ritorno, purché la
+  punta abbia fatto almeno **0,2 altezze di schermo** dall'inizio dello swing,
+  dall'ultimo taglio o dall'ultima inversione (`SWORD_MIN_CUT`); l'ampiezza conta
+  da lì, quindi un gesto corto fa poco e un tremolio nulla (test: avanti e
+  indietro quattro volte, quattro tagli; un tremolio veloce sul petto, nessuno).
+  Un **passo fatto durante lo swing** è un affondo: ×1,25. Un **quarto di giro
+  con `Q`/`E` nel verso della lama** durante lo swing è un colpo roteante: il
+  giro conta 0,8 altezze in più di ampiezza (non di linea storta) e il colpo
+  ×1,5; la lama taglia il nemico verso cui si gira, se ne ha già passato il
+  petto. Un tondo prende ancora un secondo nemico nello stesso passaggio.
+- **Il colpo si vede** (`render/first_person_sword.odin`): una striscia di sangue
+  sul petto colpito, nella direzione del taglio, più lunga se il colpo è forte,
+  che si apre subito e si assottiglia in mezzo secondo, con sette gocce che
+  schizzano e cadono; il lampo bianco del nemico (lo stesso dei pugni); la lama
+  ferma 0,06 s sul punto del taglio, poi di nuovo dove la porta il mouse; la
+  scossa dei pugni (doppia per un taglio perfetto). L'atto `prima_persona` lo
+  cattura (`_spada_sangue.png`).
+- Verifiche: tutti i test verdi (1799 con il nuovo dei tempi del sangue e del
+  fermo); atto `fps` **114 su 114** uguale alla Fase 0; atto `prima_persona`
+  uguale in due giri.
+
 
 ## 14. Fase 5 — Spada: lama, scie, scintille, suoni
 

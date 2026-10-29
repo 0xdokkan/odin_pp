@@ -213,3 +213,21 @@ test_first_person_fists_lab_sounds :: proc(t: ^testing.T) {
 	renderer.tactical.mechanics_lab = false
 	testing.expect(t, !first_person_music_wanted(renderer), "music outside the lab")
 }
+
+// A sword's cut on the board (Fase 4, after the user's try): the blade held at
+// the cut a moment, then back to the mouse; the blood opens at once, thins away
+// in half a second, its drops flying out and gone.
+@(test)
+test_first_person_sword_cut_feedback :: proc(t: ^testing.T) {
+	v := First_Person_Sword_View{tip = {0.3, 0.1}, cut_at = 10, cut_tip = {-0.1, 0.05}}
+	testing.expect_value(t, first_person_sword_shown_tip(&v, 10.03), [2]f32{-0.1, 0.05})
+	back := first_person_sword_shown_tip(&v, 10+FIRST_PERSON_SWORD_STOP*1.5)
+	testing.expect(t, back.x > -0.1 && back.x < 0.3, "the blade did not come back")
+	testing.expect_value(t, first_person_sword_shown_tip(&v, 11), [2]f32{0.3, 0.1})
+	streak, flown := first_person_sword_blood(0.06)
+	testing.expect(t, streak > 0.9 && flown < 0.2)
+	streak, flown = first_person_sword_blood(0.4)
+	testing.expect(t, streak > 0 && streak < 0.5 && flown > 0.7)
+	streak, flown = first_person_sword_blood(FIRST_PERSON_SWORD_BLOOD)
+	testing.expect(t, streak == 0 && flown == 1)
+}

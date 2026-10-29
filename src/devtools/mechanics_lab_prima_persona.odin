@@ -258,11 +258,21 @@ mechanics_lab_prima_persona :: proc(window: ^app.Window, renderer: ^render.Rende
 	from, start, finish := sword.tip, [2]f32{-0.75, line}, [2]f32{0.45, line}
 	for k in 1..=24 { drive(window, renderer, room, controller, cards, buffer, toward(sword, from+(start-from)*(f32(k)/24), false)) }
 	health = room.enemies[brute_index].health
+	// The cut's blood, caught a few frames after it lands (Fase 4, after the user's try).
+	bled, since_cut := false, -1
 	for k in 1..=15 {
 		drive(window, renderer, room, controller, cards, buffer, toward(sword, start+(finish-start)*(f32(k)/15), true))
 		if k == 9 { artifacts.screenshot("odin_pp_mechanics_lab_prima_persona_spada_taglio.png") }
+		if since_cut >= 0 { since_cut += 1 }
+		if since_cut < 0 && sword.strikes > 0 { since_cut = 0 }
+		if since_cut == 4 && !bled { artifacts.screenshot("odin_pp_mechanics_lab_prima_persona_spada_sangue.png"); bled = true }
 	}
-	for _ in 0..<20 { frame(window, renderer, room, controller, cards, buffer) }
+	for _ in 0..<20 {
+		frame(window, renderer, room, controller, cards, buffer)
+		if since_cut >= 0 { since_cut += 1 }
+		if since_cut == 4 && !bled { artifacts.screenshot("odin_pp_mechanics_lab_prima_persona_spada_sangue.png"); bled = true }
+	}
+	if !bled { fmt.eprintln("mechanics lab: no blood caught after the cut"); return false }
 	if sword.strikes != 1 || room.enemies[brute_index].health >= health {
 		fmt.eprintln("mechanics lab: the cut across the brute made", sword.strikes, "cuts, the brute at", room.enemies[brute_index].health); return false
 	}

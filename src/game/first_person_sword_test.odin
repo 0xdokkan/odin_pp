@@ -294,3 +294,76 @@ test_sword_grapple_stops_at_cover :: proc(t: ^testing.T) {
 	_ = first_person_sword_move(&room, {grapple = true}, 1.0/60)
 	testing.expect(t, room.enemies[0].position == {x = 9, y = 6} && room.first_person.sword.grapples == 0)
 }
+
+// No pause between cuts (the user's choice): straight back across the foe, the
+// return cuts too; a twitch across his chest, however fast, never does.
+@(test)
+test_sword_cuts_back_and_forth_without_a_pause :: proc(t: ^testing.T) {
+	data: level.Level
+	player: Player
+	spawns := [?]Enemy_Spawn{{position = {x = 7, y = 6}, health = 200, attack = 1}}
+	room := sword_room(t, &data, &player, spawns[:])
+	defer level.destroy(&data)
+	defer destroy_room(&room)
+	s := &room.first_person.sword
+	y, x := sword_lines(&room, room.enemies[0])
+	// Across and straight back, the button held, never stopping.
+	s.tip, s.followed, s.filter, s.swing, s.carry = {x-0.45, y}, {x-0.45, y}, {}, {}, 0
+	dt := f32(1.0/60)
+	_ = first_person_sword_move(&room, {}, dt)
+	for leg in 0..<4 {
+		to := [2]f32{x+0.45, y} if leg%2 == 0 else [2]f32{x-0.45, y}
+		frames := 12
+		step := (to-s.tip)/f32(frames)/SWORD_TIP_PER_PIXEL
+		for _ in 0..<frames { _ = first_person_sword_move(&room, {mouse = {step.x, -step.y}, cut = true}, dt) }
+	}
+	testing.expectf(t, s.strikes == 4 && s.swings == 1, "%d cuts in %d swings going back and forth", s.strikes, s.swings)
+	// A twitch: back and forth by a hair across his chest, fast: nothing more.
+	strikes := s.strikes
+	for k in 0..<120 {
+		wiggle := f32(0.04 if k%2 == 0 else -0.04)/SWORD_TIP_PER_PIXEL
+		_ = first_person_sword_move(&room, {mouse = {wiggle, 0}, cut = true}, dt)
+	}
+	testing.expect_value(t, s.strikes, strikes)
+}
+
+// A step taken mid-swing lunges into the cut; a quarter turn the way the blade
+// sweeps is a spinning cut on the foe it turns to: both harder.
+@(test)
+test_sword_lunge_and_spin :: proc(t: ^testing.T) {
+	data: level.Level
+	player: Player
+	spawns := [?]Enemy_Spawn{{position = {x = 7, y = 6}, health = 200, attack = 1}}
+	room := sword_room(t, &data, &player, spawns[:])
+	defer level.destroy(&data)
+	defer destroy_room(&room)
+	s := &room.first_person.sword
+	foe := &room.enemies[0]
+	y, x := sword_lines(&room, foe^)
+	plain_health := foe.health
+	sword_gesture(&room, {x-0.5, y}, {x+0.45, y}, 0.24, 60)
+	plain := plain_health-foe.health
+	testing.expect(t, plain > 0 && !s.last.lunge && !s.last.spin)
+	// The foe a cell further: half the stroke, a step east, the rest across him.
+	foe.position = {x = 8, y = 6}
+	dt := f32(1.0/60)
+	s.tip, s.followed, s.filter, s.swing, s.carry = {x-0.5, y}, {x-0.5, y}, {}, {}, 0
+	_ = first_person_sword_move(&room, {}, dt)
+	step := ([2]f32{x+0.45, y}-s.tip)/14/SWORD_TIP_PER_PIXEL
+	for _ in 0..<5 { _ = first_person_sword_move(&room, {mouse = {step.x, -step.y}, cut = true}, dt) }
+	room.player.tactical.config.timed_actions = false
+	testing.expect(t, try_move_player(&room, .East) == .Moved)
+	lunge_health := foe.health
+	for _ in 0..<9 { _ = first_person_sword_move(&room, {mouse = {step.x, -step.y}, cut = true}, dt) }
+	testing.expectf(t, s.last.lunge && lunge_health-foe.health > 0, "no lunge (last %v)", s.last)
+	// A spin: sweeping right, E turns him right (south) to a foe there: cut, harder.
+	foe.position = {x = room.player.position.x, y = room.player.position.y+1}
+	s.tip, s.followed, s.filter, s.swing, s.carry = {-0.7, y}, {-0.7, y}, {}, {}, 0
+	_ = first_person_sword_move(&room, {}, dt)
+	// Past the middle as he turns: the foe swung in from his right meets the blade.
+	for _ in 0..<12 { _ = first_person_sword_move(&room, {mouse = {0.06/SWORD_TIP_PER_PIXEL, 0}, cut = true}, dt) }
+	spin_health := foe.health
+	_ = first_person_sword_move(&room, {mouse = {0.06/SWORD_TIP_PER_PIXEL, 0}, cut = true, turn = 1}, dt)
+	testing.expect(t, s.facing == .South, "E did not turn him")
+	testing.expectf(t, s.last.spin && spin_health-foe.health > plain, "the spin cut %d, a plain one %d (last %v)", spin_health-foe.health, plain, s.last)
+}

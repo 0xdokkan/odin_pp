@@ -12,12 +12,20 @@ import game "../game"
 // right to its point, a magenta guard across it, drawn on the gloves' small
 // canvas so it gets their ink and paper; behind a swing a ribbon along the
 // point's last positions, coloured by how good the cut would be (grey, white,
-// gold), flaring the colour of the cut it made.
+// gold), flaring the colour of the cut it made. A cut shows at once (the
+// user's ask after trying it): a streak of blood across the chest it cut, the
+// way the blade went, longer the harder it was, drops flying off it; the
+// struck foe's print white a moment, the blade held still FIRST_PERSON_SWORD_STOP
+// at the cut, the look jolted as a punch's (twice for a perfect cut).
 
 FIRST_PERSON_SWORD_TURN :: f64(0.15)
 FIRST_PERSON_SWORD_TRAIL :: 8
 // Seconds the trail stays after a swing, and a cut's colour flares.
 FIRST_PERSON_SWORD_TRAIL_FADE :: f64(0.18)
+// A cut's stop of the blade on the board, its blood's life, the struck print's flash.
+FIRST_PERSON_SWORD_STOP :: f64(0.06)
+FIRST_PERSON_SWORD_BLOOD :: f64(0.5)
+FIRST_PERSON_SWORD_BLOOD_DROPS :: 7
 
 // What the board keeps of the sword each frame its view is on.
 First_Person_Sword_View :: struct {
@@ -36,6 +44,8 @@ First_Person_Sword_View :: struct {
 	trail: [FIRST_PERSON_SWORD_TRAIL][2]f32,
 	trail_count: int,
 	ended_at, cut_at: f64,
+	// Where the point was as the last cut landed (the blade is held there a moment).
+	cut_tip: [2]f32,
 	// The sprite clock at the last frame followed (the turn's pace).
 	seen_at: f64,
 }
@@ -49,7 +59,7 @@ follow_first_person_sword :: proc(renderer: ^Renderer, room: ^game.Room) {
 	v.seen_at = now
 	if !game.first_person_sword_active(room) { return }
 	s := &room.first_person.sword
-	if s.strikes != v.strikes { v.cut_at = now }
+	if s.strikes != v.strikes { v.cut_at, v.cut_tip = now, s.tip }
 	if v.swinging && !s.swing.active { v.ended_at = now }
 	if !v.swinging && s.swing.active { v.trail_count = 0 }
 	v.tip, v.speed, v.swinging, v.start, v.length, v.last = s.tip, s.speed, s.swing.active, s.swing.start, s.swing.length, s.last
@@ -78,6 +88,26 @@ first_person_sword_quality :: proc(v: ^First_Person_Sword_View) -> f32 {
 	return strike.speed*strike.breadth*strike.line
 }
 
+// The point as the board draws it: held at the last cut for FIRST_PERSON_SWORD_STOP,
+// then back to where the mouse has it.
+first_person_sword_shown_tip :: proc(v: ^First_Person_Sword_View, now: f64) -> [2]f32 {
+	since := now-v.cut_at
+	if v.cut_at <= 0 || since < 0 || since >= FIRST_PERSON_SWORD_STOP*2 { return v.tip }
+	if since < FIRST_PERSON_SWORD_STOP { return v.cut_tip }
+	u := f32((since-FIRST_PERSON_SWORD_STOP)/FIRST_PERSON_SWORD_STOP)
+	return v.cut_tip+(v.tip-v.cut_tip)*u
+}
+
+// The blood of the last cut, `since` seconds on: how long its streak is (a
+// part of its full length: it opens in 0.05 s, then thins away), how far its
+// drops have flown (0..1).
+first_person_sword_blood :: proc(since: f64) -> (streak, flown: f32) {
+	if since < 0 || since >= FIRST_PERSON_SWORD_BLOOD { return 0, 1 }
+	t := f32(since/FIRST_PERSON_SWORD_BLOOD)
+	streak = clamp(f32(since/0.05), 0, 1)*(1-t*t)
+	return streak, t
+}
+
 // The trail's colour for a quality: grey, white, gold.
 @(private = "file")
 first_person_sword_trail_color :: proc(quality: f32) -> rl.Color {
@@ -97,6 +127,35 @@ draw_first_person_sword_pixel :: proc(renderer: ^Renderer, w, h: i32, ready: f32
 		return {f32(w)*0.5+p.x*f32(h), f32(h)*0.5-(p.y-lift)*f32(h)}
 	}
 	hilt := game.SWORD_HILT
+	// The last cut's blood across the chest it cut, under the blade.
+	if v.cut_at > 0 && v.last.enemy_id != 0 {
+		streak, flown := first_person_sword_blood(now-v.cut_at)
+		if streak > 0 {
+			way := v.last.along
+			length := math.sqrt(way.x*way.x+way.y*way.y)
+			if length > 0 { way /= length } else { way = {1, 0} }
+			half := clamp(f32(v.last.damage)*0.025, 0.08, 0.3)*streak
+			centre := v.last.chest
+			a, b := at(centre-way*half, w, h, lift), at(centre+way*half, w, h, lift)
+			rl.DrawLineEx(a, b, max(f32(2), f32(h)*0.02*streak), {150, 12, 24, 255})
+			rl.DrawLineEx(a, b, max(f32(1), f32(h)*0.009*streak), {230, 48, 52, 255})
+		}
+		if flown < 1 {
+			way := v.last.along
+			length := math.sqrt(way.x*way.x+way.y*way.y)
+			if length > 0 { way /= length } else { way = {1, 0} }
+			side := [2]f32{-way.y, way.x}
+			for k in 0..<FIRST_PERSON_SWORD_BLOOD_DROPS {
+				spread := f32(k)/f32(FIRST_PERSON_SWORD_BLOOD_DROPS-1)-0.5
+				out := way*(0.06+0.22*flown*(0.6+0.4*f32((k*5)%3)/2))+side*spread*0.12*flown
+				// They fall as they fly.
+				out.y -= 0.25*flown*flown
+				drop := at(v.last.chest+out, w, h, lift)
+				size := f32(2) if flown < 0.6 else 1
+				rl.DrawRectangleV({math.round(drop.x), math.round(drop.y)}, {size, size}, {200, 24, 32, 255})
+			}
+		}
+	}
 	// The trail: a ribbon along the point's last places, thinning to the oldest.
 	trail := v.swinging || now-v.ended_at < FIRST_PERSON_SWORD_TRAIL_FADE
 	if trail && v.trail_count >= 2 {
@@ -110,7 +169,7 @@ draw_first_person_sword_pixel :: proc(renderer: ^Renderer, w, h: i32, ready: f32
 		}
 	}
 	// The blade: a cyan Neon strip with a white core, narrowing to the point.
-	base, point := at(hilt, w, h, lift), at(v.tip, w, h, lift)
+	base, point := at(hilt, w, h, lift), at(first_person_sword_shown_tip(v, now), w, h, lift)
 	way := point-base
 	length := math.sqrt(way.x*way.x+way.y*way.y)
 	if length < 1 { return }

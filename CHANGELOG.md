@@ -15,6 +15,9 @@ per i comandi disponibili oggi valgono il [README](README.md) e la documentazion
   regola «la lama tocca il cartoncino» avrebbe fatto colpire subito ogni swing.
 - Prototipo: lama Neon in pixel di cartoncino, nastro della scia colorato dalla qualità, icona e suono provvisori, la
   sua dimostrazione; un minuto di gioco nei test; misura `ODIN_PP_LAB_TIMING=sword` (la spada costa come l'AK).
+- **Dopo la prova:** niente più attesa fra un taglio e l'altro (minimo un quinto di schermo di strada, anche al ritorno),
+  affondo con un passo durante lo swing, colpo roteante girando con `Q`/`E`; al colpo striscia di sangue con le gocce,
+  lampo bianco, fermo della lama e scossa.
 - L'AK resta identico (114 catture su 114 uguali alla Fase 0).
 
 ## 2026-10-29 — Prima persona, Fase 3 fatta: aspetto e suoni dei pugni

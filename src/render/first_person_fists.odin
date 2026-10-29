@@ -139,8 +139,13 @@ first_person_punch_shake :: proc(since: f32, critical: bool) -> f32 {
 // How white the struck foe's print is now (0..1).
 first_person_struck_flash :: proc(renderer: ^Renderer, entity: game.Entity_Ref) -> f32 {
 	f := &renderer.tactical.first_person
-	if f.weapon != .Fists || f.amount <= 0 || f.fists_hit_at <= 0 || entity != game.enemy_entity(f.fists_struck) { return 0 }
-	since := f32(renderer.sprite_assets.elapsed-f.fists_hit_at)
+	if f.amount <= 0 { return 0 }
+	hit_at, struck := f.fists_hit_at, f.fists_struck
+	// The sword's cuts flash the same (first_person_sword.odin).
+	if f.weapon == .Sword { hit_at, struck = f.sword.cut_at, f.sword.last.enemy_id }
+	else if f.weapon != .Fists { return 0 }
+	if hit_at <= 0 || entity != game.enemy_entity(struck) { return 0 }
+	since := f32(renderer.sprite_assets.elapsed-hit_at)
 	if since < 0 { return 0 }
 	if since < FIRST_PERSON_HITSTOP { return 1 }
 	return clamp(1-(since-FIRST_PERSON_HITSTOP)/FIRST_PERSON_STRUCK_FADE, 0, 1)

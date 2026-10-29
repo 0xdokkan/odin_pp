@@ -870,8 +870,14 @@ nemico nella casella davanti (o, con un colpo di lato, anche nelle due diagonali
 davanti). Il danno, fino a 11, viene da come si muove: veloce, ampio (partire da
 un lato e tagliare attraverso), dritto (agitare il mouse dimezza), preso a tre
 quarti della lama, e dalla direzione: **fendente** dall'alto più forte, **tondo**
-di lato che prende due nemici, **montante** dal basso che spinge indietro. Un
-nemico a swing; per colpire ancora la lama deve rallentare e ripartire.
+di lato che prende due nemici, **montante** dal basso che spinge indietro. Non
+c'è attesa fra un taglio e l'altro: ogni passaggio sul petto taglia, anche al
+ritorno, purché la punta abbia fatto almeno un quinto di schermo dall'ultimo
+taglio (un tremolio non fa nulla). Un passo fatto durante lo swing è un
+**affondo** (×1,25); girare con `Q`/`E` nel verso della lama durante lo swing è
+un **colpo roteante** (×1,5). Il colpo si vede: una striscia di sangue sul petto
+con le gocce, il lampo bianco del nemico, la lama ferma un istante, la vista che
+sobbalza.
 
 **Il destro tenuto para** i colpi e i dardi dalle tre direzioni davanti, senza
 limite; premuto appena prima del colpo (entro 0,25 s) è una **parata perfetta**:

@@ -360,8 +360,11 @@ frame_first_person_camera :: proc(renderer: ^Renderer, room: ^game.Room) {
 		look := rl.Vector3{math.cos(yaw)*math.cos(pitch), math.sin(pitch), math.sin(yaw)*math.cos(pitch)}
 		position := orbit.position+(f.eye-orbit.position)*s
 		// A landed punch jolts the look a moment (first_person_fists.odin).
-		if f.weapon == .Fists && f.fists_hit_at > 0 {
-			jolt := first_person_punch_shake(f32(now-f.fists_hit_at), f.fists_hit_crit)*s
+		hit_at, hit_crit := f.fists_hit_at, f.fists_hit_crit
+		// The sword's cuts jolt it the same (first_person_sword.odin).
+		if f.weapon == .Sword { hit_at, hit_crit = f.sword.cut_at, f.sword.last.perfect }
+		if (f.weapon == .Fists || f.weapon == .Sword) && hit_at > 0 {
+			jolt := first_person_punch_shake(f32(now-hit_at), hit_crit)*s
 			yaw += jolt*f32(math.sin(now*61.3))
 			pitch += jolt*f32(math.sin(now*47.9+0.7))
 			look = {math.cos(yaw)*math.cos(pitch), math.sin(pitch), math.sin(yaw)*math.cos(pitch)}
