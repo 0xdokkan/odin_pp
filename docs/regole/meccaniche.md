@@ -919,7 +919,9 @@ più dell'AK (6). **Il tiro veloce** (rilasciato prima del primo livello, sotto
 0,4 s): parte lento e cade a parabola, come se non avesse portata; mirando dritto
 tocca terra tra 2 e 4 caselle, quindi un nemico a 3 caselle lo manca circa una
 volta su tre (mirando più in alto arriva più lontano). Fa sempre 1 danno, non dà
-stati e non mostra la guida: a raffica fa meno danni al secondo dell'AK. Senza rimbalzi rimasti
+stati e non mostra la guida: a raffica fa meno danni al secondo dell'AK. Le cose
+basse (muretti, coperture, oggetti) fermano la freccia solo fin dove sono
+disegnate: sopra ci passa, e se ci cade sopra si pianta sul loro piano. Senza rimbalzi rimasti
 si pianta nel muro; il pavimento la ferma sempre; vola e colpisce anche fuori
 vista. Se torna sul Viandante rimbalza su di lui senza ferirlo, gratis. Ogni
 freccia ha uno stato a caso (Velenosa: Veleno 2, Incendiaria: Bruciatura 1, Di

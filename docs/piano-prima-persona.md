@@ -3585,6 +3585,14 @@ dell'utente e i numeri ritoccati insieme) aspetta l'utente.
   nuove; il `README.md` ha la riga del piano aggiornata; `CHANGELOG.md`.
 - **Le carte restano `Lab_Only`** (la scelta dell'utente): nessuna offerta,
   nessun negozio, nessuna spedizione.
+- **Dalla prova dell'utente (2026-10-29), il muro invisibile:** tirando sopra
+  un muretto la freccia rimbalzava, come contro un pezzo di muro invisibile.
+  La causa: per le frecce ogni casella che ferma il passo era un muro intero.
+  Ora muretti, coperture e oggetti la fermano solo fin dove sono disegnati
+  (`bow_solid_top`; le altezze degli oggetti stanno in `game.grid_object_size`,
+  da dove le prende anche il disegno); sopra ci passa, cadendoci sopra si
+  pianta sul loro piano; le zone critiche solo sui muri alti. Test nuovo
+  (copertura, muretto, barile).
 - **Dalla prova dell'utente (2026-10-29), l'arco a destra:** l'utente lo voleva
   a destra, vicino a dove sarebbe il braccio destro. L'arco, la freccia
   incoccata e i due guantoni sono specchiati da sinistra a destra

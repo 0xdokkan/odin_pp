@@ -96,23 +96,7 @@ tactical_intent_label :: proc(intent: game.Enemy_Intent) -> cstring {
 // All environmental props have volume. The same extents drive their ray pick.
 @(private)
 voxel_object_bounds :: proc(kind: game.Grid_Object_Kind, position: view.Vec2, entity := NO_FIGURE) -> rl.BoundingBox {
-	width, height := f32(0.68), f32(0.72)
-	switch kind {
-	case .Ice_Block: width, height = 0.82, 0.94
-	case .Barrel: width, height = 0.64, 0.76
-	case .Bomb: width, height = 0.46, 0.46
-	case .Fire: width, height = 0.64, 0.7
-	case .Shock_Floor: width, height = 0.88, 0.12
-	case .Tesla_Coil: width, height = 0.64, 1.18
-	case .Cannon: width, height = 0.85, 0.85
-	case .Flood: width, height = 0.85, 0.35
-	case .Black_Hole: width, height = 0.85, 0.65
-	case .Bomb_Marley: width, height = 0.75, 0.9
-	// CANNONE on its stand; the hole is a dark disc with a sphere in it.
-	case .Field_Cannon: width, height = 0.72, 0.86
-	case .Devouring_Hole: width, height = 0.9, 0.5
-	case .Count:
-	}
+	width, height := game.grid_object_size(kind)
 	p := rl.Vector3{position.x+0.5, 0.035+entity_point_ground(entity, position), position.y+0.5}
 	return {p-rl.Vector3{width/2, 0, width/2}, p+rl.Vector3{width/2, height, width/2}}
 }

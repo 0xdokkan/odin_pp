@@ -9,12 +9,14 @@ import level "../level"
 // bare rules (DEFAULT_TACTICAL_CONFIG) at `vision`, with `spawns`, cover and
 // objects.
 first_person_test_room :: proc(t: ^testing.T, data: ^level.Level, player: ^Player, spawns: []Enemy_Spawn,
-	obstacles: []grid.Position = nil, objects: []Grid_Object_Spawn = nil, vision := 0) -> Room {
+	obstacles: []grid.Position = nil, objects: []Grid_Object_Spawn = nil, vision := 0, walls: []grid.Position = nil, fences: []grid.Position = nil) -> Room {
 	rows: [13]string
 	cells: [13][13]u8
 	for y in 0..<13 {
 		for x in 0..<13 { cells[y][x] = '#' if x == 0 || y == 0 || x == 12 || y == 12 else '.' }
 	}
+	for wall in walls { cells[wall.y][wall.x] = '#' }
+	for fence in fences { cells[fence.y][fence.x] = '=' }
 	cells[6][6] = '@'
 	cells[11][11] = '>'
 	for y in 0..<13 { rows[y] = string(cells[y][:]) }

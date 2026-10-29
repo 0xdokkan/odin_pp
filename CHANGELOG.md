@@ -5,6 +5,11 @@ I riferimenti a Classica, `--flat` e ai vecchi smoke descrivono versioni precede
 per i comandi disponibili oggi valgono il [README](README.md) e la documentazione collegata.
 
 
+## 2026-10-29 — Prima persona: frecce sopra i muretti
+
+- Le frecce di First Person Archer passano sopra muretti, coperture e oggetti bassi: li urtano solo fin dove sono
+  disegnati (prima rimbalzavano su un muro invisibile). Le zone critiche stanno solo sui muri alti.
+
 ## 2026-10-29 — Prima persona: l'arco a destra
 
 - L'arco di First Person Archer sta a destra del mirino, vicino al braccio destro, tenuto con la mano destra (la scelta

@@ -3,6 +3,7 @@ package game
 import "core:math"
 import grid "../engine/grid"
 import rng "../engine/rng"
+import level "../level"
 
 // FIRST PERSON ARCHER (docs/piano-prima-persona.md, sezioni 7 e 8, Fase 6; the
 // user's choices of 2026-10-29). The bow behind his eyes for ARCHER_SECONDS of
@@ -34,7 +35,10 @@ import rng "../engine/rng"
 // cliff face higher than the arrow) turns it as a mirror turns light: the
 // component across the face changes sign (in a corner both). Each bounce is
 // one of those left and BOW_BOUNCE_FACTOR faster; with none left the arrow
-// sticks where it struck (BOW_STUCK_SECONDS). The floor always stops it. It
+// sticks where it struck (BOW_STUCK_SECONDS). A low thing (a low wall, a
+// cover, an object) stops it only as high as it is drawn: above, it flies
+// over, and on its top it sticks as on a floor (the user found an invisible
+// wall over them, 2026-10-29). The floor always stops it. It
 // flies out of his sight too, and strikes there. Coming back at the player it
 // bounces off him as off a wall, a bounce more that costs none and never hurts
 // him (the user's choice). Arrows are endless; one flying into the open is
@@ -91,6 +95,10 @@ BOW_ZONE_MOVE_EVERY :: f32(12)
 BOW_ZONE_HALF_HEIGHT :: f32(0.35)
 // World seconds a frame flies at most (a long frame never leaps).
 BOW_MAX_PENDING :: f32(0.5)
+// How high the low things stand as they are drawn (render: a low wall's plinth
+// and block, diorama_scene; a cover's block, FIRST_PERSON_COVER_HEIGHT).
+BOW_FENCE_TOP :: f32(0.55)
+BOW_COVER_TOP :: f32(0.49)
 BOW_MAX_STEPS :: 256
 BOW_EPSILON :: f32(1e-5)
 BOW_VISUAL_GROUP :: u32(0x4B_5003)
@@ -247,7 +255,8 @@ bow_zone_candidate :: proc(room: ^Room, open: grid.Position, way: Move_Direction
 	if lasso_cell_is_solid(room, open) || !tactical_cell_visible(room, open) { return }
 	d := direction_offset(way)
 	wall := add_position(open, d)
-	if !lasso_cell_is_solid(room, wall) || !level_in_board(room, wall) { return }
+	// Only a whole wall: a zone at the eyes' height over a low one would hang in the air.
+	if _, full := bow_solid_top(room, wall); !full || !level_in_board(room, wall) { return }
 	back := Move_Direction((int(way)+2)%4)
 	return {cell = bow_cell_key(wall), face = u8(back), floor = f32(cell_height(room, open))*HEIGHT_STEP_DRAWN}, true
 }
@@ -313,13 +322,41 @@ bow_place_zones :: proc(room: ^Room, index := -1) {
 	}
 }
 
-// Whether a ray at `y` (world height) is stopped entering `cell`: a solid
-// thing there, the column's rock, or a floor higher than it (a cliff's face).
+// How high what stands in `cell` reaches (world height): its floor, or the top
+// of a low wall, a cover or an object there; `full` when nothing flies over it
+// (a wall, past the board, a shut gate's bars, a lift's shut landing).
+@(private = "file")
+bow_solid_top :: proc(room: ^Room, cell: grid.Position) -> (top: f32, full: bool) {
+	if room == nil || room.level_data == nil || !level.layer_contains(room.level_data, cell) { return 0, true }
+	floor := f32(cell_height(room, cell))*HEIGHT_STEP_DRAWN
+	if !base_cell_is_walkable(room, cell) {
+		if !cell_is_fence(room, cell) { return floor, true }
+		if _, open, gate := level.gate_at(room.level_data, cell); gate && !open { return floor, true }
+		return floor+BOW_FENCE_TOP, false
+	}
+	if lift_landing_shut(room, cell) { return floor, true }
+	top = floor
+	if obstacle_at(room, cell) { top = max(top, floor+BOW_COVER_TOP) }
+	if object, found := grid_object_at(room, cell); found {
+		definition, known := grid_object_definition(object.kind)
+		if !known { return floor, true }
+		if definition.blocks_movement {
+			_, height := grid_object_size(object.kind)
+			top = max(top, floor+height)
+		}
+	}
+	return top, false
+}
+
+// Whether a ray at `y` (world height) is stopped entering `cell`: a wall, the
+// column's rock, a low thing higher than it, or a floor higher than it (a
+// cliff's face).
 @(private = "file")
 bow_blocks :: proc(room: ^Room, cell: grid.Position, y: f32) -> bool {
 	floor, inside := layer_ray_cell(room, cell, y/HEIGHT_STEP_DRAWN)
-	if inside || lasso_cell_is_solid(room, floor) { return true }
-	return f32(cell_height(room, floor))*HEIGHT_STEP_DRAWN > y+BOW_EPSILON
+	if inside { return true }
+	top, full := bow_solid_top(room, floor)
+	return full || top > y+BOW_EPSILON
 }
 
 // Where a ray from `at` along the flat part of `way` (its x and z) first meets
@@ -362,7 +399,8 @@ bow_next :: proc(room: ^Room, a: ^Bow_Arrow, reach: f32) -> (event: Bow_Event, t
 		t, event = edge, .Edge
 		cross = {abs(tx-edge) <= BOW_EPSILON, abs(tz-edge) <= BOW_EPSILON}
 	}
-	floor := f32(cell_height(room, here))*HEIGHT_STEP_DRAWN
+	// Over a low thing its top is the floor.
+	floor, _ := bow_solid_top(room, here)
 	if a.way.y < -BOW_EPSILON {
 		tf := max((a.at.y-floor)/-a.way.y, 0)
 		if tf <= t { t, event, cross = tf, .Floor, {} }

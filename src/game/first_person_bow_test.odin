@@ -8,14 +8,14 @@ import level "../level"
 // FIRST PERSON ARCHER's rules (first_person_bow.odin, Fase 6), in the AK's
 // test room (walls round a 13x13 board), the player in (6, 6).
 
-// Without foes of its own a foe shut in the south-west corner behind cover
-// keeps the fight on, out of the arrows' way; the zones taken away but when
-// `zones`.
+// Without foes of its own a foe shut in the south-west corner behind walls
+// keeps the fight on, out of the arrows' way (they fly over a cover); the
+// zones taken away but when `zones`.
 @(private = "file")
 bow_room :: proc(t: ^testing.T, data: ^level.Level, player: ^Player, spawns: []Enemy_Spawn = nil, zones := false) -> Room {
 	shut := [?]Enemy_Spawn{{position = {x = 1, y = 11}, health = 60, attack = 1}}
-	cover := [?]grid.Position{{x = 2, y = 11}, {x = 1, y = 10}, {x = 2, y = 10}}
-	room := first_person_test_room(t, data, player, spawns if len(spawns) > 0 else shut[:], nil if len(spawns) > 0 else cover[:])
+	walls := [?]grid.Position{{x = 2, y = 11}, {x = 1, y = 10}, {x = 2, y = 10}}
+	room := first_person_test_room(t, data, player, spawns if len(spawns) > 0 else shut[:], walls = nil if len(spawns) > 0 else walls[:])
 	for foe in room.enemies { lasso_test_hold(&room, foe.id) }
 	testing.expect(t, tactical_begin_first_person(&room, 30, .Bow))
 	if !zones { room.first_person.bow.zone_count = 0 }
@@ -369,6 +369,64 @@ test_bow_critical_zones :: proc(t: ^testing.T) {
 	s.zone_clock = 0.01
 	_ = bow_frame(&room, 0.1)
 	testing.expect(t, s.zone_clock > BOW_ZONE_MOVE_EVERY-1)
+}
+
+// The low things (the user found an invisible wall over them, 2026-10-29): a
+// cover, a low wall and a barrel three cells east stop an arrow only as high
+// as they are drawn. Level, it flies over them to the east wall; pitched
+// down, it bounces off their face; falling onto a low wall or a cover, it
+// sticks on its top. A zone never stands on a low one.
+@(test)
+test_bow_flies_over_low_things :: proc(t: ^testing.T) {
+	Low :: enum {Cover, Fence, Barrel}
+	east := grid.Position{x = 9, y = 6}
+	for low in Low {
+		data: level.Level
+		player: Player
+		shut := [?]Enemy_Spawn{{position = {x = 1, y = 11}, health = 60, attack = 1}}
+		walls := [?]grid.Position{{x = 2, y = 11}, {x = 1, y = 10}, {x = 2, y = 10}}
+		cover := [?]grid.Position{east}
+		fence := [?]grid.Position{east}
+		barrel := [?]Grid_Object_Spawn{{kind = .Barrel, position = east}}
+		room := first_person_test_room(t, &data, &player, shut[:], cover[:] if low == .Cover else nil,
+			barrel[:] if low == .Barrel else nil, walls = walls[:], fences = fence[:] if low == .Fence else nil)
+		for foe in room.enemies { lasso_test_hold(&room, foe.id) }
+		testing.expect(t, tactical_begin_first_person(&room, 30, .Bow))
+		s := &room.first_person.bow
+		for zone in s.zones[:s.zone_count] { testing.expectf(t, zone.cell != {9, 6}, "%v: a zone on it", low) }
+		s.zone_count = 0
+		// Level: over it, into the east wall.
+		bow_shoot(&room, 0.3*BOW_DRAW_SECONDS)
+		a := bow_last_arrow(&room)
+		if a == nil { testing.fail(t); level.destroy(&data); destroy_room(&room); continue }
+		a.bounces_left = 0
+		for _ in 0..<60 { _ = bow_frame(&room, 1.0/60) }
+		testing.expectf(t, a.state == .Stuck && abs(a.at.x-12) < 1e-3, "%v: level, it stopped at %v", low, a.at)
+		// Pitched down: off its face, back west.
+		a.state = .None
+		s.nock = 0
+		bow_shoot(&room, 0.3*BOW_DRAW_SECONDS, pitch = -0.29)
+		a = bow_last_arrow(&room)
+		if a == nil { testing.fail(t); level.destroy(&data); destroy_room(&room); continue }
+		for _ in 0..<12 { _ = bow_frame(&room, 1.0/60) }
+		testing.expectf(t, s.bounces == 1 && a.way.x < 0, "%v: pitched down, %d bounces, at %v", low, s.bounces, a.at)
+		// Falling onto it: on its top (a barrel stands higher: on its face).
+		for &arrow in s.arrows { arrow.state = .None }
+		s.nock = 0
+		bow_shoot(&room, 0)
+		a = bow_last_arrow(&room)
+		if a == nil { testing.fail(t); level.destroy(&data); destroy_room(&room); continue }
+		a.speed = 11
+		for _ in 0..<60 { _ = bow_frame(&room, 1.0/60) }
+		top := BOW_COVER_TOP if low == .Cover else BOW_FENCE_TOP
+		if low == .Barrel {
+			testing.expectf(t, a.state == .Stuck && abs(a.at.x-9) < 1e-3, "barrel: the falling arrow stopped at %v", a.at)
+		} else {
+			testing.expectf(t, a.state == .Stuck && a.at.x > 9 && a.at.x < 10 && abs(a.at.y-top) < 1e-3, "%v: the falling arrow stopped at %v", low, a.at)
+		}
+		level.destroy(&data)
+		destroy_room(&room)
+	}
 }
 
 // The guide (the user's choice: to the second bounce): from the eye to the
