@@ -169,6 +169,10 @@ First_Person_View :: struct {
 	// The fists' body as last seen and its lift off his floor (first_person_fists.odin).
 	fists_body: [2]f32,
 	fists_lift: f32,
+	// The fists' punch out, its clock and the running pace 0..1, as last seen
+	// (first_person_gloves.odin draws the gloves from them).
+	fists_punch: game.First_Person_Punch,
+	fists_clock, fists_run: f32,
 	// The eye and its cell, as this frame's camera puts them, and the foes'
 	// cards where this frame shows them: what a shot sees (first_person_aim).
 	eye: rl.Vector3,

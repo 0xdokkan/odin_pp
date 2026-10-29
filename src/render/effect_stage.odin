@@ -42,6 +42,9 @@ BORROWED_RENDERER_OWN_HANDLES :: [?]string{
 	"tactical.first_person.gloves.sphere",
 	"tactical.first_person.gloves.cylinder",
 	"tactical.first_person.gloves.shader",
+	"tactical.first_person.gloves.paper_shader",
+	"tactical.first_person.gloves.low",
+	"tactical.first_person.gloves.paper",
 }
 
 // A renderer for a board of `canvas_width` by `canvas_height` drawn into

@@ -14,7 +14,8 @@ Commit **«Prima persona, Fase 2: critico senza mira e guantoni 3D»** sul ramo
 - **Prima:** il critico voleva il pugno chiesto dal segno **e** il mirino sopra il segno (testa o corpo compresi).
 - **Ora:** basta il pugno chiesto dal segno che prende quel nemico, dovunque. Il segno sta sul petto, dalla parte del suo
   pugno, solo come aiuto.
-- **Aspetto:** i guantoni rossi di carta ai lati diventano guantoni 3D neri e oro, in guardia al centro in basso.
+- **Aspetto:** i guantoni rossi di carta ai lati diventano guantoni neri e oro, in guardia al centro in basso: un modello 3D
+  disegnato come pixel art di cartoncino (tinte piene, inchiostro, bordo di carta e spessore).
 - Danni, tempi, rarità, energia e durata non cambiano.
 
 ## 2026-10-28 — Carta nuova: First Person Brawler (solo laboratorio)

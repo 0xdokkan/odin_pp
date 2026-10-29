@@ -62,6 +62,8 @@ follow_first_person_fists :: proc(renderer: ^Renderer, room: ^game.Room) {
 	fists := &room.first_person.fists
 	f.fists_body = fists.body
 	f.fists_lift = (fists.feet-f32(game.cell_height(room, room.player.position)))*game.HEIGHT_STEP_DRAWN
+	f.fists_punch, f.fists_clock = fists.punch, fists.punch_clock
+	f.fists_run = clamp(math.sqrt(fists.velocity.x*fists.velocity.x+fists.velocity.y*fists.velocity.y)/game.FISTS_SPEED, 0, 1)
 }
 
 // How far out a glove is, 0 at rest .. 1 landed: out over the punch's `land`

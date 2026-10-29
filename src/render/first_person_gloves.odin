@@ -1,31 +1,35 @@
 package render
 
+import "core:c"
 import "core:math"
 import rl "vendor:raylib"
 import rlgl "vendor:raylib/rlgl"
 import tween "../engine/tween"
 import game "../game"
 
-// FIRST PERSON BRAWLER's gloves (the user's choice of 2026-10-29): two real 3D
-// gloves of black leather with gold bands, made from code, held up in a
-// boxer's guard at the bottom middle of the view as a person's own hands sit:
-// the left (the lead) a little forward and higher, the right at the chin, both
-// knuckles up and turned in, their cuffs cut by the bottom edge, the crosshair
-// left clear. They are drawn over the board with a camera of their own (a first
-// person viewmodel: the board's depth is cleared before the HUD, so they never
-// go into a wall), in a light of their own, with the board's ink round them.
-// Each punch throws its own: the jab the left and the cross the right straight
-// at the crosshair, turning palm down on the way (a corkscrew); the hooks round
-// from their side, the arm level, the knuckles in. The other waits at the chin.
+// FIRST PERSON BRAWLER's gloves (the user's choices of 2026-10-29): two gloves
+// of black leather with gold bands, made from code as a 3D model but drawn as
+// paper pixel art, held up in a boxer's guard at the bottom middle of the view
+// as a person's own hands sit: the left (the lead) a little forward and higher,
+// the right at the chin, both knuckles up and turned in, their cuffs cut by the
+// bottom edge, the crosshair left clear. The model draws with a camera of its
+// own (a first person viewmodel: it never goes into a wall) on a small canvas,
+// FIRST_PERSON_GLOVE_PIXEL logical units to its pixel, in a few flat tones of
+// each colour as a pixel artist shades (no smooth light), with the board's ink
+// on every part's edge; that canvas is then cut out as a card is: an ink line
+// round it, a band of the cards' paper, the card's thickness below and to the
+// right; and laid on the view pixel for pixel. Each punch throws its own: the
+// jab the left and the cross the right straight at the crosshair, turning palm
+// down on the way (a corkscrew); the hooks round from their side, the arm level,
+// the knuckles in. The other waits at the chin.
 
 // The gloves' camera: at the origin looking down -Z (+X its right, +Y up).
 FIRST_PERSON_GLOVE_FOV :: f32(55)
 // The whole glove's size (1: about a real glove's, in metres) and its ink, in metres.
 FIRST_PERSON_GLOVE_SCALE :: f32(0.78)
-FIRST_PERSON_GLOVE_INK :: f32(0.0022)
-FIRST_PERSON_GLOVE_LEATHER :: rl.Color{20, 18, 22, 255}
-FIRST_PERSON_GLOVE_GOLD :: rl.Color{236, 178, 66, 255}
-FIRST_PERSON_GLOVE_WRAP :: rl.Color{58, 54, 62, 255}
+FIRST_PERSON_GLOVE_INK :: f32(0.0024)
+// Logical units of the canvas to one pixel of the gloves (about the AK's print).
+FIRST_PERSON_GLOVE_PIXEL :: f32(3)
 // The marks' height on a foe's card, as a part of its outline's top (its chest).
 FIRST_PERSON_MARK_HEIGHT :: f32(0.6)
 
@@ -61,12 +65,15 @@ FIRST_PERSON_GLOVE_HOOK := [2]First_Person_Glove_Pose{
 	{at = {-0.04, -0.045, -0.52}, pitch = 0.10, yaw = 1.25, roll = -1.30},
 }
 
+// What a part is made of: each its own tones (FIRST_PERSON_GLOVE_FRAGMENT).
+First_Person_Glove_Stuff :: enum i32 {Leather, Gold, Wrap}
+
 // One glove's shapes in its own frame (X right, Y the back of the hand, -Z the
 // knuckles), for the left hand: the right mirrors X. A sphere or a cylinder
-// (along +Z, from `at` toward the wrist), stretched by `size`, of leather, gold
-// or the wraps of the forearm.
+// (along +Z, from `at` toward the wrist), stretched by `size`.
 First_Person_Glove_Part :: struct {
-	cylinder, gold, wrap: bool,
+	cylinder: bool,
+	stuff: First_Person_Glove_Stuff,
 	at, size: rl.Vector3,
 }
 
@@ -79,21 +86,24 @@ FIRST_PERSON_GLOVE_PARTS := [?]First_Person_Glove_Part{
 	{at = {0.046, -0.004, -0.018}, size = {0.023, 0.028, 0.050}},
 	// The cuff and its two gold bands.
 	{cylinder = true, at = {0, -0.004, 0.050}, size = {0.050, 0.110, 0.045}},
-	{cylinder = true, gold = true, at = {0, -0.004, 0.046}, size = {0.0535, 0.018, 0.0485}},
-	{cylinder = true, gold = true, at = {0, -0.004, 0.128}, size = {0.0525, 0.012, 0.0475}},
+	{cylinder = true, stuff = .Gold, at = {0, -0.004, 0.046}, size = {0.0535, 0.018, 0.0485}},
+	{cylinder = true, stuff = .Gold, at = {0, -0.004, 0.128}, size = {0.0525, 0.012, 0.0475}},
 	// The wrapped forearm out of the cuff, on past the view's edge (never its end).
-	{cylinder = true, wrap = true, at = {0, -0.004, 0.100}, size = {0.036, 0.420, 0.033}},
+	{cylinder = true, stuff = .Wrap, at = {0, -0.004, 0.100}, size = {0.036, 0.420, 0.033}},
 	// The gold stripe down the back of the hand.
-	{gold = true, at = {0, 0.050, -0.014}, size = {0.013, 0.0060, 0.050}},
+	{stuff = .Gold, at = {0, 0.050, -0.014}, size = {0.013, 0.0060, 0.050}},
 }
 
-// The gloves' GPU handles: a sphere and a cylinder of radius and height 1, and
-// their light. Made the first time the gloves are drawn, freed with the view.
+// The gloves' GPU handles: a sphere and a cylinder of radius and height 1, the
+// model's tones, the small canvas it draws on (`low`) and the card cut from it
+// (`paper`, by `paper_shader`). Made the first time the gloves are drawn, freed
+// with the view. `ready`: `paper` holds this frame's gloves.
 First_Person_Glove_Kit :: struct {
 	sphere, cylinder: rl.Mesh,
-	shader: rl.Shader,
-	metal_location, ink_location: i32,
-	failed: bool,
+	shader, paper_shader: rl.Shader,
+	stuff_location, ink_location, texel_location: i32,
+	low, paper: rl.RenderTexture2D,
+	ready, failed: bool,
 }
 
 FIRST_PERSON_GLOVE_VERTEX :: `#version 330
@@ -111,41 +121,72 @@ void main() {
 }
 `
 
-// Leather: a warm key light from the upper left, a cool fill from below on the
-// right, a sharp gloss and a broad sheen, a gold rim from the arena behind;
-// gold: a metal that mirrors a warm sky above and a dark floor below. `ink`
-// draws the colour flat (the outline's shell).
+// A pixel artist's shading: a warm key light from the upper left makes three
+// flat tones of each stuff (shade, base, light), a sharp gloss one more spot,
+// a rim of warm light the leather's edge toward the arena; the gold takes its
+// tone from the sky it mirrors. `ink` draws the board's ink (the outline's shell).
 FIRST_PERSON_GLOVE_FRAGMENT :: `#version 330
 in vec3 fragPos;
 in vec3 fragNormal;
-uniform vec4 colDiffuse;
-uniform float metal;
+uniform float stuff;
 uniform float ink;
 out vec4 finalColor;
+const vec3 LEATHER[4] = vec3[](vec3(12, 10, 17), vec3(28, 25, 37), vec3(52, 47, 66), vec3(142, 132, 160));
+const vec3 GOLD[4] = vec3[](vec3(124, 70, 24), vec3(208, 142, 42), vec3(246, 200, 88), vec3(255, 244, 196));
+const vec3 WRAP[4] = vec3[](vec3(30, 28, 38), vec3(56, 52, 66), vec3(86, 82, 100), vec3(120, 116, 136));
+const vec3 RIM = vec3(150, 104, 44);
 void main() {
-    if (ink > 0.5) { finalColor = vec4(colDiffuse.rgb, 1.0); return; }
+    if (ink > 0.5) { finalColor = vec4(13.0, 20.0, 30.0, 255.0)/255.0; return; }
     vec3 n = normalize(fragNormal);
     vec3 v = normalize(-fragPos);
     vec3 key = normalize(vec3(-0.45, 0.80, 0.45));
-    vec3 fill = normalize(vec3(0.60, -0.35, 0.40));
-    float wrap = pow(dot(n, key)*0.5+0.5, 2.0);
-    float under = max(dot(n, fill), 0.0);
-    float facing = max(dot(n, v), 0.0);
-    float rim = pow(1.0-facing, 3.0);
-    vec3 h = normalize(key+v);
-    float gloss = pow(max(dot(n, h), 0.0), 56.0);
-    float sheen = pow(max(dot(n, h), 0.0), 7.0);
-    vec3 base = colDiffuse.rgb;
+    float wrap = dot(n, key)*0.5+0.5;
+    float gloss = pow(max(dot(n, normalize(key+v)), 0.0), 40.0);
+    float rim = 1.0-max(dot(n, v), 0.0);
+    int tone = wrap < 0.50 ? 0 : (wrap < 0.82 ? 1 : 2);
     vec3 c;
-    if (metal > 0.5) {
-        vec3 sky = mix(vec3(0.22, 0.13, 0.05), vec3(1.15, 1.0, 0.78), smoothstep(-0.6, 0.8, reflect(-v, n).y));
-        c = base*(0.18+0.55*wrap)+base*sky*0.55+mix(base, vec3(1.0), 0.4)*gloss*1.1+base*rim*0.35;
+    if (stuff > 1.5) {
+        c = WRAP[gloss > 0.6 ? 3 : tone];
+    } else if (stuff > 0.5) {
+        float sky = reflect(-v, n).y*0.5+0.5;
+        float t = wrap*0.55+sky*0.45;
+        c = GOLD[gloss > 0.5 ? 3 : (t < 0.40 ? 0 : (t < 0.70 ? 1 : 2))];
     } else {
-        c = base*(0.55+1.6*wrap)+vec3(0.32, 0.38, 0.55)*under*0.10;
-        c += vec3(1.0, 0.95, 0.88)*(gloss*0.55+sheen*0.05);
-        c += vec3(0.95, 0.70, 0.30)*rim*0.30;
+        c = LEATHER[gloss > 0.55 ? 3 : tone];
+        if (tone < 2 && rim > 0.78) { c = RIM; }
     }
-    finalColor = vec4(clamp(c, 0.0, 1.0), 1.0);
+    finalColor = vec4(c/255.0, 1.0);
+}
+`
+
+// The card cut from the small canvas, pixel by pixel: the gloves as drawn; an
+// ink line round them; a band of the cards' paper with its grain; the card's
+// thickness one pixel below and to the right of the paper; nothing else.
+FIRST_PERSON_GLOVE_PAPER :: `#version 330
+in vec2 fragTexCoord;
+in vec4 fragColor;
+uniform sampler2D texture0;
+uniform vec2 texel;
+out vec4 finalColor;
+bool near(vec2 uv, float r) {
+    for (int y = -3; y <= 3; y++) {
+        for (int x = -3; x <= 3; x++) {
+            if (float(x*x+y*y) > r*r+0.25) continue;
+            if (texture(texture0, uv+vec2(x, y)*texel).a > 0.5) return true;
+        }
+    }
+    return false;
+}
+void main() {
+    vec2 uv = fragTexCoord;
+    vec4 c = texture(texture0, uv);
+    if (c.a > 0.5) { finalColor = c; return; }
+    if (near(uv, 1.0)) { finalColor = vec4(13.0, 20.0, 30.0, 255.0)/255.0; return; }
+    vec2 cell = floor(uv/texel);
+    float grain = fract(sin(dot(cell, vec2(12.9898, 78.233)))*43758.5453);
+    if (near(uv, 2.6)) { finalColor = vec4(vec3(241.0, 239.0, 230.0)/255.0*(0.965+0.035*grain), 1.0); return; }
+    if (near(uv+vec2(-1.0, 1.0)*texel, 2.6)) { finalColor = vec4(164.0, 152.0, 131.0, 255.0)/255.0; return; }
+    finalColor = vec4(0.0);
 }
 `
 
@@ -154,13 +195,17 @@ first_person_glove_kit :: proc(f: ^First_Person_View) -> ^First_Person_Glove_Kit
 	kit := &f.gloves
 	if kit.shader.id != 0 || kit.failed { return kit }
 	shader := rl.LoadShaderFromMemory(FIRST_PERSON_GLOVE_VERTEX, FIRST_PERSON_GLOVE_FRAGMENT)
-	if shader.id == 0 || shader.id == rlgl.GetShaderIdDefault() {
+	paper := rl.LoadShaderFromMemory(nil, FIRST_PERSON_GLOVE_PAPER)
+	if shader.id == 0 || shader.id == rlgl.GetShaderIdDefault() || paper.id == 0 || paper.id == rlgl.GetShaderIdDefault() {
+		if shader.id != 0 && shader.id != rlgl.GetShaderIdDefault() { rl.UnloadShader(shader) }
+		if paper.id != 0 && paper.id != rlgl.GetShaderIdDefault() { rl.UnloadShader(paper) }
 		kit.failed = true
 		return kit
 	}
-	kit.shader = shader
-	kit.metal_location = rl.GetShaderLocation(shader, "metal")
+	kit.shader, kit.paper_shader = shader, paper
+	kit.stuff_location = rl.GetShaderLocation(shader, "stuff")
 	kit.ink_location = rl.GetShaderLocation(shader, "ink")
+	kit.texel_location = rl.GetShaderLocation(paper, "texel")
 	kit.sphere = rl.GenMeshSphere(1, 24, 32)
 	kit.cylinder = rl.GenMeshCylinder(1, 1, 32)
 	return kit
@@ -171,7 +216,31 @@ destroy_first_person_glove_kit :: proc(kit: ^First_Person_Glove_Kit) {
 	if kit.sphere.vaoId != 0 { rl.UnloadMesh(kit.sphere) }
 	if kit.cylinder.vaoId != 0 { rl.UnloadMesh(kit.cylinder) }
 	if kit.shader.id != 0 { rl.UnloadShader(kit.shader) }
+	if kit.paper_shader.id != 0 { rl.UnloadShader(kit.paper_shader) }
+	if kit.low.id != 0 { rl.UnloadRenderTexture(kit.low) }
+	if kit.paper.id != 0 { rl.UnloadRenderTexture(kit.paper) }
 	kit^ = {}
+}
+
+// The small canvases, `w` by `h` pixels (made again when the view's size changes).
+@(private = "file")
+first_person_glove_canvases :: proc(kit: ^First_Person_Glove_Kit, w, h: c.int) -> bool {
+	if kit.low.id != 0 && kit.low.texture.width == w && kit.low.texture.height == h { return true }
+	if kit.low.id != 0 { rl.UnloadRenderTexture(kit.low) }
+	if kit.paper.id != 0 { rl.UnloadRenderTexture(kit.paper) }
+	kit.low, kit.paper = rl.LoadRenderTexture(w, h), rl.LoadRenderTexture(w, h)
+	if !rl.IsRenderTextureValid(kit.low) || !rl.IsRenderTextureValid(kit.paper) {
+		if kit.low.id != 0 { rl.UnloadRenderTexture(kit.low) }
+		if kit.paper.id != 0 { rl.UnloadRenderTexture(kit.paper) }
+		kit.low, kit.paper = {}, {}
+		return false
+	}
+	rl.SetTextureFilter(kit.low.texture, .POINT)
+	rl.SetTextureFilter(kit.paper.texture, .POINT)
+	// The cut never wraps round to the canvas's other edge.
+	rl.SetTextureWrap(kit.low.texture, .CLAMP)
+	rl.SetTextureWrap(kit.paper.texture, .CLAMP)
+	return true
 }
 
 @(private = "file")
@@ -234,17 +303,21 @@ first_person_glove_part_frame :: proc(part: First_Person_Glove_Part, left: bool,
 	return rl.MatrixTranslate(at.x, at.y, at.z)*rl.MatrixScale(part.size.x+grow, part.size.y+grow, part.size.z+grow)
 }
 
-// The two gloves, over the board, in their own camera.
-@(private)
-draw_first_person_gloves :: proc(renderer: ^Renderer, room: ^game.Room, now: f64) {
-	if room == nil { return }
+// Whether the view shows the gloves now, and how far up they have come (0..1).
+@(private = "file")
+first_person_gloves_shown :: proc(renderer: ^Renderer) -> (ready: f32, shown: bool) {
 	f := &renderer.tactical.first_person
-	kit := first_person_glove_kit(f)
-	if kit.shader.id == 0 { return }
-	fists := &room.first_person.fists
-	ready := tween.smoothstep(clamp((first_person_amount(renderer)-FIRST_PERSON_AK_FROM)/(1-FIRST_PERSON_AK_FROM), 0, 1))
-	speed := math.sqrt(fists.velocity.x*fists.velocity.x+fists.velocity.y*fists.velocity.y)
-	run := clamp(speed/game.FISTS_SPEED, 0, 1)
+	if f.amount <= 0 || FIRST_PERSON_LOOKS[f.weapon].hand != .Fists { return }
+	amount := first_person_amount(renderer)
+	if amount <= FIRST_PERSON_AK_FROM { return }
+	return tween.smoothstep(clamp((amount-FIRST_PERSON_AK_FROM)/(1-FIRST_PERSON_AK_FROM), 0, 1)), true
+}
+
+// The model of both gloves, in their camera, on the target bound now.
+@(private = "file")
+draw_first_person_glove_models :: proc(renderer: ^Renderer, kit: ^First_Person_Glove_Kit, ready: f32) {
+	f := &renderer.tactical.first_person
+	now := renderer.sprite_assets.elapsed
 	camera := rl.Camera3D{position = {0, 0, 0}, target = {0, 0, -1}, up = {0, 1, 0}, fovy = FIRST_PERSON_GLOVE_FOV, projection = .PERSPECTIVE}
 	maps: [12]rl.MaterialMap
 	material := rl.Material{shader = kit.shader, maps = raw_data(maps[:])}
@@ -252,7 +325,7 @@ draw_first_person_gloves :: proc(renderer: ^Renderer, room: ^game.Room, now: f64
 	rlgl.EnableBackfaceCulling()
 	for side in 0..<2 {
 		left := side == 0
-		glove := first_person_glove_frame(first_person_glove_pose(side, fists.punch, fists.punch_clock, ready, run, now))
+		glove := first_person_glove_frame(first_person_glove_pose(side, f.fists_punch, f.fists_clock, ready, f.fists_run, now))
 		// First the ink: each part's shell a little fuller, its inside only;
 		// then the parts, which cover it but at their edges.
 		for pass in 0..<2 {
@@ -260,9 +333,8 @@ draw_first_person_gloves :: proc(renderer: ^Renderer, room: ^game.Room, now: f64
 			rlgl.SetCullFace(.FRONT if pass == 0 else .BACK)
 			rl.SetShaderValue(kit.shader, rl.ShaderLocationIndex(kit.ink_location), &ink, .FLOAT)
 			for part in FIRST_PERSON_GLOVE_PARTS {
-				metal := f32(1 if part.gold else 0)
-				rl.SetShaderValue(kit.shader, rl.ShaderLocationIndex(kit.metal_location), &metal, .FLOAT)
-				maps[0].color = LIVING_TOKEN_INK if pass == 0 else (FIRST_PERSON_GLOVE_GOLD if part.gold else (FIRST_PERSON_GLOVE_WRAP if part.wrap else FIRST_PERSON_GLOVE_LEATHER))
+				stuff := f32(part.stuff)
+				rl.SetShaderValue(kit.shader, rl.ShaderLocationIndex(kit.stuff_location), &stuff, .FLOAT)
 				grow := FIRST_PERSON_GLOVE_INK if pass == 0 else 0
 				rl.DrawMesh(kit.cylinder if part.cylinder else kit.sphere, material, glove*first_person_glove_part_frame(part, left, grow))
 			}
@@ -270,4 +342,54 @@ draw_first_person_gloves :: proc(renderer: ^Renderer, room: ^game.Room, now: f64
 	}
 	rlgl.SetCullFace(.BACK)
 	rl.EndMode3D()
+}
+
+// Between the board and the HUD, no target bound (end_tactical_surface): the
+// model on the small canvas, then the card cut from it.
+@(private)
+prepare_first_person_gloves :: proc(renderer: ^Renderer) {
+	f := &renderer.tactical.first_person
+	f.gloves.ready = false
+	ready, shown := first_person_gloves_shown(renderer)
+	if !shown { return }
+	kit := first_person_glove_kit(f)
+	if kit.shader.id == 0 { return }
+	w := c.int(max(math.round(renderer.canvas_width/FIRST_PERSON_GLOVE_PIXEL), 1))
+	h := c.int(max(math.round(renderer.canvas_height/FIRST_PERSON_GLOVE_PIXEL), 1))
+	if !first_person_glove_canvases(kit, w, h) { return }
+	rl.BeginTextureMode(kit.low)
+	rl.ClearBackground(rl.BLANK)
+	draw_first_person_glove_models(renderer, kit, ready)
+	rl.EndTextureMode()
+	rl.BeginTextureMode(kit.paper)
+	rl.ClearBackground(rl.BLANK)
+	texel := [2]f32{1/f32(w), 1/f32(h)}
+	rl.SetShaderValue(kit.paper_shader, rl.ShaderLocationIndex(kit.texel_location), &texel, .VEC2)
+	rl.BeginShaderMode(kit.paper_shader)
+	rl.DrawTextureRec(kit.low.texture, {0, 0, f32(w), f32(h)}, {}, rl.WHITE)
+	rl.EndShaderMode()
+	rl.EndTextureMode()
+	kit.ready = true
+}
+
+// The two gloves over the board: the card prepare_first_person_gloves cut this
+// frame, pixel for pixel; without it (no board surface) the model straight on
+// the view.
+@(private)
+draw_first_person_gloves :: proc(renderer: ^Renderer, room: ^game.Room, now: f64) {
+	if room == nil { return }
+	f := &renderer.tactical.first_person
+	kit := &f.gloves
+	if kit.ready {
+		kit.ready = false
+		paper := kit.paper.texture
+		// Drawn once into `paper` from `low`, it stands the right way up already.
+		rl.DrawTexturePro(paper, {0, 0, f32(paper.width), f32(paper.height)}, {0, 0, renderer.canvas_width, renderer.canvas_height}, {}, 0, rl.WHITE)
+		return
+	}
+	ready, shown := first_person_gloves_shown(renderer)
+	if !shown { return }
+	kit = first_person_glove_kit(f)
+	if kit.shader.id == 0 { return }
+	draw_first_person_glove_models(renderer, kit, ready)
 }

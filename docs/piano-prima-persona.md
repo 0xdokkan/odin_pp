@@ -2308,6 +2308,24 @@ così non entrano nei muri ([viewmodel](https://garry.net/posts/unity-viewmodels
   critici ora prova il pugno giusto dovunque sul nemico, i pugni sbagliati e il
   pugno che manca il nemico; uno nuovo prova la guardia dei guantoni 3D, il jab
   al mirino e il gancio largo.
+- **Seconda prova dell'utente: il 3D liscio non piace.** Chiesto un effetto
+  cartoncino e pixel, «che sembra più disegno che 3D». Riferimenti: la pixel
+  art 3D si fa disegnando il modello a bassa risoluzione con poche tinte piene e
+  un contorno in un passo dopo
+  ([t3ssel8r](https://cascadeur.com/forum/news/1989-making-an-animation-for-a-3d-pixel-art-game-interview-with-t3ssel8r),
+  [Pixelat3D](https://sol.sbc.org.br/index.php/sbgames/article/download/45414/45175/)).
+  Fatto così: il modello si disegna su una tela piccola, **3 unità del gioco
+  per pixel** (320 × 180 sulla tela di 960 × 540, circa i pixel della stampa
+  dell'AK), in **tre tinte piene** per materiale (ombra, base, luce) più un
+  punto di lucido, come ombreggia un pixel artist: pelle nera, oro, fasce;
+  l'inchiostro sui bordi dei pezzi. Poi un secondo passo, sempre in piccolo,
+  ritaglia il disegno come un cartoncino: una riga d'inchiostro intorno, una
+  fascia della carta dei cartoncini con la sua grana, lo spessore del
+  cartoncino un pixel sotto e a destra. Ingrandito senza sfumare, pixel per
+  pixel, sopra il tavolo, fra il tavolo e l'HUD.
+  Verifiche: `check.ps1` completo, **1782 test verdi** con e senza assert;
+  atto `fps` ancora **identico al byte** alla Fase 0 (114 su 114); atto
+  `prima_persona` uguale in due giri. Catture guardate.
 - **Verifiche:** `check.ps1` completo: **1782 test verdi** con e senza assert
   (uno tolto, uno nuovo), più le due build. L'atto `fps` dà ancora **114
   catture identiche al byte** alla Fase 0; l'atto `prima_persona` dà le stesse

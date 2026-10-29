@@ -10,7 +10,9 @@ per i comandi disponibili oggi valgono il [README](README.md) e la documentazion
 - **First Person Brawler** (solo nel laboratorio), dopo la prova dell'utente:
   - **critico senza mira:** basta il pugno che il segno acceso chiede, se prende quel nemico, dovunque prenda; il segno
     sta sul petto, dalla parte del suo pugno, solo come aiuto;
-  - **guantoni 3D** fatti da codice: pelle nera e oro, contorno a inchiostro, una telecamera e una luce loro;
+  - **guantoni 3D** fatti da codice, pelle nera e oro, disegnati come **pixel art di cartoncino**: una tela piccola
+    (3 unità per pixel), tre tinte piene per materiale, inchiostro, bordo di carta e spessore del cartoncino; una
+    telecamera loro;
   - **in guardia da pugile** in basso al centro, con l'avambraccio fasciato; jab e cross dritti al mirino, i ganci larghi
     dal loro lato.
 - L'AK è identico: le 114 catture dell'atto `fps` sono uguali al byte a quelle della Fase 0.
