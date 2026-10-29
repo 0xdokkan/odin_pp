@@ -65,12 +65,13 @@ mechanics_lab_prima_persona :: proc(window: ^app.Window, renderer: ^render.Rende
 	controller^ = {was_focused = true}
 	for foe in room.enemies { mechanics_lab_hold(room, foe.id) }
 	for _ in 0..<20 { mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0) }
-	card, brawler := u32(0), u32(0)
+	card, brawler, fencer := u32(0), u32(0), u32(0)
 	for held in player.deck.hand[:player.deck.hand_count] {
 		if held.definition_id == .First_Person { card = held.id }
 		if held.definition_id == .First_Person_Brawler { brawler = held.id }
+		if held.definition_id == .First_Person_Fencer { fencer = held.id }
 	}
-	if len(room.obstacles) != len(run_session.MECHANICS_LAB_FIRST_PERSON_COVERS) || player.deck.hand_count != 2 || card == 0 || brawler == 0 {
+	if len(room.obstacles) != len(run_session.MECHANICS_LAB_FIRST_PERSON_COVERS) || player.deck.hand_count != 3 || card == 0 || brawler == 0 || fencer == 0 {
 		fmt.eprintln("mechanics lab: the first person arena is not the one drawn, or its deck is not its own"); return false
 	}
 	mechanics_lab_still(window, renderer, room, 0, "odin_pp_mechanics_lab_prima_persona.png")
@@ -211,10 +212,89 @@ mechanics_lab_prima_persona :: proc(window: ^app.Window, renderer: ^render.Rende
 	}
 	if !leave(window, renderer, room, controller, cards, buffer) { fmt.eprintln("mechanics lab: the fists' view did not end"); return false }
 
-	// The weapons still to come: the lab takes each up; its tag, the bare line, an empty hand, no shot.
+	// FIRST PERSON FENCER from the hand (Fase 4): its words; behind his eyes the
+	// blade, the brute in front; the point brought slowly to its far side, then
+	// across its chest fast with the button held, a cut; the guard against its
+	// blow; Q twice and the grapple on it three cells west.
+	fencer_definition, _ := game.card_definition_by_id(.First_Person_Fencer)
+	for upgrade in i32(0)..=game.FIRST_PERSON_MAX_UPGRADE_LEVEL {
+		if misfit := render.tactical_card_text_misfit(renderer, {id = 1, definition_id = .First_Person_Fencer, upgrade_level = upgrade},
+			fencer_definition, width); misfit != "" {
+			fmt.eprintf("mechanics lab: First Person Fencer +%d on a %.0f px card: %s\n", upgrade, width, misfit); return false
+		}
+	}
+	mechanics_lab_still(window, renderer, room, fencer, "odin_pp_mechanics_lab_card_First_Person_Fencer.png")
+	room.enemies[brute_index].position = game.add_position(room.player.position, {x = 1})
+	room.enemies[brute_index].health = 60
+	room.player.tactical.facing = .East
+	render.clear_event_animations(renderer)
+	for _ in 0..<600 {
+		if game.tactical_allows_cards(room) && !render.renderer_blocks_player_input(renderer) && !game.tactical_player_busy(room) { break }
+		frame(window, renderer, room, controller, cards, buffer)
+	}
+	player.deck.energy = player.deck.rules.max_energy
+	if !run_session.commit_gameplay_command(room, renderer, cards, {kind = .Play_Card, origin_phase = .Combat, card_id = fencer,
+		target = game.entity_target(game.PLAYER_ENTITY)}) || room.first_person.weapon != .Sword {
+		fmt.eprintln("mechanics lab: the arena's First Person Fencer was not played"); return false
+	}
+	if !settle(window, renderer, room, controller, cards, buffer, true) { fmt.eprintln("mechanics lab: no dive with the sword"); return false }
+	for _ in 0..<12 { frame(window, renderer, room, controller, cards, buffer) }
+	if render.first_person_hud_status(renderer) != render.FIRST_PERSON_HUD_STATUS_SWORD || string(render.first_person_countdown_text(20, .Sword)) != "FPF 20s" {
+		fmt.eprintln("mechanics lab: the sword's words are not shown"); return false
+	}
+	artifacts.screenshot("odin_pp_mechanics_lab_prima_persona_spada.png")
+	sword := &room.first_person.sword
+	// The mouse that takes the point to `want` this frame, the left button held or not.
+	toward :: proc(sword: ^game.First_Person_Sword, want: [2]f32, cut: bool) -> run_session.Tactical_Controller_Input {
+		move := (want-sword.tip)/game.SWORD_TIP_PER_PIXEL
+		return {look = {move.x, -move.y}, fire = cut}
+	}
+	chest, _ := game.sword_chest_on_screen(room, render.first_person_aim(renderer), sword.facing, room.enemies[brute_index])
+	line := game.SWORD_HILT.y+(chest.y-game.SWORD_HILT.y)/0.75
+	from, start, finish := sword.tip, [2]f32{-0.75, line}, [2]f32{0.45, line}
+	for k in 1..=24 { drive(window, renderer, room, controller, cards, buffer, toward(sword, from+(start-from)*(f32(k)/24), false)) }
+	health = room.enemies[brute_index].health
+	for k in 1..=15 {
+		drive(window, renderer, room, controller, cards, buffer, toward(sword, start+(finish-start)*(f32(k)/15), true))
+		if k == 9 { artifacts.screenshot("odin_pp_mechanics_lab_prima_persona_spada_taglio.png") }
+	}
+	for _ in 0..<20 { frame(window, renderer, room, controller, cards, buffer) }
+	if sword.strikes != 1 || room.enemies[brute_index].health >= health {
+		fmt.eprintln("mechanics lab: the cut across the brute made", sword.strikes, "cuts, the brute at", room.enemies[brute_index].health); return false
+	}
+	cut := sword.last
+	// The guard up: the brute's blow parried.
+	for _ in 0..<20 { drive(window, renderer, room, controller, cards, buffer, {fire_right = true}) }
+	brute_enemy := &room.enemies[brute_index]
+	brute_enemy.intent = game.make_attack_intent(room, brute_enemy.position, room.player.position, 5)
+	before := room.player.health
+	pulse: game.Pulse_Report
+	game.resolve_enemy_intents(room, &pulse, brute)
+	for _ in 0..<3 { drive(window, renderer, room, controller, cards, buffer, {fire_right = true}) }
+	artifacts.screenshot("odin_pp_mechanics_lab_prima_persona_spada_parata.png")
+	if room.player.health != before || sword.parries != 1 { fmt.eprintln("mechanics lab: the guard did not parry the brute's blow"); return false }
+	// Held again, as the lab holds its foes, before it is moved.
+	mechanics_lab_hold(room, brute)
+	for _ in 0..<10 { frame(window, renderer, room, controller, cards, buffer) }
+	// Q twice: west. The brute three cells west, Ctrl: pulled to the cell in front.
+	for _ in 0..<2 {
+		drive(window, renderer, room, controller, cards, buffer, {diagonals = {true, false, false, false}})
+		for _ in 0..<15 { frame(window, renderer, room, controller, cards, buffer) }
+	}
+	game.tactical_first_person_tick(room, game.SWORD_GRAPPLE_RECHARGE)
+	brute_enemy.position = game.add_position(room.player.position, {x = -3})
+	drive(window, renderer, room, controller, cards, buffer, {ctrl = true})
+	for _ in 0..<6 { frame(window, renderer, room, controller, cards, buffer) }
+	artifacts.screenshot("odin_pp_mechanics_lab_prima_persona_spada_rampino.png")
+	if sword.facing != .West || sword.grapples != 1 || brute_enemy.position != game.add_position(room.player.position, {x = -1}) {
+		fmt.eprintln("mechanics lab: the grapple did not pull the brute (facing", sword.facing, "grapples", sword.grapples, ")"); return false
+	}
+	if !leave(window, renderer, room, controller, cards, buffer) { fmt.eprintln("mechanics lab: the sword's view did not end"); return false }
+
+	// The weapon still to come: the lab takes it up; its tag, the bare line, an empty hand, no shot.
 	names := [game.First_Person_Weapon]string{.AK = "ak", .Fists = "pugni", .Sword = "spada", .Bow = "arco"}
 	for weapon in game.First_Person_Weapon {
-		if weapon == .AK || weapon == .Fists { continue }
+		if weapon != .Bow { continue }
 		if !game.tactical_begin_first_person(room, 20, weapon) { fmt.eprintln("mechanics lab: the", weapon, "was not taken up"); return false }
 		if !settle(window, renderer, room, controller, cards, buffer, true) { fmt.eprintln("mechanics lab: no dive with the", weapon); return false }
 		shots = room.first_person.shots
@@ -240,7 +320,7 @@ mechanics_lab_prima_persona :: proc(window: ^app.Window, renderer: ^render.Rende
 	controller^ = {was_focused = true}
 	for _ in 0..<12 { mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0) }
 	fmt.eprintf("mechanics lab first person arena: %d shots of the AK in a second; the fists ran up to the brute, a jab, a hook " +
-		"and a critical cross on its mark; %v and %v shown with an empty hand and fired nothing\n",
-		ak_shots, game.First_Person_Weapon.Sword, game.First_Person_Weapon.Bow)
+		"and a critical cross on its mark; the sword cut the brute (%v for %d), parried its blow and pulled it in; %v shown with an " +
+		"empty hand and fired nothing\n", ak_shots, cut.kind, cut.damage, game.First_Person_Weapon.Bow)
 	return true
 }

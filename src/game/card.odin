@@ -83,6 +83,8 @@ Card_Id :: enum {
 	Dino_Ride,
 	// FIRST PERSON BRAWLER: the fists behind his eyes (first_person_fists.odin), lab only.
 	First_Person_Brawler,
+	// FIRST PERSON FENCER: the sword behind his eyes (first_person_sword.odin), lab only.
+	First_Person_Fencer,
 	Count,
 }
 
@@ -1157,6 +1159,18 @@ CARD_DEFINITIONS := [Card_Id]Card_Definition{
 		targeting = {rule = .Self},
 		effects = {{kind = .First_Person, target = .Player, base_amount = FIRST_PERSON_SECONDS,
 			amount_per_upgrade = FIRST_PERSON_SECONDS_PER_UPGRADE, charges = i32(First_Person_Weapon.Fists)}, {}, {}, {}},
+		effect_count = 1,
+	},
+	.First_Person_Fencer = {
+		upgrade_limit = FIRST_PERSON_MAX_UPGRADE_LEVEL, time_cost = 0, traits = {.Lab_Only},
+		// FIRST PERSON FENCER (docs/piano-prima-persona.md, Fase 4): his own eyes and
+		// a sword for twenty seconds of the world's, as First Person Shooter's AK:
+		// the blade moved by the mouse, the guard, the grapple (first_person_sword.odin).
+		id = .First_Person_Fencer, name = "First Person Fencer", rarity = .Rare,
+		reward_weight = 60, shop_base_price = 8, cost = 3,
+		targeting = {rule = .Self},
+		effects = {{kind = .First_Person, target = .Player, base_amount = FIRST_PERSON_SECONDS,
+			amount_per_upgrade = FIRST_PERSON_SECONDS_PER_UPGRADE, charges = i32(First_Person_Weapon.Sword)}, {}, {}, {}},
 		effect_count = 1,
 	},
 	.Cannon = {

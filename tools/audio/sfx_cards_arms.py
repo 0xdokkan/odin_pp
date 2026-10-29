@@ -1293,3 +1293,23 @@ def card_first_person_brawler(seed):
         (0.145, crackle, 0.12),
     ])
     return _out(x, 0.08)
+
+
+@sound("card_first_person_fencer", loudness=LOUD, wet=WET, marks=(0.0, 0.06, 0.30))
+def card_first_person_fencer(seed):
+    """First Person Fencer (provisional until its Fase 5, docs/piano-prima-persona.md):
+    the sword drawn as the card leaves his hand: the blade sliding out of its
+    scabbard from 0.06 s (a steel scrape rising in pitch), then the clean ring
+    of the blade free at 0.30 s, fading."""
+    dur = 1.0
+    t = time_axis(0.24)
+    scrape = sweep_bandpass(white(0.24, seed + 1), 2200, 5200, 4.0) * np.clip(t / 0.03, 0, 1) * np.exp(-np.clip(t - 0.18, 0, None) / 0.03)
+    t2 = time_axis(0.7)
+    ring = fm(2650, 2650 * 1.414, 1.4 * np.exp(-t2 / 0.05), 0.7) * np.exp(-t2 / 0.3)
+    ring = ring + 0.4 * sine(5300, 0.7) * np.exp(-t2 / 0.15)
+    x = place(dur, [
+        (0.0, _flick(seed), FLICK),
+        (0.06, _norm(scrape), 0.45),
+        (0.30, _ramp(_norm(ring), 0.0008), 0.5),
+    ])
+    return _out(x, 0.08)

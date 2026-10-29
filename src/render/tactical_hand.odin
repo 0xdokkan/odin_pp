@@ -530,6 +530,8 @@ tactical_card_inspector_rules :: proc(card: game.Card_Instance, definition: game
 	if card.definition_id == .Pinball { reaction, rule = "BOSS E MINIBOSS: TROPPO PESANTI", fmt.ctprintf("DOPO %ds SCOPPIA E CADE", int(game.PINBALL_SECONDS)) }
 	if card.definition_id == .First_Person { reaction, rule = "NIENTE CARTE: SOLO L'AK", "WASD SECONDO LA VISTA" }
 	// The fists' keys (Fase 3, the user's choice: the punches' keys too).
+	// The sword's keys (Fase 4): the cut and the grapple; the guard and Q/E are in the HUD's line.
+	if card.definition_id == .First_Person_Fencer { reaction, rule = "CLIC TENUTO + MOUSE: TAGLIA", "CTRL: RAMPINO / SHIFT: SCHIVA" }
 	if card.definition_id == .First_Person_Brawler { reaction, rule = "SX JAB / DX CROSS / SHIFT GANCI", "WASD LIBERO / SPAZIO SALTA" }
 	if card.definition_id == .Marley_Party { reaction, rule = "SOLO SULLE CASELLE LUCI", fmt.ctprintf("+%ds A UCCISIONE / MAX %ds", game.MARLEY_KILL_SECONDS, game.MARLEY_MAX_SECONDS) }
 	if card.definition_id == .Flood_Wave { reaction, rule = "UNA CASELLA PER NEMICO", "ROTELLA: GIRA LA FRECCIA" }

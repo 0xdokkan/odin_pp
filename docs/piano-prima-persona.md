@@ -2789,6 +2789,85 @@ il filtro 1€ si regola partendo da `beta` 0 e taglio minimo 1 Hz, poi alzando
 ([1€ filter](https://cristal.univ-lille.fr/~casiez/1euro)); la deviazione di
 Sekiro è stimata dai giocatori intorno a 0,2 s, diversa da colpo a colpo
 ([Steam](https://steamcommunity.com/app/814380/discussions/0/1745645926459743476)).
+Dall'utente, durante la fase: domande a ogni passo, nessuno stop per andare
+avanti (sezione 1, regola 2).
+
+**Passi 1, 2, 4 e 5 — le regole della spada: fatti** (commit «passi 1, 2, 4 e 5»;
+`src/game/first_person_sword.odin`).
+- **Il gestore dello swing.** La punta della lama sta sullo schermo in altezze
+  di schermo (il centro 0, il bordo in alto 0,5), dentro un'ellisse; il mouse la
+  muove di 0,0012 altezze per pixel. Gira su un orologio suo di 1/240 s, con il
+  movimento del fotogramma distribuito sui suoi passi: così lo stesso gesto dà
+  lo stesso danno a 30, 60 e 144 fotogrammi al secondo (test). La velocità passa
+  nel filtro 1€ (taglio minimo 1,5 Hz, `beta` 4, la velocità a 8 Hz). Lo swing
+  parte sopra 1 altezza al secondo con il sinistro tenuto, finisce sotto 0,5 per
+  0,1 s, lasciando il tasto o al colpo; dopo un colpo il successivo parte solo
+  quando la punta ha rallentato («per colpire ancora bisogna ripartire»).
+- **La formula** è quella della sezione 6.4, con gli esempi del piano nei test
+  (colpetto 1, buono 4, fendente perfetto 11, fendente d'elsa 3, mouse agitato 3).
+- **Il contatto (cambiato rispetto al piano, perché non reggeva).** A una casella
+  il cartoncino del nemico riempie quasi tutto il centro dello schermo: con la
+  regola «la lama taglia il cartoncino» la lama ci sarebbe stata sopra già prima
+  di partire, e ogni colpo sarebbe arrivato subito, senza carica. Ora il colpo
+  arriva quando la lama **passa sopra il petto** del nemico (il punto dei segni
+  dei pugni), e `u` è dove lungo la lama passa: si carica partendo da un lato e
+  si taglia attraverso. La punta conta fino al 5% oltre la sua fine (il suo
+  spessore). Il nemico deve essere a portata e in vista (la traccia dell'AK fino
+  al petto lo prende per primo). L'impugnatura sta in basso, un poco a destra
+  (fuori dal bordo), perché la lama arrivi anche alle due diagonali; quella di
+  sinistra si prende solo di punta.
+- **Tipi di colpo:** fendente ×1,25; tondo che prende anche le diagonali davanti
+  e un secondo nemico a ×0,8; montante che spinge indietro di una casella.
+  Un taglio, come un pugno, non costa tempo della finestra.
+- **Parata** (`sword_parry_blow`, in `resolve_enemy_blow` prima del Riflesso):
+  con il destro tenuto, un colpo dalle tre direzioni davanti non fa nulla,
+  **senza limite** (scelta dell'utente); premuto entro 0,25 s prima, è perfetta:
+  da vicino l'attaccante stordito un battito e 2 danni, il dardo torna al
+  balestriere. Le bombe non si parano. Scelta di difesa spenta con la spada.
+- **Rampino** (`Ctrl`): il primo nemico in linea fra 2 e 4 caselle, in vista,
+  senza muri, coperture o corpi prima, tirato nella casella davanti e stordito un
+  battito; ricarica 3 s; un boss o un miniboss resta e tira il Viandante accanto.
+- **Passi di 0,3 s** con la spada (`player_move_seconds`).
+- Test: `first_person_sword_test.odin` (formula, filtro, frame rate, portata e
+  tipi, giri e passi, parate, dardi e bombe, rampino, coperture).
+
+**Passo 3 — i tasti: fatto** (commit «passo 3»). Con la spada il mouse muove la
+lama e non la vista; `Q` ed `E` girano di un quarto (il tavolo gira la vista in
+0,15 s verso dove guardano le regole); il destro tenuto è la guardia, `Ctrl`
+premuto il rampino (uno a pressione), il sinistro tenuto taglia; i passi sono
+quelli della corsia, come con l'AK; `Shift` con una direzione schiva. Un comando
+del mondo nuovo, `First_Person_Sword`, a ogni fotogramma. Test del controller.
+
+**Domande per il passo 6** (risposte dell'utente, tutte le consigliate): la lama
+in **pixel di cartoncino, semplice**; il mazzo **AK, pugni, spada, canna**; la
+riga **«MOUSE: LAMA / DESTRO: PARA / Q E: GIRA»**.
+
+**Passo 6 — prototipo nel laboratorio: fatto.**
+- **La carta** `Card_Id.First_Person_Fencer`, «First Person Fencer»: rara, 3 di
+  energia, 0 s di finestra, su di sé, 20 s (+2 a potenziamento), `Lab_Only`; i
+  `charges` del suo effetto nominano la spada. Parole: «PRIMA PERSONA 20s /
+  SPADA: TAGLIA E PARA» (stretta: «FPF 20s / SPADA, PARATA»); nell'ispettore
+  «CLIC TENUTO + MOUSE: TAGLIA / CTRL: RAMPINO / SHIFT: SCHIVA». Icona
+  provvisoria (una spada Neon, cella 34) e un suono suo provvisorio (la lama
+  sguainata, `card_first_person_fencer`); rifatti tutti i suoni, gli altri sono
+  identici al byte. Riquadro dei secondi magenta, sigla `FPF`.
+- **Il disegno** (`src/render/first_person_sword.odin`): sulla tela a pixel dei
+  guantoni, così ha inchiostro e bordo di carta, una lama Neon (ciano con il
+  centro bianco) dall'impugnatura alla punta, la guardia magenta; dietro uno
+  swing un nastro lungo le ultime posizioni della punta, colorato da quanto
+  sarebbe buono il colpo (grigio, bianco, oro) e dal colpo fatto. Prima prova:
+  la scia come area spazzata dalla lama, un grande triangolo bianco; poi una
+  fascia lungo la punta, ancora troppo larga; ora un nastro sottile.
+- **MOSTRA EFFETTO**: tre nemici sui lati, uno dopo l'altro: la vista girata con
+  `Q`/`E`, un passo verso di lui, un taglio attraverso il petto.
+- **L'atto `prima_persona`** gioca anche First Person Fencer: carta e ispettore,
+  la lama (`_spada.png`), un tondo sul bruto (`_spada_taglio.png`), la parata del
+  suo colpo (`_spada_parata.png`), `Q` due volte e il rampino
+  (`_spada_rampino.png`). Arco ancora preso con il comando di prova.
+- Un taglio conta come colpo a segno della vista, uno swing come colpo tirato
+  (come i pugni), per la dimostrazione e i conti.
+- Test aggiornati perché elencano le carte: carte del laboratorio 8, la mano
+  dell'arena di tre carte, l'aspetto di ogni arma, le icone.
 
 
 ## 14. Fase 5 — Spada: lama, scie, scintille, suoni

@@ -73,6 +73,8 @@ docs/piano-prima-persona.md adds one more, in the Neon style of its Fase 3:
              right with a cyan rim of light, its thumb along its side, a dark
              cuff under a magenta band, laced in magenta, three strokes of
              speed behind it.
+    cell 34  First Person Fencer (provisional until its Fase 5): a Neon sword
+             across the cell from the lower left, a magenta guard and pommel.
 
 Options:
     --check        exit 1 if the atlas is not what this script would write
@@ -752,6 +754,43 @@ BRAWLER = (
 assert all(len(row) == 28 for row in BRAWLER) and len(BRAWLER) == 28
 
 ICONS.update({33: BRAWLER})
+
+# docs/piano-prima-persona.md, Fase 4: First Person Fencer, provisional until its
+# Fase 5: a Neon sword across the cell from the lower left (a white core in a
+# cyan blade, a magenta guard and pommel, a violet grip), speed strokes above.
+FENCER = (
+    "............................",
+    "........................K...",
+    "............KKKK.......KXK..",
+    "...........KPPPPK.....KXXXK.",
+    "............KKKK.....KXyXXK.",
+    ".........KKKKK......KXyXKK..",
+    "........KXXXXXK....KXyXK....",
+    ".........KKKKK....KXyXK.....",
+    ".................KXyXK......",
+    "................KXyXK.......",
+    "...............KXyXK........",
+    "..............KXyXK.........",
+    ".............KXyXK..........",
+    "............KXyXK...........",
+    "...........KXyXK............",
+    "...KK.....KXyXK.............",
+    "..KPPK...KXyXK..............",
+    "...KPPK.KXyXK...............",
+    "....KPPKXyXK................",
+    ".....KPPyXK.................",
+    ".....KXPPK..................",
+    ".....KKXPPK.................",
+    "....KSVKKPPK................",
+    "..KKSVK..KPPK...............",
+    ".KPSVK....KPPK..............",
+    ".KPPK......KK...............",
+    "..KK........................",
+    "............................",
+)
+assert all(len(row) == 28 for row in FENCER) and len(FENCER) == 28
+
+ICONS.update({34: FENCER})
 
 
 def chunk(kind, body):

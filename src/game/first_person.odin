@@ -132,7 +132,7 @@ First_Person_Weapon_Rules :: struct {
 FIRST_PERSON_WEAPONS := [First_Person_Weapon]First_Person_Weapon_Rules{
 	.AK = {card = .First_Person, while_riding = true},
 	.Fists = {card = .First_Person_Brawler},
-	.Sword = {card = .First_Person},
+	.Sword = {card = .First_Person_Fencer},
 	.Bow = {card = .First_Person},
 }
 

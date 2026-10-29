@@ -824,6 +824,8 @@ draw_first_person_overlay :: proc(renderer: ^Renderer, room: ^game.Room) {
 	case .Fists:
 		draw_first_person_marks(renderer, room, now)
 		draw_first_person_gloves(renderer, room, now)
+	// The blade is cut on the gloves' small canvas (first_person_sword.odin).
+	case .Sword: draw_first_person_gloves(renderer, room, now)
 	case .Empty:
 	}
 	// The crosshair: four paper ticks in ink round a dot, warm over a foe; a
@@ -903,6 +905,8 @@ FIRST_PERSON_HUD_STATUS :: cstring("MIRA COL MOUSE / CLIC: SPARA / WASD: PASSI")
 FIRST_PERSON_HUD_STATUS_BARE :: cstring("MIRA COL MOUSE / WASD: PASSI")
 // The fists: free moves, the four punches, the jump (the dash is a double tap).
 FIRST_PERSON_HUD_STATUS_FISTS :: cstring("WASD LIBERO / CLIC: PUGNI / SPAZIO: SALTO")
+// The sword: the blade, the guard, the turns (the cut and the grapple are in the inspector).
+FIRST_PERSON_HUD_STATUS_SWORD :: cstring("MOUSE: LAMA / DESTRO: PARA / Q E: GIRA")
 
 // --------------------------------------------------------------------------
 // Each weapon's look (game.FIRST_PERSON_WEAPONS has its rules).
@@ -910,7 +914,7 @@ FIRST_PERSON_HUD_STATUS_FISTS :: cstring("WASD LIBERO / CLIC: PUGNI / SPAZIO: SA
 // What is in hand: the AK's print, or nothing (the crosshair and the plate
 // alone, as Doom's fist leaves the ammo box blank) until a weapon's own
 // drawing comes (docs/piano-prima-persona.md, Fasi 3, 5 e 7).
-First_Person_Hand :: enum u8 {Empty, AK, Fists}
+First_Person_Hand :: enum u8 {Empty, AK, Fists, Sword}
 
 First_Person_Look :: struct {
 	// The countdown's tag (FPS, FPB, FPF, FPA: the user's choice in Fase 3),
@@ -929,7 +933,7 @@ FIRST_PERSON_NEON_MAGENTA :: rl.Color{255, 64, 206, 255}
 FIRST_PERSON_LOOKS := [game.First_Person_Weapon]First_Person_Look{
 	.AK = {tag = "FPS", status = FIRST_PERSON_HUD_STATUS, hand = .AK, accent = FIRST_PERSON_OLIVE},
 	.Fists = {tag = "FPB", status = FIRST_PERSON_HUD_STATUS_FISTS, hand = .Fists, accent = FIRST_PERSON_NEON_MAGENTA},
-	.Sword = {tag = "FPF", status = FIRST_PERSON_HUD_STATUS_BARE, accent = FIRST_PERSON_OLIVE},
+	.Sword = {tag = "FPF", status = FIRST_PERSON_HUD_STATUS_SWORD, hand = .Sword, accent = FIRST_PERSON_NEON_MAGENTA},
 	.Bow = {tag = "FPA", status = FIRST_PERSON_HUD_STATUS_BARE, accent = FIRST_PERSON_OLIVE},
 }
 

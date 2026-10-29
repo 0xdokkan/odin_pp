@@ -319,6 +319,8 @@ sword_step :: proc(room: ^Room, input: First_Person_Sword_Input, at: [2]f32) -> 
 		if !w.spent && input.cut && !input.guard && s.speed > SWORD_SWING_START {
 			w^ = {active = true, start = at}
 			s.swings += 1
+			// The view's counts: a swing is a blow thrown, a cut one that struck.
+			room.first_person.shots += 1
 		}
 		return
 	}
@@ -341,6 +343,7 @@ sword_step :: proc(room: ^Room, input: First_Person_Sword_Input, at: [2]f32) -> 
 	strike.enemy_id = target.id
 	if !sword_cut(room, target, strike) { return }
 	s.strikes += 1
+	room.first_person.hits += 1
 	s.last = strike
 	w.struck[w.struck_count] = target.id
 	w.struck_count += 1

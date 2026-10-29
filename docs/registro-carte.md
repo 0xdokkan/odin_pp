@@ -6,6 +6,18 @@ Qui si segna ogni carta tolta dal gioco o cambiata, con quello che faceva, così
 futuro. Le voci più recenti stanno in cima. Per ritrovare il commit di una voce:
 `git log --all --grep "<titolo del commit>"`.
 
+## 2026-10-29 — Carta nuova: First Person Fencer (solo laboratorio)
+
+Commit **«Prima persona, Fase 4, passo 6: First Person Fencer nel laboratorio»** sul ramo `piano-prima-persona`
+([piano](piano-prima-persona.md), Fase 4).
+
+| Carta | Nel codice | Rarità | Energia | Effetto | Peso nelle offerte | Dove sta |
+|---|---|---|---:|---|---:|---|
+| First Person Fencer | `First_Person_Fencer` | rara | 3 | su di sé, 0 s di finestra: la vista in prima persona con la spada per 20 s del mondo (+2 a potenziamento, fino a 30 a +5): a griglia con passi di 0,3 s, `Q`/`E` di 90°, la lama mossa dal mouse (danno da velocità, ampiezza, linea, punto della lama e direzione: fino a 11), parata senza limite con il destro (perfetta entro 0,25 s), rampino con `Ctrl` | 60 (ma `Lab_Only`: mai offerta) | solo nell'arena «Prima persona» del laboratorio, nel suo mazzo |
+
+- È la terza arma della vista di First Person Shooter (`First_Person_Weapon.Sword`); non si gioca in groppa al Dinosauro.
+- Icona (cella 34) e suono (`card_first_person_fencer`) **provvisori**: quelli definitivi sono della Fase 5, nello stile Neon.
+
 ## 2026-10-29 — First Person Brawler: critico senza mira, guantoni 3D
 
 Commit **«Prima persona, Fase 2: critico senza mira e guantoni 3D»** sul ramo

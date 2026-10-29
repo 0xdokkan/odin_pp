@@ -15,7 +15,7 @@ import game "../game"
 test_card_icons_add_rows_without_moving_the_painted_cells :: proc(t: ^testing.T) {
 	added := [?]game.Card_Id{.Shadow_Step, .Poison_Pool, .Wildfire, .Deflect, .Coffin, .Fate_Dice, .Venom_Blade, .Lasso, .Fishing_Rod,
 		.Pinball, .First_Person, .Marley_Party, .Flood_Wave, .Field_Cannon, .Laser_Cannon, .Devouring_Hole, .Dino_Ride,
-		.First_Person_Brawler}
+		.First_Person_Brawler, .First_Person_Fencer}
 	for id, index in added { testing.expect_value(t, gothic_card_icon(id), 16+index) }
 	for id in game.Card_Id {
 		own := id == .Count

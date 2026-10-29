@@ -29,7 +29,7 @@ test_lab_only_cards_never_enter_the_campaign :: proc(t: ^testing.T) {
 		lab += 1
 		testing.expect(t, !c.discovered[id] && !discover(&c, id) && !c.discovered[id] && !card_in_pool(&c, id))
 	}
-	testing.expect_value(t, lab, 7)
+	testing.expect_value(t, lab, 8)
 	// Every card of the collection still comes to light one at a time; the lab's, the retired ones and those only an
 	// upgrade makes never do (docs/registro-carte.md).
 	for id in game.Card_Id.Strike..<game.Card_Id.Count {
