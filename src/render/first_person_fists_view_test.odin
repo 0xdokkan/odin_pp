@@ -364,9 +364,10 @@ test_first_person_bow_lab_sounds :: proc(t: ^testing.T) {
 	s.zone_bounces += 1
 	frame(renderer, &room, 0.02)
 	testing.expect_value(t, sounds.played[LAB_BOW_BOUNCE]-before[LAB_BOW_BOUNCE], 2)
+	testing.expect_value(t, sounds.played[LAB_BOW_PLUCK]-before[LAB_BOW_PLUCK], 2)
 	testing.expect_value(t, sounds.played[LAB_BOW_ZONE]-before[LAB_BOW_ZONE], 1)
 	testing.expect(t, lab_bow_bounce_pitch(1) < lab_bow_bounce_pitch(2) && lab_bow_bounce_pitch(2) < lab_bow_bounce_pitch(4) &&
-		lab_bow_bounce_pitch(40) == lab_bow_bounce_pitch(6))
+		lab_bow_bounce_pitch(7) < lab_bow_bounce_pitch(8) && lab_bow_bounce_pitch(40) == lab_bow_bounce_pitch(8))
 	s.hits += 1
 	s.last.kind = .Ice
 	frame(renderer, &room, 0.02)

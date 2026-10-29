@@ -31,7 +31,8 @@ sword_gesture :: proc(room: ^Room, from, to: [2]f32, seconds, hz: f32, cut := tr
 	for _ in 0..<int(hz*0.15) { _ = first_person_sword_move(room, {cut = cut}, dt) }
 }
 
-// The formula gives the plan's examples (sezione 6.4).
+// The formula gives the plan's examples (sezione 6.4), half again since the
+// base went from 6 to 9 (2026-10-29).
 @(test)
 test_sword_formula_gives_the_plans_examples :: proc(t: ^testing.T) {
 	tondo :: proc(c, length: f32) -> ([2]f32, [2]f32) { return {-0.4, 0}, {-0.4+c*length, 0} }
@@ -39,14 +40,14 @@ test_sword_formula_gives_the_plans_examples :: proc(t: ^testing.T) {
 	a, b := tondo(0.95, 0.2)
 	testing.expect_value(t, sword_strike_damage(1.5, 0.2, a, b, 0.70).damage, i32(1))
 	a, b = tondo(0.90, 0.7)
-	testing.expect_value(t, sword_strike_damage(3.5, 0.7, a, b, 0.80).damage, i32(4))
+	testing.expect_value(t, sword_strike_damage(3.5, 0.7, a, b, 0.80).damage, i32(6))
 	a, b = fendente(0.95, 0.9)
 	perfect := sword_strike_damage(4.0, 0.9, a, b, 0.75)
-	testing.expect(t, perfect.damage == 11 && perfect.perfect && perfect.kind == .Fendente)
-	testing.expect_value(t, sword_strike_damage(4.0, 0.9, a, b, 0.30).damage, i32(3))
+	testing.expect(t, perfect.damage == 17 && perfect.perfect && perfect.kind == .Fendente)
+	testing.expect_value(t, sword_strike_damage(4.0, 0.9, a, b, 0.30).damage, i32(5))
 	a, b = tondo(0.20, 1.2)
 	shaken := sword_strike_damage(5.0, 1.2, a, b, 0.75)
-	testing.expect(t, shaken.damage == 3 && !shaken.perfect, "shaking the mouse beats a clean cut")
+	testing.expect(t, shaken.damage == 5 && !shaken.perfect, "shaking the mouse beats a clean cut")
 	// A tondo's second foe takes less; a montante is no stronger than a tondo.
 	a, b = tondo(0.95, 0.9)
 	testing.expect(t, sword_strike_damage(4, 0.9, a, b, 0.75, true).damage < sword_strike_damage(4, 0.9, a, b, 0.75).damage)

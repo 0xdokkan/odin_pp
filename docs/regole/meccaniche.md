@@ -941,7 +941,11 @@ inclinato, e si alza appena si comincia a tendere. Le frecce volano con la scia
 del colore del loro stato, più lunga quanto più vanno veloci, e a ogni rimbalzo
 fanno scintille (d'oro sulle zone). Le zone critiche sono bersagli di carta con
 una luce che pulsa. La freccia incoccata e la prossima stanno nella faretra
-attorno al mirino. A ogni rimbalzo un ping, una nota più alta ogni volta.
+attorno al mirino. A ogni rimbalzo un ping e una corda d'arpa pizzicata, una
+nota più alta ogni volta sulla scala pentatonica di la minore (la tonalità della
+musica dell'arco). Quando la vista finisce, le frecce ancora fuori finiscono il
+loro volo e colpiscono (si vedono anche dall'alto); la tensione in corso si
+annulla senza tirare.
 
 **La grandezza delle frecce** (2026-10-29): una freccia parte dalla punta di
 quella incoccata sull'arco, in basso a sinistra, e raggiunge la linea del mirino

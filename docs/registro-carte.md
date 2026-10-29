@@ -24,6 +24,9 @@ Commit **«Prima persona, Fase 6, passi 1-5: l'arco, regole e prototipo»** sul 
   scia del loro colore, scintille ai rimbalzi, zone critiche come bersagli di carta con la luce che pulsa, la faretra
   attorno al mirino; suoni suoi (un ping più alto a ogni rimbalzo) e una musica sua nel laboratorio. Le regole non
   cambiano.
+- **2026-10-29, Fase 8 chiusa con l'utente:** First Person Fencer, taglio pieno da 6 a 9 (nel bot la spada passa da 2,2
+  a 3,1 danni al secondo); First Person Archer, a ogni rimbalzo anche una corda d'arpa pizzicata, una nota più alta
+  ogni volta (pentatonica di la minore); le frecce ancora fuori quando la vista finisce finiscono il volo e colpiscono.
 - **2026-10-29, corda al viso** (all'utente la mano che tendeva non convinceva; scelta fra tre pose in foto): tendendo,
   la corda arriva al viso come nel tiro vero e la mano esce dallo schermo in basso vicino alla guancia; l'arco resta
   inclinato di lato al mirino; a riposo sta più basso e si alza quando si tende.

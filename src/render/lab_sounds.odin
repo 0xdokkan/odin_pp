@@ -83,22 +83,27 @@ LAB_SWORD_CHAIN_YANK :: audio.Lab_Sfx.World_Sword_Chain_Yank
 // A cut this strong or more sounds heavy.
 LAB_SWORD_HEAVY_DAMAGE :: i32(6)
 // FIRST PERSON ARCHER (first_person_bow.odin): the draw as it begins, its
-// let-off when full, the release; each bounce a ping a note higher than the
-// last of the same arrow (up the major scale: it flies faster each time), a
-// zone's bells; an arrow into a foe and its status's accent.
+// let-off when full, the release; each bounce a ping and a harp's plucked
+// string (the user's wish, 2026-10-29), a note higher than the last of the
+// same arrow (up A minor's pentatonic scale, the bow's music's key, the ping
+// a fifth over the string: it flies faster each time), a zone's bells; an
+// arrow into a foe and its status's accent.
 LAB_BOW_DRAW :: audio.Lab_Sfx.Pilgrim_Bow_Draw
 LAB_BOW_FULL :: audio.Lab_Sfx.Ui_Bow_Full
 LAB_BOW_RELEASE :: audio.Lab_Sfx.Pilgrim_Bow_Release
 LAB_BOW_BOUNCE :: audio.Lab_Sfx.World_Bow_Bounce
+LAB_BOW_PLUCK :: audio.Lab_Sfx.World_Bow_Pluck
 LAB_BOW_ZONE :: audio.Lab_Sfx.World_Bow_Zone
 LAB_BOW_HIT :: audio.Lab_Sfx.World_Bow_Hit
 @(rodata)
 LAB_BOW_ACCENT := [game.Bow_Arrow_Kind]audio.Lab_Sfx{.Poison = .World_Bow_Poison, .Burn = .World_Bow_Burn, .Ice = .World_Bow_Ice,
 	.Stun = .World_Bow_Stun, .Barbed = .World_Bow_Barbed}
+// The pentatonic scale's steps over two octaves' first eight notes
+// (semitones 0, 3, 5, 7, 10, 12, 15, 17, equal tempered).
 @(rodata)
-LAB_BOW_BOUNCE_PITCH := [6]f32{1, 1.122, 1.26, 1.335, 1.498, 1.682}
+LAB_BOW_BOUNCE_PITCH := [8]f32{1, 1.1892, 1.3348, 1.4983, 1.7818, 2, 2.3784, 2.6697}
 
-// The ping of an arrow's `order`-th bounce: a note higher each time, up to the sixth.
+// The ping and the string of an arrow's `order`-th bounce: a note higher each time, up to the eighth.
 lab_bow_bounce_pitch :: proc(order: i16) -> f32 {
 	return LAB_BOW_BOUNCE_PITCH[clamp(int(order)-1, 0, len(LAB_BOW_BOUNCE_PITCH)-1)]
 }
@@ -699,7 +704,9 @@ update_lab_sounds :: proc(renderer: ^Renderer, room: ^game.Room, now: f64) {
 	}
 	if bw.bounces != s.bow_bounces {
 		s.bow_bounces = bw.bounces
-		lab_sound_queue(s, LAB_BOW_BOUNCE, now, 0.8, 0, lab_bow_bounce_pitch(bw.bounce_order))
+		pitch := lab_bow_bounce_pitch(bw.bounce_order)
+		lab_sound_queue(s, LAB_BOW_BOUNCE, now, 0.6, 0, pitch)
+		lab_sound_queue(s, LAB_BOW_PLUCK, now, 0.85, 0, pitch)
 	}
 	if bw.zone_bounces != s.bow_zone_bounces {
 		s.bow_zone_bounces = bw.zone_bounces

@@ -42,7 +42,9 @@ import level "../level"
 // flies out of his sight too, and strikes there. Coming back at the player it
 // bounces off him as off a wall, a bounce more that costs none and never hurts
 // him (the user's choice). Arrows are endless; one flying into the open is
-// gone after BOW_FLIGHT_SECONDS.
+// gone after BOW_FLIGHT_SECONDS. When the view ends the arrows out finish
+// their flight and strike (the user's choice, 2026-10-29: they vanished),
+// the draw let go unloosed and the zones gone.
 //
 // THE CRITICAL ZONES. BOW_ZONES targets on the faces of walls toward an open
 // cell, within BOW_ZONE_RANGE cells of him and in sight, in the middle third
@@ -197,6 +199,14 @@ First_Person_Bow_Input :: struct {
 
 first_person_bow_active :: proc(room: ^Room) -> bool {
 	return tactical_first_person_active(room) && room.first_person.weapon == .Bow
+}
+
+// Whether the bow still has arrows out (flying, or stuck until they go), the
+// view on or over.
+first_person_bow_arrows_out :: proc(room: ^Room) -> bool {
+	if room == nil || room.first_person.weapon != .Bow { return false }
+	for arrow in room.first_person.bow.arrows { if arrow.state != .None { return true } }
+	return false
 }
 
 // The level of a charge (0 to BOW_LEVELS, the last one full): the bounces it gives.
@@ -628,7 +638,8 @@ bow_guide :: proc(room: ^Room, aim: First_Person_Aim, charge: f32, path: []Bow_P
 // looses the nocked arrow; the arrows flown those seconds, their blows into
 // room.recent_events; the zones' time.
 first_person_bow_move :: proc(room: ^Room, input: First_Person_Bow_Input) -> (result: Action_Result) {
-	if !first_person_bow_active(room) { return .Invalid_Phase }
+	active := first_person_bow_active(room)
+	if !active && (!first_person_bow_arrows_out(room) || room.phase != .Combat) { return .Invalid_Phase }
 	clear_event_log(room.recent_events)
 	s := &room.first_person.bow
 	seconds := s.pending
@@ -636,7 +647,10 @@ first_person_bow_move :: proc(room: ^Room, input: First_Person_Bow_Input) -> (re
 	acted := false
 	if !input.draw { s.lowered = false }
 	s.nock = max(s.nock-seconds, 0)
-	if input.draw && !s.lowered && (s.drawing || s.nock <= 0) {
+	if !active {
+		// The view over: the draw let go unloosed, the zones gone; only the arrows out fly on.
+		s.drawing, s.charge, s.zone_count = false, 0, 0
+	} else if input.draw && !s.lowered && (s.drawing || s.nock <= 0) {
 		if s.drawing { s.charge = min(f32(1), s.charge+seconds/BOW_DRAW_SECONDS) }
 		s.drawing = true
 		if input.lower {

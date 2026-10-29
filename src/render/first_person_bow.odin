@@ -117,7 +117,9 @@ First_Person_Bow_View :: struct {
 @(private)
 follow_first_person_bow :: proc(renderer: ^Renderer, room: ^game.Room) {
 	v := &renderer.tactical.first_person.bow
-	if !game.first_person_bow_active(room) { return }
+	// Followed while the arrows out finish their flight after the view; none
+	// kept once another weapon or another room has it.
+	if room.first_person.weapon != .Bow { v.arrows, v.zone_count = {}, 0; return }
 	s := &room.first_person.bow
 	if s.bounces != v.bounces {
 		v.bounce_time = renderer.sprite_assets.elapsed
@@ -145,12 +147,14 @@ follow_first_person_bow :: proc(renderer: ^Renderer, room: ^game.Room) {
 @(private)
 collect_first_person_bow_entries :: proc(renderer: ^Renderer, entries: ^[dynamic]Tactical_Alpha_Entry) {
 	f := &renderer.tactical.first_person
-	if !f.engaged || f.weapon != .Bow { return }
+	if f.weapon != .Bow { return }
 	base := 2*len(f.tracers)
+	// The arrows out, after the view too.
 	for arrow, k in f.bow.arrows {
 		if arrow.state == .None { continue }
 		append(entries, Tactical_Alpha_Entry{kind = .First_Person, first_person = i32(base+k), position = {arrow.at.x-0.5, arrow.at.z-0.5}})
 	}
+	if !f.engaged { return }
 	for zone, k in f.bow.zones[:f.bow.zone_count] {
 		append(entries, Tactical_Alpha_Entry{kind = .First_Person, first_person = i32(base+game.BOW_ARROWS+k),
 			position = {f32(zone.cell.x), f32(zone.cell.y)}})
@@ -169,14 +173,19 @@ draw_first_person_bow_entry :: proc(renderer: ^Renderer, index: int) {
 		color := FIRST_PERSON_BOW_COLORS[arrow.kind]
 		camera := renderer.tactical.camera
 		eye := camera.position
-		// Before its first bounce, on its way from the bow's arrow to its true line.
-		if gone := arrow.age*arrow.speed; arrow.state == .Flying && arrow.bounced == 0 && gone < FIRST_PERSON_BOW_ARROW_CONVERGE {
+		// Before its first bounce, on its way from the bow's arrow to its true line (in his eyes).
+		if gone := arrow.age*arrow.speed; f.engaged && arrow.state == .Flying && arrow.bounced == 0 && gone < FIRST_PERSON_BOW_ARROW_CONVERGE {
 			start := first_person_bow_launch_point(camera, f32(renderer.canvas_width)/max(f32(renderer.canvas_height), 1))
 			end := tip+way*(FIRST_PERSON_BOW_ARROW_CONVERGE-gone)
 			tip = start+(end-start)*(gone/FIRST_PERSON_BOW_ARROW_CONVERGE)
 			way = rl.Vector3Normalize(end-start)
 		}
+		// Out of his eyes (the board's camera far off) its size up close.
 		size := first_person_bow_arrow_size(eye, tip, arrow.bounced)
+		if amount := clamp(f.amount, 0, 1); amount < 1 {
+			near := first_person_bow_arrow_size(tip, tip, arrow.bounced)*FIRST_PERSON_BOW_ARROW_THICK
+			size = near+(size-near)*amount
+		}
 		// Not right on the eye, and the tail cut short before it, when it flies away
 		// from him: a thick shaft seen end on would cover the view.
 		gap := rl.Vector3Length(tip-eye)

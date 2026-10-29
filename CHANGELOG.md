@@ -5,6 +5,12 @@ I riferimenti a Classica, `--flat` e ai vecchi smoke descrivono versioni precede
 per i comandi disponibili oggi valgono il [README](README.md) e la documentazione collegata.
 
 
+## 2026-10-29 — Prima persona: spada più forte, arpa sui rimbalzi, frecce che finiscono il volo
+
+- First Person Fencer: il taglio pieno fa 9 invece di 6 (nel bot 3,1 danni al secondo invece di 2,2).
+- First Person Archer: a ogni rimbalzo anche una corda d'arpa pizzicata (fatta da codice), una nota più alta ogni volta
+  sulla pentatonica di la minore; quando la vista finisce le frecce ancora fuori finiscono il volo e colpiscono.
+
 ## 2026-10-29 — Prima persona: la corda dell'arco al viso
 
 - First Person Archer: tendendo, la corda arriva al viso come nel tiro vero e la mano esce dallo schermo vicino alla

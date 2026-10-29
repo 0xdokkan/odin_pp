@@ -62,8 +62,9 @@ SWORD_SWING_STOP_SECONDS :: f32(0.1)
 SWORD_FILTER_MIN_CUTOFF :: f32(1.5)
 SWORD_FILTER_BETA :: f32(4)
 SWORD_FILTER_D_CUTOFF :: f32(8)
-// The formula (sezione 6.4).
-SWORD_BASE_DAMAGE :: f32(6)
+// The formula (sezione 6.4; the base 6 there, 9 since the user's try of 2026-10-29:
+// the bot dealt about half the AK's a second with it).
+SWORD_BASE_DAMAGE :: f32(9)
 SWORD_SPEED_FULL :: f32(4)
 SWORD_LENGTH_FULL :: f32(0.8)
 SWORD_PERFECT_FACTOR :: f32(1.5)
@@ -216,7 +217,8 @@ sword_kind :: proc(start, at: [2]f32) -> Sword_Kind {
 	return .Tondo
 }
 
-// The formula (sezione 6.4) for a cut at `speed` (heights a second) after a
+// The formula (sezione 6.4; the base 6 there, 9 since the user's try of 2026-10-29:
+// the bot dealt about half the AK's a second with it).for a cut at `speed` (heights a second) after a
 // stroke of `length` from `start` to `at`, `u` along the blade, the `second`
 // foe of a tondo or not, a `lunge` or a `spin` (whose breadth may pass 1).
 sword_strike_damage :: proc(speed, length: f32, start, at: [2]f32, u: f32, second := false, lunge := false, spin := false) -> (strike: Sword_Strike) {

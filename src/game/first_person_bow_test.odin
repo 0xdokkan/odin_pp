@@ -429,6 +429,34 @@ test_bow_flies_over_low_things :: proc(t: ^testing.T) {
 	}
 }
 
+// The view over (the user's choice, 2026-10-29): the arrows out finish their
+// flight and strike; a draw held is let go unloosed; the zones are gone; with
+// no arrow out the bow takes no command.
+@(test)
+test_bow_arrows_fly_on_after_the_view :: proc(t: ^testing.T) {
+	data: level.Level
+	player: Player
+	spawns := [?]Enemy_Spawn{{position = {x = 11, y = 6}, health = 60, attack = 1}}
+	room := bow_room(t, &data, &player, spawns[:], zones = true)
+	defer level.destroy(&data)
+	defer destroy_room(&room)
+	s := &room.first_person.bow
+	bow_shoot(&room, 0.3*BOW_DRAW_SECONDS)
+	testing.expect_value(t, s.loosed, i32(1))
+	// The view ends a frame after the release, the next draw held.
+	room.first_person.remaining = 1.0/60
+	_ = bow_frame(&room, 1.0/60, true)
+	testing.expect(t, !first_person_bow_active(&room) && first_person_bow_arrows_out(&room))
+	for _ in 0..<60 { _ = bow_frame(&room, 1.0/60, true) }
+	testing.expect_value(t, s.hits, i32(1))
+	testing.expect(t, room.enemies[0].health < 60, "the arrow did not strike after the view")
+	testing.expect(t, s.loosed == 1 && !s.drawing && s.zone_count == 0)
+	// Once no arrow is out, nothing more.
+	for _ in 0..<60*5 { _ = bow_frame(&room, 1.0/60) }
+	testing.expect(t, !first_person_bow_arrows_out(&room))
+	testing.expect_value(t, first_person_bow_move(&room, {}), Action_Result.Invalid_Phase)
+}
+
 // The guide (the user's choice: to the second bounce): from the eye to the
 // east wall and back to the west one, a full draw's path.
 @(test)

@@ -443,7 +443,21 @@ mechanics_lab_prima_persona :: proc(window: ^app.Window, renderer: ^render.Rende
 		for _ in 0..<6 { drive(window, renderer, room, controller, cards, buffer, {}) }
 		artifacts.screenshot("odin_pp_mechanics_lab_prima_persona_arco_zona.png")
 	}
+	// A full draw loosed as the view ends: the arrow flies on, seen from the
+	// board's camera (the user's choice, 2026-10-29).
+	fp.yaw, fp.pitch = math.PI*0.75, 0
+	loosed := bow.loosed
+	for _ in 0..<int(game.BOW_DRAW_SECONDS*60)+4 { drive(window, renderer, room, controller, cards, buffer, {fire_right = true}) }
+	drive(window, renderer, room, controller, cards, buffer, {})
+	if bow.loosed != loosed+1 { fmt.eprintln("mechanics lab: the bow's last arrow was not loosed"); return false }
 	if !leave(window, renderer, room, controller, cards, buffer) { fmt.eprintln("mechanics lab: the bow's view did not end"); return false }
+	if !game.first_person_bow_arrows_out(room) { fmt.eprintln("mechanics lab: the arrow did not fly on after the view"); return false }
+	artifacts.screenshot("odin_pp_mechanics_lab_prima_persona_arco_dopo.png")
+	for _ in 0..<60*8 {
+		if !game.first_person_bow_arrows_out(room) { break }
+		frame(window, renderer, room, controller, cards, buffer)
+	}
+	if game.first_person_bow_arrows_out(room) { fmt.eprintln("mechanics lab: the arrow never ended after the view"); return false }
 
 	// The fight back, as F5 brings it, for whatever comes after.
 	game.destroy_room(room)

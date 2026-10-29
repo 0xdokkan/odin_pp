@@ -178,8 +178,14 @@ drive_first_person_bow :: proc(controller: ^Tactical_Controller, room: ^game.Roo
 	cards: ^Card_Interaction_State, buttons: First_Person_Buttons, playtest: ^combatdebug.Playtest_Session) {
 	lower := buttons.left && !controller.bow_left
 	controller.bow_left = buttons.left
-	if !game.first_person_bow_active(room) || !controller.look_captured || render.first_person_diving(renderer) { return }
-	bow := game.First_Person_Bow_Input{draw = buttons.right, lower = lower, aim = render.first_person_aim(renderer)}
+	bow: game.First_Person_Bow_Input
+	if game.first_person_bow_active(room) {
+		if !controller.look_captured || render.first_person_diving(renderer) { return }
+		bow = {draw = buttons.right, lower = lower, aim = render.first_person_aim(renderer)}
+	} else if !game.first_person_bow_arrows_out(room) {
+		return
+	}
+	// The view over, the arrows out fly on with no buttons.
 	command := Gameplay_Command{kind = .First_Person_Bow, origin_phase = .Combat, bow = bow}
 	_ = commit_gameplay_command(room, renderer, cards, command, playtest)
 }

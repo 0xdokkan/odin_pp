@@ -257,7 +257,12 @@ tactical_begin_first_person :: proc(room: ^Room, seconds: f32, weapon := First_P
 // cost where actions do not last it): the view's own, and the trigger's.
 // The last one ends it.
 tactical_first_person_tick :: proc(room: ^Room, seconds: f32) {
-	if !tactical_first_person_active(room) || !(seconds > 0) { return }
+	if !(seconds > 0) { return }
+	// The view over, the bow's arrows out still fly (first_person_bow_move).
+	if !tactical_first_person_active(room) {
+		if first_person_bow_arrows_out(room) { first_person_bow_tick(room, seconds) }
+		return
+	}
 	fp := &room.first_person
 	fp.remaining = max(f32(0), fp.remaining-seconds)
 	if fp.remaining < FIRST_PERSON_EPSILON { fp.remaining = 0 }

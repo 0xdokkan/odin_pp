@@ -12,6 +12,10 @@ code like the rest (SOUND_SPEC.md): a compound bow with the Neon style's hum.
     world_bow_bounce        a bounce: a short bright ping of metal (the lab plays
                             it a note higher at each bounce of the same arrow: it
                             flies faster each time)
+    world_bow_pluck         with it, a plucked string, a harp's (the user's wish,
+                            2026-10-29): A3, the lab playing it up A minor's
+                            pentatonic scale a step a bounce, a fifth under the
+                            ping (E pentatonic)
     world_bow_zone          a bounce on a critical zone: two bell strikes a fifth
                             apart, ringing
     world_bow_hit           an arrow into a card: a dry thunk of the head, the
@@ -92,6 +96,23 @@ def world_bow_bounce(seed):
     click = _norm(highpass(white(0.004, seed), 4000)) * 0.5
     ping[:len(click)] += click
     return _out(fade(_ramp(_norm(ping), 0.0004), 0.0, 0.12), 0.05)
+
+
+@sound("world_bow_pluck", loudness=-20, wet=0.28, rt60=1.4, marks=(0.0,))
+def world_bow_pluck(seed):
+    """A bounce's string: a harp's pluck at A3 (220 Hz, Karplus-Strong, bright
+    and long, dying in about a second), its octave a breath above it, the
+    finger's soft snap on its front."""
+    dur = 1.2
+    t = time_axis(dur)
+    string = karplus(220, dur, damping=0.9975, brightness=0.8, seed=seed + 1)
+    octave = karplus(440, dur, damping=0.995, brightness=0.6, seed=seed + 2) * 0.25
+    body = lowpass(string + octave, 5200, 2)
+    snap = _norm(bandpass(white(0.006, seed + 3), 2500, 1.5)) * 0.25
+    body[:len(snap)] += snap
+    # Faded at its end, never cut off (a click).
+    x = fade(_ramp(_norm(body), 0.0006), 0.0, 0.35) * np.clip(1.4 - t / dur, 0, 1)
+    return _out(x, 0.06)
 
 
 @sound("world_bow_zone", loudness=-18, wet=0.32, rt60=1.6, marks=(0.0, 0.07))

@@ -99,7 +99,8 @@ sale tutto il sentiero a passi veri). L'atto `prima_persona` gira per ultimo nel
 Brawler (i guantoni Neon, un jab, un gancio, il jab che colpisce, un segno, il cross critico con la stella d'oro), poi
 First Person Fencer (lo zweihänder, un tondo sul bruto, la parata, il rampino e la catena tesa, il colpo roteante, la
 parata perfetta), poi First Person Archer (l'arco compound teso con l'anello della carica, un tiro dritto sul bruto, un
-tiro di sponda trovato con la guida, una zona critica sul muro).
+tiro di sponda trovato con la guida, una zona critica sul muro, una freccia tirata mentre la vista finisce che vola
+ancora vista dall'alto).
 Con `ODIN_PP_LAB_ONLY=fps` e `ODIN_PP_LAB_TIMING=1` l'atto di First Person Shooter si ferma dopo la discesa negli occhi e misura
 600 fotogrammi con l'AK che spara, senza limite di fotogrammi né vsync (riga `FIRST PERSON TIMING`; meglio con una build `-o:speed`).
 Con `ODIN_PP_LAB_ONLY=prima_persona` la stessa misura la fa `ODIN_PP_LAB_TIMING=1` con i pugni (un pugno ogni quarto di
