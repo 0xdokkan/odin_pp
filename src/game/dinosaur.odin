@@ -82,7 +82,10 @@ ride_can_begin :: proc(room: ^Room) -> bool {
 
 // What a step of the player costs: half as much on the Velociraptor.
 player_move_seconds :: proc(room: ^Room) -> f32 {
-	return RAPTOR_MOVE_SECONDS if ride_is(room, .Raptor) else TACTICAL_MOVE_SECONDS
+	if ride_is(room, .Raptor) { return RAPTOR_MOVE_SECONDS }
+	// FIRST PERSON FENCER's quicker steps (first_person_sword.odin).
+	if first_person_sword_active(room) { return SWORD_MOVE_SECONDS }
+	return TACTICAL_MOVE_SECONDS
 }
 
 // The Stegosauro turns every blow back (deflect_enemy_blow).

@@ -474,6 +474,8 @@ offer_defense_qte :: proc(room: ^Room, enemy: ^Enemy) -> bool {
 	// With the fists he defends by moving: no choice stops the world (Fase 2 of
 	// docs/piano-prima-persona.md).
 	if first_person_fists_active(room) { return false }
+	// With the sword the right button parries (Fase 4).
+	if first_person_sword_active(room) { return false }
 	intent := &enemy.intent
 	if enemy_is_staggered(room, enemy) || intent.windup || (intent.kind != .Attack && intent.kind != .Charge) || intent.target_object != 0 || enemy.position != intent.origin ||
 	   !enemy_intent_cell_is_threatened(intent, room.player.position) ||

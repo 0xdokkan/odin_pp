@@ -709,6 +709,10 @@ resolve_enemy_blow :: proc(room: ^Room, enemy: ^Enemy, intent: ^Enemy_Intent, ra
 	source := enemy_entity(enemy.id)
 	// The blow breaks what the player has set down within its reach (structure_damage.odin).
 	_ = strike_structures(room, enemy.position, intent.threatened_cells[:intent.threatened_cell_count], intent.damage)
+	// FIRST PERSON FENCER's guard (first_person_sword.odin).
+	if sword_parry_blow(room, enemy, intent, ranged, pulse) {
+		return room.phase != .Combat
+	}
 	if deflect_enemy_blow(room, source, enemy.position, intent, ranged, pulse) {
 		return room.phase != .Combat
 	}
