@@ -830,6 +830,7 @@ draw_first_person_overlay :: proc(renderer: ^Renderer, room: ^game.Room) {
 	// The blade is cut on the gloves' small canvas (first_person_sword.odin).
 	case .Sword:
 		draw_first_person_gloves(renderer, room, now)
+		draw_first_person_sword_guard(renderer)
 		draw_first_person_sword_words(renderer)
 	case .Empty:
 	}

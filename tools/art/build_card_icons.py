@@ -73,8 +73,11 @@ docs/piano-prima-persona.md adds one more, in the Neon style of its Fase 3:
              right with a cyan rim of light, its thumb along its side, a dark
              cuff under a magenta band, laced in magenta, three strokes of
              speed behind it.
-    cell 34  First Person Fencer (provisional until its Fase 5): a Neon sword
-             across the cell from the lower left, a magenta guard and pommel.
+    cell 34  First Person Fencer (its Fase 5): the Neon zweihänder across the
+             cell from the lower left: a steel blade with a cyan fuller, the
+             parrying hooks and a dark ricasso, a broad magenta cross guard lit
+             cyan at its ends, a long violet grip ringed in magenta, a magenta
+             pommel with a cyan core.
 
 Options:
     --check        exit 1 if the atlas is not what this script would write
@@ -755,37 +758,40 @@ assert all(len(row) == 28 for row in BRAWLER) and len(BRAWLER) == 28
 
 ICONS.update({33: BRAWLER})
 
-# docs/piano-prima-persona.md, Fase 4: First Person Fencer, provisional until its
-# Fase 5: a Neon sword across the cell from the lower left (a white core in a
-# cyan blade, a magenta guard and pommel, a violet grip), speed strokes above.
+# docs/piano-prima-persona.md, Fase 5: First Person Fencer, the Neon zweihänder
+# the user chose (a two-handed great sword, cybernetic and majestic) across the
+# cell from the lower left: its steel blade lit on one side with a cyan fuller,
+# the parrying hooks, the dark ricasso with a magenta ring, the broad magenta
+# cross guard with a white core and cyan ends, the long grip, the pommel.
+# Painted by tools: rasterised along the blade's line, outlined on four sides.
 FENCER = (
     "............................",
+    "............................",
     "........................K...",
-    "............KKKK.......KXK..",
-    "...........KPPPPK.....KXXXK.",
-    "............KKKK.....KXyXXK.",
-    ".........KKKKK......KXyXKK..",
-    "........KXXXXXK....KXyXK....",
-    ".........KKKKK....KXyXK.....",
-    ".................KXyXK......",
-    "................KXyXK.......",
-    "...............KXyXK........",
-    "..............KXyXK.........",
-    ".............KXyXK..........",
-    "............KXyXK...........",
-    "...........KXyXK............",
-    "...KK.....KXyXK.............",
-    "..KPPK...KXyXK..............",
-    "...KPPK.KXyXK...............",
-    "....KPPKXyXK................",
-    ".....KPPyXK.................",
-    ".....KXPPK..................",
-    ".....KKXPPK.................",
-    "....KSVKKPPK................",
-    "..KKSVK..KPPK...............",
-    ".KPSVK....KPPK..............",
-    ".KPPK......KK...............",
-    "..KK........................",
+    ".....................KKKmK..",
+    "....................KHHMK...",
+    "...................KHHXmK...",
+    "..................KHHXMmK...",
+    ".................KHHXMmK....",
+    "................KHHXMmK.....",
+    "...............KHHXMmK......",
+    "..............KHHXMmK.......",
+    ".............KHHXMmK........",
+    "..........K.KHHXMmK.........",
+    "......K..KMKHHXMmK..........",
+    ".....KXK..KMHXMmK...........",
+    "....KXXPK.KzmMmK............",
+    ".....KPPPKPzZmK.............",
+    "......KPPyzPKKmK............",
+    ".......KyyyK..K.............",
+    "......KVVyPPK...............",
+    ".....KVPSKPPPK..............",
+    "...KKPVSK.KPXXK.............",
+    "..KPVVPK...KXK..............",
+    ".KPPPSK.....K...............",
+    ".KPXPPK.....................",
+    ".KPPPK......................",
+    "..KKK.......................",
     "............................",
 )
 assert all(len(row) == 28 for row in FENCER) and len(FENCER) == 28

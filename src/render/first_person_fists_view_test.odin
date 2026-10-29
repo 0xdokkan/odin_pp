@@ -241,4 +241,10 @@ test_first_person_sword_words :: proc(t: ^testing.T) {
 	testing.expect_value(t, string(first_person_sword_words({lunge = true})), "AFFONDO x1,25")
 	testing.expect_value(t, string(first_person_sword_words({perfect = true})), "TAGLIO PERFETTO")
 	testing.expect_value(t, string(first_person_sword_words({spin = true, lunge = true})), "ROTEANTE x1,5 + AFFONDO")
+	// The cut's tag (Fase 5): its kind and damage, coloured by its quality.
+	testing.expect_value(t, string(first_person_sword_tag({kind = .Fendente, damage = 9})), "FENDENTE 9")
+	testing.expect_value(t, string(first_person_sword_tag({kind = .Tondo, damage = 4})), "TONDO 4")
+	testing.expect_value(t, string(first_person_sword_tag({kind = .Montante, damage = 2})), "MONTANTE 2")
+	testing.expect_value(t, first_person_sword_cut_quality({perfect = true}), f32(1))
+	testing.expect(t, first_person_sword_cut_quality({speed = 0.5, breadth = 0.5, line = 1}) == 0.25)
 }

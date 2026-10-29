@@ -1,5 +1,6 @@
 package render
 
+import "core:fmt"
 import "core:math"
 import rl "vendor:raylib"
 import game "../game"
@@ -74,6 +75,9 @@ First_Person_Sword_View :: struct {
 	cut_tip: [2]f32,
 	// The sprite clock at the last frame followed (the turn's pace).
 	seen_at: f64,
+	// The guard held now, and for how long (the world's seconds).
+	guard: bool,
+	guard_age: f32,
 	// When the last parry was, and whether it was perfect.
 	parry_at: f64,
 	parry_perfect: bool,
@@ -103,6 +107,7 @@ follow_first_person_sword :: proc(renderer: ^Renderer, room: ^game.Room) {
 	if !v.swinging && s.swing.active { v.trail_count = 0 }
 	v.tip, v.speed, v.swinging, v.start, v.length, v.last = s.tip, s.speed, s.swing.active, s.swing.start, s.swing.length, s.last
 	v.spin, v.lunge = s.swing.spin, s.swing.lunge
+	v.guard, v.guard_age = s.guard, s.guard_age
 	v.strikes, v.parries, v.perfect_parries, v.grapples = s.strikes, s.parries, s.perfect_parries, s.grapples
 	first_person_sword_keep_trail(v, now)
 	// The view turns toward the rules' facing, a quarter in FIRST_PERSON_SWORD_TURN, level.
@@ -359,24 +364,66 @@ first_person_sword_words :: proc(strike: game.Sword_Strike) -> cstring {
 	return nil
 }
 
-// The last cut's words over the view, by the chest it cut, rising and fading
-// in FIRST_PERSON_SWORD_WORDS (the HUD, over the gloves' canvas).
+// The cut's tag: its kind and its damage (`FENDENTE 9`).
+first_person_sword_tag :: proc(strike: game.Sword_Strike) -> cstring {
+	names := [game.Sword_Kind]string{.None = "TAGLIO", .Fendente = "FENDENTE", .Tondo = "TONDO", .Montante = "MONTANTE"}
+	return fmt.ctprintf("%s %d", names[strike.kind], strike.damage)
+}
+
+// How good a cut was (0..1): the formula's speed, breadth and line.
+first_person_sword_cut_quality :: proc(strike: game.Sword_Strike) -> f32 {
+	return 1 if strike.perfect else strike.speed*strike.breadth*strike.line
+}
+
+// The last cut's tag over the view, by the chest it cut, in the colour of its
+// quality (the trail's: grey, white, gold), and under it the words of what
+// made it stronger, rising and fading in FIRST_PERSON_SWORD_WORDS (the HUD,
+// over the gloves' canvas).
 @(private)
 draw_first_person_sword_words :: proc(renderer: ^Renderer) {
 	v := &renderer.tactical.first_person.sword
 	since := renderer.sprite_assets.elapsed-v.cut_at
-	words := first_person_sword_words(v.last)
-	if words == nil || v.cut_at <= 0 || since < 0 || since >= FIRST_PERSON_SWORD_WORDS { return }
+	if v.cut_at <= 0 || v.last.enemy_id == 0 || since < 0 || since >= FIRST_PERSON_SWORD_WORDS { return }
 	u := f32(since/FIRST_PERSON_SWORD_WORDS)
 	w, h := renderer.canvas_width, renderer.canvas_height
 	at := [2]f32{w*0.5+v.last.chest.x*h, h*0.5-(v.last.chest.y+0.12+FIRST_PERSON_SWORD_WORDS_RISE*u)*h}
-	size := 20
-	width := gothic_text_width(renderer, words, size)
-	x := clamp(at.x-width*0.5, 8, w-width-8)
 	alpha := 1-max(0, u-0.6)/0.4
-	color := (rl.Color{255, 214, 80, 255} if !v.last.spin else rl.Color{255, 96, 214, 255})
-	gothic_text(renderer, words, x+2, at.y+2, size, color_with_opacity(LIVING_TOKEN_INK, alpha))
-	gothic_text(renderer, words, x, at.y, size, color_with_opacity(color, alpha))
+	lines := [2]cstring{first_person_sword_tag(v.last), first_person_sword_words(v.last)}
+	sizes := [2]int{26, 20}
+	colors := [2]rl.Color{first_person_sword_trail_color(first_person_sword_cut_quality(v.last)),
+		rl.Color{255, 214, 80, 255} if !v.last.spin else rl.Color{255, 96, 214, 255}}
+	y := at.y-30
+	for line, index in lines {
+		if line == nil { continue }
+		size := sizes[index]
+		width := gothic_text_width(renderer, line, size)
+		x := clamp(at.x-width*0.5, 8, w-width-8)
+		gothic_text(renderer, line, x+2, y+2, size, color_with_opacity(LIVING_TOKEN_INK, alpha))
+		gothic_text(renderer, line, x, y, size, color_with_opacity(colors[index], alpha))
+		y += f32(size)+4
+	}
+}
+
+// The guard held: four brackets round the crosshair, cyan, gold while a blow
+// met now would be a perfect parry (game.SWORD_PERFECT_PARRY); a parry's
+// brackets close in a moment.
+@(private)
+draw_first_person_sword_guard :: proc(renderer: ^Renderer) {
+	v := &renderer.tactical.first_person.sword
+	if !v.guard { return }
+	perfect := v.guard_age <= game.SWORD_PERFECT_PARRY
+	color := rl.Color{255, 214, 80, 255} if perfect else rl.Color{60, 240, 255, 255}
+	cx, cy := math.round(renderer.canvas_width*0.5), math.round(renderer.canvas_height*0.5)
+	since := renderer.sprite_assets.elapsed-v.parry_at
+	r := f32(30)
+	if v.parry_at > 0 && since >= 0 && since < 0.15 { r -= f32(8*(1-since/0.15)) }
+	for corner in ([4][2]f32{{-1, -1}, {1, -1}, {-1, 1}, {1, 1}}) {
+		x, y := cx+corner.x*r, cy+corner.y*r
+		// An L at each corner, its arms toward the middle.
+		arms := [2]rl.Rectangle{{min(x, x-corner.x*10), y-1, 11, 3}, {x-1, min(y, y-corner.y*10), 3, 11}}
+		for arm in arms { rl.DrawRectangleRec({arm.x-1, arm.y-1, arm.width+2, arm.height+2}, LIVING_TOKEN_INK) }
+		for arm in arms { rl.DrawRectangleRec(arm, color) }
+	}
 }
 
 // `a` taken `u` of the way to `b`.
