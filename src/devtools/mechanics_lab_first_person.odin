@@ -117,8 +117,10 @@ mechanics_lab_first_person :: proc(window: ^app.Window, renderer: ^render.Render
 			fmt.eprintf("mechanics lab: First Person Shooter +%d on a %.0f px card: %s\n", upgrade, width, misfit); return false
 		}
 	}
-	// Played on himself, the window open and full.
-	for _ in 0..<600 {
+	// Played on himself, the window open and full: up to half a minute, a whole
+	// window and its recovery wherever the actions before (at the player's
+	// pace) left it.
+	for _ in 0..<1800 {
 		if player.tactical.phase == .Decision && player.tactical.remaining >= f32(player.tactical.budget)-0.5 && game.tactical_allows_cards(room) &&
 		   !render.renderer_blocks_player_input(renderer) && !game.tactical_player_busy(room) { break }
 		frame(window, renderer, room, controller, cards, buffer)
