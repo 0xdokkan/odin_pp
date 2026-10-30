@@ -42,7 +42,7 @@ test_m7_fresh_and_repeated_walks_execute_during_real_enemy_movement :: proc(t: ^
 	enemy_before := snapshot.enemies[0].position
 	testing.expect(t, devtools.tactical_independent_fresh_move(&controller, &room, renderer, &cards, &buffer, .East),
 		"a fresh key during an enemy move must commit immediately, not wait for the enemy's animation")
-	testing.expect(t, !buffer.chord.active)
+	testing.expect(t, !buffer.has_pending)
 	testing.expect_value(t, player.position, grid.Position{x = 8, y = 4})
 	snapshot = render.renderer_presentation_snapshot(renderer, &room)
 	testing.expect_value(t, snapshot.enemies[0].position, enemy_before)
@@ -60,7 +60,7 @@ test_m7_fresh_and_repeated_walks_execute_during_real_enemy_movement :: proc(t: ^
 	testing.expect(t, devtools.tactical_independent_fresh_move(&controller, &room, renderer, &cards, &buffer, .South),
 		"a second fresh key must not wait for the enemy's remaining animation")
 	testing.expect_value(t, player.position, grid.Position{x = 8, y = 5})
-	testing.expect(t, !buffer.chord.active)
+	testing.expect(t, !buffer.has_pending)
 	testing.expect_value(t, renderer.timeline.update_failures, 0)
 }
 
@@ -137,7 +137,7 @@ test_m7_enemy_world_presentation_keeps_pause_and_qte_boundaries :: proc(t: ^test
 	testing.expect(t, run_session.step_tactical_controller(&controller, &room, renderer, &cards, &buffer,
 		0.25, true, {focused = true, pause = true, directions = {false, true, false, false}}))
 	testing.expect_value(t, player.tactical.remaining, before)
-	testing.expect(t, !buffer.chord.active)
+	testing.expect(t, !buffer.has_pending)
 	testing.expect_value(t, player.position, data.player_spawn)
 	controller.paused = false
 	room.qte = {kind = .Defense, remaining = 3}
@@ -145,7 +145,7 @@ test_m7_enemy_world_presentation_keeps_pause_and_qte_boundaries :: proc(t: ^test
 		0.25, true, {focused = true, directions = {false, true, false, false}}))
 	testing.expect_value(t, player.tactical.remaining, before)
 	testing.expect_value(t, room.qte.remaining, f32(2.75))
-	testing.expect(t, !buffer.chord.active)
+	testing.expect(t, !buffer.has_pending)
 	testing.expect_value(t, player.position, data.player_spawn)
 }
 
@@ -236,7 +236,7 @@ test_m7_new_defense_qte_does_not_reuse_the_same_frame_input_or_skip_paid_deadlin
 	testing.expect(t, run_session.step_tactical_controller(&controller, &room, renderer, &cards, &buffer, 2, true, input))
 	testing.expect_value(t, room.qte.kind, game.QTE_Kind.Defense)
 	testing.expect_value(t, room.qte.remaining, config.qte_seconds)
-	testing.expect(t, !room.qte.selected && room.qte.progress == 0 && !buffer.chord.active)
+	testing.expect(t, !room.qte.selected && room.qte.progress == 0 && !buffer.has_pending)
 	testing.expect_value(t, player.position, data.player_spawn)
 	testing.expect_value(t, player.tactical.remaining, f32(0))
 	testing.expect_value(t, player.tactical.queued_beats, 1)

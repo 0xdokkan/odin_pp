@@ -5,6 +5,17 @@ I riferimenti a Classica, `--flat` e ai vecchi smoke descrivono versioni precede
 per i comandi disponibili oggi valgono il [README](README.md) e la documentazione collegata.
 
 
+## 2026-10-30 — Il gioco più fluido: niente timer, cammino tenuto, tasto ricordato, carte rapide
+
+- Nel gioco come si gioca non c'è più il timer delle decisioni (la finestra «AGISCI» e lo stordimento): restano battiti,
+  critici, diagonali e i conti alla rovescia dei nemici; il fuoco cresce e la Bruciatura morde ogni quattro battiti.
+- Il Viandante cammina tenendo premuto un tasto, ricorda l'ultimo tasto premuto durante un'azione o un cast e lo esegue
+  appena può, scivola da una casella all'altra in un movimento unico; sul battito, con due tasti tenuti, va in diagonale
+  senza attese. Le carte si possono scegliere anche durante un'azione.
+- Le carte durano 0,26-0,6 s secondo il loro peso.
+- Esplorazione: partenza scattante, inversione rapida, frenata con una piccola scivolata, aiuto agli spigoli; il robot si
+  piega con l'accelerazione e alza polvere ai passi; la camera guarda avanti.
+
 ## 2026-10-30 — Il Viandante va al doppio: passi, colpi e carte più rapidi
 
 - Nel gioco come si gioca (run, spedizione, laboratorio) i prezzi del Viandante sono la metà: un passo 0,4 s invece di

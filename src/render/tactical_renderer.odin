@@ -57,6 +57,12 @@ Tactical_View :: struct {
 	expedition_free_position, expedition_free_velocity: view.Vec2,
 	expedition_player_shown, expedition_player_offset: view.Vec2,
 	expedition_stride, expedition_dt: f32,
+	// The walker's lean (into its speed-up, back as it brakes), its velocity
+	// last frame, the camera's look ahead, and its footfalls' dust
+	// (expedition_walker.odin).
+	expedition_lean: f32,
+	expedition_last_velocity, expedition_look: view.Vec2,
+	expedition_dust: Expedition_Dust,
 	// Sleeping patrols glide between the cells they step to.
 	expedition_patrols: Expedition_Patrol_Glide,
 	// The sites whose floor plans reach this frame's drawn region.
@@ -367,6 +373,8 @@ update_tactical_view :: proc(renderer: ^Renderer, room: ^game.Room, mouse: view.
 			v.expedition_follow = target
 			v.expedition_follow_ready = true
 		} else if !refresh_only {
+			// Walking free, the camera leads the walk a little (expedition_walker.odin).
+			target += rl.Vector3{v.expedition_look.x, 0, v.expedition_look.y}
 			// Frame-rate independent: a glide reads the same at any refresh.
 			v.expedition_follow = v.expedition_follow+(target-v.expedition_follow)*(1-math.exp(-10*expedition_frame_dt(renderer)))
 		}

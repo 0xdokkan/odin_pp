@@ -169,7 +169,7 @@ roguelike_update :: proc(data: rawptr, hf: ^host.Frame) {
 	if screen != .Board {
 		if update_run_screen(rs, screen) { return }
 	} else {
-		update_run_board_commands(rs, tactical_input_blocked)
+		update_run_board_commands(rs, tactical_input_blocked && !rs.tactical_controller.lane_busy)
 	}
 	update_run_dice_overlay(rs)
 	rs.challenge_message_ttl = max(rs.challenge_message_ttl-hf.dt, 0)
@@ -284,9 +284,9 @@ update_run_board_view :: proc(rs: ^Roguelike_Session, hf: ^host.Frame, screen: R
 		// A modal over the board: the view gives the mouse back.
 		release_first_person_mouse(&rs.tactical_controller, &rs.room)
 	}
-	// A tick move waiting for its diagonal partner never outlives a frame in
-	// which the player's lane is not free.
-	if tactical_input_blocked { clear_gameplay_command_buffer(&rs.gameplay_buffer) }
+	// A press kept for the end of the player's own action never outlives a
+	// frame in which his lane is shut for anything else.
+	if tactical_input_blocked && !rs.tactical_controller.lane_busy { clear_gameplay_command_buffer(&rs.gameplay_buffer) }
 	// The board's characters are living cards.
 	render.set_living_cards(&rs.iso_renderer, true)
 	render.set_mechanics_lab(&rs.iso_renderer, rs.options.mechanics_lab, rs.from_launcher)
@@ -307,17 +307,18 @@ update_run_board_view :: proc(rs: ^Roguelike_Session, hf: ^host.Frame, screen: R
 @(private = "file")
 update_run_board_commands :: proc(rs: ^Roguelike_Session, tactical_input_blocked: bool) {
 	if !tactical_input_blocked {
-		// The player's own action, its animation or its timed seconds, owns
-		// the input lane: a command pressed now is dropped, never kept for when
-		// the action ends. Only a press made after it acts.
-		rs.timeline_busy = render.renderer_blocks_player_input(&rs.iso_renderer) || game.tactical_player_busy(&rs.room)
+		// The player's own action, its animation, its timed seconds or a
+		// card's cast, owns the input lane: a press made now is kept for its
+		// end (beat_input.odin), the cards can still be chosen.
+		rs.timeline_busy = render.renderer_blocks_player_input(&rs.iso_renderer) || game.tactical_player_busy(&rs.room) ||
+			rs.tactical_controller.lane_busy
 		command, has_command := poll_gameplay_command(
 			&rs.room,
 			&rs.iso_renderer,
 			&rs.card_interaction,
 			rs.mouse_canvas,
 			rs.mouse_inside,
-			!rs.timeline_busy,
+			true,
 			rs.options.debug_abilities,
 			rs.frame_input,
 		)

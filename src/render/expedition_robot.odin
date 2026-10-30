@@ -88,6 +88,9 @@ draw_expedition_robot :: proc(renderer:^Renderer,position:view.Vec2,opacity:f32)
 		action=.Move_Side;progress=v.expedition_stride/1.8-math.floor(v.expedition_stride/1.8)
 	}
 	pose:=tactical_feedback_pose(renderer,.Player,position);shade,seen:=tactical_shadow_tint(renderer,game.PLAYER_ENTITY)
+	// Walking free it leans into its speed-up and back as it brakes (expedition_walker.odin).
+	if v.expedition_free {pose.lean+=v.expedition_lean}
+	draw_expedition_dust(renderer)
 	if shade!=rl.WHITE {pose.tint=shade}
 	art:=expedition_robot_art(f32(now),action,progress,v.expedition_mounted)
 	for &part in art.parts[:art.count] {

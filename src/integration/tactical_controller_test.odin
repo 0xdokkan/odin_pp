@@ -8,7 +8,7 @@ import level "../level"
 import render "../render"
 
 @(test)
-test_m7_movement_pressed_during_loot_animation_is_dropped :: proc(t: ^testing.T) {
+test_m7_movement_pressed_during_loot_animation_is_kept_for_its_end :: proc(t: ^testing.T) {
 	data := create_gameplay_command_test_level(t)
 	defer level.destroy(&data)
 	player := create_gameplay_command_test_player(t)
@@ -25,31 +25,26 @@ test_m7_movement_pressed_during_loot_animation_is_dropped :: proc(t: ^testing.T)
 	testing.expect(t, run_session.commit_gameplay_command(&room, renderer, &cards,
 		{kind = .Move, origin_phase = .Loot, direction = .East}))
 	testing.expect(t, render.renderer_timeline_is_busy(renderer))
-	// The player's own step owns the input lane: a press made during it is
-	// dropped, and the controller keeps nothing of it for when the step ends.
+	// The player's own step owns the input lane: the controller itself keeps
+	// nothing of a press made during it.
 	testing.expect(t, run_session.step_tactical_controller(&controller, &room, renderer, &cards, &buffer,
 		0, true, {focused = true, directions = {false, false, true, false}}))
 	testing.expect_value(t, buffer, run_session.Buffered_Gameplay_Command{})
-	// Through the scene's lane, a press on every frame the step still holds,
-	// then idle frames: nothing moves the player again.
+	// Through the scene's lane, a press while the step still holds is kept
+	// (2026-10-30: before, it was dropped), not done now.
 	walk := run_session.Gameplay_Command{kind = .Move, origin_phase = .Loot, direction = .South}
 	dt := f32(1.0/60.0)
-	dropped := 0
-	for render.renderer_blocks_player_input(renderer) && dropped < 600 {
-		testing.expect(t, !scene_lane_frame(t, &controller, &room, renderer, &cards, &buffer, walk, true, dt, only_while_busy = true))
-		testing.expect_value(t, buffer, run_session.Buffered_Gameplay_Command{})
-		dropped += 1
-	}
-	testing.expect(t, dropped > 5 && !render.renderer_blocks_player_input(renderer))
-	for _ in 0..<30 { testing.expect(t, !scene_lane_frame(t, &controller, &room, renderer, &cards, &buffer, walk, false, dt)) }
+	testing.expect(t, !scene_lane_frame(t, &controller, &room, renderer, &cards, &buffer, walk, true, dt, only_while_busy = true))
+	testing.expect(t, buffer.has_pending)
 	testing.expect_value(t, player.position, grid.Position{x = 2, y = 1})
-	// A press made after the step acts, once.
+	// It steps once as the step ends, then nothing more.
 	moved := 0
-	for index in 0..<8 {
-		if scene_lane_frame(t, &controller, &room, renderer, &cards, &buffer, walk, index == 0, dt) { moved += 1 }
+	for _ in 0..<90 {
+		if scene_lane_frame(t, &controller, &room, renderer, &cards, &buffer, walk, false, dt) { moved += 1 }
 	}
 	testing.expect_value(t, moved, 1)
 	testing.expect_value(t, player.position, grid.Position{x = 2, y = 2})
+	testing.expect(t, !buffer.has_pending)
 }
 
 @(test)
@@ -84,7 +79,7 @@ expect_m7_walk_through_pulse :: proc(t: ^testing.T, during_timeline: bool) {
 	// Only the player's own unfinished step owns the frame, and the press made
 	// during it is dropped. Ordinary world work completes in this same frame.
 	testing.expect_value(t, blocked, during_timeline)
-	testing.expect(t, !buffer.chord.active)
+	testing.expect(t, !buffer.has_pending)
 	testing.expect_value(t, room.qte.kind, game.QTE_Kind.None)
 	testing.expect_value(t, player.tactical.phase, game.Tactical_Phase.Decision)
 	testing.expect_value(t, room.pulse_count, u64(1))
@@ -120,7 +115,7 @@ test_m7_pending_chord_is_discarded_at_rules_and_interaction_boundaries :: proc(t
 		controller := run_session.Tactical_Controller{was_focused = true}
 		cards: run_session.Card_Interaction_State
 		buffer: run_session.Buffered_Gameplay_Command
-		buffer.chord = {command = {kind = .Move, origin_phase = .Combat, direction = .East, beat = 1}, timer = run_session.BEAT_CHORD_SECONDS, active = true}
+		buffer.pending, buffer.has_pending = {kind = .Move, origin_phase = .Combat, direction = .East, beat = 1}, true
 		input := run_session.Tactical_Controller_Input{focused = true, directions = {false, false, true, false}}
 		available := true
 		switch boundary {
@@ -133,7 +128,7 @@ test_m7_pending_chord_is_discarded_at_rules_and_interaction_boundaries :: proc(t
 		case .Phase_Change: room.phase = .Loot; input.directions = {}
 		}
 		testing.expect(t, run_session.step_tactical_controller(&controller, &room, renderer, &cards, &buffer, 0, available, input))
-		testing.expect(t, !buffer.chord.active, "an old walk must not replay after a rules/UI boundary")
+		testing.expect(t, !buffer.has_pending, "an old walk must not replay after a rules/UI boundary")
 	}
 }
 
@@ -148,9 +143,9 @@ test_m7_focus_resume_does_not_charge_absence_or_replay_queued_input :: proc(t: ^
 	controller := run_session.Tactical_Controller{was_focused = true}
 	cards: run_session.Card_Interaction_State
 	buffer: run_session.Buffered_Gameplay_Command
-	buffer.chord = {command = {kind = .Move, origin_phase = .Combat, direction = .East, beat = 1}, timer = run_session.BEAT_CHORD_SECONDS, active = true}
+	buffer.pending, buffer.has_pending = {kind = .Move, origin_phase = .Combat, direction = .East, beat = 1}, true
 	testing.expect(t, run_session.step_tactical_controller(&controller, &room, renderer, &cards, &buffer, 30, true, {}))
-	testing.expect(t, !controller.was_focused && !buffer.chord.active)
+	testing.expect(t, !controller.was_focused && !buffer.has_pending)
 	testing.expect(t, run_session.step_tactical_controller(&controller, &room, renderer, &cards, &buffer, 30, true, {focused = true}))
 	testing.expect_value(t, player.tactical.remaining, f32(20))
 	testing.expect(t, !run_session.step_tactical_controller(&controller, &room, renderer, &cards, &buffer, 0.25, true, {focused = true}))

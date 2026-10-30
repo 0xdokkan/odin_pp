@@ -19,10 +19,17 @@ tactical_reset_window_pressure :: proc(s: ^Tactical_State) {
 	s.stun_duration = 0
 }
 
+// Whether this room's fights have no decision window: the expedition's, and
+// the game as it is played (Tactical_Config.windowless). The beats, their
+// criticals and the foes' countdowns run on all the same.
+tactical_windowless :: proc(s: ^Tactical_State) -> bool {
+	return s != nil && (s.config.expedition || s.config.windowless)
+}
+
 // Every card played counts toward the next won second.
 @(private)
 tactical_count_card :: proc(room: ^Room) {
-	if room == nil || room.player == nil || room.phase != .Combat || room.player.tactical.config.expedition { return }
+	if room == nil || room.player == nil || room.phase != .Combat || tactical_windowless(&room.player.tactical) { return }
 	s := &room.player.tactical
 	s.cards_toward_second += 1
 	if s.cards_toward_second >= TACTICAL_CARDS_PER_SECOND {
@@ -49,7 +56,7 @@ tactical_is_casting :: proc(room: ^Room) -> bool {
 tactical_begin_card_cast :: proc(room: ^Room, seconds: f32) {
 	if room == nil || room.player == nil || room.phase != .Combat || seconds <= 0 { return }
 	s := &room.player.tactical
-	paced := tactical_paced_seconds(room, seconds)
+	paced := tactical_card_cast_seconds(seconds, tactical_player_pace(room))
 	s.cast_remaining, s.cast_duration = paced, paced
 	s.metrics.decisions += 1
 }
@@ -122,8 +129,8 @@ tactical_finish_recovery :: proc(room: ^Room) {
 @(private)
 tactical_advance_clock :: proc(room: ^Room, seconds: f32) {
 	s := &room.player.tactical
-	elapsed := max(f32(0), seconds) if s.config.expedition else min(max(f32(0), seconds), max(f32(0), s.remaining))
-	if !s.config.expedition { s.remaining = max(f32(0), s.remaining-elapsed) }
+	elapsed := max(f32(0), seconds) if tactical_windowless(s) else min(max(f32(0), seconds), max(f32(0), s.remaining))
+	if !tactical_windowless(s) { s.remaining = max(f32(0), s.remaining-elapsed) }
 	expedition_regenerate_energy(room, elapsed)
 	s.dinosaur_remaining = max(f32(0), s.dinosaur_remaining-elapsed)
 	if s.remaining < 0.00001 { s.remaining = 0 }
@@ -163,7 +170,7 @@ tactical_spend_action_time :: proc(room: ^Room, seconds: f32) {
 // beat cannot accidentally start another window or carry work into the loot.
 tactical_expire_window :: proc(room: ^Room) -> bool {
 	if room == nil || room.player == nil || room.phase != .Combat || room.tactical_pulse.pending ||
-	   room.qte.kind != .None || room.player.tactical.config.expedition || room.player.tactical.remaining > 0 { return false }
+	   room.qte.kind != .None || tactical_windowless(&room.player.tactical) || room.player.tactical.remaining > 0 { return false }
 	s := &room.player.tactical
 	if s.phase != .Decision || s.queued_beats > 0 || s.cast_remaining > 0 { return false }
 	clear_event_log(room.recent_events)

@@ -396,7 +396,9 @@ expedition_update :: proc(data:rawptr,frame:^host.Frame) {
 		// Exploration glides freely; encounters bring the cell steps back.
 		walking:=!blocked && !e.inventory_open && !e.map_open && e.site<0 && w.reward_count==0 && room.phase==.Loot
 		world.roam_step(w,room,&e.roam,expedition_walk_wish(rs,frame) if walking else {},frame.dt if world_runs else 0)
-		if !blocked && !e.inventory_open && !e.map_open && e.site<0 && w.reward_count==0 {
+		// Waiting only for the player's own action, the encounter's lane still keeps its newest press (beat_input.odin).
+		lane:=blocked && rs.tactical_controller.lane_busy && room.phase==.Combat
+		if (!blocked || lane) && !e.inventory_open && !e.map_open && e.site<0 && w.reward_count==0 {
 			if room.phase==.Loot {
 				if input.key_pressed(frame.devices,.E) {expedition_interact(e,frame)}
 				if !w.mounted {
@@ -407,8 +409,8 @@ expedition_update :: proc(data:rawptr,frame:^host.Frame) {
 				// A deliberate click on a resting enemy starts an encounter.
 				if controls.left_pressed && rs.iso_renderer.has_hovered_cell {for &g,i in w.groups[:w.group_count] {for m in g.members[:g.count] {if m.alive && world.distance(m.enemy.position,rs.iso_renderer.hovered_cell)<=1 && world.distance(room.player.position,m.enemy.position)<=8 {_=world.engage(w,room,i);w.mounted=false;break}}}}
 			} else if room.phase==.Combat {
-				busy:=render.renderer_blocks_player_input(&rs.iso_renderer)||game.tactical_player_busy(room)
-				command,has:=poll_gameplay_command(room,&rs.iso_renderer,&rs.card_interaction,rs.mouse_canvas,rs.mouse_inside,!busy,false,controls)
+				busy:=lane||render.renderer_blocks_player_input(&rs.iso_renderer)||game.tactical_player_busy(room)
+				command,has:=poll_gameplay_command(room,&rs.iso_renderer,&rs.card_interaction,rs.mouse_canvas,rs.mouse_inside,true,false,controls)
 				if ready,ok:=route_gameplay_command(&rs.gameplay_buffer,room,busy,command,has,frame.dt,game.MOVEMENT_KEY_DIRECTIONS,controls);ok {_=commit_gameplay_command(room,&rs.iso_renderer,&rs.card_interaction,ready)}
 			}
 		}

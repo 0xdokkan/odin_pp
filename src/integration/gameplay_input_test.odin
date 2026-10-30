@@ -3,15 +3,16 @@ import run_session "../run"
 
 import "core:testing"
 import game "../game"
+import grid "../engine/grid"
 import level "../level"
 import render "../render"
 
-// Nothing is kept for later: clearing drops even a tick move waiting for its
-// diagonal partner, so no boundary can replay it.
+// Clearing drops the press kept for the end of the player's action and the
+// walk key he held, so no boundary can replay them.
 @(test)
-test_clearing_held_input_drops_a_pending_tick_chord :: proc(t: ^testing.T) {
-	held := run_session.Buffered_Gameplay_Command{chord = {command = {kind = .Move, origin_phase = .Combat, direction = .North, beat = 3},
-		timer = run_session.BEAT_CHORD_SECONDS, active = true}}
+test_clearing_held_input_drops_the_kept_press :: proc(t: ^testing.T) {
+	held := run_session.Buffered_Gameplay_Command{pending = {kind = .Move, origin_phase = .Combat, direction = .North, beat = 3},
+		has_pending = true, walk = 2}
 	run_session.clear_gameplay_command_buffer(&held)
 	testing.expect_value(t, held, run_session.Buffered_Gameplay_Command{})
 	run_session.clear_gameplay_command_buffer(nil)
@@ -33,10 +34,12 @@ test_gameplay_command_rejects_kinds_outside_their_origin_phase :: proc(t: ^testi
 	}))
 }
 
-// A busy lane drops the command and any pending chord; a free lane passes an
-// off-tick command through at once, and a tick move after its chord wait.
+// A busy lane keeps the newest press, one only, and passes it the frame it is
+// free; a free lane passes a command at once. A tick move with a
+// perpendicular key held steps diagonally at once, without one straight, and
+// nothing waits for a partner key (2026-10-30).
 @(test)
-test_route_drops_commands_while_busy_and_passes_them_when_free :: proc(t: ^testing.T) {
+test_route_keeps_the_newest_press_while_busy :: proc(t: ^testing.T) {
 	data := create_gameplay_command_test_level(t)
 	defer level.destroy(&data)
 	player := create_gameplay_command_test_player(t)
@@ -46,61 +49,93 @@ test_route_drops_commands_while_busy_and_passes_them_when_free :: proc(t: ^testi
 	testing.expect(t, built)
 	defer game.destroy_room(&room)
 	east := run_session.Gameplay_Command{kind = .Move, origin_phase = .Combat, direction = .East}
-	held := run_session.Buffered_Gameplay_Command{chord = {command = east, timer = run_session.BEAT_CHORD_SECONDS, active = true}}
+	north := run_session.Gameplay_Command{kind = .Move, origin_phase = .Combat, direction = .North}
+	held: run_session.Buffered_Gameplay_Command
 	_, routed := run_session.route_gameplay_command(&held, &room, true, east, true, 1.0/60.0)
-	testing.expect(t, !routed)
-	testing.expect_value(t, held, run_session.Buffered_Gameplay_Command{})
-	// A fresh window is not on the tick: the command needs no partner key.
-	ready, passed := run_session.route_gameplay_command(&held, &room, false, east, true, 1.0/60.0)
-	testing.expect(t, passed)
-	testing.expect_value(t, ready, east)
-	testing.expect(t, !held.chord.active)
-	// A tick move waits a few frames for its diagonal partner key, then steps
-	// straight when none comes.
+	testing.expect(t, !routed && held.has_pending && held.pending == east)
+	_, routed = run_session.route_gameplay_command(&held, &room, true, north, true, 1.0/60.0)
+	testing.expect(t, !routed && held.pending == north, "the newer press did not replace the older")
+	// A dodge is the controller's answer, never kept.
+	_, routed = run_session.route_gameplay_command(&held, &room, true, {kind = .Dodge, origin_phase = .Combat, direction = .West}, true, 1.0/60.0)
+	testing.expect(t, held.pending == north)
+	ready, passed := run_session.route_gameplay_command(&held, &room, false, {}, false, 1.0/60.0)
+	testing.expect(t, passed && ready.kind == .Move && ready.direction == .North && !held.has_pending)
+	_, passed = run_session.route_gameplay_command(&held, &room, false, {}, false, 1.0/60.0)
+	testing.expect(t, !passed, "the kept press came back twice")
+	// Free, a press passes at once.
+	ready, passed = run_session.route_gameplay_command(&held, &room, false, east, true, 1.0/60.0)
+	testing.expect(t, passed && ready.direction == .East)
+	// On the tick, with W held, east steps north-east at once; with none held, straight.
 	tick := run_session.Gameplay_Command{kind = .Move, origin_phase = .Combat, direction = .East, beat = 1}
-	held.chord = {command = tick, timer = run_session.BEAT_CHORD_SECONDS, active = true}
-	straight: run_session.Gameplay_Command
-	stepped := false
-	frames := 0
-	for !stepped && frames < 60 {
-		straight, stepped = run_session.route_gameplay_command(&held, &room, false, {}, false, 1.0/60.0)
-		frames += 1
+	diagonal := run_session.beat_input_command(&room, tick, controls = run_session.Run_Input{actions = {down = {.North}}})
+	testing.expect_value(t, diagonal.diagonal, grid.Position{x = 1, y = -1})
+	testing.expect_value(t, run_session.beat_input_command(&room, tick), tick)
+}
+
+// A walk key held walks on, a step each time the last one ends, the key
+// pressed last first; let go, the walk stops (the user's choice, 2026-10-30).
+@(test)
+test_a_held_walk_key_walks_on :: proc(t: ^testing.T) {
+	data := create_gameplay_command_test_level(t)
+	defer level.destroy(&data)
+	player := create_gameplay_command_test_player(t)
+	config := game.DEFAULT_TACTICAL_CONFIG
+	config.timed_actions = true
+	testing.expect(t, game.configure_tactical(&player, config))
+	enemies := [?]game.Enemy_Spawn{{position = {x = 5, y = 3}, health = 20, attack = 1}}
+	room, built := game.create_room(&data, &player, {enemies = enemies[:]})
+	testing.expect(t, built)
+	defer game.destroy_room(&room)
+	renderer := new(render.Renderer)
+	defer free(renderer)
+	defer render.destroy_renderer_world_playback(renderer)
+	controller := run_session.Tactical_Controller{was_focused = true}
+	cards: run_session.Card_Interaction_State
+	held: run_session.Buffered_Gameplay_Command
+	start := player.position
+	east := run_session.Gameplay_Command{kind = .Move, origin_phase = .Combat, direction = .East}
+	down := run_session.Run_Input{actions = {down = {.East}}}
+	dt := f32(1.0/60.0)
+	steps := 0
+	for frame in 0..<60 {
+		if scene_lane_frame(t, &controller, &room, renderer, &cards, &held, east, frame == 0, dt, controls = down) { steps += 1 }
 	}
-	testing.expect(t, stepped && frames > 1 && f32(frames-1)/60 < run_session.BEAT_CHORD_SECONDS)
-	testing.expect_value(t, straight, tick)
-	testing.expect(t, !held.chord.active)
+	// A second of world time at 0.4 s a step: the press and two more.
+	testing.expect_value(t, steps, 3)
+	testing.expect_value(t, player.position, game.add_position(start, {x = 3, y = 0}))
+	for _ in 0..<60 { testing.expect(t, !scene_lane_frame(t, &controller, &room, renderer, &cards, &held, east, false, dt)) }
+	testing.expect_value(t, player.position, game.add_position(start, {x = 3, y = 0}))
 }
 
 // One native frame of the scene (roguelike_update): presentation, the tactical
-// controller with the frame's keys, then, unless
-// the controller keeps the frame for itself (the scene then drops all held
-// input), the input lane with the scene's busy flag, and the commit.
-// `pressed` presses `command` for the controller and the lane's poll alike.
-// With `only_while_busy` the lane takes the press only on a frame the player's
-// own action still holds after this frame's update, so the frame on which the
-// action ends never counts as a press made during it. Whatever the frame, the
-// controller never takes up a press for later.
+// controller with the frame's keys, then, unless the controller keeps the frame
+// for itself for anything but the player's own action (the scene then drops all
+// held input), the input lane with the scene's busy flag, and the commit.
+// `pressed` presses `command` for the controller and the lane's poll alike;
+// `controls` are the keys held. With `only_while_busy` the lane takes the press
+// only on a frame the player's own action still holds after this frame's
+// update. The controller itself never takes up a press.
 scene_lane_frame :: proc(t: ^testing.T, controller: ^run_session.Tactical_Controller, room: ^game.Room, renderer: ^render.Renderer,
 	cards: ^run_session.Card_Interaction_State, held: ^run_session.Buffered_Gameplay_Command, command: run_session.Gameplay_Command, pressed: bool,
-	dt: f32, only_while_busy := false) -> (committed: bool) {
+	dt: f32, only_while_busy := false, controls: run_session.Run_Input = {}) -> (committed: bool) {
 	render.update_renderer_frame_timeline(renderer, dt)
 	input := run_session.Tactical_Controller_Input{focused = true}
 	if pressed && command.kind == .Move { input.directions[int(command.direction)] = true }
 	before := held^
 	blocked := run_session.step_tactical_controller(controller, room, renderer, cards, held, dt, true, input)
 	testing.expect(t, held^ == before || held^ == run_session.Buffered_Gameplay_Command{}, "the controller kept a press for later")
-	if blocked {
+	if blocked && !controller.lane_busy {
 		run_session.clear_gameplay_command_buffer(held)
 		return false
 	}
-	busy := render.renderer_blocks_player_input(renderer) || game.tactical_player_busy(room)
-	ready, ok := run_session.route_gameplay_command(held, room, busy, command, pressed && (busy || !only_while_busy), dt)
+	busy := controller.lane_busy || render.renderer_blocks_player_input(renderer) || game.tactical_player_busy(room)
+	ready, ok := run_session.route_gameplay_command(held, room, busy, command, pressed && (busy || !only_while_busy), dt, controls = controls)
 	return ok && run_session.commit_gameplay_command(room, renderer, cards, ready)
 }
 
 // The renderer and controller must honor the cheaper walk before the next
-// world beat, including with the actual timed/shrinking-window game settings:
-// at the player's pace a step's 0.8 s first price is 0.4 s.
+// world beat, including with the actual game settings: at the player's pace a
+// step's 0.8 s first price is 0.4 s, and no window runs down (2026-10-30).
 @(test)
 test_walk_input_reopens_at_point_four_seconds_before_the_world_beat :: proc(t: ^testing.T) {
 	data := create_gameplay_command_test_level(t)
@@ -128,14 +163,14 @@ test_walk_input_reopens_at_point_four_seconds_before_the_world_beat :: proc(t: ^
 	testing.expect_value(t, player.position, game.add_position(first, {x = 1, y = 0}))
 	testing.expect_value(t, player.tactical.metrics.decisions, u64(2))
 	testing.expect_value(t, room.pulse_count, u64(0))
-	testing.expect(t, abs(player.tactical.remaining-19.6) < 0.001)
+	testing.expect_value(t, player.tactical.remaining, f32(20))
 }
 
-// Pressing forward twice during one step makes one step, not two: the second
-// press arrives while the first step's animation and timed second still run,
-// and nothing brings it back when they end. A press after the action acts.
+// Presses during a step make one more step, not one each: the newest is kept
+// and done the frame the step ends (the user's choice, 2026-10-30: before, it
+// was dropped). Nothing more comes back after it.
 @(test)
-test_presses_during_the_players_own_action_are_dropped_not_chained :: proc(t: ^testing.T) {
+test_a_press_during_the_players_own_action_is_kept_for_its_end :: proc(t: ^testing.T) {
 	data := create_gameplay_command_test_level(t)
 	defer level.destroy(&data)
 	player := create_gameplay_command_test_player(t)
@@ -159,34 +194,31 @@ test_presses_during_the_players_own_action_are_dropped_not_chained :: proc(t: ^t
 	testing.expect_value(t, first, game.add_position(data.player_spawn, {x = 1, y = 0}))
 	testing.expect(t, render.renderer_blocks_player_input(renderer) && game.tactical_player_busy(&room))
 	// A press on every frame of the step's animation and of its timed second
-	// is dropped (the frame on which the second runs out is already free).
-	dropped := 0
-	for player.tactical.action_remaining > 2*dt && dropped < 600 {
+	// is kept, the newest only (the frame on which the second runs out is
+	// already free).
+	kept := 0
+	for player.tactical.action_remaining > 2*dt && kept < 600 {
 		testing.expect(t, !scene_lane_frame(t, &controller, &room, renderer, &cards, &held, east, true, dt))
-		testing.expect(t, !held.chord.active)
-		dropped += 1
+		testing.expect(t, held.has_pending)
+		kept += 1
 	}
 	// The step's 0.4 s at the player's pace: 24 frames.
-	testing.expect(t, dropped > 18)
+	testing.expect(t, kept > 18)
 	testing.expect_value(t, player.position, first)
-	// Nothing comes back on its own once the action is over.
-	for _ in 0..<30 { testing.expect(t, !scene_lane_frame(t, &controller, &room, renderer, &cards, &held, east, false, dt)) }
-	testing.expect(t, !game.tactical_player_busy(&room) && !render.renderer_blocks_player_input(renderer))
-	testing.expect_value(t, player.position, first)
-	// A press made after the action acts once (on the tick it first waits a
-	// few frames for a diagonal partner key).
+	// The kept press steps once as the action ends, then nothing more.
 	moved := 0
-	for index in 0..<8 {
-		if scene_lane_frame(t, &controller, &room, renderer, &cards, &held, east, index == 0, dt) { moved += 1 }
+	for _ in 0..<60 {
+		if scene_lane_frame(t, &controller, &room, renderer, &cards, &held, east, false, dt) { moved += 1 }
 	}
 	testing.expect_value(t, moved, 1)
 	testing.expect_value(t, player.position, game.add_position(first, {x = 1, y = 0}))
+	testing.expect(t, !held.has_pending)
 }
 
 
-// The dodge is an answer, not a held press: Shift+WASD during the step's
-// animation is dropped like any other key, but in the timed second after it
-// the dodge acts at once and cuts that second short with its own.
+// The dodge is an answer, not a kept press: Shift+WASD during the step's
+// animation is dropped, but in the timed second after it the dodge acts at
+// once and cuts that second short with its own.
 @(test)
 test_a_dodge_still_cuts_the_players_own_timed_action_short :: proc(t: ^testing.T) {
 	data := create_gameplay_command_test_level(t)
@@ -216,5 +248,5 @@ test_a_dodge_still_cuts_the_players_own_timed_action_short :: proc(t: ^testing.T
 	testing.expect(t, run_session.step_tactical_controller(&controller, &room, renderer, &cards, &held, 0, true, dodge))
 	testing.expect_value(t, player.position, game.add_position(step, {x = 0, y = 2}))
 	testing.expect_value(t, player.tactical.action_remaining, game.TACTICAL_DODGE_SECONDS/game.TACTICAL_PLAYER_PACE)
-	testing.expect(t, !held.chord.active)
+	testing.expect(t, !held.has_pending)
 }

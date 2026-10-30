@@ -135,5 +135,5 @@ run_tactical_independent_world_smoke :: proc(window: ^app.Window, renderer: ^ren
 	return player.tactical.metrics.decision_seconds > 2 &&
 		player.tactical.remaining < f32(player.tactical.config.timer_seconds)-5 &&
 		!render.renderer_timeline_is_busy(renderer) && !room.tactical_pulse.pending &&
-		!buffer.chord.active && room.qte.kind == .None && renderer.timeline.update_failures == 0
+		!buffer.has_pending && room.qte.kind == .None && renderer.timeline.update_failures == 0
 }

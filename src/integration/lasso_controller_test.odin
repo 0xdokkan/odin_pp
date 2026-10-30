@@ -79,13 +79,14 @@ test_lasso_spins_in_world_commands_and_a_dodge_lets_go :: proc(t: ^testing.T) {
 	body := player.position
 
 	// The spin, on the world's seconds: a whole first turn (0.9 s) costs the
-	// foe 1; every press meanwhile is dropped.
+	// foe 1; a press meanwhile is kept for its end, not done (beat_input.odin);
+	// the dodge below drops it.
 	health := room.enemies[0].health
 	spun := 0
 	for room.lasso.turns == 0 && spun < 120 {
 		testing.expect(t, !scene_lane_frame(t, &controller, &room, renderer, &cards, &held, east, true, dt))
 		testing.expect(t, game.tactical_player_busy(&room))
-		testing.expect(t, held == run_session.Buffered_Gameplay_Command{})
+		testing.expect(t, held.has_pending)
 		spun += 1
 	}
 	testing.expect_value(t, room.lasso.turns, i32(1))
@@ -99,7 +100,7 @@ test_lasso_spins_in_world_commands_and_a_dodge_lets_go :: proc(t: ^testing.T) {
 	input.directions[int(game.Move_Direction.South)] = true
 	render.update_renderer_frame_timeline(renderer, dt)
 	testing.expect(t, run_session.step_tactical_controller(&controller, &room, renderer, &cards, &held, dt, true, input))
-	testing.expect(t, !room.lasso.active)
+	testing.expect(t, !room.lasso.active && !held.has_pending)
 	testing.expect_value(t, player.position, game.add_position(body, {x = 0, y = 2}))
 	index, alive := game.enemy_index_by_id(&room, foe)
 	testing.expect(t, alive)

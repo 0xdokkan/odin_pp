@@ -659,14 +659,16 @@ il gameplay. Corpi animati usano un clock cosmetico; clip evento seguono il cue.
 
 ### Input senza coda e transizioni
 
-**Nessun comando resta in coda**, nella run, nella Prova
+**Un solo comando ricordato** (dal 2026-10-30), nella run, nella Prova
 meccaniche e nei laboratori ( `route_gameplay_command` in
 [beat_input.odin](../src/run/beat_input.odin)). Mentre è in corso l'azione del player
-stesso, cioè la sua animazione nella timeline, i secondi di un'azione a tempo o
-il passo da 0,4 s dell'ombra di [Movimento Ombra](regole/meccaniche.md#movimento-ombra), una
-pressione viene scartata; agisce solo una pressione fatta dopo la fine
-dell'azione. Il poll continua a girare, così hover, `Esc` e l'annullamento del
-drag rispondono, ma il suo comando non viene tenuto. Lo stesso vale per la
+stesso, cioè la sua animazione nella timeline, i secondi di un'azione a tempo, il
+cast di una carta o il passo da 0,4 s dell'ombra di
+[Movimento Ombra](regole/meccaniche.md#movimento-ombra), la pressione più recente viene
+ricordata (`Buffered_Gameplay_Command.pending`) ed eseguita il fotogramma in cui
+l'azione finisce; poi un tasto di direzione tenuto continua a camminare (`walk`,
+l'ultimo premuto). Il poll continua a girare, così hover, `Esc`, il drag e la scelta
+delle carte rispondono anche durante l'azione. Lo stesso vale per la
 freccia di Feretro (`Ctrl` + clic, il comando `Shoot`): un'azione da 1 s come le
 altre, mai tenuta per dopo e mai segnata con lo scocco. La schivata
 `Shift + WASD` che interrompe un'azione a tempo è una regola del gioco, non una
@@ -675,13 +677,12 @@ coda, e così il grilletto dell'AK di
 colpo ogni sesto di secondo come comando del mondo (`First_Person_Fire`, come i
 giri del Lazzo e la corsa del Pinball), e da un fotogramma all'altro non porta
 più del ritardo di un colpo; un clic fatto prima che la vista prenda il mouse
-non spara finché non lo si rilascia. L'unico input che attraversa qualche
-fotogramma è il passo premuto sul secondo, che aspetta al massimo
-`BEAT_CHORD_SECONDS` (0,06 s) il tasto perpendicolare della diagonale: vive in
-`Buffered_Gameplay_Command`, e ogni confine che svuota quella struttura
-(controller bloccato, fine della finestra, QTE, pausa, mappa, schivata o
-diagonale, perdita del focus, restart, nuova stanza, schermate) lo lascia
-cadere. I comandi portano valori logici e ID, mai puntatori o indici visuali, e
+non spara finché non lo si rilascia. Il comando ricordato vive in `Buffered_Gameplay_Command`, e ogni confine che
+svuota quella struttura (controller bloccato per altro che l'azione del player,
+fine della finestra, QTE, pausa, mappa, schivata o diagonale, perdita del focus,
+restart, nuova stanza, schermate) lo lascia cadere. Nessun passo aspetta più il
+tasto della diagonale: sul battito, con il tasto perpendicolare già tenuto, il
+passo parte subito in diagonale. I comandi portano valori logici e ID, mai puntatori o indici visuali, e
 la fase d'origine: un Move nato in Combat non diventa implicitamente un Move in
 Loot. Tenere un tasto premuto non genera repeat.
 
@@ -714,8 +715,8 @@ API autorevole, criterio committed, snapshot e fase d'origine
 |---|---|
 | salto visivo / danno su entità scomparsa | ordine eventi, ID, payload from/to, start/finish, update_failures |
 | ultimo feedback tagliato | guardia timeline idle prima della transizione |
-| input perso | premuto durante la propria azione (scartato per regola) o a controller bloccato: `player_animation_blocks_input`, fase e timeline nello snapshot `F8` |
-| comando vecchio nella stanza nuova | passo in attesa della diagonale non lasciato cadere a quel confine (`clear_gameplay_command_buffer`) |
+| input perso | premuto a controller bloccato per altro che la propria azione (pausa, QTE, mappa): `player_animation_blocks_input`, fase e timeline nello snapshot `F8` |
+| comando vecchio nella stanza nuova | comando ricordato non lasciato cadere a quel confine (`clear_gameplay_command_buffer`) |
 | preview diversa dall'esito | targeting attivo su snapshot arretrato |
 | coda incompleta | dropped_count e budget eventi |
 

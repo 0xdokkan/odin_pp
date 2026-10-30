@@ -30,3 +30,18 @@ tactical_player_pace :: proc(room: ^Room, step := false) -> f32 {
 tactical_paced_seconds :: proc(room: ^Room, seconds: f32, step := false) -> f32 {
 	return seconds/tactical_player_pace(room, step)
 }
+
+// A card's cast at the player's pace (the user's choice, 2026-10-30: quick,
+// a heavier card a little longer, never past CARD_CAST_MAX): from
+// CARD_CAST_BASE, CARD_CAST_SLOPE more for each of its first seconds (one
+// second 0.26, two 0.375, three 0.49, four 0.6). At the bare rules' pace its
+// first seconds; a card of none, none.
+CARD_CAST_BASE :: f32(0.15)
+CARD_CAST_SLOPE :: f32(0.1125)
+CARD_CAST_MAX :: f32(0.6)
+
+tactical_card_cast_seconds :: proc(seconds, pace: f32) -> f32 {
+	if seconds <= 0 { return 0 }
+	if pace <= 1 { return seconds }
+	return min(CARD_CAST_MAX, CARD_CAST_BASE+CARD_CAST_SLOPE*seconds)
+}

@@ -16,6 +16,18 @@ ROAM_MOUNT_SPEED :: f32(8.4)
 // A substep never crosses more than one cell edge per axis, and stays below
 // the radius, so the center can never tunnel into a blocker.
 ROAM_MAX_STEP :: f32(0.2)
+// How the walk answers the keys on foot (the user's choice, 2026-10-30: more
+// alive): it reaches its speed briskly (ACCEL, a share of the gap a second),
+// turns about harder (TURN, when the wish points against the walk), and stops
+// with a short slide (STOP, about 0.4 cells from full speed).
+ROAM_ACCEL :: f32(20)
+ROAM_TURN :: f32(34)
+ROAM_STOP :: f32(13)
+// Sliding past a corner: walking along an axis into the corner of a solid
+// cell beside an open way, the walker is eased sideways toward the open
+// cell's middle (cells a second, from up to EDGE off it) instead of stopping.
+ROAM_CORNER_SPEED :: f32(3)
+ROAM_CORNER_EDGE :: f32(0.45)
 
 Roam :: struct {
 	// Cell units: cell (x,y) spans [x,x+1)×[y,y+1); its center is +0.5.
@@ -137,6 +149,31 @@ roam_press :: proc(room:^game.Room,r:^Roam,direction:[2]f32) {
 	}
 }
 
+// Walking straight along an axis into a corner beside an open way: eased
+// toward the open cell's middle (ROAM_CORNER_SPEED), so a doorway or a
+// corridor is taken without lining up by hand.
+@(private)
+roam_round_corner :: proc(room:^game.Room,r:^Roam,direction:[2]f32,dt:f32) {
+	axis:=0 if abs(direction.x)>=abs(direction.y) else 1
+	other:=1-axis
+	// Only a walk mostly along one axis.
+	if abs(direction[other])>.35 {return}
+	sign:=1 if direction[axis]>0 else -1
+	step:=[2]int{sign,0} if axis==0 else [2]int{0,sign}
+	ahead:=roam_layer_cell(r,room,r.cell.x+step.x,r.cell.y+step.y)
+	if roam_blocked(r,room,ahead) {return}
+	center:=roam_center(r.cell)
+	off:=r.position[other]-center[other]
+	if abs(off)<.02 || abs(off)>ROAM_CORNER_EDGE {return}
+	// Close to the face ahead, and the cell beside the open one on this side solid.
+	if (r.position[axis]-center[axis])*f32(sign)<.5-ROAM_RADIUS-.12 {return}
+	side:=1 if off>0 else -1
+	beside:=[2]int{step.x,side} if axis==0 else [2]int{side,step.y}
+	if !roam_blocked(r,room,roam_layer_cell(r,room,r.cell.x+beside.x,r.cell.y+beside.y)) {return}
+	nudge:=min(abs(off),ROAM_CORNER_SPEED*dt)
+	r.position[other]-=f32(side)*nudge
+}
+
 roam_speed :: proc(w:^World,ground:Terrain)->f32 {
 	speed:=ROAM_MOUNT_SPEED if w.mounted else ROAM_WALK_SPEED
 	if ground==.Sand || ground==.Water || ground==.Snow || ground==.Swamp {speed*=.5}
@@ -161,11 +198,14 @@ roam_step :: proc(w:^World,room:^game.Room,r:^Roam,wish:[2]f32,dt:f32) {
 	under:=ground(w,r.cell)
 	direction:=wish;length:=math.sqrt(direction.x*direction.x+direction.y*direction.y)
 	if length>1 {direction/=length;length=1}
-	// Brisk on foot, weighty in the saddle, slippery on ice.
-	rate:=f32(4.5) if w.mounted else 16
-	if length<.01 {rate=6 if w.mounted else 22}
+	// Brisk on foot, weighty in the saddle, slippery on ice; on foot a turn
+	// about bites harder, a stop slides a little.
+	rate:=f32(4.5) if w.mounted else ROAM_ACCEL
+	if !w.mounted && length>=.01 && direction.x*r.velocity.x+direction.y*r.velocity.y<0 {rate=ROAM_TURN}
+	if length<.01 {rate=6 if w.mounted else ROAM_STOP}
 	if under==.Ice {rate=2.2 if length>=.01 else .7}
 	r.velocity+=(direction*roam_speed(w,under)-r.velocity)*(1-math.exp(-rate*elapsed))
+	if length>=.5 {roam_round_corner(room,r,direction,elapsed)}
 	if length<.01 && r.velocity.x*r.velocity.x+r.velocity.y*r.velocity.y<.0004 {r.velocity={}}
 	travel:=r.velocity*elapsed
 	steps:=max(1,int(math.ceil(max(abs(travel.x),abs(travel.y))/ROAM_MAX_STEP)))

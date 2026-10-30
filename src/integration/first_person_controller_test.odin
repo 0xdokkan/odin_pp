@@ -118,10 +118,10 @@ test_first_person_fires_in_world_commands_never_blocked_by_its_steps :: proc(t: 
 			stepped = game.tactical_player_busy(&room)
 		}
 		if frame > 5 && frame < 30 {
-			// A press during the step is dropped.
+			// A press during the step is kept for its end (beat_input.odin), not done now.
 			busy := render.renderer_blocks_player_input(renderer) || game.tactical_player_busy(&room)
 			_, ok := run_session.route_gameplay_command(&held, &room, busy, {kind = .Move, origin_phase = .Combat, direction = .East}, true, dt)
-			testing.expect(t, !ok && held == run_session.Buffered_Gameplay_Command{})
+			testing.expect(t, !ok && held.has_pending)
 		}
 	}
 	testing.expect(t, stepped)

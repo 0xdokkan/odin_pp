@@ -112,9 +112,9 @@ test_timed_actions_go_at_the_players_pace :: proc(t: ^testing.T) {
 	defer destroy_room(&room)
 	testing.expect_value(t, tactical_player_pace(&room), TACTICAL_PLAYER_PACE)
 	testing.expect_value(t, tactical_paced_seconds(&room, TACTICAL_REFOCUS_SECONDS), f32(1))
-	// A card's cast: its first price, at the pace.
+	// A card's cast at the pace: quick, a heavier one a little longer (tactical_card_cast_seconds).
 	tactical_begin_card_cast(&room, tactical_card_time_cost(.Guard))
-	testing.expect_value(t, player.tactical.cast_duration, tactical_card_time_cost(.Guard)/TACTICAL_PLAYER_PACE)
+	testing.expect_value(t, player.tactical.cast_duration, tactical_card_cast_seconds(tactical_card_time_cost(.Guard), TACTICAL_PLAYER_PACE))
 	player.tactical.cast_remaining, player.tactical.cast_duration = 0, 0
 	// Behind the eyes: the AK's and the fists' prices are their first ones,
 	// the sword's and the bow's steps go at the pace (their other prices not).

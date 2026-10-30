@@ -56,11 +56,11 @@ test_tesla_square_activation_opens_the_tag_ring_and_freezes_the_run :: proc(t: ^
     testing.expect_value(t,rs.run_state.player.tactical.remaining,clock)
     testing.expect_value(t,rs.room.pulse_count,pulse)
     rs.card_interaction.selected_card_id=42
-    rs.gameplay_buffer.chord.active=true
+    rs.gameplay_buffer.has_pending=true
     commands: host.Commands
     frame := host.Frame{commands=&commands}
     testing.expect(t,run_session.roguelike_open_activity(rs,&frame))
-    testing.expect(t,rs.player_activities.ring_pending && !rs.gameplay_buffer.chord.active && rs.card_interaction.selected_card_id==0)
+    testing.expect(t,rs.player_activities.ring_pending && !rs.gameplay_buffer.has_pending && rs.card_interaction.selected_card_id==0)
     testing.expect_value(t,commands.count,1)
     // A second frame cannot open a second duel or advance the board.
     testing.expect(t,!run_session.roguelike_open_activity(rs,&frame))

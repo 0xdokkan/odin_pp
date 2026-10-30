@@ -82,6 +82,7 @@ test_roam_mount_outpaces_walking :: proc(t:^testing.T) {
 	walked:=r.position.x
 	p.position={x = 19, y = 26};w.mounted=true;mounted:Roam
 	roam_walk(&w,&room,&mounted,{1,0},1)
-	testing.expect(t,mounted.position.x>walked+1.5)
+	// The walk reaches its speed briskly since 2026-10-30 (ROAM_ACCEL): the mount still gains over a cell in a second.
+	testing.expect(t,mounted.position.x>walked+1.2)
 	testing.expect(t,walked>19.5+ROAM_WALK_SPEED*.8)
 }

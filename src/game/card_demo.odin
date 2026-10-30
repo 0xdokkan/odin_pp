@@ -354,15 +354,16 @@ card_demo_scene :: proc(id: Card_Id, upgrade_level: i32 = 0) -> (scene: Card_Dem
 			scene.pools[scene.pool_count] = cell
 			scene.pool_count += 1
 		}
-	// Windows pass: the fire grows, catches the brute and goes out. It is lit
-	// beside the player at his right, so that its cross spreads in the board's
-	// middle, between the HUD and the hand, and never under him.
+	// Beats pass, four for each growth (no window since 2026-10-30: game/
+	// expedition_combat.odin, expedition_finish_beat): the fire grows, catches
+	// the brute and goes out. It is lit beside the player at his right, so that
+	// its cross spreads in the board's middle, between the HUD and the hand,
+	// and never under him.
 	case .Wildfire:
 		scene.foes[0] = {at = card_demo_offset(1, -3), archetype = .Brute, health = 40, attack = 1}
 		scene.foe_count = 1
 		scene.target = card_demo_offset(1, -1)
-		scene.window_seconds = 2
-		scene.seconds = 15
+		scene.seconds = 24
 	// Two coils, one over the other at his right: one standing, the card's
 	// own, then ATTIVA through the foe between them.
 	case .Tesla_Coil:

@@ -41,6 +41,8 @@ tactical_feedback_pose :: proc(renderer: ^Renderer, key: Sprite_Key, position: v
 		if key != actor_key { continue }
 		p := comic_clip_progress(presentation_cue_progress(cue))
 		envelope := math.sin(p*math.PI)
+		// The player's own walk glides instead (living_card.odin, Living_Actor.walk).
+		if cue.kind == .Move && entity == game.PLAYER_ENTITY && renderer.tactical.living && living_actor_walks(renderer, entity) { continue }
 		if cue.kind == .Move {
 			result.lift = 0.095*envelope
 			result.lean = 0.028*math.sin(p*2*math.PI)

@@ -88,13 +88,17 @@ immediate_card_command :: proc(card: game.Card_Instance) -> (Gameplay_Command, b
 	return {kind = .Play_Card, origin_phase = .Combat, card_id = card.id, target = target}, true
 }
 
-// No command is ever kept for later. While the player's own action runs (its
-// animation or its timed seconds) a press is dropped; only a press made after
-// the action ends acts. The one input held across frames is a move pressed on
-// the tick, waiting BEAT_CHORD_SECONDS for its diagonal partner key
-// (beat_input.odin): every boundary that clears this struct drops it too.
+// The player's lane across frames (beat_input.odin; the user's choice of
+// 2026-10-30, for a quicker, smoother game). While his own action runs (its
+// animation, its timed seconds, a card's cast) the newest press is kept, one
+// only, and done as soon as the action ends: before, it was dropped. A walk
+// key held walks on, step after step: `walk` is the one pressed last
+// (RUN_WALK_ACTIONS' index plus one; 0, none). Every boundary that clears this
+// struct (a defence prompt, the window's end, a pause, a modal) drops both.
 Buffered_Gameplay_Command :: struct {
-	chord: Beat_Chord,
+	pending: Gameplay_Command,
+	has_pending: bool,
+	walk: int,
 }
 
 gameplay_command_is_valid :: proc(command: Gameplay_Command) -> bool {

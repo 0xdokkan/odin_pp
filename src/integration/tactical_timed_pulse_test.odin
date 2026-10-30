@@ -37,7 +37,7 @@ test_m7_fresh_walk_on_an_autonomous_world_beat_executes_in_the_same_frame :: pro
 	// remain available to poll and commit the fresh physical press immediately.
 	testing.expect(t, !run_session.step_tactical_controller(&controller, &room, renderer, &cards, &buffer,
 		1, true, {focused = true, directions = {false, true, false, false}}))
-	testing.expect(t, !buffer.chord.active)
+	testing.expect(t, !buffer.has_pending)
 	testing.expect_value(t, player.position, origin)
 	testing.expect_value(t, player.tactical.metrics.decisions, u64(0))
 	testing.expect_value(t, player.tactical.remaining, f32(19))
@@ -68,7 +68,7 @@ test_m7_timed_deadline_discards_a_pending_chord_before_recovery :: proc(t: ^test
 	controller := run_session.Tactical_Controller{was_focused = true}
 	cards: run_session.Card_Interaction_State
 	buffer: run_session.Buffered_Gameplay_Command
-	buffer.chord = {command = {kind = .Move, origin_phase = .Combat, direction = .East, beat = 1}, timer = run_session.BEAT_CHORD_SECONDS, active = true}
+	buffer.pending, buffer.has_pending = {kind = .Move, origin_phase = .Combat, direction = .East, beat = 1}, true
 	origin := player.position
 	testing.expect(t, !run_session.step_tactical_controller(&controller, &room, renderer, &cards, &buffer,
 		1, true, {focused = true}))
@@ -82,7 +82,7 @@ test_m7_timed_deadline_discards_a_pending_chord_before_recovery :: proc(t: ^test
 	testing.expect_value(t, room.pulse_count, u64(1))
 	testing.expect_value(t, player.position, origin)
 	testing.expect_value(t, player.tactical.metrics.decisions, u64(0))
-	testing.expect(t, !buffer.chord.active)
+	testing.expect(t, !buffer.has_pending)
 }
 
 @(test)

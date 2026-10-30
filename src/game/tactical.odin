@@ -21,12 +21,16 @@ Tactical_Config :: struct {
 	// The shrinking window: each window that runs out leaves the next a second
 	// shorter, down to a stun (tactical_clock.odin).
 	shrinking_window: bool,
+	// No decision window at all, as in the expedition: the world runs on and
+	// nothing runs out (tactical_windowless).
+	windowless: bool,
 }
 // The bare rules, which the regression probes are written against.
 DEFAULT_TACTICAL_CONFIG :: Tactical_Config{timer_seconds = 20, vision_size = 7, qte_seconds = 1.2}
-// The game as it is played: actions last their cost, the window shrinks.
+// The game as it is played: actions last their cost, and no window (the
+// user's choice, 2026-10-30: the game loses its timer; it shrank before).
 GAME_TACTICAL_CONFIG :: Tactical_Config{timer_seconds = 20, vision_size = 7, qte_seconds = 1.2,
-	timed_actions = true, shrinking_window = true}
+	timed_actions = true, windowless = true}
 EXPEDITION_TACTICAL_CONFIG :: Tactical_Config{expedition = true, timer_seconds = 20, vision_size = 0,
 	qte_seconds = 1.2, timed_actions = true}
 MAX_TACTICAL_VISION :: 9
@@ -230,18 +234,18 @@ tactical_tick :: proc(room: ^Room, dt: f32, available: bool, hologram: bool) -> 
 		s.cast_remaining = max(f32(0), s.cast_remaining-elapsed)
 		if s.cast_remaining < 0.00001 { s.cast_remaining = 0 }
 		charged := min(elapsed, s.remaining)
-		if s.config.expedition { charged = 0 }
+		if tactical_windowless(s) { charged = 0 }
 		s.remaining = max(f32(0), s.remaining-charged)
 		if s.remaining < 0.00001 { s.remaining = 0 }
 		s.metrics.decision_seconds += f64(charged)
 		if s.cast_remaining == 0 { tactical_refill(room) }
 		// Remainder belongs to the next controller frame: no world catch-up
 		// after a cinematic or a long frame can surprise the player.
-		return !s.config.expedition && s.cast_remaining == 0 && s.remaining == 0
+		return !tactical_windowless(s) && s.cast_remaining == 0 && s.remaining == 0
 	}
 	// The final charged beat can finish on a zero-delta controller frame. A
 	// deadline already reached must still publish its explicit timeout command.
-	if !s.config.expedition && s.remaining <= 0 {
+	if !tactical_windowless(s) && s.remaining <= 0 {
 		if tactical_between_windows(s) { tactical_finish_recovery(room); return false }
 		return true
 	}
@@ -251,7 +255,7 @@ tactical_tick :: proc(room: ^Room, dt: f32, available: bool, hologram: bool) -> 
 		s.action_remaining = max(f32(0), s.action_remaining-dt)
 		if s.action_remaining < 0.00001 { s.action_remaining = 0 }
 	}
-	elapsed := dt if s.config.expedition else min(dt, max(f32(0), s.remaining))
+	elapsed := dt if tactical_windowless(s) else min(dt, max(f32(0), s.remaining))
 	before := s.clock_fraction
 	tactical_advance_clock(room, elapsed)
 	tactical_note_beat_time(s, before, elapsed)
@@ -261,7 +265,7 @@ tactical_tick :: proc(room: ^Room, dt: f32, available: bool, hologram: bool) -> 
 	s.metrics.decision_seconds += f64(elapsed)
 	if hologram { s.metrics.hologram_seconds += f64(elapsed) }
 	if tactical_between_windows(s) { tactical_finish_recovery(room); return false }
-	return !s.config.expedition && s.remaining <= 0 && !room.tactical_pulse.pending
+	return !tactical_windowless(s) && s.remaining <= 0 && !room.tactical_pulse.pending
 }
 
 // Each continuation owns one bounded event log. Only elapsed world time queues

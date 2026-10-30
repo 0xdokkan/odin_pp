@@ -18,6 +18,9 @@ test_headless_playtest_finishes_forty_timed_decisions_and_observes_the_world :: 
 		defer game.destroy_run(&run)
 		config := game.GAME_TACTICAL_CONFIG
 		config.timer_seconds = seconds
+		// The window's own timeouts and stuns, which the game as played has
+		// lost since 2026-10-30 (Tactical_Config.windowless).
+		config.windowless, config.shrinking_window = false, true
 		testing.expect(t, game.configure_tactical(&run.player, config))
 		data := create_gameplay_command_test_level(t)
 		defer level.destroy(&data)

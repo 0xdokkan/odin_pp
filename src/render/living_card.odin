@@ -33,6 +33,10 @@ Living_Actor :: struct {
 	slide_ms: f32,
 	slide_kind: gfx.Living_Travel,
 	sliding, moved: bool,
+	// The player's own walk (the user's choice, 2026-10-30): the card glides at
+	// once, at one speed for all of his step's seconds, so that held steps run
+	// on as one smooth walk (living_card_slide).
+	walk: bool,
 	// 0..1: how close the figure is to acting (the lab's seals make it tremble).
 	tremble: f32,
 	// The cue that started the running one-shot (.Move for a step), and the
@@ -131,6 +135,17 @@ living_find :: proc(renderer: ^Renderer, entity: game.Entity_Ref, character: gfx
 	return nil
 }
 
+// Whether `entity`'s card is gliding through the player's own walk.
+@(private)
+living_actor_walks :: proc(renderer: ^Renderer, entity: game.Entity_Ref) -> bool {
+	state := renderer.tactical.living_state
+	if state == nil { return false }
+	for actor in state.actors {
+		if actor.used && actor.entity == entity && actor.walk && actor.sliding { return true }
+	}
+	return false
+}
+
 // The card of `entity` still falling, whichever its drawing: once its body
 // has left the board it finishes its death as a ghost.
 living_find_dying :: proc(renderer: ^Renderer, entity: game.Entity_Ref) -> ^Living_Actor {
@@ -157,6 +172,11 @@ living_fall :: proc(actor: ^Living_Actor, now: f64) -> f32 {
 	t := (now-actor.started-living_played_seconds(clip, actor.scale))/(LIVING_FALL_SECONDS*action_scale_of(actor.scale))
 	return f32(clamp(t, 0, 1))
 }
+
+// The player's walk (Living_Actor.walk): the shortest step it glides (a bare
+// rule's untimed step keeps the clip's own slide), and its bob's height.
+LIVING_WALK_MIN_SECONDS :: f32(0.08)
+LIVING_WALK_BOB :: f32(0.022)
 
 // The same curves as tools/art/living.py: how the card follows the push.
 @(private)
@@ -230,8 +250,10 @@ living_card_slide :: proc(renderer: ^Renderer, entity: game.Entity_Ref, key: Spr
 	u := f32((now-actor.slide_start)*1000/f64(max(actor.slide_ms, 1)))
 	if u >= 1 { return }
 	p := living_travel_progress(actor.slide_kind, u) if u > 0 else 0
+	// The player's walk: one speed across the cell, a small bob of the step.
+	if actor.walk { p = clamp(u, 0, 1) }
 	at = {actor.slide_from.x+(actor.slide_to.x-actor.slide_from.x)*p, actor.slide_from.y+(actor.slide_to.y-actor.slide_from.y)*p}
-	if u > 0 { lift += living_travel_lift(actor.slide_kind, u) }
+	if u > 0 { lift += LIVING_WALK_BOB*math.sin(clamp(u, 0, 1)*math.PI) if actor.walk else living_travel_lift(actor.slide_kind, u) }
 	return
 }
 
@@ -401,7 +423,12 @@ living_observe :: proc(renderer: ^Renderer, state: ^Living_State, room: ^game.Ro
 				// Riding, the card does not walk: the dinosaur feet do; the card
 				// only slides with it.
 				riding := actor.entity == game.PLAYER_ENTITY && snapshot.ride.active
-				if !riding { living_start(slot, move, clock) }
+				// The player's own step glides for what is left of its seconds,
+				// its walk drawing running on from the step before.
+				step := room.player.tactical.action_remaining if room != nil && room.player != nil else 0
+				walk := actor.entity == game.PLAYER_ENTITY && !pushed && !riding && move != .Dodge && step >= LIVING_WALK_MIN_SECONDS
+				walking := walk && slot.walk && slot.action == gfx.living_resolve(character, move) && living_busy(slot, clock)
+				if !riding && !walking { living_start(slot, move, clock) }
 				slot.cause, slot.shot = .Move, false
 				clip := &sheet.clips[gfx.living_resolve(character, move) if riding else slot.action]
 				// The card goes from wherever it stands now, at the push.
@@ -411,6 +438,8 @@ living_observe :: proc(renderer: ^Renderer, state: ^Living_State, room: ^game.Ro
 				travel_start, travel_length := living_played_travel(clip, slot.scale)
 				slot.slide_start = clock+(travel_start if clip.travel != .None && !pushed else 0)
 				slot.slide_ms = f32(travel_length*1000 if clip.travel != .None && !pushed else 220*action_scale_of(slot.scale))
+				slot.walk = walk
+				if walk { slot.slide_start, slot.slide_ms = clock, step*1000 }
 				slot.sliding = true
 			}
 			continue

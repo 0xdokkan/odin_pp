@@ -211,7 +211,7 @@ draw_tactical_hud :: proc(renderer: ^Renderer, room: ^game.Room, paused, hologra
 	else if lasso { label = "LAZZO" }
 	else if busy || game.tactical_player_busy(room) { label = "AZIONE" }
 	// The pulse continues during casting; cinematic dice and QTE own a full pause.
-	timed := combat && !s.config.expedition
+	timed := combat && !game.tactical_windowless(s)
 	accent := GOTHIC_RED if timed && s.remaining <= 5 else GOTHIC_BLUE
 	if recovering { accent = HUD_AMBER }
 	if stunned { accent = GOTHIC_RED }
@@ -222,13 +222,13 @@ draw_tactical_hud :: proc(renderer: ^Renderer, room: ^game.Room, paused, hologra
 	sub := fmt.ctprintf("PULSE %d", min(s.cycle, max(int)-1)+1)
 	if s.config.expedition { sub = fmt.ctprintf("BATTITO %d", s.encounter_beats+1) }
 	// The window's own seconds wait, shown still, while the shadow's run.
-	if shadow { sub = fmt.ctprintf("FERMO %.1fs", s.remaining) }
+	if shadow && !game.tactical_windowless(s) { sub = fmt.ctprintf("FERMO %.1fs", s.remaining) }
 	// The turn the rope is in.
 	if lasso { sub = fmt.ctprintf("GIRO %d", room.lasso.turns+1) }
 	gothic_text_fit(renderer, sub, {x+12, y+26, 90, 14}, 10, GOTHIC_MUTED)
 	if combat {
 		timer := fmt.ctprintf("%.1fs", s.shadow_remaining if shadow else s.remaining)
-		if s.config.expedition && !shadow { timer = "" }
+		if game.tactical_windowless(s) && !shadow { timer = "" }
 		timer_width := gothic_text_width(renderer, timer, 24)
 		// The tick: a lamp fills toward each whole second and flares gold in
 		// the window where moves, bumps and cards turn critical. In the shadow,
@@ -251,7 +251,7 @@ draw_tactical_hud :: proc(renderer: ^Renderer, room: ^game.Room, paused, hologra
 	if stunned { budget = max(f32(1), s.stun_duration) }
 	meter := rl.Rectangle{x+104, y+29, width-116, 7}
 	if shadow { hud_bar(meter, s.shadow_remaining/max(s.shadow_duration, 0.001), HUD_SHADE, int(s.shadow_duration+0.5)) }
-	else if s.config.expedition && combat { hud_bar(meter, f32(s.encounter_beats%game.EXPEDITION_DRAW_BEATS)/f32(game.EXPEDITION_DRAW_BEATS), GOTHIC_BLUE, 4) }
+	else if game.tactical_windowless(s) && combat { hud_bar(meter, f32(s.encounter_beats%game.EXPEDITION_DRAW_BEATS)/f32(game.EXPEDITION_DRAW_BEATS), GOTHIC_BLUE, 4) }
 	else if timed { hud_bar(meter, s.remaining/budget, accent, int(min(budget, 30))) }
 	else { hud_bar(meter, 1, GOTHIC_BLUE if !combat else GOTHIC_STEEL) }
 	// A timed action: a thin gold line drains as it plays out; a shadow's

@@ -30,6 +30,9 @@ Tactical_Controller :: struct {
 	sword_ctrl: bool,
 	// FIRST PERSON ARCHER: the left button as last read (a press lowers the bow).
 	bow_left: bool,
+	// The frame's input waits only for the player's own action (a card's cast,
+	// his animation): the scene still keeps its newest press (beat_input.odin).
+	lane_busy: bool,
 }
 
 M7_INPUT_TRACE :: #config(M7_INPUT_TRACE, false)
@@ -67,11 +70,11 @@ update_tactical_controller :: proc(
 			cue, has_cue := render.active_presentation_cue(&renderer.timeline)
 			elapsed, duration := f32(0), f32(0)
 			if has_cue { elapsed, duration = cue.elapsed, cue.duration }
-			fmt.printf("M7 input: keys=%v shift=%v focused=%v available=%v paused=%v map=%v blocked=%v room=%v tactical=%v pending=%v qte=%v qte_clock=%.3f clock=%.3f dt=%.6f timeline=%d/%d cue=%.6f/%.6f drag=%d deck_active=%v chord=%v position=%v\n",
+			fmt.printf("M7 input: keys=%v shift=%v focused=%v available=%v paused=%v map=%v blocked=%v room=%v tactical=%v pending=%v qte=%v qte_clock=%.3f clock=%.3f dt=%.6f timeline=%d/%d cue=%.6f/%.6f drag=%d deck_active=%v pending=%v position=%v\n",
 				input.directions, input.shift, input.focused, available, controller.paused, controller.hologram, blocked,
 				room.phase, room.player.tactical.phase, room.tactical_pulse.pending, room.qte.kind,
 				room.qte.remaining, room.player.tactical.remaining, dt, renderer.timeline.head, renderer.timeline.count,
-				elapsed, duration, cards.dragged_card_id, room.player.deck.combat_active, buffer.chord.active, room.player.position)
+				elapsed, duration, cards.dragged_card_id, room.player.deck.combat_active, buffer.has_pending, room.player.position)
 			for pressed, index in input.directions {
 				if !pressed { continue }
 				destination := game.add_position(room.player.position, game.direction_offset(game.Move_Direction(index)))
@@ -121,6 +124,7 @@ step_tactical_controller :: proc(
 	cards: ^Card_Interaction_State, buffer: ^Buffered_Gameplay_Command,
 	dt: f32, available: bool, input: Tactical_Controller_Input, playtest: ^combatdebug.Playtest_Session = nil,
 ) -> (blocks_input: bool) {
+	controller.lane_busy = false
 	if room == nil || room.player == nil { return false }
 	// The view behind the player's eyes takes the mouse, or gives it back, as
 	// this frame leaves things (first_person_input.odin).
@@ -161,8 +165,8 @@ step_tactical_controller :: proc(
 		return true
 	}
 	if game.tactical_is_casting(room) {
-		clear_gameplay_command_buffer(buffer)
 		game.tactical_tick(room, simulation_dt, true, false)
+		controller.lane_busy = true
 		return true
 	}
 	if cinematic_input { return true }
@@ -257,10 +261,13 @@ step_tactical_controller :: proc(
 		cards.selected_card_id = 0
 		cards.dragged_card_id = 0
 	}
-	// The player's own animation owns the input lane: a press made now is
-	// dropped, never kept for when the animation ends.
+	// The player's own animation owns the input lane: a press made now waits
+	// for its end (beat_input.odin).
 	if render.renderer_blocks_player_input(renderer) {
-		clear_gameplay_command_buffer(buffer)
+		// A boundary still drops what was kept: the map, a press of another phase.
+		if map_toggled || controller.hologram || (buffer.has_pending && buffer.pending.origin_phase != room.phase) {
+			clear_gameplay_command_buffer(buffer)
+		} else { controller.lane_busy = true }
 		return true
 	}
 	if !controller.hologram && room.phase == .Combat && room.player.tactical.phase == .Decision {

@@ -7,13 +7,35 @@ si usa Skip. Ogni stanza parte con cinque carte e tre energia. I nemici
 annunciano già il piano per la prossima risposta: schivare o spostare un
 bersaglio può invalidarlo, senza permettere all'IA di cambiarlo all'ultimo momento.
 
+**Il gioco più fluido (2026-10-30, scelte dell'utente).** Nel gioco come si
+gioca (la run, la spedizione, il laboratorio) **non c'è più il timer**: niente
+finestra «AGISCI» a tempo, niente recupero né stordimento quando finisce
+(`Tactical_Config.windowless`, come già nell'esplorazione). Restano il battito
+di un secondo, i critici sul battito, le diagonali e i conti alla rovescia dei
+nemici; il fuoco cresce e la Bruciatura morde ogni quattro battiti invece che a
+ogni finestra. Il Viandante:
+- **cammina tenendo premuto** un tasto di direzione, un passo dopo l'altro senza
+  pause; con due tasti tenuti, sul battito il passo è diagonale, senza più
+  aspettare 60 ms il secondo tasto;
+- **ricorda l'ultimo tasto** premuto mentre un'azione, un'animazione o il cast di
+  una carta sono in corso (uno solo, il più recente) e lo esegue appena può;
+  intanto si possono scegliere le carte;
+- **scivola** da una casella all'altra in un unico movimento per tutto il passo,
+  senza il saltello prima e la pausa dopo;
+- **gioca le carte in fretta**: il cast dura 0,15 s più 0,1125 s per ogni secondo
+  pieno della carta, mai oltre 0,6 s (una carta da 1 s 0,26 s, da 2 s 0,375 s, da
+  3 s 0,49 s, da 4 s 0,6 s; `tactical_card_cast_seconds`).
+
+Le regole di base delle sonde (`DEFAULT_TACTICAL_CONFIG`) tengono la finestra e
+i prezzi pieni: le descrizioni sotto della finestra valgono per loro.
+
 Il combattimento usa una finestra temporale, seguita da un secondo di recupero
 con movimento libero. Le azioni consumano tempo; i nemici agiscono sui propri
 ritmi, indipendenti dalle azioni del player. Le carte spendono il proprio tempo
 durante il cast, con mondo fermo; i dadi sospendono anche il timer. I QTE possono
 sospendere un attacco prima del danno. I comandi rifiutati non aggiungono costi.
-Una pressione durante l'azione del player viene scartata: agisce una nuova
-pressione dopo il suo completamento. L'energia si rigenera di uno ogni tre
+Una pressione durante l'azione del player viene ricordata (la più recente) ed
+eseguita appena l'azione finisce. L'energia si rigenera di uno ogni tre
 secondi del mondo, fino al massimo di tre.
 
 Alla morte dell'ultimo nemico la stanza passa a Loot. Ci si può muovere senza
@@ -107,10 +129,9 @@ Ogni volta che il countdown del pulse scocca un secondo intero (per esempio da
 4,35 a 4), un'azione fatta **entro 0,15 s** da quell'istante, prima o dopo, è
 **critica**. Ogni scocco premia una sola azione; i secondi saltati dal costo di
 un'azione non scoccano, e la finestra appena aperta non conta come scocco.
-Lo scocco si giudica alla pressione: un passo premuto in tempo resta critico
-anche se parte qualche fotogramma dopo, mentre aspetta (al massimo 0,06 s) il
-secondo tasto della diagonale. Non c'è coda: premuto mentre l'azione precedente
-è ancora in corso, il passo si perde. L'HUD mostra una spia che si accende
+Lo scocco si giudica quando il passo parte: un passo ricordato o tenuto premuto
+è critico se parte sullo scocco, e con un tasto perpendicolare tenuto in quel
+momento va in diagonale (nessuna attesa del secondo tasto). L'HUD mostra una spia che si accende
 nella finestra; l'azione critica mostra **CRITICO!**. Un passo in linea retta
 resta sempre di una casella e non consuma lo scocco: sul secondo, il critico
 del movimento è solo il passo in diagonale.
@@ -357,8 +378,14 @@ pieni. Dietro gli occhi (prima persona) vanno al ritmo solo i passi della spada 
 pugni restano come prima. Anche le **animazioni** delle azioni sul tabellone (i segnali della timeline, i disegni delle
 carte vive e dei flipbook che non girano in loop, i fendenti, i dardi, le stelle d'impatto, i dadi) durano la metà del
 loro tempo pieno; i loop (respiro, canalizzazione, stordimento) restano com'erano, e in prima persona nulla cambia
-([action_pace.odin](../../src/render/action_pace.odin)). Nell'esplorazione il cammino libero passa da 3,6 a 5,4 caselle
-al secondo, sempre sotto la cavalcatura (8,4).
+([action_pace.odin](../../src/render/action_pace.odin)). Le carte, dal 2026-10-30, durano ancora meno: vedi
+**Il gioco più fluido** in cima a questa pagina. Nell'esplorazione il cammino libero passa da 3,6 a 5,4 caselle
+al secondo, sempre sotto la cavalcatura (8,4). Dal 2026-10-30 il cammino è anche più vivo
+([roam.odin](../../src/expedition/roam.odin)): parte scattante, inverte più in fretta, si ferma con una piccola
+scivolata (circa 0,4 caselle), e vicino a uno spigolo accanto a un passaggio aperto scivola verso il centro del
+passaggio invece di fermarsi; il robot si piega in avanti quando accelera e indietro quando frena, alza un po' di
+polvere a ogni passo, e la camera guarda un po' avanti nella direzione di marcia
+([expedition_walker.odin](../../src/render/expedition_walker.odin)).
 
 Le carte mostrano la durata `Ns`: il cast spende quei secondi una sola volta,
 progressivamente, e ferma il mondo. Movimento Ombra mostra `0s`: non ha cast, la
@@ -453,8 +480,9 @@ che può contenere più azioni. Il countdown scorre mentre si decide. Movimento,
 attacco, attesa, refocus, attivazione ed equipaggiamento **durano in tempo reale
 il loro costo** (`Tactical_Config.timed_actions`): un passo da 0,4 s (al ritmo del giocatore) occupa il
 Viandante per quattro decimi di secondo, mentre il countdown e i nemici scorrono come sempre (un
-battito al secondo). Un comando premuto nel frattempo viene **scartato**, mai
-tenuto da parte per dopo: agisce solo una pressione fatta a fine azione. La
+battito al secondo). Un comando premuto nel frattempo viene **ricordato** (solo
+il più recente) ed eseguito a fine azione; un tasto di direzione tenuto continua
+a camminare. La
 schivata (`Shift + WASD`) invece non aspetta e interrompe subito l'azione, e la
 fine della finestra chiude anche l'azione in corso. L'HUD mostra **AZIONE** con
 una linea dorata che si consuma. Con le regole di base (`DEFAULT_TACTICAL_CONFIG`, usate
@@ -510,12 +538,10 @@ Consultare la mappa
 lascia avanzare anche i nemici, senza reset. Un input sullo stesso frame di un
 beat viene eseguito subito dopo la risoluzione logica, mentre l’animazione nemica
 prosegue. L'azione del player (la sua animazione, i suoi secondi o il passo
-dell'ombra) occupa invece il suo input: una pressione fatta nel frattempo viene
-scartata, non conservata, e solo una nuova pressione a fine azione agisce.
-Lo stesso per cast e cinematiche: al termine della carta non parte nessuna
-azione involontaria. L'unico input che aspetta qualche fotogramma è il passo
-premuto sul secondo, in attesa del tasto della diagonale; ogni confine (fine
-della finestra, QTE, pausa, mappa, schivata, perdita del focus, nuova stanza) lo
+dell'ombra) occupa invece il suo input: la pressione più recente fatta nel
+frattempo viene ricordata ed eseguita a fine azione, e così durante il cast di
+una carta. Ogni confine (fine della finestra, QTE, pausa, mappa, schivata,
+perdita del focus, nuova stanza) la
 lascia cadere. Il targeting
 delle carte sopravvive ai beat autonomi,
 ma viene chiuso da timeout o QTE. Anche il recupero avanza durante le animazioni

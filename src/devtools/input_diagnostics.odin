@@ -64,9 +64,9 @@ format_input_diagnostic :: proc(storage: []u8, run: ^game.Run_State, room: ^game
 		fmt.sbprintf(&b, "active_cue=%v started=%v elapsed=%.9f duration=%.9f event=%v source=%v target=%v\n",
 			cue.kind, cue.started, cue.elapsed, cue.duration, cue.event.kind, cue.event.source, cue.event.target)
 	}
-	fmt.sbprintf(&b, "cards_hovered=%d selected=%d dragged=%d chord_active=%v chord_direction=%v chord_timer=%.3f\n",
+	fmt.sbprintf(&b, "cards_hovered=%d selected=%d dragged=%d pending=%v pending_kind=%v walk=%d\n",
 		cards.hovered_card_id, cards.selected_card_id, cards.dragged_card_id,
-		buffer.chord.active, buffer.chord.command.direction, buffer.chord.timer)
+		buffer.has_pending, buffer.pending.kind, buffer.walk)
 	for direction in game.Move_Direction {
 		destination := game.add_position(p.position, game.direction_offset(direction))
 		query := game.query_entity_movement(room, game.PLAYER_ENTITY, destination)

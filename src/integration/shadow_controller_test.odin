@@ -57,11 +57,11 @@ test_m7_shadow_holds_its_clock_for_the_card_walks_on_moves_and_rises_by_command 
 }
 
 // The scene's lane inside the shadow, frame by frame: presses during the
-// card's cue and during a 0.4 s step are dropped, and a press on a shadow beat
-// waits for its partner key across the controller's frames (here none comes:
-// it steps straight and leaves the beat unspent).
+// card's cue are dropped, the newest during a 0.4 s step is kept for its end,
+// and a press on a shadow beat with no partner key held steps straight at once
+// and leaves the beat unspent.
 @(test)
-test_m7_shadow_lane_drops_presses_during_a_step_and_keeps_the_tick_chord :: proc(t: ^testing.T) {
+test_m7_shadow_lane_keeps_a_press_during_a_step_and_steps_on_the_tick :: proc(t: ^testing.T) {
 	data := create_gameplay_command_test_level(t)
 	defer level.destroy(&data)
 	player := create_gameplay_command_test_player(t)
@@ -99,35 +99,36 @@ test_m7_shadow_lane_drops_presses_during_a_step_and_keeps_the_tick_chord :: proc
 	testing.expect(t, scene_lane_frame(t, &controller, &room, renderer, &cards, &held, east, true, dt))
 	stepped := game.add_position(body, {x = 1, y = 0})
 	testing.expect_value(t, player.tactical.shadow_position, stepped)
-	// The step's own lockout drops presses too (the frame on which it runs
-	// out is already free).
-	dropped := 0
-	for player.tactical.shadow_step_remaining > 2*dt && dropped < 60 {
+	// During the step's own lockout the newest press is kept, and steps once
+	// as it runs out (2026-10-30: before, it was dropped).
+	kept := 0
+	for player.tactical.shadow_step_remaining > 2*dt && kept < 60 {
 		testing.expect(t, game.tactical_player_busy(&room))
 		testing.expect(t, !scene_lane_frame(t, &controller, &room, renderer, &cards, &held, east, true, dt))
-		testing.expect(t, !held.chord.active)
-		dropped += 1
+		testing.expect(t, held.has_pending)
+		kept += 1
 	}
-	testing.expect(t, dropped > 15)
+	testing.expect(t, kept > 15)
 	testing.expect_value(t, player.tactical.shadow_position, stepped)
+	again := game.add_position(stepped, {x = 1, y = 0})
+	steps := 0
 	for _ in 0..<120 {
-		if game.tactical_shadow_beat_target(&room) != 0 { break }
-		testing.expect(t, !scene_lane_frame(t, &controller, &room, renderer, &cards, &held, east, false, dt))
+		if game.tactical_shadow_beat_target(&room) != 0 && !game.tactical_player_busy(&room) { break }
+		if scene_lane_frame(t, &controller, &room, renderer, &cards, &held, east, false, dt) { steps += 1 }
 	}
+	testing.expect_value(t, steps, 1)
+	testing.expect_value(t, player.tactical.shadow_position, again)
 	testing.expect_value(t, game.tactical_shadow_beat_target(&room), u32(1))
-	testing.expect(t, !scene_lane_frame(t, &controller, &room, renderer, &cards, &held, south, true, dt))
-	testing.expect(t, held.chord.active)
-	waited := 0
-	for !scene_lane_frame(t, &controller, &room, renderer, &cards, &held, south, false, dt) && waited < 30 { waited += 1 }
-	testing.expect(t, waited > 0 && f32(waited)*dt < run_session.BEAT_CHORD_SECONDS+dt)
-	testing.expect_value(t, player.tactical.shadow_position, game.add_position(stepped, {x = 0, y = 1}))
+	// On the tick a straight step goes at once: nothing waits for a partner key.
+	testing.expect(t, scene_lane_frame(t, &controller, &room, renderer, &cards, &held, south, true, dt))
+	testing.expect_value(t, player.tactical.shadow_position, game.add_position(again, {x = 0, y = 1}))
 	testing.expect(t, 1 not_in player.tactical.shadow_beats_spent)
 	for _ in 0..<600 {
 		if !game.tactical_shadow_active(&room) { break }
 		testing.expect(t, !scene_lane_frame(t, &controller, &room, renderer, &cards, &held, east, false, dt))
 	}
 	testing.expect(t, !game.tactical_shadow_active(&room))
-	testing.expect_value(t, player.position, game.add_position(stepped, {x = 0, y = 1}))
+	testing.expect_value(t, player.position, game.add_position(again, {x = 0, y = 1}))
 	testing.expect_value(t, player.tactical.remaining, window)
 	testing.expect_value(t, room.pulse_count, u64(0))
 }

@@ -78,19 +78,24 @@ expedition_regenerate_energy :: proc(room: ^Room, elapsed: f32) {
 	if deck.energy == deck.rules.max_energy { s.energy_fraction = 0 }
 }
 
+// A fight with no window (the expedition's, and since 2026-10-30 the game as
+// it is played: tactical_windowless) keeps the window's pace every
+// EXPEDITION_DRAW_BEATS beats: fire grows and burning bites without a hidden
+// deadline. Only the expedition draws a card there (elsewhere a card played
+// is drawn again as its cast ends).
 @(private)
 expedition_finish_beat :: proc(room: ^Room, pulse: ^Pulse_Report) {
 	s := &room.player.tactical
-	if !s.config.expedition { return }
+	if !tactical_windowless(s) { return }
 	s.encounter_beats += 1
-	expedition_terrain_beat(room, pulse)
+	if s.config.expedition { expedition_terrain_beat(room, pulse) }
 	if s.encounter_beats%EXPEDITION_DRAW_BEATS != 0 { return }
-	// The old window also paced fire. The four-beat hand cadence replaces it,
+	// The old window also paced fire. The four-beat cadence replaces it,
 	// so fire still grows and burning still bites without a hidden deadline.
 	s.cycle += 1
 	tick_combatants(room, pulse, burn_status)
 	if room.phase == .Combat { grow_ground_fires(room, pulse) }
-	if room.phase == .Combat && room.player.deck.hand_count < deck_hand_limit(&room.player.deck) {
+	if s.config.expedition && room.phase == .Combat && room.player.deck.hand_count < deck_hand_limit(&room.player.deck) {
 		room.tactical_pulse.deferred_draws += 1
 	}
 }

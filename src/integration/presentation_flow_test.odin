@@ -22,7 +22,7 @@ test_terminal_room_transition_waits_for_the_presentation_timeline :: proc(t: ^te
 	rs.iso_renderer = render.create(960, 540)
 	rs.room.phase = .Complete
 	rs.card_interaction.selected_card_id = 42
-	rs.gameplay_buffer.chord.active = true
+	rs.gameplay_buffer.has_pending = true
 	testing.expect(t, run_session.room_transition_is_ready(&rs.run_state, &rs.room, &rs.iso_renderer))
 	events: game.Event_Log
 	game.record_event(&events, {
@@ -35,19 +35,19 @@ test_terminal_room_transition_waits_for_the_presentation_timeline :: proc(t: ^te
 	testing.expect(t, !run_session.room_transition_is_ready(&rs.run_state, &rs.room, &rs.iso_renderer))
 	run_session.roguelike_finish_room(rs)
 	testing.expect_value(t, rs.run_state.phase, game.Run_Phase.In_Room)
-	testing.expect(t, rs.card_interaction.selected_card_id == 42 && rs.gameplay_buffer.chord.active)
+	testing.expect(t, rs.card_interaction.selected_card_id == 42 && rs.gameplay_buffer.has_pending)
 	render.update_renderer_event_timeline(&rs.iso_renderer, render.PRESENTATION_PLAYER_MOVE_DURATION)
 	testing.expect(t, run_session.room_transition_is_ready(&rs.run_state, &rs.room, &rs.iso_renderer))
 	run_session.roguelike_finish_room(rs)
 	testing.expect_value(t, rs.run_state.phase, game.Run_Phase.Reward)
 	testing.expect(t, run_session.run_screen(&rs.run_state, rs.show_route_map) == .Reward && !rs.show_route_map)
-	testing.expect(t, rs.card_interaction == {} && !rs.gameplay_buffer.chord.active)
+	testing.expect(t, rs.card_interaction == {} && !rs.gameplay_buffer.has_pending)
 	testing.expect(t, !run_session.room_transition_is_ready(&rs.run_state, &rs.room, &rs.iso_renderer))
 
 	testing.expect_value(t, game.skip_card_reward(&rs.run_state), game.Card_Reward_Result.Skipped)
 	rs.show_route_map = true
 	rs.card_interaction.selected_card_id = 42
-	rs.gameplay_buffer.chord.active = true
+	rs.gameplay_buffer.has_pending = true
 	camera_before := rs.iso_renderer.tactical.camera
 	room_seed := rs.room.pinball_random
 	testing.expect(t, !run_session.roguelike_enter_node(rs, game.INVALID_NODE_ID))
@@ -57,7 +57,7 @@ test_terminal_room_transition_waits_for_the_presentation_timeline :: proc(t: ^te
 	testing.expect(t, run_session.run_screen(&rs.run_state, rs.show_route_map) == .Special && !rs.show_route_map)
 	testing.expect_value(t, rs.iso_renderer.tactical.camera, camera_before)
 	testing.expect_value(t, rs.room.pinball_random, room_seed)
-	testing.expect(t, rs.card_interaction == {} && !rs.gameplay_buffer.chord.active)
+	testing.expect(t, rs.card_interaction == {} && !rs.gameplay_buffer.has_pending)
 	testing.expect_value(t, game.leave_special_node(&rs.run_state), game.Special_Node_Result.Left)
 	testing.expect_value(t, game.continue_special_node(&rs.run_state), game.Special_Node_Result.Continued)
 	next := first_available_room_node(&rs.run_state)
@@ -70,13 +70,13 @@ test_terminal_room_transition_waits_for_the_presentation_timeline :: proc(t: ^te
 	rs.run_state.player.m8_profile.ring_wins = 5
 	rs.player_activities.character_open = true
 	rs.card_interaction.selected_card_id = 42
-	rs.gameplay_buffer.chord.active = true
+	rs.gameplay_buffer.has_pending = true
 	rs.tactical_controller.paused = true
 	seed := rs.run_seed
 	testing.expect(t, run_session.roguelike_restart(rs, nil))
 	testing.expect_value(t, rs.run_seed, seed+1)
 	testing.expect_value(t, rs.run_state.player.m8_profile.ring_wins, u32(5))
-	testing.expect(t, !rs.player_activities.character_open && rs.card_interaction == {} && !rs.gameplay_buffer.chord.active)
+	testing.expect(t, !rs.player_activities.character_open && rs.card_interaction == {} && !rs.gameplay_buffer.has_pending)
 	testing.expect(t, !rs.tactical_controller.paused)
 	testing.expect_value(t, rs.shop_render_state.hovered_offer_index, -1)
 	testing.expect(t, rs.room.player == &rs.run_state.player && rs.room.level_data == &rs.level_data)

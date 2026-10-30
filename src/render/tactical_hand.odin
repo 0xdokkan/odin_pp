@@ -147,12 +147,13 @@ gothic_rarity_accent :: proc(rarity: game.Card_Rarity) -> rl.Color {
 	return GOTHIC_MUTED
 }
 
-// The time a card takes from the window at the player's pace (`pace`, the
-// room's: Room_Presentation.pace): "-1s", "-1.5s", or "0s" for one that takes
-// none (Movimento Ombra stands outside it).
+// The time a card's cast takes at the player's pace (`pace`, the room's:
+// Room_Presentation.pace; game.tactical_card_cast_seconds): "-0.3s", "-0.6s",
+// the bare rules' "-2s", or "0s" for one that takes none (Movimento Ombra
+// stands outside it).
 @(private)
 tactical_card_time_badge :: proc(id: game.Card_Id, pace: f32 = 1) -> cstring {
-	cost := game.tactical_card_time_cost(id)/max(pace, 1)
+	cost := game.tactical_card_cast_seconds(game.tactical_card_time_cost(id), pace)
 	if cost <= 0 { return "0s" }
 	return fmt.ctprintf("-%ss", tactical_seconds_text(cost))
 }

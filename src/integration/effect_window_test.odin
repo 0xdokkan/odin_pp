@@ -134,7 +134,7 @@ test_effect_window_opens_frozen_and_never_touches_the_run :: proc(t: ^testing.T)
 	w := &rs.effect_window
 	card := rs.run_state.player.deck.hand[0]
 	rs.card_interaction = {selected_card_id = card.id}
-	rs.gameplay_buffer.chord.active = true
+	rs.gameplay_buffer.has_pending = true
 	rs.tactical_controller.was_focused = true
 	rs.iso_renderer.frame_clock_valid = true
 	before := rs.run_state.player
@@ -142,7 +142,7 @@ test_effect_window_opens_frozen_and_never_touches_the_run :: proc(t: ^testing.T)
 	effect_test_open(t, rs, card, .Inspector)
 	testing.expect(t, w.open && w.film != nil && w.renderer != nil && w.film_ready && w.source == .Inspector && w.card == card)
 	testing.expect(t, w.renderer != &rs.iso_renderer && w.renderer.tactical.showcase)
-	testing.expect(t, rs.card_interaction == {} && !rs.gameplay_buffer.chord.active, "the run gives up what it held")
+	testing.expect(t, rs.card_interaction == {} && !rs.gameplay_buffer.has_pending, "the run gives up what it held")
 	for _ in 0..<240 { run_session.step_effect_window_in_run(rs, {focused = true}, 1.0/60.0) }
 	testing.expect(t, w.film_time > 3.9 && w.film_time < 4.1)
 	testing.expect(t, len(run_session.effect_window_caption(w)) > 0)
@@ -669,19 +669,21 @@ test_effect_window_close_resumes_without_click_through :: proc(t: ^testing.T) {
 	effect_test_open(t, rs, rs.run_state.player.deck.hand[0], .Inspector)
 	for _ in 0..<12 { run_session.step_effect_window_in_run(rs, {focused = true}, 1.0/60.0) }
 	rs.card_interaction = {hovered_card_id = 7}
-	rs.gameplay_buffer.chord.active = true
+	rs.gameplay_buffer.has_pending = true
 	run_session.step_effect_window_in_run(rs, {focused = true, inside = true, pressed = true, mouse = effect_test_center(run_session.effect_window_close_bounds(960, 540))}, 1.0/60.0)
 	testing.expect(t, !rs.effect_window.open)
-	testing.expect(t, rs.card_interaction == {} && !rs.gameplay_buffer.chord.active && !rs.mouse_inside)
+	testing.expect(t, rs.card_interaction == {} && !rs.gameplay_buffer.has_pending && !rs.mouse_inside)
 	testing.expect(t, !rs.tactical_controller.was_focused && !rs.iso_renderer.frame_clock_valid)
 	player := &rs.run_state.player
-	remaining, position := player.tactical.remaining, player.position
+	// The world's clock (no window runs down in the game since 2026-10-30).
+	world :: proc(p: ^game.Player) -> f32 { return f32(p.tactical.beat_index)+p.tactical.clock_fraction }
+	remaining, position := world(player), player.position
 	blocked := run_session.step_tactical_controller(&rs.tactical_controller, &rs.room, &rs.iso_renderer, &rs.card_interaction, &rs.gameplay_buffer,
 		1.0/60.0, true, {focused = true, directions = {false, true, false, false}, defenses = {true, false, false, false}})
 	testing.expect(t, blocked, "the first frame back is blocked")
-	testing.expect_value(t, player.tactical.remaining, remaining)
+	testing.expect_value(t, world(player), remaining)
 	testing.expect_value(t, player.position, position)
 	_ = run_session.step_tactical_controller(&rs.tactical_controller, &rs.room, &rs.iso_renderer, &rs.card_interaction, &rs.gameplay_buffer,
 		1.0/60.0, true, {focused = true})
-	testing.expect(t, player.tactical.remaining < remaining, "then the clock runs")
+	testing.expect(t, world(player) > remaining, "then the clock runs")
 }
