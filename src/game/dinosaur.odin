@@ -193,7 +193,7 @@ giga_crush_step :: proc(room: ^Room, enemy_index: int, aim: grid.Position, rule:
 	collect_loot_in_magnet_range(room)
 	if diagonal && moved.accepted { room.player.tactical.facing = .North if offset.y < 0 else .South }
 	ride_stomp(room)
-	outcome := finish_player_combat_command(room, player_move_seconds(room))
+	outcome := finish_player_combat_command(room, player_move_seconds(room), step = true)
 	switch outcome {
 	case .Player_Defeated: return .Player_Defeated
 	case .Combat_Ended: return .Combat_Ended

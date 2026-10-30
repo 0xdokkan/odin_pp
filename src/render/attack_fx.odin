@@ -79,6 +79,9 @@ Attack_Fx :: struct {
 	origin, target: rl.Vector3,
 	arc: f32,
 	batch: u32,
+	// The board's action scale as the blow began (action_pace.odin): its
+	// swing, flight, star and shards play in this part of their first times.
+	scale: f64,
 }
 
 // What makes a blow this one, whichever of its cues shows it.
@@ -177,15 +180,16 @@ attack_look_prop :: proc(look: Attack_Look, t: f64) -> gfx.Attack_Prop {
 	return .Impact
 }
 
-// Seconds from the start of a character's attack clip to its hit drawing.
+// Seconds from the start of a character's attack clip to its hit drawing;
+// `scale` is the board's action scale (action_pace.odin; 1: the first times).
 @(private)
-attack_fx_impact_seconds :: proc(character: gfx.Flipbook_Character) -> f64 {
-	return gfx.living_hit_seconds(&gfx.LIVING_SHEETS[character].clips[gfx.living_resolve(character, .Attack)])
+attack_fx_impact_seconds :: proc(character: gfx.Flipbook_Character, scale: f64 = 1) -> f64 {
+	return living_played_hit(&gfx.LIVING_SHEETS[character].clips[gfx.living_resolve(character, .Attack)], scale)
 }
 
 @(private = "file")
-attack_flight_seconds :: proc(look: Attack_Look, cells: f32) -> f64 {
-	flight := clamp(0.11+0.04*f64(cells), 0.14, 0.34)
+attack_flight_seconds :: proc(look: Attack_Look, cells: f32, scale: f64) -> f64 {
+	flight := clamp(0.11+0.04*f64(cells), 0.14, 0.34)*action_scale_of(scale)
 	return flight*1.35 if look == .Bomb else flight
 }
 
@@ -200,23 +204,23 @@ attack_flight_arc :: proc(look: Attack_Look, cells: f32) -> f32 {
 
 // A swing's follow-through after its contact, longer the more cells it sweeps.
 @(private = "file")
-attack_swing_follow :: proc(cells: int) -> f64 {
-	return ATTACK_SWING_FOLLOW+ATTACK_SWING_FOLLOW_PER_CELL*f64(max(cells, 1)-1)
+attack_swing_follow :: proc(cells: int, scale: f64) -> f64 {
+	return (ATTACK_SWING_FOLLOW+ATTACK_SWING_FOLLOW_PER_CELL*f64(max(cells, 1)-1))*action_scale_of(scale)
 }
 
 // Seconds from the start of a marked blow until its attacker is done with it:
 // the hit drawing of its attack clip, then a bolt's flight (from its cell to
 // the aim) or a swing's follow-through and the ghoul's second rake.
 @(private)
-attack_fx_done_seconds :: proc(character: gfx.Flipbook_Character, look: Attack_Look, blow: game.Game_Event) -> f64 {
-	contact := attack_fx_impact_seconds(character)
+attack_fx_done_seconds :: proc(character: gfx.Flipbook_Character, look: Attack_Look, blow: game.Game_Event, scale: f64 = 1) -> f64 {
+	contact := attack_fx_impact_seconds(character, scale)
 	kind := attack_fx_kind(look, game.event_is_ranged_attack(blow))
 	if kind == .Projectile {
 		dx, dz := f32(blow.to_position.x-blow.from_position.x), f32(blow.to_position.y-blow.from_position.y)
-		return contact+attack_flight_seconds(look, math.sqrt(dx*dx+dz*dz))
+		return contact+attack_flight_seconds(look, math.sqrt(dx*dx+dz*dz), scale)
 	}
 	_, count := attack_swept_cells(blow.to_position, blow.area_mask&game.EVENT_FOOTPRINT_BITS)
-	return contact+attack_swing_follow(count)+(ATTACK_RAKE_SECOND if kind == .Rake else 0)
+	return contact+attack_swing_follow(count, scale)+(ATTACK_RAKE_SECOND*action_scale_of(scale) if kind == .Rake else 0)
 }
 
 // --------------------------------------------------------------------------
@@ -316,7 +320,7 @@ attack_ease_out :: proc(u: f32) -> f32 { v := clamp(u, 0, 1); return 1-(1-v)*(1-
 // never before its clip began.
 @(private)
 attack_swing_begin :: proc(fx: ^Attack_Fx) -> f64 {
-	return fx.contact-min(ATTACK_SWING_LEAD, max(fx.contact-fx.start, 0))
+	return fx.contact-min(ATTACK_SWING_LEAD*action_scale_of(fx.scale), max(fx.contact-fx.start, 0))
 }
 
 // The yaw at `t`: held at `start` until `begin`, speeding up to `aim` at
@@ -384,7 +388,7 @@ attack_swing_plan :: proc(renderer: ^Renderer, fx: ^Attack_Fx) -> (plan: Attack_
 	far := rl.Vector3{plan.hand.x+math.cos(plan.start), 0, plan.hand.z+math.sin(plan.start)}
 	near := rl.Vector3{plan.hand.x+math.cos(plan.finish), 0, plan.hand.z+math.sin(plan.finish)}
 	if rl.Vector3Distance(far, camera) < rl.Vector3Distance(near, camera) { plan.start, plan.finish = plan.finish, plan.start }
-	plan.follow = attack_swing_follow(plan.count)
+	plan.follow = attack_swing_follow(plan.count, fx.scale)
 	plan.reach = attack_prop_length(attack_look_prop(fx.look, 0), attack_texel(fx.character))
 	distance := math.sqrt((aim.x-plan.hand.x)*(aim.x-plan.hand.x)+(aim.z-plan.hand.z)*(aim.z-plan.hand.z))
 	plan.grip = clamp(distance-plan.reach*math.cos(f32(0.35))-0.05, 0.12, 1.1)
@@ -458,7 +462,7 @@ attack_aim_flight :: proc(renderer: ^Renderer, fx: ^Attack_Fx) {
 	}
 	fx.origin, fx.target = origin, target
 	fx.arc = attack_flight_arc(fx.look, cells)
-	fx.landing = fx.contact+attack_flight_seconds(fx.look, cells)
+	fx.landing = fx.contact+attack_flight_seconds(fx.look, cells, fx.scale)
 }
 
 // --------------------------------------------------------------------------
@@ -474,13 +478,14 @@ forget_attack_fx :: proc(renderer: ^Renderer) {
 
 @(private)
 attack_fx_end :: proc(fx: ^Attack_Fx) -> f64 {
+	scale := action_scale_of(fx.scale)
 	if fx.kind == .Projectile {
 		tail := ATTACK_STUCK_SECONDS+0.2 if fx.outcome == .Hit else (0.3 if fx.outcome == .Absorbed else ATTACK_GROUNDED_SECONDS+0.2)
-		return fx.landing+max(tail, ATTACK_SHARD_SECONDS)
+		return fx.landing+max(tail, ATTACK_SHARD_SECONDS)*scale
 	}
 	follow := ATTACK_SWING_FOLLOW+ATTACK_SWING_FOLLOW_PER_CELL*8
 	second := ATTACK_RAKE_SECOND if fx.kind == .Rake else 0
-	return fx.contact+second+max(follow+ATTACK_FADE_SECONDS, ATTACK_SHARD_SECONDS)
+	return fx.contact+(second+max(follow+ATTACK_FADE_SECONDS, ATTACK_SHARD_SECONDS))*scale
 }
 
 // A free slot, or the oldest blow's.
@@ -502,7 +507,7 @@ attack_fx_begin :: proc(renderer: ^Renderer, attacker, victim: game.Entity_Ref, 
 	now := living_clock(renderer, attacker)
 	state.next_id += 1
 	fx^ = {used = true, id = state.next_id, kind = kind, look = look, outcome = outcome, attacker = attacker, victim = victim,
-		character = character, aim = aim, swept = swept, start = now}
+		character = character, aim = aim, swept = swept, start = now, scale = renderer_action_scale(renderer)}
 	if feet, _, found := attack_card(renderer, attacker); found { fx.from = attack_board_cell(feet) }
 	state.spawned[look] += 1
 	return fx
@@ -516,7 +521,7 @@ play_attack_swing :: proc(renderer: ^Renderer, attacker, victim: game.Entity_Ref
 	swept: u16 = 1<<4, outcome := Attack_Outcome.Hit, contact := f64(-1)) -> (id: u32, ok: bool) {
 	if renderer == nil || look == .None { return }
 	fx := attack_fx_begin(renderer, attacker, victim, look, attack_fx_kind(look, false), outcome, aim, swept, .Pilgrim)
-	fx.contact = fx.start+(attack_fx_impact_seconds(fx.character) if contact < 0 else contact)
+	fx.contact = fx.start+(attack_fx_impact_seconds(fx.character, fx.scale) if contact < 0 else contact)
 	fx.landing = fx.contact
 	return fx.id, true
 }
@@ -529,7 +534,7 @@ play_attack_projectile :: proc(renderer: ^Renderer, shooter, victim: game.Entity
 	outcome := Attack_Outcome.Hit, release := f64(-1)) -> (id: u32, landing: f64, ok: bool) {
 	if renderer == nil || look == .None { return }
 	fx := attack_fx_begin(renderer, shooter, victim, look, .Projectile, outcome, aim, 1<<4, .Archer)
-	fx.contact = fx.start+(attack_fx_impact_seconds(fx.character) if release < 0 else release)
+	fx.contact = fx.start+(attack_fx_impact_seconds(fx.character, fx.scale) if release < 0 else release)
 	attack_aim_flight(renderer, fx)
 	return fx.id, fx.landing-fx.start, true
 }
@@ -560,7 +565,7 @@ reflect_attack_projectile :: proc(renderer: ^Renderer, id: u32, outcome := Attac
 	cells := rl.Vector3Length(rl.Vector3{target.x-from.x, 0, target.z-from.z})
 	fx.arc = attack_flight_arc(fx.look, cells)
 	fx.start, fx.contact = now, now
-	fx.landing = now+attack_flight_seconds(fx.look, cells)
+	fx.landing = now+attack_flight_seconds(fx.look, cells, fx.scale)
 	return fx.landing-now, true
 }
 
@@ -713,11 +718,12 @@ foresee_first_person_blows :: proc(renderer: ^Renderer, room: ^game.Room) {
 		character, _, found := attack_character(renderer, attacker)
 		if look == .None || !found { continue }
 		left := f64(game.tactical_enemy_seconds(room, enemy))
-		impact := attack_fx_impact_seconds(character)
+		scale := renderer_action_scale(renderer)
+		impact := attack_fx_impact_seconds(character, scale)
 		id: u32
 		if attack_fx_kind(look, ranged) == .Projectile {
 			cells := f32(max(abs(aim.x-enemy.position.x), abs(aim.y-enemy.position.y)))
-			flight := attack_flight_seconds(look, cells)
+			flight := attack_flight_seconds(look, cells, scale)
 			if left > impact+flight { continue }
 			id, _, _ = play_attack_projectile(renderer, attacker, game.PLAYER_ENTITY, look, aim, .Hit, max(0, left-flight))
 		} else {
@@ -860,7 +866,7 @@ attack_fx_landing_in :: proc(renderer: ^Renderer, victim: game.Entity_Ref, now: 
 attack_fx_reaction_delay :: proc(renderer: ^Renderer, victim: game.Entity_Ref, now: f64,
 	attacker: Maybe(game.Entity_Ref) = nil) -> f64 {
 	left, pending := attack_fx_landing_in(renderer, victim, now, attacker)
-	return max(0, left-LIVING_REACT_STRIKE) if pending else 0
+	return max(0, left-LIVING_REACT_STRIKE*renderer_action_scale(renderer)) if pending else 0
 }
 
 // Whether a blow of the player's own command (the foreground timeline's: a
@@ -1056,7 +1062,9 @@ attack_impact_star :: proc(renderer: ^Renderer, at: rl.Vector3, t: f64, seed: in
 
 // A star of paper over the struck point, and paper bits thrown off it.
 @(private = "file")
-draw_attack_impact :: proc(renderer: ^Renderer, fx: ^Attack_Fx, at: rl.Vector3, t: f64, seed: int, star := true) {
+draw_attack_impact :: proc(renderer: ^Renderer, fx: ^Attack_Fx, at: rl.Vector3, played: f64, seed: int, star := true) {
+	// The seconds since it landed, as the first times count them.
+	t := played/action_scale_of(fx.scale)
 	if t < 0 || t > ATTACK_SHARD_SECONDS || !attack_point_visible(renderer, at) { return }
 	right, up := attack_screen_axes(renderer)
 	texel := attack_texel(.Pilgrim)
@@ -1097,14 +1105,16 @@ draw_attack_swing :: proc(renderer: ^Renderer, fx: ^Attack_Fx, now: f64) {
 		// The ghoul's second rake comes a moment later, with the other hand:
 		// back the other way.
 		shifted := fx^
-		shifted.contact += ATTACK_RAKE_SECOND*f64(pass)
-		shifted.start += ATTACK_RAKE_SECOND*f64(pass)
+		scale := action_scale_of(fx.scale)
+		shifted.contact += ATTACK_RAKE_SECOND*scale*f64(pass)
+		shifted.start += ATTACK_RAKE_SECOND*scale*f64(pass)
 		swing := plan
 		if pass == 1 { swing.start, swing.finish = plan.finish, plan.start }
 		begin := attack_swing_begin(&shifted)
 		end := shifted.contact+swing.follow
-		if now < shifted.start || now > end+ATTACK_FADE_SECONDS { continue }
-		fade := clamp(f32((end+ATTACK_FADE_SECONDS-now)/ATTACK_FADE_SECONDS), 0, 1)
+		fade_seconds := ATTACK_FADE_SECONDS*scale
+		if now < shifted.start || now > end+fade_seconds { continue }
+		fade := clamp(f32((end+fade_seconds-now)/fade_seconds), 0, 1)
 		fade *= clamp(f32((now-(begin-0.04))/0.04), 0, 1)
 		grip, tip: rl.Vector3
 		if fx.kind == .Thrust { grip, tip = attack_thrust_pose(&shifted, &swing, now) }
@@ -1182,7 +1192,9 @@ draw_attack_projectile :: proc(renderer: ^Renderer, fx: ^Attack_Fx, now: f64) {
 		}
 		return
 	}
-	t := now-fx.landing
+	played := now-fx.landing
+	// Since it landed, as the first times count them.
+	t := played/action_scale_of(fx.scale)
 	_, heading := attack_flight_point(fx.origin, fx.target, fx.arc, 1)
 	// A bomb and an ember burst where they land; a bolt stays there a moment,
 	// under the star of its impact.
@@ -1213,7 +1225,7 @@ draw_attack_projectile :: proc(renderer: ^Renderer, fx: ^Attack_Fx, now: f64) {
 			}
 		}
 	}
-	draw_attack_impact(renderer, fx, fx.target, t, int(fx.id))
+	draw_attack_impact(renderer, fx, fx.target, played, int(fx.id))
 }
 
 // The board pass: one sorted entry per blow. A swung weapon shows over the

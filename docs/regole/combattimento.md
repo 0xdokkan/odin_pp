@@ -347,6 +347,19 @@ dal **costo temporale**, centralizzato in `game/tactical_action_cost.odin`:
 | [Canna da Pesca](meccaniche.md#canna-da-pesca) | 0 s: pesca a stanza liberata, dove non c'è finestra |
 | [First Person Shooter](meccaniche.md#first-person-shooter) | 0 s: i suoi 20 s sono del mondo e i colpi dell'AK non costano tempo |
 
+**Ritmo del giocatore** (dal 2026-10-30, scelta dell'utente: «due volte più veloce»). Quelli della tabella sono i
+**prezzi pieni**. Nel gioco come si gioca (azioni a tempo: la run, la spedizione, il laboratorio) ogni prezzo del
+Viandante si divide per `TACTICAL_PLAYER_PACE` = 2: un passo **0,4 s**, un attacco, un'attesa, una schivata o una
+freccia **0,5 s**, il refocus **1 s**, una carta la metà dei suoi secondi (Guard 0,5 s, Strike 1 s, Firebomb 2 s). Le
+carte e l'HUD mostrano il prezzo dimezzato (`-1.5s`). I nemici tengono i loro secondi: il Viandante fa il doppio delle
+cose prima che agiscano. Le regole di base (`DEFAULT_TACTICAL_CONFIG`, usate dalle sonde di regressione) tengono i prezzi
+pieni. Dietro gli occhi (prima persona) vanno al ritmo solo i passi della spada (0,15 s) e dell'arco (0,4 s); l'AK e i
+pugni restano come prima. Anche le **animazioni** delle azioni sul tabellone (i segnali della timeline, i disegni delle
+carte vive e dei flipbook che non girano in loop, i fendenti, i dardi, le stelle d'impatto, i dadi) durano la metà del
+loro tempo pieno; i loop (respiro, canalizzazione, stordimento) restano com'erano, e in prima persona nulla cambia
+([action_pace.odin](../../src/render/action_pace.odin)). Nell'esplorazione il cammino libero passa da 3,6 a 5,4 caselle
+al secondo, sempre sotto la cavalcatura (8,4).
+
 Le carte mostrano la durata `Ns`: il cast spende quei secondi una sola volta,
 progressivamente, e ferma il mondo. Movimento Ombra mostra `0s`: non ha cast, la
 carta di rimpiazzo arriva subito e la finestra resta ferma per tutta l'ombra.
@@ -438,8 +451,8 @@ loro condizioni.
 Il **pulse del player è una finestra di 20 secondi**, configurabile da 1 a 60,
 che può contenere più azioni. Il countdown scorre mentre si decide. Movimento,
 attacco, attesa, refocus, attivazione ed equipaggiamento **durano in tempo reale
-il loro costo** (`Tactical_Config.timed_actions`): un passo da 0,8 s occupa il
-Viandante per otto decimi di secondo, mentre il countdown e i nemici scorrono come sempre (un
+il loro costo** (`Tactical_Config.timed_actions`): un passo da 0,4 s (al ritmo del giocatore) occupa il
+Viandante per quattro decimi di secondo, mentre il countdown e i nemici scorrono come sempre (un
 battito al secondo). Un comando premuto nel frattempo viene **scartato**, mai
 tenuto da parte per dopo: agisce solo una pressione fatta a fine azione. La
 schivata (`Shift + WASD`) invece non aspetta e interrompe subito l'azione, e la

@@ -5,6 +5,15 @@ I riferimenti a Classica, `--flat` e ai vecchi smoke descrivono versioni precede
 per i comandi disponibili oggi valgono il [README](README.md) e la documentazione collegata.
 
 
+## 2026-10-30 — Il Viandante va al doppio: passi, colpi e carte più rapidi
+
+- Nel gioco come si gioca (run, spedizione, laboratorio) i prezzi del Viandante sono la metà: un passo 0,4 s invece di
+  0,8, un colpo, un'attesa, una schivata o una freccia 0,5 s invece di 1, il refocus 1 s, ogni carta metà dei suoi
+  secondi (Strike 1 s invece di 2). I nemici tengono i loro tempi. Le regole di base delle sonde restano piene.
+- Le animazioni delle azioni sul tabellone durano la metà (segnali, disegni delle carte vive, fendenti, dardi, dadi); i
+  loop restano com'erano. In prima persona cambiano solo i passi della spada e dell'arco.
+- Nell'esplorazione il cammino libero passa da 3,6 a 5,4 caselle al secondo.
+
 ## 2026-10-29 — I nemici si illuminano mentre agiscono
 
 - In tutte le viste la carta di un nemico diventa rossa quando prepara un colpo, una freccia o una carica, viola per lo

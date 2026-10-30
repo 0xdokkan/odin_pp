@@ -205,7 +205,7 @@ try_move_player_diagonal :: proc(room: ^Room, offset: grid.Position) -> Action_R
 	collect_loot_in_magnet_range(room)
 	room.player.tactical.facing = .North if offset.y < 0 else .South
 	ride_stomp(room)
-	outcome := finish_player_combat_command(room, player_move_seconds(room))
+	outcome := finish_player_combat_command(room, player_move_seconds(room), step = true)
 	switch outcome {
 	case .Player_Defeated: return .Player_Defeated
 	case .Combat_Ended: return .Combat_Ended

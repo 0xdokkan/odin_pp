@@ -85,7 +85,7 @@ begin_renderer_world_timeline :: proc(renderer: ^Renderer, before: Room_Presenta
 		renderer.shown_events += {event.kind}
 		kind := presentation_cue_kind(event)
 		entry := &world.cues[world.count]
-		entry^ = {cue = {kind = kind, event = event, duration = presentation_cue_duration(kind, event), batch = renderer.cue_batches}}
+		entry^ = {cue = {kind = kind, event = event, duration = presentation_cue_duration(kind, event)*f32(action_scale(&origin)), batch = renderer.cue_batches}}
 		// Waypoints of one body retain their normal duration and order. Every
 		// other body starts immediately; thirty enemies are not thirty turns.
 		if kind == .Move {
@@ -100,7 +100,7 @@ begin_renderer_world_timeline :: proc(renderer: ^Renderer, before: Room_Presenta
 					if !game.event_is_attack(previous.cue.event) || previous.cue.event.source != event.source { continue }
 					contact: f32
 					if actor, found := presentation_actor_in_view(&origin, event.source); found {
-						if character, ok := flipbook_character(sprite_key_for_enemy(actor.archetype)); ok { contact = f32(attack_fx_impact_seconds(character)) }
+						if character, ok := flipbook_character(sprite_key_for_enemy(actor.archetype)); ok { contact = f32(attack_fx_impact_seconds(character, action_scale(&origin))) }
 					}
 					entry.delay = max(entry.delay, previous.delay+contact)
 				}
@@ -149,13 +149,13 @@ world_blow_done :: proc(origin: ^Room_Presentation, blow: game.Game_Event) -> f3
 	// The player's shot is an arrow (attack_look), whatever is in his hand.
 	if blow.source == game.PLAYER_ENTITY {
 		look := Attack_Look.Bolt if ranged else attack_player_look(origin.weapon)
-		return f32(attack_fx_done_seconds(.Pilgrim, look, blow))
+		return f32(attack_fx_done_seconds(.Pilgrim, look, blow, action_scale(origin)))
 	}
 	actor, found := presentation_actor_in_view(origin, blow.source)
 	if !found { return 0 }
 	character, known := flipbook_character(sprite_key_for_enemy(actor.archetype))
 	if !known { return 0 }
-	return f32(attack_fx_done_seconds(character, attack_enemy_look(actor.archetype, ranged), blow))
+	return f32(attack_fx_done_seconds(character, attack_enemy_look(actor.archetype, ranged), blow, action_scale(origin)))
 }
 
 // Where the walks queued for a body leave it (`from` when none is).
@@ -181,7 +181,9 @@ world_walk_left :: proc(renderer: ^Renderer, walk: World_Presentation_Cue) -> f3
 		if known {
 			for action in ([3]gfx.Living_Action{.Move_Side, .Move_Up, .Move_Down}) {
 				clip := &gfx.LIVING_SHEETS[character].clips[gfx.living_resolve(character, action)]
-				if clip.travel != .None { shown = max(shown, (f32(clip.travel_start)+f32(clip.travel_ms))/1000) }
+				// At the pace its card will slide at (living_observe).
+				start, length := living_played_travel(clip, renderer_action_scale(renderer))
+				if clip.travel != .None { shown = max(shown, f32(start+length)) }
 			}
 		}
 	}

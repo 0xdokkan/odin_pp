@@ -18,6 +18,7 @@ MAX_PRESENTATION_GRID_OBJECTS :: game.MAX_GRID_OBJECTS_PER_ROOM
 MAX_PRESENTATION_GROUND_CELLS :: max(world.MAX_CELLS, level.MAX_GENERATED_ROOM_DIMENSION*level.MAX_GENERATED_ROOM_DIMENSION)
 
 // Values above one slow every cue while preserving their relative rhythm.
+// These are the first times: a room's pace shortens them (action_pace.odin).
 PRESENTATION_TIME_SCALE           :: f32(1.35)
 PRESENTATION_PLAYER_MOVE_DURATION :: f32(0.18)*PRESENTATION_TIME_SCALE
 PRESENTATION_ENEMY_MOVE_DURATION  :: f32(0.32)*PRESENTATION_TIME_SCALE
@@ -245,6 +246,8 @@ Room_Presentation :: struct {
 	ride:        game.Ride_State,
 	gold:        i32,
 	pulse_count: u64,
+	// The player's pace: what his prices are divided by (game.tactical_player_pace).
+	pace:        f32,
 	valid:       bool,
 	dropped:     int,
 }
@@ -285,6 +288,7 @@ capture_room_presentation :: proc(room: ^game.Room) -> (result: Room_Presentatio
 	}
 	result.valid = true
 	result.phase = room.phase
+	result.pace = game.tactical_player_pace(room)
 	result.encounter_kind = room.encounter_kind
 	result.modifier = room.modifier
 	result.family = room.family
@@ -799,6 +803,8 @@ begin_event_timeline :: proc(
 	}
 	event_count := min(events.count, len(events.events))
 	timeline.dropped_count += max(0, events.count-event_count)
+	// The cues at the room's pace.
+	scale := f32(action_scale(after if after != nil else &timeline.view))
 	for index in 0..<event_count {
 		if timeline.count >= MAX_PRESENTATION_CUES {
 			timeline.dropped_count += event_count-index
@@ -810,7 +816,7 @@ begin_event_timeline :: proc(
 		timeline.cues[tail] = {
 			kind = kind,
 			event = event,
-			duration = presentation_cue_duration(kind, event),
+			duration = presentation_cue_duration(kind, event)*scale,
 		}
 		timeline.count += 1
 	}

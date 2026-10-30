@@ -99,9 +99,10 @@ scene_lane_frame :: proc(t: ^testing.T, controller: ^run_session.Tactical_Contro
 }
 
 // The renderer and controller must honor the cheaper walk before the next
-// world beat, including with the actual timed/shrinking-window game settings.
+// world beat, including with the actual timed/shrinking-window game settings:
+// at the player's pace a step's 0.8 s first price is 0.4 s.
 @(test)
-test_walk_input_reopens_at_point_eight_seconds_before_the_world_beat :: proc(t: ^testing.T) {
+test_walk_input_reopens_at_point_four_seconds_before_the_world_beat :: proc(t: ^testing.T) {
 	data := create_gameplay_command_test_level(t)
 	defer level.destroy(&data)
 	player := create_gameplay_command_test_player(t)
@@ -119,7 +120,7 @@ test_walk_input_reopens_at_point_eight_seconds_before_the_world_beat :: proc(t: 
 	east := run_session.Gameplay_Command{kind = .Move, origin_phase = .Combat, direction = .East}
 	testing.expect(t, scene_lane_frame(t, &controller, &room, renderer, &cards, &held, east, true, 0))
 	first := player.position
-	for _ in 0..<7 {
+	for _ in 0..<3 {
 		testing.expect(t, !scene_lane_frame(t, &controller, &room, renderer, &cards, &held, east, true, 0.1))
 	}
 	testing.expect_value(t, player.position, first)
@@ -127,7 +128,7 @@ test_walk_input_reopens_at_point_eight_seconds_before_the_world_beat :: proc(t: 
 	testing.expect_value(t, player.position, game.add_position(first, {x = 1, y = 0}))
 	testing.expect_value(t, player.tactical.metrics.decisions, u64(2))
 	testing.expect_value(t, room.pulse_count, u64(0))
-	testing.expect(t, abs(player.tactical.remaining-19.2) < 0.001)
+	testing.expect(t, abs(player.tactical.remaining-19.6) < 0.001)
 }
 
 // Pressing forward twice during one step makes one step, not two: the second
@@ -165,7 +166,8 @@ test_presses_during_the_players_own_action_are_dropped_not_chained :: proc(t: ^t
 		testing.expect(t, !held.chord.active)
 		dropped += 1
 	}
-	testing.expect(t, dropped > 30)
+	// The step's 0.4 s at the player's pace: 24 frames.
+	testing.expect(t, dropped > 18)
 	testing.expect_value(t, player.position, first)
 	// Nothing comes back on its own once the action is over.
 	for _ in 0..<30 { testing.expect(t, !scene_lane_frame(t, &controller, &room, renderer, &cards, &held, east, false, dt)) }
@@ -213,6 +215,6 @@ test_a_dodge_still_cuts_the_players_own_timed_action_short :: proc(t: ^testing.T
 	testing.expect(t, game.tactical_player_busy(&room) && player.tactical.action_remaining < game.TACTICAL_DODGE_SECONDS)
 	testing.expect(t, run_session.step_tactical_controller(&controller, &room, renderer, &cards, &held, 0, true, dodge))
 	testing.expect_value(t, player.position, game.add_position(step, {x = 0, y = 2}))
-	testing.expect_value(t, player.tactical.action_remaining, game.TACTICAL_DODGE_SECONDS)
+	testing.expect_value(t, player.tactical.action_remaining, game.TACTICAL_DODGE_SECONDS/game.TACTICAL_PLAYER_PACE)
 	testing.expect(t, !held.chord.active)
 }

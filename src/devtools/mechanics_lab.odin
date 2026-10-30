@@ -1040,13 +1040,13 @@ mechanics_lab_charges :: proc(window: ^app.Window, renderer: ^render.Renderer, d
 	if !taken || !has_shot { fmt.eprintln("mechanics lab: the click on the marked foe loosed no arrow"); return false }
 	bolts := renderer.tactical.attack_fx.spawned[.Bolt]
 	if !mechanics_lab_commit(window, renderer, room, controller, cards, buffer, shot) { fmt.eprintln("mechanics lab: the arrow was not loosed"); return false }
-	// One action of a second: 1 damage and one of Veleno 2, Bruciatura 1 or
+	// One action of a second at its first price (half of it at the player's pace): 1 damage and one of Veleno 2, Bruciatura 1 or
 	// Rallentamento 1; the foe behind the cover untouched.
 	arrowed, sheltered := foe(room, target_id), foe(room, covered_id)
 	poison, burn, slow := stacks(room, target_id, .Poison), stacks(room, target_id, .Burn), stacks(room, target_id, .Slow)
 	marked := (poison == 2 && burn == 0 && slow == 0) || (poison == 0 && burn == 1 && slow == 0) || (poison == 0 && burn == 0 && slow == 1)
 	if arrowed == nil || arrowed.health != 60-game.COFFIN_ARROW_DAMAGE || !marked || game.player_charges(room, .Arrows) != 2 ||
-	   player.tactical.action_duration != game.TACTICAL_ARROW_SECONDS || sheltered == nil || sheltered.health != 60 {
+	   player.tactical.action_duration != game.tactical_paced_seconds(room, game.TACTICAL_ARROW_SECONDS) || sheltered == nil || sheltered.health != 60 {
 		fmt.eprintln("mechanics lab: the arrow did not strike as it should: foe", arrowed.health if arrowed != nil else -1,
 			"Veleno", poison, "Bruciatura", burn, "Rallentamento", slow, "arrows", game.player_charges(room, .Arrows),
 			"action", player.tactical.action_duration); return false

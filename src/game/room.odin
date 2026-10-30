@@ -732,8 +732,9 @@ player_command_outcome_for_phase :: proc(phase: Room_Phase) -> Player_Command_Ou
 // Accepted commands share loot and terminal cleanup, pay combat time and queue
 // the world beats they cross.
 // Each one is an action of the player's (`acted`): his poison bites. Rising
-// from Movimento Ombra is the shadow's end, not an action.
-finish_player_combat_command :: proc(room: ^Room, time_cost: f32 = TACTICAL_ATTACK_SECONDS, acted := true) -> (outcome: Player_Command_Outcome) {
+// from Movimento Ombra is the shadow's end, not an action. The first price is
+// paid at the player's pace (tactical_player_pace); a `step` is a walk's.
+finish_player_combat_command :: proc(room: ^Room, time_cost: f32 = TACTICAL_ATTACK_SECONDS, acted := true, step := false) -> (outcome: Player_Command_Outcome) {
 	assert(room != nil && room.player != nil)
 	collect_loot_in_magnet_range(room)
 	if acted && room.phase == .Combat {
@@ -747,7 +748,7 @@ finish_player_combat_command :: proc(room: ^Room, time_cost: f32 = TACTICAL_ATTA
 		tactical_end_combat(room)
 		return
 	}
-	tactical_spend_action_time(room, time_cost)
+	tactical_spend_action_time(room, tactical_paced_seconds(room, time_cost, step))
 	return
 }
 
@@ -939,7 +940,7 @@ try_move_player :: proc(room: ^Room, direction: Move_Direction) -> Action_Result
 
 	// The Giganotosauro's step stomps the foes round where he lands.
 	ride_stomp(room)
-	outcome := finish_player_combat_command(room, expedition_step_seconds(room))
+	outcome := finish_player_combat_command(room, expedition_step_seconds(room), step = true)
 	switch outcome {
 	case .Player_Defeated:
 		return .Player_Defeated

@@ -85,8 +85,9 @@ test_m7_shadow_lane_drops_presses_during_a_step_and_keeps_the_tick_chord :: proc
 	window := player.tactical.remaining
 	testing.expect(t, run_session.commit_gameplay_command(&room, renderer, &cards, {kind = .Play_Card, origin_phase = .Combat,
 		card_id = player.deck.hand[0].id, target = game.entity_target(game.PLAYER_ENTITY)}))
-	// The card's cue drops presses and holds the shadow's clock.
-	for _ in 0..<30 { testing.expect(t, !scene_lane_frame(t, &controller, &room, renderer, &cards, &held, east, true, dt)) }
+	// The card's cue drops presses and holds the shadow's clock (a fifth of a
+	// second: its cues play at the player's pace).
+	for _ in 0..<12 { testing.expect(t, !scene_lane_frame(t, &controller, &room, renderer, &cards, &held, east, true, dt)) }
 	testing.expect(t, render.renderer_blocks_player_input(renderer))
 	testing.expect_value(t, player.tactical.shadow_remaining, game.TACTICAL_SHADOW_SECONDS)
 	for _ in 0..<120 {

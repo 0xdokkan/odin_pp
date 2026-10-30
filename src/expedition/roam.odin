@@ -9,7 +9,9 @@ import game "../game"
 // every rule written for cells (sites, traps, lava, patrols, engagement)
 // still reads the same grid while the body glides between cell centers.
 ROAM_RADIUS :: f32(0.3)
-ROAM_WALK_SPEED :: f32(3.6)
+// On foot half again as quick as the first 3.6 (the user's choice, 2026-10-30),
+// still under the mount.
+ROAM_WALK_SPEED :: f32(5.4)
 ROAM_MOUNT_SPEED :: f32(8.4)
 // A substep never crosses more than one cell edge per axis, and stays below
 // the radius, so the center can never tunnel into a blocker.

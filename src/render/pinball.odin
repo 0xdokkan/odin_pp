@@ -300,7 +300,7 @@ update_tactical_pinball :: proc(renderer: ^Renderer, room: ^game.Room) {
 			progress, found := shadow_cue_progress(renderer, .Pinball_Made)
 			b.made = progress if found else 1
 		} else if b.made < 1 {
-			b.made = f32(clamp((now-b.began)/PINBALL_MADE_SECONDS, 0, 1))
+			b.made = f32(clamp((now-b.began)/(PINBALL_MADE_SECONDS*renderer_action_scale(renderer)), 0, 1))
 		}
 		pinball_strike(renderer, room, b, now)
 		pinball_turn_ball(b)
@@ -351,7 +351,7 @@ pinball_strike :: proc(renderer: ^Renderer, room: ^game.Room, b: ^Pinball_View, 
 				d := rl.Vector3{b.at.x-player.position.x, 0, b.at.y-player.position.y}
 				living_face(pilgrim, rl.Vector3DotProduct(d, flipbook_camera_right(renderer)), now)
 			}
-			living_start(pilgrim, .Attack, b.contact-attack_fx_impact_seconds(.Pilgrim))
+			living_start(pilgrim, .Attack, b.contact-attack_fx_impact_seconds(.Pilgrim, pilgrim.scale))
 			pilgrim.cause, pilgrim.shot = .Pinball_Launched, false
 		}
 	}

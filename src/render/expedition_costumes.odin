@@ -158,7 +158,7 @@ draw_expedition_costume :: proc(renderer:^Renderer,b:campaign.Biome,role:game.En
 	if character,ok:=flipbook_character(key);ok && renderer.tactical.living_state!=nil {
 		if actor:=living_find(renderer,entity,character);actor!=nil {
 			mirror=actor.facing_left
-			turn:=(renderer.sprite_assets.elapsed-actor.turn_started)/LIVING_TURN_SECONDS
+			turn:=living_turn_progress(actor,renderer.sprite_assets.elapsed)
 			if actor.turn_started>=0 && turn<1 {turn_width=max(f32(.04),abs(f32(math.cos(turn*math.PI))));if turn<.5 {mirror=!mirror}}
 		}
 	}

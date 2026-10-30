@@ -6,6 +6,20 @@ Qui si segna ogni carta tolta dal gioco o cambiata, con quello che faceva, così
 futuro. Le voci più recenti stanno in cima. Per ritrovare il commit di una voce:
 `git log --all --grep "<titolo del commit>"`.
 
+## 2026-10-30 — Tutte le carte: il lancio dura la metà
+
+Commit **«Il Viandante va al doppio: passi, colpi e carte più rapidi»** sul ramo `gioco-piu-veloce`
+([regole](regole/combattimento.md), «Ritmo del giocatore»).
+
+- Nel gioco come si gioca (azioni a tempo) ogni carta lancia in metà dei suoi secondi (`TACTICAL_PLAYER_PACE` = 2,
+  `game.tactical_player_pace`): 1 s → 0,5 s, 2 s → 1 s, 3 s → 1,5 s, 4 s → 2 s. Il `time_cost` delle definizioni resta il
+  prezzo pieno, che valgono ancora le regole di base delle sonde. Il badge della carta e l'ispettore mostrano il prezzo
+  dimezzato (`-1.5s`).
+- Con la finestra a 20 s ci stanno il doppio delle carte; ogni sei carte giocate si vince ancora un secondo
+  (`TACTICAL_CARDS_PER_SECOND`, invariato).
+- Le carte a 0 s (Movimento Ombra, Canna da Pesca, le quattro di prima persona) non cambiano; i secondi propri delle
+  meccaniche (ombra, giro del Lazzo, corsa del Pinball, festa di Bomb Marley, vista in prima persona) nemmeno.
+
 ## 2026-10-29 — Carta nuova: First Person Archer (solo laboratorio)
 
 Commit **«Prima persona, Fase 6, passi 1-5: l'arco, regole e prototipo»** sul ramo `piano-prima-persona`

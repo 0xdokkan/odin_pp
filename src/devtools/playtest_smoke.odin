@@ -7,6 +7,10 @@ import game "../game"
 // Count policy decisions separately from the world's observed continuations.
 // Finish the final action's elapsed time too: a report must not call a timed
 // action complete while its enemies and timer have never advanced.
+// The decisions the headless playtest takes: forty at the player's pace span
+// the world seconds twenty did at the first prices (game.TACTICAL_PLAYER_PACE).
+PLAYTEST_DECISIONS :: 20*int(game.TACTICAL_PLAYER_PACE)
+
 run_headless_playtest_decisions :: proc(room: ^game.Room, session: ^combatdebug.Playtest_Session) -> bool {
 	policy: combatdebug.Max_Distance_Policy_State
 	decisions := 0
@@ -26,7 +30,7 @@ run_headless_playtest_decisions :: proc(room: ^game.Room, session: ^combatdebug.
 			if !run_session.execute_observed_gameplay_command(room, command, session).committed { return false }
 			continue
 		}
-		if decisions == 20 { return true }
+		if decisions == PLAYTEST_DECISIONS { return true }
 		decision := combatdebug.choose_max_distance_command(room, &policy)
 		if !decision.valid { return false }
 		command.kind = .Wait

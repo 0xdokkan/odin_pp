@@ -606,7 +606,7 @@ draw_dino_entry :: proc(renderer: ^Renderer, entry: Tactical_Alpha_Entry) {
 	turned := f32(1)
 	if actor := living_find(renderer, game.PLAYER_ENTITY, gfx.Flipbook_Character.Pilgrim); actor != nil {
 		faces_right = !actor.facing_left
-		turn := (renderer.sprite_assets.elapsed-actor.turn_started)/LIVING_TURN_SECONDS
+		turn := living_turn_progress(actor, renderer.sprite_assets.elapsed)
 		if actor.turn_started >= 0 && turn < 1 {
 			turned = max(f32(0.04), abs(f32(math.cos(turn*math.PI))))
 			if turn < 0.5 { faces_right = !faces_right }

@@ -294,7 +294,7 @@ draw_tactical_hud :: proc(renderer: ^Renderer, room: ^game.Room, paused, hologra
 		// No map behind the player's eyes.
 		hud_button(renderer, layout.map_button, "TAB", "CHIUDI" if hologram else "MAPPA", room.qte.kind == .None && !fps)
 		if !hologram && combat {
-			hud_button(renderer, layout.refocus, "F", fmt.ctprintf("REFOCUS -%.0fs", game.TACTICAL_REFOCUS_SECONDS), refocus_button_is_enabled(renderer))
+			hud_button(renderer, layout.refocus, "F", fmt.ctprintf("REFOCUS -%ss", tactical_seconds_text(game.tactical_paced_seconds(room, game.TACTICAL_REFOCUS_SECONDS))), refocus_button_is_enabled(renderer))
 			draw_tactical_dodge_chip(renderer, room, layout.dodge)
 		}
 		if !hologram && m8_control_visible(room, .Character) {
@@ -344,7 +344,7 @@ draw_tactical_dodge_chip :: proc(renderer: ^Renderer, room: ^game.Room, bounds: 
 	shadow := game.tactical_shadow_active(room)
 	ready := game.tactical_dodge_ready(room) && !recovering && !stunned && !shadow
 	recovery := max(0, s.dodge_recovery-(1 if room.tactical_pulse.pending else 0))
-	detail := fmt.ctprintf("-%.0fs", game.TACTICAL_DODGE_SECONDS) if ready else fmt.ctprintf("PRONTA FRA %d", recovery)
+	detail := fmt.ctprintf("-%ss", tactical_seconds_text(game.tactical_paced_seconds(room, game.TACTICAL_DODGE_SECONDS))) if ready else fmt.ctprintf("PRONTA FRA %d", recovery)
 	if recovering { detail = "IN RECUPERO" }
 	if stunned { detail = "STORDITO" }
 	if shadow { detail = "OMBRA" }

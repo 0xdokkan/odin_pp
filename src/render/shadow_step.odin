@@ -166,7 +166,7 @@ update_tactical_shadow :: proc(renderer: ^Renderer, room: ^game.Room) {
 		if s.sink_paced {
 			progress, found := shadow_cue_progress(renderer, .Shadow_Entered)
 			s.sink = progress if found else 1
-		} else { s.sink = f32(clamp((now-s.sunk)/SHADOW_SINK_SECONDS, 0, 1)) }
+		} else { s.sink = f32(clamp((now-s.sunk)/(SHADOW_SINK_SECONDS*renderer_action_scale(renderer)), 0, 1)) }
 		s.left, s.duration = t.shadow_remaining, t.shadow_duration
 		elapsed := game.tactical_shadow_elapsed(t)
 		approach, on := game.tactical_beat_glow(room)
@@ -185,7 +185,7 @@ update_tactical_shadow :: proc(renderer: ^Renderer, room: ^game.Room) {
 		if s.rise_paced {
 			progress, found := shadow_cue_progress(renderer, .Shadow_Emerged)
 			s.rise = progress if found else 1
-		} else { s.rise = f32(clamp((now-s.risen)/SHADOW_RISE_SECONDS, 0, 1)) }
+		} else { s.rise = f32(clamp((now-s.risen)/(SHADOW_RISE_SECONDS*renderer_action_scale(renderer)), 0, 1)) }
 		if s.rise >= 1 { s.rising = false }
 		// The card comes out where the body now stands, never where the
 		// cue's first frame still had it.

@@ -45,10 +45,12 @@ tactical_is_casting :: proc(room: ^Room) -> bool {
 	return room != nil && room.player != nil && room.phase == .Combat && room.player.tactical.cast_remaining > 0
 }
 
+// `seconds` is the card's first price, cast at the player's pace.
 tactical_begin_card_cast :: proc(room: ^Room, seconds: f32) {
 	if room == nil || room.player == nil || room.phase != .Combat || seconds <= 0 { return }
 	s := &room.player.tactical
-	s.cast_remaining, s.cast_duration = seconds, seconds
+	paced := tactical_paced_seconds(room, seconds)
+	s.cast_remaining, s.cast_duration = paced, paced
 	s.metrics.decisions += 1
 }
 

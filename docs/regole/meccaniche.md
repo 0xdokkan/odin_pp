@@ -861,7 +861,7 @@ per 35 secondi del mondo (+2 a potenziamento). Piano e scelte in
 [first_person_sword.odin](../../src/game/first_person_sword.odin), disegno in
 [first_person_sword.odin](../../src/render/first_person_sword.odin).
 
-**Il movimento** resta a griglia, con passi di 0,3 s; `Q` ed `E` girano la
+**Il movimento** resta a griglia, con passi di 0,3 s (0,15 s al ritmo del giocatore); `Q` ed `E` girano la
 vista di un quarto, `Shift` con una direzione schiva. **Il mouse muove la
 lama**, non la vista: la punta corre sullo schermo dentro un'ellisse,
 dall'impugnatura in basso. Con il sinistro tenuto, uno swing parte quando la
@@ -1135,7 +1135,7 @@ con la stanza.
 
 | d4 | Dinosauro | Effetto |
 |---|---|---|
-| 1 | Velociraptor | un passo costa 0,4 s invece di 0,8 s; il colpo d'urto mette 1 Sanguinamento |
+| 1 | Velociraptor | un passo costa 0,4 s invece di 0,8 s (prezzi pieni; al ritmo del giocatore 0,2 s invece di 0,4 s); il colpo d'urto mette 1 Sanguinamento |
 | 2 | Stegosauro | ogni colpo di un nemico sul Viandante gli viene restituito senza spendere cariche e senza richiesta di difesa |
 | 3 | Dilophosaurus | 1 Veleno su ogni nemico che il Viandante ferisce e su ogni nemico che lo ferisce |
 | 4 | Giganotosauro | dopo ogni passo i nemici sulle 4 caselle intorno prendono 6 danni; il suo urto uccide all'istante Chaser, Archer e Bomber, e fa 12 danni a Brute, Custode e Demolitore. **Se l'urto ucciderebbe il nemico, non lo colpisce: cammina sulla sua casella e lo schiaccia** (passo, schiacciamento, caduta del nemico; costa un passo e calpesta anche le caselle intorno); se invece il nemico sopravvive, lo morde come prima |

@@ -147,13 +147,30 @@ gothic_rarity_accent :: proc(rarity: game.Card_Rarity) -> rl.Color {
 	return GOTHIC_MUTED
 }
 
-// The time a card takes from the window: "-2s", or "0s" for one that takes
+// The time a card takes from the window at the player's pace (`pace`, the
+// room's: Room_Presentation.pace): "-1s", "-1.5s", or "0s" for one that takes
 // none (Movimento Ombra stands outside it).
 @(private)
-tactical_card_time_badge :: proc(id: game.Card_Id) -> cstring {
-	cost := game.tactical_card_time_cost(id)
+tactical_card_time_badge :: proc(id: game.Card_Id, pace: f32 = 1) -> cstring {
+	cost := game.tactical_card_time_cost(id)/max(pace, 1)
 	if cost <= 0 { return "0s" }
-	return fmt.ctprintf("-%.0fs", cost)
+	return fmt.ctprintf("-%ss", tactical_seconds_text(cost))
+}
+
+// The player's pace the board shows (1 before any room).
+@(private)
+tactical_player_pace_shown :: proc(renderer: ^Renderer) -> f32 {
+	snapshot := renderer.tactical.snapshot
+	return snapshot.pace if snapshot != nil && snapshot.pace > 0 else 1
+}
+
+// Seconds as the hand and the HUD print them: whole ones bare ("2"), the
+// player's halves with their tenth ("1.5").
+@(private)
+tactical_seconds_text :: proc(seconds: f32) -> string {
+	whole := math.round(seconds)
+	if abs(seconds-whole) < 0.001 { return fmt.tprintf("%.0f", whole) }
+	return fmt.tprintf("%.1f", seconds)
 }
 
 SCOPA_CARD_SIZE :: rl.Vector2{60, 96}
@@ -196,7 +213,7 @@ draw_scopa_tactical_card :: proc(renderer: ^Renderer, bounds: rl.Rectangle, card
 	rl.DrawRectangleRec({x+8, y+9, 20, 22}, GOTHIC_INK)
 	gothic_text(renderer, fmt.ctprintf("%d", definition.cost), x+13, y+8, 18, GOTHIC_BLUE if affordable else GOTHIC_RED)
 	rl.DrawRectangleRec({x+7, y+36, 30, 17}, {22, 41, 54, 240})
-	gothic_text_fit(renderer, tactical_card_time_badge(card.definition_id), {x+10, y+37, 25, 15}, 12, GOTHIC_BLUE)
+	gothic_text_fit(renderer, tactical_card_time_badge(card.definition_id, tactical_player_pace_shown(renderer)), {x+10, y+37, 25, 15}, 12, GOTHIC_BLUE)
 	gold := game.card_effect_amount(definition.effects[0], card.upgrade_level)
 	ribbon := rl.Rectangle{x+width*0.5-36, y+height-27, 72, 19}
 	rl.DrawRectangleRec(ribbon, {72, 54, 24, 240})
@@ -271,7 +288,7 @@ draw_tactical_card :: proc(renderer: ^Renderer, bounds: rl.Rectangle, card: game
 	// Time has a distinct blue badge, separated from the black energy socket.
 	// The crest stays clear even with the narrowest eight-card hand.
 	rl.DrawRectangleRec({x+8, y+42, 30, 17}, {22, 41, 54, 240})
-	gothic_text_fit(renderer, tactical_card_time_badge(card.definition_id), {x+11, y+43, 25, 15}, 12, GOTHIC_BLUE)
+	gothic_text_fit(renderer, tactical_card_time_badge(card.definition_id, tactical_player_pace_shown(renderer)), {x+11, y+43, 25, 15}, 12, GOTHIC_BLUE)
 	if game.card_is_board_device(card.definition_id) {
 		gothic_text_fit(renderer,"PASSIVA" if card.definition_id == .Shock_Floor else "ATTIVO",{x+8,y+63,32,12},9,accent)
 	}
@@ -375,7 +392,7 @@ tactical_card_text_misfit :: proc(renderer: ^Renderer, card: game.Card_Instance,
 	face := tactical_card_face_words(renderer, card, definition, width)
 	inspector := [?]Tactical_Card_Words{
 		{"inspector name", tactical_card_title(card, definition), 0, 195, 0, 18, true},
-		{"inspector cost", tactical_card_cost_line(card, definition), 0, 193, 0, 14, false},
+		{"inspector cost", tactical_card_cost_line(renderer, card, definition), 0, 193, 0, 14, false},
 		{"inspector first line", whole_first, 0, 192, 0, 16, false},
 		{"inspector second line", whole_second, 0, 192, 0, 14, false},
 		{"inspector reaction", reaction, 0, 192, 0, 12, false},
@@ -486,7 +503,7 @@ draw_tactical_card_inspector :: proc(renderer: ^Renderer, card: game.Card_Instan
 	gothic_frame(frame, GOTHIC_RECESS, GOTHIC_STEEL)
 	gothic_text_fit(renderer, tactical_card_title(card, definition), {x, y, 195, 25}, 18, GOTHIC_PAPER)
 	gothic_rule(x, y+29, 190, gothic_rarity_accent(definition.rarity))
-	gothic_text_fit(renderer, tactical_card_cost_line(card, definition), {x, y+35, 193, 18}, 14, GOTHIC_BLUE)
+	gothic_text_fit(renderer, tactical_card_cost_line(renderer, card, definition), {x, y+35, 193, 18}, 14, GOTHIC_BLUE)
 	gothic_text_fit(renderer, tactical_card_target_label(definition), {x, y+54, 193, 17}, 12, GOTHIC_MUTED)
 	first, second := gothic_card_lines(card)
 	gothic_text_fit(renderer, first, {x, y+76, 192, 20}, 16, GOTHIC_PAPER)
@@ -510,8 +527,8 @@ draw_tactical_card_inspector :: proc(renderer: ^Renderer, card: game.Card_Instan
 
 // The inspector's energy and time: "ENERGIA 2 / TEMPO -2s".
 @(private = "file")
-tactical_card_cost_line :: proc(card: game.Card_Instance, definition: game.Card_Definition) -> cstring {
-	return fmt.ctprintf("ENERGIA %d / TEMPO %s", definition.cost, tactical_card_time_badge(card.definition_id))
+tactical_card_cost_line :: proc(renderer: ^Renderer, card: game.Card_Instance, definition: game.Card_Definition) -> cstring {
+	return fmt.ctprintf("ENERGIA %d / TEMPO %s", definition.cost, tactical_card_time_badge(card.definition_id, tactical_player_pace_shown(renderer)))
 }
 
 // The inspector's red lines under a card's two: how it answers (a reaction)

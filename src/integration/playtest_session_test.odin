@@ -9,7 +9,7 @@ import game "../game"
 import level "../level"
 
 @(test)
-test_headless_playtest_finishes_twenty_timed_decisions_and_observes_the_world :: proc(t: ^testing.T) {
+test_headless_playtest_finishes_forty_timed_decisions_and_observes_the_world :: proc(t: ^testing.T) {
 	// The normal window covers recovery; the one-second window also reaches
 	// shrinking-window stuns. Neither may truncate the run at Action_Busy.
 	for seconds in ([2]int{20, 1}) {
@@ -33,7 +33,8 @@ test_headless_playtest_finishes_twenty_timed_decisions_and_observes_the_world ::
 		room.enemies[0].tactical_cooldown = 1
 		game.tactical_tick(&room, 1, true, false)
 		testing.expect(t, devtools.run_headless_playtest_decisions(&room, &session))
-		testing.expect_value(t, run.player.tactical.metrics.decisions, u64(20))
+		// Forty at the player's pace: the world seconds twenty took at the first prices.
+		testing.expect_value(t, run.player.tactical.metrics.decisions, u64(devtools.PLAYTEST_DECISIONS))
 		testing.expect(t, room.pulse_count >= 20 && game.tactical_allows_action(&room))
 		testing.expect(t, run.player.tactical.metrics.timeouts > 0)
 		if seconds == 1 {

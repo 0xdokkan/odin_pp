@@ -100,7 +100,7 @@ test_an_arrow_is_one_action_and_presses_during_it_are_dropped :: proc(t: ^testin
 	testing.expect_value(t, game.player_charges(&room, .Arrows), i32(2))
 	testing.expect_value(t, cards, run_session.Card_Interaction_State{})
 	testing.expect(t, game.tactical_player_busy(&room))
-	testing.expect_value(t, room.player.tactical.action_remaining, game.TACTICAL_ARROW_SECONDS)
+	testing.expect_value(t, room.player.tactical.action_remaining, game.TACTICAL_ARROW_SECONDS/game.TACTICAL_PLAYER_PACE)
 	// Pressed while the arrow's own second runs: dropped, never kept.
 	for _ in 0..<20 {
 		busy := render.renderer_blocks_player_input(renderer) || game.tactical_player_busy(&room)
