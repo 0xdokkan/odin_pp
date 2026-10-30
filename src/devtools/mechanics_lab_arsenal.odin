@@ -250,8 +250,10 @@ mechanics_lab_dinosaur :: proc(window: ^app.Window, renderer: ^render.Renderer, 
 			bait := spawn(room, grid.offset(center, 0, -2), 60)
 			if bait == 0 { return false }
 			if !step(window, renderer, room, controller, cards, buffer, .North) || !step(window, renderer, room, controller, cards, buffer, .North) { return false }
-			// Poison wears a stack a beat: watched as it lands.
-			poisoned := false
+			// Poison wears a stack a beat: watched as it lands, the bump's own
+			// resolution first (at the player's pace the next beat can fall on
+			// the very next frame and wear the one stack away).
+			poisoned := stacks(room, bait, .Poison) >= 1
 			for _ in 0..<90 {
 				mechanics_lab_reel_frame(window, renderer, room, controller, cards, buffer, "dino_dilo_bump", 6, &frame)
 				if stacks(room, bait, .Poison) >= 1 { poisoned = true; break }
