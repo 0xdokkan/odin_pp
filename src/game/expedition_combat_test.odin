@@ -291,3 +291,38 @@ test_expedition_large_map_paths_keep_flanking_routes_with_bounded_search :: proc
 	testing.expect_value(t,room.enemy_path_distances[112*224+170],10)
 	testing.expect_value(t,room.enemy_path_distances[112*224+112],-1)
 }
+
+// A foe's committed step onto a bridge of the Isola nel cielo (biome 9) that
+// rises after the plan: the telegraph stays whole, the next plans keep it, and
+// on its beat the step is blocked (it crashed the game on 2026-10-30).
+@(test)
+test_a_bridge_risen_after_the_plan_blocks_the_step_and_keeps_the_telegraph :: proc(t: ^testing.T) {
+	rows := [?]string{"##########################", "#................@.......#", "#........................#", "#.>......................#", "##########################"}
+	data, err, _ := level.from_ascii(rows[:])
+	testing.expect_value(t, err, level.Parse_Error.None)
+	defer level.destroy(&data)
+	player := create_test_player(t)
+	player.stats.max_health, player.health = 100, 100
+	spawns := [?]Enemy_Spawn{{position = {x = 20, y = 2}, health = 20, attack = 2}}
+	room, built := create_room(&data, &player, {enemies = spawns[:]})
+	testing.expect(t, built)
+	defer destroy_room(&room)
+	testing.expect(t, configure_expedition_combat(&room))
+	player.tactical.config.expedition_biome = 9
+	bridge := grid.Position{x = 21, y = 2}
+	testing.expect_value(t, expedition_terrain(9, bridge), Expedition_Terrain.Bridge)
+	player.tactical.environment_beat = 0
+	testing.expect(t, expedition_bridge_open(&room, bridge))
+	foe := &room.enemies[0]
+	foe.intent = {kind = .Move, origin = foe.position, destination = bridge, path_count = 1, planned_pulse = room.pulse_count+1}
+	foe.intent.path[0] = bridge
+	foe.tactical_cooldown = 3
+	testing.expect(t, validate_enemy_intents(&room))
+	// The bridge rises: the step is not part of the board any more, its telegraph is.
+	player.tactical.environment_beat = 2
+	testing.expect(t, !expedition_bridge_open(&room, bridge))
+	testing.expect(t, validate_enemy_intents(&room))
+	plan_enemy_intents(&room)
+	testing.expect_value(t, foe.intent.destination, bridge)
+	testing.expect(t, !enemy_can_move_to(&room, 0, bridge))
+}

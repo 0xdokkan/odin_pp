@@ -358,6 +358,16 @@ plan_brute_intent :: proc(
 	)
 }
 
+// A cell's ground as a committed intent's structure reads it. An expedition
+// bridge (expedition_bridge_open) rises and falls with the environment's beats:
+// one that rose after the plan is a runtime blocker, like a movable object, and
+// resolution rechecks it (Move_Blocked, a charge stopped).
+@(private = "file")
+intent_ground_is_walkable :: proc(room: ^Room, position: grid.Position) -> bool {
+	tile, ok := level.tile_at(room.level_data, position)
+	return ok && level.is_walkable(tile.kind)
+}
+
 @(private)
 validate_enemy_intent_structure :: proc(room: ^Room, intent: ^Enemy_Intent) -> bool {
 	if room == nil || intent == nil || room.level_data == nil || room.phase != .Combat {
@@ -383,7 +393,7 @@ validate_enemy_intent_structure :: proc(room: ^Room, intent: ^Enemy_Intent) -> b
 		       intent.path_count == 0 && intent.threatened_cell_count == 0 && intent.damage == 0 &&
 		       abs(intent.origin.x-intent.destination.x)+abs(intent.origin.y-intent.destination.y) > 0 &&
 		       abs(intent.origin.x-intent.destination.x)+abs(intent.origin.y-intent.destination.y) <= CUSTODIAN_PROTECT_RANGE &&
-		       base_cell_is_walkable(room, intent.destination) && !obstacle_at(room, intent.destination)
+		       intent_ground_is_walkable(room, intent.destination) && !obstacle_at(room, intent.destination)
 	case .Move:
 		if intent.path_count != 1 || intent.threatened_cell_count != 0 ||
 		   intent.damage != 0 || intent.destination != intent.path[0] ||
@@ -394,7 +404,7 @@ validate_enemy_intent_structure :: proc(room: ^Room, intent: ^Enemy_Intent) -> b
 		// Movable grid objects are runtime blockers, not part of the committed
 		// intent's immutable structure. Resolution rechecks them and emits
 		// Move_Blocked if the board changed after planning.
-		return base_cell_is_walkable(room, intent.destination) &&
+		return intent_ground_is_walkable(room, intent.destination) &&
 		       !obstacle_at(room, intent.destination)
 	case .Attack:
 		if intent.destination != intent.origin || intent.path_count != 0 ||
@@ -414,7 +424,7 @@ validate_enemy_intent_structure :: proc(room: ^Room, intent: ^Enemy_Intent) -> b
 		return true
 	case .Bombard:
 		if intent.path_count != 0 || intent.damage != TACTICAL_BOMB_DAMAGE ||
-		   !base_cell_is_walkable(room, intent.destination) || obstacle_at(room, intent.destination) {
+		   !intent_ground_is_walkable(room, intent.destination) || obstacle_at(room, intent.destination) {
 			return false
 		}
 		for cell, index in intent.threatened_cells[:intent.threatened_cell_count] {
@@ -448,7 +458,7 @@ validate_enemy_intent_structure :: proc(room: ^Room, intent: ^Enemy_Intent) -> b
 		}
 		for position, index in intent.path[:intent.path_count] {
 			step := grid.Position{x = position.x-previous.x, y = position.y-previous.y}
-			if step != charge_step || !base_cell_is_walkable(room, position) ||
+			if step != charge_step || !intent_ground_is_walkable(room, position) ||
 			   obstacle_at(room, position) {
 				return false
 			}
