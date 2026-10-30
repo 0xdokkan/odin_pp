@@ -50,7 +50,7 @@ prepare_spell_replay :: proc(room: ^game.Room, renderer: ^render.Renderer, kind:
 		}
 	}
 	target := game.entity_target(game.enemy_entity(room.enemies[0].id))
-	if kind == .Firebomb { target = game.cell_target({6, 3}) }
+	if kind == .Firebomb { target = game.cell_target({x = 6, y = 3}) }
 	before := render.capture_room_presentation(room)
 	played := game.play_card(room, card.id, target)
 	if !game.card_play_was_committed(played.result) { return false }
@@ -118,7 +118,7 @@ spell_demo_expect_practice_hand :: proc(t: ^testing.T, room: ^game.Room) {
 	testing.expect(t, game.validate_enemy_intents(room))
 	testing.expect_value(t, room.phase, game.Room_Phase.Combat)
 	testing.expect_value(t, room.pulse_count, u64(0))
-	testing.expect_value(t, room.player.position, grid.Position{3, 3})
+	testing.expect_value(t, room.player.position, grid.Position{x = 3, y = 3})
 }
 
 spell_demo_expect_committed_replay :: proc(t: ^testing.T, kind: Spell_Replay_Case) {
@@ -129,9 +129,10 @@ spell_demo_expect_committed_replay :: proc(t: ^testing.T, kind: Spell_Replay_Cas
 	room: game.Room
 	defer game.destroy_room(&room)
 	if !spell_demo_test_session(t, &run, &data, &room) {return}
-	renderer: render.Renderer
-	testing.expect(t, prepare_spell_replay(&room, &renderer, kind))
-	if !render.renderer_timeline_is_busy(&renderer) {return}
+	renderer := new(render.Renderer)
+	defer free(renderer)
+	testing.expect(t, prepare_spell_replay(&room, renderer, kind))
+	if !render.renderer_timeline_is_busy(renderer) {return}
 	cue, found := render.active_presentation_cue(&renderer.timeline)
 	testing.expect(t, found && cue.started)
 	if !found {return}
@@ -177,8 +178,8 @@ spell_demo_expect_committed_replay :: proc(t: ^testing.T, kind: Spell_Replay_Cas
 
 	authoritative := render.capture_room_presentation(&room)
 	dice_after_action := run.player.dice
-	testing.expect(t, finish_spell_replay(&room, &renderer))
-	testing.expect(t, !render.renderer_timeline_is_busy(&renderer))
+	testing.expect(t, finish_spell_replay(&room, renderer))
+	testing.expect(t, !render.renderer_timeline_is_busy(renderer))
 	testing.expect_value(t, renderer.timeline.view, authoritative)
 	testing.expect_value(t, run.player.dice, dice_after_action)
 	testing.expect_value(t, renderer.timeline.update_failures, 0)
@@ -228,10 +229,11 @@ test_spell_preview_keeps_the_practice_hand_and_dice_unchanged :: proc(t: ^testin
 	defer game.destroy_room(&room)
 	if !spell_demo_test_session(t, &run, &data, &room) {return}
 	dice_before := run.player.dice
-	renderer: render.Renderer
-	testing.expect(t, prepare_spell_replay(&room, &renderer, .Preview))
+	renderer := new(render.Renderer)
+	defer free(renderer)
+	testing.expect(t, prepare_spell_replay(&room, renderer, .Preview))
 	spell_demo_expect_practice_hand(t, &room)
-	testing.expect(t, !render.renderer_timeline_is_busy(&renderer))
+	testing.expect(t, !render.renderer_timeline_is_busy(renderer))
 	testing.expect_value(t, room.recent_events.count, 0)
 	testing.expect_value(t, run.player.dice, dice_before)
 	player_before_preview := run.player

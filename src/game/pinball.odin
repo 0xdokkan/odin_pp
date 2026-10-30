@@ -149,7 +149,8 @@ pinball_next_launch :: proc(room: ^Room, cell: grid.Position) -> (heading: Pinba
 // down there while it does (board_device_can_deploy).
 @(private)
 pinball_covers_cell :: proc(room: ^Room, cell: grid.Position) -> bool {
-	if !tactical_pinball_active(room) { return false }
+	// The ball rolls on its own layer (layers.odin).
+	if !tactical_pinball_active(room) || cell.layer != room.pinball.cell.layer { return false }
 	p := pinball_position(&room.pinball)
 	closest := Pinball_Vec{clamp(p.x, f64(cell.x)-0.5, f64(cell.x)+0.5), clamp(p.y, f64(cell.y)-0.5, f64(cell.y)+0.5)}
 	return pinball_length(p-closest) < PINBALL_RADIUS
@@ -342,7 +343,8 @@ pinball_touching :: proc(s: ^Pinball_State, id: u32) -> bool {
 // A foe on the floor the ball meets: not the ball, not the Lazzo's foe.
 @(private = "file")
 pinball_bumper :: proc(room: ^Room, enemy: Enemy) -> bool {
-	return enemy.id != room.pinball.enemy_id && !enemy_is_out_of_play(room, enemy.id)
+	// It rolls on its own layer and meets only who stands there (layers.odin).
+	return enemy.id != room.pinball.enemy_id && !enemy_is_out_of_play(room, enemy.id) && enemy.position.layer == room.pinball.cell.layer
 }
 
 @(private = "file")
@@ -383,7 +385,7 @@ pinball_step :: proc(room: ^Room) {
 	foe: u32
 	for dy in -1..=1 {
 		for dx in -1..=1 {
-			cell := grid.Position{s.cell.x+dx, s.cell.y+dy}
+			cell := grid.offset(s.cell, dx, dy)
 			if !lasso_cell_is_solid(room, cell) { continue }
 			if t, n, hit := pinball_square_contact(s.origin, s.heading, s.run, cell); hit && t < best {
 				next, best, normal, wall = .Solid, t, n, cell
@@ -467,9 +469,9 @@ pinball_eight_way :: proc(from, to, fallback: Pinball_Vec) -> grid.Position {
 	sx := 1 if d.x > 0 else (-1 if d.x < 0 else 0)
 	sy := 1 if d.y > 0 else (-1 if d.y < 0 else 0)
 	ax, ay := abs(d.x), abs(d.y)
-	if ay <= ax*0.414 { return {sx, 0} }
-	if ax <= ay*0.414 { return {0, sy} }
-	return {sx, sy}
+	if ay <= ax*0.414 { return {x = sx, y = 0} }
+	if ax <= ay*0.414 { return {x = 0, y = sy} }
+	return {x = sx, y = sy}
 }
 
 // The ball touches the foe `id`: it takes the value, the player's damage; then

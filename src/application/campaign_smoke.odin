@@ -1,6 +1,7 @@
 package application
 
 import "core:fmt"
+import "core:os"
 import "core:slice"
 import "core:time"
 import rl "vendor:raylib"
@@ -14,6 +15,7 @@ import game "../game"
 import grid "../engine/grid"
 import level "../level"
 import host "../engine/host"
+import hubworld "../hubworld"
 import arcade "../memoryarcade"
 import activities "../activities"
 
@@ -31,11 +33,12 @@ Hub_Capture :: struct { kind:int, frames:int }
 @(private)
 hub_after_present :: proc(data:rawptr,frame:^host.Frame) {
 	h:=cast(^Campaign_Hub)data
+	if h.smoke_world {hub_world_smoke(h,frame);return}
 	if !h.smoke {return}
 	h.smoke_frame+=1
 	if h.smoke_frame%35!=0 {return}
 	stage:=h.smoke_frame/35-1
-	names:=[11]string{"galassia","deposito","progressi","record","cabinati","cabinati_pagina2","casino","memorie","galassia_completa","galassia_city","slot"}
+	names:=[11]string{"galassia","deposito","progressi","record","cabinati","cabinati_vicino","casino","memorie","galassia_completa","galassia_city","slot"}
 	if stage<len(names) {artifacts.screenshot(fmt.ctprintf("odin_pp_hub_%s.png",names[stage]))}
 	switch stage {
 	case 0:
@@ -50,9 +53,9 @@ hub_after_present :: proc(data:rawptr,frame:^host.Frame) {
 		for b in campaign.Biome.Cyber..<campaign.Biome.Count {h.progress.won[b]=true;h.progress.unlocked[b]=true}
 		for i in 0..<activities.MINIGAME_COUNT {campaign.record_result(&h.progress,i,i64(1250+i*175),u8(1+i%3),true)}
 		h.progress_tab=1;h.progress_page=1
-	case 3:h.page=.Arcade
-	case 4:h.arcade_page=1
-	case 5:h.page=.Casino
+	case 3:hub_room_setup(h,.Arcade);h.page=.Room
+	case 4:hubworld.room_place_before(&h.room,&h.room_world,0);h.room_camera={-6,-3}
+	case 5:hub_room_setup(h,.Casino);h.page=.Room
 	case 6:h.page=.Memories;h.progress.normal_ending=true
 	case 7:h.page=.Galaxy
 	case 8:h.selected=.City
@@ -75,8 +78,15 @@ casino_smoke_after_present :: proc(data:rawptr,frame:^host.Frame) {
 }
 
 EXPEDITION_BENCHMARK :: #config(EXPEDITION_BENCHMARK,false)
-EXPEDITION_BENCHMARK_LAST :: #config(EXPEDITION_BENCHMARK_LAST,50)
-#assert(EXPEDITION_BENCHMARK_LAST>=0 && EXPEDITION_BENCHMARK_LAST<=50)
+// The stages measured, first and last: the whole smoke path by default. The stages before the first still set their
+// scene up, unmeasured, so a measured stage starts as it does in a full run (Fase 0 of docs/piano-profondita.md).
+EXPEDITION_BENCHMARK_FIRST :: #config(EXPEDITION_BENCHMARK_FIRST,0)
+EXPEDITION_BENCHMARK_LAST :: #config(EXPEDITION_BENCHMARK_LAST,EXPEDITION_SMOKE_LAST)
+#assert(EXPEDITION_BENCHMARK_FIRST>=0 && EXPEDITION_BENCHMARK_FIRST<=EXPEDITION_BENCHMARK_LAST && EXPEDITION_BENCHMARK_LAST<=EXPEDITION_SMOKE_LAST)
+// Every scene draws into a canvas of this many pixels, whatever the window and the display's scaling, so measures
+// taken on different screens compare. Zero by zero follows the window, as before.
+EXPEDITION_BENCHMARK_CANVAS_WIDTH :: #config(EXPEDITION_BENCHMARK_CANVAS_WIDTH,1920)
+EXPEDITION_BENCHMARK_CANVAS_HEIGHT :: #config(EXPEDITION_BENCHMARK_CANVAS_HEIGHT,1080)
 @(private)
 EXPEDITION_BENCHMARK_WARMUP :: 20
 @(private)
@@ -106,6 +116,81 @@ EXPEDITION_SMOKE_ENGAGE :: 26
 EXPEDITION_SMOKE_CENTER :: 27
 @(private)
 EXPEDITION_SMOKE_WORKSHOP :: EXPEDITION_SMOKE_CENTER+12
+// "This one can be hit" over a fight in four biomes of different tints (the last
+// is the one whose own tint is violet, where the halo turns acid green).
+@(private)
+EXPEDITION_SMOKE_HITS :: EXPEDITION_SMOKE_WORKSHOP+12
+@(private)
+EXPEDITION_SMOKE_HIT_BIOMES :: [4]campaign.Biome{.Snow, .West, .Jungle, .Space}
+// Buildings and objects (level/structure.odin) in the first biome: the robot walks up to a hut
+// (6, 4, 2 and 1 cell from its door, on the threshold, inside, outside again), then the objects.
+@(private)
+EXPEDITION_SMOKE_STRUCTURES :: EXPEDITION_SMOKE_HITS+4
+@(private)
+EXPEDITION_SMOKE_STRUCTURE_STEPS :: 8
+// The relief of every biome (Fase 3): the robot stands where the ground is most uneven.
+@(private)
+EXPEDITION_SMOKE_RELIEF :: EXPEDITION_SMOKE_STRUCTURES+8
+@(private)
+EXPEDITION_SMOKE_RELIEF_COUNT :: 12
+// The map's hologram with the relief (shading and contour lines) in three biomes.
+@(private)
+EXPEDITION_SMOKE_HOLOGRAMS :: EXPEDITION_SMOKE_RELIEF+EXPEDITION_SMOKE_RELIEF_COUNT
+@(private)
+EXPEDITION_SMOKE_HOLOGRAM_BIOMES :: [3]campaign.Biome{.Egypt, .Snow, .Sky}
+// A fight on two levels in the Snow: the robot on a plateau, a foe on the ground below.
+@(private)
+EXPEDITION_SMOKE_TWO_LEVELS :: EXPEDITION_SMOKE_HOLOGRAMS+3
+// The Snow's spiral mountain (Fase 4): the robot at eight places of the climb, on the path and behind the mountain.
+@(private)
+EXPEDITION_SMOKE_MOUNTAIN :: EXPEDITION_SMOKE_TWO_LEVELS+1
+@(private)
+EXPEDITION_SMOKE_MOUNTAIN_STEPS :: 8
+// The caves (Fase 5 of docs/piano-griglia.md, walked into since Fase 5 of docs/piano-profondita.md), in the four biomes that
+// have them: the mouth, just inside, beside the foes in a room.
+@(private)
+EXPEDITION_SMOKE_CAVES :: EXPEDITION_SMOKE_MOUNTAIN+EXPEDITION_SMOKE_MOUNTAIN_STEPS
+@(private)
+EXPEDITION_SMOKE_CAVE_BIOMES :: [4]campaign.Biome{.Snow,.West,.Egypt,.Inferno}
+@(private)
+EXPEDITION_SMOKE_CAVE_VIEWS :: 3
+// The structures the player sets down (Fase 7): the footprint where it can go and where it cannot, a statue set down, and a hut next to
+// it with the statue then broken by an enemy's blow (the hut stays).
+@(private)
+EXPEDITION_SMOKE_PLACE :: EXPEDITION_SMOKE_CAVES+4*EXPEDITION_SMOKE_CAVE_VIEWS
+@(private)
+EXPEDITION_SMOKE_PLACE_STEPS :: 4
+// The hologram in a cave (Fase 5 of docs/piano-profondita.md): in the Snow's mountain room, its room in place of the rock.
+@(private)
+EXPEDITION_SMOKE_CAVE_MAP :: EXPEDITION_SMOKE_PLACE+EXPEDITION_SMOKE_PLACE_STEPS
+// The complexes (Fase 7 of docs/piano-profondita.md) of the four groups of biomes, each biome's first: the whole complex from
+// its foot, under its bridge (a pyramid's terrace, the crevasse's bottom, the boulder's hall), on it (a pyramid's top, the
+// boulder's), by its gate, on its lift halfway down, and a fight between its layers.
+@(private)
+EXPEDITION_SMOKE_COMPLEXES :: EXPEDITION_SMOKE_CAVE_MAP+1
+@(private)
+EXPEDITION_SMOKE_COMPLEX_BIOMES :: [12]campaign.Biome{.Cyber,.West,.Jungle,.City,.Egypt,.Vietnam,.Snow,.Inferno,.Gothic,.Sky,.Space,.Secret}
+@(private)
+EXPEDITION_SMOKE_COMPLEX_VIEWS :: 6
+// The networks under the ground of the raised biomes (expedition/network.odin): on a stair's pit, in a hall with its foes
+// (the Spazio's: a crater's bottom), on the lift's shaft halfway down.
+@(private)
+EXPEDITION_SMOKE_NETWORKS :: EXPEDITION_SMOKE_COMPLEXES+len(EXPEDITION_SMOKE_COMPLEX_BIOMES)*EXPEDITION_SMOKE_COMPLEX_VIEWS
+@(private)
+EXPEDITION_SMOKE_NETWORK_BIOMES :: [5]campaign.Biome{.City,.Egypt,.Vietnam,.Gothic,.Space}
+@(private)
+EXPEDITION_SMOKE_NETWORK_VIEWS :: 3
+// The stacked map (Fase 8 of docs/piano-profondita.md): City pop's on its ground, on the plate over it and on the deep
+// one, chosen as W and S choose them; the Memoria's from the hall inside the boulder's hill, which it opens on.
+@(private)
+EXPEDITION_SMOKE_PLATES :: EXPEDITION_SMOKE_NETWORKS+len(EXPEDITION_SMOKE_NETWORK_BIOMES)*EXPEDITION_SMOKE_NETWORK_VIEWS
+@(private)
+EXPEDITION_SMOKE_PLATE_NAMES :: [4]string{"citta_terra","citta_sopra","citta_profondo","memoria_sala"}
+// The last stage of the path; the smoke quits after it.
+@(private)
+EXPEDITION_SMOKE_LAST :: EXPEDITION_SMOKE_PLATES+len(EXPEDITION_SMOKE_PLATE_NAMES)-1
+@(private)
+EXPEDITION_SMOKE_STRUCTURE_NAMES :: [EXPEDITION_SMOKE_STRUCTURE_STEPS]string{"6","4","2","1","soglia","dentro","fuori","oggetti"}
 
 @(private)
 expedition_benchmark_geometry :: proc(e:^run.Expedition_Session)->[2]u64 {
@@ -120,6 +205,8 @@ expedition_benchmark_geometry :: proc(e:^run.Expedition_Session)->[2]u64 {
 // stage discards its warmup, so neither contaminates the reported interval.
 @(private)
 expedition_benchmark_present :: proc(s:^Expedition_Capture,e:^run.Expedition_Session,frame:^host.Frame)->bool {
+	// A stage before the first measured one sets its scene up, is drawn and moves on.
+	if s.stage<EXPEDITION_BENCHMARK_FIRST {return s.held>=2}
 	if s.held<=EXPEDITION_BENCHMARK_WARMUP {
 		if s.held==EXPEDITION_BENCHMARK_WARMUP {s.benchmark.geometry_measured=expedition_benchmark_geometry(e)}
 		return false
@@ -181,6 +268,50 @@ expedition_smoke_world :: proc(e:^run.Expedition_Session,b:campaign.Biome) {
 	render.clear_event_animations(&e.rs.iso_renderer)
 }
 
+// A fight on the spot: foes on the open cells beside the player, the combat begun
+// and a card chosen that would hit one of them, so the board marks it.
+@(private)
+expedition_smoke_hits :: proc(e:^run.Expedition_Session) {
+	room:=&e.rs.room;player:=room.player
+	// The nearest cell whose four neighbours are all open ground.
+	open_around :: proc(room:^game.Room,p:grid.Position)->bool {
+		if game.cell_blocks_movement(room,p) {return false}
+		for offset in ([4]grid.Position{{x = 1, y = 0},{x = 0, y = 1},{x = -1, y = 0},{x = 0, y = -1}}) {if game.cell_blocks_movement(room,game.add_position(p,offset)) {return false}}
+		return true
+	}
+	if !open_around(room,player.position) {
+		found:=false
+		search:for radius in 1..=12 {for dy in -radius..=radius {for dx in -radius..=radius {
+			if max(abs(dx),abs(dy))!=radius {continue}
+			p:=game.add_position(player.position,{x = dx, y = dy})
+			if open_around(room,p) {player.position=p;found=true;break search}
+		}}}
+		assert(found,"no open ground near the player for the hit marks")
+		e.rs.iso_renderer.tactical.expedition_follow_ready=false
+	}
+	// Foes join a room already in combat (game.spawn_enemy).
+	assert(game.begin_expedition_encounter(room),"the hit marks' fight did not begin")
+	placed:=0
+	for offset in ([4]grid.Position{{x = 1, y = 0},{x = 0, y = 1},{x = -1, y = 0},{x = 0, y = -1}}) {
+		cell:=game.add_position(player.position,offset)
+		if game.cell_blocks_movement(room,cell) {continue}
+		if _,ok:=game.spawn_enemy(room,{position=cell,health=40,attack=1,archetype=.Chaser});ok {placed+=1}
+	}
+	assert(placed>0,"no open cell beside the player for the hit marks")
+	// The first card of the hand some valid cast of which hits a foe.
+	for card in player.deck.hand[:player.deck.hand_count] {
+		definition,found:=game.card_definition_by_id(card.definition_id)
+		if !found || game.card_is_room_tool(card.definition_id) {continue}
+		for dy in -3..=3 {for dx in -3..=3 {
+			cell:=game.add_position(player.position,{x = dx, y = dy})
+			evaluation:=game.evaluate_card_targeting(room,card,game.card_target_request_at(definition,cell))
+			hits:=game.card_hit_enemies(room,card,&evaluation)
+			if hits.count>0 {e.rs.card_interaction.selected_card_id=card.id;return}
+		}}
+	}
+	assert(false,"no card of the hand hits a foe")
+}
+
 // Eight open cells west of a resting patrol: walking east engages it.
 @(private)
 expedition_smoke_before_patrol :: proc(e:^run.Expedition_Session) {
@@ -189,9 +320,9 @@ expedition_smoke_before_patrol :: proc(e:^run.Expedition_Session) {
 		if !group.patrol || group.active {continue}
 		for member in group.members[:group.count] {
 			if !member.alive || member.deployed {continue}
-			p:=grid.Position{member.enemy.position.x-8,member.enemy.position.y}
+			p:=grid.offset(member.enemy.position, -8, 0)
 			clear:=true
-			for x in p.x..<member.enemy.position.x {clear=clear && !game.cell_blocks_movement(room,{x,p.y})}
+			for x in p.x..<member.enemy.position.x {clear=clear && !game.cell_blocks_movement(room,{x = x, y = p.y})}
 			if !clear {continue}
 			room.player.position=p;e.rs.iso_renderer.tactical.expedition_follow_ready=false
 			return
@@ -208,10 +339,10 @@ expedition_smoke_behind_wall :: proc(e:^run.Expedition_Session) {
 		if !site.active || site.kind!=.Boss {continue}
 		lo,hi:=world.site_bounds(&site)
 		for y in lo.y..=hi.y {for x in lo.x..=hi.x {
-			p:=grid.Position{x,y}
+			p:=grid.Position{x = x, y = y}
 			if game.cell_blocks_movement(room,p) {continue}
 			// The camera looks from +x/+z: a wall row there hides the robot.
-			_,a:=world.site_at(w,{x,y+1});_,b:=world.site_at(w,{x+1,y+1})
+			_,a:=world.site_at(w,{x = x, y = y+1});_,b:=world.site_at(w,{x = x+1, y = y+1})
 			if !a.wall || !b.wall || a.fixture || b.fixture || a.wall_height<2.5 || b.wall_height<2.5 {continue}
 			room.player.position=p;e.rs.iso_renderer.tactical.expedition_follow_ready=false
 			game.end_expedition_encounter(room);clear(&room.enemies)
@@ -223,9 +354,17 @@ expedition_smoke_behind_wall :: proc(e:^run.Expedition_Session) {
 expedition_enable_smoke :: proc(scene:^host.Scene) {
 	when EXPEDITION_BENCHMARK {
 		rl.SetTargetFPS(0);rl.ClearWindowState({.VSYNC_HINT})
-		fmt.printfln("EXPEDITION BENCHMARK: target_fps=0 vsync_hint=%v; no screenshots or GPU readbacks; presented-frame intervals plus CPU submission timings.",rl.IsWindowState({.VSYNC_HINT}))
+		fmt.printfln("EXPEDITION BENCHMARK: target_fps=0 vsync_hint=%v; stages %d..%d; canvas %dx%d (0x0 follows the window); no screenshots or GPU readbacks; presented-frame intervals plus CPU submission timings.",
+			rl.IsWindowState({.VSYNC_HINT}),EXPEDITION_BENCHMARK_FIRST,EXPEDITION_BENCHMARK_LAST,EXPEDITION_BENCHMARK_CANVAS_WIDTH,EXPEDITION_BENCHMARK_CANVAS_HEIGHT)
 	}
 	state:=new(Expedition_Capture);state.wrapped=scene^
+	// ODIN_PP_SMOKE_ONLY=hits starts at the hit marks' fights, =caves at the caves' act, =complessi at the complexes', =reti
+	// at the networks', =piani at the stacked map's, to work on them.
+	if only,_:=os.lookup_env("ODIN_PP_SMOKE_ONLY",context.temp_allocator);only=="hits" {state.stage=EXPEDITION_SMOKE_HITS-1}
+	else if only=="caves" {state.stage=EXPEDITION_SMOKE_CAVES-1}
+	else if only=="complessi" {state.stage=EXPEDITION_SMOKE_COMPLEXES-1}
+	else if only=="reti" {state.stage=EXPEDITION_SMOKE_NETWORKS-1}
+	else if only=="piani" {state.stage=EXPEDITION_SMOKE_PLATES-1}
 	scene^=host.Scene{name="expedition-smoke",data=state,opaque=true,modal=true,update=expedition_capture_update,draw=expedition_capture_draw,after_present=expedition_capture_present,destroy=proc(data:rawptr){s:=cast(^Expedition_Capture)data;s.wrapped.destroy(s.wrapped.data);free(s)}}
 }
 
@@ -267,6 +406,8 @@ expedition_capture_present :: proc(data:rawptr,frame:^host.Frame) {
 	// Walking stages run the real scene long enough to cross several cells.
 	s.frame+=1;s.held+=1
 	when EXPEDITION_BENCHMARK {
+		// Set in the first stage's warmup; the host's next viewport refresh reallocates the canvas.
+		if frame.window!=nil {frame.window.fixed_canvas_size={EXPEDITION_BENCHMARK_CANVAS_WIDTH,EXPEDITION_BENCHMARK_CANVAS_HEIGHT}}
 		if !expedition_benchmark_present(s,e,frame) {return}
 	} else {
 		if s.held>5 {s.measured+=1;s.seconds+=f64(rl.GetFrameTime())}
@@ -286,7 +427,41 @@ expedition_capture_present :: proc(data:rawptr,frame:^host.Frame) {
 		else if s.stage==EXPEDITION_SMOKE_WALK {artifacts.screenshot("odin_pp_expedition_camminata.png")}
 		else if s.stage==EXPEDITION_SMOKE_ENGAGE {artifacts.screenshot("odin_pp_expedition_ingaggio.png")}
 		else if s.stage==EXPEDITION_SMOKE_WORKSHOP {artifacts.screenshot("odin_pp_expedition_officina_cyber.png")}
-		else if s.stage>EXPEDITION_SMOKE_WORKSHOP {artifacts.screenshot(fmt.ctprintf("odin_pp_expedition_officina_%02d.png",s.stage-EXPEDITION_SMOKE_WORKSHOP))}
+		else if s.stage>=EXPEDITION_SMOKE_HITS && s.stage<EXPEDITION_SMOKE_HITS+4 {
+			names:=[4]string{"neve","far_west","giungla","spazio"}
+			artifacts.screenshot(fmt.ctprintf("odin_pp_expedition_bersagli_%s.png",names[s.stage-EXPEDITION_SMOKE_HITS]))
+		} else if s.stage==EXPEDITION_SMOKE_TWO_LEVELS {
+			artifacts.screenshot("odin_pp_expedition_scontro_livelli.png")
+		} else if s.stage>=EXPEDITION_SMOKE_MOUNTAIN && s.stage<EXPEDITION_SMOKE_MOUNTAIN+EXPEDITION_SMOKE_MOUNTAIN_STEPS {
+			artifacts.screenshot(fmt.ctprintf("odin_pp_expedition_montagna_%d.png",s.stage-EXPEDITION_SMOKE_MOUNTAIN))
+		} else if s.stage==EXPEDITION_SMOKE_CAVE_MAP {
+			artifacts.screenshot("odin_pp_expedition_grotta_ologramma.png")
+		} else if s.stage>=EXPEDITION_SMOKE_PLATES && s.stage<=EXPEDITION_SMOKE_LAST {
+			names:=EXPEDITION_SMOKE_PLATE_NAMES
+			artifacts.screenshot(fmt.ctprintf("odin_pp_expedition_ologramma_piani_%s.png",names[s.stage-EXPEDITION_SMOKE_PLATES]))
+		} else if s.stage>=EXPEDITION_SMOKE_NETWORKS && s.stage<EXPEDITION_SMOKE_PLATES {
+			biomes:=EXPEDITION_SMOKE_NETWORK_BIOMES;views:=[EXPEDITION_SMOKE_NETWORK_VIEWS]string{"scale","sala","ascensore"}
+			k:=s.stage-EXPEDITION_SMOKE_NETWORKS
+			artifacts.screenshot(fmt.ctprintf("odin_pp_expedition_rete_%v_%s.png",biomes[k/EXPEDITION_SMOKE_NETWORK_VIEWS],views[k%EXPEDITION_SMOKE_NETWORK_VIEWS]))
+		} else if s.stage>=EXPEDITION_SMOKE_COMPLEXES && s.stage<EXPEDITION_SMOKE_NETWORKS {
+			biomes:=EXPEDITION_SMOKE_COMPLEX_BIOMES;views:=[EXPEDITION_SMOKE_COMPLEX_VIEWS]string{"panorama","sotto","ponte","cancello","ascensore","scontro"}
+			k:=s.stage-EXPEDITION_SMOKE_COMPLEXES
+			artifacts.screenshot(fmt.ctprintf("odin_pp_expedition_complesso_%v_%s.png",biomes[k/EXPEDITION_SMOKE_COMPLEX_VIEWS],views[k%EXPEDITION_SMOKE_COMPLEX_VIEWS]))
+		} else if s.stage>=EXPEDITION_SMOKE_PLACE && s.stage<EXPEDITION_SMOKE_PLACE+EXPEDITION_SMOKE_PLACE_STEPS {
+			names:=[EXPEDITION_SMOKE_PLACE_STEPS]string{"fantasma_verde","fantasma_rosso","posata","rotta"}
+			artifacts.screenshot(fmt.ctprintf("odin_pp_expedition_posa_%s.png",names[s.stage-EXPEDITION_SMOKE_PLACE]))
+		} else if s.stage>=EXPEDITION_SMOKE_CAVES && s.stage<EXPEDITION_SMOKE_CAVES+4*EXPEDITION_SMOKE_CAVE_VIEWS {
+			biomes:=EXPEDITION_SMOKE_CAVE_BIOMES;views:=[EXPEDITION_SMOKE_CAVE_VIEWS]string{"imbocco","ingresso","stanza"}
+			k:=s.stage-EXPEDITION_SMOKE_CAVES
+			artifacts.screenshot(fmt.ctprintf("odin_pp_expedition_grotta_%v_%s.png",biomes[k/EXPEDITION_SMOKE_CAVE_VIEWS],views[k%EXPEDITION_SMOKE_CAVE_VIEWS]))
+		} else if s.stage>=EXPEDITION_SMOKE_HOLOGRAMS && s.stage<EXPEDITION_SMOKE_HOLOGRAMS+3 {
+			artifacts.screenshot(fmt.ctprintf("odin_pp_expedition_ologramma_rilievo_%d.png",s.stage-EXPEDITION_SMOKE_HOLOGRAMS))
+		} else if s.stage>=EXPEDITION_SMOKE_RELIEF && s.stage<EXPEDITION_SMOKE_RELIEF+EXPEDITION_SMOKE_RELIEF_COUNT {
+			artifacts.screenshot(fmt.ctprintf("odin_pp_expedition_rilievo_%02d.png",s.stage-EXPEDITION_SMOKE_RELIEF))
+		} else if s.stage>=EXPEDITION_SMOKE_STRUCTURES && s.stage<EXPEDITION_SMOKE_STRUCTURES+EXPEDITION_SMOKE_STRUCTURE_STEPS {
+			names:=EXPEDITION_SMOKE_STRUCTURE_NAMES
+			artifacts.screenshot(fmt.ctprintf("odin_pp_expedition_edificio_%s.png",names[s.stage-EXPEDITION_SMOKE_STRUCTURES]))
+		} else if s.stage>EXPEDITION_SMOKE_WORKSHOP {artifacts.screenshot(fmt.ctprintf("odin_pp_expedition_officina_%02d.png",s.stage-EXPEDITION_SMOKE_WORKSHOP))}
 		else {artifacts.screenshot(fmt.ctprintf("odin_pp_expedition_centro_%02d.png",s.stage-EXPEDITION_SMOKE_CENTER))}
 	}
 	when EXPEDITION_BENCHMARK {
@@ -294,7 +469,7 @@ expedition_capture_present :: proc(data:rawptr,frame:^host.Frame) {
 	}
 	s.stage+=1
 	switch s.stage {
-	case 1:e.map_open=true
+	case 1:e.map_open=true;e.map_layer=e.rs.room.player.position.layer
 	case 2:e.map_open=false;e.world.mounted=true
 	case 3:
 		rl.SetWindowSize(1100,760)
@@ -305,7 +480,7 @@ expedition_capture_present :: proc(data:rawptr,frame:^host.Frame) {
 	case 4:e.inventory.panel=.Character;e.progress.run.points=3
 	case 5:
 		rl.SetWindowSize(1280,720)
-		e.inventory_open=false;e.rs.room.player.position=world.site_world(&e.world.sites[e.world.groups[0].site],{-4,0})
+		e.inventory_open=false;e.rs.room.player.position=world.site_world(&e.world.sites[e.world.groups[0].site],{x = -4, y = 0})
 		_=world.engage(&e.world,&e.rs.room,0)
 	case 6:
 		game.end_expedition_encounter(&e.rs.room);clear(&e.rs.room.enemies)
@@ -313,35 +488,452 @@ expedition_capture_present :: proc(data:rawptr,frame:^host.Frame) {
 	case:
 		if s.stage>=7 && s.stage<19 {
 			expedition_smoke_world(e,campaign.Biome(s.stage-7))
-			e.rs.room.player.position=world.site_world(&e.world.sites[2],{-5,0})
+			e.rs.room.player.position=world.site_world(&e.world.sites[2],{x = -5, y = 0})
 		} else if s.stage>=EXPEDITION_SMOKE_CENTER && s.stage<EXPEDITION_SMOKE_CENTER+12 {
 			// The framing of the biome reference captures: the map's center, mounted.
 			expedition_smoke_world(e,campaign.Biome(s.stage-EXPEDITION_SMOKE_CENTER))
-			side:=world.size(&e.world);e.rs.room.player.position={side/2,side/2}
+			side:=world.size(&e.world);e.rs.room.player.position={x = side/2, y = side/2}
 		} else if s.stage>=19 && s.stage<23 {
 			indices:=[4]int{2,0,11,3}
 			e.world.mounted=false
-			e.rs.room.player.position=world.site_world(&e.world.sites[indices[s.stage-19]],{-5,0})
+			e.rs.room.player.position=world.site_world(&e.world.sites[indices[s.stage-19]],{x = -5, y = 0})
 			e.rs.iso_renderer.tactical.expedition_follow_ready=false
 			e.message_timer=0
 			if s.stage==20 {
-				e.rs.room.player.position=world.site_world(&e.world.sites[0],{-2,0})
+				e.rs.room.player.position=world.site_world(&e.world.sites[0],{x = -2, y = 0})
 				world.tick(&e.world,&e.rs.room,.1)
 			} else {game.end_expedition_encounter(&e.rs.room);clear(&e.rs.room.enemies)}
-		} else if s.stage==23 {rl.SetWindowSize(1024,768);e.map_open=true}
+		} else if s.stage==23 {rl.SetWindowSize(1024,768);e.map_open=true;e.map_layer=e.rs.room.player.position.layer}
 		else if s.stage==24 {rl.SetWindowSize(1280,720);e.map_open=false;expedition_smoke_behind_wall(e)}
 		else if s.stage==EXPEDITION_SMOKE_WALK {e.rs.room.player.position=e.rs.room.exit_position;e.rs.room.player.position.x-=8;e.rs.iso_renderer.tactical.expedition_follow_ready=false;e.world.mounted=true}
 		else if s.stage==EXPEDITION_SMOKE_ENGAGE {e.world.mounted=false;expedition_smoke_before_patrol(e)}
-		else if s.stage>=EXPEDITION_SMOKE_WORKSHOP && s.stage<EXPEDITION_SMOKE_WORKSHOP+12 {
+		else if s.stage>=EXPEDITION_SMOKE_HITS && s.stage<EXPEDITION_SMOKE_HITS+4 {
+			biomes:=EXPEDITION_SMOKE_HIT_BIOMES
+			expedition_smoke_world(e,biomes[s.stage-EXPEDITION_SMOKE_HITS]);e.world.mounted=false;e.message_timer=0
+			expedition_smoke_hits(e)
+		} else if s.stage>=EXPEDITION_SMOKE_WORKSHOP && s.stage<EXPEDITION_SMOKE_WORKSHOP+12 {
 			expedition_smoke_world(e,campaign.Biome(s.stage-EXPEDITION_SMOKE_WORKSHOP));e.world.mounted=false;e.message_timer=0
 			for &site in e.world.sites[:e.world.site_count] {
 				if site.kind!=.Workshop {continue}
-				for local in ([3]grid.Position{{0,2},{1,1},{-5,0}}) {
+				for local in ([3]grid.Position{{x = 0, y = 2},{x = 1, y = 1},{x = -5, y = 0}}) {
 					p:=world.site_world(&site,local)
 					if !game.cell_blocks_movement(&e.rs.room,p) {e.rs.room.player.position=p;break}
 				}
 				break
 			}
-		} else if s.stage>=EXPEDITION_SMOKE_WORKSHOP+12 {host.quit(frame)}
+		} else if s.stage>=EXPEDITION_SMOKE_STRUCTURES && s.stage<EXPEDITION_SMOKE_STRUCTURES+EXPEDITION_SMOKE_STRUCTURE_STEPS {
+			expedition_smoke_structures(e,s.stage-EXPEDITION_SMOKE_STRUCTURES)
+		} else if s.stage>=EXPEDITION_SMOKE_RELIEF && s.stage<EXPEDITION_SMOKE_RELIEF+EXPEDITION_SMOKE_RELIEF_COUNT {
+			expedition_smoke_relief(e,campaign.Biome(s.stage-EXPEDITION_SMOKE_RELIEF))
+		} else if s.stage>=EXPEDITION_SMOKE_HOLOGRAMS && s.stage<EXPEDITION_SMOKE_HOLOGRAMS+3 {
+			biomes:=EXPEDITION_SMOKE_HOLOGRAM_BIOMES
+			expedition_smoke_world(e,biomes[s.stage-EXPEDITION_SMOKE_HOLOGRAMS]);e.world.mounted=false;e.message_timer=0;e.map_open=true;e.map_layer=e.rs.room.player.position.layer
+		} else if s.stage==EXPEDITION_SMOKE_TWO_LEVELS {e.map_open=false;expedition_smoke_two_levels(e)}
+		else if s.stage>=EXPEDITION_SMOKE_MOUNTAIN && s.stage<EXPEDITION_SMOKE_MOUNTAIN+EXPEDITION_SMOKE_MOUNTAIN_STEPS {expedition_smoke_mountain(e,s.stage-EXPEDITION_SMOKE_MOUNTAIN)}
+		else if s.stage>=EXPEDITION_SMOKE_CAVES && s.stage<EXPEDITION_SMOKE_CAVES+4*EXPEDITION_SMOKE_CAVE_VIEWS {expedition_smoke_cave(e,s.stage-EXPEDITION_SMOKE_CAVES)}
+		else if s.stage>=EXPEDITION_SMOKE_PLACE && s.stage<EXPEDITION_SMOKE_PLACE+EXPEDITION_SMOKE_PLACE_STEPS {expedition_smoke_place(e,s.stage-EXPEDITION_SMOKE_PLACE)}
+		else if s.stage==EXPEDITION_SMOKE_CAVE_MAP {expedition_smoke_cave(e,2);e.world.in_cave=world.cave_at(&e.world,e.rs.room.player.position);e.map_open=true;e.map_layer=e.rs.room.player.position.layer}
+		else if s.stage>=EXPEDITION_SMOKE_COMPLEXES && s.stage<EXPEDITION_SMOKE_NETWORKS {e.map_open=false;expedition_smoke_complex(e,s.stage-EXPEDITION_SMOKE_COMPLEXES)}
+		else if s.stage>=EXPEDITION_SMOKE_NETWORKS && s.stage<EXPEDITION_SMOKE_PLATES {expedition_smoke_network(e,s.stage-EXPEDITION_SMOKE_NETWORKS)}
+		else if s.stage>=EXPEDITION_SMOKE_PLATES && s.stage<=EXPEDITION_SMOKE_LAST {expedition_smoke_plates(e,s.stage-EXPEDITION_SMOKE_PLATES)}
+		else if s.stage>EXPEDITION_SMOKE_LAST {host.quit(frame)}
+	}
+}
+
+// The robot in the biome's most uneven place: the walkable cell whose 7 by 7 neighbourhood spans the most steps,
+// the nearest to the spawn if there are several.
+@(private)
+expedition_smoke_relief :: proc(e:^run.Expedition_Session,biome:campaign.Biome) {
+	expedition_smoke_world(e,biome);e.world.mounted=false;e.message_timer=0
+	data:=e.rs.room.level_data
+	best,best_range,best_distance:=grid.Position{},-1,1<<30
+	for y in 14..<data.tiles.height-14 {for x in 14..<data.tiles.width-14 {
+		cell:=grid.Position{x = x, y = y};tile,_:=level.tile_at(data,cell)
+		if !level.is_walkable(tile.kind) || game.cell_blocks_movement(&e.rs.room,cell) {continue}
+		low,high:=i32(1000),i32(-1)
+		for dy in -3..=3 {for dx in -3..=3 {
+			h:=level.height_at(data,{x = x+dx, y = y+dy});low=min(low,h);high=max(high,h)
+		}}
+		// The tallest relief first, then the nearer to the middle of the map.
+		spread:=int(high-low)*100+int(high);distance:=world.distance(cell,{x = data.tiles.width/2, y = data.tiles.height/2})
+		if spread>best_range || (spread==best_range && distance<best_distance) {best,best_range,best_distance=cell,spread,distance}
+	}}
+	e.rs.room.player.position=best
+	e.rs.iso_renderer.tactical.expedition_follow_ready=false
+}
+
+// One step of the mountain's act: the robot at `step` of eight places of the climb (the first at the foot, the last
+// at the top). The first step also checks the map: the mountain, its patrol, its relic and the walk to the top.
+@(private)
+expedition_smoke_mountain :: proc(e:^run.Expedition_Session,step:int) {
+	if step==0 {
+		expedition_smoke_world(e,.Snow);e.world.mounted=false;e.message_timer=0
+		assert(world.mountain_present(&e.world),"the Snow has no mountain")
+		summit:=world.mountain_cell(level.mountain_summit())
+		// Over the biome's base (the Neve is raised for its crevasse).
+		assert(int(level.height_at(e.rs.room.level_data,summit))==int(e.rs.room.level_data.base)+level.MOUNTAIN_TOP,"the mountain has no summit")
+		found:=false
+		for drop in e.world.drops[:e.world.drop_count] {if drop.position==summit && drop.item.kind==.Relic {found=true}}
+		assert(found,"no relic at the summit")
+		patrol:=false
+		for group in e.world.groups[:e.world.group_count] {
+			if group.patrol && world.distance(group.anchor,world.mountain_cell(level.mountain_midway()))<=1 {patrol=true}
+		}
+		assert(patrol,"no patrol halfway up the mountain")
+	}
+	laps:=f32(step)*f32(level.MOUNTAIN_LAPS)/f32(EXPEDITION_SMOKE_MOUNTAIN_STEPS-1)
+	laps=clamp(laps,0.05,f32(level.MOUNTAIN_LAPS)-0.05)
+	e.rs.room.player.position=world.mountain_cell(level.mountain_path_cell(laps))
+	if step==EXPEDITION_SMOKE_MOUNTAIN_STEPS-1 {e.rs.room.player.position=world.mountain_cell(level.mountain_summit())}
+	e.rs.iso_renderer.tactical.expedition_follow_ready=false
+}
+
+// Walks the robot a step at a time from where it stands to `to`, along a straight way (a cave's tunnel), as exploring does.
+@(private)
+expedition_smoke_walk_to :: proc(e:^run.Expedition_Session,to:grid.Position) {
+	room:=&e.rs.room
+	for step:=0;room.player.position!=to;step+=1 {
+		assert(step<16,"the walk through the mouth is too long")
+		p:=room.player.position
+		offset:=grid.Position{x = clamp(to.x-p.x,-1,1)}
+		if offset.x==0 {offset.y=clamp(to.y-p.y,-1,1)}
+		assert(world.walk(&e.world,room,offset),"a step through the mouth was refused")
+	}
+}
+
+// One step of the caves' act: the biome's first cave with foes, its mouth seen from the open ground, from just inside and beside
+// its foes. The second view also checks the walk: in through the mouth, out again and in once more, the map unchanged.
+@(private)
+expedition_smoke_cave :: proc(e:^run.Expedition_Session,step:int) {
+	biomes:=EXPEDITION_SMOKE_CAVE_BIOMES
+	biome:=biomes[step/EXPEDITION_SMOKE_CAVE_VIEWS];view:=step%EXPEDITION_SMOKE_CAVE_VIEWS
+	expedition_smoke_world(e,biome);e.world.mounted=false;e.message_timer=0
+	w:=&e.world;room:=&e.rs.room;data:=room.level_data
+	index:=-1
+	for cave,i in w.caves[:w.cave_count] {if cave.inhabited {index=i;break}}
+	assert(index>=0,"the biome has no cave with foes")
+	place:=w.caves[index].place
+	room.player.position=place.mouth
+	w.sites[w.caves[index].site].state=.Discovered
+	// The act shows the cave: the open map's foes are gone, and nothing is fought on the way in.
+	for &g in w.groups[:w.group_count] {if g.cave==0 {for &member in g.members[:g.count] {member.alive=false}}}
+	if room.phase!=.Loot {game.end_expedition_encounter(room);clear(&room.enemies);room.phase=.Loot}
+	if view==1 {
+		before:=slice.clone(data.tiles.cells[:]);defer delete(before)
+		expedition_smoke_walk_to(e,place.arrival)
+		assert(world.cave_at(w,room.player.position)==index+1,"not in the cave")
+		expedition_smoke_walk_to(e,place.mouth)
+		assert(world.cave_at(w,room.player.position)==0 && room.player.position.layer==grid.GROUND_LAYER,"not out of the cave")
+		assert(slice.equal(before,data.tiles.cells[:]),"the map changed")
+		expedition_smoke_walk_to(e,place.arrival)
+	}
+	if view==2 {
+		// Three cells from a foe of the cave, on its floor.
+		for g in w.groups[:w.group_count] {
+			if int(g.cave)!=index+1 || g.count==0 {continue}
+			foe:=g.members[0].enemy.position
+			for offset in ([4]grid.Position{{x = -3, y = 0},{x = 3, y = 0},{x = 0, y = 3},{x = 0, y = -3}}) {
+				cell:=grid.offset(foe,offset.x,offset.y)
+				if tile,_:=level.tile_at(data,cell);tile.kind==.Floor {room.player.position=cell;break}
+			}
+			break
+		}
+		assert(room.player.position.layer==world.CAVE_LAYER,"not beside the cave's foes")
+	}
+	e.rs.iso_renderer.tactical.expedition_follow_ready=false
+	world.roam_sync(&e.roam,room)
+}
+
+// The open ground at the complex's floor nearest to `near`, two cells from it at least and under no deck.
+@(private)
+expedition_smoke_complex_ground :: proc(room:^game.Room,c:world.Complex,near:grid.Position)->grid.Position {
+	data:=room.level_data
+	for radius in 2..=10 {for dy in -radius..=radius {for dx in -radius..=radius {
+		if max(abs(dx),abs(dy))!=radius {continue}
+		cell:=grid.Position{x = near.x+dx, y = near.y+dy}
+		tile,_:=level.tile_at(data,cell);over,_:=level.tile_at(data,{x = cell.x, y = cell.y, layer = world.COMPLEX_DECK})
+		if !level.is_walkable(tile.kind) || level.height_at(data,cell)!=c.floor || over.kind!=.Void || game.cell_blocks_movement(room,cell) {continue}
+		return cell
+	}}}
+	assert(false,"no open ground near the complex's bridge")
+	return near
+}
+
+// One step of the complexes' act: the biome's complex from the open ground south of it, the robot under its bridge, on it, by
+// its gate on the lever's side, riding its lift halfway down, and on its bridge in a fight with a foe on the ground below and
+// one on the bridge. The first view also checks the complex: the layers' rule, its lift resting, its gate shut.
+@(private)
+expedition_smoke_complex :: proc(e:^run.Expedition_Session,step:int) {
+	biomes:=EXPEDITION_SMOKE_COMPLEX_BIOMES
+	biome:=biomes[step/EXPEDITION_SMOKE_COMPLEX_VIEWS];view:=step%EXPEDITION_SMOKE_COMPLEX_VIEWS
+	expedition_smoke_world(e,biome);e.world.mounted=false;e.message_timer=0
+	w:=&e.world;room:=&e.rs.room;data:=room.level_data
+	assert(w.complex_count>0 && len(data.lifts)>0 && len(data.gates)>0,"the biome has no complex")
+	c:=w.complexes[0]
+	layout:=world.complex_layout(c.kind);width,height:=world.complex_size(layout)
+	deck:=world.complex_bridge_middle(c)
+	// A complex with no bridge (the Egitto's pyramids, the boulder's hill): its secret's top, or its shaft's, for the bridge;
+	// its first terrace for under it, or the hall inside it with the secret.
+	terrace:=grid.Position{x = deck.x, y = deck.y}
+	if deck==c.origin {
+		deck,terrace={x = c.origin.x+width/2, y = c.origin.y},{x = c.origin.x+width/2, y = c.origin.y}
+		found_top,found_terrace:=false,false
+		for y in 0..<height {for x in 0..<width {
+			mark:=layout.rows[y][x]
+			if (mark=='$' || mark=='S') && !found_top {deck={x = c.origin.x+x, y = c.origin.y+y};found_top=true}
+			if mark=='h' && !found_terrace {terrace=world.complex_cell(c,{x = x, y = y});found_terrace=true}
+			if mark=='?' {terrace=world.complex_cell(c,{x = x, y = y});found_terrace=true}
+		}}
+	}
+	if room.phase!=.Loot {game.end_expedition_encounter(room);clear(&room.enemies);room.phase=.Loot}
+	switch view {
+	case 0:
+		error,_:=level.check_layers(data)
+		assert(error==.None,"the complex breaks the layers' rule")
+		for gate in data.gates {_,open,_:=level.gate_at(data,gate.cell);assert(!open,"a gate is open at the run's start")}
+		assert(room.lifts.count==len(data.lifts) && !room.lifts.platforms[0].moving,"a lift's platform is not at rest")
+		// On the open ground south of it, the nearest cell one stands on (a street, not a building).
+		want:=grid.Position{x = deck.x, y = c.origin.y+height+2}
+		room.player.position=want
+		street:for radius in 0..=6 {for dy in -radius..=radius {for dx in -radius..=radius {
+			if max(abs(dx),abs(dy))!=radius {continue}
+			cell:=grid.offset(want,dx,dy)
+			if tile,_:=level.tile_at(data,cell);tile.kind==.Floor && level.height_at(data,cell)==c.floor && !game.cell_blocks_movement(room,cell) {room.player.position=cell;break street}
+		}}}
+	case 1:room.player.position=terrace
+	case 2:room.player.position=deck
+	case 3:room.player.position=data.gates[0].lever
+	case 4:
+		lift:=data.lifts[0]
+		room.player.position=lift.ends[1]
+		assert(game.lift_board(room,game.PLAYER_ENTITY,lift.ends[1]),"the robot does not get on the lift")
+		game.lift_tick(room,game.lift_journey_seconds(room,0)*0.5)
+		assert(game.lift_player_riding(room),"the robot is not on its way")
+	case 5:
+		room.player.position=deck
+		assert(game.begin_expedition_encounter(room),"the complex's fight did not begin")
+		below:=expedition_smoke_complex_ground(room,c,{x = deck.x, y = deck.y})
+		_,ok:=game.spawn_enemy(room,{position=below,health=40,attack=1,archetype=.Archer})
+		assert(ok,"no foe on the ground below the bridge")
+		for along in ([4]grid.Position{{x = 2},{x = -2},{y = 2},{y = -2}}) {
+			cell:=grid.offset(deck,along.x,along.y)
+			if tile,_:=level.tile_at(data,cell);tile.kind!=.Floor || game.cell_blocks_movement(room,cell) {continue}
+			if _,placed:=game.spawn_enemy(room,{position=cell,health=40,attack=1,archetype=.Chaser});placed {break}
+		}
+		// The first card of the hand some valid cast of which hits a foe.
+		player:=room.player
+		search:for card in player.deck.hand[:player.deck.hand_count] {
+			definition,found:=game.card_definition_by_id(card.definition_id)
+			if !found || game.card_is_room_tool(card.definition_id) {continue}
+			for dy in -4..=4 {for dx in -4..=4 {
+				for layer in ([2]i8{grid.GROUND_LAYER,world.COMPLEX_DECK}) {
+					cell:=grid.Position{x = player.position.x+dx, y = player.position.y+dy, layer = layer}
+					evaluation:=game.evaluate_card_targeting(room,card,game.card_target_request_at(definition,cell))
+					if hits:=game.card_hit_enemies(room,card,&evaluation);hits.count>0 {e.rs.card_interaction.selected_card_id=card.id;break search}
+				}
+			}}
+		}
+	}
+	e.rs.iso_renderer.tactical.expedition_follow_ready=false
+	world.roam_sync(&e.roam,room)
+}
+
+// One step of the networks' act: the raised biome's network, the robot halfway down a stair's pit, by the foes of a hall
+// (asleep), and riding the lift's shaft halfway down. The first view also checks the base and the layers' rule.
+@(private)
+expedition_smoke_network :: proc(e:^run.Expedition_Session,step:int) {
+	biomes:=EXPEDITION_SMOKE_NETWORK_BIOMES
+	biome:=biomes[step/EXPEDITION_SMOKE_NETWORK_VIEWS];view:=step%EXPEDITION_SMOKE_NETWORK_VIEWS
+	expedition_smoke_world(e,biome);e.world.mounted=false;e.message_timer=0
+	w:=&e.world;room:=&e.rs.room;data:=room.level_data
+	assert(data.base==world.EXPEDITION_RAISED_BASE,"the biome is not raised")
+	if room.phase!=.Loot {game.end_expedition_encounter(room);clear(&room.enemies);room.phase=.Loot}
+	switch view {
+	case 0:
+		error,_:=level.check_layers(data)
+		assert(error==.None,"the network breaks the layers' rule")
+		// Halfway down the first stair: the pit's cell seven steps under the base, nearest the map's middle.
+		best,found:=grid.Position{},false
+		side:=data.tiles.width
+		for steps,at in data.heights {
+			if i32(steps)!=data.base-7 || data.tiles.cells[at].kind==.Void {continue}
+			cell:=grid.Position{x = at%side, y = at/side}
+			if !found || world.distance(cell,{x = side/2, y = side/2})<world.distance(best,{x = side/2, y = side/2}) {best,found=cell,true}
+		}
+		assert(found,"no stair down to the network")
+		room.player.position=best
+	case 1:
+		// Three cells from a foe asleep in the network (under the base: in a hall, or at a crater's bottom), on its floor.
+		placed:=false
+		for g in w.groups[:w.group_count] {
+			if g.count==0 || level.height_at(data,g.members[0].enemy.position)>=data.base {continue}
+			foe:=g.members[0].enemy.position
+			for offset in ([4]grid.Position{{x = -3},{x = 3},{y = 3},{y = -3}}) {
+				cell:=grid.offset(foe,offset.x,offset.y)
+				if tile,_:=level.tile_at(data,cell);tile.kind==.Floor {room.player.position=cell;placed=true;break}
+			}
+			if placed {break}
+		}
+		assert(placed,"no foe in the network")
+	case 2:
+		// The lift down to the network (its foot under the base: in a hall, or at a crater's bottom), its platform up top: the
+		// robot on it halfway down.
+		index:=-1
+		for lift,i in data.lifts {if level.height_at(data,lift.ends[0])<data.base {index=i}}
+		assert(index>=0,"no lift down to the network")
+		lift:=data.lifts[index]
+		room.player.position=lift.ends[1]
+		assert(game.lift_board(room,game.PLAYER_ENTITY,lift.ends[1]),"the robot does not get on the network's lift")
+		game.lift_tick(room,game.lift_journey_seconds(room,index)*0.5)
+		assert(game.lift_player_riding(room),"the robot is not on its way down")
+	}
+	e.rs.iso_renderer.tactical.expedition_follow_ready=false
+	world.roam_sync(&e.roam,room)
+}
+
+// One step of the stacked map's act (Fase 8 of docs/piano-profondita.md): City pop's map opened on the ground, then on the
+// plate over it and on the one under it, chosen as W and S choose them (run.hologram_next_plate), its rooftops and its first
+// station visited; the Memoria's opened from the hall inside the boulder's hill, which it opens on.
+@(private)
+expedition_smoke_plates :: proc(e:^run.Expedition_Session,step:int) {
+	expedition_smoke_world(e,.Secret if step==3 else .City);e.world.mounted=false;e.message_timer=0
+	w:=&e.world;room:=&e.rs.room
+	if room.phase!=.Loot {game.end_expedition_encounter(room);clear(&room.enemies);room.phase=.Loot}
+	if w.complex_count>0 {w.complexes[0].visited=true}
+	w.network_visited[0]=true
+	if step==3 {
+		// Beside the secret of the hall.
+		c:=w.complexes[0];layout:=world.complex_layout(c.kind);width,height:=world.complex_size(layout)
+		for y in 0..<height {for x in 0..<width {if layout.rows[y][x]=='?' {room.player.position=world.complex_cell(c,{x = x+1, y = y})}}}
+		assert(room.player.position.layer==world.COMPLEX_TUNNEL,"the robot is not in the boulder's hall")
+	}
+	e.map_open=true;e.map_layer=room.player.position.layer
+	if step==1 {e.map_layer=run.hologram_next_plate(&e.rs.level_data,e.map_layer,1)}
+	if step==2 {e.map_layer=run.hologram_next_plate(&e.rs.level_data,e.map_layer,-1)}
+	assert(step!=1 || e.map_layer==grid.HIGHEST_LAYER,"City pop's map has no plate over its ground")
+	assert(step!=2 || e.map_layer==world.NETWORK_LAYER,"City pop's map has no deep plate")
+	e.rs.iso_renderer.tactical.expedition_follow_ready=false
+	world.roam_sync(&e.roam,room)
+}
+
+// One step of the placing act (Egypt): where the robot stands and a spot a statue can be set down, found by the same check the
+// game makes.
+@(private)
+expedition_smoke_place :: proc(e:^run.Expedition_Session,step:int) {
+	expedition_smoke_world(e,.Egypt);e.world.mounted=false;e.message_timer=0
+	w:=&e.world;room:=&e.rs.room;data:=room.level_data
+	if room.phase!=.Loot {game.end_expedition_encounter(room);room.phase=.Loot}
+	stand,origin,hut:=grid.Position{},grid.Position{},grid.Position{}
+	found:=false
+	search:for y:=14;y<data.tiles.height-14;y+=3 {for x:=14;x<data.tiles.width-14;x+=3 {
+		room.player.position={x = x, y = y}
+		tile,_:=level.tile_at(data,room.player.position);if tile.kind!=.Floor {continue}
+		for dx in 3..=6 {
+			candidate:=world.structure_origin_for(.Statue,0,false,{x = x+dx, y = y})
+			if result,_:=world.check_player_structure(w,data,room,.Statue,candidate,0,false);result==.Ok {
+				// A hut must also fit two cells further.
+				hut_origin:=world.structure_origin_for(.Hut,0,false,{x = x+dx+5, y = y})
+				if hresult,_:=world.check_player_structure(w,data,room,.Hut,hut_origin,0,false);hresult!=.Ok {continue}
+				stand,origin,hut,found={x = x, y = y},candidate,hut_origin,true;break search
+			}
+		}
+	}}
+	assert(found,"no place to set a statue down")
+	room.player.position=stand
+	ghost:=render.Structure_Ghost{active=true,ok=true,id=.Statue,origin=origin}
+	switch step {
+	case 0:
+		render.set_structure_ghost(&e.rs.iso_renderer,ghost)
+	case 1:
+		// On the player: red, and the check says why.
+		ghost.origin=world.structure_origin_for(.Statue,0,false,stand);ghost.ok=false
+		result,_:=world.check_player_structure(w,data,room,.Statue,ghost.origin,0,false)
+		assert(result!=.Ok,"a statue on the player is refused")
+		render.set_structure_ghost(&e.rs.iso_renderer,ghost)
+	case 2,3:
+		render.set_structure_ghost(&e.rs.iso_renderer,{})
+		result,_:=world.place_player_structure(w,data,room,.Statue,origin,0,false)
+		assert(result==.Ok,"the statue is set down")
+		hresult,_:=world.place_player_structure(w,data,room,.Hut,hut,0,false)
+		assert(hresult==.Ok,"the hut is set down")
+		if step==3 {
+			// An enemy's blow beside the statue breaks it and leaves the hut.
+			before:=level.structure_count(data)
+			assert(game.strike_structures(room,origin,{origin},99)==1,"the statue falls")
+			assert(level.structure_count(data)==before-1,"only the statue fell")
+			assert(game.strike_structures(room,hut,{hut},99)==0 && level.structure_count(data)==before-1,"the hut stays")
+		}
+	}
+	e.rs.iso_renderer.tactical.expedition_follow_ready=false
+}
+
+// A fight on two levels: the robot on a Snow plateau, one foe on the ground three steps or more below (the heights from
+// the map's base: the Neve is raised for its crevasse, whose bottom is no ground for this fight).
+@(private)
+expedition_smoke_two_levels :: proc(e:^run.Expedition_Session) {
+	expedition_smoke_world(e,.Snow);e.world.mounted=false;e.message_timer=0
+	data:=e.rs.room.level_data
+	high_cell,low_cell,best:=grid.Position{},grid.Position{},1<<30
+	for y in 14..<data.tiles.height-14 {for x in 14..<data.tiles.width-14 {
+		cell:=grid.Position{x = x, y = y}
+		if level.height_at(data,cell)-data.base<4 || game.cell_blocks_movement(&e.rs.room,cell) {continue}
+		for dy in -3..=3 {for dx in -3..=3 {
+			other:=grid.Position{x = x+dx, y = y+dy}
+			ground:=level.height_at(data,other)-data.base
+			if abs(dx)+abs(dy)<2 || ground<0 || ground>1 || game.cell_blocks_movement(&e.rs.room,other) {continue}
+			distance:=world.distance(cell,{x = data.tiles.width/2, y = data.tiles.height/2})
+			if distance<best {high_cell,low_cell,best=cell,other,distance}
+		}}
+	}}
+	assert(best<1<<30,"the Snow has no plateau to fight over")
+	e.rs.room.player.position=high_cell
+	if e.rs.room.phase!=.Combat {_=game.begin_expedition_encounter(&e.rs.room)}
+	_,_=game.spawn_enemy(&e.rs.room,{position=low_cell,health=10,attack=2,archetype=.Chaser})
+	e.rs.iso_renderer.tactical.expedition_follow_ready=false
+}
+
+// One step of the structures' act: where the robot stands and what the building should be doing.
+@(private)
+expedition_smoke_structures :: proc(e:^run.Expedition_Session,step:int) {
+	if step==0 {expedition_smoke_world(e,.Cyber);e.world.mounted=false;e.message_timer=0}
+	data:=e.rs.room.level_data
+	hut:=-1
+	for placed,i in data.structures {if placed.id==.Hut {hut=i;break}}
+	assert(hut>=0,"the first biome has no hut")
+	placed:=data.structures[hut];plan:=&data.structure_plans[hut]
+	door,outward:=grid.Position{},grid.Position{}
+	for y in 0..<plan.height {for x in 0..<plan.width {
+		if level.plan_at(plan,x,y)!=.Door {continue}
+		door=grid.offset(placed.origin, x, y)
+		for d in ([4]grid.Position{{x = 1, y = 0},{x = -1, y = 0},{x = 0, y = 1},{x = 0, y = -1}}) {if level.plan_at(plan,x+d.x,y+d.y)==.Outside {outward=d}}
+	}}
+	at:grid.Position
+	expected:game.Structure_Stage
+	switch step {
+	case 0:at,expected=grid.offset(door, outward.x*6, outward.y*6),.Far
+	case 1:at,expected=grid.offset(door, outward.x*4, outward.y*4),.Approaching
+	case 2:at,expected=grid.offset(door, outward.x*2, outward.y*2),.Approaching
+	case 3:at,expected=grid.offset(door, outward.x, outward.y),.Threshold
+	case 4:at,expected=door,.Threshold
+	case 5:at,expected=grid.offset(door, -outward.x*2, -outward.y*2),.Inside
+	case 6:at,expected=grid.offset(door, outward.x*4, outward.y*4),.Approaching
+	case:
+		// Round the objects: next to the first one that is not a building.
+		expected=.Far
+		for other,i in data.structures {
+			if level.structure_is_building(other.id) {continue}
+			for d in ([6]grid.Position{{x = -3, y = 0},{x = 3, y = 0},{x = 0, y = -3},{x = 0, y = 3},{x = -4, y = 1},{x = 4, y = -1}}) {
+				p:=game.add_position(other.origin,d)
+				if !game.cell_blocks_movement(&e.rs.room,p) {at=p;break}
+			}
+			_=i;break
+		}
+	}
+	e.rs.room.player.position=at
+	e.rs.iso_renderer.tactical.expedition_follow_ready=false
+	if step<7 {
+		view:=game.structure_visibility(data,hut,{f32(at.x)+.5,f32(at.y)+.5})
+		assert(view.stage==expected,"the hut is not in the stage the act expects")
+		if view.stage==.Inside {assert(view.opacity==1 && !view.roof,"inside, the walls are whole and the roof hidden")}
 	}
 }

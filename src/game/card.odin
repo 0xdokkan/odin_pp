@@ -4,6 +4,9 @@ import grid "../engine/grid"
 
 MAX_CARD_DEFINITION_EFFECTS :: 4
 MAX_CARD_UPGRADE_LEVEL :: 10
+// The upgrade at which a card that evolves becomes the next one (docs/registro-carte.md): Guard, Strike, Arc Bolt, Fate
+// Strike and Venom Needle at their second.
+CARD_EVOLVE_LEVEL :: i32(2)
 
 Card_Rarity :: enum {
 	Common,
@@ -71,12 +74,27 @@ Card_Id :: enum {
 	Pinball,
 	First_Person,
 	Cannon, Flood, Black_Hole, Bomb_Marley, Dinosaur,
+	Marley_Party,
+	Flood_Wave,
+	Field_Cannon,
+	// What the Cannone becomes at its second upgrade (never offered).
+	Laser_Cannon,
+	Devouring_Hole,
+	Dino_Ride,
+	// FIRST PERSON BRAWLER: the fists behind his eyes (first_person_fists.odin), lab only.
+	First_Person_Brawler,
+	// FIRST PERSON FENCER: the sword behind his eyes (first_person_sword.odin), lab only.
+	First_Person_Fencer,
+	// FIRST PERSON ARCHER: the bow behind his eyes (first_person_bow.odin), lab only.
+	First_Person_Archer,
 	Count,
 }
 
 // Static card traits live with the definition; rules, previews and menus query
 // these through the existing predicates instead of maintaining card lists.
-Card_Trait :: enum { Scopa, Room_Tool, Player_Charge, Board_Device, Ground }
+// `Retired`: a card taken out of the game (docs/registro-carte.md). Its code stays, so that it can come back by taking the
+// trait off, but nothing deals, offers, sells or discovers it.
+Card_Trait :: enum { Scopa, Room_Tool, Player_Charge, Board_Device, Ground, Emplacement, Lab_Only, Retired }
 
 @(private = "file")
 card_has_trait :: proc(id: Card_Id, trait: Card_Trait) -> bool {
@@ -90,6 +108,26 @@ card_is_room_tool :: proc(id: Card_Id) -> bool { return card_has_trait(id, .Room
 card_loads_player_charge :: proc(id: Card_Id) -> bool { return card_has_trait(id, .Player_Charge) }
 card_is_board_device :: proc(id: Card_Id) -> bool { return card_has_trait(id, .Board_Device) }
 card_places_ground :: proc(id: Card_Id) -> bool { return card_has_trait(id, .Ground) }
+// A cannon, a laser cannon or a black hole: set down on a free cell for a while (emplacement.odin).
+card_is_emplacement :: proc(id: Card_Id) -> bool { return card_has_trait(id, .Emplacement) }
+// Only in the Prova meccaniche for now (Bomb Marley, Inondazione, the cannons, Buco
+// Nero, Dinosauro): never offered, sold or discovered anywhere else.
+card_is_lab_only :: proc(id: Card_Id) -> bool { return card_has_trait(id, .Lab_Only) }
+// Taken out of the game (docs/registro-carte.md): kept in the code, never dealt, offered, sold or discovered.
+card_is_retired :: proc(id: Card_Id) -> bool { return card_has_trait(id, .Retired) }
+// A card of the collection: one the campaign can discover, the run's pool can hold and the archive counts. Not a card of
+// the lab, not a retired one, not one that only an upgrade makes, not a temporary one.
+card_in_collection :: proc(id: Card_Id) -> bool {
+	if id < .Strike || id >= .Count || card_is_lab_only(id) || card_is_retired(id) { return false }
+	definition := CARD_DEFINITIONS[id]
+	return !definition.evolution_only && !definition.temporary_only
+}
+// The kind of object an emplacement card sets down.
+card_emplacement_kind :: proc(id: Card_Id) -> Grid_Object_Kind {
+	return .Devouring_Hole if id == .Devouring_Hole else .Field_Cannon
+}
+// A card the player aims with the mouse wheel before he plays it.
+card_is_wheel_aimed :: proc(id: Card_Id) -> bool { return id == .Flood_Wave || id == .Field_Cannon || id == .Laser_Cannon }
 
 card_dice_count :: proc(id: Card_Id) -> int {
 	return CARD_DEFINITIONS[id].dice_count if id >= .Strike && id < .Count else 0
@@ -170,6 +208,12 @@ Card_Definition :: struct {
 	exhaust_on_play: bool,
 	retain_on_refocus: bool,
 	ethereal:          bool,
+	// A card that becomes another when its upgrade reaches `evolve_level` (the
+	// new card starts at upgrade 0), and the card nobody is offered but an
+	// upgrade makes (evolution_only).
+	evolves_to:        Card_Id,
+	evolve_level:      i32,
+	evolution_only:    bool,
 	targeting:       Targeting_Spec,
 	effects:         [MAX_CARD_DEFINITION_EFFECTS]Card_Effect_Template,
 	effect_count:    int,
@@ -188,6 +232,8 @@ Card_Instance :: struct {
 @(private, rodata)
 CARD_DEFINITIONS := [Card_Id]Card_Definition{
 	.Strike = {
+		// At its second upgrade it becomes Cross Slash, which starts again from its own level 0 (docs/registro-carte.md).
+		evolves_to = .Cross_Slash, evolve_level = CARD_EVOLVE_LEVEL,
 		upgrade_limit = MAX_CARD_UPGRADE_LEVEL, time_cost = 2,
 		id = .Strike,
 		name = "Strike",
@@ -214,6 +260,8 @@ CARD_DEFINITIONS := [Card_Id]Card_Definition{
 		effect_count = 1,
 	},
 	.Arc_Bolt = {
+		// At its second upgrade it becomes Chain Lightning, which starts again from its own level 0 (docs/registro-carte.md).
+		evolves_to = .Chain_Lightning, evolve_level = CARD_EVOLVE_LEVEL,
 		upgrade_limit = MAX_CARD_UPGRADE_LEVEL, time_cost = 2,
 		id = .Arc_Bolt,
 		name = "Arc Bolt",
@@ -270,11 +318,13 @@ CARD_DEFINITIONS := [Card_Id]Card_Definition{
 		effect_count = 1,
 	},
 	.Cross_Slash = {
+		// Only an upgrade of Strike makes it now (docs/registro-carte.md): never offered, sold or discovered.
+		evolution_only = true,
 		upgrade_limit = MAX_CARD_UPGRADE_LEVEL, time_cost = 3,
 		id = .Cross_Slash,
 		name = "Cross Slash",
 		rarity = .Uncommon,
-		reward_weight = 90,
+		reward_weight = 0,
 		shop_base_price = 5,
 		cost = 2,
 		targeting = {
@@ -329,6 +379,8 @@ CARD_DEFINITIONS := [Card_Id]Card_Definition{
 		effect_count = 1,
 	},
 	.Guard = {
+		// At its second upgrade it becomes Purifying Guard, which starts again from its own level 0 (docs/registro-carte.md).
+		evolves_to = .Purifying_Guard, evolve_level = CARD_EVOLVE_LEVEL,
 		upgrade_limit = MAX_CARD_UPGRADE_LEVEL, time_cost = 1,
 		id = .Guard,
 		name = "Guard",
@@ -376,6 +428,8 @@ CARD_DEFINITIONS := [Card_Id]Card_Definition{
 		effect_count = 1,
 	},
 	.Thorn_Coat = {
+		// RITIRATA (docs/registro-carte.md): kept so it can come back, but nothing deals it.
+		traits = {.Retired},
 		upgrade_limit = MAX_CARD_UPGRADE_LEVEL, time_cost = 1,
 		id = .Thorn_Coat,
 		name = "Thorn Coat",
@@ -400,6 +454,8 @@ CARD_DEFINITIONS := [Card_Id]Card_Definition{
 		effect_count = 1,
 	},
 	.Afterimage = {
+		// RITIRATA (docs/registro-carte.md): kept so it can come back, but nothing deals it.
+		traits = {.Retired},
 		upgrade_limit = MAX_CARD_UPGRADE_LEVEL, time_cost = 1,
 		id = .Afterimage,
 		name = "Afterimage",
@@ -424,6 +480,8 @@ CARD_DEFINITIONS := [Card_Id]Card_Definition{
 		effect_count = 1,
 	},
 	.Counter_Rune = {
+		// RITIRATA (docs/registro-carte.md): kept so it can come back, but nothing deals it.
+		traits = {.Retired},
 		upgrade_limit = MAX_CARD_UPGRADE_LEVEL, time_cost = 1,
 		id = .Counter_Rune,
 		name = "Counter Rune",
@@ -450,6 +508,8 @@ CARD_DEFINITIONS := [Card_Id]Card_Definition{
 		effect_count = 1,
 	},
 	.Battle_Focus = {
+		// RITIRATA (docs/registro-carte.md): kept so it can come back, but nothing deals it.
+		traits = {.Retired},
 		upgrade_limit = MAX_CARD_UPGRADE_LEVEL, time_cost = 1,
 		id = .Battle_Focus,
 		name = "Battle Focus",
@@ -498,6 +558,8 @@ CARD_DEFINITIONS := [Card_Id]Card_Definition{
 			effect_count = 2,
 	},
 	.Spark_Forge = {
+		// RITIRATA (docs/registro-carte.md): kept so it can come back, but nothing deals it.
+		traits = {.Retired},
 		upgrade_limit = MAX_CARD_UPGRADE_LEVEL, time_cost = 1,
 		id = .Spark_Forge,
 		name = "Spark Forge",
@@ -521,6 +583,8 @@ CARD_DEFINITIONS := [Card_Id]Card_Definition{
 		effect_count = 1,
 	},
 	.Spark = {
+		// RITIRATA (docs/registro-carte.md): kept so it can come back, but nothing deals it.
+		traits = {.Retired},
 		upgrade_limit = MAX_CARD_UPGRADE_LEVEL, time_cost = 1,
 		id = .Spark,
 		name = "Spark",
@@ -663,6 +727,8 @@ CARD_DEFINITIONS := [Card_Id]Card_Definition{
 		effect_count = 2,
 	},
 	.Venom_Needle = {
+		// At its second upgrade it becomes Twin Venom, which starts again from its own level 0 (docs/registro-carte.md).
+		evolves_to = .Twin_Venom, evolve_level = CARD_EVOLVE_LEVEL,
 		upgrade_limit = MAX_CARD_UPGRADE_LEVEL, time_cost = 2,
 		id = .Venom_Needle,
 		name = "Venom Needle",
@@ -726,11 +792,13 @@ CARD_DEFINITIONS := [Card_Id]Card_Definition{
 		effect_count = 1,
 	},
 	.Purifying_Guard = {
+		// Only an upgrade of Guard makes it now (docs/registro-carte.md): never offered, sold or discovered.
+		evolution_only = true,
 		upgrade_limit = MAX_CARD_UPGRADE_LEVEL, time_cost = 1,
 		id = .Purifying_Guard,
 		name = "Purifying Guard",
 		rarity = .Uncommon,
-		reward_weight = 80,
+		reward_weight = 0,
 		shop_base_price = 5,
 		cost = 1,
 		targeting = {rule = .Self},
@@ -754,6 +822,8 @@ CARD_DEFINITIONS := [Card_Id]Card_Definition{
 		effect_count = 2,
 	},
 	.Volatile_Study = {
+		// RITIRATA (docs/registro-carte.md): kept so it can come back, but nothing deals it.
+		traits = {.Retired},
 		upgrade_limit = MAX_CARD_UPGRADE_LEVEL, time_cost = 1,
 		id = .Volatile_Study,
 		name = "Volatile Study",
@@ -784,6 +854,8 @@ CARD_DEFINITIONS := [Card_Id]Card_Definition{
 		effect_count = 2,
 	},
 	.Fate_Strike = {
+		// At its second upgrade it becomes Prismatic Barrage, which starts again from its own level 0 (docs/registro-carte.md).
+		evolves_to = .Prismatic_Barrage, evolve_level = CARD_EVOLVE_LEVEL,
 		upgrade_limit = MAX_DICE_UPGRADE_LEVEL, time_cost = 2,
 		dice_count = 1,
 		id = .Fate_Strike,
@@ -803,11 +875,13 @@ CARD_DEFINITIONS := [Card_Id]Card_Definition{
 		effect_count = 1,
 	},
 	.Chain_Lightning = {
+		// Only an upgrade of Arc Bolt makes it now (docs/registro-carte.md): never offered, sold or discovered.
+		evolution_only = true,
 		upgrade_limit = MAX_CARD_UPGRADE_LEVEL, time_cost = 4,
 		id = .Chain_Lightning,
 		name = "Chain Lightning",
 		rarity = .Rare,
-		reward_weight = 65,
+		reward_weight = 0,
 		shop_base_price = 8,
 		cost = 2,
 		targeting = {
@@ -844,12 +918,14 @@ CARD_DEFINITIONS := [Card_Id]Card_Definition{
 		effect_count = 2,
 	},
 	.Prismatic_Barrage = {
+		// Only an upgrade of Fate Strike makes it now (docs/registro-carte.md): never offered, sold or discovered.
+		evolution_only = true,
 		upgrade_limit = MAX_DICE_UPGRADE_LEVEL, time_cost = 4,
 		dice_count = 3,
 		id = .Prismatic_Barrage,
 		name = "Prismatic Barrage",
 		rarity = .Uncommon,
-		reward_weight = 75,
+		reward_weight = 0,
 		shop_base_price = 6,
 		cost = 2,
 		targeting = {
@@ -867,12 +943,14 @@ CARD_DEFINITIONS := [Card_Id]Card_Definition{
 		effect_count = 2,
 	},
 	.Twin_Venom = {
+		// Only an upgrade of Venom Needle makes it now (docs/registro-carte.md): never offered, sold or discovered.
+		evolution_only = true,
 		upgrade_limit = MAX_DICE_UPGRADE_LEVEL, time_cost = 3,
 		dice_count = 2,
 		id = .Twin_Venom,
 		name = "Twin Venom",
 		rarity = .Uncommon,
-		reward_weight = 75,
+		reward_weight = 0,
 		shop_base_price = 6,
 		cost = 2,
 		targeting = {
@@ -908,6 +986,8 @@ CARD_DEFINITIONS := [Card_Id]Card_Definition{
 		effect_count = 1,
 	},
 	.Titan_Grip = {
+		// RITIRATA (docs/registro-carte.md): kept so it can come back, but nothing deals it.
+		traits = {.Retired},
 		upgrade_limit = MAX_CARD_UPGRADE_LEVEL, time_cost = 3,
 		id = .Titan_Grip, name = "Titan Grip", rarity = .Rare,
 		reward_weight = 65, shop_base_price = 9, cost = 2,
@@ -1070,6 +1150,44 @@ CARD_DEFINITIONS := [Card_Id]Card_Definition{
 			amount_per_upgrade = FIRST_PERSON_SECONDS_PER_UPGRADE}, {}, {}, {}},
 		effect_count = 1,
 	},
+	.First_Person_Brawler = {
+		upgrade_limit = FIRST_PERSON_MAX_UPGRADE_LEVEL, time_cost = 0, traits = {.Lab_Only},
+		// FIRST PERSON BRAWLER (docs/piano-prima-persona.md, Fase 2): his own eyes and
+		// his fists for twenty seconds of the world's, as First Person Shooter's AK:
+		// moving free, jab, cross and hooks, critical marks (first_person_fists.odin).
+		// The effect's charges name the weapon.
+		id = .First_Person_Brawler, name = "First Person Brawler", rarity = .Rare,
+		reward_weight = 60, shop_base_price = 8, cost = 3,
+		targeting = {rule = .Self},
+		effects = {{kind = .First_Person, target = .Player, base_amount = FIRST_PERSON_SECONDS,
+			amount_per_upgrade = FIRST_PERSON_SECONDS_PER_UPGRADE, charges = i32(First_Person_Weapon.Fists)}, {}, {}, {}},
+		effect_count = 1,
+	},
+	.First_Person_Fencer = {
+		upgrade_limit = FIRST_PERSON_MAX_UPGRADE_LEVEL, time_cost = 0, traits = {.Lab_Only},
+		// FIRST PERSON FENCER (docs/piano-prima-persona.md, Fase 4): his own eyes and
+		// a sword for thirty-five seconds of the world's (FENCER_SECONDS), +2 an upgrade:
+		// the blade moved by the mouse, the guard, the grapple (first_person_sword.odin).
+		id = .First_Person_Fencer, name = "First Person Fencer", rarity = .Rare,
+		reward_weight = 60, shop_base_price = 8, cost = 3,
+		targeting = {rule = .Self},
+		effects = {{kind = .First_Person, target = .Player, base_amount = FENCER_SECONDS,
+			amount_per_upgrade = FIRST_PERSON_SECONDS_PER_UPGRADE, charges = i32(First_Person_Weapon.Sword)}, {}, {}, {}},
+		effect_count = 1,
+	},
+	.First_Person_Archer = {
+		upgrade_limit = FIRST_PERSON_MAX_UPGRADE_LEVEL, time_cost = 0, traits = {.Lab_Only},
+		// FIRST PERSON ARCHER (docs/piano-prima-persona.md, Fase 6): his own eyes and a
+		// bow for thirty seconds of the world's (ARCHER_SECONDS), +2 an upgrade: drawn
+		// with the right button, its arrows bouncing off the walls faster each time
+		// (first_person_bow.odin).
+		id = .First_Person_Archer, name = "First Person Archer", rarity = .Rare,
+		reward_weight = 60, shop_base_price = 8, cost = 3,
+		targeting = {rule = .Self},
+		effects = {{kind = .First_Person, target = .Player, base_amount = ARCHER_SECONDS,
+			amount_per_upgrade = FIRST_PERSON_SECONDS_PER_UPGRADE, charges = i32(First_Person_Weapon.Bow)}, {}, {}, {}},
+		effect_count = 1,
+	},
 	.Cannon = {
 		upgrade_limit = MAX_CARD_UPGRADE_LEVEL, time_cost = 2, traits = {.Board_Device},
 		id = .Cannon, name = "Cannone", rarity = .Uncommon, reward_weight = 45, shop_base_price = 7, cost = 2,
@@ -1103,6 +1221,78 @@ CARD_DEFINITIONS := [Card_Id]Card_Definition{
 		id = .Dinosaur, name = "Dinosauro", rarity = .Rare, reward_weight = 45, shop_base_price = 7, cost = 2,
 		targeting = {rule = .Self},
 		effects = {{kind = .Apply_Status, target = .Player, base_amount = 5, amount_per_upgrade = 1, status = .Shield, duration = 12}, {}, {}, {}},
+		effect_count = 1,
+	},
+	.Marley_Party = {
+		upgrade_limit = MARLEY_MAX_UPGRADE_LEVEL, time_cost = 2, traits = {.Lab_Only},
+		// BOMB MARLEY: a party in the room for MARLEY_SECONDS world seconds (+5 a
+		// foe its bombs kill, 90 in all): lit cells that save, bombs down whole
+		// columns that hurt for 6 (+1 per upgrade) (marley.odin).
+		id = .Marley_Party, name = "Bomb Marley", rarity = .Rare,
+		reward_weight = 60, shop_base_price = 8, cost = 3,
+		targeting = {rule = .Self},
+		effects = {{kind = .Marley, target = .Player, base_amount = MARLEY_BASE_DAMAGE, amount_per_upgrade = 1,
+			duration = MARLEY_SECONDS}, {}, {}, {}},
+		effect_count = 1,
+	},
+	.Flood_Wave = {
+		upgrade_limit = FLOOD_MAX_UPGRADE_LEVEL, time_cost = 2, traits = {.Lab_Only},
+		// INONDAZIONE: dropped on a cell round the player, a wave sweeps the board
+		// from the wall behind to the wall in front of that way, pushing every foe
+		// 1 cell (+1 per upgrade) and putting out the fires (flood.odin).
+		id = .Flood_Wave, name = "Inondazione", rarity = .Uncommon,
+		reward_weight = 75, shop_base_price = 6, cost = 2,
+		targeting = {rule = .Cell, cast_range = {.Chebyshev, 1, 3}, shape = .Single},
+		effects = {{kind = .Flood_Wave, target = .Player, base_amount = FLOOD_BASE_PUSH, amount_per_upgrade = 1}, {}, {}, {}},
+		effect_count = 1,
+	},
+	.Field_Cannon = {
+		upgrade_limit = CANNON_MAX_UPGRADE_LEVEL, time_cost = 2,
+		traits = {.Emplacement, .Lab_Only},
+		// CANNONE: a cannon on its stand, aimed with the wheel, that fires a ball
+		// every world second for 20 and then falls apart: 2 damage (+1 an upgrade) to
+		// the first foe in its line. At its second upgrade it becomes the Cannone
+		// laser (cannon.odin).
+		evolves_to = .Laser_Cannon, evolve_level = CANNON_EVOLVE_LEVEL,
+		id = .Field_Cannon, name = "Cannone", rarity = .Uncommon,
+		reward_weight = 70, shop_base_price = 6, cost = 2,
+		targeting = {rule = .Walkable_Cell, cast_range = {.Chebyshev, 1, 3}, shape = .Single, requires_line_of_sight = true, stops_on_wall = true},
+		effects = {{kind = .Place_Cannon, target = .Player, base_amount = CANNON_BASE_DAMAGE, amount_per_upgrade = 1, duration = CANNON_SECONDS}, {}, {}, {}},
+		effect_count = 1,
+	},
+	.Laser_Cannon = {
+		upgrade_limit = LASER_MAX_UPGRADE_LEVEL, time_cost = 2,
+		traits = {.Emplacement, .Lab_Only},
+		// CANNONE LASER: the same stand, a beam in place of the ball: every foe on the
+		// line takes 3 damage (+1 an upgrade).
+		evolution_only = true,
+		id = .Laser_Cannon, name = "Cannone Laser", rarity = .Rare,
+		reward_weight = 0, shop_base_price = 8, cost = 2,
+		targeting = {rule = .Walkable_Cell, cast_range = {.Chebyshev, 1, 3}, shape = .Single, requires_line_of_sight = true, stops_on_wall = true},
+		effects = {{kind = .Place_Cannon, target = .Player, base_amount = LASER_BASE_DAMAGE, amount_per_upgrade = 1, duration = CANNON_SECONDS}, {}, {}, {}},
+		effect_count = 1,
+	},
+	.Devouring_Hole = {
+		upgrade_limit = BLACK_HOLE_MAX_UPGRADE_LEVEL, time_cost = 2,
+		traits = {.Emplacement, .Lab_Only},
+		// BUCO NERO: a hole of 3x3 that draws the foes of the 5x5 round it in and
+		// hurts them, 8 world seconds; its upgrades widen both and add damage
+		// (black_hole.odin).
+		id = .Devouring_Hole, name = "Buco Nero", rarity = .Rare,
+		reward_weight = 60, shop_base_price = 8, cost = 3,
+		targeting = {rule = .Walkable_Cell, cast_range = {.Chebyshev, 1, 3}, shape = .Single, requires_line_of_sight = true, stops_on_wall = true},
+		effects = {{kind = .Open_Black_Hole, target = .Player, base_amount = BLACK_HOLE_BASE_DAMAGE, amount_per_upgrade = 1, duration = BLACK_HOLE_SECONDS}, {}, {}, {}},
+		effect_count = 1,
+	},
+	.Dino_Ride = {
+		upgrade_limit = MAX_DICE_UPGRADE_LEVEL, time_cost = 2, dice_count = 1, traits = {.Lab_Only},
+		// DINOSAURO: a d4 names the dinosaur the player rides for 20 world seconds
+		// (+3 an upgrade): Velociraptor, Stegosauro, Dilophosaurus, Giganotosauro
+		// (dinosaur.odin).
+		id = .Dino_Ride, name = "Dinosauro", rarity = .Rare,
+		reward_weight = 60, shop_base_price = 8, cost = 3,
+		targeting = {rule = .Self},
+		effects = {{kind = .Ride, target = .Player, base_amount = RIDE_SECONDS, amount_per_upgrade = RIDE_SECONDS_PER_UPGRADE}, {}, {}, {}},
 		effect_count = 1,
 	},
 	.Count = {id = .Count},
@@ -1245,9 +1435,24 @@ card_effect_template_is_valid :: proc(
 		}
 		reaction, found := reaction_definition_by_id(template.reaction)
 		return found && validate_reaction_definition(&reaction) && card_amount_template_is_valid(template)
-	// The player's own seconds behind his eyes.
+	// The player's own seconds behind his eyes, with a weapon (its charges).
 	case .First_Person:
-		return template.target == .Player && definition.targeting.rule == .Self && card_amount_template_is_valid(template)
+		_, known := first_person_effect_weapon(template.charges)
+		return known && template.target == .Player && definition.targeting.rule == .Self && card_amount_template_is_valid(template)
+	// The party's bombs and seconds.
+	case .Marley:
+		return template.target == .Player && definition.targeting.rule == .Self && template.duration > 0 &&
+		       card_amount_template_is_valid(template)
+	// A cell to set an emplacement on; the Dinosauro's ride on the player.
+	case .Place_Cannon, .Open_Black_Hole:
+		return template.target == .Player && definition.targeting.rule == .Walkable_Cell && definition.targeting.shape == .Single &&
+		       template.duration > 0 && card_amount_template_is_valid(template)
+	case .Ride:
+		return template.target == .Player && definition.targeting.rule == .Self && definition.dice_count > 0 && card_amount_template_is_valid(template)
+	// A cell aimed at: the wave's way.
+	case .Flood_Wave:
+		return template.target == .Player && definition.targeting.rule == .Cell && definition.targeting.shape == .Single &&
+		       card_amount_template_is_valid(template)
 	}
 	return false
 }
@@ -1262,8 +1467,9 @@ validate_card_definition :: proc(definition: ^Card_Definition) -> bool {
 	   definition.effect_count <= 0 || definition.effect_count > MAX_CARD_DEFINITION_EFFECTS {
 		return false
 	}
-	if (!definition.temporary_only &&
+	if (!definition.temporary_only && !definition.evolution_only &&
 	    (definition.reward_weight == 0 || definition.shop_base_price <= 0)) ||
+	   (definition.evolution_only && (definition.reward_weight != 0 || definition.shop_base_price <= 0 || definition.temporary_only)) ||
 	   (definition.temporary_only &&
 	    (definition.reward_weight != 0 || definition.shop_base_price != 0 || definition.exhaust_on_play)) {
 		return false
@@ -1432,7 +1638,19 @@ instantiate_card_effect :: proc(
 	case .Move, .Gain_Energy:
 			return {}, false
 	case .First_Person:
-		return first_person_effect(card_effect_amount(template, instance.upgrade_level)), true
+		weapon, known := first_person_effect_weapon(template.charges)
+		if !known { return {}, false }
+		return first_person_effect(card_effect_amount(template, instance.upgrade_level), weapon), true
+	case .Marley:
+		return marley_effect(card_effect_amount(template, instance.upgrade_level), template.duration), true
+	case .Flood_Wave:
+		return flood_effect(card_effect_amount(template, instance.upgrade_level), {}), true
+	case .Place_Cannon:
+		return place_cannon_effect(card_effect_amount(template, instance.upgrade_level), template.duration, instance.definition_id == .Laser_Cannon), true
+	case .Open_Black_Hole:
+		return open_black_hole_effect(card_effect_amount(template, instance.upgrade_level), template.duration, black_hole_radius(instance.upgrade_level)), true
+	case .Ride:
+		return ride_effect(card_effect_amount(template, instance.upgrade_level), .Raptor), true
 	}
 	return {}, false
 }
@@ -1653,6 +1871,11 @@ evaluate_validated_card_targeting :: proc(
 		evaluation.error = .Target_Blocked
 		return
 	}
+	// CANNONE and BUCO NERO: a free cell, and room for one more of the kind.
+	if card_is_emplacement(instance.definition_id) && !emplacement_can_place(room, card_emplacement_kind(instance.definition_id), evaluation.query.anchor) {
+		evaluation.error = .Target_Blocked
+		return
+	}
 	// LAZZO: never a boss's weight, and a ring with room to swing the foe.
 	if instance.definition_id == .Lasso {
 		if refusal := lasso_target_error(room, evaluation.query.primary_target); refusal != .None {
@@ -1794,6 +2017,49 @@ build_card_target_plan :: proc(room: ^Room, card: Card_Id, definition: Card_Defi
 	return
 }
 
+// The foes a cast would really affect, for the board's "this one can be hit"
+// mark: the ones the effect plan names (damage, push, status...), the same
+// expansion the play itself compiles, not every foe the line or the area covers
+// (a Dash lists the foes on its line and hits none). Nothing for a cast the
+// evaluation refuses. A card whose foes are only known when it resolves (the
+// random columns of Bomb Marley, the die of the Dinosauro) names none.
+MAX_CARD_HITS :: MAX_ENEMIES_PER_ROOM
+Card_Hit_Set :: struct {
+	ids:   [MAX_CARD_HITS]u32,
+	count: int,
+}
+
+card_hit_set_contains :: proc(set: ^Card_Hit_Set, id: u32) -> bool {
+	for known in set.ids[:set.count] { if known == id { return true } }
+	return false
+}
+
+card_hit_set_add :: proc(set: ^Card_Hit_Set, id: u32) {
+	if set.count < len(set.ids) && !card_hit_set_contains(set, id) {
+		set.ids[set.count] = id
+		set.count += 1
+	}
+}
+
+card_hit_enemies :: proc(room: ^Room, instance: Card_Instance, evaluation: ^Card_Target_Evaluation) -> (hits: Card_Hit_Set) {
+	if room == nil || evaluation == nil || evaluation.error != .None { return }
+	definition, found := card_definition_by_id(instance.definition_id)
+	if !found { return }
+	plan := build_card_target_plan(room, instance.definition_id, definition, &evaluation.query, true)
+	for entry in plan.targets[:min(plan.count, len(plan.targets))] {
+		if entry.entity.kind != .Enemy || enemy_is_out_of_play(room, entry.entity.id) { continue }
+		if _, present := enemy_index_by_id(room, entry.entity.id); present { card_hit_set_add(&hits, entry.entity.id) }
+	}
+	// INONDAZIONE: the wave sweeps every foe in play, wherever it is dropped.
+	for index in 0..<definition.effect_count {
+		if definition.effects[index].kind != .Flood_Wave { continue }
+		for enemy in room.enemies {
+			if !enemy_is_out_of_play(room, enemy.id) && tactical_cell_visible(room, enemy.position) { card_hit_set_add(&hits, enemy.id) }
+		}
+	}
+	return
+}
+
 compile_card_action :: proc(
 	room: ^Room,
 	instance: Card_Instance,
@@ -1839,7 +2105,15 @@ compile_card_action :: proc(
 			continue
 		}
 		effect, instantiated := instantiate_card_effect(template, entry.entity, instance)
-		if effect.kind == .Deploy_Device || effect.kind == .Place_Ground { effect.destination = evaluation.query.anchor }
+		if effect.kind == .Deploy_Device || effect.kind == .Place_Ground || effect.kind == .Flood_Wave || effect.kind == .Place_Cannon || effect.kind == .Open_Black_Hole {
+				effect.destination = evaluation.query.anchor
+			}
+			// A cannon's way: the wheel's, else the way from the player to its cell.
+			if effect.kind == .Place_Cannon {
+				way, derived := flood_direction(room.player.position, evaluation.query.anchor)
+				if room.has_aim { way, derived = room.aim, true }
+				effect.charges = i32(way) if derived else 0
+			}
 		if instance.definition_id == .Strike && effect.kind == .Damage { effect.amount += tactical_strike_bonus(room, entry.entity) }
 		if !instantiated {
 			return {}, .Too_Many_Effects if template.target == .Each_Affected_Enemy && entry.entity.kind == .Object else .Invalid_Definition

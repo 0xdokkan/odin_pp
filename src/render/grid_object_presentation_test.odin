@@ -9,7 +9,7 @@ make_grid_object_presentation_test_room :: proc(player: ^game.Player) -> game.Ro
 	append(&result.objects, game.Grid_Object{
 		id = 7,
 		kind = .Ice_Block,
-		position = {3, 2},
+		position = {x = 3, y = 2},
 		max_health = 4,
 		health = 4,
 	})
@@ -36,7 +36,7 @@ test_grid_object_presentation_snapshot_is_independent_from_room_state :: proc(t:
 		testing.expect(t, object.visible)
 	}
 
-	room.objects[0].position = {8, 8}
+	room.objects[0].position = {x = 8, y = 8}
 	room.objects[0].health = 1
 	object, found = presentation_grid_object_in_view(&presentation, object_ref)
 	if found {
@@ -59,8 +59,8 @@ test_grid_object_timeline_replays_move_damage_and_destruction_after_removal :: p
 	game.record_event(&events, {
 		kind = .Moved,
 		target = object_ref,
-		from_position = {3, 2},
-		to_position = {4, 2},
+		from_position = {x = 3, y = 2},
+		to_position = {x = 4, y = 2},
 	})
 	game.record_event(&events, {kind = .Damaged, target = object_ref, amount = 2})
 	game.record_event(&events, {kind = .Entity_Defeated, target = object_ref})

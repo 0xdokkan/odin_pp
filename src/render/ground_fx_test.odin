@@ -54,8 +54,8 @@ ground_test_joined :: proc(fx: ^Ground_Fx, from, to: grid.Position) -> bool {
 	for head := 0; head < len(queue); head += 1 {
 		at := queue[head]
 		if at == to { return true }
-		for step in ([4]grid.Position{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}) {
-			next := grid.Position{at.x+step.x, at.y+step.y}
+		for step in ([4]grid.Position{{x = 1, y = 0}, {x = -1, y = 0}, {x = 0, y = 1}, {x = 0, y = -1}}) {
+			next := grid.offset(at, step.x, step.y)
 			if next.x < 0 || next.y < 0 || next.x >= width || next.y >= height || seen[next.y*width+next.x] ||
 			   !ground_test_is_venom(fx, next.x, next.y) { continue }
 			seen[next.y*width+next.x] = true
@@ -79,17 +79,17 @@ test_ground_snapshot_shows_a_pool_from_its_landing :: proc(t: ^testing.T) {
 	defer level.destroy(&data)
 	player := spell_presentation_player(t, .Poison_Pool)
 	testing.expect(t, game.configure_tactical(&player, game.DEFAULT_TACTICAL_CONFIG))
-	enemies := [?]game.Enemy_Spawn{{position = {8, 1}, health = 20, attack = 1}}
+	enemies := [?]game.Enemy_Spawn{{position = {x = 8, y = 1}, health = 20, attack = 1}}
 	room, created := game.create_room(&data, &player, {enemies = enemies[:]})
 	testing.expect(t, created)
 	defer game.destroy_room(&room)
-	cell := grid.Position{5, 1}
+	cell := grid.Position{x = 5, y = 1}
 	before := capture_room_presentation(&room)
 	played := game.play_card(&room, player.deck.hand[0].id, game.cell_target(cell))
 	testing.expect(t, game.card_play_was_committed(played.result))
 	after := capture_room_presentation(&room)
 	testing.expect(t, !presentation_ground_pool(&before.ground, cell) && presentation_ground_pool(&after.ground, cell))
-	testing.expect(t, !presentation_ground_pool(&after.ground, {4, 1}) && after.ground.width == data.tiles.width)
+	testing.expect(t, !presentation_ground_pool(&after.ground, {x = 4, y = 1}) && after.ground.width == data.tiles.width)
 	renderer := new(Renderer)
 	defer { destroy_renderer_world_playback(renderer); free(renderer) }
 	testing.expect(t, begin_renderer_event_timeline(renderer, before, room.recent_events, &after))
@@ -114,16 +114,16 @@ test_ground_snapshot_shows_a_pool_from_its_landing :: proc(t: ^testing.T) {
 	snapshot := renderer_presentation_snapshot(renderer, &room)
 	testing.expect(t, presentation_ground_pool(&snapshot.ground, cell))
 	// The fires are copied as they stand: a centre and its arms.
-	testing.expect(t, ground_test_pour(&room, .Burn, {3, 4}, 2))
+	testing.expect(t, ground_test_pour(&room, .Burn, {x = 3, y = 4}, 2))
 	burn: game.Pulse_Report
 	game.grow_ground_fires(&room, &burn)
 	fires := capture_room_presentation(&room)
 	testing.expect_value(t, fires.ground.fire_count, 1)
-	value, centre, last := presentation_ground_burn(&fires.ground, {3, 4})
+	value, centre, last := presentation_ground_burn(&fires.ground, {x = 3, y = 4})
 	testing.expect(t, value == 2 && centre && !last)
-	value, centre, _ = presentation_ground_burn(&fires.ground, {3, 5})
+	value, centre, _ = presentation_ground_burn(&fires.ground, {x = 3, y = 5})
 	testing.expect(t, value == 2 && !centre)
-	value, _, _ = presentation_ground_burn(&fires.ground, {3, 6})
+	value, _, _ = presentation_ground_burn(&fires.ground, {x = 3, y = 6})
 	testing.expect_value(t, value, i32(0))
 }
 
@@ -136,16 +136,16 @@ test_ground_decal_merges_neighbours_and_cuts_them_from_paper :: proc(t: ^testing
 	defer ground_test_free(&fx)
 	ground_fx_resize(&fx, 11, 9)
 	tx := fx.texels
-	for cell in ([?]grid.Position{{2, 2}, {3, 2}, {6, 5}, {7, 6}, {2, 6}}) { fx.cells[cell.y*fx.width+cell.x].layers += {.Pool} }
+	for cell in ([?]grid.Position{{x = 2, y = 2}, {x = 3, y = 2}, {x = 6, y = 5}, {x = 7, y = 6}, {x = 2, y = 6}}) { fx.cells[cell.y*fx.width+cell.x].layers += {.Pool} }
 	for y in 0..<fx.height { for x in 0..<fx.width {
-		fx.cells[y*fx.width+x].content = bake_ground_cell(&fx, {x, y})
+		fx.cells[y*fx.width+x].content = bake_ground_cell(&fx, {x = x, y = y})
 	} }
 	// One across the shared side of (2, 2) and (3, 2)...
 	for v in tx/4..<tx*3/4 { testing.expect(t, ground_test_is_venom(&fx, 3*tx, 2*tx+v) && ground_test_is_venom(&fx, 3*tx-1, 2*tx+v)) }
-	testing.expect(t, ground_test_joined(&fx, {2*tx+tx/2, 2*tx+tx/2}, {3*tx+tx/2, 2*tx+tx/2}))
+	testing.expect(t, ground_test_joined(&fx, {x = 2*tx+tx/2, y = 2*tx+tx/2}, {x = 3*tx+tx/2, y = 2*tx+tx/2}))
 	// ...two at the corner (6, 5) and (7, 6) share.
 	testing.expect(t, ground_test_is_venom(&fx, 6*tx+tx/2, 5*tx+tx/2) && ground_test_is_venom(&fx, 7*tx+tx/2, 6*tx+tx/2))
-	testing.expect(t, !ground_test_joined(&fx, {6*tx+tx/2, 5*tx+tx/2}, {7*tx+tx/2, 6*tx+tx/2}))
+	testing.expect(t, !ground_test_joined(&fx, {x = 6*tx+tx/2, y = 5*tx+tx/2}, {x = 7*tx+tx/2, y = 6*tx+tx/2}))
 	// The lone pool (2, 6): its middle row from the centre to the right runs
 	// liquid, paper, ink, then the cut edge; to the left liquid, paper, ink.
 	row := 6*tx+tx/2
@@ -188,13 +188,13 @@ test_ground_decal_merges_neighbours_and_cuts_them_from_paper :: proc(t: ^testing
 @(test)
 test_ground_decal_bakes_the_same_a_little_at_a_time :: proc(t: ^testing.T) {
 	steps := [?]struct{cell: grid.Position, layers: Ground_Layers}{
-		{{4, 4}, {.Pool}}, {{5, 4}, {.Pool}}, {{4, 3}, {.Char}}, {{5, 5}, {.Pool, .Char}}, {{5, 4}, {}}, {{1, 1}, {.Pool}},
+		{{x = 4, y = 4}, {.Pool}}, {{x = 5, y = 4}, {.Pool}}, {{x = 4, y = 3}, {.Char}}, {{x = 5, y = 5}, {.Pool, .Char}}, {{x = 5, y = 4}, {}}, {{x = 1, y = 1}, {.Pool}},
 	}
 	whole: Ground_Fx
 	defer ground_test_free(&whole)
 	ground_fx_resize(&whole, 10, 8)
 	for step in steps { whole.cells[step.cell.y*whole.width+step.cell.x].layers = step.layers }
-	for y in 0..<whole.height { for x in 0..<whole.width { whole.cells[y*whole.width+x].content = bake_ground_cell(&whole, {x, y}) } }
+	for y in 0..<whole.height { for x in 0..<whole.width { whole.cells[y*whole.width+x].content = bake_ground_cell(&whole, {x = x, y = y}) } }
 	step_by_step: Ground_Fx
 	defer ground_test_free(&step_by_step)
 	ground_fx_resize(&step_by_step, 10, 8)
@@ -224,7 +224,7 @@ test_ground_flames_and_splashes_follow_the_board :: proc(t: ^testing.T) {
 	config := game.DEFAULT_TACTICAL_CONFIG
 	config.vision_size = 0
 	testing.expect(t, game.configure_tactical(&player, config))
-	enemies := [?]game.Enemy_Spawn{{position = {8, 1}, health = 20, attack = 1}}
+	enemies := [?]game.Enemy_Spawn{{position = {x = 8, y = 1}, health = 20, attack = 1}}
 	room, created := game.create_room(&data, &player, {enemies = enemies[:]})
 	testing.expect(t, created)
 	defer game.destroy_room(&room)
@@ -255,7 +255,7 @@ test_ground_flames_and_splashes_follow_the_board :: proc(t: ^testing.T) {
 		for sound in sounds.queue[:sounds.count] { if sound.sfx == sfx { count += 1 } }
 		return
 	}
-	testing.expect(t, ground_test_pour(&room, .Burn, {3, 3}, 1))
+	testing.expect(t, ground_test_pour(&room, .Burn, {x = 3, y = 3}, 1))
 	burn: game.Pulse_Report
 	game.grow_ground_fires(&room, &burn)
 	frame(renderer, &room, &snapshot)
@@ -285,10 +285,10 @@ test_ground_flames_and_splashes_follow_the_board :: proc(t: ^testing.T) {
 	testing.expect_value(t, flames(renderer, &room), 0)
 	testing.expect(t, .Char not_in fx.cells[3*fx.width+3].layers)
 	// A card steps into a pool: one splash, its sound queued.
-	testing.expect(t, ground_test_pour(&room, .Poison, {7, 1}))
+	testing.expect(t, ground_test_pour(&room, .Poison, {x = 7, y = 1}))
 	frame(renderer, &room, &snapshot)
 	splashed := fx.splashed
-	room.enemies[0].position = {7, 1}
+	room.enemies[0].position = {x = 7, y = 1}
 	frame(renderer, &room, &snapshot)
 	frame(renderer, &room, &snapshot)
 	testing.expect_value(t, fx.splashed, splashed+1)
@@ -299,7 +299,7 @@ test_ground_flames_and_splashes_follow_the_board :: proc(t: ^testing.T) {
 }
 
 ground_test_bake_all :: proc(fx: ^Ground_Fx) {
-	for y in 0..<fx.height { for x in 0..<fx.width { fx.cells[y*fx.width+x].content = bake_ground_cell(fx, {x, y}) } }
+	for y in 0..<fx.height { for x in 0..<fx.width { fx.cells[y*fx.width+x].content = bake_ground_cell(fx, {x = x, y = y}) } }
 }
 
 // Where texels of `colour` lie around a lone pool: their mean against the
@@ -326,7 +326,7 @@ test_ground_decal_cuts_toward_the_orbiting_camera :: proc(t: ^testing.T) {
 	fx: Ground_Fx
 	defer ground_test_free(&fx)
 	ground_fx_resize(&fx, 11, 9)
-	pool := grid.Position{5, 4}
+	pool := grid.Position{x = 5, y = 4}
 	fx.cells[pool.y*fx.width+pool.x].layers += {.Pool}
 	ground_test_bake_all(&fx)
 	ex, ey, edges := ground_test_side(&fx, pool, LIVING_TOKEN_EDGE)
@@ -375,7 +375,7 @@ test_the_ground_is_followed_once_a_frame :: proc(t: ^testing.T) {
 	config := game.DEFAULT_TACTICAL_CONFIG
 	config.vision_size = 0
 	testing.expect(t, game.configure_tactical(&player, config))
-	enemies := [?]game.Enemy_Spawn{{position = {9, 4}, health = 20, attack = 1}}
+	enemies := [?]game.Enemy_Spawn{{position = {x = 9, y = 4}, health = 20, attack = 1}}
 	room, created := game.create_room(&data, &player, {enemies = enemies[:]})
 	testing.expect(t, created)
 	defer game.destroy_room(&room)
@@ -384,7 +384,7 @@ test_the_ground_is_followed_once_a_frame :: proc(t: ^testing.T) {
 	defer { destroy_tactical_translucents(renderer); destroy_ground_fx(renderer); attack_test_free(renderer) }
 	// No living cards: their atlas wants a window.
 	renderer.tactical.living = false
-	for cell in ([3]grid.Position{{2, 2}, {7, 4}, {8, 1}}) { testing.expect(t, ground_test_pour(&room, .Poison, cell)) }
+	for cell in ([3]grid.Position{{x = 2, y = 2}, {x = 7, y = 4}, {x = 8, y = 1}}) { testing.expect(t, ground_test_pour(&room, .Poison, cell)) }
 	snapshot = renderer_presentation_snapshot(renderer, &room)
 	update_ground_fx(renderer, &room)
 	fx := renderer.tactical.ground
@@ -414,12 +414,12 @@ test_a_fire_catches_with_its_flames_at_the_window :: proc(t: ^testing.T) {
 	config := game.DEFAULT_TACTICAL_CONFIG
 	config.vision_size = 0
 	testing.expect(t, game.configure_tactical(&player, config))
-	caught := grid.Position{4, 1}
-	enemies := [?]game.Enemy_Spawn{{position = caught, health = 20, attack = 1}, {position = {8, 4}, health = 20, attack = 1}}
+	caught := grid.Position{x = 4, y = 1}
+	enemies := [?]game.Enemy_Spawn{{position = caught, health = 20, attack = 1}, {position = {x = 8, y = 4}, health = 20, attack = 1}}
 	room, created := game.create_room(&data, &player, {enemies = enemies[:]})
 	testing.expect(t, created)
 	defer game.destroy_room(&room)
-	testing.expect(t, ground_test_pour(&room, .Burn, {3, 1}, 1))
+	testing.expect(t, ground_test_pour(&room, .Burn, {x = 3, y = 1}, 1))
 	foe := game.enemy_entity(room.enemies[0].id)
 	_, _ = game.apply_status(&room, game.enemy_entity(room.enemies[1].id), .Burn, 1, 0)
 	game.clear_event_log(room.recent_events)

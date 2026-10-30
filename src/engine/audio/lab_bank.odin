@@ -22,7 +22,27 @@ Lab_Bank :: struct {
 	ambience: rl.Music,
 	ambience_sfx: Lab_Sfx,
 	ambience_on: bool,
+	// The first person music (lab_music): the track playing, how far it is faded in.
+	music: rl.Music,
+	music_on: bool,
+	music_track: Lab_Music,
+	music_level: f32,
 }
+
+// The first person cards' music, stereo loops made from code and encoded by
+// tools/audio/encode_music.py: the fists' (32 s, tools/audio/music_brawler.py),
+// the sword's (40 s, tools/audio/music_fencer.py) and the bow's (37 s,
+// tools/audio/music_archer.py).
+Lab_Music :: enum u8 {None, Brawler, Fencer, Archer}
+LAB_MUSIC_DATA := [Lab_Music][]u8{
+	.None = nil,
+	.Brawler = #load("../../../assets/audio/music/brawler.ogg"),
+	.Fencer = #load("../../../assets/audio/music/fencer.ogg"),
+	.Archer = #load("../../../assets/audio/music/archer.ogg"),
+}
+// Seconds to fade it in or out; its level against the effects.
+LAB_MUSIC_FADE :: f32(0.5)
+LAB_MUSIC_LEVEL :: f32(0.75)
 
 lab_bank_load :: proc(b: ^Lab_Bank) -> bool {
 	if b.ready { return true }
@@ -67,6 +87,7 @@ lab_bank_unload :: proc(b: ^Lab_Bank) {
 	if b.ready && rl.IsAudioDeviceReady() {
 		rl.DetachAudioMixedProcessor(lab_limiter)
 		lab_ambience(b, false)
+		lab_music_stop(b)
 		for sfx in Lab_Sfx {
 			if LAB_SFX_LOOP[sfx] || b.sounds[sfx][0].frameCount == 0 { continue }
 			for v in 1..<LAB_VOICES { rl.UnloadSoundAlias(b.sounds[sfx][v]) }
@@ -88,6 +109,40 @@ lab_play :: proc(b: ^Lab_Bank, sfx: Lab_Sfx, volume: f32 = 1, pitch: f32 = 1, pa
 	rl.SetSoundPitch(s, clamp(pitch, 0.5, 2))
 	rl.SetSoundPan(s, clamp(pan, -1, 1))
 	rl.PlaySound(s)
+}
+
+// The track `wanted` this frame (None: silence): it fades in over
+// LAB_MUSIC_FADE seconds from the top of its loop, and out, then stops; a
+// different track waits for the one playing to fade out. `volume` is the
+// player's effects volume.
+lab_music :: proc(b: ^Lab_Bank, wanted: Lab_Music, volume, dt: f32) {
+	if b == nil || !b.ready { return }
+	step := max(dt, 0)/LAB_MUSIC_FADE
+	on := wanted != .None && (!b.music_on || b.music_track == wanted)
+	b.music_level = min(f32(1), b.music_level+step) if on else max(f32(0), b.music_level-step)
+	if b.music_level <= 0 {
+		lab_music_stop(b)
+		return
+	}
+	if !b.music_on {
+		data := LAB_MUSIC_DATA[wanted]
+		b.music = rl.LoadMusicStreamFromMemory(".ogg", raw_data(data), c.int(len(data)))
+		if !rl.IsMusicValid(b.music) { b.music_level = 0; return }
+		b.music.looping = true
+		b.music_on, b.music_track = true, wanted
+		rl.PlayMusicStream(b.music)
+	}
+	rl.SetMusicVolume(b.music, clamp(volume*LAB_MUSIC_LEVEL*b.music_level, 0, 1))
+	rl.UpdateMusicStream(b.music)
+}
+
+lab_music_stop :: proc(b: ^Lab_Bank) {
+	if b == nil || !b.music_on { return }
+	if rl.IsAudioDeviceReady() {
+		rl.StopMusicStream(b.music)
+		rl.UnloadMusicStream(b.music)
+	}
+	b.music, b.music_on, b.music_track, b.music_level = {}, false, .None, 0
 }
 
 // The room's ambience loop, streamed from the embedded file.

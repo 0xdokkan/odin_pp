@@ -18,7 +18,7 @@ status_stack_test_events :: proc(log: ^Event_Log, kind: Game_Event_Kind, cause: 
 test_burn_bites_at_each_new_tactical_window_and_never_wears :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {1, 1}, health = 50, attack = 1}}
+	spawns := [?]Enemy_Spawn{{position = {x = 1, y = 1}, health = 50, attack = 1}}
 	room := create_enemy_rework_room(t, &data, &player, spawns[:])
 	defer level.destroy(&data)
 	defer destroy_room(&room)
@@ -48,7 +48,7 @@ test_burn_bites_at_each_new_tactical_window_and_never_wears :: proc(t: ^testing.
 test_lethal_burn_at_the_window_end_finishes_the_fight :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {1, 1}, health = 2, attack = 1}}
+	spawns := [?]Enemy_Spawn{{position = {x = 1, y = 1}, health = 2, attack = 1}}
 	room := create_enemy_rework_room(t, &data, &player, spawns[:])
 	defer level.destroy(&data)
 	defer destroy_room(&room)
@@ -71,7 +71,7 @@ test_lethal_burn_at_the_window_end_finishes_the_fight :: proc(t: ^testing.T) {
 test_lethal_burn_on_the_player_at_the_window_end_is_a_defeat :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {1, 1}, health = 20, attack = 1}}
+	spawns := [?]Enemy_Spawn{{position = {x = 1, y = 1}, health = 20, attack = 1}}
 	room := create_enemy_rework_room(t, &data, &player, spawns[:])
 	defer level.destroy(&data)
 	defer destroy_room(&room)
@@ -123,7 +123,7 @@ test_status_bites_on_the_player_ignore_his_defense :: proc(t: ^testing.T) {
 test_slow_holds_each_planned_intent_by_its_stacks_then_wears :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {1, 1}, health = 50, attack = 1}}
+	spawns := [?]Enemy_Spawn{{position = {x = 1, y = 1}, health = 50, attack = 1}}
 	room := create_enemy_rework_room(t, &data, &player, spawns[:])
 	defer level.destroy(&data)
 	defer destroy_room(&room)
@@ -159,7 +159,7 @@ test_slow_holds_each_planned_intent_by_its_stacks_then_wears :: proc(t: ^testing
 test_player_poison_bites_his_actions_but_not_movimento_ombra :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {7, 7}, health = 100, attack = 1}}
+	spawns := [?]Enemy_Spawn{{position = {x = 7, y = 7}, health = 100, attack = 1}}
 	room := create_enemy_rework_room(t, &data, &player, spawns[:])
 	defer level.destroy(&data)
 	defer destroy_room(&room)
@@ -210,7 +210,7 @@ test_reactive_dodge_bites_poison_but_a_block_does_not :: proc(t: ^testing.T) {
 		if dodge {
 			testing.expect(t, select_defense(&room, .Dodge))
 			testing.expect(t, qte_key(&room, .South))
-			testing.expect_value(t, player.position, grid.Position{1, 2})
+			testing.expect_value(t, player.position, grid.Position{x = 1, y = 2})
 		} else {
 			testing.expect(t, select_defense(&room, .Block))
 			testing.expect(t, qte_key(&room, room.qte.keys[0]))

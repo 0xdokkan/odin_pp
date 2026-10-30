@@ -111,23 +111,127 @@ First_Person_Shot :: struct {
 	damage: i32,
 }
 
-First_Person_State :: struct {
-	active: bool,
-	// World seconds left of `duration`.
-	remaining, duration: f32,
+// The weapon in hand behind the player's eyes. Each is a card of its own; they
+// share the view: its dive and rise, its seconds, its pause, its ban on cards
+// and its save (docs/piano-prima-persona.md, sezione 4.1). The first is the AK,
+// as every save from before the others is.
+First_Person_Weapon :: enum u8 {AK, Fists, Sword, Bow}
+
+// What the rules ask of a weapon.
+First_Person_Weapon_Rules :: struct {
+	// The card whose view it is (First_Person_Begun names it).
+	card: Card_Id,
+	// Whether it may be taken up on a dinosaur's back (dinosaur.odin).
+	while_riding: bool,
+}
+
+// The weapons whose cards are still to come name the AK's until then (Fasi 2,
+// 4 and 6 of docs/piano-prima-persona.md); none of them is taken up riding (the
+// user's choice).
+@(rodata)
+FIRST_PERSON_WEAPONS := [First_Person_Weapon]First_Person_Weapon_Rules{
+	.AK = {card = .First_Person, while_riding = true},
+	.Fists = {card = .First_Person_Brawler},
+	.Sword = {card = .First_Person_Fencer},
+	.Bow = {card = .First_Person_Archer},
+}
+
+// The AK's own.
+First_Person_AK :: struct {
 	// Seconds until the trigger may fire again (below zero: a shot overdue).
 	cooldown: f32,
 	// The left button held, as the controller read it this frame.
 	trigger: bool,
-	// Shots fired in the room so far and those that struck a foe; the last
-	// FIRST_PERSON_TRAIL of them by number.
-	shots, hits: i32,
+	// The last FIRST_PERSON_TRAIL shots by number (First_Person_State.shots).
 	trail: [FIRST_PERSON_TRAIL]First_Person_Shot,
 }
 
+// What only the weapon in hand keeps. One view is open at a time, so they
+// share their bytes (Room keeps under 9 KB, event_test): taking up another
+// weapon clears them. A save keeps them through First_Person_Save, as JSON
+// reads no raw union.
+First_Person_Arms :: struct #raw_union {
+	using ak: First_Person_AK,
+	// FIRST PERSON BRAWLER's body (first_person_fists.odin).
+	fists: First_Person_Fists,
+	// FIRST PERSON FENCER's blade, guard and grapple (first_person_sword.odin).
+	sword: First_Person_Sword,
+	// FIRST PERSON ARCHER's draw, arrows and zones (first_person_bow.odin).
+	bow: First_Person_Bow,
+}
+
+First_Person_State :: struct {
+	active: bool,
+	weapon: First_Person_Weapon,
+	// World seconds left of `duration`.
+	remaining, duration: f32,
+	// Shots fired in the room so far and those that struck a foe, whatever
+	// was in hand between them.
+	shots, hits: i32,
+	using arms: First_Person_Arms,
+}
+
+// The view as a save keeps it (expedition/snapshot.odin). JSON reads no raw
+// union, so here each weapon's own have keys of their own; the AK's keep the
+// names they had before the other weapons, and a save without `weapon` is the
+// AK's.
+First_Person_Save :: struct {
+	active: bool,
+	weapon: First_Person_Weapon,
+	remaining, duration: f32,
+	cooldown: f32,
+	trigger: bool,
+	shots, hits: i32,
+	trail: [FIRST_PERSON_TRAIL]First_Person_Shot,
+	// The fists' body, punches and marks (first_person_fists.odin).
+	fists: First_Person_Fists,
+	// The sword's blade, guard and grapple (first_person_sword.odin).
+	sword: First_Person_Sword,
+	// The bow's draw, arrows and zones (first_person_bow.odin).
+	bow: First_Person_Bow,
+}
+
+first_person_save :: proc(state: First_Person_State) -> (save: First_Person_Save) {
+	save.active, save.weapon, save.remaining, save.duration = state.active, state.weapon, state.remaining, state.duration
+	save.shots, save.hits = state.shots, state.hits
+	switch state.weapon {
+	case .AK: save.cooldown, save.trigger, save.trail = state.cooldown, state.trigger, state.trail
+	case .Fists: save.fists = state.fists
+	case .Sword: save.sword = state.sword
+	case .Bow: save.bow = state.bow
+	}
+	return
+}
+
+// Refuses a weapon the game does not know.
+first_person_load :: proc(save: First_Person_Save) -> (state: First_Person_State, ok: bool) {
+	if _, known := first_person_effect_weapon(i32(save.weapon)); !known { return }
+	state.active, state.weapon, state.remaining, state.duration = save.active, save.weapon, save.remaining, save.duration
+	state.shots, state.hits = save.shots, save.hits
+	switch save.weapon {
+	case .AK: state.cooldown, state.trigger, state.trail = save.cooldown, save.trigger, save.trail
+	case .Fists: state.fists = save.fists
+	case .Sword: state.sword = save.sword
+	case .Bow: state.bow = save.bow
+	}
+	return state, true
+}
+
 @(private)
-first_person_effect :: proc(seconds: i32) -> Effect {
-	return {kind = .First_Person, target = PLAYER_ENTITY, amount = seconds}
+first_person_effect :: proc(seconds: i32, weapon := First_Person_Weapon.AK) -> Effect {
+	return {kind = .First_Person, target = PLAYER_ENTITY, amount = seconds, charges = i32(weapon)}
+}
+
+// The weapon an effect of .First_Person takes up (its charges), if one.
+first_person_effect_weapon :: proc(charges: i32) -> (weapon: First_Person_Weapon, ok: bool) {
+	if charges < 0 || charges > i32(max(First_Person_Weapon)) { return }
+	return First_Person_Weapon(charges), true
+}
+
+// Whether a card is one of the views behind his eyes (the cards of FIRST_PERSON_WEAPONS).
+card_is_first_person :: proc(id: Card_Id) -> bool {
+	for rules in FIRST_PERSON_WEAPONS { if rules.card == id { return true } }
+	return false
 }
 
 tactical_first_person_active :: proc(room: ^Room) -> bool {
@@ -135,12 +239,17 @@ tactical_first_person_active :: proc(room: ^Room) -> bool {
 }
 
 // The shots and hits of the room go on counting: the board numbers its
-// tracers by them.
-tactical_begin_first_person :: proc(room: ^Room, seconds: f32) -> bool {
-	if !(seconds > 0) || !tactical_can_begin_first_person(room) { return false }
+// tracers by them. The weapon kept what it had when it is the one taken up
+// again (the AK's trail, for the board's tracers); another one starts clear.
+tactical_begin_first_person :: proc(room: ^Room, seconds: f32, weapon := First_Person_Weapon.AK) -> bool {
+	if !(seconds > 0) || !tactical_can_begin_first_person(room, weapon) { return false }
 	fp := &room.first_person
-	fp.active, fp.remaining, fp.duration = true, seconds, seconds
-	fp.cooldown, fp.trigger = 0, false
+	if fp.weapon != weapon { fp.arms = {} }
+	fp.active, fp.weapon, fp.remaining, fp.duration = true, weapon, seconds, seconds
+	if weapon == .AK { fp.cooldown, fp.trigger = 0, false }
+	if weapon == .Fists { first_person_fists_begin(room) }
+	if weapon == .Sword { first_person_sword_begin(room) }
+	if weapon == .Bow { first_person_bow_begin(room) }
 	return true
 }
 
@@ -148,29 +257,42 @@ tactical_begin_first_person :: proc(room: ^Room, seconds: f32) -> bool {
 // cost where actions do not last it): the view's own, and the trigger's.
 // The last one ends it.
 tactical_first_person_tick :: proc(room: ^Room, seconds: f32) {
-	if !tactical_first_person_active(room) || !(seconds > 0) { return }
+	if !(seconds > 0) { return }
+	// The view over, the bow's arrows out still fly (first_person_bow_move).
+	if !tactical_first_person_active(room) {
+		if first_person_bow_arrows_out(room) { first_person_bow_tick(room, seconds) }
+		return
+	}
 	fp := &room.first_person
 	fp.remaining = max(f32(0), fp.remaining-seconds)
 	if fp.remaining < FIRST_PERSON_EPSILON { fp.remaining = 0 }
-	fp.cooldown = max(fp.cooldown-seconds, -FIRST_PERSON_MAX_CARRY if fp.trigger else 0)
-	if fp.remaining <= 0 { fp.active, fp.trigger, fp.cooldown = false, false, 0 }
+	if fp.weapon == .AK { fp.cooldown = max(fp.cooldown-seconds, -FIRST_PERSON_MAX_CARRY if fp.trigger else 0) }
+	if fp.weapon == .Sword { first_person_sword_tick(room, seconds) }
+	if fp.weapon == .Bow { first_person_bow_tick(room, seconds) }
+	if fp.remaining <= 0 {
+		fp.active = false
+		if fp.weapon == .AK { fp.trigger, fp.cooldown = false, 0 }
+		// Out of the air at once onto the cell under him (the user's choice).
+		if fp.weapon == .Fists { fp.fists.airborne, fp.fists.rise_speed, fp.fists.feet = false, 0, f32(cell_height(room, room.player.position)) }
+	}
 }
 
 // The left button as the controller reads it this frame. Let go, nothing is
 // banked: the next press fires at once, or as soon as the last shot allows.
+// Only the AK has a trigger.
 first_person_set_trigger :: proc(room: ^Room, held: bool) {
-	if room == nil { return }
+	if room == nil || room.first_person.weapon != .AK { return }
 	fp := &room.first_person
 	fp.trigger = held && tactical_first_person_active(room)
 	if !fp.trigger { fp.cooldown = max(fp.cooldown, 0) }
 }
 
-// A shot is due: the trigger held and its time come, the world's clock free
-// (no beat resolving, no defence prompt, no cast).
+// A shot is due: the AK in hand, its trigger held and its time come, the
+// world's clock free (no beat resolving, no defence prompt, no cast).
 first_person_fire_due :: proc(room: ^Room) -> bool {
 	if !tactical_first_person_active(room) { return false }
 	fp := &room.first_person
-	return fp.trigger && fp.remaining > 0 && fp.cooldown <= FIRST_PERSON_EPSILON && !room.tactical_pulse.pending &&
+	return fp.weapon == .AK && fp.trigger && fp.remaining > 0 && fp.cooldown <= FIRST_PERSON_EPSILON && !room.tactical_pulse.pending &&
 	       room.qte.kind == .None && room.player.tactical.cast_remaining <= 0
 }
 
@@ -238,21 +360,23 @@ first_person_outline_top :: proc(archetype: Enemy_Archetype) -> f32 {
 }
 
 // The eye a shot of `aim` leaves from: the view's own when it framed one near
-// the centre of `from` and over an open cell, else that centre.
-@(private = "file")
+// the centre of `from` and over an open cell, else that centre (the sword's
+// cuts look from it too, first_person_sword.odin).
+@(private)
 first_person_eye :: proc(room: ^Room, from: grid.Position, aim: First_Person_Aim) -> [2]f32 {
 	centre := [2]f32{f32(from.x)+0.5, f32(from.y)+0.5}
 	if !aim.framed { return centre }
 	eye := aim.eye
 	if !(abs(eye.x-centre.x) <= FIRST_PERSON_EYE_SLACK && abs(eye.y-centre.y) <= FIRST_PERSON_EYE_SLACK) { return centre }
-	if lasso_cell_is_solid(room, {int(math.floor(eye.x)), int(math.floor(eye.y))}) { return centre }
+	if lasso_cell_is_solid(room, {x = int(math.floor(eye.x)), y = int(math.floor(eye.y))}) { return centre }
 	return eye
 }
 
 // Where the card of `enemy` stands for a shot of `aim`: where the view showed
 // it, when that is near its cell, else on its cell's centre; and how far it
-// is lifted off its stand.
-@(private = "file")
+// is lifted off its stand. The fists' marks find their zones on it too
+// (first_person_marks.odin).
+@(private)
 first_person_card :: proc(enemy: Enemy, aim: First_Person_Aim) -> (at: [2]f32, lift: f32) {
 	at = {f32(enemy.position.x)+0.5, f32(enemy.position.y)+0.5}
 	if !aim.framed { return }
@@ -285,28 +409,32 @@ first_person_trace :: proc(room: ^Room, from: grid.Position, aim: First_Person_A
 	o := first_person_eye(room, from, aim)
 	d := [2]f32{math.cos(aim.yaw), math.sin(aim.yaw)}
 	rise := math.tan(pitch)
-	shot.origin = {o.x, FIRST_PERSON_EYE_HEIGHT, o.y}
+	// The eye stands on its cell's floor, which may be above the board's level.
+	base := f32(cell_height(room, from))*HEIGHT_STEP_DRAWN
+	shot.origin = {o.x, FIRST_PERSON_EYE_HEIGHT+base, o.y}
 	shot.target = SYSTEM_ENTITY
-	at :: proc(o, d: [2]f32, rise, s: f32) -> [3]f32 {
-		return {o.x+d.x*s, FIRST_PERSON_EYE_HEIGHT+rise*s, o.y+d.y*s}
+	at :: proc(o, d: [2]f32, base, rise, s: f32) -> [3]f32 {
+		return {o.x+d.x*s, FIRST_PERSON_EYE_HEIGHT+base+rise*s, o.y+d.y*s}
 	}
-	nearest := first_person_trace_board(room, o, d, rise, &shot)
+	nearest := first_person_trace_board(room, o, d, base, rise, &shot, from.layer)
 	if room == nil { return }
 	side := max(f32)
 	for enemy in room.enemies {
 		if enemy_is_out_of_play(room, enemy.id) { continue }
 		card, lift := first_person_card(enemy, aim)
-		shown := grid.Position{int(math.floor(card.x)), int(math.floor(card.y))}
+		shown := grid.Position{x = int(math.floor(card.x)), y = int(math.floor(card.y)), layer = enemy.position.layer}
 		if !tactical_cell_visible(room, enemy.position) && !tactical_cell_visible(room, shown) { continue }
 		t := (card.x-o.x)*d.x+(card.y-o.y)*d.y
 		if t <= FIRST_PERSON_EPSILON || t > nearest+FIRST_PERSON_EPSILON { continue }
 		lateral := abs((card.x-o.x)*d.y-(card.y-o.y)*d.x)
-		if lateral > first_person_outline_half_width(enemy.archetype, FIRST_PERSON_EYE_HEIGHT+rise*t-lift) { continue }
+		// The ray's height over the foe's own floor.
+		foe_base := f32(cell_height(room, enemy.position))*HEIGHT_STEP_DRAWN
+		if lateral > first_person_outline_half_width(enemy.archetype, FIRST_PERSON_EYE_HEIGHT+base-foe_base+rise*t-lift) { continue }
 		// Nearer than all before it; two cards as deep, the one the ray
 		// crosses nearer its middle.
 		if shot.hit == .Foe && t >= nearest-FIRST_PERSON_EPSILON && lateral >= side { continue }
 		nearest, side = t, lateral
-		shot.hit, shot.target, shot.cell, shot.point = .Foe, enemy_entity(enemy.id), enemy.position, at(o, d, rise, t)
+		shot.hit, shot.target, shot.cell, shot.point = .Foe, enemy_entity(enemy.id), enemy.position, at(o, d, base, rise, t)
 	}
 	return
 }
@@ -315,14 +443,24 @@ first_person_trace :: proc(room: ^Room, from: grid.Position, aim: First_Person_A
 // stops the shot, written into `shot` (nothing struck: a cell out of sight, or
 // the walk's end), and how far along the board it stops.
 @(private="file")
-first_person_trace_board :: proc(room: ^Room, o, d: [2]f32, rise: f32, shot: ^First_Person_Shot) -> (stop: f32) {
-	at :: proc(o, d: [2]f32, rise, s: f32) -> [3]f32 {
-		return {o.x+d.x*s, FIRST_PERSON_EYE_HEIGHT+rise*s, o.y+d.y*s}
+first_person_trace_board :: proc(room: ^Room, o, d: [2]f32, base, rise: f32, shot: ^First_Person_Shot, layer := i8(grid.GROUND_LAYER)) -> (stop: f32) {
+	at :: proc(o, d: [2]f32, base, rise, s: f32) -> [3]f32 {
+		return {o.x+d.x*s, FIRST_PERSON_EYE_HEIGHT+base+rise*s, o.y+d.y*s}
 	}
-	floor := max(f32)
-	if rise < -FIRST_PERSON_EPSILON { floor = FIRST_PERSON_EYE_HEIGHT/-rise }
+	// What the ray meets entering `cell` at `s` along it: with layers, the floor of the column under it, or
+	// the column's rock, deck or wall (layers.odin); then a wall, cover or a blocking object on that floor.
+	meets :: proc(room: ^Room, cell: grid.Position, base, rise, s: f32) -> (floor: grid.Position, solid: bool) {
+		inside: bool
+		floor, inside = layer_ray_cell(room, cell, (FIRST_PERSON_EYE_HEIGHT+base+rise*s)/HEIGHT_STEP_DRAWN)
+		return floor, inside || lasso_cell_is_solid(room, floor)
+	}
+	// How far along the ray it meets the floor of `cell` (the height of its steps).
+	floor_of :: proc(room: ^Room, cell: grid.Position, base, rise: f32) -> f32 {
+		if rise < -FIRST_PERSON_EPSILON { return (FIRST_PERSON_EYE_HEIGHT+base-f32(cell_height(room, cell))*HEIGHT_STEP_DRAWN)/-rise }
+		return max(f32)
+	}
 	big :: f32(1e30)
-	cell := grid.Position{int(math.floor(o.x)), int(math.floor(o.y))}
+	cell := grid.Position{x = int(math.floor(o.x)), y = int(math.floor(o.y)), layer = layer}
 	step := [2]int{1 if d.x > 0 else -1, 1 if d.y > 0 else -1}
 	delta := [2]f32{abs(1/d.x) if abs(d.x) > FIRST_PERSON_EPSILON else big, abs(1/d.y) if abs(d.y) > FIRST_PERSON_EPSILON else big}
 	// To the first edge of the eye's cell on either axis.
@@ -334,20 +472,21 @@ first_person_trace_board :: proc(room: ^Room, o, d: [2]f32, rise: f32, shot: ^Fi
 	if room != nil && room.level_data != nil { limit += room.level_data.tiles.width+room.level_data.tiles.height }
 	for _ in 0..<limit*2 {
 		leave := min(next.x, next.y)
-		if floor <= leave {
-			shot.hit, shot.cell, shot.point = .Floor, cell, at(o, d, rise, floor)
-			shot.point.y = 0
+		if floor := floor_of(room, cell, base, rise); floor <= leave {
+			shot.hit, shot.cell, shot.point = .Floor, cell, at(o, d, base, rise, floor)
+			shot.point.y = f32(cell_height(room, cell))*HEIGHT_STEP_DRAWN
 			return floor
 		}
 		entered := cell
 		if abs(next.x-next.y) <= FIRST_PERSON_EPSILON {
 			// Through a corner: both cells beside it must be open.
-			side_a, side_b := grid.Position{cell.x+step.x, cell.y}, grid.Position{cell.x, cell.y+step.y}
-			if lasso_cell_is_solid(room, side_a) && lasso_cell_is_solid(room, side_b) {
-				shot.hit, shot.cell, shot.point = .Solid, side_a, at(o, d, rise, next.x)
+			side_a, solid_a := meets(room, grid.offset(cell, step.x, 0), base, rise, next.x)
+			_, solid_b := meets(room, grid.offset(cell, 0, step.y), base, rise, next.x)
+			if solid_a && solid_b {
+				shot.hit, shot.cell, shot.point = .Solid, side_a, at(o, d, base, rise, next.x)
 				return next.x
 			}
-			entered = {cell.x+step.x, cell.y+step.y}
+			entered = grid.offset(cell, step.x, step.y)
 			s = next.x
 			next.x += delta.x
 			next.y += delta.y
@@ -360,17 +499,23 @@ first_person_trace_board :: proc(room: ^Room, o, d: [2]f32, rise: f32, shot: ^Fi
 			s = next.y
 			next.y += delta.y
 		}
-		if lasso_cell_is_solid(room, entered) {
-			shot.hit, shot.cell, shot.point = .Solid, entered, at(o, d, rise, s)
+		solid: bool
+		if entered, solid = meets(room, entered, base, rise, s); solid {
+			shot.hit, shot.cell, shot.point = .Solid, entered, at(o, d, base, rise, s)
+			return s
+		}
+		// A cell whose floor is above the ray is a cliff face: it stops the shot.
+		if f32(cell_height(room, entered))*HEIGHT_STEP_DRAWN > FIRST_PERSON_EYE_HEIGHT+base+rise*s+FIRST_PERSON_EPSILON {
+			shot.hit, shot.cell, shot.point = .Solid, entered, at(o, d, base, rise, s)
 			return s
 		}
 		if !tactical_cell_visible(room, entered) {
-			shot.cell, shot.point = entered, at(o, d, rise, s)
+			shot.cell, shot.point = entered, at(o, d, base, rise, s)
 			return s
 		}
 		cell = entered
 	}
-	shot.cell, shot.point = cell, at(o, d, rise, s)
+	shot.cell, shot.point = cell, at(o, d, base, rise, s)
 	return s
 }
 

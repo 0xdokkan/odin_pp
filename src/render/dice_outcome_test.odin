@@ -20,7 +20,7 @@ test_dice_overlay_reports_committed_card_effects_with_and_without_tick_bonus :: 
 				roll, rolled := game.roll_card_dice(&staged, player.deck.owned[0])
 				if rolled && roll.faces[0] == 3 { player.dice = candidate; break }
 			}
-			enemies := [?]game.Enemy_Spawn{{position = {3, 1}, health = 100, attack = 1}}
+			enemies := [?]game.Enemy_Spawn{{position = {x = 3, y = 1}, health = 100, attack = 1}}
 			room, ok := game.create_room(&data, &player, {enemies = enemies[:]})
 			testing.expect(t, ok)
 			room.enemies[0].intent = game.make_wait_intent(&room, room.enemies[0].position)
@@ -35,7 +35,7 @@ test_dice_overlay_reports_committed_card_effects_with_and_without_tick_bonus :: 
 			expected_roll, rolled := game.roll_card_dice(&expected_rng, player.deck.hand[0])
 			testing.expect(t, rolled)
 			target := game.entity_target(game.enemy_entity(1))
-			if card == .Shock_Floor { target = game.cell_target({2, 1}) }
+			if card == .Shock_Floor { target = game.cell_target({x = 2, y = 1}) }
 			if card == .Venom_Blade { target = game.entity_target(game.PLAYER_ENTITY) }
 			player.tactical.critical_next = critical
 			play := game.play_card(&room, player.deck.hand[0].id, target)

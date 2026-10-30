@@ -3,6 +3,7 @@ import artifacts "artifacts"
 import run_session "../run"
 
 import "core:fmt"
+import "core:os"
 import app "../engine/app"
 import audio "../engine/audio"
 import gfx "../engine/gfx"
@@ -44,11 +45,12 @@ mechanics_lab_smoke_frame :: proc(window: ^app.Window, renderer: ^render.Rendere
 
 // The sandbox in the real window: the lab's whole deck in hand, a square of
 // coils around the arrivals, the last kill that keeps the combat going and the
-// refill; then Movimento Ombra played, the shadow walked and the rise, every
-// kind of blow, a slowed brute's seal, the pools and the fire, the player's
-// charges and, last, the Lazzo, the Pinball (mechanics_lab_pinball.odin), the
-// First Person Shooter (mechanics_lab_first_person.odin) and the Canna da
-// Pesca.
+// refill; then every kind of blow, a slowed brute's seal, the pools and the
+// fire, the player's charges and, last, the Lazzo, the Pinball
+// (mechanics_lab_pinball.odin), the First Person Shooter
+// (mechanics_lab_first_person.odin), the Inondazione and Bomb Marley
+// (mechanics_lab_party.odin), the Cannone, the Buco Nero and the Dinosauro
+// (mechanics_lab_arsenal.odin) and the Canna da Pesca.
 run_mechanics_lab_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer, dice: ^render.Dice_Renderer) -> bool {
 	data: level.Level
 	defer level.destroy(&data)
@@ -77,15 +79,37 @@ run_mechanics_lab_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer,
 	buffer: run_session.Buffered_Gameplay_Command
 	sandbox := game.begin_sandbox(7)
 	for _ in 0..<20 { mechanics_lab_smoke_frame(window, renderer, &room, &controller, &cards, &buffer, 1.0/60.0) }
+	// ODIN_PP_LAB_ONLY=hit_marks runs only the hit marks' act, to work on it.
+	if only, _ := os.lookup_env("ODIN_PP_LAB_ONLY", context.temp_allocator); only == "hit_marks" {
+		return mechanics_lab_hit_marks(window, renderer, &room, &controller, &cards, &buffer)
+	} else if only == "heights" {
+		return mechanics_lab_heights(window, renderer, &room, &data, &controller, &cards, &buffer)
+	} else if only == "structures" {
+		return mechanics_lab_structures(window, renderer, &room, &data, &controller, &cards, &buffer)
+	} else if only == "mountain" {
+		return mechanics_lab_mountain(window, renderer, &room, &data, &controller, &cards, &buffer)
+	} else if only == "cave" {
+		return mechanics_lab_cave(window, renderer, &room, &data, &controller, &cards, &buffer)
+	} else if only == "layers" {
+		return mechanics_lab_layers(window, renderer, &room, &data, &controller, &cards, &buffer)
+	} else if only == "lift" {
+		return mechanics_lab_lifts(window, renderer, &room, &data, &controller, &cards, &buffer)
+	} else if only == "fps" {
+		// The First Person Shooter's act alone (docs/piano-prima-persona.md, Fase 0).
+		return mechanics_lab_first_person(window, renderer, &room, &data, &controller, &cards, &buffer)
+	} else if only == "prima_persona" {
+		// The first person arena's act alone (docs/piano-prima-persona.md, Fase 1).
+		return mechanics_lab_prima_persona(window, renderer, &room, &data, &controller, &cards, &buffer)
+	}
 	artifacts.screenshot("odin_pp_mechanics_lab.png")
 	if !mechanics_lab_card_words(renderer, &player) { return false }
 	// A square of coils around an arrival offers the ring, every time.
 	log: game.Event_Log
-	center := grid.Position{run_session.MECHANICS_LAB_WIDTH/2, run_session.MECHANICS_LAB_HEIGHT/2}
-	for offset in ([4]grid.Position{{-1, -1}, {2, -1}, {2, 2}, {-1, 2}}) {
-		if !game.deploy_board_device(&room, .Tesla_Coil, {center.x+offset.x, center.y+offset.y}, 8, 0, &log) { fmt.eprintln("mechanics lab: coil not placed"); return false }
+	center := grid.Position{x = run_session.MECHANICS_LAB_WIDTH/2, y = run_session.MECHANICS_LAB_HEIGHT/2}
+	for offset in ([4]grid.Position{{x = -1, y = -1}, {x = 2, y = -1}, {x = 2, y = 2}, {x = -1, y = 2}}) {
+		if !game.deploy_board_device(&room, .Tesla_Coil, grid.offset(center, offset.x, offset.y), 8, 0, &log) { fmt.eprintln("mechanics lab: coil not placed"); return false }
 	}
-	if _, inside := game.spawn_enemy(&room, {position = {center.x+1, center.y+1}, health = 12, attack = 2, archetype = .Chaser}); !inside {
+	if _, inside := game.spawn_enemy(&room, {position = grid.offset(center, 1, 1), health = 12, attack = 2, archetype = .Chaser}); !inside {
 		fmt.eprintln("mechanics lab: no arrival inside the square"); return false
 	}
 	player.floor_secrets += {.Tesla_Ring}
@@ -143,7 +167,7 @@ run_mechanics_lab_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer,
 	if !mechanics_lab_capture(window, renderer, &room, &controller, &cards, &buffer, {kind = .Move, origin_phase = .Combat, direction = .East}, "move") { return false }
 	// The foe stands to the north, beside the card on screen rather than in
 	// front of it, so the blow can be seen.
-	if _, placed := game.spawn_enemy(&room, {position = {player.position.x, player.position.y-1}, health = 40, attack = 1, archetype = .Chaser}); !placed {
+	if _, placed := game.spawn_enemy(&room, {position = grid.offset(player.position, 0, -1), health = 40, attack = 1, archetype = .Chaser}); !placed {
 		fmt.eprintln("mechanics lab: no foe beside the player"); return false
 	}
 	render.clear_event_animations(renderer)
@@ -215,7 +239,6 @@ run_mechanics_lab_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer,
 		artifacts.screenshot("odin_pp_mechanics_lab_pause.png" if screen == 0 else "odin_pp_mechanics_lab_defeat.png")
 	}
 	renderer.tactical.pause_hovered, renderer.tactical.pause_menu = .None, false
-	if !mechanics_lab_shadow(window, renderer, &room, &controller, &cards, &buffer) { return false }
 	if !mechanics_lab_blows(window, renderer, &room, &controller, &cards, &buffer) { return false }
 	if !mechanics_lab_slow(window, renderer, &room, &controller, &cards, &buffer) { return false }
 	if !mechanics_lab_ground(window, renderer, &room, &controller, &cards, &buffer) { return false }
@@ -223,7 +246,22 @@ run_mechanics_lab_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer,
 	if !mechanics_lab_lasso(window, renderer, &room, &controller, &cards, &buffer) { return false }
 	if !mechanics_lab_pinball(window, renderer, &room, &controller, &cards, &buffer) { return false }
 	if !mechanics_lab_first_person(window, renderer, &room, &data, &controller, &cards, &buffer) { return false }
+	if !mechanics_lab_flood(window, renderer, &room, &controller, &cards, &buffer) { return false }
+	if !mechanics_lab_marley(window, renderer, &room, &controller, &cards, &buffer) { return false }
+	if !mechanics_lab_hit_marks(window, renderer, &room, &controller, &cards, &buffer) { return false }
+	if !mechanics_lab_heights(window, renderer, &room, &data, &controller, &cards, &buffer) { return false }
+	if !mechanics_lab_structures(window, renderer, &room, &data, &controller, &cards, &buffer) { return false }
+	if !mechanics_lab_mountain(window, renderer, &room, &data, &controller, &cards, &buffer) { return false }
+	if !mechanics_lab_cave(window, renderer, &room, &data, &controller, &cards, &buffer) { return false }
+	if !mechanics_lab_layers(window, renderer, &room, &data, &controller, &cards, &buffer) { return false }
+	if !mechanics_lab_cannon(window, renderer, &room, &controller, &cards, &buffer) { return false }
+	if !mechanics_lab_black_hole(window, renderer, &room, &controller, &cards, &buffer) { return false }
+	if !mechanics_lab_dinosaur(window, renderer, &room, &controller, &cards, &buffer) { return false }
 	if !mechanics_lab_fishing(window, renderer, dice, &room, &controller, &cards, &buffer) { return false }
+	// Last, so that every act before it is the same as before it came (Fase 7).
+	if !mechanics_lab_lifts(window, renderer, &room, &data, &controller, &cards, &buffer) { return false }
+	// After it the first person arena's (docs/piano-prima-persona.md, Fase 1), for the same reason.
+	if !mechanics_lab_prima_persona(window, renderer, &room, &data, &controller, &cards, &buffer) { return false }
 	return mechanics_lab_sounds_heard(renderer)
 }
 
@@ -324,6 +362,28 @@ mechanics_lab_card_words :: proc(renderer: ^render.Renderer, player: ^game.Playe
 	return true
 }
 
+// The lab's deck no longer holds Pozza di Veleno, Deflect and Feretro (the
+// Cannone, the Buco Nero and the Dinosauro took their places), but their acts
+// still test them: for the act's time `to` takes the place of `from` (the same
+// instance, wherever it lies), and the act puts it back with the two turned.
+mechanics_lab_borrow :: proc(player: ^game.Player, from, to: game.Card_Id) -> bool {
+	deck := &player.deck
+	swapped := 0
+	swap :: proc(cards: []game.Card_Instance, count: int, from, to: game.Card_Id) -> (done: int) {
+		for &card in cards[:count] {
+			if card.definition_id == from { card.definition_id, card.upgrade_level = to, 0; done += 1 }
+		}
+		return
+	}
+	swapped += swap(deck.owned[:], deck.owned_count, from, to)
+	hand := swap(deck.hand[:], deck.hand_count, from, to)
+	swapped += swap(deck.draw_pile[:], deck.draw_count, from, to)
+	swapped += swap(deck.discard_pile[:], deck.discard_count, from, to)
+	swapped += swap(deck.exhaust_pile[:], deck.exhaust_count, from, to)
+	if swapped == 0 || hand == 0 { fmt.eprintln("mechanics lab: no", from, "to stand for", to); return false }
+	return true
+}
+
 // The id of a `card` in the hand.
 mechanics_lab_hand_card :: proc(player: ^game.Player, card: game.Card_Id) -> (id: u32, ok: bool) {
 	for held in player.deck.hand[:player.deck.hand_count] {
@@ -380,15 +440,15 @@ mechanics_lab_blows :: proc(window: ^app.Window, renderer: ^render.Renderer, roo
 	}
 	center := player.position
 	blows := [?]Blow{
-		{name = "bolt", archetype = .Archer, at = {center.x+4, center.y}, look = .Bolt},
-		{name = "bolt_miss", archetype = .Archer, at = {center.x-4, center.y}, look = .Bolt, miss = true},
-		{name = "cleave", archetype = .Brute, at = {center.x+1, center.y}, look = .Cleaver, cleave = true},
-		{name = "charge", archetype = .Brute, at = {center.x+3, center.y}, look = .Cleaver, charge = true},
-		{name = "claws", archetype = .Chaser, at = {center.x, center.y-1}, look = .Claws},
-		{name = "crozier", archetype = .Custodian, at = {center.x-1, center.y}, look = .Crozier},
-		{name = "staff", archetype = .Demolitionist, at = {center.x, center.y+1}, look = .Staff},
-		{name = "bomb", archetype = .Bomber, at = {center.x+3, center.y-1}, look = .Bomb},
-		{name = "ember", archetype = .Demolitionist, at = {center.x+3, center.y-3}, look = .Ember, barrel = true},
+		{name = "bolt", archetype = .Archer, at = grid.offset(center, 4, 0), look = .Bolt},
+		{name = "bolt_miss", archetype = .Archer, at = grid.offset(center, -4, 0), look = .Bolt, miss = true},
+		{name = "cleave", archetype = .Brute, at = grid.offset(center, 1, 0), look = .Cleaver, cleave = true},
+		{name = "charge", archetype = .Brute, at = grid.offset(center, 3, 0), look = .Cleaver, charge = true},
+		{name = "claws", archetype = .Chaser, at = grid.offset(center, 0, -1), look = .Claws},
+		{name = "crozier", archetype = .Custodian, at = grid.offset(center, -1, 0), look = .Crozier},
+		{name = "staff", archetype = .Demolitionist, at = grid.offset(center, 0, 1), look = .Staff},
+		{name = "bomb", archetype = .Bomber, at = grid.offset(center, 3, -1), look = .Bomb},
+		{name = "ember", archetype = .Demolitionist, at = grid.offset(center, 3, -3), look = .Ember, barrel = true},
 	}
 	for blow in blows {
 		if !mechanics_lab_clear_arena(room) { return false }
@@ -402,7 +462,7 @@ mechanics_lab_blows :: proc(window: ^app.Window, renderer: ^render.Renderer, roo
 		aim := center
 		intent := game.make_attack_intent(room, enemy.position, aim, 1)
 		if blow.cleave {
-			for side in ([2]grid.Position{{aim.x, aim.y-1}, {aim.x, aim.y+1}}) {
+			for side in ([2]grid.Position{grid.offset(aim, 0, -1), grid.offset(aim, 0, 1)}) {
 				intent.threatened_cells[intent.threatened_cell_count] = side
 				intent.threatened_cell_count += 1
 			}
@@ -411,7 +471,7 @@ mechanics_lab_blows :: proc(window: ^app.Window, renderer: ^render.Renderer, roo
 			// Two cells at a run, then the blow from the third.
 			intent.kind = .Charge
 			for step in 1..=2 {
-				intent.path[intent.path_count] = {enemy.position.x-step, aim.y}
+				intent.path[intent.path_count] = {x = enemy.position.x-step, y = aim.y}
 				intent.path_count += 1
 			}
 			intent.destination = intent.path[intent.path_count-1]
@@ -421,14 +481,14 @@ mechanics_lab_blows :: proc(window: ^app.Window, renderer: ^render.Renderer, roo
 			// A barrel by the player, set alight from afar.
 			barrel = room.next_object_id
 			room.next_object_id += 1
-			append(&room.objects, game.Grid_Object{id = barrel, kind = .Barrel, position = {center.x+1, center.y-1}, health = 1, max_health = 1})
-			intent = game.make_attack_intent(room, enemy.position, {center.x+1, center.y-1}, 1)
+			append(&room.objects, game.Grid_Object{id = barrel, kind = .Barrel, position = grid.offset(center, 1, -1), health = 1, max_health = 1})
+			intent = game.make_attack_intent(room, enemy.position, grid.offset(center, 1, -1), 1)
 			intent.target_object = barrel
 		}
 		intent.push = blow.cleave || blow.charge
 		enemy.intent = intent
 		// A miss: he has stepped off the line the archer shot along.
-		if blow.miss { player.position = {center.x, center.y+1} }
+		if blow.miss { player.position = grid.offset(center, 0, 1) }
 		render.clear_event_animations(renderer)
 		for _ in 0..<12 { mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0) }
 		shown := renderer.tactical.attack_fx.spawned[blow.look]
@@ -459,7 +519,7 @@ mechanics_lab_blows :: proc(window: ^app.Window, renderer: ^render.Renderer, roo
 		if !mechanics_lab_clear_arena(room) { return false }
 		player.health = player.stats.max_health
 		player.equipment.weapon = weapon
-		if _, placed := game.spawn_enemy(room, {position = {player.position.x+1, player.position.y}, health = 60, attack = 1, archetype = .Chaser}); !placed {
+		if _, placed := game.spawn_enemy(room, {position = grid.offset(player.position, 1, 0), health = 60, attack = 1, archetype = .Chaser}); !placed {
 			fmt.eprintln("mechanics lab: no foe for the bump"); return false
 		}
 		render.clear_event_animations(renderer)
@@ -536,7 +596,7 @@ mechanics_lab_slow :: proc(window: ^app.Window, renderer: ^render.Renderer, room
 	for index := len(room.loot)-1; index >= 0; index -= 1 {
 		if room.loot[index].kind == .Weapon { unordered_remove(&room.loot, index) }
 	}
-	id, placed := game.spawn_enemy(room, {position = {player.position.x+3, player.position.y+2}, health = 60, attack = 1, archetype = .Brute})
+	id, placed := game.spawn_enemy(room, {position = grid.offset(player.position, 3, 2), health = 60, attack = 1, archetype = .Brute})
 	if !placed { fmt.eprintln("mechanics lab: no room for the slowed brute"); return false }
 	foe := game.enemy_entity(id)
 	before := render.capture_room_presentation(room)
@@ -598,6 +658,9 @@ mechanics_lab_slow :: proc(window: ^app.Window, renderer: ^render.Renderer, room
 mechanics_lab_ground :: proc(window: ^app.Window, renderer: ^render.Renderer, room: ^game.Room, controller: ^run_session.Tactical_Controller,
 	cards: ^run_session.Card_Interaction_State, buffer: ^run_session.Buffered_Gameplay_Command) -> bool {
 	player := room.player
+	// The Pozza di Veleno takes the Dinosauro's place for this act.
+	if !mechanics_lab_borrow(player, .Dino_Ride, .Poison_Pool) { return false }
+	defer mechanics_lab_borrow(player, .Poison_Pool, .Dino_Ride)
 	foe :: mechanics_lab_enemy
 	stacks :: proc(room: ^game.Room, id: u32, kind: game.Status_Kind) -> i32 {
 		status, found := game.status_for_entity(room, game.enemy_entity(id), kind)
@@ -624,15 +687,15 @@ mechanics_lab_ground :: proc(window: ^app.Window, renderer: ^render.Renderer, ro
 	for kind in ([2]game.Status_Kind{.Poison, .Burn}) { _, _ = game.remove_status(room, game.PLAYER_ENTITY, kind) }
 	// Whole windows: no stun in the fire's five.
 	player.tactical.config.shrinking_window = false
-	center := grid.Position{run_session.MECHANICS_LAB_WIDTH/2, run_session.MECHANICS_LAB_HEIGHT/2}
+	center := grid.Position{x = run_session.MECHANICS_LAB_WIDTH/2, y = run_session.MECHANICS_LAB_HEIGHT/2}
 	player.position = center
 	player.tactical.facing = .North
-	held_id, held_placed := game.spawn_enemy(room, {position = {center.x, center.y-3}, health = 40, attack = 1, archetype = .Chaser})
+	held_id, held_placed := game.spawn_enemy(room, {position = grid.offset(center, 0, -3), health = 40, attack = 1, archetype = .Chaser})
 	if !held_placed { fmt.eprintln("mechanics lab: no room for the held chaser"); return false }
 	hold(room, held_id)
 	// The ring around its cell and the one beside it, but the cell below it.
-	closing := grid.Position{center.x, center.y-2}
-	ring := [?]grid.Position{{center.x, center.y-4}, {center.x+1, center.y-4}, {center.x+2, center.y-3}, {center.x+1, center.y-2}, {center.x-1, center.y-3}}
+	closing := grid.offset(center, 0, -2)
+	ring := [?]grid.Position{grid.offset(center, 0, -4), grid.offset(center, 1, -4), grid.offset(center, 2, -3), grid.offset(center, 1, -2), grid.offset(center, -1, -3)}
 	for cell in ring {
 		if !pour(room, .Poison, cell) { fmt.eprintln("mechanics lab: the ring's pool at", cell, "was refused"); return false }
 	}
@@ -662,7 +725,7 @@ mechanics_lab_ground :: proc(window: ^app.Window, renderer: ^render.Renderer, ro
 		fmt.eprintln("mechanics lab: Pozza di Veleno was not played"); return false
 	}
 	// The game has it all at once; the board shows it from the landing on.
-	for cell in ([2]grid.Position{{center.x, center.y-3}, {center.x+1, center.y-3}}) {
+	for cell in ([2]grid.Position{grid.offset(center, 0, -3), grid.offset(center, 1, -3)}) {
 		if game.ground_pool_at(room, cell) <= 0 { fmt.eprintln("mechanics lab: the closed cell", cell, "did not fill"); return false }
 	}
 	// Eight cells of pool (the ring's five, the last one and the two it
@@ -680,22 +743,22 @@ mechanics_lab_ground :: proc(window: ^app.Window, renderer: ^render.Renderer, ro
 	mechanics_lab_film(window, renderer, room, controller, cards, buffer, 90, 3, "pool")
 
 	// A chaser walks the pools toward the player: a dose and a splash each.
-	walker_id, walker_placed := game.spawn_enemy(room, {position = {center.x+4, center.y}, health = 40, attack = 1, archetype = .Chaser})
+	walker_id, walker_placed := game.spawn_enemy(room, {position = grid.offset(center, 4, 0), health = 40, attack = 1, archetype = .Chaser})
 	if !walker_placed { fmt.eprintln("mechanics lab: no room for the walking chaser"); return false }
-	for cell in ([2]grid.Position{{center.x+3, center.y}, {center.x+2, center.y}}) {
+	for cell in ([2]grid.Position{grid.offset(center, 3, 0), grid.offset(center, 2, 0)}) {
 		if !pour(room, .Poison, cell) { fmt.eprintln("mechanics lab: the path's pool at", cell, "was refused"); return false }
 	}
 	frame := 0
 	for _ in 0..<900 {
 		walker := foe(room, walker_id)
-		if walker == nil || walker.position == (grid.Position{center.x+1, center.y}) { break }
+		if walker == nil || walker.position == (grid.offset(center, 1, 0)) { break }
 		mechanics_lab_reel_frame(window, renderer, room, controller, cards, buffer, "pool_walk", 6, &frame)
 	}
 	// 2 Veleno at each pool cell it entered, and each of its steps bit its
 	// stacks: 2 at the first pool, 3 at the second, 2 on the dry cell after,
 	// with 1 left. There it stays.
 	walker := foe(room, walker_id)
-	if walker == nil || walker.position != (grid.Position{center.x+1, center.y}) || walker.health != 40-7 || stacks(room, walker_id, .Poison) != 1 {
+	if walker == nil || walker.position != (grid.offset(center, 1, 0)) || walker.health != 40-7 || stacks(room, walker_id, .Poison) != 1 {
 		fmt.eprintln("mechanics lab: the walking chaser came with", walker.health if walker != nil else -1, "hp and Veleno",
 			stacks(room, walker_id, .Poison)); return false
 	}
@@ -705,7 +768,7 @@ mechanics_lab_ground :: proc(window: ^app.Window, renderer: ^render.Renderer, ro
 		fmt.eprintln("mechanics lab: the walking chaser splashed", ground.splashed-splashed, "times"); return false
 	}
 	// The player steps into a pool of his own: no Veleno on him, no splash.
-	walked := grid.Position{center.x-1, center.y}
+	walked := grid.offset(center, -1, 0)
 	if !pour(room, .Poison, walked) { fmt.eprintln("mechanics lab: the player's pool was refused"); return false }
 	if !mechanics_lab_commit(window, renderer, room, controller, cards, buffer, {kind = .Move, origin_phase = .Combat, direction = .West}) {
 		fmt.eprintln("mechanics lab: the player's step into the pool was not taken"); return false
@@ -719,7 +782,7 @@ mechanics_lab_ground :: proc(window: ^app.Window, renderer: ^render.Renderer, ro
 	game.clear_ground(room)
 	player.health = player.stats.max_health
 	player.position = center
-	brute_id, brute_placed := game.spawn_enemy(room, {position = {center.x+2, center.y-2}, health = 60, attack = 1, archetype = .Brute})
+	brute_id, brute_placed := game.spawn_enemy(room, {position = grid.offset(center, 2, -2), health = 60, attack = 1, archetype = .Brute})
 	if !brute_placed { fmt.eprintln("mechanics lab: no room for the held brute"); return false }
 	hold(room, brute_id)
 	render.clear_event_animations(renderer)
@@ -729,7 +792,7 @@ mechanics_lab_ground :: proc(window: ^app.Window, renderer: ^render.Renderer, ro
 	sounds := renderer.tactical.lab_sounds
 	if sounds == nil { fmt.eprintln("mechanics lab: no sounds before the fire"); return false }
 	spreads, outs := sounds.played[.World_Fire_Spread], sounds.played[.World_Fire_Out]
-	if !play(window, renderer, room, controller, cards, buffer, .Wildfire, {center.x+2, center.y}) {
+	if !play(window, renderer, room, controller, cards, buffer, .Wildfire, grid.offset(center, 2, 0)) {
 		fmt.eprintln("mechanics lab: Incendio was not played"); return false
 	}
 	frame = 0
@@ -821,13 +884,17 @@ mechanics_lab_hold :: proc(room: ^game.Room, id: u32) {
 // (odin_pp_living_fate_lethal_NN.png), and with three more charges beside it
 // the HUD's three chips and count say every word whole, its d20 too
 // (odin_pp_mechanics_lab_fate_chips.png); the 16 is only a critical on the
-// Custodian, a miniboss (odin_pp_living_fate_boss_NN.png). LAMA VELENOSA: its
-// die rolled as it is played (odin_pp_mechanics_lab_venom_roll.png), the bumps
-// it poisons after (odin_pp_living_venom_NN.png).
+// Custodian, a miniboss (odin_pp_living_fate_boss_NN.png).
 mechanics_lab_charges :: proc(window: ^app.Window, renderer: ^render.Renderer, dice: ^render.Dice_Renderer, room: ^game.Room,
 	controller: ^run_session.Tactical_Controller, cards: ^run_session.Card_Interaction_State, buffer: ^run_session.Buffered_Gameplay_Command) -> bool {
 	player := room.player
-	center := grid.Position{run_session.MECHANICS_LAB_WIDTH/2, run_session.MECHANICS_LAB_HEIGHT/2}
+	center := grid.Position{x = run_session.MECHANICS_LAB_WIDTH/2, y = run_session.MECHANICS_LAB_HEIGHT/2}
+	// Deflect and Feretro take the Cannone's and the Buco Nero's places for this act.
+	if !mechanics_lab_borrow(player, .Field_Cannon, .Deflect) || !mechanics_lab_borrow(player, .Devouring_Hole, .Coffin) { return false }
+	defer {
+		mechanics_lab_borrow(player, .Deflect, .Field_Cannon)
+		mechanics_lab_borrow(player, .Coffin, .Devouring_Hole)
+	}
 	foe :: mechanics_lab_enemy
 	stacks :: proc(room: ^game.Room, id: u32, kind: game.Status_Kind) -> i32 {
 		status, found := game.status_for_entity(room, game.enemy_entity(id), kind)
@@ -851,9 +918,9 @@ mechanics_lab_charges :: proc(window: ^app.Window, renderer: ^render.Renderer, d
 	self := game.entity_target(game.PLAYER_ENTITY)
 	if !reset(room, center) { return false }
 	player.tactical.facing = .East
-	// The four cards in hand, each under the mouse: its inspector's lines
+	// The three cards in hand, each under the mouse: its inspector's lines
 	// (odin_pp_mechanics_lab_card_<Card>.png).
-	for card in ([4]game.Card_Id{.Deflect, .Coffin, .Fate_Dice, .Venom_Blade}) {
+	for card in ([3]game.Card_Id{.Deflect, .Coffin, .Fate_Dice}) {
 		id, held := mechanics_lab_hand_card(player, card)
 		if !held { fmt.eprintln("mechanics lab: no", card, "in hand"); return false }
 		mechanics_lab_still(window, renderer, room, id, fmt.ctprintf("odin_pp_mechanics_lab_card_%v.png", card))
@@ -873,9 +940,9 @@ mechanics_lab_charges :: proc(window: ^app.Window, renderer: ^render.Renderer, d
 		frames: int,
 	}
 	blows := [?]Blow{
-		{name = "deflect_bolt", archetype = .Archer, at = {center.x+4, center.y}, look = .Bolt, frames = 64},
-		{name = "deflect_cleave", archetype = .Brute, at = {center.x+1, center.y}, cleave = true, look = .Cleaver, frames = 64},
-		{name = "deflect_charge", archetype = .Brute, at = {center.x+3, center.y}, charge = true, look = .Cleaver, frames = 80},
+		{name = "deflect_bolt", archetype = .Archer, at = grid.offset(center, 4, 0), look = .Bolt, frames = 64},
+		{name = "deflect_cleave", archetype = .Brute, at = grid.offset(center, 1, 0), cleave = true, look = .Cleaver, frames = 64},
+		{name = "deflect_charge", archetype = .Brute, at = grid.offset(center, 3, 0), charge = true, look = .Cleaver, frames = 80},
 	}
 	for blow, index in blows {
 		if index > 0 {
@@ -890,7 +957,7 @@ mechanics_lab_charges :: proc(window: ^app.Window, renderer: ^render.Renderer, d
 		enemy := foe(room, id)
 		intent := game.make_attack_intent(room, enemy.position, center, 3)
 		if blow.cleave {
-			for side in ([2]grid.Position{{center.x, center.y-1}, {center.x, center.y+1}}) {
+			for side in ([2]grid.Position{grid.offset(center, 0, -1), grid.offset(center, 0, 1)}) {
 				intent.threatened_cells[intent.threatened_cell_count] = side
 				intent.threatened_cell_count += 1
 			}
@@ -899,7 +966,7 @@ mechanics_lab_charges :: proc(window: ^app.Window, renderer: ^render.Renderer, d
 			// Two cells at a run, then the blow from the third.
 			intent.kind = .Charge
 			for step in 1..=2 {
-				intent.path[intent.path_count] = {enemy.position.x-step, center.y}
+				intent.path[intent.path_count] = {x = enemy.position.x-step, y = center.y}
 				intent.path_count += 1
 			}
 			intent.destination = intent.path[intent.path_count-1]
@@ -947,10 +1014,10 @@ mechanics_lab_charges :: proc(window: ^app.Window, renderer: ^render.Renderer, d
 	mechanics_lab_wait_free(window, renderer, room, controller, cards, buffer)
 	if game.player_charges(room, .Arrows) != 3 { fmt.eprintln("mechanics lab: Feretro loaded", game.player_charges(room, .Arrows), "arrows"); return false }
 	// A foe in the line of fire, and one behind a block of cover.
-	cover := grid.Position{center.x, center.y+2}
+	cover := grid.offset(center, 0, 2)
 	append(&room.obstacles, game.Obstacle{position = cover})
-	target_id, target_placed := game.spawn_enemy(room, {position = {center.x+3, center.y-1}, health = 60, attack = 1, archetype = .Chaser})
-	covered_id, covered_placed := game.spawn_enemy(room, {position = {center.x, center.y+3}, health = 60, attack = 1, archetype = .Chaser})
+	target_id, target_placed := game.spawn_enemy(room, {position = grid.offset(center, 3, -1), health = 60, attack = 1, archetype = .Chaser})
+	covered_id, covered_placed := game.spawn_enemy(room, {position = grid.offset(center, 0, 3), health = 60, attack = 1, archetype = .Chaser})
 	if !target_placed || !covered_placed { fmt.eprintln("mechanics lab: no room for the arrows' foes"); return false }
 	mechanics_lab_hold(room, target_id)
 	mechanics_lab_hold(room, covered_id)
@@ -973,13 +1040,13 @@ mechanics_lab_charges :: proc(window: ^app.Window, renderer: ^render.Renderer, d
 	if !taken || !has_shot { fmt.eprintln("mechanics lab: the click on the marked foe loosed no arrow"); return false }
 	bolts := renderer.tactical.attack_fx.spawned[.Bolt]
 	if !mechanics_lab_commit(window, renderer, room, controller, cards, buffer, shot) { fmt.eprintln("mechanics lab: the arrow was not loosed"); return false }
-	// One action of a second: 1 damage and one of Veleno 2, Bruciatura 1 or
+	// One action of a second at its first price (half of it at the player's pace): 1 damage and one of Veleno 2, Bruciatura 1 or
 	// Rallentamento 1; the foe behind the cover untouched.
 	arrowed, sheltered := foe(room, target_id), foe(room, covered_id)
 	poison, burn, slow := stacks(room, target_id, .Poison), stacks(room, target_id, .Burn), stacks(room, target_id, .Slow)
 	marked := (poison == 2 && burn == 0 && slow == 0) || (poison == 0 && burn == 1 && slow == 0) || (poison == 0 && burn == 0 && slow == 1)
 	if arrowed == nil || arrowed.health != 60-game.COFFIN_ARROW_DAMAGE || !marked || game.player_charges(room, .Arrows) != 2 ||
-	   player.tactical.action_duration != game.TACTICAL_ARROW_SECONDS || sheltered == nil || sheltered.health != 60 {
+	   player.tactical.action_duration != game.tactical_paced_seconds(room, game.TACTICAL_ARROW_SECONDS) || sheltered == nil || sheltered.health != 60 {
 		fmt.eprintln("mechanics lab: the arrow did not strike as it should: foe", arrowed.health if arrowed != nil else -1,
 			"Veleno", poison, "Bruciatura", burn, "Rallentamento", slow, "arrows", game.player_charges(room, .Arrows),
 			"action", player.tactical.action_duration); return false
@@ -1014,7 +1081,7 @@ mechanics_lab_charges :: proc(window: ^app.Window, renderer: ^render.Renderer, d
 	}
 	if chip := fate_chip(renderer, room); chip != "DESTINO 3 d4" { fmt.eprintln("mechanics lab: the DESTINO chip says", chip); return false }
 	mechanics_lab_still(window, renderer, room, 0, "odin_pp_mechanics_lab_fate_chip.png")
-	fated_id, fated_placed := game.spawn_enemy(room, {position = {center.x, center.y-1}, health = 60, attack = 1, archetype = .Chaser})
+	fated_id, fated_placed := game.spawn_enemy(room, {position = grid.offset(center, 0, -1), health = 60, attack = 1, archetype = .Chaser})
 	if !fated_placed { fmt.eprintln("mechanics lab: no room for the fated foe"); return false }
 	mechanics_lab_hold(room, fated_id)
 	render.clear_event_animations(renderer)
@@ -1058,7 +1125,7 @@ mechanics_lab_charges :: proc(window: ^app.Window, renderer: ^render.Renderer, d
 	for kind in others { _, _ = game.remove_status(room, game.PLAYER_ENTITY, kind) }
 	// The Custodian is a miniboss: the same 16 is only a critical, the bump's
 	// 2 doubled.
-	custodian_id, custodian_placed := game.spawn_enemy(room, {position = {center.x, center.y-1}, health = 60, attack = 1, archetype = .Custodian})
+	custodian_id, custodian_placed := game.spawn_enemy(room, {position = grid.offset(center, 0, -1), health = 60, attack = 1, archetype = .Custodian})
 	if !custodian_placed { fmt.eprintln("mechanics lab: no room for the Custodian"); return false }
 	mechanics_lab_hold(room, custodian_id)
 	render.clear_event_animations(renderer)
@@ -1069,41 +1136,7 @@ mechanics_lab_charges :: proc(window: ^app.Window, renderer: ^render.Renderer, d
 		fmt.eprintln("mechanics lab: the d20's 16 on the Custodian left him", custodian.health if custodian != nil else -1, "hp"); return false
 	}
 	mechanics_lab_film(window, renderer, room, controller, cards, buffer, 76, 2, "fate_boss")
-	// LAMA VELENOSA, from the hand: its roll over the window, then a bump.
-	if !reset(room, center) { return false }
-	venom_id, venom_placed := game.spawn_enemy(room, {position = {center.x, center.y-1}, health = 60, attack = 1, archetype = .Chaser})
-	if !venom_placed { fmt.eprintln("mechanics lab: no room for the venom's foe"); return false }
-	mechanics_lab_hold(room, venom_id)
-	mechanics_lab_wait_free(window, renderer, room, controller, cards, buffer)
-	forced, found := mechanics_lab_dice_for_face(3, 4)
-	if !found { return false }
-	player.dice = forced
-	if !mechanics_lab_play(window, renderer, room, controller, cards, buffer, .Venom_Blade, self) {
-		fmt.eprintln("mechanics lab: Lama Velenosa was not played"); return false
-	}
-	rolled := false
-	for _ in 0..<300 {
-		mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0, true, dice)
-		cue, showing := render.active_presentation_cue(&renderer.timeline)
-		if showing && cue.kind == .Dice_Rolled && render.presentation_cue_progress(cue) > 0.86 && !rolled {
-			artifacts.screenshot("odin_pp_mechanics_lab_venom_roll.png")
-			rolled = true
-		}
-		if !render.renderer_blocks_player_input(renderer) { break }
-	}
-	if !rolled || game.player_charges(room, .Venom_Blade) != 3 { fmt.eprintln("mechanics lab: Lama Velenosa rolled no 3"); return false }
-	// The loaded bump: its 2 and Veleno 2, one charge spent (the Veleno bites
-	// the foe's own next action, in the film).
-	if !mechanics_lab_commit(window, renderer, room, controller, cards, buffer, {kind = .Move, origin_phase = .Combat, direction = .North}) {
-		fmt.eprintln("mechanics lab: the loaded bump was not taken"); return false
-	}
-	venomed := foe(room, venom_id)
-	if venomed == nil || venomed.health != 58 || stacks(room, venom_id, .Poison) != game.VENOM_BLADE_POISON || game.player_charges(room, .Venom_Blade) != 2 {
-		fmt.eprintln("mechanics lab: the loaded bump left Veleno", stacks(room, venom_id, .Poison), "and", game.player_charges(room, .Venom_Blade), "charges"); return false
-	}
-	mechanics_lab_film(window, renderer, room, controller, cards, buffer, 76, 2, "venom")
-	fmt.eprintf("mechanics lab charges: deflected a bolt, a cleave and a charge, an arrow (none through cover), three fated bumps " +
-		"(Bruciatura 2, lethal, critical on the Custodian), Lama %d left\n", game.player_charges(room, .Venom_Blade))
+	fmt.eprintln("mechanics lab charges: deflected a bolt, a cleave and a charge, an arrow (none through cover), three fated bumps (Bruciatura 2, lethal, critical on the Custodian)")
 	return true
 }
 
@@ -1132,7 +1165,7 @@ mechanics_lab_charges :: proc(window: ^app.Window, renderer: ^render.Renderer, d
 mechanics_lab_lasso :: proc(window: ^app.Window, renderer: ^render.Renderer, room: ^game.Room, controller: ^run_session.Tactical_Controller,
 	cards: ^run_session.Card_Interaction_State, buffer: ^run_session.Buffered_Gameplay_Command) -> bool {
 	player := room.player
-	center := grid.Position{run_session.MECHANICS_LAB_WIDTH/2, run_session.MECHANICS_LAB_HEIGHT/2}
+	center := grid.Position{x = run_session.MECHANICS_LAB_WIDTH/2, y = run_session.MECHANICS_LAB_HEIGHT/2}
 	foe :: mechanics_lab_enemy
 	// A fresh arena, the player at `at` with a whole window and his dodge
 	// ready, nothing on him from the acts before.
@@ -1178,22 +1211,22 @@ mechanics_lab_lasso :: proc(window: ^app.Window, renderer: ^render.Renderer, roo
 	}
 	wait_window(window, renderer, room, controller, cards, buffer, 12)
 	// I. The west wall on the fourth cell: a ring of 3.
-	at := grid.Position{4, center.y}
+	at := grid.Position{x = 4, y = center.y}
 	if !reset(room, at) { return false }
 	player.tactical.facing = .East
-	open, _ := game.lasso_radius(room, {at.x+1, at.y})
+	open, _ := game.lasso_radius(room, grid.offset(at, 1, 0))
 	walled, walled_smash := game.lasso_radius(room, at)
 	if open != 4 || walled != 3 || walled_smash {
 		fmt.eprintln("mechanics lab: four cells from the wall the Lazzo spins at", walled, "and a cell further at", open); return false
 	}
 	SWUNG :: i32(18)
 	// The foe to swing, four cells off: it is pulled in onto the ring.
-	target_id := spawn(room, {at.x+2, at.y-4}, SWUNG)
+	target_id := spawn(room, grid.offset(at, 2, -4), SWUNG)
 	// Three foes held on the ring, struck in the spin's order: north, south,
 	// north-east (each knocked off it where the board shows it).
-	standing := [3]struct{id: u32, cell: grid.Position}{{cell = {at.x, at.y-3}}, {cell = {at.x, at.y+3}}, {cell = {at.x+2, at.y-2}}}
+	standing := [3]struct{id: u32, cell: grid.Position}{{cell = grid.offset(at, 0, -3)}, {cell = grid.offset(at, 0, 3)}, {cell = grid.offset(at, 2, -2)}}
 	for &stander in standing { stander.id = spawn(room, stander.cell, 30) }
-	custodian_id := spawn(room, {at.x+4, at.y-3}, 40, .Custodian)
+	custodian_id := spawn(room, grid.offset(at, 4, -3), 40, .Custodian)
 	if target_id == 0 || standing[0].id == 0 || standing[1].id == 0 || standing[2].id == 0 || custodian_id == 0 {
 		fmt.eprintln("mechanics lab: no room for the lasso's foes"); return false
 	}
@@ -1214,7 +1247,7 @@ mechanics_lab_lasso :: proc(window: ^app.Window, renderer: ^render.Renderer, roo
 	aim(window, renderer, room, card, custodian, "odin_pp_mechanics_lab_lasso_miniboss.png")
 	// Then a free archer east, four cells down a clear line, off the ring: it
 	// takes aim at once.
-	archer_id := spawn(room, {at.x+4, at.y}, 30, .Archer, free = true)
+	archer_id := spawn(room, grid.offset(at, 4, 0), 30, .Archer, free = true)
 	if archer_id == 0 { fmt.eprintln("mechanics lab: no room for the archer"); return false }
 	for _ in 0..<12 { mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0) }
 	if aiming := foe(room, archer_id); aiming == nil || aiming.intent.kind != .Attack || !aiming.intent.windup {
@@ -1266,7 +1299,7 @@ mechanics_lab_lasso :: proc(window: ^app.Window, renderer: ^render.Renderer, roo
 	for stander, order in standing {
 		hit := seen.first_hit+i32(order)
 		step := game.lasso_radial_step(at, stander.cell)
-		landing := grid.Position{stander.cell.x+step.x*int(hit), stander.cell.y+step.y*int(hit)}
+		landing := grid.offset(stander.cell, step.x*int(hit), step.y*int(hit))
 		struck_foe := foe(room, stander.id)
 		if struck_foe == nil || struck_foe.position != landing || struck_foe.health != 30-hit {
 			fmt.eprintln("mechanics lab: hit", hit, "left the foe from", stander.cell, "on", struck_foe.position if struck_foe != nil else stander.cell,
@@ -1289,10 +1322,10 @@ mechanics_lab_lasso :: proc(window: ^app.Window, renderer: ^render.Renderer, roo
 	turns := seen.turns+1
 	// II. Beside the west wall: a ring of 1, smashes into the wall and back.
 	wait_window(window, renderer, room, controller, cards, buffer, 6)
-	if !reset(room, {1, center.y}) { return false }
+	if !reset(room, {x = 1, y = center.y}) { return false }
 	SMASHED :: i32(60)
 	// Free, not held: let go, it plans afresh.
-	smashed_id := spawn(room, {4, center.y}, SMASHED, free = true)
+	smashed_id := spawn(room, {x = 4, y = center.y}, SMASHED, free = true)
 	if smashed_id == 0 { fmt.eprintln("mechanics lab: no room for the smashed foe"); return false }
 	render.clear_event_animations(renderer)
 	for _ in 0..<12 { mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0) }
@@ -1410,7 +1443,7 @@ mechanics_lab_fishing_stream :: proc(card: bool, food := game.Fishing_Food.Fish)
 mechanics_lab_fishing :: proc(window: ^app.Window, renderer: ^render.Renderer, dice: ^render.Dice_Renderer, room: ^game.Room,
 	controller: ^run_session.Tactical_Controller, cards: ^run_session.Card_Interaction_State, buffer: ^run_session.Buffered_Gameplay_Command) -> bool {
 	player := room.player
-	center := grid.Position{run_session.MECHANICS_LAB_WIDTH/2, run_session.MECHANICS_LAB_HEIGHT/2}
+	center := grid.Position{x = run_session.MECHANICS_LAB_WIDTH/2, y = run_session.MECHANICS_LAB_HEIGHT/2}
 	// Plays frames with the clock running until the board is done showing,
 	// every `every`th saved as odin_pp_living_<name>_NN.png (the dice over the
 	// window as the game shows them); the roll's still once it has settled.
@@ -1471,7 +1504,7 @@ mechanics_lab_fishing :: proc(window: ^app.Window, renderer: ^render.Renderer, d
 	player.equipment = {}
 	for kind in ([6]game.Status_Kind{.Deflect, .Arrows, .Fate, .Venom_Blade, .Poison, .Burn}) { _, _ = game.remove_status(room, game.PLAYER_ENTITY, kind) }
 	player.health = player.stats.max_health-6
-	for at in ([2]grid.Position{{center.x+3, center.y-2}, {center.x-3, center.y+1}}) {
+	for at in ([2]grid.Position{grid.offset(center, 3, -2), grid.offset(center, -3, 1)}) {
 		id, placed := game.spawn_enemy(room, {position = at, health = 30, attack = 1, archetype = .Chaser})
 		if !placed { fmt.eprintln("mechanics lab: no room for the foes F7 clears"); return false }
 		mechanics_lab_hold(room, id)
@@ -1491,10 +1524,10 @@ mechanics_lab_fishing :: proc(window: ^app.Window, renderer: ^render.Renderer, d
 	if _, spawned := game.sandbox_tick(room, &sandbox, 10); spawned { fmt.eprintln("mechanics lab: a foe arrived in the cleared arena"); return false }
 	rod, held := game.fishing_rod(&player.deck)
 	if !held { fmt.eprintln("mechanics lab: no rod in the deck"); return false }
-	water := grid.Position{center.x+2, center.y-1}
+	water := grid.offset(center, 2, -1)
 	still(window, renderer, room, rod.id, 0, {}, false, "odin_pp_mechanics_lab_rod_slot.png")
 	still(window, renderer, room, 0, rod.id, water, true, "odin_pp_mechanics_lab_rod_preview.png")
-	if game.fishing_target_error(room, water) != .Fished || game.fishing_target_error(room, {center.x+4, center.y}) != .Out_Of_Reach ||
+	if game.fishing_target_error(room, water) != .Fished || game.fishing_target_error(room, grid.offset(center, 4, 0)) != .Out_Of_Reach ||
 	   game.fishing_target_error(room, center) == .Fished {
 		fmt.eprintln("mechanics lab: the rod's aim is wrong"); return false
 	}
@@ -1658,6 +1691,20 @@ mechanics_lab_still :: proc(window: ^app.Window, renderer: ^render.Renderer, roo
 	artifacts.screenshot(name)
 }
 
+// A still frame of the room's hologram (render.draw_hologram, the map the robot
+// opens in a room), saved as `name`.
+mechanics_lab_hologram_still :: proc(window: ^app.Window, renderer: ^render.Renderer, room: ^game.Room, name: cstring) {
+	for _ in 0..<3 {
+		render.update_renderer_frame_timeline(renderer, 0)
+		render.update_tactical_view(renderer, room, {}, false, true)
+		app.begin_canvas(window, render.RESIN_BACKGROUND)
+		render.draw_hologram(renderer, room)
+		render.draw_tactical_hud(renderer, room, false, true)
+		app.present(window, render.LETTERBOX_COLOR)
+	}
+	artifacts.screenshot(name)
+}
+
 // A still frame with the mouse on `foe`, so its inspector stands beside the
 // board, saved as `name`.
 mechanics_lab_inspect_still :: proc(window: ^app.Window, renderer: ^render.Renderer, room: ^game.Room, foe: game.Entity_Ref, name: cstring) {
@@ -1677,129 +1724,6 @@ mechanics_lab_inspect_still :: proc(window: ^app.Window, renderer: ^render.Rende
 	}
 	artifacts.screenshot(name)
 	renderer.has_hovered_cell = false
-}
-
-// MOVIMENTO OMBRA from the hand, as the lane plays it, filmed every fourth
-// frame as odin_pp_living_shadow_NN.png: the card sinks the player into his
-// shadow, the shadow steps, takes a diagonal on its first beat and steps
-// again while the world stands still, and when the four seconds are over he
-// rises where it stopped. The window, the world's beats and every footstep
-// wait for him; only the shadow's own sounds play.
-mechanics_lab_shadow :: proc(window: ^app.Window, renderer: ^render.Renderer, room: ^game.Room, controller: ^run_session.Tactical_Controller,
-	cards: ^run_session.Card_Interaction_State, buffer: ^run_session.Buffered_Gameplay_Command) -> bool {
-	player := room.player
-	// From an open window, the stun above over and a second and a half into
-	// it (the world's clock between two beats), nothing resolving or running.
-	for _ in 0..<600 {
-		if player.tactical.phase == .Decision && player.tactical.remaining <= f32(player.tactical.budget)-1.5 &&
-		   game.tactical_can_begin_shadow(room) && !render.renderer_blocks_player_input(renderer) { break }
-		mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0, true)
-	}
-	if room.phase != .Combat || player.tactical.phase != .Decision || !game.tactical_can_begin_shadow(room) {
-		fmt.eprintln("mechanics lab: no open window for the shadow"); return false
-	}
-	sounds := renderer.tactical.lab_sounds
-	if sounds == nil { fmt.eprintln("mechanics lab: no sounds before the shadow"); return false }
-	heard := sounds.played
-	left, clock, pulses, body := player.tactical.remaining, player.tactical.clock_fraction, room.pulse_count, player.position
-	shadow_card, held := mechanics_lab_hand_card(player, .Shadow_Step)
-	if !held || !run_session.commit_gameplay_command(room, renderer, cards, {kind = .Play_Card, origin_phase = .Combat,
-		card_id = shadow_card, target = game.entity_target(game.PLAYER_ENTITY)}) || !game.tactical_shadow_active(room) {
-		fmt.eprintln("mechanics lab: Movimento Ombra was not played"); return false
-	}
-	frame := 0
-	// The card and the sinking hold the shadow's four seconds.
-	for _ in 0..<120 {
-		if !render.renderer_blocks_player_input(renderer) { break }
-		mechanics_lab_reel_frame(window, renderer, room, controller, cards, buffer, "shadow", 4, &frame)
-	}
-	if render.renderer_blocks_player_input(renderer) || player.tactical.shadow_remaining < game.TACTICAL_SHADOW_SECONDS-2.0/60.0 {
-		fmt.eprintln("mechanics lab: the sinking ate the shadow's seconds"); return false
-	}
-	// Four steps, each as soon as the shadow's own lockout and its moment
-	// allow: one straight away, the diagonal on the first beat, two more. The
-	// first free way of each list is taken.
-	Planned_Step :: struct {
-		after: f32,
-		beat: bool,
-		ways: [4]grid.Position,
-	}
-	steps := [4]Planned_Step{
-		{after = 0, ways = {{1, 0}, {0, 1}, {-1, 0}, {0, -1}}},
-		{beat = true, ways = {{1, 1}, {1, -1}, {-1, 1}, {-1, -1}}},
-		{after = 1.6, ways = {{0, 1}, {1, 0}, {-1, 0}, {0, -1}}},
-		{after = 2.3, ways = {{1, 0}, {0, 1}, {0, -1}, {-1, 0}}},
-	}
-	shadow_cell := player.tactical.shadow_position
-	for step, index in steps {
-		for _ in 0..<240 {
-			if !game.tactical_shadow_active(room) { break }
-			if !render.renderer_blocks_player_input(renderer) && !game.tactical_player_busy(room) &&
-			   game.tactical_shadow_elapsed(&player.tactical) >= step.after && (!step.beat || game.tactical_beat_target(room) != 0) { break }
-			mechanics_lab_reel_frame(window, renderer, room, controller, cards, buffer, "shadow", 4, &frame)
-		}
-		if !game.tactical_shadow_active(room) { fmt.eprintln("mechanics lab: the shadow ended before step", index); return false }
-		stepped := false
-		for way in step.ways {
-			// A diagonal is the lane's two keys on a beat: the first key's
-			// direction, both keys' offset and the beat stamped at the press.
-			command := run_session.Gameplay_Command{kind = .Move, origin_phase = .Combat}
-			if step.beat {
-				command.direction = .East if way.x > 0 else .West
-				command.diagonal, command.beat = way, game.tactical_beat_target(room)
-			} else {
-				for direction in game.Move_Direction {
-					if game.direction_offset(direction) == way { command.direction = direction }
-				}
-			}
-			if run_session.commit_gameplay_command(room, renderer, cards, command) {
-				stepped = player.tactical.shadow_position == game.add_position(shadow_cell, way)
-				break
-			}
-		}
-		if !stepped || player.position != body {
-			fmt.eprintln("mechanics lab: shadow step", index, "not taken from", shadow_cell); return false
-		}
-		shadow_cell = player.tactical.shadow_position
-		mechanics_lab_reel_frame(window, renderer, room, controller, cards, buffer, "shadow", 4, &frame)
-	}
-	// The rest of the four seconds, then the rise (the controller's own
-	// command). Up to the rise the window and the world's clock stay where
-	// they stopped; the body lands on the shadow's cell.
-	risen := false
-	rising: [audio.Lab_Sfx]int
-	for _ in 0..<360 {
-		if player.tactical.remaining != left || player.tactical.clock_fraction != clock || room.pulse_count != pulses {
-			fmt.eprintf("mechanics lab: the world moved in the shadow (window %.3f -> %.3f s)\n", left, player.tactical.remaining); return false
-		}
-		if !game.tactical_shadow_active(room) { risen, rising = true, sounds.played; break }
-		mechanics_lab_reel_frame(window, renderer, room, controller, cards, buffer, "shadow", 4, &frame)
-	}
-	if !risen || player.position != shadow_cell || shadow_cell == body {
-		fmt.eprintln("mechanics lab: the player did not rise on the shadow's cell", shadow_cell, "but at", player.position); return false
-	}
-	// The card climbs out and the world's colours come back.
-	for _ in 0..<120 {
-		if !render.tactical_shadow_showing(renderer) && !render.renderer_blocks_player_input(renderer) && renderer.tactical.shadow.frozen <= 0 { break }
-		mechanics_lab_reel_frame(window, renderer, room, controller, cards, buffer, "shadow", 4, &frame)
-	}
-	for _ in 0..<8 { mechanics_lab_reel_frame(window, renderer, room, controller, cards, buffer, "shadow", 4, &frame) }
-	// The shadow's steps start no clip on the card: never the boots and the
-	// card's scrape, nor a dodge for the diagonal; the rise is no walk either.
-	// (Once risen the world's blows are back, and one that now misses him
-	// rightly makes his card dodge.) Its own sounds all played.
-	for sfx in ([?]audio.Lab_Sfx{.Pilgrim_Move_Side, .Pilgrim_Move_Up, .Pilgrim_Move_Down}) {
-		if sounds.played[sfx] != heard[sfx] { fmt.eprintln("mechanics lab: a footstep in the shadow:", sfx); return false }
-	}
-	if rising[.Pilgrim_Dodge] != heard[.Pilgrim_Dodge] { fmt.eprintln("mechanics lab: a shadow step played the dodge"); return false }
-	if sounds.played[.Card_Shadow_Step] != heard[.Card_Shadow_Step]+1 || sounds.played[.Pilgrim_Shadow_Sink] != heard[.Pilgrim_Shadow_Sink]+1 ||
-	   sounds.played[.Pilgrim_Shadow_Step] != heard[.Pilgrim_Shadow_Step]+len(steps) ||
-	   sounds.played[.Pilgrim_Shadow_Rise] != heard[.Pilgrim_Shadow_Rise]+1 || sounds.played[.Ui_Critical] <= heard[.Ui_Critical] ||
-	   sounds.played[.Ui_Beat_Tick] < heard[.Ui_Beat_Tick]+game.TACTICAL_SHADOW_BEATS {
-		fmt.eprintln("mechanics lab: the shadow's sounds did not all play"); return false
-	}
-	fmt.eprintf("mechanics lab shadow: %d steps, risen at %v from %v, window %.2f s kept, %d frames\n", len(steps), player.position, body, left, frame)
-	return true
 }
 
 // One frame of a film with the clock running; every `every`th one is saved
@@ -1837,11 +1761,11 @@ mechanics_lab_sounds_heard :: proc(renderer: ^render.Renderer) -> bool {
 		if sounds.played[sfx] == 0 { fmt.eprintln("mechanics lab: no sound for", sfx); return false }
 	}
 	// The player's charges: each card, and each charge as it is loaded.
-	for card in ([4]game.Card_Id{.Deflect, .Coffin, .Fate_Dice, .Venom_Blade}) {
+	for card in ([3]game.Card_Id{.Deflect, .Coffin, .Fate_Dice}) {
 		sfx, _ := render.lab_card_sfx(card)
 		if sounds.played[sfx] == 0 { fmt.eprintln("mechanics lab: no sound for the card", card, sfx); return false }
 	}
-	for kind in ([4]game.Status_Kind{.Deflect, .Arrows, .Fate, .Venom_Blade}) {
+	for kind in ([3]game.Status_Kind{.Deflect, .Arrows, .Fate}) {
 		sfx, _ := render.lab_status_sfx(kind)
 		if sounds.played[sfx] == 0 { fmt.eprintln("mechanics lab: no sound for the charge", kind, sfx); return false }
 	}
@@ -1871,6 +1795,27 @@ mechanics_lab_sounds_heard :: proc(renderer: ^render.Renderer) -> bool {
 	for sfx in ([?]audio.Lab_Sfx{render.LAB_FIRST_PERSON_CARD, render.LAB_FIRST_PERSON_ENTER, render.LAB_FIRST_PERSON_SHOT,
 		render.LAB_FIRST_PERSON_HIT, render.LAB_FIRST_PERSON_RICOCHET, render.LAB_FIRST_PERSON_EXIT}) {
 		if sounds.played[sfx] == 0 { fmt.eprintln("mechanics lab: no sound for the first person", sfx); return false }
+	}
+	// The Inondazione's: its card, the wave, a foe splashed and a fire's steam.
+	for sfx in ([?]audio.Lab_Sfx{.Card_Flood, .World_Flood_Wave, .World_Flood_Splash, .World_Flood_Steam}) {
+		if sounds.played[sfx] == 0 { fmt.eprintln("mechanics lab: no sound for the flood", sfx); return false }
+	}
+	// Bomb Marley's: its card, the ball, the lights, a warning, a bomb and its
+	// blast, a character saved, the seconds earned, the groove in both beats
+	// and the end.
+	for sfx in ([?]audio.Lab_Sfx{.Card_Bomb_Marley, .World_Marley_Ball, .World_Marley_Lights, .World_Marley_Warn, .World_Marley_Bomb,
+		.World_Marley_Blast, .World_Marley_Safe, .World_Marley_Bonus, .World_Marley_Groove_A, .World_Marley_Groove_B, .World_Marley_End}) {
+		if sounds.played[sfx] == 0 { fmt.eprintln("mechanics lab: no sound for the party", sfx); return false }
+	}
+	// The Cannone's: its card, the stand, a shot, a strike, the beam, the fall;
+	// the Buco Nero's: its card, the opening, the hum, the pull, a foe swallowed,
+	// the closing; the Dinosauro's: its card, a roar of each, the steps, a stomp
+	// and the climb down; the Sanguinamento's.
+	for sfx in ([?]audio.Lab_Sfx{.Card_Cannon, .Card_Laser_Cannon, .World_Cannon_Place, .World_Cannon_Fire, .World_Cannon_Hit, .World_Laser_Fire,
+		.World_Cannon_Break, .Card_Black_Hole, .World_Black_Hole_Open, .World_Black_Hole_Hum, .World_Black_Hole_Pull, .World_Black_Hole_Swallow,
+		.World_Black_Hole_Close, .Card_Dinosaur, .World_Dino_Roar_Raptor, .World_Dino_Roar_Stego, .World_Dino_Roar_Dilo, .World_Dino_Roar_Giga,
+		.World_Dino_Step_Small, .World_Dino_Step_Heavy, .World_Dino_Stomp, .World_Dino_Dismount, .Ui_Status_Bleed, .World_Bleed_Tick}) {
+		if sounds.played[sfx] == 0 { fmt.eprintln("mechanics lab: no sound for the arsenal", sfx); return false }
 	}
 	fmt.eprintln("mechanics lab sounds:", heard)
 	return true

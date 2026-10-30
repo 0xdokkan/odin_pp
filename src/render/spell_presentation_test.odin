@@ -63,9 +63,9 @@ test_spell_firebomb_group_starts_all_damage_shield_death_and_loot_before_reactio
 	defer level.destroy(&data)
 	player := spell_presentation_player(t, .Firebomb)
 	enemies := [?]game.Enemy_Spawn{
-		{position = {3, 1}, health = 8, attack = 1},
-		{position = {4, 1}, health = 1, attack = 1, drops_healing = true},
-		{position = {3, 2}, health = 8, attack = 1},
+		{position = {x = 3, y = 1}, health = 8, attack = 1},
+		{position = {x = 4, y = 1}, health = 1, attack = 1, drops_healing = true},
+		{position = {x = 3, y = 2}, health = 8, attack = 1},
 	}
 	room, ok := game.create_room(&data, &player, {enemies = enemies[:]})
 	testing.expect(t, ok)
@@ -75,12 +75,12 @@ test_spell_firebomb_group_starts_all_damage_shield_death_and_loot_before_reactio
 	applied, _ = game.apply_status(&room, game.enemy_entity(1), .Thorns, 1, 3)
 	testing.expect(t, applied)
 	definition, _ := game.card_definition_by_id(.Firebomb)
-	footprint := game.evaluate_card_targeting(&room, player.deck.hand[0], game.card_target_request_at(definition, {3, 1}))
+	footprint := game.evaluate_card_targeting(&room, player.deck.hand[0], game.card_target_request_at(definition, {x = 3, y = 1}))
 	testing.expect_value(t, footprint.error, game.Card_Compile_Error.None)
 	expected_mask: u16
 	for dy in -1..=1 {
 		for dx in -1..=1 {
-			if game.target_cell_set_contains(&footprint.query.affected, {3+dx, 1+dy}) {
+			if game.target_cell_set_contains(&footprint.query.affected, {x = 3+dx, y = 1+dy}) {
 				expected_mask |= u16(1)<<u32((dy+1)*3+dx+1)
 			}
 		}
@@ -88,7 +88,7 @@ test_spell_firebomb_group_starts_all_damage_shield_death_and_loot_before_reactio
 	// The top row lies inside the boundary wall, so exactly six floor cells flash.
 	testing.expect_value(t, expected_mask, u16(0b111111000))
 	before := capture_room_presentation(&room)
-	play := game.play_card(&room, player.deck.hand[0].id, game.cell_target({3, 1}))
+	play := game.play_card(&room, player.deck.hand[0].id, game.cell_target({x = 3, y = 1}))
 	testing.expect_value(t, play.result, game.Card_Play_Result.Played)
 	testing.expect_value(t, play.action_report.events.events[1].kind, game.Game_Event_Kind.Spell_Impact)
 	testing.expect_value(t, play.action_report.events.events[1].area_mask, expected_mask)
@@ -120,7 +120,7 @@ test_spell_firebomb_group_starts_all_damage_shield_death_and_loot_before_reactio
 	testing.expect_value(t, timeline.view.player.health, i32(20))
 	visible_drops := 0
 	for drop in timeline.view.loot[:timeline.view.loot_count] {
-		if drop.visible && drop.position == (grid.Position{4, 1}) { visible_drops += 1 }
+		if drop.visible && drop.position == (grid.Position{x = 4, y = 1}) { visible_drops += 1 }
 	}
 	testing.expect_value(t, visible_drops, 2)
 	for offset in 0..<span {
@@ -149,14 +149,14 @@ test_spell_firebomb_direct_cast_duration_does_not_scale_with_damage_target_count
 		data := create_encounter_presentation_test_level(t)
 		player := spell_presentation_player(t, .Firebomb)
 		enemies := [?]game.Enemy_Spawn{
-			{position = {3, 1}, health = 30, attack = 1},
-			{position = {4, 1}, health = 30, attack = 1},
-			{position = {3, 2}, health = 30, attack = 1},
+			{position = {x = 3, y = 1}, health = 30, attack = 1},
+			{position = {x = 4, y = 1}, health = 30, attack = 1},
+			{position = {x = 3, y = 2}, health = 30, attack = 1},
 		}
 		room, ok := game.create_room(&data, &player, {enemies = enemies[:target_count]})
 		testing.expect(t, ok)
 		before := capture_room_presentation(&room)
-		play := game.play_card(&room, player.deck.hand[0].id, game.cell_target({3, 1}))
+		play := game.play_card(&room, player.deck.hand[0].id, game.cell_target({x = 3, y = 1}))
 		testing.expect_value(t, play.result, game.Card_Play_Result.Played)
 		after := capture_room_presentation(&room)
 		timeline: Presentation_Timeline
@@ -188,7 +188,7 @@ test_spell_fate_die_cue_preserves_health_until_impacts_and_replays_final_deck ::
 	defer level.destroy(&data)
 	player := spell_presentation_player(t, .Fate_Strike)
 	player.dice = spell_presentation_top_face(t)
-	enemies := [?]game.Enemy_Spawn{{position = {3, 1}, health = 40, attack = 1}, {position = {4, 1}, health = 40, attack = 1}}
+	enemies := [?]game.Enemy_Spawn{{position = {x = 3, y = 1}, health = 40, attack = 1}, {position = {x = 4, y = 1}, health = 40, attack = 1}}
 	room, ok := game.create_room(&data, &player, {enemies = enemies[:]})
 	testing.expect(t, ok)
 	defer game.destroy_room(&room)
@@ -221,7 +221,7 @@ test_spell_chain_replays_visible_impacts_before_the_next_world_beat :: proc(t: ^
 	data := create_encounter_presentation_test_level(t)
 	defer level.destroy(&data)
 	player := spell_presentation_player(t, .Chain_Lightning)
-	enemies := [?]game.Enemy_Spawn{{position = {3, 1}, health = 40, attack = 1}, {position = {4, 1}, health = 40, attack = 1}, {position = {5, 1}, health = 40, attack = 1}}
+	enemies := [?]game.Enemy_Spawn{{position = {x = 3, y = 1}, health = 40, attack = 1}, {position = {x = 4, y = 1}, health = 40, attack = 1}, {position = {x = 5, y = 1}, health = 40, attack = 1}}
 	room, ok := game.create_room(&data, &player, {enemies = enemies[:]})
 	testing.expect(t, ok)
 	defer game.destroy_room(&room)
@@ -266,11 +266,11 @@ test_spell_replay_large_dt_and_small_steps_produce_identical_final_state :: proc
 		data := create_encounter_presentation_test_level(t)
 		player := spell_presentation_player(t, definition)
 		player.dice = spell_presentation_top_face(t)
-		enemies := [?]game.Enemy_Spawn{{position = {3, 1}, health = 40, attack = 1}, {position = {4, 1}, health = 40, attack = 1}, {position = {3, 2}, health = 40, attack = 1}}
+		enemies := [?]game.Enemy_Spawn{{position = {x = 3, y = 1}, health = 40, attack = 1}, {position = {x = 4, y = 1}, health = 40, attack = 1}, {position = {x = 3, y = 2}, health = 40, attack = 1}}
 		room, ok := game.create_room(&data, &player, {enemies = enemies[:]})
 		testing.expect(t, ok)
 		before := capture_room_presentation(&room)
-		target := game.cell_target({3, 1}) if definition == .Firebomb else game.entity_target(game.enemy_entity(1))
+		target := game.cell_target({x = 3, y = 1}) if definition == .Firebomb else game.entity_target(game.enemy_entity(1))
 		play := game.play_card(&room, player.deck.hand[0].id, target)
 		testing.expect_value(t, play.result, game.Card_Play_Result.Played)
 		after := capture_room_presentation(&room)

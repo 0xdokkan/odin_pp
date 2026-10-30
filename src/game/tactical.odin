@@ -1,6 +1,7 @@
 package game
 
 import grid "../engine/grid"
+import level "../level"
 
 // Recovery leaves only walking; Stunned (an exhausted window) only cards;
 // Shadow (Movimento Ombra, tactical_shadow.odin) only the shadow's own steps,
@@ -199,7 +200,10 @@ tactical_end_combat :: proc(room: ^Room) {
 	// still belong to this room; they are not part of an exclusive takeover.
 	room.lasso = {}
 	room.pinball = {}
-	room.first_person.active, room.first_person.trigger = false, false
+	room.marley = {}
+	room.ride = {}
+	room.first_person.active = false
+	if room.first_person.weapon == .AK { room.first_person.trigger = false }
 }
 
 @(private = "file")
@@ -251,8 +255,9 @@ tactical_tick :: proc(room: ^Room, dt: f32, available: bool, hologram: bool) -> 
 	before := s.clock_fraction
 	tactical_advance_clock(room, elapsed)
 	tactical_note_beat_time(s, before, elapsed)
-	// The Lazzo spins on the same seconds; the controller spins them out.
+	// The Lazzo spins on the same seconds; the controller spins them out. The lifts' platforms go on them too.
 	tactical_lasso_tick(room, elapsed)
+	lift_tick(room, elapsed)
 	s.metrics.decision_seconds += f64(elapsed)
 	if hologram { s.metrics.hologram_seconds += f64(elapsed) }
 	if tactical_between_windows(s) { tactical_finish_recovery(room); return false }
@@ -274,6 +279,11 @@ continue_tactical_pulse :: proc(room: ^Room) -> bool {
 		for &enemy in room.enemies { enemy.tactical_cooldown = max(f32(0), enemy.tactical_cooldown-1) }
 		resolve_due_explosives(room, &pulse)
 		resolve_due_room_modifier(room, &pulse)
+		// BOMB MARLEY: the party's beat (marley.odin).
+		marley_beat(room, &pulse)
+		// CANNONE and BUCO NERO: what the player set down acts; the ride's clock.
+		emplacement_beat(room, &pulse)
+		ride_beat(room, &pulse)
 		ids, count := enemy_ids_in_planning_order(room)
 		for protect_pass in 0..<2 {
 			for id in ids[:count] {
@@ -367,21 +377,33 @@ tactical_in_footprint :: proc(size: int, facing: Move_Direction, origin, positio
 
 // Visible endpoints include walls; intermediate blockers and closed corners
 // hide what lies behind them. There is deliberately no explored-cell storage.
+// `height`, when given, is the cell's height in steps: the ground hides what is
+// behind a cell above the line from the eye to the target (height_hides).
+// With `layers` (a map that has them), the line is the one through the layers (level.layer_line_blocker).
 tactical_line_visible :: proc(origin, destination: grid.Position,
-	opaque: proc(rawptr, grid.Position) -> bool, data: rawptr) -> bool {
+	opaque: proc(rawptr, grid.Position) -> bool, data: rawptr,
+	height: proc(rawptr, grid.Position) -> i32 = nil, layers: ^level.Layer_Map = nil) -> bool {
+	if layers != nil {
+		_, blocked := level.layer_line_blocker(layers, origin, destination, HEIGHT_EYE_STEPS, HEIGHT_TARGET_STEPS, opaque, data)
+		return !blocked
+	}
 	cell := origin
 	dx, dy := abs(destination.x-origin.x), abs(destination.y-origin.y)
+	count, index := max(dx, dy), 0
 	sx := 1 if destination.x > origin.x else -1
 	sy := 1 if destination.y > origin.y else -1
 	error := dx-dy
-	for cell != destination {
+	for cell.x != destination.x || cell.y != destination.y {
 		next := cell
 		twice := 2*error
 		if twice > -dy { error -= dy; next.x += sx }
 		if twice < dx { error += dx; next.y += sy }
 		if next.x != cell.x && next.y != cell.y &&
-		   opaque(data, {next.x, cell.y}) && opaque(data, {cell.x, next.y}) { return false }
-		if next != destination && opaque(data, next) { return false }
+		   opaque(data, {x = next.x, y = cell.y}) && opaque(data, {x = cell.x, y = next.y}) { return false }
+		last := next.x == destination.x && next.y == destination.y
+		if !last && opaque(data, next) { return false }
+		index += 1
+		if height != nil && !last && line_hidden_by_height(height, data, origin, destination, next, index, count) { return false }
 		cell = next
 	}
 	return true
@@ -392,14 +414,30 @@ tactical_room_opaque :: proc(data: rawptr, position: grid.Position) -> bool {
 	return cell_blocks_line_of_sight(cast(^Room)data, position)
 }
 
+// The ground's part of a line of sight, the same rule as height_hides but over a
+// callback: the renderer reads its own copy of the heights.
+@(private)
+line_hidden_by_height :: proc(height: proc(rawptr, grid.Position) -> i32, data: rawptr, origin, destination, cell: grid.Position, index, count: int) -> bool {
+	if count <= 1 || index <= 0 || index >= count { return false }
+	eye := height(data, origin)+HEIGHT_EYE_STEPS
+	aim := height(data, destination)+HEIGHT_TARGET_STEPS
+	return int(height(data, cell))*count > int(eye)*count+int(aim-eye)*index
+}
+
+@(private)
+tactical_room_height :: proc(data: rawptr, position: grid.Position) -> i32 {
+	return cell_height(cast(^Room)data, position)
+}
+
 tactical_cell_visible :: proc(room: ^Room, position: grid.Position) -> bool {
 	if room == nil || room.player == nil || room.level_data == nil { return false }
-	if !grid.contains(&room.level_data.tiles, position) { return false }
+	if !level.layer_contains(room.level_data, position) { return false }
 	s := &room.player.tactical
 	if s.config.vision_size == 0 { return true }
 	origin := tactical_view_origin(room)
+	m: level.Layer_Map
 	return tactical_in_footprint(tactical_vision_size(s.config, &room.player.statuses), s.facing, origin, position) &&
-		tactical_line_visible(origin, position, tactical_room_opaque, room)
+		tactical_line_visible(origin, position, tactical_room_opaque, room, tactical_room_height, room_line_layers(room, &m))
 }
 
 tactical_target_visible :: proc(room: ^Room, target: Target) -> bool {
@@ -420,7 +458,8 @@ begin_diagonal_qte :: proc(room: ^Room, offset: grid.Position) -> bool {
 	   abs(offset.x) != 1 || abs(offset.y) != 1 { return false }
 	destination := add_position(room.player.position, offset)
 	query := query_entity_movement(room, PLAYER_ENTITY, destination)
-	if query.error != .None { return false }
+	// A walk: a cliff stops it either way, as it stops a step (the movement's rule stops a rise only).
+	if query.error != .None || step_height_blocked(room, room.player.position, destination) { return false }
 	clear_event_log(room.recent_events)
 	room.qte = {kind = .Diagonal, remaining = room.player.tactical.config.qte_seconds,
 		destination = destination, length = 2, selected = true,
@@ -432,6 +471,11 @@ begin_diagonal_qte :: proc(room: ^Room, offset: grid.Position) -> bool {
 offer_defense_qte :: proc(room: ^Room, enemy: ^Enemy) -> bool {
 	// A stunned player cannot defend: only cards are left.
 	if tactical_is_stunned(room) { return false }
+	// With the fists he defends by moving: no choice stops the world (Fase 2 of
+	// docs/piano-prima-persona.md).
+	if first_person_fists_active(room) { return false }
+	// With the sword the right button parries (Fase 4).
+	if first_person_sword_active(room) { return false }
 	intent := &enemy.intent
 	if enemy_is_staggered(room, enemy) || intent.windup || (intent.kind != .Attack && intent.kind != .Charge) || intent.target_object != 0 || enemy.position != intent.origin ||
 	   !enemy_intent_cell_is_threatened(intent, room.player.position) ||
@@ -442,6 +486,8 @@ offer_defense_qte :: proc(room: ^Room, enemy: ^Enemy) -> bool {
 	}
 	// RIFLESSO answers this blow by itself (deflect_enemy_blow): no defence to choose.
 	if player_charges(room, .Deflect) > 0 { return false }
+	// The Stegosauro does the same for every blow while the ride lasts.
+	if ride_deflects(room) { return false }
 	defenses: bit_set[Defense_Mode]
 	if _, found := status_for_entity(room, PLAYER_ENTITY, .Shield); found { defenses += {.Block, .Parry} }
 	if _, found := status_for_entity(room, PLAYER_ENTITY, .Thorns); found && enemy.archetype == .Archer { defenses += {.Deflect} }
@@ -473,6 +519,8 @@ resolve_qte :: proc(room: ^Room, requested_success: bool, dodge_direction: Move_
 	// One report for the dodge's bite and the pulse a terminal answer ends.
 	pulse: Pulse_Report
 	if q.kind == .Diagonal {
+		// A cliff risen under the step since the QTE began stops it like a wall.
+		if success && step_height_blocked(room, room.player.position, q.destination) { success = false }
 		if success {
 			action := make_action(.Move, PLAYER_ENTITY, cell_target(q.destination), .Walkable_Cell)
 			added := add_effect(&action, move_effect(PLAYER_ENTITY, q.destination))
@@ -506,12 +554,17 @@ resolve_qte :: proc(room: ^Room, requested_success: bool, dodge_direction: Move_
 				append_event_log(room.recent_events, &report.events)
 			case .Dodge:
 				destination := add_position(room.player.position, direction_offset(dodge_direction))
-				action := make_action(.Move, PLAYER_ENTITY, cell_target(destination), .Walkable_Cell)
-				added := add_effect(&action, move_effect(PLAYER_ENTITY, destination))
-				assert(added)
-				report := resolve_action(room, &action)
-				success = report.accepted
-				append_event_log(room.recent_events, &report.events)
+				// A walk: a cliff that way stops the dodge as a wall does.
+				if step_height_blocked(room, room.player.position, destination) {
+					success = false
+				} else {
+					action := make_action(.Move, PLAYER_ENTITY, cell_target(destination), .Walkable_Cell)
+					added := add_effect(&action, move_effect(PLAYER_ENTITY, destination))
+					assert(added)
+					report := resolve_action(room, &action)
+					success = report.accepted
+					append_event_log(room.recent_events, &report.events)
+				}
 				if success {
 					start_tactical_dodge_recovery(room)
 					room.player.tactical.facing = dodge_direction

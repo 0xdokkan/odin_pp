@@ -158,7 +158,7 @@ draw_expedition_costume :: proc(renderer:^Renderer,b:campaign.Biome,role:game.En
 	if character,ok:=flipbook_character(key);ok && renderer.tactical.living_state!=nil {
 		if actor:=living_find(renderer,entity,character);actor!=nil {
 			mirror=actor.facing_left
-			turn:=(renderer.sprite_assets.elapsed-actor.turn_started)/LIVING_TURN_SECONDS
+			turn:=living_turn_progress(actor,renderer.sprite_assets.elapsed)
 			if actor.turn_started>=0 && turn<1 {turn_width=max(f32(.04),abs(f32(math.cos(turn*math.PI))));if turn<.5 {mirror=!mirror}}
 		}
 	}
@@ -171,12 +171,15 @@ draw_expedition_costume :: proc(renderer:^Renderer,b:campaign.Biome,role:game.En
 @(private)
 draw_expedition_costumes :: proc(renderer:^Renderer,room:^game.Room,w:^world.World) {
 	for actor in renderer.tactical.snapshot.enemies[:renderer.tactical.snapshot.enemy_count] {
-		if !actor.visible || actor.health<=0 || game.enemy_is_out_of_play(room,actor.entity.id) || !tactical_cell_on_screen(renderer,{int(actor.position.x),int(actor.position.y)}) {continue}
+		if !actor.visible || actor.health<=0 || game.enemy_is_out_of_play(room,actor.entity.id) || !tactical_cell_on_screen(renderer,{x = int(actor.position.x), y = int(actor.position.y)}) {continue}
+		if terrain_hides_actor(renderer,actor.position,actor.entity) {continue}
 		draw_expedition_costume(renderer,w.biome,actor.archetype,actor.position,actor.entity,w.clock,actor.opacity)
 	}
 	for &group,g in w.groups[:w.group_count] {for &member,i in group.members[:group.count] {
-		if !member.alive || member.deployed || !tactical_cell_on_screen(renderer,member.enemy.position) {continue}
-		if world.terrain(w.biome,member.enemy.position)==.Grass && world.distance(room.player.position,member.enemy.position)>3 {continue}
-		draw_expedition_costume(renderer,w.biome,member.enemy.archetype,expedition_patrol_shown(renderer,g,i,member.enemy.position),game.SYSTEM_ENTITY,w.clock)
+		if !member.alive || member.deployed || !world.in_scope(w,group.cave) || !tactical_cell_on_screen(renderer,member.enemy.position) {continue}
+		if world.ground(w,member.enemy.position)==.Grass && world.distance(room.player.position,member.enemy.position)>3 {continue}
+		entity:=expedition_member_entity(g,i)
+		if terrain_hides_actor(renderer,{f32(member.enemy.position.x),f32(member.enemy.position.y)},entity) {continue}
+		draw_expedition_costume(renderer,w.biome,member.enemy.archetype,expedition_patrol_shown(renderer,g,i,member.enemy.position),entity,w.clock)
 	}}
 }

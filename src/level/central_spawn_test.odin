@@ -23,12 +23,12 @@ test_central_spawn_selects_nearest_clear_cell_without_carving_room_shapes :: pro
 				minimum, maximum := exit_candidate_bounds(config)
 				for y in 1+config.spawn_clearance_radius..<config.height-1-config.spawn_clearance_radius {
 					for x in 1+config.spawn_clearance_radius..<config.width-1-config.spawn_clearance_radius {
-						candidate := grid.Position{x, y}
+						candidate := grid.Position{x = x, y = y}
 						if spawn_center_distance_squared(config, candidate) >= chosen_distance ||
 						   !clearance_is_walkable(&data, candidate, config.spawn_clearance_radius) { continue }
 						for exit_y in minimum.y..=maximum.y {
 							for exit_x in minimum.x..=maximum.x {
-								exit_position := grid.Position{exit_x, exit_y}
+								exit_position := grid.Position{x = exit_x, y = exit_y}
 								testing.expect(t, !anchor_pair_is_valid(config, candidate, exit_position) ||
 									!clearance_is_walkable(&data, exit_position, config.exit_clearance_radius))
 							}

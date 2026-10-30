@@ -35,12 +35,12 @@ update_tactical_atmosphere :: proc(renderer: ^Renderer, dt: f32) {
 draw_tactical_ground_shadows :: proc(renderer: ^Renderer, room: ^game.Room) {
 	for y in 0..<room.level_data.tiles.height {
 		for x in 0..<room.level_data.tiles.width {
-			cell := grid.Position{x, y}
+			cell := grid.Position{x = x, y = y}
 			if !tactical_cell_on_screen(renderer, cell) || !tactical_render_visible(renderer, cell) { continue }
 			tile, _ := level.tile_at(room.level_data, cell)
 			if tile.kind != .Floor && tile.kind != .Exit { continue }
-			for offset in ([2]grid.Position{{-1, 0}, {0, -1}}) {
-				neighbor := grid.Position{x+offset.x, y+offset.y}
+			for offset in ([2]grid.Position{{x = -1, y = 0}, {x = 0, y = -1}}) {
+				neighbor := grid.Position{x = x+offset.x, y = y+offset.y}
 				wall, found := level.tile_at(room.level_data, neighbor)
 				if !found || wall.kind != .Wall || !tactical_render_visible(renderer, neighbor) { continue }
 				for layer in 0..<3 {

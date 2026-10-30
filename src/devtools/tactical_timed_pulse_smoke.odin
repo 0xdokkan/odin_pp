@@ -28,9 +28,9 @@ run_tactical_timed_pulse_smoke :: proc(window: ^app.Window, renderer: ^render.Re
 		if _, added := game.add_owned_card(&player.deck, id); !added { return false }
 	}
 	spawns := [?]game.Enemy_Spawn{
-		{position = {2, 4}, health = 20, attack = 2},
-		{position = {11, 6}, health = 20, attack = 2, archetype = .Brute},
-		{position = {11, 2}, health = 20, attack = 2, archetype = .Archer},
+		{position = {x = 2, y = 4}, health = 20, attack = 2},
+		{position = {x = 11, y = 6}, health = 20, attack = 2, archetype = .Brute},
+		{position = {x = 11, y = 2}, health = 20, attack = 2, archetype = .Archer},
 	}
 	room, built := game.create_room(&data, &player, {enemies = spawns[:]})
 	if !built { return false }

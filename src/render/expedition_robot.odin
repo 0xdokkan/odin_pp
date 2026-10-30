@@ -78,9 +78,9 @@ draw_expedition_robot :: proc(renderer:^Renderer,position:view.Vec2,opacity:f32)
 	if actor:=living_find(renderer,game.PLAYER_ENTITY,.Pilgrim);actor!=nil {
 		expedition_walker_face(renderer,actor,now)
 		action,_=living_drawing(actor,now);mirror=actor.facing_left
-		clip:=&gfx.LIVING_SHEETS[.Pilgrim].clips[action];seconds:=max(f64(.001),gfx.living_clip_seconds(clip))
+		clip:=&gfx.LIVING_SHEETS[.Pilgrim].clips[action];seconds:=max(f64(.001),living_played_seconds(clip,actor.scale))
 		progress=f32(clamp((now-actor.started)/seconds,0,1))
-		turn:=(now-actor.turn_started)/LIVING_TURN_SECONDS
+		turn:=living_turn_progress(actor,now)
 		if actor.turn_started>=0 && turn<1 {turn_width=max(f32(.04),abs(f32(math.cos(turn*math.PI))));if turn<.5 {mirror=!mirror}}
 	}
 	// A glide has no step cue: the gait follows the ground actually covered.

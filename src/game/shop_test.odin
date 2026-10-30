@@ -113,8 +113,9 @@ test_shop_offers_are_deterministic_distinct_priced_and_do_not_allocate_ids :: pr
 
 	testing.expect_value(t, first.shop, second.shop)
 	testing.expect_value(t, first.shop_random_state, second.shop_random_state)
-	testing.expect_value(t, first.player.deck.next_card_id, u32(11))
-	testing.expect_value(t, second.player.deck.next_card_id, u32(11))
+	// The eight cards of the starter deck (docs/registro-carte.md), and no id spent by the shop.
+	testing.expect_value(t, first.player.deck.next_card_id, u32(9))
+	testing.expect_value(t, second.player.deck.next_card_id, u32(9))
 	testing.expect_value(t, first.player.gold, i32(100))
 	testing.expect_value(t, second.player.gold, i32(100))
 	offers := available_shop_offers(&first)

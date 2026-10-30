@@ -37,7 +37,7 @@ lasso_view_test_room :: proc(t: ^testing.T, data: ^level.Level, player: ^game.Pl
 	config := game.DEFAULT_TACTICAL_CONFIG
 	config.vision_size = 0
 	testing.expect(t, game.configure_tactical(player, config))
-	enemies := [?]game.Enemy_Spawn{{position = {9, 6}, health = 30, attack = 1}, {position = {9, 3}, health = 30, attack = 1}}
+	enemies := [?]game.Enemy_Spawn{{position = {x = 9, y = 6}, health = 30, attack = 1}, {position = {x = 9, y = 3}, health = 30, attack = 1}}
 	built: bool
 	room, built = game.create_room(data, player, {enemies = enemies[:]})
 	testing.expect(t, built)
@@ -109,8 +109,8 @@ test_lasso_view_follows_the_rope_of_the_room :: proc(t: ^testing.T) {
 	// Caught where it stood, though the room has it on its ring already.
 	shown, found := presentation_actor_in_view(&snapshot, foe)
 	testing.expect(t, found)
-	testing.expect_value(t, shown.position, presentation_position(grid.Position{9, 6}))
-	testing.expect_value(t, room.enemies[0].position, grid.Position{10, 6})
+	testing.expect_value(t, shown.position, presentation_position(grid.Position{x = 9, y = 6}))
+	testing.expect_value(t, room.enemies[0].position, grid.Position{x = 10, y = 6})
 	lifted, pulled := false, false
 	for frame := 0; frame < 600 && (game.tactical_is_casting(&room) || renderer_blocks_player_input(renderer)); frame += 1 {
 		lasso_view_test_frame(t, renderer, &room, 0.02)
@@ -176,7 +176,7 @@ test_lasso_view_shows_interior_push_without_hit_feedback :: proc(t: ^testing.T) 
 	defer game.destroy_room(&room)
 	// Two cells from the perimeter: the whole slide must reach the ring,
 	// including at the first contact's strength of one.
-	room.enemies[1].position = {7, 5}
+	room.enemies[1].position = {x = 7, y = 5}
 	other := game.enemy_entity(room.enemies[1].id)
 	snapshot: Room_Presentation
 	renderer := shadow_view_test_renderer(&data, &snapshot)
@@ -206,12 +206,12 @@ test_lasso_view_shows_interior_push_without_hit_feedback :: proc(t: ^testing.T) 
 		shadow_view_test_frame(renderer, &room, 0.01)
 	}
 	testing.expect(t, !renderer_world_is_busy(renderer))
-	testing.expect_value(t, room.enemies[1].position, grid.Position{9, 3})
+	testing.expect_value(t, room.enemies[1].position, grid.Position{x = 9, y = 3})
 	testing.expect_value(t, room.enemies[1].health, i32(30))
 	testing.expect_value(t, room.enemies[0].health, i32(30))
 	shown, found := presentation_actor_in_view(&snapshot, other)
 	testing.expect(t, found)
-	testing.expect_value(t, shown.position, presentation_position(grid.Position{9, 3}))
+	testing.expect_value(t, shown.position, presentation_position(grid.Position{x = 9, y = 3}))
 	testing.expect_value(t, renderer.tactical.lasso.spawned_hits, 0)
 	testing.expect_value(t, renderer.tactical.lasso.spawned_smashes, 0)
 	testing.expect_value(t, renderer.timeline.update_failures, 0)
@@ -337,9 +337,9 @@ test_lasso_says_a_dodge_lets_go_only_when_one_can :: proc(t: ^testing.T) {
 // ring at the height it keeps.
 @(test)
 test_lasso_throw_pose_stands_lifts_and_pulls :: proc(t: ^testing.T) {
-	from := presentation_position(grid.Position{9, 6})
-	orbit := lasso_orbit_point({6, 6}, 4, 0)
-	testing.expect_value(t, orbit, presentation_position(grid.Position{10, 6}))
+	from := presentation_position(grid.Position{x = 9, y = 6})
+	orbit := lasso_orbit_point({x = 6, y = 6}, 4, 0)
+	testing.expect_value(t, orbit, presentation_position(grid.Position{x = 10, y = 6}))
 	at, lift := lasso_throw_pose(from, orbit, 0)
 	testing.expect(t, at == from && lift == 0)
 	at, lift = lasso_throw_pose(from, orbit, LASSO_THROW_CINCHED-0.01)
@@ -351,7 +351,7 @@ test_lasso_throw_pose_stands_lifts_and_pulls :: proc(t: ^testing.T) {
 	at, lift = lasso_throw_pose(from, orbit, 1)
 	testing.expect(t, at == orbit && lift == LASSO_LIFT)
 	// A quarter turn on (counter-clockwise on the board: north).
-	north := lasso_orbit_point({6, 6}, 4, -math.PI/2)
+	north := lasso_orbit_point({x = 6, y = 6}, 4, -math.PI/2)
 	testing.expect(t, abs(north.x-6) < 1e-5 && abs(north.y-2) < 1e-5)
 }
 
@@ -390,7 +390,7 @@ test_lasso_ring_bake_dashes_the_radius_and_leaves_walls_out :: proc(t: ^testing.
 
 	// South (+y) is a wall: no paper over its arc, red at its two ends.
 	south, _ := game.lasso_locate(arcs[:count], math.PI/2)
-	testing.expect_value(t, arcs[south].cell, grid.Position{0, 2})
+	testing.expect_value(t, arcs[south].cell, grid.Position{x = 0, y = 2})
 	solid[south] = true
 	walled, walled_size := lasso_ring_pixels(2, arcs[:count], solid[:count], context.temp_allocator)
 	testing.expect_value(t, walled_size, size)
@@ -417,16 +417,16 @@ test_lasso_ring_key_tells_every_ring_apart :: proc(t: ^testing.T) {
 	for radius in i32(1)..=game.LASSO_MAX_RADIUS {
 		count := 8*int(radius)
 		solid: [game.LASSO_MAX_RING_CELLS]bool
-		free := lasso_ring_key({5, 5}, radius, solid[:count])
-		testing.expect(t, free != lasso_ring_key({5, 6}, radius, solid[:count]) && free != lasso_ring_key({6, 5}, radius, solid[:count]))
-		if radius > 1 { testing.expect(t, free != lasso_ring_key({5, 5}, radius-1, solid[:8*int(radius-1)])) }
+		free := lasso_ring_key({x = 5, y = 5}, radius, solid[:count])
+		testing.expect(t, free != lasso_ring_key({x = 5, y = 6}, radius, solid[:count]) && free != lasso_ring_key({x = 6, y = 5}, radius, solid[:count]))
+		if radius > 1 { testing.expect(t, free != lasso_ring_key({x = 5, y = 5}, radius-1, solid[:8*int(radius-1)])) }
 		for arc in 0..<count {
 			solid[arc] = true
-			one := lasso_ring_key({5, 5}, radius, solid[:count])
+			one := lasso_ring_key({x = 5, y = 5}, radius, solid[:count])
 			testing.expectf(t, one != free, "radius %d: arc %d solid keys as no solid", radius, arc)
 			for other in 0..<arc {
 				solid[other] = true
-				two := lasso_ring_key({5, 5}, radius, solid[:count])
+				two := lasso_ring_key({x = 5, y = 5}, radius, solid[:count])
 				testing.expectf(t, two != one && two != free, "radius %d: arcs %d and %d key as fewer", radius, other, arc)
 				solid[other] = false
 			}
@@ -461,11 +461,12 @@ test_lasso_lab_sounds_follow_the_rope :: proc(t: ^testing.T) {
 	room := game.Room{player = &player, phase = .Combat}
 	state: Living_State
 	snapshot: Room_Presentation
-	renderer: Renderer
+	renderer := new(Renderer)
+	defer free(renderer)
 	renderer.tactical.living_state = &state
 	renderer.tactical.snapshot = &snapshot
 	renderer.tactical.mechanics_lab = true
-	defer destroy_lab_sounds(&renderer)
+	defer destroy_lab_sounds(renderer)
 	foe := game.enemy_entity(3)
 	s: Lab_Sounds
 	impacts := 0
@@ -473,38 +474,38 @@ test_lasso_lab_sounds_follow_the_rope :: proc(t: ^testing.T) {
 		event = {kind = .Lasso_Caught, source = game.PLAYER_ENTITY, target = foe, card_definition = .Lasso}}
 	card, carded := lab_card_sfx(.Lasso)
 	testing.expect(t, carded && card == .Card_Lasso)
-	lab_cue_sounds(&renderer, &s, &caught, 1, &impacts)
+	lab_cue_sounds(renderer, &s, &caught, 1, &impacts)
 	testing.expect_value(t, s.count, 2)
 	testing.expect(t, s.queue[0].sfx == .Pilgrim_Lasso_Throw && s.queue[0].at == 1)
 	testing.expect(t, s.queue[1].sfx == .World_Lasso_Wrap && abs(s.queue[1].at-(1+2*f64(LASSO_THROW_FLOWN))) < 1e-6)
 	hit := Presentation_Cue{kind = .Lasso_Struck, started = true,
 		event = {kind = .Lasso_Struck, source = foe, target = game.enemy_entity(4), amount = 1, card_definition = .Lasso}}
-	lab_cue_sounds(&renderer, &s, &hit, 3, &impacts)
+	lab_cue_sounds(renderer, &s, &hit, 3, &impacts)
 	testing.expect(t, s.count == 3 && s.queue[2].sfx == .World_Lasso_Hit)
 	smash := Presentation_Cue{kind = .Lasso_Struck, started = true,
 		event = {kind = .Lasso_Struck, source = foe, target = game.SYSTEM_ENTITY, amount = 2, card_definition = .Lasso}}
-	lab_cue_sounds(&renderer, &s, &smash, 3.5, &impacts)
+	lab_cue_sounds(renderer, &s, &smash, 3.5, &impacts)
 	testing.expect(t, s.count == 4 && s.queue[3].sfx == .World_Lasso_Smash)
 	testing.expect(t, lab_whirr_pitch(0) == LAB_WHIRR_PITCH && lab_whirr_pitch(40) == lab_whirr_pitch(LAB_WHIRR_TURNS))
 	testing.expect(t, lab_whirr_pitch(LAB_WHIRR_TURNS) > lab_whirr_pitch(LAB_WHIRR_TURNS-1))
 
-	update_lab_sounds(&renderer, &room, 1)
+	update_lab_sounds(renderer, &room, 1)
 	heard := renderer.tactical.lab_sounds
 	if !testing.expect(t, heard != nil) { return }
 	testing.expect_value(t, heard.count, 0)
 	l := &renderer.tactical.lasso
 	l.enemy, l.whirrs, l.turns = foe, 1, 1
-	update_lab_sounds(&renderer, &room, 2)
+	update_lab_sounds(renderer, &room, 2)
 	testing.expect(t, heard.count == 1 && heard.queue[0].sfx == .World_Lasso_Whirr)
 	low := heard.queue[0].pitch
 	l.whirrs, l.turns = 2, 6
-	update_lab_sounds(&renderer, &room, 3)
+	update_lab_sounds(renderer, &room, 3)
 	testing.expect(t, heard.count == 2 && heard.queue[1].sfx == .World_Lasso_Whirr && heard.queue[1].pitch > low)
 	l.releases = 1
-	update_lab_sounds(&renderer, &room, 4)
+	update_lab_sounds(renderer, &room, 4)
 	testing.expect(t, heard.count == 3 && heard.queue[2].sfx == .World_Lasso_Release)
 	// Nothing new: nothing heard again.
-	update_lab_sounds(&renderer, &room, 5)
+	update_lab_sounds(renderer, &room, 5)
 	testing.expect_value(t, heard.count, 3)
 }
 

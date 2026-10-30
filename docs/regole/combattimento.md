@@ -123,6 +123,9 @@ del movimento è solo il passo in diagonale.
 | Carta: scudo, cura, oro | x1,5, almeno +1 |
 | Carta: altri status | +1 potenza e +1 durata (Veleno, Bruciatura, Rallentamento e le cariche del Viandante: +1 stack, non hanno durata; Lama Velenosa: il dado più uno) |
 | Carta: pesca, energia, carte create, reazioni | +1 (anche il primo colpo del Lazzo e il valore del Pinball, quello da cui parte e a cui lo riportano i muri) |
+| Inondazione, Bomb Marley | +1 casella di spinta; +5 s di festa |
+| Cannone, Buco Nero | danno x1,5 (almeno +2) a ogni colpo della palla, del raggio o del buco |
+| Dinosauro | +3 s di cavalcata |
 | Carta-dispositivo | danno x1,5 (almeno +2); la Tesla nasce con vita doppia, la Shock Floor con un colpo in più (massimo 21: un 20 del D20 più uno) |
 | First Person Shooter | +2 s dietro gli occhi |
 | Movimento Ombra, Dado del Destino | nessun critico: giocate sul secondo lasciano lo scocco all'azione dopo |
@@ -160,7 +163,7 @@ odin run src -o:none -- --no-fog
 | `--smoke-m7-view` | prova grafica di scena, oggetti 3D, fog, ologramma, QTE e menu |
 | `--smoke-m8-view` | prova 3D di d4, dispositivi, offerta del ring, equipaggiamento, scheda personaggio, tag match e cambio stanza |
 | `--smoke-western` | nuvoletta 6 RANCH 7: apertura automatica, volo delle carte, insegna, porte, corsa a tempo e premio |
-| `--smoke-mechanics-lab` | Prova meccaniche in 3D: mano e testi, status, intenti, colpi, ombra, pozze, incendio, cariche, Lazzo, Pinball, FPS e pesca; replay e screenshot `odin_pp_mechanics_lab_*.png` / `odin_pp_living_*.png` |
+| `--smoke-mechanics-lab` | Prova meccaniche in 3D: mano e testi, status, intenti, colpi, pozze, incendio, cariche, Lazzo, Pinball, FPS, Inondazione, Bomb Marley e pesca; replay e screenshot `odin_pp_mechanics_lab_*.png` / `odin_pp_living_*.png` |
 | `--smoke-effect-window` | Mostra effetto: ingressi da ogni menu, isolamento della run, chiusura senza click-through, testi, film delle carte e tempi dei frame. `-define:EFFECT_SMOKE_CARDS=,Strike,Pinball,` limita le carte filmate. Screenshot `odin_pp_effect_*.png` |
 | `--smoke-m9-view` | arena continua, duello con IA, presa in quattro pose, replay e FPS con ricarica e vittoria |
 
@@ -254,9 +257,10 @@ puntatore la trova nella sua striscia anche mentre si alza
 e la decima, mentre i menu restano su `1`–`8`. Le carte le cui righe lì si
 rimpicciolirebbero o si taglierebbero ne hanno una forma corta (Shock Floor,
 Tesla Coil, Movimento Ombra con `OMBRA 4s` / `MONDO FERMO`, Pozza di Veleno,
-Incendio, Deflect, Feretro, Dado del Destino, Lama Velenosa, Lazzo, Pinball e
-First Person Shooter) e quelle il cui nome lì si taglierebbe un nome corto
-(`Ombra`, `Pozza`, `Dado`, `Lama`, `FPS`; l'ispettore tiene il nome intero), che
+Incendio, Deflect, Feretro, Dado del Destino, Lama Velenosa, Lazzo, Pinball,
+First Person Shooter, Bomb Marley e Inondazione) e quelle il cui nome lì si
+taglierebbe un nome corto (`Ombra`, `Pozza`, `Dado`, `Lama`, `FPS`, `Marley`,
+`Onda`; l'ispettore tiene il nome intero), che
 dicono anche sulle carte più larghe (mani da cinque o sei, negozio, ricompense)
 dove il nome intero, con il suo `+n`, non ci starebbe così com'è alla sua
 misura: First Person Shooter è `FPS` su ogni carta della mano e dei menu,
@@ -315,6 +319,12 @@ Mira, preparazione, lancio, recupero, fendente, carica e protezione hanno
 piccoli pittogrammi distinti nel cartellino della vita e colori sul terreno. L’hover su un nemico
 visibile ne scrive l'intento con i secondi rimasti (`MUOVE / 2.8s`), il ruolo e
 come rispondere.
+**I nemici si illuminano mentre agiscono** (2026-10-29, in tutte le viste, anche
+in prima persona): tutta la carta diventa **rossa** per un colpo, una freccia o
+una carica, **viola** per lo scudo del Custode o una bomba. La luce cresce col
+conto alla rovescia dell'intento, pulsa sempre più veloce, e negli ultimi 0,25 s
+(la finestra della parata perfetta della spada) è al massimo e ferma; finito
+l'intento si spegne in 0,15 s ([foe_glow.odin](../../src/render/foe_glow.odin)).
 Lo stordimento nasconde le minacce dell’intento interrotto, ma non disinnesca
 esplosivi già presenti. Questi valori sono un primo bilanciamento da provare durante le run,
 anche mentre il player si muove durante il recupero.
@@ -330,12 +340,25 @@ dal **costo temporale**, centralizzato in `game/tactical_action_cost.odin`:
 | Refocus | 2 s |
 | Clic su **ATTIVA** o **EQUIPAGGIA** in Combat | 1 s |
 | Supporto, Guard, Afterimage, Battle Focus, Spark, Pozza di Veleno, Deflect, Feretro, Dado del Destino, Lama Velenosa | 1 s |
-| Strike, Arc Bolt, Shove, Dash, Grappling Hook, Venom Needle, Fate Strike, Tesla Coil, Incendio, Lazzo (il lancio; il giro sta sul tempo del mondo), Pinball (il colpo; la corsa sta sul tempo del mondo) | 2 s |
+| Strike, Arc Bolt, Shove, Dash, Grappling Hook, Venom Needle, Fate Strike, Tesla Coil, Incendio, Inondazione, Lazzo (il lancio; il giro sta sul tempo del mondo), Pinball (il colpo; la corsa sta sul tempo del mondo), Bomb Marley (il lancio; la festa sta sul tempo del mondo) | 2 s |
 | Piercing Ray, Cross Slash, Heavy Blow, Sundering Blow, Twin Venom, Shock Floor, Titan Grip | 3 s |
 | Firebomb, Toxic Wave, Caustic Bloom, Chain Lightning, Prismatic Barrage, Storm Crown | 4 s |
 | [Movimento Ombra](meccaniche.md#movimento-ombra) | 0 s: i suoi 4 s reali stanno fuori dalla finestra |
 | [Canna da Pesca](meccaniche.md#canna-da-pesca) | 0 s: pesca a stanza liberata, dove non c'è finestra |
 | [First Person Shooter](meccaniche.md#first-person-shooter) | 0 s: i suoi 20 s sono del mondo e i colpi dell'AK non costano tempo |
+
+**Ritmo del giocatore** (dal 2026-10-30, scelta dell'utente: «due volte più veloce»). Quelli della tabella sono i
+**prezzi pieni**. Nel gioco come si gioca (azioni a tempo: la run, la spedizione, il laboratorio) ogni prezzo del
+Viandante si divide per `TACTICAL_PLAYER_PACE` = 2: un passo **0,4 s**, un attacco, un'attesa, una schivata o una
+freccia **0,5 s**, il refocus **1 s**, una carta la metà dei suoi secondi (Guard 0,5 s, Strike 1 s, Firebomb 2 s). Le
+carte e l'HUD mostrano il prezzo dimezzato (`-1.5s`). I nemici tengono i loro secondi: il Viandante fa il doppio delle
+cose prima che agiscano. Le regole di base (`DEFAULT_TACTICAL_CONFIG`, usate dalle sonde di regressione) tengono i prezzi
+pieni. Dietro gli occhi (prima persona) vanno al ritmo solo i passi della spada (0,15 s) e dell'arco (0,4 s); l'AK e i
+pugni restano come prima. Anche le **animazioni** delle azioni sul tabellone (i segnali della timeline, i disegni delle
+carte vive e dei flipbook che non girano in loop, i fendenti, i dardi, le stelle d'impatto, i dadi) durano la metà del
+loro tempo pieno; i loop (respiro, canalizzazione, stordimento) restano com'erano, e in prima persona nulla cambia
+([action_pace.odin](../../src/render/action_pace.odin)). Nell'esplorazione il cammino libero passa da 3,6 a 5,4 caselle
+al secondo, sempre sotto la cavalcatura (8,4).
 
 Le carte mostrano la durata `Ns`: il cast spende quei secondi una sola volta,
 progressivamente, e ferma il mondo. Movimento Ombra mostra `0s`: non ha cast, la
@@ -348,19 +371,19 @@ La schivata base rimane accessibile fuori recupero, senza richiedere carte.
 |---|---:|---|
 | Strike | 1 | 3 danni; **+2** contro un nemico in recupero o stordito |
 | Arc Bolt | 1 | 2 danni, tiro economico |
-| Piercing Ray / Cross Slash | 2 | 3 danni in linea / a croce, nelle celle visibili |
+| Piercing Ray / Cross Slash | 2 | 3 danni in linea / a croce, nelle celle visibili; Cross Slash ora nasce solo dal secondo potenziamento di Strike ([registro](../registro-carte.md)) |
 | Guard | 1 | 4 Shield per 2 secondi; abilita Block e Parry |
-| Thorn Coat | 1 | 2 Thorns per 3 secondi; abilita la deviazione (QTE `L`) contro gli arcieri |
-| Counter Rune | 1 | contrattacco 3, 2 cariche, 4 secondi; Retain |
-| Battle Focus | 1 | pesca fino a 2 carte; Survey per 3 secondi: lato della vista +2 (da 2×2 passa a 5×5), massimo 9; Exhaust / Ethereal |
-| Spark Forge | 1 | crea fino a 2 Spark temporanee a costo 0 |
+| Thorn Coat | 1 | 2 Thorns per 3 secondi; abilita la deviazione (QTE `L`) contro gli arcieri — **ritirata** ([registro](../registro-carte.md)) |
+| Counter Rune | 1 | contrattacco 3, 2 cariche, 4 secondi; Retain — **ritirata** ([registro](../registro-carte.md)) |
+| Battle Focus | 1 | pesca fino a 2 carte; Survey per 3 secondi: lato della vista +2 (da 2×2 passa a 5×5), massimo 9; Exhaust / Ethereal — **ritirata** ([registro](../registro-carte.md)) |
+| Spark Forge | 1 | crea fino a 2 Spark temporanee a costo 0 — **ritirata** ([registro](../registro-carte.md)) |
 | Dash | 1 | 2 Shield **prima** di muovere, durata 2 secondi; movimento fino a 4 celle, senza usare il recupero della schivata |
 | Shove | 1 | prima spinge di 1 cella, poi infligge 1 danno; allontana bombe e interrompe intenti tramite spostamento |
 | Grappling Hook | 1 | 1 danno e trascina adiacente, raggio 2–4; interrompe gli intenti spostando il nemico |
 | Heavy Blow | 2 | 4 danni e Stagger: salta l’azione annunciata e apre almeno 1 secondo di recupero dopo il pagamento del costo temporale |
 | Venom Needle | 1 | 1 danno + 2 Veleno (danno a ogni azione del bersaglio, poi uno stack in meno) |
-| Purifying Guard | 1 | 3 Shield per 2 secondi e rimuove il Veleno |
-| Volatile Study | 2 | crea 1 Spark, pesca fino a 2 carte; Exhaust |
+| Purifying Guard | 1 | 3 Shield per 2 secondi e rimuove il Veleno; ora nasce solo dal secondo potenziamento di Guard ([registro](../registro-carte.md)) |
+| Volatile Study | 2 | crea 1 Spark, pesca fino a 2 carte; Exhaust — **ritirata** ([registro](../registro-carte.md)) |
 | Toxic Wave | 2 | 1 Veleno ai nemici visibili entro raggio Chebyshev 2 (5×5) |
 | Movimento Ombra | 3 | 4 secondi reali nell'ombra: mondo e finestra fermi, intangibile, solo passi dell'ombra da 0,4 s (diagonale sui suoi battiti); risale sull'ultima casella dell'ombra. 0 s di finestra, giocabile anche da storditi |
 | Pozza di Veleno | 1 | una pozza su una cella libera fino alla fine della stanza: 2 Veleno (+1 per upgrade) a un nemico per ogni sua cella in cui entra; le aree che chiude si riempiono ([Pozza di Veleno e Incendio](meccaniche.md#pozza-di-veleno-e-incendio)) |
@@ -373,6 +396,12 @@ La schivata base rimane accessibile fuori recupero, senza richiedere carte.
 | Canna da Pesca | 0 | mai in mano: a stanza liberata pesca da un suo slot una casella libera entro 3 celle, che diventa acqua; 95% cibo che cura un d4, 5% una carta nel mazzo; 1 pesca a stanza +1 per upgrade (fino a 6); una sola per run ([Canna da Pesca](meccaniche.md#canna-da-pesca)) |
 | Pinball | 3 | un nemico accanto (non boss né miniboss) diventa una palla d'acciaio che rimbalza per 20 s del mondo a 7 caselle al secondo: i nemici che tocca prendono 2, 3, 4... (+1 per upgrade) e sono spinti di una cella, ogni muro la riporta a 2; poi scoppia e il nemico cade ([Pinball](meccaniche.md#pinball)) |
 | First Person Shooter | 3 | 20 s del mondo (+2 per upgrade) dietro gli occhi del Viandante: un AK di carta da 6 colpi al secondo, 1 danno lungo il mirino, passi secondo la vista, niente carte; 0 s di finestra ([First Person Shooter](meccaniche.md#first-person-shooter)) |
+| Inondazione | 2 | trascinata su una casella intorno al Viandante, un'onda attraversa tutta la mappa nel verso di quel lato: spinge ogni nemico di 1 casella (+1 per upgrade, massimo 3) e spegne tutti i fuochi; nessun danno ([Inondazione](meccaniche.md#inondazione)) |
+| Bomb Marley | 3 | una festa di 35 s del mondo (+5 s per nemico ucciso da una bomba, 90 in tutto): bombe da 6 danni (+1 per upgrade) a ogni battito lungo colonne intere, che non toccano chi sta su una casella illuminata ([Bomb Marley](meccaniche.md#bomb-marley)) |
+| Cannone | 2 | una torretta d'acciaio su una casella libera entro 3 celle, girata con la rotella: ogni secondo del mondo, per 20 s, spara una palla dritta davanti a sé che colpisce il primo nemico della linea (2 danni, +1 per upgrade, massimo 2 colpi di cannone insieme); poi si sbriciola. Al **secondo upgrade diventa Cannone Laser** ([Cannone](meccaniche.md#cannone-e-cannone-laser)) |
+| Cannone Laser | 2 | l'evoluzione del Cannone, non si offre mai: un raggio rosso a ogni secondo colpisce tutti i nemici della linea (3 danni, +1 per upgrade, fino a 3) |
+| Buco Nero | 3 | un buco su una casella libera entro 3 celle per 8 s del mondo: chi sta nel 3x3 prende 4 danni a battito (+1 per upgrade), chi sta nel 5x5 intorno è tirato di una casella verso il centro, tranne boss e miniboss (che prendono solo danno); fino a 4 upgrade, che allargano buco e tiro ([Buco Nero](meccaniche.md#buco-nero)) |
+| Dinosauro | 3 | un d4 sceglie il dinosauro che il Viandante cavalca per 20 s (+3 per upgrade): 1 Velociraptor, 2 Stegosauro, 3 Dilophosaurus, 4 Giganotosauro ([Dinosauro](meccaniche.md#dinosauro-e-sanguinamento)) |
 
 Afterimage mantiene il bypass del recupero della schivata e lo Shield dopo il
 movimento. Calculated Risk, Spark, Firebomb, Caustic Bloom e le formule delle
@@ -422,8 +451,8 @@ loro condizioni.
 Il **pulse del player è una finestra di 20 secondi**, configurabile da 1 a 60,
 che può contenere più azioni. Il countdown scorre mentre si decide. Movimento,
 attacco, attesa, refocus, attivazione ed equipaggiamento **durano in tempo reale
-il loro costo** (`Tactical_Config.timed_actions`): un passo da 0,8 s occupa il
-Viandante per otto decimi di secondo, mentre il countdown e i nemici scorrono come sempre (un
+il loro costo** (`Tactical_Config.timed_actions`): un passo da 0,4 s (al ritmo del giocatore) occupa il
+Viandante per quattro decimi di secondo, mentre il countdown e i nemici scorrono come sempre (un
 battito al secondo). Un comando premuto nel frattempo viene **scartato**, mai
 tenuto da parte per dopo: agisce solo una pressione fatta a fine azione. La
 schivata (`Shift + WASD`) invece non aspetta e interrompe subito l'azione, e la
@@ -748,6 +777,107 @@ prima di pagare. Tutte e tre usano Traverse. Grappling Hook si ferma al primo
 attore e trascina il bersaglio fino alla cella adiacente al player.
 Spostare un nemico non aggiorna il suo intento già committed: il piano stale
 produce miss o blocco, poi viene ripianificato per il pulse successivo.
+
+### Altezze
+
+Ogni cella ha un'altezza in gradini (`level.height_at`, 0 su una mappa piatta, che
+è ogni mappa senza altezze): [height.odin](../../src/game/height.odin). Con altezze
+a zero ovunque il gioco è identico a prima.
+
+| Cosa | Regola |
+|---|---|
+| Passo (giocatore, nemico) | fra caselle vicine al massimo 1 gradino di dislivello, in su o in giù; di più è un **dirupo**, un muro per chi cammina |
+| Diagonale e schivata | stessa regola, cella per cella |
+| Spinta, tirata, scatto (Traverse) | un dislivello in salita di più di 1 gradino è un muro; in discesa è aperto |
+| Caduta | scendendo più di 1 gradino in un passo di uno spostamento forzato: danno = dislivello − 1, al massimo 10 (4 gradini fanno 3). Vale per giocatore e nemici; Teleport non cade |
+| Nemici | la ricerca del percorso, i passi pianificati e l'esecuzione rispettano il dirupo: un nemico non lo scende né lo sale |
+| Linea di tiro e di vista | occhio a 6 gradini sul pavimento, bersaglio a 4: una cella la cui cima sta sopra la retta fra i due nasconde ciò che c'è dietro (`height_hides`); vale per carte, nemici e nebbia |
+| Gittata | +1 casella dalle carte a distanza (gittata massima oltre 1) lanciate da almeno 4 gradini più in alto del bersaglio |
+| First Person Shooter | l'occhio sta sul pavimento della sua cella; il pavimento è quello di ogni cella; una cella con il pavimento sopra il raggio ferma il colpo |
+
+Le spedizioni hanno rilievi in ogni bioma (Fase 3 del piano griglia): in esplorazione il camminatore
+libero (a piedi e in sella), il passo a caselle, i gruppi che dormono e le pattuglie seguono la stessa
+regola di passo, e l'avvistamento usa la linea di vista con le altezze (`expedition.can_see`).
+
+Nelle Montagne innevate una montagna a spirale (Fase 4) usa queste stesse regole: il sentiero sale di un
+gradino a ogni passo, tra un giro e l'altro c'è un dirupo, e chi cade dalla cima paga al massimo 10.
+
+Il passo si controlla in `try_move_player`, nella diagonale e nella schivata; il
+danno di caduta in `apply_movement_effect`, che registra un `Hazard_Triggered`
+con il danno. Gli attacchi in mischia fra celle di altezza diversa restano
+possibili.
+
+### Piani
+
+Una mappa può avere caselle anche sopra la terra (un ponte, piano +1) e sotto (una grotta, piani −1 e −2):
+[layers.odin](../../src/level/layers.odin) per i dati, [layers.odin](../../src/game/layers.odin) per le
+regole (Fase 3 di [piano-profondita.md](../piano-profondita.md)). Ogni casella calpestabile di ogni piano è
+una casella della griglia, e la posizione ha il suo piano (`grid.Position.layer`). Senza piani, cioè con
+tutto a terra, il gioco è identico a prima.
+
+**La colonna.** Le caselle con le stesse x e y su tutti i piani. Due pavimenti della stessa colonna distano
+almeno 12 gradini, e il piano più alto sta più in alto: sopra ogni pavimento ci sono 10 gradini liberi (la
+luce), e l'impalcato di un ponte o la roccia sopra una grotta sono spessi 2. Una mappa che non lo rispetta è
+rifiutata (`level.check_layers`). Così in una colonna vicina c'è al massimo un pavimento a un gradino o due
+da qualsiasi altezza, e un passo non deve mai scegliere il piano.
+
+| Cosa | Regola |
+|---|---|
+| Passo | nella colonna vicina, sul pavimento a un gradino al massimo, su qualsiasi piano: una rampa porta sul ponte, l'imbocco in grotta (`game.layer_step`) |
+| Scala a pioli | collega due caselle di colonne vicine anche sopra un dirupo; si sale e si scende premendo la direzione verso la scala, robot e nemici (`level.Ladder`, movimento `Climb`) |
+| Ascensore | unisce due piani della stessa colonna: un pozzo verso una sala sotto, o un dirupo con in cima un pianerottolo sul piano sopra. Un passo verso il pianerottolo da cui la piattaforma è lontana la chiama (senza spendere tempo); arriva a 8 gradini al secondo. Un passo sulla piattaforma ferma la fa partire: chi c'è sopra arriva all'altro capo e intanto non agisce e non si colpisce (il robot come in Movimento Ombra, un nemico come se fosse fuori gioco). Un pianerottolo senza piattaforma non si calpesta. Anche i nemici la chiamano, la aspettano e ci salgono (`level.Lift`, [lift.odin](../../src/game/lift.odin)) |
+| Cancello | le sbarre di una scorciatoia: non si passa, ma si vede attraverso (è un recinto). Si apre con un passo contro le sbarre dalla casella della leva, che costa il tempo di un colpo; dall'altra parte resta chiuso. Aperto, resta aperto fino alla fine della spedizione; ogni run lo trova chiuso (`level.Gate`) |
+| Spinta, tirata, scatto | entrano nel pavimento la cui luce raggiungono: oltre il bordo aperto di un ponte si cade sul piano sotto, con il danno di caduta di sempre |
+| Vista e tiri | in tutte e due le direzioni: dal ponte si vede e si colpisce la strada, e dalla strada il ponte; la linea non deve toccare l'impalcato o la roccia sopra una grotta, in nessun punto della casella (`level.layer_line_blocker`) |
+| Gittata | si misura su x e y; il +1 da 4 gradini più in alto vale anche fra piani |
+| Aree | in ogni colonna, la casella del piano dell'ancora; dove quel piano non c'è, il pavimento più vicino in altezza entro 2 gradini: l'area esce da un imbocco, mentre ponti e volte la fermano (`game.area_cell`); vale anche per esplosioni, fuochi e scariche |
+| Mischia | sullo stesso piano come sempre, anche sopra un dirupo; fra piani diversi solo a un gradino al massimo, cioè agli imbocchi |
+| Chi sta dove | un personaggio per casella: due possono stare sulla stessa x,y su piani diversi |
+| Nemici | il campo delle distanze attraversa i piani con la regola del passo e le scale |
+| Carte speciali | Inondazione, Buco Nero, Bomb Marley, Lazzo, Pinball, Cannone, dispositivi e First Person Shooter agiscono sul piano di chi le gioca come sempre, e sugli altri piani solo su ciò che vede (`game.effect_reaches`); la palla del Pinball rotola sul suo piano |
+| Pozze e fuochi | stanno sul loro piano; una pozza chiude le aree anche attraverso un imbocco |
+
+Nella Prova meccaniche l'arena «Piani» (sesta di F3) li mette alla prova: una strada sotto un ponte con
+due rampe, una collina con una grotta e due imbocchi, una scala sul dirupo della collina, un nemico per
+piano. Ciò che sta sopra la testa del robot entro 6 caselle si apre a poco a poco, chi è coperto mostra il
+contorno, in grotta il fuori è più scuro (Fase 4).
+
+L'arena «Ascensori» (settima di F3, Fase 7) prova ascensori e cancelli: un altopiano di 14 gradini con un
+ascensore sul dirupo, una sala sotto raggiunta da un pozzo con l'ascensore, e un cancello nella galleria che esce
+dalla sala, che si apre solo da dentro.
+
+**Nelle spedizioni** (Fase 5 di [piano-profondita.md](../piano-profondita.md)) le grotte sono il piano −1
+sotto un massiccio di roccia: ci si entra camminando dall'imbocco, con le regole qui sopra. In sella si entra
+come altrove; un evento che sveglia nemici fa scendere il robot. Si combatte anche a cavallo dell'imbocco, e le
+pattuglie entrano in grotta come ovunque. Sotto la roccia non c'è il terreno del bioma (né lava né neve), e la
+corsia delle catastrofi non arriva; la roccia nasconde chi sta sotto a chi sta sopra, e viceversa.
+
+### Strutture
+
+Edifici e oggetti complessi occupano **tutte** le caselle della loro impronta, come
+caselle ordinarie, e perciò passo, vista, intelligenza dei nemici e anteprime delle
+carte non hanno regole nuove: [structure.odin](../../src/level/structure.odin).
+
+| Casella | Passo | Vista |
+|---|---|---|
+| Muro (`#`) | bloccato | bloccata |
+| Muretto o recinto (`=`, `Tile_Kind.Fence`) | bloccato | libera (`game.cell_is_fence`) |
+| Porta (`+`) | libero | libera |
+| Pavimento (`.`) e punto d'uso (`*`) | libero | libera |
+
+Le piante sono righe di testo (Dungeon Crawl Stone Soup ne è il modello) con rotazione a
+quarti di giro e specchio; il catalogo
+([structure_catalog.odin](../../src/level/structure_catalog.odin)) ha tre edifici
+(casetta 4×3, capanna 5×4, tempietto 7×7 con colonnato e altare), cinque oggetti
+complessi (carro 2×1, fontana 2×2, statua 2×2, macchinario 3×2, rovina a L 3×3) e un
+recinto con cancello. Una posa è rifiutata se la struttura esce dalla mappa o dal
+bordo, non sta su pavimento libero, si sovrappone o tocca un'altra struttura, copre ciò
+che il chiamante vuole libero (servizi, partenza), ha una porta che si apre su una casella
+bloccata o chiude una sacca in una mappa che era tutta raggiungibile
+(`level.place_check`, la stessa funzione che userà la posa da parte del giocatore).
+Le strutture non sono distruttibili. Le spedizioni le salvano in `World.structures`
+(vuoto negli slot vecchi, che restano com'erano); solo Robotica cibernetica ne ha, in
+posti fissi del bioma ([structures.odin](../../src/expedition/structures.odin)).
 
 ## Oggetti, esplosivi e loot
 

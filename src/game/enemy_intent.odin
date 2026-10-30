@@ -115,6 +115,11 @@ planned_cell_is_available :: proc(
 	   target == room.player.position {
 		return false
 	}
+	// A foe's step does not climb or leave a cliff.
+	if moving_index >= 0 && moving_index < position_count {
+		from := positions[moving_index]
+		if max(abs(from.x-target.x), abs(from.y-target.y)) == 1 && !is_ladder_move(room, from, target) && step_height_blocked(room, from, target) { return false }
+	}
 	for index in 0..<position_count {
 		if index != moving_index && positions[index] == target {
 			return false
@@ -200,7 +205,7 @@ plan_chaser_intent :: proc(
 	assert(room != nil && room.player != nil && enemy != nil && predicted_positions != nil)
 	delta_x := room.player.position.x-origin.x
 	delta_y := room.player.position.y-origin.y
-	if abs(delta_x)+abs(delta_y) == 1 {
+	if abs(delta_x)+abs(delta_y) == 1 && melee_layers_meet(room, origin, room.player.position) {
 		return make_attack_intent(room, origin, room.player.position, enemy.attack)
 	}
 
@@ -223,17 +228,25 @@ plan_chaser_intent :: proc(
 			return intent
 		}
 	}
-	origin_index, valid_origin := grid.index_of(&room.level_data.tiles, origin)
-	if !valid_origin || room.enemy_path_distances[origin_index] < 0 {
+	origin_index, valid_origin := room_table_index(room, origin)
+	if !valid_origin || origin_index >= len(room.enemy_path_distances) || room.enemy_path_distances[origin_index] < 0 {
 		return intent
 	}
 	best_distance := room.enemy_path_distances[origin_index]
-	steps := [?]grid.Position{first_step, second_step, {0, -1}, {1, 0}, {0, 1}, {-1, 0}}
+	steps := [?]grid.Position{first_step, second_step, {x = 0, y = -1}, {x = 1, y = 0}, {x = 0, y = 1}, {x = -1, y = 0}}
 	for step in steps {
 		if step.x == 0 && step.y == 0 {
 			continue
 		}
-		target := add_position(origin, step)
+		// The cell the step lands on, on whichever layer, up or down a ladder too (layers.odin).
+		target := walk_step(room, origin, step)
+		// A lift's landing its platform is away from, on the way: the foe calls it, and waits (lift.odin).
+		if lift_landing_shut(room, target) {
+			if at, inside := room_table_index(room, target); inside && at < len(room.enemy_path_distances) {
+				if way := room.enemy_path_distances[at]; way >= 0 && way < best_distance { _ = lift_call(room, target) }
+			}
+			continue
+		}
 		if !planned_cell_is_available(
 			room,
 			predicted_positions,
@@ -243,7 +256,8 @@ plan_chaser_intent :: proc(
 		) {
 			continue
 		}
-		index, _ := grid.index_of(&room.level_data.tiles, target)
+		index, inside := room_table_index(room, target)
+		if !inside || index >= len(room.enemy_path_distances) { continue }
 		distance := room.enemy_path_distances[index]
 		if distance >= 0 { distance += enemy_terrain_danger(room, target) }
 		if distance < 0 || distance >= best_distance {
@@ -299,7 +313,7 @@ plan_brute_intent :: proc(
 	assert(room != nil && room.player != nil && enemy != nil && predicted_positions != nil)
 	player_position := room.player.position
 	step, distance, aligned := orthogonal_step_and_distance(origin, player_position)
-	if distance == 1 {
+	if distance == 1 && melee_layers_meet(room, origin, player_position) {
 		return make_attack_intent(room, origin, player_position, enemy.attack)
 	}
 	if aligned && distance >= BRUTE_MIN_CHARGE_RANGE &&
@@ -307,14 +321,19 @@ plan_brute_intent :: proc(
 	   has_clear_orthogonal_line(room, origin, player_position) {
 		intent := make_wait_intent(room, origin)
 		intent.kind = .Charge
-		for offset in 1..<distance {
-			intent.path[intent.path_count] = {
-				x = origin.x+step.x*offset,
-				y = origin.y+step.y*offset,
-			}
+		// The charge runs on the floors its steps land on (layers.odin), as the movement it makes: up no ladder. A cliff
+		// anywhere on its way stops it as it stops a walk; only the first step was looked at, and the charge then ran into
+		// the cliff (section 12 of docs/piano-profondita.md).
+		previous := origin
+		walkable := true
+		for _ in 1..<distance {
+			next, _ := layer_step(room, previous, step)
+			if step_height_blocked(room, previous, next) { walkable = false; break }
+			previous = next
+			intent.path[intent.path_count] = previous
 			intent.path_count += 1
 		}
-		if intent.path_count <= MAX_ENEMY_INTENT_PATH_CELLS &&
+		if walkable && intent.path_count <= MAX_ENEMY_INTENT_PATH_CELLS &&
 		   planned_path_is_available(
 			room,
 			predicted_positions,
@@ -383,7 +402,7 @@ validate_enemy_intent_structure :: proc(room: ^Room, intent: ^Enemy_Intent) -> b
 			return false
 		}
 		for position, index in intent.threatened_cells[:intent.threatened_cell_count] {
-			if !grid.contains(&room.level_data.tiles, position) {
+			if !level.layer_contains(room.level_data, position) {
 				return false
 			}
 			for previous_index in 0..<index {
@@ -406,7 +425,7 @@ validate_enemy_intent_structure :: proc(room: ^Room, intent: ^Enemy_Intent) -> b
 		}
 		for y in intent.destination.y-1..=intent.destination.y+1 {
 			for x in intent.destination.x-1..=intent.destination.x+1 {
-				cell := grid.Position{x, y}
+				cell := grid.Position{x = x, y = y}
 				if explosion_contains_cell(room, intent.destination, cell) !=
 				   enemy_intent_cell_is_threatened(intent, cell) {
 					return false
@@ -441,7 +460,7 @@ validate_enemy_intent_structure :: proc(room: ^Room, intent: ^Enemy_Intent) -> b
 			previous = position
 		}
 		for position, index in intent.threatened_cells[:intent.threatened_cell_count] {
-			if !grid.contains(&room.level_data.tiles, position) {
+			if !level.layer_contains(room.level_data, position) {
 				return false
 			}
 			for previous_index in 0..<index {
@@ -544,6 +563,13 @@ plan_enemy_intents :: proc(room: ^Room) {
 				predicted_positions[ordered_index] = escape.destination
 				continue
 			}
+			// BOMB MARLEY: off the lights, make for one.
+			if shelter, sheltering := tactical_marley_shelter(room, origin, &predicted_positions, enemy_count, ordered_index); sheltering {
+				enemy.intent = shelter
+				tactical_schedule_enemy(room, enemy)
+				predicted_positions[ordered_index] = shelter.destination
+				continue
+			}
 		}
 		intent: Enemy_Intent
 		switch enemy.archetype {
@@ -591,8 +617,8 @@ plan_enemy_intents :: proc(room: ^Room) {
 			if aligned {
 				center := intent.threatened_cells[0]
 				for sign in ([?]int{-1, 1}) {
-					cell := grid.Position{center.x+step.y*sign, center.y+step.x*sign}
-					if grid.contains(&room.level_data.tiles, cell) && shape_cell_has_clear_path(room, origin, cell) {
+					cell := grid.offset(center, step.y*sign, step.x*sign)
+					if level.layer_contains(room.level_data, cell) && area_takes(room, center, cell) && shape_cell_has_clear_path(room, origin, cell) {
 						intent.threatened_cells[intent.threatened_cell_count] = cell
 						intent.threatened_cell_count += 1
 					}
@@ -624,11 +650,14 @@ enemy_charge_path_is_clear :: proc(
 	   room.enemies[enemy_index].position != intent.origin {
 		return false
 	}
+	previous := intent.origin
 	for index in 0..<intent.path_count {
 		position := intent.path[index]
-		if cell_blocks_movement(room, position) || position == room.player.position {
+		// A cliff risen on the way since the plan stops it too, rather than a move the rules refuse.
+		if cell_blocks_movement(room, position) || position == room.player.position || step_height_blocked(room, previous, position) {
 			return false
 		}
+		previous = position
 		if _, occupied := enemy_index_at(room, position, enemy_index); occupied {
 			return false
 		}
@@ -665,7 +694,7 @@ record_enemy_attack_miss :: proc(
 }
 
 // Archers shoot and bombers throw; an object is struck from afar.
-@(private = "file")
+@(private)
 enemy_attack_is_ranged :: proc(enemy: ^Enemy, intent: ^Enemy_Intent) -> bool {
 	return enemy.archetype == .Archer || enemy.archetype == .Bomber || intent.target_object != 0 ||
 		(enemy.archetype == .Demolitionist && intent.kind == .Attack && intent.threatened_cell_count>0 &&
@@ -678,6 +707,12 @@ enemy_attack_is_ranged :: proc(enemy: ^Enemy, intent: ^Enemy_Intent) -> bool {
 @(private)
 resolve_enemy_blow :: proc(room: ^Room, enemy: ^Enemy, intent: ^Enemy_Intent, ranged: bool, pulse: ^Pulse_Report) -> bool {
 	source := enemy_entity(enemy.id)
+	// The blow breaks what the player has set down within its reach (structure_damage.odin).
+	_ = strike_structures(room, enemy.position, intent.threatened_cells[:intent.threatened_cell_count], intent.damage)
+	// FIRST PERSON FENCER's guard (first_person_sword.odin).
+	if sword_parry_blow(room, enemy, intent, ranged, pulse) {
+		return room.phase != .Combat
+	}
 	if deflect_enemy_blow(room, source, enemy.position, intent, ranged, pulse) {
 		return room.phase != .Combat
 	}
@@ -824,7 +859,7 @@ resolve_enemy_intents :: proc(room: ^Room, pulse: ^Pulse_Report, only_id: u32 = 
 				continue
 			}
 			if enemy.position != intent.origin ||
-			   !enemy_intent_cell_is_threatened(&intent, room.player.position) ||
+			   !enemy_blow_reaches_player(room, &intent, ranged) ||
 			   (enemy.archetype == .Archer &&
 			    !has_clear_orthogonal_line(room, enemy.position, room.player.position)) {
 				record_enemy_attack_miss(
@@ -854,7 +889,8 @@ resolve_enemy_intents :: proc(room: ^Room, pulse: ^Pulse_Report, only_id: u32 = 
 				continue
 			}
 			action := make_action(.Move, source, cell_target(destination), .Walkable_Cell)
-			added := add_effect(&action, move_effect(source, destination, .Teleport if intent.phase_through else .Traverse))
+			mode := Movement_Mode.Climb if is_ladder_move(room, intent.origin, destination) else .Teleport if intent.phase_through else .Traverse
+			added := add_effect(&action, move_effect(source, destination, mode))
 			assert(added)
 			report := resolve_action(room, &action)
 			assert(report.accepted)
@@ -896,7 +932,7 @@ resolve_enemy_intents :: proc(room: ^Room, pulse: ^Pulse_Report, only_id: u32 = 
 				continue
 			}
 			moved_enemy := &room.enemies[moved_enemy_index]
-			if !enemy_intent_cell_is_threatened(&intent, room.player.position) {
+			if !enemy_blow_reaches_player(room, &intent, false) {
 				record_enemy_attack_miss(
 					pulse,
 					source,

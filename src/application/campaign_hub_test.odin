@@ -2,10 +2,20 @@ package application
 
 import "core:testing"
 import "core:os"
+import _ "../engine/teststack"
 import campaign "../campaign"
 import host "../engine/host"
 import input "../engine/input"
 import ui "../engine/ui"
+
+// A scratch file in the system's temp directory: the tests must not depend on
+// a macOS-only path such as /private/tmp (they failed on Windows).
+scratch_path :: proc(name: string) -> string {
+	dir, dir_error := os.temp_directory(context.temp_allocator)
+	if dir_error != nil { return name }
+	path, path_error := os.join_path({dir, name}, context.temp_allocator)
+	return path if path_error == nil else name
+}
 
 @(test)
 test_storage_tabs_cannot_activate_covered_hub_navigation :: proc(t: ^testing.T) {
@@ -51,7 +61,7 @@ test_slot_delete_modal_blocks_underlying_menu_button :: proc(t: ^testing.T) {
 
 @(test)
 test_window_focus_loss_flushes_latest_hub_state :: proc(t: ^testing.T) {
-	path := "/private/tmp/odin-pp-hub-focus-save.json"; defer os.remove(path)
+	path := scratch_path("odin-pp-hub-focus-save.json"); defer os.remove(path)
 	h := new(Campaign_Hub)
 	defer free(h)
 	campaign.initialize(&h.progress); defer campaign.destroy(&h.progress)

@@ -23,6 +23,8 @@ import view "../engine/view"
 Roguelike_Session :: struct {
 	window:                  ^app.Window,
 	options:                 Options,
+	// Which arena the Prova meccaniche is in (F3 switches it, mechanics_practice.odin).
+	lab_arena:               Mechanics_Lab_Arena,
 	actions:                 input.Action_Map(Run_Action),
 	diagnostics:             Run_Diagnostics,
 	frame_input:             Run_Input,
@@ -113,8 +115,9 @@ roguelike_suspend_input :: proc(rs: ^Roguelike_Session) {
 	rs.iso_renderer.tactical.hologram_orbit.dragging = false
 	// The view behind the player's eyes gives the mouse back.
 	if rs.attached { release_first_person_mouse(&rs.tactical_controller, &rs.room) }
-	// The room's ambience waits for the scene to come back.
+	// The room's ambience waits for the scene to come back; the fists' music stops.
 	audio.lab_ambience(&rs.lab_bank, false)
+	audio.lab_music_stop(&rs.lab_bank)
 }
 
 // The mechanics lab's sounds: what the board pass queued, and the room's
@@ -124,10 +127,13 @@ roguelike_lab_sounds :: proc(rs: ^Roguelike_Session, hf: ^host.Frame) {
 	if bank == nil || !bank.ready || bank.muted || !audio.lab_bank_load(&rs.lab_bank) {
 		render.play_lab_sounds(&rs.iso_renderer, nil, 0)
 		audio.lab_ambience(&rs.lab_bank, false)
+		audio.lab_music_stop(&rs.lab_bank)
 		return
 	}
 	render.play_lab_sounds(&rs.iso_renderer, &rs.lab_bank, bank.sfx_volume)
 	audio.lab_ambience(&rs.lab_bank, rs.run_state.phase == .In_Room, .Amb_Crypt_Loop, bank.sfx_volume)
+	// The first person cards' music: the fists' after the ring's bell, the sword's once drawn (render.first_person_music_track).
+	audio.lab_music(&rs.lab_bank, render.first_person_music_track(&rs.iso_renderer), bank.sfx_volume, hf.dt)
 }
 
 roguelike_suspend :: proc(data: rawptr) {
@@ -242,6 +248,11 @@ update_run_activity_overlay :: proc(rs: ^Roguelike_Session, hf: ^host.Frame) -> 
 	restart_requested := !rs.activity_modal && (run_pressed(rs.frame_input, .Restart) ||
 		(rs.run_state.phase == .Defeat && run_pressed(rs.frame_input, .Confirm)) ||
 		(rs.defeat_hovered == .Restart && rs.frame_input.left_pressed))
+	// F3 in PROVA MECCANICHE: the other arena, started afresh.
+	if rs.options.mechanics_lab && !rs.activity_modal && run_pressed(rs.frame_input, .Lab_Arena) {
+		rs.lab_arena = mechanics_lab_next_arena(rs.lab_arena)
+		restart_requested = true
+	}
 	if restart_requested && !roguelike_restart(rs, hf) { return true }
 
 	return false
@@ -258,7 +269,9 @@ update_run_board_view :: proc(rs: ^Roguelike_Session, hf: ^host.Frame, screen: R
 	// under the mouse wherever they are (roguelike_pointer_inside).
 	view_inside, hud_inside := roguelike_pointer_inside(rs, rs.frame_input.focused)
 	render.update_tactical_view(&rs.iso_renderer, &rs.room, rs.mouse_canvas, view_inside, input = {
-		orbit_pressed = rs.frame_input.middle_pressed, orbit_down = rs.frame_input.middle_down, wheel = rs.frame_input.wheel,
+		orbit_pressed = rs.frame_input.middle_pressed, orbit_down = rs.frame_input.middle_down,
+		// The wheel turns INONDAZIONE's wave while the card is aimed.
+		wheel = 0 if render.flood_aim_active(&rs.iso_renderer) else rs.frame_input.wheel,
 		window_mouse = {rs.frame_input.mouse_window.x, rs.frame_input.mouse_window.y},
 	})
 	render.tactical_hud_pointer(&rs.iso_renderer, rs.mouse_canvas, hud_inside)
@@ -430,14 +443,15 @@ roguelike_draw :: proc(data: rawptr, hf: ^host.Frame) {
 	if !draw_run_screen(rs) {
 		rs.timeline_busy = render.renderer_blocks_player_input(&rs.iso_renderer)
 		active_card_id := active_targeting_card_id(rs.card_interaction)
+		hover_card_id := hovered_preview_card_id(rs.card_interaction)
 		if rs.timeline_busy {
-			active_card_id = 0
+			active_card_id, hover_card_id = 0, 0
 		}
 		// FERETRO's aim shows while a click would loose an arrow.
 		rs.iso_renderer.tactical.arrow_aim = arrows_aiming(&rs.room, rs.frame_input) && !rs.activity_modal && !rs.timeline_busy &&
 			game.tactical_allows_action(&rs.room) && !game.tactical_player_busy(&rs.room)
 		render.update_tactical_view(&rs.iso_renderer, &rs.room, rs.mouse_canvas, false, true)
-		render.draw_tactical_world(&rs.iso_renderer, &rs.room, active_card_id)
+		render.draw_tactical_world(&rs.iso_renderer, &rs.room, active_card_id, nil, hover_card_id)
 		render.draw_status(&rs.iso_renderer, &rs.room, rs.window.scale_mode)
 		render.draw_relic_bar(&rs.iso_renderer, &rs.room, rs.mouse_canvas, rs.mouse_inside,
 			rs.card_interaction.hovered_card_id if rs.card_interaction.hovered_card_id != 0 else rs.card_interaction.selected_card_id)

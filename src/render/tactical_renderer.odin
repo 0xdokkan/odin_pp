@@ -33,6 +33,9 @@ Tactical_View :: struct {
 	perspective, no_fog: bool,
 	refocus_enabled: bool,
 	camera: rl.Camera3D,
+	// The buildings' see-through state this frame (structure_view.odin).
+	structures: Structure_Views,
+	structure_room_data: ^level.Level,
 	draw_frustum: Tactical_Draw_Frustum,
 	draw_timing: Expedition_Draw_Timing,
 	zoom: f32,
@@ -58,12 +61,24 @@ Tactical_View :: struct {
 	expedition_patrols: Expedition_Patrol_Glide,
 	// The sites whose floor plans reach this frame's drawn region.
 	expedition_sites: Expedition_Near_Sites,
+	// The cave the robot is in (expedition/cave.odin), its box (x0, z0, x1, z1): outside it everything is darker.
+	expedition_cave_box: rl.Vector4,
+	expedition_in_cave: bool,
+	// The structure the player is about to set down (expedition_ghost.odin).
+	structure_ghost: Structure_Ghost,
 	light_shader: rl.Shader,
 	outline_shader: rl.Shader,
 	outline_mode: Comic_Outline_Mode,
 	outline_bounds_location, outline_texel_location, outline_radius_location: c.int,
 	light_position_location, light_hologram_location, light_eye_location: c.int,
 	light_clear_location, light_accents_location: c.int,
+	layer_light: Resin_Layer_Program,
+	// The outlines of hidden figures (layer_outline.odin).
+	hidden_shader: rl.Shader,
+	hidden_bounds_location, hidden_texel_location, hidden_radius_location: c.int,
+	// The floor the camera follows on a board with layers, easing to a new layer's (Fase 4).
+	camera_ground: f32,
+	camera_ground_set: bool,
 	clear_light: f32,
 	translucents: ^Tactical_Alpha_Buffer,
 	labels: ^Tactical_Label_Layout,
@@ -114,9 +129,20 @@ Tactical_View :: struct {
 	fishing: Fishing_View,
 	// PINBALL: the steel ball, its contacts and its burst (pinball.odin).
 	pinball: Pinball_View,
+	// BOMB MARLEY: the ball, the beams, the bomb and the figure (marley.odin).
+	marley: Marley_View,
+	// CANNONE, BUCO NERO and DINOSAURO: the prints, the climb and the walk (arsenal.odin).
+	arsenal: Arsenal_View,
+	// INONDAZIONE: the way of its wave while the card is held over the board.
+	flood_aim: Flood_Aim,
+	// "This one can be hit": when each locked foe was first locked, for its ring
+	// (card_hit_mark.odin).
+	hit_marks: Card_Hit_Memory,
 	// FIRST PERSON SHOOTER: the camera in the player's eyes, the AK and its
 	// shots (first_person.odin).
 	first_person: First_Person_View,
+	// The foes' glows as they act (foe_glow.odin).
+	foe_glow: Foe_Glow_View,
 	// PROVA MECCANICHE's overlapping hand: how much of each card shows
 	// (tactical_hand.odin).
 	hand_reveal: Tactical_Hand_Reveal,
@@ -138,6 +164,7 @@ create_tactical_assets :: proc(renderer: ^Renderer, parent: rl.RenderTexture2D =
 	renderer.tactical.block_mesh = build_dice_bevel_mesh()
 	create_tactical_lighting(renderer)
 	create_comic_outline(renderer)
+	create_layer_outline(renderer)
 	create_gothic_art(&renderer.tactical.art)
 	gfx.create_flipbook_assets(&renderer.tactical.flipbook)
 	gfx.create_attack_props(&renderer.tactical.attack_props)
@@ -201,10 +228,14 @@ destroy_tactical_assets :: proc(renderer: ^Renderer) {
 	destroy_lasso_view(renderer)
 	destroy_fishing_view(renderer)
 	destroy_pinball_view(renderer)
+	destroy_marley_view(renderer)
+	destroy_arsenal_view(renderer)
 	destroy_first_person_view(renderer)
 	if renderer.tactical.outline_shader.id != 0 { rl.UnloadShader(renderer.tactical.outline_shader); renderer.tactical.outline_shader = {} }
+	if renderer.tactical.hidden_shader.id != 0 { rl.UnloadShader(renderer.tactical.hidden_shader); renderer.tactical.hidden_shader = {} }
 	if renderer.tactical.labels != nil { free(renderer.tactical.labels); renderer.tactical.labels = nil }
 	if renderer.tactical.light_shader.id != 0 { rl.UnloadShader(renderer.tactical.light_shader); renderer.tactical.light_shader = {} }
+	if renderer.tactical.layer_light.shader.id != 0 { rl.UnloadShader(renderer.tactical.layer_light.shader); renderer.tactical.layer_light = {} }
 	if renderer.tactical.snapshot != nil { free(renderer.tactical.snapshot); renderer.tactical.snapshot = nil }
 	for &texture in renderer.tactical.fallback {
 		if texture.id != 0 { rl.UnloadTexture(texture); texture = {} }
@@ -237,6 +268,8 @@ tactical_presentation_opaque :: proc(renderer: ^Renderer, room: ^game.Room, posi
 // with its footprint): the game's leaves the bottom to a full hand; MOSTRA
 // EFFETTO's film (Tactical_View.showcase) aims nearer him.
 TACTICAL_HAND_AIM :: f32(1.10)
+// How much of the way to a new layer's floor the camera goes each view update.
+TACTICAL_LAYER_CAMERA_EASE :: f32(0.2)
 TACTICAL_SHOWCASE_AIM :: f32(0.30)
 
 Tactical_View_Input :: struct {
@@ -248,11 +281,14 @@ Tactical_View_Input :: struct {
 update_tactical_view :: proc(renderer: ^Renderer, room: ^game.Room, mouse: view.Vec2, inside: bool, refresh_only: bool = false,
 	input: Tactical_View_Input = {}) {
 	v := &renderer.tactical
+	set_board_level(room.level_data)
+	set_board_actors(room)
 	v.expedition = room.player.tactical.config.expedition
 	v.expedition_biome = room.player.tactical.config.expedition_biome
 	if !refresh_only { v.pointer_window = input.window_mouse }
 	tactical_hud_pointer(renderer, mouse, inside)
 	v.snapshot^ = renderer_presentation_snapshot(renderer, room)
+	set_board_view(renderer, room)
 	update_expedition_walker_view(renderer, refresh_only)
 	update_tactical_hand_reveal(renderer, &v.snapshot.deck)
 	// Before the vision and the camera: in the shadow they follow the pool;
@@ -261,25 +297,37 @@ update_tactical_view :: proc(renderer: ^Renderer, room: ^game.Room, mouse: view.
 	update_tactical_shadow(renderer, room)
 	update_tactical_lasso(renderer, room)
 	update_tactical_pinball(renderer, room)
+	update_tactical_marley(renderer, room)
+	update_tactical_arsenal(renderer, room)
 	update_tactical_fishing(renderer)
 	update_tactical_first_person(renderer, room)
+	update_foe_glows(renderer, room)
 	v.no_fog = room.player.tactical.config.vision_size == 0 || tactical_room_is_clear(v.snapshot.phase)
 	if !tactical_room_is_clear(v.snapshot.phase) { v.clear_light = 0 }
 	// Behind the player's eyes his hand is put away: no refocus.
 	v.refocus_enabled = game.tactical_control_allowed(room, .Board_Action)
 	p := v.snapshot.player.position
-	origin := grid.Position{int(math.round(p.x)), int(math.round(p.y))}
+	origin := grid.Position{x = int(math.round(p.x)), y = int(math.round(p.y))}
 	v.visible_count = 0
 	size := game.tactical_vision_size(room.player.tactical.config, &v.snapshot.player.statuses)
 	visibility := Tactical_Visibility_Context{renderer, room}
+	// With layers, the sight goes from the player's own layer to every floor of each column (game/layers.odin).
+	m: level.Layer_Map
+	layers := game.room_line_layers(room, &m)
+	if layers != nil { origin.layer = room.player.position.layer }
 	for dy in -size/2..=size/2 {
 		for dx in -size/2..=size/2 {
-			cell := grid.Position{origin.x+dx, origin.y+dy}
-			if !grid.contains(&room.level_data.tiles, cell) ||
-			   !game.tactical_in_footprint(size, room.player.tactical.facing, origin, cell) ||
-			   !game.tactical_line_visible(origin, cell, tactical_snapshot_opaque, &visibility) { continue }
-			v.visible[v.visible_count] = cell
-			v.visible_count += 1
+			column := grid.Position{x = origin.x+dx, y = origin.y+dy}
+			if !grid.contains(&room.level_data.tiles, column) || !game.tactical_in_footprint(size, room.player.tactical.facing, origin, column) { continue }
+			for layer in grid.LOWEST_LAYER..=grid.HIGHEST_LAYER {
+				cell := column
+				cell.layer = i8(layer)
+				if layer != grid.GROUND_LAYER && (layers == nil || !level.kind_has_floor(level.map_tile(layers, cell))) { continue }
+				if !game.tactical_line_visible(origin, cell, tactical_snapshot_opaque, &visibility, tactical_snapshot_height, layers) ||
+				   v.visible_count >= len(v.visible) { continue }
+				v.visible[v.visible_count] = cell
+				v.visible_count += 1
+			}
 		}
 	}
 	lasso_extend_vision(renderer, room)
@@ -301,7 +349,16 @@ update_tactical_view :: proc(renderer: ^Renderer, room: ^game.Room, mouse: view.
 	forward := rl.Vector3{math.cos(v.world_orbit.yaw), 0, math.sin(v.world_orbit.yaw)}
 	footprint_scale := 1.1+f32(max(0, size-5))*0.065
 	aim := TACTICAL_SHOWCASE_AIM if v.showcase else TACTICAL_HAND_AIM
-	target := rl.Vector3{p.x+0.5, 0, p.y+0.5}+forward*(aim*footprint_scale*(1-LASSO_CAMERA_AIM*pull))
+	// The camera follows the ground the player stands on, up a stair and down it; on a board with layers it eases
+	// to a new layer's floor, up a ladder or down off a bridge (Fase 4 of docs/piano-profondita.md).
+	ground := entity_point_ground(game.PLAYER_ENTITY, p)
+	if board_view.layered {
+		// A jump of an expedition's camera (a new map, a robot set down elsewhere) takes the floor's height at once.
+		snap := room.player.tactical.config.expedition && !v.expedition_follow_ready
+		if v.camera_ground_set && !snap { ground = v.camera_ground+(ground-v.camera_ground)*TACTICAL_LAYER_CAMERA_EASE }
+		v.camera_ground, v.camera_ground_set = ground, true
+	} else { v.camera_ground_set = false }
+	target := rl.Vector3{p.x+0.5, ground, p.y+0.5}+forward*(aim*footprint_scale*(1-LASSO_CAMERA_AIM*pull))
 	if room.player.tactical.config.expedition {
 		combat_orbit := v.world_orbit
 		combat_orbit.distance *= footprint_scale*(1+LASSO_CAMERA_BACK*pull)
@@ -327,13 +384,12 @@ update_tactical_view :: proc(renderer: ^Renderer, room: ^game.Room, mouse: view.
 	renderer.has_hovered_cell = false
 	if !inside || !point_in_rectangle(mouse, tactical_world_bounds(renderer)) || renderer_blocks_player_input(renderer) { return }
 	ray := rl.GetScreenToWorldRayEx(to_raylib(mouse), v.camera, c.int(renderer.canvas_width), c.int(renderer.canvas_height))
-	if abs(ray.direction.y) < 0.0001 { return }
-	t := -ray.position.y/ray.direction.y
-	if t <= 0 { return }
-	point := ray.position+ray.direction*t
-	cell := grid.Position{int(math.floor(point.x)), int(math.floor(point.z))}
+	// The cell the ray reaches first: a plateau's top or a cliff's face, where
+	// there are heights (pick_ground_cell); the plane's cell where there are none.
+	cell, picked := pick_ground_cell(ray.position, ray.direction)
+	if !picked { return }
 
-	if grid.contains(&room.level_data.tiles, cell) && tactical_render_visible(renderer, cell) {
+	if level.layer_contains(room.level_data, cell) && tactical_render_visible(renderer, cell) {
 		renderer.has_hovered_cell = true
 		renderer.hovered_cell = cell
 	}
@@ -451,7 +507,16 @@ tactical_billboard :: proc(renderer: ^Renderer, key: Sprite_Key, position: view.
 	if renderer.tactical.expedition && key >= .Chaser && key <= .Demolitionist && pose.tint == rl.WHITE {
 		pose.tint = expedition_enemy_tint(campaign.Biome(renderer.tactical.expedition_biome))
 	}
+	// A foe acting glows, its whole card, paper and print (foe_glow.odin).
+	glow, lit := foe_glow(renderer, entity)
+	if lit > 0 {
+		pose.tint = foe_glow_mix(pose.tint, glow, lit*0.6)
+		shade = foe_glow_mix(shade, glow, lit*0.5)
+	}
 	draw_tactical_billboard_quad(renderer, quad, position, opacity*seen, pose.tint, shade)
+	if lit > 0 { draw_billboard_print_light(quad, glow, lit*0.55*opacity*seen, 1) }
+	// FIRST PERSON BRAWLER: the struck foe's print flashes white (first_person_fists.odin).
+	if flash := first_person_struck_flash(renderer, entity); flash > 0 { draw_first_person_struck_flash(quad, flash*opacity*seen) }
 }
 
 @(private)
@@ -508,10 +573,10 @@ tactical_cue_visible :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) -> boo
 	snapshot := renderer.tactical.snapshot
 	position := cue.event.to_position
 	if target, ok := tactical_cue_actor_position(renderer, cue.event.target); ok {
-		position = {int(math.round(target.x)), int(math.round(target.y))}
+		position = {x = int(math.round(target.x)), y = int(math.round(target.y))}
 	} else if cue.event.target.kind == .Object {
 		for object in snapshot.objects[:snapshot.object_count] {
-			if object.entity == cue.event.target { position = {int(math.round(object.position.x)), int(math.round(object.position.y))}; break }
+			if object.entity == cue.event.target { position = {x = int(math.round(object.position.x)), y = int(math.round(object.position.y))}; break }
 		}
 	}
 	if !tactical_render_visible(renderer, position) { return false }
@@ -527,35 +592,47 @@ update_tactical_body_hover :: proc(renderer: ^Renderer, mouse: view.Vec2) {
 	ray := rl.GetScreenToWorldRayEx(to_raylib(mouse), v.camera, c.int(renderer.canvas_width), c.int(renderer.canvas_height))
 	closest := f32(1.0e20)
 	for actor in v.snapshot.enemies[:v.snapshot.enemy_count] {
-		cell := grid.Position{int(math.round(actor.position.x)), int(math.round(actor.position.y))}
+		cell := grid.Position{x = int(math.round(actor.position.x)), y = int(math.round(actor.position.y))}
 		// The Pinball's ball is no card under the mouse (pinball.odin).
 		if !actor.visible || !tactical_render_visible(renderer, cell) || tactical_pinball_holds(renderer, actor.entity) { continue }
 		if distance, hit := tactical_billboard_hit(renderer, sprite_key_for_enemy(actor.archetype), actor.position, ray, actor.entity); hit && distance < closest {
 			closest = distance
+			// On a map with layers, the cell on the actor's own layer.
+			if standing, found := board_actor_cell(actor.entity); found { cell = standing }
 			renderer.hovered_cell = cell
 			renderer.has_hovered_cell = true
 		}
 	}
 	for object in v.snapshot.objects[:v.snapshot.object_count] {
-		cell := grid.Position{int(math.round(object.position.x)), int(math.round(object.position.y))}
+		cell := grid.Position{x = int(math.round(object.position.x)), y = int(math.round(object.position.y))}
 		if !object.visible || !tactical_render_visible(renderer, cell) { continue }
-		collision := rl.GetRayCollisionBox(ray, voxel_object_bounds(object.kind, object.position))
+		collision := rl.GetRayCollisionBox(ray, voxel_object_bounds(object.kind, object.position, object.entity))
 		if collision.hit && collision.distance < closest {
 			closest = collision.distance
+			if standing, found := board_actor_cell(object.entity); found { cell = standing }
 			renderer.hovered_cell = cell
 			renderer.has_hovered_cell = true
 		}
 	}
 }
 
-draw_tactical_world :: proc(renderer: ^Renderer, room: ^game.Room, active_card: u32, expedition_world: ^expedition.World = nil) {
+// `hover_card` is a card only under the mouse in the hand (none chosen): its range
+// and its targets show faintly.
+draw_tactical_world :: proc(renderer: ^Renderer, room: ^game.Room, active_card: u32, expedition_world: ^expedition.World = nil, hover_card: u32 = 0) {
 	v := &renderer.tactical
 	when EXPEDITION_BENCHMARK {v.draw_timing={};stamp:=rl.GetTime()}
 	v.draw_frustum = tactical_draw_frustum(v.camera, renderer.canvas_width, renderer.canvas_height)
 	snapshot := v.snapshot
 	preview: Card_Range_Preview
-	prepare_card_range_preview(renderer, room, active_card, &preview)
+	set_board_level(room.level_data)
+	set_board_actors(room)
+	if expedition_world != nil { set_expedition_board_actors(expedition_world) }
+	set_board_view(renderer, room)
+	if active_card != 0 { prepare_card_range_preview(renderer, room, active_card, &preview) } else { prepare_card_range_preview(renderer, room, hover_card, &preview, true) }
+	halo := CARD_HIT_VIOLET
+	if expedition_world != nil { halo = card_hit_halo_color(expedition.metadata(expedition_world.biome).color, true) }
 	update_ground_fx(renderer, room)
+	update_structure_views(renderer, room)
 	lights: [4]rl.Vector4
 	// The surface draws in logical units at its own resolution.
 	surface := begin_tactical_surface(renderer)
@@ -566,7 +643,7 @@ draw_tactical_world :: proc(renderer: ^Renderer, room: ^game.Room, active_card: 
 		p := room.player.position
 		min_x, min_y = max(0, (p.x/16-2)*16), max(0, (p.y/16-2)*16)
 		max_x, max_y = min(max_x, (p.x/16+3)*16), min(max_y, (p.y/16+3)*16)
-		expedition_gather_sites(renderer, expedition_world, {min_x, min_y}, {max_x, max_y})
+		expedition_gather_sites(renderer, expedition_world, {x = min_x, y = min_y}, {x = max_x, y = max_y})
 		prepare_expedition_material(renderer,room,expedition_world)
 		collect_expedition_edges(renderer,room,expedition_world)
 		prepare_expedition_lights(renderer,room,expedition_world)
@@ -585,13 +662,22 @@ draw_tactical_world :: proc(renderer: ^Renderer, room: ^game.Room, active_card: 
 		else {begin_expedition_material(renderer,expedition_world,floor=true)}
 		for y in min_y..<max_y {
 		for x in min_x..<max_x {
-			cell := grid.Position{x, y}
+			cell := grid.Position{x = x, y = y}
 			if !tactical_cell_on_screen(renderer, cell) || !tactical_render_visible(renderer, cell) { continue }
 			tile, _ := level.tile_at(room.level_data, cell)
 			if expedition_world != nil { draw_expedition_tile(renderer, room, expedition_world, cell, &preview) }
-			else { draw_tactical_tile(renderer, room, tile, cell, &preview) }
+			else {
+				// What fades over the robot waits for the sorted pass; the rest gets its shade (height_view.odin).
+				if cell_cover_opacity(cell) >= 1 {
+					draw_tactical_tile(renderer, room, tile, cell, &preview)
+					draw_layer_dim(cell)
+				}
+				draw_tactical_layer_tiles(renderer, room, cell, &preview)
+			}
 		}
 	}
+		// The lifts' shafts and platforms, in the board's resin light (lift_view.odin).
+		if expedition_world == nil { draw_board_lifts(renderer, room) }
 		if expedition_world!=nil {rl.EndShaderMode()}
 	}
 	when EXPEDITION_BENCHMARK {v.draw_timing.floor_ms=expedition_benchmark_elapsed(&stamp)}
@@ -601,8 +687,9 @@ draw_tactical_world :: proc(renderer: ^Renderer, room: ^game.Room, active_card: 
 		rl.EndMode3D()
 		resolve_expedition_world(renderer)
 		rl.BeginMode3D(v.camera)
-		// Devices, cover and loot placed by cards keep the board's resin light.
+		// Devices, cover and loot placed by cards keep the board's resin light; so do a complex's lifts and gates.
 		begin_tactical_lighting(renderer)
+		draw_board_lifts(renderer, room)
 	}
 	when EXPEDITION_BENCHMARK {v.draw_timing.architecture_resolve_ms=expedition_benchmark_elapsed(&stamp)}
 	for obstacle in room.obstacles {
@@ -616,7 +703,7 @@ draw_tactical_world :: proc(renderer: ^Renderer, room: ^game.Room, active_card: 
 		draw_voxel_trap(renderer, trap)
 	}
 	for object in snapshot.objects[:snapshot.object_count] {
-		cell := grid.Position{int(math.round(object.position.x)), int(math.round(object.position.y))}
+		cell := grid.Position{x = int(math.round(object.position.x)), y = int(math.round(object.position.y))}
 		if !object.visible || !tactical_cell_on_screen(renderer, cell) || !tactical_render_visible(renderer, cell) { continue }
 		draw_voxel_object(renderer, object)
 	}
@@ -633,11 +720,14 @@ draw_tactical_world :: proc(renderer: ^Renderer, room: ^game.Room, active_card: 
 	// only needs a small feathered footprint for each visible actor.
 	if expedition_world == nil { draw_tactical_ground_shadows(renderer, room) }
 	else {draw_expedition_contact_shadows(renderer,room,expedition_world)}
-	if expedition_world == nil { draw_diorama_accents(renderer, room) }
+	if expedition_world == nil { draw_diorama_accents(renderer, room); draw_structure_outlines(renderer, room) }
 	draw_tactical_clear_markers(renderer, room)
 	draw_card_range_light(renderer, room, &preview)
+	draw_card_hit_marks(renderer, room, &preview, halo)
 	draw_voxel_threats(renderer, room)
 	draw_intent_ground(renderer, room)
+	draw_marley_floor(renderer, room)
+	draw_arsenal_floor(renderer, room)
 	draw_m8_device_network(renderer, room)
 	draw_memory_device_ranges(renderer, room, active_card)
 	rl.EndMode3D()
@@ -656,7 +746,11 @@ draw_tactical_world :: proc(renderer: ^Renderer, room: ^game.Room, active_card: 
 	draw_tactical_actor_bases(renderer)
 	draw_tactical_feedback(renderer, .Ground)
 	draw_tactical_billboards(renderer, room, lights)
+	draw_marley_sky(renderer, room)
+	draw_flood_wave(renderer, room)
+	draw_arsenal_sky(renderer, room)
 	draw_tactical_feedback(renderer, .Accent)
+	draw_card_hit_sparks(renderer, room, &preview, halo)
 	rl.EndMode3D()
 	when EXPEDITION_BENCHMARK {v.draw_timing.paper_ms=expedition_benchmark_elapsed(&stamp)}
 

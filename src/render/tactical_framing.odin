@@ -34,8 +34,11 @@ tactical_cell_on_screen :: proc(renderer: ^Renderer, cell: grid.Position) -> boo
 	if !f.valid { return true }
 	// Covers a complete wall, cap, lamp, floor bevel, shadow and drifting mote.
 	// The generous sphere also avoids geometry popping at the edge of the view.
+	// It stands on the cell's own ground (its layer's, the map's base taken off):
+	// at a fixed height a mountain's flank was culled while on screen (section 12
+	// of docs/piano-profondita.md).
 	radius :: f32(1.8)
-	delta := rl.Vector3{f32(cell.x)+0.5, 0.65, f32(cell.y)+0.5}-f.eye
+	delta := rl.Vector3{f32(cell.x)+0.5, cell_ground(cell)+0.65, f32(cell.y)+0.5}-f.eye
 	z := rl.Vector3DotProduct(delta, f.forward)
 	if z+radius <= 0 { return false }
 	x, y := abs(rl.Vector3DotProduct(delta, f.right)), abs(rl.Vector3DotProduct(delta, f.up))

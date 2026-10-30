@@ -189,7 +189,7 @@ draw_tactical_spell_flight :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) 
 	for index in 0..<7 {
 		part := max(f32(0), p-f32(index)*0.028)
 		point := tactical_feedback_projectile(from, to, part, arc)
-		cell := grid.Position{int(math.floor(point.x)), int(math.floor(point.z))}
+		cell := grid.Position{x = int(math.floor(point.x)), y = int(math.floor(point.z))}
 		if !tactical_render_visible(renderer, cell) { continue }
 		size := 0.14*(1-f32(index)*0.095)
 		if index == 0 {
@@ -202,8 +202,8 @@ draw_tactical_spell_flight :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) 
 			part := p*f32(index)/10
 			point := tactical_feedback_projectile(from, to, part, false)
 			point.y += math.sin(f32(index)*12.7+p*10)*0.06
-			cell := grid.Position{int(math.floor(point.x)), int(math.floor(point.z))}
-			previous_cell := grid.Position{int(math.floor(previous.x)), int(math.floor(previous.z))}
+			cell := grid.Position{x = int(math.floor(point.x)), y = int(math.floor(point.z))}
+			previous_cell := grid.Position{x = int(math.floor(previous.x)), y = int(math.floor(previous.z))}
 			if tactical_render_visible(renderer, cell) && tactical_render_visible(renderer, previous_cell) {
 				rl.DrawLine3D(previous, point, color_with_opacity(color, 0.7))
 			}
@@ -238,7 +238,7 @@ draw_tactical_feedback :: proc(renderer: ^Renderer, layer: Tactical_Feedback_Lay
 				color := TACTICAL_FEEDBACK_BLUE if cue.event.target == game.PLAYER_ENTITY else TACTICAL_FEEDBACK_HIT
 				for index in 0..<3 {
 					point := from+(center-from)*(f32(index)+1)/4
-					cell := grid.Position{int(math.floor(point.x)), int(math.floor(point.z))}
+					cell := grid.Position{x = int(math.floor(point.x)), y = int(math.floor(point.z))}
 					if !tactical_render_visible(renderer, cell) { continue }
 					rl.DrawCube(point, 0.09, 0.01, 0.09, color_with_opacity(color, alpha*0.4))
 				}
@@ -255,7 +255,7 @@ draw_tactical_feedback :: proc(renderer: ^Renderer, layer: Tactical_Feedback_Lay
 				if cue.event.card_definition == .Firebomb {
 					for dy in -1..=1 { for dx in -1..=1 {
 						if cue.event.area_mask&(u16(1)<<u32((dy+1)*3+dx+1)) == 0 { continue }
-						cell := grid.Position{cue.event.to_position.x+dx, cue.event.to_position.y+dy}
+						cell := grid.offset(cue.event.to_position, dx, dy)
 						if !tactical_render_visible(renderer, cell) { continue }
 						point := rl.Vector3{f32(cell.x)+0.5, 0.057, f32(cell.y)+0.5}
 						draw_tactical_rune(point, 0.34, 0, color_with_opacity(color, alpha*0.7))
@@ -316,7 +316,7 @@ draw_tactical_feedback :: proc(renderer: ^Renderer, layer: Tactical_Feedback_Lay
 @(private = "file")
 draw_tactical_status_rune :: proc(renderer: ^Renderer, actor: ^Presentation_Actor) {
 	if !actor.visible || actor.opacity <= 0 { return }
-	cell := grid.Position{int(math.round(actor.position.x)), int(math.round(actor.position.y))}
+	cell := grid.Position{x = int(math.round(actor.position.x)), y = int(math.round(actor.position.y))}
 	if !tactical_render_visible(renderer, cell) { return }
 	if index, shielded := game.status_index(&actor.statuses, .Shield); shielded && actor.statuses.items[index].potency > 0 {
 		draw_tactical_rune({actor.position.x+0.5, 0.057, actor.position.y+0.5}, 0.34, 0,

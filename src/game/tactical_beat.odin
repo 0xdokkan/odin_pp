@@ -138,6 +138,16 @@ tactical_critical_scale :: proc(room: ^Room, action: ^Action) {
 		// (and the one every wall puts it back to).
 		case .Draw_Cards, .Create_Card, .Gain_Energy, .Place_Ground, .Lasso, .Pinball:
 			effect.amount += 1
+		// The wave pushes one cell more; the party lasts five seconds longer.
+		case .Flood_Wave:
+			effect.amount += 1
+		// A cannon and a hole hurt more; the ride lasts longer.
+		case .Place_Cannon, .Open_Black_Hole:
+			effect.amount = critical_damage(effect.amount)
+		case .Ride:
+			effect.amount += RIDE_CRITICAL_SECONDS
+		case .Marley:
+			effect.duration += MARLEY_CRITICAL_SECONDS
 		case .Deploy_Device:
 			effect.amount = critical_damage(effect.amount)
 			if effect.object_kind == .Shock_Floor { effect.charges = min(effect.charges+1, TACTICAL_SHOCK_FLOOR_MAX_CHARGES) }
@@ -165,12 +175,15 @@ mark_critical_events :: proc(log: ^Event_Log) {
 try_move_player_diagonal :: proc(room: ^Room, offset: grid.Position) -> Action_Result {
 	if room == nil || room.player == nil || room.phase != .Combat || !tactical_allows_movement(room) { return .Invalid_Phase }
 	if abs(offset.x) != 1 || abs(offset.y) != 1 { return .Blocked }
-	target := add_position(room.player.position, offset)
-	if enemy_index, found := enemy_index_at(room, target); found {
+	target, _ := layer_step(room, room.player.position, offset)
+	foe_cell := bump_cell(room, room.player.position, offset)
+	if enemy_index, found := enemy_index_at(room, foe_cell); found {
 		if !tactical_allows_action(room) { return .Invalid_Phase }
 		clear_event_log(room.recent_events)
+		// The Giganotosauro walks onto a foe his bump would kill.
+		if giga_crushes(room, enemy_index, true) { return giga_crush_step(room, enemy_index, foe_cell, .Opponent, true) }
 		// Always critical, loaded like a straight bump (player_charges.odin).
-		if !player_bump(room, enemy_index, target, .Opponent, true) { return .Blocked }
+		if !player_bump(room, enemy_index, foe_cell, .Opponent, true) { return .Blocked }
 		outcome := finish_player_combat_command(room)
 		switch outcome {
 		case .Player_Defeated: return .Player_Defeated
@@ -180,7 +193,7 @@ try_move_player_diagonal :: proc(room: ^Room, offset: grid.Position) -> Action_R
 		return .Attacked
 	}
 	query := query_entity_movement(room, PLAYER_ENTITY, target)
-	if !movement_query_is_clear(&query) { return .Blocked }
+	if !movement_query_is_clear(&query) || step_height_blocked(room, room.player.position, target) { return .Blocked }
 	clear_event_log(room.recent_events)
 	action := make_action(.Move, PLAYER_ENTITY, cell_target(target), .Walkable_Cell)
 	added := add_effect(&action, move_effect(PLAYER_ENTITY, target))
@@ -191,7 +204,8 @@ try_move_player_diagonal :: proc(room: ^Room, offset: grid.Position) -> Action_R
 	append_event_log(room.recent_events, &report.events)
 	collect_loot_in_magnet_range(room)
 	room.player.tactical.facing = .North if offset.y < 0 else .South
-	outcome := finish_player_combat_command(room, TACTICAL_MOVE_SECONDS)
+	ride_stomp(room)
+	outcome := finish_player_combat_command(room, player_move_seconds(room), step = true)
 	switch outcome {
 	case .Player_Defeated: return .Player_Defeated
 	case .Combat_Ended: return .Combat_Ended

@@ -812,3 +812,356 @@ rosso. Nel recupero dopo la fine della finestra l'AK spara ancora. Finiti i 20
 secondi, dopo una ventina di battiti del mondo, la vista finisce, la telecamera
 risale con il suo suono e il mouse torna libero. Una copia +5 dura 30 secondi. Il
 riquadro dei secondi e la riga dell'HUD ci stanno interi.
+
+> **Solo in Prova meccaniche, per ora.** Inondazione, Bomb Marley, Cannone,
+> Cannone Laser, Buco Nero e Dinosauro (con il Sanguinamento) qui sotto sono le
+> versioni del laboratorio: hanno il tratto `Lab_Only` e non si offrono, non si
+> comprano, non si scoprono e non entrano in una spedizione. Le carte della
+> campagna con gli stessi nomi sono altre (gli ordigni di `game/memory_devices.odin`).
+
+### First Person Brawler
+
+`First Person Brawler` (rara, energia 3, **0 s** di finestra; **solo nel
+laboratorio**, arena «Prima persona») è la seconda arma della vista di First
+Person Shooter: i **pugni**, per 20 secondi del mondo (+2 a potenziamento).
+Piano e scelte in [piano-prima-persona.md](../piano-prima-persona.md), Fasi 2 e
+3; regole in [first_person_fists.odin](../../src/game/first_person_fists.odin),
+[first_person_punches.odin](../../src/game/first_person_punches.odin) e
+[first_person_marks.odin](../../src/game/first_person_marks.odin); disegno in
+[first_person_fists.odin](../../src/render/first_person_fists.odin) e
+[first_person_gloves.odin](../../src/render/first_person_gloves.odin).
+
+**Il movimento è libero**, non a caselle: `W A S D` muovono il corpo (un
+cerchio) a 5 caselle al secondo girati con la vista; `Spazio` salta (scavalca le
+coperture basse, sale fino a 4 gradini); due tocchi veloci di una direzione
+scattano di 2 caselle. Passare il bordo di una casella è un passo vero, senza
+tempo. **I pugni:** clic sinistro jab (3), destro cross (4), con `Shift` i ganci
+(6), uno per pressione; mentre un pugno è fuori va a metà velocità. **I segni
+critici** si accendono sui nemici vicini, del colore del pugno che chiedono
+(gancio sinistro arancio, jab azzurro, cross giallo, gancio destro magenta): quel
+pugno, se prende il nemico, fa **il triplo** dovunque prenda, e il gancio critico
+lo stordisce. Correndo i colpi dei nemici prendono solo se toccano il corpo; in
+aria solo i tiri.
+
+**Come si vede.** Due guantoni **Neon** (carbonio viola, fasce e tubi magenta,
+bordo di luce ciano), un modello 3D da codice disegnato come pixel art di
+cartoncino, in guardia da pugile in basso al centro; jab e cross dritti al
+mirino, i ganci larghi dal loro lato, raggi e scie di velocità. Il pugno che
+colpisce ferma il disegno per 0,08 s, scuote la vista e fa diventare bianco il
+nemico; il critico fa scoppiare una stella d'oro. **Suoni** da codice: aria,
+tonfo di cuoio per pugno, ding del critico, tic dei segni, campanella del ring
+all'entrata, poi la musica dei pugni.
+
+### First Person Fencer
+
+`First Person Fencer` (rara, energia 3, **0 s** di finestra; **solo nel
+laboratorio**, arena «Prima persona») è la terza arma della vista: la **spada**,
+per 35 secondi del mondo (+2 a potenziamento). Piano e scelte in
+[piano-prima-persona.md](../piano-prima-persona.md), Fase 4; regole in
+[first_person_sword.odin](../../src/game/first_person_sword.odin), disegno in
+[first_person_sword.odin](../../src/render/first_person_sword.odin).
+
+**Il movimento** resta a griglia, con passi di 0,3 s (0,15 s al ritmo del giocatore); `Q` ed `E` girano la
+vista di un quarto, `Shift` con una direzione schiva. **Il mouse muove la
+lama**, non la vista: la punta corre sullo schermo dentro un'ellisse,
+dall'impugnatura in basso. Con il sinistro tenuto, uno swing parte quando la
+punta va veloce, e il colpo arriva quando la lama **passa sopra il corpo** (dalla vita alla testa, o sulle spalle) di un
+nemico nella casella davanti (o, con un colpo di lato, anche nelle due diagonali
+davanti). Il danno, fino a 11, viene da come si muove: veloce, ampio (partire da
+un lato e tagliare attraverso), dritto (agitare il mouse dimezza), preso a tre
+quarti della lama, e dalla direzione: **fendente** dall'alto più forte, **tondo**
+di lato che prende due nemici, **montante** dal basso che spinge indietro. Non
+c'è attesa fra un taglio e l'altro: ogni passaggio sul petto taglia, anche al
+ritorno, purché la punta abbia fatto almeno un quinto di schermo dall'ultimo
+taglio (un tremolio non fa nulla). Un passo fatto durante lo swing è un
+**affondo** (×1,25); girare con `Q`/`E` nel verso della lama durante lo swing è
+un **colpo roteante** (×1,5): la scia diventa magenta dal giro, e accanto al
+nemico salgono le parole del bonus (`COLPO ROTEANTE x1,5`, `AFFONDO x1,25`). Il colpo si vede: una striscia di sangue sul petto
+con le gocce, il lampo bianco del nemico, la lama ferma un istante, la vista che
+sobbalza.
+
+**Il destro tenuto para** i colpi e i dardi dalle tre direzioni davanti, senza
+limite; premuto appena prima del colpo (entro 0,25 s) è una **parata perfetta**:
+chi colpisce da vicino resta stordito e prende 2 danni, il dardo torna al
+balestriere. Le bombe non si parano. **`Ctrl` è il rampino**: il primo nemico in
+linea fra 2 e 4 caselle viene tirato davanti e resta stordito; ricarica 3 s; un
+boss o un miniboss resta fermo e tira il Viandante accanto a sé.
+
+**Come si vede** (Fase 5): uno **zweihänder** Neon, lo spadone a due mani, in
+pixel di cartoncino, tenuto con tutti e due i guantoni; la punta è sempre dove
+la mette il mouse. Dietro lo swing la scia degli ultimi 0,11 s, colorata da
+quanto è buono il colpo (grigio, bianco, oro). Al taglio, accanto al nemico, il
+tipo e il danno («FENDENTE 9»). Con la guardia alzata quattro angoli attorno al
+mirino, d'oro nel quarto di secondo in cui una parata sarebbe perfetta; nella
+vista della spada i colpi nemici arrivano a schermo esattamente al battito,
+quando la regola guarda la guardia. La parata fa poche scintille smorte, la
+parata perfetta lampeggia la lama di bianco con scintille d'oro e un anello. Il
+rampino lancia un uncino con la catena.
+
+### First Person Archer
+
+`First Person Archer` (rara, energia 3, **0 s** di finestra; **solo nel
+laboratorio**, arena «Prima persona») è la quarta arma della vista: l'**arco**,
+per 30 secondi del mondo (+2 a potenziamento). Piano e scelte in
+[piano-prima-persona.md](../piano-prima-persona.md), Fase 6; regole in
+[first_person_bow.odin](../../src/game/first_person_bow.odin).
+
+Si cammina a griglia come con l'AK e si mira col mouse. **Il destro tenuto
+tende l'arco**, pieno in 1,6 s; **rilasciato tira**; il sinistro mentre si
+tende abbassa l'arco senza tirare. Dopo ogni freccia la prossima si incocca in
+0,15 s. Più si tende, più la freccia va veloce (da 16 a 28 caselle al secondo) e
+più rimbalzi può fare sui muri: da 1 a 4. **A ogni rimbalzo va più veloce**
+(×1,25). Il danno di una freccia tesa è 2,5 × (velocità di partenza / 12) ×
+(velocità all'impatto / 12), più un ottavo a rimbalzo fino alla metà: un tiro
+dritto fa da 4 (primo livello) a 14 (carica piena), con le sponde fino a 44.
+Contando il tempo per tendere, una freccia tesa fa da 7 a 8 danni al secondo,
+più dell'AK (6). **Il tiro veloce** (rilasciato prima del primo livello, sotto
+0,4 s): parte lento e cade a parabola, come se non avesse portata; mirando dritto
+tocca terra tra 2 e 4 caselle, quindi un nemico a 3 caselle lo manca circa una
+volta su tre (mirando più in alto arriva più lontano). Fa sempre 1 danno, non dà
+stati e non mostra la guida: a raffica fa meno danni al secondo dell'AK. Le cose
+basse (muretti, coperture, oggetti) fermano la freccia solo fin dove sono
+disegnate: sopra ci passa, e se ci cade sopra si pianta sul loro piano. Senza rimbalzi rimasti
+si pianta nel muro; il pavimento la ferma sempre; vola e colpisce anche fuori
+vista. Se torna sul Viandante rimbalza su di lui senza ferirlo, gratis. Ogni
+freccia ha uno stato a caso (Velenosa: Veleno 2, Incendiaria: Bruciatura 1, Di
+ghiaccio: Rallentamento 2, Stordente: Stordito 1, Dentata: Sanguinamento 1; uno
+di più a carica piena; nessuno col tiro veloce); l'HUD mostra quella incoccata e la prossima. Sui muri ci
+sono **tre zone critiche**: un rimbalzo lì è ×1,6 e non costa; si spostano 2 s
+dopo l'uso e ogni 12 s. Tendendo, una guida a puntini mostra la strada fino al
+secondo rimbalzo.
+
+**Come si vede** (Fase 7): un arco **compound** Neon con le carrucole, tenuto con
+i due guantoni, la corda che arretra con la carica. Sta a destra del mirino,
+vicino al braccio destro (la scelta dell'utente, 2026-10-29): la mano destra
+tiene l'arco, la sinistra tira la corda. Tendendo, la corda arriva al viso come
+nel tiro vero: la freccia corre dal mirino verso l'angolo in basso e la mano
+esce dallo schermo vicino alla guancia; a riposo l'arco sta più basso e più
+inclinato, e si alza appena si comincia a tendere. Le frecce volano con la scia
+del colore del loro stato, più lunga quanto più vanno veloci, e a ogni rimbalzo
+fanno scintille (d'oro sulle zone). Le zone critiche sono bersagli di carta con
+una luce che pulsa. La freccia incoccata e la prossima stanno nella faretra
+attorno al mirino. A ogni rimbalzo un ping e una corda d'arpa pizzicata, una
+nota più alta ogni volta sulla scala pentatonica di la minore (la tonalità della
+musica dell'arco). Quando la vista finisce, le frecce ancora fuori finiscono il
+loro volo e colpiscono (si vedono anche dall'alto); la tensione in corso si
+annulla senza tirare.
+
+**La grandezza delle frecce** (2026-10-29): una freccia parte dalla punta di
+quella incoccata sull'arco, in basso a sinistra, e raggiunge la linea del mirino
+dopo 2,5 m; da lì vola sulla sua strada vera. Tra 1 e 7,5 m dall'occhio ha
+sempre la stessa grandezza sullo schermo (più lontana, più grande nel mondo), e
+a ogni rimbalzo cresce di un ottavo, fino a metà in più: lo stesso aumento del
+suo danno. Le regole (dove colpisce, quanto è grande per colpire) non cambiano.
+
+### Inondazione
+
+`Inondazione` (non comune, energia 2, **2 s** di finestra, fino a tre
+potenziamenti; per ora solo in Prova meccaniche) lancia un'onda che attraversa
+tutta la mappa e sposta ogni nemico. Regole in
+[flood.odin](../../src/game/flood.odin), onda in
+[flood.odin](../../src/render/flood.odin).
+
+**La direzione.** Si trascina la carta (o la si sceglie e poi si clicca) su una
+casella intorno al Viandante, da 1 a 3 celle di Chebyshev (la sua stessa casella
+non vale): l'onda va nel verso dell'asse principale dal Viandante a quella casella,
+una delle quattro direzioni, e in parità lungo la riga (est o ovest). **Con la
+carta in mano la rotella del mouse gira la direzione** di un quarto di giro a
+scatto (in su in senso orario: nord, est, sud, ovest) e la direzione scelta resta
+anche muovendo il mouse, finché la carta non viene giocata o rimessa a posto; la
+rotella intanto non zooma la camera. Giocata dopo la rotella, la carta va su una
+casella che quella direzione indica (la prima delle tre celle in quel verso che il
+gioco accetta), qualunque casella tocchi il mouse. L'onda parte dal muro dietro di
+sé e corre fino al muro davanti, dove finisce: la mappa intera, vista o no.
+
+**L'anteprima.** Con la carta in mano la mappa mostra una freccia grande dal muro da
+cui l'onda parte al muro in cui finisce, lungo la corsia del Viandante (spessa, con
+la punta bianca e le chevron che scorrono), altre frecce più sottili ogni tre
+corsie, una barra ciano sul muro di partenza (`PARTE`) e una bianca su quello di
+arrivo (`FINE`), il pavimento visibile tinto di blu, la corsia del Viandante più
+forte e i nemici che l'onda spingerà cerchiati; sopra il Viandante la scritta
+`ROTELLA: DIREZIONE`.
+
+**L'effetto.** Tutto si risolve in una sola giocata, nell'ordine in cui il fronte
+raggiunge le file dei nemici dalla parte lontana: la testa di una fila si
+sposta per prima, così una fila con spazio davanti si sposta insieme. Prima si
+spengono **tutti i fuochi** (gli Incendi del Viandante e gli oggetti Fuoco della
+stanza), così nessun nemico finisce in una fiamma. Poi ogni nemico a terra viene
+spinto di **1 casella** (+1 per upgrade, +1 sul colpo a tempo; fino a 4) nel
+verso dell'onda, una sola volta, con le regole di spinta del gioco: un muro, una
+copertura, un oggetto che blocca o un corpo (il Viandante compreso) fermano la
+spinta prima, e su ogni casella in cui entra agiscono pozze, trappole e pericoli
+(un nemico può morire così). L'onda non fa danni, non sposta il Viandante né gli
+oggetti, e non tocca il nemico appeso al Lazzo né la palla del Pinball.
+
+**Sul tavolo.** Un muro d'acqua a blocchi semitrasparenti, con la schiuma in cima,
+attraversa la stanza in circa 1,9 secondi del cast, mentre il mondo è fermo: ogni
+nemico parte spinto nel momento in cui il fronte lo raggiunge, e dove passa
+sopra un fuoco sale un po' di vapore. Nella Prova meccaniche suonano la carta,
+l'onda, ogni nemico bagnato e ogni fuoco spento. Il film di Mostra effetto
+mostra tre nemici (uno contro il muro) e due fuochi.
+
+### Bomb Marley
+
+`Bomb Marley` (rara, energia 3, **2 s** di finestra, fino a cinque potenziamenti;
+per ora solo in Prova meccaniche) apre una festa nella stanza: dal soffitto
+scende una sfera da discoteca che illumina alcune caselle, e Bomb Marley lancia
+bombe a ritmo lungo colonne intere. Chi sta su una casella illuminata è salvo.
+Regole in [marley.odin](../../src/game/marley.odin), tavolo in
+[marley.odin](../../src/render/marley.odin).
+
+**Bomb Marley non è un nemico.** Non è un'entità della stanza: non ha casella,
+vita né ID, quindi nessuna carta, colpo, freccia o palla lo raggiunge e nessun
+nemico lo ha come bersaglio. Sta dietro il muro nord e lancia.
+
+**Il ritmo.** La festa dura **35 secondi del mondo** e va a battiti di un
+secondo, quindi il cast, i dadi, una difesa, Movimento Ombra e la pausa la fermano
+come fermano il mondo. Ogni battito:
+
+- le colonne annunciate **due battiti prima** cadono: la bomba attraversa tutta la
+  colonna, sopra muri e coperture, e ogni personaggio (il Viandante e i nemici,
+  boss e miniboss compresi) che non sta su una casella illuminata prende **6
+  danni** (+1 per upgrade; lo Scudo li assorbe; niente scelta di difesa, Deflect non
+  li rimanda); chi sta su una luce è salvo (`SALVO`); un barile nella colonna si
+  accende; nell'ombra di Movimento Ombra il Viandante non li subisce. Ogni nemico
+  ucciso da una bomba aggiunge **5 secondi** alla festa, **90 in tutto** al massimo
+  (anche se l'ha spinto lì il Viandante);
+- il tempo cala di un secondo; alla fine, con il combattimento o con la morte del
+  Viandante, la festa finisce;
+- le **luci** si spostano ogni 5 battiti, e le caselle a cui passeranno al turno
+  dopo si vedono per tutto il tempo (un alone freddo e una cornice sottile con una
+  scintilla che corre, molto più deboli delle luci vere): in anteprima, non
+  salvano nessuno. Sono 4 più dei personaggi in gioco (il Viandante e i nemici)
+  all'inizio, una in meno ogni 5 secondi, mai meno della metà dei personaggi (2 al
+  minimo) e mai più di 32: la stanza è generosa all'inizio e dopo mezzo minuto
+  circa non c'è più posto per tutti. Sono sparse sul pavimento (fra alcune
+  candidate vince la più lontana dalle altre), una è sempre entro 3 caselle dal
+  Viandante, e le nuove cadono di preferenza dove non sta nessuno e mai sulle
+  luci accese;
+- vengono annunciate **nuove colonne**: poche all'inizio (una ogni due secondi), poi
+  una, due e tre al secondo ogni 10 secondi, in proporzione per una stanza più
+  larga di 17 caselle; metà sono la colonna di un personaggio.
+
+Le luci e le colonne nascono dal solo flusso della stanza (`Room.marley_random`),
+mai dall'orologio. Una sola festa alla volta: mentre suona, la carta viene
+rifiutata. Il colpo a tempo aggiunge 5 secondi.
+
+**I nemici.** Una colonna annunciata è una zona di pericolo, come lo scoppio di
+una bomba: i nemici ne escono e non la attraversano se c'è un'altra strada. Un
+nemico fuori dalle luci e non accanto al Viandante muove verso la luce libera più
+vicina entro 3 celle. First Person Shooter si può giocare durante la festa e la vista
+negli occhi mostra le stesse luci e colonne.
+
+**Sul tavolo.** La sfera a specchietti scende in un secondo sopra il Viandante e ruota;
+i fasci colorati (magenta, ciano, oro, verde, arancio) vanno dalla sfera alle caselle
+salve, dove ci sono macchie di luce e un bordo d'oro; puntini di riflesso girano sul
+pavimento. Le luci e le colonne si vedono anche nella nebbia (sopra i blocchi
+della nebbia). Le colonne annunciate sono rosse, più accese e lampeggianti
+all'ultimo battito, con una freccia che scende. La bomba è un cartoncino di carta
+(nero, con una fascia rossa, oro e verde, miccia e scintilla, linea d'inchiostro,
+margine bianco e taglio come gli altri pezzi del tavolo): Bomb Marley la lancia in
+un arco fino alla prima casella della colonna e poi rimbalza lungo tutta la
+colonna, un salto ogni 3 caselle, girando, con un'ombra morbida sul pavimento,
+cartoncini di fumo dietro di sé e un anello di luce dove tocca terra. Rimbalzare
+è solo il suo modo di andare: colpisce chiunque stia in un punto qualunque del suo
+percorso, a terra o in aria (una colonna dà danno a tutta la colonna). Le bombe
+di uno stesso battito volano insieme. Lascia un lampo su ogni casella (verde dove
+si è salvi) e i danni arrivano dopo. Bomb Marley è un cartoncino originale: una bomba con un berretto
+rosso, oro e verde, occhiali scuri e dreadlock di miccia, che balla a tempo sul
+muro nord sopra la colonna che sta per bombardare. L'HUD mostra `MARLEY 23s` fra i
+chip. Nella Prova meccaniche suonano la carta, la sfera, le luci, l'avviso, la
+bomba e il suo scoppio, la salvezza, i secondi guadagnati, la fine e un
+groove reggae a 60 BPM (un battito `a`, uno `b`).
+
+**Mostra effetto.** Il film mostra la carta sopra una stanza di prova con le luci e
+la prima colonna fissate: due nemici in una colonna, uno in una luce e uno no. La
+bomba salva il primo, ferisce il secondo e il film finisce pochi secondi dopo,
+molto prima dei 35 secondi della festa.
+
+
+### Cannone e Cannone Laser
+
+`Cannone` (non comune, energia 2, **2 s** di finestra, fino a 2 potenziamenti) e
+`Cannone Laser` (rara, energia 2, 2 s, fino a 3) mettono sulla mappa una
+torretta d'acciaio su un piedistallo: si trascina la carta su una casella libera
+entro 3 celle e, **con la carta in mano, la rotella del mouse gira la canna** di
+un quarto di giro a scatto (come l'onda dell'Inondazione: la camera non zooma
+e la mappa mostra la freccia della linea di tiro, fino al primo nemico o al
+muro). Senza rotella la direzione è quella dal Viandante alla casella.
+
+- **Cannone.** Ogni secondo del mondo, per **20 s**, spara una palla dritta
+  davanti a sé: il primo nemico sulla linea prende 2 danni (+1 per upgrade);
+  muri, coperture e oggetti che bloccano il passo fermano la palla, e un
+  barile sulla linea la prende e salta. Al termine si sbriciola.
+- **Evoluzione.** Il **secondo upgrade** non aumenta il danno: la carta
+  *diventa* Cannone Laser (stesso posto nel mazzo, livello 0). Il Cannone Laser
+  è `evolution_only`: peso di offerta 0, mai in premi, negozio o armeria.
+- **Cannone Laser.** Un raggio rosso ogni secondo colpisce **tutti** i nemici
+  della linea fino al muro (3 danni, +1 per upgrade, fino a 3 upgrade).
+- Il cannone è solido (blocca il passo come una bobina Tesla), nessuno lo prende
+  di mira, e al massimo due cannoni stanno insieme sulla mappa. Un colpo a tempo
+  fa il danno x1,5.
+- Sopra il cannone c'è `CANNONE 14s`; il suo lampo, il fumo di carta, la palla
+  di cartoncino che vola (con la sua ombra) e il raggio additivo sono in
+  `render/arsenal.odin`; le regole in `game/cannon.odin`.
+
+### Buco Nero
+
+`Buco Nero` (rara, energia 3, **2 s**, fino a 4 potenziamenti) apre un buco su
+una casella libera entro 3 celle per **8 battiti** del mondo. Ogni battito:
+
+- chi sta nell'**area di danno** (3x3, raggio 1 + upgrade/2: 5x5 a +2, 7x7 a +4)
+  prende 4 danni (+1 per upgrade), boss e miniboss compresi;
+- chi sta nell'**area di tiro** (una casella più larga: 5x5 di base) ma fuori
+  dall'area di danno è tirato di **una casella** verso il centro con le normali
+  regole di movimento (un muro, un corpo o un oggetto lo fermano; pozze, trappole
+  e fuochi agiscono sulla casella in cui entra); **boss e miniboss non vengono
+  tirati**;
+- un nemico che muore per il danno del buco viene **inghiottito**: il tavolo lo
+  mostra mentre gira a spirale verso il centro prima di cadere.
+
+Il buco non blocca il passo. L'anteprima della carta mostra le due aree; sul
+tavolo il buco è un disco nero con spirali viola e arancio, una sfera scura
+sospesa, aree evidenziate e un anello che a ogni battito scorre verso il centro;
+sopra c'è `BUCO NERO 5s`. Regole in `game/black_hole.odin`.
+
+### Dinosauro e Sanguinamento
+
+`Dinosauro` (rara, energia 3, **2 s**, fino a 5 potenziamenti) tira **un d4**
+(sempre un d4, a ogni livello) e il lato sceglie il dinosauro che il Viandante
+cavalca per **20 s** (+3 s per upgrade, +3 s sul colpo a tempo). Si cavalca un
+dinosauro alla volta: la carta non si gioca finché dura la cavalcata, e finisce
+con la stanza.
+
+| d4 | Dinosauro | Effetto |
+|---|---|---|
+| 1 | Velociraptor | un passo costa 0,4 s invece di 0,8 s (prezzi pieni; al ritmo del giocatore 0,2 s invece di 0,4 s); il colpo d'urto mette 1 Sanguinamento |
+| 2 | Stegosauro | ogni colpo di un nemico sul Viandante gli viene restituito senza spendere cariche e senza richiesta di difesa |
+| 3 | Dilophosaurus | 1 Veleno su ogni nemico che il Viandante ferisce e su ogni nemico che lo ferisce |
+| 4 | Giganotosauro | dopo ogni passo i nemici sulle 4 caselle intorno prendono 6 danni; il suo urto uccide all'istante Chaser, Archer e Bomber, e fa 12 danni a Brute, Custode e Demolitore. **Se l'urto ucciderebbe il nemico, non lo colpisce: cammina sulla sua casella e lo schiaccia** (passo, schiacciamento, caduta del nemico; costa un passo e calpesta anche le caselle intorno); se invece il nemico sopravvive, lo morde come prima |
+
+**Sanguinamento.** Nuovo status dei nemici (il Viandante non lo porta): un
+nemico con N stack prende **+N danni** da qualsiasi danno di qualsiasi fonte,
+una sola volta (senza ricorsione), prima dello scudo. Gli stack non calano mai.
+`Bleed` ha il suo suono (`ui_status_bleed`) e un morso `SANGUE +N` sul tavolo.
+
+Il dinosauro è una pixel art di cartoncino (quattro bestie originali, due
+fotogrammi di camminata) sotto la carta del Viandante, che sta sulla sua sella;
+cammina a tempo con il Viandante e si gira esattamente come la carta del
+Viandante (verso dove va o verso il nemico che colpisce, con lo stesso giro da
+figurina). **Mentre lo cavalca, il Viandante non esegue né passi né colpi: li
+esegue il dinosauro.** Un colpo è uno scatto in avanti verso il nemico a testa
+bassa (si carica indietro, scatta, torna), con il Viandante che lo segue sulla
+sella; il Giganotosauro ha inoltre un colpo di calpestio con onda e polvere. L'HUD mostra `RAPTOR 14s`
+fra i chip. Regole in `game/dinosaur.odin`, disegno in `render/arsenal.odin` e
+`render/dino_art.odin`.
+
+**Prova meccaniche e Mostra effetto.** Nella Prova meccaniche il mazzo ha
+Cannone, Buco Nero e Dinosauro (Pozza di Veleno, Deflect e Feretro non ci sono
+più: i loro atti nello smoke li riprendono in prestito per un momento). Gli atti
+di `--smoke-mechanics-lab` verificano la palla sul primo di due nemici, il
+raggio su entrambi, la caduta del cannone, il nemico inghiottito, quello tirato
+dentro, il boss che resta, la chiusura e i quattro dinosauri con i loro effetti.
+I film di Mostra effetto mostrano a ogni livello la scena giusta: il Cannone
+colpisce il primo nemico e il Laser entrambi, il Buco Nero inghiotte e tira, il
+Dinosauro mostra un dinosauro diverso a ogni livello (livello mod 4 + 1).

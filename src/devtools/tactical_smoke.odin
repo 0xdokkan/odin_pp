@@ -169,8 +169,8 @@ tactical_stress_sample :: proc(timer, vision: int) -> (sample: Tactical_Smoke_Sa
 	config.timer_seconds = timer
 	config.vision_size = vision
 	if !game.configure_tactical(&player, config) { return }
-	enemies := [?]game.Enemy_Spawn{{position = {2, 1}, health = 10000, attack = 2},
-		{position = {6, 1}, health = 10000, attack = 2, archetype = .Archer}}
+	enemies := [?]game.Enemy_Spawn{{position = {x = 2, y = 1}, health = 10000, attack = 2},
+		{position = {x = 6, y = 1}, health = 10000, attack = 2, archetype = .Archer}}
 	room, built := game.create_room(&data, &player, {enemies = enemies[:]})
 	if !built { return }
 	defer game.destroy_room(&room)

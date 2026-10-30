@@ -36,6 +36,9 @@ Flipbook_Actor :: struct {
 	// The drawing on the card now and the one it is morphing away from.
 	shown, previous: [2]i32,
 	shown_since: f64,
+	// The board's action scale (action_pace.odin): its one-shot clips, its
+	// turns and its fall play in this part of their first times.
+	scale: f64,
 }
 
 Flipbook_State :: struct {
@@ -72,7 +75,7 @@ flipbook_key :: proc(character: gfx.Flipbook_Character) -> Sprite_Key {
 
 @(private = "file")
 flipbook_one_shot_seconds :: proc(actor: ^Flipbook_Actor) -> f64 {
-	return gfx.flipbook_clip_seconds(&gfx.FLIPBOOK_SHEETS[actor.character].clips[actor.action], actor.first_frame)
+	return flipbook_played_seconds(&gfx.FLIPBOOK_SHEETS[actor.character].clips[actor.action], actor.scale, actor.first_frame)
 }
 
 @(private = "file")
@@ -87,7 +90,7 @@ flipbook_one_shot_running :: proc(actor: ^Flipbook_Actor, now: f64) -> bool {
 flipbook_past_hit :: proc(actor: ^Flipbook_Actor, now: f64) -> bool {
 	clip := &gfx.FLIPBOOK_SHEETS[actor.character].clips[actor.action]
 	if clip.hit < 0 { return true }
-	frame, _ := gfx.flipbook_frame(clip, now-actor.started, actor.first_frame)
+	frame, _ := flipbook_played_frame(clip, now-actor.started, actor.scale, actor.first_frame)
 	return frame > clip.hit
 }
 
@@ -95,13 +98,13 @@ flipbook_past_hit :: proc(actor: ^Flipbook_Actor, now: f64) -> bool {
 @(private = "file")
 flipbook_fall :: proc(actor: ^Flipbook_Actor, now: f64) -> f32 {
 	if actor == nil || actor.action != .Death { return 0 }
-	t := (now-actor.started-flipbook_one_shot_seconds(actor))/FLIPBOOK_FALL_SECONDS
+	t := (now-actor.started-flipbook_one_shot_seconds(actor))/(FLIPBOOK_FALL_SECONDS*action_scale_of(actor.scale))
 	return f32(clamp(t, 0, 1))
 }
 
 @(private = "file")
 flipbook_death_done :: proc(actor: ^Flipbook_Actor, now: f64) -> bool {
-	return actor.action == .Death && now-actor.started >= flipbook_one_shot_seconds(actor)+FLIPBOOK_FALL_SECONDS
+	return actor.action == .Death && now-actor.started >= flipbook_one_shot_seconds(actor)+FLIPBOOK_FALL_SECONDS*action_scale_of(actor.scale)
 }
 
 // The drawing to print right now.
@@ -110,11 +113,11 @@ flipbook_drawing :: proc(actor: ^Flipbook_Actor, now: f64) -> (action: gfx.Flipb
 	sheet := &gfx.FLIPBOOK_SHEETS[actor.character]
 	if actor.action != .Idle {
 		clip := &sheet.clips[actor.action]
-		drawing, finished := gfx.flipbook_frame(clip, now-actor.started, actor.first_frame)
+		drawing, finished := flipbook_played_frame(clip, now-actor.started, actor.scale, actor.first_frame)
 		if !finished || actor.action == .Death { return actor.action, drawing }
 	}
 	base := gfx.flipbook_resolve(actor.character, actor.base)
-	drawing, _ := gfx.flipbook_frame(&sheet.clips[base], now-actor.base_started)
+	drawing, _ := flipbook_played_frame(&sheet.clips[base], now-actor.base_started, actor.scale)
 	return base, drawing
 }
 
@@ -211,6 +214,7 @@ flipbook_observe :: proc(renderer: ^Renderer, state: ^Flipbook_State, room: ^gam
 		slot = flipbook_slot(state, actor.entity, character, now)
 	}
 	slot.seen, slot.ghost, slot.position = now, false, actor.position
+	slot.scale = renderer_action_scale(renderer)
 	wanted, from_hit := gfx.Flipbook_Action.Idle, false
 	walking := false
 	snapshot := renderer.tactical.snapshot
@@ -360,7 +364,7 @@ flipbook_billboard_geometry :: proc(renderer: ^Renderer, character: gfx.Flipbook
 	width := f32(1)
 	if actor != nil {
 		result.mirror = actor.facing_left
-		turn := (now-actor.turn_started)/FLIPBOOK_TURN_SECONDS
+		turn := (now-actor.turn_started)/(FLIPBOOK_TURN_SECONDS*action_scale_of(actor.scale))
 		if actor.turn_started >= 0 && turn < 1 {
 			// Edge-on at the midpoint; the old side shows until then.
 			width = max(f32(0.04), abs(f32(math.cos(turn*math.PI))))

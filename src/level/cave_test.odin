@@ -1,0 +1,89 @@
+package level
+
+import "core:testing"
+import grid "../engine/grid"
+
+// Every cell of the plan that is floor, reached by a walk of four-way steps from the arrival.
+@(private = "file")
+cave_reach :: proc(plan: ^Cave_Plan) -> (seen: [CAVE_HEIGHT][CAVE_WIDTH]bool) {
+	queue: [CAVE_WIDTH*CAVE_HEIGHT]grid.Position
+	tail := 1
+	queue[0] = plan.arrival
+	seen[plan.arrival.y][plan.arrival.x] = true
+	for head := 0; head < tail; head += 1 {
+		for offset in ([4]grid.Position{{x = 1, y = 0}, {x = -1, y = 0}, {x = 0, y = 1}, {x = 0, y = -1}}) {
+			q := grid.Position{x = queue[head].x+offset.x, y = queue[head].y+offset.y}
+			if cave_plan_at(plan, q.x, q.y) != '.' || seen[q.y][q.x] { continue }
+			seen[q.y][q.x] = true
+			queue[tail] = q
+			tail += 1
+		}
+	}
+	return
+}
+
+// Every seed gives a cave of two or three rooms with rock all round, whose every floor cell can be walked to from the
+// arrival, with the secret at the far end and the foes' groups in the rooms.
+@(test)
+test_every_cave_is_one_connected_set_of_rooms_with_rock_all_round :: proc(t: ^testing.T) {
+	two, three := 0, 0
+	for seed in u64(0)..<300 {
+		plan := cave_plan(seed*7919+13)
+		if plan.rooms == 2 { two += 1 } else { three += 1 }
+		testing.expect(t, plan.rooms == 2 || plan.rooms == 3)
+		for x in 0..<CAVE_WIDTH { testing.expect(t, plan.rows[0][x] == '#' && plan.rows[CAVE_HEIGHT-1][x] == '#') }
+		for y in 0..<CAVE_HEIGHT { testing.expect(t, plan.rows[y][0] == '#' && plan.rows[y][CAVE_WIDTH-1] == '#') }
+		seen := cave_reach(&plan)
+		floors, unreached := 0, 0
+		for y in 0..<CAVE_HEIGHT { for x in 0..<CAVE_WIDTH {
+			if plan.rows[y][x] == '.' { floors += 1; if !seen[y][x] { unreached += 1 } }
+		}}
+		testing.expectf(t, unreached == 0, "seed %d: %d of %d floor cells cannot be walked to", seed, unreached, floors)
+		testing.expectf(t, floors >= 150 && floors <= 400, "seed %d: %d floor cells", seed, floors)
+		testing.expect(t, seen[plan.secret.y][plan.secret.x], "the secret can be walked to")
+		testing.expect_value(t, cave_plan_at(&plan, plan.arrival.x, plan.arrival.y), u8('.'))
+		// The secret is at the far end, the arrival at the near end.
+		testing.expectf(t, plan.secret.x >= CAVE_WIDTH-4 && plan.arrival.x <= 4, "seed %d: arrival %v secret %v", seed, plan.arrival, plan.secret)
+		testing.expect(t, plan.groups >= 1 && plan.groups <= 3)
+		for g in 0..<plan.groups {
+			a := plan.anchors[g]
+			testing.expectf(t, cave_plan_at(&plan, a.x, a.y) == '.' && seen[a.y][a.x], "seed %d: group %d is not on floor", seed, g)
+			testing.expect(t, abs(a.x-plan.arrival.x) >= 6, "a group is not at the arrival")
+			testing.expect(t, plan.foes[g] >= 2 && plan.foes[g] <= 4)
+		}
+	}
+	testing.expect(t, two >= 60 && three >= 60, "both sizes of cave come up")
+}
+
+@(test)
+test_a_cave_is_the_same_every_time_and_differs_between_seeds :: proc(t: ^testing.T) {
+	a, b := cave_plan(77), cave_plan(77)
+	testing.expect(t, a.rows == b.rows && a.arrival == b.arrival && a.secret == b.secret)
+	different := 0
+	for seed in u64(1)..<20 { if cave_plan(seed).rows != a.rows { different += 1 } }
+	testing.expect(t, different >= 15, "the caves vary")
+}
+
+// The Far West's smaller board (Fase 5 of docs/piano-profondita.md): two rooms, rock all round and past the board, every
+// floor walked to from the arrival, the secret at the far end. The whole board is the plan of before, to the cell.
+@(test)
+test_a_smaller_board_has_two_rooms_joined_from_the_arrival_to_the_secret :: proc(t: ^testing.T) {
+	for seed in u64(0)..<200 {
+		plan := cave_plan_sized(seed*7919+13, 24, 14)
+		testing.expect(t, plan.width == 24 && plan.height == 14 && plan.rooms == 2)
+		seen := cave_reach(&plan)
+		for y in 0..<CAVE_HEIGHT {
+			for x in 0..<CAVE_WIDTH {
+				border := x == 0 || y == 0 || x >= 23 || y >= 13
+				if border { testing.expectf(t, cave_plan_at(&plan, x, y) == '#', "seed %d: floor at %d %d past the board", seed, x, y) }
+				if plan.rows[y][x] == '.' { testing.expectf(t, !border && seen[y][x], "seed %d: the floor at %d %d is apart", seed, x, y) }
+			}
+		}
+		testing.expect(t, plan.arrival.x == 2 && plan.secret.x == 21 && seen[plan.secret.y][plan.secret.x])
+		for g in 0..<plan.groups { testing.expect(t, cave_plan_at(&plan, plan.anchors[g].x, plan.anchors[g].y) == '.') }
+	}
+	for seed in u64(0)..<50 {
+		whole, sized := cave_plan(seed), cave_plan_sized(seed, CAVE_WIDTH, CAVE_HEIGHT)
+		testing.expect(t, whole.rows == sized.rows && whole.arrival == sized.arrival && whole.secret == sized.secret && whole.anchors == sized.anchors)
+	}
+}

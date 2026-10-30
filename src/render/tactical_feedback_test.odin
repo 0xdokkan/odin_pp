@@ -40,7 +40,7 @@ test_tactical_move_feedback_returns_to_ground_without_an_extra_timeline :: proc(
 	renderer.timeline.view.player = {entity = game.PLAYER_ENTITY, position = {2, 3}, visible = true}
 	renderer.timeline.count = 1
 	renderer.timeline.cues[0] = {kind = .Move, started = true, duration = 1,
-		event = {kind = .Moved, source = game.PLAYER_ENTITY, target = game.PLAYER_ENTITY, from_position = {2, 3}, to_position = {3, 3}}}
+		event = {kind = .Moved, source = game.PLAYER_ENTITY, target = game.PLAYER_ENTITY, from_position = {x = 2, y = 3}, to_position = {x = 3, y = 3}}}
 	testing.expect_value(t, tactical_feedback_pose(renderer, .Player, {2, 3}).lift, f32(0))
 	update_event_timeline(&renderer.timeline, 0.5)
 	position := renderer.timeline.view.player.position

@@ -2,8 +2,26 @@ package grid
 
 // Position identifies one cell in grid space. The origin is the top-left
 // corner: x grows to the right and y grows downward.
+//
+// `layer` is the layer of the map the cell is on (docs/piano-profondita.md):
+// 0 the ground, which is every map until the layers come; -1 and -2 below it,
+// +1 above it. A Grid of this package has one layer, the ground: it holds no
+// position on another one, so a cell of another layer is never mistaken for
+// the ground's cell with the same x and y.
 Position :: struct {
-	x, y: int,
+	x, y:  int,
+	layer: i8,
+}
+
+// The layers a position can be on: two below the ground, the ground, one above.
+LOWEST_LAYER :: -2
+GROUND_LAYER :: 0
+HIGHEST_LAYER :: 1
+
+// The cell `dx`, `dy` away from `p`, on the same layer: a neighbour never
+// falls to the ground.
+offset :: proc(p: Position, dx, dy: int) -> Position {
+	return {x = p.x+dx, y = p.y+dy, layer = p.layer}
 }
 
 // The cells use row-major order: index = y*width + x. Keeping them contiguous
@@ -42,9 +60,19 @@ cell_count :: proc(g: ^Grid($T)) -> int {
 }
 
 contains :: proc(g: ^Grid($T), position: Position) -> bool {
-	return g != nil &&
+	return g != nil && position.layer == GROUND_LAYER &&
 		position.x >= 0 && position.x < g.width &&
 		position.y >= 0 && position.y < g.height
+}
+
+// The index of `position` in a row-major table `width` by `height` that is not
+// a Grid (a parallel table of heights, of marks): the same rule as index_of,
+// the ground layer only.
+cell_index :: proc(position: Position, width, height: int) -> (index: int, ok: bool) {
+	if position.layer != GROUND_LAYER || position.x < 0 || position.y < 0 || position.x >= width || position.y >= height {
+		return 0, false
+	}
+	return position.y*width + position.x, true
 }
 
 index_of :: proc(g: ^Grid($T), position: Position) -> (index: int, ok: bool) {

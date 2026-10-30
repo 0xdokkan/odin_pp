@@ -30,11 +30,11 @@ run_tactical_rework_smoke :: proc(window: ^app.Window, renderer: ^render.Rendere
 	for id in ([?]game.Card_Id{.Strike, .Dash, .Heavy_Blow, .Battle_Focus, .Guard}) {
 		if _, added := game.add_owned_card(&player.deck, id); !added { return false }
 	}
-	spawns := [?]game.Enemy_Spawn{{position = {6, 4}, health = 24, attack = 2},
-		{position = {5, 1}, health = 12, attack = 2, archetype = .Archer},
-		{position = {8, 6}, health = 14, attack = 2, archetype = .Bomber},
-		{position = {3, 6}, health = 24, attack = 3, archetype = .Brute},
-		{position = {7, 6}, health = 18, attack = 1, archetype = .Custodian}}
+	spawns := [?]game.Enemy_Spawn{{position = {x = 6, y = 4}, health = 24, attack = 2},
+		{position = {x = 5, y = 1}, health = 12, attack = 2, archetype = .Archer},
+		{position = {x = 8, y = 6}, health = 14, attack = 2, archetype = .Bomber},
+		{position = {x = 3, y = 6}, health = 24, attack = 3, archetype = .Brute},
+		{position = {x = 7, y = 6}, health = 18, attack = 1, archetype = .Custodian}}
 	room, built := game.create_room(&data, &player, {enemies = spawns[:]})
 	if !built { return false }
 	defer game.destroy_room(&room)
@@ -61,5 +61,5 @@ run_tactical_rework_smoke :: proc(window: ^app.Window, renderer: ^render.Rendere
 		{kind = .Play_Card, origin_phase = .Combat, card_id = focus, target = game.entity_target(game.PLAYER_ENTITY)}) { return false }
 	artifacts.screenshot("odin_pp_m7_rework_survey.png")
 	return !render.renderer_timeline_is_busy(renderer) && !room.tactical_pulse.pending && renderer.timeline.update_failures == 0 &&
-		game.tactical_cell_visible(&room, {1, 4})
+		game.tactical_cell_visible(&room, {x = 1, y = 4})
 }

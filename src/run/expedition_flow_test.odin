@@ -1,11 +1,21 @@
 package run
 
 import "core:os"
+import _ "../engine/teststack"
 import "core:testing"
 import campaign "../campaign"
 import world "../expedition"
 import game "../game"
 import host "../engine/host"
+
+// A scratch file in the system's temp directory: the tests must not depend on
+// a macOS-only path such as /private/tmp (they failed on Windows).
+scratch_path :: proc(name: string) -> string {
+	dir, dir_error := os.temp_directory(context.temp_allocator)
+	if dir_error != nil { return name }
+	path, path_error := os.join_path({dir, name}, context.temp_allocator)
+	return path if path_error == nil else name
+}
 
 @(test)
 test_workshop_purchase_uses_cell_freed_by_payment_and_rolls_back_failure :: proc(t:^testing.T) {
@@ -83,7 +93,7 @@ test_failed_extraction_arcade_still_wins_and_clears_checkpoint :: proc(t: ^testi
 
 @(test)
 test_running_slot_snapshot_restores_owned_room_pointers :: proc(t: ^testing.T) {
-	path := "/private/tmp/odin-pp-expedition-flow-slot.json"
+	path := scratch_path("odin-pp-expedition-flow-slot.json")
 	defer os.remove(path)
 	e := flow_fixture(t); defer flow_destroy(e)
 	campaign.discover(e.progress, .Storm_Crown)
@@ -115,7 +125,7 @@ test_gold_over_99_and_full_ground_never_disappear :: proc(t: ^testing.T) {
 	e := flow_fixture(t); defer flow_destroy(e)
 	position := e.rs.room.player.position
 	e.world.drop_count = world.MAX_DROPS
-	for &drop in e.world.drops { drop = {position = {0, 0}, item = campaign.make_item(.Healing)} }
+	for &drop in e.world.drops { drop = {position = {x = 0, y = 0}, item = campaign.make_item(.Healing)} }
 	append(&e.rs.room.loot, game.Loot{position = position, kind = .Gold, amount = 250})
 	expedition_collect(e)
 	testing.expect_value(t, len(e.rs.room.loot), 1)
@@ -135,13 +145,15 @@ test_gold_over_99_and_full_ground_never_disappear :: proc(t: ^testing.T) {
 test_deliberately_dropped_item_waits_for_manual_pickup :: proc(t: ^testing.T) {
 	e := flow_fixture(t); defer flow_destroy(e)
 	position := e.rs.room.player.position
+	// The map's own drops (a complex's secret, expedition/complex.odin) lie elsewhere.
+	before := e.world.drop_count
 	testing.expect(t, world.add_drop(&e.world, position, campaign.make_item(.Healing), manual_only = true))
 	expedition_collect(e)
 	testing.expect_value(t, e.progress.backpack.grid.count, 0)
-	testing.expect_value(t, e.world.drop_count, 1)
+	testing.expect_value(t, e.world.drop_count, before+1)
 	expedition_collect(e, true)
 	testing.expect_value(t, e.progress.backpack.grid.count, 1)
-	testing.expect_value(t, e.world.drop_count, 0)
+	testing.expect_value(t, e.world.drop_count, before)
 }
 
 @(test)
@@ -157,7 +169,7 @@ test_direct_card_credits_are_physical_and_spending_does_not_duplicate :: proc(t:
 	testing.expect_value(t, e.rs.room.player.gold, i32(3))
 	// A blocked floor retains the award in the serialized pending room loot.
 	e.world.drop_count = world.MAX_DROPS
-	for &drop in e.world.drops { drop = {position = {0, 0}, item = campaign.make_item(.Healing)} }
+	for &drop in e.world.drops { drop = {position = {x = 0, y = 0}, item = campaign.make_item(.Healing)} }
 	e.rs.room.player.gold += 6
 	expedition_collect(e)
 	testing.expect_value(t, len(e.rs.room.loot), 1)
@@ -241,10 +253,10 @@ test_fished_food_is_carried_extracted_and_retained_when_ground_is_full :: proc(t
 	for seed in u64(1)..<u64(1000) { stream := seed; if !game.fishing_catch_is_card(&stream) { e.rs.room.fishing.random = seed; break } }
 	e.rs.room.player.health = 20
 	position := e.rs.room.player.position
-	report := game.fish_with_rod(&e.rs.room, {position.x+1, position.y})
+	report := game.fish_with_rod(&e.rs.room, {x = position.x+1, y = position.y})
 	testing.expect(t, report.result == .Fished && !report.card)
 	e.world.drop_count = world.MAX_DROPS
-	for &drop in e.world.drops { drop = {position = {0, 0}, item = campaign.make_item(.Healing)} }
+	for &drop in e.world.drops { drop = {position = {x = 0, y = 0}, item = campaign.make_item(.Healing)} }
 	expedition_collect(e)
 	testing.expect_value(t, e.rs.room.player.health, i32(20))
 	testing.expect_value(t, len(e.rs.room.loot), 1)
@@ -264,7 +276,7 @@ test_fished_card_discovery_survives_a_later_death :: proc(t: ^testing.T) {
 	testing.expect(t, added)
 	for seed in u64(1)..<u64(1000) { stream := seed; if game.fishing_catch_is_card(&stream) { e.rs.room.fishing.random = seed; break } }
 	position := e.rs.room.player.position
-	report := game.fish_with_rod(&e.rs.room, {position.x+1, position.y})
+	report := game.fish_with_rod(&e.rs.room, {x = position.x+1, y = position.y})
 	if !testing.expect(t, report.result == .Fished && report.card) { return }
 	e.progress.discovered[report.added.definition_id] = false
 	expedition_collect(e)

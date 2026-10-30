@@ -230,9 +230,24 @@ Room :: struct {
 	// own stream for its launches.
 	pinball: Pinball_State,
 	pinball_random: u64,
+	// BOMB MARLEY: the party in the room and its own stream for the lights and
+	// the columns (marley.odin).
+	marley: Marley_State,
+	marley_random: u64,
+	// FIRST PERSON ARCHER: the room's own stream for its arrows and zones (first_person_bow.odin).
+	bow_random: u64,
+	marley_demo: Marley_Demo,
+	// DINOSAURO: the dinosaur the player rides (dinosaur.odin).
+	ride: Ride_State,
+	// The way the player aimed the card he plays (the mouse wheel's, for a
+	// cannon): the controller sets it before the play, the play clears it.
+	aim: Move_Direction,
+	has_aim: bool,
 	// FIRST PERSON SHOOTER: the seconds behind the player's eyes and his AK's
 	// shots (first_person.odin); a new room starts them afresh.
 	first_person: First_Person_State,
+	// The platforms of the map's lifts (lift.odin).
+	lifts: Lift_State,
 }
 
 Move_Direction :: enum {
@@ -268,8 +283,9 @@ direction_offset :: proc(direction: Move_Direction) -> grid.Position {
 	return {}
 }
 
+// `a` moved by the offset `b`, on `a`'s layer.
 add_position :: proc(a, b: grid.Position) -> grid.Position {
-	return {x = a.x+b.x, y = a.y+b.y}
+	return {x = a.x+b.x, y = a.y+b.y, layer = a.layer}
 }
 
 @(private)
@@ -300,6 +316,14 @@ base_cell_is_walkable :: proc(room: ^Room, position: grid.Position) -> bool {
 	}
 	tile, ok := level.tile_at(room.level_data, position)
 	return ok && level.is_walkable(tile.kind) && expedition_bridge_open(room, position)
+}
+
+// Whether the cell holds a low wall (level.Tile_Kind.Fence): one that stops the step and
+// lets the sight through.
+cell_is_fence :: proc(room: ^Room, position: grid.Position) -> bool {
+	if room == nil || room.level_data == nil { return false }
+	tile, ok := level.tile_at(room.level_data, position)
+	return ok && tile.kind == .Fence
 }
 
 obstacle_at :: proc(room: ^Room, position: grid.Position) -> bool {
@@ -351,7 +375,8 @@ grid_object_at :: proc(room: ^Room, position: grid.Position) -> (^Grid_Object, b
 }
 
 cell_blocks_movement :: proc(room: ^Room, position: grid.Position) -> bool {
-	if !base_cell_is_walkable(room, position) || obstacle_at(room, position) {
+	// A lift's landing its platform is away from is no floor to step on (lift.odin); one sees down the shaft.
+	if !base_cell_is_walkable(room, position) || obstacle_at(room, position) || lift_landing_shut(room, position) {
 		return true
 	}
 	object, found := grid_object_at(room, position)
@@ -363,7 +388,8 @@ cell_blocks_movement :: proc(room: ^Room, position: grid.Position) -> bool {
 }
 
 cell_blocks_line_of_sight :: proc(room: ^Room, position: grid.Position) -> bool {
-	if !base_cell_is_walkable(room, position) || obstacle_at(room, position) {
+	// A fence or low wall stops the step but not the sight.
+	if !base_cell_is_walkable(room, position) && !cell_is_fence(room, position) || obstacle_at(room, position) {
 		return true
 	}
 	object, found := grid_object_at(room, position)
@@ -394,11 +420,13 @@ trap_index_at :: proc(room: ^Room, position: grid.Position) -> (int, bool) {
 	return 0, false
 }
 
-// A foe out of the world: the one the Lazzo holds in the air (lasso.odin) and
-// the Pinball's ball (pinball.odin). It acts in nothing and nothing on the
-// floor, no card and no arrow reaches it.
+// A foe out of the world: the one the Lazzo holds in the air (lasso.odin), the
+// Pinball's ball (pinball.odin) and one riding a lift in its shaft (lift.odin).
+// It acts in nothing and nothing on the floor, no card and no arrow reaches it.
 enemy_is_out_of_play :: proc(room: ^Room, id: u32) -> bool {
-	return enemy_is_lassoed(room, id) || enemy_is_pinball(room, id)
+	if enemy_is_lassoed(room, id) || enemy_is_pinball(room, id) { return true }
+	_, riding := lift_riding(room, enemy_entity(id))
+	return riding
 }
 
 // Who stands on `position`. A foe out of play stands on no cell (others walk
@@ -473,6 +501,9 @@ create_room :: proc(level_data: ^level.Level, player: ^Player, content: Room_Con
 	result.modifier = content.modifier
 	result.fishing = begin_room_fishing(player, content)
 	result.pinball_random = pinball_room_stream(player, content)
+	result.marley_random = marley_room_stream(player, content)
+	result.bow_random = bow_room_stream(player, content)
+	lifts_reset(&result)
 	result.next_enemy_id = 1
 	result.next_trap_id = 1
 	result.next_object_id = 1
@@ -489,8 +520,8 @@ create_room :: proc(level_data: ^level.Level, player: ^Player, content: Room_Con
 		}
 	}
 	result.loot = make([dynamic]Loot, 0, loot_capacity)
-	result.enemy_path_distances = make([]int, len(level_data.tiles.cells))
-	result.ground.pool = make([]i32, len(level_data.tiles.cells))
+	result.enemy_path_distances = make([]int, room_table_cells(level_data))
+	result.ground.pool = make([]i32, room_table_cells(level_data))
 	spawn_position := level_data.player_spawn
 
 	for position in content.obstacles {
@@ -701,8 +732,9 @@ player_command_outcome_for_phase :: proc(phase: Room_Phase) -> Player_Command_Ou
 // Accepted commands share loot and terminal cleanup, pay combat time and queue
 // the world beats they cross.
 // Each one is an action of the player's (`acted`): his poison bites. Rising
-// from Movimento Ombra is the shadow's end, not an action.
-finish_player_combat_command :: proc(room: ^Room, time_cost: f32 = TACTICAL_ATTACK_SECONDS, acted := true) -> (outcome: Player_Command_Outcome) {
+// from Movimento Ombra is the shadow's end, not an action. The first price is
+// paid at the player's pace (tactical_player_pace); a `step` is a walk's.
+finish_player_combat_command :: proc(room: ^Room, time_cost: f32 = TACTICAL_ATTACK_SECONDS, acted := true, step := false) -> (outcome: Player_Command_Outcome) {
 	assert(room != nil && room.player != nil)
 	collect_loot_in_magnet_range(room)
 	if acted && room.phase == .Combat {
@@ -716,7 +748,7 @@ finish_player_combat_command :: proc(room: ^Room, time_cost: f32 = TACTICAL_ATTA
 		tactical_end_combat(room)
 		return
 	}
-	tactical_spend_action_time(room, time_cost)
+	tactical_spend_action_time(room, tactical_paced_seconds(room, time_cost, step))
 	return
 }
 
@@ -791,6 +823,10 @@ enemy_can_move_to :: proc(room: ^Room, enemy_index: int, position: grid.Position
 	if cell_blocks_movement(room, position) || position == room.player.position {
 		return false
 	}
+	if enemy_index >= 0 && enemy_index < len(room.enemies) {
+		from := room.enemies[enemy_index].position
+		if max(abs(from.x-position.x), abs(from.y-position.y)) == 1 && !is_ladder_move(room, from, position) && step_height_blocked(room, from, position) { return false }
+	}
 	_, occupied := enemy_index_at(room, position, enemy_index)
 	return !occupied
 }
@@ -807,18 +843,25 @@ try_move_player :: proc(room: ^Room, direction: Move_Direction) -> Action_Result
 	if room == nil || room.player == nil || (room.phase != .Combat && room.phase != .Loot) {
 		return .Invalid_Phase
 	}
+	// One riding a lift's platform is in its shaft until it stops (lift.odin).
+	if lift_player_riding(room) { return .Blocked }
 	critical := tactical_take_critical(room)
-	target := add_position(room.player.position, direction_offset(direction))
+	step := direction_offset(direction)
+	// The cell the step lands on, on whichever layer (a ladder's other end too), and the one a bump strikes.
+	target, ladder := layer_step(room, room.player.position, step, true)
+	foe_cell := bump_cell(room, room.player.position, step)
 	// Walking remains available during recovery, but walking into an enemy is
 	// an attack and must pass the offensive gate before mutating the event log.
 	if room.phase == .Combat && !tactical_allows_action(room) {
-		if _, found := enemy_index_at(room, target); found { return .Invalid_Phase }
+		if _, found := enemy_index_at(room, foe_cell); found { return .Invalid_Phase }
 	}
 	clear_event_log(room.recent_events)
 	if room.phase == .Combat {
-		if enemy_index, found := enemy_index_at(room, target); found {
+		if enemy_index, found := enemy_index_at(room, foe_cell); found {
+			// The Giganotosauro walks onto a foe his bump would kill.
+			if giga_crushes(room, enemy_index, critical) { return giga_crush_step(room, enemy_index, foe_cell, .Adjacent_Opponent, false) }
 			// The bump, loaded with whatever the player's charges add (player_charges.odin).
-			struck := player_bump(room, enemy_index, target, .Adjacent_Opponent, critical)
+			struck := player_bump(room, enemy_index, foe_cell, .Adjacent_Opponent, critical)
 			assert(struck)
 			outcome := finish_player_combat_command(room)
 			switch outcome {
@@ -832,7 +875,23 @@ try_move_player :: proc(room: ^Room, direction: Move_Direction) -> Action_Result
 		}
 	}
 
-	if cell_blocks_movement(room, target) {
+	// LIFTS AND GATES (lift.odin): a step toward a landing its platform is away from calls the platform, and takes no
+	// time; a step into a shut gate from its lever opens it, an action.
+	if lift_call(room, target) { return .Blocked }
+	if gate_opens(room, room.player.position, target) {
+		if room.phase != .Combat { return .Used_Ability }
+		switch finish_player_combat_command(room) {
+		case .Player_Defeated: return .Player_Defeated
+		case .Combat_Ended: return .Combat_Ended
+		case .Combat_Continues:
+		}
+		return .Used_Ability
+	}
+
+	if ladder {
+		climb := query_entity_movement(room, PLAYER_ENTITY, target, .Climb)
+		if !movement_query_is_clear(&climb) { return .Blocked }
+	} else if cell_blocks_movement(room, target) || step_height_blocked(room, room.player.position, target) {
 		// Loot cannot softlock when a movable block was pushed into a corridor.
 		if room.phase == .Loot {
 			if object, found := grid_object_at(room, target); found {
@@ -858,7 +917,7 @@ try_move_player :: proc(room: ^Room, direction: Move_Direction) -> Action_Result
 	// A straight step is one cell, on the tick or not: the tick's step is the
 	// diagonal (try_move_player_diagonal).
 	action := make_action(.Move, PLAYER_ENTITY, cell_target(target), .Walkable_Cell)
-	added := add_effect(&action, move_effect(PLAYER_ENTITY, target))
+	added := add_effect(&action, move_effect(PLAYER_ENTITY, target, .Climb if ladder else .Traverse))
 	assert(added)
 	report := resolve_action(room, &action)
 	if !report.accepted {
@@ -879,7 +938,9 @@ try_move_player :: proc(room: ^Room, direction: Move_Direction) -> Action_Result
 		return .Moved
 	}
 
-	outcome := finish_player_combat_command(room, expedition_step_seconds(room))
+	// The Giganotosauro's step stomps the foes round where he lands.
+	ride_stomp(room)
+	outcome := finish_player_combat_command(room, expedition_step_seconds(room), step = true)
 	switch outcome {
 	case .Player_Defeated:
 		return .Player_Defeated

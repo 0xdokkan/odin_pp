@@ -39,7 +39,7 @@ pinball_view_test_room :: proc(t: ^testing.T, data: ^level.Level, player: ^game.
 	config := game.DEFAULT_TACTICAL_CONFIG
 	config.vision_size = 0
 	testing.expect(t, game.configure_tactical(player, config))
-	enemies := [?]game.Enemy_Spawn{{position = {7, 6}, health = 30, attack = 1, archetype = .Archer}, {position = {10, 6}, health = 40, attack = 1}}
+	enemies := [?]game.Enemy_Spawn{{position = {x = 7, y = 6}, health = 30, attack = 1, archetype = .Archer}, {position = {x = 10, y = 6}, health = 40, attack = 1}}
 	built: bool
 	room, built = game.create_room(data, player, {enemies = enemies[:]})
 	testing.expect(t, built)
@@ -168,7 +168,7 @@ test_pinball_view_follows_the_ball_of_the_room :: proc(t: ^testing.T) {
 	testing.expect_value(t, scale, f32(0))
 	// A foe of the same id alive again (a new room's) is a card of its own.
 	other := room.enemies[0]
-	other.id, other.position = foe.id, {3, 3}
+	other.id, other.position = foe.id, {x = 3, y = 3}
 	append(&room.enemies, other)
 	update_tactical_view(renderer, &room, {}, false)
 	testing.expect(t, !b.dead && !tactical_pinball_holds(renderer, foe))
@@ -347,11 +347,12 @@ test_pinball_lab_sounds_follow_the_ball :: proc(t: ^testing.T) {
 	room := game.Room{player = &player, phase = .Combat}
 	state: Living_State
 	snapshot: Room_Presentation
-	renderer: Renderer
+	renderer := new(Renderer)
+	defer free(renderer)
 	renderer.tactical.living_state = &state
 	renderer.tactical.snapshot = &snapshot
 	renderer.tactical.mechanics_lab = true
-	defer destroy_lab_sounds(&renderer)
+	defer destroy_lab_sounds(renderer)
 	card, carded := lab_card_sfx(.Pinball)
 	testing.expect(t, carded && card == LAB_PINBALL_CARD)
 	ball := game.enemy_entity(3)
@@ -360,26 +361,26 @@ test_pinball_lab_sounds_follow_the_ball :: proc(t: ^testing.T) {
 	impacts := 0
 	bounced := Presentation_Cue{kind = .Pinball_Bounced, started = true, event = {kind = .Pinball_Bounced, source = ball, target = game.SYSTEM_ENTITY,
 		amount = 2, duration = 4, card_definition = .Pinball}}
-	lab_cue_sounds(&renderer, &s, &bounced, 1, &impacts)
+	lab_cue_sounds(renderer, &s, &bounced, 1, &impacts)
 	testing.expect(t, s.count == 1 && s.queue[0].sfx == LAB_PINBALL_DING)
 	bumped := Presentation_Cue{kind = .Pinball_Bumped, started = true, event = {kind = .Pinball_Bumped, source = ball, target = game.enemy_entity(4),
 		amount = 5, card_definition = .Pinball}}
-	lab_cue_sounds(&renderer, &s, &bumped, 2, &impacts)
+	lab_cue_sounds(renderer, &s, &bumped, 2, &impacts)
 	testing.expect(t, s.count == 2 && s.queue[1].sfx == LAB_PINBALL_BONG && s.queue[1].pitch == lab_bong_pitch(5, 2))
 	testing.expect(t, lab_bong_pitch(5, 2) > lab_bong_pitch(2, 2) && lab_bong_pitch(99, 2) == lab_bong_pitch(2+LAB_BONG_STEPS, 2))
 	burst := Presentation_Cue{kind = .Pinball_Burst, started = true, event = {kind = .Pinball_Burst, source = game.PLAYER_ENTITY, target = ball,
 		card_definition = .Pinball}}
-	lab_cue_sounds(&renderer, &s, &burst, 3, &impacts)
+	lab_cue_sounds(renderer, &s, &burst, 3, &impacts)
 	testing.expect(t, s.count == 3 && s.queue[2].sfx == LAB_PINBALL_BURST)
 	// The strike's thwack waits for the swing's contact.
-	update_lab_sounds(&renderer, &room, 1)
+	update_lab_sounds(renderer, &room, 1)
 	heard := renderer.tactical.lab_sounds
 	if !testing.expect(t, heard != nil) { return }
 	testing.expect_value(t, heard.count, 0)
 	renderer.tactical.pinball.strikes, renderer.tactical.pinball.contact = 1, 2.5
-	update_lab_sounds(&renderer, &room, 2)
+	update_lab_sounds(renderer, &room, 2)
 	testing.expect(t, heard.count == 1 && heard.queue[0].sfx == LAB_PINBALL_LAUNCH && heard.queue[0].at == 2.5)
-	update_lab_sounds(&renderer, &room, 2.1)
+	update_lab_sounds(renderer, &room, 2.1)
 	testing.expect_value(t, heard.count, 1)
 	// None of them stands in for another of its own.
 	sounds := [5]audio.Lab_Sfx{LAB_PINBALL_CARD, LAB_PINBALL_LAUNCH, LAB_PINBALL_DING, LAB_PINBALL_BONG, LAB_PINBALL_BURST}
@@ -396,7 +397,7 @@ test_pinball_aim_shows_the_launch_the_strike_gives :: proc(t: ^testing.T) {
 	defer level.destroy(&data)
 	defer game.destroy_room(&room)
 	random := room.pinball_random
-	heading, turn := game.pinball_next_launch(&room, {7, 6})
+	heading, turn := game.pinball_next_launch(&room, {x = 7, y = 6})
 	testing.expect_value(t, room.pinball_random, random)
 	testing.expect(t, abs(turn) >= game.PINBALL_MIN_TURN && abs(turn) <= game.PINBALL_MAX_TURN)
 	testing.expect(t, abs(math.hypot(heading.x, heading.y)-1) < 1e-12)
@@ -404,7 +405,7 @@ test_pinball_aim_shows_the_launch_the_strike_gives :: proc(t: ^testing.T) {
 		game.Card_Play_Result.Played)
 	testing.expect_value(t, room.pinball.turn, turn)
 	testing.expect(t, room.pinball.heading == heading)
-	testing.expect_value(t, room.pinball.cell, grid.Position{7, 6})
+	testing.expect_value(t, room.pinball.cell, grid.Position{x = 7, y = 6})
 }
 
 // TROPPO PESANTE stands just under the heavy foe's feet; when a neighbour's

@@ -111,7 +111,7 @@ LB parata; B/Start restano alla pausa della shell. Dal menu il campione ha
 
 | Traguardo persistente | Sblocco |
 |---|---|
-| Prima vittoria | **Titan Grip**: 2 energia / 3 s, 3 danni, spinta di 2 celle e Stagger |
+| Prima vittoria | **Grappling Hook**: 1 danno e trascina il nemico accanto, raggio 2–4 (fino al 2026-10-25 era Titan Grip, ora ritirata: [registro](../registro-carte.md)) |
 | Terza vittoria | **Storm Crown**, ricompensa leggendaria: 3 energia / 4 s, 5 danni su fino a 3 nemici collegati |
 
 Al raggiungimento del traguardo viene aggiunta una copia se il mazzo ha spazio.

@@ -24,13 +24,19 @@ expedition_patch_distance :: proc(b:u8,p:grid.Position)->(best,variation:int) {
 // Biome IDs are serialized values shared with campaign.Biome. Exploration,
 // combat, previews and presentation all query this same fixed geography.
 expedition_terrain :: proc(b: u8, p: grid.Position) -> Expedition_Terrain {
+	// The biome's ground is the open map's: a cave under the rock has none (Fase 5 of docs/piano-profondita.md).
+	if p.layer != grid.GROUND_LAYER { return .Plain }
 	n := (p.x*13+p.y*7+int(b)*19)%37
 	switch b {
 	case 0: if n < 2 { return .Electric }
 	case 2: d,v:=expedition_patch_distance(b,p);if d<=7+v*3 {return .Grass}
 	case 4: d,v:=expedition_patch_distance(b,p);if d<=8+v*4 {return .Sand}
 	case 5: if p.y%19 < 4 { return .Water }
-	case 6: d,v:=expedition_patch_distance(b,p);if d<=6+v*2 {return .Ice};if d<=17+v*3 {return .Snow}
+	case 6:
+		// The spiral mountain's path is packed snow, with two stretches of ice (level/mountain.odin).
+		offset:=grid.offset(p, -level.MOUNTAIN_CENTER.x, -level.MOUNTAIN_CENTER.y)
+		if abs(offset.x)<=level.MOUNTAIN_HALF && abs(offset.y)<=level.MOUNTAIN_HALF {return .Ice if level.mountain_icy(offset) else .Plain}
+		d,v:=expedition_patch_distance(b,p);if d<=6+v*2 {return .Ice};if d<=17+v*3 {return .Snow}
 	case 7: if (p.x+p.y/2)%23 < 3 { return .Lava }
 	case 8: d,v:=expedition_patch_distance(b,p);if d<=9+v*3 {return .Swamp}
 	case 9: if p.x%24 >= 21 || p.y%24 >= 21 { return .Bridge }
@@ -69,7 +75,8 @@ expedition_bridge_open :: proc(room: ^Room, position: grid.Position) -> bool {
 @(private)
 expedition_step_seconds :: proc(room: ^Room) -> f32 {
 	if room == nil || room.player == nil {return TACTICAL_MOVE_SECONDS}
-	seconds := TACTICAL_MOVE_SECONDS
+	// Riding the lab's Velociraptor steps faster (dinosaur.odin).
+	seconds := player_move_seconds(room)
 	if room.player.tactical.dinosaur_remaining > 0 {seconds *= 0.75}
 	if !room.player.tactical.config.expedition {return seconds}
 	ground := expedition_terrain(room.player.tactical.config.expedition_biome, room.player.position)
@@ -130,12 +137,12 @@ expedition_gravity_pulse :: proc(room:^Room,events:^Event_Log) {
 		position,found:=entity_position(room,target);if !found {continue}
 		well:=position;best:=3
 		for y in -2..=2 {for x in -2..=2 {
-			p:=grid.Position{position.x+x,position.y+y};distance:=max(abs(x),abs(y))
+			p:=grid.offset(position, x, y);distance:=max(abs(x),abs(y))
 			if distance>=best || expedition_terrain(10,p)!=.Gravity || !base_cell_is_walkable(room,p) || !shape_cell_has_clear_path(room,position,p) {continue}
 			well,best=p,distance
 		}}
 		if best==0 || best==3 {continue}
-		step:=grid.Position{sign(well.x-position.x),sign(well.y-position.y)}
+		step:=grid.Position{x = sign(well.x-position.x), y = sign(well.y-position.y)}
 		action:=make_action(.Trigger,SYSTEM_ENTITY,entity_target(target),.Entity)
 		add_effect(&action,move_effect(target,add_position(position,step)))
 		report:=resolve_action(room,&action)

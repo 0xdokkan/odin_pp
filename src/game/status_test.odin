@@ -229,10 +229,10 @@ test_poison_bites_charges_windups_and_protections_but_not_an_interruption :: pro
 		staggered:      bool,
 	}
 	cases := [?]Case{
-		{archetype = .Brute, position = {4, 1}, ally = {6, 6}, kind = .Charge},
-		{archetype = .Bomber, position = {6, 2}, ally = {6, 6}, kind = .Bombard},
-		{archetype = .Custodian, position = {2, 2}, ally = {2, 3}, kind = .Protect},
-		{archetype = .Chaser, position = {4, 1}, ally = {6, 6}, kind = .Move, staggered = true},
+		{archetype = .Brute, position = {x = 4, y = 1}, ally = {x = 6, y = 6}, kind = .Charge},
+		{archetype = .Bomber, position = {x = 6, y = 2}, ally = {x = 6, y = 6}, kind = .Bombard},
+		{archetype = .Custodian, position = {x = 2, y = 2}, ally = {x = 2, y = 3}, kind = .Protect},
+		{archetype = .Chaser, position = {x = 4, y = 1}, ally = {x = 6, y = 6}, kind = .Move, staggered = true},
 	}
 	for c in cases {
 		data: level.Level
@@ -246,8 +246,8 @@ test_poison_bites_charges_windups_and_protections_but_not_an_interruption :: pro
 			// Lined up with the player, two cells between them.
 			enemy.intent = make_wait_intent(&room, enemy.position)
 			enemy.intent.kind = .Charge
-			enemy.intent.destination = {4, 3}
-			enemy.intent.path[0], enemy.intent.path[1] = {4, 2}, {4, 3}
+			enemy.intent.destination = {x = 4, y = 3}
+			enemy.intent.path[0], enemy.intent.path[1] = {x = 4, y = 2}, {x = 4, y = 3}
 			enemy.intent.path_count = 2
 			enemy.intent.threatened_cells[0] = player.position
 			enemy.intent.threatened_cell_count = 1
@@ -255,7 +255,7 @@ test_poison_bites_charges_windups_and_protections_but_not_an_interruption :: pro
 		} else if c.kind == .Move {
 			enemy.intent = make_wait_intent(&room, enemy.position)
 			enemy.intent.kind = .Move
-			enemy.intent.destination = {4, 2}
+			enemy.intent.destination = {x = 4, y = 2}
 			enemy.intent.path[0] = enemy.intent.destination
 			enemy.intent.path_count = 1
 		}

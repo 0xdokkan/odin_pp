@@ -218,7 +218,7 @@ draw_living_tokens :: proc(renderer: ^Renderer) {
 		sunk := token.entity == game.PLAYER_ENTITY && tactical_shadow_showing(renderer) && token.at != {}
 		kept := token.small && token.at != {}
 		if actor, found := presentation_actor_in_view(v.snapshot, token.entity); found && actor.visible && !sunk && !kept {
-			cell := grid.Position{int(math.round(actor.position.x)), int(math.round(actor.position.y))}
+			cell := grid.Position{x = int(math.round(actor.position.x)), y = int(math.round(actor.position.y))}
 			if !tactical_overlay_visible(renderer, cell) { continue }
 			// Behind his eyes his own tokens are not on show.
 			if token.entity == game.PLAYER_ENTITY && first_person_hides_player(renderer) { continue }

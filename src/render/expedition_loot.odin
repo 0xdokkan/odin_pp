@@ -54,6 +54,12 @@ expedition_loot_art :: proc(item:campaign.Item)->(m:Expedition_Paper) {
 		paper_box(&m,-.14,.48,.28,.12,{119,82,52,255})
 		paper_box(&m,-.27,.06,.54,.48,{191,135,69,255})
 		paper_box(&m,-.18,.1,.36,.2,gold);paper_box(&m,-.04,.35,.08,.12,cream,false)
+	case .Structure_Kit:
+		// A rolled-up plan: a tube with a ribbon, and the corner of a drawing.
+		paper_box(&m,-.30,.12,.60,.20,{196,163,108,255})
+		paper_disc(&m,-.30,.22,.1,.12,{222,192,134,255});paper_disc(&m,.30,.22,.1,.12,{222,192,134,255})
+		paper_box(&m,-.04,.1,.08,.24,red,false)
+		paper_tri(&m,{.05,.32},{.3,.32},{.05,.55},cream,false)
 	case .None:
 	}
 	return

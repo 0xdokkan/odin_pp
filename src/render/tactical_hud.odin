@@ -43,6 +43,8 @@ tactical_status_label :: proc(kind: game.Status_Kind, short: bool) -> (label: st
 	case .Arrows: label, accent = "FRECCE", HUD_AMBER
 	case .Fate: label, accent = "DESTINO", HUD_SHADE
 	case .Venom_Blade: label, accent = "LAMA", HUD_VENOM
+	// SANGUINAMENTO (game/dinosaur.odin): a foe's stacks.
+	case .Bleed: label, accent = "SANGUE", GOTHIC_RED
 	}
 	if short && len(label) > 3 { label = label[:3] }
 	return
@@ -124,7 +126,9 @@ tactical_status_chip_layout :: proc(renderer: ^Renderer, room: ^game.Room) -> (c
 	b := tactical_hud_layout(renderer).vitals
 	ordered := tactical_status_chip_order(&v.statuses)
 	_, ball := pinball_chip(room, false)
-	count := ordered.count+(1 if ball else 0)
+	_, party := marley_chip(renderer, false)
+	_, ride := ride_chip(renderer, false)
+	count := ordered.count+(1 if ball else 0)+(1 if party else 0)+(1 if ride else 0)
 	if count == 0 { return }
 	// The ball's place among the chips: after VELENO and BRUCIATURA.
 	bites := 0
@@ -141,11 +145,18 @@ tactical_status_chip_layout :: proc(renderer: ^Renderer, room: ^game.Room) -> (c
 	needed: f32
 	even := true
 	for index in 0..<chips.shown {
+		extras := (1 if ball else 0)+(1 if party else 0)+(1 if ride else 0)
 		if ball && index == bites {
 			chips.accents[index] = PINBALL_STEEL_LIGHT
 			chips.texts[index], _ = pinball_chip(room, short)
+		} else if party && index == bites+(1 if ball else 0) {
+			chips.accents[index] = MARLEY_GOLD
+			chips.texts[index], _ = marley_chip(renderer, short)
+		} else if ride && index == bites+(1 if ball else 0)+(1 if party else 0) {
+			chips.accents[index] = DINO_AURA[int(renderer.tactical.snapshot.ride.kind)]
+			chips.texts[index], _ = ride_chip(renderer, short)
 		} else {
-			status := ordered.items[index-1 if ball && index > bites else index]
+			status := ordered.items[index if index < bites else index-extras]
 			_, chips.accents[index] = tactical_status_label(status.kind, short)
 			chips.texts[index] = tactical_status_chip_text(status, short, v.fate_sides)
 		}
@@ -261,8 +272,8 @@ draw_tactical_hud :: proc(renderer: ^Renderer, room: ^game.Room, paused, hologra
 	if cinematic { status = "TEMPO SOSPESO" }
 	if recovering { status = "MUOVITI / CARTE IN RECUPERO" }
 	if stunned { status = "SOLO CARTE" }
-	// Behind the player's eyes, how the AK and the steps are worked.
-	if fps && !cinematic { status = FIRST_PERSON_HUD_STATUS }
+	// Behind the player's eyes, how the weapon in hand and the steps are worked.
+	if fps && !cinematic { status = first_person_hud_status(renderer) }
 	// The rope holds through a window's end and a stun: the pivot stays put.
 	if lasso && !cinematic { status = lasso_hud_status(room) }
 	if shadow { status = "MONDO FERMO / SOLO PASSI / DIAGONALE SUL BATTITO" }
@@ -283,7 +294,7 @@ draw_tactical_hud :: proc(renderer: ^Renderer, room: ^game.Room, paused, hologra
 		// No map behind the player's eyes.
 		hud_button(renderer, layout.map_button, "TAB", "CHIUDI" if hologram else "MAPPA", room.qte.kind == .None && !fps)
 		if !hologram && combat {
-			hud_button(renderer, layout.refocus, "F", fmt.ctprintf("REFOCUS -%.0fs", game.TACTICAL_REFOCUS_SECONDS), refocus_button_is_enabled(renderer))
+			hud_button(renderer, layout.refocus, "F", fmt.ctprintf("REFOCUS -%ss", tactical_seconds_text(game.tactical_paced_seconds(room, game.TACTICAL_REFOCUS_SECONDS))), refocus_button_is_enabled(renderer))
 			draw_tactical_dodge_chip(renderer, room, layout.dodge)
 		}
 		if !hologram && m8_control_visible(room, .Character) {
@@ -333,7 +344,7 @@ draw_tactical_dodge_chip :: proc(renderer: ^Renderer, room: ^game.Room, bounds: 
 	shadow := game.tactical_shadow_active(room)
 	ready := game.tactical_dodge_ready(room) && !recovering && !stunned && !shadow
 	recovery := max(0, s.dodge_recovery-(1 if room.tactical_pulse.pending else 0))
-	detail := fmt.ctprintf("-%.0fs", game.TACTICAL_DODGE_SECONDS) if ready else fmt.ctprintf("PRONTA FRA %d", recovery)
+	detail := fmt.ctprintf("-%ss", tactical_seconds_text(game.tactical_paced_seconds(room, game.TACTICAL_DODGE_SECONDS))) if ready else fmt.ctprintf("PRONTA FRA %d", recovery)
 	if recovering { detail = "IN RECUPERO" }
 	if stunned { detail = "STORDITO" }
 	if shadow { detail = "OMBRA" }

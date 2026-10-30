@@ -13,7 +13,7 @@ test_m8_cast_and_dice_share_exact_clock_without_advancing_world :: proc(t: ^test
 		defer level.destroy(&data)
 		player := create_gameplay_command_test_player(t)
 		testing.expect(t, game.configure_tactical(&player, game.DEFAULT_TACTICAL_CONFIG))
-		enemies := [?]game.Enemy_Spawn{{position = {5, 3}, health = 100, attack = 1}}
+		enemies := [?]game.Enemy_Spawn{{position = {x = 5, y = 3}, health = 100, attack = 1}}
 		room, built := game.create_room(&data, &player, {enemies = enemies[:]})
 		testing.expect(t, built)
 		defer game.destroy_room(&room)
@@ -61,7 +61,7 @@ test_m8_cinematic_holds_background_enemy_presentation :: proc(t: ^testing.T) {
 	defer free(renderer)
 	defer render.destroy_renderer_world_playback(renderer)
 	events: game.Event_Log
-	game.record_event(&events, {kind = .Moved, target = game.enemy_entity(1), from_position = {1,1}, to_position = {2,1}})
+	game.record_event(&events, {kind = .Moved, target = game.enemy_entity(1), from_position = {x = 1, y = 1}, to_position = {x = 2, y = 1}})
 	before := render.Room_Presentation{valid = true}
 	testing.expect(t, render.begin_renderer_world_timeline(renderer, before, &events, &before))
 	dice: game.Event_Log
@@ -79,7 +79,7 @@ test_m8_standalone_cinematic_defers_pending_world_and_qte_input :: proc(t: ^test
 	defer level.destroy(&data)
 	player := create_gameplay_command_test_player(t)
 	testing.expect(t, game.configure_tactical(&player, game.DEFAULT_TACTICAL_CONFIG))
-	enemies := [?]game.Enemy_Spawn{{position = {5,3}, health = 20, attack = 1}}
+	enemies := [?]game.Enemy_Spawn{{position = {x = 5, y = 3}, health = 20, attack = 1}}
 	room, built := game.create_room(&data, &player, {enemies = enemies[:]})
 	testing.expect(t, built)
 	defer game.destroy_room(&room)

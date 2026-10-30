@@ -17,7 +17,9 @@ DIORAMA_CUTAWAY_HEIGHT :: f32(0.5)
 @(private)
 diorama_interior_wall :: proc(room: ^game.Room, cell: grid.Position) -> bool {
 	tile, found := level.tile_at(room.level_data, cell)
-	return found && tile.kind == .Wall &&
+	// The walls of a structure are drawn by it (structure_diorama.odin), not as ghost interior walls.
+	_, in_structure := level.structure_index_at(room.level_data, cell)
+	return found && tile.kind == .Wall && !in_structure &&
 		!level.is_border_position(cell, room.level_data.tiles.width, room.level_data.tiles.height)
 }
 
@@ -48,7 +50,7 @@ diorama_wall_height :: proc(renderer: ^Renderer, room: ^game.Room, cell: grid.Po
 
 @(private)
 diorama_wall_face :: proc(room: ^game.Room, cell, offset: grid.Position) -> bool {
-	tile, found := level.tile_at(room.level_data, {cell.x+offset.x, cell.y+offset.y})
+	tile, found := level.tile_at(room.level_data, grid.offset(cell, offset.x, offset.y))
 	return found && level.is_walkable(tile.kind)
 }
 
@@ -57,8 +59,8 @@ diorama_lamp :: proc(renderer: ^Renderer, room: ^game.Room, cell: grid.Position)
 	if !tactical_render_visible(renderer, cell) || gothic_hash(cell.x, cell.y)%3 != 0 { return }
 	tile, found := level.tile_at(room.level_data, cell)
 	if !found || tile.kind != .Wall { return }
-	for offset in ([4]grid.Position{{0, 1}, {1, 0}, {0, -1}, {-1, 0}}) {
-		if !tactical_render_visible(renderer, {cell.x+offset.x, cell.y+offset.y}) || !diorama_wall_face(room, cell, offset) { continue }
+	for offset in ([4]grid.Position{{x = 0, y = 1}, {x = 1, y = 0}, {x = 0, y = -1}, {x = -1, y = 0}}) {
+		if !tactical_render_visible(renderer, grid.offset(cell, offset.x, offset.y)) || !diorama_wall_face(room, cell, offset) { continue }
 		return {f32(cell.x)+0.5+f32(offset.x)*0.47, diorama_wall_height(renderer, room, cell)*0.58, f32(cell.y)+0.5+f32(offset.y)*0.47}, true
 	}
 	return
@@ -70,7 +72,7 @@ prepare_diorama_lights :: proc(renderer: ^Renderer, room: ^game.Room) -> (lights
 	distances := [4]f32{1e10, 1e10, 1e10, 1e10}
 	hero := rl.Vector3{v.snapshot.player.position.x+0.5, 0, v.snapshot.player.position.y+0.5}
 	for y in 0..<room.level_data.tiles.height { for x in 0..<room.level_data.tiles.width {
-		position, found := diorama_lamp(renderer, room, {x, y})
+		position, found := diorama_lamp(renderer, room, {x = x, y = y})
 		if !found { continue }
 		distance := rl.Vector3LengthSqr(position-hero)
 		for index in 0..<4 {
@@ -116,6 +118,7 @@ draw_diorama_wall_face :: proc(center, normal: rl.Vector3, height: f32, variant:
 // opaque; the upper body is submitted with actors in the sorted alpha pass.
 @(private)
 draw_diorama_wall :: proc(renderer: ^Renderer, room: ^game.Room, cell: grid.Position) {
+	if index, owned := level.structure_index_at(room.level_data, cell); owned { draw_structure_cell(renderer, room, cell, index); return }
 	if renderer.tactical.kit.loaded { draw_diorama_kit_wall(renderer, room, cell); return }
 	p := rl.Vector3{f32(cell.x)+0.5, 0, f32(cell.y)+0.5}
 	n := gothic_hash(cell.x, cell.y)
@@ -131,12 +134,12 @@ draw_diorama_wall :: proc(renderer: ^Renderer, room: ^game.Room, cell: grid.Posi
 	draw_resin_cube(renderer, p+rl.Vector3{0, h+0.065, 0}, 0.88, 0.11, 0.88, cap)
 	rl.DrawCube(p+rl.Vector3{0, h+0.122, 0}, 0.59, 0.008, 0.59, ink if transparent else rl.Color{38, 52, 72, 255})
 	rl.DrawCube(p+rl.Vector3{0, h+0.129, 0}, 0.065, 0.006, 0.21, edge if transparent else rl.Color{78, 115, 140, 255})
-	for offset in ([4]grid.Position{{0, 1}, {1, 0}, {0, -1}, {-1, 0}}) {
+	for offset in ([4]grid.Position{{x = 0, y = 1}, {x = 1, y = 0}, {x = 0, y = -1}, {x = -1, y = 0}}) {
 		normal := rl.Vector3{f32(offset.x), 0, f32(offset.y)}
 		// Back-face ornament layers would unnecessarily darken the translucent
 		// shell. Keep the camera-facing relief, just as on the opaque surface.
 		if transparent && rl.Vector3DotProduct(normal, renderer.tactical.camera.position-p-normal*0.474) <= 0 { continue }
-		if tactical_render_visible(renderer, {cell.x+offset.x, cell.y+offset.y}) && diorama_wall_face(room, cell, offset) {
+		if tactical_render_visible(renderer, grid.offset(cell, offset.x, offset.y)) && diorama_wall_face(room, cell, offset) {
 			draw_diorama_wall_face(p, normal, h, n, transparent)
 		}
 	}
@@ -148,23 +151,63 @@ draw_diorama_wall :: proc(renderer: ^Renderer, room: ^game.Room, cell: grid.Posi
 	}
 }
 
+// A tile of the board; the cells outside the building the robot is in are drawn darker.
 @(private)
 draw_tactical_tile :: proc(renderer: ^Renderer, room: ^game.Room, tile: level.Tile, cell: grid.Position, preview: ^Card_Range_Preview = nil) {
 	if tile.kind == .Void { return }
-	p := rl.Vector3{f32(cell.x)+0.5, 0, f32(cell.y)+0.5}
+	draw_tactical_tile_body(renderer, room, tile, cell, preview)
+	structure_outside_dim(renderer, room, cell, tile)
+}
+
+@(private = "file")
+draw_tactical_tile_body :: proc(renderer: ^Renderer, room: ^game.Room, tile: level.Tile, cell: grid.Position, preview: ^Card_Range_Preview = nil) {
+	// A raised cell stands on a column down to the board's plane: the dark base
+	// gets as tall as the cell is high, and its exposed sides show the steps.
+	rise := cell_ground(cell)
+	// Under the board, or over a cave's room, or a bridge's deck (height_view.odin).
+	base := cell_base(cell)
+	p := rl.Vector3{f32(cell.x)+0.5, rise, f32(cell.y)+0.5}
 	n := gothic_hash(cell.x, cell.y)
 	shade := u8(n%11)
 	floor := rl.Color{43+shade, 52+shade, 65+shade, 255}
 	if renderer.tactical.snapshot.family == .Twin_Courts { floor = {38+shade, 51+shade, 69+shade, 255} }
 	if tile.kind != .Wall { floor = card_range_floor_color(preview, cell, floor) }
-	draw_resin_cube(renderer, p+rl.Vector3{0, -0.155, 0}, 0.99, 0.31, 0.99, RESIN_DARK)
-	draw_resin_cube(renderer, p+rl.Vector3{0, -0.05, 0}, 0.945, 0.135, 0.945, floor)
+	// On a ramp or a hill the tile follows the sculpted surface (level/surface.odin); a level tile is the block it
+	// always was.
+	surface, sculpted := cell_surface(cell)
+	sloped := sculpted && !level.surface_flat(surface)
+	if sloped {
+		draw_sloped_tile(renderer, cell, surface, floor, base)
+	} else {
+		draw_resin_cube(renderer, p+rl.Vector3{0, (base-rise)*0.5, 0}, 0.99, rise-base, 0.99, RESIN_DARK)
+		draw_resin_cube(renderer, p+rl.Vector3{0, -0.05, 0}, 0.945, 0.135, 0.945, floor)
+	}
 	if tile.kind == .Wall {
 		draw_resin_cube(renderer, p+rl.Vector3{0, 0.10, 0}, 0.98, 0.16, 0.98, DIORAMA_EDGE)
+		if index, owned := level.structure_index_at(room.level_data, cell); owned {
+			// A building's envelope that is not whole waits for the sorted pass.
+			if !structure_envelope_pending(renderer, room.level_data, index) { draw_structure_cell(renderer, room, cell, index) }
+			return
+		}
 		if !diorama_interior_wall(room, cell) || first_person_solid_walls(renderer) { draw_diorama_wall(renderer, room, cell) }
 		return
 	}
-	// Slim inset corner fittings and occasional engraving preserve empty centers.
+	// A low wall: the plinth, and what its structure puts on it.
+	if tile.kind == .Fence {
+		draw_resin_cube(renderer, p+rl.Vector3{0, 0.07, 0}, 0.96, 0.12, 0.96, DIORAMA_EDGE)
+		if index, owned := level.structure_index_at(room.level_data, cell); owned {
+			if !structure_envelope_pending(renderer, room.level_data, index) { draw_structure_cell(renderer, room, cell, index) }
+		} else {
+			draw_resin_cube(renderer, p+rl.Vector3{0, 0.30, 0}, 0.78, 0.5, 0.78, RESIN_WALL)
+		}
+		return
+	}
+	// Slim inset corner fittings and occasional engraving preserve empty centers. A sloped tile is plain: they would
+	// sink into its high side.
+	if sloped {
+		if tile.kind == .Exit { draw_voxel_exit(renderer, cell) }
+		return
+	}
 	for sign in ([2]f32{-1, 1}) {
 		rl.DrawCube(p+rl.Vector3{sign*0.35, 0.02, sign*0.40}, 0.17, 0.006, 0.018, {28, 40, 57, 255})
 		rl.DrawCube(p+rl.Vector3{sign*0.40, 0.02, sign*0.35}, 0.018, 0.006, 0.17, {28, 40, 57, 255})
@@ -186,6 +229,91 @@ draw_tactical_tile :: proc(renderer: ^Renderer, room: ^game.Room, tile: level.Ti
 		rl.DrawCubeWires(p+rl.Vector3{0, 0.105, 0}, 0.70, 0.01, 0.70, DIORAMA_EDGE)
 		draw_voxel_exit(renderer, cell)
 	}
+}
+
+// A tile on a ramp or a hill: its top follows the sculpted surface (four triangles round the middle, with smoothed
+// light), its sides go down to a little under its lowest corner, and the dark column under it stops there.
+@(private = "file")
+draw_sloped_tile :: proc(renderer: ^Renderer, cell: grid.Position, surface: level.Surface_Cell, color: rl.Color, base := f32(-0.31)) {
+	step := game.HEIGHT_STEP_DRAWN
+	// The tile is inset like the level block (0.945 of a cell) and its top lifted like the block's top.
+	INSET :: f32(0.0275)
+	LIFT :: f32(0.0175)
+	places := [4][2]f32{{INSET, INSET}, {1-INSET, INSET}, {1-INSET, 1-INSET}, {INSET, 1-INSET}}
+	corners: [4]rl.Vector3
+	lowest := surface.center
+	for place, i in places {
+		height := level.surface_cell_height_at(surface, place.x, place.y)
+		corners[i] = {f32(cell.x)+place.x, height*step+LIFT, f32(cell.y)+place.y}
+		lowest = min(lowest, surface.corners[i])
+	}
+	middle := rl.Vector3{f32(cell.x)+0.5, surface.center*step+LIFT, f32(cell.y)+0.5}
+	floor := lowest*step
+	draw_resin_cube(renderer, {middle.x, (floor+base)*0.5, middle.z}, 0.99, floor-base, 0.99, RESIN_DARK)
+	bottom := floor-0.1175
+	faces: [4]rl.Vector3
+	for i in 0..<4 { faces[i] = rl.Vector3Normalize(rl.Vector3CrossProduct(corners[(i+1)%4]-middle, corners[i]-middle)) }
+	rlgl.SetTexture(rlgl.GetTextureIdDefault())
+	rlgl.Begin(rlgl.TRIANGLES)
+	rlgl.Color4ub(color.r, color.g, color.b, color.a)
+	vertex :: proc(p, n: rl.Vector3, cell: grid.Position) {
+		rlgl.Normal3f(n.x, n.y, n.z)
+		rlgl.TexCoord2f(p.x-f32(cell.x), p.z-f32(cell.y))
+		rlgl.Vertex3f(p.x, p.y, p.z)
+	}
+	up := rl.Vector3Normalize(faces[0]+faces[1]+faces[2]+faces[3])
+	for i in 0..<4 {
+		a, b := i, (i+1)%4
+		vertex(middle, up, cell)
+		vertex(corners[b], rl.Vector3Normalize(faces[b]+faces[a]), cell)
+		vertex(corners[a], rl.Vector3Normalize(faces[a]+faces[(a+3)%4]), cell)
+	}
+	// The sides, each turned out from the tile.
+	sides := [4]rl.Vector3{{0, 0, -1}, {1, 0, 0}, {0, 0, 1}, {-1, 0, 0}}
+	for i in 0..<4 {
+		a, b := corners[i], corners[(i+1)%4]
+		low_a, low_b := rl.Vector3{a.x, bottom, a.z}, rl.Vector3{b.x, bottom, b.z}
+		quad := [6]rl.Vector3{a, low_a, low_b, a, low_b, b}
+		if rl.Vector3DotProduct(rl.Vector3CrossProduct(low_a-a, low_b-a), sides[i]) < 0 { quad = {a, low_b, low_a, a, b, low_b} }
+		for p in quad { vertex(p, sides[i], cell) }
+	}
+	rlgl.End()
+}
+
+// The cells of the other layers in the column of `cell` (a bridge's deck, a cave's floor), as the ground's are
+// drawn; what fades over the robot waits for the sorted pass (height_view.odin).
+@(private)
+draw_tactical_layer_tiles :: proc(renderer: ^Renderer, room: ^game.Room, cell: grid.Position, preview: ^Card_Range_Preview = nil) {
+	if !board_heights.layered { return }
+	for layer in grid.LOWEST_LAYER..=grid.HIGHEST_LAYER {
+		if layer == grid.GROUND_LAYER { continue }
+		at := grid.Position{x = cell.x, y = cell.y, layer = i8(layer)}
+		tile, _ := level.tile_at(room.level_data, at)
+		if !level.kind_has_floor(tile.kind) || cell_cover_opacity(at) < 1 { continue }
+		draw_tactical_tile(renderer, room, tile, at, preview)
+		draw_layer_dim(at)
+	}
+}
+
+// A cell fading over the robot (game.layer_cover_opacity), in the sorted pass: its column and its floor, as see-through
+// as the rule says, in the board's resin light.
+@(private)
+draw_layer_cover :: proc(renderer: ^Renderer, cell: grid.Position, opacity: f32) {
+	top, base := cell_ground(cell), cell_base(cell)
+	alpha := u8(clamp(opacity, 0, 1)*255)
+	shade := u8(gothic_hash(cell.x, cell.y)%11)
+	draw_resin_cube(renderer, {f32(cell.x)+0.5, (top+base)*0.5, f32(cell.y)+0.5}, 0.99, top-base, 0.99, {RESIN_DARK.r, RESIN_DARK.g, RESIN_DARK.b, alpha})
+	draw_resin_cube(renderer, {f32(cell.x)+0.5, top-0.05, f32(cell.y)+0.5}, 0.945, 0.135, 0.945, {43+shade, 52+shade, 65+shade, alpha})
+}
+
+// A cell darker than the rest (game.layer_cell_dim): the outside of a cave, what is under a bridge. A dark veil over
+// its column, as over the outside of a building (structure_outside_dim).
+@(private)
+draw_layer_dim :: proc(cell: grid.Position) {
+	dim := cell_dim(cell)
+	if dim <= 0 { return }
+	top, base := cell_ground(cell), cell_base(cell)
+	rl.DrawCube({f32(cell.x)+0.5, (top+0.03+base)*0.5, f32(cell.y)+0.5}, 1.0, top+0.03-base, 1.0, {4, 6, 14, u8(dim*255)})
 }
 
 @(private)
@@ -211,7 +339,7 @@ draw_diorama_accents :: proc(renderer: ^Renderer, room: ^game.Room) {
 	// The world's clock: the lamps and the dust hold still with it.
 	time := f32(tactical_world_time(renderer))
 	for y in 0..<room.level_data.tiles.height { for x in 0..<room.level_data.tiles.width {
-		cell := grid.Position{x, y}
+		cell := grid.Position{x = x, y = y}
 		if !tactical_cell_on_screen(renderer, cell) || !tactical_render_visible(renderer, cell) { continue }
 		if !diorama_interior_wall(room, cell) {
 			if lamp, found := diorama_lamp(renderer, room, cell); found { draw_diorama_lamp_glow(renderer, lamp, cell) }

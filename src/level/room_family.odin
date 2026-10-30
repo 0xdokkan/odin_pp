@@ -31,7 +31,7 @@ room_family_cell_is_reserved :: proc(data: ^Level, family: Room_Family, position
 			for partition in 1..=data.layout_complexity+1 {
 				wall_x := complex_court_partition_x(width, data.layout_complexity, partition)
 				if abs(position.x-wall_x) > 1 { continue }
-				gate, found := tile_at(data, {wall_x, position.y})
+				gate, found := tile_at(data, {x = wall_x, y = position.y})
 				if found && is_walkable(gate.kind) { return true }
 			}
 		}
@@ -41,14 +41,14 @@ room_family_cell_is_reserved :: proc(data: ^Level, family: Room_Family, position
 		return true
 	}
 	if family == .Twin_Courts && abs(position.x-width/2) <= 1 {
-		gate, found := tile_at(data, {width/2, position.y})
+		gate, found := tile_at(data, {x = width/2, y = position.y})
 		return found && is_walkable(gate.kind)
 	}
 	return false
 }
 
 write_family_wall :: proc(data: ^Level, x, y: int) {
-	written := set_tile(data, {x, y}, {kind = .Wall})
+	written := set_tile(data, {x = x, y = y}, {kind = .Wall})
 	assert(written)
 }
 
@@ -64,12 +64,12 @@ select_central_room_anchors :: proc(data: ^Level, config: Room_Generation_Config
 	closest, choices := max(int), 0
 	for y in 1+config.spawn_clearance_radius..<config.height-1-config.spawn_clearance_radius {
 		for x in 1+config.spawn_clearance_radius..<config.width-1-config.spawn_clearance_radius {
-			spawn := grid.Position{x, y}
+			spawn := grid.Position{x = x, y = y}
 			distance := spawn_center_distance_squared(config, spawn)
 			if distance > closest || !clearance_is_walkable(data, spawn, config.spawn_clearance_radius) { continue }
 			for exit_y in minimum.y..=maximum.y {
 				for exit_x in minimum.x..=maximum.x {
-					exit_position := grid.Position{exit_x, exit_y}
+					exit_position := grid.Position{x = exit_x, y = exit_y}
 					if !anchor_pair_is_valid(config, spawn, exit_position) ||
 					   !clearance_is_walkable(data, exit_position, config.exit_clearance_radius) { continue }
 					if distance < closest { closest = distance; choices = 0 }
@@ -91,7 +91,7 @@ generate_tactical_room_attempt :: proc(config: Room_Generation_Config, generator
 	result.layout_complexity = config.complexity
 	for y in 0..<height {
 		for x in 0..<width {
-			if is_border_position({x, y}, width, height) { write_family_wall(&result, x, y) }
+			if is_border_position({x = x, y = y}, width, height) { write_family_wall(&result, x, y) }
 		}
 	}
 	if config.complexity > 0 {
@@ -153,7 +153,7 @@ generate_tactical_room_attempt :: proc(config: Room_Generation_Config, generator
 			if !clearance_is_walkable(&result, spawn, config.spawn_clearance_radius) { continue }
 			for y in minimum.y..=maximum.y {
 				for x in minimum.x..=maximum.x {
-					exit_position := grid.Position{x, y}
+					exit_position := grid.Position{x = x, y = y}
 					if anchor_pair_is_valid(config, spawn, exit_position) &&
 					   clearance_is_walkable(&result, exit_position, config.exit_clearance_radius) {
 						append(&anchors, Room_Anchor_Pair{spawn, exit_position})

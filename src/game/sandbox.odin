@@ -73,7 +73,7 @@ sandbox_spawn_cell :: proc(room: ^Room, sandbox: ^Sandbox_State) -> (grid.Positi
 	farthest := -1
 	for y in 0..<data.tiles.height {
 		for x in 0..<data.tiles.width {
-			cell := grid.Position{x, y}
+			cell := grid.Position{x = x, y = y}
 			if enemy_spawn_cell_is_free(room, cell) { farthest = max(farthest, sandbox_distance(room, cell)) }
 		}
 	}
@@ -82,14 +82,14 @@ sandbox_spawn_cell :: proc(room: ^Room, sandbox: ^Sandbox_State) -> (grid.Positi
 	candidates := 0
 	for y in 0..<data.tiles.height {
 		for x in 0..<data.tiles.width {
-			cell := grid.Position{x, y}
+			cell := grid.Position{x = x, y = y}
 			if sandbox_distance(room, cell) >= needed && enemy_spawn_cell_is_free(room, cell) { candidates += 1 }
 		}
 	}
 	pick := sandbox_random(sandbox, candidates)
 	for y in 0..<data.tiles.height {
 		for x in 0..<data.tiles.width {
-			cell := grid.Position{x, y}
+			cell := grid.Position{x = x, y = y}
 			if sandbox_distance(room, cell) < needed || !enemy_spawn_cell_is_free(room, cell) { continue }
 			if pick == 0 { return cell, true }
 			pick -= 1

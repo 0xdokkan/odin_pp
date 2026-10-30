@@ -146,17 +146,18 @@ test_m9_startup_tuning_preserves_cancel_timing_and_active_move :: proc(t: ^testi
 
 @(test)
 test_m9_session_mouse_controls_bounds_enablement_and_mode_lifecycle :: proc(t: ^testing.T) {
-	renderer:=render.Renderer{canvas_width=960,canvas_height=540}
+	renderer:=new_clone(render.Renderer{canvas_width=960,canvas_height=540})
+	defer free(renderer)
 	s: activities.Free_Mode_Session
 	activities.begin_free_mode_session(&s,.Arena,true,true)
 	defer activities.destroy_free_mode_session(&s)
 	for control in render.M9_Control {
 		v:=activities.free_mode_view(&s)
 		if !render.m9_control_enabled(v,control) {continue}
-		bounds:=render.m9_control_bounds(&renderer,control)
+		bounds:=render.m9_control_bounds(renderer,control)
 		testing.expect(t,bounds.x>=0 && bounds.y>=0 && bounds.x+bounds.width<=960 && bounds.y+bounds.height<=540)
 		center:=view.Vec2{bounds.x+bounds.width/2,bounds.y+bounds.height/2}
-		testing.expect_value(t,render.m9_control_at_point(&renderer,v,center),control)
+		testing.expect_value(t,render.m9_control_at_point(renderer,v,center),control)
 	}
 	for control in ([3]render.M9_Control{.Ring,.FPS,.Arena}) {
 		activities.step_free_mode_session(&s,0,{focused=true,control=control})

@@ -36,6 +36,9 @@ Output :: struct {
 	action_seconds: f32,
 	show_effect: bool,
 	effect_card: game.Card_Id,
+	// A structure kit was used: the scene takes over to set it down (the kit is spent when it is, not now).
+	place_structure: bool,
+	structure: i32,
 }
 Layout :: struct {
 	window, content, bag_grid, depot_grid, detail: ui.Rect,
@@ -208,6 +211,7 @@ item_color :: proc(item: campaign.Item) -> rl.Color {
 	case .Credits: return {238, 200, 107, 255}
 	case .Memory: return {237, 160, 217, 255}
 	case .Backpack: return {147, 205, 187, 255}
+	case .Structure_Kit: return {214, 178, 120, 255}
 	}
 	return rl.WHITE
 }
@@ -225,6 +229,7 @@ item_glyph :: proc(item: campaign.Item) -> string {
 	case .Credits: return "$"
 	case .Memory: return "M"
 	case .Backpack: return "B"
+	case .Structure_Kit: return "K"
 	}
 	return "?"
 }
@@ -289,9 +294,16 @@ use_selected :: proc(c: ^campaign.Campaign, player: ^game.Player, state: ^State,
 	case .Temporary_Card: staged := player.deck; _, created := game.create_temporary_card(&staged, game.Card_Id(item.variant)); allowed = in_combat && created
 	case .Decoy: allowed = !in_combat && c.run.active
 	case .Upgrade: allowed = c.run.active
+	case .Structure_Kit: allowed = !in_combat && c.run.active
 	case: allowed = false
 	}
 	if !allowed { notice(state, "Questo oggetto non puo essere usato adesso."); return }
+	if item.kind == .Structure_Kit {
+		// Not spent here: the scene asks where it goes and spends it once it is down.
+		out.place_structure, out.structure = true, item.variant
+		state.selected = {}
+		return
+	}
 	effect, ok := campaign.consume(&c.backpack, state.selected.index, in_combat)
 	if !ok { return }
 	player.health = min(player.stats.max_health, player.health+effect.heal)

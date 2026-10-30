@@ -24,10 +24,10 @@ prepare_tactical_view_room :: proc(data: ^level.Level, run: ^game.Run_State, roo
 	// paid at once and every window is whole.
 	if !game.configure_tactical(&player, game.DEFAULT_TACTICAL_CONFIG) { return false }
 	enemies := [?]game.Enemy_Spawn{
-		{position = {5, 4}, health = 12, attack = 2},
-		{position = {7, 3}, health = 10, attack = 2, archetype = .Archer},
-		{position = {6, 6}, health = 20, attack = 2, archetype = .Custodian},
-		{position = {2, 6}, health = 25, attack = 2, archetype = .Demolitionist},
+		{position = {x = 5, y = 4}, health = 12, attack = 2},
+		{position = {x = 7, y = 3}, health = 10, attack = 2, archetype = .Archer},
+		{position = {x = 6, y = 6}, health = 20, attack = 2, archetype = .Custodian},
+		{position = {x = 2, y = 6}, health = 25, attack = 2, archetype = .Demolitionist},
 	}
 	new_room, ok := game.create_room(&new_level, &player, {enemies = enemies[:]})
 	if !ok { level.destroy(&new_level); return false }
@@ -70,7 +70,7 @@ step_tactical_view_smoke :: proc(state: ^Tactical_View_Smoke, controller: ^run_s
 	if state.frames == 13 {
 		artifacts.screenshot("odin_pp_m7_hologram_rotated.png")
 		controller.hologram = false
-		command.kind, command.offset = .Begin_Diagonal, {1, -1}
+		command.kind, command.offset = .Begin_Diagonal, {x = 1, y = -1}
 	} else if state.frames == 16 {
 		artifacts.screenshot("odin_pp_m7_diagonal.png")
 		command.kind, command.direction = .QTE_Key, .East

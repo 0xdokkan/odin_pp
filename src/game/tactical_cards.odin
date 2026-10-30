@@ -5,7 +5,9 @@ import grid "../engine/grid"
 tactical_card_enemy_in_area :: proc(room: ^Room, card: Card_Id, position: grid.Position) -> bool {
 	if !tactical_cell_visible(room, position) { return false }
 	if card == .Toxic_Wave {
-		return max(abs(position.x-room.player.position.x), abs(position.y-room.player.position.y)) <= 2
+		// An area round the player: with layers, one cell a column (layers.odin).
+		return max(abs(position.x-room.player.position.x), abs(position.y-room.player.position.y)) <= 2 &&
+			area_takes(room, room.player.position, position)
 	}
 	return true
 }

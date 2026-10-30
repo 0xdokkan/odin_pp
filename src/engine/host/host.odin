@@ -20,6 +20,9 @@ Config :: struct {
 	// Automation: report the window as focused even in the background, so
 	// focus-loss pauses do not interfere with scripted captures.
 	force_focus:     bool,
+	// Automation: keep drawing while the window is minimized. Otherwise raylib
+	// waits for an event there, and a smoke left in the background never ends.
+	keep_running:    bool,
 }
 
 Host :: struct {
@@ -54,6 +57,7 @@ create :: proc(config: Config) -> (^Host, bool) {
 		return nil, false
 	}
 	h.window = window
+	if config.keep_running {rl.SetWindowState({.WINDOW_ALWAYS_RUN})}
 	h.theme = gui.default_theme()
 	gui.load_fonts(&h.theme)
 	h.ui = gui.create(&h.theme)

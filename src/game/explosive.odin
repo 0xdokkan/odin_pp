@@ -42,10 +42,11 @@ explosive_pulses_remaining :: proc(deadline, pulse: u64, fuse: int = EXPLOSIVE_F
 	return int(min(deadline-pulse, u64(max(1, fuse)))) if deadline > pulse else 0
 }
 
-// Walls and fixed obstacles are excluded; cover objects can be destroyed by the blast.
+// Walls and fixed obstacles are excluded; cover objects can be destroyed by the blast. With layers, the
+// blast takes one cell a column, as an area does (layers.odin).
 explosion_contains_cell :: proc(room: ^Room, center, cell: grid.Position) -> bool {
 	return grid_distance(center, cell) <= 1 && base_cell_is_walkable(room, cell) &&
-	       !obstacle_at(room, cell)
+	       !obstacle_at(room, cell) && area_takes(room, center, cell)
 }
 
 @(private)
@@ -143,7 +144,7 @@ resolve_due_explosives :: proc(room: ^Room, pulse: ^Pulse_Report) {
 		// Cell order makes friendly fire independent of unordered enemy/object storage.
 		for y in center.y-1..=center.y+1 {
 			for x in center.x-1..=center.x+1 {
-				cell := grid.Position{x, y}
+				cell := grid.Position{x = x, y = y}
 				if !explosion_contains_cell(room, center, cell) {
 					continue
 				}

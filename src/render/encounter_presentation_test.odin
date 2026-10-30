@@ -16,9 +16,9 @@ encounter_presentation_test_modifier :: proc() -> game.Room_Modifier {
 	modifier := game.Room_Modifier{
 		kind = .Furnace, cell_count = 3, activation_pulse = 2, damage = game.ROOM_HAZARD_DAMAGE,
 	}
-	modifier.cells[0] = {2, 2}
-	modifier.cells[1] = {3, 2}
-	modifier.cells[2] = {4, 2}
+	modifier.cells[0] = {x = 2, y = 2}
+	modifier.cells[1] = {x = 3, y = 2}
+	modifier.cells[2] = {x = 4, y = 2}
 	return modifier
 }
 
@@ -61,8 +61,8 @@ test_custodian_shield_replays_before_ally_moves_then_absorbs_a_real_card :: proc
 	player, player_ok := game.create_player({max_health = 20, attack = 2})
 	testing.expect(t, player_ok)
 	enemies := [?]game.Enemy_Spawn{
-		{position = {3, 2}, health = 8, attack = 1},
-		{position = {4, 2}, health = 8, attack = 1, archetype = .Custodian},
+		{position = {x = 3, y = 2}, health = 8, attack = 1},
+		{position = {x = 4, y = 2}, health = 8, attack = 1, archetype = .Custodian},
 	}
 	room, ok := game.create_room(&data, &player, {enemies = enemies[:], encounter_kind = .Escort})
 	testing.expect(t, ok)
@@ -100,7 +100,7 @@ test_custodian_shield_replays_before_ally_moves_then_absorbs_a_real_card :: proc
 			testing.expect_value(t, visual.statuses.items[index].potency, i32(2))
 			// The application is visible before this pulse's status tick.
 			testing.expect_value(t, visual.statuses.items[index].remaining_pulses, i32(3))
-			testing.expect_value(t, visual.position, presentation_position({3, 2}))
+			testing.expect_value(t, visual.position, presentation_position({x = 3, y = 2}))
 		}
 		if cue.kind == .Pulse_Advanced {
 			pulse_seen = true
@@ -148,7 +148,7 @@ test_boss_snapshot_changes_phase_only_at_pulse_boundary_after_announced_charge :
 	defer level.destroy(&data)
 	player, player_ok := game.create_player({max_health = 20, attack = 2})
 	testing.expect(t, player_ok)
-	enemies := [?]game.Enemy_Spawn{{position = {3, 1}, health = 20, attack = 2, archetype = .Demolitionist}}
+	enemies := [?]game.Enemy_Spawn{{position = {x = 3, y = 1}, health = 20, attack = 2, archetype = .Demolitionist}}
 	room, ok := game.create_room(&data, &player, {enemies = enemies[:], encounter_kind = .Demolitionist})
 	testing.expect(t, ok)
 	defer game.destroy_room(&room)
@@ -195,7 +195,7 @@ test_boss_snapshot_changes_phase_only_at_pulse_boundary_after_announced_charge :
 		}
 		if cue.kind == .Move && cue.event.target == boss {
 			charge_seen = true
-			testing.expect_value(t, visual.position, presentation_position({2, 1}))
+			testing.expect_value(t, visual.position, presentation_position({x = 2, y = 1}))
 			testing.expect_value(t, visual.boss_phase, i32(1))
 		}
 	}
@@ -213,7 +213,7 @@ test_furnace_warning_snapshot_and_trigger_precede_damage_and_restart_countdown :
 	defer level.destroy(&data)
 	player, player_ok := game.create_player({max_health = 20, attack = 2})
 	testing.expect(t, player_ok)
-	enemies := [?]game.Enemy_Spawn{{position = {7, 4}, health = 20, attack = 1}}
+	enemies := [?]game.Enemy_Spawn{{position = {x = 7, y = 4}, health = 20, attack = 1}}
 	modifier := encounter_presentation_test_modifier()
 	room, ok := game.create_room(&data, &player, {enemies = enemies[:], encounter_kind = .Assault, modifier = modifier})
 	testing.expect(t, ok)
@@ -239,7 +239,7 @@ test_furnace_warning_snapshot_and_trigger_precede_damage_and_restart_countdown :
 	before = capture_room_presentation(&room)
 	game.try_move_player(&room, .South)
 	advance_presentation_test_clock(t, &room, 1)
-	testing.expect_value(t, player.position, grid.Position{2, 2})
+	testing.expect_value(t, player.position, grid.Position{x = 2, y = 2})
 	testing.expect_value(t, player.health, i32(17))
 	testing.expect_value(t, room.modifier.activation_pulse, u64(6))
 	after = capture_room_presentation(&room)
@@ -294,7 +294,7 @@ test_furnace_snapshot_disarms_after_final_player_kill_without_a_pulse_event :: p
 	defer level.destroy(&data)
 	player, player_ok := game.create_player({max_health = 20, attack = 2})
 	testing.expect(t, player_ok)
-	enemies := [?]game.Enemy_Spawn{{position = {2, 1}, health = 1, attack = 1}}
+	enemies := [?]game.Enemy_Spawn{{position = {x = 2, y = 1}, health = 1, attack = 1}}
 	room, ok := game.create_room(&data, &player, {enemies = enemies[:], modifier = encounter_presentation_test_modifier()})
 	testing.expect(t, ok)
 	defer game.destroy_room(&room)
@@ -324,13 +324,13 @@ test_furnace_death_cues_preserve_defeat_and_disarm_when_last_enemy_dies_too :: p
 	defer level.destroy(&data)
 	player, player_ok := game.create_player({max_health = 20, attack = 2})
 	testing.expect(t, player_ok)
-	enemies := [?]game.Enemy_Spawn{{position = {3, 2}, health = 1, attack = 1}}
+	enemies := [?]game.Enemy_Spawn{{position = {x = 3, y = 2}, health = 1, attack = 1}}
 	modifier := encounter_presentation_test_modifier()
 	modifier.activation_pulse = 1
 	room, ok := game.create_room(&data, &player, {enemies = enemies[:], modifier = modifier})
 	testing.expect(t, ok)
 	defer game.destroy_room(&room)
-	player.position = {2, 2}
+	player.position = {x = 2, y = 2}
 	player.health = 1
 	game.plan_enemy_intents(&room)
 	before := capture_room_presentation(&room)

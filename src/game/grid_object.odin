@@ -12,6 +12,9 @@ Grid_Object_Kind :: enum {
 	Shock_Floor,
 	Tesla_Coil,
 	Cannon, Flood, Black_Hole, Bomb_Marley,
+	// What the player sets down for a while (emplacement.odin).
+	Field_Cannon,
+	Devouring_Hole,
 	Count,
 }
 
@@ -44,6 +47,13 @@ Grid_Object :: struct {
 	device_cooldown: i32,
 	device_damage: i32,
 	device_direction: Move_Direction,
+	// An emplacement's (emplacement.odin): the beats left, its damage a beat,
+	// a hole's damage radius, a cannon's way and whether it fires a beam.
+	life: i32,
+	power: i32,
+	radius: i32,
+	facing: Move_Direction,
+	laser: bool,
 }
 
 Grid_Object_Spawn :: struct {
@@ -99,6 +109,32 @@ GRID_OBJECT_DEFINITIONS :: [int(Grid_Object_Kind.Count)]Grid_Object_Definition{
 	{kind = .Flood, name = "Inondazione"},
 	{kind = .Black_Hole, name = "Buco Nero"},
 	{kind = .Bomb_Marley, name = "Bomb Marley", max_health = 1, targetable = true, damageable = true},
+	// Solid on its stand, nothing aims at it; the hole blocks nothing.
+	{kind = .Field_Cannon, name = "Cannon", blocks_movement = true},
+	{kind = .Devouring_Hole, name = "Black Hole"},
+}
+
+// How wide and high an object stands as it is drawn (render: voxel_object_bounds,
+// its ray pick; the bow's arrows fly over it, first_person_bow.odin).
+grid_object_size :: proc(kind: Grid_Object_Kind) -> (width, height: f32) {
+	width, height = 0.68, 0.72
+	switch kind {
+	case .Ice_Block: width, height = 0.82, 0.94
+	case .Barrel: width, height = 0.64, 0.76
+	case .Bomb: width, height = 0.46, 0.46
+	case .Fire: width, height = 0.64, 0.7
+	case .Shock_Floor: width, height = 0.88, 0.12
+	case .Tesla_Coil: width, height = 0.64, 1.18
+	case .Cannon: width, height = 0.85, 0.85
+	case .Flood: width, height = 0.85, 0.35
+	case .Black_Hole: width, height = 0.85, 0.65
+	case .Bomb_Marley: width, height = 0.75, 0.9
+	// CANNONE on its stand; the hole is a dark disc with a sphere in it.
+	case .Field_Cannon: width, height = 0.72, 0.86
+	case .Devouring_Hole: width, height = 0.9, 0.5
+	case .Count:
+	}
+	return
 }
 
 grid_object_definition :: proc(kind: Grid_Object_Kind) -> (Grid_Object_Definition, bool) {

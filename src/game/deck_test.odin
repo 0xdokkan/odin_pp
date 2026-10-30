@@ -7,8 +7,9 @@ test_starter_deck_has_unique_valid_instances :: proc(t: ^testing.T) {
 	deck: Deck_State
 	testing.expect(t, initialize_starter_deck(&deck, 1234))
 	testing.expect(t, validate_deck_state(&deck))
-	testing.expect_value(t, deck.owned_count, 10)
-	testing.expect_value(t, deck.next_card_id, u32(11))
+	// Thorn Coat and Afterimage were retired and not replaced (docs/registro-carte.md).
+	testing.expect_value(t, deck.owned_count, 8)
+	testing.expect_value(t, deck.next_card_id, u32(9))
 	testing.expect(t, !deck.combat_active)
 
 	definition_counts: [int(Card_Id.Count)]int
@@ -31,8 +32,6 @@ test_starter_deck_has_unique_valid_instances :: proc(t: ^testing.T) {
 		.Firebomb,
 		.Guard,
 		.Toxic_Wave,
-		.Thorn_Coat,
-		.Afterimage,
 		.Dash,
 	}
 	for definition, index in CARD_DEFINITIONS {

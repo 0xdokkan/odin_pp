@@ -59,7 +59,7 @@ test_m8_presentation_keeps_gold_healing_and_weapon_drops_for_every_enemy :: proc
     defer delete(room.loot)
     kinds := [3]game.Loot_Kind{.Gold,.Healing,.Weapon}
     for enemy in 0..<game.MAX_ENEMIES_PER_ROOM {
-        for kind in kinds { append(&room.loot,game.Loot{position={enemy,1},kind=kind,amount=1}) }
+        for kind in kinds { append(&room.loot,game.Loot{position={x = enemy, y = 1},kind=kind,amount=1}) }
     }
     snapshot := capture_room_presentation(&room)
     testing.expect_value(t,snapshot.loot_count,len(room.loot))
@@ -121,8 +121,8 @@ test_m8_pointer_controls_match_drawn_buttons_and_respect_action_gates :: proc(t:
     testing.expect(t,created)
     defer level.destroy(&data)
     room.level_data=&data
-    append(&room.objects,game.Grid_Object{kind=.Tesla_Coil,id=2,position={1,1},device_damage=8})
-    append(&room.objects,game.Grid_Object{kind=.Tesla_Coil,id=3,position={2,1},device_damage=8})
+    append(&room.objects,game.Grid_Object{kind=.Tesla_Coil,id=2,position={x = 1, y = 1},device_damage=8})
+    append(&room.objects,game.Grid_Object{kind=.Tesla_Coil,id=3,position={x = 2, y = 1},device_damage=8})
     testing.expect_value(t,m8_control_at_point(renderer,&room,{active.x+3,active.y+3}),M8_Control.Activate)
 
     player.tactical.phase=.Recovery
@@ -155,8 +155,8 @@ test_shock_floor_entry_cue_arms_the_visual_snapshot_without_a_damage_notice :: p
     room := game.Room{player=&player,phase=.Combat}
     defer delete(room.objects)
     defer delete(room.enemies)
-    append(&room.objects,game.Grid_Object{kind=.Shock_Floor,id=1,position={2,2},device_charges=3})
-    append(&room.enemies,game.Enemy{id=4,position={2,3},health=5,max_health=5})
+    append(&room.objects,game.Grid_Object{kind=.Shock_Floor,id=1,position={x = 2, y = 2},device_charges=3})
+    append(&room.enemies,game.Enemy{id=4,position={x = 2, y = 3},health=5,max_health=5})
     before := capture_room_presentation(&room)
     events: game.Event_Log
     game.arm_shock_floor(&room.objects[0],game.enemy_entity(4),&events)
@@ -178,7 +178,7 @@ test_tesla_button_discloses_consumption_only_for_a_real_field :: proc(t: ^testin
     room := game.Room{level_data=&data,player=&player,phase=.Combat}
     defer delete(room.objects)
     for position,index in ([4][2]int{{1,1},{5,1},{5,5},{1,5}}) {
-        append(&room.objects,game.Grid_Object{kind=.Tesla_Coil,id=u32(index+1),position={position[0],position[1]},device_damage=8})
+        append(&room.objects,game.Grid_Object{kind=.Tesla_Coil,id=u32(index+1),position={x = position[0], y = position[1]},device_damage=8})
         title,detail := m8_tesla_control_labels(game.query_tesla_controls(&room))
         if index == 1 {
             testing.expect_value(t,string(title),"ATTIVA")
@@ -189,7 +189,7 @@ test_tesla_button_discloses_consumption_only_for_a_real_field :: proc(t: ^testin
         }
     }
     // Four in a line still form reusable lightning walls, not the mega field.
-    for &object,index in room.objects {object.position={index+1,1}}
+    for &object,index in room.objects {object.position={x = index+1, y = 1}}
     title,detail := m8_tesla_control_labels(game.query_tesla_controls(&room))
     testing.expect_value(t,string(title),"ATTIVA")
     testing.expect_value(t,string(detail),"TESLA 4/4 / PARETI RIUSABILI")

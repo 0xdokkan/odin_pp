@@ -14,7 +14,8 @@ verifica delle funzionalità.
 - Nel bioma: `WASD` cammina liberamente rispetto allo schermo (`W` verso
   l'alto), `M` evoca la mount, `E` interagisce, `Z` apre lo zaino, `Tab`
   apre l'ologramma e `U` apre il personaggio. In combattimento `WASD` torna
-  a muovere di una cella lungo gli assi della griglia.
+  a muovere di una cella lungo gli assi della griglia. Con l'ologramma
+  aperto `W`/`S` (o le frecce su e giù) cambiano il piano mostrato.
 - In combattimento la rotella sceglie la carta. Le carte direzionali usano
   un clic per entrare nel piazzamento, la rotella per ruotare, un secondo
   clic per confermare; il clic destro torna alla selezione.
@@ -33,7 +34,7 @@ verifica delle funzionalità.
 | Mondo aperto | Nuove mappe da 160, 192 o 224 celle per lato, geografia fissa per bioma; seed separato per i contenuti, gruppi di nemici finiti e simulazione locale. Le spedizioni salvate con la versione precedente conservano le loro dimensioni. |
 | POI | Nove planimetrie da 21–29 celle: ingressi multipli, cortili, passaggi di aggiramento, coperture e ali di spawn. Pavimento e geometria usano le stesse celle delle collisioni. Nidi a ondate che si fermano uscendo dal raggio, cache, archivi, officine, fonti, prove, tane del boss, frammenti e tunnel; stati non visitato/scoperto/risolto. |
 | Incontri | Ingaggio a distanza con linea di vista, pattuglie, guinzaglio e rientro all'esplorazione. I gruppi conservano danni e morti quando vengono rimossi dalla simulazione attiva. |
-| Ologramma e segreti | Miniatura 3D dell'intero terreno con rilievi e cortili; aree approssimative dei POI, legenda per tipo e stato, posizione precisa del robot. Non mostra le posizioni dei nemici. Anche i POI scoperti restano aree indicative, secondo la richiesta successiva al documento. I segreti compaiono soltanto dopo il ritrovamento. |
+| Ologramma e segreti | Miniatura 3D dell'intero terreno con rilievi e cortili; aree approssimative dei POI, legenda per tipo e stato, posizione precisa del robot. Non mostra le posizioni dei nemici. Anche i POI scoperti restano aree indicative, secondo la richiesta successiva al documento. I segreti compaiono soltanto dopo il ritrovamento. Dalla Fase 8 del piano profondità è una pila di lastre, una per piano (ponti sopra, terra, grotte e gallerie sotto, reti in fondo): quella mostrata è piena, le altre solo sagome; `W`/`S` cambiano piano. La struttura si vede tutta, i complessi e le sale delle reti sono segnati solo dopo che il robot ci è stato. |
 | Mount | Forma del bioma, movimento accelerato fuori dagli scontri, discesa all'ingaggio o quando un pericolo la impone. |
 | Zaino | Griglia iniziale 8×5, forme a celle e rotazioni, pile da 5 consumabili e 99 crediti, 3 reliquie attive, arma impugnata e 3 oggetti sospesi. |
 | Deposito | Griglie da 12×8 su pagine aggiunte secondo necessità, trasferimenti reali, scelta della capacità dello zaino; crediti come oggetti impilati. |
@@ -291,7 +292,10 @@ della tana (`dietro_muro`), poi guida la scena vera con i tasti tenuti
 premuti: una corsa in sella (`camminata`) e una camminata verso una
 pattuglia fino all'ingaggio (`ingaggio`), stampando posizione, cella e fase;
 infine i dodici biomi con l'inquadratura delle catture di riferimento
-(`centro_00`–`centro_11`). Dopo un'interruzione dovuta al monitor non
+(`centro_00`–`centro_11`), e quattro scontri con una carta scelta in Neve, Far West,
+Giungla e Spazio (`bersagli_neve`, `bersagli_far_west`, `bersagli_giungla`,
+`bersagli_spazio`: il segno dei nemici colpibili sui quattro biomi; con
+`ODIN_PP_SMOKE_ONLY=hits` partono solo quelli). Dopo un'interruzione dovuta al monitor non
 disponibile, la sessione grafica è tornata accessibile: le nuove catture
 native sono state controllate. La mappa intera, gli indicatori e la legenda risultano leggibili;
 il robot conserva il bordo di carta, la griglia di combattimento è visibile
@@ -565,16 +569,28 @@ odin build src -o:speed -define:EXPEDITION_BENCHMARK=true -out:build/odin_pp-ben
 rg '^(EXPEDITION BENCHMARK|CPU SUBMISSION|CPU SCENE|CPU WORLD|GEOMETRY CACHE)' build/expedition-benchmark.log
 ```
 
-Il percorso corrente comprende gli stage 0–50 (i log della revisione Cyber
-precedente terminano allo stage 39). Scarta i primi 20 frame di ogni scena,
+Il percorso comprende tutti gli stage dello smoke, 0–102 (fino al 25 ottobre
+2026 si fermava al 50; i log della revisione Cyber precedente terminano allo
+stage 39). Scarta i primi 20 frame di ogni scena,
 ne misura 120, oppure 240 per corsa e ingaggio, e termina automaticamente.
 Le scene ferme conservano uno stato di gioco prestabilito e aggiornano
 presentazione e animazioni; soltanto corsa e ingaggio, stage 25 e 26,
 eseguono l'aggiornamento completo della scena con input di movimento. La
 misura dello scontro fermo descrive quindi il disegno di quella situazione,
 non tutti i costi di una battaglia giocata.
-Per un controllo breve aggiungere `-define:EXPEDITION_BENCHMARK_LAST=7` alla
-compilazione. Il benchmark disabilita il limite fps e la richiesta di VSYNC;
+Per misurare solo una parte si scelgono primo e ultimo stage in compilazione,
+per esempio `-define:EXPEDITION_BENCHMARK_FIRST=63 -define:EXPEDITION_BENCHMARK_LAST=98`
+(rilievi, ologrammi, montagna e grotte); `-define:EXPEDITION_BENCHMARK_LAST=7`
+basta per un controllo breve. Gli stage prima del primo preparano comunque la
+loro scena, senza misurarla, così ogni stage misurato parte come in un giro
+intero. Ogni scena si disegna su un canvas fisso di 1920×1080 pixel, qualunque
+siano la finestra e il ridimensionamento dello schermo
+(`EXPEDITION_BENCHMARK_CANVAS_WIDTH` e `_HEIGHT`; 0 e 0 seguono la finestra,
+come prima): il log lo riporta in `canvas_px`. Sui portatili con due schede
+video la riga `Renderer:` del log dice quale scheda ha disegnato.
+Le misure di partenza del 25 ottobre 2026, su Windows con una RTX 3060, sono
+nella Fase 0 e nell'appendice A di [piano-profondita.md](piano-profondita.md).
+Il benchmark disabilita il limite fps e la richiesta di VSYNC;
 esclude screenshot e letture dei buffer GPU. Il compositore e il driver
 possono comunque influenzare la presentazione. La prova visiva e HDR resta
 un'esecuzione separata di `--smoke-expedition` compilata senza il flag.
@@ -588,8 +604,9 @@ odin build src -o:speed -define:EXPEDITION_BENCHMARK=true -define:EXPEDITION_TIL
 
 Confrontare gli stessi stage e `canvas_px`, sullo stesso monitor e con lo
 stesso carico di sistema; ripetere alternando l'ordine delle due build. Lo
-smoke ridimensiona alcune schermate, quindi le medie di scene con tele
-diverse non misurano lo stesso lavoro.
+smoke ridimensiona alcune schermate: con il canvas fisso i pixel disegnati
+restano gli stessi, mentre con il canvas che segue la finestra le medie di
+scene con tele diverse non misurano lo stesso lavoro.
 
 `EXPEDITION BENCHMARK` riporta gli intervalli fra frame presentati, inclusi
 aggiornamento, invio, presentazione e attese del driver. `CPU SUBMISSION`,
@@ -737,6 +754,244 @@ Per ripetere il confronto con il vecchio buffer, compilare con
 `-define:EXPEDITION_BENCHMARK_LAST=7` limita il confronto agli otto scenari
 iniziali; ometterlo esegue tutte le 51 scene. La build normale pronta da
 avviare è `build/odin_pp`; conserva il limite fps delle impostazioni di gioco.
+
+## Strutture su più caselle (Fase 6 del piano griglia)
+
+- **Livello:** `level.Tile_Kind.Fence` (blocca il passo, non la vista); `src/level/structure.odin`
+  legge le piante, le ruota e le specchia, controlla e posa; il catalogo è in
+  `structure_catalog.odin`. Il livello tiene l'elenco, le piante ruotate e per ogni cella il numero
+  della struttura sopra (`structure_index_at`).
+- **Regole:** nessuna nuova (le caselle sono ordinarie); la vista lascia passare il muretto
+  (`game.cell_blocks_line_of_sight`). `game.structure_visibility` è la funzione pura della trasparenza.
+- **Spedizioni:** `World.structures` (24 al massimo) è salvato con il mondo; il ripristino ricostruisce
+  l'indice dalle caselle salvate; il generatore posa le strutture di Robotica cibernetica dopo i servizi,
+  cercando il posto libero più vicino in un ordine fisso, quindi la stessa geografia a ogni run.
+- **Grafica:** vedi `docs/presentazione.md`.
+- **Limiti:** per ora solo Robotica cibernetica (il bioma di prova scelto dall'utente) ha strutture; le
+  piante non hanno altezze (le cifre `1`…`9` non sono accettate, le spedizioni restano piatte fino alla Fase 3);
+  l'arredo degli edifici è minimo (pavimento, altare del tempietto); nei riflessi del pavimento non compare
+  l'involucro; l'ologramma non mostra i muretti. La posa da parte del giocatore è la Fase 7.
+
+## Rilievi delle spedizioni (Fase 3 del piano griglia)
+
+- **Generatore:** `src/expedition/relief.odin` calcola le altezze come funzione pura del bioma e delle
+  coordinate (cumuli, dune, terrazze, crateri, isole del Cielo, altopiani con scala), in due strati: il
+  liscio, rilassato perché due celle vicine, anche in diagonale, siano al massimo a un gradino, e piano attorno a servizi,
+  partenza e pattuglie; e gli altopiani, con i loro dirupi, solo ben lontano da quel terreno piano.
+  `level.set_height_table` scrive la tabella; `generate` la applica dopo i servizi e prima delle strutture.
+- **Salvataggio:** `Snapshot.heights`, una tabella `[MAX_CELLS]u8` in più; manca nei salvataggi vecchi e
+  vale zero (piatto).
+- **Esplorazione:** `roam_blocked`, `walk`, `move_sleeping_group`, `patrol_move_toward` e `can_see` usano
+  `game.step_height_blocked` e le altezze della linea di vista.
+- **Renderer:** dalla Fase 1 del piano della profondità il rilievo è la superficie scolpita
+  (`level/surface.odin`) in `render/expedition_terrain.odin`: rampe, pareti di roccia sfaccettate e un bordo
+  al neon tenue in cima ai dirupi (prima erano terrazze). `Ink_Pass.lift` alza muri, prop, servizi e
+  strutture alla quota della cella; l'ologramma in `run/expedition_hologram.odin`.
+- **Limiti:** vedi l'Esito della Fase 3 nel piano.
+
+## La montagna a spirale (Fase 4 del piano griglia)
+
+- **Forma:** `src/level/mountain.odin`: `mountain_height(offset)` e `mountain_icy(offset)` sono funzioni pure della
+  posizione rispetto al centro; una casella appartiene al giro più vicino e ha la quota di quel giro all'angolo
+  suo (lunghezza del sentiero), quindi le caselle affiancate hanno la stessa quota. `mountain_stamp` la scrive
+  su un `Level` (spiana mura e prop del quadrato).
+- **Mappa:** `src/expedition/mountain.odin`: presente solo nella Neve 192×192; `apply_relief` la tratta come una
+  zona piana, `generate` la alza dopo il rilievo e prima delle strutture, e `add_mountain_inhabitants` mette la
+  pattuglia e la reliquia dopo le altre pattuglie (il flusso casuale dei contenuti arriva dopo, quindi le altre
+  mappe non cambiano).
+- **Terreno:** `game.expedition_terrain` (Neve) dà `.Plain` o `.Ice` nel quadrato della montagna.
+- **Disegno:** il pavimento ha due programmi (`plain` e `tall`): il secondo apre una finestra tonda, con un bordo
+  luminoso, attorno al robot nelle terrazze più alte dei suoi piedi (uniform di `set_expedition_reveal`, solo
+  il primo punto), ed è usato solo dove una terrazza di 16 gradini o più è in vista (un `discard` costa il test di
+  profondità anticipato). I nemici dietro un rilievo non si disegnano (`terrain_hides_actor`). L'ologramma
+  raggruppa le altezze oltre 12 a bande di sei.
+- **Attenzione:** in Odin un `defer` che cambia un risultato con nome non cambia il valore restituito.
+- **Laboratorio:** `Mechanics_Lab_Arena.Mountain`, atto `mechanics_lab_mountain`, `ODIN_PP_LAB_ONLY=mountain`.
+
+## Le caverne (Fase 5 del piano griglia, piano sotto dalla Fase 5 del piano profondità)
+
+- **Piano dell'interno:** `src/level/cave.odin`: `cave_plan(seed)` dà 34×18 caselle con due o tre stanze, l'arrivo, il segreto
+  e i punti dove aspettano i gruppi; `cave_plan_sized` una tavola più piccola, con due stanze (il Far West: 24×14,
+  `expedition.cave_board`).
+- **La grotta è un piano della mappa** (`src/expedition/cave.odin`): le stanze sono caselle del piano −1 (`CAVE_LAYER`) alla
+  quota del terreno attorno, sotto un massiccio di roccia alto 14 gradini al bordo e fino a 18 dentro; un tunnel porta dalla
+  prima stanza, attraverso l'anello di roccia, all'imbocco sul terreno aperto a ovest. Nella Neve la grotta della montagna
+  è una stanza sola nel nucleo, con l'imbocco sul sentiero vicino a metà salita (`mountain_cave_room`). Niente dissolvenza e
+  niente cambio di mappa: ci si entra camminando (`game.layer_step`), anche in sella e durante uno scontro.
+- **Posti:** fissi per bioma (`cave_places`, generatore fisso), scelti prima dei rilievi (`plan_caves`), che tengono piano il
+  terreno attorno a ogni massiccio (`cave_level_zones` in `apply_relief`); poi `place_caves` scava le grotte e mette un sito
+  `Cave` all'imbocco per ognuna. La run sceglie quali 1–3 hanno nemici e segreto (`Cave.inhabited`); la montagna sempre.
+- **Dove sta il giocatore:** `World.in_cave` (0 fuori, k+1 nella grotta k) si ricava a ogni `tick` dalla posizione
+  (`cave_at`, `update_caves`), che segna anche le grotte visitate e saccheggiate. `cave_rock` dice se una casella della
+  terra è roccia di un massiccio (la corsia dell'Inferno non la spacca; il disegno la fa di roccia nuda). Sotto la roccia il
+  terreno del bioma non c'è (`game.expedition_terrain` dà `.Plain` fuori dalla terra). `in_scope` e `visible_sites` restano
+  per compatibilità e dicono sempre «tutti».
+- **Salvataggio:** i piani fuori dalla terra sono una lista di caselle (`Snapshot.layer_cells`, 29 bit ciascuna) e di pozze
+  (`layer_pools`); `layers_version` vale `SNAPSHOT_LAYERS`: un salvataggio di prima non ce l'ha ed è rifiutato senza
+  conversione (scelta dell'utente); il campo segna `Invalid_State` nello slot.
+- **Esplorazione e pattuglie:** `roam_layer_cell` e `walk` passano dai piani come il passo; `patrol_move_toward` ha il campo
+  delle distanze su tutti i piani (finestra di 65×65 per piano, in memoria temporanea).
+- **Disegno:** `render/expedition_layers.odin` disegna le stanze con il programma del pavimento (`floorLayer` 1): pavimenti,
+  pareti di roccia sfaccettate, il taglio della roccia alla quota del soffitto; `expedition_terrain.odin` apre la parete
+  del massiccio sopra l'imbocco (`terrain_opening`). In grotta il programma «tall» dirada con un retino la terra sopra gli
+  occhi del robot entro 6 caselle (`coverPoint`, la regola della Fase 4), la scurisce tutta (`dimBox`) e toglie al cielo il
+  65% della luce delle stanze (`skyShade`); la lampada del robot è più forte e i nemici svegli hanno una luce. I nemici che
+  dormono hanno un'entità loro (`expedition_member_entity`) per stare sul pavimento del loro piano. L'arco di luce
+  sull'imbocco è `render/expedition_cave.odin`. L'ologramma, in grotta, toglie la roccia del suo massiccio e mostra le stanze,
+  e segna gli imbocchi scoperti.
+- **Smoke:** gli stage dall'87 entrano ed escono camminando nei quattro biomi (`ODIN_PP_SMOKE_ONLY=caves`); lo stage 103
+  fotografa l'ologramma nella grotta della montagna.
+
+## I complessi (Fase 7 del piano profondità)
+
+- **Cosa sono** (`src/expedition/complex.odin`): luoghi su più piani, a posti fissi per bioma come i massicci. La regola dei
+  piani vuole 12 gradini fra due pavimenti della stessa colonna, così un complesso alza blocchi di roccia di
+  `COMPLEX_TOP` (14) gradini sul terreno piano attorno, camminabili in cima, con ponti sul piano +1, gallerie sul piano −1,
+  rampe, ascensori e un cancello di scorciatoia (scelta dell'utente: «complessi a tema, alti 14»).
+- **Disegno del complesso:** una mappa ASCII per tipo (`Complex_Layout.rows`): `.` terreno, `#` blocco, `$` segreto, `@`/`&`
+  guardie, `=` ponte, `a..m` rampa (1–13 gradini), `t` galleria, `S` pozzo con ascensore fino alla cima, `L` ascensore
+  lungo il fianco (piede a terra, pianerottolo sul piano +1); dal quarto gruppo `+`/`*` segreto e guardie su un ponte, `?`
+  segreto in galleria, `O` il masso su un blocco. I cancelli sono a parte (`Complex_Layout.gates`), sul piano del loro segno.
+  - Robotica cibernetica, `Data_Node`: due piattaforme dati e una passerella; sotto la piattaforma ovest un condotto con il
+    cancello all'imbocco (leva dentro) e un pozzo fino alla cima.
+  - Far West, `Train_Bridge`: due mese e il ponte del treno (binari, cavalletti); l'ascensore della mesa est ha il cancello
+    sul bordo in cima (leva sulla mesa). La miniera resta la grotta di prima.
+  - Giungla preistorica, `Giant_Trees`: la collina delle ossa con la caverna sotto (due imbocchi, guardie dentro), due alberi
+    giganti con ponti di liane; il cancello sul secondo ponte, l'ascensore sul secondo albero.
+- **Posti:** `plan_complexes` (generatore fisso per bioma, prima dei rilievi) li mette lontano da siti, partenza, corsia
+  centrale, ancore delle pattuglie, montagna e massicci; `apply_relief` tiene piano il terreno attorno
+  (`complex_level_zone`); `structure_keep_clear` tiene lontane le strutture; `place_complexes` costruisce, dopo i rilievi;
+  `fill_complexes` mette segreto e guardie alla fine di `generate` (i gruppi dei siti restano ai loro indici).
+- **Ascensori e cancelli nel mondo:** `World.lifts`/`World.gates` li copiano per il salvataggio; `restore` li rimette prima di
+  `check_layers` (i cancelli senza `add_gate`, che li richiuderebbe). `Snapshot.lifts` tiene dove riposano le piattaforme;
+  `stable` non salva mentre una piattaforma porta qualcuno.
+- **Esplorazione:** `roam_press` chiama la piattaforma o apre il cancello quando il robot spinge contro la faccia della
+  casella; `roam_enter` lo fa salire sulla piattaforma; durante il viaggio non si cammina. `walk` fa lo stesso a passi.
+- **Disegno:** `render/expedition_decks.odin` disegna i ponti nel programma del pavimento (`floorLayer` 2, `deckMain`): piano,
+  bordi, sotto e cavalletti del Far West; i vertici dicono il verso, il bordo aperto e la fila di mezzo. Il programma «tall»
+  si usa anche quando un ponte è in vista: sopra gli occhi del robot il ponte si dirada col retino. Da `EXPEDITION_TERRAIN_TALL`
+  14 il rilievo di un complesso apre la finestra attorno al robot. Ascensori e cancelli sono quelli del laboratorio
+  (`draw_board_lifts`, luce di resina); il recinto di un cancello non ha il muretto d'inchiostro. In un condotto vale la vista
+  della grotta (`complex_tunnel_block`): fuori più scuro, la lampada del robot. I nemici che dormono sotto terra non si
+  disegnano dove la roccia li nasconde.
+  - City pop, `Rooftops`: tre palazzi con i tetti uniti da cavalcavia; scala antincendio sul primo, ascensore sul terzo, il
+    cancello sul cavalcavia del primo si apre dal tetto di mezzo (segreto e guardie).
+  - Egitto, `Pyramids`: due piramidi a gradoni (terrazze a 4, 8 e 12 gradini, cima a 14) con una scala che gira; la
+    prima ha il pozzo `D` fino alla necropoli, la seconda segreto e guardie in cima.
+  - Vietnam, `Bamboo_Bridges`: due colline sulle rive di un fiume e un ponte di bambù sopra l'acqua
+    (`Complex_Layout.over_water`: il ponte sopra l'acqua, blocchi e rampe all'asciutto).
+  - Montagne innevate, `Crevasse`: un crepaccio **scavato** (`Complex_Layout.dug`, nella Neve alzata di una base): il fondo
+    `COMPLEX_TOP` gradini sotto la neve (`_`), una scala che scende dall'ovest, il ponte di corda sul piano +1 alla quota
+    della neve, guardie e segreto sul fondo; l'ascensore scende dalla neve in una nicchia, il cancello della nicchia si apre
+    dal fondo. In un complesso scavato `complex_levels` dà fondo e neve, `complex_mark_pit` le caselle scavate.
+  - Inferno, `Bone_Bridge`: due rupi ai lati di un fiume di lava e il ponte di ossa fra le cime (`over_lava`: il ponte sopra
+    la lava, rupi e scala all'asciutto). La scala gira una volta, perché i fiumi tornano ogni 23 colonne. Nella rupe est la
+    caverna di lava con le guardie, il cancello all'imbocco (leva dentro) e il pozzo fino alla cima. L'eruzione non rompe la
+    roccia dei complessi.
+  - Southern gothic, `Ruined_House`: un fienile e una casa in rovina, il ballatoio fra i tetti; scala esterna sul fienile,
+    segreto e guardie sul tetto della casa, ascensore sul fianco della casa con il cancello in cima (leva sul tetto).
+  - Isola nel cielo, `Floating_Island`: un'isola più piccola sospesa sul piano +1 sopra un'isola libera (marmo, filetto
+    d'oro), con segreto e guardie sopra (segni `+` e `*`: segreto e guardie su un ponte); una scalinata attorno a un pilastro,
+    l'ascensore con il cancello sul pianerottolo (leva sull'isola). I ponti fra le isole restano come prima (scelta
+    dell'utente), e l'isola sotto resta camminabile, all'ombra.
+  - Spazio, `Station`: tre moduli uniti da passerelle (le passerelle d'acciaio di Robotica, nel neon dello Spazio); rampa
+    sul primo, segreto e guardie sul modulo di mezzo, ascensore sul terzo con il cancello in cima. E tre crateri **scavati**
+    (`Crater_Lift`, `Crater_Hall`, `Crater_Stair`): buche tonde profonde `COMPLEX_TOP` nello Spazio alzato di una base, una
+    con l'ascensore dal fondo, una con guardie e segreto sul fondo, una con la scala da ovest e le guardie. I due ultimi
+    cercano il posto vicino al cratere prima (`Complex_Layout.near`, `COMPLEX_NEAR`); le gallerie fra loro sono una rete
+    (sotto). I pozzi di gravità restano dove sono, anche sui complessi.
+  - La memoria del creatore, `Boulder_Hill`: la collina del masso, cima alta 14 con il masso (segno `O`: un muro, disegnato
+    come la pietra di Sisifo in `render/expedition_ascent.odin`), una terrazza a 7 su tre lati; il sentiero sale da sud
+    alla terrazza, la gira e sale sul fianco est fino in cima. Dalla cima il pozzo `S` scende nella sala dentro la collina,
+    con il segreto (segno `?`: segreto in galleria) e le guardie; il passaggio esce ai piedi dello sperone sud, con il
+    cancello che si apre da dentro. La grande collina in mezzo alla mappa, che il terreno piano di due luoghi aveva ridotto
+    a una cresta, non c'è più.
+- **Smoke:** gli stage dal 104 (`ODIN_PP_SMOKE_ONLY=complessi`), sei per bioma (tutti i dodici, fino al 175): panorama, sotto
+  il ponte (in Egitto una terrazza, nella Neve il fondo del crepaccio, nella Memoria la sala dentro la collina), sul ponte (la
+  cima), al cancello, in ascensore, uno scontro fra i piani.
+
+## Il terreno alzato e le reti sotterranee (Fase 7 del piano profondità, dal secondo al quarto gruppo)
+
+- **La base** (`level.Level.base`, `World.base`, `expedition.biome_base`): City pop, Egitto, Vietnam, Neve, Gotico e Spazio hanno
+  tutto il terreno alzato di `EXPEDITION_RAISED_BASE` (14) gradini in `apply_relief` (scelta dell'utente). La montagna della
+  Neve sta sopra la base (`level.mountain_stamp` aggiunge `Level.base`), e così la stanza della sua grotta. Le regole contano le
+  quote da 0 come sempre; il disegno toglie la base (`board_drawn`, `board_base_drawn` in `render/height_view.odin`; il
+  rilievo, le stanze sotterranee, i ponti, l'arco delle grotte, la prima persona e l'ologramma fanno lo stesso), così la
+  superficie si vede come prima e i piani sotto vanno sotto il piano del tavolo. Il salvataggio tiene la base nel mondo
+  (un salvataggio di prima ha 0, e il suo terreno non è alzato).
+- **Le reti** (`src/expedition/network.odin`): sul piano −2 (`NETWORK_LAYER`) alla quota 0, sale (`Network_Hall`, a posti
+  fissi in centesimi della mappa) unite da vie che girano attorno a muri e buche (`network_way`, una ricerca in ampiezza;
+  sotto un muro la colonna è roccia piena, `level.column_of`). Metro di City pop (tre stazioni), necropoli dell'Egitto (la
+  sala sotto il pozzo della piramide, la grande sala, la tomba), gallerie del Vietnam (dal tunnel di oggi al suo arrivo,
+  sei camere), cripta e catacombe del Gotico (il pozzo con l'ascensore, la cripta sotto la collina, due tombe aperte con
+  le scale). La Neve è alzata per il crepaccio e non ha rete. Scale: buche con una rampa da 1 a 13 gradini (`network_stair`), la più vicina alla sala che ha una via;
+  un ascensore per bioma (`network_lift`, o il pozzo `D` della piramide); un cancello sulla via indicata
+  (`Network_Plan.gate_way`), con la leva verso la sala dopo. Guardie e segreto in `fill_network`.
+- **Le gallerie dello Spazio** (quarto gruppo): le sue «sale» sono i fondi dei tre crateri (`Network_Hall.crater`, il tipo del
+  complesso): il fondo è già scavato, scala, ascensore, guardie e segreto sono del complesso. Le vie partono dalla casella
+  accanto al fondo, sotto il terreno, più vicina al cratere dopo (`network_crater_mouth`): lì la parete del cratere si apre
+  (`terrain_opening`). Il cancello è sulla galleria fra il cratere dell'ascensore e quello del segreto, con la leva dalla
+  parte del segreto: si scende dalla scala, si va al segreto, si apre, si risale con l'ascensore.
+- **Il tunnel del Vietnam:** il salto con E non c'è più (`tunnel_destination` tolto); `nearest_site` non offre il tunnel,
+  come le grotte: si scende dalle scale accanto.
+- **Il killer del Gotico** non scende sotto terra (scelta dell'utente): mentre il robot è sotto, aspetta in superficie e non
+  lo vede; uno scontro con lui finisce quando il robot scende (`tick`, come il guinzaglio).
+- **Disegno:** le caselle accanto a una buca hanno il loro muro anche se piane alla base, e il piano non copre le buche
+  (`Expedition_Terrain_Chunk.sunk`). Sotto il piano, sotto roccia, la finestra attorno al robot è più larga (taglia anche
+  gli edifici sopra) e la superficie è più scura (la scatola della «grotta» è di poche caselle attorno a lui); in una buca
+  la finestra non c'è (sotto la buca non c'è niente da mostrare). Sotto il piano le pareti di una buca hanno la roccia
+  del bioma, più chiara al bordo e più scura verso il fondo, e il fondo è più scuro quanto è più giù. Ponti di City pop
+  (lastre e riga tratteggiata), del Vietnam (bambù), della Neve (assi e corde), dell'Inferno (ossa e braci), del Gotico
+  (assi del ballatoio, balaustra) e del Cielo (marmo, filetto d'oro) in `deckMain`.
+- **Smoke:** gli stage dal 176 (`ODIN_PP_SMOKE_ONLY=reti`), tre per bioma (City pop, Egitto, Vietnam, Gotico, Spazio): a
+  metà di una scala, vicino ai nemici sotto la base (in una sala, o sul fondo di un cratere), sull'ascensore a metà discesa.
+
+## L'ologramma a piani e i blocchi sulla scheda video (Fase 8 del piano profondità)
+
+- **La pila di lastre** (`src/run/expedition_hologram.odin`, scelta dell'utente): ogni piano della mappa che ha una casella
+  (`hologram_plates`) è una lastra, nell'ordine dei piani, a `HOLO_PLATE_GAP` del lato della mappa l'una dall'altra. La
+  lastra mostrata (`Expedition_Session.map_layer`) è quella del robot quando la mappa si apre; `W`/`S` e le frecce passano
+  alla lastra sopra o sotto che ha caselle (`hologram_next_plate`). La lastra mostrata è piena (prismi, muri, curve di
+  livello; una lastra di poche caselle ha un alone attorno, `sparse`), le altre solo le cime delle loro caselle, tenui
+  (`draw_hologram_ghost`). La terra conta le quote dalla base (le buche sotto la base vanno sotto lo zero); le altre lastre
+  dal loro pavimento più basso (`hologram_plate`). Il robot è segnato sulla sua lastra, qualunque sia quella mostrata.
+- **Cosa si vede:** tutta la struttura; dei punti d'interesse, solo quelli dove il robot è stato. Sulla terra le aree dei
+  luoghi come prima, gli imbocchi delle grotte trovati e i complessi visitati; sulla lastra profonda le sale delle reti
+  visitate. Le visite stanno nel mondo, per la run: `Complex.visited` e `World.network_visited` (`update_visits`, a ogni
+  tick).
+- **Blocchi sulla scheda video** (`render/expedition_terrain.odin`, `draw_terrain_chunk`): i blocchi del rilievo e dei
+  ponti si caricano una volta, al primo disegno dopo che sono costruiti, e da lì si disegnano dalla scheda con il programma
+  del pavimento (`Expedition_Floor.bound`; la mappa delle caselle va come seconda mappa del materiale), invece di passare
+  vertice per vertice a ogni fotogramma. Si disegnano con il culling delle facce posteriori: prima lo si spegneva, ma nel
+  batch di rlgl i vertici arrivavano alla scheda quasi sempre dopo che era tornato acceso, e l'aspetto è quello. Le stanze
+  sotto terra restano come prima: dalla scheda la finestra attorno al robot nella sala di un complesso usciva diversa
+  (probabilmente per lo stesso motivo), e sono poche e solo vicino al robot.
+- **L'ologramma tenuto fra un fotogramma e l'altro** (`Hologram_Cache`, nella sessione della spedizione): le lastre si
+  costruiscono una volta per mappa (`hologram_prepare`), e i loro triangoli (la lastra mostrata piena, le cime tenui delle
+  altre) vanno sulla scheda video una volta per lastra mostrata, uno per lastra, disegnati con lo shader di base di raylib.
+  A ogni fotogramma restano solo le cose piccole o che si muovono: la base e le cornici, le linee (muri, curve di livello,
+  griglia: una mesh non sa disegnare linee, si mandano dalla lista tenuta), le aree, i segni e il robot. Si ricostruisce
+  quando cambia la geometria della mappa (`geometry_revision`), il mondo (seme o bioma) o la lastra mostrata; si libera
+  quando si chiude la spedizione (`hologram_release`). Le catture dei piani sono identiche al byte a quelle di prima.
+- **L'ologramma delle stanze** (`src/render/hologram.odin`): il tavolo segue il rilievo della stanza (ogni casella è una
+  colonna fino alla sua quota, `cell_ground`; muri, uscite, binari, minacce e scansione stanno sopra), i ponti sopra la
+  terra sono lastre alla loro quota, e chi è sotto un ponte o nella roccia ha il contorno, come in gioco
+  (`draw_hidden_outlines`). Prima il tavolo era piatto e le figure, disegnate alla loro quota, sembravano su un'altra
+  casella. Le quote, le figure e i coperti si prendono dalla stanza anche se il mondo non è stato disegnato. Una stanza
+  piatta si vede come prima, al byte.
+- **Smoke:** gli stage dal 191 (`ODIN_PP_SMOKE_ONLY=piani`): l'ologramma di City pop sulla terra, sopra e nel profondo, e
+  quello della Memoria dalla sala della collina. Nel laboratorio, l'ologramma della stanza dall'altopiano
+  (`odin_pp_mechanics_lab_heights_mappa.png`) e dal ponte (`odin_pp_mechanics_lab_layers_mappa.png`).
+
+## Strutture posate dal giocatore (Fase 7 del piano griglia)
+
+- **Kit:** `campaign.Item_Kind.Structure_Kit` (variante = `level.Structure_Id`); `campaign.spend_structure_kit` lo spende alla posa;
+  `campaignui` lo usa con **POSA** (`Output.place_structure`, non lo spende).
+- **Regole:** `expedition/player_structures.odin`: `check_player_structure` / `place_player_structure` (limite, portata, nessun attore sopra,
+  poi `level.place_check` con `structure_keep_clear`); `sync_structures` tiene la lista del mondo uguale a quella della mappa.
+- **Salute:** `Placed_Structure.health`, `level.structure_max_health`, `damage_structure`, `remove_structure`; `game.strike_structures`
+  è chiamata da `resolve_enemy_blow`.
+- **Scena:** `expedition_begin_placement` / `expedition_placing_update`; il fantasma è `render.set_structure_ghost` (`expedition_ghost.odin`).
 
 ## Limiti dichiarati
 

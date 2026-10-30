@@ -27,12 +27,15 @@ Status_Kind :: enum {
 	Fate,
 	// Lama (Lama Velenosa): bumps that poison.
 	Venom_Blade,
+	// Sanguinamento: a foe's stacks; whenever it takes damage, from any source,
+	// the damage is raised by its stacks. They never wear (dinosaur.odin).
+	Bleed,
 }
 
 status_kind_is_valid :: proc(kind: Status_Kind) -> bool {
 	switch kind {
 	case .Poison, .Shield, .Thorns, .Afterimage, .Stagger, .Survey, .Burn, .Slow,
-	     .Deflect, .Arrows, .Fate, .Venom_Blade:
+	     .Deflect, .Arrows, .Fate, .Venom_Blade, .Bleed:
 		return true
 	}
 	return false
@@ -44,7 +47,7 @@ status_kind_is_valid :: proc(kind: Status_Kind) -> bool {
 // stacks too, worn by their use.
 status_kind_stacks :: proc(kind: Status_Kind) -> bool {
 	switch kind {
-	case .Poison, .Burn, .Slow, .Deflect, .Arrows, .Fate, .Venom_Blade:
+	case .Poison, .Burn, .Slow, .Deflect, .Arrows, .Fate, .Venom_Blade, .Bleed:
 		return true
 	case .Shield, .Thorns, .Afterimage, .Stagger, .Survey:
 	}
@@ -57,7 +60,7 @@ status_kind_is_player_charge :: proc(kind: Status_Kind) -> bool {
 	switch kind {
 	case .Deflect, .Arrows, .Fate, .Venom_Blade:
 		return true
-	case .Poison, .Shield, .Thorns, .Afterimage, .Stagger, .Survey, .Burn, .Slow:
+	case .Poison, .Shield, .Thorns, .Afterimage, .Stagger, .Survey, .Burn, .Slow, .Bleed:
 	}
 	return false
 }
@@ -88,6 +91,8 @@ status_kind_name :: proc(kind: Status_Kind) -> string {
 		return "Fate"
 	case .Venom_Blade:
 		return "Venom Blade"
+	case .Bleed:
+		return "Bleed"
 	}
 	return "Unknown"
 }
@@ -155,7 +160,7 @@ can_apply_status :: proc(room: ^Room, entity: Entity_Ref, kind: Status_Kind) -> 
 		return false
 	}
 	// Rallentamento holds an enemy's intents; the player has none to hold.
-	if kind == .Slow && entity.kind == .Player {
+	if (kind == .Slow || kind == .Bleed) && entity.kind == .Player {
 		return false
 	}
 	// The player's charges load his own blows: no enemy carries one.
@@ -188,7 +193,7 @@ apply_status :: proc(
 		// A new Dado del Destino loads its bumps back to its charges, never above.
 		case .Thorns, .Afterimage, .Stagger, .Survey, .Fate:
 			status.potency = max(status.potency, potency)
-		case .Shield, .Poison, .Burn, .Slow, .Deflect, .Arrows, .Venom_Blade:
+		case .Shield, .Poison, .Burn, .Slow, .Deflect, .Arrows, .Venom_Blade, .Bleed:
 			available := max(i32)-status.potency
 			status.potency += min(potency, available)
 		}

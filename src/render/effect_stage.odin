@@ -22,10 +22,34 @@ BORROWED_RENDERER_OWN_HANDLES :: [?]string{
 	"tactical.lasso.rope_texture",
 	"tactical.lasso.ring_texture",
 	"tactical.pinball.texture",
+	"tactical.marley.figure",
+	"tactical.marley.bomb",
+	"tactical.marley.puff",
+	"tactical.arsenal.ball",
+	"tactical.arsenal.puff",
+	"tactical.arsenal.dinos[0]",
+	"tactical.arsenal.dinos[1]",
+	"tactical.arsenal.dinos[2]",
+	"tactical.arsenal.dinos[3]",
+	"tactical.arsenal.dinos[4]",
+	"tactical.arsenal.dinos[5]",
+	"tactical.arsenal.dinos[6]",
+	"tactical.arsenal.dinos[7]",
 	"tactical.first_person.ak_texture",
 	"tactical.first_person.tracer_texture",
 	"tactical.first_person.flash_textures[0]",
 	"tactical.first_person.flash_textures[1]",
+	"tactical.first_person.gloves.sphere",
+	"tactical.first_person.gloves.cylinder",
+	"tactical.first_person.gloves.cube",
+	"tactical.first_person.gloves.blade",
+	"tactical.first_person.gloves.blade_ink",
+	"tactical.first_person.gloves.compound",
+	"tactical.first_person.gloves.compound_ink",
+	"tactical.first_person.gloves.shader",
+	"tactical.first_person.gloves.paper_shader",
+	"tactical.first_person.gloves.low",
+	"tactical.first_person.gloves.paper",
 }
 
 // A renderer for a board of `canvas_width` by `canvas_height` drawn into
@@ -72,6 +96,9 @@ borrow_renderer_assets :: proc(r, main: ^Renderer) {
 	v.light_shader = m.light_shader
 	v.light_position_location, v.light_hologram_location, v.light_eye_location = m.light_position_location, m.light_hologram_location, m.light_eye_location
 	v.light_clear_location, v.light_accents_location = m.light_clear_location, m.light_accents_location
+	v.layer_light = m.layer_light
+	v.hidden_shader = m.hidden_shader
+	v.hidden_bounds_location, v.hidden_texel_location, v.hidden_radius_location = m.hidden_bounds_location, m.hidden_texel_location, m.hidden_radius_location
 	v.outline_shader = m.outline_shader
 	v.outline_bounds_location, v.outline_texel_location, v.outline_radius_location = m.outline_bounds_location, m.outline_texel_location, m.outline_radius_location
 	v.block_mesh = m.block_mesh
@@ -109,6 +136,8 @@ destroy_borrowed_renderer :: proc(r: ^Renderer) {
 	destroy_fishing_view(r)
 	destroy_pinball_view(r)
 	destroy_first_person_view(r)
+	destroy_marley_view(r)
+	destroy_arsenal_view(r)
 	if v.flipbook_state != nil { free(v.flipbook_state); v.flipbook_state = nil }
 	if v.labels != nil { free(v.labels); v.labels = nil }
 	if v.snapshot != nil { free(v.snapshot); v.snapshot = nil }

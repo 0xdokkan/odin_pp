@@ -30,9 +30,9 @@ create_tactical_independent_world_room :: proc(data: ^level.Level, player: ^game
 		if _, added := game.add_owned_card(&player.deck, id); !added { return false }
 	}
 	spawns := [?]game.Enemy_Spawn{
-		{position = {2, 4}, health = 20, attack = 2},
-		{position = {11, 6}, health = 20, attack = 2, archetype = .Brute},
-		{position = {11, 2}, health = 20, attack = 2, archetype = .Archer},
+		{position = {x = 2, y = 4}, health = 20, attack = 2},
+		{position = {x = 11, y = 6}, health = 20, attack = 2, archetype = .Brute},
+		{position = {x = 11, y = 2}, health = 20, attack = 2, archetype = .Archer},
 	}
 	room^, created = game.create_room(data, player, {enemies = spawns[:]})
 	return created
@@ -82,7 +82,7 @@ run_tactical_independent_world_smoke :: proc(window: ^app.Window, renderer: ^ren
 		3, true, {focused = true})
 	if !tactical_polish_check(!blocked && render.renderer_world_is_busy(renderer) &&
 		!render.renderer_blocks_player_input(renderer) && !room.tactical_pulse.pending &&
-		room.enemies[0].position != {2, 4}, "enemy cadence still exclusively owns player input") { return false }
+		room.enemies[0].position != {x = 2, y = 4}, "enemy cadence still exclusively owns player input") { return false }
 	if !tactical_independent_fresh_move(&controller, &room, renderer, &cards, &buffer, .East) { return false }
 	for _ in 0..<8 {
 		if !tactical_independent_visual_frame(&probe, window, renderer, &room, &controller, &cards, &buffer) { return false }

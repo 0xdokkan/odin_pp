@@ -89,9 +89,10 @@ test_route_map_toggle_rejects_terminal_rooms_and_busy_timelines :: proc(t: ^test
 	player := game.Player{stats = {max_health = 10}, health = 10}
 	room := game.Room{player = &player, phase = .Combat}
 	run := game.Run_State{phase = .In_Room}
-	renderer: render.Renderer
+	renderer := new(render.Renderer)
+	defer free(renderer)
 
-	testing.expect(t, run_session.route_map_toggle_is_allowed(&run, &room, &renderer))
+	testing.expect(t, run_session.route_map_toggle_is_allowed(&run, &room, renderer))
 	events: game.Event_Log
 	game.record_event(&events, {
 		kind = .Moved,
@@ -100,15 +101,15 @@ test_route_map_toggle_rejects_terminal_rooms_and_busy_timelines :: proc(t: ^test
 		to_position = {x = 2, y = 1},
 	})
 	render.begin_renderer_event_timeline(
-		&renderer,
+		renderer,
 		render.capture_room_presentation(&room),
 		&events,
 	)
-	testing.expect(t, !run_session.route_map_toggle_is_allowed(&run, &room, &renderer))
-	render.clear_event_animations(&renderer)
+	testing.expect(t, !run_session.route_map_toggle_is_allowed(&run, &room, renderer))
+	render.clear_event_animations(renderer)
 
 	room.phase = .Complete
-	testing.expect(t, !run_session.route_map_toggle_is_allowed(&run, &room, &renderer))
+	testing.expect(t, !run_session.route_map_toggle_is_allowed(&run, &room, renderer))
 	room.phase = .Defeat
-	testing.expect(t, !run_session.route_map_toggle_is_allowed(&run, &room, &renderer))
+	testing.expect(t, !run_session.route_map_toggle_is_allowed(&run, &room, renderer))
 }

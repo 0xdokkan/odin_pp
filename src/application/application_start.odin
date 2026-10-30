@@ -1,5 +1,6 @@
 package application
 import devtools "../devtools"
+import mapeditor "../mapeditor"
 import run_session "../run"
 
 import "core:os"
@@ -13,6 +14,8 @@ import render "../render"
 // Without arguments the menu opens; smoke, lab and report modes start the
 // roguelike directly, so automation keeps its command lines.
 start :: proc(args: []string) {
+	// The maps' retouches (Fase 6 of docs/piano-profondita.md), for every mode: the arenas' and the biomes'.
+	mapeditor.load_all()
 	launch, rest := split_launch_arguments(args)
 	defer delete(rest)
 	options := DEFAULT_RUNTIME_OPTIONS
@@ -46,6 +49,7 @@ run_roguelike_directly :: proc(rs: ^run_session.Roguelike_Session, options: devt
 		profile_path    = profile_path() if run_session.roguelike_profile_enabled(rs) else "",
 		enable_audio    = options.smoke_mode_count == 0,
 		letterbox_color = render.LETTERBOX_COLOR,
+		keep_running    = options.smoke_mode_count > 0,
 	})
 	if !ok {
 		run_session.roguelike_destroy(rs)

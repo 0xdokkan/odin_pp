@@ -35,7 +35,8 @@ test_new_tactical_run_and_restart_keep_expanded_rooms_and_starter_dice :: proc(t
 		testing.expect_value(t, count, 1)
 		// One Movimento Ombra in every tactical run, a restart included.
 		testing.expect_value(t, shadows, 1)
-		for definition in ([?]game.Card_Id{.Heavy_Blow, .Battle_Focus, .Dash}) {
+		// Toxic Wave stays: Battle Focus, which took its place, was retired (docs/registro-carte.md).
+		for definition in ([?]game.Card_Id{.Heavy_Blow, .Toxic_Wave, .Dash}) {
 			found := false
 			for card in run.player.deck.owned[:run.player.deck.owned_count] { found = found || card.definition_id == definition }
 			testing.expect(t, found)

@@ -9,7 +9,7 @@ import view "../engine/view"
 
 @(private = "file")
 draw_voxel_marker :: proc(cell: grid.Position, color: rl.Color) {
-	p := rl.Vector3{f32(cell.x)+0.5, 0.043, f32(cell.y)+0.5}
+	p := rl.Vector3{f32(cell.x)+0.5, 0.043+cell_overlay_ground(cell), f32(cell.y)+0.5}
 	rl.DrawPlane(p, {0.87, 0.87}, {color.r, color.g, color.b, 45})
 	rl.DrawCubeWires(p, 0.87, 0.005, 0.87, color)
 }
@@ -41,11 +41,11 @@ draw_voxel_threats :: proc(renderer: ^Renderer, room: ^game.Room) {
 	}
 	for object in renderer.tactical.snapshot.objects[:renderer.tactical.snapshot.object_count] {
 		if !object.visible || object.detonation_pulse == 0 { continue }
-		center := grid.Position{int(object.position.x), int(object.position.y)}
+		center := grid.Position{x = int(object.position.x), y = int(object.position.y)}
 		if !tactical_render_visible(renderer, center) { continue }
 		for y in center.y-1..=center.y+1 { for x in center.x-1..=center.x+1 {
-			if tactical_render_visible(renderer, {x, y}) && game.explosion_contains_cell(room, center, {x, y}) {
-				draw_voxel_marker({x, y}, {220, 115, 49, 255})
+			if tactical_render_visible(renderer, {x = x, y = y}) && game.explosion_contains_cell(room, center, {x = x, y = y}) {
+				draw_voxel_marker({x = x, y = y}, {220, 115, 49, 255})
 			}
 		} }
 	}
@@ -65,13 +65,14 @@ draw_voxel_fuse_labels :: proc(renderer: ^Renderer, room: ^game.Room) {
 		}
 	}
 	for object in snapshot.objects[:snapshot.object_count] {
-		cell := grid.Position{int(object.position.x), int(object.position.y)}
+		cell := grid.Position{x = int(object.position.x), y = int(object.position.y)}
 		if !object.visible || object.detonation_pulse == 0 || !tactical_render_visible(renderer, cell) { continue }
 		remaining := game.explosive_pulses_remaining(object.detonation_pulse, snapshot.pulse_count, object.fuse_pulses)
 		p := tactical_project(renderer, {object.position.x+0.5, object.position.y+0.5}, 0.85)
 		label := fmt.ctprintf("MICCIA %ds", remaining)
 		draw_tactical_label(renderer, p, label, "", GOTHIC_RED if remaining <= 1 else GOTHIC_PAPER)
 	}
+	draw_emplacement_labels(renderer, room)
 }
 
 @(private)
@@ -94,34 +95,24 @@ tactical_intent_label :: proc(intent: game.Enemy_Intent) -> cstring {
 
 // All environmental props have volume. The same extents drive their ray pick.
 @(private)
-voxel_object_bounds :: proc(kind: game.Grid_Object_Kind, position: view.Vec2) -> rl.BoundingBox {
-	width, height := f32(0.68), f32(0.72)
-	switch kind {
-	case .Ice_Block: width, height = 0.82, 0.94
-	case .Barrel: width, height = 0.64, 0.76
-	case .Bomb: width, height = 0.46, 0.46
-	case .Fire: width, height = 0.64, 0.7
-	case .Shock_Floor: width, height = 0.88, 0.12
-	case .Tesla_Coil: width, height = 0.64, 1.18
-	case .Cannon: width, height = 0.85, 0.85
-	case .Flood: width, height = 0.85, 0.35
-	case .Black_Hole: width, height = 0.85, 0.65
-	case .Bomb_Marley: width, height = 0.75, 0.9
-	case .Count:
-	}
-	p := rl.Vector3{position.x+0.5, 0.035, position.y+0.5}
+voxel_object_bounds :: proc(kind: game.Grid_Object_Kind, position: view.Vec2, entity := NO_FIGURE) -> rl.BoundingBox {
+	width, height := game.grid_object_size(kind)
+	p := rl.Vector3{position.x+0.5, 0.035+entity_point_ground(entity, position), position.y+0.5}
 	return {p-rl.Vector3{width/2, 0, width/2}, p+rl.Vector3{width/2, height, width/2}}
 }
 
 @(private)
 draw_voxel_object :: proc(renderer: ^Renderer, object: Presentation_Grid_Object) {
-	bounds := voxel_object_bounds(object.kind, object.position)
+	bounds := voxel_object_bounds(object.kind, object.position, object.entity)
 	p := (bounds.min+bounds.max)*0.5
 	size := bounds.max-bounds.min
 	tint := GOTHIC_MUTED
 	switch object.kind {
 	case .Shock_Floor, .Tesla_Coil: draw_m8_device_object(renderer, object)
 	case .Cannon, .Flood, .Black_Hole, .Bomb_Marley: draw_memory_device(renderer, object)
+	case .Field_Cannon: draw_cannon_object(renderer, object, p)
+	// The hole has its own pass: the floor and the sphere (arsenal.odin).
+	case .Devouring_Hole:
 	case .Ice_Block:
 		tint = {102, 151, 162, 255}
 		draw_resin_cube_v(renderer, p, size, tint)
@@ -197,8 +188,8 @@ draw_voxel_fog :: proc(renderer: ^Renderer, room: ^game.Room) {
 	if renderer.tactical.no_fog { return }
 	for y in 0..<room.level_data.tiles.height {
 		for x in 0..<room.level_data.tiles.width {
-			if !tactical_cell_on_screen(renderer, {x, y}) { continue }
-			if tactical_render_visible(renderer, {x, y}) { continue }
+			if !tactical_cell_on_screen(renderer, {x = x, y = y}) { continue }
+			if tactical_render_visible(renderer, {x = x, y = y}) { continue }
 			p := rl.Vector3{f32(x)+0.5, 0, f32(y)+0.5}
 			rl.DrawCube(p+rl.Vector3{0, -0.15, 0}, 1, 0.3, 1, {7, 10, 16, 255})
 			for layer in 0..<2 {

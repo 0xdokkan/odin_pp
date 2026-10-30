@@ -60,7 +60,8 @@ void main() {
     float coverage=1.-smoothstep(-aa*.5,aa*.5,distanceToEdge);
     if(coverage<.001) discard;
     vec3 radiance=pow(color.rgb,vec3(2.2))*emission;
-    finalColor=vec4(radiance,coverage);
+    // The vertices' alpha: 1 but where an edge fades with its building (draw_expedition_ribbon).
+    finalColor=vec4(radiance,coverage*color.a);
 }`
 
 @(private)
@@ -143,12 +144,15 @@ end_expedition_edges :: proc(renderer:^Renderer) {
 	rlgl.EnableDepthMask()
 }
 
+// `faded`: how far the edge has faded away with its building (Ink_Pass.faded). The color's own alpha is not the
+// fade: every edge carries EXPEDITION_EDGE_ALPHA and is drawn whole; before this the fade was lost here (section
+// 12 of docs/piano-profondita.md).
 @(private)
-draw_expedition_ribbon :: proc(e:^Expedition_Edges,a,b:rl.Vector3,color:rl.Color) {
+draw_expedition_ribbon :: proc(e:^Expedition_Edges,a,b:rl.Vector3,color:rl.Color,faded:f32=0) {
 	if e==nil {return}
 	q,ok:=expedition_ribbon(&e.frame,a,b);if !ok {return}
 	_=rlgl.CheckRenderBatchLimit(4)
-	rlgl.Begin(rlgl.QUADS);rlgl.Color4ub(color.r,color.g,color.b,255)
+	rlgl.Begin(rlgl.QUADS);rlgl.Color4ub(color.r,color.g,color.b,u8(clamp(1-faded,0,1)*255))
 	for p,i in q.vertices {rlgl.TexCoord2f(q.uv[i].x,q.uv[i].y);rlgl.Vertex3f(p.x,p.y,p.z)}
 	rlgl.End()
 }

@@ -6,6 +6,8 @@ package game
 Tactical_Capability :: enum { Action, Movement, Cards, Board_Action, Shadow, First_Person }
 
 tactical_control_allowed :: proc(room: ^Room, capability: Tactical_Capability, ignore_busy := false) -> bool {
+	// One riding a lift's platform does nothing until it stops, not even a dodge (lift.odin).
+	if lift_player_riding(room) { return false }
 	if room == nil || room.player == nil || room.phase != .Combat {
 		return capability == .Action || capability == .Movement || capability == .Cards
 	}
@@ -54,9 +56,11 @@ tactical_can_begin_shadow :: proc(room: ^Room) -> bool {
 	return tactical_control_allowed(room, .Shadow)
 }
 
+// The AK is taken up on a dinosaur's back too; the other weapons are not
+// (FIRST_PERSON_WEAPONS).
 @(private)
-tactical_can_begin_first_person :: proc(room: ^Room) -> bool {
-	return tactical_control_allowed(room, .First_Person)
+tactical_can_begin_first_person :: proc(room: ^Room, weapon := First_Person_Weapon.AK) -> bool {
+	return tactical_control_allowed(room, .First_Person) && (FIRST_PERSON_WEAPONS[weapon].while_riding || !tactical_ride_active(room))
 }
 
 Tactical_Clock_Mode :: enum { Paused, Shadow, Cast, World }

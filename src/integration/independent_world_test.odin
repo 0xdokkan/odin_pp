@@ -30,7 +30,7 @@ test_m7_fresh_and_repeated_walks_execute_during_real_enemy_movement :: proc(t: ^
 	testing.expect_value(t, player.tactical.phase, game.Tactical_Phase.Decision)
 	// Wait only until the actual enemy cue has begun interpolating, never seek
 	// it to completion. Both actors must retain distinct simultaneous paths.
-	enemy_start := render.presentation_position({2, 4})
+	enemy_start := render.presentation_position({x = 2, y = 4})
 	enemy_end := render.presentation_position(room.enemies[0].position)
 	snapshot := render.renderer_presentation_snapshot(renderer, &room)
 	for _ in 0..<60 {
@@ -43,7 +43,7 @@ test_m7_fresh_and_repeated_walks_execute_during_real_enemy_movement :: proc(t: ^
 	testing.expect(t, devtools.tactical_independent_fresh_move(&controller, &room, renderer, &cards, &buffer, .East),
 		"a fresh key during an enemy move must commit immediately, not wait for the enemy's animation")
 	testing.expect(t, !buffer.chord.active)
-	testing.expect_value(t, player.position, grid.Position{8, 4})
+	testing.expect_value(t, player.position, grid.Position{x = 8, y = 4})
 	snapshot = render.renderer_presentation_snapshot(renderer, &room)
 	testing.expect_value(t, snapshot.enemies[0].position, enemy_before)
 	render.update_renderer_frame_timeline(renderer, 1.0/60.0)
@@ -59,7 +59,7 @@ test_m7_fresh_and_repeated_walks_execute_during_real_enemy_movement :: proc(t: ^
 	testing.expect(t, render.renderer_world_is_busy(renderer))
 	testing.expect(t, devtools.tactical_independent_fresh_move(&controller, &room, renderer, &cards, &buffer, .South),
 		"a second fresh key must not wait for the enemy's remaining animation")
-	testing.expect_value(t, player.position, grid.Position{8, 5})
+	testing.expect_value(t, player.position, grid.Position{x = 8, y = 5})
 	testing.expect(t, !buffer.chord.active)
 	testing.expect_value(t, renderer.timeline.update_failures, 0)
 }
@@ -215,7 +215,7 @@ test_m7_new_defense_qte_does_not_reuse_the_same_frame_input_or_skip_paid_deadlin
 	config.timer_seconds = 3
 	testing.expect(t, game.configure_tactical(&player, config))
 	configure_single_card_test_deck(t, &player, .Guard)
-	spawns := [?]game.Enemy_Spawn{{position = {2, 1}, health = 20, attack = 1}}
+	spawns := [?]game.Enemy_Spawn{{position = {x = 2, y = 1}, health = 20, attack = 1}}
 	room, created := game.create_room(&data, &player, {enemies = spawns[:]})
 	if !testing.expect(t, created) { return }
 	defer game.destroy_room(&room)

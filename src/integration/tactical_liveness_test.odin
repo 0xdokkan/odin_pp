@@ -55,8 +55,8 @@ test_m7_controller_rendered_frames_finish_late_recoveries_and_release_new_walks 
 			config := game.DEFAULT_TACTICAL_CONFIG
 			config.timer_seconds = 2
 			testing.expect(t, game.configure_tactical(&player, config))
-			enemies := [?]game.Enemy_Spawn{{position = {2, 1}, health = 10000, attack = 2},
-				{position = {6, 1}, health = 10000, attack = 2, archetype = .Archer}}
+			enemies := [?]game.Enemy_Spawn{{position = {x = 2, y = 1}, health = 10000, attack = 2},
+				{position = {x = 6, y = 1}, health = 10000, attack = 2, archetype = .Archer}}
 			room, built := game.create_room(&data, &player, {enemies = enemies[:]})
 			testing.expect(t, built)
 			defer game.destroy_room(&room)
@@ -126,7 +126,7 @@ test_m7_controller_survives_terminal_recovery_and_defense_then_enters_next_room 
 		}
 		data := create_gameplay_command_test_level(t)
 		defer level.destroy(&data)
-		enemies := [?]game.Enemy_Spawn{{position = {2, 1}, health = 2, attack = 1}}
+		enemies := [?]game.Enemy_Spawn{{position = {x = 2, y = 1}, health = 2, attack = 1}}
 		room, built := game.create_room(&data, &run.player, {enemies = enemies[:]})
 		testing.expect(t, built)
 		defer game.destroy_room(&room)

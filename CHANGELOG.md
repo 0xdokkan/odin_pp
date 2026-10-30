@@ -5,6 +5,748 @@ I riferimenti a Classica, `--flat` e ai vecchi smoke descrivono versioni precede
 per i comandi disponibili oggi valgono il [README](README.md) e la documentazione collegata.
 
 
+## 2026-10-30 — Il Viandante va al doppio: passi, colpi e carte più rapidi
+
+- Nel gioco come si gioca (run, spedizione, laboratorio) i prezzi del Viandante sono la metà: un passo 0,4 s invece di
+  0,8, un colpo, un'attesa, una schivata o una freccia 0,5 s invece di 1, il refocus 1 s, ogni carta metà dei suoi
+  secondi (Strike 1 s invece di 2). I nemici tengono i loro tempi. Le regole di base delle sonde restano piene.
+- Le animazioni delle azioni sul tabellone durano la metà (segnali, disegni delle carte vive, fendenti, dardi, dadi); i
+  loop restano com'erano. In prima persona cambiano solo i passi della spada e dell'arco.
+- Nell'esplorazione il cammino libero passa da 3,6 a 5,4 caselle al secondo.
+
+## 2026-10-29 — I nemici si illuminano mentre agiscono
+
+- In tutte le viste la carta di un nemico diventa rossa quando prepara un colpo, una freccia o una carica, viola per lo
+  scudo del Custode o una bomba. La luce cresce col conto alla rovescia, pulsa sempre più veloce ed è al massimo negli
+  ultimi 0,25 s, la finestra della parata perfetta. Nata dalla spada in prima persona, dove non si vedeva quando un
+  nemico stava per colpire.
+
+## 2026-10-29 — Prima persona, Fase 8 fatta: il piano è chiuso
+
+- Le quattro armi in prima persona sono provate, bilanciate con l'utente e documentate; restano nel laboratorio
+  (`Lab_Only`). Controllo completo verde (1822 test), smoke completo del laboratorio verde, l'AK identico alla Fase 0
+  (114 catture su 114).
+
+## 2026-10-29 — Prima persona: spada più forte, arpa sui rimbalzi, frecce che finiscono il volo
+
+- First Person Fencer: il taglio pieno fa 9 invece di 6 (nel bot 3,1 danni al secondo invece di 2,2).
+- First Person Archer: a ogni rimbalzo anche una corda d'arpa pizzicata (fatta da codice), una nota più alta ogni volta
+  sulla pentatonica di la minore; quando la vista finisce le frecce ancora fuori finiscono il volo e colpiscono.
+
+## 2026-10-29 — Prima persona: la corda dell'arco al viso
+
+- First Person Archer: tendendo, la corda arriva al viso come nel tiro vero e la mano esce dallo schermo vicino alla
+  guancia; a riposo l'arco sta più basso e si alza quando si tende (la posa scelta dall'utente fra tre).
+
+## 2026-10-29 — Prima persona: frecce sopra i muretti
+
+- Le frecce di First Person Archer passano sopra muretti, coperture e oggetti bassi: li urtano solo fin dove sono
+  disegnati (prima rimbalzavano su un muro invisibile). Le zone critiche stanno solo sui muri alti.
+
+## 2026-10-29 — Prima persona: l'arco a destra
+
+- L'arco di First Person Archer sta a destra del mirino, vicino al braccio destro, tenuto con la mano destra (la scelta
+  dell'utente); le frecce in volo partono da lì.
+
+## 2026-10-29 — Prima persona: danni dell'arco ribilanciati
+
+- First Person Archer: il tiro senza carica (sotto 0,4 s) cade a parabola e può mancare il bersaglio, fa 1 danno e non
+  dà stati; 0,15 s per incoccare la freccia dopo. Le frecce tese fanno di più (da 4 a 14 su un tiro dritto): contando
+  la carica superano l'AK al secondo, a raffica restano sotto.
+- Il banco del bot rende i nemici duri, così nessuna arma li finisce: AK 4,6 danni al secondo, arco teso 7,0, arco a
+  raffica 2,5, pugni 14,3, spada 2,2.
+
+## 2026-10-29 — Prima persona: frecce dell'arco più grandi
+
+- Le frecce in volo di First Person Archer partono dalla punta della freccia incoccata (non più dall'occhio, da dove si
+  vedevano solo da dietro), tengono la stessa grandezza sullo schermo tra 1 e 7,5 m e crescono di un ottavo a ogni
+  rimbalzo, fino a metà in più, come il danno. Le regole non cambiano.
+
+## 2026-10-29 — Prima persona, Fase 8 (parte automatica): le quattro armi a confronto
+
+- Un bot gioca ogni arma un minuto nella stessa arena: AK 3,54 danni al secondo, pugni 3,44, arco 2,47, spada 0,98 (la
+  spada chiede abilità che il bot non ha). Nessun numero cambiato: si decide con l'utente dopo la sua prova.
+- Prestazioni delle quattro armi misurate nella stessa arena; documenti completati. Le carte restano solo nel
+  laboratorio.
+
+## 2026-10-29 — Prima persona, Fase 7 fatta: aspetto e suoni dell'arco
+
+- **First Person Archer** ha il suo arco compound Neon con le carrucole (la scelta dell'utente), un modello 3D in pixel
+  di cartoncino tenuto con i due guantoni; la corda arretra con la carica, la freccia punta sempre il mirino.
+- Frecce in volo con la scia del colore del loro stato, scintille a ogni rimbalzo, zone critiche come bersagli di carta
+  con la luce che pulsa, faretra attorno al mirino.
+- Suoni da codice (un ping più alto a ogni rimbalzo, la corda pizzicata, un accento per ogni stato) e una musica nuova
+  dell'arco nel laboratorio. L'AK resta identico (114 su 114).
+
+## 2026-10-29 — Prima persona, Fase 6 fatta: l'arco, regole e prototipo
+
+- **First Person Archer** (solo nel laboratorio, arena «Prima persona»): l'arco in prima persona per 30 s, a griglia.
+  Destro tenuto tende (pieno in 1,6 s), rilasciato tira, sinistro abbassa.
+- Le frecce rimbalzano sui muri (da 0 a 4 rimbalzi secondo la carica), sempre più veloci; il danno segue la velocità,
+  fino al 50% in più con i rimbalzi. Il volo è calcolato da un contatto al successivo: nessun muro attraversato,
+  uguale a ogni frame rate. La freccia che torna rimbalza sul Viandante senza ferirlo.
+- Cinque frecce a caso (veleno, fuoco, ghiaccio, stordente, dentata), tre zone critiche sui muri, la guida fino al
+  secondo rimbalzo.
+- Prototipo visibile, icona (l'arco compound), suono della carta e dimostrazione; l'AK resta identico (114 su 114).
+
+## 2026-10-29 — Prima persona, Fase 5 fatta: aspetto e suoni della spada
+
+- **First Person Fencer** ha il suo zweihänder Neon (la scelta dell'utente: uno spadone a due mani cibernetico e
+  maestoso), un modello 3D in pixel di cartoncino tenuto con i due guantoni, la punta sempre sul punto del mouse.
+- Scia a tempo (uguale a ogni frame rate, senza buchi), cartellino del colpo («FENDENTE 9»), angoli della guardia,
+  scintille della parata e lampo con anello della parata perfetta, catena e uncino del rampino.
+- Nella vista della spada i colpi nemici arrivano a schermo esattamente al battito, per leggere il momento della parata.
+- Icona definitiva, parole della carta, suoni da codice (acciaio e Neon) e una musica nuova della spada nel laboratorio.
+- L'AK resta identico (114 catture su 114 uguali alla Fase 0); la spada costa circa il 5% in più dell'AK per fotogramma.
+
+## 2026-10-29 — Prima persona, Fase 4 fatta: la spada, regole e prototipo
+
+- **First Person Fencer** (solo nel laboratorio, arena «Prima persona»): la spada in prima persona, a griglia con passi
+  di 0,3 s e `Q`/`E` per girare. Il mouse muove la lama: il danno viene da velocità, ampiezza, linea pulita, punto della
+  lama e direzione (fendente, tondo, montante), fino a 11. Parata senza limite con il destro, perfetta entro 0,25 s
+  (stordisce, il dardo torna); rampino con `Ctrl`.
+- Il colpo arriva quando la lama passa sopra il petto del nemico: a una casella il cartoncino riempie lo schermo, e la
+  regola «la lama tocca il cartoncino» avrebbe fatto colpire subito ogni swing.
+- Prototipo: lama Neon in pixel di cartoncino, nastro della scia colorato dalla qualità, icona e suono provvisori, la
+  sua dimostrazione; un minuto di gioco nei test; misura `ODIN_PP_LAB_TIMING=sword` (la spada costa come l'AK).
+- **Dopo la prova:** niente più attesa fra un taglio e l'altro (minimo un quinto di schermo di strada, anche al ritorno),
+  affondo con un passo durante lo swing, colpo roteante girando con `Q`/`E`; al colpo striscia di sangue con le gocce,
+  lampo bianco, fermo della lama e scossa.
+- **Tagli di lato:** il bersaglio della lama è il corpo (vita, petto, testa e spalle) e non più un punto solo sul petto:
+  i tagli orizzontali appena sotto il petto andavano a vuoto nove volte su dieci.
+- **Colpo roteante visibile e carta di 35 s:** la scia diventa magenta dal giro con `Q`/`E`, e accanto al nemico salgono
+  le parole del bonus (`COLPO ROTEANTE x1,5`, `AFFONDO x1,25`, `TAGLIO PERFETTO`); la carta dura 35 s invece di 20.
+- L'AK resta identico (114 catture su 114 uguali alla Fase 0).
+
+## 2026-10-29 — Prima persona, Fase 3 fatta: aspetto e suoni dei pugni
+
+- Tre proposte di stile cibernetico sui guantoni veri (Cyber del gioco, Neon, Circuiti d'oro); l'utente sceglie il
+  **Neon**, che vale anche per spada e arco.
+- I guantoni di First Person Brawler sono Neon: carbonio blu notte, fasce e striscia magenta accese, bordo di luce ciano,
+  e più tubi al neon (nocche, dorso, polsino, fasce). Le altre versioni sono tolte.
+- **Impatto dei pugni:** il pugno che colpisce ferma i guantoni per 0,08 s (solo il disegno, le regole vanno avanti),
+  scuote un poco la vista (il doppio al critico) e fa diventare bianco per un istante il disegno del nemico colpito.
+- **Strisce di velocità** su ogni pugno: raggi magenta e ciano intorno alle nocche, scie lungo la curva dei ganci.
+- **Segni critici** in pixel art di cartoncino (anello neon con la freccia o l'arco, inchiostro e bordo di carta) e
+  **stella d'oro** del critico che scoppia, gira e svanisce in mezzo secondo, con le scintille.
+- **Icona Neon** della carta, tasti dei pugni nell'ispettore, riquadro dei secondi magenta.
+- **Suoni dei pugni** fatti da codice: aria, tonfo di cuoio per pugno con un crepitio Neon, ding del critico, tic dei
+  segni, campanella del ring all'entrata; **la musica dei pugni** (stereo, 32 s in giro) dopo la campanella, in
+  dissolvenza.
+- **Misura nuova** `ODIN_PP_LAB_TIMING=1` (pugni) e `=ak` (AK) nell'atto `prima_persona`: nella stessa arena i pugni
+  costano come l'AK (4,3 ms di media a fotogramma con la build `-o:speed`).
+- L'AK resta identico (114 catture su 114 uguali alla Fase 0).
+
+## 2026-10-29 — Prima persona, Fase 2: critico senza mira e guantoni 3D
+
+- **First Person Brawler** (solo nel laboratorio), dopo la prova dell'utente:
+  - **critico senza mira:** basta il pugno che il segno acceso chiede, se prende quel nemico, dovunque prenda; il segno
+    sta sul petto, dalla parte del suo pugno, solo come aiuto;
+  - **guantoni 3D** fatti da codice, pelle nera e oro, disegnati come **pixel art di cartoncino**: una tela piccola
+    (3 unità per pixel), tre tinte piene per materiale, inchiostro, bordo di carta e spessore del cartoncino; una
+    telecamera loro;
+  - **in guardia da pugile** in basso al centro, con l'avambraccio fasciato; jab e cross dritti al mirino, i ganci larghi
+    dal loro lato.
+- L'AK è identico: le 114 catture dell'atto `fps` sono uguali al byte a quelle della Fase 0.
+- **Fase 2 fatta:** 1782 test verdi; gli atti `fps` (114 su 114), `structures` (10 su 10) e `prima_persona` puliti.
+
+## 2026-10-28 — Prima persona, Fase 1: base comune della prima persona
+
+- **Un'arma per vista:** la vista di First Person Shooter ora sa quale arma c'è in mano (AK, pugni, spada, arco). I dati
+  di ogni arma stanno nello stesso spazio (`Room` resta di 8952 byte, 648 byte per arma); il salvataggio ha una copia sua
+  in JSON, e i salvataggi di prima si leggono come AK. Le carte nuove non si giocano in groppa al Dinosauro.
+- **Tavolo e HUD per arma:** sigla del riquadro (`FPS` per l'AK, provvisorie `FPB`, `FPF`, `FPA`), riga di stato e cosa
+  c'è in mano; le armi senza disegno mostrano la mano vuota.
+- **Tasti per arma:** il controller legge anche il clic destro tenuto e `Ctrl`, con le regole dell'AK per tutte le armi
+  (cattura del mouse, clic di prima bloccato, pausa); per ora solo l'AK spara.
+- **Arena «Prima persona»** subito dopo la Piana nel giro di `F3`, con il suo mazzo (First Person Shooter e Canna da
+  Pesca), e atto `prima_persona` dello smoke (`ODIN_PP_LAB_ONLY=prima_persona`), per ultimo.
+- L'AK è identico: le 114 catture dell'atto `fps` sono uguali al byte a quelle della Fase 0.
+
+## 2026-10-28 — Prima persona, Fase 0 fatta: decisioni comuni e misure dell'AK
+
+- Le risposte dell'utente sono nel [piano](docs/piano-prima-persona.md): nomi inglesi (First Person Brawler, First Person
+  Fencer, First Person Archer), ordine pugni, spada, arco, numeri come l'AK, un'arena nuova «Prima persona» con il suo
+  mazzo, pixel art di carta in stile cibernetico da decidere insieme nella Fase 3, mani a schermo, un commit a ogni
+  passo, avviso sonoro spento finché l'utente non lo riaccende.
+- `ODIN_PP_LAB_ONLY=fps` fa girare solo l'atto di First Person Shooter (42 s, 114 catture identiche al byte in due giri).
+- `ODIN_PP_LAB_TIMING=1` con quell'atto misura 600 fotogrammi in prima persona: con l'AK che spara, 2,40 e 2,44 ms di
+  media (circa 410 fotogrammi al secondo) sulla RTX 3060, alla corrente.
+- `Room` pesa 8952 byte su 9216 permessi: restano 264 byte, quindi i dati delle armi nuove andranno nello stesso posto dei
+  colpi dell'AK.
+- Verifiche: check completo con e senza assert (1740 test); smoke completo del laboratorio prima e dopo, 2229 catture su
+  2232 identiche al byte; le altre tre (atto delle strutture) cambiano già da un giro all'altro e sono identiche con
+  l'atto da solo.
+
+## 2026-10-28 — Piano di lavoro delle carte in prima persona
+
+- Nuovo [documento](docs/piano-prima-persona.md) in nove fasi (0–8), da eseguire
+  una alla volta solo su comando dell'utente, con uno stop alla fine di ogni passo
+  e una ricerca su internet quando servono tecnica o riferimenti ad altri giochi.
+- Tre carte nuove che portano la vista in prima persona sul modello di First Person
+  Shooter (l'AK): pugni con movimento libero, jab, cross, ganci e punti critici a
+  tempo sui nemici; spada guidata dal mouse, con parata e rampino; arco a carica con
+  frecce che rimbalzano sui muri, zone critiche e un effetto per ogni stato negativo
+  del gioco. Nomi, numeri e formule sono proposte da confermare fase per fase.
+- La Fase 0 è una proposta di Claude: decisioni comuni (nomi, numeri, arena di
+  prova) e misure dell'AK di oggi.
+
+## 2026-10-27 — Profondità: le cinque voci aperte della sezione 12, verificate e corrette
+
+Tutte e cinque erano vere (la sesta, sulle grotte, non esiste più con le grotte a piani).
+- **Carica del bruto:** controllava l'altezza solo del primo passo. Con un dirupo più avanti sul percorso pianificava la
+  carica e, eseguendola, il gioco si fermava su un assert. Ora ogni passo deve essere percorribile; anche quando la carica
+  parte, un dirupo comparso sulla strada la ferma invece di far fallire la mossa.
+- **Diagonale con QTE, schivata di difesa, passo d'ombra:** seguivano solo la regola della salita e scendevano un dirupo che
+  a piedi non si scende. Ora seguono la regola del passo, in salita e in discesa.
+- **Rilievi in diagonale:** il rilassamento limitava solo le quattro vicine dritte, e 883 angoli (406 nell'Inferno, 304 nello
+  Spazio) fermavano un passo in diagonale dove il giro dritto si camminava e la superficie disegnata è liscia. Ora limita
+  anche le diagonali: cambia meno dell'1,3% del terreno, di un gradino; restano 140 angoli, nelle scale e nei sentieri
+  disegnati.
+- **Bordi degli edifici che svaniscono:** l'alfa calcolata si perdeva nel disegno dei bordi, che restavano pieni sopra un
+  edificio ormai trasparente. Ora sfumano con lui; tutti gli altri bordi restano identici.
+- **Sfera di taglio per casella:** stava a quota fissa 0,65, e sul terreno alto (il fianco della montagna della Neve)
+  caselle sullo schermo venivano scartate: personaggi, ombre e muri potevano sparire ai bordi. Ora sta sul terreno della
+  casella.
+- Test nuovi: la carica lungo un dirupo, la diagonale/schivata/ombra davanti a un dirupo, il taglio sul terreno alto; il
+  test dei biomi lisci controlla anche le diagonali.
+- Verifiche: check completo con e senza assert (1740 test); smoke delle spedizioni (195 catture, nessun errore: cambiano
+  gli edifici che svaniscono e il rilievo di Inferno e Spazio, il resto è animazione) e dell'editor (12); smoke del
+  laboratorio da solo, alla corrente, prima e dopo: tutte le 2232 catture identiche al byte.
+
+## 2026-10-27 — Smoke `--smoke-m7-view` di nuovo a posto
+
+- Lo smoke si fermava alla parte «polish» dal 20 ottobre (`d4057ed`): quel refactor ha portato un passo in combattimento
+  da 1 secondo a 0,8 (`TACTICAL_MOVE_SECONDS`), e il mondo batte un impulso a ogni secondo intero, quindi dopo un solo
+  passo l'impulso non è ancora arrivato. Lo smoke ora controlla che il passo spenda il suo costo sull'orologio del mondo
+  (impulsi più la frazione che resta), invece di aspettarsi un impulso.
+- Verifiche: `--smoke-m7-view` esce con 0 e produce 52 catture (prima si fermava a 23); check completo con e senza assert.
+
+## 2026-10-27 — Profondità, Fase 8 fatta: ologramma a piani, prestazioni, grotte vecchie
+
+- **Ologramma a piani impilati** (scelta dell'utente): `Tab` apre una pila di lastre, una per piano (ponti sopra, terra,
+  grotte e gallerie sotto, reti in fondo). Quella del robot è piena, le altre sono sagome tenui; `W`/`S` (o le frecce)
+  cambiano il piano mostrato. La struttura si vede tutta; complessi e sale delle reti sono segnati solo dopo che il robot
+  ci è stato, come gli imbocchi delle grotte.
+- **L'ologramma resta sulla scheda video:** le lastre si costruiscono una volta per mappa, i triangoli stanno sulla scheda,
+  e si rifà tutto solo quando cambiano la mappa o il piano mostrato. Con la mappa aperta il gioco è più del doppio più
+  veloce (da 4,0-5,2 ms a 1,6-1,9 ms a fotogramma), più veloce anche della Fase 0, con la stessa immagine al byte.
+- **Blocchi del rilievo e dei ponti sulla scheda video**, caricati una volta invece che a ogni fotogramma: la CPU lavora
+  la metà per il pavimento. Si disegnano con il culling delle facce posteriori, come di fatto succedeva prima nel batch di
+  rlgl: senza, una faccia girata copriva di scuro una rampa della montagna della Neve.
+- **La mappa olografica delle stanze ha il rilievo:** il tavolo era piatto e le figure, alla loro quota, sembravano su
+  un'altra casella. Ora le caselle sono colonne alla loro altezza, i ponti lastre, e chi è coperto ha il contorno come in
+  gioco. Le stanze piatte non cambiano.
+- **Via `level.cave_stamp`** e il suo test, l'ultimo avanzo delle grotte vecchie.
+- Smoke: stage 191-194 per i piani dell'ologramma (`ODIN_PP_SMOKE_ONLY=piani`); nel laboratorio due catture nuove
+  dell'ologramma della stanza, dall'altopiano e dal ponte.
+- Test nuovi: le lastre dei piani, le visite di complessi e sale, la cache dell'ologramma che si rifà solo quando serve
+  (1737 in tutto).
+- **Benchmark finale contro la Fase 0** (16 giri alternati alla corrente, a macchina fresca e calda): media dei gruppi
+  +4,9% e +9,3%, dentro il +10% dell'obiettivo (alla fine della Fase 7 era +9,4% e +16,7%). Senza le viste della mappa il
+  gioco resta più lento del 9,7% e 13,1%: è il terreno nuovo in vista (rocce, massicci, complessi), che la scheda video
+  disegna in più. Provate e scartate due idee che non danno niente senza perdere qualità.
+- Verifiche: check completo con e senza assert (1737 test), smoke delle spedizioni (195 catture) e dell'editor (12)
+  senza errori; smoke del laboratorio da solo, alla corrente: 129 catture identiche al byte, più le 2 nuove.
+
+## 2026-10-27 — Profondità, Fase 7 fatta: Cielo, Spazio e Memoria
+
+- **Cielo, un'isola sospesa** (scelta dell'utente): su un'isola libera galleggia un'isola più piccola di marmo, 14 gradini
+  sopra, con guardie e segreto. Ci si sale da una scalinata che gira attorno a un pilastro; l'ascensore, una colonna di
+  luce, ha il cancello sul pianerottolo, che si apre dall'isola. Sotto ci si passa all'ombra; i ponti fra le isole restano
+  come prima.
+- **Spazio, gallerie fra i crateri:** lo Spazio si alza di una base e si vede come prima. Tre crateri profondi 14: uno con
+  la scala, uno con guardie e segreto sul fondo, uno con l'ascensore. Le gallerie sul piano −2 li uniscono uscendo dalle
+  loro pareti; il cancello fra il cratere del segreto e quello dell'ascensore si apre dalla parte del segreto. In superficie
+  la stazione: tre moduli uniti da passerelle, rampa, ascensore con il cancello in cima, segreto e guardie sul modulo di
+  mezzo. I pozzi di gravità restano dove sono, anche sopra i moduli.
+- **Memoria, la collina del masso:** la grande collina in mezzo alla mappa era tagliata dal terreno in piano della Fonte e
+  della Prova (restava una cresta alta 7) e non c'è più. Al suo posto, in un punto libero, una collina vera alta 14 con il
+  masso in cima: un sentiero sale da sud a una terrazza, la gira e sale sul fianco est fino in cima; da lì un pozzo con
+  l'ascensore scende nella sala della memoria, dentro la collina, con guardie e segreto. Il passaggio della sala esce ai
+  piedi dello sperone sud, con un cancello che si apre da dentro.
+- Segni nuovi nelle mappe dei complessi: segreto e guardie su un ponte (`+`, `*`), segreto in galleria (`?`), il masso
+  (`O`). Fino a quattro complessi per bioma; un cratere si cerca il posto vicino a quello prima.
+- **Tutti i dodici biomi hanno i loro piani:** la Fase 7 del piano della profondità è fatta. Nel documento torna il titolo
+  della Fase 8, perso con il primo gruppo.
+- Smoke delle spedizioni: 18 catture nuove dei complessi e 3 delle gallerie dello Spazio (191 in tutto); i complessi vanno
+  dallo stage 104 al 175, le reti dal 176 al 190.
+- Test nuovi: l'isola sospesa, le gallerie fra i crateri, la collina con la sala; complessi e prove con i nemici liberi in
+  dodici biomi (1735 in tutto).
+- Verifiche: check completo con e senza assert, smoke delle spedizioni (191 catture) e dell'editor senza errori; smoke del
+  laboratorio rifatto da solo, alla corrente: 129 catture identiche al byte.
+- Benchmark alla corrente, dodici giri alternati, confrontati a macchina fresca e a macchina calda: il quarto gruppo contro
+  il terzo −1,3% e −0,3%; tutta la Fase 7 −0,3% a macchina fresca e +7,9% di media a macchina calda (fino a +18% nei
+  bersagli), dentro il +10% dell'obiettivo. La Fase 8 ha il passo per riprenderlo: i blocchi del terreno sulla scheda video.
+
+## 2026-10-26 — Profondità, Fase 7 (in corso): Neve, Inferno e Gotico
+
+- **Neve, il crepaccio scavato** (scelta dell'utente): la Neve si alza di una base, come City pop, Egitto e Vietnam, e si
+  vede come prima (montagna e grotta della montagna comprese). Nella neve c'è un crepaccio profondo 14: una scala scende
+  dall'ovest, il ponte di corda lo attraversa alla quota della neve, sul fondo guardie e segreto, e un ascensore scende
+  dalla neve in una nicchia il cui cancello si apre dal fondo.
+- **Inferno, il ponte di ossa:** due rupi ai lati di un fiume di lava, il ponte sopra la lava fra le cime. Nella rupe est
+  c'è la caverna di lava con le guardie, chiusa da un cancello che si apre da dentro, con il pozzo fino alla cima. Si sale
+  a piedi da una scala che gira. L'eruzione non rompe più la roccia dei complessi.
+- **Gotico, cripta e catacombe:** il Gotico si alza di una base. Sotto ci sono il pozzo con l'ascensore, la cripta sotto la
+  collina (guardie e segreto) e le catacombe fino al cimitero, con scale da due tombe aperte. Il cancello fra il pozzo e la
+  cripta si apre dalla cripta. Sopra, il fienile e la casa in rovina con il ballatoio fra i tetti.
+- **Il killer del Gotico non scende sotto terra:** lì lo si semina; uno scontro con lui finisce quando il robot scende.
+- **Disegno:** le pareti delle buche sotto la base (scale e crepaccio) hanno la roccia del bioma, più chiara al bordo, e il
+  fondo si scurisce con la profondità: prima erano una fessura nera. Ponti di corda, di ossa e il ballatoio hanno il loro
+  materiale.
+- Smoke delle spedizioni: 18 catture nuove dei complessi e 3 della rete del Gotico; i complessi vanno dallo stage 104 al
+  157, le reti dal 158. La cima della montagna e lo scontro su due livelli contano le quote della Neve dalla base.
+- Test nuovi: il crepaccio scavato, il ponte sopra la lava, il killer che non scende; complessi e prove con i nemici liberi
+  in nove biomi (1732 in tutto). Il test dell'arena degli ascensori non perde più la memoria della registrazione del
+  renderer.
+- Verifiche: smoke del laboratorio identico al byte (129 catture), smoke delle spedizioni (170 catture) e dell'editor senza
+  errori; benchmark alla corrente in ordine bilanciato: media −2,4%, i complessi nuovi 1,12 ms, la rete del Gotico 1,18 ms.
+
+## 2026-10-26 — Profondità, Fase 7 (in corso): City pop, Egitto e Vietnam, con i sotterranei
+
+- **Terreno alzato di una base** (scelta dell'utente): City pop, Egitto e Vietnam sono alzati tutti di 14 gradini, così
+  sotto c'è posto per reti vere sul piano −2. La superficie è identica e si vede come prima: il disegno toglie la base.
+- **Le reti sotterranee:**
+  - City pop: la metropolitana, tre stazioni unite da gallerie, con le scale dalla strada alle due stazioni in fondo e
+    l'ascensore in quella di mezzo; il cancello fra la stazione di mezzo e quella a sud-est si apre da sud-est;
+  - Egitto: la necropoli, con la grande sala (scala che scende dalla sabbia), una tomba col segreto e la sala sotto la
+    piramide, raggiunta dal pozzo con l'ascensore che scende dalla sua cima; il cancello si apre dalla grande sala;
+  - Vietnam: la galleria vera, dal tunnel di oggi fino a dove il tunnel portava, con sei camere e quattro botole; il
+    salto con E non c'è più.
+  - Le scale sono buche con una rampa di 13 gradini; le gallerie girano attorno a muri e decorazioni; nelle sale ci sono
+    nemici del bioma e un segreto.
+- **I complessi:** in City pop tetti e cavalcavia fra tre palazzi (scala antincendio, ascensore, cancello sul
+  cavalcavia); in Egitto due piramidi a gradoni con le terrazze e una scala che gira; in Vietnam due colline sulle rive
+  di un fiume e un ponte di bambù sopra l'acqua, con cancello e ascensore.
+- **Disegno:** le buche delle scale hanno le loro pareti; sotto terra la finestra attorno al robot è più larga e la
+  superficie più scura; cavalcavia e ponti di bambù hanno il loro materiale.
+- **La telecamera dopo un salto:** sui piani prendeva la quota nuova un po' alla volta anche quando saltava (una mappa
+  nuova, il robot messo altrove), partendo da quella di prima. Ora la prende subito: cambiano le catture degli smoke
+  fatte dopo un salto di piano, con la stessa scena e il robot al centro.
+- Smoke delle spedizioni: 18 catture dei complessi nuovi e 9 delle reti, dagli stage 122 e 140
+  (`ODIN_PP_SMOKE_ONLY=complessi`, `ODIN_PP_SMOKE_ONLY=reti`).
+- Test nuovi: le reti nei biomi alzati, segreto e nemici raggiungibili, la galleria del Vietnam dal tunnel all'arrivo,
+  la base nel salvataggio, la telecamera che salta di piano; le prove con i nemici liberi ora girano nei sei complessi
+  (1729 in tutto).
+- Prestazioni (RTX 3060, alla corrente): media +2,0%, dentro il rumore; costano 0,1-0,15 ms in più solo le viste dove la
+  rete passa sotto, al centro di City pop e dell'Egitto.
+
+## 2026-10-26 — Profondità, Fase 7 (in corso): i complessi di Robotica, Far West e Giungla
+
+- **Complessi a tema, alti 14** (scelta dell'utente all'inizio del primo gruppo di biomi): la regola dei piani vuole 12
+  gradini fra due pavimenti della stessa colonna, e gli altopiani di oggi ne hanno 3 o 4. Ogni bioma del gruppo ha ora
+  un complesso a un posto fisso, uguale a ogni run; il resto della mappa resta com'era.
+  - **Robotica cibernetica:** due piattaforme dati unite da una passerella. Sotto la piattaforma col segreto c'è un
+    condotto: il cancello all'imbocco si apre da dentro, e un pozzo con l'ascensore sale fino in cima.
+  - **Far West:** il ponte del treno fra due mese, con binari e cavalletti. Sulla mesa col segreto, l'ascensore lungo il
+    fianco ha in cima un cancello che si apre dalla mesa. La miniera resta la grotta di prima.
+  - **Giungla preistorica:** la collina delle ossa con la caverna sotto, aperta ai due lati, con le guardie dentro; due
+    alberi giganti uniti da ponti di liane. Il cancello sul secondo ponte si apre dal primo albero, dove c'è il segreto;
+    il secondo albero ha l'ascensore.
+  - In ogni complesso si sale anche a piedi (rampa o pendio) e il luogo importante ha due strade: quella lunga e la
+    scorciatoia, che si apre solo dall'altra parte e si richiude a ogni run.
+- **Ascensori e cancelli nelle spedizioni:** si chiamano e si aprono spingendo contro la casella, anche camminando liberi;
+  i nemici li usano come nel laboratorio. Il salvataggio tiene i cancelli aperti e dove riposano le piattaforme; mentre
+  una piattaforma porta qualcuno non si salva (resta il salvataggio di prima).
+- **Disegno:** i ponti e le passerelle hanno un passaggio loro, con il materiale del bioma; sopra gli occhi del robot si
+  diradano come la roccia sopra una grotta. Nei condotti vale la vista della grotta (fuori più scuro, la lampada).
+- Smoke delle spedizioni: 18 catture nuove dei complessi, dallo stage 104 (`ODIN_PP_SMOKE_ONLY=complessi`).
+- Test nuovi: complessi fissi a ogni run, tutto raggiungibile con i cancelli chiusi, salvataggio, ascensore e cancello
+  camminando, un minuto di scontro con le guardie libere, un nemico libero che sale in ascensore dietro al robot. I test
+  di raggiungibilità dei biomi ora contano anche i piani, i ponti e gli ascensori.
+
+## 2026-10-26 — Profondità, Fase 7 (in corso): ascensori e cancelli nella Prova meccaniche
+
+- **Ascensori da chiamare e aspettare** (scelta dell'utente):
+  - un passo verso il pianerottolo vuoto chiama la piattaforma, che arriva a 8 gradini al secondo;
+  - un passo sulla piattaforma la fa partire, e chi c'è sopra arriva all'altro capo senza agire né essere colpito;
+  - anche i nemici la chiamano, la aspettano e ci salgono.
+- **Cancelli delle scorciatoie:** sbarre che si aprono solo con un passo dal lato della leva e restano aperte fino
+  alla fine della spedizione.
+- Tutto si prova nella nuova arena «Ascensori» (settima di F3) e nell'atto `lift` dello smoke, che gira per ultimo.
+  Test nuovi per dati, regole e nemici, e uno che fa vivere l'arena un minuto con i nemici liberi.
+- Corretti dopo le prove dell'utente:
+  - un crash quando un nemico scendeva dall'ascensore;
+  - le piattaforme ferme dopo F7.
+- **Il robot si disegna sul suo piano.** Prima veniva disegnato sempre all'altezza del terreno di terra: sotto il
+  ponte su cui stava, sopra il massiccio quando era in una grotta, e a terra mentre l'ascensore saliva. Il difetto
+  c'era dalla Fase 3.
+
+## 2026-10-26 — Profondità, Fase 6: editor per scolpire
+
+- `--editor-mappe` apre un programma a parte per scolpire a mano le sei arene della Prova meccaniche e le mappe dei
+  dodici biomi, piano per piano, con telecamera libera. I pennelli: alza, abbassa, leviga, appiattisci, dipingi
+  (pavimento, roccia, vuoto, recinto) e, scelta dell'utente, rampa, copia e incolla, rumore. Si scolpiscono le
+  caselle, e gli angoli si ricavano come prima. C'è l'annulla e ripeti per passate intere.
+- Pennelli e ritocchi lasciano al codice gli edifici, la partenza, l'uscita e le porte.
+- I ritocchi si salvano come PNG in `assets/mappe` (per piano: altezze in grigio, tipi a colori, trasparente dove la
+  mappa resta del codice). Il gioco li applica all'avvio alle arene e alle mappe dei biomi, dopo la geografia e prima
+  degli abitanti; la mappa resta la stessa a ogni partita. File dipinti a mano che rompono la regola dei piani restano
+  fuori.
+- Prima di salvare, l'editor controlla:
+  - le colonne dei piani e la partenza;
+  - nei biomi, anche i luoghi in piano e se dalla partenza si arriva a luoghi, grotte e uscita.
+
+  Gli errori sono segnati in rosso e **G** li mostra uno per uno; con errori la mappa non si salva.
+- `--smoke-editor-mappe` scolpisce, salva, riapre e prova i pennelli, le grotte e gli errori, poi usa l'editor con mouse
+  e tasti simulati (64 azioni), con 12 catture. La prova ha corretto la scelta della casella sulla roccia e i messaggi
+  rimasti dalla mappa di prima.
+- Test: 15 nuovi (1707 in tutto). Senza file in `assets/mappe` il gioco non cambia: le catture del laboratorio sono
+  identiche al byte a quelle della Fase 5, e mappe e mondi dei biomi sono gli stessi.
+
+## 2026-10-26 — Profondità, Fase 5: grotte senza caricamento
+
+- Le grotte delle spedizioni sono il piano sotto la terra: stanze sotto un massiccio di roccia, a cui si arriva
+  camminando dall'imbocco, senza dissolvenza e senza cambiare mappa. Ogni bioma con grotte (Neve, Far West, Egitto,
+  Inferno) ha i suoi posti fissi, sempre con massiccio e grotta; la run sceglie quali 1–3 hanno nemici e segreto. Nella
+  Neve la grotta della montagna è una stanza nel nucleo, con l'imbocco sul sentiero. Nel Far West, dove la mappa non ha
+  spazio, le grotte sono di 24×14 con due stanze (scelta dell'utente durante la fase).
+- In grotta: la roccia sopra il robot si dirada con un retino, il fuori si scurisce, la luce del cielo cala e la lampada
+  del robot illumina le stanze. Si entra anche in sella; un evento che sveglia nemici fa scendere il robot. Le pattuglie
+  entrano, e si combatte anche a cavallo dell'imbocco. L'ologramma segue il piano del robot e segna gli imbocchi trovati.
+- Salvataggi: i piani sono salvati come lista di caselle; quelli di prima della fase sono rifiutati senza danni.
+- Via `Outer_Map`, `enter_cave`, `exit_cave`, la dissolvenza e il bioma 255.
+
+## 2026-10-25 — Profondità, Fase 4: piani nel laboratorio, grafica
+
+- I piani si leggono a schermo, con funzioni pure come quelle degli edifici (`game/layer_view.odin`). Ciò
+  che sta sopra la testa del robot si apre a poco a poco entro 6 caselle. In grotta il fuori si scurisce e
+  la luce del cielo cala; resta la lanterna, che illumina solo il suo piano. Sul ponte ciò che sta sotto si
+  scurisce un poco (scelta dell'utente).
+- Chi è coperto si vede con il contorno del suo colore (`render/layer_outline.odin`). Il mouse attraversa
+  ciò che è diradato e da sotto il ponte punta la strada. La telecamera segue morbida il cambio di piano.
+- Atto dello smoke `layers` con tre catture nuove: nemico sotto il ponte visto dal ponte, mouse su una
+  casella sotto il ponte, nemico sul ponte sopra il robot. Senza piani nulla cambia: un tabellone con i
+  piani usa una variante dello shader della resina, e le altre catture restano identiche al byte.
+  Prestazioni: −0,0% di media rispetto alla Fase 3. Test: 4 nuovi (1688 in tutto).
+
+## 2026-10-25 — Profondità, Fase 3: piani nel laboratorio, dati e regole
+
+- La mappa può avere caselle sopra la terra (un ponte, piano +1) e sotto (grotte, −1 e −2): `level.Level`
+  ha i suoi piani, vuoti finché non servono, e le scale a pioli. Due pavimenti della stessa colonna distano
+  almeno 12 gradini (10 di luce e 2 di spessore, come ha scelto l'utente); una mappa che non lo rispetta è
+  rifiutata.
+- Le regole passano da un piano all'altro: passo (rampe e imbocchi), scale (solo scale, niente ascensori),
+  spinte e cadute oltre il bordo aperto di un ponte, vista e tiri nelle due direzioni, aree che seguono un
+  imbocco e si fermano a ponti e volte, mischia fra piani solo agli imbocchi, campo delle distanze dei
+  nemici. Le carte speciali agiscono sul piano di chi le gioca come prima e sugli altri piani solo su ciò che
+  vede. Senza piani tutto è come prima.
+- Nella Prova meccaniche la sesta arena di F3, «Piani»: strada sotto un ponte con due rampe, collina con
+  una grotta e due imbocchi, scala sul dirupo, un nemico per piano. Disegno semplice: ciò che copre il robot
+  quando è sotto diventa mezzo trasparente. Atto dello smoke `layers` (`ODIN_PP_LAB_ONLY=layers`), sette
+  catture. Prestazioni: +0,3% di media rispetto alla Fase 2, il gruppo peggiore +2,4% (gli ologrammi):
+  rumore. Test: 19 nuovi (1684 in tutto).
+
+## 2026-10-25 — Profondità, Fase 2: posizioni con il piano
+
+- `grid.Position` ha un terzo campo, `layer`: −2 sotto profondo, −1 sotto, 0 terra, +1 sopra (quattro
+  piani, come ha scelto l'utente). Tutto resta sulla terra, quindi il gioco non cambia. Una `Grid` rifiuta
+  le posizioni di altri piani; `grid.offset` dà la vicina conservando il piano; `grid.cell_index` vale per
+  le tabelle parallele.
+- 3215 posizioni riscritte con l'aiuto del compilatore: 2909 con i nomi, 300 vicine con `grid.offset`.
+- Una posizione pesa 24 byte invece di 16: i limiti del test sul budget dello stack crescono (`Room` 9 KB,
+  registri degli eventi 104 KB), le `Renderer` dei test passano sullo heap, i salvataggi crescono del 21%
+  (+50 ms, in background). Test: 3 nuovi (1665 in tutto).
+
+## 2026-10-25 — Profondità, Fase 1: terreno scolpito
+
+- Le altezze si disegnano come una **superficie scolpita** ([surface.odin](src/level/surface.odin),
+  funzione pura): il centro di ogni casella alla sua quota, ogni angolo la media delle vicine a un gradino
+  al massimo. Le scale diventano rampe e le colline a gradoni colline; i dirupi tengono lo spigolo, con
+  pareti di roccia sfaccettate e un bordo al neon tenue del colore del bioma. Luce morbida sulle salite;
+  via le righe dei gradini.
+- Spedizioni: il rilievo in blocchi 8×8 è riscritto sulla superficie. Laboratorio: le caselle in pendenza
+  sono piastrelle inclinate. Personaggi, piedistalli, ombre e puntatore stanno sulla superficie; anteprime
+  e segni sulla cima della casella. Le regole non cambiano.
+- Gli smoke non si fermano più quando la loro finestra è ridotta a icona (`keep_running` del host).
+- Prestazioni: +2,4% di media rispetto alla Fase 0, il gruppo peggiore +4,3%. Test: 7 nuovi (1662 in
+  tutto).
+
+## 2026-10-25 — Profondità, Fase 0: misure di partenza
+
+- Il benchmark delle spedizioni misura tutto il percorso dello smoke (stage
+  0–102, prima al massimo 0–50), oppure un intervallo scelto in compilazione
+  con `EXPEDITION_BENCHMARK_FIRST` e `EXPEDITION_BENCHMARK_LAST`. Ogni scena si
+  disegna su un canvas fisso di 1920×1080 pixel (`fixed_canvas_size` della
+  finestra), così le misure non dipendono dallo schermo.
+- Sui portatili con due schede video il gioco chiede la scheda dedicata
+  ([windows_gpu.odin](src/windows_gpu.odin)). Sul PC di sviluppo disegnava con
+  la Intel UHD accanto a una RTX 3060; con la RTX gli stessi stage sono circa
+  quattro volte più rapidi.
+- Misure di partenza (due giri concordi, quasi tutte le scene intorno a 1 ms)
+  nell'esito della Fase 0 e nell'appendice A di
+  [piano-profondita.md](docs/piano-profondita.md). Test: 1 nuovo (1655 in tutto).
+- Lo smoke del laboratorio non è arrivato in fondo: si ferma quando la sua
+  finestra è ridotta a icona. La correzione apre la Fase 1.
+
+## 2026-10-25 — Piano di lavoro della profondità
+
+- Nuovo [documento](docs/piano-profondita.md) in nove fasi (0–8), da eseguire
+  una alla volta solo su comando dell'utente: terreno scolpito (rampe, colline,
+  dirupi di roccia), posizioni con il piano, mappa a piani (sotto, terra,
+  sopra) nel laboratorio, grotte senza caricamento nelle spedizioni, editor per
+  scolpire, ponti, gallerie e scorciatoie nei biomi, ologramma a piani. Il
+  combattimento resta a griglia su ogni piano.
+- La Fase 0 è una proposta di Claude: oggi il benchmark non arriva agli stage
+  di rilievi, montagna e grotte.
+
+## 2026-10-25 — Test: tutti i biomi sbloccati (temporaneo)
+
+- Nella galassia del Portale, il pulsante **TEST tutti i biomi** (SI/NO) apre tutte e 12 le isole per giocarle, in ogni
+  slot; si cambia solo tra una spedizione e l'altra e lo slot se lo ricorda.
+- Il progresso vero non cambia: i biomi sbloccati restano quelli guadagnati e, spento il test, la galassia torna com'era.
+  Una spedizione in un bioma aperto solo dal test ("Solo prova: non conta") non tocca biomi vinti, serie, sblocchi,
+  morti e finali; lo zaino segue le regole normali (torna a casa se vinci, si perde se muori) e le stelle danno il loro
+  premio. I biomi già sbloccati davvero contano come sempre anche a test acceso.
+- Per toglierlo: cercare `test_all_biomes` e `Run_Progress.test` (commento in `src/campaign/campaign.odin`); prima,
+  finire le spedizioni di prova in corso, altrimenti quello slot non si carica più. Test: 3 nuovi.
+
+## 2026-10-25 — Revisione delle carte
+
+- **Ritirate** (il codice resta, ma niente le dà più): Thorn Coat, Afterimage, Counter Rune, Battle Focus, Spark Forge,
+  Spark, Volatile Study, Titan Grip.
+- **Diventate potenziamenti** (al secondo potenziamento della carta base, poi ripartono dal livello 0): Guard → Purifying
+  Guard, Strike → Cross Slash, Arc Bolt → Chain Lightning, Fate Strike → Prismatic Barrage, Venom Needle → Twin Venom.
+- Mazzo iniziale da 8 carte; il primo ring dà Grappling Hook; archivi dei biomi aggiornati. Tutto, con l'effetto di ogni
+  carta e il modo di rimetterla, in [docs/registro-carte.md](docs/registro-carte.md).
+
+## 2026-10-24 — Posare le strutture
+
+- **Fase 7 del piano fatta, ultima del piano.** Un kit nello zaino (si trova nelle cache e si compra nelle officine per 25 crediti)
+  permette di posare una struttura sulla mappa: **POSA** dallo zaino, l'impronta segue il mouse (verde dove ci sta, rossa dove no,
+  con il motivo), la rotella la gira, R la specchia, clic posa, tasto destro annulla. Tre per spedizione, non si smontano.
+- Gli oggetti e i recinti posati hanno salute e i colpi dei nemici li rompono (carro 6, fontana 8, statua 10, macchina 8, rovina 8,
+  recinto 6); gli edifici no. Le strutture rotte non tornano al salvataggio. Test: 6 nuovi (1649 in tutto).
+
+## 2026-10-24 — Le caverne
+
+- **Fase 5 del piano fatta.** Nella Neve, nel Far West, nell'Egitto e nell'Inferno ci sono da una a tre grotte per mappa, ognuna
+  un arco-segreto (nascosto sull'ologramma finché non lo si scopre; nella Neve, il primo sul sentiero della montagna, a
+  metà salita). Con E all'arco, dissolvenza al nero ed entri in una mappa a parte: due o tre stanze in fila con dei
+  nemici e in fondo, in una nicchia, crediti e una reliquia; con E vicino all'arrivo esci, allo stesso arco.
+- Tecnicamente l'interno sta sulla stessa griglia (la mappa aperta viene messa da parte e poi riportata identica); un
+  salvataggio preso in grotta si riapre in grotta. Nuova arena «Grotta» nel laboratorio (F3). Test: 11 nuovi (1643
+  in tutto).
+
+## 2026-10-24 — La montagna a spirale
+
+- **Fase 4 del piano fatta.** Le nuove Montagne innevate hanno una montagna tonda con un sentiero largo due
+  caselle che la avvolge per tre giri, un gradino a ogni passo fino alla cima (94 gradini); tra i giri c'è un
+  dirupo, quindi non si taglia. Sul sentiero: una pattuglia a metà salita e due tratti di ghiaccio; in cima, una
+  reliquia da raccogliere a mano. Il bordo esterno è libero.
+- Il pavimento rialzato si apre in una finestra tonda con un sottile bordo luminoso davanti al robot, quindi il robot
+  si vede anche dietro la montagna; i nemici dietro la montagna restano nascosti. Corretto un difetto della Fase 3:
+  il robot che cammina libero (e ogni figura) non veniva alzato alla quota del terreno (un `defer` su un risultato
+  con nome non ha effetto in Odin); l'ologramma raggruppa le altezze oltre 12 a bande; nuova arena «Montagna» nel laboratorio (F3) e atto
+  di smoke. Test: 14 nuovi (1632 in tutto).
+
+## 2026-10-24 — Rilievi nelle spedizioni
+
+- **Fase 3 del piano fatta.** Tutti i dodici biomi hanno un rilievo a tema: piattaforme, mesa, colline,
+  piazze, dune, terrazze, altopiani con scala, cenge, tumuli, isole a quote diverse, crateri, la grande
+  collina del masso. Funzione pura del bioma, quindi la stessa geografia a ogni run; servizi, partenza e
+  pattuglie restano su terreno piano.
+- In esplorazione il robot (a piedi e in sella), i gruppi che dormono, le pattuglie e l'avvistamento
+  seguono le regole di passo e di vista dei dislivelli; il pavimento ha terrazze, più chiare con la quota e
+  con una riga a ogni gradino; l'ologramma ha ombreggiatura e curve di livello. Gli slot vecchi si caricano
+  piatti. Test: 9 nuovi (1618 in tutto).
+
+## 2026-10-24 — Strutture su più caselle
+
+- **Fase 6 del piano fatta.** Edifici (casetta, capanna, tempietto) e oggetti complessi (carro, fontana,
+  statua, macchinario, rovina, recinto) che occupano tutte le caselle della loro impronta, da piante a
+  caratteri con rotazione e specchio, posati con controlli (fuori mappa, sovrapposizione, porta bloccata,
+  sacche). Nuovo tipo di casella, il muretto, che ferma il passo ma non la vista.
+- Gli edifici diventano trasparenti avvicinandosi (intero da 5 caselle, sparito a una casella da una porta,
+  minimo del 25% accanto a un muro cieco); dentro i muri tornano pieni, il tetto si nasconde e il fuori si
+  scurisce; resta il contorno a terra. Solo grafica: i muri fermano sempre passo e vista.
+- Laboratorio: terza arena (F3) con tutto il catalogo. Spedizioni: Robotica cibernetica ha 14 strutture
+  fisse, salvate con il mondo. Test: 21 nuovi (1609 in tutto).
+
+## 2026-10-23 — Hub in 3D: dentro la sala giochi
+
+- **Fase 11 del piano fatta: l'hub 3D è completo.** Entrando nella Sala giochi dalla piazza
+  si passa, con la dissolvenza, a dodici posti a semicerchio: i cabinati dei biomi vinti
+  sono accesi, con nome, stelle e record, e si gioca entrandoci; gli altri sono coperti da
+  un telo e non dicono a quale bioma appartengono. Dopo una partita il robot è davanti al
+  cabinato e il record è aggiornato. La vecchia pagina «Cabinati» è sostituita dalla sala.
+- Sala in `hubworld/arcade.odin` e `render/hub_arcade.odin`, collegamento in
+  `application/hub_arcade_room.odin`. Test: 8 nuovi (1588 in tutto).
+
+## 2026-10-23 — Hub in 3D: dentro il deposito
+
+- **Fase 10 del piano fatta.** Entrando nel Deposito dalla piazza si passa, con la
+  dissolvenza, alla sua sala: lo zaino su un tappetino, un manichino su una pedana che
+  indossa arma e reliquie vere, un terminale con lo scaffale delle carte scoperte che si
+  accendono, casse che crescono con gli oggetti conservati e la porta «Piazza». Zaino,
+  manichino e archivio aprono i pannelli di prima e al ritorno il robot è davanti a loro.
+- Le sale di casinò e deposito condividono ora codice (`Hub_Room`, `hub_rooms.odin`,
+  `render/hub_room`-helper). Test: 9 nuovi (1580 in tutto).
+
+## 2026-10-23 — Hub in 3D: dentro il casinò
+
+- **Fase 9 del piano fatta.** Entrando nel Casinò dalla piazza si passa, con una
+  dissolvenza, alla sala: 6 Ranch 7, Tre in fuga, roulette europea e Duello del d20 sono
+  strutture a cui il robot cammina; entrandoci si apre il gioco di prima, con lo stesso
+  portafoglio, e alla fine si è davanti alla struttura. La porta «Piazza» riporta davanti
+  al Casinò. Un'insegna mostra i crediti del deposito; suoni d'ambiente leggeri.
+- Stanze e dissolvenza in `hubworld/zone.odin` (riusabili dal deposito e dalla sala
+  giochi), disegno in `render/hub_casino.odin`. Test: 9 nuovi (1571 in tutto).
+
+## 2026-10-23 — Hub in 3D: la piazza
+
+- **Fase 8 del piano fatta.** L'hub è una piazza rotonda con sette edifici (Portale dei
+  ricordi, Deposito, Progressi, Uscita, Frammenti del creatore, Sala giochi, Casinò): il
+  robot di carta cammina con WASD o frecce, o con un clic su un edificio, e ogni porta
+  apre la pagina di prima. Gli edifici sbiadiscono avvicinandosi e si vede l'interno.
+  Dopo una spedizione il robot riappare davanti al Portale, dopo una pagina davanti
+  al suo edificio; «Torna in piazza» sostituisce la barra dei pulsanti.
+- Regole nel nuovo pacchetto `hubworld` (testate senza finestra), disegno in
+  `render/hub_world.odin`; smoke `--smoke-hub-world`. Test: 11 nuovi (1562 in tutto).
+
+## 2026-10-23 — Piano di lavoro della griglia
+
+- Nuovo [piano](docs/piano-griglia.md) in undici fasi, da eseguire una alla
+  volta solo su comando dell'utente: bersagli in evidenza mentre si sceglie una
+  carta, altezze nel laboratorio e nelle spedizioni, montagna a spirale delle
+  Montagne innevate, caverne, strutture su più caselle e, se confermata, la
+  loro posa da parte del giocatore.
+- Fasi 8–11: l'hub diventa un mondo 3D in cui il robot cammina (piazza,
+  casinò, deposito, sala giochi), dai disegni dell'utente in
+  `docs/immagini/`.
+- **Fase 2 del piano fatta: altezze nel laboratorio.** Ogni cella può avere un'altezza in
+  gradini (0 ovunque = il gioco di prima).
+  - Regole: il passo fra celle vicine è al massimo di 1 gradino, di più è un dirupo (un muro
+    per chi cammina); le spinte non salgono un dirupo ma lo scendono, cadendo (danno =
+    dislivello − 1, al massimo 10); i nemici non camminano sui dirupi; linea di tiro e di vista
+    seguono il terreno; +1 gittata dalle carte a distanza da 4 o più gradini in alto; il First
+    Person Shooter segue le altezze.
+  - Grafica del laboratorio: pavimento rialzato con le linee dei gradini, personaggi, ombre,
+    anteprime, segni dei bersagli e intenti alla quota giusta, telecamera che segue il giocatore,
+    puntatore che sceglie la cima o la faccia giusta.
+  - Seconda arena della Prova meccaniche (F3): altopiano con scala, pilastro e collina a
+    spirale. Le spedizioni restano piatte (Fase 3).
+  - Test: 13 nuovi (1551 in tutto); atto `mechanics_lab_heights` dello smoke (`ODIN_PP_LAB_ONLY=heights`).
+- **Fase 1 del piano fatta: bersagli in evidenza.** Mentre si sceglie una carta,
+  ogni nemico che una giocata valida colpirebbe davvero ha la casella accesa (nucleo
+  quasi bianco che pulsa, contorno d'inchiostro, angoli, alone viola elettrico, verde
+  acido nello Spazio), un fascio di luce con scintille che sale dalla sua casella e,
+  col puntatore sulla casella giusta, angoli che si chiudono e un anello che si apre.
+  - Il calcolo è `game.card_hit_enemies`, sul piano degli effetti della giocata: lo
+    Scatto non segna chi sta sulla sua linea; l'Inondazione segna tutti.
+  - Con una carta solo sotto il mouse nella mano, raggio e bersagli compaiono più tenui.
+  - Lazzo, Pinball, Cannone e Inondazione usano questo segno al posto dei loro mirini
+    sui nemici.
+  - Test: 9 nuovi (1538 in tutto). Catture: `odin_pp_mechanics_lab_hit_*.png` e
+    `odin_pp_expedition_bersagli_*.png` (Neve, Far West, Giungla, Spazio).
+- **Fase 0 del piano fatta: test affidabili su Windows.** `check.ps1` completo
+  finisce con 1529 test verdi due volte (con e senza assert) e le due build.
+  - 14 percorsi `/private/tmp` in 6 test (di 0xdokkan) ora usano la cartella
+    temporanea del sistema.
+  - Nuovo pacchetto `src/engine/teststack`: dà 32 MiB di stack agli
+    eseguibili di test su Windows, perché `core:encoding/json` usa circa 6 MB
+    di stack per decodificare lo snapshot della spedizione (1,3 MB). Era la
+    causa del crash a metà della suite e dei pacchetti che si bloccavano da
+    soli. Il gioco non ne era toccato.
+  - Tolleranza dell'andata e ritorno schermo→mondo della camera da 0,001 a
+    0,005 caselle (rumore dei numeri a 32 bit), e conteggio delle carte
+    offribili di `test_m8_locked_cards_never_leak_into_reward_pool`.
+- Scaletta per priorità, all'inizio del piano. La tabella delle fasi segue
+  questo ordine: Fase 0 (proposta: test affidabili su Windows), bersagli,
+  hub, altezze nel laboratorio, strutture, altezze nelle spedizioni,
+  montagna, caverne, posa da parte del giocatore.
+- Fase 6 precisata: oggetti complessi ed edifici occupano tutte le caselle
+  della loro impronta. Gli edifici diventano trasparenti man mano che il robot
+  si avvicina, spariscono sulla soglia e, quando il robot è dentro, tornano
+  con i muri normali che isolano la vista. La regola vale anche per la piazza
+  dell'hub, se l'utente lo conferma alla Fase 8.
+- Quattro immagini di riferimento in 3D dell'hub, `docs/immagini/hub-3d-*.png`:
+  render di concetto fatti da Claude con Blender dai disegni dell'utente, nello
+  stile delle spedizioni, con il robot del gioco e il font Jersey 10.
+- Per ogni fase: come funziona oggi il codice, il progetto, le domande da fare
+  prima di iniziare, i passi, i test e il comando da dare a Claude. La sezione
+  1 contiene le regole per Claude, compreso lo stop a fine fase.
+
+## 2026-10-23 — Le carte del laboratorio tornano, solo in Prova meccaniche
+
+- Bomb Marley, Inondazione, Cannone, Cannone Laser, Buco Nero, Dinosauro e il
+  Sanguinamento (le voci del 21 ottobre qui sotto) tornano sopra la campagna dei
+  dodici biomi, **solo nella Prova meccaniche** per ora: non si offrono, non si
+  comprano, non si scoprono nell'archivio e non entrano nel pool di una
+  spedizione (tratto `Lab_Only`, `game.card_is_lab_only`).
+- Le carte con gli stessi nomi della campagna (gli ordigni di Cannone,
+  Inondazione, Buco Nero, Bomb Marley e lo scudo del Dinosauro) restano com'erano.
+  Le nostre hanno nomi interni propri: `Marley_Party`, `Flood_Wave`,
+  `Field_Cannon`, `Laser_Cannon`, `Devouring_Hole`, `Dino_Ride`; gli oggetti posati
+  `Field_Cannon` e `Devouring_Hole`.
+- Il mondo neon non torna: la grafica resta quella di main.
+- Il passo calcolato da main (`expedition_step_seconds`) parte da quello del
+  giocatore, così il Velociraptor cavalcato fa di nuovo passi da 0,4 s.
+
+## 2026-10-21 — Cannone, Buco Nero, Dinosauro e Sanguinamento
+
+- **Cannone** (non comune, energia 2, 2 s, fino a +2): una torretta su una casella
+  libera, girata con la rotella, spara ogni secondo del mondo per 20 s una palla
+  da 2 danni (+1) al primo nemico della linea e poi si sbriciola. Al secondo
+  upgrade **diventa Cannone Laser** (rara, mai offerta): un raggio da 3 danni
+  (+1, fino a 3 upgrade) a tutti i nemici della linea. Massimo due cannoni.
+- **Buco Nero** (rara, energia 3, 2 s, fino a +4): un buco per 8 s del mondo; il
+  3x3 prende 4 danni a battito (+1 per upgrade; l'area cresce con gli upgrade),
+  il 5x5 intorno viene tirato di una casella verso il centro, boss e miniboss
+  esclusi; chi muore viene inghiottito con una spirale.
+- **Dinosauro** (rara, energia 3, 2 s, fino a +5): un d4 sceglie per 20 s (+3 per
+  upgrade) Velociraptor (passi da 0,4 s, urto che sanguina), Stegosauro (ogni
+  colpo ricevuto torna indietro senza cariche), Dilophosaurus (1 Veleno a chi
+  ferisce o è ferito) o Giganotosauro (passi che schiacciano le 4 caselle intorno
+  per 6, urto che uccide Chaser, Archer e Bomber all'istante).
+- Dinosauro, ritocco: il dinosauro si gira come la carta del Viandante (prima poteva
+  tornare indietro dopo il passo); mentre si cavalca i passi e i colpi li fa il
+  dinosauro (scatto in avanti a testa bassa), non il disegno del Viandante; il
+  **Giganotosauro**, se il suo urto ucciderebbe il nemico, ne prende la casella e
+  lo schiaccia invece di colpirlo; se sopravvive lo morde.
+- **Sanguinamento**: nuovo status dei nemici, +N danni da ogni fonte, una volta,
+  gli stack non calano.
+- Catalogo a 50 carte (il Cannone Laser non si offre). Icone, 25 suoni
+  originali, pixel art dei quattro dinosauri, testi, chip `RAPTOR 14s`, film di
+  Mostra effetto a ogni livello e atti della Prova meccaniche.
+- Il mazzo della Prova meccaniche cambia: Pozza di Veleno, Deflect e Feretro
+  lasciano il posto a Cannone, Buco Nero e Dinosauro (restano nel gioco; lo smoke
+  li riprende per i loro atti).
+- Regole in `game/emplacement.odin`, `cannon.odin`, `black_hole.odin`,
+  `dinosaur.odin`; disegno in `render/arsenal.odin` e `render/dino_art.odin`.
+
+## 2026-10-21 — Bomb Marley e Inondazione
+
+- **Inondazione** (non comune, energia 2, 2 s, fino a +3): un'onda attraversa
+  tutta la mappa dal muro dietro la direzione scelta al muro davanti, spegne
+  tutti i fuochi e spinge ogni nemico di una casella (+1 per upgrade, +1 sul
+  colpo a tempo) con le normali regole di spinta; nessun danno. Regole in
+  `game/flood.odin`, onda e vapore in `render/flood.odin`.
+- **Bomb Marley** (rara, energia 3, 2 s, fino a +5): una festa di 35 s del
+  mondo (+5 s per nemico ucciso da una bomba, 90 in tutto) a battiti di un
+  secondo. Una sfera da discoteca illumina caselle che salvano; bombe da 6
+  danni (+1 per upgrade) attraversano colonne intere, annunciate due battiti
+  prima, e non toccano chi sta su una luce. Poche bombe all'inizio, poi sempre
+  di più; le luci calano con il tempo. Bomb Marley non è un'entità della stanza:
+  nessuno lo tocca né lo vede come bersaglio. I nemici evitano le colonne
+  annunciate e cercano le luci vicine. Regole in `game/marley.odin`, tavolo in
+  `render/marley.odin`.
+- Catalogo a 46 carte. Icone, suoni (compreso un groove reggae a 60 BPM),
+  testi, chip dell'HUD, film di Mostra effetto (quello di Bomb Marley finisce
+  alla prima bomba, non dopo l'intera festa) e atti della Prova meccaniche.
+- Bomb Marley, ritocco: bombe di cartoncino che vengono lanciate dalla figura e
+  rimbalzano lungo la colonna (un salto ogni 3 caselle) senza cambiare il danno,
+  che colpisce chiunque sia nella colonna; luci molto più numerose (4 più dei
+  personaggi, una in meno ogni 5 s) e sparse; le caselle del turno dopo si vedono
+  in anteprima per tutto il tempo.
+- Inondazione, ritocco: con la carta in mano la rotella del mouse gira la
+  direzione dell'onda di un quarto di giro a scatto (la camera non zooma) e la
+  mappa mostra una freccia grande dal muro di partenza a quello di arrivo, con
+  barre `PARTE` e `FINE` e frecce più sottili sulle altre corsie.
+- Il mazzo della Prova meccaniche resta di dieci carte più la Canna: Movimento
+  Ombra e Lama Velenosa lasciano il posto alle due nuove (restano nel gioco).
+
 ## 2026-10-20 — Verifica prima della pubblicazione
 
 - Ripristinato `scripts/check.sh --quick`: il registro delle combinazioni

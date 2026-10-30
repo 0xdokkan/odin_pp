@@ -40,8 +40,8 @@ test_pinball_ball_fades_at_the_eye_behind_his_eyes :: proc(t: ^testing.T) {
 	// The ball two cells north of him, the view on it: the crosshair finds the
 	// wall past it, never the ball.
 	testing.expect_value(t, room.pinball.run, f64(0))
-	room.pinball.origin, room.pinball.cell = {6, 4}, {6, 4}
-	if index, found := game.enemy_index_by_id(&room, foe.id); found { room.enemies[index].position = {6, 4} }
+	room.pinball.origin, room.pinball.cell = {6, 4}, {x = 6, y = 4}
+	if index, found := game.enemy_index_by_id(&room, foe.id); found { room.enemies[index].position = {x = 6, y = 4} }
 	f.yaw, f.pitch = -math.PI/2, 0
 	shadow_view_test_frame(renderer, &room, 1.0/60.0)
 	testing.expect(t, b.at == view.Vec2{6, 4} && f.aimed == .Solid)

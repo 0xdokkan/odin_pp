@@ -15,7 +15,7 @@ Run_Action :: enum {
 	Hand_1, Hand_2, Hand_3, Hand_4, Hand_5, Hand_6, Hand_7, Hand_8, Hand_9, Hand_10,
 	Route_1, Route_2, Route_3,
 	Skip, Previous_Page, Next_Page, Upgrade, Remove, Leave,
-	Restart, Main_Menu, Animation_Speed, Diagnostics, Intent_Display, Clear_Lab,
+	Restart, Main_Menu, Animation_Speed, Diagnostics, Intent_Display, Clear_Lab, Lab_Arena,
 	Debug_Thorns, Debug_Afterimage,
 }
 
@@ -39,7 +39,7 @@ default_run_actions :: proc() -> input.Action_Map(Run_Action) {
 		{.Route_1, .ONE}, {.Route_1, .KP_1}, {.Route_2, .TWO}, {.Route_2, .KP_2}, {.Route_3, .THREE}, {.Route_3, .KP_3},
 		{.Skip, .S}, {.Previous_Page, .LEFT}, {.Next_Page, .RIGHT}, {.Upgrade, .U}, {.Remove, .R}, {.Leave, .L},
 		{.Restart, .F5}, {.Main_Menu, .F10}, {.Animation_Speed, .F4}, {.Diagnostics, .F8},
-		{.Intent_Display, .F6}, {.Clear_Lab, .F7}, {.Debug_Thorns, .C}, {.Debug_Afterimage, .V},
+		{.Intent_Display, .F6}, {.Clear_Lab, .F7}, {.Lab_Arena, .F3}, {.Debug_Thorns, .C}, {.Debug_Afterimage, .V},
 	}
 	for b in bindings { input.bind(&m, b.action, input.key(b.key)) }
 	return m
@@ -50,7 +50,7 @@ default_run_actions :: proc() -> input.Action_Map(Run_Action) {
 Run_Input :: struct {
 	actions: input.Sample(Run_Action),
 	focused: bool,
-	left_pressed, left_down, left_released, right_pressed: bool,
+	left_pressed, left_down, left_released, right_pressed, right_down: bool,
 	middle_pressed, middle_down: bool,
 	mouse_window, mouse_motion: view.Vec2,
 	wheel: f32,
@@ -98,7 +98,7 @@ map_run_input :: proc(actions: ^input.Action_Map(Run_Action), devices: ^input.De
 		history^ = {active = focused, axes_down = axes_down}
 	}
 	r.left_pressed, r.left_down, r.left_released = input.mouse_pressed(devices, .LEFT), input.mouse_down(devices, .LEFT), input.mouse_released(devices, .LEFT)
-	r.right_pressed = input.mouse_pressed(devices, .RIGHT)
+	r.right_pressed, r.right_down = input.mouse_pressed(devices, .RIGHT), input.mouse_down(devices, .RIGHT)
 	r.middle_pressed, r.middle_down = input.mouse_pressed(devices, .MIDDLE), input.mouse_down(devices, .MIDDLE)
 	r.mouse_window = {devices.mouse_position.x, devices.mouse_position.y}
 	r.mouse_motion = {devices.mouse_motion.x, devices.mouse_motion.y}

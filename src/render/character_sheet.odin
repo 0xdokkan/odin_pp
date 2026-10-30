@@ -124,8 +124,8 @@ draw_character_stage :: proc(renderer: ^Renderer, stage: rl.Rectangle) {
 	draw_resin_cube(renderer, {0, SHEET_PLINTH-0.01, 0}, 0.86, 0.04, 0.86, RESIN_CAP)
 	draw_sheet_model(renderer.tactical.pilgrim, {0, SHEET_PLINTH+0.01, 0}, angle)
 	if lit { rl.EndShaderMode() }
-	draw_diorama_lamp_glow(renderer, lantern, {0, 0}, 0.9)
-	draw_diorama_lamp_glow(renderer, {1.12, DIORAMA_WALL_HEIGHT*0.58, -1.03}, {1, 0}, 0.6)
+	draw_diorama_lamp_glow(renderer, lantern, {x = 0, y = 0}, 0.9)
+	draw_diorama_lamp_glow(renderer, {1.12, DIORAMA_WALL_HEIGHT*0.58, -1.03}, {x = 1, y = 0}, 0.6)
 	rl.EndMode3D()
 	// A cold vignette folds the chapel into the frame.
 	for edge in 0..<6 {

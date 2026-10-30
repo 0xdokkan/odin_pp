@@ -12,8 +12,8 @@ test_custodian_support_precedes_ally_movement_in_stable_id_order :: proc(t: ^tes
 	for reverse_storage in storage_orders {
 		player := create_test_player(t)
 		spawns := [?]Enemy_Spawn{
-			{position = {5, 2}, health = 8, attack = 1},
-			{position = {6, 2}, health = 8, attack = 1, archetype = .Custodian},
+			{position = {x = 5, y = 2}, health = 8, attack = 1},
+			{position = {x = 6, y = 2}, health = 8, attack = 1, archetype = .Custodian},
 		}
 		room, ok := create_room(&data, &player, {enemies = spawns[:]})
 		testing.expect(t, ok)
@@ -25,7 +25,7 @@ test_custodian_support_precedes_ally_movement_in_stable_id_order :: proc(t: ^tes
 		intent := room.enemies[custodian_index].intent
 		testing.expect_value(t, intent.kind, Enemy_Intent_Kind.Protect)
 		testing.expect_value(t, intent.protected_ally, enemy_entity(1))
-		testing.expect_value(t, intent.destination, grid.Position{5, 2})
+		testing.expect_value(t, intent.destination, grid.Position{x = 5, y = 2})
 		pulse := advance_combat_pulse(&room)
 		shield, found := status_for_entity(&room, enemy_entity(1), .Shield)
 		testing.expect(t, found)
@@ -60,8 +60,8 @@ test_forced_displacement_or_death_cancels_frozen_custodian_protection :: proc(t:
 	for scenario in 0..<4 {
 		player := create_test_player(t)
 		spawns := [?]Enemy_Spawn{
-			{position = {5, 2}, health = 8, attack = 1},
-			{position = {6, 2}, health = 8, attack = 1, archetype = .Custodian},
+			{position = {x = 5, y = 2}, health = 8, attack = 1},
+			{position = {x = 6, y = 2}, health = 8, attack = 1, archetype = .Custodian},
 		}
 		room, ok := create_room(&data, &player, {enemies = spawns[:]})
 		testing.expect(t, ok)
@@ -69,7 +69,7 @@ test_forced_displacement_or_death_cancels_frozen_custodian_protection :: proc(t:
 		action := make_action(.Trigger, SYSTEM_ENTITY, entity_target(target), .Entity)
 		if scenario < 2 {
 			testing.expect(t, add_effect(&action, move_effect(target,
-				grid.Position{5, 3} if scenario == 1 else grid.Position{6, 3})))
+				grid.Position{x = 5, y = 3} if scenario == 1 else grid.Position{x = 6, y = 3})))
 		} else {
 			testing.expect(t, add_effect(&action, damage_effect(target, 8)))
 		}
@@ -95,16 +95,16 @@ test_custodian_line_rechecks_movable_cover_without_retargeting :: proc(t: ^testi
 	defer level.destroy(&data)
 	player := create_test_player(t)
 	spawns := [?]Enemy_Spawn{
-		{position = {4, 2}, health = 8, attack = 1},
-		{position = {6, 2}, health = 8, attack = 1, archetype = .Custodian},
+		{position = {x = 4, y = 2}, health = 8, attack = 1},
+		{position = {x = 6, y = 2}, health = 8, attack = 1, archetype = .Custodian},
 	}
-	objects := [?]Grid_Object_Spawn{{position = {5, 3}, kind = .Ice_Block}}
+	objects := [?]Grid_Object_Spawn{{position = {x = 5, y = 3}, kind = .Ice_Block}}
 	room, ok := create_room(&data, &player, {enemies = spawns[:], objects = objects[:]})
 	testing.expect(t, ok)
 	defer destroy_room(&room)
 	testing.expect_value(t, room.enemies[1].intent.kind, Enemy_Intent_Kind.Protect)
 	action := make_action(.Trigger, SYSTEM_ENTITY, entity_target(object_entity(1)), .Entity)
-	testing.expect(t, add_effect(&action, move_effect(object_entity(1), {5, 2})))
+	testing.expect(t, add_effect(&action, move_effect(object_entity(1), {x = 5, y = 2})))
 	report := resolve_action(&room, &action)
 	testing.expect(t, report.accepted)
 	testing.expect(t, validate_enemy_intent_structure(&room, &room.enemies[1].intent))
@@ -121,8 +121,8 @@ test_custodian_shield_absorbs_two_damage_then_breaks :: proc(t: ^testing.T) {
 	defer level.destroy(&data)
 	player := create_test_player(t)
 	spawns := [?]Enemy_Spawn{
-		{position = {5, 2}, health = 8, attack = 1},
-		{position = {6, 2}, health = 8, attack = 1, archetype = .Custodian},
+		{position = {x = 5, y = 2}, health = 8, attack = 1},
+		{position = {x = 6, y = 2}, health = 8, attack = 1, archetype = .Custodian},
 	}
 	room, ok := create_room(&data, &player, {enemies = spawns[:]})
 	testing.expect(t, ok)
@@ -143,7 +143,7 @@ test_demolitionist_bomb_charge_and_two_pulse_recovery :: proc(t: ^testing.T) {
 	data := create_enemy_archetype_test_level(t)
 	defer level.destroy(&data)
 	player := create_test_player(t)
-	spawns := [?]Enemy_Spawn{{position = {5, 1}, health = 30, attack = 2, archetype = .Demolitionist}}
+	spawns := [?]Enemy_Spawn{{position = {x = 5, y = 1}, health = 30, attack = 2, archetype = .Demolitionist}}
 	room, ok := create_room(&data, &player, {enemies = spawns[:]})
 	testing.expect(t, ok)
 	defer destroy_room(&room)
@@ -175,7 +175,7 @@ test_demolitionist_phase_transition_preserves_announced_attack :: proc(t: ^testi
 	data := create_enemy_archetype_test_level(t)
 	defer level.destroy(&data)
 	player := create_test_player(t)
-	spawns := [?]Enemy_Spawn{{position = {5, 1}, health = 30, attack = 2, archetype = .Demolitionist}}
+	spawns := [?]Enemy_Spawn{{position = {x = 5, y = 1}, health = 30, attack = 2, archetype = .Demolitionist}}
 	room, ok := create_room(&data, &player, {enemies = spawns[:]})
 	testing.expect(t, ok)
 	defer destroy_room(&room)
@@ -203,7 +203,7 @@ test_demolitionist_overdrive_throws_twice_then_announces_long_charge :: proc(t: 
 	data := create_enemy_archetype_test_level(t)
 	defer level.destroy(&data)
 	player := create_test_player(t)
-	spawns := [?]Enemy_Spawn{{position = {5, 1}, health = 30, attack = 2, archetype = .Demolitionist}}
+	spawns := [?]Enemy_Spawn{{position = {x = 5, y = 1}, health = 30, attack = 2, archetype = .Demolitionist}}
 	room, ok := create_room(&data, &player, {enemies = spawns[:]})
 	testing.expect(t, ok)
 	defer destroy_room(&room)
@@ -223,7 +223,7 @@ test_demolitionist_overdrive_throws_twice_then_announces_long_charge :: proc(t: 
 	testing.expect_value(t, room.enemies[0].intent.kind, Enemy_Intent_Kind.Charge)
 	testing.expect_value(t, room.enemies[0].intent.damage, i32(6))
 	// Overdrive threatens six cells without changing the announced cell later.
-	room.enemies[0].position = {7, 1}
+	room.enemies[0].position = {x = 7, y = 1}
 	room.enemies[0].intent, room.enemies[0].tactical_cooldown = {}, 0
 	plan_enemy_intents(&room)
 	testing.expect_value(t, room.enemies[0].intent.kind, Enemy_Intent_Kind.Charge)
@@ -236,7 +236,7 @@ test_interrupted_demolitionist_charge_still_gives_long_recovery :: proc(t: ^test
 	data := create_enemy_archetype_test_level(t)
 	defer level.destroy(&data)
 	player := create_test_player(t)
-	spawns := [?]Enemy_Spawn{{position = {5, 1}, health = 30, attack = 2, archetype = .Demolitionist}}
+	spawns := [?]Enemy_Spawn{{position = {x = 5, y = 1}, health = 30, attack = 2, archetype = .Demolitionist}}
 	room, ok := create_room(&data, &player, {enemies = spawns[:]})
 	testing.expect(t, ok)
 	defer destroy_room(&room)
@@ -244,7 +244,7 @@ test_interrupted_demolitionist_charge_still_gives_long_recovery :: proc(t: ^test
 	room.enemies[0].intent, room.enemies[0].tactical_cooldown = {}, 0
 	plan_enemy_intents(&room)
 	action := make_action(.Trigger, SYSTEM_ENTITY, entity_target(enemy_entity(1)), .Entity)
-	testing.expect(t, add_effect(&action, move_effect(enemy_entity(1), {5, 2})))
+	testing.expect(t, add_effect(&action, move_effect(enemy_entity(1), {x = 5, y = 2})))
 	report := resolve_action(&room, &action)
 	testing.expect(t, report.accepted)
 	pulse := advance_combat_pulse(&room)
@@ -260,8 +260,8 @@ test_demolitionist_unaligned_or_blocked_approach_has_bounded_recovery :: proc(t:
 	defer level.destroy(&data)
 	for scenario in 0..<2 {
 		player := create_test_player(t)
-		spawns := [?]Enemy_Spawn{{position = {7, 4}, health = 30, attack = 2, archetype = .Demolitionist}}
-		blockers := [?]grid.Position{{6, 4}, {7, 3}, {8, 4}}
+		spawns := [?]Enemy_Spawn{{position = {x = 7, y = 4}, health = 30, attack = 2, archetype = .Demolitionist}}
+		blockers := [?]grid.Position{{x = 6, y = 4}, {x = 7, y = 3}, {x = 8, y = 4}}
 		room, ok := create_room(&data, &player, {
 			enemies = spawns[:], obstacles = blockers[:] if scenario == 1 else nil,
 		})
@@ -292,8 +292,8 @@ test_demolitionist_death_cancels_pending_offense_and_phase_transition :: proc(t:
 	defer level.destroy(&data)
 	player := create_test_player(t)
 	spawns := [?]Enemy_Spawn{
-		{position = {5, 1}, health = 30, attack = 2, archetype = .Demolitionist},
-		{position = {7, 4}, health = 8, attack = 1},
+		{position = {x = 5, y = 1}, health = 30, attack = 2, archetype = .Demolitionist},
+		{position = {x = 7, y = 4}, health = 8, attack = 1},
 	}
 	room, ok := create_room(&data, &player, {enemies = spawns[:]})
 	testing.expect(t, ok)

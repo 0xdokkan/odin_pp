@@ -11,13 +11,18 @@ import world "../expedition"
 import arcade "../memoryarcade"
 import activities "../activities"
 import run "../run"
+import hubworld "../hubworld"
+import game "../game"
 import render "../render"
 import host "../engine/host"
 import input "../engine/input"
 import ui "../engine/ui"
 import gfx "../engine/gfx"
 
-Hub_Page :: enum { Slots, Galaxy, Storage, Progress, Arcade, Casino, Memories }
+// The pages after Slots: the plaza (World) where the robot walks, and, opened from
+// its buildings, the Galaxy (the Portal), Storage (the Deposito), Progress, Arcade (the
+// Sala giochi), Room (the room of the Casinò or of the Deposito) and Memories (Frammenti del creatore).
+Hub_Page :: enum { Slots, World, Galaxy, Storage, Progress, Room, Memories }
 Campaign_Save :: struct { expedition:world.Snapshot, casino:arcade.Casino_Transaction, casino_random:u64 }
 Campaign_Hub :: struct {
 	options:Runtime_Options,
@@ -35,6 +40,26 @@ Campaign_Hub :: struct {
 	slot_active:[3]bool,
 	slot_biome:[3]campaign.Biome,
 	selected:campaign.Biome,
+	// The plaza (hubworld): the robot, the building whose page is open (the robot
+	// comes back in front of it), the camera's middle and what the pointer is on.
+	plaza:hubworld.World,
+	plaza_from:hubworld.Building,
+	plaza_camera:[2]f32,
+	plaza_hover:Maybe(hubworld.Building),
+	// A room behind a door of the plaza (hubworld): which one, its plan, the robot in
+	// it, the station the robot came back from, the camera, the pointer, the casino's
+	// sounds, and the dissolve between zones with where it ends up.
+	room_kind:Hub_Room,
+	room:hubworld.Room,
+	room_world:hubworld.Room_World,
+	room_from:int,
+	room_camera:[2]f32,
+	room_hover:Maybe(int),
+	ambience:hubworld.Ambience,
+	fade:hubworld.Fade,
+	fade_to:Hub_Fade_Target,
+	fade_room:Hub_Room,
+	in_game:bool,
 	inventory:campaignui.State,
 	clock,yaw,launch_time,notice_time:f32,
 	revealed_at:f32,
@@ -45,15 +70,27 @@ Campaign_Hub :: struct {
 	departure_unlocked:[campaign.Biome.Count]bool,
 	notice:string,
 	memory:int,
-	progress_tab,progress_page,arcade_page:int,
-	smoke,smoke_expedition:bool,
-	smoke_frame:int,
+	progress_tab,progress_page:int,
+	smoke,smoke_expedition,smoke_world:bool,
+	smoke_frame,smoke_stage,smoke_phase,smoke_wait,smoke_hall:int,
+	smoke_shot:bool,
 }
 
-campaign_hub_scene :: proc(options:Runtime_Options,smoke:bool=false,expedition_smoke:bool=false) -> host.Scene {
-	h:=new(Campaign_Hub);h.options=options;h.page=.Slots;h.slot=-1;h.delete_slot=-1;h.first_frame=true;h.window_active=true;h.smoke=smoke;h.smoke_expedition=expedition_smoke
-	if smoke || expedition_smoke {campaign.initialize(&h.progress);h.slot=0;h.page=.Galaxy;h.saved.casino_random=options.seed;campaign.depot_credit(&h.progress,150);h.path=""}
-	else {hub_scan_slots(h)}
+campaign_hub_scene :: proc(options:Runtime_Options,smoke:bool=false,expedition_smoke:bool=false,world_smoke:bool=false) -> host.Scene {
+	h:=new(Campaign_Hub);h.options=options;h.page=.Slots;h.slot=-1;h.delete_slot=-1;h.first_frame=true;h.window_active=true;h.smoke=smoke;h.smoke_expedition=expedition_smoke;h.smoke_world=world_smoke
+	hub_room_setup(h,.Casino)
+	if smoke || expedition_smoke || world_smoke {
+		campaign.initialize(&h.progress);h.slot=0;h.page=.Galaxy;h.saved.casino_random=options.seed;campaign.depot_credit(&h.progress,150);h.path=""
+		if world_smoke {
+			h.page=.World;hubworld.place_at_centre(&h.plaza)
+			// The depot shows real things: a weapon and two relics on the mannequin, some stored items, some cards known.
+			h.progress.backpack.weapon=campaign.make_item(.Weapon,1,i32(game.Weapon_Id.Storm_Pike))
+			h.progress.backpack.relics[0]=campaign.make_item(.Relic,1,i32(game.Relic_Id.Guard_Sigil))
+			h.progress.backpack.relics[1]=campaign.make_item(.Relic,1,i32(game.Relic_Id.Swift_Soles))
+			for _ in 0..<14 {campaign.depot_add(&h.progress,campaign.make_item(.Healing,2))}
+			for id in game.Card_Id.Strike..<game.Card_Id.Count {if int(id)%2==0 {_=campaign.discover(&h.progress,id)}}
+		}
+	} else {hub_scan_slots(h)}
 	return host.Scene{name="memory-hub",data=h,opaque=true,modal=true,clear_color={5,6,14,255},update=hub_update,draw=hub_draw,resume=hub_resume,destroy=hub_destroy,after_present=hub_after_present}
 }
 
@@ -79,14 +116,14 @@ hub_scan_slots :: proc(h:^Campaign_Hub) {
 hub_save :: proc(data:rawptr) -> bool {
 	h:=cast(^Campaign_Hub)data
 	if h.slot<0 {return true}
-	if h.path=="" {h.save_failed=!(h.smoke || h.smoke_expedition);return !h.save_failed}
+	if h.path=="" {h.save_failed=!(h.smoke || h.smoke_expedition || h.smoke_world);return !h.save_failed}
 	accepted:=campaign.save_queue_enqueue(&h.save_queue,h.path,&h.progress,&h.saved)
 	h.save_failed=!accepted || h.save_queue.failed
 	return accepted && !h.save_failed
 }
 @(private)
 hub_flush :: proc(h:^Campaign_Hub) -> bool {
-	if h.slot>=0 && h.path=="" && !h.smoke && !h.smoke_expedition {h.save_failed=true;return false}
+	if h.slot>=0 && h.path=="" && !h.smoke && !h.smoke_expedition && !h.smoke_world {h.save_failed=true;return false}
 	h.save_failed=!campaign.save_queue_flush(&h.save_queue)
 	if !h.save_failed && h.save_queue.completed_at>0 {h.progress.saved_unix_seconds=h.save_queue.completed_at}
 	return !h.save_failed
@@ -122,7 +159,8 @@ hub_open_slot :: proc(h:^Campaign_Hub,index:int,frame:^host.Frame) {
 		status:=campaign.load_slot_into(h.path,&h.progress,&h.saved)
 		if status!=.Loaded {h.slot_status[index]=status;h.slot=-1;return}
 	}
-	h.page=.Galaxy;h.selected=.Cyber;_=hub_save(h)
+	// A memory opens on the plaza, the robot at its middle.
+	h.page=.World;h.selected=.Cyber;hubworld.place_at_centre(&h.plaza);h.plaza_camera={};_=hub_save(h)
 	if h.progress.run.active {hub_enter_expedition(h,frame)}
 }
 
@@ -136,7 +174,7 @@ hub_enter_expedition :: proc(h:^Campaign_Hub,frame:^host.Frame) {
 	}
 	scene,ok:=run.expedition_create(&h.progress,&h.saved.expedition,h.path,frame,hub_save,h,hub_flush_checkpoint)
 	if ok {
-		h.departure_unlocked=h.progress.unlocked
+		h.departure_unlocked=hub_open_biomes(&h.progress)
 		if h.smoke_expedition {expedition_enable_smoke(&scene)}
 		host.push(frame,scene)
 	} else {hub_notice(h,"Impossibile ricostruire la spedizione. Il salvataggio e stato conservato.")}
@@ -145,19 +183,40 @@ hub_enter_expedition :: proc(h:^Campaign_Hub,frame:^host.Frame) {
 @(private)
 hub_reveal_new_routes :: proc(h:^Campaign_Hub) {
 	h.revealed_at=h.clock
-	for opened,i in h.progress.unlocked {h.new_islands[i]=opened&&!h.departure_unlocked[i]}
+	for opened,i in hub_open_biomes(&h.progress) {h.new_islands[i]=opened&&!h.departure_unlocked[i]}
+}
+@(private)
+hub_open_biomes :: proc(c:^campaign.Campaign)->(open:[campaign.Biome.Count]bool) {
+	for b in campaign.Biome.Cyber..<campaign.Biome.Count {open[b]=campaign.biome_open(c,b)}
+	return
+}
+// TEMPORARY test mode: every island forms at once; switching off hides the
+// ones the slot has not really opened.
+@(private)
+hub_toggle_test_biomes :: proc(h:^Campaign_Hub) {
+	before:=hub_open_biomes(&h.progress)
+	if !campaign.set_test_all_biomes(&h.progress,!h.progress.test_all_biomes) {return}
+	h.revealed_at=h.clock
+	for opened,i in hub_open_biomes(&h.progress) {h.new_islands[i]=opened&&!before[i]}
+	if !campaign.biome_open(&h.progress,h.selected) {h.selected=.Cyber}
+	_=hub_save(h)
 }
 
 @(private)
 hub_resume :: proc(data:rawptr,frame:^host.Frame,from:string,result:Maybe(host.Result)) {
 	h:=cast(^Campaign_Hub)data;h.launching=false
+	// Back from a casino game: in the hall, in front of its station.
+	if from!="expedition" && h.in_game {h.in_game=false;if h.page==.Room {hub_room_return_to(h,h.room_from)}}
 	if from=="expedition" {
-		h.page=.Galaxy
+		// Back from the expedition: on the plaza, in front of the Portal it left by.
+		hub_world_return_to(h,.Portal)
 		if r,ok:=result.?;ok {
-			if r.outcome==.Won {hub_notice(h,world.metadata(h.saved.expedition.world.biome).message);hub_reveal_new_routes(h)}
+			// A test expedition never opens its own biome, so a closed one means a test.
+			if !h.progress.unlocked[h.saved.expedition.world.biome] {hub_notice(h,"Prova finita: lo zaino e a casa. Il progresso non cambia." if r.outcome==.Won else "Prova finita: lo zaino e perduto. Il progresso non cambia.")}
+			else if r.outcome==.Won {hub_notice(h,world.metadata(h.saved.expedition.world.biome).message);hub_reveal_new_routes(h)}
 			else {hub_notice(h,"La memoria si riavvolge. Lo zaino e perduto. Le scoperte restano.")}
-			if r.outcome==.Won && h.saved.expedition.world.biome==.Space && h.progress.normal_ending {h.page=.Memories;h.memory=-1}
-			if r.outcome==.Won && h.saved.expedition.world.biome==.Secret && h.progress.true_ending {h.page=.Memories;h.memory=-2}
+			if r.outcome==.Won && h.saved.expedition.world.biome==.Space && h.progress.normal_ending {h.page=.Memories;h.plaza_from=.Memories;h.memory=-1}
+			if r.outcome==.Won && h.saved.expedition.world.biome==.Secret && h.progress.true_ending {h.page=.Memories;h.plaza_from=.Memories;h.memory=-2}
 		}
 	} else if r,ok:=result.?;ok {campaign.record_result(&h.progress,activities.minigame_index_by_id(from),r.score,r.stars,r.outcome==.Won)}
 	_=hub_save(h)
@@ -178,6 +237,7 @@ hub_update :: proc(data:rawptr,frame:^host.Frame) {
 	if h.first_frame {h.first_frame=false;if h.smoke_expedition || (h.progress.run.active && h.path=="") {hub_enter_expedition(h,frame);return}}
 	if h.progress.initialized {h.progress.play_seconds+=f64(frame.dt)}
 	if h.page==.Slots {hub_slots(h,frame);return}
+	if hub_fade_update(h,frame) {return}
 	if h.launching {
 		h.launch_time+=frame.dt
 		if h.launch_time>=1.15 {h.launching=false;hub_enter_expedition(h,frame)}
@@ -186,19 +246,19 @@ hub_update :: proc(data:rawptr,frame:^host.Frame) {
 	// Storage is a modal surface: do not register the covered navigation or
 	// append hub notices over its inventory controls.
 	if h.page==.Storage {hub_storage(h,frame);return}
+	if h.page==.World {hub_world_update(h,frame);return}
+	if h.page==.Room {hub_room_update(h,frame);return}
 	ctx:=frame.ui;p:=ctx.theme.palette
 	ui.label(ctx,{28,18,650,40},"LA MEMORIA DEL CREATORE",.Title,p.text)
 	ui.label(ctx,{30,61,670,24},"Il mondo dimentica le cose. Tu ricordi la strada.",.Small,p.text_dim)
 	if ui.button(ctx,{798,24,132,32},"Slot / Salva") {_=hub_save(h);if hub_flush(h) {h.page=.Slots;hub_scan_slots(h)};return}
-	titles:=[7]string{"","Galassia","Deposito","Progressi","Cabinati","Casino","Memorie"}
-	for i in 1..<7 {if ui.button(ctx,{30+f32(i-1)*150,95,142,32},titles[i],primary=h.page==Hub_Page(i)) {h.page=Hub_Page(i);ui.cancel_interaction(ctx)}}
+	// The pages are the plaza's buildings: one way back, to the door the robot came by.
+	if ui.button(ctx,{30,95,190,32},"Torna in piazza") {hub_world_return_to(h,h.plaza_from);ui.cancel_interaction(ctx);return}
 	switch h.page {
-	case .Slots:
+	case .Slots,.World,.Room:
 	case .Galaxy:hub_galaxy_input(h,frame)
 	case .Storage:hub_storage(h,frame);return
 	case .Progress:hub_progress(h,frame)
-	case .Arcade:hub_arcade(h,frame)
-	case .Casino:hub_casino(h,frame)
 	case .Memories:hub_memories(h,frame)
 	}
 	if h.notice_time>0 {ui.label(ctx,{32,483,890,28},h.notice,.Small,p.warning)}
@@ -208,7 +268,7 @@ hub_update :: proc(data:rawptr,frame:^host.Frame) {
 @(private)
 hub_storage :: proc(h:^Campaign_Hub,frame:^host.Frame) {
 	out:=campaignui.update_inventory(&h.progress,nil,&h.inventory,frame,false,true)
-	if out.closed {h.page=.Galaxy;ui.cancel_interaction(frame.ui)}
+	if out.closed {hub_storage_closed(h);ui.cancel_interaction(frame.ui)}
 	if out.changed {_=hub_save(h)}
 	if out.show_effect {_=hub_open_archive_preview(&h.progress,out.effect_card,frame)}
 	if h.save_failed {h.inventory.notice="Salvataggio non riuscito: riprova prima di uscire.";h.inventory.notice_time=7}
@@ -264,7 +324,7 @@ hub_island_position :: proc(b:campaign.Biome) -> rl.Vector3 {
 hub_camera :: proc(h:^Campaign_Hub) -> rl.Camera3D {
 	low,high:=rl.Vector3{-14,0,0},rl.Vector3{-14,0,0}
 	for b in campaign.Biome.Cyber..<campaign.Biome.Count {
-		if !h.progress.unlocked[b] && !(b==.Secret&&h.progress.normal_ending) {continue}
+		if !campaign.biome_open(&h.progress,b) && !(b==.Secret&&h.progress.normal_ending) {continue}
 		p:=hub_island_position(b)
 		low.x=min(low.x,p.x);low.z=min(low.z,p.z);high.x=max(high.x,p.x);high.z=max(high.z,p.z)
 	}
@@ -288,10 +348,12 @@ hub_galaxy_input :: proc(h:^Campaign_Hub,frame:^host.Frame) {
 	if input.mouse_pressed(frame.devices,.LEFT) && frame.mouse.y>140 && frame.mouse.x<680 {h.dragging=true;h.last_mouse=frame.mouse}
 	if h.dragging && input.mouse_down(frame.devices,.LEFT) {h.yaw+=(frame.mouse.x-h.last_mouse.x)*.006;h.last_mouse=frame.mouse}
 	if !input.mouse_down(frame.devices,.LEFT) {h.dragging=false}
+	// TEMPORARY test mode switch, only between expeditions.
+	if ui.button(ctx,{236,95,250,32},"TEST tutti i biomi: SI" if c.test_all_biomes else "TEST tutti i biomi: NO",primary=c.test_all_biomes) {hub_toggle_test_biomes(h);ui.cancel_interaction(ctx)}
 	cam:=hub_camera(h)
 	hovered:=campaign.Biome.Count
 	for b in campaign.Biome.Cyber..<campaign.Biome.Count {
-		if !c.unlocked[b] && !(b==.Secret&&c.normal_ending) {continue}
+		if !campaign.biome_open(c,b) && !(b==.Secret&&c.normal_ending) {continue}
 		at:=rl.GetWorldToScreenEx(hub_island_position(b)+{0,1,0},cam,960,540)
 		bounds:=rl.Rectangle{at.x-28,at.y-21,56,42}
 		if at.x>670 || at.y<140 || at.y>460 {continue}
@@ -304,14 +366,16 @@ hub_galaxy_input :: proc(h:^Campaign_Hub,frame:^host.Frame) {
 	metadata:=world.metadata(h.selected)
 	ui.paragraph(ctx,ui.cut_top(&box,46),fmt.tprintf("Guardiano: %s",metadata.boss),.Small,p.text_dim)
 	ui.label(ctx,ui.cut_top(&box,22),fmt.tprintf("Mount: %s",metadata.mount),.Small,p.text_dim)
-	ui.label(ctx,ui.cut_top(&box,24),"Vinto" if c.won[h.selected] else "Da attraversare",.Small,p.warning)
+	status:="Vinto" if c.won[h.selected] else "Da attraversare"
+	if !c.unlocked[h.selected] && campaign.biome_open(c,h.selected) {status="Solo prova: non conta"}
+	ui.label(ctx,ui.cut_top(&box,24),status,.Small,p.warning)
 	indices,n:=hub_biome_arcades(h.selected)
 	for index in indices[:n] {
 		info,_:=activities.minigame_info(index)
 		ui.label(ctx,ui.cut_top(&box,19),info.title,.Small,p.text)
 		ui.label(ctx,ui.cut_top(&box,19),fmt.tprintf("%d/3 stelle  |  %d pt",c.records[index].best_stars,c.records[index].best_score) if c.records[index].plays>0 else "Nessun record",.Small,p.text_dim)
 	}
-	if c.unlocked[h.selected] {
+	if campaign.biome_open(c,h.selected) {
 		if ui.button(ctx,ui.cut_bottom(&box,40),"PARTI",primary=true) {h.launching=true;h.launch_time=0}
 	} else {ui.paragraph(ctx,ui.cut_bottom(&box,58),"Vinci ogni bioma nella stessa serie, senza morire.",.Small,p.warning)}
 	ui.label(ctx,{33,440,640,28},"Trascina il vuoto per orbitare. Scegli un'isola per partire.",.Small,p.text_dim)
@@ -333,29 +397,12 @@ hub_wallet_commit :: proc(data:rawptr) -> bool {
 	// A wager or paid outcome must reach the atomic file before its animation
 	// proceeds. Finish earlier checkpoints so none can overwrite this commit.
 	_=hub_flush(h)
-	if h.path=="" {h.save_failed=!(h.smoke || h.smoke_expedition);return !h.save_failed}
+	if h.path=="" {h.save_failed=!(h.smoke || h.smoke_expedition || h.smoke_world);return !h.save_failed}
 	h.save_failed=!campaign.save_slot_from(h.path,&h.progress,&h.saved)
 	h.save_queue.failed=h.save_failed
 	if !h.save_failed {h.save_queue.completed_at=h.progress.saved_unix_seconds;h.save_queue.completed_revision=h.progress.revision}
 	return !h.save_failed
 }
-@(private)
-hub_casino :: proc(h:^Campaign_Hub,frame:^host.Frame) {
-	ctx:=frame.ui;p:=ctx.theme.palette
-	ui.label(ctx,{34,150,850,32},fmt.tprintf("CASINO / %d CREDITI NEL DEPOSITO",campaign.depot_credits(&h.progress)),.Title,p.text)
-	ui.label(ctx,{36,193,850,24},"Crediti trovati nei ricordi. Nessun acquisto, nessun denaro reale.",.Small,p.text_dim)
-	names:=[4]string{"6 RANCH 7","TRE IN FUGA","ROULETTE EUROPEA","DUELLO DI D20"}
-	blurbs:=[4]string{"Cavalca, salta, raccogli. Incassa prima del BANG.","Dinosauro, Panda o moto. Fermati prima della caduta.","Un solo zero. Numeri, colori, dozzine e colonne.","Il dado piu alto vince. Il pareggio va al banco."}
-	for i in 0..<4 {
-		box:=ui.panel(ctx,{34+f32(i%2)*450,235+f32(i/2)*104,430,94})
-		ui.label(ctx,ui.cut_top(&box,20),blurbs[i],.Small,p.text_dim)
-		if ui.button(ctx,ui.cut_bottom(&box,36),names[i],primary=true) {
-			wallet:=arcade.Casino_Wallet{data=h,balance=hub_balance,debit=hub_debit,credit=hub_credit,changed=hub_wallet_changed,commit=hub_wallet_commit,transaction=&h.saved.casino,random_state=&h.saved.casino_random}
-			host.push(frame,arcade.casino_create(arcade.Casino_Kind(i),wallet,h.options.seed))
-		}
-	}
-}
-
 @(private)
 hub_memories :: proc(h:^Campaign_Hub,frame:^host.Frame) {
 	ctx:=frame.ui;p:=ctx.theme.palette
@@ -377,16 +424,24 @@ hub_memories :: proc(h:^Campaign_Hub,frame:^host.Frame) {
 @(private)
 hub_draw :: proc(data:rawptr,frame:^host.Frame) {
 	h:=cast(^Campaign_Hub)data
+	hub_draw_page(h,frame)
+	hub_fade_draw(h)
+}
+
+@(private)
+hub_draw_page :: proc(h:^Campaign_Hub,frame:^host.Frame) {
 	gfx.draw_vertical_gradient(frame.canvas,{7,7,18,255},{22,7,23,255})
 	gfx.draw_stars(960,540,100,h.clock*.04)
 	rl.DrawCircleGradient({480,420},480,{100,16,40,55},{0,0,0,0})
+	if h.page==.World && h.progress.initialized {hub_world_draw(h,frame);return}
+	if (h.page==.Room || (h.page==.Storage && h.room_kind==.Depot && h.room.count>0)) && h.progress.initialized {hub_room_draw(h,frame);return}
 	if h.page!=.Galaxy || !h.progress.initialized {return}
 	cam:=hub_camera(h);rl.BeginMode3D(cam)
 	// Only materialized memories exist. No locked silhouette leaks a route.
 	for b in campaign.Biome.Cyber..<campaign.Biome.Count {
-		if !h.progress.unlocked[b] && !(b==.Secret&&h.progress.normal_ending) {continue}
+		if !campaign.biome_open(&h.progress,b) && !(b==.Secret&&h.progress.normal_ending) {continue}
 		p:=hub_island_position(b);color:=render.expedition_color(b)
-		if !h.progress.unlocked[b] {color={52,52,68,255}}
+		if !campaign.biome_open(&h.progress,b) {color={52,52,68,255}}
 		parent:=campaign.Biome.Cyber
 		#partial switch b {
 		case .Egypt:parent=.West
@@ -400,7 +455,7 @@ hub_draw :: proc(data:rawptr,frame:^host.Frame) {
 		}
 		from:=hub_island_position(parent)
 		if b==.Cyber {from={-14,-1,0}}
-		if h.progress.unlocked[b] {rl.DrawLine3D(from,p,color)}
+		if campaign.biome_open(&h.progress,b) {rl.DrawLine3D(from,p,color)}
 		lift:=f32(.07)*math.sin(h.clock*.7+f32(b));p.y+=lift
 		hub_draw_island(h,b,p,frame.theme)
 		if !h.progress.won[b] {rl.DrawLine3D(p+{0,1.5,0},p+{0,4+math.sin(h.clock*2)*.3,0},color)}
@@ -413,7 +468,7 @@ hub_draw :: proc(data:rawptr,frame:^host.Frame) {
 	rl.DrawCubeV(robot,{.6,.9,.13},{231,218,190,255});rl.DrawCubeV(robot+{0,.65,0},{.8,.55,.15},{199,221,225,255});rl.DrawCubeV(robot+{-.2,.66,.09},{.12,.12,.02},{83,242,238,255});rl.DrawCubeV(robot+{.2,.66,.09},{.12,.12,.02},{83,242,238,255})
 	rl.EndMode3D()
 	for b in campaign.Biome.Cyber..<campaign.Biome.Count {
-		if !h.progress.unlocked[b] && !(b==.Secret&&h.progress.normal_ending) {continue}
+		if !campaign.biome_open(&h.progress,b) && !(b==.Secret&&h.progress.normal_ending) {continue}
 		at:=rl.GetWorldToScreenEx(hub_island_position(b)+{0,4.5 if h.progress.won[b] else 3.7,0},cam,960,540)
 		if at.x>660 || at.y<133 {continue}
 		anchor:=rl.GetWorldToScreenEx(hub_island_position(b)+{0,1,0},cam,960,540)

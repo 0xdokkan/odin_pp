@@ -18,8 +18,8 @@ arrow_input_test_room :: proc(t: ^testing.T, data: ^level.Level, player: ^game.P
 	config.timed_actions = timed
 	testing.expect(t, game.configure_tactical(player, config))
 	// One foe in the line of fire, one behind cover.
-	enemies := [?]game.Enemy_Spawn{{position = {4, 1}, health = 20, attack = 1}, {position = {3, 3}, health = 20, attack = 1}}
-	cover := [?]grid.Position{{2, 2}}
+	enemies := [?]game.Enemy_Spawn{{position = {x = 4, y = 1}, health = 20, attack = 1}, {position = {x = 3, y = 3}, health = 20, attack = 1}}
+	cover := [?]grid.Position{{x = 2, y = 2}}
 	room, built := game.create_room(data, player, {enemies = enemies[:], obstacles = cover[:]})
 	testing.expect(t, built)
 	return room
@@ -57,7 +57,7 @@ test_ctrl_click_on_a_foe_in_reach_looses_an_arrow :: proc(t: ^testing.T) {
 	loot.origin_phase = .Loot
 	testing.expect(t, !run_session.gameplay_command_is_valid(loot))
 	// The click is the arrow's anyway: on a floor cell, or on a foe behind cover.
-	for cell in ([2]grid.Position{{2, 3}, covered.position}) {
+	for cell in ([2]grid.Position{{x = 2, y = 3}, covered.position}) {
 		renderer.hovered_cell = cell
 		_, has_command, taken = run_session.arrow_shot_command(&room, renderer, true, true)
 		testing.expect(t, taken && !has_command)
@@ -100,7 +100,7 @@ test_an_arrow_is_one_action_and_presses_during_it_are_dropped :: proc(t: ^testin
 	testing.expect_value(t, game.player_charges(&room, .Arrows), i32(2))
 	testing.expect_value(t, cards, run_session.Card_Interaction_State{})
 	testing.expect(t, game.tactical_player_busy(&room))
-	testing.expect_value(t, room.player.tactical.action_remaining, game.TACTICAL_ARROW_SECONDS)
+	testing.expect_value(t, room.player.tactical.action_remaining, game.TACTICAL_ARROW_SECONDS/game.TACTICAL_PLAYER_PACE)
 	// Pressed while the arrow's own second runs: dropped, never kept.
 	for _ in 0..<20 {
 		busy := render.renderer_blocks_player_input(renderer) || game.tactical_player_busy(&room)

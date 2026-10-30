@@ -19,7 +19,7 @@ generated_object_kind :: proc(blueprint: ^Room_Blueprint, index: int) -> Grid_Ob
 object_preserves_encounter_link :: proc(blueprint: ^Room_Blueprint, candidate: grid.Position) -> bool {
 	if blueprint.encounter_kind != .Escort || len(blueprint.enemies) < 2 { return true }
 	a, b := blueprint.enemies[0].position, blueprint.enemies[1].position
-	return candidate != (grid.Position{(a.x+b.x)/2, (a.y+b.y)/2})
+	return candidate != (grid.Position{x = (a.x+b.x)/2, y = (a.y+b.y)/2})
 }
 
 @(private)
@@ -85,7 +85,7 @@ validate_blueprint_objects :: proc(blueprint: ^Room_Blueprint) -> bool {
 		blockers[count] = object.position
 		count += 1
 	}
-	return object_preserves_enemy_lanes(blueprint, {-1, -1}) &&
+	return object_preserves_enemy_lanes(blueprint, {x = -1, y = -1}) &&
 	       all_unblocked_walkable_cells_are_connected(&blueprint.level_data, blockers[:count])
 }
 
@@ -99,11 +99,11 @@ generated_barrel_lane_cell_open :: proc(blueprint: ^Room_Blueprint, position, ex
 
 // Require a reachable stance and a free destination on opposite sides of every barrel.
 @(private)
-generated_barrel_has_push_lane :: proc(blueprint: ^Room_Blueprint, position: grid.Position, extra_blocker: grid.Position = {-1, -1}) -> bool {
-	directions := [2]grid.Position{{1, 0}, {0, 1}}
+generated_barrel_has_push_lane :: proc(blueprint: ^Room_Blueprint, position: grid.Position, extra_blocker: grid.Position = {x = -1, y = -1}) -> bool {
+	directions := [2]grid.Position{{x = 1, y = 0}, {x = 0, y = 1}}
 	for direction in directions {
-		a := grid.Position{position.x+direction.x, position.y+direction.y}
-		b := grid.Position{position.x-direction.x, position.y-direction.y}
+		a := grid.offset(position, direction.x, direction.y)
+		b := grid.offset(position, -direction.x, -direction.y)
 		if generated_barrel_lane_cell_open(blueprint, a, extra_blocker) &&
 		   generated_barrel_lane_cell_open(blueprint, b, extra_blocker) { return true }
 	}

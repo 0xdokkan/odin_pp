@@ -14,6 +14,10 @@ Card_Interaction_State :: struct {
 	dragged_card_id:  u32,
 	placing: bool,
 	placement_direction: game.Move_Direction,
+	// INONDAZIONE: the wave's way once the wheel has turned it (else the mouse's
+	// cell gives it).
+	flood_way_set: bool,
+	flood_way: game.Move_Direction,
 }
 
 clear_card_interaction :: proc(state: ^Card_Interaction_State) {
@@ -27,6 +31,13 @@ active_targeting_card_id :: proc(state: Card_Interaction_State) -> u32 {
 		return state.dragged_card_id
 	}
 	return state.selected_card_id
+}
+
+// The card under the mouse in the hand while none is chosen or dragged: its
+// range and the foes it would hit show faintly, to help decide (render.draw_tactical_world).
+hovered_preview_card_id :: proc(state: Card_Interaction_State) -> u32 {
+	if active_targeting_card_id(state) != 0 { return 0 }
+	return state.hovered_card_id
 }
 
 // FERETRO: the player holds Ctrl with arrows to loose; the board then marks
@@ -133,10 +144,14 @@ poll_gameplay_command :: proc(
 	controls: Run_Input = {},
 ) -> (command: Gameplay_Command, has_command: bool) {
 	assert(room != nil && room.player != nil && renderer != nil && card_interaction != nil)
+	// INONDAZIONE's aim is set again below whenever the card is held.
+	render.set_flood_aim(renderer, false, false, .East)
 	// FIRST PERSON SHOOTER: the mouse is the view's and the hand is put away;
 	// only steps and waits are left (first_person_input.odin).
 	if game.tactical_first_person_active(room) {
 		clear_card_interaction(card_interaction)
+		// With the fists the movement keys move the body (first_person_input.odin).
+		if room.first_person.weapon == .Fists { return {}, false }
 		pressed: [4]bool
 		for action, index in RUN_WALK_ACTIONS { pressed[index] = run_pressed(controls, action) }
 		return first_person_lane_command(pressed, run_down(controls, .Dodge_Modifier), run_pressed(controls, .Wait),
@@ -194,6 +209,7 @@ poll_gameplay_command :: proc(
 	renderer.tactical.expedition_placement = card_interaction.placing
 	renderer.tactical.expedition_direction = card_interaction.placement_direction
 
+	update_flood_aim(room, renderer, card_interaction, input_deck, controls.wheel)
 	card_interaction.hovered_card_id = 0
 	if card_interaction.dragged_card_id == 0 && mouse_inside {
 		if hand_index, found := render.hand_card_at_point(
@@ -228,7 +244,9 @@ poll_gameplay_command :: proc(
 						renderer.tactical.expedition_placement = true
 						return
 					}
-					return targeted_card_command(room, input_deck.hand[hand_index], renderer.hovered_cell)
+					card := input_deck.hand[hand_index]
+					return targeted_card_command(room, card, flood_anchor(room, card, renderer.hovered_cell, card_interaction^),
+						card_interaction.flood_way, card_interaction.flood_way_set)
 				}
 			}
 		}
@@ -290,7 +308,8 @@ poll_gameplay_command :: proc(
 				}
 				if immediate, ok := immediate_card_command(card); ok { return immediate, true }
 			}
-			command, has_command = targeted_card_command(room, card, renderer.hovered_cell)
+			command, has_command = targeted_card_command(room, card, flood_anchor(room, card, renderer.hovered_cell, card_interaction^),
+				card_interaction.flood_way, card_interaction.flood_way_set)
 			command.direction = card_interaction.placement_direction
 			return
 		}
@@ -339,7 +358,7 @@ capture_gameplay_command_telemetry :: proc(
 		resolved_kind = .Wait
 	// An arrow is neither a step nor a bump nor a card, and the rod's cast is
 	// no card either; nor is a shot of the AK.
-	case .Ability, .Shoot, .Fish, .First_Person_Fire:
+	case .Ability, .Shoot, .Fish, .First_Person_Fire, .First_Person_Fists, .First_Person_Sword, .First_Person_Bow:
 		resolved_kind = .Ability
 	case .Play_Card:
 		resolved_kind = .Play_Card
@@ -430,6 +449,8 @@ execute_gameplay_command :: proc(room: ^game.Room, command: Gameplay_Command) ->
 		if game.tactical_card_claims_beat(room, command.card_id) {
 			room.player.tactical.critical_next = game.tactical_claim_beat(room, command.beat)
 		}
+		// A cannon's way, as the wheel turned it (play_card clears it).
+		room.aim, room.has_aim = command.aim_way, command.has_aim_way
 		play := game.play_card(room, command.card_id, command.target, command.direction)
 		room.player.tactical.critical_next = false
 		execution.committed = game.card_play_was_committed(play.result)
@@ -450,6 +471,18 @@ execute_gameplay_command :: proc(room: ^game.Room, command: Gameplay_Command) ->
 		execution.clears_card_interaction = execution.committed
 	case .First_Person_Fire:
 		_, execution.committed = game.first_person_fire(room, command.aim)
+	case .First_Person_Fists:
+		// A frame in which nothing stepped or struck has nothing to show.
+		result := game.first_person_fists_move(room, command.fists, command.seconds)
+		execution.committed = result != .Invalid_Phase && result != .None
+	case .First_Person_Sword:
+		// A frame in which the blade turned, cut or pulled nothing has nothing to show.
+		result := game.first_person_sword_move(room, command.sword, command.seconds)
+		execution.committed = result != .Invalid_Phase && result != .None
+	case .First_Person_Bow:
+		// A frame in which no arrow left the string or struck has nothing to show.
+		result := game.first_person_bow_move(room, command.bow)
+		execution.committed = result != .Invalid_Phase && result != .None
 	}
 	game.tactical_end_combat(room)
 	return
@@ -499,7 +532,8 @@ commit_gameplay_command :: proc(
 	if room == nil || renderer == nil || card_interaction == nil { return false }
 	world_command := (command.kind == .Continue_Pulse || command.kind == .Timeout || command.kind == .Lasso_Spin || command.kind == .Pinball_Roll ||
 		 command.kind == .Defense || ((command.kind == .QTE_Key || command.kind == .QTE_Fail) && room.qte.kind == .Defense) ||
-		 command.kind == .First_Person_Fire)
+		 command.kind == .First_Person_Fire || command.kind == .First_Person_Fists || command.kind == .First_Person_Sword ||
+		 command.kind == .First_Person_Bow)
 	if world_command {
 		// Reserve a whole event log before mutating gameplay: no committed beat
 		// can lose its presentation when the bounded world bank is full.

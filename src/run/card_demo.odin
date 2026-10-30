@@ -109,6 +109,10 @@ Card_Demo :: struct {
 	// seconds left, and the words of the last one done, with the seconds since.
 	acting: bool,
 	action_time, firing: f32,
+	// FIRST PERSON FENCER: the seconds before Q or E is pressed again, and where
+	// the blade's point was as the cut began.
+	turn_wait: f32,
+	cut_from: [2]f32,
 	done_key, done_text: cstring,
 	since_action: f32,
 	// The last action done was the glove's own (an arrow's click, ATTIVA).
@@ -317,7 +321,7 @@ card_demo_cell_under :: proc(demo: ^Card_Demo, renderer: ^render.Renderer, point
 	t := -ray.position.y/ray.direction.y
 	if t <= 0 { return }
 	at := ray.position+ray.direction*t
-	cell = {int(math.floor(at.x)), int(math.floor(at.z))}
+	cell = {x = int(math.floor(at.x)), y = int(math.floor(at.z))}
 	ok = grid.contains(&demo.data.tiles, cell) && render.tactical_render_visible(r, cell)
 	return
 }
@@ -371,7 +375,7 @@ card_demo_release :: proc(demo: ^Card_Demo, renderer: ^render.Renderer) -> bool 
 	demo.cards.dragged_card_id = 0
 	demo.cards.selected_card_id = dragged
 	if !r.has_hovered_cell || !render.card_drop_area_contains(r, demo.pointer) { return false }
-	command, has_target := targeted_card_command(room, card, r.hovered_cell)
+	command, has_target := targeted_card_command(room, card, r.hovered_cell, demo.scene.aim, demo.scene.has_aim)
 	return has_target && commit_gameplay_command(room, r, &demo.cards, command)
 }
 
@@ -412,12 +416,72 @@ card_demo_input :: proc(demo: ^Card_Demo, renderer: ^render.Renderer, dt: f32) -
 	input.focused, input.sensitivity = true, 1
 	if !demo.acting || demo.next_action >= demo.scene.action_count { return }
 	action := demo.scene.actions[demo.next_action]
-	if action.kind != .Fire { return }
-	if demo.firing > 0 { input.fire = true; return }
+	if action.kind == .Cut { card_demo_sword_input(demo, &input, dt); return }
+	if action.kind != .Fire && action.kind != .Punch && action.kind != .Loose { return }
+	if demo.firing > 0 {
+		if action.kind == .Loose { input.fire_right = true } else { input.fire = true }
+		return
+	}
 	turn := card_demo_turn_left(demo, renderer, action.foe)
 	step := clamp(turn, -CARD_DEMO_TURN_RATE*dt, CARD_DEMO_TURN_RATE*dt)
 	input.look.x = clamp(step/FIRST_PERSON_MOUSE_SENSITIVITY, -FIRST_PERSON_LOOK_CLAMP, FIRST_PERSON_LOOK_CLAMP)
+	// The fists run up to it, W held, once the view is on it.
+	if action.kind == .Punch && abs(turn) < 0.35 && card_demo_reach(demo, action.foe) > CARD_DEMO_PUNCH_REACH { input.walk[0] = true }
 	return
+}
+
+// FIRST PERSON FENCER: the way along the grid to the scene's foe `foe` (it
+// stands on a line from him), and the cut's parts: the point brought slowly to
+// the far side of him, then across him fast, the button held.
+CARD_DEMO_CUT_WIND :: f32(0.35)
+CARD_DEMO_CUT_SWEEP :: f32(0.25)
+CARD_DEMO_CUT_SECONDS :: CARD_DEMO_CUT_WIND+CARD_DEMO_CUT_SWEEP+0.15
+card_demo_sword_way :: proc(demo: ^Card_Demo, foe: int) -> (way: game.Move_Direction, found: bool) {
+	enemy, standing := card_demo_foe(demo, foe)
+	if !standing { return }
+	p := demo.room.player.position
+	dx, dy := enemy.position.x-p.x, enemy.position.y-p.y
+	if abs(dx) >= abs(dy) { return .East if dx > 0 else .West, true }
+	return .South if dy > 0 else .North, true
+}
+
+// The sword's keys and mouse this frame: Q or E toward the foe, then the cut's move.
+card_demo_sword_input :: proc(demo: ^Card_Demo, input: ^Tactical_Controller_Input, dt: f32) {
+	room := &demo.room
+	if !game.first_person_sword_active(room) { return }
+	s := &room.first_person.sword
+	enemy, standing := card_demo_foe(demo, demo.scene.actions[demo.next_action].foe)
+	way, found := card_demo_sword_way(demo, demo.scene.actions[demo.next_action].foe)
+	if !standing || !found { return }
+	if demo.firing > 0 {
+		t := CARD_DEMO_CUT_SECONDS-demo.firing
+		chest, _ := game.sword_chest_on_screen(room, {}, s.facing, enemy^)
+		hilt := game.SWORD_HILT
+		y := hilt.y+(chest.y-hilt.y)/0.75
+		start, finish := [2]f32{-0.75, y}, [2]f32{0.45, y}
+		want := finish
+		if t < CARD_DEMO_CUT_WIND { want = demo.cut_from+(start-demo.cut_from)*(t/CARD_DEMO_CUT_WIND) }
+		else if t < CARD_DEMO_CUT_WIND+CARD_DEMO_CUT_SWEEP { want = start+(finish-start)*((t-CARD_DEMO_CUT_WIND)/CARD_DEMO_CUT_SWEEP) }
+		move := (want-s.tip)/game.SWORD_TIP_PER_PIXEL
+		input.look, input.fire = {move.x, -move.y}, t >= CARD_DEMO_CUT_WIND
+		return
+	}
+	demo.turn_wait -= dt
+	if s.facing == way || demo.turn_wait > 0 { return }
+	// A quarter to the right (E) unless the left one (Q) is shorter.
+	if (int(way)-int(s.facing)+4)%4 == 3 { input.diagonals[0] = true } else { input.diagonals[1] = true }
+	demo.turn_wait = 0.2
+}
+
+// FIRST PERSON BRAWLER: how far the fists' body is from the scene's foe `foe`
+// (0 once it has fallen), and how near a jab is thrown from.
+CARD_DEMO_PUNCH_REACH :: f32(1.0)
+card_demo_reach :: proc(demo: ^Card_Demo, foe: int) -> f32 {
+	enemy, found := card_demo_foe(demo, foe)
+	if !found || !game.first_person_fists_active(&demo.room) { return 0 }
+	b := demo.room.first_person.fists.body
+	d := [2]f32{f32(enemy.position.x)+0.5-b.x, f32(enemy.position.y)+0.5-b.y}
+	return math.sqrt(d.x*d.x+d.y*d.y)
 }
 
 // The scene's next action, once its time has come and the board lets it,
@@ -436,7 +500,7 @@ card_demo_act :: proc(demo: ^Card_Demo, renderer: ^render.Renderer, dt: f32) {
 		switch {
 		case game.tactical_shadow_active(room):
 			if render.renderer_blocks_player_input(r) || game.tactical_shadow_step_busy(room) { return }
-		case action.kind == .Fire:
+		case action.kind == .Fire || action.kind == .Punch || action.kind == .Cut || action.kind == .Loose:
 			if game.tactical_first_person_active(room) && render.first_person_diving(r) { return }
 		case:
 			if !card_demo_board_free(demo, r) { return }
@@ -489,6 +553,59 @@ card_demo_act :: proc(demo: ^Card_Demo, renderer: ^render.Renderer, dt: f32) {
 		}
 		if abs(card_demo_turn_left(demo, r, action.foe)) <= CARD_DEMO_TURN_DONE || demo.action_time >= CARD_DEMO_TURN_SECONDS {
 			demo.firing = action.seconds
+		}
+	case .Loose:
+		// Behind his eyes with the bow: the view turned on the foe
+		// (card_demo_input), then the right button held for the draw and let go;
+		// a foe already down takes none.
+		if _, standing := card_demo_foe(demo, action.foe); !standing || !game.first_person_bow_active(room) { done = true; break }
+		if demo.firing > 0 {
+			demo.firing -= dt
+			done = demo.firing <= 0
+			break
+		}
+		if abs(card_demo_turn_left(demo, r, action.foe)) <= CARD_DEMO_TURN_DONE || demo.action_time >= CARD_DEMO_TURN_SECONDS {
+			demo.firing = action.seconds
+		}
+	case .Punch:
+		// Behind his eyes with the fists: the view turned on the foe and a run up
+		// to it (card_demo_input), then the button pressed for the jab and held
+		// as it lands; a foe already down takes none.
+		if _, standing := card_demo_foe(demo, action.foe); !standing || !game.first_person_fists_active(room) { done = true; break }
+		if demo.firing > 0 {
+			demo.firing -= dt
+			done = demo.firing <= 0
+			break
+		}
+		close := card_demo_reach(demo, action.foe) <= CARD_DEMO_PUNCH_REACH
+		if close && (abs(card_demo_turn_left(demo, r, action.foe)) <= CARD_DEMO_TURN_DONE || demo.action_time >= CARD_DEMO_TURN_SECONDS*2) {
+			demo.firing = game.FISTS_PUNCHES[.Jab].recover
+		} else if demo.action_time >= CARD_DEMO_TURN_SECONDS*3 {
+			done = true
+		}
+	case .Cut:
+		// Behind his eyes with the sword: the view turned on the foe with Q or E
+		// (card_demo_sword_input), a step up to it, then the cut; a foe already
+		// down takes none.
+		way, standing := card_demo_sword_way(demo, action.foe)
+		if !standing || !game.first_person_sword_active(room) { done = true; break }
+		if demo.firing > 0 {
+			demo.firing -= dt
+			done = demo.firing <= 0
+			break
+		}
+		s := &room.first_person.sword
+		enemy, _ := card_demo_foe(demo, action.foe)
+		ahead := game.add_position(room.player.position, game.direction_offset(way))
+		if s.facing != way {
+			if demo.action_time >= CARD_DEMO_TURN_SECONDS*2 { done = true }
+		} else if ahead != enemy.position {
+			if card_demo_board_free(demo, r) && !game.tactical_player_busy(room) {
+				_ = commit_gameplay_command(room, r, &demo.cards, {kind = .Move, origin_phase = .Combat, direction = way})
+			}
+			if demo.action_time >= CARD_DEMO_TURN_SECONDS*3 { done = true }
+		} else {
+			demo.firing, demo.cut_from = CARD_DEMO_CUT_SECONDS, s.tip
 		}
 	}
 	if done {
@@ -583,6 +700,15 @@ card_demo_advance :: proc(demo: ^Card_Demo, renderer: ^render.Renderer, frame_dt
 		   (game.tactical_first_person_active(room) || game.tactical_shadow_active(room)) { demo.free_time = 0 }
 		step_tactical_controller(&demo.controller, room, r, &demo.cards, &demo.buffer, dt, true, card_demo_input(demo, r, dt))
 		card_demo_act(demo, r, dt)
+		// FIRST PERSON FENCER's view outlasts the film (35 s and more): its cuts
+		// shown, it ends half a second on.
+		if game.first_person_sword_active(room) && demo.next_action >= demo.scene.action_count && !demo.acting {
+			room.first_person.remaining = min(room.first_person.remaining, 0.5)
+		}
+		// FIRST PERSON ARCHER's (30 s and more) too, once its last arrow has had a second to land.
+		if game.first_person_bow_active(room) && demo.next_action >= demo.scene.action_count && !demo.acting {
+			room.first_person.remaining = min(room.first_person.remaining, 1)
+		}
 		// The ground has no event: the take samples it, and the AK's hits.
 		for value in room.ground.pool { if value > 0 { demo.pooled = true } }
 		for fire in room.ground.fires[:room.ground.fire_count] { if fire.stage >= 2 { demo.burned = true } }
@@ -611,7 +737,8 @@ CARD_DEMO_NO_FILM_WORDS :: cstring("NESSUNA PROVA PER QUESTA CARTA")
 // holds each one on its plate, with its key's cap.
 Card_Demo_Words :: enum u8 {
 	Double_Click, Drag_To_Player, Drag_To_Foe, Drag_To_Cell, Drag_To_Foe_In_Line, Drag_In_Line, Drag_Rod,
-	Step, Bump, Shadow_Step, Wait, Shoot, Activate, Fire, Turn, Effect, No_Film,
+	Step, Bump, Shadow_Step, Wait, Shoot, Activate, Fire, Turn, Effect, No_Film, Run_Up, Punch,
+	Sword_Turn, Sword_Step, Cut, Loose,
 }
 
 @(rodata)
@@ -633,13 +760,20 @@ CARD_DEMO_WORDS := [Card_Demo_Words]cstring{
 	.Turn = "MUOVI IL MOUSE: GIRI LA VISTA",
 	.Effect = CARD_DEMO_EFFECT_WORDS,
 	.No_Film = CARD_DEMO_NO_FILM_WORDS,
+	.Run_Up = "TIENI PREMUTO W: CORRI DAL NEMICO",
+	.Punch = "CLIC: UN JAB",
+	.Sword_Turn = "Q / E: GIRI LA VISTA",
+	.Sword_Step = "W: UN PASSO VERSO IL NEMICO",
+	.Cut = "CLIC TENUTO + MOUSE: UN TAGLIO",
+	.Loose = "TIENI IL DESTRO E LASCIA: UNA FRECCIA",
 }
 
 // The key each caption's cap shows (nil: the mouse alone). A step's is the
 // one of its way (CARD_DEMO_STEP_KEYS), each a letter, one cap as wide.
 @(rodata)
 CARD_DEMO_WORDS_KEY := #partial [Card_Demo_Words]cstring{
-	.Step = "W", .Bump = "W", .Shadow_Step = "W", .Wait = "SPAZIO", .Shoot = "CTRL",
+	.Step = "W", .Bump = "W", .Shadow_Step = "W", .Wait = "SPAZIO", .Shoot = "CTRL", .Run_Up = "W",
+	.Sword_Turn = "Q E", .Sword_Step = "W",
 }
 
 // The step keys, in game.MOVEMENT_KEY_DIRECTIONS's order.
@@ -669,6 +803,21 @@ card_demo_action_words :: proc(demo: ^Card_Demo, index: int) -> (key, text: cstr
 	case .Fire:
 		words = .Fire
 		if demo.acting && index == demo.next_action && demo.firing <= 0 { words = .Turn }
+	case .Punch:
+		words = .Punch
+		if demo.acting && index == demo.next_action && demo.firing <= 0 {
+			words = .Run_Up if card_demo_reach(demo, action.foe) > CARD_DEMO_PUNCH_REACH else .Turn
+		}
+	case .Loose:
+		words = .Loose
+		if demo.acting && index == demo.next_action && demo.firing <= 0 { words = .Turn }
+	case .Cut:
+		words = .Cut
+		if demo.acting && index == demo.next_action && demo.firing <= 0 {
+			if way, standing := card_demo_sword_way(demo, action.foe); standing {
+				words = .Sword_Turn if room.first_person.sword.facing != way else .Sword_Step
+			}
+		}
 	}
 	return CARD_DEMO_WORDS_KEY[words], CARD_DEMO_WORDS[words]
 }
@@ -826,7 +975,7 @@ card_demo_draw :: proc(demo: ^Card_Demo, renderer: ^render.Renderer) {
 // with the ground and the AK's hits: the events missing, and whether all is shown.
 card_demo_shown :: proc(demo: ^Card_Demo, renderer: ^render.Renderer) -> (missing: bit_set[game.Game_Event_Kind], ok: bool) {
 	id := demo.card.definition_id
-	expected, hurt := game.card_demo_expected_events(id)
+	expected, hurt := game.card_demo_expected_events(id, demo.card.upgrade_level)
 	missing = expected-renderer.shown_events
 	ok = demo.played && card(missing) == 0 && card_demo_foes_hurt(demo) >= hurt
 	switch game.card_demo_ground_expected(id) {

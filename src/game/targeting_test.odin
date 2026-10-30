@@ -149,11 +149,11 @@ test_targeting_cast_range_includes_origin_and_exact_minimum_and_maximum :: proc(
 		path_count: int,
 	}
 	cases := [?]Case{
-		{range = {.Manhattan, 0, 2}, anchor = {1, 1}, error = .None},
-		{range = {.Manhattan, 2, 4}, anchor = {3, 1}, error = .None, path_count = 2},
-		{range = {.Manhattan, 2, 4}, anchor = {5, 1}, error = .None, path_count = 4},
-		{range = {.Manhattan, 2, 4}, anchor = {2, 1}, error = .Anchor_Out_Of_Range},
-		{range = {.Manhattan, 2, 4}, anchor = {6, 1}, error = .Anchor_Out_Of_Range},
+		{range = {.Manhattan, 0, 2}, anchor = {x = 1, y = 1}, error = .None},
+		{range = {.Manhattan, 2, 4}, anchor = {x = 3, y = 1}, error = .None, path_count = 2},
+		{range = {.Manhattan, 2, 4}, anchor = {x = 5, y = 1}, error = .None, path_count = 4},
+		{range = {.Manhattan, 2, 4}, anchor = {x = 2, y = 1}, error = .Anchor_Out_Of_Range},
+		{range = {.Manhattan, 2, 4}, anchor = {x = 6, y = 1}, error = .Anchor_Out_Of_Range},
 	}
 	for c in cases {
 		spec := Targeting_Spec{rule = .Cell, cast_range = c.range, shape = .Single}

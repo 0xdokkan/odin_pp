@@ -2,9 +2,11 @@ package render
 
 import "core:c"
 import "core:math"
+import "core:strings"
 import rl "vendor:raylib"
 import game "../game"
 import grid "../engine/grid"
+import level "../level"
 import view "../engine/view"
 
 Tactical_Visibility_Context :: struct {renderer: ^Renderer, room: ^game.Room}
@@ -12,6 +14,12 @@ Tactical_Visibility_Context :: struct {renderer: ^Renderer, room: ^game.Room}
 tactical_snapshot_opaque :: proc(data: rawptr, position: grid.Position) -> bool {
 	state := cast(^Tactical_Visibility_Context)data
 	return tactical_presentation_opaque(state.renderer, state.room, position)
+}
+
+@(private)
+tactical_snapshot_height :: proc(data: rawptr, position: grid.Position) -> i32 {
+	state := cast(^Tactical_Visibility_Context)data
+	return game.cell_height(state.room, position)
 }
 
 Tactical_Orbit :: struct {
@@ -75,14 +83,39 @@ create_tactical_lighting :: proc(renderer: ^Renderer) {
 	v.light_eye_location = rl.GetShaderLocation(v.light_shader, "eye")
 	v.light_clear_location = rl.GetShaderLocation(v.light_shader, "roomClear")
 	v.light_accents_location = rl.GetShaderLocation(v.light_shader, "accentLights[0]")
+	// The program of a board with layers (Resin_Layer_Program).
+	if layered := resin_layer_fragment(); layered != "" {
+		p := &v.layer_light
+		p.shader = rl.LoadShaderFromMemory(TACTICAL_LIGHT_VERTEX, strings.clone_to_cstring(layered, context.temp_allocator))
+		if p.shader.id != 0 {
+			p.lantern = rl.GetShaderLocation(p.shader, "lantern")
+			p.hologram = rl.GetShaderLocation(p.shader, "hologram")
+			p.eye = rl.GetShaderLocation(p.shader, "eye")
+			p.clear = rl.GetShaderLocation(p.shader, "roomClear")
+			p.accents = rl.GetShaderLocation(p.shader, "accentLights[0]")
+			p.underground = rl.GetShaderLocation(p.shader, "underground")
+			p.band = rl.GetShaderLocation(p.shader, "lanternBand")
+		}
+	}
 }
 @(private)
 begin_tactical_lighting :: proc(renderer: ^Renderer, hologram: bool = false, accents: [4]rl.Vector4 = {}) {
 	v := &renderer.tactical
 	p := v.snapshot.player.position
+	lantern := rl.Vector3{p.x+0.5, 2.8, p.y+0.5}
+	underground, band := f32(0), [2]f32{}
+	// On a board with layers the lantern goes with the robot's floor and lights its own layer; under a vault the
+	// sky's light falls (Fase 4 of docs/piano-profondita.md).
+	if !hologram && board_view.layered {
+		ground := entity_point_ground(game.PLAYER_ENTITY, p)
+		lantern.y += ground
+		band = {ground-0.05, ground+f32(level.LAYER_CLEARANCE)*game.HEIGHT_STEP_DRAWN}
+		if board_view.vault { underground = 1 }
+	}
 	begin_resin_lighting(renderer, {
-		eye = v.camera.position, lantern = {p.x+0.5, 2.8, p.y+0.5},
+		eye = v.camera.position, lantern = lantern,
 		mode = .Hologram if hologram else .Board, clear = v.clear_light, accents = accents,
+		layered = !hologram && board_view.layered, underground = underground, band = band,
 	})
 }
 @(private)
@@ -91,12 +124,13 @@ draw_tactical_actor_bases :: proc(renderer: ^Renderer) {
 	// The Pinball's ball has its own shadow, and no stand (pinball.odin).
 	draw_pinball_shadow(renderer)
 	for actor in snapshot.enemies[:snapshot.enemy_count] {
-		cell := grid.Position{int(math.round(actor.position.x)), int(math.round(actor.position.y))}
+		cell := grid.Position{x = int(math.round(actor.position.x)), y = int(math.round(actor.position.y))}
 		if !actor.visible || !tactical_render_visible(renderer, cell) || tactical_pinball_holds(renderer, actor.entity) { continue }
 		key := sprite_key_for_enemy(actor.archetype)
 		at, _ := living_card_position(renderer, actor.entity, key, actor.position)
-		p := rl.Vector3{at.x+0.5, 0.048, at.y+0.5}
-		draw_tactical_actor_shadow(p)
+		ground := rim_ground(at, 0.32, actor.entity)
+		p := rl.Vector3{at.x+0.5, 0.048+ground, at.y+0.5}
+		draw_tactical_actor_shadow(p, ground)
 		// Up on the Lazzo's rope: its shadow on the floor, and the stand it
 		// carries (lasso.odin).
 		if tactical_lasso_holds(renderer, actor.entity) {
@@ -117,19 +151,21 @@ draw_tactical_actor_bases :: proc(renderer: ^Renderer) {
 		if tactical_shadow_depth(renderer, game.PLAYER_ENTITY) > 0 { return }
 	}
 	at, _ := living_card_position(renderer, game.PLAYER_ENTITY, .Player, snapshot.player.position)
-	p := rl.Vector3{at.x+0.5, 0.05, at.y+0.5}
-	draw_tactical_actor_shadow(p)
+	ground := rim_ground(at, 0.34, game.PLAYER_ENTITY)
+	p := rl.Vector3{at.x+0.5, 0.05+ground, at.y+0.5}
+	draw_tactical_actor_shadow(p, ground)
 	rl.DrawCylinder(p, 0.32, 0.32, 0.01, 24, GOTHIC_INK)
 	rl.DrawCircle3D(p+rl.Vector3{0, 0.01, 0}, 0.34, {1, 0, 0}, 90, GOTHIC_PAPER)
 	if renderer.tactical.flipbook.loaded { draw_flipbook_stand(renderer, .Player, snapshot.player.position, GOTHIC_PAPER, game.PLAYER_ENTITY) }
 }
 
 @(private = "file")
-draw_tactical_actor_shadow :: proc(position: rl.Vector3) {
+draw_tactical_actor_shadow :: proc(position: rl.Vector3, ground: f32) {
 	// Nested low-opacity discs give the sprite a soft contact edge, contained
 	// within its tile and independent of animation duration or gameplay state.
+	// They lie on the ground the stand stands on.
 	for layer in 0..<4 {
 		radius := f32(0.44)-f32(layer)*0.045
-		rl.DrawCylinder({position.x, 0.024+f32(layer)*0.001, position.z}, radius, radius, 0.001, 24, {1, 5, 12, u8(7+layer*4)})
+		rl.DrawCylinder({position.x, ground+0.024+f32(layer)*0.001, position.z}, radius, radius, 0.001, 24, {1, 5, 12, u8(7+layer*4)})
 	}
 }

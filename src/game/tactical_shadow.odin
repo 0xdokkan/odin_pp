@@ -26,7 +26,8 @@ tactical_shadow_active :: proc(room: ^Room) -> bool {
 
 // No damage of any kind reaches the player while he is in his shadow.
 tactical_player_intangible :: proc(room: ^Room) -> bool {
-	return tactical_shadow_active(room)
+	// In Movimento Ombra, and in a lift's shaft (lift.odin).
+	return tactical_shadow_active(room) || lift_player_riding(room)
 }
 
 // A shadow step's own short lockout: a press during it is dropped.
@@ -122,7 +123,8 @@ try_shadow_step :: proc(room: ^Room, direction: Move_Direction, diagonal: grid.P
 	offset := diagonal if critical else direction_offset(direction)
 	destination := add_position(s.shadow_position, offset)
 	query := query_movement_from(room, PLAYER_ENTITY, s.shadow_position, destination)
-	if !movement_query_is_clear(&query) {
+	// The step's rules include its height: a cliff stops it either way (the movement's rule stops a rise only).
+	if !movement_query_is_clear(&query) || step_height_blocked(room, s.shadow_position, destination) {
 		if critical { s.shadow_beats_spent -= {int(beat)} }
 		return .Blocked
 	}

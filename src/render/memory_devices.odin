@@ -103,7 +103,7 @@ draw_memory_device_ranges :: proc(renderer: ^Renderer, room: ^game.Room, active_
 	object := game.Grid_Object{kind = kind, position = renderer.hovered_cell, device_direction = renderer.tactical.expedition_direction}
 	for y in -7..=7 {
 		for x in -7..=7 {
-			cell := grid.Position{object.position.x+x, object.position.y+y}
+			cell := grid.offset(object.position, x, y)
 			if !game.memory_device_contains(room, object, cell) || !tactical_cell_on_screen(renderer, cell) { continue }
 			rl.DrawCubeV({f32(cell.x)+0.5, 0.08, f32(cell.y)+0.5}, {0.86, 0.025, 0.86}, color_with_opacity(color, 0.25))
 		}

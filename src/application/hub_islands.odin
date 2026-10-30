@@ -13,7 +13,7 @@ import render "../render"
 @(private)
 hub_draw_island :: proc(h:^Campaign_Hub,b:campaign.Biome,origin:rl.Vector3,theme:^ui.Theme=nil) {
 	c:=render.expedition_color(b)
-	if !h.progress.unlocked[b] {c={65,63,79,255}}
+	if !campaign.biome_open(&h.progress,b) {c={65,63,79,255}}
 	turn:=h.clock*.09+f32(b)*.53
 	formation:=f32(1)
 	if h.new_islands[b] {formation=clamp((h.clock-h.revealed_at-f32(b)*.06)/2,0,1)}

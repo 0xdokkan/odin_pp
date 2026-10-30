@@ -23,6 +23,12 @@ Expedition_Material :: struct {
 	tint, floor, cyber, reveal_cyber: c.int,
 	reveal_eye, reveal_forward, reveal_viewport, reveal_points, reveal_count: c.int,
 	grid_amount: f32,
+	// Inside a building the rest of the world is darker: the building's footprint (x0, z0,
+	// x1, z1) and how dark the outside is (structure_expedition.odin).
+	dim_box: rl.Vector4,
+	dim_amount: f32,
+	// The envelope's opacity in the reveal program, per structure drawn.
+	reveal_envelope: c.int,
 	focus_points: [EXPEDITION_GRID_FOCUS]rl.Vector4,
 	focus_point_count: int,
 	// Screen uv, radius in screen heights, view depth beyond which nothing thins.
@@ -30,6 +36,8 @@ Expedition_Material :: struct {
 	// The same actors on the ground (x, z): a cheap screen for the occluders.
 	actors: [EXPEDITION_REVEAL_POINTS]rl.Vector2,
 	reveal_point_count: c.int,
+	// The first reveal point is the robot's (it has one only when the robot is shown).
+	player_reveal: bool,
 	toward_camera: rl.Vector2,
 }
 
@@ -85,6 +93,8 @@ uniform vec3 viewForward;
 uniform vec2 viewport;
 uniform vec4 reveal[9];
 uniform int revealCount;
+// A building's envelope: below 1 it is dithered away (1 for everything else).
+uniform float envelope;
 out vec4 finalColor;
 const float BAYER[16]=float[16](0.,8.,2.,10.,12.,4.,14.,6.,3.,11.,1.,9.,15.,7.,13.,5.);
 void main() {
@@ -106,6 +116,10 @@ void main() {
         // The actor's centre is fully clear; only the rim is stippled.
         // Leaving wall pixels there would break the printed paper silhouette.
         if(cut>0. && (BAYER[q.x+q.y*4]+.5)/16.<cut) discard;
+    }
+    if(envelope<.999) {
+        ivec2 e=ivec2(mod(gl_FragCoord.xy,4.));
+        if((BAYER[e.x+e.y*4]+.5)/16.>envelope) discard;
     }
     finalColor=vec4(expedition_body(worldPosition,normal,color.rgb),1.);
 }`
@@ -130,8 +144,27 @@ expedition_material_ready :: proc(renderer:^Renderer)->bool {
 	m.reveal_eye=rl.GetShaderLocation(r,"eye");m.reveal_forward=rl.GetShaderLocation(r,"viewForward")
 	m.reveal_viewport=rl.GetShaderLocation(r,"viewport")
 	m.reveal_points=rl.GetShaderLocation(r,"reveal[0]");m.reveal_count=rl.GetShaderLocation(r,"revealCount")
+	m.reveal_envelope=rl.GetShaderLocation(r,"envelope")
+	whole:=f32(1);rl.SetShaderValue(r,m.reveal_envelope,&whole,.FLOAT)
 	renderer.tactical.expedition_material=m
 	return true
+}
+
+// The camera and the actors the solids thin out for, to a program with the reveal's uniforms (the reveal
+// program of the material, and the floor's, whose terraces are as solid as a wall).
+@(private)
+set_expedition_reveal :: proc(renderer:^Renderer,shader:rl.Shader,eye_at,forward_at,viewport_at,points_at,count_at:c.int,limit:c.int=EXPEDITION_REVEAL_POINTS) {
+	m:=renderer.tactical.expedition_material
+	camera:=renderer.tactical.camera
+	forward:=rl.Vector3Normalize(camera.target-camera.position)
+	viewport:=rl.Vector2{renderer.canvas_width,renderer.canvas_height}
+	if s:=renderer.tactical.surface;s!=nil {viewport={f32(s.target.texture.width),f32(s.target.texture.height)}}
+	count:=c.int(0)
+	if m!=nil {count=min(m.reveal_point_count,limit)}
+	rl.SetShaderValue(shader,eye_at,&camera.position,.VEC3);rl.SetShaderValue(shader,forward_at,&forward,.VEC3)
+	rl.SetShaderValue(shader,viewport_at,&viewport,.VEC2)
+	rl.SetShaderValue(shader,count_at,&count,.INT)
+	if count>0 {rl.SetShaderValueV(shader,points_at,&m.reveal[0],.VEC4,count)}
 }
 
 @(private)
@@ -152,7 +185,10 @@ prepare_expedition_material :: proc(renderer:^Renderer,room:^game.Room,w:^world.
 	goal:=f32(1) if room.phase==.Combat else 0
 	m.grid_amount+=(goal-m.grid_amount)*(1-math.exp(-7*dt))
 	if goal==0 && m.grid_amount<.01 {m.grid_amount=0}
-	m.focus_point_count=0;m.reveal_point_count=0
+	m.focus_point_count=0;m.reveal_point_count=0;m.player_reveal=false
+	// The cave the robot is in, for the dimming outside it and its lamp (expedition_layers.odin).
+	set_expedition_cave_view(renderer,room,w)
+	update_structure_dim(renderer,m)
 	camera:=v.camera
 	toward:=rl.Vector2{camera.position.x-camera.target.x,camera.position.z-camera.target.z}
 	if l:=rl.Vector2Length(toward);l>.0001 {m.toward_camera=toward/l}
@@ -160,13 +196,26 @@ prepare_expedition_material :: proc(renderer:^Renderer,room:^game.Room,w:^world.
 	if snapshot.player.visible {
 		at,_:=living_card_position(renderer,game.PLAYER_ENTITY,.Player,snapshot.player.position)
 		m.focus_points[0]={at.x+.5,at.y+.5,4.5,8.5};m.focus_point_count=1
-		expedition_add_reveal(renderer,m,{at.x+.5,.75 if !v.expedition_mounted else .9,at.y+.5},1.05 if !v.expedition_mounted else 1.45)
+		ground:=entity_point_ground(game.PLAYER_ENTITY,{at.x,at.y})
+		// Under the board's plane (a raised biome's network, expedition/network.odin) the window is wider, through the
+		// ground and the buildings over him; down a stair's pit, on the ground, there is none: nothing is over him there,
+		// and under the pit there is nothing to show.
+		radius:=f32(1.05) if !v.expedition_mounted else 1.45
+		cell,standing:=board_actor_cell(game.PLAYER_ENTITY)
+		sunk:=ground < -.05
+		if sunk && board_view.vault {radius=3.2}
+		if !(sunk && standing && cell.layer==grid.GROUND_LAYER) {
+			expedition_add_reveal(renderer,m,{at.x+.5,.75+ground if !v.expedition_mounted else .9+ground,at.y+.5},radius)
+		}
+		m.player_reveal=m.reveal_point_count>0
 	}
 	for actor in snapshot.enemies[:snapshot.enemy_count] {
 		if !actor.visible || actor.health<=0 {continue}
 		at,_:=living_card_position(renderer,actor.entity,sprite_key_for_enemy(actor.archetype),actor.position)
+		// Behind a hill or a mountain: not shown, so no window for it in the solids either.
+		if terrain_hides_actor(renderer,{at.x,at.y},actor.entity) {continue}
 		if m.focus_point_count<EXPEDITION_GRID_FOCUS {m.focus_points[m.focus_point_count]={at.x+.5,at.y+.5,1.5,3.6};m.focus_point_count+=1}
-		expedition_add_reveal(renderer,m,{at.x+.5,.7,at.y+.5},.85)
+		expedition_add_reveal(renderer,m,{at.x+.5,.7+entity_point_ground(actor.entity,{at.x,at.y}),at.y+.5},.85)
 	}
 }
 
@@ -224,15 +273,8 @@ begin_expedition_material :: proc(renderer:^Renderer,w:^world.World,floor:bool=f
 	m:=renderer.tactical.expedition_material;if m==nil {return}
 	cyber:=f32(1) if w.biome==.Cyber && !floor else 0
 	if reveal {
-		camera:=renderer.tactical.camera
-		forward:=rl.Vector3Normalize(camera.target-camera.position)
-		viewport:=rl.Vector2{renderer.canvas_width,renderer.canvas_height}
-		if s:=renderer.tactical.surface;s!=nil {viewport={f32(s.target.texture.width),f32(s.target.texture.height)}}
 		r:=m.reveal_shader
-		rl.SetShaderValue(r,m.reveal_eye,&camera.position,.VEC3);rl.SetShaderValue(r,m.reveal_forward,&forward,.VEC3)
-		rl.SetShaderValue(r,m.reveal_viewport,&viewport,.VEC2)
-		rl.SetShaderValue(r,m.reveal_count,&m.reveal_point_count,.INT)
-		if m.reveal_point_count>0 {rl.SetShaderValueV(r,m.reveal_points,&m.reveal[0],.VEC4,m.reveal_point_count)}
+		set_expedition_reveal(renderer,r,m.reveal_eye,m.reveal_forward,m.reveal_viewport,m.reveal_points,m.reveal_count)
 		set_expedition_lights(renderer,r,m.reveal_light_uniforms)
 		rl.SetShaderValue(r,m.reveal_cyber,&cyber,.FLOAT)
 		rl.BeginShaderMode(r)

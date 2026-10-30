@@ -34,9 +34,10 @@ card_demo_outcome :: proc(demo: ^run_session.Card_Demo, renderer: ^render.Render
 
 // A board's canvas and projection as the game's, with no GPU asset.
 card_demo_test_renderer :: proc() -> ^render.Renderer {
-	main := render.create(960, 540)
+	main := new_clone(render.create(960, 540))
+	defer free(main)
 	main.tactical.perspective = true
-	return render.create_borrowed_renderer(&main, 960, 540, {})
+	return render.create_borrowed_renderer(main, 960, 540, {})
 }
 
 // A caption of the film's own table (CARD_DEMO_WORDS) with its key's cap (a
@@ -95,7 +96,7 @@ test_every_card_has_a_demo_that_shows_its_effect :: proc(t: ^testing.T) {
 				testing.expectf(t, mute == 0, "%v +%d take %d: %d frames with no caption", id, upgrade, take, mute)
 				testing.expectf(t, unknown == 0, "%v +%d take %d: %d frames with a caption off the film's table", id, upgrade, take, unknown)
 				missing, shown := run_session.card_demo_shown(demo, renderer)
-				expected, hurt := game.card_demo_expected_events(id)
+				expected, hurt := game.card_demo_expected_events(id, upgrade)
 				testing.expectf(t, shown, "%v +%d take %d: played %v, missing %v of %v, foes hurt %d of %d, pool %v, fire %v, AK hits %d", id, upgrade,
 					take, demo.played, missing, expected, run_session.card_demo_foes_hurt(demo), hurt, demo.pooled, demo.burned, demo.fps_hits)
 				testing.expectf(t, demo.stage == .Done && demo.take_time < run_session.CARD_DEMO_TAKE_LIMIT, "%v +%d: the take ran %.1f s", id, upgrade, demo.take_time)

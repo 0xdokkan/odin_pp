@@ -32,27 +32,28 @@ test_expedition_oriented_card_uses_two_clicks_and_cancel_returns_to_selection ::
 	player := create_gameplay_command_test_player(t)
 	configure_single_card_test_deck(t, &player, .Cannon)
 	testing.expect(t, game.configure_tactical(&player, game.EXPEDITION_TACTICAL_CONFIG))
-	enemies := [?]game.Enemy_Spawn{{position = {5, 3}, health = 20, attack = 1}}
+	enemies := [?]game.Enemy_Spawn{{position = {x = 5, y = 3}, health = 20, attack = 1}}
 	room, built := game.create_room(&data, &player, {enemies = enemies[:]})
 	testing.expect(t, built)
 	defer game.destroy_room(&room)
-	renderer := render.create(960, 540)
-	renderer.has_hovered_cell, renderer.hovered_cell = true, {3, 1}
+	renderer := new_clone(render.create(960, 540))
+	defer free(renderer)
+	renderer.has_hovered_cell, renderer.hovered_cell = true, {x = 3, y = 1}
 	card_id := player.deck.hand[0].id
 	cards := run_session.Card_Interaction_State{selected_card_id = card_id}
 	// The central board point is outside every HUD/hand hit target.
 	point := [2]f32{470, 240}
-	_, first := run_session.poll_gameplay_command(&room, &renderer, &cards, {point[0], point[1]}, true, true,
+	_, first := run_session.poll_gameplay_command(&room, renderer, &cards, {point[0], point[1]}, true, true,
 		controls = {left_pressed = true})
 	testing.expect(t, !first && cards.placing)
-	_, cancelled := run_session.poll_gameplay_command(&room, &renderer, &cards, {point[0], point[1]}, true, true,
+	_, cancelled := run_session.poll_gameplay_command(&room, renderer, &cards, {point[0], point[1]}, true, true,
 		controls = {right_pressed = true})
 	testing.expect(t, !cancelled && !cards.placing && cards.selected_card_id == card_id)
-	_, _ = run_session.poll_gameplay_command(&room, &renderer, &cards, {point[0], point[1]}, true, true,
+	_, _ = run_session.poll_gameplay_command(&room, renderer, &cards, {point[0], point[1]}, true, true,
 		controls = {left_pressed = true})
-	_, _ = run_session.poll_gameplay_command(&room, &renderer, &cards, {point[0], point[1]}, true, true,
+	_, _ = run_session.poll_gameplay_command(&room, renderer, &cards, {point[0], point[1]}, true, true,
 		controls = {wheel = -1})
-	command, placed := run_session.poll_gameplay_command(&room, &renderer, &cards, {point[0], point[1]}, true, true,
+	command, placed := run_session.poll_gameplay_command(&room, renderer, &cards, {point[0], point[1]}, true, true,
 		controls = {left_pressed = true})
 	testing.expect(t, placed)
 	testing.expect_value(t, command.direction, game.Move_Direction.East)

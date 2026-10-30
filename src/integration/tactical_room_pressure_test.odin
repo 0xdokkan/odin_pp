@@ -38,7 +38,7 @@ test_tactical_fixed_recovery_and_cycle_restart_after_reward_and_next_room :: pro
 	data, err, _ := level.from_ascii(rows[:])
 	testing.expect_value(t, err, level.Parse_Error.None)
 	defer level.destroy(&data)
-	enemies := [?]game.Enemy_Spawn{{position = {3, 3}, health = 3, attack = 1}}
+	enemies := [?]game.Enemy_Spawn{{position = {x = 3, y = 3}, health = 3, attack = 1}}
 	room, built := game.create_room(&data, &run.player, {enemies = enemies[:]})
 	testing.expect(t, built)
 	defer game.destroy_room(&room)

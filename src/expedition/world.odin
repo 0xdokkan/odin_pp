@@ -2,6 +2,7 @@
 // the tactical room; sleeping groups never spend a beat or consume combat RNG.
 package expedition
 
+import "core:fmt"
 import campaign "../campaign"
 import game "../game"
 import grid "../engine/grid"
@@ -14,7 +15,7 @@ MAX_GROUPS :: 32
 MAX_MEMBERS :: 6
 MAX_DROPS :: 128
 
-Site_Kind :: enum u8 { Nest, Cache, Archive, Workshop, Spring, Trial, Boss, Memory, Tunnel }
+Site_Kind :: enum u8 { Nest, Cache, Archive, Workshop, Spring, Trial, Boss, Memory, Tunnel, Cave }
 Site_State :: enum u8 { Unvisited, Discovered, Resolved }
 Terrain :: game.Expedition_Terrain
 Site :: struct {
@@ -35,18 +36,45 @@ Group :: struct {
 	count: int,
 	active, patrol, killer, boss, pursuing: bool,
 	site: int,
+	// Where the group is: 0 on the open map, k+1 in the k-th cave (cave.odin). A group is only alive where the
+	// player is.
+	cave: u8,
 	patrol_step: int,
 	lure_phase: Patrol_Lure_Phase,
 	lure_target: grid.Position,
 	lure_until, lure_wait_until: f32,
 }
-Drop :: struct { position: grid.Position, item: campaign.Item, xp: i32, manual_only: bool }
+Drop :: struct { position: grid.Position, item: campaign.Item, xp: i32, manual_only: bool, cave: u8 }
 World :: struct {
 	biome: campaign.Biome,
 	side_length: int,
 	seed: u64,
 	sites: [MAX_SITES]Site,
 	site_count: int,
+	// The structures standing on the map (structures.odin); empty in a world saved before
+	// there were any, whose tiles are as they were.
+	structures: [MAX_WORLD_STRUCTURES]level.Placed_Structure,
+	structure_count: int,
+	// How many the player has set down in this expedition (player_structures.odin).
+	placed_by_player: int,
+	// The caves of the map (cave.odin), on the layer under the ground, and where the player is: 0 on the open map,
+	// k+1 in the k-th cave (from where he stands, every tick).
+	caves: [MAX_CAVES]Cave,
+	cave_count: int,
+	in_cave: int,
+	// The complexes of the map (complex.odin): blocks, bridges and tunnels at places fixed by the biome.
+	complexes: [MAX_COMPLEXES]Complex,
+	complex_count: int,
+	// The halls of the network under the ground (network.odin) the robot has been in, in the plan's order: the stacked
+	// map marks them (Fase 8).
+	network_visited: [MAX_NETWORK_HALLS]bool,
+	// The height the biome's ground was raised by (biome_base, level.Level.base): 0 in a world saved before.
+	base: i32,
+	// The map's lifts and gates (level/layers.odin), kept for the saves: a gate's cell on the map says if it is open.
+	lifts: [MAX_WORLD_LIFTS]level.Lift,
+	lift_count: int,
+	gates: [MAX_WORLD_GATES]level.Gate,
+	gate_count: int,
 	groups: [MAX_GROUPS]Group,
 	group_count: int,
 	drops: [MAX_DROPS]Drop,
@@ -106,6 +134,7 @@ site_name :: proc(k: Site_Kind) -> string {
 	case .Boss:return "TANA DEL BOSS"
 	case .Memory:return "FRAMMENTO"
 	case .Tunnel:return "TUNNEL"
+	case .Cave:return "GROTTA"
 	}
 	return ""
 }
@@ -135,14 +164,20 @@ outdoor_cover :: proc(b:campaign.Biome,p:grid.Position,size:int)->bool {
 	return p.x%3==int((h>>8)%3) && p.y%3==int((h>>16)%3)
 }
 
-generate :: proc(w: ^World, data: ^level.Level, b: campaign.Biome, seed: u64) -> bool {
+// The biomes' retouches (Fase 6 of docs/piano-profondita.md): what the map editor saved for each biome's map, loaded
+// at the start (mapeditor.load_all) and put over the geography the code makes, before any inhabitant. None: the map as
+// the code makes it.
+biome_map_edits: [campaign.Biome]level.Map_Edits
+
+// The biome's map and its world. With `retouched`, its retouches over its geography (biome_map_edits).
+generate :: proc(w: ^World, data: ^level.Level, b: campaign.Biome, seed: u64, retouched := true) -> bool {
 	if b >= .Count { return false }
-	w^ = World{biome=b,side_length=map_size(b),seed=seed,loot_random=rng.create(seed~0xD0A5),reward_site=-1}
+	w^ = World{biome=b,side_length=map_size(b),seed=seed,loot_random=rng.create(seed~0xD0A5),reward_site=-1,base=biome_base(b)}
 	size := map_size(b)
 	created,ok := level.create(size,size,{.Floor}); if !ok { return false }; data^=created
-	data.player_spawn={7,size/2}; data.has_player_spawn=true
+	data.player_spawn={x = 7, y = size/2}; data.has_player_spawn=true
 	for y in 0..<size { for x in 0..<size {
-		p:=grid.Position{x,y}; edge:=x<2 || y<2 || x>=size-2 || y>=size-2
+		p:=grid.Position{x = x, y = y}; edge:=x<2 || y<2 || x>=size-2 || y>=size-2
 		// Fixed islands and clusters, with broad guaranteed connecting axes.
 		cover := outdoor_cover(b,p,size)
 		if b == .City { cover = x%18>=10 && x%18<=14 && y%16>=6 && y%16<=11 }
@@ -158,25 +193,51 @@ generate :: proc(w: ^World, data: ^level.Level, b: campaign.Biome, seed: u64) ->
 	positions := [?][2]int{{22,50},{24,27},{16,73},{42,52},{44,25},{39,79},{63,48},{66,76},{65,20},{86,70},{86,23},{90,50},{17,9},{85,91},{45,9},{59,94}}
 	content:=rng.create(seed~0xA011)
 	for kind,i in kinds {
-		p:=grid.Position{positions[i][0]*size/100,positions[i][1]*size/100}
-		if kind==.Boss { p={size-20,size/2} }
+		p:=grid.Position{x = positions[i][0]*size/100, y = positions[i][1]*size/100}
+		if kind==.Boss { p={x = size-20, y = size/2} }
 		site:=Site{kind=kind,position=p,secret=i>=12,active=true,waves=2+rank(b)/2,group=-1,seed=rng.next_u64(&content),orientation=u8((int(b)+i)%4),layout_version=SITE_LAYOUT_VERSION}
 		if kind==.Boss || kind==.Tunnel {site.orientation=0}
-		half:=site_layout(kind).half_extent;if site.orientation%2==1 {half={half.y,half.x}}
-		p={clamp(p.x,half.x+3,size-half.x-4),clamp(p.y,half.y+3,size-half.y-4)};site.position=p
+		half:=site_layout(kind).half_extent;if site.orientation%2==1 {half={x = half.y, y = half.x}}
+		p={x = clamp(p.x,half.x+3,size-half.x-4), y = clamp(p.y,half.y+3,size-half.y-4)};site.position=p
 		if i==8 || i==10 { site.active=rng.next_u64(&content)%3!=0 }
 		if i==15 { site.active=b==.Vietnam }
 		w.sites[i]=site; w.site_count+=1
 		stamp_site(data,&site)
 		if kind==.Boss { _=level.set_tile(data,p,{.Exit}) }
 	}
+	// The biome's relief, level round the sites; then its buildings and objects, level on it; all before
+	// any inhabitants.
+	// The caves' places first, and the complexes': the relief keeps the ground round each level (cave.odin, complex.odin).
+	plan_caves(w,data)
+	plan_complexes(w,data)
+	apply_relief(w,data)
+	apply_mountain(w,data)
+	place_structures(w,data)
+	place_caves(w,data)
+	place_complexes(w,data)
+	// The network under the ground of a raised biome, after the complexes (network.odin).
+	place_network(w,data)
+	// The retouches over the whole geography; then the caves' foes and secrets, on the floors the map has now. Retouches
+	// that do not go on it (an old file's, of another size, or one painted by hand that breaks the layers' rule) are
+	// left out: the map as the code makes it.
+	if retouched && level.map_edits_any(&biome_map_edits[b]) && !level.map_edits_apply_checked(data,&biome_map_edits[b]) {
+		fmt.eprintfln("mappe: the retouches of the %v map do not go on it: left out", b)
+		level.destroy(data)
+		return generate(w,data,b,seed,false)
+	}
+	fill_caves(w,data)
 	// Structural geography is finished before any inhabitants are placed.
 	for site,i in w.sites[:w.site_count] {if site.active && (site.kind==.Trial || site.kind==.Boss || (site.kind==.Cache && i<12)) {add_group(w,data,i,site.position,1 if site.kind==.Boss else 2+rank(b)/2,false,site.kind==.Boss)}}
 	for i in 0..<4 {
-		p:=grid.Position{size*(35+i*13)/100,size*(35+(i%2)*28)/100}
+		p:=grid.Position{x = size*(35+i*13)/100, y = size*(35+(i%2)*28)/100}
 		add_group(w,data,-1,p,2+int(rng.next_u64(&content)%3),true,false)
 	}
-	if b==.Gothic { add_group(w,data,-1,{size/2,size/2-10},1,false,false); w.groups[w.group_count-1].killer=true; w.groups[w.group_count-1].members[0].enemy.health*=4; w.groups[w.group_count-1].members[0].enemy.max_health*=4 }
+	add_mountain_inhabitants(w,data,&content)
+	if b==.Gothic { add_group(w,data,-1,{x = size/2, y = size/2-10},1,false,false); w.groups[w.group_count-1].killer=true; w.groups[w.group_count-1].members[0].enemy.health*=4; w.groups[w.group_count-1].members[0].enemy.max_health*=4 }
+	// The complexes' and the network's secrets and guards last: the sites' groups keep their places in the list.
+	fill_complexes(w,data)
+	fill_network(w,data)
+	keep_lifts_and_gates(w,data)
 	w.last_position=data.player_spawn
 	return true
 }
@@ -188,17 +249,17 @@ add_group :: proc(w:^World,data:^level.Level,site:int,p:grid.Position,requested_
 	g:=&w.groups[w.group_count]; g^={anchor=p,count=count,patrol=patrol,boss=boss,site=site}
 	r:=rng.create(w.seed~u64(w.group_count+1)*0x9E3779B9)
 	for i in 0..<count {
-		q:=grid.Position{p.x+i%3-1,p.y+i/3-1}
+		q:=grid.offset(p, i%3-1, i/3-1)
 		if site>=0 && w.sites[site].layout_version==SITE_LAYOUT_VERSION {q=site_spawn_position(&w.sites[site],w.sites[site].wave,i)}
 		// Placement never edits geography: content seeds only choose inhabitants.
-		if tile, present := level.tile_at(data, q); !present || tile.kind == .Wall || tile.kind == .Void {
+		if tile, present := level.tile_at(data, q); !present || tile.kind == .Wall || tile.kind == .Void || tile.kind == .Fence {
 			for radius in 1..=4 {
 				found := false
 				for dy in -radius..=radius {
 					for dx in -radius..=radius {
-						candidate := grid.Position{p.x+dx, p.y+dy}
+						candidate := grid.offset(p, dx, dy)
 						candidate_tile, candidate_present := level.tile_at(data, candidate)
-						if !candidate_present || candidate_tile.kind == .Wall || candidate_tile.kind == .Void || candidate_tile.kind == .Exit { continue }
+						if !candidate_present || candidate_tile.kind == .Wall || candidate_tile.kind == .Void || candidate_tile.kind == .Fence || candidate_tile.kind == .Exit { continue }
 						occupied := false
 						for previous in g.members[:i] { occupied = occupied || previous.enemy.position == candidate }
 						if !occupied { q = candidate; found = true; break }
@@ -223,19 +284,27 @@ add_group :: proc(w:^World,data:^level.Level,site:int,p:grid.Position,requested_
 
 can_see :: proc(room:^game.Room,a,b:grid.Position) -> bool {
 	if room == nil || room.level_data == nil { return false }
+	// Sight rises and falls with the ground: a hill hides what is behind it (game.height_hides); with layers, the
+	// line goes through them (game/layers.odin).
+	m: level.Layer_Map
 	return game.tactical_line_visible(a, b, proc(data: rawptr, cell: grid.Position) -> bool {
 		return game.cell_blocks_line_of_sight(cast(^game.Room)data, cell)
-	}, room)
+	}, room, proc(data: rawptr, cell: grid.Position) -> i32 {
+		return game.cell_height(cast(^game.Room)data, cell)
+	}, game.room_line_layers(room, &m))
 }
 
-add_drop :: proc(w:^World,p:grid.Position,item:campaign.Item,xp:i32=0,manual_only:bool=false) -> bool {
+// A drop lies at `p`; `cave` marks a cave's secret with the cave's number (cave.odin), 0 anything else.
+add_drop :: proc(w:^World,p:grid.Position,item:campaign.Item,xp:i32=0,manual_only:bool=false,cave:int=0) -> bool {
 	if w.drop_count>=MAX_DROPS {return false}
-	w.drops[w.drop_count]={p,item,xp,manual_only}; w.drop_count+=1; return true
+	w.drops[w.drop_count]={p,item,xp,manual_only,u8(cave)}; w.drop_count+=1; return true
 }
 
 nearest_site :: proc(w:^World,p:grid.Position) -> int {
 	best:=-1; d:=4
-	for site,i in w.sites[:w.site_count] { if !site.active || site.state==.Resolved {continue}; next:=distance(p,site.position); if next<d {d=next;best=i} }
+	// A cave's mouth has nothing to do: one walks in; nor has the Vietnam's tunnel, whose gallery one walks down into
+	// (network.odin).
+	for site,i in w.sites[:w.site_count] { if !site.active || site.state==.Resolved || site.kind==.Cave || site.kind==.Tunnel || site.position.layer!=p.layer {continue}; next:=distance(p,site.position); if next<d {d=next;best=i} }
 	return best
 }
 
@@ -243,7 +312,7 @@ nearest_site :: proc(w:^World,p:grid.Position) -> int {
 add_xp_drop :: proc(w:^World,p:grid.Position,xp:i32) {
 	if xp<=0 {return}
 	for &drop in w.drops[:w.drop_count] {
-		if drop.xp>0 && distance(p,drop.position)<=3 {drop.xp+=xp;return}
+		if drop.xp>0 && in_scope(w,drop.cave) && distance(p,drop.position)<=3 {drop.xp+=xp;return}
 	}
 	if add_drop(w,p,{},xp) {return}
 	if w.pending_xp==0 {w.pending_xp_position=p}
@@ -302,7 +371,7 @@ engage :: proc(w:^World,room:^game.Room,index:int) -> bool {
 		if !m.alive || m.deployed {continue}
 		for attempt in 0..<50 {
 			p:=m.enemy.position
-			if attempt>0 {p={g.anchor.x+(attempt-1)%7-3,g.anchor.y+(attempt-1)/7-3}}
+			if attempt>0 {p=grid.offset(g.anchor, (attempt-1)%7-3, (attempt-1)/7-3)}
 			id,ok:=game.spawn_enemy(room,{position=p,health=m.enemy.health,attack=m.enemy.attack,archetype=m.enemy.archetype,drops_healing=m.enemy.drops_healing})
 			if !ok {continue}
 			m.enemy.id=id;m.enemy.position=p;m.deployed=true;deployed+=1
@@ -339,10 +408,15 @@ move_sleeping_group :: proc(w:^World,g: ^Group, room: ^game.Room, step: grid.Pos
 	if step == {} {return}
 	for &m in g.members[:g.count] {
 		if !m.alive || m.deployed {continue}
-		p := game.add_position(m.enemy.position, step)
-		if !patrol_cell_free(w,room,p,&m) {continue}
-		if step.x != 0 && step.y != 0 && game.cell_blocks_movement(room, {p.x,m.enemy.position.y}) &&
-		   game.cell_blocks_movement(room, {m.enemy.position.x,p.y}) {continue}
+		// A step across the layers as a walker makes it (a cave's mouth), ladders aside.
+		from := m.enemy.position
+		p, _ := game.layer_step(room, from, step)
+		if !patrol_cell_free(w,room,p,&m) || game.step_height_blocked(room,from,p) {continue}
+		if step.x != 0 && step.y != 0 {
+			across, _ := game.layer_step(room, from, {x = step.x, y = 0})
+			along, _ := game.layer_step(room, from, {x = 0, y = step.y})
+			if game.cell_blocks_movement(room, across) && game.cell_blocks_movement(room, along) {continue}
+		}
 		m.enemy.position = p
 	}
 }
@@ -354,6 +428,7 @@ tick :: proc(w:^World,room:^game.Room,dt:f32) {
 	w.clock+=dt; w.patrol_clock+=dt
 	w.beat=u64(w.clock)
 	room.player.tactical.environment_beat=w.beat
+	// Under the rock nothing of the biome's ground reaches anyone (game.expedition_terrain).
 	room.player.tactical.config.expedition_biome=u8(w.biome)
 	room.player.tactical.config.low_gravity=w.biome==.Space
 	if room.phase==.Loot && w.beat!=previous_beat && w.beat%4==0 {game.expedition_gravity_pulse(room,room.recent_events)}
@@ -361,13 +436,15 @@ tick :: proc(w:^World,room:^game.Room,dt:f32) {
 	if room.player.health<=0 {room.phase=.Defeat;return}
 	patrol_due := w.patrol_clock >= 1.4
 	player:=room.player.position
+	update_caves(w,player)
+	update_visits(w,player)
 	if room.player.health<w.last_health {w.mounted=false}
 	w.last_health=room.player.health
 	for &s,site_index in w.sites[:w.site_count] {
 		if !s.active {continue}
 		if distance(player,s.position)<=5 && s.state==.Unvisited {s.state=.Discovered}
 		activation:=4 if s.layout_version==0 else site_layout(s.kind).trigger_radius
-		if s.kind==.Nest && s.state!=.Resolved && distance(player,s.position)<=activation {
+		if s.kind==.Nest && s.state!=.Resolved && player.layer==s.position.layer && distance(player,s.position)<=activation {
 			if !s.triggered && distance(player,s.position)<=2 {s.triggered=true}
 			if s.triggered && s.wave<s.waves {
 				alive:=false
@@ -384,18 +461,21 @@ tick :: proc(w:^World,room:^game.Room,dt:f32) {
 		}
 	}
 	for &g,i in w.groups[:w.group_count] {
+		if !in_scope(w,g.cave) {continue}
 		if g.active {
 			// A blocked member remains finite and alive. Retry just that member
 			// after a placed object expires; never duplicate deployed actors.
 			_=engage(w,room,i)
 			leash:=20 if g.killer else 12
 			if g.site>=0 && w.sites[g.site].layout_version==SITE_LAYOUT_VERSION {leash=site_layout(w.sites[g.site].kind).encounter_radius}
-			if distance(player,g.anchor)>leash {
+			// Under the ground the robot shakes the Gotico's killer off: he does not go down after him (the user's choice in
+			// Fase 7 of docs/piano-profondita.md).
+			if distance(player,g.anchor)>leash || g.killer && player.layer<grid.GROUND_LAYER {
 				for &m,member_index in g.members[:g.count] {
 					if !m.deployed {continue}
 					for e,j in room.enemies {if e.id==m.enemy.id {m.enemy=e;ordered_remove(&room.enemies,j);break}}
 					m.deployed=false
-					m.enemy.position=site_spawn_position(&w.sites[g.site],max(0,w.sites[g.site].wave-1),member_index) if g.site>=0 && w.sites[g.site].layout_version==SITE_LAYOUT_VERSION else grid.Position{g.anchor.x+member_index%3-1,g.anchor.y+member_index/3-1}
+					m.enemy.position=site_spawn_position(&w.sites[g.site],max(0,w.sites[g.site].wave-1),member_index) if g.site>=0 && w.sites[g.site].layout_version==SITE_LAYOUT_VERSION else grid.offset(g.anchor, member_index%3-1, member_index/3-1)
 				}
 				g.active=false
 			}
@@ -403,22 +483,24 @@ tick :: proc(w:^World,room:^game.Room,dt:f32) {
 		}
 		if g.lure_phase!=.None {tick_patrol_lure(w,room,&g,patrol_due)}
 		if distance(player,g.anchor)>18 && !g.killer && g.lure_phase==.None {continue}
+		// The killer waits on the open ground while the robot is under it.
+		if g.killer && player.layer<grid.GROUND_LAYER {continue}
 		if g.patrol && patrol_due && !g.pursuing && g.lure_phase==.None {
-			steps := [4]grid.Position{{1,0},{0,1},{-1,0},{0,-1}}
+			steps := [4]grid.Position{{x = 1, y = 0},{x = 0, y = 1},{x = -1, y = 0},{x = 0, y = -1}}
 			move_sleeping_group(w,&g, room, steps[(g.patrol_step/3)%4]);g.patrol_step+=1
 		}
 		if g.pursuing && distance(player,g.anchor)>12 {g.pursuing=false}
 		if g.pursuing && patrol_due {
 			first:=g.members[0].enemy.position
-			move_sleeping_group(w,&g,room,{clamp(player.x-first.x,-1,1),clamp(player.y-first.y,-1,1)})
+			move_sleeping_group(w,&g,room,{x = clamp(player.x-first.x,-1,1), y = clamp(player.y-first.y,-1,1)})
 		}
 		if g.killer && patrol_due {
 			dx,dy:=clamp(player.x-g.anchor.x,-1,1),clamp(player.y-g.anchor.y,-1,1)
-			p:=grid.Position{g.anchor.x+dx,g.anchor.y+dy}; if game.base_cell_is_walkable(room,p) {g.anchor=p;g.members[0].enemy.position=p}
+			p,_:=game.layer_step(room,g.anchor,{x = dx, y = dy}); if p.layer>=grid.GROUND_LAYER && game.base_cell_is_walkable(room,p) {g.anchor=p;g.members[0].enemy.position=p}
 		}
 		for m in g.members[:g.count] {
 			if !m.alive {continue}
-			radius:=3 if terrain(w.biome,m.enemy.position)==.Grass else 6
+			radius:=3 if ground(w,m.enemy.position)==.Grass else 6
 			if g.lure_phase==.Seeking || g.lure_phase==.Waiting {radius=1}
 			if distance(player,m.enemy.position)<=radius && can_see(room,m.enemy.position,player) {
 				if w.mounted { // riders may outrun pursuit; a close hit dismounts
@@ -434,40 +516,55 @@ tick :: proc(w:^World,room:^game.Room,dt:f32) {
 	if w.patrol_clock>=1.4 {w.patrol_clock=0}
 	if room.phase==.Combat && len(room.enemies)==0 {game.end_expedition_encounter(room)}
 	cycle:=w.beat%9
-	if !w.lane_warning && cycle==7 && w.biome!=.Gothic {w.lane_warning=true;w.lane_vertical=(w.beat/9)%2==0;w.lane=player.x if w.lane_vertical else player.y;w.lane_center=player}
+	if w.in_cave>0 {w.lane_warning=false}
+	if w.in_cave==0 && !w.lane_warning && cycle==7 && w.biome!=.Gothic {w.lane_warning=true;w.lane_vertical=(w.beat/9)%2==0;w.lane=player.x if w.lane_vertical else player.y;w.lane_center=player}
 	if w.lane_warning && cycle==0 {
 		w.lane_warning=false
 		if w.biome==.Inferno {
 			for offset in -12..=12 {
-				p:=grid.Position{w.lane,w.lane_center.y+offset} if w.lane_vertical else grid.Position{w.lane_center.x+offset,w.lane}
-				protected:=false
+				p:=grid.Position{x = w.lane, y = w.lane_center.y+offset} if w.lane_vertical else grid.Position{x = w.lane_center.x+offset, y = w.lane}
+				// The sites' ground stays whole, and the rock over a cave, and a complex's.
+				protected:=cave_rock(w,p) || complex_rock(w,p)
 				for site in w.sites[:w.site_count] {if distance(site.position,p)<=2 {protected=true;break}}
 				if !protected {_=game.expedition_fracture_floor(room,p)}
 			}
 		}
 		if lane_contains(w,player) {
-			if w.biome==.Sky {_=game.expedition_wind_push(room,game.PLAYER_ENTITY,{1,0} if w.lane_vertical else {0,1})}
+			if w.biome==.Sky {_=game.expedition_wind_push(room,game.PLAYER_ENTITY,{x = 1, y = 0} if w.lane_vertical else {x = 0, y = 1})}
 			else {room.player.health=max(0,room.player.health-3-i32(rank(w.biome)));w.mounted=false}
 		}
-		if w.biome==.Sky {for enemy in room.enemies {if lane_contains(w,enemy.position) {_=game.expedition_wind_push(room,game.enemy_entity(enemy.id),{1,0} if w.lane_vertical else {0,1})}}}
+		if w.biome==.Sky {for enemy in room.enemies {if lane_contains(w,enemy.position) {_=game.expedition_wind_push(room,game.enemy_entity(enemy.id),{x = 1, y = 0} if w.lane_vertical else {x = 0, y = 1})}}}
 	}
 	if room.player.health<=0 {room.phase=.Defeat}
 }
 
+// The lane is on the open ground: it does not reach under the rock.
 lane_contains :: proc(w:^World,p:grid.Position) -> bool {
-	return (p.x if w.lane_vertical else p.y)==w.lane &&
+	return p.layer==grid.GROUND_LAYER && (p.x if w.lane_vertical else p.y)==w.lane &&
 		abs((p.y-w.lane_center.y) if w.lane_vertical else (p.x-w.lane_center.x))<=12
 }
 
 walk :: proc(w:^World,room:^game.Room,offset:grid.Position) -> bool {
-	if room.phase!=.Loot || offset=={} {return false}
-	p:=game.add_position(room.player.position,offset)
-	if !game.base_cell_is_walkable(room,p) || game.cell_blocks_movement(room,p) {return false}
-	if offset.x!=0 && offset.y!=0 && (game.cell_blocks_movement(room,{p.x,room.player.position.y}) || game.cell_blocks_movement(room,{room.player.position.x,p.y})) {return false}
-	ground:=terrain(w.biome,p)
-	if ground==.Bridge && w.beat%4>=2 {return false}
+	if room.phase!=.Loot || offset=={} || game.lift_player_riding(room) {return false}
+	// A step across the layers as the walker makes it: into a cave's mouth, up a ladder.
+	from:=room.player.position
+	p:=game.walk_step(room,from,offset)
+	// Toward a lift's landing its platform is away from, it calls the platform; into a gate's bars from its lever, it
+	// opens the gate (game/lift.odin): no step either way.
+	if game.lift_call(room,p) || game.gate_opens(room,from,p) {return false}
+	ladder:=game.is_ladder_move(room,from,p)
+	if !game.base_cell_is_walkable(room,p) || game.cell_blocks_movement(room,p) || !ladder && game.step_height_blocked(room,from,p) {return false}
+	if offset.x!=0 && offset.y!=0 {
+		across,_:=game.layer_step(room,from,{x = offset.x, y = 0})
+		along,_:=game.layer_step(room,from,{x = 0, y = offset.y})
+		if game.cell_blocks_movement(room,across) || game.cell_blocks_movement(room,along) {return false}
+	}
+	under:=ground(w,p)
+	if under==.Bridge && w.beat%4>=2 {return false}
 	room.player.position=p
-	if ground==.Ice {slide:=game.add_position(p,offset);if game.base_cell_is_walkable(room,slide) && !game.cell_blocks_movement(room,slide) {room.player.position=slide}}
+	// Onto a platform: it rides it to the other end.
+	if game.lift_board(room,game.PLAYER_ENTITY,p) {return true}
+	if under==.Ice {slide:=game.walk_step(room,p,offset);if game.base_cell_is_walkable(room,slide) && !game.cell_blocks_movement(room,slide) {room.player.position=slide}}
 	before_health:=room.player.health
 	game.expedition_enter_cell(room)
 	if room.player.health<before_health {w.mounted=false}
@@ -484,25 +581,9 @@ prepare_room :: proc(w:^World,room:^game.Room) {
 	side:=size(w)
 	for y in 12..<side-8 {for x in 14..<side-8 {
 		if (x*17+y*31)%173!=0 || len(room.traps)>=game.MAX_TRAPS_PER_ROOM {continue}
-		p:=grid.Position{x,y};if !game.base_cell_is_walkable(room,p) || distance(p,room.player.position)<8 {continue}
+		p:=grid.Position{x = x, y = y};if !game.base_cell_is_walkable(room,p) || distance(p,room.player.position)<8 {continue}
 		near_site:=false;for &site in w.sites[:w.site_count] {near_site=near_site || distance(p,site.position)<3 || site_cell(&site,p).inside}
 		if near_site {continue}
 		append(&room.traps,game.Trap{id=room.next_trap_id,position=p,damage=4,armed=true});room.next_trap_id+=1
 	}}
-}
-
-// A shortcut never emerges inside a wall, an actor or a hidden pressure plate.
-// This also uses the saved dimensions when resuming an older small map.
-tunnel_destination :: proc(w:^World,room:^game.Room)->(position:grid.Position,ok:bool) {
-	if w==nil || room==nil {return}
-	anchor:=grid.Position{size(w)-14,16}
-	for radius in 0..=8 {for y in -radius..=radius {for x in -radius..=radius {
-		p:=game.add_position(anchor,{x,y});if !game.base_cell_is_walkable(room,p) || game.cell_blocks_movement(room,p) {continue}
-		occupied:=false
-		for enemy in room.enemies {occupied=occupied || enemy.position==p}
-		for &group in w.groups[:w.group_count] {for member in group.members[:group.count] {occupied=occupied || (member.alive && member.enemy.position==p)}}
-		for trap in room.traps {occupied=occupied || (trap.armed && trap.position==p)}
-		if !occupied {return p,true}
-	}}}
-	return
 }

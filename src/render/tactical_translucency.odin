@@ -6,10 +6,11 @@ import rl "vendor:raylib"
 import rlgl "vendor:raylib/rlgl"
 import game "../game"
 import grid "../engine/grid"
+import level "../level"
 import view "../engine/view"
 
 Tactical_Alpha_Entry :: struct {
-	kind: enum {Sprite, Wall, Attack, Ground, Lasso, Fishing, Pinball, First_Person},
+	kind: enum {Sprite, Wall, Roof, Attack, Ground, Lasso, Fishing, Pinball, First_Person, Dino, Cover},
 	// An Attack entry: its blow's slot in Attack_Fx_State.
 	attack: i32,
 	// A Ground entry: its flame's cell, or past the cells its splash (ground_fx.odin).
@@ -53,13 +54,17 @@ collect_tactical_translucents :: proc(renderer: ^Renderer, room: ^game.Room = ni
 	// reuses them as they are. The blows first: a struck card's reaction
 	// waits for its own. The ground was followed once this frame already, as
 	// the board began (draw_tactical_world).
-	if room != nil { observe_attack_cues(renderer) }
+	if room != nil {
+		// FIRST PERSON FENCER's blows begun before their beat, then the cues.
+		foresee_first_person_blows(renderer, room)
+		observe_attack_cues(renderer)
+	}
 	if room != nil { update_flipbook_actors(renderer, room) }
 	if room != nil && v.living { update_living_actors(renderer, room) }
 	living := v.living && v.living_assets.loaded && v.living_state != nil
 	snapshot := v.snapshot
 	for actor in snapshot.enemies[:snapshot.enemy_count] {
-		cell := grid.Position{int(math.round(actor.position.x)), int(math.round(actor.position.y))}
+		cell := grid.Position{x = int(math.round(actor.position.x)), y = int(math.round(actor.position.y))}
 		// The Pinball's ball has taken its foe's card's place (pinball.odin).
 		if actor.visible && tactical_render_visible(renderer, cell) && !tactical_pinball_holds(renderer, actor.entity) {
 			key := sprite_key_for_enemy(actor.archetype)
@@ -79,7 +84,7 @@ collect_tactical_translucents :: proc(renderer: ^Renderer, room: ^game.Room = ni
 	// Living cards removed from the board mid-death finish toppling first.
 	if living {
 		for &actor in v.living_state.actors {
-			cell := grid.Position{int(math.round(actor.position.x)), int(math.round(actor.position.y))}
+			cell := grid.Position{x = int(math.round(actor.position.x)), y = int(math.round(actor.position.y))}
 			if !actor.used || !actor.ghost || !tactical_render_visible(renderer, cell) || tactical_pinball_holds(renderer, actor.entity) { continue }
 			key := flipbook_key(actor.character)
 			append(entries, Tactical_Alpha_Entry{key = key, entity = actor.entity, position = actor.position,
@@ -89,7 +94,7 @@ collect_tactical_translucents :: proc(renderer: ^Renderer, room: ^game.Room = ni
 	// Standees removed from the board mid-death finish toppling first.
 	if v.flipbook_state != nil && v.flipbook.loaded {
 		for &actor in v.flipbook_state.actors {
-			cell := grid.Position{int(math.round(actor.position.x)), int(math.round(actor.position.y))}
+			cell := grid.Position{x = int(math.round(actor.position.x)), y = int(math.round(actor.position.y))}
 			if !actor.used || !actor.ghost || !tactical_render_visible(renderer, cell) || tactical_pinball_holds(renderer, actor.entity) { continue }
 			key := flipbook_key(actor.character)
 			append(entries, Tactical_Alpha_Entry{key = key, entity = actor.entity, position = actor.position,
@@ -103,22 +108,43 @@ collect_tactical_translucents :: proc(renderer: ^Renderer, room: ^game.Room = ni
 	// The Pinball's ball shows on the map's hologram too.
 	collect_pinball_entries(renderer, entries)
 	if room != nil { collect_first_person_entries(renderer, entries) }
+	if room != nil { collect_dino_entries(renderer, entries) }
 	// The hologram intentionally supplies no room: its own miniature walls
 	// remain in the table pass, and it only needs sorted actor billboards.
 	// Behind the player's eyes they are opaque, with the floor.
 	if room != nil && (room.player == nil || !room.player.tactical.config.expedition) && !first_person_solid_walls(renderer) {
 		for y in 0..<room.level_data.tiles.height { for x in 0..<room.level_data.tiles.width {
-			if tactical_cell_on_screen(renderer, {x, y}) && tactical_render_visible(renderer, {x, y}) && diorama_interior_wall(room, {x, y}) {
+			if tactical_cell_on_screen(renderer, {x = x, y = y}) && tactical_render_visible(renderer, {x = x, y = y}) && diorama_interior_wall(room, {x = x, y = y}) {
 				append(entries, Tactical_Alpha_Entry{kind = .Wall, position = {f32(x), f32(y)}})
 			}
 		} }
 	}
+	// What fades over the robot (game.layer_cover_opacity): a cell a layer, its layer in the entry's `attack`. In an
+	// expedition the floor program fades it (expedition_floor.odin).
+	if room != nil && board_view.layered && (room.player == nil || !room.player.tactical.config.expedition) {
+		c := board_view.viewer.cell
+		reach := int(game.LAYER_FADE_FAR)+1
+		for y in c.y-reach..=c.y+reach { for x in c.x-reach..=c.x+reach {
+			for layer in grid.LOWEST_LAYER..=grid.HIGHEST_LAYER {
+				cell := grid.Position{x = x, y = y, layer = i8(layer)}
+				kind := board_tile(cell)
+				if kind == .Void || layer != grid.GROUND_LAYER && !level.kind_has_floor(kind) { continue }
+				if opacity := cell_cover_opacity(cell); opacity < 1 {
+					append(entries, Tactical_Alpha_Entry{kind = .Cover, attack = i32(layer), position = {f32(x), f32(y)}, opacity = opacity})
+				}
+			}
+		} }
+	}
+	// The envelope of each building that is not whole: its walls and colonnade, and its roof.
+	if room != nil && (room.player == nil || !room.player.tactical.config.expedition) { collect_structure_entries(renderer, room, entries) }
 	forward := rl.Vector3Normalize(v.camera.target-v.camera.position)
 	for &entry in entries^ {
 		// View depth, not radial distance: objects off to the side must not
 		// change order with a nearer object on the same projected sight line.
 		center := rl.Vector3{entry.position.x+0.5, DIORAMA_WALL_HEIGHT*0.5, entry.position.y+0.5}
 		entry.depth = rl.Vector3DotProduct(center-v.camera.position, forward)
+		// The dinosaur is drawn just before the card riding it.
+		if entry.kind == .Dino { entry.depth += 0.01 }
 	}
 	slice.sort_by(entries^[:], proc(a, b: Tactical_Alpha_Entry) -> bool { return a.depth > b.depth })
 	return entries^[:]
@@ -136,7 +162,10 @@ draw_tactical_billboards :: proc(renderer: ^Renderer, room: ^game.Room = nil, li
 	for entry in entries {
 		if entry.kind == .Wall {
 			if !walls_active { begin_tactical_lighting(renderer, accents = lights); walls_active = true }
-			draw_diorama_wall(renderer, room, {int(entry.position.x), int(entry.position.y)})
+			draw_diorama_wall(renderer, room, {x = int(entry.position.x), y = int(entry.position.y)})
+		} else if entry.kind == .Roof {
+			if !walls_active { begin_tactical_lighting(renderer, accents = lights); walls_active = true }
+			draw_structure_roof(renderer, room, int(entry.attack))
 		} else if entry.kind == .Attack {
 			if walls_active { rl.EndShaderMode(); walls_active = false }
 			draw_attack_fx_entry(renderer, entry)
@@ -155,12 +184,20 @@ draw_tactical_billboards :: proc(renderer: ^Renderer, room: ^game.Room = nil, li
 		} else if entry.kind == .First_Person {
 			if walls_active { rl.EndShaderMode(); walls_active = false }
 			draw_first_person_entry(renderer, entry)
+		} else if entry.kind == .Dino {
+			if walls_active { rl.EndShaderMode(); walls_active = false }
+			draw_dino_entry(renderer, entry)
+		} else if entry.kind == .Cover {
+			if !walls_active { begin_tactical_lighting(renderer, accents = lights); walls_active = true }
+			draw_layer_cover(renderer, {x = int(entry.position.x), y = int(entry.position.y), layer = i8(entry.attack)}, entry.opacity)
 		} else {
 			if walls_active { rl.EndShaderMode(); walls_active = false }
 			tactical_billboard(renderer, entry.key, entry.position, entry.opacity, entry.entity)
 		}
 	}
 	if walls_active { rl.EndShaderMode() }
+	// Who is hidden under a deck or in the rock shows its outline, over everything (layer_outline.odin).
+	draw_hidden_outlines(renderer, room)
 	// The board pass only: the hologram has no room.
 	draw_living_rings(renderer, room)
 }

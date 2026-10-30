@@ -12,7 +12,7 @@ test_expedition_fishing_produces_food_but_legacy_fishing_still_heals :: proc(t: 
 		player.tactical.config.expedition = physical
 		room.fishing.random = fishing_test_stream(false)
 		before := player.health
-		report := fish_with_rod(&room, {6, 5})
+		report := fish_with_rod(&room, {x = 6, y = 5})
 		testing.expect_value(t, report.result, Fishing_Result.Fished)
 		testing.expect(t, !report.card && report.roll.total >= 1 && report.roll.total <= 4)
 		if physical {

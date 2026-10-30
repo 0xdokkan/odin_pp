@@ -157,7 +157,8 @@ test_card_economy_metadata_is_valid_and_covers_every_rarity :: proc(t: ^testing.
 			testing.expect_value(t, definition.reward_weight, u32(0))
 			testing.expect_value(t, definition.shop_base_price, i32(0))
 		} else {
-			testing.expect(t, definition.reward_weight > 0)
+			// The Cannone laser is what the Cannone becomes: never offered.
+			testing.expect(t, definition.reward_weight > 0 || definition.evolution_only)
 			testing.expect(t, definition.shop_base_price > 0)
 		}
 		rarity_counts[int(definition.rarity)] += 1
@@ -167,10 +168,15 @@ test_card_economy_metadata_is_valid_and_covers_every_rarity :: proc(t: ^testing.
 	}
 	// These additions must remain ordinary rewards, irrespective of tuning.
 	node := Run_Node{kind = .Combat, depth = 0}
-	for id in ([7]Card_Id{.Heavy_Blow, .Venom_Needle, .Caustic_Bloom, .Purifying_Guard, .Volatile_Study, .Fate_Strike, .Chain_Lightning}) {
+	for id in ([4]Card_Id{.Heavy_Blow, .Venom_Needle, .Caustic_Bloom, .Fate_Strike}) {
 		definition, found := card_definition_by_id(id)
 		testing.expect(t, found && !definition.temporary_only)
 		testing.expect(t, card_offer_weight(definition, &node) > 0)
+	}
+	// The retired cards and those only an upgrade makes are never offered (docs/registro-carte.md).
+	for id in ([?]Card_Id{.Purifying_Guard, .Volatile_Study, .Chain_Lightning, .Cross_Slash, .Thorn_Coat, .Titan_Grip}) {
+		definition, _ := card_definition_by_id(id)
+		testing.expect_value(t, card_offer_weight(definition, &node), u64(0))
 	}
 
 	definition, found := card_definition_by_id(.Strike)
@@ -493,7 +499,7 @@ test_local_wave_supports_nine_enemies_without_truncation :: proc(t: ^testing.T) 
 	testing.expect(t, ok)
 	defer destroy_room(&room)
 
-	player.position = {3, 2}
+	player.position = {x = 3, y = 2}
 	action, err := compile_card_action(&room, {id = 9, definition_id = .Toxic_Wave}, {})
 	testing.expect_value(t, err, Card_Compile_Error.None)
 	testing.expect_value(t, action.effect_count, len(enemy_spawns))
@@ -523,9 +529,9 @@ test_area_card_compilation_preserves_shape_and_stable_enemy_order :: proc(t: ^te
 		expected_ids: [3]u32,
 		target_count: int,
 	}{
-		{.Piercing_Ray, {5, 1}, {{4, 1}, {5, 3}, {2, 1}, {}}, 3, {1, 3, 0}, 2},
-		{.Cross_Slash, {2, 2}, {{2, 3}, {5, 3}, {2, 1}, {1, 2}}, 4, {1, 3, 4}, 3},
-		{.Firebomb, {4, 2}, {{5, 3}, {2, 3}, {3, 1}, {4, 3}}, 4, {1, 3, 4}, 3},
+		{.Piercing_Ray, {x = 5, y = 1}, {{x = 4, y = 1}, {x = 5, y = 3}, {x = 2, y = 1}, {}}, 3, {1, 3, 0}, 2},
+		{.Cross_Slash, {x = 2, y = 2}, {{x = 2, y = 3}, {x = 5, y = 3}, {x = 2, y = 1}, {x = 1, y = 2}}, 4, {1, 3, 4}, 3},
+		{.Firebomb, {x = 4, y = 2}, {{x = 5, y = 3}, {x = 2, y = 3}, {x = 3, y = 1}, {x = 4, y = 3}}, 4, {1, 3, 4}, 3},
 	}
 	for fixture in cases {
 		level_data := create_test_level(t)

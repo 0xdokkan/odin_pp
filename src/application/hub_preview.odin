@@ -38,7 +38,7 @@ hub_card_preview_scene :: proc(card: game.Card_Id, frame: ^host.Frame) -> (host.
 // Kept separate from scene creation so a locked card can never be revealed
 // accidentally by a stale menu selection. The lab remains unrestricted.
 hub_open_archive_preview :: proc(progress: ^campaign.Campaign, card: game.Card_Id, frame: ^host.Frame) -> bool {
-	if progress == nil || card < .Strike || card >= .Count || !progress.discovered[card] { return false }
+	if progress == nil || card < .Strike || card >= .Count || !progress.discovered[card] || !game.card_in_collection(card) { return false }
 	scene, ok := hub_card_preview_scene(card, frame)
 	if ok { host.push(frame, scene) }
 	return ok

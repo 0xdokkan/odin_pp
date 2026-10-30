@@ -120,11 +120,14 @@ test_event_extensions_preserve_existing_ordinals :: proc(t: ^testing.T) {
 
 @(test)
 test_inline_event_storage_stays_within_the_stack_budget :: proc(t: ^testing.T) {
-	testing.expect(t, size_of(Room) < 8*1024)
-	testing.expect(t, size_of(Event_Log) <= 96*1024)
-	testing.expect(t, size_of(Action_Report) <= 96*1024)
-	testing.expect(t, size_of(Pulse_Report) <= 96*1024)
-	testing.expect(t, size_of(Reaction_Event_Queue) <= 96*1024)
+	// Fase 2 of docs/piano-profondita.md gave every position its layer: a position takes 24 bytes instead of 16, and
+	// an event, which carries two, 16 more. The budgets grew with them (Room from 8 to 9 KB, the event stores from 96
+	// to 104 KB), as the user agreed; the game reserves 16 MiB of stack (windows_stack.odin).
+	testing.expect(t, size_of(Room) < 9*1024)
+	testing.expect(t, size_of(Event_Log) <= 104*1024)
+	testing.expect(t, size_of(Action_Report) <= 104*1024)
+	testing.expect(t, size_of(Pulse_Report) <= 104*1024)
+	testing.expect(t, size_of(Reaction_Event_Queue) <= 104*1024)
 	testing.expect(t, size_of(Card_Play_Report) <= 192*1024)
 }
 

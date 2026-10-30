@@ -38,8 +38,15 @@ paper_limb :: proc(m:^Expedition_Paper,a,b:rl.Vector2,width:f32,c:rl.Color,edge:
 
 @(private)
 draw_expedition_paper :: proc(renderer:^Renderer,m:^Expedition_Paper,base:rl.Vector3,scale:f32=1,mirror:bool=false,opacity:f32=1,horizontal_scale:f32=1) {
-	if m.cutout {draw_expedition_cutout(renderer,m,base,scale,mirror,opacity,horizontal_scale);return}
-	right:=flipbook_camera_right(renderer);normal:=rl.Vector3Normalize(rl.Vector3CrossProduct(right,{0,1,0}))
+	draw_expedition_paper_facing(flipbook_camera_right(renderer),m,base,scale,mirror,opacity,horizontal_scale)
+}
+
+// The same, for a camera given only by the way its right hand points (the hub's
+// plaza has no renderer of its own).
+@(private)
+draw_expedition_paper_facing :: proc(right:rl.Vector3,m:^Expedition_Paper,base:rl.Vector3,scale:f32=1,mirror:bool=false,opacity:f32=1,horizontal_scale:f32=1) {
+	if m.cutout {draw_expedition_cutout(right,m,base,scale,mirror,opacity,horizontal_scale);return}
+	normal:=rl.Vector3Normalize(rl.Vector3CrossProduct(right,{0,1,0}))
 	flip:f32=-1 if mirror else 1
 	for &part,i in m.parts[:m.count] {
 		center:rl.Vector2;for p in part.points[:part.count] {center+=p};center/=f32(part.count)
@@ -96,8 +103,8 @@ draw_cutout_piece :: proc(part:^Expedition_Paper_Part,base,right,normal:rl.Vecto
 // All cream silhouettes are drawn before any print, so overlapping pieces
 // merge into one cut sheet instead of looking like separately edged metal.
 @(private)
-draw_expedition_cutout :: proc(renderer:^Renderer,m:^Expedition_Paper,base:rl.Vector3,scale:f32,mirror:bool,opacity,horizontal_scale:f32) {
-	right:=flipbook_camera_right(renderer);normal:=rl.Vector3Normalize(rl.Vector3CrossProduct(right,{0,1,0}))
+draw_expedition_cutout :: proc(right:rl.Vector3,m:^Expedition_Paper,base:rl.Vector3,scale:f32,mirror:bool,opacity,horizontal_scale:f32) {
+	normal:=rl.Vector3Normalize(rl.Vector3CrossProduct(right,{0,1,0}))
 	flip:f32=-1 if mirror else 1
 	for pass in 0..<3 {
 		width:f32=.115 if pass==0 else (.102 if pass==1 else .097)

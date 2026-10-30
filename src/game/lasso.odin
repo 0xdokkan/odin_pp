@@ -2,6 +2,7 @@ package game
 
 import "core:math"
 import grid "../engine/grid"
+import level "../level"
 
 // LAZZO. The card's two seconds are the throw (a cast, the world still): the
 // rope catches one foe within LASSO_RANGE cells (the game's Chebyshev range),
@@ -76,7 +77,7 @@ LASSO_MAX_SWEEP_TARGETS :: (2*int(LASSO_MAX_RADIUS)+1)*(2*int(LASSO_MAX_RADIUS)+
 // A guard on one batch's steps (each crosses one edge or one turn at most).
 LASSO_MAX_STEPS :: 100_000
 // Where the planner sees a foe held in the air: on no cell of any board.
-LASSO_NO_CELL :: grid.Position{-1000, -1000}
+LASSO_NO_CELL :: grid.Position{x = -1000, y = -1000}
 
 // One cell of a ring: its offset from the player's cell and the angles where
 // the circle enters and leaves it (radians, `to` above `from`; the arc
@@ -173,7 +174,7 @@ lasso_ring :: proc(radius: i32) -> (arcs: [LASSO_MAX_RING_CELLS]Lasso_Arc, count
 		to := crossings[(index+1)%n]
 		if index == n-1 { to += math.TAU }
 		middle := (from+to)*0.5
-		arcs[index] = {cell = {int(math.floor(r*math.cos(middle)+0.5)), int(math.floor(r*math.sin(middle)+0.5))}, from = from, to = to}
+		arcs[index] = {cell = {x = int(math.floor(r*math.cos(middle)+0.5)), y = int(math.floor(r*math.sin(middle)+0.5))}, from = from, to = to}
 	}
 	return arcs, n
 }
@@ -181,7 +182,7 @@ lasso_ring :: proc(radius: i32) -> (arcs: [LASSO_MAX_RING_CELLS]Lasso_Arc, count
 // A cell the rope's foe cannot pass: off the board, a wall or the void, cover,
 // a blocking object.
 lasso_cell_is_solid :: proc(room: ^Room, cell: grid.Position) -> bool {
-	return room == nil || room.level_data == nil || !grid.contains(&room.level_data.tiles, cell) || cell_blocks_movement(room, cell)
+	return room == nil || room.level_data == nil || !level.layer_contains(room.level_data, cell) || cell_blocks_movement(room, cell)
 }
 
 @(private = "file")
@@ -379,8 +380,8 @@ lasso_step :: proc(room: ^Room) {
 
 @(private = "file")
 lasso_cell_on_ring :: proc(state: ^Lasso_State, cell: grid.Position) -> bool {
-	offset := grid.Position{cell.x-state.centre.x, cell.y-state.centre.y}
-	for arc in state.arcs[:state.arc_count] { if arc.cell == offset { return true } }
+	offset := grid.offset(cell, -state.centre.x, -state.centre.y)
+	for arc in state.arcs[:state.arc_count] { if arc.cell.x == offset.x && arc.cell.y == offset.y { return true } }
 	return false
 }
 
@@ -397,6 +398,8 @@ lasso_next_sweep :: proc(room: ^Room) -> (distance: f64, id: u32, cell: grid.Pos
 	for enemy in room.enemies {
 		if enemy_is_out_of_play(room, enemy.id) { continue }
 		if lasso_was_swept(s, enemy.id) { continue }
+		// With layers, the foes on the player's layer and those he sees (layers.odin).
+		if !effect_reaches(room, s.centre, enemy.position) { continue }
 		dx, dy := enemy.position.x-s.centre.x, enemy.position.y-s.centre.y
 		range_squared := dx*dx+dy*dy
 		if range_squared == 0 || range_squared >= int(s.radius*s.radius) { continue }
@@ -492,9 +495,9 @@ lasso_strike :: proc(room: ^Room, struck_id: u32, cell: grid.Position) {
 lasso_radial_step :: proc(centre, cell: grid.Position) -> grid.Position {
 	dx, dy := cell.x-centre.x, cell.y-centre.y
 	ax, ay := abs(dx), abs(dy)
-	if ay*1000 <= ax*414 { return {sign(dx), 0} }
-	if ax*1000 <= ay*414 { return {0, sign(dy)} }
-	return {sign(dx), sign(dy)}
+	if ay*1000 <= ax*414 { return {x = sign(dx), y = 0} }
+	if ax*1000 <= ay*414 { return {x = 0, y = sign(dy)} }
+	return {x = sign(dx), y = sign(dy)}
 }
 
 // The struck foe pushed `cells` away from the player, as far as its way is
@@ -510,7 +513,7 @@ lasso_knock_back :: proc(room: ^Room, id: u32, cells: i32, stop_on_ring := false
 	mover := enemy_entity(id)
 	destination := from
 	for distance in 1..=min(int(cells), MAX_MOVEMENT_PATH_CELLS) {
-		cell := grid.Position{from.x+step.x*distance, from.y+step.y*distance}
+		cell := grid.offset(from, step.x*distance, step.y*distance)
 		query := query_entity_movement(room, mover, cell)
 		if !movement_query_is_clear(&query) { break }
 		destination = cell
@@ -562,7 +565,7 @@ lasso_turn_damage :: proc(room: ^Room) {
 @(private = "file")
 lasso_landing :: proc(room: ^Room, index: int, under: grid.Position) -> (landing: grid.Position, ok: bool) {
 	free :: proc(room: ^Room, index: int, cell: grid.Position) -> bool {
-		if !grid.contains(&room.level_data.tiles, cell) || cell_blocks_movement(room, cell) || cell == room.player.position { return false }
+		if !level.layer_contains(room.level_data, cell) || cell_blocks_movement(room, cell) || cell == room.player.position { return false }
 		_, occupied := enemy_index_at(room, cell, index)
 		return !occupied
 	}
@@ -572,7 +575,7 @@ lasso_landing :: proc(room: ^Room, index: int, under: grid.Position) -> (landing
 		for y in under.y-distance..=under.y+distance {
 			for x in under.x-distance..=under.x+distance {
 				if max(abs(x-under.x), abs(y-under.y)) != distance { continue }
-				if free(room, index, {x, y}) { return {x, y}, true }
+				if free(room, index, {x = x, y = y, layer = under.layer}) { return {x = x, y = y, layer = under.layer}, true }
 			}
 		}
 	}

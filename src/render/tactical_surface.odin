@@ -125,6 +125,9 @@ end_tactical_surface :: proc(renderer: ^Renderer, active: bool) {
 	if !active { return }
 	surface := renderer.tactical.surface
 	rl.EndTextureMode()
+	// FIRST PERSON BRAWLER's gloves draw on their own small canvas between the
+	// board and the HUD (first_person_gloves.odin).
+	prepare_first_person_gloves(renderer)
 	// Raylib render targets are not a stack. Explicitly restore the borrowed
 	// canvas so later HUD, dice overlays and app.present use the right target.
 	canvas_target.begin(surface.parent, renderer.canvas_width, renderer.canvas_height)

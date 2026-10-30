@@ -21,6 +21,186 @@ maschera locale per frame, usando il targeting condiviso e limitando la ricerca
 al range massimo della carta. Materiale e alone riusano quella maschera;
 il falloff usa alpha ai vertici, senza nuovi shader, texture o render target.
 
+### Altezze del tabellone
+
+Una cella con altezza sta sul suo piano rialzato: ogni gradino è alto 0,12 di cella
+(`game.HEIGHT_STEP_DRAWN`). Dalla Fase 1 del [piano della profondità](piano-profondita.md)
+il terreno è **scolpito** ([surface.odin](../src/level/surface.odin)): il centro di ogni
+casella sta alla sua quota, e ogni angolo è la media delle caselle attorno che stanno a un
+gradino al massimo. Una scala diventa una rampa e una collina a gradoni una collina, mentre
+un dirupo tiene lo spigolo. Nel laboratorio una casella in pendenza è una piastrella
+inclinata che segue la superficie, con la colonna scura sotto; una casella in piano è il
+blocco di sempre. I fianchi non hanno più le righe dei gradini (scelta dell'utente).
+Personaggi, oggetti e telecamera stanno sulla superficie (`point_ground`: il triangolo
+della superficie sotto il punto); piedistalli e ombre sul punto più alto sotto il loro
+bordo (`rim_ground`); anteprima del raggio, segni dei bersagli, intenti e rombi del
+puntatore sulla cima della loro cella (`cell_overlay_ground`), così una rampa non li
+copre. Il puntatore sceglie la prima cella la cui superficie sta sopra il raggio
+(`pick_ground_cell`): la cima di un altopiano o la faccia di un dirupo, non il pavimento
+dietro. Le quote vengono da una copia delle altezze e delle tessere del livello,
+aggiornata quando la geometria cambia, mai da un puntatore al livello
+([height_view.odin](../src/render/height_view.odin)).
+
+Dalla Fase 8 anche la **mappa olografica delle stanze** (`Tab` nello scontro) ha il rilievo:
+ogni casella del tavolo è una colonna fino alla sua quota, i ponti sono lastre alla loro, e
+chi sta sotto un ponte o nella roccia si vede con il contorno, come in gioco
+([hologram.odin](../src/render/hologram.odin)). Prima il tavolo era piatto e le figure,
+disegnate alla loro quota, sembravano su un'altra casella. Le stanze piatte si vedono come prima.
+
+### Rilievi delle spedizioni
+
+Ogni bioma ha un rilievo a tema (colline, dune, terrazze, altopiani, isole, crateri: l'elenco è in
+[relief.odin](../src/expedition/relief.odin)). Il pavimento resta un piano e una texture; il rilievo è
+la **superficie scolpita** sopra il piano ([expedition_terrain.odin](../src/render/expedition_terrain.odin)):
+una casella rialzata o in pendenza è fatta di quattro triangoli attorno al suo centro (due, se è in piano
+e senza dirupi), disegnati dallo stesso programma del pavimento, quindi tessere, terreni e avvisi si
+leggono anche sulle rampe. La luce è morbida sulle salite (normali mediate fra i triangoli della stessa
+superficie) e la cima schiarisce con la quota (un decimo a gradino). Dove una vicina è un dirupo più in
+basso scende una parete di roccia sfaccettata, senza righe dei gradini, e lo spigolo in cima brilla appena
+del colore del bioma (l'alfa dei vertici dice al programma quanto un punto è vicino allo spigolo). Il
+rilievo sta in blocchi di 8×8 caselle ricostruiti quando la geometria cambia, e si inviano solo quelli in
+vista. Muri, prop, servizi, strutture e luci stanno alla quota della loro casella; personaggi, ombre e
+puntatore sulla superficie. L'ologramma schiarisce con la quota, la esagera e traccia una curva di livello
+a ogni cambio di altezza.
+
+### Posare le strutture
+
+Alcune strutture si portano nello zaino come **kit** (si trovano nelle cache e si comprano nelle officine). Dallo zaino, fuori dagli scontri,
+**POSA** lascia scegliere dove: l'impronta segue il mouse, verde dove ci sta e rossa dove no, la rotella la gira, R la specchia, un clic la
+posa e il tasto destro annulla. Ne puoi posare tre per spedizione e non si smontano; i colpi dei nemici rompono gli oggetti e i recinti
+(non gli edifici).
+
+### Le caverne
+
+Nella Neve, nel Far West, nell'Egitto e nell'Inferno ci sono da una a tre grotte per mappa, sotto un massiccio di roccia
+(nella Neve anche dentro la montagna a spirale, a metà salita). Dalla Fase 5 del [piano della profondità](piano-profondita.md)
+una grotta è il piano sotto la terra della stessa mappa ([cave.odin](../src/expedition/cave.odin)): ci si entra camminando
+dall'imbocco, senza schermo nero né caricamento, anche in sella o durante uno scontro. Dentro ci sono due o tre stanze in fila
+con dei nemici e in fondo una nicchia con un tesoro (crediti e una reliquia); la roccia sopra la testa del robot si dirada e la
+luce cala. I posti sono uguali a ogni run, ma solo alcune grotte sono abitate. L'imbocco è un segreto: appare sull'ologramma,
+con la lettera G, solo dopo averlo scoperto.
+
+### Ponti, gallerie, complessi e reti
+
+Dalla Fase 7 del piano della profondità ogni bioma ha i suoi piani: **complessi** a tema alti 14 gradini (piattaforme dati,
+mese e ponte del treno, alberi giganti, isola sospesa, collina del masso e altri), con rampe, ponti sopra, gallerie sotto,
+ascensori, guardie e un segreto; e, in City pop, Egitto, Vietnam, Gotico e Spazio, **reti sotterranee** sul piano più basso
+che uniscono sale e scale lontane. Un **cancello** fa da scorciatoia: si apre solo dalla parte giusta, poi resta aperto
+([complex.odin](../src/expedition/complex.odin), [network.odin](../src/expedition/network.odin)).
+
+### L'ologramma a piani
+
+Dalla Fase 8 la miniatura delle spedizioni (`Tab`) è una **pila di lastre**, una per piano: i ponti sopra, la terra, le
+grotte e le gallerie sotto, le reti in fondo (scelta dell'utente). Si apre sul piano del robot, l'unico mostrato pieno;
+le altre lastre sono solo sagome tenui, e `W`/`S` (o le frecce) cambiano il piano mostrato. La struttura si vede tutta, ma
+complessi e sale delle reti sono segnati solo dopo che il robot ci è stato, come gli imbocchi delle grotte. La miniatura si
+costruisce una volta per mappa e sta sulla scheda video finché la mappa non cambia
+([expedition_hologram.odin](../src/run/expedition_hologram.odin)).
+
+### La montagna a spirale
+
+Nelle Montagne innevate (mappe nuove) c'è una montagna tonda con un sentiero largo due caselle che la
+avvolge per tre giri ([mountain.odin](../src/level/mountain.odin)). Ogni passo sul sentiero sale di un gradino,
+fino alla cima a 94 gradini; tra un giro e l'altro c'è un dirupo, quindi non si taglia. Sul sentiero stanno una
+pattuglia a metà salita e due tratti di ghiaccio; in cima, una reliquia. Il bordo esterno è libero: chi è
+spinto fuori cade fino al terreno (al massimo dieci danni). Quando il robot è dietro la montagna, la roccia si
+apre attorno a lui in una finestra tonda con un sottile bordo luminoso; i nemici dietro la montagna restano
+nascosti.
+
+### Strutture e trasparenza degli edifici
+
+Ogni edificio è disegnato in tre parti: l'**involucro** (muri, colonnato e tetto), l'**interno**
+(il pavimento, sempre presente) e il **contorno a terra** (una linea al neon lungo l'impronta,
+con una croce sulla porta, sempre presente). Quanto è pieno l'involucro dipende da dove si trova
+il robot, ed è calcolato dalla funzione pura `game.structure_visibility`
+([structure_view.odin](../src/game/structure_view.odin)): intero da 5 caselle in su; sempre più
+trasparente avvicinandosi; sparito a una casella da una porta (e sulla porta); accanto a un muro
+senza porta mai sotto il 25%; dentro, i muri tornano interi, il tetto si nasconde e tutto ciò
+che sta fuori dall'edificio si scurisce, sempre allo stesso modo. Il valore disegnato segue quel
+valore in circa un quinto di secondo, così negli scontri (a caselle) l'edificio non lampeggia. È
+solo grafica: i muri fermano sempre passo e vista. Gli oggetti complessi non cambiano.
+
+Nel laboratorio l'involucro che non è intero va nel passaggio ordinato con gli attori, con i
+colori in trasparenza; nelle spedizioni passa dal programma di rivelazione con un retino
+ordinato per edificio (nessun ordinamento) e i suoi bordi sfumano con lui; la scurita di fuori è
+una moltiplicazione della luce condivisa. Muretti e oggetti sono blocchi cotti come i prop
+([structure_diorama.odin](../src/render/structure_diorama.odin),
+[structure_expedition.odin](../src/render/structure_expedition.odin)).
+
+### I piani nel laboratorio
+
+Nell'arena «Piani» della Prova meccaniche (Fasi 3 e 4 del [piano della profondità](piano-profondita.md)) ci
+sono un ponte sopra la strada e una grotta dentro la collina. Come si vedono lo decidono funzioni pure,
+come per gli edifici ([layer_view.odin](../src/game/layer_view.odin)); il renderer disegna solo ciò che
+dicono e non cambia nessuna regola.
+
+- **Diradamento.** Ciò che sta sopra la testa del robot, su un piano più alto del suo, si apre a poco a
+  poco entro 6 caselle: l'impalcato del ponte quando ci passa sotto, la roccia della collina quando è in
+  grotta. Accanto al robot è quasi sparito (15%), e da 6 caselle in là è intero. Le caselle diradate vanno
+  nel passaggio ordinato con gli attori, in resina trasparente
+  ([height_view.odin](../src/render/height_view.odin)).
+- **Scurimento.**
+  - In grotta, sotto la volta, tutto ciò che non sta sul piano del robot si scurisce, come fuori da un
+    edificio.
+  - Sul ponte, ciò che sta sotto il robot si scurisce un poco, per dare profondità (scelta dell'utente).
+- **Luce.**
+  - In grotta la luce del cielo cala, e resta la lanterna del robot.
+  - Con i piani la lanterna segue il pavimento del robot e illumina solo le altezze del suo piano: non
+    passa attraverso l'impalcato o la roccia.
+  - Lo fa una variante dello shader della resina, usata solo su un tabellone con i piani, con due valori
+    in più (`underground` e `lanternBand`): `resin_layer_fragment` in
+    [resin_material.odin](../src/render/resin_material.odin). Senza piani resta lo shader di prima, e le
+    catture restano identiche al byte.
+- **Nascosti.** Chi è coperto da qualcosa disegnato intero si vede attraverso con il contorno del suo
+  colore: chiaro il robot, rosso i nemici, come le loro basi. Ne è un esempio un nemico sotto l'impalcato
+  visto dal ponte, o un nemico in grotta visto da fuori. Il contorno nasce dalla trasparenza della
+  figura, come quello a fumetto, ed è disegnato sopra tutto
+  ([layer_outline.odin](../src/render/layer_outline.odin)).
+- **Mouse.** Il raggio attraversa le colonne e si ferma sul primo pezzo pieno. Salta però ciò che è
+  diradato più della metà: da sotto il ponte si puntano le caselle della strada attraverso l'impalcato.
+- **Telecamera.** Sale e scende in modo morbido quando il robot cambia piano, per esempio su una scala.
+- **Ombre.** Personaggi e ombre stanno sul pavimento del loro piano.
+
+Senza piani tutto questo non si attiva: le altre arene restano come prima.
+
+### Bersagli in evidenza
+
+Mentre si sceglie una carta, ogni nemico che una giocata valida colpirebbe
+davvero ha la casella accesa in modo molto visibile: nucleo quasi bianco che
+pulsa, contorno d'inchiostro, quattro angoli che respirano e un alone saturo.
+Un fascio di luce con una colonna di scintille sale dalla casella fino al petto
+del nemico, davanti al suo sprite. Quando il puntatore sta su una casella la cui
+giocata colpirebbe quel nemico, gli angoli si chiudono e un anello si apre una
+volta; gli altri bersagli restano nello stato «colpibile».
+
+- **Colore.** Quattro tinte sono già del raggio (blu, ambra, menta, rosso) e le
+  tinte dei biomi coprono quasi tutta la ruota, quindi nessun colore fisso si
+  legge ovunque. Il segno è quindi bianco con contorno scuro (luminosità e
+  forma), con alone **viola elettrico**, o **verde acido** nello Spazio, dove il
+  viola è la tinta del bioma. Un test tiene l'alone ad almeno 40° di tinta da
+  tutti gli altri colori, in ogni bioma e nel laboratorio.
+- **Quali nemici.** Quelli che il piano degli effetti nomina (danno, spinta,
+  stato): lo Scatto elenca i nemici sulla sua linea ma non ne colpisce nessuno,
+  e quindi non ne segna. Le carte con esito casuale (le colonne di Bomb Marley,
+  il dado del Dinosauro) e quelle che colpiscono più tardi (ordigni posati) non
+  segnano nessuno. Eccezioni calcolate a parte: l'Inondazione segna tutti i
+  nemici in gioco, il Cannone quelli sulla sua linea, il Buco Nero quelli nel
+  suo 3×3 (sotto il puntatore).
+- **Fuori vista.** Nemici fuori gioco, nella nebbia o dietro un muro (per le
+  carte con linea di vista) non sono segnati.
+- **Solo passaggio del mouse.** Con una carta sotto il mouse nella mano ma non
+  scelta, raggio e bersagli compaiono più tenui (metà intensità) e la casella
+  sotto il puntatore non viene valutata.
+- **Lazzo e Pinball.** Usano questo segno: i vecchi mirini sui bersagli validi
+  sono tolti. Restano l'anello e la freccia del Lazzo, la linea del Pinball e il
+  mirino rosso «troppo pesante».
+
+[card_hit_mark.odin](../src/render/card_hit_mark.odin) disegna il segno nel
+passaggio 3D della luce del raggio (cella, angoli, anello) e le scintille dopo
+gli sprite. Il calcolo è in `game.card_hit_enemies`, che usa lo stesso piano
+degli effetti della giocata. L'animazione usa l'orologio degli sprite, non
+quello del mondo, perché è proprio quando il mondo è fermo che si sceglie.
+
 ### Mostra effetto
 
 Ovunque si guardi una carta, **MOSTRA EFFETTO** apre sopra la run una finestra

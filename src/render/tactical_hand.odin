@@ -147,13 +147,30 @@ gothic_rarity_accent :: proc(rarity: game.Card_Rarity) -> rl.Color {
 	return GOTHIC_MUTED
 }
 
-// The time a card takes from the window: "-2s", or "0s" for one that takes
+// The time a card takes from the window at the player's pace (`pace`, the
+// room's: Room_Presentation.pace): "-1s", "-1.5s", or "0s" for one that takes
 // none (Movimento Ombra stands outside it).
 @(private)
-tactical_card_time_badge :: proc(id: game.Card_Id) -> cstring {
-	cost := game.tactical_card_time_cost(id)
+tactical_card_time_badge :: proc(id: game.Card_Id, pace: f32 = 1) -> cstring {
+	cost := game.tactical_card_time_cost(id)/max(pace, 1)
 	if cost <= 0 { return "0s" }
-	return fmt.ctprintf("-%.0fs", cost)
+	return fmt.ctprintf("-%ss", tactical_seconds_text(cost))
+}
+
+// The player's pace the board shows (1 before any room).
+@(private)
+tactical_player_pace_shown :: proc(renderer: ^Renderer) -> f32 {
+	snapshot := renderer.tactical.snapshot
+	return snapshot.pace if snapshot != nil && snapshot.pace > 0 else 1
+}
+
+// Seconds as the hand and the HUD print them: whole ones bare ("2"), the
+// player's halves with their tenth ("1.5").
+@(private)
+tactical_seconds_text :: proc(seconds: f32) -> string {
+	whole := math.round(seconds)
+	if abs(seconds-whole) < 0.001 { return fmt.tprintf("%.0f", whole) }
+	return fmt.tprintf("%.1f", seconds)
 }
 
 SCOPA_CARD_SIZE :: rl.Vector2{60, 96}
@@ -196,7 +213,7 @@ draw_scopa_tactical_card :: proc(renderer: ^Renderer, bounds: rl.Rectangle, card
 	rl.DrawRectangleRec({x+8, y+9, 20, 22}, GOTHIC_INK)
 	gothic_text(renderer, fmt.ctprintf("%d", definition.cost), x+13, y+8, 18, GOTHIC_BLUE if affordable else GOTHIC_RED)
 	rl.DrawRectangleRec({x+7, y+36, 30, 17}, {22, 41, 54, 240})
-	gothic_text_fit(renderer, tactical_card_time_badge(card.definition_id), {x+10, y+37, 25, 15}, 12, GOTHIC_BLUE)
+	gothic_text_fit(renderer, tactical_card_time_badge(card.definition_id, tactical_player_pace_shown(renderer)), {x+10, y+37, 25, 15}, 12, GOTHIC_BLUE)
 	gold := game.card_effect_amount(definition.effects[0], card.upgrade_level)
 	ribbon := rl.Rectangle{x+width*0.5-36, y+height-27, 72, 19}
 	rl.DrawRectangleRec(ribbon, {72, 54, 24, 240})
@@ -271,7 +288,7 @@ draw_tactical_card :: proc(renderer: ^Renderer, bounds: rl.Rectangle, card: game
 	// Time has a distinct blue badge, separated from the black energy socket.
 	// The crest stays clear even with the narrowest eight-card hand.
 	rl.DrawRectangleRec({x+8, y+42, 30, 17}, {22, 41, 54, 240})
-	gothic_text_fit(renderer, tactical_card_time_badge(card.definition_id), {x+11, y+43, 25, 15}, 12, GOTHIC_BLUE)
+	gothic_text_fit(renderer, tactical_card_time_badge(card.definition_id, tactical_player_pace_shown(renderer)), {x+11, y+43, 25, 15}, 12, GOTHIC_BLUE)
 	if game.card_is_board_device(card.definition_id) {
 		gothic_text_fit(renderer,"PASSIVA" if card.definition_id == .Shock_Floor else "ATTIVO",{x+8,y+63,32,12},9,accent)
 	}
@@ -375,7 +392,7 @@ tactical_card_text_misfit :: proc(renderer: ^Renderer, card: game.Card_Instance,
 	face := tactical_card_face_words(renderer, card, definition, width)
 	inspector := [?]Tactical_Card_Words{
 		{"inspector name", tactical_card_title(card, definition), 0, 195, 0, 18, true},
-		{"inspector cost", tactical_card_cost_line(card, definition), 0, 193, 0, 14, false},
+		{"inspector cost", tactical_card_cost_line(renderer, card, definition), 0, 193, 0, 14, false},
 		{"inspector first line", whole_first, 0, 192, 0, 16, false},
 		{"inspector second line", whole_second, 0, 192, 0, 14, false},
 		{"inspector reaction", reaction, 0, 192, 0, 12, false},
@@ -486,7 +503,7 @@ draw_tactical_card_inspector :: proc(renderer: ^Renderer, card: game.Card_Instan
 	gothic_frame(frame, GOTHIC_RECESS, GOTHIC_STEEL)
 	gothic_text_fit(renderer, tactical_card_title(card, definition), {x, y, 195, 25}, 18, GOTHIC_PAPER)
 	gothic_rule(x, y+29, 190, gothic_rarity_accent(definition.rarity))
-	gothic_text_fit(renderer, tactical_card_cost_line(card, definition), {x, y+35, 193, 18}, 14, GOTHIC_BLUE)
+	gothic_text_fit(renderer, tactical_card_cost_line(renderer, card, definition), {x, y+35, 193, 18}, 14, GOTHIC_BLUE)
 	gothic_text_fit(renderer, tactical_card_target_label(definition), {x, y+54, 193, 17}, 12, GOTHIC_MUTED)
 	first, second := gothic_card_lines(card)
 	gothic_text_fit(renderer, first, {x, y+76, 192, 20}, 16, GOTHIC_PAPER)
@@ -510,8 +527,8 @@ draw_tactical_card_inspector :: proc(renderer: ^Renderer, card: game.Card_Instan
 
 // The inspector's energy and time: "ENERGIA 2 / TEMPO -2s".
 @(private = "file")
-tactical_card_cost_line :: proc(card: game.Card_Instance, definition: game.Card_Definition) -> cstring {
-	return fmt.ctprintf("ENERGIA %d / TEMPO %s", definition.cost, tactical_card_time_badge(card.definition_id))
+tactical_card_cost_line :: proc(renderer: ^Renderer, card: game.Card_Instance, definition: game.Card_Definition) -> cstring {
+	return fmt.ctprintf("ENERGIA %d / TEMPO %s", definition.cost, tactical_card_time_badge(card.definition_id, tactical_player_pace_shown(renderer)))
 }
 
 // The inspector's red lines under a card's two: how it answers (a reaction)
@@ -529,6 +546,18 @@ tactical_card_inspector_rules :: proc(card: game.Card_Instance, definition: game
 	if card.definition_id == .Fishing_Rod { reaction, rule = "SOLO A STANZA LIBERATA", "MAI IN MANO / UNA PER RUN" }
 	if card.definition_id == .Pinball { reaction, rule = "BOSS E MINIBOSS: TROPPO PESANTI", fmt.ctprintf("DOPO %ds SCOPPIA E CADE", int(game.PINBALL_SECONDS)) }
 	if card.definition_id == .First_Person { reaction, rule = "NIENTE CARTE: SOLO L'AK", "WASD SECONDO LA VISTA" }
+	// The fists' keys (Fase 3, the user's choice: the punches' keys too).
+	// The sword's keys (Fase 4): the cut and the grapple; the guard and Q/E are in the HUD's line.
+	// The bow's draw and its lowering (Fase 6).
+	if card.definition_id == .First_Person_Archer { reaction, rule = "DESTRO: TENDI E TIRA", "SINISTRO: ABBASSA" }
+	if card.definition_id == .First_Person_Fencer { reaction, rule = "CLIC TENUTO + MOUSE: TAGLIA", "CTRL: RAMPINO / SHIFT: SCHIVA" }
+	if card.definition_id == .First_Person_Brawler { reaction, rule = "SX JAB / DX CROSS / SHIFT GANCI", "WASD LIBERO / SPAZIO SALTA" }
+	if card.definition_id == .Marley_Party { reaction, rule = "SOLO SULLE CASELLE LUCI", fmt.ctprintf("+%ds A UCCISIONE / MAX %ds", game.MARLEY_KILL_SECONDS, game.MARLEY_MAX_SECONDS) }
+	if card.definition_id == .Flood_Wave { reaction, rule = "UNA CASELLA PER NEMICO", "ROTELLA: GIRA LA FRECCIA" }
+	if card.definition_id == .Field_Cannon { reaction, rule = "ROTELLA: GIRA LA CANNA", "AL 2o UPGRADE: LASER" }
+	if card.definition_id == .Laser_Cannon { reaction, rule = "COLPISCE TUTTA LA LINEA", "NON SI OFFRE: EVOLUZIONE" }
+	if card.definition_id == .Devouring_Hole { reaction, rule = "TIRA IL 5X5, COLPISCE IL 3X3", "BOSS E MINIBOSS: SOLO DANNO" }
+	if card.definition_id == .Dino_Ride { reaction, rule = "1 RAPTOR 2 STEGO 3 DILO 4 GIGA", "UN DINO ALLA VOLTA" }
 	if card.definition_id == .Guard || card.definition_id == .Purifying_Guard { reaction = "QTE: BLOCK / PARRY" }
 	if card.definition_id == .Thorn_Coat { reaction = "QTE: DEVIAZIONE (FRECCE)" }
 	if card.definition_id == .Afterimage { reaction = "IGNORA RECUPERO SCHIVA" }

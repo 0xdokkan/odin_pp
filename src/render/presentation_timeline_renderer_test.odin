@@ -12,32 +12,33 @@ test_renderer_timeline_wrappers_advance_and_clear_playback :: proc(t: ^testing.T
 	game.record_event(&events, {
 		kind = .Moved,
 		target = game.PLAYER_ENTITY,
-		from_position = {1, 1},
-		to_position = {2, 1},
+		from_position = {x = 1, y = 1},
+		to_position = {x = 2, y = 1},
 	})
-	renderer: Renderer
+	renderer := new(Renderer)
+	defer free(renderer)
 
 	testing.expect(t, begin_renderer_event_timeline(
-		&renderer,
+		renderer,
 		capture_room_presentation(&room),
 		&events,
 	))
-	testing.expect(t, renderer_timeline_is_busy(&renderer))
+	testing.expect(t, renderer_timeline_is_busy(renderer))
 
 	testing.expect(t, !update_renderer_event_timeline(
-		&renderer,
+		renderer,
 		PRESENTATION_PLAYER_MOVE_DURATION*0.5,
 	))
-	testing.expect(t, renderer_timeline_is_busy(&renderer))
+	testing.expect(t, renderer_timeline_is_busy(renderer))
 	testing.expect(t, update_renderer_event_timeline(
-		&renderer,
+		renderer,
 		PRESENTATION_PLAYER_MOVE_DURATION*0.5,
 	))
-	testing.expect(t, !renderer_timeline_is_busy(&renderer))
+	testing.expect(t, !renderer_timeline_is_busy(renderer))
 
-	begin_renderer_event_timeline(&renderer, capture_room_presentation(&room), &events)
-	clear_event_animations(&renderer)
-	testing.expect(t, !renderer_timeline_is_busy(&renderer))
+	begin_renderer_event_timeline(renderer, capture_room_presentation(&room), &events)
+	clear_event_animations(renderer)
+	testing.expect(t, !renderer_timeline_is_busy(renderer))
 	testing.expect_value(t, renderer.timeline, Presentation_Timeline{})
 }
 
@@ -51,8 +52,8 @@ test_renderer_status_view_uses_snapshot_until_timeline_becomes_idle :: proc(t: ^
 	player.statuses.items[0] = {.Shield, 3, 2}
 	player.statuses.count = 1
 	enemies := [?]game.Enemy{
-		{id = 1, position = {4, 1}, max_health = 5, health = 5},
-		{id = 2, position = {5, 1}, max_health = 5, health = 5},
+		{id = 1, position = {x = 4, y = 1}, max_health = 5, health = 5},
+		{id = 2, position = {x = 5, y = 1}, max_health = 5, health = 5},
 	}
 	room := make_presentation_timeline_test_room(&player, enemies[:], nil)
 	defer game.destroy_room(&room)
@@ -74,10 +75,11 @@ test_renderer_status_view_uses_snapshot_until_timeline_becomes_idle :: proc(t: ^
 		card_id = 5,
 		card_definition = .Strike,
 	})
-	renderer: Renderer
-	testing.expect(t, begin_renderer_event_timeline(&renderer, before, &events))
+	renderer := new(Renderer)
+	defer free(renderer)
+	testing.expect(t, begin_renderer_event_timeline(renderer, before, &events))
 
-	status := renderer_status_view(&renderer, &room)
+	status := renderer_status_view(renderer, &room)
 	testing.expect_value(t, status.phase, game.Room_Phase.Combat)
 	testing.expect_value(t, status.health, i32(10))
 	testing.expect_value(t, status.max_health, i32(12))
@@ -89,8 +91,8 @@ test_renderer_status_view_uses_snapshot_until_timeline_becomes_idle :: proc(t: ^
 	testing.expect(t, snapshot_has_shield)
 	testing.expect(t, !snapshot_has_poison)
 
-	testing.expect(t, update_renderer_event_timeline(&renderer, PRESENTATION_CARD_PLAY_DURATION))
-	status = renderer_status_view(&renderer, &room)
+	testing.expect(t, update_renderer_event_timeline(renderer, PRESENTATION_CARD_PLAY_DURATION))
+	status = renderer_status_view(renderer, &room)
 	testing.expect_value(t, status.phase, game.Room_Phase.Loot)
 	testing.expect_value(t, status.health, i32(3))
 	testing.expect_value(t, status.enemy_count, 1)
@@ -104,11 +106,12 @@ test_renderer_status_view_uses_snapshot_until_timeline_becomes_idle :: proc(t: ^
 
 @(test)
 test_renderer_timeline_wrapper_handles_nil_and_empty_inputs_without_stale_state :: proc(t: ^testing.T) {
-	renderer: Renderer
+	renderer := new(Renderer)
+	defer free(renderer)
 	testing.expect(t, !renderer_timeline_is_busy(nil))
 	testing.expect(t, !begin_renderer_event_timeline(nil, {}, nil))
 	testing.expect(t, !update_renderer_event_timeline(nil, 1))
-	testing.expect(t, !begin_renderer_event_timeline(&renderer, {}, nil))
-	testing.expect(t, !renderer_timeline_is_busy(&renderer))
+	testing.expect(t, !begin_renderer_event_timeline(renderer, {}, nil))
+	testing.expect(t, !renderer_timeline_is_busy(renderer))
 	testing.expect_value(t, renderer.timeline, Presentation_Timeline{})
 }

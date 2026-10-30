@@ -18,19 +18,19 @@ test_larger_fog_exposes_blockers_but_not_cells_behind_them :: proc(t: ^testing.T
 	for size in ([?]int{3, 5, 7}) {
 		player.tactical.config.vision_size = size
 		count := 0
-		for y in 0..<9 { for x in 0..<9 { if tactical_cell_visible(&room, {x, y}) { count += 1 } } }
+		for y in 0..<9 { for x in 0..<9 { if tactical_cell_visible(&room, {x = x, y = y}) { count += 1 } } }
 		testing.expect_value(t, count, size*size)
 	}
-	append(&room.obstacles, Obstacle{position = {5, 4}})
-	testing.expect(t, tactical_cell_visible(&room, {5, 4}))
-	testing.expect(t, !tactical_cell_visible(&room, {6, 4}))
-	testing.expect(t, !tactical_cell_visible(&room, {7, 4}))
-	testing.expect(t, tactical_cell_visible(&room, {4, 7}))
-	append(&room.obstacles, Obstacle{position = {4, 5}})
-	testing.expect(t, !tactical_cell_visible(&room, {6, 6}))
+	append(&room.obstacles, Obstacle{position = {x = 5, y = 4}})
+	testing.expect(t, tactical_cell_visible(&room, {x = 5, y = 4}))
+	testing.expect(t, !tactical_cell_visible(&room, {x = 6, y = 4}))
+	testing.expect(t, !tactical_cell_visible(&room, {x = 7, y = 4}))
+	testing.expect(t, tactical_cell_visible(&room, {x = 4, y = 7}))
+	append(&room.obstacles, Obstacle{position = {x = 4, y = 5}})
+	testing.expect(t, !tactical_cell_visible(&room, {x = 6, y = 6}))
 	clear(&room.obstacles)
-	player.position = {1, 1}
-	testing.expect(t, !tactical_cell_visible(&room, {6, 6}))
+	player.position = {x = 1, y = 1}
+	testing.expect(t, !tactical_cell_visible(&room, {x = 6, y = 6}))
 }
 
 tactical_test_room :: proc(t: ^testing.T, data: ^level.Level, player: ^Player, adjacent: bool = false) -> Room {
@@ -41,7 +41,7 @@ tactical_test_room :: proc(t: ^testing.T, data: ^level.Level, player: ^Player, a
 	config := DEFAULT_TACTICAL_CONFIG
 	config.timer_seconds = 2
 	testing.expect(t, configure_tactical(player, config))
-	spawns := [?]Enemy_Spawn{{position = ({2, 1} if adjacent else {5, 3}), health = 1000, attack = 3}}
+	spawns := [?]Enemy_Spawn{{position = ({x = 2, y = 1} if adjacent else {x = 5, y = 3}), health = 1000, attack = 3}}
 	room, ok := create_room(data, player, {enemies = spawns[:]})
 	testing.expect(t, ok)
 	// Defense fixtures begin one second before an already committed attack.
@@ -149,15 +149,15 @@ test_tactical_diagonal_success_and_failure_each_consume_one_pulse :: proc(t: ^te
 	room := tactical_test_room(t, &data, &player)
 	defer level.destroy(&data)
 	defer destroy_room(&room)
-	testing.expect(t, begin_diagonal_qte(&room, {1, 1}))
+	testing.expect(t, begin_diagonal_qte(&room, {x = 1, y = 1}))
 	testing.expect(t, qte_key(&room, .East))
 	testing.expect(t, qte_key(&room, .South))
-	testing.expect_value(t, player.position, grid.Position{2, 2})
+	testing.expect_value(t, player.position, grid.Position{x = 2, y = 2})
 	drain_tactical_test_pulse(t, &room)
 	testing.expect_value(t, room.pulse_count, u64(1))
-	testing.expect(t, begin_diagonal_qte(&room, {-1, -1}))
+	testing.expect(t, begin_diagonal_qte(&room, {x = -1, y = -1}))
 	testing.expect(t, qte_key(&room, .East))
-	testing.expect_value(t, player.position, grid.Position{2, 2})
+	testing.expect_value(t, player.position, grid.Position{x = 2, y = 2})
 	drain_tactical_test_pulse(t, &room)
 	testing.expect_value(t, room.pulse_count, u64(2))
 	testing.expect_value(t, player.tactical.metrics.qte_failures, u64(1))
@@ -196,12 +196,12 @@ test_tactical_visibility_does_not_remember_cells_and_rejects_hidden_targets :: p
 	defer level.destroy(&data)
 	defer destroy_room(&room)
 	player.tactical.config.vision_size = 5
-	testing.expect(t, tactical_cell_visible(&room, {1, 1}))
-	testing.expect(t, !tactical_cell_visible(&room, {5, 3}))
-	player.position = {4, 2}
-	testing.expect(t, !tactical_cell_visible(&room, {1, 1}))
-	testing.expect(t, tactical_cell_visible(&room, {5, 3}))
-	player.position = {1, 1}
+	testing.expect(t, tactical_cell_visible(&room, {x = 1, y = 1}))
+	testing.expect(t, !tactical_cell_visible(&room, {x = 5, y = 3}))
+	player.position = {x = 4, y = 2}
+	testing.expect(t, !tactical_cell_visible(&room, {x = 1, y = 1}))
+	testing.expect(t, tactical_cell_visible(&room, {x = 5, y = 3}))
+	player.position = {x = 1, y = 1}
 	play := play_card(&room, player.deck.hand[0].id, entity_target(enemy_entity(room.enemies[0].id)))
 	testing.expect_value(t, play.result, Card_Play_Result.Action_Rejected)
 	testing.expect_value(t, room.pulse_count, u64(0))
@@ -290,7 +290,7 @@ test_tactical_dodge_revalidates_landing_and_can_invalidate_an_attack :: proc(t: 
 	testing.expect(t, continue_tactical_pulse(&room))
 	testing.expect(t, select_defense(&room, .Dodge))
 	testing.expect(t, qte_key(&room, .South))
-	testing.expect_value(t, player.position, grid.Position{1, 2})
+	testing.expect_value(t, player.position, grid.Position{x = 1, y = 2})
 	drain_tactical_test_pulse(t, &room)
 	testing.expect_value(t, player.health, i32(1000))
 	testing.expect_value(t, room.pulse_count, u64(1))
@@ -303,21 +303,21 @@ test_tactical_two_by_two_and_opaque_corners :: proc(t: ^testing.T) {
 	room := tactical_test_room(t, &data, &player)
 	defer level.destroy(&data)
 	defer destroy_room(&room)
-	player.position = {3, 2}
+	player.position = {x = 3, y = 2}
 	player.tactical.config.vision_size = 2
 	player.tactical.facing = .North
 	count := 0
 	for y in 0..<data.tiles.height {
 		for x in 0..<data.tiles.width {
-			if tactical_cell_visible(&room, {x, y}) { count += 1 }
+			if tactical_cell_visible(&room, {x = x, y = y}) { count += 1 }
 		}
 	}
 	testing.expect_value(t, count, 4)
 	player.tactical.config.vision_size = 3
-	append(&room.obstacles, Obstacle{position = {4, 2}})
-	append(&room.obstacles, Obstacle{position = {3, 3}})
-	testing.expect(t, !tactical_cell_visible(&room, {4, 3}))
-	testing.expect(t, !begin_diagonal_qte(&room, {1, 1}))
+	append(&room.obstacles, Obstacle{position = {x = 4, y = 2}})
+	append(&room.obstacles, Obstacle{position = {x = 3, y = 3}})
+	testing.expect(t, !tactical_cell_visible(&room, {x = 4, y = 3}))
+	testing.expect(t, !begin_diagonal_qte(&room, {x = 1, y = 1}))
 	testing.expect_value(t, room.pulse_count, u64(0))
 }
 
@@ -336,7 +336,7 @@ test_tactical_room_change_resets_pressure_but_preserves_run_metrics :: proc(t: ^
 	sync_deck_with_room_phase(&room)
 	tactical_end_combat(&room)
 	destroy_room(&room)
-	spawns := [?]Enemy_Spawn{{position = {5, 3}, health = 5, attack = 1}}
+	spawns := [?]Enemy_Spawn{{position = {x = 5, y = 3}, health = 5, attack = 1}}
 	ok: bool
 	room, ok = create_room(&data, &player, {enemies = spawns[:]})
 	testing.expect(t, ok)

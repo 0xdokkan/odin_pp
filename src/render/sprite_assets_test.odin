@@ -86,14 +86,15 @@ test_sprite_manifest_sheet_and_gif_configuration_enforce_frame_boundaries :: pro
 @(test)
 test_sprite_sheet_clock_and_alpha_picking_follow_the_visible_frame :: proc(t: ^testing.T) {
 	alpha := [?]u8{0,255,255,0, 0,255,255,0}
-	renderer: Renderer
+	renderer := new(Renderer)
+	defer free(renderer)
 	renderer.tactical.camera = {position = {9, 8, 9}, target = {2, 0, 2}, up = {0, 1, 0}, fovy = 7}
 	assets := &renderer.sprite_assets
 	assets.texture_count = 1
 	assets.textures[0] = {texture = {width = 4, height = 2}, alpha = alpha[:]}
 	asset := &assets.sprites[int(Sprite_Key.Chaser)]
 	asset^ = {configured = true, columns = 2, frames = 2, frame_width = 2, frame_height = 2, width = 20, height = 20, anchor = {0.5, 1}, fps = 2}
-	quad := tactical_billboard_geometry(&renderer, .Chaser, {2, 2})
+	quad := tactical_billboard_geometry(renderer, .Chaser, {2, 2})
 	// Two points in the quad, one in each atlas column. The opaque column
 	// swaps when its second frame is shown; picking follows that same frame.
 	front := rl.Vector3Normalize(rl.Vector3{1, 0, 1})
@@ -101,7 +102,7 @@ test_sprite_sheet_clock_and_alpha_picking_follow_the_visible_frame :: proc(t: ^t
 		for column in 0..<2 {
 			u := f32(column)*0.5+0.25
 			point := quad.points[0]+(quad.points[3]-quad.points[0])*u+(quad.points[1]-quad.points[0])*0.5
-			_, hit := tactical_billboard_hit(&renderer, .Chaser, {2, 2}, {point+front*10, -front})
+			_, hit := tactical_billboard_hit(renderer, .Chaser, {2, 2}, {point+front*10, -front})
 			testing.expect_value(t, hit, column != frame)
 		}
 		advance_sprite_assets(assets, 0.5)

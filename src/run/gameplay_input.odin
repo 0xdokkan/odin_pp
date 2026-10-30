@@ -29,6 +29,13 @@ Gameplay_Command_Kind :: enum {
 	// world command, as a beat: never blocked by the player's own action;
 	// game/first_person.odin).
 	First_Person_Fire,
+	// FIRST PERSON BRAWLER: the frame's `seconds` of the fists' body and punches
+	// along `fists` (a world command too; game/first_person_fists.odin).
+	First_Person_Fists,
+	First_Person_Sword,
+	// FIRST PERSON ARCHER: the frame's draw and arrows along `bow` (a world
+	// command too; game/first_person_bow.odin).
+	First_Person_Bow,
 }
 
 Gameplay_Command :: struct {
@@ -46,15 +53,29 @@ Gameplay_Command :: struct {
 	diagonal: grid.Position,
 	// The view a First_Person_Fire shot is fired along.
 	aim: game.First_Person_Aim,
+	// What a First_Person_Fists frame asks of the body, and its seconds.
+	fists: game.First_Person_Fists_Input,
+	// What a First_Person_Sword frame asks of the blade.
+	sword: game.First_Person_Sword_Input,
+	// What a First_Person_Bow frame asks of the bow.
+	bow: game.First_Person_Bow_Input,
+	seconds: f32,
+	// The way the wheel gave a cannon (CANNONE) before it was played.
+	aim_way: game.Move_Direction,
+	has_aim_way: bool,
 }
 
 // Both the native hand and MOSTRA EFFETTO construct the same commands. Their
 // callers own pointer bounds, hand lookup and selection/drag state; only the
 // game decides whether an anchor provides a target.
-targeted_card_command :: proc(room: ^game.Room, card: game.Card_Instance, anchor: grid.Position) -> (Gameplay_Command, bool) {
+targeted_card_command :: proc(room: ^game.Room, card: game.Card_Instance, anchor: grid.Position, way := game.Move_Direction.North,
+                              forced := false) -> (Gameplay_Command, bool) {
 	target, valid := game.card_drop_target(room, card, anchor)
 	if !valid { return {}, false }
-	return {kind = .Play_Card, origin_phase = .Combat, card_id = card.id, target = target}, true
+	// A cannon turned with the wheel keeps its way; without it the game takes the
+	// way from the player to the cell.
+	aimed := forced && game.card_emplacement_kind(card.definition_id) == .Field_Cannon
+	return {kind = .Play_Card, origin_phase = .Combat, card_id = card.id, target = target, aim_way = way if aimed else .North, has_aim_way = aimed}, true
 }
 
 immediate_card_command :: proc(card: game.Card_Instance) -> (Gameplay_Command, bool) {
@@ -92,7 +113,7 @@ gameplay_command_is_valid :: proc(command: Gameplay_Command) -> bool {
 	// The rod fishes a room cleared, and nothing else.
 	case .Fish:
 		return command.origin_phase == .Loot && command.target.kind == .Cell
-	case .First_Person_Fire:
+	case .First_Person_Fire, .First_Person_Fists, .First_Person_Sword, .First_Person_Bow:
 		return command.origin_phase == .Combat
 	}
 	unreachable()

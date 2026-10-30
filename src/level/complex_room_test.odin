@@ -20,7 +20,7 @@ complex_test_visit_floor :: proc(data: ^Level, index, parent: int, discovery, lo
 	position, _ := grid.position_of(&data.tiles, index)
 	children, separating_child := 0, false
 	for direction in CARDINAL_OFFSETS {
-		next := grid.Position{position.x+direction.x, position.y+direction.y}
+		next := grid.offset(position, direction.x, direction.y)
 		next_index, found := grid.index_of(&data.tiles, next)
 		if !found || !is_walkable(data.tiles.cells[next_index].kind) { continue }
 		if discovery[next_index] == 0 {
@@ -62,7 +62,7 @@ test_complex_arenas_preserve_connected_wide_routes_and_clear_central_anchors :: 
 					testing.expect(t, spawn_center_distance_squared(config, data.player_spawn) <= 16)
 					for y in 1..<config.height-1 {
 						for x in 1..<config.width-1 {
-							position := grid.Position{x, y}
+							position := grid.Position{x = x, y = y}
 							if !complex_room_crossing_is_reserved(config.width, config.height, position) { continue }
 							tile, _ := tile_at(&data, position)
 							testing.expect(t, is_walkable(tile.kind))
@@ -87,7 +87,7 @@ test_complex_court_gates_preserve_approaches_for_generated_objects :: proc(t: ^t
 			x := complex_court_partition_x(config.width, tier, partition)
 			walls, gate_width := 0, 0
 			for y in 1..<config.height-1 {
-				tile, _ := tile_at(&data, {x, y})
+				tile, _ := tile_at(&data, {x = x, y = y})
 				if !is_walkable(tile.kind) {
 					walls += 1
 					testing.expect(t, gate_width == 0 || gate_width >= 2)
@@ -95,7 +95,7 @@ test_complex_court_gates_preserve_approaches_for_generated_objects :: proc(t: ^t
 					continue
 				}
 				gate_width += 1
-				for dx in -1..=1 { testing.expect(t, room_family_cell_is_reserved(&data, .Twin_Courts, {x+dx, y})) }
+				for dx in -1..=1 { testing.expect(t, room_family_cell_is_reserved(&data, .Twin_Courts, {x = x+dx, y = y})) }
 			}
 			testing.expect(t, gate_width >= 2)
 			testing.expect(t, walls >= 2, "a reserved route erased a court partition")

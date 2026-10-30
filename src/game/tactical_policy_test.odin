@@ -7,13 +7,13 @@ import level "../level"
 test_takeovers_preserve_pinball_and_room_objects_across_freeze_and_cleanup :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {7, 6}, health = 30, attack = 1}, {position = {9, 6}, health = 30, attack = 1}}
+	spawns := [?]Enemy_Spawn{{position = {x = 7, y = 6}, health = 30, attack = 1}, {position = {x = 9, y = 6}, health = 30, attack = 1}}
 	room := lasso_test_room(t, &data, &player, spawns[:])
 	defer level.destroy(&data)
 	defer destroy_room(&room)
 	report: Action_Report
 	testing.expect(t, begin_pinball(&room, enemy_entity(room.enemies[0].id), 2, &report))
-	testing.expect(t, deploy_board_device(&room, .Tesla_Coil, {4, 4}, 8, 0, room.recent_events))
+	testing.expect(t, deploy_board_device(&room, .Tesla_Coil, {x = 4, y = 4}, 8, 0, room.recent_events))
 	device := room.objects[0]
 	fishing := room.fishing
 	ball := room.pinball

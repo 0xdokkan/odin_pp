@@ -1,6 +1,7 @@
 package game
 
 import grid "../engine/grid"
+import level "../level"
 
 // One simultaneous area discharge can hit every enemy plus the player.
 // Multi-template area cards still validate their expansion against this bound.
@@ -108,6 +109,20 @@ Effect_Kind :: enum {
 	// FIRST PERSON SHOOTER: `amount` world seconds behind the player's eyes,
 	// his AK in hand (first_person.odin).
 	First_Person,
+	// BOMB MARLEY: the party begins, its bombs hurting for `amount` and lasting
+	// `duration` world seconds (marley.odin).
+	Marley,
+	// INONDAZIONE: a wave sweeps the board the way of the player's aim at
+	// `destination`, pushing every foe `amount` cells (flood.odin).
+	Flood_Wave,
+	// CANNONE: a cannon set down on `destination`, firing for `amount`, `duration`
+	// beats, its way `charges` (card_definition says the Laser) (cannon.odin).
+	Place_Cannon,
+	// BUCO NERO: a hole on `destination`, `amount` damage a beat, `duration` beats,
+	// damage radius `charges` (black_hole.odin).
+	Open_Black_Hole,
+	// DINOSAURO: a ride of `amount` seconds on the dinosaur `charges`-1 (dinosaur.odin).
+	Ride,
 }
 
 Effect :: struct {
@@ -327,7 +342,7 @@ target_is_valid :: proc(room: ^Room, target: Target) -> bool {
 	case .Entity:
 		return entity_exists(room, target.entity)
 	case .Cell:
-		return room.level_data != nil && grid.contains(&room.level_data.tiles, target.cell)
+		return room.level_data != nil && level.layer_contains(room.level_data, target.cell)
 	}
 	return false
 }
@@ -406,7 +421,8 @@ target_matches_rule :: proc(room: ^Room, source: Entity_Ref, target: Target, rul
 		source_position, source_found := entity_position(room, source)
 		target_position, target_found := entity_position(room, target.entity)
 		return source_found && target_found &&
-		       abs(source_position.x-target_position.x)+abs(source_position.y-target_position.y) == 1
+		       abs(source_position.x-target_position.x)+abs(source_position.y-target_position.y) == 1 &&
+		       melee_layers_meet(room, source_position, target_position)
 	case .Cell:
 		return target.kind == .Cell
 	case .Walkable_Cell:
@@ -504,7 +520,20 @@ effect_is_valid :: proc(room: ^Room, effect: Effect) -> bool {
 		return effect.target == PLAYER_ENTITY && effect.amount > 0 && room.phase == .Combat &&
 		       can_create_temporary_card(&room.player.deck, effect.card_definition)
 	case .First_Person:
-		return effect.target == PLAYER_ENTITY && effect.amount > 0 && tactical_can_begin_first_person(room)
+		weapon, known := first_person_effect_weapon(effect.charges)
+		return effect.target == PLAYER_ENTITY && effect.amount > 0 && known && tactical_can_begin_first_person(room, weapon)
+	case .Marley:
+		return effect.target == PLAYER_ENTITY && effect.amount > 0 && effect.duration > 0 && marley_can_begin(room)
+	case .Flood_Wave:
+		return effect.target == PLAYER_ENTITY && effect.amount > 0 && flood_can_begin(room, effect.destination)
+	case .Place_Cannon:
+		return effect.target == PLAYER_ENTITY && effect.amount > 0 && effect.duration > 0 && effect.charges >= 0 && effect.charges < 4 &&
+		       emplacement_can_place(room, .Field_Cannon, effect.destination)
+	case .Open_Black_Hole:
+		return effect.target == PLAYER_ENTITY && effect.amount > 0 && effect.duration > 0 && effect.charges > 0 &&
+		       emplacement_can_place(room, .Devouring_Hole, effect.destination)
+	case .Ride:
+		return effect.target == PLAYER_ENTITY && effect.amount > 0 && effect.charges >= 1 && effect.charges <= 4 && ride_can_begin(room)
 	}
 	return false
 }
@@ -578,6 +607,13 @@ apply_damage_effect :: proc(
 	// a player sunk in his shadow (no shield spent, no Damaged, no reactions).
 	if effect.target.kind == .Player && tactical_player_intangible(room) { return }
 	damage := effect.amount
+	// SANGUINAMENTO: a bleeding foe takes its stacks more from any damage, once.
+	if effect.target.kind == .Enemy && damage > 0 {
+		if bleed, bleeding := status_for_entity(room, effect.target, .Bleed); bleeding && bleed.potency > 0 {
+			record_report_event(report, {kind = .Bleed_Bite, source = source, target = effect.target, amount = bleed.potency})
+			damage += bleed.potency
+		}
+	}
 	// A status's bite (Veleno, Bruciatura) is its stacks: no defense takes
 	// from it, only a Shield.
 	if effect.target.kind == .Player && !effect.has_status_cause {
@@ -658,6 +694,8 @@ apply_damage_effect :: proc(
 			defeated = true
 		}
 	}
+	// The Dilophosaurus's venom goes on whoever the player hurt or who hurt him.
+	ride_after_damage(room, source, effect, actual_damage, report)
 	if defeated {
 		record_report_event(report, {
 			kind = .Entity_Defeated,
@@ -842,13 +880,30 @@ apply_effect :: proc(room: ^Room, source: Entity_Ref, effect: Effect, report: ^A
 				.Card_Created, source, PLAYER_ENTITY, card, .Count, .Hand,
 			))
 		}
+	case .Marley:
+		begun := begin_marley(room, effect.amount, effect.duration, report)
+		assert(begun)
+	case .Flood_Wave:
+		swept := begin_flood(room, effect.destination, effect.amount, report)
+		assert(swept)
+	case .Place_Cannon:
+		placed := place_emplacement(room, .Field_Cannon, effect.destination, effect.amount, effect.duration, 0, Move_Direction(effect.charges),
+			effect.card_definition == .Laser_Cannon, report)
+		assert(placed)
+	case .Open_Black_Hole:
+		opened := place_emplacement(room, .Devouring_Hole, effect.destination, effect.amount, effect.duration, effect.charges, .North, false, report)
+		assert(opened)
+	case .Ride:
+		mounted := begin_ride(room, Dino_Kind(effect.charges-1), effect.amount, report)
+		assert(mounted)
 	case .First_Person:
-		began := tactical_begin_first_person(room, f32(effect.amount))
+		weapon, _ := first_person_effect_weapon(effect.charges)
+		began := tactical_begin_first_person(room, f32(effect.amount), weapon)
 		assert(began)
 		at := room.player.position
 		record_report_event(report, {
 			kind = .First_Person_Begun, source = source, target = PLAYER_ENTITY,
-			from_position = at, to_position = at, duration = effect.amount, card_definition = .First_Person,
+			from_position = at, to_position = at, duration = effect.amount, card_definition = FIRST_PERSON_WEAPONS[weapon].card,
 		})
 	}
 	report.applied_effects += 1

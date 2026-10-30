@@ -170,6 +170,8 @@ test_shop_owned_deck_pages_cover_partial_and_maximum_decks :: proc(t: ^testing.T
 test_shop_controls_are_disjoint_and_have_stable_hit_targets :: proc(t: ^testing.T) {
 	run := create_shop_render_test_run(t)
 	defer game.destroy_run(&run)
+	// Ten cards, two pages: the starter deck alone is one page of eight (docs/registro-carte.md).
+	for _ in 0..<2 { _, added := game.add_owned_card(&run.player.deck, .Strike); testing.expect(t, added) }
 	controls := [?]rl.Rectangle{
 		shop_previous_page_bounds(960, 540),
 		shop_next_page_bounds(960, 540),

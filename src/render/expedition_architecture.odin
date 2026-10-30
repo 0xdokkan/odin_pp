@@ -13,7 +13,10 @@ import level "../level"
 // material light each fold. Neon edges are batched analytic ribbons instead
 // of driver-dependent GL lines and retain their shape over a revealed actor.
 Ink_Mode :: enum u8 { Fill, Edge, Collect, Bake }
-Ink_Pass :: struct { mode:Ink_Mode, edges:^Expedition_Edges, builder:^Expedition_Geometry_Builder }
+// `lift` raises everything the pass draws (the height of the ground it stands on).
+// `faded`: how far the pass's edges have faded away (0 drawn whole, 1 gone), a building's as it dithers away
+// (structure_expedition.odin).
+Ink_Pass :: struct { mode:Ink_Mode, edges:^Expedition_Edges, builder:^Expedition_Geometry_Builder, lift:f32, faded:f32 }
 
 EXPEDITION_INK :: rl.Color{22,26,38,255}
 EXPEDITION_INK_TOP :: rl.Color{18,21,31,255}
@@ -39,13 +42,13 @@ ink_face_normal :: proc(a,b,c:rl.Vector3)->rl.Vector3 {return rl.Vector3Normaliz
 
 @(private="file")
 ink_triangle :: proc(pass:Ink_Pass,a,b,c:rl.Vector3,color:rl.Color) {
-	n:=ink_face_normal(a,b,c)
+	n:=ink_face_normal(a,b,c);up:=rl.Vector3{0,pass.lift,0}
 	if pass.mode==.Bake {
-		for p in ([3]rl.Vector3{a,b,c}) {append(&pass.builder.vertices,Expedition_Baked_Vertex{p,n,color})}
+		for p in ([3]rl.Vector3{a,b,c}) {append(&pass.builder.vertices,Expedition_Baked_Vertex{p+up,n,color})}
 		return
 	}
 	rlgl.Normal3f(n.x,n.y,n.z)
-	ink_vertex(a);ink_vertex(b);ink_vertex(c)
+	ink_vertex(a+up);ink_vertex(b+up);ink_vertex(c+up)
 }
 
 // A convex solid between a bottom ring and a top ring (an apex when `apex`).
@@ -104,11 +107,12 @@ ink_box :: proc(pass:Ink_Pass,base:rl.Vector3,half:rl.Vector2,height,yaw:f32,fil
 }
 
 @(private)
-ink_line :: proc(pass:Ink_Pass,a,b:rl.Vector3,color:rl.Color) {
+ink_line :: proc(pass:Ink_Pass,from,to:rl.Vector3,color:rl.Color) {
 	if pass.mode==.Fill || color.a==0 {return}
+	a,b:=from+rl.Vector3{0,pass.lift,0},to+rl.Vector3{0,pass.lift,0}
 	if pass.mode==.Bake {append(&pass.builder.lines,Expedition_Baked_Line{a,b,color});return}
 	if pass.mode==.Collect {expedition_collect_edge(pass.edges,a,b,color);return}
-	draw_expedition_ribbon(pass.edges,a,b,color)
+	draw_expedition_ribbon(pass.edges,a,b,color,pass.faded)
 }
 
 @(private)
@@ -186,7 +190,7 @@ draw_expedition_site_wall :: proc(pass:Ink_Pass,room:^game.Room,w:^world.World,s
 		if pass.mode==.Fill {return}
 	}
 	edge:=ink_edge(c)
-	sides:=[4]grid.Position{{1,0},{0,1},{-1,0},{0,-1}}
+	sides:=[4]grid.Position{{x = 1, y = 0},{x = 0, y = 1},{x = -1, y = 0},{x = 0, y = -1}}
 	joined:[4]bool
 	for d,i in sides {joined[i]=expedition_wall_joined(room,site,game.add_position(cell,d),height)}
 	for d,i in sides {
@@ -196,7 +200,7 @@ draw_expedition_site_wall :: proc(pass:Ink_Pass,room:^game.Room,w:^world.World,s
 		ink_line(pass,p+o-t+{0,height,0},p+o+t+{0,height,0},edge)
 		ink_line(pass,p+o-t,p+o+t,ink_edge(c,.55))
 	}
-	for corner in ([4]grid.Position{{1,1},{-1,1},{-1,-1},{1,-1}}) {
+	for corner in ([4]grid.Position{{x = 1, y = 1},{x = -1, y = 1},{x = -1, y = -1},{x = 1, y = -1}}) {
 		x:=joined[0] if corner.x>0 else joined[2]
 		z:=joined[1] if corner.y>0 else joined[3]
 		d:=expedition_wall_joined(room,site,game.add_position(cell,corner),height)
@@ -204,9 +208,9 @@ draw_expedition_site_wall :: proc(pass:Ink_Pass,room:^game.Room,w:^world.World,s
 		// corners and inner folds keep it.
 		if (x!=z && !d) || (x && z && d) {continue}
 		// A fold is shared by up to three cells: the first in row order draws it.
-		vertex:=grid.Position{cell.x+(1 if corner.x>0 else 0),cell.y+(1 if corner.y>0 else 0)}
+		vertex:=grid.offset(cell, (1 if corner.x>0 else 0), (1 if corner.y>0 else 0))
 		owner:=cell
-		for o in ([4]grid.Position{{-1,-1},{0,-1},{-1,0},{0,0}}) {
+		for o in ([4]grid.Position{{x = -1, y = -1},{x = 0, y = -1},{x = -1, y = 0},{x = 0, y = 0}}) {
 			q:=game.add_position(vertex,o)
 			if q==cell || expedition_wall_joined(room,site,q,height) {owner=q;break}
 		}
@@ -220,7 +224,7 @@ draw_expedition_site_wall :: proc(pass:Ink_Pass,room:^game.Room,w:^world.World,s
 // program; every other solid, and every edge, through the plain ink one.
 Ink_Layer :: enum u8 { Solid, Revealed, Edges }
 
-@(private="file")
+@(private)
 ink_layer_skips :: proc(layer:Ink_Layer,m:^Expedition_Material,center:rl.Vector2,half_width:f32=.5)->bool {
 	if m!=nil && m.reflection_pass {return layer==.Revealed}
 	return layer!=.Edges && expedition_occludes(m,center,half_width)!=(layer==.Revealed)
@@ -242,11 +246,13 @@ collect_expedition_edges :: proc(renderer:^Renderer,room:^game.Room,w:^world.Wor
 	// draw_tactical_world gathers the wider floor/site cache before this pass.
 	for y in max(0,p.y-26)..<min(room.level_data.tiles.height,p.y+27) {
 		for x in max(0,p.x-26)..<min(room.level_data.tiles.width,p.x+27) {
-			cell:=grid.Position{x,y};tile,_:=level.tile_at(room.level_data,cell);if tile.kind!=.Wall {continue}
+			cell:=grid.Position{x = x, y = y};tile,_:=level.tile_at(room.level_data,cell);if tile.kind!=.Wall && tile.kind!=.Fence {continue}
+			ground:=pass;ground.lift=cell_ground(cell)
+			if draw_expedition_structure_solid(ground,room,w,cell,tile.kind) {continue}
 			site_index,design:=expedition_site_near(renderer,w,cell)
 			if design.fixture && site_index>=0 && w.sites[site_index].active {continue}
-			if design.inside {draw_expedition_site_wall(pass,room,w,&w.sites[site_index],cell,design)}
-			else {draw_expedition_outdoor_prop(pass,w,cell)}
+			if design.inside {draw_expedition_site_wall(ground,room,w,&w.sites[site_index],cell,design)}
+			else {draw_expedition_outdoor_prop(ground,w,cell)}
 		}
 	}
 	draw_expedition_site_architecture(.Edges,renderer,room,w,true)
@@ -265,26 +271,31 @@ draw_expedition_architecture :: proc(renderer:^Renderer,room:^game.Room,w:^world
 		pass:=Ink_Pass{mode=.Edge if layer==.Edges else .Fill,edges=&m.edges if m!=nil else nil}
 		for y in max(0,p.y-26)..<min(room.level_data.tiles.height,p.y+27) {
 			for x in max(0,p.x-26)..<min(room.level_data.tiles.width,p.x+27) {
-				cell:=grid.Position{x,y};tile,_:=level.tile_at(room.level_data,cell)
-				if tile.kind!=.Wall || ((m==nil || !m.reflection_pass) && !tactical_cell_on_screen(renderer,cell)) {continue}
+				cell:=grid.Position{x = x, y = y};tile,_:=level.tile_at(room.level_data,cell)
+				if (tile.kind!=.Wall && tile.kind!=.Fence) || ((m==nil || !m.reflection_pass) && !tactical_cell_on_screen(renderer,cell)) {continue}
 				if ink_layer_skips(layer,m,{f32(x)+.5,f32(y)+.5}) {continue}
+				ground:=pass;ground.lift=cell_ground(cell)
+				if draw_expedition_structure_solid(ground,room,w,cell,tile.kind) {continue}
 				site_index,design:=expedition_site_near(renderer,w,cell)
 				// Active fixtures own a bespoke prop below; dormant ruins remain visible cover.
 				if design.fixture && site_index>=0 && w.sites[site_index].active {continue}
-				if design.inside {draw_expedition_site_wall(pass,room,w,&w.sites[site_index],cell,design)}
-				else {draw_expedition_outdoor_prop(pass,w,cell)}
+				if design.inside {draw_expedition_site_wall(ground,room,w,&w.sites[site_index],cell,design)}
+				else {draw_expedition_outdoor_prop(ground,w,cell)}
 			}
 		}
 		draw_expedition_site_architecture(layer,renderer,room,w)
 		if layer==.Edges {end_expedition_edges(renderer)}
 		else {rlgl.DrawRenderBatchActive();rl.EndShaderMode()}
 	}
+	draw_expedition_structure_envelopes(renderer,room,w)
 }
 
 // One immutable site mesh contains its gates and authored fixture. The same
 // dispatch serves the immediate fallback and the CPU-only bake pass.
 @(private)
-draw_expedition_site_static :: proc(pass:Ink_Pass,w:^world.World,site:^world.Site,layer:Ink_Layer=.Edges,m:^Expedition_Material=nil) {
+draw_expedition_site_static :: proc(pass_in:Ink_Pass,w:^world.World,site:^world.Site,layer:Ink_Layer=.Edges,m:^Expedition_Material=nil) {
+	pass:=pass_in;pass.lift=cell_ground(site.position)
+	if site.kind==.Cave {draw_expedition_cave_arch(pass,w,site,layer,m);return}
 	decor:=world.site_decor_anchors(site)
 	for i:=0;i+1<decor.count;i+=2 {
 		a,b:=decor.items[i],decor.items[i+1]
@@ -306,7 +317,8 @@ draw_expedition_site_static :: proc(pass:Ink_Pass,w:^world.World,site:^world.Sit
 // Animation is never stored in a mesh. The exit continues to move even when
 // every architectural solid is reused unchanged by both camera passes.
 @(private)
-draw_expedition_site_dynamic :: proc(pass:Ink_Pass,w:^world.World,site:^world.Site) {
+draw_expedition_site_dynamic :: proc(pass_in:Ink_Pass,w:^world.World,site:^world.Site) {
+	pass:=pass_in;pass.lift=cell_ground(site.position)
 	if pass.mode==.Fill || site.kind!=.Boss || !w.boss_defeated {return}
 	p:=rl.Vector3{f32(site.position.x)+.5,0,f32(site.position.y)+.5}
 	phase:=w.clock*24*math.PI/180;cs,sn:=math.cos(phase),math.sin(phase)
@@ -323,7 +335,7 @@ draw_expedition_site_architecture :: proc(layer:Ink_Layer,renderer:^Renderer,roo
 	m:=renderer.tactical.expedition_material
 	pass:=Ink_Pass{mode=.Edge if layer==.Edges else .Fill,edges=&m.edges if m!=nil else nil}
 	if collect {pass.mode=.Collect}
-	for &site in w.sites[:w.site_count] {
+	for &site in w.sites[:world.visible_sites(w)] {
 		if !site.active || world.distance(site.position,room.player.position)>30 {continue}
 		if !dynamic_only {draw_expedition_site_static(pass,w,&site,layer,m)}
 		draw_expedition_site_dynamic(pass,w,&site)

@@ -88,12 +88,16 @@ shader, mesh, palette, risolutori e pianificazione interna non sono API esterne.
 `engine/app`, `engine/view` e `engine/grid` non dipendono dai package del gioco:
 l'engine può essere controllato autonomamente. I vettori continui sono array
 nativi `[2]f32` e `[3]f32`, compatibili con Raylib e `core:math/linalg`.
-`grid.Position` resta una coordinata intera. Le soglie di normalizzazione della
-fisica e degli effetti, e l'ordine delle operazioni floating point, restano
-intenzionalmente quelli precedenti.
+`grid.Position` resta una coordinata intera, con il piano della mappa (`layer`: 0 la
+terra, −1 e −2 sotto, +1 sopra; [piano della profondità](piano-profondita.md), Fase 2).
+Una `Grid` ha un solo piano, la terra: `contains`, `index_of`, `get` e `set` rifiutano le
+posizioni di altri piani, e così `grid.cell_index` per le tabelle parallele; la vicina di
+una posizione si calcola con `grid.offset`, che ne conserva il piano. Le soglie di
+normalizzazione della fisica e degli effetti, e l'ordine delle operazioni floating
+point, restano intenzionalmente quelli precedenti.
 
-La griglia del gioco ha coordinate `(x, y)`: il terreno 3D e gli sprite sulla
-camera non introducono movimento verticale. Il canvas virtuale è `960x540`.
+La griglia del gioco ha coordinate `(x, y)` e un piano: per ora tutto sta sulla terra
+(piano 0); il terreno 3D e gli sprite sulla camera non introducono movimento verticale. Il canvas virtuale è `960x540`.
 
 ### Proprietà delle scene e transizioni
 

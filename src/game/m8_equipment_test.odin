@@ -8,7 +8,7 @@ test_m8_weapon_pickup_requires_equip_and_spends_only_accepted_melee :: proc(t: ^
 	data := create_test_level(t)
 	defer level.destroy(&data)
 	player := create_test_player(t)
-	spawns := [?]Enemy_Spawn{{position = {2, 1}, health = 30, attack = 1}}
+	spawns := [?]Enemy_Spawn{{position = {x = 2, y = 1}, health = 30, attack = 1}}
 	room, ok := create_room(&data, &player, {enemies = spawns[:]})
 	testing.expect(t, ok)
 	defer destroy_room(&room)
@@ -57,7 +57,7 @@ test_m8_brute_drops_weapon_and_pickup_stays_unequipped :: proc(t: ^testing.T) {
 	data := create_test_level(t)
 	defer level.destroy(&data)
 	player := create_test_player(t)
-	spawns := [?]Enemy_Spawn{{position = {2, 1}, health = 1, attack = 1, archetype = .Brute, drops_healing = true}}
+	spawns := [?]Enemy_Spawn{{position = {x = 2, y = 1}, health = 1, attack = 1, archetype = .Brute, drops_healing = true}}
 	room, ok := create_room(&data, &player, {enemies = spawns[:]})
 	testing.expect(t, ok)
 	defer destroy_room(&room)

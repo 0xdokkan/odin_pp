@@ -87,8 +87,10 @@ hub_progress :: proc(h:^Campaign_Hub,frame:^host.Frame) {
 	left:=ui.panel(ctx,{30,146,300,324})
 	ui.label(ctx,ui.cut_top(&left,30),"LA TUA MEMORIA",.Large,p.text)
 	ui.label(ctx,ui.cut_top(&left,26),fmt.tprintf("%d estrazioni / %d morti",c.total_wins,c.deaths),.Body,p.text_dim)
-	count:=0;for found in c.discovered {if found {count+=1}}
-	ui.label(ctx,ui.cut_top(&left,26),fmt.tprintf("%d / %d carte scoperte",count,int(game.Card_Id.Count)),.Body,p.focus)
+	// The collection only: not the lab's cards, the retired ones or those only an upgrade makes (docs/registro-carte.md).
+	count,total:=0,0
+	for id in game.Card_Id.Strike..<game.Card_Id.Count {if game.card_in_collection(id) {total+=1;if c.discovered[id] {count+=1}}}
+	ui.label(ctx,ui.cut_top(&left,26),fmt.tprintf("%d / %d carte scoperte",count,total),.Body,p.focus)
 	won:=0;for b in campaign.Biome.Cyber..<campaign.Biome.Secret {if c.won[b] {won+=1}}
 	ui.label(ctx,ui.cut_top(&left,25),fmt.tprintf("%d / 11 biomi vinti",won),.Small,p.text_dim)
 	minutes:=int(c.play_seconds)/60
@@ -121,22 +123,5 @@ hub_progress :: proc(h:^Campaign_Hub,frame:^host.Frame) {
 			ui.label(ctx,ui.cut_top(&row,21),info.title,.Body,p.text)
 			ui.label(ctx,row,fmt.tprintf("%s   |   %d partite / %d vittorie",hub_record_line(c,index),r.plays,r.wins),.Small,p.text_dim)
 		}
-	}
-}
-
-@(private)
-hub_arcade :: proc(h:^Campaign_Hub,frame:^host.Frame) {
-	ctx:=frame.ui;p:=ctx.theme.palette
-	ui.label(ctx,{34,143,890,26},"CABINATI / Record personali, nessun premio e nessun oggetto a rischio",.Small,p.text_dim)
-	indices,count:=hub_unlocked_arcades(&h.progress)
-	hub_page_controls(ctx,{340,439,280,28},&h.arcade_page,count,8)
-	if count==0 {ui.paragraph(ctx,{35,210,750,80},"Vinci una spedizione per conservare il suo cabinato nell'hub.",.Body,p.text_dim)}
-	for i in h.arcade_page*8..<min(count,(h.arcade_page+1)*8) {
-		index:=indices[i];info,_:=activities.minigame_info(index);local:=i%8
-		box:=ui.panel(ctx,{34+f32(local%2)*450,177+f32(local/2)*64,430,58})
-		button:=ui.cut_right(&box,78);ui.cut_right(&box,10)
-		ui.label(ctx,ui.cut_top(&box,20),info.title,.Small,p.text)
-		ui.label(ctx,box,hub_record_line(&h.progress,index),.Small,p.text_dim)
-		if ui.button(ctx,button,"GIOCA",true,false,.Small) {host.push(frame,info.create({seed=h.options.seed~u64(h.clock*1000)}))}
 	}
 }

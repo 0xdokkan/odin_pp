@@ -111,10 +111,10 @@ load_slot_into :: proc(path: string, c: ^Campaign, snapshot: ^$T, allocator := c
 	// Re-marshaling into today's type would reject every valid older schema.
 	if checksum(payload) != header.checksum { return .Checksum_Mismatch }
 	staged := new(Saved_State(T), staging)
-	if json.unmarshal(payload, staged, allocator = staging) != nil { return .Malformed }
+	if decode_save(payload, staged, staging) != nil { return .Malformed }
 	if !campaign_valid(&staged.campaign) { return .Invalid_State }
 	owned := new(Saved_State(T), staging)
-	if json.unmarshal(payload, owned, allocator = allocator) != nil { return .Malformed }
+	if decode_save(payload, owned, allocator) != nil { return .Malformed }
 	c^ = owned.campaign; snapshot^ = owned.snapshot
 	return .Loaded
 }

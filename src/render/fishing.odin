@@ -565,7 +565,7 @@ draw_fishing_target_range :: proc(renderer: ^Renderer, room: ^game.Room, card_id
 	centre := room.player.position
 	for dy in -game.FISHING_RANGE..=game.FISHING_RANGE {
 		for dx in -game.FISHING_RANGE..=game.FISHING_RANGE {
-			cell := grid.Position{centre.x+dx, centre.y+dy}
+			cell := grid.offset(centre, dx, dy)
 			if game.fishing_target_error(room, cell) != .Fished { continue }
 			if game.fishing_cell_is_water(room, cell) {
 				draw_card_range_cell(renderer, cell, {70, 150, 220, 96}, {160, 214, 250, 255})

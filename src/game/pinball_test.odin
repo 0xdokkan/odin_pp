@@ -60,7 +60,7 @@ pinball_test_roll :: proc(t: ^testing.T, room: ^Room, seconds, dt: f64, events: 
 		p := pinball_position(&room.pinball)
 		for dy in -1..=1 {
 			for dx in -1..=1 {
-				cell := grid.Position{room.pinball.cell.x+dx, room.pinball.cell.y+dy}
+				cell := grid.offset(room.pinball.cell, dx, dy)
 				if !lasso_cell_is_solid(room, cell) { continue }
 				closest := Pinball_Vec{clamp(p.x, f64(cell.x)-0.5, f64(cell.x)+0.5), clamp(p.y, f64(cell.y)-0.5, f64(cell.y)+0.5)}
 				testing.expectf(t, pinball_length(p-closest) >= PINBALL_RADIUS-1e-6, "the ball at %v sinks into %v", p, cell)
@@ -108,11 +108,11 @@ test_pinball_takes_one_foe_beside_the_player_never_the_heavy :: proc(t: ^testing
 	data: level.Level
 	player: Player
 	spawns := [?]Enemy_Spawn{
-		{position = {7, 6}, health = 20, attack = 1},
-		{position = {5, 5}, health = 20, attack = 1},
-		{position = {8, 6}, health = 20, attack = 1},
-		{position = {6, 7}, health = 40, attack = 1, archetype = .Custodian},
-		{position = {5, 7}, health = 40, attack = 1, archetype = .Demolitionist},
+		{position = {x = 7, y = 6}, health = 20, attack = 1},
+		{position = {x = 5, y = 5}, health = 20, attack = 1},
+		{position = {x = 8, y = 6}, health = 20, attack = 1},
+		{position = {x = 6, y = 7}, health = 40, attack = 1, archetype = .Custodian},
+		{position = {x = 5, y = 7}, health = 40, attack = 1, archetype = .Demolitionist},
 	}
 	room := lasso_test_room(t, &data, &player, spawns[:])
 	defer level.destroy(&data)
@@ -124,29 +124,29 @@ test_pinball_takes_one_foe_beside_the_player_never_the_heavy :: proc(t: ^testing
 		return evaluate_card_targeting(room, card, card_target_request_at(definition, cell)).error
 	}
 	// Beside him, the diagonals too; two cells off, out of reach.
-	testing.expect_value(t, aim(&room, card, definition, {7, 6}), Card_Compile_Error.None)
-	testing.expect_value(t, aim(&room, card, definition, {5, 5}), Card_Compile_Error.None)
-	testing.expect_value(t, aim(&room, card, definition, {8, 6}), Card_Compile_Error.Target_Out_Of_Range)
-	testing.expect_value(t, aim(&room, card, definition, {7, 7}), Card_Compile_Error.Invalid_Target)
+	testing.expect_value(t, aim(&room, card, definition, {x = 7, y = 6}), Card_Compile_Error.None)
+	testing.expect_value(t, aim(&room, card, definition, {x = 5, y = 5}), Card_Compile_Error.None)
+	testing.expect_value(t, aim(&room, card, definition, {x = 8, y = 6}), Card_Compile_Error.Target_Out_Of_Range)
+	testing.expect_value(t, aim(&room, card, definition, {x = 7, y = 7}), Card_Compile_Error.Invalid_Target)
 	// The miniboss and the boss are too heavy, and the drop takes neither.
-	testing.expect_value(t, aim(&room, card, definition, {6, 7}), Card_Compile_Error.Target_Too_Heavy)
-	testing.expect_value(t, aim(&room, card, definition, {5, 7}), Card_Compile_Error.Target_Too_Heavy)
-	_, takes := card_drop_target(&room, card, {6, 7})
+	testing.expect_value(t, aim(&room, card, definition, {x = 6, y = 7}), Card_Compile_Error.Target_Too_Heavy)
+	testing.expect_value(t, aim(&room, card, definition, {x = 5, y = 7}), Card_Compile_Error.Target_Too_Heavy)
+	_, takes := card_drop_target(&room, card, {x = 6, y = 7})
 	testing.expect(t, !takes)
 	// A closed corner hides the diagonal.
-	cover := [?]grid.Position{{5, 6}, {6, 5}}
+	cover := [?]grid.Position{{x = 5, y = 6}, {x = 6, y = 5}}
 	walled_data: level.Level
 	walled_player: Player
 	walled := lasso_test_room(t, &walled_data, &walled_player, spawns[1:2], obstacles = cover[:])
 	walled_card := rework_hand_card(t, &walled, .Pinball)
-	testing.expect_value(t, aim(&walled, walled_card, definition, {5, 5}), Card_Compile_Error.Target_Blocked)
+	testing.expect_value(t, aim(&walled, walled_card, definition, {x = 5, y = 5}), Card_Compile_Error.Target_Blocked)
 	destroy_room(&walled)
 	level.destroy(&walled_data)
 	// One ball at a time, and never the ball itself.
-	east := lasso_test_foe(&room, {7, 6})
+	east := lasso_test_foe(&room, {x = 7, y = 6})
 	play := pinball_test_strike(t, &room, east)
 	testing.expect_value(t, play.result, Card_Play_Result.Played)
-	testing.expect_value(t, pinball_target_error(&room, entity_target(enemy_entity(lasso_test_foe(&room, {5, 5})))), Card_Compile_Error.Target_Blocked)
+	testing.expect_value(t, pinball_target_error(&room, entity_target(enemy_entity(lasso_test_foe(&room, {x = 5, y = 5})))), Card_Compile_Error.Target_Blocked)
 	testing.expect_value(t, pinball_target_error(&room, entity_target(enemy_entity(east))), Card_Compile_Error.Invalid_Target)
 }
 
@@ -154,12 +154,12 @@ test_pinball_takes_one_foe_beside_the_player_never_the_heavy :: proc(t: ^testing
 test_pinball_strike_freezes_like_a_cast_then_rolls_on_world_seconds :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {7, 6}, health = 30, attack = 1}, {position = {2, 2}, health = 30, attack = 1}}
+	spawns := [?]Enemy_Spawn{{position = {x = 7, y = 6}, health = 30, attack = 1}, {position = {x = 2, y = 2}, health = 30, attack = 1}}
 	room := lasso_test_room(t, &data, &player, spawns[:])
 	defer level.destroy(&data)
 	defer destroy_room(&room)
-	id := lasso_test_foe(&room, {7, 6})
-	lasso_test_hold(&room, lasso_test_foe(&room, {2, 2}))
+	id := lasso_test_foe(&room, {x = 7, y = 6})
+	lasso_test_hold(&room, lasso_test_foe(&room, {x = 2, y = 2}))
 	_, _ = apply_status(&room, enemy_entity(id), .Poison, 3, 0)
 	_, _ = apply_status(&room, enemy_entity(id), .Burn, 2, 0)
 	play := pinball_test_strike(t, &room, id, keep_cast = true)
@@ -169,9 +169,9 @@ test_pinball_strike_freezes_like_a_cast_then_rolls_on_world_seconds :: proc(t: ^
 	made, launched, removed := false, false, 0
 	for event in room.recent_events.events[:room.recent_events.count] {
 		#partial switch event.kind {
-		case .Pinball_Made: made = event.target == enemy_entity(id) && event.amount == 2 && event.to_position == grid.Position{7, 6}
+		case .Pinball_Made: made = event.target == enemy_entity(id) && event.amount == 2 && event.to_position == grid.Position{x = 7, y = 6}
 		case .Pinball_Launched:
-			launched = event.from_position == grid.Position{6, 6} && event.to_position == grid.Position{7, 6}
+			launched = event.from_position == grid.Position{x = 6, y = 6} && event.to_position == grid.Position{x = 7, y = 6}
 			testing.expect(t, abs(event.duration) >= PINBALL_MIN_TURN && abs(event.duration) <= PINBALL_MAX_TURN)
 		case .Status_Removed: if event.target == enemy_entity(id) { removed += 1 }
 		}
@@ -185,7 +185,7 @@ test_pinball_strike_freezes_like_a_cast_then_rolls_on_world_seconds :: proc(t: ^
 	index, _ := enemy_index_by_id(&room, id)
 	testing.expect_value(t, room.enemies[index].statuses.count, 0)
 	testing.expect_value(t, room.enemies[index].intent.kind, Enemy_Intent_Kind.None)
-	_, standing := enemy_index_at(&room, {7, 6})
+	_, standing := enemy_index_at(&room, {x = 7, y = 6})
 	testing.expect(t, !standing)
 	testing.expect(t, !can_apply_status(&room, enemy_entity(id), .Poison))
 	testing.expect(t, !effect_is_valid(&room, damage_effect(enemy_entity(id), 5)))
@@ -205,7 +205,7 @@ test_pinball_strike_freezes_like_a_cast_then_rolls_on_world_seconds :: proc(t: ^
 	p := pinball_position(&room.pinball)
 	testing.expect(t, abs(p.x-(7+3.5*math.cos(angle))) < 1e-3 && abs(p.y-(6+3.5*math.sin(angle))) < 1e-3)
 	testing.expect_value(t, room.enemies[index].position, room.pinball.cell)
-	testing.expect_value(t, room.pinball.cell, grid.Position{int(math.round(p.x)), int(math.round(p.y))})
+	testing.expect_value(t, room.pinball.cell, grid.Position{x = int(math.round(p.x)), y = int(math.round(p.y))})
 	testing.expect_value(t, lasso_test_health(&room, id), i32(30))
 	testing.expect_value(t, try_move_player(&room, .West), Action_Result.Moved)
 }
@@ -214,7 +214,7 @@ test_pinball_strike_freezes_like_a_cast_then_rolls_on_world_seconds :: proc(t: ^
 test_pinball_bounces_off_walls_and_every_touch_resets_its_value :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {7, 6}, health = 30, attack = 1}}
+	spawns := [?]Enemy_Spawn{{position = {x = 7, y = 6}, health = 30, attack = 1}}
 	room := lasso_test_room(t, &data, &player, spawns[:])
 	defer level.destroy(&data)
 	defer destroy_room(&room)
@@ -250,11 +250,11 @@ test_pinball_bounces_off_walls_and_every_touch_resets_its_value :: proc(t: ^test
 test_pinball_strikes_foes_knocks_them_away_and_counts_up :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {7, 6}, health = 30, attack = 1}, {position = {9, 6}, health = 40, attack = 1}, {position = {4, 6}, health = 40, attack = 1}}
+	spawns := [?]Enemy_Spawn{{position = {x = 7, y = 6}, health = 30, attack = 1}, {position = {x = 9, y = 6}, health = 40, attack = 1}, {position = {x = 4, y = 6}, health = 40, attack = 1}}
 	room := lasso_test_room(t, &data, &player, spawns[:])
 	defer level.destroy(&data)
 	defer destroy_room(&room)
-	ball, east, west := lasso_test_foe(&room, {7, 6}), lasso_test_foe(&room, {9, 6}), lasso_test_foe(&room, {4, 6})
+	ball, east, west := lasso_test_foe(&room, {x = 7, y = 6}), lasso_test_foe(&room, {x = 9, y = 6}), lasso_test_foe(&room, {x = 4, y = 6})
 	lasso_test_hold(&room, east)
 	lasso_test_hold(&room, west)
 	pinball_test_strike(t, &room, ball)
@@ -272,7 +272,7 @@ test_pinball_strikes_foes_knocks_them_away_and_counts_up :: proc(t: ^testing.T) 
 		testing.expect(t, seen.event.kind != .Pinball_Bounced || len(bumps) >= 6)
 	}
 	expected := [6]struct{target: u32, amount: i32, cell: grid.Position}{
-		{east, 2, {9, 6}}, {west, 3, {4, 6}}, {east, 4, {10, 6}}, {west, 5, {3, 6}}, {east, 6, {11, 6}}, {west, 7, {2, 6}},
+		{east, 2, {x = 9, y = 6}}, {west, 3, {x = 4, y = 6}}, {east, 4, {x = 10, y = 6}}, {west, 5, {x = 3, y = 6}}, {east, 6, {x = 11, y = 6}}, {west, 7, {x = 2, y = 6}},
 	}
 	testing.expect(t, len(bumps) >= len(expected))
 	for want, index in expected {
@@ -283,7 +283,7 @@ test_pinball_strikes_foes_knocks_them_away_and_counts_up :: proc(t: ^testing.T) 
 	}
 	// Each struck foe took the value and was knocked a cell away from the ball;
 	// against the wall it stays.
-	testing.expect_value(t, lasso_test_cell(&room, east), grid.Position{11, 6})
+	testing.expect_value(t, lasso_test_cell(&room, east), grid.Position{x = 11, y = 6})
 	testing.expect(t, lasso_test_health(&room, east) < 40-2-4-6+1)
 	wounds := 0
 	for seen in events {
@@ -299,7 +299,7 @@ test_pinball_bursts_after_twenty_seconds_and_its_foe_falls :: proc(t: ^testing.T
 	for endless in ([2]bool{false, true}) {
 		data: level.Level
 		player: Player
-		spawns := [?]Enemy_Spawn{{position = {7, 6}, health = 30, attack = 1}}
+		spawns := [?]Enemy_Spawn{{position = {x = 7, y = 6}, health = 30, attack = 1}}
 		room := lasso_test_room(t, &data, &player, spawns[:])
 		room.endless = endless
 		id := room.enemies[0].id
@@ -332,11 +332,11 @@ test_pinball_roll_is_the_same_at_any_frame_rate :: proc(t: ^testing.T) {
 	for dt, run in ([2]f64{1.0/240.0, 0.5}) {
 		data: level.Level
 		player: Player
-		spawns := [?]Enemy_Spawn{{position = {7, 6}, health = 30, attack = 1}, {position = {9, 3}, health = 60, attack = 1}, {position = {3, 9}, health = 60, attack = 1}}
-		cover := [?]grid.Position{{4, 3}, {9, 9}, {2, 6}}
+		spawns := [?]Enemy_Spawn{{position = {x = 7, y = 6}, health = 30, attack = 1}, {position = {x = 9, y = 3}, health = 60, attack = 1}, {position = {x = 3, y = 9}, health = 60, attack = 1}}
+		cover := [?]grid.Position{{x = 4, y = 3}, {x = 9, y = 9}, {x = 2, y = 6}}
 		room := lasso_test_room(t, &data, &player, spawns[:], obstacles = cover[:])
-		for enemy in room.enemies { if enemy.position != (grid.Position{7, 6}) { lasso_test_hold(&room, enemy.id) } }
-		pinball_test_strike(t, &room, lasso_test_foe(&room, {7, 6}))
+		for enemy in room.enemies { if enemy.position != (grid.Position{x = 7, y = 6}) { lasso_test_hold(&room, enemy.id) } }
+		pinball_test_strike(t, &room, lasso_test_foe(&room, {x = 7, y = 6}))
 		pinball_test_aim(&room, {0.8, -0.6})
 		events: [dynamic]Pinball_Test_Event
 		pinball_test_roll(t, &room, 12, dt, &events)
@@ -364,18 +364,18 @@ test_pinball_roll_is_the_same_at_any_frame_rate :: proc(t: ^testing.T) {
 test_pinball_ball_is_out_of_every_reach :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {7, 6}, health = 30, attack = 1}, {position = {3, 3}, health = 30, attack = 1, archetype = .Custodian}}
+	spawns := [?]Enemy_Spawn{{position = {x = 7, y = 6}, health = 30, attack = 1}, {position = {x = 3, y = 3}, health = 30, attack = 1, archetype = .Custodian}}
 	room := lasso_test_room(t, &data, &player, spawns[:])
 	defer level.destroy(&data)
 	defer destroy_room(&room)
-	id := lasso_test_foe(&room, {7, 6})
-	custodian := lasso_test_foe(&room, {3, 3})
+	id := lasso_test_foe(&room, {x = 7, y = 6})
+	custodian := lasso_test_foe(&room, {x = 3, y = 3})
 	pinball_test_strike(t, &room, id)
 	// A coil square round the ball's cell: its discharge would strike only the
 	// ball, and so strikes nothing (and asks nothing of it).
 	log: Event_Log
 	cell := room.pinball.cell
-	for offset in ([4]grid.Position{{-1, -1}, {1, -1}, {1, 1}, {-1, 1}}) {
+	for offset in ([4]grid.Position{{x = -1, y = -1}, {x = 1, y = -1}, {x = 1, y = 1}, {x = -1, y = 1}}) {
 		_ = deploy_board_device(&room, .Tesla_Coil, add_position(cell, offset), 8, 0, &log)
 	}
 	_ = activate_board_devices(&room)

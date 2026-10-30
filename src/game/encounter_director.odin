@@ -42,7 +42,7 @@ encounter_required_enemies :: proc(kind: Encounter_Kind) -> [2]Enemy_Archetype {
 encounter_pair_has_clear_link :: proc(blueprint: ^Room_Blueprint, a, b: grid.Position) -> bool {
 	distance := abs(a.x-b.x)+abs(a.y-b.y)
 	if distance == 0 || distance > 2 || (a.x != b.x && a.y != b.y) { return false }
-	midpoint := grid.Position{(a.x+b.x)/2, (a.y+b.y)/2}
+	midpoint := grid.Position{x = (a.x+b.x)/2, y = (a.y+b.y)/2}
 	if distance == 2 && (!cell_is_walkable(&blueprint.level_data, midpoint) ||
 	   position_in_list(blueprint.obstacles[:], midpoint)) { return false }
 	return true
@@ -68,9 +68,9 @@ arrange_encounter_spawn_candidates :: proc(blueprint: ^Room_Blueprint, candidate
 	}
 	best_a, best_b, best_score := -1, -1, -100000
 	for a in 0..<len(candidates) {
-		for step in ([?]grid.Position{{0, -1}, {1, 0}, {0, 1}, {-1, 0}}) {
+		for step in ([?]grid.Position{{x = 0, y = -1}, {x = 1, y = 0}, {x = 0, y = 1}, {x = -1, y = 0}}) {
 			for distance in 1..=2 {
-				position := grid.Position{candidates[a].x+step.x*distance, candidates[a].y+step.y*distance}
+				position := grid.Position{x = candidates[a].x+step.x*distance, y = candidates[a].y+step.y*distance}
 				cell, valid := grid.index_of(&blueprint.level_data.tiles, position)
 				if !valid || candidate_indices[cell] == 0 { continue }
 				b := candidate_indices[cell]-1
@@ -118,14 +118,14 @@ validate_blueprint_encounter :: proc(blueprint: ^Room_Blueprint) -> bool {
 	if blueprint.encounter_kind == .Escort {
 		a, b := blueprint.enemies[0].position, blueprint.enemies[1].position
 		for object in blueprint.objects {
-			if object.position == (grid.Position{(a.x+b.x)/2, (a.y+b.y)/2}) { return false }
+			if object.position == (grid.Position{x = (a.x+b.x)/2, y = (a.y+b.y)/2}) { return false }
 		}
 	}
 	return true
 }
 
 @(private)
-encounter_position_open :: proc(blueprint: ^Room_Blueprint, position: grid.Position, extra_blocker: grid.Position = {-1, -1}) -> bool {
+encounter_position_open :: proc(blueprint: ^Room_Blueprint, position: grid.Position, extra_blocker: grid.Position = {x = -1, y = -1}) -> bool {
 	if position == extra_blocker || !cell_is_walkable(&blueprint.level_data, position) ||
 	   position_in_list(blueprint.obstacles[:], position) { return false }
 	for object in blueprint.objects {
@@ -135,10 +135,10 @@ encounter_position_open :: proc(blueprint: ^Room_Blueprint, position: grid.Posit
 }
 
 @(private)
-encounter_position_lanes :: proc(blueprint: ^Room_Blueprint, position: grid.Position, extra_blocker: grid.Position = {-1, -1}) -> (neighbors, longest, cover: int) {
-	directions := [4]grid.Position{{0, -1}, {1, 0}, {0, 1}, {-1, 0}}
+encounter_position_lanes :: proc(blueprint: ^Room_Blueprint, position: grid.Position, extra_blocker: grid.Position = {x = -1, y = -1}) -> (neighbors, longest, cover: int) {
+	directions := [4]grid.Position{{x = 0, y = -1}, {x = 1, y = 0}, {x = 0, y = 1}, {x = -1, y = 0}}
 	for direction in directions {
-		next := grid.Position{position.x+direction.x, position.y+direction.y}
+		next := grid.offset(position, direction.x, direction.y)
 		if encounter_position_open(blueprint, next, extra_blocker) {
 			neighbors += 1
 		} else if next.x > 0 && next.y > 0 && next.x < blueprint.level_data.tiles.width-1 &&
@@ -149,7 +149,7 @@ encounter_position_lanes :: proc(blueprint: ^Room_Blueprint, position: grid.Posi
 		for _ in 0..<6 {
 			if !encounter_position_open(blueprint, next, extra_blocker) { break }
 			length += 1
-			next = {next.x+direction.x, next.y+direction.y}
+			next = grid.offset(next, direction.x, direction.y)
 		}
 		longest = max(longest, length)
 	}

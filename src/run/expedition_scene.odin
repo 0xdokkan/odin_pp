@@ -14,6 +14,11 @@ import rng "../engine/rng"
 import ui "../engine/ui"
 import game "../game"
 import render "../render"
+import level "../level"
+import grid "../engine/grid"
+
+// A field named world hides the package inside the session.
+Placement_Result :: world.Player_Placement
 
 Expedition_Scene_Timing :: struct {view_ms,world_ms,hud_hand_ms,map_ms,effect_ms:f64}
 
@@ -32,7 +37,19 @@ Expedition_Session :: struct {
 	save_data:rawptr,
 	inventory:campaignui.State,
 	inventory_open,character_open,map_open,paused,abandon_confirm:bool,
+	// The plate the stacked map shows (expedition_hologram.odin): the robot's layer when it opens; W and S change it.
+	map_layer:i8,
+	// The map's plates and what of them is on the video card, kept between frames (expedition_hologram.odin).
+	hologram:Hologram_Cache,
 	site:int,
+	// A structure kit being set down (Fase 7): which, how it is turned, where the mouse puts it and whether it can go there.
+	placing,place_cached:bool,
+	place_id:level.Structure_Id,
+	place_rotation:u8,
+	place_mirror:bool,
+	place_origin:grid.Position,
+	place_result:Placement_Result,
+	place_error:level.Placement_Error,
 	workshop_remove:int,
 	save_timer,message_timer:f32,
 	message:string,
@@ -69,7 +86,7 @@ expedition_create :: proc(c:^campaign.Campaign,checkpoint:^world.Snapshot,path:s
 	rs.room.player.tactical.config.expedition_biome = u8(e.world.biome)
 	rs.room_created=true;rs.run_created=true
 	if roguelike_attach(rs,frame.window)!=.Ready {roguelike_destroy(rs);delete(e.path);free(e);return {},false}
-	for &site,i in e.world.sites[:e.world.site_count] {if site.secret && campaign.secret_known(c,e.world.biome,i) && site.state==.Unvisited {site.state=.Discovered}}
+	for &site,i in e.world.sites[:e.world.site_count] {if site.secret && site.kind!=.Cave && campaign.secret_known(c,e.world.biome,i) && site.state==.Unvisited {site.state=.Discovered}}
 	e.world.last_health=rs.room.player.health
 	// The inventory owns credits; this baseline detects direct card effects
 	// without mistaking inventory purchases or drops for a fresh award.
@@ -122,7 +139,7 @@ expedition_save :: proc(e:^Expedition_Session,durable:bool=false) -> bool {
 @(private)
 expedition_suspend :: proc(data:rawptr) {e:=cast(^Expedition_Session)data;_=expedition_save(e,true);roguelike_suspend_input(e.rs)}
 @(private)
-expedition_destroy :: proc(data:rawptr) {e:=cast(^Expedition_Session)data;_=expedition_save(e,true);roguelike_destroy(e.rs);delete(e.path);delete(e.message);free(e)}
+expedition_destroy :: proc(data:rawptr) {e:=cast(^Expedition_Session)data;_=expedition_save(e,true);hologram_release(&e.hologram);roguelike_destroy(e.rs);delete(e.path);delete(e.message);free(e)}
 @(private)
 expedition_draw_window :: proc(data:rawptr,frame:^host.Frame) {e:=cast(^Expedition_Session)data;roguelike_draw_window(e.rs,frame)}
 
@@ -175,7 +192,8 @@ expedition_collect :: proc(e:^Expedition_Session,manual:bool=false) {
 	for i<w.drop_count {
 		drop:=w.drops[i]
 		if drop.manual_only && !manual {i+=1;continue}
-		if world.distance(room.player.position,drop.position)> (2 if manual else 3) {i+=1;continue}
+		// Within reach on the player's own layer: not through the rock of a cave.
+		if drop.position.layer!=room.player.position.layer || world.distance(room.player.position,drop.position)> (2 if manual else 3) {i+=1;continue}
 		taken:=false
 		if drop.xp>0 {levels:=campaign.add_xp(c,drop.xp);taken=true;if levels>0 {expedition_message(e,fmt.tprintf("LIVELLO %d  /  +%d punto potenziamento",c.run.level,levels))}}
 		else {
@@ -231,8 +249,8 @@ expedition_reward :: proc(e:^Expedition_Session,index:int) {
 
 @(private)
 expedition_interact :: proc(e:^Expedition_Session,frame:^host.Frame) {
+	// In the saddle too (the user's choice): what wakes foes sets the robot down (world.engage).
 	w:=&e.world;c:=e.progress;room:=&e.rs.room
-	if w.mounted {expedition_message(e,"Scendi dalla mount con M per interagire.");return}
 	if room.phase==.Combat {return}
 	expedition_collect(e,true)
 	if w.boss_defeated && world.distance(room.player.position,room.exit_position)<=3 {expedition_extract(e,frame);return}
@@ -249,11 +267,12 @@ expedition_interact :: proc(e:^Expedition_Session,frame:^host.Frame) {
 		_=world.add_drop(w,s.position,campaign.make_item(.Credits,15+i32(rng.next_u64(&r)%35)))
 		kind:=campaign.Item_Kind.Healing
 		roll:=rng.next_u64(&r)%8
-		if roll==0 {kind=.Backpack};if roll==1 {kind=.Relic};if roll==2 {kind=.Energy};if roll==3 {kind=.Weapon};if roll==4 {kind=.Decoy};if roll==5 {kind=.Upgrade};if roll==6 {kind=.Temporary_Card}
+		if roll==0 {kind=.Backpack};if roll==1 {kind=.Relic};if roll==2 {kind=.Energy};if roll==3 {kind=.Weapon};if roll==4 {kind=.Decoy};if roll==5 {kind=.Upgrade};if roll==6 {kind=.Temporary_Card};if roll==7 {kind=.Structure_Kit}
 		variant:i32
 		if kind==.Relic {variant=1+i32(rng.next_u64(&r)%(u64(game.Relic_Id.Count)-1))}
 		if kind==.Weapon {variant=i32(game.Weapon_Id.Iron_Cleaver)}
 		if kind==.Temporary_Card {variant=i32(game.Card_Id.Strike)}
+		if kind==.Structure_Kit {variant=i32(rng.next_u64(&r)%u64(level.Structure_Id.Count))}
 		if kind==.Backpack {variant=min(i32(campaign.GRID_MAX_WIDTH-campaign.BACKPACK_WIDTH),1+i32(world.rank(w.biome)))}
 		_=world.add_drop(w,s.position,campaign.make_item(kind,1,variant));s.state=.Resolved;expedition_collect(e,true)
 	case .Archive:
@@ -266,10 +285,10 @@ expedition_interact :: proc(e:^Expedition_Session,frame:^host.Frame) {
 	case .Memory:
 		if !world.add_drop(w,s.position,campaign.make_item(.Memory,1,i32(w.biome))) {expedition_message(e,"Raccogli un oggetto a terra prima di recuperare il frammento.");return}
 		s.state=.Resolved;expedition_collect(e,true);expedition_message(e,"Frammento recuperato. Estrai per ascoltarlo nell'hub.")
-	case .Tunnel:
-		position,safe:=world.tunnel_destination(w,room)
-		if !safe {expedition_message(e,"L'uscita del tunnel e ostruita. Riprova piu tardi.");return}
-		room.player.position=position;s.state=.Resolved;expedition_message(e,"Il tunnel riemerge oltre le risaie.")
+	case .Cave,.Tunnel:
+		// One walks in through the mouth, or down the gallery's stair beside the tunnel (expedition/network.odin):
+		// world.nearest_site never offers them.
+		return
 	}
 	c.revision+=1
 }
@@ -281,18 +300,18 @@ expedition_discovery :: proc(c:^campaign.Campaign,b:campaign.Biome,seed:u64) -> 
 	case .West:home={.Lasso,.Sei_Denari,.Sette_Denari,.Coffin}
 	case .Jungle:home={.Dinosaur,.Poison_Pool,.Venom_Blade,.Caustic_Bloom}
 	case .City:home={.Bomb_Marley,.Pinball,.Shove,.Storm_Crown}
-	case .Egypt:home={.Fate_Dice,.Fate_Strike,.Calculated_Risk,.Prismatic_Barrage}
+	case .Egypt:home={.Fate_Dice,.Fate_Strike,.Calculated_Risk,.Coffin}
 	case .Vietnam:home={.First_Person,.Wildfire,.Firebomb,.Cannon}
-	case .Snow:home={.Deflect,.Guard,.Dash,.Purifying_Guard}
+	case .Snow:home={.Deflect,.Guard,.Dash,.Sundering_Blow}
 	case .Inferno:home={.Wildfire,.Firebomb,.Thorn_Coat,.Bomb_Marley}
 	case .Gothic:home={.Shadow_Step,.Coffin,.Lasso,.Counter_Rune}
 	case .Sky:home={.Afterimage,.Purifying_Guard,.Dash,.Grappling_Hook}
-	case .Space:home={.Black_Hole,.Cannon,.Prismatic_Barrage,.Chain_Lightning}
-	case .Secret:home={.Black_Hole,.Titan_Grip,.Storm_Crown,.Fate_Dice}
+	case .Space:home={.Black_Hole,.Cannon,.Tesla_Coil,.Storm_Crown}
+	case .Secret:home={.Black_Hole,.Grappling_Hook,.Storm_Crown,.Fate_Dice}
 	case .Count:return {},false
 	}
 	for i in 0..<4 {id:=home[(i+int(seed%4))%4];if !c.discovered[id] {return id,true}}
-	for i in 0..<int(game.Card_Id.Count) {id:=game.Card_Id((i+int(seed%u64(game.Card_Id.Count)))%int(game.Card_Id.Count));if !c.discovered[id] {return id,true}}
+	for i in 0..<int(game.Card_Id.Count) {id:=game.Card_Id((i+int(seed%u64(game.Card_Id.Count)))%int(game.Card_Id.Count));if !c.discovered[id] && game.card_in_collection(id) {return id,true}}
 	return {},false
 }
 
@@ -315,7 +334,7 @@ expedition_update :: proc(data:rawptr,frame:^host.Frame) {
 		if expedition_save(e,true) {host.pop(frame)} else {expedition_message(e,"Attendi la fine dell'azione prima di tornare all'hub.")}
 		return
 	}
-	if input.key_pressed(frame.devices,.P) || (input.key_pressed(frame.devices,.ESCAPE) && !e.inventory_open && !e.map_open && e.site<0 && w.reward_count==0) {e.paused=!e.paused;clear_card_interaction(&rs.card_interaction)}
+	if input.key_pressed(frame.devices,.P) || (input.key_pressed(frame.devices,.ESCAPE) && !e.inventory_open && !e.map_open && !e.placing && e.site<0 && w.reward_count==0) {e.paused=!e.paused;clear_card_interaction(&rs.card_interaction)}
 	if e.paused {
 		ctx:=frame.ui;p:=ctx.theme.palette
 		ui.dim(ctx,frame.canvas,.65);box:=ui.panel(ctx,ui.center(frame.canvas,430,280),"MEMORIA SOSPESA")
@@ -330,15 +349,21 @@ expedition_update :: proc(data:rawptr,frame:^host.Frame) {
 		}
 		return
 	}
+	if e.placing && !e.inventory_open {expedition_placing_update(e,frame);return}
 	if !e.inventory_open && !e.map_open && e.site<0 && w.reward_count==0 && rs.frame_input.left_pressed {
 		layout:=render.tactical_hud_layout(&rs.iso_renderer)
-		if rl.CheckCollisionPointRec(frame.mouse,layout.map_button) {e.map_open=true;rs.frame_input.left_pressed=false}
+		if rl.CheckCollisionPointRec(frame.mouse,layout.map_button) {e.map_open=true;e.map_layer=room.player.position.layer;rs.frame_input.left_pressed=false}
 		else if render.m8_control_at_point(&rs.iso_renderer,room,rs.mouse_canvas)==.Character {e.inventory_open=true;e.inventory.panel=.Character;rs.frame_input.left_pressed=false}
 	}
 	if input.key_pressed(frame.devices,.Z) && !e.inventory_open {e.inventory_open=true;e.inventory.panel=.Inventory}
 	if input.key_pressed(frame.devices,.U) && !e.inventory_open {e.inventory_open=true;e.inventory.panel=.Character}
-	if input.key_pressed(frame.devices,.TAB) && !e.inventory_open {e.map_open=!e.map_open;clear_card_interaction(&rs.card_interaction)}
+	if input.key_pressed(frame.devices,.TAB) && !e.inventory_open {e.map_open=!e.map_open;e.map_layer=room.player.position.layer;clear_card_interaction(&rs.card_interaction)}
 	if e.map_open && input.key_pressed(frame.devices,.ESCAPE) {e.map_open=false}
+	// The stacked map: W and the up arrow show the plate over, S and the down arrow the one under (the robot stays still).
+	if e.map_open {
+		if input.key_pressed(frame.devices,.W) || input.key_pressed(frame.devices,.UP) {e.map_layer=hologram_next_plate(&rs.level_data,e.map_layer,1)}
+		if input.key_pressed(frame.devices,.S) || input.key_pressed(frame.devices,.DOWN) {e.map_layer=hologram_next_plate(&rs.level_data,e.map_layer,-1)}
+	}
 	if input.key_pressed(frame.devices,.M) && room.phase==.Loot && !e.inventory_open {w.mounted=!w.mounted;expedition_message(e,world.metadata(w.biome).mount if w.mounted else "A piedi")}
 	if !e.inventory_open && !e.map_open && e.site<0 && w.reward_count==0 && render.tactical_inspector_effect_ready(&rs.iso_renderer,room) {
 		cards:=&rs.card_interaction
@@ -363,7 +388,8 @@ expedition_update :: proc(data:rawptr,frame:^host.Frame) {
 			_=world.sync(w,room)
 			world.tick(w,room,frame.dt)
 			for site,i in w.sites[:w.site_count] {
-				if site.secret && site.state!=.Unvisited {if campaign.discover_secret(c,w.biome,i) {expedition_message(e,"SEGRETO TROVATO / Un luogo che non dimenticherai.")}}
+				// A cave's arch is hidden again in every run: the secrets the campaign remembers are the map's own.
+				if site.secret && site.kind!=.Cave && site.state!=.Unvisited {if campaign.discover_secret(c,w.biome,i) {expedition_message(e,"SEGRETO TROVATO / Un luogo che non dimenticherai.")}}
 				if site.reward_pending && room.phase==.Loot {expedition_reward(e,i);break}
 			}
 		}
@@ -406,6 +432,7 @@ expedition_update :: proc(data:rawptr,frame:^host.Frame) {
 		for item in out.drops[:out.drop_count] {
 			_=expedition_drop_inventory_item(e,item)
 		}
+		if out.place_structure {expedition_begin_placement(e,out.structure)}
 		if out.action_seconds>0 {game.finish_player_combat_command(room,out.action_seconds)}
 		if out.decoy {
 			if world.lure_patrol(w,room,room.player.position) {expedition_message(e,"Esca attiva. La pattuglia vicina sta seguendo il segnale.")}
@@ -419,6 +446,60 @@ expedition_update :: proc(data:rawptr,frame:^host.Frame) {
 		if ui.button(frame.ui,{788,450,150,28},"ZAINO  [Z]") {e.inventory_open=true;e.inventory.panel=.Inventory}
 	}
 	if e.save_timer>=10 || c.revision!=e.last_revision || room.pulse_count!=e.last_pulse {if world.stable(room) && !render.renderer_timeline_is_busy(&rs.iso_renderer) {_=expedition_save(e)}}
+}
+
+// The kit of structure `id` has been used from the backpack: the footprint follows the mouse until it is set down or put away.
+@(private)
+expedition_begin_placement :: proc(e:^Expedition_Session,id:i32) {
+	if id<0 || id>=i32(level.Structure_Id.Count) {return}
+	if e.rs.room.player.position.layer!=grid.GROUND_LAYER {expedition_message(e,world.player_placement_text(.In_Cave,.None));return}
+	e.placing=true;e.place_cached=false;e.place_id=level.Structure_Id(id);e.place_rotation=0;e.place_mirror=false
+	e.map_open=false;e.site=-1
+	expedition_message(e,"Rotella ruota, R specchia, clic posa, tasto destro annulla.")
+}
+
+@(private)
+expedition_end_placement :: proc(e:^Expedition_Session) {
+	e.placing=false;e.place_cached=false
+	render.set_structure_ghost(&e.rs.iso_renderer,{})
+}
+
+// One frame of placing: the mouse puts the footprint, the wheel turns it, R mirrors it, a click sets it down if it can go and
+// the right button or Escape puts it away. The world waits meanwhile.
+@(private)
+expedition_placing_update :: proc(e:^Expedition_Session,frame:^host.Frame) {
+	rs:=e.rs;room:=&rs.room;w:=&e.world;c:=e.progress
+	if rs.frame_input.right_pressed || input.key_pressed(frame.devices,.ESCAPE) {
+		expedition_end_placement(e);expedition_message(e,"Posa annullata.");return
+	}
+	definition:=level.structure_definition(e.place_id)
+	changed:=false
+	if rs.frame_input.wheel!=0 {
+		for _ in 0..<4 {
+			e.place_rotation=(e.place_rotation+(1 if rs.frame_input.wheel>0 else 3))%4
+			if level.Rotation(e.place_rotation) in definition.rotations {break}
+		}
+		changed=true
+	}
+	if input.key_pressed(frame.devices,.R) && definition.mirror {e.place_mirror=!e.place_mirror;changed=true}
+	if rs.iso_renderer.has_hovered_cell {
+		origin:=world.structure_origin_for(e.place_id,e.place_rotation,e.place_mirror,rs.iso_renderer.hovered_cell)
+		if changed || !e.place_cached || origin!=e.place_origin {
+			e.place_origin=origin
+			e.place_result,e.place_error=world.check_player_structure(w,room.level_data,room,e.place_id,origin,e.place_rotation,e.place_mirror)
+			e.place_cached=true
+		}
+	}
+	render.set_structure_ghost(&rs.iso_renderer,{active=e.place_cached,ok=e.place_result==.Ok,id=e.place_id,origin=e.place_origin,rotation=e.place_rotation,mirror=e.place_mirror})
+	if rs.frame_input.left_pressed && e.place_cached {
+		result,err:=world.place_player_structure(w,room.level_data,room,e.place_id,e.place_origin,e.place_rotation,e.place_mirror)
+		if result==.Ok {
+			_=campaign.spend_structure_kit(&c.backpack,i32(e.place_id))
+			c.revision+=1
+			expedition_end_placement(e)
+			expedition_message(e,fmt.tprintf("%s posata.",definition.name))
+		} else {expedition_message(e,world.player_placement_text(result,err))}
+	}
 }
 
 @(private)
@@ -482,6 +563,13 @@ expedition_workshop_ui :: proc(e:^Expedition_Session,frame:^host.Frame) {
 	if ui.button(ctx,ui.cut_top(&box,36),"Kit di riparazione  /  10 crediti",campaign.backpack_credits(&c.backpack)>=10) {
 		if !expedition_buy_consumable(c,campaign.make_item(.Healing),10) {expedition_message(e,"Fai spazio nello zaino prima di comprare il kit.")}
 	}
+	// A kit of a structure to set down on the map (Fase 7): the one this workshop has.
+	kit:=i32((c.run.seed+e.world.sites[e.site].seed)%u64(level.Structure_Id.Count))
+	kit_item:=campaign.make_item(.Structure_Kit,1,kit)
+	ui.cut_top(&box,8)
+	if ui.button(ctx,ui.cut_top(&box,36),fmt.tprintf("Kit: %s  /  25 crediti",campaign.item_name(kit_item)),campaign.backpack_credits(&c.backpack)>=25) {
+		if !expedition_buy_consumable(c,kit_item,25) {expedition_message(e,"Fai spazio nello zaino prima di comprare il kit.")}
+	}
 	ui.cut_top(&box,14)
 	if room.player.deck.owned_count>0 {
 		e.workshop_remove=clamp(e.workshop_remove,0,room.player.deck.owned_count-1)
@@ -515,7 +603,7 @@ expedition_draw :: proc(data:rawptr,frame:^host.Frame) {
 	}
 	render.update_tactical_view(&rs.iso_renderer,room,rs.mouse_canvas,false,true)
 	when render.EXPEDITION_BENCHMARK {now=rl.GetTime();e.draw_timing.view_ms=(now-stamp)*1000;stamp=now}
-	render.draw_tactical_world(&rs.iso_renderer,room,active_targeting_card_id(rs.card_interaction),&e.world)
+	render.draw_tactical_world(&rs.iso_renderer,room,active_targeting_card_id(rs.card_interaction),&e.world,hovered_preview_card_id(rs.card_interaction))
 	when render.EXPEDITION_BENCHMARK {now=rl.GetTime();e.draw_timing.world_ms=(now-stamp)*1000;stamp=now}
 	render.draw_status(&rs.iso_renderer,room,rs.window.scale_mode)
 	render.draw_tactical_hud(&rs.iso_renderer,room,false,false)
@@ -527,6 +615,10 @@ expedition_draw :: proc(data:rawptr,frame:^host.Frame) {
 		ui.draw_text(frame.theme,fmt.tprintf("LIV %d   XP %d / %d   PUNTI %d   CREDITI %d",e.progress.run.level,e.progress.run.xp,campaign.xp_for_level(e.progress.run.level),e.progress.run.points,campaign.backpack_credits(&e.progress.backpack)),{27,516},.Small,{132,181,211,255})
 	}
 	if e.message_timer>0 {ui.draw_text_centered(frame.theme,e.message,{480,130 if room.phase==.Combat else 408},.Body,{239,218,160,255})}
+	if e.placing {
+		ui.draw_text_centered(frame.theme,fmt.tprintf("POSA  %s    ROTELLA ruota   R specchia   CLIC posa   TASTO DESTRO annulla",level.structure_definition(e.place_id).name),{480,388},.Small,{239,218,160,255})
+		if e.place_cached && e.place_result!=.Ok {ui.draw_text_centered(frame.theme,world.player_placement_text(e.place_result,e.place_error),{480,366},.Small,{255,125,115,255})}
+	}
 	if e.save_failed {ui.draw_text(frame.theme,"SALVATAGGIO NON RIUSCITO / Riprovo al prossimo stato stabile",{22,420},.Small,{255,125,115,255})}
 	if e.world.lane_warning {ui.draw_text_centered(frame.theme,world.metadata(e.world.biome).lane,{480,158 if e.message_timer>0 else 132},.Body,{255,126,91,255})}
 	when render.EXPEDITION_BENCHMARK {now=rl.GetTime();e.draw_timing.hud_hand_ms=(now-stamp)*1000;stamp=now}

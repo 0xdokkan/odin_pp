@@ -54,12 +54,12 @@ tesla_network_is_square :: proc(network: ^Board_Device_Network) -> bool {
 	if network == nil || network.count != MAX_TESLA_COILS || !network.field { return false }
 	lo, hi := network.positions[0], network.positions[0]
 	for p in network.positions[:network.count] {
-		lo = {min(lo.x, p.x), min(lo.y, p.y)}
-		hi = {max(hi.x, p.x), max(hi.y, p.y)}
+		lo = {x = min(lo.x, p.x), y = min(lo.y, p.y)}
+		hi = {x = max(hi.x, p.x), y = max(hi.y, p.y)}
 	}
 	side := hi.x-lo.x
 	if side < TESLA_RING_MIN_SIDE || hi.y-lo.y != side { return false }
-	corners := [MAX_TESLA_COILS]grid.Position{lo, {hi.x, lo.y}, hi, {lo.x, hi.y}}
+	corners := [MAX_TESLA_COILS]grid.Position{lo, {x = hi.x, y = lo.y}, hi, {x = lo.x, y = hi.y}}
 	for corner in corners {
 		found := false
 		for p in network.positions[:network.count] { found = found || p == corner }

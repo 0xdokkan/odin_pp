@@ -31,22 +31,22 @@ run_tactical_wall_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer)
 	probe: Tactical_Visual_Probe
 	// These captures belong to wall QA, not to the action/VFX image sequence.
 	for capture in Tactical_Visual_Capture { probe.captured += {capture} }
-	pillars := [?]grid.Position{{3, 3}, {5, 3}, {3, 5}, {5, 5}}
+	pillars := [?]grid.Position{{x = 3, y = 3}, {x = 5, y = 3}, {x = 3, y = 5}, {x = 5, y = 5}}
 	{
 		spawns := [?]game.Enemy_Spawn{
-			{position = {6, 4}, health = 8, attack = 2, archetype = .Archer},
-			{position = {6, 6}, health = 8, attack = 2, archetype = .Archer},
+			{position = {x = 6, y = 4}, health = 8, attack = 2, archetype = .Archer},
+			{position = {x = 6, y = 6}, health = 8, attack = 2, archetype = .Archer},
 		}
 		room, built := game.create_room(&data, &player, {enemies = spawns[:]})
 		if !built { return false }
 		defer game.destroy_room(&room)
 		render.clear_event_animations(renderer)
 		for _ in 0..<4 { if !tactical_visual_frame(&probe, window, renderer, &room) { return false } }
-		if !tactical_polish_check(room.phase == .Combat && game.tactical_cell_visible(&room, {6, 4}) &&
-			!game.tactical_cell_visible(&room, {6, 6}), "wall fixture lost its occluded combat enemy") { return false }
+		if !tactical_polish_check(room.phase == .Combat && game.tactical_cell_visible(&room, {x = 6, y = 4}) &&
+			!game.tactical_cell_visible(&room, {x = 6, y = 6}), "wall fixture lost its occluded combat enemy") { return false }
 		if window != nil {
 			if !tactical_polish_check(!renderer.tactical.no_fog &&
-				!render.tactical_render_visible(renderer, {6, 6}),
+				!render.tactical_render_visible(renderer, {x = 6, y = 6}),
 				"transparent wall revealed an enemy hidden by combat fog") { return false }
 			artifacts.screenshot("odin_pp_m7_walls_combat.png")
 		}

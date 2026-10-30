@@ -22,7 +22,7 @@ test_m7_fresh_walk_on_an_autonomous_world_beat_executes_in_the_same_frame :: pro
 	defer level.destroy(&data)
 	player := create_gameplay_command_test_player(t)
 	testing.expect(t, game.configure_tactical(&player, game.DEFAULT_TACTICAL_CONFIG))
-	enemies := [?]game.Enemy_Spawn{{position = {5, 3}, health = 20, attack = 1}}
+	enemies := [?]game.Enemy_Spawn{{position = {x = 5, y = 3}, health = 20, attack = 1}}
 	room, built := game.create_room(&data, &player, {enemies = enemies[:]})
 	testing.expect(t, built)
 	defer game.destroy_room(&room)
@@ -45,7 +45,7 @@ test_m7_fresh_walk_on_an_autonomous_world_beat_executes_in_the_same_frame :: pro
 	testing.expect(t, render.renderer_world_is_busy(renderer))
 	testing.expect(t, run_session.commit_gameplay_command(&room, renderer, &cards,
 		{kind = .Move, origin_phase = .Combat, direction = .East}))
-	testing.expect_value(t, player.position, game.add_position(origin, {1, 0}))
+	testing.expect_value(t, player.position, game.add_position(origin, {x = 1, y = 0}))
 	testing.expect_value(t, player.tactical.metrics.decisions, u64(1))
 	testing.expect(t, abs(player.tactical.remaining-18.2) < 0.001)
 }
@@ -58,7 +58,7 @@ test_m7_timed_deadline_discards_a_pending_chord_before_recovery :: proc(t: ^test
 	config := game.DEFAULT_TACTICAL_CONFIG
 	config.timer_seconds = 1
 	testing.expect(t, game.configure_tactical(&player, config))
-	enemies := [?]game.Enemy_Spawn{{position = {5, 3}, health = 20, attack = 1}}
+	enemies := [?]game.Enemy_Spawn{{position = {x = 5, y = 3}, health = 20, attack = 1}}
 	room, built := game.create_room(&data, &player, {enemies = enemies[:]})
 	testing.expect(t, built)
 	defer game.destroy_room(&room)
@@ -94,7 +94,7 @@ test_m7_targeting_survives_an_autonomous_beat_but_ends_at_the_deadline :: proc(t
 		config := game.DEFAULT_TACTICAL_CONFIG
 		if expires { config.timer_seconds = 1 }
 		testing.expect(t, game.configure_tactical(&player, config))
-		enemies := [?]game.Enemy_Spawn{{position = {5, 3}, health = 20, attack = 1}}
+		enemies := [?]game.Enemy_Spawn{{position = {x = 5, y = 3}, health = 20, attack = 1}}
 		room, built := game.create_room(&data, &player, {enemies = enemies[:]})
 		testing.expect(t, built)
 		defer game.destroy_room(&room)

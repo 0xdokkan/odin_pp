@@ -121,6 +121,10 @@ Sfx :: enum u8 {
 	Push,
 	Win,
 	Lose,
+	// The casino hall of the hub: a murmur, a slot's jingle, a roulette tick.
+	Hall_Murmur,
+	Hall_Slot,
+	Hall_Wheel,
 }
 
 sfx_params :: proc "contextless" (sfx: Sfx) -> Synth_Params {
@@ -159,6 +163,12 @@ sfx_params :: proc "contextless" (sfx: Sfx) -> Synth_Params {
 		return {shape = .Square, frequency = 523, sustain = 0.3, decay = 0.4, arp_time = 0.15, arp_multiply = 1.5, vibrato_rate = 6, vibrato_depth = 0.02, volume = 0.4}
 	case .Lose:
 		return {shape = .Saw, frequency = 330, slide = -260, sustain = 0.35, decay = 0.4, vibrato_rate = 5, vibrato_depth = 0.05, volume = 0.4}
+	case .Hall_Murmur:
+		return {shape = .Noise, frequency = 260, slide = 60, attack = 0.5, sustain = 0.5, decay = 0.7, volume = 0.22, seed = 21}
+	case .Hall_Slot:
+		return {shape = .Square, frequency = 1175, sustain = 0.05, decay = 0.28, punch = 0.3, arp_time = 0.09, arp_multiply = 1.26, duty = 0.3, volume = 0.22}
+	case .Hall_Wheel:
+		return {shape = .Square, frequency = 1900, sustain = 0.006, decay = 0.035, duty = 0.4, volume = 0.22}
 	}
 	return {}
 }

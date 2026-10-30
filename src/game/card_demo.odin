@@ -18,13 +18,14 @@ import level "../level"
 
 CARD_DEMO_WIDTH :: 11
 CARD_DEMO_HEIGHT :: 9
-CARD_DEMO_PLAYER :: grid.Position{5, 4}
+CARD_DEMO_PLAYER :: grid.Position{x = 5, y = 4}
 // The far corner: an exit the room needs (create_room), out of the way.
-CARD_DEMO_EXIT :: grid.Position{1, 1}
+CARD_DEMO_EXIT :: grid.Position{x = 1, y = 1}
 CARD_DEMO_MAX_FOES :: 6
 CARD_DEMO_MAX_OBJECTS :: 4
 CARD_DEMO_MAX_COILS :: 2
 CARD_DEMO_MAX_POOLS :: 8
+CARD_DEMO_MAX_FIRES :: 2
 CARD_DEMO_MAX_FILLERS :: 3
 CARD_DEMO_MAX_ACTIONS :: 12
 // FIRST PERSON SHOOTER's take: a burst of the AK every this many seconds,
@@ -34,6 +35,8 @@ CARD_DEMO_BURST_EVERY :: f32(3)
 CARD_DEMO_BURST_SECONDS :: f32(1.3)
 CARD_DEMO_BURST_DAMAGE :: i32(6)
 CARD_DEMO_BURST_TAIL :: f32(2.7)
+// FIRST PERSON ARCHER: how long the film draws the bow (a quarter and more: one bounce).
+CARD_DEMO_DRAW_SECONDS :: f32(0.6)
 CARD_DEMO_DECK_SEED :: u64(0xDE30_C4BD)
 CARD_DEMO_ROOM_SEED :: u64(0xDE30_500D)
 // The take's player: the game's own pilgrim, his life a little short where a
@@ -80,6 +83,15 @@ Card_Demo_Action_Kind :: enum u8 {
 	// FIRST PERSON SHOOTER: the view turned to the scene's foe `foe`, then the
 	// trigger held `seconds`.
 	Fire,
+	// FIRST PERSON BRAWLER: the view turned to the scene's foe `foe`, W held up to
+	// it, then a jab.
+	Punch,
+	// FIRST PERSON FENCER: the view turned to the scene's foe `foe` with Q or E,
+	// a step up to it, then a cut across it.
+	Cut,
+	// FIRST PERSON ARCHER: the view turned to the scene's foe `foe`, the bow
+	// drawn `seconds`, then let go.
+	Loose,
 	// ATTIVA: the Tesla network discharges (its button on the board's bar).
 	Activate,
 	// A wait (Space).
@@ -110,6 +122,17 @@ Card_Demo_Scene :: struct {
 	// Veleno 2 poured before the take.
 	pools: [CARD_DEMO_MAX_POOLS]grid.Position,
 	pool_count: int,
+	// Fires lit before the take (Bruciatura 1).
+	fires: [CARD_DEMO_MAX_FIRES]grid.Position,
+	fire_count: int,
+	// The way a cannon is turned to (CANNONE: the wheel's), when the scene aims it.
+	aim: Move_Direction,
+	has_aim: bool,
+	// BOMB MARLEY's script: the lights and the first column (marley_demo).
+	marley: bool,
+	marley_lights, marley_next_lights: [3]grid.Position,
+	marley_light_count, marley_next_count: int,
+	marley_column: int,
 	// More cards in the deck, so that draws have something to draw.
 	fillers: [CARD_DEMO_MAX_FILLERS]Card_Id,
 	filler_count: int,
@@ -154,7 +177,7 @@ card_demo_add_action :: proc(scene: ^Card_Demo_Scene, action: Card_Demo_Action) 
 // A cell `dx` east and `dy` south of the player (north is -dy).
 @(private)
 card_demo_offset :: proc(dx, dy: int) -> grid.Position {
-	return {CARD_DEMO_PLAYER.x+dx, CARD_DEMO_PLAYER.y+dy}
+	return grid.offset(CARD_DEMO_PLAYER, dx, dy)
 }
 
 // A cell `reach` away by `metric`, as far as can be to the player's right on
@@ -232,12 +255,12 @@ card_demo_default_scene :: proc(given: Card_Definition) -> (scene: Card_Demo_Sce
 			} else {
 				// What it strikes stands inside its area, east and north of the
 				// cell: one over the other on the screen.
-				card_demo_add_foe(&scene, {t.x+1, t.y})
-				card_demo_add_foe(&scene, {t.x, t.y-1})
+				card_demo_add_foe(&scene, grid.offset(t, 1, 0))
+				card_demo_add_foe(&scene, grid.offset(t, 0, -1))
 			}
 		}
 		if objects && spec.shape != .Line {
-			scene.objects[0] = {kind = .Barrel, position = {t.x-1, t.y}}
+			scene.objects[0] = {kind = .Barrel, position = grid.offset(t, -1, 0)}
 			scene.object_count = 1
 		}
 	}
@@ -264,13 +287,13 @@ card_demo_scene :: proc(id: Card_Id, upgrade_level: i32 = 0) -> (scene: Card_Dem
 		scene.faces = {4, 4, 0}
 	// The die's top face carries the bolt on to a second foe, beside the first.
 	case .Fate_Strike:
-		card_demo_add_foe(&scene, {scene.target.x+1, scene.target.y-1})
+		card_demo_add_foe(&scene, grid.offset(scene.target, 1, -1))
 		scene.faces = {CARD_DEMO_TOP, 0, 0}
 		scene.foe_hurt = 2
 	// The bolt leaps on to the two foes next in line.
 	case .Chain_Lightning, .Storm_Crown:
-		card_demo_add_foe(&scene, {scene.target.x+1, scene.target.y-1})
-		card_demo_add_foe(&scene, {scene.target.x+2, scene.target.y-2})
+		card_demo_add_foe(&scene, grid.offset(scene.target, 1, -1))
+		card_demo_add_foe(&scene, grid.offset(scene.target, 2, -2))
 		scene.foe_hurt = 3
 	// Two hits and a miss that guards; a pair that poisons.
 	case .Prismatic_Barrage:
@@ -352,7 +375,7 @@ card_demo_scene :: proc(id: Card_Id, upgrade_level: i32 = 0) -> (scene: Card_Dem
 		scene.foe_hurt = 1
 	// A foe beside the floor: shocked at each beat, as many times as its die.
 	case .Shock_Floor:
-		card_demo_add_foe(&scene, {scene.target.x-1, scene.target.y})
+		card_demo_add_foe(&scene, grid.offset(scene.target, -1, 0))
 		scene.faces = {3, 0, 0}
 		scene.seconds = 4
 		scene.foe_hurt = 1
@@ -388,8 +411,149 @@ card_demo_scene :: proc(id: Card_Id, upgrade_level: i32 = 0) -> (scene: Card_Dem
 			card_demo_add_action(&scene, {kind = .Fire, after = 0.3+f32(burst)*CARD_DEMO_BURST_EVERY, foe = burst%3, seconds = CARD_DEMO_BURST_SECONDS})
 		}
 		scene.foe_hurt = 3
+	// FIRST PERSON BRAWLER: played by a second click, then the same three foes as
+	// the AK's, one after the other: the view turned on it, a run up to it, a jab;
+	// a punch every few seconds for as long as the view lasts, each foe as hardy
+	// as the jabs it takes.
+	case .First_Person_Brawler:
+		seconds := f32(FIRST_PERSON_SECONDS)
+		for template in definition.effects[:definition.effect_count] {
+			if template.kind == .First_Person { seconds = f32(card_effect_amount(template, clamp(upgrade_level, 0, FIRST_PERSON_MAX_UPGRADE_LEVEL))) }
+		}
+		punches := clamp(int((seconds-CARD_DEMO_BURST_TAIL)/CARD_DEMO_BURST_EVERY)+1, 3, CARD_DEMO_MAX_ACTIONS)
+		for at, foe in ([3]grid.Position{card_demo_offset(0, -3), card_demo_offset(-2, -2), card_demo_offset(2, -2)}) {
+			card_demo_add_foe(&scene, at, health = FISTS_PUNCHES[.Jab].damage*i32((punches-foe+2)/3))
+		}
+		for punch in 0..<punches {
+			card_demo_add_action(&scene, {kind = .Punch, after = 0.3+f32(punch)*CARD_DEMO_BURST_EVERY, foe = punch%3})
+		}
+		scene.foe_hurt = 3
+	// FIRST PERSON FENCER: played by a second click, then three foes a step off his
+	// cell's sides, one after the other: the view turned on it, a step up, a cut
+	// across; a cut every few seconds for as long as the view lasts.
+	case .First_Person_Fencer:
+		seconds := f32(FENCER_SECONDS)
+		for template in definition.effects[:definition.effect_count] {
+			if template.kind == .First_Person { seconds = f32(card_effect_amount(template, clamp(upgrade_level, 0, FIRST_PERSON_MAX_UPGRADE_LEVEL))) }
+		}
+		// As many cuts as the AK's twenty seconds take (the film ends the longer view after them).
+		seconds = min(seconds, f32(FIRST_PERSON_SECONDS))
+		cuts := clamp(int((seconds-CARD_DEMO_BURST_TAIL)/CARD_DEMO_BURST_EVERY)+1, 3, CARD_DEMO_MAX_ACTIONS)
+		for at, foe in ([3]grid.Position{card_demo_offset(0, -2), card_demo_offset(-2, 0), card_demo_offset(2, 0)}) {
+			card_demo_add_foe(&scene, at, health = 3*i32((cuts-foe+2)/3))
+		}
+		for cut in 0..<cuts {
+			card_demo_add_action(&scene, {kind = .Cut, after = 0.3+f32(cut)*CARD_DEMO_BURST_EVERY, foe = cut%3})
+		}
+		scene.foe_hurt = 3
+	// FIRST PERSON ARCHER: played by a second click, then three foes three cells
+	// off him, one after the other: the view turned on it, the bow drawn a
+	// moment and let go; a shot every few seconds as the AK's bursts.
+	case .First_Person_Archer:
+		seconds := f32(ARCHER_SECONDS)
+		for template in definition.effects[:definition.effect_count] {
+			if template.kind == .First_Person { seconds = f32(card_effect_amount(template, clamp(upgrade_level, 0, FIRST_PERSON_MAX_UPGRADE_LEVEL))) }
+		}
+		// As many shots as the AK's twenty seconds take (the film ends the longer view after them).
+		seconds = min(seconds, f32(FIRST_PERSON_SECONDS))
+		shots := clamp(int((seconds-CARD_DEMO_BURST_TAIL)/CARD_DEMO_BURST_EVERY)+1, 3, CARD_DEMO_MAX_ACTIONS)
+		for at, foe in ([3]grid.Position{card_demo_offset(0, -3), card_demo_offset(-3, 0), card_demo_offset(3, 0)}) {
+			card_demo_add_foe(&scene, at, health = 4*i32((shots-foe+2)/3))
+		}
+		for shot in 0..<shots {
+			card_demo_add_action(&scene, {kind = .Loose, after = 0.3+f32(shot)*CARD_DEMO_BURST_EVERY, foe = shot%3, seconds = CARD_DEMO_DRAW_SECONDS})
+		}
+		scene.foe_hurt = 3
 	// CANNA DA PESCA: a cleared room, the rod's slot, the water at his right,
 	// the player a little hurt so that the food's cure shows.
+	// BOMB MARLEY: one column warned, and two foes in it, one standing in a
+	// light and one not: the bomb hurts the one and spares the other. The film
+	// ends a few seconds after, long before the party would.
+	case .Marley_Party:
+		scene.foes[0] = {at = card_demo_offset(3, -2), archetype = .Chaser, health = 30, attack = 1}
+		scene.foes[1] = {at = card_demo_offset(3, 1), archetype = .Chaser, health = 30, attack = 1}
+		scene.foe_count = 2
+		scene.marley = true
+		scene.marley_lights = {card_demo_offset(3, -2), card_demo_offset(-2, 1), {}}
+		scene.marley_light_count = 2
+		// The cells the lights will move to, on show meanwhile.
+		scene.marley_next_lights = {card_demo_offset(-3, -2), card_demo_offset(1, 3), card_demo_offset(-1, -3)}
+		scene.marley_next_count = 3
+		scene.marley_column = CARD_DEMO_PLAYER.x+3
+		scene.seconds = 4
+		scene.foe_hurt = 1
+		scene.expects = {.Marley_Warned, .Marley_Bomb, .Marley_Saved, .Damaged}
+	// INONDAZIONE: foes in the wave's way, one against the far wall, and two
+	// fires (one a card's, one the board's) it puts out. Dropped north east of
+	// the player, the aim is a tie: the wave goes east.
+	case .Flood_Wave:
+		scene.foes[0] = {at = card_demo_offset(-2, -1), archetype = .Chaser, health = 30, attack = 1}
+		scene.foes[1] = {at = card_demo_offset(1, 2), archetype = .Chaser, health = 30, attack = 1}
+		scene.foes[2] = {at = card_demo_offset(4, 0), archetype = .Chaser, health = 30, attack = 1}
+		scene.foe_count = 3
+		scene.fires[0] = card_demo_offset(-1, 3)
+		scene.fire_count = 1
+		scene.objects[0] = {kind = .Fire, position = card_demo_offset(2, -3)}
+		scene.object_count = 1
+		scene.seconds = 2
+		scene.expects = {.Moved, .Fire_Extinguished}
+	// CANNONE and its laser: set down at his right and turned north, up the
+	// board, at two foes one behind the other (the cell stays high: a drop must
+	// be above the hand): the ball strikes the first, the
+	// beam both.
+	case .Field_Cannon, .Laser_Cannon:
+		scene.target = card_demo_offset(2, -1)
+		scene.aim, scene.has_aim = .North, true
+		scene.foes[0] = {at = card_demo_offset(2, -2), archetype = .Chaser, health = 30, attack = 1}
+		scene.foes[1] = {at = card_demo_offset(2, -3), archetype = .Chaser, health = 30, attack = 1}
+		scene.foe_count = 2
+		scene.seconds = 4
+		scene.foe_hurt = 1 if id == .Field_Cannon else 2
+		scene.expects = {.Damaged}
+	// BUCO NERO: dropped at his right with a weak foe in its middle (it dies
+	// on the second beat, swallowed) and one at the edge of the pull, up and
+	// to the left, drawn in to be hurt.
+	case .Devouring_Hole:
+		power := BLACK_HOLE_BASE_DAMAGE+upgrade_level
+		radius := int(black_hole_radius(upgrade_level))
+		scene.target = card_demo_offset(2, -1)
+		scene.foes[0] = {at = grid.offset(scene.target, 1, 0), archetype = .Chaser, health = power*2-1, attack = 1}
+		scene.foes[1] = {at = grid.offset(scene.target, -radius-1, 0), archetype = .Chaser, health = 40, attack = 1}
+		scene.foe_count = 2
+		scene.seconds = 5
+		scene.foe_hurt = 1
+		scene.expects = {.Moved, .Black_Hole_Swallowed, .Entity_Defeated}
+	// DINOSAURO: the d4 shows a different dinosaur at each level, and a scene
+	// of its own for each: the raptor's quick steps and its bleeding bumps, the
+	// stegosaurus turning an archer's bolt back, the dilophosaurus's venom, the
+	// giganotosaurus's stomps and the bite that kills.
+	case .Dino_Ride:
+		face := upgrade_level%4+1
+		scene.faces = {face, 0, 0}
+		switch face {
+		case 1:
+			card_demo_add_foe(&scene, card_demo_offset(0, -3))
+			for step in 0..<4 { card_demo_add_action(&scene, {kind = .Step, after = 0.3+0.5*f32(step), direction = .North}) }
+			scene.expects = {.Status_Applied}
+			scene.foe_hurt = 1
+		case 2:
+			card_demo_add_foe(&scene, card_demo_offset(0, -3), .Archer, free = true)
+			scene.seconds = 4
+			scene.expects = {.Attack_Deflected}
+			scene.foe_hurt = 1
+		case 3:
+			card_demo_add_foe(&scene, card_demo_offset(0, -2))
+			for step in 0..<3 { card_demo_add_action(&scene, {kind = .Step, after = 0.3+0.9*f32(step), direction = .North}) }
+			scene.expects = {.Status_Applied}
+			scene.foe_hurt = 1
+		case:
+			card_demo_add_foe(&scene, card_demo_offset(1, -1))
+			card_demo_add_foe(&scene, card_demo_offset(-1, -1))
+			card_demo_add_foe(&scene, card_demo_offset(0, -3))
+			for step in 0..<3 { card_demo_add_action(&scene, {kind = .Step, after = 0.3+1.0*f32(step), direction = .North}) }
+			scene.expects = {.Dino_Stomp, .Entity_Defeated}
+			scene.foe_hurt = 2
+		}
 	case .Fishing_Rod:
 		scene = {gesture = .Rod_Slot, target = card_demo_offset(2, -2), cleared = true, faces = {3, 0, 0}, seconds = 1, wounds = 6}
 	}
@@ -400,7 +564,7 @@ card_demo_scene :: proc(id: Card_Id, upgrade_level: i32 = 0) -> (scene: Card_Dem
 // of the scene's foes it must hurt: from its definition alone, so that a new
 // card's take is held to it with no word of its own. Every kind of effect is
 // named, so a new one does not compile until it says how its take shows it.
-card_demo_expected_events :: proc(id: Card_Id) -> (events: bit_set[Game_Event_Kind], foes_hurt: int) {
+card_demo_expected_events :: proc(id: Card_Id, upgrade_level: i32 = 0) -> (events: bit_set[Game_Event_Kind], foes_hurt: int) {
 	definition, found := card_definition_by_id(id)
 	if !found { return }
 	// The rod is no card played: its slot casts it (Fish_Cast).
@@ -441,12 +605,18 @@ card_demo_expected_events :: proc(id: Card_Id) -> (events: bit_set[Game_Event_Ki
 		case .Pinball: events += {.Pinball_Made, .Pinball_Launched, .Pinball_Bumped, .Pinball_Burst}
 		// Its shots record no event: the take counts the room's hits.
 		case .First_Person: events += {.First_Person_Begun}
+		// The party begins under the ball's lights; the wave sweeps the board.
+		case .Marley: events += {.Marley_Begun, .Marley_Lights}
+		case .Flood_Wave: events += {.Flood_Swept}
+		case .Place_Cannon: events += {.Object_Spawned, .Cannon_Fired}
+		case .Open_Black_Hole: events += {.Object_Spawned, .Black_Hole_Tick}
+		case .Ride: events += {.Ride_Begun}
 		}
 	}
 	// A dice card shows its roll; the Dado del Destino's die rolls at the bump
 	// it loads (its scene's Fate_Rolled).
 	if card_dice_count(id) > 0 && id != .Fate_Dice { events += {.Dice_Rolled} }
-	scene := card_demo_scene(id)
+	scene := card_demo_scene(id, upgrade_level)
 	events += scene.expects
 	foes_hurt = max(foes_hurt, scene.foe_hurt)
 	return
@@ -459,7 +629,7 @@ card_demo_expected_events :: proc(id: Card_Id) -> (events: bit_set[Game_Event_Ki
 card_demo_status_use :: proc(kind: Status_Kind) -> (events: bit_set[Game_Event_Kind], foe_hurt: bool) {
 	switch kind {
 	// Their chips and the paper tags say it all.
-	case .Poison, .Shield, .Stagger, .Survey, .Burn, .Slow:
+	case .Poison, .Shield, .Stagger, .Survey, .Burn, .Slow, .Bleed:
 	// SPINE: a blow on him answered.
 	case .Thorns: return {.Damaged}, true
 	// SCIA: a step that shields him.
@@ -550,7 +720,7 @@ create_card_demo_room :: proc(given: Card_Demo_Scene, card: Card_Instance, dice:
 	buffer: [CARD_DEMO_HEIGHT][CARD_DEMO_WIDTH]u8
 	for y in 0..<CARD_DEMO_HEIGHT {
 		for x in 0..<CARD_DEMO_WIDTH {
-			cell := grid.Position{x, y}
+			cell := grid.Position{x = x, y = y}
 			switch {
 			case x == 0 || y == 0 || x == CARD_DEMO_WIDTH-1 || y == CARD_DEMO_HEIGHT-1: buffer[y][x] = '#'
 			case cell == CARD_DEMO_PLAYER: buffer[y][x] = '@'
@@ -626,6 +796,14 @@ create_card_demo_room :: proc(given: Card_Demo_Scene, card: Card_Instance, dice:
 	for cell in scene.pools[:scene.pool_count] {
 		action := make_action(.Card, PLAYER_ENTITY, cell_target(cell), .Walkable_Cell)
 		if !add_effect(&action, place_ground_effect(cell, .Poison, 2)) || !resolve_action(room, &action).accepted { return }
+	}
+	for cell in scene.fires[:scene.fire_count] {
+		action := make_action(.Card, PLAYER_ENTITY, cell_target(cell), .Walkable_Cell)
+		if !add_effect(&action, place_ground_effect(cell, .Burn, 1)) || !resolve_action(room, &action).accepted { return }
+	}
+	if scene.marley {
+		room.marley_demo = {scripted = true, lights = scene.marley_lights, light_count = scene.marley_light_count,
+			next_lights = scene.marley_next_lights, next_count = scene.marley_next_count, column = scene.marley_column}
 	}
 	if scene.player_stacks > 0 {
 		if applied, _ := apply_status(room, PLAYER_ENTITY, scene.player_status, scene.player_stacks, 0); !applied { return }

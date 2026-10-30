@@ -5,20 +5,20 @@ import game "../game"
 
 @(test)
 test_living_ring_colour_follows_the_intent :: proc(t: ^testing.T) {
-	enemy := game.Enemy{position = {5, 5}}
+	enemy := game.Enemy{position = {x = 5, y = 5}}
 	expect_kind :: proc(t: ^testing.T, enemy: ^game.Enemy, intent: game.Enemy_Intent, want: Living_Ring_Kind, loc := #caller_location) {
 		enemy.intent = intent
 		testing.expectf(t, living_ring_kind(enemy) == want, "%v: got %v, want %v", intent.kind, living_ring_kind(enemy), want, loc = loc)
 	}
 	front := game.Enemy_Intent{kind = .Attack, threatened_cell_count = 1}
-	front.threatened_cells[0] = {6, 5}
+	front.threatened_cells[0] = {x = 6, y = 5}
 	expect_kind(t, &enemy, front, .Strike)
 	// A cleave also takes the cells beside the one in front: still a blow.
 	cleave := front
-	cleave.threatened_cells[1], cleave.threatened_cells[2], cleave.threatened_cell_count = {6, 4}, {6, 6}, 3
+	cleave.threatened_cells[1], cleave.threatened_cells[2], cleave.threatened_cell_count = {x = 6, y = 4}, {x = 6, y = 6}, 3
 	expect_kind(t, &enemy, cleave, .Strike)
 	shot := game.Enemy_Intent{kind = .Attack, threatened_cell_count = 1}
-	shot.threatened_cells[0] = {9, 5}
+	shot.threatened_cells[0] = {x = 9, y = 5}
 	expect_kind(t, &enemy, shot, .Ranged)
 	aim := front
 	aim.windup = true

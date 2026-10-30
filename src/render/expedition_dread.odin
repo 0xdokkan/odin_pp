@@ -204,7 +204,7 @@ draw_expedition_dread_wall :: proc(pass:Ink_Pass,room:^game.Room,w:^world.World,
 	ink_box(pass,base,{.49,.49},height,0,stone,p.cap,{})
 	ink_box(pass,base,{.495,.495},.10,0,p.dark,p.stone,{})
 	ink_box(pass,base+{0,height-.08,0},{.495,.495},.10,0,p.cap,p.cap,{})
-	for direction,i in ([4]grid.Position{{0,1},{1,0},{0,-1},{-1,0}}) {
+	for direction,i in ([4]grid.Position{{x = 0, y = 1},{x = 1, y = 0},{x = 0, y = -1},{x = -1, y = 0}}) {
 		if expedition_wall_joined(room,site,game.add_position(cell,direction),expedition_site_wall_height(design)) {continue}
 		face:=math.atan2(f32(-direction.x),f32(direction.y))
 		// The camera-facing exposed faces carry the small details. Back faces

@@ -198,7 +198,7 @@ draw_expedition_cyber_wall :: proc(pass:Ink_Pass,room:^game.Room,site:^world.Sit
 	if gate {height=2.12}
 	cyber_case(pass,base,{.49,.49},height,0)
 	ink_box(pass,base,{.495,.495},.10,0,CYBER_RECESS,CYBER_CAP,{})
-	for direction in ([4]grid.Position{{0,1},{1,0},{0,-1},{-1,0}}) {
+	for direction in ([4]grid.Position{{x = 0, y = 1},{x = 1, y = 0},{x = 0, y = -1},{x = -1, y = 0}}) {
 		if cyber_joined_wall(room,site,game.add_position(cell,direction)) {continue}
 		face_yaw:=math.atan2(f32(-direction.x),f32(direction.y))
 		detail:=(abs(q.x)+abs(q.y))%3==0 || gate
@@ -252,7 +252,7 @@ draw_expedition_cyber_fixture :: proc(pass:Ink_Pass,site:^world.Site,boss_defeat
 	yaw:=f32(site.orientation%4)*math.PI/2
 	accent:=ink_scale(CYBER_RED,.45) if site.state==.Resolved else CYBER_RED
 	if site.secret {accent={237,195,91,254}}
-	switch site.kind {
+	#partial switch site.kind {
 	case .Archive,.Memory:
 		cyber_console(pass,base,yaw,site.kind==.Archive,site.secret)
 	case .Workshop:

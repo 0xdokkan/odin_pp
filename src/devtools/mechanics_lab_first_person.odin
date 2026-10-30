@@ -4,6 +4,8 @@ import run_session "../run"
 
 import "core:fmt"
 import "core:math"
+import "core:os"
+import "core:slice"
 import rl "vendor:raylib"
 import app "../engine/app"
 import game "../game"
@@ -42,7 +44,7 @@ import render "../render"
 mechanics_lab_first_person :: proc(window: ^app.Window, renderer: ^render.Renderer, room: ^game.Room, data: ^level.Level,
 	controller: ^run_session.Tactical_Controller, cards: ^run_session.Card_Interaction_State, buffer: ^run_session.Buffered_Gameplay_Command) -> bool {
 	player := room.player
-	center := grid.Position{run_session.MECHANICS_LAB_WIDTH/2, run_session.MECHANICS_LAB_HEIGHT/2}
+	center := grid.Position{x = run_session.MECHANICS_LAB_WIDTH/2, y = run_session.MECHANICS_LAB_HEIGHT/2}
 	fp := &renderer.tactical.first_person
 	foe :: mechanics_lab_enemy
 	spawn :: mechanics_lab_spawn_enemy
@@ -95,11 +97,11 @@ mechanics_lab_first_person :: proc(window: ^app.Window, renderer: ^render.Render
 	player.equipment = {}
 	for kind in ([6]game.Status_Kind{.Deflect, .Arrows, .Fate, .Venom_Blade, .Poison, .Burn}) { _, _ = game.remove_status(room, game.PLAYER_ENTITY, kind) }
 	player.tactical.dodge_recovery, player.tactical.facing = 0, .North
-	ghoul_id := spawn(room, {center.x, center.y-3}, 40)
-	ice := grid.Position{center.x-2, center.y}
+	ghoul_id := spawn(room, grid.offset(center, 0, -3), 40)
+	ice := grid.offset(center, -2, 0)
 	append(&room.objects, game.Grid_Object{id = room.next_object_id, kind = .Ice_Block, position = ice, health = 4, max_health = 4})
 	room.next_object_id += 1
-	hidden_id := spawn(room, {center.x-4, center.y}, 30, .Archer)
+	hidden_id := spawn(room, grid.offset(center, -4, 0), 30, .Archer)
 	if ghoul_id == 0 || hidden_id == 0 { fmt.eprintln("mechanics lab: no room for the first person's foes"); return false }
 	render.clear_event_animations(renderer)
 	for _ in 0..<12 { frame(window, renderer, room, controller, cards, buffer) }
@@ -165,6 +167,11 @@ mechanics_lab_first_person :: proc(window: ^app.Window, renderer: ^render.Render
 		fmt.eprintln("mechanics lab: the hand did not slide away behind his eyes:", render.first_person_hand_drop(renderer)); return false
 	}
 	mechanics_lab_still(window, renderer, room, 0, "odin_pp_mechanics_lab_fps.png")
+	// ODIN_PP_LAB_TIMING=1 measures the view here instead of going on
+	// (docs/piano-prima-persona.md, Fase 0).
+	if timing, _ := os.lookup_env("ODIN_PP_LAB_TIMING", context.temp_allocator); timing == "1" {
+		return mechanics_lab_first_person_timing(window, renderer, room, controller, cards, buffer)
+	}
 	// A second of the trigger held at sixty frames: six shots into the ghoul.
 	fp.yaw, fp.pitch = -math.PI/2, 0
 	poisoned, _ := game.apply_status(room, game.PLAYER_ENTITY, .Poison, 2, 0)
@@ -229,7 +236,7 @@ mechanics_lab_first_person :: proc(window: ^app.Window, renderer: ^render.Render
 	// The tracer's flight to the wall, eight cells off, and the stone chips
 	// its spark throws off.
 	for _ in 0..<16 { frame(window, renderer, room, controller, cards, buffer) }
-	edge := grid.Position{player.position.x, run_session.MECHANICS_LAB_HEIGHT-1}
+	edge := grid.Position{x = player.position.x, y = run_session.MECHANICS_LAB_HEIGHT-1}
 	tile, inside := level.tile_at(data, edge)
 	_, object := game.grid_object_at(room, edge)
 	if room.first_person.shots != shots+1 || stone.hit != .Solid || stone.cell != edge || !inside || level.is_walkable(tile.kind) || object ||
@@ -243,7 +250,7 @@ mechanics_lab_first_person :: proc(window: ^app.Window, renderer: ^render.Render
 	keys := render.first_person_keys(renderer)
 	if keys != ([4]game.Move_Direction{.East, .South, .West, .North}) { fmt.eprintln("mechanics lab: the keys facing east are", keys); return false }
 	shot = 0
-	ways := [4]grid.Position{{1, 0}, {0, 1}, {-1, 0}, {0, -1}}
+	ways := [4]grid.Position{{x = 1, y = 0}, {x = 0, y = 1}, {x = -1, y = 0}, {x = 0, y = -1}}
 	for way, index in ways {
 		free_board(window, renderer, room, controller, cards, buffer)
 		from := player.position
@@ -264,7 +271,7 @@ mechanics_lab_first_person :: proc(window: ^app.Window, renderer: ^render.Render
 		}
 	}
 	// W into a foe is a bump.
-	bumped_id := spawn(room, {center.x+1, center.y}, 30)
+	bumped_id := spawn(room, grid.offset(center, 1, 0), 30)
 	free_board(window, renderer, room, controller, cards, buffer)
 	if bumped_id == 0 || !run_session.commit_gameplay_command(room, renderer, cards, {kind = .Move, origin_phase = .Combat, direction = keys[0]}) ||
 	   player.position != center || foe(room, bumped_id).health != 30-player.stats.attack {
@@ -277,7 +284,7 @@ mechanics_lab_first_person :: proc(window: ^app.Window, renderer: ^render.Render
 	dodge := run_session.Tactical_Controller_Input{shift = true}
 	dodge.directions[1] = true
 	frame(window, renderer, room, controller, cards, buffer, input = dodge)
-	if player.position != (grid.Position{center.x, center.y+2}) {
+	if player.position != (grid.offset(center, 0, 2)) {
 		fmt.eprintln("mechanics lab: Shift and D facing east dodged to", player.position); return false
 	}
 	for _ in 0..<40 { frame(window, renderer, room, controller, cards, buffer) }
@@ -287,7 +294,7 @@ mechanics_lab_first_person :: proc(window: ^app.Window, renderer: ^render.Render
 	_ = mechanics_lab_clear_arena(room)
 	player.tactical.dodge_recovery = 0
 	fp.yaw, fp.pitch = 0, 0
-	attacker_id := spawn(room, {player.position.x+1, player.position.y}, 60, free = true)
+	attacker_id := spawn(room, grid.offset(player.position, 1, 0), 60, free = true)
 	if attacker_id == 0 { fmt.eprintln("mechanics lab: no room for the free ghoul"); return false }
 	prompted := false
 	for _ in 0..<600 {
@@ -308,7 +315,7 @@ mechanics_lab_first_person :: proc(window: ^app.Window, renderer: ^render.Render
 	land := run_session.Tactical_Controller_Input{}
 	land.directions[3] = true
 	frame(window, renderer, room, controller, cards, buffer, input = land)
-	if room.qte.kind != .None || player.position != (grid.Position{from.x, from.y-1}) {
+	if room.qte.kind != .None || player.position != (grid.offset(from, 0, -1)) {
 		fmt.eprintln("mechanics lab: E then A facing east dodged to", player.position, "from", from); return false
 	}
 	// A blow let through: the edges flash red.
@@ -375,14 +382,17 @@ mechanics_lab_first_person :: proc(window: ^app.Window, renderer: ^render.Render
 	mechanics_lab_still(window, renderer, room, 0, "odin_pp_mechanics_lab_fps_upgraded.png")
 	// The HUD's words hold: the countdown in its plate, the line beside the
 	// plate's objective (a full room's too).
+	// Every weapon's words, not only the AK's.
 	countdown := render.first_person_countdown_bounds(renderer)
-	if _, _, _, fit := render.gothic_text_fit_plan(renderer, render.first_person_countdown_text(30), countdown.width-24, 18); fit != .Fits {
-		fmt.eprintln("mechanics lab: the countdown does not hold in its plate:", fit); return false
-	}
-	for objective in ([2]cstring{render.tactical_hud_objective(renderer, room), render.tactical_hud_foes_objective(game.MAX_ENEMIES_PER_ROOM)}) {
-		room_width := render.tactical_hud_status_room(renderer, objective)
-		if _, _, _, fit := render.gothic_text_fit_plan(renderer, render.FIRST_PERSON_HUD_STATUS, room_width, 10); fit != .Fits {
-			fmt.eprintln("mechanics lab: the HUD's line behind his eyes does not hold in", room_width, "px:", fit); return false
+	for weapon in game.First_Person_Weapon {
+		if _, _, _, fit := render.gothic_text_fit_plan(renderer, render.first_person_countdown_text(30, weapon), countdown.width-24, 18); fit != .Fits {
+			fmt.eprintln("mechanics lab: the countdown does not hold in its plate:", weapon, fit); return false
+		}
+		for objective in ([2]cstring{render.tactical_hud_objective(renderer, room), render.tactical_hud_foes_objective(game.MAX_ENEMIES_PER_ROOM)}) {
+			room_width := render.tactical_hud_status_room(renderer, objective)
+			if _, _, _, fit := render.gothic_text_fit_plan(renderer, render.FIRST_PERSON_LOOKS[weapon].status, room_width, 10); fit != .Fits {
+				fmt.eprintln("mechanics lab: the HUD's line behind his eyes does not hold in", room_width, "px:", weapon, fit); return false
+			}
 		}
 	}
 	for _ in 0..<120 {
@@ -414,5 +424,59 @@ mechanics_lab_first_person :: proc(window: ^app.Window, renderer: ^render.Render
 		"%v, %v, %v, %v and %v sounded\n", dived, beats,
 		render.LAB_FIRST_PERSON_ENTER, render.LAB_FIRST_PERSON_SHOT, render.LAB_FIRST_PERSON_HIT, render.LAB_FIRST_PERSON_RICOCHET,
 		render.LAB_FIRST_PERSON_EXIT)
+	return true
+}
+
+MECHANICS_LAB_TIMING_WARMUP :: 60
+MECHANICS_LAB_TIMING_SAMPLES :: 600
+
+// The time of a frame behind his eyes, the AK firing north at the ghoul: the
+// whole smoke frame (controller, view, board, HUD, presentation), with no frame
+// limit and no vsync, as the expedition benchmark measures. The world takes
+// sixty frames a second whatever the real time, so every run sees the same room.
+// The first person arena's act (mechanics_lab_prima_persona.odin) measures the fists with it.
+@(private)
+mechanics_lab_first_person_timing :: proc(window: ^app.Window, renderer: ^render.Renderer, room: ^game.Room,
+	controller: ^run_session.Tactical_Controller, cards: ^run_session.Card_Interaction_State, buffer: ^run_session.Buffered_Gameplay_Command,
+	weapon := game.First_Person_Weapon.AK) -> bool {
+	rl.SetTargetFPS(0)
+	rl.ClearWindowState({.VSYNC_HINT})
+	fp := &renderer.tactical.first_person
+	// The AK fires north; the fists (Fase 3) face the brute east, a punch every
+	// quarter of a second (jab, cross, hooks in turn), W held half the time; the
+	// sword (Fase 4) swings back and forth, the button held half the time; the
+	// bow (Fase 6) faces the brute east, drawn a second and let go, again and again.
+	if weapon == .AK { fp.yaw, fp.pitch = -math.PI/2, 0 }
+	if weapon == .Fists || weapon == .Bow { fp.yaw, fp.pitch = 0, 0 }
+	samples: [MECHANICS_LAB_TIMING_SAMPLES]f64
+	last := rl.GetTime()
+	for index in 0..<MECHANICS_LAB_TIMING_WARMUP+MECHANICS_LAB_TIMING_SAMPLES {
+		input := run_session.Tactical_Controller_Input{focused = true, fire = true}
+		if weapon == .Sword {
+			input = {focused = true, look = {(40 if (index/30)%2 == 0 else -40), 0}, fire = (index/120)%2 == 0}
+		}
+		if weapon == .Bow { input = {focused = true, fire_right = index%75 < 60} }
+		if weapon == .Fists {
+			press := index%15 == 0
+			input = {focused = true, fire = press && (index/15)%2 == 0, fire_right = press && (index/15)%2 == 1, shift = (index/30)%2 == 1}
+			input.walk[0] = (index/60)%2 == 0
+		}
+		mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0, true, nil, input)
+		now := rl.GetTime()
+		if index >= MECHANICS_LAB_TIMING_WARMUP { samples[index-MECHANICS_LAB_TIMING_WARMUP] = (now-last)*1000 }
+		last = now
+		if !game.tactical_first_person_active(room) { fmt.eprintln("mechanics lab timing: the view ended at frame", index); return false }
+	}
+	values := samples[:]
+	slice.sort(values)
+	total: f64
+	for ms in values { total += ms }
+	count := len(values)
+	mean := total/f64(count)
+	median := (values[(count-1)/2]+values[count/2])*0.5
+	p95 := values[(count*95+99)/100-1]
+	fmt.printf("FIRST PERSON TIMING canvas_px=%dx%d samples=%d warmup=%d mean_ms=%.3f median_ms=%.3f p95_ms=%.3f max_ms=%.3f mean_fps=%.2f vsync_hint=%v\n",
+		window.canvas.texture.width, window.canvas.texture.height, count, MECHANICS_LAB_TIMING_WARMUP, mean, median, p95, values[count-1],
+		1000/max(mean, 0.000001), rl.IsWindowState({.VSYNC_HINT}))
 	return true
 }

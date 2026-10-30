@@ -1267,3 +1267,73 @@ def card_first_person(seed):
         (0.19, home, 0.8),
     ])
     return _out(x, 0.08)
+
+
+@sound("card_first_person_brawler", loudness=LOUD, wet=WET, marks=(0.0, 0.05, 0.14))
+def card_first_person_brawler(seed):
+    """First Person Brawler (docs/piano-prima-persona.md, Fase 3): the gloves as
+    the card leaves his hand: knocked together twice, at 0.05 and 0.14 (a
+    leather slap over a low thud, the second the harder), a crackle of neon on
+    the second; the ring's bell is the dive's (world_ring_bell, sfx_brawler.py)."""
+    dur = 0.5
+
+    def slap(s, hard):
+        t = time_axis(0.12)
+        thud = _thump(0.12, s, f0=150, f1=85, drop=0.012, tau=0.03 + 0.015 * hard, lp=1400, noise=0.6, ntau=0.01)
+        leather = _norm(bandpass(white(0.12, s + 1), 1000, 1.3)) * np.exp(-t / 0.012)
+        return _ramp(_norm(thud + (0.7 + 0.3 * hard) * leather), 0.0005)
+
+    t = time_axis(0.06)
+    crackle = square(2200 + 260 * np.sin(2 * np.pi * 37 * t), 0.06) * 0.5 + _norm(white(0.06, seed + 3)) * 0.6
+    crackle = _norm(highpass(crackle, 1800, 2)) * np.exp(-t / 0.02)
+    x = place(dur, [
+        (0.0, _flick(seed), FLICK),
+        (0.05, slap(seed + 10, 0.0), 0.5),
+        (0.14, slap(seed + 20, 1.0), 0.7),
+        (0.145, crackle, 0.12),
+    ])
+    return _out(x, 0.08)
+
+
+@sound("card_first_person_fencer", loudness=LOUD, wet=WET, marks=(0.0, 0.06, 0.30))
+def card_first_person_fencer(seed):
+    """First Person Fencer (provisional until its Fase 5, docs/piano-prima-persona.md):
+    the sword drawn as the card leaves his hand: the blade sliding out of its
+    scabbard from 0.06 s (a steel scrape rising in pitch), then the clean ring
+    of the blade free at 0.30 s, fading."""
+    dur = 1.0
+    t = time_axis(0.24)
+    scrape = sweep_bandpass(white(0.24, seed + 1), 2200, 5200, 4.0) * np.clip(t / 0.03, 0, 1) * np.exp(-np.clip(t - 0.18, 0, None) / 0.03)
+    t2 = time_axis(0.7)
+    ring = fm(2650, 2650 * 1.414, 1.4 * np.exp(-t2 / 0.05), 0.7) * np.exp(-t2 / 0.3)
+    ring = ring + 0.4 * sine(5300, 0.7) * np.exp(-t2 / 0.15)
+    x = place(dur, [
+        (0.0, _flick(seed), FLICK),
+        (0.06, _norm(scrape), 0.45),
+        (0.30, _ramp(_norm(ring), 0.0008), 0.5),
+    ])
+    return _out(x, 0.08)
+
+
+@sound("card_first_person_archer", loudness=LOUD, wet=WET, marks=(0.0, 0.08, 0.42))
+def card_first_person_archer(seed):
+    """First Person Archer (docs/piano-prima-persona.md, Fase 6): the compound
+    bow taken up as the card leaves his hand: its cams turning as the string is
+    drawn from 0.08 s (a soft ratchet of clicks over a rising creak), then let
+    go at 0.42 s: the string's twang (a plucked string, Karplus-Strong) and the
+    arrow's short whistle off."""
+    dur = 1.1
+    t = time_axis(0.32)
+    creak = sweep_bandpass(white(0.32, seed + 1), 500, 1400, 6.0) * np.clip(t / 0.05, 0, 1) * (0.4 + 0.6 * t / 0.32)
+    clicks = grains(0.32, [0.02 + 0.05 * k for k in range(6)], 0.004, seed + 2, band=(2500, 6000))
+    twang = fade(karplus(165, 0.6, damping=0.994, brightness=0.6, seed=seed + 3), 0.0, 0.2)
+    t3 = time_axis(0.22)
+    whistle = sweep_bandpass(white(0.22, seed + 4), 3800, 2200, 8.0) * np.exp(-t3 / 0.07)
+    x = place(dur, [
+        (0.0, _flick(seed), FLICK),
+        (0.08, _norm(creak), 0.35),
+        (0.08, _norm(clicks), 0.25),
+        (0.42, _ramp(_norm(twang), 0.0005), 0.6),
+        (0.44, _norm(whistle), 0.25),
+    ])
+    return _out(x, 0.08)

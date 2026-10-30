@@ -30,7 +30,7 @@ create_lasso_controller_test_room :: proc(t: ^testing.T, data: ^level.Level, pla
 	config.vision_size = 0
 	config.timed_actions = true
 	testing.expect(t, game.configure_tactical(player, config))
-	enemies := [?]game.Enemy_Spawn{{position = {7, 4}, health = 40, attack = 1}}
+	enemies := [?]game.Enemy_Spawn{{position = {x = 7, y = 4}, health = 40, attack = 1}}
 	built: bool
 	room^, built = game.create_room(data, player, {enemies = enemies[:]})
 	return testing.expect(t, built)
@@ -100,7 +100,7 @@ test_lasso_spins_in_world_commands_and_a_dodge_lets_go :: proc(t: ^testing.T) {
 	render.update_renderer_frame_timeline(renderer, dt)
 	testing.expect(t, run_session.step_tactical_controller(&controller, &room, renderer, &cards, &held, dt, true, input))
 	testing.expect(t, !room.lasso.active)
-	testing.expect_value(t, player.position, game.add_position(body, {0, 2}))
+	testing.expect_value(t, player.position, game.add_position(body, {x = 0, y = 2}))
 	index, alive := game.enemy_index_by_id(&room, foe)
 	testing.expect(t, alive)
 	testing.expect_value(t, room.enemies[index].position, under)

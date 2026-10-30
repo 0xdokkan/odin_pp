@@ -9,7 +9,9 @@ import game "../game"
 // every rule written for cells (sites, traps, lava, patrols, engagement)
 // still reads the same grid while the body glides between cell centers.
 ROAM_RADIUS :: f32(0.3)
-ROAM_WALK_SPEED :: f32(3.6)
+// On foot half again as quick as the first 3.6 (the user's choice, 2026-10-30),
+// still under the mount.
+ROAM_WALK_SPEED :: f32(5.4)
 ROAM_MOUNT_SPEED :: f32(8.4)
 // A substep never crosses more than one cell edge per axis, and stays below
 // the radius, so the center can never tunnel into a blocker.
@@ -27,7 +29,7 @@ Roam :: struct {
 }
 
 roam_center :: proc(cell:grid.Position)->[2]f32 {return {f32(cell.x)+.5,f32(cell.y)+.5}}
-roam_cell :: proc(p:[2]f32)->grid.Position {return {int(math.floor(p.x)),int(math.floor(p.y))}}
+roam_cell :: proc(p:[2]f32)->grid.Position {return {x = int(math.floor(p.x)), y = int(math.floor(p.y))}}
 
 // Gravity wells, wind, tunnels, encounters and saves move the room's player
 // directly. The walker adopts that cell instead of overriding it.
@@ -43,11 +45,23 @@ roam_sync :: proc(r:^Roam,room:^game.Room) {
 	r.position=target;r.velocity={};r.cell=cell;r.ready=true
 }
 
+// The cell of column (x, y) the walker meets there: its own, or where steps across the layers from its cell land
+// (game.layer_step: a cave's mouth, a bridge's ramp), a column at a time toward it. Without layers, the ground's.
+@(private)
+roam_layer_cell :: proc(r:^Roam,room:^game.Room,x,y:int)->grid.Position {
+	cell:=r.cell
+	for cell.x!=x || cell.y!=y {
+		cell,_=game.layer_step(room,cell,{x = clamp(x-cell.x,-1,1), y = clamp(y-cell.y,-1,1)})
+	}
+	return cell
+}
+
 // The cell the walker stands in never blocks it: a light bridge may close
-// beneath the robot, and it can still step off.
+// beneath the robot, and it can still step off. A cell more than a step higher or lower than the one
+// it stands in is a cliff, a wall to a walker (game/height.odin), whether on foot or in the saddle.
 @(private)
 roam_blocked :: proc(r:^Roam,room:^game.Room,cell:grid.Position)->bool {
-	return cell!=r.cell && game.cell_blocks_movement(room,cell)
+	return cell!=r.cell && (game.cell_blocks_movement(room,cell) || game.step_height_blocked(room,r.cell,cell))
 }
 
 // Circle against solid cells. A corner shared with a neighbouring solid cell
@@ -59,7 +73,7 @@ roam_resolve :: proc(r:^Roam,room:^game.Room) {
 		pushed:=false
 		base:=roam_cell(r.position)
 		for dy in -1..=1 {for dx in -1..=1 {
-			cell:=grid.Position{base.x+dx,base.y+dy}
+			cell:=roam_layer_cell(r,room,base.x+dx,base.y+dy)
 			if !roam_blocked(r,room,cell) {continue}
 			lo:=[2]f32{f32(cell.x),f32(cell.y)};hi:=lo+1
 			closest:=[2]f32{clamp(r.position.x,lo.x,hi.x),clamp(r.position.y,lo.y,hi.y)}
@@ -76,8 +90,8 @@ roam_resolve :: proc(r:^Roam,room:^game.Room) {
 				normal=d/length;depth=ROAM_RADIUS-length
 				if d.x!=0 && d.y!=0 {
 					sx,sy:=int(math.sign(d.x)),int(math.sign(d.y))
-					along_x:=roam_blocked(r,room,{cell.x+sx,cell.y})
-					along_y:=roam_blocked(r,room,{cell.x,cell.y+sy})
+					along_x:=roam_blocked(r,room,roam_layer_cell(r,room,cell.x+sx,cell.y))
+					along_y:=roam_blocked(r,room,roam_layer_cell(r,room,cell.x,cell.y+sy))
 					if along_x && along_y {continue}
 					if along_x {normal={0,f32(sy)};depth=ROAM_RADIUS-abs(d.y)}
 					else if along_y {normal={f32(sx),0};depth=ROAM_RADIUS-abs(d.x)}
@@ -92,16 +106,35 @@ roam_resolve :: proc(r:^Roam,room:^game.Room) {
 	}
 }
 
-// Entering a cell uses the exact trap and hazard pipeline of a grid step.
+// Entering a cell uses the exact trap and hazard pipeline of a grid step. A lift's landing with its platform there takes
+// the walker to its other end (game/lift.odin): it adopts the cell it rides to.
 @(private)
 roam_enter :: proc(w:^World,room:^game.Room,r:^Roam,cell:grid.Position)->bool {
 	r.cell=cell;room.player.position=cell
+	if game.lift_board(room,game.PLAYER_ENTITY,cell) {r.velocity={};roam_sync(r,room);return false}
 	before:=room.player.health
 	game.expedition_enter_cell(room)
 	if room.player.health<before {w.mounted=false}
 	if room.player.health<=0 {room.phase=.Defeat;r.velocity={};return false}
 	if room.player.position!=cell || room.phase!=.Loot {r.velocity={};roam_sync(r,room);return false}
 	return true
+}
+
+// The walker pressing on the face of the cell toward `direction` (the wish, of length one at most), along each axis it
+// presses: against a lift's landing its platform is away from it calls the platform, against a gate's bars from the
+// gate's lever it opens the gate (game/lift.odin), as a step does.
+@(private)
+roam_press :: proc(room:^game.Room,r:^Roam,direction:[2]f32) {
+	center:=roam_center(r.cell)
+	for axis in 0..<2 {
+		if abs(direction[axis])<.5 {continue}
+		sign:=1 if direction[axis]>0 else -1
+		// Only once it touches the face.
+		if (r.position[axis]-center[axis])*f32(sign)<.5-ROAM_RADIUS-.02 {continue}
+		step:=grid.Position{x = sign} if axis==0 else grid.Position{y = sign}
+		next:=roam_layer_cell(r,room,r.cell.x+step.x,r.cell.y+step.y)
+		if !game.lift_call(room,next) {_=game.gate_opens(room,r.cell,next)}
+	}
 }
 
 roam_speed :: proc(w:^World,ground:Terrain)->f32 {
@@ -123,14 +156,16 @@ roam_step :: proc(w:^World,room:^game.Room,r:^Roam,wish:[2]f32,dt:f32) {
 	elapsed:=min(max(dt,0),f32(.1))
 	r.offset*=math.exp(-12*elapsed)
 	if elapsed<=0 {return}
-	ground:=terrain(w.biome,r.cell)
+	// On a lift's platform the walker goes nowhere until it stops.
+	if game.lift_player_riding(room) {r.velocity={};return}
+	under:=ground(w,r.cell)
 	direction:=wish;length:=math.sqrt(direction.x*direction.x+direction.y*direction.y)
 	if length>1 {direction/=length;length=1}
 	// Brisk on foot, weighty in the saddle, slippery on ice.
 	rate:=f32(4.5) if w.mounted else 16
 	if length<.01 {rate=6 if w.mounted else 22}
-	if ground==.Ice {rate=2.2 if length>=.01 else .7}
-	r.velocity+=(direction*roam_speed(w,ground)-r.velocity)*(1-math.exp(-rate*elapsed))
+	if under==.Ice {rate=2.2 if length>=.01 else .7}
+	r.velocity+=(direction*roam_speed(w,under)-r.velocity)*(1-math.exp(-rate*elapsed))
 	if length<.01 && r.velocity.x*r.velocity.x+r.velocity.y*r.velocity.y<.0004 {r.velocity={}}
 	travel:=r.velocity*elapsed
 	steps:=max(1,int(math.ceil(max(abs(travel.x),abs(travel.y))/ROAM_MAX_STEP)))
@@ -138,9 +173,11 @@ roam_step :: proc(w:^World,room:^game.Room,r:^Roam,wish:[2]f32,dt:f32) {
 	for _ in 0..<steps {
 		r.position+=travel/f32(steps)
 		roam_resolve(r,room)
-		cell:=roam_cell(r.position)
+		column:=roam_cell(r.position)
+		cell:=roam_layer_cell(r,room,column.x,column.y)
 		if cell!=r.cell && !roam_enter(w,room,r,cell) {return}
 	}
 	moved:=r.position-start
 	r.stride+=math.sqrt(moved.x*moved.x+moved.y*moved.y)
+	if length>=.5 {roam_press(room,r,direction)}
 }

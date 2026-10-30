@@ -129,10 +129,12 @@ item_detail :: proc(c: ^campaign.Campaign, player: ^game.Player, state: ^State, 
 		}
 		return
 	}
-	if state.selected.source == .Backpack && item.kind <= .Upgrade {
-		if ui.button(ctx, primary, "USA", player != nil && can_use, true, .Small) {
+	if state.selected.source == .Backpack && (item.kind <= .Upgrade || item.kind == .Structure_Kit) {
+		if ui.button(ctx, primary, "POSA" if item.kind == .Structure_Kit else "USA", player != nil && can_use, true, .Small) {
 			used := use_selected(c, player, state, in_combat, can_use)
 			out.changed = out.changed || used.changed; out.decoy = used.decoy; out.action_seconds += used.action_seconds
+			out.place_structure, out.structure = used.place_structure, used.structure
+			if used.place_structure { out.closed = true }
 		}
 	} else if state.selected.source == .Pending {
 		if ui.button(ctx, primary, "SISTEMA", can_change, true, .Small) {
@@ -190,7 +192,7 @@ cards_panel :: proc(c: ^campaign.Campaign, player: ^game.Player, state: ^State, 
 	count := 0
 	if archive {
 		for id in game.Card_Id.Strike..<game.Card_Id.Count {
-			if c.discovered[id] { list[count] = id; count += 1 }
+			if c.discovered[id] && game.card_in_collection(id) { list[count] = id; count += 1 }
 		}
 		ui.text_at(ctx, {bounds.x, bounds.y}, fmt.tprintf("ARCHIVIO / %d CARTE NELLA MEMORIA", count), .Large, {190, 179, 237, 255})
 		ui.text_at(ctx, {bounds.x, bounds.y+38}, "Le nuove scoperte entrano nel pool della prossima spedizione.", .Small, {144, 173, 194, 255})
@@ -219,6 +221,11 @@ cards_panel :: proc(c: ^campaign.Campaign, player: ^game.Player, state: ^State, 
 		card := player.deck.owned[indices[index]] if !archive else game.Card_Instance{}
 		subtitle := fmt.tprintf("%s / scoperta", game.card_rarity_name(definition.rarity)) if archive else
 			fmt.tprintf("Potenziamento %d / %d", card.upgrade_level, game.card_max_upgrade_level(id))
+		// A card that evolves says what it becomes, and when.
+		if !archive && definition.evolve_level > 0 && card.upgrade_level < definition.evolve_level {
+			evolved, _ := game.card_definition_by_id(definition.evolves_to)
+			subtitle = fmt.tprintf("Potenziamento %d / %d: diventa %s", card.upgrade_level, definition.evolve_level, evolved.name)
+		}
 		ui.text_at(ctx, {r.x+14, r.y+37}, subtitle, .Small, {139, 171, 192, 255})
 		if ui.button(ctx, {r.x+r.width-158, r.y+r.height-34, 144, 26}, "MOSTRA EFFETTO", true, false, .Small) {
 			out.show_effect = true; out.effect_card = id

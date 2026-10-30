@@ -202,6 +202,12 @@ upgrade_owned_card :: proc(deck: ^Deck_State, card_id: u32) -> Deck_Mutation_Res
 
 	upgraded := deck.owned[card_index]
 	upgraded.upgrade_level += 1
+	// A card that evolves becomes the next one at its upgrade (the Cannone, at its
+	// second, the Cannone laser, which starts again from its own level 0).
+	if definition, defined := card_definition_by_id(upgraded.definition_id); defined && definition.evolve_level > 0 &&
+	   upgraded.upgrade_level >= definition.evolve_level {
+		upgraded.definition_id, upgraded.upgrade_level = definition.evolves_to, 0
+	}
 	if !validate_card_instance(upgraded) {
 		return .Invalid
 	}
@@ -244,8 +250,7 @@ initialize_starter_deck :: proc(deck: ^Deck_State, seed: u64 = DEFAULT_DECK_SEED
 		.Firebomb,
 		.Guard,
 		.Toxic_Wave,
-		.Thorn_Coat,
-		.Afterimage,
+		// Thorn Coat and Afterimage were here until they were retired (docs/registro-carte.md): eight cards now.
 		.Dash,
 	}
 	for definition_id in starter_cards {

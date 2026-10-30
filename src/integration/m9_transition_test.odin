@@ -30,12 +30,12 @@ tesla_ring_run_fixture :: proc(t: ^testing.T) -> ^run_session.Roguelike_Session 
     err: level.Parse_Error
     rs.level_data, err, _ = level.from_ascii(rows[:])
     testing.expect_value(t,err,level.Parse_Error.None)
-    spawns := [?]game.Enemy_Spawn{{position={3,3},health=20,attack=1,archetype=.Brute},{position={5,5},health=10,attack=1}}
+    spawns := [?]game.Enemy_Spawn{{position={x = 3, y = 3},health=20,attack=1,archetype=.Brute},{position={x = 5, y = 5},health=10,attack=1}}
     ok: bool
     rs.room, ok = game.create_room(&rs.level_data,&rs.run_state.player,{enemies=spawns[:]})
     testing.expect(t,ok)
     log: game.Event_Log
-    for cell in ([4]grid.Position{{2,2},{6,2},{6,6},{2,6}}) {
+    for cell in ([4]grid.Position{{x = 2, y = 2},{x = 6, y = 2},{x = 6, y = 6},{x = 2, y = 6}}) {
         testing.expect(t,game.deploy_board_device(&rs.room,.Tesla_Coil,cell,8,0,&log))
     }
     return rs

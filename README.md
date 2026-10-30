@@ -61,7 +61,7 @@ fermano il mondo; l'energia si ricarica soltanto mentre il mondo avanza.
 | `E` | interagisce con POI, oggetti e portale |
 | `Z` | zaino; il mondo continua durante gli scontri |
 | `U` | personaggio, mazzo e potenziamenti; mette in pausa |
-| `Tab` | miniatura 3D dell'intero bioma, legenda POI e posizione del robot |
+| `Tab` | miniatura 3D dell'intero bioma a piani, legenda POI e posizione del robot; `W`/`S` cambiano il piano mostrato |
 | `I` / Mostra effetto | anteprima isolata della carta selezionata |
 | `F` | Refocus |
 | `P` / `Esc` | pausa o chiusura della schermata corrente |
@@ -87,13 +87,16 @@ i nemici. Le spedizioni già salvate mantengono la loro geografia originale.
 | [Engine e minigiochi](docs/engine.md) | host, scene, input, minigiochi e atlanti incorporati |
 | [Combattimento](docs/regole/combattimento.md) | clock, comandi, status, reazioni, movimento e oggetti |
 | [Carte e dadi](docs/regole/carte.md) | catalogo, mazzo, targeting, spell e RNG |
-| [Meccaniche delle carte](docs/regole/meccaniche.md) | ombra, terreno, cariche, lazzo, pesca, Pinball e FPS |
+| [Meccaniche delle carte](docs/regole/meccaniche.md) | ombra, terreno, cariche, lazzo, pesca, Pinball, la prima persona (AK, pugni, spada, arco), Inondazione, Bomb Marley, Cannone, Buco Nero e Dinosauro |
 | [Dispositivi e attività](docs/regole/dispositivi.md) | Tesla, trappole, equipaggiamento, ring e sblocchi |
 | [Nemici e progressione](docs/regole/progressione.md) | incontri, stanze, rotta, economia e reliquie |
 | [Presentazione](docs/presentazione.md) | film delle carte, timeline, HUD, sprite e animazioni |
 | [Modalità libere](docs/modalita_libere.md) | simulazioni continue e laboratori tecnici |
 | [Verifica](docs/verifica.md) | controlli, catture e telemetria |
 | [Sviluppo](docs/sviluppo.md) | convenzioni Odin e metodo di lavoro |
+| [Piano della griglia](docs/piano-griglia.md) | fasi da eseguire una alla volta: bersagli in evidenza, altezze, montagna a spirale, caverne, strutture, hub in 3D |
+| [Piano della profondità](docs/piano-profondita.md) | fasi da eseguire una alla volta: terreno scolpito, mappa a piani, grotte senza caricamento, editor, ponti e gallerie nei biomi |
+| [Piano della prima persona](docs/piano-prima-persona.md) | tre carte in prima persona sul modello dell'AK, nel laboratorio: First Person Brawler (pugni), Fencer (zweihänder), Archer (arco compound); tutte le fasi fatte (0-8) |
 | [Cronologia](CHANGELOG.md) | milestone e refactor precedenti; le note storiche non definiscono le regole attuali |
 
 ## Sviluppo

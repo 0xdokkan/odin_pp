@@ -50,7 +50,7 @@ expedition_geometry_key :: proc(room:^game.Room,w:^world.World)->(key:Expedition
 	data:=room.level_data
 	key.geometry_id=data.geometry_id;key.revision=data.geometry_revision
 	key.width=data.tiles.width;key.height=data.tiles.height;key.biome=u8(w.biome)
-	key.sites=expedition_floor_site_keys(w);key.site_count=clamp(w.site_count,0,world.MAX_SITES)
+	key.sites=expedition_floor_site_keys(w);key.site_count=clamp(world.visible_sites(w),0,world.MAX_SITES)
 	key.boss_defeated=w.boss_defeated
 	for site,i in w.sites[:key.site_count] {key.active[i]=site.active;key.secret[i]=site.secret;key.states[i]=site.state}
 	return
@@ -74,12 +74,14 @@ expedition_build_chunk :: proc(renderer:^Renderer,room:^game.Room,w:^world.World
 	pass:=Ink_Pass{mode=.Bake,builder=builder}
 	for y in origin.y..<min(origin.y+EXPEDITION_GEOMETRY_CHUNK,room.level_data.tiles.height) {
 		for x in origin.x..<min(origin.x+EXPEDITION_GEOMETRY_CHUNK,room.level_data.tiles.width) {
-			cell:=grid.Position{x,y};tile,_:=level.tile_at(room.level_data,cell)
-			if tile.kind!=.Wall {continue}
+			cell:=grid.Position{x = x, y = y};tile,_:=level.tile_at(room.level_data,cell)
+			if tile.kind!=.Wall && tile.kind!=.Fence {continue}
+			ground:=pass;ground.lift=cell_ground(cell)
+			if draw_expedition_structure_solid(ground,room,w,cell,tile.kind) {continue}
 			site_index,design:=expedition_site_near(renderer,w,cell)
 			if design.fixture && site_index>=0 && w.sites[site_index].active {continue}
-			if design.inside {draw_expedition_site_wall(pass,room,w,&w.sites[site_index],cell,design)}
-			else {draw_expedition_outdoor_prop(pass,w,cell)}
+			if design.inside {draw_expedition_site_wall(ground,room,w,&w.sites[site_index],cell,design)}
+			else {draw_expedition_outdoor_prop(ground,w,cell)}
 		}
 	}
 }
@@ -126,14 +128,14 @@ prepare_expedition_geometry :: proc(renderer:^Renderer,room:^game.Room,w:^world.
 		cache.chunks=make([]Expedition_Geometry_Chunk,cache.columns*cache.rows);cache.ready=true
 	}
 	p:=room.player.position
-	cache.lo={max(0,p.x-26)/EXPEDITION_GEOMETRY_CHUNK,max(0,p.y-26)/EXPEDITION_GEOMETRY_CHUNK}
-	cache.hi={min(cache.columns-1,(p.x+26)/EXPEDITION_GEOMETRY_CHUNK),min(cache.rows-1,(p.y+26)/EXPEDITION_GEOMETRY_CHUNK)}
+	cache.lo={x = max(0,p.x-26)/EXPEDITION_GEOMETRY_CHUNK, y = max(0,p.y-26)/EXPEDITION_GEOMETRY_CHUNK}
+	cache.hi={x = min(cache.columns-1,(p.x+26)/EXPEDITION_GEOMETRY_CHUNK), y = min(cache.rows-1,(p.y+26)/EXPEDITION_GEOMETRY_CHUNK)}
 	builder:Expedition_Geometry_Builder
 	defer {delete(builder.vertices);delete(builder.lines)}
 	for y in cache.lo.y..=cache.hi.y {for x in cache.lo.x..=cache.hi.x {
 		chunk:=&cache.chunks[y*cache.columns+x];if chunk.ready {continue}
 		clear(&builder.vertices);clear(&builder.lines)
-		origin:=grid.Position{x*EXPEDITION_GEOMETRY_CHUNK,y*EXPEDITION_GEOMETRY_CHUNK}
+		origin:=grid.Position{x = x*EXPEDITION_GEOMETRY_CHUNK, y = y*EXPEDITION_GEOMETRY_CHUNK}
 		expedition_build_chunk(renderer,room,w,origin,&builder)
 		rlgl.DrawRenderBatchActive()
 		if !expedition_upload_chunk(chunk,&builder,origin) {cache.ready=false;cache.failed=true;return false}
@@ -235,5 +237,6 @@ draw_expedition_cached_architecture :: proc(renderer:^Renderer,room:^game.Room,w
 		if layer==.Edges {end_expedition_edges(renderer)}
 		else {rlgl.DrawRenderBatchActive();rl.EndShaderMode()}
 	}
+	draw_expedition_structure_envelopes(renderer,room,w)
 	return true
 }

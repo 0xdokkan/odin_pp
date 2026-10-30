@@ -14,6 +14,12 @@ introdurre dipendenze inverse nei package di produzione.
 i package e link della demo, sia con assert attivi sia con `-disable-assert`.
 I binari sono temporanei; `ODIN` può indicare un compilatore alternativo.
 
+Il caricamento dei salvataggi decodifica le struct grandi campo per campo:
+il decoder JSON della toolchain fissata accumula altrimenti sullo stack una
+maschera proporzionale alla dimensione della struct per ogni chiave. I test
+dell'hub e del ripristino delle spedizioni coprono le mappe a piani con lo
+stack predefinito, anche su macOS.
+
 La [CI](../.github/workflows/check.yml) esegue gli stessi script completi su
 macOS ARM64 e Windows x64, per ogni pull request e push su `main`; è disponibile
 anche l'avvio manuale. La toolchain è la release ufficiale Odin `dev-2026-10`
@@ -89,7 +95,7 @@ le immagini sono output rigenerabili, non prerequisiti del checkout.
 | `--smoke-arenas-view` | quattro fasce di arene reali, combattimento, ologramma, Loot e cambio stanza; screenshot `odin_pp_arenas_*.png` |
 | `--smoke-m8-view` | dispositivi con APRI IL RING, campo, tag match, ritorno Loot: `odin_pp_m8_d4.png`, `devices`, `mega_combo`, `character`, `loot`, `tag_ring`, `next_room` (tutti con prefisso `odin_pp_m8_` e suffisso `.png`) |
 | `--smoke-western` | 6 RANCH 7 dalla mano al premio: `odin_pp_western_hand.png`, `cards`, `sign`, `gate`, `riders`, `ride`, `grab`, `win`, `reward` (prefisso `odin_pp_western_`) |
-| `--smoke-mechanics-lab` | Prova meccaniche in 3D: mano e testi, status, intenti, colpi, ombra, pozze, incendio, cariche, Lazzo, Pinball, FPS e pesca; replay e screenshot `odin_pp_mechanics_lab_*.png` / `odin_pp_living_*.png` |
+| `--smoke-mechanics-lab` | Prova meccaniche in 3D: mano e testi, status, intenti, colpi, pozze, incendio, cariche, Lazzo, Pinball, FPS, Inondazione, Bomb Marley, bersagli in evidenza (`odin_pp_mechanics_lab_hit_*.png`; con `ODIN_PP_LAB_ONLY=hit_marks` gira solo quell'atto), altezze (arena di F3: scala, altopiano, dirupo, gittata dall'alto e caduta, `odin_pp_mechanics_lab_heights_*.png`; `ODIN_PP_LAB_ONLY=heights`), Cannone (palla e laser), Buco Nero, i quattro dinosauri e pesca; replay e screenshot `odin_pp_mechanics_lab_*.png` / `odin_pp_living_*.png` |
 | `--smoke-effect-window` | Mostra effetto: ingressi da ogni menu, isolamento della run, chiusura senza click-through, testi, film delle carte e tempi dei frame. `-define:EFFECT_SMOKE_CARDS=,Strike,Pinball,` limita le carte filmate. Screenshot `odin_pp_effect_*.png` |
 | `--smoke-playtest` | headless: al massimo venti decisioni, `odin_pp_playtest_smoke.json` |
 

@@ -36,5 +36,15 @@ show_spawned_presentation_object :: proc(presentation: ^Room_Presentation, event
 		device_direction = game.Move_Direction(event.area_mask%4),
 		device_target_limit = event.duration,
 	}
+	// An emplacement: the event says its way (+4 for a beam) or its radius.
+	#partial switch event.object_kind {
+	case .Field_Cannon:
+		presentation.objects[slot].facing = game.Move_Direction(event.duration%4)
+		presentation.objects[slot].laser = event.duration >= 4
+		presentation.objects[slot].life, presentation.objects[slot].max_life = game.CANNON_SECONDS, game.CANNON_SECONDS
+	case .Devouring_Hole:
+		presentation.objects[slot].radius = event.duration
+		presentation.objects[slot].life, presentation.objects[slot].max_life = game.BLACK_HOLE_SECONDS, game.BLACK_HOLE_SECONDS
+	}
 	return true
 }

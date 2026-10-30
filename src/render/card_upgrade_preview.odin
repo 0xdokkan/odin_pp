@@ -12,6 +12,11 @@ card_upgrade_preview :: proc(card: game.Card_Instance) -> cstring {
 		}
 		return "NO UPGRADE AVAILABLE"
 	}
+	// The upgrade that makes another card says so (docs/registro-carte.md).
+	if evolving, _ := game.card_definition_by_id(card.definition_id); evolving.evolve_level > 0 && card.upgrade_level+1 >= evolving.evolve_level {
+		evolved, _ := game.card_definition_by_id(evolving.evolves_to)
+		return fmt.ctprintf("-> %s", evolved.name)
+	}
 	// A dice card's upgrade changes only its die.
 	if game.card_dice_count(card.definition_id) > 0 {
 		return fmt.ctprintf("%s -> %s", die_label(game.card_die_sides(card.definition_id, card.upgrade_level)),
@@ -45,6 +50,12 @@ card_upgrade_preview :: proc(card: game.Card_Instance) -> cstring {
 		case .Pinball: label = "VALORE"
 		// FIRST PERSON SHOOTER: its seconds behind the player's eyes.
 		case .First_Person: label = "SECONDI"
+		// BOMB MARLEY: the bombs' damage; INONDAZIONE: the push in cells.
+		case .Marley: label = "DANNO"
+		case .Flood_Wave: label = "SPINTA"
+		// CANNONE: the ball's damage; BUCO NERO: its damage a beat; DINOSAURO: the ride.
+		case .Place_Cannon, .Open_Black_Hole: label = "DANNO"
+		case .Ride: label = "SECONDI"
 		case .Move, .Remove_Status, .Enter_Shadow:
 		}
 		before := game.card_effect_amount(template, card.upgrade_level)

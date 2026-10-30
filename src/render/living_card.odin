@@ -45,6 +45,9 @@ Living_Actor :: struct {
 	// The last blow this card struck (Attack_Fx.id): its guard and its wound
 	// are two cues, one drawing.
 	blow: u32,
+	// The board's action scale (action_pace.odin): its one-shot clips, its
+	// turns and its fall play in this part of their first times.
+	scale: f64,
 }
 
 Living_State :: struct {
@@ -143,7 +146,7 @@ living_find_dying :: proc(renderer: ^Renderer, entity: game.Entity_Ref) -> ^Livi
 living_death_done :: proc(actor: ^Living_Actor, now: f64) -> bool {
 	if actor.action != .Death { return false }
 	clip := &gfx.LIVING_SHEETS[actor.character].clips[.Death]
-	return now-actor.started >= gfx.living_clip_seconds(clip)+LIVING_FALL_SECONDS
+	return now-actor.started >= living_played_seconds(clip, actor.scale)+LIVING_FALL_SECONDS*action_scale_of(actor.scale)
 }
 
 // 0..1 progress of the card toppling after the death drawings.
@@ -151,7 +154,7 @@ living_death_done :: proc(actor: ^Living_Actor, now: f64) -> bool {
 living_fall :: proc(actor: ^Living_Actor, now: f64) -> f32 {
 	if actor == nil || actor.action != .Death { return 0 }
 	clip := &gfx.LIVING_SHEETS[actor.character].clips[.Death]
-	t := (now-actor.started-gfx.living_clip_seconds(clip))/LIVING_FALL_SECONDS
+	t := (now-actor.started-living_played_seconds(clip, actor.scale))/(LIVING_FALL_SECONDS*action_scale_of(actor.scale))
 	return f32(clamp(t, 0, 1))
 }
 
@@ -202,10 +205,21 @@ living_card_position :: proc(renderer: ^Renderer, entity: game.Entity_Ref, key: 
 	return living_card_slide_position(renderer, entity, key, position)
 }
 
+// Where the card stands, with the ground it stands on: climbing a step as the slide crosses it (height_view.odin).
+// (A deferred change of a named result is lost in Odin, so the ground is added by the caller of the slide.)
 @(private)
 living_card_slide_position :: proc(renderer: ^Renderer, entity: game.Entity_Ref, key: Sprite_Key, position: view.Vec2) -> (at: view.Vec2, lift: f32) {
+	at, lift = living_card_slide(renderer, entity, key, position)
+	lift += entity_point_ground(entity, at)
+	return
+}
+
+@(private = "file")
+living_card_slide :: proc(renderer: ^Renderer, entity: game.Entity_Ref, key: Sprite_Key, position: view.Vec2) -> (at: view.Vec2, lift: f32) {
 	at = position
 	lift = tactical_lasso_lift(renderer, entity)
+	// The dinosaur lunge carries its rider with it (arsenal.odin).
+	defer if entity == game.PLAYER_ENTITY { off := tactical_ride_offset(renderer); at.x += off.x; at.y += off.y }
 	if !renderer.tactical.living || renderer.tactical.living_state == nil { return }
 	character, ok := flipbook_character(key)
 	if !ok { return }
@@ -278,6 +292,12 @@ living_cue_action :: proc(cue: ^Presentation_Cue, entity: game.Entity_Ref) -> (a
 	return .Idle, false
 }
 
+// How far a card's drawing has turned round (1 and past: done).
+@(private)
+living_turn_progress :: proc(actor: ^Living_Actor, now: f64) -> f64 {
+	return (now-actor.turn_started)/(LIVING_TURN_SECONDS*action_scale_of(actor.scale))
+}
+
 @(private)
 living_face :: proc(actor: ^Living_Actor, sideways: f32, now: f64) {
 	if abs(sideways) < 0.2 { return }
@@ -313,14 +333,14 @@ living_busy :: proc(actor: ^Living_Actor, now: f64) -> bool {
 	if actor.action == .Idle { return false }
 	if actor.action == .Death { return true }
 	clip := &gfx.LIVING_SHEETS[actor.character].clips[actor.action]
-	return now-actor.started < gfx.living_clip_seconds(clip)
+	return now-actor.started < living_played_seconds(clip, actor.scale)
 }
 
 @(private = "file")
 living_past_hit :: proc(actor: ^Living_Actor, now: f64) -> bool {
 	clip := &gfx.LIVING_SHEETS[actor.character].clips[actor.action]
 	if clip.hit < 0 { return true }
-	frame, _ := gfx.living_frame(clip, now-actor.started)
+	frame, _ := living_played_frame(clip, now-actor.started, actor.scale)
 	return frame > clip.hit
 }
 
@@ -339,6 +359,7 @@ living_observe :: proc(renderer: ^Renderer, state: ^Living_State, room: ^game.Ro
 		slot = living_slot(state, actor.entity, character, clock)
 	}
 	slot.seen, slot.ghost, slot.position = now, false, actor.position
+	slot.scale = renderer_action_scale(renderer)
 	slot.tremble = intent_tremble(renderer, room, actor.entity)
 	right := flipbook_camera_right(renderer)
 	forward := living_camera_forward(renderer)
@@ -377,15 +398,19 @@ living_observe :: proc(renderer: ^Renderer, state: ^Living_State, room: ^game.Ro
 			else if length > 0.001 && abs(f) >= 0.38*length { move = .Move_Up if f > 0 else .Move_Down }
 			if !pushed { living_face(slot, h, clock) }
 			if slot.action != .Death {
-				living_start(slot, move, clock)
+				// Riding, the card does not walk: the dinosaur feet do; the card
+				// only slides with it.
+				riding := actor.entity == game.PLAYER_ENTITY && snapshot.ride.active
+				if !riding { living_start(slot, move, clock) }
 				slot.cause, slot.shot = .Move, false
-				clip := &sheet.clips[slot.action]
+				clip := &sheet.clips[gfx.living_resolve(character, move) if riding else slot.action]
 				// The card goes from wherever it stands now, at the push.
 				here, _ := living_card_slide_position(renderer, actor.entity, flipbook_key(character), from)
 				slot.slide_from, slot.slide_to = here, to
 				slot.slide_kind = clip.travel if clip.travel != .None && !pushed else .Dash
-				slot.slide_start = clock+(f64(clip.travel_start)/1000 if clip.travel != .None && !pushed else 0)
-				slot.slide_ms = f32(clip.travel_ms) if clip.travel != .None && !pushed else 220
+				travel_start, travel_length := living_played_travel(clip, slot.scale)
+				slot.slide_start = clock+(travel_start if clip.travel != .None && !pushed else 0)
+				slot.slide_ms = f32(travel_length*1000 if clip.travel != .None && !pushed else 220*action_scale_of(slot.scale))
 				slot.sliding = true
 			}
 			continue
@@ -414,6 +439,17 @@ living_observe :: proc(renderer: ^Renderer, state: ^Living_State, room: ^game.Ro
 				side := rl.Vector3DotProduct(delta, right)
 				if abs(side) > 0.2 && (side < 0) != slot.facing_left { action = .Hurt_Back }
 			}
+		}
+		// Riding, the player card never swings: the dinosaur attacks, lunging
+		// at the foe (its stomps and crushes have their own drawing).
+		if action == .Attack && actor.entity == game.PLAYER_ENTITY && snapshot.ride.active {
+			if event.card_definition != .Dino_Ride {
+				dir := rl.Vector2{}
+				if target, ok := presentation_actor_in_view(snapshot, event.target); ok { dir = {target.position.x-actor.position.x, target.position.y-actor.position.y} }
+				else { dir = {f32(event.to_position.x)-actor.position.x, f32(event.to_position.y)-actor.position.y} }
+				arsenal_begin_attack(renderer, {dir.x, dir.y})
+			}
+			continue
 		}
 		if gfx.living_priority(action) > gfx.living_priority(wanted) {
 			wanted, cause, blow, striker = action, cue.kind, blow_id, event.source
@@ -496,11 +532,11 @@ living_drawing :: proc(actor: ^Living_Actor, now: f64) -> (action: gfx.Living_Ac
 	// A reaction waiting for its blow to land: the loop beneath goes on until then.
 	if actor.action != .Idle && now >= actor.started {
 		clip := &sheet.clips[actor.action]
-		drawing, finished := gfx.living_frame(clip, now-actor.started)
+		drawing, finished := living_played_frame(clip, now-actor.started, actor.scale)
 		if !finished || actor.action == .Death { return actor.action, drawing }
 	}
 	base := gfx.living_resolve(actor.character, actor.base)
-	drawing, _ := gfx.living_frame(&sheet.clips[base], now-actor.base_started)
+	drawing, _ := living_played_frame(&sheet.clips[base], now-actor.base_started, actor.scale)
 	return base, drawing
 }
 
@@ -548,7 +584,7 @@ living_billboard_geometry :: proc(renderer: ^Renderer, character: gfx.Flipbook_C
 	width := f32(1)
 	if actor != nil {
 		result.mirror = actor.facing_left
-		turn := (now-actor.turn_started)/LIVING_TURN_SECONDS
+		turn := living_turn_progress(actor, now)
 		if actor.turn_started >= 0 && turn < 1 {
 			width = max(f32(0.04), abs(f32(math.cos(turn*math.PI))))
 			if turn < 0.5 { result.mirror = !result.mirror }

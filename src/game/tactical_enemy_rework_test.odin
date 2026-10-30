@@ -18,7 +18,7 @@ test_tactical_archer_aims_without_qte_then_fires_at_frozen_cell_and_recovers :: 
 	for evade in ([?]bool{false, true}) {
 		data: level.Level
 		player: Player
-		spawns := [?]Enemy_Spawn{{position = {7, 4}, health = 100, attack = 3, archetype = .Archer}}
+		spawns := [?]Enemy_Spawn{{position = {x = 7, y = 4}, health = 100, attack = 3, archetype = .Archer}}
 		room := create_enemy_rework_room(t, &data, &player, spawns[:])
 		testing.expect(t, room.enemies[0].intent.windup)
 		testing.expect(t, !offer_defense_qte(&room, &room.enemies[0]))
@@ -33,7 +33,7 @@ test_tactical_archer_aims_without_qte_then_fires_at_frozen_cell_and_recovers :: 
 		testing.expect_value(t, player.health, i32(100))
 		testing.expect(t, room.enemies[0].aim_ready)
 		testing.expect(t, !room.enemies[0].intent.windup)
-		testing.expect_value(t, room.enemies[0].intent.threatened_cells[0], grid.Position{4, 4})
+		testing.expect_value(t, room.enemies[0].intent.threatened_cells[0], grid.Position{x = 4, y = 4})
 		if evade { try_move_player(&room, .North) } else { wait_player_turn(&room) }
 		// Evading now finishes before the prepared shot's one-second deadline.
 		if evade { tactical_tick(&room, 1-TACTICAL_MOVE_SECONDS, true, false) }
@@ -55,8 +55,8 @@ test_tactical_stagger_interrupts_prepared_shots_bombs_charges_and_support :: pro
 	for archetype in ([?]Enemy_Archetype{.Archer, .Bomber, .Brute, .Custodian, .Demolitionist}) {
 		data: level.Level
 		player: Player
-		spawns := [?]Enemy_Spawn{{position = {7, 4}, health = 100, attack = 3, archetype = archetype},
-			{position = {7, 5}, health = 100, attack = 1}}
+		spawns := [?]Enemy_Spawn{{position = {x = 7, y = 4}, health = 100, attack = 3, archetype = archetype},
+			{position = {x = 7, y = 5}, health = 100, attack = 1}}
 		room := create_enemy_rework_room(t, &data, &player, spawns[:])
 		if archetype == .Archer || archetype == .Bomber {
 			pulse: Pulse_Report
@@ -89,13 +89,13 @@ test_tactical_brute_cleave_has_three_fixed_cells_and_charge_recovers_two :: proc
 	for charge in ([?]bool{false, true}) {
 		data: level.Level
 		player: Player
-		spawns := [?]Enemy_Spawn{{position = ({7, 4} if charge else {5, 4}), health = 100, attack = 2, archetype = .Brute}}
+		spawns := [?]Enemy_Spawn{{position = ({x = 7, y = 4} if charge else {x = 5, y = 4}), health = 100, attack = 2, archetype = .Brute}}
 		room := create_enemy_rework_room(t, &data, &player, spawns[:])
 		intent := room.enemies[0].intent
 		if !charge {
 			testing.expect_value(t, intent.threatened_cell_count, 3)
-			for cell in ([?]grid.Position{{4, 3}, {4, 4}, {4, 5}}) { testing.expect(t, enemy_intent_cell_is_threatened(&intent, cell)) }
-			testing.expect(t, !enemy_intent_cell_is_threatened(&intent, {3, 4}))
+			for cell in ([?]grid.Position{{x = 4, y = 3}, {x = 4, y = 4}, {x = 4, y = 5}}) { testing.expect(t, enemy_intent_cell_is_threatened(&intent, cell)) }
+			testing.expect(t, !enemy_intent_cell_is_threatened(&intent, {x = 3, y = 4}))
 		}
 		advance_enemy_rework_seconds(t, &room, 4)
 		testing.expect_value(t, room.enemies[0].intent, intent)
@@ -113,8 +113,8 @@ test_tactical_custodian_cannot_shield_loop_and_exposes_two_pulse_window :: proc(
 	for both_custodians in ([?]bool{false, true}) {
 		data: level.Level
 		player: Player
-		spawns := [?]Enemy_Spawn{{position = {7, 4}, health = 100, attack = 1, archetype = .Custodian},
-			{position = {7, 5}, health = 100, attack = 1, archetype = (.Custodian if both_custodians else .Archer)}}
+		spawns := [?]Enemy_Spawn{{position = {x = 7, y = 4}, health = 100, attack = 1, archetype = .Custodian},
+			{position = {x = 7, y = 5}, health = 100, attack = 1, archetype = (.Custodian if both_custodians else .Archer)}}
 		room := create_enemy_rework_room(t, &data, &player, spawns[:])
 		if both_custodians {
 			for enemy in room.enemies { testing.expect(t, enemy.intent.kind != .Protect) }

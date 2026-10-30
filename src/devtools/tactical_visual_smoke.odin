@@ -142,7 +142,7 @@ tactical_visual_firebomb :: proc(probe: ^Tactical_Visual_Probe, window: ^app.Win
 	for id in ([?]game.Card_Id{.Firebomb, .Guard, .Dash, .Battle_Focus, .Strike}) {
 		if _, added := game.add_owned_card(&player.deck, id); !added { return false }
 	}
-	spawns := [?]game.Enemy_Spawn{{position = {8, 4}, health = 20, attack = 2, archetype = .Archer}}
+	spawns := [?]game.Enemy_Spawn{{position = {x = 8, y = 4}, health = 20, attack = 2, archetype = .Archer}}
 	room, built := game.create_room(data, &player, {enemies = spawns[:]})
 	if !built { return false }
 	defer game.destroy_room(&room)
@@ -155,7 +155,7 @@ tactical_visual_firebomb :: proc(probe: ^Tactical_Visual_Probe, window: ^app.Win
 	cards: run_session.Card_Interaction_State
 	if !tactical_visual_command(probe, window, renderer, &room, &cards,
 		{kind = .Play_Card, origin_phase = .Combat, card_id = firebomb,
-		 target = game.cell_target({8, 4})}) { return false }
+		 target = game.cell_target({x = 8, y = 4})}) { return false }
 	return tactical_polish_check(.Spell_Flight in probe.captured && .Spell_Impact in probe.captured &&
 		room.enemies[0].health < 20 && room.phase == .Combat &&
 		room.pulse_count == 0 &&
@@ -183,7 +183,7 @@ run_tactical_visual_smoke :: proc(window: ^app.Window, renderer: ^render.Rendere
 	for id in ([?]game.Card_Id{.Heavy_Blow, .Guard, .Dash, .Battle_Focus, .Strike}) {
 		if _, added := game.add_owned_card(&player.deck, id); !added { return false }
 	}
-	spawns := [?]game.Enemy_Spawn{{position = {6, 4}, health = 20, attack = 3}}
+	spawns := [?]game.Enemy_Spawn{{position = {x = 6, y = 4}, health = 20, attack = 3}}
 	room, built := game.create_room(&data, &player, {enemies = spawns[:]})
 	if !built { return false }
 	defer game.destroy_room(&room)
@@ -231,7 +231,7 @@ run_tactical_visual_smoke :: proc(window: ^app.Window, renderer: ^render.Rendere
 	if !tactical_visual_command(&probe, window, renderer, &room, &cards,
 		{kind = .Move, origin_phase = .Combat, direction = .West}) { return false }
 	required := bit_set[Tactical_Visual_Capture]{.Cast, .Move, .Enemy_Damage, .Player_Damage, .Shield, .Absorb, .Interrupt}
-	if !tactical_polish_check(probe.captured == required && player.position == game.add_position(origin, {-1, 0}) &&
+	if !tactical_polish_check(probe.captured == required && player.position == game.add_position(origin, {x = -1, y = 0}) &&
 		player.health < player.stats.max_health && room.phase == .Combat && room.qte.kind == .None &&
 		!room.tactical_pulse.pending && !render.renderer_timeline_is_busy(renderer),
 		"visual probe did not cover every feedback or leave a settled combat") {

@@ -8,7 +8,7 @@ Queue_Test_Snapshot :: struct { tick: u64, cells: [64]u8 }
 
 @(test)
 test_save_queue_owns_immutable_depot_and_snapshot :: proc(t: ^testing.T) {
-	path := "/private/tmp/odin-pp-queue-isolation.json"; defer os.remove(path)
+	path := scratch_path("odin-pp-queue-isolation.json"); defer os.remove(path)
 	c: Campaign; initialize(&c); defer destroy(&c)
 	depot_credit(&c, 12)
 	snapshot := Queue_Test_Snapshot{tick = 1}
@@ -28,7 +28,7 @@ test_save_queue_owns_immutable_depot_and_snapshot :: proc(t: ^testing.T) {
 
 @(test)
 test_save_queue_coalesces_and_flushes_latest_checkpoint :: proc(t: ^testing.T) {
-	path := "/private/tmp/odin-pp-queue-latest.json"; defer os.remove(path)
+	path := scratch_path("odin-pp-queue-latest.json"); defer os.remove(path)
 	c: Campaign; initialize(&c); defer destroy(&c)
 	queue: Save_Queue
 	snapshot: Queue_Test_Snapshot
@@ -47,11 +47,11 @@ test_save_queue_coalesces_and_flushes_latest_checkpoint :: proc(t: ^testing.T) {
 
 @(test)
 test_save_queue_reports_failure_and_recovers_on_retry :: proc(t: ^testing.T) {
-	path := "/private/tmp/odin-pp-queue-retry.json"; defer os.remove(path)
+	path := scratch_path("odin-pp-queue-retry.json"); defer os.remove(path)
 	c: Campaign; initialize(&c); defer destroy(&c)
 	queue: Save_Queue
 	snapshot: Queue_Test_Snapshot
-	testing.expect(t, save_queue_enqueue(&queue, "/private/tmp/odin-pp-no-such-directory/slot.json", &c, &snapshot))
+	testing.expect(t, save_queue_enqueue(&queue, scratch_path("odin-pp-no-such-directory/slot.json"), &c, &snapshot))
 	testing.expect(t, !save_queue_flush(&queue) && queue.failed)
 	testing.expect(t, save_queue_enqueue(&queue, path, &c, &snapshot))
 	testing.expect(t, save_queue_flush(&queue) && !queue.failed)
@@ -60,8 +60,8 @@ test_save_queue_reports_failure_and_recovers_on_retry :: proc(t: ^testing.T) {
 
 @(test)
 test_save_queue_slot_transition_preserves_both_slots :: proc(t: ^testing.T) {
-	first := "/private/tmp/odin-pp-queue-slot-one.json"; defer os.remove(first)
-	second := "/private/tmp/odin-pp-queue-slot-two.json"; defer os.remove(second)
+	first := scratch_path("odin-pp-queue-slot-one.json"); defer os.remove(first)
+	second := scratch_path("odin-pp-queue-slot-two.json"); defer os.remove(second)
 	c: Campaign; initialize(&c); defer destroy(&c)
 	queue: Save_Queue
 	snapshot := Queue_Test_Snapshot{tick = 1}

@@ -300,7 +300,7 @@ update_tactical_pinball :: proc(renderer: ^Renderer, room: ^game.Room) {
 			progress, found := shadow_cue_progress(renderer, .Pinball_Made)
 			b.made = progress if found else 1
 		} else if b.made < 1 {
-			b.made = f32(clamp((now-b.began)/PINBALL_MADE_SECONDS, 0, 1))
+			b.made = f32(clamp((now-b.began)/(PINBALL_MADE_SECONDS*renderer_action_scale(renderer)), 0, 1))
 		}
 		pinball_strike(renderer, room, b, now)
 		pinball_turn_ball(b)
@@ -341,7 +341,7 @@ pinball_strike :: proc(renderer: ^Renderer, room: ^game.Room, b: ^Pinball_View, 
 		delay := f64(max(f32(0), room.player.tactical.cast_remaining))
 		b.struck, b.contact = true, now+delay
 		b.strikes += 1
-		cell := grid.Position{int(math.round(b.at.x)), int(math.round(b.at.y))}
+		cell := grid.Position{x = int(math.round(b.at.x)), y = int(math.round(b.at.y))}
 		// The swing's own impact would follow the ball as it flies off: the
 		// strike's star is the ball's own, where the blow lands.
 		weapon := renderer.tactical.snapshot.weapon if renderer.tactical.snapshot != nil else game.Weapon_Id.None
@@ -351,7 +351,7 @@ pinball_strike :: proc(renderer: ^Renderer, room: ^game.Room, b: ^Pinball_View, 
 				d := rl.Vector3{b.at.x-player.position.x, 0, b.at.y-player.position.y}
 				living_face(pilgrim, rl.Vector3DotProduct(d, flipbook_camera_right(renderer)), now)
 			}
-			living_start(pilgrim, .Attack, b.contact-attack_fx_impact_seconds(.Pilgrim))
+			living_start(pilgrim, .Attack, b.contact-attack_fx_impact_seconds(.Pilgrim, pilgrim.scale))
 			pilgrim.cause, pilgrim.shot = .Pinball_Launched, false
 		}
 	}
@@ -359,7 +359,7 @@ pinball_strike :: proc(renderer: ^Renderer, room: ^game.Room, b: ^Pinball_View, 
 		b.launched = true
 		centre := pinball_centre_at(b.at)
 		toward := attack_toward_camera(renderer)
-		pinball_impact(b, .Strike, centre+toward*0.35, {int(math.round(b.at.x)), int(math.round(b.at.y))}, now, int(b.enemy.id)*5)
+		pinball_impact(b, .Strike, centre+toward*0.35, {x = int(math.round(b.at.x)), y = int(math.round(b.at.y))}, now, int(b.enemy.id)*5)
 	}
 }
 
@@ -414,7 +414,7 @@ collect_pinball_entries :: proc(renderer: ^Renderer, entries: ^[dynamic]Tactical
 	now := renderer.sprite_assets.elapsed
 	if b.active || b.ending {
 		at := b.end_at if b.ending else b.at
-		if tactical_render_visible(renderer, {int(math.round(at.x)), int(math.round(at.y))}) {
+		if tactical_render_visible(renderer, {x = int(math.round(at.x)), y = int(math.round(at.y))}) {
 			append(entries, Tactical_Alpha_Entry{kind = .Pinball, pinball = 0, entity = b.enemy, position = at})
 		}
 	}
@@ -631,7 +631,7 @@ draw_pinball_shadow :: proc(renderer: ^Renderer) {
 	scale, _ := pinball_ball_scale(b, renderer.sprite_assets.elapsed)
 	if scale <= 0.01 { return }
 	at := b.end_at if b.ending else b.at
-	if !tactical_render_visible(renderer, {int(math.round(at.x)), int(math.round(at.y))}) { return }
+	if !tactical_render_visible(renderer, {x = int(math.round(at.x)), y = int(math.round(at.y))}) { return }
 	for layer in 0..<4 {
 		radius := (f32(0.5)-f32(layer)*0.06)*min(scale, 1.1)
 		rl.DrawCylinder({at.x+0.5, 0.024+f32(layer)*0.001, at.y+0.5}, radius, radius, 0.001, 28, {1, 5, 12, u8(9+layer*6)})
@@ -715,8 +715,8 @@ pinball_ball_pixels :: proc(band: rl.Color, axis: [3]f32, out: []u8) {
 
 PINBALL_HEAVY :: rl.Color{235, 91, 91, 255}
 
-// While the Pinball is aimed: every foe beside the player it can take marked
-// with a steel reticle, a boss or a miniboss there with a red one (and
+// While the Pinball is aimed: a boss or a miniboss beside the player, which it
+// cannot take, marked with a red reticle (and
 // TROPPO PESANTE, after the cards: draw_pinball_heavy_labels); for the foe under
 // the mouse, the way the strike would send the ball now, up to the first solid
 // thing on it.
@@ -733,9 +733,8 @@ draw_pinball_preview :: proc(renderer: ^Renderer, room: ^game.Room, card: game.C
 			continue
 		}
 		if evaluation.error != .None { continue }
-		hot := renderer.has_hovered_cell && renderer.hovered_cell == enemy.position
-		draw_aim_reticle(renderer, enemy.position, 0.5 if hot else 0.46, 3 if hot else 2, PINBALL_AIM_HOT if hot else PINBALL_AIM_LINE)
-		if hot { draw_pinball_launch_line(renderer, room, enemy.position) }
+		// The foe itself is marked by the general "can be hit" mark (card_hit_mark.odin).
+		if renderer.has_hovered_cell && renderer.hovered_cell == enemy.position { draw_pinball_launch_line(renderer, room, enemy.position) }
 	}
 }
 
@@ -812,7 +811,7 @@ draw_pinball_launch_line :: proc(renderer: ^Renderer, room: ^game.Room, cell: gr
 		touches := false
 		for dy in -1..=1 {
 			for dx in -1..=1 {
-				solid := grid.Position{int(math.round(p.x))+dx, int(math.round(p.y))+dy}
+				solid := grid.Position{x = int(math.round(p.x))+dx, y = int(math.round(p.y))+dy}
 				if !game.lasso_cell_is_solid(room, solid) { continue }
 				closest := [2]f64{clamp(p.x, f64(solid.x)-0.5, f64(solid.x)+0.5), clamp(p.y, f64(solid.y)-0.5, f64(solid.y)+0.5)}
 				if math.hypot(p.x-closest.x, p.y-closest.y) < game.PINBALL_RADIUS { touches = true }

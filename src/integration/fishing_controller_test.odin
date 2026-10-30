@@ -31,7 +31,7 @@ test_fishing_slot_picks_the_rod_up_and_drops_it_on_the_water :: proc(t: ^testing
 	on_slot := view.Vec2{slot.x+slot.width*0.5, slot.y+60}
 	board := render.tactical_world_bounds(renderer)
 	on_board := view.Vec2{board.x+board.width*0.5, board.y+board.height*0.5}
-	water := game.add_position(player.position, {2, 0})
+	water := game.add_position(player.position, {x = 2, y = 0})
 	// In the fight the slot is not there.
 	_, has, taken := run_session.poll_fishing_command(&room, renderer, &cards, {mouse = on_slot, inside = true, pressed = true, down = true}, true)
 	testing.expect(t, !has && !taken && cards == {})

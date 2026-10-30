@@ -11,6 +11,8 @@ Tile_Kind :: enum u8 {
 	Door,
 	Player_Spawn,
 	Exit,
+	// A low wall: it stops the step but not the sight (structure.odin).
+	Fence,
 }
 
 Tile :: struct {
@@ -26,7 +28,31 @@ Level :: struct {
 	// A lifetime identity avoids stale GPU caches when an allocator reuses a
 	// destroyed map's address. Neither counter participates in gameplay RNG.
 	geometry_id, geometry_revision: u64,
+	// The height of each cell in steps, a unit the rules count in (a step up is
+	// walked, a cliff of two or more is a wall). Empty means flat: every cell is
+	// at 0, which is every map that was not given heights.
+	heights: [dynamic]u8,
+	// The structures standing on the map (structure.odin): each one, its plan turned as
+	// placed, and for every cell the number of the structure over it (0 for none, else
+	// its index plus one). The tiles themselves are ordinary ones.
+	structures:      [dynamic]Placed_Structure,
+	structure_plans: [dynamic]Plan,
+	structure_cells: [dynamic]u8,
+	// The layers other than the ground (layers.odin), by layer_slot: the ground's slot stays empty.
+	planes:  [LAYER_COUNT]Layer_Plane,
+	ladders: [dynamic]Ladder,
+	// The lifts' shafts (layers.odin); where each platform is, the game keeps.
+	lifts:   [dynamic]Lift,
+	// The shortcuts' gates (layers.odin): shut, a gate's cell is a Fence; open, a Floor.
+	gates:   [dynamic]Gate,
+	// The height of the map's level ground, in steps: 0, or a base the map's ground was raised by so that there is room
+	// under it for the layers below (Fase 7 of docs/piano-profondita.md). It is drawn at the board's plane: the rules count
+	// heights from 0 as ever, only the drawing takes the base off.
+	base:    i32,
 }
+
+// The tallest a cell can be.
+MAX_CELL_HEIGHT :: 255
 
 @(private)
 next_geometry_id: u64
@@ -114,13 +140,105 @@ destroy :: proc(level: ^Level) {
 		return
 	}
 	grid.destroy(&level.tiles)
+	delete(level.heights)
+	delete(level.structures)
+	delete(level.structure_plans)
+	delete(level.structure_cells)
+	destroy_layers(level)
 	level^ = {}
 }
 
+// The height of `position` in steps, on its layer: 0 on a flat map, off the map or without heights.
+height_at :: proc(level: ^Level, position: grid.Position) -> i32 {
+	if level == nil { return 0 }
+	if position.layer != grid.GROUND_LAYER { return plane_height(level, position) }
+	if len(level.heights) == 0 { return 0 }
+	index, found := grid.index_of(&level.tiles, position)
+	if !found || index >= len(level.heights) { return 0 }
+	return i32(level.heights[index])
+}
+
+has_heights :: proc(level: ^Level) -> bool {
+	return level != nil && len(level.heights) > 0
+}
+
+// Raises or lowers one cell (0..MAX_CELL_HEIGHT). The first non-zero height makes
+// the map's height table; a change alters the geometry like a tile does.
+set_height :: proc(level: ^Level, position: grid.Position, height: i32) -> bool {
+	if level == nil { return false }
+	steps := clamp(height, 0, i32(MAX_CELL_HEIGHT))
+	if position.layer != grid.GROUND_LAYER { return set_plane_height(level, position, steps) }
+	index, found := grid.index_of(&level.tiles, position)
+	if !found { return false }
+	if len(level.heights) == 0 {
+		if steps == 0 { return true }
+		resize(&level.heights, len(level.tiles.cells))
+	}
+	if i32(level.heights[index]) == steps { return true }
+	level.heights[index] = u8(steps)
+	mark_geometry_changed(level)
+	return true
+}
+
+// Sets the whole height table at once (one value per cell, in the tiles' order); all zeros is
+// a flat map and leaves the table empty. A change alters the geometry like a tile does.
+set_height_table :: proc(level: ^Level, heights: []u8) -> bool {
+	if level == nil || len(heights) != len(level.tiles.cells) { return false }
+	flat := true
+	for steps in heights { if steps != 0 { flat = false; break } }
+	if flat { clear(&level.heights); mark_geometry_changed(level); return true }
+	resize(&level.heights, len(heights))
+	copy(level.heights[:], heights)
+	mark_geometry_changed(level)
+	return true
+}
+
+// Every cell's tile kind, in the tiles' order, into `out` (as many as the map has cells).
+tile_kinds :: proc(level: ^Level, out: []u8) -> bool {
+	if level == nil || len(out) < len(level.tiles.cells) { return false }
+	for tile, i in level.tiles.cells { out[i] = u8(tile.kind) }
+	return true
+}
+
+// Sets every cell's tile kind at once (one per cell, in the tiles' order): a single change of the geometry,
+// where a call of set_tile for each cell would make as many. False if a kind is not one.
+set_tile_kinds :: proc(level: ^Level, kinds: []u8) -> bool {
+	if level == nil || len(kinds) != len(level.tiles.cells) { return false }
+	for kind in kinds { if Tile_Kind(kind) > max(Tile_Kind) { return false } }
+	changed := false
+	for kind, i in kinds {
+		if u8(level.tiles.cells[i].kind) != kind { level.tiles.cells[i].kind = Tile_Kind(kind); changed = true }
+	}
+	if changed { mark_geometry_changed(level) }
+	return true
+}
+
+// Heights from rows of text the size of the map: ' ' or '0' is flat, '1'..'9'
+// that many steps, 'a'..'f' ten to fifteen. Used by the arenas that test heights.
+apply_height_rows :: proc(level: ^Level, rows: []string) -> bool {
+	if level == nil || len(rows) != level.tiles.height { return false }
+	for row in rows { if len(row) != level.tiles.width { return false } }
+	for row, y in rows {
+		for symbol, x in row {
+			steps: i32
+			switch {
+			case symbol >= '0' && symbol <= '9': steps = i32(symbol-'0')
+			case symbol >= 'a' && symbol <= 'f': steps = i32(symbol-'a')+10
+			case symbol == ' ':
+			case: return false
+			}
+			if !set_height(level, {x = x, y = y}, steps) { return false }
+		}
+	}
+	return true
+}
+
+// The tile of `position` on its layer: a cell of another layer that holds nothing is Void.
 tile_at :: proc(level: ^Level, position: grid.Position) -> (Tile, bool) {
 	if level == nil {
 		return {}, false
 	}
+	if position.layer != grid.GROUND_LAYER { return plane_tile(level, position) }
 	return grid.get(&level.tiles, position)
 }
 
@@ -128,6 +246,7 @@ set_tile :: proc(level: ^Level, position: grid.Position, tile: Tile) -> bool {
 	if level == nil {
 		return false
 	}
+	if position.layer != grid.GROUND_LAYER { return set_plane_tile(level, position, tile) }
 	previous, found := grid.get(&level.tiles, position)
 	if !found {return false}
 	if previous == tile {return true}
@@ -146,7 +265,7 @@ is_walkable :: proc(kind: Tile_Kind) -> bool {
 	switch kind {
 	case .Floor, .Door, .Player_Spawn, .Exit:
 		return true
-	case .Void, .Wall:
+	case .Void, .Wall, .Fence:
 		return false
 	}
 	return false
@@ -160,6 +279,8 @@ tile_from_symbol :: proc(symbol: u8) -> (Tile, bool) {
 		return Tile{kind = .Floor}, true
 	case '#':
 		return Tile{kind = .Wall}, true
+	case '=':
+		return Tile{kind = .Fence}, true
 	case '+':
 		return Tile{kind = .Door}, true
 	case '@':
@@ -178,6 +299,8 @@ tile_symbol :: proc(kind: Tile_Kind) -> string {
 		return "."
 	case .Wall:
 		return "#"
+	case .Fence:
+		return "="
 	case .Door:
 		return "+"
 	case .Player_Spawn:
@@ -381,7 +504,7 @@ generation_config_is_valid :: proc(config: Room_Generation_Config) -> bool {
 		// With central placement both anchors need their full clearance. The
 		// farthest corners of these regions bound every possible anchor pair.
 		spawn_min := 1+config.spawn_clearance_radius
-		spawn_max := grid.Position{config.width-2-config.spawn_clearance_radius, config.height-2-config.spawn_clearance_radius}
+		spawn_max := grid.Position{x = config.width-2-config.spawn_clearance_radius, y = config.height-2-config.spawn_clearance_radius}
 		exit_min, exit_max := exit_candidate_bounds(config)
 		exit_min.x = max(exit_min.x, 1+config.exit_clearance_radius)
 		exit_min.y = max(exit_min.y, 1+config.exit_clearance_radius)

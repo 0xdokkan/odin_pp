@@ -13,7 +13,7 @@ expedition_boss_area :: proc(room:^Room,enemy:^Enemy,origin:grid.Position,ring:b
 	for y in -radius..=radius {for x in -radius..=radius {
 		d:=max(abs(x),abs(y))
 		if d==0 || (ring && d!=radius) || (!ring && x!=0 && y!=0) {continue}
-		p:=grid.Position{origin.x+x,origin.y+y}
+		p:=grid.offset(origin, x, y)
 		if !grid.contains(&room.level_data.tiles,p) || !enemy_has_lob_line(room,origin,p) {continue}
 		if intent.threatened_cell_count<len(intent.threatened_cells) {
 			intent.threatened_cells[intent.threatened_cell_count]=p;intent.threatened_cell_count+=1

@@ -13,13 +13,13 @@ import level "../level"
 test_pinball_rolls_on_behind_his_eyes_and_the_ak_shoots_through_it :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {7, 6}, health = 30, attack = 1}, {position = {9, 6}, health = 40, attack = 1},
-		{position = {6, 2}, health = 40, attack = 1}}
+	spawns := [?]Enemy_Spawn{{position = {x = 7, y = 6}, health = 30, attack = 1}, {position = {x = 9, y = 6}, health = 40, attack = 1},
+		{position = {x = 6, y = 2}, health = 40, attack = 1}}
 	room := first_person_test_room(t, &data, &player, spawns[:])
 	defer level.destroy(&data)
 	defer destroy_room(&room)
 	for enemy in room.enemies { lasso_test_hold(&room, enemy.id) }
-	ball, behind := lasso_test_foe(&room, {7, 6}), lasso_test_foe(&room, {9, 6})
+	ball, behind := lasso_test_foe(&room, {x = 7, y = 6}), lasso_test_foe(&room, {x = 9, y = 6})
 	testing.expect_value(t, pinball_test_strike(t, &room, ball).result, Card_Play_Result.Played)
 	testing.expect(t, room.pinball.active && !tactical_is_casting(&room))
 	// Behind his eyes while it rolls; no card meanwhile.
@@ -53,7 +53,7 @@ test_pinball_rolls_on_behind_his_eyes_and_the_ak_shoots_through_it :: proc(t: ^t
 test_pinball_burst_of_the_last_foe_ends_the_view :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
-	spawns := [?]Enemy_Spawn{{position = {7, 6}, health = 30, attack = 1}}
+	spawns := [?]Enemy_Spawn{{position = {x = 7, y = 6}, health = 30, attack = 1}}
 	room := first_person_test_room(t, &data, &player, spawns[:])
 	defer level.destroy(&data)
 	defer destroy_room(&room)
