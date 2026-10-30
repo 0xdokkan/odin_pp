@@ -5,6 +5,13 @@ I riferimenti a Classica, `--flat` e ai vecchi smoke descrivono versioni precede
 per i comandi disponibili oggi valgono il [README](README.md) e la documentazione collegata.
 
 
+## 2026-10-30 — Piano del combattimento vivo
+
+- Nuovo [documento](docs/piano-succo.md) in sette fasi (0–6), da eseguire una alla volta: il succo dei colpi (pausa
+  sull'impatto sui colpi del giocatore e sui critici, scossa della telecamera, scintille, con un'opzione per ridurlo),
+  le frecce degli arcieri come proiettili veri che si evitano spostandosi, le bombe dei bombaroli che volano ad arco.
+  Il cammino tenuto premuto, prima idea scelta dall'utente, è già sul ramo `movimento-fluido`.
+
 ## 2026-10-30 — Il gioco più fluido: niente timer, cammino tenuto, tasto ricordato, carte rapide
 
 - Nel gioco come si gioca non c'è più il timer delle decisioni (la finestra «AGISCI» e lo stordimento): restano battiti,
