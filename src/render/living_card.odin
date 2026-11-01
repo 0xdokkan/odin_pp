@@ -102,6 +102,7 @@ forget_living_actors :: proc(renderer: ^Renderer) {
 	first_person_view_reset(&renderer.tactical.first_person)
 	forget_attack_fx(renderer)
 	forget_ground_fx(renderer)
+	renderer.tactical.juice_blows = {}
 	lab_sounds_reset(renderer)
 	if renderer.tactical.living_state == nil { return }
 	living_tokens_free(renderer.tactical.living_state)

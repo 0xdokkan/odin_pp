@@ -5,6 +5,15 @@ I riferimenti a Classica, `--flat` e ai vecchi smoke descrivono versioni precede
 per i comandi disponibili oggi valgono il [README](README.md) e la documentazione collegata.
 
 
+## 2026-11-01 — Piano del succo, Fase 2: i colpi si sentono
+
+- I colpi a urto e le frecce del Viandante fermano l'immagine per un istante (60 ms, 90 sui critici, 100 sulle
+  uccisioni), scuotono la telecamera, spingono indietro la carta colpita, la fanno lampeggiare bianca e lanciano
+  frammenti di carta (dorati sui critici). Le sue carte che fanno danno scuotono soltanto.
+- Un colpo nemico sul Viandante scuote lo schermo e ne arrossa i bordi per un istante; un colpo parato scuote meno, con
+  scintille azzurre; un'esplosione scuote di più se è vicina.
+- Suono nuovo `world_hit_critical`, fatto da codice, sotto i colpi critici.
+
 ## 2026-11-01 — Piano del succo, Fase 1: scossa della telecamera e pausa sull'impatto
 
 - Il tabellone ha il motore del succo dei colpi: una scossa della telecamera che cresce a ogni colpo e si spegne da sola,

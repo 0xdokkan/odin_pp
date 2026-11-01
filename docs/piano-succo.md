@@ -61,7 +61,7 @@ Parole del documento:
 |---|---|---|---|---|
 | 0 | Base: unire le correzioni di `gioco-piu-veloce`, provare il cammino tenuto, misure di partenza | — | Fatta | vedi Esito |
 | 1 | Succo, motore comune: scossa, pausa sull'impatto, opzione per ridurlo | 0 | Fatta | vedi Esito |
-| 2 | Succo sui colpi: colpi del giocatore, critici, uccisioni, colpi nemici | 1 | Da fare | |
+| 2 | Succo sui colpi: colpi del giocatore, critici, uccisioni, colpi nemici | 1 | Fatta | vedi Esito |
 | 3 | Frecce degli arcieri: proiettili veri nelle regole | 0 | Da fare | |
 | 4 | Frecce degli arcieri: aspetto 3D, riga accesa, suoni | 3 | Da fare | |
 | 5 | Bombe dei bombaroli: volo ad arco e cerchio d'impatto | 3 | Da fare | |
@@ -226,6 +226,56 @@ Passi:
 
 **Fatto quando:** l'utente approva la sensazione nel laboratorio; le catture della
 prova del laboratorio mostrano scossa e scintille; test verdi.
+
+### Esito (1 novembre 2026)
+
+Scelte dell'utente all'inizio della fase: **i numeri della tabella**; la pausa
+**solo per i colpi a urto e le frecce** (le sue carte che fanno danno danno solo
+la scossa, niente pausa né arretramento); **bordo rosso breve** quando un nemico
+lo colpisce; **un suono nuovo fatto da codice** per i critici. Dopo la prova nel
+laboratorio: il succo **va bene così** e le scintille **vanno bene**.
+
+1. **Colpi collegati** ([juice_blows.odin](../src/render/juice_blows.odin),
+   `observe_juice_blows`, dopo `observe_attack_cues` a ogni fotogramma): ogni
+   segnale di colpo dà il suo succo una volta sola (stesso schema dei suoni del
+   laboratorio), quando il colpo **arriva**: se ha l'arma disegnata, quando
+   l'arma tocca (`attack_fx_landing_in`); altrimenti quando parte il segnale.
+   Colpo a urto o freccia del giocatore (`EVENT_ATTACK_BIT`): pausa e scossa
+   della tabella; critico (`EVENT_CRITICAL_BIT`) e uccisione (un segnale di
+   sconfitta dello stesso nemico nello stesso comando) più forti. Danno di una
+   sua carta: solo la scossa. Danno che passa col tempo (veleno, bruciatura):
+   niente. Colpo nemico su di lui: scossa 0,30 e bordo rosso; colpo parato o
+   respinto: scossa 0,15 e scintille azzurre; esplosione: scossa 0,40 divisa per
+   (1 + caselle/4).
+2. **Arretramento** (`juice_kick_offset`, applicato in `tactical_billboard`):
+   la carta colpita salta subito indietro, lontano dal Viandante, e torna in
+   0,18 s; quella uccisa resta indietro mentre cade. La casella del nemico non
+   cambia.
+3. **Lampo e scintille:** il lampo bianco è quello dei pugni in prima persona
+   (`draw_first_person_struck_flash`), 60 ms (100 ms sui critici e sulle
+   uccisioni). Le scintille sono 11 frammenti di carta (16 sui critici e sulle
+   uccisioni, dorati sui critici), uno ogni due di inchiostro scuro perché si
+   vedano anche sul cartoncino crema, lanciati a 2,8-4,6 caselle al secondo,
+   con la gravità, per 0,35 s, disegnati sopra le carte. Il bordo rosso dura
+   0,25 s, più forte per un colpo più grosso, e segue il cursore
+   «Scuotimento e pausa sui colpi».
+4. **Suono:** `world_hit_critical` (tools/audio/sfx_world.py): un tonfo basso
+   che scende da 130 a 45 Hz, uno schiocco di cartoncino e qualche pezzetto di
+   carta; suona sotto il colpo critico, dove suonano i suoni del laboratorio e
+   della spedizione. Rigenerati tutti i suoni con `build_sfx.py`: gli altri 227
+   sono identici byte per byte.
+5. **Prova del laboratorio:** l'atto del succo (`mechanics_lab_juice`) ora dà
+   anche un colpo a urto vero a un nemico accanto e controlla pausa (4
+   fotogrammi fermi), arretramento (0,15 caselle) e scintille; catture
+   `odin_pp_living_juice_blow_NN.png`.
+6. **Test nuovi** ([juice_blows_test.odin](../src/render/juice_blows_test.odin)):
+   il colpo a urto dà il suo succo una volta sola, con arretramento e lampo che
+   finiscono; critico e uccisione più forti, la carta uccisa resta indietro; la
+   carta fa solo scossa e lo stato nessuna; colpo nemico, parata ed esplosione
+   lontana e vicina.
+7. **Verifiche:** `scripts/check.ps1` verde (1839 test con e senza assert);
+   prova completa del laboratorio verde nella finestra vera (2051 catture, 147
+   suoni; colpo a urto: 4 fotogrammi fermi, nemico spinto di 0,15 caselle).
 
 ## Fase 3 — Frecce degli arcieri: proiettili veri nelle regole
 

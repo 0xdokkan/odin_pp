@@ -753,6 +753,25 @@ def world_explosion(seed):
     return _finish(_limit(x, 0.52), D, fade_out=0.08)
 
 
+@sound("world_hit_critical", loudness=-15, wet=0.3,
+       note="thump 0.0 (falling 130->45 Hz, ~0.35 s); card crack 0.0-0.04; paper scraps 0.06-0.3")
+def world_hit_critical(seed):
+    """The board's critical blow (docs/piano-succo.md, Fase 2): played under
+    the blow's own sound as it lands, a heavy low thump falling in pitch, a
+    sharp crack of card on its front and a few scraps of paper after it."""
+    D = 0.6
+    lt = 0.45
+    t = time_axis(lt)
+    thump = drive(sine(glide(130, 45, lt)) * np.exp(-t / 0.11), 1.6)
+    lf = 0.05
+    tf = time_axis(lf)
+    crack = _norm(bandpass(white(lf, seed + 1), 2600, 0.9)) * np.minimum(1, tf / 0.0006) * np.exp(-tf / 0.008)
+    scraps = _paper(D, [0.06, 0.12, 0.2], seed + 2)
+    x = place(D, [(0.0, _norm(thump), 1.0), (0.0, crack, 0.5)]) + 0.08 * _norm(scraps)
+    _events("world_hit_critical", 0.0, 0.06, 0.12, 0.2)
+    return _finish(_limit(x, 0.7), D, fade_out=0.05)
+
+
 @sound("world_barrel_explosion", loudness=-12, wet=0.45,
        note="staves split 0.003; blast 0.012; oily fire whoosh 0.03-0.6 and burning to 2.0; staves clatter 0.21-1.4; a hoop rings 0.66")
 def world_barrel_explosion(seed):

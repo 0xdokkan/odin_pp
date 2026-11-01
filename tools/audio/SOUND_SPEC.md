@@ -403,6 +403,7 @@ Same rules as `cards_arms`.
 | world_bomb_fuse | a bomb is armed on the board | 1.4 | -22 | 0.2 | a fuse fizzing and spitting steadily |
 | world_explosion | a bomb explodes | 2.0 | -12 | 0.45 | a deep blast, stone shatters, debris rains, long hall tail |
 | world_barrel_explosion | a barrel explodes | 2.0 | -12 | 0.45 | wood splinters + blast + oily fire whoosh |
+| world_hit_critical | the player's critical bump or arrow lands (docs/piano-succo.md, Fase 2), under the blow's own sound | 0.6 | -15 | 0.3 | a heavy low thump falling 130 to 45 Hz, a card's crack on its front, paper scraps at 0.06-0.2 |
 | world_fire | fire on a cell | 1.2 | -20 | 0.3 | flames catch and crackle |
 | world_fire_spread | the floor's fires grow at a new window | 0.9 | -20 | 0.3 | a rush of flame swelling to 0.15, crackle running along it, dying by 0.8 |
 | world_fire_out | a floor fire goes out at its fifth window | 0.85 | -22 | 0.3 | the flames gutter and sink (the bed darkening, its crackle thinning, to 0.45), a last ember pops at 0.38, smoke hisses away with a soft puff from 0.32 |

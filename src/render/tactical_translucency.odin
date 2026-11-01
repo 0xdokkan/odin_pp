@@ -58,6 +58,8 @@ collect_tactical_translucents :: proc(renderer: ^Renderer, room: ^game.Room = ni
 		// FIRST PERSON FENCER's blows begun before their beat, then the cues.
 		foresee_first_person_blows(renderer, room)
 		observe_attack_cues(renderer)
+		// The blows that have landed give their juice (juice_blows.odin).
+		observe_juice_blows(renderer)
 	}
 	if room != nil { update_flipbook_actors(renderer, room) }
 	if room != nil && v.living { update_living_actors(renderer, room) }

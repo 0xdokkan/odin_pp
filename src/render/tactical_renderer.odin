@@ -149,6 +149,8 @@ Tactical_View :: struct {
 	first_person: First_Person_View,
 	// The foes' glows as they act (foe_glow.odin).
 	foe_glow: Foe_Glow_View,
+	// The juice of the blows landed: kicks, flashes, paper bits, the red edge (juice_blows.odin).
+	juice_blows: Juice_Blows,
 	// PROVA MECCANICHE's overlapping hand: how much of each card shows
 	// (tactical_hand.odin).
 	hand_reveal: Tactical_Hand_Reveal,
@@ -509,7 +511,9 @@ tactical_billboard :: proc(renderer: ^Renderer, key: Sprite_Key, position: view.
 		draw_expedition_robot(renderer, position, opacity)
 		return
 	}
-	quad := tactical_billboard_geometry(renderer, key, position, true, entity)
+	// A struck card thrown back a moment (juice_blows.odin).
+	kick := juice_kick_offset(renderer, entity)
+	quad := tactical_billboard_geometry(renderer, key, {position.x+kick.x, position.y+kick.y}, true, entity)
 	pose := tactical_feedback_pose(renderer, key, position)
 	// Sunk in its shadow the player's card is dark, paper and print alike.
 	shade, seen := tactical_shadow_tint(renderer, entity)
@@ -527,6 +531,8 @@ tactical_billboard :: proc(renderer: ^Renderer, key: Sprite_Key, position: view.
 	if lit > 0 { draw_billboard_print_light(quad, glow, lit*0.55*opacity*seen, 1) }
 	// FIRST PERSON BRAWLER: the struck foe's print flashes white (first_person_fists.odin).
 	if flash := first_person_struck_flash(renderer, entity); flash > 0 { draw_first_person_struck_flash(quad, flash*opacity*seen) }
+	// The board's blows flash it the same (juice_blows.odin).
+	if flash := juice_struck_flash(renderer, entity); flash > 0 { draw_first_person_struck_flash(quad, flash*opacity*seen) }
 }
 
 @(private)
@@ -761,6 +767,7 @@ draw_tactical_world :: proc(renderer: ^Renderer, room: ^game.Room, active_card: 
 	draw_arsenal_sky(renderer, room)
 	draw_tactical_feedback(renderer, .Accent)
 	draw_card_hit_sparks(renderer, room, &preview, halo)
+	draw_juice_bursts(renderer)
 	rl.EndMode3D()
 	when EXPEDITION_BENCHMARK {v.draw_timing.paper_ms=expedition_benchmark_elapsed(&stamp)}
 
@@ -776,6 +783,7 @@ draw_tactical_world :: proc(renderer: ^Renderer, room: ^game.Room, active_card: 
 	// Keep the Pinball's targeting warning above enemy health tags.
 	draw_pinball_heavy_labels(renderer, room, active_card)
 	draw_tactical_shadow_overlay(renderer)
+	draw_juice_hurt_edge(renderer)
 	draw_lasso_release_badge(renderer)
 	// Filter each member of simultaneous impacts, not only the first event.
 	for offset in 0..<renderer_active_cue_count(renderer) {
