@@ -162,6 +162,10 @@ Presentation_Cue_Kind :: enum {
 	Ride_Ended,
 	Dino_Stomp,
 	Bleed_Bite,
+	// THE ARCHERS' REAL ARROWS (game/enemy_arrow.odin): the archer looses, the
+	// arrow lands. The arrow in flight is drawn from the room (enemy_arrow.odin).
+	Arrow_Loosed,
+	Arrow_Landed,
 }
 
 Presentation_Actor :: struct {
@@ -643,6 +647,10 @@ presentation_cue_kind :: proc(event: game.Game_Event) -> Presentation_Cue_Kind {
 		return .Dino_Stomp
 	case .Bleed_Bite:
 		return .Bleed_Bite
+	case .Arrow_Loosed:
+		return .Arrow_Loosed
+	case .Arrow_Landed:
+		return .Arrow_Landed
 	}
 	unreachable()
 }
@@ -757,7 +765,7 @@ presentation_cue_duration :: proc(kind: Presentation_Cue_Kind, event: game.Game_
 		return PRESENTATION_RIDE_DURATION
 	case .Dino_Stomp:
 		return PRESENTATION_STOMP_DURATION
-	case .Black_Hole_Tick, .Bleed_Bite:
+	case .Black_Hole_Tick, .Bleed_Bite, .Arrow_Loosed, .Arrow_Landed:
 		return PRESENTATION_NOTICE_DURATION
 	}
 	unreachable()
@@ -1364,7 +1372,7 @@ start_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^Presentat
 	case .Ride_Begun, .Ride_Ended:
 		if event.source != game.PLAYER_ENTITY || event.card_definition != .Dino_Ride { timeline.update_failures += 1 }
 		if timeline.final_view.valid { timeline.view.ride = timeline.final_view.ride }
-	case .Dino_Stomp, .Bleed_Bite:
+	case .Dino_Stomp, .Bleed_Bite, .Arrow_Loosed, .Arrow_Landed:
 	case .Attack_Missed, .Move_Blocked, .Attack_Deflected,
 	     .Binding_Added, .Binding_Exhausted, .Binding_Expired, .Shadow_Entered, .Shadow_Emerged:
 	// The player's own card, behind his eyes.
@@ -1424,7 +1432,7 @@ update_active_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^P
 	     .Fish_Cast, .Fish_Bite, .Fish_Caught, .Pinball_Made, .Pinball_Launched, .Pinball_Bounced, .Pinball_Bumped, .Pinball_Burst,
 	     .First_Person_Begun, .Marley_Begun, .Marley_Lights, .Marley_Warned, .Marley_Bomb, .Marley_Saved, .Marley_Bonus,
 	     .Marley_Ended, .Flood_Swept, .Fire_Extinguished, .Cannon_Fired, .Cannon_Broken, .Black_Hole_Tick, .Black_Hole_Closed,
-	     .Ride_Begun, .Ride_Ended, .Dino_Stomp, .Bleed_Bite:
+	     .Ride_Begun, .Ride_Ended, .Dino_Stomp, .Bleed_Bite, .Arrow_Loosed, .Arrow_Landed:
 	// A foe swallowed by the hole spins down it toward the hole's centre.
 	case .Black_Hole_Swallowed:
 		if has_actor {

@@ -136,12 +136,21 @@ test_attack_marks_the_archer_shot_as_ranged_and_not_its_aim :: proc(t: ^testing.
 	resolve_enemy_intents(&room, &aim, room.enemies[0].id)
 	for event in aim.events.events[:aim.events.count] { testing.expect(t, !event_is_attack(event)) }
 	plan_enemy_intents(&room)
+	// Since 2026-11-01 the shot is a real arrow (enemy_arrow.odin): the shot's
+	// beat looses it from the archer's cell, unmarked; it lands on the player's
+	// cell later, its blow unmarked too (the arrow in flight is the board's).
 	shot: Pulse_Report
 	resolve_enemy_intents(&room, &shot, room.enemies[0].id)
-	hit, found := attack_mark_find(&shot.events, .Damaged, archer)
-	testing.expect(t, found && event_is_ranged_attack(hit))
-	testing.expect_value(t, hit.from_position, grid.Position{x = 7, y = 4})
-	testing.expect_value(t, hit.to_position, grid.Position{x = 4, y = 4})
+	loosed, found := attack_mark_find(&shot.events, .Arrow_Loosed, archer)
+	testing.expect(t, found && !event_is_attack(loosed))
+	testing.expect_value(t, loosed.from_position, grid.Position{x = 7, y = 4})
+	room.arrows.pending = 1
+	fly_enemy_arrows(&room, &shot)
+	landed, landed_found := attack_mark_find(&shot.events, .Arrow_Landed, archer)
+	testing.expect(t, landed_found && landed.target == PLAYER_ENTITY)
+	testing.expect_value(t, landed.to_position, grid.Position{x = 4, y = 4})
+	hit, hit_found := attack_mark_find(&shot.events, .Damaged, archer)
+	testing.expect(t, hit_found && !event_is_attack(hit))
 }
 
 // Thorns answer a blow with damage of their own: never marked as one.

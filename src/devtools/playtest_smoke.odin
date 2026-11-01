@@ -19,6 +19,7 @@ run_headless_playtest_decisions :: proc(room: ^game.Room, session: ^combatdebug.
 		command := run_session.Gameplay_Command{origin_phase = .Combat}
 		if room.qte.kind != .None { command.kind = .QTE_Fail }
 		else if room.tactical_pulse.pending { command.kind = .Continue_Pulse }
+		else if game.tactical_arrows_due(room) { command.kind = .Arrow_Flight } // the archers' arrows (game/enemy_arrow.odin)
 		else if room.player.tactical.phase == .Decision && room.player.tactical.remaining <= 0 { command.kind = .Timeout }
 		else if !game.tactical_allows_action(room) {
 			// The current game charges ordinary actions in real time. Recovery

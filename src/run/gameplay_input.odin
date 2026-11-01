@@ -25,6 +25,9 @@ Gameplay_Command_Kind :: enum {
 	// PINBALL: the world's seconds waiting, rolled out (a world command, as a
 	// beat; game/pinball.odin).
 	Pinball_Roll,
+	// THE ARCHERS' REAL ARROWS: the world's seconds waiting, flown out (a world
+	// command, as a beat; game/enemy_arrow.odin).
+	Arrow_Flight,
 	// FIRST PERSON SHOOTER: one shot of the AK along `aim`, its trigger held (a
 	// world command, as a beat: never blocked by the player's own action;
 	// game/first_person.odin).
@@ -112,7 +115,7 @@ gameplay_command_is_valid :: proc(command: Gameplay_Command) -> bool {
 	case .Activate:
 		return command.origin_phase == .Combat
 	case .Dodge, .Wait, .Ability, .Play_Card, .Refocus, .Timeout, .Continue_Pulse, .Begin_Diagonal, .QTE_Key, .QTE_Fail, .Defense,
-	     .Shadow_Emerge, .Shoot, .Lasso_Spin, .Pinball_Roll:
+	     .Shadow_Emerge, .Shoot, .Lasso_Spin, .Pinball_Roll, .Arrow_Flight:
 		return command.origin_phase == .Combat
 	// The rod fishes a room cleared, and nothing else.
 	case .Fish:

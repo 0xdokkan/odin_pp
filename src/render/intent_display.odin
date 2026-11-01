@@ -197,7 +197,7 @@ draw_intent_ground :: proc(renderer: ^Renderer, room: ^game.Room) {
 }
 
 // A cell striking: a frame that closes in from the edges to the middle.
-@(private = "file")
+@(private)
 draw_intent_cell :: proc(cell: grid.Position, progress: f32, color: rl.Color, alpha: f32) {
 	x, z := f32(cell.x), f32(cell.y)
 	y := f32(0.045)+cell_overlay_ground(cell)

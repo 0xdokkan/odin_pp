@@ -230,6 +230,8 @@ Room :: struct {
 	// own stream for its launches.
 	pinball: Pinball_State,
 	pinball_random: u64,
+	// The archers' arrows in flight (enemy_arrow.odin).
+	arrows: Enemy_Arrows,
 	// BOMB MARLEY: the party in the room and its own stream for the lights and
 	// the columns (marley.odin).
 	marley: Marley_State,

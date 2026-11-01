@@ -352,6 +352,11 @@ observe_event :: proc(metrics: ^Combat_Metrics, event: game.Game_Event) -> (dama
 		if event.source.kind == .Enemy && event.target.kind == .Player {
 			metrics.enemy_attack_misses += 1
 		}
+	// An archer's real arrow that lands off the player missed him (game/enemy_arrow.odin).
+	case .Arrow_Landed:
+		if event.source.kind == .Enemy && event.target != game.PLAYER_ENTITY {
+			metrics.enemy_attack_misses += 1
+		}
 	case .Card_Played:
 		metrics.cards_played += 1
 		metrics.energy_spent += i64(max(event.amount, 0))
@@ -518,6 +523,10 @@ observe_command_detailed :: proc(
 			sample.energy_wasted += i64(max(event.energy_wasted, 0))
 		case .Attack_Missed:
 			if event.source.kind == .Enemy && event.target.kind == .Player {
+				sample.enemy_attack_misses += 1
+			}
+		case .Arrow_Landed:
+			if event.source.kind == .Enemy && event.target != game.PLAYER_ENTITY {
 				sample.enemy_attack_misses += 1
 			}
 		case .Status_Applied:

@@ -245,6 +245,8 @@ step_tactical_controller :: proc(
 	// then the PINBALL's ball rolls them out.
 	drain_lasso_spin_commands(room, renderer, cards, playtest)
 	drain_pinball_roll_commands(room, renderer, cards, playtest)
+	// The archers' arrows fly their seconds out (game/enemy_arrow.odin).
+	drain_arrow_flight_commands(room, renderer, cards, playtest)
 	// FIRST PERSON SHOOTER: the buttons to the weapon in hand (the AK's
 	// trigger), then the shots due, as world commands too.
 	buttons := first_person_buttons(controller, renderer, room, input)
@@ -326,6 +328,20 @@ drain_lasso_spin_commands :: proc(room: ^game.Room, renderer: ^render.Renderer,
 	for _ in 0..<LASSO_SPIN_BATCHES {
 		if !game.tactical_lasso_due(room) { return }
 		if !commit_gameplay_command(room, renderer, cards, {kind = .Lasso_Spin, origin_phase = .Combat}, playtest) { return }
+	}
+}
+
+// A flight's batch stops short of a full log; a frame's seconds fit in this many.
+ARROW_FLIGHT_BATCHES :: 4
+
+// The arrows' seconds waiting, flown out in world commands
+// (game.resolve_arrow_flight): never more batches than the bound, never into a
+// full world bank.
+drain_arrow_flight_commands :: proc(room: ^game.Room, renderer: ^render.Renderer,
+	cards: ^Card_Interaction_State, playtest: ^combatdebug.Playtest_Session) {
+	for _ in 0..<ARROW_FLIGHT_BATCHES {
+		if !game.tactical_arrows_due(room) { return }
+		if !commit_gameplay_command(room, renderer, cards, {kind = .Arrow_Flight, origin_phase = .Combat}, playtest) { return }
 	}
 }
 

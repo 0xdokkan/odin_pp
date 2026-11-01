@@ -318,9 +318,20 @@ I nemici hanno queste cadenze e regole:
   anche mancato, recuperano per un secondo. La cadenza normale è di 3 secondi.
 - **Arcieri:** cercano una linea di tiro libera a distanza 2–5, arretrando
   quando necessario. **4 secondi per mirare/muovere**, rilascio sulla cella fissata dopo 1 secondo, poi recupero 1 secondo.
-  La mira non infligge danno e non apre QTE; durante il tiro si possono usare le
-  normali difese. Spostarli o stordirli interrompe il tiro. Da adiacenti e senza
+  La mira non infligge danno e non apre QTE. Spostarli o stordirli interrompe il tiro. Da adiacenti e senza
   vie di fuga possono colpire per un solo danno.
+  **Frecce vere** (dal 1 novembre 2026, [piano](../piano-succo.md) Fase 3,
+  [enemy_arrow.odin](../../src/game/enemy_arrow.odin)): sul battito del tiro l'arciere
+  **scocca una freccia** dalla sua cella lungo la linea mirata. Vola a **8 caselle al secondo**
+  del mondo per **al massimo 8 caselle** e colpisce la prima cosa che trova quando entra nella
+  sua casella: un muro, un muretto o una copertura la fermano; il Viandante prende il colpo
+  dell'arciere (e lo stato del bioma); **un altro nemico** in mezzo prende il danno al posto suo.
+  Contro la freccia **non c'è difesa a tasti**: ci si sposta fuori dalla riga, che a terra si
+  accende dalla mira e si spegne man mano che la freccia passa. Riflesso, lo Stegosauro e la
+  guardia della spada in prima persona la rimandano indietro quando arriva; le Spine non fanno
+  nulla contro le frecce. Le frecce volano sul tempo del mondo: ombra, lancio di una carta,
+  difesa e dadi le fermano come fermano il mondo; nessun battito le scavalca (volano prima del
+  battito).
 - **Bruti:** cadenza di 5 secondi; il fendente adiacente copre tre celle frontali; recupero 1 dopo
   il fendente e 2 dopo la carica, anche mancata. Colpi e cariche possono
   spingere di una cella, attivando i pericoli
@@ -460,7 +471,7 @@ il numero massimo di carte scritto. Upgrade e keyword mantengono le policy esist
 | `WASD` durante QTE diagonale | due pressioni nell'ordine indicato: prima asse orizzontale, poi verticale |
 | `Shift + WASD` | schivata attiva di 1–2 celle in linea; costo 1 secondo, recupero 2 secondi, senza carta richiesta |
 | `J` / `K` durante scelta difesa | parata / parry, disponibili con Shield |
-| `L` durante scelta difesa | deviazione di una freccia, disponibile con Thorns |
+| `L` durante scelta difesa | deviazione con Thorns (contro le frecce degli arcieri non si offre più: dal 1 novembre 2026 sono frecce vere, si schivano spostandosi) |
 | `E` durante scelta difesa | schivata reattiva di una cella; poi `WASD` sceglie la landing; disponibile senza carte quando pronta |
 | `WASD` dopo scelta parata/parry/deviazione | premi il tasto richiesto entro la finestra residua |
 | rotella | zoom della camera locale |
@@ -675,7 +686,8 @@ interrotto da Stagger non è un'azione. La Bruciatura in M7 morde sul comando
 Veleno e Bruciatura del pavimento (pozze e fuochi,
 [Pozza di Veleno e Incendio](meccaniche.md#pozza-di-veleno-e-incendio)) hanno sorgente System,
 come i morsi: nessuna reliquia o reazione del Viandante li modifica.
-Thorns non scatta su danno interamente assorbito, veleno, bruciatura o hazard neutrali.
+Thorns non scatta su danno interamente assorbito, veleno, bruciatura o hazard neutrali,
+né sulle frecce degli arcieri (dal 1 novembre 2026).
 Afterimage osserva solo il movimento terminale: un Dash di tre celle lo attiva
 una volta. Il suo Shield arriva **dopo** gli hazard attraversati, ma prima della
 risposta nemica. Nessuna reazione può essere costruita per un owner già morto.

@@ -237,12 +237,16 @@ test_ice_block_moved_into_committed_archer_line_causes_miss :: proc(t: ^testing.
 
 	room.objects[0].position = {x = 3, y = 1}
 	pulse := advance_combat_pulse(&room)
+	// The shot is a real arrow (enemy_arrow.odin): the block stops it in flight.
+	room.arrows.pending = 1
+	fly_enemy_arrows(&room, &pulse)
 
 	testing.expect(t, pulse.advanced)
 	testing.expect_value(t, player.health, health_before)
 	miss_events := 0
 	for event in pulse.events.events[:pulse.events.count] {
-		if event.kind == .Attack_Missed && event.source == enemy_entity(room.enemies[0].id) {
+		if event.kind == .Arrow_Landed && event.source == enemy_entity(room.enemies[0].id) && event.target == SYSTEM_ENTITY {
+			testing.expect_value(t, event.to_position, grid.Position{x = 3, y = 1})
 			miss_events += 1
 		}
 	}

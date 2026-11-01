@@ -62,7 +62,7 @@ Parole del documento:
 | 0 | Base: unire le correzioni di `gioco-piu-veloce`, provare il cammino tenuto, misure di partenza | — | Fatta | vedi Esito |
 | 1 | Succo, motore comune: scossa, pausa sull'impatto, opzione per ridurlo | 0 | Fatta | vedi Esito |
 | 2 | Succo sui colpi: colpi del giocatore, critici, uccisioni, colpi nemici | 1 | Fatta | vedi Esito |
-| 3 | Frecce degli arcieri: proiettili veri nelle regole | 0 | Da fare | |
+| 3 | Frecce degli arcieri: proiettili veri nelle regole | 0 | Fatta | vedi Esito |
 | 4 | Frecce degli arcieri: aspetto 3D, riga accesa, suoni | 3 | Da fare | |
 | 5 | Bombe dei bombaroli: volo ad arco e cerchio d'impatto | 3 | Da fare | |
 | 6 | Nel gioco vero: prova con l'utente, bilanciamento, chiusura | 2, 4, 5 | Da fare | |
@@ -300,6 +300,72 @@ Proposta di regole (da confermare all'utente all'inizio della fase):
 
 **Fatto quando:** nel laboratorio una freccia si schiva con un passo; test verdi;
 le sonde di regressione (regole nude) dicono esattamente cosa è cambiato.
+
+### Esito (1 novembre 2026)
+
+Scelte dell'utente all'inizio della fase: **8 caselle al secondo, al massimo 8
+caselle**; un altro nemico in mezzo **viene colpito**; **vere anche dietro gli
+occhi** (la spada le para quando arrivano); le Spine **non fanno nulla** contro
+le frecce («restano solo per il corpo a corpo»).
+
+1. **Regole** ([enemy_arrow.odin](../src/game/enemy_arrow.odin)): sul battito
+   del tiro (`Attack` di un arciere, non verso un barile) l'arciere scocca
+   (`loose_enemy_arrow`, evento nuovo `Arrow_Loosed`) lungo la linea della mira;
+   la freccia entra in una casella quando ci arriva a metà (0,5 caselle prima
+   del centro) e lì: muro, muretto, copertura o roccia fra i piani la fermano;
+   il Viandante (anche il corpo dei pugni, anche in aria) prende il colpo
+   dell'arciere, con lo stato del bioma; un altro nemico prende il danno. Ogni
+   arrivo dà l'evento nuovo `Arrow_Landed` (sul giocatore, su un nemico, o su
+   SYSTEM: muro o fine gittata). Al massimo 8 frecce in volo; la freccia occupa
+   24 byte perché la stanza resti sotto i 9 KB (`event_test.odin`).
+2. **Tempo:** le frecce volano sui secondi del mondo (`tactical_arrow_tick` in
+   `tactical_advance_clock`): ombra, lancio di carta, difesa e dadi le tengono
+   ferme. I secondi si consumano con un comando del mondo nuovo
+   (`Arrow_Flight`, come il roll del Pinball, nel controllore e nella
+   partita senza finestra del playtest) e **all'inizio di ogni battito, prima
+   del battito**.
+3. **Difese:** nessuna difesa a tasti contro la freccia (`offer_defense_qte`);
+   all'arrivo la guardia della spada (`sword_parry_blow`, girata verso la cella
+   da cui è partita), Riflesso e lo Stegosauro (`deflect_enemy_blow`) la
+   rimandano come prima. Il contraccolpo delle Spine (`Thorns_Counter`) non
+   risponde più agli arcieri (`reaction_definition.odin`). La spada in prima
+   persona non prevede più il colpo dell'arciere sul battito
+   (`sword_coming_blow`).
+4. **Immagini minime** ([enemy_arrow_view.odin](../src/render/enemy_arrow_view.odin);
+   l'aspetto vero è la Fase 4): le caselle della linea accese a terra dalla mira,
+   che si spengono man mano che la freccia passa; la freccia in volo, un dardo
+   con la sua ombra; l'arciere che scocca fa il gesto del colpo. Gli arrivi non
+   hanno l'arma disegnata (niente secondo dardo dall'arciere).
+5. **Sonde e test che cambiano significato** (le regole nude cambiano anche
+   loro, come voleva il piano):
+   - `test_tactical_deflection_requires_thorns_and_preserves_committed_intent`
+     diventa `test_tactical_thorns_no_longer_answer_an_archers_arrow`: niente
+     difesa, la freccia ferisce, l'arciere non prende il contraccolpo.
+   - Segni dei colpi (`attack_mark_test`): lo scocco è `Arrow_Loosed`, l'arrivo
+     `Arrow_Landed` sul giocatore, il danno non è più segnato come colpo.
+   - Schivata dell'arciere, blocco di ghiaccio sulla linea, tiro dell'arciere nel
+     tempo, Riflesso, pugni in aria, spada che para: guardano dopo il volo della
+     freccia (chi si sposta è mancato, il ghiaccio la ferma, chi resta è colpito).
+   - Statistiche del playtest: una freccia che atterra fuori dal giocatore conta
+     come colpo mancato del nemico (`telemetry.odin`).
+   - Film di «Mostra effetto» di Riflesso e dello Stegosauro: 5 secondi invece
+     di 4, perché la freccia arriva dopo il battito.
+6. **Test nuovi** ([enemy_arrow_test.odin](../src/game/enemy_arrow_test.odin)):
+   colpisce chi resta (non prima di entrare nella sua casella), manca chi si
+   sposta e si ferma al muro, colpisce il primo nemico in mezzo, sta ferma
+   durante un lancio e vola all'inizio del battito.
+7. **Prova del laboratorio:** atto nuovo `mechanics_lab_arrows` (da solo con
+   `ODIN_PP_LAB_ONLY=arrows`): un arciere scocca, il Viandante esce dalla riga e
+   non è colpito; una seconda freccia, lui fermo, lo colpisce. Catture
+   `odin_pp_living_arrow_dodge_NN.png` e `odin_pp_living_arrow_hit_NN.png`. Tre
+   atti già esistenti guardano ora il volo della freccia: i colpi dei nemici (il
+   tiro dell'arciere scocca una freccia invece di mostrare il dardo come arma;
+   il dardo `Bolt` resta l'arma delle frecce del giocatore), Riflesso (la
+   freccia volata subito, Riflesso la rimanda) e il Lazzo (la freccia non apre
+   la difesa, ferisce mentre la corda tiene).
+8. **Verifiche:** `scripts/check.ps1` verde (1843 test con e senza assert);
+   prova completa del laboratorio verde nella finestra vera (2095 catture, 147
+   suoni).
 
 ## Fase 4 — Frecce degli arcieri: aspetto 3D e suoni
 

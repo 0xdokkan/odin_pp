@@ -158,20 +158,20 @@ test_player_can_dodge_archer_committed_target :: proc(t: ^testing.T) {
 	advance_combat_pulse(&room) // Complete the aim before evading the committed shot.
 	result := try_move_player(&room, .South)
 	pulse := advance_combat_pulse(&room)
+	// The shot is a real arrow (enemy_arrow.odin): loosed at the aimed cell, it
+	// flies on past the player's old cell and lands off him.
+	room.arrows.pending = 2
+	fly_enemy_arrows(&room, &pulse)
 	room.recent_events^ = pulse.events
 
 	testing.expect_value(t, result, Action_Result.Moved)
 	testing.expect_value(t, player.health, health_before)
-	miss_index, found := enemy_archetype_test_event_index(
-		room.recent_events,
-		.Attack_Missed,
-		enemy_entity(enemy_id),
-		PLAYER_ENTITY,
-	)
-	testing.expect(t, found)
-	if found {
-		testing.expect_value(t, room.recent_events.events[miss_index].to_position, grid.Position{x = 1, y = 1})
-	}
+	loosed_index, loosed := enemy_archetype_test_event_index(room.recent_events, .Arrow_Loosed, enemy_entity(enemy_id), PLAYER_ENTITY)
+	testing.expect(t, loosed)
+	if loosed { testing.expect_value(t, room.recent_events.events[loosed_index].from_position, grid.Position{x = 3, y = 1}) }
+	_, struck := enemy_archetype_test_event_index(room.recent_events, .Arrow_Landed, enemy_entity(enemy_id), PLAYER_ENTITY)
+	_, landed := enemy_archetype_test_event_index(room.recent_events, .Arrow_Landed, enemy_entity(enemy_id), SYSTEM_ENTITY)
+	testing.expect(t, !struck && landed)
 }
 
 @(test)

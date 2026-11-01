@@ -354,7 +354,7 @@ capture_gameplay_command_telemetry :: proc(
 		// A shadow step walks from the shadow's cell and never bumps.
 		if game.tactical_shadow_active(room) { resolved_kind = .Move }
 	case .Dodge, .Wait, .Timeout, .Continue_Pulse, .Begin_Diagonal, .QTE_Key, .QTE_Fail, .Defense, .Activate, .Equip,
-	     .Shadow_Emerge, .Lasso_Spin, .Pinball_Roll:
+	     .Shadow_Emerge, .Lasso_Spin, .Pinball_Roll, .Arrow_Flight:
 		resolved_kind = .Wait
 	// An arrow is neither a step nor a bump nor a card, and the rod's cast is
 	// no card either; nor is a shot of the AK.
@@ -412,6 +412,8 @@ execute_gameplay_command :: proc(room: ^game.Room, command: Gameplay_Command) ->
 		execution.committed = game.resolve_lasso_spin(room)
 	case .Pinball_Roll:
 		execution.committed = game.resolve_pinball_roll(room)
+	case .Arrow_Flight:
+		execution.committed = game.resolve_arrow_flight(room)
 	case .Move:
 		// Inside Movimento Ombra the keys walk the shadow, on its own beats.
 		if game.tactical_shadow_active(room) {
@@ -530,7 +532,7 @@ commit_gameplay_command :: proc(
 	playtest: ^combatdebug.Playtest_Session = nil,
 ) -> bool {
 	if room == nil || renderer == nil || card_interaction == nil { return false }
-	world_command := (command.kind == .Continue_Pulse || command.kind == .Timeout || command.kind == .Lasso_Spin || command.kind == .Pinball_Roll ||
+	world_command := (command.kind == .Continue_Pulse || command.kind == .Timeout || command.kind == .Lasso_Spin || command.kind == .Pinball_Roll || command.kind == .Arrow_Flight ||
 		 command.kind == .Defense || ((command.kind == .QTE_Key || command.kind == .QTE_Fail) && room.qte.kind == .Defense) ||
 		 command.kind == .First_Person_Fire || command.kind == .First_Person_Fists || command.kind == .First_Person_Sword ||
 		 command.kind == .First_Person_Bow)

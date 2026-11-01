@@ -146,6 +146,12 @@ Game_Event_Kind :: enum {
 	Dino_Stomp,
 	// Sanguinamento: `target` takes `amount` more for its stacks.
 	Bleed_Bite,
+	// THE ARCHERS' REAL ARROWS (enemy_arrow.odin): an archer (`source`) looses an
+	// arrow from from_position, to fly at most to to_position; `amount` its damage.
+	Arrow_Loosed,
+	// The arrow lands on to_position: on `target` (the player or a foe it struck)
+	// or, SYSTEM_ENTITY, on a wall, a cover or its range's end.
+	Arrow_Landed,
 }
 
 Game_Event :: struct {

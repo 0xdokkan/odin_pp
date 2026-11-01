@@ -305,6 +305,9 @@ living_cue_action :: proc(cue: ^Presentation_Cue, entity: game.Entity_Ref) -> (a
 		if entity == game.PLAYER_ENTITY { return .Cast, true }
 	case .Spell_Launched:
 		if event.source == entity { return .Cast, true }
+	// An archer looses its real arrow (game/enemy_arrow.odin).
+	case .Arrow_Loosed:
+		if event.source == entity { return .Attack, true }
 	case .Object_Spawned:
 		if event.source == entity && entity != game.PLAYER_ENTITY { return .Cast, true }
 	case .Status_Applied:

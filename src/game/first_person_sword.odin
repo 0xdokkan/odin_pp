@@ -592,7 +592,9 @@ sword_parry_blow :: proc(room: ^Room, enemy: ^Enemy, intent: ^Enemy_Intent, rang
 sword_coming_blow :: proc(room: ^Room, enemy: ^Enemy) -> (aim: grid.Position, swept: u16, ranged, coming: bool) {
 	if room == nil || room.player == nil || enemy == nil { return }
 	intent := &enemy.intent
+	// An archer's arrow lands on its own flight, not on the beat (enemy_arrow.odin).
 	if intent.kind != .Attack || intent.threatened_cell_count == 0 || intent.target_object != 0 || enemy.archetype == .Bomber ||
+	   enemy_attack_is_arrow(enemy, intent) ||
 	   enemy_is_out_of_play(room, enemy.id) { return }
 	if _, staggered := status_index(&enemy.statuses, .Stagger); staggered { return }
 	cells := intent.threatened_cells[:intent.threatened_cell_count]

@@ -190,6 +190,9 @@ sword_blow :: proc(room: ^Room, index: int, damage := i32(5)) -> i32 {
 	health := room.player.health
 	pulse: Pulse_Report
 	resolve_enemy_intents(room, &pulse, foe.id)
+	// An archer's shot is a real arrow: it lands on its flight (enemy_arrow.odin).
+	room.arrows.pending = 2
+	fly_enemy_arrows(room, &pulse)
 	return health-room.player.health
 }
 

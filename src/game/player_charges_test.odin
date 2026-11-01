@@ -166,6 +166,12 @@ test_deflect_returns_each_kind_of_blow_to_its_attacker :: proc(t: ^testing.T) {
 		testing.expect(t, !offer_defense_qte(&room, &room.enemies[index]))
 		pulse: Pulse_Report
 		resolve_enemy_intents(&room, &pulse, foe.id)
+		// The archer's shot is a real arrow: it is turned back as it lands (enemy_arrow.odin).
+		if case_index == 0 {
+			testing.expect_value(t, room.arrows.count, 1)
+			room.arrows.pending = 1
+			fly_enemy_arrows(&room, &pulse)
+		}
 		testing.expect_value(t, player.health, i32(100))
 		testing.expect_value(t, player.position, grid.Position{x = 4, y = 4})
 		testing.expect_value(t, player_charges(&room, .Deflect), i32(0))

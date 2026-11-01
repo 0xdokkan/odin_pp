@@ -238,6 +238,8 @@ test_observer_counts_refocus_and_enemy_misses_without_guessing_commands :: proc(
 	testing.expect_value(t, metrics.enemy_attack_misses, u64(0))
 	game.tactical_tick(&room, 1-game.TACTICAL_MOVE_SECONDS, true, false)
 	debug_test_drain_world(t, &room, &metrics)
+	// The shot is a real arrow (game/enemy_arrow.odin): its miss is counted as it lands.
+	debug_test_world_seconds(t, &room, &metrics, 1)
 	testing.expect_value(t, metrics.enemy_attack_misses, u64(1))
 	testing.expect_value(t, metrics.misses_by_command[int(Command_Kind.Move)], u64(0))
 	testing.expect_value(t, metrics.damage_taken, damage_before_move)

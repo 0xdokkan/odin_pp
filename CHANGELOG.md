@@ -5,6 +5,15 @@ I riferimenti a Classica, `--flat` e ai vecchi smoke descrivono versioni precede
 per i comandi disponibili oggi valgono il [README](README.md) e la documentazione collegata.
 
 
+## 2026-11-01 — Piano del succo, Fase 3: le frecce degli arcieri sono vere
+
+- L'arciere, sul battito del tiro, scocca una freccia che vola a 8 caselle al secondo per al massimo 8 caselle e colpisce
+  la prima cosa che trova: un muro la ferma, un altro nemico in mezzo prende il danno, il Viandante il colpo. La riga
+  che attraverserà si accende a terra dalla mira.
+- Contro la freccia non c'è più difesa a tasti: ci si sposta fuori dalla riga. Riflesso, lo Stegosauro e la guardia
+  della spada la rimandano quando arriva; le Spine non fanno nulla contro le frecce. Vale anche dietro gli occhi.
+- Nel laboratorio un atto nuovo della prova automatica schiva una freccia con un passo e si fa colpire dalla seconda.
+
 ## 2026-11-01 — Piano del succo, Fase 2: i colpi si sentono
 
 - I colpi a urto e le frecce del Viandante fermano l'immagine per un istante (60 ms, 90 sui critici, 100 sulle

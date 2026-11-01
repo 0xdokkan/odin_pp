@@ -38,13 +38,19 @@ test_tactical_archer_aims_without_qte_then_fires_at_frozen_cell_and_recovers :: 
 		// Evading now finishes before the prepared shot's one-second deadline.
 		if evade { tactical_tick(&room, 1-TACTICAL_MOVE_SECONDS, true, false) }
 		drain_tactical_test_pulse(t, &room)
-		testing.expect_value(t, player.health, i32(100) if evade else i32(97))
+		// The shot looses a real arrow (enemy_arrow.odin); it lands 2.5 cells
+		// on at ENEMY_ARROW_SPEED: on him, or past the cell he left.
+		testing.expect_value(t, player.health, i32(100))
+		testing.expect_value(t, room.arrows.count, 1)
 		testing.expect(t, !room.enemies[0].aim_ready)
 		testing.expect_value(t, room.enemies[0].intent.kind, Enemy_Intent_Kind.Recover)
 		testing.expect_value(t, room.enemies[0].recovery_pulses, i32(1))
 		testing.expect_value(t, room.pulse_count, u64(5))
 		testing.expect(t, abs(player.tactical.remaining-15) < 0.001)
 		testing.expect_value(t, player.tactical.cycle, 0)
+		testing.expect(t, !tactical_tick(&room, 0.35, true, false))
+		testing.expect(t, resolve_arrow_flight(&room))
+		testing.expect_value(t, player.health, i32(100) if evade else i32(97))
 		destroy_room(&room)
 		level.destroy(&data)
 	}

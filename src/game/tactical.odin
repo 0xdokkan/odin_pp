@@ -204,6 +204,7 @@ tactical_end_combat :: proc(room: ^Room) {
 	// still belong to this room; they are not part of an exclusive takeover.
 	room.lasso = {}
 	room.pinball = {}
+	room.arrows = {}
 	room.marley = {}
 	room.ride = {}
 	room.first_person.active = false
@@ -278,6 +279,15 @@ continue_tactical_pulse :: proc(room: ^Room) -> bool {
 	clear_event_log(room.recent_events)
 	pulse: Pulse_Report
 	if !p.started {
+		// The arrows in flight land first: no beat ever passes one (enemy_arrow.odin).
+		fly_enemy_arrows(room, &pulse)
+		if room.phase != .Combat {
+			append_event_log(room.recent_events, &pulse.events)
+			collect_loot_in_magnet_range(room)
+			sync_deck_with_room_phase(room)
+			tactical_end_combat(room)
+			return true
+		}
 		p.started = true
 		s.queued_beats = max(0, s.queued_beats-1)
 		for &enemy in room.enemies { enemy.tactical_cooldown = max(f32(0), enemy.tactical_cooldown-1) }
@@ -481,6 +491,8 @@ offer_defense_qte :: proc(room: ^Room, enemy: ^Enemy) -> bool {
 	// With the sword the right button parries (Fase 4).
 	if first_person_sword_active(room) { return false }
 	intent := &enemy.intent
+	// An archer's arrow is answered by stepping out of its line (enemy_arrow.odin).
+	if enemy_attack_is_arrow(enemy, intent) { return false }
 	if enemy_is_staggered(room, enemy) || intent.windup || (intent.kind != .Attack && intent.kind != .Charge) || intent.target_object != 0 || enemy.position != intent.origin ||
 	   !enemy_intent_cell_is_threatened(intent, room.player.position) ||
 	   (enemy.archetype == .Archer && !has_clear_orthogonal_line(room, enemy.position, room.player.position)) { return false }

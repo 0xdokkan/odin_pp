@@ -863,6 +863,13 @@ resolve_enemy_intents :: proc(room: ^Room, pulse: ^Pulse_Report, only_id: u32 = 
 				if room.phase != .Combat { return }
 				continue
 			}
+			// An archer's shot looses a real arrow that lands later (enemy_arrow.odin).
+			if enemy_attack_is_arrow(enemy, &intent) {
+				if enemy.position != intent.origin || !loose_enemy_arrow(room, enemy, &intent, pulse) {
+					record_enemy_attack_miss(pulse, source, enemy.position, intent.threatened_cells[0])
+				}
+				continue
+			}
 			ranged := enemy_attack_is_ranged(enemy, &intent)
 			if room.tactical_pulse.cancel_attack == enemy.id {
 				record_enemy_attack_miss(pulse, source, enemy.position, intent.threatened_cells[0], &intent, ranged)

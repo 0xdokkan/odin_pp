@@ -255,8 +255,12 @@ test_tactical_parry_kill_finishes_started_pulse_without_extra_attack :: proc(t: 
 	testing.expect(t, !continue_tactical_pulse(&room))
 }
 
+// Until 2026-11-01 the Spine answered an archer's shot with the Deflect
+// defence. The shot is a real arrow now (enemy_arrow.odin): no defence of the
+// keys is offered against it, and the Spine have nothing against it (the
+// user's choice): one steps out of its line.
 @(test)
-test_tactical_deflection_requires_thorns_and_preserves_committed_intent :: proc(t: ^testing.T) {
+test_tactical_thorns_no_longer_answer_an_archers_arrow :: proc(t: ^testing.T) {
 	data: level.Level
 	player: Player
 	room := tactical_test_room(t, &data, &player, true)
@@ -266,15 +270,13 @@ test_tactical_deflection_requires_thorns_and_preserves_committed_intent :: proc(
 	_, _ = apply_status(&room, PLAYER_ENTITY, .Thorns, 1, 3)
 	intent := room.enemies[0].intent
 	testing.expect(t, wait_player_turn(&room) != .Invalid_Phase)
-	testing.expect(t, continue_tactical_pulse(&room))
-	testing.expect(t, continue_tactical_pulse(&room))
-	testing.expect(t, !select_defense(&room, .Parry))
-	testing.expect(t, select_defense(&room, .Deflect))
-	testing.expect(t, qte_key(&room, room.qte.keys[0]))
-	testing.expect_value(t, room.enemies[0].intent, intent)
 	drain_tactical_test_pulse(t, &room)
-	testing.expect_value(t, room.enemies[0].health, i32(1000)-intent.damage)
-	testing.expect_value(t, player.health, i32(1000))
+	testing.expect_value(t, room.qte.kind, QTE_Kind.None)
+	testing.expect_value(t, room.arrows.count, 1)
+	room.arrows.pending = 1
+	testing.expect(t, resolve_arrow_flight(&room))
+	testing.expect_value(t, room.enemies[0].health, i32(1000))
+	testing.expect(t, player.health < i32(1000) && player.health >= i32(1000)-intent.damage)
 }
 
 @(test)

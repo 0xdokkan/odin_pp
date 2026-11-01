@@ -94,6 +94,9 @@ run_mechanics_lab_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer,
 		return mechanics_lab_layers(window, renderer, &room, &data, &controller, &cards, &buffer)
 	} else if only == "lift" {
 		return mechanics_lab_lifts(window, renderer, &room, &data, &controller, &cards, &buffer)
+	} else if only == "arrows" {
+		// The archers' arrows alone (docs/piano-succo.md, Fase 3).
+		return mechanics_lab_arrows(window, renderer, &room, &controller, &cards, &buffer)
 	} else if only == "juice" {
 		// The juice's act alone (docs/piano-succo.md, Fase 1).
 		return mechanics_lab_juice(window, renderer, &room, &controller, &cards, &buffer)
@@ -267,6 +270,8 @@ run_mechanics_lab_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer,
 	if !mechanics_lab_prima_persona(window, renderer, &room, &data, &controller, &cards, &buffer) { return false }
 	// After them all the juice's F9 (docs/piano-succo.md, Fase 1), for the same reason.
 	if !mechanics_lab_juice(window, renderer, &room, &controller, &cards, &buffer) { return false }
+	// Then the archers' real arrows (docs/piano-succo.md, Fase 3).
+	if !mechanics_lab_arrows(window, renderer, &room, &controller, &cards, &buffer) { return false }
 	return mechanics_lab_sounds_heard(renderer)
 }
 
@@ -509,7 +514,13 @@ mechanics_lab_blows :: proc(window: ^app.Window, renderer: ^render.Renderer, roo
 			mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0)
 			if frame%2 == 0 { artifacts.screenshot(fmt.ctprintf("odin_pp_living_blow_%s_%02d.png", blow.name, frame/2)) }
 		}
-		if renderer.tactical.attack_fx.spawned[blow.look] != shown+1 {
+		// An archer's shot is a real arrow (game/enemy_arrow.odin): loosed, it is
+		// drawn in its flight (render/enemy_arrow_view.odin), not as a blow's prop.
+		arrow := blow.archetype == .Archer && !blow.barrel
+		if arrow {
+			if room.arrows.count != 1 { fmt.eprintln("mechanics lab: the", blow.name, "loosed no arrow"); return false }
+			room.arrows = {}
+		} else if renderer.tactical.attack_fx.spawned[blow.look] != shown+1 {
 			fmt.eprintln("mechanics lab: the", blow.name, "showed no", blow.look); return false
 		}
 		if barrel != 0 {
@@ -537,8 +548,9 @@ mechanics_lab_blows :: proc(window: ^app.Window, renderer: ^render.Renderer, roo
 		}
 	}
 	player.equipment.weapon = {}
+	// The Bolt is the player's arrows' prop now: the charges' act shows it (Feretro).
 	for look in render.Attack_Look {
-		if look != .None && renderer.tactical.attack_fx.spawned[look] == 0 { fmt.eprintln("mechanics lab: no prop for", look); return false }
+		if look != .None && look != .Bolt && renderer.tactical.attack_fx.spawned[look] == 0 { fmt.eprintln("mechanics lab: no prop for", look); return false }
 	}
 	fmt.eprintln("mechanics lab blows:", renderer.tactical.attack_fx.spawned)
 	return true
@@ -991,6 +1003,12 @@ mechanics_lab_charges :: proc(window: ^app.Window, renderer: ^render.Renderer, d
 		before := render.capture_room_presentation(room)
 		pulse: game.Pulse_Report
 		game.resolve_enemy_intents(room, &pulse, id)
+		// The archer's shot is a real arrow (game/enemy_arrow.odin): flown out at
+		// once, RIFLESSO turns it back as it lands.
+		if blow.look == .Bolt {
+			room.arrows.pending = 2
+			if game.resolve_arrow_flight(room) { game.append_event_log(&pulse.events, room.recent_events) }
+		}
 		after := render.capture_room_presentation(room)
 		if pulse.events.count == 0 || !render.begin_renderer_world_timeline(renderer, before, &pulse.events, &after) {
 			fmt.eprintln("mechanics lab: the", blow.name, "was not shown"); return false
@@ -1159,8 +1177,9 @@ mechanics_lab_charges :: proc(window: ^app.Window, renderer: ^render.Renderer, d
 // straight away from the player as many cells as its number (the last one
 // diagonally) and wounded as much, the swung foe with it; every full turn
 // takes 1 more from the swung foe (its life checked at every frame); meanwhile
-// a free archer, set down after the aim's stills, aims and shoots the pivot,
-// the defence prompt opens, the blow goes through and the rope holds; on its
+// a free archer, set down after the aim's stills, aims and shoots the pivot:
+// its real arrow (game/enemy_arrow.odin) opens no defence prompt and wounds
+// him, and the rope holds; on its
 // 18th point the swung foe falls and the rope goes slack. Beside the west wall
 // the ring is 1: the swung foe smashes into the wall, each smash's number on
 // it alone, and turns back at every one (odin_pp_living_lasso_smash_NN.png); the
@@ -1271,8 +1290,8 @@ mechanics_lab_lasso :: proc(window: ^app.Window, renderer: ^render.Renderer, roo
 		mechanics_lab_reel_frame(window, renderer, room, controller, cards, buffer, "lasso_throw", 4, &frame)
 	}
 	// The spin. At every frame the swung foe has lost its hits' numbers and one
-	// a turn, nothing else; the archer's blow opens a defence prompt that lets it
-	// through, and the rope holds.
+	// a turn, nothing else; the archer's arrow opens no defence prompt, wounds
+	// him, and the rope holds.
 	seen: game.Lasso_State
 	shot, spun := 0, 0
 	prompted, held_on, wounded := false, false, false
@@ -1289,8 +1308,8 @@ mechanics_lab_lasso :: proc(window: ^app.Window, renderer: ^render.Renderer, roo
 			}
 		}
 		if room.qte.kind == .Defense && room.qte.enemy_id == archer_id { prompted = true }
-		if prompted && room.qte.kind == .None && room.lasso.active { held_on = true }
 		if room.lasso.active && player.health < health { wounded = true }
+		if wounded && room.lasso.active { held_on = true }
 	}
 	// The rope slack, the body falling.
 	for after in 0..<24 { reel(window, renderer, room, controller, cards, buffer, "lasso", after%6 == 0, &shot) }
@@ -1317,7 +1336,7 @@ mechanics_lab_lasso :: proc(window: ^app.Window, renderer: ^render.Renderer, roo
 	// The world ran through the spin: its beats, the archer's aim and its one
 	// shot, which reached the pivot while the rope still held.
 	archer := foe(room, archer_id)
-	if archer == nil || room.pulse_count < pulses+4 || !prompted || !held_on || !wounded || player.health != health-archer.attack {
+	if archer == nil || room.pulse_count < pulses+4 || prompted || !held_on || !wounded || player.health != health-archer.attack {
 		fmt.eprintln("mechanics lab: the world did not run under the rope:", room.pulse_count-pulses, "beats, prompt", prompted, "held", held_on,
 			"player", player.health, "of", health); return false
 	}

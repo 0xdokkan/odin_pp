@@ -231,6 +231,11 @@ collect_reactions :: proc(room: ^Room, event: Game_Event) -> (batch: Reaction_Ba
 		if !matches {
 			continue
 		}
+		// The Spine have nothing against an archer's real arrow (the user's
+		// choice of 2026-11-01, docs/piano-succo.md, Fase 3; enemy_arrow.odin).
+		if definition.id == .Thorns_Counter && reaction_source_is_archer(room, event) {
+			continue
+		}
 		if definition.has_status_activation {
 			_, status_found := status_for_entity(room, reactor, definition.status_activation)
 			if status_found {
@@ -261,6 +266,14 @@ collect_reactions :: proc(room: ^Room, event: Game_Event) -> (batch: Reaction_Ba
 	}
 	sort_reaction_batch(&batch)
 	return
+}
+
+// Whether `event` comes from an archer: its blows are arrows (enemy_arrow.odin).
+@(private = "file")
+reaction_source_is_archer :: proc(room: ^Room, event: Game_Event) -> bool {
+	if event.source.kind != .Enemy { return false }
+	index, found := enemy_index_by_id(room, event.source.id)
+	return found && room.enemies[index].archetype == .Archer
 }
 
 @(private = "file")

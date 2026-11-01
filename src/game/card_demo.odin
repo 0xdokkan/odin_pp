@@ -315,7 +315,8 @@ card_demo_scene :: proc(id: Card_Id, upgrade_level: i32 = 0) -> (scene: Card_Dem
 	// A free archer's bolt, turned back: it shoots along a straight line.
 	case .Deflect:
 		card_demo_add_foe(&scene, card_demo_offset(0, -3), .Archer, free = true)
-		scene.seconds = 4
+		// Its arrow flies after its beat (enemy_arrow.odin): a second more to land.
+		scene.seconds = 5
 		scene.expects = {.Attack_Deflected}
 		scene.foe_hurt = 1
 	// Ctrl and a click: an arrow at the foe in the line of fire.
@@ -539,7 +540,8 @@ card_demo_scene :: proc(id: Card_Id, upgrade_level: i32 = 0) -> (scene: Card_Dem
 			scene.foe_hurt = 1
 		case 2:
 			card_demo_add_foe(&scene, card_demo_offset(0, -3), .Archer, free = true)
-			scene.seconds = 4
+			// Its arrow flies after its beat (enemy_arrow.odin): a second more to land.
+			scene.seconds = 5
 			scene.expects = {.Attack_Deflected}
 			scene.foe_hurt = 1
 		case 3:
