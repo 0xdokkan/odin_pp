@@ -484,6 +484,19 @@ def archer_shoot(seed):
     and twangs low (Karplus on A2, sagging into pitch); the bolt hisses off
     the groove and whistles away, falling in pitch and dulling; the recoil
     kicks him back at 0.064 (body thump, boot scuff, quiver rattle)."""
+    return _release(seed, True)
+
+
+@sound("archer_loose", loudness=-18, wet=0.25, marks=(0.06, 0.064))
+def archer_loose(seed):
+    """The shot that looses a real bolt (docs/piano-succo.md, Fase 4): the
+    release of archer_shoot without its bolt's whistle, since the bolt
+    flying over the board whistles itself (archer_bolt_flight)."""
+    return _release(seed, False)
+
+
+def _release(seed, flight):
+    """The crossbow's release; `flight`: with the bolt whistling away."""
     D = 0.75
     s = seed
     REL = 0.06
@@ -499,7 +512,7 @@ def archer_shoot(seed):
     twang = fade(sweep_lowpass(_twang(0.5, s + 5, freq=110.0, damping=0.95, brightness=0.15, bend=0.16),
                                2400, 500, 2) * _decay_env(tw_n, 0.0005, 0.14), 0.0, 0.1)
     groove = _peak(bandpass(white(0.03, s + 6), 6000, 0.9) * _decay_env(n_samples(0.03), 0.001, 0.006))
-    flight = fade(_bolt_flight(0.55, s + 7), 0.0, 0.1)
+    whistle = [(REL + 0.006, fade(_bolt_flight(0.55, s + 7), 0.0, 0.1), 0.5)] if flight else []
     # The stock butting his shoulder. It and the string are separate
     # sources, so their polarity is free: flipped, its first low swing does
     # not stack on the string's and the release crack leads the transient.
@@ -510,7 +523,7 @@ def archer_shoot(seed):
         (0.045, trigger, 0.12),
         (REL, crack, 0.7), (REL, stock, 0.7), (REL, prod, 0.28), (REL, twang, 0.6),
         (REL + 0.001, groove, 0.22),
-        (REL + 0.006, flight, 0.5),
+    ] + whistle + [
         (0.064, recoil, 0.35), (0.07, scuff, 0.14),
         (0.075, rattle, 0.18),
     ])
@@ -610,3 +623,77 @@ def archer_death(seed):
         (FALL + 0.01, spill, 0.2),
     ])
     return _finish(x, D, fade_out=0.08, max_crest=16.0)
+
+
+# --------------------------------------------------------------------------
+# The real bolt (docs/piano-succo.md, Fase 4): it flies over the board, and
+# where it misses it stays stuck, quivering.
+
+def _quiver(duration, seed, freq):
+    """A bolt stuck where it struck: its shaft quivers, a buzzing twang
+    starting a little sharp and dying away."""
+    n = n_samples(duration)
+    t = np.arange(n) / SR
+    f = freq * (1 + 0.06 * np.exp(-t / 0.05)) * (1 + 0.01 * _wobble(n, seed, 20))
+    phase = 2 * np.pi * np.cumsum(f) / SR
+    tone = sum((0.82 ** k) * np.sin(k * phase) for k in range(1, 10))
+    buzz = bandpass(tone, 650, 0.5) + 0.35 * tone
+    return _peak(lowpass(buzz, 3200, 2) * _decay_env(n, 0.002, duration * 0.28))
+
+
+@sound("archer_bolt_flight", loudness=-20, wet=0.06,
+       note="steady 0.02-1.42: fletching whistle on 2.4 kHz fluttering at 46 Hz, a low rush of air")
+def archer_bolt_flight(seed):
+    """The archers' real bolt in flight: a steady whistle of its fletching
+    (narrow noise on 2.4 kHz and its octave), the shaft's spin fluttering it
+    at about 46 Hz, and the air it pushes, a low rush. Steady and nearly dry,
+    its ends soft: the game plays it while the bolt flies, louder near the
+    Viandante, its pitch bent as it comes and goes (Doppler), and stops it
+    where the bolt lands."""
+    D = 1.5
+    n = n_samples(D)
+    t = np.arange(n) / SR
+    width = 1.0 / 6.0
+
+    def gain(f, tt):
+        return _band_gain(f, 2400.0, width) + 0.35 * _band_gain(f, 4800.0, width) + 0.1 * _band_gain(f, 2400.0, 1.2)
+    whistle = _peak(stft_filter(white(D, seed), gain))
+    rate = 46.0 * (1 + 0.04 * _wobble(n, seed + 1, 3))
+    flutter = 1 + 0.4 * np.sin(2 * np.pi * np.cumsum(rate) / SR)
+    rush = _peak(bandpass(pink(D, seed + 2), 700.0, 0.6)) * (0.8 + 0.2 * _wobble(n, seed + 3, 6))
+    x = (0.8 * whistle * flutter + 0.45 * rush) * np.minimum(1.0, t / 0.02)
+    return _finish(x, D, fade_out=0.08, max_crest=12.0)
+
+
+@sound("archer_bolt_wood", loudness=-17, wet=0.22,
+       note="bite 0.0; knock 0.0-0.12; splinters 0.002-0.06; quiver 0.006-0.5")
+def archer_bolt_wood(seed):
+    """The bolt bites into wood and stays: a hard snap as its head goes in,
+    the dry hollow knock of the struck plank, its splinters' crackle, and
+    the shaft quivering where it stands, a buzz near 76 Hz dying in half a
+    second."""
+    D = 0.6
+    bite = _snap(seed, 0.012, 0.001, 900)
+    knock = _ring(0.3, ((230.0, 0.05, 1.0), (520.0, 0.03, 0.7), (980.0, 0.018, 0.45), (1710.0, 0.01, 0.3)),
+                  seed + 1, strike_len=0.0015)
+    splinters = _peak(highpass(crackle(0.08, 900, seed + 2, 0.0005), 1500, 2)) * _decay_env(n_samples(0.08), 0.0005, 0.02)
+    quiver = _quiver(0.5, seed + 3, 76.0)
+    x = place(D, [(0.0, bite, 0.7), (0.0, knock, 1.0), (0.002, splinters, 0.25), (0.006, quiver, 0.45)])
+    return _finish(x, D, fade_out=0.05)
+
+
+@sound("archer_bolt_stone", loudness=-17, wet=0.3,
+       note="crack 0.0; grit 0.003-0.14; quiver 0.004-0.33; a chip falls 0.19")
+def archer_bolt_stone(seed):
+    """The bolt strikes stone and wedges in a seam: a hard bright crack of
+    steel on stone with the head's short ring, a spray of grit, the shaft's
+    quiver, shorter and higher than in wood, and a chip falling after."""
+    D = 0.6
+    crack = _stone_tick(seed, 0.04)
+    head = _ring(0.15, ((2900.0, 0.02, 1.0), (4700.0, 0.012, 0.5), (6900.0, 0.008, 0.3)), seed + 1, strike_len=0.0005)
+    times = random_times(D, 160, seed + 2, start=0.003, end=0.14, envelope=lambda u: (1 - u) ** 2)
+    grit = _peak(grains(D, times, 0.004, seed + 3, band=(1800, 7500), gain_jitter=0.7))
+    chip = _stone_tick(seed + 4, 0.025)
+    quiver = _quiver(0.33, seed + 5, 92.0)
+    x = place(D, [(0.0, crack, 1.0), (0.0, head, 0.2), (0.0, grit, 0.22), (0.004, quiver, 0.3), (0.19, chip, 0.25)])
+    return _finish(x, D, fade_out=0.05)

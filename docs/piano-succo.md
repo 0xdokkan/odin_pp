@@ -63,7 +63,7 @@ Parole del documento:
 | 1 | Succo, motore comune: scossa, pausa sull'impatto, opzione per ridurlo | 0 | Fatta | vedi Esito |
 | 2 | Succo sui colpi: colpi del giocatore, critici, uccisioni, colpi nemici | 1 | Fatta | vedi Esito |
 | 3 | Frecce degli arcieri: proiettili veri nelle regole | 0 | Fatta | vedi Esito |
-| 4 | Frecce degli arcieri: aspetto 3D, riga accesa, suoni | 3 | Da fare | |
+| 4 | Frecce degli arcieri: aspetto 3D, riga accesa, suoni | 3 | Fatta | vedi Esito |
 | 5 | Bombe dei bombaroli: volo ad arco e cerchio d'impatto | 3 | Da fare | |
 | 6 | Nel gioco vero: prova con l'utente, bilanciamento, chiusura | 2, 4, 5 | Da fare | |
 
@@ -376,6 +376,61 @@ Passi:
 3. Suoni: lo scocco, il sibilo che passa vicino, il colpo nel legno se manca.
 
 **Fatto quando:** l'utente approva l'aspetto nel laboratorio.
+
+### Esito (1 novembre 2026)
+
+Scelte dell'utente all'inizio della fase: il dardo è **carta ritagliata** come le
+carte (non un modello di resina né al neon); **una scia d'aria chiara**; il
+sibilo **sempre in volo**, più forte vicino al Viandante; se manca resta
+**piantato, con il tonfo**, e svanisce.
+
+1. **Il dardo** ([enemy_arrow_view.odin](../src/render/enemy_arrow_view.odin)): un
+   oggetto di carta nuovo, `Quarrel` (tools/art/build_attack_props.py), più
+   lungo del `Bolt` che le carte brandiscono: penne cremisi, legatura di cuoio,
+   asta di noce, punta d'acciaio a quattro facce; con il bordo d'inchiostro e la
+   carta tagliata dallo stesso shader delle carte. Vola lungo 0,6 caselle a
+   0,62 sopra il pavimento, con l'ombra lunga a terra. Gli altri 38 oggetti del
+   foglio restano dove erano.
+2. **La scia:** una striscia d'aria chiara lunga fino a una casella dietro il
+   dardo, che si assottiglia e svanisce, con due righe sottili ai lati; non va
+   mai oltre l'arciere.
+3. **La riga accesa** (passo 2 del piano): davanti al dardo le caselle si
+   accendono di più nelle 3 caselle che sta per raggiungere, con un'onda che
+   corre avanti; quelle lontane restano tenui; quelle passate si spengono.
+4. **Dove atterra** (osservando gli arrivi `Arrow_Landed`): se manca, resta
+   piantato nella faccia del muro all'altezza del volo, o col muso nel pavimento
+   a fine corsa; la coda vibra (11 Hz, si spegne in un quarto di secondo) e il
+   dardo svanisce in 1,5 secondi. Se ferisce resta 0,35 s nella carta colpita,
+   poi cade. Se la guardia, Riflesso o lo Stegosauro lo rimandano non resta
+   niente. Regola nuova nelle regole: `enemy_arrow_struck_wall`.
+5. **Suoni** (passo 3, fatti da codice in tools/audio/sfx_archer.py, solo nel
+   laboratorio come gli altri):
+   - `archer_loose`: lo scocco di `archer_shoot` senza il fischio del dardo che
+     si allontana (`archer_shoot` resta per il tiro verso un barile);
+   - `archer_bolt_flight`: il sibilo delle penne su 2,4 kHz, il frullo della
+     rotazione e il soffio dell'aria. Suona per tutto il volo con una voce sua
+     per freccia (`audio.lab_flights`, fino a 8): più forte vicino al
+     Viandante, più acuto mentre arriva e più grave mentre si allontana (effetto
+     Doppler), in pausa quando il mondo è fermo, spento quando il dardo atterra;
+   - `archer_bolt_wood` e `archer_bolt_stone`: il colpo dove manca. Le botti non
+     fermano le frecce, quindi il legno lo decide la terra: Far West, Giungla e
+     Vietnam; pietra altrove (cripta, coperture, ghiaccio, pavimento).
+   Rigenerati tutti i suoni: gli altri 228 sono identici byte per byte.
+6. **Test nuovi** ([enemy_arrow_view_test.odin](../src/render/enemy_arrow_view_test.odin)):
+   la riga pulsa più forte davanti al dardo; il sibilo più forte vicino e il
+   Doppler; dove resta il dardo (muro, pavimento, carta) e di che materiale è
+   la terra; il dardo piantato vibra, svanisce e suona una volta; nella carta
+   solo se ferisce; il sibilo prende una voce, si ferma col mondo, riparte e la
+   lascia all'arrivo. In `lab_sounds_test`: lo scocco della freccia vera.
+7. **Prova del laboratorio:** l'atto delle frecce controlla anche che la
+   freccia mancata resti dove è atterrata e che scocco, sibilo e colpo si
+   sentano.
+8. **Prova dell'utente nel laboratorio:** l'aspetto e i suoni **vanno bene
+   così**. Dopo le prime catture la scia è stata resa più larga e più chiara e
+   il dardo a fine corsa più inclinato, perché si leggesse piantato.
+9. **Verifiche:** `scripts/check.ps1` verde (1849 test con e senza assert);
+   prova completa del laboratorio verde nella finestra vera (2115 catture, 150
+   suoni: scocco, sibilo e colpo nella pietra fra questi).
 
 ## Fase 5 — Bombe dei bombaroli: volo ad arco
 

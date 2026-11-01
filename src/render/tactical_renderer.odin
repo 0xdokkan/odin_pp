@@ -151,6 +151,8 @@ Tactical_View :: struct {
 	foe_glow: Foe_Glow_View,
 	// The juice of the blows landed: kicks, flashes, paper bits, the red edge (juice_blows.odin).
 	juice_blows: Juice_Blows,
+	// The archers' bolts stuck where they landed (enemy_arrow_view.odin).
+	enemy_bolts: Enemy_Bolts,
 	// PROVA MECCANICHE's overlapping hand: how much of each card shows
 	// (tactical_hand.odin).
 	hand_reveal: Tactical_Hand_Reveal,

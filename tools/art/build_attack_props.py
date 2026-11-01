@@ -11,7 +11,8 @@ ground's fires, the flask a pool is thrown in, its drops and the cinders a
 fire throws (src/render/ground_fx.odin); the Canna da Pesca's rod, its
 bobber, the water's drops, the bite's "!" and what it catches: a fish, an
 apple, bread, cheese, meat or a card (src/render/fishing.odin); the stone dust
-of the Lazzo's smash into a wall (src/render/lasso.odin). Each prop is pixel
+of the Lazzo's smash into a wall (src/render/lasso.odin); the archers' real
+bolt, in flight and stuck (src/render/enemy_arrow_view.odin). Each prop is pixel
 art written here as rows of palette letters, in the figures' own colours;
 the script adds its ink outline (every empty texel touching the body, 8-way)
 and closes hollows of a texel or two. Its paper is an exact distance field
@@ -493,6 +494,19 @@ PROPS = [
         "VDDDDD",
         ".DZZZ.",
     ], (2.5, 3.5), (2.5, 0.5), True, True, 1.4),
+    # The archers' real bolt, flying over the board and stuck where it lands
+    # (src/render/enemy_arrow_view.odin, docs/piano-succo.md Fase 4): longer
+    # than the Bolt the cards swing, its crimson vanes swept back from a
+    # leather binding, a walnut shaft and a four-faced steel head, to the right.
+    ("Quarrel", [
+        "rRr...............................",
+        ".RRRr..........................s..",
+        "..dRRr.......................zsSs.",
+        "vwwwwwwLLwwwwwwwwwwwwwwwwwwwwzSSSs",
+        "..dRRr.......................zSSz.",
+        ".dRRr..........................z..",
+        "ddr...............................",
+    ], (0.5, 3.5), (33.5, 3.5), True, True, 2.4),
 ]
 
 

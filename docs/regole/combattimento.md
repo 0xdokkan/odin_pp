@@ -331,7 +331,14 @@ I nemici hanno queste cadenze e regole:
   guardia della spada in prima persona la rimandano indietro quando arriva; le Spine non fanno
   nulla contro le frecce. Le frecce volano sul tempo del mondo: ombra, lancio di una carta,
   difesa e dadi le fermano come fermano il mondo; nessun battito le scavalca (volano prima del
-  battito).
+  battito). **Come si vedono e si sentono** (Fase 4, [enemy_arrow_view.odin](../../src/render/enemy_arrow_view.odin)):
+  la freccia è un dardo di carta ritagliata come le carte, con una scia d'aria chiara e l'ombra
+  lunga a terra; le caselle davanti a lei pulsano, più forte quando sta per arrivare. Se manca resta
+  piantata nel muro (o nel pavimento a fine corsa), vibra e svanisce dopo un secondo e mezzo; se
+  ferisce resta un attimo nella carta colpita. Nel laboratorio: lo scocco senza il fischio, il
+  sibilo per tutto il volo (più forte vicino al Viandante, più acuto mentre arriva e più grave
+  mentre si allontana) e il colpo dove manca: nel legno nel Far West, nella Giungla e nel Vietnam,
+  nella pietra altrove.
 - **Bruti:** cadenza di 5 secondi; il fendente adiacente copre tre celle frontali; recupero 1 dopo
   il fendente e 2 dopo la carica, anche mancata. Colpi e cariche possono
   spingere di una cella, attivando i pericoli

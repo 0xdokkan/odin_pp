@@ -37,6 +37,11 @@ test_lab_sounds_cover_every_card_and_character :: proc(t: ^testing.T) {
 	_, bumped := lab_actor_sfx(.Pilgrim, .Block, .Move_Blocked, 0)
 	ward, blocked := lab_actor_sfx(.Pilgrim, .Block, .Damage_Absorbed, 0)
 	testing.expect(t, !bumped && blocked && ward == .Pilgrim_Block)
+	// An archer's real bolt looses without the whistle: the bolt whistles
+	// itself as it flies (enemy_arrow_view.odin).
+	shot, _ := lab_actor_sfx(.Archer, .Attack, .Damage, 0)
+	loosed, _ := lab_actor_sfx(.Archer, .Attack, .Arrow_Loosed, 0)
+	testing.expect(t, shot == .Archer_Shoot && loosed == .Archer_Loose)
 	// The telegraphs and the daze have their loops' sounds.
 	aim, aims := lab_base_sfx(.Archer, .Windup)
 	daze, dazed := lab_base_sfx(.Pilgrim, .Stunned)

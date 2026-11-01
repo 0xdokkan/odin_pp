@@ -3,7 +3,7 @@
 package gfx
 
 // The paper props of the board's blows (render/attack_fx.odin).
-Attack_Prop :: enum u8 {Bolt, Lantern, Iron_Cleaver, Storm_Pike, Claw, Cleaver, Crozier, Staff, Bomb, Ember_A, Ember_B, Swoosh, Impact, Scratch, Shard_A, Shard_B, Shard_C, Flame_A, Flame_B, Flame_C, Flame_D, Flask, Drop_A, Drop_B, Cinder, Rod, Bobber, Wet_A, Wet_B, Bang, Fish, Apple, Bread, Cheese, Meat, Card_Back, Dust_A, Dust_B}
+Attack_Prop :: enum u8 {Bolt, Lantern, Iron_Cleaver, Storm_Pike, Claw, Cleaver, Crozier, Staff, Bomb, Ember_A, Ember_B, Swoosh, Impact, Scratch, Shard_A, Shard_B, Shard_C, Flame_A, Flame_B, Flame_C, Flame_D, Flask, Drop_A, Drop_B, Cinder, Rod, Bobber, Wet_A, Wet_B, Bang, Fish, Apple, Bread, Cheese, Meat, Card_Back, Dust_A, Dust_B, Quarrel}
 // `rect` is the print, in texels of both atlases; its field reaches
 // ATTACK_PROP_MARGIN texels further on every side. `grip` is the texel
 // held (a bolt's tail), `tip` the one that leads. `paper` is the paper's
@@ -50,6 +50,7 @@ ATTACK_PROPS := [Attack_Prop]Attack_Prop_Sheet{
 	.Card_Back = {rect = {58, 218, 10, 13}, grip = {5.0, 11.5}, tip = {5.0, 1.5}, paper = 2.2},
 	.Dust_A = {rect = {82, 218, 11, 8}, grip = {5.0, 6.5}, tip = {5.0, 1.5}, paper = 1.4},
 	.Dust_B = {rect = {107, 218, 8, 6}, grip = {3.5, 4.5}, tip = {3.5, 1.5}, paper = 1.4},
+	.Quarrel = {rect = {129, 218, 36, 9}, grip = {1.5, 4.5}, tip = {34.5, 4.5}, paper = 2.4},
 }
 
 ATTACK_PROPS_PNG := #load("../../../assets/gothic/attack-props.png")

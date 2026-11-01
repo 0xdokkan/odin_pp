@@ -168,6 +168,12 @@ Lab_Sounds :: struct {
 	// FIRST PERSON ARCHER as last heard: the draw (and whether full), arrows loosed, bounces, zones, hits.
 	bow_drawing, bow_full: bool,
 	bow_loosed, bow_bounces, bow_zone_bounces, bow_hits: i32,
+	// The archers' real bolts flying (enemy_arrow_view.odin): each one's
+	// whistle as wanted this frame, how far it had flown last frame and for
+	// how many frames it has not moved.
+	flights: [audio.LAB_FLIGHTS]audio.Lab_Flight,
+	flight_flown: [audio.LAB_FLIGHTS]f32,
+	flight_still: [audio.LAB_FLIGHTS]u8,
 	// What the lab has played so far (smoke and tests).
 	played: [audio.Lab_Sfx]int,
 }
@@ -283,7 +289,8 @@ lab_actor_sfx :: proc(character: gfx.Flipbook_Character, action: gfx.Living_Acti
 	case .Archer:
 		#partial switch action {
 		case .Move_Side, .Move_Up, .Move_Down: return .Archer_Move, true
-		case .Attack: return .Archer_Shoot, true
+		// A real bolt whistles over the board itself (enemy_arrow_view.odin).
+		case .Attack: return (.Archer_Loose if cause == .Arrow_Loosed else .Archer_Shoot), true
 		case .Hurt, .Hurt_Back: return .Archer_Hurt, true
 		case .Death: return .Archer_Death, true
 		}
@@ -569,6 +576,8 @@ update_lab_sounds :: proc(renderer: ^Renderer, room: ^game.Room, now: f64) {
 	if !v.mechanics_lab || v.living_state == nil || room == nil || room.player == nil { return }
 	if v.lab_sounds == nil { v.lab_sounds = new(Lab_Sounds) }
 	s := v.lab_sounds
+	// The archers' bolts whistle as they fly (enemy_arrow_view.odin).
+	lab_bolt_flights(renderer, room, s)
 	// Characters: a sound for each clip a card starts, and for the loops of
 	// telegraph and daze.
 	for &actor in v.living_state.actors {
@@ -791,4 +800,5 @@ play_lab_sounds :: proc(renderer: ^Renderer, bank: ^audio.Lab_Bank, volume: f32)
 		audio.lab_play(bank, sound.sfx, volume*gain, pitch*(1+0.04*wobble), sound.pan)
 	}
 	s.count = kept
+	if bank != nil { audio.lab_flights(bank, s.flights[:], volume) }
 }

@@ -5,6 +5,15 @@ I riferimenti a Classica, `--flat` e ai vecchi smoke descrivono versioni precede
 per i comandi disponibili oggi valgono il [README](README.md) e la documentazione collegata.
 
 
+## 2026-11-01 — Piano del succo, Fase 4: le frecce degli arcieri si vedono e si sentono
+
+- La freccia dell'arciere è un dardo di carta ritagliata (penne rosse, asta di noce, punta d'acciaio) con una scia d'aria
+  chiara e l'ombra lunga a terra; le caselle davanti a lei pulsano, più forte quando sta per arrivare.
+- Se manca resta piantata nel muro o nel pavimento, vibra e svanisce dopo un secondo e mezzo; se ferisce resta un attimo
+  nella carta colpita.
+- Nel laboratorio quattro suoni nuovi fatti da codice: lo scocco senza fischio, il sibilo che accompagna il volo (più forte
+  vicino al Viandante, con l'effetto Doppler) e il colpo nel legno o nella pietra quando manca.
+
 ## 2026-11-01 — Piano del succo, Fase 3: le frecce degli arcieri sono vere
 
 - L'arciere, sul battito del tiro, scocca una freccia che vola a 8 caselle al secondo per al massimo 8 caselle e colpisce

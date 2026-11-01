@@ -14,11 +14,29 @@ LAB_VOICES :: 3
 // frame (about 45 ms at 44.1 kHz).
 LAB_LIMIT :: f32(0.89)
 LAB_LIMIT_RELEASE :: f32(0.9995)
+// The archers' real bolts (docs/piano-succo.md, Fase 4): a voice each, its
+// whistle played while the bolt flies and steered every frame (lab_flights).
+LAB_FLIGHTS :: 8
+LAB_FLIGHT_SFX :: Lab_Sfx.Archer_Bolt_Flight
+
+// One bolt's flight as the board wants it this frame: which bolt (`key`, 0:
+// none), how loud, its pitch and pan, and whether it flies (else it is held,
+// the world standing still, and so is its whistle).
+Lab_Flight :: struct {
+	key: u32,
+	volume, pitch, pan: f32,
+	running: bool,
+}
 
 Lab_Bank :: struct {
 	ready, failed: bool,
 	sounds: [Lab_Sfx][LAB_VOICES]rl.Sound,
 	next: [Lab_Sfx]int,
+	// The flights' voices (aliases of LAB_FLIGHT_SFX), the bolt each plays
+	// and whether it is paused.
+	flight_voices: [LAB_FLIGHTS]rl.Sound,
+	flight_keys: [LAB_FLIGHTS]u32,
+	flight_held: [LAB_FLIGHTS]bool,
 	ambience: rl.Music,
 	ambience_sfx: Lab_Sfx,
 	ambience_on: bool,
@@ -57,6 +75,9 @@ lab_bank_load :: proc(b: ^Lab_Bank) -> bool {
 		b.sounds[sfx][0] = base
 		for v in 1..<LAB_VOICES { b.sounds[sfx][v] = rl.LoadSoundAlias(base) }
 	}
+	if flight := b.sounds[LAB_FLIGHT_SFX][0]; flight.frameCount != 0 {
+		for &voice in b.flight_voices { voice = rl.LoadSoundAlias(flight) }
+	}
 	b.ready = true
 	rl.AttachAudioMixedProcessor(lab_limiter)
 	return true
@@ -88,6 +109,11 @@ lab_bank_unload :: proc(b: ^Lab_Bank) {
 		rl.DetachAudioMixedProcessor(lab_limiter)
 		lab_ambience(b, false)
 		lab_music_stop(b)
+		for voice in b.flight_voices {
+			if voice.frameCount == 0 { continue }
+			rl.StopSound(voice)
+			rl.UnloadSoundAlias(voice)
+		}
 		for sfx in Lab_Sfx {
 			if LAB_SFX_LOOP[sfx] || b.sounds[sfx][0].frameCount == 0 { continue }
 			for v in 1..<LAB_VOICES { rl.UnloadSoundAlias(b.sounds[sfx][v]) }
@@ -109,6 +135,34 @@ lab_play :: proc(b: ^Lab_Bank, sfx: Lab_Sfx, volume: f32 = 1, pitch: f32 = 1, pa
 	rl.SetSoundPitch(s, clamp(pitch, 0.5, 2))
 	rl.SetSoundPan(s, clamp(pan, -1, 1))
 	rl.PlaySound(s)
+}
+
+// The bolts in flight this frame (`volume`: the player's effects volume),
+// slot by slot: a new key starts its voice from the top, a key gone stops it,
+// a held bolt pauses its whistle until it flies again.
+lab_flights :: proc(b: ^Lab_Bank, wanted: []Lab_Flight, volume: f32) {
+	if b == nil || !b.ready { return }
+	for slot in 0..<LAB_FLIGHTS {
+		s := b.flight_voices[slot]
+		if s.frameCount == 0 { continue }
+		w := wanted[slot] if slot < len(wanted) else Lab_Flight{}
+		if w.key != b.flight_keys[slot] {
+			if b.flight_keys[slot] != 0 { rl.StopSound(s) }
+			b.flight_keys[slot], b.flight_held[slot] = w.key, false
+			if w.key == 0 { continue }
+			rl.PlaySound(s)
+		} else if w.key == 0 { continue }
+		rl.SetSoundVolume(s, clamp(volume*w.volume, 0, 1))
+		rl.SetSoundPitch(s, clamp(w.pitch, 0.5, 2))
+		rl.SetSoundPan(s, clamp(w.pan, -1, 1))
+		if !w.running && !b.flight_held[slot] {
+			rl.PauseSound(s)
+			b.flight_held[slot] = true
+		} else if w.running && b.flight_held[slot] {
+			rl.ResumeSound(s)
+			b.flight_held[slot] = false
+		}
+	}
 }
 
 // The track `wanted` this frame (None: silence): it fades in over

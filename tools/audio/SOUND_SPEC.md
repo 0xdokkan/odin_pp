@@ -279,6 +279,10 @@ crank. Taut, mechanical, quick.
 | archer_shoot | shoots | 0.75 | 0.06, 0.064 | -18 | 0.25 | release at 0.06: a hard wooden-iron thunk + string twang (karplus, low) + bolt whistle flying away (doppler down); recoil thump |
 | archer_hurt | is hit | 0.75 | 0.118 | -18 | 0.18 | leather and body thud at 0.118, crossbow wood knocks, a sharp breath-like hiss |
 | archer_death | dies | 1.2 | 0.118, 0.69 | -18 | 0.3 | hit, falls; the crossbow clatters on stone at 0.69 (wood + iron) |
+| archer_loose | shoots a real bolt (docs/piano-succo.md, Fase 4) | 0.75 | 0.06, 0.064 | -18 | 0.25 | archer_shoot without the bolt's whistle: the bolt over the board whistles itself |
+| archer_bolt_flight | a real bolt flies (played while it flies: louder near the Viandante, Doppler pitch from the game) | 1.5 | — | -20 | 0.06 | steady: the fletching's whistle on 2.4 kHz fluttering at 46 Hz, a low rush of air; soft ends |
+| archer_bolt_wood | a real bolt misses and sticks in wood (the Far West's, the Giungla's and the Vietnam's lands) | 0.6 | — | -17 | 0.22 | a hard bite, the plank's hollow knock, splinters, the shaft quivering (buzz near 76 Hz) |
+| archer_bolt_stone | a real bolt misses and sticks in stone (every other land: walls, cover, ice, the floor) | 0.6 | — | -17 | 0.3 | steel cracks on stone with a short ring, grit, a higher shorter quiver, a chip falls at 0.19 |
 
 ### Family `brute` — the brute
 

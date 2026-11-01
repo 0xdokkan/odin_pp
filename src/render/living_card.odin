@@ -103,6 +103,7 @@ forget_living_actors :: proc(renderer: ^Renderer) {
 	forget_attack_fx(renderer)
 	forget_ground_fx(renderer)
 	renderer.tactical.juice_blows = {}
+	enemy_bolts_reset(&renderer.tactical.enemy_bolts)
 	lab_sounds_reset(renderer)
 	if renderer.tactical.living_state == nil { return }
 	living_tokens_free(renderer.tactical.living_state)

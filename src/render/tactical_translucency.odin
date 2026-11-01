@@ -60,6 +60,8 @@ collect_tactical_translucents :: proc(renderer: ^Renderer, room: ^game.Room = ni
 		observe_attack_cues(renderer)
 		// The blows that have landed give their juice (juice_blows.odin).
 		observe_juice_blows(renderer)
+		// The archers' bolts that have landed stick there (enemy_arrow_view.odin).
+		observe_enemy_bolts(renderer, room)
 	}
 	if room != nil { update_flipbook_actors(renderer, room) }
 	if room != nil && v.living { update_living_actors(renderer, room) }

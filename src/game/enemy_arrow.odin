@@ -85,6 +85,13 @@ enemy_arrow_blocked :: proc(room: ^Room, origin, cell: grid.Position) -> bool {
 	return false
 }
 
+// Whether an arrow from `origin` that landed in `cell` with no one there
+// struck what stops it (it sticks in that wall or cover), not the floor at
+// its range's end (it falls there).
+enemy_arrow_struck_wall :: proc(room: ^Room, origin, cell: grid.Position) -> bool {
+	return room != nil && enemy_arrow_blocked(room, origin, cell)
+}
+
 // The cell where an arrow loosed along `step` from `origin` would end: the
 // first that stops it, or its range's last.
 enemy_arrow_course_end :: proc(room: ^Room, origin, step: grid.Position) -> (cell: grid.Position, cells: int) {
