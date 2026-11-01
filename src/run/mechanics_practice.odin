@@ -355,3 +355,13 @@ mechanics_lab_begin_fishing :: proc(rs: ^Roguelike_Session) -> bool {
 	clear_gameplay_command_buffer(&rs.gameplay_buffer)
 	return true
 }
+
+// The lab's F9 (docs/piano-succo.md, Fase 1): a strong blow's juice with no
+// blow, to feel the shake and the hit-stop alone.
+MECHANICS_LAB_JUICE_TRAUMA :: f32(0.6)
+MECHANICS_LAB_JUICE_HOLD :: f32(0.09)
+
+mechanics_lab_try_juice :: proc(renderer: ^render.Renderer) {
+	render.juice_shake(renderer, MECHANICS_LAB_JUICE_TRAUMA)
+	_ = render.juice_hit_stop(renderer, MECHANICS_LAB_JUICE_HOLD)
+}

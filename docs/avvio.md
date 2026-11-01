@@ -54,7 +54,7 @@ decimale o esadecimale con prefisso `0x`; seed e percorso scelto rendono la run
 riproducibile per la versione corrente del generatore.
 
 Senza argomenti si apre il **menu**: la run del roguelike, i minigiochi con i
-record e le impostazioni (volumi, scuotimento, sensibilità del
+record e le impostazioni (volumi, scuotimento e pausa sui colpi, sensibilità del
 mouse, FPS), salvate con i record in `odin_pp/profilo.json` nella cartella dati
 dell'utente. Se il file è corrotto o appartiene a una versione futura, la sessione
 usa valori predefiniti e disabilita le scritture per conservare il file originale.
@@ -153,6 +153,12 @@ acqua di una stanza nuova; l'uscita resta chiusa (sul tavolo niente portale né
 `USCITA`). Il cartello scrive
 `ARENA LIBERA / PESCA n/m / F7 DA CAPO / F5 RICOMINCIA`: `F7` di nuovo ricomincia
 la pesca da capo (senza acqua), `F5` riporta il combattimento.
+
+**Succo dei colpi (`F9`).** `F9` prova da solo il succo di un colpo forte: la
+telecamera del tabellone trema e le immagini si fermano per 0,09 s, senza che il
+mondo guadagni tempo ([juice.odin](../src/render/juice.odin),
+[piano](piano-succo.md), Fase 1). Il cursore delle impostazioni «Scuotimento e
+pausa sui colpi» li regola tutti e due (0: niente).
 
 Le novità nate qui ora valgono in tutto il gioco: le azioni che durano il loro
 costo e la finestra che si accorcia ([Modalità tattica M7](regole/combattimento.md#modalità-tattica-m7)),

@@ -27,6 +27,10 @@ Renderer :: struct {
 	frame_simulation_dt: f32,
 	frame_clock_valid: bool,
 	frame_had_cinematic: bool,
+	// This frame was held by a hit-stop (juice.odin): the lane keeps its press.
+	frame_had_hit_stop: bool,
+	// The juice of the blows: the camera's shake and the hit-stop (juice.odin).
+	juice: Juice_State,
 	sprite_assets: Sprite_Assets,
 	// Every command's presentation gets the next number (Presentation_Cue.batch).
 	cue_batches: u32,

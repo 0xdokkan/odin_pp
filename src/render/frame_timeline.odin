@@ -11,6 +11,13 @@ update_renderer_frame_timeline :: proc(renderer: ^Renderer, dt: f32) -> bool {
 	renderer.frame_clock_valid = true
 	renderer.frame_simulation_dt = 0
 	renderer.frame_had_cinematic = false
+	// A hit-stop holds the whole frame, as a die's throw does: no cue moves, the
+	// world gains no time (juice.odin); its shake goes on.
+	renderer.frame_had_hit_stop = update_juice(renderer, dt)
+	if renderer.frame_had_hit_stop {
+		renderer.frame_had_cinematic = true
+		return false
+	}
 	cast_frame := renderer.timeline.card_cast && event_timeline_is_busy(&renderer.timeline)
 	timeline := &renderer.timeline
 	// While the player is in his shadow the world's cues hold, like the world

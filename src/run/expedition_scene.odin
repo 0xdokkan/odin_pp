@@ -374,8 +374,10 @@ expedition_update :: proc(data:rawptr,frame:^host.Frame) {
 	}
 	character_pause:=e.inventory_open && e.inventory.panel!=.Inventory
 	if !character_pause {
+		// The juice's strength is the profile's «Scuotimento»; a hit-stop holds the drawings (juice.odin).
+		render.set_renderer_juice_strength(&rs.iso_renderer,frame.profile.settings.screen_shake if frame.profile!=nil else 1)
 		_=render.update_renderer_frame_timeline(&rs.iso_renderer,frame.dt)
-		render.advance_sprite_assets(&rs.iso_renderer.sprite_assets,frame.dt)
+		if !render.renderer_frame_held(&rs.iso_renderer) {render.advance_sprite_assets(&rs.iso_renderer.sprite_assets,frame.dt)}
 		render.update_tactical_atmosphere(&rs.iso_renderer,frame.dt)
 		render.set_living_cards(&rs.iso_renderer,true)
 		render.update_tactical_view(&rs.iso_renderer,room,rs.mouse_canvas,rs.mouse_inside&&!e.inventory_open&&!e.map_open,input={wheel=0})
@@ -383,7 +385,7 @@ expedition_update :: proc(data:rawptr,frame:^host.Frame) {
 		controls.actions.pressed-={.Pause,.Map,.Cancel,.Route_Map,.Restart}
 		if e.inventory_open || e.map_open || e.site>=0 || w.reward_count>0 {controls.left_pressed=false;controls.right_pressed=false;controls.wheel=0;controls.actions.pressed={};controls.actions.down={}}
 		blocked:=update_tactical_controller(&rs.tactical_controller,room,&rs.iso_renderer,&rs.card_interaction,&rs.gameplay_buffer,frame.dt,true,rs.mouse_canvas,!e.inventory_open&&!e.map_open&&rs.mouse_inside,nil,controls)
-		world_runs:=!game.tactical_is_casting(room) && room.qte.kind==.None && !game.tactical_shadow_active(room) && render.presentation_time_policy(&rs.iso_renderer.timeline)!=.Cinematic
+		world_runs:=!game.tactical_is_casting(room) && room.qte.kind==.None && !game.tactical_shadow_active(room) && render.presentation_time_policy(&rs.iso_renderer.timeline)!=.Cinematic && !render.renderer_frame_held(&rs.iso_renderer)
 		if world_runs {
 			_=world.sync(w,room)
 			world.tick(w,room,frame.dt)

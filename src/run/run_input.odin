@@ -17,6 +17,8 @@ Run_Action :: enum {
 	Skip, Previous_Page, Next_Page, Upgrade, Remove, Leave,
 	Restart, Main_Menu, Animation_Speed, Diagnostics, Intent_Display, Clear_Lab, Lab_Arena,
 	Debug_Thorns, Debug_Afterimage,
+	// The lab's try of the juice (docs/piano-succo.md, Fase 1).
+	Juice_Test,
 }
 
 RUN_WALK_ACTIONS :: [4]Run_Action{.North, .East, .South, .West}
@@ -40,6 +42,7 @@ default_run_actions :: proc() -> input.Action_Map(Run_Action) {
 		{.Skip, .S}, {.Previous_Page, .LEFT}, {.Next_Page, .RIGHT}, {.Upgrade, .U}, {.Remove, .R}, {.Leave, .L},
 		{.Restart, .F5}, {.Main_Menu, .F10}, {.Animation_Speed, .F4}, {.Diagnostics, .F8},
 		{.Intent_Display, .F6}, {.Clear_Lab, .F7}, {.Lab_Arena, .F3}, {.Debug_Thorns, .C}, {.Debug_Afterimage, .V},
+		{.Juice_Test, .F9},
 	}
 	for b in bindings { input.bind(&m, b.action, input.key(b.key)) }
 	return m

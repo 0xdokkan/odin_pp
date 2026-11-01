@@ -11,7 +11,7 @@ Settings :: struct {
 	muted:             bool,
 	show_fps:          bool,
 	mouse_sensitivity: f32, // multiplier on each minigame's default
-	screen_shake:      f32, // 0 disables shake, 1 is full strength
+	screen_shake:      f32, // 0 disables shake (and the board's hit-stop), 1 is full strength
 }
 
 DEFAULT_SETTINGS :: Settings{

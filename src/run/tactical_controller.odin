@@ -169,7 +169,12 @@ step_tactical_controller :: proc(
 		controller.lane_busy = true
 		return true
 	}
-	if cinematic_input { return true }
+	if cinematic_input {
+		// A hit-stop only holds the pictures of the player's own blow: his
+		// lane keeps its newest press for when they go on (juice.odin).
+		if renderer.frame_had_hit_stop { controller.lane_busy = true }
+		return true
+	}
 	map_toggled := update_tactical_map_controls(controller, room, renderer, cards, buffer, input.map_input)
 	// Movimento Ombra: the world is frozen and only the shadow's clock runs,
 	// and not while the card's own sinking cue still owns the player's input.

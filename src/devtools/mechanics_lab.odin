@@ -21,7 +21,7 @@ mechanics_lab_smoke_frame :: proc(window: ^app.Window, renderer: ^render.Rendere
 	render.update_renderer_frame_timeline(renderer, dt)
 	// The board clock runs only where a capture needs real time to pass.
 	run_session.step_tactical_controller(controller, room, renderer, cards, buffer, dt if clock else 0, true, input)
-	render.advance_sprite_assets(&renderer.sprite_assets, dt)
+	if !render.renderer_frame_held(renderer) { render.advance_sprite_assets(&renderer.sprite_assets, dt) }
 	render.update_tactical_view(renderer, room, {}, false, true)
 	render.update_tactical_atmosphere(renderer, dt)
 	overlay: app.Window_Overlay
@@ -94,6 +94,9 @@ run_mechanics_lab_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer,
 		return mechanics_lab_layers(window, renderer, &room, &data, &controller, &cards, &buffer)
 	} else if only == "lift" {
 		return mechanics_lab_lifts(window, renderer, &room, &data, &controller, &cards, &buffer)
+	} else if only == "juice" {
+		// The juice's act alone (docs/piano-succo.md, Fase 1).
+		return mechanics_lab_juice(window, renderer, &room, &controller, &cards, &buffer)
 	} else if only == "fps" {
 		// The First Person Shooter's act alone (docs/piano-prima-persona.md, Fase 0).
 		return mechanics_lab_first_person(window, renderer, &room, &data, &controller, &cards, &buffer)
@@ -262,6 +265,8 @@ run_mechanics_lab_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer,
 	if !mechanics_lab_lifts(window, renderer, &room, &data, &controller, &cards, &buffer) { return false }
 	// After it the first person arena's (docs/piano-prima-persona.md, Fase 1), for the same reason.
 	if !mechanics_lab_prima_persona(window, renderer, &room, &data, &controller, &cards, &buffer) { return false }
+	// After them all the juice's F9 (docs/piano-succo.md, Fase 1), for the same reason.
+	if !mechanics_lab_juice(window, renderer, &room, &controller, &cards, &buffer) { return false }
 	return mechanics_lab_sounds_heard(renderer)
 }
 

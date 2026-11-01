@@ -409,7 +409,7 @@ settings_update :: proc(data: rawptr, frame: ^host.Frame) {
 		audio.play(frame.audio, .Blip)
 	}
 	ui.toggle(ctx, ui.row(rows, 7, 3, 6), "Audio disattivato", &s.muted)
-	ui.slider(ctx, ui.row(rows, 7, 4, 6), "Scuotimento", &s.screen_shake, 0, 1)
+	ui.slider(ctx, ui.row(rows, 7, 4, 6), "Scuotimento e pausa sui colpi", &s.screen_shake, 0, 1)
 	ui.slider(ctx, ui.row(rows, 7, 5, 6), "Sensibilità mouse", &s.mouse_sensitivity, 0.25, 3)
 	ui.toggle(ctx, ui.row(rows, 7, 6, 6), "Mostra FPS", &s.show_fps)
 	close := ui.cut_bottom(&inner, 40)

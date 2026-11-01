@@ -387,6 +387,8 @@ update_tactical_view :: proc(renderer: ^Renderer, room: ^game.Room, mouse: view.
 	// FIRST PERSON SHOOTER: as far into the player's eyes as the dive has gone.
 	frame_first_person_camera(renderer, room)
 	v.draw_frustum = tactical_draw_frustum(v.camera, renderer.canvas_width, renderer.canvas_height)
+	// THE JUICE: the drawings shake once the aim has read the camera (juice.odin).
+	defer juice_shake_board_camera(renderer)
 	renderer.overlay_scale = 1.1/footprint_scale*12.5/v.world_orbit.distance/(1+LASSO_CAMERA_BACK*pull)
 	if refresh_only { return }
 	renderer.has_hovered_cell = false

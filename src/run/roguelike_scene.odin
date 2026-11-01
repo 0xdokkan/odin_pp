@@ -227,7 +227,9 @@ update_run_activity_overlay :: proc(rs: ^Roguelike_Session, hf: ^host.Frame) -> 
 	if run_pressed(rs.frame_input, .Diagnostics) && rs.diagnostics.capture_input != nil {
 		rs.diagnostics.capture_input(rs, hf)
 	}
-	if render.presentation_time_policy(&rs.iso_renderer.timeline) != .Cinematic {
+	// The juice's strength is the profile's «Scuotimento»; a hit-stop holds the drawings (juice.odin).
+	render.set_renderer_juice_strength(&rs.iso_renderer, hf.profile.settings.screen_shake if hf.profile != nil else 1)
+	if render.presentation_time_policy(&rs.iso_renderer.timeline) != .Cinematic && !render.renderer_hit_stopped(&rs.iso_renderer) {
 		render.advance_sprite_assets(&rs.iso_renderer.sprite_assets, rs.frame_time)
 	}
 	if !rs.activity_modal && !first_person_pause_pressed(&rs.room, rs.frame_input) &&
@@ -295,6 +297,8 @@ update_run_board_view :: proc(rs: ^Roguelike_Session, hf: ^host.Frame, screen: R
 	else if hf.focused && run_pressed(rs.frame_input, .Intent_Display) { render.cycle_intent_display(&rs.iso_renderer) }
 	// F7: the arena cleared for the Canna da Pesca (mechanics_lab_begin_fishing).
 	if rs.options.mechanics_lab && hf.focused && !rs.activity_modal && run_pressed(rs.frame_input, .Clear_Lab) { _ = mechanics_lab_begin_fishing(rs) }
+	// F9: the juice tried alone, a strong blow's shake and hit-stop (juice.odin).
+	if rs.options.mechanics_lab && hf.focused && !rs.activity_modal && run_pressed(rs.frame_input, .Juice_Test) { mechanics_lab_try_juice(&rs.iso_renderer) }
 	// Arrivals follow the running board: never paused, in a modal or mid-animation.
 	if rs.options.mechanics_lab && !rs.activity_modal && !rs.tactical_controller.paused && rs.frame_input.focused &&
 	   rs.run_state.phase == .In_Room && !render.renderer_timeline_is_busy(&rs.iso_renderer) {

@@ -637,7 +637,7 @@ card_demo_advance :: proc(demo: ^Card_Demo, renderer: ^render.Renderer, frame_dt
 	if demo.click_age >= 0 { demo.click_age += dt }
 	// The board's clocks as the run keeps them: the sprite clock waits out a
 	// cinematic roll of the dice.
-	if render.presentation_time_policy(&r.timeline) != .Cinematic { render.advance_sprite_assets(&r.sprite_assets, dt) }
+	if render.presentation_time_policy(&r.timeline) != .Cinematic && !render.renderer_hit_stopped(r) { render.advance_sprite_assets(&r.sprite_assets, dt) }
 	render.update_renderer_frame_timeline(r, dt)
 	if visual {
 		render.update_tactical_view(r, room, demo.pointer, card_demo_glove_alpha(demo) > 0, true)

@@ -5,6 +5,13 @@ I riferimenti a Classica, `--flat` e ai vecchi smoke descrivono versioni precede
 per i comandi disponibili oggi valgono il [README](README.md) e la documentazione collegata.
 
 
+## 2026-11-01 — Piano del succo, Fase 1: scossa della telecamera e pausa sull'impatto
+
+- Il tabellone ha il motore del succo dei colpi: una scossa della telecamera che cresce a ogni colpo e si spegne da sola,
+  e una pausa sull'impatto che ferma le immagini senza dare tempo al mondo. Nessun colpo la usa ancora (Fase 2).
+- Il cursore «Scuotimento» delle impostazioni diventa «Scuotimento e pausa sui colpi» e regola anche questi.
+- Nel laboratorio `F9` prova il succo di un colpo forte.
+
 ## 2026-10-30 — Piano del combattimento vivo
 
 - Nuovo [documento](docs/piano-succo.md) in sette fasi (0–6), da eseguire una alla volta: il succo dei colpi (pausa

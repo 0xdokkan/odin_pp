@@ -60,7 +60,7 @@ Parole del documento:
 | Fase | Contenuto | Dipende da | Stato | Commit |
 |---|---|---|---|---|
 | 0 | Base: unire le correzioni di `gioco-piu-veloce`, provare il cammino tenuto, misure di partenza | — | Fatta | vedi Esito |
-| 1 | Succo, motore comune: scossa, pausa sull'impatto, opzione per ridurlo | 0 | Da fare | |
+| 1 | Succo, motore comune: scossa, pausa sull'impatto, opzione per ridurlo | 0 | Fatta | vedi Esito |
 | 2 | Succo sui colpi: colpi del giocatore, critici, uccisioni, colpi nemici | 1 | Da fare | |
 | 3 | Frecce degli arcieri: proiettili veri nelle regole | 0 | Da fare | |
 | 4 | Frecce degli arcieri: aspetto 3D, riga accesa, suoni | 3 | Da fare | |
@@ -158,6 +158,48 @@ Passi:
 
 **Fatto quando:** nel laboratorio un tasto di prova scuote e ferma l'immagine;
 test verdi.
+
+### Esito (1 novembre 2026)
+
+Scelte dell'utente all'inizio della fase: **un cursore solo**, quello che c'era
+già («Scuotimento», usato dai minigiochi), rinominato «Scuotimento e pausa sui
+colpi»; **numeri della scossa come proposti** (0,12 caselle, 0,8°, spenta in
+0,35 s); durante la pausa **tutto fermo, la scossa continua**.
+
+1. **Scossa** ([juice.odin](../src/render/juice.odin)): trauma da 0 a 1 che cala
+   da solo in 0,35 s; la scossa vale trauma² e segue un rumore continuo
+   (OpenSimplex di `core:math/noise`), 22 campioni al secondo. Sposta insieme
+   posizione e punto guardato (la direzione di vista non gira mai, così il
+   cammino libero che la legge non cambia) e ruota solo il «sopra» della
+   telecamera. Si applica **dopo** la mira (`defer` in `update_tactical_view`):
+   la casella sotto il mouse non trema. Dietro gli occhi resta la scossa della
+   prima persona.
+2. **Pausa sull'impatto:** `juice_hit_stop` tiene ferme le immagini fino a
+   0,12 s, mai più di una ogni 0,15 s. `update_renderer_frame_timeline` passa il
+   fotogramma come i dadi (`frame_had_cinematic`): nessun segnale avanza, il
+   mondo non riceve tempo; le scene non fanno avanzare l'orologio dei disegni
+   (`renderer_hit_stopped` prima dell'aggiornamento, `renderer_frame_held` dopo).
+   Il controllore tiene la corsia occupata (`lane_busy`): un tasto premuto
+   durante la pausa resta ricordato.
+3. **Opzione:** `Settings.screen_shake` (0-1) scala trauma e durata della pausa;
+   a 0 non c'è né l'una né l'altra. La run e la spedizione la leggono a ogni
+   fotogramma (`set_renderer_juice_strength`).
+4. **Prova nel laboratorio:** `F9` (`Run_Action.Juice_Test`) dà il succo di un
+   colpo forte senza colpo (trauma 0,6, pausa 0,09 s). La prova completa del
+   laboratorio ha un atto nuovo in fondo (`mechanics_lab_juice`, da solo con
+   `ODIN_PP_LAB_ONLY=juice`): 6 fotogrammi fermi con i disegni fermi, telecamera
+   spostata fino a 0,028 caselle e tornata al suo posto; catture
+   `odin_pp_mechanics_lab_juice_NN.png`.
+5. **Test nuovi:** trauma, forza e spegnimento; telecamera scossa con la stessa
+   direzione di vista e nei limiti; pausa che tiene i segnali e non dà tempo al
+   mondo, con l'intervallo minimo; mira che non trema
+   ([juice_test.odin](../src/render/juice_test.odin)); controllore che durante
+   la pausa non dà tempo al mondo e ricorda il tasto
+   ([juice_controller_test.odin](../src/integration/juice_controller_test.odin)).
+6. **Verifiche:** `scripts/check.ps1` verde (1835 test con e senza assert);
+   prova completa del laboratorio verde nella finestra vera (2029 catture,
+   146 suoni; atto del succo: 6 fotogrammi fermi, telecamera fino a 0,031
+   caselle e ritorno).
 
 ## Fase 2 — Succo sui colpi
 
