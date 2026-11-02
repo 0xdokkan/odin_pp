@@ -30,6 +30,15 @@ Commit **«Piano di Napoli, Fase 0 fatta: la carta, il D4 e i quattro rami»** s
   frecce, nessuno la colpisce, una alla volta, sparisce a fine combattimento); un passo contro di lei lo fa sedere **2
   secondi** occupato e senza difesa, la cura in due metà sui due battiti, poi la tavola si sparecchia; con tutto pieno
   attorno, cura subito. 3: il **borsellino**, l'oro subito. Mentre il nonno arriva il mondo è fermo per 2 secondi.
+- **2026-11-03, Fase 2** (commit «Piano di Napoli, Fase 2 fatta: il bastone in terza persona»): la faccia 1 apre la
+  vista del **bastone** (arma `Club` della vista, `game/first_person_club.odin`): camera dietro la spalla destra, il
+  mouse gira la visuale (un po' anche su e giù), WASD fa passi sulla griglia da 0,5 s (dimezzati dal ritmo del
+  Viandante come tutti i passi), clic sinistro (tenuto: una dopo l'altra) = **mazzata** sulla casella fra le 8 attorno
+  più vicina alla visuale, segnata a terra. La mazzata dura 0,6 s (0,25 di carica, impatto, 0,35 di ritorno, il
+  Viandante occupato): 8 danni (+1 a potenziamento) e stordimento coi **ritorni decrescenti** (2 battiti, poi 1, poi
+  niente sullo stesso nemico, finché non passano 4 s senza mazzate su di lui). Senza nemico rompe un barile o un blocco
+  di ghiaccio, altrimenti picchia il pavimento; una diagonale chiusa da due muri non si colpisce. Viandante e bastone
+  provvisori (il cartoncino e un bastone semplice).
 
 ## 2026-10-30 — Tutte le carte: il lancio dura la metà
 

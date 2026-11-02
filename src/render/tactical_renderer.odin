@@ -734,6 +734,8 @@ draw_tactical_world :: proc(renderer: ^Renderer, room: ^game.Room, active_card: 
 	}
 	// BENVENUTI A NAPOLI: the table in the grandpa's arms (napoli.odin).
 	draw_napoli_visit_table(renderer, room)
+	// Its club in the player's hand, behind his back (first_person_club.odin).
+	draw_first_person_club(renderer, room)
 	for item in snapshot.loot[:snapshot.loot_count] {
 		if !item.visible || !tactical_cell_on_screen(renderer, item.position) || !tactical_render_visible(renderer, item.position) { continue }
 		draw_tactical_loot(renderer, item)
@@ -756,6 +758,7 @@ draw_tactical_world :: proc(renderer: ^Renderer, room: ^game.Room, active_card: 
 	draw_enemy_arrow_courses(renderer, room)
 	draw_enemy_bomb_floor(renderer, room)
 	draw_marley_floor(renderer, room)
+	draw_first_person_club_mark(renderer, room)
 	draw_arsenal_floor(renderer, room)
 	draw_m8_device_network(renderer, room)
 	draw_memory_device_ranges(renderer, room, active_card)

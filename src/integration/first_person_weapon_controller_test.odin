@@ -73,9 +73,10 @@ test_first_person_buttons_latch_and_route_for_every_weapon :: proc(t: ^testing.T
 		renderer.tactical.first_person.amount = 0.5
 		testing.expect_value(t, run_session.first_person_buttons(&controller, renderer, &room, keyed), run_session.First_Person_Buttons{})
 		renderer.tactical.first_person.amount = 1
-		// A second of both buttons: the AK's six shots, the fists' one punch, nobody else's.
+		// A second of both buttons: the AK's six shots, the fists' one punch, the
+		// club's two blows (held, one as soon as the last is over), nobody else's.
 		for _ in 0..<60 { first_person_controller_frame(&controller, &room, renderer, &cards, &held, dt, both) }
-		testing.expect_value(t, room.first_person.shots, i32(6) if weapon == .AK else (1 if weapon == .Fists else 0))
+		testing.expect_value(t, room.first_person.shots, i32(6) if weapon == .AK else (1 if weapon == .Fists else (2 if weapon == .Club else 0)))
 		testing.expect_value(t, room.first_person.trigger, weapon == .AK)
 	}
 }

@@ -12,7 +12,7 @@ import level "../level"
 test_first_person_each_weapon_has_its_look :: proc(t: ^testing.T) {
 	look := FIRST_PERSON_LOOKS[.AK]
 	testing.expect(t, look.tag == "FPS" && look.status == FIRST_PERSON_HUD_STATUS && look.hand == .AK)
-	tags := [game.First_Person_Weapon]string{.AK = "FPS", .Fists = "FPB", .Sword = "FPF", .Bow = "FPA"}
+	tags := [game.First_Person_Weapon]string{.AK = "FPS", .Fists = "FPB", .Sword = "FPF", .Bow = "FPA", .Club = "BAN"}
 	for weapon in game.First_Person_Weapon {
 		look = FIRST_PERSON_LOOKS[weapon]
 		testing.expect_value(t, look.tag, tags[weapon])
@@ -26,12 +26,18 @@ test_first_person_each_weapon_has_its_look :: proc(t: ^testing.T) {
 			testing.expect(t, look.status == FIRST_PERSON_HUD_STATUS_SWORD && look.hand == .Sword)
 			continue
 		}
+		// BENVENUTI A NAPOLI's club is on the board, behind his back.
+		if weapon == .Club {
+			testing.expect(t, look.status == FIRST_PERSON_HUD_STATUS_CLUB && look.hand == .Empty)
+			continue
+		}
 		testing.expect(t, look.status == FIRST_PERSON_HUD_STATUS_BOW && look.hand == .Bow)
 	}
 	testing.expect_value(t, string(first_person_countdown_text(20, .Fists)), "FPB 20s")
 	testing.expect_value(t, string(first_person_countdown_text(13.2, .Sword)), "FPF 14s")
 	testing.expect_value(t, string(first_person_countdown_text(0.4, .Bow)), "FPA 1s")
 	testing.expect_value(t, string(first_person_countdown_text(30, .AK)), "FPS 30s")
+	testing.expect_value(t, string(first_person_countdown_text(29.5, .Club)), "BAN 30s")
 	testing.expect_value(t, string(FIRST_PERSON_HUD_STATUS_BARE), "MIRA COL MOUSE / WASD: PASSI")
 	// No renderer: the AK's.
 	testing.expect_value(t, first_person_shown_weapon(nil), game.First_Person_Weapon.AK)

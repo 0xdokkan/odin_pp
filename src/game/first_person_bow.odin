@@ -369,6 +369,14 @@ bow_blocks :: proc(room: ^Room, cell: grid.Position, y: f32) -> bool {
 	return full || top > y+BOW_EPSILON
 }
 
+// Whether a point `y` high (world height, from the board's level) over `cell`'s
+// column is inside something solid, as the bow's arrows meet the room: BENVENUTI
+// A NAPOLI's camera arm behind the player's back stops there too
+// (render/first_person_club.odin).
+first_person_point_blocked :: proc(room: ^Room, cell: grid.Position, y: f32) -> bool {
+	return bow_blocks(room, cell, y)
+}
+
 // Where a ray from `at` along the flat part of `way` (its x and z) first meets
 // a circle of `radius` round `centre` (the board's x and y), in units along
 // `way`; none behind it.

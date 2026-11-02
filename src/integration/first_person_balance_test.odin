@@ -100,6 +100,15 @@ balance_run :: proc(t: ^testing.T, weapon: game.First_Person_Weapon, spam := fal
 			case .Bow:
 				view.yaw = yaw
 				input.fire_right = frame%2 == 0 if spam else frame%70 < 62
+			// BENVENUTI A NAPOLI's club: the view on the foe, the button held, a
+			// step toward him while he is not next to him (diagonals too).
+			case .Club:
+				view.yaw, input.fire = yaw, frame%30 != 0
+				way := game.Move_Direction.East if abs(dx) >= abs(dy) && dx > 0 else (game.Move_Direction.West if abs(dx) >= abs(dy) else
+					(game.Move_Direction.South if dy > 0 else game.Move_Direction.North))
+				if best > 2 && frame%10 == 0 && !game.tactical_player_busy(&room) && room.qte.kind == .None {
+					_ = run_session.commit_gameplay_command(&room, renderer, &cards, {kind = .Move, origin_phase = .Combat, direction = way})
+				}
 			}
 		}
 		_, _ = game.sandbox_tick(&room, &sandbox, 1.0/60)
@@ -132,7 +141,7 @@ balance_run :: proc(t: ^testing.T, weapon: game.First_Person_Weapon, spam := fal
 
 @(test)
 test_first_person_weapons_side_by_side :: proc(t: ^testing.T) {
-	names := [game.First_Person_Weapon]string{.AK = "AK", .Fists = "pugni", .Sword = "spada", .Bow = "arco"}
+	names := [game.First_Person_Weapon]string{.AK = "AK", .Fists = "pugni", .Sword = "spada", .Bow = "arco", .Club = "bastone"}
 	for weapon in game.First_Person_Weapon {
 		r := balance_run(t, weapon)
 		dps := f32(r.dealt)/max(r.seconds, 1)

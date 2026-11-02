@@ -37,6 +37,9 @@ import grid "../engine/grid"
 //     eaten or the combat ends. With no free cell round him the grandpa feeds him
 //     where he stands: the whole cure at once.
 //   - 3 brings a purse: the gold at once (Gold_Gained).
+//
+// Fase 2: 1 opens the view of the club (First_Person_Weapon.Club,
+// first_person_club.odin), the board's camera behind his back.
 
 NAPOLI_DIE_SIDES :: i32(4)
 NAPOLI_CLUB_SECONDS :: i32(30)
@@ -104,11 +107,12 @@ napoli_effect :: proc(face: Napoli_Face, amount, level: i32) -> Effect {
 // Never behind the player's eyes (cards are shut there anyway) nor on a
 // dinosaur's back: two of its faces open a view of their own.
 napoli_can_begin :: proc(room: ^Room) -> bool {
-	return room != nil && room.player != nil && room.phase == .Combat && !room.first_person.active && !room.ride.active
+	return room != nil && room.player != nil && room.phase == .Combat && !room.first_person.active && !room.ride.active &&
+	       tactical_can_begin_first_person(room, .Club)
 }
 
-// The face picked, said, then done: the grandpa's table or purse (Fase 1); the
-// club and the grandpa himself come with Fasi 2 and 4.
+// The face picked, said, then done: the club's view behind his back (Fase 2),
+// the grandpa's table or purse (Fase 1); the grandpa himself comes with Fase 4.
 @(private)
 begin_napoli :: proc(room: ^Room, effect: Effect, report: ^Action_Report) -> bool {
 	if report == nil || effect.amount <= 0 || effect.charges < 1 || effect.charges > 4 || !napoli_can_begin(room) { return false }
@@ -116,6 +120,13 @@ begin_napoli :: proc(room: ^Room, effect: Effect, report: ^Action_Report) -> boo
 	record_report_event(report, {kind = .Napoli_Begun, source = PLAYER_ENTITY, target = PLAYER_ENTITY, from_position = at, to_position = at,
 		amount = effect.amount, duration = effect.charges, card_definition = .Napoli})
 	#partial switch napoli_for_face(effect.charges) {
+	case .Club:
+		// The view's own cue paces the camera's flight behind his back.
+		began := tactical_begin_first_person(room, f32(effect.amount), .Club)
+		assert(began)
+		first_person_club_begin(room, napoli_club_damage(effect.duration))
+		record_report_event(report, {kind = .First_Person_Begun, source = PLAYER_ENTITY, target = PLAYER_ENTITY,
+			from_position = at, to_position = at, duration = effect.amount, card_definition = .Napoli})
 	case .Table: napoli_set_table(room, effect.amount, report)
 	case .Purse:
 		room.player.gold += effect.amount

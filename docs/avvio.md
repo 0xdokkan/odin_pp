@@ -106,7 +106,10 @@ la carta si gioca quattro volte, con il D4 fissato su ognuna delle facce come lo
 finestra, il suo pannello e la scritta sul Viandante dicono il ramo uscito (`odin_pp_napoli_dice_<faccia>.png`). Poi le
 visite del nonno: con la faccia 2 il nonno porta la tavolata (2 secondi a mondo fermo), il Viandante ferito ci mangia
 seduto e si cura in due battiti; con la faccia 3 porta il borsellino (`odin_pp_napoli_table_NN.png`,
-`odin_pp_napoli_feast_NN.png`, `odin_pp_napoli_purse_NN.png`). Nello smoke completo gira per ultimo.
+`odin_pp_napoli_feast_NN.png`, `odin_pp_napoli_purse_NN.png`). Infine il bastone (faccia 1): la camera va dietro la spalla
+destra, il Viandante gira verso il bruto, fa due passi e gli dà tre mazzate (8 danni, stordito 2, poi 1, poi niente:
+`odin_pp_napoli_club_NN.png`), poi la camera contro un muro (`odin_pp_napoli_club_muro.png`). Nello smoke completo gira
+per ultimo.
 Con `ODIN_PP_LAB_ONLY=fps` e `ODIN_PP_LAB_TIMING=1` l'atto di First Person Shooter si ferma dopo la discesa negli occhi e misura
 600 fotogrammi con l'AK che spara, senza limite di fotogrammi né vsync (riga `FIRST PERSON TIMING`; meglio con una build `-o:speed`).
 Con `ODIN_PP_LAB_ONLY=prima_persona` la stessa misura la fa `ODIN_PP_LAB_TIMING=1` con i pugni (un pugno ogni quarto di

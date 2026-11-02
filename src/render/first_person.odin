@@ -222,6 +222,9 @@ First_Person_View :: struct {
 	sword: First_Person_Sword_View,
 	// The bow as last seen (first_person_bow.odin).
 	bow: First_Person_Bow_View,
+	// BENVENUTI A NAPOLI's club behind his back: the camera's arm, the cell
+	// marked, the blow as last seen (first_person_club.odin).
+	club: First_Person_Club_View,
 	// What the board has shown so far (the lab's sounds, the smoke and tests).
 	shots, hits, ricochets, enters, exits: int,
 }
@@ -262,6 +265,7 @@ update_tactical_first_person :: proc(renderer: ^Renderer, room: ^game.Room) {
 	follow_first_person_fists(renderer, room)
 	follow_first_person_sword(renderer, room)
 	follow_first_person_bow(renderer, room)
+	follow_first_person_club(renderer, room)
 	if active != f.engaged {
 		if active {
 			// The eyes look the way he faces, or along the grid way nearest the
@@ -269,6 +273,8 @@ update_tactical_first_person :: proc(renderer: ^Renderer, room: ^game.Room) {
 			look := v.camera.target-v.camera.position
 			way := first_person_dive_way(math.atan2(look.z, look.x), room.player.tactical.facing)
 			f.yaw, f.pitch = game.first_person_yaw(way), 0
+			// Behind his back the look starts a little down (first_person_club.odin).
+			if game.FIRST_PERSON_WEAPONS[room.first_person.weapon].third_person { f.pitch = CLUB_START_PITCH }
 			f.seen_shots, f.paced = room.first_person.shots, false
 			f.enters += 1
 		} else {
@@ -358,10 +364,16 @@ frame_first_person_camera :: proc(renderer: ^Renderer, room: ^game.Room) {
 		yaw0 := math.atan2(forward.z, forward.x)
 		pitch0 := math.asin(clamp(forward.y, -1, 1))
 		s := clamp(f.amount, 0, 1)
-		yaw := yaw0+first_person_wrap(f.yaw-yaw0)*s
-		pitch := pitch0+(f.pitch-pitch0)*s
+		// Behind his eyes, or with the club behind his back (first_person_club.odin).
+		goal, goal_yaw, goal_pitch := f.eye, f.yaw, f.pitch
+		if first_person_third_person(renderer) {
+			at, way := frame_first_person_club_camera(renderer, room, p, now)
+			goal, goal_yaw, goal_pitch = at, math.atan2(way.z, way.x), math.asin(clamp(way.y, -1, 1))
+		}
+		yaw := yaw0+first_person_wrap(goal_yaw-yaw0)*s
+		pitch := pitch0+(goal_pitch-pitch0)*s
 		look := rl.Vector3{math.cos(yaw)*math.cos(pitch), math.sin(pitch), math.sin(yaw)*math.cos(pitch)}
-		position := orbit.position+(f.eye-orbit.position)*s
+		position := orbit.position+(goal-orbit.position)*s
 		// A landed punch jolts the look a moment (first_person_fists.odin).
 		hit_at, hit_crit := f.fists_hit_at, f.fists_hit_crit
 		// The sword's cuts jolt it the same (first_person_sword.odin).
@@ -403,7 +415,8 @@ frame_first_person_camera :: proc(renderer: ^Renderer, room: ^game.Room) {
 		}
 	}
 	f.aimed = .None
-	if f.engaged { f.aimed = game.first_person_trace(room, room.player.position, first_person_aim(renderer)).hit }
+	// The club aims at a cell, marked on its floor (first_person_club.odin).
+	if f.engaged && !first_person_third_person(renderer) { f.aimed = game.first_person_trace(room, room.player.position, first_person_aim(renderer)).hit }
 	frame_first_person_marks(renderer, room)
 }
 
@@ -519,16 +532,23 @@ first_person_keys :: proc(renderer: ^Renderer) -> [4]game.Move_Direction {
 	return game.first_person_key_directions(renderer.tactical.first_person.yaw)
 }
 
-// The mouse's turn of the view (radians): any yaw, the pitch held within its limit.
+// The mouse's turn of the view (radians): any yaw, the pitch held within the
+// weapon's limits (less of it behind his back: first_person_club.odin).
 turn_first_person_view :: proc(renderer: ^Renderer, yaw, pitch: f32) {
 	f := &renderer.tactical.first_person
 	f.yaw = first_person_wrap(f.yaw+yaw)
-	f.pitch = clamp(f.pitch+pitch, -game.FIRST_PERSON_PITCH_LIMIT, game.FIRST_PERSON_PITCH_LIMIT)
+	up, down := first_person_pitch_limits(f.weapon)
+	f.pitch = clamp(f.pitch+pitch, -down, up)
 }
 
-// How much of the player's own card shows (it fades as the camera reaches it).
+// How much of the player's own card shows (it fades as the camera reaches it;
+// behind his back only when the arm is pressed close to him).
 @(private)
 first_person_player_shown :: proc(renderer: ^Renderer) -> f32 {
+	if first_person_third_person(renderer) {
+		amount := first_person_amount(renderer)
+		return (1-renderer.tactical.first_person.club.fade*amount)*(1-(1-CLUB_CARD_SHOWN)*amount)
+	}
 	return 1-clamp((first_person_amount(renderer)-FIRST_PERSON_HIDE_FROM)/FIRST_PERSON_HIDE_SPAN, 0, 1)
 }
 
@@ -848,8 +868,13 @@ draw_first_person_overlay :: proc(renderer: ^Renderer, room: ^game.Room) {
 	case .Empty:
 	}
 	// The crosshair: four paper ticks in ink round a dot, warm over a foe; a
-	// hit marks it with four corners a moment.
-	draw_first_person_crosshair(renderer, f.aimed == .Foe, f.hit_at > 0 && now-f.hit_at >= 0 && now-f.hit_at < FIRST_PERSON_MARK_SECONDS)
+	// hit marks it with four corners a moment. Behind his back a dot alone: the
+	// cell the club strikes is marked on its floor.
+	if first_person_third_person(renderer) {
+		draw_first_person_dot(renderer)
+	} else {
+		draw_first_person_crosshair(renderer, f.aimed == .Foe, f.hit_at > 0 && now-f.hit_at >= 0 && now-f.hit_at < FIRST_PERSON_MARK_SECONDS)
+	}
 	// The countdown, while he is behind his eyes.
 	if !f.engaged || room == nil { return }
 	bounds := first_person_countdown_bounds(renderer)
@@ -908,6 +933,14 @@ draw_first_person_crosshair :: proc(renderer: ^Renderer, on_foe, hit: bool) {
 	}
 }
 
+// The middle's dot alone, in ink.
+@(private = "file")
+draw_first_person_dot :: proc(renderer: ^Renderer) {
+	cx, cy := math.round(renderer.canvas_width*0.5), math.round(renderer.canvas_height*0.5)
+	rl.DrawRectangleRec({cx-2, cy-2, 5, 5}, LIVING_TOKEN_INK)
+	rl.DrawRectangleRec({cx-1, cy-1, 3, 3}, GOTHIC_PAPER)
+}
+
 // The countdown's plate, at the bottom left where the hand was.
 first_person_countdown_bounds :: proc(renderer: ^Renderer) -> rl.Rectangle {
 	return {16, renderer.canvas_height-62, 176, 46}
@@ -928,6 +961,8 @@ FIRST_PERSON_HUD_STATUS_FISTS :: cstring("WASD LIBERO / CLIC: PUGNI / SPAZIO: SA
 FIRST_PERSON_HUD_STATUS_SWORD :: cstring("MOUSE: LAMA / DESTRO: PARA / Q E: GIRA")
 // The bow: the draw and the release, the lowering, the steps.
 FIRST_PERSON_HUD_STATUS_BOW :: cstring("DESTRO: TENDI E TIRA / SX: ABBASSA / WASD")
+// BENVENUTI A NAPOLI's club: the look, the blow, the steps.
+FIRST_PERSON_HUD_STATUS_CLUB :: cstring("MOUSE: GIRA / CLIC: MAZZATA / WASD: PASSI")
 
 // --------------------------------------------------------------------------
 // Each weapon's look (game.FIRST_PERSON_WEAPONS has its rules).
@@ -956,6 +991,8 @@ FIRST_PERSON_LOOKS := [game.First_Person_Weapon]First_Person_Look{
 	.Fists = {tag = "FPB", status = FIRST_PERSON_HUD_STATUS_FISTS, hand = .Fists, accent = FIRST_PERSON_NEON_MAGENTA},
 	.Sword = {tag = "FPF", status = FIRST_PERSON_HUD_STATUS_SWORD, hand = .Sword, accent = FIRST_PERSON_NEON_MAGENTA},
 	.Bow = {tag = "FPA", status = FIRST_PERSON_HUD_STATUS_BOW, hand = .Bow, accent = FIRST_PERSON_BOW_TEAL},
+	// The club is in his hand on the board, behind his back (first_person_club.odin).
+	.Club = {tag = "BAN", status = FIRST_PERSON_HUD_STATUS_CLUB, hand = .Empty, accent = CLUB_MARK_COLOR},
 }
 
 // The weapon the board shows: the room's while the view is on, the last one

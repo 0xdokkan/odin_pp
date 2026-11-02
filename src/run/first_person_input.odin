@@ -102,7 +102,7 @@ first_person_buttons :: proc(controller: ^Tactical_Controller, renderer: ^render
 route_first_person_buttons :: proc(room: ^game.Room, buttons: First_Person_Buttons) {
 	switch room.first_person.weapon {
 	case .AK: game.first_person_set_trigger(room, buttons.left)
-	case .Fists, .Sword, .Bow:
+	case .Fists, .Sword, .Bow, .Club:
 	}
 }
 
@@ -187,6 +187,21 @@ drive_first_person_bow :: proc(controller: ^Tactical_Controller, room: ^game.Roo
 	}
 	// The view over, the arrows out fly on with no buttons.
 	command := Gameplay_Command{kind = .First_Person_Bow, origin_phase = .Combat, bow = bow}
+	_ = commit_gameplay_command(room, renderer, cards, command, playtest)
+}
+
+// BENVENUTI A NAPOLI's club (game/first_person_club.odin): the left button held
+// brings it down on the cell the view looks at, blow after blow while it is
+// held (each as soon as the last is over); committed as a world command each
+// frame, which runs the blow on the world's seconds. The steps stay the
+// lane's, as with the AK. Nothing while the mouse is not the view's or the
+// camera flies behind his back.
+drive_first_person_club :: proc(controller: ^Tactical_Controller, room: ^game.Room, renderer: ^render.Renderer,
+	cards: ^Card_Interaction_State, buttons: First_Person_Buttons, playtest: ^combatdebug.Playtest_Session) {
+	if !game.first_person_club_active(room) { return }
+	swing := buttons.left && controller.look_captured && !render.first_person_diving(renderer)
+	club := game.First_Person_Club_Input{swing = swing, yaw = renderer.tactical.first_person.yaw}
+	command := Gameplay_Command{kind = .First_Person_Club, origin_phase = .Combat, club = club}
 	_ = commit_gameplay_command(room, renderer, cards, command, playtest)
 }
 

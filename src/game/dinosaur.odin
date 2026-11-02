@@ -85,6 +85,8 @@ player_move_seconds :: proc(room: ^Room) -> f32 {
 	if ride_is(room, .Raptor) { return RAPTOR_MOVE_SECONDS }
 	// FIRST PERSON FENCER's quicker steps (first_person_sword.odin).
 	if first_person_sword_active(room) { return SWORD_MOVE_SECONDS }
+	// BENVENUTI A NAPOLI's club (first_person_club.odin).
+	if first_person_club_active(room) { return CLUB_MOVE_SECONDS }
 	return TACTICAL_MOVE_SECONDS
 }
 

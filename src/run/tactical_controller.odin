@@ -254,6 +254,7 @@ step_tactical_controller :: proc(
 	drive_first_person_fists(controller, room, renderer, cards, input, buttons, simulation_dt, playtest)
 	drive_first_person_sword(controller, room, renderer, cards, input, buttons, simulation_dt, playtest)
 	drive_first_person_bow(controller, room, renderer, cards, buttons, playtest)
+	drive_first_person_club(controller, room, renderer, cards, buttons, playtest)
 	drain_first_person_fire(room, renderer, cards, playtest)
 	// Expiration is checked after all paid beats, including the last second.
 	if game.tactical_tick(room, 0, true, controller.hologram) {

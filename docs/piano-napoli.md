@@ -90,7 +90,7 @@ Note sulle decisioni:
 |---|---|---|---|---|
 | 0 | Base: la carta, il D4 e i quattro rami nel laboratorio; misure di partenza | — | Fatta | vedi Esito |
 | 1 | Il nonno ospite: tavolata (effetto 2) e borsellino (effetto 3), regole e prototipo | 0 | Fatta | vedi Esito |
-| 2 | La terza persona e la mazzata (effetto 1), regole e prototipo | 0 | Da fare | — |
+| 2 | La terza persona e la mazzata (effetto 1), regole e prototipo | 0 | Fatta | vedi Esito |
 | 3 | Lo schiacciamento alla Looney Tunes e il succo della mazzata | 2 | Da fare | — |
 | 4 | Diventi il nonno (effetto 4), regole e prototipo | 2 | Da fare | — |
 | 5 | Aspetto 3D: asso di bastoni, Viandante, nonno, tavolata, borsellino | 1, 3, 4 | Da fare | — |
@@ -458,6 +458,80 @@ Passi:
 **Fatto quando:** l'utente prova la faccia 1 nel laboratorio e approva camera e
 comandi; test verdi.
 
+### Esito (3 novembre 2026)
+
+Le scelte dell'utente all'inizio della fase:
+
+| Domanda | Risposta |
+|---|---|
+| Stordire di continuo lo stesso nemico | **Ritorni decrescenti** come in World of Warcraft: 2 battiti, poi 1, poi niente sullo stesso nemico, finché non passano 4 s senza mazzate su di lui; il danno resta pieno |
+| Ritmo della mazzata | **0,6 s:** 0,25 s di carica, impatto, 0,35 s di ritorno |
+| Passo col bastone | **0,5 s** (il normale è 0,8, la spada 0,3; tutti dimezzati dal ritmo del Viandante) |
+| Camera | **Spalla destra, vicina:** perno 0,35 caselle a destra e 1,45 in alto, camera 1,4 caselle dietro, FOV 70 |
+| Mira | **8 direzioni + segno a terra** |
+| Guardare su e giù | **Un po':** fino a 20° in su e 30° in giù |
+| Mazzata a vuoto | **Picchia il pavimento**; rompe barili e blocchi di ghiaccio sulla casella |
+
+Cosa c'è ora:
+- **Regole** ([first_person_club.odin](../src/game/first_person_club.odin)): un'arma nuova della
+  vista, `First_Person_Weapon.Club`, col suo stato nel `#raw_union` (non più grande di quello
+  dell'arco: la stanza non cresce). La faccia 1 apre la vista (`tactical_begin_first_person`) e
+  le dà il danno della carta; i secondi, il divieto delle carte e il salvataggio sono quelli della
+  vista. Ogni fotogramma il comando `First_Person_Club` fa scorrere la mazzata coi secondi del
+  mondo, come l'arco fa con le frecce. La mazzata parte solo col corpo libero e lo tiene
+  occupato 0,6 s; un movimento a metà (una schivata) la annulla, e così la fine dei secondi.
+  Colpisce la casella fra le 8 più vicina alla visuale (`club_way`); una diagonale chiusa da due
+  muri non si colpisce. Senza nemico rompe solo quello che si rompe già con un urto (barile,
+  blocco di ghiaccio), mai i dispositivi del giocatore. Lo stordimento ricorda fino a 4 nemici.
+- **Comandi** ([first_person_input.odin](../src/run/first_person_input.odin),
+  `drive_first_person_club`): il mouse gira la visuale, WASD fa i passi rispetto alla visuale
+  come con l'AK, il clic sinistro tenuto dà una mazzata dopo l'altra.
+- **Camera in terza persona** ([first_person_club.odin](../src/render/first_person_club.odin)):
+  la discesa della prima persona porta la camera al posto dietro la spalla invece che agli occhi.
+  Il braccio a molla lancia cinque raggi dal perno verso la camera (il suo e quattro attorno) e
+  usa lo stesso controllo dei muri delle frecce dell'arco (`first_person_point_blocked`: muri,
+  muretti, coperture, oggetti, rocce dei piani). Contro un muro la camera si avvicina subito e si
+  ferma 0,15 caselle prima; poi torna indietro piano (95% in 0,3 s). Sotto 0,9 caselle il
+  Viandante sbiadisce, fino al 20%. Il perno segue la scivolata del cartoncino, un po'
+  ammorbidito.
+- **Provvisori:** il Viandante è il suo cartoncino; il bastone è un manico rosso con la testa
+  verde, appoggiato sulla spalla, che si alza dietro la testa e cala sulla casella. La casella
+  mirata ha una cornice dorata a terra, rossa mentre la mazzata cala. Nel riquadro «BAN» e i
+  secondi, nella riga dell'HUD «MOUSE: GIRA / CLIC: MAZZATA / WASD: PASSI», al centro solo un
+  puntino.
+
+Corretto durante la fase, dopo le prime catture del laboratorio:
+1. **Il cartoncino copriva la mira.** Da 1,4 caselle il cartoncino del Viandante (largo quasi
+   una casella, alto una e mezza) riempiva metà schermo e nascondeva il nemico davanti. Ora nella
+   vista del bastone si vede **a metà** (50%), così il nemico si vede attraverso; contro un muro
+   sbiadisce ancora di più. I numeri della camera restano quelli scelti; con il modello 3D di
+   spalle della Fase 5 si potrà tornare a un Viandante pieno.
+2. **Lo sguardo parte un po' in giù** (11°): la camera sta sopra la testa del cartoncino e la
+   casella segnata si vede subito.
+3. **Il bastone davanti all'obiettivo.** Con la camera schiacciata contro un muro il manico
+   passava davanti alla camera: lì il bastone non si disegna.
+4. **Test vecchi da aggiornare.** Ora la carta conta come «carta della vista»
+   (`card_is_first_person`), ma il suo D4 si lancia ancora col tempo del Dinosauro: il test dei
+   tempi la tiene fuori dall'eccezione. Il film di «Mostra effetto» chiude la vista del bastone
+   dopo un secondo e mezzo, come fa con spada e arco (il film vero è della Fase 7). Un secondo
+   di clic tenuto dà due mazzate.
+
+Verifiche:
+- `scripts/check.ps1`: **1879 test** verdi, con e senza assert (erano 1869: 7 test nuovi sulle
+  regole del bastone, 3 sulla camera).
+- Atto `napoli` del laboratorio: il bastone si prende, W fa il passo dove guarda la visuale, il
+  segno a terra è sul bruto, tre mazzate da 8 con stordimento 2, 1, 0; contro il muro il braccio
+  è di 0,36 caselle e la camera non entra mai nel muro.
+- Prova completa del laboratorio: **2414 catture, 153 suoni**, verde.
+- Bilanciamento (prova automatica di un minuto, `first_person_balance_test`): il bastone fa
+  **6,4 danni al secondo** e ne prende 0,23; l'AK 4,8, la spada 3,1, i pugni 14,3, l'arco 8,9.
+- Prestazioni: quattro corse del benchmark in ordine incrociato (Fase 1, Fase 2, Fase 2,
+  Fase 1). La macchina è rallentata del 21% fra la prima e l'ultima corsa della stessa Fase 1
+  (1,452 → 1,764 ms); in media la Fase 2 fa 1,545 ms contro 1,608 (−3,9%): **nessuna
+  differenza misurabile**. Fuori dalla vista del bastone la camera e il bastone non fanno niente.
+
+Da provare con l'utente: camera, comandi e il Viandante a metà trasparenza.
+
 ## Fase 3 — Schiacciamento alla Looney Tunes e succo della mazzata
 
 **Obiettivo:** la mazzata si sente e si vede, come nei cartoni animati.
@@ -679,6 +753,11 @@ Un tiro di dado che sceglie l'effetto:
 - [Dice Room (The Binding of Isaac Wiki)](https://bindingofisaacrebirth.wiki.gg/wiki/Dice_Room)
 - [The Wheel of Fortune (Balatro Wiki)](https://balatrowiki.org/w/The_Wheel_of_Fortune)
 - [Crowd control e ritorni decrescenti (Maxroll)](https://maxroll.gg/wow/resources/crowd-control-diminishing-returns): per non stordire per sempre lo stesso nemico
+
+Il bastone (Fase 2):
+- [Crowd control (Warcraft Wiki)](https://warcraft.wiki.gg/wiki/Crowd_Control): i ritorni decrescenti, metà e poi un quarto, poi immune
+- [Diablo III, il controllo dei nemici nella patch 1.0.5 (GameBanshee)](https://www.gamebanshee.com/news/109393-diablo-iii-v105-patch-crowd-control-changes.html): perché in un gioco d'azione veloce i ritorni decrescenti vanno tenuti semplici
+- [Third-person camera with spring arm (Godot)](https://docs.godotengine.org/en/stable/tutorials/3d/spring_arm.html): il braccio a molla che controlla gli urti ogni fotogramma e avvicina la camera al punto toccato
 
 ## Appendice A — Misure della Fase 0, scena per scena
 

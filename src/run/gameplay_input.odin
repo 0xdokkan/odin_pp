@@ -40,6 +40,9 @@ Gameplay_Command_Kind :: enum {
 	// FIRST PERSON ARCHER: the frame's draw and arrows along `bow` (a world
 	// command too; game/first_person_bow.odin).
 	First_Person_Bow,
+	// BENVENUTI A NAPOLI's club: the frame's blow along `club` (a world command
+	// too; game/first_person_club.odin).
+	First_Person_Club,
 }
 
 Gameplay_Command :: struct {
@@ -63,6 +66,8 @@ Gameplay_Command :: struct {
 	sword: game.First_Person_Sword_Input,
 	// What a First_Person_Bow frame asks of the bow.
 	bow: game.First_Person_Bow_Input,
+	// What a First_Person_Club frame asks of the club.
+	club: game.First_Person_Club_Input,
 	seconds: f32,
 	// The way the wheel gave a cannon (CANNONE) before it was played.
 	aim_way: game.Move_Direction,
@@ -121,7 +126,7 @@ gameplay_command_is_valid :: proc(command: Gameplay_Command) -> bool {
 	// The rod fishes a room cleared, and nothing else.
 	case .Fish:
 		return command.origin_phase == .Loot && command.target.kind == .Cell
-	case .First_Person_Fire, .First_Person_Fists, .First_Person_Sword, .First_Person_Bow:
+	case .First_Person_Fire, .First_Person_Fists, .First_Person_Sword, .First_Person_Bow, .First_Person_Club:
 		return command.origin_phase == .Combat
 	}
 	unreachable()
