@@ -529,6 +529,10 @@ card_demo_scene :: proc(id: Card_Id, upgrade_level: i32 = 0) -> (scene: Card_Dem
 	// of its own for each: the raptor's quick steps and its bleeding bumps, the
 	// stegosaurus turning an archer's bolt back, the dilophosaurus's venom, the
 	// giganotosaurus's stomps and the bite that kills.
+	// BENVENUTI A NAPOLI: a different face at each level (Fase 0: the face only
+	// says which it is; its scenes come with the faces, docs/piano-napoli.md).
+	case .Napoli:
+		scene.faces = {upgrade_level%4+1, 0, 0}
 	case .Dino_Ride:
 		face := upgrade_level%4+1
 		scene.faces = {face, 0, 0}
@@ -614,6 +618,7 @@ card_demo_expected_events :: proc(id: Card_Id, upgrade_level: i32 = 0) -> (event
 		case .Place_Cannon: events += {.Object_Spawned, .Cannon_Fired}
 		case .Open_Black_Hole: events += {.Object_Spawned, .Black_Hole_Tick}
 		case .Ride: events += {.Ride_Begun}
+		case .Napoli: events += {.Napoli_Begun}
 		}
 	}
 	// A dice card shows its roll; the Dado del Destino's die rolls at the bump

@@ -81,6 +81,12 @@ docs/piano-prima-persona.md adds one more, in the Neon style of its Fase 3:
     cell 35  First Person Archer (its Fase 6): the Neon compound bow side on,
              two cyan cams, the string drawn to an arrow with a magenta head.
 
+docs/piano-napoli.md adds a tenth row (its Fase 0):
+
+    cell 36  Benvenuti a Napoli (provisional): Vesuvius from the bay, Monte
+             Somma and the Gran Cono with lava in its crater, a pine-shaped
+             plume of smoke above it.
+
 Options:
     --check        exit 1 if the atlas is not what this script would write
     --preview DIR  also write each added cell on a dark ground,
@@ -99,7 +105,7 @@ ATLAS = os.path.join(ROOT, "assets", "gothic", "card-icons-pixel.png")
 
 COLUMNS = 4
 PAINTED_ROWS = 4
-ROWS = 9
+ROWS = 10
 # One pixel unit of the icon, in atlas pixels (the painted icons' own size).
 SCALE = 10
 SIGNATURE = b"\x89PNG\r\n\x1a\n"
@@ -145,6 +151,9 @@ PALETTE = {
     "X": (80, 240, 255, 255),   # energy cyan
     "P": (236, 70, 210, 255),   # energy magenta
     "y": (214, 252, 255, 255),  # a beam's white core
+    "a": (132, 108, 124, 255),  # the volcano's lit slate
+    "d": (92, 72, 92, 255),     # the volcano
+    "f": (58, 44, 62, 255),     # the volcano in shade
 }
 
 # Movimento Ombra, 28x28 units, as the Viandante of the figure atlas: his hood
@@ -839,6 +848,46 @@ ARCHER = (
 assert all(len(row) == 28 for row in ARCHER) and len(ARCHER) == 28
 
 ICONS.update({35: ARCHER})
+
+# docs/piano-napoli.md, Fase 0: Benvenuti a Napoli, its provisional icon (the
+# user's choice): Vesuvius seen from the bay, the low rounded ridge of Monte
+# Somma on the left and the Gran Cono, lit from the upper left with ravines down
+# its flanks and lava glowing in its crater, under a pine-shaped plume of white
+# smoke; the bay below. Painted by tools: the cone's slopes, the Somma's arc and
+# the plume's puffs rasterised, outlined on four sides.
+VESUVIUS = (
+    "............KKK.KKKK........",
+    ".........KKKIIIKIIIIKKK.....",
+    "........KIIIIIIIIIIIIIIK....",
+    ".......KIIIIIIIIIIIIIIIKK...",
+    "......KIIIIIIIIIIIIIIIIIiK..",
+    ".....KIIIIIIIIIIIIIIIIiIiK..",
+    ".....KiiiiiiiIIIIIiiiiKiK...",
+    "......KKKKKKKiiIiiKKKK.K....",
+    ".............KiIiK..........",
+    ".............KMMMK..........",
+    ".............KMMMK..........",
+    "............KaOYOdK.........",
+    "...........KaaaOdddK........",
+    "...........KdaadddfdK.......",
+    "....KKKK..KadaadddfdfK......",
+    "...KaaaaKKadaaaddddffK......",
+    "..KaddddaaadaaaddddfffK.....",
+    ".KadddddddadaaadddddfffK....",
+    "KadddddddddaaaadddddffffK...",
+    "KddddddddddaaaadddddfffffK..",
+    "KddddddddddaaaadddddffffffK.",
+    "KddddddddfaaaaadddddfffffffK",
+    "KKKKKKKKKKKKKKKKKKKKKKKKKKKK",
+    "KcccuucccccccccccccuuucccccK",
+    "KccccccccccuucccccccccccuccK",
+    "KCCCCCCCuCCCCCCCuuCCCCCCCCCK",
+    "KCCCCCCCCCCCCCCCCCCCCCCCCCCK",
+    ".KKKKKKKKKKKKKKKKKKKKKKKKKK.",
+)
+assert all(len(row) == 28 for row in VESUVIUS) and len(VESUVIUS) == 28
+
+ICONS.update({36: VESUVIUS})
 
 
 def chunk(kind, body):

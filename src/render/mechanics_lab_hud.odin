@@ -17,8 +17,22 @@ mechanics_lab_banner_detail :: proc(renderer: ^Renderer, room: ^game.Room) -> cs
 		return fmt.ctprintf("ARENA LIBERA  /  PESCA %d/%d  /  F7 DA CAPO  /  F5 RICOMINCIA%s", game.fishing_casts_left(room),
 			game.fishing_casts_allowed(room), menu)
 	}
-	return fmt.ctprintf("NEMICI %d/%d  /  F5 RICOMINCIA  /  F6 INTENTI: %s  /  F7 PESCA  /  F3 ARENA%s", len(room.enemies), game.SANDBOX_MAX_ENEMIES,
-		intent_display_name(renderer.tactical.intent_display), menu)
+	// Benvenuti a Napoli in hand: F12 fixes the face of its d4 (docs/piano-napoli.md, Fase 0).
+	napoli: cstring = ""
+	if mechanics_lab_holds_napoli(room) {
+		face := renderer.tactical.mechanics_lab_napoli_face
+		napoli = "  /  F12 D4: A CASO" if face < 1 || face > 4 else
+			fmt.ctprintf("  /  F12 D4: %d %s", face, game.napoli_face_name(game.napoli_for_face(face)))
+	}
+	return fmt.ctprintf("NEMICI %d/%d  /  F5 RICOMINCIA  /  F6 INTENTI: %s  /  F7 PESCA  /  F3 ARENA%s%s", len(room.enemies), game.SANDBOX_MAX_ENEMIES,
+		intent_display_name(renderer.tactical.intent_display), napoli, menu)
+}
+
+@(private = "file")
+mechanics_lab_holds_napoli :: proc(room: ^game.Room) -> bool {
+	if room == nil || room.player == nil { return false }
+	for card in room.player.deck.hand[:room.player.deck.hand_count] { if card.definition_id == .Napoli { return true } }
+	return false
 }
 
 // The banner's frame, around the words it writes now: the board's labels keep

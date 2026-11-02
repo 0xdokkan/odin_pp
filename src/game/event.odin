@@ -156,6 +156,9 @@ Game_Event_Kind :: enum {
 	// its bomb from from_position at to_position, where it lands (its
 	// Object_Spawned and Explosive_Armed) ENEMY_BOMB_FLIGHT world seconds later.
 	Bomb_Thrown,
+	// BENVENUTI A NAPOLI (napoli.odin): the d4 picked face `duration` (1-4), its
+	// number `amount` (the club's seconds, the cure, the gold, the grandpa's health).
+	Napoli_Begun,
 }
 
 Game_Event :: struct {

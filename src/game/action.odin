@@ -123,6 +123,9 @@ Effect_Kind :: enum {
 	Open_Black_Hole,
 	// DINOSAURO: a ride of `amount` seconds on the dinosaur `charges`-1 (dinosaur.odin).
 	Ride,
+	// BENVENUTI A NAPOLI: the d4's face `charges` (1-4), its number `amount`, the card's
+	// upgrade level `duration` (napoli.odin).
+	Napoli,
 }
 
 Effect :: struct {
@@ -534,6 +537,9 @@ effect_is_valid :: proc(room: ^Room, effect: Effect) -> bool {
 		       emplacement_can_place(room, .Devouring_Hole, effect.destination)
 	case .Ride:
 		return effect.target == PLAYER_ENTITY && effect.amount > 0 && effect.charges >= 1 && effect.charges <= 4 && ride_can_begin(room)
+	case .Napoli:
+		return effect.target == PLAYER_ENTITY && effect.amount > 0 && effect.charges >= 1 && effect.charges <= 4 && effect.duration >= 0 &&
+		       napoli_can_begin(room)
 	}
 	return false
 }
@@ -896,6 +902,9 @@ apply_effect :: proc(room: ^Room, source: Entity_Ref, effect: Effect, report: ^A
 	case .Ride:
 		mounted := begin_ride(room, Dino_Kind(effect.charges-1), effect.amount, report)
 		assert(mounted)
+	case .Napoli:
+		begun := begin_napoli(room, effect, report)
+		assert(begun)
 	case .First_Person:
 		weapon, _ := first_person_effect_weapon(effect.charges)
 		began := tactical_begin_first_person(room, f32(effect.amount), weapon)

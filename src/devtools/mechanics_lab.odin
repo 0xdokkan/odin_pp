@@ -109,6 +109,9 @@ run_mechanics_lab_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer,
 	} else if only == "prima_persona" {
 		// The first person arena's act alone (docs/piano-prima-persona.md, Fase 1).
 		return mechanics_lab_prima_persona(window, renderer, &room, &data, &controller, &cards, &buffer)
+	} else if only == "napoli" {
+		// Benvenuti a Napoli alone (docs/piano-napoli.md, Fase 0).
+		return mechanics_lab_napoli(window, renderer, dice, &room, &data, &controller, &cards, &buffer)
 	}
 	artifacts.screenshot("odin_pp_mechanics_lab.png")
 	if !mechanics_lab_card_words(renderer, &player) { return false }
@@ -277,6 +280,8 @@ run_mechanics_lab_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer,
 	if !mechanics_lab_arrows(window, renderer, &room, &controller, &cards, &buffer) { return false }
 	// Then the bombers' bombs in flight (docs/piano-succo.md, Fase 5).
 	if !mechanics_lab_bombs(window, renderer, &room, &controller, &cards, &buffer) { return false }
+	// Then Benvenuti a Napoli (docs/piano-napoli.md, Fase 0).
+	if !mechanics_lab_napoli(window, renderer, dice, &room, &data, &controller, &cards, &buffer) { return false }
 	return mechanics_lab_sounds_heard(renderer)
 }
 

@@ -559,6 +559,7 @@ tactical_card_inspector_rules :: proc(card: game.Card_Instance, definition: game
 	if card.definition_id == .Laser_Cannon { reaction, rule = "COLPISCE TUTTA LA LINEA", "NON SI OFFRE: EVOLUZIONE" }
 	if card.definition_id == .Devouring_Hole { reaction, rule = "TIRA IL 5X5, COLPISCE IL 3X3", "BOSS E MINIBOSS: SOLO DANNO" }
 	if card.definition_id == .Dino_Ride { reaction, rule = "1 RAPTOR 2 STEGO 3 DILO 4 GIGA", "UN DINO ALLA VOLTA" }
+	if card.definition_id == .Napoli { reaction, rule = "1 BASTONE 2 TAVOLA 3 ORO 4 NONNO", "NON IN GROPPA AL DINO" }
 	if card.definition_id == .Guard || card.definition_id == .Purifying_Guard { reaction = "QTE: BLOCK / PARRY" }
 	if card.definition_id == .Thorn_Coat { reaction = "QTE: DEVIAZIONE (FRECCE)" }
 	if card.definition_id == .Afterimage { reaction = "IGNORA RECUPERO SCHIVA" }

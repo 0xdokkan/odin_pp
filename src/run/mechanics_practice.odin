@@ -11,7 +11,7 @@ import render "../render"
 // arena with no cover, a deck made only of the cards under test (one of each:
 // Bomb Marley, Inondazione, Cannone, Incendio, Buco Nero, Dinosauro, Dado del
 // Destino, the Lazzo and the Canna da Pesca, the Pinball and the First Person
-// Shooter; the Cannone laser is what the Cannone becomes at its second upgrade;
+// Shooter; Benvenuti a Napoli waits in the first person arena's; the Cannone laser is what the Cannone becomes at its second upgrade;
 // Pozza di Veleno, Deflect and Feretro left it for the three new cards)
 // and enemies that never stop coming (game/sandbox.odin). F7 clears the arena
 // at once for the rod (mechanics_lab_begin_fishing); F5 brings the fight
@@ -38,8 +38,10 @@ MECHANICS_LAB_DECK_SEED :: u64(0x7E57_1AB)
 Mechanics_Lab_Arena :: enum { Flat, First_Person, Heights, Structures, Mountain, Cave, Layers, Lifts }
 
 // The first person arena's deck: First Person Shooter, the cards of the other weapons as they come (First Person
-// Brawler, Fase 2; the sword's and the bow's, Fasi 4 e 6), and the Canna da Pesca for a cleared arena, as in the others.
-MECHANICS_LAB_FIRST_PERSON_DECK :: [5]game.Card_Id{.First_Person, .First_Person_Brawler, .First_Person_Fencer, .First_Person_Archer, .Fishing_Rod}
+// Brawler, Fase 2; the sword's and the bow's, Fasi 4 e 6), Benvenuti a Napoli (docs/piano-napoli.md: its club and its
+// grandpa are views of their own, tried among these walls), and the Canna da Pesca for a cleared arena, as in the others.
+MECHANICS_LAB_FIRST_PERSON_DECK :: [6]game.Card_Id{.First_Person, .First_Person_Brawler, .First_Person_Fencer, .First_Person_Archer, .Napoli,
+	.Fishing_Rod}
 
 // The first person arena, on the 23x17 board with the player at (11,8):
 // - a wall along y = 1 with two niches in it, at (4,1) and (18,1);
@@ -364,4 +366,31 @@ MECHANICS_LAB_JUICE_HOLD :: f32(0.09)
 mechanics_lab_try_juice :: proc(renderer: ^render.Renderer) {
 	render.juice_shake(renderer, MECHANICS_LAB_JUICE_TRAUMA)
 	_ = render.juice_hit_stop(renderer, MECHANICS_LAB_JUICE_HOLD)
+}
+
+// The lab's F12 (docs/piano-napoli.md, Fase 0, the user's choice): the face
+// Benvenuti a Napoli's d4 will show, fixed in turn: 0 (at random), 1, 2, 3, 4,
+// then at random again. (F11 is the window's full screen.)
+mechanics_lab_next_napoli_face :: proc(face: i32) -> i32 {
+	return (clamp(face, 0, 4)+1)%5
+}
+
+// With a face fixed and the card in hand, the player's dice are set so that
+// their next d4 shows it: the die still rolls on screen and lands there. While
+// a face is fixed every other card's dice roll from that same state too.
+mechanics_lab_fix_napoli_face :: proc(room: ^game.Room, face: i32) {
+	if room == nil || room.player == nil || face < 1 || face > game.NAPOLI_DIE_SIDES { return }
+	held := false
+	for card in room.player.deck.hand[:room.player.deck.hand_count] { held = held || card.definition_id == .Napoli }
+	if !held { return }
+	staged := room.player.dice
+	if roll, rolled := game.roll_dice_pool(&staged, 1, game.NAPOLI_DIE_SIDES); rolled && roll.total == face { return }
+	for seed in u64(1)..<u64(400_000) {
+		dice := game.make_dice_state(seed)
+		staged = dice
+		if roll, rolled := game.roll_dice_pool(&staged, 1, game.NAPOLI_DIE_SIDES); rolled && roll.total == face {
+			room.player.dice = dice
+			return
+		}
+	}
 }

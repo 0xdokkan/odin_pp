@@ -146,6 +146,11 @@ CARD_VISUALS := [game.Card_Id]Card_Visual{
 		fill = {24, 20, 40, 245}, outline = {160, 120, 240, 255}},
 	.Dino_Ride = {icon = 32, short_name = "DINO", accent = .Green, sound = .Card_Dinosaur, narrow_name = "Dino",
 		fill = {34, 56, 36, 245}, outline = {124, 206, 96, 255}},
+	// BENVENUTI A NAPOLI (docs/piano-napoli.md): icon, initials and sound provisional, the user's choice
+	// for its Fase 0 (the Vesuvius with its plume, BAN); its sound the d4 rattled and a mandolin's
+	// Neapolitan cadence (tools/audio/sfx_napoli.py) until its Fase 6.
+	.Napoli = {icon = 36, short_name = "BAN", accent = .Gold, sound = .Card_Napoli, narrow_name = "Napoli",
+		fill = {58, 40, 52, 245}, outline = {240, 150, 80, 255}},
 	.Count = {icon = 0, short_name = "", accent = .Red,
 		fill = {45, 49, 52, 245}, outline = {105, 116, 116, 255}},
 }

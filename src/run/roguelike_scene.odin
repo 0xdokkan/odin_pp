@@ -25,6 +25,8 @@ Roguelike_Session :: struct {
 	options:                 Options,
 	// Which arena the Prova meccaniche is in (F3 switches it, mechanics_practice.odin).
 	lab_arena:               Mechanics_Lab_Arena,
+	// The face Benvenuti a Napoli's d4 shows in the lab, 0 at random (F12, mechanics_practice.odin).
+	lab_napoli_face:         i32,
 	actions:                 input.Action_Map(Run_Action),
 	diagnostics:             Run_Diagnostics,
 	frame_input:             Run_Input,
@@ -278,6 +280,14 @@ update_run_board_view :: proc(rs: ^Roguelike_Session, hf: ^host.Frame, screen: R
 	})
 	render.tactical_hud_pointer(&rs.iso_renderer, rs.mouse_canvas, hud_inside)
 	render.update_tactical_atmosphere(&rs.iso_renderer, rs.frame_time if rs.diagnostics.scripted || (!rs.tactical_controller.paused && rs.frame_input.focused) else 0)
+	// F12 in PROVA MECCANICHE: the face Benvenuti a Napoli's d4 will show, fixed before the card can be played.
+	if rs.options.mechanics_lab {
+		if hf.focused && !rs.activity_modal && run_pressed(rs.frame_input, .Napoli_Face) {
+			rs.lab_napoli_face = mechanics_lab_next_napoli_face(rs.lab_napoli_face)
+		}
+		mechanics_lab_fix_napoli_face(&rs.room, rs.lab_napoli_face)
+		rs.iso_renderer.tactical.mechanics_lab_napoli_face = rs.lab_napoli_face
+	}
 	if !rs.diagnostics.scripted && !rs.activity_modal { tactical_input_blocked = update_tactical_controller(&rs.tactical_controller, &rs.room, &rs.iso_renderer,
 		&rs.card_interaction, &rs.gameplay_buffer, rs.frame_time,
 		screen == .Board && !rs.diagnostics.scripted,

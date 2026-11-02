@@ -87,6 +87,8 @@ Card_Id :: enum {
 	First_Person_Fencer,
 	// FIRST PERSON ARCHER: the bow behind his eyes (first_person_bow.odin), lab only.
 	First_Person_Archer,
+	// BENVENUTI A NAPOLI: a d4 picks the club, the table, the purse or the grandpa (napoli.odin), lab only.
+	Napoli,
 	Count,
 }
 
@@ -1295,6 +1297,17 @@ CARD_DEFINITIONS := [Card_Id]Card_Definition{
 		effects = {{kind = .Ride, target = .Player, base_amount = RIDE_SECONDS, amount_per_upgrade = RIDE_SECONDS_PER_UPGRADE}, {}, {}, {}},
 		effect_count = 1,
 	},
+	.Napoli = {
+		upgrade_limit = MAX_DICE_UPGRADE_LEVEL, time_cost = 2, dice_count = 1, traits = {.Lab_Only},
+		// BENVENUTI A NAPOLI (docs/piano-napoli.md): a d4 picks the club behind his back for 30 world seconds (+2
+		// an upgrade), the grandpa's table, his purse, or the player as the grandpa for a minute (napoli.odin). The
+		// template's amount is the club's seconds; the face rolled rewrites it.
+		id = .Napoli, name = "Benvenuti a Napoli", rarity = .Rare,
+		reward_weight = 60, shop_base_price = 8, cost = 3,
+		targeting = {rule = .Self},
+		effects = {{kind = .Napoli, target = .Player, base_amount = NAPOLI_CLUB_SECONDS, amount_per_upgrade = NAPOLI_CLUB_SECONDS_PER_UPGRADE}, {}, {}, {}},
+		effect_count = 1,
+	},
 	.Count = {id = .Count},
 }
 
@@ -1447,7 +1460,7 @@ card_effect_template_is_valid :: proc(
 	case .Place_Cannon, .Open_Black_Hole:
 		return template.target == .Player && definition.targeting.rule == .Walkable_Cell && definition.targeting.shape == .Single &&
 		       template.duration > 0 && card_amount_template_is_valid(template)
-	case .Ride:
+	case .Ride, .Napoli:
 		return template.target == .Player && definition.targeting.rule == .Self && definition.dice_count > 0 && card_amount_template_is_valid(template)
 	// A cell aimed at: the wave's way.
 	case .Flood_Wave:
@@ -1651,6 +1664,9 @@ instantiate_card_effect :: proc(
 		return open_black_hole_effect(card_effect_amount(template, instance.upgrade_level), template.duration, black_hole_radius(instance.upgrade_level)), true
 	case .Ride:
 		return ride_effect(card_effect_amount(template, instance.upgrade_level), .Raptor), true
+	// The club's until the d4 says (resolve_napoli_card).
+	case .Napoli:
+		return napoli_effect(.Club, card_effect_amount(template, instance.upgrade_level), instance.upgrade_level), true
 	}
 	return {}, false
 }

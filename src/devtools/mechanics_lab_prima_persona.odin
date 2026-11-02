@@ -72,7 +72,8 @@ mechanics_lab_prima_persona :: proc(window: ^app.Window, renderer: ^render.Rende
 		if held.definition_id == .First_Person_Fencer { fencer = held.id }
 		if held.definition_id == .First_Person_Archer { archer = held.id }
 	}
-	if len(room.obstacles) != len(run_session.MECHANICS_LAB_FIRST_PERSON_COVERS) || player.deck.hand_count != 4 || card == 0 || brawler == 0 ||
+	// Benvenuti a Napoli is in its hand too (docs/piano-napoli.md, its own act: mechanics_lab_napoli).
+	if len(room.obstacles) != len(run_session.MECHANICS_LAB_FIRST_PERSON_COVERS) || player.deck.hand_count != 5 || card == 0 || brawler == 0 ||
 	   fencer == 0 || archer == 0 {
 		fmt.eprintln("mechanics lab: the first person arena is not the one drawn, or its deck is not its own"); return false
 	}

@@ -467,6 +467,8 @@ tactical_feedback_badges :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) ->
 	case .Move_Blocked: label = "BLOCCATO"; color = {218, 187, 123, 255}
 	case .Explosive_Disarmed: label = "DISINNESCATA"
 	case .Gold_Gained: label = fmt.ctprintf("+%d ORO", event.amount); color = {218, 187, 123, 255}
+	// BENVENUTI A NAPOLI: the face the d4 picked, over the player.
+	case .Napoli_Begun: label, color = napoli_begun_label(event), NAPOLI_LABEL_COLOR
 	case .Energy_Gained: label = fmt.ctprintf("+%d ENERGIA", event.amount)
 	case:
 	}
@@ -481,6 +483,22 @@ tactical_feedback_badges :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) ->
 		count += 1
 	}
 	return
+}
+
+// BENVENUTI A NAPOLI (game/napoli.odin): the face the d4 picked and its number,
+// "2 TAVOLATA +11 VITA" (docs/piano-napoli.md, Fase 0).
+NAPOLI_LABEL_COLOR :: rl.Color{240, 150, 80, 255}
+
+napoli_begun_label :: proc(event: game.Game_Event) -> cstring {
+	face := game.napoli_for_face(event.duration)
+	name := game.napoli_face_name(face)
+	switch face {
+	case .Club: return fmt.ctprintf("%d %s %ds", event.duration, name, event.amount)
+	case .Table: return fmt.ctprintf("%d %s +%d VITA", event.duration, name, event.amount)
+	case .Purse: return fmt.ctprintf("%d %s +%d ORO", event.duration, name, event.amount)
+	case .Nonno: return fmt.ctprintf("%d %s %d VITA", event.duration, name, event.amount)
+	}
+	return nil
 }
 
 // Whether the Dado del Destino's die made this blow critical: a Fate_Rolled of

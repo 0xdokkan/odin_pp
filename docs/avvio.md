@@ -101,6 +101,10 @@ First Person Fencer (lo zweihänder, un tondo sul bruto, il bruto che si illumin
 parata perfetta), poi First Person Archer (l'arco compound teso con l'anello della carica, un tiro dritto sul bruto, un
 tiro di sponda trovato con la guida, una zona critica sul muro, una freccia tirata mentre la vista finisce che vola
 ancora vista dall'alto).
+Con `ODIN_PP_LAB_ONLY=napoli` gira solo l'atto di Benvenuti a Napoli ([piano](piano-napoli.md)): nell'arena «Prima persona»
+la carta si gioca quattro volte, con il D4 fissato su ognuna delle facce come lo fissa `F12`; il dado gira sopra la
+finestra, il suo pannello e la scritta sul Viandante dicono il ramo uscito (`odin_pp_napoli_dice_<faccia>.png`). Nello
+smoke completo gira per ultimo.
 Con `ODIN_PP_LAB_ONLY=fps` e `ODIN_PP_LAB_TIMING=1` l'atto di First Person Shooter si ferma dopo la discesa negli occhi e misura
 600 fotogrammi con l'AK che spara, senza limite di fotogrammi né vsync (riga `FIRST PERSON TIMING`; meglio con una build `-o:speed`).
 Con `ODIN_PP_LAB_ONLY=prima_persona` la stessa misura la fa `ODIN_PP_LAB_TIMING=1` con i pugni (un pugno ogni quarto di
@@ -159,6 +163,14 @@ telecamera del tabellone trema e le immagini si fermano per 0,09 s, senza che il
 mondo guadagni tempo ([juice.odin](../src/render/juice.odin),
 [piano](piano-succo.md), Fase 1). Il cursore delle impostazioni «Scuotimento e
 pausa sui colpi» li regola tutti e due (0: niente).
+
+**Faccia del D4 di Benvenuti a Napoli (`F12`).** Con la carta in mano (arena «Prima
+persona», `F3`), `F12` fissa la faccia che il suo D4 mostrerà: A CASO, poi 1
+BASTONE, 2 TAVOLATA, 3 BORSELLINO, 4 NONNO, poi di nuovo A CASO; il cartello lo
+scrive (`F12 D4: 2 TAVOLATA`). Il dado gira comunque e atterra lì. Mentre una
+faccia è fissata, anche i dadi delle altre carte partono dallo stesso stato
+([mechanics_practice.odin](../src/run/mechanics_practice.odin), [piano](piano-napoli.md),
+Fase 0). `F11` resta lo schermo intero.
 
 Le novità nate qui ora valgono in tutto il gioco: le azioni che durano il loro
 costo e la finestra che si accorcia ([Modalità tattica M7](regole/combattimento.md#modalità-tattica-m7)),

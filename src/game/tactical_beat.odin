@@ -146,6 +146,14 @@ tactical_critical_scale :: proc(room: ^Room, action: ^Action) {
 			effect.amount = critical_damage(effect.amount)
 		case .Ride:
 			effect.amount += RIDE_CRITICAL_SECONDS
+		// BENVENUTI A NAPOLI, the user's choice: the club 3 seconds longer, the
+		// table and the purse half as much again, the grandpa 10 health more.
+		case .Napoli:
+			switch napoli_for_face(effect.charges) {
+			case .Club: effect.amount += NAPOLI_CLUB_CRITICAL_SECONDS
+			case .Table, .Purse: effect.amount = critical_boost(effect.amount)
+			case .Nonno: effect.amount += NAPOLI_NONNO_CRITICAL_HEALTH
+			}
 		case .Marley:
 			effect.duration += MARLEY_CRITICAL_SECONDS
 		case .Deploy_Device:

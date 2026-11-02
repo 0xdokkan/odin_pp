@@ -13,6 +13,8 @@ Dice_Outcome :: struct {
 	charges, targets, device_damage: i32,
 	shield, poison, healed: i32,
 	pushed: bool,
+	// BENVENUTI A NAPOLI: the face the d4 picked (1-4, 0 for none) and its number.
+	napoli_face, napoli_amount: i32,
 }
 
 dice_presentation_outcome :: proc(timeline: ^Presentation_Timeline) -> (result: Dice_Outcome) {
@@ -20,7 +22,7 @@ dice_presentation_outcome :: proc(timeline: ^Presentation_Timeline) -> (result: 
 	if !found || roll.kind != .Dice_Rolled { return }
 	card := roll.event.card_definition
 	#partial switch card {
-	case .Fate_Strike, .Sundering_Blow, .Prismatic_Barrage, .Twin_Venom, .Venom_Blade, .Shock_Floor, .Fishing_Rod:
+	case .Fate_Strike, .Sundering_Blow, .Prismatic_Barrage, .Twin_Venom, .Venom_Blade, .Shock_Floor, .Fishing_Rod, .Napoli:
 		result.valid = true
 	case: return
 	}
@@ -48,6 +50,8 @@ dice_presentation_outcome :: proc(timeline: ^Presentation_Timeline) -> (result: 
 			} else if card == .Twin_Venom && event.target == roll.event.target && event.status == .Poison {
 				result.poison = event.amount
 			}
+		case .Napoli_Begun:
+			if card == .Napoli { result.napoli_face, result.napoli_amount = event.duration, event.amount }
 		case .Object_Spawned:
 			if card == .Shock_Floor && event.object_kind == .Shock_Floor {
 				result.charges, result.targets, result.device_damage = event.duration, event.duration, event.amount
@@ -73,6 +77,17 @@ dice_outcome_text :: proc(card: game.Card_Id, outcome: Dice_Outcome) -> (primary
 		if outcome.pushed { detail = "RESPINTA +1" }
 	case .Fate_Strike:
 		if outcome.bounce_damage > 0 { detail = fmt.ctprintf("RIMBALZO %d DANNI", outcome.bounce_damage) }
+	// BENVENUTI A NAPOLI: the face's name, then its number.
+	case .Napoli:
+		if outcome.napoli_face < 1 { return "NAPOLI", "NESSUN EFFETTO" }
+		face := game.napoli_for_face(outcome.napoli_face)
+		primary = fmt.ctprintf("%d %s", outcome.napoli_face, game.napoli_face_name(face))
+		switch face {
+		case .Club: detail = fmt.ctprintf("%d SECONDI DI MAZZATE", outcome.napoli_amount)
+		case .Table: detail = fmt.ctprintf("CURA %d VITA", outcome.napoli_amount)
+		case .Purse: detail = fmt.ctprintf("+%d ORO", outcome.napoli_amount)
+		case .Nonno: detail = fmt.ctprintf("UN MINUTO, %d VITA", outcome.napoli_amount)
+		}
 	}
 	return
 }

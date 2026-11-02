@@ -6,6 +6,26 @@ Qui si segna ogni carta tolta dal gioco o cambiata, con quello che faceva, così
 futuro. Le voci più recenti stanno in cima. Per ritrovare il commit di una voce:
 `git log --all --grep "<titolo del commit>"`.
 
+## 2026-11-02 — Carta nuova: Benvenuti a Napoli (solo laboratorio)
+
+Commit **«Piano di Napoli, Fase 0 fatta: la carta, il D4 e i quattro rami»** sul ramo `piano-napoli`
+([piano](piano-napoli.md), Fase 0).
+
+| Carta | Nel codice | Rarità | Energia | Effetto | Peso nelle offerte | Dove sta |
+|---|---|---|---:|---|---:|---|
+| Benvenuti a Napoli | `Napoli` | rara | 3 | su di sé, lo stesso tempo di lancio del Dinosauro (`time_cost` 2; sulla carta -0,4 s): un D4 (sempre un D4, a ogni livello) sceglie 1 **bastone** in terza persona per 30 s (+2 a potenziamento), 2 **tavolata** del nonno che cura metà della vita massima (+2), 3 **borsellino** di 15 oro (+2), 4 il Viandante diventa il **nonno** per un minuto con 30 di vita sua (+5). La giocata critica dà +3 s al bastone, ×1,5 a tavolata e borsellino, +10 di vita al nonno. Non si gioca in groppa al Dinosauro né dentro una vista | 60 (ma `Lab_Only`: mai offerta) | solo nell'arena «Prima persona» del laboratorio, nel suo mazzo |
+
+- **Fase 0:** la carta tira il dado e dice il ramo uscito (scritta sul Viandante e pannello del dado: «2 TAVOLATA», «CURA
+  11 VITA»); i quattro rami non fanno ancora nulla: arrivano con le Fasi 1-4 del piano.
+- Prezzo nel negozio 8, prezzo in spedizione 60 (come le carte in prima persona); fino a 4 potenziamenti come le carte
+  coi dadi.
+- Icona (cella 36, in una decima riga nuova dell'atlante) e sigla `BAN` **provvisorie**, la scelta dell'utente: il
+  Vesuvio visto dal golfo, il Monte Somma e il Gran Cono con la lava nel cratere, sotto un pennacchio di fumo a forma
+  di pino. Suono provvisorio fatto da codice (`card_napoli`, tools/audio/sfx_napoli.py): la carta che scatta, il D4
+  agitato in mano, poi un mandolino in tremolo sulla cadenza napoletana (Si bemolle maggiore, Mi maggiore, La minore);
+  i suoni veri e la tarantella sono della Fase 6.
+- Nel laboratorio `F12` fissa la faccia del D4 (A CASO, 1, 2, 3, 4); `F11` resta lo schermo intero.
+
 ## 2026-10-30 — Tutte le carte: il lancio dura la metà
 
 Commit **«Il Viandante va al doppio: passi, colpi e carte più rapidi»** sul ramo `gioco-piu-veloce`

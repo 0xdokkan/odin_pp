@@ -125,6 +125,8 @@ test_dice_cards_climb_the_ladder_from_d4_to_d20 :: proc(t: ^testing.T) {
 			if dice && level >= 0 && level <= MAX_DICE_UPGRADE_LEVEL { expected = ladder[level] }
 			// The Dinosauro rolls a d4 at every level.
 			if id == .Dino_Ride && level >= 0 && level <= MAX_DICE_UPGRADE_LEVEL { expected = 4 }
+			// So does Benvenuti a Napoli.
+			if id == .Napoli && level >= 0 && level <= MAX_DICE_UPGRADE_LEVEL { expected = 4 }
 			testing.expect_value(t, card_die_sides(id, level), expected)
 		}
 	}

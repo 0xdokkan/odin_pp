@@ -88,7 +88,7 @@ Note sulle decisioni:
 
 | Fase | Contenuto | Dipende da | Stato | Commit |
 |---|---|---|---|---|
-| 0 | Base: la carta, il D4 e i quattro rami nel laboratorio; misure di partenza | — | Da fare | — |
+| 0 | Base: la carta, il D4 e i quattro rami nel laboratorio; misure di partenza | — | Fatta | vedi Esito |
 | 1 | Il nonno ospite: tavolata (effetto 2) e borsellino (effetto 3), regole e prototipo | 0 | Da fare | — |
 | 2 | La terza persona e la mazzata (effetto 1), regole e prototipo | 0 | Da fare | — |
 | 3 | Lo schiacciamento alla Looney Tunes e il succo della mazzata | 2 | Da fare | — |
@@ -220,6 +220,83 @@ Passi:
 **Fatto quando:** nel laboratorio la carta si gioca, il D4 gira e la scritta
 dice il ramo giusto per ognuna delle quattro facce; misure scritte nell'Esito;
 `scripts/check.ps1` verde; prova completa del laboratorio verde.
+
+### Esito (2 novembre 2026)
+
+Scelte dell'utente all'inizio della fase: la **giocata critica dà un po' di
+tutto** (bastone +3 s, tavolata e borsellino ×1,5, nonno +10 di vita; il minuto
+resta un minuto); la carta si prova nell'**arena «Prima persona»**; un **tasto
+del laboratorio fissa la faccia** del D4; sigla **`BAN`** e icona provvisoria
+**il Vesuvio col pennacchio**.
+
+1. **Misure di partenza** (sul commit di partenza `99e8799`, in una copia pulita
+   del ramo):
+   - `scripts/check.ps1` verde: **1857 test**, con e senza assert, in 9,5 minuti;
+   - prova completa del laboratorio verde nella finestra vera: **2175 catture**
+   in 15,6 minuti (i suoni sono i 152 della fine del piano del succo, che ha
+   lo stesso codice);
+   - peso della stanza: **9208 byte su 9216**; la carta non aggiunge niente alla
+     stanza (la faccia, il numero e il livello viaggiano nell'effetto);
+   - benchmark delle spedizioni: le corse C e D dell'appendice B di
+     [piano-succo.md](piano-succo.md) sono state fatte sullo stesso commit di
+     partenza e restano il riferimento; la corsa nuova (E) è nell'appendice A
+     qui sotto.
+2. **La carta** ([napoli.odin](../src/game/napoli.odin)): `Card_Id.Napoli`,
+   «Benvenuti a Napoli», rara, 3 energia, prezzo 8, peso 60, `Lab_Only`, un
+   dado (`dice_count = 1`), lo stesso tempo di lancio del Dinosauro, fino a 4
+   potenziamenti come le carte coi dadi. Prezzo in spedizione 60. Un effetto
+   nuovo, `.Napoli`, che tiene la faccia (1-4), il suo numero e il livello
+   della carta. Non si gioca dentro una vista né in groppa al Dinosauro
+   (`napoli_can_begin`).
+3. **Il D4 e i rami:** `card_die_sides` tiene il D4 a ogni livello;
+   `resolve_napoli_card` tira il dado come il Dinosauro, sceglie la faccia
+   (`napoli_for_face`) e calcola il suo numero (`napoli_face_amount`) con i
+   numeri dell'utente: bastone 30 s (+2), tavolata metà della vita massima
+   (+2), borsellino 15 oro (+2), nonno 30 di vita (+5); la mazzata
+   (`napoli_club_damage`) 8 (+1). L'evento nuovo `Napoli_Begun` dice faccia e
+   numero; **i rami non fanno ancora nulla** (arrivano con le Fasi 1-4). Il
+   pannello del dado dice il ramo («2 TAVOLATA», «CURA 11 VITA») e così la
+   scritta sopra il Viandante («3 BORSELLINO +15 ORO»).
+4. **Aspetto e suono provvisori:** icona del Vesuvio in una **decima riga**
+   dell'atlante (cella 36; le icone di prima non si muovono di un pixel,
+   `tools/art/build_card_icons.py`); suono della carta fatto da codice
+   (`card_napoli`, [sfx_napoli.py](../tools/audio/sfx_napoli.py)): la carta che
+   scatta, il D4 agitato in mano, poi un mandolino in tremolo sulla cadenza
+   napoletana (Si bemolle maggiore, Mi maggiore, La minore: ♭II6 – V – i, la
+   cadenza che porta il nome della città). Serviva un suono
+   suo perché un test vuole un suono diverso per ogni carta. Rigenerati tutti
+   i suoni: gli altri 233 sono identici byte per byte.
+5. **Laboratorio:** la carta è nel mazzo dell'arena «Prima persona» (ora
+   cinque carte in mano più la canna da pesca). **`F12`** fissa la faccia del
+   D4 (A CASO, 1, 2, 3, 4) e il cartello lo scrive (`F12 D4: 2 TAVOLATA`); il
+   tasto proposto era `F11`, ma `F11` è già lo schermo intero. Atto nuovo
+   `mechanics_lab_napoli` (`ODIN_PP_LAB_ONLY=napoli`, per ultimo nella prova
+   completa): la carta in mano, il giro di `F12`, poi la carta giocata quattro
+   volte con la faccia fissata; per ognuna il dado gira, il pannello e la
+   scritta dicono il ramo e il numero giusti. Catture
+   `odin_pp_mechanics_lab_card_Napoli.png`, `odin_pp_napoli_dice_<faccia>.png`,
+   `odin_pp_napoli_said_<faccia>.png` e `odin_pp_living_napoli_<faccia>_NN.png`.
+6. **Test nuovi** ([napoli_test.odin](../src/game/napoli_test.odin)): carta
+   rara del laboratorio con il D4 fisso; i numeri dell'utente a ogni livello;
+   ogni faccia apre il suo ramo, col dado prima; la giocata critica; non si
+   gioca in una vista né in groppa al Dinosauro (energia e dado restano).
+   Aggiornati i test che contano le carte coi dadi, le carte del laboratorio
+   (da 9 a 10), le icone dell'atlante e il mazzo dell'arena «Prima persona».
+7. **Registro:** voce nuova in [registro-carte.md](registro-carte.md);
+   [avvio.md](avvio.md) spiega `F12` e l'atto `napoli`.
+8. **Verifiche:** `scripts/check.ps1` verde (**1862 test** con e senza assert);
+   prova completa del laboratorio verde nella finestra vera (**2244 catture,
+   153 suoni**, in 15,3 minuti; il suono della carta fra questi).
+   **Benchmark delle spedizioni** sul codice nuovo, due corse (E e F,
+   appendice A): in media un'immagine si disegna in **1,455 ms** e **1,483 ms**,
+   contro **1,465 ms** delle corse C e D sul commit di partenza: −0,7% e +1,2%,
+   cioè **nessuna differenza misurabile** (circa 680 fotogrammi al secondo). La
+   corsa E aveva 17 scene oltre il 10% in tutte e due le direzioni (la scheda
+   video ancora fredda); la F, ripetuta subito dopo, nessuna. Corsa e ingaggio
+   (stage 25 e 26) nella F 1,65 e 1,71 ms come prima; le scene più pesanti
+   (127, 20, 5, 177, 178) intorno a 2,0 ms, 500 al secondo. La carta è solo del
+   laboratorio: le spedizioni cambiano solo per l'atlante delle icone più alto
+   e la scritta nuova, che non costano nulla di misurabile.
 
 ## Fase 1 — Il nonno ospite: tavolata e borsellino
 
@@ -526,7 +603,215 @@ Camera in terza persona e colpi:
 - [FOV comuni in terza persona (GameDev Stack Exchange)](https://gamedev.stackexchange.com/questions/135214/what-are-some-common-fov-for-third-person-games)
 - [Hitstop nei picchiaduro a scorrimento (Shane Sicienski)](https://shane-sicienski.com/blog/blog-post-title-one-55pmn)
 
+Il suono provvisorio della carta (Fase 0):
+- [The Neapolitan sixth, ♭II6 (Open Music Theory)](https://pressbooks.nebraska.edu/openmusictheory/chapter/bii6/): la cadenza ♭II6 – V – i, più comune in minore
+- [Mandolin (Wikipedia)](https://en.wikipedia.org/wiki/Mandolin): il tremolo sui cori di due corde accordate all'unisono
+
 Un tiro di dado che sceglie l'effetto:
 - [Dice Room (The Binding of Isaac Wiki)](https://bindingofisaacrebirth.wiki.gg/wiki/Dice_Room)
 - [The Wheel of Fortune (Balatro Wiki)](https://balatrowiki.org/w/The_Wheel_of_Fortune)
 - [Crowd control e ritorni decrescenti (Maxroll)](https://maxroll.gg/wow/resources/crowd-control-diminishing-returns): per non stordire per sempre lo stesso nemico
+
+## Appendice A — Misure della Fase 0, scena per scena
+
+Benchmark delle spedizioni (2 novembre 2026), RTX 3060 Laptop, canvas 1920×1080, `-o:speed`, sul codice della Fase 0,
+due corse (E e F), accanto alle corse C e D dell'appendice B di [piano-succo.md](piano-succo.md), fatte sul commit di
+partenza. Tempo di un'immagine in millisecondi: media e 95° percentile. Sotto il 10% di differenza è rumore.
+
+| Stage | Bioma | Media C | Media D | Media E | Media F | p95 E | p95 F |
+|---:|---:|---:|---:|---:|---:|---:|---:|
+| 0 | 0 | 1.45 | 1.22 | 1.45 | 1.45 | 1.74 | 1.68 |
+| 1 | 0 | 1.69 | 1.68 | 1.71 | 1.69 | 2.36 | 2.32 |
+| 2 | 0 | 1.21 | 1.23 | 1.21 | 1.24 | 1.46 | 1.40 |
+| 3 | 0 | 1.27 | 1.27 | 1.34 | 1.27 | 1.68 | 1.45 |
+| 4 | 0 | 1.27 | 1.34 | 1.26 | 1.27 | 1.43 | 1.42 |
+| 5 | 0 | 1.94 | 1.97 | 1.97 | 1.97 | 2.77 | 2.88 |
+| 6 | 0 | 1.64 | 1.65 | 1.64 | 1.66 | 2.42 | 2.41 |
+| 7 | 0 | 1.58 | 1.60 | 1.58 | 1.60 | 1.80 | 1.79 |
+| 8 | 1 | 1.58 | 1.64 | 1.57 | 1.61 | 1.76 | 1.81 |
+| 9 | 2 | 1.62 | 1.64 | 1.64 | 1.66 | 2.39 | 2.45 |
+| 10 | 3 | 1.65 | 1.64 | 1.65 | 1.65 | 2.43 | 2.46 |
+| 11 | 4 | 1.66 | 1.67 | 1.67 | 1.67 | 2.50 | 2.53 |
+| 12 | 5 | 1.14 | 1.17 | 1.16 | 1.16 | 1.31 | 1.36 |
+| 13 | 6 | 1.47 | 1.50 | 1.48 | 1.50 | 1.68 | 1.70 |
+| 14 | 7 | 1.64 | 1.67 | 1.66 | 1.67 | 2.44 | 2.47 |
+| 15 | 8 | 1.20 | 1.23 | 1.22 | 1.24 | 1.48 | 1.56 |
+| 16 | 9 | 1.53 | 1.56 | 1.58 | 1.54 | 2.03 | 1.72 |
+| 17 | 10 | 1.67 | 1.70 | 1.57 | 1.71 | 2.04 | 2.58 |
+| 18 | 11 | 1.63 | 1.67 | 1.48 | 1.68 | 1.58 | 2.46 |
+| 19 | 11 | 1.64 | 1.67 | 1.51 | 1.66 | 1.57 | 2.46 |
+| 20 | 11 | 1.99 | 2.00 | 1.80 | 1.99 | 2.10 | 2.60 |
+| 21 | 11 | 1.63 | 1.64 | 1.50 | 1.67 | 1.60 | 2.44 |
+| 22 | 11 | 1.49 | 1.52 | 1.31 | 1.52 | 1.39 | 2.30 |
+| 23 | 11 | 1.76 | 1.77 | 1.56 | 1.78 | 1.88 | 2.36 |
+| 24 | 11 | 1.60 | 1.62 | 1.58 | 1.61 | 1.64 | 1.83 |
+| 25 | 11 | 1.64 | 1.67 | 1.50 | 1.65 | 1.66 | 2.44 |
+| 26 | 11 | 1.68 | 1.71 | 1.53 | 1.71 | 1.78 | 2.41 |
+| 27 | 0 | 1.60 | 1.58 | 1.53 | 1.59 | 1.81 | 2.40 |
+| 28 | 1 | 1.64 | 1.66 | 1.46 | 1.65 | 1.52 | 2.42 |
+| 29 | 2 | 1.64 | 1.65 | 1.41 | 1.64 | 1.49 | 2.39 |
+| 30 | 3 | 1.82 | 1.87 | 1.84 | 1.86 | 2.11 | 2.11 |
+| 31 | 4 | 1.67 | 1.67 | 1.52 | 1.69 | 1.63 | 2.48 |
+| 32 | 5 | 1.11 | 1.13 | 1.25 | 1.12 | 1.80 | 1.31 |
+| 33 | 6 | 1.62 | 1.63 | 1.42 | 1.66 | 1.51 | 2.43 |
+| 34 | 7 | 1.46 | 1.50 | 1.29 | 1.49 | 1.46 | 2.30 |
+| 35 | 8 | 1.30 | 1.34 | 1.22 | 1.34 | 1.50 | 2.02 |
+| 36 | 9 | 1.23 | 1.24 | 1.25 | 1.26 | 1.41 | 1.46 |
+| 37 | 10 | 1.50 | 1.49 | 1.33 | 1.53 | 1.48 | 2.29 |
+| 38 | 11 | 1.25 | 1.25 | 1.25 | 1.24 | 1.44 | 1.40 |
+| 39 | 0 | 1.64 | 1.68 | 1.67 | 1.68 | 1.75 | 1.91 |
+| 40 | 1 | 1.61 | 1.63 | 1.48 | 1.64 | 1.53 | 2.43 |
+| 41 | 2 | 1.41 | 1.46 | 1.42 | 1.45 | 1.47 | 1.71 |
+| 42 | 3 | 1.82 | 1.83 | 1.75 | 1.85 | 1.84 | 2.75 |
+| 43 | 4 | 1.70 | 1.73 | 1.49 | 1.75 | 1.54 | 2.52 |
+| 44 | 5 | 1.22 | 1.24 | 1.23 | 1.22 | 1.72 | 1.93 |
+| 45 | 6 | 1.57 | 1.61 | 1.58 | 1.61 | 1.65 | 1.81 |
+| 46 | 7 | 1.62 | 1.66 | 1.63 | 1.65 | 1.67 | 1.87 |
+| 47 | 8 | 1.18 | 1.20 | 1.33 | 1.19 | 1.94 | 1.42 |
+| 48 | 9 | 1.44 | 1.46 | 1.46 | 1.47 | 1.50 | 1.68 |
+| 49 | 10 | 1.52 | 1.53 | 1.53 | 1.53 | 1.71 | 1.74 |
+| 50 | 11 | 1.51 | 1.52 | 1.52 | 1.52 | 1.63 | 1.68 |
+| 51 | 6 | 1.70 | 1.71 | 1.64 | 1.72 | 1.81 | 1.95 |
+| 52 | 1 | 1.60 | 1.61 | 1.62 | 1.64 | 1.94 | 1.89 |
+| 53 | 2 | 1.66 | 1.66 | 1.68 | 1.68 | 2.07 | 2.07 |
+| 54 | 10 | 1.55 | 1.59 | 1.76 | 1.57 | 2.14 | 1.78 |
+| 55 | 0 | 1.73 | 1.76 | 1.59 | 1.77 | 1.64 | 2.65 |
+| 56 | 0 | 1.65 | 1.71 | 1.58 | 1.75 | 1.64 | 2.66 |
+| 57 | 0 | 1.53 | 1.52 | 1.54 | 1.51 | 1.84 | 1.67 |
+| 58 | 0 | 1.44 | 1.43 | 1.41 | 1.43 | 1.51 | 1.68 |
+| 59 | 0 | 1.39 | 1.42 | 1.39 | 1.42 | 1.51 | 1.63 |
+| 60 | 0 | 1.47 | 1.49 | 1.47 | 1.49 | 1.56 | 1.71 |
+| 61 | 0 | 1.56 | 1.69 | 1.55 | 1.72 | 1.61 | 2.54 |
+| 62 | 0 | 1.25 | 1.43 | 1.25 | 1.42 | 1.38 | 2.15 |
+| 63 | 0 | 1.46 | 1.66 | 1.48 | 1.70 | 1.67 | 2.43 |
+| 64 | 1 | 1.48 | 1.70 | 1.47 | 1.70 | 1.63 | 2.45 |
+| 65 | 2 | 1.39 | 1.63 | 1.40 | 1.64 | 1.44 | 2.42 |
+| 66 | 3 | 1.58 | 1.75 | 1.60 | 1.76 | 1.80 | 2.59 |
+| 67 | 4 | 1.31 | 1.53 | 1.32 | 1.51 | 1.42 | 2.27 |
+| 68 | 5 | 1.11 | 1.13 | 1.09 | 1.12 | 1.47 | 1.32 |
+| 69 | 6 | 1.27 | 1.51 | 1.28 | 1.49 | 1.43 | 2.23 |
+| 70 | 7 | 1.46 | 1.67 | 1.46 | 1.65 | 1.53 | 2.43 |
+| 71 | 8 | 1.21 | 1.27 | 1.18 | 1.27 | 1.44 | 1.69 |
+| 72 | 9 | 1.40 | 1.61 | 1.42 | 1.62 | 1.58 | 2.41 |
+| 73 | 10 | 1.34 | 1.55 | 1.34 | 1.55 | 1.50 | 2.45 |
+| 74 | 11 | 1.41 | 1.57 | 1.41 | 1.61 | 1.61 | 2.40 |
+| 75 | 4 | 1.35 | 1.43 | 1.43 | 1.45 | 1.67 | 1.62 |
+| 76 | 6 | 1.35 | 1.67 | 1.37 | 1.64 | 1.57 | 2.20 |
+| 77 | 9 | 1.27 | 1.34 | 1.30 | 1.39 | 1.50 | 1.61 |
+| 78 | 6 | 1.74 | 1.81 | 1.73 | 1.79 | 1.97 | 2.68 |
+| 79 | 6 | 1.38 | 1.41 | 1.38 | 1.40 | 1.43 | 1.57 |
+| 80 | 6 | 1.30 | 1.54 | 1.29 | 1.51 | 1.35 | 2.27 |
+| 81 | 6 | 1.38 | 1.56 | 1.38 | 1.46 | 1.45 | 2.23 |
+| 82 | 6 | 1.23 | 1.23 | 1.23 | 1.23 | 1.31 | 1.27 |
+| 83 | 6 | 1.29 | 1.31 | 1.30 | 1.31 | 1.41 | 1.35 |
+| 84 | 6 | 1.22 | 1.26 | 1.23 | 1.28 | 1.32 | 1.54 |
+| 85 | 6 | 1.20 | 1.22 | 1.20 | 1.21 | 1.31 | 1.29 |
+| 86 | 6 | 1.19 | 1.21 | 1.20 | 1.21 | 1.31 | 1.36 |
+| 87 | 6 | 1.27 | 1.28 | 1.29 | 1.28 | 1.43 | 1.33 |
+| 88 | 6 | 1.24 | 1.25 | 1.24 | 1.25 | 1.31 | 1.30 |
+| 89 | 6 | 1.24 | 1.26 | 1.24 | 1.25 | 1.33 | 1.31 |
+| 90 | 1 | 1.38 | 1.40 | 1.37 | 1.39 | 1.43 | 1.45 |
+| 91 | 1 | 1.45 | 1.45 | 1.46 | 1.45 | 1.72 | 1.61 |
+| 92 | 1 | 1.43 | 1.44 | 1.45 | 1.44 | 1.62 | 1.55 |
+| 93 | 4 | 1.33 | 1.35 | 1.34 | 1.36 | 1.41 | 1.42 |
+| 94 | 4 | 1.30 | 1.33 | 1.31 | 1.32 | 1.40 | 1.37 |
+| 95 | 4 | 1.25 | 1.27 | 1.26 | 1.27 | 1.37 | 1.38 |
+| 96 | 7 | 1.35 | 1.38 | 1.37 | 1.36 | 1.67 | 1.41 |
+| 97 | 7 | 1.44 | 1.40 | 1.42 | 1.39 | 1.65 | 1.52 |
+| 98 | 7 | 1.40 | 1.41 | 1.44 | 1.44 | 1.69 | 1.66 |
+| 99 | 4 | 1.23 | 1.24 | 1.33 | 1.23 | 1.71 | 1.34 |
+| 100 | 4 | 1.22 | 1.24 | 1.23 | 1.24 | 1.32 | 1.30 |
+| 101 | 4 | 1.37 | 1.39 | 1.38 | 1.38 | 1.49 | 1.48 |
+| 102 | 4 | 1.26 | 1.28 | 1.26 | 1.26 | 1.35 | 1.34 |
+| 103 | 6 | 1.38 | 1.40 | 1.39 | 1.39 | 1.48 | 1.47 |
+| 104 | 0 | 1.31 | 1.33 | 1.38 | 1.31 | 1.69 | 1.46 |
+| 105 | 0 | 1.43 | 1.44 | 1.78 | 1.44 | 2.73 | 1.53 |
+| 106 | 0 | 1.42 | 1.44 | 1.56 | 1.43 | 2.27 | 1.57 |
+| 107 | 0 | 1.36 | 1.39 | 1.48 | 1.39 | 1.96 | 1.53 |
+| 108 | 0 | 1.33 | 1.35 | 1.47 | 1.35 | 2.04 | 1.52 |
+| 109 | 0 | 1.65 | 1.66 | 1.87 | 1.73 | 2.21 | 2.06 |
+| 110 | 1 | 1.48 | 1.49 | 1.50 | 1.49 | 1.75 | 1.55 |
+| 111 | 1 | 1.27 | 1.30 | 1.31 | 1.29 | 1.49 | 1.40 |
+| 112 | 1 | 1.22 | 1.22 | 1.25 | 1.23 | 1.40 | 1.34 |
+| 113 | 1 | 1.25 | 1.26 | 1.25 | 1.26 | 1.39 | 1.39 |
+| 114 | 1 | 1.21 | 1.23 | 1.23 | 1.24 | 1.36 | 1.37 |
+| 115 | 1 | 1.46 | 1.48 | 2.01 | 1.51 | 3.22 | 1.67 |
+| 116 | 2 | 1.41 | 1.43 | 1.71 | 1.44 | 2.90 | 1.54 |
+| 117 | 2 | 1.19 | 1.19 | 1.20 | 1.19 | 1.35 | 1.29 |
+| 118 | 2 | 1.16 | 1.15 | 1.14 | 1.16 | 1.24 | 1.29 |
+| 119 | 2 | 1.13 | 1.14 | 1.14 | 1.18 | 1.23 | 1.52 |
+| 120 | 2 | 1.25 | 1.25 | 1.27 | 1.25 | 1.78 | 1.82 |
+| 121 | 2 | 1.41 | 1.42 | 1.66 | 1.45 | 2.16 | 1.64 |
+| 122 | 3 | 1.68 | 1.69 | 1.69 | 1.70 | 1.99 | 1.80 |
+| 123 | 3 | 1.85 | 1.84 | 1.86 | 1.84 | 2.15 | 1.91 |
+| 124 | 3 | 1.78 | 1.78 | 1.80 | 1.77 | 1.99 | 1.91 |
+| 125 | 3 | 1.62 | 1.61 | 1.61 | 1.63 | 1.82 | 1.83 |
+| 126 | 3 | 1.63 | 1.62 | 1.60 | 1.63 | 1.76 | 1.79 |
+| 127 | 3 | 1.98 | 2.00 | 1.97 | 2.04 | 2.12 | 2.27 |
+| 128 | 4 | 1.12 | 1.16 | 1.14 | 1.12 | 1.74 | 1.70 |
+| 129 | 4 | 1.28 | 1.29 | 1.28 | 1.28 | 1.38 | 1.34 |
+| 130 | 4 | 1.28 | 1.28 | 1.28 | 1.33 | 1.40 | 1.58 |
+| 131 | 4 | 1.52 | 1.52 | 1.53 | 1.57 | 1.72 | 1.93 |
+| 132 | 4 | 1.32 | 1.35 | 1.36 | 1.34 | 1.71 | 1.47 |
+| 133 | 4 | 1.72 | 1.69 | 1.81 | 1.79 | 2.04 | 1.97 |
+| 134 | 5 | 1.06 | 1.07 | 1.09 | 1.07 | 1.29 | 1.23 |
+| 135 | 5 | 1.16 | 1.20 | 1.18 | 1.21 | 1.76 | 1.87 |
+| 136 | 5 | 1.19 | 1.15 | 1.19 | 1.15 | 1.70 | 1.39 |
+| 137 | 5 | 1.18 | 1.16 | 1.16 | 1.16 | 1.47 | 1.57 |
+| 138 | 5 | 1.17 | 1.10 | 1.10 | 1.10 | 1.33 | 1.28 |
+| 139 | 5 | 1.57 | 1.57 | 1.60 | 1.71 | 1.78 | 2.03 |
+| 140 | 6 | 1.51 | 1.52 | 1.50 | 1.50 | 1.68 | 1.61 |
+| 141 | 6 | 1.46 | 1.47 | 1.49 | 1.47 | 1.69 | 1.61 |
+| 142 | 6 | 1.46 | 1.44 | 1.58 | 1.44 | 2.05 | 1.54 |
+| 143 | 6 | 1.44 | 1.45 | 1.46 | 1.46 | 1.62 | 1.59 |
+| 144 | 6 | 1.44 | 1.45 | 1.44 | 1.46 | 1.57 | 1.64 |
+| 145 | 6 | 1.67 | 1.69 | 1.70 | 1.68 | 1.94 | 1.85 |
+| 146 | 7 | 1.65 | 1.68 | 1.67 | 1.68 | 1.74 | 1.76 |
+| 147 | 7 | 1.55 | 1.55 | 1.55 | 1.56 | 1.71 | 1.72 |
+| 148 | 7 | 1.48 | 1.47 | 1.48 | 1.48 | 1.56 | 1.59 |
+| 149 | 7 | 1.58 | 1.62 | 1.58 | 1.61 | 1.75 | 1.79 |
+| 150 | 7 | 1.63 | 1.67 | 1.65 | 1.66 | 1.72 | 1.72 |
+| 151 | 7 | 1.72 | 1.74 | 1.72 | 1.71 | 1.90 | 1.88 |
+| 152 | 8 | 1.44 | 1.48 | 1.42 | 1.43 | 2.16 | 2.18 |
+| 153 | 8 | 1.42 | 1.42 | 1.42 | 1.40 | 2.15 | 2.14 |
+| 154 | 8 | 1.44 | 1.43 | 1.39 | 1.38 | 2.09 | 2.13 |
+| 155 | 8 | 1.26 | 1.30 | 1.32 | 1.29 | 2.03 | 1.49 |
+| 156 | 8 | 1.27 | 1.32 | 1.27 | 1.29 | 1.51 | 1.55 |
+| 157 | 8 | 1.60 | 1.60 | 1.64 | 1.65 | 1.89 | 1.77 |
+| 158 | 9 | 1.29 | 1.37 | 1.31 | 1.31 | 1.49 | 1.41 |
+| 159 | 9 | 1.35 | 1.39 | 1.36 | 1.36 | 1.61 | 1.64 |
+| 160 | 9 | 1.38 | 1.40 | 1.36 | 1.36 | 1.50 | 1.54 |
+| 161 | 9 | 1.34 | 1.35 | 1.36 | 1.42 | 1.63 | 1.69 |
+| 162 | 9 | 1.42 | 1.33 | 1.38 | 1.36 | 1.66 | 1.54 |
+| 163 | 9 | 1.57 | 1.59 | 1.63 | 1.62 | 1.87 | 1.84 |
+| 164 | 10 | 1.44 | 1.46 | 1.46 | 1.45 | 1.63 | 1.52 |
+| 165 | 10 | 1.36 | 1.38 | 1.38 | 1.35 | 1.44 | 1.40 |
+| 166 | 10 | 1.45 | 1.43 | 1.45 | 1.40 | 1.75 | 1.53 |
+| 167 | 10 | 1.47 | 1.47 | 1.45 | 1.46 | 1.58 | 1.61 |
+| 168 | 10 | 1.46 | 1.48 | 1.47 | 1.49 | 1.57 | 1.65 |
+| 169 | 10 | 1.69 | 1.69 | 1.70 | 1.77 | 1.85 | 2.04 |
+| 170 | 11 | 1.63 | 1.65 | 1.63 | 1.67 | 1.70 | 1.86 |
+| 171 | 11 | 1.38 | 1.38 | 1.37 | 1.38 | 1.47 | 1.55 |
+| 172 | 11 | 1.32 | 1.32 | 1.32 | 1.29 | 1.45 | 1.41 |
+| 173 | 11 | 1.43 | 1.42 | 1.40 | 1.41 | 1.57 | 1.55 |
+| 174 | 11 | 1.33 | 1.35 | 1.35 | 1.34 | 1.57 | 1.43 |
+| 175 | 11 | 1.66 | 1.65 | 1.66 | 1.67 | 1.88 | 1.96 |
+| 176 | 3 | 1.81 | 1.82 | 1.85 | 1.83 | 2.22 | 2.15 |
+| 177 | 3 | 1.99 | 1.99 | 2.00 | 1.97 | 2.07 | 2.02 |
+| 178 | 3 | 1.96 | 1.96 | 1.97 | 1.94 | 2.19 | 2.13 |
+| 179 | 4 | 1.57 | 1.58 | 1.55 | 1.57 | 1.64 | 1.64 |
+| 180 | 4 | 1.47 | 1.47 | 1.47 | 1.47 | 1.64 | 1.59 |
+| 181 | 4 | 1.31 | 1.33 | 1.32 | 1.34 | 1.42 | 1.43 |
+| 182 | 5 | 1.22 | 1.22 | 1.24 | 1.25 | 1.72 | 1.92 |
+| 183 | 5 | 1.34 | 1.37 | 1.34 | 1.35 | 2.12 | 1.80 |
+| 184 | 5 | 1.31 | 1.34 | 1.32 | 1.32 | 1.52 | 1.49 |
+| 185 | 8 | 1.16 | 1.19 | 1.21 | 1.19 | 1.45 | 1.43 |
+| 186 | 8 | 1.29 | 1.33 | 1.32 | 1.34 | 1.49 | 1.59 |
+| 187 | 8 | 1.32 | 1.34 | 1.31 | 1.32 | 2.06 | 2.05 |
+| 188 | 10 | 1.40 | 1.45 | 1.40 | 1.45 | 1.52 | 1.71 |
+| 189 | 10 | 1.35 | 1.34 | 1.34 | 1.35 | 1.47 | 1.45 |
+| 190 | 10 | 1.45 | 1.50 | 1.48 | 1.46 | 1.73 | 1.62 |
+| 191 | 3 | 1.62 | 1.64 | 1.62 | 1.63 | 1.74 | 1.76 |
+| 192 | 3 | 1.50 | 1.51 | 1.49 | 1.51 | 1.55 | 1.56 |
+| 193 | 3 | 1.52 | 1.52 | 1.51 | 1.52 | 1.61 | 1.59 |
+| 194 | 11 | 1.50 | 1.48 | 1.48 | 1.49 | 1.63 | 1.64 |

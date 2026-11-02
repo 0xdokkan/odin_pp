@@ -565,7 +565,7 @@ timeline_card_cue_verb :: proc(cue: ^Presentation_Cue) -> cstring {
 	     .Pinball_Made, .Pinball_Launched, .Pinball_Bounced, .Pinball_Bumped, .Pinball_Burst, .First_Person_Begun,
 	     .Marley_Begun, .Marley_Lights, .Marley_Warned, .Marley_Bomb, .Marley_Saved, .Marley_Bonus, .Marley_Ended,
 	     .Flood_Swept, .Fire_Extinguished, .Cannon_Fired, .Cannon_Broken, .Black_Hole_Tick, .Black_Hole_Swallowed, .Black_Hole_Closed,
-	     .Ride_Begun, .Ride_Ended, .Dino_Stomp, .Bleed_Bite, .Arrow_Loosed, .Arrow_Landed, .Bomb_Thrown:
+	     .Ride_Begun, .Ride_Ended, .Dino_Stomp, .Bleed_Bite, .Arrow_Loosed, .Arrow_Landed, .Bomb_Thrown, .Napoli_Begun:
 	}
 	return nil
 }
@@ -820,6 +820,9 @@ draw_presentation_cue :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) {
 	case .Ride_Ended:
 		label = "SMONTA"
 		color = rl.Color{169, 183, 177, 255}
+	// BENVENUTI A NAPOLI: the face the d4 picked and its number (docs/piano-napoli.md, Fase 0).
+	case .Napoli_Begun:
+		label, color = napoli_begun_label(cue.event), NAPOLI_LABEL_COLOR
 	case .Bleed_Bite:
 		label = fmt.ctprintf("SANGUE +%d", cue.event.amount)
 		color = rl.Color{255, 82, 82, 255}

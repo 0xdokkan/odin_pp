@@ -77,6 +77,8 @@ PRESENTATION_HOLE_SWALLOW_DURATION :: f32(0.75)*PRESENTATION_TIME_SCALE
 PRESENTATION_HOLE_CLOSE_DURATION :: f32(0.7)*PRESENTATION_TIME_SCALE
 PRESENTATION_RIDE_DURATION :: f32(0.9)*PRESENTATION_TIME_SCALE
 PRESENTATION_STOMP_DURATION :: f32(0.35)*PRESENTATION_TIME_SCALE
+// BENVENUTI A NAPOLI: the face the d4 picked, said over the player.
+PRESENTATION_NAPOLI_DURATION :: f32(0.9)*PRESENTATION_TIME_SCALE
 PRESENTATION_MAX_SEQUENCE_DURATION :: f32(12.0)
 PRESENTATION_TIME_EPSILON         :: f32(0.00001)
 
@@ -170,6 +172,8 @@ Presentation_Cue_Kind :: enum {
 	// with its Object_Spawned. The bomb in flight is drawn from the room
 	// (enemy_bomb_view.odin).
 	Bomb_Thrown,
+	// BENVENUTI A NAPOLI (game/napoli.odin): the face the d4 picked.
+	Napoli_Begun,
 }
 
 Presentation_Actor :: struct {
@@ -657,6 +661,8 @@ presentation_cue_kind :: proc(event: game.Game_Event) -> Presentation_Cue_Kind {
 		return .Arrow_Landed
 	case .Bomb_Thrown:
 		return .Bomb_Thrown
+	case .Napoli_Begun:
+		return .Napoli_Begun
 	}
 	unreachable()
 }
@@ -771,6 +777,8 @@ presentation_cue_duration :: proc(kind: Presentation_Cue_Kind, event: game.Game_
 		return PRESENTATION_RIDE_DURATION
 	case .Dino_Stomp:
 		return PRESENTATION_STOMP_DURATION
+	case .Napoli_Begun:
+		return PRESENTATION_NAPOLI_DURATION
 	case .Black_Hole_Tick, .Bleed_Bite, .Arrow_Loosed, .Arrow_Landed, .Bomb_Thrown:
 		return PRESENTATION_NOTICE_DURATION
 	}
@@ -1379,6 +1387,9 @@ start_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^Presentat
 		if event.source != game.PLAYER_ENTITY || event.card_definition != .Dino_Ride { timeline.update_failures += 1 }
 		if timeline.final_view.valid { timeline.view.ride = timeline.final_view.ride }
 	case .Dino_Stomp, .Bleed_Bite, .Arrow_Loosed, .Arrow_Landed, .Bomb_Thrown:
+	// BENVENUTI A NAPOLI: the player's own card.
+	case .Napoli_Begun:
+		if event.source != game.PLAYER_ENTITY || event.card_definition != .Napoli { timeline.update_failures += 1 }
 	case .Attack_Missed, .Move_Blocked, .Attack_Deflected,
 	     .Binding_Added, .Binding_Exhausted, .Binding_Expired, .Shadow_Entered, .Shadow_Emerged:
 	// The player's own card, behind his eyes.
@@ -1438,7 +1449,7 @@ update_active_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^P
 	     .Fish_Cast, .Fish_Bite, .Fish_Caught, .Pinball_Made, .Pinball_Launched, .Pinball_Bounced, .Pinball_Bumped, .Pinball_Burst,
 	     .First_Person_Begun, .Marley_Begun, .Marley_Lights, .Marley_Warned, .Marley_Bomb, .Marley_Saved, .Marley_Bonus,
 	     .Marley_Ended, .Flood_Swept, .Fire_Extinguished, .Cannon_Fired, .Cannon_Broken, .Black_Hole_Tick, .Black_Hole_Closed,
-	     .Ride_Begun, .Ride_Ended, .Dino_Stomp, .Bleed_Bite, .Arrow_Loosed, .Arrow_Landed, .Bomb_Thrown:
+	     .Ride_Begun, .Ride_Ended, .Dino_Stomp, .Bleed_Bite, .Arrow_Loosed, .Arrow_Landed, .Bomb_Thrown, .Napoli_Begun:
 	// A foe swallowed by the hole spins down it toward the hole's centre.
 	case .Black_Hole_Swallowed:
 		if has_actor {

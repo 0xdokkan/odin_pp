@@ -120,6 +120,8 @@ card_die_sides :: proc(card: Card_Id, upgrade_level: i32) -> i32 {
 	if card_dice_count(card) == 0 || upgrade_level < 0 || upgrade_level > MAX_DICE_UPGRADE_LEVEL { return 0 }
 	// The Dinosauro's die names a dinosaur: a d4 at every level (its upgrades are seconds).
 	if card == .Dino_Ride { return RIDE_DIE_SIDES }
+	// Benvenuti a Napoli's die picks one of four effects: a d4 at every level too.
+	if card == .Napoli { return NAPOLI_DIE_SIDES }
 	ladder := DICE_LADDER
 	return ladder[upgrade_level]
 }
