@@ -41,7 +41,7 @@ update_renderer_frame_timeline :: proc(renderer: ^Renderer, dt: f32) -> bool {
 			remaining = 0
 			break
 		}
-		cinematic := presentation_cue_is_cinematic(cue.kind)
+		cinematic := presentation_cue_is_cinematic(cue)
 		renderer.frame_had_cinematic = renderer.frame_had_cinematic || cinematic
 		available := max(f32(0), cue.duration-cue.elapsed)
 		if available <= 0 {

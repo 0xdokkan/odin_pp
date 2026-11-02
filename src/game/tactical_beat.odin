@@ -200,6 +200,8 @@ try_move_player_diagonal :: proc(room: ^Room, offset: grid.Position) -> Action_R
 		}
 		return .Attacked
 	}
+	// BENVENUTI A NAPOLI: the grandpa's table, a corner away, sits him down too (napoli.odin).
+	if result, handled := napoli_try_feast(room, foe_cell); handled { return result }
 	query := query_entity_movement(room, PLAYER_ENTITY, target)
 	if !movement_query_is_clear(&query) || step_height_blocked(room, room.player.position, target) { return .Blocked }
 	clear_event_log(room.recent_events)

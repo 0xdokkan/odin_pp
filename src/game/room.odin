@@ -877,6 +877,8 @@ try_move_player :: proc(room: ^Room, direction: Move_Direction) -> Action_Result
 			}
 			return .Attacked
 		}
+		// BENVENUTI A NAPOLI: a step into the grandpa's table sits him down to eat (napoli.odin).
+		if result, handled := napoli_try_feast(room, foe_cell); handled { return result }
 	}
 
 	// LIFTS AND GATES (lift.odin): a step toward a landing its platform is away from calls the platform, and takes no

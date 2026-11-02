@@ -469,6 +469,11 @@ tactical_feedback_badges :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) ->
 	case .Gold_Gained: label = fmt.ctprintf("+%d ORO", event.amount); color = {218, 187, 123, 255}
 	// BENVENUTI A NAPOLI: the face the d4 picked, over the player.
 	case .Napoli_Begun: label, color = napoli_begun_label(event), NAPOLI_LABEL_COLOR
+	// Sat down at the grandpa's table, over him.
+	case .Napoli_Feast:
+		badges[count] = {label = "A TAVOLA!", color = NAPOLI_LABEL_COLOR, over = event.source, fallback = event.from_position}
+		count += 1
+		return
 	case .Energy_Gained: label = fmt.ctprintf("+%d ENERGIA", event.amount)
 	case:
 	}

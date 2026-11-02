@@ -79,6 +79,12 @@ PRESENTATION_RIDE_DURATION :: f32(0.9)*PRESENTATION_TIME_SCALE
 PRESENTATION_STOMP_DURATION :: f32(0.35)*PRESENTATION_TIME_SCALE
 // BENVENUTI A NAPOLI: the face the d4 picked, said over the player.
 PRESENTATION_NAPOLI_DURATION :: f32(0.9)*PRESENTATION_TIME_SCALE
+// The grandpa's visit with the table or the purse: the world stands still for
+// it, as for the dice (cast_playback.odin; docs/piano-napoli.md, Fase 1).
+PRESENTATION_NAPOLI_VISIT_DURATION :: f32(2.0)
+// Sitting down at the table, and the table cleared.
+PRESENTATION_NAPOLI_FEAST_DURATION :: f32(0.35)*PRESENTATION_TIME_SCALE
+PRESENTATION_NAPOLI_CLEAR_DURATION :: f32(0.4)*PRESENTATION_TIME_SCALE
 PRESENTATION_MAX_SEQUENCE_DURATION :: f32(12.0)
 PRESENTATION_TIME_EPSILON         :: f32(0.00001)
 
@@ -172,8 +178,12 @@ Presentation_Cue_Kind :: enum {
 	// with its Object_Spawned. The bomb in flight is drawn from the room
 	// (enemy_bomb_view.odin).
 	Bomb_Thrown,
-	// BENVENUTI A NAPOLI (game/napoli.odin): the face the d4 picked.
+	// BENVENUTI A NAPOLI (game/napoli.odin): the face the d4 picked (the
+	// grandpa's visit for the table and the purse); the player sat down at the
+	// table; the table cleared.
 	Napoli_Begun,
+	Napoli_Feast,
+	Napoli_Table_Cleared,
 }
 
 Presentation_Actor :: struct {
@@ -663,6 +673,10 @@ presentation_cue_kind :: proc(event: game.Game_Event) -> Presentation_Cue_Kind {
 		return .Bomb_Thrown
 	case .Napoli_Begun:
 		return .Napoli_Begun
+	case .Napoli_Feast:
+		return .Napoli_Feast
+	case .Napoli_Table_Cleared:
+		return .Napoli_Table_Cleared
 	}
 	unreachable()
 }
@@ -778,7 +792,11 @@ presentation_cue_duration :: proc(kind: Presentation_Cue_Kind, event: game.Game_
 	case .Dino_Stomp:
 		return PRESENTATION_STOMP_DURATION
 	case .Napoli_Begun:
-		return PRESENTATION_NAPOLI_DURATION
+		return PRESENTATION_NAPOLI_VISIT_DURATION if napoli_event_is_visit(event) else PRESENTATION_NAPOLI_DURATION
+	case .Napoli_Feast:
+		return PRESENTATION_NAPOLI_FEAST_DURATION
+	case .Napoli_Table_Cleared:
+		return PRESENTATION_NAPOLI_CLEAR_DURATION
 	case .Black_Hole_Tick, .Bleed_Bite, .Arrow_Loosed, .Arrow_Landed, .Bomb_Thrown:
 		return PRESENTATION_NOTICE_DURATION
 	}
@@ -835,10 +853,11 @@ begin_event_timeline :: proc(
 		event := events.events[index]
 		kind := presentation_cue_kind(event)
 		tail := (timeline.head+timeline.count)%MAX_PRESENTATION_CUES
+		// The grandpa's visit keeps its two seconds, the user's choice (napoli.odin).
 		timeline.cues[tail] = {
 			kind = kind,
 			event = event,
-			duration = presentation_cue_duration(kind, event)*scale,
+			duration = presentation_cue_duration(kind, event)*(1 if napoli_event_is_visit(event) else scale),
 		}
 		timeline.count += 1
 	}
@@ -1390,6 +1409,9 @@ start_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^Presentat
 	// BENVENUTI A NAPOLI: the player's own card.
 	case .Napoli_Begun:
 		if event.source != game.PLAYER_ENTITY || event.card_definition != .Napoli { timeline.update_failures += 1 }
+	// The table: sat at, then cleared with its cue (finish_presentation_cue).
+	case .Napoli_Feast, .Napoli_Table_Cleared:
+		if _, found := presentation_grid_object(timeline, event.target); !found { timeline.update_failures += 1 }
 	case .Attack_Missed, .Move_Blocked, .Attack_Deflected,
 	     .Binding_Added, .Binding_Exhausted, .Binding_Expired, .Shadow_Entered, .Shadow_Emerged:
 	// The player's own card, behind his eyes.
@@ -1449,7 +1471,8 @@ update_active_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^P
 	     .Fish_Cast, .Fish_Bite, .Fish_Caught, .Pinball_Made, .Pinball_Launched, .Pinball_Bounced, .Pinball_Bumped, .Pinball_Burst,
 	     .First_Person_Begun, .Marley_Begun, .Marley_Lights, .Marley_Warned, .Marley_Bomb, .Marley_Saved, .Marley_Bonus,
 	     .Marley_Ended, .Flood_Swept, .Fire_Extinguished, .Cannon_Fired, .Cannon_Broken, .Black_Hole_Tick, .Black_Hole_Closed,
-	     .Ride_Begun, .Ride_Ended, .Dino_Stomp, .Bleed_Bite, .Arrow_Loosed, .Arrow_Landed, .Bomb_Thrown, .Napoli_Begun:
+	     .Ride_Begun, .Ride_Ended, .Dino_Stomp, .Bleed_Bite, .Arrow_Loosed, .Arrow_Landed, .Bomb_Thrown, .Napoli_Begun,
+	     .Napoli_Feast, .Napoli_Table_Cleared:
 	// A foe swallowed by the hole spins down it toward the hole's centre.
 	case .Black_Hole_Swallowed:
 		if has_actor {
@@ -1469,7 +1492,7 @@ update_active_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^P
 finish_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^Presentation_Cue) {
 	assert(timeline != nil && cue != nil && cue.started)
 	// A cannon that fell apart, a hole that closed: gone with the cue.
-	if cue.kind == .Cannon_Broken || cue.kind == .Black_Hole_Closed {
+	if cue.kind == .Cannon_Broken || cue.kind == .Black_Hole_Closed || cue.kind == .Napoli_Table_Cleared {
 		if emplacement, found := presentation_grid_object(timeline, cue.event.target); found { emplacement.visible, emplacement.opacity = false, 0 }
 		return
 	}

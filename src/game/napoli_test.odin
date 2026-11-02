@@ -1,6 +1,7 @@
 package game
 
 import "core:testing"
+import grid "../engine/grid"
 import level "../level"
 
 // BENVENUTI A NAPOLI (docs/piano-napoli.md, Fase 0): the card, its d4 and the
@@ -148,4 +149,170 @@ test_napoli_is_not_played_in_a_view_nor_riding :: proc(t: ^testing.T) {
 		destroy_room(&room)
 		level.destroy(&data)
 	}
+}
+
+// A room with the player at (6,5), hurt (5 of 22), and `spawns`; the card's
+// face 2 played, the d4 fixed on it. The table's cell, if one was set.
+napoli_test_table_room :: proc(t: ^testing.T, data: ^level.Level, player: ^Player, spawns: []Enemy_Spawn, upgrade: i32 = 0) -> (room: Room, cell: grid.Position, set: bool) {
+	room = ground_test_room(t, data, player, {enemies = spawns})
+	player.stats.max_health, player.health = 22, 5
+	play := napoli_test_play(t, &room, 2, upgrade)
+	testing.expect_value(t, play.result, Card_Play_Result.Played)
+	index, found := napoli_table_index(&room)
+	if found { cell, set = room.objects[index].position, true }
+	return
+}
+
+// The player free to act again, the world's beats spent (as the clock leaves him).
+napoli_test_free :: proc(room: ^Room) {
+	s := &room.player.tactical
+	s.phase, s.remaining, s.cast_remaining, s.action_remaining, s.queued_beats = .Decision, 20, 0, 0, 0
+	room.tactical_pulse = {}
+}
+
+// Face 2: the grandpa sets the table on the cell next to the player farthest
+// from the nearest foe (ties: north, east, south, west, then the corners); it
+// stands in everyone's way and sight, nothing strikes it; a second one takes
+// its place.
+@(test)
+test_napoli_table_is_set_away_from_the_foes :: proc(t: ^testing.T) {
+	data: level.Level
+	player: Player
+	spawns := [?]Enemy_Spawn{{position = {x = 9, y = 5}, health = 50, attack = 1}, {position = {x = 3, y = 5}, health = 50, attack = 1}}
+	room, cell, set := napoli_test_table_room(t, &data, &player, spawns[:])
+	defer level.destroy(&data)
+	defer destroy_room(&room)
+	testing.expect(t, set)
+	testing.expect_value(t, cell, grid.Position{x = 6, y = 4})
+	testing.expect_value(t, arsenal_test_count(room.recent_events, .Object_Spawned), 1)
+	// The cure waits on the table: nothing yet.
+	testing.expect_value(t, player.health, i32(5))
+	index, _ := napoli_table_index(&room)
+	testing.expect_value(t, room.objects[index].power, i32(11))
+	testing.expect_value(t, room.objects[index].life, i32(0))
+	testing.expect(t, cell_blocks_movement(&room, cell) && cell_blocks_line_of_sight(&room, cell))
+	definition, _ := grid_object_definition(.Napoli_Table)
+	testing.expect(t, !definition.targetable && !definition.damageable && definition.max_health == 0)
+	// One foe only, to the east: the west side, the south-west corner first of its two.
+	data2: level.Level
+	player2: Player
+	east := [?]Enemy_Spawn{{position = {x = 9, y = 5}, health = 50, attack = 1}}
+	room2, cell2, set2 := napoli_test_table_room(t, &data2, &player2, east[:])
+	defer level.destroy(&data2)
+	defer destroy_room(&room2)
+	testing.expect(t, set2)
+	testing.expect_value(t, cell2, grid.Position{x = 5, y = 6})
+	// A second table takes the first one's place.
+	napoli_test_free(&room2)
+	again := napoli_test_play(t, &room2, 2)
+	testing.expect_value(t, again.result, Card_Play_Result.Played)
+	tables := 0
+	for object in room2.objects { if object.kind == .Napoli_Table { tables += 1 } }
+	testing.expect_value(t, tables, 1)
+	testing.expect_value(t, arsenal_test_count(room2.recent_events, .Napoli_Table_Cleared), 1)
+}
+
+// With no free cell round him the grandpa feeds him where he stands.
+@(test)
+test_napoli_table_with_no_room_cures_at_once :: proc(t: ^testing.T) {
+	data: level.Level
+	player: Player
+	spawns: [8]Enemy_Spawn
+	ways := [8]grid.Position{{x = 0, y = -1}, {x = 1, y = 0}, {x = 0, y = 1}, {x = -1, y = 0}, {x = 1, y = -1}, {x = 1, y = 1}, {x = -1, y = 1}, {x = -1, y = -1}}
+	for way, i in ways { spawns[i] = {position = {x = 6+way.x, y = 5+way.y}, health = 50, attack = 1} }
+	room, _, set := napoli_test_table_room(t, &data, &player, spawns[:])
+	defer level.destroy(&data)
+	defer destroy_room(&room)
+	testing.expect(t, !set)
+	testing.expect_value(t, player.health, i32(16))
+	testing.expect_value(t, arsenal_test_count(room.recent_events, .Object_Spawned), 0)
+}
+
+// A step into the table sits him down (he stays where he was, no dodge), the
+// cure in two halves on the two beats, then the table cleared.
+@(test)
+test_napoli_step_into_the_table_eats_in_two_beats :: proc(t: ^testing.T) {
+	data: level.Level
+	player: Player
+	spawns := [?]Enemy_Spawn{{position = {x = 9, y = 5}, health = 50, attack = 1}, {position = {x = 3, y = 5}, health = 50, attack = 1}}
+	room, cell, set := napoli_test_table_room(t, &data, &player, spawns[:])
+	defer level.destroy(&data)
+	defer destroy_room(&room)
+	testing.expect(t, set && cell == grid.Position{x = 6, y = 4})
+	napoli_test_free(&room)
+	testing.expect_value(t, try_move_player(&room, .North), Action_Result.Used_Ability)
+	testing.expect_value(t, player.position, grid.Position{x = 6, y = 5})
+	testing.expect_value(t, arsenal_test_count(room.recent_events, .Napoli_Feast), 1)
+	testing.expect(t, napoli_seated(&room))
+	testing.expect(t, !try_dodge_player(&room, .South))
+	// The meal's beats: 6 of 11, then the 5 left; the table cleared.
+	pulse: Pulse_Report
+	napoli_beat(&room, &pulse)
+	testing.expect_value(t, player.health, i32(11))
+	testing.expect(t, napoli_seated(&room))
+	napoli_beat(&room, &pulse)
+	testing.expect_value(t, player.health, i32(16))
+	testing.expect(t, !napoli_seated(&room))
+	_, standing := napoli_table_index(&room)
+	testing.expect(t, !standing)
+	testing.expect_value(t, arsenal_test_count(&pulse.events, .Healed), 2)
+	testing.expect_value(t, arsenal_test_count(&pulse.events, .Napoli_Table_Cleared), 1)
+	testing.expect_value(t, napoli_feast_bite(11, 1), i32(6))
+	testing.expect_value(t, napoli_feast_bite(11, 0), i32(5))
+}
+
+// In the timed game the meal holds his body two world seconds: no step and no
+// card while he eats; a blow does not stop it.
+@(test)
+test_napoli_feast_holds_him_two_seconds_in_the_game :: proc(t: ^testing.T) {
+	data: level.Level
+	player: Player
+	spawns := [?]Enemy_Spawn{{position = {x = 9, y = 5}, health = 50, attack = 1}, {position = {x = 3, y = 5}, health = 50, attack = 1}}
+	room, _, set := napoli_test_table_room(t, &data, &player, spawns[:])
+	defer level.destroy(&data)
+	defer destroy_room(&room)
+	testing.expect(t, set)
+	napoli_test_free(&room)
+	player.tactical.config.timed_actions = true
+	testing.expect_value(t, try_move_player(&room, .North), Action_Result.Used_Ability)
+	testing.expect_value(t, player.tactical.action_remaining, NAPOLI_FEAST_SECONDS)
+	testing.expect(t, tactical_player_busy(&room) && !tactical_allows_movement(&room) && !tactical_allows_cards(&room))
+	blow := make_action(.Attack, enemy_entity(room.enemies[0].id))
+	testing.expect(t, add_effect(&blow, damage_effect(PLAYER_ENTITY, 2)))
+	testing.expect(t, resolve_action(&room, &blow).accepted)
+	testing.expect(t, napoli_seated(&room))
+}
+
+// Face 3: the purse's gold at once, more with each upgrade.
+@(test)
+test_napoli_purse_gives_its_gold :: proc(t: ^testing.T) {
+	for upgrade in ([2]i32{0, 2}) {
+		data: level.Level
+		player: Player
+		spawns := [?]Enemy_Spawn{{position = {x = 9, y = 5}, health = 50, attack = 1}}
+		room := ground_test_room(t, &data, &player, {enemies = spawns[:]})
+		gold := player.gold
+		play := napoli_test_play(t, &room, 3, upgrade)
+		testing.expect_value(t, play.result, Card_Play_Result.Played)
+		testing.expect_value(t, player.gold-gold, NAPOLI_PURSE_GOLD+NAPOLI_PURSE_GOLD_PER_UPGRADE*upgrade)
+		testing.expect_value(t, arsenal_test_count(room.recent_events, .Gold_Gained), 1)
+		destroy_room(&room)
+		level.destroy(&data)
+	}
+}
+
+// No table outlives the combat.
+@(test)
+test_napoli_table_goes_with_the_combat :: proc(t: ^testing.T) {
+	data: level.Level
+	player: Player
+	spawns := [?]Enemy_Spawn{{position = {x = 9, y = 5}, health = 50, attack = 1}}
+	room, _, set := napoli_test_table_room(t, &data, &player, spawns[:])
+	defer level.destroy(&data)
+	defer destroy_room(&room)
+	testing.expect(t, set)
+	room.phase = .Loot
+	tactical_end_combat(&room)
+	_, standing := napoli_table_index(&room)
+	testing.expect(t, !standing)
 }

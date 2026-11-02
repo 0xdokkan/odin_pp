@@ -10,7 +10,7 @@ import level "../level"
 import view "../engine/view"
 
 Tactical_Alpha_Entry :: struct {
-	kind: enum {Sprite, Wall, Roof, Attack, Ground, Lasso, Fishing, Pinball, First_Person, Dino, Cover},
+	kind: enum {Sprite, Wall, Roof, Attack, Ground, Lasso, Fishing, Pinball, First_Person, Dino, Cover, Napoli},
 	// An Attack entry: its blow's slot in Attack_Fx_State.
 	attack: i32,
 	// A Ground entry: its flame's cell, or past the cells its splash (ground_fx.odin).
@@ -113,6 +113,8 @@ collect_tactical_translucents :: proc(renderer: ^Renderer, room: ^game.Room = ni
 	collect_pinball_entries(renderer, entries)
 	if room != nil { collect_first_person_entries(renderer, entries) }
 	if room != nil { collect_dino_entries(renderer, entries) }
+	// BENVENUTI A NAPOLI's grandpa on his visit (napoli.odin).
+	if room != nil { collect_napoli_entries(renderer, room, entries) }
 	// The hologram intentionally supplies no room: its own miniature walls
 	// remain in the table pass, and it only needs sorted actor billboards.
 	// Behind the player's eyes they are opaque, with the floor.
@@ -191,6 +193,9 @@ draw_tactical_billboards :: proc(renderer: ^Renderer, room: ^game.Room = nil, li
 		} else if entry.kind == .Dino {
 			if walls_active { rl.EndShaderMode(); walls_active = false }
 			draw_dino_entry(renderer, entry)
+		} else if entry.kind == .Napoli {
+			if walls_active { rl.EndShaderMode(); walls_active = false }
+			draw_napoli_entry(renderer, room, entry)
 		} else if entry.kind == .Cover {
 			if !walls_active { begin_tactical_lighting(renderer, accents = lights); walls_active = true }
 			draw_layer_cover(renderer, {x = int(entry.position.x), y = int(entry.position.y), layer = i8(entry.attack)}, entry.opacity)

@@ -89,7 +89,7 @@ Note sulle decisioni:
 | Fase | Contenuto | Dipende da | Stato | Commit |
 |---|---|---|---|---|
 | 0 | Base: la carta, il D4 e i quattro rami nel laboratorio; misure di partenza | — | Fatta | vedi Esito |
-| 1 | Il nonno ospite: tavolata (effetto 2) e borsellino (effetto 3), regole e prototipo | 0 | Da fare | — |
+| 1 | Il nonno ospite: tavolata (effetto 2) e borsellino (effetto 3), regole e prototipo | 0 | Fatta | vedi Esito |
 | 2 | La terza persona e la mazzata (effetto 1), regole e prototipo | 0 | Da fare | — |
 | 3 | Lo schiacciamento alla Looney Tunes e il succo della mazzata | 2 | Da fare | — |
 | 4 | Diventi il nonno (effetto 4), regole e prototipo | 2 | Da fare | — |
@@ -338,6 +338,71 @@ Passi:
 
 **Fatto quando:** nel laboratorio il nonno porta la tavolata e il Viandante
 mangia, e porta il borsellino e l'oro sale; test verdi.
+
+### Esito (2 novembre 2026)
+
+Scelte dell'utente all'inizio della fase: mentre arriva il nonno **il mondo si
+ferma per circa 2 secondi**; la tavolata va **accanto al Viandante, lontano dai
+nemici**; per mangiare il Viandante **resta seduto 2 secondi**, con la cura che
+arriva **a poco a poco** (come le pozioni di Monster Hunter) e un colpo che **non
+interrompe** il pranzo; la tavolata **blocca tutto**: passi, vista e frecce.
+
+1. **Regole della tavolata** ([napoli.odin](../src/game/napoli.odin)): un
+   oggetto nuovo della griglia, `Grid_Object_Kind.Napoli_Table` («Tavolata»),
+   che blocca passi, vista e frecce e che nessuno può colpire. Il nonno la posa
+   sulla casella libera accanto al Viandante più lontana dal nemico più vicino
+   (a pari distanza: nord, est, sud, ovest, poi gli angoli), mai su un muro, un
+   nemico, un oggetto, una trappola, l'uscita o oltre un gradino. Una sola alla
+   volta: una nuova prende il posto della vecchia. Se attorno è tutto pieno, il
+   nonno lo cura sul posto, tutta la cura subito. Sparisce con la fine del
+   combattimento.
+2. **Mangiare:** un passo contro la tavola (anche in diagonale) lo fa sedere:
+   evento nuovo `Napoli_Feast`, il corpo occupato per **2 secondi del mondo**
+   (niente passi, carte o schivate; niente difesa: i colpi li prende), la cura
+   in due metà sui due battiti che passa seduto (11 = 6 + 5), poi la tavola si
+   sparecchia (evento nuovo `Napoli_Table_Cleared`).
+3. **Borsellino:** l'oro subito (`Gold_Gained`), 15 (+2 a potenziamento, ×1,5
+   sulla giocata critica).
+4. **Il nonno ospite, provvisorio** ([render/napoli.odin](../src/render/napoli.odin)):
+   una figurina di carta in pixel art (coppola, baffoni bianchi, fazzoletto
+   rosso, gilet scuro) che arriva dal lato della telecamera, così non resta mai
+   dietro un muro o dietro il Viandante. Porta la tavola davanti a sé, la posa e
+   se ne va; col borsellino glielo lancia. La visita è una scena **cinematica di
+   2 secondi** (`presentation_cue_is_cinematic`): il mondo è fermo, come per il
+   dado, e la scena non si accorcia al ritmo del Viandante. La tavola vera resta
+   nascosta finché lui non l'ha posata.
+5. **Aspetto provvisorio:** la tavola di resina come gli altri oggetti
+   (tovaglia a quadri rossi e bianchi, due piatti di pasta al ragù, pane, una
+   bottiglia), il borsellino una figurina di cuoio con le monete; scritte «A
+   TAVOLA!» quando si siede e «2 TAVOLATA +11 VITA» all'arrivo. L'aspetto vero
+   è della Fase 5.
+6. **Salvataggio:** la spedizione salva la tavola come gli altri oggetti, anche
+   a pranzo iniziato (test nuovo in
+   [napoli_snapshot_test.odin](../src/expedition/napoli_snapshot_test.odin)).
+   Il tipo nuovo sta in fondo all'elenco, così i salvataggi vecchi non cambiano.
+7. **Test nuovi** ([napoli_test.odin](../src/game/napoli_test.odin)): la tavola
+   lontano dai nemici e il caso d'angolo; tutto pieno = cura subito; una tavola
+   alla volta; il passo che fa sedere, nessuna schivata, la cura in due battiti
+   e la tavola che sparisce; due secondi occupato nel gioco a tempo, un colpo che
+   non interrompe; l'oro del borsellino coi potenziamenti; la tavola che se ne
+   va col combattimento.
+8. **Laboratorio:** l'atto `napoli` ora prova anche le visite: il Viandante a 6
+   di vita, la faccia 2, il nonno che arriva per 2 secondi col mondo fermo
+   (controllati i fotogrammi e l'orologio del mondo), il passo nella tavola, la
+   cura di 11 in due battiti, la tavola sparita; poi la faccia 3 e i 15 oro.
+   Catture `odin_pp_napoli_table_NN.png`, `odin_pp_napoli_feast_NN.png` e
+   `odin_pp_napoli_purse_NN.png`.
+9. **Verifiche:** `scripts/check.ps1` verde (**1869 test** con e senza assert); prova
+   completa del laboratorio verde nella finestra vera (**2347 catture, 153
+   suoni**, in 16,3 minuti). **Prestazioni:** il disegno del tabellone ha tre
+   controlli nuovi (la visita, la tavola in braccio, la tavola nascosta) che
+   escono subito quando non c'è nessuna visita. Le prime due corse del
+   benchmark davano la media uguale (1,462 e 1,493 ms contro 1,465) ma la scena
+   157 più lenta del 15%; stasera però la macchina cambiava velocità fino al
+   20% da una corsa all'altra, anche con il codice della Fase 0. Allora quattro
+   corse in ordine incrociato (Fase 0, Fase 1, Fase 1, Fase 0) nelle stesse
+   condizioni: media **1,668 ms** la Fase 0 e **1,692 ms** la Fase 1 (+1,4%), scena
+   157 **2,05 e 2,08 ms** (+1,3%): **nessuna differenza misurabile**.
 
 ## Fase 2 — La terza persona e la mazzata
 
@@ -606,6 +671,9 @@ Camera in terza persona e colpi:
 Il suono provvisorio della carta (Fase 0):
 - [The Neapolitan sixth, ♭II6 (Open Music Theory)](https://pressbooks.nebraska.edu/openmusictheory/chapter/bii6/): la cadenza ♭II6 – V – i, più comune in minore
 - [Mandolin (Wikipedia)](https://en.wikipedia.org/wiki/Mandolin): il tremolo sui cori di due corde accordate all'unisono
+
+Mangiare seduti e vulnerabili (Fase 1):
+- [Monster Hunter's animations make you a better player (Kotaku)](https://kotaku.com/monster-hunters-animations-make-you-a-better-player-1822776242): l'animazione che impegna il giocatore e lo lascia esposto, come la pozione bevuta
 
 Un tiro di dado che sceglie l'effetto:
 - [Dice Room (The Binding of Isaac Wiki)](https://bindingofisaacrebirth.wiki.gg/wiki/Dice_Room)

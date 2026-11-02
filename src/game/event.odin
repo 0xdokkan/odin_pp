@@ -159,6 +159,10 @@ Game_Event_Kind :: enum {
 	// BENVENUTI A NAPOLI (napoli.odin): the d4 picked face `duration` (1-4), its
 	// number `amount` (the club's seconds, the cure, the gold, the grandpa's health).
 	Napoli_Begun,
+	// The player sits down at the grandpa's table (`target`, on to_position) to
+	// eat `amount` over `duration` world beats; the table cleared, eaten or replaced.
+	Napoli_Feast,
+	Napoli_Table_Cleared,
 }
 
 Game_Event :: struct {

@@ -103,8 +103,10 @@ tiro di sponda trovato con la guida, una zona critica sul muro, una freccia tira
 ancora vista dall'alto).
 Con `ODIN_PP_LAB_ONLY=napoli` gira solo l'atto di Benvenuti a Napoli ([piano](piano-napoli.md)): nell'arena «Prima persona»
 la carta si gioca quattro volte, con il D4 fissato su ognuna delle facce come lo fissa `F12`; il dado gira sopra la
-finestra, il suo pannello e la scritta sul Viandante dicono il ramo uscito (`odin_pp_napoli_dice_<faccia>.png`). Nello
-smoke completo gira per ultimo.
+finestra, il suo pannello e la scritta sul Viandante dicono il ramo uscito (`odin_pp_napoli_dice_<faccia>.png`). Poi le
+visite del nonno: con la faccia 2 il nonno porta la tavolata (2 secondi a mondo fermo), il Viandante ferito ci mangia
+seduto e si cura in due battiti; con la faccia 3 porta il borsellino (`odin_pp_napoli_table_NN.png`,
+`odin_pp_napoli_feast_NN.png`, `odin_pp_napoli_purse_NN.png`). Nello smoke completo gira per ultimo.
 Con `ODIN_PP_LAB_ONLY=fps` e `ODIN_PP_LAB_TIMING=1` l'atto di First Person Shooter si ferma dopo la discesa negli occhi e misura
 600 fotogrammi con l'AK che spara, senza limite di fotogrammi né vsync (riga `FIRST PERSON TIMING`; meglio con una build `-o:speed`).
 Con `ODIN_PP_LAB_ONLY=prima_persona` la stessa misura la fa `ODIN_PP_LAB_TIMING=1` con i pugni (un pugno ogni quarto di

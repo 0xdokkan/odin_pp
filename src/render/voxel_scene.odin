@@ -113,6 +113,8 @@ draw_voxel_object :: proc(renderer: ^Renderer, object: Presentation_Grid_Object)
 	case .Field_Cannon: draw_cannon_object(renderer, object, p)
 	// The hole has its own pass: the floor and the sphere (arsenal.odin).
 	case .Devouring_Hole:
+	// BENVENUTI A NAPOLI: the grandpa's table, laid (napoli.odin).
+	case .Napoli_Table: draw_napoli_table(renderer, {p.x, bounds.min.y, p.z})
 	case .Ice_Block:
 		tint = {102, 151, 162, 255}
 		draw_resin_cube_v(renderer, p, size, tint)

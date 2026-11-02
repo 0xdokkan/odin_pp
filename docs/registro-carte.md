@@ -25,6 +25,11 @@ Commit **«Piano di Napoli, Fase 0 fatta: la carta, il D4 e i quattro rami»** s
   agitato in mano, poi un mandolino in tremolo sulla cadenza napoletana (Si bemolle maggiore, Mi maggiore, La minore);
   i suoni veri e la tarantella sono della Fase 6.
 - Nel laboratorio `F12` fissa la faccia del D4 (A CASO, 1, 2, 3, 4); `F11` resta lo schermo intero.
+- **2026-11-02, Fase 1** (commit «Piano di Napoli, Fase 1 fatta: il nonno porta tavolata e borsellino»): le facce 2 e 3
+  fanno quello che dicono. 2: il nonno posa la **tavolata** accanto al Viandante, lontano dai nemici (blocca passi, vista e
+  frecce, nessuno la colpisce, una alla volta, sparisce a fine combattimento); un passo contro di lei lo fa sedere **2
+  secondi** occupato e senza difesa, la cura in due metà sui due battiti, poi la tavola si sparecchia; con tutto pieno
+  attorno, cura subito. 3: il **borsellino**, l'oro subito. Mentre il nonno arriva il mondo è fermo per 2 secondi.
 
 ## 2026-10-30 — Tutte le carte: il lancio dura la metà
 

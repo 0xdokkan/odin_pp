@@ -101,5 +101,87 @@ mechanics_lab_napoli :: proc(window: ^app.Window, renderer: ^render.Renderer, di
 	}
 	fmt.eprintf("mechanics lab napoli: the card in hand, F12's turn; the d4 on 1 BASTONE %ds, 2 TAVOLATA +%d, 3 BORSELLINO +%d, 4 NONNO %d, each rolled and named\n",
 		said[0], said[1], said[2], said[3])
+	if !mechanics_lab_napoli_visits(window, renderer, dice, room, data, controller, cards, buffer, arena) { return false }
+	return true
+}
+
+// Fase 1: the grandpa's visits. The player hurt (6 of 22), face 2: the grandpa
+// comes while the world stands still (the board's clock held all his visit) and
+// sets the table on the free cell farthest from the foes (reel
+// odin_pp_napoli_table_NN.png); a step into it sits the player down, the cure
+// coming in two halves on two beats, then the table is cleared (reel
+// odin_pp_napoli_feast_NN.png). Face 3: the purse's gold, the world still for it
+// too (reel odin_pp_napoli_purse_NN.png).
+@(private = "file")
+mechanics_lab_napoli_visits :: proc(window: ^app.Window, renderer: ^render.Renderer, dice: ^render.Dice_Renderer, room: ^game.Room, data: ^level.Level,
+	controller: ^run_session.Tactical_Controller, cards: ^run_session.Card_Interaction_State, buffer: ^run_session.Buffered_Gameplay_Command,
+	arena: proc(^app.Window, ^render.Renderer, ^game.Room, ^level.Level, ^run_session.Tactical_Controller, ^run_session.Card_Interaction_State,
+		^run_session.Buffered_Gameplay_Command) -> bool) -> bool {
+	player := room.player
+		// The card played on `face`, filmed until the board is done; whether the
+	// grandpa's visit showed, for its two seconds (the user's choice: 120
+	// frames), with the world held all through it.
+	visit :: proc(window: ^app.Window, renderer: ^render.Renderer, dice: ^render.Dice_Renderer, room: ^game.Room,
+		controller: ^run_session.Tactical_Controller, cards: ^run_session.Card_Interaction_State, buffer: ^run_session.Buffered_Gameplay_Command,
+		face: i32, name: string) -> (seen, held: bool, frames: int) {
+		renderer.tactical.mechanics_lab_napoli_face = face
+		run_session.mechanics_lab_fix_napoli_face(room, face)
+		if !mechanics_lab_play(window, renderer, room, controller, cards, buffer, .Napoli, game.entity_target(game.PLAYER_ENTITY)) { return }
+		held = true
+		frame := 0
+		clock := room.player.tactical.clock_fraction
+		for _ in 0..<900 {
+			mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0, true, dice)
+			if _, visiting := render.napoli_visit_cue(renderer); visiting {
+				if !seen { clock = room.player.tactical.clock_fraction }
+				seen = true
+				held = held && render.presentation_time_policy(&renderer.timeline) == .Cinematic && room.player.tactical.clock_fraction == clock
+				if frame%6 == 0 { artifacts.screenshot(fmt.ctprintf("odin_pp_napoli_%s_%02d.png", name, frame/6)) }
+				frame += 1
+			}
+			if seen && !render.renderer_timeline_is_busy(renderer) && !render.renderer_blocks_player_input(renderer) { break }
+		}
+		frames = frame
+		return
+	}
+	// The table.
+	if !arena(window, renderer, room, data, controller, cards, buffer) { return false }
+	player.health = 6
+	seen, held, frames := visit(window, renderer, dice, room, controller, cards, buffer, 2, "table")
+	index, laid := game.napoli_table_index(room)
+	if !seen || !held || !laid || frames < 114 || frames > 126 {
+		fmt.eprintln("mechanics lab: the grandpa's table visit (seen", seen, "world held", held, "table laid", laid, "frames", frames, ")"); return false
+	}
+	cell := room.objects[index].position
+	way := cell
+	way.x -= player.position.x
+	way.y -= player.position.y
+	if way.x != 0 && way.y != 0 { fmt.eprintln("mechanics lab: the table is set on a corner,", cell); return false }
+	direction: game.Move_Direction = .North if way.y < 0 else .South if way.y > 0 else .West if way.x < 0 else .East
+	if !mechanics_lab_commit(window, renderer, room, controller, cards, buffer, {kind = .Move, origin_phase = .Combat, direction = direction}) ||
+	   !game.napoli_seated(room) {
+		fmt.eprintln("mechanics lab: the step into the table did not sit the player down"); return false
+	}
+	frame := 0
+	for _ in 0..<600 {
+		mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0, true, dice)
+		if frame%6 == 0 { artifacts.screenshot(fmt.ctprintf("odin_pp_napoli_feast_%02d.png", frame/6)) }
+		frame += 1
+		if !game.napoli_seated(room) && !render.renderer_timeline_is_busy(renderer) { break }
+	}
+	cure := game.napoli_face_amount(.Table, 0, player.stats.max_health)
+	_, standing := game.napoli_table_index(room)
+	if game.napoli_seated(room) || standing || player.health != 6+cure {
+		fmt.eprintln("mechanics lab: the meal gave", player.health-6, "of", cure, "life; table still there", standing); return false
+	}
+	// The purse.
+	if !arena(window, renderer, room, data, controller, cards, buffer) { return false }
+	gold := player.gold
+	seen, held, frames = visit(window, renderer, dice, room, controller, cards, buffer, 3, "purse")
+	if !seen || !held || frames < 114 || frames > 126 || player.gold-gold != game.NAPOLI_PURSE_GOLD {
+		fmt.eprintln("mechanics lab: the grandpa's purse (seen", seen, "world held", held, "frames", frames, "gold", player.gold-gold, ")"); return false
+	}
+	fmt.eprintf("mechanics lab napoli visits: the world held for the grandpa; the table on %v eaten for %d life in two beats; the purse %d gold\n",
+		cell, cure, game.NAPOLI_PURSE_GOLD)
 	return true
 }

@@ -15,6 +15,8 @@ Grid_Object_Kind :: enum {
 	// What the player sets down for a while (emplacement.odin).
 	Field_Cannon,
 	Devouring_Hole,
+	// BENVENUTI A NAPOLI's table, set down by the grandpa (napoli.odin).
+	Napoli_Table,
 	Count,
 }
 
@@ -112,6 +114,8 @@ GRID_OBJECT_DEFINITIONS :: [int(Grid_Object_Kind.Count)]Grid_Object_Definition{
 	// Solid on its stand, nothing aims at it; the hole blocks nothing.
 	{kind = .Field_Cannon, name = "Cannon", blocks_movement = true},
 	{kind = .Devouring_Hole, name = "Black Hole"},
+	// Nothing walks, sees or shoots through the grandpa's table; nothing strikes it.
+	{kind = .Napoli_Table, name = "Tavolata", blocks_movement = true, blocks_line_of_sight = true},
 }
 
 // How wide and high an object stands as it is drawn (render: voxel_object_bounds,
@@ -132,6 +136,8 @@ grid_object_size :: proc(kind: Grid_Object_Kind) -> (width, height: f32) {
 	// CANNONE on its stand; the hole is a dark disc with a sphere in it.
 	case .Field_Cannon: width, height = 0.72, 0.86
 	case .Devouring_Hole: width, height = 0.9, 0.5
+	// The table, laid (napoli.odin).
+	case .Napoli_Table: width, height = 0.86, 0.56
 	case .Count:
 	}
 	return

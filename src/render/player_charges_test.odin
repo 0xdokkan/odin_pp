@@ -362,7 +362,8 @@ test_hearts_wait_for_the_blow_to_land :: proc(t: ^testing.T) {
 test_fate_cue_validates_its_die_and_shows_it_once :: proc(t: ^testing.T) {
 	testing.expect_value(t, presentation_cue_kind({kind = .Fate_Rolled}), Presentation_Cue_Kind.Fate_Rolled)
 	testing.expect_value(t, presentation_cue_kind({kind = .Attack_Deflected}), Presentation_Cue_Kind.Attack_Deflected)
-	testing.expect(t, !presentation_cue_is_cinematic(.Fate_Rolled))
+	fate_cue := Presentation_Cue{kind = .Fate_Rolled}
+	testing.expect(t, !presentation_cue_is_cinematic(&fate_cue))
 	testing.expect_value(t, presentation_cue_duration(.Fate_Rolled, {}), PRESENTATION_FATE_DURATION)
 	player := game.Player{position = {x = 2, y = 2}, health = 10, stats = {max_health = 10}}
 	enemies := [?]game.Enemy{{id = 1, archetype = .Chaser, position = {x = 2, y = 1}, health = 9, max_health = 9}}

@@ -208,6 +208,7 @@ tactical_end_combat :: proc(room: ^Room) {
 	room.bombs = {}
 	room.marley = {}
 	room.ride = {}
+	napoli_end_combat(room)
 	room.first_person.active = false
 	if room.first_person.weapon == .AK { room.first_person.trigger = false }
 }
@@ -300,6 +301,8 @@ continue_tactical_pulse :: proc(room: ^Room) -> bool {
 		// CANNONE and BUCO NERO: what the player set down acts; the ride's clock.
 		emplacement_beat(room, &pulse)
 		ride_beat(room, &pulse)
+		// BENVENUTI A NAPOLI: a half of the meal at the grandpa's table (napoli.odin).
+		napoli_beat(room, &pulse)
 		ids, count := enemy_ids_in_planning_order(room)
 		for protect_pass in 0..<2 {
 			for id in ids[:count] {
@@ -492,6 +495,8 @@ offer_defense_qte :: proc(room: ^Room, enemy: ^Enemy) -> bool {
 	if first_person_fists_active(room) { return false }
 	// With the sword the right button parries (Fase 4).
 	if first_person_sword_active(room) { return false }
+	// Sat at the grandpa's table he goes on eating and takes the blow (napoli.odin).
+	if napoli_seated(room) { return false }
 	intent := &enemy.intent
 	// An archer's arrow is answered by stepping out of its line (enemy_arrow.odin).
 	if enemy_attack_is_arrow(enemy, intent) { return false }

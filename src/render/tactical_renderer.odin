@@ -141,6 +141,8 @@ Tactical_View :: struct {
 	marley: Marley_View,
 	// CANNONE, BUCO NERO and DINOSAURO: the prints, the climb and the walk (arsenal.odin).
 	arsenal: Arsenal_View,
+	// BENVENUTI A NAPOLI: the grandpa's and the purse's prints (napoli.odin).
+	napoli: Napoli_View,
 	// INONDAZIONE: the way of its wave while the card is held over the board.
 	flood_aim: Flood_Aim,
 	// "This one can be hit": when each locked foe was first locked, for its ring
@@ -242,6 +244,7 @@ destroy_tactical_assets :: proc(renderer: ^Renderer) {
 	destroy_pinball_view(renderer)
 	destroy_marley_view(renderer)
 	destroy_arsenal_view(renderer)
+	destroy_napoli_view(renderer)
 	destroy_first_person_view(renderer)
 	if renderer.tactical.outline_shader.id != 0 { rl.UnloadShader(renderer.tactical.outline_shader); renderer.tactical.outline_shader = {} }
 	if renderer.tactical.hidden_shader.id != 0 { rl.UnloadShader(renderer.tactical.hidden_shader); renderer.tactical.hidden_shader = {} }
@@ -725,8 +728,12 @@ draw_tactical_world :: proc(renderer: ^Renderer, room: ^game.Room, active_card: 
 	for object in snapshot.objects[:snapshot.object_count] {
 		cell := grid.Position{x = int(math.round(object.position.x)), y = int(math.round(object.position.y))}
 		if !object.visible || !tactical_cell_on_screen(renderer, cell) || !tactical_render_visible(renderer, cell) { continue }
+		// The grandpa's table shows in his arms till he has set it down (napoli.odin).
+		if object.kind == .Napoli_Table && napoli_table_carried(renderer) { continue }
 		draw_voxel_object(renderer, object)
 	}
+	// BENVENUTI A NAPOLI: the table in the grandpa's arms (napoli.odin).
+	draw_napoli_visit_table(renderer, room)
 	for item in snapshot.loot[:snapshot.loot_count] {
 		if !item.visible || !tactical_cell_on_screen(renderer, item.position) || !tactical_render_visible(renderer, item.position) { continue }
 		draw_tactical_loot(renderer, item)

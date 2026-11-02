@@ -25,6 +25,9 @@ BORROWED_RENDERER_OWN_HANDLES :: [?]string{
 	"tactical.marley.figure",
 	"tactical.marley.bomb",
 	"tactical.marley.puff",
+	// BENVENUTI A NAPOLI's grandpa and purse (napoli.odin).
+	"tactical.napoli.nonno",
+	"tactical.napoli.purse",
 	"tactical.arsenal.ball",
 	"tactical.arsenal.puff",
 	"tactical.arsenal.dinos[0]",
@@ -138,6 +141,7 @@ destroy_borrowed_renderer :: proc(r: ^Renderer) {
 	destroy_first_person_view(r)
 	destroy_marley_view(r)
 	destroy_arsenal_view(r)
+	destroy_napoli_view(r)
 	if v.flipbook_state != nil { free(v.flipbook_state); v.flipbook_state = nil }
 	if v.labels != nil { free(v.labels); v.labels = nil }
 	if v.snapshot != nil { free(v.snapshot); v.snapshot = nil }
