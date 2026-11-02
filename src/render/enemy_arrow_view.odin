@@ -199,6 +199,11 @@ draw_enemy_bolt_shadow :: proc(tail, tip: rl.Vector3, ground: f32) {
 @(private)
 draw_enemy_arrows :: proc(renderer: ^Renderer, room: ^game.Room) {
 	if room == nil { return }
+	// Nothing to draw, nothing to flush: the batch goes on unbroken.
+	now := renderer.sprite_assets.elapsed
+	busy := room.arrows.count > 0
+	for bolt in renderer.tactical.enemy_bolts.stuck { busy = busy || (bolt.at > 0 && now-bolt.at < ENEMY_BOLT_STUCK_SECONDS) }
+	if !busy { return }
 	texel := enemy_bolt_texel()
 	rlgl.DrawRenderBatchActive()
 	rlgl.DisableBackfaceCulling()
@@ -224,7 +229,6 @@ draw_enemy_arrows :: proc(renderer: ^Renderer, room: ^game.Room) {
 		rlgl.DrawRenderBatchActive()
 		draw_attack_prop(renderer, .Quarrel, tail, tip, texel, 1)
 	}
-	now := renderer.sprite_assets.elapsed
 	for bolt in renderer.tactical.enemy_bolts.stuck {
 		if bolt.at <= 0 || !tactical_render_visible(renderer, bolt.cell) { continue }
 		tail, tip, opacity, shown := enemy_bolt_stuck_pose(bolt, now)

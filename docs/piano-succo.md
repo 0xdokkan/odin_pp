@@ -65,7 +65,7 @@ Parole del documento:
 | 3 | Frecce degli arcieri: proiettili veri nelle regole | 0 | Fatta | vedi Esito |
 | 4 | Frecce degli arcieri: aspetto 3D, riga accesa, suoni | 3 | Fatta | vedi Esito |
 | 5 | Bombe dei bombaroli: volo ad arco e cerchio d'impatto | 3 | Fatta | vedi Esito |
-| 6 | Nel gioco vero: prova con l'utente, bilanciamento, chiusura | 2, 4, 5 | Da fare | |
+| 6 | Nel gioco vero: prova con l'utente, bilanciamento, chiusura | 2, 4, 5 | Fatta | vedi Esito |
 
 ## Come funziona oggi (punto di partenza)
 
@@ -516,6 +516,51 @@ Passi:
 **Fatto quando:** l'utente approva; `scripts/check.ps1` verde; prova completa del
 laboratorio verde.
 
+### Esito (2 novembre 2026)
+
+Scelte dell'utente all'inizio della fase: i suoni fatti da codice **restano nel
+laboratorio** (anche quelli nuovi di frecce, bombe e critici: il gioco vero
+resta con ambiente, musica e bip); la partita di prova in una **spedizione
+della campagna**.
+
+1. **Nel gioco vero:** non serviva accendere niente. Frecce e bombe in volo sono
+   regole del pacchetto `game` e valgono in ogni modo; il succo è sul tabellone
+   della run e della spedizione e segue il cursore «Scuotimento e pausa sui
+   colpi» (la campagna gioca le sue spedizioni). Solo i suoni sono del
+   laboratorio, per scelta dell'utente.
+2. **Partita di prova e bilanciamento:** l'utente ha fatto una spedizione della
+   campagna (su una copia del salvataggio) contro arcieri e bombaroli: frecce
+   (8 caselle al secondo, il danno dell'arciere), bombe (volo di 0,6 s, miccia
+   di 3 battiti) e succo **vanno bene**. Nessun numero cambia.
+3. **Misure finali** (benchmark delle spedizioni come nella Fase 0, stesse 195
+   scene, canvas 1920×1080, RTX 3060 Laptop, `-o:speed`). Le prime due corse
+   hanno trovato tre scene (2, 4, 12) più lente di circa il 10% in tutte e due:
+   i disegni nuovi (dardi, bombe, scintille) svuotavano il lotto di disegno di
+   raylib e cambiavano il culling o la profondità **a ogni fotogramma, anche
+   senza niente da disegnare**. Ora escono subito quando non c'è nulla
+   (`draw_enemy_arrows`, `draw_enemy_bomb_floor`, `draw_juice_bursts`). Le due
+   corse dopo la correzione (C e D, appendice B):
+   - in media un'immagine si disegna in **1,47 ms**, contro 1,45 ms all'inizio:
+     lo 0,8% in più, cioè **nessuna differenza misurabile** (circa 680
+     fotogrammi al secondo contro 690; sotto il 10% è rumore);
+   - le scene 2, 4 e 12 sono tornate come all'inizio (1,22, 1,31 e 1,15 ms);
+   - corsa e ingaggio (stage 25 e 26) 1,66 e 1,70 ms, come all'inizio (1,65 e
+     1,70); le scene più pesanti restano intorno a 2,0 ms (500 al secondo);
+   - quattro scene (33, 34, 37, 43) sono più lente del 10-15% nelle corse B, C
+     e D ma non nella A, che ha lo stesso codice della B: è la scheda video che
+     cambia da una corsa all'altra, non il codice.
+4. **Documenti:** sezione nuova «Succo dei colpi» in
+   [combattimento.md](regole/combattimento.md), accanto a frecce e bombe in volo
+   (Fasi 3-5); CHANGELOG; il README indica il piano come concluso.
+5. **Verifiche:** `scripts/check.ps1` verde (1857 test con e senza assert);
+   prova completa del laboratorio verde nella finestra vera (2175 catture, 152
+   suoni).
+
+**Il piano è concluso.** Restano per dopo le idee scartate all'inizio (lo
+scatto, l'interruzione dell'attacco, le spinte contro muri e nemici, i nemici
+con movimenti propri, i boss a fasi, il bonus per le azioni concatenate) e, se
+l'utente lo vorrà, i suoni fatti da codice nel gioco vero.
+
 ## Rischi
 
 - **Troppo succo stanca e nasconde i colpi importanti:** per questo la pausa solo
@@ -746,3 +791,207 @@ Benchmark delle spedizioni della Fase 0 (30 ottobre 2026), RTX 3060 Laptop, canv
 | 192 | 3 | 1.52 | 1.50 | 1.73 | 1.59 |
 | 193 | 3 | 1.50 | 1.53 | 1.59 | 1.61 |
 | 194 | 11 | 1.47 | 1.49 | 1.60 | 1.65 |
+
+## Appendice B — Misure finali, scena per scena
+
+Benchmark delle spedizioni della Fase 6 (2 novembre 2026), stessa macchina e stesse impostazioni dell'appendice A,
+dopo la correzione del lotto di disegno, due corse (C e D). Tempo di un'immagine in millisecondi: media e 95°
+percentile.
+
+| Stage | Bioma | Media C | Media D | p95 C | p95 D |
+|---:|---:|---:|---:|---:|---:|
+| 0 | 0 | 1.45 | 1.22 | 1.77 | 1.40 |
+| 1 | 0 | 1.69 | 1.68 | 2.17 | 2.28 |
+| 2 | 0 | 1.21 | 1.23 | 1.38 | 1.40 |
+| 3 | 0 | 1.27 | 1.27 | 1.50 | 1.45 |
+| 4 | 0 | 1.27 | 1.34 | 1.53 | 1.52 |
+| 5 | 0 | 1.94 | 1.97 | 2.79 | 2.83 |
+| 6 | 0 | 1.64 | 1.65 | 2.38 | 2.43 |
+| 7 | 0 | 1.58 | 1.60 | 1.72 | 1.74 |
+| 8 | 1 | 1.58 | 1.64 | 1.75 | 1.86 |
+| 9 | 2 | 1.62 | 1.64 | 2.37 | 2.47 |
+| 10 | 3 | 1.65 | 1.64 | 2.46 | 2.42 |
+| 11 | 4 | 1.66 | 1.67 | 2.46 | 2.49 |
+| 12 | 5 | 1.14 | 1.17 | 1.34 | 1.33 |
+| 13 | 6 | 1.47 | 1.50 | 1.66 | 1.74 |
+| 14 | 7 | 1.64 | 1.67 | 2.49 | 2.48 |
+| 15 | 8 | 1.20 | 1.23 | 1.39 | 1.49 |
+| 16 | 9 | 1.53 | 1.56 | 1.69 | 1.75 |
+| 17 | 10 | 1.67 | 1.70 | 2.45 | 2.57 |
+| 18 | 11 | 1.63 | 1.67 | 2.40 | 2.43 |
+| 19 | 11 | 1.64 | 1.67 | 2.45 | 2.48 |
+| 20 | 11 | 1.99 | 2.00 | 2.64 | 2.64 |
+| 21 | 11 | 1.63 | 1.64 | 2.43 | 2.43 |
+| 22 | 11 | 1.49 | 1.52 | 2.15 | 2.28 |
+| 23 | 11 | 1.76 | 1.77 | 2.33 | 2.38 |
+| 24 | 11 | 1.60 | 1.62 | 1.77 | 1.78 |
+| 25 | 11 | 1.64 | 1.67 | 2.41 | 2.47 |
+| 26 | 11 | 1.68 | 1.71 | 2.46 | 2.45 |
+| 27 | 0 | 1.60 | 1.58 | 2.49 | 2.39 |
+| 28 | 1 | 1.64 | 1.66 | 2.42 | 2.42 |
+| 29 | 2 | 1.64 | 1.65 | 2.40 | 2.40 |
+| 30 | 3 | 1.82 | 1.87 | 1.98 | 2.12 |
+| 31 | 4 | 1.67 | 1.67 | 2.45 | 2.44 |
+| 32 | 5 | 1.11 | 1.13 | 1.27 | 1.38 |
+| 33 | 6 | 1.62 | 1.63 | 2.31 | 2.39 |
+| 34 | 7 | 1.46 | 1.50 | 2.22 | 2.28 |
+| 35 | 8 | 1.30 | 1.34 | 2.02 | 2.01 |
+| 36 | 9 | 1.23 | 1.24 | 1.37 | 1.40 |
+| 37 | 10 | 1.50 | 1.49 | 2.27 | 2.29 |
+| 38 | 11 | 1.25 | 1.25 | 1.49 | 1.46 |
+| 39 | 0 | 1.64 | 1.68 | 1.80 | 1.83 |
+| 40 | 1 | 1.61 | 1.63 | 2.38 | 2.43 |
+| 41 | 2 | 1.41 | 1.46 | 1.64 | 1.69 |
+| 42 | 3 | 1.82 | 1.83 | 2.77 | 2.76 |
+| 43 | 4 | 1.70 | 1.73 | 2.46 | 2.46 |
+| 44 | 5 | 1.22 | 1.24 | 1.85 | 1.87 |
+| 45 | 6 | 1.57 | 1.61 | 1.79 | 1.80 |
+| 46 | 7 | 1.62 | 1.66 | 1.80 | 1.84 |
+| 47 | 8 | 1.18 | 1.20 | 1.43 | 1.42 |
+| 48 | 9 | 1.44 | 1.46 | 1.61 | 1.65 |
+| 49 | 10 | 1.52 | 1.53 | 1.81 | 1.76 |
+| 50 | 11 | 1.51 | 1.52 | 1.73 | 1.71 |
+| 51 | 6 | 1.70 | 1.71 | 1.97 | 1.99 |
+| 52 | 1 | 1.60 | 1.61 | 1.76 | 1.81 |
+| 53 | 2 | 1.66 | 1.66 | 1.85 | 1.81 |
+| 54 | 10 | 1.55 | 1.59 | 1.75 | 1.79 |
+| 55 | 0 | 1.73 | 1.76 | 2.59 | 2.60 |
+| 56 | 0 | 1.65 | 1.71 | 2.47 | 2.56 |
+| 57 | 0 | 1.53 | 1.52 | 1.60 | 1.69 |
+| 58 | 0 | 1.44 | 1.43 | 1.54 | 1.69 |
+| 59 | 0 | 1.39 | 1.42 | 1.46 | 1.63 |
+| 60 | 0 | 1.47 | 1.49 | 1.55 | 1.69 |
+| 61 | 0 | 1.56 | 1.69 | 1.64 | 2.56 |
+| 62 | 0 | 1.25 | 1.43 | 1.34 | 2.19 |
+| 63 | 0 | 1.46 | 1.66 | 1.55 | 2.49 |
+| 64 | 1 | 1.48 | 1.70 | 1.54 | 2.45 |
+| 65 | 2 | 1.39 | 1.63 | 1.44 | 2.41 |
+| 66 | 3 | 1.58 | 1.75 | 1.69 | 2.64 |
+| 67 | 4 | 1.31 | 1.53 | 1.40 | 2.35 |
+| 68 | 5 | 1.11 | 1.13 | 1.64 | 1.34 |
+| 69 | 6 | 1.27 | 1.51 | 1.32 | 2.31 |
+| 70 | 7 | 1.46 | 1.67 | 1.51 | 2.50 |
+| 71 | 8 | 1.21 | 1.27 | 1.83 | 1.79 |
+| 72 | 9 | 1.40 | 1.61 | 1.54 | 2.32 |
+| 73 | 10 | 1.34 | 1.55 | 1.50 | 2.31 |
+| 74 | 11 | 1.41 | 1.57 | 1.60 | 2.36 |
+| 75 | 4 | 1.35 | 1.43 | 1.53 | 1.61 |
+| 76 | 6 | 1.35 | 1.67 | 1.52 | 2.16 |
+| 77 | 9 | 1.27 | 1.34 | 1.40 | 1.56 |
+| 78 | 6 | 1.74 | 1.81 | 1.95 | 2.67 |
+| 79 | 6 | 1.38 | 1.41 | 1.43 | 1.63 |
+| 80 | 6 | 1.30 | 1.54 | 1.35 | 2.30 |
+| 81 | 6 | 1.38 | 1.56 | 1.45 | 2.33 |
+| 82 | 6 | 1.23 | 1.23 | 1.32 | 1.34 |
+| 83 | 6 | 1.29 | 1.31 | 1.37 | 1.37 |
+| 84 | 6 | 1.22 | 1.26 | 1.25 | 1.36 |
+| 85 | 6 | 1.20 | 1.22 | 1.30 | 1.27 |
+| 86 | 6 | 1.19 | 1.21 | 1.27 | 1.31 |
+| 87 | 6 | 1.27 | 1.28 | 1.31 | 1.33 |
+| 88 | 6 | 1.24 | 1.25 | 1.28 | 1.32 |
+| 89 | 6 | 1.24 | 1.26 | 1.27 | 1.32 |
+| 90 | 1 | 1.38 | 1.40 | 1.42 | 1.47 |
+| 91 | 1 | 1.45 | 1.45 | 1.53 | 1.56 |
+| 92 | 1 | 1.43 | 1.44 | 1.58 | 1.52 |
+| 93 | 4 | 1.33 | 1.35 | 1.40 | 1.41 |
+| 94 | 4 | 1.30 | 1.33 | 1.36 | 1.41 |
+| 95 | 4 | 1.25 | 1.27 | 1.36 | 1.37 |
+| 96 | 7 | 1.35 | 1.38 | 1.49 | 1.45 |
+| 97 | 7 | 1.44 | 1.40 | 1.76 | 1.50 |
+| 98 | 7 | 1.40 | 1.41 | 1.64 | 1.48 |
+| 99 | 4 | 1.23 | 1.24 | 1.33 | 1.32 |
+| 100 | 4 | 1.22 | 1.24 | 1.30 | 1.30 |
+| 101 | 4 | 1.37 | 1.39 | 1.46 | 1.47 |
+| 102 | 4 | 1.26 | 1.28 | 1.38 | 1.41 |
+| 103 | 6 | 1.38 | 1.40 | 1.55 | 1.50 |
+| 104 | 0 | 1.31 | 1.33 | 1.49 | 1.58 |
+| 105 | 0 | 1.43 | 1.44 | 1.56 | 1.54 |
+| 106 | 0 | 1.42 | 1.44 | 1.62 | 1.56 |
+| 107 | 0 | 1.36 | 1.39 | 1.48 | 1.49 |
+| 108 | 0 | 1.33 | 1.35 | 1.44 | 1.47 |
+| 109 | 0 | 1.65 | 1.66 | 1.81 | 1.77 |
+| 110 | 1 | 1.48 | 1.49 | 1.64 | 1.54 |
+| 111 | 1 | 1.27 | 1.30 | 1.35 | 1.41 |
+| 112 | 1 | 1.22 | 1.22 | 1.35 | 1.33 |
+| 113 | 1 | 1.25 | 1.26 | 1.34 | 1.33 |
+| 114 | 1 | 1.21 | 1.23 | 1.25 | 1.33 |
+| 115 | 1 | 1.46 | 1.48 | 1.65 | 1.64 |
+| 116 | 2 | 1.41 | 1.43 | 1.47 | 1.49 |
+| 117 | 2 | 1.19 | 1.19 | 1.25 | 1.25 |
+| 118 | 2 | 1.16 | 1.15 | 1.30 | 1.25 |
+| 119 | 2 | 1.13 | 1.14 | 1.26 | 1.24 |
+| 120 | 2 | 1.25 | 1.25 | 1.80 | 1.82 |
+| 121 | 2 | 1.41 | 1.42 | 1.49 | 1.62 |
+| 122 | 3 | 1.68 | 1.69 | 1.76 | 1.76 |
+| 123 | 3 | 1.85 | 1.84 | 2.07 | 1.90 |
+| 124 | 3 | 1.78 | 1.78 | 1.84 | 1.84 |
+| 125 | 3 | 1.62 | 1.61 | 1.84 | 1.79 |
+| 126 | 3 | 1.63 | 1.62 | 1.81 | 1.75 |
+| 127 | 3 | 1.98 | 2.00 | 2.18 | 2.21 |
+| 128 | 4 | 1.12 | 1.16 | 1.73 | 1.76 |
+| 129 | 4 | 1.28 | 1.29 | 1.35 | 1.39 |
+| 130 | 4 | 1.28 | 1.28 | 1.41 | 1.42 |
+| 131 | 4 | 1.52 | 1.52 | 1.66 | 1.70 |
+| 132 | 4 | 1.32 | 1.35 | 1.41 | 1.43 |
+| 133 | 4 | 1.72 | 1.69 | 1.86 | 1.84 |
+| 134 | 5 | 1.06 | 1.07 | 1.27 | 1.31 |
+| 135 | 5 | 1.16 | 1.20 | 1.83 | 1.77 |
+| 136 | 5 | 1.19 | 1.15 | 1.80 | 1.44 |
+| 137 | 5 | 1.18 | 1.16 | 1.82 | 1.81 |
+| 138 | 5 | 1.17 | 1.10 | 1.56 | 1.53 |
+| 139 | 5 | 1.57 | 1.57 | 1.80 | 1.73 |
+| 140 | 6 | 1.51 | 1.52 | 1.71 | 1.66 |
+| 141 | 6 | 1.46 | 1.47 | 1.59 | 1.52 |
+| 142 | 6 | 1.46 | 1.44 | 1.51 | 1.54 |
+| 143 | 6 | 1.44 | 1.45 | 1.54 | 1.50 |
+| 144 | 6 | 1.44 | 1.45 | 1.49 | 1.50 |
+| 145 | 6 | 1.67 | 1.69 | 1.81 | 1.86 |
+| 146 | 7 | 1.65 | 1.68 | 1.72 | 1.75 |
+| 147 | 7 | 1.55 | 1.55 | 1.69 | 1.67 |
+| 148 | 7 | 1.48 | 1.47 | 1.61 | 1.58 |
+| 149 | 7 | 1.58 | 1.62 | 1.76 | 1.90 |
+| 150 | 7 | 1.63 | 1.67 | 1.70 | 1.79 |
+| 151 | 7 | 1.72 | 1.74 | 1.91 | 1.90 |
+| 152 | 8 | 1.44 | 1.48 | 2.17 | 2.21 |
+| 153 | 8 | 1.42 | 1.42 | 2.10 | 2.09 |
+| 154 | 8 | 1.44 | 1.43 | 2.14 | 2.11 |
+| 155 | 8 | 1.26 | 1.30 | 1.44 | 2.07 |
+| 156 | 8 | 1.27 | 1.32 | 1.93 | 2.05 |
+| 157 | 8 | 1.60 | 1.60 | 1.73 | 1.73 |
+| 158 | 9 | 1.29 | 1.37 | 1.40 | 1.63 |
+| 159 | 9 | 1.35 | 1.39 | 1.50 | 1.65 |
+| 160 | 9 | 1.38 | 1.40 | 1.51 | 1.63 |
+| 161 | 9 | 1.34 | 1.35 | 1.48 | 1.48 |
+| 162 | 9 | 1.42 | 1.33 | 1.69 | 1.46 |
+| 163 | 9 | 1.57 | 1.59 | 1.71 | 1.77 |
+| 164 | 10 | 1.44 | 1.46 | 1.52 | 1.59 |
+| 165 | 10 | 1.36 | 1.38 | 1.41 | 1.44 |
+| 166 | 10 | 1.45 | 1.43 | 1.64 | 1.55 |
+| 167 | 10 | 1.47 | 1.47 | 1.58 | 1.59 |
+| 168 | 10 | 1.46 | 1.48 | 1.61 | 1.55 |
+| 169 | 10 | 1.69 | 1.69 | 1.83 | 1.81 |
+| 170 | 11 | 1.63 | 1.65 | 1.70 | 1.73 |
+| 171 | 11 | 1.38 | 1.38 | 1.45 | 1.47 |
+| 172 | 11 | 1.32 | 1.32 | 1.47 | 1.55 |
+| 173 | 11 | 1.43 | 1.42 | 1.70 | 1.62 |
+| 174 | 11 | 1.33 | 1.35 | 1.45 | 1.46 |
+| 175 | 11 | 1.66 | 1.65 | 2.00 | 1.85 |
+| 176 | 3 | 1.81 | 1.82 | 2.03 | 2.05 |
+| 177 | 3 | 1.99 | 1.99 | 2.08 | 2.06 |
+| 178 | 3 | 1.96 | 1.96 | 2.15 | 2.15 |
+| 179 | 4 | 1.57 | 1.58 | 1.64 | 1.65 |
+| 180 | 4 | 1.47 | 1.47 | 1.59 | 1.59 |
+| 181 | 4 | 1.31 | 1.33 | 1.36 | 1.48 |
+| 182 | 5 | 1.22 | 1.22 | 1.90 | 1.51 |
+| 183 | 5 | 1.34 | 1.37 | 2.11 | 1.76 |
+| 184 | 5 | 1.31 | 1.34 | 1.45 | 1.52 |
+| 185 | 8 | 1.16 | 1.19 | 1.31 | 1.38 |
+| 186 | 8 | 1.29 | 1.33 | 1.42 | 1.47 |
+| 187 | 8 | 1.32 | 1.34 | 2.08 | 2.05 |
+| 188 | 10 | 1.40 | 1.45 | 1.55 | 1.72 |
+| 189 | 10 | 1.35 | 1.34 | 1.45 | 1.43 |
+| 190 | 10 | 1.45 | 1.50 | 1.63 | 1.83 |
+| 191 | 3 | 1.62 | 1.64 | 1.76 | 1.78 |
+| 192 | 3 | 1.50 | 1.51 | 1.55 | 1.57 |
+| 193 | 3 | 1.52 | 1.52 | 1.58 | 1.61 |
+| 194 | 11 | 1.50 | 1.48 | 1.73 | 1.65 |

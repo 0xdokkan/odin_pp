@@ -5,6 +5,15 @@ I riferimenti a Classica, `--flat` e ai vecchi smoke descrivono versioni precede
 per i comandi disponibili oggi valgono il [README](README.md) e la documentazione collegata.
 
 
+## 2026-11-02 — Piano del succo, Fase 6: nel gioco vero, piano concluso
+
+- Partita di prova in una spedizione della campagna: frecce, bombe e succo dei colpi vanno bene, nessun numero cambia.
+  I suoni fatti da codice restano nel laboratorio (scelta dell'utente).
+- I disegni nuovi di dardi, bombe e scintille non interrompono più il lotto di disegno quando non c'è niente da
+  disegnare: le spedizioni si disegnano veloci come prima del piano (1,47 ms contro 1,45 ms in media, differenza
+  dentro il rumore).
+- Le regole del combattimento hanno una sezione sul succo dei colpi.
+
 ## 2026-11-02 — Piano del succo, Fase 5: le bombe dei bombaroli volano ad arco
 
 - La bomba del bombarolo vola ad arco per 0,6 secondi prima di essere sulla cella: si vede la stessa bomba di resina che

@@ -236,6 +236,12 @@ juice_struck_flash :: proc(renderer: ^Renderer, entity: game.Entity_Ref) -> f32 
 @(private)
 draw_juice_bursts :: proc(renderer: ^Renderer) {
 	now := renderer.sprite_assets.elapsed
+	// Nothing to draw, nothing to flush: the batch goes on unbroken.
+	shown := false
+	for burst in renderer.tactical.juice_blows.bursts {
+		shown = shown || (burst.start > 0 && now >= burst.start && now-burst.start < JUICE_SPARK_SECONDS)
+	}
+	if !shown { return }
 	rlgl.DrawRenderBatchActive()
 	rlgl.DisableDepthTest()
 	defer { rlgl.DrawRenderBatchActive(); rlgl.EnableDepthTest() }

@@ -155,6 +155,28 @@ del movimento è solo il passo in diagonale.
 
 Le regole e i numeri sono in [tactical_beat.odin](../../src/game/tactical_beat.odin).
 
+### Succo dei colpi
+
+Dal 1 novembre 2026 ([piano](../piano-succo.md), Fasi 1-2; provato nel gioco vero
+dall'utente il 2 novembre, Fase 6) i colpi si sentono sul tabellone, nella run e nelle
+spedizioni. È solo immagine: le regole e il tempo del mondo non lo vedono.
+
+| Colpo | Pausa | Scossa (trauma) | Altro |
+|---|---:|---:|---|
+| Colpo a urto o freccia del Viandante | 60 ms | 0,25 | la carta colpita arretra di 0,15 caselle, lampeggia bianca, frammenti di carta |
+| Il suo critico | 90 ms | 0,45 | frammenti dorati, lampo più lungo |
+| La sua uccisione | 100 ms | 0,55 | la carta resta indietro mentre cade |
+| Una sua carta che fa danno | — | come sopra | niente pausa né arretramento |
+| Colpo nemico su di lui | — | 0,30 | bordo rosso dello schermo per 0,25 s |
+| Colpo nemico parato o respinto | — | 0,15 | scintille azzurre |
+| Esplosione | — | 0,40, meno se lontana | |
+
+La pausa ferma le immagini senza dare tempo al mondo, mai più di una ogni 0,15 s; un tasto
+premuto intanto resta ricordato. Il cursore «Scuotimento e pausa sui colpi» delle impostazioni
+le regola da 0 a 100%. Il codice è in [juice.odin](../../src/render/juice.odin) e
+[juice_blows.odin](../../src/render/juice_blows.odin). I suoni nuovi di frecce, bombe e
+critici suonano solo nel laboratorio, come gli altri suoni fatti da codice (scelta dell'utente).
+
 ## Modalità tattica M7
 
 La demo avvia **M8 / 0.4**, costruita sul loop M7: scena 3D con sprite 2D,

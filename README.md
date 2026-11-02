@@ -96,7 +96,7 @@ i nemici. Le spedizioni già salvate mantengono la loro geografia originale.
 | [Sviluppo](docs/sviluppo.md) | convenzioni Odin e metodo di lavoro |
 | [Piano della griglia](docs/piano-griglia.md) | fasi da eseguire una alla volta: bersagli in evidenza, altezze, montagna a spirale, caverne, strutture, hub in 3D |
 | [Piano della profondità](docs/piano-profondita.md) | fasi da eseguire una alla volta: terreno scolpito, mappa a piani, grotte senza caricamento, editor, ponti e gallerie nei biomi |
-| [Piano del combattimento vivo](docs/piano-succo.md) | fasi da eseguire una alla volta: succo dei colpi (pausa sull'impatto, scossa, scintille), frecce degli arcieri e bombe dei bombaroli come proiettili veri |
+| [Piano del combattimento vivo](docs/piano-succo.md) | concluso il 2 novembre 2026: succo dei colpi (pausa sull'impatto, scossa, scintille), frecce degli arcieri e bombe dei bombaroli come proiettili veri |
 | [Piano della prima persona](docs/piano-prima-persona.md) | tre carte in prima persona sul modello dell'AK, nel laboratorio: First Person Brawler (pugni), Fencer (zweihänder), Archer (arco compound); tutte le fasi fatte (0-8) |
 | [Cronologia](CHANGELOG.md) | milestone e refactor precedenti; le note storiche non definiscono le regole attuali |
 

@@ -102,6 +102,12 @@ draw_enemy_bomb_cells :: proc(renderer: ^Renderer, room: ^game.Room, centre: gri
 @(private)
 draw_enemy_bomb_floor :: proc(renderer: ^Renderer, room: ^game.Room) {
 	if room == nil || room.phase != .Combat { return }
+	// Nothing to draw, nothing to flush: the batch goes on unbroken.
+	shown := room.bombs.count > 0
+	for object in renderer.tactical.snapshot.objects[:renderer.tactical.snapshot.object_count] {
+		shown = shown || (object.visible && object.kind == .Bomb && object.detonation_pulse != 0)
+	}
+	if !shown { return }
 	now := f32(tactical_world_time(renderer))
 	rlgl.DrawRenderBatchActive()
 	rlgl.DisableBackfaceCulling()
