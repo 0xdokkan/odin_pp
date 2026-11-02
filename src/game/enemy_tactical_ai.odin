@@ -286,7 +286,8 @@ tactical_enemy_escape :: proc(room: ^Room, origin: grid.Position,
 	return
 }
 
-@(private = "file")
+// A bomber's throw at `anchor` (its windup, or the throw itself), the blast's
+// cells threatened (the mechanics lab sets one up as the AI does).
 make_tactical_bomb_intent :: proc(room: ^Room, origin, anchor: grid.Position, windup: bool) -> Enemy_Intent {
 	intent := make_wait_intent(room, origin)
 	intent.kind, intent.destination, intent.windup = .Bombard, anchor, windup

@@ -432,6 +432,8 @@ lab_cue_sounds :: proc(renderer: ^Renderer, s: ^Lab_Sounds, cue: ^Presentation_C
 			// for a coil that comes any other way.
 			if now-s.last_played[.Card_Tesla_Coil] > LAB_SOUND_CARD_DEVICE_SECONDS { lab_sound_queue(s, .World_Tesla_Deploy, now) }
 		case .Fire: lab_sound_queue(s, .World_Fire, now)
+		// A bomber's bomb lands from its arc (enemy_bomb_view.odin).
+		case .Bomb: if event.source.kind == .Enemy { lab_sound_queue(s, .World_Bomb_Land, now, 1, pan) }
 		// CANNONE and BUCO NERO set down.
 		case .Field_Cannon: lab_sound_queue(s, .World_Cannon_Place, now)
 		case .Devouring_Hole: lab_sound_queue(s, .World_Black_Hole_Open, now)

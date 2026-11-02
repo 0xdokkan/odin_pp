@@ -15,14 +15,15 @@ import level "../level"
 //
 // The arrows fly on the world's seconds (tactical_advance_clock): a shadow, a
 // cast, a defence or a die hold them as they hold the world. Their seconds are
-// flown out by world commands (resolve_arrow_flight, as the Pinball's roll)
+// flown out by world commands (resolve_enemy_flights, as the Pinball's roll)
 // and at every beat's start, before the beat: no beat ever passes an arrow.
+// The bombers' bombs (enemy_bomb.odin) fly on the same clock.
 
 ENEMY_ARROW_SPEED :: f32(8)
 ENEMY_ARROW_RANGE :: 8
 MAX_ENEMY_ARROWS :: 8
 @(private = "file")
-ENEMY_ARROW_EPSILON :: f64(0.00001)
+ENEMY_ARROW_EPSILON :: f32(0.00001)
 // A flight's batch stops short of a full log.
 @(private = "file")
 ENEMY_ARROW_EVENT_HEADROOM :: 24
@@ -43,9 +44,9 @@ Enemy_Arrow :: struct {
 
 Enemy_Arrows :: struct {
 	items: [MAX_ENEMY_ARROWS]Enemy_Arrow,
-	count: int,
+	count: i32,
 	// World seconds not flown out yet.
-	pending: f64,
+	pending: f32,
 }
 
 // An arrow's origin and step as the board's positions.
@@ -71,7 +72,7 @@ enemy_arrow_cell :: proc(arrow: Enemy_Arrow, k: int) -> grid.Position {
 // still waiting included (the board draws it there).
 enemy_arrow_distance :: proc(room: ^Room, arrow: Enemy_Arrow) -> f32 {
 	if room == nil { return arrow.flown }
-	return min(arrow.flown+f32(room.arrows.pending)*ENEMY_ARROW_SPEED, f32(ENEMY_ARROW_RANGE))
+	return min(arrow.flown+room.arrows.pending*ENEMY_ARROW_SPEED, f32(ENEMY_ARROW_RANGE))
 }
 
 // Whether a cell stops an arrow flying from `origin`: off the board, a wall,
@@ -129,28 +130,30 @@ loose_enemy_arrow :: proc(room: ^Room, enemy: ^Enemy, intent: ^Enemy_Intent, pul
 	return true
 }
 
-// The world's seconds reach the arrows in flight.
+// The world's seconds reach the arrows and the bombs in flight.
 @(private)
-tactical_arrow_tick :: proc(room: ^Room, seconds: f32) {
-	if room == nil || room.arrows.count == 0 || !(seconds > 0) { return }
-	room.arrows.pending += f64(seconds)
+tactical_flight_tick :: proc(room: ^Room, seconds: f32) {
+	if room == nil || !(seconds > 0) { return }
+	if room.arrows.count > 0 { room.arrows.pending += seconds }
+	if room.bombs.count > 0 { room.bombs.pending += seconds }
 }
 
 // Seconds wait to be flown and nothing holds the world: the controller
-// commits the flight (resolve_arrow_flight) as a world command.
-tactical_arrows_due :: proc(room: ^Room) -> bool {
-	return room != nil && room.player != nil && room.phase == .Combat && room.arrows.count > 0 &&
-	       room.arrows.pending > ENEMY_ARROW_EPSILON && !room.tactical_pulse.pending && room.qte.kind == .None &&
-	       room.player.tactical.cast_remaining <= 0
+// commits the flight (resolve_enemy_flights) as a world command.
+tactical_flights_due :: proc(room: ^Room) -> bool {
+	if room == nil || room.player == nil || room.phase != .Combat || room.tactical_pulse.pending || room.qte.kind != .None ||
+	   room.player.tactical.cast_remaining > 0 { return false }
+	return (room.arrows.count > 0 && room.arrows.pending > ENEMY_ARROW_EPSILON) ||
+	       (room.bombs.count > 0 && room.bombs.pending > ENEMY_ARROW_EPSILON)
 }
 
-// The seconds waiting, flown out into room.recent_events: every arrow's
-// landing, in order.
-resolve_arrow_flight :: proc(room: ^Room) -> bool {
-	if !tactical_arrows_due(room) { return false }
+// The seconds waiting, flown out into room.recent_events: every arrow's and
+// bomb's landing, in order.
+resolve_enemy_flights :: proc(room: ^Room) -> bool {
+	if !tactical_flights_due(room) { return false }
 	clear_event_log(room.recent_events)
 	pulse: Pulse_Report
-	fly_enemy_arrows(room, &pulse)
+	fly_enemy_flights(room, &pulse)
 	append_event_log(room.recent_events, &pulse.events)
 	collect_loot_in_magnet_range(room)
 	if room.phase != .Combat {
@@ -160,15 +163,21 @@ resolve_arrow_flight :: proc(room: ^Room) -> bool {
 	return true
 }
 
-// The arrows fly their seconds waiting into `pulse` (a world command's, or a
-// beat's before the beat).
+// The arrows and the bombs fly their seconds waiting into `pulse` (a world
+// command's, or a beat's before the beat: `beat` lands every bomb).
+@(private)
+fly_enemy_flights :: proc(room: ^Room, pulse: ^Pulse_Report, beat := false) {
+	fly_enemy_arrows(room, pulse)
+	if room.phase == .Combat { fly_enemy_bombs(room, pulse, beat) }
+}
+
 @(private)
 fly_enemy_arrows :: proc(room: ^Room, pulse: ^Pulse_Report) {
 	a := &room.arrows
 	if a.count == 0 { a.pending = 0; return }
-	distance := f32(a.pending)*ENEMY_ARROW_SPEED
+	distance := a.pending*ENEMY_ARROW_SPEED
 	a.pending = 0
-	for index := 0; index < a.count; {
+	for index := i32(0); index < a.count; {
 		arrow := &a.items[index]
 		arrow.flown += distance
 		stopped := false

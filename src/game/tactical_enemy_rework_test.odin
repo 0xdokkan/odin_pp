@@ -49,7 +49,7 @@ test_tactical_archer_aims_without_qte_then_fires_at_frozen_cell_and_recovers :: 
 		testing.expect(t, abs(player.tactical.remaining-15) < 0.001)
 		testing.expect_value(t, player.tactical.cycle, 0)
 		testing.expect(t, !tactical_tick(&room, 0.35, true, false))
-		testing.expect(t, resolve_arrow_flight(&room))
+		testing.expect(t, resolve_enemy_flights(&room))
 		testing.expect_value(t, player.health, i32(100) if evade else i32(97))
 		destroy_room(&room)
 		level.destroy(&data)

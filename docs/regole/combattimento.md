@@ -313,6 +313,16 @@ I nemici hanno queste cadenze e regole:
   I nemici rinviano il lancio anche se è già presente una bomba del player.
   Spostare il lanciatore dopo l'annuncio fa fallire il lancio. Le bombe del
   player conservano miccia di 2 secondi e 4 danni; non subiscono questa riduzione.
+  **Bombe in volo** (dal 2 novembre 2026, [piano](../piano-succo.md) Fase 5,
+  [enemy_bomb.odin](../../src/game/enemy_bomb.odin)): la bomba lanciata **vola ad arco per
+  0,6 secondi** del mondo e solo dopo è sulla cella, con la miccia accesa; lo scoppio arriva sul
+  battito di sempre (il battito dopo il lancio fa atterrare prima ogni bomba ancora in aria). Se
+  mentre vola la cella viene occupata da un oggetto, la bomba rotola via e si spegne. Una bomba in
+  aria conta come bomba attiva; in aria ce ne stanno al massimo 2. In volo si vede la stessa bomba
+  di resina che gira, con l'ombra che cresce mentre scende; le 3×3 caselle dello scoppio sono
+  segnate dal lancio e sopra di loro un cerchio si stringe verso la bomba mentre la miccia brucia
+  (rosso e lampeggiante nell'ultimo secondo), accanto alla scritta MICCIA. Nel laboratorio il
+  tonfo di ferro quando atterra.
 - **Inseguitori:** il percorso tiene conto di fuoco, trappole e zone di esplosione;
   i pericoli hanno un costo, non diventano muri invalicabili. Dopo ogni attacco,
   anche mancato, recuperano per un secondo. La cadenza normale è di 3 secondi.

@@ -65,6 +65,12 @@ test_m7_bombers_prepare_one_frozen_throw_with_three_pulses_to_escape :: proc(t: 
 	tactical_tick(&room, 1-TACTICAL_MOVE_SECONDS, true, false)
 	drain_tactical_test_pulse(t, &room)
 	testing.expect_value(t, active_bomb_count(&room), 1)
+	// It flies before it is on its cell (enemy_bomb.odin), then lands there.
+	testing.expect_value(t, len(room.objects), 0)
+	testing.expect_value(t, room.bombs.count, i32(1))
+	room.bombs.pending = ENEMY_BOMB_FLIGHT
+	testing.expect(t, resolve_enemy_flights(&room))
+	testing.expect_value(t, room.bombs.count, i32(0))
 	testing.expect_value(t, room.objects[0].position, anchor)
 	testing.expect_value(t, room.objects[0].detonation_pulse-room.pulse_count, u64(3))
 	testing.expect_value(t, room.objects[0].explosion_damage, i32(3))

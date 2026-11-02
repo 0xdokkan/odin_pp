@@ -205,6 +205,7 @@ tactical_end_combat :: proc(room: ^Room) {
 	room.lasso = {}
 	room.pinball = {}
 	room.arrows = {}
+	room.bombs = {}
 	room.marley = {}
 	room.ride = {}
 	room.first_person.active = false
@@ -279,8 +280,9 @@ continue_tactical_pulse :: proc(room: ^Room) -> bool {
 	clear_event_log(room.recent_events)
 	pulse: Pulse_Report
 	if !p.started {
-		// The arrows in flight land first: no beat ever passes one (enemy_arrow.odin).
-		fly_enemy_arrows(room, &pulse)
+		// The arrows and bombs in flight land first: no beat ever passes one
+		// (enemy_arrow.odin, enemy_bomb.odin).
+		fly_enemy_flights(room, &pulse, true)
 		if room.phase != .Combat {
 			append_event_log(room.recent_events, &pulse.events)
 			collect_loot_in_magnet_range(room)

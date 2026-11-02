@@ -126,11 +126,7 @@ draw_voxel_object :: proc(renderer: ^Renderer, object: Presentation_Grid_Object)
 		}
 		for x in ([?]f32{-0.2, 0, 0.2}) { draw_resin_cube(renderer, p+rl.Vector3{x, 0, size.z/2+0.005}, 0.02, 0.7, 0.015, {52, 34, 30, 255}) }
 		draw_resin_cube(renderer, p+rl.Vector3{0, 0, size.z/2+0.02}, 0.18, 0.23, 0.025, GOTHIC_RED)
-	case .Bomb:
-		draw_resin_cube_v(renderer, p, size, {37, 35, 42, 255})
-		draw_resin_cube_v(renderer, p+rl.Vector3{0, 0.1, 0}, {size.x+0.03, 0.06, size.z+0.03}, GOTHIC_MUTED)
-		draw_resin_cube(renderer, p+rl.Vector3{0, 0.28, 0}, 0.06, 0.18, 0.06, RESIN_CAP)
-		draw_resin_cube(renderer, p+rl.Vector3{0.03, 0.37, 0}, 0.09, 0.08, 0.09, {237, 136, 51, 255})
+	case .Bomb: draw_voxel_bomb(renderer, p, size)
 	case .Fire:
 		draw_resin_cube(renderer, {p.x, 0.05, p.z}, 0.68, 0.08, 0.68, {40, 24, 27, 255})
 		for i in 0..<5 {
@@ -141,6 +137,16 @@ draw_voxel_object :: proc(renderer: ^Renderer, object: Presentation_Grid_Object)
 		}
 	case .Count:
 	}
+}
+
+// The bomb, its body centred on `p`: iron, a band, the fuse and its spark
+// (the same in the air, enemy_bomb_view.odin).
+@(private)
+draw_voxel_bomb :: proc(renderer: ^Renderer, p, size: rl.Vector3) {
+	draw_resin_cube_v(renderer, p, size, {37, 35, 42, 255})
+	draw_resin_cube_v(renderer, p+rl.Vector3{0, 0.1, 0}, {size.x+0.03, 0.06, size.z+0.03}, GOTHIC_MUTED)
+	draw_resin_cube(renderer, p+rl.Vector3{0, 0.28, 0}, 0.06, 0.18, 0.06, RESIN_CAP)
+	draw_resin_cube(renderer, p+rl.Vector3{0.03, 0.37, 0}, 0.09, 0.08, 0.09, {237, 136, 51, 255})
 }
 
 @(private)

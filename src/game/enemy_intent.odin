@@ -826,9 +826,11 @@ resolve_enemy_intents :: proc(room: ^Room, pulse: ^Pulse_Report, only_id: u32 = 
 			enemy.recovery_pulses = 1
 			begin_demolitionist_offense(enemy, intent.kind)
 			enemy.recovery_pulses = max(enemy.recovery_pulses, TACTICAL_BOMBER_RECOVERY)
+			// The bomb flies before it is on its cell (enemy_bomb.odin).
 			if enemy.position != intent.origin ||
 			   (active_bomb_count(room) >= TACTICAL_BOMB_LIMIT || !enemy_has_lob_line(room, enemy.position, intent.destination)) ||
-			   !spawn_bomb(room, source, intent.destination, &pulse.events) {
+			   active_bomb_count(room) >= MAX_ACTIVE_BOMBS || !bomb_cell_is_available(room, intent.destination) ||
+			   !throw_enemy_bomb(room, enemy, intent.destination, pulse) {
 				record_enemy_attack_miss(pulse, source, enemy.position, intent.destination)
 			}
 			continue

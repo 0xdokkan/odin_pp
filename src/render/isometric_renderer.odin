@@ -565,7 +565,7 @@ timeline_card_cue_verb :: proc(cue: ^Presentation_Cue) -> cstring {
 	     .Pinball_Made, .Pinball_Launched, .Pinball_Bounced, .Pinball_Bumped, .Pinball_Burst, .First_Person_Begun,
 	     .Marley_Begun, .Marley_Lights, .Marley_Warned, .Marley_Bomb, .Marley_Saved, .Marley_Bonus, .Marley_Ended,
 	     .Flood_Swept, .Fire_Extinguished, .Cannon_Fired, .Cannon_Broken, .Black_Hole_Tick, .Black_Hole_Swallowed, .Black_Hole_Closed,
-	     .Ride_Begun, .Ride_Ended, .Dino_Stomp, .Bleed_Bite, .Arrow_Loosed, .Arrow_Landed:
+	     .Ride_Begun, .Ride_Ended, .Dino_Stomp, .Bleed_Bite, .Arrow_Loosed, .Arrow_Landed, .Bomb_Thrown:
 	}
 	return nil
 }
@@ -824,7 +824,7 @@ draw_presentation_cue :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) {
 		label = fmt.ctprintf("SANGUE +%d", cue.event.amount)
 		color = rl.Color{255, 82, 82, 255}
 	// The arrows show in flight and where they land, with no label (enemy_arrow.odin).
-	case .Arrow_Loosed, .Arrow_Landed:
+	case .Arrow_Loosed, .Arrow_Landed, .Bomb_Thrown:
 		return
 	case .Marley_Lights, .Marley_Warned, .Marley_Bomb, .Marley_Ended, .Flood_Swept, .Fire_Extinguished,
 	     .Cannon_Fired, .Cannon_Broken, .Black_Hole_Tick, .Black_Hole_Swallowed, .Black_Hole_Closed, .Dino_Stomp:

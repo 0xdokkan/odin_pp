@@ -274,7 +274,7 @@ test_tactical_thorns_no_longer_answer_an_archers_arrow :: proc(t: ^testing.T) {
 	testing.expect_value(t, room.qte.kind, QTE_Kind.None)
 	testing.expect_value(t, room.arrows.count, 1)
 	room.arrows.pending = 1
-	testing.expect(t, resolve_arrow_flight(&room))
+	testing.expect(t, resolve_enemy_flights(&room))
 	testing.expect_value(t, room.enemies[0].health, i32(1000))
 	testing.expect(t, player.health < i32(1000) && player.health >= i32(1000)-intent.damage)
 }

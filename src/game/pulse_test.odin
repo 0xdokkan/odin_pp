@@ -9,6 +9,9 @@ advance_combat_pulse :: proc(room: ^Room) -> (pulse: Pulse_Report) {
 		return
 	}
 	pulse.advanced = true
+	// As a beat does (continue_tactical_pulse): what flies lands first.
+	fly_enemy_flights(room, &pulse, true)
+	if room.phase != .Combat { return }
 	resolve_due_explosives(room, &pulse)
 	resolve_due_room_modifier(room, &pulse)
 	resolve_enemy_intents(room, &pulse)

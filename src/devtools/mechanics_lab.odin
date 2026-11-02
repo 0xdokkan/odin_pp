@@ -97,6 +97,9 @@ run_mechanics_lab_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer,
 	} else if only == "arrows" {
 		// The archers' arrows alone (docs/piano-succo.md, Fase 3).
 		return mechanics_lab_arrows(window, renderer, &room, &controller, &cards, &buffer)
+	} else if only == "bombs" {
+		// The bombers' bombs alone (docs/piano-succo.md, Fase 5).
+		return mechanics_lab_bombs(window, renderer, &room, &controller, &cards, &buffer)
 	} else if only == "juice" {
 		// The juice's act alone (docs/piano-succo.md, Fase 1).
 		return mechanics_lab_juice(window, renderer, &room, &controller, &cards, &buffer)
@@ -272,6 +275,8 @@ run_mechanics_lab_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer,
 	if !mechanics_lab_juice(window, renderer, &room, &controller, &cards, &buffer) { return false }
 	// Then the archers' real arrows (docs/piano-succo.md, Fase 3).
 	if !mechanics_lab_arrows(window, renderer, &room, &controller, &cards, &buffer) { return false }
+	// Then the bombers' bombs in flight (docs/piano-succo.md, Fase 5).
+	if !mechanics_lab_bombs(window, renderer, &room, &controller, &cards, &buffer) { return false }
 	return mechanics_lab_sounds_heard(renderer)
 }
 
@@ -1007,7 +1012,7 @@ mechanics_lab_charges :: proc(window: ^app.Window, renderer: ^render.Renderer, d
 		// once, RIFLESSO turns it back as it lands.
 		if blow.look == .Bolt {
 			room.arrows.pending = 2
-			if game.resolve_arrow_flight(room) { game.append_event_log(&pulse.events, room.recent_events) }
+			if game.resolve_enemy_flights(room) { game.append_event_log(&pulse.events, room.recent_events) }
 		}
 		after := render.capture_room_presentation(room)
 		if pulse.events.count == 0 || !render.begin_renderer_world_timeline(renderer, before, &pulse.events, &after) {

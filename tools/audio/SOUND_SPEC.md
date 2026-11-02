@@ -405,6 +405,7 @@ Same rules as `cards_arms`.
 | world_tesla_ring | the Tesla square closes into a ring | 1.6 | -15 | 0.4 | four coils link: a surging electric chord, buzzing, crackling, rising |
 | world_shock_floor | a shock floor discharges | 0.7 | -18 | 0.25 | a plate buzzes and snaps |
 | world_bomb_fuse | a bomb is armed on the board | 1.4 | -22 | 0.2 | a fuse fizzing and spitting steadily |
+| world_bomb_land | a bomber's bomb lands from its arc (docs/piano-succo.md, Fase 5) | 0.6 | -17 | 0.3 | a heavy iron thud on stone with a short dark ring, a small hop at 0.12, a short gritty roll settling to 0.45 |
 | world_explosion | a bomb explodes | 2.0 | -12 | 0.45 | a deep blast, stone shatters, debris rains, long hall tail |
 | world_barrel_explosion | a barrel explodes | 2.0 | -12 | 0.45 | wood splinters + blast + oily fire whoosh |
 | world_hit_critical | the player's critical bump or arrow lands (docs/piano-succo.md, Fase 2), under the blow's own sound | 0.6 | -15 | 0.3 | a heavy low thump falling 130 to 45 Hz, a card's crack on its front, paper scraps at 0.06-0.2 |

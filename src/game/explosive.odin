@@ -8,8 +8,10 @@ EXPLOSIVE_DAMAGE :: i32(4)
 MAX_ACTIVE_BOMBS :: 4
 
 // World beats advance the fuse; the arming beat completes before its countdown.
+// A bomb that `landed` from its flight (enemy_bomb.odin) was thrown on the beat
+// before the count moved on: its fuse counts from that beat.
 @(private)
-arm_explosive :: proc(room: ^Room, id: u32, source: Entity_Ref, events: ^Event_Log) -> bool {
+arm_explosive :: proc(room: ^Room, id: u32, source: Entity_Ref, events: ^Event_Log, landed := false) -> bool {
 	if room == nil || room.phase != .Combat {
 		return false
 	}
@@ -29,7 +31,7 @@ arm_explosive :: proc(room: ^Room, id: u32, source: Entity_Ref, events: ^Event_L
 		object.explosion_damage = TACTICAL_BOMB_DAMAGE
 	}
 	object.fuse_pulses = fuse
-	object.detonation_pulse = room.pulse_count+u64(fuse)+1
+	object.detonation_pulse = room.pulse_count+u64(fuse)+(0 if landed else 1)
 	record_event(events, {
 		kind = .Explosive_Armed, source = source, target = object_entity(id),
 		from_position = object.position, to_position = object.position,
@@ -49,8 +51,10 @@ explosion_contains_cell :: proc(room: ^Room, center, cell: grid.Position) -> boo
 	       !obstacle_at(room, cell) && area_takes(room, center, cell)
 }
 
+// The bombs armed on the board and those still in the air (enemy_bomb.odin).
 @(private)
 active_bomb_count :: proc(room: ^Room) -> (count: int) {
+	count = int(room.bombs.count)
 	for object in room.objects {
 		if object.kind == .Bomb && object.detonation_pulse != 0 {
 			count += 1
@@ -65,7 +69,7 @@ bomb_cell_is_available :: proc(room: ^Room, position: grid.Position) -> bool {
 	return base_cell_is_walkable(room, position) && !obstacle_at(room, position) && !occupied
 }
 
-spawn_bomb :: proc(room: ^Room, source: Entity_Ref, position: grid.Position, events: ^Event_Log) -> bool {
+spawn_bomb :: proc(room: ^Room, source: Entity_Ref, position: grid.Position, events: ^Event_Log, landed := false) -> bool {
 	if room == nil || room.phase != .Combat || len(room.objects) >= MAX_GRID_OBJECTS_PER_ROOM ||
 	   room.next_object_id == 0 || room.next_object_id == max(u32) ||
 	   active_bomb_count(room) >= MAX_ACTIVE_BOMBS || !bomb_cell_is_available(room, position) {
@@ -80,7 +84,7 @@ spawn_bomb :: proc(room: ^Room, source: Entity_Ref, position: grid.Position, eve
 		kind = .Object_Spawned, source = source, target = object_entity(id),
 		object_kind = .Bomb, from_position = position, to_position = position,
 	})
-	arm_explosive(room, id, source, events)
+	arm_explosive(room, id, source, events, landed)
 	return true
 }
 

@@ -309,7 +309,12 @@ living_cue_action :: proc(cue: ^Presentation_Cue, entity: game.Entity_Ref) -> (a
 	// An archer looses its real arrow (game/enemy_arrow.odin).
 	case .Arrow_Loosed:
 		if event.source == entity { return .Attack, true }
+	// A bomber lobs its bomb (game/enemy_bomb.odin); it lands later, with no
+	// clip of its own.
+	case .Bomb_Thrown:
+		if event.source == entity { return .Cast, true }
 	case .Object_Spawned:
+		if event.object_kind == .Bomb && event.source.kind == .Enemy { break }
 		if event.source == entity && entity != game.PLAYER_ENTITY { return .Cast, true }
 	case .Status_Applied:
 		if event.source == entity && event.target != entity && entity != game.PLAYER_ENTITY { return .Cast, true }

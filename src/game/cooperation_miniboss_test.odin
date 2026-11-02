@@ -215,7 +215,7 @@ test_demolitionist_overdrive_throws_twice_then_announces_long_charge :: proc(t: 
 	throws := 0
 	for _ in 0..<16 {
 		pulse := advance_combat_pulse(&room)
-		throws += spatial_card_event_count(&pulse.events, .Object_Spawned)
+		throws += spatial_card_event_count(&pulse.events, .Bomb_Thrown)
 		testing.expect(t, active_bomb_count(&room) <= TACTICAL_BOMB_LIMIT)
 		if throws == 2 && room.enemies[0].intent.kind == .Charge { break }
 	}

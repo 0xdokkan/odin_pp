@@ -64,7 +64,7 @@ Parole del documento:
 | 2 | Succo sui colpi: colpi del giocatore, critici, uccisioni, colpi nemici | 1 | Fatta | vedi Esito |
 | 3 | Frecce degli arcieri: proiettili veri nelle regole | 0 | Fatta | vedi Esito |
 | 4 | Frecce degli arcieri: aspetto 3D, riga accesa, suoni | 3 | Fatta | vedi Esito |
-| 5 | Bombe dei bombaroli: volo ad arco e cerchio d'impatto | 3 | Da fare | |
+| 5 | Bombe dei bombaroli: volo ad arco e cerchio d'impatto | 3 | Fatta | vedi Esito |
 | 6 | Nel gioco vero: prova con l'utente, bilanciamento, chiusura | 2, 4, 5 | Da fare | |
 
 ## Come funziona oggi (punto di partenza)
@@ -446,6 +446,64 @@ Passi:
 **Fatto quando:** nel laboratorio si vede la bomba arrivare e si scappa dal
 cerchio; test verdi.
 
+### Esito (2 novembre 2026)
+
+Scelte dell'utente all'inizio della fase: volo di **0,6 secondi**; in volo la
+**stessa bomba di resina** che atterra; **cerchio che si stringe** (resta la
+scritta MICCIA come aiuto, come suggeriscono le fonti sui segnali che si
+stringono); suono nuovo: **il tonfo all'atterraggio** (lancio e miccia c'erano già).
+
+1. **Regole** ([enemy_bomb.odin](../src/game/enemy_bomb.odin)): sul battito del
+   lancio il bombarolo (o il Demolitore) lancia la bomba (`throw_enemy_bomb`,
+   evento nuovo `Bomb_Thrown`); la bomba non è sulla cella finché, dopo 0,6
+   secondi del mondo, non atterra (`Object_Spawned` ed `Explosive_Armed`). La
+   miccia conta dal battito del lancio (`arm_explosive` con `landed`), così lo
+   scoppio arriva sul battito di sempre. Se mentre vola la cella è occupata da
+   un oggetto, è un colpo mancato. Una bomba in aria conta fra le bombe attive
+   (`active_bomb_count`).
+2. **Tempo:** le bombe volano sullo stesso orologio delle frecce, che diventa
+   comune: `tactical_flight_tick`, `tactical_flights_due`,
+   `resolve_enemy_flights`, il comando del mondo `Enemy_Flight` (prima
+   `Arrow_Flight`). Il volo dura meno di un battito, quindi **il battito dopo il
+   lancio fa atterrare prima ogni bomba ancora in aria**: vale anche nelle prove
+   che fanno solo battiti (`advance_combat_pulse` vola come un battito vero).
+3. **Peso della stanza:** le bombe in aria sono al massimo 2 (un bombarolo
+   tiene una bomba alla volta, il Demolitore ne lancia due) e il tempo in
+   sospeso di frecce e bombe è un `f32`: la stanza pesa 9208 byte, sotto i 9 KB
+   (`event_test.odin`).
+4. **Immagini** ([enemy_bomb_view.odin](../src/render/enemy_bomb_view.odin)): in
+   volo la bomba di resina (`draw_voxel_bomb`, la stessa che si posa) gira di
+   un giro e mezzo lungo un arco alto 0,9 caselle più 0,12 per casella di
+   distanza, dalla mano del bombarolo al suo posto sulla cella; sotto di lei
+   l'ombra cresce e si scurisce mentre scende. Dal lancio le 3×3 caselle sono
+   segnate e un cerchio le circonda pulsando; atterrata, il cerchio si stringe
+   da 1,5 a 0,3 caselle mentre la miccia brucia, rosso e lampeggiante
+   nell'ultimo secondo. Il bombarolo fa il gesto del lancio su `Bomb_Thrown`;
+   l'atterraggio non gli fa ripetere il gesto.
+5. **Suono:** `world_bomb_land` (tools/audio/sfx_world.py), il tonfo di ferro
+   sulla pietra con un piccolo rimbalzo e una breve rotolata. Rigenerati tutti
+   i suoni: gli altri 232 sono identici byte per byte.
+6. **Test che cambiano significato:** il lancio del bombarolo
+   (`test_m7_bombers_prepare_one_frozen_throw_with_three_pulses_to_escape`)
+   guarda la bomba in aria e poi atterrata; il Demolitore conta i lanci
+   (`Bomb_Thrown`) invece delle bombe comparse. **Test nuovi**:
+   [enemy_bomb_test.odin](../src/game/enemy_bomb_test.odin) (vola e atterra con
+   la miccia del battito di sempre, cella occupata = mancato, si ferma col
+   mondo e atterra prima del battito, conta fra le bombe attive) e
+   [enemy_bomb_view_test.odin](../src/render/enemy_bomb_view_test.odin) (l'arco,
+   il cerchio che si stringe, i secondi allo scoppio, il gesto del lancio).
+7. **Prova del laboratorio:** atto nuovo `mechanics_lab_bombs` (da solo con
+   `ODIN_PP_LAB_ONLY=bombs`): il bombarolo lancia sulla cella del Viandante, la
+   bomba è in aria e non sulla cella, poi atterra con la miccia accesa e il
+   tonfo; il Viandante fa due passi fuori dal cerchio e lo scoppio non lo
+   tocca. Catture `odin_pp_living_bomb_throw_NN.png` e
+   `odin_pp_living_bomb_escape_NN.png`.
+8. **Prova dell'utente nel laboratorio:** arco, ombra, cerchio e tonfo **vanno
+   bene così**.
+9. **Verifiche:** `scripts/check.ps1` verde (1857 test con e senza assert);
+   prova completa del laboratorio verde nella finestra vera (2175 catture, 152
+   suoni: il lancio e il tonfo fra questi).
+
 ## Fase 6 — Nel gioco vero
 
 Passi:
@@ -482,6 +540,9 @@ laboratorio verde.
 - [One Step From Eden (Wikipedia)](https://en.wikipedia.org/wiki/One_Step_From_Eden)
 - [One Step From Eden Review – Prima Games](https://primagames.com/featured/one-step-from-eden-review-a-step-too-hard)
 - [Into the Breach (Wikipedia)](https://en.wikipedia.org/wiki/Into_the_Breach)
+- [How to design enemy attack telegraphs](https://bugnet.io/blog/how-to-design-enemy-attack-telegraphs) (Fase 5)
+- [Enemy attacks and telegraphing (Game Developer)](https://gamedeveloper.com/design/enemy-attacks-and-telegraphing) (Fase 5)
+- [Hand Grenade (Warframe Wiki): il raggio dello scoppio segnato a terra](https://wiki.warframe.com/w/Hand_Grenade) (Fase 5)
 
 ## Appendice A — Misure di partenza, scena per scena
 

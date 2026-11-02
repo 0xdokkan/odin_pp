@@ -46,11 +46,11 @@ test_an_archers_arrow_flies_and_lands_on_the_player :: proc(t: ^testing.T) {
 	testing.expect_value(t, player.health, i32(100))
 	// 0.3 s: two cells entered, not his.
 	room.arrows.pending = 0.3
-	testing.expect(t, resolve_arrow_flight(&room))
+	testing.expect(t, resolve_enemy_flights(&room))
 	testing.expect_value(t, player.health, i32(100))
 	testing.expect_value(t, room.arrows.count, 1)
 	room.arrows.pending = 0.02
-	testing.expect(t, resolve_arrow_flight(&room))
+	testing.expect(t, resolve_enemy_flights(&room))
 	testing.expect_value(t, player.health, i32(97))
 	testing.expect_value(t, room.arrows.count, 0)
 	landed := false
@@ -71,7 +71,7 @@ test_an_archers_arrow_misses_one_who_stepped_out_and_stops_at_the_wall :: proc(t
 	_ = arrow_test_loose(t, &room)
 	room.player.position = {x = 4, y = 3}
 	room.arrows.pending = 2
-	testing.expect(t, resolve_arrow_flight(&room))
+	testing.expect(t, resolve_enemy_flights(&room))
 	testing.expect_value(t, player.health, i32(100))
 	testing.expect_value(t, room.arrows.count, 0)
 	wall := false
@@ -92,7 +92,7 @@ test_an_archers_arrow_strikes_the_first_foe_in_its_line :: proc(t: ^testing.T) {
 	defer destroy_room(&room)
 	_ = arrow_test_loose(t, &room)
 	room.arrows.pending = 1
-	testing.expect(t, resolve_arrow_flight(&room))
+	testing.expect(t, resolve_enemy_flights(&room))
 	testing.expect_value(t, player.health, i32(100))
 	testing.expect_value(t, room.enemies[1].health, i32(17))
 	testing.expect_value(t, room.arrows.count, 0)
@@ -110,8 +110,8 @@ test_an_archers_arrow_holds_with_the_world_and_lands_before_a_beat :: proc(t: ^t
 	_ = arrow_test_loose(t, &room)
 	tactical_begin_card_cast(&room, 1)
 	testing.expect(t, !tactical_tick(&room, 0.5, true, false))
-	testing.expect_value(t, room.arrows.pending, f64(0))
-	testing.expect(t, !tactical_arrows_due(&room))
+	testing.expect_value(t, room.arrows.pending, f32(0))
+	testing.expect(t, !tactical_flights_due(&room))
 	player.tactical.cast_remaining = 0
 	testing.expect(t, !tactical_tick(&room, 1, true, false))
 	testing.expect(t, room.tactical_pulse.pending && room.arrows.pending > 0)

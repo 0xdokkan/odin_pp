@@ -5,6 +5,15 @@ I riferimenti a Classica, `--flat` e ai vecchi smoke descrivono versioni precede
 per i comandi disponibili oggi valgono il [README](README.md) e la documentazione collegata.
 
 
+## 2026-11-02 — Piano del succo, Fase 5: le bombe dei bombaroli volano ad arco
+
+- La bomba del bombarolo vola ad arco per 0,6 secondi prima di essere sulla cella: si vede la stessa bomba di resina che
+  gira, con l'ombra che cresce mentre scende. Lo scoppio arriva sul battito di sempre.
+- Le 3×3 caselle dello scoppio sono segnate dal lancio; un cerchio si stringe verso la bomba mentre la miccia brucia e
+  diventa rosso nell'ultimo secondo.
+- Nel laboratorio un suono nuovo fatto da codice, il tonfo di ferro quando la bomba atterra, e un atto nuovo della prova
+  automatica in cui il Viandante scappa dal cerchio prima dello scoppio.
+
 ## 2026-11-01 — Piano del succo, Fase 4: le frecce degli arcieri si vedono e si sentono
 
 - La freccia dell'arciere è un dardo di carta ritagliata (penne rosse, asta di noce, punta d'acciaio) con una scia d'aria

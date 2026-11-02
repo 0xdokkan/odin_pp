@@ -717,6 +717,27 @@ def world_bomb_fuse(seed):
     return _finish(x, D, fade_out=0.06)
 
 
+@sound("world_bomb_land", loudness=-17, wet=0.3,
+       note="iron thud on stone 0.0 (a low dull body, the stone's knock, a short dark iron ring); a small hop 0.12; "
+            "a short roll 0.2-0.45 settling")
+def world_bomb_land(seed):
+    """A bomber's bomb lands from its arc (docs/piano-succo.md, Fase 5): the
+    heavy iron ball thuds on the stone, a low dull body under the stone's
+    knock and a short dark ring of its iron; it hops once a little and
+    settles with a short gritty roll. Its fuse fizzes in its own sound."""
+    D = 0.6
+    t = time_axis(D)
+    thud = _thud(0.35, seed, f0=95.0, t60=0.16, lp=420.0, drop=0.6)
+    knock = _stone_chunk(seed + 1, base=520.0, t60=0.04, length=0.2, low=0.3)
+    ring = _iron(0.4, 330.0, 0.18, seed + 2, count=8, dark=0.7, lp=2600)
+    hop = place(0.2, [(0, _thud(0.2, seed + 3, f0=120.0, t60=0.07, lp=500.0), 0.6), (0, _stone_chunk(seed + 4, base=640.0, t60=0.03, length=0.12, low=0.2), 0.5)])
+    roll = _norm(bandpass(crackle(D, 2400, seed + 5, 0.0004), 1800, 0.7)) * env_points(D, [(0, 0), (0.2, 0), (0.24, 1.0), (0.45, 0.0), (D, 0.0)])
+    roll = roll * (0.6 + 0.4 * np.sin(2 * np.pi * 9 * t))
+    x = place(D, [(0.0, _norm(thud), 1.0), (0.0, knock, 0.55), (0.002, ring, 0.18), (0.12, hop, 0.4)]) + 0.12 * roll
+    _events("world_bomb_land", 0.0, 0.12, 0.2, 0.45)
+    return _finish(_limit(x, 0.7), D, fade_out=0.05)
+
+
 @sound("world_explosion", loudness=-12, wet=0.45,
        note="blast 0.004 (front, falling boom, rumble to ~1 s); stone shatters 0.01-0.3; debris rains 0.3-1.9")
 def world_explosion(seed):

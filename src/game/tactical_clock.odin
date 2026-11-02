@@ -141,8 +141,9 @@ tactical_advance_clock :: proc(room: ^Room, seconds: f32) {
 	tactical_pinball_tick(room, elapsed)
 	// The First Person Shooter's seconds are the world's (first_person.odin).
 	tactical_first_person_tick(room, elapsed)
-	// The archers' arrows fly on them (enemy_arrow.odin); world commands fly them out.
-	tactical_arrow_tick(room, elapsed)
+	// The archers' arrows and the bombers' bombs fly on them (enemy_arrow.odin,
+	// enemy_bomb.odin); world commands fly them out.
+	tactical_flight_tick(room, elapsed)
 	// Frame partitions can leave a tiny rounding remainder at an integer edge.
 	beats := int(s.clock_fraction+0.00001)
 	s.clock_fraction = max(f32(0), s.clock_fraction-f32(beats))

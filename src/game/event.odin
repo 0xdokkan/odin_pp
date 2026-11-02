@@ -152,6 +152,10 @@ Game_Event_Kind :: enum {
 	// The arrow lands on to_position: on `target` (the player or a foe it struck)
 	// or, SYSTEM_ENTITY, on a wall, a cover or its range's end.
 	Arrow_Landed,
+	// THE BOMBERS' BOMBS IN FLIGHT (enemy_bomb.odin): a bomber (`source`) lobs
+	// its bomb from from_position at to_position, where it lands (its
+	// Object_Spawned and Explosive_Armed) ENEMY_BOMB_FLIGHT world seconds later.
+	Bomb_Thrown,
 }
 
 Game_Event :: struct {

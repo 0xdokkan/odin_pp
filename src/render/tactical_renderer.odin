@@ -745,6 +745,7 @@ draw_tactical_world :: proc(renderer: ^Renderer, room: ^game.Room, active_card: 
 	draw_voxel_threats(renderer, room)
 	draw_intent_ground(renderer, room)
 	draw_enemy_arrow_courses(renderer, room)
+	draw_enemy_bomb_floor(renderer, room)
 	draw_marley_floor(renderer, room)
 	draw_arsenal_floor(renderer, room)
 	draw_m8_device_network(renderer, room)
@@ -771,6 +772,7 @@ draw_tactical_world :: proc(renderer: ^Renderer, room: ^game.Room, active_card: 
 	draw_tactical_feedback(renderer, .Accent)
 	draw_card_hit_sparks(renderer, room, &preview, halo)
 	draw_enemy_arrows(renderer, room)
+	draw_enemy_bombs(renderer, room)
 	draw_juice_bursts(renderer)
 	rl.EndMode3D()
 	when EXPEDITION_BENCHMARK {v.draw_timing.paper_ms=expedition_benchmark_elapsed(&stamp)}
