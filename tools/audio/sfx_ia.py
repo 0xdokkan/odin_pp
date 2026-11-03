@@ -1,5 +1,4 @@
-"""Family `ia`: the IA card (docs/piano-ia.md, Fase 8; SOUND_SPEC.md), and for now the Nido di ragni's card
-(`card_spider_nest`, provisional until the plan's Fase 10).
+"""Family `ia`: the IA card (docs/piano-ia.md, Fase 8; SOUND_SPEC.md).
 
 The card's four sounds, dry and synthesized here (the build adds the stone hall); `card_ia` reuses the `cards_arms`
 family's paper flick and adds an electronic power-on:
@@ -90,16 +89,3 @@ def ia_off(seed):
         (0.3, _norm(hum), 0.42),
     ])
     return _finish(_limit(x, 0.7), D, fade_out=0.2)
-
-
-@sound("card_spider_nest", loudness=-20, wet=0.14, rt60=0.6, marks=(0.0, 0.12),
-       note="provisional until Fase 10: the card flicks out, a dry skitter of little legs from 0.12")
-def card_spider_nest(seed):
-    D = 0.8
-    legs = []
-    for k in range(9):
-        length = 0.018
-        tick = sine(_hz(92 + (k * 5) % 7), length) * env_perc(length, attack=0.001, decay=0.015, curve=4.0)
-        legs.append((0.12 + k * 0.045, _norm(tick), 0.32 + 0.04 * (k % 3)))
-    x = place(D, [(0.0, _ca_flick(seed), 0.45)] + legs)
-    return _finish(_limit(x, 0.7), D, fade_out=0.1)

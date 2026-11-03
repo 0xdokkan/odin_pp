@@ -13,7 +13,8 @@ import render "../render"
 // NIDO DI RAGNI (game/spider_nest.odin, docs/piano-ia.md, Fase 9), in the real window, in the IA's arena: a low wall
 // between the nest and a held foe, the card played by the rules (odin_pp_nido_00.png), the spiderlings around the wall and
 // their bites (odin_pp_nido_NN.png, filmed), a chaser set free beside the nest, which strikes it and takes its 3 seconds
-// (odin_pp_nido_struck.png), and the nest gone at no seconds (odin_pp_nido_end.png).
+// (odin_pp_nido_struck.png) and a tear, the nest sagging at no seconds (odin_pp_nido_sag.png) and gone
+// (odin_pp_nido_end.png). Fase 10: each of its six sounds has sounded.
 mechanics_lab_nest :: proc(window: ^app.Window, renderer: ^render.Renderer, room: ^game.Room, data: ^level.Level,
 	controller: ^run_session.Tactical_Controller, cards: ^run_session.Card_Interaction_State, buffer: ^run_session.Buffered_Gameplay_Command) -> bool {
 	player := room.player
@@ -82,13 +83,35 @@ mechanics_lab_nest :: proc(window: ^app.Window, renderer: ^render.Renderer, room
 	if !struck { fmt.eprintln("mechanics lab: the chaser did not strike the nest"); return false }
 	artifacts.screenshot("odin_pp_nido_struck.png")
 
-	// At no seconds it is gone.
-	if index, found = game.object_index_at(room, cell); found { room.objects[index].life = 1 }
-	for _ in 0..<120 { mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0, true) }
+	// At no seconds it is gone. The foe aside: it would stand in front of it.
+	foe = &room.enemies[chaser]
+	foe.position = grid.offset(cell, 3, 2)
+	foe.intent = {}
+	mechanics_lab_hold(room, foe.id)
+	if index, found = game.object_index_at(room, cell); found {
+		if room.objects[index].radius < 1 { fmt.eprintln("mechanics lab: the blow left no tear"); return false }
+		room.objects[index].life = 1
+	}
+	shown := false
+	for _ in 0..<180 {
+		mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0, true)
+		if !shown {
+			if render.nest_sagging(renderer) {
+				shown = true
+				for _ in 0..<5 { mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0, true) }
+				artifacts.screenshot("odin_pp_nido_sag.png")
+			}
+		}
+	}
 	if game.emplacement_count(room, .Spider_Nest) != 0 { fmt.eprintln("mechanics lab: the nest did not end"); return false }
+	if !shown { fmt.eprintln("mechanics lab: the nest went without sagging"); return false }
 	artifacts.screenshot("odin_pp_nido_end.png")
 	sounds := renderer.tactical.lab_sounds
-	if sounds == nil || sounds.played[audio.Lab_Sfx.Card_Spider_Nest] == 0 { fmt.eprintln("mechanics lab: the nest's sound never sounded"); return false }
-	fmt.eprintf("mechanics lab nest: bites %d of life, struck, ended\n", bitten)
+	if sounds == nil { fmt.eprintln("mechanics lab: no sounds to count"); return false }
+	for sfx in ([6]audio.Lab_Sfx{.Card_Spider_Nest, .World_Spider_Place, .World_Spider_Hatch, .World_Spider_Bite, .World_Spider_Tear, .World_Spider_Close}) {
+		if sounds.played[sfx] == 0 { fmt.eprintln("mechanics lab: the nest's sound", sfx, "never sounded"); return false }
+	}
+	fmt.eprintf("mechanics lab nest: bites %d of life, struck, ended; sounds: place %d, hatch %d, bite %d, tear %d, close %d\n", bitten,
+		sounds.played[.World_Spider_Place], sounds.played[.World_Spider_Hatch], sounds.played[.World_Spider_Bite], sounds.played[.World_Spider_Tear], sounds.played[.World_Spider_Close])
 	return true
 }

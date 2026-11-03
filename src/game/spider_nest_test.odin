@@ -192,6 +192,7 @@ test_nest_loses_three_seconds_a_blow :: proc(t: ^testing.T) {
 	index, found := object_index_by_id(&room, id)
 	testing.expect(t, found)
 	testing.expect_value(t, room.objects[index].life, SPIDER_NEST_SECONDS-SPIDER_NEST_BLOW_SECONDS)
+	testing.expect_value(t, room.objects[index].radius, i32(1))
 	testing.expect_value(t, arsenal_test_count(&pulse.events, .Spider_Nest_Struck), 1)
 	// Enough blows and it is gone.
 	for _ in 0..<7 {

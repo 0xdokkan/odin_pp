@@ -91,7 +91,7 @@ docs/piano-ia.md adds to it (its Fasi 0 and 8):
 
     cell 37  IA: a brain of circuits on a dark ground, curved folds on the
              left, cyan traces with white nodes on the right, a steel stem.
-    cell 38  Nido di ragni (provisional): a cobweb, its spider at the middle.
+    cell 38  Nido di ragni: a cobweb, its spider at the middle.
 
 Options:
     --check        exit 1 if the atlas is not what this script would write
@@ -929,34 +929,34 @@ assert all(len(row) == 28 for row in IA_BRAIN) and len(IA_BRAIN) == 28
 
 ICONS.update({37: IA_BRAIN})
 
-# docs/piano-ia.md, Fase 9: the Nido di ragni's provisional icon, a cobweb with its spider at the middle (its Fase 10).
+# docs/piano-ia.md, Fase 10: the Nido di ragni's icon, a cobweb with its black spider at the middle, a red mark on it.
 SPIDER_WEB = (
     "............................",
     "............................",
     "............................",
-    "..............K.............",
-    "...X..........K..........X..",
-    "....X.........K.........X...",
-    ".....XX.......K.......XX....",
-    ".....X.XXXXXXXKXXXXXXX.X....",
-    "......X.X.....K.....X.X.....",
-    ".......X.X....K....X.X......",
-    "........X.XXXXKXXXX.X.......",
-    ".........X.X..K..X.X........",
-    "..........X.XXKXX.X.........",
-    "...........X.KmK.X..........",
-    "KKKKKKKKKKKKKmmmKKKKKKKKKKKK",
-    "...........X.KmK.X..........",
-    "..........X.XXKXX.X.........",
-    ".........X.X..K..X.X........",
-    "........X.XXXXKXXXX.X.......",
-    ".......X.X....K....X.X......",
-    "......X.X.....K.....X.X.....",
-    ".....X.XXXXXXXKXXXXXXX.X....",
-    ".....XX.......K.......XX....",
-    "....X.........K.........X...",
-    "...X..........K..........X..",
-    "..............K.............",
+    "..............u.............",
+    "...u..........u..........u..",
+    "....u.........u.........u...",
+    ".....uu.......u.......uu....",
+    ".....u.uuuuuuuuuuuuuuu.u....",
+    "......u.KK....u...KKu.u.....",
+    ".......K.uK...u..K.uKu......",
+    "......K.u.uKuuuuKuu.uK......",
+    "......K..u.uKKKK.u.u.K......",
+    "........KKu.KzzKu.KK........",
+    ".......K..KKKzZKKK..K.......",
+    "uuuuuuKuuuuuKKKKuuuuuKuuuuuu",
+    "........KKKKZzzZKKKK........",
+    ".......K..uKZRRZK.u.K.......",
+    "......K..uKuZRRZ.K.u.K......",
+    "......K.uKuuZRRZuuK.uK......",
+    ".......uKu..KZZK...K.u......",
+    "......u.u...KKKK....u.u.....",
+    ".....u.uuuuuuuuuuuuuuu.u....",
+    ".....uu.......u.......uu....",
+    "....u.........u.........u...",
+    "...u..........u..........u..",
+    "..............u.............",
     "............................",
     "............................",
 )

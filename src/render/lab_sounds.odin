@@ -445,6 +445,8 @@ lab_cue_sounds :: proc(renderer: ^Renderer, s: ^Lab_Sounds, cue: ^Presentation_C
 		// CANNONE and BUCO NERO set down.
 		case .Field_Cannon: lab_sound_queue(s, .World_Cannon_Place, now)
 		case .Devouring_Hole: lab_sound_queue(s, .World_Black_Hole_Open, now)
+		// NIDO DI RAGNI: the silk pulled tight.
+		case .Spider_Nest: lab_sound_queue(s, .World_Spider_Place, now)
 		}
 	case .Spell_Impact:
 		#partial switch event.card_definition {
@@ -554,6 +556,16 @@ lab_cue_sounds :: proc(renderer: ^Renderer, s: ^Lab_Sounds, cue: ^Presentation_C
 		lab_sound_queue(s, .World_Black_Hole_Swallow, now, 1, pan)
 	case .Black_Hole_Closed:
 		lab_sound_queue(s, .World_Black_Hole_Close, now)
+	// NIDO DI RAGNI (spider_nest.odin): the little legs of a spiderling hatching, its bite, a blow on the nest, the nest
+	// sagging.
+	case .Spider_Hatched:
+		lab_sound_queue(s, .World_Spider_Hatch, now, 0.7)
+	case .Spider_Bite:
+		lab_sound_queue(s, .World_Spider_Bite, now, 1, lab_sound_pan(renderer, event.target))
+	case .Spider_Nest_Struck:
+		lab_sound_queue(s, .World_Spider_Tear, now)
+	case .Spider_Nest_Closed:
+		lab_sound_queue(s, .World_Spider_Close, now)
 	// DINOSAURO (dinosaur.odin): the roar of the dinosaur the die gave, its
 	// stomp, and the climb down; SANGUINAMENTO's extra bite.
 	case .Ride_Begun:

@@ -694,7 +694,7 @@ draw_presentation_cue :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) {
 	   cue.kind == .Marley_Lights || cue.kind == .Marley_Warned || cue.kind == .Marley_Bomb || cue.kind == .Marley_Ended ||
 	   cue.kind == .Flood_Swept || cue.kind == .Fire_Extinguished ||
 	   cue.kind == .Cannon_Fired || cue.kind == .Cannon_Broken || cue.kind == .Black_Hole_Tick || cue.kind == .Black_Hole_Swallowed ||
-	   cue.kind == .Black_Hole_Closed || cue.kind == .Dino_Stomp || cue.kind == .Napoli_Table_Cleared {
+	   cue.kind == .Black_Hole_Closed || cue.kind == .Spider_Nest_Closed || cue.kind == .Dino_Stomp || cue.kind == .Napoli_Table_Cleared {
 		return
 	}
 	center, has_center := presentation_event_center(renderer, cue.event)

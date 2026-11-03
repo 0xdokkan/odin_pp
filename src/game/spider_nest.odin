@@ -3,7 +3,8 @@ package game
 import grid "../engine/grid"
 
 // NIDO DI RAGNI (docs/piano-ia.md, Fase 9): set down like the Cannone, on a free cell one to three cells away, two at
-// most. It stops the steps, not the sight; it lives 20 world beats (`life`), and its spiderlings bite (`power`).
+// most. It stops the steps, not the sight; it lives 20 world beats (`life`), its spiderlings bite (`power`), and `radius`
+// counts the blows it took (the board draws them as tears).
 //
 // - A spiderling leaves at once, then one every two beats. It runs at 4 cells a second, around the walls by the
 //   shortest way (in steps, not as the crow flies) and through bodies, to the nearest foe; there it bites and dies.
@@ -108,6 +109,7 @@ spider_nest_beat :: proc(room: ^Room, pulse: ^Pulse_Report) {
 // A foe's blow takes the nest at `index`: 3 seconds off, whatever its damage.
 @(private)
 spider_nest_struck :: proc(room: ^Room, index: int, source: Entity_Ref, events: ^Event_Log) {
+	room.objects[index].radius += 1
 	nest := room.objects[index]
 	record_event(events, {kind = .Spider_Nest_Struck, source = source, target = object_entity(nest.id),
 		from_position = nest.position, to_position = nest.position, amount = SPIDER_NEST_BLOW_SECONDS})

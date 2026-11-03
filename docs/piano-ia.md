@@ -224,7 +224,7 @@ comunque nel momento in cui i rami si uniscono.
 | 7 | I casi speciali: Ombra, Lazzo, Pinball, Dinosauro, Napoli, piani e ascensori, mappe grandi; le tabelle di oggetti e caselle | 6 | Fatta | vedi Esito |
 | 8 | Aspetto e suoni della IA: icona, conto alla rovescia, accensione, suoni da codice | 5 | Fatta | vedi Esito |
 | 9 | Nido di ragni: regole e prototipo nel laboratorio; la IA lo conosce | 7 | Fatta | vedi Esito |
-| 10 | Nido di ragni: aspetto e suoni | 9 | Da fare | — |
+| 10 | Nido di ragni: aspetto e suoni | 9 | Fatta | vedi Esito |
 | 11 | Regina: regole e prototipo nel laboratorio; la IA la conosce | 7 | Da fare | — |
 | 12 | Regina: aspetto e suoni | 11 | Da fare | — |
 | 13 | Lanciafiamme: regole e prototipo nel laboratorio; la IA lo conosce | 7 | Da fare | — |
@@ -1672,6 +1672,32 @@ Passi:
 Check della fase: i test del disegno, dei suoni e delle icone; l'atto `nido`.
 
 **Fatto quando:** l'utente approva aspetto e suoni.
+
+### Esito (4 novembre 2026)
+
+Fatta, con le proposte del piano. **L'approvazione dell'utente su aspetto e suoni manca ancora:** ho guardato le catture ma
+nessuno ha ascoltato i suoni.
+
+- **Il nido** ([render/spider_nest_view.odin](../src/render/spider_nest_view.odin)): cupola di seta a sette gradini, uova,
+  sei fili tesi, un anello di 20 tacche (una al secondo, rosse negli ultimi 3). Ogni colpo apre uno strappo scuro, fino a 6;
+  le ferite sono contate in `radius` dell'oggetto, che il nido non usava. A zero secondi si affloscia e si sfalda.
+- **I ragnetti:** corpo scuro col segno rosso, otto zampe a scatti (due gruppi alternati, 14 passi al secondo). **Sotto hanno
+  una macchia chiara di seta:** scuri sul pavimento scuro non si vedevano.
+- **Il morso:** un piccolo lampo rosso sul nemico; un colpo al nido fa volare brandelli di seta.
+- **L'icona:** cella 38, ragnatela azzurra con un ragno nero e il segno rosso.
+- **I suoni** ([tools/audio/sfx_spider_nest.py](../tools/audio/sfx_spider_nest.py)): `card_spider_nest` rifatto e 5 nuovi
+  (`world_spider_place`, `hatch`, `bite`, `tear`, `close`). Sono 255 in tutto, gli altri 249 sono identici.
+- **Laboratorio:** l'atto `nido` controlla che lo strappo ci sia, che il nido si afflosci e che tutti i 6 suoni siano partiti.
+  Cattura nuova `odin_pp_nido_sag.png`.
+
+**Cambiamenti rispetto al piano, spiegati:**
+
+- **La cupola a gradini** è fatta di cubi di resina come gli altri oggetti, non è liscia.
+- **Morso e colpo durano di più:** 0,42 s invece di 0,12, altrimenti non si vedevano.
+- **Il cedimento si disegna nell'animazione:** l'oggetto sparisce col battito del mondo, quindi è l'animazione a finire di
+  abbassare la cupola.
+
+Nessun contenuto di gioco nuovo: la IA non cambia.
 
 ## Fase 11 — Regina: regole e prototipo; la IA la conosce
 

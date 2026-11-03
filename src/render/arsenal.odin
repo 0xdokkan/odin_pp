@@ -182,7 +182,7 @@ tactical_ride_lift :: proc(renderer: ^Renderer) -> f32 {
 }
 
 // The cue of `kind` about `entity` (as its target) that plays now, how far.
-@(private = "file")
+@(private)
 arsenal_cue_progress :: proc(renderer: ^Renderer, kind: Presentation_Cue_Kind, entity: game.Entity_Ref) -> (progress: f32, found: bool) {
 	for offset in 0..<renderer_active_cue_count(renderer) {
 		cue, present := renderer_active_cue_at(renderer, offset)
@@ -538,6 +538,7 @@ draw_arsenal_sky :: proc(renderer: ^Renderer, room: ^game.Room) {
 		#partial switch cue.kind {
 		case .Cannon_Fired: draw_cannon_shot(renderer, room, cue)
 		case .Cannon_Broken: draw_cannon_debris(renderer, cue)
+		case .Spider_Bite, .Spider_Died, .Spider_Hatched, .Spider_Nest_Struck, .Spider_Nest_Closed: draw_spider_nest_cue(renderer, cue)
 		case .Black_Hole_Swallowed: draw_hole_swallow(renderer, cue)
 		case .Dino_Stomp: draw_dino_stomp(renderer, room, cue)
 		case .Ride_Begun, .Ride_Ended: draw_dino_roar(renderer, cue)

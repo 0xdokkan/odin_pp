@@ -6,6 +6,17 @@ Qui si segna ogni carta tolta dal gioco o cambiata, con quello che faceva, così
 futuro. Le voci più recenti stanno in cima. Per ritrovare il commit di una voce:
 `git log --all --grep "<titolo del commit>"`.
 
+## 2026-11-04 — Nido di ragni: aspetto e suoni (solo laboratorio)
+
+Commit **«Piano IA, Fase 10 fatta: aspetto e suoni del Nido»** sul ramo `piano-ia` ([piano](piano-ia.md), Fase 10). Regole e
+numeri della carta non cambiano. Icona nuova nella cella 38: ragnatela azzurra con un ragno nero. Il nido è una cupola di
+seta con uova, fili e un anello di 20 tacche per i secondi; ogni colpo lo strappa un po'; i ragnetti hanno otto zampe a
+scatti e una macchia chiara sotto per vederli sul pavimento scuro. Suoni da codice (`tools/audio/sfx_spider_nest.py`), solo
+nel laboratorio: `card_spider_nest` rifatto, nuovi `world_spider_place`, `world_spider_hatch`, `world_spider_bite`,
+`world_spider_tear`, `world_spider_close`. Gli altri 249 suoni sono identici byte per byte.
+
+**IA aggiornata:** nessun cambiamento necessario, non ci sono contenuti di gioco nuovi.
+
 ## 2026-11-03 — Carta nuova: Nido di ragni (solo laboratorio)
 
 Commit **«Piano IA, Fase 9 fatta: Nido di ragni»** sul ramo `piano-ia` ([piano](piano-ia.md), Fase 9). Carta nuova

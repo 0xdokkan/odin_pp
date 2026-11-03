@@ -844,8 +844,11 @@ presentation_cue_duration :: proc(kind: Presentation_Cue_Kind, event: game.Game_
 		return PRESENTATION_NAPOLI_CLEAR_DURATION
 	case .IA_Begun:
 		return PRESENTATION_IA_DURATION
-	case .Black_Hole_Tick, .Bleed_Bite, .Arrow_Loosed, .Arrow_Landed, .Bomb_Thrown,
-	     .Spider_Hatched, .Spider_Bite, .Spider_Died, .Spider_Nest_Struck, .Spider_Nest_Closed:
+	case .Spider_Nest_Closed:
+		return PRESENTATION_HOLE_CLOSE_DURATION
+	case .Spider_Bite, .Spider_Nest_Struck:
+		return PRESENTATION_CANNON_FIRE_DURATION
+	case .Black_Hole_Tick, .Bleed_Bite, .Arrow_Loosed, .Arrow_Landed, .Bomb_Thrown, .Spider_Hatched, .Spider_Died:
 		return PRESENTATION_NOTICE_DURATION
 	}
 	unreachable()
@@ -1450,7 +1453,10 @@ start_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^Presentat
 	// NIDO DI RAGNI: the spiderlings are the room's; a blow takes its seconds off the nest as it shows them.
 	case .Spider_Hatched, .Spider_Bite, .Spider_Died:
 	case .Spider_Nest_Struck:
-		if emplacement, found := presentation_grid_object(timeline, event.target); found { emplacement.life = max(i32(0), emplacement.life-event.amount) } else { timeline.update_failures += 1 }
+		if emplacement, found := presentation_grid_object(timeline, event.target); found {
+			emplacement.life = max(i32(0), emplacement.life-event.amount)
+			emplacement.radius += 1
+		} else { timeline.update_failures += 1 }
 	// BUCO NERO: the hole's beat; the foe it will swallow starts to spin.
 	case .Black_Hole_Tick:
 		if emplacement, found := presentation_grid_object(timeline, event.target); found { emplacement.life = event.amount } else { timeline.update_failures += 1 }
@@ -1557,7 +1563,7 @@ update_active_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^P
 finish_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^Presentation_Cue) {
 	assert(timeline != nil && cue != nil && cue.started)
 	// A cannon that fell apart, a hole that closed: gone with the cue.
-	if cue.kind == .Cannon_Broken || cue.kind == .Black_Hole_Closed || cue.kind == .Napoli_Table_Cleared {
+	if cue.kind == .Cannon_Broken || cue.kind == .Black_Hole_Closed || cue.kind == .Spider_Nest_Closed || cue.kind == .Napoli_Table_Cleared {
 		if emplacement, found := presentation_grid_object(timeline, cue.event.target); found { emplacement.visible, emplacement.opacity = false, 0 }
 		return
 	}
