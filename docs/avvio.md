@@ -108,7 +108,9 @@ visite del nonno: con la faccia 2 il nonno porta la tavolata (2 secondi a mondo 
 seduto e si cura in due battiti; con la faccia 3 porta il borsellino (`odin_pp_napoli_table_NN.png`,
 `odin_pp_napoli_feast_NN.png`, `odin_pp_napoli_purse_NN.png`). Infine il bastone (faccia 1): la camera va dietro la spalla
 destra, il Viandante gira verso il bruto, fa due passi e gli dà tre mazzate (8 danni, stordito 2, poi 1, poi niente:
-`odin_pp_napoli_club_NN.png`), poi la camera contro un muro (`odin_pp_napoli_club_muro.png`). Nello smoke completo gira
+`odin_pp_napoli_club_NN.png`; la prima schiaccia la carta del bruto, `odin_pp_napoli_squash_NN.png`, e lo lascia con le
+stelline, `odin_pp_napoli_stelline.png`), una quarta che lo uccide a frittella (`odin_pp_napoli_frittella.png`), poi la
+camera contro un muro (`odin_pp_napoli_club_muro.png`). Nello smoke completo gira
 per ultimo.
 Con `ODIN_PP_LAB_ONLY=fps` e `ODIN_PP_LAB_TIMING=1` l'atto di First Person Shooter si ferma dopo la discesa negli occhi e misura
 600 fotogrammi con l'AK che spara, senza limite di fotogrammi né vsync (riga `FIRST PERSON TIMING`; meglio con una build `-o:speed`).

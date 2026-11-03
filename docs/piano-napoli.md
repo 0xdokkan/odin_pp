@@ -91,7 +91,7 @@ Note sulle decisioni:
 | 0 | Base: la carta, il D4 e i quattro rami nel laboratorio; misure di partenza | — | Fatta | vedi Esito |
 | 1 | Il nonno ospite: tavolata (effetto 2) e borsellino (effetto 3), regole e prototipo | 0 | Fatta | vedi Esito |
 | 2 | La terza persona e la mazzata (effetto 1), regole e prototipo | 0 | Fatta | vedi Esito |
-| 3 | Lo schiacciamento alla Looney Tunes e il succo della mazzata | 2 | Da fare | — |
+| 3 | Lo schiacciamento alla Looney Tunes e il succo della mazzata | 2 | Fatta | vedi Esito |
 | 4 | Diventi il nonno (effetto 4), regole e prototipo | 2 | Da fare | — |
 | 5 | Aspetto 3D: asso di bastoni, Viandante, nonno, tavolata, borsellino | 1, 3, 4 | Da fare | — |
 | 6 | Suoni e tarantella (CC0 o da codice) | 5 | Da fare | — |
@@ -563,6 +563,53 @@ Passi:
 
 **Fatto quando:** l'utente approva lo schiacciamento nel laboratorio; test
 verdi.
+
+### Esito (3 novembre 2026)
+
+Le scelte dell'utente all'inizio della fase:
+
+| Domanda | Risposta |
+|---|---|
+| Quanto si schiaccia | **Più forte del piano:** al 30% dell'altezza in 0,06 s, larga 1/√altezza (circa 1,8 volte), piatta 0,08 s, poi la molla fino al 112% e si posa; tutto in 0,6 s |
+| Peso della mazzata | **Come il piano:** pausa di 90 ms, scossa 0,45, schegge di carta e polvere; a vuoto solo una scossa piccola e la polvere |
+| Il nemico stordito | **Stelline sulla testa** finché dura lo stordimento |
+| La mazzata che uccide | **Frittella:** la carta resta schiacciata piatta mentre cade |
+| Controlli | Da questa fase l'utente vuole **solo i controlli di quello che si fa** e di quello che può toccare, non la verifica completa né la prova completa del laboratorio |
+
+Cosa c'è ora ([club_juice.odin](../src/render/club_juice.odin)):
+- **Schiacciamento** (`juice_squash_shape`): solo immagine, la casella e le regole non
+  cambiano. Si applica in `living_billboard_geometry` attorno ai piedi della carta, che restano a
+  terra; anche il bordo di carta si schiaccia con il disegno. La molla è smorzata, col primo picco
+  al 112% 0,14 s dopo la pausa da piatta, e a 0,6 s la carta è ferma (la differenza è sotto il
+  millesimo).
+- **Frittella:** se il colpo uccide la carta scende al 18% e resta così mentre cade, larga al
+  massimo 2 volte (con 1/√altezza sarebbe 2,4).
+- **Succo:** la ferita del bastone (`event_is_first_person_club`) dà la pausa di 90 ms, la
+  scossa 0,45, il lampo bianco della carta, le schegge dal punto colpito e la polvere dal
+  pavimento; niente arretramento, perché schiacciata la carta resta dov'è. La mazzata a vuoto
+  dà una scossa di 0,15 e la polvere sulla casella; su un barile o un blocco di ghiaccio 0,25 e
+  anche le schegge. Dietro la spalla ora la camera trema col succo come quella del tabellone (in
+  prima persona no, ha il suo).
+- **Stelline:** tre stelle di carta gialle col bordo d'inchiostro girano sopra la testa del
+  nemico che il bastone ha stordito, finché ha lo stato `Stagger`; con la carta schiacciata
+  scendono anche loro.
+
+Corretto durante la fase: le stelline uscivano scure, perché scrivevano la profondità e il
+passaggio finale del tabellone le scuriva; ora si disegnano come le schegge dei colpi, sopra
+le carte e senza profondità.
+
+Verifiche (solo quello che la fase tocca, la scelta dell'utente):
+- `odin check src -vet -strict-style` pulito.
+- 4 test nuovi ([club_juice_test.odin](../src/render/club_juice_test.odin)): la forma dello
+  schiacciamento (volume, 30%, picco al 112%, fermo a 0,6 s, frittella), i piedi a terra, un
+  colpo vero sul tabellone (pausa, scossa, schiacciamento, stelline, polvere a vuoto) e il colpo
+  che uccide. Con loro **78 test** del tabellone su vista, succo, carte vive e colpi: verdi.
+- Atto `napoli` del laboratorio: la prima mazzata schiaccia il bruto fino a **0,30** e lo lascia
+  con le stelline, la quarta lo uccide a frittella; tutto il resto dell'atto (facce, visite,
+  bastone, camera contro il muro) ancora verde.
+- Non fatti, come chiesto: la verifica completa (`scripts/check.ps1`), la prova completa del
+  laboratorio e il benchmark. Senza mazzate del bastone lo schiacciamento e le stelline non fanno
+  niente (un ciclo su 8 voci per carta).
 
 ## Fase 4 — Diventi il nonno
 

@@ -274,6 +274,18 @@ mechanics_lab_napoli_club :: proc(window: ^app.Window, renderer: ^render.Rendere
 	// Three blows: 8 the first, staggered 2, 1, then none.
 	club := &room.first_person.club
 	wanted := [3]i32{2, 1, 0}
+	brute_entity := game.enemy_entity(brute_id)
+	// Fase 3: the first blow's squash, filmed (odin_pp_napoli_squash_NN.png): its
+	// lowest height and its end; then the brute's stars.
+	lowest, squash_shots := f32(1), 0
+	squash :: proc(renderer: ^render.Renderer, entity: game.Entity_Ref, lowest: ^f32, shots: ^int) {
+		height, _ := render.juice_squash(renderer, entity)
+		lowest^ = min(lowest^, height)
+		if height != 1 && shots^ < 40 {
+			artifacts.screenshot(fmt.ctprintf("odin_pp_napoli_squash_%02d.png", shots^))
+			shots^ += 1
+		}
+	}
 	for beats, k in wanted {
 		frame(window, renderer, dice, room, controller, cards, buffer, &reel)
 		index, _ = game.enemy_index_by_id(room, brute_id)
@@ -281,7 +293,24 @@ mechanics_lab_napoli_club :: proc(window: ^app.Window, renderer: ^render.Rendere
 		impacts := club.impacts
 		for _ in 0..<90 {
 			frame(window, renderer, dice, room, controller, cards, buffer, &reel, club.impacts == impacts)
+			if k == 0 { squash(renderer, brute_entity, &lowest, &squash_shots) }
 			if club.impacts > impacts && !club.blow.active { break }
+		}
+		if k == 0 {
+			for _ in 0..<60 {
+				height, _ := render.juice_squash(renderer, brute_entity)
+				if height == 1 && lowest < 1 { break }
+				frame(window, renderer, dice, room, controller, cards, buffer, &reel)
+				squash(renderer, brute_entity, &lowest, &squash_shots)
+			}
+			height, width := render.juice_squash(renderer, brute_entity)
+			if lowest > render.JUICE_SQUASH_LOW+0.05 || height != 1 || width != 1 {
+				fmt.eprintln("mechanics lab: the brute's card squashed to", lowest, "and ended at", height, width); return false
+			}
+			if !render.juice_club_shows_stars(renderer, brute_entity) {
+				fmt.eprintln("mechanics lab: no stars over the staggered brute"); return false
+			}
+			artifacts.screenshot("odin_pp_napoli_stelline.png")
 		}
 		index, _ = game.enemy_index_by_id(room, brute_id)
 		lost := health-room.enemies[index].health
@@ -290,6 +319,22 @@ mechanics_lab_napoli_club :: proc(window: ^app.Window, renderer: ^render.Rendere
 			fmt.eprintln("mechanics lab: blow", k+1, "took", lost, "staggered", club.last.stagger, "not", beats, "(impacts", club.impacts, ")"); return false
 		}
 		for _ in 0..<12 { frame(window, renderer, dice, room, controller, cards, buffer, &reel) }
+	}
+	// The killing blow: a pancake (odin_pp_napoli_frittella.png).
+	index, _ = game.enemy_index_by_id(room, brute_id)
+	room.enemies[index].health = 5
+	for _ in 0..<40 { frame(window, renderer, dice, room, controller, cards, buffer, &reel) }
+	kills := renderer.tactical.juice_blows.kills
+	impacts := club.impacts
+	for _ in 0..<90 {
+		frame(window, renderer, dice, room, controller, cards, buffer, &reel, club.impacts == impacts)
+		if club.impacts > impacts && !club.blow.active { break }
+	}
+	for _ in 0..<10 { frame(window, renderer, dice, room, controller, cards, buffer, &reel) }
+	artifacts.screenshot("odin_pp_napoli_frittella.png")
+	flat, _ := render.juice_squash(renderer, brute_entity)
+	if _, alive := game.enemy_index_by_id(room, brute_id); alive || renderer.tactical.juice_blows.kills != kills+1 || abs(flat-render.JUICE_PANCAKE) > 0.01 {
+		fmt.eprintln("mechanics lab: the killing blow left no pancake (alive", alive, "height", flat, ")"); return false
 	}
 	// By a wall, looking away from it: a free cell with a wall to its west.
 	walled: grid.Position
@@ -325,7 +370,7 @@ mechanics_lab_napoli_club :: proc(window: ^app.Window, renderer: ^render.Rendere
 	if game.tactical_first_person_active(room) || render.first_person_amount(renderer) > 0 {
 		fmt.eprintln("mechanics lab: the club's view did not end"); return false
 	}
-	fmt.eprintf("mechanics lab napoli club: behind his back, two steps of W, three blows of %d staggering 2, 1, 0; the arm by the wall %.2f\n",
-		game.NAPOLI_CLUB_DAMAGE, arm)
+	fmt.eprintf("mechanics lab napoli club: behind his back, two steps of W, three blows of %d staggering 2, 1, 0, squashed to %.2f, stars; a pancake; the arm by the wall %.2f\n",
+		game.NAPOLI_CLUB_DAMAGE, lowest, arm)
 	return true
 }

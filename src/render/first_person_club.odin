@@ -182,6 +182,9 @@ follow_first_person_club :: proc(renderer: ^Renderer, room: ^game.Room) {
 	if club.impacts > c.impacts_seen {
 		c.impacts_seen = club.impacts
 		c.impact_at = renderer.sprite_assets.elapsed
+		// The floor's or a thing's blow has no foe's wound to juice it (club_juice.odin).
+		if club.last.hit != .Foe { juice_club_floor(renderer, club.last) }
+		if club.last.hit == .Foe && club.last.stagger > 0 { juice_club_daze(renderer, club.last.target) }
 	}
 }
 

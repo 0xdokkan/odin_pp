@@ -83,8 +83,13 @@ Juice_Blows :: struct {
 	burst_next: int,
 	hurt_at: f64,
 	hurt: f32,
+	// BENVENUTI A NAPOLI's club: the cards it squashed, the foes it staggered (club_juice.odin).
+	squashes: [JUICE_SQUASHES]Juice_Squash,
+	squash_next: int,
+	dazed: [JUICE_DAZED]Juice_Dazed,
+	dazed_next: int,
 	// What the board has juiced so far (the lab's smoke and the tests).
-	blows, criticals, kills, hurts, guards, blasts: int,
+	blows, criticals, kills, hurts, guards, blasts, clubs: int,
 }
 
 @(private = "file")
@@ -124,7 +129,13 @@ juice_burst :: proc(renderer: ^Renderer, b: ^Juice_Blows, entity: game.Entity_Re
 	if !ok { return }
 	point := rl.Vector3{at.x+0.5, 0.7, at.y+0.5}
 	if struck, found := attack_struck_point(renderer, entity); found { point = struck }
-	b.bursts[b.burst_next] = {at = point, color = color, count = count, seed = u32(b.burst_next*7919+int(entity.id)*31), start = now}
+	juice_burst_at(b, point, color, count, u32(entity.id)*31, now)
+}
+
+// Paper bits (or dust) thrown off `point`.
+@(private)
+juice_burst_at :: proc(b: ^Juice_Blows, point: rl.Vector3, color: rl.Color, count: int, salt: u32, now: f64) {
+	b.bursts[b.burst_next] = {at = point, color = color, count = count, seed = u32(b.burst_next*7919)+salt, start = now}
 	b.burst_next = (b.burst_next+1)%JUICE_BURSTS
 }
 
@@ -161,9 +172,16 @@ observe_juice_blows :: proc(renderer: ^Renderer) {
 				// A blow with its props juices as it lands.
 				if _, pending := attack_fx_landing_in(renderer, event.target, now, game.PLAYER_ENTITY); pending { continue }
 				if juice_seen(b, cue, world) { continue }
+				fells := juice_fells(renderer, cue)
+				// BENVENUTI A NAPOLI's club: its squash, its weight (club_juice.odin).
+				if game.event_is_first_person_club(event) {
+					juice_club_blow(renderer, b, event.target, fells, now)
+					b.blows += 1
+					if fells { b.kills += 1 }
+					continue
+				}
 				blow := game.event_is_attack(event)
 				critical := game.event_is_critical(event)
-				fells := juice_fells(renderer, cue)
 				hit := JUICE_KILL if fells else (JUICE_CRITICAL if critical else JUICE_BLOW)
 				juice_shake(renderer, hit.trauma)
 				b.blows += 1

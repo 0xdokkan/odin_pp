@@ -653,6 +653,11 @@ living_billboard_geometry :: proc(renderer: ^Renderer, character: gfx.Flipbook_C
 		pbl += right*(math.sin(f32(now)*math.TAU*11)*0.014*actor.tremble)
 	}
 	result.points = {pbl+top, pbl, pbl+half*2, pbl+half*2+top}
+	// BENVENUTI A NAPOLI's club squashes the struck card about its feet (club_juice.odin).
+	if height, wide := juice_squash(renderer, entity); height != 1 || wide != 1 {
+		juice_squash_points(&result.points, base, right, height, wide)
+		juice_squash_points(&result.card_points, base, right, height, wide)
+	}
 	if fall := living_fall(actor, now); fall > 0 {
 		topple_card_points(&result.points, v.camera, fall)
 		topple_card_points(&result.card_points, v.camera, fall)

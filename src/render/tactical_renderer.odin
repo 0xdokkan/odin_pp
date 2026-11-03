@@ -786,6 +786,8 @@ draw_tactical_world :: proc(renderer: ^Renderer, room: ^game.Room, active_card: 
 	draw_enemy_arrows(renderer, room)
 	draw_enemy_bombs(renderer, room)
 	draw_juice_bursts(renderer)
+	// The stars over the foes the club staggered (club_juice.odin).
+	draw_juice_dazed(renderer)
 	rl.EndMode3D()
 	when EXPEDITION_BENCHMARK {v.draw_timing.paper_ms=expedition_benchmark_elapsed(&stamp)}
 

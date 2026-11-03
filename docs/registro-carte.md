@@ -39,6 +39,11 @@ Commit **«Piano di Napoli, Fase 0 fatta: la carta, il D4 e i quattro rami»** s
   niente sullo stesso nemico, finché non passano 4 s senza mazzate su di lui). Senza nemico rompe un barile o un blocco
   di ghiaccio, altrimenti picchia il pavimento; una diagonale chiusa da due muri non si colpisce. Viandante e bastone
   provvisori (il cartoncino e un bastone semplice).
+- **2026-11-03, Fase 3** (commit «Piano di Napoli, Fase 3 fatta: schiacciamento, succo e stelline»): la carta del nemico
+  colpito dal bastone si **schiaccia** al 30% dell'altezza, larga circa 1,8 volte, resta piatta un attimo e torna su con
+  una molla fino al 112% (0,6 s, solo immagine); la mazzata che uccide lo lascia **a frittella** mentre cade. Pausa di
+  90 ms, scossa, schegge e polvere; a vuoto solo polvere e una scossa piccola. Sopra il nemico stordito girano tre
+  **stelline**.
 
 ## 2026-10-30 — Tutte le carte: il lancio dura la metà
 

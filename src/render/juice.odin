@@ -124,10 +124,11 @@ juice_camera :: proc(camera: rl.Camera3D, trauma: f32, clock: f64) -> rl.Camera3
 }
 
 // Shakes the board's camera for the drawings, after the aim has read it.
-// Behind the player's eyes the view has its own shake (first_person.odin).
+// Behind the player's eyes the view has its own shake (first_person.odin);
+// behind his back (the club's view, first_person_club.odin) the board's.
 @(private)
 juice_shake_board_camera :: proc(renderer: ^Renderer) {
 	v := &renderer.tactical
-	if renderer.juice.trauma <= 0 || first_person_amount(renderer) > 0 { return }
+	if renderer.juice.trauma <= 0 || (first_person_amount(renderer) > 0 && !first_person_third_person(renderer)) { return }
 	v.camera = juice_camera(v.camera, renderer.juice.trauma, renderer.juice.clock)
 }
