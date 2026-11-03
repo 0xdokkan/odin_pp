@@ -162,18 +162,16 @@ club_stagger_beats :: proc(club: ^First_Person_Club, enemy_id: u32) -> (beats: i
 }
 
 // The world's seconds (tactical_first_person_tick): the blow's, run by the
-// frame's command; the memory's quiet.
+// frame's command; the memory's quiet. The grandpa's club too (napoli_nonno.odin).
 @(private)
-first_person_club_tick :: proc(room: ^Room, seconds: f32) {
-	c := &room.first_person.club
+first_person_club_tick :: proc(c: ^First_Person_Club, seconds: f32) {
 	if c.blow.active { c.pending = min(c.pending+seconds, CLUB_MAX_PENDING) }
 	for &memory in c.memory { memory.quiet = min(memory.quiet+seconds, 60) }
 }
 
 // The impact: the foe on the cell, else a damageable thing, else the floor.
 @(private = "file")
-club_land :: proc(room: ^Room) {
-	c := &room.first_person.club
+club_land :: proc(room: ^Room, c: ^First_Person_Club) {
 	cell, reached := club_cell(room, c.blow.from, c.blow.way)
 	c.impacts += 1
 	c.last = {hit = .Floor, cell = cell, target = SYSTEM_ENTITY, number = c.impacts}
@@ -244,12 +242,7 @@ first_person_club_move :: proc(room: ^Room, input: First_Person_Club_Input) -> (
 	// A dodge (or anything else that moved him) mid-blow leaves it unstruck.
 	if c.blow.active && room.player.position != c.blow.from { c.blow, c.pending = {}, 0 }
 	if input.swing && !c.blow.active && tactical_allows_action(room) {
-		way := club_way(input.yaw)
-		c.blow = {active = true, way = way, from = room.player.position}
-		c.pending = 0
-		c.swings += 1
-		room.first_person.shots += 1
-		room.player.tactical.facing = first_person_key_directions(input.yaw)[0]
+		club_begin_blow(room, c, club_way(input.yaw), input.yaw)
 		switch finish_player_combat_command(room, 0) {
 		case .Player_Defeated: return .Player_Defeated
 		case .Combat_Ended: return .Combat_Ended
@@ -260,16 +253,7 @@ first_person_club_move :: proc(room: ^Room, input: First_Person_Club_Input) -> (
 		tactical_spend_action_time(room, CLUB_SWING_SECONDS)
 		acted = true
 	}
-	if c.blow.active {
-		c.blow.at += c.pending
-		c.pending = 0
-		if !c.blow.landed && c.blow.at >= CLUB_WINDUP_SECONDS-1e-5 {
-			c.blow.landed = true
-			club_land(room)
-			acted = true
-		}
-		if c.blow.at >= CLUB_SWING_SECONDS-1e-5 { c.blow = {} }
-	}
+	if club_run(room, c) { acted = true }
 	if !acted { return .None }
 	if room.phase != .Combat {
 		sync_deck_with_room_phase(room)
@@ -277,6 +261,32 @@ first_person_club_move :: proc(room: ^Room, input: First_Person_Club_Input) -> (
 		return .Combat_Ended
 	}
 	return .Moved
+}
+
+// A blow begun `way` from where he stands, the view along `yaw`.
+@(private)
+club_begin_blow :: proc(room: ^Room, c: ^First_Person_Club, way: [2]i8, yaw: f32) {
+	c.blow = {active = true, way = way, from = room.player.position}
+	c.pending = 0
+	c.swings += 1
+	room.first_person.shots += 1
+	room.player.tactical.facing = first_person_key_directions(yaw)[0]
+}
+
+// The blow under way run over the world's seconds since the last frame: its
+// impact once raised, its end. Whether it struck now.
+@(private)
+club_run :: proc(room: ^Room, c: ^First_Person_Club) -> (struck: bool) {
+	if !c.blow.active { c.pending = 0; return }
+	c.blow.at += c.pending
+	c.pending = 0
+	if !c.blow.landed && c.blow.at >= CLUB_WINDUP_SECONDS-1e-5 {
+		c.blow.landed = true
+		club_land(room, c)
+		struck = true
+	}
+	if c.blow.at >= CLUB_SWING_SECONDS-1e-5 { c.blow = {} }
+	return
 }
 
 // The club's own wounds.

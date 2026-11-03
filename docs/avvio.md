@@ -110,7 +110,9 @@ seduto e si cura in due battiti; con la faccia 3 porta il borsellino (`odin_pp_n
 destra, il Viandante gira verso il bruto, fa due passi e gli dà tre mazzate (8 danni, stordito 2, poi 1, poi niente:
 `odin_pp_napoli_club_NN.png`; la prima schiaccia la carta del bruto, `odin_pp_napoli_squash_NN.png`, e lo lascia con le
 stelline, `odin_pp_napoli_stelline.png`), una quarta che lo uccide a frittella (`odin_pp_napoli_frittella.png`), poi la
-camera contro un muro (`odin_pp_napoli_club_muro.png`). Nello smoke completo gira
+camera contro un muro; infine il nonno (faccia 4): il bastone esce dalla tasca, una mazzata al bruto, Q ed E, il colpo
+del bruto sulla vita del nonno e il nonno che se ne va a vita zero (`odin_pp_napoli_nonno_NN.png`,
+`odin_pp_napoli_nonno_tasca.png`, `_colpo.png`, `_q.png`, `_se_ne_va.png`) (`odin_pp_napoli_club_muro.png`). Nello smoke completo gira
 per ultimo.
 Con `ODIN_PP_LAB_ONLY=fps` e `ODIN_PP_LAB_TIMING=1` l'atto di First Person Shooter si ferma dopo la discesa negli occhi e misura
 600 fotogrammi con l'AK che spara, senza limite di fotogrammi né vsync (riga `FIRST PERSON TIMING`; meglio con una build `-o:speed`).

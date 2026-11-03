@@ -566,7 +566,7 @@ timeline_card_cue_verb :: proc(cue: ^Presentation_Cue) -> cstring {
 	     .Marley_Begun, .Marley_Lights, .Marley_Warned, .Marley_Bomb, .Marley_Saved, .Marley_Bonus, .Marley_Ended,
 	     .Flood_Swept, .Fire_Extinguished, .Cannon_Fired, .Cannon_Broken, .Black_Hole_Tick, .Black_Hole_Swallowed, .Black_Hole_Closed,
 	     .Ride_Begun, .Ride_Ended, .Dino_Stomp, .Bleed_Bite, .Arrow_Loosed, .Arrow_Landed, .Bomb_Thrown, .Napoli_Begun,
-	     .Napoli_Feast, .Napoli_Table_Cleared:
+	     .Napoli_Feast, .Napoli_Table_Cleared, .Napoli_Nonno_Cured, .Napoli_Nonno_Left:
 	}
 	return nil
 }
@@ -826,6 +826,11 @@ draw_presentation_cue :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) {
 		label, color = napoli_begun_label(cue.event), NAPOLI_LABEL_COLOR
 	case .Napoli_Feast:
 		label, color = "A TAVOLA!", NAPOLI_LABEL_COLOR
+	// The grandpa's Q, and his going (game/napoli_nonno.odin).
+	case .Napoli_Nonno_Cured:
+		label, color = fmt.ctprintf("NONNO +%d", cue.event.amount), rl.Color{92, 220, 151, 255}
+	case .Napoli_Nonno_Left:
+		label, color = "IL NONNO SE NE VA", NAPOLI_LABEL_COLOR
 	case .Bleed_Bite:
 		label = fmt.ctprintf("SANGUE +%d", cue.event.amount)
 		color = rl.Color{255, 82, 82, 255}

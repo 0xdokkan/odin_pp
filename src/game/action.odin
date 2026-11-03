@@ -643,6 +643,11 @@ apply_damage_effect :: proc(
 	actual_damage: i32
 	switch effect.target.kind {
 	case .Player:
+		// BENVENUTI A NAPOLI: the grandpa takes the player's wounds (napoli_nonno.odin).
+		if napoli_nonno_active(room) {
+			actual_damage = napoli_nonno_wound(room, damage)
+			break
+		}
 		actual_damage = min(damage, room.player.health)
 		room.player.health -= actual_damage
 		if room.player.health == 0 {
@@ -682,6 +687,7 @@ apply_damage_effect :: proc(
 	drop_count := 0
 	if effect.target.kind == .Player {
 		defeated = room.player.health == 0
+		napoli_nonno_after_wound(room, report)
 	} else if effect.target.kind == .Enemy {
 		index, found := enemy_index_by_id(room, effect.target.id)
 		assert(found)

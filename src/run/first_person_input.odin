@@ -102,7 +102,7 @@ first_person_buttons :: proc(controller: ^Tactical_Controller, renderer: ^render
 route_first_person_buttons :: proc(room: ^game.Room, buttons: First_Person_Buttons) {
 	switch room.first_person.weapon {
 	case .AK: game.first_person_set_trigger(room, buttons.left)
-	case .Fists, .Sword, .Bow, .Club:
+	case .Fists, .Sword, .Bow, .Club, .Nonno:
 	}
 }
 
@@ -202,6 +202,26 @@ drive_first_person_club :: proc(controller: ^Tactical_Controller, room: ^game.Ro
 	swing := buttons.left && controller.look_captured && !render.first_person_diving(renderer)
 	club := game.First_Person_Club_Input{swing = swing, yaw = renderer.tactical.first_person.yaw}
 	command := Gameplay_Command{kind = .First_Person_Club, origin_phase = .Combat, club = club}
+	_ = commit_gameplay_command(room, renderer, cards, command, playtest)
+}
+
+// BENVENUTI A NAPOLI's grandpa (game/napoli_nonno.odin): the movement keys turned
+// with the view move his body free, as the fists' do (no jump, no dash); the
+// left button held brings his club down, blow after blow; Q pressed cures, E
+// pressed pays (the diagonal keys, off behind his back); committed as a world
+// command of the frame's `seconds`. Nothing while the mouse is not the view's
+// or the camera flies behind him.
+drive_first_person_nonno :: proc(controller: ^Tactical_Controller, room: ^game.Room, renderer: ^render.Renderer,
+	cards: ^Card_Interaction_State, input: Tactical_Controller_Input, buttons: First_Person_Buttons, seconds: f32,
+	playtest: ^combatdebug.Playtest_Session) {
+	if !game.napoli_nonno_active(room) { return }
+	nonno: game.First_Person_Nonno_Input
+	if controller.look_captured && !render.first_person_diving(renderer) {
+		yaw := renderer.tactical.first_person.yaw
+		wish, _ := first_person_fists_ways(input.walk, yaw)
+		nonno = {wish = wish, yaw = yaw, swing = buttons.left, heal = input.diagonals[0], pay = input.diagonals[1]}
+	}
+	command := Gameplay_Command{kind = .Napoli_Nonno, origin_phase = .Combat, nonno = nonno, seconds = seconds}
 	_ = commit_gameplay_command(room, renderer, cards, command, playtest)
 }
 

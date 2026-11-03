@@ -109,6 +109,11 @@ balance_run :: proc(t: ^testing.T, weapon: game.First_Person_Weapon, spam := fal
 				if best > 2 && frame%10 == 0 && !game.tactical_player_busy(&room) && room.qte.kind == .None {
 					_ = run_session.commit_gameplay_command(&room, renderer, &cards, {kind = .Move, origin_phase = .Combat, direction = way})
 				}
+			// BENVENUTI A NAPOLI's grandpa: free toward the foe, the button held.
+			case .Nonno:
+				view.yaw = yaw
+				input.walk[0] = best > 1
+				input.fire = frame%30 != 0
 			}
 		}
 		_, _ = game.sandbox_tick(&room, &sandbox, 1.0/60)
@@ -141,7 +146,7 @@ balance_run :: proc(t: ^testing.T, weapon: game.First_Person_Weapon, spam := fal
 
 @(test)
 test_first_person_weapons_side_by_side :: proc(t: ^testing.T) {
-	names := [game.First_Person_Weapon]string{.AK = "AK", .Fists = "pugni", .Sword = "spada", .Bow = "arco", .Club = "bastone"}
+	names := [game.First_Person_Weapon]string{.AK = "AK", .Fists = "pugni", .Sword = "spada", .Bow = "arco", .Club = "bastone", .Nonno = "nonno"}
 	for weapon in game.First_Person_Weapon {
 		r := balance_run(t, weapon)
 		dps := f32(r.dealt)/max(r.seconds, 1)

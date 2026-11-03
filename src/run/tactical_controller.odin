@@ -255,6 +255,7 @@ step_tactical_controller :: proc(
 	drive_first_person_sword(controller, room, renderer, cards, input, buttons, simulation_dt, playtest)
 	drive_first_person_bow(controller, room, renderer, cards, buttons, playtest)
 	drive_first_person_club(controller, room, renderer, cards, buttons, playtest)
+	drive_first_person_nonno(controller, room, renderer, cards, input, buttons, simulation_dt, playtest)
 	drain_first_person_fire(room, renderer, cards, playtest)
 	// Expiration is checked after all paid beats, including the last second.
 	if game.tactical_tick(room, 0, true, controller.hologram) {
@@ -284,7 +285,7 @@ step_tactical_controller :: proc(
 		fps := game.tactical_first_person_active(room)
 		keys := render.first_person_keys(renderer)
 		// With the fists Shift is the hooks', and a double tap dashes.
-		if input.shift && !game.first_person_fists_active(room) {
+		if input.shift && !game.first_person_body_active(room) {
 			for pressed, index in input.directions {
 				if pressed { command.kind = .Dodge; command.direction = keys[index]; break }
 			}

@@ -367,7 +367,7 @@ frame_first_person_camera :: proc(renderer: ^Renderer, room: ^game.Room) {
 		// Behind his eyes, or with the club behind his back (first_person_club.odin).
 		goal, goal_yaw, goal_pitch := f.eye, f.yaw, f.pitch
 		if first_person_third_person(renderer) {
-			at, way := frame_first_person_club_camera(renderer, room, p, now)
+			at, way := frame_first_person_club_camera(renderer, room, club_anchor(renderer, room, p), now)
 			goal, goal_yaw, goal_pitch = at, math.atan2(way.z, way.x), math.asin(clamp(way.y, -1, 1))
 		}
 		yaw := yaw0+first_person_wrap(goal_yaw-yaw0)*s
@@ -545,6 +545,8 @@ turn_first_person_view :: proc(renderer: ^Renderer, yaw, pitch: f32) {
 // behind his back only when the arm is pressed close to him).
 @(private)
 first_person_player_shown :: proc(renderer: ^Renderer) -> f32 {
+	// The grandpa stands for him: his card is gone (napoli.odin draws the grandpa).
+	if renderer.tactical.first_person.weapon == .Nonno { return 1-first_person_amount(renderer) }
 	if first_person_third_person(renderer) {
 		amount := first_person_amount(renderer)
 		return (1-renderer.tactical.first_person.club.fade*amount)*(1-(1-CLUB_CARD_SHOWN)*amount)
@@ -884,6 +886,8 @@ draw_first_person_overlay :: proc(renderer: ^Renderer, room: ^game.Room) {
 	hud_frame(bounds, accent)
 	gothic_text_fit(renderer, first_person_countdown_text(left, f.weapon), {bounds.x+12, bounds.y+4, bounds.width-24, 24}, 18, GOTHIC_PAPER)
 	hud_bar({bounds.x+12, bounds.y+bounds.height-12, bounds.width-24, 6}, left/duration, accent, int(min(duration, 30)))
+	// The grandpa's health and his two keys, over the plate (napoli.odin).
+	if f.weapon == .Nonno { draw_napoli_nonno_hud(renderer, room, bounds) }
 }
 
 // The AK at the bottom right, its flash at the muzzle a moment after a shot.
@@ -963,6 +967,8 @@ FIRST_PERSON_HUD_STATUS_SWORD :: cstring("MOUSE: LAMA / DESTRO: PARA / Q E: GIRA
 FIRST_PERSON_HUD_STATUS_BOW :: cstring("DESTRO: TENDI E TIRA / SX: ABBASSA / WASD")
 // BENVENUTI A NAPOLI's club: the look, the blow, the steps.
 FIRST_PERSON_HUD_STATUS_CLUB :: cstring("MOUSE: GIRA / CLIC: MAZZATA / WASD: PASSI")
+// BENVENUTI A NAPOLI's grandpa: free steps, the blow, Q and E once each.
+FIRST_PERSON_HUD_STATUS_NONNO :: cstring("WASD LIBERO / CLIC: MAZZATA / Q CURA / E SOLDI")
 
 // --------------------------------------------------------------------------
 // Each weapon's look (game.FIRST_PERSON_WEAPONS has its rules).
@@ -993,6 +999,8 @@ FIRST_PERSON_LOOKS := [game.First_Person_Weapon]First_Person_Look{
 	.Bow = {tag = "FPA", status = FIRST_PERSON_HUD_STATUS_BOW, hand = .Bow, accent = FIRST_PERSON_BOW_TEAL},
 	// The club is in his hand on the board, behind his back (first_person_club.odin).
 	.Club = {tag = "BAN", status = FIRST_PERSON_HUD_STATUS_CLUB, hand = .Empty, accent = CLUB_MARK_COLOR},
+	// The grandpa: his own health and keys over the plate (napoli.odin).
+	.Nonno = {tag = "NONNO", status = FIRST_PERSON_HUD_STATUS_NONNO, hand = .Empty, accent = CLUB_MARK_COLOR},
 }
 
 // The weapon the board shows: the room's while the view is on, the last one

@@ -92,7 +92,7 @@ Note sulle decisioni:
 | 1 | Il nonno ospite: tavolata (effetto 2) e borsellino (effetto 3), regole e prototipo | 0 | Fatta | vedi Esito |
 | 2 | La terza persona e la mazzata (effetto 1), regole e prototipo | 0 | Fatta | vedi Esito |
 | 3 | Lo schiacciamento alla Looney Tunes e il succo della mazzata | 2 | Fatta | vedi Esito |
-| 4 | Diventi il nonno (effetto 4), regole e prototipo | 2 | Da fare | — |
+| 4 | Diventi il nonno (effetto 4), regole e prototipo | 2 | Fatta | vedi Esito |
 | 5 | Aspetto 3D: asso di bastoni, Viandante, nonno, tavolata, borsellino | 1, 3, 4 | Da fare | — |
 | 6 | Suoni e tarantella (CC0 o da codice) | 5 | Da fare | — |
 | 7 | Nel gioco vero: «Mostra effetto», offerte, salvataggi, prova con l'utente, chiusura | 6 | Da fare | — |
@@ -654,6 +654,61 @@ Passi:
 
 **Fatto quando:** l'utente prova il minuto da nonno nel laboratorio e lo approva;
 test verdi.
+
+### Esito (3 novembre 2026)
+
+Le scelte dell'utente all'inizio della fase:
+
+| Domanda | Risposta |
+|---|---|
+| Movimento | **4 caselle al secondo**, niente salto né scatto |
+| Camminare durante la mazzata | **No, si ferma** per i 0,6 s del colpo |
+| Chi colpisce | **Il nemico davanti:** il più vicino entro 1,2 caselle e dentro 45° a destra e a sinistra della visuale; se non c'è, la casella davanti |
+| Dove torna il Viandante | **Dove sta il nonno** (la casella sotto il suo corpo) |
+
+Cosa c'è ora ([napoli_nonno.odin](../src/game/napoli_nonno.odin)):
+- **Un'arma nuova della vista,** `First_Person_Weapon.Nonno`, in terza persona come il bastone.
+  Il suo stato comincia col corpo dei pugni, così le regole del corpo libero (scivolare contro i
+  muri, i passi nelle caselle, le trappole, gli ascensori) lavorano su di lui senza copie: dove
+  serviva, «i pugni attivi» è diventato «un corpo libero attivo» (`first_person_body_active`).
+  Niente schivata né difesa a tasti, come col Brawler. Sta nei byte condivisi della vista: la
+  stanza non cresce.
+- **Il bastone esce dalla tasca da solo** in 1,2 s; prima nessuna mazzata. Poi il clic sinistro
+  (tenuto: una dopo l'altra) dà la mazzata del bastone: stesso danno della carta, stessi tempi,
+  stesso stordimento che cala, stesso schiacciamento e stelline. La mazzata del bastone è stata
+  rifatta perché la usino tutti e due.
+- **La mira:** 1,2 caselle contate **dal bordo del suo corpo** (0,3 dal centro), non dal centro.
+  Contando dal centro un nemico in diagonale (a 1,41) non si colpiva mai stando in mezzo alla
+  casella; così i nemici in diagonale si colpiscono, quelli a due caselle no.
+- **La vita sua:** ogni ferita del Viandante (colpi, frecce, bombe, veleno, fuoco) passa per
+  `apply_damage_effect` e lì va al nonno. A zero il nonno se ne va subito («IL NONNO SE NE VA»),
+  la vista finisce e il Viandante ha la vita che aveva. Anche la scena lo sa: le ferite tolgono la
+  vita del nonno, non quella del Viandante nel riquadro.
+- **Q** una volta: il nonno guarisce di metà della sua vita massima, il Viandante di metà della
+  sua («NONNO +15» e «+11»). **E** una volta: l'oro del borsellino (15, +2 a potenziamento).
+- **Sul tabellone, provvisorio:** la figurina del nonno della Fase 1 al posto del cartoncino del
+  Viandante, a metà trasparenza come nella vista del bastone, che dondola quando cammina; il
+  bastone che esce dalla tasca sempre più lungo e va sulla spalla. Sopra il riquadro dei secondi
+  («NONNO 60s») la sua vita, accanto i due tasti «Q CURA» ed «E SOLDI», spenti dopo l'uso. La
+  camera segue il corpo libero.
+- Nel film di «Mostra effetto» la vista del nonno si chiude dopo un secondo e mezzo, come quella
+  del bastone (il film vero è della Fase 7).
+
+Verifiche (solo quello che la fase tocca):
+- `odin check src -vet -strict-style` pulito.
+- 6 test nuovi ([napoli_nonno_test.odin](../src/game/napoli_nonno_test.odin)): la faccia 4 e i
+  suoi numeri, i 4 caselle/s e il ritorno dove sta il nonno, niente colpo prima della tasca e il
+  colpo sul nemico davanti da fermo, Q ed E una volta, le ferite al nonno e la sua uscita, il
+  peso e il salvataggio. Con loro **104 test** delle regole (Napoli, vista, pugni, bastone,
+  eventi, azioni) e **97** del tabellone e di integrazione (vista, succo, scena, comandi delle armi,
+  film delle carte): verdi.
+- Bilanciamento (un minuto di prova automatica): il nonno fa **11,8 danni al secondo**, più del
+  bastone (6,4): cammina libero fino al nemico invece di fare passi sulla griglia. I colpi presi
+  vanno tutti al nonno.
+- Atto `napoli` del laboratorio: niente colpo con il bastone ancora in tasca, la mazzata da 8 sul
+  bruto, Q (nonno +15, Viandante +11), E (15 oro), il colpo del bruto sul nonno e non sul
+  Viandante, poi a vita zero il nonno se ne va e il Viandante resta dov'era con la sua vita.
+- Non fatti, come chiesto: la verifica completa, la prova completa del laboratorio, il benchmark.
 
 ## Fase 5 — Aspetto 3D: asso di bastoni, Viandante, nonno
 

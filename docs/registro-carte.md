@@ -44,6 +44,13 @@ Commit **«Piano di Napoli, Fase 0 fatta: la carta, il D4 e i quattro rami»** s
   una molla fino al 112% (0,6 s, solo immagine); la mazzata che uccide lo lascia **a frittella** mentre cade. Pausa di
   90 ms, scossa, schegge e polvere; a vuoto solo polvere e una scossa piccola. Sopra il nemico stordito girano tre
   **stelline**.
+- **2026-11-03, Fase 4** (commit «Piano di Napoli, Fase 4 fatta: un minuto da nonno»): la faccia 4 trasforma il
+  Viandante nel **nonno** per 60 s (arma `Nonno` della vista, `game/napoli_nonno.odin`), in terza persona e libero sulla
+  mappa a 4 caselle al secondo, senza salto né scatto. Il bastone esce dalla tasca da solo in 1,2 s, poi il clic dà la
+  mazzata del bastone sul nemico davanti (entro 1,2 caselle dal bordo del corpo, 45° per parte), fermo durante il colpo.
+  Vita sua: 30 (+5 a potenziamento, +10 sul tick); le ferite vanno a lui, a zero se ne va e il Viandante ha la vita di
+  prima, nella casella dove stava il nonno. Q una volta: cura il nonno di metà della sua vita e il Viandante di metà
+  della sua; E una volta: 15 oro (+2).
 
 ## 2026-10-30 — Tutte le carte: il lancio dura la metà
 

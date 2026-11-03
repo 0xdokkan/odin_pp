@@ -475,6 +475,9 @@ tactical_feedback_badges :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) ->
 		count += 1
 		return
 	case .Energy_Gained: label = fmt.ctprintf("+%d ENERGIA", event.amount)
+	// The grandpa's Q, over him; his going.
+	case .Napoli_Nonno_Cured: label = fmt.ctprintf("NONNO +%d", event.amount); color = {92, 220, 151, 255}
+	case .Napoli_Nonno_Left: label, color = "IL NONNO SE NE VA", NAPOLI_LABEL_COLOR
 	case:
 	}
 	if label != nil {

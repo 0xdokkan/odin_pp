@@ -12,11 +12,12 @@ import level "../level"
 test_first_person_each_weapon_has_its_look :: proc(t: ^testing.T) {
 	look := FIRST_PERSON_LOOKS[.AK]
 	testing.expect(t, look.tag == "FPS" && look.status == FIRST_PERSON_HUD_STATUS && look.hand == .AK)
-	tags := [game.First_Person_Weapon]string{.AK = "FPS", .Fists = "FPB", .Sword = "FPF", .Bow = "FPA", .Club = "BAN"}
+	tags := [game.First_Person_Weapon]string{.AK = "FPS", .Fists = "FPB", .Sword = "FPF", .Bow = "FPA", .Club = "BAN", .Nonno = "NONNO"}
 	for weapon in game.First_Person_Weapon {
 		look = FIRST_PERSON_LOOKS[weapon]
 		testing.expect_value(t, look.tag, tags[weapon])
-		testing.expect_value(t, len(look.tag), len("FPS"))
+		// The grandpa's plate names him in full.
+		if weapon != .Nonno { testing.expect_value(t, len(look.tag), len("FPS")) }
 		if weapon == .AK { continue }
 		if weapon == .Fists {
 			testing.expect(t, look.status == FIRST_PERSON_HUD_STATUS_FISTS && look.hand == .Fists)
@@ -29,6 +30,10 @@ test_first_person_each_weapon_has_its_look :: proc(t: ^testing.T) {
 		// BENVENUTI A NAPOLI's club is on the board, behind his back.
 		if weapon == .Club {
 			testing.expect(t, look.status == FIRST_PERSON_HUD_STATUS_CLUB && look.hand == .Empty)
+			continue
+		}
+		if weapon == .Nonno {
+			testing.expect(t, look.status == FIRST_PERSON_HUD_STATUS_NONNO && look.hand == .Empty)
 			continue
 		}
 		testing.expect(t, look.status == FIRST_PERSON_HUD_STATUS_BOW && look.hand == .Bow)

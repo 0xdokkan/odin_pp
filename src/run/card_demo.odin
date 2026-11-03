@@ -709,9 +709,9 @@ card_demo_advance :: proc(demo: ^Card_Demo, renderer: ^render.Renderer, frame_dt
 		if game.first_person_bow_active(room) && demo.next_action >= demo.scene.action_count && !demo.acting {
 			room.first_person.remaining = min(room.first_person.remaining, 1)
 		}
-		// BENVENUTI A NAPOLI's club (30 s and more; its own film comes with Fase 7
+		// BENVENUTI A NAPOLI's club (30 s and more) and grandpa (60 s; its own film comes with Fase 7
 		// of docs/piano-napoli.md): taken up and shown, it ends a second and a half on.
-		if game.first_person_club_active(room) && demo.next_action >= demo.scene.action_count && !demo.acting {
+		if (game.first_person_club_active(room) || game.napoli_nonno_active(room)) && demo.next_action >= demo.scene.action_count && !demo.acting {
 			room.first_person.remaining = min(room.first_person.remaining, 1.5)
 		}
 		// The ground has no event: the take samples it, and the AK's hits.

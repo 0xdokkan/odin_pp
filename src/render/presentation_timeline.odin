@@ -184,6 +184,9 @@ Presentation_Cue_Kind :: enum {
 	Napoli_Begun,
 	Napoli_Feast,
 	Napoli_Table_Cleared,
+	// The grandpa's Q, and his going at no health (game/napoli_nonno.odin).
+	Napoli_Nonno_Cured,
+	Napoli_Nonno_Left,
 }
 
 Presentation_Actor :: struct {
@@ -266,12 +269,20 @@ Room_Presentation :: struct {
 	marley:      game.Marley_State,
 	// The dinosaur the player rides, as the cues show it.
 	ride:        game.Ride_State,
+	// BENVENUTI A NAPOLI's grandpa, as the cues show him: the player's wounds
+	// are his while he is on (game/napoli_nonno.odin).
+	nonno:       Presentation_Nonno,
 	gold:        i32,
 	pulse_count: u64,
 	// The player's pace: what his prices are divided by (game.tactical_player_pace).
 	pace:        f32,
 	valid:       bool,
 	dropped:     int,
+}
+
+Presentation_Nonno :: struct {
+	active: bool,
+	health, most: i32,
 }
 
 Presentation_Cue :: struct {
@@ -318,6 +329,9 @@ capture_room_presentation :: proc(room: ^game.Room) -> (result: Room_Presentatio
 	result.weapon = room.player.equipment.weapon.id
 	result.fate_sides = game.player_fate_sides(room)
 	result.gold = room.player.gold
+	if game.napoli_nonno_active(room) {
+		result.nonno = {active = true, health = room.first_person.nonno.health, most = room.first_person.nonno.most}
+	}
 	result.pulse_count = room.pulse_count
 	result.deck = room.player.deck
 	result.player = {
@@ -677,6 +691,10 @@ presentation_cue_kind :: proc(event: game.Game_Event) -> Presentation_Cue_Kind {
 		return .Napoli_Feast
 	case .Napoli_Table_Cleared:
 		return .Napoli_Table_Cleared
+	case .Napoli_Nonno_Cured:
+		return .Napoli_Nonno_Cured
+	case .Napoli_Nonno_Left:
+		return .Napoli_Nonno_Left
 	}
 	unreachable()
 }
@@ -796,6 +814,10 @@ presentation_cue_duration :: proc(kind: Presentation_Cue_Kind, event: game.Game_
 	case .Napoli_Feast:
 		return PRESENTATION_NAPOLI_FEAST_DURATION
 	case .Napoli_Table_Cleared:
+		return PRESENTATION_NAPOLI_CLEAR_DURATION
+	case .Napoli_Nonno_Cured:
+		return PRESENTATION_HEAL_DURATION
+	case .Napoli_Nonno_Left:
 		return PRESENTATION_NAPOLI_CLEAR_DURATION
 	case .Black_Hole_Tick, .Bleed_Bite, .Arrow_Loosed, .Arrow_Landed, .Bomb_Thrown:
 		return PRESENTATION_NOTICE_DURATION
@@ -1227,7 +1249,10 @@ start_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^Presentat
 		}
 	case .Damage:
 		if event.source == game.PLAYER_ENTITY && game.event_is_attack(event) { sync_presentation_player_charges_from_final(timeline) }
-		if has_actor {
+		// The grandpa takes the player's wounds while he is on.
+		if has_actor && event.target == game.PLAYER_ENTITY && timeline.view.nonno.active {
+			timeline.view.nonno.health = max(i32(0), timeline.view.nonno.health-max(i32(0), event.amount))
+		} else if has_actor {
 			actor.health = max(i32(0), actor.health-max(i32(0), event.amount))
 			if event.has_status_cause && event.status_cause == .Poison { sync_presentation_poison_from_final(timeline, actor) }
 		} else if has_object {
@@ -1412,6 +1437,12 @@ start_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^Presentat
 	// The table: sat at, then cleared with its cue (finish_presentation_cue).
 	case .Napoli_Feast, .Napoli_Table_Cleared:
 		if _, found := presentation_grid_object(timeline, event.target); !found { timeline.update_failures += 1 }
+	case .Napoli_Nonno_Cured:
+		v := &timeline.view.nonno
+		if event.target != game.PLAYER_ENTITY || !v.active { timeline.update_failures += 1 } else { v.health = min(v.most, v.health+max(i32(0), event.amount)) }
+	case .Napoli_Nonno_Left:
+		if event.target != game.PLAYER_ENTITY { timeline.update_failures += 1 }
+		timeline.view.nonno = {}
 	case .Attack_Missed, .Move_Blocked, .Attack_Deflected,
 	     .Binding_Added, .Binding_Exhausted, .Binding_Expired, .Shadow_Entered, .Shadow_Emerged:
 	// The player's own card, behind his eyes.
@@ -1472,7 +1503,7 @@ update_active_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^P
 	     .First_Person_Begun, .Marley_Begun, .Marley_Lights, .Marley_Warned, .Marley_Bomb, .Marley_Saved, .Marley_Bonus,
 	     .Marley_Ended, .Flood_Swept, .Fire_Extinguished, .Cannon_Fired, .Cannon_Broken, .Black_Hole_Tick, .Black_Hole_Closed,
 	     .Ride_Begun, .Ride_Ended, .Dino_Stomp, .Bleed_Bite, .Arrow_Loosed, .Arrow_Landed, .Bomb_Thrown, .Napoli_Begun,
-	     .Napoli_Feast, .Napoli_Table_Cleared:
+	     .Napoli_Feast, .Napoli_Table_Cleared, .Napoli_Nonno_Cured, .Napoli_Nonno_Left:
 	// A foe swallowed by the hole spins down it toward the hole's centre.
 	case .Black_Hole_Swallowed:
 		if has_actor {

@@ -53,7 +53,7 @@ held_walk_command :: proc(held: ^Buffered_Gameplay_Command, room: ^game.Room, ke
 	controls: Run_Input = {}) -> (command: Gameplay_Command, ok: bool) {
 	if room.phase != .Combat && room.phase != .Loot { return }
 	// Shift held is the dodge's; the fists walk free (first_person_fists.odin).
-	if run_down(controls, .Dodge_Modifier) || game.first_person_fists_active(room) { return }
+	if run_down(controls, .Dodge_Modifier) || game.first_person_body_active(room) { return }
 	actions := RUN_WALK_ACTIONS
 	if held.walk > 0 && run_down(controls, actions[held.walk-1]) {
 		return {kind = .Move, origin_phase = room.phase, direction = keys[held.walk-1]}, true

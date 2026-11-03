@@ -82,6 +82,29 @@ First_Person_Club_View :: struct {
 	swinging: bool,
 	impacts_seen: i32,
 	impact_at: f64,
+	// BENVENUTI A NAPOLI's grandpa (game/napoli_nonno.odin): his body as last
+	// seen (a cell's corner, as the snapshot's positions), how far his club is
+	// out of his pocket (0..1), and whether he is the one shown.
+	body: [2]f32,
+	drawn: f32,
+	nonno: bool,
+}
+
+// The club the rules swing now: the club's view's, or the grandpa's.
+@(private)
+club_rules :: proc(room: ^game.Room) -> (club: ^game.First_Person_Club, ok: bool) {
+	if game.first_person_club_active(room) { return &room.first_person.club, true }
+	if game.napoli_nonno_active(room) { return &room.first_person.nonno.club, true }
+	return
+}
+
+// Where the one behind whose back the camera stands is (a cell's corner): the
+// grandpa's free body, else the player's card (`p`).
+@(private)
+club_anchor :: proc(renderer: ^Renderer, room: ^game.Room, p: [2]f32) -> [2]f32 {
+	c := &renderer.tactical.first_person.club
+	if game.napoli_nonno_active(room) { return c.body }
+	return p
 }
 
 // Whether the view of the weapon in hand looks from behind his back.
@@ -168,14 +191,25 @@ frame_first_person_club_camera :: proc(renderer: ^Renderer, room: ^game.Room, p:
 follow_first_person_club :: proc(renderer: ^Renderer, room: ^game.Room) {
 	f := &renderer.tactical.first_person
 	c := &f.club
-	if !game.first_person_club_active(room) {
+	club, ok := club_rules(room)
+	if !ok {
 		c.swinging = false
 		return
 	}
-	club := &room.first_person.club
+	c.nonno = game.napoli_nonno_active(room)
+	c.drawn = 1
+	if c.nonno {
+		n := &room.first_person.nonno
+		c.body = {n.body.body.x-0.5, n.body.body.y-0.5}
+		c.drawn = 1-clamp(n.draw_left/game.NAPOLI_NONNO_DRAW_SECONDS, 0, 1)
+	}
 	c.swinging, c.swing_at, c.swing_way = club.blow.active, club.blow.at, club.blow.way
 	if club.blow.active {
 		c.aimed, c.reaches = game.club_cell(room, club.blow.from, club.blow.way)
+	} else if c.nonno {
+		c.aimed, c.reaches = game.club_cell(room, room.player.position, game.napoli_nonno_aim(room, f.yaw))
+		// No mark before the club is out of his pocket.
+		c.reaches = c.reaches && c.drawn >= 1
 	} else {
 		c.aimed, c.reaches = game.club_aimed_cell(room, f.yaw)
 	}
@@ -216,7 +250,7 @@ club_swing_angle :: proc(swinging: bool, at: f32) -> f32 {
 draw_first_person_club_mark :: proc(renderer: ^Renderer, room: ^game.Room) {
 	f := &renderer.tactical.first_person
 	c := &f.club
-	if !first_person_third_person(renderer) || f.amount <= 0 || !game.first_person_club_active(room) || !c.reaches { return }
+	if _, swung := club_rules(room); !first_person_third_person(renderer) || f.amount <= 0 || !swung || !c.reaches { return }
 	rlgl.DrawRenderBatchActive()
 	defer rlgl.DrawRenderBatchActive()
 	ground := cell_overlay_ground(c.aimed)+0.03
@@ -242,7 +276,7 @@ draw_first_person_club :: proc(renderer: ^Renderer, room: ^game.Room) {
 	rlgl.DrawRenderBatchActive()
 	rlgl.DisableBackfaceCulling()
 	defer { rlgl.DrawRenderBatchActive(); rlgl.EnableBackfaceCulling() }
-	p := renderer.tactical.snapshot.player.position
+	p := club_anchor(renderer, room, renderer.tactical.snapshot.player.position)
 	floor := entity_point_ground(game.PLAYER_ENTITY, p)
 	look := club_look(f.yaw, 0)
 	way := rl.Vector3Normalize({look.x, 0, look.z})
@@ -252,8 +286,17 @@ draw_first_person_club :: proc(renderer: ^Renderer, room: ^game.Room) {
 	right := rl.Vector3{-way.z, 0, way.x}
 	grip := rl.Vector3{p.x+0.5, floor+CLUB_GRIP_HEIGHT, p.y+0.5}+right*CLUB_GRIP_RIGHT
 	angle := club_swing_angle(c.swinging, c.swing_at)
+	length := CLUB_LENGTH
+	// The grandpa's comes out of his trouser pocket by itself, longer and longer,
+	// pointing down, then up onto his shoulder (stupid on purpose; Fase 5 draws it).
+	if c.nonno && c.drawn < 1 {
+		u := c.drawn
+		grip = rl.Vector3{p.x+0.5, floor+0.42, p.y+0.5}+right*0.2+rl.Vector3{0, 0.3*max(u-0.7, 0)/0.3, 0}
+		angle = math.PI*(1-max(u-0.7, 0)/0.3*0.85)
+		length = CLUB_LENGTH*(0.15+0.85*min(u/0.7, 1))
+	}
 	along := rl.Vector3{0, math.cos(angle), 0}+way*math.sin(angle)
-	head := grip+along*CLUB_LENGTH
+	head := grip+along*length
 	rl.DrawCylinderEx(grip-along*0.08, head, 0.045, 0.07, 10, CLUB_HANDLE_COLOR)
 	rl.DrawSphereEx(head, CLUB_HEAD_RADIUS, 10, 10, CLUB_HEAD_COLOR)
 	rl.DrawSphereEx(head+along*0.04, CLUB_HEAD_RADIUS*0.7, 8, 8, rl.Color{86, 172, 92, 255})

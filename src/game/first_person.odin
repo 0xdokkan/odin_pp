@@ -116,8 +116,9 @@ First_Person_Shot :: struct {
 // and its save (docs/piano-prima-persona.md, sezione 4.1). The first is the AK,
 // as every save from before the others is.
 // The Club is BENVENUTI A NAPOLI's face 1 (first_person_club.odin), seen from
-// behind his back.
-First_Person_Weapon :: enum u8 {AK, Fists, Sword, Bow, Club}
+// behind his back; the Nonno its face 4, the player turned into the grandpa
+// (napoli_nonno.odin), seen so too.
+First_Person_Weapon :: enum u8 {AK, Fists, Sword, Bow, Club, Nonno}
 
 // What the rules ask of a weapon.
 First_Person_Weapon_Rules :: struct {
@@ -140,6 +141,7 @@ FIRST_PERSON_WEAPONS := [First_Person_Weapon]First_Person_Weapon_Rules{
 	.Sword = {card = .First_Person_Fencer},
 	.Bow = {card = .First_Person_Archer},
 	.Club = {card = .Napoli, third_person = true},
+	.Nonno = {card = .Napoli, third_person = true},
 }
 
 // The AK's own.
@@ -166,6 +168,9 @@ First_Person_Arms :: struct #raw_union {
 	bow: First_Person_Bow,
 	// BENVENUTI A NAPOLI's club and its blow (first_person_club.odin).
 	club: First_Person_Club,
+	// BENVENUTI A NAPOLI's grandpa: the fists' body first, so the body's rules
+	// read it as theirs (napoli_nonno.odin).
+	nonno: First_Person_Nonno,
 }
 
 First_Person_State :: struct {
@@ -199,6 +204,8 @@ First_Person_Save :: struct {
 	bow: First_Person_Bow,
 	// The club's damage, blow and memory (first_person_club.odin).
 	club: First_Person_Club,
+	// The grandpa's body, health, club and keys (napoli_nonno.odin).
+	nonno: First_Person_Nonno,
 }
 
 first_person_save :: proc(state: First_Person_State) -> (save: First_Person_Save) {
@@ -210,6 +217,7 @@ first_person_save :: proc(state: First_Person_State) -> (save: First_Person_Save
 	case .Sword: save.sword = state.sword
 	case .Bow: save.bow = state.bow
 	case .Club: save.club = state.club
+	case .Nonno: save.nonno = state.nonno
 	}
 	return
 }
@@ -225,6 +233,7 @@ first_person_load :: proc(save: First_Person_Save) -> (state: First_Person_State
 	case .Sword: state.sword = save.sword
 	case .Bow: state.bow = save.bow
 	case .Club: state.club = save.club
+	case .Nonno: state.nonno = save.nonno
 	}
 	return state, true
 }
@@ -264,6 +273,8 @@ tactical_begin_first_person :: proc(room: ^Room, seconds: f32, weapon := First_P
 	if weapon == .Bow { first_person_bow_begin(room) }
 	// The club's damage is its card's (napoli.odin sets it after).
 	if weapon == .Club { first_person_club_begin(room, NAPOLI_CLUB_DAMAGE) }
+	// So are the grandpa's numbers.
+	if weapon == .Nonno { napoli_nonno_begin(room, NAPOLI_NONNO_HEALTH, NAPOLI_PURSE_GOLD, NAPOLI_CLUB_DAMAGE) }
 	return true
 }
 
@@ -283,12 +294,14 @@ tactical_first_person_tick :: proc(room: ^Room, seconds: f32) {
 	if fp.weapon == .AK { fp.cooldown = max(fp.cooldown-seconds, -FIRST_PERSON_MAX_CARRY if fp.trigger else 0) }
 	if fp.weapon == .Sword { first_person_sword_tick(room, seconds) }
 	if fp.weapon == .Bow { first_person_bow_tick(room, seconds) }
-	if fp.weapon == .Club { first_person_club_tick(room, seconds) }
+	if fp.weapon == .Club { first_person_club_tick(&fp.club, seconds) }
+	if fp.weapon == .Nonno { napoli_nonno_tick(room, seconds) }
 	if fp.remaining <= 0 {
 		fp.active = false
 		if fp.weapon == .AK { fp.trigger, fp.cooldown = false, 0 }
 		// A blow raised as the seconds run out is never struck.
 		if fp.weapon == .Club { fp.club.blow, fp.club.pending = {}, 0 }
+		if fp.weapon == .Nonno { napoli_nonno_leave(room) }
 		// Out of the air at once onto the cell under him (the user's choice).
 		if fp.weapon == .Fists { fp.fists.airborne, fp.fists.rise_speed, fp.fists.feet = false, 0, f32(cell_height(room, room.player.position)) }
 	}

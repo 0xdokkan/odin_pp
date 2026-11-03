@@ -492,7 +492,7 @@ offer_defense_qte :: proc(room: ^Room, enemy: ^Enemy) -> bool {
 	if tactical_is_stunned(room) { return false }
 	// With the fists he defends by moving: no choice stops the world (Fase 2 of
 	// docs/piano-prima-persona.md).
-	if first_person_fists_active(room) { return false }
+	if first_person_body_active(room) { return false }
 	// With the sword the right button parries (Fase 4).
 	if first_person_sword_active(room) { return false }
 	// Sat at the grandpa's table he goes on eating and takes the blow (napoli.odin).

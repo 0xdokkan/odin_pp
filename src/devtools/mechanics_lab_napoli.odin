@@ -19,8 +19,9 @@ import render "../render"
 // the panel names the branch and its number (odin_pp_napoli_dice_<face>.png, the
 // roll as it settles), then the board over the player, until its word is gone
 // (odin_pp_napoli_said_<face>.png; reels odin_pp_living_napoli_<face>_NN.png).
-// Then the grandpa's visits (Fase 1, mechanics_lab_napoli_visits) and the club
-// behind his back (Fase 2, mechanics_lab_napoli_club). Its foes are held, so
+// Then the grandpa's visits (Fase 1, mechanics_lab_napoli_visits), the club
+// behind his back (Fasi 2-3, mechanics_lab_napoli_club) and the player as the
+// grandpa (Fase 4, mechanics_lab_napoli_nonno). Its foes are held, so
 // every run sees the same.
 mechanics_lab_napoli :: proc(window: ^app.Window, renderer: ^render.Renderer, dice: ^render.Dice_Renderer, room: ^game.Room, data: ^level.Level,
 	controller: ^run_session.Tactical_Controller, cards: ^run_session.Card_Interaction_State, buffer: ^run_session.Buffered_Gameplay_Command) -> bool {
@@ -106,6 +107,7 @@ mechanics_lab_napoli :: proc(window: ^app.Window, renderer: ^render.Renderer, di
 		said[0], said[1], said[2], said[3])
 	if !mechanics_lab_napoli_visits(window, renderer, dice, room, data, controller, cards, buffer, arena) { return false }
 	if !mechanics_lab_napoli_club(window, renderer, dice, room, data, controller, cards, buffer, arena) { return false }
+	if !mechanics_lab_napoli_nonno(window, renderer, dice, room, data, controller, cards, buffer, arena) { return false }
 	return true
 }
 
@@ -372,5 +374,132 @@ mechanics_lab_napoli_club :: proc(window: ^app.Window, renderer: ^render.Rendere
 	}
 	fmt.eprintf("mechanics lab napoli club: behind his back, two steps of W, three blows of %d staggering 2, 1, 0, squashed to %.2f, stars; a pancake; the arm by the wall %.2f\n",
 		game.NAPOLI_CLUB_DAMAGE, lowest, arm)
+	return true
+}
+
+// Fase 4: the player as the grandpa. Face 4 played: the camera behind him, the
+// grandpa's print where the body is, NONNO in the plate, his health and his two
+// keys; a click while the club comes out of his pocket strikes nothing; the
+// brute next to him, the view on it: a blow; Q cures him and the player, E pays;
+// the brute's blow takes his health, not the player's; at no health he goes,
+// the view over, the player where he stood, his health as it was (reel
+// odin_pp_napoli_nonno_NN.png; odin_pp_napoli_nonno_tasca.png, _colpo.png,
+// _q.png, _se_ne_va.png).
+@(private = "file")
+mechanics_lab_napoli_nonno :: proc(window: ^app.Window, renderer: ^render.Renderer, dice: ^render.Dice_Renderer, room: ^game.Room, data: ^level.Level,
+	controller: ^run_session.Tactical_Controller, cards: ^run_session.Card_Interaction_State, buffer: ^run_session.Buffered_Gameplay_Command,
+	arena: proc(^app.Window, ^render.Renderer, ^game.Room, ^level.Level, ^run_session.Tactical_Controller, ^run_session.Card_Interaction_State,
+		^run_session.Buffered_Gameplay_Command) -> bool) -> bool {
+	fp := &renderer.tactical.first_person
+	reel := 0
+	frame :: proc(window: ^app.Window, renderer: ^render.Renderer, dice: ^render.Dice_Renderer, room: ^game.Room, controller: ^run_session.Tactical_Controller,
+		cards: ^run_session.Card_Interaction_State, buffer: ^run_session.Buffered_Gameplay_Command, reel: ^int, input := run_session.Tactical_Controller_Input{}) {
+		given := input
+		given.focused = true
+		mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0, true, dice, given)
+		if reel^%6 == 0 && reel^/6 < 60 { artifacts.screenshot(fmt.ctprintf("odin_pp_napoli_nonno_%02d.png", reel^/6)) }
+		reel^ += 1
+	}
+	if !arena(window, renderer, room, data, controller, cards, buffer) { return false }
+	player := room.player
+	renderer.tactical.mechanics_lab_napoli_face = 4
+	run_session.mechanics_lab_fix_napoli_face(room, 4)
+	if !mechanics_lab_play(window, renderer, room, controller, cards, buffer, .Napoli, game.entity_target(game.PLAYER_ENTITY)) ||
+	   !game.napoli_nonno_active(room) {
+		fmt.eprintln("mechanics lab: face 4 did not turn him into the grandpa"); return false
+	}
+	n := &room.first_person.nonno
+	for _ in 0..<300 {
+		if render.first_person_amount(renderer) >= 1 && !render.renderer_blocks_player_input(renderer) { break }
+		mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0, true, dice)
+	}
+	if render.first_person_amount(renderer) < 1 || !render.first_person_third_person(renderer) || !render.first_person_hides_player(renderer) ||
+	   render.first_person_hud_status(renderer) != render.FIRST_PERSON_HUD_STATUS_NONNO {
+		fmt.eprintln("mechanics lab: the camera did not come behind the grandpa"); return false
+	}
+	// The club still in his pocket: a click strikes nothing.
+	for _ in 0..<12 { frame(window, renderer, dice, room, controller, cards, buffer, &reel) }
+	artifacts.screenshot("odin_pp_napoli_nonno_tasca.png")
+	for _ in 0..<12 { frame(window, renderer, dice, room, controller, cards, buffer, &reel, {fire = true}) }
+	if n.club.swings != 0 { fmt.eprintln("mechanics lab: the grandpa struck before his club was out"); return false }
+	for _ in 0..<90 {
+		if n.draw_left <= 0 { break }
+		frame(window, renderer, dice, room, controller, cards, buffer, &reel)
+	}
+	// The brute next to him, east, the view on it.
+	brute := -1
+	for foe, index in room.enemies { if foe.archetype == .Brute { brute = index } }
+	if brute < 0 { fmt.eprintln("mechanics lab: no brute for the grandpa"); return false }
+	east := game.add_position(room.player.position, {x = 1})
+	_, taken := game.enemy_index_at(room, east)
+	if taken || !game.base_cell_is_walkable(room, east) || game.cell_blocks_movement(room, east) {
+		fmt.eprintln("mechanics lab: the cell east of the grandpa is not free:", east); return false
+	}
+	room.enemies[brute].position = east
+	room.enemies[brute].health = 60
+	brute_id := room.enemies[brute].id
+	mechanics_lab_hold(room, brute_id)
+	fp.yaw, fp.pitch = 0, render.CLUB_START_PITCH
+	for _ in 0..<10 { frame(window, renderer, dice, room, controller, cards, buffer, &reel) }
+	impacts := n.club.impacts
+	for _ in 0..<90 {
+		frame(window, renderer, dice, room, controller, cards, buffer, &reel, {fire = n.club.impacts == impacts})
+		if n.club.impacts > impacts && !n.club.blow.active { break }
+	}
+	artifacts.screenshot("odin_pp_napoli_nonno_colpo.png")
+	index, _ := game.enemy_index_by_id(room, brute_id)
+	if n.club.last.hit != .Foe || 60-room.enemies[index].health != n.club.damage {
+		fmt.eprintln("mechanics lab: the grandpa's blow took", 60-room.enemies[index].health, "from the brute"); return false
+	}
+	// Q: both cured; E: the gold.
+	player.health = 6
+	n.health = 10
+	for _ in 0..<4 { frame(window, renderer, dice, room, controller, cards, buffer, &reel) }
+	frame(window, renderer, dice, room, controller, cards, buffer, &reel, {diagonals = {true, false, false, false}})
+	for _ in 0..<20 { frame(window, renderer, dice, room, controller, cards, buffer, &reel) }
+	artifacts.screenshot("odin_pp_napoli_nonno_q.png")
+	self, cure := game.napoli_nonno_cures(n.most, player.stats.max_health)
+	if !n.healed || n.health != min(n.most, 10+self) || player.health != min(player.stats.max_health, 6+cure) {
+		fmt.eprintln("mechanics lab: Q cured the grandpa to", n.health, "and the player to", player.health); return false
+	}
+	gold := player.gold
+	frame(window, renderer, dice, room, controller, cards, buffer, &reel, {diagonals = {false, true, false, false}})
+	for _ in 0..<20 { frame(window, renderer, dice, room, controller, cards, buffer, &reel) }
+	if !n.paid || player.gold-gold != n.gold { fmt.eprintln("mechanics lab: E paid", player.gold-gold, "not", n.gold); return false }
+	// The brute's blow (its stagger from his club taken off first, or the blow
+	// would be interrupted), held again at once: his health, not the player's.
+	strike :: proc(room: ^game.Room, brute_id: u32) {
+		_, _ = game.remove_status(room, game.enemy_entity(brute_id), .Stagger)
+		index, _ := game.enemy_index_by_id(room, brute_id)
+		foe := &room.enemies[index]
+		foe.intent = game.make_attack_intent(room, foe.position, room.player.position, 5)
+		pulse: game.Pulse_Report
+		game.resolve_enemy_intents(room, &pulse, brute_id)
+		mechanics_lab_hold(room, brute_id)
+	}
+	health, grandpa := player.health, n.health
+	strike(room, brute_id)
+	for _ in 0..<20 { frame(window, renderer, dice, room, controller, cards, buffer, &reel) }
+	if player.health != health || n.health >= grandpa {
+		fmt.eprintln("mechanics lab: the brute's blow took the player to", player.health, "and the grandpa to", n.health); return false
+	}
+	// At no health he goes: the view over, the player where the grandpa stood, as he was.
+	n.health = 1
+	at := room.player.position
+	strike(room, brute_id)
+	left := false
+	for _ in 0..<120 {
+		frame(window, renderer, dice, room, controller, cards, buffer, &reel)
+		if !left && !game.tactical_first_person_active(room) {
+			artifacts.screenshot("odin_pp_napoli_nonno_se_ne_va.png")
+			left = true
+		}
+		if left && render.first_person_amount(renderer) <= 0 { break }
+	}
+	if !left || game.napoli_nonno_active(room) || player.health != health || room.player.position != at || render.first_person_amount(renderer) > 0 {
+		fmt.eprintln("mechanics lab: the grandpa did not go at no health (left", left, "health", player.health, "at", room.player.position, ")"); return false
+	}
+	fmt.eprintf("mechanics lab napoli nonno: the club out of his pocket, a blow of %d, Q cured him %d and the player %d, E %d gold, the brute's blow his, gone at none\n",
+		n.club.damage, self, cure, game.NAPOLI_PURSE_GOLD)
 	return true
 }

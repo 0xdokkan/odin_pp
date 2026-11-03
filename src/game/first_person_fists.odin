@@ -110,6 +110,18 @@ first_person_fists_active :: proc(room: ^Room) -> bool {
 	return tactical_first_person_active(room) && room.first_person.weapon == .Fists
 }
 
+// A free body on the board, the view on: the fists', or BENVENUTI A NAPOLI's
+// grandpa's, the same body (napoli_nonno.odin: its first bytes are the fists').
+first_person_body_active :: proc(room: ^Room) -> bool {
+	return tactical_first_person_active(room) && (room.first_person.weapon == .Fists || room.first_person.weapon == .Nonno)
+}
+
+// The body's top speed (cells a second): the grandpa walks slower.
+@(private = "file")
+first_person_body_speed :: proc(room: ^Room) -> f32 {
+	return NAPOLI_NONNO_SPEED if room.first_person.weapon == .Nonno else FISTS_SPEED
+}
+
 // The body this frame (dt seconds): the jump, the dash and the punch it asks, its
 // glide and its fall, the steps its centre takes into the next cells, as world
 // moves of no time, and the punches landing. Their events are the room's recent
@@ -151,8 +163,8 @@ first_person_fists_move :: proc(room: ^Room, input: First_Person_Fists_Input, dt
 }
 
 // One FISTS_STEP of the body: whether its centre stepped into another cell, and
-// whether the fight or the view ended.
-@(private = "file")
+// whether the fight or the view ended. The grandpa's too (napoli_nonno.odin).
+@(private)
 fists_step :: proc(room: ^Room, wish: [2]f32) -> (entered, ended: bool) {
 	f := &room.first_person.fists
 	h := FISTS_STEP
@@ -177,7 +189,7 @@ fists_step :: proc(room: ^Room, wish: [2]f32) -> (entered, ended: bool) {
 	// The glide, then the steps of its centre and the walls it slides along.
 	f.body += f.velocity*h
 	entered = fists_cross(room)
-	if room.phase != .Combat || !first_person_fists_active(room) { return entered, true }
+	if room.phase != .Combat || !first_person_body_active(room) { return entered, true }
 	fists_slide(room)
 	// Landing on his floor.
 	ground := f32(cell_height(room, room.player.position))
@@ -234,7 +246,7 @@ fists_go :: proc(room: ^Room, cell: grid.Position, mode: Movement_Mode) -> bool 
 
 // Whether the body touches the cell (on his own layer): its circle over any of it.
 first_person_fists_touches :: proc(room: ^Room, cell: grid.Position) -> bool {
-	if !first_person_fists_active(room) || cell.layer != room.player.position.layer { return false }
+	if !first_person_body_active(room) || cell.layer != room.player.position.layer { return false }
 	b := room.first_person.fists.body
 	closest := [2]f32{clamp(b.x, f32(cell.x), f32(cell.x)+1), clamp(b.y, f32(cell.y), f32(cell.y)+1)}
 	d := b-closest
@@ -247,7 +259,7 @@ first_person_fists_touches :: proc(room: ^Room, cell: grid.Position) -> bool {
 // one from afar (ranged: an arrow, a bomb) does not. Otherwise as ever: his cell
 // among them.
 enemy_blow_reaches_player :: proc(room: ^Room, intent: ^Enemy_Intent, ranged: bool) -> bool {
-	if !first_person_fists_active(room) { return enemy_intent_cell_is_threatened(intent, room.player.position) }
+	if !first_person_body_active(room) { return enemy_intent_cell_is_threatened(intent, room.player.position) }
 	if room.first_person.fists.airborne && !ranged { return false }
 	for index in 0..<intent.threatened_cell_count {
 		cell := intent.threatened_cells[index]
@@ -292,7 +304,7 @@ fists_accelerate :: proc(room: ^Room, f: ^First_Person_Fists, wish: [2]f32, h: f
 	way := fists_unit(wish)
 	if way == {} { return }
 	amount := min(f32(1), math.sqrt(wish.x*wish.x+wish.y*wish.y))
-	top := FISTS_SPEED*amount*(FISTS_SLOW_FACTOR if fists_slow_ground(room) else 1)
+	top := first_person_body_speed(room)*amount*(FISTS_SLOW_FACTOR if fists_slow_ground(room) else 1)
 	// A punch out holds him back to half his speed.
 	if f.punch != .None { top *= FISTS_PUNCH_SPEED_FACTOR }
 	current := f.velocity.x*way.x+f.velocity.y*way.y

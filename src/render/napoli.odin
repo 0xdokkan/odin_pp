@@ -1,5 +1,6 @@
 package render
 
+import "core:fmt"
 import "core:math"
 import rl "vendor:raylib"
 import tween "../engine/tween"
@@ -156,9 +157,18 @@ draw_napoli_visit_table :: proc(renderer: ^Renderer, room: ^game.Room) {
 	}
 }
 
-// The grandpa in the sorted cards, while he visits.
+// The grandpa in the sorted cards, while he visits; and while the player is
+// him (face 4, game/napoli_nonno.odin), where his body is, in the player's card's
+// stead, showing half of himself as the club's view shows the player's card
+// (CLUB_CARD_SHOWN; his look from behind comes with Fase 5).
 @(private)
 collect_napoli_entries :: proc(renderer: ^Renderer, room: ^game.Room, entries: ^[dynamic]Tactical_Alpha_Entry) {
+	f := &renderer.tactical.first_person
+	if f.weapon == .Nonno && f.amount > 0 && renderer.tactical.snapshot != nil {
+		at := f.club.body if f.club.nonno else renderer.tactical.snapshot.player.position
+		shown := f.amount*(1-(1-CLUB_CARD_SHOWN)*f.amount)*(1-f.club.fade)
+		append(entries, Tactical_Alpha_Entry{kind = .Napoli, position = at, opacity = shown, first_person = 1})
+	}
 	cue, found := napoli_visit_cue(renderer)
 	if !found { return }
 	edge, stand := napoli_visit_way(renderer, room, napoli_gift_cell(room, cue))
@@ -170,11 +180,20 @@ collect_napoli_entries :: proc(renderer: ^Renderer, room: ^game.Room, entries: ^
 // held out and flying to the player.
 @(private)
 draw_napoli_entry :: proc(renderer: ^Renderer, room: ^game.Room, entry: Tactical_Alpha_Entry) {
-	cue, found := napoli_visit_cue(renderer)
-	if !found { return }
 	n := &renderer.tactical.napoli
 	if n.nonno.id == 0 { n.nonno = napoli_print(NAPOLI_NONNO_ART[:]) }
 	if n.purse.id == 0 { n.purse = napoli_print(NAPOLI_PURSE_ART[:]) }
+	// The player as the grandpa: his steps bob as the body goes.
+	if entry.first_person == 1 {
+		ground := entity_point_ground(game.PLAYER_ENTITY, entry.position)
+		moving := game.napoli_nonno_active(room) && (room.first_person.nonno.body.velocity != {})
+		bob := 0.05*f32(math.abs(math.sin(renderer.sprite_assets.elapsed*9))) if moving else 0
+		tint := rl.Color{255, 255, 255, u8(255*clamp(entry.opacity, 0, 1))}
+		marley_draw_print(renderer, n.nonno, {entry.position.x+0.5, ground+NAPOLI_PRINT_HEIGHT*0.5+bob, entry.position.y+0.5}, NAPOLI_PRINT_HEIGHT, 0, tint)
+		return
+	}
+	cue, found := napoli_visit_cue(renderer)
+	if !found { return }
 	gift := napoli_gift_cell(room, cue)
 	edge, stand := napoli_visit_way(renderer, room, gift)
 	p := presentation_cue_progress(cue)
@@ -276,4 +295,24 @@ NAPOLI_PURSE_ART := [10]string{
 	"KLLLYYYLLK",
 	".KLLLLLLK.",
 	"..KKKKKK..",
+}
+
+// Over the view's plate while the player is the grandpa: his health (as the
+// board's cues show it) and his two keys, lit until used.
+@(private)
+draw_napoli_nonno_hud :: proc(renderer: ^Renderer, room: ^game.Room, plate: rl.Rectangle) {
+	if room == nil || !game.napoli_nonno_active(room) { return }
+	n := &room.first_person.nonno
+	health, most := n.health, n.most
+	if s := renderer.tactical.snapshot; s != nil && s.nonno.active { health, most = s.nonno.health, s.nonno.most }
+	bounds := rl.Rectangle{plate.x, plate.y-58, plate.width, 50}
+	hud_frame(bounds, NAPOLI_LABEL_COLOR)
+	gothic_text_fit(renderer, fmt.ctprintf("NONNO %d/%d", health, most), {bounds.x+12, bounds.y+4, bounds.width-24, 22}, 16, GOTHIC_PAPER)
+	hud_bar({bounds.x+12, bounds.y+bounds.height-14, bounds.width-24, 8}, f32(health)/f32(max(most, 1)), GOTHIC_RED, 0)
+	keys := [2]struct{label: cstring, used: bool}{{"Q CURA", n.healed}, {"E SOLDI", n.paid}}
+	for key, index in keys {
+		at := rl.Rectangle{plate.x+plate.width+8+f32(index)*92, plate.y, 84, plate.height}
+		hud_frame(at, NAPOLI_LABEL_COLOR if !key.used else GOTHIC_STEEL)
+		gothic_text_fit(renderer, key.label, {at.x+8, at.y+12, at.width-16, 22}, 16, GOTHIC_PAPER if !key.used else color_with_opacity(GOTHIC_PAPER, 0.35))
+	}
 }

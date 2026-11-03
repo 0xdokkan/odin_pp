@@ -163,6 +163,10 @@ Game_Event_Kind :: enum {
 	// eat `amount` over `duration` world beats; the table cleared, eaten or replaced.
 	Napoli_Feast,
 	Napoli_Table_Cleared,
+	// BENVENUTI A NAPOLI's grandpa (napoli_nonno.odin): Q's cure of his own
+	// health (`amount`), and his going at no health, the view over.
+	Napoli_Nonno_Cured,
+	Napoli_Nonno_Left,
 }
 
 Game_Event :: struct {
