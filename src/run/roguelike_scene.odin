@@ -27,6 +27,8 @@ Roguelike_Session :: struct {
 	lab_arena:               Mechanics_Lab_Arena,
 	// The face Benvenuti a Napoli's d4 shows in the lab, 0 at random (F12, mechanics_practice.odin).
 	lab_napoli_face:         i32,
+	// The lab's game progress for the IA (F11: 0, 50, 100%).
+	lab_ia_progress:         f32,
 	actions:                 input.Action_Map(Run_Action),
 	diagnostics:             Run_Diagnostics,
 	frame_input:             Run_Input,
@@ -287,6 +289,14 @@ update_run_board_view :: proc(rs: ^Roguelike_Session, hf: ^host.Frame, screen: R
 		}
 		mechanics_lab_fix_napoli_face(&rs.room, rs.lab_napoli_face)
 		rs.iso_renderer.tactical.mechanics_lab_napoli_face = rs.lab_napoli_face
+		// F11: how near the end of the run the IA believes it is.
+		if hf.focused && !rs.activity_modal && run_pressed(rs.frame_input, .IA_Progress) {
+			rs.lab_ia_progress = 0 if rs.lab_ia_progress >= 1 else rs.lab_ia_progress+0.5
+		}
+		rs.iso_renderer.tactical.mechanics_lab_ia_progress = rs.lab_ia_progress
+		advisor_set_context(advisor_context_lab(rs.lab_ia_progress))
+	} else {
+		advisor_set_context(advisor_context_run(&rs.run_state))
 	}
 	if !rs.diagnostics.scripted && !rs.activity_modal { tactical_input_blocked = update_tactical_controller(&rs.tactical_controller, &rs.room, &rs.iso_renderer,
 		&rs.card_interaction, &rs.gameplay_buffer, rs.frame_time,

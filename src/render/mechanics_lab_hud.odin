@@ -24,14 +24,22 @@ mechanics_lab_banner_detail :: proc(renderer: ^Renderer, room: ^game.Room) -> cs
 		napoli = "  /  F12 D4: A CASO" if face < 1 || face > 4 else
 			fmt.ctprintf("  /  F12 D4: %d %s", face, game.napoli_face_name(game.napoli_for_face(face)))
 	}
-	return fmt.ctprintf("NEMICI %d/%d  /  F5 RICOMINCIA  /  F6 INTENTI: %s  /  F7 PESCA  /  F3 ARENA%s%s", len(room.enemies), game.SANDBOX_MAX_ENEMIES,
-		intent_display_name(renderer.tactical.intent_display), napoli, menu)
+	// The IA in hand or running: F11 sets how near the end of the run it believes it is (docs/piano-ia.md, Fase 6).
+	ia: cstring = ""
+	if mechanics_lab_holds_card(room, .IA) || game.ia_active(room) {
+		ia = fmt.ctprintf("  /  F11 PARTITA: %d%%", int(renderer.tactical.mechanics_lab_ia_progress*100+0.5))
+	}
+	return fmt.ctprintf("NEMICI %d/%d  /  F5 RICOMINCIA  /  F6 INTENTI: %s  /  F7 PESCA  /  F3 ARENA%s%s%s", len(room.enemies), game.SANDBOX_MAX_ENEMIES,
+		intent_display_name(renderer.tactical.intent_display), napoli, ia, menu)
 }
 
 @(private = "file")
-mechanics_lab_holds_napoli :: proc(room: ^game.Room) -> bool {
+mechanics_lab_holds_napoli :: proc(room: ^game.Room) -> bool { return mechanics_lab_holds_card(room, .Napoli) }
+
+@(private = "file")
+mechanics_lab_holds_card :: proc(room: ^game.Room, id: game.Card_Id) -> bool {
 	if room == nil || room.player == nil { return false }
-	for card in room.player.deck.hand[:room.player.deck.hand_count] { if card.definition_id == .Napoli { return true } }
+	for card in room.player.deck.hand[:room.player.deck.hand_count] { if card.definition_id == id { return true } }
 	return false
 }
 

@@ -32,6 +32,8 @@ Advisor_Pilot :: struct {
 	sliced: ^advisor.Search,
 	root, generation: u64,
 	since_root: f32,
+	// The game's state the current root was taken with (advisor_context.odin), as one number.
+	context_key: u64,
 	// The advice shown, and how long it has been.
 	shown: advisor.Advice,
 	shown_age: f32,
@@ -92,6 +94,9 @@ drive_advisor :: proc(room: ^game.Room, renderer: ^render.Renderer, dt: f32) {
 	p := advisor_pilot
 	if p == nil { return }
 	fingerprint := advisor.discrete_fingerprint(room)
+	// The game's state changed (the progress, a heal, the sleepers): a new root too.
+	game_context := advisor_game_context
+	if key := advisor_context_key(game_context); key != p.context_key { p.context_key, p.since_root = key, ADVISOR_ROOT_SECONDS }
 	p.since_root += dt
 	p.warning_left = max(0, p.warning_left-dt)
 	before := p.shown
@@ -108,7 +113,7 @@ drive_advisor :: proc(room: ^game.Room, renderer: ^render.Renderer, dt: f32) {
 				fresh = advisor_ahead(p, w.latest.ponder[:w.latest.ponder_count], w.latest.advice, fingerprint)
 			}
 			p.acted_rooted = p.acted
-			p.generation = advisor.worker_offer(w, room)
+			p.generation = advisor.worker_offer(w, room, game_context)
 			p.root, p.since_root = fingerprint, 0
 		} else if current && w.latest.advice.valid {
 			fresh = w.latest.advice
@@ -118,7 +123,7 @@ drive_advisor :: proc(room: ^game.Room, renderer: ^render.Renderer, dt: f32) {
 		if !s.rooted || (p.acted && !p.acted_rooted) || fingerprint != p.root || (s.done && p.since_root >= ADVISOR_FRESH_SECONDS) || p.since_root >= ADVISOR_ROOT_SECONDS {
 			if p.acted && !p.acted_rooted && fingerprint != p.root && s.rooted { fresh = advisor_ahead(p, s.ponder[:s.ponder_count], s.advice, fingerprint) }
 			p.acted_rooted = p.acted
-			advisor.search_root(s, room)
+			advisor.search_root(s, room, game_context)
 			p.root, p.since_root = fingerprint, 0
 		}
 		advisor.search_step(s, ADVISOR_FRAME_WORK)
@@ -181,6 +186,12 @@ advisor_current_advice :: proc() -> advisor.Advice {
 // TESTS ONLY: the pilot's worker held (it does no work while held), and how far its search of the current root went.
 advisor_pilot_hold :: proc(held: bool) {
 	if advisor_pilot != nil && advisor_pilot.worker != nil { advisor.worker_hold(advisor_pilot.worker, held) }
+}
+
+// The snapshot the pilot last handed to its worker (the packets of that root carry its number).
+advisor_pilot_generation :: proc() -> u64 {
+	if advisor_pilot == nil { return 0 }
+	return advisor_pilot.generation
 }
 
 advisor_pilot_packet :: proc() -> advisor.Packet {

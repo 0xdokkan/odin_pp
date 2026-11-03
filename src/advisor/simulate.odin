@@ -52,6 +52,9 @@ Defense_Policy :: enum u8 { None, Best }
 // may miss (the search sets it to nothing before every try; one a thread).
 @(thread_local)
 try_risk: f32
+// The weight of a point of life in this try (the root's: context.odin; 0 before any search: the start's).
+@(thread_local)
+try_life_weight: f32
 
 // One move carried out as the game carries out its command. Whether the game took it.
 play :: proc(r: ^Rehearsal, move: Move) -> bool {
@@ -124,7 +127,8 @@ answer_defense :: proc(room: ^game.Room, mode: game.Defense_Mode, direction: gam
 	damage := cell_threat(room, room.player.position)
 	if index, found := game.enemy_index_by_id(room, room.qte.enemy_id); found { damage = max(damage, f32(room.enemies[index].intent.damage)) }
 	if !game.select_defense(room, mode) { return false }
-	if mode != .Parry { try_risk += MISS_CHANCE*LIFE_WEIGHT*max(damage, 1) }
+	weight := try_life_weight if try_life_weight > 0 else LIFE_WEIGHT_START
+	if mode != .Parry { try_risk += MISS_CHANCE*weight*max(damage, 1) }
 	game.clear_event_log(room.recent_events)
 	switch {
 	case mode == .Dodge: game.qte_key(room, direction)

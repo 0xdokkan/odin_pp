@@ -220,7 +220,7 @@ comunque nel momento in cui i rami si uniscono.
 | 3 | Le carte nella ricerca: mano, energia, mira, pescate future, dadi; le tabelle di carte, effetti e stati | 2 | Fatta | vedi Esito |
 | 4 | Il thread: calcolo continuo su un altro core, pensare in anticipo, ricalcolo immediato | 3 | Fatta | vedi Esito |
 | 5 | Le indicazioni vere: segni ciano, parole, carta e casella, difesa, avviso di pericolo | 4 | Fatta | vedi Esito |
-| 6 | Lo stato della partita: progresso, nemici sulla mappa, cure vere, aggressività; le tabelle di posti e zaino | 5 | Da fare | — |
+| 6 | Lo stato della partita: progresso, nemici sulla mappa, cure vere, aggressività; le tabelle di posti e zaino | 5 | Fatta | vedi Esito |
 | 7 | I casi speciali: Ombra, Lazzo, Pinball, Dinosauro, Napoli, piani e ascensori, mappe grandi; le tabelle di oggetti e caselle | 6 | Da fare | — |
 | 8 | Aspetto e suoni della IA: icona, conto alla rovescia, accensione, suoni da codice | 5 | Da fare | — |
 | 9 | Nido di ragni: regole e prototipo nel laboratorio; la IA lo conosce | 7 | Da fare | — |
@@ -1349,6 +1349,63 @@ Passi:
 Check della fase: i test del pacchetto `advisor` e di chi riempie il contesto; l'atto `ia`.
 
 **Fatto quando:** i puzzle passano; l'utente prova i due estremi (inizio e fine run) nel laboratorio.
+
+### Esito (3 novembre 2026)
+
+Valgono le proposte della fase (scelta dell'utente), coi numeri proposti.
+
+1. **Lo stato della partita** ([context.odin](../src/advisor/context.odin), `advisor.Game_Context`): il progresso da 0 a
+   1, la cura vera più vicina fuori dallo scontro, i nemici che dormono sulla mappa, quanti nemici restano. Va con ogni
+   fotografia al thread della IA. Il consigliere non importa né la run né la spedizione: lo riempie
+   [advisor_context.odin](../src/run/advisor_context.odin), che le scene chiamano a ogni fotogramma:
+   - **la run:** la profondità del nodo attuale sulla strada del boss; il Riposo su un nodo raggiungibile subito (30%
+     della vita);
+   - **la spedizione:** metà dai gruppi sconfitti, metà dai luoghi fatti; 100% col boss battuto. La FONTE non ancora
+     usata entro 20 caselle (+16), il Kit di riparazione nello zaino (+12); i gruppi non ancora entrati nello scontro
+     entro 24 caselle, ognuno con la sua distanza di risveglio, come la usa la spedizione (3 caselle sull'erba, 6
+     altrove);
+   - **il laboratorio:** **F11** porta la partita a 0, 50 e 100%, e il cartello lo scrive («F11 PARTITA: 50%») quando la
+     carta IA è in mano o attiva.
+2. **Le cure dentro la stanza** le trova la IA da sola: il cibo lasciato dai nemici e la tavolata di Napoli. Il cibo
+   pescato con la canna non conta (eccezione dell'utente). Nessuna carta di oggi cura: quando ne arriverà una, la conterà
+   la regola per sempre.
+3. **L'aggressività:** un punto di vita pesa **3** a inizio run, **2** alla fine, mezzo punto in meno con una cura vera
+   vicina (dentro o fuori dalla stanza), mai sotto **1,5**. La morte resta sempre il ramo peggiore. Lo stesso peso vale
+   per il rischio di sbagliare i tasti della difesa.
+4. **I nemici sulla mappa:** un ramo che finisce dove un gruppo addormentato si sveglierebbe costa 1,5. Così la IA non
+   ti porta da loro senza motivo, ma se serve ci va.
+5. **Le tabelle per sempre** (advisor_context.odin), con `switch` senza ramo di riserva: ogni luogo della spedizione
+   (`Site_Kind`: la FONTE cura 16 una volta, il NIDO, la PROVA e il boss sono nemici…), ogni nodo della run (`Node_Kind`:
+   il Riposo cura il 30%), ogni bioma (`campaign.Biome`) e ogni oggetto dello zaino (`campaign.Item_Kind`: il Kit cura
+   12, il Cibo pescato no).
+6. Il pilota prende una radice nuova anche quando cambia lo stato della partita (il progresso, una cura, i nemici
+   addormentati).
+
+**Puzzle** ([advisor_context_test.odin](../src/integration/advisor_context_test.odin)), tutti verdi, coi numeri del
+piano:
+- a inizio run la IA non accetta di perdere 2 di vita per fare 5 danni (−6 + 5);
+- a fine run sì (−4 + 5);
+- a metà run, con una FONTE non ancora usata vicina, sì anche lì (−4 + 5);
+- la morte resta il ramo peggiore anche a fine run con una cura vicina;
+- un ramo che finisce dove un nemico addormentato si sveglia costa esattamente 1,5; uno fuori dalla sua portata, niente;
+- la run: progresso dalla profondità del nodo, Riposo al prossimo nodo = 30% della vita;
+- la spedizione: FONTE vicina (16), FONTE usata e Kit (12), solo Cibo pescato (0), i nemici addormentati, il progresso
+  e il boss;
+- il cibo dei nemici conta, il pesce della canna no.
+
+Detto con onestà: questi puzzle provano i pesi sulla valutazione stessa (due finali di ramo uguali tranne vita e danno),
+non con una ricerca intera. Nella scena del laboratorio sotto il fendente la mossa migliore non perde vita, quindi a 0,
+50 e 100% il consiglio è lo stesso: il peso della vita cambia la scelta solo quando c'è davvero vita da scambiare.
+
+Tutti i test delle fasi prima restano verdi (42 in tutto); nel torneo la IA perde 0 vita e uccide 158 nemici.
+
+**Laboratorio:** l'atto `ia` completo, più la scena con la partita a 0, 50 e 100% (`odin_pp_ia_progress_NN.png`). Ho
+corretto anche l'atto stesso: ricostruendo una scena dopo l'altra senza che il Viandante agisse, il consiglio fermo della
+Fase 5 restava quello della scena prima; ora ogni scena è uno scontro nuovo, come nel gioco vero.
+
+Verifiche (solo quello che la fase tocca): `odin check src -vet -strict-style` pulito; 42 test verdi; l'atto `ia`. Non
+fatti: benchmark (la fase non tocca il disegno), verifica completa. Resta la prova dell'utente dei due estremi nel
+laboratorio (F11).
 
 ## Fase 7 — I casi speciali
 

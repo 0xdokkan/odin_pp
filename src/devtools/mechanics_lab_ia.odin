@@ -4,6 +4,7 @@ import run_session "../run"
 import "core:fmt"
 import "core:os"
 import "core:slice"
+import "core:strings"
 import "core:time"
 import rl "vendor:raylib"
 import advisor "../advisor"
@@ -87,7 +88,8 @@ mechanics_lab_ia :: proc(window: ^app.Window, renderer: ^render.Renderer, room: 
 	artifacts.screenshot("odin_pp_ia_card_after.png")
 	if !mechanics_lab_ia_follow(window, renderer, room, controller, cards, buffer) { return false }
 	if !mechanics_lab_ia_defend(window, renderer, room, data, controller, cards, buffer) { return false }
-	return mechanics_lab_ia_warning(window, renderer, room, data, controller, cards, buffer)
+	if !mechanics_lab_ia_warning(window, renderer, room, data, controller, cards, buffer) { return false }
+	return mechanics_lab_ia_progress(window, renderer, room, data, controller, cards, buffer)
 }
 
 // The foes free, the player follows the IA's advice for twenty seconds of the world, or until its seconds are over.
@@ -201,6 +203,8 @@ mechanics_lab_ia_held_still :: proc(window: ^app.Window, renderer: ^render.Rende
 mechanics_lab_ia_scene :: proc(window: ^app.Window, renderer: ^render.Renderer, room: ^game.Room, data: ^level.Level,
 	controller: ^run_session.Tactical_Controller, cards: ^run_session.Card_Interaction_State, buffer: ^run_session.Buffered_Gameplay_Command, dodge: bool) -> bool {
 	player := room.player
+	// A new fight: the IA starts afresh (as when a fight ends: its held advice is the fight's).
+	run_session.advisor_pilot_release()
 	game.destroy_room(room)
 	player.health = player.stats.max_health
 	rebuilt, built := run_session.create_mechanics_lab_room(data, player, game.DEFAULT_TACTICAL_CONFIG, .IA)
@@ -295,5 +299,36 @@ mechanics_lab_ia_warning :: proc(window: ^app.Window, renderer: ^render.Renderer
 	}
 	if warned == 0 { fmt.eprintln("mechanics lab: no warning after the player's own move under the cleave"); return false }
 	fmt.eprintf("mechanics lab IA warning: %s\n", renderer.tactical.advice.warning)
+	return true
+}
+
+// THE GAME'S STATE (Fase 6): the scene under the cleave, the run at 0, 50 and 100% (F11 in the lab): the banner says it
+// and the IA's advice for each is filmed (odin_pp_ia_progress_NN.png). Near the end a point of life weighs less.
+@(private = "file")
+mechanics_lab_ia_progress :: proc(window: ^app.Window, renderer: ^render.Renderer, room: ^game.Room, data: ^level.Level,
+	controller: ^run_session.Tactical_Controller, cards: ^run_session.Card_Interaction_State, buffer: ^run_session.Buffered_Gameplay_Command) -> bool {
+	for progress, k in ([3]f32{0, 0.5, 1}) {
+		if !mechanics_lab_ia_scene(window, renderer, room, data, controller, cards, buffer, false) { return false }
+		run_session.advisor_set_context(run_session.advisor_context_lab(progress))
+		renderer.tactical.mechanics_lab_ia_progress = progress
+		// The search of the new root, with this progress, over (the scenes are alike: never the scene before's).
+		before := run_session.advisor_pilot_generation()
+		for _ in 0..<300 {
+			mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 0)
+			packet := run_session.advisor_pilot_packet()
+			if packet.generation > before && packet.generation == run_session.advisor_pilot_generation() && packet.done { break }
+			time.sleep(2*time.Millisecond)
+		}
+		for _ in 0..<3 { mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 0) }
+		advice := run_session.advisor_current_advice()
+		if !advice.valid { fmt.eprintln("mechanics lab: no advice at", progress); return false }
+		if detail := render.mechanics_lab_banner_detail(renderer, room); !strings.contains(string(detail), "F11 PARTITA") {
+			fmt.eprintln("mechanics lab: the banner does not show the progress:", detail); return false
+		}
+		artifacts.screenshot(fmt.ctprintf("odin_pp_ia_progress_%02d.png", k))
+		fmt.eprintf("mechanics lab IA progress %.0f%%: %v %v, value %.2f, life lost %.1f\n", progress*100, advice.kind, advice.move.direction, advice.value, advice.loss)
+	}
+	run_session.advisor_set_context({})
+	renderer.tactical.mechanics_lab_ia_progress = 0
 	return true
 }

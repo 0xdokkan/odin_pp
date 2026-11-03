@@ -15,9 +15,14 @@ Root_Facts :: struct {
 	archetypes: [game.MAX_ENEMIES_PER_ROOM]game.Enemy_Archetype,
 	// The statuses on the board at the root, at their worth (cards.odin, statuses_value).
 	statuses: f32,
+	// The game's state (context.odin) and the weight of a point of life it gives.
+	game_context: Game_Context,
+	life_weight: f32,
 }
 
-root_facts :: proc(room: ^game.Room) -> (facts: Root_Facts) {
+root_facts :: proc(room: ^game.Room, game_context: Game_Context = {}) -> (facts: Root_Facts) {
+	facts.game_context = game_context
+	facts.life_weight = life_weight(game_context, game_context.heal_outside > 0 || room_heal(room) > 0)
 	facts.health = room.player.health
 	for enemy in room.enemies {
 		if facts.enemy_count == len(facts.ids) { break }
@@ -98,7 +103,7 @@ sign :: proc(v: int) -> int { return 1 if v > 0 else (-1 if v < 0 else 0) }
 evaluate :: proc(room: ^game.Room, facts: ^Root_Facts, elapsed: f32, risk: f32 = 0) -> f32 {
 	// Death is the worst branch, always; a later one a little less bad.
 	if player_dead(room) { return DEATH_VALUE+elapsed }
-	value := -LIFE_WEIGHT*f32(facts.health-room.player.health)
+	value := -facts.life_weight*f32(facts.health-room.player.health)
 	for k in 0..<facts.enemy_count {
 		index, alive := game.enemy_index_by_id(room, facts.ids[k])
 		if alive {
@@ -113,7 +118,8 @@ evaluate :: proc(room: ^game.Room, facts: ^Root_Facts, elapsed: f32, risk: f32 =
 	if room.phase != .Combat { return value+WIN_VALUE }
 	// The position: the blows still to land past the horizon, the ways out, the weakest foe near, an archer's line.
 	p := room.player.position
-	value -= THREAT_WEIGHT*LIFE_WEIGHT*cell_threat(room, p)
+	value -= THREAT_WEIGHT*facts.life_weight*cell_threat(room, p)
+	value += SLEEPER_VALUE*f32(sleepers_woken(&facts.game_context, p))
 	for direction in game.Move_Direction {
 		if step_is_free(room, game.add_position(p, game.direction_offset(direction))) { value += EXIT_VALUE }
 	}

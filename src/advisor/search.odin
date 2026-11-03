@@ -207,8 +207,8 @@ reply_moves :: proc(out: []Move) -> (count: int) {
 }
 
 // A new root: the real room photographed (only read), the rehearsal on it, the rounds from the first.
-search_root :: proc(s: ^Search, real: ^game.Room) -> bool {
-	if !s.ready || !snapshot_take(&s.snapshot, real) { s.rooted = false; return false }
+search_root :: proc(s: ^Search, real: ^game.Room, game_context: Game_Context = {}) -> bool {
+	if !s.ready || !snapshot_take(&s.snapshot, real, game_context) { s.rooted = false; return false }
 	return search_root_from(s, &s.snapshot)
 }
 
@@ -218,7 +218,7 @@ search_root_from :: proc(s: ^Search, snapshot: ^Snapshot) -> bool {
 	if !s.ready || !rehearsal_begin(&s.rehearsal, snapshot) { s.rooted = false; return false }
 	s.source = snapshot
 	s.rooted, s.done = true, false
-	s.facts = root_facts(&snapshot.room)
+	s.facts = root_facts(&snapshot.room, snapshot.game_context)
 	// The first moves are those of the moment the player is free again (a root is often taken while his last move
 	// still plays, when the rules let no card be played): on a rehearsal run on to it, as every branch runs.
 	{
@@ -374,6 +374,7 @@ play_path :: proc(s: ^Search, path: []Move, horizon: f32, dice: game.Dice_State)
 	context.temp_allocator = context.allocator
 	room.player.dice = dice
 	try_risk = 0
+	try_life_weight = s.facts.life_weight
 	tempo_begin(room)
 	// With the defence keys up the world waits for the answer: the first move is the answer.
 	elapsed := reach_root(room, horizon)
@@ -615,8 +616,8 @@ ponder_lookup :: proc(table: []Ponder, root: u64) -> (advice: Advice, found: boo
 }
 
 // The whole search on one root, at once (the tests, the tournament, the measures): `work` at most.
-search_whole :: proc(s: ^Search, real: ^game.Room, work: int) -> Advice {
-	if !search_root(s, real) { return {} }
+search_whole :: proc(s: ^Search, real: ^game.Room, work: int, game_context: Game_Context = {}) -> Advice {
+	if !search_root(s, real, game_context) { return {} }
 	search_step(s, work)
 	return s.advice
 }

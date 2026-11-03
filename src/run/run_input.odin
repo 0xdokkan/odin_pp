@@ -21,6 +21,8 @@ Run_Action :: enum {
 	Juice_Test,
 	// The lab's fixed face of Benvenuti a Napoli's d4 (docs/piano-napoli.md, Fase 0).
 	Napoli_Face,
+	// The lab's game progress for the IA: 0, 50 and 100% (docs/piano-ia.md, Fase 6).
+	IA_Progress,
 }
 
 RUN_WALK_ACTIONS :: [4]Run_Action{.North, .East, .South, .West}
@@ -44,7 +46,7 @@ default_run_actions :: proc() -> input.Action_Map(Run_Action) {
 		{.Skip, .S}, {.Previous_Page, .LEFT}, {.Next_Page, .RIGHT}, {.Upgrade, .U}, {.Remove, .R}, {.Leave, .L},
 		{.Restart, .F5}, {.Main_Menu, .F10}, {.Animation_Speed, .F4}, {.Diagnostics, .F8},
 		{.Intent_Display, .F6}, {.Clear_Lab, .F7}, {.Lab_Arena, .F3}, {.Debug_Thorns, .C}, {.Debug_Afterimage, .V},
-		{.Juice_Test, .F9}, {.Napoli_Face, .F12},
+		{.Juice_Test, .F9}, {.Napoli_Face, .F12}, {.IA_Progress, .F11},
 	}
 	for b in bindings { input.bind(&m, b.action, input.key(b.key)) }
 	return m

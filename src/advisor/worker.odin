@@ -122,9 +122,9 @@ worker_free :: proc(w: ^Worker) {
 worker_hold :: proc(w: ^Worker, held: bool) { sync.atomic_store(&w.hold, held) }
 
 // THE GAME'S SIDE. A new root: the real room photographed into the game's slot (only read) and handed over. Its number.
-worker_offer :: proc(w: ^Worker, real: ^game.Room) -> u64 {
+worker_offer :: proc(w: ^Worker, real: ^game.Room, game_context: Game_Context = {}) -> u64 {
 	slot := w.snapshots.write
-	if !snapshot_take(&w.snapshots.slots[slot], real) { return 0 }
+	if !snapshot_take(&w.snapshots.slots[slot], real, game_context) { return 0 }
 	w.generation += 1
 	w.generations[slot] = w.generation
 	triple_publish(&w.snapshots)

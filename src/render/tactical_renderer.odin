@@ -115,6 +115,8 @@ Tactical_View :: struct {
 	mechanics_lab, mechanics_lab_menu: bool,
 	// The face the lab fixed for Benvenuti a Napoli's d4, 0 at random (F12, the banner says it).
 	mechanics_lab_napoli_face: i32,
+	// The lab's game progress for the IA (F11), shown on the banner with the IA in hand.
+	mechanics_lab_ia_progress: f32,
 	// The pause menu: the button under the mouse, and whether there is a main
 	// menu to go back to.
 	pause_hovered: Pause_Choice,

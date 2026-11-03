@@ -34,7 +34,9 @@ già: i campi copiati (`COPIED_FIELDS` in
 (`advisor_command_use` in [run/advisor_driver.odin](../src/run/advisor_driver.odin)),
 i nemici (`enemy_knowledge` in [advisor/knowledge.odin](../src/advisor/knowledge.odin)),
 le carte, gli effetti e gli stati (`ADVISOR_CARDS`, `effect_value`, `status_value` in
-[advisor/cards.odin](../src/advisor/cards.odin)).
+[advisor/cards.odin](../src/advisor/cards.odin)), i luoghi della spedizione, i nodi della run, i biomi e gli oggetti
+dello zaino (`advisor_site`, `advisor_node`, `advisor_biome`, `advisor_item_heal` in
+[run/advisor_context.odin](../src/run/advisor_context.odin)).
 Le stesse istruzioni,
 per gli agenti, stanno in [AGENTS.md](../AGENTS.md), che leggono Codex e gli
 altri, e in [CLAUDE.md](../CLAUDE.md), che legge Claude Code.

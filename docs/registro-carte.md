@@ -6,6 +6,16 @@ Qui si segna ogni carta tolta dal gioco o cambiata, con quello che faceva, così
 futuro. Le voci più recenti stanno in cima. Per ritrovare il commit di una voce:
 `git log --all --grep "<titolo del commit>"`.
 
+## 2026-11-03 — IA: conta lo stato della partita e tutte le cure vere (solo laboratorio)
+
+Commit **«Piano IA, Fase 6 fatta: lo stato della partita»** sul ramo `piano-ia` ([piano](piano-ia.md), Fase 6). La carta
+non cambia. La IA ora sa quanto manca alla fine della run o della spedizione: un punto di vita pesa 3 all'inizio, 2 alla
+fine, mezzo punto in meno con una cura vera vicina, mai sotto 1,5 (la morte resta sempre il ramo peggiore). Conta tutte
+le cure vere tranne la Canna da pesca e il suo Cibo pescato: la FONTE non ancora usata entro 20 caselle (+16), il Kit di
+riparazione nello zaino (+12), il Riposo sul prossimo nodo della run (30% della vita), il cibo lasciato a terra dai
+nemici, la tavolata di Napoli. Nelle spedizioni sa dove dormono i gruppi non ancora entrati nello scontro e non ti
+porta da loro senza motivo. Nel laboratorio F11 imposta la partita a 0, 50 o 100%.
+
 ## 2026-11-03 — IA: i segni veri e il consiglio che resta fermo (solo laboratorio)
 
 Commit **«Piano IA, Fase 5 fatta: le indicazioni vere»** sul ramo `piano-ia` ([piano](piano-ia.md), Fase 5). La carta

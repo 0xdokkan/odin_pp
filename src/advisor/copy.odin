@@ -45,6 +45,8 @@ Snapshot :: struct {
 	level: level.Level,
 	events: ^game.Event_Log,
 	taken: bool,
+	// The game's state beyond the room (context.odin), as the game's thread knew it when it took the snapshot.
+	game_context: Game_Context,
 }
 
 Rehearsal :: struct {
@@ -148,8 +150,9 @@ snapshot_destroy :: proc(s: ^Snapshot) {
 }
 
 // The photograph of the real room: everything it owns, deep, in the snapshot's own memory. The real room is only read.
-snapshot_take :: proc(s: ^Snapshot, real: ^game.Room) -> bool {
+snapshot_take :: proc(s: ^Snapshot, real: ^game.Room, game_context: Game_Context = {}) -> bool {
 	if s == nil || real == nil || real.player == nil || real.level_data == nil || real.recent_events == nil { return false }
+	s.game_context = game_context
 	virtual.arena_free_all(&s.arena)
 	allocator := virtual.arena_allocator(&s.arena)
 	s.room = real^

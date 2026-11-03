@@ -384,6 +384,8 @@ expedition_update :: proc(data:rawptr,frame:^host.Frame) {
 		controls:=rs.frame_input
 		controls.actions.pressed-={.Pause,.Map,.Cancel,.Route_Map,.Restart}
 		if e.inventory_open || e.map_open || e.site>=0 || w.reward_count>0 {controls.left_pressed=false;controls.right_pressed=false;controls.wheel=0;controls.actions.pressed={};controls.actions.down={}}
+		// The IA's game state: the expedition's groups, places and backpack (advisor_context.odin).
+		advisor_set_context(advisor_context_expedition(w,&c.backpack,room))
 		blocked:=update_tactical_controller(&rs.tactical_controller,room,&rs.iso_renderer,&rs.card_interaction,&rs.gameplay_buffer,frame.dt,true,rs.mouse_canvas,!e.inventory_open&&!e.map_open&&rs.mouse_inside,nil,controls)
 		world_runs:=!game.tactical_is_casting(room) && room.qte.kind==.None && !game.tactical_shadow_active(room) && render.presentation_time_policy(&rs.iso_renderer.timeline)!=.Cinematic && !render.renderer_frame_held(&rs.iso_renderer)
 		if world_runs {
