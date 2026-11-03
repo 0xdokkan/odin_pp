@@ -74,7 +74,8 @@ card_demo_test_take :: proc(demo: ^run_session.Card_Demo, renderer: ^render.Rend
 // definition: a new card is held to it with no word of its own), the foes it
 // must hurt are hurt and the ground it leaves shows; its caption says what is
 // done at every frame, in words of the film's own table (which the smoke holds
-// on their plate). A second take is the first again.
+// on their plate). A take is the one a round before again (a d4 card's film
+// shows a face a take: game.card_demo_film_takes).
 @(test)
 test_every_card_has_a_demo_that_shows_its_effect :: proc(t: ^testing.T) {
 	renderer := card_demo_test_renderer()
@@ -88,8 +89,9 @@ test_every_card_has_a_demo_that_shows_its_effect :: proc(t: ^testing.T) {
 		for upgrade in i32(0)..=game.card_max_upgrade_level(id) {
 			card := game.Card_Instance{id = 7, definition_id = id, upgrade_level = upgrade}
 			if !testing.expectf(t, run_session.card_demo_open(demo, renderer, card), "%v +%d: no film", id, upgrade) { continue }
-			outcomes: [2]Card_Demo_Outcome
-			for take in 0..<2 {
+			rounds := game.card_demo_film_takes(id)
+			outcomes: [8]Card_Demo_Outcome
+			for take in 0..<2*rounds {
 				if take > 0 { run_session.card_demo_restart(demo, renderer) }
 				if !testing.expectf(t, demo.built, "%v +%d: take %d not built", id, upgrade, take) { break }
 				_, mute, unknown := card_demo_test_take(demo, renderer)
@@ -104,7 +106,10 @@ test_every_card_has_a_demo_that_shows_its_effect :: proc(t: ^testing.T) {
 				testing.expectf(t, demo.room.player == &demo.player && demo.room.level_data == &demo.data, "%v +%d: the room is not the film's", id, upgrade)
 				outcomes[take] = card_demo_outcome(demo, renderer)
 			}
-			testing.expectf(t, outcomes[0] == outcomes[1], "%v +%d: the second take differs: %v / %v", id, upgrade, outcomes[0], outcomes[1])
+			for take in 0..<rounds {
+				testing.expectf(t, outcomes[take] == outcomes[take+rounds], "%v +%d: take %d differs from take %d: %v / %v", id, upgrade, take+rounds,
+					take, outcomes[take], outcomes[take+rounds])
+			}
 		}
 	}
 }

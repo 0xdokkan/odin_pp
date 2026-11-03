@@ -94,6 +94,11 @@ Card_Demo_Action_Kind :: enum u8 {
 	Loose,
 	// ATTIVA: the Tesla network discharges (its button on the board's bar).
 	Activate,
+	// BENVENUTI A NAPOLI's club, or the grandpa's: the view turned to the
+	// scene's foe `foe` (the grandpa walking up to it, W held), then a blow.
+	Club,
+	// BENVENUTI A NAPOLI's grandpa: Q (his cure), then E (his gold).
+	Keys,
 	// A wait (Space).
 	Wait,
 }
@@ -275,10 +280,25 @@ card_demo_default_scene :: proc(given: Card_Definition) -> (scene: Card_Demo_Sce
 	return
 }
 
-// Each card's scene at `upgrade_level`: the default of its targeting, or what
-// it needs instead (a scene that changes with the level: the AK's, whose view
-// lasts longer).
-card_demo_scene :: proc(id: Card_Id, upgrade_level: i32 = 0) -> (scene: Card_Demo_Scene) {
+// The face a d4 card's film shows on its `take` (the user's choice of
+// 2026-11-03: the film starts again on its own, a face a take, so that all
+// four are seen whatever the card's level; before, the level picked it, and an
+// offered card showed only its first face).
+card_demo_take_face :: proc(take: int) -> i32 {
+	return i32(max(take, 0)%4)+1
+}
+
+// How many takes of a card's film differ (then they come round again): one a
+// face for the d4 cards, one for every other.
+card_demo_film_takes :: proc(id: Card_Id) -> int {
+	return 4 if id == .Napoli || id == .Dino_Ride else 1
+}
+
+// Each card's scene at `upgrade_level` on the film's `take`: the default of its
+// targeting, or what it needs instead (a scene that changes with the level:
+// the AK's, whose view lasts longer; one that changes with the take: the d4
+// cards', card_demo_take_face).
+card_demo_scene :: proc(id: Card_Id, upgrade_level: i32 = 0, take := 0) -> (scene: Card_Demo_Scene) {
 	definition, _ := card_definition_by_id(id)
 	scene = card_demo_default_scene(definition)
 	#partial switch id {
@@ -525,16 +545,39 @@ card_demo_scene :: proc(id: Card_Id, upgrade_level: i32 = 0) -> (scene: Card_Dem
 		scene.seconds = 5
 		scene.foe_hurt = 1
 		scene.expects = {.Moved, .Black_Hole_Swallowed, .Entity_Defeated}
-	// DINOSAURO: the d4 shows a different dinosaur at each level, and a scene
+	// DINOSAURO: the d4 shows a different dinosaur at each take, and a scene
 	// of its own for each: the raptor's quick steps and its bleeding bumps, the
 	// stegosaurus turning an archer's bolt back, the dilophosaurus's venom, the
 	// giganotosaurus's stomps and the bite that kills.
-	// BENVENUTI A NAPOLI: a different face at each level (Fase 0: the face only
-	// says which it is; its scenes come with the faces, docs/piano-napoli.md).
+	// BENVENUTI A NAPOLI (docs/piano-napoli.md, Fase 7): a face at each take,
+	// a scene of its own for each: three blows of the club on a foe in front;
+	// the grandpa's table and a step into it, the player hurt; his purse; the
+	// player as the grandpa, Q and E, then a walk up to a foe and a blow.
 	case .Napoli:
-		scene.faces = {upgrade_level%4+1, 0, 0}
+		face := card_demo_take_face(take)
+		scene.faces = {face, 0, 0}
+		switch face {
+		case 1:
+			card_demo_add_foe(&scene, card_demo_offset(0, -1), health = 40)
+			for blow in 0..<3 { card_demo_add_action(&scene, {kind = .Club, after = 0.3+0.9*f32(blow), foe = 0}) }
+			scene.expects = {.First_Person_Begun, .Damaged, .Status_Applied}
+			scene.foe_hurt = 1
+		case 2:
+			scene.wounds = 12
+			card_demo_add_action(&scene, {kind = .Step, after = 0.4, direction = .North})
+			scene.seconds = 3
+			scene.expects = {.Object_Spawned, .Napoli_Feast, .Healed}
+		case 3:
+			scene.expects = {.Gold_Gained}
+		case:
+			card_demo_add_foe(&scene, card_demo_offset(3, 0), health = 40)
+			card_demo_add_action(&scene, {kind = .Keys, after = 0.2})
+			card_demo_add_action(&scene, {kind = .Club, after = 1.4, foe = 0})
+			scene.expects = {.First_Person_Begun, .Napoli_Nonno_Cured, .Gold_Gained, .Damaged}
+			scene.foe_hurt = 1
+		}
 	case .Dino_Ride:
-		face := upgrade_level%4+1
+		face := card_demo_take_face(take)
 		scene.faces = {face, 0, 0}
 		switch face {
 		case 1:
@@ -571,7 +614,7 @@ card_demo_scene :: proc(id: Card_Id, upgrade_level: i32 = 0) -> (scene: Card_Dem
 // of the scene's foes it must hurt: from its definition alone, so that a new
 // card's take is held to it with no word of its own. Every kind of effect is
 // named, so a new one does not compile until it says how its take shows it.
-card_demo_expected_events :: proc(id: Card_Id, upgrade_level: i32 = 0) -> (events: bit_set[Game_Event_Kind], foes_hurt: int) {
+card_demo_expected_events :: proc(id: Card_Id, upgrade_level: i32 = 0, take := 0) -> (events: bit_set[Game_Event_Kind], foes_hurt: int) {
 	definition, found := card_definition_by_id(id)
 	if !found { return }
 	// The rod is no card played: its slot casts it (Fish_Cast).
@@ -624,7 +667,7 @@ card_demo_expected_events :: proc(id: Card_Id, upgrade_level: i32 = 0) -> (event
 	// A dice card shows its roll; the Dado del Destino's die rolls at the bump
 	// it loads (its scene's Fate_Rolled).
 	if card_dice_count(id) > 0 && id != .Fate_Dice { events += {.Dice_Rolled} }
-	scene := card_demo_scene(id, upgrade_level)
+	scene := card_demo_scene(id, upgrade_level, take)
 	events += scene.expects
 	foes_hurt = max(foes_hurt, scene.foe_hurt)
 	return

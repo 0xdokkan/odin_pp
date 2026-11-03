@@ -5,6 +5,19 @@ I riferimenti a Classica, `--flat` e ai vecchi smoke descrivono versioni precede
 per i comandi disponibili oggi valgono il [README](README.md) e la documentazione collegata.
 
 
+## 2026-11-03 — Piano di Napoli: la carta «Benvenuti a Napoli» (Fasi 0-7)
+
+- Carta nuova, rara, 3 energia: un D4 sceglie fra il **bastone** in terza persona (camera dietro la spalla, mazzate
+  dall'alto che stordiscono e schiacciano il nemico alla Looney Tunes), la **tavolata** del nonno (si mangia seduti e
+  ci si cura), il **borsellino** di monete, o un **minuto da nonno** al mare (libero sulla mappa, con la sua vita, Q che
+  cura tutti e due ed E che dà l'oro).
+- Asso di bastoni, Viandante di spalle e nonno al mare sono modelli 3D di carta fatti da codice; nel laboratorio ci
+  sono i suoi suoni (alcuni da file CC0, fonti in `assets/audio/LICENZE.md`) e una tarantella fatta da codice.
+- La carta entra nelle offerte, nei negozi e nella collezione. Il film di «Mostra effetto» di Napoli e del Dinosauro
+  mostra una faccia del D4 a ogni giro.
+- 1893 test e la prova completa del laboratorio verdi; le spedizioni si disegnano veloci come prima (+1,8%, dentro il
+  rumore). Piano completo in [docs/piano-napoli.md](docs/piano-napoli.md).
+
 ## 2026-11-02 — Piano del succo, Fase 6: nel gioco vero, piano concluso
 
 - Partita di prova in una spedizione della campagna: frecce, bombe e succo dei colpi vanno bene, nessun numero cambia.

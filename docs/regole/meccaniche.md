@@ -1164,4 +1164,30 @@ raggio su entrambi, la caduta del cannone, il nemico inghiottito, quello tirato
 dentro, il boss che resta, la chiusura e i quattro dinosauri con i loro effetti.
 I film di Mostra effetto mostrano a ogni livello la scena giusta: il Cannone
 colpisce il primo nemico e il Laser entrambi, il Buco Nero inghiotte e tira, il
-Dinosauro mostra un dinosauro diverso a ogni livello (livello mod 4 + 1).
+Dinosauro mostra un dinosauro diverso a ogni giro del film: il film riparte da solo e
+fa vedere i quattro dinosauri uno dopo l'altro, a qualunque livello (dal 3 novembre 2026,
+[piano di Napoli](../piano-napoli.md), Fase 7; prima il dinosauro dipendeva dal livello,
+e una carta offerta mostrava solo il Velociraptor).
+
+### Benvenuti a Napoli
+
+`Benvenuti a Napoli` (rara, energia 3, **2 s**, prezzo 8, fino a 5 potenziamenti;
+[piano](../piano-napoli.md)) tira **un d4** (sempre un d4) e la faccia sceglie l'effetto. Non si
+gioca dentro una vista né in groppa al Dinosauro.
+
+| d4 | Effetto | Numeri (+ per potenziamento; colpo a tempo) |
+|---|---|---|
+| 1 | **Il bastone** in terza persona: la camera dietro la spalla destra, il mouse gira la visuale, WASD fa i passi sulla griglia (0,5 s, dimezzati dal ritmo del Viandante), il clic dà una **mazzata** dall'alto sulla casella fra le 8 attorno più vicina alla visuale, segnata a terra | 30 s (+2; +3 sul tick); mazzata 8 danni (+1), 0,6 s (0,25 di carica), stordimento 2 battiti, poi 1, poi niente sullo stesso nemico finché non passano 4 s |
+| 2 | **La tavolata**: il nonno, a mondo fermo per 2 s, posa una tavola accanto al Viandante, sulla casella libera più lontana dai nemici; un passo contro di lei lo fa sedere 2 s e si cura in due metà sui due battiti | metà della vita massima (+2; ×1,5 sul tick); senza caselle libere cura subito |
+| 3 | **Il borsellino**: il nonno porta l'oro | 15 oro (+2; ×1,5 sul tick) |
+| 4 | **Diventi il nonno** per 60 s, in terza persona e libero sulla mappa (4 caselle/s, niente salto né scatto): il bastone esce dalla tasca in 1,2 s, poi il clic dà la mazzata sul nemico davanti (entro 1,2 caselle dal bordo del corpo, 45° per parte), fermo durante il colpo; Q una volta cura il nonno di metà della sua vita e il Viandante di metà della sua; E una volta dà l'oro del borsellino | vita del nonno 30 (+5; +10 sul tick); le ferite vanno a lui, a zero se ne va e il Viandante resta dove stava il nonno, con la vita di prima |
+
+La mazzata schiaccia la carta del nemico colpito (al 30%, poi una molla fino al 112%, in 0,6 s;
+a frittella se lo uccide), con pausa di 90 ms, scossa, schegge e polvere, e le stelline sopra il
+nemico stordito. Il Viandante di spalle, l'asso di bastoni e il nonno al mare sono modelli 3D di
+carta fatti da codice; la tavola ha il pranzo completo e si svuota mangiando. Nel laboratorio ha i
+suoi suoni (alcuni da file CC0, `assets/audio/LICENZE.md`) e una tarantella fatta da codice. Il film
+di Mostra effetto fa vedere una faccia a ogni giro: tre mazzate, la tavolata col pasto, il
+borsellino, il nonno che usa Q ed E e dà una mazzata. Regole in `game/napoli.odin`,
+`game/first_person_club.odin` e `game/napoli_nonno.odin`; disegno in `render/napoli.odin`,
+`render/first_person_club.odin`, `render/club_juice.odin` e `render/napoli_models.odin`.

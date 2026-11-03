@@ -23,7 +23,7 @@ napoli_test_begun :: proc(log: ^Event_Log) -> (face, amount: i32, found: bool) {
 }
 
 @(test)
-test_napoli_is_a_rare_lab_card_with_a_fixed_d4 :: proc(t: ^testing.T) {
+test_napoli_is_a_rare_card_with_a_fixed_d4 :: proc(t: ^testing.T) {
 	definition, found := card_definition_by_id(.Napoli)
 	testing.expect(t, found && validate_card_definition(&definition))
 	testing.expect_value(t, definition.name, "Benvenuti a Napoli")
@@ -32,9 +32,9 @@ test_napoli_is_a_rare_lab_card_with_a_fixed_d4 :: proc(t: ^testing.T) {
 	testing.expect_value(t, definition.shop_base_price, i32(8))
 	testing.expect_value(t, definition.dice_count, 1)
 	testing.expect_value(t, definition.targeting.rule, Target_Rule.Self)
-	// Only in the lab for now (Fase 7 decides): never offered nor collected.
+	// In the real game since Fase 7 (the user's choice): offered, sold and collected.
 	node := Run_Node{kind = .Combat, depth = 2}
-	testing.expect(t, card_is_lab_only(.Napoli) && card_offer_weight(definition, &node) == 0 && !card_in_collection(.Napoli))
+	testing.expect(t, !card_is_lab_only(.Napoli) && card_offer_weight(definition, &node) > 0 && card_in_collection(.Napoli))
 	// The die is a d4 whatever the level; the upgrades grow the faces' numbers.
 	for upgrade in i32(0)..=MAX_DICE_UPGRADE_LEVEL {
 		testing.expect_value(t, card_die_sides(.Napoli, upgrade), NAPOLI_DIE_SIDES)

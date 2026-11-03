@@ -95,7 +95,7 @@ Note sulle decisioni:
 | 4 | Diventi il nonno (effetto 4), regole e prototipo | 2 | Fatta | vedi Esito |
 | 5 | Aspetto 3D: asso di bastoni, Viandante, nonno, tavolata, borsellino | 1, 3, 4 | Fatta | vedi Esito |
 | 6 | Suoni e tarantella (CC0 o da codice) | 5 | Fatta | vedi Esito |
-| 7 | Nel gioco vero: «Mostra effetto», offerte, salvataggi, prova con l'utente, chiusura | 6 | Da fare | — |
+| 7 | Nel gioco vero: «Mostra effetto», offerte, salvataggi, prova con l'utente, chiusura | 6 | Fatta (manca la prova dell'utente) | vedi Esito |
 
 ## Come funziona oggi (punto di partenza)
 
@@ -910,6 +910,53 @@ Passi:
 
 **Fatto quando:** l'utente approva; `scripts/check.ps1` verde; prova completa
 del laboratorio verde.
+
+### Esito (3 novembre 2026)
+
+Le scelte dell'utente:
+
+| Domanda | Risposta |
+|---|---|
+| La carta nel gioco vero | **Sì:** non più «solo laboratorio»; rara, 3 energia, prezzo 8, peso 60 nelle offerte, nei negozi e nella collezione (archivi) |
+| Il film di «Mostra effetto» | **Una faccia a ogni giro:** il film riparte da solo e mostra le quattro facce una dopo l'altra, a qualunque livello |
+| Il Dinosauro | **Anche lui così** (prima mostrava una faccia per livello: una carta offerta faceva vedere solo il Velociraptor) |
+| Il nonno (11,8 danni al secondo) | **Resta così**; si ritocca dopo la prova dell'utente se serve |
+| Le verifiche finali | **Complete** (verifica completa, prova completa del laboratorio, misure) |
+
+Cosa c'è ora:
+- **Nel gioco vero:** tolto `Lab_Only`. La carta entra nelle offerte delle stanze, nei negozi e
+  nella collezione della campagna (scoperte, archivio); nel laboratorio resta nel mazzo dell'arena
+  «Prima persona». Suoni e tarantella restano del laboratorio, come per tutte le carte.
+- **Il film** (`game/card_demo.odin`, `run/card_demo.odin`): per le carte col D4 la scena dipende
+  dal giro del film (`card_demo_take_face`), non più dal livello. Le quattro scene di Napoli:
+  1. tre mazzate a un nemico davanti (la vista del bastone, la camera dietro la spalla);
+  2. il Viandante ferito, il nonno che porta la tavola, un passo dentro, il pasto e la cura;
+  3. il borsellino;
+  4. il nonno: Q ed E, poi cammina fino al nemico e gli dà una mazzata.
+
+  Due azioni nuove guidano il film: la mazzata (girare la visuale sul nemico, col nonno
+  avvicinarsi tenendo W, poi il clic) e i tasti Q ed E, con le loro didascalie: «CLIC: UNA
+  MAZZATA», «TIENI PREMUTO W: VAI DAL NEMICO», «Q CURA, E SOLDI: UNA VOLTA SOLA». I test del film ora
+  provano ogni giro diverso, e che il giro successivo al quarto sia uguale al primo.
+- **Salvataggi:** la spedizione salva e ricarica la tavolata (Fase 1) e ora anche la vista del
+  bastone (la mazzata a metà, la memoria dello stordimento) e quella del nonno (corpo, vita, Q ed E
+  usati): test nuovo `test_expedition_snapshot_keeps_the_club_and_the_grandpa`. In spedizione la
+  vita massima è 32: la tavolata cura 16, il Q del nonno cura il Viandante di 16.
+- **Un test vecchio da aggiornare:** «un minuto di gioco nell'arena» apriva ogni vista per 12 s,
+  ma con le sei armi (anche bastone e nonno) l'ultima non entrava nel minuto; ora 9 s ciascuna.
+
+Verifiche finali:
+- `scripts/check.ps1`: **1893 test** verdi, con e senza assert (erano 1857 prima del piano).
+- Prova completa del laboratorio: **2562 catture, 165 suoni** (erano 2175 e 153 prima del piano),
+  verde; l'atto `napoli` ha sentito tutti gli 11 suoni nuovi.
+- Prestazioni: quattro corse del benchmark della spedizione, prima del piano (`piano-succo`,
+  `99e8799`) e ora, in ordine incrociato. In media **1,508 ms** prima e **1,535 ms** ora (+1,8%,
+  circa 650 fotogrammi al secondo in tutti e due i casi); la stessa versione vecchia è cambiata del
+  7% fra la sua prima e la sua ultima corsa, quindi la differenza è dentro il rumore. Le scene più
+  pesanti: la 127 (2,16 ms contro 2,08), la 178 (2,07 contro 2,04), la 5 (2,06 contro 2,05).
+
+Resta la **partita di prova dell'utente**: dopo, se serve, si ritoccano i numeri (il nonno, la
+camera del bastone) e il piano si chiude.
 
 ## Rischi
 

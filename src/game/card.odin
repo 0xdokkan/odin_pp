@@ -1298,10 +1298,11 @@ CARD_DEFINITIONS := [Card_Id]Card_Definition{
 		effect_count = 1,
 	},
 	.Napoli = {
-		upgrade_limit = MAX_DICE_UPGRADE_LEVEL, time_cost = 2, dice_count = 1, traits = {.Lab_Only},
+		upgrade_limit = MAX_DICE_UPGRADE_LEVEL, time_cost = 2, dice_count = 1,
 		// BENVENUTI A NAPOLI (docs/piano-napoli.md): a d4 picks the club behind his back for 30 world seconds (+2
 		// an upgrade), the grandpa's table, his purse, or the player as the grandpa for a minute (napoli.odin). The
-		// template's amount is the club's seconds; the face rolled rewrites it.
+		// template's amount is the club's seconds; the face rolled rewrites it. In the real game since Fase 7 (the
+		// user's choice of 2026-11-03): offered, sold and collected as any rare card.
 		id = .Napoli, name = "Benvenuti a Napoli", rarity = .Rare,
 		reward_weight = 60, shop_base_price = 8, cost = 3,
 		targeting = {rule = .Self},

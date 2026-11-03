@@ -94,7 +94,8 @@ test_mechanics_lab_first_person_lives_a_minute_of_play :: proc(t: ^testing.T) {
 	next := game.First_Person_Weapon.AK
 	ak_shots := i32(0)
 	for frame in 0..<60*60 {
-		if !game.tactical_first_person_active(&room) && game.tactical_begin_first_person(&room, 12, next) {
+		// Nine seconds each: all six weapons (BENVENUTI A NAPOLI's club and grandpa too) within the minute.
+		if !game.tactical_first_person_active(&room) && game.tactical_begin_first_person(&room, 9, next) {
 			taken[next] = true
 			next = game.First_Person_Weapon((int(next)+1)%len(game.First_Person_Weapon))
 		}

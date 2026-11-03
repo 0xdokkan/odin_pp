@@ -60,6 +60,18 @@ Commit **«Piano di Napoli, Fase 0 fatta: la carta, il D4 e i quattro rami»** s
   laboratorio: mazzata, boing, monete, posate, ciabatte e risata del nonno da file **CC0** di Freesound (fonti e licenze
   in `assets/audio/LICENZE.md`); fruscio del colpo, stelline e tasca da codice. Col bastone e col minuto da nonno suona
   una **tarantella** fatta da codice.
+- **2026-11-03, Fase 7** (commit «Piano di Napoli, Fase 7 fatta: la carta nel gioco vero»): **entra nel gioco vero**
+  (non più `Lab_Only`): offerte, negozi, collezione della campagna. Il film di «Mostra effetto» mostra una faccia a ogni
+  giro (bastone, tavolata, borsellino, nonno), non più una per livello.
+
+## 2026-11-03 — Dinosauro: il film mostra i quattro dinosauri
+
+Commit **«Piano di Napoli, Fase 7 fatta: la carta nel gioco vero»** sul ramo `piano-napoli`
+([piano](piano-napoli.md), Fase 7).
+
+- Il film di «Mostra effetto» del Dinosauro mostra un dinosauro diverso a ogni giro (il film riparte da solo):
+  Velociraptor, Stegosauro, Dilophosaurus, Giganotosauro, a qualunque livello. Prima il dinosauro dipendeva dal livello
+  della carta, e una carta offerta o appena presa mostrava solo il Velociraptor. Le regole della carta non cambiano.
 
 ## 2026-10-30 — Tutte le carte: il lancio dura la metà
 

@@ -186,10 +186,6 @@ card_demo_open :: proc(demo: ^Card_Demo, renderer: ^render.Renderer, card: game.
 		return false
 	}
 	demo.card.lifetime = .Combat if game.card_definition_temporary(card.definition_id) else .Permanent
-	demo.scene = game.card_demo_scene(card.definition_id, card.upgrade_level)
-	if demo.scene.faces != {} {
-		if dice, found := game.card_demo_dice(demo.card, demo.scene.faces, game.FISHING_HEAL_SIDES); found { demo.dice = dice }
-	}
 	return card_demo_begin_take(demo, renderer)
 }
 
@@ -212,6 +208,12 @@ card_demo_close :: proc(demo: ^Card_Demo) {
 card_demo_begin_take :: proc(demo: ^Card_Demo, renderer: ^render.Renderer) -> bool {
 	card_demo_destroy_room(demo)
 	r := renderer
+	// The take's scene: a d4 card's face changes with the take (game.card_demo_take_face).
+	demo.scene = game.card_demo_scene(demo.card.definition_id, demo.card.upgrade_level, demo.takes)
+	demo.dice = {}
+	if demo.scene.faces != {} {
+		if dice, found := game.card_demo_dice(demo.card, demo.scene.faces, game.FISHING_HEAL_SIDES); found { demo.dice = dice }
+	}
 	// Nothing of the last take's pictures stays: its cues, cards, blows,
 	// ground, rope, ball and view (render.forget_living_actors).
 	render.clear_event_animations(r)
@@ -417,6 +419,21 @@ card_demo_input :: proc(demo: ^Card_Demo, renderer: ^render.Renderer, dt: f32) -
 	if !demo.acting || demo.next_action >= demo.scene.action_count { return }
 	action := demo.scene.actions[demo.next_action]
 	if action.kind == .Cut { card_demo_sword_input(demo, &input, dt); return }
+	// BENVENUTI A NAPOLI's grandpa: Q, then E (card_demo_act paces them).
+	if action.kind == .Keys {
+		input.diagonals[0] = demo.firing > CARD_DEMO_KEYS_SECONDS*0.6
+		input.diagonals[1] = demo.firing > 0 && demo.firing < CARD_DEMO_KEYS_SECONDS*0.3
+		return
+	}
+	if action.kind == .Club {
+		if demo.firing > 0 { input.fire = true; return }
+		turn := card_demo_turn_left(demo, renderer, action.foe)
+		step := clamp(turn, -CARD_DEMO_TURN_RATE*dt, CARD_DEMO_TURN_RATE*dt)
+		input.look.x = clamp(step/FIRST_PERSON_MOUSE_SENSITIVITY, -FIRST_PERSON_LOOK_CLAMP, FIRST_PERSON_LOOK_CLAMP)
+		// The grandpa walks up to it, W held, once the view is on it.
+		if game.napoli_nonno_active(&demo.room) && abs(turn) < 0.35 && !card_demo_club_reaches(demo, action.foe) { input.walk[0] = true }
+		return
+	}
 	if action.kind != .Fire && action.kind != .Punch && action.kind != .Loose { return }
 	if demo.firing > 0 {
 		if action.kind == .Loose { input.fire_right = true } else { input.fire = true }
@@ -473,6 +490,27 @@ card_demo_sword_input :: proc(demo: ^Card_Demo, input: ^Tactical_Controller_Inpu
 	demo.turn_wait = 0.2
 }
 
+// BENVENUTI A NAPOLI: the button held for one blow (a blow lasts
+// game.CLUB_SWING_SECONDS: let go before the next would begin), and Q and E's
+// seconds.
+CARD_DEMO_CLUB_HOLD :: f32(0.4)
+CARD_DEMO_KEYS_SECONDS :: f32(0.6)
+
+// Whether the club reaches the scene's foe `foe` now: the club's view's, the
+// cell in front of him; the grandpa's, his reach from the edge of his body.
+card_demo_club_reaches :: proc(demo: ^Card_Demo, foe: int) -> bool {
+	enemy, found := card_demo_foe(demo, foe)
+	if !found { return false }
+	room := &demo.room
+	if game.napoli_nonno_active(room) {
+		b := room.first_person.fists.body
+		d := [2]f32{f32(enemy.position.x)+0.5-b.x, f32(enemy.position.y)+0.5-b.y}
+		return math.sqrt(d.x*d.x+d.y*d.y)-game.FISTS_RADIUS <= game.NAPOLI_NONNO_REACH && room.first_person.nonno.draw_left <= 0
+	}
+	p := room.player.position
+	return abs(enemy.position.x-p.x) <= 1 && abs(enemy.position.y-p.y) <= 1
+}
+
 // FIRST PERSON BRAWLER: how far the fists' body is from the scene's foe `foe`
 // (0 once it has fallen), and how near a jab is thrown from.
 CARD_DEMO_PUNCH_REACH :: f32(1.0)
@@ -500,7 +538,7 @@ card_demo_act :: proc(demo: ^Card_Demo, renderer: ^render.Renderer, dt: f32) {
 		switch {
 		case game.tactical_shadow_active(room):
 			if render.renderer_blocks_player_input(r) || game.tactical_shadow_step_busy(room) { return }
-		case action.kind == .Fire || action.kind == .Punch || action.kind == .Cut || action.kind == .Loose:
+		case action.kind == .Fire || action.kind == .Punch || action.kind == .Cut || action.kind == .Loose || action.kind == .Club || action.kind == .Keys:
 			if game.tactical_first_person_active(room) && render.first_person_diving(r) { return }
 		case:
 			if !card_demo_board_free(demo, r) { return }
@@ -607,6 +645,29 @@ card_demo_act :: proc(demo: ^Card_Demo, renderer: ^render.Renderer, dt: f32) {
 		} else {
 			demo.firing, demo.cut_from = CARD_DEMO_CUT_SECONDS, s.tip
 		}
+	case .Club:
+		// BENVENUTI A NAPOLI: the view turned on the foe (the grandpa walking up
+		// to it: card_demo_input), then the button held for a blow; a foe already
+		// down takes none.
+		_, standing := card_demo_foe(demo, action.foe)
+		if !standing || !(game.first_person_club_active(room) || game.napoli_nonno_active(room)) { done = true; break }
+		if demo.firing > 0 {
+			demo.firing -= dt
+			done = demo.firing <= 0
+			break
+		}
+		aimed := abs(card_demo_turn_left(demo, r, action.foe)) <= CARD_DEMO_TURN_DONE || demo.action_time >= CARD_DEMO_TURN_SECONDS*2
+		if aimed && card_demo_club_reaches(demo, action.foe) {
+			demo.firing = CARD_DEMO_CLUB_HOLD
+		} else if demo.action_time >= CARD_DEMO_TURN_SECONDS*4 {
+			done = true
+		}
+	case .Keys:
+		// BENVENUTI A NAPOLI's grandpa: Q, then E (card_demo_input).
+		if !game.napoli_nonno_active(room) { done = true; break }
+		if demo.firing <= 0 && demo.action_time <= dt { demo.firing = CARD_DEMO_KEYS_SECONDS; break }
+		demo.firing -= dt
+		done = demo.firing <= 0
 	}
 	if done {
 		demo.done_key, demo.done_text, demo.since_action = key, text, 0
@@ -743,7 +804,7 @@ CARD_DEMO_NO_FILM_WORDS :: cstring("NESSUNA PROVA PER QUESTA CARTA")
 Card_Demo_Words :: enum u8 {
 	Double_Click, Drag_To_Player, Drag_To_Foe, Drag_To_Cell, Drag_To_Foe_In_Line, Drag_In_Line, Drag_Rod,
 	Step, Bump, Shadow_Step, Wait, Shoot, Activate, Fire, Turn, Effect, No_Film, Run_Up, Punch,
-	Sword_Turn, Sword_Step, Cut, Loose,
+	Sword_Turn, Sword_Step, Cut, Loose, Club, Walk_Up, Nonno_Keys,
 }
 
 @(rodata)
@@ -771,6 +832,9 @@ CARD_DEMO_WORDS := [Card_Demo_Words]cstring{
 	.Sword_Step = "W: UN PASSO VERSO IL NEMICO",
 	.Cut = "CLIC TENUTO + MOUSE: UN TAGLIO",
 	.Loose = "TIENI IL DESTRO E LASCIA: UNA FRECCIA",
+	.Club = "CLIC: UNA MAZZATA",
+	.Walk_Up = "TIENI PREMUTO W: VAI DAL NEMICO",
+	.Nonno_Keys = "Q CURA, E SOLDI: UNA VOLTA SOLA",
 }
 
 // The key each caption's cap shows (nil: the mouse alone). A step's is the
@@ -778,7 +842,7 @@ CARD_DEMO_WORDS := [Card_Demo_Words]cstring{
 @(rodata)
 CARD_DEMO_WORDS_KEY := #partial [Card_Demo_Words]cstring{
 	.Step = "W", .Bump = "W", .Shadow_Step = "W", .Wait = "SPAZIO", .Shoot = "CTRL", .Run_Up = "W",
-	.Sword_Turn = "Q E", .Sword_Step = "W",
+	.Sword_Turn = "Q E", .Sword_Step = "W", .Walk_Up = "W", .Nonno_Keys = "Q E",
 }
 
 // The step keys, in game.MOVEMENT_KEY_DIRECTIONS's order.
@@ -823,6 +887,12 @@ card_demo_action_words :: proc(demo: ^Card_Demo, index: int) -> (key, text: cstr
 				words = .Sword_Turn if room.first_person.sword.facing != way else .Sword_Step
 			}
 		}
+	case .Club:
+		words = .Club
+		if demo.acting && index == demo.next_action && demo.firing <= 0 {
+			words = .Walk_Up if game.napoli_nonno_active(room) && !card_demo_club_reaches(demo, action.foe) else .Turn
+		}
+	case .Keys: words = .Nonno_Keys
 	}
 	return CARD_DEMO_WORDS_KEY[words], CARD_DEMO_WORDS[words]
 }
@@ -978,9 +1048,14 @@ card_demo_draw :: proc(demo: ^Card_Demo, renderer: ^render.Renderer) {
 
 // What the take showed of what its card promises (game.card_demo_expected_events),
 // with the ground and the AK's hits: the events missing, and whether all is shown.
+// The take on now, counted from 0 (a d4 card's face: game.card_demo_take_face).
+card_demo_take :: proc(demo: ^Card_Demo) -> int {
+	return max(demo.takes-1, 0)
+}
+
 card_demo_shown :: proc(demo: ^Card_Demo, renderer: ^render.Renderer) -> (missing: bit_set[game.Game_Event_Kind], ok: bool) {
 	id := demo.card.definition_id
-	expected, hurt := game.card_demo_expected_events(id, demo.card.upgrade_level)
+	expected, hurt := game.card_demo_expected_events(id, demo.card.upgrade_level, card_demo_take(demo))
 	missing = expected-renderer.shown_events
 	ok = demo.played && card(missing) == 0 && card_demo_foes_hurt(demo) >= hurt
 	switch game.card_demo_ground_expected(id) {

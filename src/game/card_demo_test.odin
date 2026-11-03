@@ -19,8 +19,8 @@ card_demo_test_inside :: proc(cell: grid.Position) -> bool {
 test_card_demo_scenes_build_their_rooms :: proc(t: ^testing.T) {
 	for id in Card_Id {
 		if id == .Count { continue }
-		for upgrade in i32(0)..=card_max_upgrade_level(id) {
-			scene := card_demo_scene(id, upgrade)
+		for upgrade in i32(0)..=card_max_upgrade_level(id) { for take in 0..<card_demo_film_takes(id) {
+			scene := card_demo_scene(id, upgrade, take)
 			taken: [dynamic]grid.Position
 			defer delete(taken)
 			place :: proc(t: ^testing.T, taken: ^[dynamic]grid.Position, id: Card_Id, upgrade: i32, cell: grid.Position, what: string) {
@@ -75,7 +75,7 @@ test_card_demo_scenes_build_their_rooms :: proc(t: ^testing.T) {
 			}
 			destroy_room(&room)
 			level.destroy(&data)
-		}
+		} }
 	}
 }
 
