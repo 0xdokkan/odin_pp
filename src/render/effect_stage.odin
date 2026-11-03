@@ -28,6 +28,11 @@ BORROWED_RENDERER_OWN_HANDLES :: [?]string{
 	// BENVENUTI A NAPOLI's grandpa and purse (napoli.odin).
 	"tactical.napoli.nonno",
 	"tactical.napoli.purse",
+	// Its 3D paper models (napoli_models.odin).
+	"tactical.napoli.models.sphere",
+	"tactical.napoli.models.cylinder",
+	"tactical.napoli.models.cube",
+	"tactical.napoli.models.shader",
 	"tactical.arsenal.ball",
 	"tactical.arsenal.puff",
 	"tactical.arsenal.dinos[0]",

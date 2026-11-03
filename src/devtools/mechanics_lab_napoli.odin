@@ -198,7 +198,8 @@ mechanics_lab_napoli_visits :: proc(window: ^app.Window, renderer: ^render.Rende
 // from above with the button: 8 each at least, staggered 2 beats, then 1, then
 // none (reel odin_pp_napoli_club_NN.png, the floor's mark and the blow); then
 // by a wall, looking away from it: the arm pressed short, the camera never in
-// it (odin_pp_napoli_club_muro.png); the view ended, the camera back.
+// it (odin_pp_napoli_club_muro.png); the view ended, the camera back. Fase 5:
+// his 3D model from behind (odin_pp_napoli_viandante.png).
 @(private = "file")
 mechanics_lab_napoli_club :: proc(window: ^app.Window, renderer: ^render.Renderer, dice: ^render.Dice_Renderer, room: ^game.Room, data: ^level.Level,
 	controller: ^run_session.Tactical_Controller, cards: ^run_session.Card_Interaction_State, buffer: ^run_session.Buffered_Gameplay_Command,
@@ -225,7 +226,7 @@ mechanics_lab_napoli_club :: proc(window: ^app.Window, renderer: ^render.Rendere
 		mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0, true, dice)
 	}
 	if render.first_person_amount(renderer) < 1 || !render.first_person_third_person(renderer) ||
-	   render.first_person_hud_status(renderer) != render.FIRST_PERSON_HUD_STATUS_CLUB || render.first_person_hides_player(renderer) {
+	   render.first_person_hud_status(renderer) != render.FIRST_PERSON_HUD_STATUS_CLUB || !render.first_person_hides_player(renderer) {
 		fmt.eprintln("mechanics lab: the camera did not come behind his back with the club"); return false
 	}
 	// The brute three cells along the first free way.
@@ -257,6 +258,8 @@ mechanics_lab_napoli_club :: proc(window: ^app.Window, renderer: ^render.Rendere
 		fp.yaw = from+turn*f32(k)/20
 		frame(window, renderer, dice, room, controller, cards, buffer, &reel)
 	}
+	// Fase 5: the Viandante's 3D model from behind, the ace in his hands.
+	artifacts.screenshot("odin_pp_napoli_viandante.png")
 	// Two steps of W, the way the view looks.
 	for _ in 0..<2 {
 		keys := render.first_person_keys(renderer)
@@ -384,7 +387,7 @@ mechanics_lab_napoli_club :: proc(window: ^app.Window, renderer: ^render.Rendere
 // the brute's blow takes his health, not the player's; at no health he goes,
 // the view over, the player where he stood, his health as it was (reel
 // odin_pp_napoli_nonno_NN.png; odin_pp_napoli_nonno_tasca.png, _colpo.png,
-// _q.png, _se_ne_va.png).
+// _q.png, _se_ne_va.png; Fase 5's 3D grandpa at the seaside, _3d.png).
 @(private = "file")
 mechanics_lab_napoli_nonno :: proc(window: ^app.Window, renderer: ^render.Renderer, dice: ^render.Dice_Renderer, room: ^game.Room, data: ^level.Level,
 	controller: ^run_session.Tactical_Controller, cards: ^run_session.Card_Interaction_State, buffer: ^run_session.Buffered_Gameplay_Command,
@@ -426,6 +429,9 @@ mechanics_lab_napoli_nonno :: proc(window: ^app.Window, renderer: ^render.Render
 		if n.draw_left <= 0 { break }
 		frame(window, renderer, dice, room, controller, cards, buffer, &reel)
 	}
+	// Fase 5: the grandpa at the seaside, his giant ace out of his pocket.
+	for _ in 0..<20 { frame(window, renderer, dice, room, controller, cards, buffer, &reel) }
+	artifacts.screenshot("odin_pp_napoli_nonno_3d.png")
 	// The brute next to him, east, the view on it.
 	brute := -1
 	for foe, index in room.enemies { if foe.archetype == .Brute { brute = index } }

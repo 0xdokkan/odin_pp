@@ -545,12 +545,9 @@ turn_first_person_view :: proc(renderer: ^Renderer, yaw, pitch: f32) {
 // behind his back only when the arm is pressed close to him).
 @(private)
 first_person_player_shown :: proc(renderer: ^Renderer) -> f32 {
-	// The grandpa stands for him: his card is gone (napoli.odin draws the grandpa).
-	if renderer.tactical.first_person.weapon == .Nonno { return 1-first_person_amount(renderer) }
-	if first_person_third_person(renderer) {
-		amount := first_person_amount(renderer)
-		return (1-renderer.tactical.first_person.club.fade*amount)*(1-(1-CLUB_CARD_SHOWN)*amount)
-	}
+	// Behind his back his 3D model stands for his card, or the grandpa's
+	// (first_person_club.odin): the card goes as the camera comes.
+	if first_person_third_person(renderer) { return 1-first_person_amount(renderer) }
 	return 1-clamp((first_person_amount(renderer)-FIRST_PERSON_HIDE_FROM)/FIRST_PERSON_HIDE_SPAN, 0, 1)
 }
 

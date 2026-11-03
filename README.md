@@ -98,7 +98,7 @@ i nemici. Le spedizioni già salvate mantengono la loro geografia originale.
 | [Piano della profondità](docs/piano-profondita.md) | fasi da eseguire una alla volta: terreno scolpito, mappa a piani, grotte senza caricamento, editor, ponti e gallerie nei biomi |
 | [Piano del combattimento vivo](docs/piano-succo.md) | concluso il 2 novembre 2026: succo dei colpi (pausa sull'impatto, scossa, scintille), frecce degli arcieri e bombe dei bombaroli come proiettili veri |
 | [Piano della prima persona](docs/piano-prima-persona.md) | tre carte in prima persona sul modello dell'AK, nel laboratorio: First Person Brawler (pugni), Fencer (zweihänder), Archer (arco compound); tutte le fasi fatte (0-8) |
-| [Piano di «Benvenuti a Napoli»](docs/piano-napoli.md) | carta nuova col D4: bastone in terza persona, tavolata e borsellino del nonno, un minuto da nonno; Fasi 0-4 fatte (la carta col D4 nel laboratorio; tavolata e borsellino del nonno; il bastone in terza persona; schiacciamento, succo e stelline; un minuto da nonno), fasi 5-7 da fare |
+| [Piano di «Benvenuti a Napoli»](docs/piano-napoli.md) | carta nuova col D4: bastone in terza persona, tavolata e borsellino del nonno, un minuto da nonno; Fasi 0-5 fatte (la carta col D4 nel laboratorio; tavolata e borsellino del nonno; il bastone in terza persona; schiacciamento, succo e stelline; un minuto da nonno; asso, Viandante e nonno al mare in 3D), fasi 6-7 da fare |
 | [Cronologia](CHANGELOG.md) | milestone e refactor precedenti; le note storiche non definiscono le regole attuali |
 
 ## Sviluppo

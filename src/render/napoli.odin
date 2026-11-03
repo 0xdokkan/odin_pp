@@ -26,6 +26,8 @@ NAPOLI_VISIT_REACH :: f32(6)
 Napoli_View :: struct {
 	// The prints, made the first time they are drawn: the grandpa and the purse.
 	nonno, purse: rl.Texture2D,
+	// The 3D paper models' meshes and shader (napoli_models.odin).
+	models: Napoli_Model_Kit,
 }
 
 @(private)
@@ -33,6 +35,7 @@ destroy_napoli_view :: proc(renderer: ^Renderer) {
 	n := &renderer.tactical.napoli
 	if n.nonno.id != 0 { rl.UnloadTexture(n.nonno) }
 	if n.purse.id != 0 { rl.UnloadTexture(n.purse) }
+	destroy_napoli_model_kit(&n.models)
 	n^ = {}
 }
 
@@ -93,10 +96,14 @@ napoli_visit_at :: proc(edge, stand: view.Vec2, p: f32) -> (at: view.Vec2, walki
 	return lerp(stand, edge, k), (p-NAPOLI_VISIT_GIFT)/(1-NAPOLI_VISIT_GIFT)
 }
 
-// The table, laid: a checked cloth on four legs, two plates of pasta al ragù,
-// bread and a bottle. `p` its middle on the floor; `lift` above it (carried).
+// The table, laid for the Sunday lunch (the user's choice, Fase 5): a checked
+// cloth on four legs, two plates of pasta al ragù, the parmigiana in its
+// terracotta dish, the babà, a guantiera of pastries, the moka, bread and the
+// wine. `p` its middle on the floor; `lift` above it (carried); `bites` how far
+// the meal has gone (0 laid; 1 half: the pasta eaten, half the parmigiana and
+// the babà gone).
 @(private)
-draw_napoli_table :: proc(renderer: ^Renderer, p: rl.Vector3, lift: f32 = 0) {
+draw_napoli_table :: proc(renderer: ^Renderer, p: rl.Vector3, lift: f32 = 0, bites: i32 = 0) {
 	base := p+rl.Vector3{0, lift, 0}
 	wood := rl.Color{112, 72, 42, 255}
 	for corner in ([4][2]f32{{-0.33, -0.33}, {0.33, -0.33}, {-0.33, 0.33}, {0.33, 0.33}}) {
@@ -108,14 +115,77 @@ draw_napoli_table :: proc(renderer: ^Renderer, p: rl.Vector3, lift: f32 = 0) {
 		draw_resin_cube(renderer, base+rl.Vector3{-0.3+f32(x)*0.2, 0.47, -0.3+f32(y)*0.2}, 0.2, 0.05, 0.2, color)
 	} }
 	draw_resin_cube(renderer, base+rl.Vector3{0, 0.41, 0}, 0.84, 0.08, 0.84, {196, 44, 42, 255})
-	for plate in ([2][2]f32{{-0.18, 0.12}, {0.18, -0.12}}) {
-		at := base+rl.Vector3{plate.x, 0.51, plate[1]}
-		draw_resin_cube(renderer, at, 0.24, 0.025, 0.24, {250, 250, 246, 255})
-		draw_resin_cube(renderer, at+rl.Vector3{0, 0.03, 0}, 0.15, 0.04, 0.15, {236, 196, 104, 255})
-		draw_resin_cube(renderer, at+rl.Vector3{0, 0.055, 0}, 0.09, 0.025, 0.09, {170, 36, 30, 255})
+	top := f32(0.5)
+	plate := rl.Color{250, 250, 246, 255}
+	half := bites >= 1
+	// The pasta al ragù: two plates, wiped clean once eaten.
+	for at in ([2][2]f32{{-0.2, 0.18}, {0.2, -0.2}}) {
+		c := base+rl.Vector3{at.x, top+0.012, at[1]}
+		draw_resin_cube(renderer, c, 0.22, 0.025, 0.22, plate)
+		if half {
+			draw_resin_cube(renderer, c+{0, 0.016, 0}, 0.07, 0.008, 0.05, {196, 120, 80, 255})
+			continue
+		}
+		draw_resin_cube(renderer, c+{0, 0.03, 0}, 0.15, 0.04, 0.15, {236, 196, 104, 255})
+		draw_resin_cube(renderer, c+{0, 0.055, 0}, 0.09, 0.025, 0.09, {170, 36, 30, 255})
+		draw_resin_cube(renderer, c+{0.02, 0.07, -0.01}, 0.03, 0.012, 0.03, {246, 236, 210, 255})
 	}
-	draw_resin_cube(renderer, base+rl.Vector3{0.2, 0.55, 0.2}, 0.16, 0.06, 0.09, {214, 160, 84, 255})
-	draw_resin_cube(renderer, base+rl.Vector3{-0.22, 0.6, -0.22}, 0.07, 0.2, 0.07, {38, 92, 46, 255})
+	// The parmigiana: its dish, the layers of aubergine, sauce and cheese; half of it gone.
+	{
+		c := base+rl.Vector3{0.2, top+0.03, 0.16}
+		draw_resin_cube(renderer, c, 0.24, 0.06, 0.17, {176, 86, 46, 255})
+		width := f32(0.1) if half else f32(0.2)
+		shift := f32(0.05) if half else 0
+		draw_resin_cube(renderer, c+{shift, 0.03, 0}, width, 0.03, 0.13, {92, 52, 70, 255})
+		draw_resin_cube(renderer, c+{shift, 0.05, 0}, width, 0.02, 0.13, {188, 44, 34, 255})
+		for spot in ([3][2]f32{{-0.05, -0.03}, {0.03, 0.03}, {0.07, -0.04}}) {
+			if half && spot.x < 0 { continue }
+			draw_resin_cube(renderer, c+{spot.x, 0.065, spot[1]}, 0.04, 0.012, 0.035, {244, 214, 120, 255})
+		}
+	}
+	// The babà on their plate: three, then one.
+	{
+		c := base+rl.Vector3{-0.2, top+0.012, -0.18}
+		draw_resin_cube(renderer, c, 0.16, 0.02, 0.16, plate)
+		cakes := [3][2]f32{{-0.04, -0.03}, {0.04, -0.02}, {0, 0.04}}
+		for cake, k in cakes {
+			if half && k > 0 { continue }
+			at := c+rl.Vector3{cake.x, 0.045, cake[1]}
+			draw_resin_cube(renderer, at, 0.05, 0.07, 0.05, {196, 128, 52, 255})
+			draw_resin_cube(renderer, at+{0, 0.04, 0}, 0.055, 0.02, 0.055, {222, 160, 70, 255})
+		}
+	}
+	// The guantiera of pastries in its gilded paper tray, in the middle.
+	{
+		c := base+rl.Vector3{0, top+0.012, 0}
+		draw_resin_cube(renderer, c, 0.2, 0.02, 0.14, {232, 210, 150, 255})
+		colors := [4]rl.Color{{238, 214, 160, 255}, {120, 70, 40, 255}, {246, 240, 226, 255}, {214, 150, 80, 255}}
+		for k in 0..<4 {
+			at := c+rl.Vector3{-0.06+f32(k%2)*0.12, 0.03, -0.03+f32(k/2)*0.06}
+			draw_resin_cube(renderer, at, 0.06, 0.035, 0.045, colors[k])
+		}
+	}
+	// The moka: its eight-sided steel body, its waist, its black handle.
+	{
+		c := base+rl.Vector3{-0.31, top, 0.31}
+		steel := rl.Color{176, 182, 192, 255}
+		draw_resin_cube(renderer, c+{0, 0.05, 0}, 0.09, 0.1, 0.09, steel)
+		draw_resin_cube(renderer, c+{0, 0.11, 0}, 0.06, 0.03, 0.06, {120, 126, 138, 255})
+		draw_resin_cube(renderer, c+{0, 0.16, 0}, 0.08, 0.08, 0.08, steel)
+		draw_resin_cube(renderer, c+{0, 0.205, 0}, 0.03, 0.015, 0.03, {40, 40, 46, 255})
+		draw_resin_cube(renderer, c+{-0.065, 0.13, 0}, 0.025, 0.09, 0.025, {32, 30, 34, 255})
+	}
+	// The bread and the wine.
+	draw_resin_cube(renderer, base+rl.Vector3{0.3, top+0.03, -0.33}, 0.16, 0.06, 0.08, {214, 160, 84, 255})
+	draw_resin_cube(renderer, base+rl.Vector3{0.33, top+0.1, 0.33}, 0.07, 0.2, 0.07, {38, 92, 46, 255})
+	draw_resin_cube(renderer, base+rl.Vector3{0.33, top+0.23, 0.33}, 0.03, 0.06, 0.03, {38, 92, 46, 255})
+}
+
+// How far the meal at a table has gone, from its `life` (the meal's beats left,
+// 0 before it): 0 laid, 1 half eaten.
+napoli_table_bites :: proc(life: i32) -> i32 {
+	if life <= 0 || life >= game.NAPOLI_FEAST_BEATS { return 0 }
+	return game.NAPOLI_FEAST_BEATS-life
 }
 
 // Whether the grandpa is still to bring the table, or bringing it (his visit
@@ -157,18 +227,10 @@ draw_napoli_visit_table :: proc(renderer: ^Renderer, room: ^game.Room) {
 	}
 }
 
-// The grandpa in the sorted cards, while he visits; and while the player is
-// him (face 4, game/napoli_nonno.odin), where his body is, in the player's card's
-// stead, showing half of himself as the club's view shows the player's card
-// (CLUB_CARD_SHOWN; his look from behind comes with Fase 5).
+// The grandpa in the sorted cards, while he visits (the player as the grandpa
+// is a 3D model: first_person_club.odin).
 @(private)
 collect_napoli_entries :: proc(renderer: ^Renderer, room: ^game.Room, entries: ^[dynamic]Tactical_Alpha_Entry) {
-	f := &renderer.tactical.first_person
-	if f.weapon == .Nonno && f.amount > 0 && renderer.tactical.snapshot != nil {
-		at := f.club.body if f.club.nonno else renderer.tactical.snapshot.player.position
-		shown := f.amount*(1-(1-CLUB_CARD_SHOWN)*f.amount)*(1-f.club.fade)
-		append(entries, Tactical_Alpha_Entry{kind = .Napoli, position = at, opacity = shown, first_person = 1})
-	}
 	cue, found := napoli_visit_cue(renderer)
 	if !found { return }
 	edge, stand := napoli_visit_way(renderer, room, napoli_gift_cell(room, cue))
@@ -183,15 +245,6 @@ draw_napoli_entry :: proc(renderer: ^Renderer, room: ^game.Room, entry: Tactical
 	n := &renderer.tactical.napoli
 	if n.nonno.id == 0 { n.nonno = napoli_print(NAPOLI_NONNO_ART[:]) }
 	if n.purse.id == 0 { n.purse = napoli_print(NAPOLI_PURSE_ART[:]) }
-	// The player as the grandpa: his steps bob as the body goes.
-	if entry.first_person == 1 {
-		ground := entity_point_ground(game.PLAYER_ENTITY, entry.position)
-		moving := game.napoli_nonno_active(room) && (room.first_person.nonno.body.velocity != {})
-		bob := 0.05*f32(math.abs(math.sin(renderer.sprite_assets.elapsed*9))) if moving else 0
-		tint := rl.Color{255, 255, 255, u8(255*clamp(entry.opacity, 0, 1))}
-		marley_draw_print(renderer, n.nonno, {entry.position.x+0.5, ground+NAPOLI_PRINT_HEIGHT*0.5+bob, entry.position.y+0.5}, NAPOLI_PRINT_HEIGHT, 0, tint)
-		return
-	}
 	cue, found := napoli_visit_cue(renderer)
 	if !found { return }
 	gift := napoli_gift_cell(room, cue)
@@ -245,40 +298,45 @@ napoli_ink :: proc(letter: u8) -> rl.Color {
 	case 'L': return {132, 86, 46, 255}
 	case 'l': return {170, 116, 66, 255}
 	case 'Y': return {236, 196, 72, 255}
+	case 'y': return {196, 152, 56, 255}
+	case 'w': return {206, 204, 196, 255}
+	case 'U': return {64, 104, 170, 255}
+	case 'u': return {40, 70, 130, 255}
 	}
 	return {}
 }
 
-// The grandpa: a coppola, a big white moustache, a red kerchief, a white shirt
-// under a dark waistcoat, brown trousers (provisional: docs/piano-napoli.md, Fase 5).
+// The grandpa at the seaside (the user's choice, Fase 5): a straw hat with a
+// red band, a big white moustache, a white vest over his belly, blue shorts,
+// white socks in brown sandals.
 @(private = "file", rodata)
 NAPOLI_NONNO_ART := [27]string{
 	"......KKKKKK......",
-	"....KKcccccCKK....",
-	"...KcccccccCCCK...",
-	"..KKKKKKKKKKKKKKK.",
-	"....KSSSSSSSSK....",
-	"....KSSKSSSKSK....",
+	".....KYYYYYYK.....",
+	".....KYyYYyYK.....",
+	".....KRRRRRRK.....",
+	"..KKKYYYYYYYYKKK..",
+	".KYYYYYYYYYYYYYYK.",
+	"..KKKKSSSSSSKKKK..",
+	"....KSSKSSKSSK....",
 	"....KSSSSsSSSK....",
-	"...KsSSSSsSSSSK...",
 	"....KWWWWWWWWK....",
-	"....KSWWSSWWSK....",
+	"....KsWWSSWWsK....",
 	".....KSSSSSSK.....",
 	"......KKSSKK......",
-	"....KKWWRRWWKK....",
-	"...KWVVWWWWVVWK...",
-	"..KWWVVWWWWVVWWK..",
-	"..KWKVVWWWWVVKWK..",
-	"..KWKVVWWWWVVKWK..",
-	"..KSKVVVWWVVVKSK..",
-	"..KKKVVVWWVVVKKK..",
-	"....KPPPPPPPPK....",
-	"....KPPPPPPPPK....",
-	"....KPPPKKPPPK....",
-	"....KPPPKKPPPK....",
-	"....KPPPKKPPPK....",
-	"....KppPKKPppK....",
-	"...KBBBBKKBBBBK...",
+	"...KKSWWWWWWSKK...",
+	"..KSSKWWWWWWKSSK..",
+	"..KSKWWWWWWWWKSK..",
+	"..KSKWWWWWWWWKSK..",
+	"..KsKwWWWWWWwKsK..",
+	"..KSKKwWWWWwKKSK..",
+	"..KKKUUUUUUUUKKK..",
+	"....KUUUUUUUUK....",
+	"....KUUuKKuUUK....",
+	"....KSSSKKSSSK....",
+	"....KSSSKKSSSK....",
+	"....KWWWKKWWWK....",
+	"...KLLLLKKLLLLK...",
 	"...KKKKKK.KKKKKK..",
 }
 

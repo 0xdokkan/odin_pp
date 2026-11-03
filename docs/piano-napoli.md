@@ -93,7 +93,7 @@ Note sulle decisioni:
 | 2 | La terza persona e la mazzata (effetto 1), regole e prototipo | 0 | Fatta | vedi Esito |
 | 3 | Lo schiacciamento alla Looney Tunes e il succo della mazzata | 2 | Fatta | vedi Esito |
 | 4 | Diventi il nonno (effetto 4), regole e prototipo | 2 | Fatta | vedi Esito |
-| 5 | Aspetto 3D: asso di bastoni, Viandante, nonno, tavolata, borsellino | 1, 3, 4 | Da fare | — |
+| 5 | Aspetto 3D: asso di bastoni, Viandante, nonno, tavolata, borsellino | 1, 3, 4 | Fatta | vedi Esito |
 | 6 | Suoni e tarantella (CC0 o da codice) | 5 | Da fare | — |
 | 7 | Nel gioco vero: «Mostra effetto», offerte, salvataggi, prova con l'utente, chiusura | 6 | Da fare | — |
 
@@ -752,6 +752,72 @@ Passi:
 
 **Fatto quando:** l'utente approva l'aspetto nel laboratorio; le catture della
 prova del laboratorio mostrano i modelli; test verdi.
+
+### Esito (3 novembre 2026)
+
+Le scelte dell'utente all'inizio della fase (le domande al posto delle immagini di prova: i
+modelli si vedono nelle catture del laboratorio, e l'utente li approva provandoli):
+
+| Domanda | Risposta |
+|---|---|
+| Asso di bastoni | **Fedele alla carta:** randello nodoso, testa verde tonda, manico rosso con le foglie d'acanto gialle e una verde, il taglio in fondo con gli anelli verdi |
+| Viandante di spalle | **Pieno, sbiadisce solo se copre** la casella mirata (o con la camera contro un muro) |
+| Il nonno | **Nonno al mare:** cappello di paglia, canottiera bianca, pantaloncini, sandali coi calzini |
+| La tavolata | **Pranzo completo** (ragù, parmigiana, babà, guantiera, caffettiera), i piatti si svuotano |
+| L'icona | **La faccia del nonno** al mare col cappello di paglia, al posto del Vesuvio |
+| Il nonno ospite | **Resta la figurina**, ridisegnata da nonno al mare |
+
+Cosa c'è ora:
+- **Modelli 3D di carta** ([napoli_models.odin](../src/render/napoli_models.odin)): sfere,
+  cilindri e scatole fatti da codice, come i guantoni del Brawler, ma disegnati sul tabellone. Ogni
+  parte in tre toni piatti del suo colore con la luce dall'alto a sinistra, e il bordo
+  d'inchiostro: il guscio un po' più grande, disegnato prima dal di dentro. Quando un modello deve
+  sbiadire non diventa trasparente: perde dei puntini secondo un disegno fisso 4×4 (il «dither»
+  della pixel art), così le parti non vanno ordinate.
+  - **L'asso di bastoni:** il manico rosso un po' storto in tre tratti con due nodi, due giri di
+    tre foglie gialle e una verde, la testa verde con sei nodi, in fondo il taglio color legno con
+    l'anello verde.
+  - **Il Viandante di spalle:** stivali e gambe scure, la tonaca crema con la cintura, la mantella
+    sulla schiena, lo zaino marrone col fagotto arrotolato, il cappuccio con la punta che ricade;
+    le braccia (spalla, gomito, mano) vanno tutte e due sul manico dell'asso.
+  - **Il nonno al mare:** sandali, calzini bianchi, gambe nude, pantaloncini blu, la pancia sotto
+    la canottiera, la testa con le orecchie, il naso e i baffi bianchi, il cappello di paglia con la
+    fascia rossa un po' storto; un po' curvo in avanti. Mentre il bastone esce dalla tasca ha la
+    bocca aperta. Il suo asso è gigante (1,25 caselle invece di 0,95).
+  - **Le gambe** fanno il passo quando il corpo si sposta.
+- **La mazzata coi modelli:** le mani seguono il colpo. A riposo l'asso sta in piedi accanto a lui,
+  inclinato verso destra, lontano dalla camera; poi sopra la testa, poi giù davanti sulla casella.
+- **Il cartoncino del Viandante** nella vista del bastone non c'è più: lo sostituisce il modello.
+  Il modello sbiadisce a metà quando copre la casella mirata (`club_model_covers`: la casella più
+  lontana di lui e dentro la sua sagoma sullo schermo), e di più con la camera contro un muro.
+- **La tavolata** ([napoli.odin](../src/render/napoli.odin)): due piatti di pasta al ragù, la
+  parmigiana nella teglia di coccio, tre babà, la guantiera di paste, la caffettiera, il pane, il
+  vino. A metà pasto i piatti di pasta sono puliti, metà parmigiana e due babà sono spariti.
+- **La figurina del nonno ospite** e **l'icona della carta** (la faccia del nonno, nella casella
+  36 dell'atlante, `tools/art/build_card_icons.py`) rifatte da nonno al mare.
+
+Corretto durante la fase:
+1. **Il Viandante scuro.** Il sistema di riferimento del modello (X a destra, Y in alto, Z
+   davanti) è speculare: il giro delle facce si rovesciava, e il guscio d'inchiostro copriva il
+   corpo. Ora per ogni parte il disegno controlla se il sistema è speculare e gira le facce da
+   nascondere.
+2. **L'asso troppo grande.** A riposo era inclinato indietro, verso la camera, e copriva il bruto;
+   ora sta in avanti e verso destra.
+
+Da sapere: con la camera vicina sulla spalla destra, il nemico proprio davanti al Viandante è
+quasi sempre dietro di lui sullo schermo, quindi il modello si vede spesso a puntini. Se lo si
+vuole più spesso pieno, la strada è spostare la camera più a destra (oggi 0,35 caselle).
+
+Verifiche (solo quello che la fase tocca):
+- `odin check src -vet -strict-style` pulito.
+- Test nuovi: i modelli stanno sul pavimento (niente sotto i piedi), alti come il cartoncino, il
+  bastone lungo quanto chiesto, il gomito che si piega, le mani della mazzata, quando il modello
+  copre la mira. Con loro i test della camera, del succo, dell'icona, della vista e del renderer
+  in prestito (che ha voluto i nuovi oggetti della scheda video nel suo elenco): verdi.
+- Atto `napoli` del laboratorio, verde, con le catture `odin_pp_napoli_viandante.png` e
+  `odin_pp_napoli_nonno_3d.png`.
+- Prestazioni: i modelli si disegnano solo nelle due viste (una sessantina di parti, due passate);
+  fuori il codice esce subito. Benchmark non rifatto, come chiesto.
 
 ## Fase 6 — Suoni e tarantella
 

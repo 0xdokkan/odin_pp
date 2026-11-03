@@ -51,6 +51,11 @@ Commit **«Piano di Napoli, Fase 0 fatta: la carta, il D4 e i quattro rami»** s
   Vita sua: 30 (+5 a potenziamento, +10 sul tick); le ferite vanno a lui, a zero se ne va e il Viandante ha la vita di
   prima, nella casella dove stava il nonno. Q una volta: cura il nonno di metà della sua vita e il Viandante di metà
   della sua; E una volta: 15 oro (+2).
+- **2026-11-03, Fase 5** (commit «Piano di Napoli, Fase 5 fatta: asso, Viandante e nonno al mare in 3D»): l'asso di
+  bastoni, il Viandante di spalle e il nonno **al mare** (cappello di paglia, canottiera, pantaloncini, sandali coi
+  calzini) sono modelli 3D di carta fatti da codice; il Viandante sbiadisce solo quando copre la casella mirata. La
+  tavolata ha il pranzo completo e si svuota mangiando; il nonno ospite resta una figurina, da nonno al mare. **Icona
+  nuova:** la faccia del nonno al mare (non più il Vesuvio).
 
 ## 2026-10-30 — Tutte le carte: il lancio dura la metà
 

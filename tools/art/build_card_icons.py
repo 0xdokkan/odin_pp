@@ -151,9 +151,9 @@ PALETTE = {
     "X": (80, 240, 255, 255),   # energy cyan
     "P": (236, 70, 210, 255),   # energy magenta
     "y": (214, 252, 255, 255),  # a beam's white core
-    "a": (132, 108, 124, 255),  # the volcano's lit slate
-    "d": (92, 72, 92, 255),     # the volcano
-    "f": (58, 44, 62, 255),     # the volcano in shade
+    "p": (232, 184, 146, 255),  # the grandpa's skin
+    "q": (196, 146, 112, 255),  # his skin in shade
+    "o": (246, 244, 236, 255),  # his moustache and vest
 }
 
 # Movimento Ombra, 28x28 units, as the Viandante of the figure atlas: his hood
@@ -849,45 +849,43 @@ assert all(len(row) == 28 for row in ARCHER) and len(ARCHER) == 28
 
 ICONS.update({35: ARCHER})
 
-# docs/piano-napoli.md, Fase 0: Benvenuti a Napoli, its provisional icon (the
-# user's choice): Vesuvius seen from the bay, the low rounded ridge of Monte
-# Somma on the left and the Gran Cono, lit from the upper left with ravines down
-# its flanks and lava glowing in its crater, under a pine-shaped plume of white
-# smoke; the bay below. Painted by tools: the cone's slopes, the Somma's arc and
-# the plume's puffs rasterised, outlined on four sides.
-VESUVIUS = (
-    "............KKK.KKKK........",
-    ".........KKKIIIKIIIIKKK.....",
-    "........KIIIIIIIIIIIIIIK....",
-    ".......KIIIIIIIIIIIIIIIKK...",
-    "......KIIIIIIIIIIIIIIIIIiK..",
-    ".....KIIIIIIIIIIIIIIIIiIiK..",
-    ".....KiiiiiiiIIIIIiiiiKiK...",
-    "......KKKKKKKiiIiiKKKK.K....",
-    ".............KiIiK..........",
-    ".............KMMMK..........",
-    ".............KMMMK..........",
-    "............KaOYOdK.........",
-    "...........KaaaOdddK........",
-    "...........KdaadddfdK.......",
-    "....KKKK..KadaadddfdfK......",
-    "...KaaaaKKadaaaddddffK......",
-    "..KaddddaaadaaaddddfffK.....",
-    ".KadddddddadaaadddddfffK....",
-    "KadddddddddaaaadddddffffK...",
-    "KddddddddddaaaadddddfffffK..",
-    "KddddddddddaaaadddddffffffK.",
-    "KddddddddfaaaaadddddfffffffK",
-    "KKKKKKKKKKKKKKKKKKKKKKKKKKKK",
-    "KcccuucccccccccccccuuucccccK",
-    "KccccccccccuucccccccccccuccK",
-    "KCCCCCCCuCCCCCCCuuCCCCCCCCCK",
-    "KCCCCCCCCCCCCCCCCCCCCCCCCCCK",
-    ".KKKKKKKKKKKKKKKKKKKKKKKKKK.",
+# docs/piano-napoli.md, Fase 5: Benvenuti a Napoli's icon (the user's choice,
+# in place of Fase 0's Vesuvius): the grandpa at the seaside, his face under his
+# straw hat with its red band, the brim's shade on his brow, a big white
+# moustache over his open mouth, his white vest at the bottom.
+NONNO = (
+    "............................",
+    "..........KKKKKKKK..........",
+    "........KKYYYYYYYYKK........",
+    ".......KYYYYYYYYYYQK........",
+    ".......KYYQYYYYYYQYYK.......",
+    ".......KYYYQYYYYQYYYK.......",
+    ".......KRRRRRRRRRRRRK.......",
+    "....KKKKYYYYYYYYYYYYKKKK....",
+    "..KKYYYYYYYYYYYYYYYYYYYYKK..",
+    ".KYYYYYYYYYYYYYYYYYYYYYYYYK.",
+    ".KKKQQQQQQQQQQQQQQQQQQQKKK..",
+    ".....KqppppppppppppppqK.....",
+    "....KqpppKKpppppKKpppqK.....",
+    "....KpppKUKpppppKUKpppK.....",
+    "...KKppppKKppppppKKppppKK...",
+    "...KqKpppppppqqpppppppKqK...",
+    "...KqKppppppqqqqppppppKqK...",
+    "...KKpppooooooooooopppKK....",
+    "....KpoooooooooooooooopK....",
+    ".....KoooooKKKKKKoooooK.....",
+    ".....KpppooKqqqqKoopppK.....",
+    "......KppppqqqqqqpppK.......",
+    "........KKppppppppKK........",
+    ".........KKKpppKKK..........",
+    "......KKoooooooooooKK.......",
+    "....KoooooooooooooooooK.....",
+    "...KooiooooooooooooioooK....",
+    "...KKKKKKKKKKKKKKKKKKKKKK...",
 )
-assert all(len(row) == 28 for row in VESUVIUS) and len(VESUVIUS) == 28
+assert all(len(row) == 28 for row in NONNO) and len(NONNO) == 28
 
-ICONS.update({36: VESUVIUS})
+ICONS.update({36: NONNO})
 
 
 def chunk(kind, body):

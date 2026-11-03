@@ -112,7 +112,8 @@ destra, il Viandante gira verso il bruto, fa due passi e gli dà tre mazzate (8 
 stelline, `odin_pp_napoli_stelline.png`), una quarta che lo uccide a frittella (`odin_pp_napoli_frittella.png`), poi la
 camera contro un muro; infine il nonno (faccia 4): il bastone esce dalla tasca, una mazzata al bruto, Q ed E, il colpo
 del bruto sulla vita del nonno e il nonno che se ne va a vita zero (`odin_pp_napoli_nonno_NN.png`,
-`odin_pp_napoli_nonno_tasca.png`, `_colpo.png`, `_q.png`, `_se_ne_va.png`) (`odin_pp_napoli_club_muro.png`). Nello smoke completo gira
+`odin_pp_napoli_nonno_tasca.png`, `_colpo.png`, `_q.png`, `_se_ne_va.png`); i modelli 3D da vicino in
+`odin_pp_napoli_viandante.png` e `odin_pp_napoli_nonno_3d.png` (`odin_pp_napoli_club_muro.png`). Nello smoke completo gira
 per ultimo.
 Con `ODIN_PP_LAB_ONLY=fps` e `ODIN_PP_LAB_TIMING=1` l'atto di First Person Shooter si ferma dopo la discesa negli occhi e misura
 600 fotogrammi con l'AK che spara, senza limite di fotogrammi né vsync (riga `FIRST PERSON TIMING`; meglio con una build `-o:speed`).
