@@ -8,12 +8,14 @@ import grid "../engine/grid"
 // square on the cell to step or land on, a cyan cross on the foe to strike, the word over the player. The pilot
 // (run/advisor_driver.odin) sets it every frame; nothing while the IA is off or stands still.
 
-Advice_Mark :: enum u8 { None, Step, Bump, Wait, Defend }
+Advice_Mark :: enum u8 { None, Step, Bump, Wait, Defend, Card }
 
 Advice_View :: struct {
 	mark: Advice_Mark,
 	cell: grid.Position,
 	word: cstring,
+	// A card's advice: the card in hand (framed in cyan), its target on `cell`.
+	card_id: u32,
 }
 
 @(private)
@@ -29,7 +31,7 @@ draw_advice_floor :: proc(renderer: ^Renderer, room: ^game.Room) {
 	ground := 0.05+cell_overlay_ground(advice.cell)
 	center := rl.Vector3{f32(advice.cell.x)+0.5, ground, f32(advice.cell.y)+0.5}
 	#partial switch advice.mark {
-	case .Step, .Defend:
+	case .Step, .Defend, .Card:
 		rl.DrawPlane(center, {0.8, 0.8}, {IA_COLOR.r, IA_COLOR.g, IA_COLOR.b, 60})
 		rl.DrawCubeWires(center, 0.8, 0.01, 0.8, IA_COLOR)
 		rl.DrawCubeWires(center, 0.7, 0.01, 0.7, IA_COLOR)

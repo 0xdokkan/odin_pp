@@ -23,6 +23,8 @@ Move_Kind :: enum u8 {
 	Defend,
 	// A key of the defence keys already up: `direction` (the diagonal's next key, the defence's key, the dodge's landing).
 	Key,
+	// FERETRO: an arrow loosed at the foe `target` (its charges: Ctrl and a click).
+	Shoot,
 }
 
 Move :: struct {
@@ -34,6 +36,9 @@ Move :: struct {
 	offset: grid.Position,
 	defense: game.Defense_Mode,
 	succeed: bool,
+	// A later move of a branch (search.odin): the card in hand slot `slot` (from 1), on its best target then
+	// (cards.odin, resolve_slot); 0 for a move given whole.
+	slot: i8,
 }
 
 // What the copy's player does when the defence keys come up (game.offer_defense_qte) inside a try:
@@ -96,6 +101,10 @@ play_move :: proc(room: ^game.Room, move: Move) -> (committed: bool) {
 		}
 	case .Defend:
 		committed = answer_defense(room, move.defense, move.direction, move.succeed)
+	case .Shoot:
+		// run.execute_gameplay_command's Shoot: never stamped with a beat.
+		result := game.shoot_player_arrow(room, move.target.entity)
+		committed = result != .Invalid_Phase && result != .Blocked
 	case .Key:
 		if room.qte.kind == .None || !room.qte.selected { return false }
 		game.clear_event_log(room.recent_events)

@@ -660,6 +660,14 @@ draw_tactical_hand :: proc(renderer: ^Renderer, room: ^game.Room,
 				card.id == selected || card.id == dragged, card.id == hovered, available, visible, tactical_hand_slot_key(index))
 		}
 	}
+	// The IA's advised card, framed in cyan (advisor_view.odin; its target is marked on the board).
+	if advice := renderer.tactical.advice; advice.mark == .Card && game.ia_active(room) {
+		if index, found := game.hand_card_index_by_id(deck, advice.card_id); found {
+			bounds := tactical_hand_card_bounds(renderer, index, deck.hand_count)
+			if deck.hand[index].id == raised { bounds = tactical_hand_raised_card_bounds(renderer, index, deck.hand_count) }
+			rl.DrawRectangleLinesEx({bounds.x-3, bounds.y-3, bounds.width+6, bounds.height+6}, 3, IA_COLOR)
+		}
+	}
 	active := dragged if dragged != 0 else (hovered if hovered != 0 else selected)
 	if drop > 0 { return }
 	if index, found := game.hand_card_index_by_id(deck, active); found {

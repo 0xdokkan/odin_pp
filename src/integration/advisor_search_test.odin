@@ -30,13 +30,38 @@ search_test_arena :: proc(t: ^testing.T, data: ^level.Level, player: ^game.Playe
 	return room
 }
 
+// The hand: only the `keep` cards stay (and the IA's own), those in `draw` go to the draw pile, the rest to the discard
+// pile; every card stays the one it was, in one zone (game.validate_deck_state).
+@(private = "file")
+search_test_hand :: proc(room: ^game.Room, keep: []game.Card_Id, draw: []game.Card_Id = nil) {
+	deck := &room.player.deck
+	hand := deck.hand
+	count := deck.hand_count
+	deck.hand_count = 0
+	for card in hand[:count] {
+		kept := card.definition_id == .IA
+		for id in keep { if card.definition_id == id { kept = true } }
+		drawn := false
+		for id in draw { if card.definition_id == id { drawn = true } }
+		switch {
+		case kept: deck.hand[deck.hand_count] = card; deck.hand_count += 1
+		case drawn: deck.draw_pile[deck.draw_count] = card; deck.draw_count += 1
+		case: deck.discard_pile[deck.discard_count] = card; deck.discard_count += 1
+		}
+	}
+	for &card in deck.hand[deck.hand_count:] { card = {} }
+	deck.energy = deck.rules.max_energy
+}
+
 @(private = "file")
 Puzzle_Foe :: struct { archetype: game.Enemy_Archetype, cell: grid.Position, health: i32 }
 
 // A puzzle: the arena emptied of its foes, the player on `at`, the foes given (each from the arena's own foe of its
-// archetype), every intent planned afresh by the rules.
+// archetype), every intent planned afresh by the rules. The hand keeps the `cards` given (none: the board's moves
+// alone, Fase 2's puzzles), the rest goes to the discard pile.
 @(private = "file")
-search_test_puzzle :: proc(t: ^testing.T, room: ^game.Room, at: grid.Position, foes: []Puzzle_Foe) {
+search_test_puzzle :: proc(t: ^testing.T, room: ^game.Room, at: grid.Position, foes: []Puzzle_Foe, cards: []game.Card_Id = nil, draw: []game.Card_Id = nil) {
+	search_test_hand(room, cards, draw)
 	templates: [game.Enemy_Archetype]game.Enemy
 	for enemy in room.enemies { templates[enemy.archetype] = enemy }
 	clear(&room.enemies)
@@ -550,4 +575,192 @@ test_advisor_search_measures :: proc(t: ^testing.T) {
 		worst = max(worst, time.duration_milliseconds(time.tick_since(frame)))
 	}
 	log.infof("advisor frame slice of %d work: at most %.2f ms", run_session.ADVISOR_FRAME_WORK, worst)
+}
+
+// THE CARDS (docs/piano-ia.md, Fase 3).
+
+// The advice is the card `id` of the hand (and its play).
+@(private = "file")
+advice_is_card :: proc(room: ^game.Room, advice: advisor.Advice, id: game.Card_Id) -> bool {
+	if !advice.valid || advice.kind != .Card { return false }
+	index, found := game.hand_card_index_by_id(&room.player.deck, advice.move.card_id)
+	return found && room.player.deck.hand[index].definition_id == id
+}
+
+// Three foes close together, the Firebomb in hand: the IA throws it where its square takes all three.
+@(test)
+test_advisor_card_firebomb_on_three :: proc(t: ^testing.T) {
+	data: level.Level
+	defer level.destroy(&data)
+	player: game.Player
+	room := search_test_arena(t, &data, &player)
+	defer game.destroy_room(&room)
+	search: advisor.Search
+	testing.expect(t, advisor.search_init(&search))
+	defer advisor.search_destroy(&search)
+	search_test_puzzle(t, &room, {x = 11, y = 12}, {{.Chaser, {x = 10, y = 9}, 12}, {.Chaser, {x = 11, y = 9}, 12}, {.Chaser, {x = 12, y = 9}, 12}}, {.Firebomb})
+	advice := search_test_advice(&search, &room)
+	ok := advice_is_card(&room, advice, .Firebomb)
+	if ok {
+		index, _ := game.hand_card_index_by_id(&room.player.deck, advice.move.card_id)
+		definition, _ := game.card_definition_by_id(.Firebomb)
+		request, _ := game.card_target_request_from_target(&room, definition, advice.move.target)
+		evaluation := game.evaluate_card_targeting(&room, room.player.deck.hand[index], request)
+		ok = evaluation.query.enemy_count == 3
+		testing.expectf(t, ok, "the Firebomb takes %d foes at %v", evaluation.query.enemy_count, advice.cell)
+	}
+	testing.expectf(t, ok, "the IA does not throw the Firebomb on the three: %v to %v", advice.kind, advice.cell)
+	if !ok { search_test_log_values(&search) }
+}
+
+// Shut in a dead end in the archer's line, his dodge recovering, the Guard in hand: the IA raises it before the arrow.
+@(test)
+test_advisor_card_guard_before_the_blow :: proc(t: ^testing.T) {
+	data: level.Level
+	defer level.destroy(&data)
+	player: game.Player
+	room := search_test_arena(t, &data, &player)
+	defer game.destroy_room(&room)
+	search: advisor.Search
+	testing.expect(t, advisor.search_init(&search))
+	defer advisor.search_destroy(&search)
+	for cell in ([?]grid.Position{{x = 10, y = 12}, {x = 12, y = 12}, {x = 11, y = 11}, {x = 10, y = 11}, {x = 12, y = 11}, {x = 10, y = 13}, {x = 12, y = 13}, {x = 10, y = 14}, {x = 12, y = 14}}) {
+		testing.expect(t, level.set_tile(&data, cell, {kind = .Wall}))
+	}
+	search_test_puzzle(t, &room, {x = 11, y = 12}, {{.Archer, {x = 11, y = 15}, 30}}, {.Guard})
+	archer := &room.enemies[0]
+	testing.expectf(t, archer.intent.kind == .Attack && game.enemy_intent_cell_is_threatened(&archer.intent, room.player.position),
+		"the archer does not aim at the player: %v", archer.intent.kind)
+	archer.tactical_cooldown = 1
+	room.player.tactical.dodge_recovery = game.TACTICAL_DODGE_RECOVERY+1
+	advice := search_test_advice(&search, &room)
+	ok := advice_is_card(&room, advice, .Guard)
+	testing.expectf(t, ok, "the IA does not raise the Guard: %v to %v", advice.kind, advice.cell)
+	if !ok { search_test_log_values(&search) }
+}
+
+// The brute's cleave about to fall, the Guard in hand: a step out is enough, so no card (at equal worth, no card).
+@(test)
+test_advisor_card_none_when_a_step_is_enough :: proc(t: ^testing.T) {
+	data: level.Level
+	defer level.destroy(&data)
+	player: game.Player
+	room := search_test_arena(t, &data, &player)
+	defer game.destroy_room(&room)
+	search: advisor.Search
+	testing.expect(t, advisor.search_init(&search))
+	defer advisor.search_destroy(&search)
+	search_test_puzzle(t, &room, {x = 11, y = 12}, {{.Brute, {x = 11, y = 13}, 40}}, {.Guard})
+	cells := []grid.Position{{x = 10, y = 12}, {x = 11, y = 12}, {x = 12, y = 12}}
+	search_test_blow(&room, 0, cells, 3, 1)
+	advice := search_test_advice(&search, &room)
+	ok := advice.valid && advice.kind != .Card && advice.kind != .Wait && !cell_in(advice.cell, cells)
+	testing.expectf(t, ok, "the IA spends a card where a step is enough: %v to %v", advice.kind, advice.cell)
+	if !ok { search_test_log_values(&search) }
+}
+
+// A foe at 3 of life next to the player, Strike in hand: two bumps kill it, Strike at once. The IA plays the Strike.
+@(test)
+test_advisor_card_kills_sooner :: proc(t: ^testing.T) {
+	data: level.Level
+	defer level.destroy(&data)
+	player: game.Player
+	room := search_test_arena(t, &data, &player)
+	defer game.destroy_room(&room)
+	search: advisor.Search
+	testing.expect(t, advisor.search_init(&search))
+	defer advisor.search_destroy(&search)
+	search_test_puzzle(t, &room, {x = 11, y = 12}, {{.Chaser, {x = 12, y = 12}, 3}, {.Chaser, {x = 4, y = 15}, 12}}, {.Strike})
+	advice := search_test_advice(&search, &room)
+	ok := advice_is_card(&room, advice, .Strike) && advice.cell == (grid.Position{x = 12, y = 12})
+	testing.expectf(t, ok, "the IA does not kill with the Strike: %v to %v", advice.kind, advice.cell)
+	if !ok { search_test_log_values(&search) }
+}
+
+// Nothing useful in hand, the Firebomb the next card drawn, three foes close together, held inside a ring of low walls
+// that blows over it reach and feet do not: the IA refocuses the hand to draw it (the copy knows the deck: the user's
+// choice).
+@(test)
+test_advisor_card_waits_for_the_next_draw :: proc(t: ^testing.T) {
+	data: level.Level
+	defer level.destroy(&data)
+	player: game.Player
+	room := search_test_arena(t, &data, &player)
+	defer game.destroy_room(&room)
+	search: advisor.Search
+	testing.expect(t, advisor.search_init(&search))
+	defer advisor.search_destroy(&search)
+	for x in 9..=13 {
+		testing.expect(t, level.set_tile(&data, {x = x, y = 8}, {kind = .Fence}))
+		testing.expect(t, level.set_tile(&data, {x = x, y = 10}, {kind = .Fence}))
+	}
+	testing.expect(t, level.set_tile(&data, {x = 9, y = 9}, {kind = .Fence}))
+	testing.expect(t, level.set_tile(&data, {x = 13, y = 9}, {kind = .Fence}))
+	search_test_puzzle(t, &room, {x = 11, y = 12}, {{.Chaser, {x = 10, y = 9}, 12}, {.Chaser, {x = 11, y = 9}, 12}, {.Chaser, {x = 12, y = 9}, 12}}, nil, {.Firebomb})
+	for &enemy in room.enemies { enemy.recovery_pulses, enemy.intent, enemy.tactical_cooldown = 99, {}, 0 }
+	game.plan_enemy_intents(&room)
+	advice := search_test_advice(&search, &room)
+	ok := advice.valid && advice.kind == .Refocus
+	testing.expectf(t, ok, "the IA does not refocus for the Firebomb: %v to %v", advice.kind, advice.cell)
+	if !ok { search_test_log_values(&search) }
+}
+
+// Every card the IA advises, alone in hand in the IA's arena: the search finds its plays and the rules take at least
+// one; the cards it does not advise yet have their reason (advisor.ADVISOR_CARDS).
+@(test)
+test_advisor_tries_every_card :: proc(t: ^testing.T) {
+	search: advisor.Search
+	testing.expect(t, advisor.search_init(&search))
+	defer advisor.search_destroy(&search)
+	unplayed := 0
+	for id in game.Card_Id {
+		if id == .Count { continue }
+		known := advisor.ADVISOR_CARDS[id]
+		testing.expectf(t, known.why != "" && known.puzzle != "", "the IA knows %v as %v", id, known)
+		if known.use != .Advised { continue }
+		// A card only ever made by another (the Spark, by the Spark Forge) is never a card of the deck.
+		if definition, _ := game.card_definition_by_id(id); definition.temporary_only { continue }
+		legal, count := false, 0
+		// Two rooms: a foe next to the player, then a foe three cells away in his row (the hook's).
+		for distance in ([?]int{1, 3}) {
+			if legal { break }
+			legal, count = search_test_card_plays(t, &search, id, distance)
+		}
+		if !legal { unplayed += 1; log.infof("the IA finds no play of %v in the arena (%d targets)", id, count) }
+	}
+	testing.expectf(t, unplayed == 0, "cards the IA could not play in the arena: %d", unplayed)
+}
+
+// The card `id` alone in hand (the Strike's place taken), a foe `distance` cells east of the player: the IA's plays of
+// it, and whether the rules take one.
+@(private = "file")
+search_test_card_plays :: proc(t: ^testing.T, search: ^advisor.Search, id: game.Card_Id, distance: int) -> (legal: bool, count: int) {
+	{
+		data: level.Level
+		player: game.Player
+		room := search_test_arena(t, &data, &player)
+		room.enemies[0].position = game.add_position(room.player.position, {x = distance, y = 0})
+		game.plan_enemy_intents(&room)
+		search_test_hand(&room, {.Strike})
+		deck := &room.player.deck
+		index, held := -1, false
+		for card, k in deck.hand[:deck.hand_count] { if card.definition_id == .Strike { index, held = k, true } }
+		testing.expect(t, held)
+		if held {
+			card := &deck.hand[index]
+			if owned, found := game.owned_card_index_by_id(deck, card.id); found { deck.owned[owned].definition_id, deck.owned[owned].upgrade_level = id, 0 }
+			card.definition_id, card.upgrade_level = id, 0
+			plays: [advisor.MAX_CANDIDATES]advisor.Move
+			count = advisor.card_plays(&room, plays[:])
+			if count > 0 {
+				advisor.search_whole(search, &room, 80)
+				for i in 0..<search.candidate_count {
+					if search.candidates[i].kind == .Card && search.legal[i] { legal = true }
+				}
+			}
+		}
+		game.destroy_room(&room)
+		level.destroy(&data)
+	}
+	return
 }

@@ -70,7 +70,7 @@ advisor_test_command :: proc(move: advisor.Move) -> run_session.Gameplay_Command
 	case .Card: command.kind = .Play_Card
 	case .Refocus: command.kind = .Refocus
 	// The random games play only the five above.
-	case .Diagonal, .Defend, .Key: command.kind = .None
+	case .Diagonal, .Defend, .Key, .Shoot: command.kind = .None
 	}
 	return command
 }

@@ -217,7 +217,7 @@ comunque nel momento in cui i rami si uniscono.
 | 0 | Base: la carta, i suoi secondi, l'arena del laboratorio; punto di partenza | — | Fatta | vedi Esito |
 | 1 | La copia di prova e il simulatore; il controllo dei campi (regola per sempre) | 0 | Fatta | vedi Esito |
 | 2 | La ricerca: passi, colpi a mano, schivate, attesa; i pesi; segni provvisori; le tabelle di comandi e nemici | 1 | Fatta | vedi Esito |
-| 3 | Le carte nella ricerca: mano, energia, mira, pescate future, dadi; le tabelle di carte, effetti e stati | 2 | Da fare | — |
+| 3 | Le carte nella ricerca: mano, energia, mira, pescate future, dadi; le tabelle di carte, effetti e stati | 2 | Fatta | vedi Esito |
 | 4 | Il thread: calcolo continuo su un altro core, pensare in anticipo, ricalcolo immediato | 3 | Da fare | — |
 | 5 | Le indicazioni vere: segni ciano, parole, carta e casella, difesa, avviso di pericolo | 4 | Da fare | — |
 | 6 | Lo stato della partita: progresso, nemici sulla mappa, cure vere, aggressività; le tabelle di posti e zaino | 5 | Da fare | — |
@@ -986,6 +986,95 @@ Passi:
 Check della fase: i test del pacchetto `advisor`; i test delle carte toccate; l'atto `ia`.
 
 **Fatto quando:** i puzzle con le carte passano; il torneo va meglio di quello della Fase 2; l'utente prova.
+
+### Esito (3 novembre 2026)
+
+Valgono le proposte della fase (scelta dell'utente): fino a 6 bersagli per carta; il riordino della mano consigliato
+quando conviene; a pari punteggio la mossa senza carta. Per le carte «lunghe» il piano lasciava due strade; ho scelto
+la più prudente, spiegata al punto 5.
+
+1. **Le giocate** ([cards.odin](../src/advisor/cards.odin)): ogni carta della mano che si può giocare (energia, regole,
+   tabella), la più economica prima, su al massimo 6 bersagli. I bersagli si cercano su ogni casella nella portata della
+   carta con `card_drop_target`, lo stesso del mouse, e si scelgono con una stima veloce: i nemici presi dalla forma
+   della carta, il valore dei suoi effetti, quanto è vicino un nemico, e per le carte che spostano il Viandante (Dash) se
+   la casella è minacciata. Poi la ricerca le gioca davvero nella copia. Le carte su di sé sono una giocata sola.
+2. **Le prime mosse** sono ora 13 del tabellone, il riordino, una freccia del Feretro per ogni nemico (quando ne ha), e
+   le carte: nell'arena IA circa 30-40. **Le risposte** (le mosse dopo la prima) sono le 13 del tabellone, il riordino e
+   la carta di ogni posto della mano sul suo bersaglio migliore di quel momento: così la ricerca vede anche le carte
+   che arrivano con una pescata.
+3. **I dadi:** la IA sa tutto tranne i dadi. Ogni prova tira coi suoi dadi, mai con quelli del Viandante (che decidono
+   anche altri casi del gioco, come il Pinball e Marley). Una carta con un dado si prova su **ogni faccia** e si fa la
+   media; con più dadi, su 6 tiri fissi. I dadi che danno ogni faccia si trovano una volta sola, all'avvio della
+   ricerca.
+4. **Le pescate:** la copia ha il mazzo vero, quindi sa cosa arriva (scelta dell'utente).
+5. **Le tabelle per sempre** (cards.odin):
+   - `ADVISOR_CARDS`, una riga per ogni carta (un elenco che senza la riga di una carta nuova non compila): come la IA
+     la usa, perché, e il test che la prova. Non le consiglia ancora: le carte che aprono una vista (le quattro in prima
+     persona e Napoli) e l'Ombra, perché nella copia il Viandante resterebbe fermo e varrebbero meno del giusto; arrivano
+     nella Fase 7. Non le consiglia mai: la canna da pesca (fuori dal combattimento) e la IA stessa. Lazzo, Pinball,
+     Marley, Dinosauro, Cannone e Buco Nero li gioca il gioco vero nella copia, quindi li valuta davvero (ma quello che
+     fanno dopo l'orizzonte arriva nella Fase 7);
+   - `effect_value`, uno `switch` su ogni effetto (quanto vale nella stima dei bersagli);
+   - `status_value`, uno `switch` su ogni stato, sul nemico e sul Viandante: quanto vale ogni carica dopo l'orizzonte
+     (il veleno e la bruciatura sono danno che arriverà, lo scudo un colpo assorbito, le cariche del Viandante colpi in
+     più). La valutazione conta gli stati guadagnati o persi rispetto alla radice.
+6. **I segni provvisori:** la carta consigliata ha una cornice ciano nella mano e un quadrato ciano sulla casella del
+   bersaglio, con la parola «CARTA»; «RIMESCOLA» per il riordino, «FRECCIA» per il Feretro.
+7. **Un errore trovato nel laboratorio e corretto:** nel gioco vero la radice si prende spesso subito dopo la mossa del
+   giocatore, quando è ancora occupato e le regole non lasciano giocare carte. Così la IA non consigliava mai una
+   carta. Ora le prime mosse si elencano sulla copia portata avanti fino al momento in cui il Viandante è di nuovo
+   libero, come fanno tutti i rami.
+
+**Puzzle con le carte** ([advisor_search_test.odin](../src/integration/advisor_search_test.odin)), tutti verdi:
+- **la Firebomb su tre nemici vicini:** la IA la tira dove il suo quadrato li prende tutti e tre;
+- **la Guard prima del colpo:** chiuso in un vicolo in fila con l'arciere, la schivata in recupero: la IA alza la
+  Guard;
+- **nessuna carta quando basta un passo:** sotto il fendente del bruto con la Guard in mano, la IA esce senza carta;
+- **una carta che uccide prima:** un nemico a 3 di vita accanto: due colpi a mano lo uccidono, la Strike subito; la IA
+  gioca la Strike;
+- **la carta che arriva con la pescata:** niente di utile in mano, la Firebomb è la prossima carta del mazzo, tre
+  nemici fermi dietro uno steccato basso (le carte ci arrivano, i piedi no): la IA rimescola la mano. Nella prima
+  versione i nemici erano raggiungibili e andare a colpirli valeva di più: il puzzle non metteva alla prova la pescata;
+- **ogni carta:** ogni carta che la IA consiglia, sola in mano nell'arena IA, ha almeno una giocata che le regole
+  accettano (con un nemico accanto, o a tre caselle in fila per il Rampino). La Scintilla si salta: è una carta che
+  nasce solo dalla Forgia, mai nel mazzo.
+
+Tutti i test della Fase 2 restano verdi; ai suoi puzzle «senza carte» ho tolto le carte dalla mano.
+
+**Il torneo con le carte** (20 combattimenti, lo stesso della Fase 2, col mazzo dell'arena in mano):
+
+| Giocatore | Vita persa | Nemici uccisi |
+|---|---:|---:|
+| Segue la IA, con le carte | **0** | **157** |
+| Segue la IA, Fase 2 (senza carte) | 0 | 140 |
+| Regola semplice di oggi | 7 | 0 |
+| Colpisce sempre il più vicino | 1 | 132 |
+
+Ogni decisione del torneo spende 182 di lavoro, come nella Fase 2: con 30-40 prime mosse basta per il primo giro intero
+e un pezzo del secondo.
+
+**Misure** (`-o:speed`, arena IA con la mano intera):
+
+| Cosa | Valore |
+|---|---|
+| Nodi al secondo | circa 2000-2400 |
+| Dopo 10 ms | circa 37 nodi: consiglio a una mossa |
+| Dopo 100 ms | circa 300 nodi: ancora a una mossa (il secondo giro ora è di circa 800 nodi) |
+| Ricerca intera (5 giri) | 981 nodi in 0,4-0,5 s; 149 situazioni ritrovate nella tabella |
+| Fotogramma del pilota (3 di lavoro) | al massimo 2,5-2,9 ms |
+
+In parole semplici: con le carte le mosse da provare sono circa il triplo. Nel fotogramma il primo consiglio arriva in
+circa 12 fotogrammi (un quinto di secondo); il consiglio a due e tre mosse arriverà davvero col thread della Fase 4.
+Lo stesso vale per il pensare in anticipo: ha bisogno del secondo giro intero, quindi nel gioco vero comincerà a servire
+nella Fase 4.
+
+**Laboratorio:** l'atto `ia` segue ora i consigli per 20 secondi del mondo (10 erano pochi per vedere arrivare le
+carte): 46 consigli seguiti (18 passi, 6 colpi, **20 carte**), vita 22 su 22, tutti e quattro i nemici uccisi;
+catture `odin_pp_ia_card_hint_NN.png` (la carta con la cornice e il suo bersaglio, poi la carta alzata).
+
+Verifiche (solo quello che la fase tocca): `odin check src -vet -strict-style` pulito; 30 test (ricerca, carte,
+copia e simulatore della Fase 1, carta IA, arena del laboratorio) verdi; l'atto `ia`. Non fatti: benchmark, verifica
+completa. Resta la prova dell'utente nel laboratorio.
 
 ## Fase 4 — Il thread: calcolo continuo e ricalcolo immediato
 

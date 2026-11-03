@@ -77,6 +77,9 @@ advisor_view :: proc(advice: advisor.Advice) -> render.Advice_View {
 	case .Bump: return {mark = .Bump, cell = advice.cell, word = "COLPISCI"}
 	case .Wait: return {mark = .Wait, cell = advice.cell, word = "ASPETTA"}
 	case .Defend, .Key: return {mark = .Defend, cell = advice.cell, word = "DIFENDI"}
+	case .Card: return {mark = .Card, cell = advice.cell, word = "CARTA", card_id = advice.move.card_id}
+	case .Refocus: return {mark = .Wait, cell = advice.cell, word = "RIMESCOLA"}
+	case .Shoot: return {mark = .Bump, cell = advice.cell, word = "FRECCIA"}
 	}
 	return {}
 }
@@ -95,9 +98,9 @@ advisor_command_use :: proc(kind: Gameplay_Command_Kind) -> (use: Advisor_Comman
 	case .Begin_Diagonal: return .Advised, "il passo in diagonale, coi suoi due tasti"
 	case .QTE_Key: return .Advised, "i tasti della diagonale e della difesa"
 	case .Defense: return .Advised, "la difesa a tasti"
-	case .Play_Card: return .Later, "le carte: Fase 3"
-	case .Refocus: return .Later, "rimescolare la mano: Fase 3, con le carte"
-	case .Shoot: return .Later, "la freccia del Feretro, una carica di carta: Fase 3"
+	case .Play_Card: return .Advised, "le carte della mano, sui loro bersagli migliori (advisor/cards.odin)"
+	case .Refocus: return .Advised, "rimescolare la mano"
+	case .Shoot: return .Advised, "la freccia del Feretro, a ogni nemico"
 	case .Activate: return .Later, "le bobine di Tesla: Fase 7, coi casi speciali"
 	case .Equip: return .Later, "l'arma di riserva: Fase 7, coi casi speciali"
 	case .Shadow_Emerge: return .Later, "Movimento Ombra: Fase 7, coi casi speciali"
@@ -136,6 +139,7 @@ advisor_move_commands :: proc(room: ^game.Room, move: advisor.Move) -> (commands
 		else if room != nil { commands[1].direction = game.Move_Direction((room.pulse_count+u64(room.qte.enemy_id))%4) }
 		count = 2 if move.succeed || move.defense == .Dodge else 1
 	case .Key: commands[0] = base; commands[0].kind, commands[0].direction = .QTE_Key, move.direction; count = 1
+	case .Shoot: commands[0] = base; commands[0].kind, commands[0].target = .Shoot, move.target; count = 1
 	}
 	return
 }

@@ -13,6 +13,8 @@ Root_Facts :: struct {
 	ids: [game.MAX_ENEMIES_PER_ROOM]u32,
 	healths: [game.MAX_ENEMIES_PER_ROOM]i32,
 	archetypes: [game.MAX_ENEMIES_PER_ROOM]game.Enemy_Archetype,
+	// The statuses on the board at the root, at their worth (cards.odin, statuses_value).
+	statuses: f32,
 }
 
 root_facts :: proc(room: ^game.Room) -> (facts: Root_Facts) {
@@ -24,6 +26,7 @@ root_facts :: proc(room: ^game.Room) -> (facts: Root_Facts) {
 		facts.archetypes[facts.enemy_count] = enemy.archetype
 		facts.enemy_count += 1
 	}
+	facts.statuses = statuses_value(room)
 	return
 }
 
@@ -105,6 +108,8 @@ evaluate :: proc(room: ^game.Room, facts: ^Root_Facts, elapsed: f32, risk: f32 =
 		}
 	}
 	value -= risk
+	// What the statuses gained or lost since the root will do past the horizon.
+	value += statuses_value(room)-facts.statuses
 	if room.phase != .Combat { return value+WIN_VALUE }
 	// The position: the blows still to land past the horizon, the ways out, the weakest foe near, an archer's line.
 	p := room.player.position

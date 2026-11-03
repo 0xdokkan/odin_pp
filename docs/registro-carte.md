@@ -6,6 +6,14 @@ Qui si segna ogni carta tolta dal gioco o cambiata, con quello che faceva, così
 futuro. Le voci più recenti stanno in cima. Per ritrovare il commit di una voce:
 `git log --all --grep "<titolo del commit>"`.
 
+## 2026-11-03 — IA: consiglia anche le carte (solo laboratorio)
+
+Commit **«Piano IA, Fase 3 fatta: le carte nella ricerca»** sul ramo `piano-ia` ([piano](piano-ia.md), Fase 3). La
+carta non cambia: ora la IA prova anche ogni carta della mano sui suoi bersagli migliori (al massimo 6), il riordino
+della mano e le frecce del Feretro, e consiglia la carta con la cornice ciano nella mano e il segno sulla casella del
+bersaglio («CARTA»). Non consiglia ancora le carte che aprono una vista e l'Ombra (Fase 7), né la canna da pesca e se
+stessa.
+
 ## 2026-11-03 — IA: la ricerca della mossa migliore (solo laboratorio)
 
 Commit **«Piano IA, Fase 2 fatta: la ricerca»** sul ramo `piano-ia` ([piano](piano-ia.md), Fase 2). La carta non cambia

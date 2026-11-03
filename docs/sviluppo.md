@@ -32,7 +32,9 @@ falliscono se la copia resta indietro. Non si aggirano. Le tabelle che ci sono
 già: i campi copiati (`COPIED_FIELDS` in
 [advisor/copy.odin](../src/advisor/copy.odin)), i comandi del giocatore
 (`advisor_command_use` in [run/advisor_driver.odin](../src/run/advisor_driver.odin)),
-i nemici (`enemy_knowledge` in [advisor/knowledge.odin](../src/advisor/knowledge.odin)).
+i nemici (`enemy_knowledge` in [advisor/knowledge.odin](../src/advisor/knowledge.odin)),
+le carte, gli effetti e gli stati (`ADVISOR_CARDS`, `effect_value`, `status_value` in
+[advisor/cards.odin](../src/advisor/cards.odin)).
 Le stesse istruzioni,
 per gli agenti, stanno in [AGENTS.md](../AGENTS.md), che leggono Codex e gli
 altri, e in [CLAUDE.md](../CLAUDE.md), che legge Claude Code.
