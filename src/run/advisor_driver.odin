@@ -5,67 +5,121 @@ import advisor "../advisor"
 import game "../game"
 import render "../render"
 
-// THE IA'S PILOT (docs/piano-ia.md, Fase 2). Every frame the IA's card is running, the tactical controller calls it:
-// when the situation changes (its discrete fingerprint: a step, a blow, a beat, an intent, the defence keys) it takes a
-// new root, the snapshot of the real room (only read); then it spends a few nodes of the search, its frame's slice
-// (the thread is Fase 4's), and gives the advice it has to the board's marks. Behind the eyes of a view, the IA off,
-// out of a fight: no marks, and the search's memory goes back.
-
-// The work a frame spends: a node is a quarter to half a millisecond in the IA's arena (-o:speed; a long horizon's
-// counts two), so at most two milliseconds or so.
-ADVISOR_FRAME_WORK :: 3
-// A root also grows old: the world's seconds run on under it.
+// THE IA'S PILOT (docs/piano-ia.md, Fasi 2 e 4). Every frame of a fight the tactical controller calls it. While the
+// IA's card runs, the search runs on a thread of its own (advisor.Worker): when the situation changes the pilot
+// photographs the real room (only read, a few microseconds) and hands it over; every frame it reads the newest advice
+// the worker has, never waiting for it, and gives it to the board's marks. Behind the eyes of a view or with the IA's
+// seconds over the marks go and the worker sleeps; out of the fight it is closed and its memory given back.
+//
+// When to take a new root:
+// - at once, when what a player sees changes (the discrete fingerprint: a step, a blow, a beat, an intent, the hand,
+//   the defence keys). If the change is a first move the worker already tried, its best reply is the advice in the same
+//   frame (thinking ahead);
+// - when only the world's seconds ran on: after ADVISOR_FRESH_SECONDS if the search of the root is over (the plan's
+//   tenth of a second), and after ADVISOR_ROOT_SECONDS anyway. A search still going is not thrown away every tenth of a
+//   second: its second round, the one thinking ahead needs, takes about a third of a second with the cards.
+ADVISOR_FRESH_SECONDS :: f32(0.1)
 ADVISOR_ROOT_SECONDS :: f32(1)
+// Without the worker (a thread that could not start), the search runs here, this much work a frame: a node is a quarter
+// to half a millisecond in the IA's arena (-o:speed), so two or three milliseconds.
+ADVISOR_FRAME_WORK :: 3
 
 Advisor_Pilot :: struct {
-	search: advisor.Search,
-	root: u64,
+	worker: ^advisor.Worker,
+	// The search of the frame's own slices, only when the worker could not start.
+	sliced: ^advisor.Search,
+	root, generation: u64,
 	since_root: f32,
+	// The advice shown, and whether it is the current root's own.
+	shown: advisor.Advice,
 }
 
 // One pilot a thread (the tests play rooms side by side), in the process's own memory.
 @(private = "file", thread_local)
 advisor_pilot: ^Advisor_Pilot
 
-@(private = "file")
+// The pilot closed: its worker stopped and waited for (it stops between two nodes), its memory given back.
 advisor_pilot_release :: proc() {
-	if advisor_pilot == nil { return }
-	advisor.search_destroy(&advisor_pilot.search)
-	free(advisor_pilot, runtime.heap_allocator())
+	p := advisor_pilot
+	if p == nil { return }
+	if p.worker != nil { advisor.worker_stop(p.worker) }
+	if p.sliced != nil { advisor.search_destroy(p.sliced); free(p.sliced, runtime.heap_allocator()) }
+	free(p, runtime.heap_allocator())
 	advisor_pilot = nil
+}
+
+@(private = "file")
+advisor_pilot_open :: proc() -> ^Advisor_Pilot {
+	heap := runtime.heap_allocator()
+	p := new(Advisor_Pilot, heap)
+	if p == nil { return nil }
+	p.worker = advisor.worker_start()
+	if p.worker == nil {
+		p.sliced = new(advisor.Search, heap)
+		if p.sliced == nil || !advisor.search_init(p.sliced) { free(p.sliced, heap); free(p, heap); return nil }
+	}
+	return p
 }
 
 drive_advisor :: proc(room: ^game.Room, renderer: ^render.Renderer, dt: f32) {
 	shown := render.Advice_View{}
 	defer renderer.tactical.advice = shown
-	if room == nil || room.player == nil || room.phase != .Combat || !game.ia_active(room) { advisor_pilot_release(); return }
-	if advisor_pilot == nil {
-		advisor_pilot = new(Advisor_Pilot, runtime.heap_allocator())
-		if advisor_pilot == nil { return }
-		if !advisor.search_init(&advisor_pilot.search) { free(advisor_pilot, runtime.heap_allocator()); advisor_pilot = nil; return }
+	if room == nil || room.player == nil || room.phase != .Combat { advisor_pilot_release(); return }
+	if !game.ia_active(room) {
+		if advisor_pilot != nil { advisor_pilot.shown, advisor_pilot.root = {}, 0 }
+		return
 	}
+	if advisor_pilot == nil { advisor_pilot = advisor_pilot_open() }
 	p := advisor_pilot
+	if p == nil { return }
 	fingerprint := advisor.discrete_fingerprint(room)
 	p.since_root += dt
-	kept: advisor.Advice
-	if !p.search.rooted || fingerprint != p.root || p.since_root >= ADVISOR_ROOT_SECONDS {
-		// Thinking ahead: the situation is one the last root already tried, and its best reply is ready.
-		pondered, found := advisor.search_pondered(&p.search, fingerprint)
-		// The same situation, only older: its advice stands until the new root's first round.
-		if fingerprint == p.root { kept = p.search.advice }
-		advisor.search_root(&p.search, room)
-		p.root, p.since_root = fingerprint, 0
-		if found { p.search.advice = pondered }
+	if p.worker != nil {
+		w := p.worker
+		advisor.worker_poll(w)
+		current := w.latest.generation == p.generation && p.generation != 0
+		over := current && w.latest.done
+		if p.root == 0 || fingerprint != p.root || (over && p.since_root >= ADVISOR_FRESH_SECONDS) || p.since_root >= ADVISOR_ROOT_SECONDS {
+			if fingerprint != p.root {
+				// Thinking ahead, from the newest the worker found for the root before.
+				p.shown = {}
+				if pondered, found := advisor.ponder_lookup(w.latest.ponder[:w.latest.ponder_count], fingerprint); found && w.latest.root == p.root {
+					p.shown = pondered
+				}
+			}
+			p.generation = advisor.worker_offer(w, room)
+			p.root, p.since_root = fingerprint, 0
+		} else if current && w.latest.advice.valid {
+			p.shown = w.latest.advice
+		}
+	} else {
+		s := p.sliced
+		if !s.rooted || fingerprint != p.root || (s.done && p.since_root >= ADVISOR_FRESH_SECONDS) || p.since_root >= ADVISOR_ROOT_SECONDS {
+			pondered, found := advisor.search_pondered(s, fingerprint)
+			if fingerprint != p.root { p.shown = pondered if found else {} }
+			advisor.search_root(s, room)
+			p.root, p.since_root = fingerprint, 0
+		}
+		advisor.search_step(s, ADVISOR_FRAME_WORK)
+		if s.advice.valid { p.shown = s.advice }
 	}
-	advisor.search_step(&p.search, ADVISOR_FRAME_WORK)
-	advice := p.search.advice if p.search.advice.valid else kept
-	if advice.valid { shown = advisor_view(advice) }
+	if p.shown.valid { shown = advisor_view(p.shown) }
 }
 
-// The advice the pilot has now (none while the IA is off): the lab's act follows it.
+// The advice the pilot shows now (none while the IA is off): the lab's act follows it.
 advisor_current_advice :: proc() -> advisor.Advice {
 	if advisor_pilot == nil { return {} }
-	return advisor_pilot.search.advice
+	return advisor_pilot.shown
+}
+
+// TESTS ONLY: the pilot's worker held (it does no work while held), and how far its search of the current root went.
+advisor_pilot_hold :: proc(held: bool) {
+	if advisor_pilot != nil && advisor_pilot.worker != nil { advisor.worker_hold(advisor_pilot.worker, held) }
+}
+
+advisor_pilot_packet :: proc() -> advisor.Packet {
+	if advisor_pilot == nil || advisor_pilot.worker == nil { return {} }
+	return advisor_pilot.worker.latest
 }
 
 // The advice as the board shows it (the provisional marks and words).

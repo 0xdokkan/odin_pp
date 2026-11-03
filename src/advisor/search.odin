@@ -29,6 +29,11 @@ MAX_REPLIES :: 13+1+game.MAX_HAND_CAPACITY
 // The same situation seen again (the transposition table): its slots.
 TABLE_SLOTS :: 1 << 13
 
+// THE REACTION MARGIN (docs/piano-ia.md, «Come ricalcola»): between the advice shown and the key pressed a real hand
+// takes a moment. Every branch lets the world run this long after the player is free before its first move, so that
+// an advice holds for a player who does not press at the very instant.
+REACTION_SECONDS :: f32(0.15)
+
 // The rounds, in order: every first move, every reply, the best three's third moves; then the same at the long horizon.
 Round :: struct { depth: int, horizon: f32 }
 @(rodata) ROUNDS := [?]Round{{1, HORIZON_SHORT}, {2, HORIZON_SHORT}, {3, HORIZON_SHORT}, {2, HORIZON_LONG}, {3, HORIZON_LONG}}
@@ -60,8 +65,13 @@ Table_Entry :: struct { key: u64, value: f32, used: bool }
 @(private)
 Reply :: struct { kind: Advice_Kind, cell: grid.Position, move: Move }
 
+// THINKING AHEAD: the situation right after a first move (its discrete fingerprint), and the best reply to it.
+Ponder :: struct { child: u64, advice: Advice }
+
 Search :: struct {
+	// Its own snapshot (search_root), and the one the rounds read: its own, or one lent by the worker (search_root_from).
 	snapshot: Snapshot,
+	source: ^Snapshot,
 	rehearsal: Rehearsal,
 	ready, rooted, done: bool,
 	facts: Root_Facts,
@@ -92,6 +102,9 @@ Search :: struct {
 	table_hits: int,
 	// The dice that give each face (cards.odin).
 	faces: Dice_Faces,
+	// Thinking ahead, from the last round of two moves finished: every first move's situation and best reply.
+	ponder: [MAX_CANDIDATES]Ponder,
+	ponder_count: int,
 }
 
 @(private)
@@ -188,9 +201,17 @@ reply_moves :: proc(out: []Move) -> (count: int) {
 
 // A new root: the real room photographed (only read), the rehearsal on it, the rounds from the first.
 search_root :: proc(s: ^Search, real: ^game.Room) -> bool {
-	if !s.ready || !snapshot_take(&s.snapshot, real) || !rehearsal_begin(&s.rehearsal, &s.snapshot) { s.rooted = false; return false }
+	if !s.ready || !snapshot_take(&s.snapshot, real) { s.rooted = false; return false }
+	return search_root_from(s, &s.snapshot)
+}
+
+// A new root on a snapshot already taken (the worker's, taken by the game's thread): read only, and kept as it is until
+// the next root.
+search_root_from :: proc(s: ^Search, snapshot: ^Snapshot) -> bool {
+	if !s.ready || !rehearsal_begin(&s.rehearsal, snapshot) { s.rooted = false; return false }
+	s.source = snapshot
 	s.rooted, s.done = true, false
-	s.facts = root_facts(&s.snapshot.room)
+	s.facts = root_facts(&snapshot.room)
 	// The first moves are those of the moment the player is free again (a root is often taken while his last move
 	// still plays, when the rules let no card be played): on a rehearsal run on to it, as every branch runs.
 	{
@@ -198,7 +219,7 @@ search_root :: proc(s: ^Search, real: ^game.Room) -> bool {
 		context.allocator = try_allocator(&s.rehearsal)
 		context.temp_allocator = context.allocator
 		room.player.dice = game.make_dice_state(DICE_SEED)
-		if room.qte.kind == .None { run_room_until_free(room, SIM_STEP, HORIZON_LONG, .Best) }
+		reach_root(room, HORIZON_LONG)
 		s.candidate_count = root_moves(room, s.candidates[:])
 	}
 	s.reply_count = reply_moves(s.replies[:])
@@ -206,11 +227,26 @@ search_root :: proc(s: ^Search, real: ^game.Room) -> bool {
 	s.legal = {}
 	s.described = {}
 	s.children = {}
+	s.ponder_count = 0
 	for &entry in s.table { entry = {} }
 	for &v in s.values { v = NO_VALUE }
 	s.previous = s.values
-	s.advice = {root = discrete_fingerprint(&s.snapshot.room)}
+	s.advice = {root = discrete_fingerprint(&snapshot.room)}
 	return true
+}
+
+// The world run on from the root to its first move: until the player is free, then the reaction margin. With the
+// defence keys up the world waits for the answer: nothing runs. The seconds it ran.
+@(private)
+reach_root :: proc(room: ^game.Room, horizon: f32) -> (ran: f32) {
+	if room.qte.kind != .None { return }
+	ran = run_room_until_free(room, SIM_STEP, horizon, .Best)
+	for margin := f32(0); margin < REACTION_SECONDS && ran < horizon && room.phase == .Combat && !player_dead(room); margin += SIM_STEP {
+		if room.qte.kind != .None { break }
+		frame_room(room, SIM_STEP, .Best)
+		ran += SIM_STEP
+	}
+	return
 }
 
 // A branch not played: a move the rules refused, or a slot no round filled.
@@ -324,7 +360,8 @@ play_path :: proc(s: ^Search, path: []Move, horizon: f32, dice: game.Dice_State)
 	try_risk = 0
 	tempo_begin(room)
 	// With the defence keys up the world waits for the answer: the first move is the answer.
-	if room.qte.kind == .None { elapsed = run_room_until_free(room, SIM_STEP, horizon, .Best); tempo_note(room, elapsed, horizon) }
+	elapsed = reach_root(room, horizon)
+	tempo_note(room, elapsed, horizon)
 	for planned, k in path {
 		if room.phase != .Combat || player_dead(room) || !player_free(room) && room.qte.kind == .None || elapsed >= horizon { break }
 		move := planned
@@ -368,7 +405,7 @@ play_node :: proc(s: ^Search, path: []Move, horizon: f32) -> (value: f32, result
 		path[0].succeed = true
 		return (lucky+missed)/2, result, child, first, second, 2
 	}
-	ways, sides, many := dice_ways(&s.snapshot.room, path[0], &s.faces)
+	ways, sides, many := dice_ways(&s.source.room, path[0], &s.faces)
 	if ways <= 1 {
 		value, result, child, first, second = play_path(s, path, horizon, neutral)
 		return value, result, child, first, second, 1
@@ -449,6 +486,18 @@ finish_round :: proc(s: ^Search) {
 		s.advice = {valid = true, kind = s.described[best].kind, move = s.candidates[best], cell = s.described[best].cell,
 			value = s.values[best], depth = round.depth, horizon = round.horizon, nodes = s.nodes, root = s.advice.root}
 	}
+	// A round of two moves over: the best reply to every first move, ready for thinking ahead.
+	if round.depth == 2 {
+		s.ponder_count = 0
+		for i in 0..<s.candidate_count {
+			if !s.legal[i] || s.children[i] == 0 { continue }
+			j := best_reply(s, i) or_continue
+			reply := reply_reply(s, i, j)^
+			s.ponder[s.ponder_count] = {child = s.children[i], advice = {valid = true, kind = reply.kind, move = reply.move,
+				cell = reply.cell, value = reply_value(s, i, j)^, depth = 1, horizon = round.horizon, root = s.children[i], pondered = true}}
+			s.ponder_count += 1
+		}
+	}
 	s.round += 1
 	s.cursor = 0
 	if s.round == len(ROUNDS) || best < 0 { s.done = true; return }
@@ -524,15 +573,12 @@ best_reply :: proc(s: ^Search, i: int) -> (j: int, found: bool) {
 // THINKING AHEAD (pondering): the root's situation is the one right after a first move this search tried; its best
 // reply is the advice at once, before the new root's first round.
 search_pondered :: proc(s: ^Search, root: u64) -> (advice: Advice, found: bool) {
-	if !s.rooted || s.round < 2 { return }
-	for i in 0..<s.candidate_count {
-		if !s.legal[i] || s.children[i] != root { continue }
-		j := best_reply(s, i) or_continue
-		// The reply as played then (a hand slot's card made whole).
-		reply := reply_reply(s, i, j)^
-		return {valid = true, kind = reply.kind, move = reply.move, cell = reply.cell, value = reply_value(s, i, j)^,
-			depth = 1, horizon = HORIZON_SHORT, root = root, pondered = true}, true
-	}
+	if !s.rooted { return }
+	return ponder_lookup(s.ponder[:s.ponder_count], root)
+}
+
+ponder_lookup :: proc(table: []Ponder, root: u64) -> (advice: Advice, found: bool) {
+	for entry in table { if entry.child == root { return entry.advice, true } }
 	return
 }
 

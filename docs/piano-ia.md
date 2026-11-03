@@ -218,7 +218,7 @@ comunque nel momento in cui i rami si uniscono.
 | 1 | La copia di prova e il simulatore; il controllo dei campi (regola per sempre) | 0 | Fatta | vedi Esito |
 | 2 | La ricerca: passi, colpi a mano, schivate, attesa; i pesi; segni provvisori; le tabelle di comandi e nemici | 1 | Fatta | vedi Esito |
 | 3 | Le carte nella ricerca: mano, energia, mira, pescate future, dadi; le tabelle di carte, effetti e stati | 2 | Fatta | vedi Esito |
-| 4 | Il thread: calcolo continuo su un altro core, pensare in anticipo, ricalcolo immediato | 3 | Da fare | — |
+| 4 | Il thread: calcolo continuo su un altro core, pensare in anticipo, ricalcolo immediato | 3 | Fatta | vedi Esito |
 | 5 | Le indicazioni vere: segni ciano, parole, carta e casella, difesa, avviso di pericolo | 4 | Da fare | — |
 | 6 | Lo stato della partita: progresso, nemici sulla mappa, cure vere, aggressività; le tabelle di posti e zaino | 5 | Da fare | — |
 | 7 | I casi speciali: Ombra, Lazzo, Pinball, Dinosauro, Napoli, piani e ascensori, mappe grandi; le tabelle di oggetti e caselle | 6 | Da fare | — |
@@ -1115,6 +1115,82 @@ tocca il fotogramma).
 
 **Fatto quando:** nessun calo di fotogrammi misurabile; dopo una deviazione il consiglio arriva nello stesso
 fotogramma; i test sono verdi.
+
+### Esito (3 novembre 2026)
+
+Valgono le proposte della fase (scelta dell'utente): un thread solo, la fotografia sul thread del gioco, i tripli
+buffer, il semaforo, il pensare in anticipo, il margine di reazione di 0,15 s, i test a pezzi. Il tetto di nodi per
+radice è «quanto basta per arrivare a 6 s»: tutti e cinque i giri (circa mille nodi nell'arena IA con le carte), più un
+tetto di sicurezza di 20 000. Una sola proposta l'ho dovuta adattare, perché in conflitto con un'altra (punto 4).
+
+1. **Il thread** ([worker.odin](../src/advisor/worker.odin)): nasce al primo uso della carta in un combattimento, si
+   chiude a fine combattimento (finita la carta o dentro una vista dorme, senza consumare il core).
+   - **Le fotografie** vanno al thread con un **triplo buffer**: tre fotografie, una del gioco, una del thread, una nel
+     mezzo, scambiate con una sola operazione atomica e un segno «nuova». Il gioco non aspetta mai il thread, il thread
+     non aspetta mai il gioco.
+   - **I consigli** tornano con un secondo triplo buffer: il consiglio della radice e, per ogni prima mossa provata, la
+     situazione subito dopo e la risposta migliore.
+   - **La generazione:** ogni fotografia ha il suo numero. Quando ne arriva una nuova, il thread lascia la ricerca
+     vecchia fra un nodo e l'altro e riparte; i consigli portano il numero, così il gioco non mostra mai un consiglio
+     di una radice vecchia.
+   - **Il semaforo** (`core:sync`): finita la ricerca, il thread dorme finché arriva la fotografia nuova.
+2. **Il pilota** ([advisor_driver.odin](../src/run/advisor_driver.odin)): a ogni fotogramma legge l'ultimo consiglio
+   senza aspettare e, quando serve, fa la fotografia. Il calcolo a pezzi resta come riserva se il thread non parte, e
+   per i test.
+3. **Pensare in anticipo:** quando la situazione cambia per una prima mossa che il thread aveva già provato (quella
+   consigliata o un'altra), il consiglio per la situazione nuova è la risposta migliore già pronta, **nello stesso
+   fotogramma**; poi il thread riparte da lì e lo migliora.
+4. **Quando si riparte (la proposta adattata):** i cambi veri (un passo, un colpo, un battito, un intento nuovo, la
+   mano, la difesa a tasti) fanno ripartire subito. La proposta diceva anche «ogni decimo di secondo di mondo». Ma il
+   secondo giro, quello che serve per pensare in anticipo, con le carte costa circa un terzo di secondo: ripartendo
+   ogni decimo non finirebbe mai, e il pensare in anticipo non ci sarebbe. Allora il solo tempo che passa fa ripartire
+   dopo 0,1 s **se la ricerca della radice è finita**, e comunque dopo 1 s.
+5. **Il margine di reazione:** in ogni ramo, dopo il momento in cui il Viandante è libero, il mondo va avanti 0,15 s
+   prima della prima mossa, come per una mano vera che preme un attimo dopo aver visto il consiglio.
+6. Le regole del gioco girano ora su due thread insieme (il gioco e la copia). Ho controllato che non usino variabili
+   globali condivise: l'unica, il contatore delle geometrie dei livelli, è già atomica.
+
+**Test** ([advisor_worker_test.odin](../src/integration/advisor_worker_test.odin)), tutti verdi:
+- **thread uguale ai pezzi:** in 100 situazioni di una partita giocata a mosse casuali, il consiglio del thread è
+  identico a quello della ricerca a pezzi con lo stesso lavoro;
+- **ricerca lasciata a metà:** cinque volte una ricerca lasciata dopo pochi nodi per una radice nuova; il consiglio
+  della radice nuova è quello di una ricerca cominciata da zero;
+- **il gioco non aspetta mai il thread:** col thread bloccato, 180 fotogrammi in cui la stanza cambia; il fotogramma più
+  lungo del pilota è di **0,06 ms**. Lasciato andare, il thread dà il suo consiglio;
+- **dopo una deviazione:** il giocatore fa un passo diverso da quello consigliato; nel fotogramma subito dopo il
+  consiglio c'è già, dal pensare in anticipo.
+
+Tutti i test delle Fasi 1-3 restano verdi (33 in tutto). Nel torneo, col margine di reazione, la IA uccide 158 nemici e
+perde 0 vita.
+
+**Misure** (`-o:speed`):
+
+| Cosa | Valore |
+|---|---|
+| Fotogramma del pilota (fotografia compresa) | al massimo 0,06 ms |
+| Dal cambio al primo consiglio, se non era già pronto | circa 8 ms (mezzo fotogramma) |
+| Dopo una deviazione già provata | nello stesso fotogramma |
+| Giri raggiunti fra una radice e l'altra nel laboratorio | 3 o 4 su 5 (circa 590 nodi) |
+
+**Fotogrammi, in ordine incrociato** (atto `ia` con `ODIN_PP_LAB_TIMING=1`: l'arena IA coi nemici liberi, 600
+fotogrammi per corsa, niente vsync):
+
+| Corsa | IA | Media | Mediana | 99% sotto |
+|---|---|---:|---:|---:|
+| 1 | spenta | 6,35 ms | 6,29 ms | 7,98 ms |
+| 2 | accesa | 6,44 ms | 6,38 ms | 8,01 ms |
+| 3 | accesa | 6,21 ms | 6,17 ms | 7,16 ms |
+| 4 | spenta | 5,90 ms | 5,89 ms | 6,94 ms |
+
+In parole semplici: con la IA accesa il fotogramma costa in media 0,2 ms in più (+3%), mentre la macchina stessa, a IA
+spenta, cambia del 7% fra la prima e l'ultima corsa. **Nessun calo misurabile.** Il poco in più è soprattutto il disegno
+dei segni e la parola sopra il Viandante; il pilota da solo costa 0,06 ms.
+
+**Laboratorio:** l'atto `ia` col thread: 40 consigli seguiti (8 passi, 7 colpi, 19 carte), vita 22 su 22, tutti e
+quattro i nemici uccisi.
+
+Verifiche (solo quello che la fase tocca): `odin check src -vet -strict-style` pulito; 33 test verdi; l'atto `ia`; le
+quattro corse dei fotogrammi. Non fatti: la verifica completa. Resta la prova dell'utente nel laboratorio.
 
 ## Fase 5 — Le indicazioni vere
 
