@@ -168,6 +168,10 @@ Lab_Sounds :: struct {
 	// FIRST PERSON ARCHER as last heard: the draw (and whether full), arrows loosed, bounces, zones, hits.
 	bow_drawing, bow_full: bool,
 	bow_loosed, bow_bounces, bow_zone_bounces, bow_hits: i32,
+	// BENVENUTI A NAPOLI as last heard (napoli.odin): the club's blows begun
+	// and struck, the grandpa's steps.
+	napoli_swings, napoli_impacts: i32,
+	napoli_steps: int,
 	// The archers' real bolts flying (enemy_arrow_view.odin): each one's
 	// whistle as wanted this frame, how far it had flown last frame and for
 	// how many frames it has not moved.
@@ -393,6 +397,8 @@ lab_cue_sounds :: proc(renderer: ^Renderer, s: ^Lab_Sounds, cue: ^Presentation_C
 	case .Refocus, .Card_Refocused:
 		lab_sound_queue(s, .Ui_Refocus, now)
 	case .Gold_Gained:
+		// BENVENUTI A NAPOLI's purse, and the grandpa's E: a pouch of coins.
+		if event.card_definition == .Napoli { lab_sound_queue(s, .Napoli_Coins, now); break }
 		// The coins of the Scopa cards are the card's own sound.
 		if now-s.last_played[.Card_Sei_Denari] > 0.6 && now-s.last_played[.Card_Sette_Denari] > 0.6 { lab_sound_queue(s, .Ui_Gold, now) }
 	case .Energy_Gained:
@@ -400,6 +406,8 @@ lab_cue_sounds :: proc(renderer: ^Renderer, s: ^Lab_Sounds, cue: ^Presentation_C
 	case .Loot_Dropped:
 		lab_sound_queue(s, .Ui_Loot_Drop, now, 1, lab_sound_pan(renderer, event.source))
 	case .Status_Applied:
+		// The club's stagger: the stars round the foe's head.
+		if event.status == .Stagger && game.event_is_first_person_club(event) { lab_sound_queue(s, .Napoli_Stars, now+0.1, 1, pan); break }
 		if sfx, ok := lab_status_sfx(event.status); ok { lab_sound_queue(s, sfx, now, 1, pan) }
 	case .Status_Expired, .Status_Removed:
 		lab_sound_queue(s, .Ui_Status_Expired, now, 1, pan)
@@ -447,6 +455,12 @@ lab_cue_sounds :: proc(renderer: ^Renderer, s: ^Lab_Sounds, cue: ^Presentation_C
 		case .Wildfire: lab_sound_queue(s, .World_Fire, now)
 		}
 	case .Damage:
+		// BENVENUTI A NAPOLI's club: the whack, and the squashed card's boing.
+		if game.event_is_first_person_club(event) {
+			lab_sound_queue(s, .Napoli_Club_Hit, now, 1, pan)
+			if event.target.kind == .Enemy { lab_sound_queue(s, .Napoli_Boing, now+0.04, 1, pan) }
+			break
+		}
 		if kind, object := lab_object_kind(renderer, event.target); object {
 			lab_sound_queue(s, .World_Ice_Crack if kind == .Ice_Block else .World_Object_Hit, now+landing)
 		}
@@ -497,6 +511,15 @@ lab_cue_sounds :: proc(renderer: ^Renderer, s: ^Lab_Sounds, cue: ^Presentation_C
 		if renderer.tactical.first_person.weapon == .Fists { lab_sound_queue(s, LAB_FISTS_BELL, now+0.1) }
 		// The sword drawn as it comes up.
 		if renderer.tactical.first_person.weapon == .Sword { lab_sound_queue(s, LAB_SWORD_DRAW, now+0.1) }
+		// The grandpa's giant club out of his pocket.
+		if renderer.tactical.first_person.weapon == .Nonno { lab_sound_queue(s, .Napoli_Pocket, now+0.3) }
+	// BENVENUTI A NAPOLI: cutlery at the table, the grandpa's laugh at his Q and as he goes.
+	case .Napoli_Feast:
+		lab_sound_queue(s, .Napoli_Feast, now)
+	case .Napoli_Nonno_Cured:
+		lab_sound_queue(s, .Napoli_Laugh, now)
+	case .Napoli_Nonno_Left:
+		lab_sound_queue(s, .Napoli_Laugh, now, 0.8)
 	// BOMB MARLEY (marley.odin): the ball coming down, the lights turning, a
 	// column warned, the bomb's whistle and its blast at the far end, a
 	// character saved, the seconds earned, the end; and a groove on the
@@ -744,7 +767,29 @@ update_lab_sounds :: proc(renderer: ^Renderer, room: ^game.Room, now: f64) {
 	// A discharge strikes along every link at once: one zap. (The ring's
 	// chord is for the square closing into the Ring, lab_watch_room.)
 	if impacts > 0 { lab_sound_queue(s, .World_Tesla_Zap, now) }
+	lab_napoli_sounds(renderer, room, s, now)
 	lab_watch_room(s, room, now)
+}
+
+// BENVENUTI A NAPOLI's moments with no cue of their own: the club's whoosh as a
+// blow begins, its thud on the floor (a blow on a foe or a thing sounds with
+// its wound), the grandpa's sandals at each step (each half of his legs' swing).
+@(private = "file")
+lab_napoli_sounds :: proc(renderer: ^Renderer, room: ^game.Room, s: ^Lab_Sounds, now: f64) {
+	club, swung := club_rules(room)
+	if !swung {
+		s.napoli_swings, s.napoli_impacts, s.napoli_steps = 0, 0, 0
+		return
+	}
+	pan := lab_sound_pan(renderer, game.PLAYER_ENTITY)
+	if club.swings > s.napoli_swings { lab_sound_queue(s, .Napoli_Swing, now, 1, pan) }
+	if club.impacts > s.napoli_impacts && club.last.hit == .Floor { lab_sound_queue(s, .Napoli_Club_Floor, now, 1, pan) }
+	s.napoli_swings, s.napoli_impacts = club.swings, club.impacts
+	c := &renderer.tactical.first_person.club
+	if !c.nonno { return }
+	steps := int(c.walk/math.PI)
+	if steps > s.napoli_steps { lab_sound_queue(s, .Napoli_Step_A if steps%2 == 0 else .Napoli_Step_B, now, 0.9, pan) }
+	s.napoli_steps = steps
 }
 
 // The room's own moments: the clock, criticals, the window, the defence.

@@ -56,6 +56,10 @@ Commit **«Piano di Napoli, Fase 0 fatta: la carta, il D4 e i quattro rami»** s
   calzini) sono modelli 3D di carta fatti da codice; il Viandante sbiadisce solo quando copre la casella mirata. La
   tavolata ha il pranzo completo e si svuota mangiando; il nonno ospite resta una figurina, da nonno al mare. **Icona
   nuova:** la faccia del nonno al mare (non più il Vesuvio).
+- **2026-11-03, Fase 6** (commit «Piano di Napoli, Fase 6 fatta: suoni CC0 e tarantella»): la carta ha i suoi suoni nel
+  laboratorio: mazzata, boing, monete, posate, ciabatte e risata del nonno da file **CC0** di Freesound (fonti e licenze
+  in `assets/audio/LICENZE.md`); fruscio del colpo, stelline e tasca da codice. Col bastone e col minuto da nonno suona
+  una **tarantella** fatta da codice.
 
 ## 2026-10-30 — Tutte le carte: il lancio dura la metà
 

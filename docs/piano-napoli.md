@@ -94,7 +94,7 @@ Note sulle decisioni:
 | 3 | Lo schiacciamento alla Looney Tunes e il succo della mazzata | 2 | Fatta | vedi Esito |
 | 4 | Diventi il nonno (effetto 4), regole e prototipo | 2 | Fatta | vedi Esito |
 | 5 | Aspetto 3D: asso di bastoni, Viandante, nonno, tavolata, borsellino | 1, 3, 4 | Fatta | vedi Esito |
-| 6 | Suoni e tarantella (CC0 o da codice) | 5 | Da fare | — |
+| 6 | Suoni e tarantella (CC0 o da codice) | 5 | Fatta | vedi Esito |
 | 7 | Nel gioco vero: «Mostra effetto», offerte, salvataggi, prova con l'utente, chiusura | 6 | Da fare | — |
 
 ## Come funziona oggi (punto di partenza)
@@ -840,6 +840,59 @@ Passi:
 
 **Fatto quando:** l'utente approva suoni e musica nel laboratorio; la prova del
 laboratorio conta i suoni nuovi.
+
+### Esito (3 novembre 2026)
+
+Le scelte dell'utente:
+
+| Domanda | Risposta |
+|---|---|
+| Quando suona la tarantella | **Col bastone e col minuto da nonno**, come le musiche delle altre viste |
+| Dove | **Solo nel laboratorio**, come i suoni delle altre carte |
+| La voce del nonno | **Versi se si trovano CC0** |
+| I 6 suoni CC0 trovati | **Scaricati tutti** (dopo il sì dell'utente) |
+| La tarantella | **Da codice**, dopo aver ascoltato l'unica CC0 trovata (registrata per strada, con auto e voci) |
+
+Cosa c'è ora:
+- **Ricerca CC0** su Freesound, col filtro «Creative Commons 0», poi la licenza controllata sulla
+  pagina di ogni file. Ne sono stati scaricati sei, in anteprima ad alta qualità (mp3 a 128 kbit/s,
+  senza account): la mazzata di legno, il boing di scacciapensieri, il borsellino di monete, le
+  posate sul piatto, i passi in ciabatte e la risata di un vecchietto. Da ognuno è stato tagliato
+  il pezzo buono (`tools/audio/cc0/`). Fonti, autori, licenze e tratti usati sono in
+  [assets/audio/LICENZE.md](../assets/audio/LICENZE.md).
+- **I suoni della carta** (`tools/audio/sfx_napoli.py`, 11 nuovi). Partono dai pezzi CC0 o sono
+  fatti da codice, e passano dalla stessa costruzione degli altri (volume, eco della sala di
+  pietra, .ogg):
+  - `napoli_club_hit`: la mazzata di legno (CC0) col tonfo del peso sotto;
+  - `napoli_club_floor`: la stessa più bassa e sorda, con lo sbuffo di polvere (mazzata a vuoto);
+  - `napoli_boing`: il boing (CC0) della carta schiacciata;
+  - `napoli_swing`: il fruscio del bastone alzato e calato (da codice);
+  - `napoli_stars`: tre campanellini per le stelline (da codice);
+  - `napoli_pocket`: il bastone gigante che esce dalla tasca: fruscio di stoffa, un fischietto
+    che sale e un «pop» (da codice);
+  - `napoli_feast`: le posate sul piatto (CC0), quando il Viandante si siede a tavola;
+  - `napoli_coins`: il borsellino (CC0), per la faccia 3 e per il tasto E del nonno;
+  - `napoli_step_a` e `napoli_step_b`: le ciabatte del nonno (CC0), un passo ogni mezzo passo
+    delle gambe del modello;
+  - `napoli_laugh`: la risata del nonno (CC0), al suo Q e quando se ne va.
+  Gli altri 233 suoni del laboratorio sono rimasti identici.
+- **La tarantella** (`tools/audio/music_tarantella.py`, `assets/audio/music/tarantella.ogg`):
+  6/8, La minore, l'ottavo a 0,15 s, 32 battute (28,8 s) che girano senza giunture. Il mandolino
+  fa la melodia (arpeggi, scale, note lunghe in tremolo), la chitarra il passo «um-pa-pa», la
+  tammorra il colpo grave su 1 e 4 coi sonagli su ogni ottavo, le nacchere gli ottavi in mezzo. Alla
+  fine del giro c'è la cadenza napoletana (Si bemolle, Mi, La minore). Suona come le musiche di
+  Brawler, Fencer e Archer, `Lab_Music.Tarantella`.
+
+Verifiche (solo quello che la fase tocca):
+- `odin check src -vet -strict-style` pulito.
+- I test dei suoni del laboratorio e del banco dei suoni (ogni carta ha il suo suono, ogni suono
+  si carica) e un test nuovo (`test_lab_sounds_of_benvenuti_a_napoli`: mazzata e boing,
+  stelline, monete, posate, risata, tasca, la tarantella nelle due viste): **26 test** verdi.
+- Atto `napoli` del laboratorio, verde. Ora il nonno fa anche qualche passo indietro e dà una
+  mazzata a vuoto; alla fine l'atto controlla che si sia sentito ognuno degli 11 suoni nuovi
+  (mazzata 5, a vuoto 1, boing 5, fruscio 6, stelline 3, tasca 2, posate 1, monete 3, passi 4,
+  risata 1).
+- Non fatti, come chiesto: la verifica completa, la prova completa del laboratorio, il benchmark.
 
 ## Fase 7 — Nel gioco vero
 

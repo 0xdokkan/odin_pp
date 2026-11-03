@@ -353,3 +353,48 @@ test_lab_sounds_follow_the_shadow_never_its_footsteps :: proc(t: ^testing.T) {
 	steps := sounds.played[.Pilgrim_Move_Side]+sounds.played[.Pilgrim_Move_Up]+sounds.played[.Pilgrim_Move_Down]+sounds.played[.Pilgrim_Dodge]
 	testing.expect_value(t, steps, 0)
 }
+
+// BENVENUTI A NAPOLI (docs/piano-napoli.md, Fase 6): the club's blow whacks and
+// its squashed foe boings, its stagger rings the stars; the purse's gold is a
+// pouch of coins; cutlery at the table; the grandpa laughs at his Q; the pocket
+// as he takes his club up; the tarantella behind the club and the grandpa.
+@(test)
+test_lab_sounds_of_benvenuti_a_napoli :: proc(t: ^testing.T) {
+	renderer := new(Renderer)
+	defer free(renderer)
+	snapshot: Room_Presentation
+	renderer.tactical.snapshot = &snapshot
+	s: Lab_Sounds
+	impacts := 0
+	foe := game.enemy_entity(3)
+	blow := Presentation_Cue{kind = .Damage, started = true,
+		event = {kind = .Damaged, source = game.PLAYER_ENTITY, target = foe, amount = 8, visual_group = game.CLUB_VISUAL_GROUP}}
+	lab_cue_sounds(renderer, &s, &blow, 1, &impacts)
+	testing.expect(t, s.count == 2 && s.queue[0].sfx == .Napoli_Club_Hit && s.queue[1].sfx == .Napoli_Boing && s.queue[1].at > 1)
+	stagger := Presentation_Cue{kind = .Status_Applied, started = true,
+		event = {kind = .Status_Applied, target = foe, status = .Stagger, visual_group = game.CLUB_VISUAL_GROUP}}
+	lab_cue_sounds(renderer, &s, &stagger, 1, &impacts)
+	testing.expect(t, s.queue[s.count-1].sfx == .Napoli_Stars)
+	gold := Presentation_Cue{kind = .Gold_Gained, started = true, event = {kind = .Gold_Gained, amount = 15, card_definition = .Napoli}}
+	lab_cue_sounds(renderer, &s, &gold, 2, &impacts)
+	testing.expect(t, s.queue[s.count-1].sfx == .Napoli_Coins)
+	feast := Presentation_Cue{kind = .Napoli_Feast, started = true, event = {kind = .Napoli_Feast}}
+	lab_cue_sounds(renderer, &s, &feast, 3, &impacts)
+	testing.expect(t, s.queue[s.count-1].sfx == .Napoli_Feast)
+	cured := Presentation_Cue{kind = .Napoli_Nonno_Cured, started = true, event = {kind = .Napoli_Nonno_Cured, target = game.PLAYER_ENTITY}}
+	lab_cue_sounds(renderer, &s, &cured, 4, &impacts)
+	testing.expect(t, s.queue[s.count-1].sfx == .Napoli_Laugh)
+	renderer.tactical.first_person.weapon = .Nonno
+	begun := Presentation_Cue{kind = .First_Person_Begun, started = true, event = {kind = .First_Person_Begun, card_definition = .Napoli}}
+	lab_cue_sounds(renderer, &s, &begun, 5, &impacts)
+	testing.expect(t, s.queue[s.count-1].sfx == .Napoli_Pocket)
+	// The tarantella, in the lab, once the camera is behind his back.
+	f := &renderer.tactical.first_person
+	renderer.tactical.mechanics_lab = true
+	f.engaged, f.amount, f.changed = true, 1, 0
+	renderer.sprite_assets.elapsed = 2
+	for weapon in ([2]game.First_Person_Weapon{.Club, .Nonno}) {
+		f.weapon = weapon
+		testing.expect_value(t, first_person_music_track(renderer), audio.Lab_Music.Tarantella)
+	}
+}

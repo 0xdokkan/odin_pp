@@ -50,13 +50,15 @@ Lab_Bank :: struct {
 // The first person cards' music, stereo loops made from code and encoded by
 // tools/audio/encode_music.py: the fists' (32 s, tools/audio/music_brawler.py),
 // the sword's (40 s, tools/audio/music_fencer.py) and the bow's (37 s,
-// tools/audio/music_archer.py).
-Lab_Music :: enum u8 {None, Brawler, Fencer, Archer}
+// tools/audio/music_archer.py), and BENVENUTI A NAPOLI's tarantella behind
+// its club and its grandpa (29 s, tools/audio/music_tarantella.py).
+Lab_Music :: enum u8 {None, Brawler, Fencer, Archer, Tarantella}
 LAB_MUSIC_DATA := [Lab_Music][]u8{
 	.None = nil,
 	.Brawler = #load("../../../assets/audio/music/brawler.ogg"),
 	.Fencer = #load("../../../assets/audio/music/fencer.ogg"),
 	.Archer = #load("../../../assets/audio/music/archer.ogg"),
+	.Tarantella = #load("../../../assets/audio/music/tarantella.ogg"),
 }
 // Seconds to fade it in or out; its level against the effects.
 LAB_MUSIC_FADE :: f32(0.5)

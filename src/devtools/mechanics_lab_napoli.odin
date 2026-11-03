@@ -5,6 +5,7 @@ import "core:fmt"
 import "core:math"
 import "core:strings"
 import app "../engine/app"
+import audio "../engine/audio"
 import artifacts "artifacts"
 import game "../game"
 import level "../level"
@@ -108,6 +109,18 @@ mechanics_lab_napoli :: proc(window: ^app.Window, renderer: ^render.Renderer, di
 	if !mechanics_lab_napoli_visits(window, renderer, dice, room, data, controller, cards, buffer, arena) { return false }
 	if !mechanics_lab_napoli_club(window, renderer, dice, room, data, controller, cards, buffer, arena) { return false }
 	if !mechanics_lab_napoli_nonno(window, renderer, dice, room, data, controller, cards, buffer, arena) { return false }
+	// Fase 6: every sound of the card's own heard in the act (render/lab_sounds.odin).
+	if s := renderer.tactical.lab_sounds; s != nil {
+		heard := [?]audio.Lab_Sfx{.Napoli_Club_Hit, .Napoli_Club_Floor, .Napoli_Boing, .Napoli_Swing, .Napoli_Stars, .Napoli_Pocket,
+			.Napoli_Feast, .Napoli_Coins, .Napoli_Step_A, .Napoli_Step_B, .Napoli_Laugh}
+		for sfx in heard {
+			if s.played[sfx] == 0 { fmt.eprintln("mechanics lab: Benvenuti a Napoli's sound", sfx, "was never heard"); return false }
+		}
+		fmt.eprintf("mechanics lab napoli sounds: club %d, floor %d, boing %d, swing %d, stars %d, pocket %d, feast %d, coins %d, steps %d, laugh %d\n",
+			s.played[.Napoli_Club_Hit], s.played[.Napoli_Club_Floor], s.played[.Napoli_Boing], s.played[.Napoli_Swing], s.played[.Napoli_Stars],
+			s.played[.Napoli_Pocket], s.played[.Napoli_Feast], s.played[.Napoli_Coins], s.played[.Napoli_Step_A]+s.played[.Napoli_Step_B],
+			s.played[.Napoli_Laugh])
+	}
 	return true
 }
 
@@ -457,6 +470,17 @@ mechanics_lab_napoli_nonno :: proc(window: ^app.Window, renderer: ^render.Render
 	if n.club.last.hit != .Foe || 60-room.enemies[index].health != n.club.damage {
 		fmt.eprintln("mechanics lab: the grandpa's blow took", 60-room.enemies[index].health, "from the brute"); return false
 	}
+	// Fase 6: a few steps back in his sandals (S), then a blow on the floor where
+	// no foe is in his reach.
+	for _ in 0..<40 { frame(window, renderer, dice, room, controller, cards, buffer, &reel, {walk = {false, false, true, false}}) }
+	for _ in 0..<12 { frame(window, renderer, dice, room, controller, cards, buffer, &reel) }
+	fp.yaw = math.PI
+	floor_impacts := n.club.impacts
+	for _ in 0..<90 {
+		frame(window, renderer, dice, room, controller, cards, buffer, &reel, {fire = n.club.impacts == floor_impacts})
+		if n.club.impacts > floor_impacts && !n.club.blow.active { break }
+	}
+	if n.club.last.hit != .Floor { fmt.eprintln("mechanics lab: the grandpa's blow west struck", n.club.last.hit, "not the floor"); return false }
 	// Q: both cured; E: the gold.
 	player.health = 6
 	n.health = 10

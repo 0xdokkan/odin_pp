@@ -125,6 +125,8 @@ first_person_music_track :: proc(renderer: ^Renderer) -> audio.Lab_Music {
 	case .Fists: return .Brawler
 	case .Sword: return .Fencer
 	case .Bow: return .Archer
+	// BENVENUTI A NAPOLI: the tarantella behind the club and the grandpa (the user's choice).
+	case .Club, .Nonno: return .Tarantella
 	}
 	return .None
 }

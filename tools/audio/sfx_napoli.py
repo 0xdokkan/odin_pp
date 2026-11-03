@@ -18,6 +18,8 @@ sixth"; the mandolin's tremolo on paired unison strings: Wikipedia,
 or lower before the build's ceiling, like the world family. The marks are the
 recipe's own key moments in seconds; 0.0 is always the first sound.
 """
+import os
+
 import numpy as np
 
 from dsp import *  # noqa: F401,F403
@@ -92,3 +94,111 @@ def card_napoli(seed):
         (1.36, _norm(last), 0.75),
     ])
     return _finish(_limit(x, 0.7), D, fade_out=0.3)
+
+
+# --------------------------------------------------------------------------
+# Fase 6 (the user's choices of 2026-11-03): the card's own sounds. Where a CC0
+# recording was found (Freesound, each sound's page checked: Creative Commons 0)
+# the recipe starts from a cut of it, kept in tools/audio/cc0 (its source and
+# licence: assets/audio/LICENZE.md); the rest is made here. The build
+# masters them all alike (loudness, the stone hall).
+
+CC0_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cc0")
+
+
+def _cc0(name):
+    """A CC0 cut (tools/audio/cc0/<name>.wav), mono at dsp.SR."""
+    return read_wav(os.path.join(CC0_DIR, name + ".wav"))
+
+
+@sound("napoli_club_hit", loudness=-14, wet=0.18, rt60=0.8, marks=(0.0,),
+       note="the ace of clubs comes down on a foe: a wooden stick's whack on something soft (CC0, bmacphail) over a low "
+            "thud of its weight")
+def napoli_club_hit(seed):
+    whack = _norm(_cc0("napoli_whack"))
+    D = max(0.7, len(whack) / SR)
+    thud = sine(68, D) * env_perc(D, attack=0.002, decay=0.16, curve=3.0)
+    return _finish(_limit(place(D, [(0.0, whack, 0.9), (0.0, thud, 0.45)]), 0.75), D)
+
+
+@sound("napoli_club_floor", loudness=-21, wet=0.2, rt60=0.9, marks=(0.0,),
+       note="the club on the floor: the same whack, lower and duller, and a puff of dust")
+def napoli_club_floor(seed):
+    whack = lowpass(resample(_norm(_cc0("napoli_whack")), 0.78), 2200, 2)
+    D = max(0.75, len(whack) / SR)
+    dust = bandpass(white(0.3, seed), 1800, 0.8) * env_perc(0.3, attack=0.01, decay=0.12, curve=2.0)
+    return _finish(place(D, [(0.0, _norm(whack), 0.85), (0.01, _norm(dust), 0.25)]), D)
+
+
+@sound("napoli_boing", loudness=-17, wet=0.12, rt60=0.7, marks=(0.0,),
+       note="the struck card squashes and springs back: a jaw harp's boing (CC0, magnuswaker)")
+def napoli_boing(seed):
+    x = _norm(_cc0("napoli_boing"))
+    return _finish(x, len(x) / SR, fade_out=0.05)
+
+
+@sound("napoli_swing", loudness=-24, wet=0.1, rt60=0.6, marks=(0.0, 0.25),
+       note="the club raised and brought down: a short whoosh rising to the blow at 0.25")
+def napoli_swing(seed):
+    D = 0.34
+    air = sweep_bandpass(white(D, seed), 380, 1700, q=1.6) * env_swell(D, peak_at=0.72, power=2.5)
+    return _finish(air, D, fade_out=0.04)
+
+
+@sound("napoli_stars", loudness=-24, wet=0.3, rt60=1.2, marks=(0.0, 0.07, 0.14),
+       note="the stars round a staggered foe's head: three little bells, C, E, G two octaves up")
+def napoli_stars(seed):
+    D = 0.8
+    parts = []
+    for j, f in enumerate((2093.0, 2637.0, 3136.0)):
+        tone = sine(f, D) + 0.35 * sine(f * 2.76, D) + 0.12 * sine(f * 5.4, D)
+        parts.append((j * 0.07, tone * env_perc(D, attack=0.001, decay=0.28, curve=3.0), 0.5))
+    return _finish(place(D, parts), D, fade_out=0.1)
+
+
+@sound("napoli_pocket", loudness=-22, wet=0.15, rt60=0.8, marks=(0.0, 0.84, 1.2),
+       note="the grandpa's giant club comes out of his pocket: cloth rustles, and a slide whistle climbs as it grows "
+            "longer and longer, then a pop as it is out at 1.2")
+def napoli_pocket(seed):
+    D = 1.3
+    rustle = grains(D, random_times(D, 30, seed, end=0.9), 0.03, seed + 1, band=(600, 4000))
+    t = time_axis(1.0)
+    pitch = 320 * (1200 / 320) ** (t / 1.0) * (1 + 0.012 * np.sin(2 * np.pi * 6.0 * t))
+    whistle = sine(pitch, 1.0) * env_adsr(1.0, 0.05, 0.1, 0.8, 0.15)
+    pop = sine(900, 0.08) * env_perc(0.08, attack=0.001, decay=0.03)
+    return _finish(place(D, [(0.0, _norm(rustle), 0.35), (0.12, _norm(whistle), 0.4), (1.17, _norm(pop), 0.5)]), D)
+
+
+@sound("napoli_feast", loudness=-19, wet=0.15, rt60=0.8, marks=(0.0,),
+       note="sat down at the grandpa's table: cutlery on a plate (CC0, Closetwalrus)")
+def napoli_feast(seed):
+    x = _norm(_cc0("napoli_plate"))
+    return _finish(x, len(x) / SR, fade_out=0.05)
+
+
+@sound("napoli_coins", loudness=-18, wet=0.15, rt60=0.8, marks=(0.0,),
+       note="the grandpa's purse, and his E: a pouch of coins shaken (CC0, cupido-1)")
+def napoli_coins(seed):
+    x = _norm(_cc0("napoli_purse"))
+    return _finish(x, len(x) / SR, fade_out=0.08)
+
+
+@sound("napoli_step_a", loudness=-27, wet=0.1, rt60=0.6, marks=(0.0,),
+       note="the grandpa's step in his sandals (CC0, brumxyz), the left")
+def napoli_step_a(seed):
+    x = _norm(_cc0("napoli_step_a"))
+    return _finish(x, len(x) / SR, fade_out=0.04)
+
+
+@sound("napoli_step_b", loudness=-27, wet=0.1, rt60=0.6, marks=(0.0,),
+       note="the grandpa's step in his sandals (CC0, brumxyz), the right")
+def napoli_step_b(seed):
+    x = _norm(_cc0("napoli_step_b"))
+    return _finish(x, len(x) / SR, fade_out=0.04)
+
+
+@sound("napoli_laugh", loudness=-17, wet=0.15, rt60=0.8, marks=(0.0,),
+       note="the grandpa laughs (CC0, Cavernstones): his Q, and as he goes")
+def napoli_laugh(seed):
+    x = _norm(_cc0("napoli_laugh"))
+    return _finish(x, len(x) / SR, fade_out=0.08)

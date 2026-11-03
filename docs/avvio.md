@@ -113,7 +113,9 @@ stelline, `odin_pp_napoli_stelline.png`), una quarta che lo uccide a frittella (
 camera contro un muro; infine il nonno (faccia 4): il bastone esce dalla tasca, una mazzata al bruto, Q ed E, il colpo
 del bruto sulla vita del nonno e il nonno che se ne va a vita zero (`odin_pp_napoli_nonno_NN.png`,
 `odin_pp_napoli_nonno_tasca.png`, `_colpo.png`, `_q.png`, `_se_ne_va.png`); i modelli 3D da vicino in
-`odin_pp_napoli_viandante.png` e `odin_pp_napoli_nonno_3d.png` (`odin_pp_napoli_club_muro.png`). Nello smoke completo gira
+`odin_pp_napoli_viandante.png` e `odin_pp_napoli_nonno_3d.png`; alla fine controlla che si siano sentiti tutti i suoni della carta
+(mazzata, boing, fruscio, stelline, tasca, posate, monete, ciabatte, risata) e, col bastone e col nonno, suona la
+tarantella (`odin_pp_napoli_club_muro.png`). Nello smoke completo gira
 per ultimo.
 Con `ODIN_PP_LAB_ONLY=fps` e `ODIN_PP_LAB_TIMING=1` l'atto di First Person Shooter si ferma dopo la discesa negli occhi e misura
 600 fotogrammi con l'AK che spara, senza limite di fotogrammi né vsync (riga `FIRST PERSON TIMING`; meglio con una build `-o:speed`).
