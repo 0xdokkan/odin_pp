@@ -62,7 +62,7 @@ MECHANICS_LAB_FIRST_PERSON_BRUTE :: grid.Position{x = 17, y = 9}
 // - low walls (the step stops, the sight goes over) at x 5..8, y 6, and at x 17, y 9..12;
 // - three covers (MECHANICS_LAB_IA_COVERS);
 // - a chaser, an archer, a brute and a bomber (MECHANICS_LAB_IA_FOES).
-MECHANICS_LAB_IA_DECK :: [9]game.Card_Id{.IA, .Strike, .Guard, .Firebomb, .Dash, .Shove, .Arc_Bolt, .Heavy_Blow, .Spider_Nest}
+MECHANICS_LAB_IA_DECK :: [10]game.Card_Id{.IA, .Strike, .Guard, .Firebomb, .Dash, .Shove, .Arc_Bolt, .Heavy_Blow, .Spider_Nest, .Queen}
 MECHANICS_LAB_IA_COVERS :: [3]grid.Position{{x = 9, y = 10}, {x = 13, y = 6}, {x = 15, y = 11}}
 MECHANICS_LAB_IA_FOES :: [4]game.Enemy_Spawn{
 	{position = {x = 4, y = 4}, health = 12, attack = 2, archetype = .Chaser},

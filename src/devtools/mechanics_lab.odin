@@ -118,6 +118,9 @@ run_mechanics_lab_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer,
 	} else if only == "nido" {
 		// The Nido di ragni alone (docs/piano-ia.md, Fase 9).
 		return mechanics_lab_nest(window, renderer, &room, &data, &controller, &cards, &buffer)
+	} else if only == "regina" {
+		// The Regina alone (docs/piano-ia.md, Fase 11).
+		return mechanics_lab_queen(window, renderer, &room, &data, &controller, &cards, &buffer)
 	}
 	artifacts.screenshot("odin_pp_mechanics_lab.png")
 	if !mechanics_lab_card_words(renderer, &player) { return false }
@@ -292,6 +295,8 @@ run_mechanics_lab_smoke :: proc(window: ^app.Window, renderer: ^render.Renderer,
 	if !mechanics_lab_ia(window, renderer, &room, &data, &controller, &cards, &buffer) { return false }
 	// Then the Nido di ragni (docs/piano-ia.md, Fase 9).
 	if !mechanics_lab_nest(window, renderer, &room, &data, &controller, &cards, &buffer) { return false }
+	// Then the Regina (docs/piano-ia.md, Fase 11).
+	if !mechanics_lab_queen(window, renderer, &room, &data, &controller, &cards, &buffer) { return false }
 	return mechanics_lab_sounds_heard(renderer)
 }
 

@@ -117,6 +117,8 @@ draw_voxel_object :: proc(renderer: ^Renderer, object: Presentation_Grid_Object)
 	case .Napoli_Table: draw_napoli_table(renderer, {p.x, bounds.min.y, p.z}, 0, napoli_table_bites(object.life))
 	// NIDO DI RAGNI (spider_nest_view.odin).
 	case .Spider_Nest: draw_spider_nest(renderer, object, bounds)
+	// REGINA (queen_view.odin).
+	case .Queen: draw_queen_object(renderer, object, bounds)
 	case .Ice_Block:
 		tint = {102, 151, 162, 255}
 		draw_resin_cube_v(renderer, p, size, tint)

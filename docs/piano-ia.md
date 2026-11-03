@@ -225,7 +225,7 @@ comunque nel momento in cui i rami si uniscono.
 | 8 | Aspetto e suoni della IA: icona, conto alla rovescia, accensione, suoni da codice | 5 | Fatta | vedi Esito |
 | 9 | Nido di ragni: regole e prototipo nel laboratorio; la IA lo conosce | 7 | Fatta | vedi Esito |
 | 10 | Nido di ragni: aspetto e suoni | 9 | Fatta | vedi Esito |
-| 11 | Regina: regole e prototipo nel laboratorio; la IA la conosce | 7 | Da fare | — |
+| 11 | Regina: regole e prototipo nel laboratorio; la IA la conosce | 7 | Fatta | vedi Esito |
 | 12 | Regina: aspetto e suoni | 11 | Da fare | — |
 | 13 | Lanciafiamme: regole e prototipo nel laboratorio; la IA lo conosce | 7 | Da fare | — |
 | 14 | Lanciafiamme: aspetto e suoni | 13 | Da fare | — |
@@ -1638,7 +1638,8 @@ Fatta, coi numeri proposti. **Cambiamenti rispetto al piano, spiegati:**
   faceva Refocus per riprenderlo persino sotto un fendente.
 - **Regola nuova per la IA:** un Refocus come prima mossa che serve a posare un dispositivo costa fino a 2 punti
   (`REFOCUS_PRICE`). Girare la mano regala un secondo: prima si fa quello che si può fare subito, come uccidere un nemico.
-  Vale solo per i dispositivi: un prezzo su ogni Refocus faceva perdere 5 di vita nell'arena delle strutture.
+  Vale solo per i dispositivi: un prezzo su ogni Refocus faceva perdere 5 di vita nell'arena delle strutture. La Fase 11 ha
+  sostituito questo prezzo con una regola più netta (vedi il suo Esito).
 - **Il puzzle della Guardia** ora guarda l'esito: la IA non resta ferma e la freccia non costa vita. Con 9 carte nel mazzo la
   sua risposta non è più sempre la Guardia: può correre verso l'arciere (da vicino il suo tiro salta) o fare un Refocus che
   riporta in tempo tutta la mano.
@@ -1751,6 +1752,36 @@ Check della fase: i test della carta e del consigliere; gli atti `regina` e `ia`
 
 **Fatto quando:** nel laboratorio la Regina funziona come deciso e la IA la usa bene nei suoi puzzle; i test sono
 verdi.
+
+### Esito (4 novembre 2026)
+
+Fatta, coi numeri proposti. La Regina non ferma la vista; sigla `REG`, icona provvisoria nella cella 39, suono provvisorio
+`card_queen` ([tools/audio/sfx_queen.py](../tools/audio/sfx_queen.py)). Le regole stanno in
+[game/queen.odin](../src/game/queen.odin). La Fase 12 farà aspetto e suoni veri.
+
+**Cambiamenti rispetto al piano, spiegati:**
+
+- **Quando guarda:** a ogni fotogramma in cui il mondo corre, con lo stesso comando delle frecce, e prima di ogni battito.
+  Il piano diceva «a fine battito e dopo ogni comando»: così è più semplice e copre anche il momento in cui finisce di
+  aspettare i suoi 2 secondi.
+- **I 2 secondi di attesa** stanno nell'orologio del giocatore (`Tactical_State.queen_wait`): la Regina è una sola e la stanza
+  resta di 9208 byte.
+- **Linee:** lunghe al massimo 24 caselle, per le mappe grandi; anche un dislivello troppo alto ne ferma una.
+- **Il primo puzzle** segue la IA nel gioco vero per 2 secondi e guarda che il nemico più vicino sia quello colpito.
+- **Il puzzle del corridoio** guarda l'esito: la Regina resta posata, il bruto prende i suoi colpi e il Viandante non perde
+  vita. Che la Regina vada proprio per prima mossa non è richiesto: a volte conviene farsi avanti e posarla dopo.
+- **Il puzzle dell'angolo** controlla la prima casella provata e il consiglio: mai sull'unica via d'uscita.
+
+**Corretto strada facendo:** con Regina e Nido negli scarti la IA faceva troppi Refocus per riprenderli, anche invece di
+uccidere un nemico o di uscire dalla linea di un arciere. **La regola della Fase 9 è cambiata:** niente più prezzo fino a 2
+punti. Se la prima mossa è un Refocus, un dispositivo posato dopo vale solo per quello che fa dentro l'orizzonte, non per quello
+che farà dopo. Il valore della Regina oltre l'orizzonte si ferma a 8 battiti come il Nido, e insieme al Nido non può superare la
+vita che resta ai nemici. La carta l'ho provata col gioco vero dal primo test.
+
+**Da sapere:** il mazzo dell'arena IA ora ha 10 carte. La mano le mostra tutte, un po' più strette, e qualche scritta si taglia:
+è solo il laboratorio. **L'atlante delle icone è pieno:** il Lanciafiamme (Fase 14) dovrà aggiungere una riga.
+
+**Non verificato:** a mano. Aspetto e suono sono provvisori fino alla Fase 12.
 
 ## Fase 12 — Regina: aspetto e suoni
 

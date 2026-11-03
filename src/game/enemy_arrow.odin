@@ -137,6 +137,7 @@ tactical_flight_tick :: proc(room: ^Room, seconds: f32) {
 	if room.arrows.count > 0 { room.arrows.pending += seconds }
 	if room.bombs.count > 0 { room.bombs.pending += seconds }
 	if room.player != nil && room.player.tactical.spiders.count > 0 { room.player.tactical.spiders.pending += seconds }
+	if room.player != nil { room.player.tactical.queen_wait = max(0, room.player.tactical.queen_wait-seconds) }
 }
 
 // Seconds wait to be flown and nothing holds the world: the controller
@@ -147,7 +148,7 @@ tactical_flights_due :: proc(room: ^Room) -> bool {
 	spiders := &room.player.tactical.spiders
 	return (room.arrows.count > 0 && room.arrows.pending > ENEMY_ARROW_EPSILON) ||
 	       (room.bombs.count > 0 && room.bombs.pending > ENEMY_ARROW_EPSILON) ||
-	       (spiders.count > 0 && spiders.pending > ENEMY_ARROW_EPSILON)
+	       (spiders.count > 0 && spiders.pending > ENEMY_ARROW_EPSILON) || queen_is_due(room)
 }
 
 // The seconds waiting, flown out into room.recent_events: every arrow's and
@@ -173,6 +174,7 @@ fly_enemy_flights :: proc(room: ^Room, pulse: ^Pulse_Report, beat := false) {
 	fly_enemy_arrows(room, pulse)
 	if room.phase == .Combat { fly_enemy_bombs(room, pulse, beat) }
 	if room.phase == .Combat { run_spiderlings(room, pulse) }
+	if room.phase == .Combat { queen_strike(room, pulse) }
 }
 
 @(private)

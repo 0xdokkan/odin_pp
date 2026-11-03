@@ -6,6 +6,22 @@ Qui si segna ogni carta tolta dal gioco o cambiata, con quello che faceva, così
 futuro. Le voci più recenti stanno in cima. Per ritrovare il commit di una voce:
 `git log --all --grep "<titolo del commit>"`.
 
+## 2026-11-04 — Carta nuova: Regina (solo laboratorio)
+
+Commit **«Piano IA, Fase 11 fatta: Regina»** sul ramo `piano-ia` ([piano](piano-ia.md), Fase 11). Carta nuova `Queen`,
+«Regina», sigla REG, rara, 3 energia, prezzo 8, peso 60, 60 in spedizione, solo laboratorio (`.Lab_Only`), nel mazzo
+dell'arena IA. Si posa su una casella libera a 1-3 caselle, in vista, una sola alla volta, e resta 20 s del mondo. Occupa la
+sua casella: ferma i passi di tutti ma non la vista, e nessuno la può colpire né distruggere. Guarda le 8 linee della regina
+degli scacchi, fermate da muri, muretti, coperture, oggetti solidi e corpi (anche il Viandante), lunghe al massimo 24 caselle.
+Appena un nemico è in linea corre fino alla casella accanto a lui, resta lì e lo colpisce per 4 (+1 a potenziamento, massimo 2
+potenziamenti; sul tick 6), poi aspetta 2 s. Fra più nemici sceglie il più vicino lungo la linea; a pari distanza l'ordine
+fisso nord, nord-est, est... Finito il combattimento sparisce. Aspetto e suono sono provvisori fino alla Fase 12.
+
+**IA aggiornata:** la IA conosce la Regina: la gioca nella copia con le regole vere, prova le caselle che vedono più nemici e
+mai una che chiude l'ultima via d'uscita, conta i colpi che restano (al massimo 8 battiti, mai più della vita che resta ai
+nemici). Se la prima mossa è un Refocus, un dispositivo posato dopo vale solo per quello che fa dentro l'orizzonte. Puzzle: `test_advisor_queen_hits_the_nearest`, `test_advisor_queen_closes_the_corridor`,
+`test_advisor_no_queen_in_the_corner`.
+
 ## 2026-11-04 — Nido di ragni: aspetto e suoni (solo laboratorio)
 
 Commit **«Piano IA, Fase 10 fatta: aspetto e suoni del Nido»** sul ramo `piano-ia` ([piano](piano-ia.md), Fase 10). Regole e
@@ -33,7 +49,7 @@ ragnetti. Aspetto e suono sono provvisori fino alla Fase 10; la scheda del nemic
 **IA aggiornata:** la IA conosce il Nido: lo gioca nella copia con le regole vere, prova 4 caselle appena fuori dalla
 portata dei nemici e 2 accanto a un nemico (l'esca), evita quelle sotto un colpo annunciato, e conta i ragnetti ancora da
 fare e quelli in corsa (dopo l'orizzonte al massimo 8 battiti, come gli altri dispositivi), mai più della vita che resta
-ai nemici. Un Refocus come prima mossa fatto per posare un dispositivo le costa fino a 2 punti: prima fa quello che può fare subito. Puzzle: `test_advisor_nest_away_from_the_brute`,
+ai nemici. Un Refocus come prima mossa fatto per posare un dispositivo le costa fino a 2 punti: prima fa quello che può fare subito (dalla Regina la regola è più netta, vedi sopra). Puzzle: `test_advisor_nest_away_from_the_brute`,
 `test_advisor_nest_as_bait`, `test_advisor_strike_before_the_nest`.
 
 ## 2026-11-03 — IA: aspetto e suoni (solo laboratorio)

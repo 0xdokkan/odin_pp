@@ -757,6 +757,88 @@ test_advisor_nest_as_bait :: proc(t: ^testing.T) {
 	testing.expectf(t, nest > walk, "the nest in the chaser's way is worth %.2f, walking and waiting %.2f", nest, walk)
 }
 
+// The cell of an advised Queen.
+@(private = "file")
+queen_test_cell :: proc(room: ^game.Room, advice: advisor.Advice) -> (cell: grid.Position, ok: bool) {
+	if !advice_is_card(room, advice, .Queen) { return }
+	return advice.cell, true
+}
+
+// Two chasers on one diagonal, the nearer in front: set down in line with them the Queen, in the game, strikes the nearest.
+@(test)
+test_advisor_queen_hits_the_nearest :: proc(t: ^testing.T) {
+	data: level.Level
+	defer level.destroy(&data)
+	player: game.Player
+	room := search_test_arena(t, &data, &player)
+	defer game.destroy_room(&room)
+	search: advisor.Search
+	testing.expect(t, advisor.search_init(&search))
+	defer advisor.search_destroy(&search)
+	search_test_puzzle(t, &room, {x = 11, y = 12}, {{.Chaser, {x = 14, y = 9}, 30}, {.Chaser, {x = 16, y = 7}, 30}}, {.Queen})
+	advice := search_test_advice(&search, &room)
+	cell, ok := queen_test_cell(&room, advice)
+	testing.expectf(t, ok, "the IA does not set the Queen down: %v to %v", advice.kind, advice.cell)
+	if !ok { search_test_log_values(&search); return }
+	testing.expect(t, game.queen_lines_seen(&room, cell) > 0)
+	search_test_follow(&room, &search, true, 2)
+	testing.expectf(t, room.enemies[0].health < room.enemies[1].health, "the nearest has %d, the other %d", room.enemies[0].health, room.enemies[1].health)
+}
+
+// Shut in a dead end, a brute coming up the only way in: following the IA the Queen goes down, the brute takes her blows
+// and the player loses no life.
+@(test)
+test_advisor_queen_closes_the_corridor :: proc(t: ^testing.T) {
+	data: level.Level
+	defer level.destroy(&data)
+	player: game.Player
+	room := search_test_arena(t, &data, &player)
+	defer game.destroy_room(&room)
+	search: advisor.Search
+	testing.expect(t, advisor.search_init(&search))
+	defer advisor.search_destroy(&search)
+	for cell in ([?]grid.Position{{x = 10, y = 12}, {x = 12, y = 12}, {x = 11, y = 11}, {x = 10, y = 11}, {x = 12, y = 11}, {x = 10, y = 13}, {x = 12, y = 13}, {x = 10, y = 14}, {x = 12, y = 14}}) {
+		testing.expect(t, level.set_tile(&data, cell, {kind = .Wall}))
+	}
+	search_test_puzzle(t, &room, {x = 11, y = 12}, {{.Brute, {x = 11, y = 15}, 40}}, {.Queen})
+	room.player.tactical.dodge_recovery = game.TACTICAL_DODGE_RECOVERY+1
+	lost := search_test_follow(&room, &search, true, 6)
+	testing.expectf(t, lost == 0, "the brute cost %d of life", lost)
+	testing.expectf(t, game.emplacement_count(&room, .Queen) == 1, "no Queen in the corridor")
+	testing.expectf(t, room.enemies[0].health <= 40-game.QUEEN_BASE_DAMAGE, "the brute has %d", room.enemies[0].health)
+}
+
+// In a pocket with one way out, a foe beyond it: the Queen never goes on that one way out.
+@(test)
+test_advisor_no_queen_in_the_corner :: proc(t: ^testing.T) {
+	data: level.Level
+	defer level.destroy(&data)
+	player: game.Player
+	room := search_test_arena(t, &data, &player)
+	defer game.destroy_room(&room)
+	search: advisor.Search
+	testing.expect(t, advisor.search_init(&search))
+	defer advisor.search_destroy(&search)
+	for cell in ([?]grid.Position{{x = 10, y = 12}, {x = 12, y = 12}, {x = 11, y = 11}}) {
+		testing.expect(t, level.set_tile(&data, cell, {kind = .Wall}))
+	}
+	search_test_puzzle(t, &room, {x = 11, y = 12}, {{.Chaser, {x = 11, y = 16}, 30}}, {.Queen})
+	way_out := grid.Position{x = 11, y = 13}
+	targets: [advisor.MAX_CARD_TARGETS]advisor.Card_Target
+	card, found := game.Card_Instance{}, false
+	for held in room.player.deck.hand[:room.player.deck.hand_count] {
+		if held.definition_id == .Queen { card, found = held, true }
+	}
+	testing.expect(t, found)
+	count := advisor.card_targets(&room, card, &targets)
+	testing.expect(t, count > 0)
+	best := targets[0]
+	testing.expectf(t, best.cell != way_out, "the first cell tried for the Queen shuts the player in: %v", best.cell)
+	advice := search_test_advice(&search, &room)
+	cell, queen := queen_test_cell(&room, advice)
+	testing.expectf(t, !queen || cell != way_out, "the IA shuts the player in with the Queen: %v", cell)
+}
+
 // A foe of 3 life beside the player (2 the bump kills, no card spent), another far: the Strike kills it now, the nest can
 // wait.
 @(test)

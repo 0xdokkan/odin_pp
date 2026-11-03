@@ -93,6 +93,8 @@ Card_Id :: enum {
 	IA,
 	// NIDO DI RAGNI: a nest whose spiderlings bite the foes (spider_nest.odin, docs/piano-ia.md), lab only.
 	Spider_Nest,
+	// REGINA: a chess queen on the board, along her eight lines (queen.odin, docs/piano-ia.md), lab only.
+	Queen,
 	Count,
 }
 
@@ -131,6 +133,7 @@ card_in_collection :: proc(id: Card_Id) -> bool {
 // The kind of object an emplacement card sets down.
 card_emplacement_kind :: proc(id: Card_Id) -> Grid_Object_Kind {
 	if id == .Spider_Nest { return .Spider_Nest }
+	if id == .Queen { return .Queen }
 	return .Devouring_Hole if id == .Devouring_Hole else .Field_Cannon
 }
 // A card the player aims with the mouse wheel before he plays it.
@@ -1335,6 +1338,18 @@ CARD_DEFINITIONS := [Card_Id]Card_Definition{
 		effects = {{kind = .Place_Spider_Nest, target = .Player, base_amount = SPIDER_BITE_DAMAGE, amount_per_upgrade = 1, duration = SPIDER_NEST_SECONDS}, {}, {}, {}},
 		effect_count = 1,
 	},
+	.Queen = {
+		upgrade_limit = QUEEN_MAX_UPGRADE_LEVEL, time_cost = 2,
+		traits = {.Emplacement, .Lab_Only},
+		// REGINA: a chess queen on a free cell, for 20 world seconds, one at a time: she runs down her lines to the first foe
+		// on them and strikes for 4 (+1 an upgrade), then waits 2 seconds; she stops the steps and nothing strikes her
+		// (queen.odin).
+		id = .Queen, name = "Regina", rarity = .Rare,
+		reward_weight = 60, shop_base_price = 8, cost = 3,
+		targeting = {rule = .Walkable_Cell, cast_range = {.Chebyshev, 1, 3}, shape = .Single, requires_line_of_sight = true, stops_on_wall = true},
+		effects = {{kind = .Place_Queen, target = .Player, base_amount = QUEEN_BASE_DAMAGE, amount_per_upgrade = 1, duration = QUEEN_SECONDS}, {}, {}, {}},
+		effect_count = 1,
+	},
 	.Count = {id = .Count},
 }
 
@@ -1484,7 +1499,7 @@ card_effect_template_is_valid :: proc(
 		return template.target == .Player && definition.targeting.rule == .Self && template.duration > 0 &&
 		       card_amount_template_is_valid(template)
 	// A cell to set an emplacement on; the Dinosauro's ride on the player.
-	case .Place_Cannon, .Open_Black_Hole, .Place_Spider_Nest:
+	case .Place_Cannon, .Open_Black_Hole, .Place_Spider_Nest, .Place_Queen:
 		return template.target == .Player && definition.targeting.rule == .Walkable_Cell && definition.targeting.shape == .Single &&
 		       template.duration > 0 && card_amount_template_is_valid(template)
 	case .Ride, .Napoli:
@@ -1701,6 +1716,8 @@ instantiate_card_effect :: proc(
 		return ia_effect(card_effect_amount(template, instance.upgrade_level)), true
 	case .Place_Spider_Nest:
 		return place_spider_nest_effect(card_effect_amount(template, instance.upgrade_level), template.duration), true
+	case .Place_Queen:
+		return place_queen_effect(card_effect_amount(template, instance.upgrade_level), template.duration), true
 	}
 	return {}, false
 }
@@ -2155,7 +2172,7 @@ compile_card_action :: proc(
 			continue
 		}
 		effect, instantiated := instantiate_card_effect(template, entry.entity, instance)
-		if effect.kind == .Deploy_Device || effect.kind == .Place_Ground || effect.kind == .Flood_Wave || effect.kind == .Place_Cannon || effect.kind == .Open_Black_Hole || effect.kind == .Place_Spider_Nest {
+		if effect.kind == .Deploy_Device || effect.kind == .Place_Ground || effect.kind == .Flood_Wave || effect.kind == .Place_Cannon || effect.kind == .Open_Black_Hole || effect.kind == .Place_Spider_Nest || effect.kind == .Place_Queen {
 				effect.destination = evaluation.query.anchor
 			}
 			// A cannon's way: the wheel's, else the way from the player to its cell.

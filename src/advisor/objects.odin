@@ -36,6 +36,9 @@ object_knowledge :: proc(kind: game.Grid_Object_Kind) -> Object_Knowledge {
 	// 20 would have the IA refocus for it even under a blow); what the foes take off it is the copy's own, within the
 	// horizon.
 	case .Spider_Nest: return {worth_a_beat = 0.5, beats = 8, why = "il nido fa ancora un ragnetto ogni due battiti"}
+	// A blow of her `power` every two beats, a foe on her lines about half of the time: a quarter of a blow a beat. Her cell
+	// stops the player's steps too: that the copy knows.
+	case .Queen: return {worth_a_beat = 0.25, beats = 8, why = "la Regina colpisce ancora chi entra nelle sue linee"}
 	case .Count:
 	}
 	return {}
@@ -50,7 +53,7 @@ objects_value :: proc(room: ^game.Room) -> (value: f32) {
 		beats := object.life if object.life > 0 else object.device_charges
 		power := object.power if object.power > 0 else max(object.device_damage, 1)
 		worth := known.worth_a_beat*f32(min(beats, known.beats))*f32(power)
-		if object.kind == .Spider_Nest { bites += worth } else { value += worth }
+		if object.kind == .Spider_Nest || object.kind == .Queen { bites += worth } else { value += worth }
 	}
 	// The spiderlings on their way: each a bite still to come. They bite no more than the foes have left.
 	spiders := &room.player.tactical.spiders

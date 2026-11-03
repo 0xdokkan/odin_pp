@@ -122,6 +122,7 @@ test_dice_cards_climb_the_ladder_from_d4_to_d20 :: proc(t: ^testing.T) {
 		// The IA's seconds grow five times, as the views' do (docs/piano-ia.md).
 		if id == .IA { top = IA_MAX_UPGRADE_LEVEL }
 		if id == .Spider_Nest { top = SPIDER_NEST_MAX_UPGRADE_LEVEL }
+		if id == .Queen { top = QUEEN_MAX_UPGRADE_LEVEL }
 		testing.expect_value(t, card_max_upgrade_level(id), top)
 		for level in i32(-1)..=MAX_CARD_UPGRADE_LEVEL {
 			expected := i32(0)

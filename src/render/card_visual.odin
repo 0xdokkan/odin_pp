@@ -157,6 +157,9 @@ CARD_VISUALS := [game.Card_Id]Card_Visual{
 	// NIDO DI RAGNI (docs/piano-ia.md): icon and sound provisional until its Fase 10 (a cobweb, NDR).
 	.Spider_Nest = {icon = 38, short_name = "NDR", accent = .Purple, sound = .Card_Spider_Nest, narrow_name = "Nido",
 		fill = {38, 32, 46, 245}, outline = {206, 200, 220, 255}},
+	// REGINA (docs/piano-ia.md): icon and sound provisional until its Fase 12 (a chess queen, REG).
+	.Queen = {icon = 39, short_name = "REG", accent = .Gold, sound = .Card_Queen, narrow_name = "Regina",
+		fill = {50, 42, 34, 245}, outline = {226, 214, 186, 255}},
 	.Count = {icon = 0, short_name = "", accent = .Red,
 		fill = {45, 49, 52, 245}, outline = {105, 116, 116, 255}},
 }

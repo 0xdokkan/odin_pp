@@ -665,6 +665,7 @@ card_demo_expected_events :: proc(id: Card_Id, upgrade_level: i32 = 0, take := 0
 		// IA: its seconds begin (the advisor's hints are the film of the plan's last phase).
 		case .IA: events += {.IA_Begun}
 		case .Place_Spider_Nest: events += {.Object_Spawned, .Spider_Hatched}
+		case .Place_Queen: events += {.Object_Spawned}
 		}
 	}
 	// A dice card shows its roll; the Dado del Destino's die rolls at the bump

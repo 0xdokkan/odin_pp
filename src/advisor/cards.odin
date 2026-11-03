@@ -56,6 +56,7 @@ ADVISOR_CARDS := [game.Card_Id]Advisor_Card{
 	.First_Person_Brawler = VIEW, .First_Person_Fencer = VIEW, .First_Person_Archer = VIEW,
 	.Napoli = {use = .Never, why = "il D4 può aprire una vista (il bastone, il nonno): quanto vale non si simula", puzzle = EVERY_CARD},
 	.IA = {use = .Never, why = "la IA non consiglia se stessa: rigiocata ripartirebbe dai suoi secondi", puzzle = EVERY_CARD},
+	.Queen = {use = .Advised, why = "corre sulle sue linee e colpisce; ferma i passi anche a te", puzzle = "test_advisor_queen_hits_the_nearest, test_advisor_queen_closes_the_corridor, test_advisor_no_queen_in_the_corner"},
 	.Spider_Nest = {use = .Advised, why = "ragnetti che mordono; il nido attira chi gli sta accanto", puzzle = "test_advisor_nest_away_from_the_brute, test_advisor_nest_as_bait, test_advisor_strike_before_the_nest"},
 	.Count = {use = .Never, why = "nessuna carta"},
 }
@@ -90,6 +91,7 @@ effect_value :: proc(kind: game.Effect_Kind) -> f32 {
 	case .Napoli: return 0
 	case .IA: return 0
 	case .Place_Spider_Nest: return 2
+	case .Place_Queen: return 2
 	}
 	return 0
 }
@@ -149,6 +151,19 @@ direction_to :: proc(from, to: grid.Position) -> game.Move_Direction {
 	return .South if dy > 0 else .North
 }
 
+// Whether a piece on `cell`, next to the player, leaves him one way out or none.
+@(private = "file")
+shuts_the_player :: proc(room: ^game.Room, cell: grid.Position) -> bool {
+	p := room.player.position
+	if manhattan(p, cell) != 1 { return false }
+	ways := 0
+	for direction in game.Move_Direction {
+		step := game.add_position(p, game.direction_offset(direction))
+		if step != cell && step_is_free(room, step) { ways += 1 }
+	}
+	return ways <= 1
+}
+
 // The few best targets of a card in hand now, as the mouse would aim them: every cell in its reach tried with
 // game.card_drop_target (on a foe's cell, the foe), the same target once, guessed by the foes its shape takes, the worth
 // of its effects, how near a foe it lands, and (for a card set on a free cell: the player, a nest) whether the cell is
@@ -188,7 +203,12 @@ card_targets :: proc(room: ^game.Room, card: game.Card_Instance, out: ^[MAX_CARD
 				guess = -abs(f32(nearest-2))
 				if nearest == 1 { guess = 1 if beside < 2 else -100; beside += 1 }
 			}
-			if carries && cell_threat(room, cell) > 0 { guess -= 20 }
+			// THE QUEEN: the cells that see the most foes on her lines, never one that shuts the player in; nothing strikes her,
+			// so a cell under a blow is as good as any.
+			if card.definition_id == .Queen {
+				guess = 10*f32(game.queen_lines_seen(room, cell))-0.5*f32(nearest if nearest != max(int) else 0)
+				if shuts_the_player(room, cell) { guess -= 100 }
+			} else if carries && cell_threat(room, cell) > 0 { guess -= 20 }
 			// Kept in order, best first; the first of equals stays first.
 			slot := count
 			for slot > 0 && guess > out[slot-1].guess { slot -= 1 }

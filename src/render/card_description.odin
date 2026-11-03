@@ -108,6 +108,8 @@ gothic_card_lines :: proc(card: game.Card_Instance) -> (cstring, cstring) {
 	// IA (game/ia.odin): its seconds of advice.
 	case .IA: return fmt.ctprintf("%ds: LA MOSSA MIGLIORE", a), "PASSO / COLPO / CARTA"
 	// NIDO DI RAGNI (game/spider_nest.odin): its bite, its seconds.
+	// REGINA (game/queen.odin): her blow, her seconds.
+	case .Queen: return fmt.ctprintf("CORRE E COLPISCE %d", a), fmt.ctprintf("%ds / 8 LINEE / UNA SOLA", game.QUEEN_SECONDS)
 	case .Spider_Nest: return fmt.ctprintf("RAGNETTI: MORSO %d", a), fmt.ctprintf("NIDO %ds / -3s A COLPO", game.SPIDER_NEST_SECONDS)
 	case .Sei_Denari, .Sette_Denari: return fmt.ctprintf("+%d ORO", a), "SCOPA / UNA VOLTA PER STANZA"
 	case .Firebomb: return fmt.ctprintf("%d DANNI NEL %dX%d", a, d.targeting.radius*2+1, d.targeting.radius*2+1), "ACCENDE I BARILI"
@@ -187,6 +189,7 @@ gothic_card_narrow_lines :: proc(card: game.Card_Instance) -> (first, second: cs
 	case .Napoli: return "D4 NAPOLI", "4 SORPRESE", true
 	case .IA: return fmt.ctprintf("IA %ds", a), "CONSIGLI", true
 	case .Spider_Nest: return fmt.ctprintf("NIDO MORSO %d", a), fmt.ctprintf("%ds", game.SPIDER_NEST_SECONDS), true
+	case .Queen: return fmt.ctprintf("COLPO %d", a), fmt.ctprintf("%ds", game.QUEEN_SECONDS), true
 	}
 	return
 }

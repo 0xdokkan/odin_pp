@@ -130,6 +130,7 @@ Effect_Kind :: enum {
 	IA,
 	// NIDO DI RAGNI: a nest on `destination`, its bites `amount`, `duration` beats (spider_nest.odin).
 	Place_Spider_Nest,
+	Place_Queen,
 }
 
 Effect :: struct {
@@ -536,6 +537,9 @@ effect_is_valid :: proc(room: ^Room, effect: Effect) -> bool {
 	case .Place_Spider_Nest:
 		return effect.target == PLAYER_ENTITY && effect.amount > 0 && effect.duration > 0 &&
 		       emplacement_can_place(room, .Spider_Nest, effect.destination)
+	case .Place_Queen:
+		return effect.target == PLAYER_ENTITY && effect.amount > 0 && effect.duration > 0 &&
+		       emplacement_can_place(room, .Queen, effect.destination)
 	case .Place_Cannon:
 		return effect.target == PLAYER_ENTITY && effect.amount > 0 && effect.duration > 0 && effect.charges >= 0 && effect.charges < 4 &&
 		       emplacement_can_place(room, .Field_Cannon, effect.destination)
@@ -909,6 +913,9 @@ apply_effect :: proc(room: ^Room, source: Entity_Ref, effect: Effect, report: ^A
 		assert(swept)
 	case .Place_Spider_Nest:
 		placed := place_spider_nest(room, effect.destination, effect.amount, effect.duration, report)
+		assert(placed)
+	case .Place_Queen:
+		placed := place_queen(room, effect.destination, effect.amount, effect.duration, report)
 		assert(placed)
 	case .Place_Cannon:
 		placed := place_emplacement(room, .Field_Cannon, effect.destination, effect.amount, effect.duration, 0, Move_Direction(effect.charges),

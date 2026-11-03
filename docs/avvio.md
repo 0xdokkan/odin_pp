@@ -155,7 +155,13 @@ Con `ODIN_PP_LAB_ONLY=nido` gira solo l'atto del Nido di ragni ([piano](piano-ia
 fra il nido e un nemico fermo, la carta giocata con le regole vere (`odin_pp_nido_00.png`), i ragnetti che lo aggirano e
 mordono (`odin_pp_nido_NN.png`), un inseguitore libero accanto al nido che lo colpisce e gli toglie 3 secondi
 (`odin_pp_nido_struck.png`) con uno strappo nella seta, il nido che si affloscia a zero (`odin_pp_nido_sag.png`) e sparisce
-(`odin_pp_nido_end.png`). L'atto controlla anche i suoi sei suoni. Nel laboratorio completo viene per ultimo.
+(`odin_pp_nido_end.png`). L'atto controlla anche i suoi sei suoni.
+
+Con `ODIN_PP_LAB_ONLY=regina` gira solo l'atto della Regina ([piano](piano-ia.md), Fase 11), nell'arena «IA»: la carta giocata
+con le regole vere, senza nemici in linea (`odin_pp_regina_00.png`); un nemico in diagonale, la corsa e il colpo
+(`odin_pp_regina_01.png`, `odin_pp_regina_02.png`); il più vicino fra due nemici (`odin_pp_regina_03.png`); un muretto che
+ferma una linea (`odin_pp_regina_wall.png`). Nel laboratorio completo viene per ultimo. Disegno e suono sono provvisori fino
+alla Fase 12.
 
 Il pulsante **Prova meccaniche** del menu (o `--mechanics-lab`) apre una sandbox
 per provare le meccaniche nuove, una alla volta. È un'arena grande 23x17 senza

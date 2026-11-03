@@ -409,8 +409,9 @@ play_path :: proc(s: ^Search, path: []Move, horizon: f32, dice: game.Dice_State)
 		if k == 0 { out.child = discrete_fingerprint(room) }
 		elapsed += run_after_move(room, elapsed, horizon)
 	}
-	// Turning the hand first to fetch a device gives a beat away: what can be done now, a kill, comes before it.
-	if refocused { try_risk += min(REFOCUS_PRICE, max(objects_value(room)-s.facts.devices, 0)) }
+	// Turning the hand first gives a beat away: what can be done now, a kill, a step out of a line, comes before it. A device
+	// fetched that way counts for what it does within the horizon, not for what it will do past it.
+	if refocused { try_risk += max(objects_value(room)-s.facts.devices, 0) }
 	// The table keeps what the fast rule's playout gives from here on: the risk and the tempo run so far are this
 	// branch's own.
 	key := state_fingerprint(room) ~ u64(horizon*1000) ~ (u64(elapsed*1000) << 20)

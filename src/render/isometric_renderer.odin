@@ -567,7 +567,7 @@ timeline_card_cue_verb :: proc(cue: ^Presentation_Cue) -> cstring {
 	     .Flood_Swept, .Fire_Extinguished, .Cannon_Fired, .Cannon_Broken, .Black_Hole_Tick, .Black_Hole_Swallowed, .Black_Hole_Closed,
 	     .Ride_Begun, .Ride_Ended, .Dino_Stomp, .Bleed_Bite, .Arrow_Loosed, .Arrow_Landed, .Bomb_Thrown, .Napoli_Begun,
 	     .Napoli_Feast, .Napoli_Table_Cleared, .Napoli_Nonno_Cured, .Napoli_Nonno_Left, .IA_Begun,
-	     .Spider_Hatched, .Spider_Bite, .Spider_Died, .Spider_Nest_Struck, .Spider_Nest_Closed:
+	     .Spider_Hatched, .Spider_Bite, .Spider_Died, .Spider_Nest_Struck, .Spider_Nest_Closed, .Queen_Ran, .Queen_Struck, .Queen_Closed:
 	}
 	return nil
 }
@@ -694,7 +694,7 @@ draw_presentation_cue :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) {
 	   cue.kind == .Marley_Lights || cue.kind == .Marley_Warned || cue.kind == .Marley_Bomb || cue.kind == .Marley_Ended ||
 	   cue.kind == .Flood_Swept || cue.kind == .Fire_Extinguished ||
 	   cue.kind == .Cannon_Fired || cue.kind == .Cannon_Broken || cue.kind == .Black_Hole_Tick || cue.kind == .Black_Hole_Swallowed ||
-	   cue.kind == .Black_Hole_Closed || cue.kind == .Spider_Nest_Closed || cue.kind == .Dino_Stomp || cue.kind == .Napoli_Table_Cleared {
+	   cue.kind == .Black_Hole_Closed || cue.kind == .Spider_Nest_Closed || cue.kind == .Queen_Ran || cue.kind == .Queen_Struck || cue.kind == .Queen_Closed || cue.kind == .Dino_Stomp || cue.kind == .Napoli_Table_Cleared {
 		return
 	}
 	center, has_center := presentation_event_center(renderer, cue.event)
@@ -839,7 +839,7 @@ draw_presentation_cue :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) {
 		label = fmt.ctprintf("SANGUE +%d", cue.event.amount)
 		color = rl.Color{255, 82, 82, 255}
 	// The arrows show in flight and where they land, with no label (enemy_arrow.odin).
-	case .Arrow_Loosed, .Arrow_Landed, .Bomb_Thrown, .Spider_Hatched, .Spider_Bite, .Spider_Died, .Spider_Nest_Struck, .Spider_Nest_Closed:
+	case .Arrow_Loosed, .Arrow_Landed, .Bomb_Thrown, .Spider_Hatched, .Spider_Bite, .Spider_Died, .Spider_Nest_Struck, .Spider_Nest_Closed, .Queen_Ran, .Queen_Struck, .Queen_Closed:
 		return
 	case .Marley_Lights, .Marley_Warned, .Marley_Bomb, .Marley_Ended, .Flood_Swept, .Fire_Extinguished,
 	     .Cannon_Fired, .Cannon_Broken, .Black_Hole_Tick, .Black_Hole_Swallowed, .Black_Hole_Closed, .Dino_Stomp,

@@ -52,5 +52,3 @@ MISS_CHANCE :: f32(0.25)
 // A blow struck at once is worth a fifth more than the same at the horizon (search.odin, «the tempo»).
 TEMPO_WEIGHT :: f32(0.2)
 DIAGONAL_RISK :: f32(0.2)
-// What a refocus as the first move costs a branch that sets a device down, at most (search.odin, play_path).
-REFOCUS_PRICE :: f32(2)

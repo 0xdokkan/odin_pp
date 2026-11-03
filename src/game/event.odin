@@ -171,6 +171,10 @@ Game_Event_Kind :: enum {
 	Spider_Died,
 	Spider_Nest_Struck,
 	Spider_Nest_Closed,
+	// REGINA (queen.odin): her run along a line, her blow, her end.
+	Queen_Ran,
+	Queen_Struck,
+	Queen_Closed,
 	// BENVENUTI A NAPOLI's grandpa (napoli_nonno.odin): Q's cure of his own
 	// health (`amount`), and his going at no health, the view over.
 	Napoli_Nonno_Cured,

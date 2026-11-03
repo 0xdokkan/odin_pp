@@ -539,6 +539,7 @@ draw_arsenal_sky :: proc(renderer: ^Renderer, room: ^game.Room) {
 		case .Cannon_Fired: draw_cannon_shot(renderer, room, cue)
 		case .Cannon_Broken: draw_cannon_debris(renderer, cue)
 		case .Spider_Bite, .Spider_Died, .Spider_Hatched, .Spider_Nest_Struck, .Spider_Nest_Closed: draw_spider_nest_cue(renderer, cue)
+		case .Queen_Ran: draw_queen_cue(renderer, cue)
 		case .Black_Hole_Swallowed: draw_hole_swallow(renderer, cue)
 		case .Dino_Stomp: draw_dino_stomp(renderer, room, cue)
 		case .Ride_Begun, .Ride_Ended: draw_dino_roar(renderer, cue)
@@ -708,7 +709,7 @@ draw_dino_roar :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) {
 draw_emplacement_labels :: proc(renderer: ^Renderer, room: ^game.Room) {
 	snapshot := renderer.tactical.snapshot
 	for object in snapshot.objects[:snapshot.object_count] {
-		if (object.kind != .Field_Cannon && object.kind != .Devouring_Hole && object.kind != .Spider_Nest) || !object.visible { continue }
+		if !game.emplacement_kind(object.kind) || !object.visible { continue }
 		cell := grid.Position{x = int(object.position.x), y = int(object.position.y)}
 		if !tactical_render_visible(renderer, cell) { continue }
 		name := "NIDO" if object.kind == .Spider_Nest else "BUCO NERO"
@@ -717,6 +718,7 @@ draw_emplacement_labels :: proc(renderer: ^Renderer, room: ^game.Room) {
 			name = "LASER" if object.laser else "CANNONE"
 			height = 1.0
 		}
+		if object.kind == .Queen { name, height = "REGINA", 1.3 }
 		p := tactical_project(renderer, {object.position.x+0.5, object.position.y+0.5}, height)
 		draw_tactical_label(renderer, p, fmt.ctprintf("%s %ds", name, object.life), "", GOTHIC_RED if object.life <= 3 else GOTHIC_PAPER)
 	}
