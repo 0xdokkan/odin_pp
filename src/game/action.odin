@@ -128,6 +128,8 @@ Effect_Kind :: enum {
 	Napoli,
 	// IA: `amount` world seconds of the advisor (ia.odin).
 	IA,
+	// NIDO DI RAGNI: a nest on `destination`, its bites `amount`, `duration` beats (spider_nest.odin).
+	Place_Spider_Nest,
 }
 
 Effect :: struct {
@@ -531,6 +533,9 @@ effect_is_valid :: proc(room: ^Room, effect: Effect) -> bool {
 		return effect.target == PLAYER_ENTITY && effect.amount > 0 && effect.duration > 0 && marley_can_begin(room)
 	case .Flood_Wave:
 		return effect.target == PLAYER_ENTITY && effect.amount > 0 && flood_can_begin(room, effect.destination)
+	case .Place_Spider_Nest:
+		return effect.target == PLAYER_ENTITY && effect.amount > 0 && effect.duration > 0 &&
+		       emplacement_can_place(room, .Spider_Nest, effect.destination)
 	case .Place_Cannon:
 		return effect.target == PLAYER_ENTITY && effect.amount > 0 && effect.duration > 0 && effect.charges >= 0 && effect.charges < 4 &&
 		       emplacement_can_place(room, .Field_Cannon, effect.destination)
@@ -902,6 +907,9 @@ apply_effect :: proc(room: ^Room, source: Entity_Ref, effect: Effect, report: ^A
 	case .Flood_Wave:
 		swept := begin_flood(room, effect.destination, effect.amount, report)
 		assert(swept)
+	case .Place_Spider_Nest:
+		placed := place_spider_nest(room, effect.destination, effect.amount, effect.duration, report)
+		assert(placed)
 	case .Place_Cannon:
 		placed := place_emplacement(room, .Field_Cannon, effect.destination, effect.amount, effect.duration, 0, Move_Direction(effect.charges),
 			effect.card_definition == .Laser_Cannon, report)

@@ -56,6 +56,7 @@ ADVISOR_CARDS := [game.Card_Id]Advisor_Card{
 	.First_Person_Brawler = VIEW, .First_Person_Fencer = VIEW, .First_Person_Archer = VIEW,
 	.Napoli = {use = .Never, why = "il D4 può aprire una vista (il bastone, il nonno): quanto vale non si simula", puzzle = EVERY_CARD},
 	.IA = {use = .Never, why = "la IA non consiglia se stessa: rigiocata ripartirebbe dai suoi secondi", puzzle = EVERY_CARD},
+	.Spider_Nest = {use = .Advised, why = "ragnetti che mordono; il nido attira chi gli sta accanto", puzzle = "test_advisor_nest_away_from_the_brute, test_advisor_nest_as_bait, test_advisor_strike_before_the_nest"},
 	.Count = {use = .Never, why = "nessuna carta"},
 }
 
@@ -88,6 +89,7 @@ effect_value :: proc(kind: game.Effect_Kind) -> f32 {
 	case .Ride: return 1
 	case .Napoli: return 0
 	case .IA: return 0
+	case .Place_Spider_Nest: return 2
 	}
 	return 0
 }
@@ -149,7 +151,8 @@ direction_to :: proc(from, to: grid.Position) -> game.Move_Direction {
 
 // The few best targets of a card in hand now, as the mouse would aim them: every cell in its reach tried with
 // game.card_drop_target (on a foe's cell, the foe), the same target once, guessed by the foes its shape takes, the worth
-// of its effects, how near a foe it lands, and (for a card that carries the player) whether the cell is threatened.
+// of its effects, how near a foe it lands, and (for a card set on a free cell: the player, a nest) whether the cell is
+// threatened.
 card_targets :: proc(room: ^game.Room, card: game.Card_Instance, out: ^[MAX_CARD_TARGETS]Card_Target) -> (count: int) {
 	definition, found := game.card_definition_by_id(card.definition_id)
 	if !found { return }
@@ -164,6 +167,7 @@ card_targets :: proc(room: ^game.Room, card: game.Card_Instance, out: ^[MAX_CARD
 	}
 	reach := max(definition.targeting.cast_range.maximum, 1)
 	carries := definition.targeting.rule == .Walkable_Cell
+	beside := 0
 	for y in p.y-reach..=p.y+reach {
 		for x in p.x-reach..=p.x+reach {
 			cell := grid.Position{x = x, y = y, layer = p.layer}
@@ -178,6 +182,12 @@ card_targets :: proc(room: ^game.Room, card: game.Card_Instance, out: ^[MAX_CARD
 			nearest := max(int)
 			for enemy in room.enemies { nearest = min(nearest, manhattan(enemy.position, cell)) }
 			if nearest != max(int) { guess -= 0.5*f32(nearest) }
+			// THE NEST: the cells just out of the foes' reach, where the spiderlings arrive soon and nothing strikes it; and
+			// two cells beside a foe, the bait.
+			if card.definition_id == .Spider_Nest && nearest != max(int) {
+				guess = -abs(f32(nearest-2))
+				if nearest == 1 { guess = 1 if beside < 2 else -100; beside += 1 }
+			}
 			if carries && cell_threat(room, cell) > 0 { guess -= 20 }
 			// Kept in order, best first; the first of equals stays first.
 			slot := count

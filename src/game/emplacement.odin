@@ -16,7 +16,7 @@ MAX_BLACK_HOLES :: 2
 EMPLACEMENT_BEAT_SECONDS :: 1
 
 emplacement_kind :: proc(kind: Grid_Object_Kind) -> bool {
-	return kind == .Field_Cannon || kind == .Devouring_Hole
+	return kind == .Field_Cannon || kind == .Devouring_Hole || kind == .Spider_Nest
 }
 
 emplacement_count :: proc(room: ^Room, kind: Grid_Object_Kind) -> (count: int) {
@@ -36,7 +36,7 @@ emplacement_can_place :: proc(room: ^Room, kind: Grid_Object_Kind, cell: grid.Po
 	if _, trapped := trap_index_at(room, cell); trapped { return false }
 	if _, occupied := enemy_index_at(room, cell); occupied { return false }
 	if pinball_covers_cell(room, cell) { return false }
-	limit := MAX_CANNONS if kind == .Field_Cannon else MAX_BLACK_HOLES
+	limit := MAX_CANNONS if kind == .Field_Cannon else (MAX_SPIDER_NESTS if kind == .Spider_Nest else MAX_BLACK_HOLES)
 	return emplacement_count(room, kind) < limit
 }
 
@@ -55,9 +55,10 @@ place_emplacement :: proc(room: ^Room, kind: Grid_Object_Kind, cell: grid.Positi
 	room.next_object_id += 1
 	append(&room.objects, object)
 	duration := i32(way)+(4 if laser else 0) if kind == .Field_Cannon else radius
+	definition := Card_Id.Laser_Cannon if laser else (.Field_Cannon if kind == .Field_Cannon else (.Spider_Nest if kind == .Spider_Nest else .Devouring_Hole))
 	record_report_event(report, {kind = .Object_Spawned, source = PLAYER_ENTITY, target = object_entity(object.id),
 		object_kind = kind, from_position = cell, to_position = cell, amount = power, duration = duration,
-		card_definition = .Laser_Cannon if laser else (.Field_Cannon if kind == .Field_Cannon else .Devouring_Hole)})
+		card_definition = definition})
 	return true
 }
 
@@ -83,4 +84,6 @@ emplacement_beat :: proc(room: ^Room, pulse: ^Pulse_Report) {
 	cannon_beat(room, pulse)
 	if room.phase != .Combat { return }
 	black_hole_beat(room, pulse)
+	if room.phase != .Combat { return }
+	spider_nest_beat(room, pulse)
 }

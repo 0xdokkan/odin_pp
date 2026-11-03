@@ -17,6 +17,8 @@ Grid_Object_Kind :: enum {
 	Devouring_Hole,
 	// BENVENUTI A NAPOLI's table, set down by the grandpa (napoli.odin).
 	Napoli_Table,
+	// NIDO DI RAGNI's nest (spider_nest.odin).
+	Spider_Nest,
 	Count,
 }
 
@@ -116,6 +118,8 @@ GRID_OBJECT_DEFINITIONS :: [int(Grid_Object_Kind.Count)]Grid_Object_Definition{
 	{kind = .Devouring_Hole, name = "Black Hole"},
 	// Nothing walks, sees or shoots through the grandpa's table; nothing strikes it.
 	{kind = .Napoli_Table, name = "Tavolata", blocks_movement = true, blocks_line_of_sight = true},
+	// It stops the steps, not the sight; the foes' blows take its seconds, not its health (spider_nest.odin).
+	{kind = .Spider_Nest, name = "Nido di ragni", blocks_movement = true},
 }
 
 // How wide and high an object stands as it is drawn (render: voxel_object_bounds,
@@ -138,6 +142,7 @@ grid_object_size :: proc(kind: Grid_Object_Kind) -> (width, height: f32) {
 	case .Devouring_Hole: width, height = 0.9, 0.5
 	// The table, laid (napoli.odin).
 	case .Napoli_Table: width, height = 0.86, 0.56
+	case .Spider_Nest: width, height = 0.8, 0.4
 	case .Count:
 	}
 	return

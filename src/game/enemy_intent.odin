@@ -622,7 +622,9 @@ plan_enemy_intents :: proc(room: ^Room) {
 		case .Count:
 			unreachable()
 		}
-		if enemy.archetype == .Brute && intent.kind == .Attack {
+		// NIDO DI RAGNI: a foe next to a nest and not next to the player strikes the nest.
+		spider_nest_bait(room, enemy, origin, &intent)
+		if enemy.archetype == .Brute && intent.kind == .Attack && intent.target_object == 0 {
 			step, _, aligned := orthogonal_step_and_distance(origin, intent.threatened_cells[0])
 			if aligned {
 				center := intent.threatened_cells[0]
@@ -845,6 +847,21 @@ resolve_enemy_intents :: proc(room: ^Room, pulse: ^Pulse_Report, only_id: u32 = 
 			enemy.aim_ready = false
 			begin_demolitionist_offense(enemy, intent.kind)
 			enemy.recovery_pulses = max(i32(1), enemy.recovery_pulses)
+			// The bait: the blow is the nest's, 3 seconds off it (spider_nest.odin).
+			if intent.target_object != 0 {
+				if nest, standing := object_index_by_id(room, intent.target_object); standing && room.objects[nest].kind == .Spider_Nest {
+					if enemy.position == intent.origin && room.objects[nest].position == intent.threatened_cells[0] {
+						spider_nest_struck(room, nest, source, &pulse.events)
+					} else {
+						record_enemy_attack_miss(pulse, source, enemy.position, intent.threatened_cells[0])
+					}
+					continue
+				}
+			}
+			// A blow over a nest's cell takes its seconds, whoever it was aimed at.
+			if intent.target_object == 0 && enemy.position == intent.origin && !enemy_attack_is_arrow(enemy, &intent) {
+				spider_nests_under_blow(room, intent.threatened_cells[:intent.threatened_cell_count], source, &pulse.events)
+			}
 			if intent.target_object != 0 {
 				object_index, present := object_index_by_id(room, intent.target_object)
 				if enemy.position != intent.origin || !present ||

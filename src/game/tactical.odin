@@ -66,6 +66,8 @@ Tactical_State :: struct {
 	dinosaur_remaining: f32,
 	// IA (ia.odin): the advisor's world seconds left.
 	ia_remaining: f32,
+	// NIDO DI RAGNI's spiderlings on their way (spider_nest.odin).
+	spiders: Spider_Swarm,
 	dinosaur_power: i32,
 	dodge_recovery: int,
 	metrics: Tactical_Metrics,
@@ -189,6 +191,7 @@ tactical_reset_room_clock :: proc(s: ^Tactical_State) {
 	s.dodge_recovery = 0
 	s.dinosaur_remaining, s.dinosaur_power = 0, 0
 	s.ia_remaining = 0
+	s.spiders = {}
 	s.clock_fraction = 0
 	s.queued_beats = 0
 	s.energy_fraction, s.encounter_beats = 0, 0
@@ -211,6 +214,7 @@ tactical_end_combat :: proc(room: ^Room) {
 	room.bombs = {}
 	room.marley = {}
 	room.ride = {}
+	spider_nests_end_combat(room)
 	napoli_end_combat(room)
 	room.first_person.active = false
 	if room.first_person.weapon == .AK { room.first_person.trigger = false }

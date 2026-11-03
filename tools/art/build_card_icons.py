@@ -91,6 +91,7 @@ docs/piano-ia.md adds to it (its Fasi 0 and 8):
 
     cell 37  IA: a brain of circuits on a dark ground, curved folds on the
              left, cyan traces with white nodes on the right, a steel stem.
+    cell 38  Nido di ragni (provisional): a cobweb, its spider at the middle.
 
 Options:
     --check        exit 1 if the atlas is not what this script would write
@@ -927,6 +928,41 @@ IA_BRAIN = (
 assert all(len(row) == 28 for row in IA_BRAIN) and len(IA_BRAIN) == 28
 
 ICONS.update({37: IA_BRAIN})
+
+# docs/piano-ia.md, Fase 9: the Nido di ragni's provisional icon, a cobweb with its spider at the middle (its Fase 10).
+SPIDER_WEB = (
+    "............................",
+    "............................",
+    "............................",
+    "..............K.............",
+    "...X..........K..........X..",
+    "....X.........K.........X...",
+    ".....XX.......K.......XX....",
+    ".....X.XXXXXXXKXXXXXXX.X....",
+    "......X.X.....K.....X.X.....",
+    ".......X.X....K....X.X......",
+    "........X.XXXXKXXXX.X.......",
+    ".........X.X..K..X.X........",
+    "..........X.XXKXX.X.........",
+    "...........X.KmK.X..........",
+    "KKKKKKKKKKKKKmmmKKKKKKKKKKKK",
+    "...........X.KmK.X..........",
+    "..........X.XXKXX.X.........",
+    ".........X.X..K..X.X........",
+    "........X.XXXXKXXXX.X.......",
+    ".......X.X....K....X.X......",
+    "......X.X.....K.....X.X.....",
+    ".....X.XXXXXXXKXXXXXXX.X....",
+    ".....XX.......K.......XX....",
+    "....X.........K.........X...",
+    "...X..........K..........X..",
+    "..............K.............",
+    "............................",
+    "............................",
+)
+assert all(len(row) == 28 for row in SPIDER_WEB) and len(SPIDER_WEB) == 28
+
+ICONS.update({38: SPIDER_WEB})
 
 
 def chunk(kind, body):

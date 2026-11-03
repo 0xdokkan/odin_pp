@@ -32,6 +32,10 @@ object_knowledge :: proc(kind: game.Grid_Object_Kind) -> Object_Knowledge {
 	case .Barrel: return {why = "un barile: esplode nella copia come nel gioco"}
 	case .Bomb: return {why = "una bomba: la sua miccia scorre nella copia"}
 	case .Napoli_Table: return {why = "la tavolata: una cura (context.odin)"}
+	// A spiderling every two beats, each a bite: half a bite a beat, for its beats left, at most the devices' 8 (its whole
+	// 20 would have the IA refocus for it even under a blow); what the foes take off it is the copy's own, within the
+	// horizon.
+	case .Spider_Nest: return {worth_a_beat = 0.5, beats = 8, why = "il nido fa ancora un ragnetto ogni due battiti"}
 	case .Count:
 	}
 	return {}
@@ -39,12 +43,22 @@ object_knowledge :: proc(kind: game.Grid_Object_Kind) -> Object_Knowledge {
 
 // What the player's devices on the board will still do past the horizon (each at its life or charges, its power).
 objects_value :: proc(room: ^game.Room) -> (value: f32) {
+	bites := f32(0)
 	for object in room.objects {
 		known := object_knowledge(object.kind)
 		if known.worth_a_beat <= 0 { continue }
 		beats := object.life if object.life > 0 else object.device_charges
 		power := object.power if object.power > 0 else max(object.device_damage, 1)
-		value += known.worth_a_beat*f32(min(beats, known.beats))*f32(power)
+		worth := known.worth_a_beat*f32(min(beats, known.beats))*f32(power)
+		if object.kind == .Spider_Nest { bites += worth } else { value += worth }
+	}
+	// The spiderlings on their way: each a bite still to come. They bite no more than the foes have left.
+	spiders := &room.player.tactical.spiders
+	for spider in spiders.items[:spiders.count] { bites += f32(spider.bite) }
+	if bites > 0 {
+		left := f32(0)
+		for enemy in room.enemies { left += f32(enemy.health) }
+		value += min(bites, left)
 	}
 	return
 }

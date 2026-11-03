@@ -6,6 +6,25 @@ Qui si segna ogni carta tolta dal gioco o cambiata, con quello che faceva, così
 futuro. Le voci più recenti stanno in cima. Per ritrovare il commit di una voce:
 `git log --all --grep "<titolo del commit>"`.
 
+## 2026-11-03 — Carta nuova: Nido di ragni (solo laboratorio)
+
+Commit **«Piano IA, Fase 9 fatta: Nido di ragni»** sul ramo `piano-ia` ([piano](piano-ia.md), Fase 9). Carta nuova
+`Spider_Nest`, «Nido di ragni», sigla NDR, non comune, 2 energia, prezzo 6, peso 70, 40 in spedizione, solo laboratorio
+(`.Lab_Only`), nel mazzo dell'arena IA. Si posa su una casella libera a 1-3 caselle, in vista, al massimo 2 nidi. Il nido
+ferma i passi ma non la vista e dura 20 s del mondo. Il primo ragnetto esce subito, poi uno ogni 2 s (10 in tutto se
+nessuno lo tocca). I ragnetti corrono a 4 caselle al secondo verso il nemico più vicino contato in passi, aggirano muri e
+muretti, passano attraverso i corpi, trappole, pozze e fuoco non li toccano; mordono per 2 (+1 a potenziamento, massimo
+2 potenziamenti; sul tick il doppio) e muoiono; dopo 5 s senza arrivare muoiono da soli. Ogni colpo di un nemico che
+prende la casella del nido, freccia che passa o esplosione compresa, gli toglie 3 s, una volta per colpo; a zero sparisce.
+Un nemico che ha il nido accanto e non ha te accanto colpisce il nido. Finito il combattimento spariscono nido e
+ragnetti. Aspetto e suono sono provvisori fino alla Fase 10; la scheda del nemico scrive «SUL NIDO».
+
+**IA aggiornata:** la IA conosce il Nido: lo gioca nella copia con le regole vere, prova 4 caselle appena fuori dalla
+portata dei nemici e 2 accanto a un nemico (l'esca), evita quelle sotto un colpo annunciato, e conta i ragnetti ancora da
+fare e quelli in corsa (dopo l'orizzonte al massimo 8 battiti, come gli altri dispositivi), mai più della vita che resta
+ai nemici. Un Refocus come prima mossa fatto per posare un dispositivo le costa fino a 2 punti: prima fa quello che può fare subito. Puzzle: `test_advisor_nest_away_from_the_brute`,
+`test_advisor_nest_as_bait`, `test_advisor_strike_before_the_nest`.
+
 ## 2026-11-03 — IA: aspetto e suoni (solo laboratorio)
 
 Commit **«Piano IA, Fase 8 fatta: aspetto e suoni»** sul ramo `piano-ia` ([piano](piano-ia.md), Fase 8). Regole e numeri

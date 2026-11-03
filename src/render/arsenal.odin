@@ -707,10 +707,10 @@ draw_dino_roar :: proc(renderer: ^Renderer, cue: ^Presentation_Cue) {
 draw_emplacement_labels :: proc(renderer: ^Renderer, room: ^game.Room) {
 	snapshot := renderer.tactical.snapshot
 	for object in snapshot.objects[:snapshot.object_count] {
-		if (object.kind != .Field_Cannon && object.kind != .Devouring_Hole) || !object.visible { continue }
+		if (object.kind != .Field_Cannon && object.kind != .Devouring_Hole && object.kind != .Spider_Nest) || !object.visible { continue }
 		cell := grid.Position{x = int(object.position.x), y = int(object.position.y)}
 		if !tactical_render_visible(renderer, cell) { continue }
-		name := "BUCO NERO"
+		name := "NIDO" if object.kind == .Spider_Nest else "BUCO NERO"
 		height := f32(0.8)
 		if object.kind == .Field_Cannon {
 			name = "LASER" if object.laser else "CANNONE"

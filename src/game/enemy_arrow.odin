@@ -136,6 +136,7 @@ tactical_flight_tick :: proc(room: ^Room, seconds: f32) {
 	if room == nil || !(seconds > 0) { return }
 	if room.arrows.count > 0 { room.arrows.pending += seconds }
 	if room.bombs.count > 0 { room.bombs.pending += seconds }
+	if room.player != nil && room.player.tactical.spiders.count > 0 { room.player.tactical.spiders.pending += seconds }
 }
 
 // Seconds wait to be flown and nothing holds the world: the controller
@@ -143,8 +144,10 @@ tactical_flight_tick :: proc(room: ^Room, seconds: f32) {
 tactical_flights_due :: proc(room: ^Room) -> bool {
 	if room == nil || room.player == nil || room.phase != .Combat || room.tactical_pulse.pending || room.qte.kind != .None ||
 	   room.player.tactical.cast_remaining > 0 { return false }
+	spiders := &room.player.tactical.spiders
 	return (room.arrows.count > 0 && room.arrows.pending > ENEMY_ARROW_EPSILON) ||
-	       (room.bombs.count > 0 && room.bombs.pending > ENEMY_ARROW_EPSILON)
+	       (room.bombs.count > 0 && room.bombs.pending > ENEMY_ARROW_EPSILON) ||
+	       (spiders.count > 0 && spiders.pending > ENEMY_ARROW_EPSILON)
 }
 
 // The seconds waiting, flown out into room.recent_events: every arrow's and
@@ -169,6 +172,7 @@ resolve_enemy_flights :: proc(room: ^Room) -> bool {
 fly_enemy_flights :: proc(room: ^Room, pulse: ^Pulse_Report, beat := false) {
 	fly_enemy_arrows(room, pulse)
 	if room.phase == .Combat { fly_enemy_bombs(room, pulse, beat) }
+	if room.phase == .Combat { run_spiderlings(room, pulse) }
 }
 
 @(private)
@@ -207,6 +211,8 @@ fly_enemy_arrows :: proc(room: ^Room, pulse: ^Pulse_Report) {
 enemy_arrow_enters :: proc(room: ^Room, arrow: Enemy_Arrow, cell: grid.Position, pulse: ^Pulse_Report) -> bool {
 	source := enemy_entity(arrow.shooter)
 	origin := enemy_arrow_origin(arrow)
+	// An arrow passing over a nest takes its seconds, and flies on.
+	spider_nests_under_blow(room, {cell}, source, &pulse.events)
 	if enemy_arrow_blocked(room, origin, cell) {
 		record_event(&pulse.events, {kind = .Arrow_Landed, source = source, target = SYSTEM_ENTITY, from_position = origin, to_position = cell})
 		return true

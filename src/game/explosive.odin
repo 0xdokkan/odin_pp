@@ -161,6 +161,8 @@ resolve_due_explosives :: proc(room: ^Room, pulse: ^Pulse_Report) {
 					assert(added)
 				}
 				if object, present := grid_object_at(room, cell); present && object.id != id {
+					// A blast over a nest takes its seconds, as a blow does.
+					if object.kind == .Spider_Nest { spider_nests_under_blow(room, {cell}, source, &pulse.events); continue }
 					effect := damage_effect(object_entity(object.id), damage)
 					if effect_is_valid(room, effect) {
 						added := add_effect(&action, effect)

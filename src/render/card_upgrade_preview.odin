@@ -54,7 +54,7 @@ card_upgrade_preview :: proc(card: game.Card_Instance) -> cstring {
 		case .Marley: label = "DANNO"
 		case .Flood_Wave: label = "SPINTA"
 		// CANNONE: the ball's damage; BUCO NERO: its damage a beat; DINOSAURO: the ride.
-		case .Place_Cannon, .Open_Black_Hole: label = "DANNO"
+		case .Place_Cannon, .Open_Black_Hole, .Place_Spider_Nest: label = "DANNO"
 		case .Ride: label = "SECONDI"
 		// BENVENUTI A NAPOLI: the club's seconds (its other numbers grow too, docs/piano-napoli.md).
 		case .Napoli: label = "BASTONE SECONDI"

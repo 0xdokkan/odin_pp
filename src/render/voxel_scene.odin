@@ -115,6 +115,10 @@ draw_voxel_object :: proc(renderer: ^Renderer, object: Presentation_Grid_Object)
 	case .Devouring_Hole:
 	// BENVENUTI A NAPOLI: the grandpa's table, laid (napoli.odin).
 	case .Napoli_Table: draw_napoli_table(renderer, {p.x, bounds.min.y, p.z}, 0, napoli_table_bites(object.life))
+	// NIDO DI RAGNI, provisional until its Fase 10: a heap of white silk.
+	case .Spider_Nest:
+		draw_resin_cube_v(renderer, {p.x, bounds.min.y+size.y*0.3, p.z}, {size.x, size.y*0.6, size.z}, {214, 210, 224, 255})
+		draw_resin_cube_v(renderer, {p.x, bounds.min.y+size.y*0.75, p.z}, {size.x*0.55, size.y*0.5, size.z*0.55}, {236, 232, 244, 255})
 	case .Ice_Block:
 		tint = {102, 151, 162, 255}
 		draw_resin_cube_v(renderer, p, size, tint)

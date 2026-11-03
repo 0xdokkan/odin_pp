@@ -632,7 +632,7 @@ test_advisor_card_firebomb_on_three :: proc(t: ^testing.T) {
 	if !ok { search_test_log_values(&search) }
 }
 
-// Shut in a dead end in the archer's line, his dodge recovering, the Guard in hand: the IA raises it before the arrow.
+// Shut in a dead end in the archer's line, his dodge recovering, the Guard in hand: the arrow costs nothing.
 @(test)
 test_advisor_card_guard_before_the_blow :: proc(t: ^testing.T) {
 	data: level.Level
@@ -652,10 +652,14 @@ test_advisor_card_guard_before_the_blow :: proc(t: ^testing.T) {
 		"the archer does not aim at the player: %v", archer.intent.kind)
 	archer.tactical_cooldown = 1
 	room.player.tactical.dodge_recovery = game.TACTICAL_DODGE_RECOVERY+1
+	// The answer is the IA's: the Guard, a rush (next to him his shot is off) or a refocus that brings the Guard back in
+	// time. What counts: it does not stand there, and the arrow costs no life.
 	advice := search_test_advice(&search, &room)
-	ok := advice_is_card(&room, advice, .Guard)
-	testing.expectf(t, ok, "the IA does not raise the Guard: %v to %v", advice.kind, advice.cell)
+	ok := advice.valid && advice.kind != .Wait
+	testing.expectf(t, ok, "the IA does not answer the arrow: %v to %v", advice.kind, advice.cell)
 	if !ok { search_test_log_values(&search) }
+	lost := search_test_follow(&room, &search, true, 3)
+	testing.expectf(t, lost == 0, "following the IA the arrow cost %d of life", lost)
 }
 
 // The brute's cleave about to fall, the Guard in hand: a step out is enough, so no card (at equal worth, no card).
@@ -693,6 +697,82 @@ test_advisor_card_kills_sooner :: proc(t: ^testing.T) {
 	advice := search_test_advice(&search, &room)
 	ok := advice_is_card(&room, advice, .Strike) && advice.cell == (grid.Position{x = 12, y = 12})
 	testing.expectf(t, ok, "the IA does not kill with the Strike: %v to %v", advice.kind, advice.cell)
+	if !ok { search_test_log_values(&search) }
+}
+
+// The cell of an advised nest.
+@(private = "file")
+nest_test_cell :: proc(room: ^game.Room, advice: advisor.Advice) -> (cell: grid.Position, ok: bool) {
+	if !advice_is_card(room, advice, .Spider_Nest) { return }
+	return advice.cell, true
+}
+
+// A brute's cleave about to fall on three cells between him and the player: the nest stays out of them.
+@(test)
+test_advisor_nest_away_from_the_brute :: proc(t: ^testing.T) {
+	data: level.Level
+	defer level.destroy(&data)
+	player: game.Player
+	room := search_test_arena(t, &data, &player)
+	defer game.destroy_room(&room)
+	search: advisor.Search
+	testing.expect(t, advisor.search_init(&search))
+	defer advisor.search_destroy(&search)
+	search_test_puzzle(t, &room, {x = 11, y = 12}, {{.Brute, {x = 13, y = 12}, 30}}, {.Spider_Nest})
+	cells := []grid.Position{{x = 12, y = 11}, {x = 12, y = 12}, {x = 12, y = 13}}
+	search_test_blow(&room, 0, cells, 3, 1)
+	advice := search_test_advice(&search, &room)
+	cell, ok := nest_test_cell(&room, advice)
+	ok = ok && !cell_in(cell, cells)
+	testing.expectf(t, ok, "the nest is not out of the brute's blow: %v to %v", advice.kind, advice.cell)
+	if !ok { search_test_log_values(&search) }
+}
+
+// Shut in a dead end, his dodge recovering, a chaser coming up the only way in: the nest in the way holds it, its blows go to the nest.
+@(test)
+test_advisor_nest_as_bait :: proc(t: ^testing.T) {
+	data: level.Level
+	defer level.destroy(&data)
+	player: game.Player
+	room := search_test_arena(t, &data, &player)
+	defer game.destroy_room(&room)
+	search: advisor.Search
+	testing.expect(t, advisor.search_init(&search))
+	defer advisor.search_destroy(&search)
+	for cell in ([?]grid.Position{{x = 10, y = 12}, {x = 12, y = 12}, {x = 11, y = 11}, {x = 10, y = 11}, {x = 12, y = 11}, {x = 10, y = 13}, {x = 12, y = 13}, {x = 10, y = 14}, {x = 12, y = 14}}) {
+		testing.expect(t, level.set_tile(&data, cell, {kind = .Wall}))
+	}
+	search_test_puzzle(t, &room, {x = 11, y = 12}, {{.Chaser, {x = 11, y = 15}, 30}}, {.Spider_Nest})
+	room.player.tactical.dodge_recovery = game.TACTICAL_DODGE_RECOVERY+1
+	search_test_advice(&search, &room)
+	// Against the walking and the waiting (the refocus has the other cards of the deck to bring: not this puzzle's).
+	nest, walk := f32(-1e30), f32(-1e30)
+	for i in 0..<search.candidate_count {
+		if !search.legal[i] { continue }
+		#partial switch search.candidates[i].kind {
+		case .Card: nest = max(nest, search.values[i])
+		case .Step, .Wait: walk = max(walk, search.values[i])
+		}
+	}
+	testing.expectf(t, nest > walk, "the nest in the chaser's way is worth %.2f, walking and waiting %.2f", nest, walk)
+}
+
+// A foe of 3 life beside the player (2 the bump kills, no card spent), another far: the Strike kills it now, the nest can
+// wait.
+@(test)
+test_advisor_strike_before_the_nest :: proc(t: ^testing.T) {
+	data: level.Level
+	defer level.destroy(&data)
+	player: game.Player
+	room := search_test_arena(t, &data, &player)
+	defer game.destroy_room(&room)
+	search: advisor.Search
+	testing.expect(t, advisor.search_init(&search))
+	defer advisor.search_destroy(&search)
+	search_test_puzzle(t, &room, {x = 11, y = 12}, {{.Chaser, {x = 12, y = 12}, 3}, {.Chaser, {x = 4, y = 15}, 12}}, {.Strike, .Spider_Nest})
+	advice := search_test_advice(&search, &room)
+	ok := advice_is_card(&room, advice, .Strike) && advice.cell == (grid.Position{x = 12, y = 12})
+	testing.expectf(t, ok, "the IA does not kill with the Strike first: %v to %v", advice.kind, advice.cell)
 	if !ok { search_test_log_values(&search) }
 }
 

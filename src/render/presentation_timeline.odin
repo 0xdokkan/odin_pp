@@ -191,6 +191,13 @@ Presentation_Cue_Kind :: enum {
 	Napoli_Nonno_Left,
 	// IA (game/ia.odin): the advisor's seconds begin, said over the player.
 	IA_Begun,
+	// NIDO DI RAGNI (game/spider_nest.odin): a spiderling hatches, bites, dies; a blow on the nest; the nest's end. The
+	// spiderlings are drawn from the room (spider_nest_view.odin).
+	Spider_Hatched,
+	Spider_Bite,
+	Spider_Died,
+	Spider_Nest_Struck,
+	Spider_Nest_Closed,
 }
 
 Presentation_Actor :: struct {
@@ -695,6 +702,16 @@ presentation_cue_kind :: proc(event: game.Game_Event) -> Presentation_Cue_Kind {
 		return .Napoli_Feast
 	case .Napoli_Table_Cleared:
 		return .Napoli_Table_Cleared
+	case .Spider_Hatched:
+		return .Spider_Hatched
+	case .Spider_Bite:
+		return .Spider_Bite
+	case .Spider_Died:
+		return .Spider_Died
+	case .Spider_Nest_Struck:
+		return .Spider_Nest_Struck
+	case .Spider_Nest_Closed:
+		return .Spider_Nest_Closed
 	case .Napoli_Nonno_Cured:
 		return .Napoli_Nonno_Cured
 	case .Napoli_Nonno_Left:
@@ -827,7 +844,8 @@ presentation_cue_duration :: proc(kind: Presentation_Cue_Kind, event: game.Game_
 		return PRESENTATION_NAPOLI_CLEAR_DURATION
 	case .IA_Begun:
 		return PRESENTATION_IA_DURATION
-	case .Black_Hole_Tick, .Bleed_Bite, .Arrow_Loosed, .Arrow_Landed, .Bomb_Thrown:
+	case .Black_Hole_Tick, .Bleed_Bite, .Arrow_Loosed, .Arrow_Landed, .Bomb_Thrown,
+	     .Spider_Hatched, .Spider_Bite, .Spider_Died, .Spider_Nest_Struck, .Spider_Nest_Closed:
 		return PRESENTATION_NOTICE_DURATION
 	}
 	unreachable()
@@ -1427,8 +1445,12 @@ start_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^Presentat
 	case .Cannon_Fired:
 		if event.object_kind != .Field_Cannon { timeline.update_failures += 1 }
 		if emplacement, found := presentation_grid_object(timeline, event.source); found { emplacement.life = max(i32(0), emplacement.life-1) } else { timeline.update_failures += 1 }
-	case .Cannon_Broken, .Black_Hole_Closed:
+	case .Cannon_Broken, .Black_Hole_Closed, .Spider_Nest_Closed:
 		if _, found := presentation_grid_object(timeline, event.target); !found { timeline.update_failures += 1 }
+	// NIDO DI RAGNI: the spiderlings are the room's; a blow takes its seconds off the nest as it shows them.
+	case .Spider_Hatched, .Spider_Bite, .Spider_Died:
+	case .Spider_Nest_Struck:
+		if emplacement, found := presentation_grid_object(timeline, event.target); found { emplacement.life = max(i32(0), emplacement.life-event.amount) } else { timeline.update_failures += 1 }
 	// BUCO NERO: the hole's beat; the foe it will swallow starts to spin.
 	case .Black_Hole_Tick:
 		if emplacement, found := presentation_grid_object(timeline, event.target); found { emplacement.life = event.amount } else { timeline.update_failures += 1 }
@@ -1514,7 +1536,8 @@ update_active_presentation_cue :: proc(timeline: ^Presentation_Timeline, cue: ^P
 	     .First_Person_Begun, .Marley_Begun, .Marley_Lights, .Marley_Warned, .Marley_Bomb, .Marley_Saved, .Marley_Bonus,
 	     .Marley_Ended, .Flood_Swept, .Fire_Extinguished, .Cannon_Fired, .Cannon_Broken, .Black_Hole_Tick, .Black_Hole_Closed,
 	     .Ride_Begun, .Ride_Ended, .Dino_Stomp, .Bleed_Bite, .Arrow_Loosed, .Arrow_Landed, .Bomb_Thrown, .Napoli_Begun,
-	     .Napoli_Feast, .Napoli_Table_Cleared, .Napoli_Nonno_Cured, .Napoli_Nonno_Left, .IA_Begun:
+	     .Napoli_Feast, .Napoli_Table_Cleared, .Napoli_Nonno_Cured, .Napoli_Nonno_Left, .IA_Begun,
+	     .Spider_Hatched, .Spider_Bite, .Spider_Died, .Spider_Nest_Struck, .Spider_Nest_Closed:
 	// A foe swallowed by the hole spins down it toward the hole's centre.
 	case .Black_Hole_Swallowed:
 		if has_actor {

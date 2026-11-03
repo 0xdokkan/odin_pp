@@ -142,7 +142,7 @@ tactical_critical_scale :: proc(room: ^Room, action: ^Action) {
 		case .Flood_Wave:
 			effect.amount += 1
 		// A cannon and a hole hurt more; the ride lasts longer.
-		case .Place_Cannon, .Open_Black_Hole:
+		case .Place_Cannon, .Open_Black_Hole, .Place_Spider_Nest:
 			effect.amount = critical_damage(effect.amount)
 		case .Ride:
 			effect.amount += RIDE_CRITICAL_SECONDS

@@ -91,6 +91,8 @@ Card_Id :: enum {
 	Napoli,
 	// IA: for its seconds the advisor shows the best move (ia.odin, docs/piano-ia.md), lab only.
 	IA,
+	// NIDO DI RAGNI: a nest whose spiderlings bite the foes (spider_nest.odin, docs/piano-ia.md), lab only.
+	Spider_Nest,
 	Count,
 }
 
@@ -128,6 +130,7 @@ card_in_collection :: proc(id: Card_Id) -> bool {
 }
 // The kind of object an emplacement card sets down.
 card_emplacement_kind :: proc(id: Card_Id) -> Grid_Object_Kind {
+	if id == .Spider_Nest { return .Spider_Nest }
 	return .Devouring_Hole if id == .Devouring_Hole else .Field_Cannon
 }
 // A card the player aims with the mouse wheel before he plays it.
@@ -1321,6 +1324,17 @@ CARD_DEFINITIONS := [Card_Id]Card_Definition{
 		effects = {{kind = .IA, target = .Player, base_amount = IA_SECONDS, amount_per_upgrade = IA_SECONDS_PER_UPGRADE}, {}, {}, {}},
 		effect_count = 1,
 	},
+	.Spider_Nest = {
+		upgrade_limit = SPIDER_NEST_MAX_UPGRADE_LEVEL, time_cost = 2,
+		traits = {.Emplacement, .Lab_Only},
+		// NIDO DI RAGNI: a nest on a free cell, for 20 world seconds: a spiderling at once and one every two seconds, each
+		// a bite of 2 (+1 an upgrade); every blow that takes it costs it 3 seconds (spider_nest.odin).
+		id = .Spider_Nest, name = "Nido di ragni", rarity = .Uncommon,
+		reward_weight = 70, shop_base_price = 6, cost = 2,
+		targeting = {rule = .Walkable_Cell, cast_range = {.Chebyshev, 1, 3}, shape = .Single, requires_line_of_sight = true, stops_on_wall = true},
+		effects = {{kind = .Place_Spider_Nest, target = .Player, base_amount = SPIDER_BITE_DAMAGE, amount_per_upgrade = 1, duration = SPIDER_NEST_SECONDS}, {}, {}, {}},
+		effect_count = 1,
+	},
 	.Count = {id = .Count},
 }
 
@@ -1470,7 +1484,7 @@ card_effect_template_is_valid :: proc(
 		return template.target == .Player && definition.targeting.rule == .Self && template.duration > 0 &&
 		       card_amount_template_is_valid(template)
 	// A cell to set an emplacement on; the Dinosauro's ride on the player.
-	case .Place_Cannon, .Open_Black_Hole:
+	case .Place_Cannon, .Open_Black_Hole, .Place_Spider_Nest:
 		return template.target == .Player && definition.targeting.rule == .Walkable_Cell && definition.targeting.shape == .Single &&
 		       template.duration > 0 && card_amount_template_is_valid(template)
 	case .Ride, .Napoli:
@@ -1685,6 +1699,8 @@ instantiate_card_effect :: proc(
 		return napoli_effect(.Club, card_effect_amount(template, instance.upgrade_level), instance.upgrade_level), true
 	case .IA:
 		return ia_effect(card_effect_amount(template, instance.upgrade_level)), true
+	case .Place_Spider_Nest:
+		return place_spider_nest_effect(card_effect_amount(template, instance.upgrade_level), template.duration), true
 	}
 	return {}, false
 }
@@ -2139,7 +2155,7 @@ compile_card_action :: proc(
 			continue
 		}
 		effect, instantiated := instantiate_card_effect(template, entry.entity, instance)
-		if effect.kind == .Deploy_Device || effect.kind == .Place_Ground || effect.kind == .Flood_Wave || effect.kind == .Place_Cannon || effect.kind == .Open_Black_Hole {
+		if effect.kind == .Deploy_Device || effect.kind == .Place_Ground || effect.kind == .Flood_Wave || effect.kind == .Place_Cannon || effect.kind == .Open_Black_Hole || effect.kind == .Place_Spider_Nest {
 				effect.destination = evaluation.query.anchor
 			}
 			// A cannon's way: the wheel's, else the way from the player to its cell.

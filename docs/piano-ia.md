@@ -223,7 +223,7 @@ comunque nel momento in cui i rami si uniscono.
 | 6 | Lo stato della partita: progresso, nemici sulla mappa, cure vere, aggressività; le tabelle di posti e zaino | 5 | Fatta | vedi Esito |
 | 7 | I casi speciali: Ombra, Lazzo, Pinball, Dinosauro, Napoli, piani e ascensori, mappe grandi; le tabelle di oggetti e caselle | 6 | Fatta | vedi Esito |
 | 8 | Aspetto e suoni della IA: icona, conto alla rovescia, accensione, suoni da codice | 5 | Fatta | vedi Esito |
-| 9 | Nido di ragni: regole e prototipo nel laboratorio; la IA lo conosce | 7 | Da fare | — |
+| 9 | Nido di ragni: regole e prototipo nel laboratorio; la IA lo conosce | 7 | Fatta | vedi Esito |
 | 10 | Nido di ragni: aspetto e suoni | 9 | Da fare | — |
 | 11 | Regina: regole e prototipo nel laboratorio; la IA la conosce | 7 | Da fare | — |
 | 12 | Regina: aspetto e suoni | 11 | Da fare | — |
@@ -1619,6 +1619,37 @@ Passi:
 Check della fase: i test della carta e del consigliere; gli atti `nido` e `ia`.
 
 **Fatto quando:** nel laboratorio il nido funziona come deciso e la IA lo usa bene nei suoi puzzle; i test sono verdi.
+
+### Esito (3 novembre 2026)
+
+Fatta, coi numeri proposti. **Cambiamenti rispetto al piano, spiegati:**
+
+- **I ragnetti non sono oggetti della griglia.** Una casella tiene un oggetto solo, e i ragnetti corrono attraverso i corpi
+  e uno sopra l'altro. Stanno in `Tactical_State.spiders` (massimo 12), corrono sui secondi del mondo con lo stesso comando
+  delle frecce (`fly_enemy_flights`). La stanza resta di 9208 byte; il salvataggio li tiene col giocatore.
+- **Anche le esplosioni** tolgono i 3 s al nido, oltre ai colpi dei nemici e alle frecce che passano. Vale per ogni
+  esplosione, anche di un barile acceso da te: il piano diceva «ogni colpo».
+- **Il morso parte appena il ragnetto arriva**, senza aspettare un altro quarto di secondo.
+- **Il puzzle dello Strike** usa un nemico di 3 di vita, non 2: a 2 di vita lo uccide il colpo a mano gratis, ed è la mossa
+  giusta, così la IA non spendeva la carta.
+- **Il puzzle dell'esca** confronta il valore: nel vicolo cieco il nido vale più del camminare e dell'aspettare. La mossa
+  scelta può essere un Refocus, perché il mazzo del puzzle ha altre carte da portare in mano.
+- **Il valore del nido dopo l'orizzonte** si ferma a 8 battiti, come gli altri dispositivi, non ai suoi 20: con 20 la IA
+  faceva Refocus per riprenderlo persino sotto un fendente.
+- **Regola nuova per la IA:** un Refocus come prima mossa che serve a posare un dispositivo costa fino a 2 punti
+  (`REFOCUS_PRICE`). Girare la mano regala un secondo: prima si fa quello che si può fare subito, come uccidere un nemico.
+  Vale solo per i dispositivi: un prezzo su ogni Refocus faceva perdere 5 di vita nell'arena delle strutture.
+- **Il puzzle della Guardia** ora guarda l'esito: la IA non resta ferma e la freccia non costa vita. Con 9 carte nel mazzo la
+  sua risposta non è più sempre la Guardia: può correre verso l'arciere (da vicino il suo tiro salta) o fare un Refocus che
+  riporta in tempo tutta la mano.
+- **Il puzzle del bruto** ha il fendente annunciato: il nido resta fuori dalle tre caselle. Con un bruto fermo la IA mette
+  il nido anche accanto a lui, di proposito: lo tiene lontano dal Viandante, e i valori sono a meno di 0,1.
+
+**Corretto strada facendo:** i test della IA hanno trovato che la carta non si poteva giocare davvero: mancavano due
+collegamenti in `card.odin` (`card_emplacement_kind` e la casella scelta nell'effetto). Ora c'è un test che gioca la carta
+con le regole vere. La scheda del nemico scrive «SUL NIDO» invece di «ACCENDE».
+
+**Non verificato:** a mano. Aspetto e suono sono provvisori fino alla Fase 10.
 
 ## Fase 10 — Nido di ragni: aspetto e suoni
 

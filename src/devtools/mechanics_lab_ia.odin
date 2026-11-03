@@ -46,7 +46,7 @@ mechanics_lab_ia :: proc(window: ^app.Window, renderer: ^render.Renderer, room: 
 	for _ in 0..<20 { mechanics_lab_smoke_frame(window, renderer, room, controller, cards, buffer, 1.0/60.0) }
 	if len(room.enemies) != 4 { fmt.eprintln("mechanics lab: the IA's arena has", len(room.enemies), "foes, not 4"); return false }
 	id, held := mechanics_lab_hand_card(player, .IA)
-	if !held || player.deck.hand_count != 8 { fmt.eprintln("mechanics lab: the IA's arena has not its eight cards in hand"); return false }
+	if !held || player.deck.hand_count != 9 { fmt.eprintln("mechanics lab: the IA's arena has not its nine cards in hand"); return false }
 	mechanics_lab_still(window, renderer, room, 0, "odin_pp_ia_arena.png")
 	mechanics_lab_still(window, renderer, room, id, "odin_pp_mechanics_lab_card_IA.png")
 

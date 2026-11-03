@@ -392,6 +392,7 @@ play_path :: proc(s: ^Search, path: []Move, horizon: f32, dice: game.Dice_State)
 	// With the defence keys up the world waits for the answer: the first move is the answer.
 	elapsed := reach_root(room, horizon)
 	tempo_note(room, elapsed, horizon)
+	refocused := false
 	for planned, k in path {
 		if room.phase != .Combat || player_dead(room) || !player_free(room) && room.qte.kind == .None || elapsed >= horizon { break }
 		move := planned
@@ -402,11 +403,14 @@ play_path :: proc(s: ^Search, path: []Move, horizon: f32, dice: game.Dice_State)
 			move = resolved
 		}
 		if k == 0 { out.first = describe(room, move) }
+		if k == 0 { refocused = move.kind == .Refocus }
 		if k == 1 { out.second = describe(room, move) }
 		if !play_move(room, move) { out.value, out.result = NO_VALUE, .Refused; return }
 		if k == 0 { out.child = discrete_fingerprint(room) }
 		elapsed += run_after_move(room, elapsed, horizon)
 	}
+	// Turning the hand first to fetch a device gives a beat away: what can be done now, a kill, comes before it.
+	if refocused { try_risk += min(REFOCUS_PRICE, max(objects_value(room)-s.facts.devices, 0)) }
 	// The table keeps what the fast rule's playout gives from here on: the risk and the tempo run so far are this
 	// branch's own.
 	key := state_fingerprint(room) ~ u64(horizon*1000) ~ (u64(elapsed*1000) << 20)

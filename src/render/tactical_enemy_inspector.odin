@@ -73,6 +73,7 @@ draw_tactical_enemy_inspector :: proc(renderer: ^Renderer, room: ^game.Room) {
 	gothic_text_fit(renderer, first, {x, y+38, 192, 20}, 14, GOTHIC_PAPER)
 	gothic_text_fit(renderer, second, {x, y+60, 192, 20}, 14, GOTHIC_MUTED)
 	intent := tactical_intent_label(enemy.intent)
+	if nest, baited := game.object_index_by_id(room, enemy.intent.target_object); baited && room.objects[nest].kind == .Spider_Nest { intent = "SUL NIDO" }
 	if game.enemy_is_staggered(room, enemy) { intent = "STORDITO" }
 	gothic_text_fit(renderer, fmt.ctprintf("%s / %.1fs", intent, game.tactical_enemy_seconds(room, enemy)), {x, y+86, 192, 22}, 18, GOTHIC_BLUE)
 	if renderer.tactical.living {

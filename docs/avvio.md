@@ -151,6 +151,12 @@ controllate: montagna, pattuglia e reliquia), gli atti «rilievi» (il robot nel
 l'ologramma con le curve di livello in tre biomi), «scontro su due livelli» e «edifici»; quest'ultimo: il robot si avvicina a una capanna di
 Robotica cibernetica (6, 4, 2 e 1 casella, soglia, dentro, fuori) e agli oggetti.
 
+Con `ODIN_PP_LAB_ONLY=nido` gira solo l'atto del Nido di ragni ([piano](piano-ia.md), Fase 9), nell'arena «IA»: un muretto
+fra il nido e un nemico fermo, la carta giocata con le regole vere (`odin_pp_nido_00.png`), i ragnetti che lo aggirano e
+mordono (`odin_pp_nido_NN.png`), un inseguitore libero accanto al nido che lo colpisce e gli toglie 3 secondi
+(`odin_pp_nido_struck.png`), il nido che sparisce a zero (`odin_pp_nido_end.png`). Nel laboratorio completo viene per
+ultimo. La scritta del nido e i puntini dei ragnetti sono provvisori fino alla Fase 10.
+
 Il pulsante **Prova meccaniche** del menu (o `--mechanics-lab`) apre una sandbox
 per provare le meccaniche nuove, una alla volta. È un'arena grande 23x17 senza
 ostacoli né nebbia, con il giocatore al centro. Il combattimento non finisce
