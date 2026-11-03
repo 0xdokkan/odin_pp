@@ -13,6 +13,25 @@ Le build degli script finiscono in `build/`, le catture native in
 le modalità di pratica del giocatore in `devtools`: quel package contiene
 strumenti di sviluppo, non schermate o regole del prodotto.
 
+### La carta IA conosce tutto il gioco (regola per sempre)
+
+Dal 3 novembre 2026, per decisione dell'utente ([piano](piano-ia.md), sezione
+«La regola per sempre»): da quando la carta «IA» esiste nel codice, **ogni
+cosa nuova del gioco aggiorna anche la IA**, nello stesso lavoro, su qualunque
+PC e con qualunque IA (Claude, Codex o altre). Conta tutto: carte, effetti,
+stati, nemici, oggetti della griglia, strutture, caselle e terreni, posti e
+biomi della spedizione, nodi della run, oggetti dello zaino, comandi del
+giocatore, regole del combattimento.
+
+Aggiornare la IA vuol dire che la copia di prova copia lo stato nuovo, che la
+IA sa usare la cosa nuova e quanto vale, che il contesto la conosce (cure,
+pericoli, progresso), che almeno un puzzle lo prova e che il registro delle
+carte (o il CHANGELOG) lo dice. Le tabelle della IA hanno una voce per ogni
+elenco del gioco, quindi una voce mancante non compila; i test della IA
+falliscono se la copia resta indietro. Non si aggirano. Le stesse istruzioni,
+per gli agenti, stanno in [AGENTS.md](../AGENTS.md), che leggono Codex e gli
+altri, e in [CLAUDE.md](../CLAUDE.md), che legge Claude Code.
+
 
 ## Odin: appunti per lo sviluppo
 

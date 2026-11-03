@@ -1,15 +1,15 @@
 [← Odin PP](../README.md)
 
-# Piano di lavoro: la carta «IA»
+# Piano di lavoro: la carta «IA», il Nido di ragni e la Regina
 
 Scritto il 3 novembre 2026 sul ramo `piano-ia`, partito da `piano-napoli` (commit `6ea365b`, uguale a
 `origin/piano-napoli`). È lo stato più nuovo del gioco: le carte in prima persona, il succo dei colpi, le frecce
 degli arcieri e le bombe dei bombaroli come proiettili veri, «Benvenuti a Napoli» nel gioco vero. Nessuno di questi
 rami è ancora unito a `main`.
 
-Il documento raccoglie la richiesta dell'utente dello stesso giorno (parola per parola nell'appendice A): una carta
-**«IA»**, cioè intelligenza artificiale. Da quando la giochi, per **30 secondi** ti consiglia sempre **la mossa
-migliore** da fare in quel momento della partita:
+Il documento raccoglie le richieste dell'utente dello stesso giorno (parola per parola nell'appendice A). La prima è
+una carta **«IA»**, cioè intelligenza artificiale. Da quando la giochi, per **30 secondi** ti consiglia sempre **la
+mossa migliore** da fare in quel momento della partita:
 
 1. se è meglio **muoversi**, ti illumina la **casella dove andare**: per evitare nemici e attacchi, o per metterti
    dove poi riesci a colpire, o in una posizione tattica;
@@ -21,11 +21,20 @@ La carta è **sempre in cerca** della mossa migliore. Il gioco è dinamico, quin
 guarda **qualche passo avanti**; e pensa anche al fatto che il giocatore può **non seguire** il consiglio e fare di
 testa sua. È un'intelligenza superiore che ti dice sempre la prossima mossa giusta.
 
+Lo stesso giorno l'utente ha aggiunto al piano **due carte nuove** e **una regola per sempre**:
+- il **Nido di ragni**: lo posi a terra e per 20 secondi fa uscire dei ragnetti intangibili, che corrono dal nemico più
+  vicino, gli danno un morso piccolo e muoiono. I nemici lo possono colpire, e ogni colpo gli toglie dei secondi;
+- la **Regina**: un pezzo degli scacchi che posi sulla griglia e che nessuno può distruggere. Per 20 secondi guarda
+  lungo le sue linee (le mosse della regina degli scacchi) e, appena un nemico ci entra, corre fino a lui e lo colpisce;
+- la **regola per sempre**: da quando la IA esiste, ogni cosa nuova del gioco, fatta da questo PC o da altri, con
+  Claude, con Codex o con un'altra IA, aggiorna anche la IA, così ha sempre tutte le informazioni per trovare la mossa
+  migliore (sezione «La regola per sempre»).
+
 Le fasi si eseguono **una alla volta, solo su comando dell'utente** («Esegui la Fase N»). All'inizio di ogni fase si
 fanno le domande che servono; poi si va avanti da soli fino a fine fase, senza fermarsi a chiedere «passo
 successivo?». Quando serve sapere come si fa una cosa, o come la fa un altro gioco, **si cerca su internet**. Tutto
 si prova prima nel **laboratorio** (PROVA MECCANICHE) e passa al gioco vero solo nell'ultima fase. Grafica e suoni
-fatti da codice. Si sceglie sempre la massima qualità e le prestazioni migliori. Ogni cambio alla carta si annota in
+fatti da codice. Si sceglie sempre la massima qualità e le prestazioni migliori. Ogni cambio a una carta si annota in
 [registro-carte.md](registro-carte.md). Nei **check di ogni fase si prova solo quello che la fase tocca** (i test del
 codice toccato e di chi lo usa, `odin check src -vet -strict-style`, l'atto del laboratorio della carta; il
 benchmark solo se la fase tocca il fotogramma); la **verifica completa** (`scripts/check.ps1`, prova completa del
@@ -46,8 +55,13 @@ Parole del documento:
   non dice, così se fai di testa tua il consiglio nuovo è già pronto.
 - **Battito:** un secondo del mondo; i nemici agiscono sui battiti.
 - **Stato della partita:** quanto manca alla fine della run o della spedizione, e le cure che ci sono vicino.
+- **Nido** e **ragnetti:** l'oggetto a terra del Nido di ragni e i ragnetti che fa uscire.
+- **Linea:** una delle 8 direzioni in cui si muove la regina degli scacchi (in orizzontale, in verticale e in
+  diagonale), lunga quanto la stanza.
 
 ## Decisioni dell'utente (3 novembre 2026)
+
+### La carta IA
 
 | Domanda | Risposta |
 |---|---|
@@ -57,12 +71,12 @@ Parole del documento:
 | Dove parte | **Solo laboratorio** fino all'ultima fase; lì si decide se entra nel gioco vero |
 | Che cos'è la «mossa migliore» | **Equilibrata:** prima non morire, poi non prendere colpi (1 di vita persa pesa come 3 danni fatti), poi uccidere (un nemico ucciso vale come 10 danni), poi la posizione. **Le carte:** se una carta serve per evitare danni o per uccidere più in fretta o fare più danni, la IA non pensa a «sprecarla»; **a parità di danni e di utilità consiglia la mossa senza carta**. **Conta lo stato della partita:** più il giocatore è vicino a finire la run (meno nemici sulla mappa, meno luoghi da visitare), più la IA diventa **leggermente più aggressiva**, perché è più difficile perdere tanta vita e serve meno risparmiare carte e risorse; diventa un po' più aggressiva anche se **vicino c'è una cura**, anche fuori dal combattimento |
 | Cosa sa la IA | **Tutto tranne i risultati dei dadi:** i nemici nella nebbia, le carte che pescherai e il loro ordine, i nemici sulla mappa; i dadi li tratta come incerti |
-| Cosa mette nel calcolo | **Carte in mano e carte che vengono dopo, energia, tempi delle azioni, difesa a tasti, nemici sulla mappa, strutture vicine come la fontana** (per sapere quando essere più aggressiva). **Non** il battito critico: la IA non ti dice di aspettare il tick |
+| Cosa mette nel calcolo | **Carte in mano e carte che vengono dopo, energia, tempi delle azioni, difesa a tasti, nemici sulla mappa, strutture vicine come la fontana** (per sapere quando essere più aggressiva; la fontana oggi non cura, ma la FONTE delle spedizioni sì: vedi sotto). **Non** il battito critico: la IA non ti dice di aspettare il tick |
 | Durante le viste (prima persona, bastone, nonno) | **La IA si ferma coi suoi secondi:** niente consigli; i secondi ripartono quando la vista finisce |
 | Cosa si vede | **La prossima mossa e una parola** breve sopra il Viandante: VAI, SCHIVA, COLPISCI, CARTA, DIFENDI, ASPETTA |
 | Se fai di testa tua | **Ricalcola e avvisa se era pericolosa:** il consiglio nuovo subito e, per mezzo secondo, un **«!» rosso** con la vita che rischi |
 | Colori | **Un colore solo, il ciano, con segni diversi:** impronta per il passo, mirino per il colpo a mano, cornice per la carta e per la sua casella |
-| La fontana | Oggi non cura (vedi «Come funziona oggi»). **La fontana curerà, con una fase di questo piano**; la IA conta **tutte le cure vere**, carte e altre fonti, **tranne la Canna da pesca** |
+| Le cure che conta | **Tutte le cure vere**, carte e altre fonti, **tranne la Canna da pesca** (e quindi anche il «Cibo pescato» che dà) |
 | Film «Mostra effetto» | **Una scena con i tre consigli:** il passo per schivare un colpo annunciato, il colpo a mano, la carta con la sua casella |
 | Suoni | **Da codice:** l'accensione della carta, un «tic» leggerissimo quando il consiglio cambia, un suono breve per l'avviso di pericolo |
 | Icona e sigla | **Un cervello di circuiti** (metà con le pieghe, metà con le piste di circuito), sigla **IA** |
@@ -85,23 +99,106 @@ Note sulle decisioni:
 - **Il battito critico non è nel calcolo.** La ricerca considera «normale» ogni tua azione. Se colpisci sul tick e fai
   una critica, la situazione cambia e la IA ricalcola, come per qualunque altro cambio.
 - **I numeri dei pesi** (3 a 1 per la vita, 10 per un'uccisione, e quanto scendono verso la fine) sono una proposta.
-  Si confermano all'inizio della Fase 2 e della Fase 7, e si ritoccano dopo la prova dell'utente.
+  Si confermano all'inizio della Fase 2 e della Fase 6, e si ritoccano dopo la prova dell'utente.
+
+### Le due carte nuove, la fontana e la regola per sempre
+
+| Domanda | Risposta |
+|---|---|
+| Le carte nuove | **Nido di ragni** e **Regina**, nel piano dopo le fasi di laboratorio della IA (Fasi 9-12) e prima del gioco vero (Fase 13) |
+| Costo e rarità | **Nido di ragni: non comune, 2 energia**, come il Cannone (prezzo 6, peso 70, 40 in spedizione). **Regina: rara, 3 energia**, come il Buco Nero (prezzo 8, peso 60, 60 in spedizione) |
+| Il nido e i nemici | **Un nemico che ha il nido accanto e non ha te accanto lo colpisce:** il nido fa anche un po' da esca. Il nido non ha una vita a numeri: **ogni colpo gli toglie gli stessi secondi**, qualunque colpo e di qualunque nemico; a zero secondi il nido sparisce |
+| I ragnetti | **Camminano attorno ai muri** e attraversano nemici e Viandante (sono intangibili), 4 caselle al secondo; un morso piccolo al nemico più vicino, poi muoiono, senza esplodere |
+| Le linee della Regina | **Si fermano a muri, coperture, oggetti e corpi, come i pezzi degli scacchi:** il primo nemico su una linea è quello che può raggiungere. Fra più nemici arrivati insieme sceglie il più vicino |
+| La Regina e il passo | **Occupa la sua casella**, come un pezzo: chi vuole passare le gira attorno. Nessuno la può colpire né distruggere |
+| Nomi | **«Nido di ragni»** («Nido» da solo si confonderebbe col NIDO dei luoghi delle spedizioni) e **«Regina»** |
+| La fontana | **Niente fase per la fontana.** L'utente l'aveva chiesta pensando che nel gioco non ci fosse nessuna fonte che cura; nelle spedizioni invece la **FONTE** cura già (+16 vita, una volta) e c'è il **Kit di riparazione** (+12). La IA conta loro e tutte le altre cure vere |
+| La regola per sempre | Da quando la IA esiste, **ogni cosa nuova del gioco aggiorna anche la IA**, da questo PC o da altri, con Claude, con Codex o con altre IA. È scritta qui, in [sviluppo.md](sviluppo.md), in `AGENTS.md` (che leggono Codex e gli altri agenti) e in `CLAUDE.md` (che legge Claude Code), e **il codice stesso la controlla** |
+
+### I numeri scelti da Claude (il bilanciamento chiesto dall'utente)
+
+| Cosa | Numero | Perché |
+|---|---|---|
+| Durata del nido | **20 s** del mondo (scelta dell'utente) | — |
+| Ragnetti | il primo **subito**, poi **uno ogni 2 s**: 10 in tutto, se nessuno tocca il nido | un ritmo che si vede bene, un ragnetto ogni due battiti |
+| Morso | **2 danni** (+1 a potenziamento, 2 potenziamenti come il Cannone; sul tick 4, con la stessa regola dei danni critici del Cannone) | «poco danno», quanto un colpo a mano del Viandante nel laboratorio; in tutto circa 20 danni, 1 al secondo, sempre a segno |
+| Secondi tolti a ogni colpo | **3 s** | un inseguitore che colpisce il nido ogni 3 s lo fa durare circa la metà (10 s invece di 20), ma intanto quei colpi non arrivano a te; con due nemici attorno dura circa 7 s |
+| Nidi insieme | al massimo **2**, come i cannoni | — |
+| Durata della Regina | **20 s**: l'idea dell'utente, tenuta | — |
+| Colpo della Regina | **4 danni** (+1 a potenziamento, 2 potenziamenti; sul tick 6) | un inseguitore (12 di vita) cade in 3 colpi |
+| Ritmo della Regina | il primo colpo **appena** un nemico entra in una linea, poi **uno ogni 2 s** | al massimo 10 colpi, 40 danni: 2 al secondo come il Cannone, ma sempre a segno e indistruttibile, per questo è rara e costa 3 energia |
+| Regine insieme | **una** | — |
+| Dove si posano | come il Cannone: una casella libera da 1 a 3 caselle di distanza, in vista | — |
+
+## La regola per sempre: la IA conosce tutto il gioco
+
+Decisa dall'utente il 3 novembre 2026 (le sue parole sono nell'appendice A). Vale **da quando la IA esiste nel
+codice**, per sempre, per qualunque lavoro: fatto su questo PC o su un altro, da Claude, da Codex o da un'altra IA.
+
+> Ogni volta che nel gioco si aggiunge o si cambia qualcosa, si aggiorna anche la IA, così ha sempre tutte le
+> informazioni per trovare la mossa migliore.
+
+**Cosa conta come «cosa nuova del gioco»:** una carta, un effetto, uno stato, un nemico, un oggetto della griglia, una
+struttura, un tipo di casella o di terreno, un posto o un bioma della spedizione, un nodo della mappa della run, un
+oggetto dello zaino, un comando del giocatore, una regola del combattimento.
+
+**Cosa vuol dire «aggiornare la IA»:**
+1. la copia di prova copia anche lo stato nuovo (un campo nuovo della stanza, del giocatore, di un nemico, di un
+   oggetto o del livello);
+2. la IA sa **usare** la cosa nuova: le sue mosse, per esempio una carta coi suoi bersagli buoni, o un comando nuovo;
+3. la IA sa **quanto vale**, anche oltre l'orizzonte: i secondi che restano a un oggetto, uno stato che farà danno
+   dopo, una cura che arriverà;
+4. il **contesto** la conosce: un posto nuovo dice se cura e quanto, se è pericoloso, se conta per il progresso;
+5. almeno **una situazione di prova** (un puzzle) mostra che la IA la usa bene; cose simili possono dividerla;
+6. una riga nel [registro delle carte](registro-carte.md) (o nel CHANGELOG, se non è una carta) dice «IA aggiornata».
+
+**Come il gioco lo controlla da solo**, anche quando chi scrive il codice non ha letto questa regola:
+- **Non compila.** La IA ha una tabella per ogni elenco del gioco:
+  - nel consigliere: carte (`[Card_Id]`), effetti (`Effect_Kind`), stati (`Status_Kind`), nemici
+    (`[Enemy_Archetype]`), oggetti della griglia (`[Grid_Object_Kind]`), strutture (`level.Structure_Id`), caselle
+    (`level.Tile_Kind`);
+  - nel pilota e nel contesto (pacchetto `run`): i comandi del giocatore (`Gameplay_Command_Kind`), i posti delle
+    spedizioni (`Site_Kind`), i nodi della run (`Node_Kind`), i biomi (`campaign.Biome`), gli oggetti dello zaino
+    (`campaign.Item_Kind`).
+
+  In Odin una tabella `[Elenco]Cosa` scritta per intero, o uno `switch` su un elenco senza `#partial`, non compila se
+  manca una voce: è lo stesso trucco che usano già `CARD_DEFINITIONS` e i film di «Mostra effetto». Quindi una carta
+  nuova senza la sua voce nella IA blocca la compilazione.
+- **I test falliscono:**
+  - un test elenca i campi di `Room`, `Player`, `Enemy`, `Grid_Object` e `level.Level` (con `core:reflect`) e fallisce
+    se ne compare uno che la copia non conosce;
+  - il test di equivalenza (copia contro gioco vero, Fase 1) fallisce se una regola nuova fa qualcosa che la copia non
+    rifà uguale;
+  - ogni carta della tabella deve avere il suo puzzle.
+- **Il controllo sul server** (`.github/workflows/check.yml`, a ogni pull request e a ogni push su `main`) fa girare
+  gli stessi controlli, chiunque abbia scritto il codice.
+- **Le istruzioni per gli agenti:** `AGENTS.md` nella cartella del gioco (il formato aperto che leggono Codex, Jules,
+  Cursor, Aider, Zed e altri), `CLAUDE.md` che lo importa (Claude Code legge `CLAUDE.md`, non `AGENTS.md`), e la regola
+  in [sviluppo.md](sviluppo.md).
+
+**Finché la IA non c'è ancora,** ogni fase della IA comincia guardando cosa è stato aggiunto al gioco dal commit di
+partenza (anche dagli altri rami, quando arrivano) e lo mette nelle tabelle. Dagli altri PC la regola arriva quando il
+ramo `piano-ia` va sul server (push solo su richiesta dell'utente) e viene unito; il controllo «non compila» scatta
+comunque nel momento in cui i rami si uniscono.
 
 ## Stato delle fasi
 
 | Fase | Contenuto | Dipende da | Stato | Commit |
 |---|---|---|---|---|
 | 0 | Base: la carta, i suoi secondi, l'arena del laboratorio; punto di partenza | — | Da fare | — |
-| 1 | La copia di prova e il simulatore: provare le mosse senza toccare la stanza vera | 0 | Da fare | — |
-| 2 | La ricerca: passi, colpi a mano, schivate, attesa; i pesi; segni provvisori nel laboratorio | 1 | Da fare | — |
-| 3 | Le carte nella ricerca: mano, energia, mira, pescate future, dadi | 2 | Da fare | — |
+| 1 | La copia di prova e il simulatore; il controllo dei campi (regola per sempre) | 0 | Da fare | — |
+| 2 | La ricerca: passi, colpi a mano, schivate, attesa; i pesi; segni provvisori; le tabelle di comandi e nemici | 1 | Da fare | — |
+| 3 | Le carte nella ricerca: mano, energia, mira, pescate future, dadi; le tabelle di carte, effetti e stati | 2 | Da fare | — |
 | 4 | Il thread: calcolo continuo su un altro core, pensare in anticipo, ricalcolo immediato | 3 | Da fare | — |
 | 5 | Le indicazioni vere: segni ciano, parole, carta e casella, difesa, avviso di pericolo | 4 | Da fare | — |
-| 6 | La fontana che cura (regola nuova, prima nel laboratorio) | 0 | Da fare | — |
-| 7 | Lo stato della partita: progresso, nemici sulla mappa, cure vicine, aggressività | 5, 6 | Da fare | — |
-| 8 | I casi speciali: Ombra, Lazzo, Pinball, Dinosauro, Napoli, piani e ascensori, mappe grandi | 7 | Da fare | — |
-| 9 | Aspetto e suoni: icona, conto alla rovescia, accensione, suoni da codice | 5 | Da fare | — |
-| 10 | Nel gioco vero: «Mostra effetto», offerte, salvataggi, verifica completa, prova con l'utente | 8, 9 | Da fare | — |
+| 6 | Lo stato della partita: progresso, nemici sulla mappa, cure vere, aggressività; le tabelle di posti e zaino | 5 | Da fare | — |
+| 7 | I casi speciali: Ombra, Lazzo, Pinball, Dinosauro, Napoli, piani e ascensori, mappe grandi; le tabelle di oggetti e caselle | 6 | Da fare | — |
+| 8 | Aspetto e suoni della IA: icona, conto alla rovescia, accensione, suoni da codice | 5 | Da fare | — |
+| 9 | Nido di ragni: regole e prototipo nel laboratorio; la IA lo conosce | 7 | Da fare | — |
+| 10 | Nido di ragni: aspetto e suoni | 9 | Da fare | — |
+| 11 | Regina: regole e prototipo nel laboratorio; la IA la conosce | 7 | Da fare | — |
+| 12 | Regina: aspetto e suoni | 11 | Da fare | — |
+| 13 | Nel gioco vero: le tre carte, «Mostra effetto», salvataggi, verifica completa, prova con l'utente | 8, 10, 12 | Da fare | — |
 
 ## Come funziona oggi (punto di partenza)
 
@@ -131,6 +228,10 @@ Note sulle decisioni:
   L'intelligenza dei nemici **non usa numeri a caso**: pianifica in ordine di numero (`enemy_ids_in_planning_order`) su
   un campo di distanze (`rebuild_tactical_enemy_distances`). Dalla stessa situazione, quindi, i nemici fanno sempre la
   stessa cosa.
+- **I nemici contro gli oggetti.** Un'intenzione può mirare a un oggetto invece che al giocatore
+  (`Enemy_Intent.target_object`): oggi lo fa il demolitore coi barili (`plan_tactical_bomber`), e
+  `resolve_enemy_intents` colpisce l'oggetto. Le strutture posate dal giocatore prendono i colpi che passano vicino
+  (`strike_structures`). È la strada per il nido che fa da esca.
 - **La difesa a tasti** (`offer_defense_qte` in [tactical.odin](../src/game/tactical.odin)). Quando un colpo sta per
   prenderti puoi difenderti se hai:
   - uno scudo, per la parata (`Block`, `Parry`);
@@ -160,6 +261,30 @@ Note sulle decisioni:
     spedizione c'è il mana (100).
   - **Il mazzo:** è un array fisso col suo seme (`Deck_State.random_state`), quindi l'ordine delle pescate si può
     sapere.
+- **Gli oggetti che il giocatore posa** ([emplacement.odin](../src/game/emplacement.odin)). Il Cannone e il Buco Nero
+  sono oggetti della griglia (`Grid_Object`) che vivono `life` battiti del mondo e agiscono a ogni battito
+  (`emplacement_beat`, chiamato da `continue_tactical_pulse`), poi spariscono.
+  - Si posano su una casella libera (camminabile, senza copertura, oggetto, trappola o corpo: `emplacement_can_place`),
+    al massimo 2 per tipo (`MAX_CANNONS`, `MAX_BLACK_HOLES`); la carta del Cannone mira una casella da 1 a 3 caselle di
+    distanza, in vista.
+  - Il loro stato sta nei campi dell'oggetto (`life`, `power`, `radius`, `facing`, `laser`); la tabella
+    `GRID_OBJECT_DEFINITIONS` ([grid_object.odin](../src/game/grid_object.odin)) dice cosa ferma: il Cannone ferma i
+    passi ma non la vista, il Buco Nero niente.
+  - Una stanza tiene al massimo 32 oggetti (`MAX_GRID_OBJECTS_PER_ROOM`, 128 byte l'uno), in `room.objects`, una lista
+    fuori dai 9 KB della stanza.
+- **Le cose che si muovono da sole.** Le frecce e le bombe dei nemici volano sui secondi del mondo
+  (`tactical_flight_tick` dentro `tactical_advance_clock`) e il controllore le fa avanzare con dei comandi del mondo
+  (`Enemy_Flight`, `resolve_enemy_flights`); la palla del Pinball rotola allo stesso modo. È la strada per i ragnetti.
+- **Le linee sulla griglia** ([targeting.odin](../src/game/targeting.odin)): `trace_targeting_line` traccia una linea
+  fra due caselle e `targeting_path_blocker` trova la prima cosa che la ferma; il Cannone spara lungo la sua direzione
+  (`cannon_line`). È la strada per le linee della Regina.
+- **I numeri per il bilanciamento:**
+  - i nemici del laboratorio ([sandbox.odin](../src/game/sandbox.odin)): inseguitore 12 di vita (colpo 2), arciere 10
+    (2), bruto 18 (3), bombarolo 12 (2);
+  - il Cannone ([cannon.odin](../src/game/cannon.odin)): 2 danni a battito per 20 battiti sul primo nemico della sua
+    direzione, +1 a potenziamento;
+  - il Buco Nero ([black_hole.odin](../src/game/black_hole.odin)): 4 danni a battito per 8 battiti nei 3×3 attorno;
+  - sul tick, i danni di Cannone e Buco Nero crescono con `critical_damage` (+2, o metà in più se è di più).
 - **I dadi** ([dice.odin](../src/game/dice.odin)): `Dice_State` del giocatore (un seme e il numero di tiri). Il
   laboratorio fissa una faccia cercando un seme che la dà (`mechanics_lab_dice_for_face`).
 - **La stanza** ([room.odin](../src/game/room.odin)). `Room` pesa **9208 byte su 9216** (`size_of(Room) < 9*1024`,
@@ -210,17 +335,21 @@ Note sulle decisioni:
     strutture del laboratorio, e quelle che il Viandante posa col kit dello zaino
     ([player_structures.odin](../src/expedition/player_structures.odin)).
   - Quella posata da lui ha 8 di vita, e i nemici la rompono.
-  - **Non cura e non si usa.**
+  - **Non cura e non si usa.** Nelle spedizioni a curare è un luogo, la FONTE (qui sotto).
 - **Le cure vere di oggi:**
+  - nelle spedizioni, la **FONTE** (`Site_Kind.Spring`): +16 vita, una volta sola
+    ([expedition_scene.odin](../src/run/expedition_scene.odin));
+  - nello zaino della spedizione, il **Kit di riparazione** (`campaign.Item_Kind.Healing`): +12;
   - il Riposo sulla mappa della run (30% della vita massima, `build_rest_node_state`);
   - le cure a terra lasciate dai nemici (`Loot_Kind.Healing`);
   - la tavolata di Napoli;
   - le carte, le reazioni e le reliquie che curano (`heal_effect`);
   - la vita rubata del Dado del destino;
-  - il pesce della Canna da pesca, che la IA **non** conta (scelta dell'utente).
+  - il pesce della Canna da pesca e il «Cibo pescato» dello zaino, che la IA **non** conta (scelta dell'utente).
 - **Quanto manca alla fine.** Nella run c'è la mappa (`Run_Map`: i nodi per profondità fino al boss, `Node_Kind`).
-  Nella spedizione il mondo (`expedition.World`) ha i luoghi (`sites`), i gruppi di nemici sulla mappa (`groups`, con
-  i membri non ancora entrati nello scontro), il boss (`boss_defeated`) e l'estrazione.
+  Nella spedizione il mondo (`expedition.World`) ha i luoghi (`sites`, fra cui la FONTE e i NIDI dei nemici), i gruppi
+  di nemici sulla mappa (`groups`, con i membri non ancora entrati nello scontro), il boss (`boss_defeated`) e
+  l'estrazione.
 - **I thread del gioco.** Ce n'è già uno, quello dei salvataggi della campagna
   ([save_queue.odin](../src/campaign/save_queue.odin), con `core:thread`). Il gioco gira a 60 fotogrammi al secondo con
   la sincronia verticale. Nel benchmark un'immagine costa circa 1,5 ms, cioè circa 650 immagini al secondo senza
@@ -236,7 +365,7 @@ Note sulle decisioni:
 
 ## Come si incastra nel codice (proposta)
 
-- **La carta:** `Card_Id.IA`, nome «IA». Rara, 2 energia, prezzo 8, peso 60, 50 in spedizione
+- **La carta IA:** `Card_Id.IA`, nome «IA». Rara, 2 energia, prezzo 8, peso 60, 50 in spedizione
   (`EXPEDITION_CARD_COSTS`), `Lab_Only` fino all'ultima fase, mira `Self`, fino a 5 potenziamenti. Ha un effetto nuovo,
   `.IA`, con i secondi nell'`amount` (30, +3 a potenziamento, +5 sulla giocata critica), risolto da `resolve_ia_card` in
   [spell.odin](../src/game/spell.odin) come Napoli e il Dinosauro. Un evento nuovo, `IA_Begun`, porta i secondi (per il
@@ -249,13 +378,18 @@ Note sulle decisioni:
   - la copia di prova;
   - il simulatore;
   - la ricerca e la valutazione;
-  - il consiglio (`Advice`: il tipo, la casella, il nemico, la carta, il bersaglio, la difesa, la vita che rischi).
+  - il consiglio (`Advice`: il tipo, la casella, il nemico, la carta, il bersaglio, la difesa, la vita che rischi);
+  - le **tabelle della regola per sempre**: una voce per ogni carta, effetto, stato, nemico, oggetto, struttura e
+    casella del gioco.
 
-  Importa solo `game`, `level` ed `engine/grid` (più `core:thread`, `core:sync` e `core:mem`).
+  Importa solo `game`, `level` ed `engine/grid` (più `core:thread`, `core:sync`, `core:mem` e `core:reflect` nei
+  test).
 - **Il pilota sta nel controllore** (`run/advisor_driver.odin`). A ogni fotogramma:
   - guarda se la situazione è cambiata e, se sì, fa la fotografia per la ricerca;
   - legge l'ultimo consiglio pronto e lo passa al disegno;
   - dice al consigliere quale comando il giocatore ha fatto davvero (serve per l'avviso).
+
+  Ha la tabella dei comandi del giocatore: ogni comando è una mossa della IA, o è escluso col suo motivo.
 - **Il disegno sta in `render/advisor_view.odin`:**
   - i segni ciano sul pavimento, con la stessa tinta del pavimento di `card_range_floor_color`;
   - il mirino;
@@ -263,9 +397,21 @@ Note sulle decisioni:
   - la parola sopra il Viandante;
   - la difesa giusta nel riquadro della difesa a tasti;
   - l'avviso rosso.
-- **Lo stato della partita lo prepara chi lo conosce.** La run (la mappa, i riposi) e la scena della spedizione (i
-  gruppi, i luoghi, le fontane) riempiono un `advisor.Game_Context` e lo danno al pilota. Il consigliere non importa né
-  `run` né `expedition`.
+- **Lo stato della partita lo prepara chi lo conosce** (`run/advisor_context.odin`). La run (la mappa, i riposi) e la
+  scena della spedizione (i gruppi, i luoghi come la FONTE, lo zaino) riempiono un `advisor.Game_Context` e lo danno al
+  pilota; qui stanno le tabelle di posti, nodi, biomi e oggetti dello zaino. Il consigliere non importa né `run` né
+  `expedition`.
+- **Il Nido di ragni:** `Card_Id.Spider_Nest`, nome «Nido di ragni», con un effetto nuovo che posa un oggetto nuovo
+  della griglia, `Grid_Object_Kind.Spider_Nest`, nello stesso modo di Cannone e Buco Nero. Il nido ferma i passi ma non
+  la vista; i secondi che gli restano stanno nel suo `life`. I ragnetti sono oggetti anche loro
+  (`Grid_Object_Kind.Spiderling`), che non fermano niente e nessuno colpisce, e corrono sui secondi del mondo come le
+  frecce. Il nido fa da esca con `target_object`, come i barili per il demolitore. Le regole stanno in
+  `game/spider_nest.odin`.
+- **La Regina:** `Card_Id.Queen`, nome «Regina», con un oggetto nuovo, `Grid_Object_Kind.Queen`, che ferma i passi e
+  che nessuno può colpire. Guarda le sue 8 linee con lo stesso tracciato delle linee delle carte; corsa e colpo sono
+  un'azione d'attacco come la mazzata di Napoli. Le regole stanno in `game/queen.odin`.
+- **I tipi nuovi vanno in fondo agli elenchi** (`Card_Id`, `Grid_Object_Kind`, `Effect_Kind`), così i salvataggi
+  vecchi non cambiano, come per la tavolata di Napoli.
 
 ## Come lavora la ricerca (proposta)
 
@@ -306,13 +452,16 @@ avanza fino al momento giusto, non a passi di 0,25 s) e senza nessuno che guarda
 Alla fine di ogni ramo la ricerca dà un punteggio alla situazione:
 1. **Morto:** è il ramo peggiore di tutti, sempre.
 2. **Vita persa:** −3 punti per ogni punto di vita perso. È una proposta: il peso scende un po' verso la fine della
-   run e vicino a una cura (Fase 7).
+   run e vicino a una cura (Fase 6).
 3. **Danno fatto:** +1 per ogni punto di vita tolto ai nemici; **+10** per ogni nemico ucciso.
 4. **Posizione:** pochi punti per stare fuori dalle caselle che verranno colpite, avere vie di fuga, essere a un passo
    da un nemico debole, non stare in fila con un arciere. È lo stesso principio delle «mappe di influenza» delle IA
    tattiche: una mappa del pericolo che informa la scelta.
 5. **Le carte:** nessun costo se la carta fa evitare danni, uccidere prima o fare più danni. **A pari punteggio vince
    la mossa senza carta**, e poi quella che spende meno energia.
+6. **Quello che dura oltre l'orizzonte:** quello che una cosa farà ancora dopo l'orizzonte conta col suo valore
+   (i ragnetti che deve ancora fare un nido, i colpi che restano alla Regina, il veleno che farà danno): lo dice la
+   tabella di ogni carta e di ogni oggetto.
 
 ### Come resta veloce e continua senza far calare i fotogrammi
 
@@ -404,15 +553,15 @@ Proposta (da confermare all'inizio della fase):
 - **Giocarla di nuovo mentre è attiva:** i secondi **ripartono dal pieno**, non si sommano.
 - **L'arena del laboratorio:** un'arena nuova «IA», 23×17 come quella piatta, con muretti e coperture; dentro un
   inseguitore, un arciere, un bruto e un bombarolo. Il mazzo ha carte comuni da consigliare (per esempio Strike, Guard,
-  Firebomb, Dash, Shove, Arc Bolt, Heavy Blow) più la IA.
+  Firebomb, Dash, Shove, Arc Bolt, Heavy Blow) più la IA; dalle Fasi 9 e 11 anche il Nido di ragni e la Regina.
 - **Il conto alla rovescia provvisorio:** «IA 30» in ciano, nel riquadro dove le viste mostrano i loro secondi.
 - **Sigla e icona provvisorie:** sigla `IA`, icona provvisoria disegnata da codice in una cella libera dell'atlante
-  (quella vera, il cervello di circuiti, è della Fase 9).
+  (quella vera, il cervello di circuiti, è della Fase 8).
 
 Passi:
 1. **Punto di partenza.** Le misure finali di Napoli sono state fatte sullo stesso commit `6ea365b`: 1893 test, 2562
    catture, 165 suoni, 1,535 ms a immagine nel benchmark (circa 650 al secondo), stanza di 9208 byte. Sono il
-   riferimento. Non si rifà la verifica completa, che arriva nella Fase 10 in ordine incrociato col commit di partenza.
+   riferimento. Non si rifà la verifica completa, che arriva nella Fase 13 in ordine incrociato col commit di partenza.
 2. **La carta nel codice:** `Card_Id.IA` e la sua definizione (rara, 2 energia, prezzo 8, peso 60, `Lab_Only`, mira
    `Self`, 5 potenziamenti); l'effetto `.IA`; `resolve_ia_card`; l'evento `IA_Begun`. Poi le tabelle che lo chiedono:
    `EXPEDITION_CARD_COSTS` (50), `CARD_VISUALS`, le descrizioni, i suggerimenti della mano, l'anteprima dei
@@ -464,13 +613,15 @@ Passi:
    `continue_tactical_pulse`, `resolve_enemy_flights`…).
 4. **Test di isolamento:** la stanza vera è uguale byte per byte prima e dopo mille copie e simulazioni (stanza,
    giocatore, nemici, oggetti, livello, pozze); il gioco non ha preso memoria (un allocatore che conta); nel registro
-   vero non è arrivato nessun evento. Un test fallisce se `size_of(Room)` cambia senza che la copia sia stata
-   aggiornata.
-5. **Test di equivalenza** (nel pacchetto dei test `integration`, che vede sia `run` sia il consigliere): 200 partite
+   vero non è arrivato nessun evento.
+5. **Il primo controllo della regola per sempre:** un test elenca con `core:reflect` i campi di `Room`, `Player`,
+   `Enemy`, `Grid_Object` e `level.Level`, li confronta con quelli che la copia conosce, e fallisce se ne compare uno
+   nuovo.
+6. **Test di equivalenza** (nel pacchetto dei test `integration`, che vede sia `run` sia il consigliere): 200 partite
    brevi, con mosse scelte a caso da un seme fisso, giocate due volte: dal gioco vero senza finestra
    (`execute_gameplay_command`) e dalla copia. Dopo ogni mossa le due stanze devono essere uguali.
-6. **Test di determinismo:** la stessa simulazione fatta due volte dà la stessa stanza.
-7. **Misure:** quanto costa una copia e quanto un secondo simulato, nell'arena IA, nell'arena delle strutture e nella
+7. **Test di determinismo:** la stessa simulazione fatta due volte dà la stessa stanza.
+8. **Misure:** quanto costa una copia e quanto un secondo simulato, nell'arena IA, nell'arena delle strutture e nella
    spedizione più grande (224×224); quante simulazioni al secondo fa un core.
 
 Check della fase: `odin check`; i test nuovi del pacchetto `advisor`; i test delle pozze (la fase tocca
@@ -502,21 +653,24 @@ Passi:
 1. L'elenco delle mosse: passi, colpi, schivate, attesa; durante la difesa a tasti, le difese.
 2. La valutazione: morte, vita, danno, uccisioni, posizione, coi pesi.
 3. Profondità crescente, tabella delle situazioni, ordine fisso, regola veloce fino all'orizzonte; budget in nodi.
-4. **Puzzle di prova**, situazioni dove tutto è annunciato come in Into the Breach:
+4. **Le tabelle di comandi e nemici** (regola per sempre): in `run/advisor_driver.odin` uno `switch` su
+   `Gameplay_Command_Kind` (ogni comando è una mossa della IA, o è escluso col suo motivo); nel consigliere una voce
+   per ogni nemico (`[Enemy_Archetype]`: quanto è pericoloso, quanto vale ucciderlo).
+5. **Puzzle di prova**, situazioni dove tutto è annunciato come in Into the Breach:
    - il bruto sta per colpire tre caselle: la IA esce;
    - l'arciere è in fila: la IA esce dalla fila;
    - accanto c'è un nemico a 2 di vita: la IA lo colpisce;
    - due nemici colpiranno la stessa casella: la IA non ci va;
    - un passo salva adesso ma chiude in un angolo: la IA sceglie l'altro (serve guardare avanti).
-5. **Il torneo:** 20 combattimenti fissi dell'arena IA giocati da soli, senza finestra. Il Viandante che segue sempre la
+6. **Il torneo:** 20 combattimenti fissi dell'arena IA giocati da soli, senza finestra. Il Viandante che segue sempre la
    IA gioca contro due avversari:
    - la regola semplice di oggi (`choose_max_distance_command`);
    - un Viandante senza IA, che colpisce sempre il nemico più vicino.
 
    Si contano vita persa, nemici uccisi e tempo. La IA deve perdere molta meno vita: quanta, si fissa all'inizio della
    fase (proposta: almeno un terzo in meno della regola semplice).
-6. **Misure:** nodi al secondo; profondità raggiunta in 1, 10 e 100 ms; costo nel fotogramma.
-7. **Laboratorio:** l'atto `ia` gioca la carta e segue i consigli per 10 s. Catture `odin_pp_ia_step_NN.png` e
+7. **Misure:** nodi al secondo; profondità raggiunta in 1, 10 e 100 ms; costo nel fotogramma.
+8. **Laboratorio:** l'atto `ia` gioca la carta e segue i consigli per 10 s. Catture `odin_pp_ia_step_NN.png` e
    `odin_pp_ia_bump_NN.png`.
 
 Check della fase: i test del pacchetto `advisor`; l'atto `ia`. Il benchmark no: senza la carta la ricerca non gira, e
@@ -542,7 +696,7 @@ Proposta (da confermare all'inizio della fase):
 Domande all'utente all'inizio della fase:
 - **Quanti bersagli per carta.** Proposta: fino a 6, i migliori secondo una stima veloce; tutti se sono di meno.
 - **Le carte che aprono una vista** (prima persona, Napoli con la faccia 1…) **e le carte «lunghe»** (Ombra, Lazzo,
-  Pinball, Dinosauro, Marley). Proposta: la IA le consiglia, ma la loro durata la simula davvero solo dalla Fase 8;
+  Pinball, Dinosauro, Marley). Proposta: la IA le consiglia, ma la loro durata la simula davvero solo dalla Fase 7;
   fino ad allora le valuta con una regola semplice (per esempio «vale come X danni») oppure non le consiglia.
 - **Il riordino della mano** (Refocus, 2 s). Proposta: la IA lo consiglia quando nella mano non c'è niente di utile.
 
@@ -550,14 +704,17 @@ Passi:
 1. L'elenco delle giocate e dei bersagli.
 2. I dadi: le facce e i tiri fissi, con la tabella dei semi per ogni faccia, calcolata una volta all'avvio.
 3. Energia e mana (spedizione), tempo di lancio, pescate.
-4. **Puzzle di prova:**
+4. **Le tabelle di carte, effetti e stati** (regola per sempre): `[Card_Id]Advisor_Card` (come si gioca la carta,
+   quali bersagli provare, quanto vale oltre l'orizzonte, il suo puzzle) e due `switch` senza `#partial` su
+   `Effect_Kind` e `Status_Kind` (quanto vale ogni effetto e ogni stato). Le carte simili possono dividere un puzzle.
+5. **Puzzle di prova:**
    - una Firebomb su tre nemici vicini;
    - una Guard prima del colpo del bruto;
    - nessuna carta quando basta un passo (a pari punteggio);
    - una carta che uccide prima;
    - una carta che arriva con la prossima pescata e che conviene aspettare.
-5. **Torneo con le carte:** lo stesso della Fase 2, col mazzo dell'arena.
-6. **Laboratorio:** catture `odin_pp_ia_card_hint_NN.png`, con la carta illuminata e poi la sua casella quando la tieni.
+6. **Torneo con le carte:** lo stesso della Fase 2, col mazzo dell'arena.
+7. **Laboratorio:** catture `odin_pp_ia_card_hint_NN.png`, con la carta illuminata e poi la sua casella quando la tieni.
 
 Check della fase: i test del pacchetto `advisor`; i test delle carte toccate; l'atto `ia`.
 
@@ -644,42 +801,7 @@ ogni fotogramma).
 
 **Fatto quando:** l'utente approva i segni nel laboratorio.
 
-## Fase 6 — La fontana che cura
-
-**Obiettivo:** la fontana cura il Viandante. È una regola nuova, provata prima nell'arena delle strutture del
-laboratorio; nelle spedizioni la si accende nella Fase 10.
-
-Proposta (tutto da decidere con l'utente all'inizio della fase, dopo aver guardato come fanno altri giochi):
-- **Come si usa:** un passo contro il bordo della fontana, come per la tavolata di Napoli: nessun tasto nuovo, anche
-  durante un combattimento.
-- **Quanto cura.** Due possibilità:
-  - il 30% della vita massima, come il Riposo, una volta sola per fontana;
-  - delle cariche che tornano col tempo, come i pozzi di Diablo II: metà della vita, due cariche, ognuna torna 30 s
-    dopo l'uso.
-- **Quali fontane:** quella fissa del bioma e quella posata col kit. Domanda: anche quella posata, che il giocatore può
-  mettere vicino a sé e che quindi è più forte?
-- **Come si vede che è usata:** l'acqua si abbassa ([structure_diorama.odin](../src/render/structure_diorama.odin)) e
-  torna su quando ricarica.
-- **Dove sta lo stato:** nella struttura posata (`level.Placed_Structure`, accanto a `health`) o nel mondo della
-  spedizione; mai nella stanza, che ha solo 8 byte liberi.
-- **Salvataggio:** la spedizione salva le cariche, insieme alle strutture del mondo (`World.structures`).
-
-Passi:
-1. La regola (un passo contro la fontana per bere), l'evento `Fountain_Drunk`, la cura.
-2. Le cariche e il salvataggio.
-3. Il disegno dell'acqua che scende e risale; il suono, da codice.
-4. **Laboratorio:** l'atto `structures` (l'arena con la fontana): il Viandante ferito beve. Catture
-   `odin_pp_fountain_NN.png`.
-5. **Test:** la cura giusta, mai oltre la vita massima; le cariche; il salvataggio; il passo bloccato come oggi quando
-   la fontana è vuota.
-6. La regola nuova nelle regole del gioco ([meccaniche.md](regole/meccaniche.md)). La IA comincia a contare la
-   fontana nella Fase 7, e la riga nel registro delle carte arriva lì.
-
-Check della fase: i test della fontana e delle strutture toccate; l'atto `structures`.
-
-**Fatto quando:** nell'arena delle strutture la fontana cura come deciso; i test sono verdi.
-
-## Fase 7 — Lo stato della partita
+## Fase 6 — Lo stato della partita
 
 **Obiettivo:** la IA tiene conto di quanto manca alla fine e delle cure vicine, e diventa un po' più aggressiva quando
 se lo può permettere.
@@ -689,36 +811,41 @@ Proposta (numeri da confermare all'inizio della fase):
   - nella run, la profondità del nodo attuale sulla strada del boss e i nodi che restano;
   - nella spedizione, i gruppi di nemici sconfitti sul totale, i luoghi fatti, il boss;
   - nel laboratorio, un tasto per provarlo (0, 50 e 100%).
-- **Le cure vicine:** tutte quelle vere tranne la Canna da pesca:
+- **Le cure vicine:** tutte quelle vere tranne la Canna da pesca (e il Cibo pescato):
   - le carte che curano, in mano e nelle prossime pescate;
   - le cure a terra che si possono raggiungere;
   - la tavolata;
   - il Riposo sul prossimo nodo della run;
-  - le fontane con cariche (dalla Fase 6) entro una certa distanza (proposta: 20 caselle), anche fuori dallo scontro.
+  - nelle spedizioni, la FONTE non ancora usata entro una certa distanza (proposta: 20 caselle), anche fuori dallo
+    scontro, e il Kit di riparazione nello zaino.
 - **L'aggressività:** il peso della vita scende da 3 (inizio della run) a 2 (fine), e di 0,5 in più quando c'è una
   cura vicina, mai sotto 1,5. La morte resta sempre il ramo peggiore.
 - **I nemici sulla mappa:** i membri dei gruppi non ancora entrati nello scontro entrano nella copia come «pericoli
   fermi», cioè come caselle dove li si sveglia. Così la IA non ti porta da loro senza motivo, e li conta in «quanti
   nemici restano».
-- **Chi prepara il contesto:** la run e la scena della spedizione (`advisor.Game_Context`). Il consigliere non importa
-  `run` né `expedition`.
+- **Chi prepara il contesto:** la run e la scena della spedizione (`run/advisor_context.odin`, `advisor.Game_Context`).
+  Il consigliere non importa `run` né `expedition`.
 
 Passi:
 1. `Game_Context` e chi lo riempie: la run, la spedizione, il laboratorio.
 2. I pesi che cambiano col contesto.
 3. I gruppi della spedizione nella copia.
-4. **Puzzle di prova** (coi pesi proposti):
+4. **Le tabelle di posti e zaino** (regola per sempre), in `run/advisor_context.odin`: una voce per ogni luogo della
+   spedizione (`Site_Kind`: la FONTE cura 16 una volta, il NIDO è pericoloso…), per ogni nodo della run (`Node_Kind`),
+   per ogni bioma (`campaign.Biome`) e per ogni oggetto dello zaino (`campaign.Item_Kind`: il Kit cura 12, il Cibo
+   pescato non conta).
+5. **Puzzle di prova** (coi pesi proposti):
    - a inizio run la IA non accetta di perdere 2 di vita per fare 5 danni in più (−6 + 5);
    - a fine run sì (−4 + 5);
-   - a metà run, con una fontana carica vicina, sì anche lì.
-5. **Laboratorio:** il tasto del progresso; catture.
-6. Riga nel registro delle carte: la IA conta lo stato della partita e tutte le cure vere, fontana compresa.
+   - a metà run, con una FONTE non ancora usata vicina, sì anche lì.
+6. **Laboratorio:** il tasto del progresso; catture.
+7. Riga nel registro delle carte: la IA conta lo stato della partita e tutte le cure vere.
 
 Check della fase: i test del pacchetto `advisor` e di chi riempie il contesto; l'atto `ia`.
 
 **Fatto quando:** i puzzle passano; l'utente prova i due estremi (inizio e fine run) nel laboratorio.
 
-## Fase 8 — I casi speciali
+## Fase 7 — I casi speciali
 
 **Obiettivo:** la IA non sbaglia mai nelle situazioni particolari del gioco: o le sa simulare, o sta zitta.
 
@@ -737,17 +864,20 @@ Proposta (da confermare all'inizio della fase):
 
 Passi:
 1. Un puzzle per ogni caso.
-2. Il torneo nelle arene speciali.
-3. Le misure nelle mappe grandi.
-4. **Test «consiglio possibile»:** in mille situazioni a caso il gioco accetta sempre la mossa consigliata.
+2. **Le tabelle di oggetti, strutture e caselle** (regola per sempre): una voce per ogni oggetto della griglia
+   (`[Grid_Object_Kind]`: cosa vale, cosa ferma, quanto dura), per ogni struttura (`level.Structure_Id`) e per ogni
+   tipo di casella (`level.Tile_Kind`).
+3. Il torneo nelle arene speciali.
+4. Le misure nelle mappe grandi.
+5. **Test «consiglio possibile»:** in mille situazioni a caso il gioco accetta sempre la mossa consigliata.
 
 Check della fase: i test del pacchetto `advisor` e dei casi toccati; gli atti del laboratorio dei casi provati.
 
 **Fatto quando:** tutti i casi sono provati; in mille situazioni a caso non c'è nessun consiglio impossibile.
 
-## Fase 9 — Aspetto e suoni
+## Fase 8 — Aspetto e suoni della IA
 
-**Obiettivo:** la carta ha il suo aspetto e i suoi suoni.
+**Obiettivo:** la carta IA ha il suo aspetto e i suoi suoni.
 
 Proposta (da confermare all'inizio della fase):
 - **L'icona:** un cervello di circuiti, metà con le pieghe e metà con le piste di circuito, ciano su fondo scuro; sigla
@@ -772,32 +902,192 @@ Check della fase: i test dei suoni e delle icone; l'atto `ia`.
 
 **Fatto quando:** l'utente approva icona e suoni.
 
-## Fase 10 — Nel gioco vero
+## Fase 9 — Nido di ragni: regole e prototipo; la IA lo conosce
 
-**Obiettivo:** se l'utente lo vuole, la carta e la fontana che cura passano al gioco vero, col film, i salvataggi e la
-verifica completa.
+**Obiettivo:** nel laboratorio il Nido di ragni si posa, fa uscire i ragnetti che mordono, i nemici accanto lo
+colpiscono e gli tolgono secondi; e la IA lo sa usare (prima prova della regola per sempre).
 
-Proposta (da confermare all'inizio della fase):
-- La carta entra nelle offerte, nei negozi e nella collezione come le altre rare (si toglie `Lab_Only`).
-- La fontana cura anche nelle spedizioni.
-- Il film mostra la scena con i tre consigli scelta dall'utente.
+Proposta (i numeri sono il bilanciamento scelto da Claude, da confermare all'inizio della fase):
+- **La carta:** `Card_Id.Spider_Nest`, «Nido di ragni», non comune, 2 energia, prezzo 6, peso 70, 40 in spedizione,
+  `Lab_Only` fino all'ultima fase, 2 potenziamenti. Si posa come il Cannone: una casella libera da 1 a 3 caselle di
+  distanza, in vista. Al massimo 2 nidi insieme.
+- **Il nido** (`Grid_Object_Kind.Spider_Nest`): ferma i passi ma non la vista; dura **20 s** del mondo (il suo `life`,
+  in battiti); a zero secondi sparisce, e così a fine combattimento.
+- **I ragnetti** (`Grid_Object_Kind.Spiderling`):
+  - il primo esce **subito**, poi **uno ogni 2 s** (10 in tutto, se nessuno tocca il nido);
+  - camminano **attorno ai muri**, attraversano nemici e Viandante, **4 caselle al secondo**, sul percorso più breve
+    verso il nemico più vicino (contato in passi, non in linea d'aria);
+  - arrivati al nemico gli danno un **morso di 2** (+1 a potenziamento; sul tick 4, con `critical_damage`), poi
+    muoiono senza esplodere;
+  - se il loro nemico muore prima, vanno dal più vicino; senza nemici aspettano nel nido; dopo 5 s senza arrivare
+    muoiono;
+  - nessuno li può colpire, non fermano nessuno.
+- **I colpi al nido:** ogni colpo di un nemico che lo prende (anche un colpo diretto a te che passa sulla sua casella)
+  gli toglie **3 s**, una volta per colpo, qualunque sia il danno e qualunque sia il nemico.
+- **L'esca:** un nemico che ha il nido accanto e non ha te accanto lo prende di mira (`target_object`), come il
+  demolitore coi barili.
+- **In parole semplici:** se nessuno lo tocca fa circa 20 danni (1 al secondo, sempre a segno); un inseguitore che lo
+  colpisce di continuo lo fa durare circa 10 s, ma intanto non colpisce te.
+
+Domande all'utente all'inizio della fase:
+- **I numeri** qui sopra.
+- **I ragnetti e il terreno:** proposta, le trappole, le pozze e il fuoco non li toccano (sono intangibili).
+- **Sigla e icona provvisorie:** proposta `NDR` e una ragnatela disegnata da codice.
 
 Passi:
-1. **Domanda all'utente:** la carta entra nelle offerte, nei negozi e nella collezione? E la fontana che cura si
-   accende nelle spedizioni?
-2. **Il film di «Mostra effetto»** (`card_demo.odin`): una scena con i tre consigli.
-   - Un nemico annuncia un colpo: la IA segna il passo per schivarlo e il Viandante lo fa.
-   - Poi il mirino sul nemico, e il colpo a mano.
-   - Poi la cornice su una carta e sulla sua casella, e la giocata.
+1. **Le regole** (`game/spider_nest.odin`): la carta, l'effetto, il nido sui battiti, i ragnetti sui secondi del mondo
+   con un comando del mondo come le frecce, il morso come azione d'attacco, i colpi che tolgono secondi, l'esca.
+   Eventi nuovi per la presentazione (il nido posato, il ragnetto che esce, il morso, il colpo al nido, la fine).
+2. **Salvataggio:** la spedizione salva nido e ragnetti come gli altri oggetti; i tipi nuovi in fondo agli elenchi.
+3. **Aspetto provvisorio:** un mucchietto di seta bianca e dei puntini neri che corrono; il conto dei secondi sul nido.
+4. **La IA lo conosce** (regola per sempre):
+   - la voce della carta nella tabella: le caselle da provare (al massimo 6: lontano dai nemici che lo
+     colpirebbero, vicino a dove i ragnetti arrivano presto, o accanto a un nemico da attirare);
+   - il valore oltre l'orizzonte: i ragnetti che restano per il morso, meno quello che i nemici gli toglieranno;
+   - le voci dei due oggetti nuovi;
+   - puzzle: il nido posato dove il bruto non arriva; il nido come esca per sfuggire a un inseguitore; uno Strike invece
+     del nido quando un nemico a 2 di vita si uccide subito.
+5. **Laboratorio:** atto `nido` (`ODIN_PP_LAB_ONLY=nido`) nell'arena IA: posa, ragnetti che girano attorno a un
+   muretto, morsi, un inseguitore che colpisce il nido (−3 s), il nido che finisce. Catture `odin_pp_nido_NN.png`.
+6. **Test:** il ritmo dei ragnetti, il percorso attorno ai muri, il morso coi potenziamenti e sul tick, −3 s a colpo
+   (uno per colpo, anche per un colpo che prende nido e Viandante insieme), la fine a zero, l'esca, al massimo 2 nidi,
+   il salvataggio, la stanza che resta di 9208 byte.
+7. Voce nuova in [registro-carte.md](registro-carte.md): «Carta nuova: Nido di ragni (solo laboratorio)», con «IA
+   aggiornata».
 
-   Il film fa girare la ricerca a pezzi (deterministica) e il Viandante segue il consiglio, con un'azione nuova del
-   film. Il test controlla che si vedano i tre tipi di consiglio.
-3. **Run, spedizione e campagna:** i salvataggi (i secondi della IA stanno nel giocatore, le cariche della fontana nel
-   mondo), il costo in spedizione 50, la vita massima di 32 in spedizione.
-4. **Verifica completa:** `scripts/check.ps1`, la prova completa del laboratorio, il benchmark in ordine incrociato col
+Check della fase: i test della carta e del consigliere; gli atti `nido` e `ia`.
+
+**Fatto quando:** nel laboratorio il nido funziona come deciso e la IA lo usa bene nei suoi puzzle; i test sono verdi.
+
+## Fase 10 — Nido di ragni: aspetto e suoni
+
+**Obiettivo:** il nido e i ragnetti hanno il loro aspetto e i loro suoni.
+
+Proposta (da confermare all'inizio della fase, guardando le catture):
+- **Il nido:** una cupola di seta bianca con le uova e qualche filo teso, nello stile di resina e carta degli altri
+  oggetti; a ogni colpo la seta si strappa un po'; un anello attorno mostra i secondi che restano.
+- **I ragnetti:** piccoli, scuri, con le otto zampe che si muovono a scatti; il morso con un lampo piccolo sul nemico.
+- **L'icona:** una ragnatela con un ragno, in una cella libera dell'atlante.
+- **I suoni, da codice:** la seta che si tende (posa), le zampette (uscita), uno schiocco piccolo (morso), uno strappo
+  (colpo al nido), il nido che si affloscia (fine).
+
+Passi:
+1. Il disegno del nido, dei ragnetti, del morso e dei secondi.
+2. L'icona.
+3. I suoni (`tools/audio/sfx_spider_nest.py`), solo nel laboratorio come gli altri.
+4. Laboratorio: l'atto `nido` controlla catture e suoni.
+
+Check della fase: i test del disegno, dei suoni e delle icone; l'atto `nido`.
+
+**Fatto quando:** l'utente approva aspetto e suoni.
+
+## Fase 11 — Regina: regole e prototipo; la IA la conosce
+
+**Obiettivo:** nel laboratorio la Regina si posa, guarda le sue linee, corre dal primo nemico che ci entra e lo
+colpisce; e la IA la sa usare.
+
+Proposta (i numeri sono il bilanciamento scelto da Claude, da confermare all'inizio della fase):
+- **La carta:** `Card_Id.Queen`, «Regina», rara, 3 energia, prezzo 8, peso 60, 60 in spedizione, `Lab_Only` fino
+  all'ultima fase, 2 potenziamenti. Si posa come il Cannone: una casella libera da 1 a 3 caselle di distanza, in vista.
+  Una sola Regina alla volta.
+- **La Regina** (`Grid_Object_Kind.Queen`): occupa la sua casella e ferma i passi di tutti, come un pezzo; nessuno la
+  può colpire né distruggere; dura **20 s** del mondo, poi sparisce, e così a fine combattimento.
+- **Le linee:** le 8 direzioni della regina degli scacchi, lunghe quanto la stanza; muri, coperture, oggetti e corpi
+  (anche il Viandante) le fermano. Il primo nemico su una linea è quello che può raggiungere.
+- **Il colpo:** appena un nemico è su una delle sue linee e il colpo è pronto, la Regina corre lungo la linea fino alla
+  casella accanto a lui, resta lì e lo colpisce: **4 danni** (+1 a potenziamento; sul tick 6). Poi aspetta **2 s**
+  prima del colpo dopo; se il nemico le è ancora accanto, lo colpisce di nuovo.
+- **Più nemici insieme:** il più vicino, in caselle lungo la linea; a pari distanza un ordine fisso delle direzioni
+  (nord, nord-est, est…), così è sempre lo stesso.
+- **Quando guarda:** alla fine di ogni battito e dopo ogni comando del giocatore, così «appena entra» vale anche per un
+  nemico spinto da una carta.
+- **In parole semplici:** al massimo 10 colpi, 40 danni; un inseguitore cade in 3 colpi.
+
+Domande all'utente all'inizio della fase:
+- **I numeri** qui sopra.
+- **La vista:** proposta, la Regina non ferma la vista (è un pezzo, non un muro), anche se ferma i passi.
+- **Le linee a terra:** proposta, una linea color avorio si accende un attimo sulla strada che sta per fare.
+- **Sigla e icona provvisorie:** proposta `REG` e la sagoma della regina degli scacchi.
+
+Passi:
+1. **Le regole** (`game/queen.odin`): la carta, l'effetto, le 8 linee col tracciato delle linee delle carte, la corsa e
+   il colpo come azione d'attacco, il tempo fra i colpi, la scelta del più vicino. Eventi nuovi per la presentazione
+   (posata, corsa, colpo, fine).
+2. **Salvataggio:** come per il nido.
+3. **Aspetto provvisorio:** una regina degli scacchi semplice; la corsa come una scivolata veloce lungo la linea.
+4. **La IA la conosce** (regola per sempre):
+   - la voce della carta: le caselle da provare (quelle che vedono più nemici sulle loro linee, o che chiudono il
+     corridoio da cui arriva un bruto, mai una che ti chiude la fuga);
+   - il valore oltre l'orizzonte: i colpi che restano, per la probabilità di avere un nemico in linea;
+   - la voce dell'oggetto nuovo: ferma i passi anche a te, e la copia lo sa;
+   - puzzle: la Regina sulla diagonale di due nemici colpisce il più vicino; la Regina che chiude un corridoio; nessuna
+     Regina dove ti chiuderebbe in un angolo.
+5. **Laboratorio:** atto `regina` (`ODIN_PP_LAB_ONLY=regina`) nell'arena IA: un nemico che entra in diagonale, la
+   corsa, il colpo, il più vicino fra due, una linea fermata da un muretto. Catture `odin_pp_regina_NN.png`.
+6. **Test:** le 8 linee e i loro fermi, la corsa fino alla casella accanto, il danno coi potenziamenti e sul tick, i 2 s
+   fra i colpi, il più vicino e l'ordine a pari distanza, la casella occupata (nessuno ci passa), nessuno la colpisce,
+   la fine dopo 20 s, il salvataggio, la stanza che resta di 9208 byte.
+7. Voce nuova in [registro-carte.md](registro-carte.md): «Carta nuova: Regina (solo laboratorio)», con «IA aggiornata».
+
+Check della fase: i test della carta e del consigliere; gli atti `regina` e `ia`.
+
+**Fatto quando:** nel laboratorio la Regina funziona come deciso e la IA la usa bene nei suoi puzzle; i test sono
+verdi.
+
+## Fase 12 — Regina: aspetto e suoni
+
+**Obiettivo:** la Regina ha il suo aspetto e i suoi suoni.
+
+Proposta (da confermare all'inizio della fase, guardando le catture):
+- **La Regina:** un pezzo degli scacchi color avorio, con la corona a punte, nello stile di resina degli altri
+  oggetti; nella corsa lascia una scia lungo la linea; al colpo si inclina come un pezzo che cattura; un anello alla
+  base mostra i secondi che restano.
+- **I colori:** avorio e oro scuro, lontani dal ciano della IA, dal rosso e dall'arancio delle minacce, dal verde delle
+  mosse dei nemici.
+- **L'icona:** la sagoma della regina, in una cella libera dell'atlante.
+- **I suoni, da codice:** il «toc» di un pezzo posato sulla scacchiera, un fruscio veloce che sale (corsa), uno schiocco
+  secco di legno (colpo), il pezzo che cade (fine).
+
+Passi:
+1. Il disegno della Regina, della corsa, del colpo e dei secondi.
+2. L'icona.
+3. I suoni (`tools/audio/sfx_queen.py`), solo nel laboratorio come gli altri.
+4. Laboratorio: l'atto `regina` controlla catture e suoni.
+
+Check della fase: i test del disegno, dei suoni e delle icone; l'atto `regina`.
+
+**Fatto quando:** l'utente approva aspetto e suoni.
+
+## Fase 13 — Nel gioco vero
+
+**Obiettivo:** se l'utente lo vuole, la IA, il Nido di ragni e la Regina passano al gioco vero, coi film, i salvataggi
+e la verifica completa.
+
+Proposta (da confermare all'inizio della fase):
+- Le tre carte entrano nelle offerte, nei negozi e nella collezione (si toglie `Lab_Only`).
+- Ogni carta ha il suo film di «Mostra effetto».
+
+Passi:
+1. **Domanda all'utente:** le tre carte entrano nelle offerte, nei negozi e nella collezione?
+2. **I film di «Mostra effetto»** (`card_demo.odin`):
+   - **IA**, una scena con i tre consigli: un nemico annuncia un colpo, la IA segna il passo per schivarlo e il
+     Viandante lo fa; poi il mirino sul nemico, e il colpo a mano; poi la cornice su una carta e sulla sua casella, e la
+     giocata. Il film fa girare la ricerca a pezzi (deterministica) e il Viandante segue il consiglio, con un'azione
+     nuova del film;
+   - **Nido di ragni:** il nido posato fra il Viandante e due nemici, i ragnetti che mordono, un inseguitore che lo
+     colpisce e i secondi che calano;
+   - **Regina:** la Regina posata, un nemico che entra nella sua diagonale, la corsa e il colpo, poi il secondo nemico.
+
+   I test controllano che ogni film mostri i suoi eventi.
+3. **Run, spedizione e campagna:** i salvataggi (i secondi della IA stanno nel giocatore, nido, ragnetti e Regina sono
+   oggetti); i costi in spedizione (50, 40, 60); la vita massima di 32 in spedizione.
+4. **La regola per sempre:** si controlla che `AGENTS.md`, `CLAUDE.md` e [sviluppo.md](sviluppo.md) dicano ancora il
+   vero, e che le tabelle della IA abbiano tutto quello che il gioco ha in quel momento (anche quello arrivato da altri
+   rami).
+5. **Verifica completa:** `scripts/check.ps1`, la prova completa del laboratorio, il benchmark in ordine incrociato col
    commit di partenza `6ea365b`. Le misure si spiegano in parole semplici.
-5. **Documenti:** le regole ([meccaniche.md](regole/meccaniche.md)), il registro delle carte, il CHANGELOG, il README.
-6. **Partita di prova con l'utente** e ritocco dei pesi.
+6. **Documenti:** le regole ([meccaniche.md](regole/meccaniche.md)), il registro delle carte, il CHANGELOG, il README.
+7. **Partita di prova con l'utente** e ritocco dei pesi e dei numeri delle due carte.
 
 **Fatto quando:** l'utente approva e la verifica completa è verde.
 
@@ -805,14 +1095,23 @@ Passi:
 
 - **La copia che tocca la stanza vera.** È il rischio più grave: basta un puntatore dimenticato e la ricerca cambia il
   gioco vero. Per questo la Fase 1 copia seguendo `destroy_room` (che elenca tutto quello che la stanza possiede), ha i
-  test byte per byte e un allocatore che conta. Ogni campo nuovo della stanza con un puntatore deve finire nella
-  copia: un test fallisce se `size_of(Room)` cambia senza che la copia sia stata aggiornata.
+  test byte per byte, un allocatore che conta e il test dei campi con `core:reflect`, che fallisce quando qualcuno
+  aggiunge un campo che la copia non conosce.
 - **Le cose fuori dalla stanza.** La copia usa le regole vere, quindi una carta nuova è subito nella IA. Ma quello che
   sta fuori dalla stanza, come i gruppi della spedizione o i nemici che arrivano nel laboratorio (`sandbox_tick`), la
-  copia non lo fa muovere. Il test di equivalenza della Fase 1, la Fase 7 e la Fase 8 lo tengono sotto controllo.
+  copia non lo fa muovere. Il test di equivalenza della Fase 1, la Fase 6 e la Fase 7 lo tengono sotto controllo.
+- **La regola per sempre aggirata.** Qualcuno potrebbe «spegnere» un controllo per far compilare (un `#partial`, una
+  voce finta nella tabella). `AGENTS.md` e `CLAUDE.md` lo vietano, e ogni voce della tabella delle carte deve avere un
+  puzzle che passa. Dagli altri PC la regola arriva solo quando il ramo va sul server: fino ad allora vale il controllo
+  del codice al momento di unire i rami.
 - **Il peso della stanza (8 byte liberi).** Lo stato della IA sta nel giocatore e nel consigliere; il contatore delle
-  pozze sta nei 4 byte liberi in fondo a `Ground_State`; le cariche della fontana nella struttura o nel mondo. La
-  stanza resta di 9208 byte.
+  pozze sta nei 4 byte liberi in fondo a `Ground_State`; nido, ragnetti e Regina sono oggetti della lista della stanza,
+  che sta fuori dai 9 KB. La stanza resta di 9208 byte.
+- **Troppi oggetti.** Una stanza tiene 32 oggetti: due nidi con i loro ragnetti (al massimo 2 o 3 vivi a nido) e una
+  Regina ci stanno, ma con tanti barili e trappole il limite si avvicina. Se è pieno, il ragnetto non esce (e il test lo
+  prova).
+- **La Regina che chiude la strada.** Occupa la sua casella e corre accanto ai nemici: può chiudere un corridoio anche
+  al Viandante. Dura 20 s, la IA lo sa (lo prova un puzzle), e il disegno mostra dove sta per andare.
 - **Il thread.** Due thread che toccano la stessa memoria sono il bug più difficile da trovare. Regola fissa: il thread
   non legge mai la stanza vera, solo la fotografia fatta dal gioco; il consiglio torna in un triplo buffer; nel
   fotogramma non ci sono lock. Il calcolo a pezzi resta come riserva.
@@ -899,15 +1198,29 @@ Thread e dati condivisi:
 - [TTripleBuffer (Unreal Engine)](https://dev.epicgames.com/documentation/en-us/unreal-engine/API/Runtime/Core/TTripleBuffer):
   il triplo buffer senza blocchi fra due thread
 
-Fontane che curano (Fase 6):
-- [Shrines and Wells (Maxroll, Diablo II)](https://maxroll.gg/d2/resources/shrines-and-wells): il pozzo ridà metà della
-  vita, ha due cariche e ognuna torna 30 s dopo l'uso
-- [Hades, how to heal (GameSkinny)](https://www.gameskinny.com/tips/hades-how-to-heal-guide/): la fontana nella stanza
-  dopo ogni boss
+Il Nido di ragni e la Regina:
+- [Chess queen (Chess.com)](https://www.chess.com/terms/chess-queen) e
+  [Definition: Chess Queen (ProofWiki)](https://proofwiki.org/wiki/Definition:Chess_Queen): la regina va di quante
+  caselle vuole nelle 8 direzioni e non salta i pezzi
+- [Spiderlings (Dota 2 Wiki)](https://dota2.fandom.com/wiki/Spiderlings) e
+  [Broodmother (Liquipedia)](https://liquipedia.net/dota2/Broodmother): i ragnetti evocati con una vita breve, che
+  corrono sul nemico
+- [Practical Taunt (TV Tropes)](https://www.tvtropes.org/pmwiki/pmwiki.php/Main/PracticalTaunt) e
+  [Decoy (Warframe Wiki)](https://wiki.warframe.com/w/Decoy): l'esca che si prende i colpi al posto del giocatore
 
-## Appendice A — La richiesta dell'utente, parola per parola
+La regola per sempre:
+- [AGENTS.md, il formato aperto per gli agenti (InfoQ)](https://infoq.com/news/2025/08/agents-md/): il file che leggono
+  Codex, Jules, Cursor, Aider, RooCode e Zed
+- [CLAUDE.md e gli import con @ (documentazione di Claude Code)](https://code.claude.com/docs/en/claude-md): Claude Code
+  legge `CLAUDE.md`, non `AGENTS.md`, e può importarlo con `@AGENTS.md`
+- [Make CLAUDE.md Follow AGENTS.md (travis.media)](https://travis.media/blog/claude-md-import-agents-md): lo stesso
+  import, senza collegamenti simbolici (che su Windows chiedono i permessi di amministratore)
+- [Overview, `#partial switch` (Odin)](https://odin-lang.org/docs/overview/): lo `switch` su un elenco che deve avere
+  tutte le voci, salvo `#partial`
 
-La richiesta (3 novembre 2026):
+## Appendice A — Le richieste dell'utente, parola per parola
+
+La prima richiesta (3 novembre 2026):
 
 > Quello che deve fare la carta si chiama IA, che sta per appunto intelligenza artificiale, ed è una carta che per 30
 > secondi ti consiglia la miglior mossa da fare. Mi spiego. Da quando la usi ti appaiono delle indicazioni che ti
@@ -924,7 +1237,7 @@ La richiesta (3 novembre 2026):
 > casistiche. Quello che appunto deve fare la carta è quindi è simulare un'intelligenza superiore che ti consiglia
 > sempre la mossa successiva migliore che puoi fare.
 
-Le risposte scritte dall'utente alle domande:
+Le risposte scritte dall'utente alle prime domande:
 
 > **Mossa migliore:** equilibrata ma se una carta serve per evitare danni o per uccidere più in fretta/fare più danni
 > allora non tiene conto di sprecarla, a parità di danni e utilità, consiglia l'opzione che non prevede l'uso di una
@@ -940,5 +1253,39 @@ Le risposte scritte dall'utente alle domande:
 > **Cosa mette nel calcolo:** carte disponibili in mano, carte che vengono dopo, nemici in mappa, strutture vicine come
 > fontana, così magari può consigliarti di essere più aggressivo; mano ed energia; tempi delle azioni; difesa a tasti
 
-> **La fontana:** far curare la fontana in questo piano ma fai contare alla carta ia tutte le cure vere presenti, sia
-> carte che altre fonti (ad eccezione della canna da pesca)
+> **La fontana (prima risposta):** far curare la fontana in questo piano ma fai contare alla carta ia tutte le cure
+> vere presenti, sia carte che altre fonti (ad eccezione della canna da pesca)
+
+La seconda richiesta (3 novembre 2026):
+
+> Vorrei che nel piano fossero aggiunte anche altre due corte. E vorrei anche un'aggiunta sulle regole generali dello
+> sviluppo da ora in avanti, che comprende il fatto che dopo la creazione della carta IA, ogni volta che viene aggiunto
+> un qualsiasi materiale di gioco all'interno della cartella di lavoro, cioè comunque all'interno del gioco, venga anche
+> richiesto qualsiasi posto aggiuntivo, cioè qualsiasi cosa io faccia fare sia da questo PC che da altri, voglio che
+> venga ricalcolata la funzionalità della carta IA, in modo tale che la carta IA ha sempre tutte le informazioni
+> esistenti per far funzionare il suo funzionamento, cioè quello di dover calcolare tutte le cose migliori sempre. Deve
+> avere sempre tutte le informazioni pronte. Le due carte che voglio aggiungere al piano di lavoro sono la prima e una
+> carta nido che ogni tot secondi fa spawnare dei piccoli ragnetti intangibili che cercano il nemico più vicino e si
+> fanno un effetto kamikaze, cioè non che non devono esplodere, però gli fanno un morso, gli fanno poco danno e poi
+> muoiono in automatico. Questo nido può essere attaccato dai nemici, quindi ha una vita propria. Quando questa vita
+> finisce, l'effetto della carta finisce. E oltre a questo, la carta ha una durata, cioè tu lo piazzi per terra e può
+> spawnare un ragnetto ogni x secondi per un totale di 20 secondi. Dopo 20 secondi la carta piazzata viene distrutta.
+> Se un nemico colpisce la struttura invece di avere una vita effettiva numerica, semplicemente toglie un numero di
+> secondi alla fine della carta. Il numero di secondi che toglie non è dipendente dal danno che gli viene fatto, ma ha
+> un calare di secondi standard per qualsiasi tipo di attacco da qualsiasi tipo di nemico. Questo numero di calo vorrei
+> che lo bilanciassi tu. La seconda carta che vorrei aggiungere invece è un alfiere, come se fosse degli scacchi, che,
+> o anzi meglio una regina, che e si tratta di un oggetto piazzabile sulla griglia, è intangibile dai nemici, ovvero non
+> può essere distrutto, ha un timer di fai 20 secondi, poi magari bilancio tu in base all'effetto della carta, e quello
+> che fa ha un range, cioè una portata di tiro infinita, ovvero per tutta l'area di combattimento della griglia, e
+> appena un nemico entra in gittata di tiro, la regina corre come se fosse per la traiettoria e avvicina il nemico
+> piazzandosi fianco a lui e lo colpisce facendogli un X di danno, valore che devi bilanciare tu. Se più nemici entrano
+> contemporaneamente nella sua area di tiro, va da quello più vicino. per La sua area di tiro prende la griglia come se
+> fosse una schacchiera e l'area di tiro è definibile dalle mosse della regina desgli scacchi, in sostanza può muoversi
+> come lei.
+
+Le risposte scritte dall'utente alle seconde domande:
+
+> **La fontana (dopo aver saputo della FONTE):** Tolgo la fase della fontana
+
+> **Dove scrivere la regola per sempre:** documenti, un CLAUDE.md e qualcosa che intervenga anche in caso di uso di
+> altre IA come codex
