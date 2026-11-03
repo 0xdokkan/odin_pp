@@ -99,6 +99,7 @@ i nemici. Le spedizioni già salvate mantengono la loro geografia originale.
 | [Piano del combattimento vivo](docs/piano-succo.md) | concluso il 2 novembre 2026: succo dei colpi (pausa sull'impatto, scossa, scintille), frecce degli arcieri e bombe dei bombaroli come proiettili veri |
 | [Piano della prima persona](docs/piano-prima-persona.md) | tre carte in prima persona sul modello dell'AK, nel laboratorio: First Person Brawler (pugni), Fencer (zweihänder), Archer (arco compound); tutte le fasi fatte (0-8) |
 | [Piano di «Benvenuti a Napoli»](docs/piano-napoli.md) | carta nuova col D4: bastone in terza persona, tavolata e borsellino del nonno, un minuto da nonno; Fasi 0-7 fatte (la carta col D4 nel laboratorio; tavolata e borsellino del nonno; il bastone in terza persona; schiacciamento, succo e stelline; un minuto da nonno; asso, Viandante e nonno al mare in 3D; suoni CC0 e tarantella; nel gioco vero), manca la partita di prova |
+| [Piano della carta «IA»](docs/piano-ia.md) | carta nuova: per 30 secondi una ricerca su un thread a parte consiglia sempre la mossa migliore (passo, colpo a mano, carta e sua casella, difesa) e avvisa se fai di testa tua; la fontana che cura; fasi 0-10 da eseguire una alla volta, nessuna fatta |
 | [Cronologia](CHANGELOG.md) | milestone e refactor precedenti; le note storiche non definiscono le regole attuali |
 
 ## Sviluppo
